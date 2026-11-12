@@ -1,11 +1,8 @@
-import { execFileSync } from "node:child_process";
-import { join, resolve } from "node:path";
+import { resolve } from "node:path";
 import { test as base, expect, type Page } from "@playwright/test";
 
 /** The local server's state folder (playwright.config.ts: a fresh temp folder each run, unless E2E_KEEP_STATE=1). */
 export const E2E_STATE = resolve(process.env.E2E_STATE_DIR || ".wrangler/state");
-/** Its local D1 databases (sqlite files), for the specs that read them. */
-export const D1_DIR = join(E2E_STATE, "v3/d1/miniflare-D1DatabaseObject");
 
 /**
  * Playwright's `test`, plus: every browser context a test opens itself (`browser.newContext()`, e.g. a second
@@ -34,7 +31,30 @@ async function markSeen(context: import("@playwright/test").BrowserContext) {
 /** Whether contexts made now start with the walkthrough seen (set per test from the `tutorialSeen` option, below). */
 let seenDefault = true;
 
-export const test = base.extend<{ closeOwnContexts: void; tutorialSeen: boolean; seenWalkthrough: void }>({
+/**
+ * The quests overlay's "shown today" key (packages/app/src/quests.ts, QUESTS_SEEN_KEY; Nov 9, phase 3): a signed-in account's first
+ * home visit of the day opens it over home, which would block a signed-in test's clicks, so each context starts with it set past any
+ * day. The same for its opening by itself back on home after a game that moved a quest (QUESTS_NO_POP_KEY, Nov 10). A test of
+ * either sets `test.use({ questsSeen: false })`.
+ */
+const QUESTS_SEEN_KEY = "hunchess.quests.seenDay";
+const QUESTS_NO_POP_KEY = "hunchess.quests.noPop";
+async function markQuestsSeen(context: import("@playwright/test").BrowserContext) {
+  await context.addInitScript(
+    ([k, off]: string[]) => {
+      try {
+        if (!localStorage.getItem(k!)) localStorage.setItem(k!, "9999999999999");
+        localStorage.setItem(off!, "1");
+      } catch {
+        /* no storage: the overlay may show over home */
+      }
+    },
+    [QUESTS_SEEN_KEY, QUESTS_NO_POP_KEY],
+  );
+}
+let questsSeenDefault = true;
+
+export const test = base.extend<{ closeOwnContexts: void; tutorialSeen: boolean; seenWalkthrough: void; questsSeen: boolean; questsSeenForTest: void; seenQuests: void }>({
   tutorialSeen: [true, { option: true }],
   // Sets the default for this test's contexts, then puts it back.
   seenDefaultForTest: [
@@ -45,10 +65,27 @@ export const test = base.extend<{ closeOwnContexts: void; tutorialSeen: boolean;
     },
     { auto: true },
   ],
+  questsSeen: [true, { option: true }],
+  questsSeenForTest: [
+    async ({ questsSeen }, use) => {
+      questsSeenDefault = questsSeen;
+      await use();
+      questsSeenDefault = true;
+    },
+    { auto: true },
+  ],
   // The page's own context (every page it opens, and every reload, keeps what the page saved).
   seenWalkthrough: [
-    async ({ context, tutorialSeen }, use) => {
+    async ({ context, tutorialSeen, questsSeenForTest: _ }, use) => {
       if (tutorialSeen) await markSeen(context);
+      await use();
+    },
+    { auto: true },
+  ],
+  // (After both defaults are set: the context is made by the first fixture that asks for it, with the defaults then in force.)
+  seenQuests: [
+    async ({ context, questsSeen, questsSeenForTest: _ }, use) => {
+      if (questsSeen) await markQuestsSeen(context);
       await use();
     },
     { auto: true },
@@ -60,6 +97,7 @@ export const test = base.extend<{ closeOwnContexts: void; tutorialSeen: boolean;
       browser.newContext = (async (options?: Parameters<typeof real>[0]) => {
         const ctx = await real(options);
         if (seenDefault) await markSeen(ctx);
+        if (questsSeenDefault) await markQuestsSeen(ctx);
         return ctx;
       }) as typeof browser.newContext;
       await use(browser);
@@ -150,6 +188,15 @@ export async function soundOff(page: Page) {
 }
 
 /**
+ * Out of a 50 v 50 or Squads lobby for good (Nov 10: its Exit, with "Keep me in the queue" unchecked; checked, Exit keeps you
+ * queued while you browse: search-home.spec.ts). The unchecked box is remembered on the device, as a player's is.
+ */
+export async function leaveQueue(page: Page) {
+  await page.getByRole("checkbox", { name: "Keep me in the queue" }).uncheck();
+  await page.getByRole("button", { name: "Exit", exact: true }).click();
+}
+
+/**
  * Home's RANKED row: tap `mode` ("50 v 50", "1 v 1", "Squads", "Classic"), or with none, 50 v 50 unless a mode is
  * picked already (by ?mode= or an earlier tap). Home opens with nothing picked and PLAY dimmed (Eric, Oct 18).
  */
@@ -161,28 +208,47 @@ export async function pickMode(page: Page, mode?: string) {
   if (await page.locator(".fd-mode-panel.idle").count()) await row.getByRole("radio", { name: /^50 v 50/ }).click();
 }
 
-/** Home → Matchmaking: Solo → PLAY (in the mode the URL or the picker chose, else 50 v 50): you and bots, after the seats fill. */
+/**
+ * Home → 50 v 50's Bots → PLAY → the Bot level box's OK (in the mode the URL or the picker chose, else 50 v 50): you and bots, after
+ * the seats fill. The box keeps this device's last pick; with none, Medium (the bots of before Nov 9).
+ */
 export async function soloFromHome(page: Page) {
   await pickMode(page);
-  await page.getByRole("radio", { name: /^Solo/ }).click();
+  await page.getByRole("radiogroup", { name: "Matchmaking" }).getByRole("radio", { name: /^Bots/ }).click();
   await page.getByRole("button", { name: "PLAY", exact: true }).click();
+  await startBotLevel(page);
 }
 
-/** Play with friends' sheet: a phone's Friends in home's top bar, a computer's side menu (Eric, Oct 18). */
+/** The Bot level box (PLAY with Bots): its OK, picking Medium first when nothing is picked. */
+export async function startBotLevel(page: Page) {
+  const box = page.getByRole("dialog", { name: "Bot level" });
+  await box.waitFor();
+  const ok = box.getByRole("button", { name: "OK", exact: true });
+  if (await ok.isDisabled()) await box.getByRole("radio", { name: /^Medium/ }).click();
+  await ok.click();
+}
+
+/**
+ * Play with friends' sheet: a phone's Friends in home's top bar, then the friends page's "Private lobby: make one or join with a
+ * code" (Nov 11; the pop-up's "Private lobby ›" before), a computer's side menu (Eric, Oct 18).
+ */
 export async function openPlayWithFriends(page: Page) {
   // (A computer's frame from 1024 px: phones and tablets have home's top bar.)
-  if ((page.viewportSize()?.width ?? 0) < 1024) await page.locator(".fd-top").getByRole("button", { name: /^Friends/ }).click();
-  else await page.getByRole("navigation", { name: "Menu" }).getByRole("button", { name: "Play with friends" }).click();
+  if ((page.viewportSize()?.width ?? 0) < 1024) {
+    await page.locator(".fd-top").getByRole("button", { name: /^Friends/ }).click();
+    await page.getByRole("button", { name: "Private lobby: make one or join with a code" }).click();
+  } else await page.getByRole("navigation", { name: "Menu" }).getByRole("button", { name: "Play with friends" }).click();
   await page.getByRole("dialog", { name: /Play with friends|Join lobby/ }).waitFor();
 }
 
-/** Home → Play with friends → Get friend code (a lobby, its link copied), or Create a raid on the Boss raid screen. */
+/** Home → Play with friends → Get friend code (a lobby, its link copied), or Create a Boss Battle on the full Boss Battle screen. */
 export async function createLobbyFromHome(page: Page) {
-  const raidScreen = page.getByRole("heading", { name: "Boss raid", exact: true });
+  // (The full screen's own button: since Nov 10 both Boss Battle screens share their heading.)
+  const raidScreen = page.getByRole("main").getByRole("button", { name: /^Join a Boss Battle/ });
   await page.getByRole("button", { name: "PLAY", exact: true }).or(raidScreen).first().waitFor();
   if (await raidScreen.isVisible()) await page.getByRole("main").getByRole("button", { name: /^Play with friends/ }).click();
   else await openPlayWithFriends(page);
-  await page.getByRole("button", { name: /^(Get friend code|Get a Classic friend code|Create a raid)$/ }).click();
+  await page.getByRole("button", { name: /^(Get friend code|Get a Classic friend code|Create a Boss Battle)$/ }).click();
 }
 
 /** An invite link opens the join form with the code filled in. */
@@ -393,10 +459,8 @@ export async function asAdmin(page: Page) {
  * One a file: putting an address on this account takes it off any other (withEmail), so two files running side by side
  * with one address left the first a guest halfway through ("Sign in to chat with other players." on a Report, Oct 30).
  * A new spec file that makes an admin needs its line in ADMINS. Reloads nothing: the server reads it at once.
- * The local database is one SQLite file that the running server writes to as well (presence, live lobbies), and this
- * second process gets "database is locked: SQLITE_BUSY" while a write of the server's is under way: then it waits a
- * moment and asks again, as SQLite's own busy wait would (wrangler's command has none). Any other error fails the test,
- * with its message (docs/decisions/2026-10-15-flaky-e2e-batch.md). Answers the account's id.
+ * The write goes through the server's own database (localSql), so it never locks the server out; an error fails the test, with its
+ * message. Answers the account's id.
  */
 export async function asServerAdmin(page: Page, who: "ops" | "chat" = "ops") {
   const file = test.info().file.split(/[\\/]/).pop()!.replace(/\.spec\.ts$/, "");
@@ -433,18 +497,23 @@ async function withEmail(page: Page, email: string) {
   return id;
 }
 
-/** Runs `sql` on the local database (waiting out the server's own writes: SQLITE_BUSY, as `asServerAdmin` says). */
-async function localSql(page: Page, sql: string) {
-  for (let attempt = 1; ; attempt++) {
-    try {
-      execFileSync("npx", ["wrangler", "d1", "execute", "hunchess", "--local", "--persist-to", E2E_STATE, "--command", sql], { stdio: "pipe" });
-      return;
-    } catch (e) {
-      const why = String((e as { stderr?: unknown }).stderr ?? e);
-      if (!why.includes("SQLITE_BUSY") || attempt >= 10) throw new Error(`d1 execute failed (attempt ${attempt}): ${why.slice(-500)}`);
-      await page.waitForTimeout(300);
-    }
-  }
+/**
+ * The town's first frame drawn (its canvas's `data-ready`), within 20 s: as town.spec.ts and town-street.spec.ts wait. That first frame
+ * paints every house and boss sprite on the page's own thread (Town.tsx, startTown): about 1 s on a phone, 2 to 3 s on a busy CI
+ * runner, and past 5 s (the default wait) on a cold one (main run 42768777492, town-afk; colosseum, shop). Nov 10.
+ */
+// (40 s: the street town's loading screen paints and uploads every picture before its first frame, Nov 11: about 5 s more.)
+export const townReady = (page: Page) => expect(page.locator("canvas.town-canvas")).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
+
+/**
+ * Runs `sql` on the local database, through the server's own D1 (`POST /api/e2e/sql`, server/src/e2e-sql.ts; the e2e's local server
+ * only). Answers the last statement's rows. (Not `wrangler d1 execute --local` beside the server any more: while that second process
+ * held the file's lock, a request on the server failed with SQLITE_BUSY, a 500 in whatever test was open. Nov 10.)
+ */
+export async function localSql<T = Record<string, unknown>>(page: Page, sql: string, ...params: (string | number)[]): Promise<T[]> {
+  const res = await page.request.post("/api/e2e/sql", { data: { sql, ...(params.length ? { params } : {}) }, headers: { "x-e2e-sql": process.env.E2E_SQL_KEY ?? "" } });
+  if (!res.ok()) throw new Error(`local sql failed (${res.status()}): ${(await res.text()).slice(0, 500)}\n${sql}`);
+  return ((await res.json()) as { rows: T[] }).rows;
 }
 
 /**
@@ -458,6 +527,20 @@ export async function giveItems(page: Page, items: readonly { def: string; color
   const rows = items.map((it, i) => `('${ids[i]}', '${user}', '${it.def}', '${it.color}', ${it.blemish ?? 20}, ${it.seed ?? 7 + i}, 'e2e', 0)`);
   await localSql(page, `INSERT INTO items (id, user_id, def, color, blemish, seed, crate, created_at) VALUES ${rows.join(", ")}`);
   return ids;
+}
+
+/**
+ * Gives this page's account `n` crates of a series (`crate`: "winter-1", "beta-001") and `keys` crate keys straight in the local
+ * database (Nov 9, XP phase 2: a series crate takes one you hold and a key to open), as `giveItems` gives items. Reload, or let the
+ * Crates tab load, for the app to see them. (No ledger rows: the local database's ledger check isn't run in tests.)
+ */
+export async function giveCrates(page: Page, crate: string, n: number, keys = n) {
+  const user = await pageAccountId(page);
+  await localSql(
+    page,
+    `INSERT INTO series_crates (user_id, crate, n) VALUES ('${user}', '${crate}', ${n}) ON CONFLICT (user_id, crate) DO UPDATE SET n = n + excluded.n; ` +
+      `INSERT INTO wallets (user_id, crate_keys) VALUES ('${user}', ${keys}) ON CONFLICT (user_id) DO UPDATE SET crate_keys = crate_keys + excluded.crate_keys`,
+  );
 }
 
 /**
@@ -486,7 +569,8 @@ export async function openBossRaid(page: Page) {
   const to = new URL(page.url());
   to.searchParams.set("mode", "raid");
   await page.goto(`${to.pathname}${to.search}`);
-  await expect(page.getByRole("heading", { name: "Boss raid", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Boss Battle", exact: true })).toBeVisible();
+  await expect(page.getByRole("main").getByRole("button", { name: /^Join a Boss Battle/ })).toBeVisible();
 }
 
 /** Home → Boss Battle's card → its screen: the tiles, the stage and START (Eric, Oct 26; renamed Oct 29). */

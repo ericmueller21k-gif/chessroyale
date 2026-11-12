@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { BOSS_BRAIN, BOSS_DIFFICULTY, BOSS_POWERS, BOSS_ROSTER, BOSS_TIERS, CROWD_KNOCKOUTS, CROWD_START, DEFAULT_SETTINGS, LEAVING, RANKED_1V1, RECLUSE_PHASE2, crowdFinalBoss, crowdFinalists, fixedLevel, isPlayable, lastStandBar, maiaRatingFor, maiaTopRating } from "@chessroyale/core";
-import { BOSS_BLOCKS, FAQ_DEFAULTS, eloExpected, faqAnchors, faqPage, faqPlainText, faqSections, ranked1v1, type FaqSources } from "../src/faq/content.ts";
+import { BOSS_BRAIN, BOSS_DIFFICULTY, BOSS_POWERS, BOSS_ROSTER, BOSS_TIERS, CROWD_KNOCKOUTS, CROWD_START, DEFAULT_SETTINGS, LEAVES, LEAVING, RANKED_1V1, RECLUSE_PHASE2, crowdFinalBoss, crowdFinalists, fixedLevel, isPlayable, lastStandBar, maiaRatingFor, maiaTopRating } from "@chessroyale/core";
+import { BOSS_BLOCKS, FAQ_DEFAULTS, eloExpected, faqAnchors, faqPage, faqPlainText, faqSections, ranked1v1, rankedLeaving, type FaqSources } from "../src/faq/content.ts";
 import { inlineText, linksOf, parse, plainText } from "../src/faq/markdown.ts";
 
 /** The FAQ's text, built from these sources. */
@@ -16,8 +16,12 @@ describe("the FAQ's contents", () => {
   const page = faqPage();
   const anchors = faqAnchors(page);
 
+  it("no section carries a merge's conflict markers (Nov 9: a merge left them in the XP section, inside the text)", () => {
+    expect(JSON.stringify(page.sections)).not.toMatch(/(^|\\n)(<<<<<<<|=======|>>>>>>>)( |\\n|$)/);
+  });
+
   it("has every section the brief lists, in order", () => {
-    expect(page.toc.map((t) => t.id)).toEqual(["modes", "scoring", "boss-brain", "boss-powers", "god-king", "crates", "fair-play", "privacy", "credits"]);
+    expect(page.toc.map((t) => t.id)).toEqual(["modes", "scoring", "boss-brain", "boss-powers", "god-king", "xp", "crates", "fair-play", "privacy", "credits"]);
   });
 
   it("every table-of-contents entry has a matching section, and every sub-entry a heading in it", () => {
@@ -457,13 +461,48 @@ describe("the FAQ's numbers come from the settings", () => {
     expect(moved).toContain("for 5 tokens of that boss, or 2 tokens and 1 crate key");
   });
 
+  it("XP and levels (Nov 9), from the settings: a level's XP, a game's, the move minimum, each \"No XP\" reason, the caps", () => {
+    const t = section("xp");
+    expect(t).toContain("Each level takes 1,000 XP, the same for every level, with no top level. You start at Level 1.");
+    expect(t).toContain("more for a longer game, plus 50 XP for a win. A game earns at most 350 XP.");
+    expect(t).toContain("(1,200 XP a day before win bonuses)");
+    expect(t).toContain("A game counts from your 10th move.");
+    expect(t).toContain('"No XP: the game ended before move 10."');
+    expect(t).toContain('"No XP: you resigned before move 10."');
+    expect(t).toContain("if you left the match");
+    expect(t).toContain("sign in to earn XP");
+    expect(t).toContain("5 wins a day");
+    expect(t).toContain("08:00 UTC (midnight Pacific)");
+    const moved = section("xp", { ...FAQ_DEFAULTS, xp: { ...FAQ_DEFAULTS.xp, perLevel: 1500, perMinute: 12, maxMinutes: 25, win: 40, minMoves: 8, soloWinsPerDay: 3 } });
+    expect(moved).toContain("Each level takes 1,500 XP");
+    expect(moved).toContain("more for a longer game, plus 40 XP for a win. A game earns at most 340 XP.");
+    // (No minutes and no per-minute numbers, Eric, Nov 9: "we dont want players to know they could just stall".)
+    for (const x of [t, moved]) {
+      expect(x).not.toMatch(/\bminutes?\b|\bmin\b|per minute|a minute/i);
+    }
+    expect(moved).toContain("from your 8th move");
+    expect(moved).toContain("3 wins a day");
+  });
+
+  it("quests (Nov 9, phase 3), from the settings: how many, the rewards, the carry-over, the reroll, the reset", () => {
+    const t = section("xp");
+    expect(t).toContain("you get 2 daily quests each day and 1 weekly quest each week");
+    expect(t).toContain("a daily quest gives +300 XP (some also a crate); the weekly quest gives +1,500 XP, 1 crate and 1 crate key");
+    expect(t).toContain("Unfinished dailies stay, up to 3 waiting");
+    expect(t).toContain("One free reroll a day for each daily");
+    const q = section("xp", { ...FAQ_DEFAULTS, quests: { ...FAQ_DEFAULTS.quests, dailyPerDay: 3, maxDailies: 5, weekly: [{ ...FAQ_DEFAULTS.quests.weekly[0]!, xp: 2000, keys: 2 }] } });
+    expect(q).toContain("you get 3 daily quests each day");
+    expect(q).toContain("up to 5 waiting");
+    expect(q).toContain("the weekly quest gives +2,000 XP, 1 crate and 2 crate keys");
+  });
+
   it("the clock vote's time controls, the default, and a raid's clock", () => {
     const t = section("modes");
     expect(t).toContain("Bullet 3+2 (3 minutes, +2 s a move, at most 10 s on a move), Blitz 5+3 (5 minutes, +3 s a move, at most 15 s on a move) or Rapid 10+5 (10 minutes, +5 s a move, at most 20 s on a move)");
     expect(t).toContain("Nobody voting means Blitz 5+3.");
     expect(t).toContain("as on a chess clock");
-    // (A boss raid's clock by its name, as the vote names it.)
-    expect(t).toContain("A boss raid is Rapid 10+5.");
+    // (A group Boss Battle's clock by its name, as the vote names it.)
+    expect(t).toContain("A group Boss Battle is Rapid 10+5.");
     expect(t).not.toMatch(/Variable|Normal \(/);
     // Changed time controls (and a changed default) change the words.
     const V = FAQ_DEFAULTS.clockVote;
@@ -500,7 +539,7 @@ describe("the FAQ on the Crowd's boss final (Eric, Oct 14: always the Hidden Bos
     expect(t).toContain(`a boss final (the top ${crowdFinalists("boss")} team up against the ${him.name})`);
     expect(t).toContain(`The Crowd's boss final is always the ${him.name}, for the last ${crowdFinalists("boss")} of a 50 v 50.`);
     // No strikes in the Crowd's final: the strike line is the raid's only.
-    expect(t).toContain("until half the raid is left.");
+    expect(t).toContain("until half the group is left.");
     // Other knockouts, another name: the words follow.
     const renamed = BOSS_ROSTER.map(({ the: _, ...b }) => (b.id === him.id ? { ...b, name: "A Powerful Foe" } : b));
     const moved = section("modes", { ...FAQ_DEFAULTS, roster: renamed, crowdKnockouts: { ...CROWD_KNOCKOUTS, boss: CROWD_KNOCKOUTS.team } });
@@ -713,9 +752,9 @@ describe("the FAQ: 1 v 1", () => {
 describe("the FAQ's chat entry (the town square's typed chat, Oct 28; the global chat's, Nov 7)", () => {
   it("says what typed chat allows, from the settings, that it's off until turned on, and that a reported town message is kept", () => {
     const s = section("fair-play");
-    expect(s).toContain("Chat is typed in the global chat (a computer's right column) and the town square; matches and lobbies use preset lines and emoji.");
-    expect(s).toContain("The global chat is off until you turn it on");
-    expect(s).toContain("up to 80 characters, one message every 5 seconds in the global chat (15 in the town square)");
+    expect(s).toContain("Chat is typed in the global chat (a computer's right column), the town square, and match and lobby chat once you turn chat on");
+    expect(s).toContain("Chat is off until you turn it on");
+    expect(s).toContain("up to 80 characters, one message every 5 seconds in the global chat and in matches (15 in the town square)");
     expect(s).toContain("a device that answered the age question \"too young\" keeps the preset lines");
     expect(s).toContain("if someone reports a town square message, the report keeps its words and when it was said, for a moderator to read");
     expect(s).toContain("tap a message in the town square to report it");
@@ -724,7 +763,34 @@ describe("the FAQ's chat entry (the town square's typed chat, Oct 28; the global
 
 describe("the FAQ's rating entry (Eric, Oct 28)", () => {
   it("Your rating says when your ranking changes, from the settings: 30 real players (15 in a raid), or the share's own counts (the sentence home's ⓘ carried until Oct 28)", () => {
-    expect(text()).toContain("Your ranking changes only in a match with at least 30 real players (15 in a raid). Solo games never change it.");
-    expect(text({ ...FAQ_DEFAULTS, rankedShare: 0.2 })).toContain("Your ranking changes only in a match with at least 20 real players (10 in a raid).");
+    expect(text()).toContain("Your ranking changes only in a match with at least 30 real players (15 in a group Boss Battle). Solo games never change it.");
+    expect(text({ ...FAQ_DEFAULTS, rankedShare: 0.2 })).toContain("Your ranking changes only in a match with at least 20 real players (10 in a group Boss Battle).");
+  });
+});
+
+describe("ranked's leave rules in the FAQ (L1): every number from LEAVES", () => {
+  it("as set: −5, then −10 with the lockouts; a leave's 10 more; the last 20, the waits and the 24-hour lock; 90 days", () => {
+    const t = rankedLeaving(LEAVES);
+    expect(t).toContain("A dodge to level 1 costs 5 RP; from level 2 it costs 10 RP and locks you out of 1 v 1 for 5 minutes, then 30 minutes, 2 hours and 12 hours at most.");
+    expect(t).toContain("each 12 hours without a dodge lowers it by one again");
+    expect(t).toContain("unless it's before your 3rd move");
+    expect(t).toContain("a loss, then 10 RP more.");
+    expect(t).toContain("counted over your last 20 ranked games and dodges. With 3 or more, every 1 v 1 search waits 2 minutes longer before you can be matched (5 minutes with 5 or more). With 8 or more, 1 v 1 is locked for 24 hours.");
+    expect(t).toContain("kept 90 days");
+    // (The review's fixes: Cancel, the grace before you count as gone, a no-show only once told, the window's games.)
+    expect(t).toContain("Pressing Cancel the moment a match is found, before the game opens on your screen, isn't a dodge; once it has opened, Cancel is the same as Abort.");
+    expect(t).toContain("you count as gone only after 12 seconds without a connection");
+    expect(t).toContain("while you've been gone 12 seconds or more and your opponent is still there");
+    expect(t).toContain("not turning up once your device was told a match was found");
+    expect(t).toContain("Every ranked game you finish that counts for your rank pushes an old one out of the count.");
+    expect(ranked1v1(RANKED_1V1)).toContain(t);
+  });
+  it("follows the settings when they change", () => {
+    const t = rankedLeaving({ ...LEAVES, dodgeRp: [4, 9], leaveRp: 15, dodgeLockoutMin: [0, 10, 60], lockAt: 9, lockHours: 48, quickResignMoves: 4 });
+    expect(t).toContain("A dodge to level 1 costs 4 RP; from level 2 it costs 9 RP and locks you out of 1 v 1 for 10 minutes, then 1 hour at most.");
+    expect(t).toContain("a loss, then 15 RP more.");
+    expect(t).toContain("With 9 or more, 1 v 1 is locked for 48 hours.");
+    expect(t).toContain("before your 4th move");
+    expect(rankedLeaving({ ...LEAVES, goneGraceMs: 20_000 })).toContain("only after 20 seconds without a connection");
   });
 });

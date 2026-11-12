@@ -43,6 +43,8 @@ export const SELECT_SOUND: Readonly<Record<string, SoundName>> = {
   timber: "timberChitter",
   // A sneaker squeak, a slap of his clock and his "yeah!".
   dash: "dashHello",
+  // His bread rifle's little pop, then his belly laugh.
+  zebra: "zebraPop",
   // The Hidden Boss: his low, ominous hum (the stare).
   recluse: "recluseHum",
 };
@@ -86,7 +88,8 @@ export const SELECT_LINES: Readonly<Record<string, readonly string[]>> = {
   // Folio (the director's, Oct 26): its select and intro line, the only one (its tile comes with the wiring lane).
   folio: ["Every game's a draft. Write one?"],
   timber: ["Hard hats on. We're building today.", "Measure twice, checkmate once.", "Got wood? I've got plenty."],
-  dash: ["Yo yo yo! Dash in the building, fam!", "Sup, cuz. Ready to get cooked?", "Bet. Let's run it, broski."],
+  dash: ["Yo yo yo! Dash in the building, cuz!", "Sup, cuz. Ready to get cooked?", "Bet. Let's run it, broski."],
+  zebra: ["Nothing here but a bakery.", "You want a game? Sit down, kid.", "Pop! Ha! Relax, it's just a roll."],
   // The Hidden Boss (Eric's own first line; never named on screen): the two in turn.
   recluse: ["Team up on me. It wouldn't be the first time anyone did that.", "You're not ready to fight me yet."],
 };
@@ -107,18 +110,41 @@ export function selectLine(id: string, last: string | null, rand: number = Math.
 }
 
 /**
- * Tiles to a row, on a phone and a computer alike (Eric, Oct 23: "just 5 per row, and it doesn't matter if you're on a
- * desktop"). The CSS reads it as `--bs-per`.
+ * How big the picked boss stands on the stage, as a multiple of its size before (Eric, Nov 11: "on this screen they need to be a
+ * bit bigger"): the one setting for the stage's figure. Capped by the room above its feet (BossSelect's placeOnStage), so a tall
+ * boss is held to the stage's height, never cut off; the in-game sizes are untouched.
  */
-export const TILES_PER_ROW = 5;
-
-/** A tile's height as a multiple of its width (styles.css, `--bs-h`): its visible width is 0.8 of its width (the slant is 0.2), so
- *  it is 1.55 times as tall as that. */
-export const TILE_RATIO = 1.24;
+export const STAGE_PAWN = 2;
 
 /**
- * How many tiles go in each row for `n` tiles with `per` to a row: full rows of `per`, the last the rest (fourteen: 5, 5, 4;
- * fifteen: 5, 5, 5; sixteen: 5, 5, 5, 1). Five to a row always (Eric, Oct 23: "just 5 per row"), so a new boss's tile moves no
+ * Your pawn's figure on the stage, in cqi of a platform's width (about 45: its visible top to its foot, measured at 428 px wide). The
+ * picked boss's figure aims at STAGE_PAWN times this (Nov 12, Eric: "it's okay if the boss is even a little bigger than our guy").
+ */
+export const STAGE_PAWN_FIGURE = 45;
+
+/**
+ * The room the speech bubble's band gives above the platform, in cqi of a platform's width (Nov 12, the director: "he's ~1.46x the
+ * pawn... make him grow into that room"). The boss may rise into it, and the bubble rises over his head with him. Only on a window
+ * 740 px tall or more and for guests: admins' fourth row takes that room, and a short window keeps the old room cap.
+ */
+export const STAGE_RISE = 26;
+
+/**
+ * Tiles to a row, on a phone and a computer alike (Eric, Oct 23: "just 5 per row, and it doesn't matter if you're on a
+ * desktop"; Nov 12: six, so the screen fits with no scroll). The CSS reads it as `--bs-per`.
+ */
+export const TILES_PER_ROW = 6;
+
+/** The gap between two tiles, in px (styles.css, `--bs-gap`; Eric, Nov 12: "still... a little bit of gap"). */
+export const TILE_GAP = 4;
+
+/** A tile's height as a multiple of its width (styles.css, `--bs-h`): its visible width is 0.8 of its width (the slant is 0.2), so
+ *  it is 1.25 times as tall as that (Nov 12: about square, six to a row; was 1.24 at five). */
+export const TILE_RATIO = 1;
+
+/**
+ * How many tiles go in each row for `n` tiles with `per` to a row: full rows of `per`, the last the rest (sixteen: 6, 6, 4;
+ * nineteen, the admins': 6, 6, 6, 1). Full rows of `per` always (six now, Eric, Nov 12), so a new boss's tile moves no
  * other boss's tile (Oct 27, Folio's: sharing sixteen out as 4, 4, 4, 4 would have moved every tile; Eric's rule, nothing
  * shifts). A short row is centered.
  */
@@ -143,26 +169,28 @@ export interface Framing {
   at: number;
 }
 export const SELECT_FRAMING: Readonly<Record<string, Framing>> = {
-  gingerbread: { neck: [44, 49], span: 44, at: 0.42 },
-  clown: { neck: [37, 49], span: 55, at: 0.52 },
+  gingerbread: { neck: [44, 49], span: 44, at: 0.43 },
+  clown: { neck: [37, 49], span: 55, at: 0.59 },
   grex: { neck: [38, 55], span: 62, at: 0.4 },
-  hollow: { neck: [51, 50], span: 64, at: 0.4 },
-  bigboy: { neck: [49, 50], span: 57, at: 0.52 },
-  sawyer: { neck: [45, 40], span: 56, at: 0.57 },
-  pig: { neck: [43, 50], span: 55, at: 0.66 },
+  hollow: { neck: [51, 50], span: 64, at: 0.47 },
+  bigboy: { neck: [49, 50], span: 57, at: 0.59 },
+  sawyer: { neck: [45, 40], span: 56, at: 0.69 },
+  pig: { neck: [43, 50], span: 55, at: 0.69 },
   alfil: { neck: [35, 52], span: 59, at: 0.55 },
   hopper: { neck: [38, 42], span: 57, at: 0.47 },
   smudgy: { neck: [41, 46], span: 55.5, at: 0.51 },
   moo: { neck: [36, 58], span: 56, at: 0.39 },
   gardener: { neck: [48, 56], span: 57, at: 0.42 },
   // (His bunch of balloons rides high over his head: the neck low in the tile, so the balloons are in it too.)
-  tiger: { neck: [31, 78], span: 56, at: 0.69 },
+  tiger: { neck: [31, 78], span: 58, at: 0.69 },
   // (Its long neck: the point under its head, so its head, beak and the near wing's root are in the tile.)
   folio: { neck: [30, 40], span: 58, at: 0.5 },
   // (His hat and buck teeth in the tile, the planks' ends over his shoulders.)
   timber: { neck: [38, 79], span: 58, at: 0.52 },
   // (His backwards cap and grin in the tile, the clock under his arm below.)
   dash: { neck: [36, 44], span: 54, at: 0.5 },
+  // (His fedora and the white of his face in the tile, his round belly and the planks' end below it.)
+  zebra: { neck: [40, 56], span: 58, at: 0.5 },
   recluse: { neck: [33, 47], span: 61, at: 0.5 },
 };
 
@@ -193,4 +221,32 @@ export const SELECT_TINT: Readonly<Record<string, string>> = {
   timber: "#2f8f9d",
   // (A deep violet, across the wheel from his gold fur and orange cap and away from his teal jacket.)
   dash: "#5a3f8e",
+  // (A bakery pink, across from his white fur and dark stripes; his vest's maroon stays clear of it.)
+  zebra: "#d9667a",
+};
+
+/**
+ * Each boss's goodbye in the town, after a battle it fought from there (Eric, Nov 7: "that boss says one goodbye line in their
+ * personality"): one line, by its roster id, said as you walk back into the square (its bubble, and the town's chat). In its own
+ * voice, short, no emoji; under 60 characters (a test checks: it fits the bubble's two rows).
+ */
+export const GOODBYE_LINES: Readonly<Record<string, string>> = {
+  gingerbread: "That was fun! Come back soon, it's cool in here.",
+  clown: "That was a blast! Honk honk, come back anytime!",
+  grex: "That was hot! Come back and play again soon!",
+  hollow: "Good game. The dark will keep your seat warm.",
+  bigboy: "That was fun! Big boy wants a rematch. Come back!",
+  sawyer: "Good game. Come back, the table will hold up.",
+  pig: "That was fun, partner. Come back anytime!",
+  alfil: "Good game! The Pyramid door stays open for you.",
+  hopper: "That was fun! Hop back soon, friend!",
+  smudgy: "That was fun! Come back, I've got a new painting.",
+  moo: "That was fun! Come back anytime! (Moo!)",
+  gardener: "That was fun. Mind the flower beds on your way out.",
+  tiger: "That was fun! Come back anytime, no roaring needed.",
+  folio: "That was a good read. Come back for another draft.",
+  timber: "That was fun! Come back anytime, the sawdust is fresh.",
+  dash: "That was fun, bro. Come back anytime. No cap.",
+  zebra: "Good game, kid. Come back for fresh bread anytime.",
+  recluse: "Good game. Come back and bring a better opening.",
 };

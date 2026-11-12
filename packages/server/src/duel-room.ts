@@ -1,10 +1,12 @@
-import { QUICK_CHAT, RANKED_1V1, canSay, chatCheck, chatSay, chatSent, noChatSent, ownedChatPacks, type ChatSent } from "@chessroyale/core";
+import { hearsTyped, typedReads, typedSay, typedSeat, type TypedSeats } from "./typed-chat.ts";
+import { LEAVES, QUICK_CHAT, RANKED_1V1, canSay, chatCheck, chatSay, chatSent, noChatSent, ownedChatPacks, type ChatSent } from "@chessroyale/core";
 import { START_FEN, type ChatBlock, type ChatRefusal, type NetChatLine } from "@chessroyale/chess";
 import {
   DUEL_PROTOCOL,
   callOff,
   canOfferDraw,
   clocksRun,
+  conductOf,
   declineDraw,
   firstMoveBy,
   gameControl,
@@ -18,6 +20,7 @@ import {
   tick,
   type Color,
   type DuelClientMessage,
+  type DuelConduct,
   type DuelEnd,
   type DuelGamePhase,
   type DuelOutcome,
@@ -58,6 +61,8 @@ interface DuelChat {
   muted: Partial<Record<Color, true>>;
   /** Chat moderation: a side with a chat ban in force (it can't send), as the game's object last read it. */
   blocked?: Partial<Record<Color, ChatBlock>>;
+  /** Typed chat (Nov 7, typed-chat.ts): who may type, who reads typed lines, who's too young, when each last typed. */
+  typed?: TypedSeats;
 }
 
 export interface DuelRecord {
@@ -85,6 +90,22 @@ export interface DuelRecord {
   outcomes: Partial<Record<Color, DuelOutcome>> | null;
   /** When the room closes (its results kept until then). */
   closeAt: number | null;
+  /**
+   * Who left early (ranked's leave rules, L1: conductOf), decided once as the game ends, from who was there then. Missing or
+   * null: not decided yet (or a record from before Nov 9). `excused`: called off by the queue's Cancel by a player who never
+   * connected to it (they never saw the game): nobody's dodge.
+   */
+  conduct?: DuelConduct | null;
+  excused?: boolean;
+  /** Each side has connected at least once (it saw the game). */
+  seen?: Partial<Record<Color, true>>;
+  /**
+   * Since when each side has had no socket (cleared as it connects): a side counts as gone for who left only once this is
+   * LEAVES.goneGraceMs old. One whose close the room never heard (a deploy) is counted from when the room noticed.
+   */
+  goneAt?: Partial<Record<Color, number>>;
+  /** The queue handed this side the game's code (an ask answered with it): a no-show is a dodge only then. */
+  delivered?: Partial<Record<Color, true>>;
   chat: DuelChat;
 }
 
@@ -107,7 +128,11 @@ export function newDuelRecord(code: string, now: number, players: Record<Color, 
   };
 }
 
-/** A recording with no outcome yet is tried again this long after its last try started, at most this many tries. */
+/**
+ * A recording with no outcome yet is tried again this long after its last try started, for the first RECORD_TRIES tries; then every
+ * RANKED_1V1.recordRetrySeconds, up to RANKED_1V1.recordRetryHours after the game ended (Nov 10: four tries in a minute lost every
+ * rating change of a short D1 outage).
+ */
 export const RECORD_RETRY_MS = 15_000;
 export const RECORD_TRIES = 4;
 
@@ -157,6 +182,7 @@ export class DuelCore {
       canOffer: { w: !!g && canOfferDraw(g, "w"), b: !!g && canOfferDraw(g, "b") },
       connected: { w: this.io.connected("w"), b: this.io.connected("b") },
       end: this.end,
+      ...(this.end && this.r.conduct ? { left: this.r.conduct } : {}),
     };
   }
 
@@ -174,7 +200,13 @@ export class DuelCore {
 
   /** A player connected (or reconnected): the game as it is, the chat so far; when both are here, the versus moment. */
   connect(c: Color) {
+    // (Moved on first with the time it went still kept: a flag that fell while it was gone was a flag while gone.)
     this.advance();
+    this.r.seen = { ...this.r.seen, [c]: true };
+    if (this.r.goneAt?.[c] !== undefined) {
+      const { [c]: _back, ...rest } = this.r.goneAt;
+      this.r.goneAt = rest;
+    }
     const outcome = this.r.outcomes?.[c];
     this.io.send(c, { t: "welcome", you: c, game: this.view(), v: DUEL_PROTOCOL });
     if (outcome) this.io.send(c, { t: "outcome", outcome });
@@ -185,6 +217,7 @@ export class DuelCore {
 
   /** A player's last socket closed: the other sees them gone (their clock keeps running; they can come back). */
   disconnect(c: Color) {
+    if (!this.io.connected(c)) this.r.goneAt = { ...this.r.goneAt, [c]: this.io.now() };
     this.io.send(other(c), { t: "presence", connected: { w: this.io.connected("w"), b: this.io.connected("b") } });
   }
 
@@ -206,14 +239,18 @@ export class DuelCore {
   advance() {
     const now = this.io.now();
     const before = `${this.phase(now)}:${!!this.end}`;
-    if (!this.r.game && !this.r.noShow && now >= this.r.joinBy) {
+    const noShowAt = this.noShowAt();
+    if (!this.r.game && !this.r.noShow && now >= noShowAt) {
       const here = (["w", "b"] as const).filter((c) => this.io.connected(c));
-      // (The one who didn't turn up, when one did.)
-      this.r.noShow = { result: "aborted", reason: "no_show", by: here.length === 1 ? other(here[0]!) : null, at: this.r.joinBy };
+      // (The one who didn't turn up, when one did: never seen, or gone past the grace by now.)
+      const absent = here.length === 1 ? other(here[0]!) : null;
+      this.r.noShow = { result: "aborted", reason: "no_show", by: absent && this.away(absent, noShowAt) ? absent : null, at: noShowAt };
     }
     if (this.r.game) this.r.game = tick(this.r.game, now);
-    if (`${this.phase(now)}:${!!this.end}` !== before) this.broadcastGame();
+    // (A side seen before with no socket now whose close the room never heard, a deploy's: gone from now.)
+    for (const c of ["w", "b"] as const) if (this.r.seen?.[c] && !this.io.connected(c) && this.r.goneAt?.[c] === undefined) this.r.goneAt = { ...this.r.goneAt, [c]: now };
     this.ended();
+    if (`${this.phase(now)}:${!!this.end}` !== before) this.broadcastGame();
   }
 
   alarm() {
@@ -224,14 +261,16 @@ export class DuelCore {
   get nextAlarm(): number | null {
     const r = this.r;
     const times: number[] = [];
-    if (!r.game && !r.noShow) times.push(r.joinBy);
+    if (!r.game && !r.noShow && Number.isFinite(this.noShowAt())) times.push(this.noShowAt());
     if (r.game && !r.game.end) {
       const d = nextDeadline(r.game);
       if (d !== null) times.push(d);
       // (The vote opens after the versus moment: no event of its own.)
     }
-    if (this.toRecord() && r.recordAt !== null) times.push(r.recordAt);
-    if (r.closeAt !== null) times.push(r.closeAt);
+    const recordAt = this.toRecord() ? r.recordAt : null;
+    if (recordAt !== null) times.push(recordAt);
+    // (A recording still to come: the closing waits for its try, so a closing that's due never spins the alarm.)
+    if (r.closeAt !== null) times.push(recordAt !== null ? Math.max(r.closeAt, recordAt) : r.closeAt);
     return times.length ? Math.min(...times) : null;
   }
 
@@ -239,15 +278,63 @@ export class DuelCore {
   private ended() {
     const end = this.end;
     if (end && this.r.closeAt === null) this.r.closeAt = this.io.now() + RANKED_1V1.resultsKeepMinutes * 60_000;
+    if (end && !this.r.conduct) {
+      const present = { w: !this.away("w", end.at), b: !this.away("b", end.at) };
+      const knew = { w: !!(this.r.delivered?.w || this.r.seen?.w), b: !!(this.r.delivered?.b || this.r.seen?.b) };
+      this.r.conduct = this.r.excused ? {} : conductOf(end, this.r.game, present, { knew });
+    }
+  }
+
+  /**
+   * When a game that hasn't begun is called a no-show: at joinBy, unless one side is here and the other had connected and
+   * gone only a moment before (within LEAVES.goneGraceMs): then once that grace runs out, so a phone that blinked can still
+   * come back and play, and one that closed the app is still charged (the delta review of #582, D1).
+   */
+  private noShowAt(): number {
+    const r = this.r;
+    const here = (["w", "b"] as const).filter((c) => this.io.connected(c));
+    // (Both here: the game starts, startIfBoth, whatever the clock says.)
+    if (here.length === 2) return Infinity;
+    if (here.length !== 1) return r.joinBy;
+    const gone = r.goneAt?.[other(here[0]!)];
+    return gone !== undefined && r.joinBy - gone < LEAVES.goneGraceMs ? gone + LEAVES.goneGraceMs : r.joinBy;
+  }
+
+  /**
+   * Gone at `at`, for who left (conductOf): no socket for LEAVES.goneGraceMs by then. A side never seen is gone; one seen whose
+   * close the room never heard (a deploy) isn't yet.
+   */
+  private away(c: Color, at: number): boolean {
+    const since = this.r.goneAt?.[c];
+    if (since !== undefined) return at - since >= LEAVES.goneGraceMs;
+    return !this.io.connected(c) && !this.r.seen?.[c];
+  }
+
+  /** A dodge to record: an aborted game (or a no-show) that someone left early. */
+  private dodged(): boolean {
+    return Object.values(this.r.conduct ?? {}).includes("dodge");
   }
 
   // ---------------- Recording ----------------
 
-  /** A finished game (not aborted) whose outcome hasn't come back, with tries left. */
-  private toRecord(): boolean {
-    const r = this.r;
-    const end = r.game?.end;
-    return !!end && end.result !== "aborted" && r.outcomes === null && r.recordTries < RECORD_TRIES;
+  /**
+   * A finished game (not aborted, or aborted by a dodge: ranked's leave rules) whose outcome hasn't come back, within
+   * RANKED_1V1.recordRetryHours of its end. The room stays open while this holds (DuelGame.closeIfDue).
+   */
+  toRecord(): boolean {
+    const end = this.end;
+    return this.recordable() && this.r.outcomes === null && !!end && this.io.now() < end.at + RANKED_1V1.recordRetryHours * 3_600_000;
+  }
+
+  /** A game to record whose outcome never came back in RANKED_1V1.recordRetryHours: given up on (the room closes and says so). */
+  recordGivenUp(): boolean {
+    return this.recordable() && this.r.outcomes === null && !this.toRecord();
+  }
+
+  /** A finished game that's recorded: not aborted, or aborted by a dodge (ranked's leave rules). */
+  private recordable(): boolean {
+    const end = this.end;
+    return !!end && (end.result !== "aborted" || this.dodged());
   }
 
   /** Whether a recording try is due now (takeFinished would hand the game over). */
@@ -258,27 +345,30 @@ export class DuelCore {
 
   /**
    * The finished game, to be recorded (ranks, coins, the kept game), when a try is due: at once when it ends, then
-   * again RECORD_RETRY_MS after each try while no outcome has come back (recordDuel's nonce makes a repeat harmless),
-   * at most RECORD_TRIES tries. The caller starts it only when none of its own is running. Null when nothing is due.
+   * again RECORD_RETRY_MS after each of the first RECORD_TRIES tries while no outcome has come back (recordDuel's nonce makes a
+   * repeat harmless), then every RANKED_1V1.recordRetrySeconds, for RANKED_1V1.recordRetryHours. The caller starts it only when
+   * none of its own is running. Null when nothing is due.
    */
   takeFinished(): FinishedDuel | null {
     const r = this.r;
     const g = r.game;
-    if (!this.takeFinishedDue() || !g?.end) return null;
+    const end = this.end;
+    if (!this.takeFinishedDue() || !end) return null;
     const now = this.io.now();
     r.recordTries++;
-    r.recordAt = now + RECORD_RETRY_MS;
+    r.recordAt = now + (r.recordTries < RECORD_TRIES ? RECORD_RETRY_MS : RANKED_1V1.recordRetrySeconds * 1000);
     return {
       id: r.id,
       players: { w: r.players.w.uid, b: r.players.b.uid },
-      control: g.control ?? RANKED_1V1.defaultControl,
-      result: g.end.result,
-      reason: g.end.reason,
-      moves: g.moves,
-      times: g.times,
-      startedAt: g.startsAt ?? g.end.at,
-      endedAt: g.end.at,
+      control: g?.control ?? RANKED_1V1.defaultControl,
+      result: end.result,
+      reason: end.reason,
+      moves: g?.moves ?? [],
+      times: g?.times ?? [],
+      startedAt: g?.startsAt ?? end.at,
+      endedAt: end.at,
       testSeconds: r.testSeconds,
+      conduct: r.conduct ?? {},
     };
   }
 
@@ -287,6 +377,21 @@ export class DuelCore {
     const o = outcomes ?? { w: { change: null, coins: 0 }, b: { change: null, coins: 0 } };
     this.r.outcomes = o;
     for (const c of ["w", "b"] as const) this.io.send(c, { t: "outcome", outcome: o[c] });
+  }
+
+  /**
+   * The queue's Cancel answered this game (DuelGame.abandon): the player's own Abort or Resign (conductOf decides), unless
+   * they never connected to it (pressed the moment it was found, before they could see it): then called off, nobody's dodge.
+   */
+  cancelled(c: Color) {
+    if (this.end) return;
+    if (!this.r.game && !this.r.seen?.[c]) this.r.excused = true;
+    this.message(c, { t: "resign" });
+  }
+
+  /** The queue handed this side the game's code (the matchmaker's answer to its ask): from now on a no-show is its dodge. */
+  delivered(c: Color) {
+    this.r.delivered = { ...this.r.delivered, [c]: true };
   }
 
   // ---------------- What players send ----------------
@@ -300,9 +405,9 @@ export class DuelCore {
         this.io.send(c, { t: "game", game: this.view() });
         return;
       case "chat":
-        return this.chatSay(c, msg.say);
+        return this.chatSay(c, msg.say, msg.text);
       case "chatPrefs":
-        return this.chatPrefs(c, msg.off, msg.muted);
+        return this.chatPrefs(c, msg.off, msg.muted, msg.typed);
       case "pick": {
         // (Before the vote opens, during the versus moment: nothing.)
         if (!g || now < g.voteAt) return;
@@ -337,8 +442,8 @@ export class DuelCore {
           drawOffer: s.drawOffer,
           canOffer: { w: canOfferDraw(s, "w"), b: canOfferDraw(s, "b") },
         });
-        if (s.end) this.broadcastGame();
         this.ended();
+        if (s.end) this.broadcastGame();
         return;
       }
       case "resign": {
@@ -351,8 +456,8 @@ export class DuelCore {
           if (!r.ok) return;
           this.r.game = r.state;
         }
-        this.broadcastGame();
         this.ended();
+        this.broadcastGame();
         return;
       }
       case "draw":
@@ -362,8 +467,8 @@ export class DuelCore {
         if (!r.ok) return;
         this.r.game = r.state;
         if (r.state.end) {
-          this.broadcastGame();
           this.ended();
+          this.broadcastGame();
         } else this.both({ t: "draw", drawOffer: r.state.drawOffer, canOffer: { w: canOfferDraw(r.state, "w"), b: canOfferDraw(r.state, "b") } });
         return;
       }
@@ -377,7 +482,7 @@ export class DuelCore {
     const ch = this.r.chat;
     if (ch.off[c]) return false;
     if (line.from === c) return true;
-    return !ch.muted[c];
+    return !ch.muted[c] && hearsTyped(ch.typed ?? {}, c, line);
   }
 
   private sendChatLog(c: Color) {
@@ -408,14 +513,20 @@ export class DuelCore {
    * repeats), and never from a player with a chat ban in force. There are no teams in a 1 v 1, so every line goes to
    * both (as the lobby's chat before a match).
    */
-  private chatSay(c: Color, say: unknown) {
+  private chatSay(c: Color, say: unknown, text?: unknown) {
     const now = this.io.now();
     const ch = this.r.chat;
-    const refuse = (reason: ChatRefusal, retryAt = now, block?: ChatBlock) =>
-      this.io.send(c, { t: "chatNo", say: String(say).slice(0, 40), reason, retryAt, ...(block ? { block } : {}) });
+    const refuse = (reason: ChatRefusal, retryAt = now, block?: ChatBlock, message?: string) =>
+      this.io.send(c, { t: "chatNo", say: String(say ?? "").slice(0, 40), reason, retryAt, ...(block ? { block } : {}), ...(message ? { message } : {}) });
     if (ch.off[c]) return refuse("off");
     const block = ch.blocked?.[c];
     if (block && (block.until === null || block.until > now)) return refuse("mod", block.until ?? now, block);
+    // Typed (CHAT_TYPED, typed-chat.ts): may they type, the filter, the length, one every 5 s.
+    if (typeof text === "string") {
+      const t = typedSay((ch.typed ??= {}), c, c, text, now);
+      if (!t.ok) return refuse(t.reason, t.retryAt, undefined, t.message);
+      return this.post({ n: ++ch.n, from: c, say: "", text: t.text, to: "all", team: null, at: now });
+    }
     const line = chatSay(say);
     if (!line) return refuse("unknown");
     if (!canSay(line.id, ch.owned[c])) return refuse("locked");
@@ -423,14 +534,24 @@ export class DuelCore {
     const check = chatCheck(sent, line.id, now);
     if (!check.ok) return refuse(check.limit, check.retryAt);
     ch.sent[c] = chatSent(sent, line.id, now);
-    const full: NetChatLine = { n: ++ch.n, from: c, say: line.id, to: "all", team: null, at: now };
+    this.post({ n: ++ch.n, from: c, say: line.id, to: "all", team: null, at: now });
+  }
+
+  private post(full: NetChatLine) {
+    const ch = this.r.chat;
     ch.lines = [...ch.lines, full].slice(-QUICK_CHAT.logSize);
     for (const to of ["w", "b"] as const) if (this.hears(to, full)) this.io.send(to, { t: "chat", line: full });
   }
 
+  /** Typed chat for a side as it connects (or turns chat on): may it type, is its device too young (typed-chat.ts). */
+  chatTyping(c: Color, o: { may: boolean; young: boolean }) {
+    typedSeat((this.r.chat.typed ??= {}), c, o);
+  }
+
   /** This device's chat choices: chat off, and whether it muted the other player (by their side: "w" or "b"). */
-  private chatPrefs(c: Color, off: unknown, muted: unknown) {
+  private chatPrefs(c: Color, off: unknown, muted: unknown, typed?: unknown) {
     const ch = this.r.chat;
+    if (typeof typed === "boolean" && typedReads((ch.typed ??= {}), c, typed) && !ch.off[c] && off !== true) this.sendChatLog(c);
     const wasOff = !!ch.off[c];
     const wasMuted = !!ch.muted[c];
     if (off === true) ch.off[c] = true;

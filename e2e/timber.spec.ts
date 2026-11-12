@@ -72,7 +72,7 @@ test.describe("Timber", () => {
     await expect(tiles.getByRole("radio", { name: "Timber", exact: true })).toHaveCount(0);
     await asAdmin(page);
     await page.reload();
-    await expect(page.getByRole("heading", { name: "Boss raid", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Boss Battle", exact: true })).toBeVisible();
     await expect(tiles.getByRole("radio", { name: "Timber", exact: true })).toBeVisible();
   });
 
@@ -124,6 +124,40 @@ test.describe("Timber", () => {
     expect(s.board).toHaveLength(1);
     expect(BOSS_POWERS.gnawScraps).toBe(8);
     expect(errors).toEqual([]);
+  });
+  test("the workshop strip is big: each piece is at least 70% of a board square on a phone (50% on a computer), inside the bar, clear of his name, level, bar and status", async ({ page }) => {
+    test.setTimeout(180_000);
+    await asAdmin(page);
+    await page.goto("/?debug&pace=quick&laststand=0&brain=stockfish&boss=timber&power=scraps&mode=raid");
+    await openBossRaid(page);
+    await page.getByRole("main").getByRole("button", { name: /^Boss alone/ }).click();
+    await yourMove(page);
+    const g = await page.evaluate(() => {
+      const box = (el: Element | null) => {
+        if (!el) return null;
+        const r = el.getBoundingClientRect();
+        return { l: r.left, t: r.top, r: r.right, b: r.bottom };
+      };
+      const q = (s: string) => document.querySelector(s);
+      const all = (s: string) => [...document.querySelectorAll(s)].map(box);
+      const board = box(q(".board-wrap"));
+      return {
+        square: board ? (board.r - board.l) / 8 : 0,
+        pieces: all(".ws-strip .ws-piece piece"),
+        strip: box(q(".ws-strip")),
+        bar: box(q(".boss-bar")),
+        clear: [".boss-name strong", ".boss-level", ".boss-ult", ".boss-next"].flatMap((s) => all(s)),
+      };
+    });
+    const floor = test.info().project.name === "phone" ? 0.7 : 0.5;
+    const hit = (a: { l: number; t: number; r: number; b: number }, b: { l: number; t: number; r: number; b: number }) => a.l < b.r && b.l < a.r && a.t < b.b && b.t < a.b;
+    expect(g.pieces).toHaveLength(5);
+    for (const p of g.pieces) expect((p!.r - p!.l) / g.square).toBeGreaterThanOrEqual(floor);
+    expect(g.strip!.l).toBeGreaterThanOrEqual(g.bar!.l - 0.5);
+    expect(g.strip!.r).toBeLessThanOrEqual(g.bar!.r + 0.5);
+    expect(g.strip!.t).toBeGreaterThanOrEqual(g.bar!.t - 0.5);
+    expect(g.strip!.b).toBeLessThanOrEqual(g.bar!.b + 0.5);
+    for (const c of g.clear) expect(hit(g.strip!, c!)).toBe(false);
   });
   test("on a computer his figure stands beside the board at rest (his drawing over the board's edge by at most SIDE_FEEL.over of its side, over the side menu if need be, never over the bar or off the window); his cast plays where he stands, never at the board's corner", async ({ page }) => {
     test.setTimeout(400_000);

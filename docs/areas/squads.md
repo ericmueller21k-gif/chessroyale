@@ -17,6 +17,9 @@ Bullet on the left and the longest on the right since Eric's Oct 16; nobody voti
 move.
 
 ## How it works today
+- **The XP box** (Nov 9; [2026-11-09-xp-box.md](../decisions/2026-11-09-xp-box.md)): the knocked-out card and the results (`screens/Squads.tsx`, `SquadsXp`; a win is your squad 1st; a test lobby: "No XP: test game.") shows `XpResult`, a fixed 78 px box: the
+  bar filling from your old XP to the new, "+170 XP", "Level 7", the parts ("Win +50": never the minutes, Eric, Nov 9), or why there was none. Its rules
+  and storage: [accounts.md](accounts.md), "XP and levels".
 
 - **The board on a computer** (Oct 29; docs/decisions/2026-10-29-desktop-board-size.md, [board.md](board.md)): the window's height
   less 230 px (the tiny boards over it, the clocks' line under it; a relay 250), never wider than its column: 848 px at
@@ -278,7 +281,12 @@ plays, ties). The calls are in `DECISIONS.md`, "Squads, phase 2".
 - **The queue.** `POST /api/squads/play` (one player) asks the Squads matchmaker (`squads-default`: the same Matchmaker
   object and queue as Crowd, so batches, admission and "busy, you're in line" work the same). Each ticket is a group,
   `{ size, pass }`. A lobby takes a group only if every party in it still fits the squads whole (`partiesFit`: the
-  rules' own `formSquads` packing); otherwise the next lobby. Solo players are parties of one.
+  rules' own `formSquads` packing); otherwise the next lobby. Solo players are parties of one. One seat per account: a
+  second connect takes over that seat; a seat token from another account is refused (`SQUADS_OTHER_ACCOUNT`).
+- **Bot work's trust** (Nov 10): a job never goes to two devices of one party, except a second party device as a
+  checker when no outside device is free (agreement counts as one answer, `"one"`; disagreement goes to the server).
+  No answer is shared between lobbies for now (`TOP_CACHE` stays empty until the server picks its own top moves, ROADMAP);
+  every answer serves its own job.
 - **Parties.** `POST /api/squads/party` makes one (a 5-character code; the invite link is `/squads/party/CODE`). Up to
   4 connect to `/api/squads/party/CODE/ws`. The leader (the first in; the next if they leave or drop) sends `queue`:
   the party asks the matchmaker for seats for everyone connected under a fresh pass (again every
@@ -339,7 +347,9 @@ plays, ties). The calls are in `DECISIONS.md`, "Squads, phase 2".
   anyone still seated recorded as leaving, `wrapped`, `keepMs` 0) and closes.
 - **Armageddon.** A drawn final: the rules' `armageddonChooser`; that squad's people pick a color during
   `armageddonIntroSeconds` (the last pick stands; nobody: the bots' Black), then `startArmageddon`.
-- **Spectating and leaving.** Everyone gets every match (the tiny boards). A knocked-out squad's people watch on, or
+- **Spectating and leaving.** Everyone gets every match (the tiny boards: `shownMatches`, the latest round that has
+  begun with its finished matches checked, and every match being played; a next round's match waiting out its break
+  joins when its round begins, Nov 9). A knocked-out squad's people watch on, or
   `leave` (their socket closes) and queue again.
 - **Who's watching** (Eric, Oct 14; DECISIONS.md, "Squads: jump to my next board, and who's watching"). Each screen
   sends `view` (the match and board it shows full size, or none) only when that changes, and again after a reconnect.
@@ -353,9 +363,14 @@ plays, ties). The calls are in `DECISIONS.md`, "Squads, phase 2".
   players).
 - **Placements and rewards** (unranked). When the bracket decides a squad's placement, each person on it gets a results
   row (mode "squads", placement 1, 2, 3 or 5 of 8 squads) if signed in, and `SQUADS_LOBBY.rewards` (coins into the
-  wallet, crates counted in `wallets.crates` for when crates stop being free) if still playing their seat. Nothing in
+  wallet, crates of the newest series since Nov 9, each opened with a crate key) if still playing their seat. Nothing in
   a test lobby or after a test control. At least once (Nov 6): each stays in the record until written (retried every minute;
-  the lobby keeps its code up to 24 h for it), and pays once (ledger key `squads:<code>:<made>:<ledger id>`).
+  the lobby keeps its code up to 24 h for it), and pays once (ledger key `squads:<code>:<made>:<ledger id>`). **One party's word
+  (Nov 10):** a squad whose own match's bot work only its own party's devices answered, no other party's up (a lobby of one party
+  and bots: all its squads; `SquadsRecord.unvouched`, by squad), is noted in the logs and paid as any (Eric, Nov 10: "If you play
+  with just all bots, you still get rewards from that"; the daily cap bounds it); a late answer is still compared (the server's verdict strikes the one further; no server: a referee device of another party, as in time); at most `SQUADS_LOBBY.rewardsPerDay` (5)
+  paying lobbies a UTC day per account (checked as it's written; past it the placement is sent again with nothing). The
+  placement says why (`placed.why` "daily", `NO_REWARD` in Squads.tsx). docs/decisions/2026-11-10-boss-and-lone-devices.md.
 - **Test controls** (Eric). Admins (ADMIN_EMAILS), or anyone where the Worker variable SQUADS_TEST is "1" (local and
   e2e, never production), while `SQUADS_LOBBY.testControls` is on (`squadsTestAllowed`): `nextRound` in a lobby (the
   rules' `endByMaterial` on the earliest round's matches, the next round 3 s later; in the votes: they close), and a
@@ -363,7 +378,7 @@ plays, ties). The calls are in `DECISIONS.md`, "Squads, phase 2".
   fast, normal and long map to them, an unknown id gives Blitz) or `clock=BANK,TOPUP,FREE,INC[,CAP]` (a team clock in
   seconds; without CAP the old 20 s ceiling, so older links keep their meaning; `testLobbyOptions`), that fills 5 s after it opens, skipping the rounds before (squads with more people go
   through). For tests also `fen=` (the first round's boards start there: a legal position, White to move),
-  `bots=strong` (every bot at the strongest skill), `bots=blocks` (bots block whenever they can; `bots=strong,blocks`
+  `bots=strong` (every bot at the strongest skill, never a random move: Nov 9), `bots=blocks` (bots block whenever they can; `bots=strong,blocks`
   for both), `seat=white` (the opener plays White on their first board) and `blockPoints=N` (Mercenary, 0-20: every
   squad starts every match with N block points; none otherwise, so a test can block in round 1). `mode=mercenary|classic` sets the mode
   (no Mode vote); without it the Mode vote is held and the bots sit it out, so the opener's vote decides. A Mercenary
@@ -464,7 +479,8 @@ door's look; every class is `sq-`.
   after the lobby "Back to your party" reconnects (the leader queues again). Escape closes the sheet as ✕ does, from
   its first frame (leaving a party made while it was open; `2026-10-16-flaky-e2e-batch-4.md`).
 - **The waiting room** is the home screen's queue (as Crowd's), 32 seats: people as they join (your party's dashed),
-  then the eight squads of four once bots fill. **The votes** use Crowd's vote board (`VoteScreen`, given Squads' own
+  then the eight squads of four once bots fill. Its Exit with "Keep me in the queue" (Nov 10, [matchmaking.md](matchmaking.md)) lets you
+  browse still queued: home's rows say "Searching · Squads", "Solo queue · 5 of 32" (or Party); Start with bots greys ("Soon"). **The votes** use Crowd's vote board (`VoteScreen`, given Squads' own
   votes, no eval bar, no chimes or ticks): everyone's pawn on one side, three zones, three cards.
 - **Standings everywhere.** Every squad's name (display only, by id: Rooks, Knights, Bishops, Queens, Kings, Pawns,
   Towers, Crowns, each with a color), members, where it stands in the bracket, and its team clock counting down
@@ -491,16 +507,16 @@ door's look; every class is `sq-`.
     the board). On (the default, `watching.jumpToNext`;
     remembered on the device, `brc.squads.jumpNext`, `squadsJumpNext` in prefs.ts), once you've made your Relay move the
     big board goes to the board you play next turn, `watching.jumpAfterMs` (600 ms) later so your piece lands first
-    (your move shows nowhere else until the half ends), unless you've opened another board meanwhile. Next turn's board
+    (your move shows nowhere else until the half ends), unless you've opened a board meanwhile (your own included: a tap on any tiny board calls the jump off; Nov 9, the flaky sweep). Next turn's board
     finished (you'd scout it): the first board after it still going; none but yours: you stay (`studyBoard`). The line
     above the board says "Watching Board 3 · your next board"; a tap on your own tiny board brings you back ("Back to
-    my board" is gone, Nov 5), and the jump comes once a half. Off: you stay on your board until the game moves you. Pairs and the final have no next board.
+    my board" is gone, Nov 5), and the jump comes once a half. **Your turn snaps the big board live** (Eric, Nov 9; docs/decisions/2026-11-09-squads-snap-live.md): when a new half asks your move on the board in view, that board's history goes back to live, even if you had stepped back with « while waiting (`MatchView`, `turnHalf`; check: `e2e/squads-three-boards.spec.ts`, "your turn snaps you live"). Off: you stay on your board until the game moves you. Pairs and the final have no next board.
     The half ending at once with your move (you were the last to move) doesn't call the jump off (Eric, Oct 18: it
     waited for the other half instead; `squads-watch.spec.ts` covers it).
   - **Who's watching** (Oct 14; `Watchers` in SquadsParts.tsx): right after the line above the board, a small pixel eye
     and the profile pawns (`Avatar`, with their items) of the other people showing that board full size, overlapping,
     up to `watching.shown` (4), then "+N"; their names on hover. Not you, not the board's own players this turn
-    (`notWatchers`). Each pawn is the watcher's color on that board (white for anyone outside the match). The pawns
+    (`notWatchers`: whoever moves there this turn; a squad's waiting seat on 3 boards shows, Nov 9). Each pawn is the watcher's color on that board (white for anyone outside the match). The pawns
     stand a little taller than the line and spill into the gaps around it, so the board doesn't move as people come and
     go. Static, and it listens for who's watching itself (`client.onViewers`): a `viewers` message redraws these pawns
     and nothing else (each pawn memoized), never the whole screen; a clock tick or a move doesn't redraw them.

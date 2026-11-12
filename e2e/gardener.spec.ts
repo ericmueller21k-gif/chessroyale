@@ -320,7 +320,12 @@ test("a seed lands on the page's own clock (?seedspeed=4): the meter rises, his 
   const at = Number(await meter().getAttribute("data-seeds"));
   await hide(true);
   await page.evaluate(() => ((window as any).__rec.length = 0));
-  await page.waitForTimeout(9000);
+  // (The garden's clock itself stands still: the meter's fill, redrawn every 250 ms, doesn't move in 2 s, where it would rise by
+  // a quarter of a seed (7.5 s) on a running clock. Was a 9 s wait for a seed that never comes.)
+  await page.waitForTimeout(300); // (one redraw of the meter since the page hid: its fill as the clock stopped)
+  const fill = await meter().getAttribute("data-fill");
+  await page.waitForTimeout(2000);
+  expect(await meter().getAttribute("data-fill"), "the garden's clock stands still while hidden").toBe(fill);
   expect(Number(await meter().getAttribute("data-seeds")), "no seed counted while hidden (a seed is 7.5 s)").toBe(at);
   expect((await recorded(page)).every((r) => r.seeds.length === 0 && r.anim !== "plant"), "no toss while hidden").toBe(true);
   await hide(false);

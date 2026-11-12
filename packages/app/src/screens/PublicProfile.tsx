@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "preact/hooks";
 import type { ComponentChildren } from "preact";
 import { pawnColorOf, rankView, sideOfPawn } from "@chessroyale/core";
-import { BackButton, DressedPawn, TEST_LEVEL } from "../components/FrontDoor.tsx";
+import { BackButton, DressedPawn } from "../components/FrontDoor.tsx";
 import { BossArt } from "../components/BossCharacter.tsx";
 import { InviteButton, useProfileActions } from "../components/Friends.tsx";
 import { ItemArt } from "../components/Items.tsx";
@@ -11,7 +11,6 @@ import { SELECT_TINT } from "../characters/boss-select.ts";
 import { account, fetchProfile, onAccountChange, type PublicProfile } from "../account.ts";
 import type { ProfileTarget } from "../profile-nav.ts";
 import { yourRankShown } from "../ranked.ts";
-import { testSwitchesAllowed } from "../test-switches.ts";
 import {
   RANKED_MODES,
   RECENT_SHOWN,
@@ -446,7 +445,8 @@ function CosmeticsCard({ p, loading, onAll }: { p: PublicProfile | null; loading
 
 /** A sheet over the page (the full list of matches, or each worn item's details): ✕, Escape or a tap outside closes it. */
 function Sheet({ id, title, onClose, children }: { id: string; title: string; onClose: () => void; children: ComponentChildren }) {
-  useEffect(() => {
+  // (A layout effect, as every pop-up's: an effect waits for a paint, and an Escape pressed as it opened was lost. LESSONS.md, Nov 11.)
+  useLayoutEffect(() => {
     const key = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     addEventListener("keydown", key);
     return () => removeEventListener("keydown", key);
@@ -514,7 +514,7 @@ export function PublicProfileScreen({ target, onBack, match }: { target: Profile
 
   const name = p?.name ?? target.name;
   const seen = p ? seenLine(p, now) : null;
-  const level = levelLine(testSwitchesAllowed(), TEST_LEVEL.level);
+  const level = levelLine(p?.level);
   const rows = p ? recentRows(p.ranked1v1?.recent ?? [], p.recent, now) : [];
   const blocked = act.rel === "blocked";
   // The buttons: greyed (never gone) on your own page, with a guest or a young device where friends are off, while loading, and for someone you blocked.
@@ -580,8 +580,8 @@ export function PublicProfileScreen({ target, onBack, match }: { target: Profile
           {seen?.dot && <span class="fd-dot small" aria-hidden="true" />}
           <span class={loading ? "sk" : undefined}>{seen?.text ?? "Online now · Joined Oct 2026"}</span>
         </div>
-        {/* (Levels aren't built yet: only an admin's placeholder shows. For everyone else there is no line, so nothing is ever added later.) */}
-        {level && <div class="pp-level">{level}</div>}
+        {/* (Its line is there while the page loads too, so nothing moves when the level comes.) */}
+        <div class="pp-level">{level || "\u00a0"}</div>
         <div class="pp-actions">
           <InviteButton uid={uid ?? ""} onNote={act.setNote} label="Challenge" small={false} primary greyed disabled={idle || blocked} icon={<Swords />} title="Invite to play" />
           <button type="button" class="fd-btn pp-friend" disabled={friendOff} onClick={friend.go}>

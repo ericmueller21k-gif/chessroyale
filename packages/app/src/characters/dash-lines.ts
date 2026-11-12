@@ -1,6 +1,6 @@
 /**
  * Dash's lines (Nov 3; docs/decisions/2026-11-03-dash.md): a lanky, cocky cheetah who tries way too hard to talk like the
- * younger crowd (Eric, Nov 3: "Yo, this game is chopped, bro", broski, fam, cuz) and doesn't quite pull it off; a sneaker
+ * younger crowd (Eric, Nov 3: "Yo, this game is chopped, bro", broski, cuz) and doesn't quite pull it off; a sneaker
  * hustler, always eyeing your shoes. Friendly-cocky, never mean. The director's draft (Nov 3, Eric liked the direction) merged
  * with the art session's (scripts/boss-art/out/blitz-lines-draft.md on claude/boss-art), two or three a moment, short enough
  * for the bubble. His name is always Dash.
@@ -16,22 +16,22 @@ import type { Beat } from "./boss-beats.ts";
 
 export const DASH_LINES: Partial<Record<Beat, readonly string[]>> = {
   entrance: ["Yo yo yo! Dash in the building, fam!", "Sup, cuz. Ready to get cooked?", "Bet. Let's run it, broski."],
-  move: ["Speed, baby.", "Too easy, fam.", "Ayo, what size? Asking for a friend."],
+  move: ["Speed, baby.", "Too easy, bro.", "Ayo, what size? Asking for a friend."],
   capture: ["That piece? Chopped. Fully chopped.", "Sheesh!"],
   power: ["Yoink! That time's mine now, cuz.", "Sheesh! Clock slap, baby!", "W in the chat. W on my clock."],
-  hurt: ["Yo, that's lowkey rude.", "Okay, okay. W for you, fam. Small W."],
+  hurt: ["Yo, that's lowkey rude.", "Okay, okay. W for you, cuz. Small W."],
   strike: ["Yoink!", "Too slow, cuz!"],
-  thinking: ["Bro, I already know my move. No cap.", "Clock's ticking, fam. Tick tock.", "Yo, where'd you cop those kicks, broski?"],
+  thinking: ["Bro, I already know my move. No cap.", "Clock's ticking, broski. Tick tock.", "Yo, where'd you cop those kicks, broski?"],
   check: ["Check, broski. It's giving… checkmate.", "Check! Bussin. Is that the word?"],
   smug: ["Chopped, bro. Chopped.", "Main character? Kinda, yeah.", "Real quick: you wanna try these on?"],
   rattled: ["Not sweating. It's just humid.", "Deadass did not see that coming."],
-  ultimateWarn: ["Speed run, broski! Let's gooo!", "Lace up, fam. This is gonna be quick."],
+  ultimateWarn: ["Speed run, broski! Let's gooo!", "Lace up, cuz. This is gonna be quick."],
   ultimate: ["Three seconds a move, cuz. Skrrt!", "Tick tock, my guy. Tick tock."],
   flag: ["Too slow, cuz! I picked one for you.", "No cap, you need Cheetahs.", "Bro moved like he's in flip-flops."],
-  victory: ["Too fast, fam! Built different!", "W! Big W! Hashtag no cap.", "W in the chat. Shoes are 20% off, broski."],
+  victory: ["Too fast, bro! Built different!", "W! Big W! Hashtag no cap.", "W in the chat. Shoes are 20% off, broski."],
   defeat: ["GG, cuz. Lowkey you're goated.", "I'm cooked. Bro, I'm so cooked."],
   // His attack on a king (the God King's Last Stand after your blunder, and his mate).
-  kingAttack: ["Too slow, my guy! Swipe, swipe, swipe!", "Blunder tax, fam. Paid in full.", "Zoom zoom! That one's on you, cuz."],
+  kingAttack: ["Too slow, my guy! Swipe, swipe, swipe!", "Blunder tax, broski. Paid in full.", "Zoom zoom! That one's on you, cuz."],
 };
 
 /**
@@ -48,7 +48,7 @@ export const DASH_LINES: Partial<Record<Beat, readonly string[]>> = {
 export const DASH_LINE_MAX = 48;
 export const DASH_FIT_LINES: readonly string[] = [
   "Nothing beats that click. I love this clock.",
-  "Best sound in the world, fam.",
+  "Best sound in the world, bro.",
   "Click click! Sorry, it's a whole vibe.",
   "My guy, listen to that. Pure music.",
   "Can't help it, cuz. This clock is my therapy.",
@@ -66,7 +66,7 @@ export const DASH_FIT_LINES: readonly string[] = [
 export const DASH_POPOFF_LINES: readonly string[] = [
   "Gotta pop off for a sec, bro.",
   "Hold up, I gotta pop off for a sec.",
-  "Scuse me, fam. I gotta pop off real quick.",
+  "Scuse me, broski. I gotta pop off real quick.",
 ];
 export const DASH_LOVE_LINES: readonly string[] = [
   "Nothing beats this clock. Nothing, bro.",
@@ -74,11 +74,11 @@ export const DASH_LOVE_LINES: readonly string[] = [
   "Real talk, this clock is my best friend.",
 ];
 export const DASH_RUSH_LINES = {
-  warn: ["Hope you were watching.", "Eyes on the board, fam. Trust me.", "Take a good look, cuz. Real good.", "Memorize it, my guy. No cap."],
-  done: ["Hope I wasn't too quick for you.", "Blink and you missed it, fam.", "Too fast? My bad, cuz. Not really."],
+  warn: ["Hope you were watching.", "Eyes on the board, bro. Trust me.", "Take a good look, cuz. Real good.", "Memorize it, my guy. No cap."],
+  done: ["Hope I wasn't too quick for you.", "Blink and you missed it, broski.", "Too fast? My bad, cuz. Not really."],
   close: ["Close, but not quite!"],
   far: ["Not even close."],
-  fail: ["Guess I'll move again. Clearly you weren't paying attention.", "My turn again, fam. Rules are rules.", "Nah, that's not it. I'll take another one, cuz."],
+  fail: ["Guess I'll move again. Clearly you weren't paying attention.", "My turn again, bro. Rules are rules.", "Nah, that's not it. I'll take another one, cuz."],
 } as const;
 
 /** How often each moment speaks: every boss's beats, his slap, his scramble and your flag always. */

@@ -24,7 +24,7 @@ import { KING_ATTACK } from "@chessroyale/chess";
 import type { Beat } from "./boss-beats.ts";
 import { DEFAULT_LIGHTS, LIGHT_BULBS, bulbColour, lightsSwap } from "./lights.ts";
 import { canvas, ellipse, line, poly, toGrid, type Canvas } from "./paint.ts";
-import { lazyParts, lieDown, partSize, type Anim, type Character, type Frame, type Layer, type Part, type Speck } from "./sprite.ts";
+import { lazyAnim, lazyParts, lieDown, partSize, type Anim, type Character, type Frame, type Layer, type Part, type Speck } from "./sprite.ts";
 
 /**
  * Each bulb's keys, by its number on the strand: [main, shade, glint, glow] (letters of their own, past the ASCII ones
@@ -789,7 +789,7 @@ const SWAY = [0, 0, 1, 1, 1, 0, 0, -1, -1, -1, 0, 0, 1, 1, 0, -1] as const;
  * a glint runs along the bulbs, one after another, up one half and down the other. Silent.
  */
 const IDLE_P = (i: number): HollowPose => ({ bob: BREATH[i % 8]!, phase: i, sway: SWAY[i % 16]! });
-const idle: Anim = {
+const idle: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 16 }, (_, i) => {
     const p = IDLE_P(i);
@@ -797,10 +797,10 @@ const idle: Anim = {
     const spark = i === 13 ? sparkle(...(build(p).heart.map((v, n) => v + (n ? -1 : 6)) as [number, number])) : [];
     return f(125, p, { specks: [...glint, ...spark] });
   }),
-};
+}));
 
 /** Entrance: darkness gathers into a whirl, he rises out of it, eyes snapping open; his bulbs light a color at a time. */
-const entrance: Anim = {
+const entrance: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     { ms: 110, layers: [], specks: gather(AT_HEART, 0, 8), cue: "hum" },
@@ -814,21 +814,21 @@ const entrance: Anim = {
     f(140, { mood: "grim", phase: 5 }, { specks: bulbGlint({ phase: 5 }, 2, true) }),
     f(300, { mood: "sneer", phase: 6 }),
   ],
-};
+}));
 
 /** Thinking: a claw on his chin, eyes to the side, little orbs of darkness for thoughts. */
 const thoughtOrbs = (n: number): Speck[] =>
   [[OX + 50, OY + 4], [OX + 55, OY - 1], [OX + 60, OY - 7]].slice(0, n).flatMap(([x, y], i): Speck[] => (i === 2 ? sparkle(x!, y!, true) : [[x!, y!, "u"], [x! + 1, y!, "V"], [x!, y! - 1, "U"]]));
-const thinking: Anim = {
+const thinking: Anim = lazyAnim(() => ({
   loop: true,
   frames: [0, 1, 2, 3].flatMap((n) => [0, 1, 2, 3].map((i) => f(130, { mood: "think", free: "chin", feet: i % 2 ? "tap" : "stand", bob: i === 2 ? 1 : 0, phase: n * 2 + (i >> 1), sway: i === 1 ? 1 : 0 }, { specks: thoughtOrbs(n) }))),
-};
+}));
 
 /** Smug: a claw on his hip, a brow up, swinging the strand slowly. */
-const smug: Anim = {
+const smug: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 8 }, (_, i) => f(150, { mood: "sneer", free: "hip", feet: i % 4 < 2 ? "tap" : "stand", bob: i % 4 === 1 ? 1 : 0, phase: i, sway: [0, 1, 2, 1, 0, -1, -2, -1][i]!, headDx: i < 4 ? 0 : 1 }, { specks: i === 2 ? bulbGlint({ sway: 2 }, 1, true) : [] })),
-};
+}));
 
 /** Sweat running off his fur. */
 const sweat = (i: number): Speck[] => {
@@ -839,13 +839,13 @@ const sweat = (i: number): Speck[] => {
   ];
 };
 /** Rattled: wide eyes, shaking, sweating; the void wobbles and darkness leaks off him. */
-const rattled: Anim = {
+const rattled: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 8 }, (_, i) => f(80, { mood: "rattled", dx: i % 2 ? 1 : -1, bob: i % 4 === 2 ? 1 : 0, phase: i, size: i % 3 === 0 ? 1 : 0, free: "out", sway: i % 2 ? 1 : -1 }, { specks: [...sweat(i), ...wisps([AT_HEART[0], AT_HEART[1] - 1], i, 3, 12)] })),
-};
+}));
 
 /** His move: a step and a flourish of the strand toward the board, bulbs clinking. */
-const move: Anim = {
+const move: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(100, { crouch: 1, phase: 0, arm: "low" }),
@@ -855,10 +855,10 @@ const move: Anim = {
     f(120, { phase: 4, arm: "hold", sway: -1 }),
     f(160, { phase: 5 }),
   ],
-};
+}));
 
 /** A capture: he cackles, shoulders heaving, the void flaring, the strand jangling. */
-const capture: Anim = {
+const capture: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(90, { crouch: 1, phase: 0 }),
@@ -867,10 +867,10 @@ const capture: Anim = {
     ),
     f(160, { mood: "sneer", phase: 2 }),
   ],
-};
+}));
 
 /** Hurt: a flash, tufts of fur fly, his bulbs flicker and the void sputters; he flinches, then glares. */
-const hurt: Anim = {
+const hurt: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(70, { crouch: 3, mood: "hurt", free: "out", size: 2, phase: 0 }, { cue: "pop", pal: { ...FLASH, ...FLICKER }, shake: [1, 0], specks: tufts(0) }),
@@ -881,11 +881,11 @@ const hurt: Anim = {
     f(120, { mood: "roar", free: "claw", phase: 5 }, { pal: EYES_HOT }),
     f(160, { mood: "grim", phase: 6 }),
   ],
-};
+}));
 
 /** Check: he looms, claws up, eyes and void flaring, twice. */
 const LOOM: HollowPose = { crouch: 1, feet: "wide", free: "claw", arm: "high", mood: "roar", size: 2 };
-const check: Anim = {
+const check: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(100, { feet: "wide", mood: "grim", phase: 0 }),
@@ -897,7 +897,7 @@ const check: Anim = {
     f(150, { mood: "laugh", phase: 6, free: "claw" }),
     f(160, { mood: "sneer", phase: 7 }),
   ],
-};
+}));
 
 /** Defeat: the darkness lets go. The void sputters and shrinks to nothing, his bulbs go out a color at a time, and he slumps into a heap of fur. */
 function heap(mood: Mood, extra: Speck[] = []): Partial<Frame> & { layers: Layer[] } {
@@ -918,7 +918,7 @@ function heap(mood: Mood, extra: Speck[] = []): Partial<Frame> & { layers: Layer
     specks: extra,
   };
 }
-const defeat: Anim = {
+const defeat: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(80, { crouch: 3, mood: "hurt", free: "out", size: 2 }, { cue: "pop", pal: { ...FLASH, ...FLICKER }, shake: [1, 0], specks: tufts(0) }),
@@ -929,16 +929,16 @@ const defeat: Anim = {
     { ms: 140, pal: bulbsOff(0), ...heap("out", wisps([OX + 32, OY + 52], 5, 4, 14)) },
     { ms: 1000, pal: bulbsOff(0), ...heap("out") },
   ],
-};
+}));
 
 /** Victory: the strand held high, its bulbs flashing, he leaps and cackles, the void flaring. */
-const victory: Anim = {
+const victory: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 12 }, (_, i) => {
     const air = [0, 2, 5, 6, 5, 2, 0, 0, 0, 0, 0, 0][i]!;
     return f(110, { mood: "laugh", free: "fist", arm: "high", air, crouch: i === 0 || i === 6 ? 2 : 0, feet: air > 3 ? "wide" : "stand", headDy: i % 2 ? -1 : 0, phase: i, size: air > 4 ? 2 : 1, sway: i % 2 ? 2 : -2 }, { cue: i === 2 ? "clink" : undefined, pal: i % 3 === 0 ? { ...BULBS_BRIGHT, ...VOID_HOT } : undefined });
   }),
-};
+}));
 
 /**
  * His passive, casting the dark: he draws his free arm back as darkness spirals into the void, then flicks it at the
@@ -946,7 +946,7 @@ const victory: Anim = {
  * there), and he sneers.
  */
 const CAST_P: HollowPose = { crouch: 1, feet: "wide", free: "flick", mood: "roar", size: 2 };
-const darkCast: Anim = {
+const darkCast: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(110, { crouch: 1, free: "wind", mood: "grim", phase: 0 }, { cue: "hum", specks: gather(AT_HEART, 0) }),
@@ -959,13 +959,13 @@ const darkCast: Anim = {
     f(140, { crouch: 1, phase: 7, mood: "sneer", free: "hang" }),
     f(180, { phase: 0, mood: "sneer" }),
   ],
-};
+}));
 
 /**
  * Claiming the dark side (the intro, when the crowd would have been black): he points at himself, then sweeps his arm
  * wide as the darkness rises round him like a cloak, eyes flaring; a sneer.
  */
-const claimDark: Anim = {
+const claimDark: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(120, { mood: "think", free: "chin", phase: 0 }),
@@ -977,7 +977,7 @@ const claimDark: Anim = {
     f(140, { mood: "sneer", free: "hip", phase: 6 }, { specks: wisps([AT_HEART[0], AT_HEART[1] - 4], 4, 6, 20) }),
     f(320, { mood: "sneer", free: "hip", phase: 7 }),
   ],
-};
+}));
 
 /**
  * His ultimate, Lights out, played ON THE BOARD (hide him in his usual spot meanwhile): his shadow grows, he drops in
@@ -1004,7 +1004,7 @@ const smash = (k: number, phase: number): Frame[] => {
     f(130, { ...p, phase: phase + 2, mood: "laugh" }, { pal: dim, specks: glass(2, 3) }),
   ];
 };
-const lightsOut: Anim = {
+const lightsOut: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     { ms: 100, layers: [], specks: dropShadow(5), cue: "hum" },
@@ -1022,20 +1022,20 @@ const lightsOut: Anim = {
     f(160, { mood: "dark", broken: ALL_BULBS, arm: "low", phase: 5, size: 2 }, { pal: DARK_PAL }),
     f(400, { mood: "dark", broken: ALL_BULBS, arm: "low", phase: 6, size: 1 }, { pal: DARK_PAL }),
   ],
-};
+}));
 
 /** The void's pulse in the dark: brighter and wider on the beat. */
 const PULSE_PAL: Record<string, string> = { ...DARK_PAL, u: "#8657e0", U: "#d3b6ff", V: "#4a2a80", x: "#ffffff" };
 const DARK_P = (phase: number, size: 0 | 1 | 2 = 1): HollowPose => ({ mood: "dark", broken: ALL_BULBS, arm: "low", phase, size });
 /** The test stance (a loop): in the dark, only the void, pulsing slowly (once a second). */
-const lightsTest: Anim = {
+const lightsTest: Anim = lazyAnim(() => ({
   loop: true,
   frames: [
     f(140, DARK_P(0, 2), { pal: PULSE_PAL }),
     f(140, DARK_P(1, 1), { pal: DARK_PAL }),
     ...[2, 3, 4, 5].map((ph) => f(180, DARK_P(ph, 1), { pal: DARK_PAL })),
   ],
-};
+}));
 /**
  * The test's countdown, `s` seconds: the void throbs once a second ("tick"), wider and brighter as time runs out, and
  * twice in the last second; at the end it flares. Then `lightsTest` again.
@@ -1053,21 +1053,21 @@ const countdown = (s: number): Anim => ({
 });
 
 /** In the test: a piece found (he recoils, hissing, the void sputters) or missed (he cackles in the dark). */
-const testFound: Anim = {
+const testFound: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(90, { ...DARK_P(0, 0), crouch: 2, free: "out", mood: "hurt" }, { cue: "hum", pal: DARK_PAL, shake: [1, 0] }),
     f(110, { ...DARK_P(1, 2), crouch: 1, free: "out", mood: "rattled" }, { pal: PULSE_PAL }),
     f(160, { ...DARK_P(2, 1), mood: "dark" }, { pal: DARK_PAL }),
   ],
-};
-const testMiss: Anim = {
+}));
+const testMiss: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     ...Array.from({ length: 6 }, (_, i) => f(90, { ...DARK_P(i, i % 2 ? 1 : 2), mood: "laugh", free: "claw", headDy: i % 2 ? -1 : 0 }, { cue: i === 0 ? "hum" : undefined, pal: i % 2 ? DARK_PAL : PULSE_PAL })),
     f(160, DARK_P(6, 1), { pal: DARK_PAL }),
   ],
-};
+}));
 
 /**
  * Lights back, after the test: the void flares and a fresh strand spills out of it, its bulbs lighting a color at a time
@@ -1076,7 +1076,7 @@ const testMiss: Anim = {
  */
 /** The fresh strand spilling out of the void, both halves hanging from his heart. */
 const SPILL: StrandSpec = { hand: [VOID[0] + 1, VOID[1] + 1], ends: [[-6, 24], [10, 23]], bows: [-3, 4], broken: [] };
-const lightsBack: Anim = {
+const lightsBack: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(140, DARK_P(0, 2), { pal: PULSE_PAL }),
@@ -1093,7 +1093,7 @@ const lightsBack: Anim = {
     { ms: 80, layers: [], specks: dropShadow(6) },
     { ms: 60, layers: [] },
   ],
-};
+}));
 
 /**
  * His attack on a king (the God King in his Last Stand, or the crowd's king when Hollow mates it), played ON THE BOARD
@@ -1114,7 +1114,7 @@ const tipSparks = (p: HollowPose, big: boolean): Speck[] => {
   const tips = [b[0], b[BULBS - 1]].filter((x): x is Pt => !!x);
   return [...tips.flatMap(([x, y], n) => sparkle(x + 1 + n, y + 2, big)), ...bulbGlint(p, 0, true), ...bulbGlint(p, BULBS - 1, true)];
 };
-const kingAttack: Anim = (() => {
+const kingAttack: Anim = lazyAnim(() => (() => {
   const A = KING_ATTACK;
   const frames: Frame[] = [
     // His shadow grows where he'll land; he drops in (he has left his corner) and lands, crouched.
@@ -1145,7 +1145,7 @@ const kingAttack: Anim = (() => {
     { ms: 60, layers: [] },
   );
   return { loop: false, frames };
-})();
+})());
 
 export const HOLLOW: Character = {
   id: "hollow",
@@ -1175,9 +1175,9 @@ export const HOLLOW: Character = {
     claimDark,
     lightsOut,
     lightsTest,
-    test3: countdown(3),
-    test4: countdown(4),
-    test5: countdown(5),
+    test3: lazyAnim(() => countdown(3)),
+    test4: lazyAnim(() => countdown(4)),
+    test5: lazyAnim(() => countdown(5)),
     testFound,
     testMiss,
     lightsBack,

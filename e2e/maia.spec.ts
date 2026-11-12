@@ -9,7 +9,8 @@ import { createLobbyFromHome, joinFromInvite, named, test, watchFor, bossAloneFr
  * admin every boss plays with Maia by default, in Boss alone and online (the host's device plays it, everyone gets its
  * one move); an admin can ask for another brain with ?brain=<id> (no picker in the boss menu since Eric's Oct 25 ask),
  * and a debug line says what the brain did.
- * Maia's moves come through the Maia box's worker, spoken to in text. Players never load Maia.
+ * Maia's moves come through the Maia box's worker, spoken to in text. Online, a second device plays each boss move too, with the
+ * same seed (BOSS_CHECK), so it loads Maia as the host does.
  */
 const phase = (p: Page) => p.evaluate(() => (window as any).match?.phase.kind ?? "none").catch(() => "none");
 
@@ -107,7 +108,7 @@ test("every boss is on Maia, no guard, by default for an admin (Boss alone, a ph
   }
 });
 
-test("an online raid on the Maia brain: the host's device plays Maia's move, everyone gets the same one, a player's never loads it", { tag: "@phone-only" }, async ({ browser }) => {
+test("an online raid on the Maia brain: the host's device plays Maia's move, the second device checks it (it loads Maia too), everyone gets the same one", { tag: "@phone-only" }, async ({ browser }) => {
   test.skip(test.info().project.name !== "desktop", "one run covers both devices");
   test.setTimeout(5 * 60_000);
   // (wrangler dev's MAIA_TEST counts everyone as an admin for the lobby's choice; only the admin's app may run Maia.)
@@ -142,8 +143,9 @@ test("an online raid on the Maia brain: the host's device plays Maia's move, eve
     await expect.poll(() => guest.evaluate(() => (window as any).match.boss?.lastMove?.move ?? null), { timeout: 10_000 }).toBe(played);
   }
   expect(lines.filter((l) => /Maia \d+ · no guard · Maia's #\d+ · \d+ ms/.test(l)).length, lines.join(" | ")).toBeGreaterThanOrEqual(1);
-  // The player's device never downloaded Maia, and shows no debug line.
-  expect(guestMaia).toEqual([]);
+  // The other device checks the boss's moves (BOSS_CHECK: the same request, the same seed): it loads Maia too, as the battle
+  // begins (it was told the battle's brain), and shows no debug line (not an admin).
+  expect(guestMaia.length).toBeGreaterThan(0);
   await expect(guest.locator(".brain-debug")).toHaveCount(0);
 });
 
@@ -243,7 +245,7 @@ test("the loading step: Stockfish's workers end, Maia loads alone behind \"Loadi
   expect(lines.filter((l) => /Maia \d+ · no guard · Maia's #\d+ · \d+ ms/.test(l)).length, lines.join(" | ")).toBeGreaterThanOrEqual(1);
   // The next battle on this device: its files are saved, so it's straight to "Starting…", with no word of a download.
   await page.goto("/?debug&clock=40&bossMoves=4&laststand=0&boss=gingerbread");
-  const again = await watchFor(page, { first: { selector: ".boss-loading-first" }, download: { selector: '.boss-loading[data-stage="download"]' }, starting: { selector: ".boss-loading", text: /Starting…/ } });
+  const again = await watchFor(page, { first: { selector: ".boss-loading", text: /Loading the HunChess engine…/ }, download: { selector: '.boss-loading[data-stage="download"]' }, starting: { selector: ".boss-loading", text: /Starting…/ } });
   await bossAloneFromHome(page);
   await expect(page.locator(".boss-intro")).toBeVisible({ timeout: 60_000 });
   expect(await again.seen()).toEqual({ first: false, download: false, starting: true });

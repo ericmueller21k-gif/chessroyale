@@ -193,9 +193,11 @@ export async function battleToken(sql: Sql, userId: string, battle: unknown, now
 
 /** An account's boss tokens (only bosses it has some of) and crate keys, for its locker. */
 export async function tokenHoldings(sql: Sql, userId: string): Promise<{ tokens: Record<string, number>; keys: number }> {
-  const rows = await sql.all<{ boss: string; n: number }>("SELECT boss, n FROM boss_tokens WHERE user_id = ? AND n > 0 ORDER BY boss", userId);
-  const keys = (await sql.first<{ crate_keys: number | null }>("SELECT crate_keys FROM wallets WHERE user_id = ?", userId))?.crate_keys ?? 0;
-  return { tokens: Object.fromEntries(rows.map((r) => [r.boss, r.n])), keys };
+  const [rows, wallet] = await Promise.all([
+    sql.all<{ boss: string; n: number }>("SELECT boss, n FROM boss_tokens WHERE user_id = ? AND n > 0 ORDER BY boss", userId),
+    sql.first<{ crate_keys: number | null }>("SELECT crate_keys FROM wallets WHERE user_id = ?", userId),
+  ]);
+  return { tokens: Object.fromEntries(rows.map((r) => [r.boss, r.n])), keys: wallet?.crate_keys ?? 0 };
 }
 
 /** A boss crate's two prices: all tokens, or a token and a crate key. */
@@ -321,12 +323,12 @@ export async function openBossCrate(
   return { ok: false, message: noneToOpen(crate.name) };
 }
 
-/** A whole number from 0 to BOSS_TOKENS.grantMax, or 0. */
-const grantCount = (n: unknown) => (typeof n === "number" && Number.isInteger(n) ? Math.max(0, Math.min(BOSS_TOKENS.grantMax, n)) : 0);
+/** A whole number from 0 to `max` (BOSS_TOKENS.grantMax for tokens, keysGrantMax for keys), or 0. */
+const grantCount = (n: unknown, max: number = BOSS_TOKENS.grantMax) => (typeof n === "number" && Number.isInteger(n) ? Math.max(0, Math.min(max, n)) : 0);
 
 /**
- * An admin's test grant (the Crates tab's admin box; the API checks it's an admin): crate keys, and any boss's tokens, to their
- * own account. Never a drop: the window doesn't count it. Keyed by the app's request id (`grant:<ledger id>:<request>`): a retry
+ * An admin's test grant (the Crates tab's admin box; the API checks it's an admin): crate keys (up to BOSS_TOKENS.keysGrantMax, 100,
+ * at once: Eric, Nov 9), and any boss's tokens, to their own account. Never a drop: the window doesn't count it. Keyed by the app's request id (`grant:<ledger id>:<request>`): a retry
  * gives nothing more. (An older app's, with none: a fresh key.)
  */
 export async function grantTestItems(
@@ -335,7 +337,7 @@ export async function grantTestItems(
   body: { keys?: unknown; boss?: unknown; tokens?: unknown; request?: unknown },
   now = Date.now(),
 ): Promise<{ ok: true } | { ok: false; message: string }> {
-  const keys = grantCount(body.keys);
+  const keys = grantCount(body.keys, BOSS_TOKENS.keysGrantMax);
   const tokens = isTokenBoss(body.boss) ? grantCount(body.tokens) : 0;
   if (!keys && !tokens) return { ok: false, message: "Nothing to give." };
   const me = await ledgerAccount(sql, userId);

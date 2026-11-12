@@ -37,7 +37,7 @@
  *                               left and right: the first at `launch`, each at a `shot` cue. Fly a `candleShot` from
  *                               the candle's top on each, along its tilt (grex.ts: CANDLE_SWEEP, candleMuzzle), so
  *                               they fan out. The last frame holds until you take him off. While the shots are up,
- *                               show `candleShots` by the board's right edge: `left<n>` for the n still up (24 to 0).
+ *                               show `candleShots` in his boss card: `left<n>` for the n still up (24 to 0).
  *     ultimateHit  "capture"    His laugh, as fireballs come down (lines: `kit.lines.ultimateHit`): for each, fly
  *                               `fireballFall` fall from above the board onto its square, play its `land` there,
  *                               then the square is a stage-1 `fireTile` (land ends on stage1's first frame), which
@@ -71,9 +71,10 @@
  *                               lighting (`relight`), the light comes back into him and he leaps off (ends empty:
  *                               show him back in his corner). From `relight`, nightItems() step "dawn" spreads the
  *                               light from his spot out across the board. Lines: `kit.lines.lightsBack`.
- *       bulbs      the countdown to his next cover: `bulbStrand` (a strip: `lit3`…`lit0`, `out3`/`out2`/`out1` as a
- *                               bulb goes out, `relight` after the last). Only the strip counts down: his own strand
- *                               stays lit in full in every pose (Eric, Oct 16).
+ *       bulbs      the countdown to his next cover: `bulbStrand` (a phone's) and `bulbStrandWide` (a computer's),
+ *                               six bulbs, one for each move, yours and his (Eric, Nov 12): `lit6`…`lit0`,
+ *                               `out6`…`out1` as a bulb goes out, `relight` after the last. Only the strip counts down:
+ *                               his own strand stays lit in full in every pose (Eric, Oct 16).
  *
  *   Not a power, but on the board like one: a boss's attack on a king (the God King in his Last Stand, the crowd's king
  *   at its mate) is its kit's `kingAttack` (kits.ts): Hollow's is HOLLOW_ATTACK's "kingAttack" (hollow.ts), with
@@ -216,8 +217,8 @@
  *   candleShot     square  fly (loop), pop (ends empty). A Roman candle rocket pointing up; move it up.
  *   fireballFall   square  fall (loop), land (ends on fireTile's stage1 look). Move the falling one down onto
  *                          the square, land it there, then carry on with fireTile stage1.
- *   candleShots    strip   left24 ... left0 (loops), 7 x 146: a column of the shots still up (lit rockets from
- *                          the bottom, then spent). Size its box to keep its shape (width = height x 7 / 146).
+ *   candleShots    strip   left24 ... left0 (loops), 99 x 9: a row of the shots still up (lit rockets from
+ *                          the left, then spent). Size its box to keep its shape (height = width x 9 / 99).
  *   fireShadow     square  grow1, shadow1 (loop), grow2, shadow2 (loop), grow3, shadow3 (loop): the shadow of a
  *                          fireball coming down on the square, small 3 turns out, bigger, then the biggest (a
  *                          glow round it) the turn before it lands. See-through; draw it under the pieces.
@@ -226,8 +227,9 @@
  *                          square's 32 px, so the selection's green shows round it). Over the pieces, no taps.
  *   darkPour       square  fly (loop). The darkness in flight, pointing right: turn it toward its target.
  *   darkMiss       square  miss (ends empty): a red-violet slash, for a wrong tap or a wrong move into the dark.
- *   bulbStrand     strip   lit3 … lit0 (loops), out3, out2, out1 (a bulb going out; each ends on the next lit<n>),
- *                          relight (ends on lit3); 44 x 15. Size its box to keep its shape (height = width x 15 / 44).
+ *   bulbStrand     strip   lit6 … lit0 (loops), out6 … out1 (a bulb going out, its `pop`; each ends on the next
+ *                          lit<n>), relight (ends on lit6); 44 x 11, a phone's (its rage meter's 44 px, 1:1).
+ *   bulbStrandWide strip   the same, 88 x 11: a computer's (its rage meter's 88 px, 1:1, in the 11 px under it).
  *   lifeStrand     strip   lit10 … lit0 (loops), out10 … out1 (a bulb going out, its `fizz`; each ends on the next
  *                          lit<n>): Boss alone's ten bulbs (Nov 5), 95 x 15 (height = width x 15 / 95).
  *   nightSquare    square  Lights out, a tile a square: dim1, dim2 (one-shots that hold), dim3<t>, night<t>
@@ -256,6 +258,8 @@
  *                          low, from the left or right edge: a white puff and ice shards; it never covers the king.
  *   popHit         square  hit<H|L><L|R> (ends empty, about 200 ms): a fireball of Jefferson's Roman candle popping on a
  *                          king, high or low, from the left or right: a white flash and eight sparks bursting out.
+ *   clawHit        square  hit<H|L><L|R> (ends empty, about 200 ms): a swipe of Dash's claws on a king, high or low, from
+ *                          the left or right edge: three streaks raking down, white-hot, then his teal.
  *   lashHit        square  hit<F|B><L|R><c> (ends empty, about 200 ms): a lash of Hollow's strand landing on a king,
  *                          a forehand (high) or backhand (low, rising), from the left or right edge, in bulb color c.
  *   paintSplash    square  land<A|B|C> (a splash of paint lands over a piece: it spreads, `splat`; ends on hold's look),
@@ -415,7 +419,7 @@ export const POWER_MOMENTS: Record<string, BossPowerMoments> = {
       found: { anim: "testFound", onBoard: true, effects: ["nightSquare"] },
       missed: { anim: "testMiss", onBoard: true, effects: ["darkMiss"] },
       lightsBack: { anim: "lightsBack", hit: "relight", onBoard: true, effects: ["nightSquare"] },
-      bulbs: { anim: "idle", effects: ["bulbStrand"] },
+      bulbs: { anim: "idle", effects: ["bulbStrand", "bulbStrandWide"] },
     },
   },
   "Big Boy": {
@@ -558,7 +562,8 @@ export const EFFECTS: Record<EffectName, Effect> = {
   darkSquare: { ch: EFFECT_SPRITES.darkSquare, covers: "square", start: "gather", loop: "dark", end: "clear", stages: [{ loop: "dark" }, { loop: "thin" }], sounds: { gather: "hollowWhisper", clear: "hollowWhisper" } },
   darkPour: { ch: EFFECT_SPRITES.darkPour, covers: "square", loop: "fly", sounds: {} },
   darkMiss: { ch: EFFECT_SPRITES.darkMiss, covers: "square", start: "miss", sounds: { miss: "hollowMiss" } },
-  bulbStrand: { ch: EFFECT_SPRITES.bulbStrand, covers: "strip", loop: "lit3", counter: { prefix: "lit", max: 3 }, sounds: { pop: "hollowPop", relight: "hollowRelight" } },
+  bulbStrand: { ch: EFFECT_SPRITES.bulbStrand, covers: "strip", loop: "lit6", counter: { prefix: "lit", max: 6 }, sounds: { pop: "hollowPop", relight: "hollowRelight" } },
+  bulbStrandWide: { ch: EFFECT_SPRITES.bulbStrandWide, covers: "strip", loop: "lit6", counter: { prefix: "lit", max: 6 }, sounds: { pop: "hollowPop", relight: "hollowRelight" } },
   lifeStrand: { ch: EFFECT_SPRITES.lifeStrand, covers: "strip", loop: "lit10", counter: { prefix: "lit", max: 10 }, sounds: { fizz: "hollowFizz" } },
   nightSquare: { ch: EFFECT_SPRITES.nightSquare, covers: "square", loop: "night0D", end: "dawn0D", sounds: { found: "hollowFound", answer: "hollowWhisper" } },
   nightLabel: { ch: EFFECT_SPRITES.nightLabel, covers: "square", loop: "a", sounds: {} },
@@ -573,8 +578,17 @@ export const EFFECTS: Record<EffectName, Effect> = {
   ankusHit: { ch: EFFECT_SPRITES.ankusHit, covers: "square", start: "hitHL", sounds: {} },
   sawHit: { ch: EFFECT_SPRITES.sawHit, covers: "square", start: "hitAL", sounds: {} },
   chipHit: { ch: EFFECT_SPRITES.chipHit, covers: "square", start: "hitUL", sounds: {} },
+  flourHit: { ch: EFFECT_SPRITES.flourHit, covers: "square", start: "hitHL", sounds: {} },
+  clawHit: { ch: EFFECT_SPRITES.clawHit, covers: "square", start: "hitHL", sounds: {} },
+  // Don Dough's dough on its square (components/Zebra.tsx): it lands (`land`), proofs as its kind (`p` … `q`, loops), rises into his
+  // piece (`<k>Rise`) or is squashed (`<k>Squash`). Its sounds: the plop, the swell and the oven's pop, the splat.
+  zebraDough: { ch: EFFECT_SPRITES.zebraDough, covers: "square", start: "land", loop: "p", sounds: { plop: "zebraPlop", rise: "zebraRise", pop: "zebraOvenPop", squash: "zebraSquash" } },
+  // Gold Plate on his piece's square: the gilding (its chimes are his brush's `gild` cue: quiet here), the shine, the idle glint (no
+  // sound: it repeats), a pawn's clink off it.
+  goldFx: { ch: EFFECT_SPRITES.goldFx, covers: "square", start: "gild", loop: "glint", sounds: { gild: "zebraGild", shine: "zebraShine", glint: "zebraShine", clink: "zebraClink" } },
   lassoHit: { ch: EFFECT_SPRITES.lassoHit, covers: "square", start: "hitHL", sounds: {} },
   pieHit: { ch: EFFECT_SPRITES.pieHit, covers: "square", start: "hitHL", sounds: {} },
+  pieFace: { ch: EFFECT_SPRITES.pieFace, covers: "square", start: "hitHL", sounds: { splat: "clownSplat" } },
   bonkHit: { ch: EFFECT_SPRITES.bonkHit, covers: "square", start: "hitHL", sounds: {} },
   frostHit: { ch: EFFECT_SPRITES.frostHit, covers: "square", start: "hitHL", sounds: {} },
   popHit: { ch: EFFECT_SPRITES.popHit, covers: "square", start: "hitHL", sounds: {} },
@@ -791,6 +805,16 @@ export function sawItem(square: string, i: number, from: "L" | "R", since: numbe
 export function chipItem(square: string, i: number, from: "L" | "R", since: number): SquareItem {
   const kind = i >= 9 ? "X" : i === 8 || i % 2 ? "S" : "U";
   return { square, name: "chipHit", anim: `hit${kind}${from}`, since };
+}
+
+/** Dash's i-th swipe of his claws on the king's square (at its head, then its chest, in turn), from his side. */
+export function clawItem(square: string, i: number, from: "L" | "R", since: number): SquareItem {
+  return { square, name: "clawHit", anim: `hit${i % 2 ? "L" : "H"}${from}`, since };
+}
+
+/** Don Dough's i-th shot of his bread rifle on the king's square (at its head, then its chest, in turn), from his side. */
+export function flourItem(square: string, i: number, from: "L" | "R", since: number): SquareItem {
+  return { square, name: "flourHit", anim: `hit${i % 2 ? "L" : "H"}${from}`, since };
 }
 
 /** Wrangler's i-th crack of his lasso on the king's square (high, then low, in turn), from his side. */

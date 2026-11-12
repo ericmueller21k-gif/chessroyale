@@ -1,10 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { LOBBY_LIFE, RAID_SETTINGS, SQUADS_LOBBY } from "@chessroyale/core";
+import { LOBBY_LIFE, MATCH_SAVE, RAID_SETTINGS, SQUADS_LOBBY } from "@chessroyale/core";
 import { createGuest, ensureSchema, signInWithIdentity, type Sql } from "../src/accounts.ts";
 import type { LobbyRecord } from "../src/lobby.ts";
 import type { SquadsRecord, SquadsReward } from "../src/squads-lobby.ts";
 import { ledgerAccount, ledgerMismatches } from "../src/ledger.ts";
 import { memoryDb } from "./memory-db.ts";
+import { opsStats } from "../src/ops.ts";
 
 // (The engine server is a Container, which needs the Workers runtime: not here.)
 vi.mock("../src/engine.ts", () => ({ SERVER_RECHECK_NODES: 2_000_000, serverRecheck: async () => null, serverScoreAt: async () => null, warmEngine: async () => false }));
@@ -145,6 +146,8 @@ describe("an online boss battle's token drop (lobby-do.ts: drop:<code>:<match st
           for (let i = 0; i < 5_000 && !until() && rt.alarm !== null; i++) {
             vi.setSystemTime(Math.max(Date.now(), rt.alarm));
             await lobby.alarm().catch(() => undefined);
+            // (Results are written in the background since the review of #610, m2.)
+            await rt.settle();
           }
         },
       };
@@ -155,12 +158,16 @@ describe("an online boss battle's token drop (lobby-do.ts: drop:<code>:<match st
     rt.failPut = () => !stopped && drops() > 0 && (stopped = true);
     await first.ring(() => stopped);
     expect(stopped).toBe(true);
-    expect(phase()).not.toBe("results");
+    // (Since Nov 10 the match's end is stored first, with Ann's result waiting in it: the stop came after writing it, before storing
+    // that it's written.)
+    expect(phase()).toBe("results");
+    expect((rt.store.get("lobby") as LobbyRecord).saveQueue).toHaveLength(1);
     expect(tokens()).toBe(1);
-    // Restarted from what it stored: it plays the end again and saves the results again.
+    // Restarted from what it stored: it writes the waiting result again.
     rt.failPut = () => false;
     await first.restart();
-    await first.ring(() => phase() === "results");
+    await first.ring(() => phase() === "results" && !(rt.store.get("lobby") as LobbyRecord).saveQueue?.length);
+    expect((rt.store.get("lobby") as LobbyRecord).saveQueue).toEqual([]);
     expect((rt.store.get("lobby") as LobbyRecord).resultsSaved).toBe(true);
     const start = (rt.store.get("lobby") as LobbyRecord).startedAt!;
     expect(tokens()).toBe(1);
@@ -175,6 +182,83 @@ describe("an online boss battle's token drop (lobby-do.ts: drop:<code>:<match st
     expect(tokens()).toBe(2);
     expect(db.prepare("SELECT COUNT(DISTINCT op_id) AS n FROM ledger WHERE op_id LIKE 'drop:RAIDS:%'").get()).toEqual({ n: 2 });
     expect(await ledgerMismatches(sql, ann.id)).toEqual([]);
+  }, 120_000);
+});
+
+describe("a match's end waits for D1 (lobby-do.ts: the results in the record until written; the outside review of Nov 10, finding 9)", () => {
+  it("D1 down at the end: the result stays in the record, retried every MATCH_SAVE.retrySeconds; the lobby stays past its closing time, then writes it once and closes", async () => {
+    const { sql, d1, db } = memoryDb();
+    await ensureSchema(sql);
+    const D1 = flakyD1(d1);
+    const ann = await signedIn(sql, "Ann");
+    const rt = runtime();
+    const env = { DB: D1.db };
+    const lobby = await rt.make(Lobby, env);
+    expect(await lobby.create("RAIDS", { ...RAID_SETTINGS } as LobbyRecord["overrides"])).toBe(true);
+    const ws = new FakeSocket();
+    ws.serializeAttachment({ userId: ann.id, guest: false, banned: false });
+    rt.sockets.splice(0, rt.sockets.length, ws);
+    await lobby.webSocketMessage(ws as unknown as WebSocket, JSON.stringify({ t: "hello", name: "Ann", device: "computer" }));
+    await lobby.webSocketMessage(ws as unknown as WebSocket, JSON.stringify({ t: "start" }));
+    const record = () => rt.store.get("lobby") as LobbyRecord;
+    const results = () => (db.prepare("SELECT COUNT(*) AS n FROM results WHERE user_id = ?").get(ann.id) as { n: number }).n;
+    const ring = async (until: () => boolean, most = 5_000) => {
+      for (let i = 0; i < most && !until() && rt.alarm !== null; i++) {
+        vi.setSystemTime(Math.max(Date.now(), rt.alarm));
+        await lobby.alarm().catch(() => undefined);
+        await rt.settle();
+      }
+    };
+    // Played out by its alarms (Ann picks nothing: the boss battle runs its clock); D1 goes down as it ends.
+    await ring(() => record().phase === "boss" || record().phase === "results");
+    D1.state.down = true;
+    await ring(() => record().phase === "results");
+    expect(record().resultsSaved).toBe(true);
+    expect(record().saveQueue).toHaveLength(1);
+    expect(record().saveQueue![0]!.failedAt).toBeLessThanOrEqual(Date.now());
+    expect(rt.alarm).toBeLessThanOrEqual(Date.now() + MATCH_SAVE.retrySeconds * 1000);
+    // Past its closing time: it stays (its code held), trying again.
+    const closesAt = record().endedAt! + LOBBY_LIFE.lobbyResultsKeepMinutes * 60_000;
+    await ring(() => Date.now() > closesAt + 5 * 60_000, 50);
+    expect(Date.now()).toBeGreaterThan(closesAt);
+    expect(rt.store.size).toBeGreaterThan(0);
+    expect(record().saveQueue).toHaveLength(1);
+    expect(await lobby.create("RAIDS", { ...RAID_SETTINGS } as LobbyRecord["overrides"])).toBe(false);
+    // D1 back: written once, then it closes.
+    D1.state.down = false;
+    await ring(() => rt.store.size === 0, 10);
+    expect(rt.store.size).toBe(0);
+    expect(results()).toBe(1);
+  }, 120_000);
+
+  it("D1 down for MATCH_SAVE.retryHours past the closing time: the lobby closes anyway, and the ops page hears what it couldn't write", async () => {
+    const { sql, d1 } = memoryDb();
+    await ensureSchema(sql);
+    const D1 = flakyD1(d1);
+    const ann = await signedIn(sql, "Ann");
+    const rt = runtime();
+    const lobby = await rt.make(Lobby, { DB: D1.db });
+    await lobby.create("RAIDS", { ...RAID_SETTINGS } as LobbyRecord["overrides"]);
+    const ws = new FakeSocket();
+    ws.serializeAttachment({ userId: ann.id, guest: false, banned: false });
+    rt.sockets.splice(0, rt.sockets.length, ws);
+    await lobby.webSocketMessage(ws as unknown as WebSocket, JSON.stringify({ t: "hello", name: "Ann", device: "computer" }));
+    await lobby.webSocketMessage(ws as unknown as WebSocket, JSON.stringify({ t: "start" }));
+    const record = () => rt.store.get("lobby") as LobbyRecord;
+    for (let i = 0; i < 5_000 && record().phase !== "results" && rt.alarm !== null; i++) {
+      // (D1 goes down as the boss battle begins.)
+      if (record().phase === "boss") D1.state.down = true;
+      vi.setSystemTime(Math.max(Date.now(), rt.alarm));
+      await lobby.alarm().catch(() => undefined);
+    }
+    expect(D1.state.down).toBe(true);
+    expect(record().saveQueue).toHaveLength(1);
+    const lost = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    vi.setSystemTime(record().endedAt! + LOBBY_LIFE.lobbyResultsKeepMinutes * 60_000 + MATCH_SAVE.retryHours * 3_600_000 + 1000);
+    await lobby.alarm();
+    expect(rt.store.size).toBe(0);
+    expect(opsStats().calls["lobby.resultsLost"]).toBeGreaterThanOrEqual(1);
+    lost.mockRestore();
   }, 120_000);
 });
 
@@ -201,7 +285,8 @@ describe("Squads rewards, at least once (squads-do.ts: squads:<code>:<created>:<
       await lobby.alarm();
       await rt.settle();
     };
-    const wallet = (id: string) => db.prepare("SELECT coins, crates FROM wallets WHERE user_id = ?").get(id);
+    // (A placement's crates are Winter Crates since Nov 9: series_crates.)
+    const wallet = (id: string) => db.prepare("SELECT w.coins, (SELECT COALESCE(SUM(s.n), 0) FROM series_crates s WHERE s.user_id = w.user_id) AS crates FROM wallets w WHERE w.user_id = ?").get(id);
     const results = (id: string) => (db.prepare("SELECT COUNT(*) AS n FROM results WHERE user_id = ? AND mode = 'squads'").get(id) as { n: number }).n;
     const annWon: SquadsReward = { playerId: "p1", userId: ann.id, squadId: 0, placement: 1, coins: 100, crates: 1, recorded: true };
 
@@ -221,7 +306,7 @@ describe("Squads rewards, at least once (squads-do.ts: squads:<code>:<created>:<
     const acct = (await ledgerAccount(sql, ann.id))!.account;
     expect(db.prepare("SELECT op_id, leg, asset_kind, delta FROM ledger WHERE reason = 'reward' ORDER BY leg").all()).toEqual([
       { op_id: `squads:SQUAD:${created}:${acct}`, leg: 0, asset_kind: "coins", delta: 100 },
-      { op_id: `squads:SQUAD:${created}:${acct}`, leg: 1, asset_kind: "crates", delta: 1 },
+      { op_id: `squads:SQUAD:${created}:${acct}`, leg: 1, asset_kind: "series_crate", delta: 1 },
     ]);
     // The room wrote it and stopped before storing that it had: it's written again on waking, and nothing changes.
     await queue(annWon);

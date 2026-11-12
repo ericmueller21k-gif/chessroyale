@@ -1,4 +1,4 @@
-import { mkdirSync } from "node:fs";
+import { mkdirSync, readFileSync, statSync } from "node:fs";
 import { expect, type Page } from "@playwright/test";
 import { asAdmin, test } from "./helpers.ts";
 
@@ -49,7 +49,7 @@ type Hooks = {
 async function openStreet(page: Page, query = "") {
   await asAdmin(page);
   await page.goto(`/town?sky=day${query}`);
-  await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 30_000 });
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
   await expect(canvas(page)).toHaveAttribute("data-backend", "webgl");
 }
 
@@ -222,6 +222,79 @@ async function towardKey(page: Page, dir: "N" | "E" | "S" | "W") {
 // (Round 5: "the boxes and the chase camera's turn" went with the chase camera: e2e/town-fixed.spec.ts walks the one fixed view, a
 // home's strip and the look round, on both renderers.)
 
+test("Alfil's Pyramid (Eric, Nov 12: \"more grace\"): a tap on the half-hidden tile in front of his door, the sidewalk before it, the building's bottom edge or your own pawn at his door walks you to his door and the Go in card shows", async ({ page, isMobile }) => {
+  test.setTimeout(120_000);
+  const errors = watchErrors(page);
+  await openStreet(page);
+  // (His boss to his rest square at the far end of his box, so the taps land on the building, not on him.)
+  await expect.poll(() => page.evaluate(() => (window as unknown as Hooks).__townBossBack?.("alfil") ?? false), { timeout: 30_000 }).toBe(true);
+  const card = page.getByRole("dialog", { name: "Alfil's Pyramid", exact: true });
+  /** Two rows out in South Street, before his door (open ground: a tap there is a square), the camera at rest. */
+  const stepBack = async () => {
+    await page.evaluate(() => (window as unknown as { __townWalk?: (sq: readonly [number, number]) => boolean }).__townWalk?.([37, 14]));
+    await expect.poll(async () => (await you(page)).join(","), { timeout: 30_000 }).toBe("37,14");
+    await settled(page);
+  };
+  const pickAt = (x: number, y: number) => page.evaluate(([x, y]) => (window as unknown as { __townPick?: (x: number, y: number) => { key: string } | null }).__townPick?.(x, y)?.key ?? null, [x, y] as const);
+  const tapAt = async (x: number, y: number) => {
+    const cv = (await canvas(page).boundingBox())!;
+    if (isMobile) await page.touchscreen.tap(cv.x + x, cv.y + y);
+    else await page.mouse.click(cv.x + x, cv.y + y);
+  };
+  const arrives = async (what: string) => {
+    await expect(card, `${what}: the card`).toBeVisible({ timeout: 5000 });
+    await expect(card.getByRole("button", { name: "Go in" })).toBeVisible();
+    // (His door square (37, 16), or the one beside it if someone stands there.)
+    await expect.poll(async () => { const [c, r] = await you(page); return r === 16 && Math.abs(c - 37) <= 1; }, { message: `${what}: at his door`, timeout: 20_000 }).toBe(true);
+    await expect(card, `${what}: the card stays`).toBeVisible();
+  };
+  await stepBack();
+  // Before: a square two rows out is only a square.
+  const open = (await page.evaluate(() => (window as unknown as Hooks).__townAt?.("tap-square", [37, 14]) ?? null))!;
+  expect(await pickAt(open.x, open.y), "two rows out: a square").toBe("sq:37,14");
+  // 1. The tile in front of his door his picture half hides (the front of his lot's first row, 37, 17).
+  const tile = (await page.evaluate(() => (window as unknown as Hooks).__townAt?.("tap-square", [37, 17]) ?? null))!;
+  expect(tile, "the half-hidden tile drawn").not.toBeNull();
+  expect(await pickAt(tile.x, tile.y), "the half-hidden tile").toBe("home:alfil");
+  await tapAt(tile.x, tile.y);
+  await arrives("the half-hidden tile");
+  await page.keyboard.press("Escape");
+  await expect(card).toBeHidden();
+  // 2. The ground right in front of it: the sidewalk square beside his door square (a plain square until Nov 12).
+  await stepBack();
+  const foot = (await page.evaluate(() => (window as unknown as Hooks).__townAt?.("tap-square", [38, 16]) ?? null))!;
+  expect(foot, "the sidewalk before his door drawn").not.toBeNull();
+  expect(await pickAt(foot.x, foot.y), "the sidewalk before his door").toBe("home:alfil");
+  await tapAt(foot.x, foot.y);
+  await arrives("the sidewalk before his door");
+  await page.keyboard.press("Escape");
+  await expect(card).toBeHidden();
+  // 3. The building's bottom edge: 3 px above its front's foot, at his door (the steps' foot).
+  await stepBack();
+  // (His box: the home whose front's foot spans his door's column.)
+  const box = (await page.evaluate(() =>
+    (window as unknown as { __townCam?: () => { boxes: { kind: string; foot: number[] | null }[] } }).__townCam?.().boxes.find((b) => b.kind === "home" && !!b.foot && Math.min(b.foot[6]!, b.foot[8]!) < 37.5 && Math.max(b.foot[6]!, b.foot[8]!) > 37.5) ?? null,
+  ))!;
+  expect(box?.foot, "his front drawn").toBeTruthy();
+  const [x0, y0, x1, y1, , , wx0, , wx1] = box.foot!;
+  const s = (37.5 - wx0!) / (wx1! - wx0!);
+  const edge = { x: x0! + s * (x1! - x0!), y: y0! + s * (y1! - y0!) - 3 };
+  expect(await pickAt(edge.x, edge.y), "the bottom edge").toBe("home:alfil");
+  await tapAt(edge.x, edge.y);
+  await arrives("the bottom edge");
+  // 4. Standing at his door, your own pawn over the tile in front of it: a tap there is still his (Eric's screenshot).
+  await page.keyboard.press("Escape");
+  await expect(card).toBeHidden();
+  const under = (await page.evaluate(() => (window as unknown as { __townCam?: () => { you: { x0: number; y0: number; x1: number; y1: number } | null } }).__townCam?.().you ?? null))!;
+  expect(under, "your pawn drawn").not.toBeNull();
+  const mid = { x: (under.x0 + under.x1) / 2, y: under.y0 + 0.4 * (under.y1 - under.y0) };
+  expect(await pickAt(mid.x, mid.y), "a tap on you at his door").toBe("home:alfil");
+  await tapAt(mid.x, mid.y);
+  await expect(card, "a tap on you at his door: the card").toBeVisible({ timeout: 5000 });
+  if (STILLS) await page.screenshot({ path: `${STILLS}/alfil-door-tap-${test.info().project.name}.png` });
+  expect(errors, "no page or console errors").toEqual([]);
+});
+
 test("the street town's WebGL context lost: nothing drawn until it's back, then it draws again; lost twice within a minute, the page opens again in today's town (Canvas 2D)", async ({ page }) => {
   test.setTimeout(200_000);
   await openStreet(page);
@@ -262,4 +335,160 @@ test("the street town's WebGL context lost: nothing drawn until it's back, then 
   await expect(canvas(page)).toHaveAttribute("data-backend", "2d");
   expect(await you(page), "today's town").toEqual([22, 17]);
   expect(await colors(), "the world drawn with Canvas 2D").toBeGreaterThan(40);
+});
+
+test("/town?report (Eric, Nov 11): it waits for your first move, records 3 s of walking and turning, and Done shows one panel with the numbers, inside the box; without ?report there's no pill and no panel", { tag: "@phone-only" }, async ({ page }) => {
+  type R = { __townReport: () => { state: string; frames: number; summary: { frames: number; p50: number; segs: { name: string; frames: number }[]; worst: unknown[] } | null } | null; __townHeading: (d: number | null) => void; __townWalk: (s: readonly [number, number]) => boolean };
+  const errors = watchErrors(page);
+  const pill = page.locator(".tfr-pill");
+  const panel = page.getByRole("dialog", { name: "Town frame report" });
+  await openStreet(page);
+  await page.waitForTimeout(1000);
+  await expect(pill).toHaveCount(0);
+  expect(await page.evaluate(() => (window as unknown as R).__townReport())).toBeNull();
+  await openStreet(page, "&report");
+  await expect(pill).toContainText("Report: walk or turn to start");
+  await expect(pill.getByRole("button", { name: "Done" })).toBeDisabled();
+  await page.waitForTimeout(500);
+  expect((await page.evaluate(() => (window as unknown as R).__townReport()))!.state).toBe("wait");
+  // Walking (1.5 s), then turning on the spot (1.5 s, 120° a second).
+  await page.evaluate(() => (window as unknown as R).__townWalk([4, 25]));
+  await expect(pill).toContainText(/● Recording \d+ s/);
+  await page.waitForTimeout(1500);
+  await page.evaluate(() => {
+    const w = window as unknown as R & { __spin?: boolean };
+    let h = 0;
+    let last = performance.now();
+    w.__spin = true;
+    const f = (now: number) => {
+      if (!w.__spin) return;
+      h += (120 * (now - last)) / 1000;
+      last = now;
+      w.__townHeading(h);
+      requestAnimationFrame(f);
+    };
+    requestAnimationFrame(f);
+  });
+  await page.waitForTimeout(1500);
+  await pill.getByRole("button", { name: "Done" }).click();
+  await page.evaluate(() => ((window as unknown as { __spin: boolean }).__spin = false));
+  await expect(panel).toBeVisible();
+  const rep = (await page.evaluate(() => (window as unknown as R).__townReport()))!;
+  expect(rep.state).toBe("done");
+  const s = rep.summary!;
+  expect(s.frames, "frames recorded").toBeGreaterThan(10);
+  expect(s.p50).toBeGreaterThan(0);
+  const seg = (n: string) => s.segs.find((g) => g.name === n)!.frames;
+  expect(seg("Walk"), "walking frames").toBeGreaterThan(0);
+  expect(seg("Turn"), "turning frames").toBeGreaterThan(0);
+  expect(s.worst.length).toBe(Math.min(10, s.frames));
+  // The panel: the device line, the frame rates, a row a part with numbers, the worst frames; all inside the world's box, nothing cut.
+  await expect(panel.locator(".tfr-dev")).toContainText(/ratio \d(\.\d+)? \(drawn \d(\.\d+)?\) · \d+×\d+ px · WebGL · /);
+  await expect(panel.locator(".tfr-fps b").first()).toHaveText(/^\d+$/);
+  await expect(panel.locator(".tfr-parts tbody tr")).toHaveCount(20);
+  await expect(panel.locator(".tfr-parts tbody tr").filter({ hasText: "New pictures" }).locator("td").nth(1)).toHaveText(/^\d+(\.\d)?$/);
+  await expect(panel.locator(".tfr-worst li")).toHaveCount(s.worst.length);
+  if (STILLS) {
+    mkdirSync(STILLS, { recursive: true });
+    await page.screenshot({ path: `${STILLS}/report-${test.info().project.name}.png` });
+  }
+  const fit = await panel.evaluate((el) => ({ sh: el.scrollHeight, ch: el.clientHeight, r: el.getBoundingClientRect(), box: el.parentElement!.getBoundingClientRect() }));
+  expect(fit.sh, "the panel's content fits it").toBeLessThanOrEqual(fit.ch + 1);
+  expect(fit.r.bottom).toBeLessThanOrEqual(fit.box.bottom + 0.5);
+  expect(fit.r.right).toBeLessThanOrEqual(fit.box.right + 0.5);
+  // Close: the panel goes; the town goes on.
+  await panel.getByRole("button", { name: "Close" }).click();
+  await expect(panel).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
+test("the town's loading screen (Eric, Nov 11: \"loads it all in at once and then it stays there\"): its bar fills and goes, then walking and a full turn paint nothing new and start no atlas page again", { tag: "@phone-only" }, async ({ page }) => {
+  type R = { __townReport: () => { state: string; summary: { frames: number; bakes: number; resets: number } | null } | null; __townHeading: (d: number | null) => void; __townWalk: (s: readonly [number, number]) => boolean; __townPaint: () => { loading: boolean; resets: number; atlas: { kept: number; keptPages: number; unkept: number } } };
+  const errors = watchErrors(page);
+  const bar = page.locator(".town-loading").getByRole("progressbar", { name: "Building the town" });
+  // The bar's share as it shows (sampled every frame until it goes): it only goes up.
+  await page.addInitScript(() => {
+    const seen: number[] = ((window as unknown as { __bar: number[] }).__bar = []);
+    const f = () => {
+      const v = document.querySelector(".town-loading [role=progressbar]")?.getAttribute("aria-valuenow");
+      if (v !== null && v !== undefined) seen.push(Number(v));
+      requestAnimationFrame(f);
+    };
+    requestAnimationFrame(f);
+  });
+  await asAdmin(page);
+  await page.goto("/town?sky=day&report");
+  await expect(bar).toBeVisible({ timeout: 30_000 });
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
+  await expect(page.locator(".town-loading")).toHaveCount(0);
+  const shares = await page.evaluate(() => (window as unknown as { __bar: number[] }).__bar);
+  expect(shares.length, "the bar showed").toBeGreaterThan(0);
+  expect(shares.every((v, i) => i === 0 || v >= shares[i - 1]!), `the bar only goes up: ${shares.join(",")}`).toBe(true);
+  const paint = await page.evaluate(() => (window as unknown as R).__townPaint());
+  expect(paint.loading).toBe(false);
+  expect(paint.atlas.kept, "the town's pictures kept").toBeGreaterThan(1000);
+  expect(paint.atlas.unkept, "all of them").toBe(0);
+  // Walking, then a full turn on the spot (360° in about 2 s): nothing painted, no page started again.
+  await page.evaluate(() => (window as unknown as R).__townWalk([4, 25]));
+  await page.waitForTimeout(1500);
+  await page.evaluate(() => {
+    const w = window as unknown as R & { __spin?: boolean };
+    let h = 0;
+    let last = performance.now();
+    w.__spin = true;
+    const f = (now: number) => {
+      if (!w.__spin) return;
+      h += (180 * (now - last)) / 1000;
+      last = now;
+      w.__townHeading(h);
+      requestAnimationFrame(f);
+    };
+    requestAnimationFrame(f);
+  });
+  await page.waitForTimeout(2200);
+  await page.locator(".tfr-pill").getByRole("button", { name: "Done" }).click();
+  await page.evaluate(() => ((window as unknown as { __spin: boolean }).__spin = false));
+  const s = (await page.evaluate(() => (window as unknown as R).__townReport()))!.summary!;
+  expect(s.frames, "frames recorded").toBeGreaterThan(10);
+  expect(s.bakes, "pictures painted after the loading screen").toBe(0);
+  expect(s.resets, "atlas pages started again").toBe(0);
+  expect((await page.evaluate(() => (window as unknown as R).__townPaint())).resets).toBe(0);
+  expect(errors).toEqual([]);
+});
+
+test("the town's loading fetches every boss theme once and decodes none (Eric, Nov 12: \"loading music in the loading bar\"); Music off fetches none", { tag: "@phone-only" }, async ({ page }) => {
+  const dir = "packages/app/public/music";
+  const themes = JSON.parse(readFileSync(`${dir}/themes.json`, "utf8")) as { themes: Record<string, { intro: string | null; loop: string }> };
+  const names = Object.values(themes.themes).flatMap((t) => (t.intro ? [t.intro, t.loop] : [t.loop]));
+  const sizes = names.map((n) => statSync(`${dir}/${n}.mp3`).size);
+  // (Every decode's size: a theme's would be its file's.)
+  await page.addInitScript(() => {
+    const w = window as unknown as { __soundLog: string[]; __decoded: number[] };
+    w.__soundLog = [];
+    w.__decoded = [];
+    const dec = AudioContext.prototype.decodeAudioData;
+    AudioContext.prototype.decodeAudioData = function (this: AudioContext, b: ArrayBuffer, ...rest: unknown[]) {
+      w.__decoded.push(b.byteLength);
+      return (dec as (...a: unknown[]) => Promise<AudioBuffer>).call(this, b, ...rest);
+    } as typeof dec;
+  });
+  const gets: string[] = [];
+  page.on("request", (r) => void (/^\/music\/.*\.mp3$/.test(new URL(r.url()).pathname) && gets.push(new URL(r.url()).pathname)));
+  await asAdmin(page);
+  await page.goto("/town?sky=day");
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
+  await expect.poll(() => gets.length, { timeout: 15_000 }).toBe(names.length);
+  await page.waitForTimeout(1000);
+  expect(gets.sort(), "each theme's pieces, once").toEqual(names.map((n) => `/music/${n}.mp3`).sort());
+  const decoded = await page.evaluate(() => (window as unknown as { __decoded: number[] }).__decoded);
+  expect(decoded.filter((b) => sizes.includes(b)), "no theme decoded").toEqual([]);
+  const log = await page.evaluate(() => (window as unknown as { __soundLog: string[] }).__soundLog);
+  expect(log.filter((l) => l.startsWith("music:load")), "no theme loaded to play").toEqual([]);
+  // Music off (Settings → Sound): the town's loading fetches none.
+  await page.evaluate(() => localStorage.setItem("brc.music", "0"));
+  gets.length = 0;
+  await page.reload();
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
+  await page.waitForTimeout(1500);
+  expect(gets, "Music off: nothing fetched").toEqual([]);
 });

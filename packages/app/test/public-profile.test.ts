@@ -45,8 +45,9 @@ describe("the line under the name", () => {
     expect(joinedText(Date.UTC(2026, 9, 2, 12))).toBe("Oct 2026");
   });
   it("the level line is Level N where the test switches count, else empty (the page then shows no line, and keeps no room for one)", () => {
-    expect(levelLine(true, 38)).toBe("Level 38");
-    expect(levelLine(false, 38)).toBe("");
+    expect(levelLine(38)).toBe("Level 38");
+    expect(levelLine(1)).toBe("Level 1");
+    expect(levelLine(undefined)).toBe("");
   });
   it("an icon of their own goes behind their pawn; the default pawn, or none, gets the theme's yellow", () => {
     expect(hasOwnIcon("data:image/png;base64,AAAA")).toBe(true);
@@ -143,11 +144,11 @@ describe("Recent Matches", () => {
     expect(lost!.title.startsWith("vs. ")).toBe(true);
   });
 
-  it("a raid from before bosses had identities keeps the tier's old name; one with nothing says 'Boss raid'", () => {
+  it("a raid from before bosses had identities keeps the tier's old name; one with nothing says 'Boss Battle'", () => {
     const [old, none] = recentRows([], [other({ mode: "boss", bossId: null, bossElo: 1500, won: true, playedAt: before(1) }), other({ mode: "boss", bossId: null, bossElo: null, won: null, playedAt: before(2) })], NOW);
     expect(old!.title).toMatch(/^vs\. /);
     expect(old!.face).toMatchObject({ kind: "boss", id: null });
-    expect(none).toMatchObject({ title: "Boss raid", pill: { text: "LOSS" } });
+    expect(none).toMatchObject({ title: "Boss Battle", pill: { text: "LOSS" } });
   });
 
   it("50 v 50: WIN or LOSS by its team's result, titled '50 v 50' with a mode icon", () => {
@@ -222,10 +223,14 @@ describe("Equipped Cosmetics", () => {
     const four = wornTiles({ ...look, face: { def: "smiley-face", color: "yellow", blemish: 0, seed: 1 } }).map((t) => t.slot);
     expect(four).toEqual(["skin", "head", "face", "weapon"]);
     // (The same order as today's profile's list: FrontDoor's WORN_ORDER, which lists a ride last since Oct 31.)
-    expect(four).toEqual(WORN_ORDER.filter((s) => s !== "ride"));
+    expect(four).toEqual(WORN_ORDER.filter((s) => s !== "ride" && s !== "outfit"));
     // A ride (Oct 31) isn't a tile: the row holds four at most. Its "View all" lists it (WORN_ORDER).
     expect(wornTiles({ ...look, ride: { def: "moon-ride", color: "pearl", blemish: 10, seed: 2 } }).map((t) => t.slot)).toEqual(["skin", "head", "weapon"]);
-    expect(WORN_ORDER).toEqual(["skin", "head", "face", "weapon", "ride"]);
+    expect(WORN_ORDER).toEqual(["outfit", "skin", "head", "face", "weapon", "ride"]);
+    // An outfit (Nov 10): first, and with it only eyewear (goggles, shades) shows, so only those are tiles.
+    const banana = { def: "banana-suit", color: "yellow", blemish: 5, seed: 4 };
+    expect(wornTiles({ ...look, outfit: banana, face: { def: "dark-shades", color: "red", blemish: 0, seed: 1 } }).map((t) => t.slot)).toEqual(["outfit", "face"]);
+    expect(wornTiles({ ...look, outfit: banana }).map((t) => t.name)).toEqual(["Banana Suit"]);
   });
   it("'<Slot> · <colors>': two colors with an &, one color alone", () => {
     const lines = Object.fromEntries(wornTiles(look).map((t) => [t.name, t.line]));

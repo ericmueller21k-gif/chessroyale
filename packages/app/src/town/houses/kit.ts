@@ -11,10 +11,33 @@ export const clamp = (v: number, lo: number, hi: number): number => Math.max(lo,
 /** A ramp of three keys by a light value (0 dark to 1 light): banded, never blended. */
 export const tone = (l: number, ramp: string): string => ramp[l < 0.3 ? 0 : l > 0.8 ? 2 : 1]!;
 
-/** A part painted over the box (x0, y0, w, h) in frame pixels: `fn` gives each pixel's palette key (null: empty). */
+const NONE = (): Key => null;
+/** (Tests) Paint at once, as before Nov 10: the lazy pictures are checked against these. */
+let now = false;
+export const paintAtOnce = (on: boolean): void => void (now = on);
+/**
+ * A part painted over the box (x0, y0, w, h) in frame pixels: `fn` gives each pixel's palette key (null: empty). Its pixels are
+ * worked out the first time its grid is read (Nov 10, phone load 3: the street town's ~180 buildings and every home were painted
+ * as the town opened, about 2 s on a slowed phone; now only what's drawn is). So `fn` must not lean on anything that changes after
+ * the call (a shared random number, a variable set later): `packages/app/test/town-paint-lazy.test.ts` checks every picture.
+ */
 export function paint(x0: number, y0: number, w: number, h: number, fn: (x: number, y: number) => Key, outline = true): { part: Part; at: Pt } {
-  const grid = Array.from({ length: h }, (_, j) => Array.from({ length: w }, (_, i) => fn(x0 + i, y0 + j) ?? ".").join(""));
-  return { part: { grid, outline }, at: [x0, y0] };
+  let grid: string[] | null = null;
+  const part = {
+    outline,
+    get grid(): string[] {
+      if (!grid) {
+        grid = Array.from({ length: h }, (_, j) => Array.from({ length: w }, (_, i) => fn(x0 + i, y0 + j) ?? ".").join(""));
+        fn = NONE; // (what it drew from can go)
+      }
+      return grid;
+    },
+    set grid(g: string[]) {
+      grid = g;
+    },
+  };
+  if (now) void part.grid;
+  return { part, at: [x0, y0] };
 }
 
 /** A small seeded hash of a pixel, in [0, 1): for speckles and grain that stay put. */

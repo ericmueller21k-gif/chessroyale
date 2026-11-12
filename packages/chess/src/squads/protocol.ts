@@ -424,9 +424,11 @@ export type SquadsServerMessage = { now: number } & (
   | { t: "coins"; squadId: number; coins: number; why: CoinWhy; key?: string; board?: number; move?: string; by?: string[]; against?: number; capped?: boolean }
   /**
    * Your squad's placement is decided (it's out, or it won): your reward (coins, crates), `recorded` if it went on your
-   * profile (signed in, still playing your seat, not a test lobby).
+   * profile (signed in, still playing your seat, not a test lobby). `why` a placement that pays had nothing (the outside review
+   * of Nov 10): "daily", the day's paying lobbies are used (SQUADS_LOBBY.rewardsPerDay; sent again once the reward's write finds it).
+   * Missing: paid.
    */
-  | { t: "placed"; squadId: number; placement: SquadsPlacement; coins: number; crates: number; recorded: boolean }
+  | { t: "placed"; squadId: number; placement: SquadsPlacement; coins: number; crates: number; recorded: boolean; why?: "daily" }
   /** Every placement is decided (by squad id). */
   | { t: "results"; placements: Record<number, SquadsPlacement> }
   /**

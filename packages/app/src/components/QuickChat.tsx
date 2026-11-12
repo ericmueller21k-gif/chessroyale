@@ -1,13 +1,16 @@
 import { render, type ComponentChildren } from "preact";
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
-import { QUICK_CHAT, chatSay, type ChatSay } from "@chessroyale/core";
-import { onAccountChange, refreshChatStanding } from "../account.ts";
+import { CHAT_TYPED, GLOBAL_CHAT, QUICK_CHAT, chatSay, type ChatSay } from "@chessroyale/core";
+import { onAccountChange, refreshChatStanding, tooYoung } from "../account.ts";
 import type { ChatLine, MatchChat } from "../chat.ts";
 import { chatBlockText } from "../chat-mod.ts";
 import { isCrowdFifty, type GameView } from "../game.ts";
 import { foldUnderBoard, onPrefsChange, showUnderBoard, underBoardView, type UnderBoardView } from "../prefs.ts";
 import { openProfile } from "../profile-nav.ts";
 import { MiniTower } from "./MiniTower.tsx";
+import { ChatText, EmojiPicker } from "../chat-emoji.tsx";
+import { chatOn, setChatOn } from "../chat-on.ts";
+import { useTurnChatOn } from "./ChatOptIn.tsx";
 import { UserIcon } from "./PixelIcon.tsx";
 
 /**
@@ -77,7 +80,8 @@ function ChatIcon({ chat, id }: { chat: MatchChat; id: string }) {
 
 /** One line in the feed: icon, name (tap for the menu) and what they said. */
 function ChatRow({ people, chat, line, teams, onName, tight }: { people: ChatPeople; chat: MatchChat; line: ChatLine; teams: boolean; onName: (id: string) => void; tight: boolean }) {
-  const say = chatSay(line.say);
+  // (A typed line, Nov 7: its words, our pixel emoji drawn.)
+  const say = typeof line.text === "string" ? { kind: "typed" as const, text: <ChatText text={line.text} /> } : chatSay(line.say);
   if (!say) return null;
   const who = sender(people, line.from);
   const team = line.team ?? who.team;
@@ -139,6 +143,108 @@ function ChatFeed({ people, chat, scroll, teams, onName, hint, empty }: { people
     <div class="qfeed scroll" ref={box} role="log" aria-label="Chat messages">
       {rows}
       {notes}
+    </div>
+  );
+}
+
+/**
+ * Typing (Nov 7, CHAT_TYPED: a signed-in player with chat on, not on a device too young; anyone else keeps the quick lines): the field,
+ * our pixel emoji's button and Send, in the quick lines' place. A phone's chat tab opens it over the feed's foot with "T" or the emoji
+ * button (`focus`: it takes the keyboard at once); elsewhere it sits where the buttons were. To your team, or everyone with All.
+ */
+function TypeBar({ chat, focus = false, emoji = false, onSent }: { chat: MatchChat; focus?: boolean; emoji?: boolean; onSent?: () => void }) {
+  const [draft, setDraft] = useState("");
+  const [picker, setPicker] = useState(emoji);
+  // The quick chat button (Nov 8, Eric): the player's 10 quick lines, tapped to send (under the same limits as the chips).
+  const [quick, setQuick] = useState(false);
+  const [wait, setWait] = useState<string | null>(null);
+  const field = useRef<HTMLInputElement>(null);
+  useLayoutEffect(() => void (focus && field.current?.focus()), []);
+  useEffect(() => {
+    if (!wait) return;
+    const t = setTimeout(() => setWait(null), 3000);
+    return () => clearTimeout(t);
+  }, [wait]);
+  const note = chat.note ?? wait;
+  const banned = chat.banned();
+  const send = () => {
+    if (!draft.trim()) return;
+    if (chat.type(draft)) {
+      setDraft("");
+      setPicker(false);
+      onSent?.();
+    } else if (Date.now() < chat.typedReadyAt()) setWait(`One message every ${GLOBAL_CHAT.gapMs / 1000} s.`);
+    field.current?.focus();
+  };
+  return (
+    <div class="qtype" onClick={(e) => e.stopPropagation()}>
+      {quick && <ChatButtons chat={chat} layout="groups" fit={false} now={Date.now()} only="lines" onSent={() => setQuick(false)} />}
+      {picker && (
+        <EmojiPicker
+          onPick={(code) => {
+            setDraft((d) => `${d}${d && !d.endsWith(" ") ? " " : ""}${code} `.slice(0, 200));
+            setPicker(false);
+            field.current?.focus();
+          }}
+        />
+      )}
+      {note && (
+        <p class="qtype-note" role="status">
+          {note}
+        </p>
+      )}
+      <form
+        class="qtype-row"
+        onSubmit={(e) => {
+          e.preventDefault();
+          send();
+        }}
+      >
+        <input
+          ref={field}
+          class="qtype-field"
+          type="text"
+          enterKeyHint="send"
+          autoComplete="off"
+          maxLength={200}
+          aria-label="Send a message"
+          placeholder={banned ? chatBlockText(banned) : chat.hasTeams() && chat.to === "team" ? "Message your team" : "Send a message"}
+          disabled={!!banned}
+          value={draft}
+          onInput={(e) => setDraft(e.currentTarget.value)}
+          onKeyDown={(e) => e.key === "Escape" && setPicker(false)}
+        />
+        <button
+          type="button"
+          class="qtype-quick"
+          aria-label="Quick chat: your lines"
+          aria-expanded={quick}
+          disabled={!!banned}
+          onClick={() => {
+            setPicker(false);
+            setQuick(!quick);
+          }}
+        >
+          <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 5.5h16v10H10l-4.5 3.5v-3.5H4z" />
+            <path d="M8 9.5h8M8 12.5h5" />
+          </svg>
+        </button>
+        <button type="button" class="qtype-emo" aria-label="Emoji" aria-expanded={picker} disabled={!!banned} onClick={() => {
+          setQuick(false);
+          setPicker(!picker);
+        }}>
+          <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+            <circle cx="12" cy="12" r="9" />
+            <path d="M8.2 14.2c1 1.4 2.3 2.1 3.8 2.1s2.8-.7 3.8-2.1" />
+            <circle cx="9" cy="9.8" r="0.7" fill="currentColor" />
+            <circle cx="15" cy="9.8" r="0.7" fill="currentColor" />
+          </svg>
+        </button>
+        <button type="submit" class="qtype-send" disabled={!!banned || !draft.trim()}>
+          Send
+        </button>
+      </form>
     </div>
   );
 }
@@ -318,6 +424,8 @@ export function ChatPanel({ people, chat, variant, head, fold, back }: { people:
   };
   const teams = chat.hasTeams();
   const now = Date.now();
+  // Typing replaces the quick lines for a player who may type (chat.ts mayType); anyone else keeps them.
+  const typing = chat.mayType();
   // A phone's chat tab (Eric, Nov 1): no rows of buttons; "T" opens the phrases and the emoji button the emoji, over the
   // foot of the feed. A tap on the button again, a line sent, or a tap anywhere else closes it.
   const tab = variant === "tab";
@@ -404,7 +512,7 @@ export function ChatPanel({ people, chat, variant, head, fold, back }: { people:
         {lobby && !chat.off && <span class="qhead-sub">Everyone here · teams come with the match</span>}
         {teams && !chat.off && <ToSwitch chat={chat} />}
         <span class="qhead-gap" />
-        {tab && pickButton("lines", "Quick phrases", "T")}
+        {tab && (typing ? pickButton("lines", "Type a message", "T") : pickButton("lines", "Quick phrases", "T"))}
         {tab && pickButton("emoji", "Emoji", "😊")}
         {variant !== "split" && (
           <button
@@ -445,17 +553,25 @@ export function ChatPanel({ people, chat, variant, head, fold, back }: { people:
               teams={teams}
               onName={(id) => setMenu(id)}
               hint={hint}
-              empty={lobby ? "Say hello while the seats fill." : tab ? (teams ? "Tap T or 😊 to send to your team." : "Tap T or 😊 to send.") : teams ? "Tap a line to send it to your team." : "Tap a line to send it."}
+              empty={lobby ? "Say hello while the seats fill." : typing ? (tab ? "Tap T to type a message." : teams ? "Type a message to your team." : "Type a message.") : tab ? (teams ? "Tap T or 😊 to send to your team." : "Tap T or 😊 to send.") : teams ? "Tap a line to send it to your team." : "Tap a line to send it."}
             />
           </div>
           {tab ? (
             (pick || (target && menu)) && (
               <div class="qpop" ref={pop}>
-                {target && menu ? nameMenu() : <ChatButtons chat={chat} layout="groups" fit={false} now={now} only={pick ?? undefined} onSent={() => setPick(null)} />}
+                {target && menu ? (
+                  nameMenu()
+                ) : typing ? (
+                  <TypeBar key={pick} chat={chat} focus emoji={pick === "emoji"} onSent={() => setPick(null)} />
+                ) : (
+                  <ChatButtons chat={chat} layout="groups" fit={false} now={now} only={pick ?? undefined} onSent={() => setPick(null)} />
+                )}
               </div>
             )
           ) : target && menu ? (
             nameMenu()
+          ) : typing ? (
+            <TypeBar chat={chat} />
           ) : (
             <ChatButtons chat={chat} layout={layout} fit={variant === "full" || ((variant === "page" || lobby) && !roomy)} now={now} />
           )}
@@ -506,12 +622,21 @@ function ChatOptions({ people, chat, onDone }: { people: ChatPeople; chat: Match
   const [, redraw] = useState(0);
   useEffect(() => onPrefsChange(() => redraw((n) => n + 1)), []);
   const muted = chat.mutedIds();
+  const turnOn = useTurnChatOn();
   return (
     <>
       <label class="qopt">
         <input type="checkbox" checked={chat.off} onChange={(e) => chat.setOff((e.target as HTMLInputElement).checked)} />
         <span>Chat off (no messages, on this device)</span>
       </label>
+      {/* Typed chat's opt-in (Nov 7): players' typed messages here too; the notice once, as in the global chat and Settings. */}
+      {CHAT_TYPED && !tooYoung() && (
+        <label class="qopt">
+          <input type="checkbox" checked={chatOn()} onChange={(e) => ((e.target as HTMLInputElement).checked ? turnOn.ask() : void setChatOn(false))} />
+          <span>Typed chat (players' messages)</span>
+        </label>
+      )}
+      {turnOn.notice}
       <div class="qopt-muted">
         <span class="muted small">{muted.length ? "Muted:" : "Tap a name in the chat to mute that player. Mutes stay on this device."}</span>
         {muted.map((id) => (

@@ -12,7 +12,7 @@
  * (two faces, ticks only, a red flag) tucked under his front arm, his other paw slapping its button. Facing our left.
  */
 import { canvas, inEllipse, inPoly, toGrid, type Canvas } from "./paint.ts";
-import { lazyParts, partSize, type Anim, type Character, type Frame, type Layer, type Part, type Speck } from "./sprite.ts";
+import { lazyAnim, lazyParts, partSize, type Anim, type Character, type Frame, type Layer, type Part, type Speck } from "./sprite.ts";
 
 export const PALETTE: Record<string, string> = {
   k: "#1a1210",
@@ -652,7 +652,7 @@ const click = (dy: number): Speck[] => [
 // clock (the button clicks down, the flag wobbles), a grin and an eyebrow wiggle between them, a blink near the end.
 const LIFT = [0, 1, 2, 1];
 const TAIL = [0, 2, 3, 1, -1, -2, -1, 1];
-const idle: Anim = {
+const idle: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 32 }, (_, i) => {
     const slapAt = i >= 4 && i <= 8 ? i - 4 : i >= 20 && i <= 24 ? i - 20 : -1;
@@ -679,7 +679,7 @@ const idle: Anim = {
       slapAt === 2 ? { cue: "click", specks: click(1) } : {},
     );
   }),
-};
+}));
 
 // ---- His animations. Fast guy: short frames, snappy moves, clear held poses.
 
@@ -748,7 +748,7 @@ export const pointLines = (dy: number, len = 1): Speck[] => {
 
 /** Entrance: speed lines, he zips in from the right in a blur, skids to a stop in a cloud of dust, slaps the clock, a grin at us. */
 const ZIP_YS = [32, 40, 50, 58, 70, 80, 90];
-const entrance: Anim = {
+const entrance: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     { ms: 90, layers: [], specks: zip(6, ZIP_YS), cue: "zip" },
@@ -764,10 +764,10 @@ const entrance: Anim = {
     F(420, { mouth: "wide", eyes2: "us", brow: 1, flag: 1 }),
     F(180, { mouth: "grin" }),
   ],
-};
+}));
 
 /** Thinking: he doesn't think. Bouncing faster than his idle, drumming on the clock, a glance at us, an eye-roll, a yawn. */
-const thinking: Anim = {
+const thinking: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 20 }, (_, i) => {
     const yawn = i >= 12 && i <= 15;
@@ -789,10 +789,10 @@ const thinking: Anim = {
       tap ? { specks: [sp(21, 52 - lift, "J"), sp(22, 51 - lift, "M")], ...(i % 4 === 1 ? { cue: "tick" } : {}) } : i === 13 ? { cue: "yawn" } : {},
     );
   }),
-};
+}));
 
 /** Move: a snap-point, a finger gun at the board with speed streaks, then a quick slap of the clock. */
-const move: Anim = {
+const move: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     F(70, { hand: "up", lift: 1, brow: 1 }),
@@ -803,12 +803,12 @@ const move: Anim = {
     F(90, { hand: "high", flag: -1 }),
     F(130, { flag: 1 }),
   ],
-};
+}));
 
 /** Capture: a wink and a double fist pump, then a slap of the clock. */
 const PUMP_UP: Pt = [56, 35];
 const PUMP_DN: Pt = [55, 42];
-const capture: Anim = {
+const capture: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     F(80, { at: PUMP_DN, eyes: "wide", mouth: "wide", lift: 1 }, { cue: "yes" }),
@@ -821,12 +821,12 @@ const capture: Anim = {
     F(220, { eyes2: "wink", mouth: "grin", brow: 1, flag: 1 }),
     F(150, {}),
   ],
-};
+}));
 
 /** Clock Slap (his passive): the paw wound up high, a slam, big sparks, the flag jumps; a tiny clock zips from the clock to his chest. */
 const WIND: Pt = [53, 32];
 const WIND2: Pt = [55, 30];
-const clockSlap: Anim = {
+const clockSlap: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     F(90, { at: WIND, gesture: "open", lift: 2, eyes2: "sly", mouth: "grin", brow: 1, head: [1, -1], tail: 3 }, { cue: "windup" }),
@@ -840,7 +840,7 @@ const clockSlap: Anim = {
     F(180, { eyes2: "sly", mouth: "grin", brow: 1 }, { specks: star(40, 49) }),
     F(150, {}),
   ],
-};
+}));
 
 /** Scramble warning: he holds the clock up toward us, taps it twice, eyebrows up, a sly wide grin. Holds on the last frame. */
 const RAISE: Pt = [2, -10];
@@ -848,7 +848,7 @@ const RAISE: Pt = [2, -10];
 const TAP: Pt = [34, 54];
 const TAP_UP: Pt = [36, 50];
 const tapLines: Speck[] = [sp(29, 49, "O"), sp(28, 48, "Y"), sp(31, 48, "O"), sp(32, 47, "Y"), sp(26, 52, "O"), sp(25, 52, "Y")];
-const scrambleWarn: Anim = {
+const scrambleWarn: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     F(100, { clock: [1, -5], lift: 1, eyes2: "sly", brow: 1, mouth: "grin" }, { cue: "warn" }),
@@ -859,7 +859,7 @@ const scrambleWarn: Anim = {
     F(160, { clock: RAISE, at: TAP_UP, gesture: "point", eyes2: "sly", brow: 2, mouth: "wide", flag: 1 }),
     F(700, { clock: RAISE, at: TAP_UP, gesture: "point", eyes2: "us", brow: 2, mouth: "wide" }, { specks: [...star(4, 44), ...star(36, 42)] }),
   ],
-};
+}));
 
 /** Time Scramble: the clock tossed up and spun in a blur between his paws, speed lines, sparks, cap and ears ruffled; a catch, a slam, a triumphant pose. */
 const SPIN_C: Pt = [0, -10];
@@ -899,7 +899,7 @@ const frenzy = (i: number): Frame => {
     },
   );
 };
-const timeScramble: Anim = {
+const timeScramble: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     F(100, { sink: 2, clock: [0, -2], eyes: "wide", mouth: "wide", brow: 2, ears: 1, hand: "high" }, { cue: "whoosh" }),
@@ -911,10 +911,10 @@ const timeScramble: Anim = {
     F(500, { at: PUMP_UP, lift: 2, eyes2: "sly", mouth: "wide", brow: 2, tail: 3, flag: 1 }, { cue: "ta-da", specks: [...star(56, 30, true), ...star(8, 46), ...star(30, 12)] }),
     F(180, { mouth: "grin" }),
   ],
-};
+}));
 
 /** Hurt: a pale flash, a flinch, ears back, eyes wide, the clock jolts and the cap jumps; he shakes it off fast. */
-const hurt: Anim = {
+const hurt: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     F(70, { dx: 1, lift: 1, head: [2, -1], ears: 3, eyes: "wide", mouth: "o", clock: [1, -3], flag: 1, flagY: 1, tail: 4, capAt: [1, -2], hand: "up" }, { cue: "oof", pal: FLASH, shake: [2, 0] }),
@@ -924,10 +924,10 @@ const hurt: Anim = {
     F(130, { eyes: "open", brow: 1, lift: 1 }),
     F(140, {}),
   ],
-};
+}));
 
 /** Check: a cocky finger gun at the board, held with a sly look, then a slap. */
-const check: Anim = {
+const check: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     F(80, { hand: "up", lift: 1, brow: 1, eyes2: "sly" }),
@@ -939,10 +939,10 @@ const check: Anim = {
     F(160, { mouth: "grin", brow: 1, flag: 1 }),
     F(140, {}),
   ],
-};
+}));
 
 /** Smug (loop): leaning back, half-lidded, polishing his nails on his jacket, then a look at them (a glint). */
-const smug: Anim = {
+const smug: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 12 }, (_, i) =>
     F(
@@ -958,10 +958,10 @@ const smug: Anim = {
       i === 7 ? { specks: star(21, 43) } : {},
     ),
   ),
-};
+}));
 
 /** Rattled (loop): ears flat, worried brows, sweat, fast nervous taps on the clock, glancing at it. */
-const rattled: Anim = {
+const rattled: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 12 }, (_, i) => {
     const down = i % 2 === 1;
@@ -985,10 +985,10 @@ const rattled: Anim = {
       },
     );
   }),
-};
+}));
 
 /** Defeat: the flag falls (a pale flash), a stare at it, then he slumps, the cap slipping over his eyes, the clock drooping. Holds. */
-const defeat: Anim = {
+const defeat: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     F(90, { fallen: true, eyes: "wide", ears: 2, mouth: "o", hand: "rest" }, { cue: "flag", pal: FLASH, shake: [1, 0] }),
@@ -997,11 +997,11 @@ const defeat: Anim = {
     F(160, { fallen: true, sink: 2, eyes: "shut", ears: 3, mouth: "frown", worry: true, head: [0, 3], capAt: [-1, 4], clock: [3, 5], at: [34, 64], tail: -2 }),
     F(1200, { fallen: true, sink: 3, eyes: "shut", ears: 3, mouth: "frown", worry: true, head: [0, 3], capAt: [-2, 7], clock: [3, 6], at: [35, 66], tail: -3 }),
   ],
-};
+}));
 
 /** Victory (loop): the clock raised overhead, a bounce on his toes, a fist pump then a finger gun at the board, speed sparkles. */
 const OVERHEAD: Pt = [-5, -44];
-const victory: Anim = {
+const victory: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 12 }, (_, i) =>
     F(
@@ -1019,7 +1019,7 @@ const victory: Anim = {
       { specks: i % 2 ? [...star(5, 7), ...star(31, 9, true)] : [...star(4, 32), ...star(29, 5)], ...(i === 0 ? { cue: "cheer" } : {}) },
     ),
   ),
-};
+}));
 
 export const BOSS_BLITZ: Character = {
   id: "dash",

@@ -1,6 +1,7 @@
 import { expect, type Page } from "@playwright/test";
 import { Chess } from "chess.js";
-import { BOARD_SEL, engineTop, test, watchFor, bossAloneFromHome } from "./helpers.ts";
+import { engineTop, test, watchFor, bossAloneFromHome, submitMove } from "./helpers.ts";
+import { MUSIC } from "@chessroyale/core";
 
 /**
  * Jefferson (id "grex"; G-REX until Oct 10), the Fire boss, played through alone on a phone and a computer: his sparkler's tile burning in stages with its
@@ -74,6 +75,60 @@ test("Jefferson (he was G-REX): a test link's ?boss=jefferson meets him, by his 
   expect(await page.evaluate(() => { const b = (window as any).match.boss; return [b.id, b.name]; })).toEqual(["grex", "Jefferson"]);
 });
 
+test("Jefferson's music: fetched when his battle is picked (not at app start), started as the battle starts, Music off and on in the match's options, faded out at the result; Settings has the switch", { tag: "@phone-only" }, async ({ page }) => {
+  test.setTimeout(3 * 60_000);
+  // (docs/decisions/2026-11-11-boss-music.md. ?win=1: your first move, Qxf7, mates him.)
+  // (The sound log, noting the match's phase as the music starts.)
+  await page.addInitScript(() => {
+    const w = window as any;
+    const log: string[] = [];
+    log.push = (...xs: string[]) => {
+      for (const x of xs) if (x.startsWith("music:start")) w.__musicStartPhase = { kind: w.match?.phase?.kind, intro: !!w.match?.phase?.intro, loading: !!w.match?.phase?.loading };
+      return Array.prototype.push.apply(log, xs);
+    };
+    w.__soundLog = log;
+  });
+  const music: string[] = [];
+  page.on("request", (r) => {
+    const path = new URL(r.url()).pathname;
+    if (path.startsWith("/music/")) music.push(path);
+  });
+  const log = () => page.evaluate(() => ((window as any).__soundLog as string[]).filter((l) => l.startsWith("music:")));
+  await page.goto("/?debug&pace=quick&win=1&boss=grex");
+  await expect(page.getByRole("main").getByRole("button", { name: /^Boss Battle/ })).toBeVisible({ timeout: 30_000 });
+  expect(music, "nothing of the music at app start").toEqual([]);
+  await bossAloneFromHome(page);
+  // Fetched as the battle is picked (its loading step and intro), the MP3s only.
+  await expect.poll(() => music.filter((p) => p.endsWith(".mp3")).sort(), { timeout: 30_000 }).toEqual(["/music/grex-intro.mp3", "/music/grex-loop.mp3"]);
+  // Not started during the intro; started once the battle starts (your first move).
+  await expect.poll(() => page.evaluate(() => (window as any).match?.phase?.kind), { timeout: 60_000 }).toBe("play");
+  await expect.poll(log, { timeout: 30_000 }).toContain("music:start:grex");
+  expect(await page.evaluate(() => (window as any).__musicStartPhase), "started after the intro").toEqual({ kind: "play", intro: false, loading: false });
+  // The match's options: Music off fades it to nothing, on brings it back (the loop keeping its place: no new start).
+  await page.getByRole("button", { name: "Match options" }).click();
+  const row = page.getByRole("dialog", { name: "Match options" }).getByRole("switch", { name: /Music/ });
+  await expect(row).toHaveAttribute("aria-checked", "true");
+  await row.click();
+  await expect(row).toHaveAttribute("aria-checked", "false");
+  await expect.poll(log).toContain("music:level:0");
+  await row.click();
+  await expect.poll(log).toContain(`music:level:${MUSIC.volume}`);
+  expect((await log()).filter((l) => l.startsWith("music:start")), "one start").toHaveLength(1);
+  await page.getByRole("dialog", { name: "Match options" }).getByRole("button", { name: "Close" }).click();
+  // The result: faded out and stopped (before the result screen shows).
+  await submitMove(page, "h5f7");
+  await expect(page.locator(".results h1")).toHaveText("Victory!", { timeout: 120_000 });
+  expect(await log()).toContain("music:end:grex");
+  // Settings → Sound: the Music switch beside Sound, on by default, remembered on the device.
+  await page.goto("/settings");
+  const toggle = page.getByRole("switch", { name: /^Music/ });
+  await expect(toggle).toBeChecked();
+  await page.locator(".fd-toggle", { has: toggle }).click();
+  await expect(toggle).not.toBeChecked();
+  await page.reload();
+  await expect(page.getByRole("switch", { name: /^Music/ })).not.toBeChecked();
+});
+
 test("Jefferson: his tiles burn in stages counting down, a piece left on one burns, and the Roman candle's 24 shots fall where their shadows said", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(9 * 60_000);
   // (?laststand=0: leaving a piece to burn on purpose isn't taken back by the God King.)
@@ -99,7 +154,7 @@ test("Jefferson: his tiles burn in stages counting down, a piece left on one bur
 
   // Step onto it if a piece can (the God King's warning, once a match).
   await play(page, { step: true });
-  // The Roman candle: its banner, G-REX on the middle of the board, the column of pips filling as he fires.
+  // The Roman candle: its banner, G-REX on the middle of the board, the row of pips in his boss card filling as he fires.
   await expect(banner(page, "ROMAN CANDLE!")).toBeVisible({ timeout: 30_000 });
   await expect(page.locator(".pm-rex")).toBeVisible({ timeout: 5_000 });
   await expect(page.locator(".pw-pips")).toBeVisible({ timeout: 8_000 });
@@ -107,14 +162,19 @@ test("Jefferson: his tiles burn in stages counting down, a piece left on one bur
   const p3 = await powers(page);
   expect(p3.candle).toEqual({ at: 3, left: 24 });
   expect(p3.fire[0].stage).toBe(2);
-  await expect(page.locator(".power-board .pw-pips")).toHaveAttribute("data-left", "24");
+  await expect(page.locator(".boss-prop .pw-pips")).toHaveAttribute("data-left", "24");
   await expect(page.locator(".power-board .pw-fire.stage-2 .pw-count")).toHaveText("2");
-  // The pips stand in the gutter right of the board: never over it or its timer bar (no eval bar is drawn since Nov 1).
-  const [pips, board, timer] = await Promise.all([".power-board .pw-pips", BOARD_SEL.squares, ".timer-bar"].map((s) => page.locator(s).first().boundingBox()));
-  expect(pips!.x).toBeGreaterThanOrEqual(board!.x + board!.width - 0.5);
-  expect(pips!.x + pips!.width).toBeLessThanOrEqual(page.viewportSize()!.width);
-  expect(pips!.height).toBeGreaterThan(pips!.width * 10);
-  if (timer) expect(pips!.x).toBeGreaterThanOrEqual(timer.x + timer.width - 0.5);
+  // The pips: a row in his boss card's free room (Eric, Nov 11: the column by the board's right edge was cut off by the screen),
+  // whole inside the card and the screen, clear of his name, his level and "N moves left".
+  const [pips, card, name, level, status] = await Promise.all([".boss-prop .pw-pips", ".boss-bar", ".boss-name strong", ".boss-level", ".boss-next"].map((s) => page.locator(s).first().boundingBox()));
+  const clear = (a: typeof pips, b: typeof pips) => !a || !b || a.x + a.width <= b.x + 0.5 || b.x + b.width <= a.x + 0.5 || a.y + a.height <= b.y + 0.5 || b.y + b.height <= a.y + 0.5;
+  expect(pips!.width).toBeGreaterThan(pips!.height * 8);
+  expect(pips!.x).toBeGreaterThanOrEqual(card!.x - 0.5);
+  expect(pips!.x + pips!.width).toBeLessThanOrEqual(Math.min(card!.x + card!.width, page.viewportSize()!.width) + 0.5);
+  expect(pips!.y).toBeGreaterThanOrEqual(card!.y - 0.5);
+  expect(pips!.y + pips!.height).toBeLessThanOrEqual(card!.y + card!.height + 0.5);
+  for (const [what, b] of [["name", name], ["level", level], ["moves left", status]] as const) expect(clear(pips, b), `the row clear of his ${what}`).toBe(true);
+  await expect(page.locator(".power-board .pw-pips")).toHaveCount(0);
   // The first wave's square is shadowed, small: it falls 3 turns after the launch.
   expect(p3.shadows).toEqual([{ square: expect.any(String), lands: 6, stage: 1 }]);
   await expect.poll(() => shadowsShown(page)).toEqual({ [p3.shadows[0].square]: 1 });
@@ -151,7 +211,7 @@ test("Jefferson: his tiles burn in stages counting down, a piece left on one bur
     if ((await phase(page)) !== "play") break;
     const p = await powers(page);
     left.set(p.turn, p.candle.left);
-    if (p.candle.left > 0) await expect(page.locator(".power-board .pw-pips")).toHaveAttribute("data-left", String(p.candle.left));
+    if (p.candle.left > 0) await expect(page.locator(".boss-prop .pw-pips")).toHaveAttribute("data-left", String(p.candle.left));
     // What landed this turn is what was shadowed for it (but a square the crowd's king stands on: it fizzles).
     const wave = p.events.find((e: { kind: string }) => e.kind === "fireball");
     if (shadowed.has(p.turn)) expect(wave?.squares, `turn ${p.turn}`).toEqual(shadowed.get(p.turn));

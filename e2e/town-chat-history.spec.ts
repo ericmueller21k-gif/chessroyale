@@ -26,7 +26,7 @@ const lineOf = (p: Page, text: string) => p.locator(".tc-player").filter({ hasTe
 async function openSignedIn(page: Page, admin = false) {
   const open = async () => {
     await page.goto(`/town?sky=day&townroom=${room}`);
-    await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+    await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
     await page.waitForFunction(() => typeof (window as any).__townSay === "function");
     await page.evaluate(() => (window as any).__townChatter(false));
   };

@@ -9,6 +9,7 @@ const { ROW_GROUND, STREET_BUILDINGS, STREET_LOTS } = await import("../src/town/
 const { ROW_SIDES } = await import("../src/town/rows.ts");
 const { ALL_HOMES, APRON, ARENA, BOARD_GROUND, WALL, COLISEUM, GARDEN, GRASS, HOMES, LAMPS, LOT, PARK, PAVING, PROPS, START, STATUES, TABLES, TOWN_BOTS, bossWalks, createTown, destFor, groundAt, homeDoor, inSquare, inWander, plotAt, stepsFrom, tick, walkable } =
   await import("../src/town/world.ts");
+const { hasTownBoss } = await import("../src/town/world.ts");
 
 /**
  * The street town, round 2: the layout (Nov 5; docs/decisions/2026-11-05-street-town-layout.md). Everything where the plan says
@@ -42,9 +43,9 @@ describe("the street town's layout is the plan's (Nov 5)", () => {
     expect(walkable(START.c, START.r)).toBe(true);
   });
 
-  it("has all sixteen homes (an admin's), each on its lot, its picture's foot on the lot's front line, centred", () => {
+  it("has all seventeen homes (an admin's, Rolling Dough the seventeenth since Nov 11), each on its lot, its picture's foot on the lot's front line, centred", () => {
     expect(HOMES).toEqual(ALL_HOMES);
-    expect(HOMES).toHaveLength(16);
+    expect(HOMES).toHaveLength(17);
     for (const h of HOMES) {
       const l = lotOf(h.id);
       expect(h.cx, h.id).toBe(l.c0 + (l.w - 1) / 2);
@@ -93,13 +94,13 @@ describe("the street town's layout is the plan's (Nov 5)", () => {
     expect(LAMPS).toHaveLength(PLAN.props.filter((p) => p.kind === "lamp").length);
     // (A lamp stands on a sidewalk, never under a row.)
     for (const l of LAMPS) expect(ROW_GROUND[l.r * N + l.c], at(l.c, l.r)).toBe(0);
-    expect(STREET_LOTS.filter((l) => l.kind === "home")).toHaveLength(16);
+    expect(STREET_LOTS.filter((l) => l.kind === "home")).toHaveLength(17);
   });
 
   it("no lamp stands in front of a boss's home (Eric, Nov 7: \"lamp posts right in front of Big Boy's Crib and Dash's Kicks… it just looks bad\"): none in any home's frontage box, its lot's width (its picture's, shifted) and half a square either side, from its front to the street's walking line", () => {
     const MARGIN = 0.5;
     const homes = STREET_LOTS.filter((l) => l.kind === "home");
-    expect(homes).toHaveLength(16);
+    expect(homes).toHaveLength(17);
     for (const h of homes) {
       // (Every home's front faces south, onto the sidewalk row just south of it: the walking line is that row's street edge.)
       expect(h.facing, h.id).toBe("S");
@@ -217,7 +218,7 @@ describe("the bosses and the bots (Nov 5)", () => {
       }
     });
     // (Every boss walks now and then: a lamp beside its rest square is passed, not a wall.)
-    expect([...moved].sort()).toEqual(HOMES.map((h) => h.id).sort());
+    expect([...moved].sort()).toEqual(HOMES.filter(hasTownBoss).map((h) => h.id).sort());
   });
 
   it("the bots walk the streets, sidewalks and park: never stopping on a door square, a table's square or a boss's box", () => {
@@ -244,5 +245,20 @@ describe("the bosses and the bots (Nov 5)", () => {
     }
     // (The bots' ground is every walkable square off the bosses' boxes.)
     for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) expect(inSquare(c, r), at(c, r)).toBe(groundAt[r * N + c]! <= GRASS && !HOMES.some((h) => inWander(h, c, r)));
+  });
+});
+
+describe("Rolling Dough stands clear of the other homes (Eric, Nov 11: \"make sure his building is not right next to another one\")", () => {
+  it("its lot is at least 4 squares from every other home's lot (look-alike fronts between, never a shared wall), the most open of its row", () => {
+    const N0 = N;
+    const homes = STREET_LOTS.filter((l) => l.kind === "home");
+    const zebra = homes.find((l) => l.id === "zebra")!;
+    // (The gap between two lots: across (round the east-west wrap) or along, whichever is wider; 0 when they touch.)
+    const gap = (a: typeof zebra, b: typeof zebra) => {
+      const dc = Math.min(...[0, N0, -N0].map((k) => Math.max(0, Math.max(a.c0, b.c0 + k) - Math.min(a.c0 + a.w, b.c0 + k + b.w))));
+      const dr = Math.max(0, Math.max(a.r0, b.r0) - Math.min(a.r0 + a.d, b.r0 + b.d));
+      return Math.max(dc, dr);
+    };
+    for (const h of homes) if (h !== zebra) expect(gap(zebra, h), h.id).toBeGreaterThanOrEqual(4);
   });
 });

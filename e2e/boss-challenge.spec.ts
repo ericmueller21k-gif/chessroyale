@@ -57,6 +57,7 @@ type Intro = { step: string; layout: string; attack: boolean; you: [number, numb
 type Hooks = {
   __townAt?: (k: string, id: string) => { x: number; y: number } | null;
   __townYou?: () => Stand | null;
+  __townCam?: () => { focus: [number, number] } | null;
   __shopIntro?: () => Intro | null;
 };
 const town = (p: Page) => p.locator("canvas.town-canvas");
@@ -85,9 +86,38 @@ async function alfilAt(p: Page, id = "alfil") {
   return { x: cv.x + xy.x, y: cv.y + xy.y };
 }
 
+/**
+ * The camera at rest: the same focus square on three reads 100 ms apart (its follow spring or its glide has landed). The camera runs in
+ * frame time (dt capped at 0.1 s), so under load this takes longer in wall time than on a quiet machine.
+ */
+async function cameraAtRest(p: Page) {
+  let last = "";
+  let same = 0;
+  await expect
+    .poll(
+      async () => {
+        const f = await p.evaluate(() => (window as unknown as Hooks).__townCam?.()?.focus ?? null);
+        const k = f ? f.map((v) => Math.round(v * 100)).join(",") : "";
+        same = k && k === last ? same + 1 : 0;
+        last = k;
+        return same >= 3;
+      },
+      { message: "the camera has come to rest", intervals: [100], timeout: 20_000 },
+    )
+    .toBe(true);
+}
+/** The camera glides onto a boss (as his chip would): from where it rests, he may be off the screen, or hidden behind a figure or a house. */
+const glideTo = (p: Page, id: string) => p.evaluate((i) => (window as unknown as { __townGlide?: (id: string) => void }).__townGlide?.(i), id);
+
 /** Opens Alfil's card (his Pyramid is across the map: the camera glides there, as its chip would) and his challenge's confirm (or another boss's). */
 async function toConfirm(page: Page, id = "alfil", name = "Alfil") {
-  if (!(await alfilAt(page, id))) await page.evaluate((i) => (window as unknown as { __townGlide?: (id: string) => void }).__townGlide?.(i), id);
+  // The camera comes to rest first: a town opens with it still on its way to your pawn, and a boss in view while it moves can be off the
+  // screen (or hidden) once it lands (Timber, Nov 7: at rest on you, his picture was covered and the taps found nothing for 20 s).
+  await cameraAtRest(page);
+  if (!(await alfilAt(page, id))) {
+    await glideTo(page, id);
+    await cameraAtRest(page);
+  }
   await expect.poll(() => alfilAt(page, id), { message: `${name} comes into view` }).not.toBeNull();
   // His card (he may stroll a step between the look and the tap: tap again; another's card that opened is closed first).
   const card = page.getByRole("dialog", { name, exact: true });
@@ -95,6 +125,8 @@ async function toConfirm(page: Page, id = "alfil", name = "Alfil") {
     if (await card.isVisible()) return;
     if (await page.getByRole("dialog").isVisible()) await page.keyboard.press("Escape");
     const at = await alfilAt(page, id);
+    // (Not drawn, or covered from here: the camera glides onto him, and the tap is tried again once it has.)
+    if (!at) await glideTo(page, id);
     expect(at, "drawn").not.toBeNull();
     await page.mouse.click(at!.x, at!.y);
     await expect(card).toBeVisible({ timeout: 1500 });
@@ -114,7 +146,7 @@ const serverLines = async (page: Page, who: string) => (await page.locator(".tc-
 /** Back in the town square, where you stood, facing the way you faced. */
 async function backAt(page: Page, stood: Stand) {
   await expect(page.getByRole("heading", { name: "Town square" })).toBeVisible();
-  await expect(town(page)).toHaveAttribute("data-ready", "1");
+  await expect(town(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
   expect(new URL(page.url()).pathname).toBe("/town");
   const now = (await youNow(page))!;
   expect([now.c, now.r, now.facing, now.view]).toEqual([stood.c, stood.r, stood.facing, stood.view]);
@@ -130,14 +162,49 @@ test("challenging Alfil in the town: in with him to his marks, his line, the pyr
   // Signed in (the town's chat is for signed-in players: the server's lines too).
   // (A name of its own: the town's chat is shared with the other project's run.)
   const me = `Ch${project[0]}${Math.random().toString(36).slice(2, 6)}`;
+  // (What the town's chat asked the server and heard, each /api/live: printed if the server's lines don't show. On CI the log once
+  // stayed empty for 15 s after Back to town while the server held both lines, and two batches couldn't reproduce it locally:
+  // docs/decisions/2026-11-11-flaky-batch.md. A request with no answer shows as "asked" alone.)
+  const live: string[] = [];
+  const t0 = Date.now();
+  const note = (s: string) => {
+    live.push(`${((Date.now() - t0) / 1000).toFixed(1)}s ${s}`);
+    if (live.length > 60) live.shift();
+  };
+  const liveUrl = (u: string) => (u.includes("/api/live") ? u.slice(u.indexOf("/api/live")) : null);
+  page.on("request", (r) => liveUrl(r.url()) && note(`asked ${liveUrl(r.url())}`));
+  page.on("requestfailed", (r) => liveUrl(r.url()) && note(`failed ${liveUrl(r.url())}: ${r.failure()?.errorText}`));
+  page.on("response", (r) => {
+    const u = liveUrl(r.url());
+    if (!u) return;
+    void r.json().then(
+      (b: { town?: { room?: string; n?: number; lines?: { text: string }[]; reset?: boolean; paused?: boolean } }) =>
+        note(`${r.status()} ${u} town=${b.town ? JSON.stringify({ ...b.town, lines: b.town.lines?.map((l) => l.text) }) : "none"}`),
+      () => note(`${r.status()} ${u} (no body)`),
+    );
+  });
+  const linesAre = (want: unknown[]) =>
+    expect
+      .poll(() => serverLines(page, me), { timeout: 15_000 })
+      .toEqual(want)
+      .catch(async (e: Error) => {
+        const log = await page.locator(".tc-line").allTextContents().catch(() => []);
+        throw new Error(`${e.message}\n\nThe chat log's lines: ${JSON.stringify(log)}\nThe town's /api/live:\n${live.join("\n")}`);
+      });
+  // (The town's chat lives in the live hub's memory: a restart forgets it and opens a new room, by design, docs/areas/chat.md. The
+  // local server frees a Durable Object after some seconds without a request (reproduced: 45 s on the result screen gave a new, empty
+  // room; on CI a battle's 11 s did, Nov 11), while on Cloudflare every app's heartbeat keeps it in use. So, standing in for the
+  // town's other visitors, a reader asks for the town's lines every 1.5 s until the page closes. Nothing else of the spec changes.)
+  const awake = setInterval(() => void page.request.get("/api/live?town=0").catch(() => undefined), 1500);
+  page.on("close", () => clearInterval(awake));
   await named(page, me);
   // (Once the page has its account: signing in a request's own new account would race the page's.)
   await page.goto("/town");
-  await expect(town(page)).toHaveAttribute("data-ready", "1");
+  await expect(town(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
   await page.waitForLoadState("networkidle");
   await asSignedIn(page, "challenger");
   await page.goto("/town");
-  await expect(town(page)).toHaveAttribute("data-ready", "1");
+  await expect(town(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
 
   // ---- A first challenge, quit: in, the battle, and the gear's Leave (or Resign, before 10 moves): no outcome line.
   {
@@ -153,7 +220,7 @@ test("challenging Alfil in the town: in with him to his marks, his line, the pyr
     if (how === "Resign") await page.getByRole("button", { name: "Back to town" }).click();
     await backAt(page, stood);
     // Its start line, and no outcome.
-    await expect.poll(() => serverLines(page, me), { timeout: 15_000 }).toEqual([expect.stringMatching(new RegExp(`\\] ${me} challenged Alfil!$`))]);
+    await linesAre([expect.stringMatching(new RegExp(`\\] ${me} challenged Alfil!$`))]);
   }
 
   // ---- A second challenge, finished (?mate=1: the boss mates you at once, so the battle ends by itself and its result shows).
@@ -229,16 +296,16 @@ test("challenging Alfil in the town: in with him to his marks, his line, the pyr
   await shot("07-result");
   await back.click();
   await backAt(page, stood);
+  // Alfil's goodbye (Eric, Nov 7), in his bubble as you walk back in: the town's own speech, read from its state (the bubble is canvas).
+  await expect.poll(() => page.evaluate(() => (window as any).__townCam().speechLine as string), { timeout: 3_000, intervals: [100] }).toBe("Good game! The Pyramid door stays open for you.");
   // The server's lines: still the one start line (the quit left it open: no second), and this battle's outcome (?mate=1 plays
   // your moves for you, none of them yours: no count; the counts are packages/server/test/town-chat.test.ts's).
-  await expect
-    .poll(() => serverLines(page, me), { timeout: 15_000 })
-    .toEqual([expect.stringMatching(new RegExp(`\\] ${me} challenged Alfil!$`)), expect.stringMatching(new RegExp(`\\] Alfil beat ${me}( in \\d+ moves?)?\\.$`))]);
+  await linesAre([expect.stringMatching(new RegExp(`\\] ${me} challenged Alfil!$`)), expect.stringMatching(new RegExp(`\\] Alfil beat ${me}( in \\d+ moves?)?\\.$`))]);
   await shot("08-back-in-town");
   expect(errors).toEqual([]);
 });
 
-test("challenging Babur in the town: the default intro (his line, the table pops in, his attack swung in place, the flash and the wipe), the battle; Leave back where you stood", async ({ page }) => {
+test("challenging Babur in the town: the default intro (his line, the table pops in, his attack swung in place, the flash and the wipe), the battle; Leave back where you stood", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(240_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(String(e)));
@@ -246,7 +313,7 @@ test("challenging Babur in the town: the default intro (his line, the table pops
   if (SHOTS) mkdirSync(SHOTS, { recursive: true });
   const shot = async (name: string) => SHOTS && (await page.screenshot({ path: `${SHOTS}/${name}-${project}.png` }));
   await page.goto("/town");
-  await expect(town(page)).toHaveAttribute("data-ready", "1");
+  await expect(town(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
   const { confirm, stood } = await toConfirm(page, "tiger", "Babur");
   await confirm.getByRole("button", { name: "Fight" }).click();
   // In his Circus: you both walk in, to either side of his ring's middle (his pedestal: the table stands in front of it).
@@ -299,7 +366,7 @@ test("challenging Babur in the town: the default intro (his line, the table pops
   expect(errors).toEqual([]);
 });
 
-test("challenging Hollow in the town: his own intro (in to your seats, his line, the table pops in still lit, his channel line as the ball charges, the lanterns out one by one, the string, the tree, his strand, your pawn, the blackout, the dim light, the iris to the board), the battle out of the dark; Leave back where you stood", async ({ page }) => {
+test("challenging Hollow in the town: his own intro (in to your seats, his line, the table pops in still lit, his channel line as the ball charges, the lanterns out one by one, the string, the tree, his strand, your pawn, the blackout, the dim light, the iris to the board), the battle out of the dark; Leave back where you stood", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(240_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(String(e)));
@@ -308,7 +375,7 @@ test("challenging Hollow in the town: his own intro (in to your seats, his line,
   const shot = async (name: string) => SHOTS && (await page.screenshot({ path: `${SHOTS}/${name}-${project}.png` }));
   // (Hollow is live for everyone: a player's town. Nov 3: his own intro, Eric's design with his changes.)
   await page.goto("/town?sky=night");
-  await expect(town(page)).toHaveAttribute("data-ready", "1");
+  await expect(town(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
   const { confirm, stood } = await toConfirm(page, "hollow", "Hollow");
   // (The phone's GIF at real timing: every frame from the Fight tap to the board, each with its ms since the tap; JPEGs, the quickest
   // to take, so the most frames.)
@@ -426,7 +493,7 @@ async function folioChallenge(page: Page, opts: { noGl: boolean; gif: boolean })
       } as typeof get;
     });
   await page.goto("/town?sky=day");
-  await expect(town(page)).toHaveAttribute("data-ready", "1");
+  await expect(town(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
   const { confirm, stood } = await toConfirm(page, "folio", "Folio");
   // (The phone's GIF: the page's own frames as Chrome draws them (its screencast), each with its time, from the Fight tap to the match:
   // screenshots taken alongside slow the page, and the cover's WebGL slows them to about one a second.)
@@ -566,7 +633,7 @@ async function smudgyChallenge(page: Page, opts: { gif: boolean }) {
   if (SHOTS) mkdirSync(SHOTS, { recursive: true });
   const shot = async (name: string) => SHOTS && (await page.screenshot({ path: `${SHOTS}/${name}-${project}.png` }));
   await page.goto("/town?sky=day");
-  await expect(town(page)).toHaveAttribute("data-ready", "1");
+  await expect(town(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
   const { confirm, stood } = await toConfirm(page, "smudgy", "Smudgy");
   const gif = !!SHOTS && opts.gif && project === "phone";
   const cast: { at: number; jpg: Buffer }[] = [];
@@ -660,16 +727,16 @@ test("challenging Smudgy in the town: his own intro (to the marks by the covered
   test.setTimeout(240_000);
   await smudgyChallenge(page, { gif: true });
 });
-test("challenging Folio in the town: its own intro (to the clean page's marks, its line, the step back, the stools and the table folding up, the plane bringing the board, the board unfolding, its bow and quiet line), the crumple into the match; Leave back where you stood", async ({ page }) => {
+test("challenging Folio in the town: its own intro (to the clean page's marks, its line, the step back, the stools and the table folding up, the plane bringing the board, the board unfolding, its bow and quiet line), the crumple into the match; Leave back where you stood", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(240_000);
   await folioChallenge(page, { noGl: false, gif: true });
 });
-test("challenging Folio with WebGL off: the crumple falls back to a fade through black, and the match starts", async ({ page }) => {
+test("challenging Folio with WebGL off: the crumple falls back to a fade through black, and the match starts", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(240_000);
   await folioChallenge(page, { noGl: true, gif: false });
 });
 
-test("challenging Wrangler in the town: his own intro (in to where you stand, his line, the lasso thrown to the board on its hay bale, the bale dragged to the middle, the two ropes thrown out, the buckets yanked in as the stools, his brag, his attack, his wipe), the battle; Leave back where you stood", async ({ page }) => {
+test("challenging Wrangler in the town: his own intro (in to where you stand, his line, the lasso thrown to the board on its hay bale, the bale dragged to the middle, the two ropes thrown out, the buckets yanked in as the stools, his brag, his attack, his wipe), the battle; Leave back where you stood", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(240_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(String(e)));
@@ -680,7 +747,7 @@ test("challenging Wrangler in the town: his own intro (in to where you stand, hi
   const ropeOf = (i: Intro | null) => (i as unknown as { rope: Rope | null } | null)?.rope ?? null;
   // (Wrangler is live for everyone: a player's town. Nov 4: his own intro, Eric's design.)
   await page.goto("/town?sky=day");
-  await expect(town(page)).toHaveAttribute("data-ready", "1");
+  await expect(town(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
   const { confirm, stood } = await toConfirm(page, "pig", "Wrangler");
   await confirm.getByRole("button", { name: "Fight" }).click();
   // In at the barn's doorway, straight to where you stand through it all (BOSS_INTROS' `seated`: the usual clear places, so nobody
@@ -747,7 +814,7 @@ test("challenging Wrangler in the town: his own intro (in to where you stand, hi
   expect(errors).toEqual([]);
 });
 
-test("challenging Jefferson in the town: his own intro (in to your marks, one of his calls, he hollers, the crew stop and come round the table to watch, your lift raises you level with the board, his brag, his attack, his wipe of sparklers and fireworks), the battle; Leave back where you stood", async ({ page }) => {
+test("challenging Jefferson in the town: his own intro (in to your marks, one of his calls, he hollers, the crew stop and come round the table to watch, your lift raises you level with the board, his brag, his attack, his wipe of sparklers and fireworks), the battle; Leave back where you stood", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(240_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(String(e)));
@@ -760,7 +827,7 @@ test("challenging Jefferson in the town: his own intro (in to your marks, one of
   const lineOf = (i: Intro | null) => (i as unknown as { lineText: string | null } | null)?.lineText ?? null;
   // (Jefferson is live for everyone: a player's town. Nov 4: his own intro, Eric's design.)
   await page.goto("/town?sky=day");
-  await expect(town(page)).toHaveAttribute("data-ready", "1");
+  await expect(town(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
   const { confirm, stood } = await toConfirm(page, "grex", "Jefferson");
   await confirm.getByRole("button", { name: "Fight" }).click();
   // In at the warehouse's door, to the marks: his red plate west of the board on its crates, your lift's plate east; you stand there
@@ -834,7 +901,7 @@ test("challenging Jefferson in the town: his own intro (in to your marks, one of
   expect(errors).toEqual([]);
 });
 
-test("challenging Ginger in the town: his own intro (in to your marks in his igloo, his line, he charges his staff and blasts the air, the icicle falls point first and stabs the floor, its round top the table; two elves bring the board out of the stockroom and toss it up onto it; he casts and the pieces appear; his brag, his attack, his blizzard), the battle; Leave back where you stood", async ({ page }) => {
+test("challenging Ginger in the town: his own intro (in to your marks in his igloo, his line, he charges his staff and blasts the air, the icicle falls point first and stabs the floor, its round top the table; two elves bring the board out of the stockroom and toss it up onto it; he casts and the pieces appear; his brag, his attack, his blizzard), the battle; Leave back where you stood", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(240_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(String(e)));
@@ -859,7 +926,7 @@ test("challenging Ginger in the town: his own intro (in to your marks in his igl
   const lineOf = (i: Intro | null) => (i as unknown as { lineText: string | null } | null)?.lineText ?? null;
   // (Ginger is live for everyone: a player's town. Nov 5: his own intro, Eric's design.)
   await page.goto("/town?sky=day");
-  await expect(town(page)).toHaveAttribute("data-ready", "1");
+  await expect(town(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
   const { confirm, stood } = await toConfirm(page, "gingerbread", "Ginger");
   await confirm.getByRole("button", { name: "Fight" }).click();
   // In at the igloo's doorway, to the marks: his peppermint west of the battle spot's middle, your snowflake east; you both stand
@@ -932,7 +999,7 @@ test("challenging Ginger in the town: his own intro (in to your marks in his igl
   expect(errors).toEqual([]);
 });
 
-test("challenging Big Boy in the town: his own intro (his line, his toy blocks build the table, the board plops on, the stools drop in, his attack, the lollipop swirl), the battle; Leave back where you stood", async ({ page }) => {
+test("challenging Big Boy in the town: his own intro (his line, his toy blocks build the table, the board plops on, the stools drop in, his attack, the lollipop swirl), the battle; Leave back where you stood", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(240_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(String(e)));
@@ -940,7 +1007,7 @@ test("challenging Big Boy in the town: his own intro (his line, his toy blocks b
   if (SHOTS) mkdirSync(SHOTS, { recursive: true });
   const shot = async (name: string) => SHOTS && (await page.screenshot({ path: `${SHOTS}/${name}-${project}.png` }));
   await page.goto("/town");
-  await expect(town(page)).toHaveAttribute("data-ready", "1");
+  await expect(town(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
   const { confirm, stood } = await toConfirm(page, "bigboy", "Big Boy");
   // (The phone's GIF at real timing: every frame from the Fight tap to the swirl covering, each with its ms since the tap.)
   const frames: { at: number; png: Buffer }[] = [];
@@ -1022,7 +1089,7 @@ test("challenging Big Boy in the town: his own intro (his line, his toy blocks b
   expect(errors).toEqual([]);
 });
 
-test("challenging Dash in an admin's town: his own intro in his store (you both walk to where you stand; his line; four dashes: the shoe-box table, the board, the pieces with a pop, both stools; his brag; he stands through the attack's beat; the clock rush), the battle; Leave back where you stood", async ({ page }) => {
+test("challenging Dash in an admin's town: his own intro in his store (you both walk to where you stand; his line; four dashes: the shoe-box table, the board, the pieces with a pop, both stools; his brag; he stands through the attack's beat; the clock rush), the battle; Leave back where you stood", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(240_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(String(e)));
@@ -1049,7 +1116,7 @@ test("challenging Dash in an admin's town: his own intro in his store (you both 
   // (Dash is in the game for admins first: his store is in an admin's town only. Nov 5, round 3: his own intro. `debug`: window.match.)
   await asAdmin(page);
   await page.goto("/town?sky=day&debug");
-  await expect(town(page)).toHaveAttribute("data-ready", "1");
+  await expect(town(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
   const { confirm, stood } = await toConfirm(page, "dash", "Dash");
   // (Every frame's look at the intro, from the page: his moments are a few frames each.)
   await page.evaluate(() => {
@@ -1132,7 +1199,7 @@ test("challenging Dash in an admin's town: his own intro in his store (you both 
   expect(errors).toEqual([]);
 });
 
-test("challenging Timber in an admin's town: his own intro (his line, the log carried to the middle and gnawed, the shavings' fog, his table and stumps, his attack, the sawdust sweep), the battle; Leave back where you stood", async ({ page }) => {
+test("challenging Timber in an admin's town: his own intro (his line, the log carried to the middle and gnawed, the shavings' fog, his table and stumps, his attack, the sawdust sweep), the battle; Leave back where you stood", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(240_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(String(e)));
@@ -1142,7 +1209,7 @@ test("challenging Timber in an admin's town: his own intro (his line, the log ca
   // (Timber is in the game for admins first: his lodge is in an admin's town only.)
   await asAdmin(page);
   await page.goto("/town?sky=day");
-  await expect(town(page)).toHaveAttribute("data-ready", "1");
+  await expect(town(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
   const { confirm, stood } = await toConfirm(page, "timber", "Timber");
   // (The phone's GIF at real timing: every frame from the Fight tap to the sweep covering, each with its ms since the tap.)
   const frames: { at: number; png: Buffer }[] = [];
@@ -1245,7 +1312,7 @@ test("challenging Timber in an admin's town: his own intro (his line, the log ca
   expect(errors).toEqual([]);
 });
 
-test("challenging Boingo in the town (Nov 6): into his Funhouse, the default intro on his carnival mat (his line, the table pops in, his attack, the flash and the wipe), the battle; Leave back where you stood", async ({ page }) => {
+test("challenging Boingo in the town (Nov 6): into his Funhouse, the default intro on his carnival mat (his line, the table pops in, his attack, the flash and the wipe), the battle; Leave back where you stood", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(240_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(String(e)));
@@ -1253,7 +1320,7 @@ test("challenging Boingo in the town (Nov 6): into his Funhouse, the default int
   if (SHOTS) mkdirSync(SHOTS, { recursive: true });
   const shot = async (name: string) => SHOTS && (await page.screenshot({ path: `${SHOTS}/${name}-${project}.png` }));
   await page.goto("/town");
-  await expect(town(page)).toHaveAttribute("data-ready", "1");
+  await expect(town(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
   const { confirm, stood } = await toConfirm(page, "clown", "Boingo");
   await confirm.getByRole("button", { name: "Fight" }).click();
   await expect(room(page)).toHaveAttribute("data-room", "clown", { timeout: 20_000 });

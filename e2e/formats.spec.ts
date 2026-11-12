@@ -191,9 +191,10 @@ test("boss raid alone flows like a chess site: your move is played, the boss rep
   expect(await page.evaluate(() => (window as any).match.phase.startsAt <= Date.now())).toBe(true);
 });
 
-test("the God King's Last Stand (solo raid, ?laststand=1): the ?? warning, he takes the blow, falls, leaves his charges as power-ups, and you pick again without that move", async ({ page }) => {
+test("the God King's Last Stand (solo raid, ?laststand=1): the ?? warning, he takes the blow, falls, leaves his charges as power-ups, and you pick again without that move", async ({ page }, testInfo) => {
   test.setTimeout(8 * 60_000);
-  test.skip(test.info().project.name !== "phone", "one run is enough");
+  // (Desktop runs only for the result stills, RESULT_SHOTS: the same code path, one run in CI is enough.)
+  test.skip(test.info().project.name !== "phone" && !process.env.RESULT_SHOTS, "one run is enough");
   // (?boss=1600 skips the boss menu.)
   await page.goto("/?debug&pace=quick&clock=20&bossMoves=3&boss=1600&laststand=1");
   await bossAloneFromHome(page);
@@ -260,7 +261,90 @@ test("the God King's Last Stand (solo raid, ?laststand=1): the ?? warning, he ta
   expect(record.brilliant).toBe(false);
   // The result screen: he rises if the crowd won, otherwise he stays down. Beside him, the Last Stand's card: one
   // line, and tapped open, your move, the best move, your chances and the position with both arrows.
-  await expect(page.locator(end.result === "crowd" ? ".gk-epilogue.rises" : ".gk-epilogue.down")).toBeVisible();
+  // The result screen (Eric, Nov 9): no God King, even after his Last Stand; one row, the boss on the left and your pawn on the right
+  // (your XP under it). Sampled every frame for a few seconds: the boss's figure and your pawn never touch, 16 px apart (Eric's
+  // rule), measured on what's painted: each canvas's opaque columns, mapped to the screen (mirrored
+  // or not), against your pawn's art box (wider than the pawn); every figure, bubble and the pawn inside the screen's 16 px gutters.
+  await expect(page.locator(".results .god-king, .results .gk-epilogue")).toHaveCount(0);
+  await expect(page.locator(".results-duo .rd-you .you-pawn")).toBeVisible();
+  type Sample = { t: number; boss: boolean; attacking: boolean; gap: number | null; past: number | null; rects: Record<string, { x: number; r: number }> };
+  const sampling: Promise<Sample[]> = page.evaluate(
+    () =>
+      new Promise<Sample[]>((resolve) => {
+        const out: Sample[] = [];
+        const t0 = performance.now();
+        const span = (sel: string) => {
+          const el = document.querySelector(sel);
+          if (!el) return null;
+          const b = el.getBoundingClientRect();
+          return { x: b.left, r: b.right };
+        };
+        const paintedRight = (cv: HTMLCanvasElement) => {
+          const d = cv.getContext("2d")!.getImageData(0, 0, cv.width, cv.height).data;
+          let a = cv.width, z = -1;
+          for (let y = 0; y < cv.height; y++) for (let x = 0; x < cv.width; x++) if (d[(y * cv.width + x) * 4 + 3]) { if (x < a) a = x; if (x > z) z = x; }
+          if (z < 0) return null;
+          const r = cv.getBoundingClientRect();
+          const k = r.width / cv.width;
+          const flip = getComputedStyle(cv).transform !== "none" || getComputedStyle(cv.parentElement!).transform !== "none";
+          return flip ? r.right - a * k : r.left + (z + 1) * k;
+        };
+        const tick = () => {
+          const boss = !!document.querySelector(".results-duo .boss-char .bc-bubble");
+          const rects: Record<string, { x: number; r: number }> = {};
+          const put = (k: string, sel: string) => {
+            const v = span(sel);
+            if (v) rects[k] = v;
+          };
+          put("boss", ".results-duo .boss-char");
+          put("pawn", ".results-duo .rd-you .you-pawn");
+          put("xp", ".results-duo .rd-you .xp-box");
+          if (boss) put("bossBubble", ".results-duo .boss-char .bc-bubble");
+          const cv = document.querySelector<HTMLCanvasElement>(".rd-attack canvas") ?? document.querySelector<HTMLCanvasElement>(".results-duo .boss-char-sprite");
+          const right = cv ? paintedRight(cv) : null;
+          const pawn = document.querySelector(".results-duo .you-pawn-hop")?.getBoundingClientRect();
+          const attacking = !!document.querySelector(".rd-attack canvas");
+          out.push({ t: performance.now() - t0, boss, attacking, gap: right !== null && pawn ? pawn.left - right : null, past: right !== null && pawn ? right - pawn.right : null, rects });
+          if (performance.now() - t0 < 6000) requestAnimationFrame(tick);
+          else resolve(out);
+        };
+        tick();
+      }),
+  );
+  if (process.env.RESULT_SHOTS) {
+    await expect(page.locator(".results-duo .boss-char .bc-bubble")).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator(".results-duo .boss-char .speech-rest")).toHaveText("", { timeout: 15_000 });
+    await page.screenshot({ path: `${process.env.RESULT_SHOTS}/last-stand-${testInfo.project.name}.png` });
+  }
+  const samples = await sampling;
+  if (end.result !== "draw") expect(samples.some((x) => x.boss), "the boss's line shows").toBe(true);
+  // (His attack, when he won, lands on your pawn but never passes it: ResultDuo, 2026-11-09-boss-result-v2.md.)
+  for (const x of samples) {
+    if (!x.attacking && x.gap !== null) expect(x.gap, "16 px between the boss and your pawn").toBeGreaterThanOrEqual(16);
+    if (x.attacking && x.past !== null) expect(x.past, "his attack never passes your pawn").toBeLessThanOrEqual(0);
+  }
+  const vwNow = page.viewportSize()!.width;
+  for (const x of samples) for (const [k, v] of Object.entries(x.rects)) {
+    expect(v.x, `${k} left gutter`).toBeGreaterThanOrEqual(16);
+    expect(v.r, `${k} right gutter`).toBeLessThanOrEqual(vwNow - 16);
+  }
+  const boss0 = samples.find((x) => x.rects.boss)!.rects.boss!;
+  const pawn0 = samples.find((x) => x.rects.pawn)!.rects.pawn!;
+  expect((boss0.x + boss0.r) / 2 < (pawn0.x + pawn0.r) / 2, "the boss on the left of your pawn").toBe(true);
+  // Eric, Nov 11 (your pawn sat right of the column under it): at rest (his attack's knock is over), your pawn's art box is centered
+  // over your XP box within 2 px, on the phone (390) and the computer (1440: its project's window is 1280, so it's set wider here).
+  await page.waitForFunction(() => !["wait", "on"].includes(document.querySelector(".results-duo")?.getAttribute("data-attack") ?? "done"));
+  const vp = page.viewportSize()!;
+  if (testInfo.project.name === "desktop") await page.setViewportSize({ width: 1440, height: 900 });
+  const centers = await page.evaluate(() => {
+    const cx = (sel: string) => {
+      const b = document.querySelector(sel)!.getBoundingClientRect();
+      return (b.left + b.right) / 2;
+    };
+    return { pawn: cx(".results-duo .rd-you .you-pawn-bob"), xp: cx(".results-duo .rd-you .xp-box.xp-compact") };
+  });
+  await page.setViewportSize(vp);
+  expect(Math.abs(centers.pawn - centers.xp), "your pawn's art centered over your XP (2 px)").toBeLessThanOrEqual(2);
   const card = page.getByRole("button", { name: /The God King's Last Stand/ });
   await expect(card).toContainText(/Move \d+: \S+\?\? · /);
   await card.click();

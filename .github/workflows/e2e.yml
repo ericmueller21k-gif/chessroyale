@@ -6,7 +6,7 @@
 #   Playwright config, packages/core, the runner, the protocol, …) or a path the table doesn't know runs every spec, as
 #   does the `full-e2e` label (adding it starts a new run). settings.ts, e2e/helpers.ts and a few shared app modules
 #   (`traced` in areas.json) are followed through the code instead: the specs of what uses what the diff changes.
-# - A push to main (and a manual run) runs every spec on 10 shards, about 28 minutes (Nov 6), plus any wait for runners:
+# - A push to main (and a manual run) runs every spec on 15 shards (10 until Nov 9: about 28 minutes, Nov 6), plus any wait for runners:
 #   the full run after each merge. One main run at a time: a push waits for the run going, and only the newest
 #   waiting push runs (it covers the others).
 #
@@ -196,9 +196,27 @@ jobs:
       - name: Summary
         if: ${{ needs.plan.result == 'success' }}
         run: node e2e/ci-summary-merge.mjs "$SHARDS" e2e-summary "$NOTE" >> "$GITHUB_STEP_SUMMARY"
+      # A test that passed only on its retry fails main's run (Nov 10, audit F1, after the second flaky batch): the retry
+      # stays for the trace it records, but no longer hides a flake. Pull requests aren't held up by one.
+      - name: No flaky test on main
+        if: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && needs.shard.result == 'success' }}
+        run: |
+          if ls e2e-summary/*.flaky >/dev/null 2>&1; then
+            echo "### A test passed only on its retry, so main is red: fix it at its cause (its trace is in the shard's e2e-report artifact)." >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+      # (A run red with no failed test, Nov 9 audit F2: GitHub dropped the shards or this job. Said plainly, so the director
+      # re-runs it once instead of hunting for a test.)
       - name: The plan and every shard green
         if: ${{ needs.plan.result != 'success' || needs.shard.result != 'success' }}
-        run: exit 1
+        env:
+          PLAN: ${{ needs.plan.result }}
+          SHARD: ${{ needs.shard.result }}
+        run: |
+          if [ "$PLAN" = "success" ] && [ "$SHARD" != "failure" ]; then
+            echo "### No test failed: the shards were $SHARD (GitHub didn't run them). Re-run this run once." >> "$GITHUB_STEP_SUMMARY"
+          fi
+          exit 1
 
   perf:
     if: ${{ inputs.perf }}

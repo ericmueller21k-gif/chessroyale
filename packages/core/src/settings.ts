@@ -103,7 +103,9 @@ export interface Settings {
   bossPowerTest: string;
   /**
    * Test switch, solo (?mate=1): the boss battle starts after 1.f3 e5 2.g4 with the crowd White and the boss to move, and
-   * the boss plays a mate in one whenever it has one: its attack on the crowd's king, then the result, at once.
+   * the boss plays a mate in one whenever it has one: its attack on the crowd's king, then the result, at once. Not with a
+   * boss whose first move is a power's (Wrangler's long pull; Sawyer's pawn move for his split): that first move comes
+   * first, so name a boss with ?boss= (e.g. hollow) wherever the mate must come at once (2026-11-09-boss-result-red.md).
    */
   bossMateTest?: boolean;
   /**
@@ -368,6 +370,11 @@ export interface Settings {
    * botSkillSpread (the sims) still spreads skills evenly on a log scale across it.
    */
   botSkillRange: readonly [number, number];
+  /**
+   * Solo's bot level (home's 50 v 50 Bots, the Bot level box; Eric, Nov 9): the average rating its bots are drawn around (BOT_LEVELS),
+   * or "random" (each bot's rating uniform over BOT_LOBBY.ratings' range). Unset: BOT_LOBBY's own curve, as before (online lobbies).
+   */
+  botLevel?: number | "random";
   botRandomMoveChance: number;
   /** Crowd 50 v 50's bots (CROWD_BOTS): spread over the good lines with each turn's shared lean. Unset: botPick as before. */
   crowdBots?: CrowdBotSpread;
@@ -666,6 +673,38 @@ export const BOT_LOBBY = {
 };
 export type BotLobbySettings = typeof BOT_LOBBY;
 
+/**
+ * Home's 50 v 50 Bots: the Bot level box (Eric, Nov 9: "select the average bot MMR … my level … very easy … they kind of fluctuate a few
+ * hundred points up and down around [it] … random, which is just pure randomness for every bot").
+ * docs/decisions/2026-11-09-home-modes-bot-level.md. Each level sets the bell curve's mean (BOT_LOBBY.ratings' sd, min, max and step
+ * stay, narrowed near the range's ends: botRatingOf); `mine` is your own rating (clamped to the curve's range; Medium when the app knows none); `random` draws each bot uniform
+ * over the range. Medium's 1150 is BOT_LOBBY's own mean, so Medium plays exactly as solo did before. Solo only.
+ */
+export const BOT_LEVELS = [
+  { id: "mine", label: "My level", mean: null },
+  { id: "very-easy", label: "Very easy", mean: 700 },
+  { id: "easy", label: "Easy", mean: 950 },
+  { id: "medium", label: "Medium", mean: 1150 },
+  { id: "hard", label: "Hard", mean: 1500 },
+  { id: "very-hard", label: "Very hard", mean: 1900 },
+  { id: "random", label: "Random", mean: null },
+] as const;
+export type BotLevelId = (typeof BOT_LEVELS)[number]["id"];
+
+/** A Bot level's setting (Settings.botLevel): its mean, your rating for "mine" (clamped; Medium's without one), or "random". */
+export function botLevelMean(id: BotLevelId, yourRating: number | null): number | "random" {
+  if (id === "random") return "random";
+  const { min, max, mean } = BOT_LOBBY.ratings;
+  if (id === "mine") return yourRating == null || !Number.isFinite(yourRating) ? mean : Math.max(min, Math.min(max, Math.round(yourRating)));
+  return BOT_LEVELS.find((l) => l.id === id)!.mean ?? mean;
+}
+
+/**
+ * A 50 v 50 party's people (Eric, Nov 9: queue together into the public 50 v 50 matchmaking, "like Fortnite squads", sides random, ranked):
+ * you and up to 7 friends. Not built yet (a later job's matchmaker piece): home shows Party greyed. Unused until then.
+ */
+export const CROWD_PARTY_MAX = 8;
+
 /** 32-bit FNV-1a of a string (a bot's name: its fixed rating). */
 function nameHash(name: string): number {
   let h = 0x811c9dc5;
@@ -673,10 +712,19 @@ function nameHash(name: string): number {
   return h >>> 0;
 }
 
-/** A bot's rating, from its name alone (the same every match): BOT_LOBBY.ratings' bell curve. */
-export function botRatingOf(name: string, b: Pick<BotLobbySettings, "ratings"> = BOT_LOBBY): number {
-  const { mean, sd, min, max, step } = b.ratings;
-  let a = nameHash(name);
+/**
+ * A bot's rating, from its name alone (the same every match): BOT_LOBBY.ratings' bell curve. `level` (solo's Bot level, BOT_LEVELS):
+ * the curve around that mean instead, or uniform over the range for "random", still fixed by the name within the level (the name and
+ * the level seed it; BOT_LOBBY's own mean keeps the name's rating of before).
+ */
+export function botRatingOf(name: string, b: Pick<BotLobbySettings, "ratings"> = BOT_LOBBY, level?: number | "random"): number {
+  const { min, max, step } = b.ratings;
+  const mean = typeof level === "number" ? Math.max(min, Math.min(max, level)) : b.ratings.mean;
+  // (Near the range's ends a level's curve narrows (to 1.5 times its room), so the clamp doesn't drag its average off the level's:
+  // Very easy's 700 sits 100 above the floor, a bot below 600 would play as 600 anyway.)
+  const sd = Math.min(b.ratings.sd, 1.5 * (mean - min), 1.5 * (max - mean));
+  const own = level === undefined || level === b.ratings.mean;
+  let a = nameHash(own ? name : `${name}|${level}`);
   const next = () => {
     // (mulberry32, inline: rng.ts imports nothing from here, and this file stays free of imports.)
     a = (a + 0x6d2b79f5) >>> 0;
@@ -685,6 +733,7 @@ export function botRatingOf(name: string, b: Pick<BotLobbySettings, "ratings"> =
     t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
+  if (level === "random") return Math.round((min + next() * (max - min)) / step) * step;
   const u1 = Math.max(next(), 1e-9);
   const z = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * next());
   return Math.max(min, Math.min(max, Math.round((mean + sd * z) / step) * step));
@@ -720,8 +769,8 @@ export function botRatingForSkill(skill: number, b: Pick<BotLobbySettings, "skil
  * A bot's rating and temperature as its seat gets them: its name's rating (botRatingOf), as loose as `botSkillRange`
  * allows at least (the ?weakbots=1 switch: then the rating that temperature plays like).
  */
-export function botStrength(name: string, settings: Pick<Settings, "botSkillRange"> = DEFAULT_SETTINGS): { rating: number; skill: number } {
-  const rating = botRatingOf(name);
+export function botStrength(name: string, settings: Pick<Settings, "botSkillRange" | "botLevel"> = DEFAULT_SETTINGS): { rating: number; skill: number } {
+  const rating = botRatingOf(name, BOT_LOBBY, settings.botLevel);
   const skill = botSkillForRating(rating);
   const floor = settings.botSkillRange[0];
   return skill >= floor ? { rating, skill } : { rating: Math.min(rating, botRatingForSkill(floor)), skill: floor };
@@ -1009,12 +1058,18 @@ export const BOSS_POWERS = {
     [4, 5],
   ] as readonly (readonly [number, number])[],
   /**
-   * Pie: a square near the center is pied for pieTurns crowd turns (nobody may move onto it). Up to pieMax pies on the
-   * board at once (Eric, Oct 11: two), never two on one square; a new one every pieEvery turns while there's room.
+   * Boingo's pie (Eric, Nov 12: thrown in the face of one of the crowd's pieces whose two squares diagonally behind it are
+   * empty; it splits onto those two squares): every pieEvery crowd turns from firstPassive (the next turn when there's no
+   * target), the two squares pied for pieTurns crowd turns (nobody, either side, may move onto them; Eric: "just one
+   * turn"), up to pieMax pied squares at once (one throw: two). The piece hit gets a splat mark; at pieSplatsToFreeze
+   * splats it's frozen for pieFreezeTurns crowd turns (Eric: "2 splats on the same piece make it frozen for a turn") and
+   * its mark goes. docs/decisions/2026-11-12-boingo-face-pie.md.
    */
-  pieTurns: 3,
+  pieTurns: 1,
   pieEvery: 2,
   pieMax: 2,
+  pieSplatsToFreeze: 2,
+  pieFreezeTurns: 1,
   /**
    * The ultimate's meter (the rage meter), in rage points: full at rageFull, then a one-turn warning, then the
    * ultimate. It empties as the ultimate comes and fills again for the next (Eric, Oct 11: several a match, like a
@@ -1049,7 +1104,7 @@ export const BOSS_POWERS = {
    * the raid sim (reports/folio-sim.md). Dash 1 (Nov 3): about 1.9 Time Scrambles a battle of 46 moves in the
    * raid sim with the player's clock, the crowd 0.15 (reports/dash-sim.md).
    */
-  rageSpeed: { gingerbread: 1.2, clown: 1.8, grex: 1.2, hollow: 1, bigboy: 1, sawyer: 1.3, alfil: 1.2, smudgy: 1, moo: 1, gardener: 1.2, tiger: 1.3, folio: 1.3, timber: 0.7, dash: 1 } as Readonly<Record<string, number>>,
+  rageSpeed: { gingerbread: 1.2, clown: 1.8, grex: 1.2, hollow: 1, bigboy: 1, sawyer: 1.3, alfil: 1.2, smudgy: 1, moo: 1, gardener: 1.2, tiger: 1.3, folio: 1.3, timber: 0.7, dash: 1, zebra: 1 } as Readonly<Record<string, number>>,
   /**
    * The Hidden Boss's ultimate, the bullet clock (Eric, Oct 14: "Meter builds starting turn 1, about 7 turns in he says
    * something about how you're thinking too much and to just play pure chess etc, true to him, then for the rest of phase 1
@@ -1460,8 +1515,8 @@ export const BOSS_POWERS = {
    * Smudgy's Repaint (his ultimate, his whole turn; Eric, Oct 19): one of his pawns painted the crowd's color and one of
    * the crowd's knights or bishops his. The engine picks the pair: what it gains him (his evaluation with the crowd to
    * move after it, against his evaluation before it with him to move, in pawns: passScores, each position searched at
-   * repaintNodes) within repaintBand, the nearest repaintTarget; none in the band: no Repaint that turn, again at the
-   * start of his next. At most repaintMax a battle (then his meter is off).
+   * repaintNodes) within repaintBand, the nearest repaintTarget; none in the band: the nearest outside it (Nov 7: a
+   * warned Repaint always comes). Warned only when a pair exists. At most repaintMax a battle (then his meter is off).
    */
   repaintBand: [1.5, 2.5] as readonly [number, number],
   repaintTarget: 2,
@@ -1659,7 +1714,7 @@ export const BOSS_POWERS = {
    * (Smudgy's Repaint keeps its own cap, repaintMax.) docs/decisions/2026-11-02-nov2-fixes.md. Dash's Time Scramble at most twice
    * (Eric, Nov 6: "about twice a game"; his Scramble Rush is his once-a-battle power besides).
    */
-  maxUltimates: { timber: 2, dash: 2 } as Readonly<Record<string, number>>,
+  maxUltimates: { timber: 2, dash: 2, zebra: 2 } as Readonly<Record<string, number>>,
   /**
    * Dash's Clock Slap (his passive; Eric's design, Nov 1; bosses/dash.ts; docs/decisions/2026-11-03-dash.md): each capture of
    * his steals time from your clock. On a time bank (Boss alone and a Boss Battle party: BOSS_CLOCK's 10 + 10, the team's one
@@ -1698,19 +1753,21 @@ export const BOSS_POWERS = {
   dashClockFit: { every: [4, 5] as readonly [number, number], smacks: 5, smackMs: 150 },
   /**
    * Dash's pop-off (Eric, Nov 7: "I gotta pop off for a second, bro", then he smacks it 10 times really fast, then says again how
-   * much he loves that clock): once a battle, on one of his turns from `from` to `to` (drawn from the battle's seed), before his
-   * move lands. `smacks` (3) smacks at smackMs (dashClockFit's) with the pop-off line, `popMs` long; then `hits` (10) fast smacks
-   * at `hitMs` a smack with the love line, `loveMs` long. 4.6 s in all: his thinking waits for it, and no one's clock runs meanwhile.
+   * much he loves that clock; Eric, Nov 8: twice a battle, docs/decisions/2026-11-08-dash-popoff-twice.md): twice a battle, on two
+   * of his turns from `from` to `to` (drawn from the battle's seed), at least `gap` of his turns apart, before his move lands. Each
+   * is `smacks` (3) smacks at smackMs (dashClockFit's) with the pop-off line, `popMs` long; then `hits` (10) fast smacks at `hitMs`
+   * a smack with the love line, `loveMs` long. 4.6 s in all: his thinking waits for it, and no one's clock runs meanwhile.
    */
-  dashPopOff: { from: 8, to: 20, smacks: 3, hits: 10, hitMs: 70, popMs: 2000, loveMs: 2600 },
+  dashPopOff: { from: 8, to: 20, gap: 6, smacks: 3, hits: 10, hitMs: 70, popMs: 2000, loveMs: 2600 },
   /**
    * Dash's Scramble Rush (Eric, Nov 6; bosses/dash.ts; docs/decisions/2026-11-06-dash-v2.md), once a battle: as a crowd turn
    * begins, from turn `from` on, the first time his rage meter is `atMeter` full (Time Scramble's meter: it comes at full). A
    * countdown of `countdownMs` ("1.00" to "0.00"); inside it his copies sweep the board from `scatterAt` for `scatterMs`, moving
    * `pieces` of yours and `pieces` of his (never a king) to empty squares of ranks `ranks`. His line and the God King's
    * (`linesMs`), then `placeMs` to put them back; then the board as it was, and `resultMs` for the verdict. Under `needCorrect`
-   * of the six back (the crowd's people's mean, its bots' too: each bot puts each back with `botHit`), he moves again at once
-   * (Hollow's quiet extra move). The game's position never changes: only what the screens show. Warned a turn ahead as any
+   * of the six back (online, the crowd's people's mean, its bots' too: each bot puts each back with `botHit`; solo, only your own
+   * put-back, no bots, no mean: Eric, Nov 8), he moves again at once (Hollow's quiet extra move; never skipped once due:
+   * docs/decisions/2026-11-08-dash-solo-rush.md). The game's position never changes: only what the screens show. Warned a turn ahead as any
    * ultimate is (Eric, Nov 6, playtesting: "there's no warning"): RAGE!, "Next turn: Scramble Rush", then it comes as the next crowd turn
    * begins. In the put-back each swept piece moves at most `movesPerPiece` times (Eric, Nov 6: "you can only move a piece up
    * to 2 times"); a try after that shakes it, "No more tries".
@@ -1730,6 +1787,39 @@ export const BOSS_POWERS = {
     botHit: 0.6,
     movesPerPiece: 2,
   },
+  /**
+   * Don Dough's Rising Dough (his passive; Eric, Nov 11; bosses/zebra.ts; docs/decisions/2026-11-11-don-dough.md). Early in the
+   * battle, at the end of a few of his turns, a lump of dough on an empty square of his half that shows what it will rise as.
+   * Its oven timer starts at doughTimers[kind] minutes (Eric, Nov 12: pawn 8, knight and bishop 13, rook 16, queen 21;
+   * Nov 11's 4/7/7/10/15 gave too little time to capture: "I meant 4 of our turns"), one off for
+   * every move, yours and his; at 00:00 his piece rises there (when the guards allow; else after the next move). A piece of
+   * yours landing on it squashes it. The rest is the sim's (reports/zebra-sim.md):
+   * - doughDrops a battle at most; the first after crowd move doughFirst (from the seed, in the range), each next one
+   *   doughGap of the crowd's moves later (from the seed), none after crowd move doughLast; at most doughLive on the board at once.
+   * - What it is: doughOdds (rook and queen rare, Eric), stepping down to a kind he can have now (never a ninth pawn or more pieces
+   *   than promotions could make, never past doughLeadMax pawns ahead: below).
+   * - Where: an empty square of his half off his back rank; a pawn, knight or bishop on the two ranks nearest the middle, a rook or
+   *   queen nearer his side on a file where a pawn of yours stands below it (Eric: "somewhere that's gettable for the pawn"); in a
+   *   seeded order.
+   * The sim's (reports/zebra-sim.md): with these, 2.1 pawns risen a battle (a queen in 1 in 10), the crowd 0.05 against the plain
+   * boss's 0.10.
+   */
+  doughTimers: { p: 8, n: 13, b: 13, r: 16, q: 21 } as Readonly<Record<"p" | "n" | "b" | "r" | "q", number>>,
+  doughOdds: { p: 0.5, n: 0.2, b: 0.2, r: 0.06, q: 0.04 } as Readonly<Record<"p" | "n" | "b" | "r" | "q", number>>,
+  doughDrops: 3,
+  doughFirst: [1, 3] as readonly [number, number],
+  doughGap: [3, 5] as readonly [number, number],
+  doughLast: 16,
+  doughLive: 2,
+  /**
+   * Where a lump may go besides (the sim's): "out" of reach of every move the crowd has now (a free squash is no fight), or "any"
+   * empty square of the ranks above. And a lump drops only while its piece leaves him at most doughLeadMax pawns ahead of you on
+   * material (pawn 1, knight and bishop 3, rook 5, queen 9), as Timber's workshop: he rebuilds rather than runs away with it.
+   */
+  doughReach: "any" as "out" | "any",
+  doughLeadMax: 2,
+  /** A queen's lump (rare: doughOdds) comes whatever the lead (Eric: "on occasion, he may throw out a queen"). */
+  doughQueenFree: true,
 } as const;
 
 /**
@@ -1737,7 +1827,7 @@ export const BOSS_POWERS = {
  * them (the boss select, Boss alone and a Solo raid), until Eric says go. **To put one live for everyone, take its id out of
  * this list** (core boss.ts's `adminFirst`; nothing else changes).
  */
-export const BOSS_ADMIN_FIRST: readonly string[] = ["timber", "dash"];
+export const BOSS_ADMIN_FIRST: readonly string[] = ["timber", "dash", "zebra"];
 
 /**
  * How Sawyer's split pawn looks (packages/app/src/components/Sawyer.tsx). Looks only: the rules, the engine and the
@@ -1936,6 +2026,16 @@ export const voteResultMs = (s: { voteResultSeconds: number }): number => s.vote
  * like two rows or more than a certain number of words, and then even… sit out a little bit longer." A short line now
  * rests about 3 s once typed, a two-row one (50 characters) about 5.5 s, none over 6.5 s.
  */
+/**
+ * The result screen's conversation after a Last Stand (Eric, Nov 8): the boss says its line above him, and once it has typed out
+ * it stays `bossHoldMs` more and fades; then the God King answers above him. Never both together.
+ */
+export const RESULT_TALK = {
+  bossHoldMs: 1200,
+  /** If the boss says nothing, the God King speaks after this long (ms from the result). */
+  kingAfterMs: 3000,
+} as const;
+
 export const SPEECH = {
   typeMs: 28,
   readMs: 2700,
@@ -2129,6 +2229,44 @@ export const BOSS_BRAIN = {
 };
 export type BossBrainSettings = typeof BOSS_BRAIN;
 
+/**
+ * Who plays the boss online (the outside review of Nov 10, finding 2, and its review; docs/decisions/2026-11-10-boss-and-lone-devices.md
+ * and docs/areas/bosses.md, "Who plays the boss online"): his own move (the brain's, a slip, the King's stagger, a power's best) and
+ * Boingo's funhouse move are asked of the host and a checker (an up-to-date app outside the host's account and party, drawn at random;
+ * for Maia's moves one whose Maia is loaded) with one seed, so two honest devices give the same move (Stockfish at a node count; Maia
+ * and limited-strength Stockfish draw with the seed; the bridge band's share is drawn by the server). The same move plays. Two differ:
+ * the engine server scores both and the better for him plays, but for Maia's move against a device's fallback to Stockfish (its Maia
+ * late or not ready), which plays if it's within `maiaGap` of the other. Nobody to ask, or no verdict: the host's plays, and the
+ * match pays as a solo game.
+ *   - `waitMs`: once the host has answered, how long the checker has (both search at once; the checker skips his powers' extras
+ *     on a turn that has none).
+ *   - `maiaGap`: Maia's move against a fallback plays if the engine server finds it at most this much worse (points of expected
+ *     score, 0 to 1), else the better: four honest Maia moves in five (reports/maia-sim, maia-raw: one in five gave away 0.25 or more).
+ *     A device that lies "Maia played it" gains at most this, and only on moves where the other device really fell back.
+ *   - `throwLoss`: a move the engine server finds this much worse than the other device's is a throw: its device gets a judge's
+ *     strike (benched at JUDGES.strikes). Above Maia's honest worst: its unguarded moves in reports/maia-sim (317 moves) gave away at
+ *     most 0.76.
+ *   - `missStrikes`: a checker that misses its window is replaced next move; this many misses in a battle are a strike.
+ *   - `loaders`: on the Maia brain, how many devices are told to load Maia to check his moves as the battle begins (drawn at random:
+ *     computers, and phones whose Maia is already saved; no phone downloads it for this); one more each move while none is ready.
+ *   - `eloDrawScale`: Stockfish at a strength with a seed (eloDraw) draws with T = the mean loss a move at that Elo (RATING_CURVE)
+ *     times this factor, by Elo (straight between the points, held past the ends), so it gives away what UCI_LimitStrength does
+ *     through the same guard: reports/elo-draw.md (two 200-position runs pooled; the delta reviews' D5 and N4).
+ */
+export const BOSS_CHECK = {
+  waitMs: 4_000,
+  maiaGap: 0.25,
+  throwLoss: 0.8,
+  missStrikes: 2,
+  loaders: 2,
+  eloDrawScale: [
+    [1600, 1.25],
+    [2200, 1.25],
+    [2500, 1.25],
+    [2800, 1.05],
+  ] as readonly (readonly [number, number])[],
+} as const;
+
 /** How long the cut screen shows: longer when there's an augment vote to make. */
 export const cutSeconds = (s: Pick<Settings, "cutClockVote" | "stageBreakSeconds">) => (s.cutClockVote ? Math.max(s.stageBreakSeconds, 7) : s.stageBreakSeconds);
 
@@ -2171,6 +2309,11 @@ export const FRONT_DOOR = {
   livePollMs: 5_000,
   /** …and the app says "still here" this often everywhere else (a match), so players in matches count as online. */
   heartbeatMs: 30_000,
+  /**
+   * A live request with no answer by now is given up (and the next one goes at its time): one that never answered kept the next from
+   * ever going, and the town's and the home page's chats, which ride on it, stopped until a reload (Nov 11).
+   */
+  liveTimeoutMs: 10_000,
   /** A running match counts while its lobby has reported within this long (it reports at least once a minute). */
   matchStaleMs: 3 * 60_000,
   /** The queue: after the fill time, bots pop into the empty seats for this long before the match begins. */
@@ -2190,6 +2333,19 @@ export const FRONT_DOOR = {
   heroHopFirstSec: 4,
   /** …then one every this many seconds (never under reduced motion). */
   heroHopEverySec: 30,
+  /**
+   * Searching while you browse (Eric, Nov 10): home's "Stop search?" or "Play bots?" (asked in place, in the action row) goes
+   * back to the three actions after this long without a tap.
+   */
+  searchAskMs: 6_000,
+  /**
+   * The loading bar (Eric, Nov 10: "only … if it's going to be more than like a 2-second hang"): the splash (or home's shell) under
+   * the logo shows a thin bar and what's loading once the page has been loading this long. index.html's shell runs it, before the
+   * app's script: it has these numbers written in (a unit test checks they agree).
+   */
+  loadBarAfterMs: 2_000,
+  /** No step done for this long: the bar's line says so, with "Try again" (a reload), never an endless bar. */
+  loadBarStallMs: 20_000,
 } as const;
 
 /**
@@ -2291,6 +2447,10 @@ export interface JudgeConfig {
   graceMs: number;
   graceFactor: number;
   speedWeight: number;
+  maxNps: number;
+  medianCap: number;
+  pairClassMin: number;
+  pairClassShare: number;
   benchNodes: number;
   defaultNps: number;
   deepOnDevices: boolean;
@@ -2338,8 +2498,28 @@ export const JUDGES: JudgeConfig = {
    */
   graceMs: 150,
   graceFactor: 0.25,
-  /** Choosing judges: weight = (nodes per second) ^ speedWeight, so a computer judges more often than a phone. */
-  speedWeight: 3,
+  /**
+   * Choosing judges: weight = (nodes per second) ^ speedWeight, so a computer judges more often than a phone. 2 (was 3,
+   * then 1): the speed is the device's own word until it's measured, so the cap below keeps what a claim buys small,
+   * while computers still mostly judge with computers (2026-11-10-judge-pairing.md).
+   */
+  speedWeight: 2,
+  /** The fastest a device's claimed speed counts (nodes/s; a fast desktop's real engine is about 2 to 3 million). */
+  maxNps: 3_000_000,
+  /**
+   * When judges are drawn, a speed counts at most this many times the lobby's median (so in a lobby of phones, a device
+   * that claims a desktop's speed weighs as a fast phone, not as a hundred). 3, not 4: two accounts claiming a computer
+   * in a 62-phone lobby get both judges 2.9% of the time at 3, 7% at 4 (2026-11-10-judge-pairing.md).
+   */
+  medianCap: 3,
+  /**
+   * The second judge comes from the first's class (computer or phone, the device's own word) only when that class has
+   * at least this many other accounts left, and at least `pairClassShare` of the lobby's accounts; else from everyone.
+   * A fixed count alone let an attacker supply it (four accounts claiming "computer" in a lobby of phones: both judges
+   * 29%; with the share, 7%, as if classes were ignored). Delta review 2, 2026-11-10-judge-pairing.md.
+   */
+  pairClassMin: 3,
+  pairClassShare: 0.1,
   /** A device's speed check on joining: one search of this many nodes, timed. */
   benchNodes: 150_000,
   /** A device that hasn't reported its speed yet counts as this fast (nodes/s): a typical phone. */
@@ -2354,6 +2534,8 @@ export const JUDGES: JudgeConfig = {
    * decide, and a device could copy that to dodge blame. Revisit before turning this on:
    * docs/decisions/2026-10-16-the-best-move-is-the-highest-scored.md.)
    */
+  // (Before turning this on: two accounts claiming "computer" at a fast speed would make deepMode() true and the judging
+  // pool only the capable devices, the two of them, in a lobby of phones. Delta review 2 of PR #601, Nov 10.)
   deepOnDevices: false,
   /** The re-check's node count at most: the engine server's (shared by the round's boards, as the server's is). */
   deepNodes: 2_000_000,
@@ -2390,6 +2572,22 @@ export const LOBBY_LIFE = {
    * one dropped), so this only clears one that's stuck. Never while anyone is connected.
    */
   lobbyAbandonedMinutes: 180,
+} as const;
+
+/**
+ * A match's end on players' profiles (server/lobby-do.ts; the outside review of Nov 10, finding 9): each signed-in player's result,
+ * fair play, XP and rewards wait in the lobby's record (`saveQueue`) until written, each write keyed so a retry or a restart writes
+ * nothing twice. At most `perWake` players are written per wake (about 20 D1 calls each: far under D1's 1,000 queries per
+ * invocation), the next ones a second later. A failed write is tried again every `retrySeconds`, and the lobby waits to close for it
+ * up to `retryHours` past its closing time (then it closes, and says so on the ops page). Fair play, XP, the Welcome Crate and boss
+ * tokens stop holding a result up `strictMinutes` after its first failed try (logged): a lasting bug in one never blocks the result,
+ * and a short D1 outage never drops them (by time, not tries: the review of #610, m3).
+ */
+export const MATCH_SAVE = {
+  perWake: 20,
+  retrySeconds: 60,
+  retryHours: 24,
+  strictMinutes: 30,
 } as const;
 
 /**
@@ -2464,6 +2662,13 @@ export const RANKED_1V1 = {
   drawOfferEveryMoves: 3,
   /** A finished game's results stay up this long, then the game's object deletes everything it stored. */
   resultsKeepMinutes: 10,
+  /**
+   * Recording a finished game (server/duel-room.ts): tried at once, then 15 s after each try for the first four, then every
+   * `recordRetrySeconds`, up to `recordRetryHours` after the game ended (as Squads' rewards: the outside review of Nov 10, finding 7);
+   * the room waits to close for it that long (then it closes, and says so on the ops page).
+   */
+  recordRetrySeconds: 60,
+  recordRetryHours: 24,
   /** In the queue: after this long, "Few players online right now" offers Keep waiting and Play a bot (unranked). */
   fewPlayersSeconds: 45,
   /**
@@ -2552,6 +2757,54 @@ export const RANKED_1V1 = {
 };
 
 /**
+ * Leaving ranked games early (phase L1, 1 v 1; Eric, Nov 9: "Quitting during time control. Yeah, that's fine. Quitting
+ * mid-game. Yeah, full loss."; docs/ideas/ranked-ladder.md section 4, docs/areas/ranked.md "Leaving"). The server
+ * decides all of it from the game's own record (core's ranked-leaves.ts does the math); PAUSE_LEAVE_PENALTIES turns it off.
+ *   - A **dodge**: leaving after the match is found, before both first moves (Abort, the vote, closing the app, no first
+ *     move, never connecting). The game is called off as before (no result, no hidden-rating change), and the dodger loses
+ *     `dodgeRp[0]` rank points, `dodgeRp[1]` from dodge level 2 on, with a lockout from ranked by their dodge level.
+ *   - A **leave**: after the game starts, abandoning it (your clock ran out while you were gone and your opponent was there)
+ *     or resigning before your `quickResignMoves`th move. A full loss, then `leaveRp` more rank points.
+ *   - Both put a **mark** on your record: `window` is how many of your latest ranked games and dodges are counted.
+ */
+export const LEAVES = {
+  /** Rank points a dodge costs: the first (dodge level 1), then from level 2 on. None in placements (no rank points yet). */
+  dodgeRp: [5, 10] as readonly number[],
+  /** Rank points a leave costs on top of the loss. */
+  leaveRp: 10,
+  /** The lockout from ranked after a dodge, in minutes, by the dodge level it brought (1, 2, 3, 4, 5 and up). */
+  dodgeLockoutMin: [0, 5, 30, 120, 720] as readonly number[],
+  /** The dodge level drops by one every this many hours without a dodge. */
+  dodgeDecayHours: 12,
+  /** Marks are counted among your latest this many ranked games and dodges. */
+  window: 20,
+  /**
+   * The delayed queue: with at least `at` marks in the window, each ranked search waits `waitSec` before it can be paired
+   * (the most `at` reached applies). From `noteAt` marks home's note also says "Finish ranked games to clear your leaves."
+   */
+  delayed: [
+    { at: 3, waitSec: 120 },
+    { at: 5, waitSec: 300 },
+  ] as readonly { at: number; waitSec: number }[],
+  noteAt: 5,
+  /** With this many marks in the window, ranked is locked for `lockHours` from the latest mark. */
+  lockAt: 8,
+  lockHours: 24,
+  /** Resigning before your this-many-th move is a leave (a dodge in disguise). */
+  quickResignMoves: 3,
+  /**
+   * A player counts as gone (for who left: duel rules' conductOf) only once their last socket has been closed this long: a
+   * phone backgrounding, a Wi-Fi to cellular handoff, a reload or a deploy's dropped sockets come back well within it. Within it,
+   * an Abort pressed is the presser's own, and a flag is a plain loss.
+   */
+  goneGraceMs: 12_000,
+  /** Home's note after a dodge ("You left before the game started: −5 RP") shows this long, unless a game comes after it. */
+  noteMinutes: 30,
+  /** A mark is kept this long, then the 15-minute cron deletes it. */
+  keepDays: 90,
+};
+
+/**
  * Squads' server (phase 2; docs/areas/squads.md, "The server"): the lobby around the rules (`SQUADS`, below), its
  * parties, bot work and rewards. The lobby's life (results kept, idle, abandoned) is LOBBY_LIFE's; the queue's fill
  * time is MATCH_FILL_SECONDS, as for Crowd.
@@ -2560,8 +2813,8 @@ export const SQUADS_LOBBY = {
   /** The drawn bracket on screen before round 1's matches begin (after the votes). */
   bracketIntroSeconds: 8,
   /**
-   * Placement rewards (unranked), by placement: 1st, 2nd, 3rd-4th, 5th-8th. Coins go in the wallet; crates are counted
-   * there for when crates stop being free (CRATES_FREE). Each person on the squad still playing their seat when its
+   * Placement rewards (unranked), by placement: 1st, 2nd, 3rd-4th, 5th-8th. Coins go in the wallet; crates are crates of the
+   * newest series (XP.rewardCrate since Nov 9), each opened with a crate key. Each person on the squad still playing their seat when its
    * placement is decided (not one who left, nor a seat a bot has taken over); none in a lobby a test control touched.
    */
   rewards: {
@@ -2577,11 +2830,19 @@ export const SQUADS_LOBBY = {
   rewardRetrySeconds: 60,
   rewardRetryHours: 24,
   /**
+   * The daily cap (the outside review of Nov 10, finding 5; like ranked's, RANKED_1V1.coins.perDay): at most this many lobbies a UTC
+   * day pay an account their placement's coins and crates; the next that day pay none (XP as usual), and the placement says so.
+   * Checked as the reward is written (squads-do.ts writeReward), in the same statement. A lobby of only one party and bots pays
+   * none at all (SquadsRecord.unvouched). docs/decisions/2026-11-10-boss-and-lone-devices.md.
+   */
+  rewardsPerDay: 5,
+  /**
    * Squad bots' engine work (the bot engine's top moves for a board), done on players' devices first (Eric's computing
    * priorities): `perJob` devices each (computers before phones, devices outside the match before those in it), their
-   * answers compared. The lobby waits `graceMs` after the first answer for the second, `answerMs` for any; two that
-   * disagree go to the engine server (a restricted search of their moves, at `serverNodes`) or a third device, and
-   * the device that was wrong gets a strike (`strikes` and it gets no more work). A bot whose candidates aren't in
+   * answers compared. The lobby waits `graceMs` after the first answer for the second (or `graceFactor` of the first's time),
+   * `answerMs` for any; two that disagree go to the engine server (a restricted search of their moves, at `serverNodes`) or a
+   * third device, and the device that was wrong gets a strike (`strikes` and it gets no more work). A second answer after the
+   * grace is compared when it comes: disagreeing, the engine server's verdict strikes the one further from it. A bot whose candidates aren't in
    * `fallbackMarginMs` before its deadline (no devices, none answering) plays from the server's own quick look
    * (material two moves deep and mate in one: no engine), `fallbackScale` turning its pawns into expected score. A
    * device holds at most `maxInFlight` unanswered jobs at once (a phone fewer: its battery), so a slow one is never
@@ -2593,6 +2854,8 @@ export const SQUADS_LOBBY = {
     perJob: 2,
     maxInFlight: { computer: 4, phone: 2 },
     graceMs: 400,
+    /** The second answer's grace is at least graceMs, or this share of the first's own time (as JUDGES.graceFactor). */
+    graceFactor: 0.5,
     answerMs: 4_000,
     serverNodes: 400_000,
     strikes: 2,
@@ -2651,6 +2914,31 @@ export const SQUADS_LOBBY = {
  * hides them only. Nothing is deleted: the catalog (shop.ts), owned records and the database stay as they are.
  */
 export const GOD_KING_SHOP = false;
+
+/**
+ * The shop's Chat packs tab (Eric, Nov 8: "the chat packs go away"). Off hides the tab and every pack in the shop, and the
+ * quick-chat picker offers only the free default lines. Nothing is deleted: owned packs still send (their lines work for
+ * whoever has them), and the server keeps its records and purchase code.
+ */
+export const CHAT_PACKS_SHOP = false;
+
+/**
+ * The Shop tab's page (Eric, Nov 9: his mockup, our art; docs/decisions/2026-11-09-shop-page.md). Look only for now: no purchase is
+ * wired (a tapped price says "Buying opens soon"); Stripe and coin purchases come next.
+ */
+export const SHOP = {
+  /** The beta discount on everything in the shop (0.5 = 50% off; 0 = none: no ribbons, no struck prices). */
+  discount: 0.5,
+  /**
+   * Full prices in coins (the director's numbers from the coin economy: a game pays about 1.8 coins a minute, at most 70, about
+   * 20 paying games a day). The page shows them struck through, the discounted price beside them (`shopPrice` in shop.ts).
+   */
+  prices: { key: 250, hunchess: 100, gift: 150, beta: 150, boss: 400, bundle: 900 },
+  /** The limited, rotating items: a gold clock on their card. */
+  limited: ["gift", "beta"] as readonly string[],
+  /** The bundle's 3 random crates: each this likely to be a Mythic Crate (a Fischer Random pull: Legendary or Mythic). Wired with purchases. */
+  bundleMythicChance: 0.05,
+};
 
 /**
  * Quick chat in matches and in the lobby before them (preset phrases and emoji only; see DECISIONS.md, "Quick chat
@@ -2823,6 +3111,17 @@ export const TOWN_CHAT = {
    * moves." (Eric, Nov 2); fewer is a quit: no line, and the challenge stays unfinished (the no-spam rule).
    */
   challengeSurrenderMoves: 10,
+  /**
+   * "Ann has entered the town." (Eric, Nov 12: "we have to wait for someone to say something… when you join… it should say… has entered
+   * the town"): the server's line when a player's pawn appears in the town, once per visit. Back within this long of their last beat (a
+   * reload, a quick trip home or to a shop's game) is the same visit: no line.
+   */
+  enterRejoinMs: 120_000,
+  /**
+   * A busy town doesn't flood: after an "entered" line, more arrivals within this long are held and go out as one line when it's up
+   * ("Ann and Bo entered the town.", "Ann, Bo and 3 others entered the town."): at most one such line per this long.
+   */
+  enterBurstMs: 6_000,
 } as const;
 
 /**
@@ -2893,6 +3192,12 @@ export const FRIENDS = {
   toastMs: 20_000,
   /** The computer's live panel lists at most this many friends who are online. */
   panelMax: 8,
+  /** The friends page's player search (Eric, Nov 11): it asks once a name has this many characters… */
+  searchMinChars: 2,
+  /** …this long after the last keystroke… */
+  searchDebounceMs: 250,
+  /** …and shows at most this many players (names starting with what was typed, any case). */
+  searchMax: 6,
 } as const;
 
 /**
@@ -2910,6 +3215,20 @@ export const AGE_GATE = {
   answerMinutes: 60,
   /** A "too young" answer stays on this device this long (400 days: the most a browser keeps a cookie). */
   tooYoungDays: 400,
+} as const;
+
+/**
+ * The engine server's two open routes (server/index.ts; the outside review of Nov 10, finding 4): POST /api/engine/score (a solo
+ * game's close calls) and GET /api/engine/ping (waking it as a solo game starts). Only for an account (signed in, where sign-in is
+ * set up), at most `perAccountDaily` calls an account a UTC day (counted in D1: server/engine-calls.ts; not yet measured against a
+ * keen solo player), and solo's searches at most `soloDailySearches` a day, never more than `soloShare` of the day's
+ * ENGINE_DAILY_SEARCHES (3000), so matches always keep the rest. Past either, the device re-checks itself for the rest of the game,
+ * as when the server is down. Devices first (CLAUDE.md's computing priorities): this only stops strangers.
+ */
+export const ENGINE_SERVER = {
+  perAccountDaily: 200,
+  soloDailySearches: 1000,
+  soloShare: 1 / 3,
 } as const;
 
 /**
@@ -2968,6 +3287,8 @@ export const CAPACITY = {
     play: { limit: 40, windowMs: 60_000 },
     /** Friends' actions (requests, answers, invites, blocks, settings): FRIENDS has the daily and hourly caps. */
     friends: { limit: 30, windowMs: 60_000 },
+    /** The friends page's player search, per account (a search asks after a pause in typing: FRIENDS.searchDebounceMs). */
+    search: { limit: 40, windowMs: 60_000 },
   },
 } as const;
 
@@ -3028,6 +3349,38 @@ export const OPS = {
 } as const;
 
 /**
+ * Alerts to Discord (Nov 10; docs/ideas/live-ops.md, sections 1 and 5; server/alerts.ts): the 15-minute cron compares the server's
+ * stored error counts with normal and posts to the Worker secret ALERT_WEBHOOK. A PAGE (players can't play) pings at once; the rest
+ * waits for the morning digest. A PAGE needs a real count, well above that hour's normal, two checks in a row.
+ */
+export const ALERTS = {
+  /** The cron's period (wrangler.jsonc): a 15-minute window's normal is this share of the hour's. */
+  checkMinutes: 15,
+  page: {
+    /** Errors in one 15-minute window, at least (a real count, never one event). */
+    minErrors: 20,
+    /** And at least this many times normal: the median of the same clock hour on each of the `normalDays` days before. */
+    timesNormal: 3,
+    normalDays: 7,
+    /** Checks in a row over the line before a PAGE (and under it before "recovered"). */
+    inARow: 2,
+    /** While it lasts, a problem pages again ("still happening") at most this often. */
+    repeatMs: 3_600_000,
+  },
+  /**
+   * The match, lobby and queue routes: the Worker's own errors on these (the route as routeOf names it, "POST /api/play"), with
+   * the Durable Objects' errors apart. A request into a lobby that fails is counted once in each (the room's, then the Worker's).
+   */
+  playRoutes: ["/api/play", "/api/lobby", "/api/squads/", "/api/boss/party", "/api/1v1/"],
+  /** D1 not answering: read again this much later; both failing (two checks in a row) pages. */
+  d1RetryMs: 30_000,
+  /** The morning digest: the first check at or after this hour in this time zone, once a day. */
+  digest: { hour: 8, timeZone: "America/Chicago" },
+  /** The ops page linked from every post. */
+  opsPage: "https://hunchess.com/admin/ops",
+} as const;
+
+/**
  * The town's WebGL fallbacks (Oct 30; docs/areas/ops.md, "Health"): a page whose town asked for WebGL and drew with Canvas 2D
  * instead says so once, through the error reporting (the app's problems.ts, `reportTownFallback`), as this kind with its
  * reason as the message. The health view counts them by reason, apart from the errors. The reasons: no WebGL 2 in the
@@ -3055,10 +3408,19 @@ export type TownGlFallback = (typeof TOWN_GL_FALLBACK.reasons)[number];
  */
 export const RIDES = {
   defaultScale: 0.75,
-  scale: {} as Readonly<Record<string, number>>,
+  // (An outfit is drawn round the pawn's own head, so at its size as drawn.)
+  scale: { "banana-suit": 1 } as Readonly<Record<string, number>>,
   speed: { "cheetah-shoes": 2 } as Readonly<Record<string, number>>,
   tryScale: [0.5, 1.25] as const,
 };
+
+/**
+ * Outfits (Eric, Nov 10; docs/decisions/2026-11-10-outfit-slot.md): an outfit hides every other worn item. `eyewear`: face items
+ * tagged eyewear (goggles, shades) still show, over its face hole ("the only exception"); false hides them too.
+ */
+export const OUTFIT = {
+  eyewear: true,
+} as const;
 
 /**
  * The Welcome Crates (Eric, Nov 6: "you get it for completing 5 games in any mode or any boss … Limit one per account"; then "the
@@ -3068,6 +3430,13 @@ export const RIDES = {
  */
 export const WELCOME_GIFT = {
   milestones: [5, 25],
+  /**
+   * A solo game counts toward them only with XP.minMoves of your own moves (as its XP) and at least this many seconds of the server's
+   * time (POST /api/xp/solo/start, then its result): its result is the device's word, and empty posts earned crates (the outside
+   * review of Nov 10, finding 10). By moves, not 3 minutes, so a quick boss loss or a first-stage knockout still counts (the review of
+   * #610, m6). Online games count as their rooms recorded them.
+   */
+  soloMinSeconds: 60,
 } as const;
 
 /**
@@ -3089,7 +3458,8 @@ export const BOSS_CRATE_PRICE = {
  * clock alone (`minutes` from its start to its finish as the server saw them: the device's word for its moves isn't trusted).
  * Where sign-in is set up, only signed-in accounts earn them (a guest's would move on signing in: many guests into one account).
  * `shortNames`: a boss whose token says a shorter name than the boss's own ("Boingo token", as its picture is named).
- * `grantMax`: the most an admin's test grant gives at once (keys, or one boss's tokens).
+ * `grantMax`: the most an admin's test grant gives at once of one boss's tokens; `keysGrantMax` of crate keys (Eric, Nov 9: an admin
+ * grants themselves up to 100 keys at once, now that crates take one: docs/decisions/2026-11-09-xp-phase2-keys.md).
  */
 export const BOSS_TOKENS = {
   moves: 10,
@@ -3099,6 +3469,119 @@ export const BOSS_TOKENS = {
   cap: 3,
   shortNames: { clown: "Boingo" } as Readonly<Record<string, string>>,
   grantMax: 10,
+  keysGrantMax: 100,
+} as const;
+
+/**
+ * XP and levels (Eric, Nov 9; the approved design, notes/briefs/design-xp-quests.md v2; docs/decisions/2026-11-09-xp-*.md; core's
+ * xp.ts has the rules, server/xp.ts grants them). Linear, no top: Level 1 at 0 XP, one more every `perLevel`.
+ *   - A game's XP: `perMinute` for each whole minute you played (up to `maxMinutes`), plus `win` for a win. Minutes are your time in
+ *     the game as the server measured it (online: the match room, from the match's start to your last move that went in; solo: the
+ *     server's own clock between the game's start and its result, never the device's word).
+ *   - It counts only with `minMoves` of your own moves (or your team's turns you picked in); else no XP, and the screen says why.
+ *   - No XP for leaving the match (idle, removed), for a guest where sign-in is set up, a test game, or a banned account.
+ *   - The win bonus is capped where two accounts could trade wins: a friends' lobby pays it once a day per set of opponents, and solo
+ *     games (whose result is the device's word) `soloWinsPerDay` times a day. The day starts at `dayStartUtcHour` (08:00 UTC is
+ *     midnight Pacific), the same for everyone. A solo win also needs `soloWinMinMinutes` of the server's own time (as boss tokens').
+ *   - Solo time XP (the device's word for the moves; the server's clock only proves time passed) is capped at `soloMinutesPerDay`
+ *     minutes an XP day (1,200 XP): a game past it pays what's left ("Daily solo limit"). The director's call (review M2, Nov 9);
+ *     Eric may change the number. A solo result the server never timed earns no XP at all (review M1).
+ *   - The result screen's XP box: the bar fills from the old XP to the new over `fillMs` (by how much it gains, between the two),
+ *     each part appearing in turn; a level-up fills to the end, pops "Level N!" for `levelUpMs`, and carries on from empty. Online,
+ *     the screen asks the server for its game's XP at `asksMs` after the results (the room may still be writing them).
+ *   - `testMax`: the most XP the test switch `?xp=` sets (test servers and admins only).
+ *
+ * Phase 2 (Eric, Nov 9: "go with phase two"; the design's sections 2 and 4; docs/decisions/2026-11-09-xp-phase2-*.md):
+ *   - **The daily reward:** your first counted game of the XP day with at least `dailyMinMoves` of your own moves (a solo game also
+ *     `dailySoloMinMinutes` of the server's own time) pays `dailyBonus` XP ("Daily reward +200") and `dailyCrates` crates of
+ *     `rewardCrate` (the newest series), once an XP day.
+ *   - **Level-up rewards:** each level reached pays `levelCrates` crates of `rewardCrate` and `levelKeys` crate keys; every
+ *     `bossCrateEvery`th level also a boss crate the player picks among the live bosses (it waits in the Crates tab until picked).
+ *     Paid once per level, at the next counted game (so levels reached while rewards were paused, or before phase 2, are paid then);
+ *     at most `levelsPerGame` levels a game (the rest at the next).
+ *   - The result screen shows what a game paid beside its XP in a toast at the top once the XP bar has filled, for `rewardToastMs`.
+ */
+export const XP = {
+  perLevel: 1000,
+  perMinute: 10,
+  maxMinutes: 30,
+  win: 50,
+  minMoves: 10,
+  soloWinsPerDay: 5,
+  soloWinMinMinutes: 5,
+  soloMinutesPerDay: 120,
+  dayStartUtcHour: 8,
+  fillMs: { min: 1500, max: 2500 },
+  levelUpMs: 700,
+  asksMs: [700, 1500, 3000, 6000, 10_000],
+  testMax: 100_000,
+  dailyBonus: 200,
+  dailyMinMoves: 15,
+  dailySoloMinMinutes: 3,
+  dailyCrates: 1,
+  levelCrates: 2,
+  levelKeys: 1,
+  bossCrateEvery: 10,
+  levelsPerGame: 20,
+  rewardCrate: "winter-1",
+  rewardToastMs: 6000,
+} as const;
+
+/**
+ * Quests (Eric, Nov 9; XP phase 3; the approved design's sections 3 and 5, notes/briefs/design-xp-quests.md;
+ * docs/decisions/2026-11-09-quests-*.md; core's quests.ts has the rules, server/quests.ts deals them and pays them):
+ *   - **Dailies:** `dailyPerDay` new ones each XP day (it starts at XP.dayStartUtcHour, 08:00 UTC), dealt the first time your quests
+ *     are read that day (home, or a game's end). Unfinished ones carry over, but at most `maxDailies` wait (Hearthstone's kindness
+ *     rule): a day's deal tops you up to it, never past it. Each unfinished daily has `rerollsPerDaily` free reroll a day (Eric, Nov 10: one per daily,
+ *     not one per day); its replacement's is used for that day. (The server keeps one: `quests.rerolled_day`; 1 is the only value.)
+ *   - **The weekly:** one, dealt each week (from Monday at XP.dayStartUtcHour UTC: `weekStartDay`, 1 = Monday); it doesn't carry.
+ *   - **Progress:** only a game that earned XP (a counted game: XP's rules) counts, once per game per quest, decided on the server:
+ *     online games by their match room's facts; a solo game (its moves and its win are the device's word) only for "finish games"
+ *     quests, and only with `soloMinMinutes` of the server's own time (as the daily reward's). A win counts only if the game's win
+ *     XP was paid (a friends' lobby's once a day per opponent). Nothing while PAUSE_REWARDS is on.
+ *   - **Rewards:** paid by the server through the ledger the moment a game completes a quest, once per quest, in the same batch as
+ *     that game's XP: its XP joins the game's XP box ("Quest +300"), its crates (of XP.rewardCrate) and key show in the result's toast.
+ *   - **The pool:** only modes always playable (bots fill Squads, 50 v 50 and raids); no auto chess (played on your device), no
+ *     ranked 1 v 1 (it needs another person), no "fight boss X" (a raid's boss is drawn at random; Boss alone is played on your
+ *     device). `counts`: which counted games move it: "any" any game, "win" a won online game, "boss" an online boss raid,
+ *     "bossWin" a won raid, "squads" a Squads game, "crowd" a 50 v 50 game. `weight`: how often it's dealt (wins rarer: the
+ *     design's "win quests stay rare"). `icon`: the row's picture ("boss": a live boss's portrait).
+ *   - **Progress shown (Eric, Nov 10; docs/decisions/2026-11-10-quest-progress.md):** back on home after a game that moved a quest,
+ *     the overlay opens by itself and slides each moved bar from its old count to its new, one after another: `show.startMs` after
+ *     it opens, `show.slideMs` each, `show.gapMs` between; a quest it finishes gets `show.finishMs` for its finish (the glow, "Done!",
+ *     its reward's burst). A count's tick sound plays at most every `show.tickGapMs`.
+ */
+export type QuestCounts = "any" | "win" | "boss" | "bossWin" | "squads" | "crowd";
+export interface QuestDef {
+  id: string;
+  name: string;
+  goal: string;
+  target: number;
+  counts: QuestCounts;
+  weight: number;
+  xp: number;
+  crates?: number;
+  keys?: number;
+  icon: { kind: "boss" } | { kind: "squad" } | { kind: "board"; piece: "knight" | "rook" | "queen" | "pawn" };
+}
+export const QUESTS = {
+  dailyPerDay: 2,
+  maxDailies: 3,
+  rerollsPerDaily: 1,
+  weekStartDay: 1,
+  soloMinMinutes: 3,
+  show: { startMs: 450, slideMs: 750, gapMs: 250, finishMs: 1100, tickGapMs: 70 },
+  daily: [
+    { id: "boss-hunter", name: "Boss Hunter", goal: "Win a Boss Battle", target: 1, counts: "bossWin", weight: 1, xp: 300, crates: 1, icon: { kind: "boss" } },
+    { id: "raid-party", name: "Boss Fighter", goal: "Play 2 Boss Battles", target: 2, counts: "boss", weight: 2, xp: 300, icon: { kind: "boss" } },
+    { id: "squad-up", name: "Squad Up", goal: "Play 2 Squads games", target: 2, counts: "squads", weight: 2, xp: 300, icon: { kind: "squad" } },
+    { id: "fifty-fifty", name: "Fifty-Fifty", goal: "Play a 50 v 50 game", target: 1, counts: "crowd", weight: 2, xp: 300, icon: { kind: "board", piece: "queen" } },
+    { id: "warm-up", name: "Warm Up", goal: "Finish 3 games", target: 3, counts: "any", weight: 2, xp: 300, icon: { kind: "board", piece: "pawn" } },
+    { id: "winner", name: "Winner", goal: "Win 2 online games", target: 2, counts: "win", weight: 1, xp: 300, crates: 1, icon: { kind: "board", piece: "rook" } },
+  ] as readonly QuestDef[],
+  weekly: [
+    { id: "regular", name: "Regular", goal: "Complete 10 games", target: 10, counts: "any", weight: 1, xp: 1500, crates: 1, keys: 1, icon: { kind: "board", piece: "knight" } },
+  ] as readonly QuestDef[],
 } as const;
 
 /**
@@ -3127,10 +3610,32 @@ export const CLAW = {
 export const FAIRPLAY = {
   /**
    * What detection may do on its own: "watch" records levels but acts on none of them (until the simulation's numbers
-   * are in DECISIONS), "review" also opens reviews, "ban" also bans on overwhelming evidence. Reports, admins and the
-   * automated reviewer act whatever this says.
+   * are in DECISIONS), "review" also opens reviews, "pool" also sends a level that used to ban to the engine pool (`pool`
+   * below), "ban" bans it instead. Reports and admins act whatever this says; the automated reviewer never bans. Automatic
+   * bans stay off (the outside review of Nov 10, finding 3: the ban bar's evidence is the judges' numbers, which devices
+   * send); "pool" since Nov 10 (Eric: "we just keep them in hell basically"), reversible by a person's Release.
    */
-  enforcement: "ban" as "watch" | "review" | "ban",
+  enforcement: "pool" as "watch" | "review" | "pool" | "ban",
+  /**
+   * The engine pool (Eric, Nov 10; docs/decisions/2026-11-10-engine-pool.md): an account detection puts here only ever meets other
+   * pooled accounts (or bots) in every queue, and nothing on its screen differs. In: a level that used to ban (`enforcement` "pool"),
+   * or a new account with `newHits` of its first `newGames` fair-play matches at the one-match ban bar (`levels.banOne*`), with no
+   * review. Out: a person's Release on the review page. Its evidence is kept while it's pooled. (Since Nov 11 one deep-checked match
+   * past every `banOne*` bar pools too, as the two-match path does: Eric, "It's better we put people in this queue than under";
+   * docs/decisions/2026-11-11-near-best.md.)
+   */
+  pool: {
+    newGames: 10,
+    newHits: 2,
+    /**
+     * The pool list's hints (admin.ts, poolHint): "getting crushed" from 1 v 1 games against pooled players only (at least `games`, scoring
+     * under `below`); crowd and raid results never (bots and bosses beat everyone). "Strength down": the in-pool matches' average
+     * (`dropMatches` or more) `drop` or more below the best of the matches that pooled them.
+     */
+    hint: { games: 5, below: 0.3, drop: 400, dropMatches: 3 },
+    /** The pool's JSON download: players per file (each file's full case: about 10 queries a player, under D1's 1,000 a request). */
+    exportPage: 50,
+  },
   reports: {
     /** What a report can be about (the sheet's buttons, in order). Only "cheating" counts toward an automatic review. */
     reasons: ["Cheating", "Offensive name or icon", "Something else"] as const,
@@ -3155,8 +3660,8 @@ export const FAIRPLAY = {
   holdBackDays: 7,
   /**
    * The deep re-check (server/fairplay-deep.ts): a flagged player's counted moves searched again on the engine server
-   * (native Stockfish, the full network), restricted to the judges' top moves and the pick. "Deep match": the pick is
-   * the deep search's best. Run by the Worker's schedule: cases in review at once, others off-peak, within a daily
+   * (native Stockfish, the full network), over every legal move (in groups of at most 8, one search each: the engine's
+   * own candidates, never the judges' list; Nov 10). "Deep match": the pick is at or near the deep search's best (`nearBestLoss`). Run by the Worker's schedule: cases in review at once, others off-peak, within a daily
    * budget of its own (its own container instance, so matches never wait behind it).
    */
   deep: {
@@ -3168,8 +3673,17 @@ export const FAIRPLAY = {
     perRun: 40,
     /** Off-peak hours (UTC, from-to): watch cases are checked only then; reviews any time. */
     offPeakUtc: [3, 10] as readonly [number, number],
-    /** The candidate moves searched: the judges' best this many, plus the pick. */
+    /** The judges' best moves kept with each pick as evidence (FairMove.top): this many. (The re-check searches every legal move.) */
     candidates: 8,
+    /**
+     * Near the engine's best (Eric, Nov 11; docs/decisions/2026-11-11-near-best.md): a deep-checked pick counts as the engine's best
+     * (a "deep match", what `levels.banDeep` and `banOneDeep` read) when it's the search's best or gives away at most this many
+     * points of expected score by the search's own numbers (core's nearBest). Two strong engines often prefer different, practically
+     * equal moves (the live demo, Nov 11: Stockfish 19's top move was our 17.1's exact best 74% of the time). 1 point is about 0.1 to
+     * 0.3 pawns from a level position on Stockfish's win/draw/loss scale (more material, more pawns a point), the judges' own grain
+     * for "found the best" (`signals.foundLoss`): never a real mistake. reports/fairplay.md, "Near the engine's best".
+     */
+    nearBestLoss: 1,
   },
   /**
    * Signals (core/fairplay.ts): which positions count, and what each signal measures. Tuned by the simulation
@@ -3216,10 +3730,12 @@ export const FAIRPLAY = {
     /** An engine user picks the judges' best at least this often, wherever the crowd stands (the evidence's other side). */
     cheatFind: 0.8,
     /**
-     * An engine user's picks against the deep re-check: its best this often, one of its next two, neither (its own
-     * engine, depth or version can differ from ours).
+     * An engine user's picks against the deep re-check: its best this often, one of its next two or near its best
+     * (`deep.nearBestLoss`), neither (its own engine, depth or version can differ from ours). Measured Nov 11: the live demo's
+     * Stockfish 19 was our 17.1's exact best 74% of the time; the simulation's other engine splits the rest about 12 to 1
+     * (reports/fairplay.md, "Near the engine's best"). Was [0.85, 0.13, 0.02], a guess.
      */
-    cheatDeep: [0.85, 0.13, 0.02] as readonly [number, number, number],
+    cheatDeep: [0.74, 0.24, 0.02] as readonly [number, number, number],
     /** Timing: a hard find this fast is suspicious; timing needs this many counted moves with a crowd. */
     fastHardMs: 5_000,
     minTimed: 8,
@@ -3271,8 +3787,8 @@ export const FAIRPLAY = {
     /**
      * Auto-ban: only overwhelming evidence, and only from matches the deep re-check has gone through (`banMatchChecked`
      * moves or more each). Either at least `banMatches` such matches in the window whose evidence adds up to `banEvidence`, with `banDeepChecked` moves
-     * checked among them, a deep-match share of `banDeep` and a best match strength of `banPerf`; or one match past
-     * every `banOne*` bar.
+     * checked among them, a deep-match share (at or near the engine's best: `deep.nearBestLoss`) of `banDeep` and a best match
+     * strength of `banPerf`; or one match past every `banOne*` bar. With `enforcement` "pool", either pools (never a ban).
      */
     banMatches: 2,
     /** (A match counts toward a ban only with this many of its moves deep-checked.) */
@@ -3285,6 +3801,16 @@ export const FAIRPLAY = {
     banOneDeepChecked: 12,
     banOneDeep: 0.9,
     banOnePerf: 2400,
+    /**
+     * Sustained strength (Eric, Nov 11: "People easily get around that by playing the second or third best move ... by 4 or 5 games,
+     * if their Elo is just ridiculous like that, put them in the cheater queue"): the newest `poolStrengthMatches` matches in the
+     * window with `poolStrengthCounted` counted moves or more each, their match strengths averaging `poolStrength` or more, pool the
+     * player whatever their top-move share (a ban-level verdict, as the bars above; never a ban: `enforcement`). Each match is its own
+     * lobby, so no one lobby's judges carry it. reports/fairplay.md, "Sustained strength".
+     */
+    poolStrengthMatches: 5,
+    poolStrengthCounted: 8,
+    poolStrength: 3000,
   },
 } as const;
 
@@ -3714,6 +4240,83 @@ export const SQUADS: SquadsSettings = {
  */
 export const BOARD: { readonly checkHighlight: boolean } = { checkHighlight: false };
 
+/**
+ * Boss battle music (Eric, Nov 11: "Wire boss battle music into the game"; docs/decisions/2026-11-11-boss-music.md;
+ * `packages/app/src/music.ts`). Each boss's theme (`packages/app/public/music/themes.json`) plays from the moment the
+ * battle starts (the intro's end) until its result, on its own gain into the game's sound, under its effects.
+ * - `volume`: the music's gain, where a sound effect plays at 1 (the boss packs, a move's knock).
+ * - `fadeMs`: Music or Sound switched off, or the page hidden: faded out over this (and back in).
+ * - `endFadeMs`: the battle's result (a win, a loss, leaving): faded out over this, then stopped.
+ * - `startDelayS`: from asking to the first note (s), so the intro and the loop are scheduled together.
+ * - `splashHoldMs`: a challenge from the town starts the theme as the boss's full-screen splash starts (Eric, Nov 11); a theme not
+ *   ready by then holds the splash's covering frame up to this much longer, then the battle goes on and the music joins when ready.
+ * - `townShare`, `townWaitMs`: the town's loading bar fetches every theme (Eric, Nov 12: "loading music in the loading bar"; fetched
+ *   only, decoded when a battle or a room needs it), from the bar's start, beside the town's painting. The last `townShare` of the bar
+ *   is its "Loading music…" step; if the music isn't all in by the time the town is built, the town waits at most `townWaitMs` for it,
+ *   then opens and the rest lands in the background.
+ */
+export const MUSIC = { volume: 0.25, fadeMs: 300, endFadeMs: 1500, startDelayS: 0.05, splashHoldMs: 2000, townShare: 0.15, townWaitMs: 3000 } as const;
+
+/**
+ * The area banner (Eric, Nov 11, approving its mockup: "super clean. That's exactly what I was imagining";
+ * docs/decisions/2026-11-11-area-banner-room-music.md): as you walk into a home's room through its door (once the door's
+ * black lifts), its name across a dark band a third down the room's view, the boss's name above it in gold. Taps pass
+ * through it. Reduced motion: no fades, shown for the same total time.
+ * - `inMs`, `holdMs`, `outMs`: fade in, hold, fade out.
+ */
+export const AREA_BANNER = { inMs: 400, holdMs: 1800, outMs: 600 } as const;
+
+/** A vibration: one pulse (ms), or on, off, on… (ms) as `navigator.vibrate` takes it. */
+export type HapticPattern = number | readonly number[];
+
+/**
+ * Haptics (Eric, Nov 9: "when you tap [a piece] … it should vibrate. And then when we drop it on a square … vibrate";
+ * docs/decisions/2026-11-09-haptics.md; `packages/app/src/haptics.ts`). Each kind's pattern, in ms; Settings → Sound,
+ * "Vibration" switches them all off on the device. On an iPhone each pulse is one system tick (no lengths), at most
+ * `iosTicks` of them.
+ * - `select`: a tap that picks up one of your pieces (not a press held to drag: `holdMs` and longer is a hold).
+ * - `move`: a move you make (a tap on its square, or a dragged piece let go on one; a premove placed; a promotion picked).
+ * - The boss moments, each once, on the device that sees it, keyed in `cues` by the art's id and cue (and its animation,
+ *   where the same cue plays in another one): Big Boy's toy block landing and his Big Bounce's crash, Babur's balloon
+ *   popping, Ginger's ice freezing over a piece, Boingo's pie splat; and QUEEN SLAIN! (Boss.tsx).
+ * - `duelFound` (a 1 v 1 opponent found while you browse) and `crateHold` (a crate held) were the game's two buzzes
+ *   before Nov 9.
+ */
+export const HAPTICS = {
+  holdMs: 350,
+  iosTicks: 3,
+  /** Between two ticks of a pattern on an iPhone (ms): the pulse and the gap after it, together. */
+  iosTickGapMs: 90,
+  patterns: {
+    select: 10,
+    move: 15,
+    bigboyBlock: 35,
+    bigboyBounce: [30, 60, 30, 60, 30],
+    baburPop: 25,
+    gingerFreeze: [20, 40, 20],
+    boingoPie: 40,
+    queenSlain: [40, 60, 40],
+    duelFound: [90, 60, 160],
+    crateHold: 15,
+  },
+  /** The art's cues that vibrate: "<art id> <cue>", or "<art id> <animation> <cue>" for a cue that's in other animations too. */
+  cues: {
+    "toy-block clack": "bigboyBlock",
+    "bigboy crash": "bigboyBounce",
+    "tigerPump pop": "baburPop",
+    "ice-overlay freeze crackle": "gingerFreeze",
+    "pie-splat splat": "boingoPie",
+  },
+} as const satisfies {
+  holdMs: number;
+  iosTicks: number;
+  iosTickGapMs: number;
+  patterns: Record<string, HapticPattern>;
+  cues: Record<string, string>;
+};
+
+export type HapticKind = keyof typeof HAPTICS.patterns;
+
 /** What the shop offers, in percent, by kind (pawn, knight, bishop, rook, queen): a row adds up to 100. */
 export interface ShopOdds {
   readonly p: number;
@@ -3739,8 +4342,8 @@ export interface AutoChessSettings {
   /**
    * The shop (v5, Eric Oct 20; v6 Oct 20 evening; v7 Oct 21): this many offers (4 since v7, was 5), each a piece and a square on
    * your half where it will land; buying an offer rolls a new one into its slot; one reroll of all the offers costs `reroll.first`
-   * gold the first time in a round and `reroll.step` more each time after it, up to `reroll.max` (the TFT-style economy, Eric Oct 25:
-   * 2, 3, 4, 5, 5, ...; v7.1's was 5, 6, ... 10 on the old ×10 scale), back to the first price at each round's start. The shop refills free at each round's start. **The odds follow the level of whoever's shop it is** (v7, Eric Oct 21: "when
+   * gold the first time in a round and `reroll.step` more each time after it, up to `reroll.max` (Eric Nov 10: "1 free reroll every round,
+   * and then it costs 1 for the next one, and then 2, and it's capped at 2": 0, 1, 2, 2, ...; Oct 25's was 2, 3, 4, 5, 5), back to the first price at each round's start. The shop refills free at each round's start. **The odds follow the level of whoever's shop it is** (v7, Eric Oct 21: "when
    * you level you have slightly higher chances for better pieces and pawn odds slightly decrease... [queens] shouldn't even appear
    * till level 7 like in TFT"): `oddsByLevel[level - 1]` is the percent of each kind for a shop rolled at that level, level 1 first
    * (play starts at `levels.start`, 4, and tops at `levels.max`, 10); each row adds up to 100. No rooks before level 5, no queens
@@ -3946,16 +4549,27 @@ export interface AutoChessSettings {
     readonly holdChance: number;
     /** Its pieces go down evenly over the step's open part, the last by this share of it (so something is on its board early, to scout). */
     readonly placeBy: number;
-    /** It buys XP (4 gold for 4 XP) now and then: at most this many a round, with this chance each time it has the gold (more with its board full: a level is room). */
+    /**
+     * It buys XP (4 gold for 4 XP) now and then: at most this many a round, with this chance each time it has the gold (more with its board full: a level is room).
+     * Nov 10: `xpChanceFull` 0.8 → 0.7 with the free first reroll, so the bot, keeping the gold it spent on rerolls, levels at about the same pace (214 → 210 of 300 test rounds).
+     */
     readonly maxXpBuys: number;
     readonly xpGold: number;
     /** With this much gold it buys XP even when that gives no level yet (it saves up for the next). */
     readonly xpRichGold: number;
     readonly xpChance: number;
     readonly xpChanceFull: number;
+    /** With no read of you (round 1, or a test that passes none): the chance it banks for interest. */
     readonly saveChance: number;
     /** When it banks for interest it still spends at least this much (a few pieces' worth). */
     readonly saveKeep: number;
+    /**
+     * It saves when you save (Eric, Nov 10: "if you're saving a bunch of your gold, … it shouldn't spend a ton of its own"). From round 2 it reads your gold
+     * at the round's start and what you banked from the last round (never this round's buys): you saving (`banked` or more carried over, or `gold` or more
+     * to start) it banks too, `chance` of the time, to your interest steps (the tens you kept beyond this round's income), still spending `saveKeep`, with no
+     * rerolls or XP; you spending down, it spends to keep up (no bank). From round `lateRound`, or with either side at `lowHp` HP or less, it never banks.
+     */
+    readonly follow: { readonly banked: number; readonly gold: number; readonly chance: number; readonly lateRound: number; readonly lowHp: number };
     /** It buys a queen only with this much more left after her (it buys one when rich, not with its last coins). */
     readonly queenChange: number;
     /** Whenever one of its offers is a star-up it can pay for, it buys it this often (Eric: "buys star-ups as a player would", nearly always). */
@@ -3984,7 +4598,7 @@ export const AUTOCHESS: AutoChessSettings = {
       { p: 42, n: 20, b: 19, r: 14, q: 5 },
       { p: 36, n: 21, b: 20, r: 16, q: 7 },
     ],
-    reroll: { first: 2, step: 1, max: 5 },
+    reroll: { first: 0, step: 1, max: 2 },
   },
   sellBack: 0.75,
   benchSlots: 4,
@@ -4045,5 +4659,5 @@ export const AUTOCHESS: AutoChessSettings = {
   queenLimit: 1,
   maxPawns: 8,
   pawnsPerFile: 3,
-  bot: { lockFrom: 0.3, lockTo: 0.95, neverLockChance: 0.15, maxRerolls: 3, rerollGold: 7, rerollChance: 0.06, rerollChanceBare: 0.2, maxHolds: 2, holdChance: 0.5, placeBy: 0.7, maxXpBuys: 3, xpGold: 6, xpRichGold: 14, xpChance: 0.3, xpChanceFull: 0.8, saveChance: 0.3, saveKeep: 8, queenChange: 4, starUpChance: 0.95, adjustTries: 16, adjustDestinations: 3, adjustNodes: 8000, adjustMargin: 0.02 },
+  bot: { lockFrom: 0.3, lockTo: 0.95, neverLockChance: 0.15, maxRerolls: 3, rerollGold: 7, rerollChance: 0.06, rerollChanceBare: 0.2, maxHolds: 2, holdChance: 0.5, placeBy: 0.7, maxXpBuys: 3, xpGold: 6, xpRichGold: 14, xpChance: 0.3, xpChanceFull: 0.7, saveChance: 0.3, saveKeep: 8, follow: { banked: 10, gold: 30, chance: 0.85, lateRound: 7, lowHp: 8 }, queenChange: 4, starUpChance: 0.95, adjustTries: 16, adjustDestinations: 3, adjustNodes: 8000, adjustMargin: 0.02 },
 };

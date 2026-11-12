@@ -144,7 +144,7 @@ export function WipPreview({ fen, orientation, crowd }: { fen: string; orientati
     if (moment === "bulbs") {
       const b = bulbsAt(t);
       parts.push(
-        <span key="strip" style={{ position: "absolute", zIndex: 9, left: "1%", top: "-6.6%", width: "18%", aspectRatio: "44 / 15", pointerEvents: "none" }}>
+        <span key="strip" style={{ position: "absolute", zIndex: 9, left: "1%", top: "-6.6%", width: "18%", aspectRatio: "44 / 11", pointerEvents: "none" }}>
           <BossEffect name="bulbStrand" anim={b.anim} then={b.then} since={start + b.since} id="wip-strip" />
         </span>,
       );
@@ -253,15 +253,16 @@ export function WipPreview({ fen, orientation, crowd }: { fen: string; orientati
   );
 }
 
-/** The bulbs' countdown in the preview (10 s round): a bulb out every 1.5 s, the cast at 6 s, the relight after it. */
+/** The bulbs' countdown in the preview (10 s round): six, a bulb out every 0.9 s (a move each), the cast at 6 s, the relight after it. */
 function bulbsAt(t: number): { lit: number; anim: string; then?: string; since: number } {
   const loop = 10000;
   const k = Math.floor(t / loop);
   const u = t - k * loop;
   const base = k * loop;
-  if (u < 1500) return { lit: 3, anim: "lit3", since: 0 };
-  if (u < 3000) return { lit: 2, anim: "out3", then: "lit2", since: base + 1500 };
-  if (u < 4500) return { lit: 1, anim: "out2", then: "lit1", since: base + 3000 };
-  if (u < 7600) return { lit: 0, anim: "out1", then: "lit0", since: base + 4500 };
-  return { lit: 3, anim: "relight", then: "lit3", since: base + 7600 };
+  if (u < 900) return { lit: 6, anim: "lit6", since: 0 };
+  if (u < 7600) {
+    const out = Math.min(6, Math.floor(u / 900));
+    return { lit: 6 - out, anim: `out${7 - out}`, then: `lit${6 - out}`, since: base + out * 900 };
+  }
+  return { lit: 6, anim: "relight", then: "lit6", since: base + 7600 };
 }

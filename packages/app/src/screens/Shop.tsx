@@ -1,8 +1,10 @@
-import { useState } from "preact/hooks";
-import { GOD_KING_SHOP, SHOP_CATEGORIES, SHOP_FREE, SHOP_ITEMS, chatPack, chatPickCap, chatSays, pausedLine, shopItem, shopOffersPack, wornFromLocker, type ShopSlot } from "@chessroyale/core";
+import type { JSX } from "preact";
+import { useLayoutEffect, useState } from "preact/hooks";
+import { CHAT_PACKS_SHOP, GOD_KING_SHOP, SHOP, SHOP_CATEGORIES, SHOP_FREE, SHOP_ITEMS, chatPack, chatPickCap, chatSays, pausedLine, shopItem, shopOffersPack, shopPrice, discountLabel, wornFromLocker, type ShopSlot } from "@chessroyale/core";
 import { account, buyShopItem } from "../account.ts";
 import { openProfile } from "../profile-nav.ts";
 import { KingEffectPreview } from "../components/Cosmetics.tsx";
+import { BetaCrateArt, BossCrateArt, BundleArt, HunchessCrateArt, KeyArt, MythicCrateArt, WinterCrateArt } from "../components/Items.tsx";
 import { play } from "../sound.ts";
 import { useAccount } from "./Profile.tsx";
 import { CratesPanel, LockerPanel } from "./Crates.tsx";
@@ -10,7 +12,7 @@ import { BackButton } from "../components/FrontDoor.tsx";
 import { isPaused, useServerStatus } from "../status.ts";
 
 /**
- * The shop: cosmetics by category. Get an item (free while we test); it goes to your locker, where you wear it
+ * The shop: cosmetics by category. Get an item; it goes to your locker, where you wear it
  * with your crate items (one place to wear things, Eric, Oct 8, 2026). Chat packs are yours to use once you have
  * them. Your choices are saved to your account.
  */
@@ -18,9 +20,9 @@ export function ShopScreen({ onBack, initial }: { onBack: () => void; initial?: 
   const { profile, config } = useAccount();
   useServerStatus();
   // (A profile's locked quick chat line opens it on the chat packs.)
-  // The tabs the shop shows: the God King's effects only with GOD_KING_SHOP (settings.ts).
-  const shopCategories = SHOP_CATEGORIES.filter((c) => GOD_KING_SHOP || c.slot !== "king");
-  const [slot, setSlot] = useState<ShopSlot>(initial === "chat" ? "chat" : GOD_KING_SHOP ? "king" : shopCategories[0]!.slot);
+  // The tabs the shop shows: the God King's effects only with GOD_KING_SHOP, the chat packs only with CHAT_PACKS_SHOP (settings.ts).
+  const shopCategories = SHOP_CATEGORIES.filter((c) => (c.slot !== "king" || GOD_KING_SHOP) && (c.slot !== "chat" || CHAT_PACKS_SHOP));
+  const [slot, setSlot] = useState<ShopSlot>(initial === "chat" && CHAT_PACKS_SHOP ? "chat" : GOD_KING_SHOP ? "king" : (shopCategories[0]?.slot ?? "king"));
   // (A profile's "Open locker" opens it on the locker.)
   const [area, setArea] = useState<"shop" | "crates" | "locker">(() =>
     initial && initial !== "chat" ? initial : new URLSearchParams(location.search).has("crates") ? "crates" : "shop",
@@ -30,7 +32,9 @@ export function ShopScreen({ onBack, initial }: { onBack: () => void; initial?: 
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const shop = profile?.shop;
-  const category = SHOP_CATEGORIES.find((c) => c.slot === slot)!;
+  // (With every tab hidden, nothing of a hidden tab shows: no blurb, no items.)
+  const shown = shopCategories.some((c) => c.slot === slot);
+  const category = SHOP_CATEGORIES.find((c) => c.slot === slot) ?? SHOP_CATEGORIES[0]!;
   const act = async (id: string, fn: (id: string) => Promise<void>) => {
     setBusy(id);
     setError(null);
@@ -77,12 +81,12 @@ export function ShopScreen({ onBack, initial }: { onBack: () => void; initial?: 
         <LockerPanel onShop={() => setArea("shop")} />
       ) : (
         <>
-      {SHOP_FREE && <p class="shop-note">Everything is free while we test the shop.</p>}
       {!shop ? (
         // (Still loading on a first visit: the guest account is being made. Unavailable only once that's known.)
         <p class="muted">{config && (!config.accounts || profile) ? "The shop needs your account, which isn't available here." : "Loading the shop…"}</p>
       ) : (
         <>
+          <ShopPage />
           <div class="shop-tabs" role="tablist">
             {shopCategories.map((c) => (
               <button type="button" role="tab" key={c.slot} aria-selected={c.slot === slot} class={c.slot === slot ? "on" : ""} onClick={() => setSlot(c.slot)}>
@@ -90,14 +94,16 @@ export function ShopScreen({ onBack, initial }: { onBack: () => void; initial?: 
               </button>
             ))}
           </div>
-          <p class="muted small">
-            {category.blurb}
-            {slot !== "chat" && " What you get goes to your Locker, where you wear it."}
-          </p>
+          {shown && (
+            <p class="muted small">
+              {category.blurb}
+              {slot !== "chat" && " What you get goes to your Locker, where you wear it."}
+            </p>
+          )}
           {error && <p class="shop-error">{error}</p>}
           {slot === "chat" && gotPack && <GotPackNote got={gotPack} />}
           <div class="shop-grid">
-            {SHOP_ITEMS.filter((i) => i.slot === slot && (i.slot !== "chat" || shopOffersPack(i.look.pack ?? ""))).map((item) => {
+            {SHOP_ITEMS.filter((i) => shown && i.slot === slot && (i.slot !== "chat" || shopOffersPack(i.look.pack ?? ""))).map((item) => {
               const owned = shop.owned.includes(item.id);
               const equipped = item.slot !== "chat" && shop.equipped[item.slot] === item.id;
               // Chat packs: their lines are the preview, and owning one is all it takes (nothing to equip).
@@ -136,7 +142,7 @@ export function ShopScreen({ onBack, initial }: { onBack: () => void; initial?: 
           </div>
           {slot === "chat" ? (
             <div class="shop-soon shop-chat-foot">
-              <p class="muted small">Quick chat is in online 50 v 50 matches and boss raids: preset lines only, no typing.</p>
+              <p class="muted small">Quick chat is in online 50 v 50 matches and Boss Battles: preset lines only, no typing.</p>
               <button type="button" class="btn btn-small" onClick={pickInProfile}>
                 Choose your lines and emoji in your profile ›
               </button>
@@ -179,6 +185,115 @@ function GotPackNote({ got }: { got: { pack: string; added: string[]; left: numb
           Pick these in your profile ›
         </button>
       )}
+    </div>
+  );
+}
+
+type Offer = keyof typeof SHOP.prices;
+/** The grid's cards, in the mockup's order (Eric, Nov 9), then the key. Their prices are SHOP.prices; the clock is SHOP.limited. */
+const CARDS: readonly { id: Exclude<Offer, "bundle">; name: string; line: string; Art: () => JSX.Element }[] = [
+  { id: "boss", name: "Boss Crate", line: "A random boss's crate. Opens without a key.", Art: () => <BossCrateArt /> },
+  { id: "hunchess", name: "HunChess Crate", line: "A classic crate with a variety of rewards.", Art: HunchessCrateArt },
+  { id: "gift", name: "Gift Crate", line: "A limited-time crate with special rewards.", Art: WinterCrateArt },
+  { id: "beta", name: "Beta Crate", line: "A limited-time crate for early supporters.", Art: BetaCrateArt },
+  { id: "key", name: "Crate Key", line: "Opens one crate.", Art: KeyArt },
+];
+const POP = {
+  limited: "Limited: a rotating shop item. It leaves the shop when its time is up.",
+  soon: "Buying opens soon.",
+} as const;
+
+/**
+ * The Shop tab's page (Eric's mockup, Nov 9, in our own art): the special offer, then the crates and the key. Look only: a price
+ * tapped says "Buying opens soon" (the buttons are there, nothing hidden). With SHOP.discount on, every card and the bundle wear its
+ * red ribbon ("50% OFF") and their pills strike the full price through beside the discounted one.
+ */
+function ShopPage() {
+  const [pop, setPop] = useState<keyof typeof POP | null>(null);
+  const ribbon = discountLabel();
+  const soon = () => setPop("soon");
+  return (
+    <>
+      <p class="muted shop-line">{ribbon ? `Everything in the shop is ${ribbon.replace(" OFF", " off")} during beta.` : "Buying opens soon."}</p>
+      <section class="shop-offer" data-offer="bundle" aria-label="Special offer: Crate + Key Bundle">
+        <span class="shop-offer-tab">
+          <svg viewBox="0 0 20 14" aria-hidden="true">
+            <path d="M2 12 L1 3 L6 7 L10 1 L14 7 L19 3 L18 12 Z" fill="currentColor" />
+          </svg>
+          SPECIAL OFFER
+        </span>
+        {ribbon && <span class="shop-ribbon">{ribbon}</span>}
+        <span class="shop-offer-art">
+          <BundleArt />
+        </span>
+        <div class="shop-offer-text">
+          <h2>Crate + Key Bundle</h2>
+          <strong>3 Keys + 3 Random Crates</strong>
+          <em>
+            Includes a chance at a{" "}
+            <span class="shop-mythic-icon">
+              <MythicCrateArt />
+            </span>{" "}
+            Mythic Crate.
+          </em>
+          <Price id="bundle" onTap={soon} />
+        </div>
+      </section>
+      <div class="shop-cards">
+        {CARDS.map(({ id, name, line, Art }) => (
+          <div key={id} class="shop-card" data-offer={id}>
+            {SHOP.limited.includes(id) && (
+              <button type="button" class="shop-clock" aria-label={`${name} is limited`} onClick={() => setPop("limited")}>
+                <svg viewBox="0 0 20 20" aria-hidden="true">
+                  <circle cx="10" cy="10" r="7.5" fill="#fffaf0" stroke="#1d1d1f" stroke-width="2" />
+                  <path d="M10 5.5 V10 H13.5" fill="none" stroke="#1d1d1f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+              </button>
+            )}
+            {ribbon && <span class="shop-ribbon">{ribbon}</span>}
+            <span class="shop-card-art">
+              <Art />
+            </span>
+            <strong>{name}</strong>
+            <span class="shop-card-line">{line}</span>
+            <Price id={id} onTap={soon} />
+          </div>
+        ))}
+      </div>
+      {pop && <ShopPop text={POP[pop]} onClose={() => setPop(null)} />}
+    </>
+  );
+}
+
+/** A price pill (a button: look only for now): the coin, the full price struck through while the discount is on, the price to pay. */
+function Price({ id, onTap }: { id: Offer; onTap: () => void }) {
+  const full = SHOP.prices[id];
+  const now = shopPrice(full);
+  return (
+    <button type="button" class="shop-price" aria-label={now === full ? `${now} coins` : `${now} coins, was ${full}`} onClick={onTap}>
+      <span aria-hidden="true">🪙</span>
+      {now !== full && <s>{full}</s>}
+      <b>{now}</b>
+    </button>
+  );
+}
+
+/** The shop's small pop-up (the limited clock's words, "Buying opens soon"): OK, Escape or a tap outside closes it. */
+function ShopPop({ text, onClose }: { text: string; onClose: () => void }) {
+  // (A layout effect: an effect waits for a paint, and an Escape pressed as it opened was lost: shop.spec.ts, CI, Nov 11.)
+  useLayoutEffect(() => {
+    const key = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    addEventListener("keydown", key);
+    return () => removeEventListener("keydown", key);
+  }, [onClose]);
+  return (
+    <div class="locker-dialog-back" onClick={onClose}>
+      <div class="shop-pop" role="dialog" aria-modal="true" aria-label="Shop" onClick={(e) => e.stopPropagation()}>
+        <p>{text}</p>
+        <button type="button" class="btn btn-small btn-primary" autoFocus onClick={onClose}>
+          OK
+        </button>
+      </div>
     </div>
   );
 }

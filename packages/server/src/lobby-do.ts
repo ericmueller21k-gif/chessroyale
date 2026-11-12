@@ -1,8 +1,8 @@
 import { DurableObject } from "cloudflare:workers";
 import type { ClientMessage, LobbyCloseReason, Opening, ServerMessage } from "@chessroyale/chess";
 import openings from "@chessroyale/chess/data/openings.json";
-import { LobbyCore, lobbyClosing, newLobbyRecord, type LobbyRecord, type PartyLobby, type ServerScoreRequest } from "./lobby.ts";
-import { DEVICE_COOKIE, SIGN_IN_TO_PLAY, accountOf, isSignedIn, readCookie, signInRequired, withSecrets } from "./api.ts";
+import { LobbyCore, MATCH_STARTED, atTheDoor, hostBoardOk, lobbyClosing, newLobbyRecord, type LobbyRecord, type PartyLobby, type PendingResult, type ServerScoreRequest } from "./lobby.ts";
+import { DEVICE_COOKIE, SIGN_IN_TO_PLAY, accountOf, ageAnswer, isSignedIn, readCookie, signInRequired, withSecrets } from "./api.ts";
 import { ICONS, d1Sql, ensureSchema, isPixelIcon, recordResult, shopState } from "./accounts.ts";
 import { grantWelcomeCrate } from "./welcome.ts";
 import { forgetLobby, recordWait, reportLobby, type LiveMode } from "./live.ts";
@@ -10,15 +10,18 @@ import type { Env } from "./index.ts";
 import { countCall } from "./ops.ts";
 import { liveHub } from "./live-hub.ts";
 import { SERVER_RECHECK_NODES, serverRecheck, serverScoreAt, warmEngine } from "./engine.ts";
-import { CAPACITY, CHAT_MOD, DEFAULT_SETTINGS, battleCounts } from "@chessroyale/core";
+import { CAPACITY, CHAT_MOD, DEFAULT_SETTINGS, MATCH_SAVE, XP, battleCounts } from "@chessroyale/core";
 import type { ChatBlock } from "@chessroyale/chess";
 import { chatBlock } from "./chat-mod.ts";
 import { BANNED_MESSAGE, banCheck, eligibleForRanked, recordFairPlay } from "./fairplay.ts";
 import { caseMailer } from "./fairplay-mail.ts";
 import { isAdmin } from "./admin.ts";
-import { pausedBosses } from "./kill-switches.ts";
+import { isPaused, pausedBosses } from "./kill-switches.ts";
 import { countBossBattle } from "./boss-tokens.ts";
 import { opKeys } from "./ledger.ts";
+import { grantXp, type XpGame } from "./xp.ts";
+import { serverError } from "./problems.ts";
+import type { Sql } from "./accounts.ts";
 
 const library = openings as unknown as Opening[];
 
@@ -59,6 +62,9 @@ export class Lobby extends DurableObject<Env> {
   private fairStored = 0;
   /** Chat moderation: when each account's chat standing was last read (in memory: a wake reads it again). */
   private chatChecked = new Map<string, number>();
+  /** Results being written now (writeResults), and when to try again after a failed write (0: no failure). */
+  private writing: Promise<boolean> | null = null;
+  private saveRetryAt = 0;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -86,18 +92,18 @@ export class Lobby extends DurableObject<Env> {
    * Also their name (the seat's, so a name a moderator reset stays reset whatever the device sends; null: unread) and
    * any chat ban (chat moderation; undefined: unread).
    */
-  private async joiningProfileOf(userId: string): Promise<{ name: string | null; icon: string | null; owned: string[] | null; rating: number | null; block: ChatBlock | null | undefined }> {
+  private async joiningProfileOf(userId: string): Promise<{ name: string | null; icon: string | null; owned: string[] | null; rating: number | null; block: ChatBlock | null | undefined; chatOn: boolean }> {
     const sql = d1Sql(this.env.DB!);
     const now = Date.now();
     const [row, shop, block] = await Promise.all([
-      sql.first<{ name: string; icon: string; rating: number | null }>("SELECT name, icon, rating FROM users WHERE id = ?", userId).catch(() => null),
+      sql.first<{ name: string; icon: string; rating: number | null; chat_on: number | null }>("SELECT name, icon, rating, chat_on FROM users WHERE id = ?", userId).catch(() => null),
       shopState(sql, userId).catch(() => null),
       chatBlock(sql, userId, now).catch(() => undefined),
     ]);
     if (block !== undefined) this.chatChecked.set(userId, now);
     const icon = row && (isPixelIcon(row.icon) || (ICONS as readonly string[]).includes(row.icon)) ? row.icon : null;
     const rating = typeof row?.rating === "number" && Number.isFinite(row.rating) ? row.rating : null;
-    return { name: typeof row?.name === "string" ? row.name : null, icon, owned: shop?.owned ?? null, rating, block };
+    return { name: typeof row?.name === "string" ? row.name : null, icon, owned: shop?.owned ?? null, rating, block, chatOn: row?.chat_on === 1 };
   }
 
   private core(code: string): LobbyCore {
@@ -136,8 +142,9 @@ export class Lobby extends DurableObject<Env> {
     return Promise.all(
       boards.map(async (b) => {
         const job = jobs.find((j) => j.boardId === b.boardId);
-        // Only where a person picked (a group of bots affects nobody real).
-        if (!job || !Object.values(job.humanPicks).some((m) => !!m)) return b;
+        // Only where a person picked (a group of bots affects nobody real), and scores that hold together (the lobby
+        // scores any other board as nobody could).
+        if (!job || !Object.values(job.humanPicks).some((m) => !!m) || !hostBoardOk(job, b)) return b;
         const picks = [...Object.values(job.humanPicks), ...Object.values(b.botPicks ?? {})];
         const t = Date.now();
         const out = await serverRecheck(this.env, job.fen, { bestMove: b.bestMove, bestExpected: b.bestExpected, expectedAfter: b.expectedAfter }, picks, DEFAULT_SETTINGS, jobs.length, job.priority);
@@ -155,43 +162,83 @@ export class Lobby extends DurableObject<Env> {
 
   /**
    * Results go on signed-in players' profiles (once), with the lobby's code for "See your result": everyone's when the
-   * match is over, and anyone who left mid-match (resigned, or gone too long) as they leave, a loss.
+   * match is over, and anyone who left mid-match (resigned, or gone too long) as they leave, a loss. Queued in the record
+   * (`saveQueue`, stored before anything is written) with what the room counted for each, and written by writeResults.
    */
-  private async saveResults(core: LobbyCore, rec: LobbyRecord) {
+  private queueResults(core: LobbyCore, rec: LobbyRecord) {
     if (!this.env.DB) return;
     const left = core.takeLeftResults();
     const over = rec.phase === "results" && !rec.resultsSaved;
     if (!left.length && !over) return;
     if (over) rec.resultsSaved = true;
-    const sql = d1Sql(this.env.DB);
-    const mode = this.mode();
-    const env = await withSecrets(this.env);
-    const mail = caseMailer(env);
+    const at = Date.now();
     for (const r of [...left, ...(over ? core.humanResults() : [])]) {
       const userId = rec.accounts?.[r.playerId];
       // (Someone who deleted their account mid-match gets nothing recorded: recordFairPlay and recordResult skip them.)
       if (!userId) continue;
-      // Fair play: the match's signals and the player's level first (it may put them in review)…
-      const moves = core.fairMoves(r.playerId);
-      if (moves.length) {
-        await recordFairPlay(sql, userId, { lobby: rec.code, mode, moves }, Date.now(), mail).catch((e: unknown) => console.log(`fair play for ${rec.code}: ${String(e)}`));
-      }
-      // …then a player in review (or banned) has their results held off ranking until they're cleared.
-      const held = !(await eligibleForRanked(sql, userId).catch(() => true));
-      await recordResult(sql, userId, { ...r, mode, online: true, lobby: rec.code, held }, Date.now()).catch(() => undefined);
-      // The Welcome Crate (Nov 6): a finished game may earn it, once ever (welcome.ts; an abandoned one isn't counted).
-      await grantWelcomeCrate(sql, userId, Date.now()).catch((e: unknown) => console.log(`welcome crate for ${rec.code}: ${String(e)}`));
-      // Boss tokens: a boss battle counts once it reached 10 of their own moves or 5 minutes (this room's count and clock), win
-      // or lose; then maybe a token (boss-tokens.ts). Once: keyed by this match (its code and start) and the account, so a room that
-      // stops after writing it and before storing that it did (resultsSaved, a left player's `saved`) drops nothing more next time.
-      const span = core.bossBattleSpan(r.playerId);
-      if (span && battleCounts(span)) {
-        const op = opKeys.onlineDrop(rec.code, rec.startedAt ?? rec.createdAt);
-        await countBossBattle(sql, userId, Date.now(), { battle: rec.code, op, off: pausedBosses(this.env), signedInOnly: signInRequired(env) }).catch((e: unknown) =>
-          console.log(`boss token for ${rec.code}: ${String(e)}`),
-        );
-      }
+      (rec.saveQueue ??= []).push({
+        playerId: r.playerId,
+        userId,
+        result: r,
+        at,
+        span: core.xpSpan(r.playerId) ?? { moves: 0, ms: 0 },
+        // (Only a friends' lobby caps the win by opponent: lobbyXpGame.)
+        opponents: rec.auto ? [] : core.xpOpponents(r.playerId),
+        battle: core.bossBattleSpan(r.playerId),
+      });
     }
+  }
+
+  /**
+   * Writes the results waiting (MATCH_SAVE.perWake of them, oldest first: the next ones on a wake a second later), each taken out
+   * of the record, and the record stored, only once it's written. Every write is keyed (writeResult), so a write the room stopped
+   * after, before storing that it did, writes nothing twice when it's tried again. One that fails goes to the back of the queue (so
+   * one that keeps failing never holds up the others), and the ops page hears of it; when none of a wake's went in (D1 down), the
+   * next try is MATCH_SAVE.retrySeconds on. One at a time. True: none failed.
+   */
+  private writeResults(): Promise<boolean> {
+    if (!this.writing) this.writing = this.writeSome().finally(() => (this.writing = null));
+    return this.writing;
+  }
+
+  private async writeSome(): Promise<boolean> {
+    const rec = this.record;
+    if (!rec?.saveQueue?.length || !this.env.DB) return true;
+    let written = 0;
+    let failure: unknown = null;
+    const take = (p: PendingResult) => {
+      const i = rec.saveQueue!.indexOf(p);
+      if (i >= 0) rec.saveQueue!.splice(i, 1);
+    };
+    try {
+      const sql = d1Sql(this.env.DB);
+      await ensureSchema(sql, this.env.DB);
+      const env = await withSecrets(this.env);
+      const how: SaveContext = { sql, mode: this.mode(), mail: caseMailer(env), signedInOnly: signInRequired(env), paused: isPaused(this.env, "rewards"), off: pausedBosses(this.env) };
+      for (const p of rec.saveQueue.slice(0, MATCH_SAVE.perWake)) {
+        try {
+          await writeResult(how, rec, p);
+          take(p);
+          written++;
+        } catch (e) {
+          failure = e;
+          p.failedAt ??= Date.now();
+          take(p);
+          rec.saveQueue.push(p);
+        }
+      }
+    } catch (e) {
+      failure = e;
+    }
+    if (failure !== null) {
+      countCall("lobby.saveFailed");
+      console.log(`lobby ${rec.code}: ${rec.saveQueue?.length ?? 0} results not written yet, kept to try again (${String(failure)})`);
+      serverError(this.env, { kind: "Lobby.saveResults", route: "Lobby.saveResults", code: rec.code }, failure, (p) => this.ctx.waitUntil(p));
+    }
+    this.saveRetryAt = failure !== null && !written ? Date.now() + MATCH_SAVE.retrySeconds * 1000 : 0;
+    // (Not once the lobby has closed, or a new one has its code. A store that fails: written again next time, writing nothing more.)
+    if ((written || failure !== null) && this.record === rec) await this.store(rec).catch(() => undefined);
+    return failure === null;
   }
 
   /** Anyone connected right now: an open socket that has said hello (leaving out one that's closing). */
@@ -202,17 +249,33 @@ export class Lobby extends DurableObject<Env> {
   /** `closing`: a socket that's closing (it no longer counts as someone connected). */
   private async persist(core: LobbyCore, closing?: WebSocket) {
     this.record = core.save();
-    await this.saveResults(core, this.record);
+    // Results due go in the record first, stored with it, then are written (a few at a time: writeResults).
+    this.queueResults(core, this.record);
     await this.store(this.record);
-    // The alarm: the match's next event, or when the lobby closes, whichever comes first.
-    const close = lobbyClosing(this.record, this.connectedNow(closing));
-    const times = [core.nextAlarm, close?.at].filter((t): t is number => typeof t === "number");
-    if (times.length) await this.ctx.storage.setAlarm(Math.min(...times));
-    else await this.ctx.storage.deleteAlarm();
+    // The alarm: the match's next event, or when the lobby closes, whichever comes first; with results waiting, their next try.
+    await this.armAlarm(core, closing);
     // The live line hears about it in the background (it never holds up the match).
     void this.reportLive(core).catch(() => undefined);
     // Many judges: the engine server's searches run in the background; each answer is a new event for the lobby.
     for (const req of this.serverQueue.splice(0)) this.ctx.waitUntil(this.serve(req));
+    // The results, written in the background too: a slow D1 never holds up the match's next event (the review of #610, m2). The alarm
+    // just armed is already their next try (a second on), which finds the write done, or still running and shares it.
+    if (this.record.saveQueue?.length && Date.now() >= this.saveRetryAt) this.ctx.waitUntil(this.writeResults());
+  }
+
+  /**
+   * The alarm: the match's next event, or when the lobby closes, whichever comes first. Results waiting to be written: their next try
+   * (a second on, or MATCH_SAVE.retrySeconds after a failure), and the closing no sooner (it waits for them: closeIfDue).
+   */
+  private async armAlarm(core: LobbyCore, closing?: WebSocket) {
+    const rec = this.record;
+    if (!rec) return;
+    const close = lobbyClosing(rec, this.connectedNow(closing));
+    const retry = rec.saveQueue?.length ? Math.max(Date.now() + 1000, this.saveRetryAt) : null;
+    const closeAt = close ? (retry !== null ? Math.max(close.at, retry) : close.at) : null;
+    const times = [core.nextAlarm, closeAt, retry].filter((t): t is number => typeof t === "number");
+    if (times.length) await this.ctx.storage.setAlarm(Math.min(...times));
+    else await this.ctx.storage.deleteAlarm();
   }
 
   /** One deep search for the judges (a verdict, a re-check, a spot check); its answer goes back to the lobby. */
@@ -251,6 +314,8 @@ export class Lobby extends DurableObject<Env> {
     if (!this.record) return false;
     const close = lobbyClosing(this.record, this.connectedNow());
     if (!close || close.at > Date.now()) return false;
+    // Results not written yet (D1 failing): it stays until they are, written on its alarms, up to MATCH_SAVE.retryHours.
+    if (this.record.saveQueue?.length && Date.now() < close.at + MATCH_SAVE.retryHours * 3_600_000) return false;
     await this.close(close.reason);
     return true;
   }
@@ -268,13 +333,20 @@ export class Lobby extends DurableObject<Env> {
         const sql = d1Sql(this.env.DB);
         try {
           await ensureSchema(sql, this.env.DB);
-          await this.saveResults(this.core(rec.code), rec);
+          // (Anyone's result not queued yet, and a last try for any waiting.)
+          this.queueResults(this.core(rec.code), rec);
+          if (rec.saveQueue?.length) await this.writeResults();
           if (this.env.LIVE) await liveHub(this.env).forget(rec.code);
           else await forgetLobby(sql, rec.code);
         } catch (e) {
           console.log(`lobby ${rec.code}: closing without D1 (${String(e)})`);
         }
       }
+      if (rec.saveQueue?.length) {
+        countCall("lobby.resultsLost", rec.saveQueue.length);
+        serverError(this.env, { kind: "Lobby.resultsLost", route: "Lobby.close", code: rec.code }, new Error(`closing with ${rec.saveQueue.length} results never written`), (p) => this.ctx.waitUntil(p));
+      }
+      this.saveRetryAt = 0;
       const text = JSON.stringify({ t: "closed", reason, now: Date.now() } as ServerMessage);
       for (const ws of this.ctx.getWebSockets()) {
         try {
@@ -366,9 +438,16 @@ export class Lobby extends DurableObject<Env> {
    * A new lobby under this code: false if the code is in use (a lobby that hasn't closed), so the caller tries
    * another. `keepMs`: how long its results stay up (playtests).
    */
-  async create(code: string, overrides?: LobbyRecord["overrides"], auto?: { fillAt: number | null; botsOff?: boolean; reserve?: number; reserveMs?: number }, keepMs?: number, party?: PartyLobby): Promise<boolean | number> {
+  async create(
+    code: string,
+    overrides?: LobbyRecord["overrides"],
+    auto?: { fillAt: number | null; botsOff?: boolean; reserve?: number; reserveMs?: number; engine?: boolean },
+    keepMs?: number,
+    party?: PartyLobby,
+  ): Promise<boolean | number> {
     if (this.record && !(await this.closeIfDue())) return false;
     this.record = newLobbyRecord(code, Date.now(), overrides, party);
+    if (auto?.engine) this.record.engine = true;
     this.lastStored.clear();
     this.fairStored = 0;
     this.reservations = [];
@@ -435,13 +514,18 @@ export class Lobby extends DurableObject<Env> {
     // banned for fair play (only someone new to this lobby: a seat already taken stays, the ban counts from the next).
     const guest = !!this.env.DB && signInRequired(await withSecrets(this.env)) && !isSignedIn(account);
     const seated = !!account && Object.values(this.record.accounts ?? {}).includes(account.id);
-    const banned =
-      !guest && !seated && !!account && !!this.env.DB
-        ? (await banCheck(d1Sql(this.env.DB), account, readCookie(request, DEVICE_COOKIE), Date.now()).catch(() => ({ banned: false }))).banned
-        : false;
+    const check = !guest && !seated && !!account && !!this.env.DB ? await banCheck(d1Sql(this.env.DB), account, readCookie(request, DEVICE_COOKIE), Date.now()).catch(() => null) : null;
+    const banned = !!check?.banned;
+    // A matchmade lobby seats newcomers from its own side of fair play's engine pool only, whoever has the code (a seat already taken stays;
+    // a failed read lets them in, as a ban's does). Private lobbies and invites: anyone. The #618 review, m4.
+    const pooled = account ? (check ? !!check.pooled : null) : false;
+    const apart = !guest && !seated && !!this.record.auto && pooled !== null && pooled !== !!this.record.engine;
     // (Admins, ADMIN_EMAILS as for the fair-play review: the boss battle's test trigger.)
     const admin = !guest && isAdmin(await withSecrets(this.env), account);
-    server.serializeAttachment({ userId: account?.id, guest, banned, ...(admin ? { admin } : {}) });
+    // Typed chat (typed-chat.ts): a signed-in account may type, never from a device the age gate marked too young.
+    const young = ageAnswer(request) === "under";
+    const typer = !!account && isSignedIn(account) && !young;
+    server.serializeAttachment({ userId: account?.id, guest, banned, ...(apart ? { apart } : {}), ...(admin ? { admin } : {}), ...(typer ? { typer } : {}), ...(young ? { young } : {}) });
     return new Response(null, { status: 101, webSocket: client });
   }
 
@@ -453,7 +537,8 @@ export class Lobby extends DurableObject<Env> {
     } catch {
       return;
     }
-    const attached = ws.deserializeAttachment() as { playerId?: string; userId?: string; guest?: boolean; banned?: boolean; admin?: boolean } | null;
+    if (!atTheDoor(msg)) return;
+    const attached = ws.deserializeAttachment() as { playerId?: string; userId?: string; guest?: boolean; banned?: boolean; apart?: boolean; admin?: boolean; typer?: boolean; young?: boolean } | null;
     // The host's scores: the engine server re-checks the close calls first (before the lobby is touched, so
     // nothing changes under it while it waits), and its numbers are the ones used.
     if (msg.t === "scores" && this.engineUp && this.record?.scoreRequest?.key === msg.key && attached?.playerId === this.record.hostId && !this.record.judges?.tasks) {
@@ -482,13 +567,19 @@ export class Lobby extends DurableObject<Env> {
         ws.close(1008, "Banned");
         return;
       }
+      // (The other side of the engine pool: told what anyone is told once a match has begun.)
+      if (attached?.apart) {
+        ws.send(JSON.stringify({ t: "error", message: MATCH_STARTED, now: Date.now() }));
+        ws.close(1008, MATCH_STARTED);
+        return;
+      }
       const before = this.record.humans.length;
       // Practice mode (unlimited power-ups) is for testers only (an admin, or a test server: Eric, Oct 15). A player's
       // request is ignored, so nobody plays a ranked or fair-played match with the engine's moves on tap.
       const practice = !!msg.practice && (this.env.TEST_SWITCHES === "1" || !!attached?.admin);
       // Their rating is the one stored on their account, never the app's word: a low one claimed would meet a weaker raid
       // boss. None yet, or no account: null, the prior (docs/decisions/2026-10-16-server-side-rating.md).
-      const result = core.connect(msg.token, joining?.name ?? msg.name, msg.device, practice, joining?.rating ?? null, msg.look, attached?.userId, typeof msg.lastBoss === "string" ? msg.lastBoss : null, typeof msg.evalBar === "boolean" ? msg.evalBar : null, !!attached?.admin || this.env.MAIA_TEST === "1", { pass: msg.party, seat: msg.seat });
+      const result = core.connect(msg.token, joining?.name ?? msg.name, msg.device, practice, joining?.rating ?? null, msg.look, attached?.userId, typeof msg.lastBoss === "string" ? msg.lastBoss : null, typeof msg.evalBar === "boolean" ? msg.evalBar : null, !!attached?.admin || this.env.MAIA_TEST === "1", { pass: msg.party, seat: msg.seat }, msg.seeded === true);
       // A new player took a seat: one held for the players on their way is theirs (the oldest).
       if (result.ok && this.record.humans.length > before) this.reservations.shift();
       if (!result.ok) {
@@ -496,7 +587,8 @@ export class Lobby extends DurableObject<Env> {
         ws.close(1008, result.message);
         return;
       }
-      ws.serializeAttachment({ playerId: result.playerId, userId: attached?.userId, ...(attached?.admin ? { admin: true } : {}) });
+      ws.serializeAttachment({ playerId: result.playerId, userId: attached?.userId, ...(attached?.admin ? { admin: true } : {}), ...(attached?.typer ? { typer: true } : {}), ...(attached?.young ? { young: true } : {}) });
+      core.chatTyping(result.playerId, { may: !!attached?.typer && !!joining?.chatOn, young: !!attached?.young });
       if (joining) {
         if (joining.owned) core.chatOwned(result.playerId, joining.owned);
         if (joining.block !== undefined) core.chatStanding(attached!.userId!, joining.block);
@@ -513,6 +605,12 @@ export class Lobby extends DurableObject<Env> {
     const playerId = attached?.playerId;
     if (!playerId) return;
     if (uid && block !== undefined) core.chatStanding(uid, block);
+    // Chat turned on during the match (its opt-in): may they type now? The account's switch, read again.
+    if (msg.t === "chatPrefs" && msg.typed === true && attached?.typer && uid && this.env.DB) {
+      const on = (await d1Sql(this.env.DB).first<{ chat_on: number | null }>("SELECT chat_on FROM users WHERE id = ?", uid).catch(() => null))?.chat_on === 1;
+      if (!this.record) return;
+      core.chatTyping(playerId, { may: on, young: false });
+    }
     if (msg.t === "ultimate") core.ultimateTrigger(playerId, !!attached?.admin);
     else core.message(playerId, msg);
     await this.persist(core);
@@ -562,5 +660,95 @@ export class Lobby extends DurableObject<Env> {
     core.alarm();
     await this.persist(core);
     await this.tellParty(core);
+  }
+}
+
+/**
+ * One player's XP game for a match room's match (server/xp.ts): their moves and time as the room counted them (`span`: xpSpan); a
+ * win is 1st in Classic, their team's (or the crowd's against the boss) otherwise; nothing for leaving (abandoned), practice or a
+ * lobby a test switch made (except ?xpgame=MINUTES: that long, with enough moves). A friends' lobby (not matchmade) pays the win
+ * once an XP day per set of opponents (`opponents`: player ids, xpOpponents; only those with accounts count). A match where one
+ * device's word stood alone (`unvouched`) pays as a solo game. Keyed by the match (its code and start).
+ */
+export function lobbyXpGame(
+  rec: LobbyRecord,
+  r: { playerId: string; placement: number; teamWon: boolean | null; abandoned?: true },
+  userId: string,
+  span: { moves: number; ms: number },
+  mode: string,
+  opponents: readonly string[],
+  signedInOnly: boolean,
+  now: number,
+): XpGame {
+  const o = rec.overrides ?? {};
+  const left = rec.left?.find((l) => l.id === r.playerId);
+  const practice = !!(rec.humans.find((h) => h.id === r.playerId)?.practice || left?.practice);
+  const forced = typeof o.xpGame === "number" ? o.xpGame : null;
+  const vs = rec.auto ? null : { vs: [...new Set(opponents.flatMap((id) => (rec.accounts?.[id] && rec.accounts[id] !== userId ? [rec.accounts[id]!] : [])))] };
+  return {
+    key: `lobby:${rec.code}:${rec.startedAt ?? rec.createdAt}`,
+    facts: {
+      ms: forced !== null ? forced * 60_000 : span.ms,
+      moves: forced !== null ? Math.max(span.moves, XP.minMoves) : span.moves,
+      won: mode === "classic" ? r.placement === 1 : r.teamWon === true,
+      resigned: left?.how === "resigned",
+      abandoned: !!r.abandoned,
+      test: forced === null && (!!o.tested || practice),
+    },
+    // (One device's word stood alone somewhere in the match (LobbyRecord.unvouched): it pays as a solo game does, under solo's
+    // daily caps on wins and minutes; the outside review of Nov 10, finding 5.)
+    cap: rec.unvouched ? "solo" : vs,
+    signedInOnly,
+    now,
+    // (Quests, phase 3: a raid is "boss", Crowd "crowd" (50 v 50), the rest "classic".)
+    quest: mode === "boss" ? "boss" : mode === "crowd" ? "crowd" : "classic",
+  };
+}
+
+/** What writing a lobby's results needs besides the record (Lobby.writeSome). */
+export interface SaveContext {
+  sql: Sql;
+  mode: LiveMode;
+  mail: ReturnType<typeof caseMailer>;
+  signedInOnly: boolean;
+  /** The kill switches PAUSE_REWARDS and the bosses resting. */
+  paused: boolean;
+  off: ReturnType<typeof pausedBosses>;
+}
+
+/**
+ * One player's result, written (the outside review of Nov 10, finding 9): fair play first (its signals and their level, which may put
+ * them in review), then their XP, then the result row with its rating (one batch), the Welcome Crate and a boss battle's token.
+ * Every write is keyed to this lobby (its code and creation), so writing it again (a retry, a restart) adds nothing: fair play's row
+ * and the result once per lobby (`since`), XP and rewards by their ledger keys. A failure throws (the caller keeps it to try again),
+ * except that fair play, XP, the Welcome Crate and the token stop holding the result up MATCH_SAVE.strictMinutes after its first failed
+ * try (then logged): a lasting bug in one of them never costs the result, and a minute or two of D1 trouble never costs them.
+ */
+export async function writeResult(c: SaveContext, rec: LobbyRecord, p: PendingResult): Promise<void> {
+  const since = rec.createdAt;
+  const lenient = p.failedAt !== undefined && Date.now() - p.failedAt >= MATCH_SAVE.strictMinutes * 60_000;
+  const soft = <T>(what: string, run: Promise<T>, fallback: T): Promise<T> =>
+    run.catch((e: unknown) => {
+      if (!lenient) throw e;
+      console.log(`${what} for ${rec.code}: ${String(e)}`);
+      countCall(`lobby.${what}Failed`);
+      return fallback;
+    });
+  // (A match that rested on one device's word (unvouched) builds no fair-play case: its numbers are that device's alone.)
+  const moves = rec.unvouched ? [] : (rec.fair?.[p.playerId] ?? []);
+  if (moves.length) await soft("fairPlay", recordFairPlay(c.sql, p.userId, { lobby: rec.code, mode: c.mode, moves, since }, p.at, c.mail), null);
+  // (A player in review, or banned, has their results held off ranking until they're cleared.)
+  const held = !(await eligibleForRanked(c.sql, p.userId));
+  // XP (Nov 9): decided from this room's own count and clock, granted once (keyed by this match), kept on the result row for the result
+  // screen to ask for (server/xp.ts).
+  const xp = await soft("xp", grantXp(c.sql, p.userId, { ...lobbyXpGame(rec, p.result, p.userId, p.span, c.mode, p.opponents, c.signedInOnly, p.at), paused: c.paused }), null);
+  await recordResult(c.sql, p.userId, { ...p.result, mode: c.mode, online: true, lobby: rec.code, held, playMs: p.span.ms, moves: p.span.moves, xp }, p.at, { since });
+  // The Welcome Crate (Nov 6): a finished game may earn it, once ever (welcome.ts; an abandoned one isn't counted).
+  await soft("welcome", grantWelcomeCrate(c.sql, p.userId, p.at), []);
+  // Boss tokens: a boss battle counts once it reached 10 of their own moves or 5 minutes (this room's count and clock), win or lose;
+  // then maybe a token (boss-tokens.ts), once: keyed by this match (its code and start) and the account.
+  if (p.battle && battleCounts(p.battle)) {
+    const op = opKeys.onlineDrop(rec.code, rec.startedAt ?? rec.createdAt);
+    await soft("bossToken", countBossBattle(c.sql, p.userId, p.at, { battle: rec.code, op, off: c.off, signedInOnly: c.signedInOnly }), undefined);
   }
 }

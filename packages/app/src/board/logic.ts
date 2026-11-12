@@ -8,6 +8,7 @@
  * cubic ease in and out, its arrows' widths and colors), measured against it side by side (Oct 12, 2026), so a player
  * couldn't tell the two apart.
  */
+import { HAPTICS } from "@chessroyale/core";
 import { castleShortcuts960, isChess960Fen, legalMoves, touchesDark } from "@chessroyale/chess";
 import { realSquare, viewSquare, type QuarterTurn } from "../board-view.ts";
 import type { BoardProps } from "./types.ts";
@@ -286,6 +287,14 @@ export function pressUp(b: PressBoard, selected: string | null, p: Press, to: st
   if ((p.from === p.before || p.left) && (to === p.from || !to)) sel = null;
   else if (!b.interactive) sel = null;
   return { selected: sel, move };
+}
+
+/**
+ * A press let go that picked a piece up with a tap (its haptic tick, haptics.ts): not dragged, let go on its own square,
+ * the piece selected and not already before, and let go within `holdMs` (a longer press is a hold: no tick; Eric, Nov 9).
+ */
+export function pickedUp(p: Press, selected: string | null, to: string | null, heldMs: number, holdMs: number = HAPTICS.holdMs): boolean {
+  return !p.started && to === p.from && selected === p.from && p.before !== p.from && heldMs < holdMs;
 }
 
 // ---------------- Arrows ----------------
@@ -638,6 +647,7 @@ export function boardInputs(p: Omit<BoardProps, "children" | "silent" | "onMove"
     !!p.onDarkTry,
     p.turn ?? 0,
     p.elephants?.length ? p.elephants.join() : null,
+    p.gold?.length ? p.gold.join() : null,
     p.decor?.key ?? null,
     p.premove ? `${p.premove.key}:${p.premove.side}${p.premove.watch ? ":watch" : ""}` : null,
   ];

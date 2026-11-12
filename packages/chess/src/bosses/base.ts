@@ -25,6 +25,7 @@ import {
   type StopReason,
 } from "@chessroyale/core";
 import type { BoardState } from "../boards.ts";
+import type { Opening } from "../openings.ts";
 import type { NetBossPowers } from "../protocol.ts";
 import { pieceAt } from "../rules.ts";
 import type { EngineLike } from "../runner.ts";
@@ -570,7 +571,12 @@ export function warnThenUnleash(next: BossPowerState, t: TurnContext): boolean {
 export type BossLastMove = { move: string; san: string; staggered?: boolean; captured?: string; through?: StopReason };
 
 /** The power fields `BossRules.stopReason` reads: the same in the match's state and in the screens' view. */
-export type StopFields = Partial<Pick<BossPowerState, "cut" | "boardSaw" | "pies" | "block" | "crease">> & { camo?: { square: string | null } | null; garden?: { plants: readonly { square: string }[] } | null; hoops?: { blocks: readonly string[] } | null };
+export type StopFields = Partial<Pick<BossPowerState, "cut" | "boardSaw" | "pies" | "block" | "crease">> & {
+  camo?: { square: string | null } | null;
+  garden?: { plants: readonly { square: string }[] } | null;
+  hoops?: { blocks: readonly string[] } | null;
+  zebra?: { his?: Side; lumps: readonly { square: string }[]; gold: readonly string[] } | null;
+};
 
 /**
  * What a boss's battle code (its moments in a match: the funhouse, Lights out, the bounce…) may use of the match
@@ -608,4 +614,6 @@ export interface Battle {
    * every device (the circus tiger's duds), never derived from the battle's seed, which the host's asks are built from.
    */
   random(): number;
+  /** The opening library (the match's own; tests may leave it out): Don Dough names your opening from it. */
+  readonly library?: readonly Opening[];
 }

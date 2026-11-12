@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { BOSS_POWERS, type BossPowerState } from "@chessroyale/core";
-import { DASH, DASH_FX, clockHitOn, clockHitTurns, popOffMs, popOffTurn } from "../src/bosses/dash.ts";
+import { DASH, DASH_FX, clockHitOn, clockHitTurns, popOffMs, popOffTurns } from "../src/bosses/dash.ts";
 import { POWER_FX } from "../src/index.ts";
 
 /** Dash's clock (Eric, Nov 7; docs/decisions/2026-11-07-dash-clock.md): the multi-hit every 4 or 5 of his moves, and the pop-off once. */
@@ -12,11 +12,10 @@ function simulate(seed: number, test = "", turns = 60) {
   const hits: number[] = [];
   const popAt: number[] = [];
   for (let turn = 1; turn <= turns; turn++) {
-    const before = next.dash?.popOff?.at;
     const events: { kind: string; count?: number; turn: number }[] = [];
     const t = { turn, fen: START, crowd: "w", seed, passive: "clockslap", ultimate: "scramble", test, ultNext: false, lastMove: null, rageSpeed: 1, s: BOSS_POWERS, events } as never;
     DASH.everyTurn!(next, t);
-    if (next.dash?.popOff && before === undefined) popAt.push(turn);
+    if (next.dash?.popOff?.at === turn) popAt.push(turn);
     for (const e of events) if (e.kind === "clockFit") {
       hits.push(turn);
       expect(e.count).toBe(BOSS_POWERS.dashClockFit.smacks);
@@ -61,22 +60,31 @@ describe("Dash's clock multi-hit (Eric, Nov 7: every four or five turns, five qu
   });
 });
 
-describe("Dash's pop-off (Eric, Nov 7: once a battle, before his move lands)", () => {
-  it("exactly one pop-off a battle, on one of his turns from 8 to 20 (from the seed)", () => {
-    const { from, to } = BOSS_POWERS.dashPopOff;
-    expect([from, to]).toEqual([8, 20]);
+describe("Dash's pop-off (Eric, Nov 7: once a battle; Eric, Nov 8: twice, before his move lands)", () => {
+  it("two pop-offs a battle, on two of his turns from 8 to 20, at least 6 apart, distinct, in order (from the seed)", () => {
+    const { from, to, gap } = BOSS_POWERS.dashPopOff;
+    expect([from, to, gap]).toEqual([8, 20, 6]);
     for (let seed = 0; seed < 300; seed++) {
-      const at = popOffTurn(seed);
-      expect(at).toBeGreaterThanOrEqual(from);
-      expect(at).toBeLessThanOrEqual(to);
+      const [a, b] = popOffTurns(seed);
+      for (const at of [a, b]) {
+        expect(at).toBeGreaterThanOrEqual(from);
+        expect(at).toBeLessThanOrEqual(to);
+      }
+      expect(b - a).toBeGreaterThanOrEqual(gap);
       const sim = simulate(seed, "", 60);
-      expect(sim.popAt).toEqual([at]);
-      expect(sim.popOff).toEqual({ at });
+      expect(sim.popAt).toEqual([a, b]);
+      expect(sim.popOff).toEqual({ at: b });
     }
   });
 
-  it("the test switch (?power=popoff): on his second turn", () => {
-    expect(simulate(5, "popoff", 6).popAt).toEqual([2]);
+  it("the two turns differ across seeds (not always the same pair)", () => {
+    const pairs = new Set<string>();
+    for (let seed = 0; seed < 50; seed++) pairs.add(popOffTurns(seed).join(","));
+    expect(pairs.size).toBeGreaterThan(10);
+  });
+
+  it("the test switch (?power=popoff): on his second and fourth turns", () => {
+    expect(simulate(5, "popoff", 9).popAt).toEqual([2, 4]);
   });
 
   it("two beats of 4 to 6 seconds in all (3 smacks and the pop-off line, then 10 fast smacks and the love line)", () => {

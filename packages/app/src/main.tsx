@@ -1,18 +1,21 @@
 import { render } from "preact";
 import "./board/pieces.css";
 import { App } from "./App.tsx";
+import { watchShell } from "./shell.ts";
+import { loadStep } from "./loadbar.ts";
 import { BanNotice } from "./components/FairPlay.tsx";
 import { ErrorBoundary, ReportSheet } from "./components/Problems.tsx";
 import { MaintenanceBanner } from "./components/MaintenanceBanner.tsx";
-import { DuelQueueBar } from "./components/DuelQueueBar.tsx";
+import { SearchBar } from "./components/SearchBar.tsx";
 import { startStatus } from "./status.ts";
+import { hapticsDebug } from "./haptics.ts";
 import { setUpInstall } from "./install.ts";
 import { watchErrors } from "./problems.ts";
 import { watchStaleChunks } from "./stale.ts";
 import { prepareAudio, wakeAudio } from "./sound.ts";
 import { watchTheme } from "./theme.ts";
 import { applyBoardColors } from "./prefs.ts";
-import { setBannerPlusSource } from "@chessroyale/core";
+import { mountOf, setBannerPlusSource, shownLook } from "@chessroyale/core";
 import { bannerPlusAsked } from "./test-switches.ts";
 import { account, onAccountChange } from "./account.ts";
 import { loadRide } from "./components/rides/load.ts";
@@ -30,11 +33,21 @@ document.addEventListener("touchmove", (e) => {
   if (e.touches.length > 1) e.preventDefault();
 }, { passive: false });
 
+// The app's script has run: the loading bar (index.html's shell, if it's showing) moves on to signing in (loadbar.ts).
+loadStep("signIn");
+
 // Errors on this device are reported (problems.ts), from the start.
 watchErrors();
 // A chunk of an older version gone after a deploy (opening the town square): the page loads again (stale.ts).
 watchStaleChunks();
 setUpInstall();
+// A phone is upright (Eric, Nov 11): where the browser allows a lock (an installed app, or full screen) it is locked to portrait. Elsewhere
+// index.html's panel covers a phone held sideways. Refused or unsupported (a computer): nothing happens.
+try {
+  (screen.orientation as ScreenOrientation & { lock?: (o: "portrait") => Promise<void> }).lock?.("portrait")?.catch(() => {});
+} catch {
+  /* Not supported here. */
+}
 // Light or dark: the page already shows the right one (index.html's script); from here on it follows the device
 // while nothing is picked.
 watchTheme();
@@ -52,6 +65,10 @@ prepareAudio();
 for (const ev of ["pointerdown", "touchend", "click", "keydown"]) window.addEventListener(ev, wakeAudio, { passive: true, capture: true });
 // The kill switches and the maintenance banner (status.ts), asked now and every minute.
 startStatus();
+// (`?haptics=debug`: the on-screen log of each tick tried, haptics.ts.)
+hapticsDebug();
+// (The shell in index.html goes as soon as #app draws anything but the splash: shell.ts.)
+watchShell();
 // (Fair play's ban notice sits over any screen: PLAY, a new lobby or joining one can bring it up; so does the
 // feedback sheet, from the match menu or Settings, and the maintenance banner, at the top, with the 1 v 1 search's bar
 // under it while you browse. A render error anywhere
@@ -62,7 +79,7 @@ render(
     <BanNotice />
     <ReportSheet />
     <MaintenanceBanner />
-    <DuelQueueBar />
+    <SearchBar />
   </ErrorBoundary>,
   document.getElementById("app")!,
 );
@@ -71,7 +88,7 @@ render(
 // changes (once a ride: it's kept), so your pawn on home, in your ring and in the town rarely waits for it (Nov 1, rides lazy).
 requestAnimationFrame(() =>
   setTimeout(() => {
-    const wornRide = () => void loadRide(account().profile?.locker?.look?.ride?.def);
+    const wornRide = () => void loadRide(mountOf(shownLook(account().profile?.locker?.look))?.def);
     onAccountChange(wornRide);
     wornRide();
   }),

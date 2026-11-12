@@ -4,7 +4,7 @@ import { createPortal, memo } from "preact/compat";
 import { bossAlone, cutLabel, roundLive, scoreDp, towerView, type BossView, type GameView } from "../game.ts";
 import { popOffHolding } from "@chessroyale/chess";
 import { crossedOut } from "./Folio.tsx";
-import { battleStartPly, moveNumber, moverOf, newPlyCache, noteTurns, pieceOn, plyRows, timeShown, turnBook, turnMs, type Mover, type PieceType, type PlyCache, type PlyRow } from "../move-list.ts";
+import { battleStartPly, moverOf, rowNumber, newPlyCache, noteTurns, pieceOn, plyRows, timeShown, turnBook, turnMs, type Mover, type PieceType, type PlyCache, type PlyRow } from "../move-list.ts";
 import { camoHidden, seenFen } from "../camo.ts";
 import { pawnLook } from "../looks.ts";
 import { BossFace, bossPortraitUrl } from "./BossCharacter.tsx";
@@ -126,12 +126,12 @@ const MoveRow = memo(function MoveRow({ s, boss, alone, hush, struck }: RowProps
   const other = row.color === "w" ? "b" : "w";
   const who = s.mover === "crowd" && alone ? "You" : WHO_WORD[s.mover];
   const words = hush
-    ? `${moveNumber(row.ply)} ${who}`
-    : `${moveNumber(row.ply)} ${who}: ${row.castle ?? `${PIECE[s.piece]} to ${row.to}`}${s.captured ? `, takes ${PIECE[s.captured]}` : ""}${s.ms !== null ? `, ${timeShown(s.ms)}` : ""}${struck ? ", crossed out" : ""}`;
+    ? `${rowNumber(row)} ${who}`
+    : `${rowNumber(row)} ${who}: ${row.castle ?? `${PIECE[s.piece]} to ${row.to}`}${s.captured ? `, takes ${PIECE[s.captured]}` : ""}${s.ms !== null ? `, ${timeShown(s.ms)}` : ""}${struck ? ", crossed out" : ""}`;
   return (
     <li class={`mv-row mv-${s.mover}${struck ? " mv-struck" : ""}`} aria-label={words}>
       <Who mover={s.mover} boss={boss} alone={alone} />
-      <span class="mv-no">{moveNumber(row.ply)}</span>
+      <span class="mv-no">{rowNumber(row)}</span>
       {hush ? (
         <span class="mv-sq">…</span>
       ) : (

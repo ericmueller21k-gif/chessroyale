@@ -89,8 +89,8 @@ export const NOZZLE_REACH = 23;
 export function tripMove(dx: number): FigureMove {
   const backAt = HOP_TRIP_MS + PLACE_MS;
   return (t) => {
-    const go = (t - HOP_AIR_AT) / HOP_AIR_MS;
-    const back = (t - backAt - HOP_AIR_AT) / HOP_AIR_MS;
+    const go = (t - HOP_AIR_AT()) / HOP_AIR_MS;
+    const back = (t - backAt - HOP_AIR_AT()) / HOP_AIR_MS;
     const u = t < backAt ? Math.max(0, Math.min(1, go)) : 1 - Math.max(0, Math.min(1, back));
     const air = t < backAt ? go : back;
     const y = air > 0 && air < 1 ? -10 * Math.sin(Math.PI * air) : 0;

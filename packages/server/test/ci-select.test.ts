@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import {
   assign,
   globToRegExp,
+  isTraced,
   makespan,
   MAX_SHARDS,
   plan,
@@ -17,6 +18,8 @@ import {
   shardCount,
   specFiles,
   traceModule,
+  TRACED_BY_DEFAULT,
+  unmapped,
   weigher,
 } from "../../../e2e/ci-select.mjs";
 
@@ -148,18 +151,18 @@ describe("shards", () => {
   const timings = readTimings(undefined, "");
   const weight = weigher(timings);
 
-  it("as few as the specs need, at least 1, at most 10 (Eric, Nov 6: the repo is public, so more runners cost nothing), never more than the files", () => {
+  it("as few as the specs need, at least 1, at most 15 (Eric, Nov 6: the repo is public, so more runners cost nothing; 15 since Nov 9), never more than the files", () => {
     expect(shardCount(smoke, () => 100)).toBe(1);
     expect(shardCount(smoke, () => 200)).toBe(2);
     expect(shardCount(["e2e/formats.spec.ts"], () => 5000)).toBe(1);
     expect(shardCount(all, weight)).toBe(MAX_SHARDS);
-    expect(MAX_SHARDS).toBe(10);
+    expect(MAX_SHARDS).toBe(15);
   });
 
-  it("every spec: 10 shards, each with its own files (every spec file exactly once); otherwise the pull request's files", () => {
+  it("every spec: 15 shards, each with its own files (every spec file exactly once); otherwise the pull request's files", () => {
     const full = plan({ full: "this is a push run, which tests everything", specs: [], why: [] }, timings, all);
-    expect(full.outputs).toMatchObject({ specs: "", total: "10", shards: "[1,2,3,4,5,6,7,8,9,10]" });
-    expect(full.outputs.note).toBe(`Every spec file (${all.length}) on 10 shards: this is a push run, which tests everything.`);
+    expect(full.outputs).toMatchObject({ specs: "", total: "15", shards: "[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]" });
+    expect(full.outputs.note).toBe(`Every spec file (${all.length}) on 15 shards: this is a push run, which tests everything.`);
     const filters: string[] = JSON.parse(full.outputs.assignment).flatMap((s: string) => s.split(" "));
     expect(filters.sort()).toEqual(all.map((f) => `${f.replaceAll(".", "\\.")}$`).sort());
     const one = plan(pick("packages/app/src/components/Sawyer.tsx"), timings, all);
@@ -232,7 +235,7 @@ describe("traced modules (areas.json, `traced`): a change followed through the c
     "packages/server/src/lobby.ts": same(`import { QUICK_CHAT, type Settings } from "@chessroyale/core";\nexport const gap = () => QUICK_CHAT.gapMs;\n// AUTOCHESS is named here only in a comment.\n`),
     "packages/core/test/chat.test.ts": same(`import { QUICK_CHAT } from "../src/settings.ts";\nexport const x = QUICK_CHAT;\n`),
   };
-  const autochess = ["e2e/autochess.spec.ts", "e2e/home-layout.spec.ts"];
+  const autochess = ["e2e/autochess-board.spec.ts", "e2e/autochess.spec.ts", "e2e/home-layout.spec.ts"];
 
   it("a settings key: the specs of the areas whose files read it, plus the smoke set", () => {
     const r = select([SETTINGS], areas, all, repo({ ...base, [SETTINGS]: [settings(3000, 5), settings(3000, 6)] }));
@@ -260,7 +263,7 @@ describe("traced modules (areas.json, `traced`): a change followed through the c
     expect(select([SETTINGS], areas, all, repo({ ...base, [SETTINGS]: [settings(3000, 5), loose] })).full).toMatch(/code outside any declaration changed/);
     const broken = settings(3000, 6) + "export const S = `never closed;\n";
     expect(select([SETTINGS], areas, all, repo({ ...base, [SETTINGS]: [settings(3000, 5), broken] })).full).toMatch(/doesn't read cleanly/);
-    expect(select([SETTINGS], areas, all, repo({ ...base, [SETTINGS]: [null, settings(3000, 5)] })).full).toMatch(/it's new/);
+    expect(select([SETTINGS], areas, all, repo({ ...base, [SETTINGS]: [settings(3000, 5), null] })).full).toMatch(/it's removed/);
     // (Without the repo, e.g. no base to diff: a shared foundation, as before.)
     expect(select([SETTINGS], areas, all).full).toBe("`packages/core/src/settings.ts` is a shared foundation");
   });
@@ -333,9 +336,63 @@ describe("traced modules (areas.json, `traced`): a change followed through the c
     expect(traceModule(tsx, tsx.replace("https://x.y/z", "https://x.y/w"), "x.tsx").names).toEqual(["A"]);
   });
 
+  it("every core module but index.ts is traced without a list (Nov 10, audit F3); index.ts and core's other files stay shared foundations", () => {
+    const ODDS = "packages/core/src/odds.ts";
+    const odds = (n: number) => `import { AUTOCHESS } from "./settings.ts";\nexport const odds = () => AUTOCHESS.rounds * ${n};\n`;
+    const files = {
+      ...base,
+      "packages/core/src/index.ts": same(`export * from "./settings.ts";\nexport * from "./odds.ts";\n`),
+      "packages/app/src/autochess/fight.ts": same(`import { odds } from "@chessroyale/core";\nexport const f = () => odds();\n`),
+    };
+    // A core module on no list: followed to its users (through the package's entry), not every spec.
+    const r = select([ODDS], areas, all, repo({ ...files, [ODDS]: [odds(2), odds(3)] }));
+    expect(r.full).toBeNull();
+    expect(r.specs).toEqual([...new Set([...smoke, ...autochess])].sort());
+    // New: followed from everything it exports (fight.ts imports it); with code outside a declaration, every spec.
+    expect(select([ODDS], areas, all, repo({ ...files, [ODDS]: [null, odds(2)] })).specs).toEqual([...new Set([...smoke, ...autochess])].sort());
+    expect(select([ODDS], areas, all, repo({ ...files, [ODDS]: [null, odds(2) + "console.log(1);\n"] })).full).toMatch(/code outside any declaration/);
+    expect(traceModule(null, `import "./polyfill.ts";\nexport const A = 1;\n`).reason).toMatch(/code outside any declaration/);
+    // The package's entry, and core's files that aren't TypeScript, still run everything.
+    for (const p of ["packages/core/src/index.ts", "packages/core/src/data.json"]) {
+      expect(isTraced(p, areas), p).toBe(false);
+      expect(select([p], areas, all, repo(files)).full).toBe(`\`${p}\` is a shared foundation`);
+    }
+    for (const p of ["packages/core/src/xp.ts", "packages/core/src/sub/x.ts", "packages/core/src/settings.ts"]) expect(isTraced(p, areas), p).toBe(true);
+    expect(isTraced("packages/core/test/xp.test.ts", areas)).toBe(false);
+    // (No core module is listed by hand any more.)
+    expect(areas.traced!.modules.filter((m) => TRACED_BY_DEFAULT.test(m))).toEqual([]);
+  });
+
   it("the traced modules are shared foundations too, so without a diff they still run everything", () => {
     const full = areas.full.map(globToRegExp);
-    for (const m of areas.traced!.modules) expect(full.some((re) => re.test(m)), m).toBe(true);
+    for (const m of [...areas.traced!.modules, "packages/core/src/xp.ts", "packages/core/src/sub/x.ts"]) expect(full.some((re) => re.test(m)), m).toBe(true);
     for (const h of areas.traced!.hubs ?? []) expect(full.some((re) => re.test(h)), h).toBe(false);
+  });
+});
+
+describe("a new file e2e/areas.json doesn't place fails `check` (node e2e/ci-select.mjs unmapped; Nov 10, audit F3)", () => {
+  it("names a new file under packages/ that no area, `traced`, `none` or `full` entry matches, and what to add", () => {
+    const bad = unmapped(["packages/app/src/brand-new.ts", "packages/chess/src/bosses/newboss.ts", "somewhere/new.txt", "e2e/new-helper.ts"], areas);
+    expect(bad.map((b) => b.path)).toEqual(["packages/app/src/brand-new.ts", "packages/chess/src/bosses/newboss.ts"]);
+    expect(bad[0]!.fix).toMatch(/its area's `paths` in e2e\/areas\.json, to `none`/);
+  });
+
+  it("passes a file an entry places: an area's, a traced module (core's included), `none`, `full`", () => {
+    const ok = [
+      "packages/core/src/new-rules.ts",
+      "packages/server/src/api.ts",
+      "packages/core/test/new.test.ts",
+      "packages/app/src/components/Sawyer.tsx",
+      "packages/app/src/board/new-layer.ts",
+      "packages/core/src/index.ts",
+      "docs/x.md",
+    ];
+    expect(unmapped(ok, areas)).toEqual([]);
+  });
+
+  it("a new spec must be in an area's specs, the smoke set or leftOut, or no other pull request would run it", () => {
+    expect(unmapped(["e2e/brand-new.spec.ts", smoke[0]!, "e2e/sawyer.spec.ts", "e2e/perf.spec.ts"], areas)).toEqual([
+      { path: "e2e/brand-new.spec.ts", fix: "add it to its area's `specs` in e2e/areas.json (or to `smoke`)" },
+    ]);
   });
 });

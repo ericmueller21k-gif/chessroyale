@@ -74,6 +74,11 @@ export interface BoardProps {
    * `elephants`). A piece that was one keeps its art as it fades.
    */
   elephants?: readonly string[];
+  /**
+   * Don Dough's gold pieces (Gold Plate): the squares of his pieces drawn gold (the boss view's `zebra.gold`; board/pieces/zebra).
+   * A piece that was one keeps its gold as it fades.
+   */
+  gold?: readonly string[];
   /** Drawn on each piece, inside its element (see `PieceDecor`). Not on a piece that is fading away. */
   decor?: PieceDecor;
   /**

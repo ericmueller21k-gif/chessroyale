@@ -158,6 +158,11 @@
   opacity: 0.8;
   pointer-events: none;
   user-select: none;
+  /* Its own layer, drawn once (Eric, Nov 9: white boxes flickered in the circle behind a moving pawn on an iPhone). Without it,
+     Safari re-blurs only the tiles the pawn's animation dirties, and those tiles come back white. */
+  transform: translateZ(0);
+  will-change: transform;
+  backface-visibility: hidden;
 }
 .pp-backdrop-emoji {
   display: grid;

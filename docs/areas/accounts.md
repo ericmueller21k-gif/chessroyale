@@ -13,17 +13,23 @@ Lane: `hub`. What a profile shows is on [hub.md](hub.md).
   ([docs/decisions/2026-10-16-integrity-followups.md](../decisions/2026-10-16-integrity-followups.md)). Codes and session tokens are stored
   hashed (SHA-256). Google's ID token comes straight from Google's token endpoint over TLS; `aud` is checked and the
   email used only when Google marks it verified.
-- **The age gate** (Oct 16; [docs/decisions/2026-10-16-age-gate-and-real-money.md](../decisions/2026-10-16-age-gate-and-real-money.md)):
-  13 or older for an account (Eric). Before every sign-in, the sign-in box asks "when were you born?" (a month and a
-  year, nothing chosen, no age mentioned).
+- **The age gate** (Oct 16; [docs/decisions/2026-10-16-age-gate-and-real-money.md](../decisions/2026-10-16-age-gate-and-real-money.md);
+  since Nov 12, [2026-11-12-signin-without-age.md](../decisions/2026-11-12-signin-without-age.md)): 13 or older for an account
+  (Eric). The sign-in box has **Sign in** first, with no question, and **Sign up** below it, which asks "when were you born?"
+  (a month and a year, nothing chosen, no age mentioned) before the account is made.
   - The app works the answer out (`oldEnough` in `packages/core/src/age-gate.ts`, whole months) and posts only
     `{oldEnough}` to POST `/api/auth/age`. The birth date is never sent or stored.
-  - **Old enough:** the cookie `hc_age=ok` lets this device sign in once, within `AGE_GATE.answerMinutes`. Each
-    sign-in's start (an emailed code, the trip to Google) gives it that time again, so it can't run out halfway. The
-    sign-in uses it up and sets `users.age_ok_at` (the first time only). Accounts from before the gate are asked at
-    their next sign-in.
-  - **Refused for want of it** (it ran out, or another tab's sign-in used it up): the question comes back with
-    `ASK_AGE_LINE` (Google's start: `?signin=age`).
+  - **Old enough:** the cookie `hc_age=ok` lets this device make an account (or sign in to one that never answered) once,
+    within `AGE_GATE.answerMinutes`. Each sign-in's start (an emailed code, the trip to Google) gives an answer that time
+    again, so it can't run out halfway. The sign-in uses it up and sets `users.age_ok_at` (the first time only).
+  - **No answer on the device:** the server decides once it knows who is signing in (the code checked, or Google's callback).
+    An account that has answered (`age_ok_at` set; or, for an identity new to us, the signed-in account it would join) signs
+    in with no question. Anything else (an email or Google account with no account yet, an account from before the question)
+    is asked first, with nothing made, moved or signed in: the email's check answers 403 `{askAge, message: AGE_STEP_LINE}`
+    and keeps the code live (`verifyEmailCode(…, keep)`); Google's callback sends the page back with `?signin=age-google`. The
+    box asks; the answer finishes it: the same code sent again (nothing typed again), or Google once more (one more pick of the
+    account; nothing about the Google account is kept before the answer). `signInIfAnswered`, `answeredSignIn` in
+    `accounts.ts`; the app's `pending` sign-in in `account.ts`.
   - **Too young:** `hc_age=under` (HttpOnly, `AGE_GATE.tooYoungDays`) and the app's `brc.tooYoung` flag, each putting
     the other back. Every sign-in step refuses that device (email start and verify, Google start and callback), and no
     later answer replaces it. Any `hc_age=under` in a request counts (`ageAnswer`), however many `hc_age` it carries.
@@ -44,18 +50,53 @@ Lane: `hub`. What a profile shows is on [hub.md](hub.md).
   `GOOGLE_CLIENT_SECRET` for Google, `RESEND_API_KEY` for email. They live in the account's Secrets Store (bound in
   `wrangler.jsonc`, `secrets_store_secrets`); `withSecrets()` reads them from the store or as Worker secrets.
 - **The database** is Cloudflare D1. The schema is made at runtime (`CREATE TABLE IF NOT EXISTS`, once per Worker
-  instance; later columns by `ALTER TABLE` migrations that tolerate re-runs), so a deploy needs no migration step.
+  instance; later columns by `ALTER TABLE` migrations that tolerate re-runs), so a deploy needs no migration step. One
+  run per instance (requests meanwhile wait for it), in 4 round trips after a schema change, 1 on a current database
+  (`ensureSchema`; `schema-fast.test.ts`; [2026-11-10-schema-fast.md](../decisions/2026-11-10-schema-fast.md)). Check
+  new SQL on the local D1 too: it refuses some that node:sqlite takes (more than 5 UNION terms, `pragma_table_info(col)`).
 - **Results.** The server records online matches when a lobby reaches results, for every connected player with an
   account (`results.ranked` says whether it counts for ranking). The browser posts solo matches (`online = 0`): the
   browser's word, so they never count for ranking (even the ones from before Oct 7, stored with `ranked` NULL) nor
   toward "Boss tiers beaten" (docs/decisions/2026-10-16-server-side-rating.md). Each
   result keeps whether its player had the eval bar on (`results.eval_bar`, NULL from older apps; see [hub.md](hub.md)).
+- **XP and levels** (Nov 9; [2026-11-09-xp-rules.md](../decisions/2026-11-09-xp-rules.md), [storage](../decisions/2026-11-09-xp-storage.md),
+  [the box](../decisions/2026-11-09-xp-box.md)): every counted game's XP is decided on the server (`server/xp.ts` `grantXp`, the rules in
+  core's `xp.ts`, the numbers `XP` in settings.ts) and granted through the ledger (asset kind `xp`, the wallet's `xp` column), once per game
+  per player. 10 XP a whole minute you played (up to 30), +50 a win, from 10 of your own moves; none for leaving, a test game, a banned
+  account, or a guest where sign-in is set up. Your level is 1 + XP ÷ 1,000 (`levelOf`). Each result row keeps the game's `play_ms`,
+  `moves` and its XP (`xp_before`, `xp_parts`, `xp_none`); a solo game is timed by the server between `POST /api/xp/solo/start` and its
+  `POST /api/results` (table `solo_games`); a solo result it never timed earns nothing, a solo win needs 5 of its minutes, and solo time
+  XP is capped at `XP.soloMinutesPerDay` (120) minutes an XP day. A friends' lobby's win pays once an XP day per opponent. A match that rested on one device's word (Nov 10: a host scoring alone, a boss move nobody checked; a Squads lobby of one party) pays as a solo game, under both solo caps. Merging a guest adds its XP; deleting closes it in the ledger; the download has it all.
+- **The daily reward and level rewards** (Nov 9, phase 2; `server/rewards.ts`, decisions `2026-11-09-xp-phase2-*.md`): the XP day's first
+  counted game with `XP.dailyMinMoves` (15) of your own moves (solo: also 3 minutes of the server's time) pays +200 XP ("Daily reward
+  +200" in the box) and a Winter Crate, once a day (`daily:<day>:<ledger id>`). Each level reached pays 2 Winter Crates and a crate key,
+  every 10th also a boss crate to pick (`wallets.boss_picks`), once per level (`level:<n>:<ledger id>`), every level owed at the next
+  counted game (at most 20 a game). Both go through the ledger in the game's XP grant; what a game paid is kept on its result
+  (`results.xp_rewards`) and shown in a toast at the top once the bar fills (`components/RewardBox.tsx`). `PAUSE_REWARDS` grants
+  nothing ("Rewards are paused for a moment."). Merge adds the crates and picks; deleting closes them; the download has them. A level
+  a merged guest was paid counts as paid for the account (`owedLevels` reads the merge's ledger legs; Nov 10: it was paid again).
+- **Quests** (Nov 9, phase 3; `server/quests.ts`, the rules in core's `quests.ts`, the numbers and pool `QUESTS` in settings.ts; decisions
+  `2026-11-09-quests-*.md`): 2 dailies a day and a weekly a week, dealt lazily on the day's first read (GET /api/quests or a game's XP grant)
+  from a seed of the account and the day, once (`quest_days`' nonce claim). Unfinished dailies carry over, topped up to 3 at most; the weekly
+  resets on Mondays (08:00 UTC). One free reroll a day per daily (POST /api/quests/reroll; Nov 10): the replacement keeps the slot and is marked `quests.rerolled_day`, so it can't be rerolled again that day; two tabs reroll a quest once. Progress (`quest_progress`, one row per quest per game, only from the attempt that first counted the game:
+  `quest_games`) and
+  completion (op `quest:<kind>:<quest id>:<ledger id>`: 300 XP a daily, some a Winter Crate; the weekly 1,500 XP, a crate and a key) go in the
+  game's own XP batch, only for a counted game (online by the room's facts; solo only "finish games" quests and, for a solo Boss Battle (the result's `mode: "boss"`, quest mode `soloBoss`, Nov 10), the boss quests, with 3 of the server's minutes and only while its time XP is paid (not past the day's solo minutes); a
+  win only when its win XP went in), so each quest pays once. Its XP is a part of the box ("Quest +300") and can level you up; the quests are in
+  the result's rewards (`XpRewards.quests`). Nothing while `PAUSE_REWARDS` is on. A guest's merge drops the guest's quests; deleting removes
+  them; the download has them (store `quests`). The screens: [hub.md](hub.md).
 - **Squads' placements** (unranked): a result with mode "squads" (placement 1, 2, 3 or 5 of 8 squads) and its reward:
-  coins into `wallets.coins`, crates counted in `wallets.crates` (for when crates stop being free), both carried over
+  coins into `wallets.coins`, crates (Winter Crates since Nov 9, in `series_crates`; before, counted in `wallets.crates`), both carried over
   when a guest signs in (`grantReward`).
 - **Admins** are the emails in `ADMIN_EMAILS` (a Worker variable or secret, never in the repo): the fair-play review
   page (chat moderation included), the boss battle's "Trigger ultimate (testing)" button, and the test switches in the
   address (`?debug`, `?rounds=`, …; [ops.md](ops.md), "Test switches").
+- **Test accounts** (Nov 10; `test-accounts.ts`, [the decision](../decisions/2026-11-10-cheater-demo.md)): `/api/admin/test-accounts` (an admin,
+  a script through Access with the one service token `TEST_ACCOUNTS_CLIENT_ID` names in `wrangler.jsonc`'s `vars` (empty: no token gets in;
+  emptied before launch, ROADMAP.md), or the e2e's key): POST `{name}` makes `<name>@test.hunchess` (`users.test` = 1; a real account's
+  address: 409) and signs a script in as it (not an admin's own browser), GET lists their fair play, DELETE removes them all as any deleted
+  account (results re-keyed, ledger kept), fair play's file too. They play as anyone (nothing granted), are left out of the "Top N%" and 1 v
+  1's top places, and their reports never count toward a review. `scripts/cheater-demo.ts` plays with them ([fairplay.md](fairplay.md)).
 - **Bans** (from [fairplay.md](fairplay.md)) stop online play; solo stays open.
 - **The default pawn color** (Nov 7; `users.pawn_color`, NULL: white): PATCH `/api/me` `{pawn}` (only "white" or "black"); shown on the profile and
   in the town's presence (`town-here.ts`). A guest keeps it on the device (`brc.pawnColor`, `prefs.ts`). See `core/src/pawn-color.ts`.
@@ -66,7 +107,8 @@ Lane: `hub`. What a profile shows is on [hub.md](hub.md).
   [docs/decisions/2026-10-15-delete-my-account-and-download-my-data.md](../decisions/2026-10-15-delete-my-account-and-download-my-data.md)):
   - **The download:** GET `/api/me/data` answers a JSON file of everything kept about the account (every store's rows,
     the global chat's lines from the live hub). It leaves out who has blocked them and fair play's detection records
-    (on request, by email).
+    (on request, by email). Ranked's marks for leaving early (`ranked_conduct`, Nov 9) are in its `ranked1v1` part as
+    `leaves`; deleting erases them, and a guest's move to the account on sign-in ([ranked.md](ranked.md), "Leaving early").
   - **Deleting:** POST `/api/me/delete` `{confirm: "delete"}`, from the site's own origin, as JSON, after the app's
     confirmation. It removes everything personal in every store, in one batch (one transaction), and signs the
     account out on every device. The live hub forgets it (online, global chat lines). The app clears its local
@@ -104,6 +146,10 @@ Lane: `hub`. What a profile shows is on [hub.md](hub.md).
   the same words as a setting) and chat lines (hidden in the app) away. "Show when I'm online" off hides online and
   last seen on your profile and in friends' lists, for everyone, and others get only the day of your recent matches. Not while banned (requests and invites). Switched off
   for everyone by the Worker variable `PAUSE_FRIENDS` ("1"). The screens are on [hub.md](hub.md).
+- **Round trips (Nov 10, [load regression](../decisions/2026-11-10-load-regression.md)):** every D1 read from the Worker is a round trip
+  (about 40 ms), so a route reads what it can at once (`Promise.all`): `/api/me` in 4 (5 with the D1 touch; it was 28 one after another),
+  `/api/quests` and `/api/friends` in 3. `packages/server/test/me-round-trips.test.ts` counts them on a fake D1; keep new reads beside
+  the others, not after them.
 
 ## Data stored by friends (for the privacy page and account deletion)
 
@@ -122,8 +168,9 @@ policy's "Friends" entry (`screens/Legal.tsx`) says the same in plain words.
 | `users.allow_invites` | Who may invite you: NULL everyone, "friends", "none" | With the account |
 | `users.hide_online` | 1: online and last seen hidden from everyone | With the account |
 
-Nothing else is stored: no friend codes, no search index, no chat between friends. Who's online and who's in a match
-stay in the live hub's memory (never written).
+Nothing else is stored: no friend codes, no chat between friends. The friends page's player search (Nov 11) reads names through an
+index on `users.name` (`users_name`, any case: a prefix is a range, never a scan; `searchPlayers` in `friends.ts`), nothing new kept.
+Who's online, who's in a match and what they're doing (`?doing=`) stay in the live hub's memory (never written).
 
 ## Where the code is
 
@@ -149,14 +196,24 @@ offered, how long each answer lasts).
 
 ## Tests
 
-- Unit: `packages/server/test/accounts.test.ts` (an in-memory SQLite, `memory-db.ts`); `age-gate.test.ts` (every
-  sign-in behind the answer, a too-young device refused, the guest's defaults, nothing but the answer kept), with the
-  rule's in `packages/core/test/age-gate.test.ts` and the app's in `packages/app/test/age-gate.test.ts`; `account-data.test.ts` (every
+- Quests: `packages/core/test/quests.test.ts` (what counts, the pool, seeded picks, the cap, countdowns, the toast's lines),
+  `packages/server/test/quests.test.ts` (dealing, resets, carry-over, the reroll, progress per mode, paid once under replays and races,
+  the weekly, the pause, merge, download and delete, the API); `e2e/quests.spec.ts`.
+- XP: `packages/core/test/xp.test.ts` (the rules, the fill), `packages/server/test/xp.test.ts` (granted once, races, the caps, each "No
+  XP" reason, the result row, the solo clock, merge, download and delete, each match room's facts); `e2e/xp.spec.ts`.
+- Unit: `packages/server/test/accounts.test.ts` (an in-memory SQLite, `memory-db.ts`); `age-gate.test.ts` (Sign up behind the
+  answer; Sign in with no question into an account that answered; asked first, with nothing written, for an unknown email or
+  Google account and an account from before the question, and the finish; a too-young device refused with every kind of
+  account; the kept code's limits; between steps, two tabs, a replayed callback; the guest's defaults; nothing but the answer
+  kept), with the rule's in `packages/core/test/age-gate.test.ts` and the app's in `packages/app/test/age-gate.test.ts` (the
+  waiting sign-in and its finish); `account-data.test.ts` (every
   table covered, the download, deleting in every store, a kept ban, the API, the live hub's part); `friends.test.ts` (requests,
   blocks, invites and the settings, the caps, expiry, hidden status, `deleteSocial`, the API and its kill switch, the
   live board's news and "in a match"); `packages/app/test/friends.test.ts` (the list, the toast, hiding blocked chat,
   inviting from the front door).
-- e2e: `e2e/age-gate.spec.ts` (the question, the under-13 path into guest play, the 13+ path making an account),
+- e2e: `e2e/age-gate.spec.ts` (Sign up's question, the under-13 path into guest play, the 13+ path making an account, a
+  fresh browser signing in with no question and an account from before it asked once), `landing.spec.ts` (Sign in first;
+  Sign up and back move nothing),
   `e2e/account.spec.ts`, `account-delete.spec.ts` (download, the confirmation, deleting; reads the local D1),
   `profile.spec.ts`, `legal.spec.ts` (the privacy policy, terms and copyright page),
   `friends.spec.ts` (two players: request, accept, online, the invites setting, an invite joined from its toast, a
@@ -166,8 +223,13 @@ offered, how long each answer lasts).
 
 - Secrets never in the repo or in output; Eric does sign-ups and purchases.
 - A profile others can see never shows an email, a sign-in method or anything not on the approved list.
-- Every way to sign in goes through `ageRefusal`, and a guest under the gate gets nothing that takes typed text or lets
-  others reach them (the decision file's guest audit). A new way to sign in, or a new place to type, checks the age
-  answer in the same PR.
+- Every way to sign in goes through `ageRefusal` (a device that's too young is refused at every step, Sign in included) and
+  finishes only through `signInWithIdentity` after an "old enough" answer or `signInIfAnswered` without one; a guest under the
+  gate gets nothing that takes typed text or lets others reach them (the decision file's guest audit). A new way to sign in, or
+  a new place to type, checks the age answer in the same PR. No account is made, and none that never answered signs in,
+  without this device's answer (Nov 12).
 - A new table goes in `ACCOUNT_STORES` (`account-data.ts`: its part of the download, and what deleting does to it)
   with its line in the privacy policy, or in `NO_ACCOUNT_DATA` with why it holds nothing about anyone, in the same PR.
+- The app's `api()` (`account.ts`) never takes an answer it couldn't read for one: a 2xx that isn't a JSON object fails like a server
+  error (502, asked again where a server error is), so a cut-off `/api/me` never becomes a profile without its `user` (Nov 11:
+  every screen reading `profile.user` threw). `account-load.test.ts`.

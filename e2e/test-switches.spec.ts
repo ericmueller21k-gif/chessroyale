@@ -8,7 +8,7 @@ import { asAdmin, soloFromHome, switchesOff, test, bossAloneFromHome } from "./h
  * (a lobby's options, a queue's pool, a crate's forced roll) are in packages/server/test/test-switches.test.ts.
  */
 
-test("a player's test switches are ignored: no menu skipped, no match on window, no crate test boxes; an admin's work", async ({ page }) => {
+test("a player's test switches are ignored: no menu skipped, no match on window, no crate test boxes; an admin's work (not a crate's: Nov 9)", async ({ page }) => {
   test.setTimeout(2 * 60_000);
   test.skip(test.info().project.name !== "phone", "one run is enough");
   await switchesOff(page);
@@ -33,11 +33,13 @@ test("a player's test switches are ignored: no menu skipped, no match on window,
   await expect(page.getByRole("button", { name: /Open · uses 1 key/ })).toBeVisible();
   await expect(page.locator(".test-switches")).toHaveCount(0);
 
-  // An admin: the same addresses work.
+  // An admin: the same addresses work, but a crate's (Eric, Nov 9: no admin special ability for opening crates; ?fischer and ?shiny
+  // only where the server's TEST_SWITCHES is on, which the app is told it isn't here).
   await asAdmin(page);
   await page.goto("/shop?crates&fischer=1");
   await page.locator('.crate-row[data-crate="beta-001"]').click();
-  await expect(page.getByLabel("Land on Fischer Random")).toBeChecked();
+  await expect(page.getByRole("button", { name: /Open · uses 1 key/ })).toBeVisible();
+  await expect(page.locator(".test-switches")).toHaveCount(0);
   await page.goto("/?debug&boss=pig");
   await soloFromHome(page);
   await expect.poll(() => page.evaluate(() => (window as any).match?.phase?.kind ?? null)).not.toBeNull();

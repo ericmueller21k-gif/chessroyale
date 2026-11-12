@@ -132,7 +132,14 @@ export function rushDock(boss: BossView, view: RushView, now: number): { line: s
   const right = rushJudge(boss.board.fen, rush, view.places).correct;
   if (stage === "place") return { line: `${right} of ${n} back`, sub: `${need} needed. Drag or tap them home.` };
   if (rush.correct === undefined) return { line: `Time's up: ${right} of ${n}`, sub: "The board as it was." };
-  return rush.extra ? { line: `${right} of ${n}: too few`, sub: "He moves again." } : { line: `${right} of ${n}: well done!`, sub: "The board as it was. Your move." };
+  // (The verdict's own count: yours alone solo; online, the crowd's mean, with yours beside it when it differs. Its word follows
+  // `extra`, the same field his extra move goes by, so the line and the move never disagree; Nov 8.)
+  const crowd = rush.correct !== right;
+  const count = crowd ? `Crowd: ${rush.correct} of ${n}` : `${right} of ${n}`;
+  // "you" only for a viewer who put pieces back (not a spectator, nor one who was out; review of #561).
+  const yours = crowd && Object.keys(view.places).length ? ` (On average; you: ${right}.)` : "";
+  if (rush.extra === "skipped") return { line: `${count}: too few`, sub: `No quiet move for him: your move.${yours}` };
+  return rush.extra ? { line: `${count}: too few`, sub: `He moves again.${yours}` } : { line: `${count}: well done!`, sub: `The board as it was. Your move.${yours}` };
 }
 
 // ---------------- His running copy ----------------
@@ -221,8 +228,20 @@ export function RushLayer({ boss, view, now, orientation, onPlace }: { boss: Bos
   const tl = rushTimeline();
   const t = now - view.at;
   const stage = rush ? rushStage(rush, view, now) : "done";
-  const [sel, setSel] = useState<string | null>(null);
-  const [drag, setDrag] = useState<{ from: string; x: number; y: number; moved: boolean; id: number } | null>(null);
+  const [sel, setSelShown] = useState<string | null>(null);
+  const [drag, setDragShown] = useState<{ from: string; x: number; y: number; x0: number; y0: number; moved: boolean; id: number } | null>(null);
+  // (The pointer's handlers read these refs, not the state: the next pointer event can come before the re-render that hands the
+  // handlers a new state, so a drag's moves once all read "no drag" and its drop was lost. The state draws; the refs decide.)
+  const selNow = useRef<string | null>(null);
+  const dragNow = useRef<typeof drag>(null);
+  const setSel = (v: string | null) => {
+    selNow.current = v;
+    setSelShown(v);
+  };
+  const setDrag = (v: typeof drag) => {
+    dragNow.current = v;
+    setDragShown(v);
+  };
   const [nope, setNope] = useState<{ square: string; n: number } | null>(null);
   const layer = useRef<HTMLDivElement>(null);
   const runs = rush ? rushRuns(rush).runs : [];
@@ -237,7 +256,7 @@ export function RushLayer({ boss, view, now, orientation, onPlace }: { boss: Bos
     if (t >= tl.askAt) once(`${key}:ask`, () => kingSay("rushAsk", `${key}:ask`));
     if (rush.correct !== undefined && !rush.extra) once(`${key}:well`, () => kingSay("rushWell", `${key}:well`));
     // (Too few back: his word as time's up; his extra move follows at once.)
-    if (rush.extra) once(`${key}:fail`, () => bossVoice.say(DASH_RUSH_LINES.fail[hash(key) % DASH_RUSH_LINES.fail.length], `${key}:fail`, CRITICAL));
+    if (rush.extra === "due" || rush.extra === "played") once(`${key}:fail`, () => bossVoice.say(DASH_RUSH_LINES.fail[hash(key) % DASH_RUSH_LINES.fail.length], `${key}:fail`, CRITICAL));
   });
   // The clock's tick each second of both countdowns (his "1.00" too: five of them).
   const tick = t < tl.countdownMs ? Math.floor(t / 1000) : t >= tl.placeAt && t < tl.placeUntil ? 100 + Math.floor((t - tl.placeAt) / 1000) : -1;
@@ -321,21 +340,25 @@ export function RushLayer({ boss, view, now, orientation, onPlace }: { boss: Bos
             }
             if (o) {
               setSel(o);
-              setDrag({ from: o, x: e.clientX, y: e.clientY, moved: false, id: e.pointerId });
+              setDrag({ from: o, x: e.clientX, y: e.clientY, x0: e.clientX, y0: e.clientY, moved: false, id: e.pointerId });
               (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
               return;
             }
-            if (sel) {
-              put(sel, s);
+            if (selNow.current) {
+              put(selNow.current, s);
               setSel(null);
             }
           }}
           onPointerMove={(e) => {
+            const drag = dragNow.current;
             if (!drag || drag.id !== e.pointerId) return;
-            const far = drag.moved || Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > 8;
+            // (From where it was picked up, not from the last move: a slow drag's moves are each a few pixels, so it never counted
+            // and its drop was lost, main run 42760919996's 3 of 4.)
+            const far = drag.moved || Math.hypot(e.clientX - drag.x0, e.clientY - drag.y0) > 8;
             setDrag({ ...drag, x: e.clientX, y: e.clientY, moved: far });
           }}
           onPointerUp={(e) => {
+            const drag = dragNow.current;
             if (!drag || drag.id !== e.pointerId) return;
             setDrag(null);
             if (!drag.moved) return;

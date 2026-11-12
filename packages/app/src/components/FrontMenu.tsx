@@ -10,6 +10,7 @@ import { Pic } from "../home-art/Pic.tsx";
 import { ARENA_TOWN_BADGE } from "../home-art/arena-town-badge.ts";
 import { MOUSE_LAYOUT } from "./MatchMenu.tsx";
 import { useMedia } from "./QuickChat.tsx";
+import { questsForYou } from "../quests.ts";
 
 /** Where the computer's side menu can take you. */
 export interface FrontNav {
@@ -19,6 +20,8 @@ export interface FrontNav {
   /** Solo Boss Mode: the solo boss screen (the tiles, the stage, Boss alone; Eric, Oct 26). */
   soloBoss: () => void;
   friends: () => void;
+  /** Daily Quests: home with its quests overlay open (Eric, Nov 10). */
+  quests: () => void;
   shop: () => void;
   profile: () => void;
   settings: () => void;
@@ -28,7 +31,7 @@ export interface FrontNav {
   signIn?: () => void;
 }
 
-export type FrontPage = "home" | "town" | "raid" | "queue" | "profile" | "settings" | "shop" | "lobby" | "friends";
+export type FrontPage = "home" | "town" | "raid" | "queue" | "profile" | "settings" | "shop" | "lobby" | "friends" | "autochess";
 
 const Icon = ({ d, children }: { d?: string; children?: ComponentChildren }) => (
   <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -43,9 +46,9 @@ const crown = () => (
   </Icon>
 );
 
-function Item({ label, icon, on, tip, tour, onClick }: { label: string; icon: ComponentChildren; on?: boolean; tip?: boolean; tour?: string; onClick: () => void }) {
+function Item({ label, icon, on, tip, tour, title, disabled, onClick }: { label: string; icon: ComponentChildren; on?: boolean; tip?: boolean; tour?: string; title?: string; disabled?: boolean; onClick: () => void }) {
   return (
-    <button type="button" class={`fd-menu-item${on ? " on" : ""}`} data-tour={tour} aria-current={on ? "page" : undefined} title={tip ? label : undefined} onClick={onClick}>
+    <button type="button" class={`fd-menu-item${on ? " on" : ""}`} data-tour={tour} aria-current={on ? "page" : undefined} title={title ?? (tip ? label : undefined)} disabled={disabled} onClick={onClick}>
       <span class="fd-menu-icon">{icon}</span>
       <span>{label}</span>
     </button>
@@ -59,6 +62,7 @@ function Item({ label, icon, on, tip, tour, onClick }: { label: string; icon: Co
 export function SideMenu({ page, nav, game = false }: { page?: FrontPage; nav: FrontNav; game?: boolean }) {
   const p = account().profile;
   const tip = game;
+  const questsOn = questsForYou();
   return (
     <nav class="fd-side" aria-label="Menu">
       <Logo onClick={nav.home} />
@@ -78,6 +82,22 @@ export function SideMenu({ page, nav, game = false }: { page?: FrontPage; nav: F
               <path d="M3 19c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5" />
               <circle cx="17" cy="9" r="2.6" />
               <path d="M16 13.6c2.8.2 5 2.2 5 5" />
+            </Icon>
+          }
+        />
+        {/* (Daily Quests (Eric, Nov 10): the quests overlay, over home. Greyed until quests are yours, as the phone's top-bar button.) */}
+        <Item
+          tip={tip}
+          tour="quests"
+          label="Daily Quests"
+          title={questsOn === false ? "Sign in for quests" : tip ? "Daily Quests" : undefined}
+          disabled={questsOn !== true}
+          onClick={nav.quests}
+          icon={
+            <Icon>
+              <path d="M8 4H6.5A2.5 2.5 0 0 0 4 6.5v13A2.5 2.5 0 0 0 6.5 22h11a2.5 2.5 0 0 0 2.5-2.5v-13A2.5 2.5 0 0 0 17.5 4H16" />
+              <rect x="8" y="2" width="8" height="4" rx="1.2" />
+              <path d="M8.5 13.2l2.3 2.3 4.2-4.4" />
             </Icon>
           }
         />
@@ -103,7 +123,7 @@ export function SideMenu({ page, nav, game = false }: { page?: FrontPage; nav: F
   );
 }
 
-/** The right column's top slot: the town's (TOWN and its tools, which Town.tsx draws into it), else empty (RightPanel). */
+/** The right column's top slot: the town's (TOWN and its tools, which Town.tsx draws into it), auto chess's (AUTO CHESS and the round, AutoChess.tsx), else empty (RightPanel). */
 export const RIGHT_SLOT_TOOLS = "rc-slot-tools";
 
 /**
@@ -113,13 +133,13 @@ export const RIGHT_SLOT_TOOLS = "rc-slot-tools";
  * "FRIENDS ›" (opens your friends) and the live line under it, then the global chat (components/GlobalChat.tsx) filling the rest.
  * docs/decisions/2026-11-07-typed-chat-column.md.
  */
-export function RightPanel({ onFriends, onSignIn, town = false }: { onFriends: () => void; onSignIn?: () => void; town?: boolean }) {
+export function RightPanel({ onFriends, onSignIn, slot }: { onFriends: () => void; onSignIn?: () => void; slot?: string }) {
   // (A computer's: under 1024 px the column isn't shown, so nothing in it is drawn, fetched or polled.)
   const computer = useMedia("(min-width: 1024px)");
-  return computer ? <RightColumn onFriends={onFriends} onSignIn={onSignIn} town={town} /> : <aside class="fd-right" aria-label="Live" />;
+  return computer ? <RightColumn onFriends={onFriends} onSignIn={onSignIn} slot={slot} /> : <aside class="fd-right" aria-label="Live" />;
 }
 
-function RightColumn({ onFriends, onSignIn, town }: { onFriends: () => void; onSignIn?: () => void; town: boolean }) {
+function RightColumn({ onFriends, onSignIn, slot }: { onFriends: () => void; onSignIn?: () => void; slot?: string }) {
   const live = useLive();
   // (Your friends' news for the badge: requests and invites, refreshed while the column shows.)
   useFriends(true);
@@ -127,9 +147,9 @@ function RightColumn({ onFriends, onSignIn, town }: { onFriends: () => void; onS
   return (
     <aside class="fd-right" aria-label="Live">
       <div class="rc-slot">
-        {town && (
+        {slot && (
           <>
-            <h2 class="rc-h">TOWN</h2>
+            <h2 class="rc-h">{slot}</h2>
             <div class="rc-tools" id={RIGHT_SLOT_TOOLS} />
           </>
         )}
@@ -184,7 +204,7 @@ export function FrontFrame({ children, page, nav }: { children: ComponentChildre
       {nav && <SideMenu page={page} nav={nav} />}
       <main class="fd-center">{children}</main>
       {/* (The global chat on every page with the column: it was home's and the town's only, so the queue, 1 v 1's search among them, had none. Nov 7.) */}
-      {nav && <RightPanel onFriends={nav.friendsList} onSignIn={nav.signIn} town={page === "town"} />}
+      {nav && <RightPanel onFriends={nav.friendsList} onSignIn={nav.signIn} slot={page === "town" ? "TOWN" : page === "autochess" ? "AUTO CHESS" : undefined} />}
       {/* A new invite: front-door pages only (never over a match, nor in the queue). */}
       {nav && page !== "queue" && <InviteToast />}
       {/* Back from the town for being away (town/afk.ts): "You've been dropped from the town" on home. */}

@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef } from "preact/hooks";
 import { bossBeat, type Beat, type BeatResult, type Stage } from "../characters/boss-beats.ts";
-import { artOf, bossKit, poweredKit, type BossKit } from "../characters/kits.ts";
+import { BOSS_KITS, artOf, bossKit, poweredKit, type BossKit } from "../characters/kits.ts";
 import { SELECT_FRAMING } from "../characters/boss-select.ts";
 import { stanceAt } from "../characters/stance.ts";
 import { resetMoo } from "../characters/moo-state.ts";
@@ -8,7 +8,9 @@ import { renderFrame, type Anim, type Character, type Frame } from "../character
 import { drawnFacing } from "../characters/sprite-kit.ts";
 import type { BossView, GameView, Phase } from "../game.ts";
 import { play, warmSounds } from "../sound.ts";
+import { cueHaptic } from "../haptics.ts";
 import { EFFECTS, POWER_MOMENTS } from "../characters/power-art.ts";
+import { prewarmAnims } from "./BossEffect.tsx";
 import { prewarmBigBoy } from "./BigBoy.tsx";
 import { prewarmGinger } from "./Ginger.tsx";
 import { prewarmGrex } from "./Grex.tsx";
@@ -268,34 +270,39 @@ function Character({ boss, stage, place }: { boss: BossView; stage: Stage; place
     const m = POWER_MOMENTS[kit.ch.name];
     const fx = m ? [m.power, m.ultimate, m.powerHit, m.ultimateHit, ...Object.values(m.more ?? {})].flatMap((x) => x?.effects ?? []) : [];
     warmSounds([...Object.values(kit.sounds), ...fx.flatMap((e) => Object.values(EFFECTS[e].sounds))]);
-    // (Big Boy's snack, toss and bounce drawn ahead too: his bounce is big, and his snack plays seconds in.)
-    if (kit.ch.id === "bigboy") prewarmBigBoy(kit.ch.name, boss.crowdSide === "b" ? "blackPawn" : undefined);
-    // (Sawyer's split, cuts and board saw too: the split plays seconds in, after his first move.)
-    if (kit.ch.id === "sawyer") prewarmSawyer(kit.ch.name);
-    // (Wrangler's leap and lasso too: his long pull comes a move in; then his wind-up and haul.)
-    if (kit.ch.id === "pig") prewarmPig(kit.ch.name);
-    // (Ginger's ice: its crack, thin ice and thaw.)
-    if (kit.ch.id === "gingerbread") prewarmGinger();
-    // (Jefferson's Roman candle: him, its shots and fireballs.)
-    if (kit.ch.id === "grex") prewarmGrex(kit.ch.name);
-    // (Alfil's cast, fusion and Slam, and the shadows his pieces cast while they're up.)
-    if (kit.ch.id === "alfil") prewarmAlfil(kit.ch.name);
-    // (Chub & Chirp's hop, cast and race, and the carrots.)
-    if (kit.ch.id === "hopper") prewarmHopper(kit.ch.name);
-    // (Smudgy's splash, reveal and Repaint, and the paint.)
-    if (kit.ch.id === "smudgy") prewarmSmudgy(kit.ch.name);
-    // (Moo's moonbeam, flurry and daze, his powered-up twins, his sit, and the beams on the board.)
-    if (kit.ch.id === "moo") prewarmMoo(kit.ch.name);
-    // (Puddles' tosses, watering and reactions, and the seeds, sweep and plants on the board.)
-    if (kit.ch.id === "gardener") prewarmGardener(kit.ch.name);
-    // (Babur's trip to the pump, his place, reactions and hoops, and the balloons and rings on the board.)
-    if (kit.ch.id === "tiger") prewarmTiger(kit.ch.name);
-    // (Folio's ink, its paper, the crease and Revision's strokes on the board.)
-    if (kit.ch.id === "folio") prewarmFolio();
-    // (The Hidden Boss's phase change: his rage, his leap onto the board, the book thrown down, the chant.)
-    if (kit.ch.id === "recluse") prewarmRecluse(boss.crowdSide);
-    // (Its attack on a king too: the God King's Last Stand, or its mate.)
-    prewarmKingAttack(kit.ch.name);
+    // His moves and his powers' effects are made when first read (sprite.ts lazyAnim): made here first, in quiet slices, so
+    // what follows draws ahead from them without building a boss in one stall.
+    const chs = [kit.ch, ...(full && full.ch !== kit.ch ? [full.ch] : []), ...new Set(fx.map((e) => EFFECTS[e].ch))];
+    return prewarmAnims(chs.flatMap((ch) => Object.values(ch.anims)), () => {
+      // (Big Boy's snack, toss and bounce drawn ahead too: his bounce is big, and his snack plays seconds in.)
+      if (kit.ch.id === "bigboy") prewarmBigBoy(kit.ch.name, boss.crowdSide === "b" ? "blackPawn" : undefined);
+      // (Sawyer's split, cuts and board saw too: the split plays seconds in, after his first move.)
+      if (kit.ch.id === "sawyer") prewarmSawyer(kit.ch.name);
+      // (Wrangler's leap and lasso too: his long pull comes a move in; then his wind-up and haul.)
+      if (kit.ch.id === "pig") prewarmPig(kit.ch.name);
+      // (Ginger's ice: its crack, thin ice and thaw; Boingo's freeze, a piece his pie splatted twice, shows it too.)
+      if (kit.ch.id === "gingerbread" || kit.ch.id === "clown") prewarmGinger();
+      // (Jefferson's Roman candle: him, its shots and fireballs.)
+      if (kit.ch.id === "grex") prewarmGrex(kit.ch.name);
+      // (Alfil's cast, fusion and Slam, and the shadows his pieces cast while they're up.)
+      if (kit.ch.id === "alfil") prewarmAlfil(kit.ch.name);
+      // (Chub & Chirp's hop, cast and race, and the carrots.)
+      if (kit.ch.id === "hopper") prewarmHopper(kit.ch.name);
+      // (Smudgy's splash, reveal and Repaint, and the paint.)
+      if (kit.ch.id === "smudgy") prewarmSmudgy(kit.ch.name);
+      // (Moo's moonbeam, flurry and daze, his powered-up twins, his sit, and the beams on the board.)
+      if (kit.ch.id === "moo") prewarmMoo(kit.ch.name);
+      // (Puddles' tosses, watering and reactions, and the seeds, sweep and plants on the board.)
+      if (kit.ch.id === "gardener") prewarmGardener(kit.ch.name);
+      // (Babur's trip to the pump, his place, reactions and hoops, and the balloons and rings on the board.)
+      if (kit.ch.id === "tiger") prewarmTiger(kit.ch.name);
+      // (Folio's ink, its paper, the crease and Revision's strokes on the board.)
+      if (kit.ch.id === "folio") prewarmFolio();
+      // (The Hidden Boss's phase change: his rage, his leap onto the board, the book thrown down, the chant.)
+      if (kit.ch.id === "recluse") prewarmRecluse(boss.crowdSide);
+      // (Its attack on a king too: the God King's Last Stand, or its mate.)
+      prewarmKingAttack(kit.ch.name);
+    });
   }, [kit]);
   // A recolor from the battle's state (Big Boy's black pawn), read as it's drawn.
   const lookRef = useRef<() => string>(() => "");
@@ -362,6 +369,7 @@ function Character({ boss, stage, place }: { boss: BossView; stage: Stage; place
         if (sound && !played.has(s.tag)) {
           played.add(s.tag);
           play(sound);
+          cueHaptic(kit.ch.id, s.anim, frame.cue!);
         }
       }
       raf = requestAnimationFrame(draw);
@@ -377,6 +385,7 @@ function Character({ boss, stage, place }: { boss: BossView; stage: Stage; place
   useLayoutEffect(() => {
     // (A line of its own for the moment, from the battle, over its kit's: the Hidden Boss's "Best by test.")
     const said = beat ? (kit?.lineOf?.(beat.anim, boss) ?? beat.line) : null;
+    // (The result's line is his alone since Nov 9: the God King no longer answers it there, so no hold for him.)
     if (said && !quiet && !figure.run) bossVoice.say(said, `${boss.id}:${boss.startMove}:${beat!.key}`, BEAT_PRIORITY[beat!.anim] ?? LOW);
   }, [beat?.key]);
   // Beaten: its fall lines (the Hidden Boss's mumbling), one after another once its defeat's animation is over, each
@@ -401,7 +410,7 @@ function Character({ boss, stage, place }: { boss: BossView; stage: Stage; place
   // (A phone's bar: his size and his drawing's shift in the box (kits.ts barScale, barShift; styles.css). Full size and no shift otherwise.)
   const barSize = place === "bar" ? { "--bc-scale": kit.barScale ?? 1, "--bc-shift": kit.barShift ?? 0 } : {};
   return (
-    <div ref={box} class={`boss-char place-${place} ch-${ch.id}${kit.tall ? " tall" : ""}${kit.wide ? " wide" : ""}`} data-anim={beat.anim} data-faces={kit.sprite ? drawnFacing(kit.sprite, ch) : undefined} aria-hidden="true" style={{ "--bc-w": ch.w, "--bc-h": ch.h, "--bc-fx": ch.foot[0], "--bc-fy": ch.foot[1], ...barSize }}>
+    <div ref={box} class={`boss-char place-${place} ch-${ch.id}${kit.tall ? " tall" : ""}${kit.wide ? " wide" : ""}${place === "results" && kit.artFacesLeft ? " art-left" : ""}`} data-anim={beat.anim} data-faces={kit.sprite ? drawnFacing(kit.sprite, ch) : undefined} aria-hidden="true" style={{ "--bc-w": ch.w, "--bc-h": ch.h, "--bc-fx": ch.foot[0], "--bc-fy": ch.foot[1], ...barSize }}>
       <canvas ref={cv} class="boss-char-sprite" width={ch.w} height={ch.h} />
       {kit.engine && <EngineOverlay ch={ch} elRef={eng} />}
       {/* Its words: a pixel text box beside it that types itself out and fades at the end (like the God King's). In the
@@ -438,6 +447,17 @@ export function BossFace({ boss, class: cls = "", label }: { boss: Pick<BossView
   if (!kit) return null;
   return <canvas ref={cv} class={`boss-portrait ${cls}`} width={kit.portrait.w} height={kit.portrait.h} {...(label === "" ? { "aria-hidden": "true" } : { role: "img", "aria-label": label ?? boss.name })} />;
 }
+
+/**
+ * What to make ahead of a screen of bosses (their art is made the first time it's read: sprite.ts lazyAnim; prewarmAnims
+ * makes it in quiet slices): every boss's portrait animation (the select tiles, the stage, the faces), and one boss's
+ * whole figure and his phone's bar.
+ */
+export const portraitAnims = (): Anim[] => Object.values(BOSS_KITS).flatMap((k) => artOf(k).anims[k.portrait.anim] ?? []);
+export const bossAnims = (name: string | undefined): Anim[] => {
+  const kit = bossKit(name);
+  return kit ? [kit.ch, ...(kit.bar ? [kit.bar] : [])].flatMap((ch) => Object.values(ch.anims)) : [];
+};
 
 /** A boss's portrait as an image address, made once per boss (the move list's rows: one small image each, not a canvas each). */
 const portraitUrls = new Map<string, string | null>();

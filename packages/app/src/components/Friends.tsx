@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from "preact/hooks";
+import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import type { ComponentChildren } from "preact";
-import { FRIENDS, inviteWhat, type FriendEntry, type InviteEntry } from "@chessroyale/core";
+import { ACTIVITY_LINES, FRIENDS, inviteWhat, type FriendEntry, type InviteEntry } from "@chessroyale/core";
 import {
   addFriend,
   answerFriend,
@@ -23,6 +23,7 @@ import {
 import { FdButton } from "./FrontDoor.tsx";
 import { useMedia } from "./QuickChat.tsx";
 import { PlayerName } from "./PlayerName.tsx";
+import { ago } from "../public-profile.ts";
 
 /**
  * Friends' pieces (docs/decisions/2026-10-15-friends-and-invites.md): a friend's row, the phone home's line and the computer's live
@@ -30,13 +31,22 @@ import { PlayerName } from "./PlayerName.tsx";
  * settings, and the friend buttons on a profile. Classes start with `fr-`.
  */
 
-/** "Online", "In a match", "Offline", or "Online status hidden" for a friend who hides it. */
-export function friendStatus(f: FriendEntry): string {
+/**
+ * What they're doing while online ("In Chess Town", "In a 50 v 50": core's ACTIVITY_LINES, Eric, Nov 11), else "In a match" or
+ * "Online" (an app that doesn't say yet); "Last online 2h ago" (or "Offline" when the server didn't say when), or "Online status
+ * hidden" for a friend who hides it. The "ago" words are the public profile's (public-profile.ts).
+ */
+export function friendStatus(f: FriendEntry, now = Date.now()): string {
   if (f.hidden) return "Online status hidden";
-  return f.busy ? "In a match" : f.online ? "Online" : "Offline";
+  if (f.online && f.doing) return ACTIVITY_LINES[f.doing];
+  if (f.busy) return "In a match";
+  if (f.online) return "Online";
+  if (!f.lastSeen) return "Offline";
+  const when = ago(f.lastSeen, now);
+  return `Last online ${when === "Yesterday" ? "yesterday" : when}`;
 }
 
-function Dot({ f }: { f: FriendEntry }) {
+export function Dot({ f }: { f: FriendEntry }) {
   return <span class={`fr-dot${f.hidden ? " hidden" : f.busy ? " busy" : f.online ? "" : " off"}`} aria-hidden="true" />;
 }
 
@@ -221,7 +231,8 @@ export function InviteFriends() {
 function InviteSheet({ onClose }: { onClose: () => void }) {
   const { state } = useFriends(true);
   const [note, setNote] = useState<string | null>(null);
-  useEffect(() => {
+  // (A layout effect, as every pop-up's: an effect waits for a paint, and an Escape pressed as it opened was lost. LESSONS.md, Nov 11.)
+  useLayoutEffect(() => {
     const key = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     addEventListener("keydown", key);
     return () => removeEventListener("keydown", key);

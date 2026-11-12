@@ -31,17 +31,24 @@ import {
   type EquipSlot,
   type ShopState,
   type StoredChatPicks,
+  levelOf,
+  XP,
+  type XpGrant,
 } from "@chessroyale/core";
-import { LOCKER_MIGRATIONS, LOCKER_SCHEMA, NO_ADMINS, lockerMoves, lockerState, type AdminCheck, type LockerState } from "./locker.ts";
+import { LOCKER_COLUMNS, LOCKER_SCHEMA, NO_ADMINS, lockerMoves, lockerState, type AdminCheck, type LockerState } from "./locker.ts";
 import { BOSS_TOKENS_SCHEMA, tokenMoves } from "./boss-tokens.ts";
 import { CLAW_SCHEMA } from "./claw.ts";
 import { WELCOME_SCHEMA, grantWelcomeCrate } from "./welcome.ts";
-import { LEDGER_SCHEMA, LEDGER_TRIGGERS, applyOp, cond, keyFor, leg, ledgerAccount, mergeMoves, type OpKey, type Outcome } from "./ledger.ts";
+import { LEDGER_SCHEMA, LEDGER_TRIGGERS, applyOp, cond, keyFor, leg, ledgerAccount, mergeMoves, type Cond, type OpKey, type Outcome } from "./ledger.ts";
 import { LIVE_SCHEMA } from "./live.ts";
-import { FAIRPLAY_SCHEMA, IDENTITIES_REKEY, fairPlayMoves } from "./fairplay-schema.ts";
-import { FRIENDS_COLUMNS, FRIENDS_SCHEMA, socialDeletes } from "./friends.ts";
-import { RANKED_COLUMNS, RANKED_SCHEMA, rankedMoves, rankedSummary, type RankedSummary } from "./ranked-schema.ts";
+import { FAIRPLAY_SCHEMA, IDENTITIES_REKEY, NOT_POOLED, fairPlayMoves } from "./fairplay-schema.ts";
+import { FRIENDS_COLUMNS, FRIENDS_SCHEMA, SIGNED_IN, socialDeletes } from "./friends.ts";
+import type { RankedLeaves } from "@chessroyale/core";
+import { RANKED_COLUMNS, RANKED_SCHEMA, rankedLeaves, rankedMoves, rankedSummary, type RankedSummary } from "./ranked-schema.ts";
 import { CHAT_MOD_SCHEMA } from "./chat-mod-schema.ts";
+import { XP_SCHEMA, xpColumns, xpOf } from "./xp.ts";
+import { ENGINE_CALLS_SCHEMA } from "./engine-calls.ts";
+import { QUESTS_COLUMNS, QUESTS_SCHEMA, questDeletes } from "./quests.ts";
 import { isBlockedText } from "./text-filter.ts";
 import { chatModMoves, chatStanding, type ChatNotice } from "./chat-mod.ts";
 import type { ChatBlock } from "@chessroyale/chess";
@@ -203,6 +210,12 @@ const SCHEMA = [
   ...CHAT_MOD_SCHEMA,
   // Ranked 1 v 1: each player's rank, and each ranked game kept for a while (ranked.ts).
   ...RANKED_SCHEMA,
+  // XP (Nov 9): the solo game the server is timing for each account (xp.ts).
+  ...XP_SCHEMA,
+  // Quests (Nov 9, phase 3): each account's quests, each game that moved one, and the day last dealt (quests.ts).
+  ...QUESTS_SCHEMA,
+  // The engine server's per-account cap (Nov 10): each account's calls to its open routes today (engine-calls.ts).
+  ...ENGINE_CALLS_SCHEMA,
 ];
 
 /**
@@ -210,6 +223,8 @@ const SCHEMA = [
  * read first); `then` runs right after a column is added, to fill it in from what's already stored.
  */
 const COLUMNS: { table: string; column: string; type: string; then?: string[] }[] = [
+  // The locker's (locker.ts): a present's second color.
+  ...LOCKER_COLUMNS,
   // The profile's stats (Oct 6, 2026): recorded from then on; older results leave them empty.
   { table: "results", column: "brilliant", type: "INTEGER" },
   { table: "results", column: "best_move", type: "TEXT" },
@@ -246,10 +261,29 @@ const COLUMNS: { table: string; column: string; type: string; then?: string[] }[
   // been searched again.
   { table: "fairplay_matches", column: "deep_queued", type: "INTEGER" },
   { table: "fairplay_matches", column: "deep_done", type: "INTEGER" },
-  // Crates earned (Squads' placement rewards, Oct 10, 2026), counted for when crates stop being free (CRATES_FREE).
+  // Crates earned (Squads' placement rewards, Oct 10, 2026), counted for when crates stop being free. Since Nov 9 (XP phase 2) crates
+  // are held by series (ledger.ts, series_crates): a count here is turned into crates of the newest series as the locker is read
+  // (rewards.ts, seriesFromWallet), and nothing adds to it any more but a guest's merge.
   { table: "wallets", column: "crates", type: "INTEGER NOT NULL DEFAULT 0" },
   // Crate keys (Nov 2, 2026: a boss crate takes one; an admin's test grant gives them): boss-tokens.ts.
   { table: "wallets", column: "crate_keys", type: "INTEGER NOT NULL DEFAULT 0" },
+  // XP (Nov 9, 2026; xp.ts): each account's XP, its level worked out from it (core's levelOf). Moved only through the ledger (asset
+  // kind "xp"). Every row from before starts at 0.
+  { table: "wallets", column: "xp", type: "INTEGER NOT NULL DEFAULT 0" },
+  // Boss crates to pick (Nov 9, 2026, XP phase 2: every 10th level's; rewards.ts): moved only through the ledger (asset kind
+  // "boss_pick"). Every row from before has none.
+  { table: "wallets", column: "boss_picks", type: "INTEGER NOT NULL DEFAULT 0" },
+  // A game's XP (Nov 9, 2026; xp.ts): the player's time in it and their own moves (online: as the match room counted them; solo: the
+  // server's clock between the game's start and its result, and the device's count of moves), and what the result screen showed: their XP before, the parts (JSON [{label, xp}]) or why none
+  // ("short", "resigned", "left", "guest", "test", "banned"). NULL on every result from before (and a solo result from an app before XP).
+  { table: "results", column: "play_ms", type: "INTEGER" },
+  { table: "results", column: "moves", type: "INTEGER" },
+  { table: "results", column: "xp_before", type: "INTEGER" },
+  { table: "results", column: "xp_parts", type: "TEXT" },
+  { table: "results", column: "xp_none", type: "TEXT" },
+  // What the game paid beside its XP (Nov 9, 2026, XP phase 2): JSON {crate, daily, crates, keys, bossPicks, levels} (core's
+  // XpRewards), for the result screen's rewards box. NULL: nothing (and every result from before).
+  { table: "results", column: "xp_rewards", type: "TEXT" },
   // Each account's latest rating, for the percentile (filled in from the results already stored).
   { table: "users", column: "rating", type: "INTEGER", then: [`UPDATE users SET rating = ${LATEST_RATING("users.id")}`] },
   // Friends (Oct 15, 2026): who may invite you, hiding when you're online (friends.ts).
@@ -265,9 +299,21 @@ const COLUMNS: { table: string; column: string; type: string; then?: string[] }[
   // The chat's opt-in (Nov 7, 2026: typed chat, off by default): 1 once the player turned chat on (after its one-time notice); NULL off.
   // Only a signed-in account's; a guest's is on its device. docs/decisions/2026-11-07-typed-chat-column.md.
   { table: "users", column: "chat_on", type: "INTEGER" },
+  // Quests (Nov 10, 2026: one reroll per daily): the day a reroll dealt a quest (quests.ts).
+  ...QUESTS_COLUMNS,
+  // Test accounts (Nov 10, 2026; test-accounts.ts): 1 for an account an admin's script made (a dummy email at test.hunchess), left out
+  // of public rankings; NULL for everyone else.
+  { table: "users", column: "test", type: "INTEGER" },
 ];
 const AFTER_COLUMNS = [
   `CREATE INDEX IF NOT EXISTS users_rating ON users (rating)`,
+  // (The friends page's player search, Nov 11, 2026: a name's prefix in any case is a range on this, never a scan: friends.ts, searchPlayers.)
+  `CREATE INDEX IF NOT EXISTS users_name ON users (name COLLATE NOCASE)`,
+  // (The same search where signing in is set up: only signed-in accounts, so the many guests named "Player" are never read.
+  // Its WHERE is friends.ts's SIGNED_IN, word for word: SQLite uses a partial index only for a query that says the same.)
+  `CREATE INDEX IF NOT EXISTS users_name_signed ON users (name COLLATE NOCASE) WHERE ${SIGNED_IN}`,
+  // (The few test accounts, so 1 v 1's top places leave them out without scanning the table: ranked-schema.ts, topPlace.)
+  `CREATE INDEX IF NOT EXISTS users_test ON users (id) WHERE test = 1`,
   // (The deep re-check's queue: only the matches waiting, so the scheduled run never scans the whole table.)
   `CREATE INDEX IF NOT EXISTS fairplay_matches_deep ON fairplay_matches (deep_queued) WHERE deep_queued = 1`,
   // Solo results stopped counting for ranking (Oct 16, 2026: their rating is the browser's word, and the ones from
@@ -293,56 +339,119 @@ export async function refreshRating(sql: Sql, userId: string): Promise<void> {
 }
 
 const ready = new WeakSet<object>();
+/** The schema run on its way for each database, and when it started (ensureSchema). */
+const running = new WeakMap<object, { run: Promise<void>; at: number }>();
+/**
+ * How long a request waits for a schema run another request started before running its own: a run whose request was
+ * cut short (its player gone) may never finish, and a normal one takes a few round trips.
+ */
+const SCHEMA_WAIT_MS = 5_000;
 /** Every schema statement, as one fingerprint: a database that has it recorded needs none of them run again. */
 const SCHEMA_VERSION = (() => {
-  const text = JSON.stringify([SCHEMA, LEDGER_TRIGGERS, LOCKER_MIGRATIONS, COLUMNS, AFTER_COLUMNS]);
+  const text = JSON.stringify([SCHEMA, LEDGER_TRIGGERS, COLUMNS, AFTER_COLUMNS]);
   let h = 2166136261;
   for (let i = 0; i < text.length; i++) h = Math.imul(h ^ text.charCodeAt(i), 16777619);
   return `${text.length}-${(h >>> 0).toString(36)}`;
 })();
+/** The schema's parts, for the tests (schema-fast.test.ts runs them one statement at a time, as before, to compare). */
+export const schemaParts = { SCHEMA, LEDGER_TRIGGERS, COLUMNS, AFTER_COLUMNS, version: SCHEMA_VERSION };
 
 /**
- * Creates the tables if they don't exist yet (once per Worker instance, cheap and idempotent). A database already
- * at this schema answers one read (`meta.schema`) instead of the ~35 statements: in a surge, every new Worker
- * instance runs this once, so it mustn't be a burst of statements into the one database (DECISIONS.md, "Capacity").
+ * Makes sure the database has every table, column, index and trigger, once per Worker instance: a later request costs
+ * nothing, and the requests that come while it runs wait for that one run (its failure is theirs too, and the next
+ * request tries again). A database already at this schema answers one read (`meta.schema`): in a surge every new
+ * instance makes it, so it mustn't be a burst of statements into the one database (DECISIONS.md, "Capacity"). Otherwise
+ * a few round trips (schemaRun; docs/decisions/2026-11-10-schema-fast.md).
  */
 export async function ensureSchema(sql: Sql, key: object = sql): Promise<void> {
+  let waited: Promise<void> | undefined;
+  for (let flight = running.get(key); !ready.has(key) && flight && flight.run !== waited; flight = running.get(key)) {
+    waited = flight.run;
+    if (await settlesWithin(flight.run, flight.at + SCHEMA_WAIT_MS - Date.now())) return;
+  }
   if (ready.has(key)) return;
-  const at = await sql.first<{ value: string }>("SELECT value FROM meta WHERE key = 'schema'").catch(() => null);
-  if (at?.value === SCHEMA_VERSION) {
-    ready.add(key);
-    return;
-  }
-  for (const s of SCHEMA) await sql.run(s);
-  // (The ledger's append-only triggers: a second lock beside ledger.ts's own. A database that refused them would still load.)
-  for (const s of LEDGER_TRIGGERS) await sql.run(s).catch((e: unknown) => console.error(`ledger trigger not made: ${String(e)}`));
-  // fairplay_identities' key gained the owner (Oct 16, 2026): a table from before is rebuilt once (fairplay-schema.ts).
-  const ownerColumn = (await sql.all<{ name: string; pk: number }>("PRAGMA table_info(fairplay_identities)")).find((c) => c.name === "user_id");
-  if (ownerColumn && !ownerColumn.pk) await sql.batch(IDENTITIES_REKEY);
-  for (const s of LOCKER_MIGRATIONS)
-    await sql.run(s).catch((e: unknown) => {
-      if (!/duplicate column/i.test(String(e))) throw e;
+  const run: Promise<void> = schemaRun(sql)
+    .then(() => void ready.add(key))
+    .finally(() => {
+      if (running.get(key)?.run === run) running.delete(key);
     });
-  const have = new Map<string, Set<string> | null>();
-  for (const c of COLUMNS) {
-    if (!have.has(c.table)) {
-      const cols = await sql.all<{ name: string }>(`PRAGMA table_info(${c.table})`).catch(() => null);
-      have.set(c.table, cols ? new Set(cols.map((r) => r.name)) : null);
-    }
-    if (have.get(c.table)?.has(c.column)) continue;
-    const added = await sql.run(`ALTER TABLE ${c.table} ADD COLUMN ${c.column} ${c.type}`).then(
-      () => true,
-      (e: unknown) => {
-        if (!/duplicate column/i.test(String(e))) throw e;
-        return false;
-      },
-    );
-    if (added) for (const t of c.then ?? []) await sql.run(t);
+  running.set(key, { run, at: Date.now() });
+  await run;
+}
+
+/** True once `run` is done, false if `ms` pass first; its failure is thrown. */
+async function settlesWithin(run: Promise<void>, ms: number): Promise<boolean> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([run.then(() => true), new Promise<boolean>((done) => (timer = setTimeout(() => done(false), Math.max(0, ms))))]);
+  } finally {
+    clearTimeout(timer);
   }
-  for (const s of AFTER_COLUMNS) await sql.run(s);
-  await sql.run("CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)");
-  await sql.run("INSERT INTO meta (key, value) VALUES ('schema', ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value", SCHEMA_VERSION);
-  ready.add(key);
+}
+
+/** The tables whose columns the schema run reads: fairplay_identities (for its key) and every table COLUMNS adds to. */
+const COLUMN_TABLES = [...new Set(["fairplay_identities", ...COLUMNS.map((c) => c.table)])];
+
+/**
+ * Every schema statement, in order, in a few round trips (a fresh database or an upgrade by a column: 4; before Nov 10,
+ * one per statement, 134 and 97): the version read; the tables, indexes and triggers (all IF NOT EXISTS) as one batch; the
+ * columns of every table that gains some, in one read; then the missing columns, the statements after them and this
+ * schema's version last, as one batch. A batch is one transaction (all or none); one that's refused falls back to the
+ * statements one at a time, as before.
+ */
+async function schemaRun(sql: Sql): Promise<void> {
+  const at = await sql.first<{ value: string }>("SELECT value FROM meta WHERE key = 'schema'").catch(() => null);
+  if (at?.value === SCHEMA_VERSION) return;
+  await sql.batch([...SCHEMA, ...LEDGER_TRIGGERS].map((s) => stmt(s))).catch(async () => {
+    // (The ledger's append-only triggers are a second lock beside ledger.ts's own: a database that refused them would still load.)
+    await sql.batch(SCHEMA.map((s) => stmt(s)));
+    for (const s of LEDGER_TRIGGERS) await sql.run(s).catch((e: unknown) => console.error(`ledger trigger not made: ${String(e)}`));
+  });
+  let columns = await columnsOf(sql);
+  // fairplay_identities' key gained the owner (Oct 16, 2026): a table from before is rebuilt once (fairplay-schema.ts).
+  const ownerKey = columns.get("fairplay_identities")?.get("user_id");
+  if (ownerKey === 0) {
+    await sql.batch(IDENTITIES_REKEY);
+    columns = await columnsOf(sql);
+  }
+  const missing = COLUMNS.filter((c) => !columns.get(c.table)?.has(c.column));
+  const last = [
+    ...AFTER_COLUMNS.map((s) => stmt(s)),
+    stmt("CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)"),
+    stmt("INSERT INTO meta (key, value) VALUES ('schema', ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value", SCHEMA_VERSION),
+  ];
+  const adds = missing.flatMap((c) => [stmt(`ALTER TABLE ${c.table} ADD COLUMN ${c.column} ${c.type}`), ...(c.then ?? []).map((t) => stmt(t))]);
+  await sql.batch([...adds, ...last]).catch(async (refused: unknown) => {
+    if (!missing.length) throw refused;
+    // (Another instance may have added a column first: each column with its follow-ups as its own batch, all or nothing, so a
+    // column is never left without its fill (review, Nov 10); "duplicate column" is fine. Any other refusal: the whole batch
+    // rolled back, so throw and the next request retries it.)
+    if (!/duplicate column/i.test(String(refused))) throw refused;
+    for (const c of missing)
+      await sql.batch([stmt(`ALTER TABLE ${c.table} ADD COLUMN ${c.column} ${c.type}`), ...(c.then ?? []).map((t) => stmt(t))]).catch((e: unknown) => {
+        if (!/duplicate column/i.test(String(e))) throw e;
+      });
+    await sql.batch(last);
+  });
+}
+
+/**
+ * Each of COLUMN_TABLES' columns and its place in the table's primary key (0: not in it), in one read: one row, a JSON list
+ * of [name, pk] for each table (D1 takes pragma_table_info only with the table named, and at most 5 terms in a UNION). A
+ * database that refuses it gets each table's `PRAGMA table_info`, one at a time, as before.
+ */
+async function columnsOf(sql: Sql): Promise<Map<string, Map<string, number>>> {
+  const read = `SELECT ${COLUMN_TABLES.map((t, i) => `(SELECT json_group_array(json_array(name, pk)) FROM pragma_table_info('${t}')) AS t${i}`).join(", ")}`;
+  const lists = await sql.first<Record<string, string | null>>(read).then(
+    (row) => COLUMN_TABLES.map((_, i) => JSON.parse(row?.[`t${i}`] ?? "[]") as [string, number][]),
+    async (e: unknown) => {
+      console.error(`schema: columns read a table at a time (${String(e)})`);
+      const each: [string, number][][] = [];
+      for (const t of COLUMN_TABLES) each.push((await sql.all<{ name: string; pk: number }>(`PRAGMA table_info(${t})`)).map((c) => [c.name, c.pk]));
+      return each;
+    },
+  );
+  return new Map(COLUMN_TABLES.map((t, i) => [t, new Map(lists[i])]));
 }
 
 // ---------------- Helpers ----------------
@@ -476,11 +585,16 @@ export const getUser = (sql: Sql, id: string) =>
  */
 export async function userFromToken(sql: Sql, token: string | null | undefined, now: number, touch?: (userId: string) => unknown): Promise<User | null> {
   if (!token) return null;
-  const s = await sql.first<{ user_id: string; expires_at: number }>("SELECT user_id, expires_at FROM sessions WHERE token_hash = ?", await sha256(token));
+  // (The session and its account in one read, Nov 10: each D1 read is a round trip, and every signed-in request starts here.)
+  const s = await sql.first<User & { expires_at: number }>(
+    "SELECT u.id, u.name, u.icon, u.email, u.google_sub, u.created_at, u.pawn_color, s.expires_at FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = ?",
+    await sha256(token),
+  );
   if (!s || s.expires_at < now) return null;
-  if (touch) touch(s.user_id);
-  else await touchUser(sql, s.user_id, now);
-  return getUser(sql, s.user_id);
+  if (touch) touch(s.id);
+  else await touchUser(sql, s.id, now);
+  const { expires_at: _, ...user } = s;
+  return user;
 }
 
 /** Marks an account as seen now (what "online" counts). Written at most every 15 s per account. */
@@ -540,9 +654,53 @@ export async function signInWithIdentity(
   extra: { email?: string | null } = {},
   now: number,
 ): Promise<User> {
+  return (await signIn(sql, current, kind, value, extra, now, true))!;
+}
+
+/**
+ * A sign-in from a device that hasn't answered the age question (Eric, Nov 12: "log in without having to select an age if you
+ * already have an account"; docs/decisions/2026-11-12-signin-without-age.md): it goes ahead only into an account whose holder
+ * already said they were old enough (`users.age_ok_at`), the identity's own or, for a new identity, the signed-in account you're
+ * on. Anything else (an identity with no account, which would make one or turn a guest into one; an account from before the
+ * question) is null, and nothing is written: the device is asked first.
+ */
+export async function signInIfAnswered(sql: Sql, current: User | null, kind: "google" | "email", value: string, extra: { email?: string | null } = {}, now: number): Promise<User | null> {
+  return signIn(sql, current, kind, value, extra, now, false);
+}
+
+/**
+ * Whether a sign-in with this identity would land on an account that has answered the age question (signInIfAnswered's rule,
+ * read only). The email check reads it before the code, so a right code is used up only by the request that signs in.
+ */
+export async function answeredSignIn(sql: Sql, current: User | null, kind: "google" | "email", value: string): Promise<boolean> {
   const col = kind === "google" ? "google_sub" : "email";
-  const owner = await sql.first<User>(`SELECT id, name, icon, email, google_sub, created_at FROM users WHERE ${col} = ?`, value);
-  if (owner) {
+  const owner = await sql.first<{ age_ok_at: number | null }>(`SELECT age_ok_at FROM users WHERE ${col} = ?`, value);
+  if (owner) return owner.age_ok_at !== null;
+  return attachAnswered(sql, current, col);
+}
+
+/** No account has the identity: it's added to `current` if that's a signed-in account without one of its kind, which has answered. */
+async function attachAnswered(sql: Sql, current: User | null, col: "google_sub" | "email"): Promise<boolean> {
+  if (!current || current[col] || !(current.email || current.google_sub)) return false;
+  const row = await sql.first<{ age_ok_at: number | null }>("SELECT age_ok_at FROM users WHERE id = ?", current.id);
+  return row?.age_ok_at != null;
+}
+
+async function signIn(
+  sql: Sql,
+  current: User | null,
+  kind: "google" | "email",
+  value: string,
+  extra: { email?: string | null },
+  now: number,
+  answered: boolean,
+): Promise<User | null> {
+  const col = kind === "google" ? "google_sub" : "email";
+  const found = await sql.first<User & { age_ok_at: number | null }>(`SELECT id, name, icon, email, google_sub, created_at, age_ok_at FROM users WHERE ${col} = ?`, value);
+  // (Not answered on this device: only into an account that has, checked before anything is moved or made.)
+  if (!answered && (found ? found.age_ok_at === null : !(await attachAnswered(sql, current, col)))) return null;
+  if (found) {
+    const { age_ok_at: _answeredAt, ...owner } = found;
     if (current && current.id !== owner.id && !current.email && !current.google_sub) {
       // A guest signing in to an existing account: its matches, items, coins, reports, fair-play and chat files and the rest join
       // the account and the guest goes, in one batch (one transaction), so nothing lands halfway: a buy in another tab
@@ -561,6 +719,10 @@ export async function signInWithIdentity(
         // (The balances themselves, with their ledger legs: ledger.ts.)
         ...mergeMoves(current.id, owner.id, now),
         ...rankedMoves(current.id, owner.id),
+        // (Quests, Nov 9: the guest's go; the account keeps its own. What they paid is in the balances moved above.)
+        ...questDeletes(current.id),
+        // (The guest's calls to the engine server today: the account's own count stands.)
+        stmt("DELETE FROM engine_calls WHERE user_id = ?", current.id),
         stmt("DELETE FROM sessions WHERE user_id = ?", current.id),
         ...socialDeletes(current.id),
         stmt("DELETE FROM users WHERE id = ?", current.id),
@@ -639,20 +801,26 @@ export async function startEmailCode(sql: Sql, email: string, now: number): Prom
   return { ok: false, message: "Too many codes for this address. Try again in an hour." };
 }
 
-/** Checks a code; it works once, for 10 minutes, with 5 tries. */
-export async function verifyEmailCode(sql: Sql, email: string, code: string, now: number): Promise<boolean> {
+/**
+ * Checks a code; it works once, for 10 minutes, with 5 tries. `keep`: a right code is reported but left live, for a sign-in that
+ * must ask the age question before it can finish (docs/decisions/2026-11-12-signin-without-age.md): the finish sends the same code
+ * again, and that check uses it up. Every check counts a try either way.
+ */
+export async function verifyEmailCode(sql: Sql, email: string, code: string, now: number, keep = false): Promise<boolean> {
   // One statement, so checks at once can't share a code or a try (docs/decisions/2026-10-16-sign-in-races.md): it
-  // counts the try while the code is live with tries left, and uses the code up if it's right. Only the check whose
+  // counts the try while the code is live with tries left, and uses the code up if it's right (unless kept). Only the check whose
   // statement used it up gets in.
-  const row = await sql.first<{ used: number }>(
-    `UPDATE email_codes SET attempts = attempts + 1, expires_at = CASE WHEN code_hash = ? THEN 0 ELSE expires_at END
-     WHERE email = ? AND expires_at >= ? AND attempts < ? RETURNING expires_at = 0 AS used`,
-    await sha256(`${email}:${String(code).trim()}`),
+  const hash = await sha256(`${email}:${String(code).trim()}`);
+  const row = await sql.first<{ ok: number }>(
+    `UPDATE email_codes SET attempts = attempts + 1, expires_at = CASE WHEN code_hash = ?1 AND ?5 = 0 THEN 0 ELSE expires_at END
+     WHERE email = ?2 AND expires_at >= ?3 AND attempts < ?4 RETURNING code_hash = ?1 AS ok`,
+    hash,
     email,
     now,
     MAX_ATTEMPTS,
+    keep ? 1 : 0,
   );
-  return row?.used === 1;
+  return row?.ok === 1;
 }
 
 // ---------------- Results and profiles ----------------
@@ -687,6 +855,10 @@ export interface MatchResult {
   evalBar?: boolean | null;
   /** Recorded because the player abandoned the match (gone too long, idle or removed: the match room says; never the app's word). */
   abandoned?: boolean;
+  /** XP (Nov 9; xp.ts): the player's time in the game and own moves, as the server counted them, and the game's XP as granted. */
+  playMs?: number | null;
+  moves?: number | null;
+  xp?: XpGrant | null;
 }
 
 /** A count from a result (0-500), or null. */
@@ -704,43 +876,53 @@ export async function recordResult(sql: Sql, userId: string, r: MatchResult, now
   // Only an online match the lobby judged ranked counts (a solo result, posted by the browser, never does).
   const ranked = r.online && r.ranked === true;
   const lobby = r.online && typeof r.lobby === "string" && /^[A-Z2-9]{5}$/.test(r.lobby) ? r.lobby : null;
-  await sql.run(
-    `INSERT INTO results (user_id, mode, online, placement, players, team, team_won, avg_score, rating, played_at,
-       brilliant, best_move, cuts, cuts_survived, strikes, strikes_survived, survived, last_stand, boss_elo, lobby, ranked, held, boss_id, eval_bar, abandoned)
-     SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? ${IF_ACCOUNT}
-     ${once ? "AND NOT EXISTS (SELECT 1 FROM results WHERE user_id = ? AND lobby = ? AND online = 1 AND played_at >= ?)" : ""}`,
-    userId,
-    mode,
-    r.online ? 1 : 0,
-    Math.max(1, Math.round(r.placement)),
-    Math.max(1, Math.round(r.players)),
-    r.team ?? null,
-    r.teamWon === undefined || r.teamWon === null ? null : r.teamWon ? 1 : 0,
-    r.avgScore ?? null,
-    rating,
-    now,
-    count(r.brilliant),
-    cleanSan(r.bestMove),
-    cuts,
-    cuts === null ? null : Math.min(cuts, count(r.cutsSurvived) ?? 0),
-    strikes,
-    strikes === null ? null : Math.min(strikes, count(r.strikesSurvived) ?? 0),
-    flag(r.survived),
-    flag(r.lastStand),
-    mode === "boss" && typeof r.bossElo === "number" && BOSS_TIERS.includes(r.bossElo) ? r.bossElo : null,
-    lobby,
-    ranked ? 1 : 0,
-    r.held ? 1 : 0,
-    typeof r.bossId === "string" && bossDef(r.bossId) ? r.bossId : null,
-    flag(r.evalBar),
-    // (Only an online match's room says a player abandoned it.)
-    r.online && r.abandoned === true ? 1 : null,
-    // (An account deleted mid-match gets nothing new.)
-    userId,
-    ...(once ? [userId, lobby, once.since] : []),
-  );
-  // Only a ranked match moves your ranking (and not while fair play holds your results).
-  if (rating !== null && ranked && !r.held) await sql.run("UPDATE users SET rating = ? WHERE id = ?", rating, userId);
+  // (One batch: the row and the rating it moves go in together. The rating is the latest counting result's, read again, so a
+  // result written late, or twice, never puts an older rating back: Nov 10, finding 9.)
+  const rated = rating !== null && ranked && !r.held;
+  await sql.batch([
+    stmt(
+      `INSERT INTO results (user_id, mode, online, placement, players, team, team_won, avg_score, rating, played_at,
+         brilliant, best_move, cuts, cuts_survived, strikes, strikes_survived, survived, last_stand, boss_elo, lobby, ranked, held, boss_id, eval_bar, abandoned,
+         play_ms, moves, xp_before, xp_parts, xp_none, xp_rewards)
+       SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? ${IF_ACCOUNT}
+       ${once ? "AND NOT EXISTS (SELECT 1 FROM results WHERE user_id = ? AND lobby = ? AND online = 1 AND played_at >= ?)" : ""}`,
+      userId,
+      mode,
+      r.online ? 1 : 0,
+      Math.max(1, Math.round(r.placement)),
+      Math.max(1, Math.round(r.players)),
+      r.team ?? null,
+      r.teamWon === undefined || r.teamWon === null ? null : r.teamWon ? 1 : 0,
+      r.avgScore ?? null,
+      rating,
+      now,
+      count(r.brilliant),
+      cleanSan(r.bestMove),
+      cuts,
+      cuts === null ? null : Math.min(cuts, count(r.cutsSurvived) ?? 0),
+      strikes,
+      strikes === null ? null : Math.min(strikes, count(r.strikesSurvived) ?? 0),
+      flag(r.survived),
+      flag(r.lastStand),
+      mode === "boss" && typeof r.bossElo === "number" && BOSS_TIERS.includes(r.bossElo) ? r.bossElo : null,
+      lobby,
+      ranked ? 1 : 0,
+      r.held ? 1 : 0,
+      typeof r.bossId === "string" && bossDef(r.bossId) ? r.bossId : null,
+      flag(r.evalBar),
+      // (Only an online match's room says a player abandoned it.)
+      r.online && r.abandoned === true ? 1 : null,
+      // (XP's facts are the server's: the caller's, never the app's.)
+      typeof r.playMs === "number" && Number.isFinite(r.playMs) ? Math.max(0, Math.round(r.playMs)) : null,
+      typeof r.moves === "number" && Number.isFinite(r.moves) ? Math.max(0, Math.min(10_000, Math.round(r.moves))) : null,
+      ...xpColumns(r.xp),
+      // (An account deleted mid-match gets nothing new.)
+      userId,
+      ...(once ? [userId, lobby, once.since] : []),
+    ),
+    // Only a ranked match moves your ranking (and not while fair play holds your results).
+    ...(rated ? [stmt(`UPDATE users SET rating = ${LATEST_RATING("users.id")} WHERE id = ?`, userId)] : []),
+  ]);
 }
 
 /** Your result in an online match, by its lobby's code (the latest, if a code was used again): for "See your result". */
@@ -783,18 +965,36 @@ export interface Profile {
   chatMod?: { block?: ChatBlock; notice?: ChatNotice };
   /** Chat is on for this account (its opt-in, users.chat_on; off by default, and always for a guest: theirs is on the device). */
   chatOn: boolean;
+  /** Your XP (Nov 9): your level and its ring come from it (core's levelOf, levelProgress). */
+  xp: number;
+  /**
+   * Ranked's leave rules (L1, Nov 9; ranked.ts rankedLeaves): a lockout, the delayed queue, what a dodge would cost now, and home's
+   * note after a dodge. Null while PAUSE_LEAVE_PENALTIES is on (nothing applies).
+   */
+  leaves: RankedLeaves | null;
 }
 
 /** Your profile. `admins`: who's an admin (admin.ts): an admin's shop and locker have one of every item, never stored. */
-export async function profile(sql: Sql, user: User, admins: AdminCheck = NO_ADMINS): Promise<Profile> {
+export async function profile(sql: Sql, user: User, admins: AdminCheck = NO_ADMINS, opts: { leaves?: boolean } = {}): Promise<Profile> {
   const admin = admins(user);
   // The Welcome Crate's backfill (Nov 6): an account that has finished enough games gets it here, on its next sign-in or app load,
-  // once ever (welcome.ts). Never in the way of the profile.
-  await grantWelcomeCrate(sql, user.id, Date.now()).catch((e: unknown) => console.log(`welcome crate for ${user.id}: ${String(e)}`));
-  const rows = await sql.all<{ mode: string; online: number; placement: number; players: number; team_won: number | null; rating: number | null; played_at: number; ranked: number | null; held: number | null }>(
-    "SELECT mode, online, placement, players, team_won, rating, played_at, ranked, held FROM results WHERE user_id = ? ORDER BY played_at DESC",
-    user.id,
-  );
+  // once ever (welcome.ts). Never in the way of the profile. The locker's holdings are read after it; nothing else waits on it.
+  const welcome = grantWelcomeCrate(sql, user.id, Date.now()).catch((e: unknown) => console.log(`welcome crate for ${user.id}: ${String(e)}`));
+  // Every part's reads at once (Nov 10): each D1 read is a round trip (about 40 ms from a Worker), and the app's home waits on this.
+  // One after another they were 28 round trips, over a second; at once, about four (test/me-round-trips.test.ts).
+  const [rows, chatMod, chatOnRow, shop, locker, ranked1v1, xp, leaves] = await Promise.all([
+    sql.all<{ mode: string; online: number; placement: number; players: number; team_won: number | null; rating: number | null; played_at: number; ranked: number | null; held: number | null }>(
+      "SELECT mode, online, placement, players, team_won, rating, played_at, ranked, held FROM results WHERE user_id = ? ORDER BY played_at DESC",
+      user.id,
+    ),
+    chatStanding(sql, user.id, Date.now()).catch(() => null),
+    sql.first<{ chat_on: number | null }>("SELECT chat_on FROM users WHERE id = ?", user.id).catch(() => null),
+    shopState(sql, user.id, admin),
+    lockerState(sql, user.id, admin, welcome),
+    rankedSummary(sql, user.id, admins),
+    xpOf(sql, user.id),
+    opts.leaves === false ? null : rankedLeaves(sql, user.id, Date.now()).catch(() => null),
+  ]);
   const stats = (rs: typeof rows): ModeStats => ({
     matches: rs.length,
     wins: rs.filter((r) => r.placement === 1).length,
@@ -803,15 +1003,16 @@ export async function profile(sql: Sql, user: User, admins: AdminCheck = NO_ADMI
     best: rs.length ? Math.min(...rs.map((r) => r.placement)) : null,
     teamWins: rs.filter((r) => r.team_won === 1).length,
   });
-  const chatMod = await chatStanding(sql, user.id, Date.now()).catch(() => null);
-  const chatOn = (await sql.first<{ chat_on: number | null }>("SELECT chat_on FROM users WHERE id = ?", user.id).catch(() => null))?.chat_on === 1;
+  const chatOn = chatOnRow?.chat_on === 1;
   return {
     user: { id: user.id, name: user.name, icon: user.icon, signedIn: !!(user.email || user.google_sub), email: user.email, google: !!user.google_sub, pawn: pawnColorOf(user.pawn_color) },
-    shop: await shopState(sql, user.id, admin),
-    locker: await lockerState(sql, user.id, admin),
+    shop,
+    locker,
     stats: { all: stats(rows), classic: stats(rows.filter((r) => r.mode === "classic")), crowd: stats(rows.filter((r) => r.mode === "crowd")), boss: stats(rows.filter((r) => r.mode === "boss")) },
     rating: rows.find((r) => r.rating !== null && countsForRanking(r))?.rating ?? null,
-    ranked1v1: await rankedSummary(sql, user.id, admins),
+    ranked1v1,
+    xp,
+    leaves,
     recent: rows.slice(0, 10).map((r) => ({
       mode: r.mode,
       online: !!r.online,
@@ -871,6 +1072,8 @@ export interface PublicProfile {
   online: boolean;
   /** They hide when they're online (Settings → Friends): `online` false and `lastSeen` null, whatever the truth. */
   hidden?: boolean;
+  /** Their level (Nov 9: from their XP; core's levelOf). Public, as the public profile shows it. */
+  level: number;
   rating: number | null;
   /** "Top 18%" among rated players (null until enough players have a rating). */
   topPercent: number | null;
@@ -963,8 +1166,8 @@ export function raidStats(rows: ResultRow[]): RaidStats {
  * look has the admin copies they wear (the email is read only for that, never answered).
  */
 export async function publicProfile(sql: Sql, userId: string, now: number, admins: AdminCheck = NO_ADMINS): Promise<PublicProfile | null> {
-  const u = await sql.first<{ id: string; name: string; icon: string; email: string | null; created_at: number; last_seen: number | null; rating: number | null; hide_online: number | null; pawn_color: string | null }>(
-    "SELECT id, name, icon, email, created_at, last_seen, rating, hide_online, pawn_color FROM users WHERE id = ?",
+  const u = await sql.first<{ id: string; name: string; icon: string; email: string | null; created_at: number; last_seen: number | null; rating: number | null; hide_online: number | null; pawn_color: string | null; test: number | null }>(
+    "SELECT id, name, icon, email, created_at, last_seen, rating, hide_online, pawn_color, test FROM users WHERE id = ?",
     userId,
   );
   if (!u) return null;
@@ -977,9 +1180,13 @@ export async function publicProfile(sql: Sql, userId: string, now: number, admin
   const rating = u.rating ?? rows.find((r) => r.rating !== null && countsForRanking(r))?.rating ?? null;
   let top: number | null = null;
   if (rating !== null) {
-    const total = (await sql.first<{ n: number }>("SELECT COUNT(*) AS n FROM users WHERE rating IS NOT NULL"))?.n ?? 0;
+    // (The engine pool is left out of everyone's "Top N%": a pooled player's own is worked out among the rest and them, so it looks
+    // as ever: fairplay.ts, NOT_POOLED. Test accounts likewise: test-accounts.ts.)
+    const pooled = (await sql.first<{ status: string }>("SELECT status FROM fairplay_cases WHERE user_id = ?", userId))?.status === "pool";
+    const self = pooled || u.test === 1 ? 1 : 0;
+    const total = ((await sql.first<{ n: number }>(`SELECT COUNT(*) AS n FROM users WHERE rating IS NOT NULL AND test IS NOT 1 AND ${NOT_POOLED("id")}`))?.n ?? 0) + self;
     if (total >= FRONT_DOOR.percentileMinPlayers) {
-      const above = (await sql.first<{ n: number }>("SELECT COUNT(*) AS n FROM users WHERE rating > ?", rating))?.n ?? 0;
+      const above = (await sql.first<{ n: number }>(`SELECT COUNT(*) AS n FROM users WHERE rating > ? AND test IS NOT 1 AND ${NOT_POOLED("id")}`, rating))?.n ?? 0;
       top = topPercent(above + 1, total);
     }
   }
@@ -999,6 +1206,7 @@ export async function publicProfile(sql: Sql, userId: string, now: number, admin
     topPercent: banned ? null : top,
     banned,
     ranked1v1: banned ? null : await rankedSummary(sql, u.id, admins),
+    level: levelOf(await xpOf(sql, u.id)),
     crowd: crowdStats(rows.filter((r) => r.mode === "crowd")),
     boss: raidStats(raids),
     ratingHistory: rows
@@ -1032,19 +1240,24 @@ export async function publicProfile(sql: Sql, userId: string, now: number, admin
  * admin's are what they really own.
  */
 export async function shopState(sql: Sql, userId: string, admin = false): Promise<ShopState> {
-  const stored = (await sql.all<{ item_id: string }>("SELECT item_id FROM inventory WHERE user_id = ?", userId)).map((r) => r.item_id).filter((id) => shopItem(id));
+  // (Its four reads at once: every D1 read is a round trip, and /api/me waits on this.)
+  const [inventory, rows, wallet, picks] = await Promise.all([
+    sql.all<{ item_id: string }>("SELECT item_id FROM inventory WHERE user_id = ?", userId),
+    sql.all<{ slot: string; item_id: string }>("SELECT slot, item_id FROM equipped WHERE user_id = ?", userId),
+    sql.first<{ coins: number }>("SELECT coins FROM wallets WHERE user_id = ?", userId),
+    storedChatPicks(sql, userId),
+  ]);
+  const stored = inventory.map((r) => r.item_id).filter((id) => shopItem(id));
   const starters = SHOP_ITEMS.filter((i) => i.starter).map((i) => i.id);
   const all = [...new Set([...starters, ...stored])];
   const copies = admin ? adminShopCopies(all) : [];
   const owned = [...all, ...copies];
-  const rows = await sql.all<{ slot: string; item_id: string }>("SELECT slot, item_id FROM equipped WHERE user_id = ?", userId);
   const equipped = Object.fromEntries(SHOP_CATEGORIES.filter((c) => !c.ownOnly).map((c) => [c.slot, starterItem(c.slot).id])) as Record<EquipSlot, string>;
   for (const r of rows) {
     const item = shopItem(r.item_id);
     if (item && item.slot !== "chat" && item.slot === r.slot && owned.includes(item.id)) equipped[item.slot] = item.id;
   }
-  const wallet = await sql.first<{ coins: number }>("SELECT coins FROM wallets WHERE user_id = ?", userId);
-  return { coins: wallet?.coins ?? 0, owned, equipped, chat: chatPicks(await storedChatPicks(sql, userId), all), ...(copies.length ? { admin: copies } : {}) };
+  return { coins: wallet?.coins ?? 0, owned, equipped, chat: chatPicks(picks, all), ...(copies.length ? { admin: copies } : {}) };
 }
 
 /** Quick chat picks as stored (each kind a list, or null for the defaults). */
@@ -1133,11 +1346,13 @@ export async function equipItem(sql: Sql, userId: string, itemId: unknown, admin
 }
 
 /**
- * A placement reward (Squads): coins into the wallet, and crates counted there (spendable once crates stop being free). One ledger
+ * A placement reward (Squads): coins into the wallet, and crates of the newest series (XP.rewardCrate, since Nov 9: each opens with a
+ * crate key). One ledger
  * op, keyed by `op` (Squads': opKeys.squadsReward, so its lobby can write it again after a failure or a restart and it pays once;
- * none: a fresh key). Answers what became of it; null: nothing to give, or no such account (deleted mid-match). A failed write throws.
+ * none: a fresh key). `cap`: a guard on the account's ledger id (Squads' daily cap): "refused" past it. Answers what became of it; null:
+ * nothing to give, or no such account (deleted mid-match). A failed write throws.
  */
-export async function grantReward(sql: Sql, userId: string, coins: number, crates: number, op?: OpKey, now = Date.now()): Promise<Outcome | null> {
+export async function grantReward(sql: Sql, userId: string, coins: number, crates: number, op?: OpKey, now = Date.now(), cap?: (account: string) => Cond): Promise<Outcome | null> {
   const c = Math.max(0, Math.round(coins));
   const k = Math.max(0, Math.round(crates));
   if (!c && !k) return null;
@@ -1147,7 +1362,9 @@ export async function grantReward(sql: Sql, userId: string, coins: number, crate
     id: op === undefined ? `reward:${crypto.randomUUID()}` : keyFor(op, me),
     reason: "reward",
     now,
-    legs: [...(c ? [leg.coins(userId, c)] : []), ...(k ? [leg.crates(userId, k)] : [])],
+    // (A daily cap, checked in the same statement as the reward goes in: refused past it.)
+    ...(cap ? { when: cap(me.account) } : {}),
+    legs: [...(c ? [leg.coins(userId, c)] : []), ...(k ? [leg.seriesCrates(userId, XP.rewardCrate, k)] : [])],
   });
 }
 

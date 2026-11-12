@@ -15,6 +15,7 @@
 import type { HomeId } from "../world.ts";
 import { CREW_SHEETS } from "./grex-crew-sheets.ts";
 import type { ShopPlace } from "./room.ts";
+import { ZEBRA_BATTLE_START } from "./zebra-lines.ts";
 import { timelineAt, type Timeline, type TimelineNow } from "./timeline.ts";
 
 /** Jefferson's machine guys' step-off and the dozer's wake (their baked sheets' frames: times and cues), for his intro's cues. */
@@ -76,8 +77,17 @@ export interface BossIntro {
    * its layout, as every other boss's (`introCam`).
    */
   cam?: { readonly south: number; readonly west: number; readonly zoom: number };
-  /** What its helpers call out as they come (Ginger's board carriers: "Coming, boss!"), in a bubble over them; none: they're quiet. */
+  /**
+   * What its helpers call out as they come (Ginger's board carriers: "Coming, boss!"), in a bubble over them; none: they're quiet.
+   * Don Dough's: Beanie's, over him, in his intro's `crewLine` beat.
+   */
   crewLine?: string;
+  /**
+   * Met inside, not brought in from the town (Don Dough, Nov 11: the kingpin stays in his back room; his challenge starts from his card
+   * there, Town.tsx challengeHere): you both come out through the door from the home's other room, beside each other, and walk to your
+   * marks in this one (his front room's pad).
+   */
+  fromDoor?: true;
 }
 
 /**
@@ -350,6 +360,24 @@ export const BOSS_INTROS: Readonly<Partial<Record<HomeId, BossIntro>>> = {
     layout: "across",
     custom: false,
     cues: { table: "pop", wipe: "clownSlideUp" },
+  },
+  // (Nov 11: Don Dough, met in his bakery's back room; the fight in its front room, on the pad: shops/intros/zebra.ts. Played once his
+  // boss is in the game, from his card there (shops.ts canChallengeInside); his line the art's battle start. You both walk out of the
+  // back door to where you stand (`seated`: no hop back) while his goons carry the table, chairs and board out (zebra-scene.ts
+  // SetupScene). His camera centered on the table so the five watching behind it show.)
+  zebra: {
+    name: "Don Dough",
+    line: ZEBRA_BATTLE_START.don,
+    // (Beanie, after his pop: the art's battle-start pair; ShopRoom draws it over him, intros/zebra.ts's `crewLine` beat.)
+    crewLine: ZEBRA_BATTLE_START.crew,
+    layout: "across",
+    custom: true,
+    seated: true,
+    fromDoor: true,
+    cam: { south: 0.8, west: 0, zoom: 1 },
+    // (His breadPop's own sounds: the roll pulled, its pop, his laugh. His splash: the flour wall's whoosh as it sweeps in, the loaves
+    // tumbling behind it.)
+    cues: { draw: "zebraDraw", pop: "zebraPop", laugh: "zebraLaugh", storm: "zebraWhoosh", tumble: "zebraTumble" },
   },
 };
 

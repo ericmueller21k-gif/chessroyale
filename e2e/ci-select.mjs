@@ -1,17 +1,19 @@
 // CI's e2e plan (.github/workflows/e2e.yml, the `plan` job): which spec files a run tests, and on how many shards.
 // A pull request runs the specs of the areas it changes (e2e/areas.json says which paths belong to which specs) plus
 // the smoke set; a shared foundation, or any path the table doesn't know, runs every spec. A push to main, a manual run
-// and a pull request with the `full-e2e` label run every spec too. A `traced` module (settings.ts,
-// e2e/helpers.ts, the app's shared modules) is followed through the code instead: what its diff changes, then the files
+// and a pull request with the `full-e2e` label run every spec too. A `traced` module (every core module
+// but index.ts, e2e/helpers.ts, the app's shared modules) is followed through the code instead: what its diff changes, then the files
 // that use that, each counted as changed (traceChanges, below). Docs: docs/areas/ops.md, "CI e2e".
 //
 // Usage:
-//   node e2e/ci-select.mjs full "<why>"     every spec on 10 shards (a push to main, a manual run, the full-e2e
+//   node e2e/ci-select.mjs full "<why>"     every spec on 15 shards (a push to main, a manual run, the full-e2e
 //                                           label)
 //   node e2e/ci-select.mjs diff <base>       the specs for what changed from <base> to HEAD (a pull request: HEAD^1,
 //                                           its merge commit's first parent, which is main as it is now)
 //   node e2e/ci-select.mjs files <path>...   the same for these paths (to try the table out; a traced module's change
 //                                           is read from where your branch left origin/main to your working tree)
+//   node e2e/ci-select.mjs unmapped <base>   fails (exit 1) when a file added from <base> to HEAD under packages/, or a
+//                                           new spec, has no entry in e2e/areas.json (the `check` workflow's first step)
 // It writes `specs` (the spec files, space-separated; empty for every spec), `total` (how many shards), `shards` (their
 // numbers, as JSON) and `note` (one line) to $GITHUB_OUTPUT, and why each changed path runs what it runs to $GITHUB_STEP_SUMMARY; to
 // stdout when they aren't set.
@@ -21,7 +23,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 /** Shards for every spec (a push to main), as before; a pull request uses as few as its specs need, up to this. */
-export const MAX_SHARDS = 10;
+export const MAX_SHARDS = 15;
 /**
  * The test time a pull request's shard aims at: seconds, summed over both projects (ci-timings.json's unit), so about
  * half of it on the clock with 2 workers. With setup, a shard then takes about 5 minutes.
@@ -187,11 +189,23 @@ export function readAreas(dir = DIR) {
 const SPEC = /^e2e\/[^/]+\.spec\.ts$/;
 
 /**
+ * Traced without a list (Nov 10, audit F3): every module of packages/core's source but its entry, index.ts (that one
+ * stays a shared foundation: what it re-exports reaches every package). A new core module is then traced too, instead
+ * of running everything until someone adds it to `traced.modules` by hand.
+ */
+export const TRACED_BY_DEFAULT = /^packages\/core\/src\/(?!index\.ts$)(?:[^/]+\/)*[^/]+\.ts$/;
+
+/** Whether `path` is traced: on the table's `traced.modules` list, or one of TRACED_BY_DEFAULT. */
+export function isTraced(path, areas) {
+  return TRACED_BY_DEFAULT.test(path) || (areas.traced?.modules ?? []).includes(path);
+}
+
+/**
  * What a pull request that changes `changed` (paths from the repo's root) runs, by the table `areas` (e2e/areas.json),
  * given the spec files there are (`existing`). `full` is why every spec runs (null when it doesn't); `specs` are the
  * spec files to run otherwise (smoke set included, sorted); `why` says, for each changed path, what it adds.
  *
- * A `traced` module (areas.json; settings.ts, e2e/helpers.ts, the app's shared modules), when `repo` can read the change
+ * A `traced` module (areas.json, or any core module: TRACED_BY_DEFAULT), when `repo` can read the change
  * (`repoAt`, `gitRepo`): what its diff changes (`traceModule`) is followed to the files that use it (`usersOf`), and each
  * of those counts as changed (its area's specs, a spec itself, a foundation everything); a change it can't place
  * leaves the module a shared foundation, as before. Without `repo`, every `traced` module is a path like any other.
@@ -203,7 +217,7 @@ export function select(changed, areas, existing, repo = null) {
   };
   const isFull = matcher(areas.full);
   const isNone = matcher(areas.none);
-  const traced = new Set(repo ? areas.traced?.modules ?? [] : []);
+  const traced = { has: (p) => !!repo && isTraced(p, areas) };
   const hubs = new Set(areas.traced?.hubs ?? []);
   const list = Object.entries(areas.areas).map(([name, a]) => ({ name, test: matcher(a.paths), specs: a.specs }));
   const have = new Set(existing);
@@ -229,7 +243,7 @@ export function select(changed, areas, existing, repo = null) {
     return { full: "not in e2e/areas.json", runs: "every spec: no area in areas.json has it" };
   };
   const tracedWhy = [];
-  const t = traced.size ? traceChanges([...new Set(changed)].filter((p) => traced.has(p)), traced, repo) : null;
+  const t = repo ? traceChanges([...new Set(changed)].filter((p) => traced.has(p)), traced, repo) : null;
   if (t) {
     for (const [path, r] of t) {
       if (r.reason) {
@@ -263,6 +277,25 @@ export function select(changed, areas, existing, repo = null) {
   const specs = [...picked].filter((s) => have.has(s) && !leftOut.has(s)).sort();
   if (!full && !specs.length) full = "no spec was picked";
   return { full, specs: full ? [] : specs, why };
+}
+
+/**
+ * The files among `added` (a pull request's new paths) that e2e/areas.json doesn't place, so they'd run every spec on
+ * every pull request that touches them: a new file under packages/ that no area, `traced`, `none` or `full` entry
+ * matches, and a new spec in no area, the smoke set or `leftOut` (it would never run on another pull request). Each as
+ * { path, fix } (what to add). The `check` workflow fails on any (Nov 10, audit F3).
+ */
+export function unmapped(added, areas) {
+  const globs = [...areas.full, ...areas.none, ...Object.values(areas.areas).flatMap((a) => a.paths)].map(globToRegExp);
+  const named = new Set([...areas.smoke, ...(areas.leftOut ?? []), ...Object.values(areas.areas).flatMap((a) => a.specs)]);
+  const out = [];
+  for (const path of [...new Set(added)].sort()) {
+    if (SPEC.test(path)) {
+      if (!named.has(path)) out.push({ path, fix: "add it to its area's `specs` in e2e/areas.json (or to `smoke`)" });
+    } else if (path.startsWith("packages/") && !isTraced(path, areas) && !globs.some((re) => re.test(path)))
+      out.push({ path, fix: "add it (or a glob) to its area's `paths` in e2e/areas.json, to `none` if no browser test needs it, or to `full` if it's shared by every screen" });
+  }
+  return out;
 }
 
 /** How many shards `specs` need at SHARD_SECONDS each: at least 1, at most MAX_SHARDS, never more than the files. */
@@ -584,10 +617,13 @@ function spread(stmts, seeds) {
 /**
  * What a traced module's change touches: { names (the exported names whose code changed, sorted), reason } (reason: why
  * the change can't be placed, so everything runs). `before`/`after` are the module's text, null when it didn't or
- * doesn't exist.
+ * doesn't exist (a new module counts as an empty one before; a removed one runs everything).
  */
 export function traceModule(before, after, path = "x.ts") {
-  if (before == null || after == null) return { names: [], reason: before == null ? "it's new" : "it's removed" };
+  if (after == null) return { names: [], reason: "it's removed" };
+  // (A new module: everything it exports is new, so its users are what imports it; code outside a declaration, or a
+  // side-effect import, still runs everything, as below.)
+  before ??= "";
   const a = readModule(before, path);
   const b = readModule(after, path);
   if (!a || !b) return { names: [], reason: "it doesn't read cleanly as code (no parser here)" };
@@ -811,13 +847,22 @@ function localBase() {
 
 function main(argv) {
   const [mode, ...rest] = argv;
+  if (mode === "unmapped" && rest.length === 1) {
+    // (The paths added from <base> to HEAD; a renamed file counts as added.)
+    const added = execFileSync("git", ["-c", "core.quotepath=off", "diff", "--name-only", "--no-renames", "--diff-filter=A", rest[0], "HEAD"], { encoding: "utf8" }).split("\n").filter(Boolean);
+    const bad = unmapped(added, readAreas());
+    for (const b of bad) console.log(`::error file=${b.path}::${b.path} isn't in e2e/areas.json, so every pull request that changes it would run every e2e spec: ${b.fix}.`);
+    if (bad.length) process.exit(1);
+    console.log(`Every added file is in e2e/areas.json (${added.length} added).`);
+    return;
+  }
   const all = specFiles();
   let picked;
   if (mode === "full" && rest.length === 1) picked = { full: rest[0], specs: [], why: [] };
   // (A traced module's change is read from git at the base and from the working tree: the checkout.)
   else if (mode === "diff" && rest.length === 1) picked = select(diffFrom(rest[0]), readAreas(), all, gitRepo(rest[0]));
   else if (mode === "files" && rest.length) picked = select(rest, readAreas(), all, gitRepo(localBase()));
-  else throw new Error('usage: node e2e/ci-select.mjs full "<why>" | diff <base> | files <path>...');
+  else throw new Error('usage: node e2e/ci-select.mjs full "<why>" | diff <base> | files <path>... | unmapped <base>');
   // (E2E_LIVE_TIMINGS: main's last green run's records, downloaded by the plan job; E2E_LIVE_RUN: that run's number.)
   const live = process.env.E2E_LIVE_TIMINGS ? Object.keys(readLiveTimings(process.env.E2E_LIVE_TIMINGS)).length : 0;
   const source = live ? `main's last green run (#${process.env.E2E_LIVE_RUN ?? "?"}, ${live} file${live === 1 ? "" : "s"}), the rest e2e/ci-timings.json` : "e2e/ci-timings.json";

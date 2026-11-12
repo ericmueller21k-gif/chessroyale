@@ -1,6 +1,7 @@
 import { ASK_AGE_LINE, CHAT_MOD, oldEnough, pawnColorOf, type ChatPicks, type PawnColor, type ShopState } from "@chessroyale/core";
 import { devicePawnColor, setDevicePawnColor } from "./prefs.ts";
-import type { CrateRoll, ItemInstance, ItemLook, ItemSlot, RankedSummary } from "@chessroyale/core";
+import { loadStep } from "./loadbar.ts";
+import type { CrateRoll, ItemInstance, ItemLook, ItemSlot, QuestsAnswer, RankedLeaves, RankedSummary, XpGrant } from "@chessroyale/core";
 import type { ChatBlock } from "@chessroyale/chess";
 
 /**
@@ -26,12 +27,17 @@ export interface Profile {
   user: { id: string; name: string; icon: string; signedIn: boolean; email: string | null; google: boolean; pawn?: PawnColor };
   /** The shop: coins, items owned and what's equipped (missing from an older server). */
   shop?: ShopState;
-  /** Crate items you own, what you wear, and your crates and keys (null: unlimited while testing). */
+  /** Crate items you own, what you wear, and your crates and keys. */
   locker?: Locker;
   stats: { all: ModeStats; classic: ModeStats; crowd: ModeStats; boss?: ModeStats };
   rating: number | null;
   /** Ranked 1 v 1: the rank ("Gold 2 · 45 RP", "Placement 2/5") and the record (missing from an older server). */
   ranked1v1?: RankedSummary;
+  /**
+   * Ranked's leave rules (L1, Nov 9; the server's own reckoning): a lockout, the delayed queue, what a dodge would cost now, and
+   * home's note after a dodge. Null while PAUSE_LEAVE_PENALTIES is on; missing from an older server.
+   */
+  leaves?: RankedLeaves | null;
   recent: { mode: string; online: boolean; placement: number; players: number; teamWon: boolean | null; playedAt: number }[];
   /** An admin (ADMIN_EMAILS, as for the fair-play review): sees the boss battle's test trigger, may use the test switches. */
   admin?: boolean;
@@ -39,6 +45,8 @@ export interface Profile {
   chatMod?: { block?: ChatBlock; notice?: ChatNotice };
   /** Chat is on for this account (its opt-in, off by default; a guest's is on the device: chat-on.ts). */
   chatOn?: boolean;
+  /** Your XP (Nov 9): your level and its ring come from it (core's levelOf). Missing from an older server. */
+  xp?: number;
 }
 
 /** A moderator's warning or chat ban, shown to you once (components/ChatNotice.tsx). */
@@ -66,12 +74,26 @@ export interface AccountState {
   age: AgeAnswer | null;
   /** Why the age question is back (a sign-in refused: the answer ran out), shown on it until it's answered. */
   ageNote: string | null;
+  /**
+   * A sign-in the server can't finish until this device answers the age question (Nov 12: an email or Google account with no
+   * account yet, or one from before the question): the sign-in box asks, and the answer finishes it.
+   */
+  pending: PendingSignIn | null;
+  /** Why a sign-in that waited for the answer didn't finish (its code ran out, say): shown once on the sign-in options. */
+  signInNote: { message: string; email: string } | null;
 }
 
 /** The age question's answer: old enough to sign in, or too young (docs/decisions/2026-10-16-age-gate-and-real-money.md). */
 export type AgeAnswer = "ok" | "under";
 
-let state: AccountState = { config: null, profile: null, age: null, ageNote: null };
+/**
+ * A sign-in waiting for the age question's answer (docs/decisions/2026-11-12-signin-without-age.md). Email: its address and
+ * code, sent again with the answer (in memory only; the server kept the code live for it). Google: one more trip there, back to
+ * `next`, as the server keeps nothing about a Google account before the answer.
+ */
+export type PendingSignIn = { kind: "email"; email: string; code: string } | { kind: "google"; next: string };
+
+let state: AccountState = { config: null, profile: null, age: null, ageNote: null, pending: null, signInNote: null };
 const listeners = new Set<() => void>();
 const set = (patch: Partial<AccountState>) => {
   state = { ...state, ...patch };
@@ -86,14 +108,19 @@ export function onAccountChange(fn: () => void): () => void {
 
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(path, { credentials: "same-origin", ...init, headers: { "content-type": "application/json", ...init?.headers } });
-  const body = (await res.json().catch(() => ({}))) as T & { message?: string; askAge?: boolean; tooYoung?: boolean };
+  const read = (await res.json().catch(() => null)) as (T & { message?: string; askAge?: boolean; tooYoung?: boolean }) | null;
   if (!res.ok) {
+    const body: { message?: string; askAge?: boolean; tooYoung?: boolean } = read ?? {};
     // A sign-in the age gate refused: ask the question again, saying why (the answer ran out), or too young after all.
     if (body.askAge) askAgeAgain(body.message ?? ASK_AGE_LINE);
     if (body.tooYoung) rememberTooYoung();
-    throw Object.assign(new Error(body.message ?? `Something went wrong (${res.status}).`), { status: res.status });
+    throw Object.assign(new Error(body.message ?? `Something went wrong (${res.status}).`), { status: res.status, ...(body.askAge ? { askAge: true } : {}) });
   }
-  return body;
+  // An answer that couldn't be read (cut off on the way, or not an object): a failure like the server's own (asked again where a
+  // server error is), never `{}` taken for the answer. A profile with no `user` threw on every screen that reads it (Nov 11,
+  // timber.spec on main: "Cannot read properties of undefined (reading 'signedIn')").
+  if (!read || typeof read !== "object") throw Object.assign(new Error("Something went wrong (an answer that couldn't be read)."), { status: 502 });
+  return read;
 }
 
 /** One action's id (a boss crate's buy, an open, an admin's grant): the server applies an action once per id (server/ledger.ts). */
@@ -148,7 +175,7 @@ function storedTooYoung(): boolean {
     return false;
   }
 }
-/** This device is too young: remembered here, sign-in gone, and the name it may have chosen forgotten. */
+/** This device is too young: remembered here, sign-in gone (a sign-in waiting for the answer too), and the name it may have chosen forgotten. */
 function rememberTooYoung() {
   try {
     localStorage.setItem(TOO_YOUNG_KEY, "1");
@@ -156,7 +183,7 @@ function rememberTooYoung() {
   } catch {
     // No storage: the server's cookie still holds it.
   }
-  set({ age: "under" });
+  set({ age: "under", pending: null, signInNote: null });
 }
 /** This device answered the age question "too young": guest play only, under the default name and icon. */
 export const tooYoung = () => state.age === "under";
@@ -176,20 +203,27 @@ export function askAgeAgain(why: string = ASK_AGE_LINE) {
 /** Loads the sign-in options and your profile (making a guest account the first time). */
 export async function loadAccount(name?: string): Promise<void> {
   let config: NonNullable<AccountState["config"]> | null = null;
+  // Your profile is asked for beside the options, not after them (Nov 10: home waits on it, and each request is a round trip). The
+  // server plays a device it knows is too young under the default name, whatever name this one sends.
+  const storedYoung = storedTooYoung();
+  const me = profileFrom(`/api/me${name && !storedYoung ? `?name=${encodeURIComponent(name)}` : ""}`);
+  me.catch(() => undefined);
   try {
     config = await api<NonNullable<AccountState["config"]>>("/api/auth/config");
-    const young = storedTooYoung() || config.age === "under";
+    const young = storedYoung || config.age === "under";
     set({ config, age: young ? "under" : (config.age ?? null) });
     if (young) rememberTooYoung();
-    if (!config.accounts) return;
-    const q = name && !young ? `?name=${encodeURIComponent(name)}` : "";
-    set({ profile: await profileFrom(`/api/me${q}`) });
+    if (!config.accounts) return loadStep("last");
+    loadStep("account");
+    set({ profile: await me });
+    loadStep("last");
     // The server forgot (its cookie was cleared): tell it again, which also puts the guest back to the defaults.
     if (young && config.age !== "under") await sendAgeAnswer(false).catch(() => undefined);
   } catch {
     // No server (local dev) or offline: play on without an account. A server that did answer keeps its test switch when
     // only your profile failed (Oct 25: a CI run lost its ?boss= link that way, the switch going with the profile).
     set({ config: { accounts: false, google: false, email: false, ...(config?.testSwitches ? { testSwitches: true } : {}) } });
+    loadStep("last");
   }
 }
 
@@ -213,8 +247,46 @@ export async function answerAge(month: number, year: number): Promise<AgeAnswer>
   }
   const age = await sendAgeAnswer(true);
   if (age === "under") rememberTooYoung();
-  else set({ age, ageNote: null });
+  else {
+    set({ age, ageNote: null });
+    await finishPendingSignIn();
+  }
   return age;
+}
+
+/**
+ * The sign-in that waited for the answer goes on (Nov 12): the email's code again (no new code, nothing typed again), or Google
+ * once more (one more pick of the account). A finish that fails leaves its message, and the address, on the sign-in options.
+ */
+async function finishPendingSignIn(): Promise<void> {
+  const p = state.pending;
+  if (!p) return;
+  if (p.kind === "google") {
+    set({ pending: null });
+    return signInWithGoogle(p.next);
+  }
+  // (The question stays up while the code goes again: success clears `pending`, the server asking again sets it again, and a
+  // failure clears it with its note in one render, so the sign-in options open with the note ready. Review of PR #656.)
+  try {
+    await verifyEmailCode(p.email, p.code);
+  } catch (e) {
+    set({ pending: null, ...(tooYoung() ? {} : { signInNote: { message: (e as Error).message, email: p.email } }) });
+  }
+}
+
+/** Back from Google with the server asking the age question first (`?signin=age-google`): the box asks, then Google again. */
+export function askAgeForGoogle(next: string) {
+  if (!tooYoung()) set({ pending: { kind: "google", next }, ageNote: null });
+}
+
+/** A sign-in waiting for the age question is dropped (the box switched to Sign up or Sign in). */
+export const dropPendingSignIn = () => void (state.pending && set({ pending: null }));
+
+/** The note a sign-in that waited for the answer left, once: the sign-in options show it as they open. */
+export function takeSignInNote(): { message: string; email: string } | null {
+  const note = state.signInNote;
+  if (note) state = { ...state, signInNote: null };
+  return note;
 }
 
 /** You've read a moderator's notice (a warning, a chat ban): it goes from your profile here, and on the server. */
@@ -273,7 +345,6 @@ export async function setPawnColor(c: PawnColor): Promise<void> {
   }
 }
 
-/** Gets a shop item (free while testing). */
 /** The chat's opt-in, kept on a signed-in account (chat-on.ts): the profile as it is after it. */
 export async function updateChatOn(on: boolean): Promise<void> {
   const p = state.profile;
@@ -282,6 +353,7 @@ export async function updateChatOn(on: boolean): Promise<void> {
   set({ profile: await api<Profile>("/api/me", { method: "PATCH", body: JSON.stringify({ chatOn: on }) }) });
 }
 
+/** Gets a shop item (free while SHOP_FREE is on, else paid in coins). */
 export async function buyShopItem(item: string): Promise<void> {
   if (!state.profile) return;
   const shop = await api<ShopState>("/api/shop/buy", { method: "POST", body: JSON.stringify({ item }) });
@@ -310,9 +382,14 @@ export interface Locker {
   items: ItemInstance[];
   equipped: Partial<Record<ItemSlot, string>>;
   look: ItemLook;
+  /** Series crates you hold, all series together (Nov 9: each opens with a crate key; an older server: null). */
   crates: number | null;
-  /** Crate keys (an older server: null, unlimited). */
+  /** Series crates you hold by crate id ("winter-1"; only those you have some of; missing from an older server). */
+  seriesCrates?: Record<string, number>;
+  /** Crate keys (an older server: null). */
   keys: number | null;
+  /** Boss crates to pick (every 10th level's, Nov 9; missing from an older server). */
+  bossPicks?: number;
   /** Boss tokens you have, by boss id (only those you have some of; missing from an older server). */
   tokens?: Record<string, number>;
   /** Boss crates you bought and haven't opened, by crate id ("boss-tiger"; only those you have some of; missing from an older server). */
@@ -410,7 +487,21 @@ export async function grantTestItems(body: { keys?: number; boss?: string; token
  */
 export async function startSoloBossBattle(town?: string): Promise<string | null> {
   if (!state.profile) return null;
-  return (await api<{ battle: string | null }>("/api/boss/solo/start", { method: "POST", body: JSON.stringify(town ? { town } : {}) })).battle;
+  // (Asked again as a finish is: a start lost on the way earned no token and, from the town, said nothing in its chat. A second
+  // start replaces the first on the server, one open battle an account, and the chat's line goes out once: the CI flake of Nov 10.)
+  return (await askTwice(() => api<{ battle: string | null }>("/api/boss/solo/start", { method: "POST", body: JSON.stringify(town ? { town } : {}) }))).battle;
+}
+
+/** Asks, and once more after a moment when the first try fails on the way or on the server (a refusal, a 4xx, isn't asked again). */
+async function askTwice<T>(ask: () => Promise<T>): Promise<T> {
+  try {
+    return await ask();
+  } catch (e) {
+    const status = (e as { status?: number }).status;
+    if (status !== undefined && status < 500) throw e;
+    await new Promise((r) => setTimeout(r, 1000));
+    return ask();
+  }
 }
 
 /**
@@ -420,15 +511,7 @@ export async function startSoloBossBattle(town?: string): Promise<string | null>
  */
 export async function finishSoloBossBattle(battle: string, end: { outcome: "won" | "lost" | "drew" | "surrendered"; moves: number } | null = null): Promise<{ counted: boolean; token: string | null }> {
   // (`end`: how it ended and your moves, for the town's chat when it was a challenge from the town: "Ann beat Alfil in 34 moves!".)
-  const ask = () => api<{ counted: boolean; token: string | null }>("/api/boss/solo/finish", { method: "POST", body: JSON.stringify(end ? { battle, ...end } : { battle }) });
-  try {
-    return await ask();
-  } catch (e) {
-    const status = (e as { status?: number }).status;
-    if (status !== undefined && status < 500) throw e;
-    await new Promise((r) => setTimeout(r, 1000));
-    return ask();
-  }
+  return askTwice(() => api<{ counted: boolean; token: string | null }>("/api/boss/solo/finish", { method: "POST", body: JSON.stringify(end ? { battle, ...end } : { battle }) }));
 }
 
 /** The token an online boss battle (its lobby code) dropped you, if the server has counted it yet. */
@@ -449,6 +532,13 @@ export async function openCrate(crate: string, force: { fischer?: boolean; shiny
   const r = await postOnce<{ roll: CrateRoll; item: ItemInstance; locker: Locker }>("/api/locker/open", { crate, ...force });
   if (state.profile) set({ profile: { ...state.profile, locker: r.locker } });
   return { roll: r.roll, item: r.item };
+}
+
+/** Picks a level's boss crate (Nov 9): into your boss crates, unopened. Answers the crate's id. */
+export async function pickBossCrate(crate: string): Promise<string> {
+  const r = await postOnce<{ crate: string; locker: Locker }>("/api/locker/pick", { crate });
+  if (state.profile) set({ profile: { ...state.profile, locker: r.locker } });
+  return r.crate;
 }
 
 /** Wears a crate item in its slot (null empties the slot). */
@@ -477,9 +567,18 @@ export async function sendEmailCode(email: string): Promise<void> {
   await api("/api/auth/email/start", { method: "POST", body: JSON.stringify({ email }) });
 }
 
+/**
+ * Signs in with an emailed code. The server may ask the age question first (Nov 12: an email with no account yet, or an account
+ * from before the question): then the code is kept, here and on the server, and the answer sends it again (finishPendingSignIn).
+ */
 export async function verifyEmailCode(email: string, code: string): Promise<void> {
-  // (Signing in uses the age answer up: the next sign-in on this device asks again.)
-  set({ profile: await api<Profile>("/api/auth/email/verify", { method: "POST", body: JSON.stringify({ email, code }) }), age: null });
+  try {
+    // (Signing in uses an age answer up: the next sign-in into an account that hasn't answered asks again.)
+    set({ profile: await api<Profile>("/api/auth/email/verify", { method: "POST", body: JSON.stringify({ email, code }) }), age: null, pending: null });
+  } catch (e) {
+    if ((e as { askAge?: boolean }).askAge && !tooYoung()) return set({ pending: { kind: "email", email, code }, ageNote: null });
+    throw e;
+  }
 }
 
 export async function signOut(): Promise<void> {
@@ -526,14 +625,59 @@ export async function recordSoloResult(r: {
   bossElo?: number | null;
   /** Whether the eval bar was on (testers only since Oct 15), so we can see later who played without it. */
   evalBar: boolean;
-}): Promise<void> {
-  if (!state.profile) return;
+  /**
+   * XP (Nov 9): the game's id from startSoloGame (the server times it by its own clock), your moves, whether you won or resigned,
+   * and whether a test switch was on: the device's word, which can only lower the XP (server/xp.ts).
+   */
+  game?: string | null;
+  moves?: number;
+  won?: boolean;
+  resigned?: boolean;
+  /** Removed for idling (the server answers "No XP: you left the match."). */
+  left?: boolean;
+  test?: boolean;
+}): Promise<XpGrant | null> {
+  if (!state.profile) return null;
   try {
-    await api("/api/results", { method: "POST", body: JSON.stringify(r) });
+    const answer = await api<{ xp?: XpGrant | null }>("/api/results", { method: "POST", body: JSON.stringify(r) });
     set({ profile: await api<Profile>("/api/me") });
+    return answer.xp ?? null;
   } catch {
     // Not important enough to bother the player.
+    return null;
   }
+}
+
+/** A solo game begins (XP, Nov 9): the server notes when, by its own clock; its id goes back with the result. Null: no account yet. */
+export async function startSoloGame(body: { xpgame?: number }): Promise<string | null> {
+  if (!state.profile) return null;
+  return (await api<{ game: string | null }>("/api/xp/solo/start", { method: "POST", body: JSON.stringify(body) })).game;
+}
+
+/** Your XP from an online game (its lobby's code), once its room has written it; null until then. */
+export async function onlineGameXp(code: string): Promise<XpGrant | null> {
+  return (await api<{ xp: XpGrant | null }>(`/api/xp?game=${encodeURIComponent(code)}`)).xp;
+}
+
+/** The test switch ?xp=<n> (test servers only, since Nov 9: review of #574 M1): sets your XP, then your profile again. */
+export async function setTestXp(xp: number): Promise<void> {
+  await api("/api/xp/test", { method: "POST", body: JSON.stringify({ xp }) });
+  set({ profile: await api<Profile>("/api/me") });
+}
+
+/** Your quests (Nov 9, phase 3; the server deals the day's on the day's first read: server/quests.ts). */
+export async function fetchQuests(): Promise<QuestsAnswer> {
+  return api<QuestsAnswer>("/api/quests");
+}
+
+/** Today's free reroll of a daily quest: your quests after it (a refusal throws its message). */
+export async function rerollQuestNow(quest: string): Promise<QuestsAnswer> {
+  return (await api<{ quests: QuestsAnswer }>("/api/quests/reroll", { method: "POST", body: JSON.stringify({ quest }) })).quests;
+}
+
+/** The test switch ?quests=<kind>[:<progress>],… (test servers only): your quests set to these. */
+export async function setTestQuests(quests: { kind: string; progress: number }[]): Promise<QuestsAnswer> {
+  return api<QuestsAnswer>("/api/quests/test", { method: "POST", body: JSON.stringify({ quests }) });
 }
 
 /** The name you play under: your profile's, else this device's, else "Player". */
@@ -561,6 +705,8 @@ export interface PublicProfile {
   online: boolean;
   /** They hide when they're online (Settings → Friends): `online` false and `lastSeen` null. */
   hidden?: boolean;
+  /** Their level (Nov 9: from their XP). Missing from an older server. */
+  level?: number;
   rating: number | null;
   topPercent: number | null;
   /** Banned for fair play (the profile says so; nothing else about fair play is shown). */

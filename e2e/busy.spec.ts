@@ -1,5 +1,5 @@
 import { expect } from "@playwright/test";
-import { named, test, pickMode } from "./helpers.ts";
+import { named, test, pickMode, leaveQueue } from "./helpers.ts";
 
 /**
  * Servers busy (DECISIONS.md, "Capacity: built"): past the matchmaker's admission rate or the overload limit, PLAY
@@ -39,7 +39,7 @@ test("servers busy: you're told you're in line and about how long, then the queu
   expect(asked.length).toBe(3);
   expect(new URL(asked[1]!).searchParams.get("ticket")).toBe("test-ticket-0001");
   expect(new URL(asked[2]!).searchParams.get("ticket")).toBe("test-ticket-0001");
-  await page.getByRole("button", { name: "Cancel" }).click();
+  await leaveQueue(page);
   await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
   // No sideways scroll on the busy screen either (checked above while it showed; here the page is home again).
   expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBe(0);

@@ -91,12 +91,25 @@ test("coming back from another app, sound is back on the first tap: a suspended 
   const contexts = () => page.evaluate(() => ((window as any).__contexts as AudioContext[]).map((c) => c.state));
   const heard = () => page.evaluate(() => ((window as any).__soundLog as string[]).filter((l) => l.startsWith("bigboyClack:")));
   await page.goto("/town?sky=day");
-  await expect(page.locator("canvas.town-canvas")).toHaveAttribute("data-ready", "1");
+  await expect(page.locator("canvas.town-canvas")).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
   await page.evaluate(() => (window as any).__townGlide?.("bigboy"));
+  /** Whether the camera stood still over the last two frames (a glide over). */
+  const camStill = () =>
+    page.evaluate(
+      () =>
+        new Promise<boolean>((done) => {
+          const at = () => (window as any).__townCam().focus as [number, number];
+          const a = at();
+          requestAnimationFrame(() => requestAnimationFrame(() => done(Math.hypot(at()[0] - a[0], at()[1] - a[1]) < 1e-3)));
+        }),
+    );
   /** A tap on Big Boy (his card opens and he makes his sound), then the card closed again. */
   const tapBigBoy = async () => {
     const card = page.getByRole("dialog", { name: "Big Boy", exact: true });
     await expect(async () => {
+      // (The camera at rest first: aimed while it still glided to him, a tap landed on the map, so you walked off there and the
+      // camera followed you away from him. Main run 1171.)
+      await expect.poll(camStill, { timeout: 10_000 }).toBe(true);
       const xy = await page.evaluate(() => (window as any).__townAt?.("boss", "bigboy") ?? null);
       expect(xy, "Big Boy drawn").not.toBeNull();
       const cv = (await page.locator("canvas.town-canvas").boundingBox())!;

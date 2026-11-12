@@ -1,6 +1,11 @@
 import { expect, type Locator, type Page } from "@playwright/test";
 import { BOARD_SEL, asAdmin, named, test } from "./helpers.ts";
-import { QUICK_CHAT } from "../packages/app/src/autochess/chat.ts";
+import {
+  phone, PLAIN, NEVER, LATE, EARLY, FIGHT, TWOQ, MOVE, HELD, RESULT_WHY, PRICES, NAMES, isDark, watchErrors, root, goldOf, hp, soundCount,
+  clockOf, stepLabel, say, botLevel, expectLevel, center, tapAt, tap, tapGreyed, tapSquare, dragMouse, dragTouch, middle, offers, card,
+  silhouette, tapSilhouette, reroll, piece, lockButton, xpButton, youBench, theirBench, held, benchMiddle, shopMiddle, buyAll, watchFight,
+  fightSeen, watchBanners, bannersSeen,
+} from "./autochess-helpers.ts";
 
 /**
  * Auto chess, the demo (/autochess; docs/areas/autochess.md; shelved: Settings' Testing section, for admins, opens it): a
@@ -12,190 +17,20 @@ import { QUICK_CHAT } from "../packages/app/src/autochess/chat.ts";
  * v9's meeting before round 1 (both pawns in the middle, the quick chat, a 10 s countdown; `?quick=1` makes it 2 s) is on in every game; `?intro=0` skips it (the tests
  * that aren't about it use that).
  *
+ * (Split Nov 10: the layouts, drags, stars and the meeting are in autochess-board.spec.ts; the helpers in autochess-helpers.ts.)
+ *
  * The screen is v7's (docs/decisions/2026-10-21-autochess-v7.md): their bench top left, their pawn top right, the board in its frame with the move clock's
  * bars, your pawn bottom left, the clock's small numbers and your bench bottom right, then the dock (gold and the odds pill, Buy XP, Reroll, four cards).
  */
-const phone = () => test.info().project.name === "phone";
 // (A tap or click that finds nothing fails in seconds, not at the test's end.)
 test.use({ actionTimeout: 15_000 });
-
-// Seeds (each fixes round 1's kings, its four offers and the bot). `quick` = the steps' short times. The shop rolls by the level (4 to begin with: pawns,
-// knights and bishops only; `?level=10` for rooks and queens), so these are the seeds' shops since v7 (4 slots, odds by level).
-//  9: bishop b4, pawn d4, pawn g3, pawn h3; king d2. With lock-in on the bot never locks in.
-//  5: pawn f2, pawn g2, pawn h3, pawn b2; king c1. With lock-in on the bot locks in at 3.79 s (of the 4 s open).
-// 11: pawn b2, pawn c4, pawn b3, pawn f4; king h1. With lock-in on the bot locks in at 1.33 s.
-//  3: pawn g3, pawn b4, pawn h3, bishop e4; king e2.
-// 60 with `level=10`: queen g3, queen e3, pawn h4, bishop d3; king h1 (two queens, to show the limit and the reasons).
-// 19512: bishop b4, pawn h4, pawn g2, pawn e2; king c1. Holding the bishop rolls a pawn onto b4 (the held piece's square); holding the pawn for e2 rolls a pawn
-//       onto e2 too: the two ways an offer can meet a held piece's square (v8: the roll with a starrable piece held is the new one, so the seed was found again: 6298 before).
-// 24 (quick): knight e2, pawn a3, pawn h3, bishop a1; king d1. Buying the first three, the move step lights the knight on e2 (c1, c3, d4, f4, g1, g3) with `?adjustmode=legal`.
-// 66 (quick, gold=60): the bot (king h8, yours h1) holds a bishop for a8 and a rook for f8 by 3 s, and nothing more (the TFT-style economy changed its buys: 1291
-//       before, with gold=600; v8's star-ups had changed its rolls before that: 316).
-const PLAIN = "/autochess?quick=1&seed=9&intro=0";
-const NEVER = PLAIN;
-const LATE = "/autochess?quick=1&seed=5&intro=0";
-const EARLY = "/autochess?quick=1&seed=11&intro=0";
-const FIGHT = "/autochess?quick=1&seed=3&intro=0";
-const TWOQ = "/autochess?quick=1&seed=60&level=10&intro=0";
-const MOVE = "/autochess?quick=1&seed=24&intro=0";
-const HELD = "/autochess?quick=1&seed=66&gold=60&intro=0";
-/** Every way a fight's result line can begin (the reason it ended), then the HP line. */
-const RESULT_WHY =
-  /^(Checkmate\.|Stalemate\.|(You|Your opponent) gained 3\+ pawns and held it for 6 moves\.|Fight stalled \((moves repeated|10 moves each, no capture|60 moves each)\): ((you|your opponent) gained (\d+ pawns?|the edge|a winning edge)|neither side gained the edge, a draw)\.|Draw by the fifty-move rule\.|Draw: not enough pieces left to mate\.|A side left with only its king loses at once\.|Both sides are down to a king: a draw\.) /;
-const PRICES: Record<string, number> = { p: 1, n: 3, b: 3, r: 5, q: 9 };
-const NAMES: Record<string, string> = { p: "Pawn", n: "Knight", b: "Bishop", r: "Rook", q: "Queen" };
-/** A dark square (a bench tile and a shop card's tile take the color of the square the piece lands on). */
-const isDark = (sq: string) => (sq.charCodeAt(0) - 96 + Number(sq[1])) % 2 === 0;
-
-/** Every page error and console error of a test: none may happen. */
-function watchErrors(page: Page) {
-  const errors: string[] = [];
-  page.on("pageerror", (e) => errors.push(String(e)));
-  page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
-  return errors;
-}
-
-const root = (p: Page) => p.locator(".ac-root");
-const goldOf = async (p: Page) => Number(await p.locator(".ac-gold-you b").innerText());
-const hp = async (p: Page, who: "you" | "bot") => Number(await p.locator(`.ac-hp-${who} b`).innerText());
-const soundCount = (p: Page, name: string) => p.evaluate((n) => (window as any).__soundLog.filter((l: string) => l.startsWith(`${n}:`)).length, name);
-/** The clock, in the gold row between the income and the odds pill (v7.1): the time, and the step's name under it. A short message shows for a moment under your bench's row, beside your pawn. */
-const clockOf = (p: Page) => p.locator(".ac-clock b");
-const stepLabel = (p: Page) => p.locator(".ac-clock .ac-step");
-const say = (p: Page) => p.locator(".ac-bottom > .say");
-/** Your level (the badge on your pawn) and the XP toward the next (its bar), and theirs. */
-const youBadge = (p: Page) => p.locator(".ac-badge");
-const botLevel = (p: Page) => p.locator(".ac-who .ac-lv");
-async function expectLevel(p: Page, level: number | string, xp: string) {
-  await expect(youBadge(p)).toHaveText(String(level));
-  await expect(p.locator(".ac-xp-you b")).toHaveText(xp);
-}
-
-/** The center of a square on the page (the board drawn either way up: your half is always at the bottom). */
-async function center(p: Page, square: string) {
-  const b = (await p.locator(".ac-layer").boundingBox())!;
-  const white = (await root(p).getAttribute("data-you")) === "w";
-  const f = square.charCodeAt(0) - 97;
-  const r = Number(square[1]);
-  const col = white ? f : 7 - f;
-  const row = white ? 8 - r : r - 1;
-  return { x: b.x + ((col + 0.5) * b.width) / 8, y: b.y + ((row + 0.5) * b.height) / 8 };
-}
-
-/** A tap: a finger on a phone, a click on a computer. */
-async function tapAt(p: Page, x: number, y: number) {
-  if (phone()) await p.touchscreen.tap(x, y);
-  else await p.mouse.click(x, y);
-}
-const tap = async (p: Page, l: Locator) => (phone() ? l.tap() : l.click());
-/** A tap on something greyed (aria-disabled): Playwright won't act on it unless forced; a player can. */
-const tapGreyed = async (p: Page, l: Locator) => (phone() ? l.tap({ force: true }) : l.click({ force: true }));
-const tapSquare = async (p: Page, sq: string) => {
-  const c = await center(p, sq);
-  await tapAt(p, c.x, c.y);
-};
-
-/** A drag from one point to another, with the mouse. */
-async function dragMouse(p: Page, from: { x: number; y: number }, to: { x: number; y: number }) {
-  await p.mouse.move(from.x, from.y);
-  await p.mouse.down();
-  await p.mouse.move(from.x + 6, from.y - 6, { steps: 2 });
-  await p.mouse.move(to.x, to.y, { steps: 8 });
-  await p.mouse.up();
-}
-
-/** A drag with a finger (real touch events), as a phone makes it. */
-async function dragTouch(p: Page, from: { x: number; y: number }, to: { x: number; y: number }) {
-  const cdp = await p.context().newCDPSession(p);
-  const point = (x: number, y: number) => [{ x, y, id: 1 }];
-  await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: point(from.x, from.y) });
-  for (let i = 1; i <= 8; i++) await cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: point(from.x + ((to.x - from.x) * i) / 8, from.y + ((to.y - from.y) * i) / 8) });
-  await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
-  await cdp.detach();
-}
-
-const middle = (b: { x: number; y: number; width: number; height: number }) => ({ x: b.x + b.width / 2, y: b.y + b.height / 2 });
-
-interface Shown {
-  kind: string;
-  square: string;
-}
-/** The offers now, in slot order (each shop card says its piece and its square). */
-const offers = (p: Page): Promise<Shown[]> => p.locator(".ac-buy").evaluateAll((els) => els.map((e) => ({ kind: e.getAttribute("data-kind")!, square: e.getAttribute("data-square")! })));
-const card = (p: Page, slot: number) => p.locator(`.ac-buy[data-slot="${slot}"]`);
-const silhouette = (p: Page, slot: number) => p.locator(`.ac-sil[data-slot="${slot}"]`);
-/** A tap on an offer's silhouette on the board (the layer takes the tap and finds the offer by its square and its side of it). */
-async function tapSilhouette(p: Page, slot: number) {
-  const c = middle((await silhouette(p, slot).boundingBox())!);
-  await tapAt(p, c.x, c.y);
-}
-const reroll = (p: Page) => p.getByRole("button", { name: /^Reroll the shop/ });
-const piece = (p: Page, color: "white" | "black", role: string, square: string) => p.locator(`${BOARD_SEL.piece}.${color}.${role}[data-square="${square}"]`);
-const lockButton = (p: Page) => p.getByRole("button", { name: /^Lock(ed)? in/ });
-const xpButton = (p: Page) => p.getByRole("button", { name: /^Buy \d+ XP/ });
-/** Your bench (bottom right) and theirs (top left): four tiles each, a held piece on the color of the square it keeps with that square's name. */
-const youBench = (p: Page) => p.locator(".ac-bench.you");
-const theirBench = (p: Page) => p.locator(".ac-bench.them");
-const held = (p: Page) => youBench(p).locator(".ac-slot.has");
-/** The bench row's middle (where an offer is dropped to hold it), and the shop row's (where a piece is dropped to sell it). */
-const benchMiddle = async (p: Page) => middle((await youBench(p).boundingBox())!);
-const shopMiddle = async (p: Page) => middle((await p.locator(".ac-shop").boundingBox())!);
-
-/** Taps the first offer that isn't greyed, up to `max` times (the board holds as many pieces as your level, 4 to begin with); how many taps. */
-async function buyAll(p: Page, max: number) {
-  let n = 0;
-  for (; n < max; n++) {
-    const slot = p.locator(".ac-buy:not(.off)").first();
-    if (!(await slot.count())) break;
-    await tap(p, slot);
-  }
-  return n;
-}
-
-/**
- * Watches the fight from before it can begin (a short one, decided early in a few quick moves, can come and go between two
- * looks of a poll): what the box said, the step's name and whether a move was highlighted; read with `fightSeen`.
- */
-async function watchFight(p: Page) {
-  await p.evaluate(() => {
-    const root = document.querySelector<HTMLElement>(".ac-root")!;
-    const seen = { fight: false, say: "", count: "", text: "", label: "", lastMove: false };
-    (window as any).__fight = seen;
-    new MutationObserver(() => {
-      if (root.dataset.phase !== "fight") return;
-      seen.fight = true;
-      seen.say ||= document.querySelector(".ac-clock")?.getAttribute("aria-label") ?? "";
-      seen.count ||= document.querySelector(".ac-clock .ac-step")?.textContent ?? "";
-      seen.text ||= document.querySelector(".ac-card-text")?.textContent ?? "";
-      seen.label ||= document.querySelector(".ac-clock b")?.textContent ?? "";
-      if (document.querySelector(".hb-board square.last-move")) seen.lastMove = true;
-    }).observe(root, { attributes: true, subtree: true, childList: true, characterData: true });
-  });
-}
-const fightSeen = (p: Page) => p.evaluate(() => (window as any).__fight as { fight: boolean; say: string; count: string; text: string; label: string; lastMove: boolean });
-
-/** Every banner on the board from now on (the phase words and the 3-2-1), in the order they first showed, each with when. */
-async function watchBanners(p: Page) {
-  await p.evaluate(() => {
-    const seen: { text: string; at: number }[] = [];
-    (window as any).__banners = seen;
-    const t0 = performance.now();
-    const look = () => {
-      const text = document.querySelector(".ac-banner .cc-num")?.textContent?.trim() ?? "";
-      if (text && seen[seen.length - 1]?.text !== text) seen.push({ text, at: performance.now() - t0 });
-    };
-    new MutationObserver(look).observe(document.body, { childList: true, subtree: true, characterData: true });
-    look();
-  });
-}
-const bannersSeen = (p: Page) => p.evaluate(() => (window as any).__banners as { text: string; at: number }[]);
 
 test.beforeEach(async ({ page }) => {
   await named(page, "Pawnder");
   await page.addInitScript(() => ((window as any).__soundLog = []));
 });
 
-test("shelved (Eric, Oct 19; home's card came on Oct 24, home-ranked.spec.ts): no row in a player's Settings; an admin opens it from Settings' Testing; its back button goes home", { tag: "@phone-only" }, async ({ page }) => {
+test("shelved (Eric, Oct 19; home's card came on Oct 24, home-ranked.spec.ts): no row in a player's Settings; an admin opens it from Settings' Testing; the gear's Leave goes home", { tag: "@phone-only" }, async ({ page }) => {
   const errors = watchErrors(page);
   await page.goto("/settings");
   await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
@@ -208,8 +43,12 @@ test("shelved (Eric, Oct 19; home's card came on Oct 24, home-ranked.spec.ts): n
   await expect(root(page)).toBeVisible();
   expect(new URL(page.url()).pathname).toBe("/autochess");
   await expect(page.locator(".ac-title strong")).toHaveText("Auto chess");
-  await expect(page.locator(".ac-title span")).toHaveText("Round 1 · you play White");
-  await page.getByRole("button", { name: "Back to home" }).click();
+  await expect(page.locator(".ac-title span")).toHaveText("Round 1");
+  // (No back button since Nov 8: the gear has Leave, asked first.)
+  await expect(page.getByRole("button", { name: "Back to home" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Match options" }).click();
+  await page.getByRole("dialog", { name: "Match options" }).getByRole("button", { name: "Leave", exact: true }).click();
+  await page.getByRole("alertdialog").getByRole("button", { name: "Leave", exact: true }).click();
   await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
   expect(new URL(page.url()).pathname).toBe("/");
   // The address works by itself too (nothing is signed in or sent).
@@ -239,9 +78,8 @@ test("the shop: four offers, each a piece and a square of your own, on a square 
     expect(Number(o.square[1])).toBeLessThanOrEqual(4);
     expect(o.square).not.toBe(king);
     if (o.kind === "p") expect(Number(o.square[1])).toBeGreaterThanOrEqual(2);
-    // The tile is square (never a tall one) and in the color of the square it lands on; the piece sits on it.
+    // The tile is square (never a tall one; since Nov 8 the card's own cream, no square color); the piece sits on it.
     const tile = card(page, slot).locator(".ac-tile");
-    await expect(tile).toHaveClass(isDark(o.square) ? /\bd\b/ : /\bl\b/);
     const tb = (await tile.boundingBox())!;
     expect(Math.abs(tb.width - tb.height), `${o.square}: a square tile`).toBeLessThan(1.5);
     const pb = (await tile.locator("piece").boundingBox())!;
@@ -269,27 +107,28 @@ test("the shop: four offers, each a piece and a square of your own, on a square 
   const [r, g, b] = (await page.locator(".ac-sil-shape").first().evaluate((el) => getComputedStyle(el).backgroundColor.match(/\d+/g)!.map(Number))) as number[];
   expect(g!).toBeGreaterThan(r!);
   expect(g!).toBeGreaterThan(b!);
-  // The board holds only your king: nothing is placed for free. Both benches are always there, four slots each, empty ones faint tile outlines.
+  // The board holds only your king: nothing is placed for free. Both benches are always there, four slots each (a phone's: plain tiles; a computer's: faint rings).
   await expect(page.locator(`${BOARD_SEL.piece}.white`)).toHaveCount(1);
   await expect(youBench(page).locator(".ac-slot")).toHaveCount(4);
   await expect(theirBench(page).locator(".ac-slot")).toHaveCount(4);
   await expect(held(page)).toHaveCount(0);
   await expect(theirBench(page).locator(".ac-slot.has")).toHaveCount(0);
-  expect(await youBench(page).locator(".ac-slot.empty").first().evaluate((el) => getComputedStyle(el).backgroundColor)).toBe("rgba(0, 0, 0, 0)");
-  expect(await youBench(page).locator(".ac-slot.empty").first().evaluate((el) => getComputedStyle(el).boxShadow)).not.toBe("none");
+  const emptyLook = await youBench(page).locator(".ac-slot.empty").first().evaluate((el) => ({ bg: getComputedStyle(el).backgroundColor, ring: getComputedStyle(el, "::before").content === "none" ? "none" : getComputedStyle(el, "::before").borderTopStyle }));
+  // (v5, phone and computer: an empty slot is a tile in the bench's colors, no ring.)
+  expect(emptyLook).toEqual({ bg: expect.not.stringMatching(/^rgba\(0, 0, 0, 0\)$/), ring: "none" });
   expect(errors).toEqual([]);
 });
 
-test("the shop: a reroll costs 2 (1 more each time, up to 5) and rolls all four offers (the same for the same seed), and is refused without the gold", { tag: "@phone-only" }, async ({ page }) => {
+test("the shop: a reroll is free first (then 1, then 2, capped at 2) and rolls all four offers (the same for the same seed), and is refused without the gold", { tag: "@phone-only" }, async ({ page }) => {
   const errors = watchErrors(page);
   await page.goto(PLAIN);
   await expect(root(page)).toHaveAttribute("data-phase", "buy");
   const first = await offers(page);
   expect(await goldOf(page)).toBe(10);
   await expect(reroll(page)).toContainText("Reroll");
-  await expect(reroll(page)).toContainText("2");
+  await expect(reroll(page).locator(".ac-cost b")).toHaveText("0");
   await tap(page, reroll(page));
-  expect(await goldOf(page)).toBe(8);
+  expect(await goldOf(page)).toBe(10);
   // (A shuffle and a coin's clink.)
   expect(await soundCount(page, "acReroll")).toBe(1);
   const rolled = await offers(page);
@@ -303,18 +142,18 @@ test("the shop: a reroll costs 2 (1 more each time, up to 5) and rolls all four 
   expect(await offers(page)).toEqual(first);
   await tap(page, reroll(page));
   expect(await offers(page)).toEqual(rolled);
-  // Without the gold it is refused, with the reason (the other rerolls in one go: the same button, the same code). From 8 gold: 3, then 4, and 1 is
-  // left, which is under the next price (5).
+  // Without the gold it is refused, with the reason (the other rerolls in one go: the same button, the same code). From 10 gold: 1, then 2 a time, and
+  // 1 is left, which is under the next price (2).
   await page.evaluate(() => {
     const b = document.querySelector<HTMLButtonElement>(".ac-reroll")!;
     for (let i = 0; i < 49; i++) b.click();
   });
   expect(await goldOf(page)).toBe(1);
   await expect(reroll(page)).toHaveAttribute("aria-disabled", "true");
-  await expect(reroll(page)).toContainText("5");
+  await expect(reroll(page).locator(".ac-cost b")).toHaveText("2");
   const before = await offers(page);
   await reroll(page).click({ force: true });
-  await expect(say(page)).toHaveText("Need 4 more");
+  await expect(say(page)).toHaveText("Need 1 more");
   expect(await goldOf(page)).toBe(1);
   expect(await offers(page)).toEqual(before);
   // Buy XP says so too (4 XP cost 4).
@@ -325,17 +164,17 @@ test("the shop: a reroll costs 2 (1 more each time, up to 5) and rolls all four 
   expect(errors).toEqual([]);
 });
 
-test("the reroll's price climbs 2, 3, 4, 5 and stays at 5 as the Reroll button shows it, each one charged at that price, and is back to 2 in the next round", { tag: "@phone-only" }, async ({ page }) => {
+test("the reroll's price climbs 0, 1, 2 and stays at 2 as the Reroll button shows it, each one charged at that price, and is free again in the next round", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(4 * 60_000);
   const errors = watchErrors(page);
-  // (Gold enough for the whole climb: 2 + 3 + 4 + 5 + 5 + 5 + 5 = 29.)
+  // (Gold enough for the whole climb: 0 + 1 + 2 + 2 + 2 + 2 + 2 = 11.)
   await page.goto("/autochess?quick=1&seed=9&adjust=0&gold=30&intro=0");
   await expect(root(page)).toHaveAttribute("data-phase", "buy");
   const price = async () => Number(await reroll(page).locator(".ac-cost b").innerText());
   let gold = await goldOf(page);
-  // (The start gold of 30, its interest (3) and the round's income (10): the whole climb, 29, is there.)
+  // (The start gold of 30, its interest (3) and the round's income (10): the whole climb, 11, is there.)
   expect(gold).toBe(43);
-  const climb = [2, 3, 4, 5, 5, 5, 5];
+  const climb = [0, 1, 2, 2, 2, 2, 2];
   for (const [i, expected] of climb.entries()) {
     expect(await price(), `the button shows the price of reroll ${i + 1}`).toBe(expected);
     await expect(reroll(page)).toHaveAttribute("aria-label", `Reroll the shop, ${expected} gold`);
@@ -343,15 +182,15 @@ test("the reroll's price climbs 2, 3, 4, 5 and stays at 5 as the Reroll button s
     gold -= expected;
     expect(await goldOf(page), `reroll ${i + 1} cost ${expected}`).toBe(gold);
   }
-  expect(await price(), "it stays at 5").toBe(5);
-  // The next round's shop starts at 5 again (play the round out; the fight has no move step here).
+  expect(await price(), "it stays at 2").toBe(2);
+  // The next round's shop starts free again (play the round out; the fight has no move step here).
   await expect(root(page)).toHaveAttribute("data-phase", /^(result|over)$/, { timeout: 200_000 });
   await page.getByRole("button", { name: "Next round" }).click();
   await expect(root(page)).toHaveAttribute("data-phase", "buy");
   await expect(root(page)).toHaveAttribute("data-round", "2");
-  expect(await price(), "back to 2 at the next round's start").toBe(2);
+  expect(await price(), "free again at the next round's start").toBe(0);
   await tap(page, reroll(page));
-  await expect(reroll(page).locator(".ac-cost b")).toHaveText("3");
+  await expect(reroll(page).locator(".ac-cost b")).toHaveText("1");
   expect(errors).toEqual([]);
 });
 
@@ -479,22 +318,15 @@ test("buying: a greyed offer says why (gold, the one-queen limit), in a few word
   // The king is the game's: tapping it says so.
   await tapSquare(page, "h1");
   await expect(say(page)).toHaveText("King: set by game");
-  // Sell by tapping your queen: the Sell button (in the gap between your pawn and your bench, level with the bench) says what it gives, "Sell 7" (75% of 9, 6.75, to the nearest whole gold), and the sell sound plays.
+  // Sell by tapping your queen: the Sell button (over the shop's cards, where a dragged piece is dropped to sell: Nov 8) says what it gives, "Sell 7" (75% of 9, 6.75, to the nearest whole gold), and the sell sound plays.
   await tapSquare(page, "g3");
   const sellButton = page.getByRole("button", { name: "Sell 7", exact: true });
   await expect(sellButton).toBeVisible();
   const sb = (await sellButton.boundingBox())!;
-  const gap = (await page.locator(".ac-spot").boundingBox())!;
-  const bench = (await youBench(page).boundingBox())!;
-  const mine = (await page.locator(".ac-me").boundingBox())!;
-  const frame = (await page.locator(".ac-frame").boundingBox())!;
+  const cards = (await page.locator(".ac-cards").boundingBox())!;
   expect(sb.height).toBeGreaterThanOrEqual(44);
-  expect(sb.y, "under the board, in the gap").toBeGreaterThan(frame.y + frame.height);
-  expect(Math.abs(sb.y - bench.y), "level with the bench").toBeLessThanOrEqual(2);
-  expect(sb.x, "right of your pawn").toBeGreaterThanOrEqual(mine.x + mine.width - 1);
-  expect(sb.x + sb.width, "left of your bench").toBeLessThanOrEqual(bench.x + 1);
-  expect(sb.x + sb.width / 2, "centered in the gap").toBeGreaterThan(gap.x + gap.width / 2 - 3);
-  expect(sb.x + sb.width / 2).toBeLessThan(gap.x + gap.width / 2 + 3);
+  expect(Math.abs(sb.x - cards.x) + Math.abs(sb.width - cards.width), "over the cards, as wide").toBeLessThanOrEqual(2);
+  expect(sb.y, "in the shop row").toBeGreaterThanOrEqual(cards.y - 1);
   await tap(page, sellButton);
   await expect(piece(page, "white", "queen", "g3")).toHaveCount(0);
   expect(await goldOf(page)).toBe(8);
@@ -522,7 +354,7 @@ test("buying: a greyed offer says why (gold, the one-queen limit), in a few word
   expect(errors).toEqual([]);
 });
 
-test("the bench: drag an offer onto it to hold it (it keeps its square), tap it to place it when its square is free, sell it by dragging it onto the shop", async ({ page }) => {
+test("the bench: drag an offer onto it to hold it (it keeps its square), tap it to place it when its square is free, sell it by dragging it onto the shop", { tag: "@phone-only" }, async ({ page }) => {
   const errors = watchErrors(page);
   // (The full 30 s step: a drag takes a while, and the quick step's 5 open seconds are a tap-test's. Seed 19512: see the list at the top.)
   await page.goto("/autochess?seed=19512&intro=0");
@@ -554,8 +386,17 @@ test("the bench: drag an offer onto it to hold it (it keeps its square), tap it 
   expect(await goldOf(page)).toBe(6);
   expect(await soundCount(page, "acHold")).toBe(2);
   expect((await offers(page))[3]).toEqual({ kind: "p", square: "e2" });
-  // Tapping the held pawn places it on e2 (free): the bench slot empties, and the offer on e2 (slot 3) rolls again, onto a square that is free.
+  // Tapping the held pawn (v5) lights its tile and e2, the square it goes to; nothing is placed yet. A second tap places it on e2 (free): the bench slot
+  // empties, and the offer on e2 (slot 3) rolls again, onto a square that is free.
   await tap(page, held(page).nth(1));
+  await expect(held(page).nth(1)).toHaveClass(/\baimed\b/);
+  await expect(page.locator(".ac-aim")).toHaveAttribute("data-square", "e2");
+  await expect(page.locator(".ac-slot.aimed")).toHaveCount(1);
+  const aimLook = await page.locator(".ac-aim").evaluate((el) => getComputedStyle(el).boxShadow);
+  expect(aimLook, "the target square is ringed").toContain("inset");
+  expect(await soundCount(page, "acPlace")).toBe(0);
+  await tap(page, held(page).nth(1));
+  await expect(page.locator(".ac-aim")).toHaveCount(0);
   await expect(piece(page, "white", "pawn", "e2")).toBeVisible();
   expect(await soundCount(page, "acPlace")).toBe(1);
   await expect(held(page)).toHaveCount(1);
@@ -593,7 +434,7 @@ test("the bench: drag an offer onto it to hold it (it keeps its square), tap it 
   expect(errors).toEqual([]);
 });
 
-test("while you drag an offer, your whole bench row lights up (gold ring), and only yours: theirs never takes a drag", async ({ page }) => {
+test("while you drag an offer, your whole bench row lights up (gold ring), and only yours: theirs never takes a drag", { tag: "@phone-only" }, async ({ page }) => {
   const errors = watchErrors(page);
   await page.goto("/autochess?seed=9&intro=0");
   await expect(root(page)).toHaveAttribute("data-phase", "buy");
@@ -635,6 +476,10 @@ test("the bench holds 4: a fifth is refused with the reason; the shop's offers s
   // Pawns held for squares: each is placed on its own square when tapped, never anywhere else.
   const squares = await held(page).evaluateAll((els) => els.map((e) => e.getAttribute("data-square")!));
   await tap(page, held(page).first());
+  await expect(page.locator(".ac-aim")).toHaveAttribute("data-square", squares[0]!);
+  // (A tap on the lit square places it too.)
+  const aimAt = middle((await page.locator(".ac-aim").boundingBox())!);
+  await tapAt(page, aimAt.x, aimAt.y);
   await expect(piece(page, "white", "pawn", squares[0]!)).toBeVisible();
   await expect(held(page)).toHaveCount(3);
   expect(errors).toEqual([]);
@@ -678,6 +523,7 @@ test("levels: you start at level 4 (4 pieces on the board), the 5th is refused w
   expect(await soundCount(page, "acLevel")).toBe(1);
   expect(await goldOf(page)).toBe(before - 4);
   await expect(say(page)).toHaveText("Level 5: 5 pieces");
+  // (Picked by the tap above, so this tap places it.)
   await tap(page, held(page).first());
   await expect(held(page)).toHaveCount(0);
   await expect(page.locator(`${BOARD_SEL.piece}.white`)).toHaveCount(6);
@@ -722,23 +568,14 @@ test("the odds pill in the gold row: each piece's icon with its percent under it
   // Each icon is a piece's picture with its percent under it.
   const parts = await page.locator(".ac-od").evaluateAll((els) => els.map((e) => ({ icon: e.querySelector(".ac-pc")!.getBoundingClientRect().bottom, pct: e.querySelector("b")!.getBoundingClientRect().top })));
   for (const p of parts) expect(p.icon, "the percent is under its icon").toBeLessThanOrEqual(p.pct + 1);
-  // The bottom of the percent numbers sits on the same line as the bottom of the gold number (their baselines).
-  const baselines = await page.evaluate(() => {
-    const base = (el: Element) => {
-      const probe = document.createElement("span");
-      probe.style.cssText = "display:inline-block;width:0;height:0;vertical-align:baseline";
-      el.appendChild(probe);
-      const y = probe.getBoundingClientRect().bottom;
-      probe.remove();
-      return y;
-    };
-    return { gold: base(document.querySelector(".ac-gold-you b")!), pcts: [...document.querySelectorAll(".ac-od b")].map(base) };
-  });
-  for (const y of baselines.pcts) expect(Math.abs(y - baselines.gold), "a percent's baseline is the gold number's").toBeLessThanOrEqual(1);
+  // (Nov 8: the odds sit in the band's middle, as the gold and the hexagon do; was: on the gold number's baseline.)
+  const band = (await page.locator(".ac-goldrow").boundingBox())!;
+  const ob = (await pill.boundingBox())!;
+  expect(Math.abs(ob.y + ob.height / 2 - (band.y + band.height / 2)), "the odds in the band's middle").toBeLessThanOrEqual(3);
   // The icons sit higher than the gold number's top (a little), as Eric allowed; the pill is small (its height under a button's).
   const gold = (await page.locator(".ac-gold-you b").boundingBox())!;
   const pb = (await pill.boundingBox())!;
-  expect(pb.y).toBeLessThan(gold.y + 4);
+  expect(pb.y).toBeLessThan(gold.y + 6);
   expect(pb.height).toBeLessThan(44);
   // A level-up: Buy XP (2 + 4 reaches level 5): 66/14/13/7/0, the rook no longer faded.
   await tap(page, xpButton(page));
@@ -767,39 +604,61 @@ test("the odds pill in the gold row: each piece's icon with its percent under it
   expect(errors).toEqual([]);
 });
 
-test("the screen's kitty-corner: their bench top left and their pawn top right above the board; your pawn bottom left and your bench bottom right under it, the same gap from the board, the benches' outer edges on the board's; name and level, thin HP and XP bars", async ({ page }) => {
+test("the screen (Nov 8, v5, phone and computer): the benches rows of board squares on their files, yours under E-H and theirs over A-D, alternating, yours lighter, the players kitty-corner; name and level, thin HP and XP bars", async ({ page }) => {
   const errors = watchErrors(page);
   await page.goto(PLAIN);
   await expect(root(page)).toHaveAttribute("data-phase", "buy");
   const box = async (sel: string) => (await page.locator(sel).first().boundingBox())!;
   const frame = await box(".ac-frame");
+  const dock = await box(".ac-dock");
   const theirs = await box(".ac-bench.them");
   const yours = await box(".ac-bench.you");
   const opp = await box(".ac-opp");
   const me = await box(".ac-me");
-  // Their bench top left and their pawn top right, both above the board; yours bottom right and your pawn bottom left, both under it.
-  expect(theirs.y + theirs.height).toBeLessThanOrEqual(frame.y + 0.5);
-  expect(opp.y + opp.height).toBeLessThanOrEqual(frame.y + 12);
-  expect(theirs.x + theirs.width, "their bench is left of their pawn").toBeLessThan(opp.x);
-  expect(yours.y).toBeGreaterThanOrEqual(frame.y + frame.height - 0.5);
-  expect(me.y).toBeGreaterThanOrEqual(frame.y + frame.height - 0.5);
-  expect(me.x + me.width, "your pawn is left of your bench").toBeLessThan(yours.x);
-  // Kitty-corner (v7.1): their bench's left edge is the board frame's left edge and your bench's right edge is its right edge (they follow the board's size); the pawns stay by the column's edges.
-  const top = await box(".ac-top");
-  const bottom = await box(".ac-bottom");
-  expect(Math.abs(theirs.x - frame.x), "their bench starts at the board's left edge").toBeLessThanOrEqual(1);
-  expect(Math.abs(yours.x + yours.width - (frame.x + frame.width)), "your bench ends at the board's right edge").toBeLessThanOrEqual(1);
-  expect(Math.abs(top.x + top.width - (opp.x + opp.width)), "their pawn ends at the column's right edge").toBeLessThanOrEqual(1);
-  expect(Math.abs(me.x - bottom.x), "your pawn starts at the column's left edge").toBeLessThanOrEqual(1);
-  // The same gap from the board for both (the clock's bar and a little air), and identical tiles.
-  const gapTop = frame.y - (theirs.y + theirs.height);
-  const gapBottom = yours.y - (frame.y + frame.height);
-  expect(Math.abs(gapTop - gapBottom), `the benches' gaps: ${gapTop} and ${gapBottom}`).toBeLessThanOrEqual(1.5);
-  expect(gapTop).toBeGreaterThanOrEqual(6);
-  expect(gapTop).toBeLessThanOrEqual(16);
-  const tiles = async (sel: string) => page.locator(`${sel} .ac-slot`).evaluateAll((els) => els.map((e) => ({ w: Math.round(e.getBoundingClientRect().width * 10) / 10, h: Math.round(e.getBoundingClientRect().height * 10) / 10 })));
-  expect(await tiles(".ac-bench.them")).toEqual(await tiles(".ac-bench.you"));
-  // The name and the level beside their pawn; their and your numbers in thin bars under the pawns.
+  const col = await box(".ac-col");
+  // v5 (Eric, Nov 8), phone and computer: each bench a row of 4 board squares lined up with its files, 2 to 8 px from the board's border: yours
+  // under E to H, theirs over A to D. The tiles by owner: an alternating pair, unlike the board's squares; yours lighter than theirs.
+  const look = await page.evaluate(() => {
+    const r = (e: Element) => e.getBoundingClientRect();
+    const board = r(document.querySelector(".hb-board")!);
+    const tiles = (sel: string) => [...document.querySelectorAll(`${sel} .ac-slot`)].map((e) => ({ x: r(e).left, w: r(e).width, t: r(e).top, b: r(e).bottom, bg: getComputedStyle(e).backgroundColor }));
+    const probe = document.createElement("div");
+    document.body.append(probe);
+    const sqColor = (v: string) => ((probe.style.background = `var(${v})`), getComputedStyle(probe).backgroundColor);
+    const out = { board: { l: board.left, t: board.top, w: board.width }, you: tiles(".ac-bench.you"), them: tiles(".ac-bench.them"), light: sqColor("--sq-light"), dark: sqColor("--sq-dark") };
+    probe.remove();
+    return out;
+  });
+  const sq = look.board.w / 8;
+  for (const [who, list, first] of [["yours", look.you, 4], ["theirs", look.them, 0]] as const) {
+    list.forEach((t, i) => {
+      expect(Math.abs(t.x - (look.board.l + (first + i) * sq)), `${who}: tile ${i} on its file`).toBeLessThanOrEqual(0.5);
+      expect(Math.abs(t.w - sq), `${who}: a square wide`).toBeLessThanOrEqual(0.5);
+    });
+    const bgs = list.map((t) => t.bg);
+    expect(bgs[0], `${who}: alternating`).not.toBe(bgs[1]);
+    expect(bgs[0]).toBe(bgs[2]);
+    expect(bgs[1]).toBe(bgs[3]);
+    for (const bg of bgs.slice(0, 2)) expect([look.light, look.dark], `${who}: not the board's squares`).not.toContain(bg);
+  }
+  const light = (c: string) => c.match(/\d+/g)!.slice(0, 3).reduce((a, v) => a + Number(v), 0);
+for (const i of [0, 1]) expect(light(look.you[i]!.bg), "yours lighter than theirs").toBeGreaterThan(light(look.them[i]!.bg));
+  const below = look.you[0]!.t - (frame.y + frame.height);
+  const above = frame.y - look.them[0]!.b;
+  for (const gap of [below, above]) {
+    expect(gap, "a few px from the board's border").toBeGreaterThanOrEqual(2);
+    expect(gap).toBeLessThanOrEqual(8);
+  }
+  // The players kitty-corner: you under the board's left half, beside your bench; the opponent over its right half, beside theirs.
+  const mid = frame.x + frame.width / 2;
+  expect(me.x + me.width, "you: under the left half").toBeLessThanOrEqual(mid + 0.5);
+  expect(me.y, "you: under the board").toBeGreaterThanOrEqual(frame.y + frame.height);
+  expect(opp.x, "the opponent: over the right half").toBeGreaterThanOrEqual(mid - 0.5);
+  expect(opp.y + opp.height, "the opponent: over the board").toBeLessThanOrEqual(frame.y);
+  expect(opp.y, "the opponent under the title row").toBeGreaterThanOrEqual(col.y);
+  expect(dock.y, "the action box under your row").toBeGreaterThanOrEqual(Math.max(yours.y + yours.height, me.y + me.height));
+  expect(theirs.y + theirs.height).toBeLessThanOrEqual(frame.y);
+  // The name and the level by each pawn; the numbers in thin bars (phone: beside the pawn; computer: under it).
   await expect(page.locator(".ac-who .ac-name")).toHaveText("Bot");
   await expect(botLevel(page)).toHaveText("Lv 4");
   await expect(page.locator(".ac-hp-you b")).toHaveText("24");
@@ -813,7 +672,7 @@ test("the screen's kitty-corner: their bench top left and their pawn top right a
     for (const h of bars) expect(h, `${sel}: a thin bar`).toBeLessThanOrEqual(8);
     const pawn = (await page.locator(`${sel} .ac-pawn`).boundingBox())!;
     const first = (await page.locator(`${sel} .ac-bar`).first().boundingBox())!;
-    expect(first.y, `${sel}: the bars are under the pawn`).toBeGreaterThanOrEqual(pawn.y + pawn.height - 2);
+    expect(first.x, `${sel}: the bars are right of the pawn`).toBeGreaterThanOrEqual(pawn.x + pawn.width - 2);
     expect(pawn.height, `${sel}: a big pawn`).toBeGreaterThanOrEqual(40);
   }
   // HP is green at full (the move clock's own colors: hue 135) and the bar's length is the share left.
@@ -864,7 +723,7 @@ const recordHops = (p: Page) =>
   });
 const hopsSeen = (p: Page) => p.evaluate(() => (window as any).__hops as Record<"me" | "opp", { on: number[]; off: number[] }>);
 
-test("each custom pawn hops once, then waits a random 7 to 10 s (its own draws, so the two never fall into step) before its next single hop: a crouch, a rise, a squash and a settle, the shadow shrinking and fading as it rises; transforms and opacity only; nothing moves in between", async ({ page }) => {
+test("each custom pawn hops once, then waits a random 7 to 10 s (its own draws, so the two never fall into step) before its next single hop: a crouch, a rise, a squash and a settle, the shadow shrinking and fading as it rises; transforms and opacity only; nothing moves in between", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(120_000);
   const errors = watchErrors(page);
   // (A fake clock: seven to ten seconds take no time. The screen's own steps run on it too: the buy step is 30 s, so what follows stays inside it.)
@@ -953,7 +812,7 @@ test("each custom pawn hops once, then waits a random 7 to 10 s (its own draws, 
   expect(errors).toEqual([]);
 });
 
-test("the pawns stay still under reduced motion: no hop at all", async ({ page }) => {
+test("the pawns stay still under reduced motion: no hop at all", { tag: "@phone-only" }, async ({ page }) => {
   const errors = watchErrors(page);
   await recordHops(page);
   await page.emulateMedia({ reducedMotion: "reduce" });
@@ -972,7 +831,7 @@ test("the pawns stay still under reduced motion: no hop at all", async ({ page }
   expect(errors).toEqual([]);
 });
 
-test("each pawn has one shadow: the hopping pawn's own, that shrinks and fades as it rises; the dressed pawn's own ground shadow is hidden here and still shown elsewhere", async ({ page }) => {
+test("each pawn has one shadow: the hopping pawn's own, that shrinks and fades as it rises; the dressed pawn's own ground shadow is hidden here and still shown elsewhere", { tag: "@phone-only" }, async ({ page }) => {
   const errors = watchErrors(page);
   // Dress your pawn as a snowman (its art draws its own ground shadow, which stayed under the pawn as it hopped): the profile's look comes from the server.
   await page.route(/\/api\/me(\?.*)?$/, async (route) => {
@@ -1018,7 +877,7 @@ test("each pawn has one shadow: the hopping pawn's own, that shrinks and fades a
   expect(errors).toEqual([]);
 });
 
-test("feel: every button presses down while it is held (Reroll sinks onto its shadow) and comes back up", async ({ page }) => {
+test("feel: every button presses down while it is held (Reroll sinks onto its shadow) and comes back up", { tag: "@phone-only" }, async ({ page }) => {
   const errors = watchErrors(page);
   await page.goto(PLAIN);
   await expect(root(page)).toHaveAttribute("data-phase", "buy");
@@ -1027,7 +886,6 @@ test("feel: every button presses down while it is held (Reroll sinks onto its sh
     ["Reroll", reroll(page), 3],
     ["Buy XP", xpButton(page), 3],
     ["a shop card", card(page, 2), 2],
-    ["the back button", page.getByRole("button", { name: "Back to home" }), 2],
   ];
   for (const [name, loc, least] of buttons) {
     const c = middle((await loc.boundingBox())!);
@@ -1043,7 +901,7 @@ test("feel: every button presses down while it is held (Reroll sinks onto its sh
   expect(errors).toEqual([]);
 });
 
-test("a sale floats its gold up from the square the piece stood on (+7 for a queen), light CSS that is gone a moment later; nothing floats for a purchase", async ({ page }) => {
+test("a sale floats its gold up from the square the piece stood on (+7 for a queen), light CSS that is gone a moment later; nothing floats for a purchase", { tag: "@phone-only" }, async ({ page }) => {
   const errors = watchErrors(page);
   await page.goto(TWOQ);
   await expect(root(page)).toHaveAttribute("data-phase", "buy");
@@ -1108,12 +966,12 @@ test("lock-in is off (v7): no button, no bonus for anyone (the bot never locks),
   await expect(root(page)).not.toHaveAttribute("data-lockin", /.+/);
   await expect(page.locator(".ac-bot-locked")).toHaveCount(0);
   await expect(clockOf(page)).toHaveText(/^0:(30|29)$/);
-  await expect(stepLabel(page)).toHaveText("Buy");
+  await expect(stepLabel(page)).toHaveText("Planning");
   expect(await goldOf(page)).toBe(10);
   // Open at 15 s and still at 25 s: nobody ended it early, the opponent's lock-in time (with lock-in on) came and went.
   await page.waitForTimeout(Math.max(0, 15_000 - (Date.now() - t0)));
   await expect(root(page)).toHaveAttribute("data-phase", "buy");
-  await expect(stepLabel(page)).toHaveText("Buy");
+  await expect(stepLabel(page)).toHaveText("Planning");
   await page.waitForTimeout(Math.max(0, 25_000 - (Date.now() - t0)));
   await expect(root(page)).toHaveAttribute("data-phase", "buy");
   await expect(page.locator(".ac-bot-locked")).toHaveCount(0);
@@ -1187,7 +1045,7 @@ test("lock in (behind `?lockin=1`): when the opponent locks first you see it, ge
   await expect(root(page)).toHaveAttribute("data-bonus", "bot");
   await expect(lockButton(page)).not.toContainText("+3");
   // Their name and level still fit at the narrowest screen, with the tag in it.
-  expect(await page.locator(".ac-who").evaluate((el) => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
+  expect(await page.locator(".ac-who .ac-name").evaluate((el) => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
   expect(await goldOf(page)).toBe(10);
   // You lock in second: no bonus, and the step ends at once (it would run to 7 s).
   await tap(page, lockButton(page));
@@ -1360,8 +1218,8 @@ test("tap one of their bench pieces: a red ring on it and its landing square lig
   await expect(tiles.nth(0).locator("piece")).toHaveClass(/black/);
   await expect(tiles.nth(1)).toHaveAttribute("data-kind", "r");
   await expect(tiles.nth(1)).toHaveAttribute("data-square", "f8");
-  // A tile is a real target: 44 px tall.
-  expect((await tiles.nth(0).boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  // A tile is a board square (v5: 45 px at 390 x 844, 41 on the test phone, 52 at 1280 x 800).
+  expect((await tiles.nth(0).boundingBox())!.height).toBeGreaterThanOrEqual(40);
   await expect(page.locator(".ac-red")).toHaveCount(0);
   await expect(tiles.nth(0)).not.toHaveClass(/tapped/);
   // Tapped: a red ring on the tile, and the landing square lights red, exactly on that square of their half.
@@ -1427,7 +1285,7 @@ test("a drag with a finger: a placed piece onto the shop sells it", async ({ pag
   expect(errors).toEqual([]);
 });
 
-test("the phase banners on the board: ACTION PHASE as buying begins, the big 3-2-1 for its last seconds, MOVE PHASE, BATTLE PHASE: the words about half the 3-2-1's size in a frosted box; the move clock's bars along the board; no hint text", async ({ page }) => {
+test("the phase banners on the board: ACTION PHASE as buying begins, the big 3-2-1 for its last seconds, MOVE PHASE, BATTLE PHASE: the words about half the 3-2-1's size in a frosted box; no timer bars (Nov 8); no hint text", async ({ page }) => {
   test.setTimeout(120_000);
   const errors = watchErrors(page);
   await page.goto(MOVE);
@@ -1456,27 +1314,11 @@ test("the phase banners on the board: ACTION PHASE as buying begins, the big 3-2
   expect(style.bg).toMatch(/^rgba\(/);
   // No hint text under the board any more: nothing but a short message for a moment, and the benches.
   await expect(page.locator(".ac-msg, .ac-card-say, .ac-hint")).toHaveCount(0);
-  // The move clock: the app's own bars along the board's top and bottom (6 px, green at the start), shrinking toward the middle as the step runs.
-  await expect(page.locator(".ac-frame > .timer-bar")).toHaveCount(2);
-  await expect(page.locator(".ac-frame > .timer-bar.below")).toHaveCount(1);
-  const barH = await page.locator(".ac-frame > .timer-bar").first().evaluate((el) => el.getBoundingClientRect().height);
-  expect(barH).toBeGreaterThanOrEqual(5.5);
-  expect(barH).toBeLessThanOrEqual(6.5);
-  const frame = (await page.locator(".ac-frame").boundingBox())!;
-  const top = (await page.locator(".ac-frame > .timer-bar").first().boundingBox())!;
-  const bottom = (await page.locator(".ac-frame > .timer-bar.below").boundingBox())!;
-  expect(Math.abs(top.y + top.height - frame.y), "the top bar sits on the frame's top edge").toBeLessThan(1.5);
-  expect(Math.abs(bottom.y - (frame.y + frame.height)), "the bottom bar under the frame").toBeLessThan(1.5);
-  const fill = () => page.locator(".ac-frame > .timer-bar").first().locator(".timer-fill").evaluate((el) => ({ w: el.getBoundingClientRect().width, bg: getComputedStyle(el).backgroundColor }));
-  const f0 = await fill();
-  await page.waitForTimeout(1200);
-  const f1 = await fill();
-  expect(f1.w, "the bar shrinks as the time runs").toBeLessThan(f0.w - 10);
-  expect(f1.bg).not.toBe("rgba(0, 0, 0, 0)");
-  // The clock's numbers and the step's name in the gold row (v7.1), small, with no box.
+  // No timer bars anywhere in this mode (Nov 8: was the app's own bars along the board's top and bottom): the hexagon's time is the clock.
+  await expect(page.locator(".ac-root .timer-bar")).toHaveCount(0);
+  // The step's name over the time in the hexagon (Nov 8).
   await expect(clockOf(page)).toHaveText(/^0:0[4-7]$/);
-  await expect(stepLabel(page)).toHaveText("Buy");
-  expect(await page.locator(".ac-clock").evaluate((el) => getComputedStyle(el).backgroundColor)).toBe("rgba(0, 0, 0, 0)");
+  await expect(stepLabel(page)).toHaveText("Planning");
   // The 3-2-1 for the last seconds, the app's own big numbers, and the shop shut with them.
   const count = page.locator(".ac-banner[data-banner=count] .cc-num");
   await expect(count).toHaveText(/^[321]$/, { timeout: 8000 });
@@ -1497,8 +1339,8 @@ test("the phase banners on the board: ACTION PHASE as buying begins, the big 3-2
   // (One every second for the 3-2-1.)
   expect(times[2]!.at - times[1]!.at).toBeGreaterThan(800);
   expect(times[2]!.at - times[1]!.at).toBeLessThan(1300);
-  // The bars are gone for the fight.
-  await expect(page.locator(".ac-frame > .timer-bar")).toHaveCount(0);
+  // No bars for the fight either.
+  await expect(page.locator(".ac-root .timer-bar")).toHaveCount(0);
   expect(errors).toEqual([]);
 });
 
@@ -1695,12 +1537,12 @@ test("a fight plays to a result, HP changes by the rule, and the next round star
   await watchFight(page);
   // To a result (through the move step and the fight).
   await expect(root(page)).toHaveAttribute("data-phase", /^(result|over)$/, { timeout: 150_000 });
-  // The fight: "Fight" and the move count ("12/60") in the gold row's clock (its spoken label "Move 12 of 60"), with its rules in the box, the moves highlighted on the board.
+  // The fight: "Battle" over the move count ("12/60") in the hexagon timer (its spoken label "Move 12 of 60"), with its rules in the box, the moves highlighted on the board.
   const fight = await fightSeen(page);
   expect(fight.fight).toBe(true);
   expect(fight.say).toMatch(/^Move \d+ of 60/);
   expect(fight.count).toMatch(/^\d+\/60$/);
-  expect(fight.label).toBe("Fight");
+  expect(fight.label).toBe("Battle");
   expect(fight.text).toContain("A side left with only its king loses. Gains count, not army size: 3 pawns gained for 6 moves wins,");
   expect(fight.text).toContain("and a stall (repeats, 10 moves each with no capture, or 60) goes to the side that gained more.");
   expect(fight.text).not.toMatch(/checks? in a row/);
@@ -1749,7 +1591,7 @@ test("a fight plays to a result, HP changes by the rule, and the next round star
   await page.getByRole("button", { name: "Next round" }).click();
   await expect(root(page)).toHaveAttribute("data-phase", "buy");
   await expect(root(page)).toHaveAttribute("data-round", "2");
-  await expect(page.locator(".ac-title span")).toHaveText("Round 2 · you play Black");
+  await expect(page.locator(".ac-title span")).toHaveText("Round 2");
   await expect(page.locator(BOARD_SEL.wrap)).toHaveClass(/orientation-black/);
   await expect(page.locator(`${BOARD_SEL.piece}.black`)).toHaveCount(1);
   // Round 2's free 2 XP made level 5 (2 + 2 of 4): the number pops at the round's start. The opponent got its 2 XP too.
@@ -1766,7 +1608,8 @@ test("a fight plays to a result, HP changes by the rule, and the next round star
   expect(shown).toHaveLength(4);
   for (const o of shown) expect(Number(o.square[1])).toBeGreaterThanOrEqual(5);
   expect(await goldOf(page)).toBe(total);
-  await expect(page.locator(".ac-income b")).toHaveText("+12");
+  // (Nov 8: "Income +N" is everything earned this round, the next round's gold less what was saved.)
+  await expect(page.locator(".ac-income b")).toHaveText(`+${total - Number(gold.match(/^Next round: (\d+) saved/)![1])}`);
   await expect(page.locator(".ac-od b")).toHaveText(["66%", "14%", "13%", "7%", "0%"]);
   const k2 = (await root(page).getAttribute("data-king"))!;
   const b2 = (await root(page).getAttribute("data-bot-king"))!;
@@ -1777,6 +1620,7 @@ test("a fight plays to a result, HP changes by the rule, and the next round star
   const slot = shown.findIndex((o) => o.kind === "p" && o.square !== "e5");
   await tap(page, card(page, slot));
   await expect(piece(page, "black", "pawn", shown[slot]!.square)).toBeVisible();
+  await tap(page, held(page).first());
   await tap(page, held(page).first());
   await expect(piece(page, "black", "bishop", "e5")).toBeVisible();
   await expect(held(page)).toHaveCount(0);
@@ -1899,1374 +1743,5 @@ test("a side that starts the fight with only its king loses at once: the round i
   const box = await page.locator(".ac-card").evaluate((el) => ({ scroll: el.scrollHeight, client: el.clientHeight, buttons: (el.querySelector(".ac-go") as HTMLElement).getBoundingClientRect().bottom - el.getBoundingClientRect().bottom }));
   expect(box.scroll, "the result's box holds its words").toBeLessThanOrEqual(box.client);
   expect(box.buttons, "the button is inside the box").toBeLessThanOrEqual(0);
-  expect(errors).toEqual([]);
-});
-
-/** What the page measures of the screen's layout (read in the browser), for `layouts`. */
-const measure = (p: Page) =>
-  p.evaluate(() => {
-    const rect = (sel: string) => document.querySelector(sel)!.getBoundingClientRect();
-    const all = (sel: string) => [...document.querySelectorAll(sel)].map((e) => e.getBoundingClientRect());
-    const base = (el: Element) => {
-      const probe = document.createElement("span");
-      probe.style.cssText = "display:inline-block;width:0;height:0;vertical-align:baseline";
-      el.appendChild(probe);
-      const y = probe.getBoundingClientRect().bottom;
-      probe.remove();
-      return y;
-    };
-    const board = rect(".hb-board");
-    const frame = rect(".ac-frame");
-    const them = rect(".ac-bench.them");
-    const you = rect(".ac-bench.you");
-    const bottomRow = rect(".ac-bottom");
-    const topRow = rect(".ac-top");
-    const dock = rect(".ac-dock");
-    const incomeWord = document.querySelector(".ac-income-word") as HTMLElement;
-    return {
-      down: document.documentElement.scrollHeight - innerHeight,
-      side: document.documentElement.scrollWidth - document.documentElement.clientWidth,
-      board: { w: board.width, h: board.height, left: board.left, right: board.right, top: board.top },
-      dockBottom: dock.bottom,
-      gaps: { top: frame.top - them.bottom, bottom: you.top - frame.bottom },
-      // (v7.1: the benches' outer edges are the board frame's.)
-      frameEdges: { left: frame.left, right: frame.right, w: frame.width },
-      boardEdges: { left: board.left, right: board.right },
-      benchRight: you.right,
-      benchLeft: them.left,
-      col: rect(".ac-col").width,
-      free: innerHeight - dock.bottom,
-      bottomRow: { left: bottomRow.left, right: bottomRow.right },
-      topRow: { left: topRow.left, right: topRow.right },
-      targets: {
-        buttons: all(".ac-btn").map((b) => ({ w: b.width, h: b.height })),
-        cards: all(".ac-buy").map((b) => ({ w: b.width, h: b.height, l: b.left, r: b.right })),
-        tiles: all(".ac-slot").map((b) => ({ w: b.width, h: b.height, l: b.left, r: b.right })),
-        back: [rect(".fd-back")].map((b) => ({ w: b.width, h: b.height })),
-      },
-      overflow: {
-        names: [...document.querySelectorAll(".ac-nm")].map((e) => e.scrollWidth - e.clientWidth),
-        buttons: [...document.querySelectorAll(".ac-btn")].map((e) => e.scrollWidth - e.clientWidth),
-        who: (() => {
-          const el = document.querySelector(".ac-who")!;
-          return el.scrollWidth - el.clientWidth;
-        })(),
-      },
-      goldRow: (() => {
-        const row = rect(".ac-goldrow");
-        const pill = rect(".ac-odds");
-        const gold = document.querySelector(".ac-gold-you b")!;
-        const clock = rect(".ac-clock");
-        const streak = document.querySelector(".ac-streak")?.getBoundingClientRect();
-        return {
-          left: row.left,
-          right: row.right,
-          pillLeft: pill.left,
-          pillRight: pill.right,
-          pillH: pill.height,
-          baselineGold: base(gold),
-          baselines: [...document.querySelectorAll(".ac-od b")].map(base),
-          incomeWord: incomeWord ? getComputedStyle(incomeWord).display : "none",
-          income: (document.querySelector(".ac-income b") as HTMLElement).getBoundingClientRect().right,
-          clockLeft: clock.left,
-          clockRight: clock.right,
-          clockBase: base(document.querySelector(".ac-clock .ac-step")!),
-          streakRight: streak?.right ?? null,
-          streakLeft: streak?.left ?? null,
-          over: (document.querySelector(".ac-goldrow") as HTMLElement).scrollWidth - (document.querySelector(".ac-goldrow") as HTMLElement).clientWidth,
-          clockBox: getComputedStyle(document.querySelector(".ac-clock")!).backgroundColor,
-        };
-      })(),
-      // The Sell button's gap (between your pawn and your bench), and the message under the bench's row (when one shows).
-      spot: (() => {
-        const gap = rect(".ac-spot");
-        const say = document.querySelector(".ac-bottom > .say")?.getBoundingClientRect();
-        const sayEl = document.querySelector(".ac-bottom > .say") as HTMLElement | null;
-        return { l: gap.left, r: gap.right, bench: you.left, benchBottom: you.bottom, pawnR: rect(".ac-me").right, say: say ? { l: say.left, r: say.right, t: say.top, b: say.bottom, over: sayEl!.scrollWidth - sayEl!.clientWidth } : null };
-      })(),
-      who: (() => {
-        const w = rect(".ac-who");
-        return { l: w.left, r: w.right, bench: them.right, pawn: rect(".ac-opp").left };
-      })(),
-    };
-  });
-
-test("layouts: nothing scrolls, every target is at least 44 px (a tile 34 or more wide), the benches sit on the board's edges with equal gaps from it, the gold row holds gold, income, the clock, the odds pill and the streak, and the board is as big as fits, at every phone size and on a computer", async ({ page }) => {
-  const errors = watchErrors(page);
-  const sizes = phone()
-    ? ([[320, 568], [360, 640], [375, 667], [390, 664], [390, 844], [414, 896], [430, 932]] as const)
-    : ([[1280, 800], [1280, 600], [1366, 768], [1920, 1080]] as const);
-  for (const [w, h] of sizes) {
-    await page.setViewportSize({ width: w, height: h });
-    await page.goto(TWOQ);
-    await expect(root(page)).toHaveAttribute("data-phase", "buy");
-    await tap(page, card(page, 0));
-    // A real message under the bench's row too ("Need 2 more").
-    await card(page, 3).click({ force: true });
-    await expect(say(page)).toHaveText("Need 2 more");
-    // The gold row at its widest (Eric: check at the widest realistic value): 3 digits of gold, an income of +200, a W10 streak. Since the TFT-style economy
-    // (Nov 1) a long match makes 2 digits and +20 at most; the old widest stays as the margin, so nothing shifts whatever the numbers.
-    await page.evaluate(() => {
-      document.querySelector(".ac-gold-you b")!.textContent = "999";
-      document.querySelector(".ac-income b")!.textContent = "+200";
-      const streak = document.createElement("span");
-      streak.className = "ac-streak";
-      streak.textContent = "W10";
-      document.querySelector(".ac-goldrow")!.appendChild(streak);
-    });
-    const m = await measure(page);
-    const where = `${w}×${h}`;
-    expect(m.down, `${where}: scrolling down`).toBeLessThanOrEqual(0);
-    expect(m.side, `${where}: sideways`).toBe(0);
-    expect(Math.abs(m.board.w - m.board.h), `${where}: a square board`).toBeLessThan(1.5);
-    expect(m.board.left, `${where}`).toBeGreaterThanOrEqual(0);
-    expect(m.board.right, `${where}`).toBeLessThanOrEqual(w);
-    expect(m.dockBottom, `${where}: the shop on screen`).toBeLessThanOrEqual(h);
-    // Every target is at least 44 px tall (a card, Buy XP, Reroll, the back button, a bench tile); a phone's tiles are 34 to 40 wide, a card 56 and over.
-    const minH = 44;
-    for (const b of [...m.targets.buttons, ...m.targets.cards, ...m.targets.back, ...m.targets.tiles]) expect(b.h, `${where}: a target's height`).toBeGreaterThanOrEqual(minH - 0.5);
-    for (const b of [...m.targets.buttons, ...m.targets.cards, ...m.targets.back]) expect(b.w, `${where}: a target's width`).toBeGreaterThanOrEqual(minH - 0.5);
-    for (const t of m.targets.tiles) {
-      expect(t.w, `${where}: a bench tile's width`).toBeGreaterThanOrEqual(33.5);
-      expect(t.l, `${where}`).toBeGreaterThanOrEqual(0);
-      expect(t.r, `${where}`).toBeLessThanOrEqual(w);
-    }
-    for (const c of m.targets.cards) {
-      expect(c.l, `${where}: the shop inside`).toBeGreaterThanOrEqual(0);
-      expect(c.r, `${where}: the shop inside`).toBeLessThanOrEqual(w);
-    }
-    expect(m.targets.cards, `${where}: four cards`).toHaveLength(4);
-    expect(m.targets.tiles, `${where}: four tiles a bench`).toHaveLength(8);
-    // Each name ("Bishop d3") fits under its tile, Buy XP and Reroll their words, their name and level beside their pawn.
-    expect(m.overflow.names.every((x) => x <= 0), `${where}: card labels`).toBe(true);
-    expect(m.overflow.buttons.every((x) => x <= 0), `${where}: the two buttons`).toBe(true);
-    expect(m.overflow.who, `${where}: their name and level`).toBeLessThanOrEqual(0);
-    expect(m.who.l, `${where}: their name is right of their bench`).toBeGreaterThanOrEqual(m.who.bench - 1);
-    expect(m.who.r, `${where}: and left of their pawn`).toBeLessThanOrEqual(m.who.pawn + 2);
-    // The benches are the same distance from the board (the clock's bar and a little air), theirs top left and yours bottom right.
-    expect(Math.abs(m.gaps.top - m.gaps.bottom), `${where}: the benches' gaps ${m.gaps.top} and ${m.gaps.bottom}`).toBeLessThanOrEqual(1.5);
-    // The benches' outer edges are the board's (v7.1): theirs on its left edge, yours on its right, at any size of the board.
-    expect(Math.abs(m.benchLeft - m.frameEdges.left), `${where}: their bench starts on the board's left edge`).toBeLessThanOrEqual(1);
-    expect(Math.abs(m.benchRight - m.frameEdges.right), `${where}: your bench ends on the board's right edge`).toBeLessThanOrEqual(1);
-    // The Sell button's gap is between your pawn and your bench; a message is under the bench's row, clear of the pawn, inside the board's right edge, on one or two lines.
-    expect(m.spot.l, `${where}: the gap`).toBeGreaterThanOrEqual(m.spot.pawnR - 1);
-    expect(m.spot.r, `${where}: the gap`).toBeLessThanOrEqual(m.spot.bench + 1);
-    expect(m.spot.say, `${where}: the message shows`).not.toBeNull();
-    expect(m.spot.say!.t, `${where}: the message is under the bench's row`).toBeGreaterThanOrEqual(m.spot.benchBottom - 1);
-    expect(m.spot.say!.l, `${where}: the message is clear of the pawn`).toBeGreaterThanOrEqual(m.spot.pawnR - 1);
-    expect(m.spot.say!.r, `${where}: the message ends by the board's right edge`).toBeLessThanOrEqual(m.frameEdges.right + 1);
-    expect(m.spot.say!.over, `${where}: the message fits`).toBeLessThanOrEqual(0);
-    // The gold row: gold, income, the clock (the time, and the step's name under it), the odds pill and the streak, inside the screen, in that order and clear of each other,
-    // the pill's percents, the clock's step name and the gold number on one baseline; "Income" is dropped under 415 wide (the "+200" stays); nothing overflows the row.
-    expect(m.goldRow.over, `${where}: nothing overflows the gold row`).toBeLessThanOrEqual(0);
-    expect(m.goldRow.clockLeft, `${where}: the clock is right of the income`).toBeGreaterThan(m.goldRow.income + 2);
-    expect(m.goldRow.pillLeft, `${where}: the pill is right of the clock`).toBeGreaterThan(m.goldRow.clockRight + 2);
-    expect(m.goldRow.streakLeft!, `${where}: the streak is right of the pill`).toBeGreaterThan(m.goldRow.pillRight + 2);
-    expect(m.goldRow.streakRight!, `${where}: the streak is inside the row`).toBeLessThanOrEqual(m.goldRow.right + 0.5);
-    expect(m.goldRow.clockBox, `${where}: the clock has no box`).toBe("rgba(0, 0, 0, 0)");
-    expect(m.goldRow.pillH, `${where}: a small pill`).toBeLessThan(44);
-    for (const y of m.goldRow.baselines) expect(Math.abs(y - m.goldRow.baselineGold), `${where}: baselines`).toBeLessThanOrEqual(1);
-    expect(Math.abs(m.goldRow.clockBase - m.goldRow.baselineGold), `${where}: the step's name is on the gold number's baseline`).toBeLessThanOrEqual(1.5);
-    // ("Income" is dropped under 415 wide, and on a computer when a streak joins the row: the widest content here has one.)
-    expect(m.goldRow.incomeWord, `${where}: "Income"`).toBe(w <= 414 || !phone() ? "none" : "inline");
-    await expect(page.locator(".ac-income b")).toHaveText("+200");
-    // Every phone gets some free room at the bottom (Eric: some free space; about 12 px is kept, and the page doesn't scroll if a result runs a few lines longer). On a computer the dock isn't at the bottom.
-    if (phone()) expect(h - m.dockBottom, `${where}: free room at the bottom`).toBeGreaterThanOrEqual(11.5);
-    // The board is as big as fits: as wide as the column, or as tall as the room leaves with the free room kept (about 12 px).
-    if (phone()) expect(m.frameEdges.w >= m.col - 1 || Math.abs(m.free - 12) <= 1.5, `${where}: the board is as big as fits (frame ${m.frameEdges.w} of ${m.col}, ${m.free} free)`).toBe(true);
-  }
-  expect(errors).toEqual([]);
-});
-
-test("layouts: the short words of every message fit under the bench's row at 320 px (at most 2 lines, clear of the pawn, inside the board's edge), and the 'Sell' button sits in the gap beside the bench without moving a row", async ({ page }) => {
-  test.skip(!phone(), "320 px");
-  const errors = watchErrors(page);
-  await page.setViewportSize({ width: 320, height: 568 });
-  await page.goto(TWOQ);
-  await expect(root(page)).toHaveAttribute("data-phase", "buy");
-  await tap(page, card(page, 0));
-  // (A real message first, so its box is there to lay the others into.)
-  await card(page, 3).click({ force: true });
-  await expect(say(page)).toBeVisible();
-  // Every message the screen can say (the longest first), laid into the spot.
-  const words = [
-    "Board full. Drag to bench",
-    "Tap a piece, then a square",
-    "Undo the other first",
-    "Moved. Tap ↩ to undo.",
-    "Board full: buy XP",
-    "Level 10: 10 pieces",
-    "Too many pieces",
-    "Only the lit piece",
-    "No piece can move",
-    "Not on back rank",
-    "Need 9 more",
-    "King: set by game",
-    "You're locked in",
-    "First: +3 gold",
-    "Top level (10)",
-    "One queen max",
-    "8 pawns max",
-    "h4 rolled again",
-  ];
-  const before = await page.evaluate(() => ({ bottom: document.querySelector(".ac-bottom")!.getBoundingClientRect().height, dock: document.querySelector(".ac-dock")!.getBoundingClientRect().top }));
-  for (const text of words) {
-    const r = await page.evaluate((t) => {
-      const sp = document.querySelector(".ac-bottom > .say")!;
-      sp.textContent = t;
-      const b = sp.getBoundingClientRect();
-      const lineH = parseFloat(getComputedStyle(sp).lineHeight);
-      const me = document.querySelector(".ac-me")!.getBoundingClientRect();
-      const bench = document.querySelector(".ac-bench.you")!.getBoundingClientRect();
-      return { lines: Math.round((b.height - 4) / lineH), l: b.left, r: b.right, t: b.top, me: me.right, bench: bench.right, benchBottom: bench.bottom, bottom: document.querySelector(".ac-bottom")!.getBoundingClientRect().height, dock: document.querySelector(".ac-dock")!.getBoundingClientRect().top, over: sp.scrollWidth - sp.clientWidth };
-    }, text);
-    expect(r.lines, `"${text}": lines`).toBeLessThanOrEqual(2);
-    expect(r.l, `"${text}": clear of the pawn`).toBeGreaterThanOrEqual(r.me - 1);
-    expect(r.r, `"${text}": inside the board's right edge`).toBeLessThanOrEqual(r.bench + 1);
-    expect(r.t, `"${text}": under the bench's row`).toBeGreaterThanOrEqual(r.benchBottom - 1);
-    expect(r.over, `"${text}": no overflow`).toBeLessThanOrEqual(0);
-    expect(r.bottom, `"${text}": the row doesn't grow`).toBeLessThanOrEqual(before.bottom + 0.5);
-    expect(r.dock, `"${text}": the dock doesn't move`).toBeLessThanOrEqual(before.dock + 0.5);
-  }
-  // The Sell button (a piece of yours selected) is in the gap, a real target, and the row doesn't grow for it either.
-  await tapSquare(page, "g3");
-  const sell = page.getByRole("button", { name: /^Sell \d+$/ });
-  await expect(sell).toBeVisible();
-  const sb = (await sell.boundingBox())!;
-  expect(sb.height).toBeGreaterThanOrEqual(44);
-  expect(sb.width).toBeGreaterThanOrEqual(44);
-  const gap = (await page.locator(".ac-spot").boundingBox())!;
-  const bench = (await youBench(page).boundingBox())!;
-  expect(sb.x).toBeGreaterThanOrEqual(gap.x - 1);
-  expect(sb.x + sb.width).toBeLessThanOrEqual(bench.x + 1);
-  expect(Math.abs(sb.y - bench.y), "level with the bench").toBeLessThanOrEqual(2);
-  const after = await page.evaluate(() => ({ bottom: document.querySelector(".ac-bottom")!.getBoundingClientRect().height, dock: document.querySelector(".ac-dock")!.getBoundingClientRect().top }));
-  expect(after.bottom).toBeLessThanOrEqual(before.bottom + 0.5);
-  expect(after.dock).toBeLessThanOrEqual(before.dock + 0.5);
-  expect(errors).toEqual([]);
-});
-
-test("layouts: the board never moves from step to step (buy, move, fight, result), nothing scrolls, and the fight's and the result's boxes hold their words, at the narrowest screen, a phone and a computer", async ({ page }) => {
-  test.setTimeout(240_000);
-  const errors = watchErrors(page);
-  const sizes = phone() ? ([[320, 568], [390, 844]] as const) : ([[1280, 800]] as const);
-  for (const [w, h] of sizes) {
-    await page.setViewportSize({ width: w, height: h });
-    await page.goto(FIGHT);
-    await expect(root(page)).toHaveAttribute("data-phase", "buy");
-    await buyAll(page, 4);
-    const where = `${w}×${h}`;
-    const grab = async () => {
-      const board = (await page.locator(".hb-board").boundingBox())!;
-      const frame = (await page.locator(".ac-frame").boundingBox())!;
-      const me = (await page.locator(".ac-me").boundingBox())!;
-      const dock = (await page.locator(".ac-dock").boundingBox())!;
-      const m = await page.evaluate(() => ({ down: document.documentElement.scrollHeight - innerHeight, side: document.documentElement.scrollWidth - document.documentElement.clientWidth }));
-      return { board, frame, me, dockTop: dock.y, dockBottom: dock.y + dock.height, ...m };
-    };
-    const buy = await grab();
-    await expect(root(page)).toHaveAttribute("data-phase", "adjust", { timeout: 15_000 });
-    const move = await grab();
-    await expect(root(page)).toHaveAttribute("data-phase", "fight", { timeout: 15_000 });
-    // (After the banner's first moments: the fight's box with its rules.)
-    await expect(page.locator(".ac-card-text")).toBeVisible();
-    const fight = await grab();
-    const clipped = () => page.locator(".ac-card").evaluate((el) => Array.from(el.children).filter((c) => c.getBoundingClientRect().bottom > el.getBoundingClientRect().bottom + 0.5).length + (el.scrollHeight > el.clientHeight ? 1 : 0));
-    expect(await clipped(), `${where}: the fight's box holds its words`).toBe(0);
-    await expect(root(page)).toHaveAttribute("data-phase", /^(result|over)$/, { timeout: 200_000 });
-    const result = await grab();
-    expect(await clipped(), `${where}: the result's box holds its words`).toBe(0);
-    for (const [name, step] of [["buy", buy], ["move", move], ["fight", fight], ["result", result]] as const) {
-      expect(step.down, `${where}, ${name}: scrolling down`).toBeLessThanOrEqual(0);
-      expect(step.side, `${where}, ${name}: sideways`).toBe(0);
-      // The board, its frame, your pawn and the top of the dock stay where they were: nothing moves when the step changes.
-      expect(Math.abs(step.board.x - buy.board.x) + Math.abs(step.board.y - buy.board.y) + Math.abs(step.board.width - buy.board.width), `${where}, ${name}: the board`).toBeLessThan(1);
-      expect(Math.abs(step.frame.y - buy.frame.y) + Math.abs(step.me.y - buy.me.y), `${where}, ${name}: your row under the board`).toBeLessThan(1);
-      expect(Math.abs(step.dockTop - buy.dockTop), `${where}, ${name}: the dock's top`).toBeLessThan(1);
-      expect(step.dockBottom, `${where}, ${name}: the box on screen`).toBeLessThanOrEqual(h);
-    }
-  }
-  expect(errors).toEqual([]);
-});
-
-test("the benches sit flush with the board (v7.1, Eric Oct 22): their bench's left edge on the board's left edge and yours' right edge on its right edge, at 393 x 730, 428 x 777 (Eric's iPhone), 320 x 568 and the sizes between, and the board is bigger than v7's", async ({ page }) => {
-  const errors = watchErrors(page);
-  // (The board's squares in v7, measured on main before this change: the room it left at the bottom is now the board's.)
-  // (A phone whose width is the limit, 390 x 844 and up, already had the column's width: its board stays as it was, never smaller.)
-  const sizes = phone()
-    ? ([[393, 730, 352, 3], [428, 777, 292, 3], [320, 568, 208, 3], [375, 667, 292, 3], [360, 640, 273, 3], [390, 844, 360, -0.5], [430, 932, 400, -0.5]] as const)
-    : ([[1280, 800, 484, 3], [1280, 600, 336, -0.5]] as const);
-  for (const [w, h, before, grow] of sizes) {
-    await page.setViewportSize({ width: w, height: h });
-    await page.goto(PLAIN);
-    await expect(root(page)).toHaveAttribute("data-phase", "buy");
-    const where = `${w}×${h}`;
-    const m = await page.evaluate(() => {
-      const r = (sel: string) => document.querySelector(sel)!.getBoundingClientRect();
-      const frame = r(".ac-frame");
-      const board = r(".hb-board");
-      const them = r(".ac-bench.them");
-      const you = r(".ac-bench.you");
-      return { frame: { l: frame.left, r: frame.right, w: frame.width }, board: { l: board.left, r: board.right, w: board.width }, them: { l: them.left, r: them.right }, you: { l: you.left, r: you.right }, col: r(".ac-col").width };
-    });
-    // The benches' outer edges are the frame's (the white edge of the board), to the pixel.
-    expect(Math.abs(m.them.l - m.frame.l), `${where}: their bench's left edge on the board's left edge`).toBeLessThanOrEqual(1);
-    expect(Math.abs(m.you.r - m.frame.r), `${where}: your bench's right edge on the board's right edge`).toBeLessThanOrEqual(1);
-    // And the squares' own edges are within the frame's 3 px and the squares' rounding (up to 8 device pixels).
-    expect(Math.abs(m.them.l - m.board.l), `${where}: ... and the squares' left edge`).toBeLessThanOrEqual(4);
-    expect(Math.abs(m.you.r - m.board.r), `${where}: ... and the squares' right edge`).toBeLessThanOrEqual(8);
-    // They follow the board: its size has grown since v7, and the benches stay on its edges whatever the size (never past them).
-    expect(m.board.w, `${where}: the board is bigger than v7's ${before}`).toBeGreaterThan(before + grow);
-    expect(m.them.l, `${where}: not left of the board`).toBeGreaterThanOrEqual(m.frame.l - 1);
-    expect(m.you.r, `${where}: not right of the board`).toBeLessThanOrEqual(m.frame.r + 1);
-  }
-  expect(errors).toEqual([]);
-});
-
-test("the clock is in the gold row (v7.1, Eric Oct 22): the small time with the step's name under it, between 'Income' and the odds pill, no box, and none under the board; it counts down and goes red as the step locks", async ({ page }) => {
-  const errors = watchErrors(page);
-  for (const [w, h] of phone() ? ([[320, 568], [393, 730], [428, 777]] as const) : ([[1280, 800]] as const)) {
-    await page.setViewportSize({ width: w, height: h });
-    await page.goto(PLAIN);
-    await expect(root(page)).toHaveAttribute("data-phase", "buy");
-    const where = `${w}×${h}`;
-    // Where it is: a child of the gold row, after the gold and the income and before the odds pill; the old spot under the board has no clock.
-    const order = await page.locator(".ac-goldrow > *").evaluateAll((els) => els.map((e) => (e as HTMLElement).className.split(" ")[0]));
-    expect(order.slice(0, 3), `${where}: gold and income, the clock, the pill`).toEqual(["ac-purse", "ac-clock", "ac-odds"]);
-    await expect(page.locator(".ac-bottom .ac-clock, .ac-bottom .ac-timer, .ac-timer")).toHaveCount(0);
-    await expect(page.locator(".ac-purse .ac-income")).toBeVisible();
-    // Small, no box: the time in the same size as the gold number or under it, the name under the time, in small letters.
-    const look = await page.evaluate(() => {
-      const t = document.querySelector(".ac-clock b")!.getBoundingClientRect();
-      const n = document.querySelector(".ac-clock .ac-step")!.getBoundingClientRect();
-      const css = (sel: string) => getComputedStyle(document.querySelector(sel)!);
-      return { timeBottom: t.bottom, nameTop: n.top, nameLeft: n.left, nameRight: n.right, timeLeft: t.left, timeRight: t.right, timeFont: parseFloat(css(".ac-clock b").fontSize), goldFont: parseFloat(css(".ac-gold-you b").fontSize), nameFont: parseFloat(css(".ac-clock .ac-step").fontSize), bg: css(".ac-clock").backgroundColor, border: css(".ac-clock").borderTopWidth, shadow: css(".ac-clock").boxShadow };
-    });
-    expect(look.nameTop, `${where}: the name is under the time`).toBeGreaterThanOrEqual(look.timeBottom - 3);
-    expect(look.timeFont, `${where}: the time is no bigger than the gold`).toBeLessThanOrEqual(look.goldFont);
-    expect(look.nameFont, `${where}: the name is small`).toBeLessThanOrEqual(13);
-    expect([look.bg, look.border, look.shadow], `${where}: no box`).toEqual(["rgba(0, 0, 0, 0)", "0px", "none"]);
-    // It counts down (quick: a buy step of 7 s) and the step's last seconds are red ("Locked").
-    await expect(clockOf(page)).toHaveText(/^0:0[4-7]$/);
-    await expect(stepLabel(page)).toHaveText("Buy");
-    const first = Number((await clockOf(page).innerText()).slice(2));
-    await expect.poll(async () => Number((await clockOf(page).innerText()).slice(2))).toBeLessThan(first);
-    await expect(stepLabel(page)).toHaveText("Locked", { timeout: 8000 });
-    expect(await page.locator(".ac-clock").evaluate((el) => el.classList.contains("low"))).toBe(true);
-    expect(await clockOf(page).evaluate((el) => getComputedStyle(el).color), `${where}: red`).toBe("rgb(192, 55, 47)");
-  }
-  expect(errors).toEqual([]);
-});
-
-// ---------------------------------------------------------------------------------------------------------------------------------
-// Drags cut off, silhouettes that are only tapped, a sale of a piece that isn't there (Eric's first test of the new fights, Oct 21:
-// docs/decisions/2026-10-21-autochess-drag-fixes.md). Each of these failed on main (bc9a97e) before its fix.
-// ---------------------------------------------------------------------------------------------------------------------------------
-
-const ghosts = (p: Page) => p.locator(".ac-ghost");
-const sellZone = (p: Page) => p.locator(".ac-sell-drop");
-/**
- * What a drag that does nothing must leave alone: your gold, your pieces on the board (each one's color, kind and square) and the bench. Only those: a piece's other
- * classes (a slide, its stars' outline, the reveal's gray, which can change on any tick of the step) aren't what it holds.
- */
-const holdings = (p: Page) =>
-  p.evaluate(() => ({
-    gold: Number(document.querySelector(".ac-gold-you b")?.textContent),
-    board: [...document.querySelectorAll(".hb-board piece.white")]
-      .map((e) => `white ${["pawn", "knight", "bishop", "rook", "queen", "king"].find((k) => e.classList.contains(k)) ?? "?"}@${(e as HTMLElement).dataset.square}`)
-      .sort(),
-    bench: [...document.querySelectorAll(".ac-bench.you .ac-slot.has")].map((e) => `${(e as HTMLElement).dataset.kind}@${(e as HTMLElement).dataset.square}`),
-  }));
-/** Every white piece drawn on the page (not the avatar's pawn, the side menu's Profile pawn or the shop's, the bench's and the odds' little icons), and those on the board itself: a ghost is drawn outside the board. */
-const whitePieces = (p: Page) =>
-  p.evaluate(() => ({
-    all: [...document.querySelectorAll("piece.white")].filter((e) => !e.closest(".ac-pawn, .ac-pc, .fd-side")).length,
-    board: document.querySelectorAll(".hb-board piece.white").length,
-  }));
-/** The mouse button goes down on a point and the pointer moves off it: a drag in progress, the button still down. */
-async function pickUp(p: Page, from: { x: number; y: number }, by = { x: 14, y: -40 }) {
-  await p.mouse.move(from.x, from.y);
-  await p.mouse.down();
-  await p.mouse.move(from.x + 6, from.y - 6, { steps: 2 });
-  await p.mouse.move(from.x + by.x, from.y + by.y, { steps: 4 });
-}
-/** A finger down on a point and moved to another, still down: `end` lifts it, `cancel` has the browser cancel it. */
-async function holdTouch(p: Page, from: { x: number; y: number }, to: { x: number; y: number }) {
-  const cdp = await p.context().newCDPSession(p);
-  const point = (x: number, y: number) => [{ x, y, id: 1 }];
-  await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: point(from.x, from.y) });
-  for (let i = 1; i <= 8; i++) await cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: point(from.x + ((to.x - from.x) * i) / 8, from.y + ((to.y - from.y) * i) / 8) });
-  const finish = async (type: "touchEnd" | "touchCancel") => {
-    await cdp.send("Input.dispatchTouchEvent", { type, touchPoints: [] });
-    await cdp.detach();
-  };
-  return { end: () => finish("touchEnd"), cancel: () => finish("touchCancel") };
-}
-
-// (The stars step, the default since v8, with a 2-star knight on e2 to pick up; and v7's, behind its setting, with the knight bought on e2 and lit.)
-for (const mode of ["stars", "legal"] as const) {
-test(`a drag cut off by the end of the move step ends with it: no frozen ghost over the fight, the result or the next round (Eric's second queen on g1; ${mode} step)`, async ({ page }) => {
-  test.setTimeout(240_000);
-  const errors = watchErrors(page);
-  await page.goto(mode === "stars" ? `${MOVE}&stars=n@e2:2` : `${MOVE}&adjustmode=legal`);
-  await expect(root(page)).toHaveAttribute("data-phase", "buy");
-  // The knight on e2: the lit piece of v7's move step (seed 24), or a 2-star's.
-  if (mode === "legal") await tap(page, card(page, 0));
-  await expect(piece(page, "white", "knight", "e2")).toBeVisible();
-  await expect(root(page)).toHaveAttribute("data-phase", "adjust", { timeout: 15_000 });
-  // Pick the knight up, as Eric picked up his queen, and keep holding: the drag is live, its ghost under the pointer.
-  await pickUp(page, await center(page, "e2"), { x: 24, y: -36 });
-  await expect(ghosts(page)).toHaveCount(1);
-  // The step ends under the finger: the fight begins, and the drag is over: no ghost, only the pieces that are really there.
-  await expect(root(page)).toHaveAttribute("data-phase", /^(fight|result)$/, { timeout: 15_000 });
-  await expect(ghosts(page)).toHaveCount(0);
-  const mid = await whitePieces(page);
-  expect(mid.all, "no white piece drawn off the board").toBe(mid.board);
-  expect(mid.board, "the king and the knight at most").toBeLessThanOrEqual(2);
-  // Letting go afterwards changes nothing.
-  await page.mouse.move(300, 300, { steps: 3 });
-  await page.mouse.up();
-  await expect(ghosts(page)).toHaveCount(0);
-  await expect(root(page)).toHaveAttribute("data-phase", "result", { timeout: 200_000 });
-  await expect(ghosts(page)).toHaveCount(0);
-  const end = await whitePieces(page);
-  expect(end.all).toBe(end.board);
-  // The next round starts clean: no ghost, no "Drop to sell" over the shop, and drags work (an offer is held by dragging its card onto the bench).
-  await tap(page, page.getByRole("button", { name: "Next round" }));
-  await expect(root(page)).toHaveAttribute("data-phase", "buy");
-  await expect(ghosts(page)).toHaveCount(0);
-  await expect(sellZone(page)).toHaveCount(0);
-  await expect(page.locator(".ac-shop")).not.toHaveClass(/selling/);
-  const gold = await goldOf(page);
-  const price = PRICES[(await offers(page))[0]!.kind]!;
-  await dragMouse(page, middle((await card(page, 0).boundingBox())!), await benchMiddle(page));
-  await expect(held(page)).toHaveCount(1);
-  expect(await goldOf(page)).toBe(gold - price);
-  expect(errors).toEqual([]);
-});
-}
-
-for (const via of ["a shop card", "a piece on the board", "a held piece"] as const) {
-  test(`a drag from ${via} that is still held when the buy step locks ends there with no action, and stays ended through the end of the step`, async ({ page }) => {
-    test.setTimeout(60_000);
-    const errors = watchErrors(page);
-    await page.goto("/autochess?quick=1&seed=9&intro=0");
-    await expect(root(page)).toHaveAttribute("data-phase", "buy");
-    const shown = await offers(page);
-    const pawn = shown.findIndex((o) => o.kind === "p");
-    let from: { x: number; y: number };
-    let to: { x: number; y: number };
-    if (via === "a shop card") {
-      from = middle((await card(page, pawn).boundingBox())!);
-      to = await benchMiddle(page);
-    } else if (via === "a piece on the board") {
-      await tap(page, card(page, pawn));
-      await expect(piece(page, "white", "pawn", shown[pawn]!.square)).toBeVisible();
-      from = await center(page, shown[pawn]!.square);
-      to = await shopMiddle(page);
-    } else {
-      await dragMouse(page, middle((await card(page, pawn).boundingBox())!), await benchMiddle(page));
-      await expect(held(page)).toHaveCount(1);
-      from = middle((await held(page).first().boundingBox())!);
-      to = await shopMiddle(page);
-    }
-    const before = await holdings(page);
-    await pickUp(page, from);
-    await expect(ghosts(page)).toHaveCount(1);
-    // The last seconds lock the step: the drag ends there (nothing follows the finger through the lock), and the drop does nothing.
-    await expect(stepLabel(page)).toHaveText("Locked", { timeout: 8000 });
-    // (Within a moment of "Locked" showing, not by the end of the two locked seconds.)
-    await expect(ghosts(page)).toHaveCount(0, { timeout: 700 });
-    await page.mouse.move(to.x, to.y, { steps: 4 });
-    await expect(ghosts(page)).toHaveCount(0);
-    await expect(sellZone(page)).toHaveCount(0);
-    expect(await holdings(page)).toEqual(before);
-    // The step ends with the button still down: still no ghost, and then the release changes nothing either.
-    await expect(root(page)).toHaveAttribute("data-phase", "adjust", { timeout: 8000 });
-    await expect(ghosts(page)).toHaveCount(0);
-    await page.mouse.up();
-    await expect(ghosts(page)).toHaveCount(0);
-    expect(await goldOf(page)).toBe(before.gold);
-    expect((await holdings(page)).board).toEqual(before.board);
-    expect(errors).toEqual([]);
-  });
-}
-
-test("locking in under a drag ends the drag: the bonus is the only gold that moves, and nothing is held (lock-in behind `?lockin=1`)", async ({ page }) => {
-  const errors = watchErrors(page);
-  await page.goto(`${NEVER}&lockin=1`);
-  await expect(root(page)).toHaveAttribute("data-phase", "buy");
-  await pickUp(page, middle((await card(page, 1).boundingBox())!));
-  await expect(ghosts(page)).toHaveCount(1);
-  // (A click on the button while the mouse button is down on the card: a second pointer, a keyboard or a switch does the same.)
-  await lockButton(page).evaluate((b) => (b as HTMLButtonElement).click());
-  await expect(ghosts(page)).toHaveCount(0);
-  const b = await benchMiddle(page);
-  await page.mouse.move(b.x, b.y, { steps: 4 });
-  await page.mouse.up();
-  await expect(ghosts(page)).toHaveCount(0);
-  // (10 gold and the lock-in bonus, 3: nothing was bought.)
-  expect(await goldOf(page)).toBe(13);
-  await expect(held(page)).toHaveCount(0);
-  expect(errors).toEqual([]);
-});
-
-test("a drag whose pointer is cancelled or loses its capture ends with no action: nothing bought, held or sold, no ghost", async ({ page }) => {
-  const errors = watchErrors(page);
-  await page.addInitScript(() => document.addEventListener("pointerdown", (e) => ((window as any).__pointer = e.pointerId), true));
-  await page.goto("/autochess?seed=9&intro=0");
-  await expect(root(page)).toHaveAttribute("data-phase", "buy");
-  const shown = await offers(page);
-  const pawn = shown.findIndex((o) => o.kind === "p");
-  const before = await holdings(page);
-  // The capture is lost mid-drag (the browser took the pointer away): the drag is dropped, so the bench gets nothing.
-  const cardBox = (await card(page, pawn).boundingBox())!;
-  await pickUp(page, middle(cardBox));
-  await expect(ghosts(page)).toHaveCount(1);
-  await page.evaluate((slot) => document.querySelector(`.ac-buy[data-slot="${slot}"]`)!.releasePointerCapture((window as any).__pointer), pawn);
-  await expect(ghosts(page)).toHaveCount(0);
-  const b = await benchMiddle(page);
-  await page.mouse.move(b.x, b.y, { steps: 4 });
-  await page.mouse.up();
-  expect(await holdings(page)).toEqual(before);
-  // A cancelled pointer (a phone's touch the browser takes for a scroll) does the same.
-  if (phone()) {
-    const finger = await holdTouch(page, middle((await card(page, pawn).boundingBox())!), b);
-    await expect(ghosts(page)).toHaveCount(1);
-    await finger.cancel();
-    await expect(ghosts(page)).toHaveCount(0);
-    expect(await holdings(page)).toEqual(before);
-  }
-  // Nothing is stuck: a drag after both still holds the card's piece.
-  await dragMouse(page, middle((await card(page, pawn).boundingBox())!), await benchMiddle(page));
-  await expect(held(page)).toHaveCount(1);
-  expect(await goldOf(page)).toBe(before.gold - PRICES[shown[pawn]!.kind]!);
-  expect(errors).toEqual([]);
-});
-
-test("a silhouette on the board is only tapped: pressing it and dragging it picks nothing up and drops nothing, on the sell zone, the bench or the board (Eric: 'it just sold a piece that didn't exist')", async ({ page }) => {
-  const errors = watchErrors(page);
-  await page.goto("/autochess?seed=9&intro=0");
-  await expect(root(page)).toHaveAttribute("data-phase", "buy");
-  const shown = await offers(page);
-  const pawns = shown.flatMap((o, slot) => (o.kind === "p" ? [slot] : []));
-  const [first, second] = pawns as [number, number];
-  // One of yours to be sold if the silhouette's drag could reach it: the first pawn, bought by tap.
-  await tap(page, card(page, first));
-  await expect(piece(page, "white", "pawn", shown[first]!.square)).toBeVisible();
-  const before = await holdings(page);
-  const offersBefore = await offers(page);
-  const at = middle((await silhouette(page, second).boundingBox())!);
-  const targets = { "the sell zone": await shopMiddle(page), "the bench": await benchMiddle(page), "the board": await center(page, "e3"), "the shop's edge": { x: at.x, y: (await page.locator(".ac-shop").boundingBox())!.y + 2 } };
-  for (const [name, to] of Object.entries(targets)) {
-    await pickUp(page, at, { x: 8, y: -8 });
-    await page.mouse.move(to.x, to.y, { steps: 8 });
-    // (Nothing follows the pointer, and neither the shop nor the bench lights up for a drop.)
-    await expect(ghosts(page), `a silhouette dragged to ${name}: no ghost`).toHaveCount(0);
-    await expect(sellZone(page), `${name}: no drop zone`).toHaveCount(0);
-    await expect(youBench(page), `${name}: the bench isn't lit`).not.toHaveClass(/lit/);
-    await page.mouse.up();
-    expect(await holdings(page), `dropped on ${name}: nothing changed`).toEqual(before);
-    expect(await offers(page), `${name}: the shop is as it was`).toEqual(offersBefore);
-    await expect(page.locator(".ac-sil")).toHaveCount(4);
-    expect(await soundCount(page, "sell"), `${name}: nothing sold`).toBe(0);
-  }
-  await expect(page.locator(".ac-float")).toHaveCount(0);
-  // A finger does the same.
-  if (phone()) {
-    for (const [name, to] of Object.entries(targets)) {
-      const finger = await holdTouch(page, at, to);
-      await expect(ghosts(page), `a finger dragging a silhouette to ${name}: no ghost`).toHaveCount(0);
-      await finger.end();
-      expect(await holdings(page), `a finger's drop on ${name}`).toEqual(before);
-    }
-  }
-  // A tap still buys it, though a finger wobbles a little (a few pixels) as it taps.
-  await page.mouse.move(at.x, at.y);
-  await page.mouse.down();
-  await page.mouse.move(at.x + 3, at.y - 2, { steps: 2 });
-  await page.mouse.up();
-  await expect(piece(page, "white", "pawn", shown[second]!.square)).toBeVisible();
-  expect(await goldOf(page)).toBe(before.gold - PRICES.p!);
-  expect(errors).toEqual([]);
-});
-
-test("a sale only pays for a piece of yours that is there: selling a piece the pointer is still carrying (the Sell button, the keyboard) pays once, not again at the drop", async ({ page }) => {
-  const errors = watchErrors(page);
-  await page.goto("/autochess?seed=9&intro=0");
-  await expect(root(page)).toHaveAttribute("data-phase", "buy");
-  const shown = await offers(page);
-  const pawn = shown.findIndex((o) => o.kind === "p");
-  await tap(page, card(page, pawn));
-  await expect(piece(page, "white", "pawn", shown[pawn]!.square)).toBeVisible();
-  const gold = await goldOf(page);
-  // Pick the pawn up (picking it up selects it, so "Sell 1" shows), then sell it with the keyboard while it is still held.
-  await pickUp(page, await center(page, shown[pawn]!.square), { x: 10, y: -30 });
-  await expect(ghosts(page)).toHaveCount(1);
-  const sell = page.getByRole("button", { name: "Sell 1", exact: true });
-  await sell.focus();
-  await page.keyboard.press("Enter");
-  await expect(piece(page, "white", "pawn", shown[pawn]!.square)).toHaveCount(0);
-  expect(await goldOf(page)).toBe(gold + 1);
-  // Dropping what is no longer there on the sell zone: no second payment (it was a NaN before), no second "Sold".
-  const shop = await shopMiddle(page);
-  await page.mouse.move(shop.x, shop.y, { steps: 6 });
-  await page.mouse.up();
-  await expect(ghosts(page)).toHaveCount(0);
-  expect(await goldOf(page)).toBe(gold + 1);
-  expect(await soundCount(page, "sell")).toBe(1);
-  await expect(page.locator(".ac-float")).toHaveCount(1);
-  await expect(say(page)).toHaveText("Sold for 1");
-  expect(errors).toEqual([]);
-});
-
-// ---------------------------------------------------------------------------------------------------------------------
-// Stars (v8, Eric Oct 22; docs/decisions/2026-10-22-autochess-stars.md)
-//
-// The seeds below are found by the pure code (the same rolls) with the test switches `?stars=` (your board), `?benchstars=` (your bench) and `?botbench=` (the bot's, which it places
-// for nothing): the shop rolls for the army that is there, so a test never leans on luck. A star after a piece in a shop is the stars its star-up would make.
-// 43, `stars=n@c2:1,b@d2:2,r@a1:1,n@g3:2` (a full board at level 4): king b1; shop bishop a4, knight c2*2, pawn e3, bishop d2*3: a gold card and a rainbow one. The bot (king b8) has no star.
-// 43, `stars=n@g3:2,b@d2:3,r@a1:1,n@c2:1`: the move step with a 2-star knight on g3 (its squares e2, e4, f1, h1), a 3-star bishop on d2, a plain rook and a plain knight; nobody else is starred, so 5 s + 3 s x 2.
-// 16, `benchstars=b@f3:1` (a bishop held for f3): king a2; shop pawn b3, knight c4, bishop f3*2, pawn e3: a gold card for the held bishop. The bot (king a7) has no star.
-// 1, `botbench=n@c7:2,b@f8:3&stars=n@c2:1,b@d2:1`: the bot (king b7) places a 2-star knight on c7 (1.17 s) and a 3-star bishop on f8 (1.52 s) for nothing, and buys nothing starred;
-// you (king b2) start with a plain knight on c2 and bishop on d2 (since Nov 2 a piece of theirs shows only with a match of yours: theirs were placed later, so c7 shows
-// at 1.5 s, your c2 at 3 s, f8 at 4.5 s).
-const STARS = "/autochess?quick=1&seed=43&stars=n@c2:1,b@d2:2,r@a1:1,n@g3:2&intro=0";
-const STARMOVE = "/autochess?quick=1&seed=43&stars=n@g3:2,b@d2:3,r@a1:1,n@c2:1&intro=0";
-const STARBENCH = "/autochess?quick=1&seed=16&benchstars=b@f3:1&intro=0";
-const BOTSTARS = "/autochess?quick=1&seed=1&botbench=n@c7:2,b@f8:3&stars=n@c2:1,b@d2:1&intro=0";
-const GOLD = "242, 193, 78";
-/** The stars drawn on the board by square, each with its count: they are drawn inside their piece's own element (so they slide with it). */
-const marks = (p: Page) => p.locator(`${BOARD_SEL.piece} .ac-art`).evaluateAll((els) => Object.fromEntries(els.map((e) => [(e.closest("piece") as HTMLElement).dataset.square!, Number((e as HTMLElement).dataset.stars)])));
-/** The starred pieces on the board that have their outline on, by square, each with its count. */
-const outlined = (p: Page) =>
-  p.locator(`${BOARD_SEL.piece}.ac-drawn .ac-art[data-outline="1"]`).evaluateAll((els) => Object.fromEntries(els.map((e) => [(e.closest("piece") as HTMLElement).dataset.square!, Number((e as HTMLElement).dataset.stars)])));
-/** The colors a starred piece's outline is drawn in (the stops of its gradient), as `#rrggbb` text. */
-const outlineColors = (art: Locator) => art.locator("linearGradient stop").evaluateAll((els) => els.map((e) => (e.getAttribute("stop-color") ?? "").toLowerCase()));
-const GOLD_STOPS = ["#ffd84d", "#f0a500"];
-const PRISM_STOPS = ["#22bfa9", "#1fb6cf", "#2fa3e6", "#5b84f0", "#8d68e6", "#d25ccb", "#ff6f73", "#ff9a5c"];
-/** Every phase change from now on, each with when and the stars on the board at that moment (`stepSeconds` reads the move step's length from it; `marksAt` the stars as a step began: the fight moves every 60 ms here, so a later read has seen moves). */
-async function watchPhases(p: Page) {
-  await p.evaluate((sel) => {
-    const root = document.querySelector<HTMLElement>(".ac-root")!;
-    const stars = () => Object.fromEntries([...document.querySelectorAll<HTMLElement>(`${sel} .ac-art`)].map((e) => [(e.closest("piece") as HTMLElement).dataset.square!, Number(e.dataset.stars)]));
-    const list: { phase: string; at: number; marks: Record<string, number> }[] = [{ phase: root.dataset.phase!, at: performance.now(), marks: stars() }];
-    (window as any).__phases = list;
-    new MutationObserver(() => {
-      if (list[list.length - 1]!.phase !== root.dataset.phase) list.push({ phase: root.dataset.phase!, at: performance.now(), marks: stars() });
-    }).observe(root, { attributes: true, attributeFilter: ["data-phase"] });
-  }, BOARD_SEL.piece);
-}
-const marksAt = async (p: Page, phase: string) => (await p.evaluate(() => (window as any).__phases as { phase: string; marks: Record<string, number> }[])).find((m) => m.phase === phase)!.marks;
-const stepSeconds = async (p: Page) => {
-  const list = await p.evaluate(() => (window as any).__phases as { phase: string; at: number }[]);
-  const start = list.find((m) => m.phase === "adjust")!;
-  const end = list.find((m) => m.at > start.at && m.phase !== "adjust")!;
-  return (end.at - start.at) / 1000;
-};
-const dotSquares = (p: Page) => p.locator(".ac-dot").evaluateAll((els) => els.map((e) => (e as HTMLElement).dataset.square!).sort());
-
-test("a star-up offer (v8): a gold card for a second star, a prismatic one for a third, the price 1, its piece drawn with the stars and outline it will have, nothing on the board for it and no silhouette; buying one adds no piece, takes 1, and the stars show on the piece", async ({ page }) => {
-  const errors = watchErrors(page);
-  await page.goto(STARS);
-  await expect(root(page)).toHaveAttribute("data-phase", "buy");
-  // A full board (level 4: four pieces) and four offers: a bishop, the knight's star-up, a pawn, the bishop's star-up.
-  expect(await offers(page)).toEqual([
-    { kind: "b", square: "a4" },
-    { kind: "n", square: "c2" },
-    { kind: "p", square: "e3" },
-    { kind: "b", square: "d2" },
-  ]);
-  await expect(page.locator(`${BOARD_SEL.piece}.white`)).toHaveCount(5);
-  expect(await marks(page)).toEqual({ g3: 2, d2: 2 });
-  // The cards: gold for the knight (it would be a 2-star), prismatic for the bishop (a 3-star), the others plain; a star-up costs 1, whatever the piece.
-  await expect(card(page, 1)).toHaveAttribute("data-up", "2");
-  await expect(card(page, 1)).toHaveClass(/\bup2\b/);
-  await expect(card(page, 3)).toHaveAttribute("data-up", "3");
-  await expect(card(page, 3)).toHaveClass(/\bup3\b/);
-  for (const slot of [0, 2]) await expect(card(page, slot)).not.toHaveClass(/\bup\b/);
-  await expect(card(page, 1).locator(".ac-cost b")).toHaveText("1");
-  await expect(card(page, 3).locator(".ac-cost b")).toHaveText("1");
-  await expect(card(page, 0).locator(".ac-cost b")).toHaveText("3");
-  await expect(card(page, 1)).toHaveAttribute("aria-label", /^Star up your knight on c2 to 2 stars, 1 gold/);
-  // The piece on a card is drawn with the stars it will become (2, then 3) and the outline of that many (gold, then prismatic); a plain card has neither.
-  await expect(card(page, 1).locator('.ac-art[data-stars="2"] .ac-star')).toHaveCount(2);
-  await expect(card(page, 3).locator('.ac-art[data-stars="3"] .ac-star')).toHaveCount(3);
-  await expect(card(page, 0).locator(".ac-art")).toHaveCount(0);
-  await expect(card(page, 1).locator('.ac-art[data-outline="1"]')).toHaveCount(1);
-  await expect(card(page, 3).locator('.ac-art[data-outline="1"]')).toHaveCount(1);
-  expect(await outlineColors(card(page, 1))).toEqual(expect.arrayContaining(GOLD_STOPS));
-  expect(await outlineColors(card(page, 3))).toEqual(expect.arrayContaining(PRISM_STOPS));
-  // (Teal and cyan lead the prismatic one, as in Eric's mock: no yellow and no plain green among its colors.)
-  expect((await outlineColors(card(page, 3)))[0]).toBe("#22bfa9");
-  // Gold: a gold border (a ring) and a glow that pulses (an animation on a box of its own); prismatic: a masked gradient ring in the same palette, and a glow.
-  const gold = await card(page, 1).evaluate((el) => ({ ring: getComputedStyle(el).boxShadow, glow: getComputedStyle(el, "::after").boxShadow, anim: getComputedStyle(el, "::after").animationName }));
-  expect(gold.ring).toContain(GOLD);
-  expect(gold.glow).not.toBe("none");
-  expect(gold.anim).toContain("ac-aura");
-  const prism = await card(page, 3).evaluate((el) => ({ bg: getComputedStyle(el, "::before").backgroundImage, glow: getComputedStyle(el, "::after").boxShadow, glowAnim: getComputedStyle(el, "::after").animationName }));
-  expect(prism.bg).toContain("linear-gradient");
-  expect(prism.bg).toContain("34, 191, 169");
-  expect(prism.bg).toContain("255, 154, 92");
-  expect(prism.glow).not.toBe("none");
-  expect(prism.glowAnim).toContain("ac-aura");
-  // The board is clean: nothing is drawn on a square or round a piece for a star-up (no ring, no box); the other two offers have their silhouettes.
-  await expect(page.locator(".ac-uptarget, .ac-uptile, .ac-starmark")).toHaveCount(0);
-  await expect(page.locator(".ac-sil")).toHaveCount(2);
-  await expect(silhouette(page, 1)).toHaveCount(0);
-  await expect(silhouette(page, 3)).toHaveCount(0);
-  // The odds pill is still the odds of a new piece.
-  await expect(page.locator(".ac-od[data-kind=p]")).toHaveAttribute("data-odds", "74");
-  // Buy the gold one: 1 gold, no piece added (the board was full, and a merge adds none), the knight stays on c2 and gains its stars; the level-up sound, a short line.
-  const before = await goldOf(page);
-  await tap(page, card(page, 1));
-  expect(await goldOf(page)).toBe(before - 1);
-  await expect(page.locator(`${BOARD_SEL.piece}.white`)).toHaveCount(5);
-  await expect(piece(page, "white", "knight", "c2")).toBeVisible();
-  await expect.poll(() => marks(page)).toEqual({ g3: 2, d2: 2, c2: 2 });
-  await expect(page.locator(`${BOARD_SEL.piece}[data-square="c2"] .ac-art[data-stars="2"] .ac-star`)).toHaveCount(2);
-  await expect(say(page)).toHaveText("c2 is 2 stars");
-  expect(await soundCount(page, "acStar2")).toBe(1);
-  expect(await soundCount(page, "acPlace")).toBe(0);
-  // The merge: a copy of the piece pops over it with a flash behind it, for a moment.
-  await expect(page.locator('.ac-merge[data-square="c2"]')).toHaveCount(1);
-  await expect(page.locator('.ac-merge[data-square="c2"]')).toHaveCount(0, { timeout: 3000 });
-  // The prismatic card is still there; buying it gives the bishop its third star, with the bigger sound, and the board still holds the same five.
-  await expect(card(page, 3)).toHaveAttribute("data-up", "3");
-  await tap(page, card(page, 3));
-  expect(await goldOf(page)).toBe(before - 2);
-  await expect.poll(() => marks(page)).toMatchObject({ d2: 3, c2: 2, g3: 2 });
-  await expect(page.locator(`${BOARD_SEL.piece}[data-square="d2"] .ac-art[data-stars="3"] .ac-star`)).toHaveCount(3);
-  await expect(say(page)).toHaveText("d2 is 3 stars");
-  expect(await soundCount(page, "acStar3")).toBe(1);
-  expect(await soundCount(page, "acStar2")).toBe(1);
-  await expect(page.locator(`${BOARD_SEL.piece}.white`)).toHaveCount(5);
-  // A 3-star can't star up again: nothing is offered on its square (the pawn-like case of a piece that can't star up).
-  for (const o of await offers(page)) expect(o.square).not.toBe("d2");
-  expect(errors).toEqual([]);
-});
-
-test("a star-up card is only tapped, never dragged to the bench, and with too little gold it says what is missing", { tag: "@phone-only" }, async ({ page }) => {
-  const errors = watchErrors(page);
-  await page.goto(STARS);
-  await expect(root(page)).toHaveAttribute("data-phase", "buy");
-  // Pressed and dragged to the bench: no ghost, nothing held, nothing paid, the card still there.
-  const from = middle((await card(page, 1).boundingBox())!);
-  await page.mouse.move(from.x, from.y);
-  await page.mouse.down();
-  await page.mouse.move(from.x + 8, from.y - 8, { steps: 2 });
-  const to = await benchMiddle(page);
-  await page.mouse.move(to.x, to.y, { steps: 8 });
-  await expect(ghosts(page)).toHaveCount(0);
-  await page.mouse.up();
-  expect(await goldOf(page)).toBe(10);
-  await expect(held(page)).toHaveCount(0);
-  await expect(card(page, 1)).toHaveAttribute("data-up", "2");
-  // Spend the 10 gold: hold the pawn offered for e3 (slot 2, 1 gold) and the pawn that rolls into its slot (f2 with this seed, 1 more), then two
-  // Buy XPs (4 each); the star-up cards (slots 1 and 3) stay. Then a tap on the star-up says what is missing (the 1, less the gold).
-  expect((await offers(page))[2]).toEqual({ kind: "p", square: "e3" });
-  await dragMouse(page, middle((await card(page, 2).boundingBox())!), await benchMiddle(page));
-  await expect(held(page)).toHaveCount(1);
-  expect((await offers(page))[2]).toEqual({ kind: "p", square: "f2" });
-  await dragMouse(page, middle((await card(page, 2).boundingBox())!), await benchMiddle(page));
-  await expect(held(page)).toHaveCount(2);
-  for (let i = 0; i < 2; i++) await tap(page, xpButton(page));
-  expect(await goldOf(page)).toBe(0);
-  await expect(card(page, 1)).toHaveAttribute("data-up", "2");
-  await tapGreyed(page, card(page, 1));
-  await expect(say(page)).toHaveText("Need 1 more");
-  await expect(card(page, 1)).toHaveClass(/\boff\b/);
-  expect(await soundCount(page, "acStar2")).toBe(0);
-  await expect.poll(() => marks(page)).toEqual({ g3: 2, d2: 2 });
-  expect(errors).toEqual([]);
-});
-
-test("a star-up for a held piece merges on the bench (1 gold, no piece added, its tile then shows its stars and outline, never a ring), and the stars stay through the round turn (Eric: stars up on the bench too)", { tag: "@phone-only" }, async ({ page }) => {
-  test.setTimeout(120_000);
-  const errors = watchErrors(page);
-  await page.goto(STARBENCH);
-  await expect(root(page)).toHaveAttribute("data-phase", "buy");
-  const tile = held(page).first();
-  await expect(held(page)).toHaveCount(1);
-  await expect(tile).toHaveAttribute("data-square", "f3");
-  await expect(tile).toHaveAttribute("data-stars", "1");
-  await expect(tile.locator(".ac-art")).toHaveCount(0);
-  // The offer for the held bishop is a gold card (it would be a 2-star), the held piece's tile is not ringed (the outline, once it is a 2-star, marks it), and nothing is drawn on the board for it (nothing lands).
-  expect((await offers(page))[2]).toEqual({ kind: "b", square: "f3" });
-  await expect(card(page, 2)).toHaveAttribute("data-up", "2");
-  await expect(card(page, 2).locator(".ac-cost b")).toHaveText("1");
-  await expect(tile).not.toHaveClass(/\bac-uptile\b/);
-  expect(await tile.evaluate((el) => getComputedStyle(el).boxShadow)).toBe("none");
-  await expect(page.locator(".ac-uptarget, .ac-uptile")).toHaveCount(0);
-  await expect(silhouette(page, 2)).toHaveCount(0);
-  await expect(page.locator(".ac-sil")).toHaveCount(3);
-  // Buy it: 1 gold, the tile gains two stars and the gold outline, the board still has only the king, the bench still holds one piece, the sound and the line.
-  const before = await goldOf(page);
-  await tap(page, card(page, 2));
-  expect(await goldOf(page)).toBe(before - 1);
-  await expect(tile).toHaveAttribute("data-stars", "2");
-  await expect(tile.locator('.ac-art[data-stars="2"] .ac-star')).toHaveCount(2);
-  await expect(tile.locator('.ac-art[data-outline="1"]')).toHaveCount(1);
-  expect(await outlineColors(tile)).toEqual(expect.arrayContaining(GOLD_STOPS));
-  await expect(tile).toHaveAttribute("data-square", "f3");
-  await expect(tile).toHaveClass(/\bmerged\b/);
-  await expect(tile).not.toHaveClass(/\bmerged\b/, { timeout: 3000 });
-  await expect(held(page)).toHaveCount(1);
-  await expect(page.locator(`${BOARD_SEL.piece}.white`)).toHaveCount(1);
-  await expect(say(page)).toHaveText("f3 is 2 stars");
-  expect(await soundCount(page, "acStar2")).toBe(1);
-  expect(await soundCount(page, "acPlace")).toBe(0);
-  // A held piece is not on the board: its stars don't count in the move step (5 s), and nothing glows.
-  await watchPhases(page);
-  await expect(root(page)).toHaveAttribute("data-phase", "adjust", { timeout: 15_000 });
-  await expect(page.locator(".ac-pick")).toHaveCount(0);
-  await expect(held(page).first().locator('.ac-art[data-stars="2"] .ac-star')).toHaveCount(2);
-  // Through the round (a side with only its king loses at once): the next round's bench holds it on the square turned with the colors, still with its two stars.
-  await expect(root(page)).toHaveAttribute("data-phase", "result", { timeout: 60_000 });
-  expect(await stepSeconds(page)).toBeLessThan(5.8);
-  await tap(page, page.getByRole("button", { name: "Next round" }));
-  await expect(root(page)).toHaveAttribute("data-round", "2");
-  await expect(held(page)).toHaveCount(1);
-  await expect(held(page).first()).toHaveAttribute("data-kind", "b");
-  await expect(held(page).first()).toHaveAttribute("data-square", "f6");
-  await expect(held(page).first()).toHaveAttribute("data-stars", "2");
-  await expect(held(page).first().locator('.ac-art[data-stars="2"] .ac-star')).toHaveCount(2);
-  expect(errors).toEqual([]);
-});
-
-test("the move step (v8): every starred piece carries its outline (no pulsing box) and may move once, a 2-star one legal move and a 3-star to any empty square of your half; any other piece says 'Not starred'; a moved piece is taken back by a tap; 5 s and 3 s for each starred piece", { tag: "@phone-only" }, async ({ page }) => {
-  test.setTimeout(120_000);
-  const errors = watchErrors(page);
-  await page.goto(STARMOVE);
-  await expect(root(page)).toHaveAttribute("data-phase", "buy");
-  await watchPhases(page);
-  await expect(root(page)).toHaveAttribute("data-phase", "adjust", { timeout: 15_000 });
-  await expect(stepLabel(page)).toHaveText("Move");
-  // Two starred pieces of yours and none of theirs: 5 s + 3 s x 2 = 11 s.
-  await expect(clockOf(page)).toHaveText(/^0:1[01]$/);
-  // Every starred piece has its outline (and no other piece does); no box pulses on any square (Eric Oct 22: the outline marks them), and no square is lit until one is picked. Their pieces show for real.
-  expect(await outlined(page)).toEqual({ d2: 3, g3: 2 });
-  await expect(page.locator(".ac-pick")).toHaveCount(0);
-  await expect(page.locator(".ac-dot")).toHaveCount(0);
-  await expect(page.locator(".ac-circle")).toHaveCount(0);
-  await expect(page.locator(".ac-shop")).toHaveClass(/shut/);
-  // Any other piece of yours: "Not starred" (a plain rook, a plain knight); the king stays put; nothing lights.
-  await tapSquare(page, "a1");
-  await expect(say(page)).toHaveText("Not starred");
-  await tapSquare(page, "c2");
-  await expect(say(page)).toHaveText("Not starred");
-  await tapSquare(page, "b1");
-  await expect(say(page)).toHaveText("King stays put");
-  await expect(page.locator(".ac-dot")).toHaveCount(0);
-  // The 2-star knight on g3: tapped, its legal squares light (e2, e4, f1, h1: the knight's jumps that stay on your half), and it is the picked piece.
-  await tapSquare(page, "g3");
-  expect(await dotSquares(page)).toEqual(["e2", "e4", "f1", "h1"]);
-  await expect(page.locator(".ac-picked")).toHaveCount(1);
-  // Refused, with the reason: their half, a square it can't reach (a drag onto a taken square too); nothing is used up.
-  await tapSquare(page, "e5");
-  await expect(say(page)).toHaveText("Your half only");
-  await tapSquare(page, "g4");
-  await expect(say(page)).toHaveText("Not a legal move");
-  await dragMouse(page, await center(page, "g3"), await center(page, "c2"));
-  await expect(say(page)).toHaveText("Square taken");
-  await expect(piece(page, "white", "knight", "g3")).toBeVisible();
-  await expect(page.locator(".ac-moved")).toHaveCount(0);
-  expect(await dotSquares(page)).toEqual(["e2", "e4", "f1", "h1"]);
-  // One legal move, by a tap on its dot: the knight lands on e2 with its stars and outline, is marked (tap ↩ to take it back), the dots go from it, the move sound plays.
-  await tapSquare(page, "e2");
-  await expect(piece(page, "white", "knight", "e2")).toBeVisible();
-  await expect(piece(page, "white", "knight", "g3")).toHaveCount(0);
-  await expect(page.locator('.ac-moved[data-square="e2"]')).toBeVisible();
-  await expect(page.locator(".ac-dot")).toHaveCount(0);
-  expect(await outlined(page)).toEqual({ e2: 2, d2: 3 });
-  expect(await marks(page)).toEqual({ e2: 2, d2: 3 });
-  expect(await soundCount(page, "move")).toBeGreaterThanOrEqual(1);
-  // The 3-star bishop on d2 isn't held to a bishop's moves: every empty square of your half lights (32 less the king and the four pieces' squares: 27).
-  await tapSquare(page, "d2");
-  const dots = await dotSquares(page);
-  expect(dots).toHaveLength(27);
-  for (const sqr of ["h4", "h1", "g3", "a4", "f1"]) expect(dots).toContain(sqr);
-  for (const sqr of ["b1", "a1", "c2", "d2", "e2"]) expect(dots).not.toContain(sqr);
-  await tapSquare(page, "d5");
-  await expect(say(page)).toHaveText("Your half only");
-  // To h4, by a drag (not a bishop's line from d2 either way).
-  await dragMouse(page, await center(page, "d2"), await center(page, "h4"));
-  await expect(piece(page, "white", "bishop", "h4")).toBeVisible();
-  await expect(page.locator('.ac-moved[data-square="h4"]')).toBeVisible();
-  expect(await marks(page)).toEqual({ e2: 2, h4: 3 });
-  await expect(page.locator(".ac-pick")).toHaveCount(0);
-  // Both have moved: no second move for either (a tap on a moved piece takes it back, and says nothing is used up).
-  await tapSquare(page, "e2");
-  await expect(piece(page, "white", "knight", "g3")).toBeVisible();
-  await expect(page.locator(".ac-moved")).toHaveCount(1);
-  expect(await outlined(page)).toEqual({ g3: 2, h4: 3 });
-  expect(await marks(page)).toEqual({ g3: 2, h4: 3 });
-  // The knight goes elsewhere this time: f1.
-  await dragMouse(page, await center(page, "g3"), await center(page, "f1"));
-  await expect(piece(page, "white", "knight", "f1")).toBeVisible();
-  await expect(page.locator(".ac-moved")).toHaveCount(2);
-  // The step is 11 seconds, then the fight: the pieces start where they were left, their stars on them.
-  await expect(root(page)).toHaveAttribute("data-phase", /^(fight|result|over)$/, { timeout: 15_000 });
-  expect(await stepSeconds(page)).toBeGreaterThan(10.8);
-  expect(await stepSeconds(page)).toBeLessThan(11.8);
-  expect(await marksAt(page, "fight")).toEqual({ f1: 2, h4: 3 });
-  expect(errors).toEqual([]);
-});
-
-test("the move step with nobody starred (v8): a flat 5 seconds to look at the board, nothing glows, any piece of yours says 'Not starred', then the fight", { tag: "@phone-only" }, async ({ page }) => {
-  test.setTimeout(90_000);
-  const errors = watchErrors(page);
-  await page.goto(MOVE);
-  await expect(root(page)).toHaveAttribute("data-phase", "buy");
-  // The knight for e2 and the pawns for a3 and h3 (plain pieces).
-  await tap(page, card(page, 0));
-  await tap(page, card(page, 1));
-  await tap(page, card(page, 2));
-  await expect(piece(page, "white", "knight", "e2")).toBeVisible();
-  await watchPhases(page);
-  await expect(root(page)).toHaveAttribute("data-phase", "adjust", { timeout: 15_000 });
-  await expect(clockOf(page)).toHaveText(/^0:0[45]$/);
-  await expect(stepLabel(page)).toHaveText("Move");
-  await expect(page.locator(".ac-pick")).toHaveCount(0);
-  await expect(page.locator(".ac-dot")).toHaveCount(0);
-  await expect(page.locator(`${BOARD_SEL.piece} .ac-art`)).toHaveCount(0);
-  await tapSquare(page, "e2");
-  await expect(say(page)).toHaveText("Not starred");
-  await tapSquare(page, "a3");
-  await expect(say(page)).toHaveText("Not starred");
-  await tapSquare(page, "d1");
-  await expect(say(page)).toHaveText("King stays put");
-  await expect(page.locator(".ac-dot")).toHaveCount(0);
-  await expect(page.locator(".ac-moved")).toHaveCount(0);
-  await expect(root(page)).toHaveAttribute("data-phase", /^(fight|result|over)$/, { timeout: 12_000 });
-  expect(await stepSeconds(page)).toBeGreaterThan(4.8);
-  expect(await stepSeconds(page)).toBeLessThan(5.7);
-  // The step runs even with nothing to move (no skip), also when neither side has a piece that can: here with only a king, as in v7's "no piece can move" case.
-  expect(errors).toEqual([]);
-});
-
-test("the bot's stars (v8): a starred piece of theirs shows its stars once it is revealed (a circle shows none), all of them show in the move step, and the step runs 5 s plus 3 s for each", { tag: "@phone-only" }, async ({ page }) => {
-  test.setTimeout(90_000);
-  const errors = watchErrors(page);
-  await page.goto(BOTSTARS);
-  await expect(root(page)).toHaveAttribute("data-phase", "buy");
-  await watchPhases(page);
-  // The 2-star knight on c7 is the first revealed (1.5 s); the 3-star bishop on f8 stays a plain circle until its reveal (4.5 s).
-  await expect.poll(() => marks(page), { timeout: 4000 }).toEqual({ c7: 2 });
-  await expect(page.locator('.ac-circle[data-square="f8"]')).toHaveCount(1);
-  await expect.poll(() => marks(page), { timeout: 5000 }).toEqual({ c7: 2, f8: 3 });
-  await expect(root(page)).toHaveAttribute("data-phase", "buy");
-  // The move step: all of their stars show, none of yours; 5 s + 3 s x 2 = 11 s even though you have no star.
-  await expect(root(page)).toHaveAttribute("data-phase", "adjust", { timeout: 10_000 });
-  await expect(clockOf(page)).toHaveText(/^0:1[01]$/);
-  expect(await marks(page)).toEqual({ c7: 2, f8: 3 });
-  await expect(page.locator(`${BOARD_SEL.piece}.black[data-square="c7"] .ac-art[data-stars="2"] .ac-star`)).toHaveCount(2);
-  await expect(page.locator(`${BOARD_SEL.piece}.black[data-square="f8"] .ac-art[data-stars="3"] .ac-star`)).toHaveCount(3);
-  // (Theirs have the outline too, once shown, and white stars on their black pieces; yours would have black stars on your white ones.)
-  expect(await outlined(page)).toEqual({ c7: 2, f8: 3 });
-  expect(await page.locator(`${BOARD_SEL.piece}.black .ac-star`).first().evaluate((el) => getComputedStyle(el).fill)).toBe("rgb(255, 255, 255)");
-  await expect(page.locator(".ac-pick")).toHaveCount(0);
-  // Their stars are theirs: nothing of theirs can be moved or lit by you.
-  await tapSquare(page, "c7");
-  await expect(page.locator(".ac-dot")).toHaveCount(0);
-  await expect(root(page)).toHaveAttribute("data-phase", /^(fight|result|over)$/, { timeout: 15_000 });
-  expect(await stepSeconds(page)).toBeGreaterThan(10.8);
-  expect(await stepSeconds(page)).toBeLessThan(11.8);
-  // The fight begins from their pieces as they stood (their move shows a moment later, with the stars on the pieces moved).
-  expect(await marksAt(page, "fight")).toEqual({ c7: 2, f8: 3 });
-  expect(errors).toEqual([]);
-});
-
-test("stars follow their pieces through the fight, and the survivors' refund counts what was paid for them (the price and 1 for each star above the first)", { tag: "@phone-only" }, async ({ page }) => {
-  test.setTimeout(240_000);
-  const errors = watchErrors(page);
-  // (The move step off: the fight starts from the board as bought.)
-  await page.goto(`${STARMOVE}&adjust=0`);
-  await expect(root(page)).toHaveAttribute("data-phase", "buy");
-  await watchPhases(page);
-  await expect(root(page)).toHaveAttribute("data-phase", "fight", { timeout: 20_000 });
-  expect(await marksAt(page, "fight")).toEqual({ g3: 2, d2: 3 });
-  // A star is always on a piece, as a part of it (read in one go: the fight moves every 60 ms here): sampled through the fight, and once it is over; none is on a piece that is fading away.
-  const consistent = () => page.evaluate((sel) => [...document.querySelectorAll<HTMLElement>(`${sel} .ac-art`)].every((a) => !!a.closest("piece[data-square]") && !a.closest("piece.fading")), BOARD_SEL.piece);
-  for (let i = 0; i < 6; i++) {
-    await page.waitForTimeout(700);
-    if ((await root(page).getAttribute("data-phase")) !== "fight") break;
-    await expect.poll(consistent, { timeout: 3000 }).toBe(true);
-  }
-  await expect(root(page)).toHaveAttribute("data-phase", /^(result|over)$/, { timeout: 200_000 });
-  expect(await consistent()).toBe(true);
-  // The refund in the result's gold line: 25% of what was paid for the pieces of yours still standing (their prices and 1 for each star above the first), to the nearest whole gold.
-  // (Read once the last capture has faded off the board: a piece taken on the fight's last move is drawn for 220 ms more,
-  // `.fading`, and isn't a survivor. Counted, it read 28 against the game's right 20, once in CI, Oct 24.)
-  await expect(page.locator(`${BOARD_SEL.piece}.fading`)).toHaveCount(0);
-  const left = await page.locator(`${BOARD_SEL.piece}.white:not(.king):not(.fading)`).evaluateAll((els) => els.map((e) => ({ square: (e as HTMLElement).dataset.square!, kind: ["knight", "bishop", "rook", "queen", "pawn"].find((k) => e.classList.contains(k))! })));
-  const m = await marks(page);
-  const kindPrice: Record<string, number> = { knight: 3, bishop: 3, rook: 5, queen: 9, pawn: 1 };
-  const paid = left.reduce((sum, p) => sum + kindPrice[p.kind]! + 1 * ((m[p.square] ?? 1) - 1), 0);
-  const gold = (await page.locator(".ac-card-gold").innerText()).match(/(\d+) survivors/);
-  // (A refund that rounds to 0 is left out of the line, as every empty part is.)
-  if (Math.round(paid * 0.25)) expect(Number(gold![1])).toBe(Math.round(paid * 0.25));
-  else expect(gold).toBeNull();
-  expect(errors).toEqual([]);
-});
-
-/** The geometry of every starred picture matching `sel`: its box (the piece's own), each star's box, and the box of the square's name beside it (a bench tile's). */
-const starBoxes = (p: Page, sel: string) =>
-  p.evaluate((q) => {
-    const box = (r: DOMRect) => ({ x: r.x, y: r.y, width: r.width, height: r.height });
-    return [...document.querySelectorAll<SVGElement>(q)].map((art) => ({
-      n: Number(art.dataset.stars),
-      white: !!art.closest("piece.white, .ac-bench.you, .ac-buy"),
-      art: box(art.getBoundingClientRect()),
-      stars: [...art.querySelectorAll(".ac-star")].map((st) => ({ ...box(st.getBoundingClientRect()), fill: getComputedStyle(st).fill })),
-      name: art.closest(".ac-slot")?.querySelector("em") ? box(art.closest(".ac-slot")!.querySelector("em")!.getBoundingClientRect()) : null,
-    }));
-  }, sel);
-
-test("the stars' size and place (v8, Eric Oct 22: very tiny, in the body of the piece): at most 12% of the square, two side by side or three in a triangle of at most 28% of its width, inside the piece's box and clear of the square's name, black on white pieces; on the board, the bench and the card, at every phone size and on a computer, and nothing scrolls", async ({ page }) => {
-  test.setTimeout(120_000);
-  const errors = watchErrors(page);
-  const sizes: [number, number][] = phone() ? [[320, 568], [360, 640], [393, 730], [428, 777]] : [[1280, 800], [1280, 600]];
-  const rect = (r: { x: number; y: number; width: number; height: number }) => ({ l: r.x, r: r.x + r.width, t: r.y, b: r.y + r.height });
-  const check = (boxes: Awaited<ReturnType<typeof starBoxes>>, what: string) => {
-    expect(boxes.length, `${what}: pictures`).toBeGreaterThan(0);
-    for (const o of boxes) {
-      const art = rect(o.art);
-      expect(o.stars, `${what}: one star each`).toHaveLength(o.n);
-      let group = { l: 1e9, r: -1e9, t: 1e9, b: -1e9 };
-      for (const st of o.stars) {
-        const r = rect(st);
-        // Tiny: no star is wider than 12% of the piece (a pixel of room for the edge), and none is a speck under 7%.
-        expect(st.width, `${what}: a star is at most 12% of the square`).toBeLessThanOrEqual(o.art.width * 0.12 + 1);
-        expect(st.width, `${what}: a star is at least 7% of the square`).toBeGreaterThanOrEqual(o.art.width * 0.07 - 0.6);
-        group = { l: Math.min(group.l, r.l), r: Math.max(group.r, r.r), t: Math.min(group.t, r.t), b: Math.max(group.b, r.b) };
-        // Black on a white piece, white on a black one.
-        expect(st.fill, `${what}: the stars' color`).toBe(o.white ? "rgb(0, 0, 0)" : "rgb(255, 255, 255)");
-      }
-      // In the middle of the body: well inside the box, no more than 28% of its width and 24% of its height.
-      expect(group.l, `${what}: left`).toBeGreaterThan(art.l + o.art.width * 0.2);
-      expect(group.r, `${what}: right`).toBeLessThan(art.r - o.art.width * 0.2);
-      expect(group.t, `${what}: top`).toBeGreaterThan(art.t + o.art.height * 0.2);
-      expect(group.b, `${what}: bottom`).toBeLessThan(art.b - o.art.height * 0.1);
-      expect(group.r - group.l, `${what}: width`).toBeLessThanOrEqual(o.art.width * 0.28 + 1);
-      expect(group.b - group.t, `${what}: height`).toBeLessThanOrEqual(o.art.height * 0.24 + 1);
-      if (o.n === 2) expect(Math.abs(o.stars[0]!.y - o.stars[1]!.y), `${what}: two stars side by side`).toBeLessThan(0.5);
-      else expect(o.stars[0]!.y + o.stars[0]!.height / 2, `${what}: three stars, one above and two below`).toBeLessThan(o.stars[1]!.y + o.stars[1]!.height / 2 - 0.5);
-      // Clear of the square's name (a bench tile's corner).
-      if (o.name) {
-        const nm = rect(o.name);
-        expect(group.r <= nm.l + 0.5 || group.b <= nm.t + 0.5 || group.l >= nm.r - 0.5, `${what}: clear of the square's name`).toBe(true);
-      }
-    }
-  };
-  for (const [w, h] of sizes) {
-    await page.setViewportSize({ width: w, height: h });
-    // The board: starred pieces (g3, d2), and after the merge c2 too; the cards: a gold and a prismatic one.
-    await page.goto(STARS);
-    await expect(root(page)).toHaveAttribute("data-phase", "buy");
-    await tap(page, card(page, 1));
-    await expect.poll(() => marks(page)).toEqual({ g3: 2, d2: 2, c2: 2 });
-    check(await starBoxes(page, `${BOARD_SEL.piece} .ac-art`), `${w}: board`);
-    check(await starBoxes(page, ".ac-buy[data-up] .ac-art"), `${w}: cards`);
-    for (const c of await page.locator(".ac-buy[data-up]").all()) expect((await c.boundingBox())!.width, `${w}: a card keeps its width`).toBeGreaterThan(50);
-    // The pieces drawn whole by the outline sit on their square exactly: the piece's own box is the square's.
-    for (const e of await page.locator(`${BOARD_SEL.piece}.ac-drawn`).all()) {
-      const box = (await e.boundingBox())!;
-      const sq = await center(page, (await e.getAttribute("data-square"))!);
-      expect(Math.abs(box.x + box.width / 2 - sq.x), `${w}: a starred piece is centered on its square`).toBeLessThan(1);
-      expect(Math.abs(box.y + box.height / 2 - sq.y)).toBeLessThan(1);
-    }
-    // The bench: a held 2-star and 3-star, stars in the tile, clear of the square's name.
-    await page.goto("/autochess?quick=1&seed=16&benchstars=q@h3:3,b@f3:2&intro=0");
-    await expect(root(page)).toHaveAttribute("data-phase", "buy");
-    await expect(held(page)).toHaveCount(2);
-    check(await starBoxes(page, ".ac-bench.you .ac-slot .ac-art"), `${w}: bench`);
-    // Nothing scrolls.
-    expect(await page.evaluate(() => document.scrollingElement!.scrollHeight <= document.scrollingElement!.clientHeight + 1)).toBe(true);
-  }
-  expect(errors).toEqual([]);
-});
-
-test("the stars' outlines (v8, Eric Oct 22: a gold border for the 2-star units, prismatic for the 3-star, as the cards'): on starred pieces on the board and the bench while buying, placing and moving, none on a square; off in the fight and the result (the tiny stars stay); `?fightglow=1` keeps them on", async ({ page }) => {
-  test.setTimeout(240_000);
-  const errors = watchErrors(page);
-  for (const glow of [false, true]) {
-    // (The move step off: the fight starts from the board as bought, a 2-star knight on g3 and a 3-star bishop on d2, with the benched 2-star bishop and 3-star knight.)
-    await page.goto(`${STARMOVE}&adjust=0&benchstars=b@f3:2,n@h2:3${glow ? "&fightglow=1" : ""}`);
-    await expect(root(page)).toHaveAttribute("data-phase", "buy");
-    // Buying: the outline on both pieces of the board and both bench tiles (gold for a 2-star, prismatic for a 3-star), the pieces drawn whole by it (their CSS picture off), and nothing on the squares.
-    expect(await outlined(page)).toEqual({ g3: 2, d2: 3 });
-    await expect(page.locator(`${BOARD_SEL.piece}.ac-drawn`)).toHaveCount(2);
-    expect(await outlineColors(page.locator(`${BOARD_SEL.piece}[data-square="g3"]`))).toEqual(expect.arrayContaining(GOLD_STOPS));
-    expect(await outlineColors(page.locator(`${BOARD_SEL.piece}[data-square="d2"]`))).toEqual(expect.arrayContaining(PRISM_STOPS));
-    for (const [slot, colors] of [[0, GOLD_STOPS], [1, PRISM_STOPS]] as const) {
-      await expect(held(page).nth(slot).locator('.ac-art[data-outline="1"]')).toHaveCount(1);
-      expect(await outlineColors(held(page).nth(slot))).toEqual(expect.arrayContaining(colors));
-    }
-    await expect(page.locator(".ac-uptarget, .ac-uptile, .ac-pick, .ac-starmark")).toHaveCount(0);
-    expect(await page.evaluate((sel) => getComputedStyle(document.querySelector(`${sel}.ac-drawn`)!).backgroundImage, BOARD_SEL.piece)).toBe("none");
-    await watchPhases(page);
-    await expect(root(page)).toHaveAttribute("data-phase", "fight", { timeout: 20_000 });
-    // The fight: only the tiny stars stay (outline and its drawn piece off, the board's own picture back), unless the setting keeps them. Read as the fight began and when it is over.
-    const at = await page.evaluate(() => ({ stars: document.querySelectorAll(".hb-board piece .ac-star").length, outlines: document.querySelectorAll('.hb-board piece .ac-art[data-outline="1"]').length, drawn: document.querySelectorAll(".hb-board piece.ac-drawn").length }));
-    expect(at.stars, "the stars are there in the fight").toBeGreaterThan(0);
-    if (glow) expect(at.outlines, "outlines kept in the fight").toBeGreaterThan(0);
-    else expect(at.outlines, "no outline in the fight").toBe(0);
-    expect(at.drawn).toBe(at.outlines);
-    await expect(root(page)).toHaveAttribute("data-phase", /^(result|over)$/, { timeout: 200_000 });
-    const end = await page.evaluate(() => [...document.querySelectorAll<HTMLElement>(".hb-board piece .ac-art")].map((a) => a.dataset.outline));
-    for (const o of end) expect(o, glow ? "outlines kept in the result" : "no outline in the result").toBe(glow ? "1" : "0");
-    // The bench tiles in the fight and the result: stars only, too.
-    for (const o of await page.locator(".ac-bench.you .ac-art").evaluateAll((els) => els.map((e) => (e as HTMLElement).dataset.outline))) expect(o).toBe(glow ? "1" : "0");
-  }
-  expect(errors).toEqual([]);
-});
-
-test("a starred piece moved in the move step slides like any other, its outline and stars riding it; one dragged carries them in its ghost (a real finger's drag), and lands with them (v8 star look)", async ({ page }) => {
-  test.setTimeout(120_000);
-  const errors = watchErrors(page);
-  await page.goto(STARMOVE);
-  await expect(root(page)).toHaveAttribute("data-phase", "adjust", { timeout: 20_000 });
-  // The knight on g3 to e2 by two taps, sampled every frame: its element slides (a class and a box that moves through in-between places), and its picture is in it, whole, each frame.
-  await tapSquare(page, "g3");
-  await page.evaluate((sel) => {
-    const out: { t: number; square: string; anim: boolean; x: number; ax: number; aw: number; w: number; outline: string }[] = [];
-    (window as any).__slide = out;
-    const t0 = performance.now();
-    const frame = () => {
-      const e = [...document.querySelectorAll<HTMLElement>(sel)].find((q) => q.querySelector('.ac-art[data-stars="2"]'));
-      if (e) {
-        const r = e.getBoundingClientRect();
-        const a = e.querySelector(".ac-art")!.getBoundingClientRect();
-        out.push({ t: performance.now() - t0, square: e.dataset.square!, anim: e.classList.contains("anim"), x: r.x, ax: a.x - r.x, aw: a.width - r.width, w: r.width, outline: e.querySelector<HTMLElement>(".ac-art")!.dataset.outline! });
-      }
-      if (performance.now() - t0 < 900) requestAnimationFrame(frame);
-    };
-    requestAnimationFrame(frame);
-  }, BOARD_SEL.piece);
-  await tapSquare(page, "e2");
-  await page.waitForTimeout(1000);
-  const samples = await page.evaluate(() => (window as any).__slide as { t: number; square: string; anim: boolean; x: number; ax: number; aw: number; w: number; outline: string }[]);
-  const from = samples.find((s) => s.square === "g3")!;
-  const last = samples[samples.length - 1]!;
-  expect(last.square).toBe("e2");
-  const between = samples.filter((s) => s.x < from.x - 3 && s.x > last.x + 3);
-  expect(between.length, "the piece is seen between g3 and e2, not only at the ends").toBeGreaterThanOrEqual(3);
-  expect(samples.some((s) => s.anim)).toBe(true);
-  for (const s of samples) {
-    expect(Math.abs(s.ax), "the picture is at the piece's own box").toBeLessThan(0.5);
-    expect(Math.abs(s.aw)).toBeLessThan(0.5);
-    expect(s.outline, "the outline is on through the slide").toBe("1");
-  }
-  for (let i = 1; i < samples.length; i++) expect(samples[i]!.x, "it moves one way").toBeLessThanOrEqual(samples[i - 1]!.x + 0.5);
-  expect(await marks(page)).toEqual({ e2: 2, d2: 3 });
-  // A finger's drag of the 3-star bishop: its ghost has the stars and the outline (the whole piece, no CSS picture), the board's own piece stays put under the usual picked highlight, and the drop lands them on h4.
-  const hold = await holdTouch(page, await center(page, "d2"), await center(page, "h4"));
-  await expect(ghosts(page)).toHaveCount(1);
-  await expect(page.locator('.ac-ghost .ac-art[data-stars="3"][data-outline="1"]')).toHaveCount(1);
-  await expect(page.locator(".ac-ghost .ac-art .ac-star")).toHaveCount(3);
-  await expect(page.locator(".ac-ghost piece")).toHaveCount(0);
-  expect(await outlineColors(page.locator(".ac-ghost"))).toEqual(expect.arrayContaining(PRISM_STOPS));
-  await expect(page.locator(".ac-picked")).toHaveCount(1);
-  expect(await marks(page)).toEqual({ e2: 2, d2: 3 });
-  await hold.end();
-  await expect(ghosts(page)).toHaveCount(0);
-  await expect(piece(page, "white", "bishop", "h4")).toBeVisible();
-  await expect.poll(() => marks(page)).toEqual({ e2: 2, h4: 3 });
-  expect(await outlined(page)).toEqual({ e2: 2, h4: 3 });
-  expect(errors).toEqual([]);
-});
-
-test("reduced motion (v8): a star-up card keeps its border and glow but nothing moves, the outlines are still there (and still), and a merge pops nothing", async ({ page }) => {
-  const errors = watchErrors(page);
-  await page.emulateMedia({ reducedMotion: "reduce" });
-  await page.goto(STARS);
-  await expect(root(page)).toHaveAttribute("data-phase", "buy");
-  const gold = await card(page, 1).evaluate((el) => ({ ring: getComputedStyle(el).boxShadow, glow: getComputedStyle(el, "::after").boxShadow, anim: getComputedStyle(el, "::after").animationName }));
-  expect(gold.ring).toContain(GOLD);
-  expect(gold.glow).not.toBe("none");
-  expect(gold.anim).toBe("none");
-  const prism = await card(page, 3).evaluate((el) => ({ bg: getComputedStyle(el, "::before").backgroundImage, anim: getComputedStyle(el, "::before").animationName, glowAnim: getComputedStyle(el, "::after").animationName }));
-  expect(prism.bg).toContain("linear-gradient");
-  expect(prism.anim).toBe("none");
-  expect(prism.glowAnim).toBe("none");
-  // The outlines are on (the cards', the board's), and the prismatic one does not shift its colors: no animation in it.
-  await expect(card(page, 1).locator('.ac-art[data-outline="1"]')).toHaveCount(1);
-  await expect(card(page, 3).locator('.ac-art[data-outline="1"]')).toHaveCount(1);
-  await expect(card(page, 3).locator("animateTransform")).toHaveCount(0);
-  expect(await outlined(page)).toEqual({ g3: 2, d2: 2 });
-  await tap(page, card(page, 1));
-  await expect.poll(() => marks(page)).toMatchObject({ c2: 2 });
-  expect(await outlined(page)).toMatchObject({ c2: 2 });
-  // (The copy of the piece that pops is not shown.)
-  expect(await page.locator(".ac-merge").evaluateAll((els) => els.every((e) => getComputedStyle(e).display === "none"))).toBe(true);
-  expect(errors).toEqual([]);
-});
-
-test("the prismatic outline of the shop card shifts its colors slowly (and only that one: the board's and the bench's stay still)", async ({ page }) => {
-  const errors = watchErrors(page);
-  await page.goto(STARS);
-  await expect(root(page)).toHaveAttribute("data-phase", "buy");
-  await expect(card(page, 3).locator("animateTransform")).toHaveCount(1);
-  await expect(card(page, 1).locator("animateTransform")).toHaveCount(0);
-  await expect(page.locator(`${BOARD_SEL.piece} animateTransform`)).toHaveCount(0);
-  expect(errors).toEqual([]);
-});
-
-test("a star-up's sound is asked for muted when sound is off, and unmuted when it is on", { tag: "@phone-only" }, async ({ page }) => {
-  const errors = watchErrors(page);
-  await page.addInitScript(() => localStorage.setItem("brc.muted", "1"));
-  await page.goto(STARS);
-  await expect(root(page)).toHaveAttribute("data-phase", "buy");
-  await tap(page, card(page, 1));
-  await tap(page, card(page, 3));
-  const log = await page.evaluate(() => ((window as any).__soundLog as string[]).filter((l) => /^acStar/.test(l)));
-  expect(log.some((l) => l.startsWith("acStar2:"))).toBe(true);
-  expect(log.some((l) => l.startsWith("acStar3:"))).toBe(true);
-  expect(log.every((l) => l.endsWith(":muted"))).toBe(true);
-  expect(errors).toEqual([]);
-});
-
-// ---- The meeting before round 1 (v9, Eric Oct 24) ----
-
-/** The corners' pawns, names and bars: hidden in the meeting, back as the middle pawns puff away. */
-const corners = (p: Page) => p.locator(".ac-stage, .ac-who, .ac-bars");
-
-test("the meeting before round 1 (Eric, Oct 24): both custom pawns stand in the board's middle, side by side, the corners' pawns, names and bars hidden, a countdown and the quick chat; then they puff away, the corners come in and ACTION PHASE begins", async ({ page }) => {
-  test.setTimeout(120_000);
-  const errors = watchErrors(page);
-  await page.goto("/autochess?quick=1&seed=9");
-  await expect(root(page)).toHaveAttribute("data-phase", "meet");
-  for (const c of await corners(page).all()) await expect(c).toBeHidden();
-  const frame = (await page.locator(".ac-frame").boundingBox())!;
-  const corner = (await page.locator(".ac-me .ac-pawn").boundingBox())!;
-  // (The pawns drop in first, a moment: measure them at rest.)
-  await page.waitForFunction(() => [...document.querySelectorAll(".ac-meet-pawn")].every((e) => e.getAnimations().every((a) => a.playState !== "running")));
-  const mine = (await page.locator(".ac-meet-side.you .ac-meet-pawn").boundingBox())!;
-  const theirs = (await page.locator(".ac-meet-side.them .ac-meet-pawn").boundingBox())!;
-  const mid = (b: { x: number; width: number }) => b.x + b.width / 2;
-  const fx = frame.x + frame.width / 2;
-  const fy = frame.y + frame.height / 2;
-  // In the middle of the board, yours on the left and theirs on the right, side by side and not overlapping.
-  expect(Math.abs((mid(mine) + mid(theirs)) / 2 - fx), "the pair is centered across the board").toBeLessThanOrEqual(3);
-  expect(mid(mine), "yours is left").toBeLessThan(fx);
-  expect(mid(theirs), "theirs is right").toBeGreaterThan(fx);
-  expect(mine.x + mine.width, "they don't overlap").toBeLessThanOrEqual(theirs.x);
-  expect(Math.abs(mine.y + mine.height / 2 - fy), "they stand on the board's middle row").toBeLessThanOrEqual(frame.height * 0.2);
-  // About twice a corner pawn's size.
-  expect(mine.height / corner.height, "each about twice a corner pawn").toBeGreaterThanOrEqual(1.6);
-  // The countdown under them, the quick chat: four lines from the list.
-  await expect(page.locator(".ac-meet-count")).toHaveText(/^Starting in [12]$/);
-  const lines = await page.locator(".ac-meet-chat .ac-chat").allInnerTexts();
-  expect(lines).toEqual([...QUICK_CHAT]);
-  const count = (await page.locator(".ac-meet-count").boundingBox())!;
-  const chat = (await page.locator(".ac-meet-chat").boundingBox())!;
-  for (const b of [mine, theirs, count, chat]) {
-    expect(b.x >= frame.x - 0.5 && b.x + b.width <= frame.x + frame.width + 0.5, "inside the board, across").toBe(true);
-    expect(b.y >= frame.y - 0.5 && b.y + b.height <= frame.y + frame.height + 0.5, "inside the board, down").toBe(true);
-  }
-  expect(count.y, "the countdown is under the pawns").toBeGreaterThanOrEqual(mine.y + mine.height - 1);
-  expect(chat.y, "the quick chat is under the countdown").toBeGreaterThanOrEqual(count.y + count.height - 1);
-  // Then the buying begins: the middle pawns are gone, the corners and bars are back, and ACTION PHASE shows.
-  await expect(root(page)).toHaveAttribute("data-phase", "buy", { timeout: 8000 });
-  await expect(page.locator(".ac-meet")).toHaveCount(0, { timeout: 3000 });
-  for (const c of await corners(page).all()) await expect(c).toBeVisible();
-  await expect(page.locator(".ac-who .ac-name")).toHaveText("Bot");
-  await expect(page.locator(".ac-banner .cc-num.ac-phase")).toHaveText("ACTION PHASE");
-  expect(errors).toEqual([]);
-});
-
-test("the quick chat (v9): a tap shows its line in a bubble over your pawn; the bot answers once with a line from the same list; the next tap replaces the bubble; the shop can't be used in the meeting", { tag: "@phone-only" }, async ({ page }) => {
-  const errors = watchErrors(page);
-  await page.goto("/autochess?quick=1&seed=9");
-  await expect(root(page)).toHaveAttribute("data-phase", "meet");
-  // The shop is shut: a tap on a card buys nothing, and the gold and the bench stay as they were.
-  const gold = await goldOf(page);
-  await tapGreyed(page, card(page, 0));
-  expect(await goldOf(page)).toBe(gold);
-  await expect(held(page)).toHaveCount(0);
-  // A line of yours: its bubble, over your pawn.
-  const yours = page.locator(".ac-meet-side.you .ac-say");
-  const theirs = page.locator(".ac-meet-side.them .ac-say");
-  await tap(page, page.getByRole("button", { name: "Hello!" }));
-  await expect(yours).toHaveText("Hello!");
-  const bubble = (await yours.boundingBox())!;
-  // (The pawn drops in first: measure it at rest.)
-  await page.waitForFunction(() => [...document.querySelectorAll(".ac-meet-pawn")].every((e) => e.getAnimations().every((a) => a.playState !== "running")));
-  const pawn = (await page.locator(".ac-meet-side.you .ac-meet-pawn").boundingBox())!;
-  expect(bubble.y + bubble.height, "the bubble is over the pawn").toBeLessThanOrEqual(pawn.y + 2);
-  // The bot answers once, with a line of the same list, in a bubble over its pawn.
-  await expect(theirs).toHaveCount(1, { timeout: 4000 });
-  expect(QUICK_CHAT).toContain(await theirs.innerText());
-  // The next line replaces yours: one bubble at a time.
-  await tap(page, page.getByRole("button", { name: "Nice outfit." }));
-  await expect(yours).toHaveText("Nice outfit.");
-  await expect(yours).toHaveCount(1);
-  expect(errors).toEqual([]);
-});
-
-test("the meeting fits the board: at 320, 390, 428 px wide and on a computer, the pawns, the countdown, the quick chat and the bubbles stay inside the board (and the screen)", async ({ page }) => {
-  // (Its sizes are its own, a computer's among them: one project runs them, Nov 2.)
-  test.skip(!phone(), "the sizes are the test's own: the phone project runs them all, the computer's too");
-  test.setTimeout(180_000);
-  // (The full 10 s meeting, so there is time to look at it.)
-  for (const [w, h] of [
-    [320, 568],
-    [390, 844],
-    [428, 926],
-    [1280, 800],
-  ] as const) {
-    await page.setViewportSize({ width: w, height: h });
-    await page.goto("/autochess?seed=9");
-    await expect(root(page)).toHaveAttribute("data-phase", "meet");
-    await tap(page, page.getByRole("button", { name: "Hello!" }));
-    await expect(page.locator(".ac-meet-side.them .ac-say")).toHaveCount(1, { timeout: 4000 });
-    const frame = (await page.locator(".ac-frame").boundingBox())!;
-    const inside = async (sel: string) => {
-      for (const b of await page.locator(sel).evaluateAll((els) => els.map((e) => e.getBoundingClientRect().toJSON()))) {
-        expect(b.x >= frame.x - 0.5 && b.x + b.width <= frame.x + frame.width + 0.5, `${sel} inside the board, across at ${w}`).toBe(true);
-        expect(b.y >= frame.y - 0.5 && b.y + b.height <= frame.y + frame.height + 0.5, `${sel} inside the board, down at ${w}`).toBe(true);
-      }
-    };
-    await inside(".ac-meet-pawn");
-    await inside(".ac-meet-count");
-    await inside(".ac-meet-chat");
-    // The bubbles: over the board, and on the screen.
-    for (const b of await page.locator(".ac-say").evaluateAll((els) => els.map((e) => e.getBoundingClientRect().toJSON()))) {
-      expect(b.x >= 0 && b.x + b.width <= w, `a bubble on the screen at ${w}`).toBe(true);
-      expect(b.y >= frame.y - 0.5, `a bubble below the board's top at ${w}`).toBe(true);
-    }
-    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `no sideways scroll at ${w}`).toBe(true);
-    await expect(root(page)).toHaveAttribute("data-phase", "buy", { timeout: 15000 });
-  }
-});
-
-test("the shop area is one panel (v9): the gold row, Buy XP, Reroll and the four cards inside its rounded edge with about 10 px to spare, and on a phone the board keeps the column's width", async ({ page }) => {
-  const errors = watchErrors(page);
-  // (A phone at 390 x 844: a taller screen than the project's own 390 x 664, where the board is the height's, not the column's.)
-  if (phone()) await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto(PLAIN);
-  await expect(root(page)).toHaveAttribute("data-phase", "buy");
-  const box = async (sel: string) => (await page.locator(sel).first().boundingBox())!;
-  const dock = await box(".ac-dock");
-  const goldRow = await box(".ac-goldrow");
-  const cards = await box(".ac-cards");
-  const btns = await box(".ac-btns");
-  // The gold row, the buttons and the cards sit inside the panel's edge (its 10 px of padding and 1 px of border).
-  expect(goldRow.x - dock.x, "the gold row's left inset").toBeCloseTo(11, 0);
-  expect(dock.x + dock.width - (cards.x + cards.width), "the cards' right inset").toBeCloseTo(11, 0);
-  expect(btns.x - dock.x, "the buttons' left inset").toBeCloseTo(11, 0);
-  expect(cards.y + cards.height, "the cards' bottom inset").toBeLessThanOrEqual(dock.y + dock.height - 10);
-  // The home panels' surface, edge and corners.
-  const look = await page.locator(".ac-dock").evaluate((e) => {
-    const s = getComputedStyle(e);
-    return { bg: s.backgroundColor, edge: s.borderTopColor, radius: s.borderTopLeftRadius, pad: s.paddingTop, panel: getComputedStyle(document.documentElement).getPropertyValue("--fd-panel").trim() };
-  });
-  expect(look.pad).toBe("10px");
-  expect(look.radius).toBe("14px");
-  expect(look.bg).not.toBe("rgba(0, 0, 0, 0)");
-  // The board: on a phone it is as wide as the column (it doesn't shrink for the panel).
-  const frame = await box(".ac-frame");
-  if (phone()) expect(Math.abs(frame.width - 366), "the board's width on a 390 phone").toBeLessThanOrEqual(1);
   expect(errors).toEqual([]);
 });

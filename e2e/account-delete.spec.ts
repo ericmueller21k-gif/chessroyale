@@ -1,8 +1,5 @@
-import { readdirSync } from "node:fs";
-import { createRequire } from "node:module";
-import { join } from "node:path";
-import { expect } from "@playwright/test";
-import { D1_DIR, test } from "./helpers.ts";
+import { expect, type Page } from "@playwright/test";
+import { giveCrates, localSql, test } from "./helpers.ts";
 
 /**
  * Settings → Download my data and Delete account (docs/decisions/2026-10-15-delete-my-account-and-download-my-data.md):
@@ -10,31 +7,20 @@ import { D1_DIR, test } from "./helpers.ts";
  * device, this device's settings), its results stay without it, and the local database has nothing of it left.
  */
 
-// node:sqlite through require, to read the local D1 that wrangler dev keeps (read only).
-const { DatabaseSync } = createRequire(import.meta.url)("node:sqlite") as typeof import("node:sqlite");
-
-/** Runs a query on the local D1 (the file with the users table). */
-function d1<T>(query: string, ...params: string[]): T[] {
-  for (const f of readdirSync(D1_DIR).filter((x) => x.endsWith(".sqlite"))) {
-    const db = new DatabaseSync(join(D1_DIR, f), { readOnly: true });
-    try {
-      if (db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'users'").get()) return db.prepare(query).all(...params) as T[];
-    } finally {
-      db.close();
-    }
-  }
-  throw new Error(`no local D1 with a users table in ${D1_DIR}`);
-}
+/** Runs a query on the local D1, through the server's own (helpers' localSql: no second process on its file). */
+const d1 = <T = Record<string, unknown>>(page: Page, query: string, ...params: string[]) => localSql<T>(page, query, ...params);
 
 const me = (page: import("@playwright/test").Page) => page.evaluate(() => fetch("/api/me").then((r) => r.json()) as Promise<{ user: { id: string; name: string } }>);
 
 test("Settings: download my data, then delete the account (asked first); it's gone everywhere, its results stay without it", async ({ page, browser }) => {
   test.skip(test.info().project.name !== "phone", "one run is enough");
   await page.goto("/");
-  // (Your profile: the top bar's pawn on a phone, the side menu's Profile on a computer: the right column's pawn went, Nov 7.)
-  await expect(page.getByRole("button", { name: "Your profile", exact: true }).or(page.getByRole("navigation", { name: "Menu" }).getByRole("button", { name: "Profile" })).filter({ visible: true }).first()).toBeVisible();
+  // (Your profile: "View profile" on your card on a phone, the side menu's Profile on a computer.)
+  await expect(page.getByRole("button", { name: "View profile", exact: true }).or(page.getByRole("navigation", { name: "Menu" }).getByRole("button", { name: "Profile" })).filter({ visible: true }).first()).toBeVisible();
   // A guest with a name, a solo result, a crate item and a setting on this device.
   const id = (await me(page)).user.id;
+  // (Crates need a key since Nov 9: one crate and one key to open.)
+  await giveCrates(page, "beta-001", 1);
   await page.evaluate(async () => {
     const post = (path: string, body: unknown, method = "POST") => fetch(path, { method, headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
     await post("/api/me", { name: "Delia" }, "PATCH");
@@ -64,13 +50,13 @@ test("Settings: download my data, then delete the account (asked first); it's go
   await confirm.getByRole("button", { name: "Keep it" }).click();
   await expect(confirm).toHaveCount(0);
   expect((await me(page)).user.id).toBe(id);
-  expect(d1("SELECT id FROM users WHERE id = ?", id)).toHaveLength(1);
+  expect(await d1(page, "SELECT id FROM users WHERE id = ?", id)).toHaveLength(1);
 
   // Delete my account: back to the start as a new guest, and this device's settings forgotten.
   await page.getByRole("button", { name: /^Delete account/ }).click();
   await page.getByRole("button", { name: "Delete my account" }).click();
   await expect(page).toHaveURL(/\/$/);
-  await expect(page.getByRole("button", { name: "Your profile", exact: true }).or(page.getByRole("navigation", { name: "Menu" }).getByRole("button", { name: "Profile" })).filter({ visible: true }).first()).toBeVisible();
+  await expect(page.getByRole("button", { name: "View profile", exact: true }).or(page.getByRole("navigation", { name: "Menu" }).getByRole("button", { name: "Profile" })).filter({ visible: true }).first()).toBeVisible();
   const fresh = (await me(page)).user;
   expect(fresh.id).not.toBe(id);
   expect(fresh.name).not.toBe("Delia");
@@ -94,7 +80,7 @@ test("Settings: download my data, then delete the account (asked first); it's go
     ["equipped_items", "user_id"],
     ["wallets", "user_id"],
   ]) {
-    expect(d1(`SELECT 1 AS x FROM ${table} WHERE ${column} = ?`, id), `${table}.${column}`).toHaveLength(0);
+    expect(await d1(page, `SELECT 1 AS x FROM ${table} WHERE ${column} = ?`, id), `${table}.${column}`).toHaveLength(0);
   }
-  expect(d1<{ n: number }>("SELECT COUNT(*) AS n FROM results WHERE user_id = 'deleted' AND placement = 7 AND lobby IS NULL")[0]!.n).toBeGreaterThan(0);
+  expect((await d1<{ n: number }>(page, "SELECT COUNT(*) AS n FROM results WHERE user_id = 'deleted' AND placement = 7 AND lobby IS NULL"))[0]!.n).toBeGreaterThan(0);
 });

@@ -7,11 +7,13 @@ import { buyItem, createGuest, createSession, ensureSchema, grantReward, recordR
 import { accountDownload, deleteAccount } from "../src/account-data.ts";
 import { buyBossCrate, countBossBattle, grantTestItems, openBossCrate } from "../src/boss-tokens.ts";
 import { applyOp, backfillLedger, clawOp, cond, leg, ledgerAccount, ledgerCheck, ledgerCheckDue, ledgerMismatches, opKeys, requestId } from "../src/ledger.ts";
-import { deleteLockerItems, openCrate } from "../src/locker.ts";
+import { deleteLockerItems, lockerState, openCrate } from "../src/locker.ts";
+import { pickBossCrate } from "../src/rewards.ts";
+import { grantXp, setTestXp } from "../src/xp.ts";
 import { handleOpsAdmin } from "../src/ops-admin.ts";
 import { recordDuel, type FinishedDuel } from "../src/ranked.ts";
 import { grantWelcomeCrate, openWelcomeCrate } from "../src/welcome.ts";
-import { memoryDb } from "./memory-db.ts";
+import { memoryDb, stockCrates } from "./memory-db.ts";
 
 // (The engine server is a Container, which needs the Workers runtime: the ops page imports it.)
 vi.mock("@cloudflare/containers", () => ({ Container: class {}, getContainer: () => null }));
@@ -155,7 +157,8 @@ describe("each path, keyed by its event: replayed or raced, it changes a balance
   it("Welcome Crates (welcome:… and welcome-open:…), a boss crate's buy and open (open:<its row>), deleting an item (delete:<item>)", async () => {
     const { sql, db } = await world();
     const a = await signedIn(sql, "a@example.com", T0);
-    for (let i = 0; i < 5; i++) await recordResult(sql, a.id, { mode: "classic", online: false, placement: 1, players: 8 }, T0 + i);
+    // (Solo games the server timed, with enough moves: only those count toward a Welcome Crate since Nov 10.)
+    for (let i = 0; i < 5; i++) await recordResult(sql, a.id, { mode: "classic", online: false, placement: 1, players: 8, playMs: 5 * 60_000, moves: 20 }, T0 + i);
     expect((await Promise.all([1, 2, 3].map(() => grantWelcomeCrate(sql, a.id, T0 + 9)))).flat()).toEqual([5]);
     const opens = await Promise.all([1, 2, 3].map(() => openWelcomeCrate(sql, a.id, T0 + 10)));
     expect(opens.filter((r) => r.ok && !r.again)).toHaveLength(1);
@@ -194,7 +197,7 @@ describe("part II's keys: each replayed, or raced, changes a balance once", () =
   const R = (n: number) => `req-${n}-0123456789`;
   const count = (db: Db, q: string, ...p: unknown[]) => (db.prepare(q).get(...(p as never[])) as { n: number }).n;
 
-  it("by the app's request id: an admin's grant, a boss crate's buy and open, a free crate's open (each sent again, and twice at once)", async () => {
+  it("by the app's request id: an admin's grant, a boss crate's buy and open, a series crate's open (each sent again, and twice at once)", async () => {
     const { sql, db } = await world();
     const a = await signedIn(sql, "a@example.com", T0);
     const me = (await ledgerAccount(sql, a.id))!;
@@ -229,13 +232,25 @@ describe("part II's keys: each replayed, or raced, changes a balance once", () =
     const again = await openBossCrate(sql, a.id, tiger.id, T0 + 5, false, R(6));
     expect(again.ok && last.ok && again.item.id === last.item.id && again.roll.def === last.roll.def).toBe(true);
     expect([crates(), items()]).toEqual([0, 3]);
-    // A free crate's open: one item, the same answer each time; an older app's open, with no id, is one each time.
+    // A series crate's open (Nov 9: a crate held and a key): one item, one crate and one key spent, the same answer each time; an older
+    // app's open, with no id, is one each time; with none left, refused.
+    const series = () => count(db, "SELECT COALESCE(SUM(n), 0) AS n FROM series_crates WHERE user_id = ?", a.id);
+    const keys = () => count(db, "SELECT crate_keys AS n FROM wallets WHERE user_id = ?", a.id);
+    await stockCrates(sql, a.id, "beta-001", 3, T0 + 5);
+    expect([series(), keys()]).toEqual([3, 4]);
     const free = await thrice(() => openCrate(sql, a.id, "beta-001", {}, T0 + 6, false, R(7)));
     expect(new Set(free.map((o) => o.ok && JSON.stringify([o.item, o.roll]))).size).toBe(1);
-    expect(items()).toBe(4);
+    expect([items(), series(), keys()]).toEqual([4, 2, 3]);
+    expect(legsOf(db, `open:${me.account}:${R(7)}`).map((l) => [l.asset_kind, l.delta])).toEqual([
+      ["item", 1],
+      ["series_crate", -1],
+      ["keys", -1],
+    ]);
     await openCrate(sql, a.id, "beta-001", {}, T0 + 7);
     await openCrate(sql, a.id, "beta-001", {}, T0 + 7);
-    expect(items()).toBe(6);
+    expect([items(), series(), keys()]).toEqual([6, 0, 1]);
+    expect((await openCrate(sql, a.id, "beta-001", {}, T0 + 8)).ok).toBe(false);
+    expect([items(), series(), keys()]).toEqual([6, 0, 1]);
     expect(await ledgerMismatches(sql, a.id)).toEqual([]);
   });
 
@@ -244,6 +259,7 @@ describe("part II's keys: each replayed, or raced, changes a balance once", () =
     const a = await signedIn(sql, "a@example.com", T0);
     const me = (await ledgerAccount(sql, a.id))!;
     await grantTestItems(sql, a.id, { boss: "tiger", tokens: 6 }, T0);
+    await stockCrates(sql, a.id, "beta-001", 2, T0);
     for (const n of [1, 2]) expect((await buyBossCrate(sql, a.id, tiger.id, "tokens", T0 + n, false, R(80 + n))).ok).toBe(true);
     // Each attempt rolls from its own seed, each a two-color item (whose roll once came back in another key order), so an answer that
     // is an attempt's own roll, or the stored item in another shape, shows.
@@ -304,7 +320,18 @@ describe("part II's keys: each replayed, or raced, changes a balance once", () =
           expect(answers.map((o) => o.ok && o.item.id), what).toEqual([item!.id, item!.id, item!.id]);
           expect(new Set(answers.map((o) => o.ok && JSON.stringify([o.item, o.roll]))).size, what).toBe(1);
           expect(count(db, "SELECT COUNT(DISTINCT nonce) AS n FROM ledger WHERE op_id = ?", op), what).toBe(1);
-          expect(legsOf(db, op).map((l) => [l.asset_kind, l.delta]), what).toEqual(boss ? [["boss_crate", -1], ["item", 1]] : [["item", 1]]);
+          expect(legsOf(db, op).map((l) => [l.asset_kind, l.delta]), what).toEqual(
+            boss
+              ? [
+                  ["boss_crate", -1],
+                  ["item", 1],
+                ]
+              : [
+                  ["item", 1],
+                  ["series_crate", -1],
+                  ["keys", -1],
+                ],
+          );
         }
       }
     } finally {
@@ -319,10 +346,12 @@ describe("part II's keys: each replayed, or raced, changes a balance once", () =
     const a = await signedIn(sql, "a@example.com", T0);
     const reward = (key = opKeys.squadsReward("SQUAD", T0)) => grantReward(sql, a.id, 100, 1, key, T0 + 1);
     expect([await reward(), ...(await Promise.all([reward(), reward()]))].sort()).toEqual(["applied", "replay", "replay"]);
-    expect(db.prepare("SELECT coins, crates FROM wallets WHERE user_id = ?").get(a.id)).toEqual({ coins: 100, crates: 1 });
+    // (A placement's crate is a Winter Crate since Nov 9: series_crates.)
+    const wallet = () => db.prepare("SELECT coins, (SELECT n FROM series_crates WHERE user_id = ? AND crate = 'winter-1') AS crates FROM wallets WHERE user_id = ?").get(a.id, a.id);
+    expect(wallet()).toEqual({ coins: 100, crates: 1 });
     // The same code's next lobby (made later): its own reward.
     expect(await reward(opKeys.squadsReward("SQUAD", T0 + 1))).toBe("applied");
-    expect(db.prepare("SELECT coins, crates FROM wallets WHERE user_id = ?").get(a.id)).toEqual({ coins: 200, crates: 2 });
+    expect(wallet()).toEqual({ coins: 200, crates: 2 });
     // An online drop, counted again and twice at once (every roll lucky: the window would take three): one token, the same boss.
     const lucky = () => () => 0.01;
     const drop = (start: number) => countBossBattle(sql, a.id, T0 + 2, { battle: "RAIDS", op: opKeys.onlineDrop("RAIDS", start), rng: lucky() });
@@ -444,6 +473,7 @@ describe("reconciliation: each balance is its ledger's sum", () => {
     const people: User[] = [];
     const guests: User[] = [];
     const lastDrop = new Map<string, string>();
+    const lastGame = new Map<string, string>();
     const person = async () => signedIn(sql, `p${n++}@example.com`, now);
     for (let i = 0; i < 3; i++) people.push(await person());
     const paid = SHOP_ITEMS.filter((i) => !i.starter && i.price > 0).map((i) => i.id);
@@ -468,7 +498,17 @@ describe("reconciliation: each balance is its ledger's sum", () => {
       (u) => grantTestItems(sql, u.id, { keys: Math.floor(rand() * 3), boss: "tiger", tokens: Math.floor(rand() * 4), ...(rand() < 0.5 ? { request: request(u) } : {}) }, now),
       (u) => buyBossCrate(sql, u.id, tiger.id, pick(["tokens", "key"]), now, false, rand() < 0.5 ? request(u) : null),
       (u) => openBossCrate(sql, u.id, tiger.id, now, false, rand() < 0.5 ? request(u) : null),
-      (u) => openCrate(sql, u.id, "beta-001", {}, now, false, rand() < 0.5 ? request(u) : null),
+      (u) => openCrate(sql, u.id, pick(["winter-1", "beta-001"]), {}, now, false, rand() < 0.5 ? request(u) : null),
+      // XP phase 2 (Nov 9): a counted game (its XP, maybe the day's daily reward, the levels owed), a test switch's XP (a jump of
+      // levels, or back), a boss crate picked, and an old crate (the wallet's count, before Nov 9) turned into a Winter Crate.
+      (u) => grantXp(sql, u.id, { key: rand() < 0.2 && lastGame.get(u.id) ? lastGame.get(u.id)! : (lastGame.set(u.id, `g:${n++}`), lastGame.get(u.id)!), facts: { ms: Math.floor(rand() * 40) * MIN, moves: Math.floor(rand() * 30), won: rand() < 0.5 }, signedInOnly: false, now }),
+      (u) => setTestXp(sql, u.id, Math.floor(rand() * 25_000), now),
+      (u) => pickBossCrate(sql, u.id, tiger.id, rand() < 0.5 ? request(u) : null, now),
+      async (u) => {
+        const me = await ledgerAccount(sql, u.id);
+        if (me) await applyOp(sql, me, { id: `old-crates:${n++}`, reason: "reward", now, legs: [leg.crates(u.id, 1 + Math.floor(rand() * 3))] });
+        return lockerState(sql, u.id);
+      },
       // A Squads reward, sometimes written again (a lobby retrying it).
       (u) => grantReward(sql, u.id, Math.floor(rand() * 100), rand() < 0.3 ? 1 : 0, opKeys.squadsReward("SQUAD", rand() < 0.3 ? T0 : now), now),
       (u) => deleteLockerItems(sql, u.id, itemsOf(u.id).filter(() => rand() < 0.4), false, now).catch(() => null),
@@ -476,7 +516,8 @@ describe("reconciliation: each balance is its ledger's sum", () => {
     /** What only a signed-in person does (a guest earns no Welcome Crate; ranked is two people). */
     const signedInOnly: ((u: User) => Promise<unknown>)[] = [
       async (u) => {
-        await recordResult(sql, u.id, { mode: "classic", online: false, placement: 1, players: 8 }, now);
+        // (A solo game the server timed: only those count toward a Welcome Crate since Nov 10.)
+        await recordResult(sql, u.id, { mode: "classic", online: false, placement: 1, players: 8, playMs: 5 * 60_000 }, now);
         return grantWelcomeCrate(sql, u.id, now);
       },
       (u) => openWelcomeCrate(sql, u.id, now, rand),
@@ -505,12 +546,32 @@ describe("reconciliation: each balance is its ledger's sum", () => {
       }
       for (const u of [...people, ...guests]) expect(await ledgerMismatches(sql, u.id), `step ${step}: ${u.id}`).toEqual([]);
       expect(orphans(db), `step ${step}`).toEqual([]);
-      expect(db.prepare("SELECT COUNT(*) AS n FROM wallets WHERE coins < 0 OR crates < 0 OR crate_keys < 0").get(), `step ${step}`).toEqual({ n: 0 });
+      expect(db.prepare("SELECT COUNT(*) AS n FROM wallets WHERE coins < 0 OR crates < 0 OR crate_keys < 0 OR boss_picks < 0 OR xp < 0").get(), `step ${step}`).toEqual({ n: 0 });
     }
     // Every path moved to the ledger ran (and applied) along the way.
     const reasons = (db.prepare("SELECT DISTINCT reason FROM ledger ORDER BY reason").all() as { reason: string }[]).map((r) => r.reason);
     expect(reasons).toEqual(
-      expect.arrayContaining(["admin grant", "boss crate (key)", "boss crate (tokens)", "boss crate open", "crate open", "delete", "drop", "erase", "merge", "ranked", "reward", "shop", "welcome", "welcome open"]),
+      expect.arrayContaining([
+        "admin grant",
+        "boss crate (key)",
+        "boss crate (tokens)",
+        "boss crate open",
+        "boss crate pick",
+        "crate open",
+        "crates to series",
+        "daily",
+        "delete",
+        "drop",
+        "erase",
+        "level",
+        "merge",
+        "ranked",
+        "reward",
+        "shop",
+        "welcome",
+        "welcome open",
+        "xp",
+      ]),
     );
   });
 

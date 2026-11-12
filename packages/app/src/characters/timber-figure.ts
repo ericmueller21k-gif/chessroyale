@@ -6,7 +6,7 @@
  * room round it (characters.test.ts: nothing cut off at the frame's edge).
  */
 import { BOSS_BEAVER } from "./timber.ts";
-import type { Anim, Character, Frame } from "./sprite.ts";
+import { mapFrames, type Character, type Frame } from "./sprite.ts";
 
 /** The room added on each side, in his own pixels. */
 export const TIMBER_ROOM = { top: 37, left: 6, right: 4, bottom: 4 } as const;
@@ -24,5 +24,5 @@ export const TIMBER_FIGURE: Character = {
   w: BOSS_BEAVER.w + R.left + R.right,
   h: BOSS_BEAVER.h + R.top + R.bottom,
   foot: [BOSS_BEAVER.foot[0] + R.left, BOSS_BEAVER.foot[1] + R.top],
-  anims: Object.fromEntries(Object.entries(BOSS_BEAVER.anims).map(([k, a]) => [k, { ...a, frames: a.frames.map(moved) } satisfies Anim])),
+  anims: mapFrames(BOSS_BEAVER.anims, moved),
 };

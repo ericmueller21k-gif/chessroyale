@@ -1,12 +1,13 @@
 import type { ComponentChildren } from "preact";
 import { useEffect, useState } from "preact/hooks";
-import { PAWN_OUTLINE_ON_BLACK, aboveHat, behindPiece, isShiny, secondColor, showsPurity, type ItemLook, type ItemSlot } from "@chessroyale/core";
+import { PAWN_OUTLINE_ON_BLACK, aboveHat, behindPiece, isShiny, secondColor, showsPurity, shownLook, type ItemLook, type ItemSlot } from "@chessroyale/core";
 import { LINE, Region, darken, isLight, lighten, lw, mirror, usePaint as paintIn, type Finish, type Paint } from "./item-paint.tsx";
 
 import type { RiderDraft } from "./rides/kit.ts";
 import { rideCells, useRide } from "./rides/load.ts";
 import type { RideCells } from "../town/ride-cells.ts";
 import { rideScale, scaledAt, scaledSeat, seatAnchor } from "./rides/scale.ts";
+import { TokenArt } from "./TokenArt.tsx";
 
 export { type Finish } from "./item-paint.tsx";
 export { blotchPath } from "./blotches.ts";
@@ -1337,7 +1338,9 @@ function RidingAvatar({ id, c, mount, side, rider }: { id: string; c: RideCells;
  * the votes, the cut screen, the queue and profiles. `ride` (the locker and the profiles, Oct 31): on their ride, if they
  * have one on, in its idle; everywhere else a ride isn't drawn (a match's screens, the crowd, home's pawn).
  */
-export function Avatar({ look, side = "w", ride = false, outlined = false }: { look?: ItemLook; side?: "w" | "b"; ride?: boolean; outlined?: boolean }) {
+export function Avatar({ look: equipped, side = "w", ride = false, outlined = false }: { look?: ItemLook; side?: "w" | "b"; ride?: boolean; outlined?: boolean }) {
+  // (An outfit, Nov 10: only it and any eyewear show; it's drawn round the pawn everywhere, with or without `ride`: core's shownLook.)
+  const look = shownLook(equipped);
   const at = (slot: ItemSlot) => look?.[slot];
   const skin = at("skin");
   // Worn items in drawing order (face, head, then a weapon; a face item tagged "above" goes over a hat: goggles, shades;
@@ -1365,7 +1368,7 @@ export function Avatar({ look, side = "w", ride = false, outlined = false }: { l
         ))}
     </g>
   );
-  const mount = ride ? at("ride") : undefined;
+  const mount = at("outfit") ?? (ride ? at("ride") : undefined);
   const c = rideCells(mount?.def);
   if (mount && c)
     return (
@@ -1605,14 +1608,244 @@ export function WinterCrateArt() {
   );
 }
 
+/**
+ * HunChess's own key (Eric, Nov 9: "our own proprietary key … just the head of the king [from] the king piece that we use for the
+ * normal chessboard"), on the 100 × 100 square, its bow's center at 32, 50: a gold bow, and in its navy middle the top of our board's
+ * king (the cburnett set's: its cross, its center bulb and its crown, cut off at the crown's band) in gold. The only key the game
+ * draws: the key's tile, the rewards, the quests and the shop bundle's stack.
+ */
+function KeyShape({ id = "k" }: { id?: string }) {
+  return (
+    <>
+      <defs>
+        <clipPath id={`${id}-head`}>
+          <rect x="0" y="0" width="45" height="30.6" />
+        </clipPath>
+      </defs>
+      <circle cx="32" cy="50" r="17" fill="#fbbf24" {...LINE} />
+      <circle cx="32" cy="50" r="12.5" fill="#1b2f74" stroke="#1d1d1f" {...lw(2)} />
+      {/* (The board's king, Chess_klt45.svg, its top only: scaled into the bow.) */}
+      <g transform="translate(16.25 37.6) scale(0.7)" clip-path={`url(#${id}-head)`} fill="#fbbf24" stroke="#1d1d1f" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2">
+        <path fill="none" stroke-width="4.4" d="M22.5 11.63V6M20 8h5" />
+        <path fill="none" stroke="#fbbf24" stroke-width="2" d="M22.5 11.63V6M20 8h5" />
+        <path stroke-linecap="butt" stroke-linejoin="miter" d="M22.5 25s4.5-7.5 3-10.5c0 0-1-2.5-3-2.5s-3 2.5-3 2.5c-1.5 3 3 10.5 3 10.5" />
+        <path d="M12.5 37c5.5 3.5 14.5 3.5 20 0v-7s9-4.5 6-10.5c-4-6.5-13.5-3.5-16 4V27v-3.5c-2.5-7.5-12-10.5-16-4-3 6 6 10.5 6 10.5v7" />
+        <path fill="none" d="M12.5 30c5.5-3 14.5-3 20 0" />
+      </g>
+      <path d="M48.5 46 H86 V54 H80 V62 H72 V54 H66 V60 H58 V54 H48.5 Z" fill="#fbbf24" {...LINE} />
+    </>
+  );
+}
+
 /** A key. */
 export function KeyArt() {
   return (
     <span class="item-art key-art">
       <svg viewBox="0 0 100 100" aria-hidden="true">
-        <circle cx="32" cy="50" r="16" fill="#fbbf24" {...LINE} />
-        <circle cx="32" cy="50" r="6" fill="#1b2f74" stroke="#1d1d1f" {...lw(2)} />
-        <path d="M47 46 H86 V54 H80 V62 H72 V54 H66 V60 H58 V54 H47 Z" fill="#fbbf24" {...LINE} />
+        <KeyShape />
+      </svg>
+    </span>
+  );
+}
+
+/** The gold every shop crate shares (the HunChess crate's and the Boss Crate's): pale at the top left, deep at the bottom right. */
+function GoldStops() {
+  return (
+    <>
+      <stop offset="0" stop-color="#fff0b8" />
+      <stop offset="0.45" stop-color="#f2c14e" />
+      <stop offset="1" stop-color="#a87a14" />
+    </>
+  );
+}
+
+/** The Boss Crate's seal and the mystery crates': a gold ring round a navy disc, a gold "?" (centered at 50, cy; r the ring's). */
+function QuestionSeal({ cy, r = 16, gold }: { cy: number; r?: number; gold: string }) {
+  const k = r / 16;
+  return (
+    <>
+      <circle cx="50" cy={cy} r={r} fill={`url(#${gold})`} stroke="#1d1d1f" {...lw(2.4 * k)} />
+      <circle cx="50" cy={cy} r={13.2 * k} fill="#16213e" stroke="#1d1d1f" {...lw(1.2 * k)} />
+      <text x="50" y={cy + 7.5 * k} text-anchor="middle" font-size={21 * k} font-weight="900" fill="#f2c14e" stroke="#1d1d1f" {...lw(1.2 * k)} font-family="Arial Black, Archivo, system-ui, sans-serif">
+        ?
+      </text>
+    </>
+  );
+}
+
+/**
+ * The Boss Crate (Eric approved its mock, Nov 9: notes/briefs/assets/boss-crate-mock-approved.png): a crimson chest with gold
+ * horns, iron bands and a BOSS plate. Its seal is a gold "?" (the shop's random boss crate) or, given `boss`, that boss's token
+ * (a crate in your inventory), laid over the seal's disc.
+ */
+export function BossCrateArt({ boss }: { boss?: string }) {
+  return (
+    <span class="item-art crate-art boss-crate-art">
+      <svg viewBox="0 0 100 100" aria-hidden="true">
+        <defs>
+          <linearGradient id="bc-body" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#7a1f2b" />
+            <stop offset="1" stop-color="#3d0c14" />
+          </linearGradient>
+          <linearGradient id="bc-lid" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#8f2634" />
+            <stop offset="1" stop-color="#5a1420" />
+          </linearGradient>
+          <linearGradient id="bc-gold" x1="0" y1="0" x2="1" y2="1">
+            <GoldStops />
+          </linearGradient>
+          <linearGradient id="bc-iron" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#4b4f5a" />
+            <stop offset="1" stop-color="#23262d" />
+          </linearGradient>
+        </defs>
+        <g stroke="#1d1d1f" stroke-linejoin="round" {...lw(3)}>
+          <path d="M10 22 Q2 12 6 4 Q11 12 18 18 Z" fill="url(#bc-gold)" {...lw(2)} />
+          <path d="M90 22 Q98 12 94 4 Q89 12 82 18 Z" fill="url(#bc-gold)" {...lw(2)} />
+          <rect x="8" y="34" width="84" height="56" rx="4" fill="url(#bc-body)" />
+          <path d="M4 34 Q4 18 20 16 H80 Q96 18 96 34 Z" fill="url(#bc-lid)" />
+          <rect x="22" y="16.5" width="9" height="73" fill="url(#bc-iron)" {...lw(2)} />
+          <rect x="69" y="16.5" width="9" height="73" fill="url(#bc-iron)" {...lw(2)} />
+          <rect x="4" y="31" width="92" height="6" rx="1.5" fill="url(#bc-iron)" {...lw(2)} />
+        </g>
+        <g fill="url(#bc-gold)" stroke="#1d1d1f" {...lw(1)}>
+          {[24, 48, 80].flatMap((y) => [26.5, 73.5].map((x) => <circle key={`${x},${y}`} cx={x} cy={y} r="1.8" />))}
+        </g>
+        {boss ? (
+          <>
+            <circle cx="50" cy="58" r="16" fill="url(#bc-gold)" stroke="#1d1d1f" {...lw(2.4)} />
+            <circle cx="50" cy="58" r="13.2" fill="#16213e" stroke="#1d1d1f" {...lw(1.2)} />
+          </>
+        ) : (
+          <QuestionSeal cy={58} gold="bc-gold" />
+        )}
+        <rect x="36" y="78" width="28" height="8" rx="2" fill="#1d1d1f" />
+        <text x="50" y="84.6" text-anchor="middle" font-size="6.6" font-weight="900" letter-spacing="1.6" fill="#f2c14e" font-family="ui-monospace, Menlo, Consolas, monospace">
+          BOSS
+        </text>
+      </svg>
+      {boss && (
+        <span class="boss-crate-seal">
+          <TokenArt boss={boss} />
+        </span>
+      )}
+    </span>
+  );
+}
+
+/**
+ * The Mythic Crate (Eric, Nov 9: "the exceedingly rare crate"; it holds what a Fischer Random pull holds, Legendary or Mythic):
+ * the HunChess crate's shape in deep purple and black with bright gold trim, a gold crown on its front and a MYTHIC plate, and the
+ * HunChess crate's idle glint, tinted lilac (still under reduced motion: `.hc-crate-glint`).
+ */
+export function MythicCrateArt() {
+  return (
+    <span class="item-art crate-art mythic-crate-art">
+      <svg viewBox="0 0 100 100" aria-hidden="true">
+        <defs>
+          <linearGradient id="my-crate-body" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#4a1d7a" />
+            <stop offset="1" stop-color="#12061f" />
+          </linearGradient>
+          <linearGradient id="my-crate-gold" x1="0" y1="0" x2="1" y2="1">
+            <GoldStops />
+          </linearGradient>
+          <clipPath id="my-crate-clip">
+            <rect x="4" y="20" width="92" height="68" rx="4" />
+          </clipPath>
+        </defs>
+        <rect x="8" y="30" width="84" height="58" rx="4" fill="url(#my-crate-body)" {...LINE} />
+        <rect x="4" y="20" width="92" height="14" rx="4" fill="#2a0f45" {...LINE} />
+        <g fill="none" stroke="url(#my-crate-gold)" {...lw(2.4)}>
+          <path d="M6 27 H94" />
+          <rect x="12" y="36" width="76" height="47" rx="3" />
+        </g>
+        <g fill="url(#my-crate-gold)" stroke="#1d1d1f" stroke-linejoin="round" {...lw(1.4)}>
+          <path d="M35 68 L32 46 L41 55 L50 41 L59 55 L68 46 L65 68 Z" />
+          <rect x="34" y="66" width="32" height="5" rx="1.5" />
+          <circle cx="32" cy="45" r="2.4" />
+          <circle cx="50" cy="39.5" r="2.6" />
+          <circle cx="68" cy="45" r="2.4" />
+        </g>
+        <circle cx="50" cy="60" r="3" fill="#c084fc" stroke="#1d1d1f" {...lw(1.2)} />
+        <text x="50" y="80" text-anchor="middle" font-size="8.5" font-weight="900" letter-spacing="2.2" fill="#f2c14e" font-family="ui-monospace, Menlo, Consolas, monospace">
+          MYTHIC
+        </text>
+        <g fill="url(#my-crate-gold)" stroke="#1d1d1f" {...lw(1.4)}>
+          <path d="M8 76 V88 H20 V84 H12 V76 Z" />
+          <path d="M92 76 V88 H80 V84 H88 V76 Z" />
+          <path d="M4 30 V20 H16 V24 H8 V30 Z" />
+          <path d="M96 30 V20 H84 V24 H92 V30 Z" />
+        </g>
+        <g clip-path="url(#my-crate-clip)">
+          <path class="hc-crate-glint" d="M-30 100 L0 100 L40 10 L10 10 Z" fill="#f3e3ff" opacity="0" />
+        </g>
+      </svg>
+    </span>
+  );
+}
+
+/** A mystery crate (the bundle's): the HunChess crate's black and gold, its front a gold "?" seal, drawn on the 100 × 100 square. */
+function MysteryCrate({ at }: { at: string }) {
+  return (
+    <g transform={at}>
+      <rect x="8" y="30" width="84" height="58" rx="4" fill="url(#bd-body)" {...LINE} />
+      <rect x="4" y="20" width="92" height="14" rx="4" fill="#1c1710" {...LINE} />
+      <path d="M6 27 H94" fill="none" stroke="url(#bd-gold)" {...lw(2.4)} />
+      <g fill="url(#bd-gold)" stroke="#1d1d1f" {...lw(1.4)}>
+        <path d="M8 76 V88 H20 V84 H12 V76 Z" />
+        <path d="M92 76 V88 H80 V84 H88 V76 Z" />
+        <path d="M4 30 V20 H16 V24 H8 V30 Z" />
+        <path d="M96 30 V20 H84 V24 H92 V30 Z" />
+      </g>
+      <QuestionSeal cy={60} r={19} gold="bd-gold" />
+    </g>
+  );
+}
+
+/**
+ * The shop's Crate + Key Bundle (Eric's mockup, Nov 9, in our own art): three mystery crates stacked (two below, one on top) and
+ * three crate keys stacked beside them (×3), on a soft gold glow, with a few still sparkles. 200 × 140.
+ */
+export function BundleArt() {
+  const sparkle = (x: number, y: number, r: number) => `M${x} ${y - r} Q${x} ${y} ${x + r} ${y} Q${x} ${y} ${x} ${y + r} Q${x} ${y} ${x - r} ${y} Q${x} ${y} ${x} ${y - r} Z`;
+  return (
+    <span class="item-art bundle-art">
+      <svg viewBox="0 0 200 140" aria-hidden="true">
+        <defs>
+          <radialGradient id="bd-glow" cx="0.45" cy="0.55" r="0.55">
+            <stop offset="0" stop-color="#ffd36b" stop-opacity="0.75" />
+            <stop offset="0.55" stop-color="#f2a71b" stop-opacity="0.25" />
+            <stop offset="1" stop-color="#f2a71b" stop-opacity="0" />
+          </radialGradient>
+          <linearGradient id="bd-body" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#2a2318" />
+            <stop offset="1" stop-color="#0b0906" />
+          </linearGradient>
+          <linearGradient id="bd-gold" x1="0" y1="0" x2="1" y2="1">
+            <GoldStops />
+          </linearGradient>
+        </defs>
+        <rect x="0" y="0" width="200" height="140" fill="url(#bd-glow)" />
+        <ellipse cx="80" cy="136" rx="80" ry="5" fill="#f2c14e" opacity="0.35" />
+        <MysteryCrate at="translate(-1 69) scale(0.78)" />
+        <MysteryCrate at="translate(63 69) scale(0.78)" />
+        <MysteryCrate at="translate(31 16) scale(0.78)" />
+        {/* (Three keys flat and stacked tight, the back ones peeking up and to the right, and "×3": Eric, Nov 9.) */}
+        {[2, 1, 0].map((k) => (
+          <g key={k} transform={`translate(${140 + k * 4} ${66 - k * 6}) scale(0.82) translate(-32 -50)`}>
+            <KeyShape id={`bd-key${k}`} />
+          </g>
+        ))}
+        <text x="186" y="100" text-anchor="middle" font-size="19" font-family="'Archivo Black', Archivo, system-ui, sans-serif" fill="#fbbf24" stroke="#1d1d1f" stroke-width="3.2" paint-order="stroke" stroke-linejoin="round">
+          ×3
+        </text>
+        <g fill="#fff4c8">
+          <path d={sparkle(14, 26, 5)} />
+          <path d={sparkle(118, 10, 4)} />
+          <path d={sparkle(192, 124, 4)} />
+          <path d={sparkle(112, 58, 3)} />
+        </g>
       </svg>
     </span>
   );

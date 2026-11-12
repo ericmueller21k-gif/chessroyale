@@ -1,19 +1,28 @@
+import { useContext } from "preact/hooks";
 import type { BossKit } from "../characters/kits.ts";
-import { cueAt } from "../characters/power-art.ts";
+import { EFFECTS, cueAt } from "../characters/power-art.ts";
 import { BossFace } from "./BossCharacter.tsx";
-import { BossEffect, BossMoment } from "./BossEffect.tsx";
-import { funhouseAngle, type BoardAngle } from "@chessroyale/chess";
-import type { QuarterTurn } from "../board-view.ts";
-import { Flight, hash, onSquare, type BossUi, type Moment, type MomentProps } from "./PowerParts.tsx";
+import { BossEffect, BossMoment, SpriteAnim } from "./BossEffect.tsx";
+import { funhouseAngle, pieceAt, type BoardAngle } from "@chessroyale/chess";
+import { BoardTurn, type QuarterTurn } from "../board-view.ts";
+import type { PieceDecor } from "../board/types.ts";
+import type { BossView } from "../game.ts";
+import { Flight, PIECE_WORD, hash, onSquare, type BossUi, type Moment, type MomentProps } from "./PowerParts.tsx";
 
 /**
- * Boingo's powers on screen: the pie (his throw, the pie's flight, the splat, the pie on its square while it lasts) and
- * the funhouse (he pogos onto the board, it spins and flips, he speaks, he plays the crowd's move, he bounces off). His
- * rules: packages/chess/src/bosses/boingo.ts.
+ * Boingo's powers on screen: the pie (Eric, Nov 12: his throw, the pie in the face of one of your pieces, two pieces of it
+ * splitting off onto the two squares diagonally behind it, the pies there while they last; the piece's splat mark, a
+ * small cream smear drawn with the piece; a second splat's freeze, Ginger's ice) and the funhouse (he pogos onto the
+ * board, it spins and flips, he speaks, he plays the crowd's move, he bounces off). His rules:
+ * packages/chess/src/bosses/boingo.ts.
  */
 
-/** The pie's beats: the banner (gone as he throws), then his throw, the pie's flight from his side, the splat. */
-export const PIE = { flyAt: 1450, landAt: 1800 } as const;
+/**
+ * The pie's beats (ms into its moment): the banner (gone as he throws), then his throw and the pie's flight from his side
+ * (`flyAt`), the pie in the piece's face (`hitAt`: the splash, its splat mark, a second splat's ice from `iceAt`), two
+ * pieces of it splitting off (`splitAt`) and landing on the two squares behind (`landAt`: the splat, then the pie).
+ */
+export const PIE = { flyAt: 1450, hitAt: 1800, iceAt: 1900, splitAt: 1880, landAt: 2160 } as const;
 
 // ---------------- The funhouse's beats (ms into its moment) ----------------
 
@@ -81,14 +90,55 @@ export function funhouseLine(m: Pick<Moment, "key" | "pick">): string {
 /** His line as the board turns again (round to a side, or back the right way up). */
 export const SPIN_LINES = ["Wheee! Round we go!", "Dizzy yet? Honk!", "Hold on tight! Hee hee!"];
 
-function pieMoment({ moment, t, orientation, banner, cast }: MomentProps) {
+/** The throw froze its piece (its second splat): the piece the pie hit is the one frozen from this turn. */
+const pieFroze = (boss: Pick<BossView, "powers">, m: Pick<Moment, "square">): boolean => !!m.square && boss.powers?.frozen?.square === m.square && boss.powers.frozen.until === boss.powers.turn;
+
+/** The pie in the piece's face, side on from his side (the king attack's art, `hitHL`), with its splat. */
+function FaceSplash({ square, orientation, since }: { square: string; orientation: "white" | "black"; since: number }) {
+  const fx = EFFECTS.pieFace;
+  return (
+    <span class="pw-pie pw-pie-face" style={onSquare(square, orientation, useContext(BoardTurn))}>
+      <SpriteAnim ch={fx.ch} anim="hitHL" since={since} sounds={fx.sounds} id={`face-${square}`} />
+    </span>
+  );
+}
+
+function pieMoment({ boss, moment, t, orientation, banner, cast }: MomentProps) {
+  const sq = moment.square;
+  const piece = sq ? pieceAt(boss.board.fen, sq) : null;
+  const word = piece ? PIECE_WORD[piece.type] : null;
   return (
     <div class="power-moment pm-pie">
-      {banner("PIE!", moment.square ? `Splat on ${moment.square}` : undefined, "", PIE.flyAt)}
+      {banner("PIE!", word ? (pieFroze(boss, moment) ? `Splat! Your ${word} is frozen` : `Splat on your ${word}`) : undefined, "", PIE.flyAt)}
       {cast("throw", PIE.flyAt)}
-      {moment.square && t >= PIE.flyAt && t < PIE.landAt && <Flight name="pieFly" square={moment.square} orientation={orientation} since={moment.at + PIE.flyAt} ms={PIE.landAt - PIE.flyAt} />}
+      {sq && t >= PIE.flyAt && t < PIE.hitAt && <Flight name="pieFly" square={sq} orientation={orientation} since={moment.at + PIE.flyAt} ms={PIE.hitAt - PIE.flyAt} />}
+      {sq && t >= PIE.hitAt && t < PIE.hitAt + 260 && <FaceSplash square={sq} orientation={orientation} since={moment.at + PIE.hitAt} />}
+      {sq &&
+        t >= PIE.splitAt &&
+        t < PIE.landAt &&
+        (moment.squares ?? []).map((to) => <Flight key={to} name="pieFly" anim="fly" square={to} fromSquare={sq} bit orientation={orientation} since={moment.at + PIE.splitAt} ms={PIE.landAt - PIE.splitAt} />)}
     </div>
   );
+}
+
+/**
+ * The splat marks on your pieces (a small cream smear drawn with each piece, so it slides with it), as a board decor. During
+ * the pie's moment (Boss.tsx passes its moments): the new mark comes as the pie hits, and a mark the throw turned into a
+ * freeze stays until then. Null when there's none to draw.
+ */
+export function boingoDecor(boss: (Pick<BossView, "id" | "crowdSide" | "powers">) | null | undefined, moments: readonly Moment[] = [], now = 0): PieceDecor | undefined {
+  const p = boss?.id === "clown" ? boss.powers : null;
+  if (!p) return undefined;
+  const pie = moments.find((m) => m.kind === "pie");
+  const before = !!pie?.square && now < pie.at + PIE.hitAt;
+  const marks = (p.splats ?? []).filter((m) => !(before && m.square === pie!.square)).map((m) => `${m.square}${m.piece}`);
+  if (before && pieFroze(boss!, pie!) && p.frozen) marks.push(p.frozen.square);
+  if (!marks.length) return undefined;
+  const side = boss!.crowdSide;
+  return {
+    key: `splat:${marks.join(",")}`,
+    of: (square, code) => (code[0] === side && marks.some((m) => m.slice(0, 2) === square && (m.length === 2 || m[2] === code[1])) ? { cls: "pw-splatted", kids: <i class="pw-splat-mark" /> } : null),
+  };
 }
 
 function funhouseMoment({ boss, moment, t, banner, anim: kitAnim }: MomentProps) {
@@ -119,7 +169,8 @@ export const BOINGO_UI = {
   id: "clown",
   ultimate: { name: "the Funhouse" },
   moments: {
-    pie: { order: 0, kit: "power", appearAt: (m, square) => (m.square === square ? m.at + PIE.landAt : undefined), view: pieMoment },
+    // (The pies on the two squares behind as the split pieces land; a second splat's ice on the piece just after the hit.)
+    pie: { order: 0, kit: "power", appearAt: (m, square) => (m.squares?.includes(square) ? m.at + PIE.landAt : m.square === square ? m.at + PIE.iceAt : undefined), view: pieMoment },
     // The funhouse has a screen of its own, after the move he plays for the crowd: the board turns upside down and the
     // move lands. Then each later step turns it again as a crowd turn begins.
     funhouse: {
@@ -138,19 +189,30 @@ export const BOINGO_UI = {
       view: spinMoment,
     },
   },
-  // The pies on their squares (pieSplat: the splat, then the pie), in eighths of the board's own size, where the board
-  // shows them however it's turned.
-  board: ({ p, orientation, now, appearAt, turn }) => {
+  // The pies on their squares (pieSplat: the splat, then the pie; one splat sound for the pair), and a frozen piece's ice
+  // (Ginger's: it forms, then shimmers while it lasts), in eighths of the board's own size, where the board shows them
+  // however it's turned.
+  board: ({ boss, p, board, orientation, now, appearAt, turn }) => {
     const pies = p.pies ?? (p.pie ? [p.pie] : []);
+    const ice = EFFECTS.iceOverlay;
     return {
-      over: pies.map(
-        ({ square }) =>
-          now >= appearAt(square) && (
-            <span key={`pie-${square}`} class="pw-pie" style={onSquare(square, orientation, turn)} data-square={square}>
-              <BossEffect name="pieSplat" since={appearAt(square)} id={square} />
+      over: [
+        ...pies.map(
+          ({ square }, i) =>
+            now >= appearAt(square) && (
+              <span key={`pie-${square}`} class="pw-pie" style={onSquare(square, orientation, turn)} data-square={square}>
+                <BossEffect name="pieSplat" since={appearAt(square)} id={square} quiet={i > 0} />
+              </span>
+            ),
+        ),
+        ...p.iced
+          .filter((sq) => pieceAt(board, sq)?.color === boss.crowdSide && now >= appearAt(sq))
+          .map((sq) => (
+            <span key={`ice-${sq}`} class="pw-ice" style={onSquare(sq, orientation, turn)} data-square={sq}>
+              <SpriteAnim ch={ice.ch} anim={ice.start!} then={ice.loop} since={appearAt(sq)} sounds={ice.sounds} id={sq} />
             </span>
-          ),
-      ),
+          )),
+      ],
     };
   },
 } satisfies BossUi;

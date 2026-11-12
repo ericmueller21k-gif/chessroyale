@@ -77,7 +77,7 @@ export interface BossInfo {
 }
 
 /** The boss powers there are: a passive (or opening) and an ultimate per boss. */
-export type PowerId = "freeze" | "blizzard" | "pie" | "funhouse" | "sparkler" | "candle" | "dark" | "lightsout" | "blocks" | "bounce" | "cuts" | "boardsaw" | "drag" | "showdown" | "nohelp" | "bullet" | "tusks" | "slam" | "leapfrog" | "carrotpatch" | "camouflage" | "repaint" | "moonbeam" | "fullmoon" | "seeds" | "water" | "balloons" | "hoops" | "draft" | "crease" | "revision" | "scraps" | "gnaw" | "clockslap" | "scramble" | "rush" | "clockfit" | "popoff";
+export type PowerId = "freeze" | "blizzard" | "pie" | "funhouse" | "sparkler" | "candle" | "dark" | "lightsout" | "blocks" | "bounce" | "cuts" | "boardsaw" | "drag" | "showdown" | "nohelp" | "bullet" | "tusks" | "slam" | "leapfrog" | "carrotpatch" | "camouflage" | "repaint" | "moonbeam" | "fullmoon" | "seeds" | "water" | "balloons" | "hoops" | "draft" | "crease" | "revision" | "scraps" | "gnaw" | "clockslap" | "scramble" | "rush" | "clockfit" | "popoff" | "split" | "dough" | "goldplate";
 /**
  * Every power, for the test switch (?power=<id>: a boss's ultimate comes early; its passive as usual, but for Wrangler's
  * drag and Alfil's Tusks, which come sooner and more often, the hopper's Leapfrog, whose battle starts with a hop due
@@ -91,9 +91,11 @@ export type PowerId = "freeze" | "blizzard" | "pie" | "funhouse" | "sparkler" | 
  * Draft from turn 2 and tries again every turn once a mark is gone; ?power=crease warns as the second turn begins (the
  * crease lands as the third does); ?power=revision, its once-a-battle third power (not on its BOSS_ROSTER line), comes at
  * the first crowd move it may follow (turn 5 on), whatever the evaluation says. Dash's ?power=rush, his once-a-battle Scramble
- * Rush (not on his BOSS_ROSTER line either), comes as the second turn begins.
+ * Rush (not on his BOSS_ROSTER line either), comes as the second turn begins. Don Dough's ?power=dough drops his first lump of
+ * dough at the end of his first turn (from BALLOON_TEST_MOVES, so it can rise); ?power=goldplate warns as the second turn begins
+ * (the gilding at the start of his turn after it).
  */
-export const POWER_IDS: readonly PowerId[] = ["freeze", "blizzard", "pie", "funhouse", "sparkler", "candle", "dark", "lightsout", "blocks", "bounce", "cuts", "boardsaw", "drag", "showdown", "nohelp", "bullet", "tusks", "slam", "leapfrog", "carrotpatch", "camouflage", "repaint", "moonbeam", "fullmoon", "seeds", "water", "balloons", "hoops", "draft", "crease", "revision", "scraps", "gnaw", "clockslap", "scramble", "rush", "clockfit", "popoff"];
+export const POWER_IDS: readonly PowerId[] = ["freeze", "blizzard", "pie", "funhouse", "sparkler", "candle", "dark", "lightsout", "blocks", "bounce", "cuts", "boardsaw", "drag", "showdown", "nohelp", "bullet", "tusks", "slam", "leapfrog", "carrotpatch", "camouflage", "repaint", "moonbeam", "fullmoon", "seeds", "water", "balloons", "hoops", "draft", "crease", "revision", "scraps", "gnaw", "clockslap", "scramble", "rush", "clockfit", "popoff", "split", "dough", "goldplate"];
 
 /**
  * A raid boss: the base template every boss fills in. Its powers' rules (which moves are allowed, what happens after
@@ -247,6 +249,13 @@ export const BOSS_ROSTER: readonly BossDef[] = [
   // reports/dash-sim.md). Admins first: BOSS_ADMIN_FIRST in settings.ts (the test links `?boss=dash`, `&power=clockslap`,
   // `&power=scramble`).
   { id: "dash", name: "Dash", icon: "🐆", kit: "Dash", offset: -250, powers: { passive: "clockslap", ultimate: "scramble" } },
+  // Don Dough, a zebra kingpin who runs a bakery like a mob (Eric, Nov 10-11; his rules: bosses/zebra.ts, docs/decisions/2026-11-11-don-dough.md):
+  // Rising Dough, a few lumps of dough dropped early on his half, each showing what it rises as when its oven timer (a minute a
+  // move, the crowd's and his) reaches 00:00, unless your piece lands on it first (squashed); and Gold Plate, after the usual
+  // warning, at the start of his turn: his queen (else his strongest piece) turns gold and your pawns can't take it for the rest of
+  // the battle. His offset and numbers from the raid sim (reports/zebra-sim.md). Admins first: BOSS_ADMIN_FIRST in settings.ts (the
+  // test links `?boss=zebra`, `&power=dough`, `&power=goldplate`).
+  { id: "zebra", name: "Don Dough", icon: "🦓", kit: "Don Dough", offset: -250, powers: { passive: "dough", ultimate: "goldplate" } },
   { id: "recluse", name: "Hidden Boss", icon: "📕", kit: "Hidden Boss", offset: 0, powers: { passive: "nohelp", ultimate: "bullet" }, adminOnly: true, crowdFinal: true, the: true, levelUnknown: true },
   { id: "golem", name: "The Pawn Golem", icon: "🗿", kit: null, offset: 0, powers: null },
   { id: "archer", name: "The Bone Archer", icon: "💀", kit: null, offset: 0, powers: null },
@@ -483,6 +492,13 @@ const TIER_NAMES = ["golem", "clown", "archer", "knight", "witch", "tyrant", "dr
  * A boss's powers as they stand in a battle (the rules are in the chess package's boss-powers.ts). Crowd turns are
  * numbered from 1 (the crowd's first move of the battle): turn = crowdMoves + 1.
  */
+/** A splat mark of Boingo's pie on one of the crowd's pieces: its square, its kind (p n b r q) and how many splats it holds. */
+export interface SplatMark {
+  square: string;
+  piece: string;
+  n: number;
+}
+
 export interface BossPowerState {
   /** Every choice a power makes comes from this and the position (the same on the server and in every replay). */
   seed: number;
@@ -515,8 +531,17 @@ export interface BossPowerState {
    * thaw as the next crowd turn begins (cracked and dripping on screen). Null once the ice is gone.
    */
   blizzard?: { turn: number; square: string; at?: number; iced?: string[]; next?: string[] } | null;
-  /** Boingo's pies: each pied square (nobody may move onto it) through its crowd turn; up to BOSS_POWERS.pieMax. */
+  /**
+   * Boingo's pies: each pied square (nobody may move onto it) through its crowd turn; up to BOSS_POWERS.pieMax. Since Nov 12
+   * a throw pies the two squares diagonally behind the piece it hits (Eric's face pie).
+   */
   pies?: { square: string; until: number }[];
+  /**
+   * Boingo's splat marks (Nov 12): the crowd's pieces a pie has hit, by square (each follows its piece through every move;
+   * gone once it's taken), its kind and how many splats it holds; at BOSS_POWERS.pieSplatsToFreeze the piece freezes
+   * (`frozen`) and its mark goes.
+   */
+  splats?: SplatMark[];
   /**
    * Boingo's funhouse: the crowd turn it came (the board upside down), and the side its quarter turn goes to after
    * (90: a quarter turn clockwise, 270: counterclockwise); then the other side, then back (boardAngle). `move`/`san`: the
@@ -689,6 +714,8 @@ export interface BossPowerState {
   workshop?: WorkshopState | null;
   /** Dash's clock (his passive, Clock Slap; his ultimate, Time Scramble; the flag when your time runs out). */
   dash?: DashState | null;
+  /** Don Dough's powers (Rising Dough's lumps, Gold Plate's gold pieces, his opening comment). */
+  zebra?: ZebraState | null;
   /** What happened as this turn began, for the screens' moments (the same for everyone). */
   events: PowerEvent[];
 }
@@ -874,6 +901,61 @@ export interface Crease {
  *   and Folio's move in their place once played (`move`, `san`); `revisions`, how many this battle (revisionMax).
  * - Counts for the sims and the screens: marks made, folds, marks answered (the attack ended after a crowd move).
  */
+/** What a lump of Don Dough's dough rises as (Rising Dough), in his timers' order. */
+export type DoughPiece = "p" | "n" | "b" | "r" | "q";
+export const DOUGH_PIECES: readonly DoughPiece[] = ["p", "n", "b", "r", "q"];
+
+/**
+ * A lump of dough on the board (Don Dough's Rising Dough): its number this battle (`n`: 0, 1, …), what it rises as, its square
+ * (always empty: a piece of yours landing on it squashes it, his never land on it), the minutes left on its oven timer (`left`:
+ * one off for every move, yours and his; at 0 it rises as soon as the guards allow), and the crowd move after which he dropped it.
+ */
+export interface DoughLump {
+  n: number;
+  /** Its oven timer's place on his side (the lowest free when it dropped): it keeps it until it rises or is squashed. */
+  slot: number;
+  piece: DoughPiece;
+  square: string;
+  left: number;
+  at: number;
+}
+
+/** Something that happened to a lump: after crowd move `at`, at the end of whose move (`side`: the crowd's or his). */
+export interface DoughMark {
+  at: number;
+  side: "crowd" | "boss";
+  n: number;
+  piece: DoughPiece;
+  square: string;
+}
+
+/**
+ * Don Dough's powers in a battle (id zebra; the chess package's bosses/zebra.ts).
+ * - `lumps`: the dough on the board now. `drops`: lumps dropped this battle (at most doughDrops); `next`: the crowd move from
+ *   which his next drop may come (drawn from the seed).
+ * - `drop`, `rises`, `squashes`: his last drop, and every rise and squash this battle, for the screens' moments and the sims.
+ * - `gold`: the squares of his gold pieces now (they follow their moves); `gilds`: each Gold Plate (the piece and square
+ *   gilded; none: he had nothing to gild).
+ * - `talk`: his opening comment (once a game): after which crowd move, the library's name for the moves so far (null: the
+ *   fallback), and which of its lines.
+ * - `goldTurn`: the crowd turn on which a pawn of yours could have taken a gold piece (the rule in force): it doesn't count for
+ *   fair play.
+ */
+export interface ZebraState {
+  /** His side (set as the battle begins). */
+  his?: "w" | "b";
+  lumps: DoughLump[];
+  drops: number;
+  next: number;
+  drop?: DoughMark | null;
+  rises: DoughMark[];
+  squashes: DoughMark[];
+  gold: string[];
+  gilds: { at: number; square: string | null; piece: DoughPiece | null }[];
+  talk?: { at: number; name: string | null; pick: number } | null;
+  goldTurn?: number;
+}
+
 /** The pieces Timber's workshop builds, in its strip's order (WORKSHOP_PIECES). */
 export type WorkshopPiece = "p" | "n" | "b" | "r" | "q";
 export const WORKSHOP_PIECES: readonly WorkshopPiece[] = ["p", "n", "b", "r", "q"];
@@ -929,7 +1011,7 @@ export interface DashState {
  * Dash's Scramble Rush (the chess package's bosses/dash.ts): as crowd turn `at` + 1 began, he swept 3 of the crowd's pieces and 3
  * of his own (never a king) from `from` to empty squares of the middle ranks (`to`; `piece`: color then type, "wn"). Only the
  * screens see them moved: the game's board never changes. `correct`: how many of the six the crowd put back (its people's mean,
- * its bots' too), once it's over; under BOSS_POWERS.dashScramble.needCorrect, his extra move (`extra`).
+ * its bots' too; solo, yours alone), once it's over; under BOSS_POWERS.dashScramble.needCorrect, his extra move (`extra`).
  */
 export interface DashRush {
   at: number;
@@ -1005,7 +1087,7 @@ export interface SawCut {
  * gardener's plain plant, as a toy block (either side). `hoop`: the circus tiger's burning hoop, either side (nothing crosses its
  * wall, and no check across it). `crease`: Folio's Crease, the crowd's moves only (none across its line; Folio's pieces cross it).
  */
-export type StopReason = "boardsaw" | "cut" | "pie" | "block" | "paint" | "plant" | "hoop" | "crease";
+export type StopReason = "boardsaw" | "cut" | "pie" | "block" | "paint" | "plant" | "hoop" | "crease" | "gold" | "dough";
 
 /** Wrangler's long pull: his center pawn's double step (`from` to `via`), lassoed on to `to`, as crowd turn `turn` begins. */
 export interface LongPull {
@@ -1414,13 +1496,20 @@ export type PowerEventKind =
   | "popOff"
   | "popOffFast"
   | "rushWarn"
-  | "rushExtra";
+  | "rushExtra"
+  // Don Dough: a lump of dough dropped (Rising Dough), risen into his piece, squashed by yours; Gold Plate's gilding; his comment
+  // on your opening.
+  | "doughDrop"
+  | "doughRise"
+  | "doughSquash"
+  | "goldPlate"
+  | "openingTalk";
 export interface PowerEvent {
   kind: PowerEventKind;
   turn: number;
-  /** The square it hit (a freeze, a pie, a sparkler). */
+  /** The square it hit (a freeze, a pie: the piece it hit in the face, a sparkler). */
   square?: string;
-  /** The squares a wave of fireballs hit; the pieces Ginger's blizzard thaws. */
+  /** The squares a wave of fireballs hit; the pieces Ginger's blizzard thaws; the two squares Boingo's pie split onto. */
   squares?: string[];
   /** Of those, the ones that fizzled as they landed (the crowd's king stood there): no fire tile. */
   fizzled?: string[];
@@ -1464,6 +1553,8 @@ export interface PowerEvent {
   count?: number;
   seconds?: number;
   move?: string;
+  /** Don Dough's opening comment: the library's name for your opening (none: his fallback line). */
+  opening?: string;
 }
 
 /** The settings behind the God King's Last Stand. */

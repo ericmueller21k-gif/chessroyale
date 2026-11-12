@@ -3,7 +3,7 @@ import { createPortal, memo } from "preact/compat";
 import { RECLUSE_PHASE2 } from "@chessroyale/core";
 import { moveLeft } from "@chessroyale/chess";
 import { RECLUSE, RECLUSE_BUST, RECLUSE_JUMP, palmOf } from "../characters/recluse.ts";
-import type { Frame } from "../characters/sprite.ts";
+import { lazyTable, type Frame } from "../characters/sprite.ts";
 import { EngineOverlay, placeEngine } from "../components/Recluse.tsx";
 import { kingSay } from "../godKing.ts";
 import { play } from "../sound.ts";
@@ -83,7 +83,7 @@ const FIG_H = (FIG_W * RECLUSE.h) / RECLUSE.w;
 /** Where his feet land, in the middle of the board (% of it); the book lies open just in front of them. */
 const MIDDLE: Pt = { x: 50, y: 60 };
 /** His raised hands as he chants in the middle of the board (% of it, our left first): where the arcs strike from. */
-const CHANT_HANDS = (() => {
+const CHANT_HANDS = lazyTable(() => {
   const f = RECLUSE.anims.chant!.frames[0]!;
   const left = MIDDLE.x - (FIG_W * RECLUSE.foot[0]) / RECLUSE.w;
   const top = MIDDLE.y - (FIG_H * RECLUSE.foot[1]) / RECLUSE.h;
@@ -91,7 +91,7 @@ const CHANT_HANDS = (() => {
     .filter((l) => l.part === "hand:palm")
     .map((l) => [left + ((l.x + 3.5) / RECLUSE.w) * FIG_W, top + ((l.y + 2) / RECLUSE.h) * FIG_H] as const)
     .sort((a, b) => a[0] - b[0]);
-})();
+});
 /** Where he leaps from and back to (his feet), by his place: a phone's boss bar above the board's top left; a computer's figure by its bottom left. */
 const PLACE = { phone: { x: 10, y: 38 }, computer: { x: -12, y: 100 } } as const;
 const FLIGHT = RECLUSE_JUMP.landAt - RECLUSE_JUMP.upAt;
@@ -120,7 +120,8 @@ function useCue(on: boolean, key: string, fn: () => void) {
 
 type Xy = { x: number; y: number };
 /** His raised hand in the frame he holds it up in while the power streams in (`seizeLoop`), on either drawing. */
-const SEIZE_PALM = { [RECLUSE.id]: palmOf(RECLUSE.anims.seizeLoop!.frames[0]!)!, [RECLUSE_BUST.id]: palmOf(RECLUSE_BUST.anims.seizeLoop!.frames[0]!)! };
+let seizePalm: Record<string, readonly [number, number]> | undefined;
+const SEIZE_PALM = () => (seizePalm ??= { [RECLUSE.id]: palmOf(RECLUSE.anims.seizeLoop!.frames[0]!)!, [RECLUSE_BUST.id]: palmOf(RECLUSE_BUST.anims.seizeLoop!.frames[0]!)! });
 /** Golden motes in the stream, and how long one takes from the God King to the boss (ms). */
 const MOTES = 16;
 const MOTE_MS = 650;
@@ -150,7 +151,7 @@ function AbsorbStream({ t }: { t: number }) {
       const cv = box?.querySelector(".boss-char-sprite")?.getBoundingClientRect();
       if (!him || !box || !cv?.width) return setGeo(null);
       const ch = box.classList.contains(`ch-${RECLUSE_BUST.id}`) ? RECLUSE_BUST : RECLUSE;
-      const palm = SEIZE_PALM[ch.id]!;
+      const palm = SEIZE_PALM()[ch.id]!;
       const b = { x: cv.left + (palm[0] / ch.w) * cv.width, y: cv.top + (palm[1] / ch.h) * cv.height };
       const g = { x: him.left + him.width * 0.5, y: him.top + him.height * 0.55 };
       // (Out of him sideways, low, then up into the hand from below: clear of both their words above them.)

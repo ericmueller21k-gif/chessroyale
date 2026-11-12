@@ -1,7 +1,7 @@
 /** Hollow's effects: the dark, his pour and a miss, his strand of bulbs, Lights out's night. See ../effects.ts. */
 import { DEFAULT_LIGHTS, bulbColour, lightsSwap } from "../lights.ts";
 import { canvas, ellipse, toGrid } from "../paint.ts";
-import { lazyParts, type Anim, type Character, type Frame, type Layer, type Part, type Speck } from "../sprite.ts";
+import { lazyAnim, lazyParts, type Anim, type Character, type Frame, type Layer, type Part, type Speck } from "../sprite.ts";
 import { SQUARE, sparkle, type Pt } from "./common.ts";
 
 // ---- Hollow's dark: a square covered in smoke (the passive), the darkness he pours onto it, a miss, his strand of
@@ -110,7 +110,7 @@ export const DARK_SQUARE: Character = {
   parts: DARK_PARTS,
   anims: {
     /** The darkness pours in: billows grow from the middle, swirling, and close over the square. */
-    gather: {
+    gather: lazyAnim(() => ({
       loop: false,
       frames: [0.25, 0.45, 0.65, 0.85, 1].map((g, i): Frame => ({
         ms: i === 4 ? 140 : 90,
@@ -118,19 +118,19 @@ export const DARK_SQUARE: Character = {
         layers: [{ part: cloudPart(`grow${g}`, () => cloud(i / 8, g)), x: 0, y: 0 }],
         specks: darkGlints(i, 2 + i),
       })),
-    },
+    })),
     /** Dark, while it lasts: the cloud turning slowly, violet glints twinkling in it. */
-    dark: {
+    dark: lazyAnim(() => ({
       loop: true,
       frames: Array.from({ length: 8 }, (_, i): Frame => ({ ms: 160, layers: [{ part: cloudPart(`dark${i}`, () => cloud(i / 8)), x: 0, y: 0 }], specks: darkGlints(i) })),
-    },
+    })),
     /** Its last turn: paler and grayer, wisps peeling off its top, fewer glints; the piece still hidden. */
-    thin: {
+    thin: lazyAnim(() => ({
       loop: true,
       frames: Array.from({ length: 8 }, (_, i): Frame => ({ ms: 160, layers: [{ part: cloudPart(`thin${i}`, () => cloud(i / 8, 1, true)), x: 0, y: 0 }], specks: [...peel(i), ...darkGlints(i, 1)] })),
-    },
+    })),
     /** It clears: the billows drift apart, thin out and are gone. Ends empty. */
-    clear: {
+    clear: lazyAnim(() => ({
       loop: false,
       frames: [
         ...[0.3, 0.7, 1.1].map((sp, i): Frame => ({
@@ -142,7 +142,7 @@ export const DARK_SQUARE: Character = {
         { ms: 90, layers: [{ part: cloudPart("clear3", () => cloud(0.4, 0.3, true, 1.6)), x: 0, y: 0 }], pal: { A: "#16121f66", B: "#211b2e66", C: "#2f273f55", D: "#43395644" } },
         { ms: 60, layers: [] },
       ],
-    },
+    })),
   },
 };
 
@@ -175,10 +175,10 @@ export const DARK_POUR: Character = {
     return parts;
   })(),
   anims: {
-    fly: {
+    fly: lazyAnim(() => ({
       loop: true,
       frames: [0, 1, 2, 3].map((i): Frame => ({ ms: 70, layers: [{ part: `pour${i}`, x: 0, y: 0 }], specks: [...darkGlints(i, 2).map(([x, y, k]): Speck => [x + 4, y, k]), [3 + ((i * 5) % 7), 12 + ((i * 3) % 8), "u"]] })),
-    },
+    })),
   },
 };
 
@@ -200,7 +200,7 @@ export const DARK_MISS: Character = {
   palette: DARK_PALETTE,
   parts: {},
   anims: {
-    miss: {
+    miss: lazyAnim(() => ({
       loop: false,
       frames: [
         { ms: 60, layers: [], cue: "miss", specks: missX(4, "s", 2) },
@@ -210,127 +210,7 @@ export const DARK_MISS: Character = {
         { ms: 90, layers: [], specks: missX(7, "R", 1), pal: { R: "#b0204a55" } },
         { ms: 40, layers: [] },
       ],
-    },
-  },
-};
-
-// The strand of bulbs counting down: a wire drooping between two hooks, three bulbs hanging off it.
-
-/**
- * The strip's bulbs, and a lash's colors, in the lights' default colors (lights.ts): bulb `b` is drawn in
- * DEFAULT_LIGHTS[b]'s and takes the battle's color of the strand's bulb `b` (the first three: always three colors).
- */
-const STRIP_LIT = [0, 1, 2].map((b) => bulbColour(DEFAULT_LIGHTS[b]!));
-const STRAND_PALETTE = {
-  k: "#08070c",
-  w: "#3b3844",
-  W: "#5d5968",
-  "1": STRIP_LIT[0]!.glass, // the three bulbs: main, shade, glint, glow
-  "4": STRIP_LIT[0]!.shade,
-  "7": STRIP_LIT[0]!.glint,
-  "!": `${STRIP_LIT[0]!.glass}66`,
-  "2": STRIP_LIT[1]!.glass,
-  "5": STRIP_LIT[1]!.shade,
-  "8": STRIP_LIT[1]!.glint,
-  "^": `${STRIP_LIT[1]!.glass}66`,
-  "3": STRIP_LIT[2]!.glass,
-  "6": STRIP_LIT[2]!.shade,
-  "9": STRIP_LIT[2]!.glint,
-  "~": `${STRIP_LIT[2]!.glass}66`,
-  o: "#2e2a36", // out: dark glass
-  O: "#1d1a23",
-  g: "#463f52",
-  x: "#ffffff",
-  U: "#c4a2ff",
-} as const;
-const STRAND_KEYS = [["1", "4", "7", "!"], ["2", "5", "8", "^"], ["3", "6", "9", "~"]] as const;
-export const STRAND_W = 44;
-export const STRAND_H = 15;
-/** The bulbs' x (their middle) along the strip. */
-const STRAND_X = [9, 22, 35] as const;
-const strandWire: Part = (() => {
-  const cv = canvas(STRAND_W, STRAND_H);
-  for (let x = 1; x < STRAND_W - 1; x++) {
-    const y = Math.round(2 + 2.2 * Math.sin((Math.PI * (x - 1)) / (STRAND_W - 3)) + 0.6 * Math.sin((Math.PI * 3 * (x - 1)) / (STRAND_W - 3)));
-    cv[y]![x] = "w";
-  }
-  return { grid: toGrid(cv) };
-})();
-/** A bulb, 5 x 8 (a socket and a pointed glass), lit (its own colors) or out (dark glass). */
-const stripBulb = (b: number, lit: boolean): Part => {
-  const [M, S, G] = lit ? STRAND_KEYS[b]! : (["o", "O", "g"] as const);
-  return { grid: [".WW..", ".ww..", `${G}${M}${M}${M}${S}`, `${M}${M}${M}${M}${S}`, `${M}${M}${M}${S}${S}`, `.${M}${S}${S}.`, `..${S}..`] };
-};
-const STRIP_PARTS: Record<string, Part> = { wire: strandWire };
-for (const b of [0, 1, 2]) {
-  STRIP_PARTS[`on${b}`] = stripBulb(b, true);
-  STRIP_PARTS[`off${b}`] = stripBulb(b, false);
-  const glow = canvas(9, 11);
-  ellipse(glow, 4.5, 6.5, 4.5, 4.5, STRAND_KEYS[b]![3]);
-  STRIP_PARTS[`glow${b}`] = { grid: toGrid(glow), outline: false };
-}
-/** Where a bulb's socket hangs off the wire. */
-const bulbY = (b: number) => {
-  const x = STRAND_X[b]!;
-  return Math.round(2 + 2.2 * Math.sin((Math.PI * (x - 1)) / (STRAND_W - 3)) + 0.6 * Math.sin((Math.PI * 3 * (x - 1)) / (STRAND_W - 3)));
-};
-/** The strip with `lit` bulbs on (the first ones), bulb `flick` drawn the other way (flickering), glints on frame `g`. */
-function strip(lit: number, ms: number, o: { flick?: number; g?: number; cue?: string; spark?: number } = {}): Frame {
-  const layers: Layer[] = [];
-  const on = (b: number) => (b < lit) !== (o.flick === b);
-  for (const b of [0, 1, 2]) if (on(b)) layers.push({ part: `glow${b}`, x: STRAND_X[b]! - 4, y: bulbY(b) - 1 });
-  layers.push({ part: "wire", x: 0, y: 0 });
-  for (const b of [0, 1, 2]) layers.push({ part: `${on(b) ? "on" : "off"}${b}`, x: STRAND_X[b]! - 2, y: bulbY(b) + 1 });
-  const specks: Speck[] = [];
-  if (o.g !== undefined && lit > 0) {
-    const b = o.g % lit;
-    specks.push([STRAND_X[b]! - 1, bulbY(b) + 3, "x"]);
-  }
-  if (o.spark !== undefined) {
-    const [x, y] = [STRAND_X[o.spark]!, bulbY(o.spark) + 6];
-    specks.push([x, y, "x"], [x - 2, y - 1, "U"], [x + 2, y + 1, "U"], [x + 1, y + 3, "U"]);
-  }
-  return { ms, layers, specks, cue: o.cue };
-}
-/** A bulb going out (its countdown ticks down): it flickers, sparks and dies, ending with one fewer lit. */
-const goOut = (from: number): Anim => {
-  const b = from - 1;
-  return {
-    loop: false,
-    frames: [strip(from, 80, { flick: b, cue: "pop" }), strip(from, 70), strip(from, 60, { flick: b }), strip(from, 50), strip(from - 1, 90, { spark: b }), strip(from - 1, 200)],
-  };
-};
-export const BULB_STRAND: Character = {
-  id: "bulb-strand",
-  name: "Hollow's bulbs",
-  w: STRAND_W,
-  h: STRAND_H,
-  foot: [22, 14],
-  palette: STRAND_PALETTE,
-  // (Each bulb in the battle's color: lights.ts.)
-  swap: lightsSwap(STRAND_KEYS),
-  parts: STRIP_PARTS,
-  anims: {
-    ...Object.fromEntries([3, 2, 1, 0].map((n) => [`lit${n}`, { loop: true, frames: n ? [0, 1, 2, 3].map((i) => strip(n, i === 0 ? 400 : 260, { g: i })) : [strip(0, 600)] } satisfies Anim])),
-    out3: goOut(3),
-    out2: goOut(2),
-    out1: goOut(1),
-    /** The strand lighting again after the last bulb went out: one by one, each flickering on. Ends with all three lit. */
-    relight: {
-      loop: false,
-      frames: [
-        strip(0, 120, { cue: "relight" }),
-        strip(1, 60),
-        strip(0, 50),
-        strip(1, 140, { g: 0 }),
-        strip(2, 60),
-        strip(1, 50),
-        strip(2, 140, { g: 1 }),
-        strip(3, 60),
-        strip(2, 50),
-        strip(3, 200, { g: 2 }),
-      ],
-    },
+    })),
   },
 };
 
@@ -415,6 +295,103 @@ export const LIFE_STRAND: Character = {
     ),
   },
 };
+
+// His six bulbs counting down to his next cover (Eric, Nov 12): one for each move, yours and his, until he covers a square;
+// a wire between two hooks, scalloped between the bulbs, under his rage meter and as wide as it. Two drawings, each pixel
+// for pixel at its size (no stretch): a phone's 44 x 11 (its meter's 44 px), a computer's 88 x 11 (its meter's 88 px, in
+// the 11 px under it). The bulbs are his strand's first six (LIFE_KEYS: each the battle's color for its place on his strand).
+
+/** How many bulbs the countdown has: one for each move between two covers (his darkEvery 3 and the crowd's 3). */
+export const STRIP_BULBS = 6;
+export const STRIP_H = 11;
+/** The two drawings' widths: a phone's and a computer's (each its rage meter's width in px). */
+export const STRIP_W = { phone: 44, computer: 88 } as const;
+const STRIP_KEYS = LIFE_KEYS.slice(0, STRIP_BULBS);
+
+/** A strip `w` wide: its bulbs' x (their middle), the wire's y along it, its parts, and its frames. */
+function sixStrip(w: number) {
+  // (The bulbs evenly spread, 5 px each with their outline inside the hooks: on a phone's 44 px every 7 px, nearly touching.)
+  const xs = Array.from({ length: STRIP_BULBS }, (_, i) => Math.round(4 + (i * (w - 9)) / (STRIP_BULBS - 1)));
+  const anchors = [1, ...xs, w - 2];
+  /** The wire's row at `x`: hooks at row 1, a gentle droop to the middle, and a scallop between each two bulbs. */
+  const wireY = (x: number) => {
+    const i = Math.max(0, anchors.findIndex((a, j) => x >= a && x <= anchors[j + 1]!));
+    const [a, b] = [anchors[i]!, anchors[i + 1]!];
+    // (Deeper as the span is longer: a computer's hangs a little between its bulbs, a phone's barely.)
+    const sag = Math.min(1.8, (b - a) / 9) * (i === 0 || i === anchors.length - 2 ? 0.6 : 1);
+    return Math.round(1 + 0.9 * Math.sin((Math.PI * (x - 1)) / (w - 3)) + sag * Math.sin((Math.PI * (x - a)) / (b - a)));
+  };
+  const parts: Record<string, Part> = {
+    wire: (() => {
+      const cv = canvas(w, STRIP_H);
+      for (let x = 1; x < w - 1; x++) cv[wireY(x)]![x] = "w";
+      return { grid: toGrid(cv) };
+    })(),
+  };
+  for (let b = 0; b < STRIP_BULBS; b++) {
+    const [M, S, G, L] = STRIP_KEYS[b]!;
+    parts[`on${b}`] = { grid: [".WW..", ".ww..", `${G}${M}${M}${M}${S}`, `${M}${M}${M}${M}${S}`, `${M}${M}${M}${S}${S}`, `.${M}${S}${S}.`, `..${S}..`] };
+    parts[`off${b}`] = { grid: [".WW..", ".ww..", "gooOO", "ooooO", "oooOO", ".oOO.", "..O.."] };
+    const glow = canvas(9, 11);
+    ellipse(glow, 4.5, 6.5, 4.5, 4.5, L);
+    parts[`glow${b}`] = { grid: toGrid(glow), outline: false };
+  }
+  /** The strip with `lit` bulbs on (the first ones), bulb `flick` drawn the other way (flickering), a glint on frame `g`. */
+  const frame = (lit: number, ms: number, o: { flick?: number; g?: number; cue?: string; spark?: number } = {}): Frame => {
+    const layers: Layer[] = [];
+    const on = (b: number) => (b < lit) !== (o.flick === b);
+    for (let b = 0; b < STRIP_BULBS; b++) if (on(b)) layers.push({ part: `glow${b}`, x: xs[b]! - 4, y: wireY(xs[b]!) - 1 });
+    layers.push({ part: "wire", x: 0, y: 0 });
+    for (let b = 0; b < STRIP_BULBS; b++) layers.push({ part: `${on(b) ? "on" : "off"}${b}`, x: xs[b]! - 2, y: wireY(xs[b]!) + 1 });
+    const specks: Speck[] = [];
+    if (o.g !== undefined && lit > 0) {
+      const b = (o.g * 2) % lit;
+      specks.push([xs[b]! - 1, wireY(xs[b]!) + 3, "x"]);
+    }
+    if (o.spark !== undefined) {
+      const [x, y] = [xs[o.spark]!, wireY(xs[o.spark]!) + 5];
+      specks.push([x, y, "x"], [x - 2, y - 1, "U"], [x + 2, y + 1, "U"], [x + 1, y + 3, "U"]);
+    }
+    return { ms, layers, specks, cue: o.cue };
+  };
+  return { xs, wireY, parts, frame };
+}
+
+/** A strip of six, `w` wide (STRIP_W): lit6 … lit0 (loops), out6 … out1 (a bulb going out, its `pop`), relight (ends on lit6). */
+function sixStrand(id: string, w: number): Character {
+  const s = sixStrip(w);
+  const f = s.frame;
+  return {
+    id,
+    name: "Hollow's bulbs",
+    w,
+    h: STRIP_H,
+    foot: [w >> 1, STRIP_H - 1],
+    palette: LIFE_PALETTE,
+    // (Each bulb in the battle's color for its place on his strand: lights.ts.)
+    swap: lightsSwap(STRIP_KEYS),
+    parts: s.parts,
+    anims: {
+      ...Object.fromEntries(Array.from({ length: STRIP_BULBS + 1 }, (_, n) => [`lit${n}`, { loop: true, frames: n ? [0, 1, 2, 3].map((i) => f(n, i === 0 ? 400 : 260, { g: i })) : [f(0, 600)] } satisfies Anim])),
+      // A bulb going out (a move made): it flickers, sparks and dies, ending with one fewer lit.
+      ...Object.fromEntries(
+        Array.from({ length: STRIP_BULBS }, (_, i) => {
+          const from = i + 1;
+          const b = from - 1;
+          return [`out${from}`, lazyAnim(() => ({ loop: false, frames: [f(from, 80, { flick: b, cue: "pop" }), f(from, 70), f(from, 60, { flick: b }), f(from, 50), f(from - 1, 90, { spark: b }), f(from - 1, 200)] }))];
+        }),
+      ),
+      /** The strip lighting again after the last bulb went out (his cover lands): one by one, each flickering on. Ends all lit. */
+      relight: lazyAnim(() => ({
+        loop: false,
+        frames: [f(0, 120, { cue: "relight" }), ...Array.from({ length: STRIP_BULBS }, (_, b) => [f(b + 1, 50), f(b, 40), f(b + 1, 90, { g: b })]).flat()],
+      })),
+    },
+  };
+}
+/** The countdown's strip on a phone (44 x 11) and on a computer (88 x 11). */
+export const BULB_STRAND = sixStrand("bulb-strand", STRIP_W.phone);
+export const BULB_STRAND_WIDE = sixStrand("bulb-strand-wide", STRIP_W.computer);
 
 // Lights out: the board gone to night, one tile a square (so found pieces can show through), drawn on the shared
 // board canvas. The smoke drifting over it is one field across the board, repeating every 4 squares, so each square's
@@ -502,8 +479,8 @@ const nightGlint = (x: number, y: number, big = false): Speck[] => [[x, y, "x"],
 
 const nightAnims: Record<string, Anim> = {
   /** Each bulb smashed: the lights flicker, then settle a step darker (the pieces still show at 1 and 2). */
-  dim1: { loop: false, frames: [{ ms: 60, layers: [tileLayer("dim2")] }, { ms: 60, layers: [] }, { ms: 70, layers: [tileLayer("dim1")] }, { ms: 50, layers: [] }, { ms: 300, layers: [tileLayer("dim1")] }] },
-  dim2: { loop: false, frames: [{ ms: 60, layers: [tileLayer("dim2s")] }, { ms: 60, layers: [tileLayer("dim1")] }, { ms: 70, layers: [tileLayer("dim2s")] }, { ms: 50, layers: [tileLayer("dim1")] }, { ms: 300, layers: [tileLayer("dim2")] }] },
+  dim1: lazyAnim(() => ({ loop: false, frames: [{ ms: 60, layers: [tileLayer("dim2")] }, { ms: 60, layers: [] }, { ms: 70, layers: [tileLayer("dim1")] }, { ms: 50, layers: [] }, { ms: 300, layers: [tileLayer("dim1")] }] })),
+  dim2: lazyAnim(() => ({ loop: false, frames: [{ ms: 60, layers: [tileLayer("dim2s")] }, { ms: 60, layers: [tileLayer("dim1")] }, { ms: 70, layers: [tileLayer("dim2s")] }, { ms: 50, layers: [tileLayer("dim1")] }, { ms: 300, layers: [tileLayer("dim2")] }] })),
 };
 for (let tile = 0; tile < NIGHT_TILES; tile++)
   for (const light of [false, true]) {
@@ -623,6 +600,8 @@ export const NIGHT_LABEL: Character = {
 // ---- A lash of his strand landing on a king (his attack: the God King in his Last Stand, the crowd's king at his
 // mate), one square: the strand's crack across it in one of its bulbs' colors, sparks bursting off its tip.
 
+/** The lash's colors, in the lights' default colors (lights.ts): color `b` takes the battle's color of his strand's bulb `b`. */
+const STRIP_LIT = [0, 1, 2].map((b) => bulbColour(DEFAULT_LIGHTS[b]!));
 const LASH_PALETTE = {
   k: "#00000000",
   "1": STRIP_LIT[0]!.glass, // the first three bulbs' colors: the crack's color, its edge, its spark

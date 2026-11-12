@@ -37,7 +37,7 @@
  * ground under the nozzle).
  */
 import { canvas, toGrid, type Canvas } from "./paint.ts";
-import { lazyParts, type Anim, type Character, type Frame, type Layer, type Part, type Speck } from "./sprite.ts";
+import { lazyAnim, lazyParts, type Anim, type Character, type Frame, type Layer, type Part, type Speck } from "./sprite.ts";
 
 // ---- The balloons.
 
@@ -750,8 +750,8 @@ function pieceAnims(piece: BalloonPiece): Record<string, Anim> {
 }
 
 const anims: Record<string, Anim> = {
-  bare: { loop: true, frames: [fr(1000, pumpLayers(0))] },
-  stage1: { loop: true, frames: [fr(1000, pumpLayers(0, balloonLayer({ piece: "pawn", stage: 1 })))] },
+  bare: lazyAnim(() => ({ loop: true, frames: [fr(1000, pumpLayers(0))] })),
+  stage1: lazyAnim(() => ({ loop: true, frames: [fr(1000, pumpLayers(0, balloonLayer({ piece: "pawn", stage: 1 })))] })),
   ...Object.assign({}, ...BALLOON_PIECES.map(pieceAnims)),
 };
 

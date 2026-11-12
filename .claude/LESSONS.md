@@ -48,6 +48,13 @@ Tests check *what* ends up on the screen, not *how it gets there*, nor how long 
   - Something that should stay put through a match's phases (a box under the board) is one element, not one per
     screen: count the elements across the phases (a MutationObserver or a per-frame sampler), not only their boxes.
 
+- **A level that popped twice a move, and a Back tap that was lost** (Nov 12, [story](../docs/history/lessons.md#a-level-that-popped-twice-a-move-and-a-back-tap-that-was-lost-nov-12-2026)):
+  - An animation that plays as a state begins (a pop, a slash) must not play again when its element is drawn again: the match's
+    screens are rebuilt at every phase. Keep when the state began outside the component and give a redrawn copy a negative
+    `animation-delay` from it. A test records every insertion of the element and whether its animation is running.
+  - A guard that refuses an action while something is busy (a door's fade) keeps the tap for when it's free, or greys the button: it
+    never drops it silently. Test the tap at the first moment it can come (a MutationObserver that taps as the thing is drawn).
+
 ## Measure what's on screen; don't trust a screenshot
 
 - **Purity that didn't match the item** (Oct 6, [story](../docs/history/lessons.md#purity-that-didnt-match-the-item-oct-6-2026)):
@@ -107,6 +114,19 @@ Tests check *what* ends up on the screen, not *how it gets there*, nor how long 
   wider than headless Chrome's), not by counting characters. (The same lesson's rule about seeds is under "Tests".)
 
 ## Performance: nothing may grow with the match
+
+- **Uploads that waited for the GPU, and an atlas that never gave room back** (Nov 11, [story](../docs/history/lessons.md#uploads-that-waited-for-the-gpu-and-an-atlas-that-never-gave-room-back-nov-11-2026)):
+  - A canvas WebGL uploads is drawn in memory (`art2d`: `willReadFrequently`), never on the GPU: uploading a GPU canvas waits for the
+    GPU to finish the frame (30 to 120 ms each).
+  - An atlas that hands out room must get it back, or start pages again knowingly. Letting a picture go without its room only fills
+    the atlas for the next reset.
+  - Measure on a device: a headless frame report can miss what costs a phone (Eric's iPhone run found both).
+
+- **Floor tiles that stood up** (Nov 11, [story](../docs/history/lessons.md#floor-tiles-that-stood-up-nov-11-2026)):
+  - A room's floor tiles' names start `floor-` (room.ts `isFloor`), or they stand up as pieces every frame. A new room's test
+    checks every square has a floor tile baked in (`shop-zebra.test.ts`).
+  - A rule made for one kind of room (a cave's see-through) is opted into by what it's for, not by a field another room also
+    has. Walk round every piece in a new room mid-walk, not only at rest.
 
 - **Lag that grows with the match** (Oct 9, [story](../docs/history/lessons.md#lag-that-grows-with-the-match-oct-9-2026)):
   - Anything a screen reads while rendering must be cheap and must not depend on how long the match is. A getter that
@@ -232,6 +252,46 @@ Tests check *what* ends up on the screen, not *how it gets there*, nor how long 
     Watch for it from before it can appear (`watchFor`, or `watchSquares` in `boss-powers.spec.ts` for which squares).
   - Before blaming the game for a test that fails now and then, log every frame of the moment in the page and the
     test's own times next to it: where the two don't overlap is the answer.
+- **The flaky batch of Nov 9** (`docs/decisions/2026-11-09-flaky-batch.md`):
+  - A test that fails on both tries in one run and passes locally is usually a condition, not timing: read the CI
+    trace's last snapshot (what's on screen, the turn order, the cards open) before changing a wait. Two of three were
+    app bugs.
+  - A test that taps until something opens closes whatever else its earlier taps opened first: an open card covers the
+    point a canvas hook returns (hooks see the canvas, not the page over it).
+  - A test lobby's "strong" bots must be deterministic for what the test relies on: no random move.
+  - A list that hides "what's done" must not key off "what's been created": a next round made ahead of its start
+    isn't the round being played.
+
+- **A defeat that never came** (Nov 9, [story](../docs/history/lessons.md#a-defeat-that-never-came-nov-9-2026)):
+  - A test that leans on a test switch names the boss (`?boss=`) unless it checks every boss on purpose: START's pick is
+    random, and a switch can fail for one boss in seven (`?mate=1` against Wrangler's pull or Sawyer's pawn first move).
+  - A spec that fails now and then on a random pick: run it once per boss (`?boss=<id>`) before calling it flaky.
+- **A report that looked paused in every room** (Nov 11, [story](../docs/history/lessons.md#a-report-that-looked-paused-in-every-room-nov-11-2026)):
+  anything a player reads about a run (a count, a pill) is set by the thing that records it, not by one of the loops that feed it:
+  a second loop (a room's) then keeps it going. Test it where the other loop runs (inside a room), by what's on screen.
+- **Escapes lost as a pop-up opened** (Nov 11, [story](../docs/history/lessons.md#escapes-lost-as-a-pop-up-opened-nov-11-2026)):
+  - A pop-up's, menu's or sheet's key and tap-away listeners go in a layout effect, never `useEffect` (which waits for a paint): a
+    test presses Escape the moment it is in the page (a MutationObserver), not after looking at it.
+  - Such a watcher waits for that pop-up's own class: `index.html` always holds a hidden `[role="dialog"]` ("Turn your phone upright").
+- **The flaky batch of Nov 11, second half** (`docs/decisions/2026-11-11-flaky-batch.md`, batch 2):
+  - A layout read straight after `setViewportSize` can come before the app's ResizeObserver (which runs before the next paint): wait
+    for the boxes to hold over a few painted frames, then measure.
+  - A tap aimed at something on a moving camera (a glide, a zoom back out of a room) is read again once the point holds still: a
+    missed tap walks you off, and the camera follows you.
+  - A state that changes after the judge (a timer's minute, a meter) is read from a per-frame watcher, not a 5 s poll: the judge took
+    over 5 s on CI's desktop.
+  - A value whose `null` means "everything" (`allowed`: every legal move) is checked as everything, never assumed to be a list.
+  - An answer that can't be read is a failure, never `{}` taken for it; and a request the app waits on before asking again has a
+    timeout (`AbortSignal.timeout`): one that never answered stopped the live line and every chat riding on it.
+
+- **The flaky batch of Nov 12** (`docs/decisions/2026-11-11-flaky-batch.md`, batch 3):
+  - A test hook's tap point is a point a finger can reach this frame: the middle of the part of the target that's on screen, not its
+    middle (a guard's feet below a computer's room edge made his middle null once the camera rested). A check that passes only while
+    the camera still moves is tested with the camera at rest.
+  - The local server frees an idle Durable Object within seconds, and in-memory state (the town's chat) goes with it; on Cloudflare
+    every app's heartbeat keeps the hub in use. A spec that reads in-memory server state across a long quiet stretch (a battle, a
+    result screen) keeps the object in use, as other players would. Read the room id in the recorder's answers first: a new one
+    means a restart, not a lost line.
 
 ## Eric's rules hold
 
@@ -255,5 +315,9 @@ Tests check *what* ends up on the screen, not *how it gets there*, nor how long 
     (`refused.ts`): a piece that only goes back, or a boss crossing his own saw, reads as a glitch.
   - Before fixing "the boss broke the rule", rebuild the position from the screenshot and list its legal moves: the
     rule's own exceptions come first.
+
+- **Hollow's dark at Babur's mate** (Nov 11, [story](../docs/history/lessons.md#hollows-dark-at-baburs-mate-nov-11-2026)):
+  - Code shared by every boss draws nothing of one boss's (his effect, his color): a boss's own look goes in its kit,
+    and a test walks every kit (king-attack.test.ts: each boss's hits and mate its own).
 
 - **The FAQ follows the rules** (Oct 11): a PR that changes a rule, a number's meaning or a boss updates its words in `packages/app/src/faq/content.ts` in the same PR; numbers there come from the settings objects, never typed in.

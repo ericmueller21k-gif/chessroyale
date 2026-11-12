@@ -8,6 +8,7 @@
 import type { Anim, Character, Frame, Layer, Part } from "../../characters/sprite.ts";
 import { HOPPER_PALETTE } from "../../characters/hopper.ts";
 import { flower, grain, groundShadow, logEnd, paint, signBoard, signFace, WARM, type LightSpot, type Pt } from "./kit.ts";
+import { lazyAnim } from "../../characters/sprite.ts";
 
 const P_ = HOPPER_PALETTE;
 const PALETTE: Record<string, string> = {
@@ -349,7 +350,7 @@ const frames: Frame[] = [0, 1, 2, 3].map((f) => ({
   }),
 }));
 
-const idle: Anim = { loop: true, frames };
+const idle: Anim = lazyAnim(() => ({ loop: true, frames }));
 
 export const HOUSE_HOPPER: Character = {
   id: "house-hopper",

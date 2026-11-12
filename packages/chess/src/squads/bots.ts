@@ -1,5 +1,5 @@
 import { Chess } from "chess.js";
-import { DEFAULT_SETTINGS, SQUADS, botPick, type Candidate, type Rng, type SquadsSettings } from "@chessroyale/core";
+import { DEFAULT_SETTINGS, SQUADS, botPick, type Candidate, type Rng, type Settings, type SquadsSettings } from "@chessroyale/core";
 import type { EngineLike } from "../runner.ts";
 import type { MoveScore } from "../uci.ts";
 import { blockLift, checkBlock, isBlocked } from "./blocks.ts";
@@ -42,16 +42,22 @@ export async function squadBotCandidates(engine: EngineLike, fen: string, s: Squ
   return candidatesFrom(await engine.topMoves(fen, s.bots.candidates), s);
 }
 
-/** `botPick` among the moves not in `avoid` (if that leaves nothing legal, among them all). */
-function pickAvoiding(rng: Rng, candidates: readonly Candidate[], skill: number, legal: readonly string[], avoid: ReadonlySet<string>): string {
+/**
+ * `botPick` among the moves not in `avoid` (if that leaves nothing legal, among them all). `core`: its random-move chance
+ * (`botRandomMoveChance`; none in a test lobby's `bots=strong`, `NO_RANDOM_MOVES`).
+ */
+function pickAvoiding(rng: Rng, candidates: readonly Candidate[], skill: number, legal: readonly string[], avoid: ReadonlySet<string>, core: Settings = DEFAULT_SETTINGS): string {
   const open = legal.filter((m) => !avoid.has(m));
-  if (!open.length) return botPick(rng, candidates, skill, legal, DEFAULT_SETTINGS);
-  return botPick(rng, candidates.filter((c) => !avoid.has(c.move)), skill, open, DEFAULT_SETTINGS);
+  if (!open.length) return botPick(rng, candidates, skill, legal, core);
+  return botPick(rng, candidates.filter((c) => !avoid.has(c.move)), skill, open, core);
 }
 
+/** The bots' settings with no random move (a test lobby's `bots=strong`: the strongest bots play the engine's best). */
+export const NO_RANDOM_MOVES: Settings = { ...DEFAULT_SETTINGS, botRandomMoveChance: 0 };
+
 /** Relay: the bot's move. */
-export function botRelayMove(rng: Rng, candidates: readonly Candidate[], skill: number, legal: readonly string[]): string {
-  return pickAvoiding(rng, candidates, skill, legal, new Set());
+export function botRelayMove(rng: Rng, candidates: readonly Candidate[], skill: number, legal: readonly string[], core: Settings = DEFAULT_SETTINGS): string {
+  return pickAvoiding(rng, candidates, skill, legal, new Set(), core);
 }
 
 /** The engine's top moves a bot may play here: blocks in effect take their moves' lines away. */
@@ -72,19 +78,19 @@ export function isOnlyMove(top: readonly MoveScore[], move: string, s: SquadsSet
  * Pairs: the bot's pick. Its partner's move only when `sameMove` (an only move, and the squad has a token: the caller
  * decides with `isOnlyMove`); otherwise never the move its partner has already picked.
  */
-export function botPairPick(rng: Rng, candidates: readonly Candidate[], skill: number, legal: readonly string[], partnerPick: string | null, sameMove = false): string {
+export function botPairPick(rng: Rng, candidates: readonly Candidate[], skill: number, legal: readonly string[], partnerPick: string | null, sameMove = false, core: Settings = DEFAULT_SETTINGS): string {
   if (sameMove && partnerPick && legal.includes(partnerPick)) return partnerPick;
-  return pickAvoiding(rng, candidates, skill, legal, new Set(partnerPick ? [partnerPick] : []));
+  return pickAvoiding(rng, candidates, skill, legal, new Set(partnerPick ? [partnerPick] : []), core);
 }
 
 /**
  * The final's vote: with `bots.copyHumanChance`, a pick a person on the squad has already made (the more of them on
  * it, the likelier), so the bots feel like teammates; otherwise its own pick at its skill.
  */
-export function botVotePick(rng: Rng, candidates: readonly Candidate[], skill: number, legal: readonly string[], humanPicks: readonly string[], s: SquadsSettings = SQUADS): string {
+export function botVotePick(rng: Rng, candidates: readonly Candidate[], skill: number, legal: readonly string[], humanPicks: readonly string[], s: SquadsSettings = SQUADS, core: Settings = DEFAULT_SETTINGS): string {
   const copyable = humanPicks.filter((m) => legal.includes(m));
   if (copyable.length && rng() < s.bots.copyHumanChance) return copyable[Math.floor(rng() * copyable.length)]!;
-  return pickAvoiding(rng, candidates, skill, legal, new Set());
+  return pickAvoiding(rng, candidates, skill, legal, new Set(), core);
 }
 
 /**

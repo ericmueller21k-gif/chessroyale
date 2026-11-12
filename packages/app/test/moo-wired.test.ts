@@ -239,10 +239,10 @@ describe("the stunned mark on the board", () => {
     expect(heldMarks(boss, ["g2"], 100)).toEqual({ squares: ["g2"], fadeAt: 0 });
     // (The crowd moved: the view holds nothing now.)
     expect(heldMarks(boss, [], 5000)).toEqual({ squares: ["g2"], fadeAt: 5000 });
-    expect(heldMarks(boss, [], 5000 + FADE_MS - 1).fadeAt).toBe(5000);
-    expect(heldMarks(boss, [], 5000 + FADE_MS)).toEqual({ squares: [], fadeAt: 0 });
-    expect(FADE_MS).toBeGreaterThanOrEqual(animLength(MOONBEAM.anims.fade!));
-    expect(FADE_MS).toBeGreaterThanOrEqual(animLength(MOON_SCORCH.anims.fade!));
+    expect(heldMarks(boss, [], 5000 + FADE_MS() - 1).fadeAt).toBe(5000);
+    expect(heldMarks(boss, [], 5000 + FADE_MS())).toEqual({ squares: [], fadeAt: 0 });
+    expect(FADE_MS()).toBeGreaterThanOrEqual(animLength(MOONBEAM.anims.fade!));
+    expect(FADE_MS()).toBeGreaterThanOrEqual(animLength(MOON_SCORCH.anims.fade!));
     // A new battle holds nothing of the last one's.
     expect(heldMarks(boss, ["h3"], 9000).squares).toEqual(["h3"]);
     expect(heldMarks({ id: "moo", startMove: 4 }, [], 9500).squares).toEqual([]);

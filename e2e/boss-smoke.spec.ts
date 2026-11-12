@@ -29,6 +29,7 @@ const PASSIVE_EVENTS: Partial<Record<PowerId, PowerEventKind[]>> = {
   draft: ["draft"],
   scraps: ["build"],
   clockslap: ["slap"],
+  dough: ["doughDrop"],
 };
 
 // (A boss in the game for admins first, Timber and Dash, is checked too: the test plays as an admin.)
@@ -40,6 +41,11 @@ const PLAYABLE = BOSS_ROSTER.filter((b) => isPlayable(b) || adminFirst(b));
  * side, and his Camouflage still comes from it (bosses/smudgy.ts, REPAINT_TEST_MOVES).
  */
 const SMOKE_POWER: Partial<Record<string, PowerId>> = { smudgy: "repaint" };
+/**
+ * A boss whose passive needs a position the knights' shuffle doesn't give: your first moves instead (then the usual rule).
+ * Boingo's pie (Nov 12) needs one of your pieces with both squares diagonally behind it empty: 1.e4 leaves d3 and f3 open.
+ */
+const SMOKE_FIRST: Partial<Record<string, string[]>> = { clown: ["e2e4"] };
 const desktop = () => test.info().project.name === "desktop";
 const phase = (p: Page) => p.evaluate(() => (window as any).match?.phase?.kind ?? "none").catch(() => "none");
 
@@ -67,7 +73,7 @@ const seen = (page: Page) => page.evaluate(() => (window as any).__smoke as { ki
  * Your move: a knight to an empty square when it may (the battle lasts), else the first move allowed. Once a position
  * (`done`: the positions already played from). Returns the position played from, or null.
  */
-async function playOne(page: Page, done: Set<string>): Promise<string | null> {
+async function playOne(page: Page, done: Set<string>, first: string[] = []): Promise<string | null> {
   const s = await page.evaluate(() => {
     const m = (window as any).match;
     return m.phase.kind === "play" && Date.now() >= m.phase.startsAt + 300 ? { fen: m.phase.board.fen as string, allowed: (m.boss?.powers?.allowed ?? null) as string[] | null } : null;
@@ -76,7 +82,8 @@ async function playOne(page: Page, done: Set<string>): Promise<string | null> {
   const chess = new Chess(s.fen);
   const legal = chess.moves({ verbose: true }).map((m) => ({ uci: m.from + m.to + (m.promotion ?? ""), knight: m.piece === "n" && !m.captured }));
   const ok = legal.filter((m) => !s.allowed || s.allowed.includes(m.uci)).sort((a, b) => (a.uci < b.uci ? -1 : 1));
-  await submitMove(page, (ok.find((m) => m.knight) ?? ok[0])?.uci, s.fen);
+  const planned = first.length && ok.some((m) => m.uci === first[0]) ? first.shift() : undefined;
+  await submitMove(page, planned ?? (ok.find((m) => m.knight) ?? ok[0])?.uci, s.fen);
   done.add(s.fen);
   return s.fen;
 }
@@ -107,6 +114,7 @@ PLAYABLE.forEach((def, i) => {
     const passiveSeen = (s: { kinds: string[] }) => s.kinds.some((k) => passive!.includes(k as PowerEventKind));
     let pressed = false;
     const played = new Set<string>();
+    const first = [...(SMOKE_FIRST[def.id] ?? [])];
     const deadline = Date.now() + 70_000;
     for (let s = await seen(page); !(s.ults >= 1 && passiveSeen(s)) && Date.now() < deadline; s = await seen(page)) {
       if ((await phase(page)) === "play") {
@@ -114,7 +122,7 @@ PLAYABLE.forEach((def, i) => {
           await trigger.click();
           pressed = true;
         }
-        await playOne(page, played);
+        await playOne(page, played, first);
       }
       await page.waitForTimeout(250);
     }

@@ -1,5 +1,5 @@
 import { devices, expect, type Browser, type Page } from "@playwright/test";
-import { named, test, bossAloneFromHome, openBossRaid, pickMode } from "./helpers.ts";
+import { named, test, bossAloneFromHome, openBossRaid, pickMode, startBotLevel } from "./helpers.ts";
 
 /**
  * Resign in every mode (Eric, Oct 13; DECISIONS.md, "Resign: leaving a match in every mode"): the gear in the top line
@@ -72,7 +72,8 @@ test("Boss alone: Cancel keeps playing; Resign ends the game at once, a loss (\"
   await expect.poll(() => phase(page), { timeout: 5_000 }).toBe("results");
   await expect(page.locator(".results h1")).toHaveText("You resigned");
   await expect(page.locator(".results .team-result").first()).toHaveText(/Ginger won\./);
-  await expect(page.locator(".results")).toContainText("It counts as a loss.");
+  // (A boss battle's result says no record, win or loss, in words: Eric, Nov 7; its counts just move.)
+  await expect(page.locator(".results")).not.toContainText("It counts as a loss.");
   // The boss battle's result page (Nov 2): no stage table or best and worst boards, no "Your game, move by move" button; the
   // review is on the page, one board with its stepper (◀ ▶, round 2), and the stepper and board are the same width, centered
   // (the top part's way).
@@ -106,8 +107,9 @@ test("solo 50 v 50: Leave in the votes goes home with nothing recorded; Resign m
   // The votes (before move 1): Leave.
   await page.goto("/?debug&pace=quick&mode=crowd&rounds=2&clock=30");
   await pickMode(page);
-  await page.getByRole("radiogroup", { name: "Matchmaking" }).getByRole("radio", { name: /^Solo/ }).click();
+  await page.getByRole("radiogroup", { name: "Matchmaking" }).getByRole("radio", { name: /^Bots/ }).click();
   await page.getByRole("button", { name: "PLAY", exact: true }).click();
+  await startBotLevel(page);
   await expect.poll(() => phase(page), { timeout: 30_000 }).toBe("vote");
   const leave = await openConfirm(page, /^Leave the match\?$/, /^You'll go home\. Nothing goes on your record\.$/);
   await leave.getByRole("button", { name: "Leave" }).click();
@@ -117,8 +119,9 @@ test("solo 50 v 50: Leave in the votes goes home with nothing recorded; Resign m
   // Again, past the votes: Resign.
   await page.goto("/?debug&pace=quick&mode=crowd&rounds=2&clock=30&augments=0");
   await pickMode(page);
-  await page.getByRole("radiogroup", { name: "Matchmaking" }).getByRole("radio", { name: /^Solo/ }).click();
+  await page.getByRole("radiogroup", { name: "Matchmaking" }).getByRole("radio", { name: /^Bots/ }).click();
   await page.getByRole("button", { name: "PLAY", exact: true }).click();
+  await startBotLevel(page);
   await expect.poll(() => phase(page), { timeout: 60_000 }).toMatch(/^(play|watching)$/);
   const confirm = await openConfirm(page, /^Resign\?$/, /^The match ends here for you and counts as a loss\.$/);
   await confirm.getByRole("button", { name: /Resign/ }).click();
@@ -176,7 +179,7 @@ test("online boss raid: one resigns, a bot takes the seat, the other plays on (a
     await openBossRaid(p);
   }
   // Both join back to back: bots fill this raid 8 s after its first join, and a page load in between can outlast that.
-  for (const p of [a, b]) await p.getByRole("button", { name: /^Join a raid/ }).click();
+  for (const p of [a, b]) await p.getByRole("button", { name: /^Join a Boss Battle/ }).click();
   // Bots fill at 8 s here; the boss's intro, then the crowd's first move.
   await expect.poll(() => phase(a), { timeout: 60_000 }).toBe("play");
   await expect.poll(() => phase(b), { timeout: 30_000 }).toMatch(/^(play|scoring)$/);

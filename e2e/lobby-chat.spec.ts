@@ -1,5 +1,5 @@
 import { expect, type Locator, type Page } from "@playwright/test";
-import { createLobbyFromHome, named, pickMode, soloFromHome, test } from "./helpers.ts";
+import { asSignedIn, createLobbyFromHome, named, pickMode, soloFromHome, test } from "./helpers.ts";
 
 /**
  * Quick chat in the lobby, before the match (DECISIONS.md, "Lobby chat"): one channel for everyone waiting, the same
@@ -101,6 +101,98 @@ test("two players in a Default queue chat before the match starts: each sees the
   expect(await ann.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBe(0);
 });
 
+/** Stills for Eric (not a check): a folder for the typed chat's screens. */
+const TYPED_STILLS = process.env.TYPED_STILLS;
+
+test("typed chat (Nov 7) in the queue's lobby chat and the match: signed-in players with chat on type (the field and our emoji in the quick lines' place); a player without chat on keeps the chips and never gets typed lines; the filter's reason shows", async ({ browser }) => {
+  test.setTimeout(4 * 60_000);
+  const opts = test.info().project.use;
+  const phone = test.info().project.name === "phone";
+  const pool = `ltyped-${test.info().project.name[0]}${run}`;
+  const open = async (name: string, typer: boolean) => {
+    const p = await (await browser.newContext({ ...opts, ...(phone ? {} : { viewport: { width: 1440, height: 900 } }) })).newPage();
+    await named(p, name);
+    await p.goto(`/?debug&pool=${pool}`);
+    await expect(p.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
+    if (typer) {
+      await asSignedIn(p);
+      expect((await p.request.patch("/api/me", { data: { chatOn: true } })).status()).toBe(200);
+      await p.reload();
+      await expect(p.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
+    }
+    return p;
+  };
+  const ann = await open("Ann Typed", true);
+  const bo = await open("Bo Typed", true);
+  const cy = await open("Cy Chips", false);
+  for (const p of [ann, bo, cy]) await pickMode(p);
+  await Promise.all([ann, bo, cy].map((p) => p.getByRole("button", { name: "PLAY", exact: true }).click()));
+  for (const p of [ann, bo, cy]) await expect.poll(() => p.evaluate(() => (window as any).match?.chat?.enabled ?? false), { timeout: 10_000 }).toBe(true);
+  const lobby = (p: Page) => p.locator(".fd-home.queueing .qchat-lobby");
+  // Ann and Bo: the field, no phrase buttons. Cy (a guest, chat off): the quick lines as before.
+  await expect(lobby(ann).getByRole("textbox", { name: "Send a message" })).toBeVisible();
+  await expect(lobby(ann).locator(".qbuttons")).toHaveCount(0);
+  await expect(lobby(cy).locator(".qchip", { hasText: "Good luck!" })).toBeVisible();
+  await expect(lobby(cy).getByRole("textbox")).toHaveCount(0);
+  // Ann types, with an emoji from the picker; Bo sees it with the emoji drawn; Cy never gets it.
+  await lobby(ann).getByRole("textbox", { name: "Send a message" }).fill("hi all");
+  await lobby(ann).getByRole("button", { name: "Emoji" }).click();
+  await lobby(ann).getByRole("button", { name: /Crown :crown:/ }).click();
+  await lobby(ann).getByRole("button", { name: "Send", exact: true }).click();
+  await expect(lobby(ann).locator(".qline.you", { hasText: "hi all" }).locator('svg[data-emoji="crown"]')).toBeVisible();
+  await expect(lobby(bo).locator(".qline", { hasText: "hi all" }).filter({ hasText: "Ann Typed" }).locator('svg[data-emoji="crown"]')).toBeVisible();
+  await lobby(cy).locator(".qchip", { hasText: "Good luck!" }).click();
+  await expect(lobby(ann).locator(".qline", { hasText: "Good luck!" })).toBeVisible();
+  expect(await cy.evaluate(() => (window as any).match.chat.lines().some((l: any) => typeof l.text === "string"))).toBe(false);
+  // The filter: Bo's link never goes, and he's told why.
+  await lobby(bo).getByRole("textbox", { name: "Send a message" }).fill("add me on discord");
+  await lobby(bo).getByRole("textbox", { name: "Send a message" }).press("Enter");
+  await expect(lobby(bo).locator(".qtype-note")).toHaveText("No links or contact details in chat.");
+  if (TYPED_STILLS) await bo.screenshot({ path: `${TYPED_STILLS}/${test.info().project.name}-lobby-typed.png`, fullPage: true });
+  // The quick chat button (Nov 8): next to the emoji button; it opens the player's lines (10 by default) and a tap sends one.
+  const quickBtn = lobby(ann).getByRole("button", { name: "Quick chat: your lines" });
+  const emojiBtn = lobby(ann).getByRole("button", { name: "Emoji" });
+  const [qb, eb] = [(await quickBtn.boundingBox())!, (await emojiBtn.boundingBox())!];
+  expect(Math.abs(qb.y - eb.y)).toBeLessThan(2);
+  expect(qb.x + qb.width).toBeLessThanOrEqual(eb.x + 1);
+  await quickBtn.click();
+  const quickLines = lobby(ann).locator(".qtype .qchip:not(.emoji)");
+  await expect(quickLines).toHaveCount(10);
+  const said = (await quickLines.first().textContent())!.trim();
+  await quickLines.first().click();
+  await expect(lobby(bo).locator(".qline", { hasText: said }).filter({ hasText: "Ann Typed" })).toBeVisible();
+  await expect(lobby(ann).locator(".qtype .qchip:not(.emoji)")).toHaveCount(0);
+  // The match: typing carries on in its chat (a phone's Chat tab: T opens the field over the feed's foot; a computer's panel beside the board).
+  await expect.poll(() => phase(ann), { timeout: 90_000 }).toMatch(/play|watching/);
+  if (phone) {
+    await ann.getByRole("button", { name: "Chat", exact: true }).click();
+    await ann.getByRole("button", { name: "Type a message", exact: true }).click();
+    const field = ann.locator(".qchat-tab .qpop").getByRole("textbox", { name: "Send a message" });
+    await expect(field).toBeFocused();
+    await field.fill("gg team :knight:");
+    if (TYPED_STILLS) {
+      await ann.locator(".qchat-tab .qpop").getByRole("button", { name: "Quick chat: your lines" }).click();
+      await ann.screenshot({ path: `${TYPED_STILLS}/phone-quickchat-open.png` });
+      await ann.locator(".qchat-tab .qpop").getByRole("button", { name: "Quick chat: your lines" }).click();
+      await ann.locator(".qchat-tab .qpop").getByRole("button", { name: "Emoji" }).click();
+      await ann.screenshot({ path: `${TYPED_STILLS}/phone-emoji-picker.png` });
+      await ann.locator(".qchat-tab .qpop").getByRole("button", { name: "Emoji" }).click();
+    }
+    await field.press("Enter");
+    await expect(ann.locator(".qchat-tab .qline.you", { hasText: "gg team" }).locator('svg[data-emoji="knight"]')).toBeVisible();
+    await expect(ann.locator(".qchat-tab .qpop")).toHaveCount(0);
+    if (TYPED_STILLS) await ann.screenshot({ path: `${TYPED_STILLS}/phone-match-typed.png` });
+  } else {
+    const side = ann.locator(".qchat-side");
+    await side.getByRole("textbox", { name: "Send a message" }).fill("gg team :knight:");
+    await side.getByRole("textbox", { name: "Send a message" }).press("Enter");
+    await expect(side.locator(".qline.you", { hasText: "gg team" }).locator('svg[data-emoji="knight"]')).toBeVisible();
+    if (TYPED_STILLS) await ann.screenshot({ path: `${TYPED_STILLS}/computer-match-typed.png` });
+  }
+  expect(await ann.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBe(0);
+  for (const p of [ann, bo, cy]) await p.context().close();
+});
+
 test("Solo's queue: the bots say hello, your line shows, and a 50 v 50's chat carries on into the match, with teams", { tag: "@phone-only" }, async ({ page }) => {
   await named(page, "Solo Sam");
   // Solo's queue is up about 3.1 s (MATCHMAKING.soloFillMs + soloHoldMs, all in the page). On a busy runner one or two of the
@@ -158,3 +250,4 @@ test("a private lobby: chat while you wait for the host", { tag: "@phone-only" }
   await expect(start).toBeVisible();
   expect(overlaps(await box(chat), await box(start))).toBe(false);
 });
+

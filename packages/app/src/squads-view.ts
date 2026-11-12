@@ -248,10 +248,17 @@ export const JUMP_NEXT_INFO = "On: once you've moved in Relay, you go straight t
 /**
  * Who's watching a board full size (Oct 14) shows the people the server says show it, less these: you, and the
  * board's own players (they're playing it). `m.turn` is the turn whose boards are on screen (during the show after a
- * turn, the one just played, as the YOU marks).
+ * turn, the one just played, as the YOU marks). Relay: a player whose move this turn is on that board; a squad's
+ * waiting seat (3 boards, 4 players) plays none this turn, so it shows when it watches the board it plays next (Nov 9:
+ * `myBoards` says that board, and the pawn was hidden).
  */
 export function notWatchers(m: Pick<NetSquadsMatch, "format" | "sides" | "turn" | "boards">, board: number, me: string | null): string[] {
-  const players = m.sides.flatMap((s) => s.seats).filter((id) => myBoards(m, id)?.you === board);
+  const playsNow = (id: string) => {
+    if (m.format !== "relay" || m.boards.length < 2) return myBoards(m, id)?.you;
+    const [a] = myRelayMoves(m, id, 1);
+    return a && a.turn === m.turn ? a.board : null;
+  };
+  const players = m.sides.flatMap((s) => s.seats).filter((id) => playsNow(id) === board);
   return me && !players.includes(me) ? [me, ...players] : players;
 }
 
@@ -439,11 +446,15 @@ export function standingsOrder(lobby: NetSquadsLobby): number[] {
 }
 
 /**
- * The matches whose boards show as tiny boards: every match still going, and the latest round's finished ones (grayed).
+ * The matches whose boards show as tiny boards: the latest round that has begun, its finished matches too (checked in the
+ * winner's color), and every other match being played. A next round's match waiting out its break before its first half
+ * (Nov 9: created the moment both its squads are known, 20 s ahead) joins when its round begins; until then the round
+ * just played stays, results and all (it used to vanish within a second of your result).
  */
 export function shownMatches(matches: readonly LocalMatch[]): LocalMatch[] {
-  const latest = Math.max(-1, ...matches.map((m) => m.round));
-  return matches.filter((m) => m.state !== "over" || m.round === latest).sort((a, b) => a.round - b.round || a.index - b.index);
+  const begun = matches.filter((m) => m.state !== "break");
+  const latest = Math.max(-1, ...(begun.length ? begun : matches).map((m) => m.round));
+  return matches.filter((m) => m.round === latest || (m.state !== "over" && m.state !== "break")).sort((a, b) => a.round - b.round || a.index - b.index);
 }
 
 /** The moves a half added to board `i`, from its events (a forced move, a Relay move, a pair's or the final's move). */

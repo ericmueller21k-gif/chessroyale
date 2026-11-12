@@ -83,8 +83,9 @@ test("1 v 1: picked, your rank and what it is in the panel under the row, kept u
   await expect(page.getByRole("radiogroup", { name: "Matchmaking" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: /^Party/ })).toHaveCount(0);
   // Your rank (the server's: a new account is in its placements) and what 1 v 1 is, in the panel under the row.
-  await expect(page.locator(".fd-mode-panel")).toHaveText(/^Your rank: Placement 0\/5Chess vs one player near your level$/);
-  await expect(page.locator(".fd-hint")).toHaveText("");
+  await expect(page.locator(".fd-mode-panel")).toHaveText(/^Your rank: Placement 0\/5Win to climb, lose to drop$/);
+  // (What 1 v 1 is: the line above PLAY, one line, since Nov 9.)
+  await expect(page.locator(".fd-hint")).toHaveText("Ranked chess vs one player near your level");
   const row = (await page.getByRole("radiogroup", { name: "RANKED" }).boundingBox())!;
   const rank = (await page.locator(".fd-rank1v1").boundingBox())!;
   const play = (await page.getByRole("button", { name: "PLAY", exact: true }).boundingBox())!;
@@ -125,6 +126,60 @@ test("1 v 1's rank line at its widest (a top tier with four-digit points, its em
   }
 });
 
+test("ranked's leave rules (L1): a lockout greys 1 v 1's PLAY with its countdown in the line above it, one line from 320 px; the delayed queue leaves PLAY on", async ({ page }) => {
+  await named(page, "Dodger");
+  // (The server's standing, faked: a dodge's lockout ending `lockFor` ms after the page asks, or the delayed queue.)
+  let leaves: (() => Record<string, unknown>) | null = null;
+  await page.route("**/api/me*", async (route) => {
+    const res = await route.fetch();
+    const body = await res.json();
+    if (body?.user && leaves) body.leaves = leaves();
+    await route.fulfill({ response: res, json: body });
+  });
+  const standing = { marks: 2, level: 2, lock: "dodge", delaySec: 0, nextDodge: { rp: 10, lockoutMin: 30 }, dodged: null };
+  const play = page.getByRole("button", { name: "PLAY", exact: true });
+  const line = page.locator(".fd-go > .fd-hint");
+  for (const width of desktop() ? [1280] : [390, 320]) {
+    if (!desktop()) await page.setViewportSize({ width, height: 740 });
+    leaves = () => ({ ...standing, lockedUntil: Date.now() + 4 * 60_000 + 30_000 });
+    await page.goto("/?mode=1v1&nolanding");
+    await expect(line).toHaveText(/^You left early: 1 v 1 opens in 4:[23]\d$/);
+    await expect(play).toBeDisabled();
+    const shown = await line.textContent();
+    await expect.poll(() => line.textContent(), { timeout: 3_000 }).not.toBe(shown);
+    const words = line.locator(".fd-leaves");
+    expect(await words.evaluate((e) => e.scrollWidth - e.clientWidth), `${width}`).toBeLessThanOrEqual(0);
+    expect((await words.boundingBox())!.height, `${width}: one line`).toBeLessThan(20);
+    expect(await sideways(page), `${width}`).toBe(0);
+  }
+  // The widest line (the 24-hour lock, in hours) and the delayed queue's: one line too (at 320 px on a phone).
+  for (const [make, text] of [
+    [() => ({ ...standing, marks: 8, lock: "leaves", lockedUntil: Date.now() + 23 * 3_600_000 + 59 * 60_000 + 50_000 }), /^Too many leaves: 1 v 1 opens in 23:59:\d\d$/],
+    [() => ({ ...standing, marks: 7, lock: null, lockedUntil: null, delaySec: 300 }), /^7 leaves in your last 20: \+5 min queue$/],
+  ] as const) {
+    leaves = make;
+    await page.goto("/?mode=1v1&nolanding");
+    await expect(line).toHaveText(text);
+    const words = line.locator(".fd-leaves");
+    expect(await words.evaluate((e) => e.scrollWidth - e.clientWidth)).toBeLessThanOrEqual(0);
+    expect((await words.boundingBox())!.height, "one line").toBeLessThan(20);
+  }
+  // Another mode's PLAY isn't locked.
+  await page.getByRole("radio", { name: /^50 v 50/ }).click();
+  await expect(play).toBeEnabled();
+  // A lockout ending in 2 s: PLAY comes back on its own, the line 1 v 1's usual one.
+  leaves = () => ({ ...standing, lockedUntil: Date.now() + 2_000 });
+  await page.goto("/?mode=1v1&nolanding");
+  await expect(play).toBeDisabled();
+  await expect(play).toBeEnabled({ timeout: 6_000 });
+  await expect(line).toHaveText("Ranked chess vs one player near your level");
+  // The delayed queue: its line, PLAY on (the wait starts with the search).
+  leaves = () => ({ ...standing, marks: 3, lock: null, lockedUntil: null, delaySec: 120 });
+  await page.goto("/?mode=1v1&nolanding");
+  await expect(line).toHaveText("3 leaves in your last 20: +2 min queue");
+  await expect(play).toBeEnabled();
+});
+
 test("the Boss raid screen (?mode=raid, every choice): each choice reaches its flow (a raid's queue, people only, a Solo raid, Boss alone's menu, a raid with friends); Back is home", async ({ page }) => {
   // (Its character select, the tiles and the stage: boss-select.spec.ts. Home's Boss Battle card opens the solo form:
   // home-layout.spec.ts.)
@@ -136,11 +191,11 @@ test("the Boss raid screen (?mode=raid, every choice): each choice reaches its f
   const main = page.getByRole("main");
   // The choices, in order, every word.
   await expect(main.locator(".rd-option")).toHaveText([
-    /^Join a raidRandom boss · up to 50 players · bots after \d+ s$/,
+    /^Join a Boss BattleRandom boss · up to 50 players · bots after \d+ s$/,
     /^People onlyRandom boss · no bots · starts at 50, or 10 after \d+ s$/,
-    "Raid with botsYou and 49 bots · starts at once",
+    "Play with botsYou and 49 bots · starts at once",
     "Boss aloneJust you vs a random boss",
-    "Play with friendsMake a raid and share its code, or join one",
+    "Play with friendsMake a Boss Battle and share its code, or join one",
   ]);
   await expect(main.locator(".rd-about")).toHaveText("Up to 50 of you pick the crowd's moves together against a boss. The most popular pick is played.");
   await expect(main.locator(".bs-tile canvas.bs-art").first()).toBeVisible();
@@ -148,15 +203,18 @@ test("the Boss raid screen (?mode=raid, every choice): each choice reaches its f
   expect(await sideways(page)).toBe(0);
 
   // Join a raid: the raid's queue (Default); Cancel comes back to this screen.
-  await main.getByRole("button", { name: /^Join a raid/ }).click();
-  await expect(page.locator(".fd-queue-mode")).toHaveText("Boss raid · up to 50");
+  await main.getByRole("button", { name: /^Join a Boss Battle/ }).click();
+  await expect(page.locator(".fd-queue-mode")).toHaveText("Boss Battle");
   await page.getByRole("button", { name: "Cancel" }).click();
-  await expect(page.getByRole("heading", { name: "Boss raid", exact: true })).toBeVisible();
-  // People only: the raid's queue without bots.
+  await expect(page.getByRole("heading", { name: "Boss Battle", exact: true })).toBeVisible();
+  // People only: the raid's queue without bots, still in this test's own pool after Cancel put the address back to "/"
+  // (Nov 9: it went to the server's shared queue, meeting whatever other tests had left there).
+  const peopleOnly = page.waitForRequest((r) => r.method() === "POST" && r.url().includes("/api/play?") && r.url().includes("type=botsoff"));
   await main.getByRole("button", { name: /^People only/ }).click();
-  await expect(page.locator(".fd-queue-mode")).toHaveText("Boss raid · up to 50 · Bots off");
+  expect(new URL((await peopleOnly).url()).searchParams.get("pool")).toBe(`raidscreen-${test.info().project.name}-${run}`);
+  await expect(page.locator(".fd-queue-mode")).toHaveText("Boss Battle · Bots off");
   await page.getByRole("button", { name: "Cancel" }).click();
-  await expect(page.getByRole("heading", { name: "Boss raid", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Boss Battle", exact: true })).toBeVisible();
   // Boss alone: its menu, the difficulty and the boss picked on the tiles (here "?": a random one).
   await main.getByRole("button", { name: /^Boss alone/ }).click();
   const menu = page.getByRole("dialog", { name: "Boss alone" });
@@ -167,7 +225,7 @@ test("the Boss raid screen (?mode=raid, every choice): each choice reaches its f
   // Play with friends: a raid's lobby (and joining one by code).
   await main.getByRole("button", { name: /^Play with friends/ }).click();
   const sheet = page.getByRole("dialog", { name: "Play with friends" });
-  await expect(sheet.getByRole("button", { name: "Create a raid" })).toBeVisible();
+  await expect(sheet.getByRole("button", { name: "Create a Boss Battle" })).toBeVisible();
   await expect(sheet.getByLabel("Lobby code")).toBeVisible();
   await sheet.getByRole("button", { name: "Close" }).click();
   // Back: home, the RANKED row.
@@ -176,8 +234,8 @@ test("the Boss raid screen (?mode=raid, every choice): each choice reaches its f
   // Raid with bots: you and 49 bots, in your browser (Solo), against a boss. (Its queue shows for a moment only:
   // watched for from before the tap.)
   await openBossRaid(page);
-  const solo = await watchFor(page, { queue: { selector: ".fd-queue-mode", text: /^Boss raid · up to 50 · Solo$/ } });
-  await main.getByRole("button", { name: /^Raid with bots/ }).click();
+  const solo = await watchFor(page, { queue: { selector: ".fd-queue-mode", text: /^Boss Battle · Solo$/ } });
+  await main.getByRole("button", { name: /^Play with bots/ }).click();
   await expect.poll(async () => (await solo.seen()).queue, { timeout: 30_000 }).toBe(true);
 });
 
@@ -192,13 +250,13 @@ test("the hidden /bosses opens the solo boss picker straight away (a player too)
   await menu.getByRole("button", { name: "Close" }).click();
   await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
   await page.goto("/?mode=raid");
-  await expect(page.getByRole("heading", { name: "Boss raid", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Boss Battle", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Back", exact: true }).click();
   await expect(page.getByRole("radiogroup", { name: "RANKED" })).toBeVisible();
   expect(new URL(page.url()).search).toBe("");
 });
 
-test("Other modes under Chess Town: the label, then Boss Battle (the rotating boss faces) and Auto chess (the army picture) side by side at half width each, the card's look; Auto chess opens /autochess, and its back button is home", async ({ page }) => {
+test("Other modes under Chess Town: the label, then Boss Battle (the rotating boss faces) and Auto chess (the army picture) side by side at half width each, the card's look; Auto chess opens /autochess, and its gear's Leave is home (no back button since Nov 8)", async ({ page }) => {
   await named(page, "Knight");
   await page.goto("/");
   const main = page.getByRole("main");
@@ -232,7 +290,9 @@ test("Other modes under Chess Town: the label, then Boss Battle (the rotating bo
   await auto.click();
   await expect(page.locator(".ac-title strong")).toHaveText("Auto chess");
   expect(new URL(page.url()).pathname).toBe("/autochess");
-  await page.getByRole("button", { name: "Back to home" }).click();
+  await page.getByRole("button", { name: "Match options" }).click();
+  await page.getByRole("dialog", { name: "Match options" }).getByRole("button", { name: "Leave", exact: true }).click();
+  await page.getByRole("alertdialog").getByRole("button", { name: "Leave", exact: true }).click();
   await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
   expect(new URL(page.url()).pathname).toBe("/");
 });
@@ -244,10 +304,9 @@ test("home keeps still: no click on a mode or an option moves or resizes the boa
   const sizes = desktop() ? [[1280, 800], [1440, 900], [1920, 1080]] : [[390, 844], [320, 640]];
   const radio = (name: RegExp) => page.getByRole("radio", { name });
   const steps: [string, () => Promise<unknown>][] = [
-    ["Default", () => radio(/^Default/).click()],
-    ["Bots off", () => radio(/^Bots off/).click()],
-    ["Solo", () => radio(/^Solo$/).click()],
-    ["Default again", () => radio(/^Default/).click()],
+    ["Solo queue (50 v 50)", () => radio(/^Solo queue/).click()],
+    ["Bots (50 v 50)", () => radio(/^Bots/).click()],
+    ["Solo queue again", () => radio(/^Solo queue/).click()],
     ["1 v 1", () => radio(/^1 v 1/).click()],
     ["Squads", () => radio(/^Squads/).click()],
     ["Party", async () => {
@@ -279,6 +338,10 @@ test("home keeps still: no click on a mode or an option moves or resizes the boa
     }
     // The panel is there from the first view, greyed (Eric, Oct 25). The first pick wakes it and moves nothing: the RANKED
     // row, PLAY, the cards, the panel and the board stay where they were.
+    // (The web fonts in first: home's own render asks for Archivo after the page's load (so goto doesn't wait), and it comes in
+    // with font-display: swap about 2 s later, every line a px or two shorter: 1 px here, 3 px on CI's fallback font. On the first
+    // size only (cached after). Main run 1155: "390×844, the first pick: ranked's y", 3 px, the swap between the two measures.)
+    await page.evaluate(() => document.fonts.ready);
     const before = await measure();
     expect(before.panel, `${w}: the panel is there before a pick`).toBeDefined();
     await radio(/^50 v 50/).click();
@@ -302,7 +365,7 @@ test("home keeps still: no click on a mode or an option moves or resizes the boa
         return Math.max(0, ...boxes.map((c) => Math.max(c.bottom - p.bottom, p.top - c.top, c.right - p.right, p.left - c.left)));
       });
       expect(spill, `${w}×${h}, after ${step}: inside the panel`).toBeLessThanOrEqual(0.5);
-      // The line above PLAY fits its fixed room (one line on a computer, two on a phone), whatever it says.
+      // The line above PLAY fits its fixed room (one line, phone and computer, since Nov 9), whatever it says.
       expect(await page.locator(".fd-hint").evaluate((e) => e.scrollHeight - e.clientHeight), `${w}×${h}, after ${step}: the line above PLAY`).toBeLessThanOrEqual(1);
     }
     // (The panel: there all along.)
@@ -326,7 +389,8 @@ test("Eric's rule (Oct 18, Oct 25): home's options panel is always there, greyed
   const ranked = page.getByRole("radiogroup", { name: "RANKED" });
   const matchmaking = page.getByRole("radiogroup", { name: "Matchmaking" });
   const play = page.getByRole("button", { name: "PLAY", exact: true });
-  const options = [/^Default/, /^Bots off/, /^Solo$/];
+  // (The options' names since Nov 9, Eric: Solo queue, Party, Bots. Only the names changed here.)
+  const options = [/^Solo queue/, /^Party/, /^Bots/];
   const parts: Record<string, string> = { board: ".fd-livewin", hint: ".fd-hint", play: ".fd-play", label: ".fd-other-label", boss: ".rd-card", auto: ".fd-auto-card", panel: ".fd-mode-panel" };
   const measure = async () => {
     const out: Record<string, { x: number; y: number; width: number; height: number }> = {};
@@ -371,8 +435,8 @@ test("Eric's rule (Oct 18, Oct 25): home's options panel is always there, greyed
     for (const [step, act] of steps) {
       await act();
       if (step === "50 v 50") {
-        await expect(matchmaking.getByRole("radio", { name: /^Default/ }), `${w}×${h}: Default selected once a mode is picked`).toHaveAttribute("aria-checked", "true");
-        await expect(matchmaking.getByRole("radio", { name: /^Default/ })).toBeEnabled();
+        await expect(matchmaking.getByRole("radio", { name: /^Solo queue/ }), `${w}×${h}: Solo queue selected once a mode is picked`).toHaveAttribute("aria-checked", "true");
+        await expect(matchmaking.getByRole("radio", { name: /^Solo queue/ })).toBeEnabled();
         await expect(page.locator(".fd-mode-panel.idle")).toHaveCount(0);
       }
       same(before, await measure(), `${w}×${h}, after ${step}`);
@@ -405,12 +469,14 @@ test("home, said once (Eric, Oct 28): no ⓘ; the three options are titles only 
     // (The computer's live window: on screen, waited for as in the keeps-still test, so the boxes below are the settled ones.)
     if (desktop()) await expect(page.locator(".fd-livewin-sq").first()).toBeVisible();
     const hint0 = await rect(".fd-hint");
-    await expect(page.locator(".fd-hint"), `${at}: nothing picked, nothing said`).toHaveText("");
+    // (Nov 9, Eric: "let's make that line always say something", one line.)
+    await expect(page.locator(".fd-hint"), `${at}: nothing picked`).toHaveText("Tap a game mode to get started");
     await pickMode(page, "50 v 50");
     const group = page.getByRole("radiogroup", { name: "Matchmaking" });
-    // Titles only, side by side, equal, whole, tappable, and filling the row: the group is as wide as the RANKED row, with the
-    // buttons' margins even on both sides.
-    await expect(group.getByRole("radio"), `${at}: titles only`).toHaveText(["Default", "Bots off", "Solo"]);
+    // Since Nov 9 a title and a short sub line each (Solo queue, Party, Bots), side by side, equal, whole, tappable, and filling the
+    // row: the group is as wide as the RANKED row, with the buttons' margins even on both sides.
+    await expect(group.getByRole("radio"), `${at}: the three options`).toHaveText(["Solo queuejoin a lobby", "PartySoon", "Bots99 bots, now"]);
+    for (const r of await group.getByRole("radio").all()) expect(await r.evaluate((e) => e.scrollWidth - e.clientWidth), `${at}: each option whole`).toBeLessThanOrEqual(0);
     const g = (await group.boundingBox())!;
     const ranked = await rect(".fd-ranked");
     expect(Math.abs(g.x - ranked.x), `${at}: the group as wide as the RANKED row`).toBeLessThanOrEqual(1);
@@ -428,19 +494,40 @@ test("home, said once (Eric, Oct 28): no ⓘ; the three options are titles only 
     expect(Math.abs(left - right), `${at}: the buttons fill the row`).toBeLessThanOrEqual(1);
     expect(left, `${at}: the buttons fill the row (their margin is the group's 5 px)`).toBeLessThanOrEqual(6);
     // Every pick says what PLAY does, in the one box above PLAY; nothing is said under PLAY.
-    const says: [string, RegExp][] = [
-      ["Default", /^(Starts within \d+ s; bots fill any empty seats|Usually about \d+ s to find a match)$/],
-      ["Bots off", /^People only: starts when 100 have joined$/],
-      ["Solo", /^Solo vs 99 bots · starts at once$/],
+    // (Every line one line, whole: Nov 9.)
+    const oneLine = async (what: string) => {
+      const e = page.locator(".fd-go > .fd-hint > span");
+      expect(await e.evaluate((x) => x.scrollWidth - x.clientWidth), `${at}: ${what}: whole`).toBeLessThanOrEqual(0);
+      expect((await e.boundingBox())!.height, `${at}: ${what}: one line`).toBeLessThan(20);
+    };
+    const says: [RegExp, RegExp | string][] = [
+      [/^Solo queue/, /^(Starts within \d+ s; bots fill any empty seats|Usually about \d+ s to find a match)$/],
+      [/^Bots/, "Start at once with 99 bots"],
     ];
     for (const [pick, line] of says) {
-      await group.getByRole("radio", { name: new RegExp(`^${pick}`) }).click();
+      await group.getByRole("radio", { name: pick }).click();
       await expect(page.locator(".fd-hint"), `${at}: ${pick}`).toHaveText(line);
+      await oneLine(String(pick));
     }
+    // (50 v 50's Party: greyed, "Soon", until its matchmaker piece is built; Eric, Nov 9.)
+    await expect(group.getByRole("radio", { name: /^Party/ }), `${at}: Party greyed`).toBeDisabled();
+    await group.getByRole("radio", { name: /^Solo queue/ }).click();
     await page.getByRole("radio", { name: /^Squads/ }).click();
+    await page.getByRole("radiogroup", { name: "Squads" }).getByRole("radio", { name: /^Party/ }).click();
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await expect(page.locator(".fd-hint"), `${at}: Squads' Party`).toHaveText("Queue with up to 3 friends");
+    await oneLine("Squads' Party");
+    await page.getByRole("radiogroup", { name: "Squads" }).getByRole("radio", { name: /^Solo queue/ }).click();
+    // Squads: Solo queue, Party, and Bots shown greyed ("Soon": its server part is a follow-up).
+    const squads = page.getByRole("radiogroup", { name: "Squads" });
+    await expect(squads.getByRole("radio"), `${at}: Squads' options`).toHaveText(["Solo queuejoin a squad", "Partyup to 3 friends", "BotsSoon"]);
+    await expect(squads.getByRole("radio", { name: /^Bots/ }), `${at}: Squads' Bots greyed`).toBeDisabled();
     await expect(page.locator(".fd-hint"), `${at}: Squads`).toHaveText(/^Solo queue: bots fill any empty seat after \d+ s$/);
+    await oneLine("Squads");
     await page.getByRole("radio", { name: /^1 v 1/ }).click();
-    await expect(page.locator(".fd-hint"), `${at}: 1 v 1`).toHaveText("");
+    await expect(page.locator(".fd-hint"), `${at}: 1 v 1`).toHaveText("Ranked chess vs one player near your level");
+    await oneLine("1 v 1");
     await page.getByRole("radio", { name: /^50 v 50/ }).click();
     const hint = await rect(".fd-hint");
     const playBox = (await play.boundingBox())!;
@@ -474,8 +561,8 @@ test("home, said once (Eric, Oct 28): no ⓘ; the three options are titles only 
       expect(whole, `${at}: card ${i}: the words whole, each on one line`).toBe(true);
       heights.push(c.height);
     }
-    expect(heights[0]!, `${at}: the pair shorter (was 84 on a phone, 64 on a computer)`).toBeLessThanOrEqual(57);
-    expect(heights[1]!, `${at}: the pair shorter`).toBeLessThanOrEqual(57);
+    // (Nov 9: a phone's pair grew by the line's freed 16.9 px, to 72.9; a computer's is as it was.)
+    for (const ht of heights) expect(Math.abs(ht - (desktop() ? 56 : 72.9)), `${at}: the pair's height (56 px; 72.9 on a phone since Nov 9)`).toBeLessThanOrEqual(1);
 
     // PLAY: taller than it was (64 px on a phone and on a computer; 48 px in a short window), and home as before: a phone
     // still fits with no scrolling and keeps its last card's foot where it was (25 px up from the screen's edge); a
@@ -486,6 +573,8 @@ test("home, said once (Eric, Oct 28): no ⓘ; the three options are titles only 
       const fit = await page.evaluate(() => ({ scroll: document.documentElement.scrollHeight - innerHeight, foot: innerHeight - [...document.querySelectorAll(".rd-card")].pop()!.getBoundingClientRect().bottom }));
       expect(fit.scroll, `${at}: home fits, no scrolling`).toBeLessThanOrEqual(0);
       expect(fit.foot, `${at}: the last card's foot no lower than it was`).toBeGreaterThanOrEqual(24);
+      // (Nov 9: the cards grew upward only, their foot where it was: 25 px up from the screen's edge.)
+      expect(fit.foot, `${at}: the last card's foot where it was`).toBeLessThanOrEqual(26);
     } else {
       await expect(page.locator(".fd-livewin-sq").first()).toBeVisible();
       expect((await rect(".fd-livewin-sq")).width, `${at}: the live window's board`).toBeGreaterThan(h >= 800 ? 230 : 150);
@@ -493,7 +582,7 @@ test("home, said once (Eric, Oct 28): no ⓘ; the three options are titles only 
   }
 });
 
-test("test rank and level (Eric, Oct 28): an admin's home reads their ?rank= (\"Gold 3 · 45 RP\") with a green ring at 3/4 round the icon and LVL 38 over it; a player sees their real rank and neither, and nothing moves", async ({ page }) => {
+test("test rank and level (Eric, Oct 28; the level real since Nov 9): an admin's home reads their ?rank= (\"Gold 3 · 45 RP\"); everyone's has their real level, a green ring at 3/4 round the icon and LVL 38 over it (37,750 XP); a player sees their real rank, and nothing moves", async ({ page }) => {
   await named(page, "Leveled");
   // A ranked account (Paragon 4 · 30 RP: reaching it takes many games, so the server's answer carries it), an admin once
   // `admin` is set (as /api/me says for an email in ADMIN_EMAILS). The admin's address asks for Gold 3.
@@ -502,7 +591,7 @@ test("test rank and level (Eric, Oct 28): an admin's home reads their ?rank= (\"
   await page.route(/\/api\/me(\?|$)/, async (route) => {
     const res = await route.fetch();
     const body = await res.json();
-    await route.fulfill({ response: res, json: { ...body, rating: 1580, ranked1v1: { ...(body.ranked1v1 ?? {}), rank: real, games: 40, wins: 20, losses: 20, draws: 0 }, ...(isAdmin ? { admin: true } : {}) } });
+    await route.fulfill({ response: res, json: { ...body, xp: 37_750, rating: 1580, ranked1v1: { ...(body.ranked1v1 ?? {}), rank: real, games: 40, wins: 20, losses: 20, draws: 0 }, ...(isAdmin ? { admin: true } : {}) } });
   });
   // (This server has TEST_SWITCHES on, which lets everyone use the test switches: the app is told otherwise, as hunchess.com
   // tells a player.)
@@ -521,15 +610,16 @@ test("test rank and level (Eric, Oct 28): an admin's home reads their ?rank= (\"
     await page.evaluate(() => document.fonts.ready);
   };
 
-  // A player: their real rank (the ?rank= ignored), no ring and no level; no rating rank's name (retired Oct 28).
+  // A player: their real rank (the ?rank= ignored) and their real level (Nov 9: from their XP); no rating rank's name (retired Oct 28).
   await page.goto("/?rank=gold-3");
   await expect(sub).toHaveText("Paragon 4 · 30 RP");
   await settled();
   await expect(page.locator(".fd-hero-sub .fd-rank")).toHaveText("Paragon 4");
-  await expect(page.locator(".fd-level, .fd-level-ring")).toHaveCount(0);
+  await expect(page.locator(".fd-level")).toHaveText("LVL 38");
+  await expect(page.locator(".fd-level-ring")).toHaveCount(1);
   const player = await measure();
 
-  // An admin: the same page, the test rank in the rank's place, the ring and the level; every box where it was.
+  // An admin: the same page, the test rank in the rank's place, the same ring and level; every box where it was.
   isAdmin = true;
   await page.reload();
   await expect(sub).toHaveText("Gold 3 · 45 RP");

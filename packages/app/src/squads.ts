@@ -27,7 +27,7 @@ import { crumb } from "./problems.ts";
 import { enginePool, engineSpeed } from "./engine.ts";
 import { showBanNotice } from "./components/FairPlay.tsx";
 import { play } from "./sound.ts";
-import { testParams } from "./test-switches.ts";
+import { queuePool } from "./test-switches.ts";
 import { byOfHalf } from "./move-replay.ts";
 import { LOW_BANK_MS, blockName, coinText, dutyOf, itemText, liveBank, movesOfHalf, sideIn, squadName, squadOf, tickSecond, type LocalBoard, type LocalMatch } from "./squads-view.ts";
 
@@ -92,7 +92,7 @@ export type SquadsSeatAnswer = { code: string } | { error: string } | { banned: 
 export async function squadsQueue(onBusy: (waitSeconds: number) => void, cancelled: () => boolean): Promise<SquadsSeatAnswer | null> {
   const q = new URLSearchParams();
   // (?pool=NAME: a queue of its own, a test switch.)
-  const pool = testParams().get("pool");
+  const pool = queuePool();
   if (pool) q.set("pool", pool);
   for (;;) {
     const res = await fetch(`/api/squads/play${q.size ? `?${q}` : ""}`, { method: "POST" }).catch(() => null);
@@ -224,7 +224,7 @@ export class SquadsClient {
   vote: NetSquadsVote | null = null;
   readonly matches = new Map<string, LocalMatch>();
   clocks: NetTeamClock[] = [];
-  placed: { squadId: number; placement: SquadsPlacement; coins: number; crates: number; recorded: boolean } | null = null;
+  placed: { squadId: number; placement: SquadsPlacement; coins: number; crates: number; recorded: boolean; why?: "daily" } | null = null;
   results: Record<number, SquadsPlacement> | null = null;
   /** What each person wears (sent once per player: the last one seen is kept). */
   readonly looks = new Map<string, ItemLook>();
@@ -795,7 +795,7 @@ export class SquadsClient {
         break;
       }
       case "placed":
-        this.placed = { squadId: msg.squadId, placement: msg.placement, coins: msg.coins, crates: msg.crates, recorded: msg.recorded };
+        this.placed = { squadId: msg.squadId, placement: msg.placement, coins: msg.coins, crates: msg.crates, recorded: msg.recorded, ...(msg.why ? { why: msg.why } : {}) };
         break;
       case "results":
         this.results = msg.placements;
@@ -1048,7 +1048,7 @@ export async function partyStatus(code: string, kind: PartyKind = "squads"): Pro
 /** POST /api/squads/party (or Boss Battle's): a new party's code. */
 export async function createParty(kind: PartyKind = "squads"): Promise<{ code: string } | { error: string } | { banned: true }> {
   // (?pool=NAME: a queue of its own, a test switch.)
-  const pool = kind === "squads" ? testParams().get("pool") : null;
+  const pool = kind === "squads" ? queuePool() : null;
   try {
     const res = await fetch(`/api/${kind}/party${pool ? `?pool=${encodeURIComponent(pool)}` : ""}`, { method: "POST" });
     const body = (await res.json().catch(() => ({}))) as { code?: string; message?: string; banned?: boolean };

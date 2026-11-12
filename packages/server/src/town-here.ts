@@ -78,13 +78,18 @@ export class TownHere {
     return this.here.size;
   }
 
-  /** A device's beat: where its player is now. */
-  beat(id: string, name: string, room: string, b: HereBeat, now: number, limits: HereLimits = HERE_LIMITS, look: ItemLook | null = null, pawn?: PawnColor): void {
+  /**
+   * A device's beat: where its player is now. Whether their pawn has just come into `room` (it wasn't there: new, past its limit, or
+   * in another room), for the town chat's "Ann has entered the town." (town-chat.ts `arrive`, which skips a quick reconnect).
+   */
+  beat(id: string, name: string, room: string, b: HereBeat, now: number, limits: HereLimits = HERE_LIMITS, look: ItemLook | null = null, pawn?: PawnColor): boolean {
     const was = this.here.get(id);
+    const fresh = !was || was.room !== room || TownHere.past(was, now);
     const hiddenSince = b.hidden ? (was?.hiddenSince ?? now) : null;
     if (!was && this.here.size >= HOLD_MAX) this.sweep(now);
-    if (!was && this.here.size >= HOLD_MAX) return;
+    if (!was && this.here.size >= HOLD_MAX) return false;
     this.here.set(id, { id, name, room, c: b.c, r: b.r, shop: b.shop, idleSince: now - Math.max(0, b.idleMs), hiddenSince, beatAt: now, limits, look, pawn: pawnColorOf(pawn) });
+    return fresh;
   }
 
   /** A device left the town (back home, out to a game, the page closed). */

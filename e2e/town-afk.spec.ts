@@ -1,5 +1,6 @@
 import { devices, expect, type Browser, type Page } from "@playwright/test";
-import { asSignedIn, giveItems, test, wearItem } from "./helpers.ts";
+import { TOWN_AFK } from "@chessroyale/core";
+import { asSignedIn, giveItems, test, wearItem, townReady } from "./helpers.ts";
 
 /**
  * Away in the town square (Eric, Nov 7: "after a few min put zzz with no text box… then boot after 10 min of not moving or in the
@@ -21,12 +22,12 @@ const me = async (p: Page) => (await hereOf(p)).find((h) => h.you)!;
 /** The town, open as a signed-in player (other players are signed-in players'), in this test's room, the away numbers as given. */
 async function openIn(page: Page, room: string, afk: string, before?: () => Promise<unknown>) {
   await page.goto("/town?sky=day&townafk=off");
-  await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+  await townReady(page);
   const id = await asSignedIn(page, "afk");
   // (Before the town has a beat of theirs: what they wear is read once a minute.)
   await before?.();
   await page.goto(`/town?sky=day&townroom=${room}&townafk=${afk}`);
-  await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+  await townReady(page);
   await page.waitForFunction(() => typeof (window as any).__townHere === "function" && typeof (window as any).__townChatter === "function");
   // (The bosses' own chatter stopped: the log holds only what this test makes.)
   await page.evaluate(() => (window as any).__townChatter(false));
@@ -72,7 +73,8 @@ test("after the zzz wait with no input a \"zzz\" floats over your pawn, for you 
   // A signed-in viewer sees Ann's name tag. No text box or words with the zzz: no new element, the chat log has no line about it.
   expect((await them(bo, annId))!.tag).toBe(true);
   await expect(bo.locator(".town-card")).toBeHidden();
-  await expect(bo.locator(".tc-line")).toHaveCount(0);
+  // (The server's "entered the town" lines, Nov 12, are the only lines here: none about the zzz.)
+  await expect(bo.locator(".tc-line:not(.tc-arrival)")).toHaveCount(0);
   // Ann presses an arrow key (her pawn moves): gone at once on hers, and on Bo's within a beat.
   await page.keyboard.press("ArrowLeft");
   await expect.poll(async () => (await me(page)).zzz, { timeout: 3_000 }).toBe(false);
@@ -139,7 +141,7 @@ test("in the background for the limit: the server drops your pawn for another pl
 test("a guest (Eric, on #542): the town's time runs out and \"Make an account to keep exploring\" stops it; Back goes home, coming back in shows it again at once; Sign up leaves for the sign-in; a signed-in player never sees it", async ({ page, browser }, info) => {
   test.setTimeout(120_000);
   await page.goto("/town?sky=day&townafk=off&townguest=3");
-  await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+  await townReady(page);
   await page.waitForFunction(() => typeof (window as any).__townHere === "function");
   const gate = dialog(page);
   await expect(gate).toBeVisible({ timeout: 8_000 });
@@ -157,7 +159,7 @@ test("a guest (Eric, on #542): the town's time runs out and \"Make an account to
   await expect(page).toHaveURL(/\/$/);
   await expect(canvas(page)).toHaveCount(0);
   await page.getByRole("main").getByRole("button", { name: "Chess Town", exact: true }).click();
-  await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+  await townReady(page);
   await expect(gate).toBeVisible({ timeout: 2_000 });
   // Sign up: out of the town to the app's sign-in (the landing page where signing in is set up; home here, where it isn't).
   await gate.getByRole("button", { name: "Sign up" }).click();
@@ -167,7 +169,7 @@ test("a guest (Eric, on #542): the town's time runs out and \"Make an account to
   const bo = await another(browser, info.project.name === "phone");
   await openIn(bo, room(), "600,900,900");
   await bo.goto("/town?sky=day&townafk=off&townguest=2");
-  await expect(canvas(bo)).toHaveAttribute("data-ready", "1");
+  await townReady(bo);
   await bo.waitForTimeout(4_000);
   await expect(dialog(bo)).toHaveCount(0);
   await bo.context().close();
@@ -187,7 +189,7 @@ test("a guest watches (Eric, on #542): another player in their outfit, no name t
   const posts: string[] = [];
   page.on("request", (q) => void (q.url().includes("/api/town/here") && posts.push(q.postData() ?? "")));
   await page.goto(`/town?sky=day&townroom=${r}&townafk=off`);
-  await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+  await townReady(page);
   await page.waitForFunction(() => typeof (window as any).__townHere === "function");
   // Bo, as the guest sees him: here, in his beanie, drawn dressed, no name and no tag.
   await expect.poll(async () => {
@@ -229,7 +231,7 @@ test("your default pawn color goes with you (Eric, Nov 7): you're black in your 
   const bo = await another(browser, info.project.name === "phone");
   await openIn(bo, r, "600,900,900");
   await page.goto(`/town?sky=day&townroom=${r}&townafk=off`);
-  await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+  await townReady(page);
   await page.waitForFunction(() => typeof (window as any).__townHere === "function");
   // You're drawn black, and Bo sees you black (the server's next beat for you carries it).
   await expect.poll(async () => (await me(page)).pawn, { message: "you're black in your town" }).toBe("black");
@@ -240,7 +242,7 @@ test("your default pawn color goes with you (Eric, Nov 7): you're black in your 
   await page.getByRole("button", { name: "White", exact: true }).click();
   await expect.poll(async () => ((await (await page.request.get("/api/me")).json()) as { user: { pawn: string } }).user.pawn).toBe("white");
   await page.goto(`/town?sky=day&townroom=${r}&townafk=off`);
-  await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+  await townReady(page);
   await page.waitForFunction(() => typeof (window as any).__townHere === "function");
   await expect.poll(async () => (await me(page)).pawn).toBe("white");
   await expect.poll(async () => (await them(bo, id))?.pawn, { timeout: 20_000, message: "Bo sees you white again" }).toBe("white");
@@ -248,10 +250,14 @@ test("your default pawn color goes with you (Eric, Nov 7): you're black in your 
 });
 
 test("the rule off with ?townafk=off: no zzz and no boot however long", { tag: "@phone-only" }, async ({ page }) => {
+  // (The page's clock, jumped past the real rule's boot (TOWN_AFK.bootAfterSec) rather than 4 s of real waiting: the rule reads the
+  // wall clock, Date.now().)
+  await page.clock.install();
   await page.goto("/town?sky=day&townafk=off");
-  await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+  await townReady(page);
   await page.waitForFunction(() => typeof (window as any).__townHere === "function");
-  await page.waitForTimeout(4_000);
+  await page.clock.fastForward((TOWN_AFK.bootAfterSec + 60) * 1000);
+  await page.clock.runFor(2_000); // (the away check's 1 s interval, twice past the jump)
   expect((await me(page)).zzz).toBe(false);
   await expect(canvas(page)).toHaveCount(1);
 });

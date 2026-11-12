@@ -439,7 +439,7 @@ describe("admins' test grants", () => {
     return { status: res.status, body: (await res.json()) as Record<string, unknown> };
   };
 
-  it("only an admin may grant (anyone else: not found, nothing given); keys and any boss's tokens, at most grantMax at once", async () => {
+  it("only an admin may grant (anyone else: not found, nothing given); keys up to keysGrantMax (100: Eric, Nov 9) and any boss's tokens up to grantMax at once", async () => {
     const { sql, d1 } = memoryDb();
     await ensureSchema(sql);
     const env = { DB: d1, ADMIN_EMAILS: "eric@example.com" };
@@ -454,15 +454,18 @@ describe("admins' test grants", () => {
     const r = await call(env, "/api/locker/grant", { keys: 2, boss: "tiger", tokens: 3 }, ericCookie);
     expect(r.status).toBe(200);
     expect([r.body.keys, r.body.tokens]).toEqual([2, { tiger: 3 }]);
-    // Capped, and only a boss tokens exist for (not the Hidden Boss, not a made-up one).
-    expect((await call(env, "/api/locker/grant", { keys: 1000 }, ericCookie)).body.keys).toBe(2 + BOSS_TOKENS.grantMax);
+    // Capped (keys at 100 at once, tokens at grantMax), and only a boss tokens exist for (not the Hidden Boss, not a made-up one).
+    expect(BOSS_TOKENS.keysGrantMax).toBe(100);
+    expect((await call(env, "/api/locker/grant", { keys: 100 }, ericCookie)).body.keys).toBe(2 + 100);
+    expect((await call(env, "/api/locker/grant", { keys: 1000 }, ericCookie)).body.keys).toBe(2 + 200);
+    expect((await call(env, "/api/locker/grant", { boss: "tiger", tokens: 1000 }, ericCookie)).body.tokens).toEqual({ tiger: 3 + BOSS_TOKENS.grantMax });
     expect(await call(env, "/api/locker/grant", { boss: "recluse", tokens: 3 }, ericCookie)).toEqual({ status: 400, body: { message: "Nothing to give." } });
     expect(await call(env, "/api/locker/grant", { boss: "nobody", tokens: 3 }, ericCookie)).toEqual({ status: 400, body: { message: "Nothing to give." } });
     // And the admin buys Babur's crate through the API, both ways (into the inventory, unopened).
     expect((await call(env, "/api/shop/boss-crate", { crate: babur.id, way: "tokens" }, ericCookie)).status).toBe(200);
     await call(env, "/api/locker/grant", { boss: "tiger", tokens: 1 }, ericCookie);
     const k = await call(env, "/api/shop/boss-crate", { crate: babur.id, way: "key" }, ericCookie);
-    expect([k.status, (k.body.locker as { keys: number }).keys, (k.body.locker as { bossCrates: unknown }).bossCrates]).toEqual([200, 2 + BOSS_TOKENS.grantMax - 1, { "boss-tiger": 2 }]);
+    expect([k.status, (k.body.locker as { keys: number }).keys, (k.body.locker as { bossCrates: unknown }).bossCrates]).toEqual([200, 2 + 200 - 1, { "boss-tiger": 2 }]);
     // The player can't buy without tokens.
     expect(await call(env, "/api/shop/boss-crate", { crate: babur.id, way: "tokens" }, playerCookie)).toEqual({ status: 400, body: { message: "You need 3 Babur tokens." } });
   });

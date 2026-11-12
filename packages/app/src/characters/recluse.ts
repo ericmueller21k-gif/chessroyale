@@ -34,7 +34,7 @@
  * shows (sprite.ts lazyParts).
  */
 import { canvas, inEllipse, inPoly, roundLight, toGrid, type Canvas } from "./paint.ts";
-import { lazyParts, type Anim, type Character, type Frame, type Layer, type Part, type Speck } from "./sprite.ts";
+import { lazyAnim, lazyParts, mapFrames, type Anim, type Character, type Frame, type Layer, type Part, type Speck } from "./sprite.ts";
 import { BOOK_PALETTE, BOOK_SIZE, bookFlat, bookHalf, bookOpen, bookRead, bookTurned, type BookPart } from "./effects/recluse.ts";
 
 export { RECLUSE_BOOK } from "./effects/recluse.ts";
@@ -494,8 +494,9 @@ const PALM = ["..kkkk.", ".kdeddk", ".kdcdck", ".kdcdck", "kkdcdck", "kdbdddk", 
 
 const { parts: PARTS, add } = lazyParts();
 const STANCES: readonly Stance[] = ["stand", "wide", "rise", "bend", "low", "kneel"];
-const LEGS = Object.fromEntries(STANCES.map((s) => [s, legs(s)])) as Record<Stance, { part: Part; at: Pt }>;
-for (const s of STANCES) add(`legs:${s}`, () => LEGS[s].part);
+const LEGS = new Map<Stance, { part: Part; at: Pt }>();
+const legsOf = (s: Stance) => LEGS.get(s) ?? LEGS.set(s, legs(s)).get(s)!;
+for (const s of STANCES) add(`legs:${s}`, () => legsOf(s).part);
 add("torso", torso);
 add("shoe", shoe);
 add("heels", heels);
@@ -623,7 +624,7 @@ export function recluseLayers(p: ReclusePose, bust = false): Layer[] {
   if (!bust) {
     if (!p.air) layers.push(at("shadow", 26, GROUND - 2));
     if (stance === "kneel") layers.push(at("heels", 27, GROUND - 4), at("heels", 59, GROUND - 4, true));
-    layers.push(at(`legs:${stance}`, LEGS[stance].at[0], LEGS[stance].at[1]));
+    layers.push(at(`legs:${stance}`, legsOf(stance).at[0], legsOf(stance).at[1]));
     if (stance !== "kneel") {
       const [l, r] = STANCE_LEGS[stance];
       layers.push(at("shoe", l![2]![0] - 10, GROUND - 6), at("shoe", r![2]![0] - 2, GROUND - 6, true));
@@ -1050,40 +1051,40 @@ export const RECLUSE_JUMP = (() => {
 })();
 
 const anims = (bust: boolean): Record<string, Anim> => ({
-  idle: { loop: true, frames: build(IDLE, bust) },
-  consult: { loop: false, frames: build(CONSULT(1), bust) },
-  stare: { loop: false, frames: build(STARE, bust) },
-  laugh: { loop: false, frames: build(LAUGH, bust) },
-  spellbook: { loop: false, frames: build(SPELLBOOK(1), bust) },
-  spellLoop: { loop: true, frames: build(SPELL_LOOP, bust) },
-  spellClose: { loop: false, frames: build(SPELL_CLOSE(1), bust) },
-  slam: { loop: false, frames: build(SLAM(1), bust) },
-  collapse: { loop: false, frames: build(COLLAPSE, bust) },
-  collapseLoop: { loop: true, frames: build(COLLAPSE_LOOP, bust) },
-  revive: { loop: false, frames: build(REVIVE, bust) },
-  idle2: { loop: true, frames: build(IDLE2, bust, 2) },
-  consult2: { loop: false, frames: build(CONSULT(2), bust, 2) },
-  stare2: { loop: false, frames: build(STARE, bust, 2) },
-  laugh2: { loop: false, frames: build(LAUGH, bust, 2) },
-  spellbook2: { loop: false, frames: build(SPELLBOOK(2), bust, 2) },
-  spellLoop2: { loop: true, frames: build(SPELL_LOOP, bust, 2) },
-  spellClose2: { loop: false, frames: build(SPELL_CLOSE(2), bust, 2) },
-  slam2: { loop: false, frames: build(SLAM(2), bust, 2) },
+  idle: lazyAnim(() => ({ loop: true, frames: build(IDLE, bust) })),
+  consult: lazyAnim(() => ({ loop: false, frames: build(CONSULT(1), bust) })),
+  stare: lazyAnim(() => ({ loop: false, frames: build(STARE, bust) })),
+  laugh: lazyAnim(() => ({ loop: false, frames: build(LAUGH, bust) })),
+  spellbook: lazyAnim(() => ({ loop: false, frames: build(SPELLBOOK(1), bust) })),
+  spellLoop: lazyAnim(() => ({ loop: true, frames: build(SPELL_LOOP, bust) })),
+  spellClose: lazyAnim(() => ({ loop: false, frames: build(SPELL_CLOSE(1), bust) })),
+  slam: lazyAnim(() => ({ loop: false, frames: build(SLAM(1), bust) })),
+  collapse: lazyAnim(() => ({ loop: false, frames: build(COLLAPSE, bust) })),
+  collapseLoop: lazyAnim(() => ({ loop: true, frames: build(COLLAPSE_LOOP, bust) })),
+  revive: lazyAnim(() => ({ loop: false, frames: build(REVIVE, bust) })),
+  idle2: lazyAnim(() => ({ loop: true, frames: build(IDLE2, bust, 2) })),
+  consult2: lazyAnim(() => ({ loop: false, frames: build(CONSULT(2), bust, 2) })),
+  stare2: lazyAnim(() => ({ loop: false, frames: build(STARE, bust, 2) })),
+  laugh2: lazyAnim(() => ({ loop: false, frames: build(LAUGH, bust, 2) })),
+  spellbook2: lazyAnim(() => ({ loop: false, frames: build(SPELLBOOK(2), bust, 2) })),
+  spellLoop2: lazyAnim(() => ({ loop: true, frames: build(SPELL_LOOP, bust, 2) })),
+  spellClose2: lazyAnim(() => ({ loop: false, frames: build(SPELL_CLOSE(2), bust, 2) })),
+  slam2: lazyAnim(() => ({ loop: false, frames: build(SLAM(2), bust, 2) })),
   // The phase change: he seizes the God King's power and gets up in a rage where he stands; the rest only on the board,
   // as the whole figure.
-  seize: { loop: false, frames: build(SEIZE, bust) },
-  seizeLoop: { loop: true, frames: build(SEIZE_LOOP, bust) },
-  seized: { loop: false, frames: build(SEIZED, bust) },
-  rage: { loop: false, frames: build(RAGE, bust) },
+  seize: lazyAnim(() => ({ loop: false, frames: build(SEIZE, bust) })),
+  seizeLoop: lazyAnim(() => ({ loop: true, frames: build(SEIZE_LOOP, bust) })),
+  seized: lazyAnim(() => ({ loop: false, frames: build(SEIZED, bust) })),
+  rage: lazyAnim(() => ({ loop: false, frames: build(RAGE, bust) })),
   ...(bust
     ? {}
     : {
-        leap: { loop: false, frames: build(LEAP(1), bust) },
-        drop: { loop: false, frames: build(DROP, bust) },
-        chantRaise: { loop: false, frames: build(CHANT_RAISE, bust, 2) },
-        chant: { loop: true, frames: build(CHANT, bust, 2) },
-        pickup: { loop: false, frames: build(PICKUP, bust, 2) },
-        leap2: { loop: false, frames: build(LEAP(2).slice(0, 3), bust, 2) },
+        leap: lazyAnim(() => ({ loop: false, frames: build(LEAP(1), bust) })),
+        drop: lazyAnim(() => ({ loop: false, frames: build(DROP, bust) })),
+        chantRaise: lazyAnim(() => ({ loop: false, frames: build(CHANT_RAISE, bust, 2) })),
+        chant: lazyAnim(() => ({ loop: true, frames: build(CHANT, bust, 2) })),
+        pickup: lazyAnim(() => ({ loop: false, frames: build(PICKUP, bust, 2) })),
+        leap2: lazyAnim(() => ({ loop: false, frames: build(LEAP(2).slice(0, 3), bust, 2) })),
       }),
 });
 /** The phase change's animations the board plays (the whole figure only). */
@@ -1129,7 +1130,7 @@ export const RECLUSE_BUST: Character = {
   palette: RECLUSE_PALETTE,
   halo: "#2a2733",
   parts: PARTS,
-  anims: Object.fromEntries(Object.entries(anims(true)).map(([n, a]) => [n, { ...a, frames: a.frames.map(toBust) }])),
+  anims: mapFrames(anims(true), toBust),
 };
 
 /** The part of him a portrait shows (his face and hair), in the full figure's frame pixels. */

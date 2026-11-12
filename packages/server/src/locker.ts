@@ -1,8 +1,9 @@
-import { CRATES_FREE, ITEM_SLOTS, adminCopies, adminCopyDef, crateDef, isAdminCopy, itemDef, mulberry32, rollCrate, type CrateRoll, type ItemInstance, type ItemLook, type ItemSlot } from "@chessroyale/core";
+import { ITEM_SLOTS, adminCopies, adminCopyDef, crateDef, isAdminCopy, itemDef, mulberry32, rollCrate, type CrateRoll, type ItemInstance, type ItemLook, type ItemSlot } from "@chessroyale/core";
 import type { Sql, Stmt } from "./accounts.ts";
 import { bossCrateHoldings, tokenHoldings } from "./boss-tokens.ts";
 import { welcomeState, type WelcomeState } from "./welcome.ts";
-import { applyOp, deleteItems, keyFor, leg, ledgerAccount, opKeys } from "./ledger.ts";
+import { applyOp, cond, deleteItems, keyFor, leg, ledgerAccount, opKeys } from "./ledger.ts";
+import { seriesFromWallet, seriesHoldings } from "./rewards.ts";
 
 /**
  * The locker: crate items a player owns (each with its own color, blemish and seed) and what's equipped in each
@@ -29,8 +30,8 @@ export const LOCKER_SCHEMA = [
   )`,
 ];
 
-/** Columns added after the tables first shipped (each run once; "duplicate column" afterwards is fine). */
-export const LOCKER_MIGRATIONS = [`ALTER TABLE items ADD COLUMN color2 TEXT`];
+/** Columns added after the tables first shipped (accounts.ts COLUMNS: each added once, if the table lacks it). */
+export const LOCKER_COLUMNS = [{ table: "items", column: "color2", type: "TEXT" }];
 
 /**
  * Who's an admin (admin.ts, isAdmin, with the Worker's ADMIN_EMAILS). An admin's locker has one of every item: admin
@@ -44,10 +45,14 @@ export interface LockerState {
   equipped: Partial<Record<ItemSlot, string>>;
   /** What you wear, ready to show (and to send to a lobby). */
   look: ItemLook;
-  /** Crates you have (null: unlimited, while testing). */
-  crates: number | null;
-  /** Crate keys you have (a boss crate takes one; stored since Nov 2, 2026: until then always null, unlimited). */
+  /** Series crates you hold, all series together (Nov 9: each takes a key to open; `seriesCrates` has them by crate). */
+  crates: number;
+  /** Series crates you hold, by crate id ("winter-1": only those you have some of; Nov 9, XP phase 2): rewards.ts. */
+  seriesCrates: Record<string, number>;
+  /** Crate keys you have (a series crate takes one to open, and a boss crate bought with a key; stored since Nov 2, 2026). */
   keys: number;
+  /** Boss crates to pick (Nov 9: every 10th level's): rewards.ts pickBossCrate. */
+  bossPicks: number;
   /** Boss tokens you have, by boss (only those you have some of): boss-tokens.ts. */
   tokens: Record<string, number>;
   /** Boss crates you bought and haven't opened, by crate id ("boss-tiger": only those you have some of; Nov 2): boss-tokens.ts. */
@@ -57,10 +62,18 @@ export interface LockerState {
 }
 
 /** A player's locker. `admin`: theirs is an admin's, so it has an admin copy of every item they don't own. */
-export async function lockerState(sql: Sql, userId: string, admin = false): Promise<LockerState> {
-  const stored = await sql.all<ItemInstance>("SELECT id, def, color, color2, blemish, seed FROM items WHERE user_id = ? ORDER BY created_at DESC", userId);
+export async function lockerState(sql: Sql, userId: string, admin = false, before?: Promise<unknown>): Promise<LockerState> {
+  // Two waves of reads, each at once (Nov 10: every D1 read is a round trip, about 40 ms from a Worker, and home waits on this):
+  // the items, what's worn and the old crates' move (with `before`, a write the holdings must see: the profile's Welcome Crate);
+  // then the holdings.
+  const [stored, rows] = await Promise.all([
+    sql.all<ItemInstance>("SELECT id, def, color, color2, blemish, seed FROM items WHERE user_id = ? ORDER BY created_at DESC", userId),
+    sql.all<{ slot: ItemSlot; item_id: string }>("SELECT slot, item_id FROM equipped_items WHERE user_id = ?", userId),
+    // (Crates held before Nov 9 had no series: they're Winter Crates from now on, moved once as the locker is read: rewards.ts.)
+    seriesFromWallet(sql, userId, Date.now()).catch((e: unknown) => console.log(`crates to series: ${String(e)}`)),
+    before,
+  ]);
   const items = admin ? [...stored, ...adminCopies(stored)] : stored;
-  const rows = await sql.all<{ slot: ItemSlot; item_id: string }>("SELECT slot, item_id FROM equipped_items WHERE user_id = ?", userId);
   const equipped: LockerState["equipped"] = {};
   const look: ItemLook = {};
   // An admin's worn admin copy of an item they've since really got (so it has no copy): the purest real one of that item
@@ -73,10 +86,14 @@ export async function lockerState(sql: Sql, userId: string, admin = false): Prom
     look[r.slot] = { def: it.def, color: it.color, blemish: it.blemish, seed: it.seed, ...(it.color2 ? { color2: it.color2 } : {}) };
   }
   for (const it of items) if (!it.color2) delete it.color2;
-  // (Crates earned, e.g. Squads' placement rewards, are counted in the wallet for when crates stop being free.)
-  const earned = CRATES_FREE ? null : ((await sql.first<{ crates: number | null }>("SELECT crates FROM wallets WHERE user_id = ?", userId).catch(() => null))?.crates ?? 0);
-  const { tokens, keys } = await tokenHoldings(sql, userId);
-  return { items, equipped, look, crates: earned, keys, tokens, bossCrates: await bossCrateHoldings(sql, userId), welcome: await welcomeState(sql, userId) };
+  const [{ seriesCrates, bossPicks }, { tokens, keys }, bossCrates, welcome] = await Promise.all([
+    seriesHoldings(sql, userId),
+    tokenHoldings(sql, userId),
+    bossCrateHoldings(sql, userId),
+    welcomeState(sql, userId),
+  ]);
+  const crates = Object.values(seriesCrates).reduce((s, n) => s + n, 0);
+  return { items, equipped, look, crates, seriesCrates, keys, bossPicks, tokens, bossCrates, welcome };
 }
 
 /**
@@ -107,9 +124,11 @@ export async function looksOf(sql: Sql, userIds: readonly string[], admins: Read
 }
 
 /**
- * Opens a crate (free and unlimited while testing). `force` only works while testing. `admin`: as lockerState's. One ledger op (the
- * item in), keyed by the app's request id for the open (`open:<ledger id>:<request>`): a retry of it opens nothing more and answers
- * the first open's item. (An older app's open, with none: a fresh key, as each tap was an open.)
+ * Opens a series crate you hold (Nov 9, XP phase 2: for everyone, admins too, it takes one of that crate and one crate key; Eric: "get
+ * rid of all that. Make it actually ready to go"). `force` (?fischer, ?shiny): the API passes it only where TEST_SWITCHES is "1".
+ * `admin`: as lockerState's. One ledger op: the crate and the key out, the item in, applied only if both are there (checked in the same
+ * transaction), keyed by the app's request id for the open (`open:<ledger id>:<request>`): a retry of it opens nothing more and
+ * answers the first open's item, and two opens at once with one key open one. (An older app's open, with none: a fresh key.)
  */
 export async function openCrate(
   sql: Sql,
@@ -122,20 +141,33 @@ export async function openCrate(
 ): Promise<{ ok: true; roll: CrateRoll; item: ItemInstance; locker: LockerState } | { ok: false; message: string }> {
   const crate = typeof crateId === "string" ? crateDef(crateId) : undefined;
   if (!crate) return { ok: false, message: "No such crate." };
-  if (!CRATES_FREE) return { ok: false, message: "You need a crate and a key." };
   const me = await ledgerAccount(sql, userId);
   if (!me) return { ok: false, message: "No such crate." };
   const seed = crypto.getRandomValues(new Uint32Array(1))[0]!;
-  const roll = rollCrate(mulberry32(seed), crate, CRATES_FREE ? force : {});
+  const roll = rollCrate(mulberry32(seed), crate, force);
   const id = [...crypto.getRandomValues(new Uint8Array(9))].map((b) => b.toString(16).padStart(2, "0")).join("");
   const op = request ? keyFor(opKeys.request("open", request), me) : `open:${id}`;
-  const done = await applyOp(sql, me, { id: op, reason: "crate open", now, legs: [leg.item(userId, { ...roll, id }, crate.id, now)] });
+  const done = await applyOp(sql, me, {
+    id: op,
+    reason: "crate open",
+    now,
+    when: cond(
+      "EXISTS (SELECT 1 FROM series_crates WHERE user_id = ? AND crate = ? AND n >= 1) AND EXISTS (SELECT 1 FROM wallets WHERE user_id = ? AND crate_keys >= 1)",
+      userId,
+      crate.id,
+      userId,
+    ),
+    legs: [leg.item(userId, { ...roll, id }, crate.id, now), leg.seriesCrates(userId, crate.id, -1, id), leg.keys(userId, -1, id)],
+  });
   // Every attempt answers the item as stored (this one's, or on a replay the first's), never its own roll, so every answer to one
   // request is the same whichever attempt applied it.
   const opened = done === "refused" ? null : await openedItem(sql, userId, op);
-  if (!opened) return { ok: false, message: "No such crate." };
+  if (!opened) return { ok: false, message: needToOpen(crate.name) };
   return { ok: true, ...opened, locker: await lockerState(sql, userId, admin) };
 }
+
+/** Why a series crate couldn't be opened: "You need a Winter Crate and a crate key to open it." */
+export const needToOpen = (name: string) => `You need a ${name.split(" · ")[0]} and a crate key to open it.`;
 
 /** The item an open (op `opId`) put in your locker, as stored: every attempt at the open answers this. Null: none, or gone since. */
 export async function openedItem(sql: Sql, userId: string, opId: string): Promise<{ roll: CrateRoll; item: ItemInstance } | null> {

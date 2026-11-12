@@ -25,6 +25,7 @@ import { rideScale, scaledAt, scaledSeat, seatAnchor } from "../components/rides
 import { FACINGS, type RiderDraft, type RiderFacing } from "../components/rides/kit.ts";
 import { loadRide, rideCells } from "../components/rides/load.ts";
 import { RideLayer, RideMark, svgImage, svgText, type RideColors } from "../components/rides/draw.tsx";
+import { art2d } from "./paint.ts";
 
 /** The pawn a rider carries: its picture (the square's, dressed or plain), the margin round the pawn's box in it, and its top (a share of the picture, down). */
 export interface RiderPawn {
@@ -243,15 +244,32 @@ export class Rider {
                 const c = document.createElement("canvas");
                 c.width = img!.width;
                 c.height = img!.height;
-                c.getContext("2d")!.drawImage(img!, 0, 0);
+                art2d(c).drawImage(img!, 0, 0);
                 tr.frames[v]![n]![f] = c;
               },
             });
     }
     return jobs;
   }
-  /** The jobs, one an animation frame: each puts down what the one before made, then makes its own (its images decode in between). */
+  /**
+   * Composes its frames all at once, not one an animation frame: your own rider as the town opens, before its first frame (Eric, Nov
+   * 10: "your rider doesnt appear for a few seconds"; Town.tsx `readyYou`). Asked for as it's made, before its drawing has loaded.
+   */
+  hurry(): void {
+    this.fast = true;
+  }
+  private fast = false;
+  /**
+   * The jobs, one an animation frame: each puts down what the one before made, then makes its own (its images decode in between).
+   * Hurried (`hurry`): every job's pictures made and decoded together, then all put down in one go (Nov 10, headless: about 0.25 s for a
+   * ride's 78 jobs on a computer, 1 s on a phone slowed four times; one an animation frame they took 1.5 to 2 s).
+   */
   private async compose(jobs: Job[]): Promise<void> {
+    if (this.fast) {
+      const all = await Promise.all(jobs.map((j) => Promise.all(j.make().map(svgImage))));
+      if (!this.dead) jobs.forEach((j, i) => j.done(all[i]!));
+      return;
+    }
     await nextFrame();
     if (this.dead || !jobs.length) return;
     let next = Promise.all(jobs[0]!.make().map(svgImage));
@@ -280,7 +298,7 @@ export class Rider {
     const c = document.createElement("canvas");
     c.width = Math.ceil(rv.w * s);
     c.height = Math.ceil(rv.h * s);
-    const g = c.getContext("2d")!;
+    const g = art2d(c);
     g.imageSmoothingQuality = "high";
     // The ride's cell at its scale (its layers drawn at that size).
     const cx = (rv.cell[0] - rv.x0) * s;

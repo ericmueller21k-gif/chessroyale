@@ -32,6 +32,9 @@
  * with someone unseen (no table is free for a game: a bot's card greys its Play); `__townTags()` the name tags drawn in the last frame.
  * docs/areas/town-square.md.
  */
+import { roomLoadSlice } from "./shops/load-slice.ts";
+import { F as RF, FPS, FpsCount, FrameRec, NP, P, REC, browserOf, setFps, setRec, summarize, timerStep } from "./frame-report.ts";
+import { reportPanel, reportPill, type Device } from "./frame-report-panel.ts";
 import { useLayoutEffect, useRef, useState } from "preact/hooks";
 import { createPortal } from "preact/compat";
 import { RIGHT_SLOT_TOOLS } from "../components/FrontMenu.tsx";
@@ -40,10 +43,13 @@ import { openProfile } from "../profile-nav.ts";
 import { account, myPawnColor, onAccountChange, playerName } from "../account.ts";
 import { TOWN_ASKED, testSwitchesAllowed } from "../test-switches.ts";
 import { play, warmSounds } from "../sound.ts";
+import { musicWanted, preloadMusic, roomMusic, roomMusicLoad, splashDone, splashMusic } from "../music.ts";
+import { AreaBanner, areaBannerOf, type AreaBannerText } from "./AreaBanner.tsx";
 import { SELECT_SOUND, TOWN_SOUNDS, townSound } from "../characters/boss-select.ts";
 import { N, colI, fromCam, newPt, proj, rel, rowI, wrapFX, wrapFY, wrapI } from "./camera.ts";
 import { SHOP_FEEL, TOWN_FEEL } from "./feel.ts";
-import { shopOf } from "./shops/shops.ts";
+import { ZEBRA_OUTSIDE_LINES, pickLine } from "./shops/zebra-lines.ts";
+import { canChallengeInside, shopOf } from "./shops/shops.ts";
 import type { LoadedRoom, RoomIntro, ShopCtl, ShopRoom } from "./shops/ShopRoom.tsx";
 import { CHALLENGE_FEEL, introOf, nextFlow, type ChallengeEvent, type ChallengeFlow } from "./shops/challenge.ts";
 import { BarsIcon, SwordsIcon } from "./CardIcons.tsx";
@@ -60,13 +66,13 @@ import { StreetZoom, parkSide } from "./zoom-steps.ts";
 import { PAWN_HEAD, PAWN_PX, Renderer, pawnImage, type Hit, type YouArt } from "./render.ts";
 import { dropRiders, leaveRider, ridersHeld, rideArt, shareRider, type Rider, type RiderPawn } from "./rides.ts";
 import { rideSpeed } from "../components/rides/scale.ts";
-import { secondColor, sideOfPawn } from "@chessroyale/core";
+import { MUSIC, mountOf, secondColor, shownLook, sideOfPawn } from "@chessroyale/core";
 import { painter2d, type Backend, type Painter } from "./paint.ts";
 import { painterGL } from "./paint-gl.ts";
 import { reportTownFallback } from "../problems.ts";
 import type { TownGlFallback } from "@chessroyale/core";
 import { sameWeights, skyOverride, skyWeights, type SkyWeights } from "./sky.ts";
-import { TOWN_BOTS, COLISEUM_PLACE, CROWD_MAX, HOMES, addCrowd, walkYou, addTestPlayer, fillTables, homeDoor, inSquare, stayOut, START, STATUES, TABLES, anyTableFree, botLabel, cancelMeet, comeOut, createTown, destFor, holdBot, isSprite, spotNear, meet, meetReady, meetSeat, onColiseum, playAtTableText, plotAt, ratingLine, ratingText, seated, sidekickText, spriteAnim, statueAt, stoolAt, tableAt, tableFor, tableStates, taken, tdist, tick, townLine, walkable, waitingBot, walkWalker, type HomeId, seatOf, seatText, standOf, type Person, type Place, type Seat, type Sq, type Stand, type StatueId, type Target } from "./world.ts";
+import { TOWN_BOTS, COLISEUM_PLACE, CROWD_MAX, HOMES, addCrowd, figureName, hasTownBoss, walkYou, addTestPlayer, fillTables, homeDoor, inSquare, stayOut, START, STATUES, TABLES, anyTableFree, botLabel, cancelMeet, comeOut, createTown, destFor, holdBot, homeNear, isSprite, spotNear, meet, meetReady, meetSeat, onColiseum, playAtTableText, plotAt, ratingLine, ratingText, seated, sidekickText, spriteAnim, statueAt, stoolAt, tableAt, tableFor, tableStates, taken, tdist, tick, townLine, walkable, waitingBot, walkWalker, type HomeId, seatOf, seatText, standOf, type Person, type Place, type Seat, type Sq, type Stand, type StatueId, type Target } from "./world.ts";
 import { NO_WEBGL_STREET, STREET_TOWN } from "./admin-town.ts";
 import { guestLimitMs, watchAway, watchGuest } from "./here-net.ts";
 import { FdButton } from "../components/FrontDoor.tsx";
@@ -163,12 +169,25 @@ export function TownScreen({
   const [card, setCard] = useState<Card | null>(null);
   // Inside a shop (Nov 2, round 1; shops/ShopRoom.tsx, loaded when you go in): the room, and its zoom (− / + switch Close and the
   // town's zoomed-in camera there). `fade` is the black the town zooms into and the room fades in from.
-  const [inside, setInside] = useState<{ room: LoadedRoom; View: typeof ShopRoom; intro: RoomIntro | null } | null>(null);
+  // (Rolling Dough, Nov 11: a home with two rooms; `arrived` you came through the door between them, `n` the room's mount, a new one each
+  // time through it.)
+  const [inside, setInside] = useState<{ room: LoadedRoom; View: typeof ShopRoom; intro: RoomIntro | null; arrived?: boolean; n?: number } | null>(null);
+  const insideNow = useRef(inside);
+  insideNow.current = inside;
   /** The shop you're in (its home's id), for the away rule's beats; null in the town square. */
   const shopIn = useRef<string | null>(null);
   shopIn.current = inside?.room.def.home ?? null;
   /** A guest's town time is up: "Make an account to keep exploring" over the town, which takes no more steps. */
   const [gated, setGated] = useState(false);
+  /**
+   * The street town's loading screen (Nov 11, Eric: "I have no issue with doing a loading screen for the town… even if it takes 3 or 5
+   * seconds… loads it all in at once and then it stays there"): up while every picture is painted and uploaded (startTown's `loadTown`).
+   * Its bar is moved directly (`loadBar`), not by a render a step.
+   */
+  const [loading, setLoading] = useState(STREET_TOWN && !NO_WEBGL_STREET);
+  const loadBar = useRef<HTMLElement>(null);
+  /** Its last step (Nov 12): the bosses' music still on its way once the town is built ("Loading music…"). */
+  const [loadingMusic, setLoadingMusic] = useState(false);
   useLayoutEffect(() => {
     if (!gated) return;
     // (No key reaches the town or a room under the pop-up: the arrow keys would walk you on.)
@@ -188,6 +207,17 @@ export function TownScreen({
   const fade = useRef<HTMLDivElement>(null);
   /** Going in or out: taps wait, and another way in or out isn't started. */
   const doorBusy = useRef(false);
+  /** The back button (or Go out) tapped while the room was still fading in: out as soon as it has (Nov 12: the tap was lost). */
+  const outNext = useRef(false);
+  /** Going out now (goOut, until the town is back). */
+  const leaving = useRef(false);
+  /**
+   * You're walking into a room through its door on your own (the town's door, or Rolling Dough's door between rooms), not arriving by
+   * a challenge: as it shows, its banner (Eric's mockup, Nov 11) and its boss's music (music.ts roomMusic).
+   */
+  const byDoor = useRef(false);
+  const [banner, setBanner] = useState<(AreaBannerText & { n: number }) | null>(null);
+  const bannerN = useRef(0);
   const fadeTo = (to: 0 | 1, ms: number, delay = 0) => {
     const el = fade.current;
     if (!el) return;
@@ -196,6 +226,10 @@ export function TownScreen({
     el.style.pointerEvents = to ? "auto" : "none";
   };
   const townCanvas = () => box.current?.querySelector<HTMLCanvasElement>("canvas.town-canvas") ?? null;
+  /** (`?report`) The frames from now on are going in or out of a building (RF.goIn, RF.goOut; 0: neither): frame-report.ts. */
+  const doorPhase = (f: number) => {
+    if (REC) REC.door = f;
+  };
   const later = (ms: number) => new Promise<void>((ok) => setTimeout(ok, ms));
   /**
    * You stand at a shop's door (its "Go in"): the town zooms in on the door (`x`, `y` in the box) and fades to black; the room opens.
@@ -204,8 +238,17 @@ export function TownScreen({
   const goIn = async (id: HomeId, x: number, y: number, challenge = false) => {
     if (doorBusy.current) return;
     doorBusy.current = true;
+    outNext.current = false;
+    doorPhase(RF.goIn);
     const F = SHOP_FEEL;
+    // (The room's pictures painted a slice a frame while the town zooms, the rest once it's black: shops/load-slice.ts.)
+    roomLoadSlice(F.loadSliceMs);
     if (challenge) step("atDoor");
+    // (The boss's theme loads as the door zooms: walked in on your own, it plays as the room shows; by a challenge, not until its
+    // splash. Eric, Nov 11.)
+    byDoor.current = !challenge;
+    // (A challenge's too: its splash starts the theme, Eric, Nov 11; loaded now it's ready by then.)
+    roomMusicLoad(id);
     // (Its code and art load now, while the town zooms: nothing of a shop loads while you walk round the town.)
     const load = import("./shops/ShopRoom.tsx").then((m) => m.loadRoom(id).then((room) => ({ room, View: m.ShopRoom })));
     // (A challenge's intro art too: loaded only now, as you go in to fight.)
@@ -218,13 +261,16 @@ export function TownScreen({
     }
     fadeTo(1, F.fadeMs, F.doorZoomMs - F.fadeMs);
     await later(F.doorZoomMs);
+    roomLoadSlice(0);
     const got = await load.catch(() => null);
     const fight = intro ? await intro.catch(() => null) : null;
     if (!got || !box.current || (challenge && !fight)) {
       // (It didn't load: back out to the town as you were.)
+      roomMusic(null);
       if (cv) cv.style.transform = "";
       fadeTo(0, F.fadeMs);
       doorBusy.current = false;
+      doorPhase(0);
       if (challenge) {
         step("cancel");
         ctl.current?.endChallenge();
@@ -245,32 +291,120 @@ export function TownScreen({
     if (flow.current !== "intro") return;
     step("introDone");
     const storm = m.startTransition(intro);
+    // (Eric, Nov 11: the boss's theme starts the moment his splash starts, the battle carrying it on. Not ready yet: the splash's
+    // covering frame (each boss's last frame, Folio's crumpled ball) holds until it is, MUSIC.splashHoldMs at most.)
+    const music = splashMusic(id);
     await storm.covered;
+    const ready = Promise.race([music, later(MUSIC.splashHoldMs)]);
     step("stormCovers");
     try {
       await onBossChallenge?.(id, ctl.current?.challengeStand() ?? null);
     } finally {
       step("battleReady");
+      await ready;
       await storm.out();
       step("stormGone");
+      splashDone();
     }
+  };
+  /**
+   * Through the door to the home's other room (Rolling Dough's back room, Nov 11): the same fade as going in (to black, the other room
+   * loads, from black), no zoom; you arrive just inside its door. Each room keeps its own camera and clock: it starts again each time.
+   */
+  const goThrough = async () => {
+    const at = insideNow.current;
+    if (doorBusy.current || !at || flow.current !== "town") return;
+    doorBusy.current = true;
+    outNext.current = false;
+    const F = SHOP_FEEL;
+    const to = at.room.def.part === "back" ? "front" : "back";
+    byDoor.current = true;
+    doorPhase(RF.goIn);
+    // (The back door's creak is off with the bakery's other room sounds: Eric, Nov 11.)
+    const load = import("./shops/ShopRoom.tsx").then((m) => m.loadRoom(at.room.def.home, to));
+    fadeTo(1, F.fadeMs);
+    await later(F.fadeMs);
+    const room = await load.catch(() => null);
+    if (!room || !box.current) {
+      fadeTo(0, F.fadeMs);
+      doorBusy.current = false;
+      doorPhase(0);
+      return;
+    }
+    setShopOut(F.startZoom === 1);
+    setInside({ room, View: at.View, intro: null, arrived: true, n: (at.n ?? 0) + 1 });
+  };
+  /**
+   * A challenge started inside (Don Dough's, once his Challenge's beat and walk-out have played in his back room, you through its door;
+   * Nov 11): his intro and the front room load, the back room fades to black and the front room fades in in challenge mode (Eric: "The
+   * main room is still where you fight"): you and he come out of the back door to the pad, his goons carrying the set-up after you, then
+   * his transition and the battle.
+   * "Back to town" puts you at his door in the town, where you stood to go in.
+   */
+  const challengeHere = async () => {
+    const at = insideNow.current;
+    if (doorBusy.current || !at || flow.current !== "town") return;
+    const id = at.room.def.home;
+    doorBusy.current = true;
+    outNext.current = false;
+    byDoor.current = false;
+    step("fight");
+    step("atDoor");
+    const F = SHOP_FEEL;
+    // (Eric, Nov 11: "The main room is still where you fight": his intro plays in the front room, you both coming out of the back door.)
+    const intro = import("./shops/intro.ts").then(async (m) => ({ m, intro: (await m.loadIntro(id))! }));
+    const front = import("./shops/ShopRoom.tsx").then((m) => m.loadRoom(id, "front"));
+    doorPhase(RF.goIn);
+    fadeTo(1, F.fadeMs);
+    await later(F.fadeMs);
+    const fight = await intro.catch(() => null);
+    const room = await front.catch(() => null);
+    if (!fight?.intro || !room || !box.current) {
+      step("cancel");
+      fadeTo(0, F.fadeMs);
+      doorBusy.current = false;
+      doorPhase(0);
+      return;
+    }
+    ctl.current?.standHere();
+    step("inside");
+    setInside({ room, View: at.View, intro: { intro: fight.intro, onMarks: () => step("onMarks"), onDone: () => void stormIn(id, fight.m, fight.intro) }, arrived: true, n: (at.n ?? 0) + 1 });
   };
   /** The room drew its first frame: the black lifts. */
   const shopReady = () => {
+    const at = insideNow.current;
+    if (byDoor.current && at) {
+      byDoor.current = false;
+      roomMusic(at.room.def.home);
+      setBanner({ ...areaBannerOf(at.room.def, HOMES.find((h) => h.id === at.room.def.home)?.name ?? ""), n: ++bannerN.current });
+    }
     fadeTo(0, SHOP_FEEL.fadeMs);
-    setTimeout(() => (doorBusy.current = false), SHOP_FEEL.fadeMs);
+    setTimeout(() => {
+      doorBusy.current = false;
+      doorPhase(0);
+      if (outNext.current) void goOut();
+    }, SHOP_FEEL.fadeMs);
   };
   /** "Go out" (or the back button inside): the room fades to black, and the town zooms back out from the door. */
   const goOut = async () => {
-    if (doorBusy.current) return;
+    if (doorBusy.current) {
+      // (Tapped as the room fades in: it waits for the room, then goes out. Not while already going out.)
+      if (insideNow.current && !outNext.current && !leaving.current) outNext.current = true;
+      return;
+    }
+    outNext.current = false;
     // (A challenge can be called off, with the back button, until its transition starts: the battle is coming from then on.)
     if (flow.current !== "town" && flow.current !== "walkIn" && flow.current !== "intro") return;
     doorBusy.current = true;
+    leaving.current = true;
     if (flow.current !== "town") {
       step("cancel");
       ctl.current?.endChallenge();
     }
     const F = SHOP_FEEL;
+    roomMusic(null);
+    setBanner(null);
+    doorPhase(RF.goOut);
     fadeTo(1, F.fadeMs);
     await later(F.fadeMs);
     setInside(null);
@@ -284,6 +418,8 @@ export function TownScreen({
     await later(F.doorZoomMs);
     if (cv) cv.style.transition = cv.style.transformOrigin = "";
     doorBusy.current = false;
+    leaving.current = false;
+    doorPhase(0);
   };
 
   // (A layout effect: the world's first frame is drawn before the screen first shows.)
@@ -291,7 +427,15 @@ export function TownScreen({
     const t = startTown(box.current!, canvas.current!, chips.current, cardEl.current!, live.current!, setZoomedOut, setCard, seatOf(seat), (s, face) => {
       const b = TOWN_BOTS[s.bot]!;
       onPlayBot?.({ seat: seatText(s), name: botLabel(b), rating: b.rating, look: isSprite(b.look) ? null : b.look.wear, face });
-    }, (id, x, y, challenge) => void goIn(id, x, y, challenge), stand, () => step("cancel"));
+    }, (id, x, y, challenge) => void goIn(id, x, y, challenge), stand, () => step("cancel"), (share, music) => {
+      if (share === null) return setLoading(false);
+      if (music) setLoadingMusic(true);
+      const bar = loadBar.current;
+      if (bar) {
+        bar.style.transform = `scaleX(${share})`;
+        bar.parentElement!.setAttribute("aria-valuenow", String(Math.round(share * 100)));
+      }
+    });
     ctl.current = t;
     // Away (Eric, Nov 7; afk.ts, here-net.ts): the "zzz" over your pawn (the town's and a shop's), out to home after too long, and the
     // beats that put you (and your "zzz") in everyone else's town. A boss's challenge (from the fight to the battle) and the claw
@@ -314,6 +458,7 @@ export function TownScreen({
       stopGuest();
       stopAway();
       t.stop();
+      roomMusic(null);
     };
   }, []);
   const home = card && (card.kind === "boss" || card.kind === "home") ? HOMES[card.i]! : null;
@@ -334,7 +479,7 @@ export function TownScreen({
   // The right column's top slot (a computer's frame): where the town's tools go.
   const [slot, setSlot] = useState<HTMLElement | null>(null);
   useLayoutEffect(() => setSlot(framed ? document.getElementById(RIGHT_SLOT_TOOLS) : null), [framed]);
-  const label = card?.kind === "coliseum" ? COLISEUM_PLACE.name : card?.kind === "table" ? "Chess table" : person ? (bot ? botLabel(bot) : person.name) : home ? (card!.confirm ? (introOf(home.id) ? `Challenge ${home.boss}?` : "Leave the town square?") : card!.kind === "boss" ? home.boss : home.name) : undefined;
+  const label = card?.kind === "coliseum" ? COLISEUM_PLACE.name : card?.kind === "table" ? "Chess table" : person ? (bot ? botLabel(bot) : person.name) : home ? (card!.confirm ? (introOf(home.id) ? `Challenge ${home.boss}?` : "Leave the town square?") : card!.kind === "boss" ? figureName(home) : home.name) : undefined;
   /** A boss with an intro: "Fight" on its confirm. You and the boss walk to its door and in (once: a challenge already going is left alone). */
   const fight = (i: number) => {
     if (flow.current !== "town" || doorBusy.current) return;
@@ -376,6 +521,7 @@ export function TownScreen({
         {/* Inside a shop: the room over the town (the town waits, as you left it). */}
         {inside && (
           <inside.View
+            key={inside.n ?? 0}
             room={inside.room}
             youArt={() => ctl.current?.youArt() ?? null}
             youRider={() => ctl.current?.youRider() ?? null}
@@ -386,8 +532,14 @@ export function TownScreen({
             ctl={shopCtl}
             intro={inside.intro}
             zzz={() => !!ctl.current?.town.you.zzz}
+            arrived={!!inside.arrived}
+            onPass={() => void goThrough()}
+            onChallenge={() => void challengeHere()}
+            canChallenge={canChallengeInside(inside.room.def.home)}
           />
         )}
+        {/* The room's name as you walk in (under the cards and chat; taps pass through it). */}
+        {inside && banner && <AreaBanner key={banner.n} text={banner} onDone={() => setBanner(null)} />}
         <div class="town-overlay">
           {/* The chat log, top left (its own file): under the cards; while it shows it takes every touch on its own area (the map under it gets none), faded none; the chips keep off its box (CHAT_BOX). */}
           <TownChat tone={inside?.room.def.chatTone} onSignIn={onSignIn && (() => askLeave("Sign in", onSignIn))} />
@@ -419,7 +571,18 @@ export function TownScreen({
                 </button>
               </>
             )}
-            {card && home && !card.confirm && card.kind === "boss" && (
+            {/* A stand-in (Rolling Dough's guard out front, Nov 11): his name, his line's row (kept, empty until he talks, so nothing moves),
+                and Talk: the boss is inside. */}
+            {card && home && !card.confirm && card.kind === "boss" && !hasTownBoss(home) && (
+              <>
+                <h2>{figureName(home)}</h2>
+                <p class="town-card-text town-card-line town-stand-in">{card.line ?? "\u00a0"}</p>
+                <button type="button" class="town-btn primary" onClick={() => ctl.current?.talk()}>
+                  Talk
+                </button>
+              </>
+            )}
+            {card && home && !card.confirm && card.kind === "boss" && hasTownBoss(home) && (
               <>
                 <h2>{home.boss}</h2>
                 {card.line && <p class="town-card-text town-card-line">{card.line}</p>}
@@ -554,7 +717,16 @@ export function TownScreen({
         </div>
         {/* The street town's minimap (Nov 5): small at the top right, under the chips and cards; a tap opens it large over everything. Not
             inside a building (it's the town's). */}
-        {STREET_TOWN && <TownMap hidden={!!inside} faces={() => ctl.current?.mapFaces() ?? []} />}
+        {STREET_TOWN && <TownMap hidden={!!inside} faces={() => ctl.current?.mapFaces() ?? []} onHome={(id) => ctl.current?.walkHome(id)} />}
+        {/* The street town's loading screen (Nov 11): the boss's loading card's look, its bar real progress. */}
+        {loading && (
+          <div class="boss-loading town-loading" role="status" aria-live="polite">
+            <strong class="boss-loading-title">{loadingMusic ? "Loading music…" : "Building the town…"}</strong>
+            <span class="boss-loading-bar" role="progressbar" aria-label="Building the town" aria-valuemin={0} aria-valuemax={100} aria-valuenow={0}>
+              <i ref={loadBar} />
+            </span>
+          </div>
+        )}
         {/* The black the town zooms into as you go in, and the room fades in from (and back, going out). */}
         <div class="town-fade" ref={fade} />
         <div class="town-controls">
@@ -629,6 +801,68 @@ function padPress(e: PointerEvent, d: Dir, down: boolean): void {
   hold(d, down);
 }
 
+/** Your look as the town dresses you (dress(), readyYou): what's drawn (an outfit, Nov 10: only it and any eyewear, the outfit by the
+ * rides' machinery: core's shownLook, mountOf), your ride, your pawn's color and the key your pictures are made for. */
+function yourLook() {
+  const look = shownLook(account().profile?.locker?.look);
+  const color = myPawnColor();
+  const side: "light" | "dark" = color === "black" ? "dark" : "light";
+  return { on: mountOf(look), color, side, key: `${side}|${lookKey(look)}`, wear: offRide(look) };
+}
+/**
+ * A pawn's dressed picture, and (`riding`: its ride has a back view) the same seen from behind, its face items left off (Nov 1,
+ * rides v2, the director's call: from behind a face item doesn't show, a hat does).
+ */
+const dressed = (wear: ItemLook | null, plain: HTMLCanvasElement, riding: boolean, side: "w" | "b" = "w"): Promise<[YouArt | null, YouArt | null]> => {
+  const front = dressedPawn(wear, plain, PAWN_PX, side);
+  if (!riding || !wear?.face) return front.then((a) => [a, a]);
+  return Promise.all([front, dressedPawn(offFace(wear), plain, PAWN_PX, side)]);
+};
+/**
+ * A rider (rides.ts) for a pawn wearing `ride`: its dressed picture (or the plain pawn) on it, and from behind (`back`), shared
+ * with anyone whose pawn looks the same (`pawnKey`: its side, tint and items); `done` once it's ready. Null if it isn't a ride.
+ */
+const ride = (on: NonNullable<ItemLook["ride"]>, art: YouArt | null, back: YouArt | null, plain: HTMLCanvasElement, side: "w" | "b", pawnKey: string, done: (rd: Rider) => void): Rider | null => {
+  const ra = rideArt(on.def);
+  const bare: RiderPawn = { img: plain, pad: 0, top: PAWN_HEAD - 0.75 / 45 };
+  const colors = { color: on.color, color2: secondColor(on) ?? on.color, side };
+  return ra ? shareRider(ra, colors, pawnKey, art ?? bare, back ?? art ?? bare, done) : null;
+};
+/** Your pawn made ready before the town shows (readyYou): its dressed pictures and its rider (a share of it held), for its look's key. */
+let prepared: { key: string; art: YouArt | null; back: YouArt | null; rider: Rider | null } | null = null;
+
+/**
+ * Your pawn made ready before the town shows (Eric, Nov 10: "a big bug happens every town load, your rider doesnt appear for a few
+ * seconds"): its dressed pictures, and its rider's frames composed in one go (rides.ts `hurry`; one an animation frame took 1.5 to
+ * 2 s), so the town's first frame has you on your ride. `ready` once they are, or after TOWN_FEEL.youWaitMs (the town then shows
+ * with you on foot, and the ride appears the moment it's ready); `done` gives back what the town didn't take (TownPage, as it closes).
+ */
+export function readyYou(): { ready: Promise<void>; done: () => void } {
+  const { on, color, side, key, wear } = yourLook();
+  const plain = pawnImage(side, null);
+  let over = false;
+  let mine: typeof prepared = null;
+  const ready = new Promise<void>((go) => {
+    setTimeout(go, TOWN_FEEL.youWaitMs);
+    void dressed(wear, plain, !!on, sideOfPawn(color)).then(([art, back]) => {
+      if (over) return go();
+      const rider = on ? ride(on, art, back, plain, sideOfPawn(color), `${side}||${lookKey(wear)}`, () => go()) : null;
+      rider?.hurry();
+      prepared = mine = { key, art, back, rider };
+      if (!rider) go();
+    });
+  });
+  return {
+    ready,
+    done: () => {
+      over = true;
+      if (prepared !== mine || !mine) return;
+      prepared = null;
+      if (mine.rider) leaveRider(mine.rider);
+    },
+  };
+}
+
 /** Runs the world in `box` on `cv`: the loop, the camera, the input and the chips. Returns its controls and its stop. */
 function startTown(
   box: HTMLDivElement,
@@ -645,6 +879,8 @@ function startTown(
   stand: Stand | null = null,
   /** A boss's challenge called off on the way to its door (a tap elsewhere walked you away). */
   onChallengeOff: () => void = () => {},
+  /** The loading screen's progress (0 to 1; `music`: its "Loading music…" step), then null once the town is loaded (`loadTown`). */
+  onLoading: (share: number | null, music?: boolean) => void = () => {},
 ) {
   const f = TOWN_FEEL;
   /** The world's canvas (a new one if the street town's WebGL fails as it starts: a canvas keeps the first kind of context it gave). */
@@ -788,21 +1024,17 @@ function startTown(
   // the last ones kept until they're ready.
   let youLook: string | null = null;
   const dress = () => {
-    const look = account().profile?.locker?.look;
-    const color = myPawnColor();
-    const side = color === "black" ? "dark" : "light";
-    const key = `${side}|${lookKey(look)}`;
+    const { on, color, side, key, wear } = yourLook();
     if (key === youLook) return;
     youLook = key;
     town.you.look = { side, tint: null, wear: null };
-    const wear = offRide(look);
     // (Your ride's pace, Nov 1: Cheetah Shoes walk twice as fast; RIDES.speed. As the look is put on, before its frames are ready.)
-    town.you.walker.stepMs = f.youStepMs / rideSpeed(look?.ride?.def);
+    town.you.walker.stepMs = f.youStepMs / rideSpeed(on?.def);
     // (The ride drawn now stays drawn until the new one's frames are ready; then it's given back. One share of a rider each.)
     const mount = (art: YouArt | null, back: YouArt | null) => {
       const prev = youRide;
-      youRide = look?.ride
-        ? ride(look.ride, art, back, pawnImage(side, null), sideOfPawn(color), `${side}||${lookKey(wear)}`, (rd) => {
+      youRide = on
+        ? ride(on, art, back, pawnImage(side, null), sideOfPawn(color), `${side}||${lookKey(wear)}`, (rd) => {
             if (rd !== youRide || !alive) return;
             if (youShown && youShown !== rd) leaveRider(youShown);
             youShown = r.youRider = rd;
@@ -811,39 +1043,32 @@ function startTown(
       if (prev && (prev !== youShown || prev === youRide)) leaveRider(prev);
       // (Its frames on their way, the drawing's chunk first: you walk on foot meanwhile, in its box, under its tag.)
       r.youSoon = youRide;
+      // (Its frames already composed, as the town opens (readyYou): drawn from this frame on, not the next.)
+      if (youRide?.ready && youShown !== youRide) {
+        if (youShown) leaveRider(youShown);
+        youShown = r.youRider = youRide;
+      }
       if (!youRide) {
         if (youShown) leaveRider(youShown);
         youShown = r.youRider = null;
       }
     };
-    if (!lookKey(wear)) {
+    // (Made ready before the town showed, readyYou: in its first frame. Its share of the rider given back once mount has its own.)
+    const pre = prepared?.key === key ? prepared : null;
+    if (pre) {
+      prepared = null;
+      r.youArt = pre.art;
+      mount(pre.art, pre.back);
+      if (pre.rider) leaveRider(pre.rider);
+    } else if (!lookKey(wear)) {
       r.youArt = null;
       mount(null, null);
     } else
-      void dressed(wear, pawnImage(side, null), !!look?.ride, sideOfPawn(color)).then(([art, back]) => {
+      void dressed(wear, pawnImage(side, null), !!on, sideOfPawn(color)).then(([art, back]) => {
         if (youLook !== key || !alive) return;
         r.youArt = art;
         mount(art, back);
       });
-  };
-  /**
-   * A pawn's dressed picture, and (`riding`: its ride has a back view) the same seen from behind, its face items left off (Nov 1,
-   * rides v2, the director's call: from behind a face item doesn't show, a hat does).
-   */
-  const dressed = (wear: ItemLook | null, plain: HTMLCanvasElement, riding: boolean, side: "w" | "b" = "w"): Promise<[YouArt | null, YouArt | null]> => {
-    const front = dressedPawn(wear, plain, PAWN_PX, side);
-    if (!riding || !wear?.face) return front.then((a) => [a, a]);
-    return Promise.all([front, dressedPawn(offFace(wear), plain, PAWN_PX, side)]);
-  };
-  /**
-   * A rider (rides.ts) for a pawn wearing `ride`: its dressed picture (or the plain pawn) on it, and from behind (`back`), shared
-   * with anyone whose pawn looks the same (`pawnKey`: its side, tint and items); `done` once it's ready. Null if it isn't a ride.
-   */
-  const ride = (on: NonNullable<ItemLook["ride"]>, art: YouArt | null, back: YouArt | null, plain: HTMLCanvasElement, side: "w" | "b", pawnKey: string, done: (rd: Rider) => void): Rider | null => {
-    const ra = rideArt(on.def);
-    const bare: RiderPawn = { img: plain, pad: 0, top: PAWN_HEAD - 0.75 / 45 };
-    const colors = { color: on.color, color2: secondColor(on) ?? on.color, side };
-    return ra ? shareRider(ra, colors, pawnKey, art ?? bare, back ?? art ?? bare, done) : null;
   };
   /** The rider your look asked for last (its frames may still be coming), and the one drawn now: each holds a share. */
   let youRide: Rider | null = null;
@@ -853,8 +1078,9 @@ function startTown(
     const lk = p.look;
     if (isSprite(lk) || !lk.wear) return;
     const plain = pawnImage(lk.side, lk.tint);
-    const on = lk.wear.ride;
-    const wear = offRide(lk.wear);
+    const shown = shownLook(lk.wear);
+    const on = mountOf(shown);
+    const wear = offRide(shown);
     // (Its pace on its ride, as yours: Cheetah Shoes twice a bot's.)
     p.walker.stepMs = TOWN_FEEL.botStepMs / rideSpeed(on?.def);
     const mount = (art: YouArt | null, back: YouArt | null) => {
@@ -885,11 +1111,9 @@ function startTown(
   // `/town?fps`, anyone's (Eric, Oct 30: no admin needed, the site is behind Cloudflare Access): a pill in the world's top-right
   // corner, "60 fps · 16.7 ms", frames over the last second and their mean time, the text set twice a second. Plain counters in
   // the frame loop, nothing else.
+  // (FpsCount, frame-report.ts: a room's frames count too, Nov 11.)
   let fpsEl: HTMLElement | null = null;
-  let fpsN = 0;
-  let fpsPrev = 0;
-  let fpsAt = 0;
-  let fpsPrevAt = 0;
+  let fps: FpsCount | null = null;
   if (TOWN_ASKED.fps) {
     fpsEl = document.createElement("div");
     fpsEl.className = "town-fps";
@@ -897,6 +1121,43 @@ function startTown(
     // (The backend follows the numbers, "· WebGL" or "· 2D", from town.css: the pill's text stays the numbers.)
     fpsEl.dataset.backend = BACKEND_LABEL[painter.kind];
     cv.parentElement?.append(fpsEl);
+    setFps((fps = new FpsCount(fpsEl)));
+  }
+  // `/town?report`, anyone's, as `?fps` (Eric, Nov 11): the frame report (frame-report.ts). Every frame of a run recorded from your
+  // first move, for 30 s or until Done, then one panel to screenshot. Without `?report` there's no recorder: the marks are null checks.
+  const rec = TOWN_ASKED.report ? new FrameRec() : null;
+  setRec(rec);
+  let recPill: ReturnType<typeof reportPill> | null = null;
+  let recPanel: HTMLElement | null = null;
+  if (rec) {
+    const host = cv.parentElement!;
+    const timer = timerStep();
+    recPill = reportPill(host, () => rec.finish());
+    recPill.set("Report: walk or turn to start", false);
+    // (The pill's seconds, once a second, from whichever loop records: the town's or a room's. Nov 11, Eric: "?report is pausing when
+    // I run into the building": they were set by the town's frames alone, so inside a room the pill stood still.)
+    rec.onSec = (sec) => recPill?.set(`● Recording ${sec} s`, true);
+    rec.onDone = () => {
+      recPill?.set("Report ready", false);
+      setRec(null);
+      const dev: Device = { browser: browserOf(navigator.userAgent), ratio: window.devicePixelRatio || 1, drawn: r.DPR, w: cv.width, h: cv.height, backend: `${BACKEND_LABEL[painter.kind]}${TOWN_ASKED.back2d ? " (rooms 2D)" : ""}`, timer };
+      recPanel = reportPanel(
+        host,
+        summarize(rec.run),
+        dev,
+        () => {
+          recPanel?.remove();
+          recPanel = null;
+          rec.again();
+          setRec(rec);
+          recPill?.set("Report: walk or turn to start", false);
+        },
+        () => {
+          recPanel?.remove();
+          recPanel = null;
+        },
+      );
+    };
   }
   /** The game with a bot has been asked for (once). */
   let opened = false;
@@ -905,6 +1166,8 @@ function startTown(
   let alive = true;
   /** (Tests, `__townHold`) The frame loop held: the last frame stays, and nothing moves. */
   let held = false;
+  /** The loading screen is up (`loadTown`): no frames yet. */
+  let loading = painter.kind === "webgl";
   /** Inside a shop: the town waits as you left it (no frames, nothing moves) until you come out. */
   let away = false;
   /** A home's "Go in" sent you to its door (its index in HOMES; -1: none): you go in once you stand there. */
@@ -922,7 +1185,7 @@ function startTown(
       b.held = false;
       b.walker.stepMs = f.bossStepMs;
     }
-    if (challenging >= 0) town.you.walker.stepMs = f.youStepMs / rideSpeed(account().profile?.locker?.look?.ride?.def);
+    if (challenging >= 0) town.you.walker.stepMs = f.youStepMs / rideSpeed(mountOf(shownLook(account().profile?.locker?.look))?.def);
     challenging = -1;
   };
   /** When the last frame was drawn (its `now`). */
@@ -1079,6 +1342,7 @@ function startTown(
   const frame = (now: number) => {
     raf = 0;
     if (!alive) return;
+    REC?.begin(now);
     const dt = Math.min(0.1, (now - last) / 1000);
     last = now;
     if (STREET_TOWN) {
@@ -1124,30 +1388,30 @@ function startTown(
     }
     stepClose(dt);
     updateCamera(dt, now);
+    REC?.mark(P.logic);
     draw(now, dt);
+    REC?.mark(P.chips);
     // (The minimap's dots: you and the way the camera faces; a transform only when they move. minimap.ts.)
     if (STREET_TOWN) {
       const y = town.you.walker.pose(now, POSE);
       mapFrame(y.x, y.y, heading);
     }
-    if (fpsEl) {
-      fpsN++;
-      if (!fpsAt) fpsAt = fpsPrevAt = now;
-      else if (now - fpsAt >= 500) {
-        const n = fpsN + fpsPrev;
-        const ms = now - fpsPrevAt;
-        fpsEl.textContent = `${Math.round((n * 1000) / ms)} fps · ${(ms / n).toFixed(1)} ms`;
-        fpsEl.dataset.fps = String(Math.round((n * 1000) / ms));
-        fpsPrev = fpsN;
-        fpsN = 0;
-        fpsPrevAt = fpsAt;
-        fpsAt = now;
-      }
+    const rc = REC;
+    if (rc) {
+      rc.mark(P.minimap);
+      rc.end(town.you.walker.moving(), heading, zoomCur);
     }
+    FPS?.tick(now);
     raf = requestAnimationFrame(frame);
   };
-  const run = () => {
-    if (raf || !alive || document.hidden || held || away) return;
+  /** The frames start again. `gap`: after a pause (a hidden tab, a test's hold): the recorder and the pill start afresh. Back from a
+   * room (`resume`) they don't: the room's frames led up to this one, and its time is seen. */
+  const run = (gap = true) => {
+    if (raf || !alive || document.hidden || held || away || loading) return;
+    if (gap) {
+      rec?.pause();
+      FPS?.restart();
+    }
     last = performance.now();
     raf = requestAnimationFrame(frame);
   };
@@ -1202,7 +1466,7 @@ function startTown(
   const heldBy = (c: Card | null): Person | null => (c?.kind === "person" ? town.people[c.i]! : c?.kind === "table" && c.bot !== undefined ? town.people[c.bot]! : null);
   function setCard(c: Card | null) {
     // A boss's card opening: it says something (Eric, Oct 27), once a tap (its confirm opening is the same card).
-    if (c?.kind === "boss" && !(card?.kind === "boss" && card.i === c.i)) {
+    if (c?.kind === "boss" && !(card?.kind === "boss" && card.i === c.i) && hasTownBoss(HOMES[c.i]!)) {
       const id = HOMES[c.i]!.id;
       const n = taps.get(id) ?? 0;
       taps.set(id, n + 1);
@@ -1215,7 +1479,7 @@ function startTown(
       const n = opens.get(id) ?? 0;
       const line = townLine(id, n);
       if (line) ((c = { ...c, line }), opens.set(id, n + 1));
-    } else if (c && card && c.kind === card.kind && c.i === card.i && card.line) c = { ...c, line: card.line };
+    } else if (c && card && c.kind === card.kind && c.i === card.i && card.line && c.line === undefined) c = { ...c, line: card.line };
     // A person's card opening: a sidekick waves, once (Oct 28), and its picture is made, once (kept while the card stays: `full` changing
     // sets the card again).
     if (c?.kind === "person" && !(card?.kind === "person" && card.i === c.i)) {
@@ -1348,8 +1612,9 @@ function startTown(
       const wb = waitingBot(town, table);
       c = { kind: "table", i: table.i, confirm: false, watch: tableStates(town.people)[table.i]!.kind === "playing", ...(wb ? { bot: town.people.indexOf(wb) } : {}) };
     } else if (hit.kind === "square") {
-      key = `sq:${hit.c},${hit.r}`;
-      const home = plotAt[hit.r * N + hit.c];
+      // (Nov 12, Eric: "more grace": its plot, or the row right in front of a home (its door's), is that home, by its door: homeNear.)
+      const home = homeNear(hit.c, hit.r);
+      key = home ? `home:${home.id}` : `sq:${hit.c},${hit.r}`;
       target = home ? { kind: "home", home } : { kind: "square", c: hit.c, r: hit.r };
       if (home) c = { kind: "home", i: HOMES.indexOf(home), confirm: false };
     } else if (hit.kind === "house") {
@@ -1369,6 +1634,16 @@ function startTown(
       if (hit.person.bot || hit.person.uid) c = { kind: "person", i: town.people.indexOf(hit.person), confirm: false, full: !!hit.person.bot && !anyTableFree(town, hit.person) };
     }
     return { key, dest: destFor(town, town.you.walker, target), card: c, statue };
+  };
+  /**
+   * What a tap at (x, y) in the box lands on. Your own pawn takes no tap (a tap on it does nothing), but standing at a home's foot it
+   * hides the door (Eric, Nov 12): a tap on you over a home (its picture, plot or foot row: `homeNear`) is that home's.
+   */
+  const pickTap = (x: number, y: number): Hit | null => {
+    const hit = r.pick(x, y);
+    if (hit?.kind !== "person" || !hit.person.you) return hit;
+    const under = r.pick(x, y, true);
+    return under?.kind === "house" || (under?.kind === "square" && homeNear(under.c, under.r)) ? under : hit;
   };
   /** Any walk of yours, a tap or the arrow keys: it stands you up, calls off a game you were walking to with a bot and a way into a shop. */
   const walkOff = () => {
@@ -1447,7 +1722,7 @@ function startTown(
     const now = evAt(e);
     if (closing) return press.down(e.clientX, e.clientY, "", now);
     const xy = local(e);
-    const p = plan(r.pick(xy.x, xy.y));
+    const p = plan(pickTap(xy.x, xy.y));
     if (p?.dest) r.pressSquare(p.dest.c, p.dest.r);
     press.down(e.clientX, e.clientY, p?.dest || p?.card ? p.key : "", now);
   };
@@ -1494,7 +1769,7 @@ function startTown(
       return;
     }
     const xy = local(e);
-    const p = plan(r.pick(xy.x, xy.y));
+    const p = plan(pickTap(xy.x, xy.y));
     const res = press.up(p ? p.key : "");
     if (res !== "walk" || !p) {
       if (res === "cancel") r.release(now, false);
@@ -1620,6 +1895,8 @@ function startTown(
           boxes: r.boxDraws(),
           // The boss whose speech bubble is up (null: none): drawn over the world, so a pixel check of the world quiets it (`__townHush`).
           speech: town.speech.boss?.home.id ?? null,
+          // (The line in that bubble, "" for none: a boss's goodbye on the way back from its battle, Eric, Nov 7.)
+          speechLine: town.speech.boss ? town.speech.line : "",
         }
       : null;
   // ... and `__townGather()` sends the three bots nearest you to stand beside you (to see a ring form).
@@ -1806,13 +2083,40 @@ function startTown(
     town.speech.boss = null;
     town.speech.next = on ? Infinity : 0;
   };
+  // ... `__townStill()`: no bot sets off from now on (the bots' source and their turns paused, as `__townSeat` and `__townCall` do);
+  // the walks under way end (`__townBots()`' moving), so a test can measure what the world's walkers would otherwise nudge.
+  const hookStill = () => {
+    if (!testSwitchesAllowed()) return;
+    town.nextBotAt = Infinity;
+  };
+  // ... `__townReport()` (`?report`): the recorder's state ("wait", "rec", "done"; null without `?report`), the frames so far, and once
+  // done the panel's summary (frame-report.ts summarize).
+  const hookReport = (raw = false) => {
+    if (!testSwitchesAllowed() || !rec) return null;
+    const u = rec.run;
+    const n = u.n;
+    return {
+      state: rec.state,
+      frames: n,
+      summary: rec.state === "done" ? summarize(u) : null,
+      // (raw: every frame's numbers, for a measurement script.)
+      raw: raw ? { total: [...u.total.subarray(0, n)], part: [...u.part.subarray(0, n * NP)], flags: [...u.flags.subarray(0, n)], turn: [...u.turn.subarray(0, n)], ups: [...u.ups.subarray(0, n)], bakes: [...u.bakes.subarray(0, n)] } : null,
+    };
+  };
   const hookPaint = () => {
     if (!testSwitchesAllowed()) return null;
-    const p = painter as Painter & { uploads?: number; resets?: number };
-    return { backend: painter.kind, drawCalls: painter.drawCalls, lost: painter.lost, uploads: p.uploads ?? 0, resets: p.resets ?? 0 };
+    const p = painter as Painter & { uploads?: number; resets?: number; stats?: () => unknown };
+    return { backend: painter.kind, drawCalls: painter.drawCalls, lost: painter.lost, uploads: p.uploads ?? 0, resets: p.resets ?? 0, atlas: p.stats?.() ?? null, loading, loadMs, loadPaintMs, loadMusicMs };
   };
-  const hooks = window as unknown as { __townFull?: typeof hookFull; __townPlayer?: typeof hookPlayer; __townTurns?: typeof hookTurns; __townGlide?: typeof hookGlide; __townAt?: typeof hookAt; __townGather?: typeof hookGather; __townCam?: typeof hookCam; __townSeat?: typeof hookSeat; __townTables?: typeof hookTables; __townCall?: typeof hookCall; __townBots?: typeof hookBots; __townBossBack?: typeof hookBossBack; __townTags?: typeof hookTags; __townHold?: typeof hookHold; __townPaint?: typeof hookPaint; __townBench?: typeof hookBench; __townWalk?: typeof hookWalk; __townRide?: typeof hookRide; __townYou?: typeof hookYou; __townHeading?: typeof hookHeading; __townHush?: typeof hookHush; __townHere?: typeof hookHere };
+  /** (Tests, the stills) What a tap at (x, y) in the box would do now: its key ("home:alfil", "sq:c,r", …), where you'd walk, its card's kind. */
+  const hookPick = (x: number, y: number) => {
+    if (!testSwitchesAllowed()) return null;
+    const p = plan(pickTap(x, y));
+    return p ? { key: p.key, dest: p.dest, card: p.card?.kind ?? null } : null;
+  };
+  const hooks = window as unknown as { __townPick?: typeof hookPick; __townFull?: typeof hookFull; __townPlayer?: typeof hookPlayer; __townTurns?: typeof hookTurns; __townGlide?: typeof hookGlide; __townAt?: typeof hookAt; __townGather?: typeof hookGather; __townCam?: typeof hookCam; __townSeat?: typeof hookSeat; __townTables?: typeof hookTables; __townCall?: typeof hookCall; __townBots?: typeof hookBots; __townBossBack?: typeof hookBossBack; __townTags?: typeof hookTags; __townHold?: typeof hookHold; __townPaint?: typeof hookPaint; __townBench?: typeof hookBench; __townWalk?: typeof hookWalk; __townRide?: typeof hookRide; __townYou?: typeof hookYou; __townHeading?: typeof hookHeading; __townHush?: typeof hookHush; __townStill?: typeof hookStill; __townHere?: typeof hookHere; __townReport?: typeof hookReport };
   hooks.__townAt = hookAt;
+  hooks.__townPick = hookPick;
   hooks.__townGlide = hookGlide;
   hooks.__townGather = hookGather;
   hooks.__townCam = hookCam;
@@ -1831,12 +2135,70 @@ function startTown(
   hooks.__townWalk = hookWalk;
   hooks.__townHeading = hookHeading;
   hooks.__townHush = hookHush;
+  hooks.__townStill = hookStill;
   hooks.__townRide = hookRide;
   hooks.__townYou = hookYou;
   hooks.__townHere = hookHere;
+  hooks.__townReport = hookReport;
 
-  run();
-  draw(performance.now()); // the first frame, before the screen shows
+  /**
+   * The loading screen (Nov 11, Eric: "loads it all in at once and then it stays there if you go in and out of buildings"): every
+   * picture the street town can show painted (render.ts `warm`), then uploaded for good, tallest first, onto an atlas made once as deep
+   * as they need (paint-gl.ts `keep`, `kept`), a slice a frame (`f.loadSliceMs`) so the bar moves: painting its first share
+   * (`f.loadPaintShare`), uploading the rest. The frames, and so the town's clock, start once it's done. Today's town (Canvas 2D) has
+   * nothing to upload: it starts at once.
+   * The bosses' music (Eric, Nov 12: "loading music in the loading bar"): every theme fetched (not decoded: music.ts `preloadMusic`)
+   * from the start, beside the painting (the network beside the processor). Music wanted, the town takes the bar up to
+   * 1 - MUSIC.townShare and "Loading music…" the rest: what hasn't landed once the town is built, waited for at most MUSIC.townWaitMs
+   * (a slow network never holds the town long; the rest lands in the background, and a theme not in yet is fetched as it's needed).
+   */
+  const loadTown = async () => {
+    const t0 = performance.now();
+    const keep = (src: CanvasImageSource) => painter.keep?.(src);
+    const tick = () => new Promise<void>((go) => requestAnimationFrame(() => go()));
+    const town = musicWanted() ? 1 - MUSIC.townShare : 1;
+    let musicShare = 0;
+    let musicIn = false;
+    void preloadMusic((s) => (musicShare = s)).then(() => (musicIn = true));
+    // (Whatever goes wrong here, the town opens: what wasn't made is made as it shows, as before.)
+    try {
+      for (let share = 0; share < 1 && alive; ) {
+        share = r.warm(f.loadSliceMs, keep);
+        onLoading(share * f.loadPaintShare * town);
+        await tick();
+      }
+      loadPaintMs = performance.now() - t0;
+      for (let share = 0; share < 1 && alive; ) {
+        share = painter.kept?.(f.loadSliceMs) ?? 1;
+        onLoading((f.loadPaintShare + (1 - f.loadPaintShare) * share) * town);
+        if (share < 1) await tick();
+      }
+    } catch (e) {
+      console.warn("town load:", e);
+    }
+    const built = performance.now();
+    for (const until = built + MUSIC.townWaitMs; !musicIn && alive && performance.now() < until; await tick()) {
+      onLoading(town + (1 - town) * musicShare, true);
+    }
+    loadMusicMs = performance.now() - built;
+    if (!alive) return;
+    loadMs = performance.now() - t0;
+    loading = false;
+    onLoading(null);
+    run();
+    draw(performance.now());
+  };
+  let loadMs = 0;
+  let loadPaintMs = 0;
+  /** How long the town waited on the music once built (the "Loading music…" step). */
+  let loadMusicMs = 0;
+  if (loading) void loadTown();
+  else {
+    void preloadMusic();
+    onLoading(null);
+    run();
+    draw(performance.now()); // the first frame, before the screen shows
+  }
 
   return {
     /**
@@ -1883,6 +2245,8 @@ function startTown(
       meet(town, { bot, table, yours, theirs: bot.walker.here() });
     },
     confirm: () => card && setCard({ ...card, confirm: true }),
+    /** A stand-in's Talk (Rolling Dough's guard out front): his card says the boss is inside, a line at random, never the same twice running. */
+    talk: () => card?.kind === "boss" && setCard({ ...card, line: pickLine(ZEBRA_OUTSIDE_LINES, card.line ?? null) }),
     /** A home's "Go in" (a shop's: shops/shops.ts): you walk to the square in front of its door, and go in once there. */
     goIn: (i: number) => {
       const h = HOMES[i]!;
@@ -1925,6 +2289,8 @@ function startTown(
     },
     /** Where you stood as you challenged a boss (null: no challenge). */
     challengeStand: () => challengeStand,
+    /** A challenge started inside a home (Don Dough's): you come back to where you stand in the town now, at its door. */
+    standHere: () => void (challengeStand = standOf(town.you.walker)),
     endChallenge,
     /** Inside a shop the town waits (`away`: no frames); coming out, it goes on. */
     pause: () => {
@@ -1942,7 +2308,7 @@ function startTown(
         base = freshView(turn, look, baseHeading(h.c, h.r, 0));
         heading = turn.to;
       }
-      run();
+      run(false);
     },
     /** The large map's portraits (TownMap.tsx): each boss home's place and its boss's face, as its chip shows it. */
     mapFaces: (): MapFace[] =>
@@ -1950,6 +2316,28 @@ function startTown(
         const { img, box } = r.chipFace(h);
         return { id: h.id, x: h.cx, y: h.cy, color: h.color, img, box };
       }),
+    /**
+     * (Eric, Nov 11: "When you open the mini map, if you tap on one of the bosses' buildings, it'll make your guy run there. And that's
+     * it.") The large map's tap on a home: you walk to where a tap on that home in the town would take you (by its door), as that tap
+     * walks you; no card (tap the home when you're there).
+     */
+    walkHome: (id: string) => {
+      const home = HOMES.find((h) => h.id === id);
+      if (!home || away) return;
+      const dest = destFor(town, town.you.walker, { kind: "home", home });
+      if (!dest) return;
+      if (STREET_TOWN) {
+        const b = lockIn(turn, look, performance.now());
+        if (b !== null) base = b;
+      }
+      leaveClose();
+      walkOff();
+      if (card) setCard(null);
+      if (walkWalker(town.you.walker, dest)) {
+        follow = true;
+        glide = null;
+      }
+    },
     /** Your pawn's picture as the town draws it (your items on), for the room inside a shop. */
     youArt: () => r.youArt,
     /** The rider you're on as the town draws you (its frames ready), or null: on foot. Inside a shop it comes in with you. */
@@ -1974,6 +2362,10 @@ function startTown(
       clearTimeout(lostWait);
       offAccount();
       fpsEl?.remove();
+      if (FPS === fps) setFps(null);
+      recPill?.remove();
+      recPanel?.remove();
+      if (REC === rec) setRec(null);
       halt();
       ro.disconnect();
       document.removeEventListener("visibilitychange", onVisibility);
@@ -2000,9 +2392,12 @@ function startTown(
       delete hooks.__townWalk;
       delete hooks.__townHeading;
       delete hooks.__townHush;
+      delete hooks.__townStill;
       delete hooks.__townRide;
       delete hooks.__townYou;
       delete hooks.__townHere;
+      delete hooks.__townReport;
+      delete hooks.__townPick;
       painter.dispose();
       if (card?.kind === "boss") town.bosses[card.i]!.held = false;
       detach();

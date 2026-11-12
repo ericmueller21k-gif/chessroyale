@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { VNode } from "preact";
-import { HUNCHESS_RIDES, RIDES as RIDE_SETTINGS, hunchessBase } from "@chessroyale/core";
+import { HUNCHESS_RIDES, RIDES as RIDE_SETTINGS, hunchessBase, itemDef } from "@chessroyale/core";
 import { HUNCHESS_LEVELS, HUNCHESS_PALETTE, hunchessFilterId } from "../src/components/rides/hunchess.tsx";
 import { FACINGS, viewOf, type RiderProps } from "../src/components/rides/kit.ts";
 import { RIDE_IDS, loadRide, rideBase, rideCells } from "../src/components/rides/load.ts";
@@ -21,7 +21,8 @@ const filterOf = (node: unknown) => ((node as VNode<{ filter?: string }>)?.props
 
 describe("the HunChess colorway (Nov 6)", () => {
   it("every ride has one, and only rides do", () => {
-    expect(HUNCHESS_RIDES.map((d) => hunchessBase(d.id)).sort()).toEqual([...RIDE_IDS].sort());
+    // (Rides only: an outfit, drawn with the rides' kit since Nov 10, has no colorway.)
+    expect(HUNCHESS_RIDES.map((d) => hunchessBase(d.id)).sort()).toEqual(RIDE_IDS.filter((id) => itemDef(id)?.slot === "ride").sort());
     for (const d of HUNCHESS_RIDES) expect(RIDE_IDS).not.toContain(d.id);
   });
 

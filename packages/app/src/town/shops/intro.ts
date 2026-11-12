@@ -28,7 +28,7 @@ import { TOWN_FEEL } from "../feel.ts";
 import { PARK_TABLE, TABLE_BOARD, TABLE_INK, TABLE_PIECES } from "../houses/park.ts";
 import { BOSS_ART } from "../render.ts";
 import { spriteCanvas } from "../../characters/sprite-kit.ts";
-import type { HomeId } from "../world.ts";
+import type { HomeId, TownBossId } from "../world.ts";
 import { ICE_ELF, ICE_GEAR, ICE_MOVES, iceAnims, type IceElf, type IceGear, type IceMove } from "./challenge.ts";
 import { startCrumple } from "./crumple-gl.ts";
 import { startSplatter } from "./smudgy-splatter.ts";
@@ -322,7 +322,8 @@ const trimmed = (src: HTMLCanvasElement): HTMLCanvasElement => {
   return c;
 };
 /** A picture's third (0 the left square, 1 the middle, 2 the right), as a canvas of its own. */
-const third = (img: HTMLCanvasElement, i: number): HTMLCanvasElement => {
+/** A third of a table's picture (0: a stool, 1: the leg): Rolling Dough's back room cuts its kept set the same way. */
+export const third = (img: HTMLCanvasElement, i: number): HTMLCanvasElement => {
   const w = Math.round(img.width / 3);
   const c = canvasOf(w, img.height);
   c.getContext("2d")!.drawImage(img, i * w, 0, w, img.height, 0, 0, w, img.height);
@@ -474,7 +475,8 @@ export function loadIntro(home: HomeId): Promise<LoadedIntro> | null {
     const tch = (art?.data ? art.data.table : art?.table) ?? PARK_TABLE;
     const img = toCanvas(tch, "idle", 0);
     const table = { ch: tch, img, leg: third(img, 1), stool: third(img, 0), palette: (art?.data ? art.data.palette : art?.palette) ?? PARK_TABLE.palette };
-    const bossCh = BOSS_ART[home];
+    // (A boss with no figure in the town, Don Dough in his back room: his intro's own, `figure`.)
+    const bossCh = (art?.data ? art.data.figure : undefined) ?? BOSS_ART[home as TownBossId];
     let t = 0;
     const bossIdle = bossCh.anims.idle!.frames;
     const ends = bossIdle.map((f) => (t += Math.max(16, f.ms)));

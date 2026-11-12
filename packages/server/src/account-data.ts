@@ -15,9 +15,9 @@
  *     with only the day they were played, so the game's own numbers (how often each boss wins, typical placements)
  *     stay right while no row names anyone (its place among its match's rows still shows a gap: the decision file);
  *   - the ledger (ledger.ts): its rows stay, under the account's random ledger id, which goes, so they name nobody;
- *   - fair play's file on an account that's banned or in review: the case, its log, the hashed email and Google id
- *     (fairplay_identities) and the device markers, under the deleted account's random id, so deleting never gets
- *     around fair play (a new account with the same identity is banned again, or goes back to review). Everything
+ *   - fair play's file on an account that's banned, in review or in the engine pool: the case, its log, the hashed email and Google
+ *     id (fairplay_identities) and the device markers, under the deleted account's random id, so deleting never gets
+ *     around fair play (a new account with the same identity is banned again, or goes back to review or the pool). Everything
  *     else of fair play goes (judged moves, match summaries, appeals, reports).
  * It all happens in one batch (one transaction), so it's never half done. After it, a lobby's results, a reward and
  * fair play's recording find no account and write nothing; a few other actions in flight at that very moment (a
@@ -29,11 +29,12 @@ import { caseOf } from "./fairplay.ts";
 import { socialDeletes } from "./friends.ts";
 import { rankedDownload, rankedErase } from "./ranked.ts";
 import { eraseMoves, ledgerDownload } from "./ledger.ts";
+import { questDeletes, questsDownload } from "./quests.ts";
 
 /** What a store's erase needs to know, worked out before the batch. */
 export interface EraseContext {
   now: number;
-  /** The account is banned or in review: fair play's file on it stays (with these hashed identities). */
+  /** The account is banned, in review or in the engine pool: fair play's file on it stays (with these hashed identities). */
   keepFairPlay: boolean;
   identities: [kind: string, hash: string][];
 }
@@ -55,9 +56,9 @@ const DAY = 86_400_000;
 
 /** A result's columns in the download (not `held`, which would say fair play is looking at the account). */
 const RESULT_COLUMNS =
-  "mode, online, placement, players, team, team_won, avg_score, rating, played_at, brilliant, best_move, cuts, cuts_survived, strikes, strikes_survived, survived, last_stand, boss_elo, boss_id, lobby, ranked, eval_bar, abandoned";
+  "mode, online, placement, players, team, team_won, avg_score, rating, played_at, brilliant, best_move, cuts, cuts_survived, strikes, strikes_survived, survived, last_stand, boss_elo, boss_id, lobby, ranked, eval_bar, abandoned, play_ms, moves, xp_before, xp_parts, xp_none, xp_rewards";
 /** A kept result's columns (every column but its id and account: a test pins the table's columns, so a new one is seen). */
-const KEPT_RESULT = "mode, online, placement, players, team, team_won, avg_score, rating, played_at, brilliant, best_move, cuts, cuts_survived, strikes, strikes_survived, survived, last_stand, boss_elo, boss_id, lobby, ranked, held, eval_bar, abandoned";
+const KEPT_RESULT = "mode, online, placement, players, team, team_won, avg_score, rating, played_at, brilliant, best_move, cuts, cuts_survived, strikes, strikes_survived, survived, last_stand, boss_elo, boss_id, lobby, ranked, held, eval_bar, abandoned, play_ms, moves, xp_before, xp_parts, xp_none, xp_rewards";
 
 export const ACCOUNT_STORES: AccountStore[] = [
   {
@@ -78,7 +79,8 @@ export const ACCOUNT_STORES: AccountStore[] = [
       stmt(
         `INSERT INTO results (user_id, ${KEPT_RESULT})
          SELECT ?, mode, online, placement, players, team, team_won, avg_score, NULL, played_at - played_at % ${DAY}, brilliant, NULL,
-           cuts, cuts_survived, strikes, strikes_survived, survived, last_stand, boss_elo, boss_id, NULL, ranked, held, NULL, abandoned
+           cuts, cuts_survived, strikes, strikes_survived, survived, last_stand, boss_elo, boss_id, NULL, ranked, held, NULL, abandoned,
+           play_ms, moves, NULL, xp_parts, xp_none, xp_rewards
          FROM results WHERE user_id = ? ORDER BY random()`,
         DELETED_ID,
         u.id,
@@ -90,7 +92,7 @@ export const ACCOUNT_STORES: AccountStore[] = [
     name: "shop",
     tables: ["wallets", "inventory", "equipped", "chat_picks"],
     export: async (sql, u) => ({
-      wallet: await sql.first("SELECT coins, crates, crate_keys FROM wallets WHERE user_id = ?", u.id),
+      wallet: await sql.first("SELECT coins, crates, crate_keys, xp, boss_picks FROM wallets WHERE user_id = ?", u.id),
       items: await all(sql, "SELECT item_id, acquired_at FROM inventory WHERE user_id = ?", u.id),
       equipped: await all(sql, "SELECT slot, item_id FROM equipped WHERE user_id = ?", u.id),
       chatPicks: await sql.first("SELECT lines, emoji FROM chat_picks WHERE user_id = ?", u.id),
@@ -122,6 +124,34 @@ export const ACCOUNT_STORES: AccountStore[] = [
     }),
     // (The tokens and boss crates go with the ledger's store, below.)
     erase: (u) => ["boss_token_drops", "solo_battles"].map((t) => stmt(`DELETE FROM ${t} WHERE user_id = ?`, u.id)),
+  },
+  {
+    // XP (xp.ts, Nov 9): the solo game the server is timing (when it began, and a test's minutes). The XP itself is the wallet's
+    // (above, with its ledger rows below), and each game's is on its result (its time, moves, XP and rewards). Phase 2 (Nov 9): the
+    // series crates you hold (the daily reward's and levels'; the boss crates to pick are the wallet's `boss_picks`, above).
+    name: "xp",
+    tables: ["solo_games", "series_crates"],
+    export: async (sql, u) => ({
+      soloGame: await sql.first("SELECT started_at, test_minutes FROM solo_games WHERE user_id = ?", u.id),
+      seriesCrates: await all(sql, "SELECT crate, n FROM series_crates WHERE user_id = ? ORDER BY crate", u.id),
+    }),
+    // (The series crates go with the ledger's store, below.)
+    erase: (u) => [stmt("DELETE FROM solo_games WHERE user_id = ?", u.id)],
+  },
+  {
+    // The engine server's per-account cap (engine-calls.ts, Nov 10): how many times today the account called its open routes.
+    name: "engineCalls",
+    tables: ["engine_calls"],
+    export: async (sql, u) => ({ today: await all(sql, "SELECT day, n FROM engine_calls WHERE user_id = ? ORDER BY day", u.id) }),
+    erase: (u) => [stmt("DELETE FROM engine_calls WHERE user_id = ?", u.id)],
+  },
+  {
+    // Quests (quests.ts, Nov 9, phase 3): your dailies and weekly (which, when dealt and finished, the target), each game that moved
+    // one (its key and when), and the day and week last dealt and the day a reroll dealt each one. What they paid is in the ledger, below.
+    name: "quests",
+    tables: ["quests", "quest_progress", "quest_days", "quest_games"],
+    export: (sql, u) => questsDownload(sql, u.id),
+    erase: (u) => questDeletes(u.id),
   },
   {
     // The Welcome Crates (welcome.ts, Nov 6: at 5 and 25 finished games): for each, when the player earned it and the finished
@@ -182,12 +212,12 @@ export const ACCOUNT_STORES: AccountStore[] = [
     erase: (u) => socialDeletes(u.id),
   },
   {
-    // Ranked 1 v 1 (ranked.ts): the player's rank (the hidden rating too: it's theirs) and their kept games, each with
+    // Ranked 1 v 1 (ranked.ts): the player's rank (the hidden rating too: it's theirs), their marks for leaving early, and their kept games, each with
     // the opponent's name. Deleting: the rank goes, and in the games kept for a while the player becomes the shared id
     // "deleted" (the opponent's games stay theirs). Fair play's check of a game (`checked`) isn't in the download, as
     // the rest of detection's records.
     name: "ranked1v1",
-    tables: ["ranked_1v1", "ranked_1v1_games"],
+    tables: ["ranked_1v1", "ranked_1v1_games", "ranked_conduct"],
     export: (sql, u) => rankedDownload(sql, u.id),
     erase: (u) => rankedErase(u.id),
   },
@@ -235,7 +265,7 @@ export const ACCOUNT_STORES: AccountStore[] = [
     erase: (u, { now, keepFairPlay, identities }) => {
       const gone = [stmt("DELETE FROM fairplay_matches WHERE user_id = ?", u.id), stmt("DELETE FROM fairplay_appeals WHERE user_id = ?", u.id)];
       if (!keepFairPlay) return [...gone, ...["fairplay_cases", "fairplay_log", "fairplay_identities", "fairplay_devices"].map((t) => stmt(`DELETE FROM ${t} WHERE user_id = ?`, u.id))];
-      // Banned or in review: the file outlives the account, with its identities as they are now (each in its own row;
+      // Banned, in review or pooled: the file outlives the account, with its identities as they are now (each in its own row;
       // a ban's are already there), so a new account made with one is caught (banCheck).
       return [
         ...gone,
@@ -293,9 +323,10 @@ export async function accountDownload(sql: Sql, user: User, now: number, extra: 
  * Deletes an account: every store's statements, then the account and its sessions (signed out on every device), in
  * one batch, so it's all or nothing. What stays and why: this file's header.
  */
-export async function deleteAccount(sql: Sql, user: User, now: number): Promise<{ keptFairPlay: boolean }> {
+export async function deleteAccount(sql: Sql, user: User, now: number, opts: { purgeFairPlay?: boolean } = {}): Promise<{ keptFairPlay: boolean }> {
   const status = (await caseOf(sql, user.id))?.status;
-  const keepFairPlay = status === "banned" || status === "review";
+  // (`purgeFairPlay`: a test account, deleted by an admin's call (test-accounts.ts): its case was never evidence about a person.)
+  const keepFairPlay = !opts.purgeFairPlay && (status === "banned" || status === "review" || status === "pool");
   const ctx: EraseContext = { now, keepFairPlay, identities: keepFairPlay ? await identityHashes(user) : [] };
   await sql.batch([
     ...ACCOUNT_STORES.flatMap((s) => s.erase(user, ctx)),

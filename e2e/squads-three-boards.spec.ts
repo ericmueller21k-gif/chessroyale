@@ -1,6 +1,7 @@
 import { expect, type Page } from "@playwright/test";
 import { Chess } from "chess.js";
 import { relaySeat } from "@chessroyale/chess/squads";
+import { SQUADS_LOBBY } from "@chessroyale/core";
 import { BOARD_SEL, named, test } from "./helpers.ts";
 
 /**
@@ -163,7 +164,11 @@ test("a Relay match on 3 boards plays to a result: 12 tiny boards, the finished 
   // Best 2 of 3: White wins all three (side 0 White on boards 1 and 3): 2–1.
   expect(r.points).toEqual([2, 1]);
   expect(r.winner).toBe(0);
-  // The finished boards: not grayed, a border and a check mark in the winning squad's color.
+  // The finished boards: not grayed, a border and a check mark in the winning squad's color. Still there once the match
+  // is over and the next round's matches wait out their break (Nov 9: they used to hide yours within a second).
+  await expect
+    .poll(() => page.evaluate(() => { const s = (window as any).squads; const ms = [...s.matches.values()]; const m = ms.find((x: any) => x.sides.some((sd: any) => sd.seats.includes(s.myId))); return m?.state === "over" && ms.some((x: any) => x.round > m.round && x.state === "break"); }), { timeout: 30_000 })
+    .toBe(true);
   const ours = page.locator(".sq-match.ours .sq-tiny.is-won");
   await expect(ours).toHaveCount(3, { timeout: 10_000 });
   await expect(page.locator(".sq-match.ours .sq-done")).toHaveCount(3);
@@ -203,6 +208,11 @@ test("the turn order: one queue for the board on screen, one size on every board
   await play(page, quiet(s.fen!));
   // Moved: you're no longer lit; each board of your match in turn, the box the same size, you on it somewhere.
   await expect(page.locator(".sq-to-row.you.lit")).toHaveCount(0);
+  // Your own board, opened at once (before "Jump to my next board" comes, a beat after your move), stays: the jump is called
+  // off by a board you open yourself. (Main run 1171: the jump took the screen from the board just tapped to the next.)
+  await page.locator(".sq-match.ours button.sq-tiny").nth(s.duty!.board).click();
+  await page.waitForTimeout(SQUADS_LOBBY.watching.jumpAfterMs + 400);
+  await expect(page.locator(".sq-to-list")).toHaveAttribute("aria-label", `Turn order on board ${s.duty!.board + 1}`);
   for (let i = 0; i < 3; i++) {
     await page.locator(".sq-match.ours button.sq-tiny").nth(i).click();
     await expect(page.locator(".sq-to-list")).toHaveAttribute("aria-label", `Turn order on board ${i + 1}`);
@@ -344,4 +354,23 @@ test("nothing below the screen's bottom edge at the phone sizes with their brows
     // The turn order's long names at every width: cut, never wrapped, the move column in place.
     expect(await rowsLaidOut(page), `${w}×${h}`).toEqual({ heights: 1, moveRights: 1, moveWidths: 1, wrapped: 0, ellipsis: true });
   }
+});
+
+test("your turn snaps you live (Eric, Nov 9): stepped back with « while waiting, your turn comes on that board: it's live, \"back to live\" is gone, and your move plays", async ({ page }) => {
+  test.setTimeout(240_000);
+  await relayLobby(page);
+  let s = await nextDuty(page);
+  await play(page, quiet(s.fen!));
+  // After your move the big board goes to your next board (Jump to my next board, on by default): wait for it, then step back there.
+  const shownBoard = () => page.locator(".sq-to-list").getAttribute("aria-label");
+  const afterMove = await shownBoard();
+  await expect.poll(shownBoard, { timeout: 30_000 }).not.toBe(afterMove);
+  await page.getByRole("button", { name: "Previous move" }).click();
+  await expect(page.locator(".history-nav.browsing")).toBeVisible();
+  // Your turn comes on that board: the big board is it, live, and your move can be played on it.
+  s = await nextDuty(page, s.seq);
+  await expect(page.locator(".history-nav.browsing")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Back to the live position" })).toHaveCount(0);
+  await expect(page.locator(".sq-to-list")).toHaveAttribute("aria-label", `Turn order on board ${s.duty!.board + 1}`);
+  await play(page, quiet(s.fen!));
 });

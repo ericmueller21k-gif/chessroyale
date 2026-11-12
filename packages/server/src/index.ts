@@ -1,5 +1,5 @@
 import { stockfishRefuses } from "@chessroyale/chess";
-import { OPS, RAID_SETTINGS, bossIdFromLink, modeSettings } from "@chessroyale/core";
+import { OPS, RAID_SETTINGS, bossIdFromLink, lockedLine, modeSettings, type RankedLeaves } from "@chessroyale/core";
 import { Lobby } from "./lobby-do.ts";
 import { SquadsLobby, SquadsParty } from "./squads-do.ts";
 import { squadsTestAllowed, testLobbyOptions } from "./squads-lobby.ts";
@@ -11,24 +11,28 @@ import { MATCH_ENDED } from "./lobby.ts";
 import { d1Sql, ensureSchema, lobbyResult, purgeEmailCodes, sha256, type User } from "./accounts.ts";
 import { purgeTokenDrops } from "./boss-tokens.ts";
 import { ledgerCheck, ledgerCheckDue } from "./ledger.ts";
-import { duelEntrant, purgeDuelGames } from "./ranked.ts";
+import { duelEntrant, purgeConduct, purgeDuelGames, rankedLeaves } from "./ranked.ts";
 import { DEVICE_COOKIE, SESSION_COOKIE, SIGN_IN_TO_PLAY, accountOf, handleAccountApi, isSignedIn, readCookie, signInRequired, withSecrets, type AccountEnv, type WaitUntil } from "./api.ts";
 import { BANNED_MESSAGE, banCheck } from "./fairplay.ts";
 import { caseMailer } from "./fairplay-mail.ts";
 import { handleAdmin, isAdmin, testSwitchesOn, type AdminEnv } from "./admin.ts";
+import { handleTestAccounts } from "./test-accounts.ts";
 import { asksTestSwitches, lobbyOptions } from "./lobby-options.ts";
-import { deepCheckRun } from "./fairplay-deep.ts";
+import { deepCheckRun, recountDeep } from "./fairplay-deep.ts";
 import { containerSearch } from "./fairplay-engine.ts";
 import { REGION_HINT, queueName, regionOf } from "./queue.ts";
 import { TOO_MANY, rateLimited } from "./limits.ts";
 import { expireTownCache } from "./town-chat-api.ts";
 import { handleFriendsApi } from "./friends-api.ts";
-import { countRoute, opsStats, routeOf } from "./ops.ts";
+import { countCall, countRoute, opsStats, routeOf } from "./ops.ts";
 import { codeInPath, guardEntries, handleProblems, pruneProblems, serverError } from "./problems.ts";
 import { handleOpsAdmin } from "./ops-admin.ts";
+import { checkAlerts, type AlertEnv } from "./alerts.ts";
 import { pruneChatMod } from "./chat-mod.ts";
+import { e2eSql, type E2eSqlEnv } from "./e2e-sql.ts";
 import type { AccessEnv } from "./access.ts";
 import { SERVER_RECHECK_NODES, serverScoreAt, warmEngine, type EngineEnv } from "./engine.ts";
+import { takeEngineCall } from "./engine-calls.ts";
 import { isPaused, pausedResponse, switchStatus, type KillSwitchEnv } from "./kill-switches.ts";
 import { RANGED_ASSETS, rangedAsset } from "./ranged.ts";
 
@@ -44,7 +48,7 @@ guardEntries(Matchmaker, "Matchmaker", ["next", "duelNext", "cancel"]);
 guardEntries(DuelGame, "DuelGame", ["fetch", "webSocketMessage", "webSocketClose", "alarm", "exists", "status", "create", "abandon"]);
 guardEntries(LiveHub, "LiveHub", ["seen", "arrive", "report", "forget", "liveCounts", "players", "health", "presence", "chatRead", "chatPost", "chatIcon", "alarm"]);
 
-export interface Env extends AccountEnv, EngineEnv, AdminEnv, AccessEnv, KillSwitchEnv {
+export interface Env extends AccountEnv, EngineEnv, AdminEnv, AccessEnv, KillSwitchEnv, E2eSqlEnv, AlertEnv {
   LOBBIES: DurableObjectNamespace<Lobby>;
   /** Squads: one object per lobby, and one per party (squads-do.ts). */
   SQUADS: DurableObjectNamespace<SquadsLobby>;
@@ -89,13 +93,15 @@ export default {
 
   /**
    * The Worker's schedule (wrangler.jsonc, every 15 minutes): old errors and player reports deleted (problems.ts), chat
-   * moderation's old decisions (chat-mod.ts), ranked 1 v 1's old games (ranked.ts), old boss token drops (boss-tokens.ts), once a day the item ledger's check (ledger.ts), and fair play's deep re-check of flagged players' moves on the engine
-   * server (cases in review at once, the rest off-peak; fairplay-deep.ts). An error is logged and counted like any other; the first job's never skips the second.
+   * moderation's old decisions (chat-mod.ts), ranked 1 v 1's old games and old marks for leaving early (ranked.ts), alerts to Discord (alerts.ts), old boss token drops (boss-tokens.ts), once a day the item ledger's check (ledger.ts), and fair play's deep re-check of flagged players' moves on the engine
+   * server (cases in review at once, the rest off-peak; fairplay-deep.ts), after its catch-up of summaries older than the near-best count (recountDeep). An error is logged and counted like any other; the first job's never skips the second.
    */
   async scheduled(event: ScheduledController, rawEnv: Env, ctx: ExecutionContext): Promise<void> {
     if (!rawEnv.DB) return;
     const db = rawEnv.DB;
     const failed = (route: string) => (e: unknown) => serverError(rawEnv, { kind: "cron", route }, e, (p) => ctx.waitUntil(p));
+    // Alerts to Discord (alerts.ts): apart from the jobs below, so a database that doesn't answer still pages.
+    ctx.waitUntil(checkAlerts(rawEnv, d1Sql(db), Date.now()).catch(failed("alerts")));
     ctx.waitUntil(
       (async () => {
         const sql = d1Sql(db);
@@ -107,6 +113,8 @@ export default {
         await pruneChatMod(sql, Date.now()).catch(failed("chat"));
         // Ranked 1 v 1's games past keeping (ranked.ts: RANKED_1V1.gamesKeepDays, longer for a player in a fair-play review).
         await purgeDuelGames(sql, Date.now()).catch(failed("duels"));
+        // Marks for leaving ranked games early past keeping (ranked.ts: LEAVES.keepDays).
+        await purgeConduct(sql, Date.now()).catch(failed("conduct"));
         // Boss token drops past keeping (boss-tokens.ts: DROPS_KEEP_DAYS; the window needs one day).
         await purgeTokenDrops(sql, Date.now()).catch(failed("tokens"));
         // The item ledger's daily check (ledger.ts): every account whose balances and ledger disagree, logged with what differs, and
@@ -120,6 +128,8 @@ export default {
             .catch(failed("ledger"));
         }
         const env = await withSecrets(rawEnv);
+        // Matches whose summary predates the near-best count, worked out again from their stored deep results (no searches; once each).
+        await recountDeep(sql, Date.now(), { mail: caseMailer(env) }).catch(failed("fairplay-recount"));
         const search = containerSearch(env);
         if (!search) return;
         const r = await deepCheckRun(sql, search, Date.now(), { mail: caseMailer(env) });
@@ -151,6 +161,7 @@ async function handle(request: Request, rawEnv: Env, ctx: ExecutionContext): Pro
       session: readCookie(request, SESSION_COOKIE),
       play: request.method === "POST" && (url.pathname === "/api/play" || url.pathname === "/api/lobby" || url.pathname === "/api/1v1/play" || /^\/api\/squads\/(play|party|lobby)$/.test(url.pathname) || url.pathname === "/api/boss/party"),
       friends: request.method === "POST" && url.pathname.startsWith("/api/friends/"),
+      search: request.method === "GET" && url.pathname === "/api/friends/search",
     },
     t,
     rawEnv.LOAD_TEST === "1",
@@ -170,6 +181,11 @@ async function handle(request: Request, rawEnv: Env, ctx: ExecutionContext): Pro
 }
 
 async function route(request: Request, rawEnv: Env, url: URL, waitUntil: WaitUntil): Promise<Response> {
+  // POST /api/e2e/sql: the e2e tests' writes to the local database, on its one writer (e2e-sql.ts; the e2e's local server only).
+  if (rawEnv.E2E_SQL) {
+    const res = await e2eSql(request, url, rawEnv);
+    if (res) return res;
+  }
   // GET /api/status → { paused, banner }: the kill switches that are off and the maintenance banner (kill-switches.ts).
   if (url.pathname === "/api/status" && request.method === "GET") return json(switchStatus(rawEnv));
   {
@@ -177,6 +193,9 @@ async function route(request: Request, rawEnv: Env, url: URL, waitUntil: WaitUnt
     if (url.pathname === "/api/problems") return handleProblems(request, rawEnv, waitUntil);
     // (The sign-in secrets may live in the Secrets Store: read them as strings.)
     const env = await withSecrets(rawEnv);
+    // Test accounts (admins, a script through Access, the e2e's key: test-accounts.ts): made, listed and deleted.
+    const tests = await handleTestAccounts(request, env);
+    if (tests) return tests;
     // Fair play's review page and the automated reviewer's API (admins and the reviewer's token only).
     const review = await handleAdmin(request, env, caseMailer(env), waitUntil, containerSearch(env));
     if (review) return review;
@@ -192,18 +211,23 @@ async function route(request: Request, rawEnv: Env, url: URL, waitUntil: WaitUnt
     // POST /api/engine/score {fen, moves} → {moves}: the engine server's deeper look at a few moves (solo games'
     // re-checks); 503 when there's no server or today's budget is spent (the device then re-checks itself). A position
     // Stockfish refuses is a bad request, turned away before the budget (it would end the server's Stockfish: engine.ts).
+    // Only for an account, at most ENGINE_SERVER.perAccountDaily calls a day, within solo's share of the day's budget (the outside
+    // review of Nov 10, finding 4): 401 or 429, and the device re-checks itself, as for a 503.
     if (url.pathname === "/api/engine/score" && request.method === "POST") {
       const body = (await request.json().catch(() => null)) as { fen?: unknown; moves?: unknown; boards?: unknown } | null;
       const moves = Array.isArray(body?.moves) ? body.moves.filter((m): m is string => typeof m === "string").slice(0, 8) : [];
       if (typeof body?.fen !== "string" || !moves.length || stockfishRefuses(body.fen)) return json({ message: "Bad request" }, 400);
+      const refused = await engineCaller(request, env, waitUntil);
+      if (refused) return refused;
       // Several boards re-checked at once (Classic) share the budget, so the round still takes a few seconds.
       const boards = Math.max(1, Math.min(8, Math.round(Number(body.boards) || 1)));
-      const out = await serverScoreAt(env, body.fen, moves, Math.max(400_000, Math.round(SERVER_RECHECK_NODES / boards)));
+      const out = await serverScoreAt(env, body.fen, moves, Math.max(400_000, Math.round(SERVER_RECHECK_NODES / boards)), "solo");
       return out ? json({ moves: out }) : json({ message: "Engine server unavailable" }, 503);
     }
-    // GET /api/engine/ping: wakes the engine server (a solo game is starting).
+    // GET /api/engine/ping: wakes the engine server (a solo game is starting). The same account rules as above.
     if (url.pathname === "/api/engine/ping") {
-      return json({ ok: await warmEngine(env) });
+      const refused = await engineCaller(request, env, waitUntil);
+      return refused ?? json({ ok: await warmEngine(env) });
     }
     // POST /api/play?mode=crowd|raid&type=default|botsoff → { code }: PLAY, the queue for a mode and matchmaking type
     // (one queue each). Default: the lobby that's filling up, bots in the empty seats at the fill time. Bots off: people
@@ -214,17 +238,18 @@ async function route(request: Request, rawEnv: Env, url: URL, waitUntil: WaitUnt
       const raid = url.searchParams.get("mode") === "raid";
       // (A mode resting, a kill switch: no new matches. The bosses resting are never met: the lobby's object sees to it.)
       if (isPaused(rawEnv, raid ? "raid" : "crowd")) return pausedResponse(raid ? "raid" : "crowd");
-      const refused = await mayPlay(request, env, waitUntil);
-      if (refused) return refused;
+      const may = await mayPlay(request, env, waitUntil);
+      if (may instanceof Response) return may;
       const fill = Math.max(3, Math.min(600, Number(env.MATCH_FILL_SECONDS ?? 60) || 60));
       const type = url.searchParams.get("type") === "botsoff" ? "botsoff" : "default";
       // ?pool=NAME: a queue of its own (a test switch: tests run several queues at once without meeting). Split by
-      // region when that's on (queue.ts). ?ticket=ID: a player in line asking again (they keep their place).
+      // region when that's on (queue.ts). ?ticket=ID: a player in line asking again (they keep their place). An account in
+      // the engine pool: the pool's own queue (from the account, never the browser: mayPlay).
       const region = regionOf(request.cf as { continent?: unknown } | undefined);
       const pool = await testPool(request, env, url, waitUntil);
-      const name = queueName(raid ? "raid" : "crowd", type, pool, region);
+      const name = queueName(raid ? "raid" : "crowd", type, pool, region, may.pooled);
       // (With a test's pool, ?afk=0: its 50 v 50 misses as before Nov 4, CrowdMisses off, for a test that idles on purpose.)
-      const overrides = raid ? RAID_SETTINGS : { ...modeSettings("crowd", { augments: true }), ...(pool && url.searchParams.get("afk") === "0" ? { crowdMisses: null } : {}) };
+      const overrides = raid ? RAID_SETTINGS : { ...modeSettings("crowd", { augments: true }), ...(pool && url.searchParams.get("afk") === "0" ? { crowdMisses: null, tested: true } : {}) };
       const mm = env.MATCHMAKER.get(env.MATCHMAKER.idFromName(name), region ? { locationHint: REGION_HINT[region] } : undefined);
       const ticket = url.searchParams.get("ticket");
       let since: number | undefined;
@@ -237,7 +262,8 @@ async function route(request: Request, rawEnv: Env, url: URL, waitUntil: WaitUnt
       }
       try {
         // A code, or "Servers are busy, you're in line: about N s" (busy, with the ticket to ask again with).
-        const opts = { botsOff: type === "botsoff", crowdWaitsForFull: !raid, since };
+        // (`engine`: the pool's queue makes the pool's lobbies, which seat no one else who has the code: lobby-do.ts.)
+        const opts = { botsOff: type === "botsoff", crowdWaitsForFull: !raid, since, ...(may.pooled ? { engine: true } : {}) };
         return json(await mm.next(JSON.parse(JSON.stringify(overrides)), fill * 1000, opts, ticket && /^[\w-]{8,64}$/.test(ticket) ? ticket : null));
       } catch {
         return json({ message: "Couldn't find a match. Try again." }, 500);
@@ -252,9 +278,9 @@ async function route(request: Request, rawEnv: Env, url: URL, waitUntil: WaitUnt
       if (isPaused(rawEnv, part)) return pausedResponse(part);
       if (picked && isPaused(rawEnv, `boss:${picked}`)) return pausedResponse(`boss:${picked}`);
       const refused = await mayPlay(request, env, waitUntil);
-      if (refused) return refused;
+      if (refused instanceof Response) return refused;
       const test = asksTestSwitches(url.searchParams) && (await testSwitches(request, env, waitUntil));
-      const { overrides, keepMs } = lobbyOptions(url.searchParams, test);
+      const { overrides, keepMs } = lobbyOptions(url.searchParams, test, env.TEST_SWITCHES === "1");
       const code = await openLobbyCode(async (c) => (await env.LOBBIES.get(env.LOBBIES.idFromName(c)).create(c, overrides, undefined, keepMs)) !== false);
       return code ? json({ code }) : json({ message: "Couldn't create a lobby. Try again." }, 500);
     }
@@ -264,7 +290,7 @@ async function route(request: Request, rawEnv: Env, url: URL, waitUntil: WaitUnt
     if (url.pathname === "/api/boss/party" && request.method === "POST") {
       if (isPaused(rawEnv, "raid")) return pausedResponse("raid");
       const refused = await mayPlay(request, env, waitUntil);
-      if (refused) return refused;
+      if (refused instanceof Response) return refused;
       const code = await openLobbyCode(async (c) => env.PARTIES.get(env.PARTIES.idFromName(c)).create(c, "", 0, "boss"));
       return code ? json({ code }) : json({ message: "Couldn't make a party. Try again." }, 500);
     }
@@ -321,25 +347,26 @@ async function squadsRoute(request: Request, env: Env, url: URL, waitUntil: Wait
   if (!url.pathname.startsWith("/api/squads/")) return null;
   const fill = Math.max(3, Math.min(600, Number(env.MATCH_FILL_SECONDS ?? 60) || 60));
   const region = regionOf(request.cf as { continent?: unknown } | undefined);
-  const queue = async () => queueName("squads", "default", await testPool(request, env, url, waitUntil), region);
+  const queue = async (engine = false) => queueName("squads", "default", await testPool(request, env, url, waitUntil), region, engine);
   // (Squads resting, a kill switch: no new queue or party. Its test lobbies, admins only, still open.)
   if ((url.pathname === "/api/squads/play" || url.pathname === "/api/squads/party") && request.method === "POST" && isPaused(env, "squads")) return pausedResponse("squads");
   if (url.pathname === "/api/squads/play" && request.method === "POST") {
-    const refused = await mayPlay(request, env, waitUntil);
-    if (refused) return refused;
-    const mm = env.MATCHMAKER.get(env.MATCHMAKER.idFromName(await queue()), region ? { locationHint: REGION_HINT[region] } : undefined);
+    const may = await mayPlay(request, env, waitUntil);
+    if (may instanceof Response) return may;
+    const mm = env.MATCHMAKER.get(env.MATCHMAKER.idFromName(await queue(may.pooled)), region ? { locationHint: REGION_HINT[region] } : undefined);
     const ticket = url.searchParams.get("ticket");
     try {
-      return json(await mm.next({}, fill * 1000, { squads: true }, ticket && /^[\w-]{8,64}$/.test(ticket) ? ticket : null, { size: 1, pass: "" }));
+      return json(await mm.next({}, fill * 1000, { squads: true, ...(may.pooled ? { engine: true } : {}) }, ticket && /^[\w-]{8,64}$/.test(ticket) ? ticket : null, { size: 1, pass: "" }));
     } catch {
       return json({ message: "Couldn't find a match. Try again." }, 500);
     }
   }
   if (url.pathname === "/api/squads/party" && request.method === "POST") {
     const refused = await mayPlay(request, env, waitUntil);
-    if (refused) return refused;
-    const name = await queue();
-    const code = await openLobbyCode(async (c) => env.PARTIES.get(env.PARTIES.idFromName(c)).create(c, name, fill * 1000));
+    if (refused instanceof Response) return refused;
+    // (The party queues in the engine pool's own queue when any member is pooled, read from their accounts as it queues: squads-do.ts.)
+    const [name, pooled] = [await queue(), await queue(true)];
+    const code = await openLobbyCode(async (c) => env.PARTIES.get(env.PARTIES.idFromName(c)).create(c, name, fill * 1000, undefined, pooled));
     return code ? json({ code }) : json({ message: "Couldn't make a party. Try again." }, 500);
   }
   if (url.pathname === "/api/squads/lobby" && request.method === "POST") {
@@ -371,35 +398,62 @@ async function squadsRoute(request: Request, env: Env, url: URL, waitUntil: Wait
  *     a ticket; the app asks again with it at once (each ask waits up to CAPACITY.queue.holdMs) until it's paired. A
  *     ticket the queue doesn't know (gone while the app slept) is `expired`: the app asks afresh. Signed in where
  *     sign-in is set up, not banned (mayPlay), as every mode; refused while PAUSE_RANKED1V1 rests the mode.
- *     Test switches: `pool` (a queue of its own), `clock=SECONDS` (each side's clock, no increment).
- *   POST /api/1v1/cancel?ticket= → {}: Cancel. A ticket paired just now: that game is called off for its player (an
- *     abort before any move: nothing recorded; the other player hears it at once).
+ *     Test switches: `pool` (a queue of its own), `clock=SECONDS` (each side's clock, no increment). Ranked's leave rules
+ *     (L1): a player locked out (a dodge's lockout, or too many marks) is refused, 403 { message, lockedUntil, lock }; one in
+ *     the delayed queue gets a ticket that can't be paired before its wait is over (`notBefore`; the answers' `delayMs`).
+ *     Read again on every ask that carries a ticket (a dodge in another tab meanwhile): a lockout takes the ticket out of
+ *     line (the same 403), the delayed queue holds it. An ask answered with the game's code tells the game (a no-show is
+ *     a dodge only once told: Matchmaker.told).
+ *   POST /api/1v1/cancel?ticket= → {}: Cancel. A ticket paired already: that game ends for its player as their own Abort
+ *     or Resign (ranked's leave rules decide what it costs), unless they never connected to it (pressed the moment it was
+ *     found: called off, no dodge). The other player hears it at once.
  *   GET /api/1v1/game/CODE → { open, phase } | 404; /api/1v1/game/CODE/ws: its WebSocket (the two players only).
  */
 async function duelRoute(request: Request, env: Env, url: URL, waitUntil: WaitUntil): Promise<Response | null> {
   if (!url.pathname.startsWith("/api/1v1/")) return null;
   const region = regionOf(request.cf as { continent?: unknown } | undefined);
-  const queue = async () => env.MATCHMAKER.get(env.MATCHMAKER.idFromName(queueName("ranked1v1", "default", await testPool(request, env, url, waitUntil), region)), region ? { locationHint: REGION_HINT[region] } : undefined);
+  // (An account in the engine pool: the pool's own queue, read from the account on every ask: mayPlay.)
+  const queue = async (engine: boolean) => env.MATCHMAKER.get(env.MATCHMAKER.idFromName(queueName("ranked1v1", "default", await testPool(request, env, url, waitUntil), region, engine)), region ? { locationHint: REGION_HINT[region] } : undefined);
   const ticket = ((t) => (t && /^[\w-]{8,64}$/.test(t) ? t : null))(url.searchParams.get("ticket"));
   if (url.pathname === "/api/1v1/play" && request.method === "POST") {
     if (isPaused(env, "ranked1v1")) return pausedResponse("ranked1v1");
-    const refused = await mayPlay(request, env, waitUntil);
-    if (refused) return refused;
+    const may = await mayPlay(request, env, waitUntil);
+    if (may instanceof Response) return may;
     if (!env.DB) return json({ message: "Ranked 1 v 1 isn't available here." }, 503);
     try {
-      if (ticket) return json(await (await queue()).duelNext(ticket));
+      if (ticket) {
+        // Ranked's leave rules read again on each ask (L1): a ticket made before a dodge elsewhere (a second tab or device) is
+        // taken out of line by a lockout and held by the delayed queue. A read that fails changes nothing.
+        const check = isPaused(env, "leave-penalties") ? null : await leavesRecheck(request, env, waitUntil).catch(() => null);
+        const answer = await (await queue(may.pooled)).duelNext(ticket, undefined, check ? { uid: check.uid, drop: !!check.leaves.lockedUntil, notBefore: check.leaves.delaySec ? Date.now() + check.leaves.delaySec * 1000 : null } : undefined);
+        if (check?.leaves.lockedUntil && !("code" in answer)) {
+          countCall("ranked.locked");
+          return json({ message: lockedLine(check.leaves.lock), lockedUntil: check.leaves.lockedUntil, lock: check.leaves.lock }, 403);
+        }
+        return json(answer);
+      }
       const me = await accountOf(request, env, waitUntil);
       if (!me) return json({ message: SIGN_IN_TO_PLAY }, 401);
       const sql = d1Sql(env.DB);
       await ensureSchema(sql, env.DB);
-      const { player, rating, rd } = await duelEntrant(sql, me, Date.now(), isAdmin(env, me));
+      const now = Date.now();
+      // Ranked's leave rules (L1): a lockout refuses the search (until when, and why); the delayed queue holds the ticket from
+      // pairing for its wait. The server's own record, never the app's word; none while PAUSE_LEAVE_PENALTIES is on.
+      const leaves = isPaused(env, "leave-penalties") ? null : await rankedLeaves(sql, me.id, now);
+      if (leaves?.lockedUntil) {
+        countCall("ranked.locked");
+        return json({ message: lockedLine(leaves.lock), lockedUntil: leaves.lockedUntil, lock: leaves.lock }, 403);
+      }
+      if (leaves?.delaySec) countCall("ranked.delayed");
+      const delay = leaves?.delaySec ? { notBefore: now + leaves.delaySec * 1000 } : {};
+      const { player, rating, rd } = await duelEntrant(sql, me, now, isAdmin(env, me));
       const clock = Number(url.searchParams.get("clock"));
       const testSeconds = url.searchParams.has("clock") && Number.isFinite(clock) && clock > 0 && (await testSwitches(request, env, waitUntil)) ? Math.min(3600, Math.round(clock)) : null;
       // (The first answer also carries the hidden rating, rounded: the bot a player may choose meets them there.)
       // (The device's marker, hashed: two accounts on one device never meet. Fair play's device cookie.)
       const deviceCookie = readCookie(request, DEVICE_COOKIE);
       const device = deviceCookie ? (await sha256(`1v1:${deviceCookie}`)).slice(0, 24) : null;
-      const first = await (await queue()).duelNext(null, { uid: me.id, rating, rd, player, device, ...(testSeconds ? { testSeconds } : {}) });
+      const first = await (await queue(may.pooled)).duelNext(null, { uid: me.id, rating, rd, player, device, ...delay, ...(testSeconds ? { testSeconds } : {}) });
       return json({ ...first, botRating: Math.round(rating) });
     } catch {
       return json({ message: "Couldn't find a match. Try again." }, 500);
@@ -407,10 +461,14 @@ async function duelRoute(request: Request, env: Env, url: URL, waitUntil: WaitUn
   }
   if (url.pathname === "/api/1v1/cancel" && request.method === "POST") {
     if (!ticket) return json({});
-    const placed: { code?: string } = await (await queue()).cancel(ticket).catch(() => ({}));
-    if (placed.code) {
-      const me = await accountOf(request, env, waitUntil).catch(() => null);
-      if (me) await env.DUELS.get(env.DUELS.idFromName(placed.code)).abandon(me.id).catch(() => undefined);
+    // (Both queues, the usual one and the engine pool's: a ticket made before a Release, or before the pool, is in the other one. The #618
+    // review, m3.)
+    for (const engine of [false, true]) {
+      const placed: { code?: string } = await (await queue(engine)).cancel(ticket).catch(() => ({}));
+      if (placed.code) {
+        const me = await accountOf(request, env, waitUntil).catch(() => null);
+        if (me) await env.DUELS.get(env.DUELS.idFromName(placed.code)).abandon(me.id).catch(() => undefined);
+      }
     }
     return json({});
   }
@@ -420,6 +478,14 @@ async function duelRoute(request: Request, env: Env, url: URL, waitUntil: WaitUn
   if (m[2]) return (await stub.exists()) ? stub.fetch(request) : json({ message: "That game has ended." }, 404);
   const status = request.method === "GET" ? await stub.status() : null;
   return status ? json({ open: true, phase: status.phase }) : json({ open: false, message: "That game has ended." }, 404);
+}
+
+/** The asking account and its standing with ranked's leave rules (L1), for an ask that carries a ticket; null: no account, or no database. */
+async function leavesRecheck(request: Request, env: Env, waitUntil: WaitUntil): Promise<{ uid: string; leaves: RankedLeaves } | null> {
+  if (!env.DB) return null;
+  const me = await accountOf(request, env, waitUntil);
+  if (!me) return null;
+  return { uid: me.id, leaves: await rankedLeaves(d1Sql(env.DB), me.id, Date.now()) };
 }
 
 /**
@@ -438,13 +504,25 @@ async function testPool(request: Request, env: Env, url: URL, waitUntil: WaitUnt
 }
 
 /**
- * Whether this request may start online play (PLAY, a new lobby): signed in where sign-in is set up (401 otherwise),
- * and not banned for fair play (403, with `banned` so the app shows the ban notice and its appeal). Null: go ahead.
+ * Who may call the engine server's open routes: an account (signed in, where sign-in is set up), within its calls for the day
+ * (ENGINE_SERVER.perAccountDaily, engine-calls.ts). Null if so, else the answer: 401, or 429 for the day.
  */
-async function mayPlay(request: Request, env: Env, waitUntil: WaitUntil): Promise<Response | null> {
-  if (!env.DB) return null;
+async function engineCaller(request: Request, env: Env, waitUntil: WaitUntil): Promise<Response | null> {
+  const me: User | null = env.DB ? await accountOf(request, env, waitUntil).catch(() => null) : null;
+  if (!me || (signInRequired(env) && !isSignedIn(me))) return json({ message: "Sign in to use the engine server." }, 401);
+  if (!(await takeEngineCall(d1Sql(env.DB!), me.id, Date.now()))) return json({ message: "Today's engine server checks are used up." }, 429);
+  return null;
+}
+
+/**
+ * Whether this request may start online play (PLAY, a new lobby): signed in where sign-in is set up (401 otherwise),
+ * and not banned for fair play (403, with `banned` so the app shows the ban notice and its appeal). Else go ahead, with
+ * whether the account is in fair play's engine pool (its queues are the pool's own; nothing in the answer says so).
+ */
+async function mayPlay(request: Request, env: Env, waitUntil: WaitUntil): Promise<Response | { pooled: boolean }> {
+  if (!env.DB) return { pooled: false };
   const me: User | null = await accountOf(request, env, waitUntil);
   if (signInRequired(env) && !isSignedIn(me)) return json({ message: SIGN_IN_TO_PLAY }, 401);
-  const ban = await banCheck(d1Sql(env.DB), me, readCookie(request, DEVICE_COOKIE), Date.now()).catch(() => ({ banned: false }));
-  return ban.banned ? json({ message: BANNED_MESSAGE, banned: true }, 403) : null;
+  const ban: { banned: boolean; pooled?: boolean } = await banCheck(d1Sql(env.DB), me, readCookie(request, DEVICE_COOKIE), Date.now()).catch(() => ({ banned: false }));
+  return ban.banned ? json({ message: BANNED_MESSAGE, banned: true }, 403) : { pooled: !!ban.pooled };
 }

@@ -81,7 +81,7 @@ test("a finished match: a reload mid-match rejoins it; its results survive a rel
   await page.getByRole("button", { name: "See your result" }).click();
   const marked = page.locator('.fd-match[aria-current="true"]');
   await expect(marked).toBeVisible();
-  await expect(marked).toContainText("Boss raid");
+  await expect(marked).toContainText("Boss Battle");
   await expect(page.locator(".fd-match.marked")).toHaveCount(1);
 
   // A stale tab that still has its seat (the app reopened hours later): home with the note, not a dead screen.

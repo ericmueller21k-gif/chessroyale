@@ -1,70 +1,92 @@
 import type { ComponentChildren } from "preact";
 import { useEffect, useLayoutEffect, useReducer, useRef, useState } from "preact/hooks";
-import { type MatchmakingType, CROWD_MISSES, POWER_IDS, WEAK_BOTS, bossDef, bossIdFromLink, CROWD_KNOCKOUTS, RAID_SETTINGS, bossPartySettings, raidBossElo, DEFAULT_SETTINGS, DRAW_RULES, QUICK_PACE, bestMoveOf, definedOnly, matchFeats, modeSettings, pausedLine, speedOption, startOption, type DrawRule, type FinalFormat, type ModeChoiceId, type Settings } from "@chessroyale/core";
+import { type Activity, type MatchmakingType, CROWD_MISSES, SQUADS, botLevelMean, POWER_IDS, WEAK_BOTS, bossDef, bossIdFromLink, CROWD_KNOCKOUTS, RAID_SETTINGS, bossPartySettings, raidBossElo, DEFAULT_SETTINGS, DRAW_RULES, QUICK_PACE, bestMoveOf, definedOnly, matchFeats, modeSettings, pausedLine, speedOption, startOption, type DrawRule, type FinalFormat, type ModeChoiceId, type Settings } from "@chessroyale/core";
 import { bossInUrl, bossTierFromUrl, chosenBoss, chosenHomeMode, chosenMode, lobbyModeOf, prefetchBossAlone, raidInUrl, rememberBossPick } from "./screens/Home.tsx";
 import { lastBoss } from "./boss-history.ts";
 import { unlockAudio } from "./components/Countdown.tsx";
 import { RaceTower } from "./components/RaceTower.tsx";
 import { resetBoardsStrip } from "./components/TinyBoard.tsx";
-import { enginePool } from "./engine.ts";
+import { enginePool, warmEngine } from "./engine.ts";
 import { bossAlone, cutLabel, elimination, isCrowd, roundLive, scoreDp, towerView, type GameView } from "./game.ts";
 import { NetMatch, forgetSeat, hasSeat, lobbyStatus, type LobbyGone, type LobbyResult } from "./net.ts";
 import { exitFor, exitMatch, onExitMatch, setExitTo } from "./match-exit.ts";
 import { useRecluseTalk } from "./recluse-talk.ts";
 import { ConfirmExit, MatchMenu, type MatchExit } from "./components/MatchMenu.tsx";
 import type { LeftHow } from "@chessroyale/chess";
-import { loadOpenings, SoloMatch } from "./solo.ts";
-import { FinalScreen } from "./screens/Final.tsx";
+import type { SoloMatch } from "./solo.ts";
 import { HomeScreen } from "./screens/Home.tsx";
-import { LobbyScreen } from "./screens/Lobby.tsx";
 import { QueueLine, QueueScreen } from "./screens/Queue.tsx";
-import { OpeningGrid } from "./screens/OpeningGrid.tsx";
-import { PlayScreen } from "./screens/Play.tsx";
-import { PhaseChangeScreen, SimulScreen } from "./screens/Recluse2.tsx";
-import { ResultsScreen } from "./screens/Results.tsx";
-import { RevealScreen } from "./screens/Reveal.tsx";
 import { PlayerProfileScreen } from "./screens/PlayerProfile.tsx";
 import { showBanNotice } from "./components/FairPlay.tsx";
 import { closeProfile, openProfile, useProfileTarget, type ProfileTarget } from "./profile-nav.ts";
 import { ShopScreen } from "./screens/Shop.tsx";
-import { account, askAgeAgain, loadAccount, mustSignInToPlayOnline, playerName, recordSoloResult } from "./account.ts";
+import { account, askAgeAgain, askAgeForGoogle, loadAccount, mustSignInToPlayOnline, playerName, recordSoloResult, setTestXp } from "./account.ts";
+import { leavesNote } from "./ranked.ts";
 import { isAdmin } from "./boss-brain.ts";
 import { difficultyElo, difficultyMaia } from "./boss-difficulty.ts";
-import { setLiveBusy, startLive } from "./live.ts";
+import { setLiveBusy, setLiveDoing, startLive } from "./live.ts";
 import { setInviteHost } from "./friends.ts";
 import { FriendsScreen } from "./screens/Friends.tsx";
 import { SettingsScreen } from "./screens/Settings.tsx";
-import { AutoChessScreen } from "./screens/AutoChess.tsx";
 import { TownPage, type BotGameAsk, type Stand } from "./town/TownPage.tsx";
 import { LeaveTownConfirm, TOWN_BACK_TO } from "./town/LeaveTown.tsx";
+import { setGoodbyeFrom } from "./town/goodbye.ts";
 import { ColosseumPage } from "./colosseum/ColosseumPage.tsx";
-import { FaqScreen } from "./screens/Faq.tsx";
 import { Logo } from "./components/FrontDoor.tsx";
 import { FrontFrame, GameFrame, type FrontNav } from "./components/FrontMenu.tsx";
 import { showAwayNote } from "./components/AwayNote.tsx";
 import { useAccount } from "./screens/Profile.tsx";
 import { LandingScreen } from "./screens/Landing.tsx";
-import { LegalScreen, leaveLegal, legalPageOf, type LegalPage } from "./screens/Legal.tsx";
-import { CrowdCut, CrowdReveal, WatchScreen } from "./screens/Crowd.tsx";
-import { VoteScreen } from "./screens/Vote.tsx";
-import { BossScreen } from "./screens/Boss.tsx";
-import { SpectateScreen } from "./screens/Spectate.tsx";
-import { StageBreakScreen } from "./screens/StageBreak.tsx";
+import { leaveLegal, legalPageOf, type LegalPage } from "./screens/legal-page.ts";
 import { useMedia } from "./components/QuickChat.tsx";
 import { LobbyChat } from "./components/LobbyChat.tsx";
 import { queuedSquads } from "./move-replay.ts";
 import { PartyClient, SquadsClient, createParty, currentParty, currentSquads, forgetSquads, partyStatus, squadsQueue, squadsSeat, squadsStatus, squadsTestLobby } from "./squads.ts";
-import { SquadsQueue, SquadsScreen, squadsExit, squadsWaiting } from "./screens/Squads.tsx";
+import { squadsExit, squadsWaiting } from "./screens/squads-exit.ts";
+import { lazyGroup } from "./lazy.tsx";
+import { dropShell, markHome } from "./shell.ts";
 import { PartySheet } from "./screens/SquadsParty.tsx";
 import { BotDuel, DuelQueue, NetDuel, savedDuelQueue, setRanked1v1Starter, startRanked1v1, type DuelSession } from "./duel.ts";
-import { confirmLeaveDuelQueue, duelFoundAlert, setAwaySearch } from "./components/DuelQueueBar.tsx";
-import { DuelFront } from "./screens/Duel.tsx";
+import { confirmLeaveSearch, keepInQueue, saveAwayLobby, savedAwayLobby, searchFoundAlert, searchSlots, setAwaySearch, type AwaySearch } from "./search.ts";
+import { chosenBotLevel } from "./components/BotLevelBox.tsx";
+import { clockShown } from "./clock-text.ts";
 import { measureSound } from "./sound.ts";
+import { bossMusic, type MusicBattle } from "./music.ts";
 import { noteWhere } from "./problems.ts";
-import { testParams } from "./test-switches.ts";
+import { queuePool, testParams } from "./test-switches.ts";
 import { evalBarOn, practiceOn } from "./prefs.ts";
 import { noteSoloBattle } from "./boss-tokens.ts";
+import { noteSoloGame, settleSoloXp, soloGameId, soloTestGame } from "./xp.ts";
 import { isPaused, pausedBosses } from "./status.ts";
+
+// Off the first load (Nov 10, phone load: home starts fast), each its own chunk: a match's screens (preloaded when play is
+// near), solo play with its runner and the boss rules, the FAQ, the legal pages and Auto chess (loaded on entry).
+const game = lazyGroup(() => import("./screens/game-screens.ts"));
+const FinalScreen = game.screen("FinalScreen");
+const LobbyScreen = game.screen("LobbyScreen");
+const OpeningGrid = game.screen("OpeningGrid");
+const PlayScreen = game.screen("PlayScreen");
+const PhaseChangeScreen = game.screen("PhaseChangeScreen");
+const SimulScreen = game.screen("SimulScreen");
+const ResultsScreen = game.screen("ResultsScreen");
+const RevealScreen = game.screen("RevealScreen");
+const CrowdCut = game.screen("CrowdCut");
+const CrowdReveal = game.screen("CrowdReveal");
+const WatchScreen = game.screen("WatchScreen");
+const VoteScreen = game.screen("VoteScreen");
+const BossScreen = game.screen("BossScreen");
+const SpectateScreen = game.screen("SpectateScreen");
+const StageBreakScreen = game.screen("StageBreakScreen");
+const SquadsQueue = game.screen("SquadsQueue");
+const SquadsScreen = game.screen("SquadsScreen");
+const DuelFront = game.screen("DuelFront");
+/** Solo play (solo.ts: the match runner, chess.js's whole game, the boss rules): loaded as play is near, or as it starts. */
+const solo = lazyGroup(() => import("./solo.ts"));
+const FaqScreen = lazyGroup(() => import("./screens/Faq.tsx")).screen("FaqScreen");
+const LegalScreen = lazyGroup(() => import("./screens/Legal.tsx")).screen("LegalScreen");
+const AutoChessScreen = lazyGroup(() => import("./screens/AutoChess.tsx")).screen("AutoChessScreen");
+/** A solo match (SoloMatch, solo.ts), told apart without loading its chunk. */
+const isSolo = (m: unknown): m is SoloMatch => !!(m as { isSolo?: boolean } | null)?.isSolo;
 
 /**
  * A match's settings: the mode and the choices made on the home screen, plus playtest overrides from the URL, e.g.
@@ -189,10 +211,17 @@ function setCurrentMatch(code: string | null) {
     // No storage: no rejoining from a fresh start.
   }
 }
-/** Opened from scratch at home (not a link) with a seat in a match: check it's still on, and go back in. */
+/**
+ * A lobby you stepped out of to browse, still queued in it (search.ts, this tab's): a reload on any page carries on with
+ * it, as 1 v 1's search does.
+ */
+const awayLobby = savedAwayLobby();
+/** Opened from scratch at home (not a link) with a seat in a match (or anywhere, stepped out of its lobby): check it's still on, and go back in. */
 const rejoinCode = (() => {
-  if (linkCode || location.pathname !== "/") return null;
-  const code = currentMatch();
+  if (linkCode) return null;
+  const away = awayLobby?.kind === "crowd" ? awayLobby.code : null;
+  if (location.pathname !== "/" && !away) return null;
+  const code = away ?? currentMatch();
   return code && /^[A-Z2-9]{5}$/.test(code) && hasSeat(code) ? code : null;
 })();
 
@@ -213,7 +242,9 @@ const squadsTestStart = ((m) => (m ? (m[1] === undefined || m[1] === "start" ? "
 /** Opened from scratch at home with a seat in a Squads lobby (or its link): check it's still on, and go back in. */
 const squadsRejoin = (() => {
   if (squadsLinkCode) return squadsSeat(squadsLinkCode) ? squadsLinkCode : null;
-  if (linkCode || location.pathname !== "/") return null;
+  if (linkCode) return null;
+  if (awayLobby?.kind === "squads" && squadsSeat(awayLobby.code)) return awayLobby.code;
+  if (location.pathname !== "/") return null;
   return currentSquads();
 })();
 
@@ -248,8 +279,8 @@ function leftNote(how: LeftHow | null | undefined): string {
 }
 
 /**
- * Back from Google: ?signin=google (or failed; or age: the server wanted the age question answered again first). Read
- * once, then tidied out of the address bar.
+ * Back from Google: ?signin=google (or failed; age: a device that's too young; age-google: the server asks the age question
+ * before this Google account can sign in, then Google again). Read once, then tidied out of the address bar.
  */
 const signinParam = new URLSearchParams(location.search).get("signin");
 
@@ -298,7 +329,7 @@ export function App() {
    * Open the home screen's boss menu or Play with friends: the computer's side menu, or the hidden /bosses (Eric's way
    * straight to the solo boss picker, unlisted, not admin-gated; Oct 16). Used once: a match started clears it.
    */
-  const [homeIntent, setHomeIntent] = useState<{ kind: "boss" | "friends"; n: number } | null>(() => (location.pathname === "/bosses" ? { kind: "boss", n: 0 } : null));
+  const [homeIntent, setHomeIntent] = useState<{ kind: "boss" | "friends" | "quests"; n: number } | null>(() => (location.pathname === "/bosses" ? { kind: "boss", n: 0 } : null));
   /** The Boss raid screen (the Solo Boss Mode card on home, the side menu's Solo Boss Mode, ?mode=raid). */
   const [raidOpen, setRaidOpen] = useState(() => raidInUrl() || !!bossPartyLinkCode);
   /** That screen is the full one (?mode=raid, the test link: every raid choice), not the Solo Boss Mode form (Eric, Oct 26). */
@@ -348,6 +379,9 @@ export function App() {
   const [bossParty, setBossParty] = useState<PartyClient | null>(null);
   const [bossPartyError, setBossPartyError] = useState<string | null>(null);
   const [squadsNote, setSquadsNote] = useState<string | null>(() => (squadsLinkCode && !squadsRejoin ? "That match has ended." : null));
+  // Home's notes from ranked's leave rules this tab has dismissed (by their words and dodge: a new dodge's note shows again).
+  const [leavesDismissed, setLeavesDismissed] = useState<ReadonlySet<string>>(() => new Set());
+  const dismissLeaves = (text: string) => setLeavesDismissed((d) => new Set([...d, text]));
   /**
    * The lobby has closed: home (the address too, so reopening the app lands there) with a note, and your result if
    * you played (from the server, asked before this so the note shows whole, never growing a button a moment later).
@@ -373,6 +407,8 @@ export function App() {
   useEffect(() => {
     if (!signinParam) return;
     if (signinParam === "age") askAgeAgain();
+    // (Google's account had no account yet, or one from before the question: the box asks, then goes to Google again. Nov 12.)
+    if (signinParam === "age-google") askAgeForGoogle(location.pathname);
     const q = new URLSearchParams(location.search);
     q.delete("signin");
     history.replaceState(null, "", `${location.pathname}${q.size ? `?${q}` : ""}`);
@@ -381,11 +417,6 @@ export function App() {
   useEffect(() => {
     if (config?.accounts && profile) startLive();
   }, [config?.accounts, !!profile]);
-  // The opening library, off the first load: fetched once the page has settled, so a solo match finds it there (solo.ts).
-  useEffect(() => {
-    const id = setTimeout(() => void loadOpenings().catch(() => {}), 2000);
-    return () => clearTimeout(id);
-  }, []);
   // Your account (a guest one the first time).
   useEffect(() => {
     let name: string | undefined;
@@ -394,11 +425,16 @@ export function App() {
     } catch {
       // No storage.
     }
-    void loadAccount(name);
+    // (The test switch ?xp=<n>: your XP set to n once your account has loaded, to reach a level-up; test servers only, since Nov 9.)
+    // (Read once the account has loaded: only then does the server's config say whether the test switches apply.)
+    void loadAccount(name).then(() => {
+      const xp = Number(testParams().get("xp"));
+      if (testParams().has("xp") && Number.isInteger(xp)) void setTestXp(xp).catch(() => undefined);
+    });
   }, []);
   // A solo match's result goes on your profile (online results are saved by the server).
   useEffect(() => {
-    if (!(match instanceof SoloMatch) || match.phase.kind !== "results" || savedResult.current === match) return;
+    if (!(isSolo(match)) || match.phase.kind !== "results" || savedResult.current === match) return;
     savedResult.current = match;
     const me = match.standings().find((s) => s.isYou);
     const runner = match.runner;
@@ -407,30 +443,47 @@ export function App() {
     const feats = me ? matchFeats(runner.player(me.id), match.settings.knockoutsPerStage.length, runner.boss, raid) : null;
     const bossResult = match.phase.bossResult;
     // You resigned: a loss (on your team's record, or against the boss), and you didn't see a boss battle through.
-    const resigned = match.phase.left?.how === "resigned" || match.phase.left?.how === "afk";
-    void recordSoloResult({
-      mode: raid ? "boss" : match.settings.mode,
-      placement: match.phase.placement,
-      players: match.totalPlayers,
-      team: me?.team ?? null,
-      teamWon: resigned
-        ? me?.team || runner.boss
-          ? false
-          : null
-        : bossResult
-        ? feats?.survived && bossResult !== "draw"
-          ? bossResult === "crowd"
-          : null
-        : match.phase.gameWinner === undefined || !me?.team
-          ? null
-          : match.phase.gameWinner === me.team,
-      avgScore: me?.avg ?? null,
-      rating: me?.rating ?? null,
-      brilliant: match.moves.filter((m) => m.brilliant).length,
-      bestMove: bestMoveOf(match.moves),
-      ...feats,
-      ...(resigned && feats?.strikes !== null && feats?.strikes !== undefined ? { survived: false } : {}),
-      evalBar: evalBarOn(),
+    const how = match.phase.left?.how;
+    const resigned = how === "resigned" || how === "afk";
+    const mode = raid ? "boss" : match.settings.mode;
+    const solo = match;
+    const placement = match.phase.placement;
+    const teamWon = resigned
+      ? me?.team || runner.boss
+        ? false
+        : null
+      : bossResult
+      ? feats?.survived && bossResult !== "draw"
+        ? bossResult === "crowd"
+        : null
+      : match.phase.gameWinner === undefined || !me?.team
+        ? null
+        : match.phase.gameWinner === me.team;
+    // XP (Nov 9): the server's clock times the game (its id from the start); your moves, the win, a resign and a test switch are this
+    // device's word, which can only lower it. The answer's XP goes to the result screen's box (xp.ts).
+    void soloGameId(solo).then(async (game) => {
+      const xp = await recordSoloResult({
+        mode,
+        placement,
+        players: solo.totalPlayers,
+        team: me?.team ?? null,
+        teamWon,
+        avgScore: me?.avg ?? null,
+        rating: me?.rating ?? null,
+        brilliant: solo.moves.filter((m) => m.brilliant).length,
+        bestMove: bestMoveOf(solo.moves),
+        ...feats,
+        ...(resigned && feats?.strikes !== null && feats?.strikes !== undefined ? { survived: false } : {}),
+        evalBar: evalBarOn(),
+        game,
+        moves: solo.moves.filter((m) => m.move !== null).length,
+        won: !resigned && (mode === "classic" ? placement === 1 : teamWon === true),
+        resigned: how === "resigned",
+        // (Removed for idling: "No XP: you left the match.", as online. Review m6.)
+        left: how === "afk",
+        test: soloTestGame(practiceOn()),
+      });
+      settleSoloXp(solo, xp);
     });
   });
   const [, rerender] = useReducer((n: number, _: unknown) => n + 1, 0);
@@ -466,7 +519,9 @@ export function App() {
   useEffect(() => {
     if (!squadsRejoin) return;
     void squadsStatus(squadsRejoin).then((st) => {
-      if (st?.open !== false && st?.phase !== "results") joinSquads(squadsRejoin);
+      const away = awayLobby?.kind === "squads" && awayLobby.code === squadsRejoin && st?.open && st.phase === "waiting" ? awayLobby.since : undefined;
+      if (away === undefined) saveAwayLobby(null);
+      if (st?.open !== false && st?.phase !== "results") joinSquads(squadsRejoin, undefined, away);
       else {
         forgetSquads(squadsRejoin);
         if (squadsLinkCode) setSquadsNote("That match has ended.");
@@ -497,10 +552,11 @@ export function App() {
     });
   }, [config, profile]);
 
-  // Warm the engine up in the background so play starts instantly (not on Auto chess, whose fights use the HunChess engine:
+  // Warm one engine up in the background so play starts instantly (not on Auto chess, whose fights use the HunChess engine:
   // Stockfish isn't loaded there; it warms when you leave it). Not in the town square either: nothing there plays chess yet.
+  // Only one on home (Nov 10, phone load): the rest of the pool starts when play is near (below, by the queue's state).
   useEffect(() => {
-    if (!showAutoChess && !showTown && !showColosseum) void enginePool();
+    if (!showAutoChess && !showTown && !showColosseum) void warmEngine();
   }, [showAutoChess, showTown, showColosseum]);
 
   // Back on a lobby link this device already has a seat in (a reload, the app reopened, a dropped connection):
@@ -520,7 +576,10 @@ export function App() {
   useEffect(() => {
     if (!rejoinCode) return;
     void lobbyStatus(rejoinCode).then((s) => {
-      if (s?.open && s.phase !== "over") joinLobby(rejoinCode, { resume: s.phase === "playing" });
+      // (Stepped out of its lobby to browse and it's still filling: browsing still, its search on home's rows or the bar.)
+      const away = awayLobby?.kind === "crowd" && awayLobby.code === rejoinCode && s?.open && s.phase === "waiting" ? awayLobby.since : undefined;
+      if (away === undefined) saveAwayLobby(null);
+      if (s?.open && s.phase !== "over") joinLobby(rejoinCode, { resume: s.phase === "playing", away });
       else if (s) setCurrentMatch(null);
       setRejoining(false);
     });
@@ -556,7 +615,7 @@ export function App() {
   const [duel, setDuel] = useState<DuelSession | null>(null);
   /**
    * Browsing while queued (docs/areas/ranked.md, "Browsing while queued"): you went Home from the search stage, and
-   * the search goes on (the bar on every screen: DuelQueueBar.tsx). The ref is for the queue's own callbacks.
+   * the search goes on (home's rows, the bar on every other page: search.ts). The ref is for the queue's own callbacks.
    */
   const [duelAway, setDuelAwayState] = useState(false);
   const duelAwayRef = useRef(false);
@@ -567,7 +626,7 @@ export function App() {
   /** Into a ranked game (from the queue, or a link to it). Found while you browse: a sound and a buzz, then the stage. */
   const joinDuel = (code: string) => {
     if (duelAwayRef.current) {
-      duelFoundAlert();
+      searchFoundAlert();
       nav.home();
     }
     setDuelAway(false);
@@ -607,13 +666,15 @@ export function App() {
     history.replaceState(null, "", `/1v1${location.search}`);
   };
   /**
-   * Another mode while the search goes on: "Leave the 1 v 1 queue?" first (the only confirm), then the search ends and
-   * that mode starts.
+   * Another mode while a search goes on (any queue, browsing: search.ts): "Leave the 50 v 50 queue?" first (the only
+   * confirm), then the search ends and that mode starts.
    */
-  const leavingDuelFirst = (go: () => void) => {
-    if (!duelQueue || duel || duelQueue.state.kind !== "searching") return go();
-    confirmLeaveDuelQueue(() => {
-      dropDuelSearch();
+  const awayNow = useRef<AwaySearch | null>(null);
+  const leavingSearchFirst = (go: () => void) => {
+    const s = awayNow.current;
+    if (!s) return go();
+    confirmLeaveSearch(s.name, () => {
+      s.cancel();
       go();
     });
   };
@@ -695,8 +756,12 @@ export function App() {
    * the battle's screen shows. Leaving the battle (its result's "Back to town") puts you back where you stood (`townReturn`).
    */
   const townReturn = useRef<Stand | null>(null);
+  // The boss challenged from town (its home's id): it says goodbye back in the town. Kept apart from `townReturn`, which the
+  // town reads as a stand (a stray key there changed the town's canvas: the town-fixed and town-street specs, Nov 8).
+  const bossFromTown = useRef<string | null>(null);
   const challengeFromTown = async (id: string, stand: Stand | null) => {
     rememberBossPick(id);
+    bossFromTown.current = id;
     townReturn.current = stand ?? { c: -1, r: -1, facing: 1, view: 0 };
     setExitTo("town");
     prefetchBossAlone(id, account().profile?.rating ?? null);
@@ -771,8 +836,176 @@ export function App() {
   useEffect(() => {
     if ((match || squads) && duelQueue && !duel) dropDuelSearch();
   }, [match, squads]);
-  // The bar over every screen while you browse with a search going (DuelQueueBar reads this after every render).
-  useLayoutEffect(() => setAwaySearch(duelQueue && duelAway && !duel && !match && !squads ? { queue: duelQueue, back: duelBackToStage, cancel: dropDuelSearch } : null));
+
+  // ---------------- Searching while you browse: 50 v 50's and Squads' lobbies (search.ts; Eric, Nov 10) ----------------
+
+  /**
+   * The 50 v 50 lobby or the Squads lobby you stepped out of with "Keep me in the queue" (its Exit): its connection, which
+   * holds your seat, kept by the app while you look around (home's rows, the bar on other pages). It fills: you're taken
+   * in, with the found alert, as 1 v 1 does. `searchSince`: when each search began (its lobby joined from the queue).
+   */
+  const [awayMatch, setAwayMatch] = useState<NetMatch | null>(null);
+  const [awaySquads, setAwaySquads] = useState<SquadsClient | null>(null);
+  const searchSince = useRef(new WeakMap<object, number>());
+  const sinceOf = (o: object) => {
+    let t = searchSince.current.get(o);
+    if (t === undefined) searchSince.current.set(o, (t = Date.now()));
+    return t;
+  };
+  useEffect(() => awayMatch?.subscribe(() => rerender(undefined)), [awayMatch]);
+  useEffect(() => awaySquads?.subscribe(() => rerender(undefined)), [awaySquads]);
+  /** 50 v 50's public queue, still gathering: a lobby you can step out of and stay queued in (not a raid's, a party's, Solo's or a friends' lobby). */
+  const steppable = (m: AnyMatch | null): m is NetMatch =>
+    m instanceof NetMatch && m.auto && !m.partyPass && !m.settings.raid && m.settings.mode === "crowd" && (m.phase.kind === "lobby" || m.phase.kind === "loading") && !m.gone && !m.error && !m.resuming;
+  /** Squads' lobby, still gathering (not a test lobby). */
+  const steppableSquads = (c: SquadsClient | null): boolean => !!c && !c.gone && !c.error && !c.left && !c.lobby?.test && (!c.lobby || c.lobby.phase === "waiting");
+  /** Exit with "Keep me in the queue" (or the side menu, so checked): home, still queued; the lobby's connection stays the app's. */
+  const stepOutOfLobby = () => {
+    if (steppable(match) && !match.filledAt) {
+      const m = match;
+      saveAwayLobby({ kind: "crowd", code: m.code, since: sinceOf(m) });
+      setAwayMatch(m);
+      setMatch(null);
+    } else if (squads && steppableSquads(squads)) {
+      const c = squads;
+      saveAwayLobby({ kind: "squads", code: c.code, since: sinceOf(c) });
+      setAwaySquads(c);
+      setSquads(null);
+    } else return false;
+    if (location.pathname !== "/") history.replaceState(null, "", `/${location.search}`);
+    return true;
+  };
+  /** Back into the lobby you stepped out of (Lobby, the bar's words, or found: with the alert), from any page. */
+  const backToLobby = (found = false) => {
+    const m = awayMatch;
+    const c = awaySquads;
+    if (!m && !c) return;
+    if (found) searchFoundAlert();
+    nav.home();
+    saveAwayLobby(null);
+    setAwayMatch(null);
+    setAwaySquads(null);
+    if (m) {
+      use(m);
+      history.replaceState(null, "", `/lobby/${m.code}${location.search}`);
+    } else if (c) {
+      setSquads(c);
+      history.replaceState(null, "", `/squads/${c.code}${location.search}`);
+    }
+  };
+  /** Out of the queue you stepped out of (Cancel's Yes, the bar's Cancel, or another mode): the seat freed; the page stays. */
+  const cancelAwayLobby = () => {
+    saveAwayLobby(null);
+    if (awayMatch) {
+      if (currentMatch() === awayMatch.code) setCurrentMatch(null);
+      awayMatch.leave();
+      setAwayMatch(null);
+    }
+    if (awaySquads) {
+      if (!awaySquads.left && !awaySquads.gone) awaySquads.leave();
+      else awaySquads.dispose();
+      setAwaySquads(null);
+    }
+  };
+  /** 50 v 50's Start with bots: out of the queue, then you and 99 bots at once, at your last Bot level (My level before any). */
+  const crowdBots = () => {
+    cancelAwayLobby();
+    void startSolo("crowd", { fill: true, botLevel: botLevelMean(chosenBotLevel() ?? "mine", account().profile?.rating ?? null) });
+  };
+  // Found (the lobby fills, or its match begins): you're taken in. Gone meanwhile: home's note.
+  useEffect(() => {
+    const m = awayMatch;
+    if (m && (m.gone || m.error || m.exited)) {
+      m.dispose();
+      forgetSeat(m.code);
+      if (currentMatch() === m.code) setCurrentMatch(null);
+      setAwayMatch(null);
+      saveAwayLobby(null);
+      setSquadsNote("That lobby has closed.");
+    } else if (m && (m.filledAt || m.started || (m.phase.kind !== "lobby" && m.phase.kind !== "loading"))) backToLobby(true);
+    const c = awaySquads;
+    if (c && (c.gone || c.error || c.left)) {
+      const why = c.gone ?? c.error;
+      c.dispose();
+      setAwaySquads(null);
+      saveAwayLobby(null);
+      setSquadsNote(why === "Banned" ? null : why);
+    } else if (c?.lobby && c.lobby.phase !== "waiting") backToLobby(true);
+  });
+  // Into another match or search meanwhile (an invite's lobby, a party's, a town game): the lobby's search ends.
+  useEffect(() => {
+    if ((match || squads || duel || duelQueue) && (awayMatch || awaySquads)) cancelAwayLobby();
+  }, [match, squads, duel, duelQueue]);
+
+  /** What's searching while you browse (home's rows; the bar elsewhere), with its three actions (search.ts). */
+  const awaySearchNow = ((): AwaySearch | null => {
+    if (match || squads || duel) return null;
+    const st = duelQueue?.state;
+    if (duelQueue && duelAway && st?.kind === "searching") {
+      const q = duelQueue;
+      const few = (now: number) => !q.keepWaiting && now >= q.fewAt;
+      return {
+        mode: "1v1",
+        name: "1 v 1",
+        since: st.since,
+        detail: (now) => {
+          const s = q.state;
+          const delay = s.kind === "searching" && s.delayUntil ? s.delayUntil - now : 0;
+          return [delay > 0 ? `Delayed queue · ${clockShown(delay)}` : few(now) ? "Few players online" : "Ranked · near your level"];
+        },
+        few,
+        back: duelBackToStage,
+        cancel: dropDuelSearch,
+        slots: searchSlots({ cancel: dropDuelSearch, back: duelBackToStage, bots: botDuel, backLine: "back to search" }),
+      };
+    }
+    if (awayMatch) {
+      const m = awayMatch;
+      return {
+        mode: "crowd",
+        name: "50 v 50",
+        since: sinceOf(m),
+        detail: () => [`Solo queue · ${Math.max(1, m.players.filter((p) => !p.isBot).length)} of ${m.settings.lobbySize}`, " in the lobby"],
+        few: () => false,
+        back: () => backToLobby(),
+        cancel: cancelAwayLobby,
+        slots: searchSlots({ cancel: cancelAwayLobby, back: () => backToLobby(), bots: crowdBots }),
+      };
+    }
+    if (awaySquads) {
+      const c = awaySquads;
+      return {
+        mode: "squads",
+        name: "Squads",
+        since: sinceOf(c),
+        detail: () => {
+          const l = c.lobby;
+          const people = Math.max(1, l?.players.filter((p) => !p.isBot).length ?? 1);
+          return [`${c.party ? "Party" : "Solo queue"} · ${people} of ${l?.seats ?? SQUADS.squadCount * SQUADS.squadSize}`, " in the lobby"];
+        },
+        few: () => false,
+        back: () => backToLobby(),
+        cancel: cancelAwayLobby,
+        // (Squads has no game with bots yet: greyed, "Soon", as on home.)
+        slots: searchSlots({ cancel: cancelAwayLobby, back: () => backToLobby(), bots: null }),
+      };
+    }
+    return null;
+  })();
+  awayNow.current = awaySearchNow;
+  // The shell (index.html) goes as the first screen that isn't the splash draws, in the same frame (shell.ts); home or the
+  // landing page marks which one the next load's shell is.
+  useLayoutEffect(() => {
+    if (document.querySelector("#app .fd-splash")) return;
+    dropShell();
+    if (document.querySelector("#app .fd-home")) markHome(true);
+    else if (document.querySelector("#app .landing")) markHome(false);
+  });
+  // Home's rows and the bar on every other page read it (search.ts; the bar after every render).
+  useLayoutEffect(() => setAwaySearch(awaySearchNow));
+  // The boss's music (music.ts): its theme fetched as the battle is picked (its loading step and intro), started as the battle
+  // starts (the intro's end), faded out at the result or on leaving. Solo, raids and online alike: it goes by the match shown.
+  useLayoutEffect(() => bossMusic(musicBattle(match)));
 
   // ?debug (a test switch): the match, the Squads clients and the 1 v 1 game on `window`, for tests and the console. (Each render, so
   // they're there once your account says you may, and a match joined before that, from a link, is too.)
@@ -781,12 +1014,21 @@ export function App() {
 
   // ---------------- Squads ----------------
 
-  /** Into a Squads lobby (with your party's pass, to sit with your party). */
-  const joinSquads = (code: string, pass?: string) => {
+  /**
+   * Into a Squads lobby (with your party's pass, to sit with your party). `away`: a reload carrying on with a lobby you'd
+   * stepped out of (when its search began): you browse on, still queued.
+   */
+  const joinSquads = (code: string, pass?: string, away?: number) => {
     unlockAudio();
     setSquadsNote(null);
     setPartyOpen(false);
     const c = new SquadsClient(code.toUpperCase(), { party: pass ?? null });
+    searchSince.current.set(c, away ?? Date.now());
+    if (away !== undefined) {
+      setAwaySquads(c);
+      c.connect();
+      return;
+    }
     setSquads((old) => {
       old?.dispose();
       return c;
@@ -958,7 +1200,7 @@ export function App() {
    * bots first, and a raid has 49 of them in the crowd with a boss matched to you. Boss alone: you against the boss
    * picked from the menu, at once.
    */
-  const startSolo = async (mode?: ModeChoiceId, opts: { fill?: boolean; town?: string } = {}) => {
+  const startSolo = async (mode?: ModeChoiceId, opts: { fill?: boolean; town?: string; botLevel?: number | "random" } = {}) => {
     // (Solo and Boss alone resting, a kill switch: not even from a results screen's "again".)
     if (isPaused("solo")) {
       leave();
@@ -966,13 +1208,22 @@ export function App() {
     }
     unlockAudio();
     setLoading(true);
-    const [engines] = await Promise.all([enginePool(), loadOpenings()]);
+    // (Solo's code, its opening library and the match's screens, each fetched once: usually here already, play was near.)
+    const [engines, soloCode] = await Promise.all([enginePool(), solo.preload().then(async (m) => (await m?.loadOpenings(), m)), game.preload()]);
+    if (!soloCode) {
+      setLoading(false);
+      return setError("Couldn't load the game. Check your connection and try again.");
+    }
+    const { SoloMatch } = soloCode;
     setLoading(false);
     const fill = !!opts.fill;
-    const m = new SoloMatch(engines, playerName(), { ...DEFAULT_SETTINGS, ...overridesFromUrl(mode, fill) }, practiceOn(), fill);
+    // (`botLevel`: home's Bot level box, the bots' average rating: Settings.botLevel.)
+    const m = new SoloMatch(engines, playerName(), { ...DEFAULT_SETTINGS, ...overridesFromUrl(mode, fill), ...(opts.botLevel !== undefined ? { botLevel: opts.botLevel } : {}) }, practiceOn(), fill);
     // A boss battle (Boss alone, a Solo raid): the server notes its start, to time it for a boss token (boss-tokens.ts).
     // (`town`: a boss challenged from the town: the server announces it in the town's chat, and how it ended.)
     if (m.settings.raid) noteSoloBattle(m, opts.town);
+    // XP (Nov 9): the server times every solo game by its own clock, from now to its result (xp.ts).
+    noteSoloGame(m);
     use(m);
     if (fill) m.fill();
     else m.start();
@@ -982,7 +1233,7 @@ export function App() {
    * Into a lobby by code. A queue lobby (PLAY) brings the queue's own settings (the server's, remembered with the
    * code for a reload); a lobby you made, the mode you made it in.
    */
-  const joinLobby = (code: string, opts: { queue?: "crowd" | "raid"; mode?: ModeChoiceId; typed?: boolean; resume?: boolean; party?: { pass: string; seat: number; boss: string; difficulty: string } } = {}) => {
+  const joinLobby = (code: string, opts: { queue?: "crowd" | "raid"; mode?: ModeChoiceId; typed?: boolean; resume?: boolean; away?: number; party?: { pass: string; seat: number; boss: string; difficulty: string } } = {}) => {
     const key = `brc.queue.${code.toUpperCase()}`;
     let queue = opts.queue;
     try {
@@ -1013,6 +1264,15 @@ export function App() {
     if (opts.resume) {
       m.resuming = true;
       m.auto = false;
+    }
+    // (When its search began: the queue's lobby, for home's rows and the bar.)
+    if (queue) searchSince.current.set(m, opts.away ?? Date.now());
+    // A reload carrying on with a lobby you'd stepped out of (`away`, when its search began): you browse on, still queued.
+    if (opts.away !== undefined && queue) {
+      setCurrentMatch(m.code);
+      setAwayMatch(m);
+      m.connect();
+      return;
     }
     use(m);
     // Seated here: opening the app from scratch comes back to it (until you leave on purpose or it ends).
@@ -1066,8 +1326,8 @@ export function App() {
       const q = new URLSearchParams();
       if (mode === "raid") q.set("mode", "raid");
       if (type === "botsoff") q.set("type", "botsoff");
-      // (?pool=NAME: a queue of its own, a test switch.)
-      const pool = testParams().get("pool");
+      // (?pool=NAME: a queue of its own, a test switch; kept after leaving a queue drops it from the address.)
+      const pool = queuePool();
       if (pool) q.set("pool", pool);
       // (?afk=0 with it: the pool's 50 v 50 misses as before Nov 4, for a test that idles on purpose.)
       if (pool && testParams().get("afk") === "0") q.set("afk", "0");
@@ -1108,6 +1368,15 @@ export function App() {
     }
   };
   /** Whether PLAY run `run` is already waiting in line (a 429 then means "ask later", not an error). */
+  // Once play is near (a match, the queue, the Boss raid screen, Squads, 1 v 1): the whole engine pool, the match's screens,
+  // solo's code and its opening library (Nov 10, phone load: none of it on home), so entering a match doesn't wait for them.
+  const playNear = !!match || !!inLine || raidOpen || !!squads || !!duelQueue || !!duel || !!awayMatch || !!awaySquads;
+  useEffect(() => {
+    if (!playNear) return;
+    void enginePool();
+    void game.preload();
+    void solo.preload().then((m) => m?.loadOpenings().catch(() => {}));
+  }, [playNear]);
   const lineState = useRef(inLine);
   lineState.current = inLine;
   const inLineNow = (run: number) => run === lineRun.current && !!lineState.current;
@@ -1126,7 +1395,7 @@ export function App() {
     const from = match;
     const q = new URLSearchParams({ type: "default", from: from.code });
     if (from.settings.raid) q.set("mode", "raid");
-    const pool = testParams().get("pool");
+    const pool = queuePool();
     if (pool) q.set("pool", pool);
     try {
       const res = await fetch(`/api/play?${q}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ seat: from.seat }) });
@@ -1198,6 +1467,8 @@ export function App() {
     if (back) {
       townReturn.current = null;
       setExitTo("home");
+      setGoodbyeFrom(bossFromTown.current);
+      bossFromTown.current = null;
       setTownStand(back.c >= 0 ? back : null);
       setTownSeat(null);
       setShowTown(true);
@@ -1218,7 +1489,8 @@ export function App() {
     setShowFaq(false);
     setShowShop(false);
     setShowFriends(false);
-    if (location.pathname !== "/") history.replaceState(null, "", "/");
+    // (From /friends, the page's query and hash stay: a test switch or tour link, as the pop-up kept them before, Nov 11.)
+    if (location.pathname !== "/") history.replaceState(null, "", location.pathname === "/friends" ? `/${location.search}${location.hash}` : "/");
   };
   const nav: FrontNav = {
     home: () => {
@@ -1244,6 +1516,12 @@ export function App() {
       goHome();
       setHomeIntent({ kind: "friends", n: Date.now() });
     },
+    // (Daily Quests, the computer's side menu (Eric, Nov 10): home, its quests overlay open.)
+    quests: () => {
+      goHome();
+      setRaidOpen(false);
+      setHomeIntent({ kind: "quests", n: Date.now() });
+    },
     shop: () => {
       goHome();
       setShowShop("shop");
@@ -1259,7 +1537,7 @@ export function App() {
     friendsList: () => {
       goHome();
       setShowFriends(true);
-      history.replaceState(null, "", "/friends");
+      history.replaceState(null, "", `/friends${location.search}${location.hash}`);
     },
     signIn: () => chooseGuest(false),
   };
@@ -1278,7 +1556,7 @@ export function App() {
       }
       setSideAsk({ exit: { ...e, go: () => { setSideNext({ page: k, from }); e.go(); } }, then: k });
     };
-    return { home: page("home"), chessTown: page("chessTown"), soloBoss: page("soloBoss"), friends: page("friends"), shop: page("shop"), profile: page("profile"), settings: page("settings"), friendsList: page("friendsList") };
+    return { home: page("home"), chessTown: page("chessTown"), soloBoss: page("soloBoss"), friends: page("friends"), quests: page("quests"), shop: page("shop"), profile: page("profile"), settings: page("settings"), friendsList: page("friendsList") };
   };
   // The town's side menu (and its panel, and the global chat's sign-in): each page asks first. Chess Town itself doesn't.
   const townNav: FrontNav = {
@@ -1286,6 +1564,7 @@ export function App() {
     home: () => askLeave("Play", nav.home),
     soloBoss: () => askLeave("Boss Battle", nav.soloBoss),
     friends: () => askLeave("Play with friends", nav.friends),
+    quests: () => askLeave("Daily Quests", nav.quests),
     shop: () => askLeave("the Shop", nav.shop),
     profile: () => askLeave("your profile", nav.profile),
     settings: () => askLeave("Settings", nav.settings),
@@ -1373,6 +1652,30 @@ export function App() {
   });
   // In a match (not its lobby or results): the live line says so, for friends' lists.
   setLiveBusy((!!match && !["loading", "lobby", "results"].includes(match.phase.kind)) || (!!squads && !squadsWaiting(squads.lobby)) || (!!duel && !duel.snapshot().end));
+  // What you're doing, for friends' lists (the friends page's "In Chess Town", Eric, Nov 11): a match's mode, a queue or lobby
+  // waiting, the town, auto chess, else the front door's pages ("On the home screen").
+  const doing: Activity = match
+    ? ["loading", "lobby"].includes(match.phase.kind)
+      ? "queue"
+      : match.settings.raid || match.boss
+        ? "boss"
+        : match.settings.mode === "crowd"
+          ? "crowd"
+          : "classic"
+    : duel
+      ? "duel"
+      : squads
+        ? squadsWaiting(squads.lobby)
+          ? "queue"
+          : "squads"
+        : duelQueue || inLine
+          ? "queue"
+          : showTown
+            ? "town"
+            : showAutoChess
+              ? "autochess"
+              : "home";
+  setLiveDoing(doing);
 
   /**
    * The side menu while you're in the queue (it stays on a computer): Play is where you are, and your profile opens over
@@ -1381,19 +1684,22 @@ export function App() {
    */
   const queueNav: FrontNav = {
     ...nav,
-    // (The 1 v 1 search: Play is home, and every page browses with the search still going, the bar along.)
+    // (The 1 v 1 search: Play is home, and every page browses with the search still going, home's rows or the bar along. A
+    // 50 v 50 or Squads lobby the same, as its Exit does, with "Keep me in the queue" checked.)
     home: () => {
       if (duelQueue && !duel) {
         duelGoAway();
         nav.home();
-      }
+      } else if (keepInQueue() && stepOutOfLobby()) nav.home();
     },
     profile: () => openProfile({ you: true, name: account().profile?.user.name ?? "" }),
     ...Object.fromEntries(
-      (["chessTown", "soloBoss", "friends", "shop", "settings", "friendsList"] as const).map((k) => [
+      (["chessTown", "soloBoss", "friends", "quests", "shop", "settings", "friendsList"] as const).map((k) => [
         k,
         () => {
-          if (match) leave();
+          if (keepInQueue() && stepOutOfLobby()) {
+            // (Stepped out, still queued.)
+          } else if (match) leave();
           else if (squads) leaveSquads();
           else if (duel) leaveDuel();
           else if (duelQueue) duelGoAway();
@@ -1409,6 +1715,10 @@ export function App() {
   const noLanding = testParams().has("nolanding");
   const inviteCode = invite === "open" ? linkCode : undefined;
   const notice = ended ? (ended.why === "idle" ? "That lobby has closed." : ended.why === "left" ? leftNote(ended.how) : "That match has ended.") : (squadsNote ?? undefined);
+  // Ranked's leave rules (L1): home's note after a dodge, or while finishing games would clear a delay; dismissed for the tab.
+  const leaves = leavesNote(profile?.leaves ?? null);
+  const leavesKey = `${leaves}|${profile?.leaves?.dodged?.at ?? ""}`;
+  const leavesShown = !notice && leaves && !leavesDismissed.has(leavesKey) ? leaves : null;
   // Ranked 1 v 1: the search and the versus moment (one stage, in the home screen's frame, as every queue), then the game.
   if ((duel || (duelQueue && !duelAway)) && !match && !squads) {
     const overlayD = profileOpen && (
@@ -1466,7 +1776,7 @@ export function App() {
     if (squadsWaiting(squads.lobby))
       return (
         <>
-          {homeFrame(<SquadsQueue client={squads} onCancel={leaveSquads} />)}
+          {homeFrame(<SquadsQueue client={squads} onCancel={leaveSquads} onAway={steppableSquads(squads) || (!squads.lobby?.test && squads.lobby?.phase === "filled") ? stepOutOfLobby : undefined} />)}
           {overlayS}
         </>
       );
@@ -1483,9 +1793,10 @@ export function App() {
   if (!match && showAutoChess) {
     return (
       <>
-        <GameFrame nav={autoNav}>
+        {/* The front door's frame (Nov 8): the same side menu and right column as home, so neither moves on the way in. */}
+        <FrontFrame page="autochess" nav={autoNav}>
           <AutoChessScreen onBack={autoBack} />
-        </GameFrame>
+        </FrontFrame>
         {sideConfirm}
       </>
     );
@@ -1651,13 +1962,15 @@ export function App() {
         <FriendsScreen
           onBack={() => {
             setShowFriends(false);
-            if (location.pathname === "/friends") history.replaceState(null, "", "/");
+            if (location.pathname === "/friends") history.replaceState(null, "", `/${location.search}${location.hash}`);
           }}
           onSettings={() => {
             setShowFriends(false);
             setShowSettings(true);
-            history.replaceState(null, "", "/settings");
+            history.replaceState(null, "", `/settings${location.search}`);
           }}
+          onPrivateLobby={nav.friends}
+          onSignIn={() => chooseGuest(false)}
         />
       </FrontFrame>
     );
@@ -1712,6 +2025,7 @@ export function App() {
     <FrontFrame page={queue ? "queue" : raidOpen ? "raid" : "home"} nav={!queue ? nav : computer ? queueNav : undefined}>
       <HomeScreen
         queue={queue}
+        search={awaySearchNow}
         chat={chat}
         side={side}
         intent={homeIntent}
@@ -1738,7 +2052,9 @@ export function App() {
         error={error}
         joinCode={mustSignInToPlayOnline() ? undefined : inviteCode}
         notice={
-          !ended && notice
+          leavesShown
+            ? { text: leavesShown, onDismiss: () => dismissLeaves(leavesKey) }
+            : !ended && notice
             ? { text: notice, onDismiss: () => setSquadsNote(null) }
             : ended && notice
             ? {
@@ -1755,11 +2071,11 @@ export function App() {
             : undefined
         }
         onlineLocked={mustSignInToPlayOnline()}
-        onPlay={(mode, type) => leavingDuelFirst(() => void playNow(mode, type))}
-        onSolo={(mode, opts) => leavingDuelFirst(() => void startSolo(mode, opts))}
-        onCreateLobby={(mode, made) => leavingDuelFirst(() => void createLobby(mode).then((code) => made?.(code ?? null)))}
-        onJoinLobby={(code) => leavingDuelFirst(() => joinLobby(code, { typed: code !== inviteCode }))}
-        onSquads={() => leavingDuelFirst(() => void squadsPlay())}
+        onPlay={(mode, type) => leavingSearchFirst(() => void playNow(mode, type))}
+        onSolo={(mode, opts) => leavingSearchFirst(() => void startSolo(mode, opts))}
+        onCreateLobby={(mode, made) => leavingSearchFirst(() => void createLobby(mode).then((code) => made?.(code ?? null)))}
+        onJoinLobby={(code) => leavingSearchFirst(() => joinLobby(code, { typed: code !== inviteCode }))}
+        onSquads={() => leavingSearchFirst(() => void squadsPlay())}
         onParty={openParty}
         onFriends={nav.friendsList}
         onSignIn={() => chooseGuest(false)}
@@ -1825,7 +2141,7 @@ export function App() {
     // (The lobby's chat: a phone's is in the queue screen, under Cancel; a computer's under your card, beside the lobby.)
     return (
       <>
-        {home(<QueueScreen match={q} onCancel={leave} onLetBotsFill={letBots} chat={!computer} />, computer ? <LobbyChat match={q} /> : undefined, computer)}
+        {home(<QueueScreen match={q} onCancel={leave} onLetBotsFill={letBots} onAway={steppable(match) ? stepOutOfLobby : undefined} chat={!computer} />, computer ? <LobbyChat match={q} /> : undefined, computer)}
         {overlay}
       </>
     );
@@ -1839,7 +2155,7 @@ export function App() {
       leave();
     },
     // (Solo again as it was: through the queue screen, or Boss alone straight in.)
-    again: () => (match instanceof SoloMatch ? void startSolo(match.settings.raid ? "raid" : match.settings.mode, { fill: match.players.length > 0 }) : leave()),
+    again: () => (isSolo(match) ? void startSolo(match.settings.raid ? "raid" : match.settings.mode, { fill: match.players.length > 0, ...(match.settings.botLevel !== undefined ? { botLevel: match.settings.botLevel } : {}) }) : leave()),
     homeText: townReturn.current ? "Back to town" : undefined,
   });
   // Computers get the leaderboard as a permanent sidebar during the knockout stages (and the pre-game votes, so the
@@ -1899,7 +2215,7 @@ export function App() {
   function inQueue(match: AnyMatch): boolean {
     if (resumingSplash(match)) return false;
     const k = match.phase.kind;
-    if (match instanceof SoloMatch) return k === "lobby";
+    if (isSolo(match)) return k === "lobby";
     return match instanceof NetMatch && match.auto && (k === "loading" || k === "lobby");
   }
 
@@ -1985,6 +2301,19 @@ export function App() {
   }
 }
 
+/**
+ * The boss battle a match is in, for its music: none before it, or once it's decided (`result`: the last move's moments and
+ * the fade play out before the result screen) or at its result; live once its intro ("START!") is over and the first move is
+ * being played (a battle joined in the middle: at once).
+ */
+function musicBattle(match: AnyMatch | null): MusicBattle | null {
+  const p = match?.phase;
+  if (!match || !p || p.kind === "results") return null;
+  const boss = p.kind === "boss" ? p.boss : match.boss;
+  if (!boss?.id || boss.result) return null;
+  return { key: match, boss: boss.id, live: !(p.kind === "boss" && (p.intro || p.loading)) };
+}
+
 /** A profile as a page (outside a match): its address, and back to where you were. */
 function ProfilePage({
   target,
@@ -2002,14 +2331,15 @@ function ProfilePage({
   useEffect(() => {
     // (Yours is /profile; anyone's public profile, yours as others see it included, is /profile/ID.)
     const path = target.you && !target.public ? "/profile" : target.uid ? `/profile/${target.uid}` : null;
-    if (path && location.pathname !== path) history.replaceState(null, "", path);
+    // (The query stays: test switches and links, back to the friends page's search too, Nov 11.)
+    if (path && location.pathname !== path) history.replaceState(null, "", `${path}${location.search}`);
   }, [target]);
   return (
     <PlayerProfileScreen
       target={target}
       onBack={() => {
         closeProfile();
-        if (location.pathname.startsWith("/profile")) history.replaceState(null, "", "/");
+        if (location.pathname.startsWith("/profile")) history.replaceState(null, "", `/${location.search}`);
       }}
       onLocker={onLocker}
       onSettings={onSettings}

@@ -36,7 +36,8 @@ const reducedMotion = () => !!window.matchMedia?.("(prefers-reduced-motion: redu
 
 /**
  * Plays `ch`'s idle: `draw` gets the frame to show now and again at each frame's own time. `redraw` shows the current frame
- * again (a box that changed size); `stop` ends it. A hidden page draws nothing (the loop keeps its place).
+ * again (a box that changed size); `stop` ends it. A hidden page stops it (no timers while hidden: Nov 10, phone load); it
+ * picks up where it was when the page shows again.
  */
 function play(ch: Character, draw: (frame: HTMLCanvasElement) => void) {
   const cells = framesOf(ch);
@@ -46,13 +47,29 @@ function play(ch: Character, draw: (frame: HTMLCanvasElement) => void) {
   const next = () => {
     timer = setTimeout(() => {
       i = (i + 1) % cells.length;
-      if (!document.hidden) show();
+      show();
       next();
     }, cells[i]!.ms);
   };
+  const moving = cells.length > 1 && !reducedMotion();
+  const seen = () => {
+    clearTimeout(timer);
+    if (document.hidden) return;
+    show();
+    next();
+  };
   show();
-  if (cells.length > 1 && !reducedMotion()) next();
-  return { redraw: show, stop: () => clearTimeout(timer) };
+  if (moving) {
+    if (!document.hidden) next();
+    document.addEventListener("visibilitychange", seen);
+  }
+  return {
+    redraw: show,
+    stop: () => {
+      clearTimeout(timer);
+      document.removeEventListener("visibilitychange", seen);
+    },
+  };
 }
 
 /** Device pixels per art pixel for a picture drawn at `scale` CSS pixels per art pixel (a whole number, at least 1). */

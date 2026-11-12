@@ -20,6 +20,26 @@ export function testParams(): URLSearchParams {
   return new URLSearchParams(location.search);
 }
 
+/** `?pool=` as the page opened (read once, as TOWN_ASKED below). */
+const POOL_ASKED = (() => {
+  try {
+    return new URLSearchParams(globalThis.location?.search ?? "").get("pool");
+  } catch {
+    return null;
+  }
+})();
+
+/**
+ * `?pool=NAME` (a queue of its own, a test switch): the address's now, else the one the page opened with. Leaving a queue
+ * or a match puts the address back to "/" (App's `leave`), and the next PLAY must still queue in the test's own pool, never
+ * in the server's shared one, where it met whatever another test left there (the CI flake of Nov 9: the raid screen's
+ * People only after Join a raid's Cancel). Null where the test switches don't count.
+ */
+export function queuePool(): string | null {
+  if (!testSwitchesAllowed()) return null;
+  return testParams().get("pool") ?? POOL_ASKED;
+}
+
 /**
  * Two switches for trying lengths on a phone (Eric, Oct 24: "have a URL where I can change the URL and make it say 1/2 a
  * second longer or 1 second longer or 3/4 of a second longer, and then I can go test all three of them"), in seconds:
@@ -46,14 +66,15 @@ const TIMING_ASKED = (() => {
 /**
  * `?crowd=N` and `?fps` as the page opened (the town reads them once, so a later replaceState that drops the query can't lose them), and
  * `?street=off`: the street town's WebGL failed or its context was lost for good, so the page was opened again in today's town
- * (admin-town.ts; anyone, not a test switch).
+ * (admin-town.ts; anyone, not a test switch). `?back=2d` (Nov 11, anyone's, as `?report`): rooms draw their back the 2D way, as before
+ * shops/back-gl.ts, so a phone's `?report` can compare the two.
  */
 export const TOWN_ASKED = (() => {
   try {
     const q = new URLSearchParams(globalThis.location?.search ?? "");
-    return { crowd: Number(q.get("crowd")), fps: q.has("fps"), streetOff: q.get("street") === "off" };
+    return { crowd: Number(q.get("crowd")), fps: q.has("fps"), report: q.has("report"), streetOff: q.get("street") === "off", back2d: q.get("back") === "2d" };
   } catch {
-    return { crowd: 0, fps: false, streetOff: false };
+    return { crowd: 0, fps: false, report: false, streetOff: false, back2d: false };
   }
 })();
 let gameOnDevice = true;

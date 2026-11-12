@@ -8,6 +8,7 @@
 import type { Anim, Character, Frame, Layer, Part } from "../../characters/sprite.ts";
 import { CLOWN_PALETTE } from "../../characters/clown.ts";
 import { FUN_PINK, groundShadow, paint, signBoard, signFace, tuft, WARM, type LightPool, type LightSpot, type Pt } from "./kit.ts";
+import { lazyAnim } from "../../characters/sprite.ts";
 
 const C = CLOWN_PALETTE;
 const PALETTE: Record<string, string> = {
@@ -267,7 +268,7 @@ const layers: Layer[] = order.map((part) => ({ part, x: at[part]![0], y: at[part
 const DIM = "#b58430";
 const frames: Frame[] = [0, 1, 2].map((f) => ({ ms: 160, layers, pal: { [String(f + 1)]: DIM } }));
 
-const idle: Anim = { loop: true, frames };
+const idle: Anim = lazyAnim(() => ({ loop: true, frames }));
 
 export const HOUSE_CLOWN: Character = {
   id: "house-clown",

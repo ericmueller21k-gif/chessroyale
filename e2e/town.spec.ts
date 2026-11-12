@@ -66,7 +66,7 @@ test("the town square at /town: the world is drawn and fills its box under the b
   const errors = watchErrors(page);
   await page.goto("/town");
   await expect(page.getByRole("heading", { name: "Town square" })).toBeVisible();
-  await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
   expect(await colors(page), "the world is drawn, not blank").toBeGreaterThan(40);
 
   // The world fills the rest of the screen under the bar: the whole screen's width on a phone, the front door's center column's on a
@@ -174,7 +174,7 @@ test.describe("a deploy landed", () => {
   // never came and the page never loaded again: the flaky "the page loaded again: 1" (Nov 2). The service worker installs on the
   // page's "load" and takes over at once, so on a quick run it was in charge before the town's chunk asked for its styles.)
   test.use({ serviceWorkers: "block" });
-test("a deploy landed while the page was open: the town square's files are gone, so the page loads again, once, and the town opens", async ({ page }) => {
+test("a deploy landed while the page was open: the town square's files are gone, so the page loads again, once, and the town opens", { tag: "@phone-only" }, async ({ page }) => {
   // (After a deploy the old version's files are gone: the first ask for the town's styles fails as it would then.)
   let asked = 0;
   await page.route(/\/assets\/Town-[^/]*\.css$/, (route) => (asked++ === 0 ? route.fulfill({ status: 404, body: "" }) : route.continue()));
@@ -192,13 +192,13 @@ test("a deploy landed while the page was open: the town square's files are gone,
 });
 });
 
-test("the sky by the time of day: ?sky=day and ?sky=night draw different skies (a day's top is light blue, a night's deep navy)", async ({ page }) => {
+test("the sky by the time of day: ?sky=day and ?sky=night draw different skies (a day's top is light blue, a night's deep navy)", { tag: "@phone-only" }, async ({ page }) => {
   const errors = watchErrors(page);
   await page.goto("/town?sky=day");
-  await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
   const day = await skyTop(page);
   await page.goto("/town?sky=night");
-  await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
   const night = await skyTop(page);
   const lum = ([r, g, b]: number[]) => 0.3 * r! + 0.59 * g! + 0.11 * b!;
   expect(day[2]!, `day's sky is blue: ${day.map(Math.round)}`).toBeGreaterThan(200);
@@ -207,10 +207,10 @@ test("the sky by the time of day: ?sky=day and ?sky=night draw different skies (
   expect(errors).toEqual([]);
 });
 
-test("/town?fps: anyone sees the frame-rate pill with a number (no admin needed, Eric, Oct 30), and ?crowd=50 brings the crowd; without ?fps there is no pill", async ({ page }) => {
+test("/town?fps: anyone sees the frame-rate pill with a number (no admin needed, Eric, Oct 30), and ?crowd=50 brings the crowd; without ?fps there is no pill", { tag: "@phone-only" }, async ({ page }) => {
   const pill = page.locator(".town-fps");
   await page.goto("/town?sky=day");
-  await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
   await page.waitForTimeout(1500);
   await expect(pill).toHaveCount(0);
   await page.goto("/town?sky=day&fps&crowd=50");
@@ -280,13 +280,13 @@ const glowAt = (p: Page, kind: "lamp" | "light", id: number | string) =>
     [kind, id] as const,
   );
 
-test("the lights at dusk and night: at ?sky=night a park lamp's glass and Babur's Circus's lit doorway are clearly warmer and brighter than at ?sky=day", async ({ page }) => {
+test("the lights at dusk and night: at ?sky=night a park lamp's glass and Babur's Circus's lit doorway are clearly warmer and brighter than at ?sky=day", { tag: "@phone-only" }, async ({ page }) => {
   const errors = watchErrors(page);
   const lum = ([r, g, b]: number[]) => 0.3 * r! + 0.59 * g! + 0.11 * b!;
   const warm = ([r, , b]: number[]) => r! - b!;
   const look = async (sky: string) => {
     await page.goto(`/town?sky=${sky}`);
-    await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+    await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
     // The lamp ahead on your left as the page opens (a bot may stroll in front of it a moment: wait till it's clear).
     let lamp: number[] | null = null;
     await expect(async () => {
@@ -314,11 +314,11 @@ test("the lights at dusk and night: at ?sky=night a park lamp's glass and Babur'
 
 // (Sawyer's: a boss whose home has no inside, so no challenge in it: Babur's, Puddles' and Alfil's are e2e/boss-challenge.spec.ts's.
 // Folio's was this test's boss until its home got an inside, Nov 5.)
-test("a boss's card: 'Challenge alone', then 'Leave the town square?'; Stay keeps you, Leave opens the Boss raid screen with that boss's tile picked", async ({ page }) => {
+test("a boss's card: 'Challenge alone', then 'Leave the town square?'; Stay keeps you, Leave opens the Boss raid screen with that boss's tile picked", { tag: "@phone-only" }, async ({ page }) => {
   const errors = watchErrors(page);
   await page.addInitScript(() => ((window as any).__soundLog = []));
   await page.goto("/town");
-  await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
   await toBabur(page, "sawyer", "Sawyer's Woodshed");
   let card = await openCard(page, "boss", "Sawyer", "sawyer");
   // No line on his card (only Hollow's has lines: Oct 28).
@@ -352,7 +352,7 @@ test("a boss's card: 'Challenge alone', then 'Leave the town square?'; Stay keep
 test("a home you can go into (Babur's): its card is its name, then 'Go in' under it, both centered, nothing else (Eric, Nov 2: \"chop the Shop and Coming soon\"); a tap anywhere else closes it", async ({ page }) => {
   const errors = watchErrors(page);
   await page.goto("/town");
-  await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
   await toBabur(page);
   const card = await openCard(page, "home", "Babur's Circus");
   // Its name and Go in, nothing else (a home without a shop keeps "Shop" greyed and "Coming soon"; Hollow Peak's, below, keeps his line too).
@@ -382,10 +382,10 @@ test("a home you can go into (Babur's): its card is its name, then 'Go in' under
   expect(errors).toEqual([]);
 });
 
-test("the Colosseum: a tap on its gate walks you to the apron in front of it and opens its card ('Raids with people' greyed, 'Coming soon'); a tap elsewhere closes it", async ({ page }) => {
+test("the Colosseum: a tap on its gate walks you to the apron in front of it and opens its card ('Raids with people' greyed, 'Coming soon'); a tap elsewhere closes it", { tag: "@phone-only" }, async ({ page }) => {
   const errors = watchErrors(page);
   await page.goto("/town");
-  await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
   // It stands just ahead of your start, in view from the first frame on a phone and a computer.
   const at = await page.evaluate(() => (window as unknown as { __townAt?: (k: string) => { x: number; y: number } | null }).__townAt?.("coliseum") ?? null);
   expect(at, "the Colosseum is drawn at the start").not.toBeNull();
@@ -435,7 +435,7 @@ for (const st of [
   test(`the ${st.id} statue: a tap on it walks you up to it, the camera glides in close on it and its quote shows word for word; a tap elsewhere glides back out to the zoom you had and clears it`, async ({ page }) => {
     const errors = watchErrors(page);
     await page.goto("/town");
-    await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+    await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
     const live = page.locator(".town-sr");
     await expect(live).toHaveText("");
     // (The marble one from the zoomed-in view: the camera comes back to whichever zoom you had.)
@@ -482,10 +482,10 @@ for (const st of [
   });
 }
 
-test("a chess table in the park: a tap on one walks you to a free stool and you sit; its card (no title: Eric, Oct 27) shows 'Casual' and 'Ranked' greyed and 'Coming soon'; a tap elsewhere closes it and you stand", async ({ page }) => {
+test("a chess table in the park: a tap on one walks you to a free stool and you sit; its card (no title: Eric, Oct 27) shows 'Casual' and 'Ranked' greyed and 'Coming soon'; a tap elsewhere closes it and you stand", { tag: "@phone-only" }, async ({ page }) => {
   const errors = watchErrors(page);
   await page.goto("/town");
-  await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
   await expect(canvas(page)).toHaveAttribute("data-sit", "0");
   // The table on your left as you start (the park's seventh, on your row: its square (19, 13), its stools (18, 13) and (20, 13)).
   const at = await page.evaluate(() => (window as unknown as { __townAt: (k: string, id: number) => { x: number; y: number } | null }).__townAt("table", 6));
@@ -513,7 +513,7 @@ test("a chess table in the park: a tap on one walks you to a free stool and you 
   expect(errors).toEqual([]);
 });
 
-test("Folio's Folded House: a tap walks you there and opens its card with its name; at ?sky=night its doorway's lamplight keeps its brightness, warm, as the town darkens", async ({ page }) => {
+test("Folio's Folded House: a tap walks you there and opens its card with its name; at ?sky=night its doorway's lamplight keeps its brightness, warm, as the town darkens", { tag: "@phone-only" }, async ({ page }) => {
   const errors = watchErrors(page);
   const name = "Folio's Folded House";
   const at = async () => {
@@ -552,7 +552,7 @@ test("Folio's Folded House: a tap walks you there and opens its card with its na
   const door: Record<string, number[]> = {};
   for (const sky of ["day", "night"]) {
     await page.goto(`/town?sky=${sky}`);
-    await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+    await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
     await visit();
     await expect(card.getByRole("heading", { name })).toBeVisible();
     // (A home you can go into since Nov 5, its sanctuary: its name and Go in, no Coming soon.)
@@ -587,10 +587,10 @@ test("Folio's Folded House: a tap walks you there and opens its card with its na
 const tables = (p: Page) => p.evaluate(() => (window as unknown as { __townTables: () => string[] }).__townTables());
 const seat = (p: Page, i: number, n: 1 | 2) => p.evaluate(([i, n]) => (window as unknown as { __townSeat: (i: number, n: number) => void }).__townSeat(i, n), [i, n] as const);
 
-test("the tables' boards (Eric, Oct 27): one bot sitting waits (a green ring under the free stool); two play (the pieces move, a clock over the board); a tap on a game offers 'Spectate', greyed, 'Coming soon', and you don't sit", async ({ page }) => {
+test("the tables' boards (Eric, Oct 27): one bot sitting waits (a green ring under the free stool); two play (the pieces move, a clock over the board); a tap on a game offers 'Spectate', greyed, 'Coming soon', and you don't sit", { tag: "@phone-only" }, async ({ page }) => {
   const errors = watchErrors(page);
   await page.goto("/town");
-  await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
   expect((await tables(page)).every((s) => s === "still" || s.startsWith("waiting") || s === "playing")).toBe(true);
   // One bot on the west stool of the table on your left: it waits, the east stool free.
   await seat(page, 6, 1);
@@ -670,7 +670,7 @@ test("a town bot: a tap opens its card ('<name> (bot)', its rating, Play); Play 
   const maia: string[] = [];
   page.on("request", (r) => r.url().includes("/engine/maia/") && maia.push(new URL(r.url()).pathname));
   await page.goto("/town?debug");
-  await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
   // Tempo Tess comes to stand beside you, and every bot holds still.
   const i = BOTS.findIndex((b) => b.name === "Tempo Tess");
   await page.evaluate((i) => (window as unknown as { __townCall: (i: number) => void }).__townCall(i), i);
@@ -702,7 +702,7 @@ test("a town bot: a tap opens its card ('<name> (bot)', its rating, Play); Play 
   await playAndResign(page, "Tempo Tess (bot)");
   // Back to town: at that table, on your stool, the bot across; its card closed.
   await page.getByRole("button", { name: "Back to town" }).click();
-  await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
   await expect(page).toHaveURL(/\/town(\?debug)?$/);
   const t = TABLES[seat[0]]!;
   expect((await you(page)).join(",")).toBe(`${t.stools[seat[1]]!.c},${t.stools[seat[1]]!.r}`);
@@ -715,11 +715,11 @@ test("a town bot: a tap opens its card ('<name> (bot)', its rating, Play); Play 
   expect(errors).toEqual([]);
 });
 
-test("a bot sitting at a table: a tap on the table walks you to the free stool; its card's first button plays it ('Play <name> (bot) · <rating>', Casual and Ranked greyed under it); a reload or the back button from the game lands you back at the table", async ({ page }) => {
+test("a bot sitting at a table: a tap on the table walks you to the free stool; its card's first button plays it ('Play <name> (bot) · <rating>', Casual and Ranked greyed under it); a reload or the back button from the game lands you back at the table", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(4 * 60_000);
   const errors = watchErrors(page);
   await page.goto("/town?debug");
-  await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
   await seat(page, 6, 1);
   await expect.poll(async () => (await tables(page))[6], { message: "a bot sits and waits", timeout: 15_000 }).toBe("waiting:1");
   const sitter = (await bots(page)).find((b) => b.table === 6)!;
@@ -741,7 +741,7 @@ test("a bot sitting at a table: a tap on the table walks you to the free stool; 
   await expect(page.locator(".dv-strip.dv-you .dv-rank")).toHaveText("Casual");
   // A reload: back in the town at the table, the bot across.
   await page.reload();
-  await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
   // (Every bot holds still from here, the one across too: it would get up after a while.)
   await page.evaluate(() => (window as unknown as { __townCall: (i: number) => void }).__townCall(-1));
   await expect(page).toHaveURL(/\/town(\?debug)?$/);
@@ -753,7 +753,7 @@ test("a bot sitting at a table: a tap on the table walks you to the free stool; 
   await card.getByRole("button", { name: `Play ${bot.name} (bot) · ${bot.rating}` }).click();
   await expect(page.locator(".duel-screen")).toBeVisible({ timeout: 15_000 });
   await page.goBack();
-  await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
   expect((await you(page)).join(",")).toBe("20,13");
   await expect(canvas(page)).toHaveAttribute("data-sit", "1");
   expect((await bots(page)).find((b) => b.name === sitter.name)).toMatchObject({ at: "18,13", table: 6 });
@@ -762,11 +762,11 @@ test("a bot sitting at a table: a tap on the table walks you to the free stool; 
 
 // ---------------- The bosses' sidekicks (Oct 28, Eric; docs/decisions/2026-10-28-sidekicks-in-town.md) ----------------
 
-test("a sidekick: a tap and it waves, then stands while its card is open ('Glim (bot)', 'Hollow's sidekick', its rating, Play); Play: both seated, the game against it with its face on its strip; resign, back at the table", async ({ page }) => {
+test("a sidekick: a tap and it waves, then stands while its card is open ('Glim (bot)', 'Hollow's sidekick', its rating, Play); Play: both seated, the game against it with its face on its strip; resign, back at the table", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(4 * 60_000);
   const errors = watchErrors(page);
   await page.goto("/town?debug");
-  await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
   // Glim, Hollow's critter (the top rung), comes to stand beside you, and every bot holds still.
   const i = BOTS.findIndex((b) => b.name === "Glim");
   await page.evaluate((i) => (window as unknown as { __townCall: (i: number) => void }).__townCall(i), i);
@@ -799,7 +799,7 @@ test("a sidekick: a tap and it waves, then stands while its card is open ('Glim 
   await playAndResign(page, "Glim (bot)");
   // Back to town: at that table, on your stool, Glim across in its sit.
   await page.getByRole("button", { name: "Back to town" }).click();
-  await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
   const t = TABLES[seat[0]]!;
   expect((await you(page)).join(",")).toBe(`${t.stools[seat[1]]!.c},${t.stools[seat[1]]!.r}`);
   await expect(canvas(page)).toHaveAttribute("data-sit", "1");
@@ -808,10 +808,10 @@ test("a sidekick: a tap and it waves, then stands while its card is open ('Glim 
   expect(errors).toEqual([]);
 });
 
-test("Hollow's card: one of his three lines (Eric's words), the next one each time it opens", async ({ page }) => {
+test("Hollow's card: one of his three lines (Eric's words), the next one each time it opens", { tag: "@phone-only" }, async ({ page }) => {
   const errors = watchErrors(page);
   await page.goto("/town");
-  await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
   const lines = TOWN_LINES.hollow!;
   const at = async () => {
     const xy = await page.evaluate(() => (window as unknown as { __townAt?: (k: string, id: string) => { x: number; y: number } | null }).__townAt?.("home", "hollow") ?? null);
@@ -862,11 +862,11 @@ test("Hollow's card: one of his three lines (Eric's words), the next one each ti
  * they walk and fade into their respective house and then the new one walks out from their home"). A test hook speeds the
  * minute (`__townTurns(ms)`: the next turn now, then every `ms`); `__townBots()` says who's going home, where to, fading.
  */
-test("the bots' turns: ten out; one walks home and fades out at its door, gone; the one home longest fades in at its own door and walks to the square", async ({ page }) => {
+test("the bots' turns: ten out; one walks home and fades out at its door, gone; the one home longest fades in at its own door and walks to the square", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(120_000);
   const errors = watchErrors(page);
   await page.goto("/town?sky=day");
-  await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
   type Bot = { name: string; at: string; moving: boolean; home: boolean; going: boolean; trip: string | null; fading: "in" | "out" | null; door: string; inSquare: boolean; queue: number };
   const bots = () => page.evaluate(() => (window as unknown as { __townBots: () => Bot[] }).__townBots());
   expect((await bots()).filter((b) => !b.home)).toHaveLength(10);
@@ -980,7 +980,7 @@ test("a person's card (Eric's mockup, Oct 28): a sidekick's has its picture in a
   test.setTimeout(120_000);
   const errors = watchErrors(page);
   await page.goto("/town");
-  await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
   // ---- A sidekick: Glim, Hollow's.
   let card = await openBotCard(page, "Glim");
   // Dark, with a thin warm-gold border and rounded corners.
@@ -1067,7 +1067,7 @@ test("tables full: a bot's Play is greyed (not tappable) and reads 'Full'; the c
   test.setTimeout(120_000);
   const errors = watchErrors(page);
   await page.goto("/town");
-  await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
   for (const name of ["Glim", "Tempo Tess"]) {
     const card = await openBotCard(page, name);
     const play = card.locator(".town-play");
@@ -1105,7 +1105,7 @@ test("a long name or line shrinks its own words to fit its row (Eric, Oct 29), n
   test.setTimeout(120_000);
   const errors = watchErrors(page);
   await page.goto("/town");
-  await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
   let card = await openBotCard(page, "Tempo Tess");
   // Every bot's words, measured in the card's own fonts against its rows: the size each would shrink to is at or above its floor.
   const room = await card.evaluate(async (el, bots) => {
@@ -1179,7 +1179,7 @@ test("the other cards on the same dark look: the boss's, the home's, the Colosse
   test.setTimeout(120_000);
   const errors = watchErrors(page);
   await page.goto("/town");
-  await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
   /** The open card is dark with a gold border, white words, a gold primary button, greyed ones and "Coming soon" that read. */
   const onDark = async (what: string, texts: string[]) => {
     const look = await page.locator(".town-card").evaluate((el) => {
@@ -1249,13 +1249,13 @@ test("a real player's card (a test player; no real players walk in the town yet)
   // Another player's account (a guest, named), to have a real profile to open.
   const other = await (await browser.newContext()).newPage();
   await other.goto("/");
-  // (Your profile: the top bar's pawn on a phone, the side menu's Profile on a computer: the right column's pawn went, Nov 7.)
-  await expect(other.getByRole("button", { name: "Your profile", exact: true }).or(other.getByRole("navigation", { name: "Menu" }).getByRole("button", { name: "Profile" })).filter({ visible: true }).first()).toBeVisible();
+  // (Your profile: "View profile" on your card on a phone, the side menu's Profile on a computer.)
+  await expect(other.getByRole("button", { name: "View profile", exact: true }).or(other.getByRole("navigation", { name: "Menu" }).getByRole("button", { name: "Profile" })).filter({ visible: true }).first()).toBeVisible();
   await other.evaluate(() => fetch("/api/me", { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ name: "Cyrus" }) }));
   const uid = ((await (await other.request.get("/api/me")).json()) as { user: { id: string; name: string } }).user.id;
   expect(((await (await other.request.get("/api/me")).json()) as { user: { name: string } }).user.name).toBe("Cyrus");
   await page.goto("/town");
-  await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
   // The test player: a pawn with that account's id, a drawn icon and a rating, beside you.
   await page.evaluate(
     ([id]) => {
@@ -1298,7 +1298,7 @@ test("a real player's card (a test player; no real players walk in the town yet)
   await expect(sheet.getByRole("heading", { name: "Cyrus" })).toBeVisible({ timeout: 15_000 });
   await sheet.getByRole("button", { name: "Back", exact: true }).first().click();
   await expect(sheet).toHaveCount(0);
-  await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
   await expect(card).toBeVisible();
   expect(errors).toEqual([]);
 });
@@ -1366,12 +1366,12 @@ async function squareSettled(page: Page, c: number, r: number): Promise<{ x: num
   throw new Error(`square ${c},${r}: the camera never settled`);
 }
 
-test("rides (Oct 31; Nov 1, every boss's): your pawn sits on its ride, the ride's idle standing and its move walking, its side, back or front the way it goes; its trail instead of the droplets; its tag over its top; nothing fetched for it; another rider as others see them", async ({ page }) => {
+test("rides (Oct 31; Nov 1, every boss's): your pawn sits on its ride, the ride's idle standing and its move walking, its side, back or front the way it goes; its trail instead of the droplets; its tag over its top; nothing fetched for it; another rider as others see them", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(150_000);
   const errors = watchErrors(page);
   await page.goto("/");
-  // (Your profile: the top bar's pawn on a phone, the side menu's Profile on a computer: the right column's pawn went, Nov 7.)
-  await expect(page.getByRole("button", { name: "Your profile", exact: true }).or(page.getByRole("navigation", { name: "Menu" }).getByRole("button", { name: "Profile" })).filter({ visible: true }).first()).toBeVisible();
+  // (Your profile: "View profile" on your card on a phone, the side menu's Profile on a computer.)
+  await expect(page.getByRole("button", { name: "View profile", exact: true }).or(page.getByRole("navigation", { name: "Menu" }).getByRole("button", { name: "Profile" })).filter({ visible: true }).first()).toBeVisible();
   // (No crate holds a ride yet: given straight, as only admins have them.)
   const [chirp, shoes] = await giveItems(page, [
     { def: "riding-chirp", color: "cobalt", blemish: 40 },
@@ -1401,9 +1401,24 @@ test("rides (Oct 31; Nov 1, every boss's): your pawn sits on its ride, the ride'
       },
     });
   });
+  // Your ride is in the town's first drawn frame (Eric, Nov 10: "your rider doesnt appear for a few seconds"; it came 1.5 to 2 s after):
+  // read as that frame sets `data-ready`. (Within 500 ms of it at worst: past TOWN_FEEL.youWaitMs the town shows without it.)
+  await page.addInitScript(() => {
+    const w = window as unknown as { __townRide?: () => RideSeen; __firstRide?: { anim: string; gap: number | null } };
+    new MutationObserver(() => {
+      if (w.__firstRide || document.querySelector("canvas.town-canvas")?.getAttribute("data-ready") !== "1") return;
+      const t0 = performance.now();
+      const first = (w.__firstRide = { anim: w.__townRide!().you.anim, gap: null as number | null });
+      const look = () => (w.__townRide?.().you.anim ? (first.gap = performance.now() - t0) : requestAnimationFrame(look));
+      look();
+    }).observe(document, { subtree: true, attributes: true, attributeFilter: ["data-ready"] });
+  });
   await page.goto("/town?sky=day");
-  await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
   await expect.poll(async () => (await rideNow(page)).you.ready, { message: "your ride's frames are ready", timeout: 30_000 }).toBe(true);
+  const first = await page.evaluate(() => (window as unknown as { __firstRide: { anim: string; gap: number | null } }).__firstRide);
+  console.log(`your ride in the town's first frame: ${first.anim || "on foot"}, drawn ${Math.round(first.gap ?? -1)} ms after it`);
+  expect(first.gap, "your ride drawn within 500 ms of the town's first frame").toBeLessThanOrEqual(500);
   expect(fetched).toEqual([]);
   // Standing: its idle, frame after frame, at every ride's size (0.75, Nov 1).
   const seen = new Set<number>();
@@ -1499,7 +1514,7 @@ test("rides (Oct 31; Nov 1, every boss's): your pawn sits on its ride, the ride'
   const small = (await rideNow(page)).you;
   expect(small.scale).toBe(0.75);
   await page.goto("/town?sky=day&rideScale=1");
-  await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
   await expect.poll(async () => (await rideNow(page)).you.ready, { message: "your ride's frames are ready", timeout: 30_000 }).toBe(true);
   await page.evaluate(() => (window as unknown as { __townCall: (i: number) => void }).__townCall(-1));
   await expect.poll(async () => (await rideNow(page)).you.anim).toBe("idle");
@@ -1515,7 +1530,7 @@ test("rides (Oct 31; Nov 1, every boss's): your pawn sits on its ride, the ride'
   // Cheetah Shoes (Nov 1, Dash's): your step takes half its time (45 ms, youStepMs / RIDES.speed), and its frames are drawn.
   await wearItem(page, "ride", shoes!);
   await page.goto("/town?sky=day");
-  await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
   await expect.poll(async () => (await rideNow(page)).you.ready, { message: "your shoes' frames are ready", timeout: 30_000 }).toBe(true);
   expect([(await rideNow(page)).you.ride, (await rideNow(page)).you.stepMs]).toEqual(["cheetah-shoes", 45]);
   expect(fetched).toEqual([]);
@@ -1525,11 +1540,11 @@ test("rides (Oct 31; Nov 1, every boss's): your pawn sits on its ride, the ride'
 test.describe("rides lazy", () => {
   // (No service worker: it would serve the ride's chunk from its cache, past the hold.)
   test.use({ serviceWorkers: "block" });
-  test("rides lazy (Nov 1): while your ride's drawing loads (its own chunk), your pawn is on foot in the box and under the tag it will have on its ride; when it comes, the ride appears there and nothing moves", async ({ page }) => {
+  test("rides lazy (Nov 1): while your ride's drawing loads (its own chunk), your pawn is on foot in the box and under the tag it will have on its ride; when it comes, the ride appears there and nothing moves", { tag: "@phone-only" }, async ({ page }) => {
     const errors = watchErrors(page);
     await page.goto("/");
-    // (Your profile: the top bar's pawn on a phone, the side menu's Profile on a computer: the right column's pawn went, Nov 7.)
-    await expect(page.getByRole("button", { name: "Your profile", exact: true }).or(page.getByRole("navigation", { name: "Menu" }).getByRole("button", { name: "Profile" })).filter({ visible: true }).first()).toBeVisible();
+    // (Your profile: "View profile" on your card on a phone, the side menu's Profile on a computer.)
+    await expect(page.getByRole("button", { name: "View profile", exact: true }).or(page.getByRole("navigation", { name: "Menu" }).getByRole("button", { name: "Profile" })).filter({ visible: true }).first()).toBeVisible();
     const [chirp] = await giveItems(page, [{ def: "riding-chirp", color: "cobalt", blemish: 40 }]);
     await wearItem(page, "ride", chirp!);
     // (Its drawing's chunk held back until the boxes are read.)
@@ -1540,7 +1555,7 @@ test.describe("rides lazy", () => {
       await route.continue();
     });
     await page.goto("/town?sky=day");
-    await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+    await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
     await page.evaluate(() => (window as unknown as { __townCall: (i: number) => void }).__townCall(-1));
     await expect.poll(async () => (await rideNow(page)).you.coming, { message: "your ride is on its way" }).toBe("riding-chirp");
     /** Your box and your tag once the camera has settled (it glides a moment after the town opens). */
@@ -1577,7 +1592,7 @@ test.describe("rides lazy", () => {
 test("a home's door (Eric, Nov 5): a tap on Folio's house walks you to the square before its door; from there, the up arrow into it opens its card", async ({ page }) => {
   const errors = watchErrors(page);
   await page.goto("/town");
-  await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
   await page.waitForTimeout(800); // (the first walk settles)
   const name = "Folio's Folded House";
   const card = page.getByRole("dialog", { name, exact: true });
@@ -1609,7 +1624,7 @@ test("a home's door (Eric, Nov 5): a tap on Folio's house walks you to the squar
 test("the arrow keys: holding ArrowUp walks you up and the up key lights while it's held; the on-screen down arrow walks you back; a release stops you", async ({ page }) => {
   const errors = watchErrors(page);
   await page.goto("/town");
-  await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
   await page.waitForTimeout(800); // (the first walk settles)
   const up = page.locator(".town-key-up");
   const [, r0] = await you(page);

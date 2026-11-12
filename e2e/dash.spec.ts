@@ -82,7 +82,7 @@ test.describe("Dash", () => {
     await expect(tiles.getByRole("radio", { name: "Dash", exact: true })).toHaveCount(0);
     await asAdmin(page);
     await page.reload();
-    await expect(page.getByRole("heading", { name: "Boss raid", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Boss Battle", exact: true })).toBeVisible();
     await expect(tiles.getByRole("radio", { name: "Dash", exact: true })).toBeVisible();
   });
 
@@ -292,16 +292,19 @@ for (const [right, held] of [
       await page.mouse.click(at(m.from).x, at(m.from).y);
       const after = await page.evaluate((f) => ({ to: (window as any).match.phase.rush.places[f], moved: (window as any).match.phase.rush.moved[f] }), m.from);
       expect(after).toEqual({ to: w2, moved: BOSS_POWERS.dashScramble.movesPerPiece });
-      expect(((await page.evaluate(() => (window as any).__rush)) as RushSeen).shook).toContain(w2);
+      // (The watcher samples once a frame; the refusal, its word and this read can all land within one frame under load: wait for
+      // its next frame, as the shake lasts 360 ms.)
+      await expect.poll(async () => ((await page.evaluate(() => (window as any).__rush)) as RushSeen).shook, { timeout: 2_000 }).toContain(w2);
     }
     for (const [i, m] of start.moves.slice(0, right).entries()) {
       const a = at(m.to);
       const b = at(m.from);
       if (i === 0) {
-        // (A drag: the piece picked up and dropped on its square.)
+        // (A drag: the piece picked up and dropped on its square, slowly, as a finger: each move 4 px at most. It counts from where
+        // it was picked up; counted from each last move, a slow drag never did and its drop was lost.)
         await page.mouse.move(a.x, a.y);
         await page.mouse.down();
-        await page.mouse.move(b.x, b.y, { steps: 8 });
+        await page.mouse.move(b.x, b.y, { steps: Math.max(8, Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) / 4)) });
         await page.mouse.up();
       } else {
         await page.mouse.click(a.x, a.y);
@@ -312,10 +315,18 @@ for (const [right, held] of [
     if (held) await expect(page.locator(".rush-edge.wrong")).toHaveCount(1);
     if (right === 3) {
       // One more, put down on a wrong square (a free one of the middle ranks): a red edge, and his word.
+      // (A drag whose press, moves and release all come in one task, with no re-render between them, the quickest a finger can be:
+      // its moves once read the drag from before the press and the drop was lost, main run 1135's 2 of 3.)
       const m = start.moves[3]!;
       const sq = free([m.from])[0]!;
-      await page.mouse.click(at(m.to).x, at(m.to).y);
-      await page.mouse.click(at(sq).x, at(sq).y);
+      await page.evaluate(([a, b]) => {
+        const el = document.querySelector(".rush-taps")!;
+        const at = (k: number) => ({ clientX: a!.x + ((b!.x - a!.x) * k) / 4, clientY: a!.y + ((b!.y - a!.y) * k) / 4 });
+        const fire = (type: string, k: number) => el.dispatchEvent(new PointerEvent(type, { bubbles: true, pointerId: 1, pointerType: "mouse", isPrimary: true, ...at(k) }));
+        fire("pointerdown", 0);
+        for (let k = 1; k <= 4; k++) fire("pointermove", k);
+        fire("pointerup", 4);
+      }, [at(m.to), at(sq)] as const);
       await expect(page.locator(".rush-edge.wrong")).toHaveCount(1);
       await expect(page.locator(".rush-edge.right")).toHaveCount(3);
     }
@@ -323,6 +334,12 @@ for (const [right, held] of [
     await expect.poll(() => page.evaluate(() => (window as any).match.boss.powers.dash.rush.correct ?? null), { timeout: 30_000 }).toBe(right);
     expect(!(await page.evaluate(() => (window as any).match.boss.powers.dash.rush.extra))).toBe(held);
     await yourMove(page);
+    // (Eric, Nov 8: the move list. Failed: two of his moves in a row, numbered as played, "13…" then "14…"; held: one, then yours.)
+    const listed = await page.evaluate(() =>
+      [...document.querySelector(".mv-list")!.querySelectorAll(".mv-row:not(.mv-opening)")].slice(-2).map((r) => ({ boss: r.classList.contains("mv-boss"), no: r.querySelector(".mv-no")!.textContent! })),
+    );
+    expect(listed.map((r) => r.boss)).toEqual(held ? [false, true] : [true, true]);
+    if (!held) expect(Number.parseInt(listed[1]!.no)).toBe(Number.parseInt(listed[0]!.no) + 1);
     const rush = await page.evaluate(() => (window as any).match.boss.powers.dash.rush);
     const after = await page.evaluate(() => ({ fen: (window as any).match.phase.board.fen as string, plies: (window as any).match.boss.board.history.length as number }));
     if (held) expect(after.fen).toBe(start.fen);
@@ -353,7 +370,7 @@ for (const [right, held] of [
 
 /**
  * Dash's clock (Eric, Nov 7; docs/decisions/2026-11-07-dash-clock.md), Boss alone on a phone and a computer. His multi-hit
- * (`&power=clockfit`: five quick smacks and a line, on his second turn) and his pop-off (`&power=popoff`: on his second turn, three
+ * (`&power=clockfit`: five quick smacks and a line, on his second turn) and his pop-off (`&power=popoff`: on his second and eighth turns, three
  * smacks and "I gotta pop off", then ten fast smacks and a love line, while he thinks, before his move lands). Read from the page:
  * each moment's key, kind and count as it first shows, and the lines said on screen (the same text as the lines' files).
  */
@@ -365,7 +382,7 @@ type ClockSeen = {
   lineAt: Record<string, number>;
   /** Each frame's sample: the move list's rows and whether the square ring (his move landed) is drawn. */
   samples: { t: number; rows: number; ring: boolean; last: string; phase: string }[];
-  /** The figure's clicks: `anim:click` counted as each frame's cue is set (a smack is one click frame). */
+  /** The figure's clicks: `anim:click` counted as the figure enters each click frame (a smack is one click frame). */
   cues: Record<string, number>;
 };
 const ALL_CLOCK_LINES = [...DASH_FIT_LINES, ...DASH_POPOFF_LINES, ...DASH_LOVE_LINES];
@@ -377,9 +394,16 @@ async function watchClock(page: Page) {
     // (Every smack: the figure's frame cue set as its frame changes; a click is one smack. Only the figure on screen counts: the
     // boss screen mounts a second figure beside the board (BossSide, display none on a phone) that runs the same frames, so
     // counting every element would count each smack twice.)
+    // A click counts once per frame it's on: the figure sets data-cue again whenever its picture changes on the same frame (his
+    // look or the lights: BossCharacter's id), the same "click", and each set is a mutation, so a smack is counted as its
+    // element enters a click frame (its anim and frame), not at each set.
+    const onFrame = new WeakMap<HTMLElement, string>();
     new MutationObserver((muts) => {
       for (const m of muts) {
         const el = m.target as HTMLElement;
+        const at = `${el.dataset.anim}:${el.dataset.frame}:${el.dataset.cue}`;
+        if (onFrame.get(el) === at) continue;
+        onFrame.set(el, at);
         if (el.dataset.cue === "click" && el.getBoundingClientRect().width > 0) {
           const k = `${el.dataset.anim}:click`;
           seen.cues[k] = (seen.cues[k] ?? 0) + 1;
@@ -405,7 +429,7 @@ async function watchClock(page: Page) {
 }
 
 test.describe("Dash's clock", () => {
-  test("the clock multi-hit: five quick smacks and a line on his turn (Eric, Nov 7: every four or five of his moves)", async ({ page }) => {
+  test("the clock multi-hit: five quick smacks and a line on his turn (Eric, Nov 7: every four or five of his moves)", { tag: "@phone-only" }, async ({ page }) => {
     test.setTimeout(240_000);
     const errors: string[] = [];
     page.on("pageerror", (e) => errors.push(e.message));
@@ -428,7 +452,7 @@ test.describe("Dash's clock", () => {
     expect(errors).toEqual([]);
   });
 
-  test("the pop-off, once: three smacks and 'I gotta pop off', ten fast smacks and a love line, while he thinks; your clock starts after it", async ({ page }) => {
+  test("the pop-off, twice: three smacks and 'I gotta pop off', ten fast smacks and a love line, while he thinks, twice; your clock starts after the first", { tag: "@phone-only" }, async ({ page }) => {
     test.setTimeout(240_000);
     const errors: string[] = [];
     page.on("pageerror", (e) => errors.push(e.message));
@@ -438,18 +462,19 @@ test.describe("Dash's clock", () => {
     await page.getByRole("main").getByRole("button", { name: /^Boss alone/ }).click();
     await yourMove(page);
     await watchClock(page);
-    // (The test switch: the pop-off is his second turn's, and only one comes in a battle.)
-    await playOne(page);
-    await playOne(page);
-    await playOne(page);
+    // (The test switch: the pop-offs are his second and fourth turns' (Eric, Nov 8: two a battle). His pop-off comes as your move
+    // before his turn does, so four of your moves reach the fourth: before his Scramble Rush can come (from his turn 7, its
+    // countdown smacks fit3 too) and before Stockfish mates the shuffled knights.)
+    for (let i = 0; i < 4; i++) await playOne(page);
     await yourMove(page);
     const seen = await page.evaluate(() => (window as any).__clock as ClockSeen);
-    const pops = Object.values(seen.moments).filter((m) => m.kind === "popOff");
-    const fast = Object.values(seen.moments).filter((m) => m.kind === "popOffFast");
-    expect(pops).toHaveLength(1);
-    expect(fast).toHaveLength(1);
-    expect(pops[0]!.count).toBe("3");
-    expect(fast[0]!.count).toBe("10");
+    const pops = Object.values(seen.moments).filter((m) => m.kind === "popOff").sort((x, y) => x.at - y.at);
+    const fast = Object.values(seen.moments).filter((m) => m.kind === "popOffFast").sort((x, y) => x.at - y.at);
+    expect(pops).toHaveLength(2);
+    expect(fast).toHaveLength(2);
+    for (const m of [...pops, ...fast]) expect(m.count).toBe(m.kind === "popOff" ? "3" : "10");
+    // (The second pop-off comes after the first one's beats are over.)
+    expect(pops[1]!.at).toBeGreaterThan(fast[0]!.at + BOSS_POWERS.dashPopOff.loveMs);
     expect(seen.lines.some((l) => DASH_POPOFF_LINES.includes(l))).toBe(true);
     expect(seen.lines.some((l) => DASH_LOVE_LINES.includes(l))).toBe(true);
     // (Its two beats play one after the other, 4.6 s; your clock starts only after them, so nobody's time goes while he thinks.)
@@ -477,8 +502,8 @@ test.describe("Dash's clock", () => {
     expect(landed!).toBeGreaterThanOrEqual(beatEnd - 300);
     // (The move list doesn't grow while the beats play: his move isn't in it until it lands.)
     for (const x of seen.samples) if (x.t >= beatStart && x.t < landed! - 50) expect(x.rows, `rows at ${x.t - beatStart} ms`).toBe(before);
-    expect(seen.cues["fit10:click"]).toBe(BOSS_POWERS.dashPopOff.hits);
-    expect(seen.cues["fit3:click"]).toBe(BOSS_POWERS.dashPopOff.smacks);
+    expect(seen.cues["fit10:click"]).toBe(2 * BOSS_POWERS.dashPopOff.hits);
+    expect(seen.cues["fit3:click"]).toBe(2 * BOSS_POWERS.dashPopOff.smacks);
     expect(errors).toEqual([]);
   });
 });

@@ -93,7 +93,7 @@ export interface TigerShow {
   end: EndShow | null;
   out: OutShow | null;
   /** The pump's stage as this device last drew it, for the balloon put on at clock time `of`, and its step in progress. */
-  pump: { of: number; shown: number; grow: { stage: number; since: number } | null } | null;
+  pump: { of: number; shown: number; grow: { stage: number; since: number } | null; putFrom?: number } | null;
 }
 
 const shows = new Map<string, TigerShow>();
@@ -226,8 +226,12 @@ export function pumpShows(rec: TigerShow | null, balloon: PumpBalloon | null, cl
     // (Put on in front of us: stage 1 first, so any stage it's already at steps up after the put. Else what it is now just shows.)
     pump = rec.pump = { of: balloon.at, shown: put ? 1 : stage, grow: null };
   }
-  const putEnd = put ? put.putAt! + PUT_MS : 0;
-  if (put && now < putEnd) return { anim: pumpAnim("put", piece), since: put.putAt!, then: "stage1", look, quiet: true, wake: putEnd };
+  // (The put plays from when it's first drawn: a page busy as its time came (a slow phone) still shows it, a moment late, rather
+  // than skipping its 160 ms. Hidden, or long ago: it's done.)
+  if (put && pump && pump.putFrom === undefined) pump.putFrom = visible && now - put.putAt! < GROW_FRESH_MS ? now : put.putAt!;
+  const putFrom = put ? (pump?.putFrom ?? put.putAt!) : 0;
+  const putEnd = put ? putFrom + PUT_MS : 0;
+  if (put && now < putEnd) return { anim: pumpAnim("put", piece), since: putFrom, then: "stage1", look, quiet: true, wake: putEnd };
   if (pump && stage > pump.shown) {
     // A step reached in front of us (the page in view, its time a moment ago, or just after the put) plays from now; one reached
     // while hidden, or long ago, just shows.

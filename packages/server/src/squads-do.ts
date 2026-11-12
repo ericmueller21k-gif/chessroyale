@@ -3,16 +3,17 @@ import { SQUADS, SQUADS_LOBBY, pausedLine } from "@chessroyale/core";
 import type { LobbyCloseReason, Opening } from "@chessroyale/chess";
 import type { PartyClientMessage, PlayerBadge, SquadsClientMessage } from "@chessroyale/chess/squads";
 import openings from "@chessroyale/chess/data/openings.json";
-import { SquadsCore, newSquadsRecord, squadsClosing, squadsLiveKey, squadsLiveSummary, type LiveMatch, type SquadsRecord, type SquadsReward, type SquadsServerRequest } from "./squads-lobby.ts";
+import { SQUADS_STARTED, SquadsCore, newSquadsRecord, squadsClosing, squadsLiveKey, squadsLiveSummary, type LiveMatch, type SquadsRecord, type SquadsReward, type SquadsServerRequest } from "./squads-lobby.ts";
 import { PartyCore, newPartyRecord, partyClosing, type PartyRecord } from "./squads-party.ts";
 import { bossPartyOverrides, partyLobby } from "./boss-party.ts";
 import { openLobbyCode } from "./codes.ts";
 import { DEVICE_COOKIE, SIGN_IN_TO_PLAY, accountOf, isSignedIn, readCookie, signInRequired, withSecrets } from "./api.ts";
 import { d1Sql, ensureSchema, grantReward, recordResult, type Sql } from "./accounts.ts";
-import { opKeys } from "./ledger.ts";
+import { cond, opKeys, type Cond, type Outcome } from "./ledger.ts";
+import { grantXp } from "./xp.ts";
 import { rankOf } from "./ranked-schema.ts";
 import { grantWelcomeCrate } from "./welcome.ts";
-import { BANNED_MESSAGE, banCheck } from "./fairplay.ts";
+import { BANNED_MESSAGE, anyPooled, banCheck } from "./fairplay.ts";
 import { isAdmin } from "./admin.ts";
 import { serverScoreAt } from "./engine.ts";
 import { countCall } from "./ops.ts";
@@ -31,6 +32,8 @@ interface Attached {
   name?: string;
   guest?: boolean;
   banned?: boolean;
+  /** In fair play's engine pool (null: not known, the read failed; false for no account). */
+  pooled?: boolean | null;
   /** May use the test controls (an admin, or SQUADS_TEST on). */
   test?: boolean;
   /** Their badge in the turn order (a lobby's sockets only). */
@@ -58,12 +61,11 @@ async function whoIsAsking(request: Request, env: Env, waitUntil: (p: Promise<un
   const account = await accountOf(request, env, waitUntil).catch(() => null);
   const secrets = await withSecrets(env);
   const guest = !!env.DB && signInRequired(secrets) && !isSignedIn(account);
-  const banned =
-    !guest && !!account && !seated(account.id) && !!env.DB
-      ? (await banCheck(d1Sql(env.DB), account, readCookie(request, DEVICE_COOKIE), Date.now()).catch(() => ({ banned: false }))).banned
-      : false;
+  const check = !guest && !!account && !seated(account.id) && !!env.DB ? await banCheck(d1Sql(env.DB), account, readCookie(request, DEVICE_COOKIE), Date.now()).catch(() => null) : null;
+  const banned = !!check?.banned;
+  const pooled = account ? (check ? !!check.pooled : null) : false;
   const test = !guest && (env.SQUADS_TEST === "1" || isAdmin(secrets, account));
-  return { userId: account?.id, ...(account?.name ? { name: account.name } : {}), guest, banned, ...(test ? { test: true } : {}) };
+  return { userId: account?.id, ...(account?.name ? { name: account.name } : {}), guest, banned, pooled, ...(test ? { test: true } : {}) };
 }
 
 /**
@@ -201,11 +203,17 @@ export class SquadsLobby extends DurableObject<Env> {
     let ok = true;
     try {
       await ensureSchema(sql, this.env.DB);
+      const signedInOnly = signInRequired(await withSecrets(this.env));
       for (const r of [...rec.rewardQueue]) {
-        await writeReward(sql, rec.code, rec.createdAt, r, Date.now());
+        const out = await writeReward(sql, rec.code, rec.createdAt, r, Date.now(), signedInOnly, isPaused(this.env, "rewards"));
         const i = rec.rewardQueue.indexOf(r);
         if (i >= 0) rec.rewardQueue.splice(i, 1);
         written++;
+        // (The daily cap took it: kept with the lobby, so a reconnect is told too (m7), and they're told now, in place of the coins.)
+        if (out === "refused") {
+          (rec.capped ??= {})[r.playerId] = true;
+          if (this.record === rec) this.core().rewardCapped(r.playerId);
+        }
       }
     } catch (e) {
       ok = false;
@@ -280,11 +288,12 @@ export class SquadsLobby extends DurableObject<Env> {
    */
   async create(
     code: string,
-    opts: { fillAt: number | null; reserve?: { size: number; pass: string }[]; reserveMs?: number; test?: SquadsRecord["test"]; keepMs?: number },
+    opts: { fillAt: number | null; reserve?: { size: number; pass: string }[]; reserveMs?: number; test?: SquadsRecord["test"]; keepMs?: number; engine?: boolean },
   ): Promise<false | number[]> {
     if (this.record && !(await this.closeIfDue())) return false;
     const seed = crypto.getRandomValues(new Uint32Array(1))[0]!;
     this.record = newSquadsRecord(code, Date.now(), seed, { auto: !opts.test, fillAt: opts.fillAt, test: opts.test, keepMs: opts.keepMs });
+    if (opts.engine) this.record.engine = true;
     this.matches = {};
     const core = this.core();
     const took = opts.reserve?.length ? core.reserve(opts.reserve, opts.reserveMs ?? 20_000) : [];
@@ -335,6 +344,10 @@ export class SquadsLobby extends DurableObject<Env> {
       // (Attached first, so what connect() sends reaches this socket.)
       const token = typeof msg.token === "string" ? msg.token : undefined;
       const known = token ? this.record.humans.find((h) => h.token === token) : undefined;
+      // A matchmade lobby seats newcomers from its own side of fair play's engine pool only, whoever has the code; a party's members come in
+      // by its pass, as their party queued (a failed read lets them in, as a ban's does). The #618 review, m4.
+      const member = typeof msg.party === "string" && !!msg.party && Object.values(this.record.parties).some((p) => p.pass === msg.party);
+      if (!known && this.record.auto && !member && attached.pooled !== undefined && attached.pooled !== null && attached.pooled !== !!this.record.engine) return refuse(SQUADS_STARTED);
       if (known) ws.serializeAttachment({ ...attached, playerId: known.id });
       const result = core.connect(token, {
         name: attached.name ?? (typeof msg.name === "string" ? msg.name : undefined),
@@ -347,6 +360,8 @@ export class SquadsLobby extends DurableObject<Env> {
         ...(attached.badge ? { badge: attached.badge } : {}),
       });
       if (!result.ok) {
+        // (Not that seat's socket: closing this one mustn't mark its player gone.)
+        if (known) ws.serializeAttachment(attached);
         await this.persist(core);
         return refuse(result.message, { ...(result.ended ? { ended: true } : {}), ...(result.left ? { left: result.left } : {}) });
       }
@@ -387,7 +402,7 @@ export class SquadsLobby extends DurableObject<Env> {
  * are busy) and tells everyone the lobby and its pass. It closes after a while with nobody in it.
  */
 export class SquadsParty extends DurableObject<Env> {
-  private record: (PartyRecord & { queueName: string; fillMs: number }) | null = null;
+  private record: (PartyRecord & { queueName: string; fillMs: number; poolName?: string }) | null = null;
   private asking = false;
   /** A Boss Battle party's START is making its battle (one at a time: makeBattle). */
   private making = false;
@@ -395,7 +410,7 @@ export class SquadsParty extends DurableObject<Env> {
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
     void ctx.blockConcurrencyWhile(async () => {
-      this.record = (await ctx.storage.get<PartyRecord & { queueName: string; fillMs: number }>("party")) ?? null;
+      this.record = (await ctx.storage.get<PartyRecord & { queueName: string; fillMs: number; poolName?: string }>("party")) ?? null;
     });
   }
 
@@ -462,12 +477,13 @@ export class SquadsParty extends DurableObject<Env> {
   }
 
   /**
-   * A new party under this code (false: the code is in use), queueing on `queueName` (lobbies fill after `fillMs`). A
-   * Boss Battle party (`kind` "boss", boss-party.ts) has no queue: its START makes the battle.
+   * A new party under this code (false: the code is in use), queueing on `queueName` (lobbies fill after `fillMs`), or on
+   * `poolName` when a member is in fair play's engine pool (read from their accounts as it queues). A Boss Battle party (`kind`
+   * "boss", boss-party.ts) has no queue: its START makes the battle.
    */
-  async create(code: string, queueName: string, fillMs: number, kind?: "boss"): Promise<boolean> {
+  async create(code: string, queueName: string, fillMs: number, kind?: "boss", poolName?: string): Promise<boolean> {
     if (this.record && !(await this.closeIfDue())) return false;
-    this.record = { ...newPartyRecord(code, Date.now(), kind), queueName, fillMs };
+    this.record = { ...newPartyRecord(code, Date.now(), kind), queueName, fillMs, ...(poolName ? { poolName } : {}) };
     await this.persist(this.core());
     return true;
   }
@@ -606,12 +622,17 @@ export class SquadsParty extends DurableObject<Env> {
     this.asking = true;
     try {
       await this.persist(asking);
+      // A member in fair play's engine pool: the whole party queues in the pool's own queue (the server's record, never a browser's).
+      const ids = this.record.members.flatMap((m) => (m.userId ? [m.userId] : []));
+      const pooled = !!this.record.poolName && !!this.env.DB && (await anyPooled(d1Sql(this.env.DB), ids).catch(() => false));
+      if (!this.record) return;
+      const queue = pooled ? this.record.poolName! : this.record.queueName;
       // Squads resting (a kill switch): the party waits in line with its line, asking again each minute, and goes in
       // once it's back.
       const answer = isPaused(this.env, "squads")
         ? { busy: true as const, ticket: want.ticket ?? "", position: 0, waitSeconds: 60, retryMs: 60_000, message: pausedLine("squads") }
-        : await this.env.MATCHMAKER.get(this.env.MATCHMAKER.idFromName(this.record.queueName))
-            .next({}, this.record.fillMs, { squads: true }, want.ticket, { size: want.size, pass: want.pass })
+        : await this.env.MATCHMAKER.get(this.env.MATCHMAKER.idFromName(queue))
+            .next({}, this.record.fillMs, { squads: true, ...(pooled ? { engine: true } : {}) }, want.ticket, { size: want.size, pass: want.pass })
             .catch(() => null);
       if (!this.record) return;
       const core = this.core();
@@ -628,13 +649,40 @@ export class SquadsParty extends DurableObject<Env> {
  * (code and creation), the Welcome Crate (once ever), and the coins and crates as a ledger op keyed `squads:<code>:<created>:<ledger
  * id>`. Throws if D1 fails, so the lobby keeps it to try again.
  */
-async function writeReward(sql: Sql, code: string, created: number, r: SquadsReward, now: number): Promise<void> {
-  if (!r.userId) return;
+export async function writeReward(sql: Sql, code: string, created: number, r: SquadsReward, now: number, signedInOnly: boolean, paused = false): Promise<Outcome | null> {
+  if (!r.userId) return null;
   if (r.recorded) {
-    const result = { mode: "squads" as const, online: true, placement: r.placement, players: SQUADS.squadCount, teamWon: r.placement === 1, ranked: false, lobby: code };
+    // XP (Nov 9): your moves and time as this lobby counted them; a win is your squad winning the lobby (1st). Once: keyed by this
+    // lobby (code and creation). Never in the way of the result.
+    const xp = await grantXp(sql, r.userId, {
+      key: `squads:${code}:${created}`,
+      facts: { ms: r.playMs ?? 0, moves: r.moves ?? 0, won: r.placement === 1, resigned: !!r.resigned, abandoned: !!r.abandoned },
+      signedInOnly,
+      now,
+      paused,
+      quest: "squads",
+    }).catch((e: unknown) => {
+      console.log(`xp for squads ${code}: ${String(e)}`);
+      return null;
+    });
+    const result = { mode: "squads" as const, online: true, placement: r.placement, players: SQUADS.squadCount, teamWon: r.placement === 1, ranked: false, lobby: code, playMs: r.playMs ?? null, moves: r.moves ?? null, xp };
     await recordResult(sql, r.userId, result, now, { since: created });
     // (A finished game: maybe the Welcome Crate, once ever: welcome.ts.)
     await grantWelcomeCrate(sql, r.userId, now).catch(() => false);
   }
-  await grantReward(sql, r.userId, r.coins, r.crates, opKeys.squadsReward(code, created), now);
+  return grantReward(sql, r.userId, r.coins, r.crates, opKeys.squadsReward(code, created), now, squadsDailyCap(now));
 }
+
+/**
+ * Squads' daily cap (SQUADS_LOBBY.rewardsPerDay, like ranked's): fewer than that many Squads placement rewards in the account's ledger
+ * since the UTC day began, checked in the same statement as this one goes in (two lobbies ending at once can't both pass it).
+ */
+export const squadsDailyCap =
+  (now: number) =>
+  (account: string): Cond =>
+    cond(
+      "(SELECT COUNT(*) FROM ledger WHERE account = ? AND reason = 'reward' AND leg = 0 AND op_id LIKE 'squads:%' AND created_at >= ?) < ?",
+      account,
+      Math.floor(now / 86_400_000) * 86_400_000,
+      SQUADS_LOBBY.rewardsPerDay,
+    );

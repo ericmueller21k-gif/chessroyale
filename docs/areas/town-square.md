@@ -29,7 +29,8 @@ behind Cloudflare Access like the rest of the site). Phone and computer; **on a 
   `in-frame` to its screen (`town.css`: in the page's flow, the window's height, not fixed). On a computer **the chat icon sits right
   after the "Town square" title and the gear alone at the right end** (`town-chat.css`: the tools' box `display: contents`, the gear
   `margin-left: auto`): the chat's place was hard to see at the far right. Every side-menu item leaves the town (`goHome` in
-  `App.tsx` closes it), Chess Town opens it again. Known limit: resizing a mouse window across 1024 px adds or takes away the
+  `App.tsx` closes it), Chess Town opens it again. Leaving asks "Leave Chess Town?" first (`town/LeaveTown.tsx`; Stay focused,
+  Escape is Stay; both set in layout effects so a key in the sheet's first frame isn't lost, Nov 10). Known limit: resizing a mouse window across 1024 px adds or takes away the
   frame, which starts the town again at its start square. The world never assumes a screen size: it fills its box and works its camera out
   from the box's shape, so the panels Eric designs around it can change without touching it. The back button, the chat icon, the
   gear and the buttons stay put. **The buttons** (Eric, Oct 28: "remove the 'Back to me' button … replace with circular focus
@@ -75,6 +76,10 @@ behind Cloudflare Access like the rest of the site). Phone and computer; **on a 
 - **The drawing** (`town/render.ts`): one canvas, one `requestAnimationFrame` loop (in `Town.tsx`), stopped when the screen
   closes or the tab is hidden; device pixel ratio capped at 2; nothing allocated per frame on the hot path (square colors,
   fonts, gradients, clouds, pawns and every boss and home frame are made once, the frames the first time they show).
+  Since Nov 10 (phone load 3) a picture's pixels are painted the first time it's drawn too (`houses/kit.ts` `paint`: so a paint
+  function must not lean on anything that changes after the call; `test/town-paint-lazy.test.ts` checks every picture), and each
+  statue's world-scale picture is made when first drawn: opening took 5.8 s to its first frame on a slowed phone, now 2.1 s
+  (`e2e/perf.spec.ts`, "Chess Town on a slow phone").
   It draws through a **drawing layer** (`town/paint.ts`, Oct 30) with two backends: Canvas 2D (today's town, everyone's) and
   WebGL 2 (the street town's only drawing since Nov 6, `town/paint-gl.ts`; below, "WebGL").
 - **WebGL (Oct 30; docs/decisions/2026-10-30-town-webgl.md; the street town's only drawing since Nov 6,
@@ -108,6 +113,14 @@ behind Cloudflare Access like the rest of the site). Phone and computer; **on a 
   round its plot, the Colosseum (or its ground) on the free apron square nearest its gate (`destFor`), so a crowd at the
   gate grows in a half ring. If two walks end on one square, the later claim gives way to the nearest free square
   beside it (`keepApart`, every tick). Bots and bosses pick their ends the same way.
+- **A tap near a home's foot is the home's** (Nov 12, Eric: "more grace where you can click anywhere near or on the building"): its
+  picture, its plot (the half-hidden row under its front), its foot row (the row right in front of its front edge across the plot,
+  its door square among them: `world.ts homeNear`), a see-through pixel of its picture's box over ground within a square of its
+  plot and no other home's (`render.ts pick`), and your own pawn over any of those (`Town.tsx pickTap`; a tap on you elsewhere
+  still does nothing). Not the corners beside the foot row, nothing two rows out; people, bosses, tables and statues are picked
+  first. Of two homes, the nearer door. It walks you to the door square and opens its card, as a tap on the building does. Test
+  hook `__townPick(x, y)` (its key, where you'd walk, the card). Tests: `packages/app/test/town-door-tap.test.ts`,
+  `town-world.test.ts`, `e2e/town-street.spec.ts` ("Alfil's Pyramid"). [2026-11-12-town-door-tap.md](../decisions/2026-11-12-town-door-tap.md).
 - **Cards** (the prototype's, inside the world's box, over the boss's head or above the home's name, placed every frame;
   a tap anywhere else, or Escape, closes one). **Every card is dark** (Eric's mockup, Oct 28: "dark card" with a "thin warm-gold
   border"): `#20212a`, a 1.5 px `#d9bb8c` border, rounded corners, a tail with the same border pointing at what it's about, white
@@ -260,8 +273,10 @@ behind Cloudflare Access like the rest of the site). Phone and computer; **on a 
   `town/TownChat.tsx`, the header's icons in `town/TownChatTools.tsx`, its styles in `town/town-chat.css`; one mount each in
   `Town.tsx`). **One box** in the map's **top left corner** (flush, 8 px in), over the map and under the cards: a
   phone's from the left edge to about two thirds across and a bit under a quarter down (about 7 messages), a computer's 500 × 340
-  with a bigger font (about 12 lines), and in the frame 500 × 120 (about 4 lines; Eric, Oct 30: a third as tall, "so easy to click on it
-  when running around"; `docs/decisions/2026-10-30-town-chat-short.md`; `CHAT.computerQuery` is styles.css' computer). It keeps one place and size whatever it
+  with a bigger font (about 12 lines), and in the frame 500 × 190 (8 lines: Eric, Oct 30, made it 120, a third as tall, "so easy to
+  click on it when running around"; Nov 12, about half as tall again (4 more lines), "bump the desktop to about 4 or 5 more lines. Make it about 1.5 times the
+  current height"; `docs/decisions/2026-10-30-town-chat-short.md`, `2026-11-12-town-chat-hints.md`; the phone's is unchanged: a taller one
+  would cover more of the map it walks on; `CHAT.computerQuery` is styles.css' computer). It keeps one place and size whatever it
   holds, **and in every mode**: the stream ends above a **30 px strip at its foot that is reserved for the typing line** whether it shows
   or not (v4), so the line appearing moves nothing. **Nothing is drawn behind or round the text** (Eric, Oct 28, from his phone:
   "clearly a container still showing behind the text"; "I don't want the shadow text period"): no backing, border, bar, box-shadow,
@@ -286,7 +301,12 @@ behind Cloudflare Access like the rest of the site). Phone and computer; **on a 
     computer). **Enter or the keyboard's Send sends** and closes it; **a press on the map or Escape closes it** (the line hides, the keyboard goes,
     the blur goes unless the setting holds it); the words you typed stay for the next tap. A guest, a young device, a paused chat or a chat
     ban gets the same line **greyed with the reason in it** ("Sign in to chat with other players.", …): the reason is the disabled input's
-    placeholder, so no "Say something…" is anywhere. A tap is a press under `holdMs` (400 ms) that moves under `holdSlopPx` (8 px); a finger that
+    placeholder. **The hint** (Eric, Nov 12: "in very faint, like gray… tap the box to type… only a few words… it will disappear when the
+    text box disappears as well"): while the box shows and you aren't typing, the strip holds "Tap here to type" (a phone) or "Click here
+    to type" (a computer; `CHAT.hintPhone` / `hintComputer`, `chatHint`), thin (300) and faint gray (`--chat-hint`, the system gray at 0.72,
+    by day and by night), the messages' size, its first letter 8 px in like the timestamps' "[", no touches of its own (a tap there is the
+    box's). It hides the instant typing opens (the form's `data-open`) and comes back when typing closes; it fades and goes with the box
+    (new messages' fade, off). It is a `div.tc-hint`, not the field's placeholder (the field still has none). A tap is a press under `holdMs` (400 ms) that moves under `holdSlopPx` (8 px); a finger that
     moves scrolls the stream, and press and hold picks the box up, as before. While typing, in new messages, the lines are held and every
     line shows ("high text", below). A keyboard reaches the box with Tab (the stream takes focus) and Enter opens typing.
   - **The modes** (`ChatMode`, remembered on this device: localStorage `brc.townChatMode`, in a try/catch; "always on" until one
@@ -400,7 +420,9 @@ behind Cloudflare Access like the rest of the site). Phone and computer; **on a 
   own worn ride's is asked for as the app starts, after its first paint: `components/rides/load.ts`,
   [2026-11-01-rides-lazy.md](../decisions/2026-11-01-rides-lazy.md)). A rider's frames are composed once from the ride's own drawing (`components/rides/draw.tsx`: each layer of each frame as SVG,
   made into an image, in the ride's colors at the rider's size, as `dressedPawn` makes your dressed pawn), with the pawn on its seat
-  (its back, the pawn, its front), **one frame an animation frame** (`Rider` in `town/rides.ts`), every view, then its trail marks; each
+  (its back, the pawn, its front), **one frame an animation frame** (`Rider` in `town/rides.ts`), every view, then its trail marks
+(**yours all at once, before the town shows**, Nov 10: `readyYou` in Town.tsx, `Rider.hurry`; the town waits up to `TOWN_FEEL.youWaitMs`,
+1 s, so its first frame has you on your ride: [2026-11-10-town-rider.md](../decisions/2026-11-10-town-rider.md)); each
   view's box comes from `town/ride-cells.ts` (measured ahead by `scripts/measure-rides.ts`, with each view's frames' seats, times and lift,
   the tile's box and the trail's numbers; a hash test keeps it fresh). Until that's done (its drawing loaded, then about 2 s on a phone)
   the person walks on foot, **in the box and under the tag the rider will have** (Nov 1, rides lazy: the renderer's `youSoon` and
@@ -463,9 +485,9 @@ behind Cloudflare Access like the rest of the site). Phone and computer; **on a 
     bot's pawn from its idle's top to its feet (`sidekickSquares`, 0.87), its feet where a pawn's base stands; its name
     tag over its head, as a pawn's. **Its frames are baked** (`scripts/bake-sidekicks.ts`, run after changing a sidekick's
     art): one PNG a sidekick (`town/sidekicks/<boss>.png`: rows idle, walk, sit, wave) and their times, feet and heads in
-    `town/sidekick-sheets.ts`; the town loads the fourteen pictures as it opens and cuts every frame into a canvas once
-    (`SpriteFrames` in `render.ts`), never per frame; a sidekick isn't drawn (or tapped) until its picture has loaded (a
-    moment). No art code runs in the town: the sprites' own code paints for about 3 s as it loads, which would hold the
+    `town/sidekick-sheets.ts`; the town loads the fourteen pictures as it opens and cuts a sheet's frames into canvases once,
+    when its sidekick is first drawn (`SpriteFrames.cut` in `render.ts`; Nov 10, phone load), never per frame; a sidekick isn't
+    drawn (or tapped) until its picture has loaded (a moment). No art code runs in the town: the sprites' own code paints for about 3 s as it loads, which would hold the
     town's first frame back (measured: the decision).
   - **A person's card** (a tap on a bot, or on a real player once they walk in the town: `Card` kind `"person"`; placed over its
     name tag like a boss's, as before; the bot holds still while it's open, `hold`). **One row, one size, 210 × 53 px on a phone and
@@ -513,6 +535,8 @@ behind Cloudflare Access like the rest of the site). Phone and computer; **on a 
 
 ## Inside a shop (Nov 2, round 1)
 
+**Frame rate inside (Nov 11):** the room keeps its back (ceiling, what's past the walls, the floor and the one-frame plans that come first) as one picture while the camera rests (`drawBack`, `__shopStill()`): the floor is laid every frame as some hundreds of clipped, stretched triangles, the costliest drawing of a room's frame (headless, CPU slowed 4x: 20 fps with it, 60 without). The second frame the view is the same (camX, camY, the zoom, the claw's close-in, the canvas size) the back is copied as drawn; while it stays, one copy draws it. The camera's follow spring now settles exactly (within 1e-4 of a square) so a resting view stays the same. A moving view draws as before (walking in a room is still about the floor's cost: the next step if it matters). [2026-11-11-town-room-perf.md](../decisions/2026-11-11-town-room-perf.md). **Walking (Nov 11):** the back is drawn by WebGL (`shops/back-gl.ts`): the ceiling's picture, a cave's rock, the day outside and the floor (its picture with the still plans, uploaded once; each frame one mesh, two triangles a square, through the room's `P`) into one opaque picture, copied onto the canvas in one `drawImage` where the back was, so the pools, figures and darks blend with it as before. No WebGL or a lost context: the 2D way (`drawBack2d`). `?back=2d` (anyone's) draws it the 2D way, to compare with `?report` on a phone. Hooks: `__shopStill()` adds `gl`, `backTris` (2D floor triangles in the last back: 0 with WebGL) and `glTris`; `__shopBackDiff()` draws the back both ways and compares; `__shopBench(n, true)` times a draw with the view moving. Scripts: `scripts/perf-room.mjs`, `scripts/stills-room.mjs`. Headless can't show its speed (no GPU: WebGL is software there). [2026-11-11-room-smooth.md](../decisions/2026-11-11-room-smooth.md). **Going in (Nov 11, Eric: "just make it take an extra second"):** while the town zooms on the door the room's pictures are painted at most `SHOP_FEEL.loadSliceMs` (4 ms) a frame (`shops/load-slice.ts`), the rest once it's black; the black lifts once the room has drawn `warmFrames` (3) frames, `warmMaxMs` (1 s) at the most, so their first-time costs are under it. Measure with `scripts/door-room.mjs`.
+
 Eric, Nov 2: walk up to Babur's home and go in; inside, the Shopkeeper sells **Babur's Boss Crate**. Round 1 was the town side, with
 buying stubbed behind one function; round 2 (Nov 2) put the stored data behind it: boss tokens, crate keys and the purchase
 ([shop.md](shop.md), "Boss tokens"; [2026-11-02-boss-tokens.md](../decisions/2026-11-02-boss-tokens.md)). Inside, the page's header says
@@ -550,7 +574,8 @@ and [2026-11-02-bigger-showpieces.md](../decisions/2026-11-02-bigger-showpieces.
   art's `rockPiece` puts them. **The camera:** a drag's focus stays over the floor (`camFocus`: never into the rock or past the edge);
   past the 20 × 20 squares the rock goes on (one fill in the flat rock tile's own tone, under the horizon), and past the mouth the
   snowy night (`CAVE_SNOW`) where a box room has the bright day; a piece nearer the camera than you and drawn over you is see-through
-  (`SHOP_FEEL.seeThrough`, 0.35, caves only: the passage's walls south of you, the mouth's arch as you come in). Its roof: dark stone
+  (`SHOP_FEEL.seeThrough`, 0.35: the passage's walls south of you, the mouth's arch as you come in; any room with a floor's shape,
+  only its `seeThru` pieces where it lists them: Rolling Dough's doors and near walls, never its table, Nov 11). Its roof: dark stone
   and stalactites (`roof: "cave"`, the mockup's). **The Shopkeeper:** Hollow's dog (`characters/sidekicks/hollowdog.ts`, baked as
   the others; not a town bot: Glim stays Hollow's kid in the town) on (5, 2) and (6, 2) behind the 30 px counter, drawn at (5.5, 2.4);
   "Shopkeeper", no name; his tag drawn with him, so nearer rock covers it. "Hollow's Boss Crate" with Hollow's Bulb; the chat's
@@ -645,6 +670,18 @@ and [2026-11-02-bigger-showpieces.md](../decisions/2026-11-02-bigger-showpieces.
 - **Boingo's Funhouse (Nov 6).** Everyone's town. A 24 x 24 arcade (`shops/boingo-art.ts`, `RoomArt.n`) in `CLOWN_PALETTE` under an arcade ceiling of bulbs (`roof: "arcade"`): a 3-level net climb with a spiral slide and a ball pit, the spinning light game, roll-ball lanes, the squirt race (5 clown players, knights racing on a loop), the
   prize counter (the clown attendant `characters/sidekicks/funkeeper.ts`, "Shopkeeper"; "Boingo's Boss Crate" with Boingo's Pogo) and the pogo under a spotlight with its price sign (`pogoSign()`, the crate's price). **The claw machine** (19, 7): the kit model `town/kit/models/claw-cabinet.ts` placed by `shops/claw-cabinet.ts`, its claw posed
   from the play (`claw/view.ts`); walking up glides the camera in (`SHOP_FEEL.claw`), its coin slot opens `openClawMachine()`. His challenge: the default intro on his carnival mat. docs/decisions/2026-11-06-boingo-home.md.
+- **Rolling Dough (Nov 11), an admin's town only** (`zebra` in `BOSS_ADMIN_FIRST`; no town boss: `hasTownBoss`). **Out front, a stand-in**
+  (`STAND_IN` in `world.ts`: the "Bakery guard", the flat-cap guard's drawing, on the home's rest square, never roaming or talking on his
+  own; in today's town beside its door): his card is his name, a line row kept two lines high and **Talk** ("the boss is inside", one of
+  `ZEBRA_OUTSIDE_LINES` at random). Front room (`shops/zebra-art.ts`): a tapped guard and the counter zebra's Talk say he's in the back
+  (`ZEBRA_BACK_LINES`, at random, in a bubble); the guards' `watch` follows you. **The door between rooms** (`ShopPlace.door`,
+  `Room.pass`; "Go in" / "Go out front"; Town.tsx `goThrough`) leads to the dim back room (`BACK_ROOMS`, its own fixed camera): the chatter,
+  Don's card: **Challenge** alone (Nov 11, docs/decisions/2026-11-11-bakery-challenge.md). It plays his beat (the crew stand, draw and
+  aim at you, each turned to your side, his roll at your angle, `aimAt`, following you as you move), then the walk-out (`WalkOut`: four
+  goons pick up the set kept before his table, `ZEBRA_BACK_SET`, and carry it out, Don and you following; no taps), then
+  fades to the front room's pad (`SHOP_ZEBRA_PAD`), the goons carry the set-up in from behind the door (`SetupScene`), five watch, `intros/zebra.ts` plays: his line, his `breadPop`, Beanie's line over him (`crewLine`), his bread splash as the wipe (`zebra-intro-art.ts`, sounds `zebraWhoosh`, `zebraTumble`). Hook `__shopZebra()`; tests `shop-zebra.test.ts`, `e2e/zebra-home.spec.ts`; docs/decisions/2026-11-11-zebra-home.md.
+  Its floor tiles' names start `floor-` (`floor-back-*`, `floor-rug-*`, `floor-mat-*`: room.ts `isFloor`), so they're baked into the
+  floor; a tile named otherwise stands up as a piece every frame (Nov 11: the back room's 196, ghosted as you walked behind them).
 - **Which homes.** Babur's Circus (`tiger`), Puddles' Botanical Garden (`gardener`) and Alfil's Pyramid (`alfil`, Nov 2: Woolly the Shopkeeper, "Alfil's Boss Crate" with Alfil's Howdah, a sandstone ceiling, the chat's day tone) and Big Boy's Crib (`bigboy`, Nov 2: Blocky the Shopkeeper, "Big Boy's Boss Crate" with Big Boy's Buggy, a nursery ceiling of sky, clouds and stars, the chat's day tone; a ball pit, solid, under a walkway, the shop's platform and the battle circle you walk on, the circle in the walkway's foam squares with a zoo-animal rug in its middle; his toy airplane, three squares deep, stands up whole at its foot, `RoomArt.upright`, rather than lying flat as a plan) and Timber's Lumber Lodge (`timber`, Nov 3, an admin's town only: Rivet the Shopkeeper behind the middle of the workbench, "Timber's Boss Crate" with The Log Roller, a lodge's ceiling of dark planks between heavy beams, the chat's day tone; the giant king being carved on its dais, 4 × 2 squares, stands up whole, `RoomArt.upright`; the circle's branded start marks, `SHOP_TIMBER_MARKS`, passed as Big Boy's are; his challenge his own intro since Nov 3, the log he gnaws into the table, his line "Hard hats on. We're building today.")) and Dash's Kicks (`dash`, Nov 3, an admin's town only: Tick the Shopkeeper on the counter's middle squares, drawn half a square back and west (`at` [9, 1.5]) so the low tortoise's head shows over the 30 px counter, clear of its shoe boxes; "Dash's Boss Crate" with Cheetah Shoes; a store's ceiling of white tiles and light panels; the chat's day tone; the halfpipe, 4 × 2 squares, stands up whole, `RoomArt.upright`; his try-on mats, `SHOP_BLITZ_MARKS`, passed as Timber's are) and Hollow Peak (`hollow`, Nov 3, everyone's town: below, "Hollow's cave") and Wrangler's Stall (`pig`, Nov 4, everyone's town: above, "Wrangler's barn") and Jefferson's Fireworks (`grex`, Nov 4, everyone's town: above, "Jefferson's warehouse") and Ginger Igloo (`gingerbread`, Nov 5, everyone's town: above, "Ginger's igloo") and Folio's Folded House (`folio`, Nov 5, everyone's town: above, "Folio's sanctuary") and Boingo's Funhouse (`clown`, Nov 6, everyone's town: above): `SHOPS` in `town/shops/shops.ts`. Their home's card
   is its name, centered, and **"Go in"** (gold) under it, centered, nothing else (Eric, Nov 2: "chop the Shop and Coming soon": a short
   card, `.town-card.town-door`); every other home's card is as it was (its name, Hollow's line, "Shop" greyed and "Coming soon").
@@ -653,6 +690,16 @@ and [2026-11-02-bigger-showpieces.md](../decisions/2026-11-02-bigger-showpieces.
   `fadeMs`), the room's code and art load (only now: `shops/ShopRoom.tsx` and each room's art are chunks of their own), the town waits
   (`pause`: no frames, nothing moves, its chips put away) and the room fades in from black. **Going out** ("Go out", or the back button,
   which inside a shop means out, not home): the room fades to black and the town zooms back out from the door, you where you stood.
+  A Back or Go out tapped while the room still fades in waits for it, then goes out (`outNext`, Nov 12: it was lost).
+  **The area banner (Nov 11, Eric's mockup):** as the black lifts on a room you walked into through its door (the town's, or Rolling
+  Dough's door between rooms; never one you arrive in by a challenge), its name across a soft dark band a third down the room's view:
+  the boss's name and 's in gold in the pixel font ("DON DOUGH'S"; Rolling Dough's back room "BACK ROOM"; a room with no boss nothing),
+  gold rules above and below, the home's name in Archivo Black (`town/AreaBanner.tsx`, `areaBannerOf`, from the homes' and rooms'
+  data). Fades in 0.4 s, holds 1.8 s, fades out 0.6 s (`AREA_BANNER`; reduced motion: no fades); taps pass through it; sized from
+  the room's view (container units). **Room music:** the boss's theme loads as the door zooms and plays as the room shows; a
+  challenge's starts as its splash starts, the splash held up to 2 s for it (`stormIn`; docs/areas/bosses.md "Music"). Tests: `e2e/zebra-home.spec.ts` (the banner's words, place, taps through it, gone by 4 s; none
+  arriving by the challenge), `packages/app/test/music.test.ts` ("a boss's room").
+  docs/decisions/2026-11-11-area-banner-room-music.md.
 - **The room** (`shops/ShopRoom.tsx`): 20 × 20 squares from the art's layout (`shops/babur-art.ts`, `shops/puddles-art.ts`, copied from
   `claude/boss-art`), drawn as the approved mockup (`scripts/boss-art/shop-view.ts` there) drew it, through `camera.ts` (`setView`'s
   `sets`: the room's own camera sets): the floor tiles baked once into one picture and laid flat in blocks of two squares (a block drawn
@@ -689,8 +736,15 @@ and [2026-11-02-bigger-showpieces.md](../decisions/2026-11-02-bigger-showpieces.
   and 1 crate key."**: `bossHoldings`, your locker's, drawn again whenever your account changes) and two buttons, **"Buy with 3 Babur
   tokens"** and **"Buy with 1 Babur token + 1 crate key"**, each greyed while you can't pay that way (`canAfford`), both through
   `buyBossCrate(boss, way)`: the server's purchase (round 2), into your inventory, unopened (Eric, Nov 2; the Crates tab opens it:
-  [shop.md](shop.md), "Boss crates you hold"). Its answer shows in a row under them that's always there, 40 px high: **"Babur's Boss Crate
-  is in your inventory."**, or the server's reason (**"You need 3 Babur tokens."**).
+  [shop.md](shop.md), "Boss crates you hold"). Its answer shows in a row under them that's always there, 40 px high, in the card's white
+  at 13 px (Nov 12: it was the 11 px gray "Coming soon" style, and Eric missed it): **"Babur's Boss Crate is in your inventory."**, or the
+  server's reason (**"You need 3 Babur tokens."**). The price line is its own class, `.shop-room-price` (Nov 12: it shared `.shop-price`
+  with the Shop screen's cream price button, which won). **After a buy** (either way; Eric, Nov 12) a pop-up over the room and the card
+  (dimmed under it, never moved): **"You got Babur's Boss Crate!"** (`gotLine`), the crate's picture, "It's in your inventory.",
+  **Open now** and **Later** (44 px). Open now opens it with the Crates tab's own `CrateOpening` (the strip, the reveal; the same route and
+  odds), in a box over the room in the app's light or dark surface; its Done (or Later, or Escape) closes it and leaves the card as it was.
+  A failed buy: the row says why, no pop-up. e2e `shop.spec.ts`, "Boingo's Boss Crate bought in his Funhouse";
+  docs/decisions/2026-11-12-boss-crate-bought.md.
 - **The chat log inside** (Eric, Nov 2: "make the default text color white, or black, depending on darkness of background in the shop"):
   the town's chat box over the room takes the room's tone, not the sky's (`ShopDef.chatTone`: TownChat's `data-tone`): Babur's dark tent
   `night` (white words on a dark tint), Puddles' light greenhouse `day` (dark words on a light tint), whatever the time outside.
@@ -887,6 +941,16 @@ standing where the chair blocks are"): [2026-11-02-challenge-pacing.md](../decis
   About 12 s from Fight to the screen covered for Big Boy and Alfil, 9 for the default (it was about 6; the room's loading adds to it); about 16.5 for Timber (his own intro about 12.7 s from the marks to covered, Eric's "about 12 s"); about 15 s from the marks to the board for Hollow (Eric: "his startup time can be a few seconds longer").
 - **After the battle:** the result screen's leaving button reads **"Back to town"**; it (and the gear's Leave: "You'll go back to the
   town square.") opens the town with you on the square you stood on, facing the same way (`createTown`'s `stand`). "Play again" keeps it.
+- **"Ann has entered the town."** (Eric, Nov 12: "it's not persistent enough… we have to wait for someone to say something… when you
+  join… it should say… has entered the town"): the server's line when a signed-in player's pawn comes into the town (`TownHere.beat`
+  says it's fresh: new, past its limit, or from another room; the live hub hands it to that town's chat room, `TownChat.arrive`). Once
+  per visit: back within `TOWN_CHAT.enterRejoinMs` (2 minutes) of your last beat (a reload, a trip home or to a game) posts nothing. A
+  busy town doesn't flood: arrivals within `enterBurstMs` (6 s) of an "entered" line wait and go out as one line when it's up ("Ann and
+  Bo entered the town.", "Ann, Bo and Cy entered the town.", "Ann, Bo and 3 others entered the town."), so at most one every 6 s.
+  Everyone in the town reads them (guests, chat off: they arrive and show when it's on), and a device marked too young reads these
+  alone (the server sends it nothing else: `enterOnly`). In the log: `sys: "enter"`, kind `arrival`, the system gray upright (a line only
+  you see is the italic one), no name, no menu, not reportable or mutable; a tap on it opens typing. They follow the room's rules (5
+  minutes, a newcomer's last 12). A Worker instance's 2 s copy of the room means your own may show a moment after you arrive.
 - **The server's lines in the town's chat** (signed-in players; blue, `.tc-server`, no name and no menu): "Ann challenged Alfil!" as the
   battle starts; as it finishes, "Ann beat Alfil in 34 moves!", "Alfil beat Ann in 21 moves.", "Ann drew with Alfil in 40 moves.",
   "Ann surrendered to Alfil after 15 moves." (a resign after `TOWN_CHAT.challengeSurrenderMoves`, 10; before, it's a quit), and
@@ -1014,7 +1078,9 @@ and Seam Avenue's camera turn, is done; then the switch goes). Eric approved its
     `mapMaxPx`), `mapOpacity` 0.7, rounded; under the chat where the chat takes the whole top (a narrow frame). Drawn once a size to its
     canvas; each frame only your dot's transform moves (`MapDot`, `mapFrame`). The map button (`TownChatTools`) turns it off and on,
     stored per device (`brc.townMap`, on by default), grayed inside a building. A tap opens it large in the middle (every boss home's
-    chip portrait, the park and Colosseum icons, your dot; no names); a tap anywhere closes it. The chips and `pick` keep off its box
+    chip portrait, the park and Colosseum icons, your dot; no names); a tap anywhere closes it. A tap on a boss's portrait or its home's
+    block (within 2 squares of its middle, the nearest) also walks you to that home as a tap on it in the town would, by its door, with
+    no card (Nov 11, `walkHome`; [2026-11-11-map-walk.md](../decisions/2026-11-11-map-walk.md)). The chips and `pick` keep off its box
     (`MAP_BOX`).
   - **Test hooks:** `__townCam()`'s `base`, `snapped`, `gesture`, `run` and `you` (your pawn's drawn box).
   - **Tests:** `packages/app/test/town-controls.test.ts`, `e2e/town-controls.spec.ts`.
@@ -1022,8 +1088,28 @@ and Seam Avenue's camera turn, is done; then the switch goes). Eric approved its
     `docs/street-controls-map/`.
 
 ## Frame-rate pill (`?fps`)
-`/town?fps` shows anyone (Eric, Oct 30: no admin needed, the site is behind Cloudflare Access) a pill in the world's top-right corner, "60 fps · 16.7 ms · 2D": frames over the last second and their mean time, text set twice a second from plain counters in the frame loop, then the drawing's backend ("· WebGL" in the street town; added by town.css from `data-backend`, so the pill's text stays the numbers). Without `?fps` there is none. `?crowd=N` is anyone's too (only that device draws the pawns).
-`?fps`, `?crowd=N` and `?street=off` are read once as the page opens (`TOWN_ASKED`, test-switches.ts), so a later replaceState can't lose them; they apply as the town opens.
+`/town?fps` shows anyone (Eric, Oct 30: no admin needed, the site is behind Cloudflare Access) a pill in the world's top-right corner, "60 fps · 16.7 ms · 2D": frames over the last second and their mean time, text set twice a second from plain counters in the frame loop, then the drawing's backend ("· WebGL" in the street town; added by town.css from `data-backend`, so the pill's text stays the numbers). Without `?fps` there is none. `?crowd=N` is anyone's too (only that device draws the pawns). Since Nov 11 the count is shared (`FpsCount`, `FPS` in `frame-report.ts`): the town's frames and a room's both tick it, so inside a building it reads the room (before, it stood still on the town's last reading there, and its first two readings out divided the frames from before you went in by the whole visit: Eric's "42-44 inside, 2-4 going out", Nov 11). A hidden tab restarts it; the black between the town and a room doesn't (that wait is real).
+`?fps`, `?report`, `?crowd=N` and `?street=off` are read once as the page opens (`TOWN_ASKED`, test-switches.ts), so a later replaceState can't lose them; they apply as the town opens.
+
+## Frame report (`?report`, Nov 11)
+`/town?report`, anyone's: from your first move, every frame for 30 s (or until **Done** on the pill at the top) is recorded in typed arrays made once (`town/frame-report.ts`; `REC` null without it, so the marks in `Town.tsx`, `render.ts` and `paint-gl.ts` are null checks): its time, the time of each part (logic, camera, sky, ground, placing and sorting, buildings, props, bosses, you, other players, lights, labels, WebGL submit, chips, minimap, and wherever they happen new pictures painted, sight lines and texture uploads; the rest is "outside our code": the browser, the GPU, garbage collection), and what was happening (walking, turning and how fast, zoom, pictures painted, uploads, an atlas reset, a long gap). Then one panel the size of the box to screenshot (`frame-report-panel.ts`): device, fps median / 5th / 1st percentile, the mean and worst ms a part, all and split by walk / turn / load, where the most time went, the worst 10 frames. The chat does no per-frame work. Hook `__townReport()`; tests `packages/app/test/town-frame-report.test.ts`, `e2e/town-street.spec.ts`.
+**Rooms (Nov 11):** a room's own loop (`shops/ShopRoom.tsx`) records into the same run, its parts under the town's names (ceiling and what's past the walls: sky; floor: ground; sorting: placing; pieces and the fight's set: props; you, the boss, everyone else; glows and darks: lights; tags and bubbles: labels; the card: chips), each frame marked "in a room"; from a home's Go in until the room's black lifts the frames are "going in", from Go out until the town's zoom ends "going out" (`REC.door`, set by `TownScreen`). Two columns more: **Room** and **In/out** (Walk, Turn and Load are the town's own frames); a room's first frame is recorded with the wait before it (the room's art painting behind the black on a first visit), not dropped as a pause. The pill's seconds come from the recorder (`FrameRec.onSec`), so they count on inside a room too (Nov 11: they were set by the town's loop alone, and Eric saw the report "pausing" as he went in). Tests: the same unit file, "rooms, and going in and out"; `e2e/shop.spec.ts`, "?fps in a room" and "a room's report records while walking".
+**The loading screen (Nov 11; [decision](../decisions/2026-11-11-town-loading.md)):** the street town opens on "Building the town…"
+(`.town-loading`, the boss loading card's look, its bar real progress: half painting, half uploading; `Town.tsx` `loadTown`,
+`f.loadSliceMs`, `f.loadPaintShare`, `f.loadSheetWaitMs`). It paints every picture (`render.ts` `warm`) and uploads them for good
+(`paint-gl.ts` `keep`, `kept`: tallest first, the atlas made once as deep as they need, plus 2 spare pages for tags, boards, the
+bubble, signs and text, the only ones that start again). Then the frames start. Measured headless at 1x: 4.5 s (painting 4.3,
+uploading 0.2); slowed 4x: about 21 s. 10 kept pages, 12 in all (192 MB). After it, 30 s of walking and turning: 0 painted,
+0 uploads, 0 resets. A building in and out uploads nothing of the town. The town's 2D pictures are made in memory (`paint.ts`
+`art2d`): uploading a GPU canvas waits for the GPU. Hooks: `__townPaint()`'s `loading`, `loadMs`, `loadPaintMs`, `atlas`. Tests:
+`packages/app/test/town-atlas.test.ts`, `e2e/town-street.spec.ts` ("the town's loading screen…").
+**Its music step (Nov 12; [decision](../decisions/2026-11-12-music-mono-preload.md)):** from the bar's start every boss theme is fetched
+beside the painting (`music.ts` `preloadMusic`: fetched, never decoded); with Music on the town takes the bar to 85% and "Loading music…"
+the rest (`MUSIC.townShare`), only for what hasn't landed once the town is built, at most `MUSIC.townWaitMs` (3 s; then the town opens and
+the rest lands behind it). Music or Sound off: nothing fetched, no step. Hook: `__townPaint()`'s `loadMusicMs`. Test: `e2e/town-street.spec.ts`
+("the town's loading fetches every boss theme once").
+
+**Painting ahead (Nov 11):** each frame `planBoxes` paints, nearest first, the pictures of the boxes in reach: always the faced quarter's roofs and the sides' and backs' pictures (and shaded steps), mid-turn the next quarter's roofs (`boxBakeMs`, 1.5 ms); standing still, also the fronts' shaded frames and the other quarters' roofs (`boxBakeStillMs`, 4 ms, while the view is at rest). Before, a first look round painted hundreds of them as they showed. [Decision](../decisions/2026-11-11-town-frame-report.md). (Since the loading screen, it finds nothing left to paint.)
 
 ## The feel: `town/feel.ts`
 
@@ -1170,7 +1256,10 @@ noted wherever a slice changed one.
   at most; **a tap on the box anywhere but a name opening typing** (the blur behind the whole box with a slight blur and a faint light tint,
   a focused typing line with no placeholder at the box's foot, no line moved, the box unchanged, the map not seeing the tap; Escape and a press
   on the map closing it and keeping the words; a name's tap the menu's, a text tap typing's; Enter sending and closing it); **typing works wherever the
-  box shows** (always on; new messages while the lines show; off has none; Off stays off; no "Say something…" in the page); "Chat background"
+  box shows** (always on; new messages while the lines show; off has none; Off stays off; the faint hint on the foot line while the box shows
+  and you aren't typing, gone while you type and with the box: Eric's rule, changed Nov 12); **Nov 12**: a second player entering shows "Bo
+  has entered the town." to the first (gray, upright, no name, its tap opens typing), the hint in line with the "[" within 2 px, thin and
+  faint, hidden while typing, and the computer's framed box 190 px; "Chat background"
   (off by default; on, the blur stays behind the box with nothing typed, in always on and new messages while they show, remembered across a
   reload, a faint dark tint by night); **always on never fading** (`page.clock`: after the wait, minutes on, the lines still taking touches, a 4
   minute line there, a 5 minute one gone); the text's colors by sky (ink by day, dawn and dusk, white by night, the names' and gray lines' shades,
@@ -1223,7 +1312,7 @@ title; a bot waiting, two playing (the board's pixels change), a tap on their ga
   `data-ready` (a frame is drawn) and `data-sit` ("1" while you sit at a table); with the test switches on, `window.__townAt(kind, id)` (where to tap a boss, a home or
   the Colosseum's gate) and `window.__townGather()` (the three nearest bots come and stand beside you), `window.__townAt("statue", "bronze" | "marble")`, `window.__townAt("table", i)` (a table by its index in `TABLES`), `window.__townAt("lamp", i)` (a park lamp's glass, by its index in `LAMPS`), `window.__townAt("light", id)` (a lit pixel of a home's, or `"coliseum"`'s, first light with nothing in front of it) and
   `window.__townCam()` (the zoom, the lens, the focus, the statue up close, whether its quote shows and its letters' size),
-  `window.__townSeat(i, n)` (the nearest free bots sit on table i's first n stools, and every bot holds still from then on)
+  `window.__townSeat(i, n)` (the nearest free bots sit on table i's first n stools, and every bot holds still from then on), `window.__townStill()` (no bot sets off from then on; the walks under way end: a check that a walker's name tag could nudge, Nov 9)
   and `window.__townTables()` (each table's state: "still", "waiting:<free stool>" or "playing"); the bots (Oct 27):
   `window.__townAt("bot", i)` (where to tap BOTS[i]), `window.__townCall(i)` (BOTS[i] comes to stand beside you, out from home first if it's there, and every bot
   holds still; -1: only the holding still) and `window.__townBots()` (each bot: its name, square, the table it sits at, whether

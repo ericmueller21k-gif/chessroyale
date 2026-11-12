@@ -102,17 +102,20 @@ account or email.
    "This player isn't taking invites right now."
 5. Tell me whether the invite at the top is easy to see and to dismiss on the iPhone (it sits under the notch).
 
-## The age question (Oct 16, about 3 minutes)
+## The age question (Oct 16; Sign in without it since Nov 12, about 3 minutes)
 
 Try the under-13 answer **only in a private tab**: a browser that answers it can't sign in for 400 days (that's the
 point). Closing the private tab forgets it.
 
-1. **Private tab, under 13.** On your phone, open hunchess.com in a private tab. Under "Sign in to play online" the box
-   asks **when were you born?** Tap **Month** and **Year**: each should open the phone's own picker, easy to scroll,
-   with nothing chosen at first. Pick this month and a year 12 years ago, then **Continue**. The box should say
-   "Accounts are for players 13 and older, so you'll play as a guest." Reload: still that line, no question. Close the
-   private tab.
-2. **Your own browser, with Google.** Sign out (Settings → Sign out), then sign in again **with Google** (not the email
-   code): the question comes first, then **Continue with Google**, and you should come back signed in, on the page you
-   started from. Google's return trip is the one path the automatic tests can't run. Tell me if the question is in the
-   way or reads oddly.
+1. **Private tab, under 13.** On your phone, open hunchess.com in a private tab. "Sign in to play online" shows **Continue
+   with Google** and the email box at once, with no question. Tap **Sign up** below them: the box asks **Sign up: when were
+   you born?** without moving anything under it. Tap **Month** and **Year**: each should open the phone's own picker, easy to
+   scroll, with nothing chosen at first. Pick this month and a year 12 years ago, then **Continue**. The box should say
+   "Accounts are for players 13 and older, so you'll play as a guest", with no Sign in or Sign up left. Reload: still that
+   line. Close the private tab.
+2. **Another private tab, your own account, with Google** (Eric, Nov 12: "go to the site on a fresh browser and log in without
+   having to select an age"). Open hunchess.com in a new private tab and tap **Continue with Google** straight away (with the Google account you already sign in with; if you've only ever used the email code, use the code instead): no
+   question, and you should come back signed in, on the page you started from. Google's return trip is the one path the
+   automatic tests can't run. Tell me if anything asks your age on the way. (One exception, once: an account that hasn't
+   signed in since the question came in, Oct 16, is asked "One more step: when were you born?" and then picks its Google
+   account again; after that, never.)

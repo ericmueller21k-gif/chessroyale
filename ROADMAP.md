@@ -29,6 +29,10 @@ on Eric's account.
    `reports/fairplay.md`), appeals for a person, ban emails, the review page (`/admin/fairplay`) and an API for an
    automated reviewer (`docs/fairplay-reviewer.md`). Next: refit the evidence model from real cleared players; block
    disposable email domains and add Cloudflare Turnstile (free) on email sign-in against scripted sign-ups.
+   - **Before Eric turns bans back on** (`enforcement` "review" since Nov 10; the reviewer's token never bans): the deep re-check
+     keeps its own facts per move (second-best gap, best expected score, the crowd recounted against its scores), `skipReason` and
+     `matchSignals` prefer them, and the ban bar's strength comes from deep losses (the review of PR #610, M1 steps 1-3). And a "ban" verdict from matches
+     checked only to the watch cap (`banMatchChecked`) opens a review first, which checks them in full (the delta review, m4-b).
 7. **Coins, icons and emotes.** Coins for doing well (placement, surviving cuts, a good move streak, daily first match),
    spent on cosmetic things only: profile icons, emotes to send during a match, board and piece themes, name colors.
    Nothing that changes play: no power-ups, no hints, no extra time. Earned only, not bought, unless Eric decides
@@ -97,7 +101,26 @@ decisions. In this order:
    - the engine container's Stockfish 17.1 against the browsers' 19;
    - chat moderation (report and mute);
    - the privacy policy and terms (Eric's sign-off);
-   - loot-box rules before any real-money crates.
+   - loot-box rules before any real-money crates;
+   - judges drawn by a device's *measured* speed (each one's first job timed), not its claim; until then the claim is
+     capped at `JUDGES.maxNps` and 3 times the lobby's median, which still leaves small lobbies a bigger share
+     (docs/decisions/2026-11-10-judge-pairing.md);
+   - Squads' engine server picks its own top moves (a `topMoves` search, or `fallbackTop`'s candidates added to the
+     verdict's moves), not only scores the devices' list; then its answers fill `TOP_CACHE` again, and the main lobby's
+     re-check gets the same (outside review finding 3; PR #601 review, major 2);
+   - a lone host's values checked for truth, not only shape (`hostBoardOk`): a server sample of its boards;
+   - a Squads job that pays something (a token refund, a brilliant) settled `"one"` (one device, or two of one
+     party agreeing) gets a server spot check, as the main lobby's lone answers do (PR #601 delta review, minor 3);
+   - a host whose boards fail `hostBoardOk` (every pick scored the same) is counted: after one or two, another device
+     hosts and fair play is told (PR #601 review, minor 4);
+   - the matchmaker's reservations per account, not per ticket: an account that queued twice holds two, one never
+     filled (a bot takes it) (PR #601 review, minor 8);
+   - a lone device's word where a reward rides on it (Squads' bots with one human; the main lobby's host under two
+     judges): a server sample, or no extra reward (outside review, finding 5);
+   - close the test accounts' token path: `npx tsx scripts/cheater-demo.ts --delete` first (the demo's accounts and
+     their fair-play files), then `TEST_ACCOUNTS_CLIENT_ID` back to `""` in `wrangler.jsonc` and deployed (no token
+     can make or sign in to accounts on the live site; docs/decisions/2026-11-10-cheater-demo.md; PR #622 review,
+     finding 1).
 
 **Only Eric can do:**
 
@@ -375,6 +398,57 @@ Added Oct 14, 2026 (Eric; notes only, nothing built):
     things around"), whether a friend request must be accepted or "Add friend" is one-sided like a follow, and what
     an invite does when the other player is already in a match. It's stored data and a client-server change, so it
     takes the full test lane.
+
+## Live ops: alerts, an on-call agent, a live-site bot (Eric, Nov 9, 2026: build before launch, not urgent)
+
+The design is `docs/ideas/live-ops.md`. Push alerts to Discord when real players hit errors, and a scheduled agent that confirms
+the problem and fixes it through the normal lanes, telling Eric. A bot plays the live site every 2 hours. Releases go out
+gradually. False alarms are avoided by design (rates against normal, two checks in a row, retry, confirm first). Build order there.
+
+## Riders in regular crates (Eric, Nov 9, 2026: next after the shop page)
+
+A few rides that have nothing to do with the bosses, put in the regular crates (HunChess, Gift, Beta) to make them worth buying,
+since rides are the most wanted items. item-builder for the rides' art and the crates' odds.
+
+## Rare items: a special border, and a tap-to-preview on a pawn (Eric, Nov 12, 2026: queued, not started; low weekly usage)
+
+Eric (on a crate's prize list showing "Boingo's Pogo, Mythic · Ride"): "for the mythic and like the super legendary items, we have a
+nice little... nice clean like gold border or like diamond border, whatever, pearl border around these, so that's clear. ... if you
+click on them, it should load up like a little box... in the middle of your screen that actually shows a little preview of like a
+pawn, just like a bare black or white pawn, just like utilizing the rider or whatever. So you can actually see what it looks like.
+And we'll have to do that for every rider."
+
+- Every list row of a Mythic (and the tiers above Legendary) item gets a clean, tier-colored frame (gold, pearl or diamond: one look
+  per tier), everywhere items are listed (crate prize lists, the boss crate cards, the shop, the inventory).
+- Tapping any item row opens a centered preview card: a bare pawn (black or white) wearing or riding the item, animated as in a game.
+  Rides first (every rider needs its pawn-on-ride preview), then the other slots. Reuse the item-builder's fitting sheet
+  (`npm run preview:items`) and the in-game pawn drawing; one shared preview card for all items.
+- Lane: item-builder (the art fits), with the hub for the card; light-to-targeted lane.
+
+## The Hidden Boss's building in the town, and his three forms (Eric, Nov 12, 2026: queued, not started)
+
+The full notes: branch `claude/director-notes`, `notes/briefs/hidden-boss-house-NOTES.md`; how he works today:
+`notes/hidden-boss-today.md`. Everything stays original (no name, sign or likeness from the reference photos).
+
+- **The building:** an old Brooklyn-style corner walk-up (red-brown brick, 4-5 stories, an ornate cornice, fire escapes down the front),
+  in a corner of the town. Inside, smaller than it looks: a hall with doors that don't open, two flights of stairs, then the top floor.
+- **The top floor:** a 1950s child's room (a rocking horse, a little table with a chessboard, a poster, a kid's mat, a small bed, a
+  sunny window); he sits on the floor with a board and scattered pieces.
+- **The challenge:** anyone in the room can challenge him; the town shows "1 of 4"... (leaving the room drops you); at four, a countdown
+  for those four and a town chat line naming them; then the battle.
+- **Three forms:**
+  1. **New: the child.** No powers, kid lines. Maia from about 1800, +100 every 4 moves up to its cap; five drawings as he grows up,
+     his level rising with a level-up each step. The team's move: the majority's; a tie is random between close moves, else the stronger.
+  2. **Today's phase 1** (bullet, no help), as a new match.
+  3. **Today's phase 2** (four boards); online it's a separate build (four boards online, server Stockfish, fair play).
+- Open: a time limit on the count, his locked select tile, a reward, admins first.
+
+## Ranked rewards (Eric, Nov 9, 2026: later, not a priority; don't raise it again until ranked seasons are built)
+
+Eric: "we do want to give a reward for ranking, just like other games do … probably do a personalized crate that contains like
+colors … if you got a higher rank, you get like a different color of like one item." At a season's end, each mode's peak (or end)
+rank earns a reward: a crate or item whose color shows the rank reached (a higher rank, a rarer color of the same item). Built
+with seasons (ranked phase S1, docs/ideas/ranked-ladder.md), item-builder for the art.
 
 ## Needs Eric
 

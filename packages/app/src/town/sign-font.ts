@@ -3,6 +3,8 @@
  * third narrower than Press Start 2P at the same height, so a home's whole name fits its board even zoomed out on a
  * phone). Names are written in capitals on the signs, as on Eric's pictures; the floating names keep their own case.
  */
+import { art2d } from "./paint.ts";
+
 
 /** Each glyph's rows ('#' lit). */
 const GLYPHS: Record<string, readonly string[]> = {
@@ -70,7 +72,7 @@ export function renderLines(lines: readonly string[], w: number, h: number, s: n
   const c = document.createElement("canvas");
   c.width = w * s;
   c.height = h * s;
-  const g = c.getContext("2d")!;
+  const g = art2d(c);
   g.fillStyle = ink;
   lines.forEach((line, li) => {
     let x = Math.floor((w - lineWidth(line)) / 2);

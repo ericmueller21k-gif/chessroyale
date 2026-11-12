@@ -1,6 +1,6 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import { WelcomeNotice } from "../components/WelcomeNotice.tsx";
-import { BOSS_TIERS, FRONT_DOOR, adminPlayable, bossDef, bossIdFromLink, bossThreat, isPlayable, menuBosses, CROWD_SETTINGS, DEFAULT_SETTINGS as S, MATCHMAKING, MATCHMAKING_TYPES, PRIOR_RATING, RAID_SETTINGS, SQUADS, pausedLine, type BossDifficultyId, type MatchmakingType, type ModeChoiceId, type Pausable } from "@chessroyale/core";
+import { CROWD_PARTY_MAX, BOSS_TIERS, FRONT_DOOR, adminPlayable, bossDef, bossIdFromLink, bossThreat, isPlayable, menuBosses, CROWD_SETTINGS, DEFAULT_SETTINGS as S, MATCHMAKING, MATCHMAKING_TYPES, PRIOR_RATING, RAID_SETTINGS, SQUADS, pausedLine, type BossDifficultyId, type MatchmakingType, type ModeChoiceId, type Pausable } from "@chessroyale/core";
 import { useAccount } from "./Profile.tsx";
 import { bossAloneElo, chosenDifficulty, rememberDifficulty } from "../boss-difficulty.ts";
 import { powersLine } from "../power-words.ts";
@@ -8,13 +8,15 @@ import { BossDifficulty } from "../components/BossDifficulty.tsx";
 import { isAdmin, maiaAllowed, maiaLikely } from "../boss-brain.ts";
 import { prefetchMaia } from "../maia.ts";
 import type { ComponentChildren } from "preact";
-import { AccountBar, BackButton, DressedPawn, FdButton, FriendsIcon, GearIcon, LevelRing, LiveLine, Logo, RankLine, ShopIcon } from "../components/FrontDoor.tsx";
+import { BackButton, ChatIcon, DressedPawn, FdButton, FriendsIcon, GearIcon, LevelRing, LiveLine, Logo, RankLine, ShopIcon } from "../components/FrontDoor.tsx";
+import { ChatSheet } from "../components/ChatSheet.tsx";
 import { useLive } from "../live.ts";
 import { BossCardFace, BossSelect, RANDOM, selectBosses } from "../components/BossSelect.tsx";
 import { BossInviteSheet } from "../components/BossParty.tsx";
 import type { PartyClient } from "../squads.ts";
 import { openProfile } from "../profile-nav.ts";
-import { BossFace } from "../components/BossCharacter.tsx";
+import { BossFace, bossAnims, portraitAnims } from "../components/BossCharacter.tsx";
+import { prewarmAnims } from "../components/BossEffect.tsx";
 import { UserIcon } from "../components/PixelIcon.tsx";
 import { useMedia } from "../components/QuickChat.tsx";
 import { LiveWindow } from "../components/LiveWindow.tsx";
@@ -24,14 +26,20 @@ import { friendsBadge, useFriends } from "../friends.ts";
 import { FriendsBadge } from "../components/Friends.tsx";
 import { noteLinkCopied } from "./Lobby.tsx";
 import { testParams, testSwitchesAllowed } from "../test-switches.ts";
+import { QuestsBarIcon, QuestsOverlay } from "../components/QuestsOverlay.tsx";
+import { BotLevelBox } from "../components/BotLevelBox.tsx";
+import { questCountdowns, questsForYou, useQuests } from "../quests.ts";
+import { account, mustSignInToPlayOnline } from "../account.ts";
 import { isPaused, useServerStatus } from "../status.ts";
 import { ChatNotice } from "../components/ChatNotice.tsx";
-import { homeRankLine, ranked1v1Rank } from "../ranked.ts";
+import { homeRankLine, leavesLine, ranked1v1Rank, rankedLockedUntil, yourLeaves } from "../ranked.ts";
 import { RankEmblem } from "../components/RankEmblem.tsx";
 import { SwordsIcon } from "../town/CardIcons.tsx";
 import { Pic, Scene } from "../home-art/Pic.tsx";
 import { ARENA_AUTO_CARD } from "../home-art/arena-auto-card.ts";
 import { TOWN_PICTURE, TOWN_SCENE, TOWN_SKY } from "../home-art/town.ts";
+import { setSearchOnHome, type AwaySearch } from "../search.ts";
+import { clockShown } from "../clock-text.ts";
 
 const MODE_KEY = "brc.mode";
 
@@ -56,7 +64,10 @@ function saveMode(mode: ModeChoiceId) {
 }
 
 const MATCHMAKING_KEY = "brc.matchmaking";
-/** How you're matched (the home screen's Matchmaking: Default, Bots off or Solo): this device's choice. */
+/**
+ * How you're matched (home's 50 v 50 options, Nov 9: Solo queue "default", Bots "solo"; Party is greyed until it's built): this device's
+ * choice. "botsoff" (people only) has no button on home since Nov 9; stored (a test's), it still queues people only under Solo queue.
+ */
 export function chosenMatchmaking(): MatchmakingType {
   try {
     const v = localStorage.getItem(MATCHMAKING_KEY);
@@ -172,6 +183,9 @@ export function BossMenu({
   useEffect(() => {
     if (maiaAhead()) prefetchMaia();
     picked.current?.scrollIntoView({ block: "nearest" });
+  }, []);
+  // (A layout effect, as every pop-up's: an effect waits for a paint, and an Escape pressed as it opened was lost. LESSONS.md, Nov 11.)
+  useLayoutEffect(() => {
     const key = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     addEventListener("keydown", key);
     return () => removeEventListener("keydown", key);
@@ -335,13 +349,14 @@ function FriendsSheet({
   const [code, setCode] = useState(initialCode ?? "");
   const { status } = useFriends();
   const news = friendsBadge();
-  useEffect(() => {
+  // (A layout effect, as every pop-up's: an effect waits for a paint, and an Escape pressed as it opened was lost. LESSONS.md, Nov 11.)
+  useLayoutEffect(() => {
     const key = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     addEventListener("keydown", key);
     return () => removeEventListener("keydown", key);
   }, []);
   // (A friend code: a lobby made for you and your friends, its link copied to share: Eric, Oct 18.)
-  const label = mode === "raid" ? "Create a raid" : mode === "classic" ? "Get a Classic friend code" : "Get friend code";
+  const label = mode === "raid" ? "Create a Boss Battle" : mode === "classic" ? "Get a Classic friend code" : "Get friend code";
   return (
     <div class="fd-sheet-scrim" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div class="fd-sheet" role="dialog" aria-modal="true" aria-labelledby="friends-title">
@@ -397,14 +412,33 @@ function FriendsSheet({
 }
 
 /**
- * The Matchmaking choices, each its title only (Eric, Oct 28: "3 times in this screen it says the same thing"): what each
- * does is the line above PLAY, and the ranking rule is in the FAQ ("Your rating").
+ * 50 v 50's options (Eric, Nov 9: "solo queue, party, and then … bots"), left to right, each a title and a short sub line as Squads'
+ * (what each does in full is the line above PLAY). Solo queue is the public queue (it was Default), Bots a game in your browser at
+ * the level you pick (it was Solo). Party (queueing together into the public matchmaking, up to CROWD_PARTY_MAX, ranked; Eric, Nov 9)
+ * shows greyed, "Soon", until its matchmaker piece is built. Bots off is gone from home. docs/decisions/2026-11-09-home-modes-options.md.
  */
-const types: { id: MatchmakingType; label: string }[] = [
-  { id: "default", label: "Default" },
-  { id: "botsoff", label: "Bots off" },
-  { id: "solo", label: "Solo" },
+const types: { id: "default" | "party" | "solo"; label: string; sub: string; soon?: boolean }[] = [
+  { id: "default", label: "Solo queue", sub: "join a lobby" },
+  { id: "party", label: "Party", sub: "Soon", soon: true },
+  { id: "solo", label: "Bots", sub: `${CROWD_SIZE - 1} bots, now` },
 ];
+
+/**
+ * Home's line above PLAY for 1 v 1 under ranked's leave rules (L1): a lockout's countdown, or the delayed queue's extra wait
+ * (`otherwise`, 1 v 1's usual line, when neither applies). Its own small part, so only it is drawn each second while a lockout
+ * counts down.
+ */
+function LeavesLine({ otherwise }: { otherwise: string }) {
+  const l = yourLeaves();
+  const counting = !!rankedLockedUntil(l, Date.now());
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    if (!counting) return;
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [counting]);
+  return <span class="fd-leaves">{leavesLine(l, Math.max(now, Date.now())) ?? otherwise}</span>;
+}
 
 /** A short note at the top of the home screen ("That match has ended"), with "See your result" when there is one. */
 export interface HomeNotice {
@@ -477,6 +511,7 @@ function RaidOption({ label, sub, disabled, locked, onClick }: { label: string; 
  */
 export function HomeScreen({
   queue,
+  search = null,
   chat,
   side = true,
   intent,
@@ -507,12 +542,17 @@ export function HomeScreen({
 }: {
   /** In the queue: the queue screen (or the line for a seat), shown in place of the play column. */
   queue?: ComponentChildren;
+  /**
+   * A search going on while you browse (search.ts; Eric, Nov 10): the modes row shows it and the row under it its three
+   * actions; PLAY, Chess Town and the cards grey in place.
+   */
+  search?: AwaySearch | null;
   /** In the queue on a computer: the lobby's chat, under your pawn. */
   chat?: ComponentChildren;
   /** In the queue: draw the computer's column (your card, the chat) beside it. A phone shows only the queue. */
   side?: boolean;
   /** The computer's side menu (or /bosses) asked for the boss menu or Play with friends. */
-  intent?: { kind: "boss" | "friends"; n: number } | null;
+  intent?: { kind: "boss" | "friends" | "quests"; n: number } | null;
   /** The Boss raid screen is open (the Solo Boss Mode card, the side menu's Solo Boss Mode, ?mode=raid). */
   raid?: boolean;
   /** With `raid`: the full Boss raid screen (?mode=raid, the test link: every raid choice), not the Solo Boss Mode form. */
@@ -527,8 +567,11 @@ export function HomeScreen({
   onlineLocked?: boolean;
   /** PLAY (50 v 50) or a raid's queue, Default or Bots off. */
   onPlay: (mode: "crowd" | "raid", type: Exclude<MatchmakingType, "solo">) => void;
-  /** PLAY, Solo, or a Solo raid: you and bots, in your browser (`fill`: the queue screen first). Boss alone: you against a boss you pick. */
-  onSolo: (mode: ModeChoiceId, opts?: { fill?: boolean }) => void;
+  /**
+   * PLAY with Bots, or a Solo raid: you and bots, in your browser (`fill`: the queue screen first; `botLevel`: the Bot level box's
+   * pick). Boss alone: you against a boss you pick.
+   */
+  onSolo: (mode: ModeChoiceId, opts?: { fill?: boolean; botLevel?: number | "random" }) => void;
   /** Make a lobby; `made` hears its code once it's open (null if it couldn't be made). */
   onCreateLobby: (mode: ModeChoiceId, made?: (code: string | null) => void) => void;
   /** Your friends list. */
@@ -583,19 +626,27 @@ export function HomeScreen({
       }
     } else saveMode(m);
   };
-  // How you're matched (50 v 50). Guests (online needs signing in) can only play Solo; Classic online is coming (Solo works).
-  const [picked, setPicked] = useState<MatchmakingType>(chosenMatchmaking);
+  // How you're matched (50 v 50: Solo queue or Bots; Party greyed). Guests (online needs signing in) can only play Bots; Classic online
+  // is coming (Bots works). ("botsoff", a test's stored pick, shows as Solo queue and queues people only.)
+  const [picked, setPicked] = useState(chosenMatchmaking);
   const soloOnly = !!onlineLocked;
-  const type: MatchmakingType = soloOnly ? "solo" : picked;
+  const type = soloOnly ? "solo" : picked;
+  // (The option shown picked: Bots off has no button since Nov 9.)
+  const option = type === "botsoff" ? "default" : type;
+  // The Bot level box (PLAY with Bots).
+  const [botBox, setBotBox] = useState(false);
   // (Nothing picked yet: the options show greyed, none selected and none tappable: Eric, Oct 25.)
-  const pickType = (t: MatchmakingType) => {
-    if (!mode || (soloOnly && t !== "solo")) return;
+  const pickType = (t: "default" | "party" | "solo") => {
+    // (Party: greyed until it's built.)
+    if (!mode || t === "party" || (soloOnly && t !== "solo")) return;
     setPicked(t);
     saveMatchmaking(t);
   };
   // Squads: Solo queue (false) or Party (true), the panel's pick; PLAY then queues alone or opens the party.
   const [party, setParty] = useState(false);
   const [friends, setFriends] = useState(!!joinCode);
+  // (A phone's chat: the top bar's chat button opens it as a sheet over home, Nov 11.)
+  const [chatSheet, setChatSheet] = useState(false);
   // Play with friends: a lobby in the row's pick (1 v 1 has none: 50 v 50's), or a raid from the Boss raid screen.
   const lobbyMode: ModeChoiceId = raid ? "raid" : lobbyModeOf(mode ?? "crowd");
   // The Boss raid screen's pick (its tiles): a boss you can meet, "" for a random one, or the Hidden Boss (dark and
@@ -638,6 +689,18 @@ export function HomeScreen({
       setDifficulty(pv.boss.difficulty);
     } else if (pv.boss.id !== pick || pv.boss.difficulty !== difficulty) bp!.choose(pick, difficulty);
   }, [inParty, leading, pv?.boss?.id, pv?.boss?.difficulty]);
+  // The bosses' art is made the first time it's shown (sprite.ts lazyAnim): their tiles' and faces' made here in quiet slices,
+  // a moment after home shows, so the Boss Battle screen opens without building them; and there, the picked boss's moves. Not
+  // while a game is starting (the Bot level box, the queue: home fills in place): one face can take a slow phone most of a
+  // second, and the queue waited on it (Nov 10 flakes, docs/decisions/2026-11-10-flaky-batch-7.md).
+  const starting = botBox || (queue !== undefined && queue !== null);
+  useEffect(() => {
+    if (starting) return;
+    let stop = () => {};
+    const t = setTimeout(() => (stop = prewarmAnims(portraitAnims())), 1500);
+    return () => (clearTimeout(t), stop());
+  }, [starting]);
+  useEffect(() => (raid ? prewarmAnims(bossAnims(bossDef(pick)?.name)) : undefined), [raid, pick]);
   // (Not while Solo and Boss alone rest: the hidden /bosses lands here too, and the Boss raid screen says why.)
   const bossAlone = () => (rest("solo") ? undefined : bossInUrl() ? onSolo("raid") : setBossMenu("solo"));
   // Boss Battle's START: Maia's files fetched ahead as the old Boss alone menu did when it opened, then the battle.
@@ -662,17 +725,28 @@ export function HomeScreen({
   // What PLAY would start, if it's resting: Squads, 1 v 1 (PAUSE_RANKED1V1), Solo (you and bots), or 50 v 50 online.
   const resting = !mode ? null : mode === "squads" ? rest("squads") : mode === "1v1" ? rest("ranked1v1") : type === "solo" ? rest("solo") : mode === "crowd" ? rest("crowd") : null;
   const soloResting = rest("solo");
+  // Ranked's leave rules (L1): a lockout greys 1 v 1's PLAY until it's over (the line above PLAY counts it down; the server
+  // refuses the search anyway). Drawn again once, as it ends.
+  const lockUntil = mode === "1v1" && !onlineLocked ? rankedLockedUntil(yourLeaves(), Date.now()) : null;
+  const [, lockEnded] = useState(0);
+  useEffect(() => {
+    if (!lockUntil) return;
+    const t = setTimeout(() => lockEnded((n) => n + 1), Math.max(0, lockUntil - Date.now()) + 50);
+    return () => clearTimeout(t);
+  }, [lockUntil]);
   const play = () => {
-    if (!mode || resting) return;
+    if (!mode || resting || lockUntil) return;
     if (mode === "squads") return onlineLocked ? onSignIn() : party ? onParty() : onSquads();
     if (mode === "1v1") return onlineLocked ? onSignIn() : onRanked1v1();
-    if (type === "solo") return onSolo(mode, { fill: true });
+    // (Bots: the Bot level box first; its OK starts the game.)
+    if (type === "solo") return setBotBox(true);
     if (mode === "crowd") onPlay("crowd", type);
   };
   const fill = live?.fillSeconds ?? 60;
   const wait = mode === "crowd" ? live?.waits.crowd : null;
   const bots = (mode === "classic" ? S.lobbySize : CROWD_SIZE) - 1;
-  // The line above PLAY: what PLAY does, for this pick and way of being matched.
+  // The line above PLAY: what PLAY does, for this pick and way of being matched. Always one line, never empty (Eric, Nov 9: "let's make
+  // that line always say something"; each fits 320 px: e2e/home-ranked.spec.ts).
   const soloLine = `Solo vs ${bots} bots`;
   const signIn = (what: string) => (
     <>
@@ -683,21 +757,21 @@ export function HomeScreen({
     </>
   );
   const hint = !mode ? (
-    // (Nothing picked yet: the panel says to pick one.)
-    ""
+    // (Nothing picked yet.)
+    "Tap a game mode to get started"
   ) : resting ? (
     resting
   ) : mode === "squads" ? (
     onlineLocked ? (
       signIn("Squads")
     ) : party ? (
-      "Party: create one or join by code"
+      `Queue with up to ${SQUADS.partyMax - 1} friends`
     ) : (
       `Solo queue: bots fill any empty seat after ${fill} s`
     )
   ) : mode === "1v1" ? (
-    // (What 1 v 1 is: in the panel, with your rank.)
-    onlineLocked ? signIn("1 v 1") : ""
+    // (Your rank: in the panel. A lockout or the delayed queue says so here instead, L1.)
+    onlineLocked ? signIn("1 v 1") : <LeavesLine otherwise="Ranked chess vs one player near your level" />
   ) : mode === "classic" && type !== "solo" ? (
     "Classic is being reworked"
   ) : onlineLocked ? (
@@ -708,7 +782,7 @@ export function HomeScreen({
       </button>
     </>
   ) : type === "solo" ? (
-    `${soloLine} · starts at once${mode === "classic" ? " · online Classic is coming" : ""}`
+    `Start at once with ${bots} bots`
   ) : type === "botsoff" ? (
     `People only: starts when ${CROWD_SIZE} have joined`
   ) : wait ? (
@@ -719,6 +793,15 @@ export function HomeScreen({
   const look = profile?.locker?.look;
   const name = profile?.user.name ?? "Player";
   const queueing = queue !== undefined && queue !== null;
+  // Searching while you browse (Eric, Nov 10: "the exact container ... that would be lit up, but everything else below it would be
+  // gray"): home's rows show it, so the bar on other pages stands aside here.
+  const searching = !!search && !queueing && !raid;
+  useLayoutEffect(() => {
+    if (!searching) return;
+    setSearchOnHome(true);
+    return () => setSearchOnHome(false);
+  }, [searching]);
+  const off = searching ? " fd-off" : "";
   // A screen that replaces home (a phone's queue, the Boss raid screen, and home again) starts at its top, wherever home
   // was scrolled to (its card and PLAY sit low on a small phone). Before its first paint.
   const view = raid ? "raid" : queueing && !side ? "queue" : "home";
@@ -731,6 +814,17 @@ export function HomeScreen({
   // public profile, the page others see (Eric, Nov 7). A guest with no profile loaded yet gets your own page instead.
   const onIcon = () => openProfile({ you: true, name, section: "icon" });
   const onName = () => (profile ? openProfile({ uid: profile.user.id, name, you: true, public: true }) : openProfile({ you: true, name }));
+  // The daily quests (Nov 9, phase 3; quests.ts, the server's server/quests.ts): the Quests entry for everyone (greyed, "Sign in for
+  // quests", where a guest can't have them: nothing hidden), the overlay opened on the XP day's first visit (signed in) and from it.
+  const questsOn = questsForYou();
+  // (Never opening by itself over the queue or another notice: it waits for the next home visit. Review of #575, m3.)
+  const quests = useQuests(questsOn === true, queueing);
+  // (A computer's entry is Daily Quests in its side menu (Eric, Nov 10: FrontMenu.tsx); a phone's is in the top bar.)
+  useEffect(() => {
+    if (intent?.kind === "quests") quests.show();
+  }, [intent?.n]);
+  const computer = useMedia("(min-width: 1024px)");
+  const questsLabel = questsOn === false ? "Sign in for quests" : "Quests";
   const hero = (
     <section class="fd-hero" aria-label="You">
       {/* (A phone sizes your pawn to the room the card has. Home shows your tag above the pawn's head, centered (styles.css, `order`); the
@@ -745,8 +839,9 @@ export function HomeScreen({
           <button type="button" class="fd-hero-iconbtn" aria-label="Edit icon" onClick={onIcon}>
             <UserIcon icon={profile?.user.icon ?? "♟"} />
           </button>
-          {/* (An admin's test level: a ring round the icon and "LVL 38" above it. Placeholders: FrontDoor.tsx, TEST_LEVEL.) */}
-          {testSwitchesAllowed() && <LevelRing />}
+          {/* (Your level, Nov 9: a ring round the icon and "LVL 7" above it, from your XP, wherever you can earn XP: signed in, or
+              anyone where sign-in isn't set up.) */}
+          {profile && account().config && !mustSignInToPlayOnline() && <LevelRing xp={profile.xp ?? 0} />}
         </span>
         <div class="fd-hero-text">
           <button type="button" class="fd-hero-namebtn" aria-label="View your profile" onClick={onName}>
@@ -758,6 +853,14 @@ export function HomeScreen({
         </div>
       </div>
       </div>
+      {/* (Eric, Nov 11: "View profile" in the card's top right, a normal blue, a chevron and a light sweep; the same screen the pawn opened.
+          Out of the flow (styles.css, `.fd-hero-profile`): nothing else on the card moves.) */}
+      <button type="button" class="fd-hero-profile" data-tour="profile" onClick={onProfile}>
+        <span class="fd-hero-profile-text">View profile</span>
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M9 6l6 6-6 6" />
+        </svg>
+      </button>
     </section>
   );
   // The sheets and menus either view can open (and chat moderation's notice).
@@ -787,6 +890,16 @@ export function HomeScreen({
           onClose={() => setFriends(false)}
         />
       )}
+      {botBox && (
+        <BotLevelBox
+          rating={profile?.rating ?? null}
+          onClose={() => setBotBox(false)}
+          onStart={(botLevel) => {
+            setBotBox(false);
+            if (mode && mode !== "squads" && mode !== "1v1") onSolo(mode, { fill: true, botLevel });
+          }}
+        />
+      )}
       {bossMenu && (
         <BossMenu only={bossMenu === "solo" ? pick : undefined} value={bossMenu === "solo" ? pick : chosenBoss(isAdmin())} rating={profile?.rating ?? null} difficulty={difficulty} onDifficulty={pickDifficulty} onPick={pickBoss} onClose={() => setBossMenu(null)} />
       )}
@@ -794,6 +907,18 @@ export function HomeScreen({
       <ChatNotice />
       {/* (The Welcome Crate earned, Nov 6: its one-time notice; WelcomeNotice.tsx.) */}
       <WelcomeNotice />
+      {chatSheet && !computer && <ChatSheet onSignIn={onSignIn} onClose={() => setChatSheet(false)} />}
+      {quests.open && quests.answer && !queueing && (
+        <QuestsOverlay
+          quests={quests.answer.quests}
+          dailyResetIn={questCountdowns(quests.answer, quests.receivedAt).daily}
+          weeklyResetIn={questCountdowns(quests.answer, quests.receivedAt).weekly}
+          paused={!!quests.answer.paused}
+          from={quests.from}
+          onReroll={quests.reroll}
+          onClose={quests.close}
+        />
+      )}
     </>
   );
   if (queueing)
@@ -844,7 +969,7 @@ export function HomeScreen({
       <div class="fd-page rd-page">
         <header class="fd-page-head">
           <BackButton onClick={() => onRaid(false)} />
-          <h1>{full ? "Boss raid" : "Boss Battle"}</h1>
+          <h1>Boss Battle</h1>
           <span class="fd-head-spacer" />
         </header>
         {/* (Why you're here: a match that closed while this screen was where you'd come back to, as on home.) */}
@@ -855,7 +980,7 @@ export function HomeScreen({
           {/* (The public queues share their lobby: always a random boss.) */}
           {full && (
             <RaidOption
-              label="Join a raid"
+              label="Join a Boss Battle"
               sub={online(`Random boss · up to ${RAID_SIZE} players · bots after ${fill} s`)}
               disabled={loading || !!raidResting}
               locked={locked}
@@ -871,7 +996,7 @@ export function HomeScreen({
               onClick={() => (onlineLocked ? onSignIn() : onPlay("raid", "botsoff"))}
             />
           )}
-          {full && <RaidOption label="Raid with bots" sub={`You and ${RAID_SIZE - 1} bots · starts at once`} disabled={loading || !!soloResting} locked={locked} onClick={() => onSolo("raid", { fill: true })} />}
+          {full && <RaidOption label="Play with bots" sub={`You and ${RAID_SIZE - 1} bots · starts at once`} disabled={loading || !!soloResting} locked={locked} onClick={() => onSolo("raid", { fill: true })} />}
           {full ? (
             <RaidOption label="Boss alone" sub={pick === RANDOM ? "Just you vs a random boss" : "Just you vs this boss"} disabled={loading || !!soloResting} locked={locked} onClick={bossAlone} />
           ) : (
@@ -894,7 +1019,7 @@ export function HomeScreen({
               </p>
             </>
           )}
-          {full && <RaidOption label="Play with friends" sub="Make a raid and share its code, or join one" locked={locked} onClick={() => setFriends(true)} />}
+          {full && <RaidOption label="Play with friends" sub="Make a Boss Battle and share its code, or join one" locked={locked} onClick={() => setFriends(true)} />}
         </div>
         {full && <p class="fd-sub rd-about">{`Up to ${RAID_SIZE} of you pick the crowd's moves together against a boss. The most popular pick is played.`}</p>}
         {raidResting && <p class="fd-rest">{raidResting}</p>}
@@ -918,19 +1043,24 @@ export function HomeScreen({
   }
   // The RANKED row: the three ranked modes, one picked (Eric, Oct 16).
   const ranked = (
-    <div class="fd-ranked">
-      <h2 class="fd-label" id="fd-ranked-label">
+    <div class={`fd-ranked${searching ? " fd-searching" : ""}`}>
+      <h2 class={`fd-label${off}`} id="fd-ranked-label">
         RANKED
       </h2>
-      <div class="fd-modes" role="radiogroup" aria-labelledby="fd-ranked-label">
-        {MODES.map((m) => (
-          <button type="button" role="radio" key={m.id} data-tour={`mode-${m.id}`} aria-checked={mode === m.id} class={mode === m.id ? "on" : ""} onClick={() => pickMode(m.id)}>
-            {m.label}
-            <br />
-            <span>{m.sub}</span>
-          </button>
-        ))}
-      </div>
+      {searching ? (
+        // (Searching: the same box, the same size, the search in it.)
+        <SearchRow search={search!} />
+      ) : (
+        <div class="fd-modes" role="radiogroup" aria-labelledby="fd-ranked-label">
+          {MODES.map((m) => (
+            <button type="button" role="radio" key={m.id} data-tour={`mode-${m.id}`} aria-checked={mode === m.id} class={mode === m.id ? "on" : ""} onClick={() => pickMode(m.id)}>
+              {m.label}
+              <br />
+              <span>{m.sub}</span>
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
   // The panel under the row (Eric, Oct 18: "it should never change size, and it should be dedicated to whatever text we
@@ -940,14 +1070,19 @@ export function HomeScreen({
   // page's layout. Always there (Eric, Oct 25: "the menu buttons should never be like invisible"):
   // with no mode picked it shows 50 v 50's options greyed, none selected and none tappable; the first pick wakes them.
   const rank1v1 = mode === "1v1" ? ranked1v1Rank() : null;
-  const panel = (
+  const panel = searching ? (
+    // (Searching: the same box, its three actions: Cancel, Lobby, Start with bots.)
+    <div class="fd-mode-panel fd-searching">
+      <SearchActions search={search!} />
+    </div>
+  ) : (
     <div class={`fd-mode-panel${mode ? "" : " idle"}`}>
       {mode === "squads" ? (
-        <div class="fd-modes fd-types fd-squad-pick" role="radiogroup" aria-label="Squads">
+        <div class="fd-modes fd-types fd-squad-pick fd-three" role="radiogroup" aria-label="Squads">
           {(
             [
-              { id: false, label: "Solo queue", sub: "you join a squad" },
-              { id: true, label: "Party", sub: `with up to ${SQUADS.partyMax - 1} friends` },
+              { id: false, label: "Solo queue", sub: "join a squad" },
+              { id: true, label: "Party", sub: `up to ${SQUADS.partyMax - 1} friends` },
             ] as const
           ).map((c) => (
             <button
@@ -967,6 +1102,12 @@ export function HomeScreen({
               <span>{c.sub}</span>
             </button>
           ))}
+          {/* (Squads with bots (Eric, Nov 9: "play a squad game with 31 bots"): shown greyed until its server part lands: nothing hidden.) */}
+          <button type="button" role="radio" aria-checked={false} aria-disabled class="off" title="Coming soon">
+            Bots
+            <br />
+            <span>Soon</span>
+          </button>
         </div>
       ) : mode === "1v1" ? (
         <div class="fd-panel-words fd-rank-words">
@@ -974,27 +1115,29 @@ export function HomeScreen({
           <RankEmblem rank={rank1v1} class="fd-rank-emblem" />
           <span class="fd-rank-lines">
             {rank1v1 && <strong class="fd-rank1v1">Your rank: {rank1v1.label}</strong>}
-            {/* (Not "Ranked chess vs…": RANKED heads the row, and the line fits beside the emblem at 320 px.) */}
-            <span>Chess vs one player near your level</span>
+            {/* (What 1 v 1 is: the line above PLAY since Nov 9, so the panel says only how ranks move.) */}
+            <span>Win to climb, lose to drop</span>
           </span>
         </div>
       ) : (
-        <div class="fd-modes fd-types" role="radiogroup" aria-label="Matchmaking">
+        <div class="fd-modes fd-types fd-three" role="radiogroup" aria-label="Matchmaking">
           {types.map((t) => {
-            const off = soloOnly && t.id !== "solo";
+            const off = !!t.soon || (soloOnly && t.id !== "solo");
             const idle = !mode;
             return (
               <button
                 type="button"
                 role="radio"
                 key={t.id}
-                aria-checked={!idle && type === t.id}
+                aria-checked={!idle && option === t.id}
                 aria-disabled={idle || off || undefined}
-                class={`${type === t.id && !idle ? "on" : ""}${off ? " off" : ""}`}
-                title={off ? "Online: sign in to play" : undefined}
+                class={`${option === t.id && !idle ? "on" : ""}${off ? " off" : ""}`}
+                title={t.soon ? `Queue with up to ${CROWD_PARTY_MAX - 1} friends (soon)` : off ? "Online: sign in to play" : undefined}
                 onClick={() => pickType(t.id)}
               >
                 {t.label}
+                <br />
+                <span>{t.sub}</span>
               </button>
             );
           })}
@@ -1005,12 +1148,12 @@ export function HomeScreen({
   // The line above PLAY (what PLAY does, for this pick) and PLAY (and an error, if any). Eric, Oct 28: the line moved from under
   // PLAY to just above it. It has one place and one height whatever is picked (styles.css, `fd-hint`).
   const go = (
-    <div class="fd-go">
+    <div class={`fd-go${off}`} inert={searching}>
       <div class="fd-hint" aria-live="polite">
         <span>{loading ? "Loading the engine…" : hint}</span>
       </div>
       {/* (Dimmed until a mode is picked: Eric, Oct 18.) */}
-      <button type="button" class="fd-play" data-tour="play" disabled={!mode || loading || !!resting || (mode === "classic" && type !== "solo")} onClick={play}>
+      <button type="button" class="fd-play" data-tour="play" disabled={searching || !mode || loading || !!resting || !!lockUntil || (mode === "classic" && type !== "solo")} onClick={play}>
         PLAY
       </button>
       {error && <p class="fd-error">{error}</p>}
@@ -1021,7 +1164,7 @@ export function HomeScreen({
   // of the device's time of day (day, dusk or night; picked as the page loads too, home-art/town.ts). Its own class, not PLAY's
   // (`fd-town`; styles.css gives both the same size at every width).
   const chessTownButton = (
-    <button type="button" class="fd-town" data-tour="chess-town" onClick={onChessTown} data-picture={TOWN_PICTURE.id} data-sky={TOWN_SKY}>
+    <button type="button" class={`fd-town${off}`} inert={searching} data-tour="chess-town" onClick={onChessTown} data-picture={TOWN_PICTURE.id} data-sky={TOWN_SKY}>
       <Scene ch={TOWN_SCENE} dropBottom={TOWN_PICTURE.dropBottom} groundRow={TOWN_PICTURE.groundRow} class="fd-town-scene" />
       <span class="fd-town-label">Chess Town</span>
     </button>
@@ -1065,7 +1208,19 @@ export function HomeScreen({
       <header class="fd-top">
         <Logo />
         <div class="fd-top-end">
-          <AccountBar onProfile={onProfile} tourId="profile" />
+          {!computer && (
+            // (Eric, Nov 11: a phone's top bar has the chat where the pawn was, the same square; a computer has neither (its side menu has Profile and the chat).)
+            <button type="button" class="fd-icon-btn fd-top-chat" aria-label="Chat" onClick={() => setChatSheet(true)}>
+              <ChatIcon />
+            </button>
+          )}
+          {!computer && (
+            // (The Quests entry (Nov 9): one more square button in a phone's top bar, the quests icon, as the shop's; greyed until quests
+            // are yours.)
+            <button type="button" class="fd-icon-btn fd-top-quests" aria-label="Quests" title={questsLabel} disabled={questsOn !== true} onClick={quests.show}>
+              <QuestsBarIcon />
+            </button>
+          )}
           <button type="button" class="fd-icon-btn fd-top-shop" data-tour="shop" aria-label="Shop & crates" onClick={onShop}>
             <ShopIcon />
           </button>
@@ -1073,7 +1228,7 @@ export function HomeScreen({
             type="button"
             class="fd-icon-btn fd-top-friends" data-tour="play-with-friends"
             aria-label={friendsNews ? `Friends, ${friendsNews} new` : "Friends"}
-            onClick={() => setFriends(true)}
+            onClick={onFriends}
           >
             <FriendsIcon />
             {friendsNews > 0 && (
@@ -1103,14 +1258,110 @@ export function HomeScreen({
           {panel}
           {go}
           {chessTownButton}
-          <h2 class="fd-label fd-other-label">Other modes</h2>
-          <div class="rd-pair">
+          <h2 class={`fd-label fd-other-label${off}`}>Other modes</h2>
+          <div class={`rd-pair${off}`} inert={searching}>
             {soloCard}
             {autoCard}
           </div>
         </div>
       </div>
       {overlays}
+    </div>
+  );
+}
+
+/** Now, every second (a search's time). */
+function useSecond(): number {
+  const [now, setNow] = useState(Date.now);
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+  return now;
+}
+
+/**
+ * Searching (Eric, Nov 10; the approved mockup, notes/assets/search-rows2-*.png): the modes row's own box and size shows the
+ * search: a green spinning ring, "Searching · 50 v 50", the queue type and the lobby's count, and the time searched in green
+ * on the right.
+ */
+function SearchRow({ search }: { search: AwaySearch }) {
+  const now = useSecond();
+  const [words, more] = search.detail(now);
+  return (
+    <div class="fd-modes fd-search" role="group" aria-label={`Searching ${search.name}`}>
+      <span class="fd-search-ring" aria-hidden="true" />
+      <span class="fd-search-words">
+        <strong class="fd-search-title">Searching · {search.name}</strong>
+        <span class="fd-search-detail">
+          {words}
+          {more && <span class="fd-search-more">{more}</span>}
+        </span>
+      </span>
+      <span class="fd-search-time">{clockShown(Math.max(0, now - search.since))}</span>
+    </div>
+  );
+}
+
+/**
+ * The row under it: the search's three actions (data: search.ts's `slots`), no lines between them, as home's rows are. One
+ * that asks first (Cancel, Start with bots) asks in the same three slots (Eric: "you hit cancel and then you just hit yes or
+ * no"): the question where the first slot was (not a button, so a double tap can't confirm), Yes, No. No, or
+ * FRONT_DOOR.searchAskMs without a tap, puts the actions back. Nothing moves or opens.
+ */
+function SearchActions({ search }: { search: AwaySearch }) {
+  const [asking, setAsking] = useState<number | null>(null);
+  useEffect(() => {
+    if (asking === null) return;
+    const t = setTimeout(() => setAsking(null), FRONT_DOOR.searchAskMs);
+    return () => clearTimeout(t);
+  }, [asking]);
+  const slot = asking === null ? null : search.slots[asking]!;
+  if (slot?.ask) {
+    const a = slot.ask;
+    return (
+      <div class="fd-modes fd-types fd-three fd-search-acts asking" role="group" aria-label={a.question}>
+        <div class="fd-search-ask" role="status">
+          {a.question}
+          <br />
+          <span>{a.note}</span>
+        </div>
+        <button
+          type="button"
+          class={`fd-search-yes ${a.red ? "red" : "go"}`}
+          onClick={() => {
+            setAsking(null);
+            slot.run?.();
+          }}
+        >
+          Yes
+          <br />
+          <span>{a.yes}</span>
+        </button>
+        <button type="button" class="fd-search-no" onClick={() => setAsking(null)}>
+          No
+          <br />
+          <span>keep searching</span>
+        </button>
+      </div>
+    );
+  }
+  return (
+    <div class="fd-modes fd-types fd-three fd-search-acts" role="group" aria-label={`${search.name} search`}>
+      {search.slots.map((s, i) => (
+        <button
+          type="button"
+          key={i}
+          aria-disabled={!s.run || undefined}
+          class={`${s.red ? "red" : ""}${s.run ? "" : " off"}`}
+          title={s.run ? undefined : "Coming soon"}
+          onClick={() => (!s.run ? undefined : s.ask ? setAsking(i) : s.run())}
+        >
+          {s.label}
+          <br />
+          <span>{s.line}</span>
+        </button>
+      ))}
     </div>
   );
 }

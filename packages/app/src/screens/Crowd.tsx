@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "preact/hooks";
 import { PowerBoard, crowdView } from "../components/BossPowers.tsx";
+import { boingoDecor } from "../components/Boingo.tsx";
 import { applyMove, inCheck, pieceAt, sideToMove } from "@chessroyale/chess";
 import { seenFen, seenSan } from "../camo.ts";
 import { blunderWords, capitalised, crowdMoveCues, type KingCue } from "../godKing.ts";
@@ -9,7 +10,9 @@ import { seatKey } from "../board/yours.ts";
 import { TimerBar, useFrameNow } from "../components/Countdown.tsx";
 import { BoardClock } from "../components/BoardClock.tsx";
 import { EvalBar } from "../components/EvalBar.tsx";
-import { ChatSection, UnderBoard } from "../components/QuickChat.tsx";
+import { ChatSection, LOCKED_PHONE, UnderBoard, useMedia } from "../components/QuickChat.tsx";
+import { HistoryNav, type useHistoryView } from "../components/HistoryNav.tsx";
+import { PowerUps } from "../components/PowerUpButton.tsx";
 import { BossPanel, besideBoard, useBossLayout } from "../components/MovePanel.tsx";
 import { SquareRing } from "../components/ShadeMoves.tsx";
 import { CrowdGhosts, type GhostPick } from "../components/CrowdGhosts.tsx";
@@ -95,6 +98,13 @@ export function WatchScreen({
   const standings = match.standings();
   const choosing = standings.filter((s) => !s.out && s.team === side);
   const done = choosing.filter((s) => match.done.has(s.id)).length;
+  // The power-up row keeps its place through the other team's vote (Nov 8, Eric: nothing on the match screen moves): your
+  // power-ups, all greyed, in the same place as on your own turn (Play), with no history to step through.
+  const fifty = isCrowdFifty(match);
+  const lockedPhone = useMedia(LOCKED_PHONE) && fifty;
+  const you = standings.find((s) => s.isYou);
+  const noHistory = { ply: 0, browsing: false, go: () => {}, live: () => {} } as unknown as ReturnType<typeof useHistoryView>;
+  const powerRow = fifty ? <HistoryNav view={noHistory} total={0} extra={<PowerUps count={match.practice ? Infinity : (you?.powerUps ?? 0)} max={match.settings.powerUpsMax} used={false} disabled onUse={() => {}} />} /> : null;
   return (
     <div class={`screen game crowd${isCrowdFifty(match) ? " crowd-50" : ""}`}>
       <Hud match={match} />
@@ -111,23 +121,27 @@ export function WatchScreen({
             {!shown.replaying && <LiveGhosts match={match} fen={board.fen} orientation={team === "w" ? "white" : "black"} />}
           </Board>
         </div>
+        {!lockedPhone && powerRow}
       </div>
       <div class="play-footer">
-        <div class="waiting-banner" role="status">
-          <span class="waiting-dots" aria-hidden="true">
-            <i />
-            <i />
-            <i />
-          </span>
-          <span>
-            <strong>{counting ? "Counting the votes…" : `${sideName(side)} is voting.`}</strong>{" "}
-            {counting ? "" : "Your team moves next."}
-          </span>
-          {choosing.length > 0 && (
-            <span class="waiting-count">
-              {done}/{choosing.length}
+        {lockedPhone && powerRow}
+        <div class={fifty ? "play-slot" : undefined}>
+          <div class="waiting-banner" role="status">
+            <span class="waiting-dots" aria-hidden="true">
+              <i />
+              <i />
+              <i />
             </span>
-          )}
+            <span>
+              <strong>{counting ? "Counting the votes…" : `${sideName(side)} is voting.`}</strong>{" "}
+              {counting ? "" : "Your team moves next."}
+            </span>
+            {choosing.length > 0 && (
+              <span class="waiting-count">
+                {done}/{choosing.length}
+              </span>
+            )}
+          </div>
         </div>
       </div>
       <UnderBoard match={match} />
@@ -578,7 +592,7 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
           evaluate={(f) => match.evaluate(f)}
           override={plunge}
         />
-        <Board fen={onBoard.fen} orientation={orientation} turn={view.turn} lastMove={onBoard.lastMove} marks={stand && played && ts < LAST_STAND.crashAt ? { [mine.result.playedMove.slice(2, 4)]: "ls-blunder" } : undefined} premove={{ key: seatKey(match, board.id, team ?? sideToMove(fen)), side: team ?? sideToMove(fen), watch: true }}>
+        <Board fen={onBoard.fen} orientation={orientation} turn={view.turn} lastMove={onBoard.lastMove} decor={boingoDecor(match.boss)} marks={stand && played && ts < LAST_STAND.crashAt ? { [mine.result.playedMove.slice(2, 4)]: "ls-blunder" } : undefined} premove={{ key: seatKey(match, board.id, team ?? sideToMove(fen)), side: team ?? sideToMove(fen), watch: true }}>
           {match.boss?.powers && <PowerBoard boss={match.boss} orientation={orientation} fen={onBoard.fen} />}
           {!played && (
             <CrowdGhosts

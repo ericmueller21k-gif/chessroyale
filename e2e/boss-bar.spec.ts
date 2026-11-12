@@ -204,6 +204,18 @@ async function quietMove(page: Page) {
 test("his level follows his strength: lifted in Moo's Full Moon (gold, an arrow), back to his own after it", async ({ page }) => {
   test.skip(desktop(), "the level's states are the same on the computer; the phone runs it");
   test.setTimeout(240_000);
+  // Every lifted badge put in the page, and whether its pop is running then (the match's screens are drawn anew at every phase,
+  // and the bar with them: Nov 12, the pop replayed at each one, twice a move, all through the Moon).
+  await page.addInitScript(() => {
+    const pops: { t: number; running: boolean }[] = ((window as any).__lvPops = []);
+    new MutationObserver((ms) => {
+      for (const m of ms)
+        for (const n of m.addedNodes) {
+          if (!(n instanceof Element)) continue;
+          for (const e of n.matches(".boss-level.lv-up") ? [n] : [...n.querySelectorAll(".boss-level.lv-up")]) pops.push({ t: performance.now(), running: e.getAnimations().length > 0 });
+        }
+    }).observe(document, { childList: true, subtree: true });
+  });
   await page.goto(`${BASE}&boss=moo&power=fullmoon`);
   await bossAloneFromHome(page);
   await expect(page.locator(".boss-level")).toBeVisible({ timeout: 60_000 });
@@ -224,7 +236,9 @@ test("his level follows his strength: lifted in Moo's Full Moon (gold, an arrow)
   // The color: gold (and no animation under reduced motion: just the color).
   await expect.poll(() => page.locator(".boss-level.lv-up").evaluate((e) => getComputedStyle(e).color), { timeout: 5000 }).toBe("rgb(255, 212, 102)");
   await page.emulateMedia({ reducedMotion: "reduce" });
-  expect(await page.locator(".boss-level.lv-up").evaluate((e) => getComputedStyle(e).animationName)).toBe("none");
+  // (Found and read in one go: the badge is drawn anew with its screen at each phase, and a computed style read from one just
+  // replaced is empty.)
+  await expect.poll(() => page.evaluate(() => getComputedStyle(document.querySelector(".boss-level.lv-up")!).animationName), { timeout: 5000 }).toBe("none");
   await page.emulateMedia({ reducedMotion: "no-preference" });
   // It lasts through his powered moves, and goes when they're over.
   for (let i = 0; i < 12 && lifted.up; i++) {
@@ -234,6 +248,12 @@ test("his level follows his strength: lifted in Moo's Full Moon (gold, an arrow)
   }
   expect(lifted.up, "back to his own level after the Full Moon").toBe(false);
   expect(lifted.n).toBe(first.base);
+  // The pop played once, as the lift began: a badge drawn again later carries on (its pop long over), it doesn't replay it.
+  const pops = await page.evaluate(() => (window as any).__lvPops as { t: number; running: boolean }[]);
+  expect(pops.length, "the badge was drawn anew through the Moon (what this check is for)").toBeGreaterThan(2);
+  expect(pops[0]!.running, "the pop as the lift began").toBe(true);
+  const replays = pops.filter((p) => p.t - pops[0]!.t > 700 && p.running).map((p) => Math.round(p.t - pops[0]!.t));
+  expect(replays, "no pop replayed mid-Moon (ms after the lift)").toEqual([]);
 });
 
 test("his level is slashed for the move the King's strike weakens, then back (red, a slash; just the color under reduced motion)", async ({ page }) => {

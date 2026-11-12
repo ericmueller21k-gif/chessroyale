@@ -1868,6 +1868,15 @@ p {
   font-size: 16px;
   animation: fade 160ms ease-out;
 }
+/* A 50 v 50's status slot (Nov 8, Eric: nothing on the match screen moves): one height in every phase, reserved (empty)
+   while picking, so the box under it never shifts. The banner is the desktop's 56 px; the phone's is set below. */
+.screen.game.crowd-50 .play-slot {
+  height: 56px;
+}
+.screen.game.crowd-50 .play-slot > .waiting-banner {
+  height: 100%;
+  min-width: 0;
+}
 .waiting-count {
   margin-left: auto;
   font-weight: 800;
@@ -3075,10 +3084,18 @@ button.history-label {
     min-height: 0;
     align-content: start;
   }
-  /* (The power-up row or the waiting line sits in the middle of the box while it's the picking's: the box's height is the
-     vote box's, so the space is shared out, not left at the foot.) */
+  /* Nov 8 (Eric: nothing on the match screen moves): the power-up row sits at the top of the box, right under the board, on
+     every phase, and the status slot under it is 42 px on every phase (empty while picking, the waiting line's box in the
+     others). Two lines of text fit it, so a long line never grows the box. */
   .screen.game.crowd-50 > .play-footer {
-    align-content: center;
+    align-content: start;
+  }
+  .screen.game.crowd-50 .play-slot {
+    height: 42px;
+  }
+  .screen.game.crowd-50 .play-slot > .waiting-banner {
+    padding: 0 14px;
+    line-height: 1.2;
   }
   .screen.game.crowd-50 .poll {
     display: flex;
@@ -4016,6 +4033,8 @@ button.history-label {
 }
 .signin-row input {
   flex: 1;
+  /* (Its size is the row's to give: a text box's own width, about 274 px, pushed the box 8 px past a 320 px phone's column.) */
+  width: 0;
   min-width: 0;
   font: inherit;
   padding: 0 12px;
@@ -4028,10 +4047,9 @@ button.history-label {
 .signin-row .btn {
   flex: none;
 }
-/* The age question: the month and the year share the row, 3 to 2 (measured at 320 px: "September" and a year each
-   have about 28 px to spare; evenly, the month had 7), Continue below them. */
+/* The age question: the month and the year in one row, Continue below them. The row wraps where the email's row does (the
+   shared rule under "Narrow phones"), so Sign up's question is as tall as Sign in's options and switching moves nothing (Nov 12). */
 .signin-born select {
-  flex: 3 1 0;
   min-width: 0;
   font: inherit;
   padding: 0 10px;
@@ -4041,12 +4059,29 @@ button.history-label {
   background: var(--surface);
   color: var(--text);
 }
-.signin-born select:last-child {
-  flex-grow: 2;
-}
-.signin-ask,
 .signin-young {
   margin: 0;
+}
+/* Sign in, then Sign up below it (Eric, Nov 12): one box, its heading, the step (options or the question), and the switch. */
+.signin-box {
+  display: grid;
+  gap: 8px;
+}
+.signin-title {
+  margin: 0;
+  font-size: 16px;
+}
+.signin-switch {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+.signin-switch .btn {
+  flex: none;
+  min-width: 120px;
 }
 .profile-actions {
   display: flex;
@@ -4073,26 +4108,26 @@ button.history-label {
 .landing-tag strong {
   color: var(--text);
 }
-.landing-main {
-  display: grid;
-  gap: 18px;
+/* The two panes of a computer's layout: on a phone, no boxes of their own (the screen's column holds their parts, as before). */
+.landing-stage,
+.landing-side {
+  display: contents;
 }
+/* The demo reel (Eric, Nov 11: "Make it much bigger"): on a phone, the screen's whole width, edge to edge (the frame reaches out
+   over the screen's side padding; at most 480 px wide on a tablet); its box keeps its size while it loads (aspect-ratio). */
 .demo-frame {
-  margin: 0;
+  margin: 0 calc(-1 * (var(--gutter) + env(safe-area-inset-right))) 0 calc(-1 * (var(--gutter) + env(safe-area-inset-left)));
   display: grid;
   justify-items: center;
   gap: 6px;
 }
 .demo-video {
   display: block;
-  width: min(100%, 300px);
+  width: min(100%, 480px);
   aspect-ratio: 390 / 700;
   object-fit: cover;
   object-position: top;
-  border-radius: 22px;
-  border: 6px solid var(--surface-2);
   background: var(--surface);
-  box-shadow: var(--shadow);
 }
 .landing-actions {
   display: grid;
@@ -4263,33 +4298,112 @@ button.history-label {
   white-space: pre;
 }
 @media (min-width: 900px) {
+  /* (900 to 1023 px: the portrait reel beside the sign-in, the title above and the questions below, across both.) */
   .screen.landing {
     width: min(100vw, 980px);
-  }
-  .landing-main {
+    display: grid;
     grid-template-columns: auto 1fr;
-    align-items: center;
-    gap: 40px;
+    align-content: start;
+    gap: 18px 40px;
+  }
+  .landing-head,
+  .faq,
+  .landing-foot {
+    grid-column: 1 / -1;
+  }
+  .landing-actions {
+    align-self: center;
   }
   .landing-head {
     text-align: left;
   }
+  /* A computer: about two thirds of the window's height (never smaller than before, 574 px, and leaving room for the title above). */
+  .demo-frame {
+    margin: 0;
+  }
   .demo-video {
-    width: 320px;
+    width: auto;
+    height: clamp(574px, 65vh, calc(100vh - 160px));
+    border-radius: 22px;
+    border: 6px solid var(--surface-2);
+    box-shadow: var(--shadow);
   }
   .faq {
     max-width: 720px;
   }
 }
-/* Narrow phones: the email box gets its own line. */
+/* A computer (Eric, Nov 11: "Move the whole screen to the left, fill it up mostly … the questions can just be a scrollable thing
+   underneath the sign-in … the right side is scrollable, but the left, the large part where the video plays, is not"): the page fills
+   the window and never scrolls. Left, the title and the 16:9 reel, as big as fits and centered; right, a 380 px column with the
+   sign-in on top and the questions under it, the one part that scrolls. */
+@media (min-width: 1024px) {
+  .screen.landing {
+    width: 100vw;
+    height: var(--app-h);
+    min-height: 0;
+    overflow: hidden;
+    padding: 24px 28px;
+    grid-template-columns: minmax(0, 1fr) 380px;
+    grid-template-rows: minmax(0, 1fr);
+    gap: 28px;
+  }
+  .landing-stage,
+  .landing-side {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    min-height: 0;
+    min-width: 0;
+  }
+  .landing-head {
+    text-align: center;
+    justify-items: center;
+  }
+  /* The reel's pane is the box it fits in (container-type: size), less a line for the caption under it. */
+  .demo-frame {
+    flex: 1 1 0;
+    min-height: 0;
+    container-type: size;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+  .demo-video.wide {
+    width: min(100cqw, calc((100cqh - 24px) * 16 / 9));
+    height: auto;
+    aspect-ratio: 16 / 9;
+    border-radius: 16px;
+  }
+  .landing-side {
+    gap: 18px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding-right: 6px;
+  }
+  .landing-actions {
+    align-self: stretch;
+  }
+  .faq {
+    max-width: none;
+  }
+  .landing-foot {
+    margin-top: auto;
+  }
+}
+/* Narrow phones: the email box gets its own line, and so does the birth month (each row's second part from 196 px, wider than
+   "Email me a code", so the email's row and the question's wrap at the same width: Sign in and Sign up stay the same height). */
 .signin-options .signin-row {
   flex-wrap: wrap;
 }
-.signin-options .signin-row input {
+.signin-options .signin-row > :first-child {
   flex: 1 1 210px;
 }
-.signin-options .signin-row .btn {
+.signin-options .signin-row > :last-child {
   flex: 1 0 auto;
+}
+.signin-options .signin-row:is(.signin-email, .signin-born) > :last-child {
+  flex: 1 0 196px;
 }
 
 /* ---- Pre-game votes ----
@@ -5117,12 +5231,6 @@ button.history-label {
   font-size: 13px;
   opacity: 0.9;
   font-variant-numeric: tabular-nums;
-}
-.boss-loading-first {
-  max-width: 250px;
-  font-size: 12px;
-  line-height: 1.35;
-  opacity: 0.8;
 }
 .boss-loading-leave {
   margin-top: 4px;
@@ -6486,6 +6594,241 @@ button.history-label {
 .shop-soon {
   text-align: center;
 }
+
+/*
+ * The Shop tab's page (Eric's mockup, Nov 9; docs/decisions/2026-11-09-shop-page.md): the special offer's dark-and-gold banner, then
+ * the cards (2 a row on a phone, the page scrolls; 4 a row on a computer), each with its price pill; the beta discount's red ribbon
+ * on every one, the limited items' gold clock in the corner. The banner and the gold are the same in light and dark (the offer's own
+ * look); the cards are the page's surface.
+ */
+.shop-line {
+  margin: 0;
+  font-size: 15px;
+}
+.shop-offer {
+  position: relative;
+  display: grid;
+  grid-template-columns: 46% 1fr;
+  align-items: center;
+  gap: 10px;
+  padding: 30px 12px 14px 8px;
+  border-radius: 18px;
+  border: 3px solid #e2ad3b;
+  background: radial-gradient(ellipse at 25% 55%, #3a2c12 0%, #17140f 55%, #0d0c0a 100%);
+  box-shadow: 0 0 0 1px #6b4f12, 0 4px 14px rgba(0, 0, 0, 0.25);
+  color: #fff;
+}
+.shop-offer::before,
+.shop-offer::after {
+  content: "";
+  position: absolute;
+  bottom: 7px;
+  width: 14px;
+  height: 14px;
+  border: 0 solid #e2ad3b;
+  border-bottom-width: 3px;
+}
+.shop-offer::before {
+  left: 7px;
+  border-left-width: 3px;
+  border-bottom-left-radius: 5px;
+}
+.shop-offer::after {
+  right: 7px;
+  border-right-width: 3px;
+  border-bottom-right-radius: 5px;
+}
+.shop-offer-tab {
+  position: absolute;
+  top: 0;
+  left: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 16px 4px 10px;
+  background: linear-gradient(180deg, #f8d77a, #d9a22e);
+  color: #2b1d02;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 1.5px;
+  clip-path: polygon(0 0, 100% 0, calc(100% - 10px) 100%, 0 100%);
+  border-bottom-left-radius: 6px;
+}
+.shop-offer-tab svg {
+  width: 16px;
+  height: 12px;
+}
+.shop-offer-art {
+  display: block;
+  aspect-ratio: 200 / 140;
+}
+.shop-offer-text {
+  display: grid;
+  gap: 4px;
+  padding-left: 12px;
+  border-left: 2px solid color-mix(in srgb, #e2ad3b 70%, transparent);
+}
+.shop-offer-text h2 {
+  margin: 0;
+  font-size: clamp(19px, 6vw, 26px);
+  line-height: 1.1;
+  font-weight: 900;
+}
+.shop-offer-text strong {
+  font-size: clamp(12px, 3.6vw, 15px);
+}
+.shop-offer-text em {
+  font-size: clamp(11.5px, 3.3vw, 14px);
+  line-height: 1.3;
+  color: #e9e3d6;
+}
+.shop-mythic-icon {
+  display: inline-block;
+  width: 1.5em;
+  height: 1.5em;
+  vertical-align: -0.45em;
+}
+.shop-offer .shop-price {
+  margin-top: 6px;
+  justify-self: stretch;
+}
+.shop-cards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+@media (min-width: 1024px) and (hover: hover) and (pointer: fine) {
+  .shop-cards {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 14px;
+  }
+  .shop-offer {
+    grid-template-columns: 40% 1fr;
+    padding: 34px 28px 18px 16px;
+  }
+}
+.shop-card {
+  position: relative;
+  display: grid;
+  grid-template-rows: auto auto 1fr auto;
+  justify-items: center;
+  gap: 4px;
+  padding: 14px 8px 12px;
+  border-radius: 14px;
+  border: 2px solid var(--line);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  text-align: center;
+}
+.shop-card-art {
+  display: block;
+  width: 96px;
+  height: 88px;
+}
+.shop-card strong {
+  font-size: 17px;
+  font-weight: 900;
+  line-height: 1.15;
+}
+.shop-card-line {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.3;
+}
+.shop-price {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  justify-self: stretch;
+  min-height: 38px;
+  margin-top: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 2px solid #d9a93f;
+  background: linear-gradient(180deg, #fffaf0, #f7e3ad);
+  color: #1d1d1f;
+  font: inherit;
+  font-size: 18px;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.shop-price s {
+  color: #7a6a4a;
+  font-size: 13px;
+  font-weight: 700;
+}
+.shop-price span {
+  font-size: 17px;
+}
+.shop-ribbon {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  z-index: 1;
+  padding: 4px 10px 4px 18px;
+  background: linear-gradient(180deg, #c8312b, #8f1813);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 900;
+  font-style: italic;
+  letter-spacing: 0.2px;
+  white-space: nowrap;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.35);
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%, 9px 50%);
+  border-top-right-radius: 14px;
+}
+.shop-clock {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-top-left-radius: 12px;
+  background: linear-gradient(135deg, #e9b949 0 50%, transparent 50%);
+  cursor: pointer;
+}
+.shop-clock svg {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 19px;
+  height: 19px;
+}
+.shop-pop {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  width: min(300px, 100%);
+  padding: 16px 14px 14px;
+  border-radius: 14px;
+  border: 2px solid #d9a93f;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow);
+  text-align: center;
+}
+.shop-pop p {
+  margin: 0;
+  font-weight: 600;
+}
+.boss-crate-art {
+  position: relative;
+}
+/* A boss's token over the Boss Crate's seal (its disc: centered at 50, 58, radius 13.2, on the 100 × 100 square). */
+.boss-crate-seal {
+  position: absolute;
+  left: 36.8%;
+  top: 44.8%;
+  width: 26.4%;
+  height: 26.4%;
+  border-radius: 50%;
+  overflow: hidden;
+}
 .home-shop-btn {
   margin-left: auto;
   padding: 6px 12px;
@@ -7458,8 +7801,92 @@ button.history-label {
   width: 28px;
   height: 28px;
 }
-.boss-crate-row.none {
+.boss-crate-row.none,
+.series-crate-row.none,
+.boss-pick-row.none {
   opacity: 0.55;
+}
+/* A series crate you can't open yet (Nov 9: none held, or no key): the Welcome Crate's padlock on its corner. */
+.crate-lock {
+  z-index: 1;
+}
+.crates-how {
+  margin: 0;
+}
+/* Choosing a level's boss crate (Nov 9): every live boss's crate as a tile, its token on the corner. */
+.boss-pick-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+  gap: 8px;
+}
+.boss-pick {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  padding: 10px 6px;
+  font: inherit;
+  cursor: pointer;
+}
+.boss-pick:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.boss-pick-name {
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+}
+.boss-pick-said {
+  min-height: 1.45em;
+  margin: 0;
+}
+/* The result screen's rewards toast (components/RewardBox.tsx; Nov 9): the friends' invite toast's place and look, the crate and the
+   key with their counts, then the lines. It takes no taps (whatever is under it stays tappable) and goes on its own. */
+.reward-toast {
+  position: fixed;
+  z-index: 65;
+  top: calc(env(safe-area-inset-top) + 10px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(440px, calc(100% - 24px));
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 14px;
+  border-radius: 16px;
+  background: var(--fd-panel-2);
+  color: var(--fd-text);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--fd-line);
+  pointer-events: none;
+}
+.reward-art {
+  flex: none;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 15px;
+  font-weight: 800;
+}
+.reward-thing {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.reward-thing-art {
+  width: 40px;
+  height: 40px;
+}
+.reward-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+  font-size: 13px;
+  line-height: 1.3;
+}
+.reward-title {
+  font-size: 16px;
 }
 .crate-row-held {
   font-size: 12px;
@@ -7890,6 +8317,25 @@ button.history-label {
   font-size: 12px;
   line-height: 1.15;
 }
+/* An item an outfit hides (Nov 10): greyed, still there and still wearable underneath; its line over the art. */
+.locker-item.covered > :not(.locker-covered):not(.locker-worn) {
+  opacity: 0.45;
+  filter: grayscale(1);
+}
+.locker-covered {
+  position: absolute;
+  top: 46px;
+  left: 4px;
+  right: 4px;
+  padding: 1px 3px;
+  border-radius: 6px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  color: var(--text);
+  font-size: 9px;
+  line-height: 1.15;
+  pointer-events: none;
+}
 .locker-item.worn {
   border-color: var(--accent);
   background: color-mix(in srgb, var(--accent) 10%, var(--surface));
@@ -7942,6 +8388,17 @@ button.history-label {
 }
 .locker-tabs {
   flex-wrap: wrap;
+}
+/* With the secret Outfit tab (only once you own an outfit, Nov 10): seven tabs, two even rows of four on a phone, one row on a
+   wider screen; never a lone stretched tab. Without it, the layout above, as before. */
+.locker-tabs.with-outfit {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+}
+@media (min-width: 600px) {
+  .locker-tabs.with-outfit {
+    grid-template-columns: repeat(7, 1fr);
+  }
 }
 .locker-item.default {
   --tier: var(--line);
@@ -8568,6 +9025,9 @@ button.history-label {
 .gk-epilogue.up .god-king {
   width: 84px;
   height: 84px;
+}
+/* His rise's motion, as he starts to speak (never over the boss's line: LastStand.tsx). */
+.gk-epilogue.rising .god-king {
   animation: gk-rise 600ms cubic-bezier(0.2, 1.4, 0.4, 1) both;
 }
 @keyframes gk-rise {
@@ -8607,7 +9067,7 @@ button.history-label {
   right: auto;
   bottom: auto;
   translate: -50% 0;
-  max-width: min(220px, 80vw);
+  max-width: min(220px, calc(100vw - 32px));
 }
 .gk-epilogue-bubble::after {
   left: calc(50% - 6px);
@@ -8649,6 +9109,9 @@ button.history-label {
   --fd-danger: #f2a3a3;
   --fd-danger-line: #5b2a2a;
   --fd-scrim: rgba(0, 0, 0, 0.55);
+  /* The card's "View profile" (Nov 11): a lighter blue on the dark card (6.4:1), and the sweep across it. */
+  --fd-link: #60a5fa;
+  --fd-shine: #e0f2fe;
 }
 :root[data-theme="light"] {
   --fd-bg: #f4f2ee;
@@ -8667,6 +9130,9 @@ button.history-label {
   --fd-danger: #b42318;
   --fd-danger-line: #f1b5ae;
   --fd-scrim: rgba(20, 22, 27, 0.4);
+  /* The card's "View profile": #2563eb on white (5.2:1). */
+  --fd-link: #2563eb;
+  --fd-shine: #8ab8f7;
   --fd-shadow: 0.16;
 }
 body:has(.fd-root) {
@@ -9047,19 +9513,104 @@ button.fd-logo {
     gap: 6px;
   }
 }
-@media (max-width: 399px) {
-  .fd-top .fd-logo {
-    font-size: clamp(18px, 5.2vw, 20px);
-  }
-}
-@media (max-width: 359px) {
-  .fd-top .fd-logo {
-    font-size: 15px;
-  }
+/*
+ * The row (the logo, five buttons, the gaps) must fit the bar at every phone width (Nov 11, the director): below 375 px the
+ * buttons are 40 px, from 375 up 44 px; the word logo's width is about 5.3 times its font size, so it takes what the row leaves
+ * (the bar's 18 px margins and 6 px gaps; 10 px gaps from 430 px). Below 344 px the logo is the app's icon (below).
+ */
+@media (max-width: 374px) {
   .fd-top .fd-ring,
   .fd-top .fd-icon-btn {
     width: 40px;
     height: 40px;
+  }
+}
+@media (min-width: 344px) and (max-width: 374px) {
+  .fd-top .fd-logo {
+    font-size: clamp(13px, calc((100vw - 270px) / 5.3), 20px);
+  }
+}
+@media (min-width: 375px) and (max-width: 459px) {
+  .fd-top .fd-logo {
+    font-size: clamp(13px, calc((100vw - 296px) / 5.3), 20px);
+  }
+}
+/*
+ * Below 344 px (a 320 px phone) the row holds your pawn, Quests, the shop, Friends and the gear beside the logo (Nov 9, phase 3): the
+ * buttons keep their 40 px (home-layout.spec.ts's tap-target check) and the logo steps down to the app's icon (the browser tab's,
+ * 28 px), its words kept for screen readers. (The mockup's 36 px squeeze went under 40 px.)
+ */
+@media (max-width: 343px) {
+  .fd-top:has(.fd-top-quests) > .fd-logo {
+    flex: none;
+    width: 28px;
+    height: 28px;
+    overflow: hidden;
+    font-size: 0;
+    color: transparent;
+    background: url("/icons/icon.svg") center / contain no-repeat;
+    border-radius: 7px;
+  }
+  .fd-top:has(.fd-top-quests) > .fd-logo span {
+    font-size: 0;
+  }
+}
+/* The Quests entry, greyed (muted, not tappable) until quests are yours: a guest where sign-in is set up, or the account still loading. */
+.fd-top-quests:disabled,
+.fd-menu-item:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.fd-menu-item:disabled:hover {
+  background: transparent;
+  color: var(--fd-off);
+}
+/*
+ * The phone's top bar (Eric, Nov 10, undoing Nov 9's colors: "just make them all black, like the settings, just black and empty on
+ * the inside, except for your guy"): Quests, the shop, Friends and the gear are plain outlines in the text color (black in light
+ * mode, light in dark), no fill; the icons a size bigger (29 px in the same 44 px squares, 40 px below 360 px). The profile is the
+ * shop's square too: no gold ring, your pawn's face only (cropped, still: no ride, no animation), the one in color.
+ */
+.fd-top .fd-icon-btn svg {
+  width: 29px;
+  height: 29px;
+}
+/*
+ * The profile square's face (Eric, Nov 9: "a zoom in of your guy's head, but there should still be padding around all the sides,
+ * just like for the rest of the icons"): a window inset `--pad` from the square's edges, on the square's own gray (no layer of
+ * its own), your pawn inside it at `--face` with its head in view. The window clips with `clip-path`, never `overflow: hidden`
+ * (the Quests spec's "cut" guard).
+ */
+.fd-top .fd-top-face {
+  --pad: 6px;
+  --face: 56px;
+  --face-y: 4px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--fd-panel-2);
+}
+.fd-top .fd-top-face .fd-pawn-ring {
+  position: absolute;
+  inset: var(--pad);
+  width: auto;
+  height: auto;
+  border-radius: 8px;
+  clip-path: inset(0 round 8px);
+}
+.fd-top .fd-top-face .fd-pawn-ring .fd-pawn-box {
+  inset: auto;
+  left: 50%;
+  top: var(--face-y);
+  width: var(--face);
+  height: var(--face);
+  transform: translateX(-50%);
+}
+/* Below 360 px the square is 40 px: the face scales with it. */
+@media (max-width: 359px) {
+  .fd-top .fd-top-face {
+    --pad: 5.5px;
+    --face: 51px;
+    --face-y: 3.5px;
   }
 }
 .fd-home-main {
@@ -9109,7 +9660,46 @@ button.fd-logo {
     margin: 0;
   }
 }
+/*
+ * The phone's chat (Eric, Nov 11: "a chat icon" in the top bar, in place of the pawn): the global chat as a full-screen sheet over
+ * home, its × a 44 px square at the top right. Home under it stays as it was (ChatSheet.tsx).
+ */
+.chat-sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: flex;
+  flex-direction: column;
+  background: var(--fd-bg);
+  padding: env(safe-area-inset-top, 0px) 12px env(safe-area-inset-bottom, 0px);
+}
+.chat-sheet-top {
+  flex: none;
+  display: flex;
+  justify-content: flex-end;
+  min-height: 44px;
+}
+.chat-sheet-close {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 12px;
+  background: none;
+  color: inherit;
+  font: 400 32px/1 system-ui, sans-serif;
+  cursor: pointer;
+}
+.chat-sheet-close:focus-visible {
+  outline: 2px solid var(--fd-gold, #f5c542);
+  outline-offset: 2px;
+}
+.chat-sheet > .gchat {
+  flex: 1 1 0;
+  min-height: 0;
+}
 .fd-hero {
+  position: relative;
   flex: 1 1 auto;
   min-height: 230px;
   display: flex;
@@ -9174,6 +9764,62 @@ button.fd-logo {
 .fd-pawn.fd-tap:focus-visible {
   outline: 2px solid var(--fd-gold, #f5c542);
   outline-offset: 2px;
+}
+/*
+ * "View profile" (Eric, Nov 11: "top right of that white container", moved to the bottom right on the director's call, Nov 11, as
+ * it cut into the name): in the card's bottom-right corner, 12 px in from its right and bottom edges, so the words sit about 16 px
+ * in from the edge (the chevron's own padding). Its 44 px tap box is out of the flow, so nothing else on the card moves. Blue, a
+ * chevron, and a light sweep every 6 s (none under reduced motion). Its no-overlap check: home-layout.spec.ts.
+ */
+.fd-hero-profile {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  min-height: 44px;
+  padding: 0 4px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--fd-link);
+  font: 600 15px/1 Archivo, system-ui, sans-serif;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 120ms ease;
+}
+.fd-hero-profile-text {
+  background: linear-gradient(100deg, var(--fd-link) 40%, var(--fd-shine) 50%, var(--fd-link) 60%) no-repeat;
+  background-size: 250% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: fd-profile-sweep 6s ease-in-out infinite;
+}
+@keyframes fd-profile-sweep {
+  0% {
+    background-position: 100% 0;
+  }
+  30%,
+  100% {
+    background-position: 0% 0;
+  }
+}
+.fd-hero-profile:active {
+  transform: scale(0.97);
+}
+.fd-hero-profile:focus-visible {
+  outline: 2px solid var(--fd-gold, #f5c542);
+  outline-offset: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .fd-hero-profile-text {
+    animation: none;
+    background: none;
+    -webkit-text-fill-color: currentColor;
+  }
 }
 /* Your icon to the left of your name and rating: the pair centered under your pawn, the words ranged left. */
 .fd-hero-id {
@@ -9610,6 +10256,27 @@ button.fd-logo {
       overflow: hidden;
     }
   }
+  /*
+   * A very short card (under 110 px: a 360 × 640 phone): the pawn and name row starts at the left, so the "View profile" link
+   * (bottom right, Nov 11, the director's call) fits beside the name; the pawn fits inside the card's content height, always.
+   * Only this row moves, and only on these cards.
+   */
+  @container fd-hero (max-height: 110px) {
+    .fd-hero-in,
+    .fd-home:not(.queueing) .fd-hero-in {
+      justify-content: flex-start;
+    }
+    .fd-hero .fd-pawn-hero {
+      height: clamp(40px, calc(100cqh - 22px), 130px);
+    }
+    /* The link (the director, Nov 11): its box at the card's bottom edge and 13 px words, so the words clear the name's words. */
+    .fd-hero-profile {
+      bottom: 0;
+    }
+    .fd-hero-profile-text {
+      font-size: 13px;
+    }
+  }
 }
 /* Under PLAY (Oct 24): "Other modes", the RANKED label's style at 11 px, over the Boss raid and Auto chess cards. Centered over
    the cards (Oct 26, Eric). */
@@ -9628,7 +10295,150 @@ button.fd-logo {
 /* (Oct 24: centered over the three buttons.) */
 .fd-ranked .fd-label {
   font-size: 12px;
+  /* (Archivo's own line, fixed: the fallback font's is 1 to 3 px taller, and your card took the difference when Archivo landed.) */
+  line-height: 14px;
   text-align: center;
+}
+/*
+ * Searching while you browse (Eric, Nov 10; the approved mockup, notes/assets/search-rows2-*.png; Home.tsx, search.ts): the
+ * modes row's own box shows the search, at the row's own height (52 px buttons and 5 px round them), so nothing moves. The row
+ * under it holds the three actions (and, in place, a question with Yes and No). Everything under them greys in place, not
+ * tappable (`fd-off` and `inert`); the top bar and your card stay lit.
+ */
+.fd-off {
+  opacity: 0.38;
+  filter: grayscale(1);
+  pointer-events: none;
+}
+.fd-modes.fd-search {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 62px;
+  padding: 0 16px;
+  box-sizing: border-box;
+  color: var(--fd-text);
+}
+.fd-search-ring {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  box-sizing: border-box;
+  border-radius: 50%;
+  border: 4px solid color-mix(in srgb, var(--fd-green) 25%, transparent);
+  border-top-color: var(--fd-green);
+  animation: fd-search-spin 1s linear infinite;
+}
+@keyframes fd-search-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fd-search-ring {
+    animation: none;
+  }
+}
+.fd-search-words {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+  text-align: left;
+}
+.fd-search-title,
+.fd-search-detail {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.fd-search-title {
+  font: 800 17px Archivo, system-ui, sans-serif;
+}
+.fd-search-detail {
+  font-size: 13px;
+  color: var(--fd-sub);
+}
+.fd-search-time {
+  flex: none;
+  font: 800 22px Archivo, system-ui, sans-serif;
+  color: var(--fd-green);
+  font-variant-numeric: tabular-nums;
+}
+/* (The actions: the options row's buttons, lit, with no lines between them; Cancel and a red Yes in the danger color.) */
+.fd-modes.fd-search-acts > * {
+  color: var(--fd-text);
+}
+.fd-modes.fd-search-acts button span,
+.fd-search-ask span {
+  color: var(--fd-sub);
+}
+.fd-modes.fd-search-acts button.red,
+.fd-modes.fd-search-acts .fd-search-yes.red {
+  color: var(--fd-danger);
+}
+.fd-modes.fd-search-acts .fd-search-yes.go {
+  color: var(--fd-green);
+}
+.fd-modes.fd-search-acts .fd-search-yes,
+.fd-search-ask {
+  font-weight: 800;
+}
+/* (The question: where the first action was, the same box, not a button.) */
+.fd-search-ask {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  font-size: 14px;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.fd-search-ask br {
+  display: none;
+}
+.fd-search-ask span {
+  font-size: 11px;
+  font-weight: 400;
+}
+/*
+ * Narrow rows (a phone under 375 px, a 1280 px computer's 320 px column): a little smaller, and the detail's ending ("in the
+ * lobby") goes, so nothing is cut (measured at 320 px with the widest words: e2e/search-home.spec.ts). The rows are
+ * containers only while searching, so home's own layout is untouched.
+ */
+.fd-searching {
+  container-type: inline-size;
+}
+@container (max-width: 339px) {
+  .fd-modes.fd-search {
+    gap: 9px;
+    padding: 0 12px;
+  }
+  .fd-search-ring {
+    width: 22px;
+    height: 22px;
+    border-width: 3px;
+  }
+  .fd-search-title {
+    font-size: 15px;
+  }
+  .fd-search-detail {
+    font-size: 12px;
+  }
+  .fd-search-more {
+    display: none;
+  }
+  .fd-search-time {
+    font-size: 19px;
+  }
+  .fd-modes.fd-search-acts button,
+  .fd-search-ask {
+    font-size: 12.5px;
+  }
 }
 
 /* Home, 1 v 1 picked: your rank's emblem (48 px, 1×) beside your rank and what 1 v 1 is, in the panel. */
@@ -9737,6 +10547,12 @@ button.fd-logo {
   width: 100%;
   max-width: 560px;
   margin: 0 auto;
+  /* (Nov 12, Eric: the Boss Battle screen fills the window and never scrolls: the grid on top, the stage and START at the bottom.) */
+  gap: 10px;
+}
+/* (The START form, Home's Boss Battle: a window's height, never a scroll. The raid form's list of ways to play keeps its height.) */
+.rd-page:has(.bs-start) {
+  height: var(--app-h);
 }
 .rd-about {
   line-height: 1.4;
@@ -9755,7 +10571,7 @@ button.fd-logo {
 /*
  * -- The Boss raid screen's character select (Eric, Oct 16: SF2 / PlayStation era; bs- for boss select) --
  * A fighting game's grid (Eric, Oct 21 to 23; the last look from Street Fighter 6's select): tall slanted tiles, all the same
- * size, a small gap between them, five to a row on a phone and a computer alike (BossSelect's `--bs-per`), a short row
+ * size, a small gap between them, six to a row on a phone and a computer alike (BossSelect's `--bs-per`; Nov 12), a short row
  * centered. The block takes back all but 10 px of the page's padding at the top and both sides, so on a phone it's nearly the
  * screen's width; on a computer the tiles stop growing at 96 px and the block stays in the middle of the column. Each tile is
  * a parallelogram (clip-path: nothing sticks out sideways, and a tap lands on the right tile where boxes overlap) holding the
@@ -9766,16 +10582,19 @@ button.fd-logo {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  /* (Nov 12, Eric: the screen never scrolls. The grid at the top, the stage pushed down into the room left, the START under it.) */
+  flex: 1 1 auto;
+  min-height: 0;
 }
 .bs-tiles {
   /* (A row of n tiles with a gap between them is n wide, less n - 1 slants, plus n - 1 gaps; the slant is a fifth of a tile's
      width and a tile is 1.24 as tall as wide, which makes its visible width 1 to 1.55 of its height. --bs-w: a tile's width in a
      full row, at most 96 px. cqi: the block's own width.) */
-  --bs-per: 5;
-  --bs-gap: 5px;
+  --bs-per: 6;
+  --bs-gap: 4px;
   --bs-w: min(calc((100cqi - (var(--bs-per) - 1) * var(--bs-gap)) / (var(--bs-per) - 0.2 * (var(--bs-per) - 1))), 96px);
   --bs-slant: calc(var(--bs-w) * 0.2);
-  --bs-h: calc(var(--bs-w) * 1.24);
+  --bs-h: calc(var(--bs-w) * var(--bs-ratio, 1));
   container-type: inline-size;
   display: flex;
   flex-direction: column;
@@ -9890,13 +10709,18 @@ button.fd-logo {
    one's name under it, and under the boss's the difficulty: arrows, its name and five dots. --bs-sw: a platform's room. */
 .bs-stage {
   container-type: inline-size;
+  /* (A platform's room: 156 px on a phone, less on a narrow one so the two sides never run past the screen. Nov 12: a shorter screen
+     shrinks the stage, never the grid: 156 px at 746 px tall and up, 93 px at 640, so the admin's four rows fit. A custom property, so
+     each use reads cqi from its own box.) --bs-rise: the band the speech bubble rises over a tall boss (BossSelect's --bs-rise-cqi). */
+  --bs-sw: min(156px, 46cqi, calc(100dvh - 547px));
+  --bs-rise: calc(var(--bs-rise-cqi, 0) * var(--bs-sw) / 100);
   display: flex;
   flex-direction: column;
   gap: 0;
+  /* (Pushed down into the room the grid leaves: the stage sits just above START.) */
+  margin-top: auto;
 }
 .bs-row-stage {
-  /* (A platform's room: 156 px on a phone, less on a narrow one so the two sides never run past the screen.) */
-  --bs-sw: min(156px, 46cqi);
   display: grid;
   grid-template-columns: 1fr auto 1fr;
   align-items: start;
@@ -9951,6 +10775,10 @@ button.fd-logo {
   height: auto;
   max-width: none;
   image-rendering: pixelated;
+}
+/* (Its height from its width, in the sprite's own proportions: .fx-sprite's 100% of the box would stretch the figure. Eric, Nov 11.) */
+.bs-spot .bs-sprite {
+  height: auto;
 }
 .bs-q-big {
   font-size: 90px;
@@ -10204,11 +11032,11 @@ button.fd-logo {
 .bs-say {
   position: relative;
   z-index: 2;
-  height: 40px;
-  margin-bottom: -6px;
+  /* (Nov 12, Eric: the bubble sits above the boss's head, never over it: its box and tail end above the stage's top, where the boss's head may reach.) */
+  height: calc(46px + var(--bs-rise));
 }
 .bs-say .bs-bubble {
-  bottom: 0;
+  bottom: calc(16px + var(--bs-rise));
   left: auto;
   right: 0;
   max-width: min(100%, 260px);
@@ -11364,6 +12192,46 @@ a.fd-row-link {
   font-weight: 800;
 }
 /*
+ * A lobby's way out (Nov 10, Queue.tsx's useQueueExit): "Keep me in the queue" and Exit in Cancel's place and height, so the
+ * chat under it doesn't move.
+ */
+.fd-exit-row {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+  min-height: 56px;
+}
+.fd-keep {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 14px;
+  border-radius: 16px;
+  background: var(--fd-panel);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--fd-text);
+  cursor: pointer;
+}
+.fd-keep input {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  margin: 0;
+  accent-color: var(--fd-gold);
+}
+.fd-keep span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.fd-exit-row .fd-exit {
+  flex: none;
+  min-width: 110px;
+}
+/*
  * A phone's queue fits a common phone (390 x 664, 375 x 667) with the count, the grid and Cancel in view: your seat is
  * one line under the grid (your pawn is the gold-ringed one), and the lobby's chat goes under Cancel, filling the rest
  * of the screen (on a short phone, a scroll away; its header shows). A computer keeps the card (below).
@@ -11895,7 +12763,7 @@ button.fd-seat {
     margin-inline: auto;
   }
   /* Two rows when the page's width (the column less its padding) is 660 px or more: cards of 90 px or more, the 17 tiles of
-     an admin's two rows of nine and eight at 1280 px wide. Narrower keeps five a row, as before. Each row of cards is one
+     an admin's two rows of nine and eight at 1280 px wide. Narrower keeps six a row (Nov 12). Each row of cards is one
      flex line: every card's margin to the next is the gap less its slant, so a line is as wide as its cards' visible
      widths; the translate moves each card by half the slant less the gap, which centers the visible cards in the line. */
   @container rd-page (min-width: 660px) {
@@ -12072,6 +12940,31 @@ button.fd-seat {
     align-self: stretch;
     min-width: 150px;
     padding: 0 28px;
+  }
+  /* (Keep me in the queue over Exit, in Cancel's cell beside your seat, about Cancel's width, so your seat's card keeps its room.) */
+  .fd-root.framed .fd-home .fd-queue .fd-exit-row {
+    grid-area: cancel;
+    flex-direction: column;
+    gap: 6px;
+    width: 168px;
+  }
+  .fd-root.framed .fd-home .fd-queue .fd-exit-row .fd-keep {
+    flex: none;
+    min-height: 32px;
+    gap: 6px;
+    padding: 0 8px;
+    border-radius: 10px;
+    font-size: 12px;
+  }
+  .fd-root.framed .fd-home .fd-queue .fd-exit-row .fd-keep input {
+    width: 16px;
+    height: 16px;
+  }
+  .fd-root.framed .fd-home .fd-queue .fd-exit-row .fd-cancel {
+    flex: 1;
+    min-width: 0;
+    min-height: 44px;
+    padding: 0;
   }
 }
 @media (min-width: 1024px) {
@@ -13728,12 +14621,19 @@ img.qicon {
     z-index: 3;
   }
   .boss-bar.has-char .boss-main {
-    grid-template-columns: 130px minmax(0, 1fr) auto;
+    /* (The name column only as wide as what it holds, at most 130 px, and "N moves left" never wrapped: a figure drawn as tall as the
+       bar (Eric, Nov 12) moves the column right, and the room it takes comes from the empty middle, the boss's own room.) */
+    grid-template-columns: fit-content(130px) minmax(0, 1fr) max-content;
     /* (A figure that reaches past the usual name column moves it right: kits.ts barName, set on the bar as --bc-name.) */
     padding-left: var(--bc-name, 0px);
   }
   .boss-bar.has-char .boss-name {
     justify-content: flex-start;
+  }
+  /* (The boss's own room measures itself: a prop sizes itself to it where the name column moved right leaves it less, never over the
+     name: Don Dough's timers.) */
+  .boss-bar.has-char .boss-prop {
+    container-type: inline-size;
   }
   /* (The meter at the top of its row: a boss's own piece beside it, Moo's moon, may be taller, and must not move the meter.) */
   .boss-bar.has-char .boss-ult {
@@ -14048,9 +14948,24 @@ img.qicon {
   right: 0;
   bottom: calc(100% + 34px);
 }
+/* (Eric's result screen, Nov 7: his words centered above him, inside the screen with a 16 px gutter on each side, the tail
+   pointing down at him; the figure below makes room for them, so they never cover the title above.) */
 .place-results .bc-bubble {
-  left: calc(100% + 8px);
-  top: 0;
+  left: 50%;
+  top: auto;
+  bottom: calc(100% + 12px);
+  /* (`translate`, not `transform`: the entrance's animation sets transform and would drop the centering.) */
+  translate: -50% 0;
+  width: max-content;
+  max-width: min(220px, calc(100vw - 32px));
+}
+.place-results .bc-bubble::after {
+  left: 50%;
+  right: auto;
+  margin-left: -6px;
+}
+.boss-char.place-results {
+  margin-top: 100px;
 }
 /* The Hidden Boss (admins only, for now): his whole figure is far taller than the cast (129 px above his feet, 137 with
    his hair in the wind), so on a computer his words go above his head, whatever his scale; on the results he's drawn
@@ -14188,6 +15103,54 @@ img.qicon {
     scale: 1;
   }
 }
+/* Boingo's pie splitting off a piece's face: two small pieces of it lobbed onto the two squares behind (Nov 12). */
+.pw-flight.pieFly.bit {
+  animation-name: pw-lob-bit;
+}
+@keyframes pw-lob-bit {
+  from {
+    scale: 0.8;
+  }
+  50% {
+    scale: 1.15;
+  }
+  to {
+    left: var(--fx);
+    top: var(--fy);
+    scale: 0.8;
+  }
+}
+/* The pie in a piece's face: over the piece. */
+.pw-pie.pw-pie-face {
+  z-index: 4;
+}
+/* Boingo's splat mark (Nov 12; Eric: "the way to mark it should be subtle"): a small cream smear on the piece's face with a
+   drip, drawn as part of the piece (a board decor), so it slides and fades with it. */
+.hb piece .pw-splat-mark {
+  position: absolute;
+  left: 37%;
+  top: 25%;
+  width: 26%;
+  height: 12%;
+  border-radius: 48% 55% 50% 45%;
+  background: #fdeedb;
+  box-shadow:
+    inset 0 -1.5px 0 #dfbb9c,
+    0 0 0 0.5px rgba(43, 24, 16, 0.55);
+  pointer-events: none;
+}
+.hb piece .pw-splat-mark::after {
+  content: "";
+  position: absolute;
+  left: 56%;
+  top: 78%;
+  width: 20%;
+  height: 85%;
+  border-radius: 0 0 50% 50%;
+  background: #fdeedb;
+  box-shadow: inset 0 -1px 0 #dfbb9c;
+}
+
 /* The blizzard's sweep covers the whole board (clipped to it). */
 .pw-clip {
   position: absolute;
@@ -14607,19 +15570,32 @@ img.qicon {
     translate: 0 0;
   }
 }
-/* The candle's shots still up: a column in the gutter beside the board's right edge (the characters' 7 x 146 sprite,
-   kept to its shape, as tall as the board), never over the board, its timer bar or the eval bar (on the left). On a
-   phone the board row keeps 24 px there; on a computer there's room. */
+/* The candle's shots still up: a row in his boss card's free room (the bar's prop slot, as Hollow's bulbs and Timber's
+   workshop; Eric, Nov 11: the column by the board's right edge was cut off by a phone's screen). The characters' 99 x 9
+   sprite, kept to its shape, 2 screen px a sprite px where the room has it; at the slot's right, under "N moves left". */
 .pw-pips {
   position: absolute;
-  z-index: 9;
-  left: calc(var(--board-size, 100%) + 5px);
-  top: calc(var(--board-size, 100%) / 2);
-  translate: 0 -50%;
-  width: min(16px, calc(var(--board-size, 100%) * 7 / 146));
-  aspect-ratio: 7 / 146;
+  right: 0;
+  top: 4px;
+  display: block;
+  width: min(100%, 198px);
+  aspect-ratio: 99 / 9;
   pointer-events: none;
-  filter: drop-shadow(0.15cqw 0.15cqw 0 rgba(0, 0, 0, 0.4));
+  filter: drop-shadow(1px 1px 0 rgba(0, 0, 0, 0.5));
+}
+/* A computer's bar is one short row: the row takes the free room's left part, centered on the bar's height, between his bars
+   and "Move N" (as Timber's workshop and Tick's tally). */
+@media (min-width: 900px) and (min-height: 600px) {
+  .boss-bar .boss-prop:has(> .pw-pips) {
+    grid-column: 2;
+    grid-row: 1 / 3;
+  }
+  .boss-bar .pw-pips {
+    top: 50%;
+    right: auto;
+    left: 4px;
+    transform: translateY(-50%);
+  }
 }
 /* The fire's banners: embers and flame. */
 .fight-banner.power-cut.fire .fb-band {
@@ -15062,7 +16038,8 @@ img.qicon {
   color: var(--fd-gold-text);
   cursor: pointer;
 }
-.gchat-emo-btn {
+.gchat-emo-btn,
+.gchat-quick-btn {
   flex: none;
   width: 28px;
   height: 28px;
@@ -15075,6 +16052,8 @@ img.qicon {
   place-items: center;
   cursor: pointer;
 }
+.gchat-quick-btn:hover:not(:disabled),
+.gchat-quick-btn[aria-expanded="true"],
 .gchat-emo-btn:hover:not(:disabled),
 .gchat-emo-btn[aria-expanded="true"] {
   background: var(--fd-panel-2);
@@ -15270,28 +16249,38 @@ img.qicon {
 .refused-note {
   color: var(--bad);
 }
-/* His bulbs (the strip): one lit for each of his moves until he covers another square. In the boss bar's row under the rage meter. */
+/* His six bulbs (the strip; Eric, Nov 12): one lit for each move, yours and his, until he covers another square. In the boss
+   bar's row under the rage meter and as wide as it (a phone's 44 px, a computer's 88), its drawing pixel for pixel (11 px tall).
+   The row keeps the 11.25 px it had (33 x 15 / 44), so the bar and the board under it don't move. */
 .bulb-strip {
   display: block;
-  width: 33px;
-  aspect-ratio: 44 / 15;
+  width: 44px;
+  height: 11.25px;
 }
-/* Boss alone against Hollow (Nov 5): your ten bulbs, his strand, in the boss bar's free room at its right. */
+.bulb-strip > .fx-sprite {
+  height: 11px;
+}
+/* Boss alone against Hollow (Nov 5): your ten bulbs, his strand, in the boss bar's free room at its right. Eric, Nov 12: "way
+   bigger": a phone's 1.2x (114 px), never wider than the room (so never over his name or the edge). */
 .life-strip {
   position: absolute;
   right: 2px;
   top: 2px;
   display: block;
-  width: 95px;
+  width: min(114px, 100%);
   aspect-ratio: 95 / 15;
   pointer-events: none;
 }
 /* A computer's bar is one short row: the strand stays in the free room under the status (its slot keeps its place: e2e
-   boss-bar.spec.ts), at its right, centered on the slot's height. */
+   boss-bar.spec.ts), at its right, centered on the slot's height. Twice its drawing (190 px, every pixel 2 x 2: Eric, Nov 12,
+   "way bigger", about 1.8x the 110 px it was), never wider than the room. */
 @media (min-width: 900px) and (min-height: 600px) {
+  .boss-bar .bulb-strip {
+    width: 88px;
+  }
   .boss-bar .life-strip {
     top: 50%;
-    width: 110px;
+    width: min(190px, 100%);
     transform: translateY(-50%);
   }
 }
@@ -20317,193 +21306,6 @@ button.sq-tiny {
 }
 
 /* -- Auto chess, the demo (screens/AutoChess.tsx; docs/areas/autochess.md; ac- for auto chess) -- */
-/*
- * v7's screen (docs/decisions/2026-10-21-autochess-v7.md), built from Eric's approved round-4 mock, as v7.1 changed it (docs/decisions/2026-10-22-autochess-v7-1.md).
- * Kitty-corner: at the top their bench (left) and their custom pawn (right), under the board your pawn (left) and your bench (right), each bench on the
- * board frame's edge; the Sell button in the gap beside your bench and a message under the bench's row. The move clock is the app's own bar (components/Countdown.tsx
- * TimerBar, .timer-bar) along the board's top and bottom edges. Under the board, the dock: gold, income and the clock's small numbers, the shop's odds in a small pill,
- * then Buy XP and Reroll beside the four square cards.
- */
-.ac-root {
-  --ac-card: var(--fd-panel-2);
-  --ac-frame: var(--fd-panel-2);
-  --ac-lip: rgba(0, 0, 0, 0.4);
-  --ac-shadow: 0 3px 12px rgba(0, 0, 0, 0.35);
-  --ac-xp: #5b7be8;
-  /*
-   * The screen's sizes (v7.1). Every row has a set height but the board and the shop, so the board takes exactly what is left: `--chrome` adds
-   * up every row, gap and padding (the safe areas too), and the frame is `--fw` wide, as wide as the column or as tall as the room left.
-   * The page keeps `--free` free at the bottom (Eric: every phone gets some free space there): room the board leaves, not padding, so a result
-   * a few lines long may use it without the page scrolling. The benches sit on the frame's edges
-   * (`--gut` is the room between the column's edge and the frame's), so they follow the board as it grows and shrinks.
-   */
-  --hop: 10px;
-  --tw: 40px;
-  --tile: 44px;
-  --sidew: 88px;
-  --fm: 4px;
-  --gap: 5px;
-  --dock-gap: 6px;
-  --pad-t: 6px;
-  --free: 12px;
-  --gold-h: 38px;
-  --lock-h: 0px;
-  /* The column's width, and the shop's height from it (the cards' tiles are square: a card's tile is its width less 6 px). */
-  --colw: min(calc(100vw - 24px), 560px);
-  --shop-h: max(94px, calc((var(--colw) - 102px - var(--panel-x)) / 4 + 39px));
-  /*
-   * A pawn's column: the hop's room, the pawn, and its two thin bars. The top row is as tall as that or the title and bench (44 + 4 + 44). The pawn is 72 px, or up
-   * to 82 (the approved mock's) when the board is as wide as the column anyway and the room is there for it (`--pawn-fit`: what the two rows can have and still leave the board the column's width).
-   */
-  --k: calc(var(--pad-t) + var(--free) + env(safe-area-inset-top) + env(safe-area-inset-bottom) + 3 * var(--gap) + 2 * var(--fm) + var(--gold-h) + var(--dock-gap) + var(--shop-h) + var(--lock-h) + var(--panel-y));
-  --pawn-fit: calc((var(--app-h) - var(--colw) - var(--k)) / 2 - var(--hop) - 28px);
-  --pawn: clamp(72px, var(--pawn-fit), 82px);
-  --rowh: calc(var(--hop) + var(--pawn) + 28px);
-  --top-h: max(var(--rowh), 92px);
-  --bot-h: var(--rowh);
-  --chrome: calc(var(--k) + var(--top-h) + var(--bot-h));
-  --fw: min(var(--colw), calc(var(--app-h) - var(--chrome)));
-  --gut: calc((var(--colw) - var(--fw)) / 2);
-  /* The shop area is one panel (v9): its padding, and the border's 1 px each side, the room it takes beside the cards and above and below the rows. */
-  --panel-p: 10px;
-  --panel-x: calc(2 * var(--panel-p) + 2px);
-  --panel-y: calc(2 * var(--panel-p) + 2px);
-  display: flex;
-  justify-content: center;
-  align-items: flex-start;
-  padding: calc(env(safe-area-inset-top) + var(--pad-t)) calc(12px + env(safe-area-inset-right)) env(safe-area-inset-bottom) calc(12px + env(safe-area-inset-left));
-}
-:root[data-theme="light"] .ac-root {
-  --ac-card: #ffffff;
-  --ac-frame: #ffffff;
-  --ac-lip: rgba(0, 0, 0, 0.16);
-  --ac-shadow: 0 3px 12px rgba(0, 0, 0, 0.12);
-}
-/* One column: the top row, the board's frame, the bottom row and the dock, each with its set height but the dock's. */
-.ac-col {
-  position: relative;
-  width: 100%;
-  max-width: 560px;
-  display: flex;
-  flex-direction: column;
-  gap: var(--gap);
-  min-width: 0;
-}
-/* ---- The top: the title row over their bench (left), their name and pawn (right) ---- */
-.ac-top {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) var(--sidew);
-  grid-template-rows: 44px 1fr;
-  column-gap: 8px;
-  row-gap: 4px;
-  align-items: end;
-  height: var(--top-h);
-}
-.ac-titlebar {
-  /* (Columns 1 and 2 only: the gear at the title row's right end sits left of their pawn, in column 3.) */
-  grid-area: 1 / 1 / 2 / 3;
-  align-self: center;
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-/* The gear (Eric, Oct 25; the director's review): the match screens' plain gear, no box, 36 px. On a phone it sits in the
-   title row, 8 px after the title, centered on the title's first line (the line box is 20.7 px: 36 px less that, halved, up).
-   On a computer it's over the column's right edge, the shop panel's (below, in the computer's layout). */
-/* (The title row centres the title, so the gear is centred on the row and lifted 7.2 px: its centre then sits on the title's
-   first line, whatever the row's height, the back button's included.) */
-.ac-titlebar .mm {
-  align-self: center;
-  margin-top: -14.4px;
-}
-.ac-titlebar .mm-more {
-  width: 36px;
-  min-height: 36px;
-  border: none;
-  background: transparent;
-  box-shadow: none;
-}
-.ac-titlebar .mm-more.on {
-  background: var(--surface-2);
-}
-.ac-title {
-  flex: 0 1 auto;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  line-height: 1.15;
-}
-.ac-title strong {
-  font-family: "Archivo Black", Archivo, sans-serif;
-  font-weight: 400;
-  font-size: 18px;
-  white-space: nowrap;
-}
-.ac-title span {
-  font-size: 12.5px;
-  color: var(--fd-sub);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-/* Their bench's left edge is the board frame's left edge, at any size of the board (the pawn stays by the column's edge). */
-.ac-top > .ac-bench {
-  grid-area: 2 / 1;
-  margin-left: var(--gut);
-}
-.ac-top > .ac-opp {
-  grid-area: 1 / 3 / 3 / 4;
-}
-/* Their name and level: small, beside their pawn, level with its feet (the middle of the top row is free). */
-.ac-who {
-  grid-area: 2 / 2;
-  justify-self: end;
-  min-width: 0;
-  transform: translateY(-30px);
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  line-height: 1.2;
-  white-space: nowrap;
-}
-.ac-who strong {
-  font-size: 14px;
-  max-width: 80px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.ac-lv {
-  font-size: 12px;
-  color: var(--fd-sub);
-}
-.ac-lv b {
-  font-weight: 800;
-  color: var(--fd-text);
-}
-/* "Locked in" by their name (lock-in on): the opponent's buying is over. */
-.ac-tag {
-  padding: 0 6px;
-  border-radius: 999px;
-  background: var(--fd-gold);
-  color: var(--fd-gold-ink);
-  font-size: 10.5px;
-  font-weight: 800;
-}
-
-/* ---- A custom pawn: the app's dressed pawn, hopping on its shadow ---- */
-.ac-side {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  width: var(--sidew);
-}
-.ac-stage {
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  padding-top: var(--hop);
-}
 .ac-pawn {
   position: relative;
   display: block;
@@ -20606,23 +21408,6 @@ button.sq-tiny {
     animation: none;
   }
 }
-/* Your level, a small round gold badge on your pawn's corner; the number pops when the level goes up. */
-.ac-badge {
-  position: absolute;
-  right: -4px;
-  bottom: 2px;
-  z-index: 3;
-  min-width: 20px;
-  height: 20px;
-  padding: 0 4px;
-  border-radius: 10px;
-  background: var(--fd-gold);
-  color: var(--fd-gold-ink);
-  font: 400 12px/20px "Archivo Black", Archivo, sans-serif;
-  font-style: normal;
-  text-align: center;
-  box-shadow: 0 0 0 2px var(--fd-bg);
-}
 .ac-badge.pop {
   animation: ac-pop 700ms cubic-bezier(0.2, 0.9, 0.3, 1.2);
 }
@@ -20691,53 +21476,6 @@ button.sq-tiny {
   text-align: right;
 }
 
-/* ---- Benches: the same size and style, bare pieces on small tiles in the color of the square each keeps, close together; a free slot is a faint tile outline ---- */
-.ac-bench {
-  position: relative;
-  display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: var(--tw);
-  gap: 3px;
-  align-items: start;
-}
-.ac-slot {
-  position: relative;
-  height: var(--tile);
-  min-width: 0;
-  padding: 2px 0 0;
-  border: 0;
-  border-radius: 7px;
-  display: grid;
-  place-items: center;
-  align-content: start;
-  container-type: size;
-  color: var(--fd-text);
-  font-family: inherit;
-  touch-action: none;
-}
-.ac-slot.l {
-  background: var(--sq-light);
-  --lab: var(--sq-coord-on-light);
-}
-.ac-slot.d {
-  background: var(--sq-dark);
-  --lab: var(--sq-coord-on-dark);
-}
-.ac-slot.empty {
-  background: transparent;
-  box-shadow: inset 0 0 0 1.5px rgba(128, 132, 140, 0.32);
-}
-.ac-slot .ac-pc {
-  width: min(88cqw, 86cqh);
-}
-.ac-slot em {
-  position: absolute;
-  right: 3px;
-  bottom: 1px;
-  font: 700 8.5px/1.1 sans-serif;
-  font-style: normal;
-  color: var(--lab);
-}
 /* Yours are held down on, tapped to place and dragged to sell; theirs are only tapped. A tile you can't use now is dim; one in a drag is faint. */
 .ac-bench.you .ac-slot.has {
   cursor: pointer;
@@ -20796,29 +21534,6 @@ button.sq-tiny {
   box-shadow: inset 0 0 0 2px rgba(0, 0, 0, 0.18);
 }
 
-/* ---- The board in its frame: the white frame (the app's curved board) with the move clock's bars along its top and bottom edges ---- */
-.ac-frame {
-  position: relative;
-  align-self: center;
-  width: var(--fw);
-  margin: var(--fm) 0;
-  padding: 3px;
-  border-radius: 13px;
-  background: var(--ac-frame);
-  box-shadow: var(--ac-shadow);
-}
-.ac-frame .ac-board {
-  border-radius: 9px;
-  overflow: hidden;
-}
-/* The move clock, the app's own bar (components/Countdown.tsx TimerBar: 6 px, full at the start, shrinking from both ends to the middle, dark green through yellow to red), along the board's top edge and mirrored along its bottom. In the app it sits behind the board's row (z-index -1); here it has the frame. */
-.ac-frame > .timer-bar {
-  z-index: 0;
-  width: 100%;
-}
-.ac-frame > .timer-bar.below {
-  top: 100%;
-}
 .ac-circle.w::after {
   background: #fff;
   box-shadow: 0 0 0 1.5px rgba(0, 0, 0, 0.55);
@@ -20835,6 +21550,12 @@ button.sq-tiny {
 }
 .ac-board .board-wrap {
   width: 100%;
+}
+/* Classic's dark squares a touch darker on this board (Eric, Nov 10: "the colors fuse"), so they still part from the light ones
+   under their half's dim layer (.ac-theirs): color distance 16 → 22, 14 → 18 dimmed. Other boards and schemes are as they were. */
+:root:not([data-board-colors]) .ac-board,
+[data-board-colors="classic"] .ac-board {
+  --sq-dark: #b39c7c;
 }
 /* What is drawn over the squares: exactly the board (eighths of --board-size), the taps and drags of the buy and adjust steps. */
 .ac-layer {
@@ -21039,12 +21760,12 @@ button.sq-tiny {
 /* ---- The meeting before round 1 (v9, Eric Oct 24): both custom pawns stand in the middle of the board, with a countdown and the quick chat. The corners
    (pawns, names, bars) wait out of sight (`data-phase="meet"`) and come in as the middle pawns puff away: a fade, and a slight scale-up, over 400 ms. ---- */
 .ac-stage,
-.ac-who,
+.ac-info,
 .ac-bars {
   transition: opacity 400ms ease, visibility 400ms ease, scale 400ms ease;
 }
 .ac-root[data-phase="meet"] .ac-stage,
-.ac-root[data-phase="meet"] .ac-who,
+.ac-root[data-phase="meet"] .ac-info,
 .ac-root[data-phase="meet"] .ac-bars {
   opacity: 0;
   visibility: hidden;
@@ -21251,332 +21972,6 @@ button.sq-tiny {
   }
 }
 
-/* ---- Under the board: your pawn (left), the clock's numbers (the gap), your bench (right, up against the board like theirs) ---- */
-.ac-bottom {
-  position: relative;
-  display: grid;
-  grid-template-columns: var(--sidew) minmax(0, 1fr) auto;
-  grid-template-rows: var(--tile) minmax(0, 1fr);
-  column-gap: 8px;
-  align-items: start;
-  height: var(--bot-h);
-}
-.ac-bottom > .ac-me {
-  grid-area: 1 / 1 / 3 / 2;
-}
-/* Your bench's right edge is the board frame's right edge, at any size of the board (your pawn stays by the column's edge). */
-.ac-bottom > .ac-bench {
-  grid-area: 1 / 3;
-  align-self: start;
-  margin-right: var(--gut);
-}
-/* The Sell button sits in the gap between your pawn and your bench, level with the bench (the clock is in the gold row now). */
-.ac-spot {
-  grid-area: 1 / 2;
-  min-width: 0;
-  display: grid;
-  place-items: center;
-}
-/* A short message, for a moment: under the bench's row, beside your pawn, as wide as the room there (one or two short lines), centered under the gap and the bench. */
-.ac-bottom > .say {
-  grid-area: 2 / 2 / 3 / 4;
-  margin-right: var(--gut);
-  padding-top: 4px;
-  min-width: 0;
-  text-align: center;
-  font-size: 11.5px;
-  font-weight: 600;
-  line-height: 1.2;
-  color: var(--fd-text);
-}
-/* The clock, in the gold row between the income and the odds pill: small, straight on the page, no box. The time, and the step's name on the row's baseline
-   (it is a block of one inline-block, so its baseline is its last line, like the pill's). */
-.ac-clock {
-  margin-left: auto;
-  text-align: center;
-  white-space: nowrap;
-  font-size: 0;
-  line-height: 1.15;
-}
-.ac-clock-in {
-  display: inline-block;
-  vertical-align: baseline;
-}
-.ac-clock b {
-  display: block;
-  font: 400 17px/1.15 "Archivo Black", Archivo, sans-serif;
-  font-variant-numeric: tabular-nums;
-  letter-spacing: -0.01em;
-}
-.ac-clock .ac-step {
-  display: block;
-  margin-top: 1px;
-  font-size: 11.5px;
-  font-weight: 700;
-  line-height: 1.15;
-  color: var(--fd-sub);
-}
-.ac-clock.low b,
-.ac-clock.low .ac-step {
-  color: #c0372f;
-}
-.ac-clock.quiet b {
-  color: var(--fd-dim);
-}
-/* Sell (a piece of yours is selected on the board): a gold button in the gap, as tall as the bench's row (it never grows a row). */
-.ac-sell {
-  width: 100%;
-  max-width: 84px;
-  height: 44px;
-  padding: 0 6px;
-  border: 0;
-  border-radius: 12px;
-  background: var(--fd-gold);
-  color: var(--fd-gold-ink);
-  font-weight: 800;
-  font-size: 14px;
-  cursor: pointer;
-  box-shadow: 0 3px 0 var(--ac-lip);
-}
-
-/* ---- The dock: gold (with the shop's odds in a small pill), then Buy XP and Reroll beside the four shop cards (square around the pieces) ---- */
-.ac-dock {
-  display: flex;
-  flex-direction: column;
-  gap: var(--dock-gap);
-  /* The shop area in one panel (v9, Eric Oct 24): the home panels' surface, edge and corners, light or dark. */
-  padding: var(--panel-p);
-  border: 1px solid var(--fd-line);
-  border-radius: 14px;
-  background: var(--fd-panel);
-}
-/* The gold row: gold, income, then (at the right) the odds pill and the win streak, all on one text baseline: the % under each icon and the gold number sit on the same line. */
-.ac-goldrow {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-  height: var(--gold-h);
-}
-.ac-purse {
-  display: block;
-  white-space: nowrap;
-}
-.ac-gold-you {
-  display: inline;
-}
-.ac-gold-you .ac-coin {
-  width: 15px;
-  height: 15px;
-  margin-right: 6px;
-  vertical-align: -2px;
-}
-.ac-gold-you b {
-  font: 400 18px/1 "Archivo Black", Archivo, sans-serif;
-  font-variant-numeric: tabular-nums;
-}
-.ac-income {
-  margin-left: 12px;
-  font-size: 11.5px;
-  color: var(--fd-muted);
-}
-.ac-income b {
-  font-size: 13px;
-  font-weight: 800;
-  color: var(--fd-gold-text);
-}
-/* The odds pill, small, like the streak's: each piece's icon with its percent under it. The pill is a block of inline blocks, so its baseline is the percents' line. */
-.ac-odds {
-  display: block;
-  margin-left: auto;
-  padding: 3px 6px 2px;
-  border-radius: 999px;
-  background: var(--fd-panel-2);
-  text-align: center;
-  white-space: nowrap;
-  font-size: 0;
-}
-.ac-od {
-  display: inline-block;
-  vertical-align: baseline;
-  min-width: 24px;
-  margin: 0 1px;
-}
-.ac-od .ac-pc {
-  width: 20px;
-  margin: 0 auto;
-}
-.ac-od b {
-  display: block;
-  font-size: 10.5px;
-  line-height: 1.15;
-  font-weight: 800;
-  font-variant-numeric: tabular-nums;
-}
-.ac-od.none {
-  opacity: 0.4;
-}
-.ac-streak {
-  padding: 3px 9px;
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: 800;
-  line-height: 1.2;
-  color: var(--fd-green);
-  background: color-mix(in srgb, var(--fd-green) 16%, transparent);
-}
-.ac-shop {
-  position: relative;
-  display: grid;
-  grid-template-columns: 78px minmax(0, 1fr);
-  gap: 6px;
-}
-.ac-shop.selling {
-  box-shadow: 0 0 0 2px var(--fd-gold);
-  border-radius: 12px;
-}
-/* The shop is shut (the last seconds, the move step): the buttons and the cards dim, as the app dims what you can't buy. */
-.ac-shop.shut {
-  opacity: 0.5;
-  filter: grayscale(0.7);
-}
-.ac-btns {
-  display: grid;
-  grid-template-rows: 1fr 1fr;
-  gap: 6px;
-}
-.ac-btn,
-.ac-buy {
-  border: 0;
-  background: var(--ac-card);
-  color: var(--fd-text);
-  font-family: inherit;
-  box-shadow: 0 3px 0 var(--ac-lip);
-}
-.ac-btn {
-  min-height: 44px;
-  border-radius: 12px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 3px;
-  font-size: 14px;
-  font-weight: 800;
-  line-height: 1.1;
-  word-spacing: 0.06em;
-  cursor: pointer;
-}
-.ac-cost {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-.ac-cost b {
-  font: 400 14px/1 "Archivo Black", Archivo, sans-serif;
-  font-variant-numeric: tabular-nums;
-  color: var(--fd-gold-text);
-}
-.ac-btn.off,
-.ac-buy.off {
-  opacity: 0.5;
-  filter: grayscale(0.7);
-}
-.ac-shop.shut .ac-btn.off,
-.ac-shop.shut .ac-buy.off {
-  opacity: 1;
-  filter: none;
-}
-.ac-cards {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 6px;
-}
-.ac-buy {
-  min-width: 0;
-  padding: 4px 3px 6px;
-  border-radius: 12px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  cursor: pointer;
-  /* A card is tapped to buy and dragged to the bench to hold: a finger's drag is ours (without this the browser takes it for a pan and cancels it). */
-  touch-action: none;
-}
-/* The piece sits on a square tile (the square it lands on), never a tall one. */
-.ac-tile {
-  flex: none;
-  width: 100%;
-  aspect-ratio: 1;
-  border-radius: 8px;
-  display: grid;
-  place-items: center;
-  container-type: size;
-}
-.ac-tile.l {
-  background: var(--sq-light);
-}
-.ac-tile.d {
-  background: var(--sq-dark);
-}
-.ac-tile .ac-pc {
-  width: 92cqw;
-}
-.ac-nm {
-  font-size: 12px;
-  font-weight: 800;
-  line-height: 1.1;
-  white-space: nowrap;
-}
-.ac-nm em {
-  font-style: normal;
-  font-weight: 600;
-  color: var(--fd-sub);
-}
-/* An offer the board has no room for: still holdable, so not greyed; its square shows in gold. */
-.ac-buy.hold-only .ac-nm em {
-  color: var(--fd-gold-text);
-  font-weight: 700;
-}
-/* Lock in (off since v7; with `lockIn` on it is a bar under the shop). */
-.ac-lock {
-  min-height: 44px;
-  border: 0;
-  border-radius: 12px;
-  background: var(--fd-gold);
-  color: var(--fd-gold-ink);
-  font-family: inherit;
-  font-weight: 800;
-  font-size: 14px;
-  box-shadow: 0 3px 0 var(--ac-lip);
-  cursor: pointer;
-}
-.ac-lock small {
-  margin-left: 6px;
-  font-size: 12px;
-  font-weight: 700;
-}
-.ac-lock.off {
-  opacity: 0.5;
-  filter: grayscale(0.7);
-}
-.ac-lock.done {
-  background: var(--ac-card);
-  color: var(--fd-gold-text);
-  cursor: default;
-}
-.ac-sell-drop {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  border-radius: 12px;
-  background: rgba(14, 16, 21, 0.86);
-  color: var(--fd-gold-text);
-  font-weight: 800;
-  font-size: 15px;
-  pointer-events: none;
-}
 /*
  * The fight's and the result's box, in the shop's place: the same two columns as the shop (the buttons at the left, Next round or
  * Play again and Home, as tall as Buy XP and Reroll; the words at the right). The result's box also takes the gold row's room (its line says
@@ -21891,339 +22286,882 @@ button.sq-tiny {
   }
 }
 
-/* With lock-in on (off by default) its bar is one more row under the shop: the board gives the room, so nothing scrolls. */
+/*
+ * ---- Auto chess's screen (Nov 8, Eric's approved v4 mockup and his last changes; docs/decisions/2026-11-08-autochess-redesign.md) ----
+ * One grid at every size. A phone: the title and the gear, the two players centered about 5 px above the board, then your bench up the
+ * board's left side from your corner, the board, their bench down its right side from theirs, and the action box under the board, as
+ * wide as it. A computer (the front door's frame, so the side menu and the right column never move): you left of the action box, the
+ * opponent right of the board's top with their bench under them, the gear over them; the right column's slot says the round.
+ * Every size comes from a few tokens: the board's frame is `--fw` wide, as big as fits the width and the height, and the action box's
+ * square cards are a quarter of what is left of it, so its height follows the board's.
+ */
+.ac-root {
+  --ac-gold: #c9a23a;
+  --ac-gold-hi: #f0cf6b;
+  --ac-band: #17181d;
+  --ac-cream: #f6eedb;
+  --ac-cream-ink: #1b1c20;
+  --ac-xp: #5b7be8;
+  --ac-lip: rgba(0, 0, 0, 0.4);
+  /* The meeting's bubbles, countdown and quick chat and the result's card stand on these (v5 dropped them, Nov 9: Eric saw the
+     chat buttons see-through over the board). */
+  --ac-card: var(--fd-panel-2);
+  --ac-shadow: 0 3px 12px rgba(0, 0, 0, 0.35);
+  --hop: 8px;
+  --pawn: 44px;
+  --pad-t: 6px;
+  --head-h: 44px;
+  --pl-h: calc(var(--hop) + var(--pawn) + 4px);
+  --above: 5px;
+  /* A bench: its column, the gap to the board, a slot (a 44 px target) and the piece in it. */
+  --bw: 28px;
+  --bgap: 3px;
+  --tile: 44px;
+  --sgap: 2px;
+  --bp: 24px;
+  /* The action box: its gap under the board, the band's height, the shop row's padding, the buttons' column and the gaps. */
+  --dock-gap: 10px;
+  --band-h: 40px;
+  --box-p: 5px;
+  --btnw: 58px;
+  --cgap: 4px;
+  --free: 12px;
+  --colw: min(calc(100vw - 16px), 560px);
+  /* The room left for the board and the action box, top to bottom; the cards' row is (fw - k) / 4 tall (square cards). */
+  --k: calc(2 * 3px + 2 * var(--box-p) + var(--btnw) + 4 * var(--cgap));
+  --a: calc(var(--app-h) - env(safe-area-inset-top) - env(safe-area-inset-bottom) - var(--pad-t) - var(--head-h) - var(--pl-h) - var(--above) - var(--dock-gap) - 2 * 3px - var(--band-h) - 1px - 2 * var(--box-p) - var(--free) - var(--lock-h, 0px));
+  /* (Snapped to 8 px inside its 4 px border and edge: the board draws in whole multiples of 8 device pixels, so no strip shows at its edge.) */
+  --fw: calc(round(down, min(calc(var(--colw) - 2 * (var(--bw) + var(--bgap))), calc((var(--a) + var(--k) / 4) * 0.8), calc(var(--a) - 44px)) - 8px, 8px) + 8px);
+  /* A card's width and height (the same ratio at every size: square, but never under 44 px tall). */
+  --cw: calc((var(--fw) - var(--k)) / 4);
+  --ch: max(44px, var(--cw));
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: calc(env(safe-area-inset-top) + var(--pad-t)) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  color: var(--fd-text);
+}
+:root[data-theme="light"] .ac-root {
+  --ac-card: #ffffff;
+  --ac-shadow: 0 3px 12px rgba(0, 0, 0, 0.12);
+}
 .ac-root[data-lockin] {
-  --lock-h: calc(44px + var(--gap));
+  --lock-h: calc(44px + 6px);
 }
-/* ---- A short phone (320 x 568, 360 x 640, 375 x 667, 393 x 730): smaller pawns, tighter rows ---- */
-/* A phone's short screen (340 to 899 px wide, under 760 px high): the title's text ends 8 px short of the gear, which sits
-   10 px after the title (the title row's gap) and 8 px before the opponent's name, the name being level with the gear's
-   box at this height. So the title's second line is cut with an ellipsis where it must (at 360 × 640, to about 116 px). */
-@media (min-width: 340px) and (max-width: 899px) and (max-height: 760px) {
-  .ac-title {
-    max-width: calc(100vw - 244px);
-  }
+.ac-col {
+  position: relative;
+  width: var(--colw);
+  display: grid;
+  /* (A bench's track holds the bench and its gap to the board.) */
+  grid-template-columns: minmax(0, 1fr) calc(var(--bw) + var(--bgap)) var(--fw) calc(var(--bw) + var(--bgap)) minmax(0, 1fr);
+  grid-template-rows: var(--head-h) var(--pl-h) var(--fw) auto;
+  column-gap: 0;
+  grid-template-areas:
+    "head head head head head"
+    "pl pl pl pl pl"
+    ". by board bt ."
+    ". . dock . .";
 }
-@media (max-height: 760px) {
-  .ac-root {
-    --pawn: 46px;
-    --sidew: 80px;
-    --hop: 7px;
-    --pad-t: 2px;
-    --gap: 4px;
-    --gold-h: 31px;
-    --dock-gap: 1px;
-    /* (The shop panel's padding is 6 px on a short phone: the room the board keeps, v7.1's size.) */
-    --panel-p: 6px;
-    --shop-h: max(92px, calc((var(--colw) - 94px - var(--panel-x)) / 4 + 39px));
-    --top-h: 90px;
-  }
-  .ac-col {
-    gap: 4px;
-  }
-  .ac-top {
-    row-gap: 2px;
-  }
-  .ac-who {
-    transform: translateY(-24px);
-  }
-  .ac-goldrow {
-    min-height: 24px;
-  }
-  .ac-shop,
-  .ac-card {
-    grid-template-columns: 70px minmax(0, 1fr);
-  }
-  .ac-card-fight {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .ac-btns {
-    gap: 4px;
-  }
-  .ac-badge {
-    min-width: 17px;
-    height: 17px;
-    font-size: 10.5px;
-    line-height: 17px;
-    right: -5px;
-    bottom: 0;
-  }
-  .ac-clock b {
-    font-size: 16px;
-  }
-  .ac-clock .ac-step,
-  .ac-bottom > .say {
-    font-size: 11px;
-  }
+.ac-head {
+  grid-area: head;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+  padding: 0 2px 0 4px;
 }
-
-/* ---- A phone under 415 wide (360, 375, 390, 393, 414): the gold row holds gold, income, the clock, the odds pill and the win streak, so "Income" is dropped (the "+140" stays) and the pill is a little tighter ---- */
-@media (max-width: 414px) {
-  .ac-root {
-    --tw: 36px;
-  }
-  .ac-sell {
-    font-size: 13px;
-  }
-  .ac-goldrow {
-    gap: 6px;
-  }
+.ac-title {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.1;
+}
+.ac-title strong {
+  font-family: "Archivo Black", Archivo, sans-serif;
+  font-weight: 400;
+  font-size: 19px;
+  white-space: nowrap;
+}
+.ac-title span {
+  font-size: 13px;
+  color: var(--fd-sub);
+  white-space: nowrap;
+}
+/* The gear (Eric, Oct 25): the match screens' plain gear, no box, 36 px. */
+/* (At the top of the row, level with the title's first line: clear of the players under it.) */
+.ac-head > .mm {
+  align-self: flex-start;
+  margin-top: 2px;
+}
+.ac-head .mm-more {
+  width: 36px;
+  min-height: 36px;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+}
+.ac-head .mm-more.on {
+  background: var(--surface-2);
+}
+/* ---- The players: the same block at every size (the pawn, the name, the level, HP and XP) ---- */
+.ac-players {
+  grid-area: pl;
+  align-self: end;
+  margin-bottom: var(--above);
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+  min-width: 0;
+}
+.ac-players .ac-me {
+  order: -1;
+}
+.ac-side {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  min-width: 0;
+}
+.ac-stage {
+  flex: none;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-top: var(--hop);
+}
+.ac-info {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+}
+.ac-name {
+  font-size: 12px;
+  font-weight: 800;
+  max-width: 96px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ac-lv {
+  font-size: 10.5px;
+  color: var(--fd-sub);
+  white-space: nowrap;
+}
+.ac-lv b,
+.ac-lv .ac-badge {
+  font-weight: 800;
+  font-style: normal;
+  color: var(--fd-text);
+}
+.ac-badge {
+  display: inline-block;
+}
+.ac-badge.pop {
+  animation: ac-pop 700ms cubic-bezier(0.2, 0.9, 0.3, 1.2);
+}
+.ac-tag {
+  align-self: flex-start;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--fd-gold);
+  color: var(--fd-gold-ink);
+  font-size: 10px;
+  font-weight: 800;
+}
+.ac-info .ac-bars {
+  width: 96px;
+  margin-top: 2px;
+  gap: 2px;
+}
+.ac-bar {
+  display: grid;
+  grid-template-columns: 15px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 4px;
+  line-height: 1;
+}
+.ac-bar small {
+  font-size: 9px;
+  font-weight: 800;
+  color: var(--fd-text);
+}
+.ac-bar i {
+  display: block;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--fd-panel-2);
+  box-shadow: inset 0 0 0 1px var(--fd-line);
+  overflow: hidden;
+}
+.ac-bar i::after {
+  content: "";
+  display: block;
+  height: 100%;
+  width: calc(var(--f, 1) * 100%);
+  border-radius: 3px;
+  background: var(--fill);
+}
+.ac-bar.hp {
+  --fill: hsl(calc(var(--f) * 135) 70% calc(42% - var(--f) * 6%));
+}
+.ac-bar.xp {
+  --fill: var(--ac-xp);
+}
+.ac-bar b {
+  min-width: 24px;
+  font-size: 10.5px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+/* ---- The benches, on the board's sides: yours up its left side from your corner, theirs down its right side from theirs. Each piece
+   in its side's own look (no glow, no tile), its square under it; a free slot is a faint ring. ---- */
+.ac-bench {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sgap);
+  width: var(--bw);
+}
+.ac-bench.you {
+  grid-area: by;
+  align-self: end;
+  justify-self: start;
+  flex-direction: column-reverse;
+}
+.ac-bench.them {
+  grid-area: bt;
+  align-self: start;
+  justify-self: end;
+}
+.ac-slot {
+  position: relative;
+  flex: none;
+  width: 100%;
+  height: var(--tile);
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  color: var(--fd-text);
+  font-family: inherit;
+  touch-action: none;
+}
+.ac-slot .ac-pc {
+  width: var(--bp);
+}
+.ac-slot em {
+  font: 700 9px/1 Archivo, sans-serif;
+  font-style: normal;
+  color: var(--fd-gold-text);
+}
+.ac-slot.empty::before {
+  content: "";
+  width: calc(var(--bp) * 0.62);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  border: 1.5px dashed color-mix(in srgb, var(--fd-gold-text) 45%, transparent);
+}
+.ac-bench.you .ac-float.on-bench {
+  left: 0;
+  top: auto;
+  width: 100%;
+  height: var(--tile);
+  bottom: calc((var(--tile) + var(--sgap)) * var(--slot, 0));
+}
+/* A piece's picture: the board's own art in a box that sizes it. */
+.ac-pc {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+}
+.ac-pc piece {
+  position: static;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.ac-coin {
+  display: inline-block;
+  flex: none;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #ffe58a, #e0a91c 60%, #a87710);
+}
+/* ---- The board: square, in a thin square double border (thin black, gold, thin black) ---- */
+.ac-frame {
+  grid-area: board;
+  position: relative;
+  width: var(--fw);
+  height: var(--fw);
+  padding: 1px;
+  border: 3px solid var(--ac-gold);
+  outline: 1px solid #000;
+  background: #000;
+}
+.ac-frame .ac-board {
+  width: 100%;
+}
+.ac-root .ac-board .board-wrap,
+.ac-root .ac-board .hb-board {
+  border-radius: 0;
+}
+.ac-msg {
+  position: absolute;
+  left: 50%;
+  bottom: 10px;
+  z-index: 7;
+  transform: translateX(-50%);
+  max-width: 88%;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: rgba(17, 18, 22, 0.88);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.2;
+  text-align: center;
+  pointer-events: none;
+}
+/* ---- The action box: as wide as the board, the same border, a little under it. The band: gold, Income, the hexagon timer, the odds. ---- */
+.ac-dock {
+  grid-area: dock;
+  position: relative;
+  container-type: inline-size;
+  margin-top: var(--dock-gap);
+  width: var(--fw);
+  border: 3px solid var(--ac-gold);
+  outline: 1px solid #000;
+  background: var(--ac-band);
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+}
+.ac-goldrow {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: var(--band-h);
+  padding: 0 6px;
+  border-bottom: 1px solid var(--ac-gold);
+}
+.ac-gold-you {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+.ac-gold-you .ac-coin {
+  width: calc(var(--band-h) * 0.28);
+  height: calc(var(--band-h) * 0.28);
+}
+.ac-gold-you b {
+  font: 400 calc(var(--band-h) * 0.37) / 1 "Archivo Black", Archivo, sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+.ac-income {
+  align-self: stretch;
+  padding: 0 0 0 6px;
+  border: 0;
+  border-left: 1px solid color-mix(in srgb, var(--ac-gold) 60%, transparent);
+  background: none;
+  color: #fff;
+  font-family: inherit;
+  font-size: 9.5px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+}
+/* (A narrow box: "+10" alone, so the hexagon keeps its room.) */
+@container (max-width: 300px) {
   .ac-income-word {
     display: none;
   }
-  .ac-income {
-    margin-left: 8px;
-  }
-  .ac-odds {
-    padding: 3px 5px 2px;
-  }
-  .ac-od {
-    min-width: 20px;
-    margin: 0;
-  }
-  .ac-od .ac-pc {
-    width: 19px;
-  }
-  .ac-streak {
-    padding: 3px 5px;
-  }
-}
-
-/* A phone 381 to 414 wide has room to spare in the gold row once "Income" is gone: the pill's numbers get a little air. */
-@media (min-width: 381px) and (max-width: 414px) {
-  .ac-od {
-    min-width: 24px;
-  }
-}
-
-/* A phone 415 to 899 wide: the panel takes 22 px of the gold row, so the row's gaps and the pill's icons take a little less (the word "Income" stays). */
-@media (min-width: 415px) and (max-width: 899px) {
   .ac-goldrow {
-    gap: 8px;
-  }
-  .ac-odds {
-    padding: 3px 5px 2px;
-  }
-  .ac-od {
-    min-width: 22px;
-    margin: 0;
-  }
-}
-
-/* ---- A narrow phone (320) ---- */
-@media (max-width: 350px) {
-  .ac-root {
-    padding-left: 8px;
-    padding-right: 8px;
-    --sidew: 60px;
-    --tw: 34px;
-    --colw: calc(100vw - 16px);
-    --shop-h: 92px;
-    --panel-p: 6px;
-  }
-  .ac-titlebar {
-    gap: 6px;
-  }
-  .ac-title strong {
-    font-size: 16px;
-  }
-  .ac-title span {
-    font-size: 11px;
-  }
-  .ac-who strong {
-    font-size: 12.5px;
-    max-width: 44px;
-  }
-  .ac-lv {
-    font-size: 10.5px;
-  }
-  .ac-bar {
-    grid-template-columns: 13px minmax(0, 1fr) auto;
-    gap: 3px;
-  }
-  .ac-bottom {
-    column-gap: 4px;
-  }
-  .ac-top {
-    column-gap: 6px;
-  }
-  .ac-clock b {
-    font-size: 15px;
-  }
-  .ac-clock .ac-step,
-  .ac-bottom > .say {
-    font-size: 10.5px;
-  }
-  .ac-sell {
-    padding: 0 3px;
-    font-size: 12px;
-  }
-  .ac-bench {
-    gap: 2px;
-  }
-  /* The gold row at 320: gold, income, the clock, the odds pill and the streak in 304 px: a smaller coin and numbers, smaller icons in a tighter pill. */
-  .ac-goldrow {
-    gap: 3px;
-  }
-  .ac-gold-you .ac-coin {
-    width: 13px;
-    height: 13px;
-    margin-right: 4px;
-  }
-  .ac-gold-you b {
-    font-size: 17px;
+    gap: 4px;
+    padding: 0 4px;
   }
   .ac-income {
-    margin-left: 6px;
-  }
-  .ac-odds {
-    padding: 3px 4px 2px;
-  }
-  .ac-od {
-    min-width: 21px;
-    margin: 0;
-  }
-  .ac-od .ac-pc {
-    width: 17px;
-  }
-  .ac-od b {
-    font-size: 10px;
-  }
-  .ac-streak {
-    padding: 3px 5px;
-    font-size: 11.5px;
-  }
-  .ac-shop {
-    grid-template-columns: 62px minmax(0, 1fr);
-    gap: 5px;
-  }
-  .ac-btns {
-    gap: 4px;
-  }
-  .ac-btn {
-    font-size: 12.5px;
-  }
-  .ac-cards {
-    gap: 4px;
-  }
-  .ac-buy {
-    padding: 3px 2px 4px;
-    gap: 2px;
-  }
-  .ac-tile {
-    width: 92%;
-  }
-  .ac-nm {
-    font-size: 10.5px;
-    text-align: center;
-  }
-  .ac-cost b {
-    font-size: 12.5px;
-  }
-  .ac-card {
-    grid-template-columns: 62px minmax(0, 1fr);
-    column-gap: 8px;
-  }
-  .ac-card-fight {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .ac-go {
-    font-size: 12.5px;
-  }
-  .ac-card-text,
-  .ac-card-gold {
-    font-size: 12px;
-  }
-  /* The fight's rules are the longest words the box holds: a little smaller and tighter so they fit what the shop's height reserves (the page must not scroll). */
-  .ac-card-fight {
-    padding: 6px 8px;
-  }
-  .ac-card-fight .ac-card-text {
-    font-size: 11px;
-    line-height: 1.25;
-  }
-  /* The result's words: a stall's reason is the longest text the card holds (3 lines of 12 px made the box 13 px taller than the shop's height, so the page scrolled 1 px at 320 x 568). A little smaller and tighter keeps the box at the shop's height. */
-  .ac-card-result .ac-card-text,
-  .ac-card-over .ac-card-text,
-  .ac-card-result .ac-card-gold,
-  .ac-card-over .ac-card-gold {
-    font-size: 11.5px;
-    line-height: 1.25;
+    padding-left: 4px;
   }
 }
+.ac-income b {
+  font-weight: 800;
+  color: #4ade80;
+}
+.ac-income.on {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+/* The hexagon timer: centered on the box, with its own gold border; the step's name over the time. */
+.ac-clock {
+  --hex-h: calc(var(--band-h) - 2px);
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: calc(var(--hex-h) * 1.62);
+  height: var(--hex-h);
+  transform: translate(-50%, -50%);
+  clip-path: polygon(14% 0, 86% 0, 100% 50%, 86% 100%, 14% 100%, 0 50%);
+  background: linear-gradient(var(--ac-gold-hi), var(--ac-gold));
+}
+.ac-clock-in {
+  position: absolute;
+  inset: 2.5px;
+  clip-path: polygon(14% 0, 86% 0, 100% 50%, 86% 100%, 14% 100%, 0 50%);
+  background: var(--ac-band);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  text-align: center;
+}
+.ac-clock .ac-step {
+  font-size: calc(var(--hex-h) * 0.2);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ac-gold-hi);
+}
+.ac-clock b {
+  font: 400 calc(var(--hex-h) * 0.4) / 1 "Archivo Black", Archivo, sans-serif;
+  font-variant-numeric: tabular-nums;
+  color: #fff;
+}
+.ac-clock.low .ac-step,
+.ac-clock.low b {
+  color: #f0564b;
+}
+.ac-clock.quiet b {
+  font-size: calc(var(--hex-h) * 0.32);
+}
+/* The shop's odds at your level: each piece with its percent under it. */
+.ac-odds {
+  margin-left: auto;
+  display: flex;
+  gap: 0;
+}
+.ac-od {
+  width: calc((var(--fw) / 2 - var(--band-h) * 0.81 - 14px) / 5);
+  max-width: 30px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.ac-od .ac-pc {
+  width: min(100%, 22px);
+}
+.ac-od b {
+  font-size: clamp(6.5px, calc(var(--fw) * 0.028), 11px);
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+.ac-od.none {
+  opacity: 0.4;
+}
+/* The Income breakdown: over the board's foot, from the box's left edge. */
+.ac-income-box {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 8px);
+  z-index: 20;
+  width: min(250px, 100%);
+  padding: 10px 12px;
+  border: 2px solid var(--ac-gold);
+  border-radius: 8px;
+  background: var(--ac-band);
+  color: #fff;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+.ac-income-head {
+  margin: 0 0 6px;
+  font-size: 11.5px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ac-gold-hi);
+}
+.ac-income-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.ac-income-total {
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid rgba(255, 255, 255, 0.25);
+  font-weight: 800;
+}
+/* ---- The shop row: Buy XP and Reroll stacked at the left, four square cards ---- */
+.ac-shop {
+  position: relative;
+  display: grid;
+  grid-template-columns: var(--btnw) minmax(0, 1fr);
+  gap: var(--cgap);
+  padding: var(--box-p);
+}
+.ac-shop.selling {
+  box-shadow: inset 0 0 0 2px var(--ac-gold-hi);
+}
+.ac-shop.shut {
+  opacity: 0.5;
+  filter: grayscale(0.7);
+}
+.ac-btns {
+  grid-area: 1 / 1;
+  display: grid;
+  grid-template-rows: 1fr 1fr;
+  gap: var(--cgap);
+  height: var(--ch);
+}
+.ac-btn,
+.ac-buy {
+  border: 1px solid var(--ac-gold);
+  border-radius: 6px;
+  background: var(--ac-cream);
+  color: var(--ac-cream-ink);
+  font-family: inherit;
+  box-shadow: 0 2px 0 var(--ac-lip);
+  cursor: pointer;
+}
+.ac-btn {
+  position: relative;
+  min-height: 0;
+  padding: 0 4px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: auto auto;
+  align-content: center;
+  justify-items: start;
+  column-gap: 2px;
+  font-size: clamp(9px, calc(var(--btnw) * 0.17), 14px);
+  font-weight: 800;
+  line-height: 1.05;
+  text-align: left;
+}
+.ac-btn > span:first-child {
+  white-space: nowrap;
+}
+.ac-btn-icon {
+  grid-area: 1 / 2 / 3 / 3;
+  align-self: center;
+  width: clamp(9px, calc(var(--btnw) * 0.17), 18px);
+  height: auto;
+  fill: none;
+  stroke: #a0700f;
+  stroke-width: 2.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.ac-cost {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.ac-cost b {
+  font: 400 1em/1 "Archivo Black", Archivo, sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+.ac-cost .ac-coin {
+  width: 0.85em;
+  height: 0.85em;
+}
+.ac-btn.off,
+.ac-buy.off {
+  opacity: 0.5;
+  filter: grayscale(0.7);
+}
+.ac-shop.shut .ac-btn.off,
+.ac-shop.shut .ac-buy.off {
+  opacity: 1;
+  filter: none;
+}
+.ac-cards {
+  grid-area: 1 / 2;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--cgap);
+}
+.ac-buy {
+  min-width: 0;
+  height: var(--ch);
+  padding: 2px 1px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  font-size: clamp(7px, calc(var(--cw) * 0.17), 14px);
+  touch-action: none;
+}
+.ac-tile {
+  flex: none;
+  width: 52%;
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  container-type: size;
+}
+.ac-tile .ac-pc {
+  width: 100cqw;
+}
+.ac-nm {
+  font-size: 1em;
+  font-weight: 800;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+.ac-nm em {
+  font-style: normal;
+  font-weight: 800;
+}
+.ac-buy.hold-only .ac-nm em {
+  color: #a0700f;
+}
+.ac-sell {
+  grid-area: 1 / 2;
+  z-index: 2;
+  min-height: 44px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--fd-gold);
+  color: var(--fd-gold-ink);
+  font-family: "Archivo Black", Archivo, sans-serif;
+  font-size: 15px;
+  cursor: pointer;
+  box-shadow: 0 3px 0 var(--ac-lip);
+}
+.ac-sell-drop {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(14, 16, 21, 0.86);
+  color: var(--ac-gold-hi);
+  font-weight: 800;
+  font-size: 15px;
+  pointer-events: none;
+}
+.ac-lock {
+  margin: 0 var(--box-p) var(--box-p);
+  min-height: 44px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--fd-gold);
+  color: var(--fd-gold-ink);
+  font-family: inherit;
+  font-weight: 800;
+  font-size: 14px;
+  cursor: pointer;
+}
+.ac-lock small {
+  margin-left: 6px;
+  font-size: 12px;
+  font-weight: 700;
+}
+.ac-lock.off {
+  opacity: 0.5;
+  filter: grayscale(0.7);
+}
+.ac-lock.done {
+  background: var(--ac-cream);
+  color: #a0700f;
+  cursor: default;
+}
+/* The fight's box (under the band) and the result's (the whole box): the words on the box's dark ground. */
+.ac-dock .ac-card {
+  min-height: calc(var(--ch) + 2 * var(--box-p));
+  border-radius: 0;
+  background: transparent;
+  color: #fff;
+  padding: 6px 8px;
+}
+.ac-dock .ac-card-result,
+.ac-dock .ac-card-over {
+  min-height: calc(var(--ch) + 2 * var(--box-p) + var(--band-h) + 1px);
+}
+.ac-dock .ac-card-text {
+  color: #d8d9de;
+  font-size: 11.5px;
+}
+.ac-dock .ac-card-gold {
+  color: #fff;
+  font-size: 11.5px;
+}
+.ac-dock .ac-card-head {
+  font-size: 15px;
+}
+.ac-root button:active {
+  transform: translateY(1px);
+}
 
-/* ---- A computer (1280 x 800): the board with the rows around it at the left, the dock at the right ---- */
-@media (min-width: 900px) and (min-height: 540px) {
-  .ac-root {
-    justify-content: center;
-    padding: 14px 24px;
-    --pawn: 72px;
-    --hop: 12px;
-    --tw: 54px;
-    --tile: 52px;
-    --sidew: 116px;
-    --fm: 4px;
-    --gold-h: 40px;
-    --top-h: max(var(--rowh), 100px);
-    /* The board's column: the rows above and below it, the gaps (10) and the page's padding (28) come off the height. The benches are on the frame's edges already: nothing to add. */
-    --bw: min(560px, calc(var(--app-h) - 28px - var(--top-h) - var(--bot-h) - 20px - 2 * var(--fm)));
-    --gut: 0px;
+/* A bench piece of yours picked (v5): its tile and the square it goes to light up in gold. */
+.ac-aim,
+.ac-slot.aimed {
+  background: rgba(242, 193, 78, 0.62);
+  box-shadow: inset 0 0 0 3px #f2b705;
+  z-index: 2;
+}
+
+/* ---- v5, every size (Eric Nov 8; docs/decisions/2026-11-08-autochess-redesign.md): the board and the action box as big as fit (a
+   phone's nearly its width); each bench a row of 4 tiles the size of the board's squares, lined up with its files: theirs over A to
+   D, yours under E to H, a few px from the border; the players kitty-corner: the opponent over E to H, you under A to D. A computer
+   only sets its frame and a few sizes (below). ---- */
+.ac-root {
+  --rgap: 4px;
+  --lab: 14px;
+  --free: 12px;
+  /* Everything top to bottom but the board, the two rows and the cards (the frame's and the box's borders at their widest, 6 px). */
+  --k0: calc(2 * 3px + 2 * var(--box-p) + var(--btnw) + 4 * var(--cgap));
+  --k: calc(2 * var(--bd) + 2 * var(--box-p) + var(--btnw) + 4 * var(--cgap));
+  --acc: calc(env(safe-area-inset-top) + env(safe-area-inset-bottom) + var(--pad-t) + var(--head-h) + var(--dock-gap) + 2 * 6px + var(--band-h) + 1px + 2 * var(--box-p) + var(--free) + var(--lock-h, 0px) + 16px - var(--k0) / 4);
+  /* The board: as wide as the column less its frame, or what the height leaves (the frame is the board + 8, a card a quarter of the
+     frame less k, each row a tile, its gap and its label, or the player's block when that is taller), snapped to 8 px (it draws in
+     whole multiples of 8 device pixels); the frame's gold border takes up to 3 px more a side, so the frame is 8 px from each edge
+     at 390, 360 and 430. A tile is a square. */
+  --b: round(down, min(calc(var(--colw) - 8px), calc((var(--app-h) - var(--acc) - 2 * (var(--rgap) + var(--lab))) / 1.5), calc((var(--app-h) - var(--acc) - 2 * var(--pl-h)) / 1.25)), 8px);
+  --bd: calc(3px + min(3px, round(down, calc((var(--colw) - 8px - var(--b)) / 2), 1px)));
+  --fw: calc(var(--b) + 2px + 2 * var(--bd));
+  --acs: calc(var(--b) / 8);
+  --acrow: max(calc(var(--acs) + var(--rgap) + var(--lab)), var(--pl-h));
+  /* The players' pawns a little bigger (Eric, Nov 9: "I just wanted it a little bit bigger"): as tall as their row leaves (a tile, its
+     gap and label, less the hop), 44 to 60 px; the rows and the board keep their sizes (--pl-h still counts a 44 px pawn). */
+  --pawn-c: clamp(44px, calc(var(--acs) + var(--rgap) + var(--lab) - var(--hop) - 6px), 60px);
+}
+.ac-side .ac-stage .ac-pawn {
+  width: calc(var(--pawn-c) * 1.107);
+  height: var(--pawn-c);
+}
+.ac-col {
+  /* (Up to 24 px each side of the board, so the players and the gear stay by it on a wide screen.) */
+  width: min(var(--colw), calc(var(--fw) + 48px));
+  grid-template-columns: minmax(0, 1fr) calc(var(--fw) / 2) calc(var(--fw) / 2) minmax(0, 1fr);
+  grid-template-rows: var(--head-h) var(--acrow) var(--fw) var(--acrow) auto;
+  grid-template-areas:
+    "head head head head"
+    ". bt opp opp"
+    ". board board ."
+    "me me by ."
+    ". dock dock .";
+}
+.ac-frame,
+.ac-dock {
+  border-width: var(--bd);
+}
+/* (The Income breakdown keeps its place 3 px in from the box's outer edge, whatever the border.) */
+.ac-income-box {
+  left: calc(3px - var(--bd));
+}
+.ac-players {
+  display: contents;
+}
+.ac-opp {
+  grid-area: opp;
+  align-self: end;
+  justify-self: center;
+  margin-bottom: var(--rgap);
+}
+.ac-me {
+  grid-area: me;
+  align-self: start;
+  justify-self: center;
+  margin-top: var(--rgap);
+}
+.ac-bench {
+  flex-direction: row;
+  gap: 0;
+  width: calc(var(--acs) * 4);
+}
+.ac-bench.them {
+  grid-area: bt;
+  align-self: end;
+  justify-self: end;
+  margin-bottom: var(--rgap);
+}
+.ac-bench.you {
+  grid-area: by;
+  align-self: start;
+  justify-self: start;
+  flex-direction: row;
+  margin-top: var(--rgap);
+}
+.ac-slot {
+  width: var(--acs);
+  height: var(--acs);
+  border-radius: 0;
+  background: var(--t1);
+}
+.ac-slot:nth-child(even) {
+  background: var(--t2);
+}
+.ac-slot.aimed {
+  background: rgba(242, 193, 78, 0.62);
+}
+/* The tiles: by owner (Eric, Nov 8): yours a light gray pair, theirs a slightly darker one, both unlike the board's squares. */
+.ac-bench.you {
+  --t1: #e4e2dd;
+  --t2: #c6c3bc;
+}
+.ac-bench.them {
+  --t1: #bdb9b1;
+  --t2: #98948b;
+}
+.ac-slot .ac-pc {
+  width: var(--acs);
+}
+.ac-slot em {
+  position: absolute;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 11px;
+}
+.ac-bench.you .ac-slot em {
+  top: calc(100% + 2px);
+}
+.ac-bench.them .ac-slot em {
+  bottom: calc(100% + 2px);
+}
+.ac-slot.empty::before {
+  content: none;
+}
+.ac-slot.tapped {
+  box-shadow: inset 0 0 0 3px #dc2626;
+}
+.ac-bench.you .ac-float.on-bench {
+  left: calc(var(--acs) * var(--slot, 0));
+  top: 0;
+  bottom: auto;
+  width: var(--acs);
+  height: var(--acs);
+}
+
+/* (The players' words a size bigger only on phones 360 px wide AND 700 px tall or more, Nov 9: at 360 x 640 the opponent's taller block
+   came within 4 px of the gear, main e2e match-menu.spec.ts:240.)
+   (Under 360 px wide, v5: the fight's and the result's words a size smaller, and 36 px kept free at the foot for them to grow into, so
+   they fit under the board.) */
+@media (min-width: 360px) and (min-height: 700px) {
+  .ac-name {
+    font-size: 13px;
   }
-  .ac-col {
-    width: calc(var(--bw) + 32px + 440px);
-    max-width: 100%;
-    display: grid;
-    grid-template-columns: var(--bw) 440px;
-    grid-auto-rows: auto;
-    column-gap: 32px;
-    row-gap: 10px;
-    align-content: start;
-  }
-  .ac-top {
-    grid-column: 1;
-    grid-row: 1;
-  }
-  .ac-frame {
-    grid-column: 1;
-    grid-row: 2;
-    width: 100%;
-  }
-  .ac-bottom {
-    grid-column: 1;
-    grid-row: 3;
-  }
-  .ac-dock {
-    grid-column: 2;
-    grid-row: 2;
-    align-self: start;
-    margin-top: var(--fm);
-    gap: 10px;
-  }
-  .ac-title strong {
-    font-size: 20px;
-  }
-  .ac-title span {
-    font-size: 13.5px;
-  }
-  .ac-who {
-    transform: translateY(-34px);
-  }
-  .ac-titlebar .mm {
-    position: absolute;
-    top: 4px;
-    right: 0;
-    align-self: auto;
-    margin: 0;
-  }
-  .ac-title {
-    flex: 1 1 auto;
-  }
-  .ac-who strong {
-    font-size: 15px;
-    max-width: 90px;
-  }
-  .ac-lv {
-    font-size: 12.5px;
+  .ac-lv,
+  .ac-bar b {
+    font-size: 11.5px;
   }
   .ac-bar small {
     font-size: 10px;
@@ -22231,105 +23169,59 @@ button.sq-tiny {
   .ac-bar i {
     height: 7px;
   }
-  .ac-bar b {
-    font-size: 12px;
+}
+@media (max-width: 359px) {
+  .ac-root {
+    --free: 36px;
   }
-  .ac-clock b {
-    font-size: 22px;
+  .ac-dock .ac-card {
+    padding: 4px 6px;
+    grid-template-columns: 66px minmax(0, 1fr);
+    column-gap: 6px;
   }
-  .ac-clock .ac-step,
-  .ac-bottom > .say {
-    font-size: 13px;
-  }
-  .ac-slot em {
-    font-size: 10px;
-  }
-  .ac-gold-you b {
-    font-size: 24px;
-  }
-  .ac-gold-you .ac-coin {
-    width: 19px;
-    height: 19px;
-  }
-  .ac-income {
-    font-size: 13.5px;
-  }
-  .ac-income b {
-    font-size: 16px;
-  }
-  .ac-streak {
-    font-size: 14px;
-    padding: 4px 11px;
-  }
-  .ac-odds {
-    padding: 3px 7px 2px;
-  }
-  /* (The shop panel takes 22 px of the row: the pill's five icons take 3 px less each, so a streak still fits.) */
-  .ac-od {
-    min-width: 25px;
-    margin: 0 1px;
-  }
-  .ac-od .ac-pc {
-    width: 20px;
-  }
-  .ac-od b {
-    font-size: 12px;
-  }
-  .ac-goldrow {
-    gap: 8px;
-  }
-  /* The dock is 440 wide: gold, income, the clock, the pill and a win streak need the room "Income" takes, so with a streak the word goes. */
-  .ac-goldrow:has(.ac-streak) .ac-income-word {
-    display: none;
-  }
-  .ac-shop,
-  .ac-card {
-    grid-template-columns: 92px minmax(0, 1fr);
-  }
-  .ac-card-fight {
+  .ac-dock .ac-card-fight {
     grid-template-columns: minmax(0, 1fr);
   }
-  .ac-shop {
-    gap: 8px;
+  .ac-dock .ac-card-text,
+  .ac-dock .ac-card-gold {
+    font-size: 10.5px;
+    line-height: 1.25;
   }
-  .ac-btns {
-    gap: 8px;
-  }
-  .ac-btn {
+  .ac-dock .ac-card-head {
     font-size: 14px;
-    border-radius: 12px;
-    gap: 2px;
-  }
-  .ac-cost b {
-    font-size: 14px;
-  }
-  .ac-cards {
-    gap: 8px;
-  }
-  .ac-buy {
-    padding: 5px 4px 7px;
-    gap: 4px;
-    border-radius: 12px;
-  }
-  .ac-nm {
-    font-size: 13px;
-  }
-  .ac-card {
-    min-height: 119px;
   }
 }
-
-/* A laptop's short window (1280 x 600): the rows around the board are tighter (a smaller pawn, narrower bench tiles), so the board keeps room and their bench, name and pawn still fit its width. */
-@media (min-width: 900px) and (min-height: 540px) and (max-height: 700px) {
+/* ---- A computer (the front door's frame, 1024 px and wider): the same screen (v5) in the center column, with a computer's sizes ---- */
+@media (min-width: 1024px) {
+  .fd-root.framed.fd-on-autochess .fd-center {
+    max-width: none;
+  }
   .ac-root {
-    --pawn: 60px;
-    --hop: 9px;
-    --tw: 38px;
-    --sidew: 92px;
+    --pad-t: 12px;
+    --head-h: 40px;
+    --band-h: 48px;
+    --box-p: 7px;
+    /* (Buy XP and Reroll's column follows the height, as the board does, so a card stays 44 px wide or more on a short screen.) */
+    --btnw: clamp(58px, calc(var(--app-h) * 0.1), 96px);
+    --cgap: 6px;
+    --colw: calc(100vw - var(--fd-menu) - var(--fd-rail) - 32px);
   }
-  .ac-who {
-    transform: translateY(-26px);
+  /* (The title block is the right column's slot here: "AUTO CHESS", the round and the step. The gear: top right, over the opponent.) */
+  .ac-title {
+    visibility: hidden;
   }
+  .ac-head {
+    padding: 0;
+  }
+  .ac-income {
+    font-size: 13px;
+  }
+}
+.rc-sub {
+  margin: 0;
+  font-size: 13px;
+  color: var(--fd-sub);
+  text-align: center;
 }
 
 /* ---- Moo & Moon (components/Moo.tsx; mo- for Moo) ---- */
@@ -22542,6 +23434,12 @@ button.sq-tiny {
 }
 /* His hop along a phone's bar to the pump and back: facing the way he goes (his drawing faces our left), mirrored about his feet. */
 .boss-char.bc-flip .boss-char-sprite {
+  transform: scaleX(-1);
+  transform-origin: calc(var(--bc-fx) * var(--bc-scale) * 1px) 100%;
+}
+/* The results: a figure drawn facing our left turns to the God King on its right, mirrored about its feet (only the image: the
+   bubble and its words are its own children and stay as they are). Pixel-crisp: whole-pixel scale, nearest filtering. */
+.boss-char.place-results.art-left .boss-char-sprite {
   transform: scaleX(-1);
   transform-origin: calc(var(--bc-fx) * var(--bc-scale) * 1px) 100%;
 }
@@ -23219,6 +24117,77 @@ button.sq-tiny {
     right: calc(100% - var(--dk-left, 0px) - var(--dk-w, 100%) + 186px);
   }
 }
+/* Stacked (Eric, Nov 11: "put the king and pawn vertical. When space is tight, this is too small and compact. They should be
+   stacked, the king on top"): where the strip is tall enough (BossDock's stackScale: `dk-stack`, `--dk-k`), the God King and
+   your pawn share one column at the strip's right, he on top under the row, your pawn under him, each `--dk-k` times its
+   side-by-side size (as big as the strip's height lets the two be, at most the old two columns' width). The panel keeps the
+   rest. His menu still opens above the row, his words to his left over the panel; his ⚡ and 🐟 and the carrot count stand
+   just left of the column. */
+@media (max-width: 899px) and (min-height: 520px) {
+  .screen.game > .boss-dock.dk-strip.dk-pawn.dk-stack {
+    grid-template-columns: var(--dk-left, 0px) minmax(0, 1fr) calc(58px * var(--dk-k, 1)) minmax(0, calc(100% - var(--dk-left, 0px) - var(--dk-w, 100%)));
+    grid-template-rows: auto calc(62px * var(--dk-k, 1)) minmax(0, 1fr);
+  }
+  .boss-dock.dk-strip.dk-pawn.dk-stack > .boss-dock-main {
+    grid-column: 2 / 4;
+  }
+  .boss-dock.dk-strip.dk-pawn.dk-stack > .dk-panel {
+    grid-row: 2 / 4;
+    margin-right: 6px;
+  }
+  .boss-dock.dk-strip.dk-pawn.dk-stack > .gk-unit {
+    grid-column: 3;
+    grid-row: 2;
+    width: calc(58px * var(--dk-k, 1));
+    height: calc(62px * var(--dk-k, 1));
+    grid-template-rows: 1fr calc(12px * var(--dk-k, 1));
+  }
+  .boss-dock.dk-strip.dk-pawn.dk-stack .gk-unit-btn {
+    width: calc(58px * var(--dk-k, 1));
+    height: calc(50px * var(--dk-k, 1));
+  }
+  .boss-dock.dk-strip.dk-pawn.dk-stack .gk-unit .god-king {
+    width: calc(50px * var(--dk-k, 1));
+    height: calc(50px * var(--dk-k, 1));
+  }
+  .boss-dock.dk-strip.dk-pawn.dk-stack .gk-unit-charges {
+    font-size: calc(9px * var(--dk-k, 1));
+    line-height: calc(12px * var(--dk-k, 1));
+  }
+  .boss-dock.dk-strip.dk-pawn.dk-stack .gk-unit.fallen .god-king.fallen {
+    width: calc(58px * var(--dk-k, 1));
+    height: calc(58px * var(--dk-k, 1));
+  }
+  .boss-dock.dk-strip.dk-pawn.dk-stack .gk-unit.fallen.has-power {
+    grid-template-rows: calc(24px * var(--dk-k, 1)) 1fr;
+  }
+  .boss-dock.dk-strip.dk-pawn.dk-stack .gk-unit.fallen.has-power .gk-unit-btn {
+    height: calc(38px * var(--dk-k, 1));
+  }
+  .boss-dock.dk-strip.dk-pawn.dk-stack > .gk-unit > .gk-bubble {
+    max-width: calc(var(--dk-w, 100vw) - 58px * var(--dk-k, 1) - 30px);
+  }
+  .boss-dock.dk-strip.dk-stack > .you-pawn {
+    --pw: calc(68px * var(--dk-k, 1));
+    --feet: calc(6px * var(--dk-k, 1));
+    grid-column: 3;
+    grid-row: 3;
+    width: calc(58px * var(--dk-k, 1));
+    height: calc(62px * var(--dk-k, 1));
+  }
+  .boss-dock.dk-strip.dk-pawn.dk-stack > .ult-test.gk-tool {
+    left: calc(var(--dk-left, 0px) + var(--dk-w, 100%) - 58px * var(--dk-k, 1) - 34px);
+  }
+  .boss-dock.dk-strip.dk-pawn.dk-stack > .engine-move.gk-tool {
+    left: calc(var(--dk-left, 0px) + var(--dk-w, 100%) - 58px * var(--dk-k, 1) - 64px);
+  }
+  .boss-dock.dk-strip.dk-pawn.dk-stack > .dk-race-below {
+    right: calc(100% - var(--dk-left, 0px) - var(--dk-w, 100%) + 58px * var(--dk-k, 1) + 8px);
+  }
+  .boss-dock.dk-strip.dk-pawn.dk-stack:has(> .gk-tool) > .dk-race-below {
+    right: calc(100% - var(--dk-left, 0px) - var(--dk-w, 100%) + 58px * var(--dk-k, 1) + 70px);
+  }
+}
 /* Where the panel is narrower than a capture's row (with its time) needs, the row tightens (320 to 390 px wide phones). */
 @container (max-width: 190px) {
   .bp .mv-row {
@@ -23329,7 +24298,7 @@ button.sq-tiny {
   background: #7486c0;
   pointer-events: none;
 }
-/* A computer: the stage and START a bit bigger, the same idea (Eric, Oct 29). */
+/* A computer (Eric, Oct 29: the stage and START a bit bigger). */
 @media (min-width: 1024px) {
   .bs-row-stage {
     --bs-sw: min(200px, 46cqi);
@@ -23339,6 +24308,44 @@ button.sq-tiny {
   }
   .bs-vs {
     font-size: 32px;
+  }
+}
+/*
+ * A computer's two rows (Nov 12, Eric: "3X the pawn and boss size even 4"): the platform grows into the room the grid and START leave.
+ * Only where the grid is two rows across the column (the rd-page container of 660 px or more, BossSelect's rows of ceil(n/2)); a
+ * narrower window keeps today's size, since its grid is taller. A platform is the smaller of two rooms, never below today's 200 px:
+ * 46cqi of the stage's column (two platforms and the VS side by side), and the window's height less the grid (its bottom at about
+ * 350 px), the band the bubble rises over, the name, the level and its dots, and START (625 px in all, measured; a tight window
+ * then fits with nothing over START). docs/decisions/2026-11-12-select-desktop-big.md.
+ * The band (--bs-rise) is set on .bs-say here too, so it is the platform's, not the phone's.
+ */
+@container rd-page (min-width: 660px) {
+  .bs-row-stage,
+  .bs-say {
+    --bs-sw: max(200px, min(46cqi, calc((100dvh - 625px) / 1.034)));
+  }
+  .bs-say {
+    --bs-rise: calc(var(--bs-rise-cqi, 0) * var(--bs-sw) / 100);
+  }
+  /* The names, the level and its dots grow a little with the figures: not tiny next to a platform 2x today's. */
+  .bs-name,
+  .bs-you-name {
+    font-size: 24px;
+  }
+  .bs-level {
+    font-size: 20px;
+  }
+  .bs-dot {
+    width: 6px;
+    height: 6px;
+  }
+  .bs-dot.on {
+    width: 12px;
+    height: 12px;
+  }
+  /* The "?" stands at 45% of its platform, as it did at 90 px on a 200 px one (its nearest box is the spot). */
+  .bs-q-big {
+    font-size: 45cqi;
   }
 }
 /* Boss Battle's invite sheet (components/BossParty.tsx): Squads' invite rows; admins' bot buttons side by side. */
@@ -23529,31 +24536,30 @@ button.sq-tiny {
   background: repeating-linear-gradient(180deg, #7d4a27 0 3.2cqw, #9c6334 3.2cqw 3.6cqw);
   border-color: #f08a24;
 }
-/* The workshop strip, in the boss bar's prop slot (right of his bars, under the status): his five pieces in a row, each with a bar
-   filling toward its cost and its count, his woodpecker foreman at the end. Positioned at the slot's top right (a phone's speech
-   bubble sits at the bar's foot, under it), the same size
-   whatever it shows, never taking a tap: nothing in the bar moves for it. */
+/* The workshop strip, in the boss bar's prop slot (right of his bars, under the status): his five pieces and his woodpecker foreman,
+   each a square of --ws (about a chess piece on the board: Eric, Nov 8, "nearly normal sized"). A piece's bar runs along its foot
+   and its count sits in its top right corner, so the squares keep their size. A phone lays them out three to a row, in two rows
+   (the room under the status is 61 to 72 px tall); a computer's bar is one row of six at the bar's height. Absolute, never taking
+   a tap: nothing in the bar moves for it. */
 .ws-strip {
+  --ws: 35px;
   position: absolute;
   right: 0;
   top: 0;
-  display: flex;
-  align-items: flex-end;
+  display: grid;
+  grid-template-columns: repeat(3, var(--ws));
   gap: 2px;
   pointer-events: none;
 }
 .ws-slot {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  width: 22px;
-  gap: 1px;
+  position: relative;
+  width: var(--ws);
+  height: var(--ws);
 }
 .ws-strip .ws-piece {
-  position: relative;
+  position: absolute;
+  inset: 0;
   display: block;
-  width: 18px;
-  height: 18px;
 }
 .ws-strip .ws-piece piece {
   position: absolute;
@@ -23563,29 +24569,17 @@ button.sq-tiny {
   will-change: auto;
 }
 .ws-meta {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 1px;
-}
-/* A computer's bar is one short row (his figure stands by the board): the strip takes the free room's left part over both rows,
-   between his bars and "Move 2", centered on the bar's height. */
-@media (min-width: 900px) and (min-height: 600px) {
-  .boss-bar .boss-prop:has(> .ws-strip) {
-    grid-column: 2;
-    grid-row: 1 / 3;
-  }
-  .boss-bar .ws-strip {
-    top: 50%;
-    right: auto;
-    left: 4px;
-    transform: translateY(-50%);
-  }
+  position: absolute;
+  inset: 0;
+  z-index: 3; /* over the pieces (.hb-pieces piece is z 2) */
 }
 .ws-bar {
-  position: relative;
-  width: 18px;
-  height: 3px;
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 4px;
+  box-sizing: border-box;
   border: 1px solid rgba(255, 255, 255, 0.3);
   border-radius: 2px;
   background: rgba(0, 0, 0, 0.45);
@@ -23597,12 +24591,40 @@ button.sq-tiny {
   background: linear-gradient(90deg, #f7b267, #e8742c);
 }
 .ws-count {
-  font-size: 9px;
-  line-height: 1;
+  position: absolute;
+  top: 0;
+  right: 0;
+  padding: 0 3px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.6);
+  font-size: max(9px, calc(var(--ws) * 0.28));
+  line-height: 1.4;
   font-weight: 800;
   color: #ffe0b8;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+/* A phone narrower than 341 px (a 320 px one): the squares a little smaller, still about 80% of a board square. */
+@media (max-width: 340px) {
+  .ws-strip {
+    --ws: 28px;
+  }
+}
+/* A computer's boss bar is one short row (his figure stands by the board): the strip takes the free room's left part, one row of
+   six squares centered on the bar's height, between his bars and "Move 2". */
+@media (min-width: 900px) and (min-height: 600px) {
+  .boss-bar .boss-prop:has(> .ws-strip) {
+    grid-column: 2;
+    grid-row: 1 / 3;
+  }
+  .boss-bar .ws-strip {
+    --ws: 42px;
+    grid-template-columns: repeat(6, var(--ws));
+    top: 50%;
+    right: auto;
+    left: 4px;
+    transform: translateY(-50%);
+  }
 }
 /* A finished piece glows until it drops. */
 .ws-slot.done .ws-piece {
@@ -23617,7 +24639,7 @@ button.sq-tiny {
 }
 @keyframes ws-bump {
   0% {
-    transform: translateY(-6px) scale(1.18);
+    transform: translateY(-3px) scale(1.1);
   }
   60% {
     transform: translateY(1px);
@@ -23628,9 +24650,8 @@ button.sq-tiny {
 }
 .ws-foreman {
   display: block;
-  width: 26px;
-  height: 26px;
-  margin-left: 1px;
+  width: var(--ws);
+  height: var(--ws);
 }
 .ws-foreman canvas {
   display: block;
@@ -24693,3 +25714,1318 @@ button.sq-tiny {
   .wt-spot.wt-glide, .wt-hole.wt-glide, .wt-track, .wt-bar > span { transition: none; }
 }
 
+
+/* -- Typing in a match's or a lobby's chat (QuickChat.tsx TypeBar; Nov 7, CHAT_TYPED): in the quick lines' place, or in a phone tab's
+   pop over the feed's foot. The field (no box), the emoji button and Send; our pixel emoji's picker above, in the flow (never clipped). -- */
+.qtype {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border-top: 1px solid var(--qc-rule);
+  padding: 4px 8px 6px;
+}
+.qchat-tab .qpop .qtype {
+  border-top: 0;
+}
+.qtype .chat-emo-picker {
+  position: static;
+  align-self: flex-end;
+  box-shadow: none;
+  border-color: var(--qc-edge);
+  background: var(--qc-head);
+}
+.qtype .chat-emo-pick:hover {
+  background: var(--qc-chip);
+}
+.qtype-note {
+  margin: 0;
+  color: #f2a3a3;
+  font-size: 12.5px;
+}
+.qtype-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+}
+.qtype-field {
+  flex: 1;
+  min-width: 0;
+  height: 32px;
+  padding: 0 2px;
+  border: 0;
+  outline: none;
+  background: none;
+  color: var(--qc-text);
+  font: 400 14px Archivo, system-ui, sans-serif;
+}
+.qtype-field::placeholder {
+  color: var(--qc-muted);
+}
+.qtype-emo,
+.qtype-quick,
+.qtype-send {
+  flex: none;
+  height: 30px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--qc-chip);
+  color: var(--qc-text);
+  cursor: pointer;
+}
+.qtype-emo,
+.qtype-quick {
+  width: 30px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+}
+.qtype-send {
+  padding: 0 10px;
+  font: 700 13px Archivo, system-ui, sans-serif;
+}
+.qtype-quick:disabled,
+.qtype-emo:disabled,
+.qtype-send:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.qline .chat-emo {
+  width: 1.35em;
+  height: 1.35em;
+  vertical-align: -0.32em;
+}
+/* (A phone's chat tab: the picker in one row of eight over the field, so both fit the box's foot.) */
+.qchat-tab .qpop .qtype .chat-emo-picker {
+  align-self: stretch;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 2px;
+  padding: 3px;
+}
+.qchat-tab .qpop .qtype .chat-emo-pick {
+  width: auto;
+  height: 32px;
+}
+/* ---- A boss battle's result (Eric, Nov 7): its title in the God King's pixel type; your pawn stands beside him ---- */
+.results .boss-title {
+  font-family: "Press Start 2P", ui-monospace, monospace;
+  font-size: 20px;
+  line-height: 1.4;
+  color: #1a1406;
+  text-shadow: 3px 3px 0 #e8b84a;
+  margin: 12px 0 14px;
+}
+/* ---- A boss battle's result (Eric, Nov 9; components/ResultDuo.tsx): one row, the boss on the left, your pawn on the right with
+   your name, XP and level under it; no God King. A loss: the boss's attack on a king where he stands, your pawn jolting back. ---- */
+.results-duo {
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  /* (At least 16 px between the boss's painted figure and your pawn's art box at rest (a win, a draw, before and after his attack):
+     the e2e gap check, Eric's rule (nothing touches); Smudgy's victory came to 12 px at an 8 px gap. His attack's blow is meant to
+     land on your pawn: see docs/decisions/2026-11-09-boss-result-v2.md. The room on the left is for the bosses drawn wider than
+     their box (Folio's quill, Wrangler's rope: up to 34 px past it), so they keep the 16 px gutter at 360 px; measured for every
+     boss with scripts/frames-boss-result.mjs.) Eric, Nov 11: your pawn, now centered over its XP, takes 20 px off that gap, so the
+     row gap is 36 px (at 24 px Smudgy's figure came to 5.6 px). The row is as wide as its content, so the gap adds to its width; the
+     padding is 30 px (it was 32), which keeps the XP column 8 px from the edge at 360 px and the boss 16 px in at 390 px. Measured for
+     every boss: at least 17.6 px from 360 to 430 px. */
+  gap: 36px;
+  padding-left: 30px;
+  margin: 0 auto;
+}
+/* (A phone under 360 px: a narrower column, less room on the left: the row fits; the widest bosses come nearer the edge there.) */
+@media (max-width: 359px) {
+  .results-duo {
+    gap: 20px;
+    padding-left: 12px;
+  }
+  .rd-you,
+  .xp-box.xp-compact {
+    width: 160px;
+  }
+}
+/* (He stands on your pawn's base line, not on the bottom of your XP under it: his attack aims at your pawn and never crosses your
+   name or your XP. The XP's height (96) and its margin (4), plus where the pawn's base stands in its box (--feet, 12).) */
+.rd-boss {
+  position: relative;
+  flex: none;
+  margin-bottom: 112px;
+}
+.results-duo .boss-char.place-results {
+  margin: 100px 0 0;
+}
+/* His attack in his place: his usual figure hides (his words stay); the attack's frame, at his scale (2), stands on his feet. */
+.rd-attacking .boss-char-sprite {
+  visibility: hidden;
+}
+.rd-attack {
+  position: absolute;
+  left: calc(50% - var(--ra-fx) * 2px);
+  bottom: calc((var(--ra-fy) - var(--ra-h)) * 2px);
+  width: calc(var(--ra-w) * 2px);
+  height: calc(var(--ra-h) * 2px);
+  pointer-events: none;
+}
+/* (Drawn facing our left: mirrored about his feet, toward your pawn.) */
+.rd-attack.flip {
+  transform: scaleX(-1);
+  transform-origin: calc(var(--ra-fx) * 2px) 100%;
+}
+.rd-you {
+  flex: none;
+  width: 176px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+/* Eric, Nov 9 (round 2): your pawn is bigger, 1.6x (about 77 px tall at 390; it was about 48). Its feet stay on the base line. The
+   layout box stays 58 x 62, so the XP under it, the row and the boss don't move or jump. The column is 176 px (160 under 360), and
+   the bigger pawn stays inside it, so the 16 px gutters hold at 360 and 390 px (at 320 px, see docs/decisions/2026-11-11-result-pawn-center.md).
+   Eric, Nov 11: its art is centered over the XP column (the default margin: no -34 px override, which had it 20 px right of
+   center). That takes 20 px off the gap to the boss, which the row gap (.results-duo) buys back. */
+.rd-you .you-pawn {
+  --pk: 1.6;
+  --pw: calc(68px * var(--pk));
+}
+/* Each lash: your pawn jolts back (away from him) and flashes, as the king does at his mate (KingAttack.tsx). */
+.rd-pawn.rd-hit {
+  animation: rd-knock 170ms ease-out 10 both;
+}
+@keyframes rd-knock {
+  0% {
+    translate: 0 0;
+    filter: none;
+  }
+  20% {
+    translate: 6px 0;
+    filter: brightness(1.9) drop-shadow(0 0 4px #9c6cff);
+  }
+  55% {
+    filter: none;
+  }
+  100% {
+    translate: 0 0;
+    filter: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rd-pawn.rd-hit {
+    animation: none;
+  }
+}
+/* The boss's words start at his box's left edge (his tail over his middle): inside the gutter on a phone, the row is centered. */
+.results-duo .boss-char .bc-bubble {
+  left: -4px;
+  translate: 0 0;
+  max-width: min(220px, calc(100vw - 32px));
+}
+.results-duo .boss-char .bc-bubble::after {
+  left: 40px;
+  margin-left: 0;
+}
+
+/*
+ * The XP box on every result screen (Nov 9; components/XpResult.tsx). One fixed size whatever it shows (filling, done, waiting, "No
+ * XP"), so nothing around it moves; it contains its own layout and paint, and the fill moves only by its transform. The bar's green
+ * is home's level ring's.
+ */
+.xp-box {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 420px;
+  height: 78px;
+  margin: 10px auto;
+  padding: 9px 12px 8px;
+  display: grid;
+  grid-template-rows: 20px 10px 18px;
+  row-gap: 6px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  contain: strict;
+  text-align: left;
+  font-variant-numeric: tabular-nums;
+}
+/* The gain, your name, your level: the name centered between them (equal side tracks), the one that shrinks (ellipsized) first. */
+.xp-top {
+  display: grid;
+  grid-template-columns: 1fr minmax(0, max-content) 1fr;
+  align-items: baseline;
+  column-gap: 8px;
+  line-height: 20px;
+  white-space: nowrap;
+}
+.xp-gain {
+  justify-self: start;
+}
+.xp-level {
+  justify-self: end;
+}
+.xp-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.xp-gain {
+  font-weight: 800;
+  font-size: 17px;
+  color: var(--good);
+}
+.xp-none .xp-gain,
+.xp-wait .xp-gain {
+  color: var(--muted);
+}
+.xp-level {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted);
+}
+.xp-bar {
+  position: relative;
+  height: 10px;
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--muted) 22%, transparent);
+  overflow: visible;
+}
+.xp-fill {
+  position: absolute;
+  inset: 0;
+  border-radius: 5px;
+  background: var(--good);
+  transform-origin: left center;
+  will-change: transform;
+}
+.xp-none .xp-fill,
+.xp-wait .xp-fill {
+  background: color-mix(in srgb, var(--good) 55%, var(--muted));
+}
+/* "Level 8!" over the bar's end as a level is reached: an opacity and transform pop, no layout. */
+.xp-pop {
+  position: absolute;
+  right: 0;
+  bottom: 14px;
+  font-weight: 900;
+  font-size: 15px;
+  color: var(--accent);
+  opacity: 0;
+  pointer-events: none;
+  white-space: nowrap;
+}
+.xp-pop.on {
+  animation: xp-pop 900ms ease-out both;
+}
+.xp-level {
+  transition: opacity 120ms;
+}
+.xp-popping .xp-level {
+  opacity: 0;
+}
+@keyframes xp-pop {
+  0% {
+    opacity: 0;
+    transform: translateY(6px) scale(0.7);
+  }
+  20% {
+    opacity: 1;
+    transform: translateY(0) scale(1.15);
+  }
+  70% {
+    opacity: 1;
+    transform: translateY(-2px) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-6px) scale(1);
+  }
+}
+.xp-parts {
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.xp-parts b {
+  color: var(--text);
+}
+.xp-part {
+  visibility: hidden;
+}
+.xp-part.shown {
+  visibility: visible;
+}
+.xp-why {
+  color: var(--text);
+}
+.xp-wait .xp-why {
+  color: var(--muted);
+}
+/* Compact (a boss battle's result, under your pawn): no frame; your name on its own line, then the gain and the level over the bar. */
+.xp-box.xp-compact {
+  width: 176px;
+  height: 96px;
+  margin: 4px 0 0;
+  padding: 0;
+  grid-template-rows: 42px 10px 30px;
+  row-gap: 5px;
+  border: 0;
+  border-radius: 0;
+  background: none;
+}
+.xp-compact .xp-top {
+  grid-template-columns: auto auto;
+  grid-template-rows: 18px 20px;
+  grid-template-areas: "name name" "gain level";
+  justify-content: space-between;
+  row-gap: 4px;
+}
+.xp-compact .xp-name {
+  grid-area: name;
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 18px;
+  color: var(--text);
+}
+.xp-compact .xp-gain {
+  grid-area: gain;
+}
+.xp-compact .xp-level {
+  grid-area: level;
+}
+/* (Two lines at most, in its fixed row: "No XP: the game ended before move 10." is wider than the column.) */
+.xp-compact .xp-parts {
+  font-size: 12px;
+  line-height: 15px;
+  text-align: center;
+  white-space: normal;
+  text-overflow: clip;
+}
+@media (prefers-reduced-motion: reduce) {
+  .xp-pop.on {
+    animation: none;
+  }
+  .xp-popping .xp-level {
+    opacity: 1;
+  }
+}
+
+/*
+ * The daily quests overlay (a mockup, Nov 9: components/QuestsOverlay.tsx; Eric's reference, notes/briefs/design-xp-quests.md,
+ * section 5): a gold-framed card over home (dimmed behind; no blur, Eric Nov 9), the pawn in a black-and-gold crest (the Welcome
+ * Crate's colors), the title on a black banner, a row per quest, "Got it". Plain CSS over the front door's colors, light and dark;
+ * the pictures are the game's own (a boss's portrait, the board's pieces, the shop's crate and key).
+ */
+:root {
+  --qo-card: color-mix(in srgb, var(--fd-gold) 6%, var(--fd-panel));
+  --qo-row: var(--fd-panel-2);
+  --qo-ink: #16130d;
+  --qo-track: #101218;
+}
+:root[data-theme="light"] {
+  --qo-card: color-mix(in srgb, var(--fd-gold) 12%, #fff);
+  --qo-row: #fff;
+  --qo-track: var(--fd-seat);
+}
+.qo-back {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  /* (A plain dark overlay, light and dark: no blur, which costs a phone while home's pictures move.) */
+  background: rgba(0, 0, 0, 0.55);
+  /* (A flex box and the card's auto margins: centered, and when the window is shorter than the card, it scrolls from its top.) */
+  display: flex;
+  padding: 46px max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  font-family: Archivo, system-ui, sans-serif;
+  color: var(--fd-text);
+}
+.qo-card {
+  position: relative;
+  width: min(100%, 440px);
+  margin: auto;
+  background: var(--qo-card);
+  border: 3px solid var(--fd-gold);
+  border-radius: 24px;
+  box-shadow:
+    0 0 0 2px var(--qo-ink),
+    0 18px 44px rgba(0, 0, 0, 0.35);
+  padding: 40px 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  container: qo-card / inline-size;
+  animation: qo-in 180ms ease-out;
+}
+@keyframes qo-in {
+  from {
+    transform: scale(0.96);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .qo-card {
+    animation: none;
+  }
+}
+/* The crest: the HunChess app icon (public/icons/icon.svg) in a black disc ringed in gold, over the card's top edge. */
+.qo-crest {
+  position: absolute;
+  top: -34px;
+  left: 50%;
+  translate: -50% 0;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 35%, #3a3020, var(--qo-ink) 70%);
+  border: 3px solid var(--fd-gold);
+  box-shadow: 0 0 0 2px var(--qo-ink);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+.qo-crest-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.hb-pieces.qo-pieces {
+  width: 40px;
+  height: 40px;
+}
+.hb-pieces.qo-pieces piece {
+  width: 100%;
+  height: 100%;
+}
+.qo-x {
+  position: absolute;
+  top: -14px;
+  right: -14px;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 3px solid var(--fd-gold);
+  background: var(--qo-ink);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  cursor: pointer;
+  box-shadow: 0 0 0 2px var(--qo-ink);
+}
+.qo-head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 4px;
+}
+.qo-title {
+  margin: 0;
+  background: var(--qo-ink);
+  color: #fff;
+  border: 2px solid var(--fd-gold);
+  border-radius: 12px;
+  padding: 5px 22px 9px;
+  font: 400 24px/1.1 "Archivo Black", Archivo, system-ui, sans-serif;
+  letter-spacing: 0.01em;
+}
+.qo-when,
+.qo-label-when {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 700;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.qo-when {
+  position: relative;
+  margin-top: -6px;
+  background: var(--fd-gold);
+  color: var(--fd-gold-ink);
+  border-radius: 999px;
+  padding: 3px 12px;
+}
+.qo-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.qo-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 2px 4px -2px;
+  font: 800 12px Archivo, system-ui, sans-serif;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--fd-gold-text);
+}
+.qo-label-when {
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--fd-sub);
+  font-size: 12px;
+}
+.qo-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr) 86px;
+  align-items: center;
+  gap: 10px;
+  min-height: 96px;
+  padding: 10px;
+  background: var(--qo-row);
+  border: 1.5px solid var(--fd-line);
+  border-radius: 16px;
+}
+.qo-row.weekly {
+  background: var(--fd-gold-soft);
+  border-color: var(--fd-gold);
+}
+.qo-row.done {
+  border-color: var(--fd-green);
+}
+/* The quest's picture: a dark tile with a thin gold line, as the reference's. */
+.qo-pic {
+  position: relative;
+  width: 52px;
+  height: 52px;
+  border-radius: 12px;
+  background: #2a2318;
+  box-shadow: inset 0 0 0 2px rgba(242, 193, 78, 0.55);
+  display: grid;
+  place-items: center;
+}
+.qo-pic .qo-boss {
+  width: 48px;
+  height: 46px;
+  object-fit: contain;
+}
+.hb-pieces.qo-board {
+  width: 44px;
+  height: 44px;
+  border-radius: 6px;
+  overflow: hidden;
+  /* (The board's own squares.) */
+  background: repeating-conic-gradient(#f0d9b5 0 25%, #b58863 0 50%) 0 0 / 22px 22px;
+}
+.hb-pieces.qo-board piece {
+  inset: 3px;
+  width: auto;
+  height: auto;
+}
+.hb-pieces.qo-squad {
+  width: 50px;
+  height: 44px;
+}
+.hb-pieces.qo-squad piece {
+  width: 30px;
+  height: 30px;
+}
+.hb-pieces.qo-squad piece:nth-child(1) {
+  left: -1px;
+  top: 14px;
+  z-index: 3;
+}
+.hb-pieces.qo-squad piece:nth-child(2) {
+  left: 10px;
+  top: 2px;
+}
+.hb-pieces.qo-squad piece:nth-child(3) {
+  left: 21px;
+  top: 14px;
+  z-index: 3;
+}
+.qo-check {
+  position: absolute;
+  right: -6px;
+  bottom: -6px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--fd-green);
+  color: #fff;
+  border: 2px solid var(--qo-row);
+  display: grid;
+  place-items: center;
+}
+.qo-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.qo-name {
+  font: 800 16px/1.25 Archivo, system-ui, sans-serif;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.qo-goal {
+  font-size: 13px;
+  line-height: 1.25;
+  color: var(--fd-sub);
+}
+.qo-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+.qo-bar {
+  flex: 1 1 auto;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--qo-track);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.25);
+  overflow: hidden;
+}
+/* (Its share is its transform, as the XP bar's: a quest's slide moves it without a layout.) */
+.qo-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(#f8d77e, #e2a92c);
+  transform-origin: left center;
+  will-change: transform;
+}
+.qo-row.done .qo-fill {
+  background: var(--fd-green);
+}
+/* (Wide enough for "Done!": a count turning into it never narrows the bar.) */
+.qo-count {
+  flex: none;
+  min-width: 46px;
+  text-align: right;
+  font: 800 14px Archivo, system-ui, sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+.qo-row.done .qo-count {
+  color: var(--fd-green);
+}
+/* Reroll (a daily's): a small round button on the row's top left corner, always there; greyed when it can't be used. */
+.qo-reroll {
+  position: absolute;
+  top: -8px;
+  left: -8px;
+  z-index: 2;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid var(--fd-gold);
+  background: var(--qo-ink);
+  color: var(--fd-gold);
+  display: grid;
+  place-items: center;
+  padding: 0;
+  cursor: pointer;
+}
+/* (Its tap area is 44 px, more than it shows.) */
+.qo-reroll::after {
+  content: "";
+  position: absolute;
+  inset: -8px;
+}
+.qo-reroll:disabled {
+  cursor: default;
+  border-color: var(--fd-dim);
+  color: var(--fd-dim);
+  background: var(--fd-seat);
+}
+.qo-reward {
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  border-left: 1.5px solid var(--fd-line);
+  padding-left: 8px;
+}
+.qo-row.weekly .qo-reward {
+  border-color: color-mix(in srgb, var(--fd-gold) 45%, transparent);
+}
+.qo-reward-tag {
+  font: 800 10px Archivo, system-ui, sans-serif;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fd-gold-ink);
+  background: var(--fd-gold);
+  border-radius: 6px;
+  padding: 1px 7px;
+}
+.qo-xp {
+  font: 900 15px Archivo, system-ui, sans-serif;
+  color: var(--fd-gold-text);
+  white-space: nowrap;
+}
+.qo-things {
+  display: flex;
+  gap: 6px;
+}
+.qo-thing {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font: 700 10px Archivo, system-ui, sans-serif;
+  color: var(--fd-sub);
+}
+.qo-thing .item-art {
+  width: 36px;
+  height: 36px;
+  margin: -2px 0 -3px;
+}
+.qo-ok {
+  margin-top: 4px;
+  min-height: 52px;
+  font-size: 17px;
+  border: 2px solid var(--qo-ink);
+}
+/*
+ * Quest progress shown (Nov 10; QuestsOverlay's `from`): a moved row slides its fill (its transform); one that
+ * finishes pops (transform), its bar glows (a shadow), the check and "Done!" pop in, and its reward bursts: a gold ring and sparks
+ * (the present's burst and the splinters' box-shadow dots, in gold) while its XP and things pop. Transforms, opacity and shadows only:
+ * nothing around it moves. The back clips sideways so a spark past the card never scrolls the page.
+ */
+.qo-back {
+  overflow-x: hidden;
+}
+.qo-reward {
+  position: relative;
+}
+.qo-finish {
+  animation: qo-row-pop 420ms ease-out;
+}
+.qo-finish .qo-bar {
+  animation: qo-bar-glow 1100ms ease-out;
+}
+.qo-finish .qo-check,
+.qo-finish .qo-count {
+  animation: qo-pop-in 420ms cubic-bezier(0.3, 1.6, 0.5, 1) both;
+}
+.qo-finish .qo-xp,
+.qo-finish .qo-things {
+  animation: qo-reward-pop 600ms ease-out 80ms both;
+}
+.qo-finish .qo-reward::before,
+.qo-finish .qo-reward::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  pointer-events: none;
+}
+.qo-finish .qo-reward::before {
+  width: 64px;
+  height: 64px;
+  margin: -32px 0 0 -32px;
+  border-radius: 50%;
+  border: 3px solid var(--fd-gold);
+  animation: qo-ring 700ms ease-out both;
+}
+.qo-finish .qo-reward::after {
+  width: 4px;
+  height: 4px;
+  margin: -2px 0 0 -2px;
+  border-radius: 50%;
+  background: #fde68a;
+  box-shadow:
+    14px -10px 0 #f8d77e,
+    -15px -8px 0 #e2a92c,
+    11px 13px 0 #fde68a,
+    -12px 12px 0 #f8d77e,
+    0 -16px 0 #e2a92c,
+    17px 3px 0 #fde68a,
+    -18px 2px 0 #e2a92c,
+    3px 17px 0 #f8d77e;
+  animation: qo-sparks 650ms ease-out 60ms both;
+}
+@keyframes qo-row-pop {
+  40% {
+    transform: scale(1.035);
+  }
+}
+@keyframes qo-bar-glow {
+  20% {
+    box-shadow:
+      inset 0 1px 2px rgba(0, 0, 0, 0.25),
+      0 0 10px 3px color-mix(in srgb, var(--fd-gold) 85%, #fff);
+  }
+}
+@keyframes qo-pop-in {
+  from {
+    transform: scale(0.2);
+    opacity: 0;
+  }
+}
+@keyframes qo-reward-pop {
+  35% {
+    transform: scale(1.22);
+  }
+}
+@keyframes qo-ring {
+  from {
+    transform: scale(0.3);
+    opacity: 1;
+  }
+  to {
+    transform: scale(1.5);
+    opacity: 0;
+  }
+}
+@keyframes qo-sparks {
+  from {
+    transform: scale(0.4);
+    opacity: 1;
+  }
+  to {
+    transform: scale(2.1);
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .qo-finish,
+  .qo-finish .qo-bar,
+  .qo-finish .qo-check,
+  .qo-finish .qo-count,
+  .qo-finish .qo-xp,
+  .qo-finish .qo-things {
+    animation: none;
+  }
+  .qo-finish .qo-reward::before,
+  .qo-finish .qo-reward::after {
+    content: none;
+  }
+}
+/* A narrow phone (320 px): smaller pictures and rewards, so the quest's words keep their room. */
+@container qo-card (max-width: 320px) {
+  .qo-row {
+    grid-template-columns: 44px minmax(0, 1fr) 72px;
+    gap: 8px;
+    padding: 8px;
+  }
+  .qo-pic {
+    width: 44px;
+    height: 44px;
+  }
+  .qo-pic .qo-boss {
+    width: 40px;
+    height: 40px;
+  }
+  .hb-pieces.qo-board {
+    width: 38px;
+    height: 38px;
+    background-size: 19px 19px;
+  }
+  .hb-pieces.qo-squad {
+    transform: scale(0.85);
+  }
+  .qo-name {
+    font-size: 15px;
+  }
+  .qo-goal {
+    font-size: 12px;
+  }
+  .qo-xp {
+    font-size: 13px;
+  }
+  .qo-thing .item-art {
+    width: 30px;
+    height: 30px;
+  }
+  .qo-title {
+    font-size: 21px;
+    padding: 5px 16px 8px;
+  }
+}
+/* ---------------- The friends page (Nov 11; screens/Friends.tsx) ----------------
+ * A page with Back (it replaced the Nov 9 pop-up): the search box, Private lobby, then the lists. The search's results open in a
+ * box of their own over the page, always the same size, so nothing on the page moves as they come (Eric's rule: nothing shifts). */
+.fp-page {
+  width: 100%;
+  max-width: 560px;
+  margin-inline: auto;
+}
+.fp-search {
+  position: relative;
+  z-index: 5;
+}
+.fp-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 52px;
+  padding: 0 6px 0 14px;
+  border-radius: 14px;
+  background: var(--fd-panel);
+  border: 2px solid var(--fd-line);
+  color: var(--fd-muted);
+}
+.fp-box:focus-within {
+  border-color: var(--fd-gold);
+}
+.fp-box.off {
+  opacity: 0.55;
+}
+.fp-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 100%;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--fd-text);
+  /* (16 px: a phone's browser doesn't zoom into it.) */
+  font: 600 16px Archivo, system-ui, sans-serif;
+}
+.fp-input::-webkit-search-cancel-button {
+  display: none;
+}
+.fp-input::placeholder {
+  color: var(--fd-muted);
+}
+.fp-clear {
+  flex: none;
+  width: 40px;
+  height: 40px;
+}
+.fp-clear:disabled {
+  opacity: 0.35;
+}
+/* The results: FRIENDS.searchMax (6) rows of 56 px and their gaps, or less where the window is short (its rows scroll inside). */
+.fp-results {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  height: min(386px, calc(var(--app-h, 100dvh) - 150px));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px;
+  border-radius: 16px;
+  background: var(--fd-panel-2);
+  border: 1px solid var(--fd-line);
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.3);
+}
+.fp-results-note {
+  margin: 10px 8px;
+}
+.fp-player {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 56px;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--fd-panel);
+  color: var(--fd-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.fp-player:hover,
+.fp-player:focus-visible {
+  outline: 2px solid var(--fd-gold);
+  outline-offset: -2px;
+}
+.fp-player.stale,
+.fp-results-note.stale {
+  opacity: 0.5;
+}
+.fp-icon {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--fd-panel-2);
+  font-size: 26px;
+  line-height: 1;
+}
+.fp-icon .user-icon.pixel {
+  width: 40px;
+  height: 40px;
+}
+.fp-name {
+  font-weight: 800;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.fp-chev {
+  flex: none;
+  font-size: 22px;
+  color: var(--fd-muted);
+}
+/* Greyed rows while something loads. */
+.fp-skel {
+  pointer-events: none;
+}
+.fp-skel-icon {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: var(--fd-line);
+}
+.fp-skel-bar {
+  flex: 0 1 140px;
+  height: 14px;
+  border-radius: 7px;
+  background: var(--fd-line);
+}
+.fp-private {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 56px;
+  padding: 6px 16px;
+  border-radius: 14px;
+  border: 2px solid var(--fd-gold);
+  background: var(--fd-panel);
+  color: var(--fd-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.fp-private .fp-name {
+  font-size: 15px;
+}
+.fp-private .fp-chev {
+  color: var(--fd-gold-text);
+}
+.fp-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0;
+}
+/* (Offline: greyed. The dot already says so; the words fade with it.) */
+.fp-offline .fr-row-text {
+  opacity: 0.55;
+}
+.fp-foot {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+}
+.fp-foot .fd-row-link:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+/* ---------------- (end of the friends page) ---------------- */
+/* (The key is drawn across the middle of its square: a little bigger, so it reads beside the crate.) */
+.qo-thing .key-art svg {
+  transform: scale(1.3);
+}
+
+/* ===== Home modes (Nov 9, Eric; docs/decisions/2026-11-09-home-modes-*.md) =====
+ * A. The line above PLAY is always exactly one line (ellipsized if ever too long; every line is written to fit 320 px). On a phone it
+ *    had two lines' room (2.6em of 13 px): the freed 16.9 px lifts PLAY and Chess Town, and the Other modes cards grow by the same, so
+ *    their bottom edge stays where it was. A computer's line was one line already: its layout is unchanged.
+ * B. The options under RANKED: three equal buttons, a title and a short sub line each, in the panel's one box.
+ * C. The Bot level box (components/BotLevelBox.tsx): the Quests overlay's dim and card, with its own rows.
+ */
+.fd-go > .fd-hint > span {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+@media (max-width: 1023px) {
+  .fd-go > .fd-hint {
+    height: 1.3em;
+  }
+  /* (56 px + the line's freed 16.9 px.) The content stays centered in the taller box, the pictures a touch bigger. */
+  .fd-root .rd-pair .rd-card.rd-half {
+    min-height: 72.9px;
+  }
+  .fd-root .rd-pair .rd-card.rd-half .rd-face {
+    width: 40px;
+    height: 40px;
+  }
+  .fd-root .rd-pair .rd-card.rd-half .rd-face svg {
+    width: 32px;
+    height: 32px;
+  }
+}
+@media (max-width: 359px) {
+  .fd-root .rd-pair .rd-card.rd-half .rd-face {
+    width: 34px;
+    height: 34px;
+  }
+  .fd-root .rd-pair .rd-card.rd-half .rd-face svg {
+    width: 28px;
+    height: 28px;
+  }
+}
+.fd-modes.fd-types.fd-three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.fd-modes.fd-types.fd-three button {
+  min-width: 0;
+  padding: 0 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.2;
+}
+/* The Bot level box: compact (Eric, Nov 9: "about half the size … more condensed"): the Quests shell's look, smaller; each
+   number close to its level. */
+.qo-card.bl-card {
+  width: min(100%, 264px);
+  padding: 26px 10px 10px;
+  gap: 6px;
+  border-radius: 18px;
+}
+.bl-card:focus {
+  outline: none;
+}
+.bl-card .qo-x {
+  top: -12px;
+  right: -12px;
+  width: 36px;
+  height: 36px;
+}
+.qo-title.bl-title {
+  font-size: 17px;
+  padding: 3px 14px 6px;
+}
+.bl-card .qo-when {
+  font-size: 11px;
+  padding: 2px 10px;
+}
+.bl-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.bl-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--qo-row);
+  box-shadow: inset 0 0 0 2px transparent;
+  color: var(--fd-text);
+  font: 600 14px Archivo, system-ui, sans-serif;
+  text-align: left;
+  cursor: pointer;
+}
+.bl-row span {
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--fd-gold-text);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.bl-row.on {
+  box-shadow: inset 0 0 0 3px var(--fd-gold);
+  color: var(--fd-gold-text);
+  font-weight: 800;
+}
+.qo-ok.bl-ok {
+  margin-top: 2px;
+  min-height: 40px;
+  font-size: 15px;
+}
+.bl-ok:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+/* ===== end Home modes ===== */
+/* Don Dough (components/Zebra.tsx). His banner: gold on a crust brown. */
+.fight-banner.power-cut.zebra .fb-band {
+  background: repeating-linear-gradient(180deg, #7a3f12 0 3.2cqw, #ab5f1d 3.2cqw 3.6cqw);
+  border-color: #f6cf55;
+}
+/* His dough under the pieces (your piece stands on a squashed pancake): a canvas of its own under the pieces (z-index 1, the
+   pieces 2), as the Roman candle's shadows. */
+.board-wrap > .zb-under {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: var(--board-size, 100%);
+  height: var(--board-size, 100%);
+  z-index: 1;
+  pointer-events: none;
+}
+/* His oven timers, in the boss bar's prop slot (right of his bars, under the status): a slot for each lump the rules allow at once,
+   side by side, each a kitchen timer at 2x (76 x 44: a computer's bar is one short row, so not the art's 3x there); an empty slot a
+   faint outline of the same size. Absolute, never taking a tap: nothing in the bar moves for them. */
+.dd-timers {
+  /* (Two timers in the boss's room, a 4 px gap: no wider than the room, Nov 12: his name column moved right as his figure grew.) */
+  --dd-w: min(76px, (100cqw - 4px) / 2);
+  --dd-h: calc(var(--dd-w) * 44 / 76);
+  position: absolute;
+  right: 0;
+  top: 0;
+  display: flex;
+  gap: 4px;
+  pointer-events: none;
+}
+.dd-slot {
+  position: relative;
+  display: block;
+  width: var(--dd-w);
+  height: var(--dd-h);
+}
+.dd-slot.empty {
+  box-sizing: border-box;
+  border: 1px dashed rgba(255, 255, 255, 0.18);
+  border-radius: 6px;
+}
+.dd-timer {
+  display: block;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+}
+/* A 320 px phone: the timers a little smaller (1.5x). */
+@media (max-width: 340px) {
+  .dd-timers {
+    --dd-w: min(57px, (100cqw - 4px) / 2);
+  }
+}
+/* A computer's boss bar is one short row (his figure stands by the board): the timers centered on the bar's height, in the free
+   room's left part, between his bars and "Move 2". */
+@media (min-width: 900px) and (min-height: 600px) {
+  .boss-bar .boss-prop:has(> .dd-timers) {
+    grid-column: 2;
+    grid-row: 1 / 3;
+  }
+  .boss-bar .dd-timers {
+    --dd-w: 76px;
+    top: 50%;
+    right: auto;
+    left: 4px;
+    transform: translateY(-50%);
+  }
+}

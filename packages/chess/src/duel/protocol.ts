@@ -1,6 +1,6 @@
-import type { DuelZone, ItemLook, RankChange, RankView } from "@chessroyale/core";
+import type { DuelZone, ItemLook, RankChange, RankView, XpGrant } from "@chessroyale/core";
 import type { ChatBlock, ChatRefusal, NetChatLine } from "../protocol.ts";
-import type { Color, DuelEnd } from "./rules.ts";
+import type { Color, DuelConduct, DuelEnd } from "./rules.ts";
 
 /**
  * Ranked 1 v 1's messages between the app and a game's object (docs/areas/ranked.md, "The protocol"). Every message
@@ -50,6 +50,11 @@ export interface DuelView {
   canOffer: Record<Color, boolean>;
   connected: Record<Color, boolean>;
   end: DuelEnd | null;
+  /**
+   * Who left early (ranked's leave rules, L1: the room's conductOf), decided as it ended: the result card's words follow it (the
+   * one charged reads their own line, the other "No rank change."). Missing: not ended, or an older server.
+   */
+  left?: DuelConduct;
 }
 
 /** What a finished game did for you: your rank's change and your coins (none for an aborted game). */
@@ -57,8 +62,15 @@ export interface DuelOutcome {
   /** Null when your rank didn't change (an aborted game, or fair play holding your rank). */
   change: RankChange | null;
   coins: number;
+  /**
+   * Ranked's leave rules (L1, Nov 9): this game was a dodge (you left before it started) or a leave (you abandoned it, or resigned
+   * before your 3rd move), and the rank points it cost on top (0 in placements, or with fair play holding your rank). Missing: neither.
+   */
+  conduct?: { kind: "dodge" | "leave"; rp: number };
   /** An unranked game: a test's clock on a server without test switches (nothing recorded). */
   unranked?: boolean;
+  /** The game's XP (Nov 9; server/xp.ts), for the result screen's XP box. Missing: an older server, or none decided (no database). */
+  xp?: XpGrant;
 }
 
 /** The server's answer to an app on another protocol: it reloads (once) to get the new app. */
@@ -74,8 +86,8 @@ export type DuelClientMessage =
   /** Offer a draw, or accept the other side's offer. */
   | { t: "draw" }
   | { t: "drawNo" }
-  | { t: "chat"; say: string }
-  | { t: "chatPrefs"; off?: boolean; muted?: string[] }
+  | { t: "chat"; say: string; text?: string }
+  | { t: "chatPrefs"; off?: boolean; muted?: string[]; typed?: boolean }
   | { t: "sync" };
 
 export type DuelServerMessage = (
@@ -91,7 +103,7 @@ export type DuelServerMessage = (
   | { t: "chat"; line: NetChatLine }
   | { t: "chatLog"; lines: NetChatLine[]; packs: string[] }
   /** `block`: your chat ban (reason "mod", chat moderation). */
-  | { t: "chatNo"; say: string; reason: ChatRefusal; retryAt: number; block?: ChatBlock }
+  | { t: "chatNo"; say: string; reason: ChatRefusal; retryAt: number; block?: ChatBlock; message?: string }
   /** `reload`: the app is out of date (DUEL_PROTOCOL): it reloads. */
   | { t: "error"; message: string; reload?: boolean }
   | { t: "closed"; reason: string }

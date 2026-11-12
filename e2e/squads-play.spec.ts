@@ -145,6 +145,8 @@ test("Pairs (a test lobby): your partner's pick shows live, both squads' tokens 
   await page.getByRole("button", { name: "Next round" }).click();
   await expect.poll(async () => Object.values(await next.seen()).some(Boolean), { timeout: 20_000 }).toBe(true);
   await fits(page);
+  // XP (Nov 9): knocked out, the card's XP box; a test lobby records nothing, so it says so.
+  if ((await next.seen()).out) await expect(page.locator(".sq-out").getByTestId("xp-box").locator(".xp-why")).toHaveText("No XP: test game.");
 });
 
 test("the final (a test lobby): the whole squad votes, teammates' picks named on the board, copy one, lock in, the most picked plays", { tag: "@phone-only" }, async ({ page }) => {
@@ -309,12 +311,14 @@ test("the party sheet: Escape closes it from its first frame, and leaves a party
   await page.goto(`/?nolanding&debug&pool=sqesc-${run}`);
   await page.getByRole("radio", { name: /Squads/ }).click();
   const sheet = page.getByRole("dialog", { name: "Squads party" });
-  // Escape the moment the sheet is in the page (before it's painted): it closes.
+  // Escape the moment the sheet is in the page (before it's painted): it closes. (The sheet itself: the page always holds another
+  // dialog, index.html's hidden "Turn your phone upright", so any change to the page before the sheet set the Escape off too early:
+  // CI, Nov 11. docs/decisions/2026-11-11-flaky-batch.md)
   await page.evaluate(() => {
     const w = window as any;
     w.__sheetSeen = false;
     const obs = new MutationObserver(() => {
-      if (!document.querySelector('[role="dialog"]')) return;
+      if (!document.querySelector(".sq-party")) return;
       obs.disconnect();
       w.__sheetSeen = true;
       document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));

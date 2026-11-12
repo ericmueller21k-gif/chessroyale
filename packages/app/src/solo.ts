@@ -1,6 +1,6 @@
 import { RECLUSE_PHASE2, BOSS_ALONE_SCORING, bossClockSettings, BOSS_BRAIN, BOSS_POWERS, DEFAULT_SETTINGS, MATCHMAKING, type ItemLook, type MatchmakingType, botVotes, castPregameVote, clockAfterVote, closePregameVote, cutSeconds, pregameVotes, voteResultMs, type Augment, type BossBrain, type PlayerState, type Settings } from "@chessroyale/core";
 import { GUARD_WORDS, MatchRunner, START_FEN, baseAt, ShowdownScout, brainLine as brainWords, boardSlots, type HumanUciEngine, netBoard, type LobbyPlayer, type LivePick, toSan, type BoardSlot, type BoardState, type NetFinal, type Opening, type RoundReport, type UciEngine } from "@chessroyale/chess";
-import { bulletClock, crowdRace, phase2Numbers, phase2ToMove, botRoster, bossIntroTimeline, bossThinkMs, landedEarlyMs, fullMoonMs, folioTurnMs, popOffMs, bossTurnShowMs, judgeTaps, bossRules, kingHelpBlocked, kingMoveMs, kingStrikeMs, lightsDeadline, lightsOutTimeline, lightsRoundEnd, lastStandMs, powerMomentMs, rushKeep, rushMovesLeft, rushSquares, rushTimeline } from "@chessroyale/chess";
+import { bulletClock, crowdRace, phase2Numbers, phase2ToMove, botRoster, bossIntroTimeline, bossThinkMs, landedEarlyMs, fullMoonMs, folioTurnMs, popOffMs, zebraTurnMs, bossTurnShowMs, judgeTaps, bossRules, kingHelpBlocked, kingMoveMs, kingStrikeMs, lightsDeadline, lightsOutTimeline, lightsRoundEnd, lastStandMs, powerMomentMs, rushKeep, rushMovesLeft, rushSquares, rushTimeline } from "@chessroyale/chess";
 import type { BossView, BoardView, DarkNote, ExitKind, FinalView, GameView, Hint, LightsView, MoveRecord, RushView, Phase, SimulView, Standing, VoteView } from "./game.ts";
 import { PHASE2_ULT_ANIMS, PHASE_CHANGE, Phase2Game, phase2Follows, phase2Mates, phaseChangeRun } from "./recluse-phase2.ts";
 import { RECLUSE_LINES } from "./characters/recluse-lines.ts";
@@ -64,6 +64,8 @@ export class SoloMatch implements GameView {
   phase: Phase = { kind: "loading" };
   /** Solo games never count for your ranking (all bots, and no server sees them). */
   readonly ranked = false;
+  /** A solo match (App.tsx tells it apart by this, without loading this chunk). */
+  readonly isSolo = true;
   /** The queue screen (Solo): who has a seat so far, and when they're all in. */
   readonly queueType: MatchmakingType = "solo";
   auto = false;
@@ -775,7 +777,8 @@ export class SoloMatch implements GameView {
     const r = this.rush;
     if (!r || this.stopped) return;
     if (this.runner.rushDue()) {
-      this.runner.finishRush(this.you.alive ? { [HUMAN]: r.places } : {});
+      // (Solo: only your own put-back counts, no bots and no mean; Eric, Nov 8. Out of the battle: the bots' as online.)
+      this.runner.finishRush(this.you.alive ? { [HUMAN]: r.places } : {}, this.you.alive ? HUMAN : undefined);
       this.showRush();
       this.timer = setTimeout(() => this.rushStep(), Math.max(0, r.at + rushTimeline().total - Date.now()));
       return;
@@ -905,7 +908,7 @@ export class SoloMatch implements GameView {
     // (G-REX's fire has just burnt something, or Alfil's pieces came down early, or Moo's Full Moon came, or Folio folded a
     // piece or wrote its Revision: it plays out before the boss's move.)
     const burnt = !!snap.powers?.burnt?.some((b) => b.turn === snap.crowdMoves && (b.piece || b.fizzled));
-    const landed = landedEarlyMs(snap) + fullMoonMs(snap) + folioTurnMs(snap) + popOffMs(snap);
+    const landed = landedEarlyMs(snap) + fullMoonMs(snap) + folioTurnMs(snap) + popOffMs(snap) + zebraTurnMs(snap);
     const minThink = bossThinkMs(snap, burnt, landed) - (this.alone && !burnt && !landed ? Date.now() - this.movedAt : 0);
     await Promise.all([this.runner.playBoss(this.engines[0]), new Promise((r) => setTimeout(r, Math.max(0, minThink)))]);
     if (this.stopped) return;

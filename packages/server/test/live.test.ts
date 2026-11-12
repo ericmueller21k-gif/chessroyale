@@ -5,6 +5,7 @@ import { createGuest, ensureSchema, lobbyResult, profile, publicProfile, recordR
 import { handleAccountApi } from "../src/api.ts";
 import { equipLocker, openCrate } from "../src/locker.ts";
 import { liveCounts, recordWait, reportLobby, typicalWait, type LobbySummary } from "../src/live.ts";
+import { stockCrates } from "./memory-db.ts";
 
 const { DatabaseSync } = createRequire(import.meta.url)("node:sqlite") as typeof import("node:sqlite");
 
@@ -30,7 +31,15 @@ function memoryDb() {
     first: async () => db.prepare(q).get(...(params as never[])) ?? null,
     all: async () => ({ results: db.prepare(q).all(...(params as never[])) }),
   });
-  const d1 = { prepare: (q: string) => stmt(q) } as unknown as D1Database;
+  const d1 = {
+    prepare: (q: string) => stmt(q),
+    // (In order. The schema run sends its statements in batches.)
+    batch: async (stmts: { run(): Promise<unknown> }[]) => {
+      const out = [];
+      for (const s of stmts) out.push(await s.run());
+      return out;
+    },
+  } as unknown as D1Database;
   return { db, sql, d1 };
 }
 
@@ -164,6 +173,7 @@ describe("profiles", () => {
     await ensureSchema(sql);
     const { user } = await createGuest(sql, 1000, "Eric");
     const signed = await signInWithIdentity(sql, user, "email", "eric@example.com", {}, 2000);
+    await stockCrates(sql, signed.id, "winter-1", 1);
     const r = await openCrate(sql, signed.id, "winter-1", {}, 3000);
     if (!r.ok) throw new Error(r.message);
     await equipLocker(sql, signed.id, itemDef(r.item.def)!.slot, r.item.id);

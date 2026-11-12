@@ -8,9 +8,9 @@
  */
 import type { Character } from "./sprite.ts";
 import { BLIZZARD_SWEEP, FROST_HIT, ICE_BOLT, ICE_OVERLAY } from "./effects/ginger.ts";
-import { PIE_FLY, PIE_HIT, PIE_SPLAT } from "./effects/boingo.ts";
+import { PIE_FACE, PIE_FLY, PIE_HIT, PIE_SPLAT } from "./effects/boingo.ts";
 import { CANDLE_SHOT, CANDLE_SHOTS, FIREBALL_FALL, FIRE_SHADOW, FIRE_TILE, PIECE_BURN, POP_HIT, SPARK_FLY } from "./effects/grex.ts";
-import { BULB_STRAND, LIFE_STRAND, DARK_MISS, DARK_POUR, DARK_SQUARE, LASH_HIT, NIGHT_LABEL, NIGHT_SQUARE } from "./effects/hollow.ts";
+import { BULB_STRAND, BULB_STRAND_WIDE, LIFE_STRAND, DARK_MISS, DARK_POUR, DARK_SQUARE, LASH_HIT, NIGHT_LABEL, NIGHT_SQUARE } from "./effects/hollow.ts";
 import { BLOCK_FLY, BONK_HIT, BOUNCE_CRASH, BOUNCE_PUFF, TOY_BLOCK } from "./effects/bigboy.ts";
 import { BOARD_GAP, SAW_CRACK, SAW_CUT, SAW_HIT } from "./effects/sawyer.ts";
 import { LASSO_HIT } from "./effects/pig.ts";
@@ -22,11 +22,15 @@ import { GARDEN_PLANT, SEED_FLY, SEED_PLOP, WATER_HIT, WATER_SWEEP } from "./eff
 import { BALLOON_FLY, BALLOON_HIT, BALLOON_LAND, HOOP_FLY, HOOP_RING } from "./effects/tiger.ts";
 import { CREASE_EDGE, CREASE_PENCIL, FOLD_PAPER, INK_HIT, INK_LINE, INK_MARK, INK_STRIKE } from "./effects/folio.ts";
 import { CHIP_HIT } from "./effects/timber.ts";
+import { FLOUR_HIT } from "./effects/zebra.ts";
+import { CLAW_HIT } from "./effects/dash.ts";
+import { ZEBRA_DOUGH } from "./zebra-dough.ts";
+import { GOLD_FX } from "./zebra-gold.ts";
 
 // Each boss's effects are drawn in its own file (effects/<boss>.ts); what they share is in effects/common.ts.
 export { BOARD_CELL, SQUARE } from "./effects/common.ts";
 export { SHADOW_R } from "./effects/grex.ts";
-export { NIGHT_TILES, STRAND_H, STRAND_W } from "./effects/hollow.ts";
+export { NIGHT_TILES, STRIP_H, STRIP_W } from "./effects/hollow.ts";
 export { TOY_LETTER_NAMES, type ToyLetter } from "./effects/bigboy.ts";
 export { CUT_SIDES, GAP_W, type CutSide } from "./effects/sawyer.ts";
 
@@ -48,6 +52,7 @@ export const EFFECT_SPRITES = {
   darkPour: DARK_POUR,
   darkMiss: DARK_MISS,
   bulbStrand: BULB_STRAND,
+  bulbStrandWide: BULB_STRAND_WIDE,
   lifeStrand: LIFE_STRAND,
   nightSquare: NIGHT_SQUARE,
   nightLabel: NIGHT_LABEL,
@@ -62,8 +67,13 @@ export const EFFECT_SPRITES = {
   ankusHit: ANKUS_HIT,
   sawHit: SAW_HIT,
   chipHit: CHIP_HIT,
+  flourHit: FLOUR_HIT,
+  clawHit: CLAW_HIT,
+  zebraDough: ZEBRA_DOUGH,
+  goldFx: GOLD_FX,
   lassoHit: LASSO_HIT,
   pieHit: PIE_HIT,
+  pieFace: PIE_FACE,
   bonkHit: BONK_HIT,
   frostHit: FROST_HIT,
   popHit: POP_HIT,

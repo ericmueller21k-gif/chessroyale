@@ -7,14 +7,12 @@
  * results keep the full drawing, with the spray.
  */
 import { GARDENER } from "./gardener.ts";
-import type { Anim, Character } from "./sprite.ts";
+import { mapFrames, type Character } from "./sprite.ts";
 
 /** A layer of the spray (gardener.ts names it `spray:<tip>:<tilt>:<length>:<droop>:<seed>`). */
 export const isSpray = (part: string): boolean => part.startsWith("spray:");
 
-const noSpray = (a: Anim): Anim => ({ ...a, frames: a.frames.map((f) => ({ ...f, layers: f.layers.filter((l) => !isSpray(l.part)) })) });
-
 export const GARDENER_BAR: Character = {
   ...GARDENER,
-  anims: Object.fromEntries(Object.entries(GARDENER.anims).map(([name, a]) => [name, noSpray(a)])),
+  anims: mapFrames(GARDENER.anims, (f) => ({ ...f, layers: f.layers.filter((l) => !isSpray(l.part)) })),
 };

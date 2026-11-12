@@ -408,6 +408,12 @@ a.town-btn.town-look {
   margin-bottom: 8px;
   font-style: italic;
 }
+/* A stand-in's line (Rolling Dough's guard out front, Nov 11): the card's full width and two lines' room kept from the start, so his
+   Talk never resizes the card (his longest line takes two). */
+.town-card-line.town-stand-in {
+  width: 206px;
+  min-height: calc(2em * 1.35);
+}
 /* The card's buttons on the dark card (the chat's menu keeps `.town-btn` as it was: it's a light box): a plain one is a dark gray
    with a gray border and white words, the primary one gold with dark words, a greyed one dimmer and flat (words 4.5:1 on it). */
 .town-card .town-btn {
@@ -645,7 +651,9 @@ button.town-pic.player {
 .shop-prize-kind {
   font: 700 11px/1.3 Archivo, sans-serif;
 }
-.shop-price {
+/* The price line: plain words, the card's own white (Nov 12: its own class; it shared `.shop-price` with the Shop screen's cream price
+   button, which won, and Eric saw "the wrong shape, the wrong color, white text"). */
+.shop-room-price {
   margin: 4px 0 2px;
   font: 700 13px/1.35 Archivo, sans-serif;
   color: #fff;
@@ -663,7 +671,63 @@ button.town-pic.player {
   gap: 8px;
   height: 40px;
   margin-top: 6px;
-  line-height: 1.3;
+  font: 600 13px/1.3 Archivo, sans-serif;
+  color: #fff;
+}
+/*
+ * After a buy (Eric, Nov 12): "You got Boingo's Boss Crate!" over the room and its card (dimmed under it, as it was: nothing moves),
+ * the crate's picture, Open now and Later. Open now: the Crates tab's own opening (CrateOpening), in a box over the room, the app's
+ * light or dark surface. Phone first: the pop-up 260 px, its buttons the card's 40 px ones.
+ */
+.shop-bought-veil {
+  position: absolute;
+  inset: 0;
+  z-index: 9;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(10, 14, 22, 0.55);
+  pointer-events: auto;
+  touch-action: none;
+}
+.town-card.shop-bought {
+  position: relative;
+  width: 260px;
+  max-width: 100%;
+  padding: 14px 16px 16px;
+}
+.town-card.shop-bought::after {
+  display: none;
+}
+.shop-bought .shop-crate-pic {
+  display: block;
+  margin: 0 auto;
+}
+.shop-bought-line {
+  margin: 6px 0 4px;
+  text-align: center;
+  font: 500 12px/1.35 Archivo, sans-serif;
+  color: #d6d8df;
+}
+.shop-bought .town-btn {
+  min-height: 44px;
+  margin-top: 8px;
+}
+.shop-opening-veil {
+  padding: 12px;
+  overflow: auto;
+  touch-action: pan-y;
+}
+.shop-opening {
+  box-sizing: border-box;
+  width: min(100%, 420px);
+  max-height: 100%;
+  overflow: auto;
+  padding: 12px;
+  border-radius: 18px;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.38);
 }
 .shop-pool {
   font: 600 11px/1.3 Archivo, sans-serif;
@@ -800,4 +864,195 @@ button.town-pic.player {
   transform: translate(-50%, -50%);
   pointer-events: none;
   filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3));
+}
+/* `/town?report` (frame-report.ts, Nov 11): the pill while a run waits or records, then one panel the size of the world's box, made
+   to be screenshotted on a phone. */
+.tfr-pill {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 4px 3px 10px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.7);
+  color: #fff;
+  font: 600 12px/1.4 ui-monospace, monospace;
+  white-space: nowrap;
+}
+.tfr-pill[data-state="rec"] span {
+  color: #ffb4a8;
+}
+.tfr-pill button,
+.tfr-panel button {
+  font: 600 12px/1 system-ui, sans-serif;
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 0;
+  background: #d9bb8c;
+  color: #20212a;
+  cursor: pointer;
+}
+.tfr-pill button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.tfr-panel {
+  position: absolute;
+  inset: 6px 6px auto;
+  max-height: calc(100% - 12px);
+  max-width: 560px;
+  margin-inline: auto;
+  z-index: 40;
+  overflow: hidden;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1.5px solid #d9bb8c;
+  background: #20212a;
+  color: #f2f2f2;
+  font: 400 10.5px/1.25 system-ui, sans-serif;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.tfr-panel b {
+  color: #fff;
+}
+.tfr-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 14px;
+}
+.tfr-btns {
+  display: flex;
+  gap: 6px;
+}
+.tfr-dev,
+.tfr-most {
+  color: #c9c9d2;
+}
+.tfr-fps {
+  font-size: 11px;
+}
+.tfr-fps b {
+  font-size: 15px;
+  color: #ffd98a;
+}
+.tfr-parts {
+  border-collapse: collapse;
+  font: 400 10px/1.15 ui-monospace, monospace;
+  width: 100%;
+}
+.tfr-parts th,
+.tfr-parts td {
+  padding: 0 2px;
+  text-align: right;
+  white-space: nowrap;
+}
+.tfr-parts th:first-child,
+.tfr-parts td:first-child {
+  text-align: left;
+}
+.tfr-parts thead th {
+  color: #d9bb8c;
+}
+.tfr-sub td {
+  color: #9a9aa6;
+  font-size: 9.5px;
+}
+.tfr-hot td {
+  color: #ffd98a;
+  font-weight: 700;
+}
+.tfr-total td {
+  border-top: 1px solid #555;
+  font-weight: 700;
+}
+.tfr-worst ol {
+  margin: 1px 0 0;
+  padding-left: 18px;
+  font-size: 10px;
+  line-height: 1.2;
+}
+/* (A 360 px phone: the table's six columns a size smaller, so the Worst column fits: Nov 11.) */
+@media (max-width: 380px) {
+  .tfr-parts {
+    font-size: 8.5px;
+  }
+}
+/* A computer's box is wide: the panel at a readable size in its middle. */
+@media (hover: hover) and (pointer: fine) {
+  .tfr-panel {
+    max-width: 660px;
+    font-size: 12.5px;
+  }
+  .tfr-head {
+    font-size: 17px;
+  }
+  .tfr-fps {
+    font-size: 13px;
+  }
+  .tfr-fps b {
+    font-size: 18px;
+  }
+  .tfr-parts,
+  .tfr-worst ol {
+    font-size: 12px;
+  }
+}
+
+/* The street town's loading screen (Nov 11; Town.tsx `loadTown`): the boss's loading card (.boss-loading, styles.css), over the whole
+   world and opaque, so the views the load draws behind it never show. */
+.town-loading {
+  z-index: 30;
+  background: #1b1830;
+}
+
+/* ---- The area banner (Eric's mockup, Nov 11; AreaBanner.tsx): a room's name as you walk in through its door. Over the room, under
+   the cards and chat; taps pass through it. Sized from the room's view (the box's container units), so it stays within it on a phone
+   and in a computer's frame. ---- */
+.area-banner {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+  container-type: size;
+  overflow: hidden;
+}
+.area-banner-band {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 33%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(6px, 2.1cqw, 12px);
+  padding: clamp(14px, 5.1cqw, 28px) 0 clamp(12px, 4.7cqw, 26px);
+  background: linear-gradient(90deg, rgba(12, 8, 6, 0) 0, rgba(12, 8, 6, 0.78) 22%, rgba(12, 8, 6, 0.78) 78%, rgba(12, 8, 6, 0) 100%);
+}
+.area-banner-sub {
+  font: 400 clamp(8px, 2.35cqw, 14px) / 1 "Press Start 2P", ui-monospace, monospace;
+  color: #f3d27a;
+  letter-spacing: 0.2em;
+  text-shadow: 0 2px 0 #2a1a10;
+  white-space: nowrap;
+}
+.area-banner-rule {
+  width: min(61cqw, 420px);
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #f3d27a 30%, #f3d27a 70%, transparent);
+}
+.area-banner-title {
+  max-width: 94cqw;
+  font: 400 clamp(20px, 7.9cqw, 46px) / 1.05 "Archivo Black", Archivo, sans-serif;
+  color: #fff8e6;
+  letter-spacing: 0.03em;
+  text-align: center;
+  text-shadow: 0 3px 0 #2a1a10, 0 0 18px rgba(0, 0, 0, 0.6);
 }

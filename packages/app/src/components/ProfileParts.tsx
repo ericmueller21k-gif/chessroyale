@@ -1,6 +1,6 @@
 import { Fragment } from "preact";
 import { useLayoutEffect, useRef, useState } from "preact/hooks";
-import { FAIRPLAY, bossInfo, itemDef, tierInfo, type ItemLook } from "@chessroyale/core";
+import { FAIRPLAY, bossInfo, itemDef, shownLook, tierInfo, type ItemLook } from "@chessroyale/core";
 import { wornDetails } from "../item-details.ts";
 import { FdButton, WORN_ORDER } from "./FrontDoor.tsx";
 import { ItemArt } from "./Items.tsx";
@@ -24,8 +24,9 @@ export function when(at: number, now = Date.now()): string {
 
 /** The items they wear, in the order they're listed (slot, item, its definition). */
 function wornRows(look: ItemLook) {
+  const shown = shownLook(look);
   return WORN_ORDER.flatMap((slot) => {
-    const it = look[slot];
+    const it = shown[slot];
     const d = it && itemDef(it.def);
     return it && d ? [{ slot, it, d }] : [];
   });
@@ -95,7 +96,7 @@ export function Recent({ p, mark, bare }: { p: PublicProfile; mark?: number; /**
           r.mode === "crowd"
             ? `Crowd · ${r.team ? "50 v 50" : "everyone moves"}`
             : boss
-              ? `Boss raid · ${r.bossElo ? `${bossInfo(r.bossElo, r.bossId).name} ${r.bossElo}` : "a boss"}`
+              ? `Boss Battle · ${r.bossElo ? `${bossInfo(r.bossElo, r.bossId).name} ${r.bossElo}` : "a boss"}`
               : `Classic · ${r.players} players`;
         return (
           <div

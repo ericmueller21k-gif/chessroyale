@@ -1,6 +1,6 @@
 import { expect, type Page } from "@playwright/test";
-import { bossCrateOf } from "@chessroyale/core";
-import { asAdmin, asServerAdmin, asSignedIn, backdateSoloBattle, bossAloneFromHome, giveItems, test, wearItem } from "./helpers.ts";
+import { SHOP, bossCrateOf, discountLabel, shopPrice } from "@chessroyale/core";
+import { asAdmin, asServerAdmin, asSignedIn, backdateSoloBattle, bossAloneFromHome, giveItems, test, wearItem, townReady } from "./helpers.ts";
 
 /**
  * Inside a shop (Nov 2, round 1; docs/areas/town-square.md, "Inside a shop"), on a phone and a computer: walk up to Babur's
@@ -45,6 +45,35 @@ type Hooks = {
 /** Where to tap a home now (in the page); null while it isn't drawn. */
 async function homeAt(p: Page, id: string) {
   const xy = await p.evaluate((h) => (window as unknown as Hooks).__townAt?.("home", h) ?? null, id);
+  if (!xy) return null;
+  const cv = (await town(p).boundingBox())!;
+  return { x: cv.x + xy.x, y: cv.y + xy.y };
+}
+/**
+ * Where to tap a home once the view holds still: its point the same over three painted frames (null if it isn't drawn then, or after
+ * 3 s still moving). The camera glides to a far home (its chip, Hollow Peak), trails you out of a room's door and zooms back out
+ * after one: a point read while it moves is 30 to 180 px off by the time the click lands, the click walks you off, the camera
+ * follows you and the home leaves the screen (PR #640's run: "drawn" null for 20 s on desktop; locally, 2 of 3 first taps missed).
+ */
+async function homeStill(p: Page, id: string) {
+  const xy = await p.evaluate(
+    (h) =>
+      new Promise<{ x: number; y: number } | null>((done) => {
+        const at = () => (window as unknown as Hooks).__townAt?.("home", h) ?? null;
+        const until = performance.now() + 3000;
+        let last = at();
+        let same = 0;
+        const look = () => {
+          const now = at();
+          same = now && last && Math.hypot(now.x - last.x, now.y - last.y) < 0.5 ? same + 1 : 0;
+          last = now;
+          if (same >= 3 || performance.now() > until) done(same >= 3 ? now : null);
+          else requestAnimationFrame(look);
+        };
+        requestAnimationFrame(look);
+      }),
+    id,
+  );
   if (!xy) return null;
   const cv = (await town(p).boundingBox())!;
   return { x: cv.x + xy.x, y: cv.y + xy.y };
@@ -96,8 +125,8 @@ async function goIn(p: Page, id: string, name: string) {
     if (await card.isVisible()) return;
     // (A boss strolling in front of its home may take the tap: close its card and tap again.)
     if (await p.getByRole("dialog").isVisible()) await p.keyboard.press("Escape");
-    const at = await homeAt(p, id);
-    expect(at, "drawn").not.toBeNull();
+    const at = await homeStill(p, id);
+    expect(at, "drawn, the view still").not.toBeNull();
     await p.mouse.click(at!.x, at!.y);
     await expect(card).toBeVisible({ timeout: 1500 });
   }).toPass({ timeout: 20_000 });
@@ -151,7 +180,7 @@ test("Babur's tent: Go in, start zoomed out, talk to the Shopkeeper, the crate's
   page.on("pageerror", (e) => errors.push(String(e)));
   page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
   await page.goto("/town?sky=day");
-  await expect(town(page)).toHaveAttribute("data-ready", "1");
+  await townReady(page);
   await goIn(page, "tiger", "Babur's Circus");
   // Outside, you stood at the tent's door (the square in front of it) as you went in.
   const door = await town(page).getAttribute("data-you");
@@ -218,12 +247,12 @@ test("Babur's tent: Go in, start zoomed out, talk to the Shopkeeper, the crate's
   expect(errors).toEqual([]);
 });
 
-test("Puddles' greenhouse: Go in, Drizzle's crate with Puddles's Mower; the back button takes you out", async ({ page }) => {
+test("Puddles' greenhouse: Go in, Drizzle's crate with Puddles's Mower; the back button takes you out", { tag: "@phone-only" }, async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(String(e)));
   // (By night outside: the chat's words are white in the town, dark in the greenhouse.)
   await page.goto("/town?sky=night");
-  await expect(town(page)).toHaveAttribute("data-ready", "1");
+  await townReady(page);
   await expect(page.locator(".town-chat")).toHaveAttribute("data-tone", "night");
   await goIn(page, "gardener", "Puddles' Botanical Garden");
   await expect(room(page)).toHaveAttribute("data-room", "gardener");
@@ -243,15 +272,98 @@ test("Puddles' greenhouse: Go in, Drizzle's crate with Puddles's Mower; the back
   await leaveRoom(page);
   await expect(room(page)).toHaveCount(0, { timeout: 10_000 });
   await expect(page.getByRole("heading", { name: "Town square" })).toBeVisible();
-  await expect(town(page)).toHaveAttribute("data-ready", "1");
+  await townReady(page);
   expect(errors).toEqual([]);
 });
 
-test("Alfil's Pyramid (Nov 2): Go in, Woolly's crate with Alfil's Howdah; the chat's words dark over the sandstone", async ({ page }) => {
+test("?fps in a room (Nov 11, Eric's iPhone: frozen at 42-44 inside, 2-4 going out): the pill reads the room's frames, never spans the visit going out; standing still, the room's back is drawn from its kept copy", { tag: "@phone-only" }, async ({ page }) => {
+  await page.goto("/town?sky=day&fps");
+  await townReady(page);
+  await goIn(page, "gardener", "Puddles' Botanical Garden");
+  type Seen = { __pill: string[]; __shopStill?: () => { drawn: number; made: number } | null };
+  // Every reading the pill is given from here (before: none inside a room, its town reading stood still).
+  await page.evaluate(() => {
+    const el = document.querySelector(".town-fps")!;
+    const w = window as unknown as Seen;
+    w.__pill = [];
+    new MutationObserver(() => w.__pill.push(el.textContent ?? "")).observe(el, { childList: true, characterData: true, subtree: true });
+  });
+  await page.waitForTimeout(2500);
+  const inside = await page.evaluate(() => [...(window as unknown as Seen).__pill]);
+  expect(inside.length, `the pill reads the room twice a second: ${inside.join(" | ")}`).toBeGreaterThanOrEqual(3);
+  // Standing still: the ceiling and floor come from the copy kept as the view came to rest (one copy, drawn every frame since).
+  const still = await page.evaluate(() => (window as unknown as Seen).__shopStill?.() ?? null);
+  expect(still!.made, "kept once the view rests").toBeGreaterThanOrEqual(1);
+  expect(still!.drawn, "drawn from the copy while you stand").toBeGreaterThan(30);
+  // Out: every reading is the frames of its last second (before: the frames before you went in over the whole visit, "1 fps").
+  const room = Number.parseInt(inside[inside.length - 1]!);
+  await page.evaluate(() => ((window as unknown as Seen).__pill.length = 0));
+  await page.getByRole("button", { name: "Back", exact: true }).click();
+  await expect(page.locator("canvas.town-shop-canvas")).toHaveCount(0);
+  await page.waitForTimeout(1500);
+  const out = await page.evaluate(() => [...(window as unknown as Seen).__pill]);
+  expect(out.length).toBeGreaterThanOrEqual(2);
+  expect(Math.min(...out.map((x) => Number.parseInt(x))), `going out, against ${room} fps inside: ${out.join(" | ")}`).toBeGreaterThan(room / 5);
+});
+
+test("a room's report records while walking, and walking lays no floor triangles (Nov 11, Eric: inside it's \"just like capped\"; ?report \"is pausing when I run into the building\"): the pill counts on inside; WebGL draws the back, the same picture as the 2D way's", { tag: "@phone-only" }, async ({ page }) => {
+  await page.goto("/town?sky=day&report");
+  await townReady(page);
+  await goIn(page, "gardener", "Puddles' Botanical Garden");
+  type Back = { drawn: number; made: number; gl: boolean; backTris: number; glTris: number };
+  type Seen = { __pill: string[]; __backs: Back[]; __stop: boolean; __shopStill?: () => Back | null; __shopCam?: () => { focus: [number, number] } | null };
+  // Every text the pill shows from here, and the back's numbers each frame the view moved.
+  await page.evaluate(() => {
+    const w = window as unknown as Seen;
+    const el = document.querySelector(".tfr-pill span")!;
+    w.__pill = [];
+    new MutationObserver(() => w.__pill.push(el.textContent ?? "")).observe(el, { childList: true, characterData: true, subtree: true });
+    w.__backs = [];
+    w.__stop = false;
+    let last = "";
+    const tick = () => {
+      const at = String(w.__shopCam?.()?.focus);
+      const b = w.__shopStill?.();
+      if (b && at !== last && last) w.__backs.push(b);
+      last = at;
+      if (!w.__stop) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  });
+  // Walk until the recorder has more than 30 walking frames in the room (3 strolls is about 3 s; CI's software WebGL draws
+  // 8 to 9 frames a second there, so it may take a few more: PR #661's run, 26 and 28 after 3), at most 8 strolls.
+  const walkFrames = () =>
+    page.evaluate(() => ((window as unknown as { __townReport?: (raw: boolean) => { raw: { flags: number[] } } | null }).__townReport?.(true)?.raw.flags ?? []).filter((f) => f & 256 && f & 1 && !(f & 1536)).length);
+  for (let i = 0; i < 8 && (i < 3 || (await walkFrames()) <= 30); i++) {
+    const k = i % 2 ? "ArrowRight" : "ArrowLeft";
+    await page.keyboard.down(k);
+    await page.waitForTimeout(1100);
+    await page.keyboard.up(k);
+  }
+  const seen = await page.evaluate(() => {
+    const w = window as unknown as Seen;
+    w.__stop = true;
+    return { pill: [...w.__pill], backs: [...w.__backs] };
+  });
+  // The pill counts the seconds inside (before: it stood still on "walk or turn to start" or the town's last second).
+  await expect(page.locator(".tfr-pill")).toBeVisible();
+  expect(seen.pill.filter((x) => /Recording [1-9] s/.test(x)).length, `the pill inside: ${seen.pill.join(" | ")}`).toBeGreaterThanOrEqual(2);
+  const rep = await page.evaluate(() => (window as unknown as { __townReport?: (raw: boolean) => { raw: { flags: number[] } } | null }).__townReport?.(true) ?? null);
+  // (Frames in a room (256) while walking (1), not going in or out.)
+  expect(rep!.raw.flags.filter((f) => f & 256 && f & 1 && !(f & 1536)).length, "the room's walking frames recorded").toBeGreaterThan(30);
+  // Walking: the back is WebGL's, no floor triangle laid on the 2D canvas in any frame the view moved (before: some hundreds a frame).
+  expect(seen.backs.length, "frames the view moved").toBeGreaterThan(20);
+  expect(seen.backs.every((b) => b.gl && b.backTris === 0 && b.glTris > 0), JSON.stringify(seen.backs.slice(0, 3))).toBe(true);
+  // The same picture: drawn both ways at this view, all but tile edges a pixel off (measured Nov 11: 1 to 6% of pixels past 48).
+  const diff = await page.evaluate(() => (window as unknown as { __shopBackDiff?: () => { over48: number; mean: number } | null }).__shopBackDiff?.() ?? null);
+  expect(diff!.over48, JSON.stringify(diff)).toBeLessThan(0.1);
+});
+
+test("Alfil's Pyramid (Nov 2): Go in, Woolly's crate with Alfil's Howdah; the chat's words dark over the sandstone", { tag: "@phone-only" }, async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(String(e)));
   await page.goto("/town?sky=night");
-  await expect(town(page)).toHaveAttribute("data-ready", "1");
+  await townReady(page);
   // (His Pyramid is across the map: the camera glides there, as its chip would.)
   await page.evaluate(() => (window as unknown as { __townGlide?: (id: string) => void }).__townGlide?.("alfil"));
   await expect.poll(() => homeAt(page, "alfil"), { message: "the Pyramid comes into view" }).not.toBeNull();
@@ -271,14 +383,14 @@ test("Alfil's Pyramid (Nov 2): Go in, Woolly's crate with Alfil's Howdah; the ch
   expect(errors).toEqual([]);
 });
 
-test("Timber's Lumber Lodge (Nov 3): in an admin's town only; its card is its name and Go in; Rivet keeps the shop, Timber's Boss Crate with The Log Roller", async ({ page }) => {
+test("Timber's Lumber Lodge (Nov 3): in an admin's town only; its card is its name and Go in; Rivet keeps the shop, Timber's Boss Crate with The Log Roller", { tag: "@phone-only" }, async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(String(e)));
   type Hook = { __townBots?: () => { name: string }[] | null; __townGlide?: (to: string | readonly [number, number]) => void };
   const bots = async () => (await page.evaluate(() => (window as unknown as Hook).__townBots?.() ?? []))!.map((b) => b.name);
   // A player's town: no lodge on its ground west of the Colosseum (open ground there), no Rivet (Timber is in the game for admins first).
   await page.goto("/town?sky=day");
-  await expect(town(page)).toHaveAttribute("data-ready", "1");
+  await townReady(page);
   await page.evaluate(() => (window as unknown as Hook).__townGlide?.([11, 31]));
   await page.waitForTimeout(1500);
   expect(await homeAt(page, "timber")).toBeNull();
@@ -287,7 +399,7 @@ test("Timber's Lumber Lodge (Nov 3): in an admin's town only; its card is its na
   // An admin's: the lodge there, Rivet among the bots.
   await asAdmin(page);
   await page.reload();
-  await expect(town(page)).toHaveAttribute("data-ready", "1");
+  await townReady(page);
   expect(await bots()).toContain("Rivet (bot)");
   await page.evaluate(() => (window as unknown as Hook).__townGlide?.("timber"));
   await expect.poll(() => homeAt(page, "timber"), { message: "the lodge comes into view" }).not.toBeNull();
@@ -332,14 +444,14 @@ test("Timber's Lumber Lodge (Nov 3): in an admin's town only; its card is its na
   expect(errors).toEqual([]);
 });
 
-test("Dash's Kicks (Nov 3): in an admin's town only; its card is its name and Go in; Tick keeps the shop, Dash's Boss Crate with Cheetah Shoes; the halfpipe", async ({ page }) => {
+test("Dash's Kicks (Nov 3): in an admin's town only; its card is its name and Go in; Tick keeps the shop, Dash's Boss Crate with Cheetah Shoes; the halfpipe", { tag: "@phone-only" }, async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(String(e)));
   type Hook = { __townBots?: () => { name: string }[] | null; __townGlide?: (to: string | readonly [number, number]) => void; __townBossBack?: (id: string) => void };
   const bots = async () => (await page.evaluate(() => (window as unknown as Hook).__townBots?.() ?? []))!.map((b) => b.name);
   // A player's town: no store on its ground beside Timber's (open ground there), no Tick (Dash is in the game for admins first).
   await page.goto("/town?sky=day");
-  await expect(town(page)).toHaveAttribute("data-ready", "1");
+  await townReady(page);
   await page.evaluate(() => (window as unknown as Hook).__townGlide?.([4, 33]));
   await page.waitForTimeout(1500);
   expect(await homeAt(page, "dash")).toBeNull();
@@ -349,7 +461,7 @@ test("Dash's Kicks (Nov 3): in an admin's town only; its card is its name and Go
   await asAdmin(page);
   for (const sky of SHOTS ? ["night", "day"] : ["day"]) {
     await page.goto(`/town?sky=${sky}`);
-    await expect(town(page)).toHaveAttribute("data-ready", "1");
+    await townReady(page);
     expect(await bots()).toContain("Tick (bot)");
     await page.evaluate(() => (window as unknown as Hook).__townGlide?.("dash"));
     await expect.poll(() => homeAt(page, "dash"), { message: "the store comes into view" }).not.toBeNull();
@@ -404,7 +516,7 @@ test("Hollow Peak (Nov 3): Go in (his line on the card), the cave: in at the mou
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(String(e)));
   await page.goto("/town?sky=night");
-  await expect(town(page)).toHaveAttribute("data-ready", "1");
+  await townReady(page);
   await page.evaluate(() => (window as unknown as { __townGlide?: (id: string) => void }).__townGlide?.("hollow"));
   await expect.poll(() => homeAt(page, "hollow"), { message: "Hollow Peak comes into view" }).not.toBeNull();
   // (Hollow live for everyone, so his cave is too: a player's town. His card keeps his line over "Go in": the next each time.)
@@ -492,13 +604,13 @@ test("Hollow Peak (Nov 3): Go in (his line on the card), the cave: in at the mou
   expect(errors).toEqual([]);
 });
 
-test("Wrangler's Stall (Nov 4): Go in (its card its name and Go in), his barn: the pens, the board on its hay bale, the lanterns; his rooster keeps the shop on the counter, Wrangler's Boss Crate with Pen Pony", async ({ page }) => {
+test("Wrangler's Stall (Nov 4): Go in (its card its name and Go in), his barn: the pens, the board on its hay bale, the lanterns; his rooster keeps the shop on the counter, Wrangler's Boss Crate with Pen Pony", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(120_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(String(e)));
   // (Wrangler is live for everyone, so his barn is too: a player's town.)
   await page.goto("/town?sky=day");
-  await expect(town(page)).toHaveAttribute("data-ready", "1");
+  await townReady(page);
   await page.evaluate(() => (window as unknown as { __townGlide?: (id: string) => void }).__townGlide?.("pig"));
   await expect.poll(() => homeAt(page, "pig"), { message: "Wrangler's Stall comes into view" }).not.toBeNull();
   await goIn(page, "pig", "Wrangler's Stall");
@@ -539,13 +651,13 @@ test("Wrangler's Stall (Nov 4): Go in (its card its name and Go in), his barn: t
   expect(errors).toEqual([]);
 });
 
-test("Folio's Folded House (Nov 5): Go in (its card its name and Go in), its sanctuary: the clean page, the fountain, the windows' pools drifting, the \"being written\" edge; its paper turtle keeps the shop behind the low counter, Folio's Boss Crate with the Paper Crane", async ({ page }) => {
+test("Folio's Folded House (Nov 5): Go in (its card its name and Go in), its sanctuary: the clean page, the fountain, the windows' pools drifting, the \"being written\" edge; its paper turtle keeps the shop behind the low counter, Folio's Boss Crate with the Paper Crane", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(150_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(String(e)));
   // (Folio is live for everyone, so its sanctuary is too: a player's town.)
   await page.goto("/town?sky=day");
-  await expect(town(page)).toHaveAttribute("data-ready", "1");
+  await townReady(page);
   await page.evaluate(() => (window as unknown as { __townGlide?: (id: string) => void }).__townGlide?.("folio"));
   await expect.poll(() => homeAt(page, "folio"), { message: "Folio's Folded House comes into view" }).not.toBeNull();
   await goIn(page, "folio", "Folio's Folded House");
@@ -605,13 +717,13 @@ test("Folio's Folded House (Nov 5): Go in (its card its name and Go in), its san
   expect(errors).toEqual([]);
 });
 
-test("Smudgy's Art Gallery (Nov 6): Go in, his paint studio: the life class (the knight turning, eight painters at their easels), the cloth-covered table on the drop cloth, the sculptures; the gallery owner keeps the shop behind the counter, Smudgy's Boss Crate with the Brush Ride", async ({ page }) => {
+test("Smudgy's Art Gallery (Nov 6): Go in, his paint studio: the life class (the knight turning, eight painters at their easels), the cloth-covered table on the drop cloth, the sculptures; the gallery owner keeps the shop behind the counter, Smudgy's Boss Crate with the Brush Ride", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(150_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(String(e)));
   // (Smudgy is live for everyone, so his studio is too: a player's town.)
   await page.goto("/town?sky=day");
-  await expect(town(page)).toHaveAttribute("data-ready", "1");
+  await townReady(page);
   await page.evaluate(() => (window as unknown as { __townGlide?: (id: string) => void }).__townGlide?.("smudgy"));
   await expect.poll(() => homeAt(page, "smudgy"), { message: "Smudgy's Art Gallery comes into view" }).not.toBeNull();
   await goIn(page, "smudgy", "Smudgy's Art Gallery");
@@ -677,13 +789,13 @@ type CrewHook = {
 };
 const crew = (p: Page) => p.evaluate(() => (window as unknown as CrewHook).__shopCrew?.() ?? null);
 
-test("Jefferson's Fireworks (Nov 4): Go in (its card its name and Go in), his warehouse: the racking, the board on its crates, the crew at work; the dealer keeps the shop in his corner, Jefferson's Boss Crate with Giraffe Gallop; the scissor lift waits while you stand in its way and goes on once you step aside", async ({ page }) => {
+test("Jefferson's Fireworks (Nov 4): Go in (its card its name and Go in), his warehouse: the racking, the board on its crates, the crew at work; the dealer keeps the shop in his corner, Jefferson's Boss Crate with Giraffe Gallop; the scissor lift waits while you stand in its way and goes on once you step aside", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(180_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(String(e)));
   // (Jefferson is live for everyone, so his warehouse is too: a player's town.)
   await page.goto("/town?sky=day");
-  await expect(town(page)).toHaveAttribute("data-ready", "1");
+  await townReady(page);
   await page.evaluate(() => (window as unknown as { __townGlide?: (id: string) => void }).__townGlide?.("grex"));
   await expect.poll(() => homeAt(page, "grex"), { message: "Jefferson's Fireworks comes into view" }).not.toBeNull();
   await goIn(page, "grex", "Jefferson's Fireworks");
@@ -760,13 +872,13 @@ type ElvesHook = {
 /** Ginger's igloo's elves and your figure as drawn frame by frame (`clear`: start the trail afresh). */
 const elvesOf = (p: Page, clear = false) => p.evaluate((c) => (window as unknown as { __shopElves?: (c: boolean) => ElvesHook | null }).__shopElves?.(c) ?? null, clear);
 
-test("Ginger Igloo (Nov 5): Go in (its card its name and Go in), the round igloo: the candy wall, the catwalk and its two staircases, the elves at work; the shopkeeper elf keeps the shop, Ginger's Boss Crate with the Candy Cane Sled; you run up one staircase, along the catwalk and down the other, by taps and by the arrow keys, your feet on the steps all the way; an elf waits while you stand in its way and goes on once you step aside", async ({ page }) => {
+test("Ginger Igloo (Nov 5): Go in (its card its name and Go in), the round igloo: the candy wall, the catwalk and its two staircases, the elves at work; the shopkeeper elf keeps the shop, Ginger's Boss Crate with the Candy Cane Sled; you run up one staircase, along the catwalk and down the other, by taps and by the arrow keys, your feet on the steps all the way; an elf waits while you stand in its way and goes on once you step aside", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(240_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(String(e)));
   // (Ginger is live for everyone, so his igloo is too: a player's town.)
   await page.goto("/town?sky=day");
-  await expect(town(page)).toHaveAttribute("data-ready", "1");
+  await townReady(page);
   await page.evaluate(() => (window as unknown as { __townGlide?: (id: string) => void }).__townGlide?.("gingerbread"));
   await expect.poll(() => homeAt(page, "gingerbread"), { message: "Ginger Igloo comes into view" }).not.toBeNull();
   await goIn(page, "gingerbread", "Ginger Igloo");
@@ -902,11 +1014,11 @@ test("Ginger Igloo (Nov 5): Go in (its card its name and Go in), the round igloo
   expect(errors).toEqual([]);
 });
 
-test("Big Boy's Crib (Nov 2): Go in, Blocky's crate with Big Boy's Buggy; the chat's words dark over the nursery", async ({ page }) => {
+test("Big Boy's Crib (Nov 2): Go in, Blocky's crate with Big Boy's Buggy; the chat's words dark over the nursery", { tag: "@phone-only" }, async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(String(e)));
   await page.goto("/town?sky=night");
-  await expect(town(page)).toHaveAttribute("data-ready", "1");
+  await townReady(page);
   await page.evaluate(() => (window as unknown as { __townGlide?: (id: string) => void }).__townGlide?.("bigboy"));
   await expect.poll(() => homeAt(page, "bigboy"), { message: "the Crib comes into view" }).not.toBeNull();
   await goIn(page, "bigboy", "Big Boy's Crib");
@@ -977,7 +1089,7 @@ async function followsFinger(p: Page, at: () => Promise<{ x: number; y: number }
 
 test("inside, a drag looks around as the town's does (Eric, Nov 2: \"when I drag from down to up, it should be the same as the town movement\"): what's under the finger follows it, both ways", async ({ page }) => {
   await page.goto("/town?sky=day");
-  await expect(town(page)).toHaveAttribute("data-ready", "1");
+  await townReady(page);
   // The town: Babur's tent, dragged down, up and sideways, follows the finger.
   if (!(await homeAt(page, "tiger"))) await page.getByRole("button", { name: "Go to Babur's Circus" }).dispatchEvent("click");
   await expect.poll(() => homeAt(page, "tiger"), { message: "Babur's tent in view" }).not.toBeNull();
@@ -1097,14 +1209,14 @@ for (const ride of [false, true])
     page.on("pageerror", (e) => errors.push(String(e)));
     if (ride) {
       await page.goto("/");
-      // (Your profile: the top bar's pawn on a phone, the side menu's Profile on a computer: the right column's pawn went, Nov 7.)
-      await expect(page.getByRole("button", { name: "Your profile", exact: true }).or(page.getByRole("navigation", { name: "Menu" }).getByRole("button", { name: "Profile" })).filter({ visible: true }).first()).toBeVisible();
+      // (Your profile: "View profile" on your card on a phone, the side menu's Profile on a computer.)
+      await expect(page.getByRole("button", { name: "View profile", exact: true }).or(page.getByRole("navigation", { name: "Menu" }).getByRole("button", { name: "Profile" })).filter({ visible: true }).first()).toBeVisible();
       // (No crate holds a ride yet: given straight, as only admins have them.)
       const [chirp] = await giveItems(page, [{ def: "riding-chirp", color: "cobalt", blemish: 0 }]);
       await wearItem(page, "ride", chirp!);
     }
     await page.goto("/town?sky=day");
-    await expect(town(page)).toHaveAttribute("data-ready", "1");
+    await townReady(page);
     if (ride) await expect.poll(async () => (await page.evaluate(() => (window as unknown as Hooks).__townRide!().you)).ready, { message: "your ride's frames are ready", timeout: 30_000 }).toBe(true);
     for (const [id, name] of KEY_ROOMS) {
       await goIn(page, id, name);
@@ -1115,22 +1227,22 @@ for (const ride of [false, true])
       if (SHOTS) await page.screenshot({ path: `${SHOTS}/room-keys-${id}-${ride ? "ride" : "foot"}-${test.info().project.name}.png` });
       await leaveRoom(page);
       await expect(room(page)).toHaveCount(0, { timeout: 10_000 });
-      await expect(town(page)).toHaveAttribute("data-ready", "1");
+      await townReady(page);
     }
     expect(errors).toEqual([]);
   });
 
-test("on a ride (Eric, Nov 2: \"your rider goes in with you\"): inside you're on it, its idle standing and its move walking, its back going up to the counter; you come out still on it", async ({ page }) => {
+test("on a ride (Eric, Nov 2: \"your rider goes in with you\"): inside you're on it, its idle standing and its move walking, its back going up to the counter; you come out still on it", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(150_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(String(e)));
   await page.goto("/");
-  await expect(page.getByRole("button", { name: "Your profile", exact: true }).or(page.getByRole("navigation", { name: "Menu" }).getByRole("button", { name: "Profile" })).filter({ visible: true }).first()).toBeVisible();
+  await expect(page.getByRole("button", { name: "View profile", exact: true }).or(page.getByRole("navigation", { name: "Menu" }).getByRole("button", { name: "Profile" })).filter({ visible: true }).first()).toBeVisible();
   // (No crate holds a ride yet: given straight, as only admins have them.)
   const [chirp] = await giveItems(page, [{ def: "riding-chirp", color: "cobalt", blemish: 0 }]);
   await wearItem(page, "ride", chirp!);
   await page.goto("/town?sky=day");
-  await expect(town(page)).toHaveAttribute("data-ready", "1");
+  await townReady(page);
   const townRide = () => page.evaluate(() => (window as unknown as Hooks).__townRide!().you);
   await expect.poll(async () => (await townRide()).ready, { message: "your ride's frames are ready", timeout: 30_000 }).toBe(true);
   const outside = await townRide();
@@ -1163,7 +1275,7 @@ test("on a ride (Eric, Nov 2: \"your rider goes in with you\"): inside you're on
   // Out by the back button (a computer: the door, no bar since Nov 7): in the town again, still on it.
   await leaveRoom(page);
   await expect(room(page)).toHaveCount(0, { timeout: 10_000 });
-  await expect(town(page)).toHaveAttribute("data-ready", "1");
+  await townReady(page);
   expect(await townRide()).toMatchObject({ ride: "riding-chirp", ready: true });
   expect(errors).toEqual([]);
 });
@@ -1195,7 +1307,7 @@ test("boss tokens: an admin gives himself Babur tokens and a crate key in the Cr
 
   // Babur's tent: the card has the real counts, both ways open.
   await page.goto("/town?sky=day");
-  await expect(town(page)).toHaveAttribute("data-ready", "1");
+  await townReady(page);
   await goIn(page, "tiger", "Babur's Circus");
   await talk(page);
   const crate = page.getByRole("dialog", { name: "Babur's Boss Crate", exact: true });
@@ -1212,6 +1324,10 @@ test("boss tokens: an admin gives himself Babur tokens and a crate key in the Cr
   // token and the key left, so only the key's way stays open.
   await byTokens.click();
   await expect(answer).toHaveText("Babur's Boss Crate is in your inventory.");
+  // (Its pop-up, Nov 12: Later keeps it in the inventory; Boingo's test below checks the pop-up itself.)
+  const got = page.getByRole("dialog", { name: "You got Babur's Boss Crate!", exact: true });
+  await got.getByRole("button", { name: "Later" }).click();
+  await expect(got).toBeHidden();
   await expect(crate).toContainText("You have 1 Babur token and 1 crate key.");
   await expect(byTokens).toBeDisabled();
   await expect(byKey).toBeEnabled();
@@ -1220,6 +1336,8 @@ test("boss tokens: an admin gives himself Babur tokens and a crate key in the Cr
   await byKey.click();
   await expect(crate).toContainText("You have 0 Babur tokens and 0 crate keys.");
   await expect(answer).toHaveText("Babur's Boss Crate is in your inventory.");
+  await got.getByRole("button", { name: "Later" }).click();
+  await expect(got).toBeHidden();
   await expect(byKey).toBeDisabled();
   await expect(byTokens).toBeDisabled();
   // (The answer's row was there all along: the card didn't grow.)
@@ -1298,13 +1416,13 @@ test("boss tokens: a counted boss battle (Boss alone, 5 minutes by the server's 
   expect(errors).toEqual([]);
 });
 
-test("Boingo's Funhouse (Nov 6): Go in, the arcade (the play structure and slide, the squirt race, the spinning light game, the roll-ball lanes); the clown attendant keeps the prize counter, Boingo's Boss Crate with Boingo's Pogo", async ({ page }) => {
+test("Boingo's Funhouse (Nov 6): Go in, the arcade (the play structure and slide, the squirt race, the spinning light game, the roll-ball lanes); the clown attendant keeps the prize counter, Boingo's Boss Crate with Boingo's Pogo", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(150_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(String(e)));
   // (Boingo is live for everyone, so his Funhouse is too: a player's town.)
   await page.goto("/town?sky=day");
-  await expect(town(page)).toHaveAttribute("data-ready", "1");
+  await townReady(page);
   await page.evaluate(() => (window as unknown as { __townGlide?: (id: string) => void }).__townGlide?.("clown"));
   await expect.poll(() => homeAt(page, "clown"), { message: "Boingo's Funhouse comes into view" }).not.toBeNull();
   await goIn(page, "clown", "Boingo's Funhouse");
@@ -1370,6 +1488,113 @@ test("Boingo's Funhouse (Nov 6): Go in, the arcade (the play structure and slide
   await leaveRoom(page);
   await expect(room(page)).toHaveCount(0, { timeout: 10_000 });
   await expect(page.getByRole("heading", { name: "Town square" })).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+/**
+ * Boingo's Boss Crate bought in his Funhouse (Eric, Nov 12: "I just bought his box, and it just deducted my tokens ... but nothing
+ * popped up"): the price line is plain words in the card's own color (not the Shop screen's cream button); a buy says so in the card's
+ * row and pops up "You got Boingo's Boss Crate!" with its picture, Open now and Later. Later closes it (the crate is in your inventory);
+ * a second buy's Open now opens it with the Crates tab's own opening (the strip, then the reveal), and the crate's count goes down.
+ * docs/decisions/2026-11-12-boss-crate-bought.md.
+ */
+test("Boingo's Boss Crate bought in his Funhouse: the price line is plain words, a buy pops up \"You got Boingo's Boss Crate!\" with Open now and Later; Later keeps it, Open now opens it with the usual strip and reveal (Eric, Nov 12)", { tag: "@phone-only" }, async ({ page }) => {
+  test.setTimeout(240_000);
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(String(e)));
+  // (The stills at Eric's phone size, 428 x 746.)
+  if (SHOTS && test.info().project.name === "phone") await page.setViewportSize({ width: 428, height: 746 });
+  await asServerAdmin(page);
+  await page.goto("/town?sky=day");
+  await townReady(page);
+  // Nine of Boingo's tokens and a key: three buys, the second with the key.
+  for (const body of [{ boss: "clown", tokens: 3 }, { boss: "clown", tokens: 3 }, { boss: "clown", tokens: 3 }, { keys: 1 }]) {
+    const r = await page.request.post("/api/locker/grant", { data: { ...body, request: `grant-${Math.random()}` } });
+    expect(r.ok()).toBe(true);
+  }
+  type LockerNow = { tokens: Record<string, number>; keys: number; bossCrates: Record<string, number> };
+  const held = async () => ((await (await page.request.get("/api/locker")).json()) as LockerNow).bossCrates["boss-clown"] ?? 0;
+  await page.reload();
+  await townReady(page);
+  await page.evaluate(() => (window as unknown as { __townGlide?: (id: string) => void }).__townGlide?.("clown"));
+  await goIn(page, "clown", "Boingo's Funhouse");
+  const walkTo = async (sq: readonly [number, number]) => {
+    await viewOnYou(page);
+    await expect.poll(() => shopAt(page, "square", sq), { message: `square ${sq} drawn` }).not.toBeNull();
+    const at = (await shopAt(page, "square", sq))!;
+    await page.mouse.click(at.x, at.y);
+    await expect(room(page)).toHaveAttribute("data-you", `${sq[0]},${sq[1]}`, { timeout: 20_000 });
+  };
+  await walkTo([14, 16]);
+  await walkTo([15, 10]);
+  await walkTo([13, 6]);
+  await viewOnYou(page);
+  await talk(page);
+  const crate = page.getByRole("dialog", { name: "Boingo's Boss Crate", exact: true });
+  await expect(crate).toContainText("You have 9 Boingo tokens and 1 crate key.");
+  // The price line: plain words in the card's own color, not the Shop screen's cream price button.
+  const price = crate.locator(".shop-room-price");
+  await expect(price).toHaveText("3 Boingo tokens, or 1 Boingo token + 1 crate key");
+  await expect(crate.locator(".shop-price")).toHaveCount(0);
+  const look = await price.evaluate((el) => {
+    const s = getComputedStyle(el);
+    return { color: s.color, card: getComputedStyle(el.closest(".town-card")!).color, bg: s.backgroundColor, image: s.backgroundImage, radius: s.borderRadius, cursor: s.cursor };
+  });
+  expect(look).toEqual({ color: look.card, card: "rgb(255, 255, 255)", bg: "rgba(0, 0, 0, 0)", image: "none", radius: "0px", cursor: "default" });
+  if (SHOTS) await page.screenshot({ path: `${SHOTS}/boingo-card-${test.info().project.name}.png` });
+  const before = (await crate.boundingBox())!;
+  const answer = crate.locator(".shop-msg");
+  const got = page.getByRole("dialog", { name: "You got Boingo's Boss Crate!", exact: true });
+  const byTokens = crate.getByRole("button", { name: "Buy with 3 Boingo tokens" });
+  const byKey = crate.getByRole("button", { name: "Buy with 1 Boingo token + 1 crate key" });
+
+  // 1. With tokens: the card's row says so, in the card's white, and the pop-up: the heading, the crate's picture, Open now and Later.
+  await byTokens.click();
+  await expect(answer).toHaveText("Boingo's Boss Crate is in your inventory.");
+  expect(await answer.evaluate((el) => [getComputedStyle(el).color, getComputedStyle(el).fontSize])).toEqual(["rgb(255, 255, 255)", "13px"]);
+  await expect(got).toBeVisible();
+  await expect(got.getByRole("heading")).toHaveText("You got Boingo's Boss Crate!");
+  await expect(got.locator("canvas.shop-crate-pic")).toBeVisible();
+  await expect(got.getByRole("button")).toHaveText(["Open now", "Later"]);
+  for (const b of await got.getByRole("button").all()) expect((await b.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  // (Over the card, which keeps its size and place under it.)
+  expect((await crate.boundingBox())!).toEqual(before);
+  if (SHOTS) await page.screenshot({ path: `${SHOTS}/boingo-got-${test.info().project.name}.png` });
+  // Later: the pop-up closes, the card stays open; the crate is in the inventory, unopened.
+  await got.getByRole("button", { name: "Later" }).click();
+  await expect(got).toBeHidden();
+  await expect(crate).toBeVisible();
+  await expect(crate).toContainText("You have 6 Boingo tokens and 1 crate key.");
+  expect(await held()).toBe(1);
+
+  // 2. With the key: the pop-up again; Open now opens it with the Crates tab's own opening (the strip, then the reveal), one crate fewer.
+  await byKey.click();
+  await expect(got).toBeVisible();
+  expect(await held()).toBe(2);
+  await got.getByRole("button", { name: "Open now" }).click();
+  await expect(got).toBeHidden();
+  const opening = page.locator(".shop-opening .crate-opening");
+  await expect(opening).toBeVisible();
+  await expect(opening.getByRole("heading", { level: 2 })).toHaveText("Boingo's Boss Crate");
+  await expect.poll(held, { message: "opened: one fewer held" }).toBe(1);
+  const reveal = opening.locator(".reveal-card");
+  await expect(reveal).toBeVisible({ timeout: 30_000 });
+  if (SHOTS) await page.screenshot({ path: `${SHOTS}/boingo-reveal-${test.info().project.name}.png` });
+  // Done: back in the room, the card as it was.
+  await reveal.getByRole("button", { name: "▶ Done" }).click();
+  await expect(opening).toBeHidden();
+  await expect(crate).toBeVisible();
+  await expect(crate).toContainText("You have 5 Boingo tokens and 0 crate keys.");
+  expect((await crate.boundingBox())!).toEqual(before);
+
+  // 3. Buying again still works after Open now; Escape is Later (the card stays).
+  await byTokens.click();
+  await expect(got).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(got).toBeHidden();
+  await expect(crate).toBeVisible();
+  await expect(crate).toContainText("You have 2 Boingo tokens and 0 crate keys.");
+  expect(await held()).toBe(2);
   expect(errors).toEqual([]);
 });
 
@@ -1463,10 +1688,114 @@ test("the shop has no \"Shop\" title on any tab; the locker has one pawn in a bo
   await expect(page.getByRole("tab", { name: "God King effects", exact: true })).toHaveCount(0);
   await expect(page.getByText("Coming later: King kill moves")).toHaveCount(0);
   await expect(page.locator("body")).not.toContainText(/Holy Light|God King effect|From the shop/);
-  // The Chat packs tab: no God King pack (GOD_KING_SHOP off); the Winter pack is still there.
-  await page.getByRole("tab", { name: "Chat packs", exact: true }).click();
-  await expect(page.locator(".shop-item", { hasText: "Winter pack" })).toHaveCount(1);
-  await expect(page.locator(".shop-grid")).not.toContainText("God King pack");
+  // The Chat packs tab is off (CHAT_PACKS_SHOP, Nov 8): no tab and no pack for sale (the Winter pack too). Before: the tab
+  // showed the Winter pack and no God King pack.
+  await expect(page.getByRole("tab", { name: "Chat packs", exact: true })).toHaveCount(0);
+  await expect(page.locator(".shop-item", { hasText: "Winter pack" })).toHaveCount(0);
+  await expect(page.getByText("Everything in the shop is 50% off during beta.")).toBeVisible();
+});
+
+/**
+ * The Shop tab's page (Eric's mockup, Nov 9; docs/decisions/2026-11-09-shop-page.md), look only: the line under the tabs, the special
+ * offer (its tab, the bundle's words, the Mythic Crate's icon), the five cards in order, each (and the bundle) with the discount's ribbon
+ * and its full price struck through beside the discounted one (from SHOP), the gold clock on the limited ones only, whose tap opens its
+ * pop-up, and a price's tap "Buying opens soon"; neither moves anything. Phone: 2 cards a row; computer: 4.
+ * SHOP_PAGE_SHOTS=<dir>: the PR's stills (phone 390 light and dark, top and scrolled; 320; the computer).
+ */
+test("the Shop tab's page (Eric's mockup, Nov 9): the special offer, five cards with the discount's ribbon and struck prices, the limited clock's pop-up, \"Buying opens soon\"; 2 a row on a phone, 4 on a computer", async ({ page, browser }, testInfo) => {
+  const computer = testInfo.project.name === "desktop";
+  await asSignedIn(page, "shopper");
+  await page.goto("/shop");
+  const pct = Math.round(SHOP.discount * 100);
+  await expect(page.getByText(`Everything in the shop is ${pct}% off during beta.`)).toBeVisible();
+  const offer = page.locator(".shop-offer");
+  for (const words of ["SPECIAL OFFER", "Crate + Key Bundle", "3 Keys + 3 Random Crates", "Includes a chance at a", "Mythic Crate."]) await expect(offer).toContainText(words);
+  await expect(offer.locator(".bundle-art svg")).toHaveCount(1);
+  await expect(offer.locator(".shop-mythic-icon .mythic-crate-art")).toHaveCount(1);
+  const cards = page.locator(".shop-card");
+  await expect(cards.locator("strong")).toHaveText(["Boss Crate", "HunChess Crate", "Gift Crate", "Beta Crate", "Crate Key"]);
+  await expect(page.locator('.shop-card[data-offer="boss"] .boss-crate-art')).toHaveCount(1);
+  // The ribbon and the struck price on every card and the bundle, from the setting.
+  for (const id of ["bundle", "boss", "hunchess", "gift", "beta", "key"] as const) {
+    const box = page.locator(`[data-offer="${id}"]`);
+    await expect(box.locator(".shop-ribbon")).toHaveText(discountLabel()!);
+    await expect(box.locator(".shop-price s")).toHaveText(String(SHOP.prices[id]));
+    await expect(box.locator(".shop-price b")).toHaveText(String(shopPrice(SHOP.prices[id])));
+  }
+  expect(discountLabel()).toBe(`${pct}% OFF`);
+  // The clock on the limited items only.
+  await expect(page.locator(".shop-card:has(.shop-clock)")).toHaveCount(SHOP.limited.length);
+  for (const id of ["boss", "hunchess", "key"]) await expect(page.locator(`.shop-card[data-offer="${id}"] .shop-clock`)).toHaveCount(0);
+  // 2 a row on a phone, 4 on a computer.
+  const tops = await cards.evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().top)));
+  const perRow = tops.filter((t) => t === tops[0]).length;
+  expect(perRow, "cards a row").toBe(computer ? 4 : 2);
+  // The pop-ups: the clock's words, then a price's; nothing moves while either shows.
+  const boxes = () => page.locator(".shop-offer, .shop-card, .area-tabs, .shop-line").evaluateAll((els) =>
+      els.map((e) => {
+        // (In the page, not the window: a tap may scroll its button into view.)
+        const b = e.getBoundingClientRect();
+        return [b.left + scrollX, b.top + scrollY, b.width, b.height].map(Math.round).join(",");
+      }),
+    );
+  const before = await boxes();
+  await page.locator('.shop-card[data-offer="gift"] .shop-clock').click();
+  const pop = page.getByRole("dialog");
+  await expect(pop).toHaveText(/Limited: a rotating shop item\. It leaves the shop when its time is up\./);
+  expect(await boxes()).toEqual(before);
+  await pop.getByRole("button", { name: "OK" }).click();
+  await expect(pop).toHaveCount(0);
+  await page.locator('.shop-card[data-offer="key"] .shop-price').click();
+  await expect(pop).toHaveText(/Buying opens soon\./);
+  expect(await boxes()).toEqual(before);
+  await page.keyboard.press("Escape");
+  await expect(pop).toHaveCount(0);
+  // Escape the moment the pop-up is in the page (before it's painted): it closes too. (Its listener waited for a paint, so an Escape
+  // pressed as it opened was lost: this test on CI, Nov 11. docs/decisions/2026-11-11-flaky-batch.md)
+  await page.evaluate(() => {
+    const w = window as unknown as { __popEsc?: boolean };
+    w.__popEsc = false;
+    const obs = new MutationObserver(() => {
+      if (!document.querySelector(".shop-pop")) return;
+      obs.disconnect();
+      w.__popEsc = true;
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    });
+    obs.observe(document.body, { childList: true, subtree: true });
+  });
+  await page.locator('.shop-card[data-offer="key"] .shop-price').click();
+  await expect.poll(() => page.evaluate(() => (window as unknown as { __popEsc?: boolean }).__popEsc)).toBe(true);
+  await expect(pop).toHaveCount(0);
+  await page.locator('.shop-offer .shop-price').click();
+  await expect(pop).toHaveText(/Buying opens soon\./);
+  await page.mouse.click(5, 5);
+  await expect(pop).toHaveCount(0);
+  // The stills, at deviceScaleFactor 2, in a context of their own (the same account), from the computer's run.
+  const shots = process.env.SHOP_PAGE_SHOTS;
+  if (shots && computer) {
+    const state = await page.context().storageState();
+    const sizes = [
+      ["phone-390", 390, 844, ["light", "dark"]],
+      ["phone-320", 320, 640, ["light"]],
+      ["computer-1440", 1440, 900, ["light", "dark"]],
+    ] as const;
+    for (const [name, width, height, schemes] of sizes) {
+      for (const colorScheme of schemes) {
+        const ctx = await browser.newContext({ storageState: state, deviceScaleFactor: 2, viewport: { width, height }, colorScheme, baseURL: testInfo.project.use.baseURL });
+        const p = await ctx.newPage();
+        await p.goto("/shop");
+        await expect(p.locator(".shop-card")).toHaveCount(5);
+        await p.waitForTimeout(400);
+        await p.screenshot({ path: `${shots}/${name}-${colorScheme}-top.png` });
+        if (!name.startsWith("computer")) {
+          await p.evaluate(() => scrollTo(0, document.documentElement.scrollHeight));
+          await p.waitForTimeout(300);
+          await p.screenshot({ path: `${shots}/${name}-${colorScheme}-scrolled.png` });
+        }
+        await ctx.close();
+      }
+    }
+  }
 });
 
 /**
@@ -1482,7 +1811,8 @@ test("the shop page's width (Eric, Nov 8): on a computer all three tabs sit 120 
   await giveItems(page, [{ def: "riding-chirp", color: "cobalt", blemish: 40 }]);
   await page.goto("/shop");
   const cases = [
-    { tab: "Shop", shot: "shop", chips: ".shop-tabs", box: null, card: ".shop-item", grid: ".shop-grid" },
+    // The Shop tab's page (Nov 9): the special offer's banner and its cards (paused Nov 8 while nothing was for sale).
+    { tab: "Shop", shot: "shop", chips: null, box: ".shop-offer", card: ".shop-card", grid: ".shop-cards" },
     { tab: "Crates", shot: "crates", chips: null, box: null, card: ".crates .crate-row", grid: ".crates" },
     { tab: "Locker", shot: "locker-W", chips: ".locker-tabs", box: ".locker-preview", card: ".locker-item", grid: ".locker-grid" },
   ] as const;

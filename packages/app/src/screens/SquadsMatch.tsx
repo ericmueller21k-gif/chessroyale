@@ -94,7 +94,8 @@ const sideWord = (c: Colour) => (c === "w" ? "White" : "Black");
 
 /** The match to watch when you have none of your own: the final, else the latest round's first live match. */
 export function spectateDefault(client: SquadsClient): BoardRef | null {
-  const live = shownMatches([...client.matches.values()]).filter((m) => m.state !== "over");
+  // (Every match not over, a next round's still in its break too: the final is the one to watch the moment it's made.)
+  const live = [...client.matches.values()].filter((m) => m.state !== "over").sort((a, b) => a.round - b.round || a.index - b.index);
   const pick = live.find((m) => m.round === 2) ?? live[live.length - 1] ?? shownMatches([...client.matches.values()]).pop();
   return pick ? { key: pick.key, board: 0 } : null;
 }
@@ -470,7 +471,12 @@ export function SquadsMatchScreen({
       watching={!!watch && !onMine}
       studying={!onMine && !!mine && vm.key === mine.key && vb.id === studyBoard({ ...mine, turn: shownTurn(mine) }, me)}
       canWatch={!duty || myLocked || vm.state !== "half"}
-      onWatch={(key, board) => setWatch(mine && key === mine.key && board === myBoard ? null : { key, board })}
+      onWatch={(key, board) => {
+        // (A board you open yourself, your own too, calls off the jump still to come: it once took you from your own board, a
+        // beat after you'd opened it, to the next one. Main run 1171.)
+        clearTimeout(jumpTimer.current);
+        setWatch(mine && key === mine.key && board === myBoard ? null : { key, board });
+      }}
       onShow={(board, ply) => setWatch({ key: vm.key, board, ply, at: Date.now() })}
       showAt={viewing.ply !== undefined ? { ply: viewing.ply, at: viewing.at ?? 0 } : null}
       canShow={!duty || myLocked || vm.state !== "half"}
@@ -533,6 +539,12 @@ function MatchView({
   const d = onMine && !client.me?.botPlays ? dutyOf(m, me) : null;
   const mySide = sideIn(m, me);
   const myLocked = !!me && m.locked.includes(me);
+  // Your turn begins (a new half asks your move on this board): it goes live, even if you were looking back (Eric,
+  // Nov 9: "The moment it becomes your turn on a board, it should snap you to that board"). Keyed by the half.
+  const turnHalf = d && !myLocked && m.current ? `${m.key}/${m.current.seq}` : null;
+  useLayoutEffect(() => {
+    if (turnHalf) history.live();
+  }, [turnHalf]);
   const mineChoice = me ? (m.visible[me] ?? null) : null;
   const partner = d?.partner ?? null;
   const partnerChoice = partner ? (m.visible[partner] ?? null) : null;

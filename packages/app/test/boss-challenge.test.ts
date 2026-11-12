@@ -73,9 +73,9 @@ describe("the challenge's flow", () => {
     expect(run(["fight", "atDoor", "cancel", "fight"])).toBe("toDoor");
   });
 
-  it("every boss whose home has an inside has an intro (Alfil, Big Boy, Timber, Hollow, Wrangler, Jefferson, Ginger, Dash, Folio and Smudgy their own, Babur, Puddles and Boingo the default); every other boss is challenged as before (the Boss raid screen)", () => {
+  it("every boss whose home has an inside has an intro (Alfil, Big Boy, Timber, Hollow, Wrangler, Jefferson, Ginger, Dash, Folio, Smudgy and Don Dough their own, Babur, Puddles and Boingo the default); every other boss is challenged as before (the Boss raid screen)", () => {
     const withIntro = ALL_HOMES.filter((h) => introOf(h.id)).map((h) => h.id).sort();
-    expect(withIntro).toEqual(["alfil", "bigboy", "clown", "dash", "folio", "gardener", "gingerbread", "grex", "hollow", "pig", "smudgy", "tiger", "timber"]);
+    expect(withIntro).toEqual(["alfil", "bigboy", "clown", "dash", "folio", "gardener", "gingerbread", "grex", "hollow", "pig", "smudgy", "tiger", "timber", "zebra"]);
     expect(withIntro).toEqual(Object.keys(SHOPS).sort());
     expect(introOf("alfil")).toMatchObject({ custom: true, line: "I'll show you the power of the old piece." });
     expect(introOf("tiger")).toMatchObject({ custom: false, name: "Babur", line: "Fine. One more show. Then I'm on break." });

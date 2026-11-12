@@ -48,24 +48,62 @@ const boxes = (page: Page) =>
       const b = e.getBoundingClientRect();
       return { x: b.left, r: b.right, y: b.top, b: b.bottom };
     };
-    return { board: r(`.board-area .board-row > .board-wrap ${sel}`), row: r(".boss-dock-main"), status: r(".boss-dock-status"), clock: r(".dk-clock"), king: r(".gk-unit-btn") };
+    return { board: r(`.board-area .board-row > .board-wrap ${sel}`), row: r(".boss-dock-main"), status: r(".boss-dock-status"), clock: r(".dk-clock"), king: r(".gk-unit-btn"), unit: r(".boss-dock > .gk-unit"), pawn: r(".boss-dock > .you-pawn"), panel: r(".boss-dock > .dk-panel"), stacked: !!document.querySelector(".boss-dock.dk-stack") };
   }, BOARD_SEL.container);
 
-test("the row is exactly the board's width under its edges at every width; the God King under it (phone, tablet upright), beside it with room (a phone on its side), by the board's corner (computer)", async ({ browser }) => {
+/**
+ * Resolves once the board's, the row's and the God King's boxes have been the same for three painted frames in a row (or after
+ * 2 s, if something there keeps moving: the checks that follow then decide).
+ */
+const settled = (page: Page) =>
+  page.evaluate((sel) => {
+    const key = () =>
+      [`.board-area .board-row > .board-wrap ${sel}`, ".boss-dock-main", ".gk-unit-btn"]
+        .map((s) => JSON.stringify(document.querySelector(s)?.getBoundingClientRect() ?? null))
+        .join();
+    return new Promise<void>((done) => {
+      let last = "";
+      let same = 0;
+      const until = performance.now() + 2000;
+      const look = () => {
+        const k = key();
+        same = k === last ? same + 1 : 0;
+        last = k;
+        if (same >= 3 || performance.now() > until) done();
+        else requestAnimationFrame(look);
+      };
+      requestAnimationFrame(look);
+    });
+  }, BOARD_SEL.container);
+
+test("the row is exactly the board's width under its edges at every width; the God King under it (phone, tablet upright: stacked over your pawn where the strip is tall enough, Eric, Nov 11), beside it with room (a phone on its side), by the board's corner (computer)", async ({ browser }) => {
   test.skip(test.info().project.name !== "phone", "one run is enough: it opens its own screens");
   test.setTimeout(6 * 60_000);
   const sizes = [
-    { name: "320", viewport: { width: 320, height: 640 }, phone: true, king: "under" },
+    { name: "320", viewport: { width: 320, height: 640 }, phone: true, king: "stack" },
     { name: "390", viewport: { width: 390, height: 664 }, phone: true, king: "under" },
-    { name: "768", viewport: { width: 768, height: 1024 }, phone: false, king: "under" },
+    // (Eric's iPhone 14 Plus, Nov 11: the strip tall enough for the two, one above the other; the bar collapsed and not.)
+    { name: "428x746", viewport: { width: 428, height: 746 }, phone: true, king: "stack" },
+    { name: "428x926", viewport: { width: 428, height: 926 }, phone: true, king: "stack" },
+    { name: "768", viewport: { width: 768, height: 1024 }, phone: false, king: "stack" },
     { name: "844x390", viewport: { width: 844, height: 390 }, phone: true, king: "beside" },
     { name: "1024", viewport: { width: 1024, height: 768 }, phone: false, king: "corner" },
     { name: "1280", viewport: { width: 1280, height: 800 }, phone: false, king: "corner" },
   ] as const;
   for (const s of sizes) {
-    const ctx = await browser.newContext(s.phone ? { ...devices["iPhone 13"], viewport: s.viewport } : { viewport: s.viewport });
+    // (A phone on its side is covered by the "turn upright" panel since Nov 11, so the battle is entered upright and the phone is
+    // turned after; the layout is measured the same.)
+    const upright = s.phone && s.viewport.width > s.viewport.height ? { width: 390, height: 664 } : s.viewport;
+    const ctx = await browser.newContext(s.phone ? { ...devices["iPhone 13"], viewport: upright } : { viewport: s.viewport });
     const page = await ctx.newPage();
     await intoBattle(page);
+    if (upright !== s.viewport) {
+      await page.setViewportSize(s.viewport);
+      // (The row is lined up with the board by a ResizeObserver, which runs before the turned screen's first paint, and the God
+      // King stepping beside the row shrinks the board a frame later. Measured straight after the resize, a forced layout read the
+      // row where it stood upright, 122 px off (main's run 43016010621, and 2 of 3 locally): measure once the frames stop changing.)
+      await settled(page);
+    }
     const b = await boxes(page);
     expect(b.board && b.row && b.status && b.clock && b.king, s.name).toBeTruthy();
     // The row's edges are the board's, within a pixel.
@@ -75,10 +113,27 @@ test("the row is exactly the board's width under its edges at every width; the G
     expect(b.clock!.r, `${s.name}: clock inside the box`).toBeLessThanOrEqual(b.status!.r);
     expect(b.status!.r - b.clock!.r, `${s.name}: clock at the box's right`).toBeLessThan(16);
     await expect(page.locator(".dk-clock.running .dk-time")).toHaveText(/^\d:\d\d$/);
-    if (s.king === "under") {
+    if (s.king === "under" || s.king === "stack") {
       // (Under the row at the strip's far right, the panel to his left, since Oct 25: docs/decisions/2026-10-25-board-layout.md.)
       expect(b.king!.y, `${s.name}: the God King under the row`).toBeGreaterThanOrEqual(b.row!.b);
       expect(Math.abs(b.king!.r - b.row!.r), `${s.name}: at the row's right edge`).toBeLessThanOrEqual(1);
+      const [unit, pawn, panel] = [b.unit!, b.pawn!, b.panel!];
+      expect(b.stacked, `${s.name}: stacked`).toBe(s.king === "stack");
+      if (s.king === "stack") {
+        // Stacked (Eric, Nov 11: "put the king and pawn vertical… the king on top"): your pawn under him in his column, as big as
+        // he is, each bigger than side by side (58 px wide), both in the strip and on the screen, the panel left of them.
+        expect(Math.abs(pawn.x - unit.x) + Math.abs(pawn.r - unit.r), `${s.name}: your pawn in his column`).toBeLessThanOrEqual(1);
+        expect(pawn.y, `${s.name}: your pawn under him`).toBeGreaterThanOrEqual(unit.b - 0.5);
+        expect(Math.abs(pawn.b - pawn.y - (unit.b - unit.y)), `${s.name}: as tall as he is`).toBeLessThanOrEqual(1);
+        expect(unit.r - unit.x, `${s.name}: bigger than side by side`).toBeGreaterThan(58);
+        expect(pawn.b, `${s.name}: inside the strip`).toBeLessThanOrEqual(panel.b + 0.5);
+        expect(pawn.b, `${s.name}: on the screen`).toBeLessThanOrEqual(s.viewport.height);
+        expect(panel.r, `${s.name}: the panel left of them`).toBeLessThanOrEqual(unit.x + 0.5);
+      } else {
+        // (A strip too short for the two one above the other: side by side, your pawn just left of him, Oct 28.)
+        expect(Math.abs(pawn.r - unit.x), `${s.name}: your pawn just left of him`).toBeLessThanOrEqual(1);
+        expect(Math.abs(pawn.y - unit.y), `${s.name}: on his line`).toBeLessThanOrEqual(1);
+      }
     } else if (s.king === "beside") {
       expect(b.king!.x, `${s.name}: beside the row`).toBeGreaterThanOrEqual(b.row!.r);
       expect(b.king!.y, `${s.name}: on the row's line`).toBeLessThan(b.row!.b);
@@ -88,6 +143,7 @@ test("the row is exactly the board's width under its edges at every width; the G
     }
     // Everything in view across (nothing past the screen's edges).
     expect(b.king!.r, `${s.name}: the God King in view`).toBeLessThanOrEqual(s.viewport.width);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth), `${s.name}: no sideways scroll`).toBeLessThanOrEqual(0);
     await ctx.close();
   }
   // (A phone whose board grew as the scoreboard was minimized was checked here: since Oct 25 a boss screen on a phone has no
@@ -170,7 +226,7 @@ test("your pick the best move: the dock's line says so (\"Best move · You: …\
   // A Solo raid (you and 49 bots: a reveal after each crowd move, as in a raid or the Crowd's boss battle).
   await page.goto("/?debug&pace=quick&clock=30&bossMoves=6&laststand=0");
   await openBossRaid(page);
-  await page.getByRole("button", { name: /^Raid with bots/ }).click();
+  await page.getByRole("button", { name: /^Play with bots/ }).click();
   // Every line of yours the dock shows, every frame from before it can appear, with what the reveal says: your move,
   // its loss and score, the best move (docs/decisions/2026-10-16-the-best-move-is-the-highest-scored.md).
   await page.evaluate(() => {
@@ -226,7 +282,7 @@ test("your pick the best move: the dock's line says so (\"Best move · You: …\
 async function intoFrozenReveal(page: Page) {
   await page.goto("/?debug&pace=quick&clock=30&bossMoves=6&laststand=0");
   await openBossRaid(page);
-  await page.getByRole("button", { name: /^Raid with bots/ }).click();
+  await page.getByRole("button", { name: /^Play with bots/ }).click();
   // Watched from before it can appear: the first frame of a reveal whose dock line has your pick, then halted.
   await page.evaluate(() => {
     const w = window as any;

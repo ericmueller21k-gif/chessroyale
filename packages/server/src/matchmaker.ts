@@ -21,7 +21,11 @@ export type PlayAnswer =
  * waits up to holdMs); or `expired`: the queue doesn't know that ticket (it went while the app was asleep, or it never
  * was one): ask again without it.
  */
-export type DuelPlayAnswer = PlayAnswer | { searching: true; ticket: string; waitedMs: number } | { expired: true };
+/** `delayMs`: ranked's delayed queue (L1): how long until this ticket can be paired (missing: it can be now). */
+export type DuelPlayAnswer = PlayAnswer | { searching: true; ticket: string; waitedMs: number; delayMs?: number } | { expired: true };
+
+/** Ranked's leave rules read again as a ticket asks (L1; queue.ts restrict): the asking account, a lockout, the delayed queue's time. */
+export type DuelRecheck = { uid: string; drop: boolean; notBefore: number | null };
 
 export const busyMessage = (seconds: number) => `Servers are busy, you're in line: about ${seconds} s`;
 
@@ -44,6 +48,11 @@ export interface PlayOptions {
    * server), paired by rating (PAIR_BY_RATING); each pair gets a game of its own (a DuelGame object).
    */
   duel?: boolean;
+  /**
+   * The engine pool's queue (an account fair play pooled: set by the Worker from the account, never the browser): its lobbies say so, and
+   * seat no one else who has their code (lobby-do.ts, squads-do.ts). The #618 review, m4.
+   */
+  engine?: boolean;
 }
 
 /**
@@ -66,13 +75,14 @@ export class Matchmaker extends DurableObject<Env> {
   private current = new Map<string, string>();
   private forming: Promise<void> | null = null;
   private again: ReturnType<typeof setTimeout> | null = null;
-  private lobbyOptions: { overrides: LobbyRecord["overrides"]; fillMs: number; botsOff: boolean; crowdWaitsForFull: boolean; squads: boolean; duel: boolean } = {
+  private lobbyOptions: { overrides: LobbyRecord["overrides"]; fillMs: number; botsOff: boolean; crowdWaitsForFull: boolean; squads: boolean; duel: boolean; engine: boolean } = {
     overrides: {},
     fillMs: 60_000,
     botsOff: false,
     crowdWaitsForFull: false,
     squads: false,
     duel: false,
+    engine: false,
   };
   private players: { at: number; n: number } = { at: 0, n: 0 };
   /** The matching rules (ranked replaces these). */
@@ -98,31 +108,52 @@ export class Matchmaker extends DurableObject<Env> {
    * A ticket is only ever made with its player: an ask with a ticket this queue doesn't know is `expired` (never a new,
    * empty ticket), and a first ask without the player is refused.
    */
-  async duelNext(ticketId: string | null, info?: Record<string, unknown>): Promise<DuelPlayAnswer> {
+  async duelNext(ticketId: string | null, info?: Record<string, unknown>, recheck?: DuelRecheck): Promise<DuelPlayAnswer> {
     if (ticketId ? !this.q.known(ticketId) : !info || !duelTicketComplete({ id: "", at: 0, seenAt: 0, info })) return { expired: true };
+    // (Ranked's leave rules read again for a ticket already in line, L1: a lockout takes it out; the delayed queue holds it.)
+    if (ticketId && recheck && this.q.restrict(ticketId, recheck.uid, recheck)) return { expired: true };
     return this.ask({}, 0, { duel: true }, ticketId, ticketId ? undefined : info);
   }
 
   private async ask(overrides: LobbyRecord["overrides"], fillMs: number, opts: PlayOptions, ticketId?: string | null, info?: Record<string, unknown>): Promise<DuelPlayAnswer> {
     countCall("mm.next");
-    this.lobbyOptions = { overrides, fillMs, botsOff: !!opts.botsOff, crowdWaitsForFull: !!opts.crowdWaitsForFull, squads: !!opts.squads, duel: !!opts.duel };
+    this.lobbyOptions = { overrides, fillMs, botsOff: !!opts.botsOff, crowdWaitsForFull: !!opts.crowdWaitsForFull, squads: !!opts.squads, duel: !!opts.duel, engine: !!opts.engine };
     const now = Date.now();
     const t = this.q.enqueue(ticketId, now, opts.since !== undefined ? { ...info, since: opts.since } : info);
     const done = this.q.placedIn(t.id);
-    if (done) return { code: done, ticket: t.id };
+    if (done) return { code: await this.told(t.id, done, opts), ticket: t.id };
     const seated = new Promise<string>((resolve) => this.waiters.set(t.id, resolve));
     this.kick();
     const code = await Promise.race([seated, sleep(this.holdMs).then(() => null)]);
     this.waiters.delete(t.id);
-    if (code) return { code, ticket: t.id };
+    if (code) return { code: await this.told(t.id, code, opts), ticket: t.id };
     // Placed just now, after the wait ran out?
     const late = this.q.placedIn(t.id);
-    if (late) return { code: late, ticket: t.id };
+    if (late) return { code: await this.told(t.id, late, opts), ticket: t.id };
     // Ranked 1 v 1: no opponent yet (unless the servers are full: then busy, as every queue).
-    if (opts.duel && this.players.n < this.q.cfg.maxPlayers && this.q.position(t.id) > 0) return { searching: true, ticket: t.id, waitedMs: Math.max(0, Date.now() - t.at) };
+    if (opts.duel && this.players.n < this.q.cfg.maxPlayers && this.q.position(t.id) > 0) {
+      const delayMs = Math.max(0, Number(t.info?.notBefore ?? 0) - Date.now());
+      return { searching: true, ticket: t.id, waitedMs: Math.max(0, Date.now() - t.at), ...(delayMs > 0 ? { delayMs } : {}) };
+    }
     countCall("mm.busy");
     const waitSeconds = this.q.estimateSeconds(t.id, Date.now(), this.players.n);
     return { busy: true, ticket: t.id, position: this.q.position(t.id), waitSeconds, retryMs: CAPACITY.queue.retryMs, message: busyMessage(waitSeconds) };
+  }
+
+  /**
+   * An ask is answered with its game's code: ranked 1 v 1's game hears (once) that this player was told (ranked's leave rules,
+   * L1: a no-show is a dodge only then). A call that fails leaves it untold: the player is never charged for the server's slip.
+   */
+  private async told(ticketId: string, code: string, opts: PlayOptions): Promise<string> {
+    const d = opts.duel ? this.q.deliver(ticketId) : null;
+    if (d?.uid) {
+      try {
+        await this.env.DUELS.get(this.env.DUELS.idFromName(d.code)).delivered(d.uid);
+      } catch {
+        countCall("mm.toldFailed");
+      }
+    }
+    return code;
   }
 
   /** Ranked 1 v 1's Cancel: the ticket leaves the line. Answers its game if it was paired already (the app then leaves it). */
@@ -218,7 +249,7 @@ export class Matchmaker extends DurableObject<Env> {
       }
     }
     while (rest.length) {
-      const { overrides, fillMs, botsOff, crowdWaitsForFull } = this.lobbyOptions;
+      const { overrides, fillMs, botsOff, crowdWaitsForFull, engine } = this.lobbyOptions;
       let granted: number | boolean = false;
       countCall("mm.create");
       const want = rest.length;
@@ -235,7 +266,7 @@ export class Matchmaker extends DurableObject<Env> {
           : now + fillMs;
       // A fresh code: one whose lobby is still open (a match, or its results) is never handed out.
       const fresh = await openLobbyCode(async (c) => {
-        granted = await this.lobby(c).create(c, overrides, { fillAt, botsOff, reserve: want, reserveMs: CAPACITY.queue.reservationMs });
+        granted = await this.lobby(c).create(c, overrides, { fillAt, botsOff, reserve: want, reserveMs: CAPACITY.queue.reservationMs, ...(engine ? { engine } : {}) });
         return granted !== false;
       });
       if (!fresh || !granted) {
@@ -273,7 +304,7 @@ export class Matchmaker extends DurableObject<Env> {
       const fillAt = Date.now() + this.lobbyOptions.fillMs;
       let took: number[] | false = false;
       const fresh = await openLobbyCode(async (c) => {
-        took = await this.squadsLobby(c).create(c, { fillAt, reserve: groups(rest), reserveMs: CAPACITY.queue.reservationMs });
+        took = await this.squadsLobby(c).create(c, { fillAt, reserve: groups(rest), reserveMs: CAPACITY.queue.reservationMs, ...(this.lobbyOptions.engine ? { engine: true } : {}) });
         return took !== false;
       });
       const placed = fresh && took ? rest.filter((_, i) => (took as number[]).includes(i)) : [];

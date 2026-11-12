@@ -51,6 +51,11 @@ export interface SkyLook {
 }
 
 export const TOWN_FEEL = {
+  /**
+   * The longest the town waits, as it opens, for your pawn's pictures and your ride's frames (Eric, Nov 10: "your rider doesnt appear
+   * for a few seconds"; Town.tsx readyYou): past it the town shows with you on foot and the ride appears the moment it's ready.
+   */
+  youWaitMs: 1000,
   // ---- The walk (Eric: "perfect"; square to square "makes it feel like chess").
   /** Your step: one square in this many ms. (Prototype: 90.) */
   youStepMs: 90,
@@ -216,6 +221,16 @@ export const TOWN_FEEL = {
   boxStripsFine: 24,
   /** How long a frame may spend getting buildings' roofs ready before they're seen (ms; the nearest first). (Round 4: 2.5 before.) */
   boxBakeMs: 1.5,
+  /** The same while you stand still and the view isn't turning (Nov 11: a still frame has room, and what a look round shows gets ready sooner). */
+  boxBakeStillMs: 4,
+  /**
+   * The street town's loading screen (Nov 11, Eric: "loads it all in at once and then it stays there"; Town.tsx `loadTown`): the work done
+   * between two of its frames (ms; the bar moves between them), and the bar's share for painting every picture (the rest: uploading them).
+   */
+  loadSliceMs: 40,
+  loadPaintShare: 0.5,
+  /** How long it waits for the sidekicks' sheets (ms; they load as the town opens): past it, one not in yet is drawn when it's in, as before. */
+  loadSheetWaitMs: 3000,
   /** A home's floating name: how far over its roof it floats (px), and the step it drops by to keep off the buildings behind. */
   nameOverRoof: 6,
   nameDropStep: 3,
@@ -482,7 +497,8 @@ export const TOWN_FEEL = {
    * Some bosses smaller than that in the town square, by their home's id (Eric, Oct 26: "Sawyer the raccoon and the pig
    * are massive. And the chameleon … about 65% or three-fourths"; Puddles and Jefferson are the right size).
    */
-  bossScale: { sawyer: 0.7, pig: 0.7, smudgy: 0.7 } as Readonly<Record<string, number>>,
+  // (Don Dough has no town figure: his intro draws his art 1:1 at the room's 37 px a square, 104 / 37 / 3 of bossSquares.)
+  bossScale: { sawyer: 0.7, pig: 0.7, smudgy: 0.7, zebra: 0.94 } as Readonly<Record<string, number>>,
   /** A bot's pawn. */
   botSquares: 1.25,
   /**
@@ -519,6 +535,8 @@ export const TOWN_FEEL = {
     "cheetah-shoes": { foot: 95, shadow: 0.9 },
     "log-roller": { foot: 96, shadow: 0 },
     "pen-pony": { foot: 98.5, shadow: 1.3 },
+    // (An outfit, Nov 10: drawn with the rides' kit; its shoes' soles.)
+    "banana-suit": { foot: 98, shadow: 1.1 },
   } as Readonly<Record<string, { foot: number; shadow: number }>>,
   /**
    * The shadows under a pawn (and a boss): the soft one this strong (as before), and a contact shadow right under the
@@ -745,6 +763,15 @@ export const SHOP_FEEL = {
   doorZoomMs: 600,
   fadeMs: 260,
   /**
+   * (Nov 11, Eric: "when you go into a building, just make it take an extra second... and just load the whole inside.") While the
+   * town zooms on the door, the room's pictures are painted at most this many ms a frame (shops/load-slice.ts); the rest behind the
+   * black. Inside, the black lifts once the room has drawn `warmFrames` frames (their first-time costs, WebGL's set-up among them,
+   * under the black), or after `warmMaxMs` at the most.
+   */
+  loadSliceMs: 4,
+  warmFrames: 3,
+  warmMaxMs: 1000,
+  /**
    * The floor is drawn flat on its squares in blocks of this many squares a side (each block two triangles of one baked picture of
    * the whole floor): 1 is exactly the mockup's (a tile a draw), 2 a quarter of the draws, the room's gentle curve barely bent.
    */
@@ -794,4 +821,42 @@ export const SHOP_FEEL = {
    * controls docked at the bottom.
    */
   claw: { glideMs: 900, tall: 0.56, wide: 0.8, maxMag: 3, atY: 0.4 },
+  /**
+   * Rolling Dough's people (Nov 11, shops/zebra-scene.ts). A line stays up `lineMs` plus `perCharMs` a character (the longest, 58
+   * characters, about 4.4 s). The guards say one now and then (`guardMs`, at random), sooner while you're beside them or by the back
+   * door (`guardNearMs`). The back table's chatter: its first line `firstMs` after you come in, `lineGapMs` between lines, `exchangeGapMs`
+   * between exchanges. The talk beat: the crew `staggerMs` apart; Fedora's line `aimLeadMs` after his draw; they lower `lowerAfterMs` into
+   * Don's "Relax"; his challenge line `gapMs` after. While they aim, each points his roll at you (zebra-scene.ts aimAt): your rows
+   * toward the camera count `aimRowK` of a column on screen, and the roll at his shoulder sits `aimDrop` squares above your middle.
+   * `dim`: the back room's dark wash (the art's mockup: 0.36), its lights added over it.
+   */
+  zebra: {
+    lineMs: 1800,
+    perCharMs: 45,
+    guardMs: [9000, 15000],
+    guardNearMs: [3500, 6000],
+    firstMs: 900,
+    lineGapMs: 500,
+    exchangeGapMs: 1400,
+    beat: { staggerMs: 120, aimLeadMs: 150, lowerAfterMs: 900, gapMs: 300, aimRowK: 0.8, aimDrop: 0.7 },
+    /**
+     * The walk-out in the back room after his challenge line (Eric, Nov 11: "watch all of them walk out, like pick up the stuff in the
+     * back and walk out"; zebra-scene.ts WalkOut): the crew set off `followMs` apart, the door guard comes in for your chair at once; a
+     * square every `stepMs`; `pickMs` picking a thing up (in his hooves halfway); Don gets up `donAfterMs` after the last is picked up,
+     * a square every `donStepMs`, and you set off `youAfterMs` after him. Through the door each fades out between rows `fade[0]` and
+     * `fade[1]` (in the front room, in between the same distance from its door).
+     */
+    out: { followMs: 450, stepMs: 200, pickMs: 400, donAfterMs: 800, donStepMs: 240, youAfterMs: 450, fade: [10.1, 10.8] },
+    dim: 0.36,
+    /**
+     * His challenge's set-up in the front room (Eric, Nov 11: "4 of his goons who follow you in carry a chair and a board and a table, 1
+     * item per goon"): the first goon `leadMs` after you start walking out, the next each `followMs` after; a square every `stepMs`;
+     * `setMs` setting it down (it's in place halfway); a square every `backMs` stepping back to where he watches, `watchBack` rows behind
+     * the table, `watchGap` squares apart. His line waits `holdMs` after you're both on your marks, so all is set and everyone watching.
+     */
+    setup: { leadMs: 500, followMs: 450, stepMs: 220, setMs: 350, backMs: 260, watchBack: 2.2, watchGap: 0.95, holdMs: 2600 },
+    /** How high a goon carries his thing (the room's pixels over his feet: at his hooves); the kept board on its table's top. */
+    carryUp: 26,
+    boardUp: 23,
+  },
 } as const;

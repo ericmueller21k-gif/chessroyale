@@ -75,7 +75,9 @@ describe("a Boss Battle party's battle (docs/decisions/2026-10-30-boss-party.md)
     const B = battle(3);
     expect(B.join(0, "wrong")).toEqual({ ok: false, message: PARTY_ONLY });
     expect(B.join(0).ok).toBe(true);
-    expect(B.join(0)).toEqual({ ok: false, message: PARTY_ONLY });
+    // (The same account again, a second device: its own seat back, never a second one: 2026-11-10-device-trust.md.)
+    expect(B.join(0)).toEqual({ ok: true, playerId: "p1" });
+    expect(B.core.record.humans.length).toBe(1);
     expect(B.join(5)).toEqual({ ok: false, message: PARTY_ONLY });
     // (A pass takes its own seat, whatever seat the app claims; another account can't use it.)
     expect(B.join(1, "pass1", "someone-else")).toEqual({ ok: false, message: PARTY_ONLY });
@@ -347,8 +349,12 @@ describe("Boss Battle party: the review's fixes (#420)", () => {
     // Maya (seat 1) can't take the leader's seat: her pass gives her seat 1 whatever the app says.
     expect(B.core.connect(undefined, "Maya", "phone", false, 1500, undefined, "u1", null, null, false, { pass: "pass1", seat: 0 }).ok).toBe(true);
     expect(B.last("p1", "lobby")!.party!.seats).toEqual({ p1: 1 });
-    // The same pass again (a second device, no token): refused, so nobody fills the battle to start it without the leader.
-    expect(B.core.connect(undefined, "Maya2", "phone", false, 1500, undefined, "u1", null, null, false, { pass: "pass1", seat: 2 })).toEqual({ ok: false, message: PARTY_ONLY });
+    // The same pass again (a second device, no token): her own seat back, not another, so nobody fills the battle to start
+    // it without the leader (one seat per account: 2026-11-10-device-trust.md).
+    expect(B.core.connect(undefined, "Maya2", "phone", false, 1500, undefined, "u1", null, null, false, { pass: "pass1", seat: 2 })).toEqual({ ok: true, playerId: "p1" });
+    expect(B.last("p1", "lobby")!.party!.seats).toEqual({ p1: 1 });
+    // From another account, that pass is refused.
+    expect(B.core.connect(undefined, "Maya3", "phone", false, 1500, undefined, "u9", null, null, false, { pass: "pass1", seat: 2 })).toEqual({ ok: false, message: PARTY_ONLY });
     // Seat 2's member was kicked at the stage after START: their pass is revoked.
     B.core.revokePartyMember("m2");
     expect(B.join(2)).toEqual({ ok: false, message: PARTY_ONLY });

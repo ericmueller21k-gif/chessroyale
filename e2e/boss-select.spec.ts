@@ -1,6 +1,6 @@
 import { expect, type Page } from "@playwright/test";
 import { adminFirstBosses, playableBosses } from "@chessroyale/core";
-import { named, openBossRaid, openSoloBoss, test } from "./helpers.ts";
+import { asAdmin, named, openBossRaid, openSoloBoss, test } from "./helpers.ts";
 
 /**
  * The Boss raid screen as an old-school character select (Eric, Oct 16; docs/decisions/2026-10-16-boss-character-select.md):
@@ -33,7 +33,7 @@ test("the tiles and the stage: a tap drops the boss on, plays its sound once and
   await named(page, "Selector");
   await page.addInitScript(() => ((window as any).__soundLog = []));
   await page.goto("/?mode=raid");
-  await expect(page.getByRole("heading", { name: "Boss raid", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Boss Battle", exact: true })).toBeVisible();
   const tiles = page.getByRole("radiogroup", { name: "Bosses" }).getByRole("radio");
   // Fourteen bosses you can meet (Folio the last), the Hidden Boss's tile, then "?".
   await expect(tiles).toHaveCount(16);
@@ -54,7 +54,7 @@ test("the tiles and the stage: a tap drops the boss on, plays its sound once and
   await expect(page.locator(".bs-level")).not.toContainText(/Rating|💀|\d/u);
   await expect(bubble(page)).toBeVisible();
   // (Nothing shifts, Eric's rule: the "Join a raid" button keeps its box whichever boss is picked, checked below.)
-  const joinBox = async (): Promise<Box> => (await page.getByRole("main").getByRole("button", { name: /^Join a raid/ }).boundingBox())!;
+  const joinBox = async (): Promise<Box> => (await page.getByRole("main").getByRole("button", { name: /^Join a Boss Battle/ }).boundingBox())!;
   const boingoJoin = await joinBox();
   expect(BOINGO).toContain(await bubble(page).getAttribute("aria-label"));
   await expect.poll(async () => (await sounds(page)).filter((s) => s.startsWith("clownSplat")).length).toBe(1);
@@ -198,14 +198,14 @@ test("the pick reaches Boss alone, a Solo raid and a raid you make; the public q
   await page.goto("/?debug&pace=quick&clock=20&bossMoves=3");
   await openBossRaid(page);
   const main = page.getByRole("main");
-  await expect(main.getByRole("button", { name: /^Join a raid/ })).toHaveText(/^Join a raidRandom boss · up to 50 players · bots after \d+ s$/);
+  await expect(main.getByRole("button", { name: /^Join a Boss Battle/ })).toHaveText(/^Join a Boss BattleRandom boss · up to 50 players · bots after \d+ s$/);
   await expect(main.getByRole("button", { name: /^People only/ })).toHaveText(/^People onlyRandom boss · no bots · starts at 50, or 10 after \d+ s$/);
 
   // Play with friends: the raid is made for the boss picked (the lobby's bossPicked).
   await tile(page, "Jefferson").click();
   await main.getByRole("button", { name: /^Play with friends/ }).click();
   const made = page.waitForRequest((r) => r.method() === "POST" && r.url().includes("/api/lobby?"));
-  await page.getByRole("dialog", { name: "Play with friends" }).getByRole("button", { name: "Create a raid" }).click();
+  await page.getByRole("dialog", { name: "Play with friends" }).getByRole("button", { name: "Create a Boss Battle" }).click();
   const url = new URL((await made).url());
   expect(url.searchParams.get("mode")).toBe("raid");
   expect(url.searchParams.get("boss")).toBe("grex");
@@ -218,7 +218,7 @@ test("the pick reaches Boss alone, a Solo raid and a raid you make; the public q
   // (The stage shows no number (Eric, Oct 25), and the difficulty's name under the boss (Medium). A Solo raid's strength is the usual one, a
   // step above your rating plus Sawyer's offset: 1350 unrated, as it was; its brain plays it with the bots as a crowd.)
   await expect(page.locator(".bs-level")).toHaveText("Medium");
-  await main.getByRole("button", { name: /^Raid with bots/ }).click();
+  await main.getByRole("button", { name: /^Play with bots/ }).click();
   await expect.poll(() => page.evaluate(() => (window as any).match?.boss?.id ?? null), { timeout: 60_000 }).toBe("sawyer");
   expect(await page.evaluate(() => (window as any).match.runner.state.boss.elo)).toBe(1350);
 
@@ -297,29 +297,128 @@ function measureGrid() {
   return { rows, block: R(document.querySelector(".bs-tiles")!), column: R(document.querySelector(".rd-page")!), head: R(document.querySelector(".rd-page .fd-page-head")!) };
 }
 /** The tiles' lines on the page, each as many tiles as it holds (top to bottom). */
+// The START form fits its window with no scroll (Eric, Nov 12: "an immutable screen... never scroll"): the grid on top, the stage
+// pushed down, START at the bottom, the speech bubble above the picked boss's head. Guest (sixteen tiles, three rows) and admin
+// (nineteen, a fourth row of one), at iPhone 14 Plus (428 x 746, Eric's baseline) and a small phone (360 x 640).
+for (const admin of [false, true]) {
+  test(`the Boss Battle screen never scrolls, ${admin ? "admin (nineteen tiles, four rows)" : "guest (sixteen tiles, three rows)"}: at 428 x 746 and 360 x 640 the page fits its window, START is on screen, and the picked boss's speech bubble sits above its head (Eric, Nov 12)`, async ({ page }) => {
+    test.skip(desktop(), "a phone's windows");
+    await named(page, "Selector");
+    if (admin) await asAdmin(page);
+    for (const [w, h] of [[428, 746], [360, 640]] as const) {
+      const at = `${w}x${h}`;
+      await page.setViewportSize({ width: w, height: h });
+      await page.goto("/");
+      await openSoloBoss(page);
+      await expect(page.locator(".bs-tile")).toHaveCount(admin ? 19 : 16);
+      await tile(page, "Jefferson").click();
+      // (After its drop, which squashes it a little wider for a moment.)
+      await page.waitForTimeout(500);
+      expect(await page.evaluate(() => document.documentElement.scrollHeight - innerHeight), `${at}: no page scroll`).toBeLessThanOrEqual(0);
+      expect(await sideways(page), `${at}: no sideways scroll`).toBe(0);
+      const start = (await page.locator(".bs-start").boundingBox())!;
+      expect(start.y, `${at}: START's top in the window`).toBeGreaterThanOrEqual(0);
+      expect(start.y + start.height, `${at}: START's foot in the window`).toBeLessThanOrEqual(h);
+      // The boss's head: its visible top, the first row of its figure's paint in the sprite's canvas (its box runs past its frame's empty rows).
+      const head = await page.evaluate(() => {
+        const el = document.querySelector(".bs-spot:not(.bs-mine) .bs-sprite") as HTMLElement | null;
+        const cv = el && (el.tagName === "CANVAS" ? (el as HTMLCanvasElement) : el.querySelector("canvas"));
+        if (!cv) return null;
+        const d = cv.getContext("2d")!.getImageData(0, 0, cv.width, cv.height).data;
+        let row = -1;
+        for (let y = 0; y < cv.height && row < 0; y++) for (let x = 0; x < cv.width; x++) if (d[(y * cv.width + x) * 4 + 3]! > 0) { row = y; break; }
+        const r = cv.getBoundingClientRect();
+        return r.top + (row / cv.height) * r.height;
+      });
+      const bubble = (await bubbleBox(page))!;
+      expect(head, `${at}: the boss's head`).not.toBeNull();
+      expect(bubble.y + bubble.height, `${at}: the bubble's box above the boss's head`).toBeLessThanOrEqual(head!);
+    }
+  });
+}
+
+const bubbleBox = (p: Page) => p.locator(".bs-say .bs-bubble").boundingBox();
+
 const tileLines = (p: Page) => p.locator(".bs-tile").evaluateAll((es) => [...new Set(es.map((e) => Math.round(e.getBoundingClientRect().top)))].map((y) => es.filter((e) => Math.round(e.getBoundingClientRect().top) === y).length));
 /** What tile (its name) is at each point, null where none is (the page, a gap). */
 const tileAt = (ps: { x: number; y: number }[]) => ps.map((p) => document.elementFromPoint(p.x, p.y)?.closest(".bs-tile")?.getAttribute("aria-label") ?? null);
 
+// The computer's stage grows into the room the grid and START leave (Nov 12, Eric: "3X the pawn and boss size even 4"). Today's computer
+// figures on main (Nov 12, the same at 1536 x 864 and 1920 x 1080): the pawn's box 145 px tall; the boss's painted figure 178 (Jefferson),
+// 182 (Big Boy), 180 (Alfil), 167 (Chub & Chirp). The room now gives about 1.15x at 1536 x 864 (the grid takes the top of that window) and
+// about 1.96x at 1920 x 1080 (the stage's 920 px column is the width's limit). 2.5x and more needs a shorter grid or a wider stage: Eric's
+// call (docs/decisions/2026-11-12-select-desktop-big.md). The floors below are what the room gives, measured.
+const TODAY_PAWN = 145;
+const TODAY_BOSS: Record<string, number> = { Jefferson: 178, "Big Boy": 182, Alfil: 180, "Chub & Chirp": 167 };
+/** The boss's painted figure on the stage: its top and foot, from the canvas's own pixels (as the never-scroll test reads its head). */
+const bossPaint = (p: Page) =>
+  p.evaluate(() => {
+    const el = document.querySelector(".bs-spot:not(.bs-mine) .bs-sprite") as HTMLElement | null;
+    const cv = el && (el.tagName === "CANVAS" ? (el as HTMLCanvasElement) : el.querySelector("canvas"));
+    if (!cv) return null;
+    const d = cv.getContext("2d")!.getImageData(0, 0, cv.width, cv.height).data;
+    let top = -1;
+    let bot = -1;
+    for (let y = 0; y < cv.height; y++) {
+      for (let x = 0; x < cv.width; x++) {
+        if (d[(y * cv.width + x) * 4 + 3]! > 0) {
+          if (top < 0) top = y;
+          bot = y;
+          break;
+        }
+      }
+    }
+    const r = cv.getBoundingClientRect();
+    return { top: r.top + (top / cv.height) * r.height, bottom: r.top + ((bot + 1) / cv.height) * r.height };
+  });
+test("on a computer the pawn and the picked boss stand bigger on the stage, as the room allows (Nov 12): at 1536 x 864 and 1920 x 1080, a guest and an admin, every boss: the pawn at least 1.1x and 1.9x today's height and the boss likewise, no page scroll, START on screen, the speech bubble's box above the boss's painted head", async ({ page }) => {
+  test.skip(!desktop(), "a computer");
+  for (const admin of [false, true]) {
+    await named(page, "Selector");
+    if (admin) await asAdmin(page);
+    for (const [w, h, floor] of [[1536, 864, 1.1], [1920, 1080, 1.9]] as const) {
+      await page.setViewportSize({ width: w, height: h });
+      await page.goto("/");
+      await openSoloBoss(page);
+      for (const boss of Object.keys(TODAY_BOSS)) {
+        const at = `${admin ? "admin" : "guest"} ${w}x${h} ${boss}`;
+        await tile(page, boss).click();
+        // (After its drop, which squashes it a little wider for a moment.)
+        await page.waitForTimeout(500);
+        const pawn = (await page.locator(".bs-me .fd-pawn-stage").boundingBox())!;
+        expect(pawn.height / TODAY_PAWN, `${at}: the pawn's height`).toBeGreaterThanOrEqual(floor);
+        const fig = (await bossPaint(page))!;
+        expect((fig.bottom - fig.top) / TODAY_BOSS[boss]!, `${at}: the boss's height`).toBeGreaterThanOrEqual(floor);
+        expect(await page.evaluate(() => document.documentElement.scrollHeight - innerHeight), `${at}: no page scroll`).toBeLessThanOrEqual(0);
+        const start = (await page.locator(".bs-start").boundingBox())!;
+        expect(start.y, `${at}: START's top in the window`).toBeGreaterThanOrEqual(0);
+        expect(start.y + start.height, `${at}: START's foot in the window`).toBeLessThanOrEqual(h);
+        const bubble = (await bubbleBox(page))!;
+        expect(bubble.y + bubble.height, `${at}: the bubble's box above the boss's head`).toBeLessThanOrEqual(fig.top);
+      }
+    }
+  }
+});
+
 for (const scheme of ["light", "dark"] as const) {
-  test(`the grid, ${scheme}: tall slanted tiles all the same size with a small gap, five to a row on a phone (a short row centered), two rows of eight across a computer's column (Eric, Nov 2), edge to edge, bigger than before, 44 px targets, each filled by its boss's figure, nothing sideways`, async ({ page }) => {
+  test(`the grid, ${scheme}: square slanted tiles all the same size with a small gap, six to a row on a phone (a short row centered), two rows of eight across a computer's column (Eric, Nov 2), edge to edge, bigger than before, 44 px targets, each filled by its boss's figure, nothing sideways`, async ({ page }) => {
     await page.emulateMedia({ colorScheme: scheme });
     for (const [w, h] of SIZES()) {
       const at = `${scheme} ${w}x${h}`;
       await page.setViewportSize({ width: w!, height: h! });
       await page.goto("/?mode=raid");
-      await expect(page.getByRole("heading", { name: "Boss raid", exact: true })).toBeVisible();
+      await expect(page.getByRole("heading", { name: "Boss Battle", exact: true })).toBeVisible();
       await expect(page.locator(".bs-tile")).toHaveCount(16);
       await page.evaluate(() => document.fonts.ready);
       const g = await page.evaluate(measureGrid);
 
-      // Five to a row on a phone: 5, 5, 5 and "?" on its own (sixteen tiles since Folio, Oct 27). On a computer's wide column, two rows
-      // of eight (Eric, Nov 2; docs/decisions/2026-11-02-boss-select-rows.md); the narrower window keeps five a row.
-      expect(g.rows.map((r) => r.tiles.length), at).toEqual(desktop() && w! >= 1280 ? [8, 8] : [5, 5, 5, 1]);
+      // Six to a row on a phone: 6, 6 and 4, the "?" in the last (sixteen tiles). On a computer's wide column, two rows of eight
+      // (Eric, Nov 2; docs/decisions/2026-11-02-boss-select-rows.md); the narrower window keeps six a row (Nov 12).
+      expect(g.rows.map((r) => r.tiles.length), at).toEqual(desktop() && w! >= 1280 ? [8, 8] : [6, 6, 4]);
       const tiles = g.rows.flatMap((r) => r.tiles);
       const t0 = tiles[0]!;
 
-      // Every tile the very same size and shape: tall (its visible width 1 to 1.55 of its height), its slant a fifth of its width.
+      // Every tile the very same size and shape: square on its box (its visible width 0.8 of its height, Nov 12), its slant a fifth of its width.
       for (const t of tiles) {
         // ("?" is the smaller box since Oct 29, Eric's picture: 0.82 of a tile's width, half its height; in a computer's two rows it's
         // full height, so its edge runs parallel to its neighbor's: docs/decisions/2026-11-02-boss-select-rows.md.)
@@ -332,17 +431,19 @@ for (const scheme of ["light", "dark"] as const) {
         expect(Math.abs(t.h - t0.h), `${at} ${t.name}: height`).toBeLessThan(0.6);
         expect(Math.abs(t.slant - 0.2 * t.w), `${at} ${t.name}: slant`).toBeLessThan(0.7);
       }
-      expect(Math.abs(t0.h / t0.w - 1.24), `${at}: tall`).toBeLessThan(0.02);
+      // (Square on the tile's box: its height the width, its visible width 0.8 of that (the slant is a fifth), so 1.25 of it. Nov 12: was 1.24 of the width.)
+      expect(Math.abs(t0.h / t0.w - 1), `${at}: square`).toBeLessThan(0.02);
       const slant = t0.slant;
       expect(slant, `${at}: the frame stays slanted`).toBeGreaterThan(8);
-      expect((t0.w - slant) * 1.55, `${at}: visible width to height`).toBeCloseTo(t0.h, 0);
+      expect((t0.w - slant) * 1.25, `${at}: visible width to height`).toBeCloseTo(t0.h, 0);
 
       // A small, even gap between neighbors (along their slanted edge) and between rows.
       const gaps: number[] = [];
-      for (const row of g.rows) for (let i = 1; i < row.tiles.length; i++) gaps.push(row.tiles[i]!.x - (row.tiles[i - 1]!.r - slant));
+      // (The "?" keeps its own, shallower slant on a phone (Nov 12: six a row puts it in a row with the bosses), so its gap is left out.)
+      for (const row of g.rows) for (let i = 1; i < row.tiles.length; i++) if (row.tiles[i]!.name !== "Random boss" && row.tiles[i - 1]!.name !== "Random boss") gaps.push(row.tiles[i]!.x - (row.tiles[i - 1]!.r - slant));
       for (const gap of gaps) {
         expect(gap, `${at}: gap between neighbors`).toBeGreaterThanOrEqual(4);
-        expect(gap, `${at}: gap between neighbors`).toBeLessThanOrEqual(6);
+        expect(gap, `${at}: gap between neighbors`).toBeLessThanOrEqual(5);
         expect(Math.abs(gap - gaps[0]!), `${at}: the same gap everywhere`).toBeLessThan(0.6);
       }
       for (let i = 1; i < g.rows.length; i++) {
@@ -440,6 +541,8 @@ test("every tile can be tapped, in its middle and either side of a gap; a press 
         const a = row.tiles[i - 1]!;
         const b = row.tiles[i]!;
         const gap = b.x - (a.r - slant);
+        // (Not beside the "?": its own, shallower slant on a phone makes its edge sit elsewhere, Nov 12.)
+        if (a.name === "Random boss" || b.name === "Random boss") continue;
         for (const f of [0.1, 0.5, 0.9]) {
           const edge = a.r - slant * f;
           const y = a.y + a.h * f;
@@ -513,7 +616,7 @@ test("the layout: the stage under the tiles, the ways to play under the stage an
   }
 });
 
-test("on a computer the tiles go in two rows across the middle column, and START shows at 1280 x 800 (Eric, Nov 2); a window under 1280 px wide keeps five a row", async ({ page }) => {
+test("on a computer the tiles go in two rows across the middle column, and START shows at 1280 x 800 (Eric, Nov 2); a window under 1280 px wide keeps six a row (Nov 12)", async ({ page }) => {
   test.skip(!desktop(), "one run is enough: a computer");
   await named(page, "Tapper");
   await page.setViewportSize({ width: 1280, height: 800 });
@@ -528,9 +631,9 @@ test("on a computer the tiles go in two rows across the middle column, and START
   expect(buffer, "right buffer").toBeLessThanOrEqual(-8);
   const start = (await page.locator(".bs-start").boundingBox())!;
   expect(start.y + start.height, "START in the window at 1280 x 800").toBeLessThanOrEqual(800);
-  // A narrower window: five a row again, as before.
+  // A narrower window: six a row (Nov 12, Eric: six a row; was five), the sixteen as 6, 6 and 4.
   await page.setViewportSize({ width: 1100, height: 800 });
-  expect(await tileLines(page)).toEqual([5, 5, 5, 1]);
+  expect(await tileLines(page)).toEqual([6, 6, 4]);
 });
 
 test("home's Boss Battle card: a still portrait that moves on to the next boss you can meet, never the Hidden Boss, the card never changing size", async ({ page }) => {

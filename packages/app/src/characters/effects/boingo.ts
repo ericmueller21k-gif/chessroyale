@@ -2,6 +2,7 @@
 import { canvas, ellipse, inEllipse, roundLight, shade, toGrid, type Canvas } from "../paint.ts";
 import type { Anim, Character, Frame, Part, Speck } from "../sprite.ts";
 import { SQUARE, type Pt } from "./common.ts";
+import { lazyAnim } from "../sprite.ts";
 
 // ---- The pie (Boingo's passive): flying, splatting on a square, staying, fading.
 
@@ -78,7 +79,7 @@ export const PIE_SPLAT: Character = {
   parts: { top10: pieTop(10), top16: pieTop(16), splatBig: splatPart(true), splat: splatPart(false) },
   anims: {
     /** The pie lands: it comes down (seen from above, growing), then SPLAT, cream flying, and it settles. */
-    splat: {
+    splat: lazyAnim(() => ({
       loop: false,
       frames: [
         { ms: 60, layers: [{ part: "top10", x: 11, y: 11 }] },
@@ -87,14 +88,14 @@ export const PIE_SPLAT: Character = {
         { ms: 90, layers: [{ part: "splatBig", x: 1, y: 1 }], specks: spatter(1) },
         { ms: 140, layers: [{ part: "splat", x: 1, y: 1 }] },
       ],
-    },
+    })),
     /** Pied, while it lasts: the cherry glints now and then. */
-    pied: {
+    pied: lazyAnim(() => ({
       loop: true,
       frames: Array.from({ length: 8 }, (_, i) => ({ ms: 220, layers: [{ part: "splat", x: 1, y: 1 }], pal: i === 5 ? { E: "#ffffff", r: "#ff5a5f" } : undefined })),
-    },
+    })),
     /** It clears: the pie fades away. The last frame is empty. */
-    fade: {
+    fade: lazyAnim(() => ({
       loop: false,
       frames: [
         { ms: 110, layers: [{ part: "splat", x: 1, y: 1 }], pal: fadePie("c0") },
@@ -102,7 +103,7 @@ export const PIE_SPLAT: Character = {
         { ms: 110, layers: [{ part: "splat", x: 1, y: 1 }], pal: fadePie("40") },
         { ms: 60, layers: [] },
       ],
-    },
+    })),
   },
 };
 
@@ -116,13 +117,13 @@ export const PIE_FLY: Character = {
   parts: { pie: pieFlyPart },
   anims: {
     /** In flight, tumbling (a quarter turn a frame). Loops while it flies. */
-    fly: {
+    fly: lazyAnim(() => ({
       loop: true,
       frames: ([0, 1, 2, 3] as const).map((rot): Frame => {
         const across = rot % 2 ? [13, 11] : [11, 13];
         return { ms: 70, layers: [{ part: "pie", x: across[0]!, y: across[1]!, rot }] };
       }),
-    },
+    })),
   },
 };
 
@@ -174,7 +175,7 @@ for (const [kind, y] of [["H", 8], ["L", 13]] as const)
 /**
  * A pie in a king's face (Boingo's attack on a king): `hit<H|L><L|R>`, at his head or a little lower, thrown in from
  * the left or the right edge: the pie hits side on, the cream splats wide and flies on past him, then slides down.
- * About 200 ms; ends empty. Over the piece (or the God King standing there).
+ * About 200 ms; ends empty. Over the piece (or the God King standing there). Silent: the attack's own cues are its sound.
  */
 export const PIE_HIT: Character = {
   id: "pie-hit",
@@ -185,4 +186,17 @@ export const PIE_HIT: Character = {
   palette: PIE_PALETTE,
   parts: {},
   anims: pieHitAnims,
+};
+
+/**
+ * His pie in a piece's face (Nov 12, Boingo.tsx's FaceSplash): the same art as PIE_HIT, its first frame cueing `splat` (the pie's
+ * splat sound, EFFECTS.pieFace). A copy, so the king attack's PIE_HIT stays silent.
+ */
+export const PIE_FACE: Character = {
+  ...PIE_HIT,
+  id: "pie-face",
+  name: "A pie in a piece's face",
+  anims: Object.fromEntries(
+    Object.entries(pieHitAnims).map(([k, a]) => [k, { ...a, frames: a.frames.map((f, i) => (i === 0 ? { ...f, cue: "splat" } : f)) }]),
+  ),
 };

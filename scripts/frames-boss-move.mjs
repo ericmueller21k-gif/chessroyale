@@ -17,6 +17,8 @@ const b = await chromium.launch();
 const w = Number(widthArg);
 const p = await b.newPage(w ? { viewport: { width: w, height: w < 800 ? 760 : 800 }, deviceScaleFactor: w < 800 ? 2 : 1, isMobile: w < 800, hasTouch: w < 800 } : { ...devices["iPhone 13"] });
 p.on("pageerror", (e) => console.log("pageerror", e.message));
+// (The first-time walkthrough seen, as every e2e test's context: tutorial.ts's TUTORIAL_SEEN_KEY.)
+await p.addInitScript(() => localStorage.setItem("hunchess.tutorial.dismissed", "1"));
 // (The hidden /bosses: the solo boss picker at once, every boss by name.)
 await p.goto(url + "bosses?debug&clock=30&nolanding");
 await p.getByRole("dialog", { name: "Choose your boss" }).getByRole("button", { name: new RegExp(bossName) }).click();

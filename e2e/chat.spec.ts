@@ -39,16 +39,21 @@ async function untilMyTurn(p: Page, other: Page) {
 /** Plays a legal move by tapping its two squares on the board (real taps). Returns the move. */
 async function tapMove(p: Page): Promise<string> {
   // (Picks are recorded as the board hands them over, whatever the phase is by the time we look.)
-  await p.evaluate(() => {
+  // (And the board's box at that moment, `__boardAtPick`: a pick that's the team's last ends the turn at once, and the Crowd's
+  // next phase draws its own screen, with no board left to measure by the time the test looks. Main run 42768777492, Nov 10.)
+  await p.evaluate((sel) => {
     const m = (window as any).match;
     if (m.__recorded) return;
     m.__recorded = true;
     const submit = m.submit.bind(m);
     m.submit = (mv: string) => {
-      ((window as any).__picked ??= []).push(mv);
+      const w = window as any;
+      (w.__picked ??= []).push(mv);
+      const r = document.querySelector(sel)?.getBoundingClientRect();
+      (w.__boardAtPick ??= []).push(r ? { x: r.x, y: r.y, width: r.width, height: r.height } : null);
       submit(mv);
     };
-  });
+  }, `.board-area ${BOARD_SEL.squares}`);
   const fen: string = await p.evaluate(() => (window as any).match.phase.board.fen);
   const side = fen.split(" ")[1];
   const moves = legalMoves(fen)
@@ -72,7 +77,7 @@ async function tapMove(p: Page): Promise<string> {
 /** What the server has for this device's account: its quick chat picks (as ids). */
 const savedPicks = (p: Page) => p.evaluate(() => fetch("/api/shop").then((r) => r.json()).then((s) => s.chat as { lines: string[]; emoji: string[] }));
 
-test("quick chat picks in the profile: search, a check, n/10, locked lines to the shop and a pack's nudge back; exactly those lines in a match", async ({ browser }) => {
+test("quick chat picks in the profile: search, a check, n/10, free lines only (the chat packs are off, Nov 8); exactly those lines in a match", async ({ browser }) => {
   test.setTimeout(9 * 60_000);
   test.skip(test.info().project.name !== "desktop", "one run plays both a phone and a computer");
   const desk = await (await browser.newContext({ viewport: { width: 1280, height: 800 } })).newPage();
@@ -81,8 +86,8 @@ test("quick chat picks in the profile: search, a check, n/10, locked lines to th
   await named(phone, "Phoney");
   for (const p of [desk, phone]) {
     await p.goto("/");
-    // (Your profile: the top bar's pawn on a phone, the side menu's Profile on a computer: the right column's pawn went, Nov 7.)
-    await p.getByRole("button", { name: "Your profile", exact: true }).or(p.getByRole("navigation", { name: "Menu" }).getByRole("button", { name: "Profile" })).filter({ visible: true }).first().click();
+    // (Your profile: "View profile" on your card on a phone, the side menu's Profile on a computer.)
+    await p.getByRole("button", { name: "View profile", exact: true }).or(p.getByRole("navigation", { name: "Menu" }).getByRole("button", { name: "Profile" })).filter({ visible: true }).first().click();
     await expect(p.locator(".qp")).toBeVisible();
   }
 
@@ -104,9 +109,9 @@ test("quick chat picks in the profile: search, a check, n/10, locked lines to th
   await pawns.click();
   await expect(pawns).toHaveAttribute("aria-checked", "true");
   await expect(qp.locator(".qp-menu-foot")).toContainText("10/10 picked");
-  // Full: the others wait until one comes out. A pack's lines show locked, with its name.
+  // Full: the others wait until one comes out. The chat packs are off (CHAT_PACKS_SHOP, Nov 8): the picker has no pack lines.
   await search.fill("ho ho");
-  await expect(qp.locator(".qp-opt.locked", { hasText: "Ho ho ho!" })).toContainText("Winter pack");
+  await expect(qp.locator(".qp-opt")).toHaveCount(0);
   await search.fill("");
   await expect(qp.getByRole("checkbox", { name: "Hi all!" })).toBeDisabled();
   // Big tap targets.
@@ -120,26 +125,16 @@ test("quick chat picks in the profile: search, a check, n/10, locked lines to th
   });
   expect(await phone.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBe(0);
 
-  // The computer: a locked line goes to the shop's chat packs; getting the pack (full picks) says to pick them in
-  // the profile, which opens at Quick chat and emoji.
+  // The computer: 9 of its 10 free lines (the chat packs are off, Nov 8).
   const dq = desk.locator(".qp");
   await dq.getByRole("button", { name: /Choose lines/ }).click();
-  await dq.getByPlaceholder("Search lines or packs").fill("ho ho");
-  await dq.getByRole("button", { name: /Ho ho ho!: locked/ }).click();
-  await expect(desk.getByRole("tab", { name: "Chat packs" })).toHaveAttribute("aria-selected", "true");
-  await expect(desk.locator(".shop-chat-foot")).toContainText("Choose your lines and emoji in your profile");
-  await desk.locator(".shop-item", { hasText: "Winter pack" }).getByRole("button", { name: /Get/ }).click();
-  await expect(desk.locator(".shop-got")).toContainText("full (10/10)");
-  await desk.locator(".shop-got").getByRole("button", { name: "Pick these in your profile ›" }).click();
-  await expect(dq).toBeInViewport();
   await dq.getByRole("button", { name: "Take out Thanks!" }).click();
   await dq.getByRole("button", { name: "Take out Oops…" }).click();
-  await dq.getByRole("button", { name: /Choose lines/ }).click();
-  await dq.getByPlaceholder("Search lines or packs").fill("ho ho");
-  await dq.getByRole("checkbox", { name: "Ho ho ho!" }).click();
+  await dq.getByPlaceholder("Search lines or packs").fill("hi all");
+  await dq.getByRole("checkbox", { name: "Hi all!" }).click();
   await expect(dq.locator(".qp-lines .qp-count")).toHaveText("9/10");
-  const deskPicks = ["Good luck!", "Have fun!", "Nice move!", "Wow!", "Trust the crowd", "Defend the king!", "Go for mate!", "GG", "Ho ho ho!"];
-  await expect.poll(() => savedPicks(desk)).toMatchObject({ lines: ["good-luck", "have-fun", "nice-move", "wow", "trust-crowd", "defend-king", "go-mate", "gg", "w-hohoho"] });
+  const deskPicks = ["Good luck!", "Have fun!", "Nice move!", "Wow!", "Trust the crowd", "Defend the king!", "Go for mate!", "GG", "Hi all!"];
+  await expect.poll(() => savedPicks(desk)).toMatchObject({ lines: ["good-luck", "have-fun", "nice-move", "wow", "trust-crowd", "defend-king", "go-mate", "gg", "hi-all"] });
 
   // Into a match (a fresh load: the picks come from the account).
   for (const p of [desk, phone]) {
@@ -189,13 +184,13 @@ test("quick chat picks in the profile: search, a check, n/10, locked lines to th
   await expect(desk.locator(".qchat-side .qgroup-lines:not(.emoji) .qchip")).toHaveText(deskPicks);
   await expect(desk.locator(".qchat-side .qgroup-lines.emoji .qchip")).toHaveCount(8);
 
-  // A pack's Hello line to everyone (the switch): the phone sees it with the computer's name, from the server.
+  // A free Hello line to everyone (the switch): the phone sees it with the computer's name, from the server.
   await desk.locator(".qto button", { hasText: "All" }).click();
   await expect(desk.locator(".qchat-side .qfeed-hint")).toContainText("Hello and Sporting lines and emoji go to both teams");
   // In All, plans can't be sent; emoji can.
   await expect(desk.locator(".qchat-side .qchip", { hasText: "Defend the king!" })).toBeDisabled();
-  await desk.locator(".qchat-side .qchip", { hasText: "Ho ho ho!" }).click();
-  await expect(phone.locator(".qchat-tab .qline", { hasText: "Ho ho ho!" }).filter({ hasText: "Desky" })).toBeVisible();
+  await desk.locator(".qchat-side .qchip", { hasText: "Hi all!" }).click();
+  await expect(phone.locator(".qchat-tab .qline", { hasText: "Hi all!" }).filter({ hasText: "Desky" })).toBeVisible();
   await desk.locator(".qto button", { hasText: "Team" }).click();
 
   // A plan goes to your team only. Sending closes the phrases; right after, the buttons gray out (one message every 3 s).
@@ -213,15 +208,17 @@ test("quick chat picks in the profile: search, a check, n/10, locked lines to th
   await phone.locator(".qchat-tab .qfeed").click({ position: { x: 5, y: 5 } });
   await expect(phone.locator(".qchat-tab .qpop")).toHaveCount(0);
 
-  // The server drops free text and lines from packs you don't own (the phone hasn't got the Winter pack).
+  // The server drops free text and lines from packs you don't own (the phone hasn't got the Winter pack, and can't buy one now).
   await phone.evaluate(() => {
     const m = (window as any).match;
     m.send({ t: "chat", say: "Free text, typed!" });
     m.send({ t: "chat", say: "w-hohoho", to: "all" });
   });
   await desk.waitForTimeout(800);
-  expect(await desk.evaluate(() => (window as any).match.chat.list.filter((l: any) => !["w-hohoho", "push-pawns"].includes(l.say) && !/^bot/.test(l.from)).length)).toBe(0);
-  expect(await desk.evaluate(() => (window as any).match.chat.list.filter((l: any) => l.say === "w-hohoho").length)).toBe(1);
+  expect(await desk.evaluate(() => (window as any).match.chat.list.filter((l: any) => !["hi-all", "push-pawns"].includes(l.say) && !/^bot/.test(l.from)).length)).toBe(0);
+  expect(await desk.evaluate(() => (window as any).match.chat.list.filter((l: any) => l.say === "w-hohoho").length)).toBe(0);
+  // (Bots greet too: only the phone's own "Hi all!" counts.)
+  expect(await desk.evaluate(() => (window as any).match.chat.list.filter((l: any) => l.say === "hi-all" && !/^bot/.test(l.from)).length)).toBe(1);
 
   // An emoji to the team floats over its sender's row on the computer's leaderboard (when they're on the same team).
   await phone.getByRole("button", { name: "Emoji", exact: true }).click();
@@ -284,8 +281,8 @@ test("quick chat picks in the profile: search, a check, n/10, locked lines to th
   const picked = () => phone.evaluate(() => (window as any).__picked ?? []);
   const first = await tapMove(phone);
   await expect.poll(picked).toEqual([first]);
-  // The board never moved or resized for chat.
-  expect(await rect(phone, `.board-area ${BOARD_SEL.squares}`)).toEqual(boardBefore);
+  // The board never moved or resized for chat: as the move was made (the turn may be over by now: see tapMove).
+  expect(await phone.evaluate(() => (window as any).__boardAtPick[0])).toEqual(boardBefore);
 
   // The scoreboard (chat hidden, "‹ Back"): a new line shows nowhere over or above the board (Eric, Nov 4: the
   // new-message bubble went; chat stays in its box), watched from before it's sent; a move made meanwhile still lands.
@@ -315,6 +312,9 @@ test("quick chat picks in the profile: search, a check, n/10, locked lines to th
   await expect(phone.locator(".under-board.ub-tab .qchat-tab")).toBeVisible();
   await expect(phone.locator(".qchat-tab .qline", { hasText: "GG" }).filter({ hasText: "Desky" })).toBeVisible();
   await expect(unread).toHaveCount(0);
+  // (Measured on the phone's turn, as the checks above are: between turns the Crowd's next phase draws its own screen, with
+  // no board to measure. Main run 1197, Nov 10.)
+  await untilMyTurn(phone, desk);
   expect(await rect(phone, `.board-area ${BOARD_SEL.squares}`)).toEqual(boardBefore);
 });
 

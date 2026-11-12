@@ -26,6 +26,7 @@ import { tigerSound, type TigerSound } from "./characters/tiger-sounds.ts";
 import { folioSound, type FolioSound } from "./characters/folio-sounds.ts";
 import { timberSound, type TimberSound } from "./characters/timber-sounds.ts";
 import { dashSound, type DashSound } from "./characters/dash-sounds.ts";
+import { zebraSound, type ZebraSound } from "./characters/zebra-sounds.ts";
 import { clawSound, type ClawSound } from "./claw/sounds.ts";
 import { godKingSound } from "./characters/god-king-sounds.ts";
 import { captureWorkerError } from "./problems.ts";
@@ -361,6 +362,33 @@ export function onMuteChange(fn: () => void): () => void {
   return () => listeners.delete(fn);
 }
 
+/**
+ * The boss music's way out (music.ts): the audio context and the master gain every sound goes through (the same softening,
+ * the same speakers), made if it hasn't been (suspended until a tap, as ever). Null without audio.
+ */
+export function musicBus(): { ctx: AudioContext; master: GainNode } | null {
+  try {
+    ensureContext();
+  } catch {
+    return null;
+  }
+  return ctx && master ? { ctx, master } : null;
+}
+/** A recorded file fetched and decoded once a visit (by its path; a failure is tried again next time). Null without audio. */
+export function loadAudioFile(url: string): Promise<AudioBuffer | null> {
+  return musicBus() ? loadFile(url) : Promise.resolve(null);
+}
+/** The page is hidden (another app, a locked phone, another tab). */
+export const isPageHidden = () => pageHidden();
+/**
+ * Lets a recorded file's decoded audio go (a boss theme after its battle: about 45 MB decoded for two minutes, and the
+ * phone has the town's pictures to keep). Fetched again it comes from the service worker's cache and is decoded anew.
+ */
+export function forgetAudioFile(url: string) {
+  files.delete(url);
+  decoded.delete(url);
+}
+
 /** The Colosseum's cheer (a queen taken): loaded by `warmFile` when the Colosseum opens. */
 export const COLOSSEUM_CHEER = "/sounds/colosseum/cheer.mp3";
 /** Fetches and decodes a recorded file a screen will play (`fileSample`), if sound has been made ready. */
@@ -484,6 +512,8 @@ const folioBoss = (name: FolioSound) => (t: number) => buffer(folioSound(name, c
 const timberBoss = (name: TimberSound) => (t: number) => buffer(timberSound(name, ctx!.sampleRate), t);
 const clawPlay = (name: ClawSound) => (t: number) => buffer(clawSound(name, ctx!.sampleRate), t);
 const dashBoss = (name: DashSound) => (t: number) => buffer(dashSound(name, ctx!.sampleRate), t);
+const zebraBoss = (name: ZebraSound) => (t: number) => buffer(zebraSound(name, ctx!.sampleRate), t);
+const zebraRoom = (name: ZebraSound) => (t: number) => buffer(zebraSound(name, ctx!.sampleRate), t);
 /** Timber's build sound picks one of these each time (Eric, Nov 2: "interchangeable between the tap, the whack, and the knock"). */
 export const TIMBER_BUILD = ["timberTap", "timberWhack", "timberKnock"] as const satisfies readonly SoundName[];
 /** The God King tapped with no charges left: his soft "can't" (god-king-sounds.ts). */
@@ -1062,10 +1092,44 @@ export type SoundName =
   | "dashHello"
   | "dashDing"
   | "dashChomp"
+  // Rolling Dough, Don Dough's bakery (Nov 11): its room sounds, synthesized and quiet, see characters/zebra-sounds.ts.
+  | "zebraDoor"
+  | "zebraThump"
+  | "zebraClick"
+  | "zebraMurmur"
   | "dashStep"
   // (His intro's, Nov 5: the shoe boxes landing, his jacket dusted off.)
   | "dashThud"
   | "dashBrush"
+  // Don Dough, the zebra kingpin (a raid boss): synthesized, a bread rifle and a bakery, see characters/zebra-sounds.ts.
+  | "zebraPop"
+  | "zebraVolley"
+  | "zebraLaugh"
+  | "zebraChuckle"
+  | "zebraDraw"
+  | "zebraCock"
+  | "zebraRelax"
+  | "zebraTsk"
+  | "zebraTap"
+  | "zebraThud"
+  | "zebraTip"
+  | "zebraHm"
+  | "zebraOof"
+  | "zebraSnap"
+  | "zebraLob"
+  | "zebraPlop"
+  | "zebraRoll"
+  | "zebraDing"
+  | "zebraRise"
+  | "zebraOvenPop"
+  | "zebraSquash"
+  | "zebraStir"
+  | "zebraGild"
+  | "zebraWhoosh"
+  | "zebraTumble"
+  | "zebraShine"
+  | "zebraKiss"
+  | "zebraClink"
   | "kingCant"
   // Squads: a short tick in the last seconds of your free time, and the sting as a squad enters sudden death.
   | "sqTick"
@@ -1075,7 +1139,10 @@ export type SoundName =
   | "clawCoin"
   | "clawWhir"
   | "clawGrab"
-  | "clawThud";
+  | "clawThud"
+  // Quest progress on home (Nov 10; questSound below).
+  | "questTick"
+  | "questDone";
 
 const SOUNDS: Record<SoundName, (t: number) => void> = {
   move: (t) => pieceSample("move", t),
@@ -1134,6 +1201,9 @@ const SOUNDS: Record<SoundName, (t: number) => void> = {
   // The queue: a pawn pops into its seat (a short soft "pop"), and a bot's, quieter.
   pop: (t) => bubblePop(t, 1),
   popSoft: (t) => bubblePop(t, 0.45),
+  // (Placeholders until Eric's pack: a small bell note per count, and the auto chess level-up's arpeggio and chord. QUEST_SOUND_FILES.)
+  questTick: (t) => (QUEST_SOUND_FILES.tick ? fileSample(QUEST_SOUND_FILES.tick, t) : strike(t, 1568, [[1, 1, 0.09], [2, 0.3, 0.05]], 0.1)),
+  questDone: (t) => (QUEST_SOUND_FILES.done ? fileSample(QUEST_SOUND_FILES.done, t) : autochess("level")(t)),
   sell: autochess("sell"),
   acReroll: autochess("reroll"),
   acPlace: autochess("place"),
@@ -1417,9 +1487,41 @@ const SOUNDS: Record<SoundName, (t: number) => void> = {
   dashHello: dashBoss("hello"),
   dashDing: dashBoss("ding"),
   dashChomp: dashBoss("chomp"),
+  zebraDoor: zebraRoom("door"),
+  zebraThump: zebraRoom("thump"),
+  zebraClick: zebraRoom("click"),
+  zebraMurmur: zebraRoom("murmur"),
   dashStep: dashBoss("step"),
   dashThud: dashBoss("thud"),
   dashBrush: dashBoss("brush"),
+  zebraPop: zebraBoss("pop"),
+  zebraVolley: zebraBoss("volley"),
+  zebraLaugh: zebraBoss("laugh"),
+  zebraChuckle: zebraBoss("chuckle"),
+  zebraDraw: zebraBoss("draw"),
+  zebraCock: zebraBoss("cock"),
+  zebraRelax: zebraBoss("relax"),
+  zebraTsk: zebraBoss("tsk"),
+  zebraTap: zebraBoss("tap"),
+  zebraThud: zebraBoss("thud"),
+  zebraTip: zebraBoss("tip"),
+  zebraHm: zebraBoss("hm"),
+  zebraOof: zebraBoss("oof"),
+  zebraSnap: zebraBoss("snap"),
+  zebraLob: zebraBoss("lob"),
+  zebraPlop: zebraBoss("plop"),
+  zebraRoll: zebraBoss("roll"),
+  zebraDing: zebraBoss("ding"),
+  zebraRise: zebraBoss("rise"),
+  zebraOvenPop: zebraBoss("ovenPop"),
+  zebraSquash: zebraBoss("squash"),
+  zebraStir: zebraBoss("stir"),
+  zebraGild: zebraBoss("gild"),
+  zebraWhoosh: zebraBoss("whoosh"),
+  zebraTumble: zebraBoss("tumble"),
+  zebraShine: zebraBoss("shine"),
+  zebraKiss: zebraBoss("kiss"),
+  zebraClink: zebraBoss("clink"),
   kingCant,
   sqTick: (t) => clockTick(t, 0.22),
   sqSting,
@@ -1440,6 +1542,7 @@ const MAKE: Partial<Record<SoundName, readonly BossSound[]>> = {
   acPlace: [["autochess", "place"]],
   acHold: [["autochess", "hold"]],
   acXp: [["autochess", "xp"]],
+  questDone: [["autochess", "level"]],
   acLevel: [["autochess", "level"]],
   acLock: [["autochess", "lock"]],
   acReveal: [["autochess", "reveal"]],
@@ -1711,9 +1814,41 @@ const MAKE: Partial<Record<SoundName, readonly BossSound[]>> = {
   dashHello: [["dash", "hello"]],
   dashDing: [["dash", "ding"]],
   dashChomp: [["dash", "chomp"]],
+  zebraDoor: [["zebra", "door"]],
+  zebraThump: [["zebra", "thump"]],
+  zebraClick: [["zebra", "click"]],
+  zebraMurmur: [["zebra", "murmur"]],
   dashStep: [["dash", "step"]],
   dashThud: [["dash", "thud"]],
   dashBrush: [["dash", "brush"]],
+  zebraPop: [["zebra", "pop"]],
+  zebraVolley: [["zebra", "volley"]],
+  zebraLaugh: [["zebra", "laugh"]],
+  zebraChuckle: [["zebra", "chuckle"]],
+  zebraDraw: [["zebra", "draw"]],
+  zebraCock: [["zebra", "cock"]],
+  zebraRelax: [["zebra", "relax"]],
+  zebraTsk: [["zebra", "tsk"]],
+  zebraWhoosh: [["zebra", "whoosh"]],
+  zebraTumble: [["zebra", "tumble"]],
+  zebraTap: [["zebra", "tap"]],
+  zebraThud: [["zebra", "thud"]],
+  zebraTip: [["zebra", "tip"]],
+  zebraHm: [["zebra", "hm"]],
+  zebraOof: [["zebra", "oof"]],
+  zebraSnap: [["zebra", "snap"]],
+  zebraLob: [["zebra", "lob"]],
+  zebraPlop: [["zebra", "plop"]],
+  zebraRoll: [["zebra", "roll"]],
+  zebraDing: [["zebra", "ding"]],
+  zebraRise: [["zebra", "rise"]],
+  zebraOvenPop: [["zebra", "ovenPop"]],
+  zebraSquash: [["zebra", "squash"]],
+  zebraStir: [["zebra", "stir"]],
+  zebraGild: [["zebra", "gild"]],
+  zebraShine: [["zebra", "shine"]],
+  zebraKiss: [["zebra", "kiss"]],
+  zebraClink: [["zebra", "clink"]],
   kingCant: [["godKing", "cant"]],
   clawCoin: [["claw", "coin"]],
   clawWhir: [["claw", "whir"]],
@@ -1801,6 +1936,17 @@ export function playOnTap(name: SoundName) {
     .catch(() => undefined)
     .then(() => ctx === c && play(name));
 }
+
+/**
+ * Quest progress's sounds (Eric, Nov 10: "some sort of satisfying animation or sound. I've actually got a sound pack that I'm working
+ * on"): "tick" as a moved quest's count goes up on home, "done" as one finishes. Everything plays them through here, by name: the
+ * pack drops in by setting its files below (e.g. "/sounds/quests/done.mp3"); null plays the placeholder made in code.
+ */
+export type QuestSound = "tick" | "done";
+const QUEST_SOUND_FILES: Record<QuestSound, string | null> = { tick: null, done: null };
+export const questSound = (s: QuestSound) => play(s === "tick" ? "questTick" : "questDone");
+/** Made ahead (the done sound's placeholder, in the sound worker), as the overlay opens to show progress. */
+export const warmQuestSounds = () => warmSounds(["questDone"]);
 
 /** Plays a sound; `voice` previews a roulette voice without choosing it (Settings → Sound, "Reveal sound"). */
 export function play(name: SoundName, voice?: ReelVoice) {

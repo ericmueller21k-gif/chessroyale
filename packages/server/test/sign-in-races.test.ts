@@ -13,7 +13,9 @@ vi.mock("@chessroyale/core", async (orig) => ({ ...(await orig<typeof import("@c
 async function setup() {
   const { sql, db } = memoryDb();
   await ensureSchema(sql);
-  const wallet = (userId: string) => db.prepare("SELECT coins, crates FROM wallets WHERE user_id = ?").get(userId) ?? null;
+  // (Crates are held by series since Nov 9: a Squads placement's are Winter Crates, in series_crates.)
+  const wallet = (userId: string) =>
+    db.prepare("SELECT coins, (SELECT COALESCE(SUM(n), 0) FROM series_crates s WHERE s.user_id = w.user_id) AS crates FROM wallets w WHERE w.user_id = ?").get(userId) ?? null;
   return { sql, db, wallet };
 }
 

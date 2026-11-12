@@ -50,10 +50,14 @@ const FLIGHT = PIG_LEAP.landAt - PIG_LEAP.upAt;
 const MIDDLE: Pt = { x: 50, y: 64 };
 
 /** The lasso's beats within its own animation: its catch, and its tug after it. */
-const LASSO = (() => {
-  const a = PIG.anims.lasso!;
-  return { catch: cueAt(a, "catch") ?? 0, tug: cueAt(a, "tug") ?? 0 };
-})();
+const LASSO = {
+  get catch() {
+    return cueAt(PIG.anims.lasso!, "catch") ?? 0;
+  },
+  get tug() {
+    return cueAt(PIG.anims.lasso!, "tug") ?? 0;
+  },
+};
 
 /** One of his figures on the board: his frame placed by his feet, facing right (or left, `flip`), playing `anim` from `since`. */
 function Figure({ boss, at, flip, anim, since, then, id }: { boss: BossView; at: Pt; flip: boolean; anim: string; since: number; then?: string; id: string }) {

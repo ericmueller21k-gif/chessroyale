@@ -1,6 +1,6 @@
 /** Big Boy's effects: the toy block and its flight, the Big Bounce's dust and crash. See ../effects.ts. */
 import { canvas, ellipse, inEllipse, shade, toGrid } from "../paint.ts";
-import { lazyParts, type Anim, type Character, type Frame, type Layer, type Part, type Speck } from "../sprite.ts";
+import { lazyAnim, lazyParts, type Anim, type Character, type Frame, type Layer, type Part, type Speck } from "../sprite.ts";
 import { BOARD, SQUARE, hitAnims } from "./common.ts";
 
 // ---- Big Boy's toys: the toy block (an ABC block on an empty square), its flight, his bounce's dust and crash.
@@ -169,7 +169,7 @@ export const BOUNCE_PUFF: Character = {
   palette: TOY_PALETTE,
   parts: TOY_PARTS,
   anims: {
-    puff: {
+    puff: lazyAnim(() => ({
       loop: false,
       frames: [0, 1, 2, 3, 4].map((t): Frame => ({
         ms: t < 4 ? 70 : 40,
@@ -182,7 +182,7 @@ export const BOUNCE_PUFF: Character = {
               ]
             : [],
       })),
-    },
+    })),
   },
 };
 
@@ -244,14 +244,14 @@ export const BOUNCE_CRASH: Character = {
   palette: CRASH_PALETTE,
   parts: TOY_PARTS,
   anims: {
-    crash: {
+    crash: lazyAnim(() => ({
       loop: false,
       frames: [14, 30, 48, 68, 90, 112, 134, 0].map((r, t): Frame => ({
         ms: t < 7 ? 75 : 60,
         layers: crashCloud(t),
         specks: r ? [...shockRing(r, t >= 5 ? (t - 4) * 3 : 0), ...debris(t)] : [],
       })),
-    },
+    })),
   },
 };
 

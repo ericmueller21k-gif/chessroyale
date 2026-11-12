@@ -11,11 +11,15 @@ import { battleToken, buyBossCrate, endSoloBattle, grantTestItems, openBossCrate
 import { playClaw } from "./claw.ts";
 import { grantWelcomeCrate, openWelcomeCrate, seenWelcomeNotice } from "./welcome.ts";
 import { requestId } from "./ledger.ts";
+import { pickBossCrate } from "./rewards.ts";
+import { SOLO_TESTED, endSoloGame, gameXpOf, grantXp, setTestXp, startSoloGame } from "./xp.ts";
+import { questsAnswer, rerollQuest, setTestQuests } from "./quests.ts";
 import { chatIconResponse, chatPostResponse, chatSlice, globalRoomOf } from "./global-chat-api.ts";
 import { forgetLook, townHereResponse } from "./town-here-api.ts";
+import { enterOnly } from "./town-chat.ts";
 import { SIGN_IN_TO_TOWN_CHAT, TOWN_CHAT_AGE, chatRoomOf, mayTownChat, reportedLine, townChallengeNote, townPostResponse, townRemoveResponse, townSlice } from "./town-chat-api.ts";
 import { accountDownload, deleteAccount } from "./account-data.ts";
-import { AGE_GATE, ASK_AGE_LINE, FAIRPLAY, TOO_YOUNG_LINE, adminFirst, bossCrateDef, bossDef, cleanPawnColor, isWelcomeCrate, tokenBossName } from "@chessroyale/core";
+import { XP, AGE_GATE, AGE_STEP_LINE, FAIRPLAY, TOO_YOUNG_LINE, adminFirst, bossCrateDef, bossDef, cleanPawnColor, isActivity, isWelcomeCrate, tokenBossName } from "@chessroyale/core";
 import {
   buyItem,
   cleanEmail,
@@ -26,6 +30,7 @@ import {
   ensureSchema,
   equipItem,
   markAgeOk,
+  answeredSignIn,
   profile,
   publicProfile,
   randomToken,
@@ -34,6 +39,7 @@ import {
   setChatOn,
   setChatPicks,
   shopState,
+  signInIfAnswered,
   signInWithIdentity,
   startEmailCode,
   touchSession,
@@ -121,7 +127,7 @@ export function readCookie(request: Request, name: string): string | null {
 }
 const cookie = (name: string, value: string, maxAge: number) =>
   `${name}=${encodeURIComponent(value)}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${maxAge}`;
-const sessionCookie = (token: string) => cookie(SESSION_COOKIE, token, 365 * 86_400);
+export const sessionCookie = (token: string) => cookie(SESSION_COOKIE, token, 365 * 86_400);
 
 /**
  * This device's answer to the age question (AGE_COOKIE), or null if it hasn't answered (or its "ok" has run out). An
@@ -138,19 +144,23 @@ export function ageAnswer(request: Request): "ok" | "under" | null {
  */
 const ageOk = () => cookie(AGE_COOKIE, "ok", AGE_GATE.answerMinutes * 60);
 /**
- * Every sign-in needs this device's "old enough" answer first (null: go ahead). A device that answered "too young"
- * can't sign in at all (new account or not: the email would be a child's), and one that hasn't answered is asked.
+ * Every sign-in step starts here (null: go ahead): a device that answered "too young" can't sign in at all, new account or not
+ * (the email would be a child's), at any step. One that hasn't answered may start a sign-in (Eric, Nov 12: "log in without
+ * having to select an age if you already have an account"); it finishes only into an account that has answered
+ * (signInIfAnswered), else it's asked first (AGE_STEP_LINE): docs/decisions/2026-11-12-signin-without-age.md.
  */
 function ageRefusal(request: Request): Response | null {
-  const age = ageAnswer(request);
-  if (age === "ok") return null;
-  return age === "under" ? json({ message: TOO_YOUNG_LINE, tooYoung: true }, 403) : json({ message: ASK_AGE_LINE, askAge: true }, 403);
+  return ageAnswer(request) === "under" ? json({ message: TOO_YOUNG_LINE, tooYoung: true }, 403) : null;
 }
+/** A sign-in that can't finish until this device answers the age question: nothing was made, moved or signed in. */
+const askAgeFirst = () => json({ message: AGE_STEP_LINE, askAge: true }, 403);
 
 /** Online play needs a signed-in account once a way to sign in is set up (guests play solo against bots). */
 export const signInRequired = (env: AccountEnv) => !!((env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET) || env.RESEND_API_KEY);
 export const isSignedIn = (user: User | null) => !!(user && (user.email || user.google_sub));
 export const SIGN_IN_TO_PLAY = "Sign in to play online. Guests can play solo against bots.";
+/** A guest's answer from the quests' routes, where sign-in is set up (Nov 9, phase 3). */
+export const SIGN_IN_FOR_QUESTS = "Sign in for quests.";
 
 /** Where to go after signing in: a path on this site only. */
 const safeNext = (next: string | null) => (next && /^\/(?!\/)[\w\-/]*$/.test(next) ? next : "/");
@@ -194,7 +204,10 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
     path !== "/api/town/here" &&
     path !== "/api/boss/solo/start" &&
     path !== "/api/boss/solo/finish" &&
-    path !== "/api/boss/token"
+    path !== "/api/boss/token" &&
+    !path.startsWith("/api/xp") &&
+    path !== "/api/quests" &&
+    !path.startsWith("/api/quests/")
   )
     return null;
   const google = !!(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET);
@@ -220,12 +233,17 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
   // Who's an admin (ADMIN_EMAILS): an admin owns one of every item, never stored (core/admin-copies.ts), so the profile,
   // shop and locker answers carry their admin copies, and others see the ones they wear.
   const admins: AdminCheck = (u) => isAdmin(env as AdminEnv, u);
+  // (Ranked's leave rules on the profile, L1: none while PAUSE_LEAVE_PENALTIES is on.)
+  const leaves = { leaves: !isPaused(env, "leave-penalties") };
 
   // GET /api/live: the live line (online, matches running, in queue, the playing-now list, typical waits). Polled by
   // the front door every few seconds and by matches every 30 s, so it also marks you as online.
   if (path === "/api/live" && request.method === "GET") {
     // ?busy=1: the app is in a match (friends lists show "In a match"). `inbox`: friends' news for you (presence.ts).
     const busy = url.searchParams.get("busy") === "1";
+    // ?doing=town: what the app is doing (the friends page's "In Chess Town"; core's ACTIVITIES, anything else ignored).
+    const doingAsked = url.searchParams.get("doing");
+    const doing = isActivity(doingAsked) ? doingAsked : undefined;
     let inbox: number | undefined;
     if (env.LIVE && waitUntil) {
       // The live hub: presence in batches (the session lookup cached), the numbers from its memory.
@@ -233,13 +251,13 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
       if (uid && firstSighting(uid, now)) {
         // Just arrived: the hub hears at once, and its numbers (which include you) refresh this instance's.
         // (Typed as sent: RPC's types widen the votes' [SAN, count] pairs to plain arrays.)
-        const counts = (await liveHub(env as Required<Pick<AccountEnv, "LIVE">>).arrive(uid, now, busy).catch(() => null)) as (LiveCounts & { inbox?: number }) | null;
+        const counts = (await liveHub(env as Required<Pick<AccountEnv, "LIVE">>).arrive(uid, now, busy, doing).catch(() => null)) as (LiveCounts & { inbox?: number }) | null;
         if (counts) {
           const { inbox: news, ...numbers } = counts;
           if (news) rememberInbox(uid, news);
           liveCache = { at: now, body: numbers };
         }
-      } else if (uid) markSeen(env as Required<Pick<AccountEnv, "LIVE">>, uid, now, waitUntil, busy);
+      } else if (uid) markSeen(env as Required<Pick<AccountEnv, "LIVE">>, uid, now, waitUntil, busy, doing);
       if (uid) inbox = inboxOf(uid);
     } else await touchSession(sql, token, now);
     if (!liveCache || now - liveCache.at > LIVE_CACHE_MS) {
@@ -262,14 +280,18 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
           }).catch(() => null)
         : null;
     // ?town=N (the town square is open): the town chat's lines after N, for anyone (a guest reads it too: Eric, on #542, "they
-    // should be able to see the chat. They just can't type in it") but never on a device the age gate marked too young
-    // (town-chat-api.ts); while its switch is off, only that it's paused. Sending stays signed-in only (townPostResponse).
+    // should be able to see the chat. They just can't type in it"); on a device the age gate marked too young, only the server's
+    // "Ann has entered the town." lines (Nov 12: no one's typed words: town-chat.ts `enterOnly`); while its switch is off, only that
+    // it's paused. Sending stays signed-in only (townPostResponse).
     const townSince = url.searchParams.get("town");
     let town: unknown = null;
-    if (townSince !== null && env.LIVE && ageAnswer(request) !== "under") {
+    if (townSince !== null && env.LIVE) {
+      const young = ageAnswer(request) === "under";
       town = isPaused(env, "town-chat", now)
         ? { paused: true }
-        : await townSlice(liveHub(env as Required<Pick<AccountEnv, "LIVE">>), Number(townSince), now, url.searchParams.get("room"), waitUntil, chatRoomOf(url.searchParams.get("townroom"), (env as AdminEnv).TEST_SWITCHES === "1")).catch(() => null);
+        : await townSlice(liveHub(env as Required<Pick<AccountEnv, "LIVE">>), Number(townSince), now, url.searchParams.get("room"), waitUntil, chatRoomOf(url.searchParams.get("townroom"), (env as AdminEnv).TEST_SWITCHES === "1"))
+            .then((t) => (young ? enterOnly(t) : t))
+            .catch(() => null);
     }
     return json({
       ...liveCache.body,
@@ -316,12 +338,16 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
 
   /**
    * Switches the browser to `user` (a new session) and answers with `body` or a redirect. Every sign-in comes through
-   * the age gate (ageRefusal): the account keeps that its holder said they were old enough, and the answer is used up,
-   * so the next sign-in on this device asks again.
+   * the age gate: either this device `answered` "old enough" just before (the account keeps that its holder said so, and the
+   * answer is used up, so a sign-in into an account that hasn't answered asks again), or the account had answered already
+   * (signInIfAnswered).
    */
-  const signInAs = async (user: User, redirect?: string) => {
-    await markAgeOk(sql, user.id, now);
-    const headers = new Headers({ "set-cookie": cookie(AGE_COOKIE, "", 0), "cache-control": "no-store" });
+  const signInAs = async (user: User, answered: boolean, redirect?: string) => {
+    const headers = new Headers({ "cache-control": "no-store" });
+    if (answered) {
+      await markAgeOk(sql, user.id, now);
+      headers.append("set-cookie", cookie(AGE_COOKIE, "", 0));
+    }
     if (!token || current?.id !== user.id) {
       if (token) await endSession(sql, token);
       headers.append("set-cookie", sessionCookie(await createSession(sql, user.id, now)));
@@ -331,7 +357,7 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
       return new Response(null, { status: 302, headers });
     }
     headers.set("content-type", "application/json");
-    return new Response(JSON.stringify(await profile(sql, user, admins)), { status: 200, headers });
+    return new Response(JSON.stringify(await profile(sql, user, admins, leaves)), { status: 200, headers });
   };
 
   // GET /api/me: your profile (a guest account is made the first time). It also gives the device its marker.
@@ -339,11 +365,11 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
     const headers = new Headers({ "content-type": "application/json", "cache-control": "no-store" });
     if (!readCookie(request, DEVICE_COOKIE)) headers.append("set-cookie", cookie(DEVICE_COOKIE, randomToken(16), 400 * 86_400));
     // (Admins, ADMIN_EMAILS as for the fair-play review, also see the boss battle's test trigger.)
-    if (current) return new Response(JSON.stringify({ ...(await profile(sql, current, admins)), ...(admin ? { admin: true } : {}) }), { headers });
+    if (current) return new Response(JSON.stringify({ ...(await profile(sql, current, admins, leaves)), ...(admin ? { admin: true } : {}) }), { headers });
     // (A device that answered "too young" plays under the default name.)
     const g = await createGuest(sql, now, ageAnswer(request) === "under" ? "Player" : (url.searchParams.get("name") ?? "Player"));
     headers.append("set-cookie", sessionCookie(g.token));
-    return new Response(JSON.stringify(await profile(sql, g.user, admins)), { headers });
+    return new Response(JSON.stringify(await profile(sql, g.user, admins, leaves)), { headers });
   }
   if (!current) return json({ message: "No account on this device yet." }, 401);
 
@@ -360,7 +386,7 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
     if (typeof body.chatOn === "boolean" && isSignedIn(current)) await setChatOn(sql, current.id, body.chatOn);
     const updated = await updateProfile(sql, current.id, body);
     if (body.pawn !== undefined) forgetLook(current.id);
-    return json(await profile(sql, updated, admins));
+    return json(await profile(sql, updated, admins, leaves));
   }
 
   // POST /api/auth/age {oldEnough}: the age question's answer, asked before any sign-in (the app works it out from the
@@ -450,13 +476,15 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
   }
 
   // The locker. GET /api/locker; POST /api/locker/open {crate, request, fischer?, shiny?} (`request`: the app's id for the open, so a
-  // retry opens it once; the test switches: admins, or
-  // TEST_SWITCHES, and only while crates are free; a boss crate is one you hold, opened once, never with a test switch: openBossCrate); POST /api/locker/equip {slot, item} (item null empties the slot); POST /api/locker/delete
-  // {items} (deletes your crate items for good).
+  // retry opens it once; a series crate takes one you hold and a crate key, for everyone (Nov 9); the test switches ?fischer and ?shiny
+  // only where TEST_SWITCHES is "1", never an admin's elsewhere (Eric, Nov 9: no admin special ability); a boss crate is one you hold,
+  // opened once, never with a test switch: openBossCrate); POST /api/locker/pick {crate, request} (a level's boss crate picked:
+  // rewards.ts); POST /api/locker/equip {slot, item} (item null empties the slot); POST /api/locker/delete {items} (deletes your crate
+  // items for good).
   if (path === "/api/locker" && request.method === "GET") return json(await lockerState(sql, current.id, admin));
   if (path === "/api/locker/open" && request.method === "POST") {
     const b = (await request.json().catch(() => ({}))) as { crate?: unknown; fischer?: unknown; shiny?: unknown; request?: unknown };
-    const force = testSwitchesOn(env as AdminEnv, current) ? { fischer: b.fischer === true, shiny: b.shiny === true } : {};
+    const force = (env as AdminEnv).TEST_SWITCHES === "1" ? { fischer: b.fischer === true, shiny: b.shiny === true } : {};
     // (The Welcome Crate, Nov 6: yours once you've earned it, opened once, the server's roll only: welcome.ts.)
     if (isWelcomeCrate(b.crate)) {
       const w = await openWelcomeCrate(sql, current.id, now);
@@ -465,6 +493,11 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
     const once = requestId(b.request);
     const r = typeof b.crate === "string" && bossCrateDef(b.crate) ? await openBossCrate(sql, current.id, b.crate, now, admin, once) : await openCrate(sql, current.id, b.crate, force, now, admin, once);
     return r.ok ? json(r) : json({ message: r.message }, 400);
+  }
+  if (path === "/api/locker/pick" && request.method === "POST") {
+    const b = (await request.json().catch(() => ({}))) as { crate?: unknown; request?: unknown };
+    const r = await pickBossCrate(sql, current.id, b?.crate, requestId(b?.request), now);
+    return r.ok ? json({ crate: r.crate, locker: await lockerState(sql, current.id, admin) }) : json({ message: r.message }, 400);
   }
   // POST /api/locker/welcome/seen: the "You earned a Welcome Crate!" notice closed, for good (it shows once). Answers the locker.
   if (path === "/api/locker/welcome/seen" && request.method === "POST") {
@@ -476,8 +509,8 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
     const r = await equipLocker(sql, current.id, b.slot, b.item ?? null, admin);
     return r.ok ? json(r.locker) : json({ message: r.message }, 400);
   }
-  // POST /api/locker/grant {keys?, boss?, tokens?, request}: an admin's test grant to their own account (crate keys, a boss's tokens;
-  // once per request id); for anyone else it isn't there. Answers the locker.
+  // POST /api/locker/grant {keys?, boss?, tokens?, request}: an admin's test grant to their own account (crate keys, up to
+  // BOSS_TOKENS.keysGrantMax (100) at once; a boss's tokens; once per request id); for anyone else it isn't there. Answers the locker.
   if (path === "/api/locker/grant" && request.method === "POST") {
     if (!admin) return json({ message: "Not found" }, 404);
     const b = (await request.json().catch(() => ({}))) as { keys?: unknown; boss?: unknown; tokens?: unknown; request?: unknown };
@@ -562,14 +595,89 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
   }
   if (path === "/api/boss/token" && request.method === "GET") return json({ token: await battleToken(sql, current.id, url.searchParams.get("battle"), now) });
 
-  // POST /api/results: a solo match's result, from the browser.
+  // XP (Nov 9; xp.ts). POST /api/xp/solo/start as any solo game begins ({game}: its id; the server notes the time); its result's POST
+  // /api/results carries it back, and answers the game's XP. GET /api/xp?game=CODE: your XP from an online game, once its room has
+  // written it ({xp}: null until then). POST /api/xp/test {xp} (test switches only): sets your XP, for tests and stills.
+  if (path === "/api/xp/solo/start" && request.method === "POST") {
+    const b = (await request.json().catch(() => ({}))) as { xpgame?: unknown } | null;
+    // (?xpgame=MINUTES counts the game that long only where TEST_SWITCHES is "1" (local, e2e, staging). Anywhere else, an admin's
+    // included, it's a test switch like the others: the game is a test game, no XP (SOLO_TESTED). Review m1, Nov 9.)
+    const asked = typeof b?.xpgame === "number" && Number.isFinite(b.xpgame) && testSwitchesOn(env as AdminEnv, current);
+    const minutes = !asked ? null : (env as AdminEnv).TEST_SWITCHES === "1" ? Math.max(0, Math.min(XP.maxMinutes, Math.floor(b!.xpgame as number))) : SOLO_TESTED;
+    return json({ game: await startSoloGame(sql, current.id, now, minutes) });
+  }
+  if (path === "/api/xp" && request.method === "GET") return json({ xp: await gameXpOf(sql, current.id, url.searchParams.get("game"), now) });
+  if (path === "/api/xp/test" && request.method === "POST") {
+    // (Only where TEST_SWITCHES is "1" (local, e2e, staging), never an admin's on production: a jump there would be owed real level
+    // rewards, crates, keys and boss picks. Review of #574, M1, Nov 9.)
+    if ((env as AdminEnv).TEST_SWITCHES !== "1") return json({ message: "Not allowed" }, 403);
+    const b = (await request.json().catch(() => ({}))) as { xp?: unknown } | null;
+    const xp = await setTestXp(sql, current.id, b?.xp, now);
+    return xp === null ? json({ message: "Bad XP" }, 400) : json({ xp });
+  }
+
+  // Quests (Nov 9, phase 3; quests.ts). GET /api/quests: your quests (the day's dealt first, on the day's first read), the resets and
+  // each daily's reroll. POST /api/quests/reroll {quest}: that daily's free reroll today ({ok, quests} or a refusal). POST /api/quests/test {quests}
+  // (test servers only): your quests set, for tests and stills. A guest where sign-in is set up has none ("Sign in for quests.").
+  if (path === "/api/quests" || path.startsWith("/api/quests/")) {
+    if (signInRequired(env) && !isSignedIn(current)) return json({ message: SIGN_IN_FOR_QUESTS }, 403);
+    const paused = isPaused(env, "rewards", now);
+    if (path === "/api/quests" && request.method === "GET") return json(await questsAnswer(sql, current.id, now, paused));
+    if (path === "/api/quests/reroll" && request.method === "POST") {
+      const b = (await request.json().catch(() => ({}))) as { quest?: unknown } | null;
+      const done = await rerollQuest(sql, current.id, b?.quest, now);
+      return done.ok ? json({ ok: true, quests: await questsAnswer(sql, current.id, now, paused) }) : json({ message: done.message }, 409);
+    }
+    if (path === "/api/quests/test" && request.method === "POST") {
+      if ((env as AdminEnv).TEST_SWITCHES !== "1") return json({ message: "Not allowed" }, 403);
+      const b = (await request.json().catch(() => ({}))) as { quests?: unknown } | null;
+      return (await setTestQuests(sql, current.id, b?.quests, now)) ? json(await questsAnswer(sql, current.id, now, paused)) : json({ message: "Bad quests" }, 400);
+    }
+  }
+
+  // POST /api/results: a solo match's result, from the browser. Its XP (Nov 9) is the server's: the time between the game's start
+  // and now by the server's clock (`game`: its id from /api/xp/solo/start); the moves, the win, a resign, leaving (`left`: removed
+  // for idling) and a test switch are the device's word, so they can only lower it. A result the server never timed (no `game`, or
+  // one already ended) earns no XP at all; a win needs XP.soloWinMinMinutes of the server's time and is capped (XP.soloWinsPerDay
+  // a day), and the time too (XP.soloMinutesPerDay a day). Review M1 and M2, Nov 9. Answers {ok, xp}.
   if (path === "/api/results" && request.method === "POST") {
-    const b = (await request.json().catch(() => null)) as Partial<MatchResult> | null;
+    const b = (await request.json().catch(() => null)) as (Partial<MatchResult> & { game?: unknown; won?: unknown; resigned?: unknown; left?: unknown; test?: unknown }) | null;
     if (!b || typeof b.placement !== "number" || typeof b.players !== "number") return json({ message: "Bad result" }, 400);
-    await recordResult(sql, current.id, { ...b, online: false, mode: b.mode === "crowd" || b.mode === "boss" ? b.mode : "classic" } as MatchResult, now);
+    const timed = await endSoloGame(sql, current.id, b.game, now);
+    // (An app from before XP sends no moves: NULL, as for every result from before.)
+    const moves = typeof b.moves === "number" && Number.isFinite(b.moves) ? Math.max(0, Math.min(10_000, Math.round(b.moves))) : null;
+    const tested = timed?.testMinutes === SOLO_TESTED;
+    const forced = tested ? null : (timed?.testMinutes ?? null);
+    const ms = forced !== null ? forced * 60_000 : (timed?.ms ?? 0);
+    const xp = !timed
+      ? null
+      : await grantXp(sql, current.id, {
+          key: `solo:${timed.id}`,
+          facts: {
+            ms,
+            moves: forced !== null ? Math.max(moves ?? 0, XP.minMoves) : (moves ?? 0),
+            won: b.won === true && ms >= XP.soloWinMinMinutes * 60_000,
+            resigned: b.resigned === true,
+            abandoned: b.left === true,
+            test: tested || (forced === null && b.test === true),
+          },
+          cap: "solo",
+          signedInOnly: signInRequired(env),
+          now,
+          paused: isPaused(env, "rewards", now),
+          // (A solo Boss Battle moves the boss quests too, Nov 10: the device names the mode, as it does its moves and its win.)
+          quest: b.mode === "boss" ? "soloBoss" : "solo",
+        }).catch((e: unknown) => {
+          console.log(`xp for a solo game: ${String(e)}`);
+          return null;
+        });
+    const { game: _game, won: _won, resigned: _resigned, left: _left, test: _test, ...result } = b;
+    // (`playMs`: the server's time, as XP counted it (a test server's ?xpgame minutes included); none for a game it never timed. The
+    // Welcome Crate counts a solo game only with WELCOME_GIFT.soloMinSeconds of it and XP.minMoves moves: Nov 10.)
+    await recordResult(sql, current.id, { ...result, online: false, mode: b.mode === "crowd" || b.mode === "boss" ? b.mode : "classic", playMs: timed ? ms : null, moves, xp } as MatchResult, now);
     // (A finished game: maybe the Welcome Crate, once ever. The app's next /api/me shows it.)
     await grantWelcomeCrate(sql, current.id, now).catch(() => false);
-    return json({ ok: true });
+    return json({ ok: true, xp });
   }
 
   // POST /api/auth/logout: a fresh guest account on this device.
@@ -579,10 +687,11 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
       await endSession(sql, token);
     }
     const g = await createGuest(sql, now, "Player");
-    return json(await profile(sql, g.user), 200, { "set-cookie": sessionCookie(g.token) });
+    return json(await profile(sql, g.user, admins, leaves), 200, { "set-cookie": sessionCookie(g.token) });
   }
 
-  // ---- Email: a 6-digit code (each step behind the age gate: no email is taken from a device that hasn't answered) ----
+  // ---- Email: a 6-digit code (no email is taken from a device that answered "too young"; one that hasn't answered is asked once
+  // the code shows whose email it is, unless that account has answered) ----
   if (path === "/api/auth/email/start" && request.method === "POST") {
     if (!email) return json({ message: "Email sign-in isn't set up yet." }, 503);
     const tooYoung = ageRefusal(request);
@@ -604,8 +713,8 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
       }),
     });
     if (!sent.ok) return json({ message: "We couldn't send the email. Try again in a minute." }, 502);
-    // (The answer starts its time again, so it outlasts the code.)
-    return json({ ok: true }, 200, { "set-cookie": ageOk() });
+    // (An answer starts its time again, so it outlasts the code.)
+    return json({ ok: true }, 200, ageAnswer(request) === "ok" ? { "set-cookie": ageOk() } : {});
   }
   if (path === "/api/auth/email/verify" && request.method === "POST") {
     const tooYoung = ageRefusal(request);
@@ -613,15 +722,24 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
     const b = (await request.json().catch(() => ({}))) as { email?: unknown; code?: unknown };
     const address = cleanEmail(b.email);
     if (!address || typeof b.code !== "string") return json({ message: "Enter the 6-digit code." }, 400);
-    if (!(await verifyEmailCode(sql, address, b.code, now))) return json({ message: "That code didn't work. Check it, or send a new one." }, 400);
-    return signInAs(await signInWithIdentity(sql, current, "email", address, {}, now));
+    // Whether it can finish now: this device just answered "old enough", or the account it lands on has. Read before the code is
+    // checked, so a right code is used up only by a check that signs in; one that must ask first keeps it live, and the app sends it
+    // again with the answer (no new code). The answer is the same for a wrong code either way.
+    const answered = ageAnswer(request) === "ok";
+    const finish = answered || (await answeredSignIn(sql, current, "email", address));
+    if (!(await verifyEmailCode(sql, address, b.code, now, !finish))) return json({ message: "That code didn't work. Check it, or send a new one." }, 400);
+    if (!finish) return askAgeFirst();
+    const user = answered ? await signInWithIdentity(sql, current, "email", address, {}, now) : await signInIfAnswered(sql, current, "email", address, {}, now);
+    // (The account went between the two reads: asked first, and the code's used: the finish fails and the player sends a new code.)
+    return user ? signInAs(user, answered) : askAgeFirst();
   }
 
-  // ---- Google (behind the age gate too: without an "old enough" answer, back to the page, which asks) ----
+  // ---- Google (behind the age gate too: a device that's too young goes back to the page; one that hasn't answered is asked when it
+  // comes back, unless the Google account's own account has answered) ----
   const redirectUri = `${url.origin}/api/auth/google/callback`;
   if (path === "/api/auth/google/start" && request.method === "GET") {
     if (!google) return json({ message: "Google sign-in isn't set up yet." }, 503);
-    // (?signin=age: the app shows ASK_AGE_LINE on the question, or the friendly line to a device that's too young.)
+    // (?signin=age: the app shows the friendly line to a device that's too young.)
     if (ageRefusal(request)) return Response.redirect(`${url.origin}${safeNext(url.searchParams.get("next"))}?signin=age`, 302);
     const state = randomToken(16);
     const q = new URLSearchParams({
@@ -635,8 +753,8 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
     const headers = new Headers({ location: `https://accounts.google.com/o/oauth2/v2/auth?${q}`, "cache-control": "no-store" });
     headers.append("set-cookie", cookie(STATE_COOKIE, state, 600));
     headers.append("set-cookie", cookie(NEXT_COOKIE, safeNext(url.searchParams.get("next")), 600));
-    // (The answer starts its time again, so it outlasts the trip to Google.)
-    headers.append("set-cookie", ageOk());
+    // (An answer starts its time again, so it outlasts the trip to Google.)
+    if (ageAnswer(request) === "ok") headers.append("set-cookie", ageOk());
     return new Response(null, { status: 302, headers });
   }
   if (path === "/api/auth/google/callback" && request.method === "GET") {
@@ -654,8 +772,19 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
     // The token came straight from Google over TLS, so its claims can be read without checking the signature.
     const claims = id_token ? (JSON.parse(atob(id_token.split(".")[1]!.replace(/-/g, "+").replace(/_/g, "/"))) as { sub?: string; email?: string; email_verified?: boolean; aud?: string }) : null;
     if (!claims?.sub || claims.aud !== env.GOOGLE_CLIENT_ID) return Response.redirect(`${url.origin}/?signin=failed`, 302);
-    const user = await signInWithIdentity(sql, current, "google", claims.sub, { email: claims.email_verified ? (claims.email ?? null) : null }, now);
-    return signInAs(user, `${url.origin}${safeNext(readCookie(request, NEXT_COOKIE))}?signin=google`);
+    const answered = ageAnswer(request) === "ok";
+    const extra = { email: claims.email_verified ? (claims.email ?? null) : null };
+    const user = answered ? await signInWithIdentity(sql, current, "google", claims.sub, extra, now) : await signInIfAnswered(sql, current, "google", claims.sub, extra, now);
+    const back = `${url.origin}${safeNext(readCookie(request, NEXT_COOKIE))}`;
+    if (!user) {
+      // Asked first (?signin=age-google): nothing was made or kept, not even who the Google account is. After the answer the app
+      // goes to Google again (one more pick of the account), and this time the callback finishes. This trip's state is spent.
+      const headers = new Headers({ location: `${back}?signin=age-google`, "cache-control": "no-store" });
+      headers.append("set-cookie", cookie(STATE_COOKIE, "", 0));
+      headers.append("set-cookie", cookie(NEXT_COOKIE, "", 0));
+      return new Response(null, { status: 302, headers });
+    }
+    return signInAs(user, answered, `${back}?signin=google`);
   }
 
   return json({ message: "Not found" }, 404);

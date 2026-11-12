@@ -10,6 +10,7 @@
 import type { Anim, Character, Frame, Layer, Part } from "../../characters/sprite.ts";
 import { MOO_PALETTE } from "../../characters/moo.ts";
 import { grain, groundShadow, LANTERN_LIGHT, paint, signBoard, signFace, type LightSpot, type Pt } from "./kit.ts";
+import { lazyAnim } from "../../characters/sprite.ts";
 
 const M_ = MOO_PALETTE;
 const PALETTE: Record<string, string> = {
@@ -243,7 +244,7 @@ const frames: Frame[] = SWAY.map(([m, s, pal]) => ({
   ],
 }));
 
-const idle: Anim = { loop: true, frames };
+const idle: Anim = lazyAnim(() => ({ loop: true, frames }));
 
 export const HOUSE_MOO: Character = {
   id: "house-moo",

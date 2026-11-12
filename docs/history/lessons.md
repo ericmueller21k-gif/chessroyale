@@ -911,3 +911,108 @@ which never changed, so none failed.
 
 **The fix:** one box element for the match (`KeptBox`), and `MiniTower` measuring in a layout effect from its last room.
 docs/decisions/2026-11-01-crowd-steady-box.md.
+
+## A defeat that never came (Nov 9, 2026)
+
+**What happened:** main's full run on 729e639 went red on `e2e/boss-result.spec.ts:44` (phone, both tries): after
+`?mate=1` and START, `.results h1` never came. It had passed before, and it passed locally. Only CSS had changed.
+
+**Why:** START with no boss picked plays a random one. `?mate=1` (`bossMateTest`) has the boss play a mate in one from
+1.f3 e5 2.g4, but only among the moves his rules allow, and only on his ordinary move: Wrangler's first move is always
+his long pull (`pigTurn` plays the pull before the mate is looked at) and Sawyer's first move must be a pawn's (his
+split). Both played 2…d5 and the battle went on. 2 bosses of 14: about one run in seven per try, so it came and went.
+
+**How it was found:** the defeat path run once per playable boss (`?boss=<id>`): 12 passed, Wrangler and Sawyer
+failed. `?win=1` passed for all 14.
+
+**The fix:** the spec names Hollow (as `king-attack` and `shop` already do), and the switch's comment in settings.ts
+says which bosses it can't mate at once. docs/decisions/2026-11-09-boss-result-red.md.
+
+## Uploads that waited for the GPU, and an atlas that never gave room back (Nov 11, 2026)
+
+**What Eric saw:** `/town?report` on his iPhone 14 Plus. Warm: 4,353 uploads and 12 atlas resets in 28 s, most of the frame "Outside
+our code". Cold: frames up to 259 ms while turning, painting and uploading.
+
+**The cause:** two things. (1) The town's 2D pictures (tags, signs, the bubble, text) were canvases the browser drew on the GPU.
+Uploading one to WebGL first waits for the GPU to finish what it's drawing: 30 to 120 ms an upload, headless. (2) The atlas only got
+room back by starting a whole page again. A picture the sweep let go, or one that changed size, kept its old room, so the 6 pages
+filled and reset over and over, and everything on them was uploaded again.
+
+**How it was found:** each upload timed by where it came from, headless, once the loading screen had taken painting out of the
+picture.
+
+**The fix:** the town's pictures are painted and uploaded once, on a loading screen, onto an atlas sized for them. Only 2 spare pages
+start again. The town's 2D pictures are made in memory (`art2d`). docs/decisions/2026-11-11-town-loading.md.
+
+
+## A report that looked paused in every room (Nov 11, 2026)
+
+**What Eric saw:** `/town?report` on his iPhone "is pausing when I run into the building, so I don't know how to capture it", the day
+#638 made the report record rooms.
+
+**The cause:** the rooms' frames were recorded, but the pill's "● Recording N s" was set in the town's frame loop, which stops while
+you're in a room. Inside, the pill stood still. #638's tests checked the recorded frames and the `?fps` pill, not the report's pill.
+
+**The fix:** the recorder tells the pill each new second (`FrameRec.onSec`), whichever loop records. The e2e check walks in a room and
+reads the pill's texts. docs/decisions/2026-11-11-room-smooth.md.
+
+
+## Floor tiles that stood up (Nov 11, 2026)
+
+**What Eric saw:** in Rolling Dough's back room, on his iPhone, the table and its board ghosted, and dark squares on the floor as he
+walked round it; "the same in the main bakery".
+
+**The cause:** the back room's tiles were named `bfloor-` and `rug-`, and the room bakes only names starting `floor-` into its floor.
+Every tile stood up as a piece each frame, and went see-through over you, as a cave's rock does. The see-through rule reached the
+whole room (and the table) because the room has a floor's shape. The room's unit tests checked walls and paths, not that its floor
+was a floor; the stills at rest looked right.
+
+**The fix:** the tiles renamed; a room lists what may go see-through (`seeThru`). A unit test: every square has a floor tile baked
+in; an e2e check walks round the table: no tile stands, nothing but the door and near wall see-through.
+docs/decisions/2026-11-11-room-smooth.md.
+
+## Escapes lost as a pop-up opened (Nov 11, 2026)
+
+**What happened:** main's full run went red on retry-only passes in `town-chat.spec.ts:1410` (a player's own line menu stayed open
+after Escape) and `shop.spec.ts:1480` (the "Buying opens soon" pop-up stayed open after Escape, many runs), and on
+`squads-play.spec.ts:304`, the very test written for this in October.
+
+**Why:** the town chat's line menu and the shop's pop-up added their Escape listener in a `useEffect`, which Preact runs after a paint
+(up to about 100 ms later, more on a busy phone or CI): an Escape pressed as they opened was lost. The party sheet had been fixed for
+this on Oct 16, but its test's watcher fired on any `[role="dialog"]`, and `index.html` always holds one (the hidden "Turn your phone
+upright"), so it could send its Escape before the sheet existed.
+
+**How it was found:** the CI snapshots (the pop-up still open, the sheet still open with nothing else on screen), then an Escape sent
+from a MutationObserver the moment each pop-up is in the page: the menu and the pop-up stayed open on the old build, every time.
+
+**The fix:** layout effects for both listeners; each spec presses Escape at the pop-up's first frame; the party sheet's watcher waits
+for `.sq-party`. docs/decisions/2026-11-11-flaky-batch.md (it lists eight more pop-ups with the same `useEffect`).
+
+## Hollow's dark at Babur's mate (Nov 11, 2026)
+
+**What Eric saw:** "when Babur mated me it showed the dark matter Hollow uses on the tile."
+
+**Why:** the mate on your king was built for Hollow first (Oct 10): the king toppled into his dark (`darkItem`) and flashed his
+violet at each lash, both drawn in the shared `KingAttack.tsx`. When every boss got an attack, those stayed there, so every boss's
+mate ended on Hollow's dark square. The tests checked Hollow's mate only. The same sweep found Dash's swipes showing Jefferson's
+fireball pops (`popItem`).
+
+**The fix:** the dark and the violet are Hollow's kit's (`mateMark`, `glow`); Dash got his own claw marks (`clawHit`); a test walks
+every boss's kit. docs/decisions/2026-11-11-mate-effects-iphone-vibration.md.
+
+## A level that popped twice a move, and a Back tap that was lost (Nov 12, 2026)
+
+**What happened:** main's full run went red on retry-only passes in `boss-bar.spec.ts:204` (the level badge's animation read as `""`
+mid-Full-Moon) and `town-leave.spec.ts:148` (still inside Babur's Circus 20 s after the room's Back was tapped).
+
+**Why:** the match's screens are separate components, one per phase, so the boss bar and its level badge are put in the page anew at
+every phase: twice a move. The lifted badge's gold pop (560 ms) replayed at each one, about nine times in one Full Moon, and the test's
+read could land on a badge just replaced. In the town, `goOut` returned at once while the door was busy, and the door stays busy until
+the room's warm-up frames and its 260 ms fade are done (up to about 1.3 s after it's drawn): a Back tapped then did nothing.
+
+**How it was found:** a MutationObserver logging each `.boss-level` put in the page (with the phase), and one tapping Back the moment the
+room's canvas is drawn: the pop replayed at every phase, and the room stayed, on the old build every time.
+
+**The fix:** the badge carries on its animation from when the lift or slash began (`levelSince`, a negative `animation-delay`); the town
+keeps a Back tapped as the room fades in and goes out once it has (`outNext`). Each spec has the check that failed on the old build.
+docs/decisions/2026-11-11-flaky-batch.md, "Batch 4".

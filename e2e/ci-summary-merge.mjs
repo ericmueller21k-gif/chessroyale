@@ -32,7 +32,7 @@ const table = (title, list, how) => {
   for (const t of list) out.push(`| ${t.n} | \`${t.where}\` ${cell(t.title)} | ${t.project} | ${cell(t.error)}${t.at ? ` (at ${t.at})` : ""} |`);
   out.push("");
 };
-if (flaky.length) table("⚠️ Flaky: failed, then passed on the retry", flaky, "CI retries a failed test once (until the flaky tests are fixed; the goal is no retries). These passed the second time.");
+if (flaky.length) table("⚠️ Flaky: failed, then passed on the retry", flaky, "CI retries a failed test once, for its trace. These passed the second time: on main that turns the run red (Nov 10).");
 if (failed.length) table("❌ Failed", failed, "Failed twice. Run one alone: `npx playwright test <file:line> --project <project>`.");
 out.push("### Shards", "", "| Shard | Result | Passed | Failed | Flaky | Skipped | Time |", "| --- | --- | --- | --- | --- | --- | --- |");
 for (const { n, record: r } of shards) {

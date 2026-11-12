@@ -5,18 +5,25 @@ import { elimination, lossRows, myTeam, scoreDp, type GameView } from "../game.t
 import { useState } from "preact/hooks";
 import { Breakdown } from "../components/Breakdown.tsx";
 import { ordinal } from "./StageBreak.tsx";
-import { GodKingEpilogue, LastStandCard } from "../components/LastStand.tsx";
+import { LastStandCard } from "../components/LastStand.tsx";
 import { PlayerName } from "../components/PlayerName.tsx";
 import { ChatSection, useMedia } from "../components/QuickChat.tsx";
 import { bossInText, crowdFinalists, rankedMinHumans } from "@chessroyale/core";
-import { BossCharacter, BossTag, hasCharacter } from "../components/BossCharacter.tsx";
+import { BossTag, hasCharacter } from "../components/BossCharacter.tsx";
+import { ResultDuo } from "../components/ResultDuo.tsx";
 import { FlagIcon, MOUSE_LAYOUT, MatchMenu } from "../components/MatchMenu.tsx";
 import { exitFor } from "../match-exit.ts";
 import { TokenBox } from "../components/TokenBox.tsx";
+import { XpResult, useGameXp } from "../components/XpResult.tsx";
+
+/** An online match where one device's word stood alone (LobbyRecord.unvouched: nobody could check a host's scores or the boss's move). */
+export const UNVOUCHED_LINE = "Only one device checked this match: it pays as a solo game.";
 
 export function ResultsScreen({ match, placement, winner, onAgain, onHome, homeText = "Home" }: { match: GameView; placement: number; winner: string; onAgain: () => void; onHome: () => void; /** Its leaving button's words: "Back to town" after a boss challenged in the town. */ homeText?: string }) {
   const played = match.moves.filter((m) => m.move !== null);
   const [review, setReview] = useState(false);
+  // XP (Nov 9): an online game's by its lobby code, as its room writes it; a solo game's with its result (App.tsx).
+  const xp = useGameXp(match, match.serverPaced ? { code: (match as { code?: string }).code ?? null } : { solo: true });
   // A computer has the side bar (its Settings); a boss battle's gear is left out there (Eric, round 2).
   const sidebar = useMedia(MOUSE_LAYOUT);
   // Out at a cut (Crowd): the breakdown measures you against the line you missed.
@@ -65,10 +72,14 @@ export function ResultsScreen({ match, placement, winner, onAgain, onHome, homeT
             <MatchMenu exit={exitFor(match)} />
           </div>
         )}
-        <div class={`trophy${resigned ? " resigned" : ""}`} aria-hidden="true">
-          {resigned ? <FlagIcon size={56} /> : bossResult ? (bossResult === "crowd" ? "🏆" : bossResult === "boss" ? "💀" : "🤝") : placement === 1 ? "🏆" : placement <= 4 ? "🥈" : "♟️"}
-        </div>
-        <h1>
+        {/* (A boss battle has no trophy and no skull above its title: Eric, Nov 7.) */}
+        {!bossResult && (
+          <div class={`trophy${resigned ? " resigned" : ""}`} aria-hidden="true">
+            {resigned ? <FlagIcon size={56} /> : placement === 1 ? "🏆" : placement <= 4 ? "🥈" : "♟️"}
+          </div>
+        )}
+        {/* (A boss battle's title: the God King's pixel type, Eric, Nov 7.) */}
+        <h1 class={bossResult ? "boss-title" : undefined}>
           {afk ? (
             "Removed for being away"
           ) : resigned ? (
@@ -109,8 +120,9 @@ export function ResultsScreen({ match, placement, winner, onAgain, onHome, homeT
             )}
           </p>
         )}
-        {/* A boss with a character takes its bow: knocked off its pogo, or bouncing in triumph. */}
-        {bossResult && match.boss && <BossCharacter match={match} place="results" />}
+        {/* The boss on the left (his bow, or his attack on you if he won), your pawn on the right with your XP under it; no God
+            King (Eric, Nov 9: ResultDuo). */}
+        {bossResult && match.boss && <ResultDuo match={match} result={bossResult} xp={xp} />}
         {bossResult && match.boss && (
           <p class={`team-result ${bossResult === "crowd" && survived ? "good" : bossResult === "boss" ? "bad" : ""}`}>
             {hasCharacter(match) ? null : <><BossTag boss={match.boss} /> </>}
@@ -120,18 +132,16 @@ export function ResultsScreen({ match, placement, winner, onAgain, onHome, homeT
                 ? `You beat ${bossInText(match.boss.name)} on all ${simul.of} boards!`
                 : `${bossInText(match.boss.name, true)} won. You won ${simul.won} of ${simul.of} boards: all ${simul.of} must be won.`
               : bossResult === "crowd"
-              ? `${alone ? "You" : "The crowd"} beat ${bossInText(match.boss.name)}!${survived ? " A win on your record." : ""}`
+              ? `${alone ? "You" : "The crowd"} beat ${bossInText(match.boss.name)}!`
               : bossResult === "boss"
                 ? `${bossInText(match.boss.name, true)} won${onTime ? " on time" : byCarrots ? " with their fifth carrot" : byBlackout ? ": the last of your ten bulbs went out" : ""}.`
                 : `A draw with ${bossInText(match.boss.name)}.`}
           </p>
         )}
-        {/* After his Last Stand: he rises again if the crowd won; otherwise he stays down. */}
-        {bossResult && match.boss?.lastStand && <GodKingEpilogue side={match.boss.crowdSide} rises={bossResult === "crowd"} />}
         {/* What he saved you from: the blunder, the boss's reply, the best move, your chances (tap to open). */}
         {bossResult && match.boss?.lastStand?.fen && <LastStandCard stand={match.boss.lastStand} side={match.boss.crowdSide} />}
-        {/* You resigned: a loss on your record. */}
-        {resigned && <p class="team-result bad">It counts as a loss.</p>}
+        {/* You resigned: a loss on your record (a boss battle says nothing of the record: its counts just move, Eric, Nov 7). */}
+        {resigned && !bossResult && <p class="team-result bad">It counts as a loss.</p>}
         {team && !bossResult && !left && (
           <p class={`team-result ${gameWinner === team ? "good" : gameWinner ? "bad" : ""}`}>
             {gameWinner === team
@@ -142,13 +152,18 @@ export function ResultsScreen({ match, placement, winner, onAgain, onHome, homeT
           </p>
         )}
         {/* Whether it counted for your ranking, in words (the rule: RANKING in settings.ts). */}
-        {match.ranked === false && (
+        {/* (A boss battle's solo note: it says nothing of ranking, Eric, Nov 8; a lobby's line stays.) */}
+        {/* (One device's word stood alone somewhere in it: why it pays as a solo game, in place of the unranked line.) */}
+        {match.unvouched && <p class="results-unranked">{UNVOUCHED_LINE}</p>}
+        {match.ranked === false && !match.unvouched && (match.serverPaced || !bossResult) && (
           <p class="results-unranked">
             {match.serverPaced
               ? `Unranked: fewer than ${rankedMinHumans(match.settings.lobbySize)} real players, so your ranking didn't change.`
               : "Unranked: solo games don't count for ranking."}
           </p>
         )}
+        {/* XP (Nov 9): the bar filling from your old XP to the new, on every result screen (a boss battle's: under your pawn). */}
+        {!(bossResult && match.boss) && <XpResult xp={xp} />}
         {/* Online: quick chat, for the GGs. */}
         <ChatSection match={match} />
         {me && (

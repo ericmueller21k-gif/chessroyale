@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { BOSS_ROSTER } from "@chessroyale/core";
+import { BOSS_POWERS, BOSS_ROSTER } from "@chessroyale/core";
+import { bulbsAt, coversAfter } from "../../chess/src/bosses/hollow.ts";
+import { STRIP_BULBS } from "../src/characters/effects/hollow.ts";
+import { stripLit } from "../src/components/Hollow.tsx";
 import { pickLine, type Beat } from "../src/characters/boss-beats.ts";
 import { HOLLOW_SOUNDS, hollowSound } from "../src/characters/hollow-sounds.ts";
 import { BULBS, BULB_KEYS, HOLLOW_ATTACK, HOLLOW_CAST_FROM, HOLLOW_HEART, HOLLOW_PALETTE, STRAND_SECTIONS, bulbsLook, findLine, findShort, hollowBuild } from "../src/characters/hollow.ts";
@@ -300,20 +303,39 @@ describe("his dark on the board", () => {
     expect(darkItem("e4", "clear", 9).anim).toBe("clear");
   });
 
-  it("counts the bulbs down on the strip: each going out ends on one fewer, the relight on all three", () => {
-    const strip = EFFECTS.bulbStrand.ch;
-    const last = (a: string) => renderFrame(strip, strip.anims[a]!.frames.at(-1)!).data;
-    const first = (a: string) => renderFrame(strip, strip.anims[a]!.frames[0]!).data;
-    // (A glint aside: compare without specks by rendering lit<n>'s glint-free frame.)
-    const plain = (a: string) => renderFrame(strip, { ...strip.anims[a]!.frames[0]!, specks: [] }).data;
-    expect(renderFrame(strip, { ...strip.anims.out3!.frames.at(-1)!, specks: [] }).data).toEqual(plain("lit2"));
-    expect(renderFrame(strip, { ...strip.anims.out1!.frames.at(-1)!, specks: [] }).data).toEqual(plain("lit0"));
-    expect(renderFrame(strip, { ...strip.anims.relight!.frames.at(-1)!, specks: [] }).data).toEqual(plain("lit3"));
-    expect(cueAt(strip.anims.out2!, "pop")).toBe(0);
-    expect(cueAt(strip.anims.relight!, "relight")).toBe(0);
-    void last;
-    void first;
+  it("counts the bulbs down on the strip, six of them, phone and computer: each going out ends on one fewer, the relight on all six", () => {
+    for (const [fx, w] of [[EFFECTS.bulbStrand, 44], [EFFECTS.bulbStrandWide, 88]] as const) {
+      const strip = fx.ch;
+      // (Pixel for pixel under the rage meter: a phone's 44 px, a computer's 88, 11 tall.)
+      expect([strip.w, strip.h]).toEqual([w, 11]);
+      expect(fx.loop).toBe("lit6");
+      // (A glint aside: compare without specks.)
+      const plain = (a: string, f = 0) => renderFrame(strip, { ...strip.anims[a]!.frames.at(f)!, specks: [] }).data;
+      for (let n = 1; n <= 6; n++) expect(plain(`out${n}`, -1), `${w}: out${n}`).toEqual(plain(`lit${n - 1}`));
+      expect(plain("relight", -1)).toEqual(plain("lit6"));
+      expect(plain("relight", 0)).toEqual(plain("lit0"));
+      // Each lit<n> has n bulbs lit: one more bulb's colors than lit<n-1>.
+      for (let n = 1; n <= 6; n++) expect(plain(`lit${n}`), `${w}: lit${n}`).not.toEqual(plain(`lit${n - 1}`));
+      expect(cueAt(strip.anims.out2!, "pop")).toBe(0);
+      expect(cueAt(strip.anims.out6!, "pop")).toBe(0);
+      expect(cueAt(strip.anims.relight!, "relight")).toBe(0);
+    }
   });
+
+  it("the strip's count (Eric, Nov 12): one for each move, yours and his, six lit at a cover, relit as it lands", () => {
+    // Turn by turn (the rules' bulbs as it begins: 1, then 3, 2, 1…), before your move and after it.
+    const seen = Array.from({ length: 10 }, (_, i) => [stripLit(bulbsAt(i + 1), false), stripLit(bulbsAt(i + 1), true)]).flat();
+    // Before his first cover: your first move and his (which brings it). Then six at each cover, one out with every move,
+    // the last with his move that covers (and back to six as it lands).
+    expect(seen).toEqual([2, 1, 6, 5, 4, 3, 2, 1, 6, 5, 4, 3, 2, 1, 6, 5, 4, 3, 2, 1]);
+    // His covers fall where the strip runs out: after his 1st, 4th, 7th… moves (darkEvery 3: his and yours, six).
+    expect(STRIP_BULBS).toBe(2 * BOSS_POWERS.darkEvery);
+    for (let t = 1; t <= 12; t++) expect(stripLit(bulbsAt(t), true) === 1, `turn ${t}`).toBe(coversAfter(t));
+    // Never more than six, never below none.
+    expect(stripLit(9, false)).toBe(6);
+    expect(stripLit(0, true)).toBe(0);
+  });
+
 
   it("lights out: the whole board's tiles dim, go to night (opaque, faint edges, coordinates) and come back from his spot", () => {
     const night = EFFECTS.nightSquare.ch;

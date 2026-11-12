@@ -8,7 +8,7 @@ Lane: `god-king`. The bosses' own rules and art are on [bosses.md](bosses.md).
   stands in the dock under the board (a computer: by the board's bottom-right corner, mirroring the boss by its
   bottom-left, his words and menu opening outwards; Eric, Oct 11; from 1100 px wide he and your pawn grow toward twice their size as far as
   the room right of the board lets them, over its corner a little where needed, `--king-k`, Nov 4: bosses.md, "A boss battle on a computer"; in Boss alone, **your own pawn** stands there and he
-  to its right, a phone's strip has it just left of him, Oct 28: see [bosses.md](bosses.md), "Your pawn"; a phone upright: at the far right of the strip under the
+  to its right, a phone's strip has it just left of him, Oct 28, or under him where the strip is tall enough, the two bigger, Nov 11: see [bosses.md](bosses.md), "Your pawn"; a phone upright: at the far right of the strip under the
   dock's row, the scoreboard / move list panel to his left, his menu opening above the row and his words to his left,
   Eric, Oct 25; a phone on its side: beside the row where the screen's column has room right of the board, Eric, Oct 15:
   see [bosses.md](bosses.md), "The dock under the board"), talks now and then, and can be called to act. He is
@@ -65,6 +65,9 @@ Lane: `god-king`. The bosses' own rules and art are on [bosses.md](bosses.md).
   board's top rows, so it never rises over the boss bar: `kingAttackPlace`).
   It fits between the slide and the stagger, so the Last Stand takes no longer and nothing changed on the server. See
   [bosses.md](bosses.md), "A boss's attack on a king".
+- **Not on the result screen** (Eric, Nov 9: "get rid of the king in the victory and defeat screen entirely"): a boss battle's
+  result shows the boss and your pawn only, after a Last Stand too ([bosses.md](bosses.md), "The result screen").
+  `GodKingEpilogue` stays in `LastStand.tsx` for the dev preview.
 - **Fair.** A power never changes how a player's own pick was judged, and a move he plays never earns brilliant credit.
 - **Against the Hidden Boss his help doesn't work** (Eric, Oct 14; the boss's passive, `BossRules.blocksKing`): his
   move, his strike and his Last Stand never come (the runner's `kingDecision`, `callStrike`, `lastStandFor`). His menu

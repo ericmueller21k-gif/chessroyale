@@ -1,6 +1,6 @@
 import type { ComponentChildren } from "preact";
 import { useEffect, useRef, useState } from "preact/hooks";
-import { FRONT_DOOR, sideOfPawn, type ItemLook, type ItemSlot } from "@chessroyale/core";
+import { FRONT_DOOR, levelOf, levelProgress, sideOfPawn, type ItemLook, type ItemSlot } from "@chessroyale/core";
 import type { HomeRankLine } from "../ranked.ts";
 import { Avatar } from "./Items.tsx";
 import { account, myPawnColor, onAccountChange } from "../account.ts";
@@ -107,27 +107,12 @@ export function DressedPawn({
   );
 }
 
-/** Your pawn in a gold ring: it opens your profile. */
-export function MyPawnButton({ onClick }: { onClick: () => void }) {
-  const p = account().profile;
-  return (
-    <button type="button" class="fd-ring" aria-label="Your profile" onClick={onClick}>
-      <DressedPawn look={p?.locker?.look} size="ring" ride own />
-    </button>
-  );
-}
-
-/**
- * Your pawn in its ring (the home's top bar on a phone; the top right of the page on a computer). No coins (Eric,
- * Oct 18: "nobody needs to see their coins" there; the shop and your profile show them).
- */
-export function AccountBar({ onProfile, tourId }: { onProfile: () => void; tourId?: string }) {
-  return (
-    <div class="fd-top-right" data-tour={tourId}>
-      <MyPawnButton onClick={onProfile} />
-    </div>
-  );
-}
+/** Chat: a speech bubble, drawn as the shop's and friends' icons are (a phone's top bar, Nov 11). */
+export const ChatIcon = () => (
+  <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <path d="M4 5.5h16a1.5 1.5 0 0 1 1.5 1.5v9.5a1.5 1.5 0 0 1-1.5 1.5h-9l-5 4v-4H4A1.5 1.5 0 0 1 2.5 16.5V7A1.5 1.5 0 0 1 4 5.5z" />
+  </svg>
+);
 
 /** Settings: a gear (the side menu, your profile). */
 export const GearIcon = () => (
@@ -230,12 +215,6 @@ export function RatingPill({ rating }: { rating: number | null }) {
   return <span class="fd-pill">{rating === null ? "No rating yet" : `Rating ${Math.round(rating)}`}</span>;
 }
 
-/**
- * PLACEHOLDER for an admin's home, until the real levels exist (Eric, Oct 28: the level "lvl - 38", "show it at 3/4 like I'm
- * 3/4 to level 39"). Shown only where testSwitchesAllowed(); a player sees no level. The real level system replaces it. (The
- * test rank "Opal III" it came with is now any rank by `?rank=`: ranked.ts, rankFromSwitch.)
- */
-export const TEST_LEVEL = { level: 38, progress: 0.75 } as const;
 
 /**
  * The rank line under your name on home (Eric, Oct 28: "we're going with the new ranking system"): your ranked 1 v 1 rank,
@@ -265,11 +244,13 @@ const RING_LEN = 4 * (RING - 2 - 2 * RING_R) + 2 * Math.PI * RING_R;
 const RING_PATH = `M${RING / 2} 1H${RING - 1 - RING_R}A${RING_R} ${RING_R} 0 0 1 ${RING - 1} ${1 + RING_R}V${RING - 1 - RING_R}A${RING_R} ${RING_R} 0 0 1 ${RING - 1 - RING_R} ${RING - 1}H${1 + RING_R}A${RING_R} ${RING_R} 0 0 1 1 ${RING - 1 - RING_R}V${1 + RING_R}A${RING_R} ${RING_R} 0 0 1 ${1 + RING_R} 1H${RING / 2}`;
 
 /**
- * An admin's test level on home (TEST_LEVEL, a placeholder): a thin green ring round your icon, filled clockwise from the top
- * to `progress` over a faint track, and "LVL 38" above it. Both sit outside the icon's box (styles.css, `fd-level`).
+ * Your level on home (Nov 9: real, from your XP; it was an admin's placeholder, Oct 28): a thin green ring round your icon, filled
+ * clockwise from the top to your share of the level over a faint track, and "LVL 7" above it. Both sit outside the icon's box
+ * (styles.css, `fd-level`), so home is the same size and shape with or without them.
  */
-export function LevelRing() {
-  const { level, progress } = TEST_LEVEL;
+export function LevelRing({ xp }: { xp: number }) {
+  const level = levelOf(xp);
+  const progress = levelProgress(xp);
   return (
     <>
       <span class="fd-level">{`LVL ${level}`}</span>
@@ -281,8 +262,8 @@ export function LevelRing() {
   );
 }
 
-/** The order worn items are listed in (a ride last, Oct 31). */
-export const WORN_ORDER: readonly ItemSlot[] = ["skin", "head", "face", "weapon", "ride"];
+/** The order worn items are listed in (a ride last, Oct 31; an outfit first, Nov 10: with one on, only it and eyewear show). */
+export const WORN_ORDER: readonly ItemSlot[] = ["outfit", "skin", "head", "face", "weapon", "ride"];
 
 /** The 44 px back button at the top left of a front-door page. */
 export function BackButton({ onClick, label = "Back" }: { onClick: () => void; label?: string }) {

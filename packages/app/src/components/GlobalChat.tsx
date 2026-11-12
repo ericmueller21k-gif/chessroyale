@@ -85,6 +85,13 @@ function QuickChips({ busy, onSay }: { busy: boolean; onSay: (id: string) => voi
   );
 }
 
+const QuickIcon = () => (
+  <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M4 5.5h16v10H10l-4.5 3.5v-3.5H4z" />
+    <path d="M8 9.5h8M8 12.5h5" />
+  </svg>
+);
+
 const EmojiIcon = () => (
   <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
     <circle cx="12" cy="12" r="9" />
@@ -99,6 +106,8 @@ export function GlobalChat({ onSignIn }: { onSignIn?: () => void }) {
   const [menu, setMenu] = useState<GlobalLine | null>(null);
   const [gear, setGear] = useState(false);
   const [picker, setPicker] = useState(false);
+  // The quick chat button (Nov 8, Eric): the player's quick lines and emoji, tapped to send, under the same limits as the chips.
+  const [quick, setQuick] = useState(false);
   const [draft, setDraft] = useState("");
   const feed = useRef<HTMLDivElement>(null);
   const field = useRef<HTMLInputElement>(null);
@@ -140,8 +149,9 @@ export function GlobalChat({ onSignIn }: { onSignIn?: () => void }) {
     const t = setTimeout(() => globalChat.clearError(), 4000);
     return () => clearTimeout(t);
   }, [note]);
-  // (Escape or a press elsewhere closes the gear's menu.)
-  useEffect(() => {
+  // (Escape or a press elsewhere closes the gear's menu. A layout effect, as every pop-up's: an effect waits for a paint, and an
+  // Escape pressed as it opened was lost: LESSONS.md, Nov 11.)
+  useLayoutEffect(() => {
     if (!gear) return;
     const close = (e: Event) => (e instanceof KeyboardEvent ? e.key === "Escape" : !(e.target as Element | null)?.closest?.(".gchat-head")) && setGear(false);
     addEventListener("keydown", close);
@@ -263,6 +273,16 @@ export function GlobalChat({ onSignIn }: { onSignIn?: () => void }) {
             {note}
           </p>
         )}
+        {quick && !why && (
+          <QuickChips
+            busy={busy}
+            onSay={(id) => {
+              stick.current = true;
+              setQuick(false);
+              void globalChat.say(id);
+            }}
+          />
+        )}
         {picker && !why && (
           <EmojiPicker
             onPick={(code) => {
@@ -315,7 +335,30 @@ export function GlobalChat({ onSignIn }: { onSignIn?: () => void }) {
               onKeyDown={(e) => e.key === "Escape" && setPicker(false)}
             />
           )}
-          <button type="button" class="gchat-emo-btn" aria-label="Emoji" aria-expanded={picker} disabled={!!why} onClick={() => setPicker(!picker)}>
+          <button
+            type="button"
+            class="gchat-quick-btn"
+            aria-label="Quick chat: your lines"
+            aria-expanded={quick}
+            disabled={!!why}
+            onClick={() => {
+              setPicker(false);
+              setQuick(!quick);
+            }}
+          >
+            <QuickIcon />
+          </button>
+          <button
+            type="button"
+            class="gchat-emo-btn"
+            aria-label="Emoji"
+            aria-expanded={picker}
+            disabled={!!why}
+            onClick={() => {
+              setQuick(false);
+              setPicker(!picker);
+            }}
+          >
             <EmojiIcon />
           </button>
         </form>

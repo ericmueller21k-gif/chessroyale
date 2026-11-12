@@ -4,6 +4,7 @@ import { DUEL_PROTOCOL, DUEL_UPDATE, type DuelServerMessage } from "@chessroyale
 import { createGuest, d1Sql, ensureSchema } from "../src/accounts.ts";
 import { duelEntrant, duelGamesOf, rankedRecordOf } from "../src/ranked.ts";
 import { DuelGame } from "../src/duel-do.ts";
+import { xpOf } from "../src/xp.ts";
 import { memoryDb } from "./memory-db.ts";
 
 /**
@@ -65,9 +66,11 @@ async function runtime(envExtra: Record<string, string> = {}) {
   await ensureSchema(sql);
   const ann = (await createGuest(sql, T0, "Ann")).user;
   const bob = (await createGuest(sql, T0, "Bob")).user;
-  const slow = { hang: false, fail: null as ((e: Error) => void) | null };
+  const slow = { hang: false, fail: null as ((e: Error) => void) | null, down: false };
   const db = new Proxy(d1 as object, {
     get(t, k) {
+      // (`down`: every batch fails at once, as in a D1 outage.)
+      if (k === "batch" && slow.down) return () => Promise.reject(new Error("D1 is down"));
       if (k === "batch" && slow.hang)
         return () =>
           new Promise((_, reject) => {
@@ -135,6 +138,9 @@ describe("the 1 v 1 game object", () => {
     await rt.settle();
     expect(w.last("outcome")!.outcome.change!.after.label).toBe("Placement 1/5");
     expect(b.last("outcome")!.outcome.change!.after.label).toBe("Placement 1/5");
+    // (XP, Nov 9: a game of 2 moves each counts for no one.)
+    expect(w.last("outcome")!.outcome.xp).toMatchObject({ none: "short", parts: [] });
+    expect(b.last("outcome")!.outcome.xp).toMatchObject({ none: "short", parts: [] });
     const sql = d1Sql(rt.d1);
     expect((await rankedRecordOf(sql, rt.bob.id)).record).toMatchObject({ games: 1, wins: 1 });
     expect((await duelGamesOf(sql, rt.ann.id))[0]).toMatchObject({ result: "0-1", reason: "checkmate", control: "bullet" });
@@ -146,6 +152,32 @@ describe("the 1 v 1 game object", () => {
     expect(rt.store.size).toBe(0);
     expect(w.last("closed")).toBeDefined();
     expect(await again.exists()).toBe(false);
+  });
+
+  it("XP (Nov 9): 10 moves each counts; the winner's +50 in the outcome, the resigner's counted loss; once, whatever the retries", async () => {
+    const rt = await runtime();
+    const game = await rt.make();
+    const players = { w: (await duelEntrant(d1Sql(rt.d1), rt.ann)).player, b: (await duelEntrant(d1Sql(rt.d1), rt.bob)).player };
+    await game.create("FGHJK", players);
+    const w = rt.socket("w", rt.ann.id);
+    const b = rt.socket("b", rt.bob.id);
+    await game.webSocketMessage(w as never, JSON.stringify({ t: "hello", v: DUEL_PROTOCOL }));
+    await game.webSocketMessage(b as never, JSON.stringify({ t: "hello", v: DUEL_PROTOCOL }));
+    for (const t of [T0 + RANKED_1V1.versusMs + RANKED_1V1.voteSeconds * 1000, T0 + RANKED_1V1.versusMs + RANKED_1V1.voteSeconds * 1000 + RANKED_1V1.overlayMs]) {
+      vi.setSystemTime(t);
+      await game.alarm();
+    }
+    const line = "e2e4 e7e5 g1f3 b8c6 f1c4 g8f6 d2d3 f8c5 c2c3 d7d6 b1d2 e8g8 e1g1 a7a6 a2a4 c8e6 f1e1 h7h6 h2h3 f8e8".split(" ");
+    for (const [i, m] of line.entries()) {
+      vi.setSystemTime(Date.now() + 1000);
+      await game.webSocketMessage((i % 2 ? b : w) as never, JSON.stringify({ t: "move", uci: m, ply: i }));
+    }
+    await game.webSocketMessage(w as never, JSON.stringify({ t: "resign" }));
+    await rt.settle();
+    expect(b.last("game")!.game.end).toMatchObject({ result: "0-1", reason: "resign" });
+    expect(b.last("outcome")!.outcome.xp).toEqual({ before: 0, after: 50, levelBefore: 1, levelAfter: 1, parts: [{ label: "Win", xp: 50 }] });
+    expect(w.last("outcome")!.outcome.xp).toEqual({ before: 0, after: 0, levelBefore: 1, levelAfter: 1, parts: [] });
+    expect(await xpOf(d1Sql(rt.d1), rt.bob.id)).toBe(50);
   });
 
   it("Cancel just as it paired (abandon): called off before anyone arrives, nothing recorded; a stranger can't", async () => {
@@ -276,3 +308,52 @@ describe("the 1 v 1 game object", () => {
     expect(res.status).toBe(403);
   });
 });
+
+describe("a game's recording waits out a D1 outage (Nov 10, finding 7: before, four tries in a minute, then given up)", () => {
+  it("D1 down for an hour after checkmate: tried again each minute, the room stays past its closing; D1 back: recorded once, then it closes", async () => {
+    const rt = await runtime();
+    const game = await rt.make();
+    const sql = d1Sql(rt.d1);
+    // (Each failed try reports itself to the ops page, whose write waits on a timer these fake timers hold: so no rt.settle() here,
+    // just the recording's own steps.)
+    const tick = async () => {
+      for (let i = 0; i < 200; i++) await Promise.resolve();
+    };
+    await game.create("ABCDE", { w: (await duelEntrant(sql, rt.ann)).player, b: (await duelEntrant(sql, rt.bob)).player });
+    const w = rt.socket("w", rt.ann.id);
+    const b = rt.socket("b", rt.bob.id);
+    await game.webSocketMessage(w as never, JSON.stringify({ t: "hello", v: DUEL_PROTOCOL }));
+    await game.webSocketMessage(b as never, JSON.stringify({ t: "hello", v: DUEL_PROTOCOL }));
+    vi.setSystemTime(T0 + RANKED_1V1.versusMs + RANKED_1V1.voteSeconds * 1000 + RANKED_1V1.overlayMs);
+    await game.alarm();
+    await game.alarm();
+    rt.slow.down = true;
+    for (const [i, m] of ["f2f3", "e7e5", "g2g4", "d8h4"].entries()) {
+      vi.setSystemTime(Date.now() + 1000);
+      await game.webSocketMessage((i % 2 ? b : w) as never, JSON.stringify({ t: "move", uci: m, ply: i }));
+    }
+    await tick();
+    const end = Date.now();
+    // An hour of alarms with D1 down: no outcome, the room still there (its results keep 10 minutes).
+    for (let i = 0; i < 200 && rt.alarm !== null && rt.alarm < end + 3_600_000; i++) {
+      vi.setSystemTime(Math.max(Date.now(), rt.alarm));
+      await game.alarm();
+      await tick();
+    }
+    expect(Date.now()).toBeGreaterThan(end + RANKED_1V1.resultsKeepMinutes * 60_000);
+    expect(rt.store.has("game")).toBe(true);
+    expect((rt.store.get("game") as { recordTries: number }).recordTries).toBeGreaterThan(20);
+    expect(await duelGamesOf(sql, rt.ann.id)).toHaveLength(0);
+    // D1 back: the next try records it (once), each player hears, and the room closes.
+    rt.slow.down = false;
+    for (let i = 0; i < 10 && rt.store.has("game"); i++) {
+      vi.setSystemTime(Math.max(Date.now(), rt.alarm ?? Date.now()));
+      await game.alarm();
+      await tick();
+    }
+    expect(await duelGamesOf(sql, rt.ann.id)).toHaveLength(1);
+    expect(w.last("outcome")).toBeDefined();
+    expect(rt.store.has("game")).toBe(false);
+  });
+});
+

@@ -40,15 +40,15 @@ describe("Folio: playable", () => {
     expect(kit.kingAttack?.ch).toBe(FOLIO_ATTACK);
   });
 
-  it("says its seven lines as written, each on its own beat, every time; its select line is its entrance", () => {
+  it("says its lines as written (two for victory and for defeat, Nov 8), each on its own beat, each on its own beat, every time; its select line is its entrance", () => {
     expect(FOLIO_LINES).toEqual({
       entrance: ["Every game's a draft. Write one?"],
       power: ["I'll be honest: that piece is next."],
       fold: ["Folded. It'll keep."],
       ultimateWarn: ["Mind the crease."],
       revision: ["Let me write that again."],
-      victory: ["Well played. Keep the crane."],
-      defeat: ["Lovely prose. I'll fold this away."],
+      victory: ["Well played. Keep the crane.", "Every fold landed just right."],
+      defeat: ["Lovely prose. I'll fold this away.", "Crumpled. Smooth it out and try again."],
     });
     expect(kit.lines).toBe(FOLIO_LINES);
     for (const beat of Object.keys(FOLIO_LINES)) expect(kit.chance[beat as keyof typeof kit.chance], beat).toBe(1);

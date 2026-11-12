@@ -1,4 +1,4 @@
-import type { BossBrain, BounceResult, BurnEvent, Fusion, LassoDrag, LeapfrogHop, LightsOutTarget, LongPull, PowerEvent, PowerId, RepaintResult, SawCut, ShowdownResult, SlamLanding, SlamPiece, SlamResult, SplitPawn, StopReason, TusksCast } from "@chessroyale/core";
+import type { BossBrain, BounceResult, BurnEvent, Fusion, LassoDrag, LeapfrogHop, LightsOutTarget, LongPull, PowerEvent, PowerId, RepaintResult, SawCut, ShowdownResult, SlamLanding, SlamPiece, SlamResult, SplatMark, SplitPawn, StopReason, TusksCast } from "@chessroyale/core";
 import type { Base, Capture } from "./rules.ts";
 import type { ItemLook } from "@chessroyale/core";
 import type { Augment, DrawRule, MaterialSlip } from "@chessroyale/core";
@@ -12,6 +12,7 @@ import type { BalloonAsk, HoopsAsk, TigerView } from "./bosses/tiger.ts";
 import type { CreaseAsk, FolioView } from "./bosses/folio.ts";
 import type { WorkshopView } from "./bosses/timber.ts";
 import type { DashView } from "./bosses/dash.ts";
+import type { ZebraView } from "./bosses/zebra.ts";
 import type { MoveScore } from "./uci.ts";
 /**
  * Messages between the browser and the lobby server (one Durable Object per
@@ -285,10 +286,15 @@ export interface NetBossPowers {
   warned: boolean;
   ultAt: number | null;
   ults?: number;
-  /** A frozen piece's square, through which crowd turn; Boingo's pies (`pie`: the newest, for older screens). */
+  /**
+   * A frozen piece's square, through which crowd turn (Ginger's freeze, a piece Boingo's pie splatted twice); Boingo's pies
+   * (`pie`: the newest, for older screens), and his splat marks (Nov 12; missing for other bosses and from older servers):
+   * the crowd's pieces his pie has hit, by square, each one's kind and its splats.
+   */
   frozen: { square: string; until: number } | null;
   pie: { square: string; until: number } | null;
   pies?: { square: string; until: number }[];
+  splats?: SplatMark[];
   /**
    * Squares that show ice now (the frozen piece; in Ginger's blizzard every crowd piece its ice holds, through the
    * boss's turn after too); and of those, the ones that thaw as the next crowd turn begins (cracked and dripping on
@@ -450,6 +456,12 @@ export interface NetBossPowers {
    */
   dash?: DashView | null;
   /**
+   * Don Dough (missing for other bosses and from older servers; an older app ignores it): his dough on the board (each lump's
+   * kind, square and minutes left), his drops and their cap, his last drop, rise and squash, his gold pieces' squares and his
+   * last Gold Plate, and his opening comment.
+   */
+  zebra?: ZebraView | null;
+  /**
    * The circus tiger (missing for other bosses and from older servers; an older app ignores them): the balloon on his
    * nozzle (`balloon`: its shape as everyone sees it, a fake queen's "q"; its color; when it went on and when it's fully
    * blown, on the battle's clock: the server's online, the page's visible time solo, so every device draws the same stage;
@@ -535,7 +547,13 @@ export interface NetVote {
 export interface NetChatLine {
   n: number;
   from: string;
+  /** A preset line's id ("" for a typed one). */
   say: string;
+  /**
+   * What a player typed (Nov 7, CHAT_TYPED: tidied and passed by the server's filter). Sent only to players who turned chat on and
+   * whose device the age gate didn't mark too young (docs/decisions/2026-11-07-typed-chat-everywhere.md).
+   */
+  text?: string;
   to: "team" | "all";
   team: "w" | "b" | null;
   at: number;
@@ -547,7 +565,7 @@ export interface NetChatLine {
  * Why the server dropped a chat line (the app mirrors the limits, so this is rare). "mod": the sender has a
  * moderator's chat ban (see ChatBlock).
  */
-export type ChatRefusal = "unknown" | "locked" | "team" | "gap" | "burst" | "repeat" | "closed" | "off" | "mod";
+export type ChatRefusal = "unknown" | "locked" | "team" | "gap" | "burst" | "repeat" | "closed" | "off" | "mod" | "typed" | "text";
 
 /** A moderator's chat ban: the player can't send (they still read) until `until` (server time; null: no end). */
 export interface ChatBlock {
@@ -559,7 +577,8 @@ export type ClientMessage =
   /** `lastBoss`: the boss this player met last (a BOSS_ROSTER id), so a raid can avoid the one most of the lobby met. */
   /** No rating: the lobby reads the one stored on the player's account (one an older app still sends is ignored). */
   /** `party`, `seat`: a Boss Battle party's battle, its pass (from the party's `placed`) and this member's seat in it. */
-  | { t: "hello"; token?: string; name?: string; device?: "phone" | "computer"; practice?: boolean; look?: unknown; lastBoss?: string | null; evalBar?: boolean; party?: string; seat?: number }
+  /** `seeded`: this app plays a boss request's `draw` (BOSS_CHECK): only such devices check the boss's moves or have theirs compared. */
+  | { t: "hello"; token?: string; name?: string; device?: "phone" | "computer"; practice?: boolean; look?: unknown; lastBoss?: string | null; evalBar?: boolean; party?: string; seat?: number; seeded?: true }
   | { t: "start" }
   /** A Boss Battle party's AFK kick: `playerId` hasn't picked a minute after the turn's first pick (the lobby's partyKickable). */
   | { t: "kick"; playerId: string }
@@ -598,7 +617,16 @@ export type ClientMessage =
    * (hoopsAnswer's, "c3 f5 b6"; "" none); the server checks it (hoopsCheck). `crease` (Folio's, asked with `crease`): the
    * Crease's line after his move (creaseAnswer's, "d|e" or "4|5"; "" none); the server checks it (creaseCheck).
    */
-  | { t: "bossMove"; key: string; move: string; drag?: string; showdown?: string; outside?: boolean; beam?: string[]; balloon?: string; hoops?: string; crease?: string }
+  /**
+   * `by` (a request with a `brain`): which brain played it, "maia", or "stockfish" (a fallback: Maia not ready, late or failed, a
+   * guard's swap). Two devices' different Maia moves are settled by it (BOSS_CHECK). Missing: "stockfish".
+   */
+  | { t: "bossMove"; key: string; move: string; drag?: string; showdown?: string; outside?: boolean; beam?: string[]; balloon?: string; hoops?: string; crease?: string; by?: "maia" | "stockfish" }
+  /**
+   * This device's Maia is loaded (its `init` succeeded): it may check the boss's Maia moves, and as the host play them (BOSS_CHECK).
+   * `off`: it failed after all (its worker broke): no longer loaded.
+   */
+  | { t: "maiaReady"; off?: true }
   /** Leaving before the match starts (Cancel in the queue): the seat is freed. */
   | { t: "leave" }
   /**
@@ -609,14 +637,17 @@ export type ClientMessage =
    */
   | { t: "resign" }
   /** Quick chat: say a line (a phrase or emoji id) to your team or, for Hello and Sporting lines and emoji, to everyone. */
-  | { t: "chat"; say: string; to?: "team" | "all" }
+  | { t: "chat"; say: string; to?: "team" | "all"; /** Typed (CHAT_TYPED): what the player typed, `say` "". */ text?: string }
   /**
    * Quick chat, this device's choices: chat off (nothing is sent to it, and it can't send), and the players muted
    * for this match (their lines aren't sent to it).
    */
-  | { t: "chatPrefs"; off?: boolean; muted?: string[] }
-  /** Many judges: this device's engine speed (nodes per second), from its speed check on joining. */
-  | { t: "speed"; nps: number }
+  | { t: "chatPrefs"; off?: boolean; muted?: string[]; /** Chat is on for typed lines here (its opt-in; the server checks the account and the age gate). */ typed?: boolean }
+  /**
+   * Many judges: this device's engine speed (nodes per second), from its speed check on joining. `maiaSaved`: Maia's files are saved
+   * on this device already (a phone may then be drawn to check the boss's Maia moves: BOSS_CHECK.loaders).
+   */
+  | { t: "speed"; nps: number; maiaSaved?: true }
   /** Many judges: this device's answer to one scoring job. */
   | { t: "judged"; key: string; id: string; report: JudgeReport }
   /** Many judges, deep checks: this device's re-check of the job's close calls (sent after its "judged"). */
@@ -861,8 +892,22 @@ export type ServerMessage = { now: number } & (
        * as `move`; "" when none is within the cap (nothing moves).
        */
       bounce?: string[];
-      /** The boss's own move on the Maia brain (BOSS_BRAIN): with Maia, at this rating (the lobby decides, once a battle). */
+      /**
+       * The boss's own move on the Maia brain (BOSS_BRAIN): with Maia, at this rating (the lobby decides, once a battle). The bridge
+       * band's share of Stockfish's moves is the lobby's draw: a request with no `stockfishShare` draws none.
+       */
       brain?: NetBossBrain;
+      /** On the Maia brain, this move is the bridge band's share (the lobby drew it): Stockfish's, with no brain (BOSS_CHECK). */
+      share?: true;
+      /** This device checks the host's move (BOSS_CHECK): a phone doesn't download Maia for it. */
+      check?: true;
+      /**
+       * His own move and the funhouse's (BOSS_CHECK): the seed to play it with, for the random source, Maia's draw and limited-strength
+       * Stockfish's (1 to 2147483647). The request goes to a checker too (without his powers' extras, drag, showdown, beam, balloon,
+       * hoops and crease, unless the turn has any), and the two moves are compared: the same seed, the same move. Missing (nobody to
+       * check it, older servers, his powers' picks): play as before.
+       */
+      draw?: number;
       /**
        * Wrangler's turn (BossAsks): his long pulls to choose from (his first move: answer one of them as `move`, or an
        * ordinary move), his showdown's line-up after his move (`showdown`: "try", one that qualifies, else ""; "test",
@@ -961,9 +1006,11 @@ export type ServerMessage = { now: number } & (
     }
   /**
    * The boss's brain for this battle, to the host as the battle begins (on the Maia brain only): it starts loading
-   * Maia during the intro, so the first move can be Maia's.
+   * Maia during the intro, so the first move can be Maia's. `check`: to a device drawn to check his moves (BOSS_CHECK.loaders): a
+   * computer loads Maia; a phone only if Maia's files are already saved on it (no download for this). Either says `maiaReady` once
+   * loaded.
    */
-  | { t: "bossBrain"; brain: NetBossBrain }
+  | { t: "bossBrain"; brain: NetBossBrain; check?: true }
   /** Quick chat: a line for you (your own included, echoed back). */
   | { t: "chat"; line: NetChatLine }
   /**
@@ -975,7 +1022,7 @@ export type ServerMessage = { now: number } & (
    * Quick chat: your line was dropped; `retryAt` (server time) is when it (or anything, for the gap and burst limits)
    * could go. `block`: your chat ban (reason "mod").
    */
-  | { t: "chatNo"; say: string; reason: ChatRefusal; retryAt: number; block?: ChatBlock }
+  | { t: "chatNo"; say: string; reason: ChatRefusal; retryAt: number; block?: ChatBlock; /** Why, in words (a typed message: the filter's, the age gate's). */ message?: string }
   | {
       t: "results";
       placements: Record<string, number>;
@@ -993,6 +1040,8 @@ export type ServerMessage = { now: number } & (
       carrots?: boolean;
       /** It counted for ranking (real players filled at least RANKING.rankedMinHumanShare of the seats). Missing: an older server. */
       ranked?: boolean;
+      /** Something in it stood on one device's word alone (LobbyRecord.unvouched): it pays as a solo game, and the results say so. */
+      unvouched?: true;
     }
 );
 

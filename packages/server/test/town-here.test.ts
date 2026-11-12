@@ -121,4 +121,15 @@ describe("who's in the town square (town-here.ts): the server drops an away pawn
     expect(readBeat({ c: 3, r: 4, idleMs: -5, shop: "<b>" })).toEqual({ c: 3, r: 4, idleMs: 0, hidden: false, shop: null });
     expect(readBeat({ c: 3, r: 4, idleMs: 1e12 })!.idleMs).toBe(86_400_000);
   });
+
+  it("a beat says whether the pawn has just come in (new, past its limit, or from another room): the town chat's \"entered\" line (Nov 12)", () => {
+    const h = new TownHere();
+    expect(h.beat("ann", "Ann", "town", at(1, 2), 0)).toBe(true);
+    expect(h.beat("ann", "Ann", "town", at(1, 3), 5 * S)).toBe(false);
+    expect(h.beat("ann", "Ann", "other", at(1, 3), 10 * S)).toBe(true);
+    h.leave("ann");
+    expect(h.beat("ann", "Ann", "other", at(1, 3), 11 * S)).toBe(true);
+    // Silent past its limit (a hidden phone): back, it has come in again.
+    expect(h.beat("ann", "Ann", "other", at(1, 3), 11 * S + 330 * S)).toBe(true);
+  });
 });

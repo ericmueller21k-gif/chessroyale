@@ -77,7 +77,7 @@ async function into(page: Page, raid: boolean) {
   await page.goto("/?debug&pace=quick&clock=60&laststand=0&boss=gingerbread");
   if (raid) {
     await openBossRaid(page);
-    await page.getByRole("button", { name: /^Raid with bots/ }).click();
+    await page.getByRole("button", { name: /^Play with bots/ }).click();
   } else await bossAloneFromHome(page);
   await yourMove(page);
 }
@@ -192,10 +192,19 @@ test("a phone: the God King at the strip's right edge, the panel to his left, th
       else {
         const pawn = b.pawn!;
         expect(pawn, `${at}: your pawn`).toBeTruthy();
-        expect(Math.abs(pawn.r - king.x), `${at}: just left of him`).toBeLessThanOrEqual(1);
         expect(Math.abs(pawn.r - pawn.x - (king.r - king.x)), `${at}: his width`).toBeLessThanOrEqual(1);
         expect(Math.abs(pawn.b - pawn.y - (king.b - king.y)), `${at}: his height`).toBeLessThanOrEqual(1);
-        expect(Math.abs(pawn.y - king.y), `${at}: on his line`).toBeLessThanOrEqual(1);
+        // (Stacked where the strip is tall enough, Eric, Nov 11: under him in his column, the 390 × 844 strip's; side by side, just
+        // left of him, on his line, where it's short: 360 × 640, 320 × 568.)
+        if (size === "390x844") {
+          expect(Math.abs(pawn.x - king.x), `${at}: in his column`).toBeLessThanOrEqual(1);
+          expect(pawn.y, `${at}: under him`).toBeGreaterThanOrEqual(king.b - 0.5);
+          expect(king.r - king.x, `${at}: bigger than side by side`).toBeGreaterThan(58);
+          expect(pawn.b, `${at}: in the strip`).toBeLessThanOrEqual(panel.b + 0.5);
+        } else {
+          expect(Math.abs(pawn.r - king.x), `${at}: just left of him`).toBeLessThanOrEqual(1);
+          expect(Math.abs(pawn.y - king.y), `${at}: on his line`).toBeLessThanOrEqual(1);
+        }
         expect(panel.r, `${at}: the panel left of your pawn`).toBeLessThanOrEqual(pawn.x + 1);
         expect(overlap(panel, pawn) || overlap(pawn, king) || overlap(pawn, row), `${at}: your pawn over nothing`).toBe(false);
         expect(pawn.y, `${at}: under the row`).toBeGreaterThanOrEqual(row.b);

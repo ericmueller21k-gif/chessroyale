@@ -1,7 +1,8 @@
-import { BOSS_BRAIN, BOSS_ROSTER, bossBrainFor, isPlayable, maiaRatingFor } from "@chessroyale/core";
+import { BOSS_BRAIN, BOSS_CHECK, BOSS_ROSTER, bossBrainFor, isPlayable, lossForRating, maiaRatingFor, mulberry32 } from "@chessroyale/core";
 import { describe, expect, it } from "vitest";
 import {
   bossMoveFrom,
+  eloDrawT,
   brainGuard,
   brainLine,
   HumanUciEngine,
@@ -221,6 +222,45 @@ describe("the boss's move with a Maia brain (bossMoveFrom)", () => {
     expect(brainLine(note!)).toBe("Maia 1100 · no guard · Maia's #2 · 90 ms");
   });
 
+  it("an online move's seed (BOSS_CHECK) goes to Maia's draw, and the rest of the move draws from the seeded source", async () => {
+    const opts: { seed?: number }[] = [];
+    const maia: HumanEngineLike = { ready: () => true, candidates: async (_f, _r, _a, o) => (opts.push(o), answer("g2g4", [["e2e4", 0.5], ["g2g4", 0.2]])) };
+    const move = await bossMoveFrom(scripted(), START_FEN, 1400, 1000, "elo", mulberry32(77), [5, 15], undefined, null, { brain: "maia-raw", rating: 1100, engine: maia, settings, seed: 77 });
+    expect(move).toBe("g2g4");
+    expect(opts[0]!.seed).toBe(77);
+    // (No seed, as before: none sent.)
+    await bossMoveFrom(scripted(), START_FEN, 1400, 1000, "elo", Math.random, [5, 15], undefined, null, { brain: "maia-raw", rating: 1100, engine: maia, settings });
+    expect(opts[1]!.seed).toBeUndefined();
+    // Two devices with one seed: the same slip (the rest of the move's draws come from the seed too).
+    const slip = async () => bossMoveFrom(scripted(), START_FEN, 1400, 1000, "stumble", mulberry32(5), [5, 15]);
+    expect(await slip()).toBe(await slip());
+  });
+
+  it("an online move at a strength with a seed (BOSS_CHECK, the review's m1): drawn from the top moves with it, never UCI_LimitStrength's own draw; two devices agree, and the guard still holds", async () => {
+    const seeded = (seed: number) => bossMoveFrom(scripted("a2a4"), START_FEN, 1400, 1000, "elo", mulberry32(seed), [5, 15], undefined, null, undefined, null, null, true);
+    const counts = new Map<string, number>();
+    for (let seed = 1; seed <= 200; seed++) {
+      const move = await seeded(seed);
+      expect(await seeded(seed)).toBe(move);
+      counts.set(move, (counts.get(move) ?? 0) + 1);
+    }
+    // (Stockfish's own pick at a strength, a2a4 here, is never asked for; a draw past the guard, 10 points, gives way to a slip.)
+    expect([...counts.keys()].sort()).toEqual(["c2c4", "d2d4", "e2e4", "g1f3"]);
+    expect(counts.get("e2e4")).toBeGreaterThan(counts.get("c2c4")!);
+    // (No seed: Stockfish at a strength, as before.)
+    expect(await bossMoveFrom(scripted("d2d4"), START_FEN, 1400, 1000, "elo", Math.random, [5, 15])).toBe("d2d4");
+  });
+
+  it("the seeded draw's temperature follows BOSS_CHECK.eloDrawScale (straight between its points, held past its ends; reports/elo-draw.md, D5)", () => {
+    const pts = BOSS_CHECK.eloDrawScale;
+    for (const [elo, k] of pts) expect(eloDrawT(elo)).toBeCloseTo(lossForRating(elo) * k, 6);
+    const [a, b] = [pts[0]!, pts[1]!];
+    const mid = (a[0] + b[0]) / 2;
+    expect(eloDrawT(mid)).toBeCloseTo((lossForRating(mid) * (a[1] + b[1])) / 2, 6);
+    expect(eloDrawT(1200)).toBeCloseTo(lossForRating(1200) * a[1], 6);
+    expect(eloDrawT(3100)).toBeCloseTo(lossForRating(3100) * pts[pts.length - 1]![1], 6);
+  });
+
   it("the full guard turns Maia's blunder down for its next likely move", async () => {
     let note: BrainNote | null = null;
     const move = await bossMoveFrom(scripted(), START_FEN, 1400, 1000, "elo", Math.random, [5, 15], undefined, null, {
@@ -352,9 +392,15 @@ describe("speaking to the Maia box (HumanUciEngine)", () => {
       "setoption name Temperature value 0.8",
       "setoption name TopP value 0.9",
       "setoption name MultiPV value 8",
+      // (No seed: the box's own random draw.)
+      "setoption name Seed value 0",
       `position fen ${START_FEN}`,
       "go searchmoves e2e4 d2d4",
     ]);
+    // An online boss move (BOSS_CHECK): the server's seed, for this draw alone, so two devices draw the same move.
+    const before = t.sent.length;
+    await maia.candidates(START_FEN, 1200, null, { temperature: 0.8, topP: 0.9, multipv: 8, seed: 123456789 });
+    expect(t.sent.slice(before)).toContain("setoption name Seed value 123456789");
     maia.close();
     expect(t.closed).toBe(true);
     expect(t.sent.at(-1)).toBe("quit");
@@ -368,9 +414,13 @@ describe("speaking to the Maia box (HumanUciEngine)", () => {
     expect(maia.error).toBe("load failed: HTTP 404");
     const ok = new HumanUciEngine(maiaBox());
     await ok.init();
+    // (Its hook: the app tells the lobby its Maia is no longer loaded, BOSS_CHECK's N1.)
+    let told = 0;
+    ok.onFail = () => told++;
     ok.fail("worker error");
     expect(ok.ready()).toBe(false);
     expect(ok.failed()).toBe(true);
+    expect(told).toBe(1);
   });
 
   it("a load that never ends gives up after its time", async () => {

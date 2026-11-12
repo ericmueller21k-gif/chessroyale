@@ -61,7 +61,7 @@ async function into(page: Page, screen: Screen) {
     await page.goto("/?debug&pace=quick&clock=60&laststand=0&boss=gardener");
     if (screen === "raid") {
       await openBossRaid(page);
-      await page.getByRole("button", { name: /^Raid with bots/ }).click();
+      await page.getByRole("button", { name: /^Play with bots/ }).click();
     } else await bossAloneFromHome(page);
     await expect.poll(() => phase(page), { timeout: 120_000 }).toBe("play");
   } else if (screen === "crowd" || screen === "vote") {
@@ -281,11 +281,32 @@ for (const screen of Object.keys(ROOM) as Screen[]) {
     await page.setViewportSize({ width: 1280, height: 800 });
     await page.waitForTimeout(500);
     await watchSize(page);
+    // (Until what each screen goes through has happened, polled, not a fixed 8 or 15 s that, on the duel, saw only its countdown.)
     if (screen === "alone" || screen === "raid") await playBoss(page, 2);
     else if (screen === "duel") {
-      // (The bot's move and yours: the board as you play.)
-      await page.waitForTimeout(8_000);
-    } else await page.waitForTimeout(15_000);
+      // Your first move and the bot's reply: the board as you play (its line: "Your first move", "Their move", then "Your move").
+      await expect(page.locator(".dv-status")).toContainText("Your first move", { timeout: 30_000 });
+      const white = (await page.locator(".dv-strip.dv-you").getAttribute("data-side")) === "w";
+      const box = (await page.locator(`.board-area ${BOARD_SEL.squares}`).boundingBox())!;
+      for (const sq of white ? ["e2", "e4"] : ["e7", "e5"]) {
+        const col = white ? sq.charCodeAt(0) - 97 : 104 - sq.charCodeAt(0);
+        const row = white ? 8 - Number(sq[1]) : Number(sq[1]) - 1;
+        await page.mouse.click(box.x + ((col + 0.5) * box.width) / 8, box.y + ((row + 0.5) * box.height) / 8);
+      }
+      await expect(page.locator(".dv-status")).toHaveText("Your move", { timeout: 30_000 });
+    } else if (screen === "crowd") {
+      // A turn's end: the scoring, the reveal and what follows it: the next turn (yours to play or the other team's to watch) or,
+      // after a stage's last turn, its break. (Not "play" itself: you never pick here, so a stage's end can knock you out and
+      // the rest is "simulating", with no next turn of yours. Main run 42768777492, Nov 10.)
+      await expect.poll(() => phase(page), { timeout: 60_000, intervals: [100] }).toBe("reveal");
+      await expect.poll(() => phase(page), { timeout: 30_000, intervals: [100] }).toMatch(/^(play|watching|stageBreak)$/);
+    } else if (screen === "vote") {
+      // A vote's end (its result) and the next one's start.
+      await expect.poll(() => page.evaluate(() => (window as any).match?.phase.vote?.index ?? 0), { timeout: 60_000 }).toBeGreaterThanOrEqual(1);
+    } else {
+      // Squads: the half played out and its show after.
+      await expect.poll(() => page.evaluate(() => [...(window as any).squads.matches.values()].some((m: any) => m.state === "show")), { timeout: 60_000 }).toBe(true);
+    }
     const seen = await sizesSeen(page);
     expect(seen.length, `${screen}: one board size through the game: ${JSON.stringify(seen)}`).toBe(1);
     expect(Math.abs(seen[0]![0] - NOW[screen]["1280x800"]), `${screen}: that size`).toBeLessThanOrEqual(1);
@@ -405,12 +426,14 @@ test("a computer's game screens: the side menu is on each; icons only below 1800
   test.setTimeout(12 * 60_000);
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
   const page = await ctx.newPage();
-  const items = ["Play", "Chess Town", "Boss Battle", "Play with friends", "Shop & crates", "Profile", "Settings"];
+  // (Daily Quests (Eric, Nov 10): its tooltip says "Sign in for quests" while quests aren't yours.)
+  const items = ["Play", "Chess Town", "Boss Battle", "Play with friends", "Daily Quests", "Shop & crates", "Profile", "Settings"];
   const check = async (at: string, labels: boolean) => {
     const side = page.locator(".gm-frame > .fd-side");
     await expect(side, `${at}: the side menu`).toBeVisible();
     await expect(side.locator(".fd-menu-item"), `${at}: its items`).toHaveCount(items.length);
-    for (const name of items) await expect(side.getByRole("button", { name, exact: true }), `${at}: ${name}`).toHaveAttribute("title", name);
+    for (const name of items)
+      await expect(side.getByRole("button", { name, exact: true }), `${at}: ${name}`).toHaveAttribute("title", name === "Daily Quests" ? /^(Daily Quests|Sign in for quests)$/ : name);
     const w = (await side.boundingBox())!.width;
     const label = (await side.locator(".fd-menu-item > span:last-child").first().boundingBox())!;
     expect(Math.abs(w - (labels ? 232 : 80)), `${at}: the menu ${w} px wide`).toBeLessThanOrEqual(1);

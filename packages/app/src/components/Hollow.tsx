@@ -10,12 +10,14 @@ import { Cast, Flight, at, onSquare, stageSince, type BossUi, type Moment, type 
 import { CRITICAL, NORMAL } from "../speech.tsx";
 import { syncLights } from "../characters/lights.ts";
 import { useFrameNow } from "./Countdown.tsx";
+import { useEffect, useState } from "preact/hooks";
+import { STRIP_BULBS } from "../characters/effects/hollow.ts";
 
 /**
  * Hollow's powers on screen: his cover of the dark (his cast from the board's corner, the darkness pouring onto its
  * square, the square hidden while it lasts and thinning on its last turn, then lifting), a wrong move attempt into the
- * dark (DarkCost), his strand of bulbs by the boss bar (one lit for each of his moves until his next cover), and the
- * banner of his extra move after a failed Lights out. Lights out itself: LightsOut.tsx. His rules:
+ * dark (DarkCost), his strand of six bulbs under his rage meter (one lit for each move, yours and his, until his next
+ * cover), and the banner of his extra move after a failed Lights out. Lights out itself: LightsOut.tsx. His rules:
  * packages/chess/src/bosses/hollow.ts.
  */
 
@@ -33,7 +35,7 @@ export function hollowCastFrom(kit: BossKit | null): { x: number; y: number } {
   const h = kit?.ch.h ?? 102;
   return { x: HOLLOW_CASTER.left + (HOLLOW_CAST_FROM[0] / w) * HOLLOW_CASTER.width, y: HOLLOW_CASTER.top + (HOLLOW_CAST_FROM[1] / h) * HOLLOW_CASTER.width * (h / w) };
 }
-const CLEAR_MS = animLength(EFFECTS.darkSquare.ch.anims.clear!);
+const CLEAR_MS = () => animLength(EFFECTS.darkSquare.ch.anims.clear!);
 
 /** The square a side's king stands on. */
 function kingOn(fen: string, side: "w" | "b"): string | null {
@@ -153,42 +155,69 @@ function lifeStrip({ boss }: { boss: BossView }) {
 
 /** The strip relights this long after the last bulb goes out (his move shows, then the cast lands). */
 const BULB_RELIGHT_MS = 1800 + DARK.landAt;
-/** When this device saw Hollow's bulbs change, and from what (so the strip plays a bulb going out, or the relight). */
-const bulbSeen = new Map<string, { n: number; from: number; at: number; relightAt?: number }>();
 /**
- * Hollow's bulbs by the boss bar: the strip (`bulbStrand`), one lit for each of his moves until he covers another square
- * (the same count as on his strand). A bulb goes out as he moves; at the last he covers a square and they relight.
- * `moments`: the boss screen's moments (one of them may be a cover).
+ * The strip's bulbs lit (Eric, Nov 12: six, "make it our moves count as well"): one for each move, yours and his, until he
+ * next covers a square. `bulbs`: his moves until then, as the turn began (the rules' count: 3, 2, 1); `yoursPlayed`: this
+ * turn's move of yours (the crowd's) is on the board. Between two covers there are his darkEvery moves and as many of
+ * yours: six lit as a cover lands, one out with each move, the last with his move that covers, and all six relit as its
+ * darkness lands. Before his first cover, 2: your first move and his, which brings it.
  */
-function bulbStrip({ boss, moments }: { boss: BossView; moments: () => Moment[] }) {
-  const n = boss.powers?.bulbs;
-  if (n === undefined || boss.result) return null;
+export function stripLit(bulbs: number, yoursPlayed: boolean): number {
+  return Math.max(0, Math.min(STRIP_BULBS, 2 * bulbs - (yoursPlayed ? 1 : 0)));
+}
+/** styles.css' computer (its strip is the wide one, under its wider rage meter). */
+const COMPUTER = "(min-width: 900px) and (min-height: 600px)";
+function useComputer(): boolean {
+  const [on, setOn] = useState(() => matchMedia(COMPUTER).matches);
+  useEffect(() => {
+    const mq = matchMedia(COMPUTER);
+    const fn = () => setOn(mq.matches);
+    mq.addEventListener("change", fn);
+    fn();
+    return () => mq.removeEventListener("change", fn);
+  }, []);
+  return on;
+}
+/** When this device saw the strip change, and from how many lit (so it plays a bulb going out, or the relight). */
+const bulbSeen = new Map<string, { lit: number; from: number; at: number; relightAt?: number }>();
+/**
+ * Hollow's bulbs under his rage meter, as wide as it: the strip (`bulbStrand`, a computer's `bulbStrandWide`), one lit for
+ * each move, yours and his, until he covers another square (stripLit). A bulb goes out with each move; at the last he covers
+ * a square and they relight. `moments`: the boss screen's moments (one of them may be a cover).
+ */
+function BulbStrip({ boss, moments }: { boss: BossView; moments: () => Moment[] }) {
+  const computer = useComputer();
+  const n = boss.powers?.bulbs ?? 0;
   // (In the battle's lights: lights.ts.)
   syncLights(boss);
+  const yours = sideToMove(boss.board.fen) !== boss.crowdSide;
+  const lit = stripLit(n, yours);
   // (On the boss screen that brings a cover: the strip relights as the darkness lands.)
   const cover = moments().find((m) => m.kind === "dark");
   const key = `${boss.id}:${boss.startMove}:${boss.board.generation}`;
   const now = Date.now();
   let seen = bulbSeen.get(key);
-  if (!seen) bulbSeen.set(key, (seen = { n, from: n, at: 0 }));
-  else if (seen.n !== n) bulbSeen.set(key, (seen = { n, from: seen.n, at: now }));
-  // Fewer: the bulb going out. More (he covered a square): the last going out with his move, then the relight as the
-  // darkness lands.
-  if (cover && seen.at && n > seen.from) seen.relightAt = cover.at + DARK.landAt;
+  if (!seen) bulbSeen.set(key, (seen = { lit, from: lit, at: 0 }));
+  else if (seen.lit !== lit) bulbSeen.set(key, (seen = { lit, from: seen.lit, at: now }));
+  // Fewer: the bulb going out (with a pop on his move; yours has its own knock). More (he covered a square): the last going
+  // out with his move, then the relight as the darkness lands.
+  if (cover && seen.at && lit > seen.from) seen.relightAt = cover.at + DARK.landAt;
   const relightAt = seen.relightAt ?? seen.at + BULB_RELIGHT_MS;
   const look = !seen.at
-    ? { anim: `lit${Math.min(3, n)}`, since: 0 }
-    : n < seen.from
-      ? { anim: `out${Math.min(3, seen.from)}`, then: `lit${Math.min(3, n)}`, since: seen.at }
+    ? { anim: `lit${lit}`, since: 0 }
+    : lit < seen.from
+      ? { anim: `out${seen.from}`, then: `lit${lit}`, since: seen.at, quiet: yours }
       : now < relightAt
         ? { anim: "out1", then: "lit0", since: seen.at }
-        : { anim: "relight", then: "lit3", since: relightAt };
+        : { anim: "relight", then: `lit${STRIP_BULBS}`, since: relightAt };
+  const name = computer ? "bulbStrandWide" : "bulbStrand";
   return (
-    <span class="bulb-strip" role="img" aria-label={`${n} ${n === 1 ? "bulb" : "bulbs"} lit`} data-bulbs={n}>
-      <BossEffect name="bulbStrand" anim={look.anim} then={look.then} since={look.since} id={`bulbs-${key}-${look.anim}-${look.since}`} />
+    <span class="bulb-strip" role="img" aria-label={`${lit} of ${STRIP_BULBS} bulbs lit`} data-lit={lit} data-of={STRIP_BULBS} data-bulbs={n}>
+      <BossEffect name={name} anim={look.anim} then={look.then} since={look.since} quiet={look.quiet} id={`bulbs-${name}-${key}-${look.anim}-${look.since}`} />
     </span>
   );
 }
+const bulbStrip = (p: { boss: BossView; moments: () => Moment[] }) => (p.boss.powers?.bulbs === undefined || p.boss.result ? null : <BulbStrip {...p} />);
 
 /** A block's banner (Eric, Nov 5): his 2 x 2 and his 3 x 3, with how long it lasts. */
 export const blockBanner = (size: number): [string, string] =>
@@ -257,7 +286,7 @@ export const HOLLOW_UI = {
       }),
       ...(p.cleared ?? []).flatMap((sq) => {
         const since = stageSince(`clear:${boss.id}:${sq}:${p.turn}`, now);
-        return now < since + CLEAR_MS ? [{ square: sq, state: "clear" as const, since }] : [];
+        return now < since + CLEAR_MS() ? [{ square: sq, state: "clear" as const, since }] : [];
       }),
     ];
     const checked = darkNow.length && inCheck(board) ? kingOn(board, sideToMove(board)) : null;

@@ -37,7 +37,13 @@ export const CHAT = {
   keepLines: TOWN_CHAT.deviceMax,
   /** A boss or a kid speaks every this many ms, at random between the two. */
   everyMs: [20_000, 45_000] as readonly [number, number],
-  /** The computer's frame (styles.css' "computer"); anything else is a phone. (The box's size is in town-chat.css: about 5 lines on a phone, 4 on a computer in the frame, Eric, Oct 30.) */
+  /**
+   * The faint hint on the typing line's strip while the box shows and you aren't typing (Eric, Nov 12: "tap the box to type or
+   * something… only a few words"): a phone's, a computer's.
+   */
+  hintPhone: "Tap here to type",
+  hintComputer: "Click here to type",
+  /** The computer's frame (styles.css' "computer"); anything else is a phone. (The box's size is in town-chat.css: about 5 lines on a phone; about 8 on a computer in the frame, Eric, Nov 12: "about 1.5 times the current height".) */
   computerQuery: "(min-width: 900px) and (min-height: 600px)",
   /** Scrolled this near the foot (px) still counts as at the foot: new lines keep it there. */
   pinSlopPx: 4,
@@ -76,8 +82,11 @@ export const CHAT_BACKGROUND_NOTE = "A soft tint behind the chat, always on whil
 /** The mode a tap on the icon goes to: always on, new messages, off, and round again. */
 export const nextChatMode = (m: ChatMode): ChatMode => CHAT_MODES[(CHAT_MODES.indexOf(m) + 1) % CHAT_MODES.length]!;
 
-/** "server": the server's own lines for everyone (a boss challenged from the town, and how it went: Nov 2), in their own blue. */
-export type ChatKind = "boss" | "kid" | "player" | "system" | "server";
+/**
+ * "server": the server's own lines for everyone (a boss challenged from the town, and how it went: Nov 2), in their own blue.
+ * "arrival": the server's "Ann has entered the town." (Nov 12), quieter: gray, no name, no menu.
+ */
+export type ChatKind = "boss" | "kid" | "player" | "system" | "server" | "arrival";
 
 /** Who said a player's line, from the server: their account id and the line's number in its room, and the name color their device picked (names.ts). */
 export interface ChatWho {
@@ -186,6 +195,15 @@ export const chatShows = (m: ChatMode, shown: boolean): boolean => m === "always
  * you're typing (a tap on it), or whenever it shows when the "Chat background" setting is on. The blur itself runs only while typing.
  */
 export const chatBlurs = (m: ChatMode, shown: boolean, typing: boolean, background: boolean): boolean => chatShows(m, shown) && (typing || background);
+
+/**
+ * The faint hint on the typing line's strip (Eric, Nov 12): "Tap here to type" on a phone, "Click here to type" on a computer; it shows
+ * while the box shows and you aren't typing, and goes with the box (new messages' fade, off).
+ */
+export const chatHint = (m: ChatMode, shown: boolean, typing: boolean, computer: boolean): { text: string; shows: boolean } => ({
+  text: computer ? CHAT.hintComputer : CHAT.hintPhone,
+  shows: chatShows(m, shown) && !typing,
+});
 
 /** "Chat background" now: the one remembered on this device (the first time it's asked), else off. */
 let background: boolean | null = null;
@@ -418,7 +436,7 @@ interface Voices {
  * Short (under 60 characters), friendly, in their voices, about chess or the town. Not the Hidden Boss; nothing about the
  * bronze statue. Hollow's kid is only ever eerie, as Hollow says of it. Keyed by home, so every boss with a home has one.
  */
-export const CHATTER: Readonly<Record<HomeId, Voices>> = {
+export const CHATTER: Readonly<Partial<Record<HomeId, Voices>>> = {
   grex: { kid: "Sparky", boss: ["Fireworks by my place at dusk. Come watch!", "Tall tip: see the whole board, not one square."], kidSays: ["Ooh, sparkly! Is it fireworks time yet?", "Sparky's sparkler is lit. Stand back!"] },
   clown: { kid: "Squirt", boss: ["Honk honk! Who wants a game at the park?", "Knights hop like clowns. I taught them."], kidSays: ["Psst! Smell my flower. Go on, closer!", "Oops! My flower squirted again. Sorry!"] },
   gingerbread: { kid: "Crumb", boss: ["Come by the igloo. It's nice and cool.", "Careful with the pawns. Some of us crumble."], kidSays: ["Crumb here! Careful, I'm still warm."] },
@@ -436,7 +454,8 @@ export const CHATTER: Readonly<Record<HomeId, Voices>> = {
   // (Heard in an admin's town only while Timber is in the game for admins first: the speakers are this town's homes.)
   timber: { kid: "Rivet", boss: ["The Lumber Lodge is open. Mind the sawdust!", "A good board starts with good wood."], kidSays: ["Rat-a-tat! Rivet's on the job!", "Hard hats on! Rivet says so."] },
   // (The same while Dash is in the game for admins first. Tick is slow and sleepy; Dash sells sneakers.)
-  dash: { kid: "Tick", boss: ["Dash's Kicks is open, fam. Fresh pairs!", "New drop just landed. No cap."], kidSays: ["Tick is almost there. Almost.", "Tick yawns. Slow and steady!"] },
+  dash: { kid: "Tick", boss: ["Dash's Kicks is open, broski. Fresh pairs!", "New drop just landed. No cap."], kidSays: ["Tick is almost there. Almost.", "Tick yawns. Slow and steady!"] },
+  // (Rolling Dough has none: Don Dough stays in his back room and his crew in the bakery, Eric's Nov 10 design.)
 };
 
 export interface Chatter {
@@ -446,10 +465,10 @@ export interface Chatter {
 }
 
 /** Everyone who talks: each home's boss, then its kid. */
-const SPEAKERS: readonly { name: string; kind: "boss" | "kid"; lines: readonly string[] }[] = HOMES.flatMap((h) => [
-  { name: h.boss, kind: "boss" as const, lines: CHATTER[h.id].boss },
-  { name: CHATTER[h.id].kid, kind: "kid" as const, lines: CHATTER[h.id].kidSays },
-]);
+const SPEAKERS: readonly { name: string; kind: "boss" | "kid"; lines: readonly string[] }[] = HOMES.flatMap((h) => {
+  const v = CHATTER[h.id];
+  return v ? [{ name: h.boss, kind: "boss" as const, lines: v.boss }, { name: v.kid, kind: "kid" as const, lines: v.kidSays }] : [];
+});
 
 /** The next speaker and line: anyone but the one who spoke last (`last`), one of their lines at random. `rand` in [0, 1). */
 export function pickChatter(rand: () => number, last: string | null = null): Chatter {

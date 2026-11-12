@@ -213,7 +213,8 @@ describe("many judges: the lobby", () => {
 
   it("a cheater on one of two judges never changes the result: the server's verdict (or two of three devices, if sooner) decides, and the cheater is struck, then benched", async () => {
     const L = setup({ server: true, settings: { firstStageRounds: 12 } });
-    L.begin(3, [1_000_000, 900_000, 800_000]);
+    // (All computers: so p1 is paired with judges that answer as fast, and the match lasts the rounds the test needs.)
+    L.begin(3, [1_000_000, 900_000, 800_000], [], [0, 1, 2]);
     let rounds = 0;
     for (let i = 0; i < 8 && L.core.record.judges!.devices.p1!.strikes < 2; i++) {
       if (i > 0 && !(await L.nextTurn())) break;

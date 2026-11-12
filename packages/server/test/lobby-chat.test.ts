@@ -343,6 +343,44 @@ describe("lobby: chat moderation", () => {
     expect(L.people(bo).at(-1)).toMatchObject({ from: again, say: "lets-go" });
   });
 
+  it("typed chat (Nov 7): only a seat that may type (signed in, chat on, not too young) types; the filter, 80 characters, one every 5 s; typed lines reach only those who turned chat on, never a device too young", () => {
+    const { L, ann, bo, cy } = queue();
+    const type = (id: string, text: string, to?: "team" | "all") => L.core.message(id, { t: "chat", say: "", text, ...(to ? { to } : {}) } as never);
+    L.core.chatTyping(ann, { may: true, young: false });
+    L.core.chatTyping(bo, { may: false, young: false });
+    L.core.chatTyping(cy, { may: false, young: true });
+    // Who reads: Ann and Bo turned chat on (their devices say so); Cy's device is too young, whatever it says.
+    for (const id of [ann, bo, cy]) L.core.message(id, { t: "chatPrefs", typed: true } as never);
+    L.clear();
+    type(ann, "  hi   all :crown: ");
+    expect(L.people(ann)).toEqual([expect.objectContaining({ from: ann, say: "", text: "hi all :crown:", to: "all", lobby: true })]);
+    expect(L.people(bo).map((l) => l.text)).toEqual(["hi all :crown:"]);
+    expect(L.people(cy)).toEqual([]);
+    // One every 5 s (a refusal says why; it doesn't start the wait).
+    type(ann, "again");
+    expect(L.last(ann, "chatNo")).toMatchObject({ reason: "gap", message: "One message every 5 s." });
+    L.advance(5_000);
+    type(ann, "add me on discord");
+    expect(L.last(ann, "chatNo")).toMatchObject({ reason: "text", message: "No links or contact details in chat." });
+    type(ann, "x".repeat(81));
+    expect(L.last(ann, "chatNo")).toMatchObject({ reason: "text", message: "Messages are at most 80 characters." });
+    // Bo hasn't turned chat on for his account; Cy's device is too young: neither types. Cy keeps the quick lines.
+    type(bo, "hello");
+    expect(L.last(bo, "chatNo")).toMatchObject({ reason: "typed", message: "Turn on chat to type." });
+    type(cy, "hello");
+    expect(L.last(cy, "chatNo")).toMatchObject({ reason: "typed", message: expect.stringMatching(/13 and older/) });
+    L.say(cy, "have-fun");
+    expect(L.people(ann).map((l) => l.say)).toContain("have-fun");
+    // Bo turns typed lines off: Ann's next one isn't sent to him; on again, the log brings it.
+    L.core.message(bo, { t: "chatPrefs", typed: false } as never);
+    L.clear();
+    type(ann, "gg everyone");
+    expect(L.people(bo)).toEqual([]);
+    L.core.message(bo, { t: "chatPrefs", typed: true } as never);
+    expect(L.last(bo, "chatLog")!.lines.map((l) => l.text ?? l.say)).toContain("gg everyone");
+    expect(L.last(cy, "chatLog")?.lines.some((l) => l.text) ?? false).toBe(false);
+  });
+
   it("a name the filter refuses takes a seat as Player N", () => {
     const L = setup(CROWD);
     const ann = L.join("Ann");

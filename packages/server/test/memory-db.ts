@@ -34,14 +34,26 @@ export function memoryDb() {
   }
   const stmt = (q: string, params: unknown[] = []) => ({
     bind: (...p: unknown[]) => stmt(q, p),
-    // (The statement runs at once, so a batch's transaction holds it.)
     run: async () => (db.prepare(q).run(...(params as never[])), { success: true }),
     first: async () => db.prepare(q).get(...(params as never[])) ?? null,
     all: async () => ({ results: db.prepare(q).all(...(params as never[])) }),
+    // (For a batch: run at once, so its transaction holds it, and a statement that fails undoes them all, as D1's.)
+    runNow: () => db.prepare(q).run(...(params as never[])),
   });
   const d1 = {
     prepare: (q: string) => stmt(q),
-    batch: async (stmts: { run(): unknown }[]) => (transaction(stmts.map((s) => () => s.run())), stmts.map(() => ({ success: true }))),
+    batch: async (stmts: { runNow(): unknown }[]) => (transaction(stmts.map((s) => () => s.runNow())), stmts.map(() => ({ success: true }))),
   } as unknown as D1Database;
   return { db, sql, d1 };
+}
+
+/**
+ * Crates to open (Nov 9, XP phase 2: a series crate takes one you hold and a crate key): `n` of `crate` and `n` keys, through the
+ * ledger as any grant (an op "test-stock"), so the balances and the ledger still agree.
+ */
+export async function stockCrates(sql: Sql, userId: string, crate: string, n: number, now = 1): Promise<void> {
+  const { applyOp, leg, ledgerAccount } = await import("../src/ledger.ts");
+  const me = await ledgerAccount(sql, userId);
+  if (!me || n <= 0) return;
+  await applyOp(sql, me, { id: `test-stock:${me.account}:${crypto.randomUUID()}`, reason: "test", now, legs: [leg.seriesCrates(userId, crate, n), leg.keys(userId, n)] });
 }

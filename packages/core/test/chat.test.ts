@@ -23,6 +23,7 @@ import {
   defaultChatPicks,
   mulberry32,
   noChatSent,
+  CHAT_PACKS_SHOP,
   GOD_KING_SHOP,
   ownedChatPacks,
   packOffered,
@@ -36,10 +37,12 @@ import {
 describe("quick chat: packs the shop stops offering", () => {
   it("hides the God King pack from the shop while GOD_KING_SHOP is off, and keeps it for whoever owns it", () => {
     expect(shopOffersPack("godking")).toBe(GOD_KING_SHOP);
-    expect(shopOffersPack("winter")).toBe(true);
+    // (CHAT_PACKS_SHOP off, Nov 8: the shop offers no pack, and the picker only the free lines; an owner's lines still send.)
+    expect(shopOffersPack("winter")).toBe(CHAT_PACKS_SHOP);
     expect(packOffered("godking", [])).toBe(GOD_KING_SHOP);
-    expect(packOffered("godking", ["godking"])).toBe(true);
-    expect(packOffered("winter", [])).toBe(true);
+    expect(packOffered("godking", ["godking"])).toBe(CHAT_PACKS_SHOP);
+    expect(packOffered("winter", [])).toBe(CHAT_PACKS_SHOP);
+    expect(packOffered("winter", ["winter"])).toBe(CHAT_PACKS_SHOP);
     // Its lines still work for an owner.
     expect(canSay("gk-crown", ["chat-godking"])).toBe(true);
   });

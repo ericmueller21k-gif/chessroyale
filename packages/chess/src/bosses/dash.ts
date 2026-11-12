@@ -32,7 +32,7 @@
  * Dash v2 (Eric, Nov 6; docs/decisions/2026-11-06-dash-v2.md): Time Scramble at most twice a battle (maxUltimates.dash); and once a
  * battle his **Scramble Rush** (below): a memory test over a frozen position, whose only outcome is his extra move or not.
  * Dash v3 (Eric, Nov 7; docs/decisions/2026-11-07-dash-clock.md): his clock multi-hit every 4 or 5 of his moves (`clockFit`: 5
- * quick smacks and always a line, clockHitTurns), and once a battle his pop-off (popOff: state, not an event; popOffMs holds his
+ * quick smacks and always a line, clockHitTurns), and twice a battle his pop-off (popOff: state, not an event; popOffMs holds his
  * thinking for its two beats, 3 smacks and a pop-off line, then 10 fast smacks and a love line).
  */
 import { BOSS_POWERS, type BossPowerSettings, type BossPowerState, type BossState, type DashRush, type DashState } from "@chessroyale/core";
@@ -143,9 +143,9 @@ export const DASH: BossRules = {
   ultimateRunning: (p, turn, s) => scrambleOn(p, turn, s),
   // As the crowd's turn after his turn's end begins: your flag's jab, then his slap.
   everyTurn(next, t) {
-    // His pop-off, once a battle, on one of his turns (from the seed; the test switch: his second turn). It is state, not an
-    // event: it plays while he thinks, before his move lands (popOffMs), so it's set before the rest reads his state.
-    if (next.dash && !next.dash.popOff && (t.test === "popoff" ? t.turn === 2 : t.turn === popOffTurn(t.seed, t.s.dashPopOff))) next.dash = { ...next.dash, popOff: { at: t.turn } };
+    // His pop-off, twice a battle, on two of his turns (from the seed; the test switch: his second and eighth turns). It is state,
+    // not an event: it plays while he thinks, before his move lands (popOffMs), so it's set before the rest reads his state.
+    if (next.dash && popOffTurns(t.seed, t.s.dashPopOff, t.test).includes(t.turn)) next.dash = { ...next.dash, popOff: { at: t.turn } };
     const d = next.dash;
     if (!d) return;
     if (d.flag && d.flag.at + 1 === t.turn) t.events.push({ kind: "flag", turn: t.turn, move: d.flag.move });
@@ -154,7 +154,10 @@ export const DASH: BossRules = {
     if (clockHitOn(t.seed, t.turn, t.s.dashClockFit, t.test)) t.events.push({ kind: "clockFit", turn: t.turn, count: t.s.dashClockFit.smacks });
     // His Scramble Rush, once a battle, warned a turn ahead as an ultimate is (Eric, Nov 6: RAGE!, "Next turn: Scramble Rush",
     // his line); as the next crowd turn begins it comes, the crowd's turn waiting for it (the runner's rushDue), the board as it is.
+    // (Never while the crowd is in check: he couldn't move again then, as the crowd's turn can't pass, so the verdict and his
+    // extra move could disagree. It waits, still warned, for the next crowd turn out of check; Nov 8.)
     if (rushWarned(d) && t.turn > d.rushWarn!) {
+      if (!passTurn(t.fen)) return;
       const moves = chooseRush(t.fen, t.crowd, t.seed, t.turn, t.s.dashScramble);
       if (moves.length) next.dash = { ...d, rush: { at: t.turn - 1, moves } };
       return;
@@ -222,9 +225,16 @@ export const popOffPending = (boss: { id?: string; powers?: { turn?: number; das
 export const popOffHolding = (boss: { id?: string; powers?: { turn?: number; dash?: { popOff?: { at: number } | null } | null } | null } | null | undefined): boolean =>
   boss?.id === "dash" && !!boss.powers?.dash?.popOff && boss.powers.dash.popOff.at >= (boss.powers.turn ?? 0) - 1;
 
-/** His pop-off's turn: one of his turns from dashPopOff.from to dashPopOff.to, from the battle's seed. */
-export function popOffTurn(seed: number, s: BossPowerSettings["dashPopOff"] = BOSS_POWERS.dashPopOff): number {
-  return s.from + Math.floor(powerRoll(seed, "popoff") * (s.to - s.from + 1));
+/**
+ * His two pop-off turns: two of his turns from dashPopOff.from to dashPopOff.to, at least dashPopOff.gap apart, from the battle's
+ * seed (the same on every device; in order). The test switch (?power=popoff): his second and fourth turns (close together, so
+ * the e2e plays few moves: before his Scramble Rush can come, turn 7, and before Stockfish mates the test's shuffled knights).
+ */
+export function popOffTurns(seed: number, s: BossPowerSettings["dashPopOff"] = BOSS_POWERS.dashPopOff, test = ""): [number, number] {
+  if (test === "popoff") return [2, 4];
+  const first = s.from + Math.floor(powerRoll(seed, "popoff", 1) * (s.to - s.from + 1 - s.gap));
+  const second = first + s.gap + Math.floor(powerRoll(seed, "popoff", 2) * (s.to - first - s.gap + 1));
+  return [first, second];
 }
 
 /**
@@ -370,9 +380,37 @@ export function botRushCorrect(seed: number, botId: string, rush: Pick<DashRush,
   return rush.moves.filter((_, i) => powerRoll(seed, "rush-bot", botId, rush.at, i) < s.botHit).length;
 }
 
-/** The crowd held: its mean put back (people's and bots' alike) at least dashScramble.needCorrect, or all of them when fewer were swept. */
+/**
+ * The crowd held: its mean put back (people's and bots' alike) at least dashScramble.needCorrect, or all of them when fewer were
+ * swept. (Solo, only your own count is passed: finishRush's `only`; Eric, Nov 8.)
+ */
 export const rushHeld = (correct: readonly number[], swept: number, s: RushSettings = BOSS_POWERS.dashScramble): boolean =>
   !correct.length || correct.reduce((a, b) => a + b, 0) / correct.length >= Math.min(s.needCorrect, swept) - 1e-9;
+
+/**
+ * His extra move after a failed Rush (Eric, Nov 8: "if YOU fail, he moves twice"): Hollow's quiet move within the cap
+ * (extraMoveFrom) when there's one; else the quiet candidate closest to no gain at all (the least either way; never a forced mate
+ * in its line, unless every one has one: then one against him before his own). Null only when the crowd's turn can't pass or he has no quiet move.
+ */
+export async function dashExtraMoveFrom(engine: EngineLike, fen: string): Promise<string | null> {
+  const capped = await extraMoveFrom(engine, fen);
+  if (capped) return capped;
+  const passed = passTurn(fen);
+  const candidates = passed ? extraMoveCandidates(passed) : [];
+  if (!passed || !candidates.length) return null;
+  const crowdBest = (await engine.topMoves(fen, 1))[0];
+  const before = crowdBest ? 1 - crowdBest.expected : 0.5;
+  const scored = (await engine.scoreMoves(passed, candidates)).filter((m) => candidates.includes(m.move));
+  // Prefer no forced mate; then one against him (the crowd's); his own only when nothing else is left (review of #561).
+  const quiet = scored.filter((m) => m.mate === undefined);
+  const theirs = scored.filter((m) => m.mate !== undefined && m.mate < 0);
+  const pool = quiet.length ? quiet : theirs.length ? theirs : scored;
+  return [...pool].sort((a, b) => Math.abs(a.expected - before) - Math.abs(b.expected - before) || (a.move < b.move ? -1 : 1))[0]?.move ?? candidates[0]!;
+}
+
+/** His extra move when no engine answer came (or one that isn't a candidate): a quiet candidate from the battle's seed; null: none. */
+export const rushStandIn = (seed: number, at: number, candidates: readonly string[]): string | null =>
+  candidates.length ? [...candidates].sort()[Math.floor(powerRoll(seed, "rush-extra", at) * candidates.length)]! : null;
 
 /** A swept piece's moves left in the put-back (`moved`: each piece's moves so far, by its square before the sweep). */
 export const rushMovesLeft = (moved: Readonly<Record<string, number>> | undefined, from: string, s: Pick<RushSettings, "movesPerPiece"> = BOSS_POWERS.dashScramble): number =>
@@ -506,8 +544,12 @@ export const dashBattle = {
    * The Rush is over: each person's placements (`places`, by player id: square before the sweep → square put on) judged by
    * rushJudge, each bot's from the seed; the crowd held when its mean is at least needCorrect, else his extra move is due. The
    * game's position never changed: nothing on the board changes here. Returns each player's count and the verdict.
+   * `only` (solo: you, while you're in; Eric, Nov 8: "there should be no average when I'm playing in solo mode"): only that
+   * player's put-back counts, no bots, no mean. Online the crowd's mean stays.
+   * A failed Rush with no quiet move for him at all (extraMoveCandidates: none) is "skipped" here, in the verdict itself, so the
+   * screens never say he moves again when he can't; otherwise his extra move always comes (applyExtraMove).
    */
-  finishRush(b: Battle, places: Readonly<Record<string, Readonly<Record<string, unknown>>>>): { correct: Record<string, number>; mean: number; held: boolean } {
+  finishRush(b: Battle, places: Readonly<Record<string, Readonly<Record<string, unknown>>>>, only?: string): { correct: Record<string, number>; mean: number; held: boolean } {
     const boss = b.state.boss!;
     const p = boss.powers!;
     const d = dashOf(p);
@@ -515,11 +557,14 @@ export const dashBattle = {
     if (!r || r.correct !== undefined) return { correct: {}, mean: r?.correct ?? 0, held: r?.extra === undefined };
     const fen = b.boards.get(b.state.boards[0]!)!.fen;
     const correct: Record<string, number> = {};
-    for (const pl of b.alive()) correct[pl.id] = pl.isBot ? botRushCorrect(p.seed, pl.id, r) : rushJudge(fen, r, places[pl.id] ?? {}).correct;
+    const judged = only !== undefined ? b.alive().filter((pl) => pl.id === only) : b.alive();
+    for (const pl of judged) correct[pl.id] = pl.isBot ? botRushCorrect(p.seed, pl.id, r) : rushJudge(fen, r, places[pl.id] ?? {}).correct;
     const counts = Object.values(correct);
     const mean = counts.length ? counts.reduce((a, c) => a + c, 0) / counts.length : r.moves.length;
     const held = rushHeld(counts, r.moves.length);
-    const rush: DashRush = { ...r, correct: Math.round(mean * 10) / 10, ...(held ? {} : { extra: "due" as const }) };
+    const passed = held ? null : passTurn(fen);
+    const extra = held ? undefined : passed && extraMoveCandidates(passed).length ? ("due" as const) : ("skipped" as const);
+    const rush: DashRush = { ...r, correct: Math.floor(mean * 10 + 1e-9) / 10, ...(extra ? { extra } : {}) };
     b.state = { ...b.state, boss: { ...boss, powers: { ...p, dash: { ...d, rush } } } };
     return { correct, mean, held };
   },
@@ -531,14 +576,17 @@ export const dashBattle = {
     return r?.extra === "due" && r.at === boss!.crowdMoves && !boss!.result && !b.finalGameOver() && !b.bossToMove();
   },
 
-  /** His extra move: Hollow's quiet one, within the same cap (extraMoveFrom), from this device's engine. */
+  /** His extra move from this device's engine (dashExtraMoveFrom); the engine failing, applyExtraMove's seeded stand-in. */
   async playExtraMove(b: Battle, engine: EngineLike): Promise<string | null> {
-    return dashBattle.applyExtraMove(b, await extraMoveFrom(engine, b.boards.get(b.state.boards[0]!)!.fen));
+    const pick = await dashExtraMoveFrom(engine, b.boards.get(b.state.boards[0]!)!.fen).catch(() => null);
+    return dashBattle.applyExtraMove(b, pick);
   },
 
   /**
    * Plays his extra move (from the host's engine online), as Hollow's after Lights out: the crowd's turn passes (a base), then
-   * his quiet move; one that isn't a candidate, or none, and he skips it. Unscored, never fair play's. Returns it, or null.
+   * his quiet move. Unlike Hollow he never skips it once it's due (Eric, Nov 8: the verdict said he'd move again and he didn't):
+   * a move that isn't a candidate, or none (the engine failed, a host sent ""), and he plays a quiet candidate from the seed
+   * instead (rushStandIn). Unscored, never fair play's. Returns it, or null when it wasn't due.
    */
   applyExtraMove(b: Battle, move: string | null): string | null {
     const boss = b.state.boss!;
@@ -549,7 +597,9 @@ export const dashBattle = {
     const id = b.state.boards[0]!;
     const board = b.boards.get(id)!;
     const passed = passTurn(board.fen);
-    if (!move || !passed || !extraMoveCandidates(passed).includes(move)) {
+    const candidates = passed ? extraMoveCandidates(passed) : [];
+    if (move === null || !candidates.includes(move)) move = rushStandIn(p.seed, r.at, candidates);
+    if (!passed || !move) {
       b.state = { ...b.state, boss: { ...boss, powers: { ...p, dash: { ...d, rush: { ...r, extra: "skipped" } } } } };
       return null;
     }

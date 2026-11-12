@@ -24,6 +24,8 @@
   --chat-soft: rgba(29, 31, 36, 0.68);
   /* A line only you see ("Sorry, you can't send another message for 12 seconds."): gray. */
   --chat-system: #4f5561;
+  /* The faint "Tap here to type" on the typing line's strip (Eric, Nov 12: "very faint, like gray"). */
+  --chat-hint: rgba(79, 85, 97, 0.72);
   /* A boss's name and a kid's (gold and mint, deeper by day), and the count of characters left. */
   --chat-boss: #7a5600;
   --chat-kid: #0a5f36;
@@ -55,6 +57,7 @@
   --chat-ink: #fff;
   --chat-soft: rgba(255, 255, 255, 0.8);
   --chat-system: #c8ccd2;
+  --chat-hint: rgba(200, 204, 210, 0.72);
   --chat-boss: #ffd479;
   --chat-kid: #9be8c0;
   --chat-server: #9cc2ff;
@@ -75,10 +78,12 @@
   font-size: 14px;
   line-height: 17px;
 }
-/* On a computer in the frame, a third as tall: about 4 lines (Eric, Oct 30: "it's so easy to click on it when running around … about
-   4-5 lines of text"). A tablet's, and a mouse window under 1024 px (no frame), keep the 340. */
+/* On a computer in the frame, lower than the 340: about 4 lines (Eric, Oct 30: "it's so easy to click on it when running around … about
+   4-5 lines of text"), then about half as tall again, 120 to 190 px: 8 lines, 4 more (Eric, Nov 12: "bump the desktop to about 4 or 5 more
+   lines. Make it about 1.5 times the current height"). Same place, same width. A tablet's, and a mouse window under 1024 px (no frame),
+   keep the 340. */
 .town-screen.in-frame .town-chat[data-size="computer"] {
-  height: 120px;
+  height: 190px;
 }
 /* While it's picked up: an outline, so you can see where it is even with nothing in it (only while you carry it). */
 .town-chat.grab {
@@ -138,15 +143,17 @@
   outline: 2px solid var(--chat-ink);
   outline-offset: -2px;
 }
-/* Shown, or faded out (new messages: the lines fade, and a faded box takes no taps and can't be tabbed to). */
+/* Shown, or faded out (new messages: the lines fade, and a faded box takes no taps and can't be tabbed to). The hint goes with them. */
 .tc-log,
-.tc-new {
+.tc-new,
+.tc-hint {
   opacity: 0;
   visibility: hidden;
   transition: opacity var(--chat-out, 1000ms) ease-in, visibility 0s linear var(--chat-out, 1000ms);
 }
 .town-chat[data-on="1"] .tc-log,
 .town-chat[data-on="1"] .tc-new,
+.town-chat[data-on="1"] .tc-hint[data-show="1"],
 .town-chat.grab .tc-log {
   opacity: 1;
   visibility: visible;
@@ -202,6 +209,11 @@
   font-weight: 600;
   color: var(--chat-server);
 }
+/* The server's "Ann has entered the town." (Nov 12): quieter than a message: the gray of a system line, upright (a line only you see
+   is italic), no name, and its tap is the box's (it opens typing: there's no one to open a menu for). */
+.tc-arrival {
+  color: var(--chat-system);
+}
 /* A line only you see (a gray system line): the "too soon" and every refusal. */
 .tc-system {
   font-style: italic;
@@ -220,6 +232,30 @@
   font: 700 12px/16px Archivo, system-ui, sans-serif;
   cursor: pointer;
   pointer-events: auto;
+}
+/* The hint on the typing line's strip while you aren't typing (Eric, Nov 12): "Tap here to type" (a phone) or "Click here to type" (a
+   computer), thin and faint gray, the messages' size, its first letter in line with the timestamps' "[" (the stream's 5 px and a line's
+   3 px: 8 px from the box's edge, as the field's own text). It hides the instant typing opens (the form's `data-open`, set in the tap's
+   own handler) and comes back when typing closes; it fades and goes with the box (the rule above). It takes no touches: a tap there is
+   the box's, which opens typing. Nothing behind or round it. */
+.tc-hint {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 0;
+  height: var(--tc-strip);
+  line-height: var(--tc-strip);
+  color: var(--chat-hint);
+  font-weight: 300;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+}
+.town-chat[data-typing="1"] .tc-hint[data-show],
+.town-chat .tc-form[data-open="1"] + .tc-hint[data-show] {
+  visibility: hidden;
+  transition: none;
 }
 /* The typing line: in the strip at the box's foot, only while you're typing (`data-open`, set the instant a tap lands). An input and
    nothing else: no placeholder (a greyed one's reason is its placeholder), no box, no bar, no background, no shadow, even in iPhone
@@ -282,6 +318,7 @@
 @media (prefers-reduced-motion: reduce) {
   .tc-log,
   .tc-new,
+  .tc-hint,
   .tc-back {
     transition: none;
   }

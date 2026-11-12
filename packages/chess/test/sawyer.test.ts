@@ -8,6 +8,7 @@ import {
   START_FEN,
   applyMove,
   SAWYER,
+  SPLIT_TEST_MOVES,
   bossAllowed,
   chooseCut,
   chooseSplit,
@@ -607,5 +608,24 @@ describe("Sawyer's board saw", () => {
     expect(t.boss!.powers!.warnAt).toBeUndefined();
     expect(t.boss!.powers!.boardSaw).toEqual({ at: 3, until: 7 });
     expect(t.triggerUltimate()).toBe(false);
+  });
+});
+
+describe("Sawyer's split test switch (?power=split)", () => {
+  it("starts a few moves in, a pawn of his gone and the crowd to move, either side; his first move, a pawn's, splits at once", async () => {
+    for (const side of ["w", "b"] as const) {
+      const settings = { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossFixedElo: 2000, bossId: "sawyer", lastStandLoss: 999, lastStandLossFloor: 999, bossPowerTest: "split" } as Settings;
+      const r = new MatchRunner({ settings, rng: mulberry32(5), engines: [fakeEngine()], library: [opening(LINE)], entrants: [{ id: "h0", name: "H", isBot: false }], raidSide: side });
+      expect(r.boss!.crowdSide).toBe(side);
+      expect(r.boards.get(0)!.history).toEqual(SPLIT_TEST_MOVES[side]);
+      expect(fenOf(r).split(" ")[1]).toBe(side);
+      const his = side === "w" ? "p" : "P";
+      expect([...fenOf(r).split(" ")[0]!].filter((c) => c === his)).toHaveLength(7);
+      expect(splitRoom(fenOf(r), side === "w" ? "b" : "w")).toBe(true);
+      await turn(r);
+      const sp = r.boss!.powers!.split!;
+      expect(sp.square, side).toBeTruthy();
+      expect(sp.waiting).toBeUndefined();
+    }
   });
 });

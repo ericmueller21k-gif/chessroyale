@@ -10,6 +10,7 @@
  */
 import type { Anim, Character, Frame, Layer, Part } from "../../characters/sprite.ts";
 import { clamp, paint, signBoard, signFace, signPost, tone, WARM, type LightPool, type LightSpot, type Pt } from "./kit.ts";
+import { lazyAnim } from "../../characters/sprite.ts";
 
 const PALETTE: Record<string, string> = {
   k: "#1f1210", // outline (the tiger's)
@@ -339,7 +340,7 @@ function frame(phase: number): Frame {
   };
 }
 
-const idle: Anim = { loop: true, frames: [0, 1, 2, 3].map((i) => frame((i * Math.PI) / 2)) };
+const idle: Anim = lazyAnim(() => ({ loop: true, frames: [0, 1, 2, 3].map((i) => frame((i * Math.PI) / 2)) }));
 
 export const HOUSE_TIGER: Character = {
   id: "house-tiger",

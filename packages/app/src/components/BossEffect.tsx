@@ -2,8 +2,9 @@ import { useLayoutEffect, useRef } from "preact/hooks";
 import { bossKit } from "../characters/kits.ts";
 import { SQUARE } from "../characters/effects.ts";
 import { EFFECTS, animLength, type EffectName } from "../characters/power-art.ts";
-import { renderFrame, type Character, type Frame } from "../characters/sprite.ts";
+import { renderFrame, type Anim, type Character, type Frame } from "../characters/sprite.ts";
 import { play, type SoundName } from "../sound.ts";
+import { cueHaptic } from "../haptics.ts";
 
 /**
  * A boss power's pixel art on screen: an effect sprite on the board (the ice over a frozen piece, a pie, the
@@ -65,7 +66,7 @@ export function spriteFrameAt(ch: Character, anim: string, then: string | undefi
  * `ch.swap`); a new battle's lights replace the last one's.
  */
 const images = new WeakMap<Frame, Map<string, ImageData>>();
-function frameImage(ch: Character, frame: Frame, look = ""): ImageData {
+export function frameImage(ch: Character, frame: Frame, look = ""): ImageData {
   const swap = ch.swap?.() ?? null;
   let byLook = images.get(frame);
   if (!byLook) images.set(frame, (byLook = new Map()));
@@ -112,6 +113,25 @@ export function prewarm(name: EffectName, frames: readonly (readonly [string, nu
     if (i >= frames.length) stop();
   });
   return () => stop();
+}
+
+/**
+ * Characters' animations made ahead (their frames' poses, made the first time they're read: sprite.ts lazyAnim): about 4 ms
+ * of work at a time with a pause between (one big move can take longer: frames still draw between them), then `done`. So a
+ * boss's battle builds his moves while it loads, not in one stall the first time one shows. Returns a cancel.
+ */
+export function prewarmAnims(anims: readonly Anim[], done?: () => void): () => void {
+  let i = 0;
+  let timer = 0;
+  const slice = () => {
+    const t0 = performance.now();
+    do void anims[i++]?.frames;
+    while (i < anims.length && performance.now() - t0 < 4);
+    if (i < anims.length) timer = window.setTimeout(slice, 50);
+    else done?.();
+  };
+  timer = window.setTimeout(slice, 50);
+  return () => clearTimeout(timer);
 }
 
 /**
@@ -204,6 +224,7 @@ export function SpriteAnim({ ch, anim, since, then, sounds = {}, id = "", class:
           if (sound && !played.has(tag)) {
             played.add(tag);
             play(sound);
+            cueHaptic(ch.id, f.anim, fr.cue!);
           }
         }
         prev = s;
@@ -265,7 +286,7 @@ export function BoardEffects({ items, orientation, class: cls = "", style }: { i
     const shown = new Map<string, string>();
     const draw = () => {
       const now = Date.now();
-      const want = new Map<string, { key: string; frames: { ch: Character; frame: Frame; sound?: SoundName; tag: string }[] }>();
+      const want = new Map<string, { key: string; frames: { ch: Character; frame: Frame; sound?: SoundName; anim: string; tag: string }[] }>();
       for (const it of live.current) {
         const fx = EFFECTS[it.name];
         const a = it.anim ?? fx.start ?? fx.loop!;
@@ -273,7 +294,7 @@ export function BoardEffects({ items, orientation, class: cls = "", style }: { i
         const frame = fx.ch.anims[s.anim]!.frames[s.frame]!;
         const w = want.get(it.square) ?? { key: "", frames: [] };
         w.key += `${it.name}:${s.anim}:${s.frame};`;
-        w.frames.push({ ch: fx.ch, frame, sound: frame.cue && !it.quiet ? fx.sounds[frame.cue] : undefined, tag: `${fx.ch.id}:${it.square}:${s.tag}:${s.frame}` });
+        w.frames.push({ ch: fx.ch, frame, sound: frame.cue && !it.quiet ? fx.sounds[frame.cue] : undefined, anim: s.anim, tag: `${fx.ch.id}:${it.square}:${s.tag}:${s.frame}` });
         want.set(it.square, w);
       }
       for (const sq of new Set([...shown.keys(), ...want.keys()])) {
@@ -289,6 +310,7 @@ export function BoardEffects({ items, orientation, class: cls = "", style }: { i
           if (fr.sound && !played.has(fr.tag)) {
             played.add(fr.tag);
             play(fr.sound);
+            cueHaptic(fr.ch.id, fr.anim, fr.frame.cue!);
           }
         }
         if (w) shown.set(sq, w.key);

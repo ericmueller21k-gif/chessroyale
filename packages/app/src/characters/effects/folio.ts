@@ -23,6 +23,7 @@
  */
 import type { Anim, Character, Frame, Speck } from "../sprite.ts";
 import { SQUARE, hitAnims } from "./common.ts";
+import { lazyAnim } from "../sprite.ts";
 
 const S = SQUARE;
 
@@ -114,14 +115,14 @@ function numeral(n: 1 | 2): Speck[] {
 
 const FULL = 7.5;
 export const INK_MARK = char("folio-ink-mark", "Folio's ink mark under a piece", {
-  blot: { loop: false, frames: [still(60, blot(2.5), "ink"), still(60, blot(4.5)), still(70, blot(6.5)), still(90, blot(FULL + 0.8)), still(80, blot(FULL))] },
-  mark: { loop: true, frames: [still(1000, blot(FULL))] },
-  mark1: { loop: true, frames: [still(1000, [...blot(FULL), ...numeral(1)])] },
-  mark2: { loop: true, frames: [still(1000, [...blot(FULL), ...numeral(2)])] },
-  fade: {
+  blot: lazyAnim(() => ({ loop: false, frames: [still(60, blot(2.5), "ink"), still(60, blot(4.5)), still(70, blot(6.5)), still(90, blot(FULL + 0.8)), still(80, blot(FULL))] })),
+  mark: lazyAnim(() => ({ loop: true, frames: [still(1000, blot(FULL))] })),
+  mark1: lazyAnim(() => ({ loop: true, frames: [still(1000, [...blot(FULL), ...numeral(1)])] })),
+  mark2: lazyAnim(() => ({ loop: true, frames: [still(1000, [...blot(FULL), ...numeral(2)])] })),
+  fade: lazyAnim(() => ({
     loop: false,
     frames: [still(90, blot(FULL).map(([x, y, k]): Speck => [x, y, k === "I" ? "J" : "L"])), still(90, blot(FULL - 2).map(([x, y]): Speck => [x, y, "L"])), still(90, blot(3).map(([x, y]): Speck => [x, y, "L"])), empty(40)],
-  },
+  })),
 });
 /** How long the blot takes to spread (ms). */
 export const BLOT_MS = 360;
@@ -142,10 +143,10 @@ function dots(dx: number, dy: number): Speck[] {
 }
 export type LineDir = "h" | "v" | "d1" | "d2";
 export const INK_LINE = char("folio-ink-line", "The faint ink line of an attack Folio marked", {
-  h: { loop: true, frames: [still(1000, dots(1, 0))] },
-  v: { loop: true, frames: [still(1000, dots(0, 1))] },
-  d1: { loop: true, frames: [still(1000, dots(1, -1))] },
-  d2: { loop: true, frames: [still(1000, dots(1, 1))] },
+  h: lazyAnim(() => ({ loop: true, frames: [still(1000, dots(1, 0))] })),
+  v: lazyAnim(() => ({ loop: true, frames: [still(1000, dots(0, 1))] })),
+  d1: lazyAnim(() => ({ loop: true, frames: [still(1000, dots(1, -1))] })),
+  d2: lazyAnim(() => ({ loop: true, frames: [still(1000, dots(1, 1))] })),
 });
 
 // ---------------- The folded piece ----------------
@@ -185,9 +186,9 @@ function paper(t: number): Speck[] {
   return out;
 }
 export const FOLD_PAPER = char("folio-fold-paper", "Folio's paper folded over a piece", {
-  fold: { loop: false, frames: [still(70, paper(0.25), "fold"), still(70, paper(0.5)), still(70, paper(0.78)), still(90, paper(1))] },
-  folded: { loop: true, frames: [still(1000, paper(1))] },
-  unfold: { loop: false, frames: [still(80, paper(0.7), "unfold"), still(80, paper(0.4)), still(80, paper(0.15)), empty(40)] },
+  fold: lazyAnim(() => ({ loop: false, frames: [still(70, paper(0.25), "fold"), still(70, paper(0.5)), still(70, paper(0.78)), still(90, paper(1))] })),
+  folded: lazyAnim(() => ({ loop: true, frames: [still(1000, paper(1))] })),
+  unfold: lazyAnim(() => ({ loop: false, frames: [still(80, paper(0.7), "unfold"), still(80, paper(0.4)), still(80, paper(0.15)), empty(40)] })),
 });
 /** How long the paper takes to fold over (ms). */
 export const FOLD_MS = 300;
@@ -234,8 +235,8 @@ function pencil(side: "E" | "S"): Speck[] {
   return out;
 }
 export const CREASE_PENCIL = char("folio-pencil", "The faint pencil line of a crease to come", {
-  E: { loop: true, frames: [still(1000, pencil("E"))] },
-  S: { loop: true, frames: [still(1000, pencil("S"))] },
+  E: lazyAnim(() => ({ loop: true, frames: [still(1000, pencil("E"))] })),
+  S: lazyAnim(() => ({ loop: true, frames: [still(1000, pencil("S"))] })),
 });
 
 // ---------------- Revision's strike-through ----------------
@@ -258,8 +259,8 @@ function stroke(t: number): Speck[] {
   return inside(out);
 }
 export const INK_STRIKE = char("folio-strike", "Folio's ink crossing out a move", {
-  strike: { loop: false, frames: [still(60, stroke(0.3), "strike"), still(60, stroke(0.65)), still(60, stroke(1))] },
-  struck: { loop: true, frames: [still(1000, stroke(1))] },
+  strike: lazyAnim(() => ({ loop: false, frames: [still(60, stroke(0.3), "strike"), still(60, stroke(0.65)), still(60, stroke(1))] })),
+  struck: lazyAnim(() => ({ loop: true, frames: [still(1000, stroke(1))] })),
 });
 /** How long a strike takes to draw (ms). */
 export const STRIKE_MS = 180;

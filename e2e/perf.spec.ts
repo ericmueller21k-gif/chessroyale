@@ -1,7 +1,7 @@
 import { expect, type Page } from "@playwright/test";
 import { Chess } from "chess.js";
 import { RECLUSE_PHASE2 } from "@chessroyale/core";
-import { BOARD_SEL, test, bossAloneFromHome } from "./helpers.ts";
+import { BOARD_SEL, asAdmin, test, bossAloneFromHome } from "./helpers.ts";
 import { counts, frameStats, instrument } from "./perf-probe.js";
 
 /**
@@ -202,7 +202,7 @@ test("G-REX's fire on a slow phone: a barrage of tiles late in a long game stays
     { history, fen, squares, king },
   );
   await expect(page.locator(".power-board .pw-fire")).toHaveCount(squares.length);
-  await expect(page.locator(".power-board .pw-pips")).toHaveAttribute("data-left", "12");
+  await expect(page.locator(".boss-prop .pw-pips")).toHaveAttribute("data-left", "12");
   await expect(page.locator(".power-board .pw-shadow")).not.toHaveCount(0);
   const late = await page.evaluate(counts);
   const idle = await frames(1500);
@@ -356,3 +356,88 @@ test("the Hidden Boss's phase 2 on a slow phone: the phase change and four board
     expect(s.slow, `${what}: share of dropped frames`).toBeLessThan(0.15);
   }
 });
+
+test("the XP box on a slow phone: the result screen's frames while the bar fills, a level-up included (Nov 9)", { tag: "@perf" }, async ({ page }) => {
+  test.skip(test.info().project.name !== "phone", "one run is enough (the phone, slowed)");
+  test.setTimeout(3 * 60_000);
+  await page.addInitScript(instrument);
+  // (990 XP, then a won game counted as 12 minutes: 170 XP, through a level-up. e2e/xp.spec.ts has the fill's own checks.)
+  await page.goto("/?debug&nolanding&pace=quick&win=1&boss=gingerbread&xp=990&xpgame=12");
+  await expect.poll(async () => (await page.context().cookies()).some((c) => c.name === "hc_session"), { timeout: 20_000 }).toBe(true);
+  await expect.poll(async () => ((await (await page.request.get("/api/me")).json()) as { xp?: number }).xp, { timeout: 20_000 }).toBe(990);
+  await bossAloneFromHome(page);
+  await expect.poll(() => phase(page), { timeout: 60_000 }).toBe("play");
+  // (Slowed from the mate on: the result screen comes, the box waits for its XP, then fills.)
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send("Emulation.setCPUThrottlingRate", { rate: 4 });
+  await page.evaluate(() => (window as any).match.submit("h5f7"));
+  await page.locator(".xp-box").waitFor({ timeout: 60_000 });
+  await page.evaluate(() => ((window as any).__perf.frames = []));
+  await expect(page.locator(".xp-box")).toHaveClass(/xp-done/, { timeout: 30_000 });
+  const s = frameStats(((await page.evaluate(() => (window as any).__perf.frames.splice(0))) as [number][]).map((x) => x[0]));
+  console.log(`the XP box filling (slowed phone): ${f(s)}`);
+  expect(s.n, "frames while it filled").toBeGreaterThan(20);
+  expect(s.p95, "95th percentile frame (ms)").toBeLessThan(50);
+  expect(s.slow, "share of dropped frames").toBeLessThan(0.15);
+});
+
+test("the boss's attack on your pawn on a slow phone: a loss's result screen while he attacks and your XP fills (Nov 9)", { tag: "@perf" }, async ({ page }) => {
+  test.skip(test.info().project.name !== "phone", "one run is enough (the phone, slowed)");
+  test.setTimeout(3 * 60_000);
+  await page.addInitScript(instrument);
+  // (Ginger mates you at once: his attack where he stands, your pawn jolting at each lash, ResultDuo.tsx.)
+  await page.goto("/?debug&nolanding&pace=quick&mate=1&boss=gingerbread");
+  await bossAloneFromHome(page);
+  await expect.poll(() => phase(page), { timeout: 60_000 }).toBe("boss");
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send("Emulation.setCPUThrottlingRate", { rate: 4 });
+  await page.locator(".results-duo").waitFor({ timeout: 60_000 });
+  await page.evaluate(() => ((window as any).__perf.frames = []));
+  await expect(page.locator(".results-duo")).toHaveAttribute("data-attack", "done", { timeout: 30_000 });
+  const s = frameStats(((await page.evaluate(() => (window as any).__perf.frames.splice(0))) as [number][]).map((x) => x[0]));
+  console.log(`the boss's attack on your pawn (slowed phone): ${f(s)}`);
+  expect(s.n, "frames while he attacked").toBeGreaterThan(20);
+  expect(s.p95, "95th percentile frame (ms)").toBeLessThan(50);
+  expect(s.slow, "share of dropped frames").toBeLessThan(0.15);
+});
+
+for (const who of ["a player's town", "an admin's street town"] as const)
+  test(`Chess Town on a slow phone: ${who} draws its first frame (the street town: its loading screen, Nov 11) soon after the tap, with no long freeze (Nov 10, phone load 3)`, { tag: "@perf" }, async ({ page }) => {
+    test.skip(test.info().project.name !== "phone", "one run is enough (the phone, slowed)");
+    test.setTimeout(2 * 60_000);
+    const street = who !== "a player's town";
+    if (street) await asAdmin(page);
+    await page.addInitScript(() => {
+      const w = window as unknown as { __long: { s: number; d: number }[] };
+      w.__long = [];
+      new PerformanceObserver((l) => l.getEntries().forEach((e) => w.__long.push({ s: e.startTime, d: e.duration }))).observe({ type: "longtask", buffered: true });
+    });
+    await page.goto("/?sky=day");
+    const town = page.getByRole("main").getByRole("button", { name: "Chess Town", exact: true }).first();
+    await town.waitFor({ timeout: 60_000 });
+    await page.waitForTimeout(3000);
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send("Emulation.setCPUThrottlingRate", { rate: 4 });
+    await page.evaluate(() => addEventListener("pointerup", () => ((window as unknown as { __tap: number }).__tap = performance.now()), { capture: true, once: true }));
+    await town.click();
+    const canvas = page.locator("canvas.town-canvas");
+    // (The street town, Nov 11: its loading screen first (Eric: "I have no issue with doing a loading screen for the town… even if it
+    // takes 3 or 5 seconds"): what's timed is the tap to that screen; its first frame comes once every picture is in.)
+    const sinceTap = () => page.evaluate(() => performance.now() - (window as unknown as { __tap: number }).__tap);
+    if (street) await expect(page.locator(".town-loading")).toBeVisible({ timeout: 60_000 });
+    const shown = street ? await sinceTap() : 0;
+    await expect(canvas).toHaveAttribute("data-ready", "1", { timeout: 90_000 });
+    await expect(canvas).toHaveAttribute("data-backend", street ? "webgl" : "2d");
+    const loaded = await sinceTap();
+    const first = street ? shown : loaded;
+    // (The first frame was drawn just before data-ready was read: within one frame of it.)
+    const long = await page.evaluate(() => {
+      const w = window as unknown as { __long: { s: number; d: number }[]; __tap: number };
+      return Math.max(0, ...w.__long.filter((e) => e.s >= w.__tap - 5).map((e) => e.d));
+    });
+    console.log(`${who} (slowed phone): ${street ? "loading screen" : "first frame"} ${Math.round(first)} ms after the tap, the town's first frame ${Math.round(loaded)} ms, longest task ${Math.round(long)} ms`);
+    // (Nov 10, headless Chromium: about 1.7 s and 1.1 s for a player's, 2.1 s and 1.4 s for the street town; before phone load 3,
+    // 3.2 s and 1.9 s, 5.8 s and 4.6 s.)
+    expect(first, street ? "tap to the loading screen (ms)" : "tap to first frame (ms)").toBeLessThan(street ? 3000 : 2500);
+    expect(long, "longest task (ms)").toBeLessThan(2000);
+  });

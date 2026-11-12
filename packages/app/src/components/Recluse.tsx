@@ -3,7 +3,7 @@ import { BOSS_POWERS } from "@chessroyale/core";
 import { LAST_STAND, RECLUSE_FX, bulletIncrementAt, kingHelpBlocked } from "@chessroyale/chess";
 import { ENGINE_EYE, HEAD_SIZE, ON_BOARD_ANIMS, RECLUSE, RECLUSE_BUST, headOf } from "../characters/recluse.ts";
 import { GOD_KING } from "../characters/god-king.ts";
-import type { Character, Frame } from "../characters/sprite.ts";
+import { lazyTable, type Character, type Frame } from "../characters/sprite.ts";
 import { RECLUSE_LINES } from "../characters/recluse-lines.ts";
 import { animLength, cueAt } from "../characters/power-art.ts";
 import type { BossView } from "../game.ts";
@@ -34,11 +34,11 @@ import { hash, type BossUi, type KitMoment, type MomentProps } from "./PowerPart
 /** The bullet clock's moment where he stands: the book consulted, opened like a spell book, the spell held, slammed shut. */
 export const BULLET_ANIMS = ["consult", "spellbook", "spellLoop", "spellClose"] as const;
 /** Its beats (ms into the moment): "BULLET!" as the book falls open (spellbook's `open`), for BOSS_BANNER.ms; its runs' end. */
-export const BULLET = (() => {
+export const BULLET = lazyTable(() => {
   const a = RECLUSE.anims;
   const bannerAt = animLength(a.consult!) + (cueAt(a.spellbook!, "open") ?? 0);
   return { bannerAt, runMs: BULLET_ANIMS.reduce((t, n) => t + animLength(a[n]!), 0) };
-})();
+});
 
 /** The bullet clock is on: his ultimate has come (to the end of the battle). */
 export const bulletOn = (boss: Pick<BossView, "powers" | "result"> | null | undefined): boolean =>

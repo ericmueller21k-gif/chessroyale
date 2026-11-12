@@ -1,5 +1,6 @@
-import { FRIENDS, FRONT_DOOR, CAPACITY, isInviteSetting, type FriendsState, type InviteKind, type InviteSetting } from "@chessroyale/core";
+import { FRIENDS, FRONT_DOOR, CAPACITY, isInviteSetting, levelOf, type FriendsState, type InviteKind, type InviteSetting, type PlayerSearchEntry } from "@chessroyale/core";
 import type { Sql, Stmt } from "./accounts.ts";
+import type { Presence } from "./live.ts";
 
 /**
  * Friends and invites in D1 (docs/decisions/2026-10-15-friends-and-invites.md; the tables are listed in docs/areas/accounts.md for the
@@ -262,41 +263,44 @@ export async function setFriendSettings(sql: Sql, meId: string, patch: { invites
   return { ok: true };
 }
 
-/** Who's online and who's in a match, for a list of accounts (the live hub's memory, else D1's last_seen). */
-export type PresenceOf = (ids: string[]) => Promise<Record<string, { online: boolean; busy: boolean }> | null>;
+/** Who's online, who's in a match and what they're doing, for a list of accounts (the live hub's memory, else D1's last_seen). */
+export type PresenceOf = (ids: string[]) => Promise<Record<string, Presence> | null>;
 
 /**
  * Your friends list: friends (online first, then in a match, then the rest, each by name), requests to you, your
  * requests, open invites to you, who you've blocked and your settings. Nothing from or about someone you've blocked.
  */
 export async function friendsState(sql: Sql, meId: string, now: number, presenceOf?: PresenceOf): Promise<FriendsState> {
-  const me = await sql.first<{ allow_invites: string | null; hide_online: number | null }>("SELECT allow_invites, hide_online FROM users WHERE id = ?", meId);
-  const rows = await sql.all<FriendRow & { name: string; since: number }>(
-    "SELECT u.id, u.name, f.since, u.last_seen, u.hide_online FROM friends f JOIN users u ON u.id = f.friend_id WHERE f.user_id = ?",
-    meId,
-  );
+  // (Its reads at once, Nov 10: each D1 read is a round trip; then who's online among the friends.)
+  const [me, rows, requests, sent, invites, blocked] = await Promise.all([
+    sql.first<{ allow_invites: string | null; hide_online: number | null }>("SELECT allow_invites, hide_online FROM users WHERE id = ?", meId),
+    sql.all<FriendRow & { name: string; since: number }>(
+      "SELECT u.id, u.name, f.since, u.last_seen, u.hide_online FROM friends f JOIN users u ON u.id = f.friend_id WHERE f.user_id = ?",
+      meId,
+    ),
+    sql.all<{ id: string; name: string; at: number }>(
+      `SELECT u.id, u.name, r.at FROM friend_requests r JOIN users u ON u.id = r.from_id
+       WHERE r.to_id = ? AND NOT EXISTS (SELECT 1 FROM blocks b WHERE b.user_id = r.to_id AND b.blocked_id = r.from_id)
+       ORDER BY r.at DESC LIMIT 100`,
+      meId,
+    ),
+    sql.all<{ id: string; name: string; at: number }>(
+      "SELECT u.id, u.name, r.at FROM friend_requests r JOIN users u ON u.id = r.to_id WHERE r.from_id = ? ORDER BY r.at DESC",
+      meId,
+    ),
+    sql.all<{ from_id: string; name: string; kind: InviteKind; code: string; at: number; expires_at: number }>(
+      `SELECT i.from_id, u.name, i.kind, i.code, i.at, i.expires_at FROM invites i JOIN users u ON u.id = i.from_id
+       WHERE i.to_id = ? AND i.expires_at > ? AND NOT EXISTS (SELECT 1 FROM blocks b WHERE b.user_id = i.to_id AND b.blocked_id = i.from_id)
+       ORDER BY i.at DESC LIMIT 50`,
+      meId,
+      now,
+    ),
+    sql.all<{ id: string; name: string }>("SELECT u.id, u.name FROM blocks b JOIN users u ON u.id = b.blocked_id WHERE b.user_id = ? ORDER BY b.at DESC", meId),
+  ]);
   const live = await presenceRows(rows, now, presenceOf);
   const friends = rows
-    .map((r) => ({ id: r.id, name: r.name, since: r.since, ...live[r.id]!, hidden: !!r.hide_online }))
+    .map((r) => ({ id: r.id, name: r.name, since: r.since, ...live[r.id]!, hidden: !!r.hide_online, lastSeen: r.hide_online ? null : r.last_seen }))
     .sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name, "en", { sensitivity: "base" }));
-  const requests = await sql.all<{ id: string; name: string; at: number }>(
-    `SELECT u.id, u.name, r.at FROM friend_requests r JOIN users u ON u.id = r.from_id
-     WHERE r.to_id = ? AND NOT EXISTS (SELECT 1 FROM blocks b WHERE b.user_id = r.to_id AND b.blocked_id = r.from_id)
-     ORDER BY r.at DESC LIMIT 100`,
-    meId,
-  );
-  const sent = await sql.all<{ id: string; name: string; at: number }>(
-    "SELECT u.id, u.name, r.at FROM friend_requests r JOIN users u ON u.id = r.to_id WHERE r.from_id = ? ORDER BY r.at DESC",
-    meId,
-  );
-  const invites = await sql.all<{ from_id: string; name: string; kind: InviteKind; code: string; at: number; expires_at: number }>(
-    `SELECT i.from_id, u.name, i.kind, i.code, i.at, i.expires_at FROM invites i JOIN users u ON u.id = i.from_id
-     WHERE i.to_id = ? AND i.expires_at > ? AND NOT EXISTS (SELECT 1 FROM blocks b WHERE b.user_id = i.to_id AND b.blocked_id = i.from_id)
-     ORDER BY i.at DESC LIMIT 50`,
-    meId,
-    now,
-  );
-  const blocked = await sql.all<{ id: string; name: string }>("SELECT u.id, u.name FROM blocks b JOIN users u ON u.id = b.blocked_id WHERE b.user_id = ? ORDER BY b.at DESC", meId);
   return {
     friends,
     requests,
@@ -315,25 +319,58 @@ interface FriendRow {
   hide_online: number | null;
 }
 
-/** Online and in a match for each friend: the live hub's (one call), nothing for one who hides it. */
-async function presenceRows(rows: FriendRow[], now: number, presenceOf?: PresenceOf): Promise<Record<string, { online: boolean; busy: boolean }>> {
+/** Online, in a match and what they're doing for each friend: the live hub's (one call), nothing for one who hides it. */
+async function presenceRows(rows: FriendRow[], now: number, presenceOf?: PresenceOf): Promise<Record<string, Presence>> {
   const shown = rows.filter((r) => !r.hide_online).map((r) => r.id);
   const live = shown.length && presenceOf ? await presenceOf(shown).catch(() => null) : null;
-  const out: Record<string, { online: boolean; busy: boolean }> = {};
+  const out: Record<string, Presence> = {};
   for (const r of rows) {
     // (Without the live hub: D1's last_seen, which a request touches every 15 s there.)
-    const p = r.hide_online
+    const p: Presence = r.hide_online
       ? { online: false, busy: false }
       : (live?.[r.id] ?? { online: !live && r.last_seen !== null && now - r.last_seen < FRONT_DOOR.onlineWindowMs + CAPACITY.presence.lastSeenWriteMs, busy: false });
-    out[r.id] = { online: p.online, busy: p.online && p.busy };
+    out[r.id] = { online: p.online, busy: p.online && p.busy, ...(p.online && p.doing ? { doing: p.doing } : {}) };
   }
   return out;
 }
 
 /** Just who's online among your friends (the list's refresh while it's on screen): one D1 read and one hub call. */
-export async function friendsOnline(sql: Sql, meId: string, now: number, presenceOf?: PresenceOf): Promise<Record<string, { online: boolean; busy: boolean }>> {
+export async function friendsOnline(sql: Sql, meId: string, now: number, presenceOf?: PresenceOf): Promise<Record<string, Presence>> {
   const rows = await sql.all<FriendRow>("SELECT u.id, u.last_seen, u.hide_online FROM friends f JOIN users u ON u.id = f.friend_id WHERE f.user_id = ?", meId);
   return presenceRows(rows, now, presenceOf);
+}
+
+/** A signed-in account: the search's filter where signing in is set up, and `users_name_signed`'s WHERE (the same text). */
+export const SIGNED_IN = "email IS NOT NULL OR google_sub IS NOT NULL";
+/**
+ * searchPlayers' read (exported for its test: the plan uses the name index). Ordered by the index's own order only, so LIMIT
+ * stops after the first rows (a second key would sort every match first).
+ */
+export const searchSql = (needSignIn: boolean) =>
+  `SELECT u.id, u.name, u.icon, w.xp FROM users u LEFT JOIN wallets w ON w.user_id = u.id
+   WHERE u.name >= ?1 COLLATE NOCASE AND u.name < ?2 COLLATE NOCASE AND u.id != ?3 AND u.test IS NOT 1
+     AND NOT EXISTS (SELECT 1 FROM fairplay_cases c WHERE c.user_id = u.id AND c.status = 'banned')
+     ${needSignIn ? `AND (${SIGNED_IN})` : ""}
+   ORDER BY u.name COLLATE NOCASE LIMIT ?4`;
+/** Its parameters: the range's top is the prefix and the highest character there is, so every name that starts with it sorts below. */
+export const searchParams = (prefix: string, meId: string) => [prefix, `${prefix}\u{10FFFF}`, meId, FRIENDS.searchMax] as const;
+
+/** The longest search the server reads (a name is shorter: anything past this can't match more closely). */
+export const SEARCH_MAX_CHARS = 32;
+
+/**
+ * Players whose name starts with `q`, any case (the friends page's search, Eric, Nov 11): at most FRIENDS.searchMax, by name.
+ * Only what their profile shows anyone (id, name, icon, level), never an email. Left out: you, banned accounts (fair play's
+ * `banned`), test accounts (`users.test`), and, where signing in is set up, guests (they can't be added as friends). The
+ * engine pool's players show as anyone else's, never marked. One read on the `users_name` index (name, any case), or
+ * `users_name_signed` where signing in is set up: a prefix is a range on it, in its order, so a search reads a few rows and
+ * stops, never the table or every guest named "Player". Fewer than FRIENDS.searchMinChars characters: nobody.
+ */
+export async function searchPlayers(sql: Sql, meId: string, q: string, needSignIn: boolean): Promise<PlayerSearchEntry[]> {
+  const prefix = q.trim().slice(0, SEARCH_MAX_CHARS);
+  if ([...prefix].length < FRIENDS.searchMinChars) return [];
+  const rows = await sql.all<{ id: string; name: string; icon: string; xp: number | null }>(searchSql(needSignIn), ...searchParams(prefix, meId));
+  return rows.map((r) => ({ id: r.id, name: r.name, icon: r.icon, level: levelOf(r.xp ?? 0) }));
 }
 
 /** Accounts with something new in the last hour (open invites, recent requests): the live hub's start, after a restart. */

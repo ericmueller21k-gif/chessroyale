@@ -56,11 +56,14 @@ export declare function resolveImport(from: string, spec: string, exportsOf: (pk
 export declare function usersOf(path: string, names: string[], repo: Repo): Map<string, string[]>;
 export declare function traceChanges(
   paths: string[],
-  traced: Set<string>,
+  traced: { has(path: string): boolean },
   repo: Repo,
 ): Map<string, { names: string[]; users: Map<string, string[]>; reason: string | null; via: string | null }>;
 export declare function gitRepo(base: string, head?: string | null, cwd?: string): Repo;
 export declare function allWebgl(areas: Areas, existing: string[]): string[];
+export declare const TRACED_BY_DEFAULT: RegExp;
+export declare function isTraced(path: string, areas: Areas): boolean;
+export declare function unmapped(added: string[], areas: Areas): { path: string; fix: string }[];
 export declare function shardCount(specs: string[], weight: (file: string) => number): number;
 export declare function plan(
   picked: Picked,

@@ -13,6 +13,7 @@
  */
 import type { Anim, Character, Frame, Layer, Part, Speck } from "../../characters/sprite.ts";
 import { grain, groundShadow, logEnd, paint, signBoard, signFace, signPost, WARM, type LightPool, type LightSpot, type Pt } from "./kit.ts";
+import { lazyAnim } from "../../characters/sprite.ts";
 
 const PALETTE: Record<string, string> = {
   k: "#1e130d", // outline (Timber's)
@@ -441,7 +442,7 @@ const frames: Frame[] = Array.from({ length: N }, (_, f) => ({
   specks: chips(f),
 }));
 
-const idle: Anim = { loop: true, frames };
+const idle: Anim = lazyAnim(() => ({ loop: true, frames }));
 
 export const HOUSE_TIMBER: Character = {
   id: "house-timber",

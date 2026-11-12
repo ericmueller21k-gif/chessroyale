@@ -71,6 +71,10 @@ message, without a code change: each is a Worker variable (docs/areas/ops.md, "K
    - `PAUSE_SOLO`: Solo and Boss alone.
    - `PAUSE_SHOP`: getting shop items and opening crates (the locker stays).
    - `PAUSE_FRIENDS`: friends and invites.
+   - `PAUSE_REWARDS`: XP, the daily reward and level rewards (games play on; the result's XP box says "Rewards are paused for
+     a moment."; levels reached meanwhile are paid at the next game after it).
+   - `PAUSE_LEAVE_PENALTIES`: ranked's leave rules (dodges and leaves: no rank points taken, nothing marked, and no lockout or
+     delayed queue applies while it's on). Games play as usual. For when the rules misfire.
    - `PAUSE_TOWN_CHAT`: typing in the town square's chat, everywhere at once (the field says "Chat is paused."; players'
      messages stop showing, the bosses' chatter goes on).
    - One boss, never met while it's set (its id, from `BOSS_ROSTER` in `packages/core/src/boss.ts`, isn't always its
@@ -179,3 +183,9 @@ What to watch in the Cloudflare dashboard (the names move around; search the das
    Add → Workers) plus the uptime check below cover it.
 4. **Uptime:** a free external monitor (e.g. UptimeRobot) on `https://hunchess.com/api/live` every 5 minutes, emailed
    when it fails twice. (Cloudflare Health Checks need a Pro zone plan, $20/month; not needed.)
+5. **Discord (the game's own alerts, alerts.ts; docs/areas/ops.md, "Alerts"):** in Discord, a private channel (e.g.
+   `#hunchess-alerts`) → **Edit Channel → Integrations → Webhooks → New Webhook → Copy Webhook URL**. Then in Cloudflare,
+   Workers & Pages → chessroyale → Settings → Variables and Secrets → **Add**: name `ALERT_WEBHOOK`, type **Secret**, value the
+   URL; Save and deploy. Optional: `ALERT_PING` (Text), your Discord user id (Discord → Settings → Advanced → Developer Mode,
+   then right-click your name → Copy User ID), so a page pings you rather than `@everyone`. `PAUSE_ALERTS` = `1` turns them off.
+   The ops page's Health says "Alerts: on" once it's set.

@@ -43,13 +43,16 @@ export const FILL_IN_ORDER: MatchRules = { group: (tickets) => (tickets.length ?
 /**
  * Ranked 1 v 1: pairs by the hidden rating (each ticket's `info.uid`, `info.rating`, `info.rd` and `info.device`, read
  * by the server), the range widening with the wait and the ratings' uncertainty (core's pairUp): each pair is a group
- * of its own (a game). Tickets without a partner yet stay in line, in order, for the next batch. A ticket without its
+ * of its own (a game). Tickets without a partner yet stay in line, in order, for the next batch, and so do tickets in ranked's
+ * delayed queue (`info.notBefore`, L1) until their wait is over. A ticket without its
  * player (`info.uid`, `info.player`) is never paired (the matchmaker never makes one: duelNext).
  */
 export const PAIR_BY_RATING: MatchRules = {
   group(tickets, now) {
     const entries = tickets
       .filter(duelTicketComplete)
+      // (Ranked's delayed queue, L1: a ticket waits until its `notBefore` before it can be paired.)
+      .filter((t) => !(Number(t.info?.notBefore) > now))
       .map((t) => ({ id: t.id, uid: t.info!.uid as string, rating: Number(t.info?.rating) || 1500, rd: Number(t.info?.rd) || 0, device: typeof t.info?.device === "string" ? t.info.device : null, at: t.at, t }));
     return pairUp(entries, now).map(([a, b]) => ({ key: `duel:${a.id}`, tickets: [a.t, b.t] }));
   },
@@ -91,8 +94,11 @@ export class QueueCore {
    * a backstop, forgotten after SEATING_KEEP_MS).
    */
   private seating = new Map<string, { t: Ticket; since: number }>();
-  /** Placed tickets: their lobby, until when it's remembered. */
-  private placed = new Map<string, { code: string; until: number }>();
+  /**
+   * Placed tickets: their lobby, until when it's remembered; ranked 1 v 1's also their account (`uid`) and whether an ask has
+   * been answered with the code yet (`told`: ranked's leave rules charge a no-show only then).
+   */
+  private placed = new Map<string, { code: string; until: number; uid?: string; told?: boolean }>();
   private tokens: number;
   private refilledAt: number;
   /** Recent admissions per second (for the wait estimate when the player cap, not the rate, holds the line). */
@@ -198,8 +204,38 @@ export class QueueCore {
   place(tickets: Ticket[], code: string, now: number) {
     for (const t of tickets) {
       this.seating.delete(t.id);
-      this.placed.set(t.id, { code, until: now + this.cfg.placedKeepMs });
+      const uid = typeof t.info?.uid === "string" ? t.info.uid : undefined;
+      this.placed.set(t.id, { code, until: now + this.cfg.placedKeepMs, ...(uid ? { uid } : {}) });
     }
+  }
+
+  /**
+   * An ask is being answered with this ticket's code: its placement, the first time only (null after, or if it isn't placed),
+   * so the game can be told its player now knows of it (ranked's leave rules: a no-show is a dodge only then).
+   */
+  deliver(ticketId: string): { code: string; uid?: string } | null {
+    const p = this.placed.get(ticketId);
+    if (!p || p.told) return null;
+    p.told = true;
+    return { code: p.code, ...(p.uid ? { uid: p.uid } : {}) };
+  }
+
+  /**
+   * Ranked's leave rules, read again as a ticket already in line asks (L1: it may have been made before a dodge elsewhere, a
+   * second tab or device): `drop` takes it out of line (a lockout); `notBefore` holds it from pairing until then (the delayed
+   * queue), set once: a later ask never pushes it further. Only the account's own ticket, and only while in line (one being
+   * seated or placed keeps its game). Answers whether it was dropped.
+   */
+  restrict(ticketId: string, uid: string, o: { drop: boolean; notBefore: number | null }): boolean {
+    const t = this.byId.get(ticketId);
+    if (!t || t.info?.uid !== uid) return false;
+    if (o.drop) {
+      this.line = this.line.filter((x) => x !== t);
+      this.byId.delete(ticketId);
+      return true;
+    }
+    if (o.notBefore !== null && t.info.notBefore === undefined) t.info = { ...t.info, notBefore: o.notBefore };
+    return false;
   }
 
   private seatingOf(uid: string): Ticket | undefined {
@@ -256,12 +292,13 @@ export class QueueCore {
 
 /**
  * Which matchmaker a PLAY press goes to: one per mode and matchmaking type ("crowd-default", "raid-botsoff"), so
- * Default and Bots off never share a lobby; a test's own pool (?pool=NAME); and, with CAPACITY.queue.byRegion on, one
- * per continent ("crowd-default@EU"), created near its players. Squads has its own ("squads-default": parties and solo
- * players, squads-lobby.ts), and so does ranked 1 v 1 ("ranked1v1-default": PAIR_BY_RATING, duel-room.ts).
+ * Default and Bots off never share a lobby; a test's own pool (?pool=NAME); the engine pool's own (`engine`: an account fair play
+ * pooled, set by the server from the account, never the browser: "crowd-default.engine", a name no test's pool can make); and, with
+ * CAPACITY.queue.byRegion on, one per continent ("crowd-default@EU"), created near its players. Squads has its own ("squads-default":
+ * parties and solo players, squads-lobby.ts), and so does ranked 1 v 1 ("ranked1v1-default": PAIR_BY_RATING, duel-room.ts).
  */
-export function queueName(mode: "crowd" | "raid" | "squads" | "ranked1v1", type: "default" | "botsoff", pool?: string | null, region?: string | null): string {
-  const base = `${mode}-${type}${pool && /^[a-z0-9-]{1,24}$/.test(pool) ? `-${pool}` : ""}`;
+export function queueName(mode: "crowd" | "raid" | "squads" | "ranked1v1", type: "default" | "botsoff", pool?: string | null, region?: string | null, engine = false): string {
+  const base = `${mode}-${type}${pool && /^[a-z0-9-]{1,24}$/.test(pool) ? `-${pool}` : ""}${engine ? ".engine" : ""}`;
   return region ? `${base}@${region}` : base;
 }
 

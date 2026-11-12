@@ -21,9 +21,10 @@
  */
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "preact/hooks";
 import { BOARD } from "@chessroyale/core";
+import { haptic, hapticAtLift, hapticAtPress, type LiftTick } from "../haptics.ts";
 import { applyMove, inCheck, isChess960Fen, pieceAt, sideToMove, touchesDark } from "@chessroyale/chess";
 import { BoardTurn, coordLabel, type QuarterTurn } from "../board-view.ts";
-import { BRUSHES, FILES, NO_MARKS, SLIDE_MS, arrowColor, boardInputs, boardSize, cellOf, destsFor, drawArrows, follow, gestureMoves, highlightColor, marksEmpty, pieceClass, pieceCloseTo, positionKey, premoveDests, premovePieces, premoveQueueTurn, premoveSquares, pressDown, pressMove, pressUp, readPieces, refusedMove, slidePiece, squareAtPoint, stillRunning, toggleArrow, toggleSquare, userArrowShape, USER_ARROW, type BoardPiece, type Box, type PieceCode, type Premove, type Press, type PressBoard } from "./logic.ts";
+import { BRUSHES, FILES, NO_MARKS, SLIDE_MS, arrowColor, boardInputs, boardSize, cellOf, destsFor, drawArrows, follow, gestureMoves, highlightColor, marksEmpty, pieceClass, pickedUp, pieceCloseTo, positionKey, premoveDests, premovePieces, premoveQueueTurn, premoveSquares, pressDown, pressMove, pressUp, readPieces, refusedMove, slidePiece, squareAtPoint, stillRunning, toggleArrow, toggleSquare, userArrowShape, USER_ARROW, type BoardPiece, type Box, type PieceCode, type Premove, type Press, type PressBoard } from "./logic.ts";
 import type { BoardProps } from "./types.ts";
 import { boardMarksOn, premovesOn } from "../prefs.ts";
 import { addPremove, dropYours, onYours, setMarks, setQueue, yours } from "./yours.ts";
@@ -49,6 +50,8 @@ interface Track {
   turn: QuarterTurn;
   /** Alfil's elephants among them (or fading), by piece id: drawn with their own art. */
   elephants: Set<number>;
+  /** Don Dough's gold pieces among them (or fading), by piece id: drawn gold. */
+  gold: Set<number>;
 }
 
 /**
@@ -89,7 +92,7 @@ interface BoardActs {
  * when what it shows changes (`boardInputs` in logic.ts), or by itself (a tap, a drag, a slide or a fade ending).
  */
 export function OwnBoard(props: BoardProps) {
-  const { fen, orientation, lastMove, interactive, moves, onMove, arrows, small, animate = true, children, marks, dark, onDarkTry, turn = 0, elephants, decor, premove } = props;
+  const { fen, orientation, lastMove, interactive, moves, onMove, arrows, small, animate = true, children, marks, dark, onDarkTry, turn = 0, elephants, gold, decor, premove } = props;
   const onMoveRef = useRef(onMove);
   onMoveRef.current = onMove;
   const onDarkRef = useRef(onDarkTry);
@@ -122,7 +125,7 @@ export function OwnBoard(props: BoardProps) {
   const acts = useMemo<BoardActs>(() => ({ move: (uci, how) => onMoveRef.current?.(uci, how), darkTry: (uci) => onDarkRef.current?.(uci), refused: onRefusedRef, stopped: stoppedRef, promote: setPromotion, selectDark: setDarkSel, local }), []);
   // (The same element while nothing it shows has changed: Preact leaves it, and everything in it, alone.)
   const layer = useMemo(
-    () => <BoardLayer fen={fen} orientation={orientation} lastMove={lastMove} interactive={interactive} moves={moves} arrows={arrows} small={small} animate={animate} marks={marks} dark={dark} darkOn={darkOn} darkSel={darkSel} turn={turn} elephants={elephants} decor={decor} premove={premove} acts={acts} />,
+    () => <BoardLayer fen={fen} orientation={orientation} lastMove={lastMove} interactive={interactive} moves={moves} arrows={arrows} small={small} animate={animate} marks={marks} dark={dark} darkOn={darkOn} darkSel={darkSel} turn={turn} elephants={elephants} gold={gold} decor={decor} premove={premove} acts={acts} />,
     [...boardInputs(props), darkOn, darkSel, cleared.current],
   );
   const promoWhite = promotion?.premove ? promotion.premove.side === "w" : sideToMove(fen) === "w";
@@ -145,8 +148,10 @@ export function OwnBoard(props: BoardProps) {
                 const uci = pr.from + pr.to + p;
                 if (pr.premove) addPremove(pr.premove.key, { from: pr.from, to: pr.to, promo: p }, pr.premove.many);
                 else if (pr.dark) onDarkRef.current?.(uci);
-                else if (stoppedRef.current?.(uci)) onRefusedRef.current?.(uci);
+                else if (stoppedRef.current?.(uci)) return void onRefusedRef.current?.(uci);
                 else onMoveRef.current?.(uci);
+                // (A move made: its tick, once the move's gone.)
+                haptic("move");
               }}
               aria-label={{ q: "Queen", r: "Rook", b: "Bishop", n: "Knight" }[p]}
             >
@@ -165,7 +170,7 @@ type LayerProps = Omit<BoardProps, "children" | "silent" | "onMove" | "onDarkTry
  * The board's drawing: the squares and their highlights, the pieces (sliding, fading, following a drag), the arrows and
  * the coordinates, and the taps and drags on them. Drawn again only when what it shows changes (see OwnBoard).
  */
-function BoardLayer({ fen, orientation, lastMove, interactive, moves, arrows, small, animate = true, marks, dark, darkOn, darkSel, turn = 0, elephants, decor, premove, acts }: LayerProps) {
+function BoardLayer({ fen, orientation, lastMove, interactive, moves, arrows, small, animate = true, marks, dark, darkOn, darkSel, turn = 0, elephants, gold, decor, premove, acts }: LayerProps) {
   const rootRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const boardRef = useRef<HTMLDivElement>(null);
@@ -204,7 +209,7 @@ function BoardLayer({ fen, orientation, lastMove, interactive, moves, arrows, sm
   const dests = useMemo(() => (interactive && !small ? destsFor(fen, moves, darkList) : new Map<string, string[]>()), [fen, interactive, small, moves?.join(), darkList.join()]);
 
   // ---------------- Which piece is which ----------------
-  const track = useRef<Track>({ key: null, pieces: [], fading: [], sliding: new Map(), orientation, turn, elephants: new Set() });
+  const track = useRef<Track>({ key: null, pieces: [], fading: [], sliding: new Map(), orientation, turn, elephants: new Set(), gold: new Set() });
   const tr = track.current;
   // (A new way up or a new turn of the board: every piece jumps to its new square, never flies there.)
   const turned = tr.orientation !== orientation || tr.turn !== turn;
@@ -243,7 +248,14 @@ function BoardLayer({ fen, orientation, lastMove, interactive, moves, arrows, sm
     else tr.elephants.delete(p.id);
     for (const id of tr.elephants) if (!tr.pieces.some((p) => p.id === id) && !fading.some((f) => f.piece.id === id)) tr.elephants.delete(id);
   }
-  const look = (p: BoardPiece) => `${pieceClass(p.code)}${tr.elephants.has(p.id) ? " elephant" : ""}`;
+  // Don Dough's gold pieces: his pieces on their squares now; one taken keeps its gold as it fades.
+  if (gold?.length || tr.gold.size) {
+    const on = new Set(gold ?? []);
+    for (const p of tr.pieces) if (p.code[1] !== "k" && p.code[1] !== "p" && on.has(p.square)) tr.gold.add(p.id);
+    else tr.gold.delete(p.id);
+    for (const id of tr.gold) if (!tr.pieces.some((p) => p.id === id) && !fading.some((f) => f.piece.id === id)) tr.gold.delete(id);
+  }
+  const look = (p: BoardPiece) => `${pieceClass(p.code)}${tr.elephants.has(p.id) ? " elephant" : ""}${tr.gold.has(p.id) ? " gold" : ""}`;
 
   // Captured pieces fade and sliding ones settle: drawn again once they're done.
   useEffect(() => {
@@ -269,6 +281,17 @@ function BoardLayer({ fen, orientation, lastMove, interactive, moves, arrows, sm
   const dragged = useRef(false);
   /** The press being made is a mouse's (a computer: premoves queue up). */
   const pressMouse = useRef(false);
+  /** When the press went down (Date.now()): let go within HAPTICS.holdMs, it was a tap. */
+  const pressAt = useRef(0);
+  /** The press going down now (inside onDown), and a move's tick it made, kept for its lift on an iPhone (haptics.ts). */
+  const downNow = useRef<{ pointer: number; square: string } | null>(null);
+  const liftTick = useRef<LiftTick | null>(null);
+  /** A move's tick: as the finger lifts if a press-down made it (an iPhone's tick needs the lift), else at once. */
+  const moveTick = () => {
+    const d = downNow.current;
+    if (d) liftTick.current = hapticAtPress("move", d.pointer, d.square);
+    else haptic("move");
+  };
   /** A right-drag (an arrow, or a square's color where it started), and the square and color under it now. */
   const right = useRef<{ from: string; at: string | null; pointer: number; box: Box; mods: PointerEvent } | null>(null);
   const pieceEls = useRef(new Map<number, HTMLElement>());
@@ -298,7 +321,8 @@ function BoardLayer({ fen, orientation, lastMove, interactive, moves, arrows, sm
       const piece = pieceAt(s.fen, from);
       // (A pawn you can see reaching the last rank: you pick its piece. From the dark: a queen.)
       if (piece?.type === "p" && !s.darkList.includes(from) && (to[1] === "8" || to[1] === "1")) return setPromotion({ from, to, dark: true });
-      return acts.darkTry(from + to);
+      acts.darkTry(from + to);
+      return moveTick();
     }
     const legal = gestureMoves(s.fen, moves, from, to);
     // (Hollow's dark takes a drop anywhere: an ordinary move that isn't on stays where it was.)
@@ -321,6 +345,7 @@ function BoardLayer({ fen, orientation, lastMove, interactive, moves, arrows, sm
     local.current = { pieces: after, last: [from, to] };
     redraw();
     acts.move(legal[0]!);
+    moveTick();
   };
 
   /** A move made ahead (a premove): its piece shows at once on its new square, both squares in the premove color. */
@@ -332,6 +357,7 @@ function BoardLayer({ fen, orientation, lastMove, interactive, moves, arrows, sm
     const many = pressMouse.current;
     if (s.shown.get(from)?.[1] === "p" && to[1] === (side === "w" ? "8" : "1")) return setPromotion({ from, to, premove: { key: s.ykey, side, many } });
     addPremove(s.ykey, { from, to }, many);
+    moveTick();
   };
 
   /** A move from the board's gestures: made now, or ahead. */
@@ -430,6 +456,14 @@ function BoardLayer({ fen, orientation, lastMove, interactive, moves, arrows, sm
   };
 
   const onDown = (e: PointerEvent) => {
+    try {
+      pressedDown(e);
+    } finally {
+      downNow.current = null;
+    }
+  };
+
+  const pressedDown = (e: PointerEvent) => {
     if (small) return;
     // (A second finger: the drag in progress is let go.)
     if (press.current) {
@@ -443,6 +477,7 @@ function BoardLayer({ fen, orientation, lastMove, interactive, moves, arrows, sm
     const box = boxOf();
     const sq = squareAtPoint(e.clientX, e.clientY, box, s.orientation, s.turn);
     if (!sq) return;
+    downNow.current = { pointer: e.pointerId, square: sq };
     // (A mouse press on the board starts no text selection; a touch's scrolling is decided in onTouch, below.)
     if (mouse) e.preventDefault();
     pressMouse.current = mouse;
@@ -457,7 +492,7 @@ function BoardLayer({ fen, orientation, lastMove, interactive, moves, arrows, sm
       if (s.darkSel) {
         if (sq === s.darkSel) return void setDarkSel(null);
         setDarkSel(null);
-        if (!mine) return void acts.darkTry(s.darkSel + sq);
+        if (!mine) return void (acts.darkTry(s.darkSel + sq), moveTick());
       } else {
         const held = selected.current;
         if (held && sq !== held && mine) selected.current = null;
@@ -476,6 +511,7 @@ function BoardLayer({ fen, orientation, lastMove, interactive, moves, arrows, sm
       made(r.move[0], r.move[1], false);
     } else if (r.press) {
       press.current = r.press;
+      pressAt.current = Date.now();
       pressBox.current = box;
       pressPointer.current = e.pointerId;
       pressId.current = tr.pieces.find((q) => q.square === sq)?.id ?? null;
@@ -512,6 +548,13 @@ function BoardLayer({ fen, orientation, lastMove, interactive, moves, arrows, sm
   };
 
   const onUp = (e: PointerEvent) => {
+    // A move's tick kept for this finger's lift (an iPhone): it plays now, on the same square (haptics.ts).
+    const lt = liftTick.current;
+    if (lt && e.pointerId === lt.pointer) {
+      liftTick.current = null;
+      const s = live.current;
+      hapticAtLift(lt, e.pointerId, e.type === "pointerup" ? squareAtPoint(e.clientX, e.clientY, boxOf(), s.orientation, s.turn) : null);
+    }
     // A right-click let go: on its own square, that square's color; on another, an arrow; off the board, nothing.
     const rd = right.current;
     if (rd && e.pointerId === rd.pointer) {
@@ -534,6 +577,8 @@ function BoardLayer({ fen, orientation, lastMove, interactive, moves, arrows, sm
     if (p.started) endDrag(p);
     if (r.move) made(r.move[0], r.move[1], true);
     else if (p.started && to && to !== p.from) refusedTry(p.from, to);
+    // A tap that picked up a piece (not one held, nor a drag, nor a tap on the one already picked up): its tick.
+    else if (pickedUp(p, r.selected, to, Date.now() - pressAt.current)) haptic("select");
     redraw();
   };
 

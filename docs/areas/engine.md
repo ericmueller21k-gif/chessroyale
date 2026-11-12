@@ -12,7 +12,8 @@ Lane: `engine`. The bosses' strength is here; their powers are on [bosses.md](bo
   `engineNodes` (250k) per position, top lines first; the score a pick gets is its loss against the best move.
   `packages/chess/src/uci.ts` (`UciEngine`) speaks UCI; the same code runs in Node (tests, sims: `src/node.ts`) and in
   the browser (a Web Worker pool, Stockfish 19 lite WASM: `packages/app/src/engine.ts`). The browser engine is
-  deterministic (`reports/judge-determinism.md`).
+  deterministic (`reports/judge-determinism.md`). Home warms one worker (`warmEngine`); the rest of the pool starts when
+  play is near: a match, the queue, the boss menu, Squads, 1 v 1 (`App.tsx`, `playNear`; Nov 10, phone load).
 - **The best move is the highest-scored pick** (`docs/decisions/2026-10-16-the-best-move-is-the-highest-scored.md`):
   the judge's best (the top-8 search's first line, or what the re-check made best), unless a pick scored above it
   (`bestOf` in `packages/core/src/scoring.ts`; a tie keeps the judge's best). `resolveBoard` names it on every path, so
@@ -33,22 +34,36 @@ Lane: `engine`. The bosses' strength is here; their powers are on [bosses.md](bo
   refuses", Oct 15): one would end the container's Stockfish, and every lobby's re-checks with it. Every search the
   Worker sends the container goes through `containerScore` (`packages/server/src/engine.ts`: `serverScoreAt`'s and
   fair play's), which checks first: not sent, "no answer", one log line. `/api/engine/score` answers 400 for one,
-  before the day's budget; fair play's deep re-check passes one over. `engine/server.mjs` has no copy of the rules
+  before the day's budget; fair play's deep re-check passes one over. `/api/engine/score` and `/api/engine/ping` answer only an
+  account (signed in where sign-in is set up; 401), `ENGINE_SERVER.perAccountDaily` (200) calls a UTC day each (D1 `engine_calls`,
+  `engine-calls.ts`; then 429), and solo's searches stop at `ENGINE_SERVER.soloDailySearches` (1000), never over `soloShare` (a third)
+  of the day's 3000 (the row `<day>:solo`), so matches keep the rest (Nov 10, the outside review's finding 4). Every refusal: the
+  device re-checks itself, and after a 401, 404 or 429 asks nothing more that game (`app/src/engine.ts`). `engine/server.mjs` has no copy of the rules
   (only the Worker can reach it). Its own Stockfish (17.1) is checked against the same rules in CI (DECISIONS.md, "The
   engine server's own Stockfish, checked in CI", Oct 15): `.github/workflows/engine-container.yml` builds the image
   and sends it every case in `packages/chess/test/stockfish-refuses-cases.ts` through `server.mjs`; each one
   `stockfishRefuses` lets through must be searched with the server answering on (`engine-container.test.ts`). It
   runs when `engine/`, `uci.ts` or the check change, or by hand, in about a minute.
 - **Who scores, online: many judges.** Each board's scoring job (position, picks, bots; no names) goes to **two
-  devices** drawn by the lobby, weighted by the speed each reported on joining. A device sends the engine's raw output;
+  devices** drawn by the lobby, weighted by the speed each reported on joining (capped at `JUDGES.maxNps` 3M and at
+  `medianCap` 3 times the lobby's median, weight squared: `speedWeight` 2), the second (and a refill or referee) from
+  the first's class (computer with computer) when that class has `pairClassMin` 3 other accounts left, else from
+  anyone; never two of one account (2026-11-10-judge-pairing.md). A device sends the engine's raw output;
   the lobby works out the board with the same code (`judge.ts`: `runJudgeJob`, `judgedBoard`). Two honest answers are
   identical (`JUDGES.tolerance` 0). A disagreement asks a third device and the engine server at once; strikes bench a
   device. Fewer than two capable devices (or `JUDGES.on` false): the lobby's **host** scores every round (`pickHost`
-  prefers a connected computer over a phone). Knocked-out players' devices keep judging while their page is open.
+  prefers a connected computer over a phone); its boards are checked for shape (`hostBoardOk`: legal moves, chances
+  0 to 1, every pick and bot scored), and one that doesn't hold together scores every pick the same. The values of a
+  board that does are still the host's word (ROADMAP), so a match where the host scored a round alone (or two judges' dispute
+  had no verdict) pays as a solo game and isn't ranked (`LobbyRecord.unvouched`, Nov 10). A judge answering alone (its partner past the grace) is
+  spot-checked, not cross-checked. Knocked-out players'
+  devices keep judging while their page is open.
 - **The Crowd's and Squads' bots** (Nov 1; docs/decisions/2026-11-01-bot-lobby.md): Stockfish-style at the
   temperature each bot's rating plays like (no extra engine work: the judge's top moves). Not Maia (too slow for a
   team turn on a phone). [crowd.md](crowd.md), "The bots".
-- **Squads' bots** get their engine's top moves from players' devices the same way (the page's one speed check,
+- **Squads' bots** get their engine's top moves from players' devices the same way (never two of one party, but a
+  party's second device checks a job when no outside device is free: agreement counts as one answer; nothing is
+  shared between lobbies for now, `TOP_CACHE`; the page's one speed check,
   `engineSpeed()`, then `botWork` jobs on the engine pool; [squads.md](squads.md), "The server" and "The screens").
 - **Close calls are re-checked deeper** before a cut (`recheckCloseCalls()` in `runner.ts`: `recheckLoss`,
   `recheckMax`, `recheckNodes` 700k), only for groups with a human pick, in one search with the best move (the anchor),
@@ -105,6 +120,16 @@ Lane: `engine`. The bosses' strength is here; their powers are on [bosses.md](bo
     them), and the admins' debug line says "pick replaced (not allowed)"; the runner's `applyBossMove` (solo and the
     server) plays the first allowed move for anything else a host sends, and logs it. Every power × brain path is tested
     (`packages/chess/test/boss-power-legal.test.ts`).
+  - **Two devices play each online boss move** (Nov 10, `BOSS_CHECK`; 2026-11-10-boss-and-lone-devices.md): his move and the funhouse's go
+    to the host and a checker (an up-to-date app, `seeded` at hello; Maia's moves: `maiaReady`, and only with the host's own Maia
+    loaded, else no brain to either: `maiaReady` `off` when it fails) with one seed (`bossRequest.draw`: the
+    rng, Maia's Seed, and `eloDraw` for Stockfish at a strength, its T scaled by `eloDrawScale` to match UCI_LimitStrength,
+    `reports/elo-draw.md`); the checker's request skips his powers' extras on turns that have none. Same move: it plays; two differ:
+    the better, but Maia's against a fallback within `maiaGap` (0.25; `bossMove.by` heard on Maia moves only, the server draws the
+    bridge share: `bossRequest.share`); a throw (`throwLoss` 0.8) or a junk move: a strike; a missed window: replaced, `missStrikes`
+    a strike, one more asked once; a new host: its whole window; none: unvouched; no verdict: the host's, unvouched. His powers' extras
+    are always the host's: when another device's move plays, the host is asked for that move's (`allowed: [move]`), and the other's
+    only if it can't answer in time. `boss-check.test.ts`, `delta2-review-fable-b3.test.ts`.
   - **The landing guard** (Oct 17; docs/decisions/2026-10-17-alfil-sees-the-landing.md; Eric: "can we make the engine
     think, the turn before the pieces land, that they're there?"): on Alfil's move just before his Mammoth Slam's pieces
     land (`landsAfterHisMove`), his moves still come from the board as it is, but `bossMoveFrom`'s `ahead` judges them
@@ -143,7 +168,7 @@ Lane: `engine`. The bosses' strength is here; their powers are on [bosses.md](bo
     the battle's Stockfish): before the intro of a solo battle on Maia (Boss alone, a Solo raid, the Crowd's boss
     battle), the boss screen holds the intro's first frame under a card, "Loading the boss…", with the download's bar
     (bytes of the three files, their sizes written in by the build since live the worker and the WebAssembly come
-    compressed; a sliding bar when unknown; "First time only: about 40 MB, then it's saved on this device."), then
+    compressed; a sliding bar when unknown; the note "Loading the HunChess engine…", no size shown (Nov 11, Eric), then
     "Starting…" while Maia starts (at once when its files are kept), and Leave (before move 1). Meanwhile this device's
     **Stockfish is paused**: its workers end once the work asked for is done (their WebAssembly memory freed), work
     asked for meanwhile waits, and fresh workers start once the step ends (`UciEngine.pause`, `pauseEngines`); Maia's

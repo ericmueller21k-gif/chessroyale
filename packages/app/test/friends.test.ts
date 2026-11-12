@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { FRIENDS, type FriendsState } from "@chessroyale/core";
+import { ACTIVITIES, ACTIVITY_LINES, FRIENDS, type Activity, type FriendsState } from "@chessroyale/core";
 import type { NetChatLine } from "@chessroyale/chess";
 import { loadAccount } from "../src/account.ts";
 import { friendsBadge, friendsStatus, hideToast, inviteMode, invitePlayer, inviteToast, isBlocked, joinInvite, loadFriends, openInvites, relationTo, setInviteHost, toastOnScreen } from "../src/friends.ts";
@@ -9,7 +9,7 @@ import { MatchChat } from "../src/chat.ts";
 vi.mock("../src/sound.ts", () => ({ play: vi.fn() }));
 
 const NOW = Date.now();
-const friend = (id: string, name: string, online = true) => ({ id, name, since: NOW - 1000, online, busy: false, hidden: false });
+const friend = (id: string, name: string, online = true) => ({ id, name, since: NOW - 1000, online, busy: false, hidden: false, doing: undefined as Activity | undefined });
 let friends: FriendsState = {
   friends: [friend("f1", "Fay"), friend("f2", "Gus", false)],
   requests: [{ id: "r1", name: "Rae", at: NOW - 500 }],
@@ -114,5 +114,35 @@ describe("friends in the app", () => {
     expect(joined).toEqual(["crowd:ABCDE"]);
     await vi.waitFor(() => expect(posted).toEqual([{ path: "/api/friends/dismiss", body: { id: "f1" } }]));
     expect(inviteToast()).toBeNull();
+  });
+});
+
+describe("the friends overlay's words (Nov 9)", async () => {
+  const { friendStatus } = await import("../src/components/Friends.tsx");
+  const f = (o: Partial<ReturnType<typeof friend>> & { lastSeen?: number | null }) => ({ ...friend("f9", "Ivy"), ...o });
+  it("a friend's line: online, in a match, last online when (the profile's words), offline without a time, hidden", () => {
+    expect(friendStatus(f({}), NOW)).toBe("Online");
+    expect(friendStatus(f({ busy: true }), NOW)).toBe("In a match");
+    expect(friendStatus(f({ online: false, lastSeen: NOW - 2 * 3_600_000 }), NOW)).toBe("Last online 2h ago");
+    expect(friendStatus(f({ online: false, lastSeen: NOW - 5 * 60_000 }), NOW)).toBe("Last online 5m ago");
+    expect(friendStatus(f({ online: false, lastSeen: null }), NOW)).toBe("Offline");
+    expect(friendStatus(f({ online: false }), NOW)).toBe("Offline");
+    expect(friendStatus(f({ online: false, hidden: true, lastSeen: null }), NOW)).toBe("Online status hidden");
+  });
+  it("online, what they're doing (the friends page, Eric, Nov 11): each activity's line; offline or hidden, never", () => {
+    expect(friendStatus(f({ doing: "town" }), NOW)).toBe("In Chess Town");
+    expect(friendStatus(f({ doing: "crowd", busy: true }), NOW)).toBe("In a 50 v 50");
+    expect(friendStatus(f({ doing: "boss", busy: true }), NOW)).toBe("In a boss battle");
+    expect(friendStatus(f({ doing: "queue" }), NOW)).toBe("In a queue");
+    expect(friendStatus(f({ doing: "home" }), NOW)).toBe("On the home screen");
+    for (const a of ACTIVITIES) expect(friendStatus(f({ doing: a }), NOW)).toBe(ACTIVITY_LINES[a]);
+    expect(friendStatus(f({ online: false, doing: "town", lastSeen: NOW - 60_000 }), NOW)).toBe("Last online 1m ago");
+    expect(friendStatus(f({ hidden: true, doing: "town" }), NOW)).toBe("Online status hidden");
+  });
+  it("the page's groups: Online is online and showing it; Offline the rest, hiding it included", async () => {
+    const { friendGroups } = await import("../src/screens/Friends.tsx");
+    const g = friendGroups([f({ id: "a" }), f({ id: "b", online: false }), f({ id: "c", online: false, hidden: true }), f({ id: "d", busy: true, doing: "crowd" })]);
+    expect(g.online.map((x) => x.id)).toEqual(["a", "d"]);
+    expect(g.offline.map((x) => x.id)).toEqual(["b", "c"]);
   });
 });

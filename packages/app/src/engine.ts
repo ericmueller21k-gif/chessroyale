@@ -40,18 +40,31 @@ function workerTransport(): UciTransport {
   };
 }
 
+function makeEngine(): Promise<UciEngine> {
+  return (async () => {
+    const engine = new UciEngine(workerTransport(), { nodes: DEFAULT_SETTINGS.engineNodes, hashMb: DEFAULT_SETTINGS.engineHashMb });
+    await engine.init();
+    return engine;
+  })();
+}
+
+let first: Promise<UciEngine> | null = null;
 let pool: Promise<UciEngine[]> | null = null;
 
-/** Several engines in separate workers so boards are scored in parallel. */
+/**
+ * The pool's first engine alone, warmed on home so play starts at once (Nov 10, phone load: one Stockfish on home, not
+ * three or four, about 56 MB each). The rest start with `enginePool`, when play is near (a match, the queue, the boss menu).
+ */
+export function warmEngine(): Promise<UciEngine> {
+  first ??= makeEngine();
+  return first;
+}
+
+/** Several engines in separate workers so boards are scored in parallel (the first is `warmEngine`'s). */
 export function enginePool(): Promise<UciEngine[]> {
   pool ??= (async () => {
     const n = Math.max(1, Math.min(4, (navigator.hardwareConcurrency || 2) - 1));
-    const engines = Array.from(
-      { length: n },
-      () => new UciEngine(workerTransport(), { nodes: DEFAULT_SETTINGS.engineNodes, hashMb: DEFAULT_SETTINGS.engineHashMb }),
-    );
-    await Promise.all(engines.map((e) => e.init()));
-    return engines;
+    return Promise.all([warmEngine(), ...Array.from({ length: n - 1 }, makeEngine)]);
   })();
   return pool;
 }
@@ -63,11 +76,7 @@ let own: Promise<UciEngine> | null = null;
  * pool does for a lobby. Made the first time it's asked for.
  */
 export function ownEngine(): Promise<UciEngine> {
-  own ??= (async () => {
-    const engine = new UciEngine(workerTransport(), { nodes: DEFAULT_SETTINGS.engineNodes, hashMb: DEFAULT_SETTINGS.engineHashMb });
-    await engine.init();
-    return engine;
-  })();
+  own ??= makeEngine();
   return own;
 }
 
@@ -78,7 +87,7 @@ export function ownEngine(): Promise<UciEngine> {
  * within `reviveMs` (to free memory for it: Maia closed), before it's started once more.
  */
 export async function pauseEngines(until: Promise<unknown>, revive?: () => void, reviveMs?: number): Promise<void> {
-  const engines = [...(pool ? await pool : []), ...(own ? [await own] : [])];
+  const engines = [...(pool ? await pool : first ? [await first] : []), ...(own ? [await own] : [])];
   let revived = false;
   const once = () => {
     if (revived) return;
@@ -113,7 +122,12 @@ export function withServerRecheck(engine: UciEngine, boards: () => number = () =
   };
 }
 
+/**
+ * The engine server said no for this game: none here (404, e.g. the dev server), not signed in (401) or today's calls used up (429).
+ * This device re-checks for the rest of the game, asking nothing more (the review of #610, m5); a new game asks again.
+ */
 let serverDown = false;
+const refusal = (status: number) => status === 404 || status === 401 || status === 429;
 
 async function serverScoreAt(fen: string, moves: readonly string[], boards: number): Promise<MoveScore[] | null> {
   if (serverDown) return null;
@@ -122,7 +136,7 @@ async function serverScoreAt(fen: string, moves: readonly string[], boards: numb
     const t = setTimeout(() => ctl.abort(), 9000);
     const res = await fetch("/api/engine/score", { method: "POST", body: JSON.stringify({ fen, moves, boards }), signal: ctl.signal });
     clearTimeout(t);
-    if (res.status === 404) serverDown = true; // no engine server here (e.g. the dev server): stop asking
+    if (refusal(res.status)) serverDown = true;
     if (!res.ok) return null;
     const body = (await res.json()) as { moves?: MoveScore[] };
     return Array.isArray(body.moves) && body.moves.length ? body.moves : null;
@@ -131,7 +145,10 @@ async function serverScoreAt(fen: string, moves: readonly string[], boards: numb
   }
 }
 
-/** Wakes the engine server as a game starts (so the first re-check doesn't wait for it to boot). */
+/** Wakes the engine server as a game starts (so the first re-check doesn't wait for it to boot); its refusal holds for the game. */
 export function warmEngineServer() {
-  void fetch("/api/engine/ping").catch(() => undefined);
+  serverDown = false;
+  void fetch("/api/engine/ping")
+    .then((res) => void (refusal(res.status) && (serverDown = true)))
+    .catch(() => undefined);
 }

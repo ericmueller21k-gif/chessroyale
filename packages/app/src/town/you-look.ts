@@ -10,6 +10,7 @@ import { h, render } from "preact";
 import type { ItemLook } from "@chessroyale/core";
 import { Avatar } from "../components/Items.tsx";
 import type { YouArt } from "./render.ts";
+import { art2d } from "./paint.ts";
 
 /** Room round the pawn's box for items that rise or reach past it (`Avatar` lets them go 12% past it at most). */
 const PAD = 0.15;
@@ -17,10 +18,13 @@ const PAD = 0.15;
 /** A key for a look (null: nothing on), to tell when it changed. */
 export const lookKey = (look: ItemLook | null | undefined): string | null => (look && Object.keys(look).length ? JSON.stringify(look) : null);
 
-/** What the pawn itself wears: a look without its ride (Oct 31: the town draws the ride under the dressed pawn, rides.ts). */
+/**
+ * What the pawn itself wears: a look without its ride (Oct 31: the town draws the ride under the dressed pawn, rides.ts) or its
+ * outfit (Nov 10: drawn the same way, round the pawn).
+ */
 export function offRide(look: ItemLook | null | undefined): ItemLook | null {
-  if (!look?.ride) return look ?? null;
-  const { ride: _, ...rest } = look;
+  if (!look?.ride && !look?.outfit) return look ?? null;
+  const { ride: _, outfit: _o, ...rest } = look;
   return rest;
 }
 
@@ -62,7 +66,7 @@ export async function dressedPawn(look: ItemLook | null | undefined, pawn: HTMLC
     );
     const c = document.createElement("canvas");
     c.width = c.height = S;
-    const g = c.getContext("2d")!;
+    const g = art2d(c);
     const inset = Math.round(PAD * px);
     for (const l of layers) {
       if (l === pawn) g.drawImage(pawn, inset, inset, S - 2 * inset, S - 2 * inset);

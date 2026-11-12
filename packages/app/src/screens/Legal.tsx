@@ -1,5 +1,5 @@
 import type { ComponentChildren } from "preact";
-import { AGE_GATE, CHAT_MOD, FAIRPLAY, FRIENDS, GLOBAL_CHAT, LOBBY_LIFE, OPS, RANKED_1V1, TOWN_CHAT } from "@chessroyale/core";
+import { AGE_GATE, CHAT_MOD, ENGINE_SERVER, FAIRPLAY, FRIENDS, GLOBAL_CHAT, LOBBY_LIFE, LEAVES, OPS, RANKED_1V1, TOWN_CHAT } from "@chessroyale/core";
 
 /**
  * The privacy policy (/privacy), terms of service (/terms) and copyright page (/copyright): drafts written from what
@@ -41,7 +41,8 @@ function Draft() {
         </li>
         <li>
           <strong>Minimum age outside the US:</strong> 13 for an account is decided and built (Eric, Oct 16), asked as a neutral
-          birth month and year before signing in; under 13, guest play only. Whether some EU countries need a higher age (up to
+          birth month and year before an account is made (since Nov 12, not again at an account's later sign-ins); under 13, guest
+          play only. Whether some EU countries need a higher age (up to
           16), and the UK's, is a lawyer's call.
         </li>
         <li>
@@ -162,14 +163,19 @@ function Privacy() {
               their moves is kept with the game. A game called off before both first moves keeps nothing, and neither does a game
               against a bot (it's played on your device).
             </p>
+            <p>
+              Leaving ranked games early, which can delay your queue: each time you left one before it started, or by resigning very early
+              or abandoning it (which game, when, and the rank points it cost), and how many ranked games you'd played by then.
+            </p>
           </>
         }
-        why="your rank and record (on your profile, for anyone: your rank, your highest, your run of wins, and your last five games with whom you played and the rank points; never the hidden rating), matching you with players near your strength, and checking reported games for fair play."
+        why="your rank and record (on your profile, for anyone: your rank, your highest, your run of wins, and your last five games with whom you played and the rank points; never the hidden rating), matching you with players near your strength, the rank points and waits for leaving ranked games early, and checking reported games for fair play."
         kept={
           <>
             your rank with your account. A game usually {RANKED_1V1.gamesKeepDays} days after it ends; longer only while a
-            fair-play review of a player in it is open, or their appeal of a ban. If you delete your account, your rank goes,
-            and in the games still kept you become the shared "deleted" account (your opponent's games stay theirs).
+            fair-play review of a player in it is open, or their appeal of a ban. Each time you left early, {LEAVES.keepDays} days. If
+            you delete your account, your rank and those go, and in the games still kept you become the shared "deleted" account
+            (your opponent's games stay theirs).
           </>
         }
       />
@@ -184,7 +190,7 @@ function Privacy() {
         what={
           <p>
             The crate items you own (each with its color, purity and pattern), what you wear, your default pawn color (white or black),
-            your coins, earned crates and crate keys, your shop items, and the quick-chat lines you picked. And a record of each change to your coins, crates, keys, tokens and
+            your coins, earned crates and crate keys, your shop items, and the quick-chat lines you picked. And a record of each change to your coins, crates, keys, XP, tokens and
             items: what, how many, why (a game, a battle, a crate, a buy) and when.
           </p>
         }
@@ -203,11 +209,31 @@ function Privacy() {
         kept="your tokens until you spend them or the account is deleted; each token's record for 30 days; a solo battle's start until it ends; a boss crate until you open it."
       />
       <Item
+        title="XP, levels and quests"
+        what={
+          <p>
+            Your XP (your level is worked out from it), and for each game you finish: how long you played it and how many moves you made,
+            the XP it gave you and what for, or why it gave none, and the crates and keys it gave you (the daily reward, your levels' and
+            your quests'). The crates you hold by series, and the boss crates you have to pick. When a game you play on your device began
+            (our server times it). Your quests: which ones you have, when each was given and finished, which games moved each one, and the
+            day a reroll gave it.
+          </p>
+        }
+        why="so your level and quests are yours on every device, a game's XP, rewards and quest progress are counted once, and the result screen can show what a game gave you."
+        kept="your XP, crates and boss crates to pick until you open or pick them, or the account is deleted; each game's XP with its result (a deleted account's results are kept without the account, as above); a game's start until its result comes in; a daily quest until the day after it's finished (one not finished waits), the weekly until the week ends, each with the games that moved it."
+      />
+      <Item
+        title="The engine server"
+        what={<p>How many times today your account asked our engine server for a deeper look at a solo game's moves, or to wake it.</p>}
+        why={`so no one can use up the server's day for everyone: at most ${ENGINE_SERVER.perAccountDaily} a day, then your device checks on its own.`}
+        kept="until the day ends (UTC), then it's deleted."
+      />
+      <Item
         title="Chat"
         what={
           <>
             <p>
-              Chat is preset lines and emoji, except in the town square and the global chat, where signed-in players type. Lines in a
+              Chat is preset lines and emoji, except in the town square, the global chat and match chat, where signed-in players type. Lines in a
               match go to its players and stay with the match until its lobby closes, up to {LOBBY_LIFE.lobbyResultsKeepMinutes} minutes
               after the end. Lines in the global chat carry your name, rating and icon. Whether you turned chat on is kept with your
               account (a guest's on the device).
@@ -384,9 +410,12 @@ function Privacy() {
         {AGE_GATE.minAge} and older.
       </p>
       <p>
-        Before anyone signs in, we ask their birth month and year. It's checked on the device and never sent to us or kept: only
-        the answer is. Under {AGE_GATE.minAge}, you play as a guest: no sign-in and no email, the default name and icon, and
-        nothing you type reaches us or other players (a bug report sends its details without a note). Guests can't play online,
+        Before an account is made, we ask the birth month and year, and we ask once at the next sign-in of an account made before
+        we asked. An account that has answered signs in without the question. The date is checked on the device and never sent to
+        us or kept: only the answer is. Signing in with an email sends a code first; if that email has no account yet, the
+        question comes before the account, and if the answer is under {AGE_GATE.minAge}, nothing is made and the code's record,
+        the only thing kept, goes about an hour later. Under {AGE_GATE.minAge}, you play as a guest: no sign-in and no email, the
+        default name and icon, and nothing you type reaches us or other players (a bug report sends its details without a note). Guests can't play online,
         post in the global chat, type in the town square or see other players' messages there, add friends or get invites. The
         device remembers the answer, so it can't simply be answered again.
       </p>
@@ -508,7 +537,7 @@ function Terms() {
       <h2>Conduct and chat</h2>
       <ul>
         <li>
-          Chat is preset lines and emoji, except in the town square and the global chat, where signed-in players type. Don't use chat
+          Chat is preset lines and emoji, except in the town square, the global chat and match chat, where signed-in players type. Don't use chat
           to harass anyone or to spam.
         </li>
         <li>
@@ -669,11 +698,10 @@ function Copyright() {
   );
 }
 
-export type LegalPage = "privacy" | "terms" | "copyright";
+import type { LegalPage } from "./legal-page.ts";
+export { leaveLegal, legalPageOf, type LegalPage } from "./legal-page.ts";
 const TITLES: Record<LegalPage, string> = { privacy: "Privacy policy", terms: "Terms of service", copyright: "Copyright" };
 
-/** Which legal page an address shows (null: none). */
-export const legalPageOf = (path: string): LegalPage | null => (path === "/privacy" || path === "/terms" || path === "/copyright" ? (path.slice(1) as LegalPage) : null);
 
 /** A legal page: the draft notice first, then the page, then links to the other two. */
 export function LegalScreen({ page, onBack }: { page: LegalPage; onBack: () => void }) {
@@ -699,21 +727,3 @@ export function LegalScreen({ page, onBack }: { page: LegalPage; onBack: () => v
   );
 }
 
-/**
- * Back from a legal page. Every link here is a plain link (a page load), from the landing page, Settings, the FAQ or
- * the other legal page, so back is the browser's back to it; opened any other way (typed, or from another site), home.
- */
-export function leaveLegal(close: () => void) {
-  let fromHere = false;
-  try {
-    fromHere = history.length > 1 && !!document.referrer && new URL(document.referrer).origin === location.origin;
-  } catch {
-    // No referrer to read.
-  }
-  if (fromHere) {
-    history.back();
-    return;
-  }
-  close();
-  history.replaceState(null, "", "/");
-}

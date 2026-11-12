@@ -39,7 +39,7 @@ async function still(p: Page, name: string) {
 /** The town, open and drawn; your square once you've stopped (the same square after a Stay). */
 async function openTown(p: Page, query = "sky=day&townafk=off") {
   await p.goto(`/town?${query}`);
-  await expect(canvas(p)).toHaveAttribute("data-ready", "1");
+  await expect(canvas(p)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
   await p.waitForTimeout(600);
   return (await you(p))!;
 }
@@ -47,7 +47,7 @@ async function openTown(p: Page, query = "sky=day&townafk=off") {
 /** Stay: the dialog closes, and you're still in the town on the same square. */
 async function expectStayed(p: Page, square: string) {
   await expect(leaveDialog(p)).toHaveCount(0);
-  await expect(canvas(p)).toHaveAttribute("data-ready", "1");
+  await expect(canvas(p)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
   await p.waitForTimeout(800);
   expect(await you(p), "still on the same square").toBe(square);
   expect(new URL(p.url()).pathname).toBe("/town");
@@ -59,11 +59,16 @@ const tapPoint = async (p: Page, kind: "boss" | "home", id: string) => {
   const cv = (await canvas(p).boundingBox())!;
   return { x: cv.x + xy.x, y: cv.y + xy.y };
 };
-/** Opens a boss's or a home's card by tapping it (it may stroll a step; the card's own tap then opens it). */
+/**
+ * Opens a boss's or a home's card by tapping it (it may stroll a step; the card's own tap then opens it). A tap that met
+ * someone else first (Babur strolling in front of his circus, Nov 9) opened their card, which then covers the home's point:
+ * closed first, or every later tap lands on that card (as e2e/town.spec.ts).
+ */
 async function openCard(p: Page, kind: "boss" | "home", name: string, id: string) {
   const card = p.getByRole("dialog", { name, exact: true });
   await expect(async () => {
     if (await card.isVisible()) return;
+    if (await p.locator(".town-card").isVisible()) await p.keyboard.press("Escape");
     if (!(await tapPoint(p, kind, id))) await p.evaluate((i) => (window as unknown as { __townGlide?: (id: string) => void }).__townGlide?.(i), id);
     await expect.poll(() => tapPoint(p, kind, id), { message: `${name} comes into view` }).not.toBeNull();
     const at = await tapPoint(p, kind, id);
@@ -91,9 +96,8 @@ test("the town's back button asks 'Leave Chess Town?' first: Stay keeps you on y
   await still(page, "back-button");
   await sheet.getByRole("button", { name: "Stay" }).click();
   await expectStayed(page, square);
-  // Escape is Stay.
+  // Escape is Stay, at once: the sheet takes keys as it's drawn, not a frame later (an Escape in that frame was lost under load).
   await page.getByRole("button", { name: "Back", exact: true }).click();
-  await expect(leaveDialog(page)).toBeVisible();
   await page.keyboard.press("Escape");
   await expectStayed(page, square);
   // Leave: the front door, and the address back to /.
@@ -163,6 +167,21 @@ test("inside a room: the back button goes out to the square with no question; th
   await expect(room(page)).toHaveCount(0, { timeout: 20_000 });
   await expect(leaveDialog(page)).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Town square" })).toBeVisible();
+  if (test.info().project.name !== "phone") return;
+  // Back tapped the moment the room is drawn, as it still fades in: the tap waits for the room, then out (Nov 12: it was lost, and
+  // you stayed in the room).
+  await page.evaluate(() => {
+    new MutationObserver((_, ob) => {
+      if (document.querySelector("canvas.town-shop-canvas")?.getAttribute("data-ready") !== "1") return;
+      ob.disconnect();
+      document.querySelector<HTMLButtonElement>("button.town-back")!.click();
+    }).observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ["data-ready"] });
+  });
+  const card = await openCard(page, "home", "Babur's Circus", "tiger");
+  await card.getByRole("button", { name: "Go in" }).click();
+  await expect(room(page)).toHaveCount(1, { timeout: 20_000 });
+  await expect(room(page)).toHaveCount(0, { timeout: 10_000 });
+  await expect(leaveDialog(page)).toHaveCount(0);
 });
 
 test("a computer's side menu inside a room asks too; Leave goes to the front door", async ({ page }) => {
@@ -205,7 +224,7 @@ test("no input for the limit: the AFK drop goes home with its own pop-up, and no
   await openTown(page, "sky=day&townafk=off");
   await asSignedIn(page, "leave");
   await page.goto(`/town?sky=day&townroom=leave${Date.now().toString(36)}&townafk=2,6,600`);
-  await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
   await expect(page).toHaveURL(/\/$/, { timeout: 30_000 });
   await expect(page.getByRole("alertdialog", { name: "You've been dropped from the town" })).toBeVisible();
   await expect(leaveDialog(page)).toHaveCount(0);

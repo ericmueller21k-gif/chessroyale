@@ -1,9 +1,10 @@
 import { hollowLobby } from "./bosses/hollow.ts";
 import { dashLobby } from "./bosses/dash.ts";
 import type { BossLobby } from "./bosses/base.ts";
+import { hearsTyped, typedReads, typedSay, typedSeat, type TypedSeats } from "./typed-chat.ts";
 import { QUICK_CHAT, botChatLines, canSay, canSayToAll, chatCheck, chatSay, chatSent, mulberry32, noChatSent, ownedChatPacks, type BotChatMoment, type ChatSent } from "@chessroyale/core";
 import { FAIRPLAY, type FairMove } from "@chessroyale/core";
-import { BOSS_BRAIN, BOSS_PARTY, BOSS_POWERS, DEFAULT_SETTINGS, JUDGES, isTeamMatch, type JudgeConfig, FRONT_DOOR, LEAVING, LOBBY_LIFE, MATCHMAKING, isRankedMatch, type PlayerState, brilliance, cleanLook, matchFeats, type ItemLook, type MatchFeats, botVotes, castPregameVote, closePregameVote, raidBossElo, bossDef, clockAfterVote, cutSeconds, pregameVotes, voteResultMs, type Augment, type DrawRule, type Settings } from "@chessroyale/core";
+import { BOSS_BRAIN, BOSS_CHECK, BOSS_PARTY, BOSS_POWERS, DEFAULT_SETTINGS, JUDGES, isTeamMatch, type JudgeConfig, FRONT_DOOR, LEAVING, LOBBY_LIFE, MATCHMAKING, isRankedMatch, type PlayerState, brilliance, cleanLook, matchFeats, type ItemLook, type MatchFeats, botVotes, castPregameVote, closePregameVote, raidBossElo, bossDef, clockAfterVote, cutSeconds, pregameVotes, voteResultMs, type Augment, type DrawRule, type Settings } from "@chessroyale/core";
 import {
   MatchRunner,
   BOT_NAMES,
@@ -14,6 +15,7 @@ import {
   bossThinkMs,
   landedEarlyMs,
   fullMoonMs,
+  zebraTurnMs,
   popOffMs,
   folioTurnMs,
   landsAfterHisMove,
@@ -69,7 +71,7 @@ import {
   type NetBossBrain,
 } from "@chessroyale/chess";
 import { seatName } from "./text-filter.ts";
-import { assignJudges, cutBubble, drawJudges, emptyStats, seedFor, type JudgeDevice, type JudgeHow, type JudgeStats, type JudgeTask } from "./judges.ts";
+import { assignJudges, cutBubble, drawJudges, emptyStats, seedFor, type JudgeCandidate, type JudgeDevice, type JudgeHow, type JudgeStats, type JudgeTask } from "./judges.ts";
 
 /**
  * One lobby's logic, independent of Cloudflare: players and tokens, the round
@@ -136,6 +138,8 @@ interface ChatRecord {
   bots: number[];
   /** Chat moderation: accounts with a chat ban in force (they can't send), as the Durable Object last read them. */
   blocked?: Record<string, ChatBlock>;
+  /** Typed chat (Nov 7, typed-chat.ts): who may type, who reads typed lines, who's too young, and when each last typed. */
+  typed?: TypedSeats;
 }
 
 export interface Human {
@@ -162,6 +166,15 @@ export interface Human {
   goneAt?: number;
   /** An admin (ADMIN_EMAILS, as the Durable Object found on connecting): a lobby of admins only meets the Maia boss. */
   admin?: boolean;
+  /** Its app plays a boss request's seed (hello's `seeded`): it may check the boss's moves, and have its own compared (BOSS_CHECK). */
+  seeded?: true;
+  /**
+   * Its Maia is loaded (`maiaReady`; forgotten on a reconnect, which the app answers again, and when it says its Maia failed): it may
+   * check his Maia moves, and as the host play them (N1).
+   */
+  maiaReady?: true;
+  /** Maia's files are saved on it (its speed report): a phone may then be told to load Maia to check his moves (BOSS_CHECK.loaders). */
+  maiaSaved?: true;
 }
 
 /** A person's result in a match, for their profile (humanResults; a resign's is taken as they leave). */
@@ -180,6 +193,24 @@ export type HumanResult = {
   /** They had the eval bar on, as their app said (null: an app from before the setting). */
   evalBar: boolean | null;
 } & MatchFeats;
+
+/**
+ * A signed-in player's result waiting to be written (server/lobby-do.ts; MATCH_SAVE in settings.ts): queued as they leave mid-match,
+ * or with everyone's at the end, with what the room counted for it then; taken out of the record only once written.
+ */
+export interface PendingResult {
+  playerId: string;
+  userId: string;
+  result: HumanResult & { abandoned?: true };
+  /** When it was queued: the result's time, and its XP's day. */
+  at: number;
+  /** XP's facts (xpSpan), the people against them (xpOpponents: a friends' lobby's win cap; none when matchmade), a boss battle's span. */
+  span: { moves: number; ms: number };
+  opponents: string[];
+  battle: { moves: number; ms: number } | null;
+  /** When a try first failed (MATCH_SAVE.strictMinutes counts from it). */
+  failedAt?: number;
+}
 
 /**
  * Someone who left the match (LEAVING in settings.ts): resigned, gone longer than LEAVING.awayMs, left before move 1
@@ -287,10 +318,17 @@ export interface LobbyRecord {
     bossPicked?: string;
     /** Boss raid: a fixed strength (a test link's ?boss=<tier>), so it isn't matched to the group. */
     bossFixed?: number;
+    /** A test switch made this lobby (lobby-options.ts; index.ts sets it): no XP for anyone in it (server/xp.ts). */
+    tested?: boolean;
+    /** The test switch `?xpgame=MINUTES`: XP counts this game as that long, with enough moves, test switches or not. */
+    xpGame?: number;
   };
   /** Signed-in players' account ids (by player id), so results go on their profiles. */
   accounts?: Record<string, string>;
+  /** The match's end has been queued for profiles (saveQueue): everyone's results, once. */
   resultsSaved?: boolean;
+  /** Results waiting to be written (lobby-do.ts), oldest first; each leaves only once written. */
+  saveQueue?: PendingResult[];
   /** Crowd augments: the move clock as voted (seconds), and this cut's votes. */
   moveClock?: number;
   augmentVotes?: Record<string, Augment>;
@@ -325,7 +363,23 @@ export interface LobbyRecord {
   /** The boss's move, held until it has "thought" long enough (your queen banner plays first), and when that is. */
   bossPending?: string;
   /** What came with that move (Wrangler's drag or showdown line-up), held with it. */
-  bossPendingExtras?: { drag?: string; showdown?: string; outside?: boolean; beam?: string[]; balloon?: string; hoops?: string; crease?: string };
+  bossPendingExtras?: BossExtras;
+  /**
+   * The boss's own move (and Boingo's funhouse move) asked of two devices (the outside review of Nov 10, finding 2): the seed both
+   * play it with (`draw`: the app's random source, Maia's draw and limited-strength Stockfish's; 0 with no checker), so two honest
+   * devices give the same move; whether it's Maia's (`maia`: its checker must have Maia loaded, and only then is a device's "Maia
+   * played it" heard) or the bridge band's share (`share`, drawn here); the devices asked (`asked`: the host first; more after a host
+   * change or a missed window, `second`: one more asked once; `missed`: those counted as missing it; `at`: when each was first
+   * asked; `hosts`: those given the host's whole window); each one's answer, by device; and the engine server's id while it's asked
+   * which of two different moves stands. checkBoss and settleBoss; docs/areas/bosses.md.
+   */
+  bossCheck?: { draw: number; maia: boolean; share?: true; asked: string[]; at?: Record<string, number>; hosts?: string[]; answers: Record<string, BossAnswer>; missed?: string[]; second?: true; server?: string; reask?: BossAnswer };
+  /** The device that checks the boss's moves this battle (kept while it can and doesn't miss, so its Maia stays loaded). */
+  bossChecker?: string;
+  /** On the Maia brain: the devices told to load Maia to check his moves (BOSS_CHECK.loaders), this battle. */
+  bossLoaders?: string[];
+  /** Times each device missed its window for a checked boss move this battle (BOSS_CHECK.missStrikes of them: a strike). */
+  bossMisses?: Record<string, number>;
   bossMinAt?: number;
   bossIntroDone?: boolean;
   /**
@@ -355,6 +409,11 @@ export interface LobbyRecord {
    * (admins' tests). `seats`: each person's seat in the party (their color, by seat); `leaderSeat`: the leader's.
    */
   party?: PartyLobby;
+  /**
+   * Matchmade by the engine pool's queue (fair play's pooled accounts: docs/decisions/2026-11-10-engine-pool.md): it seats only pooled
+   * accounts, and a lobby without it none, whoever has the code (lobby-do.ts). The #618 review, m4.
+   */
+  engine?: true;
   auto?: {
     /** When bots fill the empty seats (null: Bots off in a 50 v 50, which waits until it's full). */
     fillAt: number | null;
@@ -374,6 +433,8 @@ export interface LobbyRecord {
   startedAt?: number;
   /** Boss tokens: how many of each person's picks went in (their own moves), by player id: `bossBattleSpan`. */
   picked?: Record<string, number>;
+  /** XP (Nov 9): when each person's last pick went in (the turn's lock), by player id: their time in the match ends there (`xpSpan`). */
+  pickedAt?: Record<string, number>;
   /** Quick chat (Crowd matches and boss raids, from the lobby before the match: the queue, a private lobby). */
   chat?: ChatRecord;
   /**
@@ -417,6 +478,13 @@ export interface LobbyRecord {
   emptiedAt?: number;
   /** The match ended early because everyone had left it (it closes at once). */
   wrapped?: true;
+  /**
+   * What in this match stood on one device's word alone, the first time it did (the outside review of Nov 10, finding 5): a
+   * round the host scored (under two judging devices), a board settled on one of two disagreeing judges with no verdict, or the
+   * boss's move with no second device to check it. Set: its results pay as a solo game's do (lobby-do.ts lobbyXpGame: the win
+   * and the minutes under solo's daily caps) and it isn't ranked. docs/decisions/2026-11-10-boss-and-lone-devices.md.
+   */
+  unvouched?: string;
 }
 
 export interface JudgesRecord {
@@ -439,6 +507,41 @@ export interface JudgesRecord {
 
 /** What someone is told when they open a match that's over (results still up, or long gone). */
 export const MATCH_ENDED = "That match has ended.";
+/** A lobby that no longer takes new players (or, matchmade, not this one: the engine pool's apart, lobby-do.ts). */
+export const MATCH_STARTED = "This match has already started.";
+
+const isRecord = (v: unknown): v is Record<string, unknown> => !!v && typeof v === "object" && !Array.isArray(v);
+const isChance = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v) && v >= 0 && v <= 1;
+
+/**
+ * The lobby Durable Object's door: a message is an object with a type; the host's scores, a list of at most 64 boards,
+ * each an object (the lobby checks each field it uses).
+ */
+export function atTheDoor(msg: unknown): msg is ClientMessage {
+  if (!msg || typeof msg !== "object" || typeof (msg as { t?: unknown }).t !== "string") return false;
+  if ((msg as { t: string }).t !== "scores") return true;
+  const boards = (msg as { boards?: unknown }).boards;
+  return Array.isArray(boards) && boards.length <= 64 && boards.every(isRecord);
+}
+
+/**
+ * Whether a host's scores for a board hold together, as a judge's must (judgedBoard in @chessroyale/chess): a legal best
+ * move, every number a chance from 0 to 1, a legal pick for every bot, and every pick scored. A board that doesn't is
+ * scored as when nobody could score it: every pick the same (2026-11-10-device-trust.md).
+ */
+export function hostBoardOk(job: ScoreJob, b: unknown): b is BoardScore {
+  if (!isRecord(b) || !isRecord(b.expectedAfter) || !isRecord(b.botPicks)) return false;
+  const legal = new Set(job.allowed ?? legalMoves(job.fen).filter((m) => m !== job.barred));
+  const after = b.expectedAfter;
+  if (typeof b.bestMove !== "string" || !legal.has(b.bestMove) || !isChance(b.bestExpected)) return false;
+  const scores = Object.values(after);
+  if (scores.length > 256 || !scores.every(isChance)) return false;
+  const scored = (m: unknown) => typeof m === "string" && Object.hasOwn(after, m);
+  const bots = job.bots.map((x) => (b.botPicks as Record<string, unknown>)[x.id]);
+  if (!bots.every((m) => typeof m === "string" && legal.has(m) && scored(m))) return false;
+  if (b.botPowerUps !== undefined && !(Array.isArray(b.botPowerUps) && b.botPowerUps.every((x) => typeof x === "string"))) return false;
+  return Object.values(job.humanPicks).every((m) => m === null || scored(m));
+}
 /** Someone not in the party at a party's battle (a guessed code). */
 export const PARTY_ONLY = "This battle is for its party.";
 
@@ -516,6 +619,13 @@ const FINAL_CUT_MS = 1800;
 /** Boss battle: how long the boss's move shows, how long a strike shows, and how long the host has to play the boss. */
 const BOSS_KILL_MS = 3800;
 const BOSS_TIMEOUT_MS = 15_000;
+/** What may come with the boss's move (Wrangler's drag or showdown line-up, Moo's lines, the tiger's balloon and hoops, Folio's Crease). */
+type BossExtras = { drag?: string; showdown?: string; outside?: boolean; beam?: string[]; balloon?: string; hoops?: string; crease?: string };
+/** A device's answer to a checked boss move: the move, what came with it, and `by` "maia" when Maia played it (else a fallback). */
+type BossAnswer = { move: string; extras: BossExtras; by?: "maia" };
+/** The boss's moves two devices play with one seed (checkBoss): his own (the brain's, a slip, a stagger, a power's best) and Boingo's funhouse move. */
+const CHECKED_BOSS_KINDS: ReadonlySet<string> = new Set(["elo", "stumble", "stagger", "best", "funhouse"]);
+
 /**
  * Longer when the host also works out Wrangler's showdown (a few seconds of line-ups on its engines, more on a phone:
  * three pairs and two, and a drag; the admins' test trigger up to showdownTestMs) or his drag (about one of his moves'
@@ -781,12 +891,16 @@ export class LobbyCore {
     evalBar: boolean | null = null,
     admin = false,
     party: { pass?: unknown; seat?: unknown } = {},
+    seeded = false,
   ) {
     this.r.activeAt = this.io.now();
-    const existing = token ? this.r.humans.find((h) => h.token === token) : undefined;
+    const byToken = token ? this.r.humans.find((h) => h.token === token) : undefined;
     // A seat keeps the account it was taken on: its rating set the raid's boss, and its result goes to that account.
     // Back on another one (or on one when it had none), they're refused (docs/decisions/2026-10-16-server-side-rating.md).
-    if (existing && userId && userId !== this.r.accounts?.[existing.id]) return { ok: false as const, message: OTHER_ACCOUNT };
+    if (byToken && userId && userId !== this.r.accounts?.[byToken.id]) return { ok: false as const, message: OTHER_ACCOUNT };
+    // One seat per account (a guest's too: its guest account): a second tab or device of an account that already sits
+    // here takes over that seat, as a reconnect does, never a seat of its own (docs/decisions/2026-11-10-device-trust.md).
+    const existing = byToken ?? (userId ? this.r.humans.find((h) => this.r.accounts?.[h.id] === userId) : undefined);
     // (Bots off: seats of people long gone are freed first, so the count and "full" are real. Not the arriving one's.)
     this.freeGoneSeats(existing?.id);
     if (existing) {
@@ -797,6 +911,10 @@ export class LobbyCore {
       if (look !== undefined) existing.look = cleanLook(look);
       if (bossDef(lastBoss)) existing.lastBoss = lastBoss;
       if (evalBar !== null) existing.evalBar = evalBar;
+      // (Its app may have changed with a reload; its Maia went with the page: an app that still has it says so again.)
+      if (seeded) existing.seeded = true;
+      else delete existing.seeded;
+      delete existing.maiaReady;
       if (!this.r.hostId || !this.human(this.r.hostId)?.connected) this.r.hostId = existing.id;
       this.send(existing.id, { t: "welcome", playerId: existing.id, token: existing.token, code: this.r.code }, false);
       this.broadcast(this.lobbyMessage(existing.id), false);
@@ -804,6 +922,8 @@ export class LobbyCore {
       if (last) this.send(existing.id, last, false);
       this.resendHostWork();
       this.resendJudgeWork(existing.id);
+      // (Told to load Maia to check the boss's moves: told again, in case the reload lost it.)
+      if (this.r.bossBrain && this.r.bossIntroDone && this.r.phase !== "results" && this.r.bossLoaders?.includes(existing.id) && existing.id !== this.r.hostId) this.io.send(existing.id, { t: "bossBrain", brain: this.r.bossBrain, check: true });
       // Matchmade, and its time came while nobody was here (nothing started it): start now (bots fill the rest unless Bots off).
       if ((!this.r.timer || this.r.party) && this.dueToStart()) this.startMatch();
       return { ok: true as const, playerId: existing.id };
@@ -817,7 +937,7 @@ export class LobbyCore {
     // A seat this lobby never gave out: from an older lobby that had this code (it has closed since), so that match is over.
     else if (token) return { ok: false as const, message: MATCH_ENDED, ended: true as const };
     if (this.r.phase === "results") return { ok: false as const, message: MATCH_ENDED, ended: true as const };
-    if (this.r.phase !== "lobby" || this.r.auto?.filledAt) return { ok: false as const, message: "This match has already started." };
+    if (this.r.phase !== "lobby" || this.r.auto?.filledAt) return { ok: false as const, message: MATCH_STARTED };
     if (this.r.humans.length >= this.settings.lobbySize) return { ok: false as const, message: "This lobby is full." };
     // A party's battle: only its members, each by their own pass into their own seat, from their own account.
     const pl = this.r.party;
@@ -841,6 +961,7 @@ export class LobbyCore {
       ...(bossDef(lastBoss) ? { lastBoss } : {}),
       ...(evalBar !== null ? { evalBar } : {}),
       ...(admin ? { admin: true } : {}),
+      ...(seeded ? { seeded: true as const } : {}),
     });
     if (userId) this.r.accounts = { ...(this.r.accounts ?? {}), [id]: userId };
     if (pl && admit) {
@@ -1239,7 +1360,11 @@ export class LobbyCore {
     if (this.r.phase === "scoring" && this.r.scoreRequest && !this.r.judges?.tasks) {
       this.io.send(host, { t: "scoreRequest", ...this.r.scoreRequest });
     }
-    if (this.r.phase === "boss" && this.r.bossKey) this.sendBossRequest(host);
+    // (A checked move: re-asked around the host as it is now, the answers in kept: reaskBoss.)
+    if (this.r.phase === "boss" && this.r.bossKey) {
+      if (this.r.bossCheck) this.reaskBoss(host);
+      else this.sendBossRequest(host);
+    }
     // (A new host, or the host back after a reload: the battle's brain, so it loads Maia now.)
     if (this.r.bossBrain && this.r.bossIntroDone && this.r.phase !== "results") this.io.send(host, { t: "bossBrain", brain: this.r.bossBrain });
   }
@@ -1253,6 +1378,8 @@ export class LobbyCore {
     if (!admin || !BOSS_POWERS.ultimateTestButton || !this.human(playerId) || !this.runner?.boss || this.r.phase === "results") return false;
     const ok = this.runner.triggerUltimate();
     if (ok) console.log(`test trigger: ${playerId} brings the ultimate in ${this.r.code}`);
+    // (A test control touched the battle: no XP for anyone in it, "No XP: test game." Review m3, Nov 9.)
+    if (ok) this.r.overrides = { ...this.r.overrides, tested: true };
     return ok;
   }
 
@@ -1273,14 +1400,14 @@ export class LobbyCore {
       case "scores":
         return this.scores(playerId, msg.key, msg.boards);
       case "crossCheck":
-        if (!msg.ok) {
-          this.r.mismatches++;
-          console.log(`cross-check mismatch in ${this.r.code} (${msg.key}, board ${msg.boardId}): ${msg.detail ?? ""}`);
+        // (Anyone can send one: counted, and only the first few logged, short, so nobody can fill the log.)
+        if (msg.ok !== true && this.r.mismatches++ < 20) {
+          console.log(`cross-check mismatch in ${this.r.code} (${String(msg.key).slice(0, 40)}, board ${Number(msg.boardId)}): ${String(msg.detail ?? "").slice(0, 200)}`);
         }
         return;
       case "botPlan":
         if (this.planner(playerId, msg.key) && this.r.round?.key === msg.key && this.r.phase === "play" && !this.r.round.botPlan) {
-          this.r.round.botPlan = { picks: msg.picks, powerUps: msg.powerUps, ...(this.r.judges?.plan?.key === msg.key ? { by: playerId } : {}) };
+          this.r.round.botPlan = { ...this.cleanBotPlan(msg.picks, msg.powerUps), ...(this.r.judges?.plan?.key === msg.key ? { by: playerId } : {}) };
           this.sendTally();
         }
         return;
@@ -1310,21 +1437,33 @@ export class LobbyCore {
         if (this.roundDone() || this.settings.kingAnyCall) this.lock();
         return;
       }
-      case "bossMove":
-        if (playerId === this.r.hostId && this.r.phase === "boss" && this.r.bossKey === msg.key)
-          this.playBoss(msg.move, { ...(typeof msg.drag === "string" ? { drag: msg.drag } : {}), ...(typeof msg.showdown === "string" ? { showdown: msg.showdown } : {}), ...(msg.outside === true ? { outside: true } : {}), ...(Array.isArray(msg.beam) ? { beam: msg.beam.filter((x): x is string => typeof x === "string").slice(0, 32) } : {}), ...(typeof msg.balloon === "string" ? { balloon: msg.balloon.slice(0, 2) } : {}), ...(typeof msg.hoops === "string" ? { hoops: msg.hoops.slice(0, 32) } : {}), ...(typeof msg.crease === "string" ? { crease: msg.crease.slice(0, 8) } : {}) });
+      case "bossMove": {
+        if (this.r.phase !== "boss" || this.r.bossKey !== msg.key || typeof msg.move !== "string" || msg.move.length > 128) return;
+        const extras: BossExtras = { ...(typeof msg.drag === "string" ? { drag: msg.drag } : {}), ...(typeof msg.showdown === "string" ? { showdown: msg.showdown } : {}), ...(msg.outside === true ? { outside: true } : {}), ...(Array.isArray(msg.beam) ? { beam: msg.beam.filter((x): x is string => typeof x === "string").slice(0, 32) } : {}), ...(typeof msg.balloon === "string" ? { balloon: msg.balloon.slice(0, 2) } : {}), ...(typeof msg.hoops === "string" ? { hoops: msg.hoops.slice(0, 32) } : {}), ...(typeof msg.crease === "string" ? { crease: msg.crease.slice(0, 8) } : {}) };
+        // (His own move and the funhouse's: the host's and a second device's, compared. His powers' picks: the host's, checked by their rules.)
+        // ("Maia played it" is heard only where Maia could have: a Maia move, not the share, the strike or a power's: D1.)
+        if (this.r.bossCheck) return this.bossAnswer(playerId, msg.move, extras, msg.by === "maia" && this.r.bossCheck.maia);
+        if (playerId === this.r.hostId) this.playBoss(msg.move, extras);
         return;
+      }
       case "leave":
         // (Cancel on the queue screen once its seats have filled is leaving the match: before move 1, a bot sits in.)
         return this.inMatch() ? this.resign(playerId) : this.leave(playerId);
       case "resign":
         return this.resign(playerId);
       case "chat":
-        return this.chatSay(playerId, msg.say, msg.to);
+        return this.chatSay(playerId, msg.say, msg.to, msg.text);
       case "chatPrefs":
-        return this.chatPrefs(playerId, msg.off, msg.muted);
+        return this.chatPrefs(playerId, msg.off, msg.muted, msg.typed);
       case "speed":
-        return this.speed(playerId, msg.nps);
+        return this.speed(playerId, msg.nps, msg.maiaSaved === true);
+      case "maiaReady": {
+        // (Its Maia is loaded: it may check the boss's Maia moves, and as the host play them, BOSS_CHECK. `off`: it failed since, N1.)
+        const h = this.human(playerId);
+        if (h && msg.off === true) delete h.maiaReady;
+        else if (h) h.maiaReady = true;
+        return;
+      }
       case "judged":
         return this.judged(playerId, msg.key, msg.id, msg.report);
       case "judgedDeep":
@@ -1594,8 +1733,283 @@ export class LobbyCore {
     this.broadcast(this.bossMessage(0, { thinking: true }));
     const host = this.hostNow();
     this.r.hostId = host;
-    if (host) this.sendBossRequest(host);
+    this.askBoss(host);
     this.setTimer("bossTimeout", this.io.now() + bossTimeoutMs(this.bossAsks()) + hoopsMs(this.runner));
+  }
+
+  /**
+   * Sends the boss request to the host; his own move and the funhouse's also to a checker, with one seed for both (checkBoss). The
+   * checker's request has only what the move needs (his powers' extras are the host's alone).
+   */
+  private askBoss(host: string | null) {
+    this.checkBoss(host);
+    if (host) this.sendBossRequest(host);
+    for (const id of this.r.bossCheck?.asked ?? []) if (id !== host) this.sendBossRequest(id, true);
+  }
+
+  /**
+   * The boss's own move (or Boingo's funhouse move) is about to be asked for: a seed for it, and a checker to play it too (BOSS_CHECK;
+   * the outside review of Nov 10, finding 2, and its review). Two honest devices with one seed give the same move, so a host can't
+   * throw the battle. With nobody to ask (the host's app from before the seed, a party's battle, nobody else up to it), the host's
+   * move plays alone and the match is unvouched (it pays as a solo game). His move is Maia's only with the host's Maia loaded (N1).
+   */
+  private checkBoss(host: string | null) {
+    const kind = this.r.bossKind;
+    if (!kind || !CHECKED_BOSS_KINDS.has(kind)) return void (this.r.bossCheck = undefined);
+    const b = this.r.bossBrain;
+    const brain = !!b && b.brain !== "stockfish" && (kind === "elo" || kind === "stumble");
+    // (The bridge band's share of his moves, drawn here, not on the devices (D1): Stockfish's, with no brain sent to anyone.)
+    const share = brain && (b!.stockfishShare ?? 0) > 0 && this.jrng() < b!.stockfishShare!;
+    // (Maia's move only with the host's Maia loaded: else no brain to anyone, and both play the seeded Stockfish move the host would
+    // have fallen back to, so nobody's "Maia played it" is heard (delta review 2, N1).)
+    const maia = brain && !share && !!host && !!this.human(host)?.maiaReady;
+    // (Its Maia not loaded yet (a new host, say): told the battle's brain, so it loads it for his moves to come, as a request's did.)
+    if (brain && !share && host && !maia) this.io.send(host, { t: "bossBrain", brain: b! });
+    const checker = host && this.human(host)?.seeded ? this.bossCheckerFor(host, [host], maia) : null;
+    // (No checker: no seed either; the host plays as it always has.)
+    this.r.bossCheck = { draw: checker ? 1 + Math.floor(this.jrng() * 2_147_483_646) : 0, maia, ...(share ? { share: true as const } : {}), asked: host ? [host, ...(checker ? [checker] : [])] : [], ...(host ? { hosts: [host] } : {}), answers: {} };
+    if (checker) this.r.bossChecker = checker;
+    // (His Maia move with nobody's Maia ready to check it: one more device told to load it, for the moves to come.)
+    else if (maia && host) this.moreLoaders(host, 1);
+  }
+
+  /**
+   * Devices that may check the boss's moves beside `host`: up to judging (connected, speed known, not benched), an app that plays the
+   * seed (m2), outside the host's account and party (a Boss Battle party's battle is all one party: none), not `asked` already; for
+   * Maia's moves, with Maia loaded (`maiaReady`).
+   */
+  private bossCheckers(host: string, asked: readonly string[], maia: boolean): JudgeCandidate[] {
+    if (this.r.party) return [];
+    const owner = this.r.accounts?.[host] ?? host;
+    return this.judgeDevices().filter((d) => !asked.includes(d.id) && d.owner !== owner && !!this.human(d.id)?.seeded && (!maia || !!this.human(d.id)?.maiaReady));
+  }
+
+  /**
+   * The checker beside `host`: this battle's again while it may and hasn't missed (its Maia stays loaded); else one drawn at random
+   * among those that missed least (a checker that missed is replaced). None: null.
+   */
+  private bossCheckerFor(host: string, asked: readonly string[], maia: boolean): string | null {
+    const pool = this.bossCheckers(host, asked, maia);
+    const misses = (id: string) => this.r.bossMisses?.[id] ?? 0;
+    const kept = this.r.bossChecker;
+    if (kept && !misses(kept) && pool.some((d) => d.id === kept)) return kept;
+    const least = Math.min(...pool.map((d) => misses(d.id)));
+    const fewest = pool.filter((d) => misses(d.id) === least);
+    return fewest.length ? fewest[Math.floor(this.jrng() * fewest.length)]!.id : null;
+  }
+
+  /**
+   * On the Maia brain: `n` more devices told to load Maia to check his moves (BOSS_CHECK.loaders), drawn at random among those that
+   * may check and weren't told yet: computers, and phones whose Maia is saved already (no phone downloads it for this; E1).
+   */
+  private moreLoaders(host: string, n: number) {
+    const brain = this.r.bossBrain;
+    if (!brain || brain.brain === "stockfish") return;
+    const told = (this.r.bossLoaders ??= []);
+    const pool = this.bossCheckers(host, [host], false).filter((d) => !told.includes(d.id) && !this.human(d.id)?.maiaReady && (d.kind === "computer" || !!this.human(d.id)?.maiaSaved));
+    for (let i = 0; i < n && pool.length; i++) {
+      const [d] = pool.splice(Math.floor(this.jrng() * pool.length), 1);
+      told.push(d!.id);
+      this.io.send(d!.id, { t: "bossBrain", brain, check: true });
+    }
+  }
+
+  /**
+   * A checked move while the host changes (gone, back after a reload, or a new one: M1): the host asked (the whole request) unless it
+   * answered; a checker back is asked again; and with fewer than two devices left that answered or still can (the new host was the
+   * checker, or the one that answered is gone without it), a fresh checker beside it, with the same seed. The answers already in are
+   * kept by device, so one device never counts twice and a dropped host's answer is still compared.
+   */
+  private reaskBoss(host: string) {
+    const c = this.r.bossCheck!;
+    // (The move settled, its extras asked of the host (playChecked): asked of the host as it is now, in the time left.)
+    if (c.reask) return this.sendBossRequest(host, false, c.reask.move);
+    if (c.server) return;
+    if (!c.answers[host]) {
+      if (!c.asked.includes(host)) c.asked.push(host);
+      this.sendBossRequest(host);
+      // (A new host and no answer in yet: the host's whole window from now (D3), once a move for each device.)
+      if (!(c.hosts ??= []).includes(host) && !Object.keys(c.answers).length) {
+        c.hosts.push(host);
+        this.setTimer("bossTimeout", this.io.now() + bossTimeoutMs(this.bossAsks()) + hoopsMs(this.runner));
+      }
+    }
+    for (const id of c.asked) if (id !== host && !c.answers[id] && this.human(id)?.connected) this.sendBossRequest(id, true);
+    if (!c.draw || c.asked.filter((id) => c.answers[id] || this.human(id)?.connected).length >= 2) return;
+    const next = this.bossCheckerFor(host, c.asked, c.maia);
+    if (!next) return;
+    c.asked.push(next);
+    this.r.bossChecker = next;
+    this.sendBossRequest(next, true);
+    // (Answers in already: the fresh one has the checker's window from now.)
+    if (Object.keys(c.answers).length && this.r.timer?.kind === "bossTimeout") this.setTimer("bossTimeout", Math.max(this.r.timer.at, this.io.now() + this.checkMs()));
+  }
+
+  /** The position the boss's turn is played in. */
+  private bossFen(): string {
+    const runner = this.runner!;
+    return runner.boards.get(runner.state.boards[0]!)!.fen;
+  }
+
+  /** A move the boss's turn may play: one the turn allows (the funhouse's: the crowd's), or one his rules play as another (Wrangler's long pull). */
+  private bossMoveOk(move: string): boolean {
+    const runner = this.runner!;
+    const fen = this.bossFen();
+    if (this.r.bossKind === "funhouse") return (runner.crowdAllowed() ?? legalMoves(fen)).includes(move);
+    const legal = runner.bossAllowed() ?? legalMoves(fen);
+    if (legal.includes(move)) return true;
+    const boss = runner.state.boss;
+    const special = boss?.powers ? (bossRules(boss)?.specialMove?.(boss, fen, move) ?? null) : null;
+    return !!special && legal.includes(special.play);
+  }
+
+  /**
+   * A device's answer to a checked boss move: from a device asked (anyone else's is ignored), once each. One the turn can't play is
+   * junk: its device gets a strike and is dropped from this move. `maia`: the app says Maia played it (heard on a Maia move only).
+   */
+  private bossAnswer(playerId: string, move: string, extras: BossExtras, maia: boolean) {
+    const c = this.r.bossCheck!;
+    // (The move that plays is settled; the host was asked for its extras (playChecked): its answer for that move, its extras.)
+    if (c.reask) return void (playerId === this.r.hostId && move === c.reask.move && this.playBoss(move, extras));
+    if (!c.asked.includes(playerId) || c.answers[playerId] || c.server) return;
+    // (With nobody to compare it with, it goes to the runner as ever: its first allowed move in place of one it can't play.)
+    if (c.asked.length > 1 && !this.bossMoveOk(move)) {
+      this.strike(playerId, `a boss move the turn can't play (${move.slice(0, 12)})`);
+      c.asked = c.asked.filter((id) => id !== playerId);
+      return this.settleBoss(false);
+    }
+    c.answers[playerId] = { move, extras, ...(maia ? { by: "maia" as const } : {}) };
+    // (The host's in: the checker has a little longer, both searching at once, its request lighter. The checker's in first: the host
+    // keeps its own time, for his powers' extras.)
+    const by = this.io.now() + this.checkMs();
+    if (playerId === this.r.hostId && this.r.timer?.kind === "bossTimeout" && this.r.timer.at > by) this.setTimer("bossTimeout", by);
+    this.settleBoss(false);
+  }
+
+  /**
+   * Plays a checked boss move once it can. Two answers (the first two in, from two devices): the same move plays (as two honest
+   * devices give); two different ones go to the engine server (bossServerScored; no server: bossDefault's, unvouched). One answer and
+   * nobody left to wait for (the others gone, or `late`: out of time): those that didn't answer missed it; one more device is asked
+   * once (the same seed); then it stands alone, unvouched.
+   */
+  private settleBoss(late: boolean) {
+    const c = this.r.bossCheck;
+    if (!c || c.server || c.reask || this.r.phase !== "boss" || !this.r.bossKey) return;
+    const ids = Object.keys(c.answers);
+    // (No seed (nobody to check it): two devices' answers would differ honestly. The first stands, as the host's alone.)
+    if (!c.draw && ids.length) {
+      this.unvouch("the boss's move with no second device to check it");
+      const one = c.answers[ids[0]!]!;
+      return this.playBoss(one.move, one.extras);
+    }
+    if (ids.length >= 2) {
+      const [a, b] = [c.answers[ids[0]!]!, c.answers[ids[1]!]!];
+      // (His powers' extras: the host's (playChecked), else, the host not answering, the fuller of the two.)
+      if (a.move === b.move) return this.playChecked(Object.keys(b.extras).length > Object.keys(a.extras).length ? ids[1]! : ids[0]!);
+      console.log(`boss move in ${this.r.code}: ${ids[0]} played ${a.move}${a.by ? " (Maia)" : ""}, ${ids[1]} ${b.move}${b.by ? " (Maia)" : ""}`);
+      if (this.serverOn) {
+        c.server = `boss:${this.r.bossKey}`;
+        this.askServer(c.server, this.bossFen(), [a.move, b.move]);
+        return this.setTimer("bossTimeout", this.io.now() + SERVER_WAIT_MS);
+      }
+      this.unvouch("two devices played the boss differently, with no engine server to settle it");
+      return this.playChecked(this.bossDefault(ids[0]!, ids[1]!));
+    }
+    const waiting = c.asked.some((id) => !c.answers[id] && !!this.human(id)?.connected);
+    if ((waiting && !late) || !ids.length) return;
+    this.bossMissedAll(c);
+    // (Before it stands alone: one more device, once, with the same seed: M2.)
+    const next = c.draw && !c.second ? this.bossCheckerFor(this.r.hostId ?? ids[0]!, c.asked, c.maia) : null;
+    if (next) {
+      c.second = true;
+      c.asked.push(next);
+      this.r.bossChecker = next;
+      this.sendBossRequest(next, true);
+      return this.setTimer("bossTimeout", this.io.now() + this.checkMs());
+    }
+    this.unvouch("the boss's move with no second device to check it");
+    const one = c.answers[ids[0]!]!;
+    this.playBoss(one.move, one.extras);
+  }
+
+  /**
+   * How long a checker has once another device's answer is in: BOSS_CHECK.waitMs, plus the time the host is given for his powers'
+   * extras on a turn that has them (the checker's request is whole then, D2: so it isn't routinely late on a heavy turn, M2).
+   */
+  private checkMs(): number {
+    return BOSS_CHECK.waitMs + bossTimeoutMs(this.bossAsks()) - BOSS_TIMEOUT_MS + hoopsMs(this.runner);
+  }
+
+  /** Each device asked that didn't answer missed it (once a move), but not one asked less than BOSS_CHECK.waitMs ago (D3). */
+  private bossMissedAll(c: NonNullable<LobbyRecord["bossCheck"]>) {
+    const now = this.io.now();
+    for (const id of c.asked) if (!c.answers[id] && !c.missed?.includes(id) && now - (c.at?.[id] ?? 0) >= BOSS_CHECK.waitMs) this.bossMissed(id);
+  }
+
+  /** A device asked for a checked boss move missed its window: replaced as checker next move; BOSS_CHECK.missStrikes misses, a strike. */
+  private bossMissed(id: string) {
+    const c = this.r.bossCheck;
+    if (c) (c.missed ??= []).push(id);
+    const m = (this.r.bossMisses ??= {});
+    m[id] = (m[id] ?? 0) + 1;
+    console.log(`boss move in ${this.r.code}: ${id} missed its window (${m[id]} this battle)`);
+    if (m[id] % BOSS_CHECK.missStrikes === 0) this.strike(id, `missed its window for the boss's move ${m[id]} times`);
+  }
+
+  /** Of two different answers with no verdict: the host's, as before the check (D1), else the first in. */
+  private bossDefault(a: string, b: string): string {
+    return b === this.r.hostId ? b : a;
+  }
+
+  /**
+   * Plays the checked move two answers settled on: `id`'s. His powers' extras are the host's for that move (its word, checked by their
+   * rules, as before the check): its own answer's when it played that move; else, on a turn with extras and the host up, the host is
+   * asked for that move's (the whole request, that move alone, the same seed: delta review 2, N2), and `id`'s play only if it doesn't
+   * answer in its time (bossTimeout). So a checker can't choose the turn's power by getting its own move played.
+   */
+  private playChecked(id: string) {
+    const c = this.r.bossCheck!;
+    const a = c.answers[id]!;
+    const host = this.r.hostId;
+    const own = host ? c.answers[host] : undefined;
+    if (own?.move === a.move) return this.playBoss(a.move, own.extras);
+    // (Not Wrangler's long pull, which has no extras: a move the turn plays as it is.)
+    if (host && this.human(host)?.connected && this.bossExtrasAsked() && (this.runner!.bossAllowed() ?? legalMoves(this.bossFen())).includes(a.move)) {
+      c.reask = a;
+      this.sendBossRequest(host, false, a.move);
+      return this.setTimer("bossTimeout", this.io.now() + this.checkMs());
+    }
+    this.playBoss(a.move, a.extras);
+  }
+
+  /**
+   * The engine server's search of two devices' different boss moves (his own move: his chances after it; the funhouse's, played for
+   * the crowd: the lower of the crowd's). The better for him plays, but for Maia's move against a fallback to Stockfish (a Maia
+   * move, one device's Maia late, not ready or failed: honest devices differ so): it plays, the battle's own brain, if it's within
+   * BOSS_CHECK.maiaGap of the other (as four honest Maia moves in five; D1). A move BOSS_CHECK.throwLoss or more worse than the other
+   * is a throw: its device gets a strike. No answer: bossDefault's, unvouched.
+   */
+  private bossServerScored(moves: MoveScore[] | null) {
+    const c = this.r.bossCheck!;
+    c.server = undefined;
+    const [ia, ib] = Object.keys(c.answers) as [string, string];
+    const [a, b] = [c.answers[ia]!, c.answers[ib]!];
+    const score = (m: string) => moves?.find((x) => x.move === m)?.expected;
+    const [sa, sb] = [score(a.move), score(b.move)];
+    if (typeof sa !== "number" || typeof sb !== "number") {
+      this.unvouch("two devices played the boss differently, and the engine server couldn't settle it");
+      return this.playChecked(this.bossDefault(ia, ib));
+    }
+    const sign = this.r.bossKind === "funhouse" ? -1 : 1;
+    const better = sign * sa >= sign * sb ? ia : ib;
+    const worse = better === ia ? ib : ia;
+    const gap = Math.abs(sa - sb);
+    const thrown = gap >= BOSS_CHECK.throwLoss ? worse : null;
+    const maiaOf = !!a.by !== !!b.by ? (a.by ? ia : ib) : null;
+    const pick = maiaOf && (maiaOf === better || gap <= BOSS_CHECK.maiaGap) ? maiaOf : better;
+    console.log(`boss move in ${this.r.code}: the engine server's scores ${ia} ${sa.toFixed(3)}, ${ib} ${sb.toFixed(3)}: ${pick}'s plays${maiaOf ? " (Maia's against a fallback)" : ""}`);
+    if (thrown) this.strike(thrown, `its boss move was ${(gap * 100).toFixed(0)} points worse than the other device's`);
+    this.playChecked(pick);
   }
 
   /**
@@ -1609,8 +2023,16 @@ export class LobbyCore {
     const burnt = !!b?.powers?.burnt?.some((x) => x.turn === b.crowdMoves && (x.piece || x.fizzled));
     // (Alfil's pieces came down early after your move: their landing plays first too; so does Moo's Full Moon, his
     // transformation at the start of his turn.)
-    const own = landedEarlyMs(b) + fullMoonMs(b) + folioTurnMs(b) + popOffMs(b);
+    const own = landedEarlyMs(b) + fullMoonMs(b) + folioTurnMs(b) + popOffMs(b) + zebraTurnMs(b);
     return queenSlain(view) || burnt || own ? this.io.now() + bossThinkMs(view, burnt, own) : undefined;
+  }
+
+  /** The boss's own turn asks for his powers' extras after his move (the drag, the showdown, Moo's lines, the balloon, the hoops, the Crease). */
+  private bossExtrasAsked(): boolean {
+    const runner = this.runner!;
+    const kind = this.r.bossKind;
+    const asks = this.bossAsks();
+    return (kind === "elo" || kind === "stumble" || kind === "stagger" || kind === "best") && !!(runner.bossBeam() || runner.balloonAsk() || runner.hoopsAsk() || runner.creaseAsk() || asks?.drag || asks?.showdown);
   }
 
   /** What the boss's own turn asks the host for besides its move (Wrangler's long pull, drag or showdown), or null. */
@@ -1619,8 +2041,16 @@ export class LobbyCore {
     return kind === "elo" || kind === "stumble" || kind === "stagger" || kind === "best" ? (this.runner?.bossAsks() ?? null) : null;
   }
 
-  private sendBossRequest(host: string) {
+  /**
+   * `checker` (BOSS_CHECK; the review's M2 and D2): a checker's request has only what the move needs (the long pull, the landing guard,
+   * the race brain), unless the turn has his powers' extras (the drag, the showdown, Moo's lines, the balloon, the hoops, the Crease):
+   * then the whole request, so whichever device's move plays brings its own. Its brain only for a Maia move (D6).
+   */
+  private sendBossRequest(host: string, checker = false, only?: string) {
     const runner = this.runner!;
+    const c = this.r.bossCheck;
+    // (When each device was first asked: one asked late isn't counted as missing it, D3.)
+    if (c) (c.at ??= {})[host] ??= this.io.now();
     const fen = runner.boards.get(runner.state.boards[0]!)!.fen;
     const funhouse = this.r.bossKind === "funhouse";
     // (A pick among candidate positions, not a move: Big Boy's bounce, Alfil's cast, fusion and Slam, the hopper's hop;
@@ -1636,12 +2066,21 @@ export class LobbyCore {
     const land = kind === "elo" || kind === "stumble" || kind === "stagger" || kind === "fuse" ? landsAfterHisMove(runner.state.boss) : null;
     // (Chub & Chirp's Carrot Patch: his ordinary move in the race goes through his race brain, on the host's engine.)
     const race = kind === "elo" ? (runner.bossRace("elo")?.race ?? null) : null;
+    const own = kind === "elo" || kind === "stumble" || kind === "stagger" || kind === "best";
+    const bare = checker && !this.bossExtrasAsked();
     // (Moo's Moonbeam lands after this move: the host lists the crowd's top moves after it.)
-    const beam = kind === "elo" || kind === "stumble" || kind === "stagger" || kind === "best" ? runner.bossBeam() : null;
+    const beam = !bare && own ? runner.bossBeam() : null;
     // (The circus tiger's balloon, due at the end of this turn: the host lands it after his move (and his hoops, when they
     // come with it). Decided once a turn, the same for a balloon that will pop.)
-    const move = kind === "elo" || kind === "stumble" || kind === "stagger" || kind === "best";
+    const move = !bare && own;
     const balloon = move ? runner.balloonAsk() : null;
+    // (Only the boss's own moves are Maia's: the funhouse's move for the crowd, Hollow's extra move and Big Boy's bounce keep their
+    // own engine picks, and so does Wrangler's reply to the showdown's duel: the engine's best. His own move carries it only as a Maia
+    // move (checkBoss): not the share, the server's draw (D1), nor with the host's Maia not loaded (N1); to the host and a checker
+    // alike (D6). The strike's goes to the host alone, for its note.)
+    const mine = c && (kind === "elo" || kind === "stumble") ? c.maia : !checker;
+    const b = this.r.bossBrain && !funhouse && !pick && kind !== "extra" && kind !== "best" && mine && !only ? this.r.bossBrain : null;
+    const brain = b ? { brain: b.brain, rating: b.rating } : null;
     this.io.send(host, {
       t: "bossRequest",
       key: this.r.bossKey!,
@@ -1663,11 +2102,14 @@ export class LobbyCore {
       ...(move ? creaseAsk(runner) : {}),
       // (A step that spends his whole turn: the pass guard, on the host's engine. The server never searches.)
       ...(kind === "fuse" || kind === "carrots" ? { pass: true as const } : {}),
-      ...(allowed && !pick ? { allowed } : {}),
-      // (Only the boss's own moves are Maia's: the funhouse's move for the crowd, Hollow's extra move and Big Boy's
-      // bounce keep their own engine picks, and so does Wrangler's reply to the showdown's duel: the engine's best.)
-      ...(this.r.bossBrain && !funhouse && !pick && this.r.bossKind !== "extra" && this.r.bossKind !== "best" ? { brain: this.r.bossBrain } : {}),
-      ...(asks ? { ...(asks.pull ? { pull: asks.pull } : {}), ...(asks.drag ? { drag: true as const } : {}), ...(asks.showdown ? { showdown: asks.showdown } : {}), seed: asks.seed } : {}),
+      // (`only`: the move that plays, its extras asked of the host (playChecked, N2): that move alone, no long pull, no brain.)
+      ...(only ? { allowed: [only] } : allowed && !pick ? { allowed } : {}),
+      ...(brain ? { brain } : {}),
+      ...(c?.share ? { share: true as const } : {}),
+      ...(checker ? { check: true as const } : {}),
+      // (His own move and the funhouse's: the seed the host and the checker both play it with.)
+      ...(c?.draw ? { draw: c.draw } : {}),
+      ...(asks ? { ...(asks.pull && !only ? { pull: asks.pull } : {}), ...(asks.drag && !bare ? { drag: true as const } : {}), ...(asks.showdown && !bare ? { showdown: asks.showdown } : {}), seed: asks.seed } : {}),
       ...(land ? { land: land.map((x) => ({ ...x })) } : {}),
       ...(race ? { race } : {}),
       ...(beam ? { beam } : {}),
@@ -1849,12 +2291,13 @@ export class LobbyCore {
     this.r.bossMinAt = undefined;
     const host = this.hostNow();
     this.r.hostId = host;
-    if (host) this.sendBossRequest(host);
+    this.askBoss(host);
     this.setTimer("bossTimeout", this.io.now() + BOSS_TIMEOUT_MS);
   }
 
-  private playBoss(move: string, extras: { drag?: string; showdown?: string; outside?: boolean; beam?: string[]; balloon?: string; hoops?: string; crease?: string } = {}) {
+  private playBoss(move: string, extras: BossExtras = {}) {
     this.r.bossKey = undefined;
+    this.r.bossCheck = undefined;
     // Too soon (your queen banner is still up): hold the move (or Big Boy's bounce) until then.
     if (this.r.bossMinAt && this.io.now() < this.r.bossMinAt - 50) {
       this.r.bossPending = move;
@@ -1963,9 +2406,24 @@ export class LobbyCore {
 
   private bossTimeout() {
     if (this.r.phase !== "boss" || !this.r.bossKey) return;
+    const c = this.r.bossCheck;
+    // (The host didn't give the extras of the move that plays in its time: that move's own answer's, N2.)
+    if (c?.reask) return this.playBoss(c.reask.move, c.reask.extras);
+    // (The engine server didn't answer in time about two different moves: as if it couldn't.)
+    if (c?.server) return this.bossServerScored(null);
+    // (A checked move with an answer in: the other device is out of time.)
+    if (c && Object.keys(c.answers).length) return this.settleBoss(true);
+    // (Nobody answered a checked move: each device asked missed it.)
+    if (c) this.bossMissedAll(c);
     const next = this.pickHost(this.r.hostId ?? undefined);
     if (next && next !== this.r.hostId) {
       this.r.hostId = next;
+      if (c) {
+        // (A checked move: a fresh seed and checker beside the new host.)
+        this.askBoss(next);
+        this.setTimer("bossTimeout", this.io.now() + bossTimeoutMs(this.bossAsks()) + hoopsMs(this.runner));
+        return;
+      }
       this.sendBossRequest(next);
       this.setTimer("bossTimeout", this.io.now() + bossTimeoutMs(this.bossAsks()) + hoopsMs(this.runner));
       return;
@@ -1997,6 +2455,8 @@ export class LobbyCore {
         this.r.bossBrain = this.bossBrainNow();
         const host = this.hostNow();
         if (this.r.bossBrain && host) this.io.send(host, { t: "bossBrain", brain: this.r.bossBrain });
+        // (Devices drawn to check his moves load it too: BOSS_CHECK.loaders.)
+        if (host) this.moreLoaders(host, BOSS_CHECK.loaders);
         const until = this.io.now() + bossIntroTimeline(runner.boards.get(runner.state.boards[0]!)!.history.length, !!runner.boss.powers?.claimed, !!runner.boss.powers?.snack).total;
         this.broadcast({ ...this.bossMessage(until), intro: true } as Outgoing);
         return this.setTimer("nextRound", until);
@@ -2261,6 +2721,22 @@ export class LobbyCore {
     if (this.roundDone()) this.lock();
   }
 
+  /**
+   * The Crowd bots' early picks as sent (everyone sees them as the bots' live votes): only this round's picking bots, each
+   * a move allowed on the board; anything else is dropped (that bot picks with the scoring, as without a plan).
+   */
+  private cleanBotPlan(picks: unknown, powerUps: unknown): { picks: Record<string, string>; powerUps: string[] } {
+    const runner = this.runner!;
+    const [boardId, ids] = [...runner.groups.entries()][0] ?? [0, []];
+    const bots = new Set(ids.filter((id) => this.r.bots.some((b) => b.id === id)));
+    const fen = runner.boards.get(boardId)?.fen;
+    const barred = runner.boss?.barred;
+    const legal = new Set(fen ? ((runner.boss && runner.crowdAllowed(boardId)) || legalMoves(fen).filter((m) => m !== barred)) : []);
+    const clean = Object.entries(isRecord(picks) ? picks : {}).filter((e): e is [string, string] => bots.has(e[0]) && typeof e[1] === "string" && legal.has(e[1]));
+    const used = Array.isArray(powerUps) ? powerUps.filter((id): id is string => typeof id === "string" && bots.has(id)) : [];
+    return { picks: Object.fromEntries(clean), powerUps: [...new Set(used)] };
+  }
+
   private sendTally() {
     const round = this.r.round;
     const runner = this.runner;
@@ -2293,7 +2769,12 @@ export class LobbyCore {
     if (!this.runner || !this.r.round || this.r.phase !== "play") return;
     this.r.phase = "scoring";
     // (Boss tokens: each person's own moves, the picks that went in this turn.)
-    for (const h of this.r.humans) if (this.r.round.picks[h.id]?.move) (this.r.picked ??= {})[h.id] = (this.r.picked?.[h.id] ?? 0) + 1;
+    for (const h of this.r.humans) {
+      if (!this.r.round.picks[h.id]?.move) continue;
+      (this.r.picked ??= {})[h.id] = (this.r.picked?.[h.id] ?? 0) + 1;
+      // (XP: their time in the match runs to their last move that went in; watching after it adds nothing.)
+      (this.r.pickedAt ??= {})[h.id] = this.io.now();
+    }
     // (A party: the turn's length comes out of the team's one bank, up to the clock's end.)
     if (this.r.party) this.r.round.teamMs = this.thinkTime(this.r.round, Math.min(this.io.now(), this.r.round.deadline));
     const skills = new Map(this.r.bots.map((b) => [b.id, b.skill]));
@@ -2355,7 +2836,16 @@ export class LobbyCore {
 
   private scores(playerId: string, key: string, boards: BoardScore[]) {
     if (this.r.phase !== "scoring" || playerId !== this.r.hostId || this.r.scoreRequest?.key !== key || this.r.judges?.tasks) return;
+    // (One device scored the round, its bots' picks too: the match pays as a solo game does.)
+    this.unvouch("the host scored a round alone");
     this.applyScores(boards);
+  }
+
+  /** Something in this match stood on one device's word alone (LobbyRecord.unvouched): noted once, with the first reason. */
+  private unvouch(why: string) {
+    if (this.r.unvouched || !this.runner) return;
+    this.r.unvouched = why;
+    console.log(`lobby ${this.r.code}: one device's word alone (${why}): results pay as a solo game's`);
   }
 
   private applyScores(boards: BoardScore[], judged = false) {
@@ -2366,7 +2856,10 @@ export class LobbyCore {
     // (Fair play: the move before each position, for recaptures; the boards move on in finishRound.)
     const lastMoves = new Map(this.r.scoreRequest!.jobs.map((j) => [j.boardId, runner.boards.get(j.boardId)?.lastMove ?? null]));
     const results = this.r.scoreRequest!.jobs.map((job) => {
-      const s = byBoard.get(job.boardId);
+      // (The host's: checked as a judge's are. A board that doesn't hold together is scored as nobody could: all the same.)
+      const sent = byBoard.get(job.boardId);
+      const s = judged || hostBoardOk(job, sent) ? sent : undefined;
+      if (sent && !s) console.log(`host scores for board ${job.boardId} in ${this.r.code} don't hold together: every pick scored the same`);
       const ids = runner.groups.get(job.boardId)!;
       const picks: Record<string, string | null> = { ...job.humanPicks };
       // (Boss battle: no bot plays a move that isn't allowed, nor the move the God King took back.)
@@ -2378,12 +2871,12 @@ export class LobbyCore {
       }
       const bestExpected = s?.bestExpected ?? 0.5;
       const expectedAfter: Record<string, number> = { ...(s?.expectedAfter ?? {}) };
-      // A pick the host didn't score counts as the best (no loss) rather than failing the round.
+      // (No scores for the board, the host's not holding together: every pick counts the same.)
       for (const m of Object.values(picks)) if (m && expectedAfter[m] === undefined) expectedAfter[m] = bestExpected;
       const bestMove = s?.bestMove && legal.includes(s.bestMove) ? s.bestMove : legal[0]!;
       if (expectedAfter[bestMove] === undefined) expectedAfter[bestMove] = bestExpected;
       // (The host's replies and mates from the same searches: what a blunder loses, for the God King's Last Stand.)
-      return runner.resolveBoard(job.boardId, ids, picks, { bestMove, bestExpected, expectedAfter, ...(s?.replies ? { replies: s.replies } : {}), ...(s?.mates ? { mates: s.mates } : {}) });
+      return runner.resolveBoard(job.boardId, ids, picks, { bestMove, bestExpected, expectedAfter, ...(isRecord(s?.replies) ? { replies: s.replies } : {}), ...(isRecord(s?.mates) ? { mates: s.mates } : {}) });
     });
     const think = Object.fromEntries(Object.entries(round.picks).map(([id, p]) => [id, p.thinkMs]));
     // A miss uses the whole of the player's time for the move (out of tries in Hollow's dark: the time until then).
@@ -2541,9 +3034,17 @@ export class LobbyCore {
   }
 
   /** Devices that can judge now: connected, speed known (an up-to-date app), not benched. */
-  private judgeDevices(): { id: string; nps: number }[] {
+  private judgeDevices(): JudgeCandidate[] {
     const devices = this.r.judges?.devices ?? {};
-    return this.r.humans.filter((h) => h.connected && devices[h.id] && !this.benched(h.id)).map((h) => ({ id: h.id, nps: devices[h.id]!.nps }));
+    // (`owner`: the account, so no two judges of a job are one person's; one seat per account makes it so already.)
+    return this.r.humans
+      .filter((h) => h.connected && devices[h.id] && !this.benched(h.id))
+      .map((h) => ({ id: h.id, nps: devices[h.id]!.nps, owner: this.r.accounts?.[h.id] ?? h.id, kind: h.device }));
+  }
+
+  /** A device's class (computer or phone, its own word at hello), for drawing a judge beside it; none for no device. */
+  private kindOf(id: string | undefined): JudgeCandidate["kind"] {
+    return id === undefined ? undefined : this.human(id)?.device;
   }
 
   /** Two judges per job when two devices can judge (else the host, as before). */
@@ -2565,7 +3066,7 @@ export class LobbyCore {
   }
 
   /** The devices a round's judges are drawn from: the capable ones in deep mode, else all that can judge. */
-  private judgePool(): { id: string; nps: number }[] {
+  private judgePool(): JudgeCandidate[] {
     const all = this.judgeDevices();
     return this.deepMode() ? all.filter((d) => this.capable(d.id)) : all;
   }
@@ -2583,10 +3084,12 @@ export class LobbyCore {
   }
 
   /** A device's speed check (nodes per second). */
-  private speed(playerId: string, nps: unknown) {
-    if (!this.human(playerId) || typeof nps !== "number" || !Number.isFinite(nps) || nps <= 0) return;
+  private speed(playerId: string, nps: unknown, maiaSaved = false) {
+    const h = this.human(playerId);
+    if (!h || typeof nps !== "number" || !Number.isFinite(nps) || nps <= 0) return;
+    if (maiaSaved) h.maiaSaved = true;
     const d = (this.jr.devices[playerId] ??= { nps: 0, strikes: 0, jobs: 0, answered: 0 });
-    d.nps = Math.round(Math.max(10_000, Math.min(50_000_000, nps)));
+    d.nps = Math.round(Math.max(10_000, Math.min(this.jcfg.maxNps ?? JUDGES.maxNps, nps)));
   }
 
   /** Who may send the Crowd bots' early picks this round: the host, or (many judges) a judge of the board. */
@@ -2680,7 +3183,8 @@ export class LobbyCore {
         ...(sj.priority ? { priority: sj.priority } : {}),
       };
       const judges = (planned[String(sj.boardId)] ?? []).filter((id) => devices.some((d) => d.id === id)).slice(0, perJob);
-      if (judges.length < perJob) judges.push(...drawJudges(() => this.jrng(), devices, perJob - judges.length, cfg, load, new Set(judges)));
+      // (A refill beside a remaining judge comes from its class, as a planned pair does.)
+      if (judges.length < perJob) judges.push(...drawJudges(() => this.jrng(), devices, perJob - judges.length, cfg, load, new Set(judges), this.kindOf(judges[0])));
       for (const j of judges) load.set(j, (load.get(j) ?? 0) + 1);
       tasks[job.id] = { boardId: sj.boardId, job, botIds: sj.bots.map((b) => b.id), judges, tried: [...judges], want: perJob, sentAt: now, sent: {}, reports: {}, boards: {} };
       this.jr.stats.jobs++;
@@ -2745,7 +3249,8 @@ export class LobbyCore {
     // (A job with a deep re-check goes to another capable device, if there is one.)
     const capable = t.deep ? this.judgeDevices().filter((d) => this.capable(d.id)) : [];
     const pool = capable.some((d) => !t.tried.includes(d.id)) ? capable : this.judgeDevices();
-    const [next] = drawJudges(() => this.jrng(), pool, 1, this.jcfg, new Map(), new Set(t.tried));
+    // (From the remaining judge's class, if one is still on it, so the two finish together.)
+    const [next] = drawJudges(() => this.jrng(), pool, 1, this.jcfg, new Map(), new Set(t.tried), this.kindOf(t.judges[0]));
     if (!next) return false;
     t.judges.push(next);
     t.tried.push(next);
@@ -2959,7 +3464,9 @@ export class LobbyCore {
     t.judges = [a, b];
     t.waitUntil = undefined;
     const pool = t.deep ? this.judgeDevices().filter((d) => this.capable(d.id)) : this.judgeDevices();
-    const [ref] = drawJudges(() => this.jrng(), pool, 1, this.jcfg, new Map(), new Set(t.tried));
+    // (From the two's class when they share one: the referee races the server's verdict.)
+    const kind = this.kindOf(a) === this.kindOf(b) ? this.kindOf(a) : undefined;
+    const [ref] = drawJudges(() => this.jrng(), pool, 1, this.jcfg, new Map(), new Set(t.tried), kind);
     if (ref) {
       t.refereed = true;
       t.refereeBy = ref;
@@ -2993,6 +3500,7 @@ export class LobbyCore {
     this.jr.stats.fallback++;
     t.server = undefined;
     t.done = { board: t.boards[pick]!, how: "fallback" };
+    this.unvouch("two judges disagreed with no verdict");
   }
 
   /** One judge's answer used alone, with no second answer to check it against: now and then the engine server checks it afterwards (blame only). */
@@ -3016,6 +3524,8 @@ export class LobbyCore {
 
   /** The engine server's answer (null: it couldn't). */
   serverScored(id: string, moves: MoveScore[] | null) {
+    // (Two devices' different boss moves: the better for him plays.)
+    if (this.r.bossCheck?.server === id && this.r.phase === "boss") return this.bossServerScored(moves);
     const spot = this.r.judges?.spots?.[id];
     if (spot) {
       delete this.r.judges!.spots![id];
@@ -3324,6 +3834,29 @@ export class LobbyCore {
     return { moves: this.r.picked?.[playerId] ?? 0, ms: Math.max(0, end - this.r.startedAt) };
   }
 
+  /**
+   * XP (Nov 9; server/xp.ts): a person's own moves in the match (their picks that went in) and their time in it as this room
+   * measured it, from the match's start to their last move that went in (knocked out at 8 minutes: 8 minutes; watching after
+   * adds nothing). Null: the match never started.
+   */
+  xpSpan(playerId: string): { moves: number; ms: number } | null {
+    if (!this.r.startedAt) return null;
+    const last = this.r.pickedAt?.[playerId];
+    return { moves: this.r.picked?.[playerId] ?? 0, ms: last === undefined ? 0 : Math.max(0, last - this.r.startedAt) };
+  }
+
+  /**
+   * XP's win cap in a friends' lobby: the people against this person (player ids; bots and people alike, the caller keeps the
+   * accounts). A raid or a Boss Battle party: none (the boss is the opponent). Crowd: the other team. Classic: everyone else.
+   */
+  xpOpponents(playerId: string): string[] {
+    if (this.settings.raid || this.r.party || !this.runner) return [];
+    const rows = this.runner.leaderboard();
+    const team = rows.find((s) => s.id === playerId)?.team ?? null;
+    const ids = new Set([...rows.map((s) => ({ id: s.id, team: s.team ?? null })), ...(this.r.left ?? []).map((l) => ({ id: l.id, team: l.result?.team ?? null }))].filter((s) => s.id !== playerId && (!team || (s.team && s.team !== team))).map((s) => s.id));
+    return [...ids];
+  }
+
   /** Fair play: a person's recorded picks this match (for their fair-play summary once it's over). */
   fairMoves(playerId: string): FairMove[] {
     return this.r.fair?.[playerId] ?? [];
@@ -3379,8 +3912,8 @@ export class LobbyCore {
    * unranked for those who stay, nor for the one who left. Only someone who left before move 1 doesn't count.
    */
   ranked(): boolean {
-    // (A Boss Battle party is a private team: never ranked.)
-    if (this.r.party) return false;
+    // (A Boss Battle party is a private team: never ranked. Nor a match where one device's word stood alone: unvouched.)
+    if (this.r.party || this.r.unvouched) return false;
     const players = this.runner?.state.players ?? [];
     const played = this.r.humans.length + (this.r.left ?? []).filter((l) => l.how !== "early").length;
     return isRankedMatch(played, Math.max(this.settings.lobbySize, players.length));
@@ -3458,6 +3991,8 @@ export class LobbyCore {
       ...(runner.bossCarrotWin ? { carrots: true } : {}),
       // Whether it counted for ranking (the results say so in words).
       ranked: this.ranked(),
+      // (One device's word stood alone somewhere in it: it pays as a solo game, and the results say why.)
+      ...(this.r.unvouched ? { unvouched: true as const } : {}),
     };
     this.broadcast(msg);
     this.botChat({ kind: "end" });
@@ -3515,11 +4050,12 @@ export class LobbyCore {
     return this.runner?.boss ? null : this.chatSide(id);
   }
 
-  /** Whether a player is sent a line: chat on, sender not muted, and the line to everyone or to their team. */
+  /** Whether a player is sent a line: chat on, sender not muted, a typed line only if they read them, and the line to everyone or to their team. */
   private chatHears(id: string, line: NetChatLine): boolean {
     const c = this.chat;
     if (c.off[id]) return false;
     if (line.from === id) return true;
+    if (!hearsTyped(c.typed ?? {}, id, line)) return false;
     if (c.muted[id]?.includes(line.from)) return false;
     return line.to === "all" || line.team === null || this.chatSide(id) === line.team;
   }
@@ -3570,15 +4106,23 @@ export class LobbyCore {
    * lines show as buttons is their profile's picks: the app's business. Any line they own may go.) In the lobby
    * before the match, every line goes to everyone there (no teams yet), with the same checks.
    */
-  private chatSay(playerId: string, say: unknown, to: unknown) {
+  private chatSay(playerId: string, say: unknown, to: unknown, text?: unknown) {
     const now = this.io.now();
     const c = this.chat;
-    const refuse = (reason: ChatRefusal, retryAt = now, block?: ChatBlock) =>
-      this.io.send(playerId, { t: "chatNo", say: String(say).slice(0, 40), reason, retryAt, ...(block ? { block } : {}) });
+    const refuse = (reason: ChatRefusal, retryAt = now, block?: ChatBlock, message?: string) =>
+      this.io.send(playerId, { t: "chatNo", say: String(say ?? "").slice(0, 40), reason, retryAt, ...(block ? { block } : {}), ...(message ? { message } : {}) });
     if (!this.chatOpen() || !this.human(playerId)) return refuse("closed");
     if (c.off[playerId]) return refuse("off");
     const block = this.chatBlockOf(playerId, now);
     if (block) return refuse("mod", block.until ?? now, block);
+    // Typed (CHAT_TYPED, typed-chat.ts): may they type, the filter, the length, one every 5 s. To their team, or everyone with the
+    // switch on All (no teams before the match).
+    if (typeof text === "string") {
+      const t = typedSay((c.typed ??= {}), playerId, this.chatKey(playerId), text, now);
+      if (!t.ok) return refuse(t.reason, t.retryAt, undefined, t.message);
+      const toAll = !this.chatInLobby() && to === "all";
+      return this.chatPost({ ...this.chatLine(playerId, "", toAll ? "all" : "team", now), text: t.text });
+    }
     const line = chatSay(say);
     if (!line) return refuse("unknown");
     if (!canSay(line.id, c.owned[playerId])) return refuse("locked");
@@ -3619,10 +4163,19 @@ export class LobbyCore {
     return { from, say, to, team: this.chatTeam(from), at };
   }
 
-  /** This device's chat choices: chat off, and who it muted for the match (their lines aren't sent to it). */
-  private chatPrefs(playerId: string, off: unknown, muted: unknown) {
+  /**
+   * Typed chat for a player as they join (or turn chat on): may they type (signed in, the account's chat on, not too young: the
+   * Durable Object read them), and is their device too young (never sent typed lines).
+   */
+  chatTyping(playerId: string, o: { may: boolean; young: boolean }) {
+    typedSeat((this.chat.typed ??= {}), playerId, o);
+  }
+
+  /** This device's chat choices: chat off, who it muted for the match (their lines aren't sent to it), and typed lines on or off. */
+  private chatPrefs(playerId: string, off: unknown, muted: unknown, typed?: unknown) {
     if (!this.human(playerId)) return;
     const c = this.chat;
+    if (typeof typed === "boolean" && typedReads((c.typed ??= {}), playerId, typed) && !c.off[playerId] && off !== true) this.sendChatLog(playerId, false);
     const wasOff = !!c.off[playerId];
     const wasMuted = c.muted[playerId] ?? [];
     if (off === true) c.off[playerId] = true;

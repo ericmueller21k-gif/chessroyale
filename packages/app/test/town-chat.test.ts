@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TOWN_CHAT } from "@chessroyale/core";
-import { CHAT, CHATTER, CHAT_BACKGROUND_LABEL, CHAT_BACKGROUND_NOTE, CHAT_MODES, CHAT_MODE_CHOICE, CHAT_MODE_LABEL, ChatLog, Stick, chatBackground, chatBlurs, chatMode, chatShows, clampBox, chatterDelay, clockText, loadChatBackground, loadChatMode, loadChatPos, nextChatMode, onChatBackground, onChatMode, onTownChatLineTap, pickChatter, saveChatBackground, saveChatMode, saveChatPos, say, setChatBackground, setChatMode, setTownChatLineTap, startChatter, tooSoonText, townTone, unsay, type ChatKind } from "../src/town/chat.ts";
+import { CHAT, CHATTER, CHAT_BACKGROUND_LABEL, CHAT_BACKGROUND_NOTE, CHAT_MODES, CHAT_MODE_CHOICE, CHAT_MODE_LABEL, ChatLog, Stick, chatBackground, chatBlurs, chatHint, chatMode, chatShows, clampBox, chatterDelay, clockText, loadChatBackground, loadChatMode, loadChatPos, nextChatMode, onChatBackground, onChatMode, onTownChatLineTap, pickChatter, saveChatBackground, saveChatMode, saveChatPos, say, setChatBackground, setChatMode, setTownChatLineTap, startChatter, tooSoonText, townTone, unsay, type ChatKind } from "../src/town/chat.ts";
 import { NAME_COLORS, NAME_COLOR_LIMIT, nameColorIndex, pickNameColor } from "../src/town/names.ts";
 import { skyTone, skyWeights } from "../src/town/sky.ts";
-import { ALL_HOMES, HOMES } from "../src/town/world.ts";
+import { ALL_HOMES, HOMES, hasTownBoss } from "../src/town/world.ts";
 
 /** The town square's chat log (Eric, Oct 28): the time's format, the three modes (their cycle, what each shows, remembered on
  * this device), the fade and the way back, the tap that brings the faded lines back, the stream pinned to its foot unless scrolled
@@ -167,6 +167,20 @@ describe("\"Chat background\" (Eric, Oct 28: a switch in Town settings for the b
 
   it("is a separate key from the mode's and the box's place", () => {
     expect(new Set([CHAT.backgroundKey, CHAT.modeKey, CHAT.storageKey]).size).toBe(3);
+  });
+});
+
+describe("the hint on the typing line's strip (Eric, Nov 12: \"in very faint, like gray… tap the box to type… it will disappear when the text box disappears as well\")", () => {
+  it("a few words, a phone's and a computer's; shown while the box shows and you aren't typing; gone while you type, faded or off", () => {
+    expect(CHAT.hintPhone).toBe("Tap here to type");
+    expect(CHAT.hintComputer).toBe("Click here to type");
+    expect(chatHint("always", false, false, false)).toEqual({ text: "Tap here to type", shows: true });
+    expect(chatHint("always", false, false, true)).toEqual({ text: "Click here to type", shows: true });
+    expect(chatHint("always", true, true, false).shows, "typing: the field takes its place").toBe(false);
+    expect(chatHint("new", true, false, false).shows, "new messages, its lines showing").toBe(true);
+    expect(chatHint("new", false, false, false).shows, "new messages, faded: it goes with the box").toBe(false);
+    expect(chatHint("new", true, true, false).shows).toBe(false);
+    expect(chatHint("off", true, false, false).shows, "off: no box").toBe(false);
   });
 });
 
@@ -570,11 +584,12 @@ describe("the stream stays at its foot unless it's scrolled up (Eric, Oct 28)", 
 });
 
 describe("the chatter table (placeholders until real players chat)", () => {
-  // (Every home, an admin's town's too: Timber's and Dash's, Nov 3.)
-  const all = ALL_HOMES.map((h) => ({ home: h, v: CHATTER[h.id] }));
+  // (Every home whose boss is out in the town, an admin's town's too: Timber's and Dash's, Nov 3. Not Rolling Dough's, Nov 11: Don
+  // Dough stays in his back room, and his crew in the bakery.)
+  const all = ALL_HOMES.filter(hasTownBoss).map((h) => ({ home: h, v: CHATTER[h.id]! }));
 
-  it("has every boss with a home: two lines each, and a kid with one or two", () => {
-    expect(Object.keys(CHATTER).sort()).toEqual(ALL_HOMES.map((h) => h.id).sort());
+  it("has every boss with a home in the town: two lines each, and a kid with one or two", () => {
+    expect(Object.keys(CHATTER).sort()).toEqual(ALL_HOMES.filter(hasTownBoss).map((h) => h.id).sort());
     for (const { home, v } of all) {
       expect(v.boss, home.boss).toHaveLength(2);
       expect(v.kidSays.length, v.kid).toBeGreaterThanOrEqual(1);

@@ -28,12 +28,112 @@
         document.documentElement.setAttribute("data-theme", t);
       })();
     </script>
-    <link rel="manifest" href="/manifest.webmanifest" />
+    <script>
+      // A script that won't load (the app's own is in <head>, so this listens from here): the loading bar says so (below).
+      addEventListener("error", function (e) {
+        if (!e.target || e.target.tagName !== "SCRIPT") return;
+        window.hcLoadFailed = true;
+        if (window.hcLoadFail) window.hcLoadFail();
+      }, true);
+    </script>
+    <link rel="manifest" href="/manifest.webmanifest" crossorigin="use-credentials" />
     <link rel="icon" href="/icons/icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
     <title>HunChess</title>
+    <style>
+      /* The shell (Nov 10, phone load): drawn before the app's script has run, then dropped (shell.ts) as the app draws
+         its first screen. Always the app's own splash: the HunChess logo centered, on a phone and a computer alike (Eric, Nov 10:
+         "You load the game, hun chess in the middle with the loading bar ... it doesn't start putting in the containers until
+         everything is able to load at once"); home's outline was dropped. */
+      #shell { position: fixed; inset: 0; z-index: 2147483000; display: flex; justify-content: center; overflow: hidden; }
+      #shell * { visibility: hidden; }
+      #shell .fd-logo, #shell .fd-logo * { visibility: visible; }
+      /* While the shell is up it is the splash: the app's own splash under it stays hidden, so the two never show at once. */
+      #shell ~ #app .fd-splash { visibility: hidden; }
+      /* The loading bar (Nov 10): only once the page has loaded for FRONT_DOOR.loadBarAfterMs (the script below). Under the
+         splash's logo, centered on the screen on a phone and a computer alike (Eric, Nov 10): from home's outline it switches to the
+         splash first; out of the flow, so nothing else moves when it shows. */
+      #shell .fd-splash { position: relative; }
+      .hc-load { position: absolute; left: 50%; top: calc(50% + 36px); transform: translateX(-50%); width: min(240px, calc(100vw - 64px));
+        display: flex; flex-direction: column; align-items: center; gap: 10px; opacity: 0; transition: opacity 0.25s; }
+      .hc-load.on { opacity: 1; }
+      #shell .hc-load.on, #shell .hc-load.on * { visibility: visible; }
+      #shell .hc-load:not(.failed) .hc-load-retry { visibility: hidden; }
+      .hc-load-track { width: 100%; height: 4px; border-radius: 2px; background: var(--fd-line); overflow: hidden; }
+      .hc-load-fill { height: 100%; background: var(--fd-gold); transform: scaleX(0.1); transform-origin: left; transition: transform 0.5s ease-out; }
+      .hc-load-line { margin: 0; font: 500 14px/20px Archivo, system-ui, sans-serif; color: var(--fd-sub); white-space: nowrap; }
+      .hc-load.failed .hc-load-line { color: var(--fd-text); }
+      /* (Under the line, out of the box's own height: the bar and its line are what's centered.) */
+      .hc-load-retry { position: absolute; top: calc(100% + 12px); }
+      /* A phone held sideways (Eric, Nov 11: "rotation disabled for this app on mobile"): a browser can't lock the page's rotation
+         outside an installed app (its manifest is portrait), so this covers the app until the phone is upright. Shown only at a
+         landscape height of 500 px or less: a tablet or a computer is taller and never sees it. */
+      .rotate-lock { display: none; position: fixed; inset: 0; z-index: 2147483600; flex-direction: column; align-items: center;
+        justify-content: center; gap: 18px; padding: 24px; background: var(--fd-bg, #14161b); color: var(--fd-text, #eef0f4);
+        font: 600 18px/24px Archivo, system-ui, sans-serif; text-align: center; }
+      .rotate-lock p { margin: 0; }
+      @media (orientation: landscape) and (max-height: 500px) { .rotate-lock { display: flex; } }
+    </style>
   </head>
   <body>
+    <div id="shell" aria-hidden="true"><div class="fd-splash"><div class="fd-logo">Hun<span>Chess</span></div></div></div>
+    <script>
+      // The loading bar (Eric, Nov 10): hidden for the first AFTER ms (most loads are done by then), then a thin bar and the step
+      // loading now. The app moves it as each step finishes (loadbar.ts calls hcLoad); it never goes back. No step for STALL ms, or
+      // a script that won't load: the line says so, with "Try again". Gone with the shell as the first real screen draws.
+      (function () {
+        var AFTER = 2000, STALL = 20000; // FRONT_DOOR.loadBarAfterMs and loadBarStallMs (a unit test checks they agree)
+        var shell = document.getElementById("shell");
+        var bar = document.createElement("div");
+        bar.className = "hc-load";
+        bar.innerHTML = '<div class="hc-load-track"><div class="hc-load-fill"></div></div><p class="hc-load-line">Loading the game…</p>' +
+          '<button type="button" class="fd-btn primary small hc-load-retry">Try again</button>';
+        // (Centered as the splash's: home's outline gives way to the splash, logo and bar in the screen's middle, once it shows.)
+        function host() {
+          var splash = shell.querySelector(".fd-splash");
+          if (!splash) {
+            shell.innerHTML = '<div class="fd-splash"><div class="fd-logo">Hun<span>Chess</span></div></div>';
+            splash = shell.querySelector(".fd-splash");
+          }
+          if (bar.parentNode !== splash) splash.appendChild(bar);
+        }
+        if (shell.querySelector(".fd-splash")) host();
+        var fill = bar.firstChild.firstChild, line = bar.childNodes[1], at = 0.1, stall = 0;
+        bar.lastChild.onclick = function () { location.reload(); };
+        function fail(text) {
+          if (!shell.isConnected) return;
+          host();
+          line.textContent = text;
+          bar.className = "hc-load on failed";
+        }
+        function wait() {
+          clearTimeout(stall);
+          stall = setTimeout(function () { fail("This is taking too long."); }, STALL);
+        }
+        wait();
+        setTimeout(function () {
+          if (!shell.isConnected || bar.className !== "hc-load") return;
+          host();
+          bar.className = "hc-load on";
+        }, Math.max(0, AFTER - performance.now()));
+        window.hcLoadFail = function () { fail("Couldn't load the game."); };
+        if (window.hcLoadFailed) window.hcLoadFail();
+        window.hcLoad = function (to, text) {
+          if (!shell.isConnected || bar.className.indexOf("failed") >= 0) return;
+          if (to > at) fill.style.transform = "scaleX(" + (at = to) + ")";
+          line.textContent = text;
+          wait();
+        };
+      })();
+    </script>
+    <div id="rotate-lock" class="rotate-lock" role="dialog" aria-modal="true" aria-label="Turn your phone upright">
+      <svg viewBox="0 0 24 24" width="56" height="56" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <rect x="7.5" y="2.5" width="9" height="16" rx="2" />
+        <path d="M3.2 9.2A9 9 0 0 1 12 3.5" />
+        <path d="M20.8 14.8A9 9 0 0 1 12 20.5" />
+      </svg>
+      <p>Turn your phone upright to play</p>
+    </div>
     <div id="app"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

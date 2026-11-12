@@ -8,21 +8,35 @@
  * and `buyBossCrate` is the purchase: the server takes the price and puts the crate in your inventory, in one transaction (since
  * Eric's Nov 2 fixes it isn't opened at once: you open it in the Crates tab, as any crate).
  */
-import { BOSS_CRATE_PRICE, BOSS_CRATE_POOL, bossCrateOf, itemDef, tierInfo } from "@chessroyale/core";
+import { BOSS_CRATE_PRICE, BOSS_CRATE_POOL, BOSS_ROSTER, adminPlayable, bossCrateOf, itemDef, tierInfo, type BossCrateDef } from "@chessroyale/core";
 import { buyBossCrateOnServer, tokenCount } from "../../account.ts";
 import type { HomeId } from "../world.ts";
 import type { SkyTone } from "../sky.ts";
 import type { Sq } from "./room.ts";
+import { ZEBRA_BACK_LINES } from "./zebra-lines.ts";
 
 export interface ShopDef {
   /** Its home. */
   home: HomeId;
   /** The boss whose shop it is, as the town names it ("Babur"). */
   boss: string;
-  /** Its crate's name, word for word ("Babur's Boss Crate"). */
-  crate: string;
+  /** Its crate's name, word for word ("Babur's Boss Crate"); null: none yet (Rolling Dough, Nov 11: its Shopkeeper's chat only). */
+  crate: string | null;
+  /** A shop with no crate yet: what its Shopkeeper says to Talk, one at random each time, in a bubble over him (Rolling Dough's). */
+  says?: readonly string[];
+  /**
+   * The home's second room (Rolling Dough's back room, Nov 11): reached through its door from the front room, not from the town; its
+   * "Shopkeeper" is the boss himself (`name`), drawn as one of the room's people (`hideKid`), talked to from `talkAt`.
+   */
+  part?: "back";
+  /** The talk card's name ("Don Dough"); none: "Shopkeeper". */
+  name?: string;
+  /** No Shopkeeper sidekick drawn (the back room: Don Dough is one of its people, shops/zebra-scene.ts). */
+  hideKid?: true;
+  /** Where you stand to talk (room.ts Room.talkAt: Don Dough's, the foot of his table); none: within talking range of `keeper`. */
+  talkAt?: readonly Sq[];
   /** The Shopkeeper: the boss's kid (its sheet's name in town/sidekicks/), drawn at `at` (a square, fractions allowed). */
-  kid: "babur" | "puddles" | "alfil" | "bigboy" | "timber" | "blitz" | "hollowdog" | "rooster" | "dealer" | "elf" | "folioturtle" | "smudgykeeper" | "funkeeper";
+  kid: "babur" | "puddles" | "alfil" | "bigboy" | "timber" | "blitz" | "hollowdog" | "rooster" | "dealer" | "elf" | "folioturtle" | "smudgykeeper" | "funkeeper" | "zebrakeeper";
   at: readonly [number, number];
   /**
    * Drawn at the art's own size, this many of the room's pixels (37 a square) from its feet to the top of its idle, rather than the
@@ -47,9 +61,10 @@ export interface ShopDef {
    * stars, a lodge's dark planks between heavy beams, a store's white ceiling tiles and light panels, a cave's dark stone and
    * stalactites, a barn's dark rafters and cross beams, a warehouse's dark steel trusses, an igloo's dome of ice blocks arching overhead, or a
    * sanctuary's pale folded paper, its pleats running up to a fold overhead, a studio's dark beams over a skylight, or an arcade's
-   * night-purple ceiling hung with strings of bulbs (drawn by the game, not the art: as the mockup did).
+   * night-purple ceiling hung with strings of bulbs, a bakery's warm ceiling of light beams, or its back room's dark rafters (drawn by
+   * the game, not the art: as the mockup did).
    */
-  roof: "tent" | "glass" | "stone" | "nursery" | "lodge" | "store" | "cave" | "barn" | "warehouse" | "igloo" | "paper" | "studio" | "arcade";
+  roof: "tent" | "glass" | "stone" | "nursery" | "lodge" | "store" | "cave" | "barn" | "warehouse" | "igloo" | "paper" | "studio" | "arcade" | "bakery" | "backroom";
   /**
    * The chat log's text over the room (Eric, Nov 2: "white, or black, depending on darkness of background in the shop"): "night" for
    * a dark room (white words on a dark tint: Babur's tent), "day" for a light one (dark words on a light tint: Puddles' greenhouse),
@@ -104,7 +119,44 @@ export const SHOPS: Readonly<Partial<Record<HomeId, ShopDef>>> = {
   // the night tone. His pogo first in his crate (his ride). The room is 24 x 24 (boingo-art.ts SHOP_BOINGO_N).
   clown: { home: "clown", boss: "Boingo", crate: "Boingo's Boss Crate", kid: "funkeeper", at: [10.5, 2.2], keeper: [{ c: 10, r: 2 }, { c: 11, r: 2 }], prizes: ["boingo-pogo"], roof: "arcade", chatTone: "night" },
   grex: { home: "grex", boss: "Jefferson", crate: "Jefferson's Boss Crate", kid: "dealer", at: [16.8, 3.2], tall: 79, flip: true, talk: ["crate", "corner-shop"], keeper: [{ c: 16, r: 3 }, { c: 17, r: 3 }], prizes: ["jefferson-giraffe"], roof: "warehouse", chatTone: "day" },
+  // Rolling Dough (Nov 11, Don Dough's bakery; an admin's town only while he's in the game for admins first): the counter zebra in his
+  // baker's cap behind the counter, left of the register, facing into the room (the art's SHOP_ZEBRA_KEEPER), drawn at his art's size
+  // (73 px). He has no name: "Shopkeeper". No crate yet (his items come later): Talk has him say one of his lines. A bright bakery:
+  // the day tone. Its back room is BACK_ROOMS'.
+  zebra: { home: "zebra", boss: "Don Dough", crate: null, says: ZEBRA_BACK_LINES, kid: "zebrakeeper", at: [12.5, 7.3], tall: 73, flip: true, keeper: [{ c: 12, r: 7 }, { c: 13, r: 7 }], prizes: [], roof: "bakery", chatTone: "day" },
 };
+
+/**
+ * The homes' second rooms (Nov 11: Rolling Dough's back room, through the door at the front room's back left). Don Dough sits in his
+ * wingback at the head of the table; you talk to him from its foot (the art's challenge mark, facing him across it), or by tapping him
+ * or the table. A dim room: the night tone.
+ */
+export const BACK_ROOMS: Readonly<Partial<Record<HomeId, ShopDef>>> = {
+  zebra: {
+    home: "zebra",
+    part: "back",
+    boss: "Don Dough",
+    name: "Don Dough",
+    crate: null,
+    kid: "zebrakeeper",
+    hideKid: true,
+    at: [4.3, 6.82],
+    keeper: [{ c: 4, r: 7 }],
+    talk: ["table", "armchair", "bench"],
+    talkAt: [{ c: 8, r: 6 }, { c: 8, r: 7 }],
+    prizes: [],
+    roof: "backroom",
+    chatTone: "night",
+  },
+};
+/**
+ * A boss met inside his home can be fought (Don Dough, Nov 11): his boss is in the game (core's roster, with his character and powers;
+ * in the game for admins first, so his home is in an admin's town only). Until his boss lands (another helper's round), his card's
+ * Challenge stays greyed, "Coming soon", and the talk beat still plays.
+ */
+export const canChallengeInside = (id: HomeId): boolean => BOSS_ROSTER.some((b) => b.id === id && adminPlayable(b));
+/** A home's room: its front (the shop, from the town) or its back room. */
+export const roomDef = (id: HomeId, part: "front" | "back" = "front"): ShopDef | null => (part === "back" ? BACK_ROOMS[id] : SHOPS[id]) ?? null;
 
 /** The shop inside a home, or null: every other home has no "Go in" yet. */
 export const shopOf = (id: HomeId): ShopDef | null => SHOPS[id] ?? null;
@@ -149,13 +201,16 @@ export const canAfford = (h: Holdings, way: CrateWay): boolean => {
   return h.tokens >= p.tokens && h.keys >= p.keys;
 };
 
-/** What a buy came to: done, or why not (shown under the buttons). */
+/** What a buy came to: done, or why not (shown under the buttons); done, the crate bought (its pop-up: Open now, Later). */
 export interface BuyResult {
   ok: boolean;
   message: string;
+  crate?: BossCrateDef;
 }
 /** A buy's answer (Eric, Nov 2: "it says when you buy it it's in your inventory"): "Babur's Boss Crate is in your inventory." */
 export const inInventoryLine = (crate: string) => `${crate} is in your inventory.`;
+/** The pop-up after a buy (Eric, Nov 12: "another pop-up that says that you bought it"): "You got Boingo's Boss Crate!" */
+export const gotLine = (crate: string) => `You got ${crate}!`;
 /**
  * Buys a boss's crate one of its two ways. Every buy button goes through here, and only here: the server takes the price (the
  * tokens, and the key) and puts the crate in your inventory, unopened, in one transaction (server/boss-tokens.ts), or says why not.
@@ -165,7 +220,7 @@ export async function buyBossCrate(boss: HomeId, way: CrateWay): Promise<BuyResu
   if (!crate) return { ok: false, message: "This crate isn't sold yet." };
   try {
     await buyBossCrateOnServer(crate.id, way);
-    return { ok: true, message: inInventoryLine(crate.name) };
+    return { ok: true, message: inInventoryLine(crate.name), crate };
   } catch (e) {
     return { ok: false, message: e instanceof Error ? e.message : "Something went wrong." };
   }

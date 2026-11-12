@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useState } from "preact/hooks";
+import { hapticOnce } from "../haptics.ts";
 import { KING_ATTACK, SNACK, bossIntroTimeline, bossRules, fenAtPly, inCheck, pieceAt, withPiece } from "@chessroyale/chess";
 import { BLIZZARD, BURN, BossBarExtra, CANDLE, FUNHOUSE, FireBurn, HOLLOW_CASTER, THAW, angleView, dockLine, noMoveLine, PowerBoard, PowerMoment, RageMeter, funhouseView, mateMomentsOf, momentAt, momentsOf, thawOver, useMomentSpeech } from "../components/BossPowers.tsx";
 import { BossMoment } from "../components/BossEffect.tsx";
@@ -12,7 +13,9 @@ import { fullMoonMoment, noteMooMoments } from "../components/Moo.tsx";
 import { popOffMoments } from "../components/Dash.tsx";
 import { folioMoments, revisionFen } from "../components/Folio.tsx";
 import { gardenerFen } from "../components/Gardener.tsx";
+import { boingoDecor } from "../components/Boingo.tsx";
 import { timberFen } from "../components/Timber.tsx";
+import { ZEBRA_BEATS, zebraFen, zebraGold, zebraTurnMoments } from "../components/Zebra.tsx";
 import { pickLine } from "../characters/boss-beats.ts";
 import { rememberBoss } from "../boss-history.ts";
 import { bannerOn, dueQueenBanner, resetBattleBanners } from "../battle-banners.ts";
@@ -165,9 +168,12 @@ export function BossLevel({ boss }: { boss: BossView }) {
   if (lv === undefined) return null;
   const base = boss.levelBase ?? lv;
   const dir = lv === null || base === null || lv === base ? "" : lv > base ? "up" : "down";
+  // (The match's screens are drawn anew at every phase, and the bar with them: a badge drawn again carries on its pop from
+  // when the lift began, so the pop plays once, not at every phase (Nov 12).)
+  const since = levelSince(`${boss.name}:${boss.startMove}`, dir);
   return (
     // (Its own element for each direction: a lift or a slash plays as it begins, then stays as a color.)
-    <span key={dir} class={`boss-level${dir ? ` lv-${dir}` : ""}`} data-level={lv ?? "unknown"}>
+    <span key={dir} class={`boss-level${dir ? ` lv-${dir}` : ""}`} data-level={lv ?? "unknown"} style={dir ? { animationDelay: `${since - Date.now()}ms` } : undefined}>
       <span class="lv-text" aria-hidden="true">
         LVL {lv ?? "???"}
       </span>
@@ -175,6 +181,13 @@ export function BossLevel({ boss }: { boss: BossView }) {
       <span class="lv-sr">{lv === null ? "Level unknown" : `Level ${lv}`}</span>
     </span>
   );
+}
+
+/** When the level's current direction began on this device (one battle at a time): a lift or a slash that goes on keeps its start. */
+let levelDir = { battle: "", dir: "", at: 0 };
+function levelSince(battle: string, dir: string): number {
+  if (levelDir.battle !== battle || levelDir.dir !== dir) levelDir = { battle, dir, at: Date.now() };
+  return levelDir.at;
 }
 
 /** The crowd's moves left before the battle is judged, this one included: "12 moves left". */
@@ -270,7 +283,7 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
   const moments = useMemo(() => {
     if (intro || victim || fall) return [];
     if (mating) return mateMomentsOf(boss, until);
-    if (thinking) return lights || rush ? [] : [earlyLanding(boss), ...yourPulls(boss), ...rookTakenMoment(boss), ...fullMoonMoment(boss), ...folioMoments(boss), ...popOffMoments(boss)].filter((m) => m !== null);
+    if (thinking) return lights || rush ? [] : [earlyLanding(boss), ...yourPulls(boss), ...rookTakenMoment(boss), ...fullMoonMoment(boss), ...folioMoments(boss), ...popOffMoments(boss), ...zebraTurnMoments(boss)].filter((m) => m !== null);
     return momentsOf(boss, until);
   }, [boss.board.fen, boss.powers?.events.length, until, thinking, intro, victim, mating, fall]);
   // (Moo's daze: he's drawn powered up until its `calm`, noted from the moment's start.)
@@ -314,6 +327,10 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
   // (the Slam's, a bounce's, the funhouse's, his second thinking) never brings it back.
   const queenDue = intro || loading || victim ? null : dueQueenBanner(boss, thinkingNow ? "thinking" : thinking ? null : "move", `${boss.id}:${boss.startMove}`);
   const queenBanner = queenDue && bannerOn(queenDue.key, now, bossBannerMs()) ? queenDue : null;
+  // (QUEEN SLAIN!'s buzz, once for its banner, as it comes: haptics.ts.)
+  useLayoutEffect(() => {
+    if (queenBanner?.kind === "slain") hapticOnce(`slain:${queenBanner.key}`, "queenSlain");
+  }, [queenBanner?.key]);
   const left = until ? Math.max(0, Math.ceil((until - now) / 1000)) : null;
   // A boss raid alone plays like any chess site: the boss's move lands and it's your turn (no ring, no countdown).
   const alone = match.standings().length === 1;
@@ -340,6 +357,12 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
   useEffect(() => {
     if (funLine) kingSay("funhouse", `funhouse-${funhouse!.key}`);
   }, [funLine]);
+  // Don Dough's dough: the God King's word as a lump lands ("Squash it before it rises!").
+  const dough = moments.find((m) => m.kind === "doughDrop");
+  const doughLine = !!dough && now >= dough.at + ZEBRA_BEATS.drop.landAt;
+  useEffect(() => {
+    if (doughLine) kingSay("dough", `dough-${dough!.key}`);
+  }, [doughLine]);
   // Wrangler's showdown: the God King's word as "DRAW!" comes.
   const showdown = moments.find((m) => m.kind === "showdown");
   const showdownLine = !!showdown && now >= showdown.at + SHOWDOWN_KING_AT;
@@ -390,8 +413,10 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
   const revised = bounceShown || splitShown || pig || alfil || hopper || smudgy || gardener ? null : revisionFen(boss, moments, now);
   // Timber's: a piece he dropped off its square until his plank lands; a pawn he gnaws on its square until his last chomp.
   const timber = bounceShown || splitShown || pig || alfil || hopper || smudgy || gardener || revised ? null : timberFen(boss, moments, now, fenShown);
+  // Don Dough's: a piece risen from his dough off its square until the rise's pop.
+  const zebra = bounceShown || splitShown || pig || alfil || hopper || smudgy || gardener || revised || timber ? null : zebraFen(boss, moments, now, fenShown);
   // (Dash's Scramble Rush: his sweep, your placements, then the position as it was: the game's never changed.)
-  const boardFen = rush ? rushBoard(boss, rush, now) : (bounceShown ?? splitShown ?? pig?.fen ?? alfil ?? hopper ?? smudgy?.fen ?? gardener?.fen ?? revised?.fen ?? timber?.fen ?? fenShown);
+  const boardFen = rush ? rushBoard(boss, rush, now) : (bounceShown ?? splitShown ?? pig?.fen ?? alfil ?? hopper ?? smudgy?.fen ?? gardener?.fen ?? revised?.fen ?? timber?.fen ?? zebra?.fen ?? fenShown);
   const rushLines = rush ? rushDock(boss, rush, now) : null;
   const evalFen = bounceShown && bounceShown !== boss.board.fen ? (boss.powers?.bounce?.before ?? fenShown) : (pig?.evalFen ?? fenShown);
   const jolt = bounceJolt(bounce && now >= bounce.at ? bounce : null, now) ?? boardSawJolt(moment, now) ?? alfilJolt(moment, now);
@@ -526,7 +551,7 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
         <div class={`board-row${fun.spin === "half" ? " pw-flipping" : fun.spin ? ` pw-turning-${fun.spin}` : ""}`}>
           {bossSide}
           <EvalBar fen={evalFen} orientation={orientation === "white" ? "w" : "b"} evaluate={(f) => match.evaluate(f)} />
-          <Board fen={boardFen} orientation={orientation} turn={view.turn} lastMove={pig?.lastMove ?? revised?.lastMove ?? lastShown} animate={!rush && !bounceShown && !splitStill(split, now) && !pig?.still && !alfil && !hopper && !smudgy?.still} elephants={intro ? undefined : boss.powers?.elephants} decor={gardener?.decor} premove={{ key: seatKey(match, boss.board.id, boss.crowdSide), side: boss.crowdSide, watch: !!lights || !!rush || !!loading }}>
+          <Board fen={boardFen} orientation={orientation} turn={view.turn} lastMove={pig?.lastMove ?? revised?.lastMove ?? lastShown} animate={!rush && !bounceShown && !splitStill(split, now) && !pig?.still && !alfil && !hopper && !smudgy?.still} elephants={intro ? undefined : boss.powers?.elephants} gold={intro ? undefined : zebraGold(boss, moments, now)} decor={gardener?.decor ?? (intro ? undefined : boingoDecor(boss, moments, now))} premove={{ key: seatKey(match, boss.board.id, boss.crowdSide), side: boss.crowdSide, watch: !!lights || !!rush || !!loading }}>
             {!intro && <PowerBoard boss={boss} orientation={orientation} moments={moments} now={now} fen={boardFen} />}
             {rush && <RushLayer boss={boss} view={rush} now={now} orientation={orientation} onPlace={(from, to) => match.rushPlace(from, to)} />}
             {lights && <LightsOutLayer boss={boss} lights={lights} now={now} orientation={orientation} graceMs={match.settings.lateGraceMs} onTap={(sq) => match.lightsTap(sq)} />}

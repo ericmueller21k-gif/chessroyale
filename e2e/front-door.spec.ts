@@ -1,5 +1,5 @@
 import { expect } from "@playwright/test";
-import { asAdmin, named, openBossRaid, switchesOff, test, openPlayWithFriends, pickMode } from "./helpers.ts";
+import { asAdmin, named, openBossRaid, switchesOff, test, openPlayWithFriends, pickMode, leaveQueue } from "./helpers.ts";
 
 const live = (p: import("@playwright/test").Page) => p.evaluate(() => fetch("/api/live").then((r) => r.json()));
 
@@ -10,7 +10,7 @@ test("home: the live line comes from the server, the RANKED row changes the line
   await expect(page.locator(".fd-logo").filter({ visible: true })).toHaveText("HunChess");
   // Your profile: the top bar's pawn on a phone, the side menu's Profile on a computer (the right column's pawn went, Nov 7).
   if (test.info().project.name === "desktop") await expect(page.getByRole("navigation", { name: "Menu" }).getByRole("button", { name: "Profile" })).toBeVisible();
-  else await expect(page.getByRole("button", { name: "Your profile", exact: true })).toBeVisible();
+  else await expect(page.getByRole("button", { name: "View profile", exact: true })).toBeVisible();
   await expect(page.locator(".fd-hero-name")).toHaveText("Eric");
   // The live line: you're online (the app told the server you're here).
   const line = page.getByRole("status").filter({ hasText: "online" });
@@ -35,7 +35,7 @@ test("home: the live line comes from the server, the RANKED row changes the line
   await expect(page.getByRole("radiogroup", { name: "RANKED" }).getByRole("radio")).toHaveText([/^50 v 50/, /^1 v 1/, /^Squads/]);
   await page.getByRole("radio", { name: /Squads/ }).click();
   await expect(page.locator(".fd-hint")).toHaveText(/^Solo queue: bots fill any empty seat after \d+ s$/);
-  await expect(page.getByRole("radiogroup", { name: "Squads" }).getByRole("radio")).toHaveText(["Solo queueyou join a squad", "Partywith up to 3 friends"]);
+  await expect(page.getByRole("radiogroup", { name: "Squads" }).getByRole("radio")).toHaveText(["Solo queuejoin a squad", "Partyup to 3 friends", "BotsSoon"]);
   await expect(page.getByRole("radio", { name: /^Solo queue/ })).toHaveAttribute("aria-checked", "true");
   await expect(page.getByRole("radiogroup", { name: "Matchmaking" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeEnabled();
@@ -132,8 +132,8 @@ test("the queue: your pawn first and ringed, others pop in, Cancel frees the sea
   const before: string[] = await ann.evaluate(() => (window as any).__soundLog);
   expect(before.some((l) => l.startsWith("pop:") && !l.endsWith(":muted"))).toBe(true);
   await ann.getByRole("button", { name: "Turn sound off" }).click();
-  // Bo cancels: home again, and Ann's count drops.
-  await bo.getByRole("button", { name: "Cancel" }).click();
+  // Bo leaves the queue (Exit, "Keep me in the queue" unchecked: Nov 10): home again, and Ann's count drops.
+  await leaveQueue(bo);
   await expect(bo.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
   await expect(ann.locator(".fd-count-n")).toHaveText("1");
   // Time's up (8 s locally): bots pop into the empty seats, then the match begins.

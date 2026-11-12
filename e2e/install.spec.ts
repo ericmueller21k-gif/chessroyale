@@ -10,5 +10,13 @@ test("installable: manifest, icons and a service worker that precaches the engin
   expect((await request.get("/icons/apple-touch-icon.png")).ok()).toBe(true);
   const sw = await (await request.get("/sw.js")).text();
   expect(sw).toContain("/engine/stockfish-19-lite-single.wasm");
+  // Pictures and the demo video aren't precached (Nov 10, phone load): pictures are kept when first shown, the video streams.
+  const files = JSON.parse(/const FILES = (\[.*?\]);/s.exec(sw)![1]!) as string[];
+  expect(files.filter((f) => /\.(png|jpe?g|webp|gif|mp4|webm)$/.test(f))).toEqual([]);
   await expect.poll(() => page.evaluate(async () => !!(await navigator.serviceWorker.getRegistration())), { timeout: 10_000 }).toBe(true);
+  // A file outside /assets/ is kept with its contents' hash (Nov 10), so the next version copies it instead of downloading it again.
+  const hashes = JSON.parse(/const HASHES = (\{.*?\});/s.exec(sw)![1]!) as Record<string, string>;
+  const wasm = "/engine/stockfish-19-lite-single.wasm";
+  expect(hashes[wasm]).toMatch(/^[0-9a-f]{12}$/);
+  await expect.poll(() => page.evaluate(async (f) => (await caches.match(f))?.headers.get("x-brc-hash") ?? null, wasm), { timeout: 30_000 }).toBe(hashes[wasm]);
 });

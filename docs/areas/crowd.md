@@ -4,6 +4,12 @@ Lane: the director (the match screens are the director's; other lanes add to the
 The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine.md).
 
 ## How it works today
+- **Its queue while you browse** (Nov 10; [matchmaking.md](matchmaking.md), "Stepping out of a lobby"; home's rows: [hub.md](hub.md)): the 50 v 50
+  lobby's Exit with "Keep me in the queue" keeps your seat as you look around ("Searching · 50 v 50", "Solo queue · 37 of 100"); the lobby
+  filling takes you in. Home's Start with bots ("Play bots?", Yes) leaves the queue for you and 99 bots at once, at your last Bot level.
+- **The XP box** (Nov 9; [2026-11-09-xp-box.md](../decisions/2026-11-09-xp-box.md)): the result screen (`screens/Results.tsx`; online, asked for by the lobby's code) shows `XpResult`, a fixed 78 px box (its top row: the gain, your name, your level): the
+  bar filling from your old XP to the new, "+170 XP", "Level 7", the parts ("Win +50": never the minutes, Eric, Nov 9), or why there was none. Its rules
+  and storage: [accounts.md](accounts.md), "XP and levels".
 
 - **The board on a computer** (Oct 29; docs/decisions/2026-10-29-desktop-board-size.md, [board.md](board.md)): the window's height
   less 170 px (the title line, the line over the board, the row under it), never wider than its column: 904 px at 1920 × 1080
@@ -169,6 +175,10 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
   0.75 s of Maia a team turn on a computer, about 3 s on a phone (`reports/crowd-bots.md`). Test:
   `npx tsx packages/sim/scripts/crowd-bots-sim.ts tuned 10` (an engine-best player among 99 bots; `summary` writes
   `reports/crowd-bots.md`).
+  **Solo's Bot level** (Nov 9; [2026-11-09-home-modes-bot-level.md](../decisions/2026-11-09-home-modes-bot-level.md)): home's Bots asks
+  the bots' average (`BOT_LEVELS`: 700, 950, 1150 = the curve above, 1500, 1900, your own rating, or Random, uniform 600 to 2200), carried
+  as `Settings.botLevel` into `botStrength` (each bot's rating fixed by name + level; the curve narrows near 600 and 2200 so a level's
+  average holds). Solo only: online lobbies' bots are as above.
   **In 50 v 50 they spread over the good lines** (Nov 2; `CROWD_BOTS`, `botLean`, `botPickSpread` in core/match.ts;
   docs/decisions/2026-11-02-crowd-bot-spread.md; Eric: "unique lines favored over optimal play"): each team turn draws
   one shared lean from the turn's seed (a focus on the engine's numbers and a taste per line, the same for every bot of
@@ -200,7 +210,8 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
 - **The phone's layout (Nov 1; docs/decisions/2026-11-01-crowd-phone-scoreboard.md, then 2026-11-01-crowd-phone-tabs.md):**
   the middle box under the board is one fixed height (`--mid-h`, styles.css, the locked phone screen), exactly the vote
   box's: its bars (14 px each, six at most; `--slots` steps down on short screens) and the one result line, which sits at
-  its foot. The ⚡ row, the status line and the bars take turns in it. The scoreboard starts 4 px under it and fills the
+  its foot. The ⚡ row sits at its top and the status slot under it is 42 px in every phase (empty while picking; Nov 8,
+  `crowd.spec` "the match screen's rows never move"), the bars take turns in the rest. The scoreboard starts 4 px under it and fills the
   rest of the screen, and never moves. Its header reads Black · White · All · Chat (yours picked when the match starts;
   tapping the picked one or the rows opens the full list for that pick). Chat replaces the scoreboard in the same box;
   "‹ Back" returns to the pick. The reveal has no "your team watched" line any more. The box is one element for the

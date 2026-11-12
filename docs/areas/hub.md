@@ -4,6 +4,35 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
 
 ## How it works today
 
+- **Loading (Nov 10, [phone load 2](../decisions/2026-11-10-phone-load-2.md)):** `index.html`'s shell (home's markup, only the logo, hero
+  panel and PLAY's outline visible; the splash where this device hasn't landed on home: `shell.ts`) shows before the script runs and goes as
+  the first real screen draws. The match screens (`screens/game-screens.ts`), solo, FAQ, Legal and Auto chess are chunks (`lazy.tsx`),
+  preloaded when play is near. Pictures are cached on first show, not precached; the demo video is MP4 only. `scripts/measure-load.mjs`.
+  Past `FRONT_DOOR.loadBarAfterMs` (2 s) the shell shows a thin bar and what's loading (under the splash's logo, centered; the shell is always the splash since Eric's Nov 10 call, never home's outline),
+  moved by the app's steps (`loadbar.ts`); a script that won't load, or no step for 20 s: "Try again" (a reload).
+  [Decision](../decisions/2026-11-10-loading-bar.md); guard: `e2e/home-layout.spec.ts`, "the loading bar".
+  Your profile (`/api/me`) is asked for beside the sign-in options, not after them (`account.ts` `loadAccount`, Nov 10). The service
+  worker precaches one file at a time at low priority and, after a deploy, copies what's unchanged from the old version's cache
+  (same name under `/assets/`, else the same hash in `sw.js`'s `HASHES`) instead of downloading it again.
+
+- **The daily quests overlay (Nov 9; the mockup [2026-11-09-quests-mock.md](../decisions/2026-11-09-quests-mock.md), on real quests since
+  phase 3: [2026-11-09-quests-screens.md](../decisions/2026-11-09-quests-screens.md); the rules and server: [accounts.md](accounts.md), "Quests"):**
+  `components/QuestsOverlay.tsx` (props: the quests, each with its `canReroll`, the two countdowns, paused, callbacks), fed by `quests.ts` (`useQuests`:
+  GET /api/quests as home shows; the reroll's POST). A gold-framed card over home (a plain dark dim, no blur): the app icon in a crest, "Daily Quests",
+  "New quests in 12h" ("Quests are paused for a moment." under PAUSE_REWARDS), two or three daily rows (one carried over) and the weekly under its own
+  label ("Resets in 4d"), each with its picture (a live boss's portrait, Squads' pawns, the board's pieces), goal, bar and count ("Done!"), and its
+  reward in the shop's art (the Winter crate, the key); a reroll on each daily (each its own, once a day: only that one greys once used, or on a done quest; Nov 10); "Got it", ×, Escape
+  or a tap outside close it. **By itself** on the XP day's first home visit, signed in, on this device (`hunchess.quests.seenDay`), never over the
+  walkthrough, the queue or another notice (chat's, the Welcome Crate's): then it stays due, and the day counts as seen only when it shows
+  (review of #575, m3). **After a game that moved a quest** (Nov 10, [decision](../decisions/2026-11-10-quest-progress.md)): home compares the counts
+  with the ones this device last saw (`hunchess.quests.shown`, per account) and opens it by itself (same "never over" rules), each moved bar sliding to
+  its new count in turn (`QUESTS.show`); one it finishes glows, pops, says "Done!" and bursts its reward; sounds by name (`questSound` in sound.ts,
+  placeholders until Eric's pack: `QUEST_SOUND_FILES`). e2e sets `hunchess.quests.noPop` unless `questsSeen: false`. The **Quests entry** is a phone's top bar button (beside your pawn, before the shop; below 344 px the logo becomes the app's icon so
+  every button keeps 40 px) and a computer's **Daily Quests** in its side menu, between Play with friends and Shop & crates (`nav.quests`: home with the
+  overlay open, via `intent`; Eric, Nov 10, [decision](../decisions/2026-11-10-desktop-quests.md); nothing on the card); for everyone, greyed ("Sign in
+  for quests") for a guest where sign-in is set up. A game that finishes a quest says so in its result's toast ("Quest done: Boss Hunter +300 XP").
+  Guards: `e2e/home-layout.spec.ts`, "quests (Nov 9, phase 3 …)", and `e2e/quests.spec.ts`, phone and computer.
+
 - **The first-time walkthrough** (`components/Walkthrough.tsx`, slides in `tutorial.ts`): 13 slides; each lights every visible
   `data-tour` element (a computer's side menu and home button both). Only the last slide has OK and "Don't show me this again";
   `?tour=1` reopens it. Decision: [2026-11-07-walkthrough-v2.md](../decisions/2026-11-07-walkthrough-v2.md).
@@ -15,6 +44,17 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
 - **The landing page** shows where online play needs signing in (`onlineNeedsSignIn` from `/api/auth/config`) and
   you aren't signed in: sign in, or play against bots as a guest (remembered on the device). An invite link shows it
   even to a guest. `?nolanding` skips it (tests). Guests play Solo, a Solo raid and Boss alone.
+  Its sign-in box (Nov 12, Eric: "put a sign in already [first], and then below that... a sign up button, and then... your age
+  thing"): **Sign in** first, Google and the email code with no question; "New to HunChess?" **Sign up** below, which asks
+  "Sign up: when were you born?" in the same box, then the same two ways ("Have an account? Sign in" goes back). The heading
+  names the view ("Sign in to play online", "Sign up to join lobby ABCDE"). Both views are the same height (the question's rows
+  wrap where the email's do), so switching moves nothing below. [accounts.md](accounts.md), "The age gate";
+  [2026-11-12-signin-without-age.md](../decisions/2026-11-12-signin-without-age.md).
+  Its **demo reel**, 25 s on a loop, a pixel-font caption each (50 v 50; the park, Big Boy's challenge; ranked, the ranks up to
+  Transcendent; the Hidden Boss), cut twice: a phone's portrait one (`/media/hunchess-reel.*`, 860 × 1544, the screen's whole width)
+  and a computer's 16:9 one from 1024 px (`hunchess-reel-wide.*`, 1920 × 1080). Only one loads. From 1024 px the page fills the
+  window and never scrolls: left, the title and the reel, as big as fits; right, a 380 px column (sign-in, then Questions), the
+  only part that scrolls (`.landing-stage` / `.landing-side`, display: contents below 1024 px). Remake: `scripts/reel/` then `scripts/encode-demo.sh`. [2026-11-11-landing-reel.md](../decisions/2026-11-11-landing-reel.md).
 - **Home** (built from the approved mockups in `docs/mockups/front-door/`; the RANKED row and the Boss raid card, Eric,
   Oct 16, [docs/decisions/2026-10-16-home-ranked-row-and-boss-raid.md](../decisions/2026-10-16-home-ranked-row-and-boss-raid.md)):
   - **The RANKED row:** a small "RANKED" label over three buttons, a radio group: **50 v 50** ("Crowd chess"), **1 v 1**
@@ -26,22 +66,37 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
     text). One box of one fixed size for every mode (Eric, Oct 18:
     "it should never change size";
     [docs/decisions/2026-10-18-home-steady-layout.md](../decisions/2026-10-18-home-steady-layout.md)), holding the
-    pick's options or words: 50 v 50's Matchmaking (**Default**, **Bots off**, **Solo**: each its title only, 44 px
-    buttons filling the row; Oct 28, Eric: "3 times in this screen it says the same thing", so the sub-labels and the ⓘ
-    with its pop-up are gone: what each does is the line above PLAY, and the ranking rule is in the FAQ's "Your rating");
-    Squads' **Solo queue** or **Party** ([squads.md](squads.md); Party opens the party sheet at
-    once, and PLAY opens it again while Party is picked); for 1 v 1 (always people) your rank's emblem (48 px, its box
+    pick's options or words (Nov 9, [2026-11-09-home-modes-options.md](../decisions/2026-11-09-home-modes-options.md)): 50 v 50's
+    **Solo queue** (the public queue), **Party** (greyed, "Soon": queueing together into the public matchmaking, up to
+    `CROWD_PARTY_MAX` = 8, sides random, ranked, a later job; Eric, Nov 9) and **Bots** (you and 99 bots in your
+    browser: PLAY opens **the Bot level box**, [2026-11-09-home-modes-bot-level.md](../decisions/2026-11-09-home-modes-bot-level.md):
+    My level, Very easy … Very hard, Random, each with its average; OK greyed until a pick, remembered on the device, `BOT_LEVELS`;
+    `components/BotLevelBox.tsx`), each a title and a sub line, three equal buttons in the 44 px row (Bots off has no button since
+    Nov 9; a stored "botsoff", a test's, still queues people only); Squads' **Solo queue**, **Party** ([squads.md](squads.md); Party
+    opens the party sheet at once, and PLAY opens it again while Party is picked; its line "Queue with up to 3 friends") and **Bots**, greyed ("Soon") until its server part;
+    for 1 v 1 (always people) your rank's emblem (48 px, its box
     there before your profile loads; none in placements) beside your rank, "Your rank: Gold 2 · 45 RP" or "Your rank:
     Placement 2/5" (`ranked1v1Rank`, from your profile; whole on one line at 320 px at its widest, "Your rank:
-    Transcendent · 1234 RP"), over "Chess vs one player near your level" (Oct 28: "Ranked" dropped so it fits beside
-    the emblem; RANKED heads the row; [2026-10-28-ranked-tiers.md](../decisions/2026-10-28-ranked-tiers.md)). Then **the line above PLAY** (Oct 28, Eric: "swap the line
-    of text below Play and put it above play") and PLAY. The line is a fixed height whatever it says (two lines' room on a
-    phone, one line on a computer), its text bottom-aligned so it sits on PLAY, and empty with no mode picked. After the
+    Transcendent · 1234 RP"), over "Win to climb, lose to drop" (Nov 9; what 1 v 1 is, "Ranked chess vs one player near your level", is
+    the line above PLAY). Then **the line above PLAY** (Oct 28, Eric: "swap the line
+    of text below Play and put it above play") and PLAY. The line is exactly one line whatever it says, phone and computer (Nov 9,
+    [2026-11-09-home-modes-hint-line.md](../decisions/2026-11-09-home-modes-hint-line.md): ellipsized if ever too long, every line
+    written to fit 320 px), and never empty: "Tap a game mode to get started" with no mode picked. The room it freed on a phone (16.9 px)
+    went to the Other modes cards (72.9 px tall there, their foot where it was), PLAY and Chess Town rising by it. After the
     first pick no click on home moves or resizes anything (a mode, an option). The first pick wakes the greyed options (their default selected) and moves nothing: the
     panel was there from the first view (Oct 25; it used to come in with the first pick, Oct 24, which raised the RANKED
     row and the board). PLAY, the cards and the line stay put. 1 v 1's PLAY is
     `startRanked1v1()`: its queue at once, at `/1v1` ([ranked.md](ranked.md)); resting (`PAUSE_RANKED1V1`), PLAY is
-    off with its line, as the other modes.
+    off with its line, as the other modes. Ranked's leave rules (L1, Nov 9; [ranked.md](ranked.md), "Leaving early"): a
+    lockout greys 1 v 1's PLAY with its countdown in the line ("You left early: 1 v 1 opens in 4:32", one line from 320 px;
+    `LeavesLine`, the only part drawn each second), PLAY back by itself as it ends; the delayed queue's line ("3 leaves in your
+    last 20: +2 min queue") leaves PLAY on. Home's note slot (the `fd-notice` at its top, dismissable for the tab) says "You left
+    before the game started: −5 RP" after a dodge, or "Finish ranked games to clear your leaves." from 5 marks; another notice (a match
+    that ended) goes first.
+  - **Searching while you browse** (Eric, Nov 10; [2026-11-10-search-on-home.md](../decisions/2026-11-10-search-on-home.md); `search.ts`, Home's `SearchRow`):
+    a search on (1 v 1's, a 50 v 50 or Squads lobby stepped out of), the modes row keeps its box: a green ring, "Searching · 50 v 50", "Solo queue · 37 of
+    100 in the lobby" (no "in the lobby" under 340 px), the time; the panel Cancel, Lobby, Start with bots (`searchSlots`), Cancel and bots asking in the
+    same slots (the question not a button; Yes, No; back after `FRONT_DOOR.searchAskMs`). The rest greys (`fd-off`, `inert`); the top bar and card stay lit.
   - **Chess Town's button** (Eric, Oct 31 and Nov 1; it was the full-width Boss Arena card, Oct 26, "Party up and take on the bosses";
     [docs/decisions/2026-11-01-home-chess-town.md](../decisions/2026-11-01-home-chess-town.md)): right under PLAY, **exactly PLAY's size at
     every width** (`.fd-town` is in each of PLAY's size rules in `styles.css`: 97 px on a phone, 76 px on a computer, 60 px in a short
@@ -95,7 +150,7 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
   - **The Boss raid screen: a character select** (Eric, Oct 16;
     [docs/decisions/2026-10-16-boss-character-select.md](../decisions/2026-10-16-boss-character-select.md);
     `BossSelect`): tall slanted tiles at the top like a fighting game's select grid, one per boss you can meet, each its
-    boss's figure on a color of its own, all the same size with a small gap, five to a row on a phone (two rows on a wide computer, Nov 2:
+    boss's figure on a color of its own, all the same size with a small gap, six to a row on a phone (two rows on a wide computer, Nov 2:
     [docs/decisions/2026-11-02-boss-select-rows.md]), see also
     [docs/decisions/2026-10-23-boss-select-sf.md](../decisions/2026-10-23-boss-select-sf.md)), the Hidden Boss's dark
     and locked, and "?" for a random boss; under them a stage (the 1 v 1 stage's
@@ -106,9 +161,9 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
     ([docs/decisions/2026-10-17-boss-sheet-fit.md](../decisions/2026-10-17-boss-sheet-fit.md)). A tap drops the boss on,
     plays its sound once and says one of its lines (the boss section, [bosses.md](bosses.md)). Under the stage the ways
     to play. **Boss Battle** (Oct 26 as Solo Boss Mode; the home card and the side menu's item) shows **START** (Oct 29; it was the Boss alone button); the full
-    screen (`?mode=raid`, the test link, titled "Boss raid") shows every choice below, as before, until the raids move to
-    Chess Town's Colosseum. Each choice goes through its flow: **Join a raid** and **People only** (the raid's queues, always a random boss:
-    "Random boss · …"), **Raid with bots** (a Solo raid against the boss picked), **Boss alone** (its menu: the
+    screen (`?mode=raid`, the test link, titled "Boss Battle" too since Nov 10) shows every choice below, as before, until the raids move to
+    Chess Town's Colosseum. Each choice goes through its flow: **Join a Boss Battle** and **People only** (the raid's queues, always a random boss:
+    "Random boss · …"), **Play with bots** (a Solo raid against the boss picked), **Boss alone** (its menu: the
     difficulty and the boss picked; a phone's sheet at the foot under 600 px wide, a dialog in the middle with room all
     round from 600 px at any height, its rows scrolling inside so it always fits) and **Play with friends** (a raid made
     for the boss picked: the lobby's `bossPicked`; or join one by code). With the Hidden Boss picked every choice is
@@ -124,7 +179,7 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
     then goes to its page. A phone and a touch tablet have none.
     wait above PLAY. The shop, your profile and Play with friends are in a phone's top bar and a computer's side menu,
     not on home's column (Eric, Oct 18; [docs/decisions/2026-10-18-play-at-the-bottom.md](../decisions/2026-10-18-play-at-the-bottom.md)).
-  - **Play with friends** (a phone's **Friends** in the top bar, a computer's side menu): **Get friend code** makes a
+  - **Play with friends** (the friends page's **Private lobby**, a computer's side menu): **Get friend code** makes a
     lobby in the row's pick (50 v 50 if none, or with 1 v 1 or Squads picked) and copies its invite link as it opens
     (the lobby screen says "Invite link copied: paste it to your friends"); join one by its code; **Your friends ›**
     (with "N new") opens the friends list. The full Boss raid screen's Play with friends makes a raid, as before (the
@@ -134,13 +189,11 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
     color, then the RP ("Gold 3 · 45 RP"), "Placement 2/5", or "Unranked" before your first ranked game (a blank line of the
     same height while your account loads). No rating rank's name: `RATING_RANKS` is retired
     ([2026-10-28-ranked-tiers.md](../decisions/2026-10-28-ranked-tiers.md)).
-  - **An admin's test rank and level** (Oct 28, Eric: "lvl - 38 … show it at 3/4 like I'm 3/4 to level 39"; only where
-    `testSwitchesAllowed()`: an admin, or a server with `TEST_SWITCHES` on; a player sees home as before). The rank line shows
-    the address's `?rank=` (`?rank=gold-3`, `?rank=transcendent`; it replaced the first placeholder, "Opal III"), and your icon
-    has a thin **green ring** filled clockwise from the top to **3/4** over a faint track, with a tiny **"LVL 38"** (the line's
-    gray) centered above it, as wide as the icon (`LevelRing`, `TEST_LEVEL` in `components/FrontDoor.tsx`). **The level is a
-    placeholder** until the real levels exist. The ring and the level are drawn outside the icon's box and take
-    no room, so home is the same size and shape with or without them (and doesn't move when the account loads).
+  - **An admin's test rank** (Oct 28: `?rank=gold-3`, only where `testSwitchesAllowed()`) shows in the rank line; a player sees their real
+    rank. **Your level** (real since Nov 9; [2026-11-09-xp-box.md](../decisions/2026-11-09-xp-box.md)): a thin **green ring** round your
+    icon, filled clockwise from the top to your share of the level, and a tiny **"LVL 7"** above it (`LevelRing` in `components/FrontDoor.tsx`,
+    from `/api/me`'s `xp`), for everyone who can earn XP (signed in, or anyone where sign-in isn't set up). Both are drawn outside the
+    icon's box and take no room, so home is the same size and shape with or without them.
   - **Your ride on home** (Eric, Nov 1: he equipped Riding Chirp and "it doesn't show on the main page on desktop"): the big pawn on
     your card, your ring (a phone's top bar) and the side menu's Profile item ride the ride you wear
     (`DressedPawn`'s `ride`, as the locker's preview and the profiles do; [2026-10-31-rides.md](../decisions/2026-10-31-rides.md)), its
@@ -148,8 +201,8 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
     The same big pawn on a computer's queue screen rides too (it's the same card). Not your pawn in the queue's and Squads' small cards or a match's screens (still the pawn alone).
   - A screen that replaces home (a phone's queue, the Boss raid screen, home again) starts at its top. A match's Home
     and a closed lobby's note land on home itself; Cancel in a raid's queue goes back to the Boss raid screen (the full one).
-  - **Phone:** a top bar (the logo, your pawn (your profile), the shop, **Friends** (with a count
-    of requests and invites), then a gear that opens Settings in one tap; a computer's are its side menu's, so none is
+  - **Phone:** a top bar (the logo, a **chat** button where the pawn was (Nov 11: the global chat as a full-screen sheet over home, `components/ChatSheet.tsx`; [decision](../decisions/2026-11-11-home-chat-profile.md)), the shop, **Friends** (with a count
+    of requests and invites), then a gear that opens Settings in one tap (Nov 9: the icons a size bigger; Nov 10: Quests, the shop, Friends and the gear plain outlines in the text color, no fill, [decision](../decisions/2026-11-10-quick-fixes.md); the profile is the shop's square showing only your pawn's face, still: [decision](../decisions/2026-11-09-topbar-color.md)); a computer's are its side menu's, so none is
     there; [docs/decisions/2026-10-17-phone-settings-gear.md](../decisions/2026-10-17-phone-settings-gear.md),
     [docs/decisions/2026-10-18-play-at-the-bottom.md](../decisions/2026-10-18-play-at-the-bottom.md)), then one column: your card, the RANKED row, its panel, the line
     above PLAY and PLAY (Oct 28), then Chess Town's button (PLAY's size), then Other modes with Boss Battle and Auto chess side by side, at the bottom. Your pawn's card takes the room
@@ -160,17 +213,20 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
     from 360×640 up in every mode. At 320×568 home fits too, with a small pawn (about 51 px).
     ([docs/decisions/2026-10-18-phone-home-fits.md](../decisions/2026-10-18-phone-home-fits.md)). Big tap targets, no
     sideways scroll at 320–430 px; a long name on your home card ellipsizes.
+  - **Your profile (Nov 11):** "View profile" in the card's bottom-right corner (13 px words and its box at the bottom edge on cards under 110 px); `e2e/home-layout.spec.ts`, "View profile never covers your name".
+  - **Portrait (Nov 11, Eric: rotation off on phones):** a phone held sideways (landscape, 500 px high or less) is covered by `#rotate-lock` in `index.html`; the installed app is locked by its manifest, and `main.tsx` asks `screen.orientation.lock` where a browser allows it.
   - **Computer** (1024 px+): a side menu, the play column in the center in the phone's order (Eric, Oct 18): the RANKED
     row, its panel, the line above PLAY and PLAY (Oct 28), then Chess Town's button (PLAY's size), then Other modes with Boss Battle and Auto chess side by side (a little shorter) at the
     bottom; the right column (Nov 7, Eric's mockup; the same place on every framed page: a 62 px slot, TOWN and its tools in the
-    town; FRIENDS ›; the live line; the global chat, [chat.md](chat.md)). The pawn hops on a computer too (Oct 24: the hop was phone-only).
+    town; FRIENDS ›; the live line; the global chat, [chat.md](chat.md)). The pawn hops on a computer too (Oct 24: the hop was phone-only). Nov 11: no pawn or chat button in the top area on a computer.
     From 1280 px the play column starts with the **live window**: the featured real match (a matchmade one, most
     people, then newest) or, when none runs, bot-match replays played on a shared clock cycle so everyone sees the same
     moment (`LIVE_WINDOW`; replays in `packages/app/public/replays/crowd-bots.json`, never fetched on phones).
     A computer's only (`LIVE_WINDOW_MEDIA`: 1280 px wide, 600 px tall, a mouse; never mounted on a phone or tablet)
     and always silent, whatever the sound setting (its board is `silent`; Eric, Oct 12).
 - **The live line** is GET `/api/live`: polled every `FRONT_DOOR.livePollMs` while a front-door screen shows it, every
-  `heartbeatMs` elsewhere (a match), never while the tab is hidden. The same request says you're here. Online = seen
+  `heartbeatMs` elsewhere (a match), never while the tab is hidden; a request with no answer is given up after `liveTimeoutMs` (10 s,
+  Nov 11: one that never answered stopped every later one, and the chats riding on it). The same request says you're here. Online = seen
   within `onlineWindowMs`. The numbers come from the live hub (see [ops.md](ops.md)). Squads' lobbies report to the
   hub too (Oct 15) but stay off this line: they count for the overload limit and the ops health view only.
 - **The queue screen:** the lobby's seats fill on screen (people, then bots popping in after the fill time), the wait
@@ -180,8 +236,7 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
     viewer, opened by a tap on another player's name or face anywhere (`PlayerName`, the queue's pawns, the town card, a lobby; the
     address `/profile/<id>`). Back, "Player Profile", ••• (Block, Report); their dressed pawn in a circle over their icon (blurred and
     faded; the theme's light yellow with the default pawn) with a green dot while they're online; their name; "Online now · Joined
-    Oct 2026" (or "Last seen 2h ago · …", or just "Joined …" if they hide it); "Level 38" (an admin's `TEST_LEVEL` placeholder only,
-    else no line, and no room kept for one); **Challenge** (today's invite) and **Add Friend** (today's request), both greyed on your
+    Oct 2026" (or "Last seen 2h ago · …", or just "Joined …" if they hide it); "Level 7" (everyone's, from their XP, since Nov 9; the line is there while the page loads); **Challenge** (today's invite) and **Add Friend** (today's request), both greyed on your
     own page, for a guest, while loading and for someone you blocked; then three cards: **Ranked Standing** (1v1 / 50 v 50 /
     Squads menu, "Season 1": the 1v1 emblem, tier and division, RP, peak rank, win rate, W / L, win streak; "Placement 2/5",
     "Unranked", "Banned" and "Coming soon" in the same room), **Recent Matches** (the last five games in any mode, a ranked 1 v 1's
@@ -204,12 +259,23 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
   the rank's label from the profile, null until it loads). The first-time pawn-vote hint is `VoteHint`
   (`components/VoteHint.tsx`, once per device: `brc.voteHintSeen`), for every pawn vote to use.
 - **Friends** (Oct 15; [docs/decisions/2026-10-15-friends-and-invites.md](../decisions/2026-10-15-friends-and-invites.md); the rules and data on [accounts.md](accounts.md)):
-  - **Where:** a phone's way in is **Friends** in home's top bar (its sheet's "Your friends ›"), or Friends on your own
+  - **The friends page** (`/friends`, `screens/Friends.tsx`; Eric, Nov 11, [decision](../decisions/2026-11-11-friends-page.md): it replaced the Nov 9
+    pop-up): Back, a search box (names starting with what's typed, any case, from 2 characters, 250 ms after typing stops: `GET /api/friends/search`,
+    public fields only, banned, test accounts and, where sign-in is set up, guests left out; its own rate limit), the results in a fixed-size box over
+    the page (icon, name, level; a tap opens their profile, where Add Friend is), **Private lobby** ("Make one or join with a code": Play with friends'
+    sheet), **Online** (each with what they're doing: the app's live line says `?doing=`, core's `ACTIVITIES`,
+    kept in the live hub's memory beside "in a match"; Invite) and **Offline** ("Last online 2h ago", Invite greyed), then invites and friend
+    requests when any (under the lists, so nothing above them moves when they arrive: fix round, Nov 11), then "Requests sent and blocked ›"
+    (Cancel, Unblock) and Settings. The query and hash stay on the address in and out of `/friends` and a profile opened from it (test switches, links). The page watches the live line (`watchLive`) while open: its inbox count is how a new request or invite reaches the list. The search reads
+    `users_name`, or `users_name_signed` (partial: signed-in accounts only, its WHERE the search's own text) where sign-in is set up, ordered by
+    the name alone so LIMIT stops after six rows (never every guest named "Player").
+  - **Known staleness (accepted):** `doing` can be a moment stale across Worker instances: two instances' batches can reach the hub out of order
+    (the town, then home from another instance flushed first), and the list shows the older activity until the next 30 s heartbeat. Same as
+    `busy` today (`presence.ts`, `live.ts`); not worth ordering the batches.
+  - **Where:** a phone's way in is **Friends** in home's top bar (the page above), or Friends on your own
     profile, each with the count of requests and invites (Eric, Oct 18: home's line above the live line is gone,
     [docs/decisions/2026-10-18-play-at-the-bottom.md](../decisions/2026-10-18-play-at-the-bottom.md)); a computer's right column has "FRIENDS ›" (Nov 7: the list and its Invite buttons went with Eric's mockup; requests' count
-    beside it). Both open the friends list (`/friends`): invites to you (Join,
-    ✕), friend requests (Accept, Decline), your friends online first (In a match next, then the rest; Invite on each),
-    the requests you sent (Cancel) and who you've blocked (Unblock).
+    beside it). Both open the friends page.
   - **Someone's profile:** Add friend (or Cancel request, Accept friend, Remove friend), Invite to play, Block and
     Report; Remove and Block ask for a second tap. Blocked: Unblock and Report only.
   - **Inviting:** to your private lobby while it waits, or your Squads party; at the front door with neither, the
@@ -314,6 +380,7 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
 
 | What | Where |
 | --- | --- |
+| Searching while you browse (every queue): the state, the bar | `packages/app/src/search.ts`, `components/SearchBar.tsx`; home's rows in `screens/Home.tsx`; the lobbies' Exit in `screens/Queue.tsx` (`useQueueExit`) |
 | Screens | `packages/app/src/screens/Home.tsx` (home, the RANKED row, Chess Town's button, the Other modes cards (Boss Battle, Auto chess), the Boss raid screen and its Solo Boss Mode form), `Landing.tsx`, `Queue.tsx`, `Profile.tsx`, `PlayerProfile.tsx` (yours), `PublicProfile.tsx` (everyone's), `Settings.tsx`, `Lobby.tsx`, `Legal.tsx`, `Friends.tsx` |
 | Friends' pieces (rows, the live panel's section, the toast, Invite friends, the settings, a profile's buttons) | `packages/app/src/components/Friends.tsx`; the list and actions `friends.ts` |
 | The computer's frame and menus | `components/FrontDoor.tsx`, `FrontMenu.tsx`, `LiveWindow.tsx`, `LiveNumber.tsx`, `MiniBoard.tsx`, `TinyBoard.tsx`, `LeaderboardSheet.tsx` |
@@ -343,7 +410,7 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
 - e2e: `e2e/front-door.spec.ts`, `home-ranked.spec.ts` (the RANKED row at 320-390 px and on a computer, home keeping still through every click
   (PLAY, the line above it, the board preview, Chess Town's button and the panel within 1 px, at 320 and 390 px and 1280-1920 px), "home, said
   once" (Oct 28: no ⓘ, titles only, the line above PLAY, the cards' pictures beside their words, PLAY's height, Chess Town's button PLAY's size, a phone fits) and "test rank
-  and level" (an admin's `?rank=`, ring and LVL 38; a player sees neither, and their real 1 v 1 rank), 1 v 1's PLAY,
+  and level" (an admin's `?rank=`; everyone's real level ring and LVL from their XP, Nov 9; a player's real 1 v 1 rank), 1 v 1's PLAY,
   the Boss raid screen (`?mode=raid`) and each of its choices, `/bosses`), `boss-select.spec.ts` (the character select: a
   tap's drop, sound and line, "?", the Hidden Boss dark and locked and never named, the pick reaching Boss alone, a Solo
   raid and a raid you make, resting bosses, the layout at 320-1280 px, the card turning; Boss alone's menu and
@@ -352,7 +419,7 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
   `profile.spec.ts` also checks that home's pawn and your ring ride your ride in the same boxes (Nov 1), at every ride's 0.75 and as drawn too (`?rideScale=1`), and ("rides lazy", Nov 1) that while a ride's drawing (its own chunk) is held back home's pawn and ring, your profile's pawn and the locker's tile keep the same boxes, the pawn sitting where it will ride, the ride appearing under it; `crate-banner.spec.ts` also the crate pages' gambling warning (shop.md);
   unit: `packages/app/test/home-art.test.ts` (the 50/50 pick and `?town=`, the scene's whole-pixel layout at phone, computer and short-laptop sizes, the four drawings' frames, the clock's three skies and `?sky=`, and that each look keeps every pixel in its place); `home-polish.spec.ts` also checks Chess Town's button under the three skies (the clock's edges, `?sky=`, nothing moving, no swap while you look);
   `install.spec.ts`, `crate-banner.spec.ts`, `friends.spec.ts` (two players: request, accept, online, the invites
-  setting, an invite joined from its toast, a block; the phone's line at 320 px), `eval-bar.spec.ts` (never shown, testers
+  setting, an invite joined from its toast, a block; the friends page: search, profile, accept, "In Chess Town", phone and computer), `eval-bar.spec.ts` (never shown, testers
   too: the Testing row shown, off and disabled, the board's room, phone and computer; players: no bar, no switch), `piece-sounds.spec.ts`
   (pick, preview, reload, what loads, every file's start and loudness; the Reveal sound), `faq.spec.ts` (Settings →
   FAQ, a jump to a section, a link to a heading, back).

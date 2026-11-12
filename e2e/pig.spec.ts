@@ -164,7 +164,14 @@ async function untilShowdown(page: Page, turns = 8) {
     expect(b.powers.events.map((e: { kind: string }) => e.kind)).not.toContain("warn");
     if (b.powers.showdown && b.powers.showdown.turn === b.powers.turn) return b;
     const move = await goodMove(page);
-    if (b.powers.scout) await page.waitForTimeout(6000);
+    // (His scout's search on this position wound down (it stops early on a hopeless one), up to the 6 s a crowd might think.)
+    if (b.powers.scout)
+      await page.evaluate(() => {
+        const m = (window as any).match;
+        const scout = m?.runner?.showdownScout ?? m?.scout;
+        const think = new Promise((done) => setTimeout(done, 6000));
+        return scout ? Promise.race([scout.idle(), think]) : think;
+      });
     await play(page, move);
   }
   throw new Error("no showdown");

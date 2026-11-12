@@ -4,7 +4,7 @@
  */
 import { BOARD_SAW } from "@chessroyale/chess";
 import { toGrid } from "../paint.ts";
-import { lazyParts, type Anim, type Character, type Frame, type Speck } from "../sprite.ts";
+import { lazyAnim, lazyParts, type Anim, type Character, type Frame, type Speck } from "../sprite.ts";
 import { SQUARE } from "./common.ts";
 
 const SAW_PALETTE = {
@@ -202,7 +202,7 @@ export const SAW_CRACK: Character = {
   palette: SAW_PALETTE,
   parts: crackParts,
   anims: {
-    crack: { loop: false, frames: [cutFrame("crack0", 60, "crack"), cutFrame("crack1", 80), cutFrame("crack2", 90), cutFrame("crack3", 100), cutFrame("crack4", 110), cutFrame("empty", 20)] },
+    crack: lazyAnim(() => ({ loop: false, frames: [cutFrame("crack0", 60, "crack"), cutFrame("crack1", 80), cutFrame("crack2", 90), cutFrame("crack3", 100), cutFrame("crack4", 110), cutFrame("empty", 20)] })),
   },
 };
 
@@ -265,11 +265,11 @@ export const BOARD_GAP: Character = {
   palette: SAW_PALETTE,
   parts: gapParts,
   anims: {
-    run: { loop: false, frames: Array.from({ length: GAP_STEPS + 1 }, (_, k) => cutFrame(`run${k}`, gapRunStep(BOARD_SAW.runMs))) },
+    run: lazyAnim(() => ({ loop: false, frames: Array.from({ length: GAP_STEPS + 1 }, (_, k) => cutFrame(`run${k}`, gapRunStep(BOARD_SAW.runMs))) })),
     // (The first frame long enough that a busy phone never skips it, and its sound with it.)
-    part: { loop: false, frames: [cutFrame("part7", 160, "split"), cutFrame("part10", 90), cutFrame(`part${GAP_W}`, 100)] },
-    gap: { loop: true, frames: [cutFrame(`part${GAP_W}`, 1000)] },
-    close: { loop: false, frames: [cutFrame("close10", 110, "rejoin"), cutFrame("close6", 110), cutFrame("close2", 140), cutFrame("empty", 30)] },
+    part: lazyAnim(() => ({ loop: false, frames: [cutFrame("part7", 160, "split"), cutFrame("part10", 90), cutFrame(`part${GAP_W}`, 100)] })),
+    gap: lazyAnim(() => ({ loop: true, frames: [cutFrame(`part${GAP_W}`, 1000)] })),
+    close: lazyAnim(() => ({ loop: false, frames: [cutFrame("close10", 110, "rejoin"), cutFrame("close6", 110), cutFrame("close2", 140), cutFrame("empty", 30)] })),
   },
 };
 

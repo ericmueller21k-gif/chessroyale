@@ -230,7 +230,8 @@ test("the blocks' sizes and spaces are the mockup's: each card's height, the gap
     });
     const at = (s: string) => `${vp.width}, ${s}`;
     if (isComputer()) {
-      near(at("the header card's height (no level line)"), m.card.h, 257.7, 3);
+      // (The level line is everyone's since Nov 9: the mockup's own 281 with it; docs/decisions/2026-10-29-public-profile-fit.md.)
+      near(at("the header card's height (with the level line)"), m.card.h, 281, 3);
       near(at("Ranked's height"), m.ranked.h, 312.7, 4);
       near(at("Recent's height"), m.recent.h, 312.7, 4);
       near(at("Cosmetics' height"), m.cos.h, 175.1, 4);
@@ -447,7 +448,7 @@ test("View all: the full list of matches and each worn item's details open in sh
   const matches = page.getByRole("dialog", { name: "Recent matches" });
   // (Today's profile's list: the profile's own games, with their details.)
   await expect(matches.locator(".fd-match")).toHaveCount(3);
-  await expect(matches).toContainText("Boss raid · Ginger 1500");
+  await expect(matches).toContainText("Boss Battle · Ginger 1500");
   await expect(matches).toContainText("Crowd · 50 v 50");
   await page.keyboard.press("Escape");
   await expect(matches).toHaveCount(0);
@@ -593,24 +594,24 @@ test("online: a dot at the picture's lower right and 'Online now'; last seen wit
   }
 });
 
-test("the level: an admin sees Level 38; a player's page has no level line, and no room kept for one", { tag: "@phone-only" }, async ({ page, browser }) => {
-  await openDemo(page, demoProfile(), { admin: true });
+test("the level (Nov 9: real, from their XP): everyone's page reads it, admin or not; its line is there while the page loads, so nothing moves when it comes", { tag: "@phone-only" }, async ({ page, browser }) => {
+  await openDemo(page, demoProfile({ level: 38 }), { admin: true });
   await loaded(page);
   await expect(page.locator(".pp-level")).toHaveText("Level 38");
   const admin = await layout(page);
   const player2 = await (await browser.newContext({ ...test.info().project.use })).newPage();
-  await openDemo(player2);
+  await openDemo(player2, demoProfile({ level: 7 }), { delay: 3000 });
+  // (While it loads: the line's room, empty.)
+  await expect(player2.locator(".pp.pp-loading")).toBeVisible();
+  await expect(player2.locator(".pp-level")).toHaveCount(1);
+  const loading = await layout(player2);
   await loaded(player2);
-  // (Was an empty line of 22 px, kept for every player.)
-  await expect(player2.locator(".pp-level")).toHaveCount(0);
+  await expect(player2.locator(".pp-level")).toHaveText("Level 7");
   const mine = await layout(player2);
-  // The admin's buttons and everything under them sit one line lower (23.8 to 24.4 px: the line's 20 and its space); the cards are the same size.
-  const shift = admin[".pp-actions"]![1]! - mine[".pp-actions"]![1]!;
-  expect(shift).toBeGreaterThan(22);
-  expect(shift).toBeLessThan(26);
-  for (const s of [".pp-ranked", ".pp-recent", ".pp-cosmetics"]) {
-    expect(Math.abs(mine[s]![3]! - admin[s]![3]!), s).toBeLessThan(0.25);
-    expect(Math.abs(admin[s]![1]! - mine[s]![1]! - shift), s).toBeLessThan(0.25);
+  // (An admin's page and a player's: the same; and nothing moved when the level came.)
+  for (const s of [".pp-actions", ".pp-ranked", ".pp-recent", ".pp-cosmetics"]) {
+    expect(Math.abs(mine[s]![1]! - admin[s]![1]!), s).toBeLessThan(0.25);
+    expect(Math.abs(mine[s]![1]! - loading[s]![1]!), `${s} while loading`).toBeLessThan(0.25);
   }
   await player2.context().close();
 });
@@ -661,8 +662,8 @@ test("your own page: from your pawn, today's profile with View public profile at
   await page.goto("/");
   await expect(page.locator(".fd-hero-name")).toHaveText("Eric");
   const id = await page.evaluate(() => fetch("/api/me").then((r) => r.json()).then((p) => p.user.id as string));
-  // (Your profile: the top bar's pawn on a phone, the side menu's Profile on a computer: the right column's pawn went, Nov 7.)
-  await page.getByRole("button", { name: "Your profile", exact: true }).or(page.getByRole("navigation", { name: "Menu" }).getByRole("button", { name: "Profile" })).filter({ visible: true }).first().click();
+  // (Your profile: "View profile" on your card on a phone, the side menu's Profile on a computer.)
+  await page.getByRole("button", { name: "View profile", exact: true }).or(page.getByRole("navigation", { name: "Menu" }).getByRole("button", { name: "Profile" })).filter({ visible: true }).first().click();
   // Today's profile, unchanged but for one line at its top.
   await expect(page.getByRole("heading", { name: "Eric", level: 1 })).toBeVisible();
   const view = page.getByRole("button", { name: "View public profile" });
@@ -684,7 +685,8 @@ test("your own page: from your pawn, today's profile with View public profile at
   await expect(page.getByRole("button", { name: "Add Friend" })).toBeDisabled();
   await expect(page.getByRole("button", { name: "More options" })).toBeDisabled();
   await expect(page.locator(".pp-seen")).toContainText("Online now · Joined");
-  await expect(page.locator(".pp-level")).toHaveCount(0);
+  // (Your level, as everyone's page shows it: Nov 9.)
+  await expect(page.locator(".pp-level")).toHaveText(/^Level \d+$/);
   // Nothing from today's profile (your coins, edit, locker) leaks onto it.
   await expect(page.locator(".pp")).not.toContainText(/coins|Edit name|locker/i);
   // Back is to your profile.
@@ -703,7 +705,7 @@ test("an admin's ?rank= shows on their own public page, as on their profile", { 
   await named(page, "Rank Admin");
   await page.goto("/?rank=gold-3");
   await expect(page.locator(".fd-hero-name")).toHaveText("Rank Admin");
-  await page.getByRole("button", { name: "Your profile", exact: true }).or(page.getByRole("navigation", { name: "Menu" }).getByRole("button", { name: "Profile" })).filter({ visible: true }).first().click();
+  await page.getByRole("button", { name: "View profile", exact: true }).or(page.getByRole("navigation", { name: "Menu" }).getByRole("button", { name: "Profile" })).filter({ visible: true }).first().click();
   await page.getByRole("button", { name: "View public profile" }).click();
   await expect(page.locator(".pp-tier")).toHaveText("Gold 3");
   await expect(page.locator('.pp-ranked [data-emblem="gold-d3"]')).toHaveCount(1);

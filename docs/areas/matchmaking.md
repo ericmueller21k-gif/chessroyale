@@ -7,7 +7,9 @@ Lanes: `hub` (joining and filling a lobby, the queue screen), `ranked` (the matc
 
 - **"Play now" is the queue.** POST `/api/play` hands the press to the matchmaker (a Durable Object), which answers
   with a lobby code, or "Servers are busy, you're in line: about N s" with a ticket to ask again with.
-- **One queue per mode and type** (`queueName`): crowd-default, crowd-botsoff, raid-default, raid-botsoff. The three
+- **One queue per mode and type** (`queueName`): crowd-default, crowd-botsoff, raid-default, raid-botsoff; each with an engine pool's
+  own (`.engine`) for accounts fair play pooled, set from the account on every ask (1 v 1 and Squads too; a party with a pooled member
+  queues there), never by the browser; its lobbies seat no newcomer from the other side ([fairplay.md](fairplay.md)). The three
   matchmaking types, picked on the home screen under the mode and remembered per device:
   - **Default:** real players; bots fill the empty seats once the lobby has waited `MATCH_FILL_SECONDS` (60 s; 8 s in
     the e2e suite). Bots pop into the seats over `FRONT_DOOR.fillShowMs`.
@@ -30,8 +32,13 @@ Lanes: `hub` (joining and filling a lobby, the queue screen), `ranked` (the matc
   batch began is forgotten (`SEATING_KEEP_MS`, a backstop no seating reaches today).
 - **Lobbies.** One Durable Object per lobby, under a 5-character code with no look-alikes (`codes.ts`; a code is never
   reused while its lobby exists). "Play with friends" makes a private lobby (invite link `/lobby/CODE`); a private raid
-  stays people-only. Seats survive reloads (a seat token on the device). The host (a connected computer before a
+  stays people-only. Seats survive reloads (a seat token on the device). One seat per account (a guest's too): a second
+  tab or device takes over that seat, as a reconnect does; a token from another account is refused. The host (a connected computer before a
   phone) or the many judges score each round (see [engine.md](engine.md)).
+- **Stepping out of a lobby** (Nov 10, [2026-11-10-search-on-home.md](../decisions/2026-11-10-search-on-home.md)): 50 v 50's and Squads'
+  queue lobbies have Exit and "Keep me in the queue" (checked unless unchecked on the device) where Cancel was. Checked, you browse
+  with the seat held by the app's connection (home's rows, the bar elsewhere; a reload keeps it: `hunchess.awaySearch`); the lobby
+  filling takes you in, with the found alert. Unchecked, Exit leaves as Cancel did. Raid, party and Solo queues keep Cancel.
 - **A lobby's life** (`LOBBY_LIFE`): results stay up `lobbyResultsKeepMinutes` (15), then it closes; a lobby that
   never starts closes after `lobbyIdleMinutes`, an abandoned one after `lobbyAbandonedMinutes` (now only a safety net).
   Closing tells anyone still connected, records results on profiles, drops it from the live line and deletes its
@@ -56,7 +63,9 @@ Lanes: `hub` (joining and filling a lobby, the queue screen), `ranked` (the matc
 - **Ranked 1 v 1** ([ranked.md](ranked.md)): its own queue (`ranked1v1-default`, the same matchmaker object) of
   single players paired by the hidden rating (`PAIR_BY_RATING`, core's `pairUp`: the range widens with the wait and
   the ratings' deviations), each pair a game object of its own (`DuelGame`). Its own rank and tiers; routes under
-  `/api/1v1/`.
+  `/api/1v1/`. Ranked's leave rules (L1, Nov 9; [ranked.md](ranked.md), "Leaving early"): a locked-out player's first ask is
+  refused with when; one in the delayed queue gets a ticket with `notBefore` that `PAIR_BY_RATING` won't pair before (it
+  keeps its place in line; the answers say `delayMs`).
 - **Ranking today** (other modes) is the rating on your profile (its rank, chart and "Top N%"). A match
   counts for ranking only if at least `RANKING.rankedMinHumanShare` (30%) of its seats are real players
   (`isRankedMatch`; 30 of a 50 v 50's 100, 15 of a raid's 50). Solo and practice never count (only `online = 1`

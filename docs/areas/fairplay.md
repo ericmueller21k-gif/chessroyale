@@ -32,13 +32,21 @@ Lane: `fairplay`. The reviewer's brief: `docs/fairplay-reviewer.md`. The numbers
   while the other team chooses, is). The review page shows "(premove)" by its time. 1 v 1 has no timing signal, so
   nothing there is marked.
 - **Someone who resigns mid-match** (or is gone too long) has their match's signals recorded with their result as
-  they leave (`takeLeftResults`, the Durable Object's `saveResults`), as everyone's are at the end.
+  they leave (`takeLeftResults`, queued by the Durable Object's `queueResults`, once per lobby: `since`), as everyone's are at the end.
 - **The suspicion score** turns a player's evidence into a level; every threshold is in `FAIRPLAY`.
 - **A case** is one player's file. Its status: **watch** (recorded only), **review** (a person or the automated
-  reviewer decides; meanwhile their online results are held off ranking and `eligibleForRanked` says no), **banned**
+  reviewer decides; meanwhile their online results are held off ranking and `eligibleForRanked` says no), **pool** (below), **banned**
   (no online play, solo stays open; an appeal a person decides; their sign-in identities are kept hashed so a new
   account with them is banned too, and a device they played from puts new accounts in review), **cleared** (held
   results count again), **closed** (a watch with nothing new for `FAIRPLAY.evidenceDays`).
+- **The engine pool** (Eric, Nov 10; [2026-11-10-engine-pool.md](../decisions/2026-11-10-engine-pool.md)): detection's ban level (one
+  deep-checked match past every one-match bar, the two-match path, or sustained strength: the 5 newest matches of 8+ counted moves
+  averaging 3,000 (`levels.poolStrength*`; the judges' numbers alone, so under `enforcement: "ban"` it opens a review, never a ban); Nov 11, [2026-11-11-near-best.md](../decisions/2026-11-11-near-best.md)),
+  or a new account with 2 of its first 10 matches at the one-match ban bar (`FAIRPLAY.pool`), quietly: every queue seats them only with pooled players or bots (`mayPlay`, `queueName`'s `engine`), and matchmade
+  lobbies turn away the other side's newcomers ("This match has already started."); results not held, their profile as ever, public rankings
+  leave them out (`NOT_POOLED`), evidence kept and deep-checked in full. The review page's `pool` tab (grouped queries, never one a player):
+  why, the evidence, how they do there (hints: in-pool engine play first; "crushed" only from 1 v 1 against the pool; a strength drop), Release,
+  a JSON download (50 players a file, no emails).
 - **Each banned account keeps its own identity rows** (`fairplay_identities` is keyed by identity and account), so
   clearing one forgets only its own: another ban with the same email still catches new accounts, banned owners
   first. For an account cleared by a person or the reviewer (its latest "cleared" line in the log), `banCheck`
@@ -56,7 +64,8 @@ Lane: `fairplay`. The reviewer's brief: `docs/fairplay-reviewer.md`. The numbers
 - **Reports** never ban anyone: they raise a player's review priority and record their moves. A report of a line in
   the town square's chat ("Offensive chat", Oct 28: [chat.md](chat.md)) carries the line's text and time, read from the
   server's room, and the case page shows it under Reports. The automated reviewer's API gets that report without the
-  words and refuses to let it clear such a case: a moderator reads the line first.
+  words and refuses to let it clear such a case: a moderator reads the line first. A test account's reports
+  (`users.test`, [accounts.md](accounts.md)) never count toward the reporters that put a player in review.
 - **Deleting an account never gets around fair play** (`account-data.ts`; [accounts.md](accounts.md)). A banned or
   in-review account's case, log, hashed identities and device markers stay under its old id; its judged moves, match
   summaries and appeals go. A new account with one of its identities is banned again, or goes to review (`banCheck`).
@@ -64,8 +73,15 @@ Lane: `fairplay`. The reviewer's brief: `docs/fairplay-reviewer.md`. The numbers
   Lifting a ban, or deciding a review any way but a ban, forgets that account's identities (not another's). An account fair play hasn't acted on leaves nothing in fair play's tables.
 - **A ban needs the deep re-check:** a flagged player's counted moves searched again on the engine server (its own
   instance, `fairplay-1`, its own daily budget, from the Worker's schedule: cases in review at once, the rest
-  off-peak). The judges' quick numbers can open a review, never a ban. A move in a position Stockfish refuses is
+  off-peak), over every legal move in groups of at most 8 (`moveGroups`, as 1 v 1's check), never the judges' list, which a device
+  sent (Nov 10); a position's whole budget taken before its first search, and outside a review, a ban or the pool a match only as far as
+  `levels.banMatchChecked` (8) moves (a review queues the rest: `setCase`). The judges' quick numbers can open a review, never a ban. **Detection never bans since Nov 10**
+  (the outside review's finding 3): at the ban bar it pools (`FAIRPLAY.enforcement: "pool"`); bans are a person's. A move in a position Stockfish refuses is
   passed over (the engine server never gets one: [engine.md](engine.md)), so it can't stop the queue.
+- **Near the engine's best** (Eric, Nov 11): a deep-checked pick counts as the engine's best at rank 1 or within `deep.nearBestLoss` (1 point)
+  of it (`nearBest`): the share bars read that, and the evidence never counts such a pick as "neither". The review page says "82% near the
+  engine's best" and marks a move "≈ engine". Summaries from before are worked out again from their stored deep results by the schedule, once
+  each (`recountDeep`, matches played before `RECOUNT_BEFORE` only: remove both after a week of catching up nothing). Its numbers: `reports/fairplay.md`, "Near the engine's best" (`fairplay-maia.ts`: Maia 2200-2600 people).
 - **1 v 1** ([ranked.md](ranked.md)): no judged picks, so no signals and no part in the suspicion score. Reports from
   the profile, as everywhere (one opened from the game names it). On a case's page, "Check the counted moves with the
   engine server" also checks the player's kept 1 v 1 games (`fairplay-duel.ts`, `checkDuelGames`): reported ones
@@ -78,7 +94,8 @@ Lane: `fairplay`. The reviewer's brief: `docs/fairplay-reviewer.md`. The numbers
   only while their case is open (watch or review) or an appeal of a ban is waiting (purgeEvidence's rule).
 - **The review page** `/admin/fairplay` (admins only, `ADMIN_EMAILS`) and the reviewer's API `/api/admin/fairplay/*`
   (a bearer token, `FAIRPLAY_REVIEW_TOKEN`). Every decision goes in the case's log with who and why; the automated
-  reviewer never decides appeals nor changes a ban. A player's page also has chat moderation's section (warn, chat
+  reviewer never bans (409: a ban is a person's), decides appeals nor changes a ban, and
+  reads no email: admins are "admin", typed addresses "[email]" (`forReviewer`; Nov 10). A player's page also has chat moderation's section (warn, chat
   ban, lift, reset the name and icon; admins only: [chat.md](chat.md), "Moderation"), and a box on the list opens any
   player's page by id or profile link.
 - **Emails:** a ban notice and a clearing go to the player's sign-in address through Resend.
@@ -95,6 +112,7 @@ Lane: `fairplay`. The reviewer's brief: `docs/fairplay-reviewer.md`. The numbers
 | The review page and API | `packages/server/src/admin.ts` |
 | The report sheet, ban notice and appeal form, look-away counter | `packages/app/src/screens/PlayerProfile.tsx`, `components/FairPlay.tsx`, `lookaway.ts`, `net.ts` |
 | Simulations | `packages/sim/scripts/fairplay-bank.ts` (the position bank in `packages/sim/data/`), `fairplay-sim.ts` → `reports/fairplay.md` |
+| The cheater demo on a real server (test accounts: Engine Eddie, Strong Sam, two judges; its result comes from the deep re-check later: `--report`) | `scripts/cheater-demo.ts`; accounts `test-accounts.ts` ([accounts.md](accounts.md)) |
 
 ## Settings
 
@@ -104,8 +122,8 @@ Lane: `fairplay`. The reviewer's brief: `docs/fairplay-reviewer.md`. The numbers
 ## Tests
 
 - Unit: `packages/core/test/fairplay.test.ts`, `packages/server/test/fairplay.test.ts`, `fairplay-lobby.test.ts`,
-  `fairplay-deep.test.ts`, `fairplay-admin.test.ts`.
-- e2e: `e2e/fairplay.spec.ts` (reporting, a banned account; the review token is set in `playwright.config.ts`).
+  `fairplay-deep.test.ts`, `fairplay-admin.test.ts`, `engine-pool.test.ts`.
+- e2e: `e2e/fairplay.spec.ts` (reporting, a banned account, the engine pool; the review token is set in `playwright.config.ts`).
 
 ## Rules for this area
 

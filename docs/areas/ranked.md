@@ -6,6 +6,9 @@ Lanes: `ranked` (the rating math, ranks, pairing), the director (the game's rule
 (`packages/core/src/settings.ts`).
 
 ## How it works today
+- **The XP box** (Nov 9; [2026-11-09-xp-box.md](../decisions/2026-11-09-xp-box.md)): the result card (`screens/Duel.tsx`; its XP on the `outcome` message, `DuelOutcome.xp`; a bot or town game has none) shows `XpResult`, a fixed 78 px box (its top row: the gain, your name, your level): the
+  bar filling from your old XP to the new, "+170 XP", "Level 7", the parts ("Win +50": never the minutes, Eric, Nov 9), or why there was none. Its rules
+  and storage: [accounts.md](accounts.md), "XP and levels".
 
 - **The board on a computer** (Oct 29; docs/decisions/2026-10-29-desktop-board-size.md, [board.md](board.md)): the window's height
   less 170 px (the title, the two players' strips), never wider than its column: 904 px at 1920 × 1080, 624 at 1280 × 800
@@ -30,8 +33,8 @@ Lanes: `ranked` (the rating math, ranks, pairing), the director (the game's rule
   puts the pair back at the front of the line at once, still searching, and the next batch tries again (a second later,
   or at their next ask); one the queue doesn't know (gone while the app slept, or made up) is answered `expired` and the
   app asks afresh. Cancel takes the ticket out (one still on its way back with the first ask is canceled when it
-  comes); a pairing made that very moment is called off for that player (`DuelGame.abandon`: an abort before any move,
-  nothing recorded). After `fewPlayersSeconds` (45) the app offers "Few players online right now" with Keep waiting and
+  comes); a ticket paired already ends that game for its player (`DuelGame.abandon`): called off and nobody's dodge if they
+  never connected to it (pressed the moment it was found), else their own Abort or Resign ("Leaving early", below). After `fewPlayersSeconds` (45) the app offers "Few players online right now" with Keep waiting and
   Play a bot (unranked).
 - **The stage** (Eric, Oct 16: "your character's sitting there, and then there's like kind of this empty platform thing
   like waiting, and then when your opponent joins, like their pawn loads up next to you"; `components/DuelStage.tsx`,
@@ -53,12 +56,14 @@ Lanes: `ranked` (the rating math, ranks, pairing), the director (the game's rule
   - **motion:** transforms and opacity only (the drops, the waiting rings and outline, a slight breathing of each pawn
     from its foot, "VS"); `prefers-reduced-motion` turns them all off.
 - **Browsing while queued** (Eric, Oct 16: "a back button or they can view inventory", "no confirmation needed";
-  `components/DuelQueueBar.tsx`, styles `dq-`; why:
-  [docs/decisions/2026-10-16-1v1-browse-while-queued.md](../decisions/2026-10-16-1v1-browse-while-queued.md)):
+  every queue's since Nov 10: `search.ts`, `components/SearchBar.tsx`, styles `dq-`; home's rows: [hub.md](hub.md); why:
+  [docs/decisions/2026-10-16-1v1-browse-while-queued.md](../decisions/2026-10-16-1v1-browse-while-queued.md),
+  [2026-11-10-search-on-home.md](../decisions/2026-11-10-search-on-home.md)):
   - **away from the stage:** "‹ Home" on the search stage (or a computer's side menu) goes home and keeps the search
     going: the queue is the app's (`DuelQueue` in App.tsx), not the screen's, so it keeps asking (and its ticket stays
     known) wherever you are. No confirm. Cancel on the stage still leaves the queue;
-  - **the bar,** at the top of every screen while you browse: a green dot, "Searching 1 v 1 · 0:42 ›" (back to the
+  - **home's rows** show it ("Searching · 1 v 1", "Ranked · near your level"; Cancel, Lobby (the stage), Start with bots
+    (a bot, unranked), the two asking in place); **the bar,** on every other screen while you browse: a green dot, "Searching 1 v 1 · 0:42 ›" (back to the
     stage, the same search and wait) and Cancel (out of the queue, no confirm; the page stays). Under the maintenance
     banner; its height is `--qbar-h`, which `--banner-h` adds to the banner's `--maint-h`, so the page starts under it;
   - **few players:** at `fewPlayersSeconds` the bar turns gold and says "Few players online · 0:45 ›"; its words take
@@ -66,13 +71,12 @@ Lanes: `ranked` (the rating math, ranks, pairing), the director (the game's rule
     it holds as you come and go;
   - **found while browsing:** a sound (`bannerStart`) and a buzz (`navigator.vibrate`, 90-60-160 ms; none while sound is
     off), the page you were on closes, and the stage opens with the game's waiting and versus moment as ever;
-  - **another mode while searching** (PLAY for 50 v 50 or Squads, the Boss raid's choices, Boss alone, a lobby made or
-    joined from home): "Leave the 1 v 1 queue?" / "Starting this ends your 1 v 1 search." / Stay, Leave queue: the only
-    confirm. 1 v 1's PLAY goes back to the stage. Anything else that puts you in a match (an invite's lobby, a party's)
-    ends the search;
+  - **another mode while searching** (home's PLAY greys; the Boss raid's choices, Boss alone, a lobby made or joined):
+    "Leave the 1 v 1 queue?" / "Starting this ends your 1 v 1 search." / Stay, Leave queue: the only confirm (any
+    queue's name). Anything else that puts you in a match (an invite's lobby, a party's) ends the search;
   - **a reload** carries on with the search (`savedDuelQueue`: its ticket, when it began and its test switches in the
     tab's sessionStorage after every ask; dropped when found, cancelled or refused, or 2 minutes after the last ask):
-    on the stage from /1v1, else with the bar. A refusal while browsing (the mode resting) brings you to the stage,
+    on the stage from /1v1, else in home's rows or the bar. A refusal while browsing (the mode resting) brings you to the stage,
     which says why.
 - **A game** (`duel-room.ts`, pure, around the rules in `@chessroyale/chess/duel`; `duel-do.ts`, the `DuelGame` object):
   - **waiting** for both players' sockets (seats by account: a reload or another device of theirs goes straight back
@@ -85,7 +89,7 @@ Lanes: `ranked` (the rating math, ranks, pairing), the director (the game's rule
     between (Bullet 2+1, Blitz 5+3); Bullet against Rapid, Blitz 3+2; one pick counts alone; none: Blitz 3+2;
   - **the overlay** (`overlayMs`, 1.5 s): "Timer: Blitz 3+2" over the board (a line, not a banner); the pawns are gone;
   - **play:** each first move within `firstMoveSeconds` (20; White's from the start, Black's from White's) or the game
-    is aborted (no result, no rank change). The clocks start after Black's first move; then Fischer: the mover's
+    is aborted (no result; a dodge for the side that didn't move: "Leaving early", below). The clocks start after Black's first move; then Fischer: the mover's
     thinking off their clock, the increment on after the move. Ends: checkmate; resigning (before both first moves,
     resigning is Abort); flagging (a loss, a draw when the side on time has a lone king, or a king and one knight or one
     bishop: `canMate`); stalemate, threefold repetition (a position count kept with the game), the 50-move rule (at
@@ -102,6 +106,59 @@ Lanes: `ranked` (the rating math, ranks, pairing), the director (the game's rule
   an ordinary move the moment your turn shows, so the clock charges one the time from your opponent's move reaching the
   server to yours reaching it, about a round trip (chess.com charges 0.1 s); the bot game, on the device, about a frame.
   Nothing marks a premove for the server (1 v 1 has no timing signal), so nothing a premove does changes a rank.
+- **Leaving early** (phase L1, Nov 9; Eric: "Quitting during time control. Yeah, that's fine. Quitting mid-game. Yeah, full
+  loss."; the design: [docs/ideas/ranked-ladder.md](../ideas/ranked-ladder.md) section 4; the calls:
+  [2026-11-09-ranked-l1-leave-rules.md](../decisions/2026-11-09-ranked-l1-leave-rules.md)). Every number in `LEAVES`
+  (settings.ts); the math in core's `ranked-leaves.ts`; who left decided by the duel rules' `conductOf`; nothing from an app.
+  - **Who left, and how** (decided once, as the game ends, from who was there then; kept on the room's record as `conduct`
+    and sent in the game's view as `left`, which the result card's words follow). A player counts as **gone** only once their
+    last socket has been closed `goneGraceMs` (12 s) by then (the room's `goneAt`, set as the last socket closes, cleared as one
+    opens; a close the room never heard, a deploy's, counts from when it noticed): a backgrounded phone, a handoff, a reload or
+    a deploy isn't leaving:
+    - a **dodge** (before both first moves): Abort (also during the versus moment and the vote), a first move that didn't come,
+      never connecting (`no_show`: only if the queue told them the code, `delivered`, or they had connected, `seen`; else
+      nobody's). Abort or a missed first move with exactly one player gone: the one who's gone (they left first); neither
+      gone (within the grace too): the one it's about; both gone: nobody (a server that dropped both looks the same). Before
+      the game began (still waiting for both), Abort is the presser's. The queue's Cancel (`DuelGame.abandon` → the room's
+      `cancelled`) is nobody's only from a player who never connected to the game (`seen`); otherwise it's their Abort or Resign;
+    - a **leave** (after): resigning before your `quickResignMoves`th move (3), or a flag while you were gone and your
+      opponent wasn't (abandoning: in 1 v 1 your clock is the hold). A flag that's a draw isn't one;
+  - **What it costs** (`recordDuel`, `recordDodges` in `server/src/ranked.ts`): a dodge: no hidden-rating change, the game
+    still called off for both, and `dodgeRp` (5, then 10 from dodge level 2) off the dodger's ladder; a leave: the loss as
+    ever, then `leaveRp` (10) more (its `points` on the result card and the game's row include it). Never below Wood 5 0; none
+    in placements (no ladder yet; the game that completes them included: a leave there is the mark only) or while fair play
+    holds them. A game's write is guarded on each player's ladder as read too, so a dodge's fee landing meanwhile is kept (the
+    game is read again). Each is a row in `ranked_conduct`, keyed by player and game:
+    a dodge's fee applies only with its own row (its nonce), a leave's only with the game's own row, so a retry, a second
+    recording or two at once charge once;
+  - **The dodge level** (one per account): +1 per dodge, −1 every `dodgeDecayHours` (12) without one, worked out from the
+    dodges kept (never stored). The lockout from ranked by the level a dodge brought: none, 5 minutes, 30, 2 hours, 12 hours
+    at most (`dodgeLockoutMin`), from that dodge;
+  - **The last 20** (`marksInWindow`): marks among your latest `window` (20) ranked games and dodges (each mark keeps the
+    player's game count then, so every clean game pushes the oldest out). 3-4: each search waits 2 minutes before it can be
+    paired; 5+: 5 minutes (`delayed`), and home's note says "Finish ranked games to clear your leaves."; 8+ (`lockAt`): 1 v 1 locked
+    `lockHours` (24) from the latest mark. Not built yet: the second 8+ in a season (7 days and a fair-play case: phases S1
+    and A1);
+  - **The queue** (`index.ts`'s `/api/1v1/play`, first ask): a lockout is refused (403 `{ message, lockedUntil, lock }`); the
+    delayed queue gives the ticket `notBefore`, which `PAIR_BY_RATING` won't pair before (the ticket keeps its place), and
+    the "still looking" answers carry `delayMs`. Every later ask (with its ticket) reads the standing again (`QueueCore.restrict`):
+    a lockout takes the ticket out of line (the same 403), the delayed queue sets `notBefore` once. An ask answered with the
+    game's code tells the game (`Matchmaker.told` → `DuelGame.delivered`), once per player;
+  - **On screen:** home's line above PLAY with 1 v 1 picked: "You left early: 1 v 1 opens in 4:32" (or "Too many leaves: …")
+    with PLAY greyed until it's over (drawn again as it ends), or "3 leaves in your last 20: +2 min queue" with PLAY on (the
+    wait starts with the search); the stage's line: "Delayed queue · 1:42" in place of "Finding opponent…" while it counts
+    down; home's note (its note slot, dismissable for the tab): "You left before the game started: −5 RP" for
+    `noteMinutes` (30) unless a game comes after it, or from 5 marks "Finish ranked games to clear your leaves." (the count is in the line); the match menu's confirms (the words only, the same box): Abort "The game is called off. Leaving
+    before it starts costs 5 RP." (with the lockout it would bring: "10 RP and a 30-minute wait before your next 1 v 1"),
+    Resign before your 3rd move "It counts as a loss, and resigning this early costs 10 RP more." (in placements: "…goes on
+    your record"); the result card's line after your own dodge: "Left before it started: −5 RP" ("Updating your rank…" until
+    it's recorded), its sentence without "No rank change."; the other player's sentence names the one who left, with "No rank
+    change." (`calledOff` in `screens/Duel.tsx`, from the view's `left`). A bot's or the town's game
+    says none of it. All from `/api/me`'s `leaves` (`RankedLeaves`: the standing, what a dodge now costs, the note), read
+    again when an outcome says you left (or 2 s after leaving an aborted game whose outcome hadn't come);
+  - **Its kill switch:** `PAUSE_LEAVE_PENALTIES` ([ops.md](ops.md)): nothing charged or marked, no lockout or delayed queue,
+    `/api/me`'s `leaves` null (the confirms' words as before);
+  - **The other player:** loses nothing, and goes back to the queue as ever (Play again).
 - **Quick chat** as in other online matches (`MatchChat`, `ChatPanel`), one channel (no teams: every line a player
   owns goes to both), the limits of `QUICK_CHAT`, mute by account on the device (`chat-mod.ts` in the app) and on the
   server (`chatPrefs`), and #252's chat bans (read as each player connects, again at most every `CHAT_MOD.recheckMs` as
@@ -119,8 +176,8 @@ Lanes: `ranked` (the rating math, ranks, pairing), the director (the game's rule
     ("Transcendent · 120 RP"). At the floor or more but outside the top 500 a player stays Radiant 1, the RP counting on
     past 80 ("Radiant 1 · 95 RP"). The place is 1 + how many ladders are higher (equal ladders share a place), counted
     by the server (`topPlace` in `ranked-schema.ts`): only for a ladder at the floor or more, one `COUNT(*)` on the
-    `ranked_1v1_ladder` index (the entries above it, never the table), kept a minute per ladder in each Worker
-    instance. Falling below the floor is Radiant 1 again.
+    `ranked_1v1_ladder` index (the entries above it, never the table), less fair play's engine pool's ladders above it
+    ([fairplay.md](fairplay.md)), kept a minute per ladder in each Worker instance. Falling below the floor is Radiant 1 again.
   - **Rank points a game:** 2 × 20 × (the result − the expected result from the two hidden ratings): ±20 between
     equals, more for beating someone stronger, less for beating someone weaker; plus 0.05 × (hidden rating − the
     ladder's rating), that adjustment within ±10 (a draw: half). A win never takes points, a loss never gives them.
@@ -170,9 +227,10 @@ Lanes: `ranked` (the rating math, ranks, pairing), the director (the game's rule
   both records as they stand now), their coins. The game's row goes in only if neither player's record changed since it
   was read (another game of theirs ending at the same moment), and everything else applies only if that row is this
   recording's (its nonce), so a game is recorded once; a row that didn't go in is read again and retried. The object
-  starts a try at the end and again on any wake while no outcome has come back (15 s after the last try started, 4
-  tries: a slow failure, an eviction or a deploy mid-way loses nothing); a game already in answers each player's rank as
-  it stands. A game on a test's clock where `TEST_SWITCHES` isn't "1" records nothing ("Unranked game").
+  starts a try at the end and again on any wake while no outcome has come back (15 s after the last try started for 4
+  tries, then every `recordRetrySeconds` (60) up to `recordRetryHours` (24) after the end, Nov 10; the room waits to close
+  for it, then says so on the ops page: a slow failure, an eviction, a deploy or a D1 outage loses nothing); a game
+  already in answers each player's rank as it stands. A game on a test's clock where `TEST_SWITCHES` isn't "1" records nothing ("Unranked game").
 - **The bot game** (`BotDuel` in `packages/app/src/duel.ts`): "Play a bot (unranked)" plays on the device by the same
   rules, the same vote (the bot picks at random) and the same board: Maia at the player's hidden rating (the first
   queue answer's `botRating`; the bosses' human-like engine, its own draw, `BOSS_BRAIN` temperature and top-p) when
@@ -205,6 +263,7 @@ by the clock (`voteAt`); everything else comes as a message.
 | Table / column | What | Kept |
 | --- | --- | --- |
 | `ranked_1v1` (user_id, rating, rd, games, wins, losses, draws, ladder, last_game, last_at, coin_day, coin_games, peak, streak; index `ranked_1v1_ladder` on ladder, Oct 28) | A player's hidden rating, record and ladder place; the UTC day of their last paying game and how many paid that day; the highest ladder reached and the current run of wins (from Oct 28) | With the account; deleted with it; in the download; a guest's moves to an account without one on sign-in |
+| `ranked_conduct` (user_id, match_id, at, mode, kind, games, rp, nonce; PK (user_id, match_id); indexes on (user_id, at) and at; Nov 9) | Each dodge and leave (ranked's leave rules): which game, when, the mode ("1v1"), which kind, the player's ranked games by then (the last-20 window), the rank points it cost, the recording that wrote it | `LEAVES.keepDays` (90), then the 15-minute cron (`purgeConduct`); deleted with the account; in the download (`leaves`: game, at, mode, kind, rp); a guest's move to the account on sign-in |
 | `ranked_1v1_games` (id, white_id, black_id, control, result, reason, moves, times, started_at, ended_at, checked, nonce, white_points, black_points) | Each ranked game (never an aborted one): moves (UCI), think times (ms), how it ended; fair play's engine check by side; the rank points it moved for each side (from Oct 28) | `gamesKeepDays` (30) after it ends (the 15-minute cron, `purgeDuelGames`); longer only while a player in it has a fair-play case open (watch or review) or an appeal of a ban waiting (`purgeEvidence`'s rule); on account deletion that player becomes "deleted" in it; the download has a player's games (opponent by name, not the check) |
 
 No `results` rows for 1 v 1 (Crowd's stats and `users.rating` stay as they were). The privacy policy's "1 v 1 (ranked)"
@@ -220,21 +279,25 @@ entry says the same.
 | Ranks and games in D1; the schema, a guest's merge, the profile's read | `packages/server/src/ranked.ts`, `ranked-schema.ts` |
 | The queue | `packages/server/src/matchmaker.ts` (duel mode, `duelNext`, `cancel`), `queue.ts` (`PAIR_BY_RATING`) |
 | Routes, the cron's purge | `packages/server/src/index.ts` (`duelRoute`, `scheduled`) |
+| Leaving early: the math (fees, dodge levels, the last 20, the standing) | `packages/core/src/ranked-leaves.ts`; numbers `LEAVES` |
+| Leaving early: who left (`conductOf`), the room's record of it, recording it, reading it | `packages/chess/src/duel/rules.ts`, `packages/server/src/duel-room.ts`, `ranked.ts` (`recordDuel`, `recordDodges`, `purgeConduct`), `ranked-schema.ts` (`marksOf`, `rankedLeaves`) |
+| Leaving early on screen: home's line and note, the confirms, the stage's countdown | `packages/app/src/ranked.ts` (`leavesLine`, `leavesNote`, `abortNote`, `resignNote`), `screens/Home.tsx` (`LeavesLine`, PLAY), `App.tsx` (the note), `screens/Duel.tsx`, `duel.ts` |
 | Fair play's engine check of 1 v 1 games | `packages/server/src/fairplay-duel.ts`; the case page in `admin.ts` |
 | The app: queue, online game, bot game, the way in | `packages/app/src/duel.ts` |
 | The screens (`DuelFront`: the stage, then the board); the stage; the vote on the board; the hint; the rank pill; the emblem | `packages/app/src/screens/Duel.tsx`, `components/DuelStage.tsx`, `DuelVote.tsx`, `VoteHint.tsx`, `DuelRankPill.tsx`, `RankEmblem.tsx`; styles `dv-` and `re-` in `styles.css` |
 | The emblems: the drawing, its bake, the baked picture | `packages/app/src/characters/rank-set.ts`, `scripts/bake-emblems.ts`, `packages/app/src/emblems/` |
 | The top tiers' place (the count and its minute's cache), a rank with it | `packages/server/src/ranked-schema.ts` (`topPlace`, `rankOf`) |
 | The stage, recorded (GIFs and stills, light and dark, 320-1280 px) | `scripts/frames-versus.mjs` |
-| Browsing while queued: the bar, the leave confirm, the found alert; App's `duelAway` | `packages/app/src/components/DuelQueueBar.tsx` (mounted in `main.tsx`), `App.tsx`; recorded by `scripts/frames-queue-browse.mjs` |
+| Browsing while queued (every queue's since Nov 10): the search, the bar, the leave confirm, the found alert; App's `duelAway` | `packages/app/src/search.ts`, `components/SearchBar.tsx` (mounted in `main.tsx`), `App.tsx`; home's rows in `screens/Home.tsx`; recorded by `scripts/frames-queue-browse.mjs` |
 | The home screen's helper; an admin's `?rank=` | `packages/app/src/ranked.ts` (`ranked1v1Label`, `ranked1v1Rank`, `rankFromSwitch`, `yourRankShown`) |
 | Wiring (`/1v1`, `/1v1/CODE`) | `packages/app/src/App.tsx` |
 
 ## Settings
 
 `RANKED_1V1` (controls, the vote and the game's timings, pairing, the hidden rating, tiers, the top tiers and their
-floor, rank points, placements, coins, games kept, the bot); `CAPACITY.queue` (the queue's asks); `QUICK_CHAT`, `CHAT_MOD`; the
-kill switch `PAUSE_RANKED1V1`.
+floor, rank points, placements, coins, games kept, the bot); `LEAVES` (leaving early: the fees, the dodge lockouts and their
+decay, the last-20 window, the delayed queue's waits, the 8-mark lock, the quick resign, home's note, how long marks are kept);
+`CAPACITY.queue` (the queue's asks); `QUICK_CHAT`, `CHAT_MOD`; the kill switches `PAUSE_RANKED1V1`, `PAUSE_LEAVE_PENALTIES`.
 
 ## Tests and tools
 
@@ -261,6 +324,22 @@ kill switch `PAUSE_RANKED1V1`.
   `packages/app/test/duel.test.ts` (the hint once per device, an expired ticket, the clock sample, a move resent after
   a reconnect, clocks, the result's words, the home screen's label), `faq.test.ts` (1 v 1's words follow the
   settings).
+- Leaving early (L1, Nov 9): `packages/core/test/ranked-leaves.test.ts` (dodge levels and their decay, the fees and lockouts,
+  the floor, the quick resign, the last-20 window and the delayed queue, the standing), `packages/chess/test/duel-rules.test.ts`
+  ("who left early": every abort, no-show, no-first-move, quick-resign and flag path), `packages/server/test/duel-room.test.ts`
+  (the room's record of it, decided once; the queue's Cancel excused only before the game opened, else Abort or Resign in each
+  phase; the grace before a player counts as gone, for an Abort, a missed first move and a flag; a no-show never told;
+  `left` in the view), `duel-queue.test.ts` (the re-check on a ticket's ask: dropped by a lockout, held once by the delayed
+  queue; a placement delivered once, the game told by each player's own ask), `ranked-store.test.ts` ("leaving early": a dodge's fee
+  and mark, charged once under a retry and two recordings at once, the levels and lockouts, placements, fair play's hold, the
+  kill switch, a leave's loss plus its fee, the last 20 and home's note, the purge, the download, deleting, a guest's merge, the
+  profile; no fee on the game that completes placements; a dodge's fee racing a game's write kept; a guest's marks rebased
+  onto the account's games), `duel-queue.test.ts` (the delayed queue in the line and the Matchmaker's `delayMs`), `kill-switches.test.ts` (a
+  locked-out search refused; `PAUSE_LEAVE_PENALTIES` lifts it), `account-data.test.ts` (the table pinned and covered),
+  `packages/app/test/ranked-leaves.test.ts` (home's line and note, the confirms' words), `faq.test.ts` (the FAQ's words follow
+  `LEAVES`); e2e: `ranked-1v1.spec.ts` (a dodge from the vote: the confirm's words, the result, home's note; a first move that
+  never comes; a quick resign's confirm), `home-ranked.spec.ts` (a lockout greying PLAY with its countdown, one line from 320
+  px; the delayed queue's line).
 - Tiers and emblems (Oct 28): `packages/core/test/ranked.test.ts` (every ladder to its tier, division and RP at the
   edges; the top tiers' floor, top 500 and top 100; stored ladders 0-4000 keep their hidden rating; each pill's
   contrast), `packages/server/test/ranked-store.test.ts` ("the top tiers": the place counted, ties sharing it, the
@@ -315,3 +394,5 @@ kill switch `PAUSE_RANKED1V1`.
 - Anything the game object starts has an end (a result, an abort, a no-show, closing after its results): a test for
   each.
 - A new table (or column) goes in `ACCOUNT_STORES` or `NO_ACCOUNT_DATA` and the privacy policy in the same PR.
+- A fee is charged once: its write goes in the same batch as the row that proves it's this recording's (a nonce), never on its
+  own. The leave rules' standing (lockouts, the delayed queue) is worked out from the kept marks, never stored.
