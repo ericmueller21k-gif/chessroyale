@@ -999,3 +999,20 @@ fireball pops (`popItem`).
 
 **The fix:** the dark and the violet are Hollow's kit's (`mateMark`, `glow`); Dash got his own claw marks (`clawHit`); a test walks
 every boss's kit. docs/decisions/2026-11-11-mate-effects-iphone-vibration.md.
+
+## A level that popped twice a move, and a Back tap that was lost (Nov 12, 2026)
+
+**What happened:** main's full run went red on retry-only passes in `boss-bar.spec.ts:204` (the level badge's animation read as `""`
+mid-Full-Moon) and `town-leave.spec.ts:148` (still inside Babur's Circus 20 s after the room's Back was tapped).
+
+**Why:** the match's screens are separate components, one per phase, so the boss bar and its level badge are put in the page anew at
+every phase: twice a move. The lifted badge's gold pop (560 ms) replayed at each one, about nine times in one Full Moon, and the test's
+read could land on a badge just replaced. In the town, `goOut` returned at once while the door was busy, and the door stays busy until
+the room's warm-up frames and its 260 ms fade are done (up to about 1.3 s after it's drawn): a Back tapped then did nothing.
+
+**How it was found:** a MutationObserver logging each `.boss-level` put in the page (with the phase), and one tapping Back the moment the
+room's canvas is drawn: the pop replayed at every phase, and the room stayed, on the old build every time.
+
+**The fix:** the badge carries on its animation from when the lift or slash began (`levelSince`, a negative `animation-delay`); the town
+keeps a Back tapped as the room fades in and goes out once it has (`outNext`). Each spec has the check that failed on the old build.
+docs/decisions/2026-11-11-flaky-batch.md, "Batch 4".
