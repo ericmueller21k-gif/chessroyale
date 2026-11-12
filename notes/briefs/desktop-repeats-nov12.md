@@ -1,0 +1,9 @@
+# Desktop repeats + one dead flag (Nov 12)
+You are a helper for HunChess (repo ericmueller21k-gif/chessroyale). Effort: medium (test placement and one dead constant).
+Read CLAUDE.md, docs/areas/ops.md ("CI e2e"), and docs/rules/eric.md (the guard tests: these must keep running on BOTH projects).
+Background: notes/pipeline-audit-2026-11-12.md on branch claude/director-notes (L4, Q5).
+1. Three specs cost most on the desktop project: boss-side (368 s desktop vs 178 phone), tiger (226 vs 173), town-controls (194 desktop). For each test in them, decide: does the desktop run check anything the phone run does not (desktop layout, mouse, keyboard, wide screen)? If not, tag it @phone-only (see how other specs do it). Keep every eric.md guard and anything layout- or input-specific on both. List each test and your call in the PR body.
+2. packages/app/src/components/Countdown.tsx:41: TIMER_BAR_BELOW is always true. Remove the constant and its condition (keep the bar), and fix the comment at styles.css:2670.
+Testing: run the three specs once on each project you change, plus typecheck. Locally Playwright may look for chromium_headless_shell-1194: if so, run `mkdir -p /opt/pw-browsers/chromium_headless_shell-1194 && ln -sfn /opt/pw-browsers/chromium_headless_shell-1243/chrome-headless-shell-linux64 /opt/pw-browsers/chromium_headless_shell-1194/chrome-linux && ln -sfn chrome-headless-shell /opt/pw-browsers/chromium_headless_shell-1243/chrome-headless-shell-linux64/headless_shell`. About an hour.
+Work on branch claude/desktop-repeats (from origin/main). Decision note docs/decisions/2026-11-12-desktop-repeats.md, at most 80 words.
+When done: push .pr-body.md (short: what changed and why, player-visible changes, changed checks old -> new, proof, left open), then .done as the last commit. Do not open a PR or wait on CI: the director does. American English. Never include model names in commits.
