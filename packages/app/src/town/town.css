@@ -953,3 +953,48 @@ button.town-pic.player {
   z-index: 30;
   background: #1b1830;
 }
+
+/* ---- The area banner (Eric's mockup, Nov 11; AreaBanner.tsx): a room's name as you walk in through its door. Over the room, under
+   the cards and chat; taps pass through it. Sized from the room's view (the box's container units), so it stays within it on a phone
+   and in a computer's frame. ---- */
+.area-banner {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+  container-type: size;
+  overflow: hidden;
+}
+.area-banner-band {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 33%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(6px, 2.1cqw, 12px);
+  padding: clamp(14px, 5.1cqw, 28px) 0 clamp(12px, 4.7cqw, 26px);
+  background: linear-gradient(90deg, rgba(12, 8, 6, 0) 0, rgba(12, 8, 6, 0.78) 22%, rgba(12, 8, 6, 0.78) 78%, rgba(12, 8, 6, 0) 100%);
+}
+.area-banner-sub {
+  font: 400 clamp(8px, 2.35cqw, 14px) / 1 "Press Start 2P", ui-monospace, monospace;
+  color: #f3d27a;
+  letter-spacing: 0.2em;
+  text-shadow: 0 2px 0 #2a1a10;
+  white-space: nowrap;
+}
+.area-banner-rule {
+  width: min(61cqw, 420px);
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #f3d27a 30%, #f3d27a 70%, transparent);
+}
+.area-banner-title {
+  max-width: 94cqw;
+  font: 400 clamp(20px, 7.9cqw, 46px) / 1.05 "Archivo Black", Archivo, sans-serif;
+  color: #fff8e6;
+  letter-spacing: 0.03em;
+  text-align: center;
+  text-shadow: 0 3px 0 #2a1a10, 0 0 18px rgba(0, 0, 0, 0.6);
+}

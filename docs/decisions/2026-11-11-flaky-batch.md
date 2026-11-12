@@ -46,3 +46,25 @@ Left open:
   `FRONT_DOOR.liveTimeoutMs`, 10 s, with a unit test that fails on the old code), a stale `last` from a rider removed while its request
   was out (`feed.take` is shared), or the server's `townSlice` failing (`.catch(() => null)`). The spec now records every `/api/live` request, answer (its town slice) and
   failure, and prints them with the chat log's lines if the server's lines don't show: the next CI failure says which.
+
+## Batch 3 (Nov 12, branch `claude/main-red-nov12`)
+
+Each fixed at its cause; no retries, skips or sleeps added. Proved with `--repeat-each 5`, both projects, under the e2e lock.
+
+| Test | Cause | Fix |
+| --- | --- | --- |
+| zebra-home:93 [desktop] ("the guard is drawn": null; failed both tries on main's b7cb743 run and on #646) | **Test hook.** `__shopAt("guard-b")` gave the guard's middle, null when off screen. On a computer, with the camera at rest on you at (10,13), both guards' feet are below the room's bottom edge, so his middle was off screen while a finger could still tap his head and chest (`guardAt`'s box). It passed only while the camera still glided after your walk (CI's trace: null for 20 s from the first look; locally null after a 4 s wait). Not #641's floor change or #643's music. | The hook gives the middle of the on-screen part of his tap box (null only when under 12 px of him shows). The spec taps once the camera rests on you (stricter: fails on the old build, passes now). 10/10. |
+| boss-challenge:155 [phone] (the server's lines after Back to town) | **Test environment.** Batch 2's recorder showed it: after the second battle the town came back in a new room (`181310af`, empty) while the old one (`7957c1db`) held the challenge line. The town's chat lives in the live hub's memory, and a restart opens a new room (by design, docs/areas/chat.md). The local server frees an idle Durable Object within seconds (11 s on CI); on Cloudflare every app's 30 s heartbeat keeps the hub in use (eviction there is after 70 to 140 s idle). Reproduced locally: 45 s on the result screen gave a new, empty room. | A reader asks `/api/live?town=0` every 1.5 s for the whole test, as the town's other visitors would; the same 45 s wait then passes. 10/10. |
+
+Read, not fixed (left for the next batch):
+- **boss-bar:204 [phone]**: `animationName` read as `""`, which `getComputedStyle` gives only for an element out of the page: the level
+  badge was replaced between the locator's find and its read. The badge is keyed by direction (`Boss.tsx` `BossLevel`, `key={dir}`), so a
+  replacement while lifted means the level flickered (lifted, its own, lifted) or the bar remounted: either replays the gold "pop"
+  mid-Moon, which a player would see. Next: watch `data-level` and the badge's node every frame through the Full Moon.
+- **autochess-board:248, :274, :373 [desktop]**: `.ac-root` not in the page 5 s after `goto`, three tests in a row on one worker, then
+  each passed on its retry: the page or the server was stalled for that stretch, not the tests. No trace kept.
+- **shop:870 [phone]** (Ginger Igloo, ArrowLeft never reached 10,4 in 10 s): the kept trace is the passing retry's; nothing to read.
+- **multiplayer:18 [desktop]**: the power-up showed 2 hints (13 looks), then 0 (the phase moved on), wanting 3. `hintsFrom` shows
+  the search's top 3: the search returned 2 lines. Its trace is 742 MB; not read.
+- town-leave:148 and global-chat:46 (PR runs only): not reached.
+

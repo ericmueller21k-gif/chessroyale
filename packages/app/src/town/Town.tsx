@@ -43,6 +43,8 @@ import { openProfile } from "../profile-nav.ts";
 import { account, myPawnColor, onAccountChange, playerName } from "../account.ts";
 import { TOWN_ASKED, testSwitchesAllowed } from "../test-switches.ts";
 import { play, warmSounds } from "../sound.ts";
+import { roomMusic, roomMusicLoad, splashDone, splashMusic } from "../music.ts";
+import { AreaBanner, areaBannerOf, type AreaBannerText } from "./AreaBanner.tsx";
 import { SELECT_SOUND, TOWN_SOUNDS, townSound } from "../characters/boss-select.ts";
 import { N, colI, fromCam, newPt, proj, rel, rowI, wrapFX, wrapFY, wrapI } from "./camera.ts";
 import { SHOP_FEEL, TOWN_FEEL } from "./feel.ts";
@@ -64,7 +66,7 @@ import { StreetZoom, parkSide } from "./zoom-steps.ts";
 import { PAWN_HEAD, PAWN_PX, Renderer, pawnImage, type Hit, type YouArt } from "./render.ts";
 import { dropRiders, leaveRider, ridersHeld, rideArt, shareRider, type Rider, type RiderPawn } from "./rides.ts";
 import { rideSpeed } from "../components/rides/scale.ts";
-import { mountOf, secondColor, shownLook, sideOfPawn } from "@chessroyale/core";
+import { MUSIC, mountOf, secondColor, shownLook, sideOfPawn } from "@chessroyale/core";
 import { painter2d, type Backend, type Painter } from "./paint.ts";
 import { painterGL } from "./paint-gl.ts";
 import { reportTownFallback } from "../problems.ts";
@@ -203,6 +205,13 @@ export function TownScreen({
   const fade = useRef<HTMLDivElement>(null);
   /** Going in or out: taps wait, and another way in or out isn't started. */
   const doorBusy = useRef(false);
+  /**
+   * You're walking into a room through its door on your own (the town's door, or Rolling Dough's door between rooms), not arriving by
+   * a challenge: as it shows, its banner (Eric's mockup, Nov 11) and its boss's music (music.ts roomMusic).
+   */
+  const byDoor = useRef(false);
+  const [banner, setBanner] = useState<(AreaBannerText & { n: number }) | null>(null);
+  const bannerN = useRef(0);
   const fadeTo = (to: 0 | 1, ms: number, delay = 0) => {
     const el = fade.current;
     if (!el) return;
@@ -228,6 +237,11 @@ export function TownScreen({
     // (The room's pictures painted a slice a frame while the town zooms, the rest once it's black: shops/load-slice.ts.)
     roomLoadSlice(F.loadSliceMs);
     if (challenge) step("atDoor");
+    // (The boss's theme loads as the door zooms: walked in on your own, it plays as the room shows; by a challenge, not until its
+    // splash. Eric, Nov 11.)
+    byDoor.current = !challenge;
+    // (A challenge's too: its splash starts the theme, Eric, Nov 11; loaded now it's ready by then.)
+    roomMusicLoad(id);
     // (Its code and art load now, while the town zooms: nothing of a shop loads while you walk round the town.)
     const load = import("./shops/ShopRoom.tsx").then((m) => m.loadRoom(id).then((room) => ({ room, View: m.ShopRoom })));
     // (A challenge's intro art too: loaded only now, as you go in to fight.)
@@ -245,6 +259,7 @@ export function TownScreen({
     const fight = intro ? await intro.catch(() => null) : null;
     if (!got || !box.current || (challenge && !fight)) {
       // (It didn't load: back out to the town as you were.)
+      roomMusic(null);
       if (cv) cv.style.transform = "";
       fadeTo(0, F.fadeMs);
       doorBusy.current = false;
@@ -269,14 +284,20 @@ export function TownScreen({
     if (flow.current !== "intro") return;
     step("introDone");
     const storm = m.startTransition(intro);
+    // (Eric, Nov 11: the boss's theme starts the moment his splash starts, the battle carrying it on. Not ready yet: the splash's
+    // covering frame (each boss's last frame, Folio's crumpled ball) holds until it is, MUSIC.splashHoldMs at most.)
+    const music = splashMusic(id);
     await storm.covered;
+    const ready = Promise.race([music, later(MUSIC.splashHoldMs)]);
     step("stormCovers");
     try {
       await onBossChallenge?.(id, ctl.current?.challengeStand() ?? null);
     } finally {
       step("battleReady");
+      await ready;
       await storm.out();
       step("stormGone");
+      splashDone();
     }
   };
   /**
@@ -289,6 +310,7 @@ export function TownScreen({
     doorBusy.current = true;
     const F = SHOP_FEEL;
     const to = at.room.def.part === "back" ? "front" : "back";
+    byDoor.current = true;
     doorPhase(RF.goIn);
     // (The back door's creak is off with the bakery's other room sounds: Eric, Nov 11.)
     const load = import("./shops/ShopRoom.tsx").then((m) => m.loadRoom(at.room.def.home, to));
@@ -316,6 +338,7 @@ export function TownScreen({
     if (doorBusy.current || !at || flow.current !== "town") return;
     const id = at.room.def.home;
     doorBusy.current = true;
+    byDoor.current = false;
     step("fight");
     step("atDoor");
     const F = SHOP_FEEL;
@@ -340,6 +363,12 @@ export function TownScreen({
   };
   /** The room drew its first frame: the black lifts. */
   const shopReady = () => {
+    const at = insideNow.current;
+    if (byDoor.current && at) {
+      byDoor.current = false;
+      roomMusic(at.room.def.home);
+      setBanner({ ...areaBannerOf(at.room.def, HOMES.find((h) => h.id === at.room.def.home)?.name ?? ""), n: ++bannerN.current });
+    }
     fadeTo(0, SHOP_FEEL.fadeMs);
     setTimeout(() => {
       doorBusy.current = false;
@@ -357,6 +386,8 @@ export function TownScreen({
       ctl.current?.endChallenge();
     }
     const F = SHOP_FEEL;
+    roomMusic(null);
+    setBanner(null);
     doorPhase(RF.goOut);
     fadeTo(1, F.fadeMs);
     await later(F.fadeMs);
@@ -409,6 +440,7 @@ export function TownScreen({
       stopGuest();
       stopAway();
       t.stop();
+      roomMusic(null);
     };
   }, []);
   const home = card && (card.kind === "boss" || card.kind === "home") ? HOMES[card.i]! : null;
@@ -488,6 +520,8 @@ export function TownScreen({
             canChallenge={canChallengeInside(inside.room.def.home)}
           />
         )}
+        {/* The room's name as you walk in (under the cards and chat; taps pass through it). */}
+        {inside && banner && <AreaBanner key={banner.n} text={banner} onDone={() => setBanner(null)} />}
         <div class="town-overlay">
           {/* The chat log, top left (its own file): under the cards; while it shows it takes every touch on its own area (the map under it gets none), faded none; the chips keep off its box (CHAT_BOX). */}
           <TownChat tone={inside?.room.def.chatTone} onSignIn={onSignIn && (() => askLeave("Sign in", onSignIn))} />

@@ -110,6 +110,13 @@ export function selectLine(id: string, last: string | null, rand: number = Math.
 }
 
 /**
+ * How big the picked boss stands on the stage, as a multiple of its size before (Eric, Nov 11: "on this screen they need to be a
+ * bit bigger"): the one setting for the stage's figure. Capped by the room above its feet (BossSelect's placeOnStage), so a tall
+ * boss is held to the stage's height, never cut off; the in-game sizes are untouched.
+ */
+export const STAGE_SCALE = 1.5;
+
+/**
  * Tiles to a row, on a phone and a computer alike (Eric, Oct 23: "just 5 per row, and it doesn't matter if you're on a
  * desktop"). The CSS reads it as `--bs-per`.
  */
@@ -166,6 +173,8 @@ export const SELECT_FRAMING: Readonly<Record<string, Framing>> = {
   timber: { neck: [38, 79], span: 58, at: 0.52 },
   // (His backwards cap and grin in the tile, the clock under his arm below.)
   dash: { neck: [36, 44], span: 54, at: 0.5 },
+  // (His fedora and the white of his face in the tile, his round belly and the planks' end below it.)
+  zebra: { neck: [40, 56], span: 58, at: 0.5 },
   recluse: { neck: [33, 47], span: 61, at: 0.5 },
 };
 
@@ -196,6 +205,8 @@ export const SELECT_TINT: Readonly<Record<string, string>> = {
   timber: "#2f8f9d",
   // (A deep violet, across the wheel from his gold fur and orange cap and away from his teal jacket.)
   dash: "#5a3f8e",
+  // (A bakery pink, across from his white fur and dark stripes; his vest's maroon stays clear of it.)
+  zebra: "#d9667a",
 };
 
 /**

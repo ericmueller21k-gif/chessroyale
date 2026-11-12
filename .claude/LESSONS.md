@@ -277,6 +277,15 @@ Tests check *what* ends up on the screen, not *how it gets there*, nor how long 
   - An answer that can't be read is a failure, never `{}` taken for it; and a request the app waits on before asking again has a
     timeout (`AbortSignal.timeout`): one that never answered stopped the live line and every chat riding on it.
 
+- **The flaky batch of Nov 12** (`docs/decisions/2026-11-11-flaky-batch.md`, batch 3):
+  - A test hook's tap point is a point a finger can reach this frame: the middle of the part of the target that's on screen, not its
+    middle (a guard's feet below a computer's room edge made his middle null once the camera rested). A check that passes only while
+    the camera still moves is tested with the camera at rest.
+  - The local server frees an idle Durable Object within seconds, and in-memory state (the town's chat) goes with it; on Cloudflare
+    every app's heartbeat keeps the hub in use. A spec that reads in-memory server state across a long quiet stretch (a battle, a
+    result screen) keeps the object in use, as other players would. Read the room id in the recorder's answers first: a new one
+    means a restart, not a lost line.
+
 ## Eric's rules hold
 
 - **An options panel that disappeared** (Oct 25, [story](../docs/history/lessons.md#an-options-panel-that-disappeared-oct-25-2026)):
