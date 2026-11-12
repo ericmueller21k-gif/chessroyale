@@ -280,6 +280,49 @@ test("Hollow's bulbs (Boss alone): a 2 x 2 block of the dark drawn, then the 10t
   expect(errors).toEqual([]);
 });
 
+test("Hollow's bulbs, Nov 12: his six under his bar count every move, yours and his, as wide as it; your ten bigger, at the card's right", async ({ page }) => {
+  test.setTimeout(4 * 60_000);
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await page.goto("/?debug&clock=60&boss=hollow&laststand=0");
+  await bossAloneFromHome(page);
+  await yourMove(page);
+  const strip = page.locator(".bulb-strip");
+  const lit = () => strip.getAttribute("data-lit");
+  // Before his first cover: your first move and his (which brings it).
+  await expect(strip).toHaveAttribute("data-of", "6");
+  expect(await lit()).toBe("2");
+  const box = await page.evaluate(() => {
+    const r = (s: string) => document.querySelector(s)!.getBoundingClientRect();
+    const [s, m, life, card, next] = [r(".bulb-strip"), r(".boss-bar .rage-meter"), r(".life-strip"), r(".boss-prop"), r(".boss-next")];
+    return { s: [s.left, s.right, s.top], m: [m.left, m.right, m.bottom], life: [life.left, life.right, life.width], card: [card.left, card.right], next: next.right };
+  });
+  // The six: as wide as his rage meter above it (within 2 px), under it.
+  expect(Math.abs(box.s[0]! - box.m[0]!), JSON.stringify(box)).toBeLessThanOrEqual(2);
+  expect(Math.abs(box.s[1]! - box.m[1]!), JSON.stringify(box)).toBeLessThanOrEqual(2);
+  expect(box.s[2]!).toBeGreaterThanOrEqual(box.m[2]! - 0.5);
+  // Your ten (Eric, Nov 12: "way bigger"): a computer's at least 1.6x its old 110 px, a phone's past its old 95; at the card's
+  // right, under the status, inside the room (never over his name).
+  const computer = test.info().project.name === "desktop";
+  expect(box.life[2]!, JSON.stringify(box)).toBeGreaterThanOrEqual(computer ? 1.6 * 110 : 1.15 * 95);
+  expect(Math.abs(box.life[1]! - box.next), JSON.stringify(box)).toBeLessThanOrEqual(3);
+  expect(box.life[0]!).toBeGreaterThanOrEqual(box.card[0]! - 0.5);
+  // A bulb out with your move, another with his; his cover relights all six. (Your move's count shows while he thinks, about
+  // half a second: watched every 30 ms.)
+  await play(page, "e2e4");
+  await expect.poll(lit, { timeout: 10_000, intervals: [30] }).toBe("1");
+  await yourMove(page);
+  expect((await powers(page)).dark).toHaveLength(1);
+  await expect.poll(lit, { timeout: 10_000 }).toBe("6");
+  await play(page, "d2d4");
+  await expect.poll(lit, { timeout: 10_000, intervals: [30] }).toBe("5");
+  await yourMove(page);
+  expect(await lit()).toBe("4");
+  expect(await strip.getAttribute("data-bulbs")).toBe("2");
+  if (STILLS) await still(page, "bulbs-six");
+  expect(errors).toEqual([]);
+});
+
 /**
  * Watches his speech box through Lights out, every frame, round by round (Eric, Oct 10: on a computer it showed for a
  * moment and was gone). Every frame of a round, from its first to the end of its answers, must show the box on screen
