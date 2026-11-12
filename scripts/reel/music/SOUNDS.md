@@ -31,6 +31,7 @@ from the liked list, keep off the other one. Eric's words are quoted; the date i
 | Ice cracking through a build | song_t.py (`crackle`, the thaw) | "the ice kind of sound you have going that makes it sound like it's like ice cracking, that's perfect" |
 | A slow intro of bells and chimes before the band | song_t.py (the first ten seconds) | "I like how it's kind of the whimsical, like kind of chimes and kind of like the bells, and that's a nice touch"; he asked for ten seconds more of it |
 | Plucked strings built from their harmonics, quick to die, in a long echo (oud, qanun; held notes struck again and again); a hum on one note and its fifth; a scale with a three-half-step gap over a bass that stays put; a hand drum's rhythm with a kick under it; a tune shared between two instruments and then fused into one; a drop that is thrown up (a hush) and lands on one thud | song_u.py | Nov 12, of Alfil's first go, with no changes asked: "this one's good to go. I've got no issues with it" |
+| A wordless men's choir (basses an octave under, a voice a fifth over) singing a slow chant over a band at full tilt (16th strings, a driven guitar, a kick on every 16th), the lead and the fiddle running through the scale a third apart; then the choir and the lead trading, on chords a major third apart; then the choir alone | song_v.py (`chanted`, `dueled`) | Nov 12, of the Hidden Boss's third go: "it's so good actually" |
 | A fast pattern racing under everything | every song since song_i.py | asked for in all of them |
 | The NES's four voices | song_c.py, song_f.py | "much much better" than the 16-bit orchestra |
 
@@ -100,6 +101,11 @@ A big middle (Nov 12, the Hidden Boss's): when the main part doesn't hit, he ask
 voice in front: "that hymning ... really epic ... a holy sensation, but ... a lot of instrumentals going around with
 it, a lot of fast-pacedness" (a wordless men's choir over a racing band). A build that pays off wants a faster part
 after it, not a slower one.
+
+A longer song for a two-part boss (Nov 12, the Hidden Boss's): after the first big part, a quiet memory (a place,
+its background sounds, a soft warm tune) that builds, goes out of sync and out of key, and screeches; a slight pause;
+the big part again with more on it ("a bit more layers on top ... kind of pause ... long note, short note"); the
+ending as before. "It doesn't matter how much you add."
 
 Into a drop (Nov 12, Ginger's): more of the build's own sound right before it ("a little more like ice crack"), then
 "a little bit of ... pause with ... quiet, like jingling", "and then all of a sudden like the big ice shatter, and

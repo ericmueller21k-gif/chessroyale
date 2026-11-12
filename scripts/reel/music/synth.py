@@ -305,7 +305,10 @@ class Ride(Mix):
 
     STEP = 1 / 192
 
-    def __init__(self, plan, beats_, secs, os=1, seed=7):
+    def __init__(self, plan, beats_, secs, os=1, seed=7, tape_secs=None):
+        """`secs`: how long the song is as heard (the tempos are all scaled alike until it is). Or `tape_secs`: how
+        long the tape is, the heard length following from it: for a long song, a tape whose length in samples has
+        only small factors keeps the mix's transforms quick."""
         grid = np.arange(0, beats_ + self.STEP / 2, self.STEP)
         bpm, speed, waver = np.zeros(len(grid)), np.ones(len(grid)), np.zeros(len(grid))
         for a, b, t0, t1, s0, s1, w in plan:
@@ -320,10 +323,11 @@ class Ride(Mix):
             wow = (np.sin(2 * np.pi * 0.6 * tape) + 0.5 * np.sin(2 * np.pi * 1.37 * tape + 1.0) + 0.2 * np.sin(2 * np.pi * 6.3 * tape)) / 1.7
             s = speed * (1 + waver * wow)
             heard = np.concatenate([[0], np.cumsum(60 / (bpm[:-1] * scale * s[:-1]) * self.STEP)])
-            if abs(heard[-1] - secs) < 1e-7:
+            now, want = (tape[-1], tape_secs) if tape_secs else (heard[-1], secs)
+            if abs(now - want) < 1e-7:
                 break
-            scale *= heard[-1] / secs
-        self.grid, self.tape, self.heard, self.secs, self.scale = grid, tape, heard, secs, scale
+            scale *= now / want
+        self.grid, self.tape, self.heard, self.secs, self.scale = grid, tape, heard, float(heard[-1]) if tape_secs else secs, scale
         super().__init__(float(tape[-1]), beats_, os=os, seed=seed)
 
     def t(self, beat: float) -> float:
