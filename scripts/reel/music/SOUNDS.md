@@ -25,6 +25,36 @@ from the liked list, keep off the other one. Eric's words are quoted; the date i
 | A fast pattern racing under everything | every song since song_i.py | asked for in all of them |
 | The NES's four voices | song_c.py, song_f.py | "much much better" than the 16-bit orchestra |
 
+## The recipe that worked: write the next themes this way
+
+Eric on Moo & Moon's third go (song_r.py, Nov 12): "please whatever ... u did for this do it for the rest, this is pure
+magic, i could listen to this anytime" (he meant: keep it in the notes for the bosses still to come). What that song
+does, in the order it was built:
+
+1. **The boss first.** Read his row in `docs/areas/bosses.md` and his sounds file in `packages/app/src/characters/`.
+   The lead is the boss; a second voice is his sidekick, in small doses (a few words in the gaps, never a section of
+   its own); two or three sounds from his world, built as the game builds them and kept quiet.
+2. **Tunes off the grid.** Triplets across the beat, octave jumps that float back down, notes held over the bar line,
+   phrases of three bars beside the usual two and four, a lead that slides into its long notes. Not: 8ths on the grid,
+   two-bar question and answer, the same shape moved from chord to chord.
+3. **A chord a bar**, the bass stepping (by half steps there) under one note that never moves and belongs to every
+   chord; a chord from outside the key before the turn home.
+4. **A second tune that shifts in the bar:** a motif of an odd length (five 8ths), so it lands somewhere new each
+   time, over chords moving by whole steps.
+5. **The last tune a minor third up**, and a short tag that walks home for the loop.
+6. **Two calms of about 15 seconds:** no drums, slow strings on a chord with a raised fourth, the fast pattern at half
+   speed, something of the boss's world (wind chimes for stargazing, stopped two bars early so none hangs), a flute; the
+   lead playing slowly in one of them.
+7. **One drop:** the lead and a second lead trade two bars each, then play together; chords a major third apart; an
+   808, a wobble bass, a stutter at the end of each turn.
+8. **The fast pattern is from his world** (stars) and keeps coming back to the note that never moves.
+9. **Measure before sending:** each voice's level section by section, the spectrum against an approved song, the calm
+   about 6 dB under the rest. Then send, and expect two or three rounds: the first go was "too slow ... too deep", the
+   second "feels like the other ones a lot".
+
+Vary the particulars from boss to boss (which way the bass steps, how long the shifting motif is, what the calm is
+made of): the point is the kind of move, not these notes.
+
 ## Not liked: avoid, or ask first
 
 | Sound | What Eric said |
