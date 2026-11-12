@@ -298,6 +298,75 @@ class Mix:
         return np.fft.irfft(spec / np.sqrt(1 + (f / lowpass) ** 2), n=n, axis=1)
 
 
+class Ride(Mix):
+    """A Mix on a tape that doesn't run at one speed. Notes go onto the tape at the band's own tempo and pitch
+    (`at(beat, beats)` before making a note sets its length; `put` places it); `play` then runs the tape at the
+    ride's speed, so tempo and pitch rise and sink together, as a record's do when its motor starts or dies."""
+
+    STEP = 1 / 192
+
+    def __init__(self, plan, beats_, secs, os=1, seed=7):
+        grid = np.arange(0, beats_ + self.STEP / 2, self.STEP)
+        bpm, speed, waver = np.zeros(len(grid)), np.ones(len(grid)), np.zeros(len(grid))
+        for a, b, t0, t1, s0, s1, w in plan:
+            on = (grid >= a - 1e-9) & (grid < b - 1e-9)
+            u = (grid[on] - a) / (b - a)
+            bpm[on], speed[on], waver[on] = t0 + (t1 - t0) * u, s0 * (s1 / s0) ** u, w
+        bpm[-1], speed[-1] = plan[-1][3], plan[-1][5]
+        scale = 1.0
+        for _ in range(8):
+            tape = np.concatenate([[0], np.cumsum(60 / (bpm[:-1] * scale) * self.STEP)])
+            # The waver: a slow drift, a quicker one and a flutter, together at most `waver` either way.
+            wow = (np.sin(2 * np.pi * 0.6 * tape) + 0.5 * np.sin(2 * np.pi * 1.37 * tape + 1.0) + 0.2 * np.sin(2 * np.pi * 6.3 * tape)) / 1.7
+            s = speed * (1 + waver * wow)
+            heard = np.concatenate([[0], np.cumsum(60 / (bpm[:-1] * scale * s[:-1]) * self.STEP)])
+            if abs(heard[-1] - secs) < 1e-7:
+                break
+            scale *= heard[-1] / secs
+        self.grid, self.tape, self.heard, self.secs, self.scale = grid, tape, heard, secs, scale
+        super().__init__(float(tape[-1]), beats_, os=os, seed=seed)
+
+    def t(self, beat: float) -> float:
+        """Where on the tape a beat is, in seconds."""
+        return float(np.interp(beat, self.grid, self.tape))
+
+    def when(self, beat: float) -> float:
+        """When a beat is heard, in seconds."""
+        return float(np.interp(beat, self.grid, self.heard))
+
+    def speed(self, beat: float) -> float:
+        """How fast the tape runs at a beat."""
+        return (self.t(beat + self.STEP) - self.t(beat)) / (self.when(beat + self.STEP) - self.when(beat))
+
+    def at(self, beat: float, beats_: float = 1.0) -> None:
+        self.beat_s = (self.t(beat + beats_) - self.t(beat)) / beats_
+
+    def put(self, bus, beat, x, pan=0.0, late=0.0):
+        """`late`: seconds after the beat."""
+        b = self.bus(bus)
+        i0 = int(round((self.t(beat) + late) * self.sr)) % self.N
+        gl, gr = 1 - max(0.0, pan), 1 + min(0.0, pan)
+        k, done = len(x), 0
+        while done < k:
+            m = min(k - done, self.N - i0)
+            b[0, i0 : i0 + m] += x[done : done + m] * gl
+            b[1, i0 : i0 + m] += x[done : done + m] * gr
+            done, i0 = done + m, 0
+
+    def play(self, mix: np.ndarray) -> np.ndarray:
+        """The mixed tape as it's heard: read at the ride's speed (the four nearest samples, a smooth curve through them)."""
+        k = int(round(self.secs * SR))
+        pos = np.interp(np.arange(k) / SR, self.heard, self.tape) * SR
+        i = np.floor(pos).astype(np.int64)
+        f = pos - i
+        size = mix.shape[1]
+        out = np.empty((2, k))
+        for c in range(2):
+            a, b, d, e = (mix[c, (i + j) % size] for j in (-1, 0, 1, 2))
+            out[c] = b + 0.5 * f * (d - a + f * (2 * a - 5 * b + 4 * d - e + f * (3 * (b - d) + e - a)))
+        return out
+
+
 def write_wav(path: str, x: np.ndarray, rate: int = SR) -> None:
     """Float stereo (2, n) -> 16-bit, after a peak check."""
     peak = float(np.max(np.abs(x)))
