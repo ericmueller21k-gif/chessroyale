@@ -1,0 +1,8 @@
+.bs-tiles { --bs-per: 6 !important; --bs-gap: 4px !important; --bs-h: calc(var(--bs-w) * 1.0) !important; }
+.bs-select { gap: 4px !important; flex: 1 1 auto !important; }
+.fd-page.rd-page { min-height: 100dvh !important; height: 100dvh !important; display: flex !important; flex-direction: column !important; box-sizing: border-box; padding-bottom: 10px !important; }
+.bs-stage { margin-top: auto !important; }
+.rd-options { margin-top: 14px !important; }
+.bs-spot:not(.bs-mine) .bs-sprite { transform: scale(1.7); transform-origin: 50% 100%; }
+.bs-say { transform: translateY(-58px); }
+.bs-stage { padding-top: 58px; }
