@@ -1,3 +1,4 @@
+- Nov 12 ~22:00 UTC: Eric: text-box rule, spotlight staging, kid poof/fall/buckle, room rules (wait in room, cancel on leave, 4 max, locked door), summoning. Two Opus high mockup helpers: cutscene (claude/hidden-boss-cutscene) and room (claude/hidden-boss-room). All in hidden-boss-house-NOTES.md.
 - Nov 12 ~21:35 UTC: age-20 black suit done (claude/hidden-boss-ages 88baec9; stills updated). Sent to Eric. Mockup branch kept unmerged until the build. No helpers running.
 - Nov 12 ~21:30 UTC: Eric: two real quotes in the cutscene (good moves; best by test), longer OK. RULES exception extended. Draft 2 lines in hidden-boss-house-NOTES.md.
 - Nov 12 21:20 UTC: Eric liked the ages mockup; age-20 -> black suit (Opus medium helper on claude/hidden-boss-ages). Sent him a draft cutscene conversation.

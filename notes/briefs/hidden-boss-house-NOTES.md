@@ -161,3 +161,22 @@ about a second, then types the next.
 16 Man: Do you really believe that?
 17 Kid: I'm not sure. // The only one who can prove it / is right next to me.
 -> segue: the kid fades, the book opens, the light, the cyborg.
+
+## Nov 12 (night): Eric's big update (text, cutscene staging, the room's rules, the summoning)
+**Text boxes:** each numbered line is its own text box, typed out. A line of two sentences types the first, holds about 1 s, then types
+the second. One long sentence types all at once (no breaks inside a sentence). Each box stays long enough to read: err on the slow side.
+Line 15 is two sentences: "Computers or no computers. The best player in the world is still the best."
+**Staging on the board (phone and computer):** everything dims; a circular spotlight shines down on the center of the board with a
+soft, feathered edge (no hard edge). The scene plays in that light.
+**The kid appears:** a magical poof, materializing a foot or two ABOVE the board; he drops, lands, and his knees buckle (he fell from thin air).
+**The room's rules (CHANGES the earlier plan: no more roaming town with a pending request):**
+- To challenge, you wait IN the child's room. You can't just walk out: leaving asks "Cancel your game request?" (yes = leave and cancel).
+- At most 4 players in the room at a time (per server/town instance). A 5th tapping the door: "The door is locked." and can't enter.
+- (Still: the 5-minute cap, then "Sorry, not enough players." with OK.)
+**The summoning (when the 4th arrives and the game starts):** a freeze frame: every player's sprite becomes a still image. The chessboard
+on the floor shoots light rays outward and upward. The frozen players burst into particles, all at once, and are absorbed into the light.
+The light and particles draw back, fall and splash into the board; the board wobbles up and down, settles; the room goes quiet. Then a
+transition (director's choice) into the match.
+**Order (director):** mockups first, two helpers in parallel: (A) the cutscene staging + the kid's arrival + the typed lines, (B) the room:
+the child playing his real game on the floor, and the summoning animation with four stand-in players. Then, after Eric's look: the
+building and inside in town (targeted); the room's rules and challenge (server, full lane, xhigh, alone); the child form in a match.
