@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { N, wrapF, wrapI } from "../src/town/camera.ts";
 import { TOWN_FEEL } from "../src/town/feel.ts";
-import { APRON, BOTS, APRON_ROWS, COLISEUM, GRASS, HOMES, PARK, PAVING, PROPS, START, STATUES, TABLES, Walker, createTown, destFor, findPath, groundAt, onColiseum, plotDist, seated, statueAt, stoolAt, tableAt, tableStates, taken, tick, walkWalker, walkable, type Sq, type Town } from "../src/town/world.ts";
+import { APRON, BOTS, APRON_ROWS, COLISEUM, GRASS, HOMES, PARK, PAVING, PROPS, START, STATUES, TABLES, Walker, createTown, destFor, findPath, groundAt, homeNear, onColiseum, plotDist, seated, statueAt, stoolAt, tableAt, tableStates, taken, tick, walkWalker, walkable, type Sq, type Town } from "../src/town/world.ts";
 
 /** One pawn a square (src/town/world.ts): where a walk ends, and rings of people round someone. */
 
@@ -351,5 +351,19 @@ describe("town square: the park (slice 6)", () => {
       apart(t, tripping);
     }
     expect(sat).toBeGreaterThan(0);
+  });
+});
+
+describe("a tap on or near a home's foot is that home (today's town; Nov 12, homeNear)", () => {
+  it("its plot, its door square and the row in front across the plot are the home; two rows out and the corners are not", () => {
+    for (const h of HOMES) {
+      const foot = h.door.r;
+      for (const dc of [-1, 0, 1]) {
+        expect(homeNear(h.cx + dc, foot)?.id, `${h.id}: its foot`).toBe(h.id);
+        expect(homeNear(h.cx + dc, wrapI(foot + 1))?.id, `${h.id}: its plot's front row`).toBe(h.id);
+        expect(homeNear(h.cx + dc, wrapI(foot - 1))?.id ?? null, `${h.id}: two out`).not.toBe(h.id);
+      }
+      for (const dc of [-2, 2]) expect(homeNear(wrapI(h.cx + dc), foot)?.id ?? null, `${h.id}: the corner`).not.toBe(h.id);
+    }
   });
 });

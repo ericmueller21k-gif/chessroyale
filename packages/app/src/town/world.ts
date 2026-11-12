@@ -553,6 +553,30 @@ export const bossGround = (h: Home, c: number, r: number): boolean => (h.wander 
 export const tdist = (a: Sq, b: Sq): number => Math.abs(wrapFX(a.c - b.c)) + Math.abs(wrapFY(a.r - b.r));
 /** How far a square is from a home's plot (0 on it, 1 on the ring around it). */
 export const plotDist = (h: Home, c: number, r: number): number => Math.max(0, Math.abs(wrapFX(c - h.cx)) - h.hw, Math.abs(wrapFY(r - h.cy)) - h.hd);
+/**
+ * The home a tap on square (c, r) means, or null (Nov 12, Eric: "more grace where you can click anywhere near or on the building"):
+ * a square of its plot (its picture's foot and the half-hidden squares under it), or its foot's row, the one row right in front of its
+ * front edge (its door square's row) across the plot's width, the squares before its door among them. Never a corner square beside
+ * it, nor anything two rows out. Of two homes, the nearer door wins.
+ */
+export function homeNear(c: number, r: number): Home | null {
+  const cc = colI(c);
+  const rr = rowI(r);
+  if (cc < 0 || rr < 0) return null;
+  const on = plotAt[rr * N + cc];
+  if (on) return on;
+  let best: Home | null = null;
+  let bestD = Infinity;
+  for (const h of HOMES) {
+    if (rr !== h.door.r || Math.abs(wrapFX(cc - h.cx)) > h.hw) continue;
+    const d = Math.abs(wrapFX(cc - h.door.c));
+    if (d < bestD) {
+      best = h;
+      bestD = d;
+    }
+  }
+  return best;
+}
 
 const DIRS = [
   [1, 0],
