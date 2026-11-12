@@ -1,3 +1,4 @@
+- Nov 12 00:45: Eric approved boss select mockup v2 ("exactly what I want"). Haiku helper on claude/boss-select-six.
 - Nov 12 00:30: QUEUED (xhigh, full lane): landing sign-in without age for existing accounts; age only on sign-up/new account. Starts when dock-stack + main-red finish. Boss select 6/row: waiting Eric pick (recommended: 6/row, admins get a 4th row).
 - Nov 12 00:25: #648 area banner + room/splash music MERGED (c22d7f1). Boss select 6/row mockup sent; waiting Eric.
 - Nov 12 00:10: #648 area banner + room/splash music opened (41a82cc; watcher bnbm8qfob). Helper archived. Batch 3 helper (main red) session_01JuCWRtNjTA... see list; on claude/main-red-nov12. Running Opus: dock-stack, main-red.
