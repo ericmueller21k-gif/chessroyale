@@ -55,6 +55,11 @@ Tests check *what* ends up on the screen, not *how it gets there*, nor how long 
   - A guard that refuses an action while something is busy (a door's fade) keeps the tap for when it's free, or greys the button: it
     never drops it silently. Test the tap at the first moment it can come (a MutationObserver that taps as the thing is drawn).
 
+- **A plip that never played on a busy page** (Nov 12, [story](../docs/history/lessons.md#a-plip-that-never-played-on-a-busy-page-nov-12-2026)):
+  - Anything tied to a frame or a moment (a sound, a haptic) happens even when that frame is never drawn, including an element's first
+    drawing coming late. Try a moment's path with the page's CPU slowed 4x (CDP `Emulation.setCPUThrottlingRate`), not only at full speed.
+  - A test of a short-lived state (under about 300 ms) records it as the app sets it (a MutationObserver), never with a once-a-frame sampler.
+
 ## Measure what's on screen; don't trust a screenshot
 
 - **Purity that didn't match the item** (Oct 6, [story](../docs/history/lessons.md#purity-that-didnt-match-the-item-oct-6-2026)):

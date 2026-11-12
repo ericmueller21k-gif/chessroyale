@@ -35,7 +35,8 @@ const sample = (p: Page) => p.evaluate(() => (window as unknown as Partial<Hooks
 function watchErrors(page: Page) {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(String(e)));
-  page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
+  // (With the resource's address: main run 1216's one error was a bare "Failed to load resource: … 500", which didn't say which.)
+  page.on("console", (m) => m.type() === "error" && errors.push(`${m.text()}${m.location().url ? ` (${m.location().url})` : ""}`));
   return errors;
 }
 

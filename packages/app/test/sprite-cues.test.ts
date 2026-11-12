@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { framesSince, spriteFrameAt } from "../src/components/BossEffect.tsx";
+import { LATE_CUE_MS, framesSince, spriteFrameAt } from "../src/components/BossEffect.tsx";
 import { PIG } from "../src/characters/pig.ts";
 
 /**
@@ -48,5 +48,14 @@ describe("a sprite's cue sounds survive a skipped frame", () => {
     const due = framesSince(PIG, "lasso", a, b);
     expect(due.filter((f) => f.anim === "lasso").map((f) => lasso.frames[f.frame]!.cue)).toContain("tug");
     expect(due.at(-1)).toEqual(b);
+  });
+
+  it("first drawn late (a busy page), a cue passed over since the one-shot began is still due; one older than LATE_CUE_MS is not", () => {
+    const throwAt = start("throw");
+    const cues = (ms: number) => framesSince(PIG, "lasso", null, at(ms), { now: 1_000 + ms, since: 1_000 }).map((f) => lasso.frames[f.frame]!.cue);
+    expect(cues(throwAt + 200)).toContain("throw");
+    expect(cues(throwAt + LATE_CUE_MS + 100)).not.toContain("throw");
+    // (Drawn on time: only the frame shown.)
+    expect(framesSince(PIG, "lasso", null, at(0), { now: 1_000, since: 1_000 })).toEqual([at(0)]);
   });
 });

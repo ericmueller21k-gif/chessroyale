@@ -116,6 +116,28 @@ async function record(page: Page) {
     };
     // (The first look now, not at the next frame: a reading straight after this has it.)
     look();
+    // The pump's animations in the order the app sets them, whatever the frame rate (its 160 ms put once fell between two frames of
+    // the sampler above on CI: main run 1235).
+    // So are his figure's by the board (a computer) and the limp balloon he tosses.
+    w.__tgPump = [] as string[];
+    w.__tgSide = [] as string[];
+    w.__tgLimp = false;
+    const note = (e: Element) => {
+      const a = e.getAttribute("data-anim");
+      const list = e.matches(".tg-pump-slot") ? w.__tgPump : e.matches(".boss-char.place-side") ? w.__tgSide : null;
+      if (a && list && list.at(-1) !== a) list.push(a);
+    };
+    for (const e of document.querySelectorAll(".tg-pump-slot, .boss-char.place-side")) note(e);
+    new MutationObserver((list) => {
+      for (const m of list) {
+        if (m.type === "attributes") note(m.target as Element);
+        for (const n of m.addedNodes)
+          if (n instanceof Element) {
+            for (const e of [n, ...n.querySelectorAll(".tg-pump-slot, .boss-char.place-side")]) note(e);
+            if (n.matches(".tg-limp") || n.querySelector(".tg-limp")) w.__tgLimp = true;
+          }
+      }
+    }).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["data-anim"] });
   });
 }
 const recorded = (page: Page) => page.evaluate(() => (window as any).__tg as Rec[]);
@@ -329,8 +351,9 @@ test("Babur: a balloon put on the pump at the start of his turn (a phone: his ho
   expect(b, "a balloon on the nozzle").toBeTruthy();
   const piece = ({ p: "Pawn", n: "Knight", b: "Bishop", r: "Rook", q: "Queen" } as Record<string, string>)[b.shape]!;
   if (desktop()) {
-    expect(rec.some((r) => r.side === "place"), "his place where he stands").toBe(true);
-    expect(rec.some((r) => r.limp), "the limp balloon tossed to the pump").toBe(true);
+    const seen = (await page.evaluate(() => ({ side: (window as any).__tgSide, limp: (window as any).__tgLimp }))) as { side: string[]; limp: boolean };
+    expect(seen.side, "his place where he stands").toContain("place");
+    expect(seen.limp, "the limp balloon tossed to the pump").toBe(true);
     expect(rec.every((r) => !r.bar)).toBe(true);
   } else {
     const trip = rec.filter((r) => r.bar && r.bar.translate);
@@ -348,7 +371,7 @@ test("Babur: a balloon put on the pump at the start of his turn (a phone: his ho
     expect(rec.at(-1)!.bar!.translate, "home again").toBe("");
   }
   // The pump: bare until the put, then the limp balloon, then each stage stepping up on the clock, then ready, bobbing.
-  const anims = [...new Set(rec.map((r) => r.pump))];
+  const anims = [...new Set((await page.evaluate(() => (window as any).__tgPump)) as string[])];
   const i = (a: string) => anims.indexOf(a);
   expect(i(`put${piece}`), JSON.stringify(anims)).toBeGreaterThan(i("bare"));
   expect(i(`grow2${piece}`), JSON.stringify(anims)).toBeGreaterThan(i(`put${piece}`));
@@ -526,7 +549,7 @@ test("Babur's balloon on the board is as tall as a queen piece on its square: it
 // the window's edge); clear of the board, the eval bar, the leaderboard and the status, inside the window; a landing flies from it.
 test("Babur's pump on a computer at 1280 × 800, 1440 × 900, 1920 × 1080 and 1024 × 768: a stage-4 queen as tall as the board's queen, beside him or in a taller bar, clear of everything, and a landing flies from it", async ({ page }) => {
   test.skip(!desktop(), "a computer's layout");
-  test.setTimeout(420_000);
+  test.setTimeout(300_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   for (const [w, h, place] of [

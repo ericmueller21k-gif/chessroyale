@@ -24,7 +24,15 @@ const missing = shards.filter((s) => !s.record);
 const red = failed.length > 0 || missing.length > 0 || shards.some((s) => s.record && s.record.status !== "passed");
 
 const out = [];
-const head = [red ? "❌ red" : "✅ green", failed.length && `${failed.length} failed`, flaky.length && `${flaky.length} flaky`, missing.length && `${missing.length} shard(s) without results`];
+// The title tells a retry-pass red from a real failure at a glance (audit Q3, Nov 12): "red: N failed" is a test that failed twice
+// or a shard that stopped (look for the cause, or revert); "red: flaky only (N)" is main's run red only because tests passed on their
+// retry (Nov 10: fix each at its cause). FLAKY_RED=true (the workflow's, for main) makes a flaky test red; a pull request isn't held up.
+const flakyRed = process.env.FLAKY_RED === "true";
+const head = red
+  ? [`❌ red: ${failed.length} failed`, flaky.length && `${flaky.length} flaky`, missing.length && `${missing.length} shard(s) without results`]
+  : flaky.length && flakyRed
+    ? [`❌ red: flaky only (${flaky.length})`]
+    : ["✅ green", flaky.length && `${flaky.length} flaky`];
 out.push(`## e2e: ${head.filter(Boolean).join(", ")}`, "");
 if (note) out.push(note, "");
 const table = (title, list, how) => {

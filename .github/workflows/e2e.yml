@@ -195,6 +195,9 @@ jobs:
           merge-multiple: true
       - name: Summary
         if: ${{ needs.plan.result == 'success' }}
+        env:
+          # (Main's run is red on a test that passed only on its retry: the summary's title says "red: flaky only (N)".)
+          FLAKY_RED: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}
         run: node e2e/ci-summary-merge.mjs "$SHARDS" e2e-summary "$NOTE" >> "$GITHUB_STEP_SUMMARY"
       # A test that passed only on its retry fails main's run (Nov 10, audit F1, after the second flaky batch): the retry
       # stays for the trace it records, but no longer hides a flake. Pull requests aren't held up by one.

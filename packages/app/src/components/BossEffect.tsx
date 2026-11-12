@@ -187,13 +187,30 @@ export type Shown = { anim: string; frame: number; tag: string };
  * over since in the same run, or in the one-shot `anim` before its loop took over. A slow frame on a busy phone jumps
  * past a short one (Wrangler's 60 ms "tug"), and its sound would never play. Their sounds come a moment late instead.
  */
-export function framesSince(ch: Character, anim: string, prev: Shown | null, s: Shown): Shown[] {
+export function framesSince(ch: Character, anim: string, prev: Shown | null, s: Shown, first?: { now: number; since: number }): Shown[] {
   const out: Shown[] = [];
   if (prev && prev.tag === s.tag) for (let i = prev.frame + 1; i < s.frame; i++) out.push({ anim: s.anim, frame: i, tag: s.tag });
   else if (prev && prev.anim === anim && s.anim !== anim) for (let i = prev.frame + 1; i < ch.anims[anim]!.frames.length; i++) out.push({ anim, frame: i, tag: prev.tag });
+  else if (!prev && first && !ch.anims[anim]!.loop) {
+    // The first drawing, after the one-shot began (`first`: now, its start): the frames it passed over meanwhile, those at most
+    // LATE_CUE_MS ago. (A seed's plop drawn 100 ms late on a busy page skipped its 55 ms first frame, and its plip with it.)
+    const tag = `${anim}:${first.since}`;
+    let t = first.since;
+    for (const [i, f] of ch.anims[anim]!.frames.entries()) {
+      if (s.tag === tag && i >= s.frame) break;
+      if (t >= first.now - LATE_CUE_MS) out.push({ anim, frame: i, tag });
+      t += f.ms;
+    }
+  }
   out.push(s);
   return out;
 }
+/**
+ * How late a cue's sound may come when the sprite is first drawn after its frame (a busy page): later than this (a reload, a screen
+ * opened mid-animation) it isn't played. A copy drawn again (the match's screens are rebuilt every phase) never plays a cue twice: each
+ * is played once, by its tag.
+ */
+export const LATE_CUE_MS = 1_000;
 
 export function SpriteAnim({ ch, anim, since, then, sounds = {}, id = "", class: cls = "", style, look, onFrame, still = false }: SpriteAnimProps) {
   const cv = useRef<HTMLCanvasElement>(null);
@@ -206,7 +223,8 @@ export function SpriteAnim({ ch, anim, since, then, sounds = {}, id = "", class:
     // plays its sound, a moment late rather than never (framesSince).
     let prev: Shown | null = null;
     const draw = () => {
-      const s = spriteFrameAt(ch, anim, then, Date.now(), since);
+      const now = Date.now();
+      const s = spriteFrameAt(ch, anim, then, now, since);
       const shown = `${s.anim}:${s.frame}`;
       // (Drawn again for a new battle's lights too.)
       const key = `${shown}:${ch.swap?.()?.id ?? ""}`;
@@ -217,7 +235,7 @@ export function SpriteAnim({ ch, anim, since, then, sounds = {}, id = "", class:
         g.putImageData(frameImage(ch, frame, look), 0, 0);
         onFrame?.(frame);
         cv.current?.setAttribute("data-frame", shown);
-        for (const f of framesSince(ch, anim, prev, s)) {
+        for (const f of framesSince(ch, anim, prev, s, prev ? undefined : { now, since })) {
           const fr = ch.anims[f.anim]!.frames[f.frame]!;
           const sound = fr.cue ? sounds[fr.cue] : undefined;
           const tag = `${ch.id}:${id}:${f.tag}:${f.frame}`;

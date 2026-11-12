@@ -91,6 +91,20 @@ async function record(page: Page, watch: string[] = []) {
     const w = window as any;
     w.__rec = [] as any[];
     w.__watch = watch;
+    // (Every seed and plop as the app puts it in the page, whatever the frame rate: a busy page (CI's desktop; the CPU slowed 4x)
+    // can draw a 620 ms flight between two frames of the sampler below, or a seed already on its way.)
+    w.__seedsIn = [] as any[];
+    new MutationObserver((list) => {
+      const b = document.querySelector<HTMLElement>(".hb-board")?.getBoundingClientRect();
+      for (const m of list)
+        for (const n of m.addedNodes) {
+          if (!(n instanceof HTMLElement) || !b || !n.matches(".gd-seed, .gd-plop")) continue;
+          const seed = n.matches(".gd-seed");
+          // (A seed's box middle where its flight starts: its `--x0`/`--y0`, the board's size as 1; a seed is an eighth of the board.)
+          const from = seed ? { x: b.left + (Number(n.style.getPropertyValue("--x0")) + 1 / 16) * b.width, y: b.top + (Number(n.style.getPropertyValue("--y0")) + 1 / 16) * b.width } : null;
+          w.__seedsIn.push({ kind: seed ? "seed" : "plop", sq: n.dataset.square, from, inAir: document.querySelectorAll(".gd-seed").length });
+        }
+    }).observe(document.body, { childList: true, subtree: true });
     const frame = () => {
       const board = document.querySelector<HTMLElement>(".hb-board");
       const b = board?.getBoundingClientRect();
@@ -239,13 +253,14 @@ test("the opening's five seeds: his plant animation, five seeds arcing from his 
   const rec = await recorded(page);
   // His plant animation (the five's own), where he stands.
   expect(rec.some((r) => r.anim === "plantMany"), "his plantMany animation").toBe(true);
-  // Five seeds in the air, each to its own square in the board's middle four ranks; each then plops on that square.
-  const flown = new Map<string, Rec>();
-  for (const r of rec) for (const s of r.seeds) if (!flown.has(s.sq)) flown.set(s.sq, r);
-  expect([...flown.keys()], "five different squares").toHaveLength(5);
-  for (const sq of flown.keys()) expect(sq).toMatch(/^[a-h][3-6]$/);
-  for (const sq of flown.keys()) expect(rec.some((r) => r.plops.includes(sq)), `a plop on ${sq}`).toBe(true);
-  expect(Math.max(...rec.map((r) => r.seeds.length))).toBe(5);
+  // Five seeds in the air, each to its own square in the board's middle four ranks; each then plops on that square. (As the app put
+  // them in the page: __seedsIn.)
+  const seedsIn = (await page.evaluate(() => (window as any).__seedsIn)) as { kind: "seed" | "plop"; sq: string; from: { x: number; y: number } | null; inAir: number }[];
+  const flown = [...new Set(seedsIn.filter((x) => x.kind === "seed").map((x) => x.sq))];
+  expect(flown, "five different squares").toHaveLength(5);
+  for (const sq of flown) expect(sq).toMatch(/^[a-h][3-6]$/);
+  for (const sq of flown) expect(seedsIn.some((x) => x.kind === "plop" && x.sq === sq), `a plop on ${sq}`).toBe(true);
+  expect(Math.max(...seedsIn.map((x) => x.inAir)), "all five in the air at once").toBe(5);
   // The first seed leaves his hand: a point near where his figure's `toss` frame has it (HAND), on the screen.
   const hand = await page.evaluate(() => {
     const c = [...document.querySelectorAll<HTMLElement>(".boss-char:not(.place-results) .boss-char-sprite")].find((e) => e.getBoundingClientRect().width > 0)!;
@@ -253,8 +268,10 @@ test("the opening's five seeds: his plant animation, five seeds arcing from his 
     const k = r.width / 90;
     return { x: r.left + 23 * k, y: r.top + 54.5 * k, unit: document.querySelector(".hb-board")!.getBoundingClientRect().width / 8 };
   });
-  const firstSeen = rec.find((r) => r.seeds.length)!.seeds[0]!;
-  expect(Math.hypot(firstSeen.x - hand.x, firstSeen.y - hand.y), "the first seed's first frame is at his hand").toBeLessThan(hand.unit * 1.6);
+  // (Where its flight starts, not where its first frame is drawn: a busy page (CI's desktop) draws a seed late, already on its way,
+  // 170 to 530 px from his hand with the CPU slowed 4x. The flight is CSS on the page's clock, so it still lands on time.)
+  const from = seedsIn.find((x) => x.kind === "seed")!.from!;
+  expect(Math.hypot(from.x - hand.x, from.y - hand.y), "the first seed's flight starts at his hand").toBeLessThan(hand.unit * 1.6);
   // Nothing stays: no seed and no plop a moment later, and nothing on the board but the pieces.
   const last = rec.at(-1)!;
   expect(last.seeds).toEqual([]);

@@ -1016,3 +1016,16 @@ room's canvas is drawn: the pop replayed at every phase, and the room stayed, on
 **The fix:** the badge carries on its animation from when the lift or slash began (`levelSince`, a negative `animation-delay`); the town
 keeps a Back tapped as the room fades in and goes out once it has (`outNext`). Each spec has the check that failed on the old build.
 docs/decisions/2026-11-11-flaky-batch.md, "Batch 4".
+
+## A plip that never played on a busy page (Nov 12, 2026)
+
+**What happened:** main's run went red on a retry-only pass in `gardener.spec.ts:229`: four plips for the opening's five seeds.
+
+**Why:** a sprite plays a frame's sound as it draws that frame, and a frame a slow tick jumps past still plays (Oct, Wrangler's tug), but
+only from the second drawing on. A seed's plop is put in the page by a timer at its landing; on a busy page the timer came over 55 ms
+late, the plop's first drawing was already past its first frame (the one with the plip), and the sound never played.
+
+**How it was found:** the page's CPU slowed 4x through CDP (`Emulation.setCPUThrottlingRate`): four plips in 5 of 6 runs.
+
+**The fix:** the first drawing plays the cues the one-shot passed over since it began, up to `LATE_CUE_MS` (1 s) late. A unit test.
+docs/decisions/2026-11-12-flaky-batch-5.md.

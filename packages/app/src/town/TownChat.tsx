@@ -345,7 +345,7 @@ export function TownChat({ tone: room, onSignIn }: { /** Inside a shop: its room
   }, [log]);
 
   // Escape closes typing (a computer's way to; the map press is the phone's). A line's menu or the settings sheet that is open take their own Escape first.
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!typing) return;
     const esc = (e: KeyboardEvent) => {
       if (e.key !== "Escape" || wrap.current?.querySelector(".tc-menu") || document.querySelector(".mm-scrim")) return;
