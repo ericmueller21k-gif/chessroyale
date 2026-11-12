@@ -13,7 +13,7 @@ import { useTurnChatOn } from "../components/ChatOptIn.tsx";
 import { BOARD_COLORS, boardColors, boardMarksOn, chatOff, crowdAnimations, crowdTrail, onPrefsChange, practiceOn, premovesOn, setBoardColors, setBoardMarksOn, setChatOff, setCrowdAnimations, setCrowdTrail, setPracticeOn, setPremovesOn, setSquadsJumpNext, setVibrationOn, squadsJumpNext, vibrationOn, type BoardColors } from "../prefs.ts";
 import { JUMP_NEXT_INFO, JUMP_NEXT_LABEL } from "../squads-view.ts";
 import { clearAllPremoves } from "../board/yours.ts";
-import { hapticWay } from "../haptics.ts";
+import { hapticWay, vibrationGreyed } from "../haptics.ts";
 import { REEL_VOICES, getReelVoice, isMuted, onMuteChange, previewPieceSound, previewReel, setMuted, setReelVoice, soundReport, unlockAudio, type ReelVoice } from "../sound.ts";
 import { PIECE_SOUNDS, pieceSound, setPieceSound } from "../piece-sounds.ts";
 import { musicOn, onMusicChange, setMusicOn } from "../music.ts";
@@ -227,8 +227,9 @@ export function SettingsScreen({ onBack, onFaq, onAutoChess }: { onBack: () => v
   const [busy, setBusy] = useState(false);
   // (Arrows and highlights are drawn with a mouse: greyed on a device without one.)
   const [mouse] = useState(() => typeof matchMedia === "function" && matchMedia("(any-pointer: fine)").matches);
-  // (Vibration: greyed where the device has no way to vibrate, haptics.ts.)
-  const [canVibrate] = useState(() => hapticWay() !== null);
+  // (Vibration: greyed where the device has no way to vibrate, and on an iPhone, which gives web pages no tick: haptics.ts.)
+  const [greyed] = useState(() => vibrationGreyed(hapticWay()));
+  const canVibrate = greyed === null;
   const u = profile?.user;
   return (
     <div class="fd-page fd-settings">
@@ -259,7 +260,7 @@ export function SettingsScreen({ onBack, onFaq, onAutoChess }: { onBack: () => v
           {isMuted() ? "Off with the sound. Switch Sound on to hear it." : "Each boss's theme, through the battle."}
         </Toggle>
         <Toggle title="Vibration" checked={canVibrate && vibrationOn()} disabled={!canVibrate} onChange={setVibrationOn}>
-          {canVibrate ? "A light tick as you pick up a piece and as you move, and a buzz at a few boss moments." : "Not available on this device."}
+          {greyed ?? "A light tick as you pick up a piece and as you move, and a buzz at a few boss moments."}
         </Toggle>
         <SoundPicker title="Move sound" options={PIECE_SOUNDS.move} chosen={pieceSound("move").id} pick={(id) => setPieceSound("move", id).id} hear={(id) => previewPieceSound("move", id)}>
           What a piece makes as it lands, in every mode. Tap {"\u25B6\uFE0E"} to hear one.

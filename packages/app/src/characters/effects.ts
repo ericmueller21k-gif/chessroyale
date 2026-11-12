@@ -23,6 +23,7 @@ import { BALLOON_FLY, BALLOON_HIT, BALLOON_LAND, HOOP_FLY, HOOP_RING } from "./e
 import { CREASE_EDGE, CREASE_PENCIL, FOLD_PAPER, INK_HIT, INK_LINE, INK_MARK, INK_STRIKE } from "./effects/folio.ts";
 import { CHIP_HIT } from "./effects/timber.ts";
 import { FLOUR_HIT } from "./effects/zebra.ts";
+import { CLAW_HIT } from "./effects/dash.ts";
 import { ZEBRA_DOUGH } from "./zebra-dough.ts";
 import { GOLD_FX } from "./zebra-gold.ts";
 
@@ -66,6 +67,7 @@ export const EFFECT_SPRITES = {
   sawHit: SAW_HIT,
   chipHit: CHIP_HIT,
   flourHit: FLOUR_HIT,
+  clawHit: CLAW_HIT,
   zebraDough: ZEBRA_DOUGH,
   goldFx: GOLD_FX,
   lassoHit: LASSO_HIT,
