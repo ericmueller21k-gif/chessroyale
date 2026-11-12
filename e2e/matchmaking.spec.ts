@@ -1,4 +1,5 @@
 import { devices, expect, type Page } from "@playwright/test";
+import { MATCHMAKING } from "@chessroyale/core";
 import { named, test, watchFor, openBossRaid, pickMode, leaveQueue } from "./helpers.ts";
 
 /**
@@ -65,18 +66,27 @@ test("home (Nov 9): Solo queue, Party and Bots, each a title and a sub line; the
   await box.getByRole("radio", { name: /^Very easy/ }).click();
 
   // OK: the queue screen, your bots fill the 100 seats in a couple of seconds, then the match begins, the bots at Very easy.
-  const t0 = Date.now();
+  // (Timed in the page, as it happens: when the queue screen is put in the page and when its count first reads 100.)
+  await page.evaluate(() => {
+    const w = window as any;
+    const t = (w.__fill = { ok: performance.now(), seats: 0, full: 0 });
+    new MutationObserver(() => {
+      if (!t.seats && document.querySelector(".fd-seats")) t.seats = performance.now();
+      if (!t.full && document.querySelector(".fd-count-n")?.textContent === "100") t.full = performance.now();
+    }).observe(document.body, { childList: true, subtree: true, characterData: true });
+  });
   await box.getByRole("button", { name: "OK", exact: true }).click();
   await expect(page.locator(".fd-seats")).toBeVisible();
   await expect(page.locator(".fd-queue-mode")).toHaveText("Crowd · 50 v 50 · Solo");
   await expect(page.locator(".fd-queue-rank")).toHaveText("Unranked: solo games don't count for ranking");
-  // Full at 100, and the match starts straight away: under load the last frame can be gone before we look, so a
-  // queue that has already moved on to the vote counts as full too.
-  await expect
-    .poll(async () => (await page.evaluate(() => document.querySelector(".fd-count-n")?.textContent ?? null)) === "100" || (await phase(page)) === "vote", { timeout: 6_000 })
-    .toBe(true);
-  const filled = Date.now() - t0;
-  expect(filled).toBeLessThan(5_000);
+  // Full at 100 over the fill's time (MATCHMAKING.soloFillMs, 2.2 s), give or take a busy frame, then the match starts. Timed from the
+  // queue screen, not the OK tap: before it, the match's code, the opening library and the engines load (0.8 to 1 s locally with the
+  // CPU slowed 4x, about 3 s on CI's busiest runners: matchmaking:22 took 5,289 and 5,727 ms against a 5 s budget from the tap, the
+  // fill itself on time), which is the machine, not the queue: that part only has to come.
+  await expect.poll(() => page.evaluate(() => (window as any).__fill.full > 0), { timeout: 15_000 }).toBe(true);
+  const fill = (await page.evaluate(() => (window as any).__fill)) as { ok: number; seats: number; full: number };
+  expect(fill.seats - fill.ok, "the queue screen comes within 10 s of OK").toBeLessThan(10_000);
+  expect(fill.full - fill.seats, "the seats fill over the fill's time").toBeLessThan(MATCHMAKING.soloFillMs + 1_000);
   await expect.poll(() => phase(page), { timeout: 10_000 }).toBe("vote");
   // (Its bots are the match's: the same 99.)
   expect(await page.evaluate(() => (window as any).match.standings().length)).toBe(100);
