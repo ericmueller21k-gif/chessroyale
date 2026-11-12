@@ -138,3 +138,5 @@ Draft 2 is in the chat of Nov 12 and below; Eric's to change. Unattributed quote
   sensible game, generated once with Stockfish self-play (or a public classic), but NOT one of his own famous games (that would hint
   at who he is). Start with the reset as a quick fade; his putting the pieces back is an extra if cheap.
 - Cutscene: Eric doesn't like line 4 ("I forgot that part"); he's writing his own version of the lines. Wait for it; don't send another draft.
+
+- Eric, Nov 12 (final): no more likeness or legal caveats about the Hidden Boss, ever. His real games, quotes and life are fine; only the name stays out.

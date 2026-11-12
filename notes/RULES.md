@@ -72,7 +72,7 @@ notes to a private place or strip them). Never put a secret value here or anywhe
 - "Nothing hidden, nothing shifts" by default; briefs list "Rules you must keep".
 - Reports: every player-visible text change listed; mark the director's own calls *(mine)*.
 - Style: simple beats flashy, American English, no slop, short messages, times in Eric's local time (UTC−5).
-- Real people: never base anything on, name or hint at a real person; the bronze statue's subject is never named. Exception (Eric, Nov 12, "I did the research"): the Hidden Boss's drawings may look like the person (the child and grown forms), but his name never appears anywhere. Also (Eric, Nov 12, "quotes are not owned by anyone"): his cutscene may use two short real quotes of his, "All that matters on the chessboard is good moves" and "Best by test", unattributed; still no name, place or date.
+- Real people: never base anything on, name or hint at a real person; the bronze statue's subject is never named. EXCEPTION, the Hidden Boss (Eric, Nov 12, final: "stop bringing it up"): he is a tribute, and Eric has settled it. His likeness, his real quotes, his real games and facts from his life are all fine to use. Only his name stays out of the game, per Eric's own call. Never raise legal or likeness concerns about him again, to Eric or in briefs; helpers don't either.
 - Test-value review (Oct 18 reminder): offered; don't start until Eric says go.
 - Names (Eric, Nov 1: "whatever you come up with is fine"): Timber's woodpecker **Rivet**, Blitz's tortoise **Tick**.
 - **Blitz's voice (Eric, Nov 3):** silly, try-hard young slang ("Yo, this game is chopped, bro", broski, fam, cuz); trying to fit in
