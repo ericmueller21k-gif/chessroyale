@@ -1,3 +1,4 @@
+- Nov 12 02:05: #646 Babur mate + iPhone Vibration MERGED (7278799). Main run on edb8cac red only on retry-passes (global-chat:116 desktop, town-leave:148 phone); batch 3 fixes held. Batch 4 helper session_01JuCWRryNiHuETc3ZxFfwDb (Opus high) on claude/main-red-batch4 (boss-bar:204 flicker first). Running Opus: dock-stack + batch 4. Landing sign-in (xhigh, alone) after both.
 - Nov 12 01:55: #651 boss select six MERGED (af601af).
 - Nov 12 01:45: #651 boss select six opened (c44227e; boss ~2x pawn on tall guest screens; Ginger ~1.6x flagged). Six helper archived. Watcher bifh6cgo6. Stills sent to Eric.
 - Nov 12 01:35: #650 batch 3 MERGED (edb8cac). #649 dough timers MERGED (331f5ce). #646 merged main -> dce1148, CI rerun (watcher bhh52o81z). Main run watcher on edb8cac (bb13o0o85).
