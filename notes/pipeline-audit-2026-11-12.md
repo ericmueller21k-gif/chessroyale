@@ -106,3 +106,11 @@ caveats in L3 and Q4. Everything else is flat or down: CI got faster across the 
   - Evidence: you-look grew 50 kB (+14%) and CSS 29 kB in 3 days. The main chunk is still 1.9 MB.
   - Change: the Nov 6 character split (load each boss's code with his match) remains the big win.
   - Size: Opus high, 3-5 h. Not urgent: no CI cost.
+
+## Correction (Nov 12, after Eric asked)
+
+Q1 is withdrawn: its evidence was wrong. Eric has been on GitHub Pro (40 jobs at once) since Nov 9, and every run cited came after that. Measured from each run's jobs:
+- Runner waits were 3-4 s in 7 of the 9 slow runs and in 43261225701. The worst were 370 s (1313) and 155 s (1357).
+- What actually made eight of them slow (8-17 min each): the run waited for the previous main run to finish. Main runs one at a time by design.
+- 1235 (50 min): one shard stalled for 50 min, which is the long-timeout problem (F6/L5), not runners.
+- Fix: "the 20-runner cap" was the free plan's number. Every figure the audit cites is now checked against the jobs API first.
