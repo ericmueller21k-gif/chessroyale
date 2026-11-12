@@ -1,3 +1,4 @@
+- Nov 12 19:15 UTC: Eric (heads-up): Hidden Boss gets a ~30 s cutscene between adult and cyborg (ghostly younger self, heartfelt talk, book opens, beam of light makes the cyborg); per-phase music with fades; a Fable session may send the music wiring. In hidden-boss-house-NOTES.md. Eric at lunch.
 - Nov 12 19:10 UTC: main 50edb24 (#667, docs only) RED by retry-pass only: town-leave:148 [phone] again (after batch 4). Sent to the batch 5 helper.
 - Nov 12 18:57 UTC: #668 desktop repeats MERGED (34f5559). Watching main runs on 50edb24 and 34f5559. Batch 5 helper still running.
 - Nov 12 18:5x UTC: #667 docs trim MERGED (50edb24; six notes 34,557 -> 865 words). #668 desktop repeats open (tiger 2 tests @phone-only, TIMER_BAR_BELOW gone; saving ~2 min/full run, boss-side guard left as is). Batch 5 helper still running.

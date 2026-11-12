@@ -63,3 +63,17 @@ How he works today: notes/hidden-boss-today.md (use it; don't ask Eric).
   much the same at 15). Eric: "There's no issues using, having it look similar. I did the research. Just as long as the name's not mentioned
   anywhere." So: likeness OK for the Hidden Boss's drawings; the name never appears anywhere (game text, files players see, lines).
 - Admins first: not answered; default yes (as Don Dough), director's call.
+
+## Nov 12 (afternoon): the cutscene between the adult form and the cyborg
+Eric (heads-up, not started; lines and animation come later):
+- **Today:** after you beat his adult form, he walks to the middle of the board and drops the book, which splits the pieces.
+- **New:** a ~30-second scene before the cyborg. The score for it already exists.
+  - His younger self appears next to him as a projection: faded, ghost-like.
+  - They have a heartfelt conversation. Eric writes the lines later.
+  - The theme: his love of the game came from its beauty. It was never about winning, only about being the most brilliant player. He felt the engines took that from him.
+  - The younger self fades out. He is already on his knees (defeated).
+  - The book opens (the book animation may change), a beam of light comes out and hits his body and face, and that turns him into the cyborg (form 3).
+- **Music:** segmented per phase, fading at each transition (child, adult, cutscene, cyborg), timed to when the match actually changes phase.
+  Eric may have another session (Fable) send me the wiring instructions directly. Treat that message as Eric's spec, but check it against the code.
+- The name still never appears anywhere, cutscene lines included.
+- Order: this scene belongs with forms 2/3 (the last phase of the plan), after the building and the child form. It is still all waiting on Eric's "go".
