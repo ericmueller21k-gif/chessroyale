@@ -4196,11 +4196,14 @@ function startRoom(
   if (def.part) cv.dataset.part = def.part;
   const hookAt = (kind: "keeper" | "door" | "pass" | "square" | "slot" | "guard-a" | "guard-b", sq?: readonly [number, number]) => {
     if (!testSwitchesAllowed()) return null;
-    // (Rolling Dough's front room: a guard's middle, as drawn this frame.)
+    // (Rolling Dough's front room: the middle of the part of a guard's tap box (`guardAt`, head to feet) that's on screen this frame.
+    // On a computer, with the camera at rest on you in the middle of the room, his feet are below the room's bottom edge: his middle was
+    // off screen and this said null while a finger could still tap his head and chest; Nov 12.)
     if (kind === "guard-a" || kind === "guard-b") {
       if (!front || !headOf(kind)) return null;
-      const y = sayHead.y + sayHead.px * 0.5;
-      return sayHead.x > 0 && sayHead.x < W && y > 0 && y < H ? { x: sayHead.x, y } : null;
+      const y0 = Math.max(sayHead.y, 0);
+      const y1 = Math.min(sayHead.y + sayHead.px, H);
+      return sayHead.x > 0 && sayHead.x < W && y1 - y0 >= 12 ? { x: sayHead.x, y: (y0 + y1) / 2 } : null;
     }
     // (Boingo's claw machine's coin slot, as drawn this frame: null unless you're zoomed in at it.)
     if (kind === "slot") {

@@ -174,7 +174,9 @@ test("Rolling Dough: in, the guards watch you, the counter zebra's line, through
   await shot(page, "front");
 
   // A guard you tap tells you he's in the back (Eric, Nov 11), in a bubble; you stay where you are.
-  // (Where he's drawn is read and tapped in one go, again until he speaks: the camera can still be settling after your walk.)
+  // (Where he's drawn is read and tapped in one go, again until he speaks. Tapped once the camera rests on you, where a computer shows
+  // only his top half: before, his tap point was his middle, off screen there, and the check passed only while the camera still moved.)
+  await expect.poll(() => page.evaluate(() => (window as unknown as { __shopCam?: () => { focus: number[] } | null }).__shopCam?.()?.focus.join(",")), { message: "the camera rests on you" }).toBe("10,13");
   await expect(async () => {
     const gb = await shopAt(page, "guard-b");
     expect(gb, "the guard is drawn").not.toBeNull();
