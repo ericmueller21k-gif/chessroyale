@@ -18,8 +18,8 @@
  * 2. ZEBRA_TIMER (38 x 22, foot [19, 20]): the oven timer on his side, one per dough on the board: a white kitchen timer with
  *    a red button, the dough's kind printed on its left, an LCD showing MM:00 (minutes are moves: one off for every move, yours
  *    and his). The last minute's digits are red.
- *    - `kNN` (NN 00 to 15): still, showing NN:00.
- *    - `kRollNN` (NN 01 to 15, once, 7 frames, about 0.25 s): the drop from NN:00 to (NN-1):00: the minute goes and the seconds
+ *    - `kNN` (NN 00 to TIMER_MAX, 30: room for any doughTimers setting; Nov 12, was 15): still, showing NN:00.
+ *    - `kRollNN` (NN 01 to TIMER_MAX, once, 7 frames, about 0.25 s): the drop from NN:00 to (NN-1):00: the minute goes and the seconds
  *      race 59 to 00 in a blink, "all of a sudden a minute passed" (cue `roll` f0). It ends on k(NN-1).
  *    - `kDing` (once, 6 frames, about 0.8 s): at 00:00, the LCD flashes and it rings, bell lines off its top, a jiggle (cue
  *      `ding` f0). Then play the dough's `kRise`.
@@ -360,11 +360,13 @@ function lcd(mm: number, ss: number, flash = false): string {
 }
 const timer: Record<string, Anim> = {};
 const nn = (n: number) => String(n).padStart(2, "0");
+/** The highest minute the timer has frames for (each made only when first drawn): above every doughTimers value. */
+export const TIMER_MAX = 30;
 for (const k of KINDS) {
   // (Its body, painted the first time a frame needs it.)
   const body = () => timerBody(k);
-  for (let m = 0; m <= 15; m++) timer[`${k}${nn(m)}`] = lazyAnim(() => ({ loop: false, frames: [{ ms: 1000, layers: [L(body(), 2, 1), L(lcd(m, 0), 2, 1)] }] }));
-  for (let m = 1; m <= 15; m++)
+  for (let m = 0; m <= TIMER_MAX; m++) timer[`${k}${nn(m)}`] = lazyAnim(() => ({ loop: false, frames: [{ ms: 1000, layers: [L(body(), 2, 1), L(lcd(m, 0), 2, 1)] }] }));
+  for (let m = 1; m <= TIMER_MAX; m++)
     timer[`${k}Roll${nn(m)}`] = lazyAnim(() => ({
       loop: false,
       frames: [

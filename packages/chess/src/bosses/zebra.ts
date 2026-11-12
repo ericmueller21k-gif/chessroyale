@@ -13,7 +13,7 @@
  *   doughLive on the board at once), a lump of dough on an empty square of his half. Everyone sees what it will rise as
  *   (doughOdds, stepping down to a kind he can have now: never a ninth pawn, more pieces than promotions could make, or past
  *   doughLeadMax pawns ahead of you on material, a queen's excepted) and its oven
- *   timer, starting at doughTimers[kind] minutes (Eric's: pawn 4, knight and bishop 7, rook 10, queen 15).
+ *   timer, starting at doughTimers[kind] minutes (Eric's, Nov 12: pawn 8, knight and bishop 13, rook 16, queen 21).
  * - **Where** (doughSquare): never his back rank, the en passant square or a lump's square (doughReach "out": nor a square one
  *   of the crowd's moves reaches now; the sim ships "any", so it can be squashed); a pawn, knight or bishop on the two ranks of his half nearest the middle, a rook
  *   or queen on the two ranks behind them, on a file where a pawn of the crowd's stands below it (Eric: "near his side somewhere,
