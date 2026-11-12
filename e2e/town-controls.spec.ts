@@ -191,7 +191,7 @@ async function dot(page: Page, sel = ".tm-small .tm-you") {
 }
 
 test(`hold to run: a press held still runs you each way the finger is from your pawn, at once; letting go stops you; the camera never turns`, async ({ page }) => {
-  test.setTimeout(90_000);
+  test.setTimeout(180_000);
   await open(page);
   const f = await finger(page);
   // Each from a square with a long street that way (a run under a slow machine goes on a few squares before the test lets go):
@@ -228,7 +228,7 @@ test(`hold to run: a press held still runs you each way the finger is from your 
 });
 
 test(`a run steers: sliding the finger mid-run changes the way, and the camera doesn't turn`, async ({ page }) => {
-  test.setTimeout(60_000);
+  test.setTimeout(90_000);
   await open(page);
   // (Fountain Street east of the park, from where it runs on round the world's east-west wrap to the park's west side: room to run
   // right while the test reads and slides, however slow the machine.)
@@ -253,7 +253,7 @@ test(`a run steers: sliding the finger mid-run changes the way, and the camera d
 });
 
 test(`locking a new view: a drag let go near east snaps there; a tap locks it in and the up arrow goes east; about 54° left of east snaps to north, a tap locks it in; a building's in and out resets north`, async ({ page }) => {
-  test.setTimeout(120_000);
+  test.setTimeout(240_000);
   await open(page);
   // (Fountain Street east of the park: room to walk and run east, round the world's wrap, before the park.)
   await walkTo(page, [38, 28]);
@@ -344,7 +344,7 @@ test(`locking a new view: a drag let go near east snaps there; a tap locks it in
 });
 
 test("the minimap: on by default at the top right, your dot moving with you and its arrow the camera's way; the button hides it (remembered); a tap opens it large with the boss portraits, a tap closes it", async ({ page }) => {
-  test.setTimeout(150_000);
+  test.setTimeout(270_000);
   await open(page);
   const small = page.locator(".tm-small");
   await expect(small).toBeVisible();

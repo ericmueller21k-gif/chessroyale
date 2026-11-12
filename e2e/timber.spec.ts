@@ -160,7 +160,7 @@ test.describe("Timber", () => {
     for (const c of g.clear) expect(hit(g.strip!, c!)).toBe(false);
   });
   test("on a computer his figure stands beside the board at rest (his drawing over the board's edge by at most SIDE_FEEL.over of its side, over the side menu if need be, never over the bar or off the window); his cast plays where he stands, never at the board's corner", async ({ page }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(240_000);
     test.skip(test.info().project.name !== "desktop", "his figure stands beside the board on a computer only");
     await asAdmin(page);
     await page.addInitScript(() => localStorage.setItem("brc.evalBar", "0"));

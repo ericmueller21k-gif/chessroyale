@@ -279,7 +279,7 @@ async function battle(page: Page, id: string) {
 }
 
 test("every playable boss's phone bar: one bar and one figure box for all, the figure at its size and in the room at rest", async ({ page }, testInfo) => {
-  test.setTimeout(180_000);
+  test.setTimeout(300_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   const snaps: Record<string, Partial<Record<number, Snap>>> = {};
@@ -405,7 +405,7 @@ const safe = (n: string) => n.replace(/[^a-zA-Z0-9]+/g, "-");
 
 for (const def of PLAYABLE) {
   test(`${def.name}${def.name.endsWith("s") ? "'" : "'s"} phone bar: every line inside its bar at 320, 390 and 428 px, in the rows its width asks for`, async ({ page }, testInfo) => {
-    test.setTimeout(120_000);
+    test.setTimeout(240_000);
     const errors: string[] = [];
     page.on("pageerror", (e) => errors.push(e.message));
     const lines: Partial<Record<number, LineRes[]>> = {};

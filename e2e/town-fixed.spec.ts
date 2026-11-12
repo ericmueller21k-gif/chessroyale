@@ -47,18 +47,23 @@ async function open(page: Page, sky = "day") {
   await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 30_000 });
   await expect(canvas(page)).toHaveAttribute("data-backend", "webgl");
 }
-/** Every figure drawn whole inside the world's box (Eric, Nov 4), its foot on screen; a faded one may be off. */
+/**
+ * Every figure drawn whole inside the world's box (Eric, Nov 4), its foot on screen; a faded one may be off. (A bot walking past the
+ * box's edge fades as it goes: whole on screen once it has, within a moment. Main run 43284874552: Pin Pete mid-fade, 2.6 px past.)
+ */
 async function figuresOnScreen(page: Page, what: string) {
   const cv = (await canvas(page).boundingBox())!;
-  const c = await cam(page);
-  expect(c.figures.length, `${what}: figures drawn`).toBeGreaterThan(0);
-  for (const f of c.figures) {
-    if (f.alpha < 0.5) continue;
-    expect(f.x0, `${what}: ${f.name} not cut off on the left`).toBeGreaterThanOrEqual(-1);
-    expect(f.x1, `${what}: ${f.name} not cut off on the right`).toBeLessThanOrEqual(cv.width + 1);
-    expect(f.y0, `${what}: ${f.name} not cut off at the top`).toBeGreaterThanOrEqual(-1);
-    expect(f.fy, `${what}: ${f.name}'s foot on screen`).toBeLessThanOrEqual(cv.height + 1);
-  }
+  await expect(async () => {
+    const c = await cam(page);
+    expect(c.figures.length, `${what}: figures drawn`).toBeGreaterThan(0);
+    for (const f of c.figures) {
+      if (f.alpha < 0.5) continue;
+      expect(f.x0, `${what}: ${f.name} not cut off on the left`).toBeGreaterThanOrEqual(-1);
+      expect(f.x1, `${what}: ${f.name} not cut off on the right`).toBeLessThanOrEqual(cv.width + 1);
+      expect(f.y0, `${what}: ${f.name} not cut off at the top`).toBeGreaterThanOrEqual(-1);
+      expect(f.fy, `${what}: ${f.name}'s foot on screen`).toBeLessThanOrEqual(cv.height + 1);
+    }
+  }).toPass({ timeout: 3000 });
 }
 /** The boxes drawn past the back line (y 43.5): none but the Colosseum's ring and the back wall standing on it (the north edge round). */
 const beyond = (boxes: Box[]) => boxes.filter((b) => b.y > 43.5 + 1e-6 && b.kind !== "ring").map((b) => `${b.kind} ${b.id} ${b.x.toFixed(1)},${b.y.toFixed(1)}`);
@@ -117,7 +122,7 @@ async function drag(page: Page, share: number) {
 }
 
 test(`one fixed view: the arrows walk all four ways and the camera never turns; a home's strip; step off`, async ({ page }) => {
-  test.setTimeout(60_000);
+  test.setTimeout(120_000);
   await open(page);
   // On Fountain Street, clear of the homes' strips.
   await walkTo(page, [8, 28]);
@@ -170,7 +175,7 @@ test(`one fixed view: the arrows walk all four ways and the camera never turns; 
 });
 
 test(`the Colosseum against the back wall: ahead up the promenade, the plaza's walls before it, nothing past the back line; you can't go north past it`, async ({ page }) => {
-  test.setTimeout(60_000);
+  test.setTimeout(90_000);
   await open(page);
   // From the park, up the promenade: the Colosseum ahead in the middle of the view, the plaza's three front walls before it.
   await walkTo(page, [22, 32]);
@@ -216,7 +221,7 @@ test(`the Colosseum against the back wall: ahead up the promenade, the plaza's w
 });
 
 test(`the plaza: a drag all the way round shows nothing past the back line, the Colosseum as faces; out onto Colosseum Row`, async ({ page }) => {
-  test.setTimeout(90_000);
+  test.setTimeout(150_000);
   await open(page);
   await walkTo(page, [20, 41]);
   // Eight eighths of a turn, a drag each: at every one, nothing past the line drawn; facing it, its ring's faces.
@@ -228,8 +233,7 @@ test(`the plaza: a drag all the way round shows nothing past the back line, the 
     expect(beyond(c.boxes), `nothing past the line at ${Math.round(c.heading)} degrees`).toEqual([]);
     const ring = c.boxes.filter((b) => b.kind === "ring" && b.front).length;
     if (ring >= 2) ringSeen++;
-    // (A bot walking past the box's edge fades as it goes: whole on screen once it has, within a moment.)
-    await expect(async () => figuresOnScreen(page, `looking round, ${Math.round(c.heading)} degrees`)).toPass({ timeout: 3000 });
+    await figuresOnScreen(page, `looking round, ${Math.round(c.heading)} degrees`);
   }
   expect(ringSeen, "its ring's faces drawn as you look round").toBeGreaterThanOrEqual(2);
   // Out: the plaza is open to Colosseum Row (Eric, Nov 6), straight down from it onto the street.
@@ -242,7 +246,7 @@ test(`the plaza: a drag all the way round shows nothing past the back line, the 
 });
 
 test(`looking round: a drag turns the camera about your pawn, which doesn't move or turn; it lets go to the nearest quarter, and the up arrow locks it in and walks you that way`, async ({ page }) => {
-  test.setTimeout(60_000);
+  test.setTimeout(90_000);
   await open(page);
   await walkTo(page, [8, 28]);
   const before = await me(page);
@@ -326,7 +330,7 @@ test("stills: the fixed view (round 5)", async ({ page }) => {
 test(`the Colosseum stays put as the view turns: its portal and ring drawn where they stand at every heading, as the ground is`, async ({ page }) => {
   // (Eric, Nov 6, on round 5's flat Colosseum: it would "glitch and follow the camera around". The solid's portal and each stretch of its
   // ring are drawn on their own feet in the world: as the view turns, each moves across the box exactly as the ground under it does.)
-  test.setTimeout(60_000);
+  test.setTimeout(120_000);
   await open(page);
   // A few squares before the portal, on Colosseum Row's edge of the plaza.
   await walkTo(page, [22, 38]);

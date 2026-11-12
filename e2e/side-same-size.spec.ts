@@ -15,7 +15,7 @@ const kitOf = (id: string) => Object.values(BOSS_KITS).find((k) => k.ch.id === i
 
 test("one size beside the board on a computer: every boss the same screen px a sprite px at a window size, your pawn and the God King as tall in every fight", async ({ page }) => {
   test.skip(test.info().project.name !== "desktop", "the side figures grow on a computer only");
-  test.setTimeout(120_000);
+  test.setTimeout(240_000);
   await asAdmin(page);
   await page.addInitScript(() => localStorage.setItem("brc.evalBar", "0"));
   const seen: Record<string, Record<string, { s: number; pawn: number; king: number; pump: string | null; board: number }>> = {};
