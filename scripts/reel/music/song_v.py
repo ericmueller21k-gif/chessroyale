@@ -7,29 +7,36 @@ drone and low brass swells in place of drums; chords a major third apart, minor 
 scales; and voices entering one after another in canon, one, two, four, eight.
 Only those techniques are used. The cue itself was not listened to, measured or transcribed, and every figure, tune
 and chord progression here is original: none of it is that cue's, or any song's or game's.
-The Hidden Boss is the chess legend with the red book, and his power is Bullet: the clock. So the song is a chess
-clock (recipe: SOUNDS.md). It ticks on every 8th; every two bars it is pressed and the band is four beats a minute
-faster (128, 132 ... 212: 21 changes); every four bars another voice has worked out the line and joins, a few notes
-behind the first (the variations branching). At the top it stops: three ticks, the engine in him catching, and the
-book slammed shut. Then the half-time theme, twice (phase 2: an 808, a drone, low brass). After a slow move, his "+2 a
-move": bars of 5, 7, 9, 11 and 13 8ths, each two longer than the last, climbing again to the theme over the figure at
-full speed.
+The Hidden Boss is the chess legend with the red book, so the song is a chess clock. It ticks on every 8th; every
+two bars it is pressed and the band is four beats a minute faster (128, 132 ... 212: 21 changes); the voices on the
+figure double: one, then two, then four, then eight, each a few notes behind the first. At the top it stops: three
+ticks, a cold tone rising, and the book slammed shut. Then the theme at exactly half that pace (106), twice. After a
+slow move a tritone away, bars of 5, 7, 9, 11 and 13 8ths, each two longer than the last, climbing again to the theme
+over the figure at full speed.
+The second go (Eric, Nov 12, before hearing the first: "His powers don't matter, he's a unique boss, same with his
+sounds he really has none ... feel free to do that"; the write-up is "more of a reference ... if we incorporate a lot
+of these ideas into it, so just make sure you're doing that"). Checked against his list and tightened: the entries
+are one, two, four, eight (they were one, two, three, four, six); the bars of six have a pulse in three against them
+(the bow's knocks and the bass); arpeggios in threes run beside the 16ths under the themes and at the top; the
+collapse is to exactly half the top pace, and the slow move's beat is that theme's dotted beat; the slow move is on
+the six notes a tritone away; and the first theme has no drums (the drone, the 808 and the brass carry it), the
+second a kick and a snare, the last a full kit. The clock stays: it is the only percussion for the first minute.
 The six notes: G, B flat, B, D, E flat, F sharp (a minor third, a half step, and round again): in it are G minor with
 its major seventh, the same on E flat and on B, and nothing else, so the chords can only move by major thirds, and
 any voice a major third from another is still in the scale.
-339 beats, about 2:27.
+339 beats, about 2:26.
   python3 song_v.py <out.wav>
 
   0:00  the stare: his two low tones beating, the clock (a tick a second), the red book's pages, one trembling note
-  0:10  the calculation: the solo violin's figure; a new voice every four bars; the clock pressed and the pace up every
-        two (128 to 212); a synth bass, held notes climbing, slides, low brass
+  0:10  the calculation: the solo violin's figure; then two voices, four, eight; the clock pressed and the pace up
+        every two bars (128 to 212); a synth bass, held notes climbing, slides, low brass
   0:56  the flag: silence, three ticks, the engine catching, and the book slammed shut
-  0:59  the theme, half-time, on E flat: the lead and the violins over a drone, an 808 and low brass
-  1:17  the theme again, a major third up, fuller
-  1:35  the slow move: the solo violin and the cellos, two beats apart; his stare; his laugh
-  1:48  "+2 a move": bars of 5, 7, 9, 11 and 13 8ths, faster with each
-  2:02  the theme over the figure at full speed, a full kit
-  2:23  the tag: the book shut, the clock slowing to a tick a second, his stare
+  0:59  the theme, at half the pace, on E flat: the lead and the violins over a drone, an 808 and low brass; no drums
+  1:17  the theme again, a major third up, with a kick and a snare, and arpeggios in threes
+  1:35  the slow move, a tritone away: the solo violin and the cellos, two beats apart; his stare; his laugh
+  1:49  bars of 5, 7, 9, 11 and 13 8ths, faster with each
+  2:04  the theme over the figure at full speed, a full kit
+  2:22  the tag: the book shut, the clock slowing to a tick a second, his stare
 """
 import sys
 
@@ -42,7 +49,7 @@ from synth import Ride, n, write_wav
 UNITS = [(5, 128), (5, 132), (5, 136), (5, 140), (7, 144), (7, 148), (7, 152), (7, 156), (6, 160), (6, 164), (6, 168), (6, 172), (5, 176), (5, 180),
          (7, 184), (7, 188), (57, 192), (57, 196), (6, 200), (6, 204), (4, 208), (4, 212)]
 # "+2 a move": each unit's bars two 8ths longer than the last.
-PLUS = [(5, 160), (7, 172), (9, 184), (11, 196), (13, 208)]
+PLUS = [(5, 142), (7, 160), (9, 178), (11, 196), (13, 212)]
 # Which of the three roots each four bars (each move) stand on: G, a major third down (E flat), a major third up (B).
 POLES = (0, 0, -4, 4, 0, -4, 4, 0, -4, 4, 0)
 PLUS_POLES = (0, -4, 4, 0, -4)
@@ -66,8 +73,9 @@ CALC_BARS, _calc, T_FLAG = lay(T_CALC, UNITS)
 T_DROP, T_DROP2, T_CALM, T_PLUS = T_FLAG + 4, T_FLAG + 36, T_FLAG + 68, T_FLAG + 84
 PLUS_BARS, _plus, T_LAST = lay(T_PLUS, PLUS)
 T_TAG, BEATS = T_LAST + 64, T_LAST + 72
-PACE = ([(0, T_CALC, 60, 60)] + _calc + [(T_FLAG, T_DROP, 90, 90), (T_DROP, T_DROP2, 104, 104), (T_DROP2, T_CALM, 112, 112), (T_CALM, T_PLUS, 72, 72)]
-        + _plus + [(T_LAST, T_TAG, 184, 184), (T_TAG, BEATS, 184, 60)])
+# The themes at half the top pace (212: an 8th becomes a 16th); the slow move's beat is their dotted beat (106 x 2/3).
+PACE = ([(0, T_CALC, 60, 60)] + _calc + [(T_FLAG, T_DROP, 90, 90), (T_DROP, T_CALM, 106, 106), (T_CALM, T_PLUS, 70.67, 70.67)]
+        + _plus + [(T_LAST, T_TAG, 212, 212), (T_TAG, BEATS, 212, 60)])
 SECS = round(float(sum(60 * (b - a) / t0 if t0 == t1 else 60 * (b - a) * np.log(t1 / t0) / (t1 - t0) for a, b, t0, t1 in PACE)), 2)
 
 # ---- the figure: 16ths rocking between a note that stays (the fifth, then the sixth) and a line that moves; in half
@@ -77,11 +85,14 @@ MIDDLE = ([15, 12, 11, 7], [16, 12, 11, 8])
 TAIL = ([8, 4], [7, 3])
 # Where a bar leans, in 16ths: 5/8 is 3+2, 7/8 is 2+2+3, 6/8 is 3+3, and so on.
 LEAN = {8: (0,), 10: (0, 6), 12: (0, 6), 14: (0, 4, 8), 18: (0, 4, 8, 12), 22: (0, 6, 12, 18), 26: (0, 6, 12, 18, 22)}
-# The voices of the canon: from which move, how many 16ths behind the first, how far from it in half steps (a major
-# third, or two, always: still in the scale), where it sits, its instrument, and whether it plays every note or (the
-# cellos) every other one, the line at half speed.
-VOICES = [(0, 0, 0, -0.15, "solo", 1), (1, 6, 4, 0.45, "violins", 1), (2, 10, -8, -0.5, "violas", 1), (3, 0, -24, 0.15, "cellos", 2),
-          (5, 3, 12, 0.65, "violins", 1), (5, 4, -12, -0.65, "violas", 1)]
+# The voices of the canon, one, then two, then four, then eight: from which move, how many 16ths behind the first, how
+# far from it in half steps (major thirds, always: still in the scale), where it sits, its instrument, and whether it
+# plays every note or (the cellos) every other one, the line at half speed.
+VOICES = [(0, 0, 0, -0.15, "solo", 1),
+          (1, 6, 4, 0.45, "violins", 1),
+          (3, 10, -8, -0.5, "violas", 1), (3, 0, -24, 0.15, "cellos", 2),
+          (6, 3, 12, 0.65, "violins", 1), (6, 4, -12, -0.65, "violas", 1), (6, 9, 8, 0.25, "violins", 1), (6, 2, -20, -0.25, "cellos", 2)]
+THREES = (0, 3, 7, 11, 12, 11, 7, 3)  # the arpeggio in threes: the minor chord and its major seventh, up and down
 
 
 def figure(length, which):
@@ -179,6 +190,13 @@ def main(out: str) -> None:
                 m = line[begin - behind + (j - begin) // every] + far if every > 1 else line[j - behind] + far
                 lean = 1.3 if (i in LEAN[length] and every == 1) else 1.0
                 bow(b, 0.25 * every, m, kind, loud(move // 2) * lean * (0.85 if kind != "solo" else 1.0), pan, long=every > 1)
+
+    def threes(start, length, low, vol=0.5):
+        """Three notes a beat against the figure's four: the chord and its seventh, up and down, on the violas.
+        `low(beat)`: the root there."""
+        for j in range(int(length * 3)):
+            b = start + j / 3
+            bow(b, 1 / 3, low(j / 3) + 12 + THREES[j % 8], "violas", vol * (1.25 if j % 3 == 0 else 1.0), 0.3)
 
     # ---- the low end ----
     def synth(b, m, length, vol=0.3, cut=400.0):
@@ -398,11 +416,12 @@ def main(out: str) -> None:
     glow(6, 4, 55, 0.03)
     press(T_CALC - 0.5, 0.12)
 
-    # 0:10 The calculation. The solo violin has the figure, alone; every four bars another voice has it too (violins
-    # a major third up and six notes behind, violas, cellos at half speed, then two more); every two bars the clock is
-    # pressed and everything is four beats a minute faster. The clock ticks on every 8th, a bow knocks where each bar
-    # leans; from the seventh unit the synth bass, its filter opening a little with each; later held notes climbing,
-    # slow slides, low brass.
+    # 0:10 The calculation. The solo violin has the figure, alone; then two voices (violins a major third up, six notes
+    # behind), then four (violas, and cellos at half speed), then eight; every two bars the clock is pressed and
+    # everything is four beats a minute faster. The clock ticks on every 8th, a bow knocks where each bar leans (in the
+    # bars of six it knocks in three, against them, and the bass with it); from the seventh unit the synth bass, its
+    # filter opening a little with each; later held notes climbing, slow slides, low brass; at the top, arpeggios in
+    # threes.
     canon(CALC_BARS, POLES, VOICES, lambda move: 0.62 + 0.045 * move)
     for u, (first, _, _, _) in enumerate(CALC_BARS[::2]):
         press(first, 0.1 + 0.004 * u)
@@ -412,12 +431,13 @@ def main(out: str) -> None:
         move = u // 2
         for i in range(length // 2):
             tick(b + i * 0.5, 0.035 + 0.0012 * u, i % 2 == 0)
-        for i in LEAN[length]:
+        cross = (0, 4, 8) if length == 12 else LEAN[length]  # a bar of six, counted in three
+        for i in cross:
             tap(b + i * 0.25, 0.05 + 0.002 * u, 0.2 if i else -0.2)
         low = 43 + POLES[move]
         if u >= 6:
             cut = 140 * (2400 / 140) ** ((u - 6) / 15)
-            for i in range(length // 2) if u >= 16 else [j // 2 for j in LEAN[length]]:
+            for i in range(length // 2) if u >= 16 and length != 12 else [j // 2 for j in cross]:
                 synth(b + i * 0.5, low, 0.45, 0.3, cut)
         if u >= 12 and which == 0:
             thump(b, 0.16 + 0.01 * (u - 12))
@@ -432,6 +452,7 @@ def main(out: str) -> None:
     brass(CALC_BARS[28][0], 7, 31 + 12, 0.1)
     brass(CALC_BARS[36][0], 6, 31 + 12 + 4, 0.11)
     brass(T_FLAG - 8, 8, 31 + 12, 0.13)
+    threes(T_FLAG - 8, 8, lambda beat: 43, 0.5)
 
     # 0:56 The flag. Everything stops. Three ticks; the engine in him catching (a cold tone rising, sparks); and on
     # the fourth beat the book is slammed shut.
@@ -439,13 +460,16 @@ def main(out: str) -> None:
     ignite(T_FLAG, 3, 0.08)
     shut(T_FLAG + 3, 1.0)
 
-    # 0:59 The theme, half-time, on E flat: the lead and the violins over a drone, an 808 and low brass; the figure goes
-    # on in three voices; the clock ticks in 16ths; a kick on 1, a clap and the snare on 3.
-    # 1:17 The theme again, a major third up (G), the violas a third over it; the kit fuller.
+    # 0:59 The theme, at half the pace, on E flat: the lead and the violins over a drone, an 808 and low brass; the
+    # figure goes on in four voices; the clock ticks in 16ths; no drums.
+    # 1:17 The theme again, a major third up (G), the violas a third over it; six voices on the figure and arpeggios in
+    # threes; a kick, a clap and the snare on 3.
     for start, shift, second in ((T_DROP, -4, False), (T_DROP2, 0, True)):
         arcs(start, 0.1), x.crash(start, 0.2, decay=0.6)
         theme(start, shift, 1, 1.0, 1.0, 0.8 if second else 0.0)
-        figured(start, 32, shift, 1, VOICES[:3] + (VOICES[4:] if second else []), lambda move: 0.7)
+        figured(start, 32, shift, 1, VOICES[:6] if second else VOICES[:4], lambda move: 0.7)
+        if second:
+            threes(start, 32, lambda beat: root(beat, shift), 0.45)
         for phrase, length in ((0, 12), (12, 12), (24, 4), (28, 4)):
             low = root(phrase, shift)
             brass(start + phrase, min(length, 8), low, 0.15 if phrase in (0, 12) else 0.12)
@@ -453,10 +477,13 @@ def main(out: str) -> None:
         for bar in range(8):
             b = start + 4 * bar
             low = root(4 * bar, shift)
-            kick(b, 0.6), sub(b, low - 12 if low - 12 >= 31 else low, 3.4, 0.45), thump(b, 0.2)
-            clap(b + 2), snare(b + 2, 0.24)
+            sub(b, low - 12 if low - 12 >= 31 else low, 3.4, 0.45), thump(b, 0.3)
             if bar % 2:
-                kick(b + 2.75, 0.42), sub(b + 2.75, low - 12 if low - 12 >= 31 else low, 1.1, 0.34)
+                sub(b + 2.75, low - 12 if low - 12 >= 31 else low, 1.1, 0.34), thump(b + 2.75, 0.2)
+            if second:
+                kick(b, 0.6), clap(b + 2), snare(b + 2, 0.24)
+                if bar % 2:
+                    kick(b + 2.75, 0.42)
             for i in range(16):
                 tick(b + i * 0.25, 0.03 if i % 4 else 0.05, i % 2 == 0)
             for i in (0, 6, 12):
@@ -469,23 +496,24 @@ def main(out: str) -> None:
                     synth(b + i * 0.5, low, 0.45, 0.22, 900)
         press(start + 31.5, 0.14)
 
-    # 1:35 The slow move. The solo violin has the figure as a tune, in 8ths; the cellos follow two beats behind, low;
-    # his stare; the clock, a tick a beat; pages; his laugh, through the nose; the book's light.
+    # 1:35 The slow move, on the six notes a tritone away (C#, E, F, G#, A, C). The solo violin has the figure as a
+    # tune, in 8ths; the cellos follow two beats behind, low; his stare; the clock, a tick a beat; pages; his laugh,
+    # through the nose; the book's light.
     stare(T_CALM, 16.5, 0.13)
     slow = notes(T_CALM, SLOW)
     for b, d, m in slow:
-        bow(b, d, m, "solo", 0.45, -0.15, long=True)
+        bow(b, d, m + 6, "solo", 0.45, -0.15, long=True)
         if b + 2 < T_PLUS - 2:
-            bow(b + 2, d, m - 24, "cellos", 0.45, 0.25, long=True)
+            bow(b + 2, d, m - 18, "cellos", 0.45, 0.25, long=True)
     for i in range(16):
         tick(T_CALM + i, 0.13, i % 2 == 0)
     flip(T_CALM + 5.6, 0.08)
     huff(T_CALM + 9.5, 0.07)
-    glow(T_CALM + 10, 6, 55, 0.035)
-    shimmer(T_CALM + 12, 4, 79, 0.03, 0.3)
+    glow(T_CALM + 10, 6, 61, 0.035)
+    shimmer(T_CALM + 12, 4, 76, 0.03, 0.3)
     press(T_PLUS - 0.5, 0.14)
 
-    # 1:48 "+2 a move": bars of 5, 7, 9, 11 and 13 8ths, two of each, every voice on the figure from the first, the
+    # 1:49 Bars of 5, 7, 9, 11 and 13 8ths, two of each, every voice on the figure from the first, the
     # clock pressed and the pace up with each; the bass on every 8th, its filter opening; held notes climbing; slides;
     # low brass; a kick where each bar begins.
     canon([(b, length, 2 * u, which) for b, length, u, which in PLUS_BARS], PLUS_POLES, [(0, *voice[1:]) for voice in VOICES], lambda move: 0.8 + 0.06 * move)
@@ -508,12 +536,14 @@ def main(out: str) -> None:
     for i in range(16):
         snare(T_LAST - 2 + i * 0.125, 0.06 + 0.012 * i)
 
-    # 2:02 The theme over the figure at full speed, on G: each of its notes twice as long, the violas a third over it;
-    # all six voices on the figure; a full kit (a kick on 1 and 3, the snare on 2 and 4), the 808, the bass on every
-    # 8th, low brass under each phrase.
+    # 2:04 The theme over the figure at full speed (212), on G: each of its notes twice as long, so the theme goes at
+    # the pace it had; the violas a third over it; all eight voices on the figure, arpeggios in threes; a full kit at
+    # the theme's pace (a kick on 1, the snare and a clap on 3), the 808, the bass on every 8th, low brass under each
+    # phrase.
     arcs(T_LAST, 0.1), x.crash(T_LAST, 0.2, decay=0.6), shut(T_LAST, 0.3)
     theme(T_LAST, 0, 2, 1.0, 1.0, 0.8)
-    figured(T_LAST, 64, 0, 2, VOICES, lambda move: 0.72)
+    figured(T_LAST, 64, 0, 2, VOICES, lambda move: 0.66)
+    threes(T_LAST, 64, lambda beat: root(beat, 0, 2), 0.42)
     for phrase, length in ((0, 24), (24, 24), (48, 8), (56, 8)):
         low = root(phrase, 0, 2)
         brass(T_LAST + phrase, min(length, 10), low, 0.15)
@@ -521,9 +551,11 @@ def main(out: str) -> None:
     for bar in range(16):
         b = T_LAST + 4 * bar
         low = root(4 * bar, 0, 2)
-        kick(b, 0.55), kick(b + 2, 0.5), snare(b + 1, 0.24), snare(b + 3, 0.24)
+        kick(b, 0.6), clap(b + 2), snare(b + 2, 0.26)
         if bar % 2:
-            kick(b + 2.5, 0.36)
+            kick(b + 1.5, 0.4), kick(b + 3.5, 0.42)
+        else:
+            kick(b + 2.75, 0.36)
         sub(b, low - 12 if low - 12 >= 31 else low, 1.8, 0.42)
         for i in range(8):
             tick(b + i * 0.5, 0.05 if i % 2 == 0 else 0.035, i % 2 == 0)
@@ -532,7 +564,7 @@ def main(out: str) -> None:
         if bar % 4 == 0 and bar:
             x.crash(b, 0.1, decay=0.4)
 
-    # 2:23 The tag. The book shut on the last beat's first; the clock alone, slowing to a tick a second; his stare
+    # 2:22 The tag. The book shut on the last beat's first; the clock alone, slowing to a tick a second; his stare
     # coming up under it, which the start begins with.
     shut(T_TAG, 0.5), kick(T_TAG, 0.6), x.crash(T_TAG, 0.14, decay=0.6)
     brass(T_TAG, 5, 43, 0.12)
