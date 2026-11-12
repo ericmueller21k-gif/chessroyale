@@ -20,13 +20,18 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
   "START!" done) until it's decided (`boss.result`; then a 1.5 s fade, `MUSIC.endFadeMs`, and nothing on the result screen); solo,
   raids, online and the Crowd's boss final alike, one check in `App.tsx` (`musicBattle` → `bossMusic`). The intro once at t0, the
   loop from t0 + `introSeconds`, from `pad`, looping between `pad` and `pad + loopSeconds` (`musicPlan`), Web Audio only, on its own
-  gain into sound.ts's master (`musicBus`) at `MUSIC.volume` (0.25: about 7 dB under the boss sounds). Fetched (MP3 only) when the battle
-  is picked, never at app start, not precached, kept for the visit; late, it starts when it arrives. **Music** in Settings → Sound and
+  gain into sound.ts's master (`musicBus`) at `MUSIC.volume` (0.25: about 7 dB under the boss sounds). MP3 only, **mono at 64 kbps**
+  (Nov 12, Eric: "Mono 64 sounds... it's totally fine"; about 1 MB a theme, 23 MB decoded for two minutes). **Fetched during the town's
+  loading bar** (Nov 12, `preloadMusic`: every theme, fetched only, kept by the service worker; its last step "Loading music…",
+  `MUSIC.townShare`, waits at most `MUSIC.townWaitMs`, 3 s, once the town is built), never at app start, not precached; **decoded** when
+  the battle is picked (or its room or splash needs it), one theme at a time (`forgetTheme` after); late, it starts when it arrives.
+  [Decision](../decisions/2026-11-12-music-mono-preload.md). **Music** in Settings → Sound and
   the match's options (on by default, per device, `brc.music`; greyed while Sound is off, which silences it too): off, or the page
   hidden, fades it out in 0.3 s (`MUSIC.fadeMs`) with the loop running on, so on again picks it up where it is. A boss with no theme
   plays nothing. **Adding a boss's theme:** its `.mp3` pieces from the handoff (`boss-music/` on `stills/trailer-v2`) into
   `public/music/`, its entry into `themes.json` (lengths from there, never from code); no code change (`public/music/README.md`).
-  Tests: `packages/app/test/music.test.ts`, `e2e/grex.spec.ts` ("Jefferson's music").
+  Tests: `packages/app/test/music.test.ts`, `e2e/grex.spec.ts` ("Jefferson's music"), `e2e/town-street.spec.ts` ("the town's loading
+  fetches every boss theme once").
   **In the boss's room, and a challenge's splash (Nov 11, Eric: "only play the music if you walk in on your own through the door,
   not via challenging the boss"; then: a challenge inside the boss's building starts the theme "the moment the boss's full-screen
   splash starts"):** the theme loads as the door zooms (`roomMusicLoad`; the intro decoded first, then the loop). Walked in on your
