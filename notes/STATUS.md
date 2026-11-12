@@ -1,3 +1,4 @@
+- Nov 12 17:40: #663 red only on town-afk:76 (counted the new arrival lines) -> fix 2715489 (local 2/2). Rerunning. #664 CI running.
 - Nov 12 17:25: #664 town door tap opened (6a2795f), helper archived, still sent. Open: #663, #664. No helpers running.
 - Nov 12 17:15: #662 hollow test MERGED (980ae30). Open: #663 town chat (CI running). Running: door-tap helper.
 - Nov 12 17:05: #663 town chat hints opened (bbbd05d), helper archived, stills sent. Open: #662 hollow test, #663. Running: door-tap helper.
