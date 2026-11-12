@@ -32,6 +32,12 @@ export const TOO_YOUNG_LINE = `Accounts are for players ${AGE_GATE.minAge} and o
 
 /**
  * A sign-in refused because this device's "old enough" answer ran out (or another tab's sign-in used it up): shown on
- * the question when it comes back.
+ * the question when it comes back. (Since Nov 12 the server asks with AGE_STEP_LINE instead; this stays for `?signin=age`.)
  */
 export const ASK_AGE_LINE = "Please answer again before you sign in.";
+
+/**
+ * A sign-in that can't finish until this device answers (Nov 12, docs/decisions/2026-11-12-signin-without-age.md): the email or
+ * Google account has no account yet, or one from before the question. The question's own heading then, as neutral as the rest.
+ */
+export const AGE_STEP_LINE = "One more step: when were you born?";

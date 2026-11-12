@@ -20,7 +20,7 @@ import { PlayerProfileScreen } from "./screens/PlayerProfile.tsx";
 import { showBanNotice } from "./components/FairPlay.tsx";
 import { closeProfile, openProfile, useProfileTarget, type ProfileTarget } from "./profile-nav.ts";
 import { ShopScreen } from "./screens/Shop.tsx";
-import { account, askAgeAgain, loadAccount, mustSignInToPlayOnline, playerName, recordSoloResult, setTestXp } from "./account.ts";
+import { account, askAgeAgain, askAgeForGoogle, loadAccount, mustSignInToPlayOnline, playerName, recordSoloResult, setTestXp } from "./account.ts";
 import { leavesNote } from "./ranked.ts";
 import { isAdmin } from "./boss-brain.ts";
 import { difficultyElo, difficultyMaia } from "./boss-difficulty.ts";
@@ -279,8 +279,8 @@ function leftNote(how: LeftHow | null | undefined): string {
 }
 
 /**
- * Back from Google: ?signin=google (or failed; or age: the server wanted the age question answered again first). Read
- * once, then tidied out of the address bar.
+ * Back from Google: ?signin=google (or failed; age: a device that's too young; age-google: the server asks the age question
+ * before this Google account can sign in, then Google again). Read once, then tidied out of the address bar.
  */
 const signinParam = new URLSearchParams(location.search).get("signin");
 
@@ -407,6 +407,8 @@ export function App() {
   useEffect(() => {
     if (!signinParam) return;
     if (signinParam === "age") askAgeAgain();
+    // (Google's account had no account yet, or one from before the question: the box asks, then goes to Google again. Nov 12.)
+    if (signinParam === "age-google") askAgeForGoogle(location.pathname);
     const q = new URLSearchParams(location.search);
     q.delete("signin");
     history.replaceState(null, "", `${location.pathname}${q.size ? `?${q}` : ""}`);

@@ -74,12 +74,26 @@ export interface AccountState {
   age: AgeAnswer | null;
   /** Why the age question is back (a sign-in refused: the answer ran out), shown on it until it's answered. */
   ageNote: string | null;
+  /**
+   * A sign-in the server can't finish until this device answers the age question (Nov 12: an email or Google account with no
+   * account yet, or one from before the question): the sign-in box asks, and the answer finishes it.
+   */
+  pending: PendingSignIn | null;
+  /** Why a sign-in that waited for the answer didn't finish (its code ran out, say): shown once on the sign-in options. */
+  signInNote: { message: string; email: string } | null;
 }
 
 /** The age question's answer: old enough to sign in, or too young (docs/decisions/2026-10-16-age-gate-and-real-money.md). */
 export type AgeAnswer = "ok" | "under";
 
-let state: AccountState = { config: null, profile: null, age: null, ageNote: null };
+/**
+ * A sign-in waiting for the age question's answer (docs/decisions/2026-11-12-signin-without-age.md). Email: its address and
+ * code, sent again with the answer (in memory only; the server kept the code live for it). Google: one more trip there, back to
+ * `next`, as the server keeps nothing about a Google account before the answer.
+ */
+export type PendingSignIn = { kind: "email"; email: string; code: string } | { kind: "google"; next: string };
+
+let state: AccountState = { config: null, profile: null, age: null, ageNote: null, pending: null, signInNote: null };
 const listeners = new Set<() => void>();
 const set = (patch: Partial<AccountState>) => {
   state = { ...state, ...patch };
@@ -100,7 +114,7 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
     // A sign-in the age gate refused: ask the question again, saying why (the answer ran out), or too young after all.
     if (body.askAge) askAgeAgain(body.message ?? ASK_AGE_LINE);
     if (body.tooYoung) rememberTooYoung();
-    throw Object.assign(new Error(body.message ?? `Something went wrong (${res.status}).`), { status: res.status });
+    throw Object.assign(new Error(body.message ?? `Something went wrong (${res.status}).`), { status: res.status, ...(body.askAge ? { askAge: true } : {}) });
   }
   // An answer that couldn't be read (cut off on the way, or not an object): a failure like the server's own (asked again where a
   // server error is), never `{}` taken for the answer. A profile with no `user` threw on every screen that reads it (Nov 11,
@@ -161,7 +175,7 @@ function storedTooYoung(): boolean {
     return false;
   }
 }
-/** This device is too young: remembered here, sign-in gone, and the name it may have chosen forgotten. */
+/** This device is too young: remembered here, sign-in gone (a sign-in waiting for the answer too), and the name it may have chosen forgotten. */
 function rememberTooYoung() {
   try {
     localStorage.setItem(TOO_YOUNG_KEY, "1");
@@ -169,7 +183,7 @@ function rememberTooYoung() {
   } catch {
     // No storage: the server's cookie still holds it.
   }
-  set({ age: "under" });
+  set({ age: "under", pending: null, signInNote: null });
 }
 /** This device answered the age question "too young": guest play only, under the default name and icon. */
 export const tooYoung = () => state.age === "under";
@@ -233,8 +247,46 @@ export async function answerAge(month: number, year: number): Promise<AgeAnswer>
   }
   const age = await sendAgeAnswer(true);
   if (age === "under") rememberTooYoung();
-  else set({ age, ageNote: null });
+  else {
+    set({ age, ageNote: null });
+    await finishPendingSignIn();
+  }
   return age;
+}
+
+/**
+ * The sign-in that waited for the answer goes on (Nov 12): the email's code again (no new code, nothing typed again), or Google
+ * once more (one more pick of the account). A finish that fails leaves its message, and the address, on the sign-in options.
+ */
+async function finishPendingSignIn(): Promise<void> {
+  const p = state.pending;
+  if (!p) return;
+  if (p.kind === "google") {
+    set({ pending: null });
+    return signInWithGoogle(p.next);
+  }
+  // (The question stays up while the code goes again: success clears `pending`, the server asking again sets it again, and a
+  // failure clears it with its note in one render, so the sign-in options open with the note ready. Review of PR #656.)
+  try {
+    await verifyEmailCode(p.email, p.code);
+  } catch (e) {
+    set({ pending: null, ...(tooYoung() ? {} : { signInNote: { message: (e as Error).message, email: p.email } }) });
+  }
+}
+
+/** Back from Google with the server asking the age question first (`?signin=age-google`): the box asks, then Google again. */
+export function askAgeForGoogle(next: string) {
+  if (!tooYoung()) set({ pending: { kind: "google", next }, ageNote: null });
+}
+
+/** A sign-in waiting for the age question is dropped (the box switched to Sign up or Sign in). */
+export const dropPendingSignIn = () => void (state.pending && set({ pending: null }));
+
+/** The note a sign-in that waited for the answer left, once: the sign-in options show it as they open. */
+export function takeSignInNote(): { message: string; email: string } | null {
+  const note = state.signInNote;
+  if (note) state = { ...state, signInNote: null };
+  return note;
 }
 
 /** You've read a moderator's notice (a warning, a chat ban): it goes from your profile here, and on the server. */
@@ -515,9 +567,18 @@ export async function sendEmailCode(email: string): Promise<void> {
   await api("/api/auth/email/start", { method: "POST", body: JSON.stringify({ email }) });
 }
 
+/**
+ * Signs in with an emailed code. The server may ask the age question first (Nov 12: an email with no account yet, or an account
+ * from before the question): then the code is kept, here and on the server, and the answer sends it again (finishPendingSignIn).
+ */
 export async function verifyEmailCode(email: string, code: string): Promise<void> {
-  // (Signing in uses the age answer up: the next sign-in on this device asks again.)
-  set({ profile: await api<Profile>("/api/auth/email/verify", { method: "POST", body: JSON.stringify({ email, code }) }), age: null });
+  try {
+    // (Signing in uses an age answer up: the next sign-in into an account that hasn't answered asks again.)
+    set({ profile: await api<Profile>("/api/auth/email/verify", { method: "POST", body: JSON.stringify({ email, code }) }), age: null, pending: null });
+  } catch (e) {
+    if ((e as { askAge?: boolean }).askAge && !tooYoung()) return set({ pending: { kind: "email", email, code }, ageNote: null });
+    throw e;
+  }
 }
 
 export async function signOut(): Promise<void> {
