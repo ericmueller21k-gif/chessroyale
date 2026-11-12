@@ -1,4 +1,4 @@
-import { useEffect, useState } from "preact/hooks";
+import { useEffect, useLayoutEffect, useState } from "preact/hooks";
 import { toSan } from "@chessroyale/chess";
 import { Board } from "./Board.tsx";
 import { Chevrons } from "./HistoryNav.tsx";
@@ -161,7 +161,7 @@ function InlineReview({ moves, dp, solo }: { moves: readonly MoveRecord[]; dp: n
   const last = played.length - 1;
   const [at, setAt] = useState(0);
   const step = (d: number) => setAt((p) => Math.min(last, Math.max(0, p + d)));
-  useEffect(() => {
+  useLayoutEffect(() => {
     // The arrow keys step through the review, but not while typing in a field.
     const onKey = (e: KeyboardEvent) => {
       const t = e.target;

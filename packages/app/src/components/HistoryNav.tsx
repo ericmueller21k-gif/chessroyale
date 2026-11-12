@@ -1,5 +1,5 @@
 import type { ComponentChildren } from "preact";
-import { useEffect, useState } from "preact/hooks";
+import { useEffect, useLayoutEffect, useState } from "preact/hooks";
 import { baseAt, fenAtPly, type Base } from "@chessroyale/chess";
 
 /**
@@ -11,7 +11,7 @@ export function useHistoryView(history: readonly string[], bases?: readonly Base
   const live = history.length;
   const at = ply ?? live;
   const go = (p: number) => setPly(p >= live ? null : Math.max(0, p));
-  useEffect(() => {
+  useLayoutEffect(() => {
     // Desktop: arrow keys step through the game.
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "ArrowLeft") go(at - 1);
