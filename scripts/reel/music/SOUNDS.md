@@ -30,6 +30,7 @@ from the liked list, keep off the other one. Eric's words are quoted; the date i
 | Sleigh bells on every 8th, a tower bell, hand bells (on the lead's notes, on the hymn's tune, ringing changes in 16ths), icicles, wind; a wordless choir's hymn whose tune fits over the fast one; a round (the same line a few beats behind) | song_t.py | Nov 12, of Ginger's first go: "it's almost all the way there ... Other than that, I would say it's perfect" |
 | Ice cracking through a build | song_t.py (`crackle`, the thaw) | "the ice kind of sound you have going that makes it sound like it's like ice cracking, that's perfect" |
 | A slow intro of bells and chimes before the band | song_t.py (the first ten seconds) | "I like how it's kind of the whimsical, like kind of chimes and kind of like the bells, and that's a nice touch"; he asked for ten seconds more of it |
+| Plucked strings built from their harmonics, quick to die, in a long echo (oud, qanun; held notes struck again and again); a hum on one note and its fifth; a scale with a three-half-step gap over a bass that stays put; a hand drum's rhythm with a kick under it; a tune shared between two instruments and then fused into one; a drop that is thrown up (a hush) and lands on one thud | song_u.py | Nov 12, of Alfil's first go, with no changes asked: "this one's good to go. I've got no issues with it" |
 | A fast pattern racing under everything | every song since song_i.py | asked for in all of them |
 | The NES's four voices | song_c.py, song_f.py | "much much better" than the 16-bit orchestra |
 
@@ -76,7 +77,7 @@ boss's world that reaches into how the song itself runs, not only its sounds.
 |---|---|
 | A plain marimba or xylophone as the lead over a busy kit (songs P and Q, first go) | "whatever the heck is playing it I don't like it sounds really basic" |
 | A thumb piano lead: a high, clicky struck-wood note with a pulse under it (song_m.py, first go) | "the only thing I don't like is whatever instrument is playing the main melody" |
-| Low plucked strings (`Mix.pluck`, Karplus-Strong) as a bass or harp under a tune (song_o.py, first go) | "a really loose guitar string ... cut that from the whole thing" |
+| Low plucked strings (`Mix.pluck`, Karplus-Strong) as a bass or harp under a tune (song_o.py, first go) | "a really loose guitar string ... cut that from the whole thing". (That voice: a long, buzzy ring. song_u.py's plucks, which die fast and leave the ring to the echo, he passed.) |
 | Wind chimes ringing on in a calm or at a loop's end | "two chimes that hit weird ... left in the song" |
 | A heroic major-key fanfare with brass, flute and bells (song_d.py) | "way too upbeat and happy" |
 | Lots of brass (track_b.py) | "less brass, more of the other voices"; then "the 2nd song is awful" |
@@ -88,7 +89,8 @@ boss's world that reaches into how the song itself runs, not only its sounds.
 ## What he asks of every theme
 
 Two minutes from the start (or a little more when the intro wants it: Nov 12, "it's our game ... let's just make it a
-little bit longer than 2 minutes and it'll still loop"), loop-clean, an intro of its own; a fast pattern underneath; a switch every eight bars or
+little bit longer than 2 minutes and it'll still loop"; for the Hidden Boss, "if this song is 2:30-3 that's fine"),
+loop-clean, an intro of its own; a fast pattern underneath; a switch every eight bars or
 so (he liked Big Boy's variety most); instruments layered and trading in different parts; a slower, simpler stretch
 somewhere; and where it fits, a drop. When he doesn't like a lead, send him short samples of the same tune on other
 instruments: he picks fast.
