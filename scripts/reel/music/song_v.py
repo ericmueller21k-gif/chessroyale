@@ -42,18 +42,19 @@ ocarina sounds real nice"; it was a harp, the choir joining as children), its ro
 2 for sure ... the soft piano"), and a music box behind them ("incorporate a little bit of the music box in softly");
 the souring moved onto the same three. The memory by itself, with nothing going wrong, is his house's loop: song_w.py.
 And the build's long notes come forward ("almost sounds like a siren ... drawn out, eerie ... it's so faint that I
-can barely hear it ... get that kind of out a bit more a few times"): five of them, about 4 dB under the strings
+can barely hear it ... get that kind of out a bit more a few times"): four of them, about 4 dB under the strings
 together where the one he noticed was 16 under, the figure's strings down 2 dB. Of four voices sampled for them he
 kept the strings ("I like the strings") and gave them their shape: "it hangs for a few seconds and then does like a
 drop down ... every time it comes through". The notes are this song's own: A sharp, which all three of the build's
-chords share, held, then falling to the nearest note of the chord under it.
+chords share, held, then falling to the nearest note of the chord under it. The game plays this score in pieces,
+by the boss's phase: phases_v.py cuts them.
 591 beats, about 3:58.
   python3 song_v.py <out.wav>
 
   0:00  the stare: his two low tones beating, the clock (a tick a second), the red book's pages, one trembling note
   0:10  the calculation: the solo violin's figure; then two voices, four, eight; the clock pressed and the pace up
-        every two bars (128 to 212); a synth bass, held notes climbing, low brass; and over it, five times (0:19,
-        0:30, 0:39, 0:47, 0:54), the strings hold one long note and let it fall, louder and in more voices each time
+        every two bars (128 to 212); a synth bass, held notes climbing, low brass; and over it, four times (0:19,
+        0:30, 0:39, and from 0:47 to the flag), the strings hold one long note and let it fall, louder each time
   0:56  the flag: silence, three ticks, a cold tone rising, and the book slammed shut
   0:59  the chant: the men's choir, slow, over the band at full tilt; the lead's runs at each phrase's end
   1:20  the duel: the choir calls, the lead answers; four phrases, a major third apart, each faster
@@ -190,10 +191,11 @@ assert beats(CHILD) == 32
 assert (T_FLAG, T_MEMORY, T_CHANT2, T_LAST, BEATS, len(SWEEP)) == (138, 268, 334, 519, 591, 30)
 
 
-def main(out: str, window=None) -> None:
-    """`window`: (from beat, to beat), to make only that passage (a sample)."""
+def render(window=None, lead: float = 8.0) -> np.ndarray:
+    """The song as heard (stereo, at the mix's own level). `window`: (from beat, to beat), to make only that passage
+    (a sample; or, with `lead` 0, a piece cut clean for phases_v.py: its notes only, their tails ringing on)."""
     x = Ride(PLAN, BEATS, None, os=2, seed=227, tape_secs=TAPE)
-    x.window = window
+    x.window, x.lead = window, lead
     put, at = x.put, x.at
     rng = np.random.default_rng(59)
     sr = x.sr
@@ -769,12 +771,14 @@ def main(out: str, window=None) -> None:
     # we can hear some of that ... get that kind of out a bit more a few times, like in the intro"; then, of its
     # shape: "a slide down from that note to a deeper note ... it hangs for a few seconds and then does like a drop
     # down, and it does that like every time it comes through ... like an A# to a G# ... or maybe A# to a G"). So:
-    # five times (0:19, 0:30, 0:39, 0:47, 0:54) the strings hold A sharp, the one note all three of the build's
-    # chords share, and let it fall: to G where the chord is G, to F sharp where it is E flat or B (G sharp isn't
-    # one of this song's six notes). Louder each time; an octave over it from the third, an octave under too at the
-    # last. And the figure's strings a little down.
+    # four times (0:19, 0:30, 0:39, 0:47) the strings hold A sharp, the one note all three of the build's chords
+    # share, and let it fall: to G where the chord is G, to F sharp where it is E flat or B (G sharp isn't one of
+    # this song's six notes). Louder each time; an octave over it from the third. The last was two short ones (0:47
+    # and 0:54) until he asked for them as one ("combine those two into a longer, drawn out single one, and then
+    # where it ends is still kind of in the same spot"): nine and a half seconds, held across all three chords, in
+    # three octaves, falling to G as the flag falls. And the figure's strings a little down.
     for b, length, vol, low, voices in ((CALC_BARS[8][0], 14, 0.08, 66, (0,)), (CALC_BARS[16][0], 12, 0.09, 67, (0,)), (CALC_BARS[24][0], 10, 0.1, 66, (0, 12)),
-                                        (CALC_BARS[32][0], 12, 0.11, 66, (0, 12)), (T_FLAG - 8, 8, 0.12, 67, (0, 12, -12))):
+                                        (CALC_BARS[32][0], T_FLAG - CALC_BARS[32][0], 0.12, 67, (0, 12, -12))):
         for j, far in enumerate(voices):
             slide(b, length, 70 + far, low + far, vol * (0.7 if j else 1.0), (-0.4, 0.4, 0.0)[j], "siren", hang=0.6)
     brass(CALC_BARS[28][0], 7, 31 + 12, 0.1)
@@ -976,7 +980,11 @@ def main(out: str, window=None) -> None:
     x.beat_s = 60 / 160  # the echoes' beat
     x.echo("lead", 0.75, 0.14, 0.06)
     x.echo("solo", 0.75, 0.12, 0.05)
-    write_wav(out, x.play(x.mixdown(levels, lowpass=8500, room=0.34, room_s=2.0)))
+    return x.play(x.mixdown(levels, lowpass=8500, room=0.34, room_s=2.0))
+
+
+def main(out: str, window=None) -> None:
+    write_wav(out, render(window))
 
 
 if __name__ == "__main__":  # song_v.py <out.wav> [from beat, to beat: only that passage]

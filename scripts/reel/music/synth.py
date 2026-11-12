@@ -384,11 +384,13 @@ class Ride(Mix):
 
     # For a sample of one passage (to compare instruments on it): (from beat, to beat). Notes outside it, bar a few
     # beats before whose tails ring in, are neither made (their length is cut to nothing) nor placed, so it's quick.
+    # `lead`: how many beats before it are made too (0: a clean cut, to build a piece of the song by itself).
     window = None
+    lead = 8.0
     now = 0.0
 
     def outside(self, beat: float) -> bool:
-        return self.window is not None and not self.window[0] - 8 <= beat < self.window[1]
+        return self.window is not None and not self.window[0] - self.lead <= beat < self.window[1]
 
     def at(self, beat: float, beats_: float = 1.0) -> None:
         self.now = beat
