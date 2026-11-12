@@ -1,16 +1,17 @@
 import { createHash } from "node:crypto";
 import { expect, type Page } from "@playwright/test";
 import { test } from "./helpers.ts";
-import { TOO_YOUNG_LINE } from "@chessroyale/core";
+import { AGE_STEP_LINE, TOO_YOUNG_LINE } from "@chessroyale/core";
 import { localSql, pickMode } from "./helpers.ts";
 
 /**
- * The age gate (docs/decisions/2026-10-16-age-gate-and-real-money.md), on a phone: before signing in, a neutral
- * question asks for the birth month and year. Under 13: a friendly line, guest play, and no way to sign in from this
- * device, even after a reload, a retry or cleared cookies. 13 or older: the sign-in options, and the account made keeps
- * when its holder said so. Sign-in isn't set up on the local server (no Google or email secrets), so the config shows
- * both ways to sign in, and the code email is skipped: the code goes straight into the local database. The code check,
- * the age gate and the account are the real server's.
+ * The age gate (docs/decisions/2026-10-16-age-gate-and-real-money.md; since Nov 12, 2026-11-12-signin-without-age.md), on a
+ * phone: Sign in comes first, with no question; Sign up, below it, asks a neutral question (the birth month and year) before the
+ * account is made, and so does a sign-in into an account that never answered. Under 13: a friendly line, guest play, and no way
+ * to sign in from this device, even after a reload, a retry or cleared cookies. 13 or older: the account made keeps when its
+ * holder said so, and signs in on a fresh browser with no question. Sign-in isn't set up on the local server (no Google or email
+ * secrets), so the config shows both ways to sign in, and the code email is skipped: the code goes straight into the local
+ * database. The code check, the age gate and the account are the real server's.
  */
 
 /** Runs a query on the local D1, through the server's own (helpers' localSql: no second process on its file). */
@@ -36,6 +37,17 @@ const api = (page: Page, path: string, init?: { method: string; body?: unknown }
     [path, init] as const,
   );
 
+/** A 6-digit code for `email` in the local database, as if it had been emailed (no email service here). */
+async function codeFor(page: Page, email: string, code: string) {
+  const at = Date.now();
+  const hash = createHash("sha256").update(`${email}:${code}`).digest("hex");
+  await d1Write(
+    page,
+    `INSERT OR REPLACE INTO email_codes (email, code_hash, expires_at, attempts, sent_at, hour_start, sends_this_hour) VALUES ('${email}', '${hash}', ${at + 600_000}, 0, ${at}, ${at}, 1)`,
+  );
+  return at;
+}
+
 /** Picks a birth month (1-12) and year in the question, then Continue. */
 async function answer(page: Page, month: number, year: number) {
   await page.getByLabel("Birth month").selectOption(String(month));
@@ -54,9 +66,10 @@ test("under 13: a neutral question, a friendly line, guest play, and no sign-in 
   // A name chosen before the question (a guest's).
   expect((await api(page, "/api/me", { method: "PATCH", body: { name: "Sam Lee" } })).body?.user.name).toBe("Sam Lee");
 
-  // The question: a birth month and year, nothing chosen, no age mentioned, and no way to sign in yet.
+  // Sign up's question: a birth month and year, nothing chosen, no age mentioned, and no way to sign up yet.
   const box = page.locator(".landing-signin");
-  await expect(box.getByText("Before you sign in: when were you born?")).toBeVisible();
+  await page.getByRole("button", { name: "Sign up", exact: true }).click();
+  await expect(box.getByRole("heading", { name: "Sign up: when were you born?" })).toBeVisible();
   await expect(page.getByLabel("Birth month")).toHaveValue("");
   await expect(page.getByLabel("Birth year")).toHaveValue("");
   await expect(page.getByRole("button", { name: "Continue" })).toBeDisabled();
@@ -82,6 +95,9 @@ test("under 13: a neutral question, a friendly line, guest play, and no sign-in 
   await expect(page.getByLabel("Birth month")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Continue with Google" })).toHaveCount(0);
   await expect(page.locator(".or-line")).toHaveCount(0);
+  // Sign in included (Nov 12): no email field, no Sign in or Sign up.
+  await expect(page.getByLabel("Email")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /^Sign (in|up)$/ })).toHaveCount(0);
 
   // A reload (or the back button and back again) doesn't ask again; nor does the server let a new answer through.
   await page.reload();
@@ -124,32 +140,30 @@ test("under 13: a neutral question, a friendly line, guest play, and no sign-in 
   expect(await d1<{ kind: string; note: string }>(page, "SELECT kind, note FROM ops_reports WHERE id = ?", id)).toEqual([{ kind: "bug", note: "" }]);
 });
 
-test("13 or older: the sign-in options after the question, and the account made keeps when its holder said so", async ({ page }) => {
+test("Sign up: the question first, then the sign-up options; the account made keeps when its holder said so", async ({ page }) => {
   test.skip(test.info().project.name !== "phone", "one run is enough");
   await signInOn(page);
   // (No email service here: the code goes into the local database instead of an inbox.)
   await page.route("**/api/auth/email/start", (route) => route.fulfill({ json: { ok: true } }));
   await page.goto("/");
-  await expect(page.getByText("Before you sign in: when were you born?")).toBeVisible();
+  await page.getByRole("button", { name: "Sign up", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Sign up: when were you born?" })).toBeVisible();
+  await expect(page.getByLabel("Email")).toHaveCount(0);
 
   // 13 exactly.
   await answer(page, thisMonth, now.getFullYear() - 13);
+  await expect(page.getByRole("heading", { name: "Sign up to play online" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Continue with Google" })).toBeVisible();
   await expect(page.getByLabel("Email")).toBeVisible();
   expect((await api(page, "/api/auth/config")).body?.age).toBe("ok");
 
   const email = `age-${Date.now().toString(36)}@e2e.test`;
   const code = "424242";
-  const at = Date.now();
-  const hash = createHash("sha256").update(`${email}:${code}`).digest("hex");
-  await d1Write(
-    page,
-    `INSERT OR REPLACE INTO email_codes (email, code_hash, expires_at, attempts, sent_at, hour_start, sends_this_hour) VALUES ('${email}', '${hash}', ${at + 600_000}, 0, ${at}, ${at}, 1)`,
-  );
+  const at = await codeFor(page, email, code);
   await page.getByLabel("Email").fill(email);
   await page.getByRole("button", { name: "Email me a code" }).click();
   await page.getByLabel("6-digit code").fill(code);
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await page.getByRole("button", { name: "Sign up", exact: true }).click();
 
   // Signed in: home, the account has the email and when its holder said they were old enough; the answer is used up.
   await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
@@ -158,4 +172,84 @@ test("13 or older: the sign-in options after the question, and the account made 
   const [row] = await d1<{ age_ok_at: number | null }>(page, "SELECT age_ok_at FROM users WHERE email = ?", email);
   expect(row!.age_ok_at).toBeGreaterThanOrEqual(at - 60_000);
   expect((await api(page, "/api/auth/config")).body?.age).toBeUndefined();
+});
+
+test("Sign in on a fresh browser (Eric, Nov 12): an account that answered signs in with no question; one that never did is asked once, and its code finishes it", async ({ page }) => {
+  test.skip(test.info().project.name !== "phone", "one run is enough");
+  await signInOn(page);
+  await page.route("**/api/auth/email/start", (route) => route.fulfill({ json: { ok: true } }));
+  // Every age question that appears, from the first frame, and every answer sent.
+  await page.addInitScript(() => {
+    const w = window as unknown as { __asked: string[] };
+    w.__asked = [];
+    new MutationObserver(() => {
+      const h = document.querySelector('[aria-label="Birth month"]') && document.querySelector(".signin-title")?.textContent;
+      if (h && w.__asked.at(-1) !== h) w.__asked.push(h);
+    }).observe(document, { childList: true, subtree: true, characterData: true });
+  });
+  const answers: unknown[] = [];
+  page.on("request", (r) => void (r.url().endsWith("/api/auth/age") && answers.push(r.postDataJSON())));
+  const asked = () => page.evaluate(() => (window as unknown as { __asked: string[] }).__asked);
+  const tag = Date.now().toString(36);
+  // An account made on another device, whose holder said they were old enough; and one from before the question.
+  const known = `known-${tag}@e2e.test`;
+  const old = `old-${tag}@e2e.test`;
+  await page.goto("/");
+  await d1Write(page, `INSERT INTO users (id, name, email, created_at, last_seen, age_ok_at) VALUES ('k${tag}', 'Kim', '${known}', 1, 1, 2), ('o${tag}', 'Olly', '${old}', 1, 1, NULL)`);
+
+  // The front door: Sign in first, its options at once; Sign up below.
+  await expect(page.getByRole("heading", { name: "Sign in to play online" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Continue with Google" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Sign up", exact: true })).toBeVisible();
+  await codeFor(page, known, "135790");
+  await page.getByLabel("Email").fill(known);
+  await page.getByRole("button", { name: "Email me a code" }).click();
+  await page.getByLabel("6-digit code").fill("135790");
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
+  expect((await api(page, "/api/me")).body!.user).toMatchObject({ signedIn: true, email: known, name: "Kim" });
+  // No question, no answer sent, and the account's answer as it was.
+  expect(await asked()).toEqual([]);
+  expect(answers).toEqual([]);
+  expect(await d1(page, "SELECT age_ok_at FROM users WHERE email = ?", known)).toEqual([{ age_ok_at: 2 }]);
+
+  // Signed out, the account from before the question: asked once, then the same code signs in (nothing typed again).
+  await api(page, "/api/auth/logout", { method: "POST" });
+  await page.reload();
+  await codeFor(page, old, "246801");
+  await page.getByLabel("Email").fill(old);
+  await page.getByRole("button", { name: "Email me a code" }).click();
+  await page.getByLabel("6-digit code").fill("246801");
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await expect(page.getByRole("heading", { name: AGE_STEP_LINE })).toBeVisible();
+  expect((await api(page, "/api/me")).body!.user.signedIn).toBe(false);
+  await answer(page, 6, 1990);
+  await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
+  expect((await api(page, "/api/me")).body!.user).toMatchObject({ signedIn: true, email: old, name: "Olly" });
+  expect(await asked()).toEqual([AGE_STEP_LINE]);
+  expect(answers).toEqual([{ oldEnough: true }]);
+  const [row] = await d1<{ age_ok_at: number | null }>(page, "SELECT age_ok_at FROM users WHERE email = ?", old);
+  expect(row!.age_ok_at).toBeGreaterThan(2);
+});
+
+test("Sign in, then the question, then the code no longer works (review of PR #656): the reason shows, with the address kept", async ({ page }) => {
+  test.skip(test.info().project.name !== "phone", "one run is enough");
+  await signInOn(page);
+  await page.route("**/api/auth/email/start", (route) => route.fulfill({ json: { ok: true } }));
+  const tag = Date.now().toString(36);
+  const old = `late-${tag}@e2e.test`;
+  await page.goto("/");
+  await d1Write(page, `INSERT INTO users (id, name, email, created_at, last_seen, age_ok_at) VALUES ('l${tag}', 'Lee', '${old}', 1, 1, NULL)`);
+  await codeFor(page, old, "975310");
+  await page.getByLabel("Email").fill(old);
+  await page.getByRole("button", { name: "Email me a code" }).click();
+  await page.getByLabel("6-digit code").fill("975310");
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await expect(page.getByRole("heading", { name: AGE_STEP_LINE })).toBeVisible();
+  // The question takes longer than the code lives.
+  await d1Write(page, `UPDATE email_codes SET expires_at = 1 WHERE email = '${old}'`);
+  await answer(page, 6, 1990);
+  await expect(page.getByText("That code didn't work", { exact: false })).toBeVisible();
+  await expect(page.getByLabel("Email")).toHaveValue(old);
+  expect((await api(page, "/api/me")).body!.user.signedIn).toBe(false);
 });

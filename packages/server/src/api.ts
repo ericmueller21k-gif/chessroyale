@@ -18,7 +18,7 @@ import { chatIconResponse, chatPostResponse, chatSlice, globalRoomOf } from "./g
 import { forgetLook, townHereResponse } from "./town-here-api.ts";
 import { SIGN_IN_TO_TOWN_CHAT, TOWN_CHAT_AGE, chatRoomOf, mayTownChat, reportedLine, townChallengeNote, townPostResponse, townRemoveResponse, townSlice } from "./town-chat-api.ts";
 import { accountDownload, deleteAccount } from "./account-data.ts";
-import { XP, AGE_GATE, ASK_AGE_LINE, FAIRPLAY, TOO_YOUNG_LINE, adminFirst, bossCrateDef, bossDef, cleanPawnColor, isActivity, isWelcomeCrate, tokenBossName } from "@chessroyale/core";
+import { XP, AGE_GATE, AGE_STEP_LINE, FAIRPLAY, TOO_YOUNG_LINE, adminFirst, bossCrateDef, bossDef, cleanPawnColor, isActivity, isWelcomeCrate, tokenBossName } from "@chessroyale/core";
 import {
   buyItem,
   cleanEmail,
@@ -29,6 +29,7 @@ import {
   ensureSchema,
   equipItem,
   markAgeOk,
+  answeredSignIn,
   profile,
   publicProfile,
   randomToken,
@@ -37,6 +38,7 @@ import {
   setChatOn,
   setChatPicks,
   shopState,
+  signInIfAnswered,
   signInWithIdentity,
   startEmailCode,
   touchSession,
@@ -141,14 +143,16 @@ export function ageAnswer(request: Request): "ok" | "under" | null {
  */
 const ageOk = () => cookie(AGE_COOKIE, "ok", AGE_GATE.answerMinutes * 60);
 /**
- * Every sign-in needs this device's "old enough" answer first (null: go ahead). A device that answered "too young"
- * can't sign in at all (new account or not: the email would be a child's), and one that hasn't answered is asked.
+ * Every sign-in step starts here (null: go ahead): a device that answered "too young" can't sign in at all, new account or not
+ * (the email would be a child's), at any step. One that hasn't answered may start a sign-in (Eric, Nov 12: "log in without
+ * having to select an age if you already have an account"); it finishes only into an account that has answered
+ * (signInIfAnswered), else it's asked first (AGE_STEP_LINE): docs/decisions/2026-11-12-signin-without-age.md.
  */
 function ageRefusal(request: Request): Response | null {
-  const age = ageAnswer(request);
-  if (age === "ok") return null;
-  return age === "under" ? json({ message: TOO_YOUNG_LINE, tooYoung: true }, 403) : json({ message: ASK_AGE_LINE, askAge: true }, 403);
+  return ageAnswer(request) === "under" ? json({ message: TOO_YOUNG_LINE, tooYoung: true }, 403) : null;
 }
+/** A sign-in that can't finish until this device answers the age question: nothing was made, moved or signed in. */
+const askAgeFirst = () => json({ message: AGE_STEP_LINE, askAge: true }, 403);
 
 /** Online play needs a signed-in account once a way to sign in is set up (guests play solo against bots). */
 export const signInRequired = (env: AccountEnv) => !!((env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET) || env.RESEND_API_KEY);
@@ -329,12 +333,16 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
 
   /**
    * Switches the browser to `user` (a new session) and answers with `body` or a redirect. Every sign-in comes through
-   * the age gate (ageRefusal): the account keeps that its holder said they were old enough, and the answer is used up,
-   * so the next sign-in on this device asks again.
+   * the age gate: either this device `answered` "old enough" just before (the account keeps that its holder said so, and the
+   * answer is used up, so a sign-in into an account that hasn't answered asks again), or the account had answered already
+   * (signInIfAnswered).
    */
-  const signInAs = async (user: User, redirect?: string) => {
-    await markAgeOk(sql, user.id, now);
-    const headers = new Headers({ "set-cookie": cookie(AGE_COOKIE, "", 0), "cache-control": "no-store" });
+  const signInAs = async (user: User, answered: boolean, redirect?: string) => {
+    const headers = new Headers({ "cache-control": "no-store" });
+    if (answered) {
+      await markAgeOk(sql, user.id, now);
+      headers.append("set-cookie", cookie(AGE_COOKIE, "", 0));
+    }
     if (!token || current?.id !== user.id) {
       if (token) await endSession(sql, token);
       headers.append("set-cookie", sessionCookie(await createSession(sql, user.id, now)));
@@ -677,7 +685,8 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
     return json(await profile(sql, g.user, admins, leaves), 200, { "set-cookie": sessionCookie(g.token) });
   }
 
-  // ---- Email: a 6-digit code (each step behind the age gate: no email is taken from a device that hasn't answered) ----
+  // ---- Email: a 6-digit code (no email is taken from a device that answered "too young"; one that hasn't answered is asked once
+  // the code shows whose email it is, unless that account has answered) ----
   if (path === "/api/auth/email/start" && request.method === "POST") {
     if (!email) return json({ message: "Email sign-in isn't set up yet." }, 503);
     const tooYoung = ageRefusal(request);
@@ -699,8 +708,8 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
       }),
     });
     if (!sent.ok) return json({ message: "We couldn't send the email. Try again in a minute." }, 502);
-    // (The answer starts its time again, so it outlasts the code.)
-    return json({ ok: true }, 200, { "set-cookie": ageOk() });
+    // (An answer starts its time again, so it outlasts the code.)
+    return json({ ok: true }, 200, ageAnswer(request) === "ok" ? { "set-cookie": ageOk() } : {});
   }
   if (path === "/api/auth/email/verify" && request.method === "POST") {
     const tooYoung = ageRefusal(request);
@@ -708,15 +717,24 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
     const b = (await request.json().catch(() => ({}))) as { email?: unknown; code?: unknown };
     const address = cleanEmail(b.email);
     if (!address || typeof b.code !== "string") return json({ message: "Enter the 6-digit code." }, 400);
-    if (!(await verifyEmailCode(sql, address, b.code, now))) return json({ message: "That code didn't work. Check it, or send a new one." }, 400);
-    return signInAs(await signInWithIdentity(sql, current, "email", address, {}, now));
+    // Whether it can finish now: this device just answered "old enough", or the account it lands on has. Read before the code is
+    // checked, so a right code is used up only by a check that signs in; one that must ask first keeps it live, and the app sends it
+    // again with the answer (no new code). The answer is the same for a wrong code either way.
+    const answered = ageAnswer(request) === "ok";
+    const finish = answered || (await answeredSignIn(sql, current, "email", address));
+    if (!(await verifyEmailCode(sql, address, b.code, now, !finish))) return json({ message: "That code didn't work. Check it, or send a new one." }, 400);
+    if (!finish) return askAgeFirst();
+    const user = answered ? await signInWithIdentity(sql, current, "email", address, {}, now) : await signInIfAnswered(sql, current, "email", address, {}, now);
+    // (The account went between the two reads: asked first, and the code's used: the finish fails and the player sends a new code.)
+    return user ? signInAs(user, answered) : askAgeFirst();
   }
 
-  // ---- Google (behind the age gate too: without an "old enough" answer, back to the page, which asks) ----
+  // ---- Google (behind the age gate too: a device that's too young goes back to the page; one that hasn't answered is asked when it
+  // comes back, unless the Google account's own account has answered) ----
   const redirectUri = `${url.origin}/api/auth/google/callback`;
   if (path === "/api/auth/google/start" && request.method === "GET") {
     if (!google) return json({ message: "Google sign-in isn't set up yet." }, 503);
-    // (?signin=age: the app shows ASK_AGE_LINE on the question, or the friendly line to a device that's too young.)
+    // (?signin=age: the app shows the friendly line to a device that's too young.)
     if (ageRefusal(request)) return Response.redirect(`${url.origin}${safeNext(url.searchParams.get("next"))}?signin=age`, 302);
     const state = randomToken(16);
     const q = new URLSearchParams({
@@ -730,8 +748,8 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
     const headers = new Headers({ location: `https://accounts.google.com/o/oauth2/v2/auth?${q}`, "cache-control": "no-store" });
     headers.append("set-cookie", cookie(STATE_COOKIE, state, 600));
     headers.append("set-cookie", cookie(NEXT_COOKIE, safeNext(url.searchParams.get("next")), 600));
-    // (The answer starts its time again, so it outlasts the trip to Google.)
-    headers.append("set-cookie", ageOk());
+    // (An answer starts its time again, so it outlasts the trip to Google.)
+    if (ageAnswer(request) === "ok") headers.append("set-cookie", ageOk());
     return new Response(null, { status: 302, headers });
   }
   if (path === "/api/auth/google/callback" && request.method === "GET") {
@@ -749,8 +767,19 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
     // The token came straight from Google over TLS, so its claims can be read without checking the signature.
     const claims = id_token ? (JSON.parse(atob(id_token.split(".")[1]!.replace(/-/g, "+").replace(/_/g, "/"))) as { sub?: string; email?: string; email_verified?: boolean; aud?: string }) : null;
     if (!claims?.sub || claims.aud !== env.GOOGLE_CLIENT_ID) return Response.redirect(`${url.origin}/?signin=failed`, 302);
-    const user = await signInWithIdentity(sql, current, "google", claims.sub, { email: claims.email_verified ? (claims.email ?? null) : null }, now);
-    return signInAs(user, `${url.origin}${safeNext(readCookie(request, NEXT_COOKIE))}?signin=google`);
+    const answered = ageAnswer(request) === "ok";
+    const extra = { email: claims.email_verified ? (claims.email ?? null) : null };
+    const user = answered ? await signInWithIdentity(sql, current, "google", claims.sub, extra, now) : await signInIfAnswered(sql, current, "google", claims.sub, extra, now);
+    const back = `${url.origin}${safeNext(readCookie(request, NEXT_COOKIE))}`;
+    if (!user) {
+      // Asked first (?signin=age-google): nothing was made or kept, not even who the Google account is. After the answer the app
+      // goes to Google again (one more pick of the account), and this time the callback finishes. This trip's state is spent.
+      const headers = new Headers({ location: `${back}?signin=age-google`, "cache-control": "no-store" });
+      headers.append("set-cookie", cookie(STATE_COOKIE, "", 0));
+      headers.append("set-cookie", cookie(NEXT_COOKIE, "", 0));
+      return new Response(null, { status: 302, headers });
+    }
+    return signInAs(user, answered, `${back}?signin=google`);
   }
 
   return json({ message: "Not found" }, 404);

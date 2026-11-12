@@ -44,6 +44,12 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
 - **The landing page** shows where online play needs signing in (`onlineNeedsSignIn` from `/api/auth/config`) and
   you aren't signed in: sign in, or play against bots as a guest (remembered on the device). An invite link shows it
   even to a guest. `?nolanding` skips it (tests). Guests play Solo, a Solo raid and Boss alone.
+  Its sign-in box (Nov 12, Eric: "put a sign in already [first], and then below that... a sign up button, and then... your age
+  thing"): **Sign in** first, Google and the email code with no question; "New to HunChess?" **Sign up** below, which asks
+  "Sign up: when were you born?" in the same box, then the same two ways ("Have an account? Sign in" goes back). The heading
+  names the view ("Sign in to play online", "Sign up to join lobby ABCDE"). Both views are the same height (the question's rows
+  wrap where the email's do), so switching moves nothing below. [accounts.md](accounts.md), "The age gate";
+  [2026-11-12-signin-without-age.md](../decisions/2026-11-12-signin-without-age.md).
   Its **demo reel**, 25 s on a loop, a pixel-font caption each (50 v 50; the park, Big Boy's challenge; ranked, the ranks up to
   Transcendent; the Hidden Boss), cut twice: a phone's portrait one (`/media/hunchess-reel.*`, 860 × 1544, the screen's whole width)
   and a computer's 16:9 one from 1024 px (`hunchess-reel-wide.*`, 1920 × 1080). Only one loads. From 1024 px the page fills the

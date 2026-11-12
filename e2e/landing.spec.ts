@@ -5,11 +5,26 @@ import { openPlayWithFriends, pickMode } from "./helpers.ts";
 // The landing page shows only where sign-in is set up; locally there are no Google or Resend secrets, so the config is faked.
 const signInOn = { accounts: true, google: true, email: true, onlineNeedsSignIn: true };
 
-/** The age question that comes before the sign-in options (age-gate.spec.ts tests the gate): an adult's answer. */
-async function oldEnough(page: Page) {
-  await page.getByLabel("Birth month").selectOption("6");
-  await page.getByLabel("Birth year").selectOption("1990");
-  await page.getByRole("button", { name: "Continue" }).click();
+/**
+ * The sign-in box's size and where the guest button sits below it (from the box's top, so a tap that scrolls the page doesn't
+ * count), read a few painted frames apart once they hold still.
+ */
+async function boxes(page: Page) {
+  const read = () =>
+    page.evaluate(() => {
+      const box = document.querySelector(".landing-signin")!.getBoundingClientRect();
+      const guest = document.querySelector(".landing-actions > .btn-wide")!.getBoundingClientRect();
+      const r = Math.round;
+      return JSON.stringify({ box: [r(box.width), r(box.height)], guest: [r(guest.x - box.x), r(guest.y - box.y), r(guest.width), r(guest.height)] });
+    });
+  let last = "";
+  for (let i = 0; i < 20; i++) {
+    await page.evaluate(() => new Promise((f) => requestAnimationFrame(() => requestAnimationFrame(f))));
+    const now = await read();
+    if (now === last) return JSON.parse(now) as { guest: number[]; box: number[] };
+    last = now;
+  }
+  throw new Error(`boxes kept moving: ${last}`);
 }
 
 test("landing on a computer: two panes filling the window, the 16:9 reel big on the left and still, the sign-in and questions scrolling on the right", async ({ page }) => {
@@ -38,12 +53,19 @@ test("landing on a computer: two panes filling the window, the 16:9 reel big on 
     const side = page.locator(".landing-side");
     const col = (await side.boundingBox())!;
     expect(box.x + box.width, `${w}x${h}`).toBeLessThan(col.x);
-    // The sign-in and the guest button are on screen, at the top of the right column.
-    for (const b of [page.getByRole("button", { name: "Continue" }), page.getByRole("button", { name: /Play vs \d+ bots as a guest/ })]) {
+    // The sign-in (Sign in first, then Sign up) and the guest button are on screen, at the top of the right column.
+    for (const b of [page.getByRole("button", { name: "Continue with Google" }), page.getByRole("button", { name: "Sign up", exact: true }), page.getByRole("button", { name: /Play vs \d+ bots as a guest/ })]) {
       const r = (await b.boundingBox())!;
       expect(r.x, `${w}x${h}`).toBeGreaterThanOrEqual(col.x);
       expect(r.y + r.height, `${w}x${h}`).toBeLessThanOrEqual(h);
     }
+    // Sign up and back move nothing (Nov 12).
+    const before = await boxes(page);
+    await page.getByRole("button", { name: "Sign up", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "Sign up: when were you born?" })).toBeVisible();
+    expect(await boxes(page), `${w}x${h}: Sign up`).toEqual(before);
+    await page.getByRole("button", { name: "Sign in", exact: true }).click();
+    expect(await boxes(page), `${w}x${h}: back`).toEqual(before);
     // With every answer open the questions run long: the right column scrolls on its own, and the reel stays where it was.
     for (const d of await page.locator(".faq details").all()) await d.evaluate((e: HTMLDetailsElement) => (e.open = true));
     expect(await side.evaluate((e) => e.scrollHeight > e.clientHeight), `${w}x${h}`).toBe(true);
@@ -74,9 +96,25 @@ test("landing: demo loop, sign-in, guests play bots only, FAQ and legal pages, i
   const reel = (await video.boundingBox())!;
   expect([Math.round(reel.x), Math.round(reel.width)]).toEqual([0, vp.width]);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(vp.width);
-  await oldEnough(page);
+  // Sign in first, with no question (Eric, Nov 12): Google and the email code at once; Sign up below them.
   await expect(page.getByRole("button", { name: "Continue with Google" })).toBeVisible();
   await expect(page.getByLabel("Email")).toBeVisible();
+  await expect(page.getByLabel("Birth month")).toHaveCount(0);
+  const signUp = page.getByRole("button", { name: "Sign up", exact: true });
+  expect((await signUp.boundingBox())!.y).toBeGreaterThan((await page.getByLabel("Email").boundingBox())!.y);
+  // Sign up asks the question in the same box, and back: nothing below moves, at this phone's width, the 428 x 746 baseline and 320.
+  for (const size of [vp, { width: 428, height: 746 }, { width: 320, height: 640 }]) {
+    await page.setViewportSize(size);
+    const before = await boxes(page);
+    await signUp.click();
+    await expect(page.getByRole("heading", { name: "Sign up: when were you born?" })).toBeVisible();
+    expect(await boxes(page), `${size.width}: Sign up`).toEqual(before);
+    await page.getByRole("button", { name: "Sign in", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "Sign in to play online" })).toBeVisible();
+    expect(await boxes(page), `${size.width}: back to Sign in`).toEqual(before);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth), `${size.width}`).toBeLessThanOrEqual(0);
+  }
+  await page.setViewportSize(vp);
   // FAQ answers open.
   await page.getByText("Why do I need an account to play online?").click();
   await expect(page.getByText(/ban sticks/i)).toBeVisible();
@@ -113,7 +151,6 @@ test("landing: demo loop, sign-in, guests play bots only, FAQ and legal pages, i
   await page.route("**/api/lobby/ABCDE", (r) => r.fulfill({ json: { open: true, phase: "waiting" } }));
   await page.goto("/lobby/ABCDE");
   await expect(page.getByRole("heading", { name: "Sign in to join lobby ABCDE" })).toBeVisible();
-  await oldEnough(page);
   await page.getByRole("button", { name: "Continue with Google" }).click();
   await expect.poll(() => googleStart).toContain("next=%2Flobby%2FABCDE");
 });

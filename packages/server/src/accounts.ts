@@ -654,9 +654,53 @@ export async function signInWithIdentity(
   extra: { email?: string | null } = {},
   now: number,
 ): Promise<User> {
+  return (await signIn(sql, current, kind, value, extra, now, true))!;
+}
+
+/**
+ * A sign-in from a device that hasn't answered the age question (Eric, Nov 12: "log in without having to select an age if you
+ * already have an account"; docs/decisions/2026-11-12-signin-without-age.md): it goes ahead only into an account whose holder
+ * already said they were old enough (`users.age_ok_at`), the identity's own or, for a new identity, the signed-in account you're
+ * on. Anything else (an identity with no account, which would make one or turn a guest into one; an account from before the
+ * question) is null, and nothing is written: the device is asked first.
+ */
+export async function signInIfAnswered(sql: Sql, current: User | null, kind: "google" | "email", value: string, extra: { email?: string | null } = {}, now: number): Promise<User | null> {
+  return signIn(sql, current, kind, value, extra, now, false);
+}
+
+/**
+ * Whether a sign-in with this identity would land on an account that has answered the age question (signInIfAnswered's rule,
+ * read only). The email check reads it before the code, so a right code is used up only by the request that signs in.
+ */
+export async function answeredSignIn(sql: Sql, current: User | null, kind: "google" | "email", value: string): Promise<boolean> {
   const col = kind === "google" ? "google_sub" : "email";
-  const owner = await sql.first<User>(`SELECT id, name, icon, email, google_sub, created_at FROM users WHERE ${col} = ?`, value);
-  if (owner) {
+  const owner = await sql.first<{ age_ok_at: number | null }>(`SELECT age_ok_at FROM users WHERE ${col} = ?`, value);
+  if (owner) return owner.age_ok_at !== null;
+  return attachAnswered(sql, current, col);
+}
+
+/** No account has the identity: it's added to `current` if that's a signed-in account without one of its kind, which has answered. */
+async function attachAnswered(sql: Sql, current: User | null, col: "google_sub" | "email"): Promise<boolean> {
+  if (!current || current[col] || !(current.email || current.google_sub)) return false;
+  const row = await sql.first<{ age_ok_at: number | null }>("SELECT age_ok_at FROM users WHERE id = ?", current.id);
+  return row?.age_ok_at != null;
+}
+
+async function signIn(
+  sql: Sql,
+  current: User | null,
+  kind: "google" | "email",
+  value: string,
+  extra: { email?: string | null },
+  now: number,
+  answered: boolean,
+): Promise<User | null> {
+  const col = kind === "google" ? "google_sub" : "email";
+  const found = await sql.first<User & { age_ok_at: number | null }>(`SELECT id, name, icon, email, google_sub, created_at, age_ok_at FROM users WHERE ${col} = ?`, value);
+  // (Not answered on this device: only into an account that has, checked before anything is moved or made.)
+  if (!answered && (found ? found.age_ok_at === null : !(await attachAnswered(sql, current, col)))) return null;
+  if (found) {
+    const { age_ok_at: _answeredAt, ...owner } = found;
     if (current && current.id !== owner.id && !current.email && !current.google_sub) {
       // A guest signing in to an existing account: its matches, items, coins, reports, fair-play and chat files and the rest join
       // the account and the guest goes, in one batch (one transaction), so nothing lands halfway: a buy in another tab
@@ -757,20 +801,26 @@ export async function startEmailCode(sql: Sql, email: string, now: number): Prom
   return { ok: false, message: "Too many codes for this address. Try again in an hour." };
 }
 
-/** Checks a code; it works once, for 10 minutes, with 5 tries. */
-export async function verifyEmailCode(sql: Sql, email: string, code: string, now: number): Promise<boolean> {
+/**
+ * Checks a code; it works once, for 10 minutes, with 5 tries. `keep`: a right code is reported but left live, for a sign-in that
+ * must ask the age question before it can finish (docs/decisions/2026-11-12-signin-without-age.md): the finish sends the same code
+ * again, and that check uses it up. Every check counts a try either way.
+ */
+export async function verifyEmailCode(sql: Sql, email: string, code: string, now: number, keep = false): Promise<boolean> {
   // One statement, so checks at once can't share a code or a try (docs/decisions/2026-10-16-sign-in-races.md): it
-  // counts the try while the code is live with tries left, and uses the code up if it's right. Only the check whose
+  // counts the try while the code is live with tries left, and uses the code up if it's right (unless kept). Only the check whose
   // statement used it up gets in.
-  const row = await sql.first<{ used: number }>(
-    `UPDATE email_codes SET attempts = attempts + 1, expires_at = CASE WHEN code_hash = ? THEN 0 ELSE expires_at END
-     WHERE email = ? AND expires_at >= ? AND attempts < ? RETURNING expires_at = 0 AS used`,
-    await sha256(`${email}:${String(code).trim()}`),
+  const hash = await sha256(`${email}:${String(code).trim()}`);
+  const row = await sql.first<{ ok: number }>(
+    `UPDATE email_codes SET attempts = attempts + 1, expires_at = CASE WHEN code_hash = ?1 AND ?5 = 0 THEN 0 ELSE expires_at END
+     WHERE email = ?2 AND expires_at >= ?3 AND attempts < ?4 RETURNING code_hash = ?1 AS ok`,
+    hash,
     email,
     now,
     MAX_ATTEMPTS,
+    keep ? 1 : 0,
   );
-  return row?.used === 1;
+  return row?.ok === 1;
 }
 
 // ---------------- Results and profiles ----------------

@@ -122,9 +122,10 @@ export function LandingScreen({
             </p>
           )}
           <section class="signin landing-signin">
-            {/* (A device that answered the age question "too young": no sign-in, the guest button below.) */}
-            <h2>{tooYoung() ? "Online play needs an account" : joinCode ? `Sign in to join lobby ${joinCode}` : "Sign in to play online"}</h2>
-            <SignIn google={google} email={email} next={joinCode ? `/lobby/${joinCode}` : "/"} failed={failed} />
+            {/* (Sign in first, then Sign up below it (Eric, Nov 12); the box's heading follows: "Sign in to play online", "Sign up to
+                join lobby ABCDE". A device that answered the age question "too young": "Online play needs an account", no sign-in,
+                the guest button below.) */}
+            <SignIn google={google} email={email} next={joinCode ? `/lobby/${joinCode}` : "/"} failed={failed} title={joinCode ? `join lobby ${joinCode}` : "play online"} />
           </section>
           {!tooYoung() && (
             <div class="or-line" aria-hidden="true">
