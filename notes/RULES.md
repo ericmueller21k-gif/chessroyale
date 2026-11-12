@@ -131,3 +131,4 @@ checks it (stills at phone + computer sizes). Guard: docs/rules/eric.md + a chec
 - Before saying a helper job is still running, check its branch/session (Nov 11: song C was done while I said "in progress"). Brief only what Eric asked: no extra deliverables (Nov 11: an unrequested video over song C).
 - Briefs: say "stills go on a stills/<name> branch, never committed under docs/ (check.yml fails the PR)". #654 hit this Nov 12.
 - RULE (Nov 12 miss): Boingo pie helper finished 08:37 UTC; director told Eric "still working" for 6 h without checking the branch. Before any status line about a helper, fetch its branch for .done (or get_session). Run a background .done watcher for every running helper.
+- The director cannot re-run failed GitHub jobs (403 for this integration). A flake on a PR: fix at cause or ask Eric to press Re-run.
