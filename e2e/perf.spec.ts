@@ -202,7 +202,7 @@ test("G-REX's fire on a slow phone: a barrage of tiles late in a long game stays
     { history, fen, squares, king },
   );
   await expect(page.locator(".power-board .pw-fire")).toHaveCount(squares.length);
-  await expect(page.locator(".power-board .pw-pips")).toHaveAttribute("data-left", "12");
+  await expect(page.locator(".boss-prop .pw-pips")).toHaveAttribute("data-left", "12");
   await expect(page.locator(".power-board .pw-shadow")).not.toHaveCount(0);
   const late = await page.evaluate(counts);
   const idle = await frames(1500);

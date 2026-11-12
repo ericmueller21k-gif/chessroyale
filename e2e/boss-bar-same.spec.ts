@@ -380,7 +380,9 @@ test("every playable boss's phone bar: one bar and one figure box for all, the f
       expect.soft(p.minY, `${who}: not above the bar's top`).toBeGreaterThanOrEqual(s.bar.y);
       expect.soft(p.maxX, `${who}: 2 px clear of the name column`).toBeLessThanOrEqual(s.name.x - NAME_CLEAR);
       expect.soft(p.minY, `${who}: never covers the "BOSS · move N" text`).toBeGreaterThanOrEqual(s.hudText!.b + 1);
-      expect.soft(p.maxY, `${who}: nothing of the figure below the bar`).toBeLessThanOrEqual(s.bar.b - BAR_CLEAR);
+      // (Inside the bar's bottom edge: its 6 px padding under the feet holds a figure's feet drawn under its baseline, Ginger's and Hollow's
+      // 4 px at their size since Nov 12, as tall as the bar; was 2 px clear of it.)
+      expect.soft(p.maxY, `${who}: nothing of the figure below the bar`).toBeLessThanOrEqual(s.bar.b + 0.5);
     }
   }
 

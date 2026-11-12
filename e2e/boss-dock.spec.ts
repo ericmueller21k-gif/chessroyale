@@ -48,7 +48,7 @@ const boxes = (page: Page) =>
       const b = e.getBoundingClientRect();
       return { x: b.left, r: b.right, y: b.top, b: b.bottom };
     };
-    return { board: r(`.board-area .board-row > .board-wrap ${sel}`), row: r(".boss-dock-main"), status: r(".boss-dock-status"), clock: r(".dk-clock"), king: r(".gk-unit-btn") };
+    return { board: r(`.board-area .board-row > .board-wrap ${sel}`), row: r(".boss-dock-main"), status: r(".boss-dock-status"), clock: r(".dk-clock"), king: r(".gk-unit-btn"), unit: r(".boss-dock > .gk-unit"), pawn: r(".boss-dock > .you-pawn"), panel: r(".boss-dock > .dk-panel"), stacked: !!document.querySelector(".boss-dock.dk-stack") };
   }, BOARD_SEL.container);
 
 /**
@@ -76,13 +76,16 @@ const settled = (page: Page) =>
     });
   }, BOARD_SEL.container);
 
-test("the row is exactly the board's width under its edges at every width; the God King under it (phone, tablet upright), beside it with room (a phone on its side), by the board's corner (computer)", async ({ browser }) => {
+test("the row is exactly the board's width under its edges at every width; the God King under it (phone, tablet upright: stacked over your pawn where the strip is tall enough, Eric, Nov 11), beside it with room (a phone on its side), by the board's corner (computer)", async ({ browser }) => {
   test.skip(test.info().project.name !== "phone", "one run is enough: it opens its own screens");
   test.setTimeout(6 * 60_000);
   const sizes = [
-    { name: "320", viewport: { width: 320, height: 640 }, phone: true, king: "under" },
+    { name: "320", viewport: { width: 320, height: 640 }, phone: true, king: "stack" },
     { name: "390", viewport: { width: 390, height: 664 }, phone: true, king: "under" },
-    { name: "768", viewport: { width: 768, height: 1024 }, phone: false, king: "under" },
+    // (Eric's iPhone 14 Plus, Nov 11: the strip tall enough for the two, one above the other; the bar collapsed and not.)
+    { name: "428x746", viewport: { width: 428, height: 746 }, phone: true, king: "stack" },
+    { name: "428x926", viewport: { width: 428, height: 926 }, phone: true, king: "stack" },
+    { name: "768", viewport: { width: 768, height: 1024 }, phone: false, king: "stack" },
     { name: "844x390", viewport: { width: 844, height: 390 }, phone: true, king: "beside" },
     { name: "1024", viewport: { width: 1024, height: 768 }, phone: false, king: "corner" },
     { name: "1280", viewport: { width: 1280, height: 800 }, phone: false, king: "corner" },
@@ -110,10 +113,27 @@ test("the row is exactly the board's width under its edges at every width; the G
     expect(b.clock!.r, `${s.name}: clock inside the box`).toBeLessThanOrEqual(b.status!.r);
     expect(b.status!.r - b.clock!.r, `${s.name}: clock at the box's right`).toBeLessThan(16);
     await expect(page.locator(".dk-clock.running .dk-time")).toHaveText(/^\d:\d\d$/);
-    if (s.king === "under") {
+    if (s.king === "under" || s.king === "stack") {
       // (Under the row at the strip's far right, the panel to his left, since Oct 25: docs/decisions/2026-10-25-board-layout.md.)
       expect(b.king!.y, `${s.name}: the God King under the row`).toBeGreaterThanOrEqual(b.row!.b);
       expect(Math.abs(b.king!.r - b.row!.r), `${s.name}: at the row's right edge`).toBeLessThanOrEqual(1);
+      const [unit, pawn, panel] = [b.unit!, b.pawn!, b.panel!];
+      expect(b.stacked, `${s.name}: stacked`).toBe(s.king === "stack");
+      if (s.king === "stack") {
+        // Stacked (Eric, Nov 11: "put the king and pawn vertical… the king on top"): your pawn under him in his column, as big as
+        // he is, each bigger than side by side (58 px wide), both in the strip and on the screen, the panel left of them.
+        expect(Math.abs(pawn.x - unit.x) + Math.abs(pawn.r - unit.r), `${s.name}: your pawn in his column`).toBeLessThanOrEqual(1);
+        expect(pawn.y, `${s.name}: your pawn under him`).toBeGreaterThanOrEqual(unit.b - 0.5);
+        expect(Math.abs(pawn.b - pawn.y - (unit.b - unit.y)), `${s.name}: as tall as he is`).toBeLessThanOrEqual(1);
+        expect(unit.r - unit.x, `${s.name}: bigger than side by side`).toBeGreaterThan(58);
+        expect(pawn.b, `${s.name}: inside the strip`).toBeLessThanOrEqual(panel.b + 0.5);
+        expect(pawn.b, `${s.name}: on the screen`).toBeLessThanOrEqual(s.viewport.height);
+        expect(panel.r, `${s.name}: the panel left of them`).toBeLessThanOrEqual(unit.x + 0.5);
+      } else {
+        // (A strip too short for the two one above the other: side by side, your pawn just left of him, Oct 28.)
+        expect(Math.abs(pawn.r - unit.x), `${s.name}: your pawn just left of him`).toBeLessThanOrEqual(1);
+        expect(Math.abs(pawn.y - unit.y), `${s.name}: on his line`).toBeLessThanOrEqual(1);
+      }
     } else if (s.king === "beside") {
       expect(b.king!.x, `${s.name}: beside the row`).toBeGreaterThanOrEqual(b.row!.r);
       expect(b.king!.y, `${s.name}: on the row's line`).toBeLessThan(b.row!.b);
@@ -123,6 +143,7 @@ test("the row is exactly the board's width under its edges at every width; the G
     }
     // Everything in view across (nothing past the screen's edges).
     expect(b.king!.r, `${s.name}: the God King in view`).toBeLessThanOrEqual(s.viewport.width);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth), `${s.name}: no sideways scroll`).toBeLessThanOrEqual(0);
     await ctx.close();
   }
   // (A phone whose board grew as the scoreboard was minimized was checked here: since Oct 25 a boss screen on a phone has no

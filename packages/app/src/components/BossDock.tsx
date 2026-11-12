@@ -45,7 +45,9 @@ import { RaceBadge } from "./Hopper.tsx";
  * his words and menu open outwards there.
  *
  * Boss alone also has your own pawn, as your profile wears it, at his size and on his line: left of him in a phone's strip,
- * by the board's corner with him to its right on a computer (Eric, Oct 28; YourPawn).
+ * by the board's corner with him to its right on a computer (Eric, Oct 28; YourPawn). Where the phone's strip is tall enough,
+ * the two stand in one column instead, he on top, each as big as the strip's height lets them be (Eric, Nov 11: `dk-stack`,
+ * stackScale).
  */
 export function BossDock({
   match,
@@ -156,12 +158,15 @@ export function BossDock({
     if (!ready) setMenu(false);
   }, [ready]);
   const dockRef = useRef<HTMLDivElement>(null);
-  useLayoutEffect(() => lineUpWithBoard(dockRef.current!, strip ? undefined : setBeside), [strip]);
+  // (A phone's strip with your pawn, not a party's: the pawn and he in one column where its height has room: stackScale.)
+  const [stack, setStack] = useState(false);
+  const stacks = strip && pawn && !match.party;
+  useLayoutEffect(() => lineUpWithBoard(dockRef.current!, strip ? undefined : setBeside, stacks ? setStack : undefined), [strip, stacks]);
   // (His "can't" made ahead in the sound worker, so its first tap never stalls a slow phone.)
   useEffect(() => warmSounds(["kingCant"]), []);
   return (
     <>
-    <div class={`boss-dock${strip ? " dk-strip" : ""}${pawn ? " dk-pawn" : ""}${pawn && match.party ? " dk-party" : ""}`} ref={dockRef}>
+    <div class={`boss-dock${strip ? " dk-strip" : ""}${pawn ? " dk-pawn" : ""}${pawn && match.party ? " dk-party" : ""}${stacks && stack ? " dk-stack" : ""}`} ref={dockRef}>
       <div class={`history-nav boss-dock-main${view?.browsing ? " browsing" : ""}${wide ? " wide" : ""}`}>
         {!wide && (
           <button type="button" class="nav-btn" aria-label="Previous move" disabled={!view || view.ply === 0} onClick={() => view?.go(view.ply - 1)}>
@@ -365,6 +370,22 @@ function PartyMates({ match, side }: { match: GameView; side: "w" | "b" }) {
 /** The room right of the board the God King needs to stand beside the dock's row on a phone: his 58 px and a gap. */
 export const KING_BESIDE_PX = 66;
 
+/**
+ * A phone's strip, your pawn and the God King stacked (Eric, Nov 11: "When space is tight, this is too small and compact. They
+ * should be stacked, the king on top"): each figure's size against its side-by-side one (a 58 x 62 box), from the strip's
+ * height (`room`, the panel's less the dock's row gap) for the two, one above the other, at most STACK_MAX (their old two columns'
+ * width), and no bigger than the room right of the board lets his frame be (KING_FRAME_OUT). Below STACK_FROM (a strip too short for the two at today's size: a small phone) they stay side by side (0).
+ */
+export const STACK_FROM = 1;
+export const STACK_MAX = 2;
+/** How far the God King's frame (his canvas, wider than his drawing) reaches past his column's right edge, per unit of size (px). */
+export const KING_FRAME_OUT = 8;
+export function stackScale(room: number, right = Infinity): number {
+  // (His frame stays inside the window, `right` px right of the board: a frame past its edge scrolls the page sideways.)
+  const k = Math.min(STACK_MAX, right / KING_FRAME_OUT, Math.floor((room / 124) * 100) / 100);
+  return k >= STACK_FROM ? k : 0;
+}
+
 /** Where an element's box starts across the page, without transforms (a board that shakes or turns keeps its place). */
 function pageLeft(el: HTMLElement): number {
   let x = 0;
@@ -381,7 +402,7 @@ function pageLeft(el: HTMLElement): number {
  * has KING_BESIDE_PX right of the board, the God King stands beside the row (`dk-beside`); otherwise under it (Eric,
  * Oct 15: decided by the room there is, not the device).
  */
-function lineUpWithBoard(dock: HTMLElement, onBeside?: (beside: boolean) => void): (() => void) | void {
+function lineUpWithBoard(dock: HTMLElement, onBeside?: (beside: boolean) => void, onStack?: (stack: boolean) => void): (() => void) | void {
   // (With the panel's strip under the row (`onBeside` left out), he's always in the strip: never beside.)
   const wrap = dock.parentElement?.querySelector<HTMLElement>(".board-area .board-row > .board-wrap");
   if (!wrap) return;
@@ -397,6 +418,17 @@ function lineUpWithBoard(dock: HTMLElement, onBeside?: (beside: boolean) => void
     const beside = !!onBeside && dock.clientWidth - left - width >= KING_BESIDE_PX;
     dock.classList.toggle("dk-beside", beside);
     onBeside?.(beside);
+    // (Your pawn and the God King stacked in a phone's strip, as big as its height lets them be: stackScale. Set before the
+    // first paint, the class with it, then kept by the dock's own render.)
+    if (onStack) {
+      // (The strip's height, less the gap between his row and your pawn's.)
+      const room = (dock.querySelector<HTMLElement>(":scope > .dk-panel")?.offsetHeight ?? 0) - (parseFloat(getComputedStyle(dock).rowGap) || 0);
+      const right = document.documentElement.clientWidth - (dock.getBoundingClientRect().left + left + width);
+      const k = Math.floor(stackScale(room, right) * 100) / 100;
+      if (k) dock.style.setProperty("--dk-k", String(k));
+      dock.classList.toggle("dk-stack", k > 0);
+      onStack(k > 0);
+    }
   };
   place();
   const watch = new ResizeObserver(place);
