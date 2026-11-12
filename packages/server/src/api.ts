@@ -725,7 +725,7 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
     if (!(await verifyEmailCode(sql, address, b.code, now, !finish))) return json({ message: "That code didn't work. Check it, or send a new one." }, 400);
     if (!finish) return askAgeFirst();
     const user = answered ? await signInWithIdentity(sql, current, "email", address, {}, now) : await signInIfAnswered(sql, current, "email", address, {}, now);
-    // (The account went between the two reads: asked first, and the code's used, so a new one is sent.)
+    // (The account went between the two reads: asked first, and the code's used: the finish fails and the player sends a new code.)
     return user ? signInAs(user, answered) : askAgeFirst();
   }
 

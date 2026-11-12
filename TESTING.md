@@ -114,7 +114,7 @@ point). Closing the private tab forgets it.
    "Accounts are for players 13 and older, so you'll play as a guest", with no Sign in or Sign up left. Reload: still that
    line. Close the private tab.
 2. **Another private tab, your own account, with Google** (Eric, Nov 12: "go to the site on a fresh browser and log in without
-   having to select an age"). Open hunchess.com in a new private tab and tap **Continue with Google** straight away: no
+   having to select an age"). Open hunchess.com in a new private tab and tap **Continue with Google** straight away (with the Google account you already sign in with; if you've only ever used the email code, use the code instead): no
    question, and you should come back signed in, on the page you started from. Google's return trip is the one path the
    automatic tests can't run. Tell me if anything asks your age on the way. (One exception, once: an account that hasn't
    signed in since the question came in, Oct 16, is asked "One more step: when were you born?" and then picks its Google

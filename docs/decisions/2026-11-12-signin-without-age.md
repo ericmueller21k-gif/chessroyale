@@ -80,6 +80,16 @@ This replaces that file's call 1 ("the question comes before every sign-in"); th
 | A kept code abused | Still 5 tries, 10 minutes, one finish | server "a code kept for the question…" |
 | Probing which emails have accounts | A wrong code answers the same for every email | the same test |
 
+## After the independent review (director, Nov 12)
+No blockers (the review is on branch `claude/review-656`, REVIEW-656.md). Fixed in this PR: a sign-in that fails after the answer now
+shows its reason (the question stays up while the kept code goes again, and the options open with the note); the race comment in
+api.ts; the privacy policy's "about an hour later"; TESTING.md's Google step. Left as they are, on purpose:
+- A kept check uses one of the code's 5 tries, so a right code on the 5th try is asked about and can't finish: send a new code.
+  Rare, safe, and the try count stays simple.
+- A signed-in prober with a Google-only account could time `/api/auth/email/verify` (one extra D1 read when the email has no
+  account) to guess which emails have accounts. Noisy (tens of ms) and needs many requests; a follow-up makes `answeredSignIn` one
+  statement whatever it finds.
+
 ## Tests changed (old → new)
 
 None of these guards a rule in `docs/rules/eric.md`.

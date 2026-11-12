@@ -261,12 +261,16 @@ export async function answerAge(month: number, year: number): Promise<AgeAnswer>
 async function finishPendingSignIn(): Promise<void> {
   const p = state.pending;
   if (!p) return;
-  set({ pending: null });
-  if (p.kind === "google") return signInWithGoogle(p.next);
+  if (p.kind === "google") {
+    set({ pending: null });
+    return signInWithGoogle(p.next);
+  }
+  // (The question stays up while the code goes again: success clears `pending`, the server asking again sets it again, and a
+  // failure clears it with its note in one render, so the sign-in options open with the note ready. Review of PR #656.)
   try {
     await verifyEmailCode(p.email, p.code);
   } catch (e) {
-    if (!tooYoung()) set({ signInNote: { message: (e as Error).message, email: p.email } });
+    set({ pending: null, ...(tooYoung() ? {} : { signInNote: { message: (e as Error).message, email: p.email } }) });
   }
 }
 

@@ -231,3 +231,25 @@ test("Sign in on a fresh browser (Eric, Nov 12): an account that answered signs 
   const [row] = await d1<{ age_ok_at: number | null }>(page, "SELECT age_ok_at FROM users WHERE email = ?", old);
   expect(row!.age_ok_at).toBeGreaterThan(2);
 });
+
+test("Sign in, then the question, then the code no longer works (review of PR #656): the reason shows, with the address kept", async ({ page }) => {
+  test.skip(test.info().project.name !== "phone", "one run is enough");
+  await signInOn(page);
+  await page.route("**/api/auth/email/start", (route) => route.fulfill({ json: { ok: true } }));
+  const tag = Date.now().toString(36);
+  const old = `late-${tag}@e2e.test`;
+  await page.goto("/");
+  await d1Write(page, `INSERT INTO users (id, name, email, created_at, last_seen, age_ok_at) VALUES ('l${tag}', 'Lee', '${old}', 1, 1, NULL)`);
+  await codeFor(page, old, "975310");
+  await page.getByLabel("Email").fill(old);
+  await page.getByRole("button", { name: "Email me a code" }).click();
+  await page.getByLabel("6-digit code").fill("975310");
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await expect(page.getByRole("heading", { name: AGE_STEP_LINE })).toBeVisible();
+  // The question takes longer than the code lives.
+  await d1Write(page, `UPDATE email_codes SET expires_at = 1 WHERE email = '${old}'`);
+  await answer(page, 6, 1990);
+  await expect(page.getByText("That code didn't work", { exact: false })).toBeVisible();
+  await expect(page.getByLabel("Email")).toHaveValue(old);
+  expect((await api(page, "/api/me")).body!.user.signedIn).toBe(false);
+});
