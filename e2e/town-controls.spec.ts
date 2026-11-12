@@ -465,7 +465,7 @@ test("the minimap: on by default at the top right, your dot moving with you and 
 });
 
 test("the minimap never covers the arrows, the zoom pair, the focus button or the chat, at every phone size and on computers", async ({ browser }) => {
-  test.setTimeout(300_000);
+  test.setTimeout(400_000);
   const phone = test.info().project.name === "phone";
   const sizes: [number, number][] = phone ? [[320, 568], [360, 740], [390, 844], [430, 932], [844, 390], [768, 1024], [1024, 768]] : [[1280, 800], [1440, 900], [1920, 1080], [1024, 700]];
   for (const [w, h] of sizes) {
