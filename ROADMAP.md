@@ -425,6 +425,24 @@ And we'll have to do that for every rider."
   (`npm run preview:items`) and the in-game pawn drawing; one shared preview card for all items.
 - Lane: item-builder (the art fits), with the hub for the card; light-to-targeted lane.
 
+## The Hidden Boss's building in the town, and his three forms (Eric, Nov 12, 2026: queued, not started)
+
+The full notes: branch `claude/director-notes`, `notes/briefs/hidden-boss-house-NOTES.md`; how he works today:
+`notes/hidden-boss-today.md`. Everything stays original (no name, sign or likeness from the reference photos).
+
+- **The building:** an old Brooklyn-style corner walk-up (red-brown brick, 4-5 stories, an ornate cornice, fire escapes down the front),
+  in a corner of the town. Inside, smaller than it looks: a hall with doors that don't open, two flights of stairs, then the top floor.
+- **The top floor:** a 1950s child's room (a rocking horse, a little table with a chessboard, a poster, a kid's mat, a small bed, a
+  sunny window); he sits on the floor with a board and scattered pieces.
+- **The challenge:** anyone in the room can challenge him; the town shows "1 of 4"... (leaving the room drops you); at four, a countdown
+  for those four and a town chat line naming them; then the battle.
+- **Three forms:**
+  1. **New: the child.** No powers, kid lines. Maia from about 1800, +100 every 4 moves up to its cap; five drawings as he grows up,
+     his level rising with a level-up each step. The team's move: the majority's; a tie is random between close moves, else the stronger.
+  2. **Today's phase 1** (bullet, no help), as a new match.
+  3. **Today's phase 2** (four boards); online it's a separate build (four boards online, server Stockfish, fair play).
+- Open: a time limit on the count, his locked select tile, a reward, admins first.
+
 ## Ranked rewards (Eric, Nov 9, 2026: later, not a priority; don't raise it again until ranked seasons are built)
 
 Eric: "we do want to give a reward for ranking, just like other games do … probably do a personalized crate that contains like
