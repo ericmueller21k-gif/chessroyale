@@ -2,125 +2,146 @@
 slight variation ... more whimsical but still like the whimsicalness comes from the background notes, like star
 sparkling sort of thing. Kind of more like a darker night style and so really honestly like avoiding high pitched
 notes ... just try to come up with something, and it'll get me started."
-On the first go (112 beats a minute, the lead between F#3 and A#4): "its a little too slow, the moos and the noise that
-sounds like anime wawawa or something is nice, but too slow on the melody and maybe even too deep/low". So this one is
-136 beats a minute, the tunes rewritten in quicker notes and an octave higher, the half-pace stretch gone, and the Moon
-(the "wawawa") given eight bars of its own.
-A night drive, a kick on every beat: 272 beats = 68 bars = 120.0 s. B minor; the drop walks down by major thirds
-(B minor, G minor, E flat minor), the old trick for outer space.
-Moo is a sweet cow who can't talk, the Moon his chatty friend, so: the lead is Moo, the overdriven lead (synth.py's
-`drive`) a shade darker than Sawyer's (F#4 to B5); the Moon answers on a talking synth (each note a "wah"). The whimsy
-is behind them: the stars, a soft bell pattern in 16ths that keeps coming back to one note, each star at its own
-brightness, some with a glint an octave up; a cowbell; an owl; and Moo's moos, built as the game builds them (a
-sawtooth through two formants gliding from "mm" to "oo").
-Under them: a kick, a gated snare, soft hats, toms; a rolling bass that ducks under the kick; held strings. The drop
-adds an 808, a wobble bass, a clap, and a gritty synth, low, that duels the lead.
+The first go (112 beats a minute, the lead low): "a little too slow ... too slow on the melody and maybe even too
+deep/low"; "the moos and the noise that sounds like anime wawawa ... is nice". The second (136, an octave up, eight
+bars for the wawawa): "turn down the moo volume"; of the wah, "I didn't want more of it. I was just saying I liked it";
+the calm should be longer, "almost like stargazing feel, like wind chime a bit ... two of those calming periods ... 15
+seconds each"; and the melody "just feels like the other ones a lot ... work up the timings a little bit. Some of the
+chord progression and maybe even ... be adventurous a little".
+So, this third go. 136 beats a minute, a kick on every beat: 272 beats = 68 bars = 120.0 s. B minor.
+The tunes are in a different rhythm from the other themes': notes in threes across the beat (triplets), octave jumps
+(the cow over the moon) that float back down, notes held across the bar line, phrases of three bars, and the lead
+slides into its long notes (a moo's glide). The chords change every bar: the tune's bass steps down by half steps
+(B, A#, A, G#, G) under one star that never moves (F#, in every chord), then E minor, a C chord from outside the key,
+and F#. The second tune's chords drop by whole steps (B minor, A, G, F), each motif five 8ths long so it lands
+somewhere new in the bar every time. The drop walks down by major thirds (B minor, G minor, E flat minor). The last
+tune arrives a minor third up, in D minor, and the tag walks home.
+Moo is a sweet cow who can't talk, the Moon his chatty friend: the lead is Moo, the overdriven lead (synth.py's `drive`)
+a shade darker than Sawyer's; the Moon says a few words in the gaps on a talking synth (each note a "wah").
+Behind them: the stars (a soft bell pattern in 16ths coming back to one note, each star at its own brightness, some
+with a glint an octave up), a cowbell, an owl, Moo's moos (built as the game builds them). Two calms of eight bars,
+stargazing: no drums; held strings on a chord with a raised fourth, wind chimes, the stars at half speed, a flute.
 Every melody, riff and chord progression here is original: none of it is any song's or any game's.
   python3 song_r.py <out.wav>
 
   bars  1-4    night: wind, an owl, the stars coming out one by one, a cowbell, a moo, the Moon's first words
-  bars  5-12   Moo's tune over the beat, the bass and the stars
-  bars 13-20   its answer, the Moon chattering in the gaps
-  bars 21-28   a second tune, darker (E minor, a C chord); the stars falling, the bass jumping octaves
-  bars 29-32   the hush: a heartbeat, the stars thinning, a hum rising, a moo, a moonbeam coming down
-  bars 33-44   the Full Moon (0:56): a big moo, 808, wobble bass, more cowbell; the lead and a gritty synth trade two
+  bars  5-12   Moo's tune over the beat, the bass stepping down under it
+  bars 13-20   the tune's second verse, the Moon saying a word in three of its gaps
+  bars 21-28   the first calm (0:35, 14 s): stargazing; a flute, wind chimes; then a hum, a moo, a moonbeam
+  bars 29-40   the Full Moon (0:49): a big moo, 808, wobble bass, more cowbell; the lead and a gritty synth trade two
                bars each, then play together
-  bars 45-52   the Moon's turn: it talks a tune in bursts, Moo answering each with a lick; a happy moo
-  bars 53-56   the calm: no drums; long soft notes, the stars at half speed, the owl, the Moon
-  bars 57-64   Moo's tune again, the Moon chattering, a square in harmony for its last four bars
-  bars 65-68   the tune's hook once more, a moonbeam and a moo into bar 1
+  bars 41-48   the second tune, the one that keeps shifting in the bar
+  bars 49-56   the second calm (1:25, 14 s): the lead plays the jump slowly, the flute answers; chimes
+  bars 57-64   Moo's tune a minor third up, a square in harmony for its last four bars
+  bars 65-68   the tag: home by way of B flat and G; a moonbeam and a moo into bar 1
 """
 import sys
+from fractions import Fraction
 
 import numpy as np
 
-from synth import Mix, length, line, n, write_wav
+from synth import Mix, n, write_wav
 
 BPM = 136.0
 BEATS = 272
 SECS = BEATS * 60 / BPM
 
+# A chord a bar. "+3" after a name: that chord a minor third up (the last tune).
 CHORDS = (
-    "Bm Bm Bm Bm  Bm Bm G G E E F# F#  Bm Bm G G Em Em F# F#  Em Em Bm Bm C C F# F#  G G F# F#  "
-    "Bm Bm Gm Gm Ebm Ebm F# F#  Bm Gm Ebm F#  Bm Bm Em Em G G F# F#  Bm G Em F#  Bm Bm G G E E F# F#  Bm G F# F#"
+    "Bm Bm Bm Bm  Bm Bm/A# Bm/A G#o G Em C F#  Bm Bm/A# Bm/A G#o G Em C F#  Gl Gl Em Em Gl Gl F#sus F#  "
+    "Bm Bm Gm Gm Ebm Ebm F# F#  Bm Gm Ebm F#  Bm11 A G6 F E E F#7 F#7  Bbl Bbl Gm9 Gm9 Bbl Bbl Asus A7  "
+    "Bm+3 Bm/A#+3 Bm/A+3 G#o+3 G+3 Em+3 C+3 F#+3  Bm+3 Bbl G F#"
 ).split()
 assert len(CHORDS) == 68
 # Each chord: the bass note; the strings' three notes; the stars' five (low, middle, the one they keep coming back
-# to, a color, high).
+# to, a color, high). Through the tune the one they come back to is always F#5.
 SKY = {
     "Bm": ("B1", "B2 F#3 D4", "B4 D5 F#5 A5 B5"),
-    "G": ("G1", "G2 D3 B3", "B4 D5 G5 A5 B5"),
-    "E": ("E2", "E2 B2 G#3", "B4 E5 G#5 F#5 B5"),
-    "Em": ("E2", "E2 B2 G3", "B4 E5 G5 F#5 B5"),
+    "Bm/A#": ("A#1", "B2 F#3 D4", "A#4 D5 F#5 C#5 A#5"),
+    "Bm/A": ("A1", "A2 F#3 D4", "A4 D5 F#5 B4 A5"),
+    "G#o": ("G#1", "G#2 D3 B3", "G#4 B4 F#5 D5 B5"),
+    "G": ("G1", "G2 D3 B3", "B4 D5 F#5 A5 B5"),
+    "Em": ("E2", "E2 B2 G3", "B4 E5 F#5 G5 B5"),
+    "C": ("C2", "C3 G3 E4", "C5 E5 F#5 G5 B5"),
     "F#": ("F#1", "F#2 C#3 A#3", "A#4 C#5 F#5 E5 A#5"),
-    "C": ("C2", "C3 G3 E4", "C5 E5 G5 F#5 C6"),
+    "Gl": ("G1", "G2 D3 B3", "B4 D5 F#5 C#5 A5"),  # G with its raised fourth, C#: the stargazing chord
+    "F#sus": ("F#1", "F#2 C#3 B3", "B4 C#5 F#5 E5 B5"),
     "Gm": ("G1", "G2 D3 Bb3", "Bb4 D5 G5 A5 Bb5"),
     "Ebm": ("Eb2", "Eb2 Bb2 Gb3", "Bb4 Eb5 Gb5 F5 Bb5"),
+    "Bm11": ("B1", "B2 F#3 D4", "B4 D5 E5 F#5 B5"),  # the second tune's chords: the stars come back to E5
+    "A": ("A1", "A2 E3 C#4", "A4 C#5 E5 F#5 A5"),
+    "G6": ("G1", "G2 D3 B3", "B4 D5 E5 G5 B5"),
+    "F": ("F1", "F2 C3 A3", "A4 C5 E5 G5 A5"),
+    "E": ("E2", "E2 B2 G#3", "G#4 B4 E5 F#5 G#5"),
+    "F#7": ("F#1", "F#2 C#3 A#3", "A#4 C#5 E5 F#5 A#5"),
+    "Bbl": ("Bb1", "Bb2 F3 D4", "A4 D5 F5 E5 A5"),  # B flat with its raised fourth, E
+    "Gm9": ("G1", "G2 D3 Bb3", "Bb4 D5 F5 A5 Bb5"),
+    "Asus": ("A1", "A2 E3 D4", "A4 D5 E5 G5 A5"),
+    "A7": ("A1", "A2 E3 C#4", "A4 C#5 E5 G5 A5"),
 }
 STAR = (0, 2, 4, 2, 1, 2, 3, 2, 0, 2, 4, 2, 3, 2, 1, 2)  # the stars' bar: which of the five, 16th by 16th
 MINOR = (11, 1, 2, 4, 6, 7, 9)  # B minor, for the square's harmony
 
-# ---- Moo's lines (the overdriven lead) ----
-# The hook: two quick notes up to a third, a drop, a gap, and up again.
+# ---- Moo's lines (the overdriven lead). Lengths are in beats; 2/3 is a note of three-across-two, 1/3 three-in-one. ----
+# The tune, three bars and three and two: an octave jump, three notes floating down, a held note that doesn't belong
+# (A#); a note held over the bar line; another jump; up the C chord in threes; down the F#.
 TUNE = (
-    "B4:.25 C#5:.25 D5:.5 B4:.5 F#4:.5 -:.5 B4:.25 C#5:.25 D5:.5 F#5:.5 | E5:.5 D5:.5 C#5:.5 D5:.5 B4:1 -:.5 F#4:.5 | "
-    "B4:.25 C#5:.25 D5:.5 G5:.5 D5:.5 -:.5 E5:.25 D5:.25 B4:.5 D5:.5 | E5:.5 D5:.5 B4:.5 A4:.5 B4:1 -:1 | "
-    "E5:.25 F#5:.25 G#5:.5 E5:.5 B4:.5 -:.5 E5:.25 F#5:.25 G#5:.5 B5:.5 | A5:.5 G#5:.5 F#5:.5 E5:.5 G#5:1 -:.5 E5:.5 | "
-    "F#5:.5 -:.5 F#5:.25 E5:.25 C#5:.5 A#4:.5 C#5:.5 E5:.5 F#5:.5 | E5:.5 C#5:.5 A#4:.5 F#4:.5 A#4:.5 C#5:.5 F#4:.5 -:.5"
+    "F#4:1 F#5:2/3 E5:2/3 D5:2/3 B4:1 | A#4:1.5 C#5:.5 D5:2/3 C#5:2/3 A#4:2/3 | A4:1 D5:1 F#5:1.5 E5:2 | "
+    "D5:.5 B4:1/3 D5:1/3 F#5:1/3 G#5:1 | F#5:2 E5:2/3 D5:2/3 B4:2/3 | E4:.5 E5:1.5 D5:.5 B4:.5 G4:1 | "
+    "C5:2/3 E5:2/3 G5:2/3 F#5:1 E5:1 | C#5:1.5 A#4:.5 F#4:1 -:1"
 )
-ANSWER = (
-    "F#5:.5 E5:.5 D5:.5 -:.5 D5:.25 E5:.25 F#5:.5 D5:.5 B4:.5 | C#5:.5 D5:.5 E5:.5 F#5:.5 D5:1 -:1 | "
-    "G5:.5 -:.5 G5:.25 F#5:.25 E5:.5 D5:.5 B4:.5 D5:.5 E5:.5 | D5:.5 B4:.5 A4:.5 B4:.5 D5:1 -:1 | "
-    "E5:.25 F#5:.25 G5:.5 E5:.5 B4:.5 -:.5 B4:.25 E5:.25 G5:.5 F#5:.5 | E5:.5 D5:.5 C#5:.5 D5:.5 E5:1 -:1 | "
-    "F#5:.5 F#5:.5 E5:.5 C#5:.5 A#4:.5 C#5:.5 E5:.5 C#5:.5 | A#4:.25 C#5:.25 E5:.5 F#5:1.5 -:1.5"
+VERSE = (
+    "B4:1/3 D5:1/3 F#5:1/3 B5:1 A5:.5 F#5:.5 D5:1 | C#5:2/3 D5:2/3 F#5:2/3 A#4:1 -:1 | A4:.5 B4:.5 D5:1 E5:2/3 D5:2/3 B4:2/3 | "
+    "G#4:1.5 B4:.5 D5:1 -:1 | G4:.5 G5:1.5 F#5:2/3 D5:2/3 B4:2/3 | E5:1 G5:1 F#5:1.5 E5:2 | "
+    "G5:.5 F#5:1/3 E5:1/3 C5:1/3 E5:1 | F#5:1 E5:.5 C#5:.5 A#4:1 -:1"
 )
-DARK = (
-    "E4:.5 G4:.5 B4:.5 -:.5 B4:.25 A4:.25 G4:.5 A4:.5 B4:.5 | C#5:.5 B4:.5 G4:.5 E4:.5 G4:1 -:1 | "
-    "D5:.5 -:.5 D5:.25 C#5:.25 B4:.5 F#4:.5 B4:.5 C#5:.5 D5:.5 | E5:.5 D5:.5 C#5:.5 B4:.5 F#4:1 -:1 | "
-    "E5:.25 F#5:.25 G5:.5 E5:.5 C5:.5 -:.5 C5:.25 E5:.25 G5:.5 F#5:.5 | E5:.5 C5:.5 G4:.5 C5:.5 E5:1 -:1 | "
-    "C#5:.5 C#5:.5 D5:.5 C#5:.5 A#4:.5 F#4:.5 A#4:.5 C#5:.5 | E5:.5 F#5:.5 E5:.5 C#5:.5 A#4:1 -:1"
+# The second tune: a motif five 8ths long, so each time it starts somewhere else in the bar; then a jump, and home.
+SHIFT = (
+    "B4:.5 E5:.5 D5:.5 F#5:1 A4:.5 E5:.5 C#5:.5 E5:1 A4:.5 C#5:.5 E5:.5 A5:1 -:.5 | "
+    "B4:.5 E5:.5 D5:.5 G5:1 A4:.5 E5:.5 C5:.5 E5:1 A4:.5 C5:.5 F5:.5 A5:1 -:.5 | "
+    "G#4:1 G#5:2 F#5:1 | B4:2/3 E5:2/3 F#5:2/3 G#5:2 | C#5:.5 E5:.5 F#5:1 E5:.5 C#5:.5 A#4:1 | F#4:1 A#4:1/3 C#5:1/3 E5:1/3 F#5:1 -:1"
 )
-# The Full Moon: the lead's bars (played an octave up) and the gritty synth's, two each in turn; then four together.
+# The Full Moon: the lead's bars and the gritty synth's, two each in turn; then four together.
 DUEL_LEAD = (
-    "B3:.5 B3:.5 D4:.5 F#4:1 -:.5 E4:.5 D4:.5 | C#4:.5 D4:.5 E4:.5 D4:.5 B3:1 -:1 | -:4 | -:4 | "
-    "Gb4:.5 Gb4:.5 F4:.5 Eb4:1 -:.5 Bb3:.5 Eb4:.5 | F4:.5 Gb4:.5 Ab4:.5 Gb4:.5 Bb4:1 -:1 | -:4 | -:4 | "
-    "F#4:1.5 E4:.5 D4:1 F#4:1 | G4:1.5 F4:.5 D4:1 G4:1 | Gb4:1.5 F4:.5 Eb4:1 Bb4:1 | A#4:2 F#4:1 C#4:1"
+    "B4:.5 B5:1.5 A5:2/3 F#5:2/3 D5:2/3 | E5:1/3 F#5:1/3 E5:1/3 D5:1 B4:1 -:1 | -:4 | -:4 | "
+    "Bb4:.5 Bb5:1.5 Ab5:2/3 Gb5:2/3 Eb5:2/3 | F5:1/3 Gb5:1/3 Ab5:1/3 Bb5:1.5 Gb5:.5 -:1 | -:4 | -:4 | "
+    "F#5:2 D5:2/3 E5:2/3 F#5:2/3 | G5:2 D5:2/3 Bb4:2/3 D5:2/3 | Gb5:2 Eb5:2/3 F5:2/3 Gb5:2/3 | A#5:1.5 F#5:.5 C#5:1 F#5:1"
 )
 DUEL_GRIT = (
     "-:4 | -:4 | D4:.5 D4:.5 Bb3:.5 G3:1 -:.5 A3:.5 Bb3:.5 | C4:.5 D4:.5 Eb4:.5 D4:.5 G4:1 -:1 | "
     "-:4 | -:4 | A#3:.5 C#4:.5 E4:.5 -:.5 E4:.25 F#4:.25 E4:.5 C#4:1 | F#4:1 E4:.5 C#4:.5 A#3:.5 C#4:.5 F#4:1 | "
-    "D4:1.5 C#4:.5 B3:1 D4:1 | Bb3:1.5 A3:.5 G3:1 Bb3:1 | Eb4:1.5 Db4:.5 Bb3:1 Gb4:1 | F#4:2 C#4:1 A#3:1"
+    "D4:2 B3:1 D4:1 | Bb3:2 G3:1 Bb3:1 | Eb4:2 Bb3:1 Eb4:1 | F#4:1.5 C#4:.5 A#3:1 C#4:1"
 )
-# The Moon's turn: its bursts, and Moo's lick after each.
-TURN_MOON = (
-    "B4:.25 D5:.25 C#5:.25 D5:.25 F#5:.5 -:.5 D5:.25 E5:.25 D5:.25 B4:.25 -:1 | -:4 | "
-    "G5:.25 F#5:.25 E5:.25 F#5:.25 G5:.5 -:.5 E5:.25 G5:.25 B5:.5 -:1 | -:4 | "
-    "D5:.25 D5:.25 E5:.25 D5:.25 B4:.5 D5:.5 -:.5 G5:.25 F#5:.25 E5:.25 D5:.25 -:.5 | -:4 | "
-    "C#5:.25 E5:.25 C#5:.25 A#4:.25 C#5:.5 -:.5 F#5:.25 E5:.25 C#5:.5 -:1 | A#4:.25 C#5:.25 E5:.25 F#5:.25 E5:.5 C#5:.5 -:2"
-)
-TURN_MOO = (
-    "-:4 | -:.5 F#5:.5 E5:.5 D5:.5 B4:1 -:1 | -:4 | -:.5 B4:.5 E5:.5 G5:.5 F#5:.5 E5:1 -:.5 | "
-    "-:4 | -:.5 B4:.5 D5:.5 G5:.5 E5:.5 D5:1.5 | -:4 | -:2 F#5:.5 E5:.5 C#5:.5 F#5:.5"
-)
-CALM = "B4:4 | D5:4 | E5:2 G5:2 | F#5:3 -:1"
-TAG = (
-    "B4:.25 C#5:.25 D5:.5 B4:.5 F#4:.5 -:.5 B4:.25 C#5:.25 D5:.5 F#5:.5 | E5:.5 D5:.5 B4:.5 A4:.5 B4:1 -:1 | "
-    "F#5:.5 -:.5 F#5:.25 E5:.25 C#5:.5 A#4:.5 C#5:.5 E5:.5 F#5:.5 | F#5:1 -:3"
-)
-# ---- the Moon's (the talking synth): a few quick words in Moo's gaps ----
-MOON_1 = (
+# The calms: the flute's slow tune; then the lead playing the jump slowly and the flute answering.
+CALM_1 = "D5:3 F#5:1 | E5:2 C#5:2 | B4:3 D5:1 | E5:4 | D5:2 G5:2 | F#5:3 E5:1 | C#5:4 | A#4:3 -:1"
+CALM_2_LEAD = "A4:2 A5:2 | G5:4/3 F5:4/3 D5:4/3 | D5:3 F5:1 | E5:4 | -:4 | -:4 | -:4 | -:4"
+CALM_2_FLUTE = "-:4 | -:4 | -:4 | -:4 | D5:2 F5:2 | E5:3 C5:1 | D5:4 | C#5:3 -:1"
+TAG = "A4:1 A5:2/3 G5:2/3 F5:2/3 D5:1 | Bb4:1 D5:1 F5:1 A5:1 | G5:1.5 D5:.5 B4:1 D5:1 | F#5:1.5 C#5:.5 A#4:1 -:1"
+# ---- the Moon's (the talking synth): a word in three of the verse's gaps ----
+MOON = (
     "-:4 | -:3 B4:.25 D5:.25 C#5:.25 B4:.25 | -:4 | -:3 D5:.25 E5:.25 D5:.25 B4:.25 | "
-    "-:4 | -:3 G4:.25 B4:.25 E5:.25 B4:.25 | -:4 | -:3 A#4:.25 C#5:.25 E5:.25 C#5:.25"
+    "-:4 | -:4 | -:4 | -:3 A#4:.25 C#5:.25 E5:.25 C#5:.25"
 )
-MOON_2 = (
-    "-:4 | -:3 D5:.25 E5:.25 D5:.25 B4:.25 | -:4 | -:3 B4:.25 D5:.25 G5:.25 D5:.25 | "
-    "-:4 | -:3 E5:.25 G#5:.25 F#5:.25 E5:.25 | -:4 | -:4"
-)
-for _name, _beats in ((TUNE, 32), (ANSWER, 32), (DARK, 32), (DUEL_LEAD, 48), (DUEL_GRIT, 48), (TURN_MOON, 32), (TURN_MOO, 32), (CALM, 16),
-                      (TAG, 16), (MOON_1, 32), (MOON_2, 32)):
-    assert abs(length(_name) - _beats) < 1e-9, (_name[:30], length(_name))
-    for _bar in _name.split("|"):
-        assert abs(length(_bar) - 4) < 1e-9, _bar
+
+
+def notes(start, text):
+    """'F#5:2/3 -:1 | D5:.5' -> [(beat, beats, midi)] from `start`; '-' rests; '|' is for the eye (a note may cross it)."""
+    out, t = [], Fraction(start)
+    for tok in text.replace("|", " ").split():
+        name, d = tok.split(":")
+        if name != "-":
+            out.append((float(t), float(Fraction(d)), n(name)))
+        t += Fraction(d)
+    return out
+
+
+def beats(text):
+    return sum(Fraction(tok.split(":")[1]) for tok in text.replace("|", " ").split())
+
+
+for _name, _beats in ((TUNE, 32), (VERSE, 32), (SHIFT, 32), (DUEL_LEAD, 48), (DUEL_GRIT, 48), (CALM_1, 32), (CALM_2_LEAD, 32),
+                      (CALM_2_FLUTE, 32), (TAG, 16), (MOON, 32)):
+    assert beats(_name) == _beats, (_name[:30], beats(_name))
 
 
 def main(out: str) -> None:
@@ -142,8 +163,10 @@ def main(out: str) -> None:
         return np.repeat(r, hold)[:k]
 
     def chord(bar):
-        root, pad, sky = SKY[CHORDS[bar]]
-        return n(root), [n(c) for c in pad.split()], [n(c) for c in sky.split()]
+        name, _, shift = CHORDS[bar].partition("+")
+        root, pad, sky = SKY[name]
+        up = int(shift or 0)
+        return n(root) + up, [n(c) + up for c in pad.split()], [n(c) + up for c in sky.split()]
 
     # ---- the kit ----
     def kick(b, vol=0.5):
@@ -172,6 +195,11 @@ def main(out: str) -> None:
         w = np.sin(tau * np.cumsum(x.hz(m) * (1 + 0.35 * np.exp(-t / 0.025))) / sr) * np.exp(-t / 0.15) + 0.3 * hiss(k, 3000) * np.exp(-t / 0.008)
         put("toms", b, w * tail(k) * vol, pan)
 
+    def toms(b, pitches=(50, 50, 45, 40)):
+        """A run of toms into the next bar, a 16th each."""
+        for i, m in enumerate(pitches):
+            tom(b + i * 0.25, m, 0.24 + 0.03 * i, {50: 0.3, 45: 0.0, 40: -0.3}[m])
+
     def clap(b, vol=0.2):
         for o in (0, 0.011, 0.023):
             put("snare", b + o / x.beat_s, hiss(int(0.02 * sr), 8000, 0.4) * np.exp(-np.arange(int(0.02 * sr)) / sr / 0.006) * vol * 0.7)
@@ -186,27 +214,27 @@ def main(out: str) -> None:
         put("bell", b, w * (0.7 * np.exp(-t / 0.02) + 0.3 * np.exp(-t / 0.11)) * np.minimum(1, t / 0.0008) * tail(k) * vol, pan)
 
     # ---- the low end ----
-    def bass(b, m, beats, vol=0.4, slide=0.0):
+    def bass(b, m, length, vol=0.4, slide=0.0):
         """A deep note driven so small speakers hear it, with a round pluck an octave up."""
-        k = x.k(beats)
+        k = x.k(length)
         t = np.arange(k) / sr
         ph = tau * np.cumsum(x.hz(m) * 2 ** (slide * np.exp(-t / 0.05) / 12)) / sr
-        env = np.minimum(1, t / 0.006) * np.exp(-t / (beats * x.beat_s * 2.0)) * tail(k, 0.02)
+        env = np.minimum(1, t / 0.006) * np.exp(-t / (length * x.beat_s * 2.0)) * tail(k, 0.02)
         w = np.tanh(2.2 * np.sin(ph)) / np.tanh(2.2) + 0.35 * np.sin(2 * ph) + 0.12 * np.sin(3 * ph)
         mid = 0.45 * np.sin(2 * ph + 1.6 * np.exp(-t / 0.09) * np.sin(2 * ph)) * np.exp(-t / 0.3)
         put("bass", b, (w + mid) * env * vol)
 
-    def sub(b, m, beats, vol=0.5):
+    def sub(b, m, length, vol=0.5):
         """The 808."""
-        k = x.k(beats)
+        k = x.k(length)
         t = np.arange(k) / sr
         ph = tau * np.cumsum(x.hz(m) * 2 ** (12 * np.exp(-t / 0.012) / 12)) / sr
-        env = np.exp(-t / (beats * x.beat_s * 0.6)) * tail(k, 0.02)
+        env = np.exp(-t / (length * x.beat_s * 0.6)) * tail(k, 0.02)
         put("sub", b, (np.tanh(2.4 * np.sin(ph) * env) / np.tanh(2.4) + 0.3 * np.sin(2 * ph) * env + 0.15 * np.sin(3 * ph) * env) * vol)
 
-    def wobble(b, m, beats, rate, vol=0.2, top=18.0):
+    def wobble(b, m, length, rate, vol=0.2, top=18.0):
         """The wobble bass: a sawtooth whose brightness sweeps open and shut `rate` times a beat, driven hard."""
-        k = x.k(beats)
+        k = x.k(length)
         t = np.arange(k) / sr
         cut = 1.5 + (0.5 - 0.5 * np.cos(tau * rate * t / x.beat_s)) * top
         w = np.zeros(k)
@@ -223,17 +251,17 @@ def main(out: str) -> None:
         kk = int(0.9 * sr)
         put("fx", b, hiss(kk, 7000, 0.2) * np.exp(-np.arange(kk) / sr / 0.2) * vol * 0.3)
 
-    def hum(b, beats, vol=0.1, m0=35, m1=59):
+    def hum(b, length, vol=0.1, m0=35, m1=59):
         """The Moon gathering a beam: a soft tone climbing two octaves, swelling."""
-        k = x.k(beats)
+        k = x.k(length)
         u = np.linspace(0, 1, k)
         ph = tau * np.cumsum(x.hz(m0 + (m1 - m0) * u**1.5)) / sr
         put("fx", b, (np.sin(ph) + 0.4 * np.sin(2 * ph) + 0.2 * np.sin(3 * ph)) * u**2 * np.minimum(1, (1 - u) * 60) * vol)
 
-    def strings(bar, vol=0.045, beats=4.0):
+    def strings(bar, vol=0.045, length=4.0, slow=False):
         _, pad, _ = chord(bar)
         for j, m in enumerate(pad):
-            put("pad", bar * 4, x.strings(m, beats, vol, attack=0.12, release=0.2), (-0.45, 0.0, 0.45)[j])
+            put("pad", bar * 4, x.strings(m, length, vol, attack=0.4 if slow else 0.12, release=0.5 if slow else 0.2), (-0.45, 0.0, 0.45)[j])
 
     # ---- the sky ----
     def star(b, m, vol=0.07, pan=0.0):
@@ -255,18 +283,20 @@ def main(out: str) -> None:
             if lower:
                 star(t + 0.25, sky[STAR[(i + 5) % 16]] - 12, 0.035 * v, -pan)
 
-    def falling(bar, vol=0.6):
-        """Stars falling: four 16ths down through the five notes on each beat."""
-        sky = chord(bar)[2]
-        for beat in range(4):
-            for j in range(4):
-                star(bar * 4 + beat + j * 0.25, sky[(4 - j) if beat % 2 == 0 else (3 - j)], 0.06 * vol * rng.uniform(0.6, 1.0), 0.5 * (-1) ** beat)
+    def chimes(first, bars_, per_bar=3, vol=0.05):
+        """Wind chimes: a few soft strikes a bar on the chord's notes, each near an 8th but not on it, ringing long."""
+        for bar in range(first, first + bars_):
+            sky = chord(bar)[2]
+            for at in rng.choice(8, per_bar, replace=False):
+                put("chimes", bar * 4 + at * 0.5 + rng.uniform(-0.07, 0.07),
+                    x.bell(sky[rng.integers(0, 5)] + 12 * rng.integers(0, 2), 3.0, vol * rng.uniform(0.5, 1.0), ratio=3.5, index=0.9, decay=0.8),
+                    rng.uniform(-0.7, 0.7))
 
-    def beam(b, beats=2.0, vol=0.07):
-        """A moonbeam coming down: the stars' bell running from B5 down two octaves."""
-        notes = [n(c) for c in "B5 A5 F#5 E5 D5 B4 A4 F#4 E4 D4 B3".split()]
-        for i, m in enumerate(notes):
-            star(b + beats * i / len(notes), m, vol * (1.2 - 0.5 * i / len(notes)), 0.6 * np.cos(i))
+    def beam(b, length=2.0, vol=0.07):
+        """A moonbeam (or a shooting star) coming down: the stars' bell running from B5 down two octaves."""
+        run = [n(c) for c in "B5 A5 F#5 E5 D5 B4 A4 F#4 E4 D4 B3".split()]
+        for i, m in enumerate(run):
+            star(b + length * i / len(run), m, vol * (1.2 - 0.5 * i / len(run)), 0.6 * np.cos(i))
 
     def hoot(b, secs=0.32, vol=0.09, pan=-0.4):
         k = int(secs * sr)
@@ -278,7 +308,7 @@ def main(out: str) -> None:
     def owl(b, vol=0.09):
         hoot(b, 0.34, vol), hoot(b + 1.5, 0.2, vol * 0.85), hoot(b + 2.0, 0.42, vol)
 
-    def moo(b, secs, pitch, f1, f2, vol=0.3, rough=0.0, breath=0.2, open_=0.15, vib=(5.0, 0.015), pan=0.0):
+    def moo(b, secs, pitch, f1, f2, vol=0.2, rough=0.0, breath=0.2, open_=0.15, vib=(5.0, 0.015), pan=0.0):
         """Moo's moo, as the game makes it (packages/app/src/characters/moo-sounds.ts): a sawtooth whose pitch rises
         to a peak and falls, through two resonances gliding from "mm" to "oo", a slow vibrato, a breath of noise."""
         k = int(secs * sr)
@@ -300,24 +330,28 @@ def main(out: str) -> None:
         grr = 1 - rough * (0.5 + 0.5 * np.sin(tau * 28 * t))
         put("night", b, (w * grr + breath * 0.4 * hiss(k, 3000, 0.3)) * env * vol, pan)
 
-    def soft_moo(b, vol=0.3):  # D3 up to E3 and down to B2
+    # The moos, a third quieter than the second go's (Eric: "turn down the moo volume a little bit").
+    def soft_moo(b, vol=0.2):  # D3 up to E3 and down to B2
         moo(b, 0.9, (147, 165, 123.5), (330, 470), (700, 900), vol, breath=0.25, open_=0.2)
 
-    def happy_moo(b, vol=0.28):  # F#3 lilting up to B3 and back
-        moo(b, 0.7, (185, 247, 185), (360, 560), (760, 1150), vol, breath=0.15, open_=0.16, vib=(6.0, 0.025))
-
-    def big_moo(b, vol=0.4):  # F#2 up to B2 and down
+    def big_moo(b, vol=0.24):  # F#2 up to B2 and down
         moo(b, 1.5, (92.5, 123.5, 82.4), (420, 640), (780, 1000), vol, rough=0.3, breath=0.2, open_=0.3, vib=(4.5, 0.02))
 
     # ---- the voices ----
     def cow(start, text, vol=1.0, pan=-0.1, up=0):
-        """Moo: the overdriven lead, a shade darker than Sawyer's."""
-        for b, d, m in line(start, text):
-            put("lead", b, x.drive(m + up, d * 0.96, 0.16 * vol, knee=1400.0), pan)
+        """Moo: the overdriven lead, a shade darker than Sawyer's. A long note that follows another straight on
+        slides in from most of the way back to it, as a moo glides."""
+        last = None
+        for b, d, m in notes(start, text):
+            m += up
+            glide = 0.6 * (last[1] - m) if last and abs(last[0] - b) < 1e-6 and d >= 1 and 0 < abs(last[1] - m) <= 12 else 0.0
+            put("lead", b, x.drive(m, d * 0.96, 0.16 * vol, knee=1400.0, glide=glide), pan)
+            last = (b + d, m)
 
-    def talk(start, text, vol=0.12, pan=0.35):
+    def talk(start, text, vol=0.12, pan=0.35, up=0):
         """The Moon: a talking synth, each note's mouth opening and closing (a "wah"), with a little quaver."""
-        for b, d, m in line(start, text):
+        for b, d, m in notes(start, text):
+            m += up
             k = x.k(d * 0.92)
             t = np.arange(k) / sr
             u = np.linspace(0, 1, k)
@@ -329,8 +363,12 @@ def main(out: str) -> None:
             put("moon", b, w * np.minimum(1, t / 0.008) * tail(k, 0.02) * vol, pan)
 
     def grit(start, text, vol=1.0, pan=0.3):
-        for b, d, m in line(start, text):
+        for b, d, m in notes(start, text):
             put("grit", b, x.gritty(m, d * 0.92, 0.21 * vol), pan)
+
+    def flute(start, text, vol=0.2, pan=0.2):
+        for b, d, m in notes(start, text):
+            put("flute", b, x.flute(m, d * 0.97, vol), pan)
 
     def third(m):
         pc = m % 12
@@ -344,35 +382,21 @@ def main(out: str) -> None:
             put("lead", b + i * 0.125, x.drive(m, 0.1, 0.16 * vol * (1 - 0.6 * i / count), attack=0.004, knee=1400.0), 0.4 if i % 2 else -0.4)
 
     # ---- the band, bar by bar ----
-    def drive_beat(bar, bell=True, fill=False):
-        """A kick on every beat, the gated snare on 2 and 4, soft hats between, the bass rolling in 8ths, the cowbell."""
+    def drive_beat(bar, bell=True, fill=False, jump=False):
+        """A kick on every beat, the gated snare on 2 and 4, soft hats between, the bass rolling in 8ths (jumping
+        octaves when `jump`), the cowbell."""
         b, (root, _, _) = bar * 4, chord(bar)
         for i in range(4):
             kick(b + i, 0.5)
             hat(b + i + 0.5, 0.04), hat(b + i + 0.75, 0.02)
         snare(b + 1), snare(b + 3)
         for i in range(8):
-            bass(b + i * 0.5, root + (12 if i == 7 else 0), 0.46, 0.4)
+            bass(b + i * 0.5, root + (12 if (i % 2 if jump else i == 7) else 0), 0.46, 0.4)
         if bell:
             for o in (0.5, 1.5, 2.75) if bar % 2 == 0 else (0.5, 1.5, 2.5, 3):
                 cowbell(b + o, 0.085)
         if fill:
-            for i, m in enumerate((50, 50, 45, 40)):
-                tom(b + 3 + i * 0.25, m, 0.26 + 0.03 * i, (0.3, 0.3, 0.0, -0.3)[i])
-
-    def dark_beat(bar, fill=False):
-        """The same pace, darker: the kick, the snare and hats, the bass jumping octaves, a floor tom, no cowbell."""
-        b, (root, _, _) = bar * 4, chord(bar)
-        for i in range(4):
-            kick(b + i, 0.5)
-            hat(b + i + 0.5, 0.04)
-        snare(b + 1), snare(b + 3)
-        tom(b + 2.5, 40, 0.24, -0.3)
-        for i in range(8):
-            bass(b + i * 0.5, root + (12 if i % 2 else 0), 0.46, 0.4)
-        if fill:
-            for i, m in enumerate((50, 50, 45, 40)):
-                tom(b + 3 + i * 0.25, m, 0.26 + 0.03 * i, (0.3, 0.3, 0.0, -0.3)[i])
+            toms(b + 3)
 
     WOB = [((2, 1), (1, 2), (1, 4)), ((1, 2), (1, 3), (2, 0.5)), ((1.5, 2), (1.5, 4), (1, 6)), ((1, 1), (1, 4), (2, 2))]
 
@@ -394,6 +418,23 @@ def main(out: str) -> None:
         for i in range(4):
             cowbell(b + i + 0.5, 0.1)
 
+    def stargaze(first, build):
+        """A calm, eight bars: no drums; slow strings, long bass notes, the stars at half speed, wind chimes for six
+        bars (so none is left ringing into what comes next), an owl, a shooting star. `build`: its last two bars
+        gather a hum and a heartbeat."""
+        for i in range(8):
+            bar = first + i
+            strings(bar, 0.07, slow=True)
+            bass(bar * 4, chord(bar)[0] + 12, 3.9, 0.22)
+            stars(bar, vol=0.7 if i < 6 else 0.5, keep=2 if i < 6 else 4, glints=0.12)
+        chimes(first, 6)
+        owl(first * 4 + 5.0, 0.07)
+        beam(first * 4 + 16, 2.5, 0.05)
+        if build:
+            for b in (24, 24.5, 26, 26.5, 28, 28.5, 30, 30.5):
+                kick(first * 4 + b, 0.3 if b == int(b) else 0.22)
+            hum(first * 4 + 24, 7.5)
+
     # Bars 1-4: night. Wind, the owl, the stars coming out one by one, the strings rising, a cowbell far off, a moo,
     # and the Moon's first words; toms into the tune.
     put("night", 0, x.rumble(16, 0.1, hold=60), -0.2)
@@ -408,10 +449,9 @@ def main(out: str) -> None:
         cowbell(b, 0.075)
     soft_moo(9)
     talk(13.5, "B4:.25 D5:.25 C#5:.25 D5:.25 B4:.5")
-    for i, m in enumerate((50, 45, 40, 40)):
-        tom(15 + i * 0.25, m, 0.24 + 0.03 * i, (0.3, 0.0, -0.3, -0.3)[i])
+    toms(15, (50, 45, 40, 40))
 
-    # Bars 5-12: Moo's tune.
+    # Bars 5-12: Moo's tune, the bass stepping down a half step a bar under it.
     x.crash(16, 0.14, decay=0.5)
     cow(16, TUNE)
     for bar in range(4, 12):
@@ -419,93 +459,71 @@ def main(out: str) -> None:
         strings(bar)
         stars(bar)
 
-    # Bars 13-20: its answer, the Moon chattering in the gaps; more glints.
-    cow(48, ANSWER)
-    talk(48, MOON_1)
+    # Bars 13-20: the second verse; the Moon says a word in three of its gaps.
+    cow(48, VERSE)
+    talk(48, MOON)
     for bar in range(12, 20):
         drive_beat(bar, fill=bar in (15, 19))
         strings(bar)
         stars(bar, glints=0.32)
 
-    # Bars 21-28: a second tune, darker. The same pace; the strings up, the stars falling, the bass jumping octaves.
-    x.crash(80, 0.12, decay=0.6)
-    cow(80, DARK)
-    for bar in range(20, 28):
-        dark_beat(bar, fill=bar in (23, 27))
-        strings(bar, 0.06)
-        falling(bar)
-    owl(93.0, 0.07)
+    # Bars 21-28: the first calm. The flute's slow tune over the stargazing chord; then the hum, a moo and a moonbeam.
+    stargaze(20, build=True)
+    flute(80, CALM_1)
+    talk(94.5, "E5:.25 D5:.25 B4:.5", 0.1)
+    soft_moo(107.5)
+    beam(110, 2.0)
 
-    # Bars 29-32: the hush. The kit out but a heartbeat; the stars thin; the Moon asks something; a hum climbs; a moo;
-    # half a beat of nothing but a moonbeam coming down.
-    for i, bar in enumerate(range(28, 32)):
-        stars(bar, vol=0.8 - 0.12 * i, keep=(1, 2, 2, 4)[i], glints=0.1)
-        strings(bar, 0.04 - 0.008 * i)
-        kick(bar * 4, 0.34), kick(bar * 4 + 0.5, 0.24)
-    talk(114, "F#5:.25 E5:.25 D5:.5 B4:.25 D5:.25")
-    hum(116, 10)
-    soft_moo(120.5, 0.28)
-    beam(126, 2.0)
-
-    # Bars 33-44: the Full Moon. The lead and the gritty synth trade two bars each, a stutter at the end of each
+    # Bars 29-40: the Full Moon. The lead and the gritty synth trade two bars each, a stutter at the end of each
     # turn; then four bars together.
-    boom(128, 0.8), x.crash(128, 0.2, decay=0.6)
-    big_moo(128, 0.34)
-    cow(128, DUEL_LEAD, up=12)
-    grit(128, DUEL_GRIT)
-    for i, bar in enumerate(range(32, 44)):
+    boom(112, 0.8), x.crash(112, 0.2, decay=0.6)
+    big_moo(112)
+    cow(112, DUEL_LEAD)
+    grit(112, DUEL_GRIT)
+    for i, bar in enumerate(range(28, 40)):
         full_moon(bar, i)
         stars(bar, vol=1.05, glints=0.35, lower=True)
         if i >= 8:
             strings(bar, 0.05)
             x.crash(bar * 4, 0.12, decay=0.4)
-    for b, m in ((135, "B4"), (143, "G4"), (151, "Bb5"), (159, "F#4")):
-        stutter(b, n(m), 8 if b in (143, 159) else 4)
-    for i, m in enumerate((50, 50, 45, 45, 40, 40, 40, 40)):
-        tom(158 + i * 0.25, m, 0.24 + 0.02 * i, (0.3, 0.3, 0.0, 0.0, -0.3, -0.3, -0.3, -0.3)[i])
+    for b, m in ((119, "B4"), (127, "G4"), (135, "Gb5"), (143, "F#4")):
+        stutter(b, n(m), 8 if b in (127, 143) else 4)
+    toms(142, (50, 50, 45, 45, 40, 40, 40, 40))
     for i in range(8):
-        snare(174 + i * 0.25, 0.08 + 0.02 * i)
+        snare(158 + i * 0.25, 0.08 + 0.02 * i)
 
-    # Bars 45-52: the Moon's turn. It talks a tune in bursts; Moo answers each with a lick, and once with a happy moo.
-    x.crash(176, 0.16, decay=0.5)
-    talk(176, TURN_MOON, vol=0.15)
-    cow(176, TURN_MOO)
-    for bar in range(44, 52):
-        drive_beat(bar, fill=bar in (47, 51))
-        strings(bar)
+    # Bars 41-48: the second tune, shifting in the bar; the chords dropping by whole steps, the bass jumping octaves.
+    x.crash(160, 0.16, decay=0.5)
+    cow(160, SHIFT)
+    for bar in range(40, 48):
+        drive_beat(bar, bell=bar >= 44, fill=bar in (43, 47), jump=True)
+        strings(bar, 0.055)
         stars(bar, glints=0.3)
-    happy_moo(190.6)
 
-    # Bars 53-56: the calm. No drums: long soft notes, the stars at half speed, the strings, the owl, the Moon, a moo;
-    # a hum and toms back into the tune.
-    boom(208, 0.3)
-    cow(208, CALM, vol=0.7)
-    for bar in range(52, 56):
-        strings(bar, 0.06)
-        stars(bar, vol=0.85, keep=2, glints=0.15)
-        bass(bar * 4, chord(bar)[0], 3.9, 0.3)
-    owl(213.0, 0.08)
-    talk(218.5, "E5:.25 D5:.25 B4:.5")
-    soft_moo(220.2, 0.24)
-    hum(220, 4, 0.07)
-    for i, m in enumerate((50, 45, 45, 40)):
-        tom(223 + i * 0.25, m, 0.24 + 0.03 * i, (0.3, 0.0, 0.0, -0.3)[i])
+    # Bars 49-56: the second calm. The lead plays the jump slowly; the flute answers; toms back into the tune.
+    stargaze(48, build=False)
+    cow(192, CALM_2_LEAD, vol=0.7)
+    flute(192, CALM_2_FLUTE)
+    talk(206.5, "F5:.25 E5:.25 D5:.5", 0.1)
+    soft_moo(217.5, 0.17)
+    hum(216, 7.5, 0.06)
+    toms(223, (50, 45, 45, 40))
 
-    # Bars 57-64: Moo's tune again, the Moon chattering; a square joins in harmony for the last four bars.
+    # Bars 57-64: Moo's tune a minor third up; the Moon's word after its second bar and its fourth; a square in harmony
+    # under the last four bars.
     x.crash(224, 0.16, decay=0.5)
-    cow(224, TUNE)
-    talk(224, MOON_2)
-    for b, d, m in line(240, "|".join(TUNE.split("|")[4:])):
-        put("square", b, x.chip(third(m) - 12, d * 0.9, 0.07), 0.3)
+    cow(224, TUNE, up=3)
+    talk(224, "|".join(MOON.split("|")[:4]), up=3)
+    for b, d, m in notes(240, "|".join(TUNE.split("|")[4:])):
+        put("square", b, x.chip(third(m) - 12 + 3, d * 0.9, 0.07), 0.3)
     for bar in range(56, 64):
         drive_beat(bar, fill=bar in (59, 63))
         strings(bar)
         stars(bar, vol=1.05, glints=0.3)
 
-    # Bars 65-68: the hook once more, the Moon's last word, three hits; a moonbeam comes down and Moo moos into bar 1.
+    # Bars 65-68: the tag. The jump once more, home by way of B flat and G; one last hit, a moonbeam and a moo into bar 1.
     x.crash(256, 0.16, decay=0.5)
     cow(256, TAG)
-    talk(263, "D5:.25 E5:.25 D5:.25 B4:.25")
     for bar in range(64, 67):
         drive_beat(bar, fill=bar == 66)
         strings(bar)
@@ -514,7 +532,7 @@ def main(out: str) -> None:
     strings(67, 0.05)
     stars(67, vol=0.8, keep=2, glints=0.15)
     beam(269, 2.5, 0.06)
-    soft_moo(269.8, 0.26)
+    soft_moo(269.8, 0.18)
 
     # The bass, the strings and (lightly) the stars duck under each kick: the night-drive pump.
     marks = x.buses.pop("duck")[0]
@@ -526,10 +544,12 @@ def main(out: str) -> None:
 
     x.echo("lead", 0.75, 0.14, 0.06)
     x.echo("stars", 0.75, 0.2, 0.08)
+    x.echo("chimes", 1.0, 0.25, 0.1)
+    x.echo("flute", 0.75, 0.18, 0.07)
     x.echo("moon", 0.5, 0.15, 0.05)
     x.echo("night", 1.5, 0.2, 0.08)
     levels = {"lead": 1.15, "bass": 0.5, "sub": 0.5, "wobble": 0.8, "kick": 0.9, "snare": 2.0, "hats": 4.0, "toms": 1.5, "drum": 1.5, "stars": 1.8,
-              "pad": 1.7, "bell": 2.0, "moon": 1.6, "grit": 1.1, "square": 1.2, "fx": 1.2}
+              "pad": 1.7, "bell": 2.0, "moon": 1.6, "grit": 1.1, "square": 1.2, "fx": 1.2, "flute": 0.6, "chimes": 2.0}
     write_wav(out, x.mixdown(levels, lowpass=7000, room=0.25))
 
 

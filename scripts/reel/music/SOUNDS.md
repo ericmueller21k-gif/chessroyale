@@ -19,6 +19,7 @@ from the liked list, keep off the other one. Eric's words are quoted; the date i
 | A music box, heartbeat, creeping bass with the kit out ("lights out") | song_l.py, bars 29-34 | "so fucking good" |
 | Rockets, booms, crackle, sparkles; hand drums; a low chant | song_m.py | "It's perfect" |
 | An overdriven lead (the 16-bit consoles' lead guitar), built from measurements of a reference he sent | `Mix.drive` | of the reference: "a really badass instrument"; of the build's sample: "swap that instrument with the one that's currently in his actual completed one" (it is Sawyer's lead) |
+| A talking synth (each note a "wah") in small doses, and the cow's moos, kept quiet | song_r.py (`talk`, `moo`) | "the moos and the noise that sounds like anime wawawa or something is nice"; then, when given eight bars of it, "I didn't want more of it. I was just saying I liked it", and "turn down the moo volume a little bit" |
 | A fast pattern racing under everything | every song since song_i.py | asked for in all of them |
 | The NES's four voices | song_c.py, song_f.py | "much much better" than the 16-bit orchestra |
 
@@ -33,6 +34,7 @@ from the liked list, keep off the other one. Eric's words are quoted; the date i
 | A heroic major-key fanfare with brass, flute and bells (song_d.py) | "way too upbeat and happy" |
 | Lots of brass (track_b.py) | "less brass, more of the other voices"; then "the 2nd song is awful" |
 | A slow-down in the middle of a song (song_g.py) | "the slowdown didn't land, the speed up was cool tho" |
+| Tunes built from the same rhythm as the last boss's: 8ths on the grid, two-bar phrases, a chord every two bars (song_r.py, second go) | "it just feels like the other ones a lot ... work up the timings a little bit. Some of the chord progression and maybe even ... be adventurous a little" |
 | A tune that runs up and down its chords, the same shape on chord after chord (song_j.py) | "very dull and boring, sounds like all the rest ... that style chord progression is slop" |
 
 ## What he asks of every theme

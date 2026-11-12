@@ -189,15 +189,17 @@ class Mix:
         top = self.pulse(m, beats, 0.25, vol, vib=0.012 if long else 0.0, decay=0.2, sustain=0.6, release=0.008)
         return top + self.pulse(m - 12, beats, 0.5, 0.4 * vol, decay=0.2, sustain=0.6, release=0.008)[:k]
 
-    def drive(self, m, beats, vol=0.15, vib=0.007, vib_hz=4.2, attack=0.07, release=0.04, top=8500.0, knee=1500.0) -> np.ndarray:
+    def drive(self, m, beats, vol=0.15, vib=0.007, vib_hz=4.2, attack=0.07, release=0.04, top=8500.0, knee=1500.0, glide=0.0, glide_s=0.035) -> np.ndarray:
         """An overdriven lead, the 16-bit consoles' lead-guitar sound, built from measurements of a reference's lead
         (Eric, Nov 11; no sample of it is used): every harmonic present, those up to 1.5 kHz all about 3 dB under the
         fundamental, falling 9 dB an octave from there to 4 kHz and 6.5 above, nothing over `top` Hz; a soft start;
         held, sinking only a little; a slow, shallow vibrato (4.2 times a second, 12 cents each way) once the note
         settles. Each harmonic's level drifts a little on its own, as a driven string's do. `knee`: where the fall
-        starts; lower is darker (Moo & Moon's is 1150)."""
+        starts; lower is darker (Moo & Moon's is 1400). `glide` semitones: the note slides in from that far off (Moo's)."""
         k = self.k(beats)
         f, t = self._freq(m, k, vib, None, vib_hz)
+        if glide:
+            f = f * 2 ** (glide * np.exp(-t / glide_s) / 12)
         ph = 2 * np.pi * np.cumsum(f) / self.sr
         f0 = self.hz(m)
         out = np.sin(ph)
