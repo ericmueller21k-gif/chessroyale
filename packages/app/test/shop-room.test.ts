@@ -6,7 +6,7 @@ import { SHOP_BIGBOY_LAYOUT } from "../src/town/shops/bigboy-art.ts";
 import { SHOP_TIMBER_LAYOUT, SHOP_TIMBER_MARKS } from "../src/town/shops/timber-art.ts";
 import { SHOP_BLITZ_CRATE_AT, SHOP_BLITZ_LAYOUT, SHOP_BLITZ_MARKS, SHOP_BLITZ_PIECES } from "../src/town/shops/blitz-art.ts";
 import { STORE_PANELS, ceilingPanel, findPath, inTalkRange, makeRoom, onDoor, stepsFrom, tapTarget, walkable, type Room, type Sq } from "../src/town/shops/room.ts";
-import { POOL_LINE, buyBossCrate, canAfford, inInventoryLine, holdLine, priceLine, prizeRows, shopOf, wayText, SHOPS } from "../src/town/shops/shops.ts";
+import { POOL_LINE, buyBossCrate, canAfford, gotLine, inInventoryLine, holdLine, priceLine, prizeRows, shopOf, wayText, SHOPS } from "../src/town/shops/shops.ts";
 import { bossCrateOf } from "@chessroyale/core";
 import { ALL_HOMES } from "../src/town/world.ts";
 import { SHOP_FEEL } from "../src/town/feel.ts";
@@ -293,7 +293,9 @@ describe("the shops", () => {
     expect(canAfford({ tokens: 1, keys: 0 }, "key")).toBe(false);
     expect(canAfford({ tokens: 0, keys: 3 }, "key")).toBe(false);
     // A buy's answer (Eric, Nov 2): the crate is in your inventory, unopened.
-    expect(inInventoryLine(shopOf("tiger")!.crate)).toBe("Babur's Boss Crate is in your inventory.");
+    expect(inInventoryLine(shopOf("tiger")!.crate!)).toBe("Babur's Boss Crate is in your inventory.");
+    // Its pop-up's line (Eric, Nov 12).
+    expect(gotLine(shopOf("clown")!.crate!)).toBe("You got Boingo's Boss Crate!");
   });
 
   it("buying goes through buyBossCrate: the server's purchase (round 2), its answer the crate in your inventory (Nov 2) or the server's reason", async () => {
@@ -308,7 +310,8 @@ describe("the shops", () => {
     try {
       expect(await buyBossCrate("tiger", "tokens")).toEqual({ ok: false, message: "You need 3 Babur tokens." });
       next = answer(200, { crate: "boss-gardener", locker: { bossCrates: { "boss-gardener": 1 } } });
-      expect(await buyBossCrate("gardener", "key")).toEqual({ ok: true, message: "Puddles' Boss Crate is in your inventory." });
+      // (Done: the crate bought comes back with the answer, for its pop-up, Open now and Later: Nov 12.)
+      expect(await buyBossCrate("gardener", "key")).toEqual({ ok: true, message: "Puddles' Boss Crate is in your inventory.", crate: bossCrateOf("gardener") });
       expect(asked).toEqual([
         { url: "/api/shop/boss-crate", body: { crate: "boss-tiger", way: "tokens", request: expect.any(String) } },
         { url: "/api/shop/boss-crate", body: { crate: "boss-gardener", way: "key", request: expect.any(String) } },
@@ -323,7 +326,7 @@ describe("the shops", () => {
         asked.push({ url, body: JSON.parse(String(init?.body)) });
         return answers.shift()!;
       }) as typeof fetch;
-      expect(await buyBossCrate("tiger", "tokens")).toEqual({ ok: true, message: "Babur's Boss Crate is in your inventory." });
+      expect(await buyBossCrate("tiger", "tokens")).toEqual({ ok: true, message: "Babur's Boss Crate is in your inventory.", crate: bossCrateOf("tiger") });
       expect(asked).toHaveLength(2);
       expect(asked[1]).toEqual(asked[0]);
     } finally {

@@ -47,7 +47,9 @@ import { Walker, type HomeId } from "../world.ts";
 import type { Rider } from "../rides.ts";
 import { rideSpeed } from "../../components/rides/scale.ts";
 import { STORE_PANELS, driftAt, type PoolDrift, camFocus, ceilingPanel, inTalkRange, lightsAt, litDx, overlaps, upAlpha, walkable, youBox, isFloor, makeRoom, onDoor, onPass, passArrive, tapTarget, findPath, stepFor, type Room, type ShopPlace, type Sq } from "./room.ts";
-import { POOL_LINE, bossHoldings, buyBossCrate, canAfford, holdLine, priceLine, prizeRows, roomDef, wayText, type CrateWay, type ShopDef } from "./shops.ts";
+import { POOL_LINE, bossHoldings, buyBossCrate, canAfford, gotLine, holdLine, priceLine, prizeRows, roomDef, wayText, type CrateWay, type ShopDef } from "./shops.ts";
+import { CrateOpening } from "../../screens/Crates.tsx";
+import type { BossCrateDef } from "@chessroyale/core";
 import { ZEBRA_BACK_LINES, pickLine } from "./zebra-lines.ts";
 import { BackScene, FrontScene, SetupScene, WalkOut, ZEBRA_BACK_SET, ZEBRA_BACK_SET_SQUARES, ZEBRA_GUARDS, type BeatStep, type CarriedNow, type SceneClips, type SceneFig, type SceneSay, type SetupItem } from "./zebra-scene.ts";
 import { iceAt, introCam, isIce, type IceNow } from "./challenge.ts";
@@ -61,7 +63,7 @@ import { isUp, levelZ, liftAt, makeLevels, squareOf, type LevelsArt } from "./le
 import { pressKey, squareUnder } from "./tap.ts";
 import { ElfLoop, elfB, pairLegs, stopJob, walkerLegs, type DispenseStop, type ElfPose } from "./ginger-elves.ts";
 import { HOLLOW, HOLLOW_HEART, hollowBuild } from "../../characters/hollow.ts";
-import { play, type SoundName } from "../../sound.ts";
+import { play, unlockAudio, type SoundName } from "../../sound.ts";
 import { paintTable, playCue, slabFrontY, third, type Emis, type LoadedIntro } from "./intro.ts";
 import { folioTimes, isFolio, type FoldNow } from "./challenge.ts";
 import { prepareCrumple } from "./crumple-gl.ts";
@@ -441,6 +443,10 @@ export function ShopRoom({ room, youArt, youRider, youName, onZoom, onOut, onRea
   const [, accountChanged] = useState(0);
   useEffect(() => onAccountChange(() => accountChanged((n) => n + 1)), []);
   const [busy, setBusy] = useState(false);
+  // The crate just bought: its pop-up over the card (Eric, Nov 12: "another pop-up that says that you bought it, and then give you an
+  // option to open it now"), and whether Open now is opening it (the Crates tab's own opening, over the room).
+  const [got, setGot] = useState<BossCrateDef | null>(null);
+  const [opening, setOpening] = useState(false);
   const buy = (way: CrateWay) => {
     if (busy) return;
     setBusy(true);
@@ -448,8 +454,29 @@ export function ShopRoom({ room, youArt, youRider, youName, onZoom, onOut, onRea
     void buyBossCrate(def.home, way).then((res) => {
       setBusy(false);
       setMsg(res.message);
+      if (res.ok && res.crate) setGot(res.crate);
     });
   };
+  const later = () => {
+    setGot(null);
+    setOpening(false);
+  };
+  // While the pop-up (or its opening) is up, Escape is Later, and only that: the card under it stays open, and you stay in the room.
+  // (A layout effect, as every pop-up's: LESSONS.md, Nov 11. Capturing, so the room's and the town's own Escape never see it.)
+  const gotOpen = !!got;
+  const openNow = useRef<HTMLButtonElement>(null);
+  useLayoutEffect(() => {
+    if (!gotOpen) return;
+    // (Its first button takes the keyboard's focus: Enter opens it.)
+    if (!opening) openNow.current?.focus({ preventScroll: true });
+    const key = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.stopImmediatePropagation();
+      if (!opening) later();
+    };
+    addEventListener("keydown", key, true);
+    return () => removeEventListener("keydown", key, true);
+  }, [gotOpen, opening]);
   const held = bossHoldings(def.home);
   const label = card === "talk" ? (def.name ?? "Shopkeeper") : card === "crate" ? (def.crate ?? undefined) : card === "door" || card === "pass" ? "Door" : undefined;
   // (Don Dough's card, Nov 11: his Challenge alone. It plays his beat, the walk-out, then the challenge: Eric, "when you hit challenge,
@@ -506,7 +533,8 @@ export function ShopRoom({ room, youArt, youRider, youName, onZoom, onOut, onRea
                 </ul>
               </div>
             </div>
-            <p class="shop-price">{priceLine(def)}</p>
+            {/* (Its own class: the Shop screen's `.shop-price` is its cream price button; Eric, Nov 12.) */}
+            <p class="shop-room-price">{priceLine(def)}</p>
             <p class="shop-hold">{holdLine(def, held)}</p>
             {/* (A way you can't pay is greyed, not hidden; the server checks again.) */}
             <button type="button" class="town-btn primary" disabled={busy || !canAfford(held, "tokens")} onClick={() => buy("tokens")}>
@@ -516,13 +544,46 @@ export function ShopRoom({ room, youArt, youRider, youName, onZoom, onOut, onRea
               Buy with {wayText(def, "key")}
             </button>
             {/* (Its row is always there, its height kept, empty until a buy answers: nothing moves. A crate bought goes into your
-                inventory, unopened: "Babur's Boss Crate is in your inventory." (Eric, Nov 2); the Crates tab opens it.) */}
-            <div class="town-soon shop-msg" aria-live="polite">
+                inventory, unopened: "Babur's Boss Crate is in your inventory." (Eric, Nov 2), and its pop-up asks Open now or Later
+                (Nov 12). Its words the card's own size and color, not the 11 px gray of "Coming soon": Eric missed them, Nov 12.) */}
+            <div class="shop-msg" aria-live="polite">
               <span>{msg}</span>
             </div>
           </>
         )}
       </div>
+      {got && !opening && (
+        <div class="shop-got-veil">
+          <div class="town-card shop-got" role="dialog" aria-label={gotLine(got.name)}>
+            <h2>{gotLine(got.name)}</h2>
+            <CratePic frames={room.frames["crate"]!} />
+            <p class="shop-got-line">It's in your inventory.</p>
+            <button
+              type="button"
+              class="town-btn primary"
+              ref={openNow}
+              onClick={() => {
+                // (A tap: the moment a phone allows sound, so the strip's clicks are heard; as the Crates tab's Open.)
+                unlockAudio();
+                play("menuSelect");
+                setOpening(true);
+              }}
+            >
+              Open now
+            </button>
+            <button type="button" class="town-btn" onClick={later}>
+              Later
+            </button>
+          </div>
+        </div>
+      )}
+      {got && opening && (
+        <div class="shop-got-veil shop-opening-veil">
+          <div class="shop-opening crates" role="dialog" aria-label={got.name}>
+            <CrateOpening crate={got} force={{}} onClose={later} />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

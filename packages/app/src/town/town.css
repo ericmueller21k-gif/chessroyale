@@ -651,7 +651,9 @@ button.town-pic.player {
 .shop-prize-kind {
   font: 700 11px/1.3 Archivo, sans-serif;
 }
-.shop-price {
+/* The price line: plain words, the card's own white (Nov 12: its own class; it shared `.shop-price` with the Shop screen's cream price
+   button, which won, and Eric saw "the wrong shape, the wrong color, white text"). */
+.shop-room-price {
   margin: 4px 0 2px;
   font: 700 13px/1.35 Archivo, sans-serif;
   color: #fff;
@@ -669,7 +671,62 @@ button.town-pic.player {
   gap: 8px;
   height: 40px;
   margin-top: 6px;
-  line-height: 1.3;
+  font: 600 13px/1.3 Archivo, sans-serif;
+  color: #fff;
+}
+/*
+ * After a buy (Eric, Nov 12): "You got Boingo's Boss Crate!" over the room and its card (dimmed under it, as it was: nothing moves),
+ * the crate's picture, Open now and Later. Open now: the Crates tab's own opening (CrateOpening), in a box over the room, the app's
+ * light or dark surface. Phone first: the pop-up 260 px, its buttons the card's 40 px ones.
+ */
+.shop-got-veil {
+  position: absolute;
+  inset: 0;
+  z-index: 9;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(10, 14, 22, 0.55);
+  pointer-events: auto;
+  touch-action: none;
+}
+.town-card.shop-got {
+  position: relative;
+  width: 260px;
+  max-width: 100%;
+  padding: 14px 16px 16px;
+}
+.town-card.shop-got::after {
+  display: none;
+}
+.shop-got .shop-crate-pic {
+  display: block;
+  margin: 0 auto;
+}
+.shop-got-line {
+  margin: 6px 0 4px;
+  font: 500 12px/1.35 Archivo, sans-serif;
+  color: #d6d8df;
+}
+.shop-got .town-btn {
+  min-height: 44px;
+  margin-top: 8px;
+}
+.shop-opening-veil {
+  padding: 12px;
+  overflow: auto;
+  touch-action: pan-y;
+}
+.shop-opening {
+  box-sizing: border-box;
+  width: min(100%, 420px);
+  max-height: 100%;
+  overflow: auto;
+  padding: 12px;
+  border-radius: 18px;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.38);
 }
 .shop-pool {
   font: 600 11px/1.3 Archivo, sans-serif;

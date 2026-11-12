@@ -8,7 +8,7 @@
  * and `buyBossCrate` is the purchase: the server takes the price and puts the crate in your inventory, in one transaction (since
  * Eric's Nov 2 fixes it isn't opened at once: you open it in the Crates tab, as any crate).
  */
-import { BOSS_CRATE_PRICE, BOSS_CRATE_POOL, BOSS_ROSTER, adminPlayable, bossCrateOf, itemDef, tierInfo } from "@chessroyale/core";
+import { BOSS_CRATE_PRICE, BOSS_CRATE_POOL, BOSS_ROSTER, adminPlayable, bossCrateOf, itemDef, tierInfo, type BossCrateDef } from "@chessroyale/core";
 import { buyBossCrateOnServer, tokenCount } from "../../account.ts";
 import type { HomeId } from "../world.ts";
 import type { SkyTone } from "../sky.ts";
@@ -201,13 +201,16 @@ export const canAfford = (h: Holdings, way: CrateWay): boolean => {
   return h.tokens >= p.tokens && h.keys >= p.keys;
 };
 
-/** What a buy came to: done, or why not (shown under the buttons). */
+/** What a buy came to: done, or why not (shown under the buttons); done, the crate bought (its pop-up: Open now, Later). */
 export interface BuyResult {
   ok: boolean;
   message: string;
+  crate?: BossCrateDef;
 }
 /** A buy's answer (Eric, Nov 2: "it says when you buy it it's in your inventory"): "Babur's Boss Crate is in your inventory." */
 export const inInventoryLine = (crate: string) => `${crate} is in your inventory.`;
+/** The pop-up after a buy (Eric, Nov 12: "another pop-up that says that you bought it"): "You got Boingo's Boss Crate!" */
+export const gotLine = (crate: string) => `You got ${crate}!`;
 /**
  * Buys a boss's crate one of its two ways. Every buy button goes through here, and only here: the server takes the price (the
  * tokens, and the key) and puts the crate in your inventory, unopened, in one transaction (server/boss-tokens.ts), or says why not.
@@ -217,7 +220,7 @@ export async function buyBossCrate(boss: HomeId, way: CrateWay): Promise<BuyResu
   if (!crate) return { ok: false, message: "This crate isn't sold yet." };
   try {
     await buyBossCrateOnServer(crate.id, way);
-    return { ok: true, message: inInventoryLine(crate.name) };
+    return { ok: true, message: inInventoryLine(crate.name), crate };
   } catch (e) {
     return { ok: false, message: e instanceof Error ? e.message : "Something went wrong." };
   }

@@ -1319,6 +1319,10 @@ test("boss tokens: an admin gives himself Babur tokens and a crate key in the Cr
   // token and the key left, so only the key's way stays open.
   await byTokens.click();
   await expect(answer).toHaveText("Babur's Boss Crate is in your inventory.");
+  // (Its pop-up, Nov 12: Later keeps it in the inventory; Boingo's test below checks the pop-up itself.)
+  const got = page.getByRole("dialog", { name: "You got Babur's Boss Crate!", exact: true });
+  await got.getByRole("button", { name: "Later" }).click();
+  await expect(got).toBeHidden();
   await expect(crate).toContainText("You have 1 Babur token and 1 crate key.");
   await expect(byTokens).toBeDisabled();
   await expect(byKey).toBeEnabled();
@@ -1327,6 +1331,8 @@ test("boss tokens: an admin gives himself Babur tokens and a crate key in the Cr
   await byKey.click();
   await expect(crate).toContainText("You have 0 Babur tokens and 0 crate keys.");
   await expect(answer).toHaveText("Babur's Boss Crate is in your inventory.");
+  await got.getByRole("button", { name: "Later" }).click();
+  await expect(got).toBeHidden();
   await expect(byKey).toBeDisabled();
   await expect(byTokens).toBeDisabled();
   // (The answer's row was there all along: the card didn't grow.)
@@ -1488,17 +1494,21 @@ test("Boingo's Funhouse (Nov 6): Go in, the arcade (the play structure and slide
  * docs/decisions/2026-11-12-boss-crate-bought.md.
  */
 test("Boingo's Boss Crate bought in his Funhouse: the price line is plain words, a buy pops up \"You got Boingo's Boss Crate!\" with Open now and Later; Later keeps it, Open now opens it with the usual strip and reveal (Eric, Nov 12)", { tag: "@phone-only" }, async ({ page }) => {
-  test.setTimeout(180_000);
+  test.setTimeout(240_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(String(e)));
+  // (The stills at Eric's phone size, 428 x 746.)
+  if (SHOTS) await page.setViewportSize({ width: 428, height: 746 });
   await asServerAdmin(page);
   await page.goto("/town?sky=day");
   await townReady(page);
-  // Six of Boingo's tokens and a key: two buys, one each way.
-  for (const body of [{ boss: "clown", tokens: 3 }, { boss: "clown", tokens: 3 }, { keys: 1 }]) {
+  // Nine of Boingo's tokens and a key: three buys, the second with the key.
+  for (const body of [{ boss: "clown", tokens: 3 }, { boss: "clown", tokens: 3 }, { boss: "clown", tokens: 3 }, { keys: 1 }]) {
     const r = await page.request.post("/api/locker/grant", { data: { ...body, request: `grant-${Math.random()}` } });
     expect(r.ok()).toBe(true);
   }
+  type LockerNow = { tokens: Record<string, number>; keys: number; bossCrates: Record<string, number> };
+  const held = async () => ((await (await page.request.get("/api/locker")).json()) as LockerNow).bossCrates["boss-clown"] ?? 0;
   await page.reload();
   await townReady(page);
   await page.evaluate(() => (window as unknown as { __townGlide?: (id: string) => void }).__townGlide?.("clown"));
@@ -1516,11 +1526,70 @@ test("Boingo's Boss Crate bought in his Funhouse: the price line is plain words,
   await viewOnYou(page);
   await talk(page);
   const crate = page.getByRole("dialog", { name: "Boingo's Boss Crate", exact: true });
-  await expect(crate).toContainText("You have 6 Boingo tokens and 1 crate key.");
+  await expect(crate).toContainText("You have 9 Boingo tokens and 1 crate key.");
+  // The price line: plain words in the card's own color, not the Shop screen's cream price button.
+  const price = crate.locator(".shop-room-price");
+  await expect(price).toHaveText("3 Boingo tokens, or 1 Boingo token + 1 crate key");
+  await expect(crate.locator(".shop-price")).toHaveCount(0);
+  const look = await price.evaluate((el) => {
+    const s = getComputedStyle(el);
+    return { color: s.color, card: getComputedStyle(el.closest(".town-card")!).color, bg: s.backgroundColor, image: s.backgroundImage, radius: s.borderRadius, cursor: s.cursor };
+  });
+  expect(look).toEqual({ color: look.card, card: "rgb(255, 255, 255)", bg: "rgba(0, 0, 0, 0)", image: "none", radius: "0px", cursor: "default" });
+  if (SHOTS) await page.screenshot({ path: `${SHOTS}/boingo-card-${test.info().project.name}.png` });
+  const before = (await crate.boundingBox())!;
   const answer = crate.locator(".shop-msg");
-  await crate.getByRole("button", { name: "Buy with 3 Boingo tokens" }).click();
-  await expect(crate).toContainText("You have 3 Boingo tokens and 1 crate key.");
+  const got = page.getByRole("dialog", { name: "You got Boingo's Boss Crate!", exact: true });
+  const byTokens = crate.getByRole("button", { name: "Buy with 3 Boingo tokens" });
+  const byKey = crate.getByRole("button", { name: "Buy with 1 Boingo token + 1 crate key" });
+
+  // 1. With tokens: the card's row says so, in the card's white, and the pop-up: the heading, the crate's picture, Open now and Later.
+  await byTokens.click();
   await expect(answer).toHaveText("Boingo's Boss Crate is in your inventory.");
+  expect(await answer.evaluate((el) => [getComputedStyle(el).color, getComputedStyle(el).fontSize])).toEqual(["rgb(255, 255, 255)", "13px"]);
+  await expect(got).toBeVisible();
+  await expect(got.getByRole("heading")).toHaveText("You got Boingo's Boss Crate!");
+  await expect(got.locator("canvas.shop-crate-pic")).toBeVisible();
+  await expect(got.getByRole("button")).toHaveText(["Open now", "Later"]);
+  for (const b of await got.getByRole("button").all()) expect((await b.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  // (Over the card, which keeps its size and place under it.)
+  expect((await crate.boundingBox())!).toEqual(before);
+  if (SHOTS) await page.screenshot({ path: `${SHOTS}/boingo-got-${test.info().project.name}.png` });
+  // Later: the pop-up closes, the card stays open; the crate is in the inventory, unopened.
+  await got.getByRole("button", { name: "Later" }).click();
+  await expect(got).toBeHidden();
+  await expect(crate).toBeVisible();
+  await expect(crate).toContainText("You have 6 Boingo tokens and 1 crate key.");
+  expect(await held()).toBe(1);
+
+  // 2. With the key: the pop-up again; Open now opens it with the Crates tab's own opening (the strip, then the reveal), one crate fewer.
+  await byKey.click();
+  await expect(got).toBeVisible();
+  expect(await held()).toBe(2);
+  await got.getByRole("button", { name: "Open now" }).click();
+  await expect(got).toBeHidden();
+  const opening = page.locator(".shop-opening .crate-opening");
+  await expect(opening).toBeVisible();
+  await expect(opening.getByRole("heading", { level: 2 })).toHaveText("Boingo's Boss Crate");
+  await expect.poll(held, { message: "opened: one fewer held" }).toBe(1);
+  const reveal = opening.locator(".reveal-card");
+  await expect(reveal).toBeVisible({ timeout: 30_000 });
+  if (SHOTS) await page.screenshot({ path: `${SHOTS}/boingo-reveal-${test.info().project.name}.png` });
+  // Done: back in the room, the card as it was.
+  await reveal.getByRole("button", { name: "▶ Done" }).click();
+  await expect(opening).toBeHidden();
+  await expect(crate).toBeVisible();
+  await expect(crate).toContainText("You have 5 Boingo tokens and 0 crate keys.");
+  expect((await crate.boundingBox())!).toEqual(before);
+
+  // 3. Buying again still works after Open now; Escape is Later (the card stays).
+  await byTokens.click();
+  await expect(got).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(got).toBeHidden();
+  await expect(crate).toBeVisible();
+  await expect(crate).toContainText("You have 2 Boingo tokens and 0 crate keys.");
+  expect(await held()).toBe(2);
   expect(errors).toEqual([]);
 });
 
