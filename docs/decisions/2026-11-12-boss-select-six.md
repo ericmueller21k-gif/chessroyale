@@ -28,3 +28,13 @@
 - `alfil.spec.ts`, `hopper.spec.ts` stage checks: unchanged; they still hold (the floor and the in-stage checks).
 
 Eric's standing rules (docs/rules/eric.md) are untouched.
+
+## Follow-up (Nov 12, the director): the picked boss grows into the room
+
+The director compared the 428 x 746 guest still with the approved mockup: the mockup's boss is about two pawns tall and his bubble sits right under the grid. Ours was about 1.46 pawns with empty space above him.
+
+- The aim is now `STAGE_PAWN` (2) times your pawn's figure, `STAGE_PAWN_FIGURE` (45 cqi of a platform), instead of `STAGE_SCALE` (1.5) times the old size. The room above the feet still caps him, and the old size is still the floor, so nothing is smaller than before.
+- The room is `STAGE_RISE` (26 cqi, about 40 px at 156 px wide) higher, and the speech band grows by the same amount, so the bubble rides over his head. Its box and tail end above his visible top.
+- The band is used only on a window 740 px tall or more and for guests (`useMedia("(min-height: 740px)")`, and no fourth row of tiles). Admins' fourth row and 360 x 640 keep the old cap, as before.
+- Measured at 428 x 746 (guest): Jefferson and Alfil about 140 px tall (about 2 pawns); Big Boy about 140 px; the bubble's box ends about 19 px above his head and below the grid. Ginger, a shorter boss, reaches about 113 px (about 1.6 pawns). Not yet traced: the cause is open (his frame's measure or his width cap), so he's flagged for a look. Admin and 360 x 640 are unchanged.
+- The stage moves up about 40 px on the guest screen at 746 px; START does not move.

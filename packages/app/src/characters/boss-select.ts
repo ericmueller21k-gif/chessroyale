@@ -114,7 +114,20 @@ export function selectLine(id: string, last: string | null, rand: number = Math.
  * bit bigger"): the one setting for the stage's figure. Capped by the room above its feet (BossSelect's placeOnStage), so a tall
  * boss is held to the stage's height, never cut off; the in-game sizes are untouched.
  */
-export const STAGE_SCALE = 1.5;
+export const STAGE_PAWN = 2;
+
+/**
+ * Your pawn's figure on the stage, in cqi of a platform's width (about 45: its visible top to its foot, measured at 428 px wide). The
+ * picked boss's figure aims at STAGE_PAWN times this (Nov 12, Eric: "it's okay if the boss is even a little bigger than our guy").
+ */
+export const STAGE_PAWN_FIGURE = 45;
+
+/**
+ * The room the speech bubble's band gives above the platform, in cqi of a platform's width (Nov 12, the director: "he's ~1.46x the
+ * pawn... make him grow into that room"). The boss may rise into it, and the bubble rises over his head with him. Only on a window
+ * 740 px tall or more and for guests: admins' fourth row takes that room, and a short window keeps the old room cap.
+ */
+export const STAGE_RISE = 26;
 
 /**
  * Tiles to a row, on a phone and a computer alike (Eric, Oct 23: "just 5 per row, and it doesn't matter if you're on a
