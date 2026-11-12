@@ -89,4 +89,5 @@ its checks; `pieMax` under 2 can't turn the pie off; the FAQ names the castling 
 (`pieFace`) so the king attack's pie stays silent (unit check: every cue has a sound). Left for later: the e2e can pass a run without a
 freeze (nit 4), the boss-side guard is a rough check (nit 5, the dispatcher's lift is the guarantee), and in the Crowd's reveal a moving
 piece's mark shows only once its move lands (nit 7, cosmetic).
-
+The boss kit's smoke (e2e/boss-smoke.spec.ts) plays knights only, which never leaves a piece with both squares behind it empty:
+Boingo's smoke now opens 1.e4 (`SMOKE_FIRST`), every other boss's is unchanged. In real games a pawn's first move gives a target.
