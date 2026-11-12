@@ -458,6 +458,7 @@ test("Boingo's pie (?power=pie): in your piece's face, two pies on the squares d
     await submitMove(page, move, s.fen);
     await expect.poll(() => phase(page), { timeout: 20_000 }).not.toBe("play");
   }
+  if (process.env.PIE_DEBUG) console.log("pie", JSON.stringify({ thrown, froze, due }));
   expect(thrown).toBeGreaterThan(0);
   // (A freeze whenever the rule called for one: the splatted piece still standing on a target the turn after.)
   expect(froze).toBe(due > 0 ? 1 : froze);

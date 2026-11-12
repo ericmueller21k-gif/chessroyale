@@ -15087,15 +15087,15 @@ img.qicon {
 }
 @keyframes pw-lob-bit {
   from {
-    scale: 0.45;
+    scale: 0.8;
   }
   50% {
-    scale: 0.7;
+    scale: 1.15;
   }
   to {
     left: var(--fx);
     top: var(--fy);
-    scale: 0.45;
+    scale: 0.8;
   }
 }
 /* The pie in a piece's face: over the piece. */
@@ -15111,10 +15111,10 @@ img.qicon {
   width: 26%;
   height: 12%;
   border-radius: 48% 55% 50% 45%;
-  background: #fff8ef;
+  background: #fdeedb;
   box-shadow:
-    inset 0 -1.5px 0 #e6cbb6,
-    0 0 0 0.5px rgba(43, 24, 16, 0.5);
+    inset 0 -1.5px 0 #dfbb9c,
+    0 0 0 0.5px rgba(43, 24, 16, 0.55);
   pointer-events: none;
 }
 .hb piece .pw-splat-mark::after {
@@ -15125,8 +15125,8 @@ img.qicon {
   width: 20%;
   height: 85%;
   border-radius: 0 0 50% 50%;
-  background: #fff8ef;
-  box-shadow: inset 0 -1px 0 #e6cbb6;
+  background: #fdeedb;
+  box-shadow: inset 0 -1px 0 #dfbb9c;
 }
 
 /* The blizzard's sweep covers the whole board (clipped to it). */

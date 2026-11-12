@@ -66,4 +66,18 @@ turns"), and its FAQ words. `pieTurns` went from 3 to 1; `pieEvery` and `pieMax`
 
 `npx tsx packages/sim/scripts/boss-sim.ts raid clown 20 21 0 <tag>` (a raid crowd of bots against Boingo, 20 battles, seed
 21, no God King strikes), before on main and after on this branch: `reports/boss-sim/raid-bfp-before.jsonl` and
-`raid-bfp-after.jsonl`. Results in the PR body.
+`raid-bfp-after.jsonl`. The raid crowd's bots (tier 1600) against Boingo at 1500:
+
+| | Boingo wins | draws | crowd wins | Boingo's score | moves a battle | ultimates a battle |
+| --- | --- | --- | --- | --- | --- | --- |
+| before (the center pie) | 17 | 3 | 0 | 0.925 | 40.5 | 1.9 |
+| after (the face pie) | 18 | 2 | 0 | 0.950 | 44.4 | 1.9 |
+
+A shade stronger, as Eric expected, but within the noise of 20 battles: no tuning. This crowd of bots loses to him either
+way, so it can't show how much the freeze costs a real crowd; Eric's playtests will.
+
+## Tools fixed on the way
+
+`scripts/frames-boss-powers.mjs` and `frames-boss-move.mjs` stalled at the first-time walkthrough and the old Boss alone
+button: both mark the walkthrough seen (as e2e does), the powers script goes in by Boss Battle and START, and takes
+`POWER=pie`, `PHONE=428x746` and `DPR=2`.
