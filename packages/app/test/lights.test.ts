@@ -112,16 +112,19 @@ describe("Hollow's lights", () => {
     }
   });
 
-  it("colors the strip by the boss bar and the lashes on a king with the first three bulbs' colors", () => {
+  it("colors the strip under the rage meter with his strand's first six bulbs' colors, and the lashes on a king with the first three", () => {
     syncLights(battle(2024));
     const order = lightsOrder(2024);
-    const strip = EFFECTS.bulbStrand.ch;
-    const lit = strip.anims.lit3!.frames[0]!;
+    for (const strip of [EFFECTS.bulbStrand.ch, EFFECTS.bulbStrandWide.ch]) {
+      const lit = strip.anims.lit6!.frames[0]!;
+      // (The strip's bulb b is drawn in the ten bulbs' keys for b, as his strand of ten: effects/hollow.ts LIFE_KEYS.)
+      const keys = Array.from({ length: 6 }, (_, b) => [String.fromCharCode(0xc0 + 4 * b), String.fromCharCode(0xc0 + 4 * b + 1)] as const);
+      keys.forEach(([main, shade], b) => {
+        expect(coloursOf(strip, lit, main).map((p) => p.hex), `${strip.id} bulb ${b}`).toContain(bulbColour(order[b]!).glass);
+        expect(coloursOf(strip, lit, shade).map((p) => p.hex), `${strip.id} bulb ${b}`).toContain(bulbColour(order[b]!).shade);
+      });
+    }
     const keys = [["1", "4"], ["2", "5"], ["3", "6"]] as const;
-    keys.forEach(([main, shade], b) => {
-      expect(coloursOf(strip, lit, main).map((p) => p.hex)).toContain(bulbColour(order[b]!).glass);
-      expect(coloursOf(strip, lit, shade).map((p) => p.hex)).toContain(bulbColour(order[b]!).shade);
-    });
     const lash = EFFECTS.lashHit.ch;
     for (let c = 0; c < 3; c++) {
       const f = lash.anims[`hitFL${c}`]!.frames[1]!;
