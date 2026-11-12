@@ -1,3 +1,4 @@
+- Nov 12 07:00: #658 roadmap rare items MERGED (5a5f36c). Open: crate helper (running), #656 waits on review.
 - Nov 12 06:55: #657 Hollow bulbs MERGED (a1f0543). Proposed to Eric: hold Boingo pie until weekly usage resets (default hold).
 - Nov 12 06:45: Eric: low weekly usage -> queue, not start. Roadmap entry "Rare items: border + tap-to-preview" -> #658 (docs). Watcher: ci-658.
 - Nov 12 06:35: #657 Hollow bulbs opened (8dab7f9), helper archived, watcher buoub9rja, stills sent. Note to Eric: his phone speech bubble hides the strip while he talks (layout follow-up if wanted). Running Opus: crate (high). xhigh queue after crate: #656 review -> Boingo pie.
