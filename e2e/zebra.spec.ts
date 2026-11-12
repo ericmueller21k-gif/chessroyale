@@ -100,7 +100,7 @@ test.describe("Don Dough", () => {
     // Two empty slots before any dough (the rules' doughLive), taking their room from the start.
     await expect(page.locator(".dd-slot")).toHaveCount(BOSS_POWERS.doughLive);
     await expect(page.locator(".dd-slot.empty")).toHaveCount(BOSS_POWERS.doughLive);
-    // Your move; his move, then his lump of dough: a pawn's (the test switch), on his half, its timer at 04:00.
+    // Your move; his move, then his lump of dough: a pawn's (the test switch), on his half, its timer at doughTimers.p (8:00).
     await playOne(page);
     await yourMove(page);
     let z = await zebraOf(page);
@@ -117,14 +117,22 @@ test.describe("Don Dough", () => {
     await playOne(page);
     await yourMove(page);
     let s = await seen(page);
-    expect(s.left0).toEqual([BOSS_POWERS.doughTimers.p, 3, 2]);
-    expect((await zebraOf(page)).lumps.find((l) => l.n === 0)?.left).toBe(2);
-    await expect(page.locator('.dd-slot[data-slot="0"] .dd-timer')).toHaveAttribute("data-left", "2");
-    // (The roll from 04:00 and from 03:00 played: their frames drawn.)
-    expect(s.frames.some((f) => f.startsWith("pRoll04:"))).toBe(true);
-    expect(s.frames.some((f) => f.startsWith("pRoll03:"))).toBe(true);
+    const P = BOSS_POWERS.doughTimers.p;
+    const mm = (n: number) => String(n).padStart(2, "0");
+    expect(s.left0).toEqual([P, P - 1, P - 2]);
+    expect((await zebraOf(page)).lumps.find((l) => l.n === 0)?.left).toBe(P - 2);
+    await expect(page.locator('.dd-slot[data-slot="0"] .dd-timer')).toHaveAttribute("data-left", String(P - 2));
+    // (The roll from its start and from a minute under played: their frames drawn.)
+    expect(s.frames.some((f) => f.startsWith(`pRoll${mm(P)}:`))).toBe(true);
+    expect(s.frames.some((f) => f.startsWith(`pRoll${mm(P - 1)}:`))).toBe(true);
     // (The roll after his move plays to its last frame, though the bar redraws every frame while his move shows: the review's 2.)
-    expect(s.frames).toContain("pRoll03:6");
+    expect(s.frames).toContain(`pRoll${mm(P - 1)}:6`);
+    // (Down to 2: a minute off each move, yours and his.)
+    for (let left = P - 2; left > 2; left -= 2) {
+      await playOne(page);
+      await yourMove(page);
+      expect((await zebraOf(page)).lumps.find((l) => l.n === 0)?.left).toBe(left - 2);
+    }
     // 1 after yours, 0 after his: it rises into his pawn (the guards allowing), the timer's ding, the dough's rise.
     await playOne(page);
     await yourMove(page);
