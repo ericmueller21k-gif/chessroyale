@@ -498,7 +498,8 @@ build): online, phase 1 won is the crowd's victory):
   (`runner.bossStrengthNow`): up to the engine's top (`ENGINE_MAX_ELO`) for the Full Moon's whole stretch (`BossRules.fullStretch`,
   the crowd's turns between his moves too) and for a power's engine-best reply when he's to move (`bestReply`: Wrangler's reply
   to the showdown), `weakDrop` (700 Elo, 25 levels) lower for the move the King's strike weakens (`staggerNext`); gold with a small
-  arrow while up, red with a quick slash while down (color only under reduced motion); heard as "Level 99" (a screen reader's
+  arrow while up, red with a quick slash while down (color only under reduced motion), the pop or slash played once as it begins:
+  the match's screens are drawn anew at every phase, and a badge drawn again carries on from that start (`levelSince`, Nov 12); heard as "Level 99" (a screen reader's
   live region) or "Level unknown". A slip (`bossStumbles`), the bridge's Stockfish share and every scripted move leave it alone
   (the decision file lists each place his strength changes and what it does for each). Tests: `packages/core/test/boss.test.ts`,
   `packages/chess/test/moo.test.ts`, `pig.test.ts`, `recluse.test.ts`, `e2e/boss-bar.spec.ts` (every boss's bar and bubble at
