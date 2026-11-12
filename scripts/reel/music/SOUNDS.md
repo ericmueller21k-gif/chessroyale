@@ -27,6 +27,9 @@ from the liked list, keep off the other one. Eric's words are quoted; the date i
 | Bars that lose a beat, a motif seven 8ths long, five notes in two beats (a laugh), the tune turned upside down and played against itself in the drop | song_s.py (`LIMP`, `SHIFT`, `DROP_GRIT`, `DROP_PIPE`) | the same |
 | Very short high dings over a deep bass that climbs and builds; a music box that sticks on two notes | song_s.py (`ding`, `eerie`, the first calm) | his own direction for it, then the same |
 | The boss's own sounds (horn, kazoo laugh, slide whistle, a pie's splat), a few times each | song_s.py (`honk`, `laugh`, `slide`, `splat`) | the same |
+| Sleigh bells on every 8th, a tower bell, hand bells (on the lead's notes, on the hymn's tune, ringing changes in 16ths), icicles, wind; a wordless choir's hymn whose tune fits over the fast one; a round (the same line a few beats behind) | song_t.py | Nov 12, of Ginger's first go: "it's almost all the way there ... Other than that, I would say it's perfect" |
+| Ice cracking through a build | song_t.py (`crackle`, the thaw) | "the ice kind of sound you have going that makes it sound like it's like ice cracking, that's perfect" |
+| A slow intro of bells and chimes before the band | song_t.py (the first ten seconds) | "I like how it's kind of the whimsical, like kind of chimes and kind of like the bells, and that's a nice touch"; he asked for ten seconds more of it |
 | A fast pattern racing under everything | every song since song_i.py | asked for in all of them |
 | The NES's four voices | song_c.py, song_f.py | "much much better" than the 16-bit orchestra |
 
@@ -77,13 +80,19 @@ boss's world that reaches into how the song itself runs, not only its sounds.
 | Wind chimes ringing on in a calm or at a loop's end | "two chimes that hit weird ... left in the song" |
 | A heroic major-key fanfare with brass, flute and bells (song_d.py) | "way too upbeat and happy" |
 | Lots of brass (track_b.py) | "less brass, more of the other voices"; then "the 2nd song is awful" |
+| The band frozen for a beat or two in the middle of a verse (its sound held, iced over, then going on: song_t.py's first go) | "get rid of the things that sound like glitches at the beginning, because they do come off like ... something weird with it" |
 | A slow-down in the middle of a song (song_g.py) | "the slowdown didn't land, the speed up was cool tho". (A plain one. Boingo's song slows twice with the pitch sinking as it goes, the ride dying, which he asked for and called flawless.) |
 | Tunes built from the same rhythm as the last boss's: 8ths on the grid, two-bar phrases, a chord every two bars (song_r.py, second go) | "it just feels like the other ones a lot ... work up the timings a little bit. Some of the chord progression and maybe even ... be adventurous a little" |
 | A tune that runs up and down its chords, the same shape on chord after chord (song_j.py) | "very dull and boring, sounds like all the rest ... that style chord progression is slop" |
 
 ## What he asks of every theme
 
-Two minutes from the start, loop-clean, an intro of its own; a fast pattern underneath; a switch every eight bars or
+Two minutes from the start (or a little more when the intro wants it: Nov 12, "it's our game ... let's just make it a
+little bit longer than 2 minutes and it'll still loop"), loop-clean, an intro of its own; a fast pattern underneath; a switch every eight bars or
 so (he liked Big Boy's variety most); instruments layered and trading in different parts; a slower, simpler stretch
 somewhere; and where it fits, a drop. When he doesn't like a lead, send him short samples of the same tune on other
 instruments: he picks fast.
+
+Into a drop (Nov 12, Ginger's): more of the build's own sound right before it ("a little more like ice crack"), then
+"a little bit of ... pause with ... quiet, like jingling", "and then all of a sudden like the big ice shatter, and
+then it jumps back into it": a hush of a bar, one big hit from the boss's world with room to be heard, then the drop.

@@ -7,10 +7,16 @@ somewhere in the middle ... keeping it fresh, playing around, with the tempo, wi
 harmonizing ... weaving in ... each character and their special sort of attributes that make it feel like when you're
 fighting Ginger, you're in the middle of the North Pole, and there's a bunch of lights and bells".
 So: a sleigh ride into Ginger's blizzard, and his two powers run the song. Freeze: the music itself freezes (`frost`:
-whatever is sounding is held, iced over, until it cracks free): twice in the second verse, mid-bar, and once for good
-at the end of the hymn. Blizzard, his three turns: "only one piece moves" (one voice alone over the frozen band),
-"thawing" (the others crack free one a bar, each coming in with the first one's tune: a round), "thawed" (the drop).
-D minor leaning Dorian (a G major chord, the old carols' light), about 155 beats a minute; 283 beats; 120.0 s.
+whatever is sounding is held and iced over): the hymn's last chord. Blizzard, his three turns: "only one piece moves"
+(one voice alone over the frozen band), "thawing" (the others crack free one a bar, each coming in with the first
+one's tune: a round), "thawed" (the drop).
+The second go (Eric on the first: "it's almost all the way there"): the first also froze the band for a beat or two in
+the middle of the second verse; those "come off like ... something weird with it", so they're gone. Before the drop,
+as he asked: "a little more like ice crack right before it, and then ... a little bit of ... pause with ... quiet,
+like jingling ... and then all of a sudden like the big ice shatter, and then it jumps back into it". And the intro is
+ten seconds longer ("I like how it's kind of the whimsical, like kind of chimes and ... the bells ... let's just make
+it a little bit longer than 2 minutes and it'll still loop"): hand bells play the tune's first phrase slowly, first.
+D minor leaning Dorian (a G major chord, the old carols' light), about 155 beats a minute; 302 beats; about 2:10.
 The tune (recipe: SOUNDS.md): bells ringing down from A to D in a sleigh's trot rhythm, a flurry of three, a note held
 across the bar line, phrases of three bars, two and three. A chord a bar: four over a bass that never moves (D, a
 drone, galloping), then the bass climbing B flat, C, D flat (a B flat minor chord from outside the key: the cold one)
@@ -25,19 +31,23 @@ crackling, the blizzard's wind, his staff charging and its blast, a bite of ging
 Every melody, riff and chord progression here is original: none of it is any carol's, hymn's, song's or game's.
   python3 song_t.py <out.wav>
 
-  0:00  the sleigh arrives: wind, the tower bell, icicles, sleigh bells and hooves coming nearer, hand bells ringing
-        down, the bass's drone; his staff charges and fires
-  0:07  Ginger's tune (eight bars): the lead with a hand bell on every note
-  0:19  the second verse: the fiddle and the lead take turns, then play together; the band freezes twice
-  0:32  the round, faster: the lead's line, the fiddle three beats behind with the same one
-  0:44  the hymn (the first calm): the choir, hand bells on its tune, snow, far sleigh bells
-  0:58  the Blizzard, frozen: the hymn's last chord iced solid; one voice moves, low
-  1:01  thawing: the others crack free, one a bar, with the same tune; the kit comes back to life
-  1:08  thawed (the drop): the lead and the gritty synth, an 808, a wobble bass, the choir
-  1:20  the gallop, the fastest: the round in three voices, sleigh bells on every 16th
-  1:30  icicles (the second calm): the fiddle has the hymn, icicles answer, the choir hums
-  1:42  the tune again with the hymn sung over it
-  1:54  the tag: two bars of light, the cold chord, the tower bell; the sleigh goes off into the wind
+  0:00  the North Pole at night: wind, the tower bell, hand bells playing the tune's first phrase slowly, icicles,
+        the choir humming, a far sleigh bell or two
+  0:10  the sleigh arrives: sleigh bells and hooves coming nearer, hand bells ringing down, the bass's drone; his
+        staff charges and fires
+  0:16  Ginger's tune (eight bars): the lead with a hand bell on every note
+  0:29  the second verse: the fiddle and the lead take turns, then play together
+  0:41  the round, faster: the lead's line, the fiddle three beats behind with the same one
+  0:53  the hymn (the first calm): the choir, hand bells on its tune, snow, far sleigh bells
+  1:07  the Blizzard, frozen: the hymn's last chord iced solid; one voice moves, low
+  1:10  thawing: the others crack free, one a bar, with the same tune; the kit comes back to life; more and more ice
+        cracking; his staff fires
+  1:16  a hush: far sleigh bells, the ice creaking; then it shatters
+  1:19  thawed (the drop): the lead and the gritty synth, an 808, a wobble bass, the choir
+  1:31  the gallop, the fastest: the round in three voices, sleigh bells on every 16th
+  1:41  icicles (the second calm): the fiddle has the hymn, icicles answer, the choir hums
+  1:53  the tune again with the hymn sung over it
+  2:05  the tag: two bars of light, the cold chord, the tower bell; the sleigh goes off into the wind
 """
 import sys
 
@@ -46,27 +56,28 @@ import numpy as np
 from song_r import beats, notes
 from synth import SR, Ride, n, write_wav
 
-BEATS = 283
-SECS = 120.0
-# The sleigh's pace: from beat, to beat, the tempo there (from, to). All scaled alike so the song is SECS long.
+BEATS = 302
+# The sleigh's pace: from beat, to beat, the tempo there (from, to).
 PACE = [
-    (0, 16, 140, 152),  # it arrives
-    (16, 48, 152, 152),
-    (48, 83, 152, 156),
-    (83, 115, 164, 164),  # the round
-    (115, 131, 68, 68),  # the hymn
-    (131, 139, 140, 140),  # frozen
-    (139, 155, 140, 156),  # thawing
-    (155, 187, 156, 156),  # thawed
-    (187, 219, 180, 180),  # the gallop
-    (219, 231, 72, 72),  # icicles
-    (231, 235, 110, 160),
-    (235, 275, 160, 160),
-    (275, 283, 160, 110),  # it leaves
+    (0, 16, 96, 96),  # the North Pole at night
+    (16, 32, 142.3, 154.5),  # the sleigh arrives
+    (32, 64, 154.5, 154.5),
+    (64, 96, 154.5, 158.6),
+    (96, 128, 166.7, 166.7),  # the round
+    (128, 144, 69.1, 69.1),  # the hymn
+    (144, 152, 142.3, 142.3),  # frozen
+    (152, 168, 142.3, 158.6),  # thawing
+    (168, 174, 158.6, 158.6),  # the hush, and the ice shatters
+    (174, 206, 158.6, 158.6),  # thawed
+    (206, 238, 182.9, 182.9),  # the gallop
+    (238, 250, 73.2, 73.2),  # icicles
+    (250, 254, 111.8, 162.6),
+    (254, 294, 162.6, 162.6),
+    (294, 302, 162.6, 111.8),  # it leaves
 ]
-T_TUNE, T_VERSE, T_ROUND, T_HYMN, T_ICE, T_THAW, T_DROP, T_RUN, T_CALM2, T_LAST, T_TAG = 16, 48, 83, 115, 131, 139, 155, 187, 219, 235, 267
-# The second verse's frozen beats: before which beat of the verse, and how many.
-GAPS = ((12, 1), (21, 2))
+# How long that is (Eric, Nov 12: a little over two minutes is fine; it still loops).
+SECS = round(float(sum(60 * (b - a) / t0 if t0 == t1 else 60 * (b - a) * np.log(t1 / t0) / (t1 - t0) for a, b, t0, t1 in PACE)), 2)
+T_ARRIVE, T_TUNE, T_VERSE, T_ROUND, T_HYMN, T_ICE, T_THAW, T_HUSH, T_DROP, T_RUN, T_CALM2, T_LAST, T_TAG = 16, 32, 64, 96, 128, 144, 152, 168, 174, 206, 238, 254, 286
 
 # Each chord: the bass note; the strings' and the choir's three; the hand bells' six (low to high; A in all but one).
 RING = {
@@ -184,22 +195,6 @@ def main(out: str) -> None:
     def ring(ch):
         root, three, six = RING[ch]
         return n(root), [n(c) for c in three.split()], [n(c) for c in six.split()]
-
-    # ---- the second verse's clock: its beats, with the frozen ones cut in ----
-    def v(b):
-        return T_VERSE + b + sum(g for where, g in GAPS if b >= where - 1e-9)
-
-    def verse(text):
-        """A line of the verse: [(beat, beats, note)], a note the ice interrupts cut in two (it stops, then goes on)."""
-        line = []
-        for b, d, m in notes(0, text):
-            start = b
-            for where, _ in GAPS:
-                if start < where - 1e-9 < b + d - 1e-9:
-                    line.append((v(start), where - start, m))
-                    start = where
-            line.append((v(start), b + d - start, m))
-        return line
 
     def follow(start, text, behind, until):
         """A round's later voice: the same line `behind` beats late, stopping at beat `until` of the section."""
@@ -381,11 +376,17 @@ def main(out: str) -> None:
         put("ice", b, (1.1 * w + 0.1 * np.exp(-t / 0.14) * glass) * tail(k) * vol, rng.uniform(-0.4, 0.4))
 
     def shatter(b, vol=0.1):
-        """Ice breaking: a burst and a scatter of glass."""
-        for _ in range(18):
-            icicle(b, rng.integers(88, 106), vol * rng.uniform(0.4, 1.0), rng.uniform(-0.8, 0.8), 0.07, late=rng.uniform(0, 0.22))
-        k = int(0.3 * sr)
-        put("ice", b, hiss(k, 9000, 0.6) * np.exp(-np.arange(k) / sr / 0.05) * tail(k) * vol * 1.5)
+        """A sheet of ice shattering: the crack as it gives way (a thud you feel under a sharp snap), a burst, and
+        glass flying: most of it at once, the rest falling for most of a second."""
+        k = int(0.35 * sr)
+        t = np.arange(k) / sr
+        crack = np.sin(tau * np.cumsum(60 + 140 * np.exp(-t / 0.02)) / sr) * np.exp(-t / 0.09) + 0.8 * hiss(k, 14000, 0.3) * np.exp(-t / 0.006)
+        put("fx", b, crack * tail(k) * vol * 5)
+        k = int(0.6 * sr)
+        put("ice", b, hiss(k, 9000, 0.6) * np.exp(-np.arange(k) / sr / 0.09) * tail(k) * vol * 2.5)
+        for _ in range(70):
+            late = rng.uniform(0, 1) ** 2 * 0.75
+            icicle(b, rng.integers(86, 108), vol * rng.uniform(0.4, 1.0) * (1 - 0.6 * late / 0.75), rng.uniform(-0.9, 0.9), rng.uniform(0.05, 0.14), late=late)
 
     def drip(b, m, vol=0.05, pan=0.0):
         """Meltwater: a drop, its pitch flicking up."""
@@ -546,30 +547,53 @@ def main(out: str) -> None:
         for i in range(16):
             hat(b + i * 0.25, 0.03 if i % 4 == 2 else 0.018)
 
-    # 0:00 The sleigh arrives. Wind; the tower bell; icicles; sleigh bells and hooves coming nearer from the left;
-    # six hand bells ringing down, twice, then the changes; the bass's drone; his staff charges, and fires.
-    wind(0, 13, 0.12), wind(5, 11, 0.07, 0.4)
-    bell(0, n("D3"), 2.2, 0.13, dark=1.0), bell(8, n("D3"), 2.2, 0.1, dark=1.0)
-    tinkle(1, 7, "Dm", 0.9)
-    for i in range(28):
-        jingle(2 + i * 0.5, (0.06 + 0.44 * (i / 27) ** 1.5) * (1.0 if i % 2 == 0 else 0.65), -0.7 + 0.95 * i / 27)
-    for i in range(12):
-        hoof(4 + i, 0.05 + 0.006 * i, -0.6 + 0.04 * i), hoof(4 + i + 0.75, 0.035 + 0.005 * i, -0.6 + 0.04 * i)
-    six = ring("Dm")[2]
-    for i in range(12):
-        bell(8 + i * 0.5, six[5 - i % 6], 0.14, 0.035 + 0.002 * i, 0.5 * np.sin(i * 1.7), bus="peal")
-    peal(14, "Dm", 2, 0.9)
-    at(8, 8)
-    for j, m in enumerate(ring("Dm")[1]):
-        put("pad", 8, x.swell(x.strings(m + 12, 8, 0.05, attack=0.5, release=0.3), 0.9), PANS[j])
-    for i in range(8):
-        bass(8 + i, n("D2"), 0.46, 0.16 + 0.03 * i), bass(8.5 + i, n("D3"), 0.23, 0.1 + 0.025 * i), bass(8.75 + i, n("D3"), 0.23, 0.1 + 0.025 * i)
-    charge(10.5, 4.2, 0.1)
-    kick(12, 0.4), kick(13, 0.42), kick(14, 0.45), kick(15, 0.5)
-    roll(14, 2, 0.06, 0.22)
-    blast(14.75, 0.2)
+    # 0:00 The North Pole at night (the second go's ten seconds more): wind; the tower bell, twice; hand bells play
+    # the tune's first phrase, slowly, an icicle over each long note; the choir hums the chords; snow; icicles; now
+    # and then a sleigh bell, far off to the left.
+    wind(0, 9, 0.1, -0.2), wind(7, 10, 0.08, 0.3)
+    bell(0, n("D3"), 2.2, 0.13, dark=1.0), bell(8, n("D3"), 2.2, 0.09, dark=1.0)
+    for b, d, m in notes(0, "|".join(TUNE.split("|")[:4])):
+        bell(b, m, 0.7, 0.085, 0.3 * np.sin(b))
+        if d >= 1:
+            icicle(b, m + 12, 0.03, -0.3, 0.25)
+    for i, ch in enumerate(TUNE_CH[:4]):
+        chorus(4 * i, 4, ch, 0.045, 0.1)
+        bass(4 * i, n("D3"), 3.8, 0.16)
+        pad(4 * i, 4, ch, 0.03, slow=True)
+        if i % 2:
+            flurry(4 * i + 3, ch, 0.03)
+    tinkle(0, 16, "Dm", 0.5, 0.03)
+    for b, loud in ((9, 0.14), (9.5, 0.09), (12, 0.16), (12.5, 0.1), (14, 0.18), (14.5, 0.12), (15, 0.18), (15.5, 0.12)):
+        jingle(b, loud, -0.7)
 
-    # 0:07 Ginger's tune: eight bars, the bass on its drone for four, then climbing.
+    # 0:10 The sleigh arrives. Wind; the tower bell; icicles; sleigh bells and hooves coming nearer from the left;
+    # six hand bells ringing down (a beat each, then twice in 8ths, then the changes in 16ths); the bass's drone; his
+    # staff charges, and fires.
+    a = T_ARRIVE
+    wind(a, 13, 0.12), wind(a + 5, 11, 0.07, 0.4)
+    bell(a, n("D3"), 2.2, 0.12, dark=1.0)
+    tinkle(a + 1, 7, "Dm", 0.9)
+    for i in range(28):
+        jingle(a + 2 + i * 0.5, (0.08 + 0.42 * (i / 27) ** 1.5) * (1.0 if i % 2 == 0 else 0.65), -0.7 + 0.95 * i / 27)
+    for i in range(12):
+        hoof(a + 4 + i, 0.05 + 0.006 * i, -0.6 + 0.04 * i), hoof(a + 4 + i + 0.75, 0.035 + 0.005 * i, -0.6 + 0.04 * i)
+    six = ring("Dm")[2]
+    for i in range(6):
+        bell(a + 2 + i, six[5 - i], 0.3, 0.05, 0.5 * np.sin(i * 1.7), bus="peal")
+    for i in range(12):
+        bell(a + 8 + i * 0.5, six[5 - i % 6], 0.14, 0.035 + 0.002 * i, 0.5 * np.sin(i * 1.7), bus="peal")
+    peal(a + 14, "Dm", 2, 0.9)
+    at(a + 8, 8)
+    for j, m in enumerate(ring("Dm")[1]):
+        put("pad", a + 8, x.swell(x.strings(m + 12, 8, 0.05, attack=0.5, release=0.3), 0.9), PANS[j])
+    for i in range(8):
+        bass(a + 8 + i, n("D2"), 0.46, 0.16 + 0.03 * i), bass(a + 8.5 + i, n("D3"), 0.23, 0.1 + 0.025 * i), bass(a + 8.75 + i, n("D3"), 0.23, 0.1 + 0.025 * i)
+    charge(a + 10.5, 4.2, 0.1)
+    kick(a + 12, 0.4), kick(a + 13, 0.42), kick(a + 14, 0.45), kick(a + 15, 0.5)
+    roll(a + 14, 2, 0.06, 0.22)
+    blast(a + 14.75, 0.2)
+
+    # 0:16 Ginger's tune: eight bars, the bass on its drone for four, then climbing.
     x.crash(T_TUNE, 0.14, decay=0.5), burst(T_TUNE, 0.14)
     belled(notes(T_TUNE, TUNE))
     for i, ch in enumerate(TUNE_CH):
@@ -578,28 +602,15 @@ def main(out: str) -> None:
         if i in (1, 5):
             flurry(T_TUNE + 4 * i + 3, ch)
 
-    # 0:19 The second verse: the fiddle and the lead take the tune in turns, and together for its last two bars. The
-    # band freezes twice (a beat, then two): the ice crackles over, icicles ring, and it cracks free.
-    fiddle(verse(V_FIDDLE))
-    belled(verse(V_LEAD))
+    # 0:29 The second verse: the fiddle and the lead take the tune in turns, and together for its last two bars.
+    fiddle(notes(T_VERSE, V_FIDDLE))
+    belled(notes(T_VERSE, V_LEAD))
     for i, ch in enumerate(TUNE_CH):
         for beat in range(4):
-            trot(v(4 * i + beat), beat, i, ch, fill=i in (3, 7), glints=0.3, strings=0)
-    for i, ch in enumerate(TUNE_CH):
-        start = 4 * i
-        for where, _ in GAPS:
-            if start < where < start + 4:
-                pad(v(start), where - start, ch)
-                start = where
-        pad(v(start), 4 * i + 4 - start, ch)
-    freezes = [(v(where) - g, g) for where, g in GAPS]
-    for g, d in freezes:
-        crackle(g, 0.22, 0.3 * d, 10 * d)
-        tinkle(g, d, "Dm", 3.0, 0.05)
-        burst(g + d, 0.16)
+            trot(T_VERSE + 4 * i + beat, beat, i, ch, fill=i in (3, 7), glints=0.3)
     x.crash(T_VERSE, 0.12, decay=0.4)
 
-    # 0:32 The round, faster: the lead's line on five notes; the fiddle plays the same line three beats behind; for
+    # 0:41 The round, faster: the lead's line on five notes; the fiddle plays the same line three beats behind; for
     # the cold chord and home they play together, a third apart.
     x.crash(T_ROUND, 0.16, decay=0.5)
     belled(notes(T_ROUND, ROUND + " | " + ROUND_END[0]))
@@ -610,7 +621,7 @@ def main(out: str) -> None:
         if i in (1, 5):
             flurry(T_ROUND + 4 * i + 3, ch)
 
-    # 0:44 The hymn, the first calm: the choir, two beats a chord, over a soft bass and strings; the tower bell; a
+    # 0:53 The hymn, the first calm: the choir, two beats a chord, over a soft bass and strings; the tower bell; a
     # hand bell on each chord; snow falling (quick runs of icicles); far sleigh bells; wind.
     bell(T_HYMN, n("D3"), 2.2, 0.14, dark=1.0)
     wind(T_HYMN, 9, 0.05, -0.3), wind(T_HYMN + 7, 9, 0.06, 0.3)
@@ -628,7 +639,7 @@ def main(out: str) -> None:
         jingle(T_HYMN + i * 0.5, 0.16 if i % 2 == 0 else 0.1, 0.6)
     tinkle(T_HYMN, 16, "Dm", 0.6, 0.03)
 
-    # 0:58 The Blizzard. Turn one, frozen: the hymn's last chord iced solid (see `frost`, below); a boom, the wind, ice
+    # 1:07 The Blizzard. Turn one, frozen: the hymn's last chord iced solid (see `frost`, below); a boom, the wind, ice
     # crackling; "only one piece moves": the gritty synth, alone and low.
     boom(T_ICE, 0.8)
     crackle(T_ICE, 0.25, 0.9, 30)
@@ -637,8 +648,9 @@ def main(out: str) -> None:
     grit(notes(T_ICE, LONE))
     tinkle(T_ICE, 8, "A", 1.0, 0.04)
 
-    # 1:01 Turn two, thawing: the others crack free one a bar, each with the lone one's two bars (the hand bells, then
-    # the fiddle, then the lead, running up), over an 808 and a kick that come to life; meltwater dripping; his staff.
+    # 1:10 Turn two, thawing: the others crack free one a bar, each with the lone one's two bars (the hand bells, then
+    # the fiddle, then the lead, running up), over an 808 and a kick that come to life; meltwater dripping; the ice
+    # cracking more with every bar, on every beat of the last; his staff charges, and fires.
     grit(notes(T_THAW, THAW_GRIT))
     for b, d, m in notes(T_THAW, THAW_BELL):
         bell(b, m, 0.45, 0.1, -0.3)
@@ -646,7 +658,11 @@ def main(out: str) -> None:
     belled(notes(T_THAW, THAW_LEAD), struck=False)
     for i in range(4):
         b = T_THAW + 4 * i
-        crackle(b, 0.16, 0.25, 8)
+        crackle(b, 0.16 + 0.04 * i, 0.25, 8 + 2 * i)
+        if i >= 2:
+            crackle(b + 2, 0.2 + 0.04 * i, 0.25, 10)
+        if i == 3:
+            crackle(b + 1, 0.3, 0.2, 10), crackle(b + 3, 0.36, 0.3, 16)
         kick(b, 0.55), sub(b, n("A1"), 3.5, 0.4), clap(b + 2, 0.18), snare(b + 2, 0.16)
         for j in range(3 + 2 * i):
             drip(b + rng.integers(0, 16) * 0.25, 84 - 2 * j - 3 * i, 0.05, rng.uniform(-0.6, 0.6))
@@ -661,12 +677,22 @@ def main(out: str) -> None:
         if i == 3:
             kick(b + 1, 0.5), kick(b + 3, 0.5)
             roll(b, 4, 0.05, 0.24)
-    charge(T_DROP - 4.5, 4.2, 0.1)
-    blast(T_DROP - 1.25, 0.2)
+    charge(T_HUSH - 4.5, 4.2, 0.1)
+    blast(T_HUSH - 1.25, 0.2)
 
-    # 1:08 Turn three, thawed: the drop. The lead has the tune's first bar and a climb; the gritty synth answers in
+    # 1:16 The hush (Eric, Nov 12): the band stops where the blast lands. Four beats of far sleigh bells and wind,
+    # the ice creaking, louder each time; then, all at once, it shatters, and the glass is still falling as the drop
+    # comes in.
+    burst(T_HUSH, 0.2)
+    wind(T_HUSH - 1, 7, 0.12, 0.3)
+    for i in range(8):
+        jingle(T_HUSH + i * 0.5, 0.5 if i % 2 == 0 else 0.32, 0.5)
+    crackle(T_HUSH + 0.75, 0.16, 0.15, 4), crackle(T_HUSH + 2, 0.22, 0.2, 7), crackle(T_HUSH + 3.25, 0.3, 0.25, 12)
+    shatter(T_HUSH + 4, 0.18)
+
+    # 1:19 Turn three, thawed: the drop. The lead has the tune's first bar and a climb; the gritty synth answers in
     # the cold chord; then four bars together, an octave apart. The choir on each new chord; a stutter after each turn.
-    boom(T_DROP, 0.8), x.crash(T_DROP, 0.2, decay=0.6), shatter(T_DROP)
+    boom(T_DROP, 0.8), x.crash(T_DROP, 0.2, decay=0.6)
     belled(notes(T_DROP, DROP_LEAD))
     grit(notes(T_DROP, DROP_GRIT))
     for i, ch in enumerate(DROP_CH):
@@ -680,7 +706,7 @@ def main(out: str) -> None:
         stutter(T_DROP + b, n(m), count)
     toms(T_RUN - 1, (50, 50, 45, 40))
 
-    # 1:20 The gallop, the fastest: the round again, now three voices (the lead; the fiddle three beats behind; a
+    # 1:31 The gallop, the fastest: the round again, now three voices (the lead; the fiddle three beats behind; a
     # square six behind), a kick on every beat, sleigh bells on every 16th; a whip to start it.
     whip(T_RUN - 0.4)
     x.crash(T_RUN, 0.18, decay=0.5)
@@ -693,7 +719,7 @@ def main(out: str) -> None:
         if i == 4:
             x.crash(T_RUN + 16, 0.12, decay=0.4)
 
-    # 1:30 Icicles, the second calm: the fiddle has the hymn, slowly; icicles answer with bits of the tune; the choir
+    # 1:41 Icicles, the second calm: the fiddle has the hymn, slowly; icicles answer with bits of the tune; the choir
     # hums under it; the tower bell, far sleigh bells, wind. Its last two chords quicken: his staff charges, and fires.
     bell(T_CALM2, n("D3"), 2.2, 0.12, dark=1.0)
     wind(T_CALM2, 10, 0.06, 0.3), wind(T_CALM2 + 7, 9, 0.07, -0.3)
@@ -715,7 +741,7 @@ def main(out: str) -> None:
     roll(T_LAST - 2, 2, 0.06, 0.24)
     blast(T_LAST - 1.1, 0.2)
 
-    # 1:42 The tune again, and the hymn over it: the choir sings its line, each note twice as long, above the band;
+    # 1:53 The tune again, and the hymn over it: the choir sings its line, each note twice as long, above the band;
     # the fiddle joins under the lead for the last four bars.
     x.crash(T_LAST, 0.18, decay=0.5), burst(T_LAST, 0.14)
     belled(notes(T_LAST, TUNE))
@@ -733,7 +759,7 @@ def main(out: str) -> None:
         if i == 4:
             x.crash(T_LAST + 16, 0.12, decay=0.4)
 
-    # 1:54 The tag: two bars of light (D major: the lead's call, then eight hand bells ringing down the scale), the
+    # 2:05 The tag: two bars of light (D major: the lead's call, then eight hand bells ringing down the scale), the
     # cold chord, and A; the tower bell, and the sleigh goes off to the right into the wind that bar 1 begins with.
     x.crash(T_TAG, 0.16, decay=0.5)
     belled(notes(T_TAG, TAG))
@@ -758,11 +784,11 @@ def main(out: str) -> None:
     tinkle(T_TAG + 8, 8, "A", 0.6, 0.035)
     wind(T_TAG + 8, 8, 0.1)
 
-    def frost(b, length, hold=None, vol=1.0, back=0.0, sources=("lead", "fiddle", "bells", "peal", "pad", "choir", "bass", "square", "grit")):
-        """Freeze: the band's sound at beat `b`, held for `length` beats. The last third of a second before `b` is
+    def frost(b, length, hold, vol=1.0, back=0.0, sources=("choir", "pad", "bass", "bells")):
+        """Freeze: those voices' sound at beat `b`, held for `length` beats. The last third of a second before `b` is
         measured (how loud each pitch in it is) and played on and on with its timing scrambled, so it stands still;
-        as it stays it ices over (its lows thin, its highs glint). `hold`: after that many beats it melts away to
-        nothing by the end; without it, it stops dead at the end (it cracks). `back`: measure that many beats early."""
+        as it stays it ices over (its lows thin, its highs glint). After `hold` beats it melts away, to nothing by
+        the end. `back`: measure that many beats early."""
         size = 16384
         hop = size // 4
         i0 = int(round(x.t(b) * sr))
@@ -782,20 +808,14 @@ def main(out: str) -> None:
         ice = ice[:, size // 2 : size // 2 + total]
         ice *= vol * level / (np.sqrt(np.mean(ice**2)) + 1e-9)
         t = np.arange(total) / sr
-        shape = np.minimum(1, t / 0.02)
-        if hold is None:
-            shape *= np.minimum(1, (total - 1 - np.arange(total)) / (0.012 * sr))
-        else:
-            melt = int(round((x.t(b + hold) - x.t(b)) * sr))
-            shape *= np.clip((total - np.arange(total)) / (total - melt), 0, 1)
+        melt = int(round((x.t(b + hold) - x.t(b)) * sr))
+        shape = np.minimum(1, t / 0.02) * np.clip((total - np.arange(total)) / (total - melt), 0, 1)
         idx = (i0 + np.arange(total)) % x.N
         x.bus("frost")[:, idx] += ice * shape
 
-    # The freezes, now that everything they hold is in place: the verse's two, and the hymn's last chord, which stays
-    # frozen under the lone voice (eight beats) and melts away through the thaw.
-    for g, d in freezes:
-        frost(g, d)
-    frost(T_ICE, 24, hold=8, vol=0.8, back=0.3, sources=("choir", "pad", "bass", "bells"))
+    # The freeze, now that what it holds is in place: the hymn's last chord, frozen under the lone voice (eight beats)
+    # and melting away through the thaw.
+    frost(T_ICE, 24, hold=8, vol=0.8, back=0.3)
 
     # The bass, the strings, the choir and (lightly) the hand bells duck under each kick.
     marks = x.buses.pop("duck")[0]
