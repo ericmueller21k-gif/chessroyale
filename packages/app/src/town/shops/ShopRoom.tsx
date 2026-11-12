@@ -553,11 +553,11 @@ export function ShopRoom({ room, youArt, youRider, youName, onZoom, onOut, onRea
         )}
       </div>
       {got && !opening && (
-        <div class="shop-got-veil">
-          <div class="town-card shop-got" role="dialog" aria-label={gotLine(got.name)}>
+        <div class="shop-bought-veil">
+          <div class="town-card shop-bought" role="dialog" aria-label={gotLine(got.name)}>
             <h2>{gotLine(got.name)}</h2>
             <CratePic frames={room.frames["crate"]!} />
-            <p class="shop-got-line">It's in your inventory.</p>
+            <p class="shop-bought-line">It's in your inventory.</p>
             <button
               type="button"
               class="town-btn primary"
@@ -578,7 +578,7 @@ export function ShopRoom({ room, youArt, youRider, youName, onZoom, onOut, onRea
         </div>
       )}
       {got && opening && (
-        <div class="shop-got-veil shop-opening-veil">
+        <div class="shop-bought-veil shop-opening-veil">
           <div class="shop-opening crates" role="dialog" aria-label={got.name}>
             <CrateOpening crate={got} force={{}} onClose={later} />
           </div>

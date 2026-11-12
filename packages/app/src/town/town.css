@@ -679,7 +679,7 @@ button.town-pic.player {
  * the crate's picture, Open now and Later. Open now: the Crates tab's own opening (CrateOpening), in a box over the room, the app's
  * light or dark surface. Phone first: the pop-up 260 px, its buttons the card's 40 px ones.
  */
-.shop-got-veil {
+.shop-bought-veil {
   position: absolute;
   inset: 0;
   z-index: 9;
@@ -690,25 +690,26 @@ button.town-pic.player {
   pointer-events: auto;
   touch-action: none;
 }
-.town-card.shop-got {
+.town-card.shop-bought {
   position: relative;
   width: 260px;
   max-width: 100%;
   padding: 14px 16px 16px;
 }
-.town-card.shop-got::after {
+.town-card.shop-bought::after {
   display: none;
 }
-.shop-got .shop-crate-pic {
+.shop-bought .shop-crate-pic {
   display: block;
   margin: 0 auto;
 }
-.shop-got-line {
+.shop-bought-line {
   margin: 6px 0 4px;
+  text-align: center;
   font: 500 12px/1.35 Archivo, sans-serif;
   color: #d6d8df;
 }
-.shop-got .town-btn {
+.shop-bought .town-btn {
   min-height: 44px;
   margin-top: 8px;
 }

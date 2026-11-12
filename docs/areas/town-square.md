@@ -721,8 +721,15 @@ and [2026-11-02-bigger-showpieces.md](../decisions/2026-11-02-bigger-showpieces.
   and 1 crate key."**: `bossHoldings`, your locker's, drawn again whenever your account changes) and two buttons, **"Buy with 3 Babur
   tokens"** and **"Buy with 1 Babur token + 1 crate key"**, each greyed while you can't pay that way (`canAfford`), both through
   `buyBossCrate(boss, way)`: the server's purchase (round 2), into your inventory, unopened (Eric, Nov 2; the Crates tab opens it:
-  [shop.md](shop.md), "Boss crates you hold"). Its answer shows in a row under them that's always there, 40 px high: **"Babur's Boss Crate
-  is in your inventory."**, or the server's reason (**"You need 3 Babur tokens."**).
+  [shop.md](shop.md), "Boss crates you hold"). Its answer shows in a row under them that's always there, 40 px high, in the card's white
+  at 13 px (Nov 12: it was the 11 px gray "Coming soon" style, and Eric missed it): **"Babur's Boss Crate is in your inventory."**, or the
+  server's reason (**"You need 3 Babur tokens."**). The price line is its own class, `.shop-room-price` (Nov 12: it shared `.shop-price`
+  with the Shop screen's cream price button, which won). **After a buy** (either way; Eric, Nov 12) a pop-up over the room and the card
+  (dimmed under it, never moved): **"You got Babur's Boss Crate!"** (`gotLine`), the crate's picture, "It's in your inventory.",
+  **Open now** and **Later** (44 px). Open now opens it with the Crates tab's own `CrateOpening` (the strip, the reveal; the same route and
+  odds), in a box over the room in the app's light or dark surface; its Done (or Later, or Escape) closes it and leaves the card as it was.
+  A failed buy: the row says why, no pop-up. e2e `shop.spec.ts`, "Boingo's Boss Crate bought in his Funhouse";
+  docs/decisions/2026-11-12-boss-crate-bought.md.
 - **The chat log inside** (Eric, Nov 2: "make the default text color white, or black, depending on darkness of background in the shop"):
   the town's chat box over the room takes the room's tone, not the sky's (`ShopDef.chatTone`: TownChat's `data-tone`): Babur's dark tent
   `night` (white words on a dark tint), Puddles' light greenhouse `day` (dark words on a light tint), whatever the time outside.

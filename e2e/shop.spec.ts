@@ -1498,7 +1498,7 @@ test("Boingo's Boss Crate bought in his Funhouse: the price line is plain words,
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(String(e)));
   // (The stills at Eric's phone size, 428 x 746.)
-  if (SHOTS) await page.setViewportSize({ width: 428, height: 746 });
+  if (SHOTS && test.info().project.name === "phone") await page.setViewportSize({ width: 428, height: 746 });
   await asServerAdmin(page);
   await page.goto("/town?sky=day");
   await townReady(page);
