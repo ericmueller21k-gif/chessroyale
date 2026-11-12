@@ -178,9 +178,10 @@ assert beats(CHILD) == 32
 assert (T_FLAG, T_MEMORY, T_CHANT2, T_LAST, BEATS, len(SWEEP)) == (138, 268, 334, 519, 591, 30)
 
 
-def main(out: str, tune: str = "harp", window=None) -> None:
-    """`tune`: what plays the memory's tune ("harp": the harp, the choir as children joining it; or one of `soft`'s
-    voices alone). `window`: (from beat, to beat), to make only that passage (a sample)."""
+def main(out: str, tune: str = "ocarina", roll: str = "harp", window=None) -> None:
+    """`tune`: what plays the memory's tune: one of `soft`'s voices (Eric, Nov 12, of six tried: "the ocarina sounds
+    real nice"), or "harp": the harp with the choir as children joining it, as it first was. `roll`: what rolls the
+    chords under it: "harp", or one of `rolled`'s. `window`: (from beat, to beat), to make only that passage."""
     x = Ride(PLAN, BEATS, None, os=2, seed=227, tape_secs=TAPE)
     x.window = window
     put, at = x.put, x.at
@@ -591,6 +592,43 @@ def main(out: str, tune: str = "harp", window=None) -> None:
         breath = np.convolve(hiss(k, 9000, 0.6), np.ones(8) / 8, "same") * (air + puff * np.exp(-t / 0.05)) * vol / 0.1
         put("tune", b, w + breath * np.minimum(1, t / 0.02) * tail(k, 0.1), pan)
 
+    def rolled(b, m, kind, vol=0.08, pan=0.0):
+        """One note of the chords rolling under the memory's tune, on an instrument other than the harp, for Eric to
+        choose from: a soft piano (felt on the hammers), a music box, a marimba played with soft mallets, a
+        vibraphone (its ring wavering), or the small organ's flutes."""
+        if kind == "organ":
+            at(b, 0.5)
+            put("harp", b, x.tone(m + 12, 0.46, [1, 0.45, 0.12, 0.2, 0.04, 0.06], vol * 0.55, detune=(-3, 3), attack=0.03, release=0.12), pan)
+            return
+        key = (kind, m)
+        if key not in plucks:
+            k = int(2.5 * sr)
+            t = np.arange(k) / sr
+            if kind == "piano":
+                f0 = x.hz(m)
+                h = np.arange(1, max(2, int(3500 / f0) + 1))
+                loud = (1 + 0.5 * np.exp(-(((h * f0 - 450) / 300) ** 2))) / h**1.7
+                w = np.zeros(k)
+                for cents in (-1.2, 1.2):
+                    f = f0 * 2 ** (cents / 1200)
+                    w += (loud[:, None] * np.sin(np.outer(h * np.sqrt(1 + 0.0004 * h * h), tau * f * t) + h[:, None]) * np.exp(-np.outer(1 + 0.3 * h, t) / (1.1 * (262 / f0) ** 0.35))).sum(axis=0)
+                w = w / (np.max(np.abs(w)) + 1e-9) + 0.25 * paper(k, 700) * np.exp(-t / 0.006)
+                rise = 0.004
+            elif kind == "musicbox":
+                f0 = x.hz(m + 12)
+                w = np.sin(tau * f0 * t + 1.2 * np.exp(-t / 0.25) * np.sin(tau * 3.5 * f0 * t)) * np.exp(-t / 0.5)
+                rise = 0.001
+            else:  # a bar struck with a soft mallet: the note and the overtones a bar has (two octaves up, and higher)
+                f0 = x.hz(m + (12 if kind == "vibes" else 0))
+                ring = 1.6 if kind == "vibes" else 0.45 * (262 / f0) ** 0.3
+                w = np.sin(tau * f0 * t) * np.exp(-t / ring) + 0.22 * np.sin(tau * 4 * f0 * t) * np.exp(-t / (ring * 0.35)) + 0.05 * np.sin(tau * 10 * f0 * t) * np.exp(-t / (ring * 0.1))
+                if kind == "vibes":
+                    w *= 1 - 0.3 * (0.5 + 0.5 * np.sin(tau * 4.5 * t))
+                w += 0.2 * paper(k, 500) * np.exp(-t / 0.008)
+                rise = 0.003
+            plucks[key] = w / (np.max(np.abs(w)) + 1e-9) * np.minimum(1, t / rise) * tail(k, 0.05)
+        put("harp", b, plucks[key] * vol * {"vibes": 0.7, "musicbox": 0.85}.get(kind, 1.0), pan)  # the long ringers a little down
+
     def organ(b, d, m, vol=0.022, pan=0.0):
         """A small organ's flutes: soft, steady."""
         at(b, d)
@@ -828,7 +866,10 @@ def main(out: str, tune: str = "harp", window=None) -> None:
     rng = np.random.default_rng(61)  # from here the same chances whatever played the tune (the birds don't move)
     for bar, shape in enumerate(MEMORY_CH):
         for i, m in enumerate(shape):
-            harp(first + 4 * bar + i * 0.5, m, 0.09 if i == 0 else 0.07, -0.25 + 0.06 * i)
+            if roll == "harp":
+                harp(first + 4 * bar + i * 0.5, m, 0.09 if i == 0 else 0.07, -0.25 + 0.06 * i)
+            else:
+                rolled(first + 4 * bar + i * 0.5, m, roll, 0.1 if i == 0 else 0.08, -0.25 + 0.06 * i)
         for m in shape[2:5]:
             organ(first + 4 * bar, 4.1, m)
     bell(first + 16, 55, 2.2, 0.035, -0.5)
@@ -983,5 +1024,5 @@ def main(out: str, tune: str = "harp", window=None) -> None:
     write_wav(out, x.play(x.mixdown(levels, lowpass=8500, room=0.34, room_s=2.0)))
 
 
-if __name__ == "__main__":  # song_v.py <out.wav> [the memory's tune] [from beat, to beat: only that passage]
-    main(sys.argv[1], *sys.argv[2:3], window=tuple(float(v) for v in sys.argv[3:5]) or None)
+if __name__ == "__main__":  # song_v.py <out.wav> [the memory's tune, what rolls its chords] [from beat, to beat: only that passage]
+    main(sys.argv[1], *sys.argv[2:4], window=tuple(float(v) for v in sys.argv[4:6]) or None)
