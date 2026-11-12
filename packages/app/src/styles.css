@@ -4033,6 +4033,8 @@ button.history-label {
 }
 .signin-row input {
   flex: 1;
+  /* (Its size is the row's to give: a text box's own width, about 274 px, pushed the box 8 px past a 320 px phone's column.) */
+  width: 0;
   min-width: 0;
   font: inherit;
   padding: 0 12px;
@@ -4045,10 +4047,9 @@ button.history-label {
 .signin-row .btn {
   flex: none;
 }
-/* The age question: the month and the year share the row, 3 to 2 (measured at 320 px: "September" and a year each
-   have about 28 px to spare; evenly, the month had 7), Continue below them. */
+/* The age question: the month and the year in one row, Continue below them. The row wraps where the email's row does (the
+   shared rule under "Narrow phones"), so Sign up's question is as tall as Sign in's options and switching moves nothing (Nov 12). */
 .signin-born select {
-  flex: 3 1 0;
   min-width: 0;
   font: inherit;
   padding: 0 10px;
@@ -4058,12 +4059,29 @@ button.history-label {
   background: var(--surface);
   color: var(--text);
 }
-.signin-born select:last-child {
-  flex-grow: 2;
-}
-.signin-ask,
 .signin-young {
   margin: 0;
+}
+/* Sign in, then Sign up below it (Eric, Nov 12): one box, its heading, the step (options or the question), and the switch. */
+.signin-box {
+  display: grid;
+  gap: 8px;
+}
+.signin-title {
+  margin: 0;
+  font-size: 16px;
+}
+.signin-switch {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+.signin-switch .btn {
+  flex: none;
+  min-width: 120px;
 }
 .profile-actions {
   display: flex;
@@ -4373,15 +4391,19 @@ button.history-label {
     margin-top: auto;
   }
 }
-/* Narrow phones: the email box gets its own line. */
+/* Narrow phones: the email box gets its own line, and so does the birth month (each row's second part from 196 px, wider than
+   "Email me a code", so the email's row and the question's wrap at the same width: Sign in and Sign up stay the same height). */
 .signin-options .signin-row {
   flex-wrap: wrap;
 }
-.signin-options .signin-row input {
+.signin-options .signin-row > :first-child {
   flex: 1 1 210px;
 }
-.signin-options .signin-row .btn {
+.signin-options .signin-row > :last-child {
   flex: 1 0 auto;
+}
+.signin-options .signin-row:is(.signin-email, .signin-born) > :last-child {
+  flex: 1 0 196px;
 }
 
 /* ---- Pre-game votes ----

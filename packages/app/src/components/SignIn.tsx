@@ -1,6 +1,6 @@
 import { useEffect, useState } from "preact/hooks";
-import { MONTHS, TOO_YOUNG_LINE, birthYears } from "@chessroyale/core";
-import { account, answerAge, onAccountChange, sendEmailCode, signInWithGoogle, verifyEmailCode } from "../account.ts";
+import { AGE_STEP_LINE, MONTHS, TOO_YOUNG_LINE, birthYears } from "@chessroyale/core";
+import { account, answerAge, dropPendingSignIn, onAccountChange, sendEmailCode, signInWithGoogle, takeSignInNote, verifyEmailCode } from "../account.ts";
 
 const GoogleG = () => (
   <svg viewBox="0 0 48 48" width="20" height="20" aria-hidden="true">
@@ -11,26 +11,76 @@ const GoogleG = () => (
   </svg>
 );
 
-type SignInProps = { google: boolean; email: boolean; next?: string; failed?: boolean };
+type SignInProps = {
+  google: boolean;
+  email: boolean;
+  next?: string;
+  failed?: boolean;
+  /** What signing in is for, in the box's heading ("play online": "Sign in to play online"); none: a plain "Sign in" (Settings, the profile). */
+  title?: string;
+};
+
+/** The Sign up view's heading: the age question itself, as neutral as before (no age mentioned). */
+export const SIGN_UP_ASK = "Sign up: when were you born?";
 
 /**
- * Signing in, wherever it's offered: the age question first (each sign-in, until it's answered), then Google or a
- * 6-digit code sent to your email; a device that answered "too young" gets a friendly line instead. `next` is where
- * Google sends you back to. See docs/decisions/2026-10-16-age-gate-and-real-money.md.
+ * Signing in, wherever it's offered (Eric, Nov 12: "put a sign in already [first], and then below that... a sign up button, and
+ * then... your age thing"). Sign in comes first, with no question: Google, or a 6-digit code sent to your email. Below it, Sign
+ * up asks "when were you born?" before the account is made, then offers the same two ways. A sign-in the server can't finish
+ * without the answer (an email or Google account with no account yet, or an account from before the question) asks it then
+ * (AGE_STEP_LINE), and the answer finishes it. A device that answered "too young" gets a friendly line instead, Sign in included.
+ * Both views are the same height (the question's rows wrap as the email's do), so switching moves nothing. `next` is where Google
+ * sends you back to. See docs/decisions/2026-11-12-signin-without-age.md and 2026-10-16-age-gate-and-real-money.md.
  */
 export function SignIn(props: SignInProps) {
   const [, rerender] = useState(0);
   useEffect(() => onAccountChange(() => rerender((n) => n + 1)), []);
-  const age = account().age;
-  if (age === "under") return <p class="signin-young" role="status">{TOO_YOUNG_LINE}</p>;
-  return age === "ok" ? <SignInOptions {...props} /> : <AgeQuestion />;
+  const [view, setView] = useState<"in" | "up">("in");
+  const { age, pending } = account();
+  const Heading = props.title ? "h2" : "h3";
+  if (age === "under") {
+    return (
+      <>
+        {props.title && <h2 class="signin-title">Online play needs an account</h2>}
+        <p class="signin-young" role="status">
+          {TOO_YOUNG_LINE}
+        </p>
+      </>
+    );
+  }
+  const up = view === "up";
+  // (A sign-in waiting for the answer asks first, whichever view; Sign up asks before anything else, until it's answered.)
+  const ask = pending ? AGE_STEP_LINE : up && age !== "ok" ? SIGN_UP_ASK : null;
+  const verb = up ? "Sign up" : "Sign in";
+  return (
+    <div class="signin-box">
+      <Heading class="signin-title" id="signin-ask">
+        {ask ?? `${verb}${props.title ? ` to ${props.title}` : ""}`}
+      </Heading>
+      {ask ? <AgeQuestion key={pending ? pending.kind : "up"} again={pending?.kind === "google"} /> : <SignInOptions {...props} verb={verb} />}
+      <div class="signin-switch">
+        <span class="muted">{up ? "Have an account?" : "New to HunChess?"}</span>
+        <button
+          type="button"
+          class="btn btn-secondary"
+          onClick={() => {
+            dropPendingSignIn();
+            setView(up ? "in" : "up");
+          }}
+        >
+          {up ? "Sign in" : "Sign up"}
+        </button>
+      </div>
+    </div>
+  );
 }
 
 /**
  * The age question: a birth month and year, nothing chosen to start with and no age mentioned, so the answer can't
- * be steered. It's checked on this device; only the answer goes to the server, and "too young" sticks.
+ * be steered (the box's heading asks it). It's checked on this device; only the answer goes to the server, and "too young"
+ * sticks. `again`: a Google sign-in waits for it, and goes back to Google once it's answered.
  */
-function AgeQuestion() {
+function AgeQuestion({ again }: { again: boolean }) {
   const [month, setMonth] = useState("");
   const [year, setYear] = useState("");
   const [busy, setBusy] = useState(false);
@@ -45,9 +95,6 @@ function AgeQuestion() {
   };
   return (
     <div class="signin-options">
-      <p class="signin-ask" id="signin-ask">
-        Before you sign in: when were you born?
-      </p>
       <div class="signin-row signin-born" role="group" aria-labelledby="signin-ask">
         <select aria-label="Birth month" value={month} onChange={(e) => setMonth(e.currentTarget.value)}>
           <option value="">Month</option>
@@ -69,18 +116,21 @@ function AgeQuestion() {
       <button type="button" class="btn btn-primary" disabled={busy || !month || !year} onClick={answer}>
         Continue
       </button>
+      {again && <p class="muted small signin-msg">Then pick your Google account again.</p>}
       {msg && <p class="muted small signin-msg">{msg}</p>}
     </div>
   );
 }
 
-/** Google, or a 6-digit code sent to your email. */
-function SignInOptions({ google, email, next, failed }: SignInProps) {
-  const [address, setAddress] = useState("");
+/** Google, or a 6-digit code sent to your email; `verb` names the code's button ("Sign in", or "Sign up" in that view). */
+function SignInOptions({ google, email, next, failed, verb }: SignInProps & { verb: string }) {
+  // (A sign-in that waited for the age answer and didn't finish: why, with its address back in the box.)
+  const [note] = useState(takeSignInNote);
+  const [address, setAddress] = useState(note?.email ?? "");
   const [code, setCode] = useState("");
   const [codeSent, setCodeSent] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState<string | null>(failed ? "Google sign-in didn't work. Try again, or use your email." : null);
+  const [msg, setMsg] = useState<string | null>(note?.message ?? (failed ? "Google sign-in didn't work. Try again, or use your email." : null));
   const run = async (fn: () => Promise<void>, ok?: string) => {
     setBusy(true);
     setMsg(null);
@@ -114,7 +164,7 @@ function SignInOptions({ google, email, next, failed }: SignInProps) {
                 onInput={(e) => setCode(e.currentTarget.value.replace(/\D/g, ""))}
               />
               <button type="button" class="btn btn-primary" disabled={busy || code.length !== 6} onClick={() => void run(() => verifyEmailCode(address, code))}>
-                Sign in
+                {verb}
               </button>
             </div>
             <button type="button" class="link-btn" onClick={() => (setCodeSent(false), setCode(""), setMsg(null))}>
@@ -122,7 +172,7 @@ function SignInOptions({ google, email, next, failed }: SignInProps) {
             </button>
           </>
         ) : (
-          <div class="signin-row">
+          <div class="signin-row signin-email">
             <input type="email" autoComplete="email" placeholder="you@example.com" aria-label="Email" value={address} onInput={(e) => setAddress(e.currentTarget.value)} />
             <button
               type="button"
