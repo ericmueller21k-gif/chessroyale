@@ -167,6 +167,21 @@ test("inside a room: the back button goes out to the square with no question; th
   await expect(room(page)).toHaveCount(0, { timeout: 20_000 });
   await expect(leaveDialog(page)).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Town square" })).toBeVisible();
+  if (test.info().project.name !== "phone") return;
+  // Back tapped the moment the room is drawn, as it still fades in: the tap waits for the room, then out (Nov 12: it was lost, and
+  // you stayed in the room).
+  await page.evaluate(() => {
+    new MutationObserver((_, ob) => {
+      if (document.querySelector("canvas.town-shop-canvas")?.getAttribute("data-ready") !== "1") return;
+      ob.disconnect();
+      document.querySelector<HTMLButtonElement>("button.town-back")!.click();
+    }).observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ["data-ready"] });
+  });
+  const card = await openCard(page, "home", "Babur's Circus", "tiger");
+  await card.getByRole("button", { name: "Go in" }).click();
+  await expect(room(page)).toHaveCount(1, { timeout: 20_000 });
+  await expect(room(page)).toHaveCount(0, { timeout: 10_000 });
+  await expect(leaveDialog(page)).toHaveCount(0);
 });
 
 test("a computer's side menu inside a room asks too; Leave goes to the front door", async ({ page }) => {

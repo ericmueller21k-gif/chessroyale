@@ -167,9 +167,12 @@ export function BossLevel({ boss }: { boss: BossView }) {
   if (lv === undefined) return null;
   const base = boss.levelBase ?? lv;
   const dir = lv === null || base === null || lv === base ? "" : lv > base ? "up" : "down";
+  // (The match's screens are drawn anew at every phase, and the bar with them: a badge drawn again carries on its pop from
+  // when the lift began, so the pop plays once, not at every phase (Nov 12).)
+  const since = levelSince(`${boss.name}:${boss.startMove}`, dir);
   return (
     // (Its own element for each direction: a lift or a slash plays as it begins, then stays as a color.)
-    <span key={dir} class={`boss-level${dir ? ` lv-${dir}` : ""}`} data-level={lv ?? "unknown"}>
+    <span key={dir} class={`boss-level${dir ? ` lv-${dir}` : ""}`} data-level={lv ?? "unknown"} style={dir ? { animationDelay: `${since - Date.now()}ms` } : undefined}>
       <span class="lv-text" aria-hidden="true">
         LVL {lv ?? "???"}
       </span>
@@ -177,6 +180,13 @@ export function BossLevel({ boss }: { boss: BossView }) {
       <span class="lv-sr">{lv === null ? "Level unknown" : `Level ${lv}`}</span>
     </span>
   );
+}
+
+/** When the level's current direction began on this device (one battle at a time): a lift or a slash that goes on keeps its start. */
+let levelDir = { battle: "", dir: "", at: 0 };
+function levelSince(battle: string, dir: string): number {
+  if (levelDir.battle !== battle || levelDir.dir !== dir) levelDir = { battle, dir, at: Date.now() };
+  return levelDir.at;
 }
 
 /** The crowd's moves left before the battle is judged, this one included: "12 moves left". */

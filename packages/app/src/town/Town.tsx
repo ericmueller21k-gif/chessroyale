@@ -205,6 +205,10 @@ export function TownScreen({
   const fade = useRef<HTMLDivElement>(null);
   /** Going in or out: taps wait, and another way in or out isn't started. */
   const doorBusy = useRef(false);
+  /** The back button (or Go out) tapped while the room was still fading in: out as soon as it has (Nov 12: the tap was lost). */
+  const outNext = useRef(false);
+  /** Going out now (goOut, until the town is back). */
+  const leaving = useRef(false);
   /**
    * You're walking into a room through its door on your own (the town's door, or Rolling Dough's door between rooms), not arriving by
    * a challenge: as it shows, its banner (Eric's mockup, Nov 11) and its boss's music (music.ts roomMusic).
@@ -232,6 +236,7 @@ export function TownScreen({
   const goIn = async (id: HomeId, x: number, y: number, challenge = false) => {
     if (doorBusy.current) return;
     doorBusy.current = true;
+    outNext.current = false;
     doorPhase(RF.goIn);
     const F = SHOP_FEEL;
     // (The room's pictures painted a slice a frame while the town zooms, the rest once it's black: shops/load-slice.ts.)
@@ -308,6 +313,7 @@ export function TownScreen({
     const at = insideNow.current;
     if (doorBusy.current || !at || flow.current !== "town") return;
     doorBusy.current = true;
+    outNext.current = false;
     const F = SHOP_FEEL;
     const to = at.room.def.part === "back" ? "front" : "back";
     byDoor.current = true;
@@ -338,6 +344,7 @@ export function TownScreen({
     if (doorBusy.current || !at || flow.current !== "town") return;
     const id = at.room.def.home;
     doorBusy.current = true;
+    outNext.current = false;
     byDoor.current = false;
     step("fight");
     step("atDoor");
@@ -373,14 +380,21 @@ export function TownScreen({
     setTimeout(() => {
       doorBusy.current = false;
       doorPhase(0);
+      if (outNext.current) void goOut();
     }, SHOP_FEEL.fadeMs);
   };
   /** "Go out" (or the back button inside): the room fades to black, and the town zooms back out from the door. */
   const goOut = async () => {
-    if (doorBusy.current) return;
+    if (doorBusy.current) {
+      // (Tapped as the room fades in: it waits for the room, then goes out. Not while already going out.)
+      if (insideNow.current && !outNext.current && !leaving.current) outNext.current = true;
+      return;
+    }
+    outNext.current = false;
     // (A challenge can be called off, with the back button, until its transition starts: the battle is coming from then on.)
     if (flow.current !== "town" && flow.current !== "walkIn" && flow.current !== "intro") return;
     doorBusy.current = true;
+    leaving.current = true;
     if (flow.current !== "town") {
       step("cancel");
       ctl.current?.endChallenge();
@@ -402,6 +416,7 @@ export function TownScreen({
     await later(F.doorZoomMs);
     if (cv) cv.style.transition = cv.style.transformOrigin = "";
     doorBusy.current = false;
+    leaving.current = false;
     doorPhase(0);
   };
 
