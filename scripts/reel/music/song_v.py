@@ -41,12 +41,17 @@ The fifth go is the memory's instruments, chosen by ear from samples of that pas
 ocarina sounds real nice"; it was a harp, the choir joining as children), its rolling chords on a soft piano ("Number
 2 for sure ... the soft piano"), and a music box behind them ("incorporate a little bit of the music box in softly");
 the souring moved onto the same three. The memory by itself, with nothing going wrong, is his house's loop: song_w.py.
+And the build's long sliding notes come forward ("almost sounds like a siren ... drawn out, eerie ... it's so faint
+that I can barely hear it ... get that kind of out a bit more a few times"): five of them, about 4 dB under the
+strings together where the one he noticed was 16 under, the figure's strings down 2 dB. They are this song's own
+(a note of one chord sliding to a note of the next); `slide` has three other voices for them, for him to choose from.
 591 beats, about 3:58.
   python3 song_v.py <out.wav>
 
   0:00  the stare: his two low tones beating, the clock (a tick a second), the red book's pages, one trembling note
   0:10  the calculation: the solo violin's figure; then two voices, four, eight; the clock pressed and the pace up
-        every two bars (128 to 212); a synth bass, held notes climbing, slides, low brass
+        every two bars (128 to 212); a synth bass, held notes climbing, low brass; and over it a long note sliding
+        slowly up, a siren's rise, five times (0:19, 0:30, 0:39, 0:47, 0:54), louder and in more voices each time
   0:56  the flag: silence, three ticks, a cold tone rising, and the book slammed shut
   0:59  the chant: the men's choir, slow, over the band at full tilt; the lead's runs at each phrase's end
   1:20  the duel: the choir calls, the lead answers; four phrases, a major third apart, each faster
@@ -183,8 +188,9 @@ assert beats(CHILD) == 32
 assert (T_FLAG, T_MEMORY, T_CHANT2, T_LAST, BEATS, len(SWEEP)) == (138, 268, 334, 519, 591, 30)
 
 
-def main(out: str, window=None) -> None:
-    """`window`: (from beat, to beat), to make only that passage (a sample)."""
+def main(out: str, window=None, siren: str = "strings") -> None:
+    """`window`: (from beat, to beat), to make only that passage (a sample). `siren`: what plays the build's long
+    sliding notes (one of `slide`'s kinds)."""
     x = Ride(PLAN, BEATS, None, os=2, seed=227, tape_secs=TAPE)
     x.window = window
     put, at = x.put, x.at
@@ -192,7 +198,7 @@ def main(out: str, window=None) -> None:
     sr = x.sr
     tau = 2 * np.pi
     levels = {"solo": 1.6, "violins": 1.0, "violas": 1.0, "cellos": 1.0, "pads": 1.0, "slide": 1.6, "lead": 1.25, "bass": 0.7, "sub": 0.6, "brass": 1.0,
-              "kick": 0.9, "snare": 2.0, "hats": 4.0, "drum": 1.5, "clock": 3.0, "book": 1.5, "fx": 1.2, "hum": 0.7, "choir": 6.0, "guitar": 1.15, "keys": 2.1, "park": 3.0, "tune": 2.1, "box": 2.1}
+              "kick": 0.9, "snare": 2.0, "hats": 4.0, "drum": 1.5, "clock": 3.0, "book": 1.5, "fx": 1.2, "hum": 0.7, "choir": 6.0, "guitar": 1.15, "keys": 2.1, "park": 3.0, "tune": 2.1, "box": 2.1, "siren": 1.6}
     BOWED = x.BOWED
     BRIDGE = [0.5, 0.6, 0.8, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.25, 0.2]  # bowed near the bridge: the high overtones over the note
 
@@ -230,18 +236,48 @@ def main(out: str, window=None) -> None:
         at(b, d)
         put("pads", b, x.tone(m, d, BRIDGE, vol, detune=(-8, 0, 7), attack=0.12, release=0.15, trem=0.55, trem_hz=13.0), pan)
 
-    def slide(b, d, m0, m1, vol=0.04, pan=0.0):
-        """A section sliding slowly from one note to another, no steps between: a siren's rise."""
+    def slide(b, d, m0, m1, vol=0.04, pan=0.0, kind="strings", bus="slide"):
+        """A long note sliding slowly from one pitch to another, no steps between: a siren's rise. `kind`: a string
+        section near the bridge; or, for Eric to choose from for the build's long notes: "saw" (a singing saw, an
+        octave up: almost a pure tone, its waver widening), "synth" (an analog synth: two sawtooths, the filter
+        opening as it climbs), "voices" (the men, an octave down, from a hum to "ah")."""
         at(b, d)
         k = x.k(d)
         t = np.arange(k) / sr
         u = np.linspace(0, 1, k)
+        line = m0 + (m1 - m0) * u
         w = np.zeros(k)
-        for c in (-11, 0, 9):
-            ph = tau * np.cumsum(x.hz(m0 + (m1 - m0) * u + c / 100)) / sr
-            for h, a in enumerate(BRIDGE[:8], 1):
-                w += a * np.sin(h * ph + 0.7 * h)
-        put("slide", b, w / 3 * np.minimum(1, t / 0.3) * tail(k, 0.2) * (0.4 + 0.6 * u) * vol, pan)
+        if kind == "strings":
+            for c in (-11, 0, 9):
+                ph = tau * np.cumsum(x.hz(line + c / 100)) / sr
+                for h, a in enumerate(BRIDGE[:8], 1):
+                    w += a * np.sin(h * ph + 0.7 * h)
+            w /= 3
+        else:
+            if kind == "saw":
+                wide = 0.012 * np.minimum(1, t / 1.5)
+                for c in (-4, 4):
+                    ph = tau * np.cumsum(x.hz(line + 12 + c / 100) * (1 + wide * np.sin(tau * 5.3 * t))) / sr
+                    w += np.sin(ph) + 0.1 * np.sin(2 * ph) + 0.03 * np.sin(3 * ph)
+            elif kind == "synth":
+                cut = 600 * (3200 / 600) ** u
+                for c in (-7, 7):
+                    f = x.hz(line + c / 100)
+                    ph = tau * np.cumsum(f) / sr
+                    for h in range(1, 25):
+                        w += (1 / np.sqrt(1 + (h * f / cut) ** 4) + 1.2 * np.exp(-(((h * f - cut) / (0.2 * cut)) ** 2))) / h * np.sin(h * ph)
+            else:  # voices
+                mouth = 0.2 + 0.6 * u
+                f1, f2, f3 = 320 + 380 * mouth, 700 + 400 * mouth, 2600
+                for i in range(5):
+                    f = x.hz(line - 12 + rng.uniform(-14, 14) / 100) * (1 + 0.003 * np.sin(tau * (4.4 + 0.5 * i) * t + rng.uniform(0, tau)))
+                    ph = tau * np.cumsum(f) / sr
+                    for h in range(1, int(4200 / f.max()) + 1):
+                        fh = h * f
+                        g = 1.0 / np.sqrt(1 + 30 * (fh / f1 - f1 / fh) ** 2) + 0.55 / np.sqrt(1 + 40 * (fh / f2 - f2 / fh) ** 2) + 0.14 / np.sqrt(1 + 60 * (fh / f3 - f3 / fh) ** 2) + 0.03
+                        w += g / h**1.2 * np.sin(h * ph + rng.uniform(0, tau))
+            w *= np.sqrt(sum(a * a for a in BRIDGE[:8]) / 6) / (np.sqrt(np.mean(w**2)) + 1e-9)  # as loud as the strings' would be
+        put(bus, b, w * np.minimum(1, t / 0.3) * tail(k, 0.2) * (0.4 + 0.6 * u) * vol, pan)
 
     def canon(bars, poles, voices, loud, first=0):
         """The figure on a run of bars, every voice in its turn. `loud(move)`: how loud that move is."""
@@ -729,7 +765,7 @@ def main(out: str, window=None) -> None:
     # bars of six it knocks in three, against them, and the bass with it); from the seventh unit the synth bass, its
     # filter opening a little with each; later held notes climbing, slow slides, low brass; at the top, arpeggios in
     # threes.
-    canon(CALC_BARS, POLES, VOICES, lambda move: 0.62 + 0.045 * move)
+    canon(CALC_BARS, POLES, VOICES, lambda move: 0.5 + 0.036 * move)
     for u, (first, _, _, _) in enumerate(CALC_BARS[::2]):
         press(first, 0.1 + 0.004 * u)
         if u % 2 == 0 and u:
@@ -753,9 +789,18 @@ def main(out: str, window=None) -> None:
         b0, b1 = CALC_BARS[2 * u][0], (CALC_BARS[2 * u + 2][0] if u < 21 else T_FLAG)
         m = 67 + POLES[u // 2] + step
         shimmer(b0, b1 - b0, m, 0.035 + 0.004 * j, 0.3), shimmer(b0, b1 - b0, m - 12, 0.03 + 0.003 * j, -0.3)
-    slide(CALC_BARS[16][0], 12, 67, 71, 0.03, -0.4)
-    slide(CALC_BARS[32][0], 12, 70, 76, 0.04, 0.4), slide(CALC_BARS[32][0], 12, 63, 67, 0.04, -0.4)
-    slide(T_FLAG - 8, 8, 74, 86, 0.06, 0.3), slide(T_FLAG - 8, 8, 67, 82, 0.06, -0.3), slide(T_FLAG - 8, 8, 55, 67, 0.05, 0.0)
+    # The long notes: one voice sliding slowly up, a siren's rise, over the racing figure (the fifth go, Eric, Nov 12:
+    # "almost sounds like a siren at ... 31 to 32 seconds ... drawn out, eerie ... it's so faint that I can barely
+    # hear it ... the strings that are playing in the intro to be toned down a bit so we can hear some of that ... get
+    # that kind of out a bit more a few times, like in the intro"). So: five of them now (0:19, 0:30, 0:39, 0:47,
+    # 0:54), each from a note of its chord to a note of the chord it lands on, louder each time, the later ones in
+    # two or three voices; and the figure's strings a little down.
+    for bar, length, vol, lines in ((8, 14, 0.08, ((70, 74, 0.4),)), (16, 12, 0.09, ((67, 71, -0.4),)), (24, 10, 0.1, ((74, 78, 0.4), (62, 66, -0.4))),
+                                    (32, 12, 0.11, ((70, 78, 0.4), (63, 71, -0.4)))):
+        for j, (m0, m1, pan) in enumerate(lines):
+            slide(CALC_BARS[bar][0], length, m0, m1, vol * (0.7 if j else 1.0), pan, siren, "siren")
+    for m0, m1, vol, pan in ((74, 86, 0.12, 0.3), (67, 82, 0.12, -0.3), (55, 67, 0.1, 0.0)):
+        slide(T_FLAG - 8, 8, m0, m1, vol, pan, siren, "siren")
     brass(CALC_BARS[28][0], 7, 31 + 12, 0.1)
     brass(CALC_BARS[36][0], 6, 31 + 12 + 4, 0.11)
     brass(T_FLAG - 8, 8, 31 + 12, 0.13)
@@ -951,12 +996,12 @@ def main(out: str, window=None) -> None:
 
     cathedral("choir")
     cathedral("keys", 2.5, 0.4), cathedral("tune", 2.5, 0.4), cathedral("box", 2.5, 0.45)
-    cathedral("park", 1.6, 0.7)
+    cathedral("park", 1.6, 0.7), cathedral("siren", 3.0, 0.35)
     x.beat_s = 60 / 160  # the echoes' beat
     x.echo("lead", 0.75, 0.14, 0.06)
     x.echo("solo", 0.75, 0.12, 0.05)
     write_wav(out, x.play(x.mixdown(levels, lowpass=8500, room=0.34, room_s=2.0)))
 
 
-if __name__ == "__main__":  # song_v.py <out.wav> [from beat, to beat: only that passage]
-    main(sys.argv[1], window=tuple(float(v) for v in sys.argv[2:4]) or None)
+if __name__ == "__main__":  # song_v.py <out.wav> [from beat, to beat: only that passage] [what plays the build's long notes]
+    main(sys.argv[1], tuple(float(v) for v in sys.argv[2:4]) or None, *sys.argv[4:5])
