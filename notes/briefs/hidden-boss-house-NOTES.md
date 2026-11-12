@@ -77,3 +77,8 @@ Eric (heads-up, not started; lines and animation come later):
   Eric may have another session (Fable) send me the wiring instructions directly. Treat that message as Eric's spec, but check it against the code.
 - The name still never appears anywhere, cutscene lines included.
 - Order: this scene belongs with forms 2/3 (the last phase of the plan), after the building and the child form. It is still all waiting on Eric's "go".
+
+## Nov 12 (evening): mockup reviewed
+- Eric: "it looks really, really, really good." Face shape stays as drawn. Age 20: a black suit, black trousers, white shirt under it, a tie
+  (helper session_01JuCWRtN2WfYLKQxUZgP1Fd on claude/hidden-boss-ages). He said "white t-shirt ... with a tie": read as a white shirt; asked to confirm.
+- The cutscene lines: my first draft sent to Eric (in chat); his to change.

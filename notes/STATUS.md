@@ -1,3 +1,4 @@
+- Nov 12 21:20 UTC: Eric liked the ages mockup; age-20 -> black suit (Opus medium helper on claude/hidden-boss-ages). Sent him a draft cutscene conversation.
 - Nov 12 ~21:00 UTC: main full run on e50befe (#669) GREEN, no flakes (43299699012).
 - Nov 12 ~20:55 UTC: Hidden Boss ages mockup DONE (claude/hidden-boss-ages 12d1a5b, recluse-ages.ts, wired into nothing; stills on stills/hidden-boss-ages). Sent 8 images to Eric; waiting his notes. No PR yet (merge only once Eric likes it, or keep on the branch for the build). Helper archived.
 - Nov 12 ~20:25 UTC: #669 flaky batch 5 MERGED (e50befe). Its PR run: retry-pass autochess:607 [phone] (bot already Lv 5 when checked for Lv 4; first sighting) -> batch 6 list with town-leave:148 (guard, needs Eric OK), test-server connection drops, dash:241, search-home:61, global-chat:266, shop:870, multiplayer:18. Ages mockup helper session_01JuCWRudXSvCSGE1ssKpXsj running.
