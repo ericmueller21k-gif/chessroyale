@@ -32,3 +32,23 @@ Lanes: town art (characters/rooms), hub/social for the party count, server for t
   the count; the first four to challenge go in. At 4: a countdown in the town for those four, then into the battle; the town chat gets a
   line naming who is fighting the Hidden Boss.
 - Still open: a time limit on the count; what the starter sees if others leave; rewards; his tile stays locked?; admins first.
+
+## Update 3 (Eric, Nov 12): the top floor is a child's room, and a new first form
+How he works today: notes/hidden-boss-today.md (use it; don't ask Eric).
+- **The room (top floor, 3rd story):** a 1950s child's room: a little rocking horse in the corner, a little table with a chessboard,
+  a poster on the wall, a kid's play mat, a small bed in the corner, a window with light gleaming through. He sits on the floor with a
+  chessboard and scattered pieces, playing.
+- **Three forms now:**
+  1. **NEW form 1, the child** (about 8 to 10): the fight starts with him as a kid. No powers; new lines fitting a kid. His engine
+     ramps as the game goes: Maia at about 1800 for the first moves, +100 Elo every 4 moves (all moves) up to Maia's cap (about 2300+;
+     check the cap), and he grows: 5 drawings, each a little older/taller/longer hair, the last matching today's young-adult look
+     (which may be redrawn later). His level beside him rises with a level-up animation at each step.
+     - The team's move: everyone picks; the majority's move is played (no pick: doesn't count). A tie: random between the tied
+       moves if they're close in strength; if far apart, the stronger (a deliberate blunder never wins a tie). This is the boss
+       party's existing draw rule (`partyMove`: a majority, else the engine's best or one of two within 30 cp at random): reuse it.
+  2. **Form 2 = today's phase 1** (bullet, no help, chatter): after beating the child, a new match starts (reset), the same as today.
+  3. **Form 3 = today's phase 2** (the board splits into four; solo only today; online phase 2 is unbuilt).
+- **Not started.** Still open: the "1 of 4" count's time limit; whether his select tile stays locked (adminOnly exception for the room);
+  reward (none today); admins first; online phase 2 (four boards online, server Stockfish, fair play) is a separate big build.
+- **Real people (RULES.md):** Eric describes the kid as the real player as a child. The drawings stay ORIGINAL: a generic 1950s boy,
+  no likeness, never named or hinted in game text (his name is still the "Hidden Boss" string). Confirm with Eric before drawing.
