@@ -1,4 +1,5 @@
 # The Hidden Boss's house in the town (Eric, Nov 12): notes, not started
+How he works today (phases, rules, where he's met, the code): notes/hidden-boss-today.md.
 Reference photo: notes/mockups/2026-11-12-eric-hidden-boss-house-ref.webp (a real building).
 RULE CHECK (RULES.md "Real people"): never base anything on, name or hint at a real person. The house is drawn as an ORIGINAL
 building in that style (white corrugated-iron two-story house, steep red roof with skylights, green trim, two green awnings, a side
