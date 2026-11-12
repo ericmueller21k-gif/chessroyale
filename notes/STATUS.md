@@ -1,3 +1,4 @@
+- Nov 12 17:25: #664 town door tap opened (6a2795f), helper archived, still sent. Open: #663, #664. No helpers running.
 - Nov 12 17:15: #662 hollow test MERGED (980ae30). Open: #663 town chat (CI running). Running: door-tap helper.
 - Nov 12 17:05: #663 town chat hints opened (bbbd05d), helper archived, stills sent. Open: #662 hollow test, #663. Running: door-tap helper.
 - Nov 12 16:45: main 19157ba red: hollow:283 both projects both tries (30 ms poll missed the transient strip count; PR run passed same code). Fix #662 (81d9a13: record every frame, check order). Local 4/4.
