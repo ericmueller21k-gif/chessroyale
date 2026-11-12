@@ -22,6 +22,11 @@ from the liked list, keep off the other one. Eric's words are quoted; the date i
 | A talking synth (each note a "wah") in small doses, and the cow's moos, kept quiet | song_r.py (`talk`, `moo`) | "the moos and the noise that sounds like anime wawawa or something is nice"; then, when given eight bars of it, "I didn't want more of it. I was just saying I liked it", and "turn down the moo volume a little bit" |
 | Tunes off the grid: triplets, octave jumps that float back down, notes held over the bar line, three-bar phrases, a lead that slides into long notes; a chord a bar over a bass stepping down by half steps | song_r.py (`TUNE`, `VERSE`) | 25 seconds in: "this slaps bro, way sicker already, bro you nailed it" |
 | A motif five 8ths long that lands somewhere new in the bar each time, over chords dropping by whole steps; and the last tune arriving a minor third up | song_r.py (`SHIFT`, bars 57-64) | "holy shit the key change and second tune was fire" |
+| The whole band on a "tape" that doesn't run at one speed: it starts up from a groan, dies (pitch sinking as it slows), wavers off key in the calms, runs away two half steps sharp, and comes back a half step too high | song_s.py (`Ride`, `RIDE`) | Nov 12, of Boingo's first go: "This is flawless and your best work yet ... WOW this is so good" |
+| A steam-organ whistle as the lead, its long notes landing sharp and springing into place | song_s.py (`whistle`) | the same |
+| Bars that lose a beat, a motif seven 8ths long, five notes in two beats (a laugh), the tune turned upside down and played against itself in the drop | song_s.py (`LIMP`, `SHIFT`, `DROP_GRIT`, `DROP_PIPE`) | the same |
+| Very short high dings over a deep bass that climbs and builds; a music box that sticks on two notes | song_s.py (`ding`, `eerie`, the first calm) | his own direction for it, then the same |
+| The boss's own sounds (horn, kazoo laugh, slide whistle, a pie's splat), a few times each | song_s.py (`honk`, `laugh`, `slide`, `splat`) | the same |
 | A fast pattern racing under everything | every song since song_i.py | asked for in all of them |
 | The NES's four voices | song_c.py, song_f.py | "much much better" than the 16-bit orchestra |
 
@@ -55,6 +60,13 @@ does, in the order it was built:
 Vary the particulars from boss to boss (which way the bass steps, how long the shifting motif is, what the calm is
 made of): the point is the kind of move, not these notes.
 
+Boingo (song_s.py, Nov 12) followed it and went a step further, as Eric asked ("how you kind of went adventurous, this
+one, even take it up another notch"): the bass steps up instead of down, the motif is seven 8ths, the calms are a
+broken music box and a whistle three half steps flat, the drop is the tune upside down, and one idea from the boss's
+world shapes the whole song (a merry-go-round whose speed changes). His verdict on the first go, with no changes
+asked: "This is flawless and your best work yet." So for the next bosses: the recipe, plus one such idea from the
+boss's world that reaches into how the song itself runs, not only its sounds.
+
 ## Not liked: avoid, or ask first
 
 | Sound | What Eric said |
@@ -65,7 +77,7 @@ made of): the point is the kind of move, not these notes.
 | Wind chimes ringing on in a calm or at a loop's end | "two chimes that hit weird ... left in the song" |
 | A heroic major-key fanfare with brass, flute and bells (song_d.py) | "way too upbeat and happy" |
 | Lots of brass (track_b.py) | "less brass, more of the other voices"; then "the 2nd song is awful" |
-| A slow-down in the middle of a song (song_g.py) | "the slowdown didn't land, the speed up was cool tho" |
+| A slow-down in the middle of a song (song_g.py) | "the slowdown didn't land, the speed up was cool tho". (A plain one. Boingo's song slows twice with the pitch sinking as it goes, the ride dying, which he asked for and called flawless.) |
 | Tunes built from the same rhythm as the last boss's: 8ths on the grid, two-bar phrases, a chord every two bars (song_r.py, second go) | "it just feels like the other ones a lot ... work up the timings a little bit. Some of the chord progression and maybe even ... be adventurous a little" |
 | A tune that runs up and down its chords, the same shape on chord after chord (song_j.py) | "very dull and boring, sounds like all the rest ... that style chord progression is slop" |
 
