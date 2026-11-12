@@ -1,3 +1,4 @@
+- Nov 12 17:05: #663 town chat hints opened (bbbd05d), helper archived, stills sent. Open: #662 hollow test, #663. Running: door-tap helper.
 - Nov 12 16:45: main 19157ba red: hollow:283 both projects both tries (30 ms poll missed the transient strip count; PR run passed same code). Fix #662 (81d9a13: record every frame, check order). Local 4/4.
 - Nov 12 16:30: Town door tap helper session_01JuCWRtR8HzWRMb8YHwREET (Opus high) on claude/town-door-tap. Running Opus: town chat + door tap (2 high). Watchers on both .done.
 - Nov 12 16:20: #661 Boingo face pie MERGED (19157ba). Watching main full run. Running: town chat helper.
