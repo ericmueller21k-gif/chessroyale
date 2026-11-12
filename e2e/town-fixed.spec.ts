@@ -117,7 +117,7 @@ async function drag(page: Page, share: number) {
 }
 
 test(`one fixed view: the arrows walk all four ways and the camera never turns; a home's strip; step off`, async ({ page }) => {
-  test.setTimeout(400_000);
+  test.setTimeout(60_000);
   await open(page);
   // On Fountain Street, clear of the homes' strips.
   await walkTo(page, [8, 28]);
@@ -170,7 +170,7 @@ test(`one fixed view: the arrows walk all four ways and the camera never turns; 
 });
 
 test(`the Colosseum against the back wall: ahead up the promenade, the plaza's walls before it, nothing past the back line; you can't go north past it`, async ({ page }) => {
-  test.setTimeout(400_000);
+  test.setTimeout(60_000);
   await open(page);
   // From the park, up the promenade: the Colosseum ahead in the middle of the view, the plaza's three front walls before it.
   await walkTo(page, [22, 32]);
@@ -216,7 +216,7 @@ test(`the Colosseum against the back wall: ahead up the promenade, the plaza's w
 });
 
 test(`the plaza: a drag all the way round shows nothing past the back line, the Colosseum as faces; out onto Colosseum Row`, async ({ page }) => {
-  test.setTimeout(400_000);
+  test.setTimeout(90_000);
   await open(page);
   await walkTo(page, [20, 41]);
   // Eight eighths of a turn, a drag each: at every one, nothing past the line drawn; facing it, its ring's faces.
@@ -242,7 +242,7 @@ test(`the plaza: a drag all the way round shows nothing past the back line, the 
 });
 
 test(`looking round: a drag turns the camera about your pawn, which doesn't move or turn; it lets go to the nearest quarter, and the up arrow locks it in and walks you that way`, async ({ page }) => {
-  test.setTimeout(400_000);
+  test.setTimeout(60_000);
   await open(page);
   await walkTo(page, [8, 28]);
   const before = await me(page);
@@ -326,7 +326,7 @@ test("stills: the fixed view (round 5)", async ({ page }) => {
 test(`the Colosseum stays put as the view turns: its portal and ring drawn where they stand at every heading, as the ground is`, async ({ page }) => {
   // (Eric, Nov 6, on round 5's flat Colosseum: it would "glitch and follow the camera around". The solid's portal and each stretch of its
   // ring are drawn on their own feet in the world: as the view turns, each moves across the box exactly as the ground under it does.)
-  test.setTimeout(400_000);
+  test.setTimeout(60_000);
   await open(page);
   // A few squares before the portal, on Colosseum Row's edge of the plaza.
   await walkTo(page, [22, 38]);

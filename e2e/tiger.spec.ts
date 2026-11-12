@@ -526,7 +526,7 @@ test("Babur's balloon on the board is as tall as a queen piece on its square: it
 // the window's edge); clear of the board, the eval bar, the leaderboard and the status, inside the window; a landing flies from it.
 test("Babur's pump on a computer at 1280 × 800, 1440 × 900, 1920 × 1080 and 1024 × 768: a stage-4 queen as tall as the board's queen, beside him or in a taller bar, clear of everything, and a landing flies from it", async ({ page }) => {
   test.skip(!desktop(), "a computer's layout");
-  test.setTimeout(420_000);
+  test.setTimeout(270_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   for (const [w, h, place] of [

@@ -97,7 +97,7 @@ async function drag(page: Page, share: number) {
 // (Round 5: the camera faces north; a drag looks round. Looking along a street both ways is a drag a quarter turn each way, from where
 // round 4 walked along it.)
 test("no sky between the fronts at street level: Fountain Street and South Street, looking both ways along each", async ({ page }) => {
-  test.setTimeout(400_000);
+  test.setTimeout(120_000);
   await open(page, "day");
   // (Street level: the mockup's step, 1. The town opens a step further out since Nov 5, which sees over the rows.)
   await page.getByRole("button", { name: "Zoom in" }).click();
@@ -121,7 +121,7 @@ test("no sky between the fronts at street level: Fountain Street and South Stree
 });
 
 test("the zoom steps: − and + move a step at a time (in, the mockup's, out (the default since Nov 5), the overview); every figure on screen at each", async ({ page }) => {
-  test.setTimeout(400_000);
+  test.setTimeout(90_000);
   await open(page, "day");
   await walkAlong(page, [1, 28], [4, 28]);
   // (Eric, Nov 5: "we're going with number three for the default": the town opens at step 2.)
@@ -143,7 +143,7 @@ test("the zoom steps: − and + move a step at a time (in, the mockup's, out (th
 });
 
 test("the park zooms a step out as you come in and back as you leave; a press in it wins", async ({ page }) => {
-  test.setTimeout(400_000);
+  test.setTimeout(60_000);
   await open(page, "day");
   await walkAlong(page, [6, 28], [9, 28]);
   // (The default since Nov 5: step 2, so the park's step out is to the overview, 3.)
