@@ -204,6 +204,8 @@ describe("boss powers online", () => {
     const warned = L.last("p1", "boss")!;
     // (His pie on turn 2 when the position has a piece with both squares behind it empty: the rule's own condition.)
     const thrown = !!choosePieThrow(warned.boss.board.fen, warned.boss.crowdSide, 0, 2);
+    // (The raid's opening has a target on turn 2: the checks below always run. Review of the face pie, nit 3.)
+    expect(thrown).toBe(true);
     expect(warned.boss.powers!.events.map((e) => e.kind).sort()).toEqual(thrown ? ["pie", "warn"] : ["warn"]);
     const pied = (warned.boss.powers!.pies ?? []).map((x) => x.square);
     expect(pied).toHaveLength(thrown ? 2 : 0);

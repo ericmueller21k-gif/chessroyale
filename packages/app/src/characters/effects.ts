@@ -8,7 +8,7 @@
  */
 import type { Character } from "./sprite.ts";
 import { BLIZZARD_SWEEP, FROST_HIT, ICE_BOLT, ICE_OVERLAY } from "./effects/ginger.ts";
-import { PIE_FLY, PIE_HIT, PIE_SPLAT } from "./effects/boingo.ts";
+import { PIE_FACE, PIE_FLY, PIE_HIT, PIE_SPLAT } from "./effects/boingo.ts";
 import { CANDLE_SHOT, CANDLE_SHOTS, FIREBALL_FALL, FIRE_SHADOW, FIRE_TILE, PIECE_BURN, POP_HIT, SPARK_FLY } from "./effects/grex.ts";
 import { BULB_STRAND, BULB_STRAND_WIDE, LIFE_STRAND, DARK_MISS, DARK_POUR, DARK_SQUARE, LASH_HIT, NIGHT_LABEL, NIGHT_SQUARE } from "./effects/hollow.ts";
 import { BLOCK_FLY, BONK_HIT, BOUNCE_CRASH, BOUNCE_PUFF, TOY_BLOCK } from "./effects/bigboy.ts";
@@ -73,6 +73,7 @@ export const EFFECT_SPRITES = {
   goldFx: GOLD_FX,
   lassoHit: LASSO_HIT,
   pieHit: PIE_HIT,
+  pieFace: PIE_FACE,
   bonkHit: BONK_HIT,
   frostHit: FROST_HIT,
   popHit: POP_HIT,

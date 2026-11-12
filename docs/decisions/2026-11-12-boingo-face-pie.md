@@ -81,3 +81,12 @@ way, so it can't show how much the freeze costs a real crowd; Eric's playtests w
 `scripts/frames-boss-powers.mjs` and `frames-boss-move.mjs` stalled at the first-time walkthrough and the old Boss alone
 button: both mark the walkthrough seen (as e2e does), the powers script goes in by Boss Battle and START, and takes
 `POWER=pie`, `PHONE=428x746` and `DPR=2`.
+
+## After the boss lane's quick review (director, Nov 12)
+No blockers (REVIEW-BOINGO.md on branch `claude/review-boingo-pie`). Fixed here: castling's rook can't land on a pie (`lands`,
+used by the filter, the stop reason and the target's guard and score); the ranking now has its own test; the lobby test always runs
+its checks; `pieMax` under 2 can't turn the pie off; the FAQ names the castling cases. The face hit got its own sounded copy
+(`pieFace`) so the king attack's pie stays silent (unit check: every cue has a sound). Left for later: the e2e can pass a run without a
+freeze (nit 4), the boss-side guard is a rough check (nit 5, the dispatcher's lift is the guarantee), and in the Crowd's reveal a moving
+piece's mark shows only once its move lands (nit 7, cosmetic).
+

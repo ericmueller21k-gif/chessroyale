@@ -164,7 +164,7 @@ for (const [kind, y] of [["H", 8], ["L", 13]] as const)
     pieHitAnims[`hit${kind}${side}`] = {
       loop: false,
       frames: [
-        { ms: 50, cue: "splat", layers: [], specks: sp(0) },
+        { ms: 50, layers: [], specks: sp(0) },
         { ms: 70, layers: [], specks: sp(1) },
         { ms: 60, layers: [], specks: sp(2) },
         { ms: 20, layers: [] },
@@ -175,8 +175,7 @@ for (const [kind, y] of [["H", 8], ["L", 13]] as const)
 /**
  * A pie in a king's face (Boingo's attack on a king): `hit<H|L><L|R>`, at his head or a little lower, thrown in from
  * the left or the right edge: the pie hits side on, the cream splats wide and flies on past him, then slides down.
- * About 200 ms; ends empty. Over the piece (or the God King standing there). Its first frame's cue, `splat`, sounds only
- * where a moment gives it one (his pie in a piece's face, Nov 12: Boingo.tsx); the attack's own cues are its sound.
+ * About 200 ms; ends empty. Over the piece (or the God King standing there). Silent: the attack's own cues are its sound.
  */
 export const PIE_HIT: Character = {
   id: "pie-hit",
@@ -187,4 +186,17 @@ export const PIE_HIT: Character = {
   palette: PIE_PALETTE,
   parts: {},
   anims: pieHitAnims,
+};
+
+/**
+ * His pie in a piece's face (Nov 12, Boingo.tsx's FaceSplash): the same art as PIE_HIT, its first frame cueing `splat` (the pie's
+ * splat sound, EFFECTS.pieFace). A copy, so the king attack's PIE_HIT stays silent.
+ */
+export const PIE_FACE: Character = {
+  ...PIE_HIT,
+  id: "pie-face",
+  name: "A pie in a piece's face",
+  anims: Object.fromEntries(
+    Object.entries(pieHitAnims).map(([k, a]) => [k, { ...a, frames: a.frames.map((f, i) => (i === 0 ? { ...f, cue: "splat" } : f)) }]),
+  ),
 };

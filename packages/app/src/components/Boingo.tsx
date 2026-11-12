@@ -95,10 +95,10 @@ const pieFroze = (boss: Pick<BossView, "powers">, m: Pick<Moment, "square">): bo
 
 /** The pie in the piece's face, side on from his side (the king attack's art, `hitHL`), with its splat. */
 function FaceSplash({ square, orientation, since }: { square: string; orientation: "white" | "black"; since: number }) {
-  const fx = EFFECTS.pieHit;
+  const fx = EFFECTS.pieFace;
   return (
     <span class="pw-pie pw-pie-face" style={onSquare(square, orientation, useContext(BoardTurn))}>
-      <SpriteAnim ch={fx.ch} anim="hitHL" since={since} sounds={{ splat: "clownSplat" }} id={`face-${square}`} />
+      <SpriteAnim ch={fx.ch} anim="hitHL" since={since} sounds={fx.sounds} id={`face-${square}`} />
     </span>
   );
 }

@@ -12,6 +12,7 @@ import {
   bossAllowed,
   choosePieThrow,
   crowdAllowed,
+  lands,
   followSplats,
   icedSquares,
   initPowers,
@@ -87,6 +88,25 @@ describe("Boingo's pie: the target", () => {
     // (Here the e4 pawn is the only target: the bishop and the knight stand on the back rank.)
     const ranked = choosePieThrow(B, "w", 1, 2);
     expect(ranked?.square).toBe("e4");
+  });
+
+  it("the ranking (review of the face pie): the top three by moves taken away (own retreats double), then value, then square", () => {
+    // Targets and their scores: Be3 6 (its retreats d2 and f2 double, the king's e1-d2 and e1-f2); the b5, d5 pawns 1 each
+    // (c2-c4 onto their pie), the c2 pawn 1 (e1-d1); the g4 pawn 0. Top three: e3, then b5 and c2 (by square). Never d5 or g4.
+    const fen = "4k3/8/8/1P1P4/6P1/4B3/2P5/4K3 w - - 0 1";
+    const picks = new Set(Array.from({ length: 60 }, (_, s) => choosePieThrow(fen, "w", s, 2)!.square));
+    expect([...picks].sort()).toEqual(["b5", "c2", "e3"]);
+  });
+
+  it("castling's rook can't land on a pie (review of the face pie, Nov 12)", () => {
+    // He throws at the bishop on e2: d1 and f1 pied. O-O would put the rook on f1: refused.
+    const F = "r3k3/pppppppp/8/8/Q7/8/4BPPP/4K2R w K - 0 1";
+    expect(lands("e1g1", F).sort()).toEqual(["f1", "g1"]);
+    expect(lands("e1f1", F)).toEqual(["f1"]);
+    const b = at(battle(F), F, 2);
+    expect((b.powers!.pies ?? []).map((p) => p.square).sort()).toEqual(["d1", "f1"]);
+    expect(legalMoves(F)).toContain("e1g1");
+    expect(crowdAllowed(b, F)).not.toContain("e1g1");
   });
 
   it("the guards: the crowd keeps a move with the squares pied (and the piece frozen), in check too", () => {
