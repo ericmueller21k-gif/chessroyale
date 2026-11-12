@@ -119,7 +119,7 @@ async function powers(p, name, sq, board) {
   const grex = kitName === "Jefferson" || full === "Jefferson";
   if (grex) {
     const tile = pieceSq;
-    const strip = { x: board.x, y: board.y - cell * 0.45, w: cell * 3, h: (cell * 3 * 11) / 74 };
+    const strip = { x: board.x, y: board.y - cell * 0.45, w: cell * 3, h: (cell * 3 * 9) / 99 };
     sequences.length = 0;
     sequences.push(
       ["spark", [{ kind: "effect", name: "sparkFly", box: at("d4") }, { kind: "effect", name: "fireTile", anim: "ignite", then: "stage1", box: at(tile) }], 1100],
@@ -206,7 +206,7 @@ async function perf(p, name, sq, board, fen) {
     { kind: "effect", name: "candleShot", box: at("c7") },
     { kind: "effect", name: "candleShot", box: at("g7") },
     { kind: "effect", name: "sparkFly", box: at("e5") },
-    { kind: "effect", name: "candleShots", anim: "left9", box: { x: board.x, y: board.y - cell * 0.45, w: cell * 3, h: (cell * 3 * 11) / 74 } },
+    { kind: "effect", name: "candleShots", anim: "left9", box: { x: board.x, y: board.y - cell * 0.45, w: cell * 3, h: (cell * 3 * 9) / 99 } },
     { kind: "moment", name: kitName ? `original:${kitName}` : "Jefferson", anim: "idle", box: { x: board.x + board.width / 2 - cell * 1.25, y: board.y + board.height / 2 - cell * 2.1, w: cell * 2.5, h: cell * 2.6 } },
   ];
   await p.evaluate(async ({ lab, items }) => (await import(lab)).mount(items), { lab, items });
