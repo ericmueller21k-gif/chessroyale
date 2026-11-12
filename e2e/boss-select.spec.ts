@@ -343,6 +343,63 @@ const tileLines = (p: Page) => p.locator(".bs-tile").evaluateAll((es) => [...new
 /** What tile (its name) is at each point, null where none is (the page, a gap). */
 const tileAt = (ps: { x: number; y: number }[]) => ps.map((p) => document.elementFromPoint(p.x, p.y)?.closest(".bs-tile")?.getAttribute("aria-label") ?? null);
 
+// The computer's stage grows into the room the grid and START leave (Nov 12, Eric: "3X the pawn and boss size even 4"). Today's computer
+// figures on main (Nov 12, the same at 1536 x 864 and 1920 x 1080): the pawn's box 145 px tall; the boss's painted figure 178 (Jefferson),
+// 182 (Big Boy), 180 (Alfil), 167 (Chub & Chirp). The room now gives about 1.15x at 1536 x 864 (the grid takes the top of that window) and
+// about 1.96x at 1920 x 1080 (the stage's 920 px column is the width's limit). 2.5x and more needs a shorter grid or a wider stage: Eric's
+// call (docs/decisions/2026-11-12-select-desktop-big.md). The floors below are what the room gives, measured.
+const TODAY_PAWN = 145;
+const TODAY_BOSS: Record<string, number> = { Jefferson: 178, "Big Boy": 182, Alfil: 180, "Chub & Chirp": 167 };
+/** The boss's painted figure on the stage: its top and foot, from the canvas's own pixels (as the never-scroll test reads its head). */
+const bossPaint = (p: Page) =>
+  p.evaluate(() => {
+    const el = document.querySelector(".bs-spot:not(.bs-mine) .bs-sprite") as HTMLElement | null;
+    const cv = el && (el.tagName === "CANVAS" ? (el as HTMLCanvasElement) : el.querySelector("canvas"));
+    if (!cv) return null;
+    const d = cv.getContext("2d")!.getImageData(0, 0, cv.width, cv.height).data;
+    let top = -1;
+    let bot = -1;
+    for (let y = 0; y < cv.height; y++) {
+      for (let x = 0; x < cv.width; x++) {
+        if (d[(y * cv.width + x) * 4 + 3]! > 0) {
+          if (top < 0) top = y;
+          bot = y;
+          break;
+        }
+      }
+    }
+    const r = cv.getBoundingClientRect();
+    return { top: r.top + (top / cv.height) * r.height, bottom: r.top + ((bot + 1) / cv.height) * r.height };
+  });
+test("on a computer the pawn and the picked boss stand bigger on the stage, as the room allows (Nov 12): at 1536 x 864 and 1920 x 1080, a guest and an admin, every boss: the pawn at least 1.1x and 1.9x today's height and the boss likewise, no page scroll, START on screen, the speech bubble's box above the boss's painted head", async ({ page }) => {
+  test.skip(!desktop(), "a computer");
+  for (const admin of [false, true]) {
+    await named(page, "Selector");
+    if (admin) await asAdmin(page);
+    for (const [w, h, floor] of [[1536, 864, 1.1], [1920, 1080, 1.9]] as const) {
+      await page.setViewportSize({ width: w, height: h });
+      await page.goto("/");
+      await openSoloBoss(page);
+      for (const boss of Object.keys(TODAY_BOSS)) {
+        const at = `${admin ? "admin" : "guest"} ${w}x${h} ${boss}`;
+        await tile(page, boss).click();
+        // (After its drop, which squashes it a little wider for a moment.)
+        await page.waitForTimeout(500);
+        const pawn = (await page.locator(".bs-me .fd-pawn-stage").boundingBox())!;
+        expect(pawn.height / TODAY_PAWN, `${at}: the pawn's height`).toBeGreaterThanOrEqual(floor);
+        const fig = (await bossPaint(page))!;
+        expect((fig.bottom - fig.top) / TODAY_BOSS[boss]!, `${at}: the boss's height`).toBeGreaterThanOrEqual(floor);
+        expect(await page.evaluate(() => document.documentElement.scrollHeight - innerHeight), `${at}: no page scroll`).toBeLessThanOrEqual(0);
+        const start = (await page.locator(".bs-start").boundingBox())!;
+        expect(start.y, `${at}: START's top in the window`).toBeGreaterThanOrEqual(0);
+        expect(start.y + start.height, `${at}: START's foot in the window`).toBeLessThanOrEqual(h);
+        const bubble = (await bubbleBox(page))!;
+        expect(bubble.y + bubble.height, `${at}: the bubble's box above the boss's head`).toBeLessThanOrEqual(fig.top);
+      }
+    }
+  }
+});
+
 for (const scheme of ["light", "dark"] as const) {
   test(`the grid, ${scheme}: square slanted tiles all the same size with a small gap, six to a row on a phone (a short row centered), two rows of eight across a computer's column (Eric, Nov 2), edge to edge, bigger than before, 44 px targets, each filled by its boss's figure, nothing sideways`, async ({ page }) => {
     await page.emulateMedia({ colorScheme: scheme });

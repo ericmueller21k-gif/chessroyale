@@ -78,6 +78,16 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
   violet), "???", never named, his ominous hum and Eric's two lines in turn ("Team up on me. It wouldn't be the first
   time anyone did that.", "You're not ready to fight me yet."), every way to play locked. Its own voice
   (`selectVoice`), the battle's speech rule.
+- **The computer's stage (Nov 12, Eric: "3X the pawn and boss size even 4").** On a computer with two rows of tiles (the page's content
+  660 px or more, a window 1236 px wide and up: `@container rd-page` in styles.css, and `twoRows` in `BossSelect.tsx`) the platform
+  (`--bs-sw`) is the smaller of 46cqi of the stage's column and the window's height less 625 px (`(100dvh - 625px) / 1.034`), never under
+  today's 200 px. The pawn, the picked boss, the invite circles, the "?" and the speech band (`--bs-rise`, now set on `.bs-say` in the
+  two-row layout) all scale with it; the names grow to 24 px, the level to 20 px, the dots to 6 and 12 px; START and the grid are unchanged.
+  Measured: 1.96x today's figures (pawn 145 to 285 px; the boss's painted figure 178 to 350 for Jefferson) at 1490 x 1090, 1920 x 1080,
+  2560 x 1440 and 4K; 1.15x at 1536 x 864 (the grid's 350 px leaves the room); 1.00x at 1280 x 800 and 1236 x 800 (the floor). A window
+  under 1236 px wide, and the phone, are unchanged. Admins get the speech band on a computer too (no fourth row there), so their bosses
+  clear their bubbles. Guard: `e2e/boss-select.spec.ts` ("on a computer the pawn and the picked boss stand bigger"). Decision:
+  [2026-11-12-select-desktop-big.md](../decisions/2026-11-12-select-desktop-big.md).
 - **The roster is a template** (`BOSS_ROSTER` in `packages/core/src/boss.ts`): each boss has an id, a name, an icon,
   a character kit (its art, moments, lines and sounds, by name), an Elo `offset` (nastier powers play a little weaker
   underneath) and its powers: a **passive** and an **ultimate**. Only a **playable** boss (`isPlayable`: a complete

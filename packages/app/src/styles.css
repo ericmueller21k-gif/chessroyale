@@ -24228,7 +24228,7 @@ button.sq-tiny {
   background: #7486c0;
   pointer-events: none;
 }
-/* A computer: the stage and START a bit bigger, the same idea (Eric, Oct 29). */
+/* A computer (Eric, Oct 29: the stage and START a bit bigger). */
 @media (min-width: 1024px) {
   .bs-row-stage {
     --bs-sw: min(200px, 46cqi);
@@ -24238,6 +24238,44 @@ button.sq-tiny {
   }
   .bs-vs {
     font-size: 32px;
+  }
+}
+/*
+ * A computer's two rows (Nov 12, Eric: "3X the pawn and boss size even 4"): the platform grows into the room the grid and START leave.
+ * Only where the grid is two rows across the column (the rd-page container of 660 px or more, BossSelect's rows of ceil(n/2)); a
+ * narrower window keeps today's size, since its grid is taller. A platform is the smaller of two rooms, never below today's 200 px:
+ * 46cqi of the stage's column (two platforms and the VS side by side), and the window's height less the grid (its bottom at about
+ * 350 px), the band the bubble rises over, the name, the level and its dots, and START (625 px in all, measured; a tight window
+ * then fits with nothing over START). docs/decisions/2026-11-12-select-desktop-big.md.
+ * The band (--bs-rise) is set on .bs-say here too, so it is the platform's, not the phone's.
+ */
+@container rd-page (min-width: 660px) {
+  .bs-row-stage,
+  .bs-say {
+    --bs-sw: max(200px, min(46cqi, calc((100dvh - 625px) / 1.034)));
+  }
+  .bs-say {
+    --bs-rise: calc(var(--bs-rise-cqi, 0) * var(--bs-sw) / 100);
+  }
+  /* The names, the level and its dots grow a little with the figures: not tiny next to a platform 2x today's. */
+  .bs-name,
+  .bs-you-name {
+    font-size: 24px;
+  }
+  .bs-level {
+    font-size: 20px;
+  }
+  .bs-dot {
+    width: 6px;
+    height: 6px;
+  }
+  .bs-dot.on {
+    width: 12px;
+    height: 12px;
+  }
+  /* The "?" stands at 45% of its platform, as it did at 90 px on a 200 px one (its nearest box is the spot). */
+  .bs-q-big {
+    font-size: 45cqi;
   }
 }
 /* Boss Battle's invite sheet (components/BossParty.tsx): Squads' invite rows; admins' bot buttons side by side. */
