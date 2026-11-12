@@ -9,34 +9,39 @@ Only those techniques are used. The cue itself was not listened to, measured or 
 and chord progression here is original: none of it is that cue's, or any song's or game's.
 The Hidden Boss is the chess legend with the red book, so the song is a chess clock. It ticks on every 8th; every
 two bars it is pressed and the band is four beats a minute faster (128, 132 ... 212: 21 changes); the voices on the
-figure double: one, then two, then four, then eight, each a few notes behind the first. At the top it stops: three
-ticks, a cold tone rising, and the book slammed shut. Then the theme at exactly half that pace (106), twice. After a
-slow move a tritone away, bars of 5, 7, 9, 11 and 13 8ths, each two longer than the last, climbing again to the theme
-over the figure at full speed.
-The second go (Eric, Nov 12, before hearing the first: "His powers don't matter, he's a unique boss, same with his
-sounds he really has none ... feel free to do that"; the write-up is "more of a reference ... if we incorporate a lot
-of these ideas into it, so just make sure you're doing that"). Checked against his list and tightened: the entries
-are one, two, four, eight (they were one, two, three, four, six); the bars of six have a pulse in three against them
-(the bow's knocks and the bass); arpeggios in threes run beside the 16ths under the themes and at the top; the
-collapse is to exactly half the top pace, and the slow move's beat is that theme's dotted beat; the slow move is on
-the six notes a tritone away; and the first theme has no drums (the drone, the 808 and the brass carry it), the
-second a kick and a snare, the last a full kit. The clock stays: it is the only percussion for the first minute.
-The six notes: G, B flat, B, D, E flat, F sharp (a minor third, a half step, and round again): in it are G minor with
-its major seventh, the same on E flat and on B, and nothing else, so the chords can only move by major thirds, and
-any voice a major third from another is still in the scale.
-339 beats, about 2:26.
+figure double: one, then two, then four, then eight, each a few notes behind the first; the bars of six have a pulse
+in three against them. At the top it stops: three ticks, a cold tone rising, and the book slammed shut.
+The middle is the third go's. Eric (Nov 12) on the second, whose middle was the theme at half pace, twice, and a
+slow move: "it's just not really hitting like the intro does and the outro ... a bit crazier ... a total
+reconfiguration of that middle section ... definitely switching up the instrument ... that hymning ... really epic
+... a holy sensation, but ... a lot of instrumentals going around with it, a lot of fast-pacedness", like a fighting
+game's battle music. So: straight out of the slam, fast (184), a choir of men with no words sings a slow chant (the
+basses an octave under, a third voice a fifth over, as old chant was sung; its own tune, in G minor) while the band
+races round it: the strings' 16ths, a driven guitar chugging, a kick on the 8ths and then on every 16th, and the lead
+and the fiddle tearing through the scale a third apart at each phrase's end. Then a duel: the choir calls, the lead
+answers, on chords a major third apart, each phrase a little faster and an 8th short. Then the band stops on the
+book and the choir sings alone, in a stone room's echo: the last theme's first phrase.
+From there, as before (he liked "the intro ... and the outro"): bars of 5, 7, 9, 11 and 13 8ths, each two longer than
+the last, climbing to the theme (the overdriven lead and the violins) over the figure at the top pace, the theme and
+the kit at half of it.
+The six notes of the build and the end: G, B flat, B, D, E flat, F sharp (a minor third, a half step, and round
+again): in it are G minor with its major seventh, the same on E flat and on B, and nothing else, so the chords can
+only move by major thirds, and any voice a major third from another is still in the scale. (Earlier in this notes'
+history: his "His powers don't matter ... same with his sounds he really has none ... feel free to do that"; the clock
+stays as the piece's percussion until the chant.)
+399 beats, about 2:28.
   python3 song_v.py <out.wav>
 
   0:00  the stare: his two low tones beating, the clock (a tick a second), the red book's pages, one trembling note
   0:10  the calculation: the solo violin's figure; then two voices, four, eight; the clock pressed and the pace up
         every two bars (128 to 212); a synth bass, held notes climbing, slides, low brass
-  0:56  the flag: silence, three ticks, the engine catching, and the book slammed shut
-  0:59  the theme, at half the pace, on E flat: the lead and the violins over a drone, an 808 and low brass; no drums
-  1:17  the theme again, a major third up, with a kick and a snare, and arpeggios in threes
-  1:35  the slow move, a tritone away: the solo violin and the cellos, two beats apart; his stare; his laugh
-  1:49  bars of 5, 7, 9, 11 and 13 8ths, faster with each
-  2:04  the theme over the figure at full speed, a full kit
-  2:22  the tag: the book shut, the clock slowing to a tick a second, his stare
+  0:56  the flag: silence, three ticks, a cold tone rising, and the book slammed shut
+  0:59  the chant: the men's choir, slow, over the band at full tilt; the lead's runs at each phrase's end
+  1:20  the duel: the choir calls, the lead answers; four phrases, a major third apart, each faster
+  1:39  the choir alone, in the echo: the last theme's first phrase; the clock, a tick a beat
+  1:51  bars of 5, 7, 9, 11 and 13 8ths, faster with each
+  2:06  the theme over the figure at full speed, a full kit
+  2:24  the tag: the book shut, the clock slowing to a tick a second, his stare
 """
 import sys
 
@@ -70,11 +75,13 @@ def lay(start, units):
 
 T_CALC = 10
 CALC_BARS, _calc, T_FLAG = lay(T_CALC, UNITS)
-T_DROP, T_DROP2, T_CALM, T_PLUS = T_FLAG + 4, T_FLAG + 36, T_FLAG + 68, T_FLAG + 84
+T_CHANT, T_DUEL, T_CALM, T_PLUS = T_FLAG + 4, T_FLAG + 68, T_FLAG + 130, T_FLAG + 144
 PLUS_BARS, _plus, T_LAST = lay(T_PLUS, PLUS)
 T_TAG, BEATS = T_LAST + 64, T_LAST + 72
-# The themes at half the top pace (212: an 8th becomes a 16th); the slow move's beat is their dotted beat (106 x 2/3).
-PACE = ([(0, T_CALC, 60, 60)] + _calc + [(T_FLAG, T_DROP, 90, 90), (T_DROP, T_CALM, 106, 106), (T_CALM, T_PLUS, 70.67, 70.67)]
+# The chant at 184; the duel's four phrases (15.5 beats each) at 184, 188, 192 and 196; the choir alone at 70; the
+# last theme's figure at the top pace (212), the theme itself and the kit at half of it.
+PACE = ([(0, T_CALC, 60, 60)] + _calc + [(T_FLAG, T_CHANT, 90, 90), (T_CHANT, T_DUEL, 184, 184)]
+        + [(T_DUEL + 15.5 * i, T_DUEL + 15.5 * (i + 1), 184 + 4 * i, 184 + 4 * i) for i in range(4)] + [(T_CALM, T_PLUS, 70, 70)]
         + _plus + [(T_LAST, T_TAG, 212, 212), (T_TAG, BEATS, 212, 60)])
 SECS = round(float(sum(60 * (b - a) / t0 if t0 == t1 else 60 * (b - a) * np.log(t1 / t0) / (t1 - t0) for a, b, t0, t1 in PACE)), 2)
 
@@ -107,11 +114,32 @@ THEME = (
     "Eb4:1 Bb4:1 D5:3 Eb5:.5 Gb5:.5 Bb5:2 Gb5:2/3 D5:2/3 B4:2/3 Bb4:2 | "
     "B4:1 F#5:1 Bb5:1.5 B5:.5 D6:1.5 Eb6:.5 F#6:2"
 )
-# The slow move: the figure as a tune, in 8ths.
-SLOW = "G4:.5 D5:.5 Bb4:.5 D5:.5 F#5:1 D5:1 | G5:1.5 F#5:.5 Eb5:1 B4:1 | G4:.5 Eb5:.5 B4:.5 Eb5:.5 G5:1 Eb5:1 | F#5:1.5 D5:.5 Bb4:2"
-for _name, _beats in ((THEME, 32), (SLOW, 16)):
+# ---- the middle (the third go): a chant, in G minor (F sharp where the chord is D). ----
+# The choir's line, sixteen bars of four, slow over a fast band: down from G; up to B flat the second time.
+CHANT = (
+    "G4:3 F4:1 | Eb4:1 D4:3 | Eb4:2 G4:2 | F#4:3 D4:1 | Eb4:2 D4:1 C4:1 | D4:3 Bb3:1 | C4:2 Eb4:2 | D4:4 | "
+    "G4:2 A4:1 Bb4:1 | A4:3 F4:1 | G4:2 Bb4:2 | A4:3 F#4:1 | G4:2 Eb4:1 F4:1 | G4:3 Eb4:1 | F#4:2 A4:2 | A4:2 F#4:2"
+)
+# Its chords, a bar each: the bass note, the strings' root, minor (m), major (M) or diminished (o).
+CHANT_CH = [(43, 67, "m"), (43, 67, "m"), (39, 63, "M"), (38, 62, "M"), (36, 60, "m"), (46, 67, "m"), (45, 69, "o"), (38, 62, "M"),
+            (43, 67, "m"), (41, 65, "M"), (39, 63, "M"), (38, 62, "M"), (36, 60, "m"), (39, 63, "M"), (38, 62, "M"), (38, 62, "M")]
+HARMONIC = (0, 2, 3, 5, 7, 8, 11)  # the minor scale with its seventh raised
+DOMINANT = (0, 1, 4, 5, 7, 8, 10)  # the same scale from its fifth
+# The lead's runs at the ends of the chant's phrases: steps of G's scale, a 16th each.
+RUNS = ([11, 10, 9, 8, 9, 8, 7, 6, 7, 6, 5, 4, 5, 4, 3, 4], [4, 5, 6, 7, 6, 7, 8, 9, 8, 9, 10, 11, 10, 11, 12, 13],
+        [13, 12, 11, 10, 11, 10, 9, 8, 9, 8, 7, 6, 7, 8, 9, 11], [4, 6, 8, 6, 5, 7, 9, 7, 6, 8, 10, 8, 9, 11, 13, 14])
+# The duel: four phrases of four, four, four and three and a half beats, on B minor, E flat minor, G minor and D (major
+# thirds apart, then home's dominant): the bass, the strings' root, the chord, the run's first note and scale, and the
+# choir's call. The lead answers each call with the same run: down in fours, then up two octaves.
+DUEL = [(47, 59, "m", 59, HARMONIC, "F#4:3 G4:1 | F#4:2 B4:2"), (39, 63, "m", 63, HARMONIC, "Bb3:3 B3:1 | Bb3:2 Eb4:2"),
+        (43, 67, "m", 55, HARMONIC, "D4:3 Eb4:1 | D4:2 G4:2"), (38, 62, "M", 62, DOMINANT, "A3:3 Bb3:1 | A3:2 D4:2")]
+SWEEP = [11, 10, 9, 8, 9, 8, 7, 6, 7, 6, 5, 4, 5, 4, 3, 2] + list(range(1, 15))
+ARP = {"m": (0, 7, 3, 7, 12, 7, 15, 7, 12, 7, 15, 12, 19, 15, 12, 7), "M": (0, 7, 4, 7, 12, 7, 16, 7, 12, 7, 16, 12, 19, 16, 12, 7),
+       "o": (0, 6, 3, 6, 12, 6, 15, 6, 12, 6, 15, 12, 18, 15, 12, 6)}  # the strings' 16ths on a chord, a bar
+CHUG = (1, 0, 1, 1, 0, 1, 1, 0, 1, 0, 1, 1, 0, 1, 1, 0)  # where in a bar's 16ths the guitar chugs
+for _name, _beats in ((THEME, 32), (CHANT, 64)) + tuple((call, 8) for *_, call in DUEL):
     assert beats(_name) == _beats, (_name[:30], beats(_name))
-assert (T_FLAG, T_LAST, BEATS) == (138, 267, 339)
+assert (T_FLAG, T_LAST, BEATS, len(SWEEP)) == (138, 327, 399, 30)
 
 
 def main(out: str) -> None:
@@ -121,7 +149,7 @@ def main(out: str) -> None:
     sr = x.sr
     tau = 2 * np.pi
     levels = {"solo": 1.6, "violins": 1.0, "violas": 1.0, "cellos": 1.0, "pads": 1.0, "slide": 1.6, "lead": 1.25, "bass": 0.7, "sub": 0.6, "brass": 1.0,
-              "kick": 0.9, "snare": 2.0, "hats": 4.0, "drum": 1.5, "clock": 3.0, "book": 1.5, "fx": 1.2, "hum": 0.7}
+              "kick": 0.9, "snare": 2.0, "hats": 4.0, "drum": 1.5, "clock": 3.0, "book": 1.5, "fx": 1.2, "hum": 0.7, "choir": 6.0, "guitar": 1.15}
     BOWED = x.BOWED
     BRIDGE = [0.5, 0.6, 0.8, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.25, 0.2]  # bowed near the bridge: the high overtones over the note
 
@@ -251,12 +279,14 @@ def main(out: str) -> None:
         env = np.minimum(1, t / 0.06) * (0.45 + 0.55 * np.minimum(1, u / 0.22)) * np.exp(-1.3 * np.maximum(0, u - 0.3)) * tail(k, 0.12)
         put("brass", b, np.tanh(1.1 * w * env * (1 - 0.22 * (0.5 + 0.5 * np.sin(tau * 27 * t)))) * vol)
 
-    def kick(b, vol=0.5):
-        k = int(0.3 * sr)
+    def kick(b, vol=0.5, short=False):
+        """`short`: a tight one, for a kick on every 16th (it doesn't make the bass duck)."""
+        k = int((0.11 if short else 0.3) * sr)
         t = np.arange(k) / sr
-        w = np.tanh(1.8 * np.sin(tau * np.cumsum(46 + 150 * np.exp(-t / 0.014)) / sr) * np.exp(-t / 0.12))
+        w = np.tanh(1.8 * np.sin(tau * np.cumsum(46 + 150 * np.exp(-t / 0.014)) / sr) * np.exp(-t / (0.04 if short else 0.12)))
         put("kick", b, w * tail(k) * vol)
-        put("duck", b, np.ones(1))  # where the bass, the drone and the held strings duck
+        if not short:
+            put("duck", b, np.ones(1))  # where the bass, the drone and the held strings duck
 
     def snare(b, vol=0.26):
         k = int(0.24 * sr)
@@ -394,6 +424,84 @@ def main(out: str) -> None:
                 bow(b, d, m + 4, "violas", 0.55 * third, 0.15, long=True)
         return line
 
+    def sing(b, d, m, vol=0.1, mouth=0.7, pan=0.0, singers=5):
+        """Men singing one note, no words: several voices a little apart, straight (hardly any vibrato); `mouth` from
+        closed (0, a hum) to "ah" (1)."""
+        at(b, d)
+        k = x.k(d * 1.03)
+        t = np.arange(k) / sr
+        f0 = x.hz(m)
+        f1, f2, f3 = 320 + 380 * mouth, 700 + 400 * mouth, 2600
+        gains = []
+        for h in range(1, int(4200 / f0) + 1):
+            fh = h * f0
+            g = 1.0 / np.sqrt(1 + 30 * (fh / f1 - f1 / fh) ** 2) + 0.55 / np.sqrt(1 + 40 * (fh / f2 - f2 / fh) ** 2) + 0.14 / np.sqrt(1 + 60 * (fh / f3 - f3 / fh) ** 2) + 0.03
+            gains.append(g / h**1.2)
+        w = np.zeros(k)
+        for s in range(singers):
+            waver = 1 + 0.003 * np.sin(tau * (4.4 + 0.5 * s) * t + rng.uniform(0, tau))
+            ph = tau * np.cumsum(f0 * 2 ** (rng.uniform(-14, 14) / 1200) * waver) / sr
+            for h, g in enumerate(gains, 1):
+                w += g * np.sin(h * ph + rng.uniform(0, tau))
+        put("choir", b, (w / singers + 0.015 * hiss(k, 4000, 0.5)) * np.minimum(1, t / 0.1) * tail(k, 0.18) * vol, pan)
+
+    def chant(line, vol=1.0, mouth=0.75, scale=None):
+        """The choir on a line: the men, the basses an octave under them, and (where `scale`, a set of the notes
+        allowed, has it) a third voice a fifth over the line, as old chant was sung."""
+        for b, d, m in line:
+            sing(b, d, m, 0.1 * vol, mouth, -0.2)
+            sing(b, d, m - 12, 0.085 * vol, mouth * 0.8, 0.2, 4)
+            if scale is not None and (m + 7) % 12 in scale:
+                sing(b, d, m + 7, 0.045 * vol, mouth, 0.0, 3)
+
+    def chug(b, m, vol=0.5):
+        """A driven guitar's short chord: the note, its fifth, its octave."""
+        at(b, 0.25)
+        for over, loud, pan in ((0, 1.0, -0.3), (7, 0.8, 0.3), (12, 0.5, 0.0)):
+            put("guitar", b, x.gritty(m + over, 0.2, 0.21 * vol * loud), pan)
+
+    def run(start, steps, tonic, scale, vol=1.0):
+        """The lead tearing through a scale, a 16th a step, the fiddle a third over it."""
+        for i, step in enumerate(steps):
+            b = start + i * 0.25
+            at(b, 0.25)
+            put("lead", b, x.drive(tonic + 12 * (step // 7) + scale[step % 7], 0.24, 0.15 * vol, attack=0.008, release=0.015), -0.1)
+            bow(b, 0.25, tonic + 12 * ((step + 2) // 7) + scale[(step + 2) % 7], "solo", 0.7 * vol, 0.3, long=True)
+
+    def band(b, count, low, chord, kind, hard=False):
+        """A bar of the battle band, `count` beats long, on a chord (`low` its bass, `chord` the strings' root): the
+        strings' 16ths in three voices, each a little behind the last; the guitar chugging; the bass and the clock on
+        the 8ths; the snare on 2 and 4; a kick on the other 8ths, or (`hard`) on every 16th."""
+        for i in range(int(round(count * 4))):
+            t = b + i * 0.25
+            lean = 1.25 if i % 4 == 0 else 1.0
+            bow(t, 0.25, chord + ARP[kind][i % 16], "solo", 0.45 * lean, -0.15)
+            bow(t, 0.25, chord + 12 + ARP[kind][(i + 13) % 16], "violins", 0.7 * lean, 0.5)
+            bow(t, 0.25, chord - 12 + ARP[kind][(i + 14) % 16], "violas", 0.7 * lean, -0.5)
+            if CHUG[i % 16]:
+                chug(t, low + 12 if low < 44 else low, 0.5 * lean)
+            if i % 2 == 0:
+                synth(t, low, 0.45, 0.24, 1100)
+                tick(t, 0.045 if i % 4 == 0 else 0.03, i % 4 == 0)
+            if i % 8 == 4:
+                snare(t, 0.26)
+            if hard:
+                kick(t, 0.44 if i % 4 == 0 else 0.28, short=True)
+            elif i % 2 == 0 and i % 8 != 4:
+                kick(t, 0.5 if i % 4 == 0 else 0.4, short=i % 4 != 0)
+
+    def cathedral(name, secs=3.5, wet=0.5):
+        """A long echo for a voice: a stone room."""
+        bus = x.buses[name]
+        size = bus.shape[1]
+        k = int(secs * sr)
+        t = np.arange(k) / sr
+        ir = np.zeros((2, size))
+        ir[:, :k] = rng.normal(0, 1, (2, k)) * np.exp(-t / (secs / 6.9)) * np.minimum(1, t / 0.03)
+        ir /= np.sqrt(np.sum(ir**2, axis=1, keepdims=True))
+        f = np.fft.rfftfreq(size, 1 / sr)
+        x.buses[name] = bus + wet * np.fft.irfft(np.fft.rfft(bus, axis=1) * np.fft.rfft(ir, axis=1) / (1 + (f / 4000) ** 2) * (f > 150), n=size, axis=1)
+
     def root(beat, shift, stretch=1):
         """The theme's root at a beat of it: G for twelve beats, E flat for twelve, B for four, G for four."""
         beat /= stretch
@@ -460,60 +568,55 @@ def main(out: str) -> None:
     ignite(T_FLAG, 3, 0.08)
     shut(T_FLAG + 3, 1.0)
 
-    # 0:59 The theme, at half the pace, on E flat: the lead and the violins over a drone, an 808 and low brass; the
-    # figure goes on in four voices; the clock ticks in 16ths; no drums.
-    # 1:17 The theme again, a major third up (G), the violas a third over it; six voices on the figure and arpeggios in
-    # threes; a kick, a clap and the snare on 3.
-    for start, shift, second in ((T_DROP, -4, False), (T_DROP2, 0, True)):
-        arcs(start, 0.1), x.crash(start, 0.2, decay=0.6)
-        theme(start, shift, 1, 1.0, 1.0, 0.8 if second else 0.0)
-        figured(start, 32, shift, 1, VOICES[:6] if second else VOICES[:4], lambda move: 0.7)
-        if second:
-            threes(start, 32, lambda beat: root(beat, shift), 0.45)
-        for phrase, length in ((0, 12), (12, 12), (24, 4), (28, 4)):
-            low = root(phrase, shift)
-            brass(start + phrase, min(length, 8), low, 0.15 if phrase in (0, 12) else 0.12)
-            drone(start + phrase, length, low, 0.1)
-        for bar in range(8):
-            b = start + 4 * bar
-            low = root(4 * bar, shift)
-            sub(b, low - 12 if low - 12 >= 31 else low, 3.4, 0.45), thump(b, 0.3)
-            if bar % 2:
-                sub(b + 2.75, low - 12 if low - 12 >= 31 else low, 1.1, 0.34), thump(b + 2.75, 0.2)
-            if second:
-                kick(b, 0.6), clap(b + 2), snare(b + 2, 0.24)
-                if bar % 2:
-                    kick(b + 2.75, 0.42)
-            for i in range(16):
-                tick(b + i * 0.25, 0.03 if i % 4 else 0.05, i % 2 == 0)
-            for i in (0, 6, 12):
-                tap(b + i * 0.25, 0.06, 0.2 if i else -0.2)
-            if second:
-                kick(b + 1.5, 0.4), snare(b + 3.5, 0.1)
-                for i in range(8):
-                    hat(b + i * 0.5 + 0.25, 0.025)
-                for i in range(8):
-                    synth(b + i * 0.5, low, 0.45, 0.22, 900)
-        press(start + 31.5, 0.14)
+    # 0:59 The chant (the third go's middle; Eric, Nov 12: the first two's "just not really hitting like the intro
+    # does and the outro ... a bit crazier ... definitely switching up the instrument ... that hymning ... really
+    # epic ... a holy sensation, but ... a lot of instrumentals going around with it, a lot of fast-pacedness").
+    # Straight out of the slam, fast: a choir of men, no words, sings a slow chant (the basses an octave under, a
+    # third voice a fifth over) across sixteen bars, in a stone room's echo, and the band races round it: the
+    # strings' 16ths on each chord, a driven guitar chugging, the bass, a kick on the 8ths (from the ninth bar on
+    # every 16th), the snare on 2 and 4, the clock; low brass under each phrase; and at each phrase's end the lead and
+    # the fiddle, a third apart, tear through the scale.
+    arcs(T_CHANT, 0.1), x.crash(T_CHANT, 0.2, decay=0.6)
+    minor = {(7 + step) % 12 for step in HARMONIC} | {5}
+    chant(notes(T_CHANT, CHANT), 1.3, 0.75, minor)
+    for bar, (low, chord, kind) in enumerate(CHANT_CH):
+        b = T_CHANT + 4 * bar
+        band(b, 4, low, chord, kind, hard=bar >= 8)
+        if bar % 4 == 0:
+            brass(b, 8, low, 0.1)
+            if bar:
+                x.crash(b, 0.12, decay=0.4)
+        if bar % 4 == 3:
+            run(b, RUNS[bar // 4], 55, HARMONIC)
 
-    # 1:35 The slow move, on the six notes a tritone away (C#, E, F, G#, A, C). The solo violin has the figure as a
-    # tune, in 8ths; the cellos follow two beats behind, low; his stare; the clock, a tick a beat; pages; his laugh,
-    # through the nose; the book's light.
-    stare(T_CALM, 16.5, 0.13)
-    slow = notes(T_CALM, SLOW)
-    for b, d, m in slow:
-        bow(b, d, m + 6, "solo", 0.45, -0.15, long=True)
-        if b + 2 < T_PLUS - 2:
-            bow(b + 2, d, m - 18, "cellos", 0.45, 0.25, long=True)
-    for i in range(16):
+    # 1:20 The duel: four phrases, each a major third from the last (B minor, E flat minor, G minor, then D), each a
+    # little faster (the clock pressed), each with an 8th missing from its last bar. The choir calls for two bars;
+    # the lead and the fiddle answer for two with a run down in fours and up two octaves. The kick on every 16th.
+    b = T_DUEL
+    for phrase, (low, chord, kind, tonic, scale, call) in enumerate(DUEL):
+        press(b, 0.12), x.crash(b, 0.14, decay=0.4)
+        chant(notes(b, call), 1.4, 0.9, {(tonic + step) % 12 for step in scale})
+        brass(b, 6, low, 0.1)
+        for start, count in ((b, 4), (b + 4, 4), (b + 8, 4), (b + 12, 3.5)):
+            band(start, count, low, chord, kind, hard=True)
+        run(b + 8, SWEEP, tonic, scale)
+        snare(b + 15, 0.2), snare(b + 15.25, 0.26)
+        b += 15.5
+    slide(T_DUEL + 31, 31, 67, 79, 0.05, 0.4), slide(T_DUEL + 31, 31, 62, 74, 0.05, -0.4)
+
+    # 1:40 The choir alone. The band stops on the book, slammed; in the echo the men sing the last theme's first
+    # phrase, slowly, over two of them holding G and D; his stare; the clock, a tick a beat; pages; the book's light.
+    shut(T_CALM, 0.8), x.crash(T_CALM, 0.14, decay=0.6)
+    stare(T_CALM, 14.5, 0.12)
+    chant([(T_CALM + 1 + b, d, m - 12) for b, d, m in notes(0, THEME.split("|")[0])], 0.7, 0.35)
+    sing(T_CALM + 1, 12.5, 43, 0.04, 0.0, -0.4, 3), sing(T_CALM + 1, 12.5, 50, 0.033, 0.0, 0.4, 3)
+    for i in range(1, 14):
         tick(T_CALM + i, 0.13, i % 2 == 0)
-    flip(T_CALM + 5.6, 0.08)
-    huff(T_CALM + 9.5, 0.07)
-    glow(T_CALM + 10, 6, 61, 0.035)
-    shimmer(T_CALM + 12, 4, 76, 0.03, 0.3)
+    flip(T_CALM + 7.6, 0.08)
+    glow(T_CALM + 8, 6, 55, 0.035)
     press(T_PLUS - 0.5, 0.14)
 
-    # 1:49 Bars of 5, 7, 9, 11 and 13 8ths, two of each, every voice on the figure from the first, the
+    # 1:52 Bars of 5, 7, 9, 11 and 13 8ths, two of each, every voice on the figure from the first, the
     # clock pressed and the pace up with each; the bass on every 8th, its filter opening; held notes climbing; slides;
     # low brass; a kick where each bar begins.
     canon([(b, length, 2 * u, which) for b, length, u, which in PLUS_BARS], PLUS_POLES, [(0, *voice[1:]) for voice in VOICES], lambda move: 0.8 + 0.06 * move)
@@ -536,7 +639,7 @@ def main(out: str) -> None:
     for i in range(16):
         snare(T_LAST - 2 + i * 0.125, 0.06 + 0.012 * i)
 
-    # 2:04 The theme over the figure at full speed (212), on G: each of its notes twice as long, so the theme goes at
+    # 2:07 The theme over the figure at full speed (212), on G: each of its notes twice as long, so the theme goes at
     # the pace it had; the violas a third over it; all eight voices on the figure, arpeggios in threes; a full kit at
     # the theme's pace (a kick on 1, the snare and a clap on 3), the 808, the bass on every 8th, low brass under each
     # phrase.
@@ -564,7 +667,7 @@ def main(out: str) -> None:
         if bar % 4 == 0 and bar:
             x.crash(b, 0.1, decay=0.4)
 
-    # 2:22 The tag. The book shut on the last beat's first; the clock alone, slowing to a tick a second; his stare
+    # 2:25 The tag. The book shut on the last beat's first; the clock alone, slowing to a tick a second; his stare
     # coming up under it, which the start begins with.
     shut(T_TAG, 0.5), kick(T_TAG, 0.6), x.crash(T_TAG, 0.14, decay=0.6)
     brass(T_TAG, 5, 43, 0.12)
@@ -580,6 +683,7 @@ def main(out: str) -> None:
     x.buses["sub"] *= 0.5 + 0.5 * gain
     x.buses["pads"] *= 0.6 + 0.4 * gain
 
+    cathedral("choir")
     x.beat_s = 60 / 160  # the echoes' beat
     x.echo("lead", 0.75, 0.14, 0.06)
     x.echo("solo", 0.75, 0.12, 0.05)

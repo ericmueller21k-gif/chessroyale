@@ -82,6 +82,7 @@ boss's world that reaches into how the song itself runs, not only its sounds.
 | A heroic major-key fanfare with brass, flute and bells (song_d.py) | "way too upbeat and happy" |
 | Lots of brass (track_b.py) | "less brass, more of the other voices"; then "the 2nd song is awful" |
 | The band frozen for a beat or two in the middle of a verse (its sound held, iced over, then going on: song_t.py's first go) | "get rid of the things that sound like glitches at the beginning, because they do come off like ... something weird with it" |
+| A slow theme at half pace as a song's main part, on the overdriven lead and strings (song_v.py's second go, 0:59 to 1:50), after a build and before an ending he liked | "it's just not really hitting like the intro does and the outro ... a bit crazier ... definitely switching up the instrument" (he would have shipped it: "it's good") |
 | A slow-down in the middle of a song (song_g.py) | "the slowdown didn't land, the speed up was cool tho". (A plain one. Boingo's song slows twice with the pitch sinking as it goes, the ride dying, which he asked for and called flawless.) |
 | Tunes built from the same rhythm as the last boss's: 8ths on the grid, two-bar phrases, a chord every two bars (song_r.py, second go) | "it just feels like the other ones a lot ... work up the timings a little bit. Some of the chord progression and maybe even ... be adventurous a little" |
 | A tune that runs up and down its chords, the same shape on chord after chord (song_j.py) | "very dull and boring, sounds like all the rest ... that style chord progression is slop" |
@@ -94,6 +95,11 @@ loop-clean, an intro of its own; a fast pattern underneath; a switch every eight
 so (he liked Big Boy's variety most); instruments layered and trading in different parts; a slower, simpler stretch
 somewhere; and where it fits, a drop. When he doesn't like a lead, send him short samples of the same tune on other
 instruments: he picks fast.
+
+A big middle (Nov 12, the Hidden Boss's): when the main part doesn't hit, he asks for it faster and wilder with a new
+voice in front: "that hymning ... really epic ... a holy sensation, but ... a lot of instrumentals going around with
+it, a lot of fast-pacedness" (a wordless men's choir over a racing band). A build that pays off wants a faster part
+after it, not a slower one.
 
 Into a drop (Nov 12, Ginger's): more of the build's own sound right before it ("a little more like ice crack"), then
 "a little bit of ... pause with ... quiet, like jingling", "and then all of a sudden like the big ice shatter, and
