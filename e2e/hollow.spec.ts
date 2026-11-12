@@ -307,17 +307,29 @@ test("Hollow's bulbs, Nov 12: his six under his bar count every move, yours and 
   expect(box.life[2]!, JSON.stringify(box)).toBeGreaterThanOrEqual(computer ? 1.6 * 110 : 1.15 * 95);
   expect(Math.abs(box.life[1]! - box.next), JSON.stringify(box)).toBeLessThanOrEqual(3);
   expect(box.life[0]!).toBeGreaterThanOrEqual(box.card[0]! - 0.5);
-  // A bulb out with your move, another with his; his cover relights all six. (Your move's count shows while he thinks, about
-  // half a second: watched every 30 ms.)
+  // A bulb out with your move, another with his; his cover relights all six. (Your move's count shows only while he thinks,
+  // which can be a few frames when his reply comes quickly: main's run 43250918402 polled past it. So every value the strip
+  // shows is recorded each frame, and the order is checked.)
+  await page.evaluate(() => {
+    const w = window as unknown as { __lits: string[] };
+    w.__lits = [];
+    const look = () => {
+      const v = document.querySelector(".bulb-strip")?.getAttribute("data-lit") ?? "";
+      if (v && w.__lits.at(-1) !== v) w.__lits.push(v);
+      requestAnimationFrame(look);
+    };
+    requestAnimationFrame(look);
+  });
+  const lits = () => page.evaluate(() => (window as unknown as { __lits: string[] }).__lits);
   await play(page, "e2e4");
-  await expect.poll(lit, { timeout: 10_000, intervals: [30] }).toBe("1");
   await yourMove(page);
   expect((await powers(page)).dark).toHaveLength(1);
   await expect.poll(lit, { timeout: 10_000 }).toBe("6");
+  expect(await lits()).toEqual(["2", "1", "6"]);
   await play(page, "d2d4");
-  await expect.poll(lit, { timeout: 10_000, intervals: [30] }).toBe("5");
   await yourMove(page);
   expect(await lit()).toBe("4");
+  expect(await lits()).toEqual(["2", "1", "6", "5", "4"]);
   expect(await strip.getAttribute("data-bulbs")).toBe("2");
   if (STILLS) await still(page, "bulbs-six");
   expect(errors).toEqual([]);
