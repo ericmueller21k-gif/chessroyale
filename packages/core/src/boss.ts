@@ -492,6 +492,13 @@ const TIER_NAMES = ["golem", "clown", "archer", "knight", "witch", "tyrant", "dr
  * A boss's powers as they stand in a battle (the rules are in the chess package's boss-powers.ts). Crowd turns are
  * numbered from 1 (the crowd's first move of the battle): turn = crowdMoves + 1.
  */
+/** A splat mark of Boingo's pie on one of the crowd's pieces: its square, its kind (p n b r q) and how many splats it holds. */
+export interface SplatMark {
+  square: string;
+  piece: string;
+  n: number;
+}
+
 export interface BossPowerState {
   /** Every choice a power makes comes from this and the position (the same on the server and in every replay). */
   seed: number;
@@ -524,8 +531,17 @@ export interface BossPowerState {
    * thaw as the next crowd turn begins (cracked and dripping on screen). Null once the ice is gone.
    */
   blizzard?: { turn: number; square: string; at?: number; iced?: string[]; next?: string[] } | null;
-  /** Boingo's pies: each pied square (nobody may move onto it) through its crowd turn; up to BOSS_POWERS.pieMax. */
+  /**
+   * Boingo's pies: each pied square (nobody may move onto it) through its crowd turn; up to BOSS_POWERS.pieMax. Since Nov 12
+   * a throw pies the two squares diagonally behind the piece it hits (Eric's face pie).
+   */
   pies?: { square: string; until: number }[];
+  /**
+   * Boingo's splat marks (Nov 12): the crowd's pieces a pie has hit, by square (each follows its piece through every move;
+   * gone once it's taken), its kind and how many splats it holds; at BOSS_POWERS.pieSplatsToFreeze the piece freezes
+   * (`frozen`) and its mark goes.
+   */
+  splats?: SplatMark[];
   /**
    * Boingo's funhouse: the crowd turn it came (the board upside down), and the side its quarter turn goes to after
    * (90: a quarter turn clockwise, 270: counterclockwise); then the other side, then back (boardAngle). `move`/`san`: the
@@ -1491,9 +1507,9 @@ export type PowerEventKind =
 export interface PowerEvent {
   kind: PowerEventKind;
   turn: number;
-  /** The square it hit (a freeze, a pie, a sparkler). */
+  /** The square it hit (a freeze, a pie: the piece it hit in the face, a sparkler). */
   square?: string;
-  /** The squares a wave of fireballs hit; the pieces Ginger's blizzard thaws. */
+  /** The squares a wave of fireballs hit; the pieces Ginger's blizzard thaws; the two squares Boingo's pie split onto. */
   squares?: string[];
   /** Of those, the ones that fizzled as they landed (the crowd's king stood there): no fire tile. */
   fizzled?: string[];

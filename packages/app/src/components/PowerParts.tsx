@@ -254,15 +254,17 @@ export function kitLine(kit: BossKit | null, moment: KitMoment, key: string): st
 
 /**
  * Something flying from the boss's corner of the board (its top-left) to a square: the ice bolt (pointed at its
- * target) or the pie (tumbling), over `ms`.
+ * target) or the pie (tumbling), over `ms`. `fromSquare`: from that square instead, on every screen (Boingo's pie splitting
+ * off a piece's face onto the squares behind it); `bit`: a small piece of it (half the size).
  */
 /** Where a flight leaves on a computer (the board 800 across): the board's left edge, at the standing boss's hands. */
 const SIDE_FROM = { x: -16, y: 680 } as const;
-export function Flight({ name, anim, square, orientation, since, ms, aim = false, from: fromPct }: { name: "iceBolt" | "pieFly" | "sparkFly" | "darkPour" | "blockFly"; anim?: string; square: string; orientation: "white" | "black"; since: number; ms: number; aim?: boolean; from?: { x: number; y: number } }) {
-  const { x, y } = squareXY(square, orientation, useContext(BoardTurn));
+export function Flight({ name, anim, square, orientation, since, ms, aim = false, from: fromPct, fromSquare, bit = false }: { name: "iceBolt" | "pieFly" | "sparkFly" | "darkPour" | "blockFly"; anim?: string; square: string; orientation: "white" | "black"; since: number; ms: number; aim?: boolean; from?: { x: number; y: number }; fromSquare?: string; bit?: boolean }) {
+  const turn = useContext(BoardTurn);
+  const { x, y } = squareXY(square, orientation, turn);
   // (From the boss's corner of the board; Hollow's darkness from the void in his chest, given in % of the board. On a computer from
   // where the boss stands, by the board's bottom-left corner: Cast.)
-  const from = onComputer() ? SIDE_FROM : fromPct ? { x: fromPct.x * 8, y: fromPct.y * 8 } : { x: 60, y: 30 };
+  const from = fromSquare ? squareXY(fromSquare, orientation, turn) : onComputer() ? SIDE_FROM : fromPct ? { x: fromPct.x * 8, y: fromPct.y * 8 } : { x: 60, y: 30 };
   const angle = (Math.atan2(y - from.y, x - from.x) * 180) / Math.PI;
   const style: Record<string, string> = {
     left: `${(from.x - 50) / 8}%`,
@@ -274,7 +276,7 @@ export function Flight({ name, anim, square, orientation, since, ms, aim = false
     ...(aim ? { rotate: `${angle}deg` } : {}),
   };
   return (
-    <span class={`pw-flight ${name}`} style={style}>
+    <span class={`pw-flight ${name}${bit ? " bit" : ""}`} style={style}>
       <BossEffect name={name} anim={anim} since={since} />
     </span>
   );

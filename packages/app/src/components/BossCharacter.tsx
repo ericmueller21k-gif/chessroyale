@@ -280,8 +280,8 @@ function Character({ boss, stage, place }: { boss: BossView; stage: Stage; place
       if (kit.ch.id === "sawyer") prewarmSawyer(kit.ch.name);
       // (Wrangler's leap and lasso too: his long pull comes a move in; then his wind-up and haul.)
       if (kit.ch.id === "pig") prewarmPig(kit.ch.name);
-      // (Ginger's ice: its crack, thin ice and thaw.)
-      if (kit.ch.id === "gingerbread") prewarmGinger();
+      // (Ginger's ice: its crack, thin ice and thaw; Boingo's freeze, a piece his pie splatted twice, shows it too.)
+      if (kit.ch.id === "gingerbread" || kit.ch.id === "clown") prewarmGinger();
       // (Jefferson's Roman candle: him, its shots and fireballs.)
       if (kit.ch.id === "grex") prewarmGrex(kit.ch.name);
       // (Alfil's cast, fusion and Slam, and the shadows his pieces cast while they're up.)

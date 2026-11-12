@@ -1,6 +1,8 @@
 import { expect, type Page } from "@playwright/test";
 import { Chess } from "chess.js";
-import { BOARD_SEL, createLobbyFromHome, engineTop, expectCoordsInSquares, test, watchFor, bossAloneFromHome } from "./helpers.ts";
+import { BOSS_POWERS, type SplatMark } from "@chessroyale/core";
+import { applyMove, behindSquares, choosePieThrow, followSplats } from "@chessroyale/chess";
+import { BOARD_SEL, createLobbyFromHome, engineTop, expectCoordsInSquares, submitMove, test, watchFor, bossAloneFromHome } from "./helpers.ts";
 
 /**
  * Boss powers, played through: the gingerbread man's freeze and blizzard, Boingo's pie and funhouse, alone (solo) on a
@@ -386,7 +388,86 @@ async function playByHand(page: Page, how: "tap" | "drag", phone: boolean, lasti
   return move;
 }
 
-test("Boingo: pies nobody can move onto (up to two, on their squares), the warning, then the funhouse turns the board upside down and plays your move (unscored)", { tag: "@phone-only" }, async ({ page }) => {
+test("Boingo's pie (?power=pie): in your piece's face, two pies on the squares diagonally behind it that nobody can move onto, its splat mark, a second splat freezes it", { tag: "@phone-only" }, async ({ page }) => {
+  test.setTimeout(5 * 60_000);
+  await page.goto("/?debug&clock=60&bossMoves=12&boss=clown&power=pie&laststand=0");
+  await bossAloneFromHome(page);
+  await expect(page.locator(".boss-intro")).toBeVisible({ timeout: 30_000 });
+  expect(await page.evaluate(() => (window as any).match.boss.name)).toBe("Boingo the Clown");
+  // Each beat, watched from before it can come: his throw's flight, the pie in the piece's face, its two pieces flying
+  // to the squares behind, the pies there, a freeze's ice.
+  const beats = await watchFor(page, { flight: { selector: ".pw-flight.pieFly:not(.bit)" }, face: { selector: ".pw-pie-face" }, split: { selector: ".pw-flight.pieFly.bit" }, pie: { selector: ".power-board .pw-pie[data-square]" }, ice: { selector: ".power-board .pw-ice" } });
+  // Your moves: quiet ones that leave a piece he can hit (1. e4, then Nc3 to guard it, then the edge pawns), never the
+  // splatted piece nor onto the squares behind it.
+  const plan = ["e2e4", "b1c3", "a2a3", "h2h3", "a3a4", "h3h4", "d2d4", "g2g3", "b2b3"];
+  let thrown = 0;
+  let froze = 0;
+  let due = 0;
+  let last: { turn: number; fen: string; move: string; marks: SplatMark[] } | null = null;
+  for (let i = 0; i < 8 && froze === 0; i++) {
+    await expect.poll(() => phase(page), { timeout: 60_000 }).toBe("play");
+    await page.waitForTimeout(300);
+    const s = await page.evaluate(() => {
+      const m = (window as any).match;
+      return { fen: m.phase.board.fen as string, history: [...m.runner.boards.get(0).history] as string[], p: m.boss.powers };
+    });
+    const p = s.p;
+    const ev = p.events.find((e: { kind: string }) => e.kind === "pie") as { square: string; squares: string[] } | undefined;
+    // The rule in the position the game reached: the marks as they stood before this turn's throw, followed through your
+    // move and his; with the test switch, the piece already splatted comes first, and a second splat freezes it.
+    if (last && p.turn === last.turn + 1 && last.marks.length) {
+      const after = applyMove(last.fen, last.move);
+      const marks = followSplats(followSplats(last.marks, last.move, after, "w"), s.history.at(-1)!, s.fen, "w");
+      const want = choosePieThrow(s.fen, "w", 0, p.turn, marks, [], BOSS_POWERS, true);
+      if (want?.freeze) {
+        due++;
+        expect(ev?.square).toBe(want.square);
+      }
+    }
+    if (ev) {
+      thrown++;
+      // Its two pies: the squares diagonally behind it (toward your side), empty, nobody may move onto them.
+      expect(ev.squares).toEqual(behindSquares(ev.square, "w"));
+      expect(p.pies.map((x: { square: string }) => x.square)).toEqual(ev.squares);
+      if (p.allowed) expect(p.allowed.some((m: string) => ev.squares.includes(m.slice(2, 4)))).toBe(false);
+      for (const sq of ev.squares) await expect(page.locator(`.board-area .power-board .pw-pie[data-square="${sq}"]`)).toBeVisible();
+      const pied = await piesOffSquares(page);
+      expect(pied.worst, JSON.stringify(pied.off)).toBeLessThanOrEqual(1);
+      if (p.frozen?.square === ev.square) {
+        // The second splat: frozen this turn (Ginger's ice), its mark gone, none of its moves allowed.
+        froze++;
+        expect(p.frozen.until).toBe(p.turn);
+        expect(p.iced).toEqual([ev.square]);
+        expect((p.splats ?? []).some((m: SplatMark) => m.square === ev.square)).toBe(false);
+        expect((p.allowed ?? []).some((m: string) => m.startsWith(ev.square))).toBe(false);
+        await expect(page.locator(`.board-area .power-board .pw-ice[data-square="${ev.square}"]`)).toBeVisible();
+        await expect(page.locator(`.board-area .hb piece[data-square="${ev.square}"] .pw-splat-mark`)).toHaveCount(0);
+      } else {
+        // The first: a splat mark on the piece, drawn with it.
+        expect(p.splats).toEqual(expect.arrayContaining([expect.objectContaining({ square: ev.square, n: 1 })]));
+        await expect(page.locator(`.board-area .hb piece[data-square="${ev.square}"] .pw-splat-mark`)).toHaveCount(1);
+      }
+    }
+    const marked = new Set((p.splats ?? []).map((m: SplatMark) => m.square));
+    const behind = new Set([...marked].flatMap((sq) => behindSquares(sq as string, "w") ?? []));
+    const ok = (p.allowed ?? null) as string[] | null;
+    const free = (m: string) => (!ok || ok.includes(m)) && !marked.has(m.slice(0, 2)) && !behind.has(m.slice(2, 4)) && !s.history.includes(m);
+    const legal = new Chess(s.fen).moves({ verbose: true }).map((m) => m.from + m.to + (m.promotion ?? ""));
+    const move = plan.find((m) => legal.includes(m) && free(m)) ?? legal.find(free) ?? (ok ?? legal)[0]!;
+    last = { turn: p.turn, fen: s.fen, move, marks: (p.splats ?? []).map((m: SplatMark) => ({ ...m })) };
+    await submitMove(page, move, s.fen);
+    await expect.poll(() => phase(page), { timeout: 20_000 }).not.toBe("play");
+  }
+  if (process.env.PIE_DEBUG) console.log("pie", JSON.stringify({ thrown, froze, due }));
+  expect(thrown).toBeGreaterThan(0);
+  // (A freeze whenever the rule called for one: the splatted piece still standing on a target the turn after.)
+  expect(froze).toBe(due > 0 ? 1 : froze);
+  const seen = await beats.seen();
+  expect(seen).toMatchObject({ flight: true, face: true, split: true, pie: true, ...(froze ? { ice: true } : {}) });
+  expect(BOSS_POWERS.pieTurns).toBe(1);
+});
+
+test("Boingo: the warning, then the funhouse turns the board upside down and plays your move (unscored); his pies on their squares", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(5 * 60_000);
   await page.goto("/?debug&clock=40&bossMoves=8&boss=clown&power=funhouse&laststand=0");
   await bossAloneFromHome(page);
@@ -394,12 +475,11 @@ test("Boingo: pies nobody can move onto (up to two, on their squares), the warni
   expect(await page.evaluate(() => (window as any).match.boss.name)).toBe("Boingo the Clown");
 
   await playBest(page);
-  await expect(banner(page, "PIE!")).toBeVisible({ timeout: 30_000 });
-  await expect(page.locator(".pw-pie")).toBeVisible({ timeout: 5_000 });
-  await expect(banner(page, "RAGE!")).toBeVisible({ timeout: 10_000 });
+  await expect(banner(page, "RAGE!")).toBeVisible({ timeout: 30_000 });
   await expect.poll(() => phase(page), { timeout: 20_000 }).toBe("play");
   const p2 = await powers(page);
-  expect(p2.pies).toHaveLength(1);
+  // (His pie on turn 2 if a piece of yours has both squares behind it empty: two pies, nobody moves onto them.)
+  expect([0, 2]).toContain(p2.pies.length);
   if (p2.allowed) expect(p2.allowed.some((m: string) => p2.pies.some((x: { square: string }) => x.square === m.slice(2, 4)))).toBe(false);
   const pie2 = await piesOffSquares(page);
   expect(pie2.worst, JSON.stringify(pie2.off)).toBeLessThanOrEqual(1);
@@ -423,9 +503,8 @@ test("Boingo: pies nobody can move onto (up to two, on their squares), the warni
   expect(await page.evaluate(() => (window as any).match.moves.length)).toBe(scoredBefore + 1);
   const p3 = await powers(page);
   expect(p3.angle).toBe(180);
-  // Two pies now (a new one every other turn), on their squares, the board upside down: you play White from Black's side.
-  expect(p3.pies.length).toBeGreaterThanOrEqual(1);
-  expect(p3.pies.length).toBeLessThanOrEqual(2);
+  // His pies (none, or a throw's two: each lasts a turn), on their squares, the board upside down: you play White from Black's side.
+  expect([0, 2]).toContain(p3.pies.length);
   expect(new Set(p3.pies.map((x: { square: string }) => x.square)).size).toBe(p3.pies.length);
   await expect(page.locator(`.board-area ${BOARD_SEL.wrap}.orientation-black`)).toBeVisible();
   await expectCoordsInSquares(page, "black", 10_000, 0);

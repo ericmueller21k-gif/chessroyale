@@ -8,6 +8,9 @@
 // G-REX: his sparkler's tile through its stages, a piece left on it burning, a step onto a tile (the God King's
 // warning), the Roman candle (?power=candle) and its five waves of fireballs (12 crowd moves by default).
 // Read the frames before calling a power done (.claude/LESSONS.md: watch it frame by frame).
+// POWER=<id> switches that power on instead of the boss's ultimate (POWER=pie: Boingo's pie every turn, the second splat
+// freezing); PHONE=<w>x<h> sizes the phone (e.g. 428x746, at 2x) instead of an iPhone 13; DPR=2 records the frames at the
+// screen's own pixels (stills for Eric) and the computer at 2x too.
 import { mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { resolve, join } from "node:path";
@@ -29,6 +32,8 @@ const WIP = {};
 async function run(boss, name, context) {
   const tag = `${boss}-${name}`;
   const p = await browser.newPage({ ...context, colorScheme: scheme });
+  // (The first-time walkthrough seen, as every e2e test's context: tutorial.ts's TUTORIAL_SEEN_KEY.)
+  await p.addInitScript(() => localStorage.setItem("hunchess.tutorial.dismissed", "1"));
   p.on("pageerror", (e) => console.log(tag, "pageerror", e.message));
   const cdp = await p.context().newCDPSession(p);
   const frames = [];
@@ -36,8 +41,10 @@ async function run(boss, name, context) {
     frames.push({ t: f.metadata.timestamp * 1000, data: f.data });
     await cdp.send("Page.screencastFrameAck", { sessionId: f.sessionId }).catch(() => undefined);
   });
-  await p.goto(`${url}?debug&clock=60&nolanding&boss=${boss}&power=${ULT[boss]}${WIP[boss] ?? ""}`);
-  await p.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
+  await p.goto(`${url}?debug&clock=60&nolanding&boss=${boss}&power=${process.env.POWER || ULT[boss]}${WIP[boss] ?? ""}`);
+  // (Home, Boss Battle, START: the battle at once with the ?boss= boss; the Boss alone menu went on Oct 29.)
+  await p.getByRole("main").getByRole("button", { name: /^Boss Battle/ }).click();
+  await p.getByRole("main").getByRole("button", { name: "START" }).click();
   const t0 = Date.now();
   const phase = () => p.evaluate(() => window.match?.phase.kind ?? null);
   const state = () =>
@@ -93,7 +100,7 @@ async function run(boss, name, context) {
     }
     console.log(`${tag} +${Date.now() - t0}ms played ${pick}${allowed ? ` (of ${allowed.length} allowed)` : ""}, now ${await phase()}`);
   };
-  await cdp.send("Page.startScreencast", { format: "jpeg", quality: 80, everyNthFrame: 1 });
+  await cdp.send("Page.startScreencast", { format: "jpeg", quality: 80, everyNthFrame: 1, ...(process.env.DPR ? { maxWidth: 3200, maxHeight: 3200 } : {}) });
   const marks = [];
   // Three crowd moves (Boingo: sixteen, to see every step of the funhouse), watching each boss screen's moments.
   const moves = Number(movesArg) || (boss === "grex" ? 12 : boss === "clown" ? 16 : boss === "gingerbread" ? 6 : 4);
@@ -161,8 +168,9 @@ async function run(boss, name, context) {
 }
 
 for (const boss of bossArg === "both" ? ["gingerbread", "clown"] : bossArg === "all" ? ["gingerbread", "clown", "grex"] : [bossArg]) {
-  if (which !== "desktop") await run(boss, "phone", { ...devices["iPhone 13"] });
-  if (which !== "phone") await run(boss, "desktop", { viewport: { width: Number(widthArg) || 1440, height: 900 } });
+  const [pw, ph] = (process.env.PHONE ?? "").split("x").map(Number);
+  if (which !== "desktop") await run(boss, "phone", pw && ph ? { viewport: { width: pw, height: ph }, deviceScaleFactor: 2, isMobile: true, hasTouch: true } : { ...devices["iPhone 13"] });
+  if (which !== "phone") await run(boss, "desktop", { viewport: { width: Number(widthArg) || 1440, height: 900 }, ...(process.env.DPR ? { deviceScaleFactor: Number(process.env.DPR) } : {}) });
 }
 await browser.close();
 await server.close();

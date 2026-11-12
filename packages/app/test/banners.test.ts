@@ -167,7 +167,9 @@ describe("a boss's banners a second shorter", () => {
   });
 
   it("the moments that grew a second for the longer banner are a second shorter again (no time on screen with nothing)", () => {
-    expect(POWER_FX).toMatchObject({ warn: 1700, freeze: 2300, thaw: 2200, pie: 2300, spark: 2300, extra: 2200, block: 2300, cut: 2300, showdown: 6000, funhouse: 5200, spin: 2600 });
+    expect(POWER_FX).toMatchObject({ warn: 1700, freeze: 2300, thaw: 2200, spark: 2300, extra: 2200, block: 2300, cut: 2300, showdown: 6000, funhouse: 5200, spin: 2600 });
+    // (Boingo's pie, Nov 12: the same banner, then the pie in a piece's face and its two pieces landing behind it: 0.4 s more.)
+    expect(POWER_FX.pie).toBe(2700);
     // (Those that held their banner already keep their length.)
     expect(POWER_FX).toMatchObject({ blizzard: 3600, candle: 7100, dark: 2700, bounce: 6200, split: 3600, boardsaw: 5700, pull: 3500, drag: 3500, bullet: 4600 });
   });
