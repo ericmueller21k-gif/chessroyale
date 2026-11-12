@@ -191,6 +191,12 @@ test("challenging Alfil in the town: in with him to his marks, his line, the pyr
         const log = await page.locator(".tc-line").allTextContents().catch(() => []);
         throw new Error(`${e.message}\n\nThe chat log's lines: ${JSON.stringify(log)}\nThe town's /api/live:\n${live.join("\n")}`);
       });
+  // (The town's chat lives in the live hub's memory: a restart forgets it and opens a new room, by design, docs/areas/chat.md. The
+  // local server frees a Durable Object after some seconds without a request (reproduced: 45 s on the result screen gave a new, empty
+  // room; on CI a battle's 11 s did, Nov 11), while on Cloudflare every app's heartbeat keeps it in use. So, standing in for the
+  // town's other visitors, a reader asks for the town's lines every 1.5 s until the page closes. Nothing else of the spec changes.)
+  const awake = setInterval(() => void page.request.get("/api/live?town=0").catch(() => undefined), 1500);
+  page.on("close", () => clearInterval(awake));
   await named(page, me);
   // (Once the page has its account: signing in a request's own new account would race the page's.)
   await page.goto("/town");

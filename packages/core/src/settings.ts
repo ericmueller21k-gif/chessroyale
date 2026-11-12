@@ -1784,7 +1784,8 @@ export const BOSS_POWERS = {
   /**
    * Don Dough's Rising Dough (his passive; Eric, Nov 11; bosses/zebra.ts; docs/decisions/2026-11-11-don-dough.md). Early in the
    * battle, at the end of a few of his turns, a lump of dough on an empty square of his half that shows what it will rise as.
-   * Its oven timer starts at doughTimers[kind] minutes (Eric's: pawn 4, knight and bishop 7, rook 10, queen 15), one off for
+   * Its oven timer starts at doughTimers[kind] minutes (Eric, Nov 12: pawn 8, knight and bishop 13, rook 16, queen 21;
+   * Nov 11's 4/7/7/10/15 gave too little time to capture: "I meant 4 of our turns"), one off for
    * every move, yours and his; at 00:00 his piece rises there (when the guards allow; else after the next move). A piece of
    * yours landing on it squashes it. The rest is the sim's (reports/zebra-sim.md):
    * - doughDrops a battle at most; the first after crowd move doughFirst (from the seed, in the range), each next one
@@ -1797,7 +1798,7 @@ export const BOSS_POWERS = {
    * The sim's (reports/zebra-sim.md): with these, 2.1 pawns risen a battle (a queen in 1 in 10), the crowd 0.05 against the plain
    * boss's 0.10.
    */
-  doughTimers: { p: 4, n: 7, b: 7, r: 10, q: 15 } as Readonly<Record<"p" | "n" | "b" | "r" | "q", number>>,
+  doughTimers: { p: 8, n: 13, b: 13, r: 16, q: 21 } as Readonly<Record<"p" | "n" | "b" | "r" | "q", number>>,
   doughOdds: { p: 0.5, n: 0.2, b: 0.2, r: 0.06, q: 0.04 } as Readonly<Record<"p" | "n" | "b" | "r" | "q", number>>,
   doughDrops: 3,
   doughFirst: [1, 3] as readonly [number, number],
@@ -4230,8 +4231,19 @@ export const BOARD: { readonly checkHighlight: boolean } = { checkHighlight: fal
  * - `fadeMs`: Music or Sound switched off, or the page hidden: faded out over this (and back in).
  * - `endFadeMs`: the battle's result (a win, a loss, leaving): faded out over this, then stopped.
  * - `startDelayS`: from asking to the first note (s), so the intro and the loop are scheduled together.
+ * - `splashHoldMs`: a challenge from the town starts the theme as the boss's full-screen splash starts (Eric, Nov 11); a theme not
+ *   ready by then holds the splash's covering frame up to this much longer, then the battle goes on and the music joins when ready.
  */
-export const MUSIC = { volume: 0.25, fadeMs: 300, endFadeMs: 1500, startDelayS: 0.05 } as const;
+export const MUSIC = { volume: 0.25, fadeMs: 300, endFadeMs: 1500, startDelayS: 0.05, splashHoldMs: 2000 } as const;
+
+/**
+ * The area banner (Eric, Nov 11, approving its mockup: "super clean. That's exactly what I was imagining";
+ * docs/decisions/2026-11-11-area-banner-room-music.md): as you walk into a home's room through its door (once the door's
+ * black lifts), its name across a dark band a third down the room's view, the boss's name above it in gold. Taps pass
+ * through it. Reduced motion: no fades, shown for the same total time.
+ * - `inMs`, `holdMs`, `outMs`: fade in, hold, fade out.
+ */
+export const AREA_BANNER = { inMs: 400, holdMs: 1800, outMs: 600 } as const;
 
 /** A vibration: one pulse (ms), or on, off, on… (ms) as `navigator.vibrate` takes it. */
 export type HapticPattern = number | readonly number[];

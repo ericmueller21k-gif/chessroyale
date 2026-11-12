@@ -111,8 +111,8 @@ describe("Don Dough's sheet", () => {
     expect(menuBosses({ admin: true, raid: false }).some((d) => d.id === "zebra")).toBe(true);
   });
 
-  it("has Eric's timers (pawn 4, knight and bishop 7, rook 10, queen 15), rook and queen rare, a few drops early on", () => {
-    expect(S.doughTimers).toEqual({ p: 4, n: 7, b: 7, r: 10, q: 15 });
+  it("has Eric's timers (Nov 12: pawn 8, knight and bishop 13, rook 16, queen 21), rook and queen rare, a few drops early on", () => {
+    expect(S.doughTimers).toEqual({ p: 8, n: 13, b: 13, r: 16, q: 21 });
     expect(S.doughOdds.r).toBeLessThan(S.doughOdds.p);
     expect(S.doughOdds.q).toBeLessThan(S.doughOdds.n);
     expect(S.doughOdds.q).toBeLessThan(S.doughOdds.b);
@@ -207,7 +207,7 @@ describe("Rising Dough: what and where", () => {
 });
 
 describe("Rising Dough in a battle", () => {
-  it("?power=dough: a pawn's lump at the end of his first turn (from 1.e4 d5 2.exd5 Qxd5), its timer 04:00, a minute off each move, and it rises at 00:00 unless squashed", async () => {
+  it("?power=dough: a pawn's lump at the end of his first turn (from 1.e4 d5 2.exd5 Qxd5), its timer at doughTimers.p, a minute off each move, and it rises at 00:00 unless squashed", async () => {
     // (The crowd keeps clear of the lump: its moves never land on it.)
     let rose = 0;
     for (const seed of [1, 2, 3, 4, 5, 6]) {
@@ -222,11 +222,11 @@ describe("Rising Dough in a battle", () => {
       const z = zOf(r);
       expect(z.drops).toBe(1);
       const lump = z.lumps[0]!;
-      expect(lump).toMatchObject({ n: 0, slot: 0, piece: "p", left: 4, at: 1 });
+      expect(lump).toMatchObject({ n: 0, slot: 0, piece: "p", left: S.doughTimers.p, at: 1 });
       expect(r.boss!.powers!.events.find((e) => e.kind === "doughDrop")).toMatchObject({ square: lump.square, shape: "p" });
-      // (Your move: 3; his: 2; yours: 1; his: 0, and it rises after his move unless a guard holds it.)
+      // (A minute off each move, yours and his, down to his move at 0, and it rises after his move unless a guard holds it.)
       const lefts: number[] = [];
-      for (let i = 0; i < 2; i++) {
+      for (let i = 0; i < S.doughTimers.p / 2; i++) {
         await crowdMove(r, avoid);
         lefts.push(zOf(r).lumps.find((l) => l.n === 0)?.left ?? -1);
         if (r.isOver() || !r.bossToMove()) break;
@@ -236,7 +236,7 @@ describe("Rising Dough in a battle", () => {
       const up = zOf(r).rises.find((x) => x.n === 0);
       if (up) {
         rose++;
-        expect(lefts).toEqual([3, 2, 1, -1]);
+        expect(lefts).toEqual([...Array.from({ length: S.doughTimers.p - 1 }, (_, i) => S.doughTimers.p - 1 - i), -1]);
         expect(up).toMatchObject({
           side: "boss",
           piece: "p",
@@ -248,7 +248,7 @@ describe("Rising Dough in a battle", () => {
         });
         expect(r.boss!.powers!.events.some((e) => e.kind === "doughRise" && e.square === lump.square)).toBe(true);
         expect(powerTurn(r.boss)).toBe(true);
-      } else expect(lefts.slice(0, 3)).toEqual([3, 2, 1]);
+      } else expect(lefts.slice(0, 3)).toEqual([S.doughTimers.p - 1, S.doughTimers.p - 2, S.doughTimers.p - 3]);
     }
     expect(rose).toBeGreaterThan(2);
   });

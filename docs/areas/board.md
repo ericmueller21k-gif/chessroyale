@@ -124,7 +124,9 @@ Lane: the director (every screen draws it; a boss's powers draw over it). How ea
   longer, not a drag's start, not a drag let go back on its square or off the board, not a move a power refuses, not the
   opponent's or a replay's, not a premove playing by itself (`pickedUp` in logic.ts decides the tap; OwnBoard calls
   `haptic`). Every board through `OwnBoard`. Settings → Sound, "Vibration" (on; per device, `prefs.ts`; greyed with "Not
-  available on this device" where there's no way: a computer, an old iPhone). An iPhone has no Vibration API: its ticks
+  available on this device." where there's no way: a computer, an old iPhone; greyed with "Not available on iPhone." on an
+  iPhone or iPad since Nov 11, as iOS 27's Safari gives web pages no tick: `vibrationGreyed` in haptics.ts). An iPhone has no
+  Vibration API: its ticks
   are the hidden-switch trick, inside the tap only. A touch's press-down isn't a gesture there, so a tick a press-down
   makes (a tap-tap move, a premove or a Hollow try placed by tap) plays as that finger lifts on the same square, within
   `holdMs` (`hapticAtPress` / `hapticAtLift`; docs/decisions/2026-11-11-ios-move-tick.md); Android ticks at once. An

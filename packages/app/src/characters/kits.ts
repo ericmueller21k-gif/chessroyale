@@ -44,7 +44,7 @@ import { mooPowered } from "./moo-state.ts";
 import { RECLUSE_LINES } from "./recluse-lines.ts";
 import type { BossView } from "../game.ts";
 import { mapFrames, type Character } from "./sprite.ts";
-import { ankusItem, balloonItem, bonkItem, chipItem, flourItem, inkItem, carrotItem, frostItem, lashItem, lassoItem, moonItem, paintItem, pieItem, popItem, sawItem, waterItem, type SquareItem } from "./power-art.ts";
+import { ankusItem, balloonItem, bonkItem, chipItem, clawItem, darkItem, flourItem, inkItem, carrotItem, frostItem, lashItem, lassoItem, moonItem, paintItem, pieItem, popItem, sawItem, waterItem, type SquareItem } from "./power-art.ts";
 import { testSwitchesAllowed } from "../test-switches.ts";
 
 /**
@@ -81,6 +81,13 @@ export interface KingAttackKit {
    * kit's "whack" is the gnaw as he takes a piece). Undefined: the kit's.
    */
   sounds?: Record<string, SoundName>;
+  /**
+   * At its mate, what stays on the king's square once the king has toppled, until the result (Hollow: his dark gathers there,
+   * darkItem). Undefined: nothing, the square left empty. A boss's own (Eric, Nov 11: Babur's mate showed Hollow's dark).
+   */
+  mateMark?: (square: string, since: number) => SquareItem;
+  /** The color of the king's flash at each hit at its mate (Hollow: his violet). Undefined: white. */
+  glow?: string;
 }
 
 export interface BossKit extends BeatLines {
@@ -263,7 +270,9 @@ export const BOSS_KITS: Record<string, BossKit> = {
     // (No `lookOf`: his strand is lit in full in every pose, Eric, Oct 16. The countdown to his next cover is the strip
     // of three bulbs by the boss bar alone: docs/decisions/2026-10-16-hollow-full-strand.md.)
     // He drops in beside the king and whips his strand at it (hollow.ts: kingAttack), a lash of color on its square each hit.
-    kingAttack: { ch: HOLLOW_ATTACK, anim: "kingAttack", perSquare: 36, stand: 1.8, hit: lashItem },
+    // At its mate the king's square fades into his dark (`mateMark`), and the king flashes his violet at each lash (`glow`): his alone
+    // (Eric, Nov 11: Babur's mate showed it; docs/decisions/2026-11-11-mate-effects-iphone-vibration.md).
+    kingAttack: { ch: HOLLOW_ATTACK, anim: "kingAttack", perSquare: 36, stand: 1.8, hit: lashItem, mateMark: (square, since) => darkItem(square, "new", since), glow: "#9c6cff" },
   },
   "Big Boy": {
     barScale: 1.26,
@@ -943,7 +952,8 @@ export const BOSS_KITS: Record<string, BossKit> = {
     // His attack on a king (Eric, Nov 6: "when you blunder, all bosses are supposed to jump on the board and attack"): he dashes
     // in from his side with his trail, swipes his claws at it ten times, high and low (a whoosh and a snap in turn), and dashes
     // off (dash-figure.ts: DASH_ATTACK). Facing our left; 48 frame pixels a square (he's lanky), a square off.
-    kingAttack: { ch: DASH_ATTACK, anim: "kingAttack", perSquare: 48, stand: 1, facesLeft: true, hit: popItem },
+    // His claw marks on its square each swipe (clawItem; until Nov 11 Jefferson's fireball pops, popItem: docs/decisions/2026-11-11-mate-effects-iphone-vibration.md).
+    kingAttack: { ch: DASH_ATTACK, anim: "kingAttack", perSquare: 48, stand: 1, facesLeft: true, hit: clawItem },
   },
   // Don Dough, the zebra kingpin (Eric's design, Nov 10-11; his art approved Nov 11): docs/decisions/2026-11-11-don-dough.md. His art is
   // the art branch's boss-zebra, as drawn (characters/zebra.ts, on its rig zebra-rig.ts). His sounds are his own: a bread rifle's

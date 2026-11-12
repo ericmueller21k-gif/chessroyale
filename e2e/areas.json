@@ -374,6 +374,7 @@
       "paths": [
         "packages/chess/src/bosses/dash.ts",
         "packages/app/src/characters/dash*.ts",
+        "packages/app/src/characters/effects/dash.ts",
         "packages/app/src/characters/boss-blitz.ts",
         "packages/app/src/characters/sidekicks/blitz.ts",
         "packages/app/src/components/Dash.tsx",

@@ -256,6 +256,8 @@
  *                          low, from the left or right edge: a white puff and ice shards; it never covers the king.
  *   popHit         square  hit<H|L><L|R> (ends empty, about 200 ms): a fireball of Jefferson's Roman candle popping on a
  *                          king, high or low, from the left or right: a white flash and eight sparks bursting out.
+ *   clawHit        square  hit<H|L><L|R> (ends empty, about 200 ms): a swipe of Dash's claws on a king, high or low, from
+ *                          the left or right edge: three streaks raking down, white-hot, then his teal.
  *   lashHit        square  hit<F|B><L|R><c> (ends empty, about 200 ms): a lash of Hollow's strand landing on a king,
  *                          a forehand (high) or backhand (low, rising), from the left or right edge, in bulb color c.
  *   paintSplash    square  land<A|B|C> (a splash of paint lands over a piece: it spreads, `splat`; ends on hold's look),
@@ -574,6 +576,7 @@ export const EFFECTS: Record<EffectName, Effect> = {
   sawHit: { ch: EFFECT_SPRITES.sawHit, covers: "square", start: "hitAL", sounds: {} },
   chipHit: { ch: EFFECT_SPRITES.chipHit, covers: "square", start: "hitUL", sounds: {} },
   flourHit: { ch: EFFECT_SPRITES.flourHit, covers: "square", start: "hitHL", sounds: {} },
+  clawHit: { ch: EFFECT_SPRITES.clawHit, covers: "square", start: "hitHL", sounds: {} },
   // Don Dough's dough on its square (components/Zebra.tsx): it lands (`land`), proofs as its kind (`p` … `q`, loops), rises into his
   // piece (`<k>Rise`) or is squashed (`<k>Squash`). Its sounds: the plop, the swell and the oven's pop, the splat.
   zebraDough: { ch: EFFECT_SPRITES.zebraDough, covers: "square", start: "land", loop: "p", sounds: { plop: "zebraPlop", rise: "zebraRise", pop: "zebraOvenPop", squash: "zebraSquash" } },
@@ -798,6 +801,11 @@ export function sawItem(square: string, i: number, from: "L" | "R", since: numbe
 export function chipItem(square: string, i: number, from: "L" | "R", since: number): SquareItem {
   const kind = i >= 9 ? "X" : i === 8 || i % 2 ? "S" : "U";
   return { square, name: "chipHit", anim: `hit${kind}${from}`, since };
+}
+
+/** Dash's i-th swipe of his claws on the king's square (at its head, then its chest, in turn), from his side. */
+export function clawItem(square: string, i: number, from: "L" | "R", since: number): SquareItem {
+  return { square, name: "clawHit", anim: `hit${i % 2 ? "L" : "H"}${from}`, since };
 }
 
 /** Don Dough's i-th shot of his bread rifle on the king's square (at its head, then its chest, in turn), from his side. */

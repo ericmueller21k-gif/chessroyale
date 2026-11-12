@@ -4,7 +4,7 @@ import { KING_ATTACK, kingAttackHits, lastStandHits, mateAttackDue } from "@ches
 import { bossKit, type KingAttackKit } from "../characters/kits.ts";
 import { partSize } from "../characters/sprite.ts";
 import { turned } from "../characters/sprite-kit.ts";
-import { EFFECTS, darkItem, type SquareItem } from "../characters/power-art.ts";
+import { EFFECTS, type SquareItem } from "../characters/power-art.ts";
 import { pickLine } from "../characters/boss-beats.ts";
 import type { BossView } from "../game.ts";
 import { BoardEffects, SpriteAnim, prewarm, prewarmSprite } from "./BossEffect.tsx";
@@ -85,6 +85,16 @@ export function attackTop(ka: KingAttackKit): number {
   }
   tops.set(ka, top);
   return top;
+}
+
+/**
+ * What a boss's mate leaves on the king's square (shown as `square`) from halfway through its topple, pure: its kit's own mark
+ * (`mateMark`: Hollow's dark), or nothing. Never another boss's (Eric, Nov 11: Babur's mate showed Hollow's dark, then drawn here
+ * for every boss; king-attack.test.ts checks each boss's).
+ */
+export function mateItems(ka: KingAttackKit, square: string, startAt: number, now: number): SquareItem[] {
+  const at = startAt + KING_ATTACK.toppleAt + KING_ATTACK.toppleMs * 0.5;
+  return ka.mateMark && now >= at ? [ka.mateMark(square, at)] : [];
 }
 
 /** How far above the board's top edge (squares) a boss's attack may rise: never as far as what's above it (a phone's boss bar). */
@@ -206,9 +216,8 @@ export function KingAttack({
   hits.forEach((at, i) => {
     if (t >= at && t < at + 220) items.push(ka.hit(shown, i, from, startAt + at));
   });
-  // At a mate the king fades into the dark: the dark gathers on its square as it goes, and stays.
-  const darkAt = startAt + KING_ATTACK.toppleAt + KING_ATTACK.toppleMs * 0.5;
-  if (king && now >= darkAt) items.push(darkItem(shown, "new", darkAt));
+  // At a mate, as the king goes, its kit's mark gathers on its square and stays (Hollow's dark; none for the rest): mateItems.
+  if (king) items.push(...mateItems(ka, shown, startAt, now));
   const him = t <= KING_ATTACK.ms;
   // The king: a flash at each lash, a jolt, darker each time; then it topples away from him and goes.
   const jolt = beat.lit ? (beat.hit % 2 ? -1 : 1) * 4 : 0;
@@ -218,7 +227,7 @@ export function KingAttack({
         translate: `${(left ? 1 : -1) * Math.abs(jolt) * 0.6 + beat.topple * (left ? 8 : -8)}% ${beat.topple * 4}%`,
         rotate: `${(left ? 1 : -1) * 84 * beat.topple * beat.topple}deg`,
         transformOrigin: left ? "80% 92%" : "20% 92%",
-        filter: beat.lit ? "brightness(1.9) drop-shadow(0 0 4px #9c6cff)" : `brightness(${(1 - 0.45 * beat.dim) * (1 - 0.8 * beat.gone)})`,
+        filter: beat.lit ? `brightness(1.9) drop-shadow(0 0 4px ${ka.glow ?? "#fff"})` : `brightness(${(1 - 0.45 * beat.dim) * (1 - 0.8 * beat.gone)})`,
         opacity: String(1 - beat.gone),
       }
     : undefined;
