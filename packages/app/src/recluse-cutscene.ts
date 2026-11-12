@@ -1,0 +1,96 @@
+/**
+ * The Hidden Boss's cutscene between his adult form and the cyborg (a MOCKUP, Nov 12): its one timeline, pure. The
+ * times are RECLUSE_CUTSCENE in settings.ts; the arrival's lengths come from the figures' own frames
+ * (`RECLUSE_CUTSCENE` in characters/recluse-ages.ts), so the picture and the timeline can't drift apart. Drawn by
+ * `components/RecluseCutscene.tsx`; wired into no match yet.
+ */
+import { RECLUSE_CUTSCENE } from "@chessroyale/core";
+
+export type Speaker = "kid" | "man";
+export interface CutLine {
+  who: Speaker;
+  /** Its sentences, typed one after the other with a pause between. */
+  say: readonly string[];
+}
+/** One box: its words (the sentences joined), when it starts, when each sentence starts typing, when it's typed, when it's gone. */
+export interface CutBox {
+  who: Speaker;
+  text: string;
+  at: number;
+  starts: readonly number[];
+  typed: number;
+  until: number;
+}
+export interface CutTimeline {
+  /** The light fully up. */
+  litAt: number;
+  poofAt: number;
+  dropAt: number;
+  landAt: number;
+  /** He has straightened: the conversation's loop from here. */
+  standAt: number;
+  boxes: readonly CutBox[];
+  /** The child fades (his frames' `fade`), and the scene is over (the light and the man held a moment). */
+  fadeAt: number;
+  endAt: number;
+}
+
+type Settings = typeof RECLUSE_CUTSCENE;
+
+/** How long a box stays fully readable once its words are typed (ms). */
+export const cutReadMs = (text: string, c: Settings = RECLUSE_CUTSCENE) => Math.min(c.maxReadMs, c.readMs + c.perCharMs * text.length);
+
+/** A box for a line starting at `at`: each sentence typed at `typeMs` a character, `sentencePauseMs` between them. */
+export function cutBox(line: CutLine, at: number, c: Settings = RECLUSE_CUTSCENE): CutBox {
+  const starts: number[] = [];
+  let t = at;
+  line.say.forEach((s, i) => {
+    if (i) t += c.sentencePauseMs;
+    starts.push(t);
+    t += s.length * c.typeMs;
+  });
+  const text = line.say.join(" ");
+  return { who: line.who, text, at, starts, typed: t, until: t + cutReadMs(text, c) + c.boxFadeMs };
+}
+
+/**
+ * How many of a box's characters are typed by `now` (its sentences joined by one space, the space typed with the second):
+ * every character of the sentences already started, at `typeMs` each, none during a pause.
+ */
+export function cutTyped(line: CutLine, box: CutBox, now: number, c: Settings = RECLUSE_CUTSCENE): number {
+  let n = 0;
+  line.say.forEach((s, i) => {
+    const sep = i ? 1 : 0;
+    const t = now - box.starts[i]!;
+    if (t < 0) return;
+    n += sep + Math.min(s.length, Math.floor(t / c.typeMs) + 1);
+  });
+  return n;
+}
+
+/**
+ * The scene's beats from its start (0: the dimming begins). `arrival`: the lengths of the child's poof, drop and landing
+ * (from his frames).
+ */
+export function cutsceneTimeline(lines: readonly CutLine[], arrival: { poofMs: number; dropMs: number; landMs: number; fadeMs: number }, c: Settings = RECLUSE_CUTSCENE): CutTimeline {
+  const litAt = c.dimMs;
+  const poofAt = litAt + c.poofAfterMs;
+  const dropAt = poofAt + arrival.poofMs;
+  const landAt = dropAt + arrival.dropMs;
+  const standAt = landAt + arrival.landMs;
+  const boxes: CutBox[] = [];
+  let t = standAt + c.firstLineAfterMs;
+  for (const line of lines) {
+    const b = cutBox(line, t, c);
+    boxes.push(b);
+    t = b.until + c.gapMs;
+  }
+  const fadeAt = (boxes.at(-1)?.until ?? standAt) + c.kidFadeAfterMs;
+  return { litAt, poofAt, dropAt, landAt, standAt, boxes, fadeAt, endAt: fadeAt + arrival.fadeMs + c.endHoldMs };
+}
+
+/** The box up at `t` (from the scene's start), if any. */
+export const boxAt = (tl: CutTimeline, t: number): { box: CutBox; i: number } | null => {
+  const i = tl.boxes.findIndex((b) => t >= b.at && t < b.until);
+  return i < 0 ? null : { box: tl.boxes[i]!, i };
+};

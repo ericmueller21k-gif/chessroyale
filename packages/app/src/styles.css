@@ -27029,3 +27029,63 @@ button.sq-tiny {
     transform: translateY(-50%);
   }
 }
+
+/* The Hidden Boss's cutscene (a MOCKUP, Nov 12: components/RecluseCutscene.tsx; in no match yet). One fixed layer over the
+   whole screen: everything dims but a round pool of light on the board's middle, its edge feathered over the outer part of
+   its radius (eased stops, so no ring shows); the figure and the text boxes on a stage laid over the board, above the dark. */
+.cs-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 900;
+  pointer-events: none;
+}
+.cs-dim {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    circle var(--cs-r) at var(--cs-x) var(--cs-y),
+    rgba(255, 238, 200, 0.07) 0%,
+    rgba(255, 238, 200, 0.03) calc(var(--cs-in) * 0.7),
+    rgba(6, 6, 12, 0) var(--cs-in),
+    rgba(6, 6, 12, calc(var(--cs-a) * 0.12)) calc(var(--cs-in) + (100% - var(--cs-in)) * 0.25),
+    rgba(6, 6, 12, calc(var(--cs-a) * 0.38)) calc(var(--cs-in) + (100% - var(--cs-in)) * 0.5),
+    rgba(6, 6, 12, calc(var(--cs-a) * 0.7)) calc(var(--cs-in) + (100% - var(--cs-in)) * 0.75),
+    rgba(6, 6, 12, calc(var(--cs-a) * 0.92)) calc(var(--cs-in) + (100% - var(--cs-in)) * 0.92),
+    rgba(6, 6, 12, var(--cs-a)) 100%
+  );
+}
+.cs-stage {
+  position: fixed;
+}
+.cs-fig {
+  position: absolute;
+  display: block;
+}
+/* The point above the speaker's head that his box stands on: the child's box runs right from it, its tail at its left; the
+   man's runs left from it, its tail at its right (the bubble's own tail). */
+.cs-anchor {
+  position: absolute;
+  width: 0;
+  height: 0;
+}
+.cs-say {
+  bottom: 0;
+  max-width: min(230px, 64vw);
+  font-size: 10px;
+}
+.cs-kid .cs-say {
+  left: 0;
+}
+.cs-kid .cs-say::after {
+  right: auto;
+  left: 26px;
+}
+.cs-man .cs-say {
+  right: 0;
+}
+@media (min-width: 900px) {
+  .cs-say {
+    max-width: 320px;
+    font-size: 12px;
+  }
+}

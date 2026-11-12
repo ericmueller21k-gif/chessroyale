@@ -270,7 +270,7 @@ export function Say({ voice, text, sayKey, priority = NORMAL }: { voice: Voice; 
  * would run off the screen takes a smaller size (`fits` steps: its CSS's `.fit1`…), and past the last step is moved
  * back into view. It's never hidden.
  */
-export function SpeechBox({ class: cls, text, at, until, now, fits = 0, balanced = false, children, ...props }: { class: string; text: string; at: number; until: number; now: number; fits?: number; /** Fitted to its line, two balanced rows or three (bubbleFit): a boss's bar. */ balanced?: boolean; children?: ComponentChildren } & Omit<JSX.HTMLAttributes<HTMLDivElement>, "class">) {
+export function SpeechBox({ class: cls, text, at, until, now, fits = 0, balanced = false, typed, children, ...props }: { class: string; text: string; at: number; until: number; now: number; fits?: number; /** Fitted to its line, two balanced rows or three (bubbleFit): a boss's bar. */ balanced?: boolean; /** How many characters are typed, when its typing isn't the usual steady pace (a cutscene's pause between sentences). */ typed?: number; children?: ComponentChildren } & Omit<JSX.HTMLAttributes<HTMLDivElement>, "class">) {
   const el = useRef<HTMLDivElement>(null);
   const [fit, setFit] = useState<{ step: number; dx: number; dy: number }>({ step: 0, dx: 0, dy: 0 });
   const [fitted, setFitted] = useState<{ width: number; three: boolean } | null>(null);
@@ -304,7 +304,7 @@ export function SpeechBox({ class: cls, text, at, until, now, fits = 0, balanced
     if (fit.step < fits) setFit({ step: fit.step + 1, dx: 0, dy: 0 });
     else setFit({ step: fit.step, dx: r.left < minX ? minX - r.left : r.right > innerWidth ? innerWidth - r.right : 0, dy: r.top < 0 ? -r.top : 0 });
   }, [fit]);
-  const { shown, rest } = sliceLine(text, typedCount(text, at, now));
+  const { shown, rest } = sliceLine(text, typed ?? typedCount(text, at, now));
   const leaving = until - now < SPEECH.fadeMs;
   // (Whole pixels, rounded away from the edge it came off: rounded to the nearest, a box 12.25 px over the top moved 12
   // and stayed a quarter pixel above the window, every frame of its line.)
