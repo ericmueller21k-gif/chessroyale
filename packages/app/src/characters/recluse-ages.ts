@@ -924,7 +924,8 @@ export const RECLUSE_GHOST: Character = {
 
 /** How far above the ground the child appears (drawing pixels: about a foot and a half at his size, 82 px tall). */
 const LIFT = 38;
-const CUT_H = H + LIFT;
+// (Four more rows under the ground: the ghost's glow at his soles as he lands.)
+const CUT_H = H + LIFT + 4;
 /** The poof's sparkle: white to pale blue, keys of its own, so the ghost's fade-in doesn't dim it. */
 const POOF_PALETTE: Record<string, string> = { Y: "#f4fbff", A: "#bfe2ff", C: "#7fb0e6" };
 /** The growing step's motes (`shimmer`: gold `8` to ember `0`) in the poof's colors. */

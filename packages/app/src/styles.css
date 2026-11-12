@@ -27061,8 +27061,8 @@ button.sq-tiny {
   position: absolute;
   display: block;
 }
-/* The point above the speaker's head that his box stands on: the child's box runs right from it, its tail at its left; the
-   man's runs left from it, its tail at its right (the bubble's own tail). */
+/* The point above the speaker's head that his box stands on: the child's box runs right from it, the man's left; the tail (the
+   bubble's own, drawn apart from the box so it stays over the speaker when the box is moved into view) points down at him. */
 .cs-anchor {
   position: absolute;
   width: 0;
@@ -27073,15 +27073,30 @@ button.sq-tiny {
   max-width: min(230px, 64vw);
   font-size: 10px;
 }
-.cs-kid .cs-say {
-  left: 0;
+.cs-say::after {
+  display: none;
 }
-.cs-kid .cs-say::after {
-  right: auto;
-  left: 26px;
+.cs-kid .cs-say {
+  left: -32px;
 }
 .cs-man .cs-say {
-  right: 0;
+  right: -32px;
+}
+.cs-tail {
+  position: absolute;
+  z-index: 13;
+  left: -6px;
+  bottom: -8px;
+  width: 12px;
+  height: 12px;
+  background: #fffbea;
+  border-right: 3px solid #1a1406;
+  border-bottom: 3px solid #1a1406;
+  transform: rotate(45deg);
+  transition: opacity 240ms ease-in;
+}
+.cs-tail.leaving {
+  opacity: 0;
 }
 @media (min-width: 900px) {
   .cs-say {

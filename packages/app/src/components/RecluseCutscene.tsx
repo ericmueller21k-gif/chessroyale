@@ -99,17 +99,11 @@ export function RecluseCutscene({ at, board, lines = RECLUSE_CUTSCENE_LINES }: {
           <SpriteAnim ch={ch} anim={fig.anim} then={fig.then} since={at + fig.since} id="cs-fig" />
         </span>
         {up && line && (
-          // (A point above the speaker's head; the box stands on it, its tail over him: SpeechBox keeps its own style to move a box
-          // back into view.)
-          <span
-            class={`cs-anchor cs-${up.box.who}`}
-            style={
-              up.box.who === "kid"
-                ? { left: `${px(CUTSCENE_SPOTS.kid.x) - 32}px`, top: `${py(CUTSCENE_SPOTS.kid.head) - 14}px` }
-                : { left: `${px(CUTSCENE_SPOTS.man.x) + 32}px`, top: `${py(CUTSCENE_SPOTS.man.head) - 14}px` }
-            }
-          >
-            <SpeechBox key={up.i} class={`bc-bubble cs-say`} text={up.box.text} at={at + up.box.at} until={at + up.box.until} now={now} typed={cutTyped(line, up.box, t)} fits={1} data-line={up.i + 1} />
+          // (A point just above the speaker's head. His box stands on it, running right from it for the child and left for the man, and
+          // SpeechBox moves a box that would run off the screen back into view; so the tail is drawn here, always over the speaker.)
+          <span class={`cs-anchor cs-${up.box.who}`} style={{ left: `${px(CUTSCENE_SPOTS[up.box.who].x)}px`, top: `${py(CUTSCENE_SPOTS[up.box.who].head) - 14}px` }}>
+            <SpeechBox key={up.i} class="bc-bubble cs-say" text={up.box.text} at={at + up.box.at} until={at + up.box.until} now={now} typed={cutTyped(line, up.box, t)} fits={1} data-line={up.i + 1} />
+            <span class={`cs-tail${at + up.box.until - now < C.boxFadeMs ? " leaving" : ""}`} />
           </span>
         )}
       </div>
