@@ -1,3 +1,4 @@
+- Nov 12 14:50: Boingo pie was DONE at 08:37 (missed 6 h: director did not check; apologized). #661 opened (9247713, full suite via protocol), helper archived, stills sent. Quick boss-lane review session_01JuCWRvvUwpQik238BMNJMv (Opus high, read-only) -> claude/review-boingo-pie. Watcher: CI + review .done.
 - Nov 12 09:10: #660 age-gate race MERGED (ebe4ba4). Boingo pie still running.
 - Nov 12 09:00: main 267f1cb red on retry-pass age-gate:61 (test race: app tells server too-young async; test posted first). Fix #660 (cbb47a0, test waits for config age=under). Still open from before: gardener.spec:229 desktop.
 - Nov 12 08:45: #656 landing sign-in MERGED (267f1cb). Director call: no delta re-review (the delta = the review's own suggested app fix + docs + a test proven to fail on old code; full suite green). Eric phone check: TESTING.md step 2 (Google from a fresh private tab). Watching main full run.
