@@ -178,14 +178,17 @@ assert beats(CHILD) == 32
 assert (T_FLAG, T_MEMORY, T_CHANT2, T_LAST, BEATS, len(SWEEP)) == (138, 268, 334, 519, 591, 30)
 
 
-def main(out: str) -> None:
+def main(out: str, tune: str = "harp", window=None) -> None:
+    """`tune`: what plays the memory's tune ("harp": the harp, the choir as children joining it; or one of `soft`'s
+    voices alone). `window`: (from beat, to beat), to make only that passage (a sample)."""
     x = Ride(PLAN, BEATS, None, os=2, seed=227, tape_secs=TAPE)
+    x.window = window
     put, at = x.put, x.at
     rng = np.random.default_rng(59)
     sr = x.sr
     tau = 2 * np.pi
     levels = {"solo": 1.6, "violins": 1.0, "violas": 1.0, "cellos": 1.0, "pads": 1.0, "slide": 1.6, "lead": 1.25, "bass": 0.7, "sub": 0.6, "brass": 1.0,
-              "kick": 0.9, "snare": 2.0, "hats": 4.0, "drum": 1.5, "clock": 3.0, "book": 1.5, "fx": 1.2, "hum": 0.7, "choir": 6.0, "guitar": 1.15, "harp": 2.5, "park": 3.0}
+              "kick": 0.9, "snare": 2.0, "hats": 4.0, "drum": 1.5, "clock": 3.0, "book": 1.5, "fx": 1.2, "hum": 0.7, "choir": 6.0, "guitar": 1.15, "harp": 2.5, "park": 3.0, "tune": 2.5}
     BOWED = x.BOWED
     BRIDGE = [0.5, 0.6, 0.8, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.25, 0.2]  # bowed near the bridge: the high overtones over the note
 
@@ -560,6 +563,34 @@ def main(out: str) -> None:
             plucks[key] = (w / (np.max(np.abs(w)) + 1e-9) + 0.2 * hiss(k, 5000, 0.5) * np.exp(-t / 0.003)) * np.minimum(1, t / 0.001) * tail(k, 0.05)
         put("harp", b, plucks[key] * vol, pan, late=late)
 
+    def soft(b, d, m, kind, vol=0.1, pan=0.2):
+        """The memory's tune on a softer voice (Eric, Nov 12: "lighter kind of softer ... a really light flute sort of
+        thing, like a whistle, but not really like a whistle"), for him to choose from: a flute (breathy, a little
+        vibrato), an ocarina (round and hollow, each note leaning up into place), a pan flute (more air than note, a
+        puff at the start), glass (a wet finger on a glass's rim: it swells in and out, no edge), a celesta (a small
+        soft bell)."""
+        at(b, d)
+        if kind == "celesta":
+            at(b, d + 1.5)
+            put("tune", b, x.bell(m, d + 1.5, vol * 1.2, ratio=4.0, index=0.6, decay=0.5), pan)
+            return
+        if kind == "flute":
+            w = x.tone(m, d * 0.98, [1, 0.22, 0.06, 0.02], vol * 0.6, vib=0.004, vib_hz=4.8, attack=0.07, release=0.12)
+            air, puff = 0.02, 0.045
+        elif kind == "ocarina":
+            w = x.tone(m, d * 0.98, [1, 0.03, 0.07, 0.01, 0.02], vol * 0.6, vib=0.003, vib_hz=4.5, scoop=0.3, scoop_s=0.04, attack=0.04, release=0.08)
+            air, puff = 0.006, 0.02
+        elif kind == "panflute":
+            w = x.tone(m, d * 0.96, [1, 0.12, 0.2, 0.04, 0.06], vol * 0.6, vib=0.003, vib_hz=5.0, scoop=0.2, scoop_s=0.03, attack=0.03, release=0.1)
+            air, puff = 0.035, 0.09
+        else:  # glass
+            w = x.tone(m, d * 1.05, [1, 0.0, 0.05], vol, detune=(-3, 0, 3), attack=0.25, release=0.4, trem=0.15, trem_hz=4.0)
+            air, puff = 0.0, 0.0
+        k = len(w)
+        t = np.arange(k) / sr
+        breath = np.convolve(hiss(k, 9000, 0.6), np.ones(8) / 8, "same") * (air + puff * np.exp(-t / 0.05)) * vol / 0.1
+        put("tune", b, w + breath * np.minimum(1, t / 0.02) * tail(k, 0.1), pan)
+
     def organ(b, d, m, vol=0.022, pan=0.0):
         """A small organ's flutes: soft, steady."""
         at(b, d)
@@ -788,9 +819,13 @@ def main(out: str) -> None:
     shut(T_MEMORY, 0.8), x.crash(T_MEMORY, 0.14, decay=0.6)
     first = T_MEMORY + 2
     for b, d, m in notes(first, CHILD):
-        harp(b, m, 0.11, 0.25)
-        if b >= first + 16:
-            sing(b, d, m, 0.04, 0.15, -0.2, 3)
+        if tune != "harp":
+            soft(b, d, m, tune)
+        else:
+            harp(b, m, 0.11, 0.25)
+            if b >= first + 16:
+                sing(b, d, m, 0.04, 0.15, -0.2, 3)
+    rng = np.random.default_rng(61)  # from here the same chances whatever played the tune (the birds don't move)
     for bar, shape in enumerate(MEMORY_CH):
         for i, m in enumerate(shape):
             harp(first + 4 * bar + i * 0.5, m, 0.09 if i == 0 else 0.07, -0.25 + 0.06 * i)
@@ -939,6 +974,8 @@ def main(out: str) -> None:
 
     cathedral("choir")
     cathedral("harp", 2.5, 0.4)
+    if "tune" in x.buses:
+        cathedral("tune", 2.5, 0.4)
     cathedral("park", 1.6, 0.7)
     x.beat_s = 60 / 160  # the echoes' beat
     x.echo("lead", 0.75, 0.14, 0.06)
@@ -946,5 +983,5 @@ def main(out: str) -> None:
     write_wav(out, x.play(x.mixdown(levels, lowpass=8500, room=0.34, room_s=2.0)))
 
 
-if __name__ == "__main__":
-    main(sys.argv[1])
+if __name__ == "__main__":  # song_v.py <out.wav> [the memory's tune] [from beat, to beat: only that passage]
+    main(sys.argv[1], *sys.argv[2:3], window=tuple(float(v) for v in sys.argv[3:5]) or None)

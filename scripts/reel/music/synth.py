@@ -342,12 +342,26 @@ class Ride(Mix):
         """How fast the tape runs at a beat."""
         return (self.t(beat + self.STEP) - self.t(beat)) / (self.when(beat + self.STEP) - self.when(beat))
 
+    # For a sample of one passage (to compare instruments on it): (from beat, to beat). Notes outside it, bar a few
+    # beats before whose tails ring in, are neither made (their length is cut to nothing) nor placed, so it's quick.
+    window = None
+    now = 0.0
+
+    def outside(self, beat: float) -> bool:
+        return self.window is not None and not self.window[0] - 8 <= beat < self.window[1]
+
     def at(self, beat: float, beats_: float = 1.0) -> None:
+        self.now = beat
         self.beat_s = (self.t(beat + beats_) - self.t(beat)) / beats_
+
+    def k(self, beats_: float) -> int:
+        return 64 if self.outside(self.now) else super().k(beats_)
 
     def put(self, bus, beat, x, pan=0.0, late=0.0):
         """`late`: seconds after the beat."""
         b = self.bus(bus)
+        if self.outside(beat):
+            return
         i0 = int(round((self.t(beat) + late) * self.sr)) % self.N
         gl, gr = 1 - max(0.0, pan), 1 + min(0.0, pan)
         k, done = len(x), 0
