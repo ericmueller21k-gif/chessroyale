@@ -103,6 +103,9 @@ test("under 13: a neutral question, a friendly line, guest play, and no sign-in 
   await page.reload();
   await expect(page.getByRole("status").filter({ hasText: TOO_YOUNG_LINE })).toBeVisible();
   await expect(page.getByLabel("Birth month")).toHaveCount(0);
+  // (The phone remembers "too young" at once and tells the server after; a reload can cut that off, and the app tells it again
+  // as it loads. Wait until the server knows, so this "old enough" can't overtake the app's own answer: main's run 43182175549.)
+  await expect.poll(async () => (await api(page, "/api/auth/config")).body?.age).toBe("under");
   expect((await api(page, "/api/auth/age", { method: "POST", body: { oldEnough: true } })).body).toEqual({ age: "under" });
   const refused = await api(page, "/api/auth/email/verify", { method: "POST", body: { email: "sam@e2e.test", code: "123456" } });
   expect([refused.status, refused.body?.tooYoung]).toEqual([403, true]);
