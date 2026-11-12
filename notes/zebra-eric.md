@@ -107,3 +107,4 @@ closing line is one of the six, at random.
 - Boss select v2 (Eric, Nov 12): "bring the start button down"; "it's okay if the boss is even a little bigger than our guy, because it's supposed to be a boss". Mockup v2: notes/mockups/2026-11-12-boss-select-6-v2.png (+ .css: page 100dvh flex, stage margin-top auto, START at bottom, boss x1.7, bubble raised 58 px).
 - Nov 12: "Yeah, Mono 64 sounds much. I mean, it's totally fine." (music sample pick)
 - Nov 12 (desktop select still): "can we make this different on desktop like 3X the pawn and boss size even 4K" (read as 4x). notes/mockups/2026-11-12-eric-desktop-select.png
+- Nov 12 (Hollow bulbs screenshot, desktop): "The 10 hollow bulbs need to be way bigger. Like 3-4 times that length, like much more stretched out on the desktop... string it across the entire free space... On mobile, I would need to see what it looks like."
