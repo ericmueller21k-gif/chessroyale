@@ -73,7 +73,9 @@ watchShell();
 // feedback sheet, from the match menu or Settings, and the maintenance banner, at the top, with the 1 v 1 search's bar
 // under it while you browse. A render error anywhere
 // shows "Something went wrong" instead of a blank page.)
-render(
+// (The Hidden Boss's room, a mockup for Eric, Nov 12: on the dev server only, at /preview/hidden-room; a production build drops this.)
+if (import.meta.env.DEV && location.pathname === "/preview/hidden-room") void import("./town/shops/recluse-preview.tsx").then((m) => m.mountHiddenRoom(document.getElementById("app")!));
+else render(
   <ErrorBoundary>
     <App />
     <BanNotice />

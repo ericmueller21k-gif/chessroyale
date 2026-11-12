@@ -910,5 +910,93 @@ export const RECLUSE_GHOST: Character = {
   },
 };
 
+// ---- The child on the floor, playing himself (the Hidden Boss's room, Nov 12: shops/recluse-scene.ts draws him by his board).
+
+/** How far the sitting child is below the standing one: his hips on the floor, his legs crossed in front of him. */
+const SIT_DROP = 22;
+/** How far a lean forward (toward us, over the board) takes his shoulders and his head down. */
+const LEAN_BODY = [0, 2, 5] as const;
+const LEAN_HEAD = [0, 3, 8] as const;
+/** The sitting child's pose: his lean over the board, the hand out on it (its arm is the scene's), his eyes and mouth. */
+export interface SitPose {
+  lean: 0 | 1 | 2;
+  /** The hand out on the board: our left ("l") or our right ("r"); that arm isn't drawn here (the scene draws it reaching). */
+  reach: "" | "l" | "r";
+  eyes: "down" | "ahead" | "shut";
+  mouth: "stern" | "smile";
+}
+export const SIT_POSES: readonly SitPose[] = [0, 1, 2].flatMap((lean) =>
+  (["", "l", "r"] as const).flatMap((reach) => (["down", "ahead", "shut"] as const).flatMap((eyes) => (["stern", "smile"] as const).map((mouth) => ({ lean: lean as 0 | 1 | 2, reach, eyes, mouth })))),
+);
+export const sitName = (p: SitPose): string => `sit-${p.lean}-${p.reach || "n"}-${p.eyes}-${p.mouth}`;
+/** His shoulder on that side in the drawing's frame pixels (the scene's reaching arm starts there), and his knee's (the hand's rest). */
+export function sitShoulder(side: "l" | "r", lean: 0 | 1 | 2): Pt {
+  const b = BODY.child;
+  return [OX + 46 + (side === "l" ? -1 : 1) * (b.shoulder - 0.5), OY + b.shoulderY + 2 + SIT_DROP + LEAN_BODY[lean]];
+}
+export const sitKnee = (side: "l" | "r"): Pt => [OX + 46 + (side === "l" ? -1 : 1) * 12, OY + 121];
+/** His crossed legs: each thigh out to its knee and the shin back in, the turned-up cuffs and a sneaker's sole showing. */
+function lapPart(): { part: Part; at: Pt } {
+  const X0 = 46 - 20;
+  const Y0 = 112;
+  const cv = canvas(40, 129 - Y0);
+  for (const side of [-1, 1] as const) {
+    const l = paintLimb([[46 + side * 3, 116], [46 + side * 12, 121], [46 - side * 5, 125]], 3, 2.6, TROUSERS.child, side < 0 ? 0.66 : 0.5);
+    l.cv.forEach((row, y) => row.forEach((k, x) => k !== "." && cv[l.at[1] - Y0 + y]?.[l.at[0] - X0 + x] !== undefined && (cv[l.at[1] - Y0 + y]![l.at[0] - X0 + x] = k)));
+  }
+  // The cuffs and the soles where the shins cross: a light band, the sneakers' white rubber under them.
+  stamp(cv, X0, Y0, ["Z=&", "=&="], 46 - 9, 124);
+  stamp(cv, X0, Y0, ["&=Z", "=&="], 46 + 7, 124);
+  stamp(cv, X0, Y0, ["tt", "rr"], 46 - 11, 126);
+  stamp(cv, X0, Y0, ["tt", "rr"], 46 + 10, 126);
+  return { part: { grid: toGrid(cv) }, at: [X0, Y0] };
+}
+const LAP = new Map<0, { part: Part; at: Pt }>();
+const lapOf = () => LAP.get(0) ?? LAP.set(0, lapPart()).get(0)!;
+add("lap:child", () => lapOf().part);
+add("shadow:sit", () => shadow(40));
+export function sitLayers(p: SitPose): Layer[] {
+  const b = BODY.child;
+  const at = (part: string, x: number, y: number, flipX = false): Layer => ({ part, x: OX + Math.round(x), y: OY + Math.round(y), ...(flipX ? { flipX } : {}) });
+  const D = SIT_DROP;
+  const lb = LEAN_BODY[p.lean];
+  const layers: Layer[] = [at("shadow:sit", 46 - 20, 126)];
+  const lap = lapOf();
+  layers.push(at("lap:child", lap.at[0], lap.at[1]));
+  const t = torsoOf("child");
+  layers.push(at("torso:child", t.at[0], t.at[1] + D + lb));
+  layers.push(at(headName("child", { eyes: p.eyes, brows: p.eyes === "ahead" ? "up" : "stern", mouth: p.mouth }), HEAD_X, b.top + D + LEAN_HEAD[p.lean]));
+  // His hands on his knees (the one out on the board is the scene's).
+  for (const side of [-1, 1] as const) {
+    if ((side < 0 && p.reach === "l") || (side > 0 && p.reach === "r")) continue;
+    const sh: Pt = [46 + side * b.shoulder, b.shoulderY + 1 + D + lb];
+    const wr: Pt = [46 + side * 11, 117];
+    const el: Pt = [46 + side * (b.shoulder + 3.5), (sh[1] + wr[1]) / 2 + 1];
+    const arm = armPart("child", sh, el, wr);
+    layers.push(at(arm.name, arm.at[0], arm.at[1]));
+    const hw = HANDS.child.rest[0]!.length;
+    layers.push(at("hand:child:rest", side > 0 ? wr[0] - 3 : wr[0] - (hw - 3), wr[1] - 1, side < 0));
+  }
+  return layers;
+}
+/** Thinking over the board (his idle when nothing's played): eyes down, a blink, a glance up. */
+const SIT_IDLE = (): Frame[] =>
+  Array.from({ length: 12 }, (_, i): Frame => ({ ms: 200, layers: sitLayers({ lean: 1, reach: "", eyes: i === 5 ? "shut" : i >= 8 && i < 10 ? "ahead" : "down", mouth: "stern" }) }));
+/** The child sitting on the floor: every pose the scene draws him in (one frame each, cue `pose`), and his idle. */
+export const RECLUSE_CHILD_SIT: Character = {
+  id: "recluse-child-sit",
+  name: "Hidden Boss age 9, on the floor",
+  w: W,
+  h: H,
+  foot: [OX + 46, OY + 128],
+  palette: AGES_PALETTE,
+  halo: "#2a2733",
+  parts: PARTS_ALL,
+  anims: {
+    idle: lazyAnim(() => ({ loop: true, frames: SIT_IDLE() })),
+    ...Object.fromEntries(SIT_POSES.map((p) => [sitName(p), lazyAnim(() => ({ loop: false, frames: [{ ms: 1000, cue: "pose", layers: sitLayers(p) }] }))])),
+  },
+};
+
 /** Everything this mockup draws, for the preview and the tests; none of it is in CHARACTERS or any kit. */
-export const RECLUSE_AGES_PREVIEW: readonly Character[] = [RECLUSE_CHILD, RECLUSE_TEEN, RECLUSE_YOUNG, RECLUSE_CHILD_BUST, RECLUSE_TEEN_BUST, RECLUSE_YOUNG_BUST, RECLUSE_GROW, RECLUSE_GHOST];
+export const RECLUSE_AGES_PREVIEW: readonly Character[] = [RECLUSE_CHILD, RECLUSE_TEEN, RECLUSE_YOUNG, RECLUSE_CHILD_BUST, RECLUSE_TEEN_BUST, RECLUSE_YOUNG_BUST, RECLUSE_GROW, RECLUSE_GHOST, RECLUSE_CHILD_SIT];

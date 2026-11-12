@@ -860,3 +860,35 @@ export const SHOP_FEEL = {
     boardUp: 23,
   },
 } as const;
+
+/**
+ * The Hidden Boss's child's room (Nov 12: a mockup, shops/recluse-scene.ts; not reachable from the town yet). Times in ms.
+ * `play`: one half-move of the child playing himself: he thinks, reaches, carries the piece over, sits back, looks; the start's pause,
+ * the pause on the mate and the fade back to the start. `kid`: his drawing's size (room pixels a drawing pixel), the board's (squares
+ * across), the piece's lift as it's carried (board squares). `summon`: the summoning's beats, each from its start.
+ */
+export const HIDDEN_ROOM_FEEL = {
+  play: { first: 1400, think: 760, reach: 300, carry: 460, back: 300, look: 480, end: 1800, fade: 1100 },
+  kid: { scale: 0.62, board: 1.5, lift: 0.7 },
+  summon: {
+    /** The freeze frame: the players' figures still images (a flash). */
+    freeze: 0,
+    /** The rays shoot from the board, outward and upward, growing. */
+    rays: 350,
+    /** The four burst into particles all at once; drawn into the light. */
+    burst: 1300,
+    /** The light and particles draw back over the board, then fall and splash into it. */
+    drawBack: 2350,
+    fall: 2850,
+    splash: 3150,
+    /** The board wobbles up and down, settling; then quiet. */
+    wobbleMs: 1100,
+    quiet: 4500,
+    /** Then the transition: the room closes in on the board (an iris), black, and the match. */
+    iris: 5500,
+    irisMs: 900,
+    end: 6900,
+    /** The particles each player bursts into. */
+    bits: 90,
+  },
+} as const;
