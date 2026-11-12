@@ -52,3 +52,14 @@ How he works today: notes/hidden-boss-today.md (use it; don't ask Eric).
   reward (none today); admins first; online phase 2 (four boards online, server Stockfish, fair play) is a separate big build.
 - **Real people (RULES.md):** Eric describes the kid as the real player as a child. The drawings stay ORIGINAL: a generic 1950s boy,
   no likeness, never named or hinted in game text (his name is still the "Hidden Boss" string). Confirm with Eric before drawing.
+
+## Eric's answers (Nov 12, evening)
+- **His Boss Battle tile stays locked**, unchanged.
+- **The challenge request:** it stays while you run around town (leaving the building doesn't drop it). You can be in only one: challenging
+  another boss (or starting another battle) ends it. A **5-minute cap**, not shown anywhere: when it runs out without four players, a small
+  pop-up "Sorry, not enough players." with OK. (The "1 of 4" count itself still shows in the room/town as before.)
+- **Reward:** later (work in progress).
+- **The child: OK to draw, and to look like him.** Keep the strong features of today's Hidden Boss face, as a child; a skinny kid (he looked
+  much the same at 15). Eric: "There's no issues using, having it look similar. I did the research. Just as long as the name's not mentioned
+  anywhere." So: likeness OK for the Hidden Boss's drawings; the name never appears anywhere (game text, files players see, lines).
+- Admins first: not answered; default yes (as Don Dough), director's call.
