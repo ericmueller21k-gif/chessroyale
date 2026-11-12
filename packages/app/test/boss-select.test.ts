@@ -61,14 +61,16 @@ describe("the boss select", () => {
 
   it("shares the tiles out over as few rows as it takes, evenly, the longer rows first (docs/decisions/2026-10-23-boss-select-sf.md)", () => {
     const per = TILES_PER_ROW;
-    expect(per).toBe(5);
-    // Today's sixteen tiles (fourteen bosses, the Hidden Boss's and "?"): three rows of five and "?" on its own (Oct 27, Folio's).
+    expect(per).toBe(6);
+    // Today's sixteen tiles (fourteen bosses, the Hidden Boss's and "?"): two rows of six and the rest below (Nov 12, Eric: six a row).
     expect(all.length + 1).toBe(16);
-    expect(rowSizes(all.length + 1, per)).toEqual([5, 5, 5, 1]);
-    expect(rowSizes(14, per)).toEqual([5, 5, 4]);
-    expect(rowSizes(15, per)).toEqual([5, 5, 5]);
-    // The next bosses: five to a row always, so a new tile moves no boss's tile before it.
-    expect(rowSizes(17, per)).toEqual([5, 5, 5, 2]);
+    expect(rowSizes(all.length + 1, per)).toEqual([6, 6, 4]);
+    // The admins' nineteen (Dash, Timber and Don Dough admin-first): a fourth row of one (Nov 12, Eric: it still fits with no scroll).
+    expect(rowSizes(19, per)).toEqual([6, 6, 6, 1]);
+    expect(rowSizes(14, per)).toEqual([6, 6, 2]);
+    expect(rowSizes(15, per)).toEqual([6, 6, 3]);
+    // The next bosses: six to a row always, so a new tile moves no boss's tile before it.
+    expect(rowSizes(18, per)).toEqual([6, 6, 6]);
     expect(rowSizes(0, per)).toEqual([]);
     for (let n = 1; n <= 60; n++) {
       const rows = rowSizes(n, per);
@@ -104,7 +106,9 @@ describe("the boss select", () => {
       expect(tile.left, `${b.id}: the left edge of its frame`).toBeGreaterThanOrEqual(0);
       expect(tile.right, `${b.id}: the right edge of its frame`).toBeLessThanOrEqual(img.w);
       // The head, hat, ears and all, inside the tile's top, and the figure still going at its foot.
-      expect(ink.y0, `${b.id}: the top of its head`).toBeGreaterThanOrEqual(tile.top - 0.5);
+      // (Nov 12: the tile is 1.0 of its width, not 1.24, so a tall head can run a little past the top corner, as in Eric's approved
+      // mockup: the tip may be cut by up to 15% of the figure's width, never more.)
+      expect(ink.y0, `${b.id}: the top of its head`).toBeGreaterThanOrEqual(tile.top - 0.15 * fit.span);
       expect(ink.y1, `${b.id}: its body to the tile's foot`).toBeGreaterThanOrEqual(tile.bottom - 0.5);
       // Neither the tile nor its neck outside the frame.
       expect(fit.neck[0], b.id).toBeGreaterThan(0);

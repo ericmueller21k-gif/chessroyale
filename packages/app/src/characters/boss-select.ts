@@ -118,17 +118,20 @@ export const STAGE_SCALE = 1.5;
 
 /**
  * Tiles to a row, on a phone and a computer alike (Eric, Oct 23: "just 5 per row, and it doesn't matter if you're on a
- * desktop"). The CSS reads it as `--bs-per`.
+ * desktop"; Nov 12: six, so the screen fits with no scroll). The CSS reads it as `--bs-per`.
  */
-export const TILES_PER_ROW = 5;
+export const TILES_PER_ROW = 6;
+
+/** The gap between two tiles, in px (styles.css, `--bs-gap`; Eric, Nov 12: "still... a little bit of gap"). */
+export const TILE_GAP = 4;
 
 /** A tile's height as a multiple of its width (styles.css, `--bs-h`): its visible width is 0.8 of its width (the slant is 0.2), so
- *  it is 1.55 times as tall as that. */
-export const TILE_RATIO = 1.24;
+ *  it is 1.25 times as tall as that (Nov 12: about square, six to a row; was 1.24 at five). */
+export const TILE_RATIO = 1;
 
 /**
- * How many tiles go in each row for `n` tiles with `per` to a row: full rows of `per`, the last the rest (fourteen: 5, 5, 4;
- * fifteen: 5, 5, 5; sixteen: 5, 5, 5, 1). Five to a row always (Eric, Oct 23: "just 5 per row"), so a new boss's tile moves no
+ * How many tiles go in each row for `n` tiles with `per` to a row: full rows of `per`, the last the rest (sixteen: 6, 6, 4;
+ * nineteen, the admins': 6, 6, 6, 1). Full rows of `per` always (six now, Eric, Nov 12), so a new boss's tile moves no
  * other boss's tile (Oct 27, Folio's: sharing sixteen out as 4, 4, 4, 4 would have moved every tile; Eric's rule, nothing
  * shifts). A short row is centered.
  */
@@ -153,20 +156,20 @@ export interface Framing {
   at: number;
 }
 export const SELECT_FRAMING: Readonly<Record<string, Framing>> = {
-  gingerbread: { neck: [44, 49], span: 44, at: 0.42 },
-  clown: { neck: [37, 49], span: 55, at: 0.52 },
+  gingerbread: { neck: [44, 49], span: 44, at: 0.43 },
+  clown: { neck: [37, 49], span: 55, at: 0.59 },
   grex: { neck: [38, 55], span: 62, at: 0.4 },
-  hollow: { neck: [51, 50], span: 64, at: 0.4 },
-  bigboy: { neck: [49, 50], span: 57, at: 0.52 },
-  sawyer: { neck: [45, 40], span: 56, at: 0.57 },
-  pig: { neck: [43, 50], span: 55, at: 0.66 },
+  hollow: { neck: [51, 50], span: 64, at: 0.47 },
+  bigboy: { neck: [49, 50], span: 57, at: 0.59 },
+  sawyer: { neck: [45, 40], span: 56, at: 0.69 },
+  pig: { neck: [43, 50], span: 55, at: 0.69 },
   alfil: { neck: [35, 52], span: 59, at: 0.55 },
   hopper: { neck: [38, 42], span: 57, at: 0.47 },
   smudgy: { neck: [41, 46], span: 55.5, at: 0.51 },
   moo: { neck: [36, 58], span: 56, at: 0.39 },
   gardener: { neck: [48, 56], span: 57, at: 0.42 },
   // (His bunch of balloons rides high over his head: the neck low in the tile, so the balloons are in it too.)
-  tiger: { neck: [31, 78], span: 56, at: 0.69 },
+  tiger: { neck: [31, 78], span: 58, at: 0.69 },
   // (Its long neck: the point under its head, so its head, beak and the near wing's root are in the tile.)
   folio: { neck: [30, 40], span: 58, at: 0.5 },
   // (His hat and buck teeth in the tile, the planks' ends over his shoulders.)

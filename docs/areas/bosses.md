@@ -50,13 +50,13 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
 - **The Boss raid screen's character select** (Eric, Oct 16; now the Boss Battle screen's, Oct 26; Oct 29: your stage and a party's two invite circles, VS, a smaller "?" box, the five-level difficulty and START, docs/decisions/2026-10-29-boss-battle-look.md; docs/decisions/2026-10-16-boss-character-select.md;
   `components/BossSelect.tsx`, `characters/boss-select.ts`): a tile per boss you can meet, the picked one on a stage in
   its idle (one sprite animating, on the shared loop; reduced motion: a still, no drop). **The grid** (Eric, Oct 21 to 23; from a Street Fighter 6 select;
-  docs/decisions/2026-10-23-boss-select-sf.md): sixteen tiles since Folio, all the very same tall slanted tile (visible
-  width 1 to 1.55 of its height, a slant of a fifth of its width), a 5 px gap between neighbors and rows, five to a row on a phone
-  (5, 5, 5, 1: `rowSizes` in `characters/boss-select.ts` fills full rows of five and puts the rest on the
-  last, so a new tile moves none before it; docs/decisions/2026-10-27-folio-wired.md), a short row centered. On a computer's
+  docs/decisions/2026-10-23-boss-select-sf.md): sixteen tiles since Folio (nineteen for an admin, a fourth row of one), all the very same square slanted tile (Nov 12, Eric: `TILE_RATIO` 1; visible
+  width 0.8 of its height, a slant of a fifth of its width), a 4 px gap between neighbors and rows (`TILE_GAP`), six to a row on a phone
+  (6, 6, 4; 6, 6, 6, 1 for an admin: `rowSizes` in `characters/boss-select.ts` fills full rows of six and puts the rest on the
+  last, so a new tile moves none before it; docs/decisions/2026-10-27-folio-wired.md; docs/decisions/2026-11-12-boss-select-six.md), a short row centered. On a computer's
   wide middle column (the page's width less its 32 px sides, 660 px or more: `@container rd-page`) the tiles go in two rows across it instead: nine and eight
   with seventeen tiles, eight and eight with sixteen (`--bs-two`; the `@container rd-page` rules in styles.css; Eric, Nov 2:
-  docs/decisions/2026-11-02-boss-select-rows.md). A narrower window keeps five a row. On a phone the block is nearly the screen's width (a 10 px buffer top and
+  docs/decisions/2026-11-02-boss-select-rows.md). A narrower window keeps six a row. On a phone the block is nearly the screen's width (a 10 px buffer top and
   sides); on a computer's narrow window the tiles stop at 96 px and the block sits in the middle of the column; on a wide one the two rows fill it
   (the cards 90 px or more, the "?" full height beside the Hidden Boss). Each tile shows its boss's whole
   figure (`BossArt`: the portrait's frame at full size, placed by `SELECT_FRAMING`: the neck pinned `at` of the way down, `span`
@@ -1000,8 +1000,8 @@ sampling, the guards, `forPlayers`), `BOSS_TIERS` and each boss's `offset` in `b
   its place at all 64 squares both ways up: `kingAttackPlace`).
 - e2e, the Boss raid screen's select: `e2e/boss-select.spec.ts`; unit `packages/app/test/boss-select.test.ts` (every
   boss's sound from its own pack, its own lines, none twice running, the Hidden Boss's in turn; how the tiles are shared out
-  over rows). The grid's e2e, at 320, 360, 390, 428, 430 and 1280 px in light and dark: five to a row (5, 5, 4),
-  every tile the same size and shape, the gaps, each row centered, the buffer on a phone and a computer, the 96 px cap in five a row, two rows of eight or nine on a wide computer (and START in view at 1280 x 800),
+  over rows). The grid's e2e, at 320, 360, 390, 428, 430 and 1280 px in light and dark: six to a row (6, 6, 4),
+  every tile the same size and shape, the gaps, each row centered, the buffer on a phone and a computer, the 96 px cap in six a row, two rows of eight or nine on a wide computer (and START in view at 1280 x 800),
   bigger than
   the first grid, 44 px targets, a figure covering each tile and a color each, nothing in the gaps, every tile tapped, either side of
   each gap, the press, the gold, the dark tile, the "?"; the unit tests check each boss's framing (the head inside the tile, the body

@@ -4,7 +4,7 @@ import { isAdmin } from "../boss-brain.ts";
 import { DressedPawn } from "./FrontDoor.tsx";
 import { artOf, bossKit } from "../characters/kits.ts";
 import { frameKeys, type Character } from "../characters/sprite.ts";
-import { rowSizes, SELECT_SOUND, SELECT_TINT, selectLine, STAGE_SCALE, TILES_PER_ROW } from "../characters/boss-select.ts";
+import { rowSizes, SELECT_SOUND, SELECT_TINT, selectLine, STAGE_SCALE, TILE_GAP, TILE_RATIO, TILES_PER_ROW } from "../characters/boss-select.ts";
 import { isPaused, useServerStatus } from "../status.ts";
 import { playOnTap, warmSounds } from "../sound.ts";
 import { NORMAL, Voice, VoiceBubble } from "../speech.tsx";
@@ -21,7 +21,7 @@ import { useMedia } from "./QuickChat.tsx";
  * stage (Eric, Oct 25; Boss alone's menu keeps its number).
  *
  * The tiles are a fighting game's select grid (Eric, Oct 21 to 23; the last look from Street Fighter 6's): tall slanted tiles,
- * all the same size, a small gap between them, five to a row on a phone and a computer alike (a short row centered), each
+ * all the same size, a small gap between them, six to a row on a phone and a computer alike (a short row centered), each
  * with the boss's whole figure framed from the neck up and cut off by the tile's corners, on a color from its own palette.
  * No names on the tiles. docs/decisions/2026-10-23-boss-select-sf.md.
  *
@@ -64,10 +64,11 @@ const FOOT_AT = 50;
  */
 const STAGE_FOOT_X: Readonly<Record<string, number>> = { bigboy: 49.5 };
 /**
- * The room above a boss's feet on the stage, in cqi: its feet sit 12% up the stage's height (.bs-spot), a spot is 124:96, and
- * the speech bubble's tail reaches about 12 cqi into the spot's top, so a head stays clear of it (never under the bubble).
+ * The room above a boss's feet on the stage, in cqi: its feet sit 12% up from the bottom of the spot (.bs-spot), a spot is 124:96,
+ * so the feet are 88% of the spot's height down. The speech bubble sits above the spot now (Nov 12, Eric: "never over the
+ * head"), so the whole height is the room, less a sliver for the head's outline.
  */
-const STAGE_ROOM = (1 - 0.12) * ((100 * 96) / 124) - 12;
+const STAGE_ROOM = (1 - 0.12) * ((100 * 96) / 124) - 1;
 const placed = new Map<string, { left: number; width: number }>();
 function placeOnStage(ch: Character, idle: string): { left: number; width: number } {
   let p = placed.get(ch.id);
@@ -243,7 +244,7 @@ export function BossSelect({
   return (
     <div class="bs-select">
       {/* (Rows are layout only: the radios stay one group, in order.) */}
-      <div class={`bs-tiles${locked ? " bs-theirs" : ""}`} role="radiogroup" aria-label="Bosses" aria-disabled={locked || undefined} style={{ "--bs-per": TILES_PER_ROW, "--bs-two": two }}>
+      <div class={`bs-tiles${locked ? " bs-theirs" : ""}`} role="radiogroup" aria-label="Bosses" aria-disabled={locked || undefined} style={{ "--bs-per": TILES_PER_ROW, "--bs-two": two, "--bs-gap": `${TILE_GAP}px`, "--bs-ratio": TILE_RATIO }}>
         {rows.map((row, i) => (
           <div class="bs-row" role="presentation" key={i}>
             {row}

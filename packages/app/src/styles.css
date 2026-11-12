@@ -10525,6 +10525,12 @@ button.fd-logo {
   width: 100%;
   max-width: 560px;
   margin: 0 auto;
+  /* (Nov 12, Eric: the Boss Battle screen fills the window and never scrolls: the grid on top, the stage and START at the bottom.) */
+  gap: 10px;
+}
+/* (The START form, Home's Boss Battle: a window's height, never a scroll. The raid form's list of ways to play keeps its height.) */
+.rd-page:has(.bs-start) {
+  height: var(--app-h);
 }
 .rd-about {
   line-height: 1.4;
@@ -10543,7 +10549,7 @@ button.fd-logo {
 /*
  * -- The Boss raid screen's character select (Eric, Oct 16: SF2 / PlayStation era; bs- for boss select) --
  * A fighting game's grid (Eric, Oct 21 to 23; the last look from Street Fighter 6's select): tall slanted tiles, all the same
- * size, a small gap between them, five to a row on a phone and a computer alike (BossSelect's `--bs-per`), a short row
+ * size, a small gap between them, six to a row on a phone and a computer alike (BossSelect's `--bs-per`; Nov 12), a short row
  * centered. The block takes back all but 10 px of the page's padding at the top and both sides, so on a phone it's nearly the
  * screen's width; on a computer the tiles stop growing at 96 px and the block stays in the middle of the column. Each tile is
  * a parallelogram (clip-path: nothing sticks out sideways, and a tap lands on the right tile where boxes overlap) holding the
@@ -10554,16 +10560,19 @@ button.fd-logo {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  /* (Nov 12, Eric: the screen never scrolls. The grid at the top, the stage pushed down into the room left, the START under it.) */
+  flex: 1 1 auto;
+  min-height: 0;
 }
 .bs-tiles {
   /* (A row of n tiles with a gap between them is n wide, less n - 1 slants, plus n - 1 gaps; the slant is a fifth of a tile's
      width and a tile is 1.24 as tall as wide, which makes its visible width 1 to 1.55 of its height. --bs-w: a tile's width in a
      full row, at most 96 px. cqi: the block's own width.) */
-  --bs-per: 5;
-  --bs-gap: 5px;
+  --bs-per: 6;
+  --bs-gap: 4px;
   --bs-w: min(calc((100cqi - (var(--bs-per) - 1) * var(--bs-gap)) / (var(--bs-per) - 0.2 * (var(--bs-per) - 1))), 96px);
   --bs-slant: calc(var(--bs-w) * 0.2);
-  --bs-h: calc(var(--bs-w) * 1.24);
+  --bs-h: calc(var(--bs-w) * var(--bs-ratio, 1));
   container-type: inline-size;
   display: flex;
   flex-direction: column;
@@ -10681,10 +10690,13 @@ button.fd-logo {
   display: flex;
   flex-direction: column;
   gap: 0;
+  /* (Pushed down into the room the grid leaves: the stage sits just above START.) */
+  margin-top: auto;
 }
 .bs-row-stage {
   /* (A platform's room: 156 px on a phone, less on a narrow one so the two sides never run past the screen.) */
-  --bs-sw: min(156px, 46cqi);
+  /* (Nov 12: a shorter screen shrinks the stage, never the grid: 156 px at 746 px tall and up, 93 px at 640, so the admin's four rows fit.) */
+  --bs-sw: min(156px, 46cqi, calc(100dvh - 547px));
   display: grid;
   grid-template-columns: 1fr auto 1fr;
   align-items: start;
@@ -10996,11 +11008,11 @@ button.fd-logo {
 .bs-say {
   position: relative;
   z-index: 2;
-  height: 40px;
-  margin-bottom: -6px;
+  /* (Nov 12, Eric: the bubble sits above the boss's head, never over it: its box and tail end above the stage's top, where the boss's head may reach.) */
+  height: 46px;
 }
 .bs-say .bs-bubble {
-  bottom: 0;
+  bottom: 16px;
   left: auto;
   right: 0;
   max-width: min(100%, 260px);
@@ -12727,7 +12739,7 @@ button.fd-seat {
     margin-inline: auto;
   }
   /* Two rows when the page's width (the column less its padding) is 660 px or more: cards of 90 px or more, the 17 tiles of
-     an admin's two rows of nine and eight at 1280 px wide. Narrower keeps five a row, as before. Each row of cards is one
+     an admin's two rows of nine and eight at 1280 px wide. Narrower keeps six a row (Nov 12). Each row of cards is one
      flex line: every card's margin to the next is the gap less its slant, so a line is as wide as its cards' visible
      widths; the translate moves each card by half the slant less the gap, which centers the visible cards in the line. */
   @container rd-page (min-width: 660px) {
