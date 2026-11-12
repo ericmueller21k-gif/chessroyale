@@ -57,7 +57,7 @@ import { seenEither, seenFrom, seenReady, seenWorked } from "./seen.ts";
 import { P, REC, type PartId } from "./frame-report.ts";
 import { bakeRoof, type Piece, type RoofArt } from "./box-draw.ts";
 import { stepChar } from "./kit/bake.ts";
-import { ARENA, COLISEUM_PLACE, GARDEN, WALL, GRASS, LAMPS, LOT, PAVING, PROPS, STATUES, TABLES, figureName, groundAt, hasTownBoss, isSprite, onColiseum, plotAt, seated, spriteAnim, tableStates, type Boss, type SpriteAnim, type Home, type HomeId, type IndoorId, type TownBossId, type Person, type Place, type Pose, type Prop, type Statue, type StatueId, type Table, type TableState, type Town, type Walker } from "./world.ts";
+import { ARENA, COLISEUM_PLACE, GARDEN, WALL, GRASS, LAMPS, LOT, PAVING, PROPS, STATUES, TABLES, figureName, groundAt, hasTownBoss, isSprite, onColiseum, plotAt, plotDist, seated, spriteAnim, tableStates, type Boss, type SpriteAnim, type Home, type HomeId, type IndoorId, type TownBossId, type Person, type Place, type Pose, type Prop, type Statue, type StatueId, type Table, type TableState, type Town, type Walker } from "./world.ts";
 import { drawZzz } from "./zzz.ts";
 import { TAG_STYLE, TagCache, easeTag, namesMode, tagAlpha, type NamesMode, type TagKind } from "./tags.ts";
 
@@ -3950,14 +3950,19 @@ export class Renderer {
     return null;
   }
 
-  /** What's under (x, y) in the box: a home, a boss or a person (nearest first), else a square, else null (the sky). */
-  pick(x: number, y: number): Hit | null {
+  /**
+   * What's under (x, y) in the box: a home, a boss or a person (nearest first), else a square, else null (the sky). `skipYou`: your own
+   * pawn is see-through to it (what stands or lies under you: Town.tsx `pickTap`).
+   */
+  pick(x: number, y: number, skipYou = false): Hit | null {
     // (Nothing under the street town's minimap: a tap there is the map's. The test hooks' tap points keep off it this way too.)
     const mb = MAP_BOX;
     if (mb.w > 0 && x >= mb.x && x <= mb.x + mb.w && y >= mb.y && y <= mb.y + mb.h) return null;
     // (A tap on a row's front, or on any building's side, back or roof, never opens something drawn behind it: the street town's
     // Colosseum rises over the rows' roofs (the paused round's guard, the north edge round). Only the ground under the tap is left.)
     let overFront = false;
+    // (A home whose picture's box the tap is in, on a see-through pixel: Nov 12, below.)
+    let boxOf: Home | null = null;
     for (let i = this.items.length - 1; i >= 0; i--) {
       const it = this.items[i]!;
       if (!it.on || it.faded || x < it.x0 || x > it.x1 || y < it.y0 || y > it.y1) continue;
@@ -3968,7 +3973,10 @@ export class Renderer {
           const st = this.statueHit(x, y);
           if (st) return { kind: "statue", statue: st };
         }
-        if (!this.houseHit(it, x, y)) continue;
+        if (!this.houseHit(it, x, y)) {
+          if (it.i < this.homes.length) boxOf ??= this.homes[it.i]!;
+          continue;
+        }
         if (it.i >= this.homes.length) return { kind: "coliseum" };
         return { kind: "house", home: this.homes[it.i]! };
       }
@@ -4000,9 +4008,14 @@ export class Renderer {
         }
         continue;
       }
-      return { kind: "person", person: this.town.people[it.i]! };
+      const person = this.town.people[it.i]!;
+      if (skipYou && person.you) continue;
+      return { kind: "person", person };
     }
     const sq = pickSquare(this.view, this.camX, this.camY, x, y);
+    // (Nov 12, Eric: "more grace where you can click anywhere near or on the building".) A see-through pixel of a home's picture (between
+    // its pyramid and its flagpole, round its door) over ground within a square of its plot, and no other home's: that home.
+    if (sq && boxOf && plotDist(boxOf, sq.c, sq.r) <= 1 && !plotAt[sq.r * N + sq.c]) return { kind: "house", home: boxOf };
     return sq ? { kind: "square", c: sq.c, r: sq.r } : null;
   }
 

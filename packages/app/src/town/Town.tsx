@@ -72,7 +72,7 @@ import { painterGL } from "./paint-gl.ts";
 import { reportTownFallback } from "../problems.ts";
 import type { TownGlFallback } from "@chessroyale/core";
 import { sameWeights, skyOverride, skyWeights, type SkyWeights } from "./sky.ts";
-import { TOWN_BOTS, COLISEUM_PLACE, CROWD_MAX, HOMES, addCrowd, figureName, hasTownBoss, walkYou, addTestPlayer, fillTables, homeDoor, inSquare, stayOut, START, STATUES, TABLES, anyTableFree, botLabel, cancelMeet, comeOut, createTown, destFor, holdBot, isSprite, spotNear, meet, meetReady, meetSeat, onColiseum, playAtTableText, plotAt, ratingLine, ratingText, seated, sidekickText, spriteAnim, statueAt, stoolAt, tableAt, tableFor, tableStates, taken, tdist, tick, townLine, walkable, waitingBot, walkWalker, type HomeId, seatOf, seatText, standOf, type Person, type Place, type Seat, type Sq, type Stand, type StatueId, type Target } from "./world.ts";
+import { TOWN_BOTS, COLISEUM_PLACE, CROWD_MAX, HOMES, addCrowd, figureName, hasTownBoss, walkYou, addTestPlayer, fillTables, homeDoor, inSquare, stayOut, START, STATUES, TABLES, anyTableFree, botLabel, cancelMeet, comeOut, createTown, destFor, holdBot, homeNear, isSprite, spotNear, meet, meetReady, meetSeat, onColiseum, playAtTableText, plotAt, ratingLine, ratingText, seated, sidekickText, spriteAnim, statueAt, stoolAt, tableAt, tableFor, tableStates, taken, tdist, tick, townLine, walkable, waitingBot, walkWalker, type HomeId, seatOf, seatText, standOf, type Person, type Place, type Seat, type Sq, type Stand, type StatueId, type Target } from "./world.ts";
 import { NO_WEBGL_STREET, STREET_TOWN } from "./admin-town.ts";
 import { guestLimitMs, watchAway, watchGuest } from "./here-net.ts";
 import { FdButton } from "../components/FrontDoor.tsx";
@@ -1612,8 +1612,9 @@ function startTown(
       const wb = waitingBot(town, table);
       c = { kind: "table", i: table.i, confirm: false, watch: tableStates(town.people)[table.i]!.kind === "playing", ...(wb ? { bot: town.people.indexOf(wb) } : {}) };
     } else if (hit.kind === "square") {
-      key = `sq:${hit.c},${hit.r}`;
-      const home = plotAt[hit.r * N + hit.c];
+      // (Nov 12, Eric: "more grace": its plot, or the row right in front of a home (its door's), is that home, by its door: homeNear.)
+      const home = homeNear(hit.c, hit.r);
+      key = home ? `home:${home.id}` : `sq:${hit.c},${hit.r}`;
       target = home ? { kind: "home", home } : { kind: "square", c: hit.c, r: hit.r };
       if (home) c = { kind: "home", i: HOMES.indexOf(home), confirm: false };
     } else if (hit.kind === "house") {
@@ -1633,6 +1634,16 @@ function startTown(
       if (hit.person.bot || hit.person.uid) c = { kind: "person", i: town.people.indexOf(hit.person), confirm: false, full: !!hit.person.bot && !anyTableFree(town, hit.person) };
     }
     return { key, dest: destFor(town, town.you.walker, target), card: c, statue };
+  };
+  /**
+   * What a tap at (x, y) in the box lands on. Your own pawn takes no tap (a tap on it does nothing), but standing at a home's foot it
+   * hides the door (Eric, Nov 12): a tap on you over a home (its picture, plot or foot row: `homeNear`) is that home's.
+   */
+  const pickTap = (x: number, y: number): Hit | null => {
+    const hit = r.pick(x, y);
+    if (hit?.kind !== "person" || !hit.person.you) return hit;
+    const under = r.pick(x, y, true);
+    return under?.kind === "house" || (under?.kind === "square" && homeNear(under.c, under.r)) ? under : hit;
   };
   /** Any walk of yours, a tap or the arrow keys: it stands you up, calls off a game you were walking to with a bot and a way into a shop. */
   const walkOff = () => {
@@ -1711,7 +1722,7 @@ function startTown(
     const now = evAt(e);
     if (closing) return press.down(e.clientX, e.clientY, "", now);
     const xy = local(e);
-    const p = plan(r.pick(xy.x, xy.y));
+    const p = plan(pickTap(xy.x, xy.y));
     if (p?.dest) r.pressSquare(p.dest.c, p.dest.r);
     press.down(e.clientX, e.clientY, p?.dest || p?.card ? p.key : "", now);
   };
@@ -1758,7 +1769,7 @@ function startTown(
       return;
     }
     const xy = local(e);
-    const p = plan(r.pick(xy.x, xy.y));
+    const p = plan(pickTap(xy.x, xy.y));
     const res = press.up(p ? p.key : "");
     if (res !== "walk" || !p) {
       if (res === "cancel") r.release(now, false);
@@ -2097,8 +2108,15 @@ function startTown(
     const p = painter as Painter & { uploads?: number; resets?: number; stats?: () => unknown };
     return { backend: painter.kind, drawCalls: painter.drawCalls, lost: painter.lost, uploads: p.uploads ?? 0, resets: p.resets ?? 0, atlas: p.stats?.() ?? null, loading, loadMs, loadPaintMs, loadMusicMs };
   };
-  const hooks = window as unknown as { __townFull?: typeof hookFull; __townPlayer?: typeof hookPlayer; __townTurns?: typeof hookTurns; __townGlide?: typeof hookGlide; __townAt?: typeof hookAt; __townGather?: typeof hookGather; __townCam?: typeof hookCam; __townSeat?: typeof hookSeat; __townTables?: typeof hookTables; __townCall?: typeof hookCall; __townBots?: typeof hookBots; __townBossBack?: typeof hookBossBack; __townTags?: typeof hookTags; __townHold?: typeof hookHold; __townPaint?: typeof hookPaint; __townBench?: typeof hookBench; __townWalk?: typeof hookWalk; __townRide?: typeof hookRide; __townYou?: typeof hookYou; __townHeading?: typeof hookHeading; __townHush?: typeof hookHush; __townStill?: typeof hookStill; __townHere?: typeof hookHere; __townReport?: typeof hookReport };
+  /** (Tests, the stills) What a tap at (x, y) in the box would do now: its key ("home:alfil", "sq:c,r", …), where you'd walk, its card's kind. */
+  const hookPick = (x: number, y: number) => {
+    if (!testSwitchesAllowed()) return null;
+    const p = plan(pickTap(x, y));
+    return p ? { key: p.key, dest: p.dest, card: p.card?.kind ?? null } : null;
+  };
+  const hooks = window as unknown as { __townPick?: typeof hookPick; __townFull?: typeof hookFull; __townPlayer?: typeof hookPlayer; __townTurns?: typeof hookTurns; __townGlide?: typeof hookGlide; __townAt?: typeof hookAt; __townGather?: typeof hookGather; __townCam?: typeof hookCam; __townSeat?: typeof hookSeat; __townTables?: typeof hookTables; __townCall?: typeof hookCall; __townBots?: typeof hookBots; __townBossBack?: typeof hookBossBack; __townTags?: typeof hookTags; __townHold?: typeof hookHold; __townPaint?: typeof hookPaint; __townBench?: typeof hookBench; __townWalk?: typeof hookWalk; __townRide?: typeof hookRide; __townYou?: typeof hookYou; __townHeading?: typeof hookHeading; __townHush?: typeof hookHush; __townStill?: typeof hookStill; __townHere?: typeof hookHere; __townReport?: typeof hookReport };
   hooks.__townAt = hookAt;
+  hooks.__townPick = hookPick;
   hooks.__townGlide = hookGlide;
   hooks.__townGather = hookGather;
   hooks.__townCam = hookCam;
@@ -2379,6 +2397,7 @@ function startTown(
       delete hooks.__townYou;
       delete hooks.__townHere;
       delete hooks.__townReport;
+      delete hooks.__townPick;
       painter.dispose();
       if (card?.kind === "boss") town.bosses[card.i]!.held = false;
       detach();

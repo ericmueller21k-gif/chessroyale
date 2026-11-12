@@ -112,6 +112,10 @@ removed (old → new) and says whether any of them guards a rule here.
   possible"; "if I use the arrow keys and you run up to a building, it should also ask you if you want to enter").**
   - Guards: `packages/app/test/town-world.test.ts`, "tapping a home walks you in front of its door…"; `e2e/town.spec.ts`, "a home's
     door (Eric, Nov 5)…", phone and computer.
+  - Nov 12, more grace ("you can click anywhere near or on the building, and it should make your guy run and then give him the go in
+    message"): its foot row, see-through gaps near its foot and your own pawn at its door count too
+    ([2026-11-12-town-door-tap.md](../decisions/2026-11-12-town-door-tap.md)). Guards: `packages/app/test/town-door-tap.test.ts`;
+    `e2e/town-street.spec.ts`, "Alfil's Pyramid (Eric, Nov 12…)", phone and computer.
 
 - **Up is up the screen in every room (Eric, Nov 5: "if I hold up, it goes up in the… chess town, but then if you hold up in one of
   the rooms, it actually gave you the kind of sensation you're running down. So it's flipped").** Inside every building (each shop, the

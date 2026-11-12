@@ -113,6 +113,14 @@ behind Cloudflare Access like the rest of the site). Phone and computer; **on a 
   round its plot, the Colosseum (or its ground) on the free apron square nearest its gate (`destFor`), so a crowd at the
   gate grows in a half ring. If two walks end on one square, the later claim gives way to the nearest free square
   beside it (`keepApart`, every tick). Bots and bosses pick their ends the same way.
+- **A tap near a home's foot is the home's** (Nov 12, Eric: "more grace where you can click anywhere near or on the building"): its
+  picture, its plot (the half-hidden row under its front), its foot row (the row right in front of its front edge across the plot,
+  its door square among them: `world.ts homeNear`), a see-through pixel of its picture's box over ground within a square of its
+  plot and no other home's (`render.ts pick`), and your own pawn over any of those (`Town.tsx pickTap`; a tap on you elsewhere
+  still does nothing). Not the corners beside the foot row, nothing two rows out; people, bosses, tables and statues are picked
+  first. Of two homes, the nearer door. It walks you to the door square and opens its card, as a tap on the building does. Test
+  hook `__townPick(x, y)` (its key, where you'd walk, the card). Tests: `packages/app/test/town-door-tap.test.ts`,
+  `town-world.test.ts`, `e2e/town-street.spec.ts` ("Alfil's Pyramid"). [2026-11-12-town-door-tap.md](../decisions/2026-11-12-town-door-tap.md).
 - **Cards** (the prototype's, inside the world's box, over the boss's head or above the home's name, placed every frame;
   a tap anywhere else, or Escape, closes one). **Every card is dark** (Eric's mockup, Oct 28: "dark card" with a "thin warm-gold
   border"): `#20212a`, a 1.5 px `#d9bb8c` border, rounded corners, a tail with the same border pointing at what it's about, white
