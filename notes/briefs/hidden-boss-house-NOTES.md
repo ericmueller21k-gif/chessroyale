@@ -139,3 +139,25 @@ Draft 2 is in the chat of Nov 12 and below; Eric's to change. Unattributed quote
 - Cutscene: Eric doesn't like line 4 ("I forgot that part"); he's writing his own version of the lines. Wait for it; don't send another draft.
 
 - Eric, Nov 12 (final): no more likeness or legal caveats about the Hidden Boss, ever. His real games, quotes and life are fine; only the name stays out.
+
+## Nov 12 (night): the cutscene, Eric's version (cleaned up; "/" = a typing break)
+How the text shows (Eric): typed out letter by letter, at most 5 or 6 words at a time; a line of two sentences types the first, holds
+about a second, then types the next.
+1 Kid: Why are you on the floor?
+2 Man: I lost.
+3 Kid: Do you still find them?
+4 Man: Find what?
+5 Kid: The moves / that make you laugh out loud.
+6 Man: The machines find them now. // They don't need us anymore.
+7 Kid: That's not the point.
+8 Man: All that matters / on the chessboard / is good moves.
+9 Kid: And how do you know they're good? // Because a machine says so?
+10 Man: ...
+11 Kid: Best by test, / right?
+12 Man: I just wanted to play / the most beautiful game / anyone ever played.
+13 Kid: Then why'd you stop?
+14 Man: The computers. // They ruined everything.
+15 Kid: Computers or no computers, / the best player in the world / is still the best.
+16 Man: Do you really believe that?
+17 Kid: I'm not sure. // The only one who can prove it / is right next to me.
+-> segue: the kid fades, the book opens, the light, the cyborg.
