@@ -92,12 +92,20 @@ const THEMES = {
   },
 };
 let themesAsked = 0;
+/** The pieces fetched by the town's loading (preloadMusic: fetched, not decoded), and the ones to fail once. */
+const preFetched: string[] = [];
+const failOnce = new Set<string>();
 vi.stubGlobal("fetch", (url: string) => {
   if (url === "/music/themes.json") themesAsked++;
+  if (url.endsWith(".mp3")) {
+    preFetched.push(url);
+    if (failOnce.delete(url)) return Promise.resolve({ ok: false, status: 503 });
+    return Promise.resolve({ ok: true, blob: () => Promise.resolve(new Blob()) });
+  }
   return Promise.resolve({ ok: true, json: () => Promise.resolve(THEMES) });
 });
 
-const { bossMusic, musicLevel, musicNow, musicPlan, roomMusic, roomMusicLoad, roomMusicNow, setMusicOn, splashDone, splashMusic } = await import("../src/music.ts");
+const { bossMusic, musicFiles, musicLevel, musicNow, musicPlan, musicWanted, preloadMusic, roomMusic, roomMusicLoad, roomMusicNow, setMusicOn, splashDone, splashMusic } = await import("../src/music.ts");
 const settle = () => new Promise((r) => setTimeout(r, 0));
 
 describe("the plan from themes.json", () => {
@@ -128,6 +136,44 @@ describe("the plan from themes.json", () => {
     expect(musicLevel(false, false, false)).toBe(0);
     expect(musicLevel(true, true, false)).toBe(0);
     expect(musicLevel(true, false, true)).toBe(0);
+  });
+});
+
+describe("the town's loading bar (Nov 12: every theme fetched, none decoded)", () => {
+  const ALL = ["/music/grex-intro.mp3", "/music/grex-loop.mp3", "/music/bigboy-loop.mp3", "/music/zebra-intro.mp3", "/music/zebra-loop.mp3"];
+  beforeEach(() => {
+    preFetched.length = 0;
+    files.length = 0;
+    sound.muted = false;
+    setMusicOn(true);
+  });
+
+  it("every theme's pieces, each once", () => {
+    expect(musicFiles(THEMES)).toEqual(ALL);
+  });
+  it("Music off or Sound off: nothing fetched (and no music step)", async () => {
+    setMusicOn(false);
+    expect(musicWanted()).toBe(false);
+    await preloadMusic();
+    sound.muted = true;
+    setMusicOn(true);
+    expect(musicWanted()).toBe(false);
+    await preloadMusic();
+    expect(preFetched).toEqual([]);
+  });
+  it("fetches every piece once, decodes none, the share rising to 1; a failed piece is fetched again next time, the rest not", async () => {
+    failOnce.add("/music/bigboy-loop.mp3");
+    const shares: number[] = [];
+    await preloadMusic((s) => shares.push(s));
+    expect(preFetched.sort()).toEqual([...ALL].sort());
+    expect(files, "nothing decoded").toEqual([]);
+    expect(shares).toEqual([0.2, 0.4, 0.6, 0.8, 1]);
+    preFetched.length = 0;
+    await preloadMusic();
+    expect(preFetched).toEqual(["/music/bigboy-loop.mp3"]);
+    preFetched.length = 0;
+    await preloadMusic();
+    expect(preFetched).toEqual([]);
   });
 });
 

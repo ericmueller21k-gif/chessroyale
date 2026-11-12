@@ -68,3 +68,31 @@ Read, not fixed (left for the next batch):
   the search's top 3: the search returned 2 lines. Its trace is 742 MB; not read.
 - town-leave:148 and global-chat:46 (PR runs only): not reached.
 
+
+## Batch 4 (Nov 12, branch `claude/main-red-batch4`)
+
+Each fixed at its cause; no retries, skips or sleeps added. Two of the four are **app bugs** a player would meet. One wait made longer,
+for a real thing (a chat line that waits its turn, below). Proved with `--repeat-each`, under the e2e lock.
+
+| Test | Cause | Fix |
+| --- | --- | --- |
+| boss-bar:204 [phone] (`animationName` `""` mid-Moon) | **App bug.** The match's screens are one component per phase, so the boss bar and its level badge are put in the page anew twice a move. The lifted badge's gold pop (560 ms) replayed at each: about nine times in one Full Moon (logged by a MutationObserver, with the phase). The test's `locator.evaluate` could also land on a badge just replaced (a detached element's computed style is empty). | The badge carries on its animation from when the lift or slash began (`levelSince` in `Boss.tsx`: a negative `animation-delay`), so it plays once. The spec records every lifted badge put in the page and fails if one drawn after the pop is over plays it again (fails on the old build: 9 replays; passes now, 5/5), and reads the reduced-motion style in one `page.evaluate`. |
+| town-leave:148 [phone] (still in the room after Back) | **App bug.** `goOut` returned at once while the door was busy, and it stays busy until the room's warm-up frames and the 260 ms fade are done (up to about 1.3 s after the room is drawn): a Back or Go out tapped then was lost (CI's snapshot: Back focused, still in Babur's Circus). | The tap waits for the room, then goes out (`outNext` in `Town.tsx`; not while already going out; cleared when a new way in starts). The spec, on a phone, taps Back from the page the moment the room is drawn: fails on the old build, 6/6 now; the whole spec passes on both projects. |
+| global-chat:116 [desktop] ("Chat is busy" never showed) | **Test timing.** The test chat's cap was one line a second with a 2 s line: three rushes fill it and a fourth is busy only if it reaches the server within 1 s of the first. On CI it came later and was queued (its snapshot: "me too" shown fourth). With the Enter delayed 1.2 s it fails locally every time. | The test chat (test switches only) is one line every 3 s with a 6 s line (`TEST_GLOBAL_CHAT`): the same four players, a 3 s margin. Passes with the 1.2 s delay. The young-device check (:141) now waits 10 s for its own line: it can queue behind Ann's (up to 3 s), and a line that queued comes with the next live poll (every 5 s). Unit test updated (`[0, 3000, 6000, "busy"]`). 12/12. |
+
+Read, not fixed:
+- **autochess-board:248, :274, :373 [desktop]** (run 43115844651, shard 8): `.ac-root` never in the page; CI's snapshot shows the computer's
+  front door with its column headed AUTO CHESS and an empty `main`: the screen's lazy chunk hadn't come. The job log has
+  `ProxyWorker: GET /assets/AutoChess-….js recovered on attempt 2 after a dropped connection to the UserWorker` right after the first,
+  and the same for `/autochess`, `/`, `sw.js` and the Stockfish wasm round the other two, among 24 broken-pipe or reset errors from
+  workerd in that shard. The local server (wrangler dev) dropped its connections to the app's worker for those seconds: the test server,
+  not the app on Cloudflare. Retries loaded in 0.1 to 0.4 s. Not reproduced locally. Next, if it keeps coming: the wrangler version, or
+  what closes those connections (the broken pipes follow pages closed mid-response). Seen in passing: `lazyGroup` (`lazy.tsx`) shows a
+  blank screen until its chunk comes and, if the import fails, doesn't ask again while that screen stays: a lost chunk on a bad
+  connection leaves the screen blank until you leave it. A small follow-up (ask again after a second, a few times).
+- **global-chat:266 [desktop]** (the right column at 1920 × 1080; seen here once in 9 local runs, not on CI's list): its tap on Babur's
+  home missed (the home's point moved 225 px between looks: the camera gliding). Batch 2's `homeStill` (three still frames) never
+  succeeded at 1920 × 1080 locally: a frame took 400 to 600 ms there and the point kept moving (125 to 179 px, undrawn between).
+  Reverted; needs its own look.
+- **global-chat:46**: passed 7 of 7 locally (no CI trace kept).
+- **shop:870, multiplayer:18**: not reached.

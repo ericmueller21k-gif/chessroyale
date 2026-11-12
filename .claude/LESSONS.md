@@ -48,6 +48,13 @@ Tests check *what* ends up on the screen, not *how it gets there*, nor how long 
   - Something that should stay put through a match's phases (a box under the board) is one element, not one per
     screen: count the elements across the phases (a MutationObserver or a per-frame sampler), not only their boxes.
 
+- **A level that popped twice a move, and a Back tap that was lost** (Nov 12, [story](../docs/history/lessons.md#a-level-that-popped-twice-a-move-and-a-back-tap-that-was-lost-nov-12-2026)):
+  - An animation that plays as a state begins (a pop, a slash) must not play again when its element is drawn again: the match's
+    screens are rebuilt at every phase. Keep when the state began outside the component and give a redrawn copy a negative
+    `animation-delay` from it. A test records every insertion of the element and whether its animation is running.
+  - A guard that refuses an action while something is busy (a door's fade) keeps the tap for when it's free, or greys the button: it
+    never drops it silently. Test the tap at the first moment it can come (a MutationObserver that taps as the thing is drawn).
+
 ## Measure what's on screen; don't trust a screenshot
 
 - **Purity that didn't match the item** (Oct 6, [story](../docs/history/lessons.md#purity-that-didnt-match-the-item-oct-6-2026)):

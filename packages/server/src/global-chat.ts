@@ -71,10 +71,11 @@ export type GlobalChatOptions = { [K in keyof typeof GLOBAL_CHAT]: (typeof GLOBA
 export const PAWN = "♟";
 
 /**
- * A test's own global chat (the test switches only: an e2e's `?chatroom=`): no bots, and a cap of one message a second with a 2 s line,
- * so a test can show "Chat is busy" with four players instead of fifty.
+ * A test's own global chat (the test switches only: an e2e's `?chatroom=`): no bots, and a cap of one message every 3 s with a 6 s line,
+ * so a test can show "Chat is busy" with four players instead of fifty. (Three fill the line; a fourth is busy for 3 s after the
+ * first: Nov 12, a 1 s window with a 2 s line left a slow CI runner 1 s, and the fourth was queued instead.)
  */
-export const TEST_GLOBAL_CHAT: GlobalChatOptions = { ...GLOBAL_CHAT, bots: false, capCount: 1, capWindowMs: 1_000, queueMs: 2_000 };
+export const TEST_GLOBAL_CHAT: GlobalChatOptions = { ...GLOBAL_CHAT, bots: false, capCount: 1, capWindowMs: 3_000, queueMs: 6_000 };
 
 /** A short key for an icon's content (53-bit cyrb53, in hex): the same drawing always has the same key. */
 export function iconKey(icon: string): string {
