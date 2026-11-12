@@ -1,7 +1,6 @@
 /**
- * The Hidden Boss's room, a MOCKUP for Eric (Nov 12): the room drawn by the real room (ShopRoom.tsx) with its scene (recluse-scene.ts).
- * Reachable only on the dev server (`npm run dev`, then /preview/hidden-room): main.tsx loads this behind `import.meta.env.DEV`, which
- * a production build drops, so it never ships. No home in the town opens the room yet.
+ * Dev only (not in the build): the Hidden Boss's room, a MOCKUP for Eric (Nov 12), drawn by the real room (town/shops/ShopRoom.tsx)
+ * with its scene (town/shops/recluse-scene.ts). `npm run dev`, then /hidden-room-preview.html. No home in the town opens the room yet.
  *
  * Switches in the address: `?t=<ms>` starts the child's game that far in (a still mid-game); `?summon=<ms>` starts the summoning that
  * long after the room is ready; `?ui=0` hides the preview's buttons (for stills). Test hooks: `window.__hiddenRoom()` (the summoning's
@@ -9,11 +8,12 @@
  */
 import { render } from "preact";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
-import type { HomeId } from "../world.ts";
-import type { ShopDef } from "./shops.ts";
-import { ShopRoom, loadRoomWith, type LoadedRoom, type RoomArt, type ShopCtl } from "./ShopRoom.tsx";
-import { recluseScene } from "./recluse-scene.ts";
-import "../town.css";
+import type { HomeId } from "../town/world.ts";
+import type { ShopDef } from "../town/shops/shops.ts";
+import { ShopRoom, loadRoomWith, type LoadedRoom, type RoomArt, type ShopCtl } from "../town/shops/ShopRoom.tsx";
+import { recluseScene } from "../town/shops/recluse-scene.ts";
+import "../styles.css";
+import "../town/town.css";
 
 /** The room's def (the mockup's own; in no list a home opens): no Shopkeeper, nowhere to talk, a sunny room. */
 const DEF: ShopDef = {
@@ -31,7 +31,7 @@ const DEF: ShopDef = {
   chatTone: "day",
 };
 const art = (): Promise<RoomArt> =>
-  import("./recluse-art.ts").then((m) => ({
+  import("../town/shops/recluse-art.ts").then((m) => ({
     n: m.SHOP_RECLUSE_N,
     layout: m.SHOP_RECLUSE_LAYOUT,
     pieces: m.SHOP_RECLUSE_PIECES,
@@ -90,7 +90,4 @@ function Preview() {
   );
 }
 
-/** Mounts the preview in the page (main.tsx, on the dev server only). */
-export function mountHiddenRoom(el: HTMLElement): void {
-  render(<Preview />, el);
-}
+render(<Preview />, document.getElementById("app")!);

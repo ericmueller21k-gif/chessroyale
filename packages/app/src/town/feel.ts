@@ -869,7 +869,7 @@ export const SHOP_FEEL = {
  */
 export const HIDDEN_ROOM_FEEL = {
   play: { first: 1400, think: 760, reach: 300, carry: 460, back: 300, look: 480, end: 1800, fade: 1100 },
-  kid: { scale: 0.62, board: 1.5, lift: 0.7 },
+  kid: { scale: 0.8, board: 1.5, lift: 0.7 },
   summon: {
     /** The freeze frame: the players' figures still images (a flash). */
     freeze: 0,

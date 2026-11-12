@@ -128,6 +128,7 @@
     "packages/app/stockfish-source/**",
     "packages/app/public/licenses/**",
     "packages/app/god-king-preview.html",
+    "packages/app/hidden-room-preview.html",
     "packages/app/items-preview.html",
     "packages/app/rides-measure.html",
     "packages/app/src/dev/**",

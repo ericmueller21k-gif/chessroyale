@@ -529,11 +529,11 @@ export const SHOP_RECLUSE_PIECES: Readonly<Record<string, Character>> = Object.f
 export const SHOP_RECLUSE_SCENE = {
   kid: [5.5, 5.0] as const,
   board: [5.5, 5.95] as const,
-  players: [[3.2, 7.4], [4.6, 8.3], [6.4, 8.3], [7.8, 7.4]] as const,
+  players: [[3.0, 6.9], [4.2, 8.0], [6.8, 8.0], [8.0, 6.9]] as const,
   /** Where you stand as you come in (the mockup hides you). */
   you: [5, 10] as const,
 };
 /** The squares nobody walks on: the child and his board (the scene's, not a room piece's). */
 export const SHOP_RECLUSE_STANDING = [{ c: 5, r: 5 }, { c: 6, r: 5 }, { c: 5, r: 6 }, { c: 6, r: 6 }] as const;
 /** The camera's fixed look at the town's zoom (a small room seen whole, as Rolling Dough's back room). */
-export const SHOP_RECLUSE_CAM = { x: 5.5, y: 6.4 } as const;
+export const SHOP_RECLUSE_CAM = { x: 5.5, y: 5.9 } as const;
