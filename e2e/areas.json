@@ -102,7 +102,6 @@
     "packages/app/src/components/HistoryNav.tsx",
     "packages/app/src/components/LiveNumber.tsx",
     "packages/app/src/components/MuteButton.tsx",
-    "packages/app/src/components/PauseMenu.tsx",
     "packages/app/src/components/PowerUpButton.tsx",
     "packages/app/src/components/TinyBoard.tsx",
     "packages/app/src/clock-text.ts",

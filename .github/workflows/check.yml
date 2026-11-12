@@ -41,6 +41,15 @@ jobs:
       - name: Every new file is in e2e/areas.json
         if: ${{ github.event_name == 'pull_request' }}
         run: node e2e/ci-select.mjs unmapped HEAD^1
+      # Decision notes stay short (CLAUDE.md: "a decision note of about five lines"): the Nov 12 bloat sweep found 116 notes and
+      # 34k words in 3.5 days, every helper re-reading them. A warning, not a failure: long tables belong in the PR body.
+      - name: New decision notes are short
+        if: ${{ github.event_name == 'pull_request' }}
+        run: |
+          for f in $(git -c core.quotepath=off diff --name-only --diff-filter=A HEAD^1 HEAD -- docs/decisions | grep '\.md$' || true); do
+            w=$(wc -w < "$f")
+            if [ "$w" -gt 250 ]; then echo "::warning file=$f::$f is $w words. Keep a decision note to about 150 words (Eric's words, what changed, the calls made); tables and test lists go in the PR body."; fi
+          done
       - uses: actions/setup-node@v7
         with:
           node-version: 22
