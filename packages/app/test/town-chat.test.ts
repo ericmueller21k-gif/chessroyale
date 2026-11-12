@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TOWN_CHAT } from "@chessroyale/core";
-import { CHAT, CHATTER, CHAT_BACKGROUND_LABEL, CHAT_BACKGROUND_NOTE, CHAT_MODES, CHAT_MODE_CHOICE, CHAT_MODE_LABEL, ChatLog, Stick, chatBackground, chatBlurs, chatMode, chatShows, clampBox, chatterDelay, clockText, loadChatBackground, loadChatMode, loadChatPos, nextChatMode, onChatBackground, onChatMode, onTownChatLineTap, pickChatter, saveChatBackground, saveChatMode, saveChatPos, say, setChatBackground, setChatMode, setTownChatLineTap, startChatter, tooSoonText, townTone, unsay, type ChatKind } from "../src/town/chat.ts";
+import { CHAT, CHATTER, CHAT_BACKGROUND_LABEL, CHAT_BACKGROUND_NOTE, CHAT_MODES, CHAT_MODE_CHOICE, CHAT_MODE_LABEL, ChatLog, Stick, chatBackground, chatBlurs, chatHint, chatMode, chatShows, clampBox, chatterDelay, clockText, loadChatBackground, loadChatMode, loadChatPos, nextChatMode, onChatBackground, onChatMode, onTownChatLineTap, pickChatter, saveChatBackground, saveChatMode, saveChatPos, say, setChatBackground, setChatMode, setTownChatLineTap, startChatter, tooSoonText, townTone, unsay, type ChatKind } from "../src/town/chat.ts";
 import { NAME_COLORS, NAME_COLOR_LIMIT, nameColorIndex, pickNameColor } from "../src/town/names.ts";
 import { skyTone, skyWeights } from "../src/town/sky.ts";
 import { ALL_HOMES, HOMES, hasTownBoss } from "../src/town/world.ts";
@@ -167,6 +167,20 @@ describe("\"Chat background\" (Eric, Oct 28: a switch in Town settings for the b
 
   it("is a separate key from the mode's and the box's place", () => {
     expect(new Set([CHAT.backgroundKey, CHAT.modeKey, CHAT.storageKey]).size).toBe(3);
+  });
+});
+
+describe("the hint on the typing line's strip (Eric, Nov 12: \"in very faint, like gray… tap the box to type… it will disappear when the text box disappears as well\")", () => {
+  it("a few words, a phone's and a computer's; shown while the box shows and you aren't typing; gone while you type, faded or off", () => {
+    expect(CHAT.hintPhone).toBe("Tap here to type");
+    expect(CHAT.hintComputer).toBe("Click here to type");
+    expect(chatHint("always", false, false, false)).toEqual({ text: "Tap here to type", shows: true });
+    expect(chatHint("always", false, false, true)).toEqual({ text: "Click here to type", shows: true });
+    expect(chatHint("always", true, true, false).shows, "typing: the field takes its place").toBe(false);
+    expect(chatHint("new", true, false, false).shows, "new messages, its lines showing").toBe(true);
+    expect(chatHint("new", false, false, false).shows, "new messages, faded: it goes with the box").toBe(false);
+    expect(chatHint("new", true, true, false).shows).toBe(false);
+    expect(chatHint("off", true, false, false).shows, "off: no box").toBe(false);
   });
 });
 

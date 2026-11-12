@@ -37,11 +37,14 @@ export interface TownLine {
    */
   color?: number;
   /**
-   * A line the server says itself, not a player (`from` and `name` empty; the app shows it in its own blue, with no menu): a boss
-   * challenged from the town, and how its battle ended (`challengeLine`).
+   * A line the server says itself, not a player (`from` and `name` empty; no menu): "challenge", a boss challenged from the town and
+   * how its battle ended (`challenge`), in its own blue; "enter", a player came into the town (`arrive`: Nov 12), in a quiet gray.
    */
-  sys?: "challenge";
+  sys?: TownSys;
 }
+
+/** The server's own kinds of line. */
+export type TownSys = "challenge" | "enter";
 
 /** What the server knows of someone sending, from their account (never from the request). */
 export interface TownSender {
@@ -178,6 +181,17 @@ export function challengeText(name: string, boss: string, end?: ChallengeEnd): s
           : `${name} surrendered to ${boss}${moves("after")}.`;
   return end.token ? `${line} + ${end.token} token` : line;
 }
+/**
+ * Who came into the town, as one line (Eric, Nov 12): "Ann has entered the town."; a burst of them, "Ann and Bo entered the town.",
+ * "Ann, Bo and Cy entered the town.", "Ann, Bo and 3 others entered the town."
+ */
+export function enterText(names: readonly string[]): string {
+  if (names.length <= 1) return `${names[0] ?? "Someone"} has entered the town.`;
+  if (names.length === 2) return `${names[0]} and ${names[1]} entered the town.`;
+  if (names.length === 3) return `${names[0]}, ${names[1]} and ${names[2]} entered the town.`;
+  return `${names[0]}, ${names[1]} and ${names.length - 2} others entered the town.`;
+}
+
 /** A challenge's step, as the Worker passes it on: its battle started (its id on the server), or that battle finished, with how. */
 export type ChallengeNote = { kind: "start"; boss: string; battle: string | null } | ({ kind: "finish"; battle: string } & ChallengeEnd);
 /** A finish that ends a challenge with a line: not a surrender before TOWN_CHAT.challengeSurrenderMoves of your moves (that's a quit). */
@@ -197,6 +211,11 @@ export class TownChat {
    * (by name, as the lines say it) and the battle whose finish ends it (the newest one started since).
    */
   private open = new Map<string, { boss: string; battle: string | null; at: number }>();
+  /** Each account's last beat in this town (`arrive`), kept TOWN_CHAT.enterRejoinMs: back within it is the same visit. Ids and times only. */
+  private seen = new Map<string, number>();
+  /** When the last "entered" line went out, and the names that came since it (held for one line when TOWN_CHAT.enterBurstMs is up). */
+  private lastEnter = -Infinity;
+  private entering: string[] = [];
 
   constructor(private o: TownChatOptions = TOWN_CHAT) {}
 
@@ -256,9 +275,43 @@ export class TownChat {
     return this.open.has(accountId);
   }
 
+  /**
+   * A player's device beat in this town (live-hub.ts, every beat): `fresh` when their pawn wasn't there (town-here.ts `beat`). A fresh
+   * pawn whose last beat was more than TOWN_CHAT.enterRejoinMs ago (or never) has entered the town: "Ann has entered the town." at once,
+   * unless an "entered" line went out within TOWN_CHAT.enterBurstMs; then the name waits and goes out with the others that come in that
+   * time, as one line, when it's up (`sweep`). The line posted now, or null.
+   */
+  arrive(sender: Pick<TownSender, "id" | "name">, now: number, fresh: boolean): TownLine | null {
+    const last = this.seen.get(sender.id);
+    this.seen.delete(sender.id); // (re-set last, so the map's order is the beats' and `sweep` can stop at the first recent one)
+    this.seen.set(sender.id, now);
+    this.flush(now);
+    if (!fresh || (last !== undefined && now - last < this.o.enterRejoinMs)) return null;
+    if (now - this.lastEnter < this.o.enterBurstMs) {
+      this.entering.push(sender.name);
+      return null;
+    }
+    this.lastEnter = now;
+    return this.notice(enterText([sender.name]), now, "enter");
+  }
+
+  /** Whether names are held for a burst's line (the hub's alarm is set for when it goes). */
+  get holdsEntering(): boolean {
+    return this.entering.length > 0;
+  }
+
+  /** The names held for a burst go out as one line once TOWN_CHAT.enterBurstMs has passed since the last "entered" line. */
+  private flush(now: number) {
+    if (!this.entering.length || now - this.lastEnter < this.o.enterBurstMs) return;
+    const names = this.entering;
+    this.entering = [];
+    this.lastEnter = now;
+    this.notice(enterText(names), now, "enter");
+  }
+
   /** A line the server says itself (`sys`), held as players' lines are, for TOWN_CHAT.lineMs. */
-  private notice(text: string, now: number): TownLine {
-    const line: TownLine = { n: ++this.n, at: now, from: "", name: "", text, sys: "challenge" };
+  private notice(text: string, now: number, sys: TownSys = "challenge"): TownLine {
+    const line: TownLine = { n: ++this.n, at: now, from: "", name: "", text, sys };
     this.held.push(line);
     if (this.held.length > this.o.holdMax) this.held.splice(0, this.held.length - this.o.holdMax);
     return line;
@@ -301,6 +354,11 @@ export class TownChat {
    * live hub calls it on its alarm too, at `nextExpiry`.
    */
   sweep(now: number) {
+    this.flush(now);
+    for (const [id, at] of this.seen) {
+      if (now - at < this.o.enterRejoinMs) break;
+      this.seen.delete(id);
+    }
     const old = (at: number) => now - at >= this.o.lineMs;
     if (this.held.length && old(this.held[0]!.at)) this.held = this.held.filter((l) => !old(l.at));
     if (this.gone.length && old(this.gone[0]!.at)) this.gone = this.gone.filter((g) => !old(g.at));
@@ -320,6 +378,7 @@ export class TownChat {
     if (this.gone.length) at = Math.min(at, this.gone[0]!.at + this.o.lineMs);
     const keep = Math.max(this.o.repeatMs, this.o.gapMs);
     for (const s of this.sent.values()) if (s.length) at = Math.min(at, s[0]!.at + keep);
+    if (this.entering.length) at = Math.min(at, this.lastEnter + this.o.enterBurstMs);
     return at === Infinity ? null : at;
   }
 
@@ -338,3 +397,6 @@ export function townSince(snap: TownSnapshot, since: number, keep: number = TOWN
   const lines = (reset ? snap.lines : snap.lines.filter((l) => l.n > since)).slice(-keep);
   return { room: snap.room, n: snap.n, lines, ...(snap.gone.length ? { gone: snap.gone } : {}), ...(reset ? { reset: true as const } : {}) };
 }
+
+/** A slice with the server's "entered the town" lines alone (a device the age gate marked too young: no one's typed words). */
+export const enterOnly = (slice: TownSlice): TownSlice => ({ ...slice, lines: slice.lines.filter((l) => l.sys === "enter") });

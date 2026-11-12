@@ -16,6 +16,7 @@ import { SOLO_TESTED, endSoloGame, gameXpOf, grantXp, setTestXp, startSoloGame }
 import { questsAnswer, rerollQuest, setTestQuests } from "./quests.ts";
 import { chatIconResponse, chatPostResponse, chatSlice, globalRoomOf } from "./global-chat-api.ts";
 import { forgetLook, townHereResponse } from "./town-here-api.ts";
+import { enterOnly } from "./town-chat.ts";
 import { SIGN_IN_TO_TOWN_CHAT, TOWN_CHAT_AGE, chatRoomOf, mayTownChat, reportedLine, townChallengeNote, townPostResponse, townRemoveResponse, townSlice } from "./town-chat-api.ts";
 import { accountDownload, deleteAccount } from "./account-data.ts";
 import { XP, AGE_GATE, AGE_STEP_LINE, FAIRPLAY, TOO_YOUNG_LINE, adminFirst, bossCrateDef, bossDef, cleanPawnColor, isActivity, isWelcomeCrate, tokenBossName } from "@chessroyale/core";
@@ -279,14 +280,18 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
           }).catch(() => null)
         : null;
     // ?town=N (the town square is open): the town chat's lines after N, for anyone (a guest reads it too: Eric, on #542, "they
-    // should be able to see the chat. They just can't type in it") but never on a device the age gate marked too young
-    // (town-chat-api.ts); while its switch is off, only that it's paused. Sending stays signed-in only (townPostResponse).
+    // should be able to see the chat. They just can't type in it"); on a device the age gate marked too young, only the server's
+    // "Ann has entered the town." lines (Nov 12: no one's typed words: town-chat.ts `enterOnly`); while its switch is off, only that
+    // it's paused. Sending stays signed-in only (townPostResponse).
     const townSince = url.searchParams.get("town");
     let town: unknown = null;
-    if (townSince !== null && env.LIVE && ageAnswer(request) !== "under") {
+    if (townSince !== null && env.LIVE) {
+      const young = ageAnswer(request) === "under";
       town = isPaused(env, "town-chat", now)
         ? { paused: true }
-        : await townSlice(liveHub(env as Required<Pick<AccountEnv, "LIVE">>), Number(townSince), now, url.searchParams.get("room"), waitUntil, chatRoomOf(url.searchParams.get("townroom"), (env as AdminEnv).TEST_SWITCHES === "1")).catch(() => null);
+        : await townSlice(liveHub(env as Required<Pick<AccountEnv, "LIVE">>), Number(townSince), now, url.searchParams.get("room"), waitUntil, chatRoomOf(url.searchParams.get("townroom"), (env as AdminEnv).TEST_SWITCHES === "1"))
+            .then((t) => (young ? enterOnly(t) : t))
+            .catch(() => null);
     }
     return json({
       ...liveCache.body,

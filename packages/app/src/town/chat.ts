@@ -37,7 +37,13 @@ export const CHAT = {
   keepLines: TOWN_CHAT.deviceMax,
   /** A boss or a kid speaks every this many ms, at random between the two. */
   everyMs: [20_000, 45_000] as readonly [number, number],
-  /** The computer's frame (styles.css' "computer"); anything else is a phone. (The box's size is in town-chat.css: about 5 lines on a phone, 4 on a computer in the frame, Eric, Oct 30.) */
+  /**
+   * The faint hint on the typing line's strip while the box shows and you aren't typing (Eric, Nov 12: "tap the box to type or
+   * something… only a few words"): a phone's, a computer's.
+   */
+  hintPhone: "Tap here to type",
+  hintComputer: "Click here to type",
+  /** The computer's frame (styles.css' "computer"); anything else is a phone. (The box's size is in town-chat.css: about 5 lines on a phone; about 9 on a computer in the frame, Eric, Nov 12: "about 1.5 times the current height".) */
   computerQuery: "(min-width: 900px) and (min-height: 600px)",
   /** Scrolled this near the foot (px) still counts as at the foot: new lines keep it there. */
   pinSlopPx: 4,
@@ -76,8 +82,11 @@ export const CHAT_BACKGROUND_NOTE = "A soft tint behind the chat, always on whil
 /** The mode a tap on the icon goes to: always on, new messages, off, and round again. */
 export const nextChatMode = (m: ChatMode): ChatMode => CHAT_MODES[(CHAT_MODES.indexOf(m) + 1) % CHAT_MODES.length]!;
 
-/** "server": the server's own lines for everyone (a boss challenged from the town, and how it went: Nov 2), in their own blue. */
-export type ChatKind = "boss" | "kid" | "player" | "system" | "server";
+/**
+ * "server": the server's own lines for everyone (a boss challenged from the town, and how it went: Nov 2), in their own blue.
+ * "arrival": the server's "Ann has entered the town." (Nov 12), quieter: gray, no name, no menu.
+ */
+export type ChatKind = "boss" | "kid" | "player" | "system" | "server" | "arrival";
 
 /** Who said a player's line, from the server: their account id and the line's number in its room, and the name color their device picked (names.ts). */
 export interface ChatWho {
@@ -186,6 +195,15 @@ export const chatShows = (m: ChatMode, shown: boolean): boolean => m === "always
  * you're typing (a tap on it), or whenever it shows when the "Chat background" setting is on. The blur itself runs only while typing.
  */
 export const chatBlurs = (m: ChatMode, shown: boolean, typing: boolean, background: boolean): boolean => chatShows(m, shown) && (typing || background);
+
+/**
+ * The faint hint on the typing line's strip (Eric, Nov 12): "Tap here to type" on a phone, "Click here to type" on a computer; it shows
+ * while the box shows and you aren't typing, and goes with the box (new messages' fade, off).
+ */
+export const chatHint = (m: ChatMode, shown: boolean, typing: boolean, computer: boolean): { text: string; shows: boolean } => ({
+  text: computer ? CHAT.hintComputer : CHAT.hintPhone,
+  shows: chatShows(m, shown) && !typing,
+});
 
 /** "Chat background" now: the one remembered on this device (the first time it's asked), else off. */
 let background: boolean | null = null;

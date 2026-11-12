@@ -3105,6 +3105,17 @@ export const TOWN_CHAT = {
    * moves." (Eric, Nov 2); fewer is a quit: no line, and the challenge stays unfinished (the no-spam rule).
    */
   challengeSurrenderMoves: 10,
+  /**
+   * "Ann has entered the town." (Eric, Nov 12: "we have to wait for someone to say something… when you join… it should say… has entered
+   * the town"): the server's line when a player's pawn appears in the town, once per visit. Back within this long of their last beat (a
+   * reload, a quick trip home or to a shop's game) is the same visit: no line.
+   */
+  enterRejoinMs: 120_000,
+  /**
+   * A busy town doesn't flood: after an "entered" line, more arrivals within this long are held and go out as one line when it's up
+   * ("Ann and Bo entered the town.", "Ann, Bo and 3 others entered the town."): at most one such line per this long.
+   */
+  enterBurstMs: 6_000,
 } as const;
 
 /**
