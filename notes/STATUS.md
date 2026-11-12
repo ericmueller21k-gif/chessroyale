@@ -1,3 +1,4 @@
+- Nov 13 ~00:30 UTC: room mockup DONE (claude/hidden-boss-room 73f6455; stills/hidden-boss-room). Sent 6 to Eric. Before any merge: check /hidden-room-preview.html is not in the production build. Helper archived. Cutscene mockup still running.
 - Nov 12 23:28 UTC: running: cutscene mockup session_01JuCWRviLT9vYk3ozHwujGh (claude/hidden-boss-cutscene), room mockup session_01JuCWRvPT8ejzDKKZYCEvNF (claude/hidden-boss-room). .done watchers on both.
 - Nov 12 ~22:00 UTC: Eric: text-box rule, spotlight staging, kid poof/fall/buckle, room rules (wait in room, cancel on leave, 4 max, locked door), summoning. Two Opus high mockup helpers: cutscene (claude/hidden-boss-cutscene) and room (claude/hidden-boss-room). All in hidden-boss-house-NOTES.md.
 - Nov 12 ~21:35 UTC: age-20 black suit done (claude/hidden-boss-ages 88baec9; stills updated). Sent to Eric. Mockup branch kept unmerged until the build. No helpers running.
