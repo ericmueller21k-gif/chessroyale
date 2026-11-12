@@ -73,7 +73,8 @@ test("after the zzz wait with no input a \"zzz\" floats over your pawn, for you 
   // A signed-in viewer sees Ann's name tag. No text box or words with the zzz: no new element, the chat log has no line about it.
   expect((await them(bo, annId))!.tag).toBe(true);
   await expect(bo.locator(".town-card")).toBeHidden();
-  await expect(bo.locator(".tc-line")).toHaveCount(0);
+  // (The server's "entered the town" lines, Nov 12, are the only lines here: none about the zzz.)
+  await expect(bo.locator(".tc-line:not(.tc-arrival)")).toHaveCount(0);
   // Ann presses an arrow key (her pawn moves): gone at once on hers, and on Bo's within a beat.
   await page.keyboard.press("ArrowLeft");
   await expect.poll(async () => (await me(page)).zzz, { timeout: 3_000 }).toBe(false);
