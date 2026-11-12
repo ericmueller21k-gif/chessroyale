@@ -1,3 +1,4 @@
+- Nov 12 07:50: Eric: start Boingo pie when no other Opus runs ("especially during the nighttime"). Rule for the night: one Opus at a time, chain jobs. Crate helper done -> #659 opened (2a0bf73), archived. Review #656 helper session_01JuCWRvGg6UbgqdRBUe4uny (xhigh) running; Boingo pie (brief notes/briefs/boingo-face-pie.md) starts when it ends.
 - Nov 12 07:00: #658 roadmap rare items MERGED (5a5f36c). Open: crate helper (running), #656 waits on review.
 - Nov 12 06:55: #657 Hollow bulbs MERGED (a1f0543). Proposed to Eric: hold Boingo pie until weekly usage resets (default hold).
 - Nov 12 06:45: Eric: low weekly usage -> queue, not start. Roadmap entry "Rare items: border + tap-to-preview" -> #658 (docs). Watcher: ci-658.
