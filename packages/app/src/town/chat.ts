@@ -43,7 +43,7 @@ export const CHAT = {
    */
   hintPhone: "Tap here to type",
   hintComputer: "Click here to type",
-  /** The computer's frame (styles.css' "computer"); anything else is a phone. (The box's size is in town-chat.css: about 5 lines on a phone; about 9 on a computer in the frame, Eric, Nov 12: "about 1.5 times the current height".) */
+  /** The computer's frame (styles.css' "computer"); anything else is a phone. (The box's size is in town-chat.css: about 5 lines on a phone; about 8 on a computer in the frame, Eric, Nov 12: "about 1.5 times the current height".) */
   computerQuery: "(min-width: 900px) and (min-height: 600px)",
   /** Scrolled this near the foot (px) still counts as at the foot: new lines keep it there. */
   pinSlopPx: 4,

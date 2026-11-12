@@ -79,11 +79,11 @@
   line-height: 17px;
 }
 /* On a computer in the frame, lower than the 340: about 4 lines (Eric, Oct 30: "it's so easy to click on it when running around … about
-   4-5 lines of text"), then half as tall again, 120 to 180 px, about 4 lines more (Eric, Nov 12: "bump the desktop to about 4 or 5 more
+   4-5 lines of text"), then about half as tall again, 120 to 190 px: 8 lines, 4 more (Eric, Nov 12: "bump the desktop to about 4 or 5 more
    lines. Make it about 1.5 times the current height"). Same place, same width. A tablet's, and a mouse window under 1024 px (no frame),
    keep the 340. */
 .town-screen.in-frame .town-chat[data-size="computer"] {
-  height: 180px;
+  height: 190px;
 }
 /* While it's picked up: an outline, so you can see where it is even with nothing in it (only while you carry it). */
 .town-chat.grab {

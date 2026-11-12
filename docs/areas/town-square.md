@@ -265,8 +265,8 @@ behind Cloudflare Access like the rest of the site). Phone and computer; **on a 
   `town/TownChat.tsx`, the header's icons in `town/TownChatTools.tsx`, its styles in `town/town-chat.css`; one mount each in
   `Town.tsx`). **One box** in the map's **top left corner** (flush, 8 px in), over the map and under the cards: a
   phone's from the left edge to about two thirds across and a bit under a quarter down (about 7 messages), a computer's 500 × 340
-  with a bigger font (about 12 lines), and in the frame 500 × 180 (about 8 lines: Eric, Oct 30, made it 120, a third as tall, "so easy to
-  click on it when running around"; Nov 12, half as tall again, "bump the desktop to about 4 or 5 more lines. Make it about 1.5 times the
+  with a bigger font (about 12 lines), and in the frame 500 × 190 (8 lines: Eric, Oct 30, made it 120, a third as tall, "so easy to
+  click on it when running around"; Nov 12, about half as tall again (4 more lines), "bump the desktop to about 4 or 5 more lines. Make it about 1.5 times the
   current height"; `docs/decisions/2026-10-30-town-chat-short.md`, `2026-11-12-town-chat-hints.md`; the phone's is unchanged: a taller one
   would cover more of the map it walks on; `CHAT.computerQuery` is styles.css' computer). It keeps one place and size whatever it
   holds, **and in every mode**: the stream ends above a **30 px strip at its foot that is reserved for the typing line** whether it shows
@@ -1251,7 +1251,7 @@ noted wherever a slice changed one.
   box shows** (always on; new messages while the lines show; off has none; Off stays off; the faint hint on the foot line while the box shows
   and you aren't typing, gone while you type and with the box: Eric's rule, changed Nov 12); **Nov 12**: a second player entering shows "Bo
   has entered the town." to the first (gray, upright, no name, its tap opens typing), the hint in line with the "[" within 2 px, thin and
-  faint, hidden while typing, and the computer's framed box 180 px; "Chat background"
+  faint, hidden while typing, and the computer's framed box 190 px; "Chat background"
   (off by default; on, the blur stays behind the box with nothing typed, in always on and new messages while they show, remembered across a
   reload, a faint dark tint by night); **always on never fading** (`page.clock`: after the wait, minutes on, the lines still taking touches, a 4
   minute line there, a 5 minute one gone); the text's colors by sky (ink by day, dawn and dusk, white by night, the names' and gray lines' shades,

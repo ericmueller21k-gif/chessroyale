@@ -226,9 +226,9 @@ test("the chat box (always on, the default): one see-through box flush in the ma
     expect(b0.h / map.h).toBeLessThan(0.3);
   } else {
     expect(b0.w).toBeGreaterThanOrEqual(400);
-    // (In the frame a third of the 340 it was, Eric, Oct 30.)
-    expect(b0.h).toBeGreaterThanOrEqual(110);
-    expect(b0.h).toBeLessThanOrEqual(130);
+    // (In the frame a third of the 340 it was, Eric, Oct 30; about half as tall again, 190, Eric, Nov 12.)
+    expect(b0.h).toBeGreaterThanOrEqual(180);
+    expect(b0.h).toBeLessThanOrEqual(200);
   }
   expect(meets(b0, await rectOf(page, ".town-controls")), "the box never covers the buttons").toBe(false);
   // (A computer has no bar since Nov 7, its tools in the right column's slot: there the box is just on the map.)
@@ -302,10 +302,10 @@ test("the chat box (always on, the default): one see-through box flush in the ma
   expect(m.h, "at most two lines").toBeLessThanOrEqual(2 * m.lh + 6);
   expect(m.sh, "cut off, with dots").toBeGreaterThan(m.h);
   expect(await rectOf(page, ".town-chat")).toEqual(b0);
-  // About 5 lines of messages on a phone and 4 to 5 on a computer (Eric, Oct 30; it was 12) fit the box before it scrolls.
+  // About 5 lines of messages on a phone and 8 on a computer (Eric, Oct 30, 4 to 5; Nov 12, "about 4 or 5 more lines") fit the box before it scrolls.
   const fit = await page.locator(".tc-log").evaluate((el) => Math.floor(el.clientHeight / (parseFloat(getComputedStyle(el.querySelector(".tc-line")!).lineHeight) + 2)));
-  expect(fit, "single lines that fit before it scrolls").toBeGreaterThanOrEqual(phone ? 5 : 4);
-  if (!phone) expect(fit, "no more than about 5 on a computer").toBeLessThanOrEqual(5);
+  expect(fit, "single lines that fit before it scrolls").toBeGreaterThanOrEqual(phone ? 5 : 8);
+  if (!phone) expect(fit, "no more than about 9 on a computer").toBeLessThanOrEqual(9);
   // It doesn't fade: always on.
   await page.waitForTimeout(CHAT.fadeAfterMs + 1500);
   await expect(log(page)).toHaveCSS("opacity", "1");
@@ -833,7 +833,7 @@ test("typing works wherever the box shows: always on, and new messages while its
   await expect(hint, "new messages, faded: gone with the box").toBeHidden({ timeout: CHAT.fadeMs + 2_000 });
 });
 
-test("Eric, Nov 12: a player entering the town shows \"Name has entered the town.\" to everyone there, a quiet server line (no name menu); the faint hint sits on the foot line in line with the timestamps' \"[\" and hides while typing; a computer's box is 1.5 times its old height (120 to 180 px), a phone's unchanged", async ({ page, browser }, info) => {
+test("Eric, Nov 12: a player entering the town shows \"Name has entered the town.\" to everyone there, a quiet server line (no name menu); the faint hint sits on the foot line in line with the timestamps' \"[\" and hides while typing; a computer's box about 1.5 times its old height (120 to 190 px: 4 more lines), a phone's unchanged", async ({ page, browser }, info) => {
   test.setTimeout(150_000);
   const phone = info.project.name === "phone";
   await openSignedIn(page);
@@ -847,9 +847,11 @@ test("Eric, Nov 12: a player entering the town shows \"Name has entered the town
   const bo = await another(browser, phone);
   await openSignedIn(bo);
   const boName = ((await (await bo.request.get("/api/me")).json()) as { user: { name: string } }).user.name;
-  await expect(arrivals.filter({ hasText: `${boName} has entered the town.` })).toHaveCount(1, { timeout: 20_000 });
+  // (e2e accounts may share a name: yours, then Bo's, two lines.)
+  await expect(arrivals).toHaveCount(2, { timeout: 20_000 });
+  await expect(arrivals.last()).toHaveText(new RegExp(`\\] ${boName} has entered the town\\.$`));
   // A tap on it is the box's: typing opens, no menu.
-  await arrivals.filter({ hasText: boName }).click();
+  await arrivals.last().click();
   await expect(page.locator(".town-chat")).toHaveAttribute("data-typing", "1");
   await expect(page.locator(".tc-menu")).toHaveCount(0);
   await page.keyboard.press("Escape");
@@ -881,10 +883,10 @@ test("Eric, Nov 12: a player entering the town shows \"Name has entered the town
   await page.keyboard.press("Escape");
   await expect(hint).toBeVisible();
 
-  // The box's height: a computer's 1.5 times its old 120 px; a phone's as before (about 5 lines: no room for more over the map).
+  // The box's height: a computer's about 1.5 times its old 120 px (190: 4 more lines); a phone's as before (about 5 lines: no room for more over the map).
   const h = (await rectOf(page, ".town-chat")).h;
   if (phone) expect(h, "the phone's: unchanged").toBeLessThanOrEqual(230);
-  else expect(h, "the computer's: 180 px, 1.5 times 120").toBe(180);
+  else expect(h, "the computer's: 190 px, about 1.5 times 120").toBe(190);
 });
 
 test("\"Chat background\": off by default; on, the faint tint stays behind the box whenever it shows, always on and new messages, when you aren't typing too, and the slight blur comes with typing (the blur only while typing is the frame rate's corner cut); remembered on this device; the tint is faint light by day and faint dark by night (white text on it)", { tag: "@phone-only" }, async ({ page }) => {
