@@ -1,5 +1,5 @@
 """Builds the game-ready boss themes: each song as an intro piece (played once) and a loop piece (repeated), as OGG and
-MP3, with a manifest. Both pieces get one fixed gain (about -16 LUFS for intro + one pass of the loop, a little under where the
+MP3 (mono, the MP3 at 64 kbps: Eric, Nov 12, "Mono 64 sounds... it's totally fine"), with a manifest. Both pieces get one fixed gain (about -16 LUFS for intro + one pass of the loop, a little under where the
 peaks need the room) and master.py's soft ceiling.
   python3 handoff.py <out folder> [boss id ...]   (only those bosses; the folder's themes.json keeps the others)
 
@@ -24,6 +24,12 @@ import synth
 PAD = 0.5
 TAIL = 4.0
 HEADROOM = 0.86  # the pieces' summed peak before encoding: -1.3 dBFS
+# Mono (Eric, Nov 12): the themes have about 2% side energy, so folding them to (L + R) / 2 loses almost nothing, halves the
+# file and halves the decoded audio a phone keeps (a 2-minute theme about 46 MB stereo, 23 MB mono). The song is folded right
+# after it's rendered, so the level, the ceiling and the manifest's numbers are all measured on what ships (played on both
+# speakers, as Web Audio plays a mono file). MP3 at a constant 64 kbps. MONO = False gives the old stereo pieces.
+MONO = True
+MP3 = ["-c:a", "libmp3lame", "-b:a", "64k"] if MONO else ["-c:a", "libmp3lame", "-q:a", "5"]
 # boss id (packages/core's), the song's module, the intro's length in beats (0: the whole song loops).
 SONGS = [("grex", "song_m", 16, "Jefferson"), ("bigboy", "song_k", 0, "Big Boy"), ("hollow", "song_l", 16, "Hollow"), ("folio", "song_o", 54, "Folio"), ("zebra", "song_n", 16, "Don Dough")]
 
@@ -56,9 +62,14 @@ def render(module: str, intro_beats: float, part: str) -> np.ndarray:
     return got["x"]
 
 
+def fold(x: np.ndarray) -> np.ndarray:
+    """The mix folded to mono, kept as two equal channels (MONO), or as it is."""
+    return np.repeat(x.mean(axis=0, keepdims=True), 2, axis=0) if MONO else x
+
+
 def save(path: str, x: np.ndarray) -> None:
     with wave.open(path, "wb") as w:
-        w.setnchannels(2), w.setsampwidth(2), w.setframerate(synth.SR)
+        w.setnchannels(x.shape[0]), w.setsampwidth(2), w.setframerate(synth.SR)
         w.writeframes((np.clip(x, -1, 1).T * 32767).astype("<i2").tobytes())
 
 
@@ -78,9 +89,9 @@ def main(out: str, *only: str) -> None:
             continue
         mod = importlib.import_module(module)
         beat_s = 60 / mod.BPM
-        loop = render(module, intro_beats, "loop")
+        loop = fold(render(module, intro_beats, "loop"))
         n_loop = loop.shape[1]
-        intro = render(module, intro_beats, "intro") if intro_beats else np.zeros((2, 0))
+        intro = fold(render(module, intro_beats, "intro")) if intro_beats else np.zeros((2, 0))
         n_intro = int(round(intro_beats * beat_s * synth.SR))
         # One play-through, to set the gain: the intro and its tails, with one pass of the loop from the intro's end.
         once = np.zeros((2, n_intro + n_loop))
@@ -114,8 +125,8 @@ def main(out: str, *only: str) -> None:
             parts["intro"] = piece
         for part, x in parts.items():
             wav = f"{out}/{boss}-{part}.wav"
-            save(wav, ceiling(x))
-            for ext, codec in (("ogg", ["-c:a", "libvorbis", "-q:a", "3"]), ("mp3", ["-c:a", "libmp3lame", "-q:a", "5"])):
+            save(wav, ceiling(x[:1] if MONO else x))
+            for ext, codec in (("ogg", ["-c:a", "libvorbis", "-q:a", "3"]), ("mp3", MP3)):
                 subprocess.run(["ffmpeg", "-hide_banner", "-v", "error", "-y", "-i", wav, *codec, f"{out}/{boss}-{part}.{ext}"], check=True)
             files[part] = f"{boss}-{part}"
         save(f"{out}/_once.wav", both)
