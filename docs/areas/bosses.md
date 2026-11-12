@@ -470,10 +470,16 @@ build): online, phase 1 won is the crowd's victory):
 - **The boss bar and the level in it** (Eric, Oct 23; docs/decisions/2026-10-23-boss-bar.md): `BossBar` (`screens/Boss.tsx`) is a
   figure (a phone) and a grid. **On a phone, every boss has the same bar and the same figure box** (Oct 24;
   docs/decisions/2026-10-24-boss-bar-same.md): one bar, 99 px tall, and one figure box (58 px wide, the bar's content tall) for
-  every boss, its feet on one baseline. Each boss is drawn at its own size, never below full size: the big animals (Alfil,
-  Puddles, Moo & Moon, Babur) at up to 4/3 (`barScale` in kits.ts), and a per-boss sideways shift (`barShift`) where a drawing is
-  wider on one side. At rest (every idle frame) the drawing stays 2 px inside the screen's left edge, 2 px clear of the name
-  column and under the "BOSS · move N" text; it may hang out of the bar's top and left edge. Checked every frame by
+  every boss, its feet on one baseline. **Each boss as tall as the bar** (Eric, Nov 12: "every boss as tall as their container… the
+  height, minus a few pixels… just shove over his name and stuff"; docs/decisions/2026-11-12-boss-card-height.md): `barScale` (kits.ts)
+  is the largest hundredth at which every frame it rests in (its loops but the victory, the last frame of each one-shot) reaches no
+  higher than `BAR_TOP_GAP` (3 px) under the bar's top, in its own proportions; `barShift`, the least sideways shift that keeps it 2 px
+  inside the bar's left edge; `barName`, the least move right of the name column that keeps it 2 px clear. All three are measured from
+  the art (`packages/app/test/bar-fit.ts`; `npx tsx scripts/bar-fit.ts` prints them after a change to a drawing or to the gap). Moo &
+  Moon and Puddles stay a little shorter (their thinking pose, every turn, is their tallest). The victory, the battle won, may rise
+  over the bar, never off the screen. The name column is as wide as its name and bars, at most 130 px (`fit-content`), and the
+  status ("N moves left") is never wrapped, so a column moved right takes its room from the empty middle; the boss's own room
+  (`.boss-prop`) is a container its prop sizes itself to (Don Dough's timers). Checked every frame by
   `packages/app/test/boss-bar-same.test.ts` and on the page by `e2e/boss-bar-same.spec.ts`. **No skulls** in the battle bar (the select screen and the menus keep theirs; the threat is in the
   bar's `aria-label`, "Puddles, threat 3 of 5"). At the left one column under the name, every row left aligned with it: **LVL**
   (`BossLevel`), the ultimate's rage meter (`.boss-ult`: `RageMeter`, and Moo's moon beside it: `BossUi.ultBar`), then the

@@ -14581,12 +14581,19 @@ img.qicon {
     z-index: 3;
   }
   .boss-bar.has-char .boss-main {
-    grid-template-columns: 130px minmax(0, 1fr) auto;
+    /* (The name column only as wide as what it holds, at most 130 px, and "N moves left" never wrapped: a figure drawn as tall as the
+       bar (Eric, Nov 12) moves the column right, and the room it takes comes from the empty middle, the boss's own room.) */
+    grid-template-columns: fit-content(130px) minmax(0, 1fr) max-content;
     /* (A figure that reaches past the usual name column moves it right: kits.ts barName, set on the bar as --bc-name.) */
     padding-left: var(--bc-name, 0px);
   }
   .boss-bar.has-char .boss-name {
     justify-content: flex-start;
+  }
+  /* (The boss's own room measures itself: a prop sizes itself to it where the name column moved right leaves it less, never over the
+     name: Don Dough's timers.) */
+  .boss-bar.has-char .boss-prop {
+    container-type: inline-size;
   }
   /* (The meter at the top of its row: a boss's own piece beside it, Moo's moon, may be taller, and must not move the meter.) */
   .boss-bar.has-char .boss-ult {
@@ -26838,8 +26845,9 @@ button.sq-tiny {
    side by side, each a kitchen timer at 2x (76 x 44: a computer's bar is one short row, so not the art's 3x there); an empty slot a
    faint outline of the same size. Absolute, never taking a tap: nothing in the bar moves for them. */
 .dd-timers {
-  --dd-w: 76px;
-  --dd-h: 44px;
+  /* (Two timers in the boss's room, a 4 px gap: no wider than the room, Nov 12: his name column moved right as his figure grew.) */
+  --dd-w: min(76px, (100cqw - 4px) / 2);
+  --dd-h: calc(var(--dd-w) * 44 / 76);
   position: absolute;
   right: 0;
   top: 0;
@@ -26867,8 +26875,7 @@ button.sq-tiny {
 /* A 320 px phone: the timers a little smaller (1.5x). */
 @media (max-width: 340px) {
   .dd-timers {
-    --dd-w: 57px;
-    --dd-h: 33px;
+    --dd-w: min(57px, (100cqw - 4px) / 2);
   }
 }
 /* A computer's boss bar is one short row (his figure stands by the board): the timers centered on the bar's height, in the free
@@ -26880,7 +26887,6 @@ button.sq-tiny {
   }
   .boss-bar .dd-timers {
     --dd-w: 76px;
-    --dd-h: 44px;
     top: 50%;
     right: auto;
     left: 4px;

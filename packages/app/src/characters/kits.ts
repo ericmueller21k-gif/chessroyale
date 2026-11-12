@@ -48,6 +48,13 @@ import { ankusItem, balloonItem, bonkItem, chipItem, flourItem, inkItem, carrotI
 import { testSwitchesAllowed } from "../test-switches.ts";
 
 /**
+ * A phone's boss bar: how far under its top every boss's figure reaches at most, px (Eric, Nov 12: "every boss as tall as their
+ * container… the height, minus a few pixels"). Each kit's barScale, barShift and barName are measured from its art against it
+ * (packages/app/test/bar-fit.ts; `npx tsx scripts/bar-fit.ts` prints them after a change).
+ */
+export const BAR_TOP_GAP = 3;
+
+/**
  * A boss's attack on a king (Eric, Oct 10: Hollow first): played on the board beside the God King in his Last Stand
  * (the blow meant for the piece) and beside the crowd's king when the boss mates it, before the result. Its beats are
  * shared (KING_ATTACK in boss-timing.ts: the drop, the hits, the leap off), so its animation lands each hit on them;
@@ -113,19 +120,21 @@ export interface BossKit extends BeatLines {
    * edge nor the boss's name cuts into him. */
   wide?: boolean;
   /**
-   * The figure's size in a phone's boss bar (Eric, Oct 24; Nov 4: every boss whole inside the bar): the largest size that fits the
-   * bar's height at rest, at most the kit's own, in 1/12 steps for the big animals (Alfil, Puddles, Moo & Moon, Babur) and in
-   * hundredths for the rest (Jefferson and Dash, a little smaller to fit). Undefined: 1. See docs/decisions/2026-11-04-phone-bar-fit.md.
+   * The figure's size in a phone's boss bar (Eric, Nov 12: "every boss as tall as their container"; Nov 4: every boss whole inside the
+   * bar): the largest hundredth at which every frame it rests in (its loops but its victory, the last frame of each one-shot) reaches no
+   * higher than BAR_TOP_GAP under the bar's top. Measured from the art (packages/app/test/bar-fit.ts). Undefined: 1.
+   * See docs/decisions/2026-11-12-boss-card-height.md.
    */
   barScale?: number;
   /**
-   * The drawing's horizontal shift inside a phone's bar, px (+ right): its drawing sits whole inside the bar's left edge (2 px in),
-   * for a boss wider on one side than the other. The feet, the box and the bar stay as they are for every boss. Undefined: 0.
+   * The drawing's horizontal shift inside a phone's bar, px (+ right): the least that keeps its drawing whole inside the bar's left
+   * edge (2 px in) at its size. The feet's box and the bar stay as they are for every boss. Undefined: 0.
    */
   barShift?: number;
   /**
    * The name column's extra room, px (+ right): the name, level, meters and words start this far further right, so a figure that
-   * reaches past the column's usual left edge (89 px) keeps 2 px clear of it. Undefined: 0.
+   * reaches past the column's usual left edge (89 px) keeps 2 px clear of it (Eric, Nov 12: "just shove over his name and stuff").
+   * Undefined: 0.
    */
   barName?: number;
   /** A recolor (one of the character's `looks`) from the battle's state: Big Boy's black pawn. */
@@ -164,8 +173,8 @@ const FOLIO_BAR: Character = (() => {
 
 export const BOSS_KITS: Record<string, BossKit> = {
   "Boingo the Clown": {
-    barScale: 1,
-    barShift: 1,
+    barScale: 1.12,
+    barShift: -4,
     ch: CLOWN,
     anims: { strike: "capture", power: "pieThrow", ultimateWarn: "check", ultimate: "funhouse" },
     sounds: {
@@ -187,8 +196,9 @@ export const BOSS_KITS: Record<string, BossKit> = {
     kingAttack: { ch: CLOWN_ATTACK, anim: "kingAttack", perSquare: 36, stand: 1.8, hit: pieItem },
   },
   "Ginger": {
-    barScale: 1,
-    barShift: 4,
+    barScale: 1.45,
+    barShift: 19,
+    barName: 21,
     ch: GINGERBREAD,
     anims: { strike: "capture", power: "freezeCast", ultimateWarn: "check", ultimate: "blizzard" },
     sounds: { jingle: "gingerJingle", crunch: "gingerCrunch", crackle: "gingerCrackle", freeze: "gingerCrackle", blizzard: "gingerCrackle" },
@@ -200,9 +210,9 @@ export const BOSS_KITS: Record<string, BossKit> = {
     kingAttack: { ch: GINGER_ATTACK, anim: "kingAttack", perSquare: 36, stand: 1, hit: frostItem },
   },
   "Jefferson": {
-    barScale: 0.93,
-    barShift: 8,
-    barName: 9,
+    barScale: 0.97,
+    barShift: 9,
+    barName: 11,
     ch: GREX,
     anims: { strike: "capture", power: "ignite", powerHit: "capture", ultimateWarn: "candleWarn", ultimate: "romanCandle", ultimateHit: "capture" },
     sounds: {
@@ -228,9 +238,9 @@ export const BOSS_KITS: Record<string, BossKit> = {
     kingAttack: { ch: GREX_ATTACK, anim: "kingAttack", perSquare: 36, stand: 1.8, hit: popItem },
   },
   "Hollow": {
-    barScale: 1,
-    barShift: 6,
-    barName: 6,
+    barScale: 1.2,
+    barShift: 14,
+    barName: 22,
     ch: HOLLOW,
     anims: { strike: "capture", power: "darkCast", darkFirst: "darkCast", ultimateWarn: "check", ultimate: "lightsOut", claim: "claimDark", found: "testFound", missed: "testMiss", lightsBack: "lightsBack" },
     sounds: {
@@ -256,8 +266,9 @@ export const BOSS_KITS: Record<string, BossKit> = {
     kingAttack: { ch: HOLLOW_ATTACK, anim: "kingAttack", perSquare: 36, stand: 1.8, hit: lashItem },
   },
   "Big Boy": {
-    barScale: 1,
-    barShift: -2,
+    barScale: 1.26,
+    barShift: 6,
+    barName: 4,
     // (On the sprite kit, Nov 7: drawn facing front, never mirrored, so his shirt reads "BIG BOY"; Eric: "just make him face the right way".)
     sprite: BIGBOY_SPRITE,
     ch: facingAs(BIGBOY_SPRITE, BOARD_FACING).ch,
@@ -304,9 +315,9 @@ export const BOSS_KITS: Record<string, BossKit> = {
   },
   "Sawyer": {
     artFacesLeft: true,
-    barScale: 1,
-    barShift: 7,
-    barName: 5,
+    barScale: 1.34,
+    barShift: 21,
+    barName: 32,
     ch: SAWYER,
     anims: {
       entrance: "rev",
@@ -342,9 +353,9 @@ export const BOSS_KITS: Record<string, BossKit> = {
     kingAttack: { ch: SAWYER_ATTACK, anim: "kingAttack", perSquare: 36, stand: 1.45, facesLeft: true, hit: sawItem },
   },
   "Wrangler": {
-    barScale: 1,
-    barShift: 7,
-    barName: 6,
+    barScale: 1.28,
+    barShift: 18,
+    barName: 28,
     ch: PIG,
     anims: {
       entrance: "taunt",
@@ -396,9 +407,9 @@ export const BOSS_KITS: Record<string, BossKit> = {
   // Alfil, the woolly mammoth (Eric, Oct 17): docs/decisions/2026-10-17-alfil-wired.md.
   "Alfil": {
     artFacesLeft: true,
-    barScale: 13 / 12,
-    barShift: 18,
-    barName: 14,
+    barScale: 1.13,
+    barShift: 19,
+    barName: 17,
     ch: ALFIL,
     anims: {
       strike: "capture",
@@ -446,8 +457,9 @@ export const BOSS_KITS: Record<string, BossKit> = {
   // Chub & Chirp, a rabbit riding a grasshopper (Eric, Oct 18): docs/decisions/2026-10-18-hopper-wired.md.
   "Chub & Chirp": {
     artFacesLeft: true,
-    barScale: 1,
-    barShift: 5,
+    barScale: 1.15,
+    barShift: 11,
+    barName: 8,
     ch: HOPPER,
     anims: {
       strike: "capture",
@@ -498,11 +510,10 @@ export const BOSS_KITS: Record<string, BossKit> = {
   },
   // Smudgy, the chameleon painter (Eric, Oct 19): docs/decisions/2026-10-19-smudgy-wired.md.
   "Smudgy": {
-    barScale: 1,
-    // (Facing the board, his tail is on our left: 37 px of him left of his feet, 50 right, where he had 50 and 37. Shifted 5 px, his
-    // drawing's left and right edges in the bar are where they were with 18.)
-    barShift: 5,
-    barName: 16,
+    barScale: 1.18,
+    // (Facing the board, his tail is on our left: 37 px of him left of his feet, 50 right. Size, shift and name: bar-fit, Nov 12.)
+    barShift: 12,
+    barName: 32,
     // (On the sprite kit, the pilot, Nov 6: drawn facing our left, turned to face the board; Eric: "in the battle intro he's facing
     // the wrong way when the match starts".)
     sprite: SMUDGY_SPRITE,
@@ -552,8 +563,8 @@ export const BOSS_KITS: Record<string, BossKit> = {
   // Moo & Moon, a cow and his friend the Moon (Eric, Oct 20): docs/decisions/2026-10-20-moo-wired.md.
   "Moo": {
     artFacesLeft: true,
-    barScale: 1,
-    barShift: 2,
+    barScale: 0.96,
+    barShift: 1,
     ch: MOO,
     anims: {
       // The periodic strike on a piece is his capture cheer.
@@ -625,8 +636,8 @@ export const BOSS_KITS: Record<string, BossKit> = {
   // Puddles, the hippo gardener (Eric, Oct 20-21): docs/decisions/2026-10-23-gardener-wired.md.
   "Gardener": {
     artFacesLeft: true,
-    barScale: 14 / 12,
-    barShift: 5,
+    barScale: 1.15,
+    barShift: 3,
     ch: GARDENER,
     // (A phone's bar: the same drawing with the water off, which would run past his box into his name.)
     bar: GARDENER_BAR,
@@ -685,8 +696,9 @@ export const BOSS_KITS: Record<string, BossKit> = {
   // Babur, the circus tiger (Eric, Oct 23-24): docs/decisions/2026-10-24-tiger-wired.md.
   "Tiger": {
     artFacesLeft: true,
-    barScale: 1,
-    barShift: -1,
+    barScale: 1.26,
+    barShift: 8,
+    barName: 9,
     ch: TIGER_FIGURE,
     anims: {
       // The periodic strike on a piece is his lazy swat.
@@ -750,9 +762,9 @@ export const BOSS_KITS: Record<string, BossKit> = {
   // Folio, the paper crane (the director's, Oct 26; "it" everywhere): docs/decisions/2026-10-27-folio-wired.md.
   "Folio": {
     artFacesLeft: true,
-    barScale: 1,
-    barShift: 13,
-    barName: 14,
+    barScale: 1.13,
+    barShift: 19,
+    barName: 26,
     ch: FOLIO,
     // (A phone's boss bar: the same drawing and animations without its faint halo, a pixel to the left, its frame stopping 5 px short
     // on the left where a 320 px screen's edge is. With the halo its idle is 87 px across, the bar's room 85 at full size, and it's
@@ -808,9 +820,9 @@ export const BOSS_KITS: Record<string, BossKit> = {
   // all wood (Eric, Nov 2: "a gnawing wood sound… Wood knocking, cutting, saw, thumping"): characters/timber-sounds.ts.
   "Timber": {
     artFacesLeft: true,
-    barScale: 1,
-    barShift: 6,
-    barName: 13,
+    barScale: 1.09,
+    barShift: 9,
+    barName: 21,
     ch: TIMBER,
     anims: {
       // (His periodic strike on a piece, the God King's: his hammer whack.)
@@ -880,8 +892,8 @@ export const BOSS_KITS: Record<string, BossKit> = {
   // (characters/dash-sounds.ts); Tick's ding, chomp and step too.
   "Dash": {
     artFacesLeft: true,
-    barScale: 0.97,
-    barShift: 6,
+    barScale: 0.98,
+    barShift: 5,
     ch: DASH,
     anims: {
       // (His periodic strike on a piece in a raid: his capture's double fist pump.)
@@ -937,8 +949,9 @@ export const BOSS_KITS: Record<string, BossKit> = {
   // the art branch's boss-zebra, as drawn (characters/zebra.ts, on its rig zebra-rig.ts). His sounds are his own: a bread rifle's
   // little pops, crust and flour, a bakery's oven timer and gold glaze (characters/zebra-sounds.ts).
   "Don Dough": {
-    barScale: 0.9,
-    barShift: 0,
+    barScale: 1.21,
+    barShift: 8,
+    barName: 31,
     ch: ZEBRA,
     anims: {
       // His battle start (Eric: "he pulls out his bread and holds it like a rifle, pretends to shoot it at you, a little pop, and
@@ -988,8 +1001,8 @@ export const BOSS_KITS: Record<string, BossKit> = {
     kingAttack: { ch: ZEBRA_ATTACK, anim: "kingAttack", perSquare: 37, stand: 1.1, hit: flourItem },
   },
   "Hidden Boss": {
-    barScale: 1,
-    barShift: -10,
+    barScale: 1.34,
+    barShift: -2,
     ch: RECLUSE,
     // (A phone's boss bar: his bust, head and shoulders, the same animations.)
     bar: RECLUSE_BUST,
