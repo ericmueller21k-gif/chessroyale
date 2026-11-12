@@ -410,6 +410,21 @@ gradually. False alarms are avoided by design (rates against normal, two checks 
 A few rides that have nothing to do with the bosses, put in the regular crates (HunChess, Gift, Beta) to make them worth buying,
 since rides are the most wanted items. item-builder for the rides' art and the crates' odds.
 
+## Rare items: a special border, and a tap-to-preview on a pawn (Eric, Nov 12, 2026: queued, not started; low weekly usage)
+
+Eric (on a crate's prize list showing "Boingo's Pogo, Mythic · Ride"): "for the mythic and like the super legendary items, we have a
+nice little... nice clean like gold border or like diamond border, whatever, pearl border around these, so that's clear. ... if you
+click on them, it should load up like a little box... in the middle of your screen that actually shows a little preview of like a
+pawn, just like a bare black or white pawn, just like utilizing the rider or whatever. So you can actually see what it looks like.
+And we'll have to do that for every rider."
+
+- Every list row of a Mythic (and the tiers above Legendary) item gets a clean, tier-colored frame (gold, pearl or diamond: one look
+  per tier), everywhere items are listed (crate prize lists, the boss crate cards, the shop, the inventory).
+- Tapping any item row opens a centered preview card: a bare pawn (black or white) wearing or riding the item, animated as in a game.
+  Rides first (every rider needs its pawn-on-ride preview), then the other slots. Reuse the item-builder's fitting sheet
+  (`npm run preview:items`) and the in-game pawn drawing; one shared preview card for all items.
+- Lane: item-builder (the art fits), with the hub for the card; light-to-targeted lane.
+
 ## Ranked rewards (Eric, Nov 9, 2026: later, not a priority; don't raise it again until ranked seasons are built)
 
 Eric: "we do want to give a reward for ranking, just like other games do … probably do a personalized crate that contains like
