@@ -16,3 +16,6 @@ reports/crowd-spread/*.jsonl
 # Stills and GIF frames: never committed (send their paths); check.yml refuses new images under docs/
 stills/
 frames/
+
+# Generated boss art (scripts/boss-art): kept on the art branch claude/boss-art, never on main (bloat sweep, Nov 12)
+scripts/boss-art/out/
