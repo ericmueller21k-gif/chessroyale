@@ -124,7 +124,7 @@ const HEAD: Record<Age, HeadSpec> = {
 const BODY: Record<Age, BodySpec> = {
   child: { top: 46, shoulderY: 72, shoulder: 7, waistY: 94, waist: 7, hipY: 97, knee: 111, elbowY: 85, wristY: 96, armOut: 1, rUp: 2.2, rLo: 1.6, rLeg: 2.7 },
   teen: { top: 26, shoulderY: 56, shoulder: 9, waistY: 82, waist: 8.5, hipY: 85, knee: 105, elbowY: 70, wristY: 84, armOut: 1.5, rUp: 2.7, rLo: 2, rLeg: 3.5 },
-  young: { top: 4, shoulderY: 39, shoulder: 10.5, waistY: 73, waist: 10.5, hipY: 79, knee: 101, elbowY: 61, wristY: 81, armOut: 2.5, rUp: 3.2, rLo: 2.3, rLeg: 4.2 },
+  young: { top: 4, shoulderY: 39, shoulder: 10.5, waistY: 73, waist: 10.5, hipY: 79, knee: 101, elbowY: 61, wristY: 81, armOut: 1.5, rUp: 3.2, rLo: 2.3, rLeg: 4.2 },
 };
 
 /** The head's grid: 25 wide, the face's middle (the nose) on x 12, as today's. */
