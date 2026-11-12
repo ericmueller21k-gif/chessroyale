@@ -8,6 +8,8 @@
 // G-REX: his sparkler's tile through its stages, a piece left on it burning, a step onto a tile (the God King's
 // warning), the Roman candle (?power=candle) and its five waves of fireballs (12 crowd moves by default).
 // Read the frames before calling a power done (.claude/LESSONS.md: watch it frame by frame).
+// POWER=<id> switches that power on instead of the boss's ultimate (POWER=pie: Boingo's pie every turn, the second splat
+// freezing); PHONE=<w>x<h> sizes the phone (e.g. 428x746, at 2x) instead of an iPhone 13.
 import { mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { resolve, join } from "node:path";
@@ -36,7 +38,7 @@ async function run(boss, name, context) {
     frames.push({ t: f.metadata.timestamp * 1000, data: f.data });
     await cdp.send("Page.screencastFrameAck", { sessionId: f.sessionId }).catch(() => undefined);
   });
-  await p.goto(`${url}?debug&clock=60&nolanding&boss=${boss}&power=${ULT[boss]}${WIP[boss] ?? ""}`);
+  await p.goto(`${url}?debug&clock=60&nolanding&boss=${boss}&power=${process.env.POWER || ULT[boss]}${WIP[boss] ?? ""}`);
   await p.getByRole("main").getByRole("button", { name: "Boss alone" }).click();
   const t0 = Date.now();
   const phase = () => p.evaluate(() => window.match?.phase.kind ?? null);
@@ -161,7 +163,8 @@ async function run(boss, name, context) {
 }
 
 for (const boss of bossArg === "both" ? ["gingerbread", "clown"] : bossArg === "all" ? ["gingerbread", "clown", "grex"] : [bossArg]) {
-  if (which !== "desktop") await run(boss, "phone", { ...devices["iPhone 13"] });
+  const [pw, ph] = (process.env.PHONE ?? "").split("x").map(Number);
+  if (which !== "desktop") await run(boss, "phone", pw && ph ? { viewport: { width: pw, height: ph }, deviceScaleFactor: 2, isMobile: true, hasTouch: true } : { ...devices["iPhone 13"] });
   if (which !== "phone") await run(boss, "desktop", { viewport: { width: Number(widthArg) || 1440, height: 900 } });
 }
 await browser.close();

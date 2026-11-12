@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { BOSS_BRAIN, BOSS_POWERS, bossBannerMs, DEFAULT_SETTINGS, RAID_SETTINGS, bossBrainFor, maiaRatingFor, mulberry32, playableBosses, type Settings } from "@chessroyale/core";
-import { FIRE_BURN_MS, KING_ATTACK, applyMove, powerFxMs, bossMoveFrom, bossShowMs, bossTurnShowMs, dragOptions, powerMomentMs, extraMoveCandidates, inCheck, initPowers, legalMoves, lightsOutTimeline, lineups, passTurn, pieceAt, queenSlain, sanLineToUci, sideToMove, withPiece, withoutPiece, type BoardScore, type BossMoveKind, type EngineLike, type HumanEngineLike, type MatchRunner, type Opening, type ServerMessage } from "@chessroyale/chess";
+import { FIRE_BURN_MS, KING_ATTACK, applyMove, choosePieThrow, powerFxMs, bossMoveFrom, bossShowMs, bossTurnShowMs, dragOptions, powerMomentMs, extraMoveCandidates, inCheck, initPowers, legalMoves, lightsOutTimeline, lineups, passTurn, pieceAt, queenSlain, sanLineToUci, sideToMove, withPiece, withoutPiece, type BoardScore, type BossMoveKind, type EngineLike, type HumanEngineLike, type MatchRunner, type Opening, type ServerMessage } from "@chessroyale/chess";
 import { LobbyCore, newLobbyRecord } from "../src/lobby.ts";
 
 afterEach(() => vi.restoreAllMocks());
@@ -197,21 +197,30 @@ describe("boss powers online", () => {
     expect(L.core.fairMoves("p1").map((m) => !!m.power)).toEqual([false, true, true, true, false]);
   });
 
-  it("Boingo: his pies kept off by both sides; the funhouse: the host plays the crowd's move once (unscored), the same for everyone, then the board turned for all", () => {
+  it("Boingo: his pies kept off by both sides, his splat mark the same for everyone; the funhouse: the host plays the crowd's move once (unscored), the same for everyone, then the board turned for all", () => {
     const L = raid({ bossId: "clown", bossPowerTest: "funhouse" });
     crowdMove(L);
     hostBoss(L);
     const warned = L.last("p1", "boss")!;
-    expect(warned.boss.powers!.events.map((e) => e.kind).sort()).toEqual(["pie", "warn"]);
-    const pie = warned.boss.powers!.pies![0]!.square;
-    expect(warned.boss.powers!.pie!.square).toBe(pie);
+    // (His pie on turn 2 when the position has a piece with both squares behind it empty: the rule's own condition.)
+    const thrown = !!choosePieThrow(warned.boss.board.fen, warned.boss.crowdSide, 0, 2);
+    expect(warned.boss.powers!.events.map((e) => e.kind).sort()).toEqual(thrown ? ["pie", "warn"] : ["warn"]);
+    const pied = (warned.boss.powers!.pies ?? []).map((x) => x.square);
+    expect(pied).toHaveLength(thrown ? 2 : 0);
+    if (thrown) {
+      const hit = warned.boss.powers!.events.find((e) => e.kind === "pie")!;
+      expect(hit.squares).toEqual(pied);
+      expect(warned.boss.powers!.pie!.square).toBe(pied[1]);
+      expect(warned.boss.powers!.splats).toEqual([expect.objectContaining({ square: hit.square, n: 1 })]);
+      expect(L.last("p2", "boss")!.boss.powers!.splats).toEqual(warned.boss.powers!.splats);
+    }
     L.advance(warned.until - L.now + 10);
     const r2 = L.last("p1", "round")!;
-    expect((r2.boss!.powers!.allowed ?? legalMoves(r2.board!.fen)).some((m) => m.slice(2, 4) === pie)).toBe(false);
+    expect((r2.boss!.powers!.allowed ?? legalMoves(r2.board!.fen)).some((m) => pied.includes(m.slice(2, 4)))).toBe(false);
     crowdMove(L);
     const req = hostBoss(L);
-    // The boss never moves onto the pie either.
-    if (req.allowed) expect(req.allowed.some((m) => m.slice(2, 4) === pie)).toBe(false);
+    // The boss never moves onto the pies either.
+    if (req.allowed) expect(req.allowed.some((m) => pied.includes(m.slice(2, 4)))).toBe(false);
     // His move shows the board the right way up still (it turns in the funhouse's own moment).
     const before = L.last("p1", "boss")!;
     expect(before.boss.powers!.angle).toBe(0);
