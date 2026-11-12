@@ -1,3 +1,4 @@
+- Nov 12 06:25: Boss crate card helper session_01JuCWRrojXnwdZ2EqKGf8of (Opus high, item-builder) on claude/boss-crate-buy: price line class collision fix, Boingo crate stripe overflow, bought pop-up with Open now/Later. Room shrink HELD for Eric revisions. Running Opus: bulbs + crate (2 high). xhigh queue after both: #656 review -> Boingo face pie.
 - Nov 12 05:05: Boingo face pie: brief notes/briefs/boingo-face-pie.md (god-king, xhigh, boss lane + quick review). Queue of xhigh-alone jobs: bulbs (high, running) -> #656 review (xhigh) -> Boingo pie (xhigh).
 - Nov 12 04:55: #656 landing: full suite green (15 shards, labeled run). Needs independent xhigh review (brief notes/briefs/review-656-signin.md) -> start when bulbs helper (claude/hollow-bulbs-big, 1 commit so far) finishes.
 - Nov 12 04:45: #655 select desktop ~2x MERGED (22268ad). Eric asked: go further (wider stage past 920 col, or shorter grid)? pending.
