@@ -135,7 +135,7 @@ Draft 2 is in the chat of Nov 12 and below; Eric's to change. Unattributed quote
   over and plays one from the other side. A REAL game (small on screen, but real chess), about 30 moves, on a loop. When it ends, the
   pieces reset (simplest) or, if not much work, he puts them back himself, then it plays again.
 - Director's calls (for the brief): the game is a fixed move list in the code (no engine running in the room: no lag). Use one of HIS
-  real games (Eric: "It would be even better if it was an actual move that he played"); the 1956 game he won at 13 is the natural pick.
+  real games (Eric: "It would be even better if it was an actual move that he played"); the 1956 game he won at 13 is the natural pick. Start with the reset as a quick fade; his putting the pieces back is an extra if cheap.
 - Cutscene: Eric doesn't like line 4 ("I forgot that part"); he's writing his own version of the lines. Wait for it; don't send another draft.
 
 - Eric, Nov 12 (final): no more likeness or legal caveats about the Hidden Boss, ever. His real games, quotes and life are fine; only the name stays out.
