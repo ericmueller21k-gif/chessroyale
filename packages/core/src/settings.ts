@@ -4233,8 +4233,12 @@ export const BOARD: { readonly checkHighlight: boolean } = { checkHighlight: fal
  * - `startDelayS`: from asking to the first note (s), so the intro and the loop are scheduled together.
  * - `splashHoldMs`: a challenge from the town starts the theme as the boss's full-screen splash starts (Eric, Nov 11); a theme not
  *   ready by then holds the splash's covering frame up to this much longer, then the battle goes on and the music joins when ready.
+ * - `townShare`, `townWaitMs`: the town's loading bar fetches every theme (Eric, Nov 12: "loading music in the loading bar"; fetched
+ *   only, decoded when a battle or a room needs it), from the bar's start, beside the town's painting. The last `townShare` of the bar
+ *   is its "Loading music…" step; if the music isn't all in by the time the town is built, the town waits at most `townWaitMs` for it,
+ *   then opens and the rest lands in the background.
  */
-export const MUSIC = { volume: 0.25, fadeMs: 300, endFadeMs: 1500, startDelayS: 0.05, splashHoldMs: 2000 } as const;
+export const MUSIC = { volume: 0.25, fadeMs: 300, endFadeMs: 1500, startDelayS: 0.05, splashHoldMs: 2000, townShare: 0.15, townWaitMs: 3000 } as const;
 
 /**
  * The area banner (Eric, Nov 11, approving its mockup: "super clean. That's exactly what I was imagining";
