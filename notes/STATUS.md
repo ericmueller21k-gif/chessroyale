@@ -1,3 +1,4 @@
+- Nov 12 16:30: Town door tap helper session_01JuCWRtR8HzWRMb8YHwREET (Opus high) on claude/town-door-tap. Running Opus: town chat + door tap (2 high). Watchers on both .done.
 - Nov 12 16:20: #661 Boingo face pie MERGED (19157ba). Watching main full run. Running: town chat helper.
 - Nov 12 16:10: Town chat helper session_01JuCWRt4FvGyiroWGdPdQkb (Opus high, social) on claude/town-chat-hints (Eric OK to change his Oct 28 no-placeholder rule + guard). Hidden Boss notes v2 saved (Brooklyn walk-up). Watcher: helper .done.
 - Nov 12 16:00: #661 run on f4919ea: smoke fixed; shop.spec:309 hard-failed (26/28 < 30 walking frames on CI software WebGL; passes locally); fixed the test at cause (walk until >30, max 8 strolls) in f69736c. matchmaking:22 retry-pass (5289 ms > 5000; next flaky batch). Full suite rerunning.
