@@ -1,4 +1,4 @@
-import type { BossBrain, BounceResult, BurnEvent, Fusion, LassoDrag, LeapfrogHop, LightsOutTarget, LongPull, PowerEvent, PowerId, RepaintResult, SawCut, ShowdownResult, SlamLanding, SlamPiece, SlamResult, SplitPawn, StopReason, TusksCast } from "@chessroyale/core";
+import type { BossBrain, BounceResult, BurnEvent, Fusion, LassoDrag, LeapfrogHop, LightsOutTarget, LongPull, PowerEvent, PowerId, RepaintResult, SawCut, ShowdownResult, SlamLanding, SlamPiece, SlamResult, SplatMark, SplitPawn, StopReason, TusksCast } from "@chessroyale/core";
 import type { Base, Capture } from "./rules.ts";
 import type { ItemLook } from "@chessroyale/core";
 import type { Augment, DrawRule, MaterialSlip } from "@chessroyale/core";
@@ -286,10 +286,15 @@ export interface NetBossPowers {
   warned: boolean;
   ultAt: number | null;
   ults?: number;
-  /** A frozen piece's square, through which crowd turn; Boingo's pies (`pie`: the newest, for older screens). */
+  /**
+   * A frozen piece's square, through which crowd turn (Ginger's freeze, a piece Boingo's pie splatted twice); Boingo's pies
+   * (`pie`: the newest, for older screens), and his splat marks (Nov 12; missing for other bosses and from older servers):
+   * the crowd's pieces his pie has hit, by square, each one's kind and its splats.
+   */
   frozen: { square: string; until: number } | null;
   pie: { square: string; until: number } | null;
   pies?: { square: string; until: number }[];
+  splats?: SplatMark[];
   /**
    * Squares that show ice now (the frozen piece; in Ginger's blizzard every crowd piece its ice holds, through the
    * boss's turn after too); and of those, the ones that thaw as the next crowd turn begins (cracked and dripping on

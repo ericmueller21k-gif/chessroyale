@@ -588,6 +588,7 @@ export const EFFECTS: Record<EffectName, Effect> = {
   goldFx: { ch: EFFECT_SPRITES.goldFx, covers: "square", start: "gild", loop: "glint", sounds: { gild: "zebraGild", shine: "zebraShine", glint: "zebraShine", clink: "zebraClink" } },
   lassoHit: { ch: EFFECT_SPRITES.lassoHit, covers: "square", start: "hitHL", sounds: {} },
   pieHit: { ch: EFFECT_SPRITES.pieHit, covers: "square", start: "hitHL", sounds: {} },
+  pieFace: { ch: EFFECT_SPRITES.pieFace, covers: "square", start: "hitHL", sounds: { splat: "clownSplat" } },
   bonkHit: { ch: EFFECT_SPRITES.bonkHit, covers: "square", start: "hitHL", sounds: {} },
   frostHit: { ch: EFFECT_SPRITES.frostHit, covers: "square", start: "hitHL", sounds: {} },
   popHit: { ch: EFFECT_SPRITES.popHit, covers: "square", start: "hitHL", sounds: {} },

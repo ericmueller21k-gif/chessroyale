@@ -330,7 +330,12 @@ test("a room's report records while walking, and walking lays no floor triangles
     };
     requestAnimationFrame(tick);
   });
-  for (const k of ["ArrowLeft", "ArrowRight", "ArrowLeft"]) {
+  // Walk until the recorder has more than 30 walking frames in the room (3 strolls is about 3 s; CI's software WebGL draws
+  // 8 to 9 frames a second there, so it may take a few more: PR #661's run, 26 and 28 after 3), at most 8 strolls.
+  const walkFrames = () =>
+    page.evaluate(() => ((window as unknown as { __townReport?: (raw: boolean) => { raw: { flags: number[] } } | null }).__townReport?.(true)?.raw.flags ?? []).filter((f) => f & 256 && f & 1 && !(f & 1536)).length);
+  for (let i = 0; i < 8 && (i < 3 || (await walkFrames()) <= 30); i++) {
+    const k = i % 2 ? "ArrowRight" : "ArrowLeft";
     await page.keyboard.down(k);
     await page.waitForTimeout(1100);
     await page.keyboard.up(k);

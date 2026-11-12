@@ -1058,12 +1058,18 @@ export const BOSS_POWERS = {
     [4, 5],
   ] as readonly (readonly [number, number])[],
   /**
-   * Pie: a square near the center is pied for pieTurns crowd turns (nobody may move onto it). Up to pieMax pies on the
-   * board at once (Eric, Oct 11: two), never two on one square; a new one every pieEvery turns while there's room.
+   * Boingo's pie (Eric, Nov 12: thrown in the face of one of the crowd's pieces whose two squares diagonally behind it are
+   * empty; it splits onto those two squares): every pieEvery crowd turns from firstPassive (the next turn when there's no
+   * target), the two squares pied for pieTurns crowd turns (nobody, either side, may move onto them; Eric: "just one
+   * turn"), up to pieMax pied squares at once (one throw: two). The piece hit gets a splat mark; at pieSplatsToFreeze
+   * splats it's frozen for pieFreezeTurns crowd turns (Eric: "2 splats on the same piece make it frozen for a turn") and
+   * its mark goes. docs/decisions/2026-11-12-boingo-face-pie.md.
    */
-  pieTurns: 3,
+  pieTurns: 1,
   pieEvery: 2,
   pieMax: 2,
+  pieSplatsToFreeze: 2,
+  pieFreezeTurns: 1,
   /**
    * The ultimate's meter (the rage meter), in rage points: full at rageFull, then a one-turn warning, then the
    * ultimate. It empties as the ultimate comes and fills again for the next (Eric, Oct 11: several a match, like a
