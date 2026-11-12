@@ -1,3 +1,4 @@
+- Nov 12 01:00: Eric: Don Dough timers too short; picked "Pawn 8, rest 6 more" -> #649 (claude/dough-timers, 4ea2a4a): doughTimers 8/13/13/16/21, timer art to 30:00, tests read the setting; local e2e Rising Dough phone pass. Watcher bxoyiwfv0. Eric boss-card request (sprites as tall as the card, name shifted right) sent to dock-stack helper.
 - Nov 12 00:45: Eric approved boss select mockup v2 ("exactly what I want"). Haiku helper on claude/boss-select-six.
 - Nov 12 00:30: QUEUED (xhigh, full lane): landing sign-in without age for existing accounts; age only on sign-up/new account. Starts when dock-stack + main-red finish. Boss select 6/row: waiting Eric pick (recommended: 6/row, admins get a 4th row).
 - Nov 12 00:25: #648 area banner + room/splash music MERGED (c22d7f1). Boss select 6/row mockup sent; waiting Eric.
