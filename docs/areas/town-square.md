@@ -1071,6 +1071,11 @@ uploading 0.2); slowed 4x: about 21 s. 10 kept pages, 12 in all (192 MB). After 
 0 uploads, 0 resets. A building in and out uploads nothing of the town. The town's 2D pictures are made in memory (`paint.ts`
 `art2d`): uploading a GPU canvas waits for the GPU. Hooks: `__townPaint()`'s `loading`, `loadMs`, `loadPaintMs`, `atlas`. Tests:
 `packages/app/test/town-atlas.test.ts`, `e2e/town-street.spec.ts` ("the town's loading screen…").
+**Its music step (Nov 12; [decision](../decisions/2026-11-12-music-mono-preload.md)):** from the bar's start every boss theme is fetched
+beside the painting (`music.ts` `preloadMusic`: fetched, never decoded); with Music on the town takes the bar to 85% and "Loading music…"
+the rest (`MUSIC.townShare`), only for what hasn't landed once the town is built, at most `MUSIC.townWaitMs` (3 s; then the town opens and
+the rest lands behind it). Music or Sound off: nothing fetched, no step. Hook: `__townPaint()`'s `loadMusicMs`. Test: `e2e/town-street.spec.ts`
+("the town's loading fetches every boss theme once").
 
 **Painting ahead (Nov 11):** each frame `planBoxes` paints, nearest first, the pictures of the boxes in reach: always the faced quarter's roofs and the sides' and backs' pictures (and shaded steps), mid-turn the next quarter's roofs (`boxBakeMs`, 1.5 ms); standing still, also the fronts' shaded frames and the other quarters' roofs (`boxBakeStillMs`, 4 ms, while the view is at rest). Before, a first look round painted hundreds of them as they showed. [Decision](../decisions/2026-11-11-town-frame-report.md). (Since the loading screen, it finds nothing left to paint.)
 

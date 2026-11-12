@@ -1,4 +1,4 @@
-import { mkdirSync } from "node:fs";
+import { mkdirSync, readFileSync, statSync } from "node:fs";
 import { expect, type Page } from "@playwright/test";
 import { asAdmin, test } from "./helpers.ts";
 
@@ -381,4 +381,41 @@ test("the town's loading screen (Eric, Nov 11: \"loads it all in at once and the
   expect(s.resets, "atlas pages started again").toBe(0);
   expect((await page.evaluate(() => (window as unknown as R).__townPaint())).resets).toBe(0);
   expect(errors).toEqual([]);
+});
+
+test("the town's loading fetches every boss theme once and decodes none (Eric, Nov 12: \"loading music in the loading bar\"); Music off fetches none", { tag: "@phone-only" }, async ({ page }) => {
+  const dir = "packages/app/public/music";
+  const themes = JSON.parse(readFileSync(`${dir}/themes.json`, "utf8")) as { themes: Record<string, { intro: string | null; loop: string }> };
+  const names = Object.values(themes.themes).flatMap((t) => (t.intro ? [t.intro, t.loop] : [t.loop]));
+  const sizes = names.map((n) => statSync(`${dir}/${n}.mp3`).size);
+  // (Every decode's size: a theme's would be its file's.)
+  await page.addInitScript(() => {
+    const w = window as unknown as { __soundLog: string[]; __decoded: number[] };
+    w.__soundLog = [];
+    w.__decoded = [];
+    const dec = AudioContext.prototype.decodeAudioData;
+    AudioContext.prototype.decodeAudioData = function (this: AudioContext, b: ArrayBuffer, ...rest: unknown[]) {
+      w.__decoded.push(b.byteLength);
+      return (dec as (...a: unknown[]) => Promise<AudioBuffer>).call(this, b, ...rest);
+    } as typeof dec;
+  });
+  const gets: string[] = [];
+  page.on("request", (r) => void (/^\/music\/.*\.mp3$/.test(new URL(r.url()).pathname) && gets.push(new URL(r.url()).pathname)));
+  await asAdmin(page);
+  await page.goto("/town?sky=day");
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
+  await expect.poll(() => gets.length, { timeout: 15_000 }).toBe(names.length);
+  await page.waitForTimeout(1000);
+  expect(gets.sort(), "each theme's pieces, once").toEqual(names.map((n) => `/music/${n}.mp3`).sort());
+  const decoded = await page.evaluate(() => (window as unknown as { __decoded: number[] }).__decoded);
+  expect(decoded.filter((b) => sizes.includes(b)), "no theme decoded").toEqual([]);
+  const log = await page.evaluate(() => (window as unknown as { __soundLog: string[] }).__soundLog);
+  expect(log.filter((l) => l.startsWith("music:load")), "no theme loaded to play").toEqual([]);
+  // Music off (Settings → Sound): the town's loading fetches none.
+  await page.evaluate(() => localStorage.setItem("brc.music", "0"));
+  gets.length = 0;
+  await page.reload();
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
+  await page.waitForTimeout(1500);
+  expect(gets, "Music off: nothing fetched").toEqual([]);
 });
