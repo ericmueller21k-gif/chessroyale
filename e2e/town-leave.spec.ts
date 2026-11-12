@@ -169,27 +169,18 @@ test("inside a room: the back button goes out to the square with no question; th
   await expect(page.getByRole("heading", { name: "Town square" })).toBeVisible();
   if (test.info().project.name !== "phone") return;
   // Back tapped the moment the room is drawn, as it still fades in: the tap waits for the room, then out (Nov 12: it was lost, and
-  // you stayed in the room). (The page notes the tap and when the room went: in and out can both come between two looks of a
-  // locator, main run 43283021649.)
+  // you stayed in the room).
   await page.evaluate(() => {
-    const w = window as unknown as { __roomBack?: { at: number; gone: number } };
     new MutationObserver((_, ob) => {
-      const room = document.querySelector("canvas.town-shop-canvas");
-      if (w.__roomBack) {
-        if (!room) ((w.__roomBack.gone = performance.now()), ob.disconnect());
-        return;
-      }
-      if (room?.getAttribute("data-ready") !== "1") return;
-      w.__roomBack = { at: performance.now(), gone: 0 };
+      if (document.querySelector("canvas.town-shop-canvas")?.getAttribute("data-ready") !== "1") return;
+      ob.disconnect();
       document.querySelector<HTMLButtonElement>("button.town-back")!.click();
     }).observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ["data-ready"] });
   });
   const card = await openCard(page, "home", "Babur's Circus", "tiger");
   await card.getByRole("button", { name: "Go in" }).click();
-  const roomBack = () => page.evaluate(() => (window as unknown as { __roomBack?: { at: number; gone: number } }).__roomBack ?? null);
-  await expect.poll(roomBack, { message: "the room drawn, and Back tapped at once", timeout: 20_000 }).not.toBeNull();
-  await expect.poll(async () => (await roomBack())!.gone > 0, { message: "out of the room", timeout: 10_000 }).toBe(true);
-  await expect(room(page)).toHaveCount(0);
+  await expect(room(page)).toHaveCount(1, { timeout: 20_000 });
+  await expect(room(page)).toHaveCount(0, { timeout: 10_000 });
   await expect(leaveDialog(page)).toHaveCount(0);
 });
 
