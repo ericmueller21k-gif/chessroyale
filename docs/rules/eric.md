@@ -85,7 +85,11 @@ removed (old → new) and says whether any of them guards a rule here.
     walking, the medians of four runs taken in turn, one pass); not a CI test, CI frame rates vary too much. `e2e/town.spec.ts` checks that nothing of Maia's is fetched in the town before a game opens.
 - **Typing works wherever the chat box shows (Eric, Oct 28, from his phone; replaces "the field is in Always on only").** You chat by
   tapping the box anywhere but a player's name; the typing line is an input with no placeholder, border or backing and shows only while
-  you're typing (a strip at the box's foot, reserved so nothing moves), and there is no "Say something…" anywhere. In Always on the box
+  you're typing (a strip at the box's foot, reserved so nothing moves). While the box shows and you aren't typing, that strip holds a faint
+  hint, "Tap here to type" (phone) / "Click here to type" (computer), thin and gray, in line with the timestamps' "[": gone while you type
+  and gone with the box (Eric, Nov 12, replacing Oct 28's "there is no 'Say something…' anywhere": "In very faint, like gray, let's put a
+  message that says like tap the box to type or something… only a few words… it will disappear when the text box disappears as well").
+  In Always on the box
   always shows; in New messages it shows when a message comes and fades, and **while its lines show a tap opens typing and is "high text"
   (every line, no fade) until you finish** (you send, tap the map, or press Escape), the icon staying one bubble green: "while lines are
   showing you can tap and it will open the chat still, temporarily making it 'high text' mode until you finish, but don't change the text
@@ -93,9 +97,11 @@ removed (old → new) and says whether any of them guards a rule here.
   mode (v3's "no field in New messages", which this replaces, was the one exception Eric had named to "nothing hidden" for the chat; the
   typing line being visible only while you type is the exception now).
   - Guard: `e2e/town-chat.spec.ts`, "typing works wherever the box shows: always on, and new messages while its lines show (a tap opens it);
-    off shows no box, so nothing to type in (Off stays off); no \"Say something…\" anywhere; the box keeps its place and size throughout",
+    off shows no box, so nothing to type in (Off stays off); the faint hint shows on the foot line while the box shows and you aren't
+    typing, and is gone while you type and when the box is gone; the box keeps its place and size throughout",
     phone and computer. Its unit side: `packages/app/test/town-chat.test.ts`, "what each mode does".
-  - Decision: [2026-10-28-town-chat-v2.md](../decisions/2026-10-28-town-chat-v2.md), "v4".
+  - Decision: [2026-10-28-town-chat-v2.md](../decisions/2026-10-28-town-chat-v2.md), "v4"; the hint:
+    [2026-11-12-town-chat-hints.md](../decisions/2026-11-12-town-chat-hints.md).
 - **Leaving Chess Town asks first (Eric, Nov 7: "you should always have a confirm if you're going back out to a different menu or
   you're trying to exit").** The side menu, the town's back button, the phone's or browser's back gesture ask "Leave Chess Town?" with
   Stay (the default, Escape) and Leave; Stay changes nothing. Rooms, boss challenges, the AFK drop and forced exits don't ask.

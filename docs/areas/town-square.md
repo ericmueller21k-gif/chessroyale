@@ -265,8 +265,10 @@ behind Cloudflare Access like the rest of the site). Phone and computer; **on a 
   `town/TownChat.tsx`, the header's icons in `town/TownChatTools.tsx`, its styles in `town/town-chat.css`; one mount each in
   `Town.tsx`). **One box** in the map's **top left corner** (flush, 8 px in), over the map and under the cards: a
   phone's from the left edge to about two thirds across and a bit under a quarter down (about 7 messages), a computer's 500 × 340
-  with a bigger font (about 12 lines), and in the frame 500 × 120 (about 4 lines; Eric, Oct 30: a third as tall, "so easy to click on it
-  when running around"; `docs/decisions/2026-10-30-town-chat-short.md`; `CHAT.computerQuery` is styles.css' computer). It keeps one place and size whatever it
+  with a bigger font (about 12 lines), and in the frame 500 × 180 (about 8 lines: Eric, Oct 30, made it 120, a third as tall, "so easy to
+  click on it when running around"; Nov 12, half as tall again, "bump the desktop to about 4 or 5 more lines. Make it about 1.5 times the
+  current height"; `docs/decisions/2026-10-30-town-chat-short.md`, `2026-11-12-town-chat-hints.md`; the phone's is unchanged: a taller one
+  would cover more of the map it walks on; `CHAT.computerQuery` is styles.css' computer). It keeps one place and size whatever it
   holds, **and in every mode**: the stream ends above a **30 px strip at its foot that is reserved for the typing line** whether it shows
   or not (v4), so the line appearing moves nothing. **Nothing is drawn behind or round the text** (Eric, Oct 28, from his phone:
   "clearly a container still showing behind the text"; "I don't want the shadow text period"): no backing, border, bar, box-shadow,
@@ -291,7 +293,12 @@ behind Cloudflare Access like the rest of the site). Phone and computer; **on a 
     computer). **Enter or the keyboard's Send sends** and closes it; **a press on the map or Escape closes it** (the line hides, the keyboard goes,
     the blur goes unless the setting holds it); the words you typed stay for the next tap. A guest, a young device, a paused chat or a chat
     ban gets the same line **greyed with the reason in it** ("Sign in to chat with other players.", …): the reason is the disabled input's
-    placeholder, so no "Say something…" is anywhere. A tap is a press under `holdMs` (400 ms) that moves under `holdSlopPx` (8 px); a finger that
+    placeholder. **The hint** (Eric, Nov 12: "in very faint, like gray… tap the box to type… only a few words… it will disappear when the
+    text box disappears as well"): while the box shows and you aren't typing, the strip holds "Tap here to type" (a phone) or "Click here
+    to type" (a computer; `CHAT.hintPhone` / `hintComputer`, `chatHint`), thin (300) and faint gray (`--chat-hint`, the system gray at 0.72,
+    by day and by night), the messages' size, its first letter 8 px in like the timestamps' "[", no touches of its own (a tap there is the
+    box's). It hides the instant typing opens (the form's `data-open`) and comes back when typing closes; it fades and goes with the box
+    (new messages' fade, off). It is a `div.tc-hint`, not the field's placeholder (the field still has none). A tap is a press under `holdMs` (400 ms) that moves under `holdSlopPx` (8 px); a finger that
     moves scrolls the stream, and press and hold picks the box up, as before. While typing, in new messages, the lines are held and every
     line shows ("high text", below). A keyboard reaches the box with Tab (the stream takes focus) and Enter opens typing.
   - **The modes** (`ChatMode`, remembered on this device: localStorage `brc.townChatMode`, in a try/catch; "always on" until one
@@ -926,6 +933,16 @@ standing where the chair blocks are"): [2026-11-02-challenge-pacing.md](../decis
   About 12 s from Fight to the screen covered for Big Boy and Alfil, 9 for the default (it was about 6; the room's loading adds to it); about 16.5 for Timber (his own intro about 12.7 s from the marks to covered, Eric's "about 12 s"); about 15 s from the marks to the board for Hollow (Eric: "his startup time can be a few seconds longer").
 - **After the battle:** the result screen's leaving button reads **"Back to town"**; it (and the gear's Leave: "You'll go back to the
   town square.") opens the town with you on the square you stood on, facing the same way (`createTown`'s `stand`). "Play again" keeps it.
+- **"Ann has entered the town."** (Eric, Nov 12: "it's not persistent enough… we have to wait for someone to say something… when you
+  join… it should say… has entered the town"): the server's line when a signed-in player's pawn comes into the town (`TownHere.beat`
+  says it's fresh: new, past its limit, or from another room; the live hub hands it to that town's chat room, `TownChat.arrive`). Once
+  per visit: back within `TOWN_CHAT.enterRejoinMs` (2 minutes) of your last beat (a reload, a trip home or to a game) posts nothing. A
+  busy town doesn't flood: arrivals within `enterBurstMs` (6 s) of an "entered" line wait and go out as one line when it's up ("Ann and
+  Bo entered the town.", "Ann, Bo and Cy entered the town.", "Ann, Bo and 3 others entered the town."), so at most one every 6 s.
+  Everyone in the town reads them (guests, chat off: they arrive and show when it's on), and a device marked too young reads these
+  alone (the server sends it nothing else: `enterOnly`). In the log: `sys: "enter"`, kind `arrival`, the system gray upright (a line only
+  you see is the italic one), no name, no menu, not reportable or mutable; a tap on it opens typing. They follow the room's rules (5
+  minutes, a newcomer's last 12). A Worker instance's 2 s copy of the room means your own may show a moment after you arrive.
 - **The server's lines in the town's chat** (signed-in players; blue, `.tc-server`, no name and no menu): "Ann challenged Alfil!" as the
   battle starts; as it finishes, "Ann beat Alfil in 34 moves!", "Alfil beat Ann in 21 moves.", "Ann drew with Alfil in 40 moves.",
   "Ann surrendered to Alfil after 15 moves." (a resign after `TOWN_CHAT.challengeSurrenderMoves`, 10; before, it's a quit), and
@@ -1231,7 +1248,10 @@ noted wherever a slice changed one.
   at most; **a tap on the box anywhere but a name opening typing** (the blur behind the whole box with a slight blur and a faint light tint,
   a focused typing line with no placeholder at the box's foot, no line moved, the box unchanged, the map not seeing the tap; Escape and a press
   on the map closing it and keeping the words; a name's tap the menu's, a text tap typing's; Enter sending and closing it); **typing works wherever the
-  box shows** (always on; new messages while the lines show; off has none; Off stays off; no "Say something…" in the page); "Chat background"
+  box shows** (always on; new messages while the lines show; off has none; Off stays off; the faint hint on the foot line while the box shows
+  and you aren't typing, gone while you type and with the box: Eric's rule, changed Nov 12); **Nov 12**: a second player entering shows "Bo
+  has entered the town." to the first (gray, upright, no name, its tap opens typing), the hint in line with the "[" within 2 px, thin and
+  faint, hidden while typing, and the computer's framed box 180 px; "Chat background"
   (off by default; on, the blur stays behind the box with nothing typed, in always on and new messages while they show, remembered across a
   reload, a faint dark tint by night); **always on never fading** (`page.clock`: after the wait, minutes on, the lines still taking touches, a 4
   minute line there, a 5 minute one gone); the text's colors by sky (ink by day, dawn and dusk, white by night, the names' and gray lines' shades,

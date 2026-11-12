@@ -32,7 +32,10 @@ Lane: `social`.
   mode: a line shows only in the chat box or tab (and an emoji's float on the scoreboard); while chat is hidden the
   Chat tab counts what's new. e2e `chat.spec.ts` watches that nothing of a new line shows outside the box.
 - **The town square's chat log** is its own thing (a fading log in the top left of `/town`: the bosses' and kids' chatter,
-  and signed-in players' typed messages, below): its look in [town-square.md](town-square.md), "The chat log".
+  and signed-in players' typed messages, below): its look in [town-square.md](town-square.md), "The chat log". Since Nov 12 the
+  server also says "Ann has entered the town." when a player comes in (once per visit, a quick reconnect skipped, a burst as one
+  line; a device marked too young reads these lines alone), and the box's foot shows a faint "Tap here to type" / "Click here to
+  type" while you aren't typing (`docs/decisions/2026-11-12-town-chat-hints.md`).
 - **Your picks.** Each player's profile chooses which lines they see in their games: up to `QUICK_CHAT.maxLines`
   phrases and `maxEmoji` emoji (the defaults until they choose). Bots use the whole list.
 - **Packs.** Free packs everyone has; more are sold in the shop (`QUICK_CHAT.packPrices`; `core/shop.ts` lists them
