@@ -548,11 +548,22 @@ build): online, phase 1 won is the crowd's victory):
   "Your last bulb went out.", then the loss ("Hollow won: the last of your ten bulbs went out."). Solo (`solo.ts`: `darkForcedTurn`,
   `blackoutTurn`) runs it on the shared rules; online never has a strand. Test switches: `?bulbs=N` (N out already), `?darkblock=2|3`.
   Units: `packages/chess/test/hollow-bulbs.test.ts`, `packages/app/test/hollow-bulbs.test.ts`; e2e: `e2e/hollow.spec.ts`.
+  **Bigger** (Eric, Nov 12; [decision](../decisions/2026-11-12-hollow-bulbs-big.md)): a computer's 190 px (twice the 95 x 15
+  drawing, every pixel 2 x 2; it was 110), a phone's 114 (1.2x; it was 95), right-aligned under the status, never wider than the
+  free room (`min(…, 100%)` in styles.css), so never over the name, the level, "moves left" or the edge.
+- **Hollow's six bulbs under his rage meter** (`HOLLOW_UI.bar`, `BulbStrip` in `components/Hollow.tsx`; Eric, Nov 12, was three
+  for his moves only): the countdown to his next cover, one lit for each move, yours and his (`stripLit(bulbs, yoursPlayed)`: twice
+  the rules' `bulbs`, less one once this turn's crowd move is on the board): 2 before his first cover, then 6, 5, 4, 3, 2, 1 and
+  relit (`relight`) as each cover's darkness lands. `darkEvery` 3 is unchanged: three of his moves and three of yours between two
+  covers. A bulb out on his move pops (`hollowPop`); on yours it goes out quietly (your move has its knock). Raids, parties and
+  online the same (the crowd's move is "yours"). As wide as the meter, its drawing pixel for pixel: `bulbStrand` 44 x 11 on a
+  phone, `bulbStrandWide` 88 x 11 on a computer (the 11 px under its meter; the row keeps its 11.25 px, so nothing moves). His
+  strand's first six colors. e2e: `e2e/hollow.spec.ts`, "Hollow's bulbs, Nov 12: …"; units: `packages/app/test/hollow.test.ts`.
 - **Hollow's lights** (Eric, Oct 11): his ten bulbs take a fresh order of `HOLLOW_LIGHTS`' 8 colors (settings.ts)
   each battle, never one color on bulbs within three of each other along the wire (so none lit side by side match as
   the countdown puts every third one out), the
   same for everyone: from his view's `lights` (0 to 4095, drawn from the battle's seed). Every place a bulb is drawn
-  takes them (his sprite and moments, his attack and lashes, Lights out, the strip by the boss bar): each bulb has its
+  takes them (his sprite and moments, his attack and lashes, Lights out, the six-bulb strip under his rage meter): each bulb has its
   own palette keys, recolored as frames are drawn (`characters/lights.ts`, `Swap` in `sprite.ts`). Unit:
   `packages/app/test/lights.test.ts`.
 - **Hollow's whole strand in every pose** (Eric, Oct 16: "make sure it's showing for all of his animations";

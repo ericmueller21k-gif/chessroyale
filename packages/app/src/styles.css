@@ -16179,28 +16179,38 @@ img.qicon {
 .refused-note {
   color: var(--bad);
 }
-/* His bulbs (the strip): one lit for each of his moves until he covers another square. In the boss bar's row under the rage meter. */
+/* His six bulbs (the strip; Eric, Nov 12): one lit for each move, yours and his, until he covers another square. In the boss
+   bar's row under the rage meter and as wide as it (a phone's 44 px, a computer's 88), its drawing pixel for pixel (11 px tall).
+   The row keeps the 11.25 px it had (33 x 15 / 44), so the bar and the board under it don't move. */
 .bulb-strip {
   display: block;
-  width: 33px;
-  aspect-ratio: 44 / 15;
+  width: 44px;
+  height: 11.25px;
 }
-/* Boss alone against Hollow (Nov 5): your ten bulbs, his strand, in the boss bar's free room at its right. */
+.bulb-strip > .fx-sprite {
+  height: 11px;
+}
+/* Boss alone against Hollow (Nov 5): your ten bulbs, his strand, in the boss bar's free room at its right. Eric, Nov 12: "way
+   bigger": a phone's 1.2x (114 px), never wider than the room (so never over his name or the edge). */
 .life-strip {
   position: absolute;
   right: 2px;
   top: 2px;
   display: block;
-  width: 95px;
+  width: min(114px, 100%);
   aspect-ratio: 95 / 15;
   pointer-events: none;
 }
 /* A computer's bar is one short row: the strand stays in the free room under the status (its slot keeps its place: e2e
-   boss-bar.spec.ts), at its right, centered on the slot's height. */
+   boss-bar.spec.ts), at its right, centered on the slot's height. Twice its drawing (190 px, every pixel 2 x 2: Eric, Nov 12,
+   "way bigger", about 1.8x the 110 px it was), never wider than the room. */
 @media (min-width: 900px) and (min-height: 600px) {
+  .boss-bar .bulb-strip {
+    width: 88px;
+  }
   .boss-bar .life-strip {
     top: 50%;
-    width: 110px;
+    width: min(190px, 100%);
     transform: translateY(-50%);
   }
 }
