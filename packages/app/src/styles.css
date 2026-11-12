@@ -2667,7 +2667,7 @@ button.history-label {
 .timer-fill {
   height: 100%;
 }
-/* The mirror under the board (TIMER_BAR_BELOW in components/Countdown.tsx turns it off). */
+/* The mirror under the board (components/Countdown.tsx, Eric, Oct 9). */
 .timer-bar.below {
   top: var(--board-size, 100%);
 }
