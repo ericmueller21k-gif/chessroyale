@@ -1,3 +1,4 @@
+- Nov 12 19:00: #665 roadmap Hidden Boss MERGED (f7b7b30). Nothing open. Waiting Eric: Hidden Boss go + answers (count time limit, tile locked, reward, admins first, original child drawing OK).
 - Nov 12 18:20: main cb60a50 full run GREEN (no flakes). Nothing open.
 - Nov 12 18:05: #663 town chat hints MERGED (cb60a50). No open PRs, no helpers. Watching main full run. Queued: Hidden Boss building (notes, waiting Eric go + answers); Boingo room shrink (waiting Eric revisions); select desktop >2x (waiting Eric); Hollow bubble over strip (waiting Eric); flaky batch 5 (gardener:229 desktop, matchmaking:22, global-chat:266, autochess desktop, shop:870, multiplayer:18).
 - Nov 12 17:50: #664 town door tap MERGED (8799f42). Open: #663 (rerunning).
