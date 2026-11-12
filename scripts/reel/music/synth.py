@@ -213,6 +213,46 @@ class Mix:
         a = min(attack, 0.4 * k / self.sr)
         return out * np.minimum(1, t / a) * np.exp(-t / 1.5) * np.minimum(1, (k - 1 - np.arange(k)) / (release * self.sr)) * vol
 
+    # ---- soft voices Eric picked by ear (Nov 12, for the Hidden Boss's memory and his house: SOUNDS.md) ----
+    def ocarina(self, m, beats, vol=0.06) -> np.ndarray:
+        """An ocarina: round and hollow, almost no breath, each note leaning up into place. `m` can be a fraction
+        (a note between two notes)."""
+        w = self.tone(m, beats, [1, 0.03, 0.07, 0.01, 0.02], vol, vib=0.003, vib_hz=4.5, scoop=0.3, scoop_s=0.04, attack=0.04, release=0.08)
+        k = len(w)
+        t = np.arange(k) / self.sr
+        hold = max(1, int(self.sr / 9000))
+        r = self.rng.uniform(-1, 1, k // hold + 2)
+        air = np.convolve(np.repeat(r[1:] - 0.6 * r[:-1], hold)[:k], np.ones(8) / 8, "same") * (0.006 + 0.02 * np.exp(-t / 0.05)) * vol / 0.06
+        return w + air * np.minimum(1, t / 0.02) * np.minimum(1, (k - 1 - np.arange(k)) / (0.1 * self.sr))
+
+    def struck(self, kind, m, cents=0.0) -> np.ndarray:
+        """One note, its loudest point 1, two and a half seconds, kept once made. "felt": a soft piano, felt on its
+        hammers (built from its harmonics, the high ones few and quick to die; two strings a hair apart; a soft
+        thump). "box": a music box's tooth. `cents`: how far out of tune."""
+        made = self.__dict__.setdefault("_struck", {})
+        key = (kind, m, round(cents))
+        if key not in made:
+            k = int(2.5 * self.sr)
+            t = np.arange(k) / self.sr
+            f0 = self.hz(m + cents / 100)
+            if kind == "felt":
+                h = np.arange(1, max(2, int(3500 / f0) + 1))
+                loud = (1 + 0.5 * np.exp(-(((h * f0 - 450) / 300) ** 2))) / h**1.7
+                w = np.zeros(k)
+                for off in (-1.2, 1.2):
+                    f = f0 * 2 ** (off / 1200)
+                    w += (loud[:, None] * np.sin(np.outer(h * np.sqrt(1 + 0.0004 * h * h), 2 * np.pi * f * t) + h[:, None])
+                          * np.exp(-np.outer(1 + 0.3 * h, t) / (1.1 * (262 / f0) ** 0.35))).sum(axis=0)
+                size = max(2, int(self.sr / 1400))
+                thump = np.convolve(self.rng.uniform(-1, 1, k + 2 * size), np.ones(size) / size, "same")[size : size + k]
+                w = w / (np.max(np.abs(w)) + 1e-9) + 0.125 * thump / (np.sqrt(np.mean(thump**2)) + 1e-9) * np.exp(-t / 0.006)
+                rise = 0.004
+            else:
+                w = np.sin(2 * np.pi * f0 * t + 1.2 * np.exp(-t / 0.25) * np.sin(2 * np.pi * 3.5 * f0 * t)) * np.exp(-t / 0.5)
+                rise = 0.001
+            made[key] = w / (np.max(np.abs(w)) + 1e-9) * np.minimum(1, t / rise) * np.minimum(1, (k - 1 - np.arange(k)) / (0.05 * self.sr))
+        return made[key]
+
     def pluck(self, m, beats, vol=0.25, damp=0.996, tone=0.5) -> np.ndarray:
         """A plucked string (Karplus-Strong): a burst of noise fed round a delay as long as the note's period."""
         k = self.k(beats)

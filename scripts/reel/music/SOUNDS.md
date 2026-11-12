@@ -32,6 +32,9 @@ from the liked list, keep off the other one. Eric's words are quoted; the date i
 | A slow intro of bells and chimes before the band | song_t.py (the first ten seconds) | "I like how it's kind of the whimsical, like kind of chimes and kind of like the bells, and that's a nice touch"; he asked for ten seconds more of it |
 | Plucked strings built from their harmonics, quick to die, in a long echo (oud, qanun; held notes struck again and again); a hum on one note and its fifth; a scale with a three-half-step gap over a bass that stays put; a hand drum's rhythm with a kick under it; a tune shared between two instruments and then fused into one; a drop that is thrown up (a hush) and lands on one thud | song_u.py | Nov 12, of Alfil's first go, with no changes asked: "this one's good to go. I've got no issues with it" |
 | A wordless men's choir (basses an octave under, a voice a fifth over) singing a slow chant over a band at full tilt (16th strings, a driven guitar, a kick on every 16th), the lead and the fiddle running through the scale a third apart; then the choir and the lead trading, on chords a major third apart; then the choir alone | song_v.py (`chanted`, `dueled`) | Nov 12, of the Hidden Boss's third go: "it's so good actually" |
+| An ocarina (round and hollow, almost no breath, each note leaning up into place) for a soft tune | `Mix.ocarina` (synth.py); song_v.py's memory, song_w.py | Nov 12, of six voices tried on the Hidden Boss's memory (he asked for "lighter kind of softer ... a really light flute sort of thing, like a whistle, but not really like a whistle"): "the ocarina sounds real nice" |
+| A soft piano (felt on the hammers) rolling the chords under it | `Mix.struck("felt", ...)`; the same songs | Nov 12, of six instruments tried under the ocarina: "Number 2 for sure ... the soft piano" |
+| A music box, softly in the background of a quiet part (two or three high notes a bar), or taking the tune for a phrase | `Mix.struck("box", ...)`; the same songs | Nov 12: "incorporate a little bit of the music box in softly ... I really do like that music box" |
 | A fast pattern racing under everything | every song since song_i.py | asked for in all of them |
 | The NES's four voices | song_c.py, song_f.py | "much much better" than the 16-bit orchestra |
 
@@ -106,6 +109,15 @@ A longer song for a two-part boss (Nov 12, the Hidden Boss's): after the first b
 its background sounds, a soft warm tune) that builds, goes out of sync and out of key, and screeches; a slight pause;
 the big part again with more on it ("a bit more layers on top ... kind of pause ... long note, short note"); the
 ending as before. "It doesn't matter how much you add."
+
+Tried on that memory and not chosen (Nov 12; none of them disliked, he just picked others): for the tune, a harp with
+the choir as children (its first go: "that one's not bad"), a breathy flute, a pan flute, a wet finger on a glass's
+rim, a celesta; for the rolling chords, the harp, a soft-mallet marimba, a vibraphone, a small organ's flutes.
+
+A place's own loop from a song's quiet part (Nov 12, the Hidden Boss's house as a child: song_w.py): "just that soft,
+cozy thing ... like a 1-minute loop that doesn't do any of the crazy like spiraling stuff ... nice and cozy". The
+same tune, chords and instruments by themselves, the second half turned over (another instrument takes the tune, a
+new answering phrase) so the minute isn't thirty seconds twice, and the place's own small sounds, quiet.
 
 Into a drop (Nov 12, Ginger's): more of the build's own sound right before it ("a little more like ice crack"), then
 "a little bit of ... pause with ... quiet, like jingling", "and then all of a sudden like the big ice shatter, and

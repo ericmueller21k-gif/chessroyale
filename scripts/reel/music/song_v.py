@@ -37,6 +37,10 @@ welcoming"), which "starts building up, and then it starts getting like out of s
 screeching"; "another slight pause before the big drop again", the chant, "a bit more layers on top, a bit more like
 big sound, kind of pause, a bit more like long note, short note"; the duel again; and the same ending. The memory's
 tune is the last theme's first phrase with its two dark notes made bright (G major): as it sours they go back.
+The fifth go is the memory's instruments, chosen by ear from samples of that passage: its tune on an ocarina ("the
+ocarina sounds real nice"; it was a harp, the choir joining as children), its rolling chords on a soft piano ("Number
+2 for sure ... the soft piano"), and a music box behind them ("incorporate a little bit of the music box in softly");
+the souring moved onto the same three. The memory by itself, with nothing going wrong, is his house's loop: song_w.py.
 591 beats, about 3:58.
   python3 song_v.py <out.wav>
 
@@ -46,10 +50,11 @@ tune is the last theme's first phrase with its two dark notes made bright (G maj
   0:56  the flag: silence, three ticks, a cold tone rising, and the book slammed shut
   0:59  the chant: the men's choir, slow, over the band at full tilt; the lead's runs at each phrase's end
   1:20  the duel: the choir calls, the lead answers; four phrases, a major third apart, each faster
-  1:39  the memory: a park (birds, children far off, a car, a bicycle's bell, chess pieces, the clock); a harp, a
-        small organ, the choir as children, a far church bell; the theme's phrase in G major
-  2:10  it sours: the harp's three notes over and over, flatter, further out of tune, its hands apart; the tape
-        sinking and wavering; the figure creeping back; strings screeching; the clock pressed, faster each time
+  1:39  the memory: a park (birds, children far off, a car, a bicycle's bell, chess pieces, the clock); an ocarina
+        with the theme's phrase in G major, a soft piano rolling the chords, a small organ, a music box, a far bell
+  2:10  it sours: the ocarina's three notes over and over, flatter each time; the piano out of tune, its echo late;
+        the music box out of step; the tape sinking and wavering; the figure creeping back; strings screeching; the
+        clock pressed, faster each time
   2:27  the pause: silence, one bird, a tick, the book
   2:29  the chant again, bigger: boys over the men, a bell, shouts after the long notes, two stops
   2:50  the duel again, its chords in another order
@@ -171,17 +176,15 @@ for _name, _beats in ((THEME, 32), (CHANT, 64)) + tuple((call, 8) for *_, call i
 # and E flat), a little answer, the phrase again from E, and a turn that doesn't come home.
 CHILD = ("G4:1 D5:1 F#5:3 G5:.5 B5:.5 D6:2 B5:2/3 F#5:2/3 E5:2/3 D5:2 | E5:1 F#5:1 A5:2 | "
          "G5:1 E5:1 B5:3 A5:.5 G5:.5 E5:2 G5:2/3 E5:2/3 B4:2/3 D5:2 | C5:1 E5:1 F#5:2")
-# Its chords, a bar each (G, G, C, D, E minor, C, G, D): the harp's eight notes, up and back.
+# Its chords, a bar each (G, G, C, D, E minor, C, G, D): eight notes, up and back, for the piano.
 MEMORY_CH = [[43, 50, 55, 59, 62, 59, 55, 50], [43, 50, 55, 59, 62, 59, 55, 50], [48, 55, 60, 64, 67, 64, 60, 55], [50, 57, 62, 66, 69, 66, 62, 57],
              [52, 59, 64, 67, 71, 67, 64, 59], [48, 55, 60, 64, 67, 64, 60, 55], [50, 55, 59, 62, 67, 62, 59, 55], [50, 57, 60, 66, 69, 66, 60, 57]]
 assert beats(CHILD) == 32
 assert (T_FLAG, T_MEMORY, T_CHANT2, T_LAST, BEATS, len(SWEEP)) == (138, 268, 334, 519, 591, 30)
 
 
-def main(out: str, tune: str = "ocarina", roll: str = "harp", window=None) -> None:
-    """`tune`: what plays the memory's tune: one of `soft`'s voices (Eric, Nov 12, of six tried: "the ocarina sounds
-    real nice"), or "harp": the harp with the choir as children joining it, as it first was. `roll`: what rolls the
-    chords under it: "harp", or one of `rolled`'s. `window`: (from beat, to beat), to make only that passage."""
+def main(out: str, window=None) -> None:
+    """`window`: (from beat, to beat), to make only that passage (a sample)."""
     x = Ride(PLAN, BEATS, None, os=2, seed=227, tape_secs=TAPE)
     x.window = window
     put, at = x.put, x.at
@@ -189,7 +192,7 @@ def main(out: str, tune: str = "ocarina", roll: str = "harp", window=None) -> No
     sr = x.sr
     tau = 2 * np.pi
     levels = {"solo": 1.6, "violins": 1.0, "violas": 1.0, "cellos": 1.0, "pads": 1.0, "slide": 1.6, "lead": 1.25, "bass": 0.7, "sub": 0.6, "brass": 1.0,
-              "kick": 0.9, "snare": 2.0, "hats": 4.0, "drum": 1.5, "clock": 3.0, "book": 1.5, "fx": 1.2, "hum": 0.7, "choir": 6.0, "guitar": 1.15, "harp": 2.5, "park": 3.0, "tune": 2.5}
+              "kick": 0.9, "snare": 2.0, "hats": 4.0, "drum": 1.5, "clock": 3.0, "book": 1.5, "fx": 1.2, "hum": 0.7, "choir": 6.0, "guitar": 1.15, "keys": 2.1, "park": 3.0, "tune": 2.1, "box": 2.1}
     BOWED = x.BOWED
     BRIDGE = [0.5, 0.6, 0.8, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.25, 0.2]  # bowed near the bridge: the high overtones over the note
 
@@ -548,86 +551,19 @@ def main(out: str, tune: str = "ocarina", roll: str = "harp", window=None) -> No
             w += loud * np.sin(tau * f * r * t + r) * np.exp(-t / (ring_s * long))
         put("fx", b, w * np.minimum(1, t / 0.002) * tail(k) * vol, pan)
 
-    # ---- the memory's sounds: a harp, a small organ, a park ----
-    plucks = {}
-
-    def harp(b, m, vol=0.1, pan=0.0, cents=0.0, late=0.0):
-        """A harp string: warm, each harmonic dying at its own speed. `cents`: how far out of tune."""
-        key = (m, round(cents))
-        if key not in plucks:
-            f0 = x.hz(m + cents / 100)
-            k = int(2.2 * sr)
-            t = np.arange(k) / sr
-            h = np.arange(1, max(2, int(6000 / f0) + 1))
-            loud = np.abs(np.sin(np.pi * h * 0.17)) / h**1.15
-            w = (loud[:, None] * np.sin(np.outer(h, tau * f0 * t) + h[:, None]) * np.exp(-np.outer(1 + 0.22 * h, t) / (0.85 * (262 / f0) ** 0.3))).sum(axis=0)
-            plucks[key] = (w / (np.max(np.abs(w)) + 1e-9) + 0.2 * hiss(k, 5000, 0.5) * np.exp(-t / 0.003)) * np.minimum(1, t / 0.001) * tail(k, 0.05)
-        put("harp", b, plucks[key] * vol, pan, late=late)
-
-    def soft(b, d, m, kind, vol=0.1, pan=0.2):
-        """The memory's tune on a softer voice (Eric, Nov 12: "lighter kind of softer ... a really light flute sort of
-        thing, like a whistle, but not really like a whistle"), for him to choose from: a flute (breathy, a little
-        vibrato), an ocarina (round and hollow, each note leaning up into place), a pan flute (more air than note, a
-        puff at the start), glass (a wet finger on a glass's rim: it swells in and out, no edge), a celesta (a small
-        soft bell)."""
+    # ---- the memory's sounds: an ocarina, a soft piano, a music box, a small organ, a park ----
+    def ocarina(b, d, m, vol=0.06, pan=0.2):
+        """The memory's tune (Eric, Nov 12, of six voices tried on it: "the ocarina sounds real nice")."""
         at(b, d)
-        if kind == "celesta":
-            at(b, d + 1.5)
-            put("tune", b, x.bell(m, d + 1.5, vol * 1.2, ratio=4.0, index=0.6, decay=0.5), pan)
-            return
-        if kind == "flute":
-            w = x.tone(m, d * 0.98, [1, 0.22, 0.06, 0.02], vol * 0.6, vib=0.004, vib_hz=4.8, attack=0.07, release=0.12)
-            air, puff = 0.02, 0.045
-        elif kind == "ocarina":
-            w = x.tone(m, d * 0.98, [1, 0.03, 0.07, 0.01, 0.02], vol * 0.6, vib=0.003, vib_hz=4.5, scoop=0.3, scoop_s=0.04, attack=0.04, release=0.08)
-            air, puff = 0.006, 0.02
-        elif kind == "panflute":
-            w = x.tone(m, d * 0.96, [1, 0.12, 0.2, 0.04, 0.06], vol * 0.6, vib=0.003, vib_hz=5.0, scoop=0.2, scoop_s=0.03, attack=0.03, release=0.1)
-            air, puff = 0.035, 0.09
-        else:  # glass
-            w = x.tone(m, d * 1.05, [1, 0.0, 0.05], vol, detune=(-3, 0, 3), attack=0.25, release=0.4, trem=0.15, trem_hz=4.0)
-            air, puff = 0.0, 0.0
-        k = len(w)
-        t = np.arange(k) / sr
-        breath = np.convolve(hiss(k, 9000, 0.6), np.ones(8) / 8, "same") * (air + puff * np.exp(-t / 0.05)) * vol / 0.1
-        put("tune", b, w + breath * np.minimum(1, t / 0.02) * tail(k, 0.1), pan)
+        put("tune", b, x.ocarina(m, d * 0.98, vol), pan)
 
-    def rolled(b, m, kind, vol=0.08, pan=0.0):
-        """One note of the chords rolling under the memory's tune, on an instrument other than the harp, for Eric to
-        choose from: a soft piano (felt on the hammers), a music box, a marimba played with soft mallets, a
-        vibraphone (its ring wavering), or the small organ's flutes."""
-        if kind == "organ":
-            at(b, 0.5)
-            put("harp", b, x.tone(m + 12, 0.46, [1, 0.45, 0.12, 0.2, 0.04, 0.06], vol * 0.55, detune=(-3, 3), attack=0.03, release=0.12), pan)
-            return
-        key = (kind, m)
-        if key not in plucks:
-            k = int(2.5 * sr)
-            t = np.arange(k) / sr
-            if kind == "piano":
-                f0 = x.hz(m)
-                h = np.arange(1, max(2, int(3500 / f0) + 1))
-                loud = (1 + 0.5 * np.exp(-(((h * f0 - 450) / 300) ** 2))) / h**1.7
-                w = np.zeros(k)
-                for cents in (-1.2, 1.2):
-                    f = f0 * 2 ** (cents / 1200)
-                    w += (loud[:, None] * np.sin(np.outer(h * np.sqrt(1 + 0.0004 * h * h), tau * f * t) + h[:, None]) * np.exp(-np.outer(1 + 0.3 * h, t) / (1.1 * (262 / f0) ** 0.35))).sum(axis=0)
-                w = w / (np.max(np.abs(w)) + 1e-9) + 0.25 * paper(k, 700) * np.exp(-t / 0.006)
-                rise = 0.004
-            elif kind == "musicbox":
-                f0 = x.hz(m + 12)
-                w = np.sin(tau * f0 * t + 1.2 * np.exp(-t / 0.25) * np.sin(tau * 3.5 * f0 * t)) * np.exp(-t / 0.5)
-                rise = 0.001
-            else:  # a bar struck with a soft mallet: the note and the overtones a bar has (two octaves up, and higher)
-                f0 = x.hz(m + (12 if kind == "vibes" else 0))
-                ring = 1.6 if kind == "vibes" else 0.45 * (262 / f0) ** 0.3
-                w = np.sin(tau * f0 * t) * np.exp(-t / ring) + 0.22 * np.sin(tau * 4 * f0 * t) * np.exp(-t / (ring * 0.35)) + 0.05 * np.sin(tau * 10 * f0 * t) * np.exp(-t / (ring * 0.1))
-                if kind == "vibes":
-                    w *= 1 - 0.3 * (0.5 + 0.5 * np.sin(tau * 4.5 * t))
-                w += 0.2 * paper(k, 500) * np.exp(-t / 0.008)
-                rise = 0.003
-            plucks[key] = w / (np.max(np.abs(w)) + 1e-9) * np.minimum(1, t / rise) * tail(k, 0.05)
-        put("harp", b, plucks[key] * vol * {"vibes": 0.7, "musicbox": 0.85}.get(kind, 1.0), pan)  # the long ringers a little down
+    def keys(b, m, vol=0.08, pan=0.0, cents=0.0, late=0.0):
+        """A soft piano note (of six instruments tried on the rolling chords: "Number 2 for sure ... the soft piano")."""
+        put("keys", b, x.struck("felt", m, cents) * vol, pan, late=late)
+
+    def box(b, m, vol=0.035, pan=0.4, cents=0.0, late=0.0):
+        """A music box's note ("incorporate a little bit of the music box in softly ... I really do like that music box")."""
+        put("box", b, x.struck("box", m, cents) * vol, pan, late=late)
 
     def organ(b, d, m, vol=0.022, pan=0.0):
         """A small organ's flutes: soft, steady."""
@@ -851,27 +787,23 @@ def main(out: str, tune: str = "ocarina", roll: str = "harp", window=None) -> No
     # noises ... the birds kind of chirping ... outside playing chess at the park ... really calming, like harp sort
     # of church style ... really soft ... warm and welcoming"). The band stops on the book. A park: birds, children
     # far off, a car a street away, a bicycle's bell, chess pieces put down and a clock pressed gently, the clock's
-    # tick, slow. A harp, rolling the chords; over it, on the harp, the last theme's first phrase as a child would
-    # have it, in G major; a small organ; from the fifth bar the choir, as children; a church bell, far. All on a tape
-    # that wavers a little.
+    # tick, slow. An ocarina has the last theme's first phrase as a child would have it, in G major; under it a soft
+    # piano rolls the chords, a small organ holds them, and a music box plays two or three high notes a bar (the
+    # instruments he chose by ear from the samples: it was a harp and the choir at first); a church bell, far. All on
+    # a tape that wavers a little.
     shut(T_MEMORY, 0.8), x.crash(T_MEMORY, 0.14, decay=0.6)
     first = T_MEMORY + 2
     for b, d, m in notes(first, CHILD):
-        if tune != "harp":
-            soft(b, d, m, tune)
-        else:
-            harp(b, m, 0.11, 0.25)
-            if b >= first + 16:
-                sing(b, d, m, 0.04, 0.15, -0.2, 3)
-    rng = np.random.default_rng(61)  # from here the same chances whatever played the tune (the birds don't move)
+        ocarina(b, d, m)
+    rng = np.random.default_rng(61)  # the park's own chances
     for bar, shape in enumerate(MEMORY_CH):
+        b = first + 4 * bar
         for i, m in enumerate(shape):
-            if roll == "harp":
-                harp(first + 4 * bar + i * 0.5, m, 0.09 if i == 0 else 0.07, -0.25 + 0.06 * i)
-            else:
-                rolled(first + 4 * bar + i * 0.5, m, roll, 0.1 if i == 0 else 0.08, -0.25 + 0.06 * i)
+            keys(b + i * 0.5, m, 0.1 if i == 0 else 0.08, -0.25 + 0.06 * i)
         for m in shape[2:5]:
-            organ(first + 4 * bar, 4.1, m)
+            organ(b, 4.1, m)
+        for over, which in ((1.5, 4), (3, 4), (3.5, 3)) if bar % 2 == 0 else ((0.5, 4), (2.5, 3)):
+            box(b + over, shape[which] + 24, 0.035)
     bell(first + 16, 55, 2.2, 0.035, -0.5)
     for i in range(2, 34):
         tick(T_MEMORY + i, 0.035, i % 2 == 0)
@@ -885,21 +817,22 @@ def main(out: str, tune: str = "ocarina", roll: str = "harp", window=None) -> No
         clack(T_MEMORY + b, 0.05), press(T_MEMORY + b + 0.6, 0.035)
 
     # 2:10 It sours ("it kind of starts building up ... starts getting like out of sync a little bit, out of key,
-    # starts screeching"). Seven times the clock is pressed, faster each time. The harp has only the tune's first
-    # three notes now, over and over: more of them a half step flat each time, each string further out of tune, the
-    # second hand later and later behind the first; the children's note sinks and opens to a cry; the tape runs
-    # flatter and wavers more. The solo violin's figure creeps back under it, then the violins and violas; strings
+    # starts screeching"). Seven times the clock is pressed, faster each time. The ocarina has only the tune's
+    # first three notes now, over and over: more of them a half step flat each time, and flatter still between the
+    # notes; the piano's chords too, each string further out of tune, an echo of them an octave up later and later
+    # behind; the music box goes on at the pace it had, so it falls out of step with everything, its notes going
+    # sour; a children's note sinks and opens to a cry; the tape runs flatter and wavers more. The solo violin's figure creeps back under it, then the violins and violas; strings
     # screech; a kick, the bass, slides rising, low brass. The birds stop.
     for u in range(7):
         b = T_SPIRAL + 4 * u
         press(b, 0.08 + 0.012 * u)
-        for over, m in ((0, 67), (1, 74), (2, 78)):
-            m -= 1 if rng.uniform() < u / 7 else 0
-            off = rng.uniform(-1, 1) * 10 * u
-            harp(b + over, m, 0.11, 0.25, off)
-            harp(b + over + 0.09 * u, m + 12, 0.07, -0.4, -1.3 * off)
+        for over, d, m in ((0, 1, 67), (1, 1, 74), (2, 2, 78)):
+            ocarina(b + over, d, m - (1 if rng.uniform() < u / 7 else 0) - rng.uniform(0, 0.1) * u, 0.06 + 0.005 * u)
         for i, m in enumerate(MEMORY_CH[0]):
-            harp(b + i * 0.5 + 0.04 * u * (i % 2), m - (1 if rng.uniform() < u / 7 else 0), 0.07, -0.25 + 0.06 * i, rng.uniform(-1, 1) * 8 * u)
+            m -= 1 if rng.uniform() < u / 7 else 0
+            keys(b + i * 0.5 + 0.04 * u * (i % 2), m, 0.08, -0.25 + 0.06 * i, rng.uniform(-1, 1) * 8 * u)
+            if i % 2 == 0:
+                keys(b + i * 0.5 + 0.09 * u, m + 12, 0.05, 0.3, rng.uniform(-1, 1) * 12 * u)
         sing(b, 4.1, 74 - 0.12 * u, 0.026 + 0.003 * u, 0.15 + 0.1 * u, -0.2, 3), sing(b, 4.1, 79 - 0.2 * u, 0.018 + 0.003 * u, 0.15 + 0.1 * u, 0.3, 3)
         for i in range(8):
             tick(b + i * 0.5, 0.04 + 0.014 * u, i % 2 == 0)
@@ -917,6 +850,9 @@ def main(out: str, tune: str = "ocarina", roll: str = "harp", window=None) -> No
                 screech(b + rng.uniform(0, 3), rng.uniform(0.6, 1.4), rng.integers(84, 96), rng.integers(86, 101), 0.055 + 0.014 * u, rng.uniform(-0.7, 0.7))
             for i in range(4 if u >= 5 else 2):
                 kick(b + i * (1 if u >= 5 else 2), 0.3 + 0.05 * u)
+    slow = x.t(T_SPIRAL) - x.t(T_SPIRAL - 1)  # the memory's beat, in seconds: the music box keeps to it
+    for j in range(int((x.t(T_PAUSE) - x.t(T_SPIRAL)) / (1.5 * slow))):
+        box(T_SPIRAL, (86, 83, 86, 79)[j % 4] - (1 if rng.uniform() < j / 14 else 0), 0.035 + 0.002 * j, 0.4, rng.uniform(-1, 1) * 4 * j, late=j * 1.5 * slow)
     for i in range(16):
         synth(T_SPIRAL + 12 + i, 43, 0.9, 0.2 + 0.01 * i, 200 * 10 ** (i / 16))
     slide(T_SPIRAL + 8, 20, 67, 91, 0.05, 0.3), slide(T_SPIRAL + 12, 16, 62, 80, 0.05, -0.3)
@@ -1014,9 +950,7 @@ def main(out: str, tune: str = "ocarina", roll: str = "harp", window=None) -> No
     x.buses["pads"] *= 0.6 + 0.4 * gain
 
     cathedral("choir")
-    cathedral("harp", 2.5, 0.4)
-    if "tune" in x.buses:
-        cathedral("tune", 2.5, 0.4)
+    cathedral("keys", 2.5, 0.4), cathedral("tune", 2.5, 0.4), cathedral("box", 2.5, 0.45)
     cathedral("park", 1.6, 0.7)
     x.beat_s = 60 / 160  # the echoes' beat
     x.echo("lead", 0.75, 0.14, 0.06)
@@ -1024,5 +958,5 @@ def main(out: str, tune: str = "ocarina", roll: str = "harp", window=None) -> No
     write_wav(out, x.play(x.mixdown(levels, lowpass=8500, room=0.34, room_s=2.0)))
 
 
-if __name__ == "__main__":  # song_v.py <out.wav> [the memory's tune, what rolls its chords] [from beat, to beat: only that passage]
-    main(sys.argv[1], *sys.argv[2:4], window=tuple(float(v) for v in sys.argv[4:6]) or None)
+if __name__ == "__main__":  # song_v.py <out.wav> [from beat, to beat: only that passage]
+    main(sys.argv[1], window=tuple(float(v) for v in sys.argv[2:4]) or None)
