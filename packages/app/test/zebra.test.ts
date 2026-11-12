@@ -108,10 +108,14 @@ describe("his dough and gold on the board", () => {
     expect(zebraItems(b, [g], 1000 + ZEBRA_BEATS.gold.shineAt)[0]).toMatchObject({ anim: "shine" });
   });
 
-  it("a timer for each lump the rules allow at once, each kind 00 to 15 and its rolls and ding", async () => {
+  it("a timer for each lump the rules allow at once, each kind from its start (doughTimers) down to 00, its rolls and ding", async () => {
     const { ZEBRA_TIMER } = await import("../src/characters/zebra-dough.ts");
     for (const k of ["p", "n", "b", "r", "q"]) {
-      expect(ZEBRA_TIMER.anims[`${k}${String(BOSS_POWERS.doughTimers[k as "p"]).padStart(2, "0")}`]).toBeTruthy();
+      for (let m = 0; m <= BOSS_POWERS.doughTimers[k as "p"]; m++) {
+        const mm = String(m).padStart(2, "0");
+        expect(ZEBRA_TIMER.anims[`${k}${mm}`]).toBeTruthy();
+        if (m > 0) expect(ZEBRA_TIMER.anims[`${k}Roll${mm}`]).toBeTruthy();
+      }
       expect(ZEBRA_TIMER.anims[`${k}Roll01`]!.frames[0]!.cue).toBe("roll");
       expect(ZEBRA_TIMER.anims[`${k}Ding`]!.frames[0]!.cue).toBe("ding");
     }
