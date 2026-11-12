@@ -1,3 +1,4 @@
+- Nov 12 01:55: #651 boss select six MERGED (af601af).
 - Nov 12 01:45: #651 boss select six opened (c44227e; boss ~2x pawn on tall guest screens; Ginger ~1.6x flagged). Six helper archived. Watcher bifh6cgo6. Stills sent to Eric.
 - Nov 12 01:35: #650 batch 3 MERGED (edb8cac). #649 dough timers MERGED (331f5ce). #646 merged main -> dce1148, CI rerun (watcher bhh52o81z). Main run watcher on edb8cac (bb13o0o85).
 - Nov 12 01:20: six helper pushed 12dc6ed (grid ok, centered last row). Sent back: boss only 1.46x pawn vs mockup v2 ~2x; grow into room under grid; commit .pr-body.md/.done.
