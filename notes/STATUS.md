@@ -1,3 +1,4 @@
+- Nov 12 ~21:30 UTC: Eric: two real quotes in the cutscene (good moves; best by test), longer OK. RULES exception extended. Draft 2 lines in hidden-boss-house-NOTES.md.
 - Nov 12 21:20 UTC: Eric liked the ages mockup; age-20 -> black suit (Opus medium helper on claude/hidden-boss-ages). Sent him a draft cutscene conversation.
 - Nov 12 ~21:00 UTC: main full run on e50befe (#669) GREEN, no flakes (43299699012).
 - Nov 12 ~20:55 UTC: Hidden Boss ages mockup DONE (claude/hidden-boss-ages 12d1a5b, recluse-ages.ts, wired into nothing; stills on stills/hidden-boss-ages). Sent 8 images to Eric; waiting his notes. No PR yet (merge only once Eric likes it, or keep on the branch for the build). Helper archived.

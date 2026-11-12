@@ -82,3 +82,28 @@ Eric (heads-up, not started; lines and animation come later):
 - Eric: "it looks really, really, really good." Face shape stays as drawn. Age 20: a black suit, black trousers, white shirt under it, a tie
   (helper session_01JuCWRtN2WfYLKQxUZgP1Fd on claude/hidden-boss-ages). He said "white t-shirt ... with a tie": read as a white shirt; asked to confirm.
 - The cutscene lines: my first draft sent to Eric (in chat); his to change.
+
+## Nov 12 (evening): the cutscene lines, draft 2 (Eric liked draft 1; asked for two real quotes, longer)
+Eric: work in "all that matters on the chessboard is good moves" (the man says it, "But all that matters..."; the kid pushes back: there's
+more to chess, it's beautiful) and "best by test" (the kid turns it on him about the machines: "I knew a wise man who once said..."). Longer is fine.
+Draft 2 is in the chat of Nov 12 and below; Eric's to change. Unattributed quotes, no name (RULES.md).
+1 Kid: Why are you on the floor?
+2 Man: I lost.
+3 Kid: So? We lose all the time. Then we set them up again.
+4 Man: I forgot that part.
+5 Kid: Remember the board on the kitchen table? You'd play both sides till the lights went out.
+6 Man: I remember.
+7 Kid: Do you still find them? The moves that make you laugh out loud?
+8 Man: The machines find them now. Faster. Every single one.
+9 Man: And they're right. All that matters on the chessboard is good moves.
+10 Kid: That's not all. A good move is just a word. The game is what you say with it.
+11 Kid: It's beautiful. You used to know that.
+12 Man: I never cared about the trophies. I wanted to play the most beautiful game anyone ever played.
+13 Kid: Then why'd you stop?
+14 Man: Because they tested every move there is. There's nothing left to find.
+15 Kid: I knew a wise man who used to say "best by test."
+16 Man: ...That was me.
+17 Kid: So test it. Not their way. Ours.
+18 Kid: (fading) Don't forget me.
+19 Man: (alone, at the book) ...If the machines took the beauty, then I'll take the machines.
+   (alt 19: "Then let's show them what it looked like.")
