@@ -196,7 +196,6 @@ export async function preloadMusic(onShare: (share: number) => void = () => {}):
   await Promise.all(
     urls.map((url) => {
       preloaded.add(url);
-      log(`music:fetch:${url}`);
       // (Low priority: the town's own files first. Read to the end, as a blob, not into the page's memory: the service worker
       // copies it into its cache as it passes.)
       return fetch(url, { priority: "low" } as RequestInit)
