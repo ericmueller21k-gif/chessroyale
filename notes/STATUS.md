@@ -1,3 +1,4 @@
+- Nov 12 00:25: #648 area banner + room/splash music MERGED (c22d7f1). Boss select 6/row mockup sent; waiting Eric.
 - Nov 12 00:10: #648 area banner + room/splash music opened (41a82cc; watcher bnbm8qfob). Helper archived. Batch 3 helper (main red) session_01JuCWRtNjTA... see list; on claude/main-red-nov12. Running Opus: dock-stack, main-red.
 - Nov 12 00:05: #647 select stage MERGED (c570efc).
 - Nov 12 00:00: Eric music timing -> sent to the banner/room-music helper (splash-start music on in-building challenges, hold splash <=2 s, intro decoded first). NEXT job queued: shrink all themes (mono, lower bitrate) + fetch (not decode) all themes during the town loading bar ("Loading music"). Memory: decode only on walking in.
