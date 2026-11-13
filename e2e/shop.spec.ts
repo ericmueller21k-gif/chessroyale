@@ -119,7 +119,8 @@ async function goIn(p: Page, id: string, name: string) {
     if (await chip.count()) await chip.dispatchEvent("click");
     else await p.evaluate((h) => (window as unknown as { __townGlide?: (to: string) => void }).__townGlide?.(h), id);
   }
-  await expect.poll(() => homeAt(p, id), { message: `${name} comes into view` }).not.toBeNull();
+  // (15 s: the camera's glide across the street town on CI's software WebGL, under a full shard, can take longer than the default 5.)
+  await expect.poll(() => homeAt(p, id), { message: `${name} comes into view`, timeout: 15_000 }).not.toBeNull();
   const card = p.getByRole("dialog", { name, exact: true });
   await expect(async () => {
     if (await card.isVisible()) return;
@@ -525,7 +526,7 @@ test("Hollow Peak (Nov 3): Go in (his line on the card), the cave: in at the mou
   await page.goto("/town?sky=night");
   await townReady(page);
   await page.evaluate(() => (window as unknown as { __townGlide?: (id: string) => void }).__townGlide?.("hollow"));
-  await expect.poll(() => homeAt(page, "hollow"), { message: "Hollow Peak comes into view" }).not.toBeNull();
+  await expect.poll(() => homeAt(page, "hollow"), { message: "Hollow Peak comes into view", timeout: 15_000 }).not.toBeNull();
   // (Hollow live for everyone, so his cave is too: a player's town. His card keeps his line over "Go in": the next each time.)
   await goIn(page, "hollow", "Hollow Peak");
   await expect(room(page)).toHaveAttribute("data-room", "hollow");
