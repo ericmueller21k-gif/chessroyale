@@ -178,16 +178,16 @@ test("tags fade as you walk away from a figure (not a pop), are gone past the ra
     requestAnimationFrame(tick);
   }, name);
   let far = 0;
-  // (The street town's open ground, everyone's since Nov 13: up the park, then along its north walk and the street beyond; before, taps
-  // at points on the old town's open map.)
-  for (const sq of [[21, 33], [33, 37], [12, 37], [33, 14]] as const) {
+  // (The street town's open ground, everyone's since Nov 13: up column 24, a clear lane from the park to the gate, a square at a time so
+  // the tag's fade over the last square is caught; before, taps on the old town's open map.)
+  for (const sq of [[24, 25], [24, 27], [24, 29], [24, 31], [24, 33], [24, 35]] as const) {
     await page.evaluate((s) => (window as unknown as { __townWalk: (s: readonly [number, number]) => boolean }).__townWalk(s), sq);
     let last = "";
-    for (let n = 0; n < 40; n++) {
+    for (let n = 0; n < 20; n++) {
       const you = await canvas(page).getAttribute("data-you");
       if (you === last) break;
       last = you!;
-      await page.waitForTimeout(500);
+      await page.waitForTimeout(400);
     }
     const now = await read(page);
     far = dist(now.bots[i]!.at, now.you);
