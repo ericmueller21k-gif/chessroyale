@@ -10,7 +10,7 @@ import { GOODBYE_LINES, SELECT_LINES } from "../characters/boss-select.ts";
 import { takeGoodbyeFrom } from "./goodbye.ts";
 import { N, WRAP, colI, rowI, wrapF, wrapFX, wrapFY, wrapI } from "./camera.ts";
 import { ADMIN_TOWN } from "./admin-town.ts";
-import { STREET_BUILDINGS, STREET_COLISEUM, STREET_FOUNTAIN, STREET_GROUND, STREET_HOMES, STREET_PARK, STREET_PROPS, STREET_START, STREET_TABLES, STREET_WRAP, type SqBox } from "./street.ts";
+import { PLAN_HOMES, STREET_BUILDINGS, STREET_COLISEUM, STREET_FOUNTAIN, STREET_GROUND, STREET_HOMES, STREET_PARK, STREET_PROPS, STREET_START, STREET_TABLES, STREET_WRAP, type SqBox } from "./street.ts";
 import { TOWN_FEEL } from "./feel.ts";
 import { SIDEKICK_SHEETS, type SidekickSheet } from "./sidekick-sheets.ts";
 
@@ -305,13 +305,15 @@ export const ALL_HOMES: readonly Home[] = (
  * its front line, its door square, its boss's rest square and wander box as the plan says.
  */
 function streetHome(h: Omit<Home, "half" | "foot" | "hw" | "hd" | "door" | "entry" | "rest" | "wander">): Home {
-  const lot = STREET_HOMES.find((l) => l.id === (h.id === "dash" ? "blitz" : h.id))!;
+  const id = h.id === "dash" ? "blitz" : h.id;
+  // (A home not in this town, street.ts lotHere: its plan's lot, never drawn or walked to.)
+  const lot = STREET_HOMES.find((l) => l.id === id) ?? PLAN_HOMES.find((l) => l.id === id)!;
   const cy = lot.r0 + (lot.d - 1) / 2;
   return { ...h, cx: lot.c0 + (lot.w - 1) / 2, cy, half: 1.5, foot: cy - (lot.r0 - 0.5 + lot.inset), hw: (lot.w - 1) / 2, hd: (lot.d - 1) / 2, door: { ...lot.door }, entry: { c: lot.door.c, r: lot.r0 }, rest: { ...lot.rest }, wander: { ...lot.wander } };
 }
 /**
  * Every home in this town: all of them in an admin's (ADMIN_TOWN), and none of a boss in the game for admins first (core's
- * BOSS_ADMIN_FIRST: Timber's) in anyone else's, so its plot is open ground there.
+ * BOSS_ADMIN_FIRST: Timber's, Dash's, Rolling Dough) in anyone else's, where its row's look-alike fronts fill its place (street.ts lotHere).
  */
 export const HOMES: readonly Home[] = ALL_HOMES.filter((h) => ADMIN_TOWN || !adminFirst(h));
 /** Every place: the homes (in the bosses' order), then the Colosseum. */

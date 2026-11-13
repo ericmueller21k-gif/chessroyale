@@ -3,12 +3,14 @@
  * the lots and their buildings, the back gardens, the plus-shaped park, the Colosseum in its grove), read from
  * `street-plan.json`: the art's `town-plan-nov5.json` (claude/boss-art 11a4d903; its doc is scripts/boss-art/out/town-plan-nov5.md
  * there) as round 4 reshaped it (scripts/street-plan-north.py: the Colosseum at the north edge, a closing row along the south edge).
- * Data only: world.ts builds the street town's world from it when STREET_TOWN is on (admins only), and render.ts draws it.
+ * Data only: world.ts builds the town's world from it (everyone's town since Nov 13), and render.ts draws it.
  *
  * Squares are (c, r): c west to east, r south to north, wrapping east-west only (round 4: the plan's `wrap`; camera.ts WRAP); a
  * position (x, y) is in squares, a square's middle at whole numbers.
  */
 import PLAN from "./street-plan.json" with { type: "json" };
+import { adminFirst } from "@chessroyale/core";
+import { ADMIN_TOWN } from "./admin-town.ts";
 import { N } from "./camera.ts";
 import type { Design } from "./buildings.ts";
 import type { LookSpec } from "./lookalike.ts";
@@ -153,7 +155,13 @@ function colosseumLots(): StreetLot[] {
     })),
   ];
 }
-export const STREET_LOTS: readonly StreetLot[] = [...withRows(PLAN.lots as StreetLot[]), ...colosseumLots()];
+/**
+ * Whether a lot is in this town: every one in an admin's; a home whose boss is in the game for admins first (core's BOSS_ADMIN_FIRST:
+ * Timber's, Dash's, Rolling Dough) in an admin's only (world.ts HOMES). Anyone else's town leaves its lot out before the rows are laid,
+ * so its row fills the place with look-alike fronts, as anywhere else along it (Nov 13: no half-built home for a player).
+ */
+const lotHere = (l: StreetLot): boolean => l.kind !== "home" || ADMIN_TOWN || !adminFirst({ id: l.id === "blitz" ? "dash" : l.id });
+export const STREET_LOTS: readonly StreetLot[] = [...withRows((PLAN.lots as StreetLot[]).filter(lotHere)), ...colosseumLots()];
 /** The squares under a row (1): a lot's (not walked on), drawn paved, the sidewalk running up to the fronts (no lawn before a row). */
 export const ROW_GROUND = new Uint8Array(N * N);
 for (let r = 0; r < N; r++)
@@ -164,8 +172,10 @@ for (let r = 0; r < N; r++)
     }
 /** The everyday buildings (on the rows and behind them), each with its design. */
 export const STREET_BUILDINGS = STREET_LOTS.filter((l) => l.kind !== "home" && l.kind !== "portal") as readonly (StreetLot & { id: Design })[];
-/** The homes' lots, by the art's home id. */
+/** The homes' lots in this town (lotHere), by the art's home id. */
 export const STREET_HOMES = STREET_LOTS.filter((l) => l.kind === "home") as readonly (StreetLot & { door: { c: number; r: number }; rest: { c: number; r: number }; wander: SqBox })[];
+/** Every home's lot as the plan has it, in this town or not (world.ts ALL_HOMES: a home not in this town keeps its plan's place, unused). */
+export const PLAN_HOMES = (PLAN.lots as StreetLot[]).filter((l) => l.kind === "home") as unknown as typeof STREET_HOMES;
 
 /** Something standing in the plan: a park thing (tree, bench, lamp, table, the fountain) or a garden's (hedge, bush, bed, shed). */
 export interface StreetProp {

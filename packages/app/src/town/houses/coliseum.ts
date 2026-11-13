@@ -240,9 +240,40 @@ function crown(i: number, j: number): boolean {
   if (j >= 5) return true;
   return i === 0 || i === 7 || i === 3 || i === 4 ? j >= 1 : j >= 3;
 }
+/** A banner: navy with a gold edge, a gold crown on it over a band of the board's squares, its foot cut in a point with a gold fringe. */
+function banner(): Part {
+  const grid: string[] = [];
+  for (let j = 0; j < BAN_H; j++) {
+    let row = "";
+    for (let i = 0; i < BAN_W; i++) {
+      const point = Math.abs(i - (BAN_W - 1) / 2) * 0.6;
+      if (j > BAN_H - 5 - point) row += j > BAN_H - 2 - point ? "." : i % 2 ? "Y" : "O";
+      else if (i === 0 || i === BAN_W - 1) row += "Y";
+      else if (j < 4) row += j === 1 || j === 2 ? "Y" : "N";
+      else if (j >= 14 && j < 26 && crown(Math.floor((i - 3) / 1.5), Math.floor((j - 14) / 1.5))) row += j < 17 ? "y" : "Y";
+      else if (j >= 32 && j < 38 && i > 1 && i < BAN_W - 2) row += (Math.floor((i - 2) / 3) + Math.floor((j - 32) / 3)) % 2 ? "L" : "D";
+      else row += i < 5 ? "n" : "N";
+    }
+    grid.push(row);
+  }
+  return { grid };
+}
 
 const PEN_W = 22;
 const PEN_H = 12;
+/** A pennant: a long triangle, `main` with a stripe of `stripe`. */
+function pennant(main: string, stripe: string): Part {
+  const grid: string[] = [];
+  for (let j = 0; j < PEN_H; j++) {
+    let row = "";
+    for (let i = 0; i < PEN_W; i++) {
+      const half = (PEN_H / 2) * (1 - i / PEN_W);
+      row += Math.abs(j + 0.5 - PEN_H / 2) < half ? (Math.abs(j + 0.5 - PEN_H / 2) < 1.2 ? stripe : main) : ".";
+    }
+    grid.push(row);
+  }
+  return { grid };
+}
 const FLAG_W = 44;
 const FLAG_H = 26;
 /** The flag: navy with a gold border, a gold crown over a band of the board's squares. */
@@ -260,6 +291,10 @@ const FRONT = FOOT + 4;
 // ---- Parts and frames.
 
 const parts: Record<string, Part> = {};
+parts.banner = banner();
+parts.flag = flag;
+parts.penGold = pennant("Y", "O");
+parts.penNavy = pennant("N", "Y");
 /**
  * Where a statue's picture stands over this one (frame pixels: its top left; it is STATUE_W x statueH(id)), its
  * pedestal's foot on the front row's line, either side of the gate.
