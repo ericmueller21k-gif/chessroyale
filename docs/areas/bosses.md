@@ -42,6 +42,16 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
   takes it over (`bossMusic`) with no restart at "START!". From the boss menu: started after the intro, as before. Same player, gain,
   switches and fades throughout. Tests: `music.test.ts` ("a boss's room"), `e2e/zebra-home.spec.ts` (Don's theme carried through).
   docs/decisions/2026-11-11-area-banner-room-music.md.
+  **The Hidden Boss's four themes, switched mid-fight (Nov 13; [decision](../decisions/2026-11-13-hidden-boss-music.md)):** a battle
+  names the theme it wants now (`MusicBattle.theme`, a themes.json key) and music.ts switches by `MUSIC_SWITCH` (`switchPlan`; a single
+  theme still plays by `musicPlan`/`startPlan`). Which when: `recluseMusic` (App.tsx's `musicBattle`), keys in `RECLUSE_MUSIC`: his
+  adult form (phase 1) `recluse-phase2` from the start (online too); beaten with the phase change next (solo, the fall's `toPhase2`)
+  `recluse-beaten` at once (0.3 s fade); the phase change `recluse-phase3`, its loop on the board's crack (`phaseChange.splitAt` =
+  `at + PHASE_CHANGE.crackAt`), its intro started `introSeconds` before (from themes.json, never code; the beaten theme fades 0.5 s
+  from there; late, the loop alone on the drop), on through phase 2 until every board is decided. `recluse-house` (the child form)
+  isn't played yet: its hook is `recluseMusic`. Not in the town's loading: fetched as his fight starts (`ahead`), the transformation's
+  decoded as he's beaten (`next`). The drop lands on the split's first frame (5 to 8 ms measured). Tests: `music.test.ts` ("the Hidden
+  Boss"), `e2e/recluse.spec.ts` ("beaten in phase 1").
 - **Banners and lines (Eric, Nov 5):** a power's banner shows your pawn on the right (the God King only for his save, LastStand); a boss's name is his small portrait plus his name, never his emoji (`BossTag`, the status line); the banner's name stays whole. [decision](../decisions/2026-11-05-banners-emoji-cards.md); rules in [eric.md](../rules/eric.md).
 - **A boss can be rested** (`PAUSE_BOSS_<ID>`, [ops.md](ops.md) "Kill switches"): the boss menu hides him, a raid
   lobby picked for him is refused, and every match's pick skips him (`rosterWithout` in `boss.ts`, a lobby's or solo

@@ -16,5 +16,11 @@ music. Made in code by `scripts/reel/music/` on branch `claude/trailer-v2` (no s
    `loopSeconds`. Keep `pad` as the handoff has it. A longer version of a theme: replace its files and its entry.
 
 The lengths are read from `themes.json`, never from the code. These files aren't precached (vite.config.ts): every theme in
-`themes.json` is fetched during the town's loading bar ("Loading music…", Nov 12) and kept by the service worker; a theme is decoded
+`themes.json` but the Hidden Boss's (`RECLUSE_MUSIC` in settings.ts: fetched as his fight starts, Nov 13) is fetched during the town's loading bar ("Loading music…", Nov 12) and kept by the service worker; a theme is decoded
 only when its battle, room or splash needs it.
+
+## The Hidden Boss's four themes (Nov 13)
+
+`recluse-house`, `recluse-phase2`, `recluse-beaten`, `recluse-phase3`: keyed by their point in his fight, not by a boss id, and switched
+mid-fight (`src/music.ts`, `recluseMusic` and `switchPlan`; the handoff's README, "The Hidden Boss"). Keep each entry's `marks`. The
+boards split at the transformation's start + `recluse-phase3`'s `introSeconds`: a new length needs no code change.
