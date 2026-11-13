@@ -367,8 +367,8 @@ function Privacy() {
         </li>
         <li>
           <strong>hc_banned</strong> is set only if an account banned for fair play (or for getting around a ban) was used or signed
-          in to on this device: that account's random id. While the ban stands, this device shows only the ban to anyone not signed in
-          to another account, and anyone may still sign in to theirs on it (a shared device). 400 days, or until the ban is lifted.
+          in to on this device: that account's random id. While the ban stands, the whole device is banned: it shows only the ban to
+          everyone who uses it, and no account can sign in on it. 400 days, or until the ban is lifted.
         </li>
         <li>
           <strong>hc_oauth</strong> and <strong>hc_next</strong> exist only during "Continue with Google". 10 minutes.

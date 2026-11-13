@@ -7,8 +7,8 @@
  *
  * This device remembers it (`brc.banned`), so a reload, a deep link or another tab shows the ban screen from its first frame. While the
  * screen is up it asks the server (`checkBan`: at load, a minute after each ban answer, sooner after a failed ask, and whenever the page
- * comes back into view or online), and leaves the screen once the server lets this browser in: the ban lifted, the browser's data
- * cleared (a guest again), or someone signed in to their own account on it (a shared device: the ban screen's sign-in box).
+ * comes back into view or online), and leaves the screen once the server lets this browser in: the ban lifted, or the browser's data
+ * cleared (a guest again). The whole device is banned (Eric, Nov 13): no account signs in on it meanwhile.
  */
 
 const KEY = "brc.banned";
@@ -89,8 +89,8 @@ export function watchBans(): void {
 
 /**
  * While the ban screen is up, asks the server whether it still holds (`/api/me`: the gate answers before anything else runs). The ban
- * answer keeps the screen, and asks again in RECHECK_MS; a 2xx means the server let this browser in (the ban lifted, its data cleared,
- * or a sign-in here to an account that isn't banned), so the app loads as usual. No answer (offline), or any other (a 429, a 5xx, the
+ * answer keeps the screen, and asks again in RECHECK_MS; a 2xx means the server let this browser in (the ban lifted, or its data
+ * cleared), so the app loads as usual. No answer (offline), or any other (a 429, a 5xx, the
  * database down): the screen stays, and asks again after RETRY_MS, doubling, up to RECHECK_MS. A player who isn't banned is never kept
  * there for a page's life by one failed ask (the review of #687, minor 3).
  */

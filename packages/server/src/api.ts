@@ -3,7 +3,7 @@ import { liveCounts, pruneLive, type LiveCounts } from "./live.ts";
 import { liveHub, type LiveHub } from "./live-hub.ts";
 import { cachedUserId, firstSighting, forgetToken, inboxOf, markSeen, rememberInbox } from "./presence.ts";
 import { REPORT_THANKS, evasionAccount, reportPlayer, signInBan } from "./fairplay.ts";
-import { banAnswer, banRedirect, refusalEnds } from "./ban-gate.ts";
+import { banAnswer, banRedirect } from "./ban-gate.ts";
 import { NAME_NOT_ALLOWED, isBlockedText } from "./text-filter.ts";
 import { chatNoticeSeen } from "./chat-mod.ts";
 import { isAdmin, testSwitchesOn, type AdminEnv } from "./admin.ts";
@@ -381,11 +381,9 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
     return new Response(JSON.stringify(await profile(sql, g.user, admins, leaves)), { headers });
   }
   // ---- Signing in: the age question, an emailed code, Google. These run without a session too (Nov 13): a browser the ban gate marked
-  // banned has none, and anyone else may still sign in on it (a shared device: the review of #687, M1; ban-gate.ts SIGN_IN_ROUTES). ----
+  // banned never reaches them (the whole device is banned: ban-gate.ts). ----
 
-  // A sign-in refused for a ban (Eric, Nov 13: signInBan) ends this browser's session only if it's the banned account's own or a guest's
-  // (the one signing in); another account signed in here stays signed in (a shared device: ban-gate.ts refusalEnds).
-  const endOnRefusal = (banned: string) => refusalEnds(token, current, banned);
+  // A sign-in refused for a ban (Eric, Nov 13: signInBan) ends whatever session this browser carried (the whole device is banned).
 
   // POST /api/auth/age {oldEnough}: the age question's answer, asked before any sign-in (the app works it out from the
   // birth month and year and sends only this; the date never leaves the device). Old enough: this device may sign in
@@ -451,7 +449,7 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
     const ban = await signInBan(sql, "email", address, null, now);
     const refuse = async (id: string) => {
       await spendEmailCode(sql, address);
-      return banAnswer(sql, endOnRefusal(id), id);
+      return banAnswer(sql, token, id);
     };
     if (ban && "banned" in ban) return refuse(ban.banned);
     if (!finish) return askAgeFirst();
@@ -508,7 +506,7 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
     // once it can finish.
     const ban = await signInBan(sql, "google", claims.sub, extra.email, now);
     const refuse = async (id: string) => {
-      const refused = await banRedirect(sql, endOnRefusal(id), id, `${back}?signin=banned`);
+      const refused = await banRedirect(sql, token, id, `${back}?signin=banned`);
       refused.headers.append("set-cookie", cookie(STATE_COOKIE, "", 0));
       refused.headers.append("set-cookie", cookie(NEXT_COOKIE, "", 0));
       return refused;

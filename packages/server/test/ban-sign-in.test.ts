@@ -15,7 +15,7 @@ const { default: worker } = await import("../src/index.ts");
  * work"; docs/decisions/2026-11-13-ban-blocks-sign-in.md). Through the whole Worker, its ban gate included (ban-gate.ts): signing in to
  * a banned account (by email or Google, or by ban evasion) is refused with Eric's line and no session; a session signed in when the
  * ban lands gets the ban answer on its next request, and is ended; the browser is marked, so every route answers the same to it until
- * the ban is lifted, unless someone else signs in to their own account on it (a shared device); a lifted ban signs in as before; the
+ * the ban is lifted, sign-in included, whoever uses it (the whole device is banned: Eric, Nov 13); a lifted ban signs in as before; the
  * engine pool and guests pass as ever.
  */
 
@@ -107,7 +107,7 @@ const users = async (sql: Sql) => (await sql.first<{ n: number }>("SELECT COUNT(
 
 /**
  * Routes a banned browser tries (a lobby link's and its WebSocket, the town's, the shop's, PLAY, signing out): each the ban answer.
- * (Not the sign-in's own routes: anyone may sign in to their own account on a marked browser, SIGN_IN_ROUTES; nor the admin pages.)
+ * The sign-in's own routes too: the whole device is banned (Eric, Nov 13). (Not the admin pages.)
  */
 const ROUTES: [string, RequestInit & { json?: unknown }][] = [
   ["/api/me", {}],
@@ -123,6 +123,12 @@ const ROUTES: [string, RequestInit & { json?: unknown }][] = [
   ["/api/town/here", { json: { at: [1, 1] } }],
   ["/api/auth/logout", { method: "POST" }],
   ["/api/fairplay/status", {}],
+  ["/api/auth/config", {}],
+  ["/api/auth/age", { json: { oldEnough: true } }],
+  ["/api/auth/email/start", { json: { email: "someone@example.com" } }],
+  ["/api/auth/email/verify", { json: { email: "someone@example.com", code: "123456" } }],
+  ["/api/auth/google/start?next=/", {}],
+  ["/api/auth/google/callback?state=s&code=c", {}],
 ];
 
 beforeEach(() => vi.unstubAllGlobals());
@@ -347,8 +353,8 @@ describe("what passes the gate", () => {
   });
 });
 
-describe("a shared device: the mark keeps out only the banned account (the review of #687, M1)", () => {
-  it("a family tablet marked by one banned account: anyone else signs in to their own account there and plays; the banned one still gets only the line", async () => {
+describe("the whole device is banned (Eric, Nov 13: \"If you get banned and your sister gets upset about it, so be it\")", () => {
+  it("a family tablet marked by one banned account: nobody signs in on it, the sister included; a session of hers on it is ended; only the line", async () => {
     const w = await setUp();
     const bro = await account(w.sql, "email", "bro@example.com");
     const sis = await account(w.sql, "email", "sis@example.com");
@@ -358,47 +364,35 @@ describe("a shared device: the mark keeps out only the banned account (the revie
     await decide(w.sql, bro.id, "ban", "admin:eric@example.com", "engine moves", Date.now());
     isBanAnswer(await tablet.call("/api/live"));
     expect([tablet.jar.get("hc_banned"), tablet.jar.has("hc_session")]).toEqual([bro.id, false]);
-    // Signed out, the tablet gets only the line (no guest made for it)...
-    isBanAnswer(await tablet.call("/api/me"));
-    // ...except on the sign-in's own routes, which run with no session: the options, Google's start, the age question, a code.
-    expect((await tablet.call("/api/auth/config")).status).toBe(200);
-    const google = await tablet.call("/api/auth/google/start?next=/");
-    expect([google.status, new URL(google.res.headers.get("location")!).origin]).toEqual([302, "https://accounts.google.com"]);
-    // His sister signs in to her own account on it: a session of hers, which passes the mark on every route.
+    // Signed out, the tablet gets only the line (no guest made for it), the sign-in's own routes included.
     const made = await users(w.sql);
-    const signed = await tablet.emailSignIn("sis@example.com");
-    expect([signed.status, signed.banHeader, (signed.body as { user: { id: string } }).user.id]).toEqual([200, null, sis.id]);
-    expect(await users(w.sql)).toBe(made);
-    for (const path of ["/api/me", "/api/live", "/api/shop", "/api/quests"]) expect([path, (await tablet.call(path)).status]).toEqual([path, 200]);
-    expect(await sessionsOf(w.sql, sis.id)).toBe(1);
-    expect(tablet.jar.get("hc_banned")).toBe(bro.id);
-    // He tries his own account on it: refused (the line), and her session isn't ended: the next request is hers again.
-    await w.sql.run("UPDATE email_codes SET sent_at = sent_at - 60000");
-    isBanAnswer(await tablet.emailSignIn("bro@example.com"));
-    expect(await sessionsOf(w.sql, bro.id)).toBe(0);
-    expect(await sessionsOf(w.sql, sis.id)).toBe(1);
-    expect(tablet.jar.get("hc_banned")).toBe(bro.id);
-    expect(((await tablet.call("/api/me")).body as { user: { id: string } }).user.id).toBe(sis.id);
-    // A session of his own on it (made some other way): refused and ended, as ever; with none, only the line again.
-    const hers = tablet.jar.get("hc_session")!;
-    tablet.jar.set("hc_session", await createSession(w.sql, bro.id, Date.now()));
-    isBanAnswer(await tablet.call("/api/live"));
-    expect(await sessionsOf(w.sql, bro.id)).toBe(0);
-    isBanAnswer(await tablet.call("/api/live"));
-    // Her session brought back: in, and nothing of hers was ended or opened as a case.
-    tablet.jar.set("hc_session", hers);
-    expect((await tablet.call("/api/live")).status).toBe(200);
+    isBanAnswer(await tablet.call("/api/me"));
+    isBanAnswer(await tablet.call("/api/auth/config"));
+    isBanAnswer(await tablet.call("/api/auth/google/start?next=/"));
+    isBanAnswer(await tablet.call("/api/auth/age", { json: { oldEnough: true } }));
+    // His sister tries her own account on it: the line, no code sent, no session, nothing made.
+    isBanAnswer(await tablet.call("/api/auth/email/start", { json: { email: "sis@example.com" } }));
+    expect(w.codes.has("sis@example.com")).toBe(false);
+    isBanAnswer(await tablet.call("/api/auth/email/verify", { json: { email: "sis@example.com", code: "123456" } }));
+    expect([await sessionsOf(w.sql, sis.id), await users(w.sql)]).toEqual([0, made]);
+    // A session of hers on it (signed in before the ban, or brought some other way): the ban answer, and that session ended.
+    tablet.jar.set("hc_session", await createSession(w.sql, sis.id, Date.now()));
+    isBanAnswer(await tablet.call("/api/me"));
+    expect([await sessionsOf(w.sql, sis.id), tablet.jar.has("hc_session"), tablet.jar.get("hc_banned")]).toEqual([0, false, bro.id]);
+    // Her account isn't banned or opened as a case: on her own phone she plays as ever.
     expect(await caseOf(w.sql, sis.id)).toBeNull();
-    // Signing out of hers on it: a guest of the tablet's, made from her live session, plays on as any guest.
-    expect((await tablet.call("/api/auth/logout", { method: "POST" })).status).toBe(200);
-    expect((await tablet.call("/api/live")).status).toBe(200);
+    const phone = browser(w);
+    expect((await phone.emailSignIn("sis@example.com")).status).toBe(200);
+    expect((await phone.call("/api/live")).status).toBe(200);
     // The admin pages aren't behind the gate (only admins see them: an admin's browser that met a ban can still lift it).
     const marked = browser(w);
     marked.jar.set("hc_banned", bro.id);
     const admin = await marked.call("/admin/fairplay");
     expect([admin.status, admin.banHeader]).toEqual([404, null]);
   });
+});
 
+describe("the review of #687's fixes", () => {
   it("the stale-token case: once a banned session's row is gone (ended by another instance's gate), this instance's presence cache can't serve the account (M2)", async () => {
     const w = await setUp();
     vi.useFakeTimers({ now: Date.UTC(2026, 10, 13, 12), toFake: ["Date"] });
