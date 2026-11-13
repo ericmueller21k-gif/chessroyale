@@ -19,8 +19,8 @@ So four themes, each an intro (or none) and a loop, started one after another as
   recluse-beaten   he's beaten; he talks (as long as it takes) once: the book slammed shut (1.8 s)
                                                                loop: the house's minute again (the same file)
   recluse-phase3   he transforms; the boards split; the rest   once: the souring at the game's pace (song_v.py's
-                                                                     RAGE, 8.74 s): it ends on the drop, where the
-                                                                     boards split
+                                                                     RAGE, 17.435 s): it ends on the drop, where
+                                                                     the boards split
                                                                loop: the chant again (bigger) to the score's end
 
 My calls (his to reverse): phase 2 keeps the score's first half and phase 3 its second, so the drop brings music the
@@ -32,7 +32,8 @@ from the phase change on main: he rises in a rage; his book lands open at 2.640 
 at 8.540 s; the boards crack at 8.740 s), so the souring has a layout of its own for the game (song_v.py's RAGE: the
 score's 19 seconds of it stay as they are). Two dips are put on it here, on the sound itself: a hush before the book
 and a breath before the drop (the notes' tails ring through both otherwise): a full second of it, at Eric's word
-("we need that pause longer like a full second it will make it more epic"). A new length: RAGE, and this again.
+("we need that pause longer like a full second it will make it more epic"). A new length: RAGE, and this again
+(as when the director gave his chant two more lines, the same day: 17.435 s from his rising to the crack).
 Each piece is made by itself (song_v.render with a window: its notes only, their tails ringing on), so a cut never
 slices an echo, and each loop begins with the ring of what leads into it; so an intro here stops dead at its
 `introSeconds` (no tail of its own to overlap) and the loop starts there, as for every theme. The score's pieces share

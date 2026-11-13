@@ -133,9 +133,12 @@ PLAN = [part if len(part) == 7 else (*part, 1.0, 1.0, 0.0) for part in PACE]
 # wanna add a few more seconds like 5 to the transition animation so we get the souring longer"), and the breath is a
 # full second ("we need that pause longer like a full second it will make it more epic before going into the drop":
 # it was a fifth of one). RAGE: the build's seconds, how many of the spiral's last units it has (3 to 6: up to about 18
-# s in all), and the breath's seconds. As it is, the build is the spiral's last three units at very nearly the score's
-# own pace; five seconds more on the picture, RAGE (9.7, 5, 1.0), is its last five at exactly the score's.
-RAGE = (4.7, 3, 1.0)
+# s in all), and the breath's seconds. On the picture as first measured (8.740 s from his rising to the crack) it was
+# (4.7, 3, 1.0). Then the director gave his chant Eric's two lines ("Computation without creativity is nothing. Now I
+# have both." "Prepare yourself. This is the ultimate test of your skill."): 17.435 s from his rising to the crack, the
+# book landing where it did, the last line typed as the breath begins. So the build is now the spiral's last six units,
+# at very nearly the score's own pace: the first has no band at all, only the sour notes.
+RAGE = (13.395, 6, 1.0)
 
 
 def rage_layout(build: float = RAGE[0], units: int = RAGE[1], breath: float = RAGE[2]):

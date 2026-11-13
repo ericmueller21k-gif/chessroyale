@@ -131,6 +131,10 @@ souring is untouched. He heard it and asked for two things: about five seconds m
 souring longer" (the build's length is `RAGE`'s first number; the longer cut ships when the animation is lengthened),
 and the pause before the drop "longer like a full second it will make it more epic" (it was a fifth of one: a tick,
 then the sound dying to nothing).
+He then chose two lines for the man to say in the chant ("Computation without creativity is nothing. Now I have
+both." "Prepare yourself. This is the ultimate test of your skill."); the director built them (17.435 s from his
+rising to the crack, the last line typed as the silence begins) and the cut was fitted to that: `RAGE` (13.395, 6,
+1.0), its build the spiral's last six units, the first with only the sour notes.
 
 A place's own loop from a song's quiet part (Nov 12, the Hidden Boss's house as a child: song_w.py): "just that soft,
 cozy thing ... like a 1-minute loop that doesn't do any of the crazy like spiraling stuff ... nice and cozy". The
