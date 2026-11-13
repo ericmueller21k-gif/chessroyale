@@ -213,13 +213,16 @@ describe("appeals", () => {
 });
 
 describe("emails", () => {
-  it("say what happened and how to appeal, from fairplay@ the sign-in emails' domain; nothing without a key or an address", async () => {
+  it("a ban's says what the ban screen says (Eric, Nov 13: appeals by email), from fairplay@ the sign-in emails' domain; nothing without a key or an address", async () => {
     expect(fairplayFrom({ EMAIL_FROM: "HunChess <login@hunchess.com>" })).toBe("HunChess <fairplay@hunchess.com>");
     expect(fairplayFrom({})).toBe("HunChess <fairplay@hunchess.com>");
     const ban = caseEmail({ name: "Pat" }, "banned", null);
-    expect(ban.subject).toMatch(/can't play online/);
-    expect(ban.text).toMatch(/appeal/);
-    expect(ban.text).toMatch(/Solo games against bots are still open/);
+    expect(ban.subject).toBe("Your HunChess account has been banned");
+    expect(ban.text).toBe(["Hi Pat,", "", "Your account has been banned. For more information, email support@hunchess.com.", "", "HunChess"].join("\n"));
+    expect(caseEmail({ name: "Pat" }, "banned", "Nine matches matched the engine.").text).toContain("support@hunchess.com.\n\nNine matches matched the engine.");
+    // (Nothing says solo stays open, or to appeal in the game, any more.)
+    for (const kind of ["banned", "upheld"] as const) expect(caseEmail({ name: "Pat" }, kind, null).text).not.toMatch(/Solo|tap PLAY|see a form/);
+    expect(caseEmail({ name: "Pat" }, "upheld", null).text).toContain("For more information, email support@hunchess.com.");
     expect(caseEmail({ name: "Pat" }, "cleared", null).text).toMatch(/now count again/);
     expect(caseMailer({})).toBeUndefined();
     const calls: { url: string; body: { to: string[]; from: string } }[] = [];
@@ -411,7 +414,7 @@ describe("admin settings kept in the Secrets Store", () => {
 });
 
 describe("the player's side of the API", () => {
-  it("/api/me gives the device a marker; a banned account sees its status and appeals", async () => {
+  it("/api/me gives the device a marker; the appeal form's routes are gone (Eric, Nov 13: appeals by email)", async () => {
     const { sql, d1 } = memoryDb();
     await ensureSchema(sql, d1);
     const env = { DB: d1 };
@@ -423,12 +426,13 @@ describe("the player's side of the API", () => {
     expect(again.headers.getSetCookie().some((c) => c.startsWith("hc_device="))).toBe(false);
     const me = (await again.json()) as { user: { id: string } };
     await decide(sql, me.user.id, "ban", "admin:e", "engine", Date.now());
-    const status = (await handleAccountApi(new Request("https://hunchess.test/api/fairplay/status", { headers: { cookie: session } }), env))!;
-    expect(await status.json()).toEqual({ banned: true, appeal: null });
-    const sent = (await handleAccountApi(
+    // (Not the account API's any more: the Worker answers them 404, after its ban gate: ban-sign-in.test.ts.)
+    expect(await handleAccountApi(new Request("https://hunchess.test/api/fairplay/status", { headers: { cookie: session } }), env)).toBeNull();
+    const sent = await handleAccountApi(
       new Request("https://hunchess.test/api/appeal", { method: "POST", headers: { cookie: session, "content-type": "application/json" }, body: JSON.stringify({ text: "I play at a club, I didn't cheat." }) }),
       env,
-    ))!;
-    expect(await sent.json()).toMatchObject({ ok: true, banned: true, appeal: { status: "open" } });
+    );
+    expect(sent).toBeNull();
+    expect(await sql.first("SELECT id FROM fairplay_appeals")).toBeNull();
   });
 });

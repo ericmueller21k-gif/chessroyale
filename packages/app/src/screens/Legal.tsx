@@ -529,8 +529,9 @@ function Terms() {
         <li>No second accounts to get around a ban, and no arranging results with other players.</li>
         <li>Don't exploit bugs. Report them.</li>
         <li>
-          We check online moves for engine help. While an account is under review, its online results are held off the rankings. A ban
-          stops online play; solo games against bots stay open. Borderline cases go to a person, and you can appeal a ban.
+          We check online moves for engine help. While an account is under review, its online results are held off the rankings. A
+          banned account can't sign in or play at all. Borderline cases go to a person, and you can appeal a ban by email to
+          support@hunchess.com.
         </li>
       </ul>
 
