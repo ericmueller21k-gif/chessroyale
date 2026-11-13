@@ -179,7 +179,7 @@ export const RECLUSE_LINES = {
  */
 export const RECLUSE_CHILD_LINES = {
   /** His entrance (the fight's start): one. */
-  intro: ["Wanna play? I set the pieces up myself.", "Four against one? Okay. I'm ready.", "I've been practicing all week."],
+  intro: ["Wanna play? I set the pieces up myself.", "You want to play me? Okay. I'm ready.", "I've been practicing all week."],
   /** He takes a piece (now and then). */
   capture: ["Gotcha!", "That one's mine now.", "Ha! Didn't see that, huh?"],
   /** He loses one. */
