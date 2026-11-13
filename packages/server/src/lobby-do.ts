@@ -139,7 +139,7 @@ export class Lobby extends DurableObject<Env> {
           }
         }
       },
-    }, library, undefined, { ...DEFAULT_SETTINGS, bossesOff: pausedBosses(this.env) });
+    }, library, undefined, { ...DEFAULT_SETTINGS, bossesOff: pausedBosses(this.env), ...cutsceneHold(this.env) });
   }
 
   /** Re-checks each board's close calls on the engine server (the host's numbers stand where it can't). */
@@ -769,4 +769,10 @@ export async function writeResult(c: SaveContext, rec: LobbyRecord, p: PendingRe
     const op = opKeys.onlineDrop(rec.code, rec.startedAt ?? rec.createdAt);
     await soft("bossToken", countBossBattle(c.sql, p.userId, p.at, { battle: rec.code, op, off: c.off, signedInOnly: c.signedInOnly }), undefined);
   }
+}
+
+/** The cutscene's hold for a test server (CUTSCENE_HOLD_MS, only with TEST_SWITCHES on): 1 s to 120 s, else the setting's own. */
+function cutsceneHold(env: Pick<Env, "TEST_SWITCHES" | "CUTSCENE_HOLD_MS">): { cutsceneHoldMs?: number } {
+  const ms = Number(env.CUTSCENE_HOLD_MS);
+  return env.TEST_SWITCHES === "1" && Number.isFinite(ms) && ms >= 1000 && ms <= 120_000 ? { cutsceneHoldMs: Math.round(ms) } : {};
 }
