@@ -481,7 +481,7 @@ test("a chess table in the park: a tap on one walks you to a free stool and you 
   await page.goto("/town");
   await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
   await expect(canvas(page)).toHaveAttribute("data-sit", "0");
-  // The park table nearest your start (the street town's, everyone's since Nov 13: table 10, square (19, 24), its stools (18, 24) and (20, 24)).
+  // The park table nearest your start (the street town's, everyone's since Nov 13: table 7, square (19, 26), its stools (18, 26) and (20, 26)).
   const at = await page.evaluate(() => (window as unknown as { __townAt: (k: string, id: number) => { x: number; y: number } | null }).__townAt("table", 7));
   expect(at, "the table is drawn at the start").not.toBeNull();
   const cv = (await canvas(page).boundingBox())!;
@@ -727,7 +727,7 @@ test("a bot sitting at a table: a tap on the table walks you to the free stool; 
   await expect.poll(async () => (await you(page)).join(","), { timeout: 5000 }).toBe("20,26");
   await expect(canvas(page)).toHaveAttribute("data-sit", "1");
   await page.waitForTimeout(600);
-  expect((await bots(page)).find((b) => b.name === sitter.name)!.table).toBe(6);
+  expect((await bots(page)).find((b) => b.name === sitter.name)!.table).toBe(7);
   await play.click();
   await expect(page.locator(".duel-screen")).toBeVisible({ timeout: 15_000 });
   await expect(page.locator(".dv-strip.dv-them .dv-name")).toHaveText(`${bot.name} (bot)`);
@@ -740,7 +740,7 @@ test("a bot sitting at a table: a tap on the table walks you to the free stool; 
   await expect(page).toHaveURL(/\/town(\?debug)?$/);
   expect((await you(page)).join(",")).toBe("20,26");
   await expect(canvas(page)).toHaveAttribute("data-sit", "1");
-  expect((await bots(page)).find((b) => b.name === sitter.name)).toMatchObject({ at: "18,13", table: 6 });
+  expect((await bots(page)).find((b) => b.name === sitter.name)).toMatchObject({ at: "18,26", table: 7 });
   // Again (the bot still there), and this time the back button.
   await tapAt(page, "table", 7);
   await card.getByRole("button", { name: `Play ${bot.name} (bot) · ${bot.rating}` }).click();
@@ -749,7 +749,7 @@ test("a bot sitting at a table: a tap on the table walks you to the free stool; 
   await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
   expect((await you(page)).join(",")).toBe("20,26");
   await expect(canvas(page)).toHaveAttribute("data-sit", "1");
-  expect((await bots(page)).find((b) => b.name === sitter.name)).toMatchObject({ at: "18,13", table: 6 });
+  expect((await bots(page)).find((b) => b.name === sitter.name)).toMatchObject({ at: "18,26", table: 7 });
   expect(errors).toEqual([]);
 });
 

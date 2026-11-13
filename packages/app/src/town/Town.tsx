@@ -580,6 +580,8 @@ export function TownScreen({
   useLayoutEffect(() => {
     /** The town is drawn (its loading screen gone): until then the away clock holds, as under a challenge. */
     let loaded = false;
+    /** The town failed (its message shows instead): the away clock runs again, so a player who can't play is dropped as idle, never held present. */
+    let broken = false;
     const t = startTown(box.current!, canvas.current!, chips.current, cardEl.current!, live.current!, setZoomedOut, setCard, seatOf(seat), (s, face) => {
       const b = TOWN_BOTS[s.bot]!;
       onPlayBot?.({ seat: seatText(s), name: botLabel(b), rating: b.rating, look: isSprite(b.look) ? null : b.look.wear, face });
@@ -595,6 +597,7 @@ export function TownScreen({
         bar.parentElement!.setAttribute("aria-valuenow", String(Math.round(share * 100)));
       }
     }, (why) => {
+      broken = true;
       setLoading(false);
       setBroken(why);
     });
@@ -605,7 +608,7 @@ export function TownScreen({
     const stopAway = watchAway({
       town: t.town,
       shop: () => shopIn.current,
-      busy: () => !loaded || flow.current !== "town" || summoning.current || !!shopCtl.current?.busy?.(),
+      busy: () => (!loaded && !broken) || flow.current !== "town" || summoning.current || !!shopCtl.current?.busy?.(),
       onState: (st) => void (t.town.you.zzz = st === "zzz"),
       onOut: () => awayOut.current(),
       onOthers: t.others,
