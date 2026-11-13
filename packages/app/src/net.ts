@@ -203,6 +203,13 @@ export class NetMatch implements GameView {
     turnBegins: () => this.lookAways.start(),
     turnEnds: () => this.lookAways.stop(),
   });
+  /** His fall's word on who takes his four boards (player ids): leaving is resigning a board for them from the fall on. */
+  private phase2Boards: readonly string[] = [];
+  /** You take (or play) a board of his phase 2: leaving is resigning it (a loss), and a bot plays it on. */
+  private get phase2Seat(): boolean {
+    if (this.phase2.onBoard) return true;
+    return this.phase.kind === "boss" && !!this.phase.toPhase2 && !!this.myId && this.phase2Boards.includes(this.myId);
+  }
   /** His phase 2 can follow here (his room's fight, a Crowd final): its themes are fetched as his fight starts. */
   get phase2Ahead(): boolean {
     return this.hiddenRoom || (this.settings.mode === "crowd" && !this.settings.raid);
@@ -353,8 +360,9 @@ export class NetMatch implements GameView {
     const k = this.phase.kind;
     if (this.closed || this.resigning || k === "results" || k === "loading" || (k === "lobby" && !this.started)) return null;
     if (!this.begun) return "leave";
-    // (His phase 2: you play a board, so leaving is resigning: a loss, and a bot plays it on. In his room's fight, from his fall on.)
-    if (this.phase2.onBoard || (this.hiddenRoom && this.phase.kind === "boss" && !!this.phase.toPhase2)) return "resign";
+    // (His phase 2: you play a board, so leaving is resigning: a loss, and a bot plays it on. From his fall on, as his fall says who
+    // takes the boards: his room's fight and a Crowd final's top 4 alike, a reload included.)
+    if (this.phase2Seat) return "resign";
     const me = this.standingsList.find((s) => s.id === this.myId);
     return me && !me.out ? "resign" : "leave";
   }
@@ -366,7 +374,7 @@ export class NetMatch implements GameView {
 
   /** The lobby fills seats with bots (Default, and private Crowd lobbies; not Bots off, nor a private raid), or it's a final. */
   get seatToBot(): boolean {
-    return (!this.botsOff && !(this.settings.raid && !this.auto)) || (!!this.final && this.final.order.includes(this.myId ?? ""));
+    return (!this.botsOff && !(this.settings.raid && !this.auto)) || (!!this.final && this.final.order.includes(this.myId ?? "")) || this.phase2Seat;
   }
 
   /**
@@ -624,8 +632,9 @@ export class NetMatch implements GameView {
         if (this.phase.kind === "loading") this.setPhase({ kind: "lobby" });
         // (A resign sent while the connection was down: again, now it's back.)
         if (this.resigning) this.send({ t: "resign" });
-        // (A premove the server may have missed while the connection was down: again.)
+        // (A premove the server may have missed while the connection was down: again. And a move on his phase 2 board.)
         if (this.premoveTold) this.send({ t: "premove", move: this.premoveTold });
+        this.phase2.onWelcome();
         this.chat.onWelcome();
         // This device's engine speed, so the lobby can share out the judging (once per page; sent again on reconnect).
         void this.reportSpeed();
@@ -808,7 +817,10 @@ export class NetMatch implements GameView {
         this.rush = m.rush ? { key: m.rush.key, at: this.local(m.rush.at), ...(this.rush?.key === m.rush.key ? { places: this.rush.places, moved: this.rush.moved } : { places: {}, moved: {} }) } : null;
         // (`fall`: beaten, the Hidden Boss collapses on the board until the results come, or (`toPhase2`) his phase change: his words are
         // cleared as he falls, so his mumbling carries on into it, as solo's.)
-        if (m.fall && m.toPhase2) bossVoice.reset();
+        if (m.fall && m.toPhase2) {
+          bossVoice.reset();
+          this.phase2Boards = m.phase2Boards ?? [];
+        }
         return this.setPhase({ kind: "boss", boss: this.boss, until: m.until ? this.local(m.until) : 0, thinking: m.thinking, intro: m.intro, ...(m.fall ? { fall: true } : {}), ...(m.fall && m.toPhase2 ? { toPhase2: true } : {}), ...(this.rush ? { rush: { ...this.rush, places: { ...this.rush.places }, moved: { ...this.rush.moved } } } : {}) });
       case "darkTry": {
         if (m.key !== this.key || this.phase.kind !== "play") return;
@@ -879,7 +891,7 @@ export class NetMatch implements GameView {
         // (Back in the middle of it, a reload: the battle and the standings come with it.)
         if (m.boss) this.boss = { ...m.boss, board: this.toView(m.boss.board) };
         if (m.standings) this.standingsList = m.standings;
-        return this.phase2.onMessage(m.p2);
+        return this.phase2.onMessage(m.p2, !!m.refused);
       case "phase2Ask":
         return void this.hostPhase2(m.id, m.fen, m.elo, m.nodes, m.moveMs);
       case "bossBrain":

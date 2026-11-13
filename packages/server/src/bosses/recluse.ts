@@ -6,8 +6,10 @@
  * (the rules: packages/chess/src/bosses/recluse-phase2.ts, the same as solo's). The server runs every board and clock:
  * - each person plays their own board (`phase2Move`, checked here: theirs, their move, legal);
  * - his moves and the bots' come from the engine server (every legal move scored, `search`: he plays the best, a bot one near it);
- *   where it can't answer (none, its budget spent, no answer) the host's device plays it (`phase2Ask`; one device's word: the match
- *   pays as a solo game), and where that doesn't answer in RECLUSE_ONLINE.askMs, the server's own quick move (never a stall);
+ *   where it can't answer (none, its budget spent, no answer) the host's device plays it (`phase2Ask`), and where that doesn't answer
+ *   in RECLUSE_ONLINE.askMs, the server's own quick move (never a stall). A move of HIS from either (one device's word, or a weak
+ *   move) leaves phase 2's result unvouched (`unvouched`: its players' result pays as a solo game; phase 1's results and fair play
+ *   stand); a bot's never does (a bot only plays for its own team). The host gone, or back: its open asks go to the host now (`resend`);
  * - fair play: each person's move is scored on the engine server too (when it answers) and kept as a FairMove (no crowd: each
  *   board is its player's alone);
  * - someone who leaves (resigns, or gone longer than LEAVING.awayMs) hands their board to a bot, which plays it on;
@@ -39,7 +41,7 @@ interface Work {
   fen: string;
   who: "boss" | "bot";
   via: "server" | "device";
-  /** When it was asked where it is now (the engine server, or the device). */
+  /** When it was asked where it is now (the engine server, or the device; asked again of a new host or a reloaded one: `resend`). */
   at: number;
   device?: string;
   move?: string;
@@ -81,6 +83,12 @@ export interface Recluse2Record {
   fair: Record<string, FairAsk>;
   winNext?: true;
   done?: NonNullable<NetPhase2["done"]>;
+  /**
+   * A move of his stood on one device's word, or was the server's quick move (the review of #677, M1 and M2): phase 2's result
+   * isn't vouched for (the first reason). Its players' results (everyone who played a board: `names`) pay as a solo game's and
+   * aren't ranked (phase2Unvouched); the rest of the match (phase 1, its fair play, a Crowd final's watchers) stands.
+   */
+  unvouched?: string;
   seq: number;
 }
 
@@ -99,10 +107,12 @@ export interface Phase2Lobby {
   fairPlayer(id: string): boolean;
   /** A person in the match (else a bot plays the board). */
   person(id: string): boolean;
+  /** Someone in the match but `except` is here (connected, or gone less than LEAVING.awayMs): if not, the match ends this event. */
+  anyoneHere(except: string): boolean;
   /** The engine server: every legal move of `fen` scored, answered through `searched` (null: it couldn't). Missing: none here. */
   search?(req: { id: string; fen: string }): void;
-  /** One device's word stood alone (the host played a move): the match pays as a solo game. */
-  unvouched(why: string): void;
+  /** Wakes the engine server (phase 2 is coming: his fall and phase change are its time to boot). Missing: none here. */
+  warm?(): void;
   /** Every board decided and shown: the results. */
   finish(): void;
 }
@@ -136,6 +146,8 @@ export function begin(lobby: Phase2Lobby, o: { players: readonly { id: string; n
     seq: 0,
   };
   lobby.r.recluse2 = p;
+  // (The engine server, asleep after 3 idle minutes, boots during his fall and phase change, before his first search: M2.)
+  lobby.warm?.();
   arm(lobby);
   return p;
 }
@@ -144,6 +156,7 @@ export function begin(lobby: Phase2Lobby, o: { players: readonly { id: string; n
 export function view(p: Recluse2Record): NetPhase2 {
   return {
     key: p.key,
+    cutAt: p.cutAt,
     at: p.at,
     clocksAt: p.clocksAt,
     from: p.from,
@@ -193,7 +206,7 @@ export function step(lobby: Phase2Lobby) {
     apply(lobby, p, phase2Timeouts(phase2Flags(p.state, now), now, () => lobby.rng()), "clock");
     for (const w of Object.values(p.work)) {
       // (A device that never answered, or an engine server search lost: the server's own quick move.)
-      if (!w.move && w.via === "device" && now >= w.at + RECLUSE_ONLINE.askMs) w.move = quickMove(w.fen);
+      if (!w.move && w.via === "device" && now >= w.at + RECLUSE_ONLINE.askMs) quick(lobby, p, w);
       if (!w.move && w.via === "server" && now >= w.at + SERVER_LOST_MS) toDevice(lobby, p, w);
     }
     playReady(lobby, p);
@@ -283,13 +296,47 @@ function toDevice(lobby: Phase2Lobby, p: Recluse2Record, w: Work) {
   const host = lobby.host();
   w.via = "device";
   w.at = lobby.now();
-  if (!host) {
-    w.move = quickMove(w.fen);
-    return;
-  }
+  if (!host) return quick(lobby, p, w);
+  ask(lobby, host, w);
+}
+
+/** A move asked of a device (the host), at the strength asked: his, or a bot's. */
+function ask(lobby: Phase2Lobby, host: string, w: Work) {
   w.device = host;
   const boss = w.who === "boss";
   lobby.send(host, { t: "phase2Ask", id: w.id, fen: w.fen, elo: boss ? RECLUSE_PHASE2.elo : RECLUSE_PHASE2.botElo, nodes: boss ? RECLUSE_PHASE2.nodes : RECLUSE_PHASE2.botNodes, moveMs: boss ? RECLUSE_PHASE2.moveMs : RECLUSE_PHASE2.botMoveMs[1] }, false);
+}
+
+/** No engine answered (neither the engine server nor a device): the server's own quick move. His: phase 2's result unvouched. */
+function quick(lobby: Phase2Lobby, p: Recluse2Record, w: Work) {
+  w.move = quickMove(w.fen);
+  if (w.who === "boss") unvouch(lobby, p, "his move was the server's quick move");
+}
+
+/** A move of his stood on one device's word, or was the quick move: phase 2's result isn't vouched for (noted once, the first why). */
+function unvouch(lobby: Phase2Lobby, p: Recluse2Record, why: string) {
+  if (p.unvouched) return;
+  p.unvouched = why;
+  console.log(`lobby ${lobby.r.code}: the Hidden Boss's phase 2 unvouched (${why}): its players' results pay as a solo game's`);
+}
+
+/**
+ * The host changed (a disconnect, a leave), or a device is back (`back`: a reload, resendTo): every move still asked of a device goes
+ * to the host now, asked again with a fresh RECLUSE_ONLINE.askMs (as resendHostWork re-asks the boss's move), so an honest host's
+ * reload, or a new host, plays it rather than the quick move (the review of #677, M1). A move asked of the host now, who isn't the one
+ * back: nothing (it's on its way). No host here: it waits, and the quick move comes when its time is up.
+ */
+export function resend(lobby: Phase2Lobby, back?: string) {
+  const p = lobby.r.recluse2;
+  if (!p || !p.playing || p.done || lobby.r.phase !== "phase2") return;
+  const host = lobby.host();
+  if (!host) return;
+  for (const w of Object.values(p.work)) {
+    if (w.move || w.via !== "device" || (w.device === host && host !== back)) continue;
+    w.at = lobby.now();
+    ask(lobby, host, w);
+  }
+  arm(lobby);
 }
 
 /** Moves worked out and due: his at once, a bot's once it has thought its while. The team's under the admins' win wins it all. */
@@ -318,19 +365,23 @@ function winIfArmed(lobby: Phase2Lobby, p: Recluse2Record) {
  * A person's move on their board: theirs, their move, legal, the clocks running (out of time, phase2Move loses the board instead).
  * Its fair-play numbers are asked of the engine server.
  */
-export function move(lobby: Phase2Lobby, playerId: string, key: unknown, boardId: unknown, mv: unknown, away: unknown) {
+export function move(lobby: Phase2Lobby, playerId: string, key: unknown, boardId: unknown, mv: unknown, away: unknown, ply: unknown) {
   const p = lobby.r.recluse2;
   if (!p || key !== p.key) return;
   startClocks(lobby, p);
   const b = boardOf(p, typeof boardId === "number" ? boardId : -1);
-  // (Refused: they're told phase 2 as it stands, so the move their screen showed ahead goes back.)
-  const refuse = () => lobby.send(playerId, { t: "phase2", p2: view(p) });
-  if (!p.playing || p.done || typeof mv !== "string" || mv.length > 8 || !b || b.player !== playerId || phase2ToMove(b) !== "crowd" || !legalMoves(b.board.fen).includes(mv)) return refuse();
+  // (Refused: they're told phase 2 as it stands (`refused`: their app drops the move it showed ahead). Not remembered: what a reconnect
+  // gets is the last told to everyone, as it stands, with the battle and the standings.)
+  const refuse = () => lobby.send(playerId, { t: "phase2", p2: view(p), refused: true }, false);
+  // (`ply`: the board's move count it was made on, so a move made on a position gone (a second drag in a moment the screen showed an
+  // old state) is refused, never played as the next one: the review of #677, m2.)
+  if (!p.playing || p.done || typeof mv !== "string" || mv.length > 8 || !b || b.player !== playerId || ply !== b.board.history.length || phase2ToMove(b) !== "crowd" || !legalMoves(b.board.fen).includes(mv)) return refuse();
   const now = lobby.now();
   const before = b;
   if (!apply(lobby, p, phase2Move(p.state, b.id, mv, now), "person")) return refuse();
   const after = boardOf(p, b.id)!;
-  if (lobby.search && lobby.fairPlayer(playerId) && after.board.history.length > before.board.history.length) {
+  // (Not in a test fight (the admins' 🏆 or ultimate trigger): no fair-play rows, no engine budget spent on them. The review's m4.)
+  if (lobby.search && lobby.fairPlayer(playerId) && !lobby.r.overrides?.tested && after.board.history.length > before.board.history.length) {
     const id = `f${++p.seq}`;
     const looks = typeof away === "number" && Number.isInteger(away) && away >= 0 ? Math.min(away, 1000) : 0;
     p.fair[id] = { player: playerId, ply: before.board.history.length, fen: before.board.fen, move: mv, thinkMs: Math.max(0, now - (before.turnAt ?? now)), away: looks, last: before.board.lastMove };
@@ -363,14 +414,17 @@ export function searched(lobby: Phase2Lobby, id: string, scores: readonly MoveSc
   arm(lobby);
 }
 
-/** The host's answer to a phase2Ask: its move, if legal there and still wanted. One device's word: the match pays as a solo game. */
+/**
+ * The host's answer to a phase2Ask: its move, if legal there and still wanted. His move on one device's word: phase 2's result
+ * unvouched. A bot's: not (a bot only plays for its own team; the review of #677, M2).
+ */
 export function answer(lobby: Phase2Lobby, playerId: string, id: unknown, mv: unknown) {
   const p = lobby.r.recluse2;
   if (!p || typeof id !== "string" || typeof mv !== "string") return;
   const w = Object.values(p.work).find((x) => x.id === id && x.via === "device" && x.device === playerId && !x.move);
   if (!w || !legalMoves(w.fen).includes(mv)) return;
   w.move = mv;
-  lobby.unvouched("phase2-device");
+  if (w.who === "boss") unvouch(lobby, p, "his move on the host's device alone");
   playReady(lobby, p);
   arm(lobby);
 }
@@ -401,10 +455,20 @@ export function handOver(lobby: Phase2Lobby, from: string, bot: { id: string; na
   if (!p || !p.state.boards.some((b) => b.player === from)) return false;
   p.names[bot.id] = bot.name;
   p.state = { ...p.state, boards: p.state.boards.map((b) => (b.player === from ? { ...b, player: bot.id } : b)) };
-  if (!p.done && p.playing) for (const b of p.state.boards) if (b.player === bot.id) queue(lobby, p, b);
+  // (Not when nobody else is here: the match ends in this same event (wrapUpIfEmpty), and its search would be thrown away. m5.)
+  if (!p.done && p.playing && lobby.anyoneHere(from)) for (const b of p.state.boards) if (b.player === bot.id) queue(lobby, p, b);
   tell(lobby, p);
   arm(lobby);
   return true;
+}
+
+/**
+ * Whether `id`'s result rests on a phase 2 that isn't vouched for (Recluse2Record.unvouched): they played one of its boards (a
+ * person who left it too). Their result pays as a solo game's (lobby-do.ts lobbyXpGame) and isn't ranked; nobody else's changes.
+ */
+export function phase2Unvouched(r: Pick<LobbyRecord, "recluse2">, id: string): boolean {
+  const p = r.recluse2;
+  return !!p?.unvouched && Object.hasOwn(p.names, id);
 }
 
 /** Whether `id` plays a board of phase 2 (still on). */
@@ -413,8 +477,13 @@ export function onBoard(r: LobbyRecord, id: string): boolean {
   return !!p && !p.done && p.state.boards.some((b) => b.player === id);
 }
 
-/** His move: the best scored (the first of equals). A bot's: one of those within RECLUSE_ONLINE.botLoss of it, at random. */
+/**
+ * His move: the best scored (the first of equals). A bot's: one of those within RECLUSE_ONLINE.botLoss of it, at random. A mate scored
+ * (`mate` > 0): the quickest, his or a bot's (in a won position every move scores near 1, and a draw doesn't win a board).
+ */
 export function pick(scores: readonly MoveScore[], who: "boss" | "bot", rng: () => number): string {
+  const mates = scores.filter((s) => (s.mate ?? 0) > 0);
+  if (mates.length) return mates.reduce((a, b) => (b.mate! < a.mate! ? b : a)).move;
   const best = scores.reduce((a, b) => (b.expected > a.expected ? b : a));
   if (who === "boss") return best.move;
   const near = scores.filter((s) => s.expected >= best.expected - RECLUSE_ONLINE.botLoss);
@@ -480,4 +549,4 @@ function noteFair(lobby: Phase2Lobby, f: FairAsk, scores: readonly MoveScore[]) 
   r.fairV = (r.fairV ?? 0) + 1;
 }
 
-export const recluseLobby = { begin, step, move, searched, answer, winForm, ult, handOver, onBoard, view };
+export const recluseLobby = { begin, step, move, searched, answer, resend, winForm, ult, handOver, onBoard, view };

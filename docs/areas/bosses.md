@@ -271,16 +271,22 @@ below):
   (`RECLUSE_CUTSCENE.holdMs`, the scene's length: the event `recluseCutscene`, its start and end, `NetMatch.cutscene`; below), then his phase
   change for everyone from one start (`phase2`'s `at`; `RECLUSE_ONLINE.changeMs`, the screens' `PHASE_CHANGE.total` within 300 ms),
   the countdown, and the four boards to the real result. The server runs them (`packages/server/src/bosses/recluse.ts`, on the same
-  rules, `LobbyRecord.recluse2`, the lobby phase `phase2`): each person plays their own board (`phase2Move`: theirs, their move,
-  legal; refused, they're told phase 2 again); his moves and the bots' from the engine server, every legal move scored in groups of at
-  most 8 (`serverAllMovesAt`, `RECLUSE_ONLINE.groupNodes`; one budget search a position), he the best, a bot one within `botLoss`;
-  where it can't answer, the host's device (`phase2Ask`/`phase2Answer`, solo's strengths; the match then pays as a solo game), and
-  with no answer in `askMs`, the server's quick move. Each person's move is scored too, a `FairMove` with no crowd (fair play). Leaving
-  (resign, or away past `LEAVING.awayMs`): a bot plays their board on; for them a loss. The results carry `simul` ("won N of 4"). The
-  Crowd final's top 4 take the boards (fresh bots for any empty one); the others watch. The app: `recluse-online.ts` (`OnlinePhase2`:
-  the view with your board first, the phase at the server's moments, his lines and sounds as solo's, your move shown at once),
-  `NetMatch`'s `simul`, `simulMove`, `bossNote`, `phase2Ahead` (his themes fetched ahead). Tests: `server/test/recluse-online.test.ts`,
-  `crowd-hidden-boss.test.ts`, `app/test/recluse-online.test.ts`, `e2e/hidden-boss-room.spec.ts`.
+  rules, `LobbyRecord.recluse2`, the lobby phase `phase2`): each person plays their own board (`phase2Move`: theirs, their move, on
+  the position it was made on (`ply`), legal; refused, they're told phase 2 again with `refused`); his moves and the bots' from the
+  engine server (woken as his fall begins), every legal move scored in groups of at most 8 (`serverAllMovesAt`, the first group tried
+  twice, `RECLUSE_ONLINE.groupNodes`; one budget search a position), he the best, a bot one within `botLoss`, either the quickest mate
+  when one scores; where it can't answer, the host's device (`phase2Ask`/`phase2Answer`, solo's strengths; re-asked of a new host or
+  a host back from a reload, `resend`), and with no answer in `askMs`, the server's quick move. A move of HIS from a device or the
+  quick move leaves phase 2's result unvouched (`recluse2.unvouched`, `phase2Unvouched`): the board players' results pay as a solo
+  game's and aren't ranked; phase 1's, its fair play and the watchers' stand. A bot's never does. Each person's move is scored too, a
+  `FairMove` with no crowd (fair play; not in a test fight). Leaving (resign, or away past `LEAVING.awayMs`): a bot plays their board
+  on; for them a loss, from his fall on (its message names the board players: `phase2Boards`). The results carry `simul` ("won N of
+  4"). The Crowd final's top 4 take the boards (fresh bots for any empty one); the others watch. Everyone's told phase 2 lean; what a
+  reconnect gets (`last`) adds the battle and the standings, and `cutAt` (the cutscene's hold). The app: `recluse-online.ts`
+  (`OnlinePhase2`: the view with your board first, the phase at the server's moments, his lines and sounds as solo's, your move shown
+  at once and kept over the server's word until it has it or refuses it, sent again on a reconnect), `NetMatch`'s `simul`,
+  `simulMove`, `bossNote`, `phase2Ahead` (his themes fetched ahead). Tests: `server/test/recluse-online.test.ts`,
+  `crowd-hidden-boss.test.ts`, `engine-server.test.ts`, `app/test/recluse-online.test.ts`, `e2e/hidden-boss-room.spec.ts`.
 - **His cutscene** (Eric, Nov 12; in the fight since Nov 13, solo and online; [decision](../decisions/2026-11-13-recluse-cutscene-wired.md)):
   after his fall, before the phase change, about 104 s (`RECLUSE_CUTSCENE.holdMs`; a unit test keeps it the timeline's length):
   everything dims but a soft round spotlight on the board's middle; he kneels in it while the ghost of him as a child poofs in above

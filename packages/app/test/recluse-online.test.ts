@@ -3,6 +3,7 @@ import { RECLUSE_ONLINE, RECLUSE_PHASE2 } from "@chessroyale/core";
 import { chess960Fen, legalMoves, type ClientMessage, type NetPhase2 } from "@chessroyale/chess";
 import { PHASE_CHANGE } from "../src/recluse-phase2.ts";
 import { OnlinePhase2 } from "../src/recluse-online.ts";
+import { NetMatch } from "../src/net.ts";
 import type { Phase } from "../src/game.ts";
 
 /**
@@ -23,6 +24,7 @@ describe("his phase change online: the server's length is the screens'", () => {
 function serverView(now: number, me: string, o: Partial<NetPhase2> = {}): NetPhase2 {
   return {
     key: "p2-1",
+    cutAt: now - 40_000,
     at: now - 40_000,
     clocksAt: now - 1000,
     from: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
@@ -93,11 +95,54 @@ describe("phase 2 online on this device", () => {
     D.g.move(0, legalMoves(p.boards[0]!.fen)[0]!);
     expect(D.sent).toHaveLength(0);
     D.g.move(2, move);
-    expect(D.sent).toEqual([{ t: "phase2Move", key: "p2-1", board: 2, move, away: 3 }]);
+    expect(D.sent).toEqual([{ t: "phase2Move", key: "p2-1", board: 2, move, ply: 0, away: 3 }]);
     const mine = D.g.view()!.boards[0]!;
     expect(mine.history).toEqual([move]);
     expect(mine.toMove).toBe("boss");
     expect(mine.turnAt).toBeNull();
+    D.g.dispose();
+  });
+
+  it("your move stays shown over the server's word until it has it (another board's move before it doesn't put your piece back); a refusal drops it; back after a dropped connection, it's sent again", () => {
+    const D = device();
+    const now = Date.now() + 5000;
+    const p = serverView(now, "me");
+    D.g.onMessage(p);
+    const fen = p.boards[2]!.fen;
+    const move = legalMoves(fen)[0]!;
+    D.g.move(2, move);
+    // (A word the server sent before it got your move: a bot moved on board 0. Yours stays shown, and you can't move again.)
+    const bot = legalMoves(p.boards[0]!.fen)[0]!;
+    const other = { ...p, boards: p.boards.map((b) => (b.id === 0 ? { ...b, history: [bot], lastMove: bot } : b)) };
+    D.g.onMessage(other);
+    expect(D.g.view()!.boards[0]).toMatchObject({ id: 2, history: [move], toMove: "boss" });
+    expect(D.g.view()!.boards.find((b) => b.id === 0)!.history).toEqual([bot]);
+    D.g.move(2, legalMoves(fen)[1]!);
+    expect(D.sent).toHaveLength(1);
+    // (The connection dropped and came back: sent again, with its ply, so the server refuses it if it has it already.)
+    D.g.onWelcome();
+    expect(D.sent[1]).toEqual({ t: "phase2Move", key: "p2-1", board: 2, move, ply: 0 });
+    // The server's word with it (and his reply): its state from here.
+    const reply = { ...p.boards[2]!, history: [move, "x"], lastMove: "x" };
+    D.g.onMessage({ ...other, boards: other.boards.map((b) => (b.id === 2 ? reply : b)) });
+    expect(D.g.view()!.boards[0]!.history).toEqual([move, "x"]);
+    D.g.onWelcome();
+    expect(D.sent).toHaveLength(2);
+    // A refusal: the move shown goes back.
+    const E = device();
+    E.g.onMessage(p);
+    E.g.move(2, move);
+    E.g.onMessage(p, true);
+    expect(E.g.view()!.boards[0]).toMatchObject({ history: [], toMove: "crowd" });
+    D.g.dispose();
+    E.g.dispose();
+  });
+
+  it("the cutscene's hold from the view (`cutAt` to `at`): a device back during it, which missed its event, still knows the scene", () => {
+    const D = device();
+    const now = Date.now() + 5000;
+    D.g.onMessage(serverView(now, "me", { cutAt: now - 1000, at: now + 9000, clocksAt: now + 9000 + RECLUSE_ONLINE.changeMs + 5000 }));
+    expect(D.g.cutscene).toEqual({ at: now - 1000 - 5000, until: now + 9000 - 5000 });
     D.g.dispose();
   });
 
@@ -108,5 +153,36 @@ describe("phase 2 online on this device", () => {
     expect(D.g.view()!.boards.every((b) => !b.you)).toBe(true);
     expect(D.g.onBoard).toBe(false);
     D.g.dispose();
+  });
+});
+
+describe("his fall online says who takes the boards (the review of #677, m3)", () => {
+  /** A match told your id, then his fall with his phase change to follow: `boards` take the four boards; you're out in the standings. */
+  function fallen(boards: string[]) {
+    const m = new NetMatch("TEST", "Ann", async () => []);
+    const tell = (msg: object) => (m as unknown as { onMessage(x: object): void }).onMessage({ now: Date.now(), ...msg });
+    tell({ t: "welcome", playerId: "me", token: "t", code: "TEST" });
+    const fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+    tell({
+      t: "boss",
+      boss: { id: "recluse", name: "Hidden Boss", result: "crowd", lastMove: "e2e4", board: { id: 0, fen, lastMove: "e2e4", ply: 9 } },
+      standings: [{ id: "me", name: "Ann", out: true }],
+      until: Date.now() + 1800,
+      fall: true,
+      toPhase2: true,
+      phase2Boards: boards,
+    });
+    return m;
+  }
+
+  it("on a board: leaving from his fall on is resigning it (a loss; a bot plays it on), in a Crowd final as in his room", () => {
+    const m = fallen(["p1", "me", "p3", "b4"]);
+    expect(m.exit).toBe("resign");
+    expect(m.seatToBot).toBe(true);
+  });
+
+  it("a watcher (out, no board): leaving is going home, the result standing", () => {
+    const m = fallen(["p1", "p2", "p3", "b4"]);
+    expect(m.exit).toBe("leave");
   });
 });

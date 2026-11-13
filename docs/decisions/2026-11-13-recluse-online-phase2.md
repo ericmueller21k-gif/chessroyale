@@ -25,11 +25,11 @@ adult form ended the fight as a win; his phase change and the four boards were s
    solo's, is Eric's call if these fights become common.
 3. **Where the engine server can't answer** (none, as in local runs and the e2e suite; its budget spent; no answer): the host's device
    plays the move (`phase2Ask`, its engine at solo's strengths), and the match pays as a solo game (`unvouched`, as any boss move on one
-   device's word). No answer from it in `askMs` (6 s): the server's own quick move (the most valuable capture, else the first legal
+   device's word). Since the review round: his moves only, and phase 2's result only (below). No answer from it in `askMs` (6 s): the server's own quick move (the most valuable capture, else the first legal
    move), so a board never stalls.
 4. **Fair play:** each person's move is scored on the engine server (when it answers) and kept as a `FairMove` with no crowd (fair
    play's model has a branch for that), in his room's fight too. Phase 1's party rule (no signals: teammates' picks show live) doesn't
-   apply on a board that's yours alone. A match that leaned on a device (call 3) builds no case, as for any unvouched match.
+   apply on a board that's yours alone. (Since the review round, a device in phase 2 no longer drops fair-play cases: below.)
 5. **"Win this form" in the four boards: the phase as a whole.** The admin's 🏆 (his room's fight, server-checked) makes the team's next
    move (a person's or a bot's, on any board) win every board still on. Pressed during his fall or phase change, it waits for the boards.
 6. **The admins' ultimate trigger** brings his phase 2 ultimate ("5 SECONDS!") online too, once the clocks run (as solo's).
@@ -52,3 +52,27 @@ adult form ended the fight as a win; his phase change and the four boards were s
 
 - XP's move count online is phase 1's picks only.
 - A reload in the middle of his room's fight doesn't know it's the room's (no 🏆 after it): as before this change.
+
+## Review round (Nov 13; the review of #677, the director's calls)
+
+- **M1:** his move from the server's quick move unvouches too (call 3, scoped as in M2). Device work follows the host: a disconnect or a
+  leave re-points it to the host now, and a host back from a reload (`resendTo`) is asked again; each with a fresh `askMs`
+  (`recluse.ts` `resend`). No cap on fresh times: a reload loop only delays his reply, and his moves cost nobody's clock.
+- **M2 (options 1 and 2):** the engine server is woken as phase 2 begins (`warmEngine` through `LobbyIO.warmEngine`); a position's first
+  group is tried twice before the device path. A bot's move from a device or the quick move never unvouches. His does, but only
+  phase 2's result (`recluse2.unvouched`): the players of its boards (`names`, leavers included) aren't ranked and are paid as a solo
+  game, and their results say so; the match's `unvouched`, phase 1's fair play and the Crowd final's watchers are untouched. Small and
+  clear (one helper, `phase2Unvouched`, read in `rankedFor`, the results message and `lobbyXpGame`), so call 3's match-wide flag is
+  replaced. People's phase 2 fair-play moves stay: their numbers are the engine server's, never a device's.
+- **m1:** the phase 2 message to everyone is lean; `last` (a reconnect's) carries the battle and the standings, one shared copy.
+- **m2:** `phase2Move` carries `ply`; a mismatch is refused (`refused: true`, not remembered). The app keeps your move shown over the
+  server's word until its history has it, the board is decided, or it's refused, and sends it again on a reconnect.
+- **m3:** the fall's message names who takes the boards (`phase2Boards`); `NetMatch.exit` is "resign" for them from the fall on.
+- **m4:** no fair-play search in a test fight (`overrides.tested`). The tested boss token in `writeResult` is older: left, listed.
+- **m5:** a seat handed to a bot asks no search when nobody else is here (the match ends that event). Through the away sweep, a
+  handed-over board has always run out of time already (the bank equals `awayMs`): the waste was the last person's resign.
+- **m6:** `NetPhase2.cutAt`; `OnlinePhase2.cutscene` is set from the view too (a reload during the hold). The event stays.
+- **Nit:** a mate scored is played, the quickest, his or a bot's. The player list nit: left.
+- **Checks changed:** `server/test/recluse-online.test.ts`, "no engine server: … (one device's word: the match pays as a solo game)" →
+  "… (a bot's: nothing unvouched); his quick move unvouches phase 2's result only"; its first board test now clears `tested` (a test
+  fight keeps no fair-play moves); `phase2Move` sends gain `ply`. `app/test/recluse-online.test.ts`: the move sent gains `ply: 0`.
