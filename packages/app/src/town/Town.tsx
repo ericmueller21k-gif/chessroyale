@@ -1148,6 +1148,8 @@ function startTown(
   const town = createTown(performance.now(), undefined, seat, undefined, stand);
   /** (Its speech, for the loading's end: loadTown's `town` is a share.) */
   const speech = town.speech;
+  /** The world itself (the loader below names its share of the bar `town`). */
+  const world = town;
   const r = new Renderer(painter, town, HOMES);
   // The arrow keys (arrows.ts): hold one and you walk that way, on squares you can stand on and nobody's (the walker's own check).
   // (The street town's turning camera, Nov 5, round 3: the keys go through its heading, so up is always up the screen.)
@@ -2382,6 +2384,10 @@ function startTown(
     const sp = speech;
     const late = sp.boss ? performance.now() + f.speechMs - sp.until : 0;
     if (late > 0) ((sp.until += late), (sp.next += late));
+    // (So does the bot across your table after a game with it: it gets up botLeaveAfterGameMs after the first frame, not under the
+    // loading screen, which can outlast it.)
+    const lv = world.leave;
+    if (lv) lv.at = Math.max(lv.at, performance.now() + f.botLeaveAfterGameMs);
     run();
     draw(performance.now());
   };
