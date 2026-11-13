@@ -31,7 +31,11 @@ HEADROOM = 0.86  # the pieces' summed peak before encoding: -1.3 dBFS
 MONO = True
 MP3 = ["-c:a", "libmp3lame", "-b:a", "64k"] if MONO else ["-c:a", "libmp3lame", "-q:a", "5"]
 # boss id (packages/core's), the song's module, the intro's length in beats (0: the whole song loops).
-SONGS = [("grex", "song_m", 16, "Jefferson"), ("bigboy", "song_k", 0, "Big Boy"), ("hollow", "song_l", 16, "Hollow"), ("folio", "song_o", 54, "Folio"), ("zebra", "song_n", 16, "Don Dough")]
+# A song on a tape whose pace changes (synth.py's Ride: Boingo's, Ginger's, Alfil's) is handed over whole, as a loop: its
+# start is part of the ride each time round. (The Hidden Boss's pieces are phases_v.py's.)
+SONGS = [("grex", "song_m", 16, "Jefferson"), ("bigboy", "song_k", 0, "Big Boy"), ("hollow", "song_l", 16, "Hollow"), ("folio", "song_o", 54, "Folio"), ("zebra", "song_n", 16, "Don Dough"),
+         ("sawyer", "song_p", 32, "Sawyer"), ("timber", "song_q", 32, "Timber"), ("moo", "song_r", 16, "Moo & Moon"), ("clown", "song_s", 0, "Boingo the Clown"),
+         ("gingerbread", "song_t", 0, "Ginger"), ("alfil", "song_u", 0, "Alfil")]
 
 
 def render(module: str, intro_beats: float, part: str) -> np.ndarray:
@@ -88,7 +92,8 @@ def main(out: str, *only: str) -> None:
         if only and boss not in only:
             continue
         mod = importlib.import_module(module)
-        beat_s = 60 / mod.BPM
+        bpm = getattr(mod, "BPM", None)  # (none: a song whose pace changes, handed over whole)
+        beat_s = 60 / bpm if bpm else 0.0
         loop = fold(render(module, intro_beats, "loop"))
         n_loop = loop.shape[1]
         intro = fold(render(module, intro_beats, "intro")) if intro_beats else np.zeros((2, 0))
@@ -138,7 +143,7 @@ def main(out: str, *only: str) -> None:
             "loop": files["loop"],
             "introSeconds": round(n_intro / synth.SR, 6),
             "loopSeconds": round(n_loop / synth.SR, 6),
-            "bpm": mod.BPM,
+            "bpm": bpm,
             "lufs": round(master.lufs(f"{out}/_once.wav"), 1),
             "peakDb": round(float(20 * np.log10(peak)), 1),
         }
