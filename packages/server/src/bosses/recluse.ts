@@ -15,15 +15,19 @@
  *   (`noResult`: nothing counts for or against its board players; phase 2's fair-play moves dropped; everyone else's result stands).
  *   With no engine server set up at all (local runs, the e2e suite, staging: no `search`), his move is the server's quick move and
  *   phase 2's result unvouched (`unvouched`: it pays as a solo game);
- * - the bots' moves come from the host's device first (`phase2Ask`, at a bot's strength: a bot plays for its own team, and the
- *   engine server's queue stays his), the engine server where no device answers in RECLUSE_ONLINE.askMs or there's no host (one
- *   near the best), the server's own quick move where that can't either (never a stall); a bot's never unvouches anything. The host
- *   gone, or back: its open asks go to the host now (`resend`);
+ * - the bots' moves come from the host's device first (`phase2Ask`, at a bot's strength, so the engine server's queue stays his), the
+ *   engine server where no device answers in RECLUSE_ONLINE.askMs or there's no host (one near the best), the server's own quick
+ *   move where that can't either (never a stall); a bot's never unvouches anything. The host's device chooses them, checked only for
+ *   legality, as phase 1's bot picks are: a modified host could play them strong (his room's fight) or throw them (a Crowd final's
+ *   host watching), and that's accepted (the director's call on the delta review of #683, m3; docs/decisions/2026-11-13-recluse-
+ *   phase1-pause.md). The host gone, or back: its open asks go to the host now (`resend`);
  * - fair play: each person's move is scored on fair play's own instance of the engine server (`fair`: never in his queue; when it
  *   answers) and kept as a FairMove (no crowd: each board is its player's alone);
  * - someone who leaves (resigns, or gone longer than LEAVING.awayMs) hands their board to a bot, which plays it on;
  * - the admins' "Win this form" (his room's fight): the team's next move (a person's or a bot's, any board) wins every board still on.
  * Every board decided: his reaction holds the boards (RECLUSE_PHASE2.endMs), then the results (all four won beats him).
+ * His phase 1 moves (child and man) stay the devices' (BOSS_CHECK); one no device answered in its window goes to the engine server
+ * too (lobby.ts bossTimeout, Recluse1Ask: at his strength, never a random move; never in, no result for those fighting him).
  */
 import { FAIRPLAY, RECLUSE_CUTSCENE, RECLUSE_ONLINE, RECLUSE_PHASE2, type FairMove } from "@chessroyale/core";
 import {
@@ -618,7 +622,8 @@ export function withMates(fen: string, scores: readonly MoveScore[]): MoveScore[
 
 /**
  * The host's answer to a phase2Ask (a bot's move: his are never asked of a device): its move, if legal there and still wanted. A bot's
- * move from a device unvouches nothing (a bot only plays for its own team; the review of #677, M2).
+ * move from a device unvouches nothing (the review of #677, M2), though the host chooses it, as phase 1's bot picks: accepted (the
+ * delta review of #683, m3).
  */
 export function answer(lobby: Phase2Lobby, playerId: string, id: unknown, mv: unknown) {
   const p = lobby.r.recluse2;

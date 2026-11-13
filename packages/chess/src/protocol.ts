@@ -1071,7 +1071,8 @@ export type ServerMessage = { now: number } & (
   /**
    * To the host: a bot's move of phase 2 (never his: his come from the engine server alone; a bot's comes from the host's device
    * first, so the engine server's queue holds his): play it on your engine, at this strength (UciEngine.playAtElo), and answer with
-   * phase2Answer. With no answer in time, the server asks the engine server, then plays its own quick move.
+   * phase2Answer. With no answer in time, the server asks the engine server, then plays its own quick move. The server checks only
+   * that the answer is legal (as phase 1's bot picks): accepted, the delta review of #683, m3.
    */
   | { t: "phase2Ask"; id: string; fen: string; elo: number; nodes: number; moveMs: number }
   | {
