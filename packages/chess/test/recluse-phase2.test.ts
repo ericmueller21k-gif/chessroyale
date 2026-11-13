@@ -19,6 +19,7 @@ import {
   phase2Resign,
   phase2Timeouts,
   phase2Ult,
+  phase2WinAll,
   moveLeft,
   phase2ToMove,
   recentMoves,
@@ -310,5 +311,18 @@ describe("his phase 2 brain: Stockfish only, at a fixed strength", () => {
         st = next;
       }
     }, 60_000);
+  });
+});
+
+describe("testing (admins, Nov 13): \"Win this form\" in phase 2 wins every board still on", () => {
+  it("each undecided board won for the players, its clock stopped where it stands; decided boards kept; nothing left: the same state", () => {
+    const st = withBoards(start(), (id) => (id === 2 ? { result: { winner: "boss", how: "time" }, turnAt: null, bankMs: 0 } : {}));
+    const won = phase2WinAll(st, T0 + 5000);
+    expect(won.boards.map((b) => b.result?.winner)).toEqual(["crowd", "crowd", "boss", "crowd"]);
+    for (const b of won.boards) expect(b.turnAt).toBeNull();
+    expect(won.boards[0]!.bankMs).toBe(bankLeft(st.boards[0]!, T0 + 5000));
+    expect(phase2Outcome(won)).toMatchObject({ decided: true, won: 3 });
+    expect(phase2Outcome(phase2WinAll(start(), T0))).toMatchObject({ decided: true, beaten: true });
+    expect(phase2WinAll(won, T0)).toBe(won);
   });
 });

@@ -114,3 +114,44 @@ describe("Engine move: Stockfish at full strength, never Maia", () => {
     expect(engineMoveTitle("")).toBe("Engine move (Stockfish)");
   });
 });
+
+/** The admins' "Win this form" (Nov 13, Eric's timing test of the Hidden Boss's music): admins only, Boss alone, him only, never online. */
+describe("Win this form: who sees it", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.stubGlobal("fetch", () => Promise.reject(new Error("offline")));
+    vi.stubGlobal("location", { search: "" });
+    vi.stubGlobal("Worker", class { onmessage = null; onerror = null; postMessage() {} terminate() {} });
+  });
+  afterEach(() => {
+    who.admin = false;
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+  const shown = (bots: boolean, settings = raid({ bossId: "recluse", bossHidden: true })) => {
+    const m = new SoloMatch([], "Ann", settings, false, bots);
+    m.start();
+    const on = m.winFormShown;
+    // (Pressed by a player: nothing armed.)
+    m.winForm();
+    const armed = m.winFormArmed;
+    m.dispose();
+    return on || armed;
+  };
+  it("an admin in Boss alone against him sees it", () => {
+    who.admin = true;
+    expect(shown(false)).toBe(true);
+  });
+  it("a player never does, and pressing it does nothing", () => {
+    expect(shown(false)).toBe(false);
+    expect(shown(true)).toBe(false);
+  });
+  it("an admin doesn't against another boss, or outside Boss alone", () => {
+    who.admin = true;
+    expect(shown(false, raid({ bossId: "clown", bossHidden: false }))).toBe(false);
+    expect(shown(true)).toBe(false);
+  });
+  it("online matches have none", () => {
+    expect("winForm" in NetMatch.prototype).toBe(false);
+  });
+});

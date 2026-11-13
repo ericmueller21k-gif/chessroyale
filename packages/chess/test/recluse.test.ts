@@ -497,3 +497,24 @@ describe("beaten (?win=1, Boss alone): a crowd win, then his fall", () => {
     expect(r.bossTimedOut).toBe(false);
   });
 });
+
+describe("testing (admins, Nov 13): \"Win this form\" beats him on the crowd's next move, by the end a mate takes", () => {
+  it("armed, nothing ends until the crowd's move lands; then the battle is complete and the crowd's", async () => {
+    const r = alone();
+    await untilTurn(r, 1);
+    r.bossForceWin = true;
+    expect(r.stageComplete(), "before the move").toBe(false);
+    r.deal();
+    await r.score(new Map([["h0", { move: crowdMove(r), thinkMs: 1000 }]]));
+    expect(r.stageComplete()).toBe(true);
+    expect(r.finishBossBattle()).toBe("crowd");
+    expect(r.boss!.result).toBe("crowd");
+  });
+  it("not armed: the same move ends nothing", async () => {
+    const r = alone();
+    await untilTurn(r, 1);
+    r.deal();
+    await r.score(new Map([["h0", { move: crowdMove(r), thinkMs: 1000 }]]));
+    expect(r.stageComplete()).toBe(false);
+  });
+});

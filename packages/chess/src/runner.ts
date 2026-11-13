@@ -1270,7 +1270,7 @@ export class MatchRunner {
   }
 
   stageComplete(): boolean {
-    if (this.state.boss) return this.finalGameOver() || this.state.boss.crowdMoves >= this.settings.bossMaxMoves || this.bossOutOfTime() || carrotBattle.won(this.state.boss) || blackedOut(this.state.boss);
+    if (this.state.boss) return this.finalGameOver() || this.state.boss.crowdMoves >= this.settings.bossMaxMoves || this.bossOutOfTime() || carrotBattle.won(this.state.boss) || blackedOut(this.state.boss) || (this.bossForceWin && this.bossToMove());
     if (this.state.final) return finalComplete(this.state, this.settings) || this.finalGameOver();
     return stageComplete(this.state, this.settings);
   }
@@ -1852,11 +1852,17 @@ export class MatchRunner {
     const timeout = this.bossOutOfTime() && !this.finalGameOver();
     const winner = this.gameWinner();
     // (Hollow's last bulb out, Boss alone: his, whatever the board says.)
-    const result = timeout || this.bossCarrotWin || blackedOut(b) ? "boss" : winner === null ? "draw" : winner === b.crowdSide ? "crowd" : "boss";
+    const result = this.bossForceWin ? "crowd" : timeout || this.bossCarrotWin || blackedOut(b) ? "boss" : winner === null ? "draw" : winner === b.crowdSide ? "crowd" : "boss";
     this.state = finishBoss(this.state, this.opts.rng, result, this.settings);
     this.bossTimedOut = timeout;
     return result;
   }
+
+  /**
+   * Testing (admins, solo: "Win this form", the Hidden Boss): the boss is beaten as the crowd's next move lands, by the same end a
+   * mate takes (stageComplete, then finishBossBattle's "crowd"). Kept on the runner, never in the match state; online never sets it.
+   */
+  bossForceWin = false;
 
   /**
    * The boss battle was lost on time (the bullet clock ran out): for the result screen. Kept on the runner, not in the

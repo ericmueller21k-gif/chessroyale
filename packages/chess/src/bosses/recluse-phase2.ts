@@ -204,6 +204,15 @@ export function phase2Resign(st: Phase2State, boardId: number, now: number): Pha
 }
 
 /**
+ * Testing (admins, "Win this form": its phase 2): every board not yet decided is won for the players, as by mate, their clocks
+ * stopped where they stand. Nothing to win: the same state.
+ */
+export function phase2WinAll(st: Phase2State, now: number): Phase2State {
+  if (st.boards.every((b) => b.result)) return st;
+  return { ...st, boards: st.boards.map((b) => (b.result ? b : { ...b, bankMs: b.turnAt === null ? b.bankMs : bankLeft(b, now), turnAt: null, result: { winner: "crowd", how: "mate" } })) };
+}
+
+/**
  * Where the battle stands: boards won, lost and drawn so far, whether every board is decided, and whether he's beaten
  * (every board won: all four must win; a draw is not a win).
  */

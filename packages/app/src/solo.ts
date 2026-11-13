@@ -17,7 +17,7 @@ import { CRITICAL, LOW, NORMAL, bossVoice } from "./speech.tsx";
 import { SoloLobbyChat } from "./chat.ts";
 import { account } from "./account.ts";
 import { crumb } from "./problems.ts";
-import { engineMoveAllowed, isAdmin, maiaAllowed, soloBrain } from "./boss-brain.ts";
+import { engineMoveAllowed, isAdmin, maiaAllowed, soloBrain, winFormAllowed } from "./boss-brain.ts";
 import { prefetchMaia, startMaia } from "./maia.ts";
 import { MaiaGate, type GateEnd } from "./maia-gate.ts";
 import { testParams, timingOnDevice } from "./test-switches.ts";
@@ -821,6 +821,30 @@ export class SoloMatch implements GameView {
     this.armLights();
   }
 
+  /** Testing, admins in Boss alone against the Hidden Boss: "Win this form" shows (winFormAllowed). */
+  get winFormShown(): boolean {
+    return winFormAllowed(this.settings.raid && !this.raidBots, this.runner?.boss?.id);
+  }
+  get winFormArmed(): boolean {
+    return this.phase.kind === "simul" ? !!this.phase2?.winNext : !!this.runner?.bossForceWin;
+  }
+  /**
+   * "Win this form" (Nov 13, Eric's timing test): your next move beats his adult form, the same end a mate takes (the runner's
+   * bossForceWin: his fall, the phase change and its music follow as for real); in phase 2, your next move wins every board and
+   * the result plays.
+   */
+  winForm() {
+    if (!this.winFormShown || this.stopped) return;
+    if (this.phase.kind === "simul") {
+      if (!this.phase2 || !this.phase2Playing || this.phase2.outcome.decided) return;
+      this.phase2.winNext = true;
+    } else {
+      if (this.phase.kind === "phaseChange" || this.runner.boss?.result) return;
+      this.runner.bossForceWin = true;
+    }
+    this.emit();
+  }
+
   /** Testing, admins in Boss alone: the "Engine move" button shows (see engineMoveAllowed). */
   get engineMoveShown(): boolean {
     return !!this.runner?.boss && engineMoveAllowed(this.settings.raid && !this.raidBots);
@@ -1149,7 +1173,8 @@ export class SoloMatch implements GameView {
     // as the power lands, for the rest of the fight.
     setFigureRun(phaseChangeRun(at));
     setEngineAt(at + PHASE_CHANGE.igniteAt);
-    this.set({ kind: "phaseChange", at });
+    // (The board cracks into four at `splitAt`: his music's drop is put there, music.ts.)
+    this.set({ kind: "phaseChange", at, splitAt: at + PHASE_CHANGE.crackAt });
     this.timer = setTimeout(() => this.startSimul(), PHASE_CHANGE.total);
   }
   private phase2Names = new Map<string, string>();
@@ -1318,7 +1343,7 @@ export class SoloMatch implements GameView {
         if (fallMs) {
           if (phase2) bossVoice.reset();
           const next = phase2 ? () => this.startPhaseChange(true, mates) : () => this.finish();
-          this.set({ kind: "boss", boss: this.bossSnapshot(), until: Date.now() + fallMs, fall: true });
+          this.set({ kind: "boss", boss: this.bossSnapshot(), until: Date.now() + fallMs, fall: true, ...(phase2 ? { toPhase2: true } : {}) });
           this.timer = setTimeout(next, fallMs);
           return;
         }

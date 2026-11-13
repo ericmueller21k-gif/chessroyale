@@ -230,6 +230,7 @@ export function BossDock({
       {/* (Admins' testing: tiny icons beside the God King's head, styles.css .gk-tool; a computer has them in its title line.) */}
       {!computer && <UltimateTest match={match} icon />}
       {!computer && <EngineMove match={match} icon />}
+      {!computer && <WinForm match={match} icon />}
     </div>
     {/* (A phone keeps the brain's line in the page, hidden: its words are the 🐟 icon's title, and the tests read them.) */}
     {!computer && <BrainDebug match={match} hidden />}
@@ -594,6 +595,20 @@ export function EngineMove({ match, icon = false }: { match: GameView; icon?: bo
       onClick={() => match.engineMove?.()}
     />
   );
+}
+
+/**
+ * Testing, admins only, Boss alone against the Hidden Boss (Nov 13, Eric's timing test of his music and phase change): "Win this
+ * form" (SoloMatch.winForm): pressed, your next move beats his adult form (his fall and phase change follow as for a mate) or, in
+ * phase 2, wins every board. A tiny 🏆 beside the God King on a phone; in the title line on a computer. Greyed once pressed, and
+ * whenever nothing is left to win.
+ */
+export function WinForm({ match, icon = false }: { match: GameView; icon?: boolean }) {
+  if (!match.winFormShown || !match.winForm) return null;
+  const simul = match.simul;
+  const p = match.phase.kind;
+  const open = simul ? simul.playing && !simul.decided : p !== "phaseChange" && !match.boss?.result;
+  return <TestButton cls="win-form" icon={icon} glyph="🏆" label={match.winFormArmed ? "Your next move wins this form (testing)" : "Win this form (testing)"} disabled={!open || !!match.winFormArmed} onClick={() => match.winForm?.()} />;
 }
 
 /**

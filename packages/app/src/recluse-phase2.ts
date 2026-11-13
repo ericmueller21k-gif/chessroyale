@@ -16,6 +16,7 @@ import {
   phase2Timeouts,
   phase2ToMove,
   phase2Ult,
+  phase2WinAll,
   startPhase2,
   type MoveScore,
   type Phase2Board,
@@ -366,8 +367,16 @@ export class Phase2Game {
   move(boardId: number, move: string) {
     const b = this.board(boardId);
     if (!b || b.player !== this.opts.human || phase2ToMove(b) !== "crowd") return;
+    const before = this.state;
     this.update(phase2Move(this.state, boardId, move, Date.now()));
+    if (this.winNext && this.state !== before) {
+      this.winNext = false;
+      this.update(phase2WinAll(this.state, Date.now()));
+    }
   }
+
+  /** Testing (admins, "Win this form"): your next move here wins every board still on. */
+  winNext = false;
 
   /** Testing (admins): his ultimate now. */
   ult() {

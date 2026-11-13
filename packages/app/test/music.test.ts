@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { MUSIC } from "@chessroyale/core";
+import { MUSIC, MUSIC_SWITCH, RECLUSE_MUSIC } from "@chessroyale/core";
 
 // The audio graph, faked: what was started where, and every move of the music's gain.
 type Call = [string, ...number[]];
@@ -89,6 +89,11 @@ const THEMES = {
     grex: { intro: "grex-intro", loop: "grex-loop", introSeconds: 6.666667, loopSeconds: 113.333333 },
     bigboy: { intro: null, loop: "bigboy-loop", introSeconds: 0, loopSeconds: 60 },
     zebra: { intro: "zebra-intro", loop: "zebra-loop", introSeconds: 4, loopSeconds: 100 },
+    // (The Hidden Boss's, as the handoff has them, Nov 13.)
+    "recluse-house": { intro: null, loop: "recluse-house-loop", introSeconds: 0, loopSeconds: 60 },
+    "recluse-phase2": { intro: "recluse-phase2-intro", loop: "recluse-phase2-loop", introSeconds: 58.869625, loopSeconds: 89.275563 },
+    "recluse-beaten": { intro: "recluse-beaten-intro", loop: "recluse-house-loop", introSeconds: 1.815, loopSeconds: 60 },
+    "recluse-phase3": { intro: "recluse-phase3-intro", loop: "recluse-phase3-loop", introSeconds: 19.29325, loopSeconds: 88.371021 },
   },
 };
 let themesAsked = 0;
@@ -105,7 +110,9 @@ vi.stubGlobal("fetch", (url: string) => {
   return Promise.resolve({ ok: true, json: () => Promise.resolve(THEMES) });
 });
 
-const { bossMusic, musicFiles, musicLevel, musicNow, musicPlan, musicWanted, preloadMusic, roomMusic, roomMusicLoad, roomMusicNow, setMusicOn, splashDone, splashMusic } = await import("../src/music.ts");
+const { bossMusic, musicFiles, musicLevel, musicNow, musicPlan, musicTheme, musicWanted, preloadMusic, recluseMusic, roomMusic, roomMusicLoad, roomMusicNow, setMusicOn, splashDone, splashMusic, switchPlan, heardNow } = await import(
+  "../src/music.ts"
+);
 const settle = () => new Promise((r) => setTimeout(r, 0));
 
 describe("the plan from themes.json", () => {
@@ -148,8 +155,10 @@ describe("the town's loading bar (Nov 12: every theme fetched, none decoded)", (
     setMusicOn(true);
   });
 
-  it("every theme's pieces, each once", () => {
-    expect(musicFiles(THEMES)).toEqual(ALL);
+  it("every theme's pieces, each once; the town's loading leaves the Hidden Boss's out (fetched as his fight starts)", () => {
+    const his = ["/music/recluse-house-loop.mp3", "/music/recluse-phase2-intro.mp3", "/music/recluse-phase2-loop.mp3", "/music/recluse-beaten-intro.mp3", "/music/recluse-phase3-intro.mp3", "/music/recluse-phase3-loop.mp3"];
+    expect(musicFiles(THEMES)).toEqual([...ALL, ...his]);
+    expect(musicFiles(THEMES, Object.values(RECLUSE_MUSIC))).toEqual(ALL);
   });
   it("Music off or Sound off: nothing fetched (and no music step)", async () => {
     setMusicOn(false);
@@ -481,5 +490,159 @@ describe("a boss's room", () => {
     sound.muted = true;
     sound.muteListeners.forEach((l) => l());
     expect(ctx.gains[0]!.gain.lastRamp![0]).toBe(0);
+  });
+});
+
+describe("the Hidden Boss: a theme for each point of his fight, switched mid-fight (Nov 13)", () => {
+  const H = RECLUSE_MUSIC;
+  const boss = (o: object = {}) => ({ kind: "boss", boss: {} as never, until: 0, ...o }) as const;
+  it("which theme when: his adult form's from the start; beaten, with the phase change next, his beaten theme; the phase change and phase 2, the transformation's, its drop on the split; the result, none", () => {
+    expect(recluseMusic(boss({ intro: true }), false, false)).toEqual({ theme: H.adult });
+    expect(recluseMusic({ kind: "play" } as never, false, false)).toEqual({ theme: H.adult });
+    // (The transformation's decoded now, ready before the phase change.)
+    expect(recluseMusic(boss({ fall: true, toPhase2: true }), true, false)).toEqual({ theme: H.beaten, next: H.transform });
+    // (Beaten where no phase 2 follows (online, a Solo raid), or he won: the result, as for any boss.)
+    expect(recluseMusic(boss({ fall: true }), true, false)).toBeNull();
+    expect(recluseMusic(boss(), true, false)).toBeNull();
+    expect(recluseMusic({ kind: "phaseChange", at: 1000, splitAt: 20_630 }, true, false)).toEqual({ theme: H.transform, dropAt: 20_630 });
+    expect(recluseMusic({ kind: "simul", at: 0 }, true, false)).toEqual({ theme: H.transform });
+    expect(recluseMusic({ kind: "simul", at: 0 }, true, true)).toBeNull();
+    expect(recluseMusic({ kind: "results" } as never, true, false)).toBeNull();
+  });
+
+  it("the switches' fades (the handoff's README): into his adult form's after a 1.5 s fade; his beaten theme at once over a 0.3 s fade; the transformation's at once, the last fading over 0.5 s", () => {
+    expect(MUSIC_SWITCH[H.adult]).toEqual({ fadeMs: 1500, after: true });
+    expect(MUSIC_SWITCH[H.beaten]).toEqual({ fadeMs: 300, after: false });
+    expect(MUSIC_SWITCH[H.transform]).toEqual({ fadeMs: 500, after: false });
+    // (From his house's loop, later: the adult form's theme once the house has faded.)
+    expect(switchPlan(THEMES, H.adult, 10, true)).toMatchObject({ outAt: 10, outMs: 1500, plan: { intro: { at: 11.5 } } });
+    // (Nothing playing: at once.)
+    expect(switchPlan(THEMES, H.adult, 10, false)?.plan.intro?.at).toBe(10);
+    expect(switchPlan(THEMES, H.beaten, 10, true)).toMatchObject({ outAt: 10, outMs: 300, plan: { intro: { at: 10 }, loop: { at: 10 + 1.815 } } });
+  });
+
+  it("the split time from introSeconds: the transformation starts its intro's length before the drop, read from themes.json (any length)", () => {
+    const sw = switchPlan(THEMES, H.transform, 10, true, 40)!;
+    expect(sw.plan.intro!.at).toBeCloseTo(40 - 19.29325, 9);
+    expect(sw.plan.loop.at).toBe(40);
+    expect(sw.outAt).toBeCloseTo(40 - 19.29325, 9);
+    expect(sw.outMs).toBe(500);
+    const shorter = { ...THEMES, themes: { ...THEMES.themes, [H.transform]: { ...THEMES.themes[H.transform], introSeconds: 8.74 } } };
+    expect(switchPlan(shorter, H.transform, 10, true, 40)!.plan.intro!.at).toBeCloseTo(31.26, 9);
+    expect(switchPlan(shorter, H.transform, 10, true, 40)!.plan.loop.at).toBe(40);
+    // (Too late for its intro (it loaded late): its loop alone, still on the drop; past the drop too: at once.)
+    expect(switchPlan(THEMES, H.transform, 30, true, 40)).toMatchObject({ outAt: 40, plan: { intro: null, loop: { at: 40 } } });
+    expect(switchPlan(THEMES, H.transform, 50, true, 40)).toMatchObject({ outAt: 50, plan: { intro: null, loop: { at: 50 } } });
+  });
+
+  it("a moment on screen onto the audio clock: the output's own timestamp, else the clock less its output latency", () => {
+    expect(heardNow({ currentTime: 10 }, 0)).toBe(10);
+    expect(heardNow({ currentTime: 10, outputLatency: 0.04 }, 0)).toBeCloseTo(9.96, 9);
+    const ts = { contextTime: 9.9, performanceTime: 5000 };
+    expect(heardNow({ currentTime: 10, outputLatency: 0.04, getOutputTimestamp: () => ts }, 5050)).toBeCloseTo(9.95, 9);
+    // (A stale stamp: the fallback.)
+    expect(heardNow({ currentTime: 10, getOutputTimestamp: () => ({ contextTime: 2, performanceTime: 1 }) }, 5050)).toBe(10);
+  });
+
+  describe("through his fight", () => {
+    let key = 1000;
+    const fight = (theme: string, o: object = {}) => bossMusic({ key, boss: "recluse", live: true, theme, ...o });
+    beforeEach(() => {
+      key++;
+      ctx.currentTime = 10;
+      ctx.sources = [];
+      ctx.gains = [];
+      files.length = 0;
+      forgot.length = 0;
+      sound.muted = false;
+      sound.hidden = false;
+      setMusicOn(true);
+    });
+    afterEach(() => bossMusic(null));
+
+    it("his fight starts: his adult form's theme, decoded and played; his later themes fetched, not decoded", async () => {
+      preFetched.length = 0;
+      fight(H.adult, { ahead: [H.beaten, H.transform] });
+      await settle();
+      await settle();
+      expect([...new Set(files)], "decoded: his adult form's only").toEqual(["/music/recluse-phase2-intro.mp3", "/music/recluse-phase2-loop.mp3"]);
+      expect(preFetched.sort()).toEqual(["/music/recluse-beaten-intro.mp3", "/music/recluse-house-loop.mp3", "/music/recluse-phase3-intro.mp3", "/music/recluse-phase3-loop.mp3"]);
+      expect(musicTheme()).toBe(H.adult);
+      expect(ctx.sources[0]!.started).toEqual([10 + MUSIC.startDelayS, undefined]);
+    });
+
+    it("beaten: his beaten theme at once, what was playing faded over 0.3 s and stopped there; then the transformation's intro its length before the split, the beaten one fading over 0.5 s from there, its loop on the split", async () => {
+      vi.useFakeTimers({ toFake: ["setTimeout", "Date"] });
+      try {
+        fight(H.adult);
+        await vi.advanceTimersByTimeAsync(0);
+        const adult = ctx.gains[0]!;
+        ctx.currentTime = 100;
+        files.length = 0;
+        fight(H.beaten, { next: H.transform });
+        await vi.advanceTimersByTimeAsync(0);
+        const t = 100 + MUSIC.startDelayS;
+        expect(musicTheme()).toBe(H.beaten);
+        expect(files, "the transformation's decoded as he's beaten").toEqual(expect.arrayContaining(["/music/recluse-phase3-intro.mp3", "/music/recluse-phase3-loop.mp3"]));
+        const [bi, bl] = ctx.sources.slice(2);
+        expect(bi!.started).toEqual([t, undefined]);
+        expect(bl!.started![0]).toBeCloseTo(t + 1.815, 9);
+        expect(ctx.gains[1]!.gain.value, "at full level at once").toBe(MUSIC.volume);
+        expect(adult.gain.calls).toContainEqual(["set", MUSIC.volume, t]);
+        expect(adult.gain.lastRamp).toEqual([0, t + 0.3]);
+        for (const s of ctx.sources.slice(0, 2)) expect(s.stoppedAt).toBeCloseTo(t + 0.3, 9);
+        // (Its fade done: his adult form's theme let go.)
+        await vi.advanceTimersByTimeAsync(700);
+        expect(forgot.sort()).toEqual(["/music/recluse-phase2-intro.mp3", "/music/recluse-phase2-loop.mp3"]);
+        // The phase change: the board splits 20 s from now.
+        ctx.currentTime = 110;
+        const split = Date.now() + 20_000;
+        fight(H.transform, { dropAt: split });
+        await vi.advanceTimersByTimeAsync(0);
+        expect(musicTheme()).toBe(H.transform);
+        const [ti, tl] = ctx.sources.slice(4);
+        const t0 = 130 - 19.29325;
+        expect(ti!.started![0]).toBeCloseTo(t0, 6);
+        expect(tl!.started![0]).toBeCloseTo(130, 6);
+        expect(tl!.started![1]).toBe(0.5);
+        expect(ctx.gains[2]!.gain.value).toBe(MUSIC.volume);
+        const beaten = ctx.gains[1]!.gain;
+        expect(beaten.calls).toContainEqual(["set", MUSIC.volume, t0]);
+        expect(beaten.lastRamp![0]).toBe(0);
+        expect(beaten.lastRamp![1]).toBeCloseTo(t0 + 0.5, 6);
+        for (const s of [bi, bl]) expect(s!.stoppedAt).toBeCloseTo(t0 + 0.5, 6);
+        // (Phase 2: the same theme on, no restart; the next render with no drop changes nothing.)
+        fight(H.transform);
+        await vi.advanceTimersByTimeAsync(0);
+        expect(ctx.sources).toHaveLength(6);
+        // The result: it fades out as any boss's.
+        ctx.currentTime = 200;
+        bossMusic(null);
+        expect(ctx.gains[2]!.gain.lastRamp).toEqual([0, 200 + MUSIC.endFadeMs / 1000]);
+        expect(musicTheme()).toBeNull();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("the result while a switch's fade waits (his beaten theme till the transformation): both stop", async () => {
+      fight(H.beaten);
+      await settle();
+      fight(H.transform, { dropAt: Date.now() + 20_000 });
+      await settle();
+      ctx.currentTime = 12;
+      bossMusic(null);
+      for (const s of ctx.sources) expect(s.stoppedAt).toBeCloseTo(12 + MUSIC.endFadeMs / 1000, 6);
+    });
+
+    it("Music off while a switch's fade waits: what was leaving stops at once", async () => {
+      fight(H.beaten);
+      await settle();
+      fight(H.transform, { dropAt: Date.now() + 20_000 });
+      await settle();
+      setMusicOn(false);
+      const [bi, bl] = ctx.sources;
+      for (const s of [bi, bl]) expect(s!.stoppedAt).toBeCloseTo(10 + MUSIC.fadeMs / 1000, 6);
+    });
   });
 });

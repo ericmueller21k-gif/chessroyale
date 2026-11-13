@@ -2055,7 +2055,8 @@ p {
   line-height: 16px;
 }
 .match-tools > .ult-test,
-.match-tools > .engine-move {
+.match-tools > .engine-move,
+.match-tools > .win-form {
   flex: none;
   margin: 0;
   white-space: nowrap;
@@ -5771,6 +5772,10 @@ button.history-label {
   .boss-dock > .engine-move.gk-tool {
     left: calc(var(--dk-left, 0px) + var(--dk-w, 100%) / 2 - 91px);
   }
+  /* (The Hidden Boss's "Win this form", Nov 13: a 🏆 after them.) */
+  .boss-dock > .win-form.gk-tool {
+    left: calc(var(--dk-left, 0px) + var(--dk-w, 100%) / 2 - 121px);
+  }
   .boss-dock.dk-beside > .gk-tool {
     left: calc(var(--dk-left, 0px) + var(--dk-w, 100%) + 72px);
   }
@@ -5779,6 +5784,9 @@ button.history-label {
   }
   .boss-dock.dk-beside > .engine-move.gk-tool {
     top: 34px;
+  }
+  .boss-dock.dk-beside > .win-form.gk-tool {
+    top: 66px;
   }
 }
 .dock-line {
@@ -15670,7 +15678,8 @@ img.qicon {
 
 /* Testing (admins only): the test trigger and Engine move, small and plain. */
 .ult-test,
-.engine-move {
+.engine-move,
+.win-form {
   display: block;
   margin: 6px auto 0;
   padding: 4px 10px;
@@ -15683,7 +15692,8 @@ img.qicon {
   cursor: pointer;
 }
 .ult-test:disabled,
-.engine-move:disabled {
+.engine-move:disabled,
+.win-form:disabled {
   opacity: 0.55;
   cursor: default;
 }
@@ -23969,6 +23979,9 @@ button.sq-tiny {
   .boss-dock.dk-strip > .engine-move.gk-tool {
     left: calc(var(--dk-left, 0px) + var(--dk-w, 100%) - 58px - 64px);
   }
+  .boss-dock.dk-strip > .win-form.gk-tool {
+    left: calc(var(--dk-left, 0px) + var(--dk-w, 100%) - 58px - 94px);
+  }
   /* (Chub & Chirp's carrot count: at the strip's top, just left of him, or of an admin's icons.) */
   .boss-dock.dk-strip > .dk-race-below {
     top: 40px;
@@ -24110,6 +24123,9 @@ button.sq-tiny {
   .boss-dock.dk-strip.dk-pawn > .engine-move.gk-tool {
     left: calc(var(--dk-left, 0px) + var(--dk-w, 100%) - 116px - 64px);
   }
+  .boss-dock.dk-strip.dk-pawn > .win-form.gk-tool {
+    left: calc(var(--dk-left, 0px) + var(--dk-w, 100%) - 116px - 94px);
+  }
   .boss-dock.dk-strip.dk-pawn > .dk-race-below {
     right: calc(100% - var(--dk-left, 0px) - var(--dk-w, 100%) + 124px);
   }
@@ -24180,6 +24196,9 @@ button.sq-tiny {
   }
   .boss-dock.dk-strip.dk-pawn.dk-stack > .engine-move.gk-tool {
     left: calc(var(--dk-left, 0px) + var(--dk-w, 100%) - 58px * var(--dk-k, 1) - 64px);
+  }
+  .boss-dock.dk-strip.dk-pawn.dk-stack > .win-form.gk-tool {
+    left: calc(var(--dk-left, 0px) + var(--dk-w, 100%) - 58px * var(--dk-k, 1) - 94px);
   }
   .boss-dock.dk-strip.dk-pawn.dk-stack > .dk-race-below {
     right: calc(100% - var(--dk-left, 0px) - var(--dk-w, 100%) + 58px * var(--dk-k, 1) + 8px);

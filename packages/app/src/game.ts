@@ -224,14 +224,15 @@ export type Phase =
    * Boss battle: the boss thinking, its move, or its strike (`until`: when the next crowd move starts). `lights`:
    * Hollow's Lights out, at the start of his turn (the clocks stopped), before his move. `loading` (with `intro`): solo,
    * the loading step before the intro, while the boss's Maia brain loads (maia-gate.ts): the intro's first frame, held;
-   * `afterLoading`: the intro that follows it.
+   * `afterLoading`: the intro that follows it. `toPhase2` (with `fall`): the Hidden Boss beaten, his phase change next (solo).
    */
-  | { kind: "boss"; boss: BossView; until: number; thinking?: boolean; intro?: boolean; loading?: boolean; afterLoading?: boolean; lights?: LightsView; rush?: RushView; fall?: boolean }
+  | { kind: "boss"; boss: BossView; until: number; thinking?: boolean; intro?: boolean; loading?: boolean; afterLoading?: boolean; lights?: LightsView; rush?: RushView; fall?: boolean; toPhase2?: boolean }
   /**
    * The Hidden Boss's phase change (`at`: when it began; PHASE_CHANGE in recluse-phase2.ts): the book's slam, the board
-   * split into four, his revive, the Chess960 shuffle. Then `simul`: his phase 2, four boards at once (GameView.simul).
+   * split into four, his revive, the Chess960 shuffle; `splitAt`: when the board cracks into four, Date.now()'s clock, where his
+   * music's drop lands). Then `simul`: his phase 2, four boards at once (GameView.simul).
    */
-  | { kind: "phaseChange"; at: number }
+  | { kind: "phaseChange"; at: number; splitAt: number }
   /** (`at`: when its clocks start: a countdown on the boards until then, Oct 17.) */
   | { kind: "simul"; at: number }
   /**
@@ -388,6 +389,12 @@ export interface GameView {
   readonly engineThinking?: boolean;
   /** Plays Stockfish's best move as your own, through the normal move path. */
   engineMove?(): void;
+  /** Testing, admins in Boss alone against the Hidden Boss: the "Win this form" button shows (solo only). */
+  readonly winFormShown?: boolean;
+  /** It was pressed: your next move wins the form (his adult form, or phase 2's four boards). */
+  readonly winFormArmed?: boolean;
+  /** Arms it: your next move beats his adult form (the phase change follows as for a mate), or in phase 2 wins every board. */
+  winForm?(): void;
   /** You called the King to play this move. */
   readonly kingCalled: boolean;
   /** Testing, admins (Boss alone): what the boss's brain did with its last move (Maia or Stockfish), or null. */
