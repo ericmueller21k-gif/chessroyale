@@ -165,7 +165,8 @@ before the rows are laid (`street.ts lotHere`), so each row fills the place with
   Numbers: `TOWN_FEEL.youStepMs` (the same pace as a tap); the sizes are the CSS in `town.css`. Test: `e2e/town.spec.ts`, "the arrow
   keys"; unit: `packages/app/test/town-arrows.test.ts`. Decision: `docs/decisions/2026-11-04-town-arrow-keys.md`.
 - **Looking around.** Drag to look
-  around; the focus button ("Back to me") brings the camera back; − / + (and the mouse wheel) zoom. The chips at the box's edge show the
+  around; the focus button ("Back to me") brings the camera back (and, since Nov 13, eases a look round snapped to another quarter back
+  to the normal view); − / + (and the mouse wheel) zoom. The chips at the box's edge show the
   bosses whose homes are off screen (the nearest few: `maxChips` in `feel.ts`, 4), and the Colosseum's crown when none of
   it is on screen (among the nearest four, it's placed first, so it always shows); a tap glides the camera there. A chip
   never covers a name tag, a home's floating name, the speech bubble, the −/+ and "Back to me" buttons or a nearer
@@ -1265,6 +1266,10 @@ noted wherever a slice changed one.
 
 ## Tests
 
+- **Tapping in the street town from a spec (Nov 13):** `tapInTown(page, kind, id, card)` in `e2e/helpers.ts` opens a figure's or a
+  place's card. It waits until the view holds still over 3 drawn frames (`townTapPoint`), glides there once if the target is off the screen
+  or covered, and taps with the press and release together (`quickTap`). Read a point mid-glide, or a separate `page.mouse.click`, and
+  the tap fails on CI's software WebGL ([2026-11-13-street-town-taps-on-ci.md](../decisions/2026-11-13-street-town-taps-on-ci.md)).
 - `e2e/shop.spec.ts` (Nov 2, inside a shop; phone and computer): Babur's card's "Go in", inside zoomed out (+ and − switch to Close and back), a tap
   on the Shopkeeper walks you up and its card's Talk opens "Babur's Boss Crate" (the price line, Balloon Pup, what you have, both buys
   greyed with nothing to pay), the header saying "Babur's Circus", then the view dragged back to the door, "Go out" and you're outside

@@ -1,6 +1,6 @@
 import { expect, type Page } from "@playwright/test";
 import { BOTS, STATUES, TABLES, TOWN_LINES, sidekickText } from "../packages/app/src/town/world.ts";
-import { BOARD_SEL, giveItems, tapInTown, test, townTapPoint, wearItem } from "./helpers.ts";
+import { BOARD_SEL, giveItems, quickTap, tapInTown, test, townTapPoint, wearItem } from "./helpers.ts";
 
 /**
  * The town square (/town; hidden: docs/areas/town-square.md), on a phone and a computer: the page loads, its world is
@@ -1327,19 +1327,31 @@ const tagOverHead = (p: Page, id: string, name: string) =>
  * drawn over its middle on a phone, and a tap there is a tap on them (their card; you don't move).
  */
 async function squareSettled(page: Page, c: number, r: number): Promise<{ x: number; y: number }> {
-  type At = (k: string, id: [number, number]) => { x: number; y: number } | null;
-  const at = () => page.evaluate(([c, r]) => ({ mid: (window as unknown as { __townAt: At }).__townAt("square", [c, r]), tap: (window as unknown as { __townAt: At }).__townAt("tap-square", [c, r]) }), [c, r] as [number, number]);
-  let prev = (await at()).mid;
-  for (let i = 0; i < 40; i++) {
-    await page.waitForTimeout(50);
-    const now = await at();
-    if (now.mid && prev && Math.abs(now.mid.x - prev.x) < 0.25 && Math.abs(now.mid.y - prev.y) < 0.25) {
-      if (!now.tap) throw new Error(`square ${c},${r}: no point of it a tap reaches (someone is drawn over all of it)`);
-      return now.tap;
-    }
-    prev = now.mid;
-  }
-  throw new Error(`square ${c},${r}: the camera never settled`);
+  // (Nov 13: counted in drawn frames, up to 10 s, not 40 reads 50 ms apart: on a slow software-WebGL runner the camera's trail after a walk
+  // outlasted 2 s of wall time.)
+  const got = await page.evaluate(
+    ([c, r]) =>
+      new Promise<{ tap: { x: number; y: number } | null; mid: boolean; still: boolean }>((done) => {
+        type At = (k: string, id: [number, number]) => { x: number; y: number } | null;
+        const at = (k: string) => (window as unknown as { __townAt: At }).__townAt(k, [c, r]);
+        const until = performance.now() + 10_000;
+        let prev = at("square");
+        let same = 0;
+        const look = () => {
+          const mid = at("square");
+          same = mid && prev && Math.abs(mid.x - prev.x) < 0.25 && Math.abs(mid.y - prev.y) < 0.25 ? same + 1 : 0;
+          prev = mid;
+          if (same >= 3) done({ tap: at("tap-square"), mid: true, still: true });
+          else if (performance.now() > until) done({ tap: null, mid: !!mid, still: false });
+          else requestAnimationFrame(look);
+        };
+        requestAnimationFrame(look);
+      }),
+    [c, r] as [number, number],
+  );
+  if (!got.still) throw new Error(`square ${c},${r}: ${got.mid ? "the camera never settled" : "not on the screen"}`);
+  if (!got.tap) throw new Error(`square ${c},${r}: no point of it a tap reaches (someone is drawn over all of it)`);
+  return got.tap;
 }
 
 test("rides (Oct 31; Nov 1, every boss's): your pawn sits on its ride, the ride's idle standing and its move walking, its side, back or front the way it goes; its trail instead of the droplets; its tag over its top; nothing fetched for it; another rider as others see them", { tag: "@phone-only" }, async ({ page }) => {
@@ -1425,7 +1437,8 @@ test("rides (Oct 31; Nov 1, every boss's): your pawn sits on its ride, the ride'
   const walkTo = async (c: number, r: number) => {
     const at = await squareSettled(page, c, r);
     const cv = (await canvas(page).boundingBox())!;
-    await page.mouse.click(cv.x + at.x, cv.y + at.y);
+    // (A quick tap: a slow frame between a separate press and release would make it a run, helpers.ts quickTap.)
+    await quickTap(page, cv.x + at.x, cv.y + at.y);
     // (There, or beside it if a bot stands there: one pawn a square.)
     await expect.poll(async () => Math.abs((await you(page))[0] - c) + Math.abs((await you(page))[1] - r)).toBeLessThanOrEqual(1);
     await expect.poll(async () => (await rideNow(page)).you.anim).toBe("idle");
@@ -1456,7 +1469,7 @@ test("rides (Oct 31; Nov 1, every boss's): your pawn sits on its ride, the ride'
   for (const c of [c0 + 1, c0]) {
     const at = await squareSettled(page, c, r0);
     const cv = (await canvas(page).boundingBox())!;
-    await page.mouse.click(cv.x + at.x, cv.y + at.y);
+    await quickTap(page, cv.x + at.x, cv.y + at.y);
     await expect.poll(() => you(page), { message: `beside you: ${c},${r0}` }).toEqual([c, r0]);
     await expect.poll(async () => (await rideNow(page)).you.anim).toBe("idle");
   }

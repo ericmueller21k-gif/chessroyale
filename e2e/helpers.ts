@@ -687,6 +687,6 @@ export async function tapInTown(page: Page, kind: TownThing, id: string | number
     expect(at, `${kind} ${id} drawn and clear, the view still`).not.toBeNull();
     await quickTap(page, at!.x, at!.y);
     await expect(card).toBeVisible({ timeout: 3000 });
-  }).toPass({ timeout: opts.timeout ?? 45_000 });
+  }).toPass({ timeout: opts.timeout ?? 60_000 });
   return card;
 }
