@@ -20,7 +20,7 @@ import { hiddenRoomResponse } from "./hidden-room-api.ts";
 import { enterOnly } from "./town-chat.ts";
 import { SIGN_IN_TO_TOWN_CHAT, TOWN_CHAT_AGE, chatRoomOf, mayTownChat, reportedLine, townChallengeNote, townPostResponse, townRemoveResponse, townSlice } from "./town-chat-api.ts";
 import { accountDownload, deleteAccount } from "./account-data.ts";
-import { XP, AGE_GATE, AGE_STEP_LINE, FAIRPLAY, TOO_YOUNG_LINE, adminFirst, bossCrateDef, bossDef, cleanPawnColor, isActivity, isWelcomeCrate, tokenBossName } from "@chessroyale/core";
+import { XP, AGE_GATE, HIDDEN_ROOM, AGE_STEP_LINE, FAIRPLAY, TOO_YOUNG_LINE, adminFirst, bossCrateDef, bossDef, cleanPawnColor, isActivity, isWelcomeCrate, tokenBossName } from "@chessroyale/core";
 import {
   buyItem,
   cleanEmail,
@@ -315,7 +315,7 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
   // of his fight; "Fill with 3 bots" for admins only). No session lookup past the cached ones.
   if (path === "/api/town/hidden" && request.method === "POST") {
     if (!env.LIVE) return json({ message: "The town isn't set up here." }, 503);
-    return hiddenRoomResponse(request, sql, liveHub(env as Required<Pick<AccountEnv, "LIVE">>), { token, tooYoung: ageAnswer(request) === "under", testSwitches: (env as AdminEnv).TEST_SWITCHES === "1", admin: (email) => isAdmin(env as AdminEnv, { email }), paused: isPaused(env, "raid", now) }, now);
+    return hiddenRoomResponse(request, sql, liveHub(env as Required<Pick<AccountEnv, "LIVE">>), { token, tooYoung: ageAnswer(request) === "under", testSwitches: (env as AdminEnv).TEST_SWITCHES === "1", admin: (email) => isAdmin(env as AdminEnv, { email }), paused: isPaused(env, "raid", now) ? "raid" : isPaused(env, `boss:${HIDDEN_ROOM.boss}`, now) ? `boss:${HIDDEN_ROOM.boss}` : null }, now);
   }
 
   // GET /api/chat/icon/KEY: a drawn icon on a line in the global chat (anyone may read the chat).

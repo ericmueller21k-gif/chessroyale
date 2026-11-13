@@ -148,6 +148,7 @@ test("his room (Eric, Nov 12 and 13): Challenge is 1 of 4; leaving asks; an admi
   await card.getByRole("button", { name: "Fill with 3 bots" }).click();
   await expect.poll(async () => (await hook(page))?.info?.people ?? 0, { timeout: 10_000 }).toBe(4);
   await expect.poll(() => counts.join(" | "), { timeout: 15_000 }).toMatch(/2 of 4/);
+  await expect(count).toHaveText(/2 of 4/);
   await still(page, "room-2-of-4");
   // At four: the summoning (frozen, the scene's clock running), then his fight.
   await expect.poll(async () => (await hook(page))?.frozen ?? false, { message: "the summoning starts", timeout: 20_000 }).toBe(true);
@@ -207,6 +208,8 @@ test("a 5th at his door: \"The door is locked.\", and you stay on the landing; a
       await expect(note).toBeVisible({ timeout: 6000 });
     }).toPass({ timeout: 45_000 });
     await expect(room(player)).toHaveAttribute("data-part", "landing");
+    await expect(player.getByRole("dialog", { name: "Stairs", exact: true })).toBeHidden();
+    await player.waitForTimeout(700);
     await still(player, "door-locked");
     await note.getByRole("button", { name: "OK" }).click();
     await expect(note).toBeHidden();

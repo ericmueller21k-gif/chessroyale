@@ -1,4 +1,4 @@
-import { pausedLine } from "@chessroyale/core";
+import { pausedLine, type Pausable } from "@chessroyale/core";
 import type { Sql } from "./accounts.ts";
 import { isBlockedText } from "./text-filter.ts";
 import { signedInReader } from "./town-chat-api.ts";
@@ -67,7 +67,7 @@ export async function hiddenRoomResponse(
   request: Request,
   sql: Sql,
   hub: RoomHub,
-  a: { token: string | null; tooYoung: boolean; testSwitches: boolean; admin: (email: string | null) => boolean; paused: boolean },
+  a: { token: string | null; tooYoung: boolean; testSwitches: boolean; admin: (email: string | null) => boolean; paused: Pausable | null },
   now: number,
 ): Promise<Response> {
   if (Number(request.headers.get("content-length")) > BODY_MAX) return json({ message: "Too big." }, 413);
@@ -86,8 +86,8 @@ export async function hiddenRoomResponse(
   })();
   const action = ACTIONS.find((x) => x === body.action);
   if (!action) return json({ message: "No such action." }, 400);
-  // (A raid's kill switch rests his fight as it rests Boss Battle's parties: no new request, the rest as ever.)
-  if (action === "challenge" && a.paused) return json({ message: pausedLine("raid"), paused: "raid" }, 503);
+  // (A raid's kill switch rests his fight as it rests Boss Battle's parties, and his own rests him: no new request, the rest as ever.)
+  if (action === "challenge" && a.paused) return json({ message: pausedLine(a.paused), paused: a.paused }, 503);
   const room = !a.testSwitches ? "town" : typeof body.room === "string" && /^[\w-]{1,40}$/.test(body.room) ? `test:${body.room}` : `alone:${id}`;
   const me = await whoIs(sql, id, now, a.admin);
   const view = await hub.hiddenRoom({ id, name: me.name, room, action, admin: me.admin, beat: readRoomBeat(body), ...(a.testSwitches ? { limits: readRoomLimits(body.limits) } : {}) });

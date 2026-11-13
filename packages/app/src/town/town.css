@@ -1059,14 +1059,14 @@ button.town-pic.player {
 
 /*
  * The Hidden Boss's room challenge (Eric, Nov 12 and 13; HiddenRoom.tsx): the count over his room ("Challengers 2 of 4", for everyone in
- * it while a request is on; top middle, under the cards, taps pass through), his card's line (its row kept: nothing moves as the count
- * changes), the summoning's freeze (no taps reach the room), and the black that covers the page as his fight opens (outside the town).
+ * it while a request is on; the room's bottom left, level with the buttons' row on the right: clear of the chat log at the top and the
+ * buttons; under the cards, taps pass through), his card's line (its row kept: nothing moves as the count changes), the summoning's
+ * freeze (no taps reach the room), and the black that covers the page as his fight opens (outside the town).
  */
 .hb-count {
   position: absolute;
-  top: 10px;
-  left: 50%;
-  transform: translateX(-50%);
+  left: 14px;
+  bottom: 14px;
   z-index: 5;
   pointer-events: none;
   padding: 5px 12px;

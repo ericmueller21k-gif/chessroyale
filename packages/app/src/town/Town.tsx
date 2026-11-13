@@ -388,6 +388,8 @@ export function TownScreen({
     if (at.room.def.home === "recluse" && to === "top") {
       const r = await hiddenClient().enter();
       if (!r.ok) {
+        // (The stairs' card closes under the note: you stay on the landing.)
+        shopCtl.current?.close?.();
         setNote(r.message);
         doorBusy.current = false;
         return;

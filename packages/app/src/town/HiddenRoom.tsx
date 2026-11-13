@@ -21,7 +21,8 @@ export function HiddenCard({ client }: { client: HiddenRoomClient }) {
   const info = client.info;
   const waiting = !!info?.yours;
   const count = info?.count ?? 0;
-  const line = client.refused ?? (count ? `${countText(count)}${info?.names.length ? `: ${info.names.join(", ")}` : ""}` : `Up to ${HIDDEN_ROOM.players} fight him together.`);
+  // (A refusal's words while they're news: a rest's kill switch, "The room is full." Gone with the next answer.)
+  const line = client.refused ?? info?.message ?? (count ? `${countText(count)}${info?.names.length ? `: ${info.names.join(", ")}` : ""}` : `Up to ${HIDDEN_ROOM.players} fight him together.`);
   return (
     <>
       <p class="town-card-text hb-card-line" aria-live="polite">
