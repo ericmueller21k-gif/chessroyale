@@ -93,11 +93,16 @@ behind Cloudflare Access like the rest of the site). Phone and computer; **on a 
   modes too), each draw using the least that covers what it holds: the same pixels, much less work for a software
   renderer. 4x multisampling on a GPU; where the browser would render WebGL in software (no GPU, or SwiftShader in the
   headless tests: `failIfMajorPerformanceCaveat` refuses the first context), none, which halves a frame there (Oct 30,
-  later). An admin's device without WebGL 2 gets today's town (admin-town.ts `STREET_TOWN`). No context, or its shader fails:
-  the page opens again in today's town (`?street=off`). Context lost: nothing drawn until it's back (textures made again);
-  lost twice within a minute, or not back within 5 s: the page opens again in today's town. Each of those fallbacks is
-  reported once a page with its reason, nothing shown (the health view counts them: docs/areas/ops.md, "Health"). The
-  canvas says which backend (`data-backend`).
+  later). **It never falls back to today's town** (Eric, Nov 13: he saw the old town on his iPhone; `town/gl-fail.ts`,
+  [2026-11-13-town-no-old-fallback.md](../decisions/2026-11-13-town-no-old-fallback.md)). Context lost: nothing drawn until it's back
+  (textures made again), however often; lost while the page is hidden (iOS drops WebGL in the background) it waits for the page to
+  show, then gets 5 s (`LOST_WAIT_MS`) to come back. Not back, or WebGL failing as it starts (no WebGL 2, no context, its shader
+  fails): the street town reloads once (`/town`, the same query); failing again within 2 minutes of that (`RETRY_WINDOW_MS`, the
+  time kept in the tab's session storage), the town's box shows the loading card's look with "The town couldn't load on this
+  device." and a **Reload** button, nothing else (`.town-broken`). Each page reports once with its reason (`message` for the page
+  that gives up), nothing shown (the health view counts them: docs/areas/ops.md, "Health"). The canvas says which backend
+  (`data-backend`). Tests: `test/town-gl-fail.test.ts`, `e2e/town-street.spec.ts` ("context lost"), `e2e/problems.spec.ts`
+  ("without WebGL 2").
 - **Taps** (slice 4: `town/press.ts`; cleaned up in slice 5). A finger down presses the square you'd walk to like a
   button: its face dims a little and one bold gold border lies on its edge, glowing outside only, while the finger is
   down; up on the same thing releases it with one short pulse of that border (brighter, a little wider, fading) and you
@@ -1130,7 +1135,7 @@ and Seam Avenue's camera turn, is done; then the switch goes). Eric approved its
 
 ## Frame-rate pill (`?fps`)
 `/town?fps` shows anyone (Eric, Oct 30: no admin needed, the site is behind Cloudflare Access) a pill in the world's top-right corner, "60 fps · 16.7 ms · 2D": frames over the last second and their mean time, text set twice a second from plain counters in the frame loop, then the drawing's backend ("· WebGL" in the street town; added by town.css from `data-backend`, so the pill's text stays the numbers). Without `?fps` there is none. `?crowd=N` is anyone's too (only that device draws the pawns). Since Nov 11 the count is shared (`FpsCount`, `FPS` in `frame-report.ts`): the town's frames and a room's both tick it, so inside a building it reads the room (before, it stood still on the town's last reading there, and its first two readings out divided the frames from before you went in by the whole visit: Eric's "42-44 inside, 2-4 going out", Nov 11). A hidden tab restarts it; the black between the town and a room doesn't (that wait is real).
-`?fps`, `?report`, `?crowd=N` and `?street=off` are read once as the page opens (`TOWN_ASKED`, test-switches.ts), so a later replaceState can't lose them; they apply as the town opens.
+`?fps`, `?report` and `?crowd=N` are read once as the page opens (`TOWN_ASKED`, test-switches.ts), so a later replaceState can't lose them; they apply as the town opens.
 
 ## Frame report (`?report`, Nov 11)
 `/town?report`, anyone's: from your first move, every frame for 30 s (or until **Done** on the pill at the top) is recorded in typed arrays made once (`town/frame-report.ts`; `REC` null without it, so the marks in `Town.tsx`, `render.ts` and `paint-gl.ts` are null checks): its time, the time of each part (logic, camera, sky, ground, placing and sorting, buildings, props, bosses, you, other players, lights, labels, WebGL submit, chips, minimap, and wherever they happen new pictures painted, sight lines and texture uploads; the rest is "outside our code": the browser, the GPU, garbage collection), and what was happening (walking, turning and how fast, zoom, pictures painted, uploads, an atlas reset, a long gap). Then one panel the size of the box to screenshot (`frame-report-panel.ts`): device, fps median / 5th / 1st percentile, the mean and worst ms a part, all and split by walk / turn / load, where the most time went, the worst 10 frames. The chat does no per-frame work. Hook `__townReport()`; tests `packages/app/test/town-frame-report.test.ts`, `e2e/town-street.spec.ts`.
