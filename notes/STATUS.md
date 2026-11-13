@@ -976,3 +976,4 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   - cutscene: session_01JuCWRrgyEXVs6KoeQYaGwX (high, boss lane) claude/recluse-cutscene
   - #676 street town for everyone (full-e2e), review session_01JuCWRueYxDh1BbfLXTzgfV -> review/street-for-everyone
   - Bans block sign-in: queued after the Hidden Boss.
+- Nov 13 16:20: Eric: TWO helpers at once in total. Running: online phase 2 (session_01JuCWRsbJBuVni54xhGTj6A) + #676 reviewer (session_01JuCWRueYxDh1BbfLXTzgfV). PAUSED (resume by send_message, same session): child form (session_01JuCWRsZZGaeExAxBWEvkG4) first, then cutscene (session_01JuCWRrgyEXVs6KoeQYaGwX). A #676 fix round (if any) counts as one of the two.
