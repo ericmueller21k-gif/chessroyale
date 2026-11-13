@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BOSS_POWERS, CROWD_KNOCKOUTS, DEFAULT_SETTINGS, RECLUSE_PHASE2, bossDef, crowdFinalists, fixedLevel, maiaTopRating, modeSettings, mulberry32, type Settings } from "@chessroyale/core";
+import { BOSS_POWERS, CROWD_KNOCKOUTS, DEFAULT_SETTINGS, RECLUSE_CHILD, RECLUSE_PHASE2, bossDef, childRating, crowdFinalists, fixedLevel, levelForMaia, maiaTopRating, modeSettings, mulberry32, type Settings } from "@chessroyale/core";
 import { legalMoves, sanLineToUci, type BoardScore, type Opening, type ServerMessage } from "@chessroyale/chess";
 import { LobbyCore, newLobbyRecord } from "../src/lobby.ts";
 
@@ -261,5 +261,62 @@ describe("the Crowd's boss final online: always the Hidden Boss (Eric, Oct 14)",
     expect(res.bossResult).toBe("boss");
     expect(res.simul).toEqual({ won: 0, of: 4 });
     expect(res.now).toBeGreaterThanOrEqual(p2.clocksAt);
+  });
+
+  it("the child first (Nov 13; the review of the child form online, m3): mated, his fall (not phase 2's), then one new match against the man from the start, at the man's strength; mated, phase 2, the results", () => {
+    const L = crowdFinal({ recluseChild: true });
+    expect(L.last("p2", "boss")!.boss).toMatchObject({ form: "child", formStep: 0 });
+    expect(L.last("p2", "boss")!.boss.powers).toBeUndefined();
+    // (The host's Maia loaded: his moves go out as Maia's, with their rating.)
+    L.core.message(L.core.record.hostId!, { t: "maiaReady" });
+    // Scholar's mate on each, the crowd White; the host plays his replies into it.
+    L.script = sanLineToUci(["e4", "e5", "Bc4", "Nc6", "Qh5", "Nf6", "Qxf7#"]).filter((_, i) => i % 2 === 0);
+    L.bossScript = sanLineToUci(["e4", "e5", "Bc4", "Nc6", "Qh5", "Nf6"]).filter((_, i) => i % 2 === 1);
+    let fall: Extract<Msg, { t: "boss" }> | undefined;
+    for (let i = 0; i < 2000 && !fall; i++) (L.step(), (fall = L.all("p2", "boss").find((m) => m.fall)));
+    expect(fall!.boss).toMatchObject({ form: "child", result: "crowd" });
+    expect(fall!.toPhase2).toBeUndefined();
+    expect(fall!.until - fall!.now).toBe(RECLUSE_CHILD.fallMs);
+    // (The child's moves at his rating as it rises, Maia's and Stockfish's stand-in alike: the host and its checker play the same.)
+    const plyOf = (fen: string) => { const [, side, , , , full] = fen.split(" "); return (Number(full) - 1) * 2 + (side === "b" ? 1 : 0); };
+    const childAsked = [...L.bossRequests];
+    expect(childAsked.length).toBeGreaterThanOrEqual(3);
+    for (const a of childAsked) {
+      expect(a.brain?.rating).toBe(childRating(plyOf(a.fen)));
+      expect(a.elo).toBe(levelForMaia(childRating(plyOf(a.fen))));
+    }
+    expect(childAsked[0]!.brain!.rating).toBe(RECLUSE_CHILD.startRating);
+    let fall2: Extract<Msg, { t: "boss" }> | undefined;
+    for (let i = 0; i < 3000 && !fall2; i++) (L.step(), (fall2 = L.all("p2", "boss").find((m) => m.fall && !m.boss.form)));
+    // (One new match, one intro: the man's, from the start.)
+    expect(L.all("p2", "boss").filter((m) => m.intro).map((m) => m.boss.form ?? "adult")).toEqual(["child", "adult"]);
+    const manAsked = L.bossRequests.slice(childAsked.length);
+    expect(manAsked[0]!.fen.split(" ")[5]).toBe("1");
+    for (const a of manAsked) expect(a).toMatchObject({ elo: fixedLevel(), brain: { rating: maiaTopRating() } });
+    expect(fall2!.toPhase2).toBe(true);
+    for (let i = 0; i < 20 && L.core.record.phase === "boss"; i++) L.advance(1000);
+    expect(L.core.record.phase).toBe("phase2");
+    for (let i = 0; i < 2000 && L.core.record.phase !== "results"; i++) L.advance(1000);
+    const res = L.last("p2", "results")!;
+    expect(res.bossResult).toBe("boss");
+    expect(Object.keys(res.placements)).toHaveLength(100);
+  });
+
+  it("the man's intro after the child's tells no more devices to load Maia: those told at the child's intro stand (the review of the child form online, n1)", () => {
+    const L = crowdFinal({ recluseChild: true });
+    L.core.message(L.core.record.hostId!, { t: "maiaReady" });
+    L.script = sanLineToUci(["e4", "e5", "Bc4", "Nc6", "Qh5", "Nf6", "Qxf7#"]).filter((_, i) => i % 2 === 0);
+    L.bossScript = sanLineToUci(["e4", "e5", "Bc4", "Nc6", "Qh5", "Nf6"]).filter((_, i) => i % 2 === 1);
+    for (let i = 0; i < 2000 && !L.all("p2", "boss").some((m) => m.fall); i++) L.step();
+    // (In his fall, Bo's phone comes back able to check, its Maia saved: one the man's intro would have told to load it.)
+    const bo = L.core.record.humans.find((h) => h.id === "p2")!;
+    expect(bo.id).not.toBe(L.core.record.hostId);
+    L.core.connect(bo.token, "Bo", "phone", false, null, undefined, undefined, null, null, false, {}, true);
+    L.core.message("p2", { t: "speed", nps: 300_000, maiaSaved: true });
+    const told = () => L.all("p2", "bossBrain").filter((m) => m.check).length;
+    expect(told()).toBe(0);
+    for (let i = 0; i < 100 && !L.all("p2", "boss").some((m) => m.intro && !m.boss.form); i++) L.advance(1000);
+    expect(L.all("p2", "boss").filter((m) => m.intro).map((m) => m.boss.form ?? "adult")).toEqual(["child", "adult"]);
+    expect(told()).toBe(0);
   });
 });

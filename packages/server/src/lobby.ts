@@ -2612,8 +2612,9 @@ export class LobbyCore {
         this.r.bossBrain = this.bossBrainNow();
         const host = this.hostNow();
         if (this.r.bossBrain && host) this.io.send(host, { t: "bossBrain", brain: this.r.bossBrain });
-        // (Devices drawn to check his moves load it too: BOSS_CHECK.loaders.)
-        if (host) this.moreLoaders(host, BOSS_CHECK.loaders);
+        // (Devices drawn to check his moves load it too: BOSS_CHECK.loaders. Once a battle: the Hidden Boss's adult form, after his
+        // child's, keeps the devices told at the child's intro, and more only as his moves need them (checkBoss).)
+        if (host && !this.r.bossLoaders) this.moreLoaders(host, BOSS_CHECK.loaders);
         const until = this.io.now() + bossIntroTimeline(runner.boards.get(runner.state.boards[0]!)!.history.length, !!runner.boss.powers?.claimed, !!runner.boss.powers?.snack).total;
         this.broadcast({ ...this.bossMessage(until), intro: true } as Outgoing);
         return this.setTimer("nextRound", until);
