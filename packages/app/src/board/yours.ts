@@ -64,6 +64,16 @@ export function clearAllPremoves() {
   for (const [key, e] of [...entries]) if (e.queue.length) put(key, { ...e, queue: [] });
 }
 
+/**
+ * Every premove on a game's boards cancelled (its listeners told, so an online match tells its server): the Hidden Boss's child
+ * beaten and grown up, a new match against the man from the start on the same board, so a premove made on the child's last
+ * position doesn't play itself there (Nov 13). Marks stay.
+ */
+export function clearPremoves(game: object) {
+  const start = `${gameKey(game)}:`;
+  for (const [key, e] of [...entries]) if (e.queue.length && key.startsWith(start)) put(key, { ...e, queue: [] });
+}
+
 /** Hears every change: the key that changed. */
 export function onYours(fn: (key: string) => void): () => void {
   listeners.add(fn);

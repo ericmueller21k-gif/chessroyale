@@ -8,8 +8,8 @@ import { asServerAdmin, asSignedIn, submitMove, test } from "./helpers.ts";
  * The Hidden Boss's room challenge (Eric, Nov 12 and 13; docs/areas/town-square.md, "His room's challenge"): up his walk-up to the top
  * floor, his card's Challenge ("1 of 4" for everyone in the room), leaving asks "Cancel your game request?", an admin's "Fill with 3 bots"
  * (they join the request one by one: 2 of 4, 3 of 4, 4 of 4), the summoning in the room, and the four into his fight (a party battle
- * online), where the admin's 🏆 ("Win this form") makes the team's next move beat his form: his adult form, then (Nov 13) his phase
- * change and the four boards online, to the result. And a 5th at his door: "The door is locked." Each test in its own town (`?townroom=`). `STILLS=<dir>` writes the stills for the PR.
+ * online), where the admin's 🏆 ("Win this form") makes the team's next move beat his form: the child (Nov 13: his first form; a new
+ * match after him), his adult form, then (Nov 13) his phase change and the four boards online, to the result. And a 5th at his door: "The door is locked." Each test in its own town (`?townroom=`). `STILLS=<dir>` writes the stills for the PR.
  */
 
 const STILLS = process.env.STILLS;
@@ -101,8 +101,8 @@ async function hisCard(page: Page) {
   return his;
 }
 
-test("his room (Eric, Nov 12 and 13): Challenge is 1 of 4; leaving asks; an admin's 3 bots join (2, 3, 4 of 4); the summoning; the fight, and the online 🏆 wins it", async ({ page }) => {
-  test.setTimeout(300_000);
+test("his room (Eric, Nov 12 and 13): Challenge is 1 of 4; leaving asks; an admin's 3 bots join (2, 3, 4 of 4); the summoning; the fight, and the online 🏆 wins each form: the child, the man, the four boards", async ({ page }) => {
+  test.setTimeout(400_000);
   const townroom = `hb-${test.info().project.name}-${Date.now().toString(36)}`;
   await page.goto("/");
   await asServerAdmin(page, "ops");
@@ -164,21 +164,44 @@ test("his room (Eric, Nov 12 and 13): Challenge is 1 of 4; leaving asks; an admi
   await expect.poll(phase, { message: "the team's first turn", timeout: 120_000 }).toBe("play");
   const fight = await page.evaluate(() => {
     const m = (window as any).match;
-    return { boss: m.boss?.id, seats: Object.keys(m.party?.seats ?? {}).length, hidden: m.hiddenRoom };
+    return { boss: m.boss?.id, seats: Object.keys(m.party?.seats ?? {}).length, hidden: m.hiddenRoom, form: m.boss?.form ?? "adult" };
   });
-  expect(fight).toEqual({ boss: HIDDEN_ROOM.boss, seats: 4, hidden: true });
+  // (His first form, Nov 13: the child, his level known.)
+  expect(fight).toEqual({ boss: HIDDEN_ROOM.boss, seats: 4, hidden: true, form: "child" });
+  expect(typeof (await page.evaluate(() => (window as any).match.boss.level))).toBe("number");
+  await expect(page.locator(".boss-char").first()).toHaveClass(/ch-recluse-growing/);
   await page.waitForTimeout(1500);
   await still(page, "fight");
   // The online 🏆 (admins only; the server checks): the team's next move beats his form, as a mate's end.
   const trophy = page.getByRole("button", { name: "Win this form (testing)" });
+  const yourTurnMove = async () => {
+    await expect.poll(phase, { message: "the team's turn", timeout: 120_000 }).toBe("play");
+    const turn = await page.evaluate(() => {
+      const m = (window as any).match;
+      return { fen: m.phase.board.fen as string, allowed: (m.phase.allowed ?? null) as string[] | null };
+    });
+    await submitMove(page, turn.allowed?.[0] ?? legalMoves(turn.fen)[0], turn.fen);
+  };
   await expect(trophy).toBeVisible();
   await trophy.click();
   await expect(page.getByRole("button", { name: "Your next move wins this form (testing)" })).toBeDisabled();
-  const turn = await page.evaluate(() => {
-    const m = (window as any).match;
-    return { fen: m.phase.board.fen as string, allowed: (m.phase.allowed ?? null) as string[] | null };
+  await yourTurnMove();
+  // The child beaten: his fall (he grows up into the man), then a new match against his adult form, from the start, "LVL ???".
+  await expect.poll(() => page.evaluate(() => (window as any).match.boss?.result ?? null), { message: "the child beaten", timeout: 90_000 }).toBe("crowd");
+  expect(await page.evaluate(() => (window as any).match.boss.form)).toBe("child");
+  await expect.poll(() => page.evaluate(() => (window as any).match.boss?.form ?? "adult"), { message: "the new match: his adult form", timeout: 30_000 }).toBe("adult");
+  const adult = await page.evaluate(() => {
+    const b = (window as any).match.boss;
+    return { result: b.result ?? null, level: b.level, ult: b.powers?.ultimate ?? null, moves: b.board.history.length };
   });
-  await submitMove(page, turn.allowed?.[0] ?? legalMoves(turn.fen)[0], turn.fen);
+  expect(adult).toEqual({ result: null, level: null, ult: "bullet", moves: 0 });
+  await expect(page.locator(".boss-char").first()).not.toHaveClass(/ch-recluse-growing/);
+  // His adult form's own 🏆.
+  await expect(trophy).toBeEnabled({ timeout: 60_000 });
+  await expect.poll(phase, { message: "the team's turn against the man", timeout: 120_000 }).toBe("play");
+  await trophy.click();
+  await expect(page.getByRole("button", { name: "Your next move wins this form (testing)" })).toBeDisabled();
+  await yourTurnMove();
   // His adult form beaten (Nov 13: "it plays through till the end"): his fall, then his phase change for everyone, the four boards
   // (the server runs them; with no engine server here, this device's engine plays him and the bots), and the 🏆 again.
   await expect.poll(phase, { message: "his adult form beaten: his phase change", timeout: 90_000 }).toBe("phaseChange");

@@ -1342,7 +1342,7 @@ export class MatchRunner {
     // (The Hidden Boss's child: Maia at his rating now, and Stockfish at the strength that rating stands for while Maia isn't there.)
     const child = this.childRatingNow();
     const brain = this.humanBrain && child !== null ? { ...this.humanBrain, rating: child } : this.humanBrain;
-    const elo = child !== null ? levelForMaia(child) : this.state.boss!.elo;
+    const elo = this.bossEloNow();
     // (Alfil's Slam's pieces land as the crowd's turn after this move begins: his move is judged with them down.)
     const look = this.bossAhead();
     this.landingCheck = null;
@@ -1877,7 +1877,7 @@ export class MatchRunner {
 
   /**
    * The form a boss battle against `id` starts in: the Hidden Boss's child (RECLUSE_CHILD), where the settings ask for it
-   * (`recluseChild`: solo; online once the server's form list is in), else his usual form (nothing set).
+   * (`recluseChild`, from RECLUSE_FORMS: solo, his room's fight and the Crowd's boss final online), else his usual form (nothing set).
    */
   private firstForm(id: string): { form?: BossForm } {
     return id === "recluse" && this.settings.recluseChild ? { form: "child" } : {};
@@ -1896,6 +1896,15 @@ export class MatchRunner {
   /** The Hidden Boss's child: the Maia rating he plays his next move at (core childRating); null in any other form. */
   childRatingNow(b: BossState | null | undefined = this.state.boss): number | null {
     return b?.form === "child" ? childRating(this.formPlies(b)) : null;
+  }
+
+  /**
+   * The strength the boss's next move is played at on Stockfish: the battle's, or the Hidden Boss's child's (the level his Maia
+   * rating now stands for: Stockfish's stand-in while Maia isn't there). Solo's playBoss and the lobby's request (the host's engine).
+   */
+  bossEloNow(): number {
+    const child = this.childRatingNow();
+    return child !== null ? levelForMaia(child) : this.state.boss!.elo;
   }
 
   /**

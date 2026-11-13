@@ -6,6 +6,7 @@ import { PHASE2_ULT_ANIMS, PHASE_CHANGE, Phase2Game, phase2Follows, phase2Mates,
 import { RECLUSE_LINES } from "./characters/recluse-lines.ts";
 import { playInPlace, resetBeats, setEngineAt, setFigureRun } from "./components/BossCharacter.tsx";
 import { resetBattleBanners } from "./battle-banners.ts";
+import { clearPremoves } from "./board/yours.ts";
 import { BLACKOUT, DARK_FORCED } from "./components/Hollow.tsx";
 import { play, warmSounds } from "./sound.ts";
 import { trackCamo } from "./camo.ts";
@@ -550,7 +551,8 @@ export class SoloMatch implements GameView {
   /**
    * The Hidden Boss's child beaten and grown up: a new match against his adult form (the runner's nextBossForm: the board from the
    * start, his powers, the clocks), his entrance again as a new battle's (his beats, lines and banners forgotten: the boss screen
-   * stays up through it, so it doesn't reset them itself), then play. His brain carries on (Maia, at his adult form's rating).
+   * stays up through it, so it doesn't reset them itself), then play. His brain carries on (Maia, at his adult form's rating). Your
+   * premoves on the child's last position are dropped: the same board starts again, and they'd play themselves on the man's first move.
    */
   private nextForm() {
     if (this.stopped) return;
@@ -559,6 +561,7 @@ export class SoloMatch implements GameView {
     bossVoice.reset();
     resetBeats();
     resetBattleBanners();
+    clearPremoves(this);
     this.kingCalled = false;
     this.frozen = null;
     this.bossIntro();
