@@ -32,11 +32,12 @@ adult form ended the fight as a win; his phase change and the four boards were s
    apply on a board that's yours alone. A match that leaned on a device (call 3) builds no case, as for any unvouched match.
 5. **"Win this form" in the four boards: the phase as a whole.** The admin's 🏆 (his room's fight, server-checked) makes the team's next
    move (a person's or a bot's, on any board) win every board still on. Pressed during his fall or phase change, it waits for the boards.
-6. **Leaving** (resign, or gone longer than `LEAVING.awayMs`): their board goes to a bot, which plays it on (the brief: "a seat gone,
+6. **The admins' ultimate trigger** brings his phase 2 ultimate ("5 SECONDS!") online too, once the clocks run (as solo's).
+7. **Leaving** (resign, or gone longer than `LEAVING.awayMs`): their board goes to a bot, which plays it on (the brief: "a seat gone,
    its bot plays it"); for them it's a loss. A disconnect's clock runs meanwhile. Everyone gone: the match ends, his.
-7. **The 50 v 50 final** reaches him online on the same path: those who fought him (the top 4) take the boards, fresh bots any board
+8. **The 50 v 50 final** reaches him online on the same path: those who fought him (the top 4) take the boards, fresh bots any board
    still empty; everyone else watches the four boards (none is theirs).
-8. **The phase change's length** is the server's number (`RECLUSE_ONLINE.changeMs`, 34.3 s): the screens' own timeline
+9. **The phase change's length** is the server's number (`RECLUSE_ONLINE.changeMs`, 34.3 s): the screens' own timeline
    (`PHASE_CHANGE.total`) must stay within 300 ms of it (`packages/app/test/recluse-online.test.ts`). A change to his phase change's
    beats updates the setting with it.
 
@@ -49,6 +50,5 @@ adult form ended the fight as a win; his phase change and the four boards were s
 
 ## Not done
 
-- The admins' "ultimate" trigger doesn't bring his phase 2 ultimate online (solo's does).
 - XP's move count online is phase 1's picks only.
 - A reload in the middle of his room's fight doesn't know it's the room's (no 🏆 after it): as before this change.

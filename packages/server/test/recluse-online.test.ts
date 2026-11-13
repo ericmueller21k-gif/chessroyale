@@ -306,6 +306,20 @@ describe("the admin's Win this form in every form online (server-checked)", () =
   });
 });
 
+describe("the admins' ultimate trigger in phase 2 (as solo's)", () => {
+  it("brings his \"5 SECONDS!\" once the clocks run: every move then has its few seconds", () => {
+    const F = roomFight(1, 3, { engine: true });
+    F.beatAdult();
+    expect(F.core.ultimateTrigger("p1", true)).toBe(false);
+    F.toBoards();
+    expect(F.core.ultimateTrigger("p1", false)).toBe(false);
+    expect(F.core.ultimateTrigger("p1", true)).toBe(true);
+    expect(F.p2().state.ultAt).toBe(F.now);
+    expect(F.last("p1", "phase2")!.p2.ultAt).toBe(F.now);
+    expect(F.core.ultimateTrigger("p1", true)).toBe(false);
+  });
+});
+
 describe("leaving and disconnects in phase 2: a seat gone, its bot plays the board", () => {
   it("a resign: their board is a bot's (it plays on), their result a loss; the others play on", () => {
     const F = roomFight(2, 2, { engine: true });

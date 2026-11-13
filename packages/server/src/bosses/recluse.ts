@@ -23,6 +23,7 @@ import {
   phase2Outcome,
   phase2Timeouts,
   phase2ToMove,
+  phase2Ult,
   phase2WinAll,
   startPhase2,
   type MoveScore,
@@ -384,6 +385,15 @@ export function winForm(lobby: Phase2Lobby): boolean {
   return true;
 }
 
+/** Testing (the admins' ultimate trigger, as solo's): his phase 2 ultimate now, once the clocks run. */
+export function ult(lobby: Phase2Lobby): boolean {
+  const p = lobby.r.recluse2;
+  if (!p || !p.playing || p.done || p.state.ultAt !== null) return false;
+  apply(lobby, p, phase2Ult(p.state, lobby.now()), "ult");
+  arm(lobby);
+  return true;
+}
+
 /** Someone left: their board is a bot's from now on (it plays on), under `bot`'s id and name. */
 export function handOver(lobby: Phase2Lobby, from: string, bot: { id: string; name: string }): boolean {
   const p = lobby.r.recluse2;
@@ -469,4 +479,4 @@ function noteFair(lobby: Phase2Lobby, f: FairAsk, scores: readonly MoveScore[]) 
   r.fairV = (r.fairV ?? 0) + 1;
 }
 
-export const recluseLobby = { begin, step, move, searched, answer, winForm, handOver, onBoard, view };
+export const recluseLobby = { begin, step, move, searched, answer, winForm, ult, handOver, onBoard, view };
