@@ -8,39 +8,57 @@ const REVIEW = { authorization: "Bearer e2e-review-token-0123456789" };
 
 const myId = (page: Page) => page.evaluate(async () => ((await (await fetch("/api/me")).json()) as { user: { id: string } }).user.id);
 
-/** The ban screen and nothing else (Eric, Nov 13): only the line, its address a mailto link; no button, menu or board; no sideways scroll. */
+/**
+ * The ban screen and nothing else (Eric, Nov 13): the line, its address a mailto link, and under it, where sign-in is set up, only the
+ * sign-in to another account (a shared device: the review of #687, M1); no other button, no menu or board; no sideways scroll.
+ */
 async function onlyTheBan(page: Page) {
   await expect(page.locator(".ban-screen")).toBeVisible();
   await expect(page.locator(".ban-line")).toHaveText(BANNED_LINE);
   await expect(page.getByRole("link", { name: SUPPORT_EMAIL })).toHaveAttribute("href", `mailto:${SUPPORT_EMAIL}`);
-  expect((await page.evaluate(() => document.body.innerText)).trim()).toBe(BANNED_LINE);
-  await expect(page.getByRole("button")).toHaveCount(0);
+  const shown = await page.evaluate(() => {
+    const box = document.querySelector<HTMLElement>(".ban-screen > .ban-signin");
+    return {
+      parts: [...document.querySelector(".ban-screen")!.children].map((e) => e.className),
+      rest: document.body.innerText.replace(box?.innerText ?? "", "").trim(),
+      heading: box?.querySelector("h2")?.textContent ?? null,
+      strayButtons: document.querySelectorAll("button").length - document.querySelectorAll(".ban-signin button").length,
+    };
+  });
+  expect(shown).toEqual({ parts: shown.heading ? ["ban-line", "ban-signin"] : ["ban-line"], rest: BANNED_LINE, heading: shown.heading && "Sign in to another account", strayButtons: 0 });
   await expect(page.locator("canvas, .fd-home, .landing, .board-wrap")).toHaveCount(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBe(0);
 }
 
-/** Every answer the server gives this browser on these routes: the ban answer (403, the line, the app's header). */
+/**
+ * Every answer the server gives this browser on these routes: the ban answer (403, the line, the app's header). The sign-in's own
+ * routes aren't among them: anyone may sign in to their own account on a marked browser (a shared device; ban-gate.ts).
+ */
 async function everyRouteBanned(page: Page) {
   const routes: [string, "GET" | "POST"][] = [
     ["/api/me", "GET"],
     ["/api/status", "GET"],
-    ["/api/auth/config", "GET"],
     ["/api/live", "GET"],
     ["/api/shop", "GET"],
     ["/api/lobby/ABCDE", "GET"],
     ["/api/play", "POST"],
     ["/api/lobby", "POST"],
     ["/api/town/here", "POST"],
-    ["/api/auth/email/start", "POST"],
+    ["/api/auth/logout", "POST"],
   ];
   for (const [path, method] of routes) {
     const res = method === "GET" ? await page.request.get(path) : await page.request.post(path, { data: {} });
     expect([path, res.status(), res.headers()["x-hc-banned"], await res.json()]).toEqual([path, 403, "1", { banned: true, message: BANNED_LINE }]);
   }
+  const options = await page.request.get("/api/auth/config");
+  expect([options.status(), options.headers()["x-hc-banned"]]).toEqual([200, undefined]);
 }
 
-/** The real config with email sign-in shown (as where it's set up), and its emailed code planted in the local database. */
-async function emailSignIn(page: Page, email: string, code: string) {
+/**
+ * The real config with email sign-in shown (as where it's set up), and its emailed code planted in the local database. `heading`: the
+ * sign-in box's (home's for a guest; the ban screen's "Sign in to another account").
+ */
+async function emailSignIn(page: Page, email: string, code: string, heading = "Sign in to play online") {
   await page.route("**/api/auth/config", async (route) => {
     const real = await route.fetch();
     const body = (await real.json()) as Record<string, unknown>;
@@ -51,7 +69,7 @@ async function emailSignIn(page: Page, email: string, code: string) {
   const hash = createHash("sha256").update(`${email}:${code}`).digest("hex");
   await localSql(page, `INSERT OR REPLACE INTO email_codes (email, code_hash, expires_at, attempts, sent_at, hour_start, sends_this_hour) VALUES ('${email}', '${hash}', ${at + 600_000}, 0, ${at}, ${at}, 1)`);
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "Sign in to play online" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: heading })).toBeVisible();
   await page.getByLabel("Email").fill(email);
   await page.getByRole("button", { name: "Email me a code" }).click();
   await page.getByLabel("6-digit code").fill(code);
@@ -134,6 +152,26 @@ test("a ban means you can't sign in (Eric, Nov 13): a tab open drops to the ban 
   await page.unrouteAll();
   await page.goto("/town");
   await onlyTheBan(page);
+
+  // A shared device (the review of #687, M1): the mark keeps out only the banned account. Someone else signs in to their own account
+  // from the ban screen (the sign-in to another account under the line) and plays; the browser keeps the banned account's mark.
+  const sisCtx = await browser.newContext();
+  const sisPage = await sisCtx.newPage();
+  await named(sisPage, "Sissy");
+  await sisPage.goto("/?debug");
+  const sisId = await asSignedIn(sisPage, "sissy");
+  await localSql(sisPage, "UPDATE users SET age_ok_at = 1 WHERE id = ?", sisId);
+  const [{ email: sisEmail }] = await localSql<{ email: string }>(sisPage, "SELECT email FROM users WHERE id = ?", sisId);
+  await sisCtx.close();
+  const shared = await browser.newContext();
+  await shared.addCookies([{ name: "hc_banned", value: id, url: page.url() }]);
+  const tablet = await shared.newPage();
+  await emailSignIn(tablet, sisEmail, "616161", "Sign in to another account");
+  await expect(tablet.getByRole("button", { name: "PLAY", exact: true })).toBeVisible({ timeout: 15_000 });
+  await expect(tablet.locator(".ban-screen")).toHaveCount(0);
+  expect(await myId(tablet)).toBe(sisId);
+  expect((await shared.cookies()).find((c) => c.name === "hc_banned")?.value).toBe(id);
+  await shared.close();
 
   // Lifted (an appeal by email, answered by a person): the next load is the game again, and the account signs in as before.
   expect(await (await decide("clear")).json()).toMatchObject({ ok: true, status: "cleared" });
