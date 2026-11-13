@@ -11,6 +11,9 @@ Chromium matched the project's Playwright.
   landed, the click walked you off, the camera followed you, and the target left the screen for good.
 - **A separate press and release.** `page.mouse.click` sends them as two messages; a slow frame between them outlasts the street town's hold
   time (`streetHoldMs`, 180 ms) and the tap becomes a run: no card.
+- **Points a finger can't reach.** `__townAt` accepts any point inside the box, so a home barely on screen counted as "in view" (Big Boy's
+  Crib at x 389.8 of a 390 px phone): no glide, and every tap missed. A point under the page's own layer (an edge chip, the map, the
+  arrows) sends the tap to that button instead.
 - **The test player was put behind you.** `addTestPlayer` took the nearest free square, south of you, which under the chase camera is the
   box's foot, where figures fade out and can't be tapped (every run on a computer).
 - **Folio's doorway was covered.** You stop on his door square, so your pawn and tag cover the doorway from the camera behind you. From
@@ -20,12 +23,13 @@ Chromium matched the project's Playwright.
 
 **Decided.**
 - One shared helper in `e2e/helpers.ts`. `townTapPoint` waits until the tap point holds still over 3 drawn frames (counted with
-  `requestAnimationFrame`, not wall time). `tapInTown` opens a card: it closes any other card, glides once if the target is off the screen
+  `requestAnimationFrame`, not wall time), and counts a point only 10 px inside the canvas with the canvas itself under it
+  (`elementFromPoint`). `tapInTown` opens a card: it closes any other card, glides once if the target is off the screen
   or covered, waits for the view to land, then sends a `quickTap` (press and release together). boss-challenge, town-leave, shop and
   town.spec use it. The rides test's `squareSettled` also counts frames now, and its taps are quick taps.
 - `addTestPlayer` (a test hook) puts the player on your right or left as the town opens. It falls back to the nearest free square.
 - Folio's doorway light is read from the corner of his lot, (29, 14). The rides guard now checks only the squares tapped and the squares in
-  front of them.
+  front of them, and its walk left goes in two taps (four columns left of you is off a phone's screen).
 - **Not changed in the game (for the director):** in the street town, Folio resting on his rest square (25, 16) stands in front of his
   own lit doorway from most views. You can still tap the house, so it's cosmetic.
 

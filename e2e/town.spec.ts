@@ -1156,7 +1156,8 @@ test("a long name or line shrinks its own words to fit its row (Eric, Oct 29), n
 });
 
 test("the other cards on the same dark look: the boss's, the home's, the Colosseum's, a table's and 'Leave the town square?' keep their words and buttons; gold primary buttons, greyed ones and 'Coming soon' read on the dark (4.5:1)", async ({ page }) => {
-  test.setTimeout(120_000);
+  // (Five cards, each tapped once the view holds still: under a full shard's slow frames that can outlast 2 minutes, Nov 13.)
+  test.setTimeout(180_000);
   const errors = watchErrors(page);
   await page.goto("/town");
   await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
@@ -1483,7 +1484,10 @@ test("rides (Oct 31; Nov 1, every boss's): your pawn sits on its ride, the ride'
   await walkTo(c0 - 1, r0 + 5);
   // Stopped: the idle again, its side, facing left as it came.
   expect([(await rideNow(page)).you.anim, (await rideNow(page)).you.view, (await rideNow(page)).you.facing]).toEqual(["idle", 0, -1]);
-  await walkTo(c0 - 1, r0 + 2);
+  // (Down by the walk hook, as a tap would walk you: 3 rows down is behind you, below a phone's chase camera, so no tap reaches it. Nov 13.)
+  await page.evaluate(([c, r]) => (window as unknown as { __townWalk: (s: readonly [number, number]) => boolean }).__townWalk([c, r]), [c0 - 1, r0 + 2] as const);
+  await expect.poll(() => you(page), { message: "down 3 rows" }).toEqual([c0 - 1, r0 + 2]);
+  await expect.poll(async () => (await rideNow(page)).you.anim).toBe("idle");
   // Standing after walking down: its front view's idle.
   expect([(await rideNow(page)).you.anim, (await rideNow(page)).you.view]).toEqual(["idle", 2]);
   const steps = await page.evaluate(() => [...(window as unknown as { __rideSeen: Set<string> }).__rideSeen]);
