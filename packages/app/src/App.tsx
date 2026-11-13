@@ -58,6 +58,7 @@ import { evalBarOn, practiceOn } from "./prefs.ts";
 import { noteSoloBattle } from "./boss-tokens.ts";
 import { noteSoloGame, settleSoloXp, soloGameId, soloTestGame } from "./xp.ts";
 import { isPaused, pausedBosses } from "./status.ts";
+import { kingSay, type KingCue } from "./godKing.ts";
 
 // Off the first load (Nov 10, phone load: home starts fast), each its own chunk: a match's screens (preloaded when play is
 // near), solo play with its runner and the boss rules, the FAQ, the legal pages and Auto chess (loaded on entry).
@@ -68,6 +69,7 @@ const OpeningGrid = game.screen("OpeningGrid");
 const PlayScreen = game.screen("PlayScreen");
 const PhaseChangeScreen = game.screen("PhaseChangeScreen");
 const SimulScreen = game.screen("SimulScreen");
+const RecluseCutscene = game.screen("RecluseCutscene");
 const ResultsScreen = game.screen("ResultsScreen");
 const RevealScreen = game.screen("RevealScreen");
 const CrowdCut = game.screen("CrowdCut");
@@ -164,6 +166,8 @@ function overridesFromUrl(modeId?: ModeChoiceId, matchBoss = false): Partial<Set
     ...(q.get("paint") === "1" ? { bossPaintTest: 1 as const } : q.get("paint") === "2" ? { bossPaintTest: 2 as const } : {}),
     // Testing, solo: ?win=1, you mate the boss at once (1.e4 e5 2.Bc4 Nc6 3.Qh5 Nf6, your move: Qxf7): a boss beaten.
     ...(q.get("win") === "1" ? { bossWinTest: true } : {}),
+    // Testing, solo: ?cutscene=SECONDS (1 to 120), the Hidden Boss's cutscene in that long, sped up to fit (fitCutscene).
+    ...(n("cutscene") !== undefined && n("cutscene")! >= 1 && n("cutscene")! <= 120 ? { cutsceneHoldMs: Math.round(n("cutscene")! * 1000) } : {}),
     // Testing, solo: ?carrots=N (0 to 5, with ?boss=hopper&power=carrotpatch), N of Chub & Chirp's carrots a step from
     // one of his pieces and out of your reach, the rest a step from yours and out of his: his spin on N (5: he wins).
     ...(/^[0-5]$/.test(q.get("carrots") ?? "") ? { bossCarrotTest: Number(q.get("carrots")) } : {}),
@@ -1026,7 +1030,8 @@ export function App() {
   // ?debug (a test switch): the match, the Squads clients and the 1 v 1 game on `window`, for tests and the console. (Each render, so
   // they're there once your account says you may, and a match joined before that, from a link, is too.)
   const debug = testParams().has("debug");
-  if (debug) Object.assign(window as unknown as Record<string, unknown>, { squads, party, duel, __measureSound: measureSound, ...(match ? { match } : {}) });
+  // (__kingSay: a God King line on cue, for the layout checks; the roll always lands.)
+  if (debug) Object.assign(window as unknown as Record<string, unknown>, { squads, party, duel, __measureSound: measureSound, __kingSay: (cue: KingCue, key: string) => kingSay(cue, key, Date.now(), () => 0), ...(match ? { match } : {}) });
 
   // ---------------- Squads ----------------
 
@@ -1234,7 +1239,10 @@ export function App() {
     setLoading(false);
     const fill = !!opts.fill;
     // (`botLevel`: home's Bot level box, the bots' average rating: Settings.botLevel.)
-    const m = new SoloMatch(engines, playerName(), { ...DEFAULT_SETTINGS, ...overridesFromUrl(mode, fill), ...(opts.botLevel !== undefined ? { botLevel: opts.botLevel } : {}) }, practiceOn(), fill);
+    // (The Hidden Boss starts as the child, solo (RECLUSE_CHILD); ?form=adult, a test switch, starts at his adult form, and so does
+    // ?phase=2, which jumps to his phase change from the man. Online waits for the server's form list: never in an online lobby's settings.)
+    const child = testParams().get("form") !== "adult" && testParams().get("phase") !== "2";
+    const m = new SoloMatch(engines, playerName(), { ...DEFAULT_SETTINGS, ...overridesFromUrl(mode, fill), ...(child ? { recluseChild: true } : {}), ...(opts.botLevel !== undefined ? { botLevel: opts.botLevel } : {}) }, practiceOn(), fill);
     // A boss battle (Boss alone, a Solo raid): the server notes its start, to time it for a boss token (boss-tokens.ts).
     // (`town`: a boss challenged from the town: the server announces it in the town's chat, and how it ended.)
     if (m.settings.raid) noteSoloBattle(m, opts.town);
@@ -2302,7 +2310,13 @@ export function App() {
       return <VoteScreen match={match} vote={p.vote} menu={<MatchMenu exit={exitFor(match)} crowd={isCrowd(match)} />} />;
     case "boss":
       // (The loading step, then the intro on a screen of its own: the intro's timeline starts as it mounts.)
-      return <BossScreen key={p.loading ? "boss-loading" : "boss"} match={match} boss={p.boss} until={p.until} thinking={p.thinking} intro={p.intro} loading={p.loading} afterLoading={p.afterLoading} lights={p.lights} rush={p.rush} fall={p.fall} />;
+      return (
+        <>
+          <BossScreen key={p.loading ? "boss-loading" : "boss"} match={match} boss={p.boss} until={p.until} thinking={p.thinking} intro={p.intro} loading={p.loading} afterLoading={p.afterLoading} lights={p.lights} rush={p.rush} fall={p.fall} />
+          {/* (The Hidden Boss beaten, his phase change next: his cutscene over his fall's screen, from its moment: solo's, or the server's.) */}
+          {p.fall && p.toPhase2 && match.cutscene && <RecluseCutscene key={match.cutscene.at} at={match.cutscene.at} until={match.cutscene.until} />}
+        </>
+      );
     case "phaseChange":
       return <PhaseChangeScreen match={match} at={p.at} />;
     case "simul":
@@ -2334,10 +2348,11 @@ function musicBattle(match: AnyMatch | null): MusicBattle | null {
   if (!boss?.id) return null;
   const live = !(p.kind === "boss" && (p.intro || p.loading));
   // (The Hidden Boss: a theme for each point of his fight, switched as it goes (recluseMusic). His later themes are fetched as his
-  // fight starts where his phase change can follow (solo); online his phase 1 is the whole fight.)
+  // fight starts where his phase change can follow: solo, and online his room's fight and the Crowd's final (Nov 13).)
   if (boss.id === "recluse") {
-    const r = recluseMusic(p, !!boss.result, !!match.simul?.decided);
-    return r && { key: match, boss: boss.id, live, ...r, ...(isSolo(match) ? { ahead: [RECLUSE_MUSIC.beaten, RECLUSE_MUSIC.transform] } : {}) };
+    const r = recluseMusic(p, !!boss.result, !!match.simul?.decided, boss.form === "child");
+    const ahead = isSolo(match) || !!(match as { phase2Ahead?: boolean }).phase2Ahead;
+    return r && { key: match, boss: boss.id, live, ...r, ...(ahead ? { ahead: [RECLUSE_MUSIC.beaten, RECLUSE_MUSIC.transform] } : {}) };
   }
   if (boss.result) return null;
   return { key: match, boss: boss.id, live };

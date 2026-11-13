@@ -131,10 +131,20 @@ export interface Settings {
    */
   bossHidden?: boolean;
   /**
+   * The Hidden Boss starts in his child form (RECLUSE_CHILD), then a new match against his adult form once the child is beaten.
+   * Solo sets it (`?form=adult`, a test switch, starts at his adult form); online waits for the server's form list.
+   */
+  recluseChild?: boolean;
+  /**
    * Test switch, solo (?win=1): the boss battle starts after 1.e4 e5 2.Bc4 Nc6 3.Qh5 Nf6 with the crowd White to move,
    * so Qxf7 mates the boss at once (to see a boss beaten: the Hidden Boss's collapse).
    */
   bossWinTest?: boolean;
+  /**
+   * Testing only (e2e): the Hidden Boss's cutscene's hold (ms) instead of RECLUSE_CUTSCENE.holdMs; the scene plays sped up to fit it
+   * (fitCutscene). Solo: `?cutscene=SECONDS`; online: the lobby server's CUTSCENE_HOLD_MS where TEST_SWITCHES is on.
+   */
+  cutsceneHoldMs?: number;
   /**
    * Test switch, solo (?carrots=N, 0 to 5, with ?boss=hopper&power=carrotpatch): Chub & Chirp's cast plants N carrots
    * each a step from one of his pieces and out of the crowd's reach, and the rest each a step from one of the crowd's
@@ -1023,8 +1033,8 @@ export function bossPartySettings(difficulty: string): Partial<Settings> {
 /**
  * The Hidden Boss's fight from his room (HIDDEN_ROOM; Eric, Nov 13): Boss Battle's party battle for the room's four (the party rule:
  * a move two or more picked is played, a tie between moves by their strength: partyMove), the team's one clock, any member's God
- * King call; the boss always him (`bossHidden`: he's hidden from players everywhere else). His adult form only online: winning it ends
- * the fight, as the Crowd's final does (his phase 2's four boards are solo only). The server's alone: a player can't ask for it.
+ * King call; the boss always him (`bossHidden`: he's hidden from players everywhere else). His adult form beaten, his phase change and
+ * the four boards follow online (Nov 13: RECLUSE_ONLINE), as in the Crowd's final. The server's alone: a player can't ask for it.
  */
 export function hiddenRoomSettings(): Partial<Settings> {
   return { ...bossPartySettings("normal"), lobbySize: HIDDEN_ROOM.players, groupSize: HIDDEN_ROOM.players, bossId: HIDDEN_ROOM.boss, bossHidden: true };
@@ -1920,6 +1930,106 @@ export const RECLUSE_TALK = {
   2: { middleFromMs: 45_000, lateFromMs: 105_000 },
 } as const;
 
+/**
+ * The Hidden Boss's first form, the child (Eric, Nov 12-13; docs/decisions/2026-11-13-hidden-boss-child-form.md): no powers
+ * (no "No help", no bullet clock; he never strikes, as his adult form), a kid's lines, and a brain that grows with the game.
+ * - **His strength:** Maia, raw (his adult form's brain), at `startRating` for his first moves, `stepRating` more every
+ *   `everyPlies` moves on the board (both sides' moves: Eric's "every 4 moves (all moves)"), up to Maia's top rating in our
+ *   setup (core `maiaTopRating`: 2500, BOSS_BRAIN.maiaRating's last point), which is his adult form's own: the child at the top
+ *   plays as the man does. 1800 to 2500: seven steps, the last after 28 moves on the board (his 14th move).
+ * - **He grows:** `ages`, the Maia rating from which each drawing shows (`recluse-ages.ts`): about 9, 13, 20 (the black suit),
+ *   then his adult look, the last at the top (a test checks), so the child at his strongest is the man you meet next.
+ * - **Beaten** (by mate, or the admins' "Win this form"): his line, then he grows up into the man (`fallMs` in all), and a new
+ *   match starts from the starting position against his adult form (today's phase 1), solo and, once its form list is in,
+ *   online. A draw or a loss ends the fight, as his adult form's does.
+ */
+export const RECLUSE_CHILD = {
+  startRating: 1800,
+  stepRating: 100,
+  everyPlies: 4,
+  ages: [1800, 2000, 2200, 2500],
+  /** Beaten: his line first, then he grows up into the man at `growUpAt` ms into his fall (about 2.3 s), the fall `fallMs` in all. */
+  growUpAt: 1200,
+  fallMs: 4200,
+} as const;
+
+/**
+ * The Hidden Boss's forms, in the order his fight meets them (Eric, Nov 13: "it plays through till the end";
+ * docs/decisions/2026-11-13-recluse-online-phase2.md). Each one beaten brings the next; the last beaten is his defeat.
+ * `adult`: his phase 1 (Bullet, No help, his chatter); `four`: his phase change and the four boards (RECLUSE_PHASE2).
+ * The child form (`child`, being built on claude/recluse-child-form) goes first: `["child", "adult", "four"]`, with no change
+ * to the online code that reads this (recluseNextForm).
+ */
+export type RecluseForm = "child" | "adult" | "four";
+export const RECLUSE_FORMS: readonly RecluseForm[] = ["adult", "four"];
+/** The form his fight meets after `form` (null: `form` is his last, or isn't in his fight). */
+export function recluseNextForm(form: RecluseForm, forms: readonly RecluseForm[] = RECLUSE_FORMS): RecluseForm | null {
+  const i = forms.indexOf(form);
+  return i >= 0 ? (forms[i + 1] ?? null) : null;
+}
+
+/**
+ * The Hidden Boss's cutscene between his adult form and the cyborg (Nov 12; `components/RecluseCutscene.tsx`): after his fall,
+ * before his phase change, solo and online (Nov 13). Eric: everything dims and a soft-edged spotlight shines on the board's middle; his ghost as a
+ * child poofs into being above the board, drops and lands; then the 17 lines, each its own text box by its speaker,
+ * typed out, a line of two sentences typing the first, holding about a second, then the second; each box up long enough
+ * to read ("err on the slow side"); after the last, the child fades. Times in ms.
+ */
+export const RECLUSE_CUTSCENE = {
+  /** Everything dims and the spotlight comes up over this long. */
+  dimMs: 1000,
+  /** How dark the dimmed screen is outside the light (0 to 1). */
+  dimAlpha: 0.86,
+  /** The light's radius, a share of the board's width: fully lit inside `spotInner` of it, then a soft fade to the dark. */
+  spot: 0.4,
+  spotInner: 0.45,
+  /** The child poofs in this long after the light is fully up. */
+  poofAfterMs: 600,
+  /** The first line this long after he has landed and straightened. */
+  firstLineAfterMs: 600,
+  /** Typing: a character every `typeMs` (the game's lines type at 28: slower here, to read along). */
+  typeMs: 45,
+  /** Between the two sentences of a line: the first typed, then this pause, then the second. */
+  sentencePauseMs: 1000,
+  /** Once typed, a box stays fully readable `readMs` plus `perCharMs` a character, at most `maxReadMs`, then fades. */
+  readMs: 1700,
+  perCharMs: 40,
+  maxReadMs: 5500,
+  /** A box's fade, and the quiet between it and the next box. */
+  boxFadeMs: 260,
+  gapMs: 400,
+  /** After the last box has gone, the child fades out this much later (his fade is his frames'), then the scene holds. */
+  kidFadeAfterMs: 500,
+  endHoldMs: 1500,
+  /** Then the light lifts and the scene fades away (the dim and the man on the board), and his phase change begins. */
+  outMs: 600,
+  /**
+   * Online (claude/recluse-online-phase2): after his fall the server holds this long for the scene, telling everyone when it
+   * starts (`recluseCutscene`), then his phase change starts for everyone at once. The scene's whole length (the app's
+   * `recluseCutsceneTimeline().endAt`: a unit test keeps the two equal; change it with the lines or the times above).
+   */
+  holdMs: 104_085,
+} as const;
+
+/**
+ * His phase 2 online (Nov 13; docs/decisions/2026-11-13-recluse-online-phase2.md): the lobby server runs the four boards
+ * (packages/server/src/bosses/recluse.ts), his moves and the bots' from the engine server, the host's device where it can't
+ * answer (the result then pays as a solo game), the server's own quick move where neither does.
+ * - `changeMs`: his phase change's length on every screen, from its start to the boards (the app's PHASE_CHANGE.total: a test
+ *   keeps the two within 300 ms); the clocks start `RECLUSE_PHASE2.change.countdownSeconds` after it.
+ * - `groupNodes`: the engine server's search per group of moves (every legal move scored, at most 8 a search: its limit), so one
+ *   move of his (about five groups) searches less than one judge's re-check, and counts once against the day's budget.
+ * - `botLoss`: a bot's move is one of those within this much of the best (expected score, 0 to 1), at random: a bot's strength,
+ *   never his (he plays the best).
+ * - `askMs`: how long the host's device has to play a move when the engine server can't; then the server's quick move.
+ */
+export const RECLUSE_ONLINE = {
+  changeMs: 34_300,
+  groupNodes: 120_000,
+  botLoss: 0.06,
+  askMs: 6000,
+} as const;
+
 export const RECLUSE_PHASE2 = {
   /** How many boards (all of them must be won to beat him). */
   boards: 4,
@@ -2001,6 +2111,8 @@ export const RECLUSE_PHASE2 = {
     chantLines: { typeMs: 45, sentencePauseMs: 1000, readMs: 1700, perCharMs: 40, maxReadMs: 5500, fadeMs: 260, gapMs: 400, firstAfterMs: 1500 },
     /** The boards split and set: a big 5, 4, 3, 2, 1 on every board before phase 2's clocks run (s). */
     countdownSeconds: 5,
+    /** Beaten where his phase change follows: the board holds this long while he collapses (ms; solo and online). */
+    fallMs: 1800,
   },
 };
 

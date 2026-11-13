@@ -9,10 +9,13 @@ import { START_FEN, chess960Fen, legalMoves960, stockfishRefuses } from "@chessr
 
 // (The real container needs the Workers runtime: a stub that records what it's sent and scores every move 0.5.)
 const sent = vi.hoisted(() => [] as { instance: string; fen: string; moves: string[] }[]);
+// (Searches that fail, by their number from the test's start (a container still waking: no answer).)
+const failing = vi.hoisted(() => ({ calls: 0, at: new Set<number>() }));
 vi.mock("@cloudflare/containers", () => ({
   Container: class {},
   getContainer: (_ns: unknown, instance: string) => ({
     fetch: async (_url: string, init: { body: string }) => {
+      if (failing.at.has(failing.calls++)) return new Response("", { status: 503 });
       const body = JSON.parse(init.body) as { fen: string; moves: string[] };
       sent.push({ instance, fen: body.fen, moves: body.moves });
       return new Response(JSON.stringify({ moves: body.moves.map((move) => ({ move, expected: 0.5 })) }));
@@ -25,7 +28,7 @@ import worker, { type Env } from "../src/index.ts";
 import { createGuest, ensureSchema, signInWithIdentity } from "../src/accounts.ts";
 import { SESSION_COOKIE } from "../src/api.ts";
 import { memoryDb } from "./memory-db.ts";
-import { serverScoreAt, soloCap } from "../src/engine.ts";
+import { serverAllMovesAt, serverScoreAt, soloCap } from "../src/engine.ts";
 import { containerSearch } from "../src/fairplay-engine.ts";
 
 /** Positions Stockfish refuses, one of each kind the game could be handed (stockfishRefuses). */
@@ -81,6 +84,8 @@ async function accountsDb() {
 let log: ReturnType<typeof vi.spyOn>;
 beforeEach(() => {
   sent.length = 0;
+  failing.calls = 0;
+  failing.at.clear();
   log = vi.spyOn(console, "log").mockImplementation(() => undefined);
 });
 afterEach(() => log.mockRestore());
@@ -130,6 +135,32 @@ describe("the engine server never gets a position Stockfish refuses", () => {
     expect(await serverScoreAt({ ENGINE: {} as never }, C960, C960_MOVES)).toHaveLength(2);
     expect(sent.map((s) => s.fen)).toEqual([START_FEN, C960]);
     expect(log).not.toHaveBeenCalled();
+  });
+
+  it("the Hidden Boss's phase 2 (serverAllMovesAt): every legal move in groups of 8; the first group tried twice (a container still waking), a later one once", async () => {
+    const all = legalMoves960(C960);
+    const groups = Math.ceil(all.length / 8);
+    expect(groups).toBeGreaterThan(2);
+    expect((await serverAllMovesAt({ ENGINE: {} as never }, C960, 1000))?.map((s) => s.move).sort()).toEqual([...all].sort());
+    expect(sent).toHaveLength(groups);
+    // (The first group's first try fails: tried again, and the position is scored.)
+    sent.length = 0;
+    failing.calls = 0;
+    failing.at.add(0);
+    expect(await serverAllMovesAt({ ENGINE: {} as never }, C960, 1000)).toHaveLength(all.length);
+    expect(sent).toHaveLength(groups);
+    expect(failing.calls).toBe(groups + 1);
+    // (Both tries fail: no answer; the device's turn.)
+    failing.calls = 0;
+    failing.at.add(1);
+    expect(await serverAllMovesAt({ ENGINE: {} as never }, C960, 1000)).toBeNull();
+    expect(failing.calls).toBe(2);
+    // (A later group fails: no answer at once, no second try.)
+    failing.calls = 0;
+    failing.at.clear();
+    failing.at.add(1);
+    expect(await serverAllMovesAt({ ENGINE: {} as never }, C960, 1000)).toBeNull();
+    expect(failing.calls).toBe(2);
   });
 
   it("fair play's deep search goes the same way: refused, nothing sent; legal, sent to its own instance", async () => {

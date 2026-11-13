@@ -17,7 +17,7 @@
  *
  * His art and lines are the app's (characters/recluse.ts, characters/recluse-lines.ts, components/Recluse.tsx).
  */
-import { BOSS_POWERS, type BossPowerSettings, type BossPowerState, type BossState } from "@chessroyale/core";
+import { BOSS_POWERS, RECLUSE_CHILD, type BossPowerSettings, type BossPowerState, type BossState } from "@chessroyale/core";
 import { bossPowers, testSwitch, type Battle, type BossRules } from "./base.ts";
 
 /**
@@ -96,4 +96,19 @@ export const RECLUSE: BossRules = {
     if (!p?.events.some((e) => e.kind === "bullet" && e.turn === p.turn)) return;
     b.state = { ...b.state, players: b.state.players.map((pl) => (pl.alive ? { ...pl, bankMs: BOSS_POWERS.bulletBankSeconds * 1000 } : pl)) };
   },
+};
+
+/**
+ * His child form's rules (BossState.form "child", RECLUSE_CHILD; Eric, Nov 12-13): no powers at all (bossPowers gives none, so
+ * no meter, no bullet clock and no "No help": the God King's help works against the child), from the starting position, and he
+ * never strikes, as his adult form (his fight is a squad's). Beaten, he grows up (`fallMs`), and the runner starts a new match
+ * against his adult form (`nextBossForm`).
+ */
+export const RECLUSE_CHILD_RULES: BossRules = {
+  id: "recluse",
+  noStrikes: true,
+  fallMs: RECLUSE_CHILD.fallMs,
+  opening: { fromStart: true },
+  ultimate: () => false,
+  passive() {},
 };

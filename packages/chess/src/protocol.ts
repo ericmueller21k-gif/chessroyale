@@ -13,6 +13,7 @@ import type { CreaseAsk, FolioView } from "./bosses/folio.ts";
 import type { WorkshopView } from "./bosses/timber.ts";
 import type { DashView } from "./bosses/dash.ts";
 import type { ZebraView } from "./bosses/zebra.ts";
+import type { Phase2Result } from "./bosses/recluse-phase2.ts";
 import type { MoveScore } from "./uci.ts";
 /**
  * Messages between the browser and the lobby server (one Durable Object per
@@ -216,6 +217,13 @@ export interface NetBoss {
   level?: number | null;
   /** The level at its usual strength: the bar shows a lift or a slash as `level` against it (missing with `level`; none for "???"). */
   levelBase?: number;
+  /**
+   * The boss's form, when it isn't his usual one (BossState.form): "child", the Hidden Boss's first (RECLUSE_CHILD), and the step
+   * of his ramp now (`formStep`, core childStep: 0 at the start, one more every RECLUSE_CHILD.everyPlies moves): his level and his
+   * drawing (core childAge) follow it. Missing: his usual form.
+   */
+  form?: "child";
+  formStep?: number;
   /** The side the crowd plays. */
   crowdSide: "w" | "b";
   crowdMoves: number;
@@ -660,6 +668,14 @@ export type ClientMessage =
    */
   | { t: "winForm" }
   /**
+   * The Hidden Boss's phase 2 online (NetPhase2): your move on your board (`key`: its phase 2; `ply`: the board's move count it was
+   * made on; `away`: your look-aways during it, as with a pick). The server checks it's your board, your move, on that position and
+   * legal; else it's refused (`phase2` with `refused`).
+   */
+  | { t: "phase2Move"; key: string; board: number; move: string; ply: number; away?: number }
+  /** The host's answer to phase2Ask: the move its engine played (the server checks it's legal there). */
+  | { t: "phase2Answer"; id: string; move: string }
+  /**
    * Hollow's dark: a move attempt that touches a dark square, sent unchecked (the app can't show what's there). The
    * server judges it: a legal move is this player's pick; an illegal one costs points and they pick again.
    */
@@ -861,7 +877,20 @@ export type ServerMessage = { now: number } & (
    * (the Hidden Boss, BossRules.fallMs) collapses on the board until `until`, then the results come (an older app shows
    * the board with the result in it meanwhile).
    */
-  | { t: "boss"; boss: NetBoss; standings: NetStanding[]; until: number; thinking?: boolean; intro?: boolean; fall?: boolean; rush?: NetRush }
+  | {
+      t: "boss";
+      boss: NetBoss;
+      standings: NetStanding[];
+      until: number;
+      thinking?: boolean;
+      intro?: boolean;
+      fall?: boolean;
+      rush?: NetRush;
+      /** With `fall`: the Hidden Boss's phase change follows (his phase 2 online), not the results. */
+      toPhase2?: true;
+      /** With `toPhase2`: who takes his four boards (player ids, board order): for them, leaving from here on is resigning a board. */
+      phase2Boards?: string[];
+    }
   /**
    * Hollow's dark, to the player who tried: `ok` the attempt was legal and is their pick (`move`, as played); else it
    * cost darkTryCost (`tries` wrong so far this turn) and they pick again, or (`out`) their turn is over, as a miss.
@@ -1028,6 +1057,22 @@ export type ServerMessage = { now: number } & (
    * could go. `block`: your chat ban (reason "mod").
    */
   | { t: "chatNo"; say: string; reason: ChatRefusal; retryAt: number; block?: ChatBlock; /** Why, in words (a typed message: the filter's, the age gate's). */ message?: string }
+  /**
+   * The Hidden Boss's cutscene before his phase change online (RECLUSE_CUTSCENE.holdMs; the scene is the app's): from `at` (server
+   * time) to `until`, when his phase change starts for everyone (the `phase2` message's `at`). Sent once, as the hold begins.
+   */
+  | { t: "recluseCutscene"; at: number; until: number }
+  /**
+   * The Hidden Boss's phase 2 online: his phase change, then the four boards, all of it as it stands (sent whole on every change).
+   * `boss` and `standings` (the battle as it ended, the standings) only in what a device back in the middle of it gets (a reload);
+   * `refused`: to one player, their move wasn't played (their app drops the move it showed ahead).
+   */
+  | { t: "phase2"; p2: NetPhase2; boss?: NetBoss; standings?: NetStanding[]; refused?: true }
+  /**
+   * To the host: the engine server can't play this move of phase 2 (his, or a bot's): play it on your engine, at this strength
+   * (UciEngine.playAtElo), and answer with phase2Answer. The server plays its own quick move if no answer comes in time.
+   */
+  | { t: "phase2Ask"; id: string; fen: string; elo: number; nodes: number; moveMs: number }
   | {
       t: "results";
       placements: Record<string, number>;
@@ -1047,8 +1092,52 @@ export type ServerMessage = { now: number } & (
       ranked?: boolean;
       /** Something in it stood on one device's word alone (LobbyRecord.unvouched): it pays as a solo game, and the results say so. */
       unvouched?: true;
+      /** The Hidden Boss's phase 2 decided it: how many of its boards were won (all of them beat him). */
+      simul?: { won: number; of: number };
     }
 );
+
+/** One of the Hidden Boss's phase 2 boards online (NetPhase2): who plays it for the team, and where it stands. */
+export interface NetPhase2Board {
+  id: number;
+  /** Its player's id (a person's, or a bot's: a person who leaves hands it to a bot), and their name. */
+  player: string;
+  name: string;
+  /** Its Chess960 start position (the standard numbering; -1: the test switch's position). */
+  number: number;
+  fen: string;
+  /** The last move (UCI), and every move from its start. */
+  lastMove: string | null;
+  history: string[];
+  bases: Base[];
+  /** The player's bank as of `turnAt` (ms), and when their turn began (server time; their clock running), or null. */
+  bankMs: number;
+  turnAt: number | null;
+  result: Phase2Result | null;
+}
+
+/**
+ * The Hidden Boss's phase 2 online (packages/server/src/bosses/recluse.ts): his phase change for everyone from `at`, the boards
+ * set and counting down until `clocksAt`, then the four boards played at once until each is decided. Every time is the server's.
+ */
+export interface NetPhase2 {
+  key: string;
+  /** His fall ends and the cutscene's hold begins (`cutAt`, to `at`: a device back during it still knows the scene). */
+  cutAt: number;
+  at: number;
+  clocksAt: number;
+  /** Phase 1's last position, the one his phase change splits. */
+  from: string;
+  boards: NetPhase2Board[];
+  /** The team's slow moves so far, the last one (which board, when), and when his ultimate came (null: not yet). */
+  slow: number;
+  lastSlow: { board: number; at: number } | null;
+  ultAt: number | null;
+  /** Every board decided: when, whether he's beaten (all of them won) and how many were; the result screen at `until`. */
+  done?: { at: number; until: number; beaten: boolean; won: number; of: number };
+  /** Testing (an admin's "Win this form"): the team's next move wins every board still on. */
+  winNext?: true;
+}
 
 /**
  * Dash's Scramble Rush on the server's clock (the crowd's turn waits for it): its key and when it began (server time; every beat

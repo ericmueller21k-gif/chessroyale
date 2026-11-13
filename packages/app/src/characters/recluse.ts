@@ -882,6 +882,16 @@ const COLLAPSE_LOOP: Spec[] = Array.from({ length: 16 }, (_, i) => {
   return { ms: 90, p: { stance: "kneel", dip: 6 + (i % 4 === 2 ? 1 : 0), headDx: rock, face: { eyes: i === 9 ? "shut" : "down", brows: i === 5 ? "twitch" : "up", mouth }, hold: SLUMP } };
 });
 
+/**
+ * On his knees after his cutscene (loop, 3.84 s; Nov 13): the child gone, he kneels quietly where he fell, no mumbling now, slow
+ * breaths (his shoulders sinking and rising), a blink, a long look up at where the child stood, then down again. His place through
+ * the phase change's first seconds, until he seizes the God King's power (`phaseChangeRun`'s `before`).
+ */
+const KNEEL: Spec[] = Array.from({ length: 16 }, (_, i) => {
+  const up = i >= 9 && i < 13;
+  return { ms: 240, p: { stance: "kneel", dip: up ? 4 : i >= 3 && i < 8 ? 5 : 6, face: { eyes: i === 5 ? "shut" : up ? "readR" : "down", brows: "up", mouth: "tight" }, hold: SLUMP } };
+});
+
 /** The book flying back to his hand as he revives: from the ground, spinning up in an arc. */
 const flyBack = (spin: BookState, at: Pt): Partial<Hold> => ({ book: spin, at, loose: true, clutched: false, elbowR: [29, 53], wristR: [28, 62], elbowL: [62, 56], wristL: [60, 72] });
 /**
@@ -1061,6 +1071,7 @@ const anims = (bust: boolean): Record<string, Anim> => ({
   slam: lazyAnim(() => ({ loop: false, frames: build(SLAM(1), bust) })),
   collapse: lazyAnim(() => ({ loop: false, frames: build(COLLAPSE, bust) })),
   collapseLoop: lazyAnim(() => ({ loop: true, frames: build(COLLAPSE_LOOP, bust) })),
+  kneel: lazyAnim(() => ({ loop: true, frames: build(KNEEL, bust) })),
   revive: lazyAnim(() => ({ loop: false, frames: build(REVIVE, bust) })),
   idle2: lazyAnim(() => ({ loop: true, frames: build(IDLE2, bust, 2) })),
   consult2: lazyAnim(() => ({ loop: false, frames: build(CONSULT(2), bust, 2) })),

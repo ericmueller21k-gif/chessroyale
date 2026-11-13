@@ -27048,3 +27048,101 @@ button.sq-tiny {
     transform: translateY(-50%);
   }
 }
+
+/* While it plays, his figure in its usual place is hidden: he kneels in the light. */
+body.cs-on .boss-char {
+  visibility: hidden;
+}
+/* Nothing to tap during it (review of #679, m1): the ⋯ greyed in its place, as the 🏆 is, never hidden. A sheet already open when it
+   starts stays readable over its dark. */
+body.cs-on .mm .mm-more {
+  opacity: 0.55;
+  pointer-events: none;
+}
+body.cs-on .mm-scrim {
+  z-index: 901;
+}
+/* The Hidden Boss's cutscene (Nov 12: components/RecluseCutscene.tsx; after his fall, before his phase change). One fixed layer over the
+   whole screen: everything dims but a round pool of light on the board's middle, its edge feathered over the outer part of
+   its radius (eased stops, so no ring shows); the figure and the text boxes on a stage laid over the board, above the dark. */
+.cs-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 900;
+  pointer-events: none;
+}
+.cs-dim {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    circle var(--cs-r) at var(--cs-x) var(--cs-y),
+    rgba(255, 238, 200, 0.07) 0%,
+    rgba(255, 238, 200, 0.03) calc(var(--cs-in) * 0.7),
+    rgba(6, 6, 12, 0) var(--cs-in),
+    rgba(6, 6, 12, calc(var(--cs-a) * 0.12)) calc(var(--cs-in) + (100% - var(--cs-in)) * 0.25),
+    rgba(6, 6, 12, calc(var(--cs-a) * 0.38)) calc(var(--cs-in) + (100% - var(--cs-in)) * 0.5),
+    rgba(6, 6, 12, calc(var(--cs-a) * 0.7)) calc(var(--cs-in) + (100% - var(--cs-in)) * 0.75),
+    rgba(6, 6, 12, calc(var(--cs-a) * 0.92)) calc(var(--cs-in) + (100% - var(--cs-in)) * 0.92),
+    rgba(6, 6, 12, var(--cs-a)) 100%
+  );
+}
+.cs-stage {
+  position: fixed;
+}
+.cs-fig {
+  position: absolute;
+  display: block;
+}
+/* The point above the speaker's head that his box stands on: the child's box runs right from it, the man's left; the tail (the
+   bubble's own, drawn apart from the box so it stays over the speaker when the box is moved into view) points down at him. */
+.cs-anchor {
+  position: absolute;
+  width: 0;
+  height: 0;
+}
+.cs-say {
+  bottom: 0;
+  max-width: min(230px, 64vw);
+  font-size: 10px;
+}
+.cs-say::after {
+  display: none;
+}
+.cs-kid .cs-say {
+  left: -32px;
+}
+.cs-man .cs-say {
+  right: -32px;
+}
+.cs-tail {
+  position: absolute;
+  z-index: 13;
+  left: -6px;
+  bottom: -8px;
+  width: 12px;
+  height: 12px;
+  background: #fffbea;
+  border-right: 3px solid #1a1406;
+  border-bottom: 3px solid #1a1406;
+  transform: rotate(45deg);
+  transition: opacity 240ms ease-in;
+}
+.cs-tail.leaving {
+  opacity: 0;
+}
+/* (A phone: the board fills the width, so a box running 32 px past the speaker reaches the screen's edge; there it runs 110 px past
+   him, so a long line sits inside the screen with room on both sides, still over him.) */
+@media (max-width: 599px) {
+  .cs-kid .cs-say {
+    left: -110px;
+  }
+  .cs-man .cs-say {
+    right: -110px;
+  }
+}
+@media (min-width: 900px) {
+  .cs-say {
+    max-width: 320px;
+    font-size: 12px;
+  }
+}

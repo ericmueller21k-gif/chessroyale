@@ -81,7 +81,8 @@ test("solo Crowd: the top 4 meet him; the God King's help tried spends a charge;
   // (Two rounds a stage: with one, the team that hasn't moved yet is a coin flip at the first cut. ?weakbots=1: people rank
   // above bots, so the cuts take bots first and you surely reach the final. Playing well isn't enough: the opening
   // allowance leaves bots level with you, and only two of each team reach it. docs/decisions/2026-10-16-flaky-e2e-batch-2.md)
-  await page.goto("/?debug&pace=quick&mode=crowd&format=boss&rounds=2&clock=30&win=1&weakbots=1");
+  // (At his adult form, ?form=adult: this test is about it; his child form comes first otherwise, Nov 13.)
+  await page.goto("/?debug&pace=quick&mode=crowd&format=boss&rounds=2&clock=30&win=1&weakbots=1&form=adult&cutscene=6");
   await soloFromHome(page);
   await knockouts(page, 8);
   // (The battle is set up at the last cut; its intro comes after the cut's screen. Its line counts the finalists.)

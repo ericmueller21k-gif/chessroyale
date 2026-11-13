@@ -106,7 +106,7 @@ export class Voice {
    * busy frame never eats into it). Returns whether it was taken (shown now, or waiting its turn).
    */
   say(text: string | null | undefined, key: string, priority: Priority = NORMAL, at = Date.now(), hold?: number, paced?: PacedLine): boolean {
-    if (!text || this.said.has(key)) return false;
+    if (!text || this.said.has(key) || at < this.hushedUntil) return false;
     this.said.add(key);
     if (this.said.size > 400) this.said.delete(this.said.values().next().value!);
     this.advance(at);
@@ -152,7 +152,26 @@ export class Voice {
     return () => this.listeners.delete(f);
   }
 
-  /** A new battle: nothing said yet. */
+  /**
+   * Quiet until `until` (the Hidden Boss's cutscene, whose own boxes speak): the line up and those waiting are dropped, and nothing
+   * said for a moment before `until` is taken (his fall's mumbling, the God King's remarks).
+   */
+  hush(until: number) {
+    this.hushedUntil = until;
+    this.now = null;
+    this.queue = [];
+    for (const f of this.listeners) f();
+  }
+  private hushedUntil = 0;
+  /** The hush lifted early: its scene taken off the screen (the match left during it). */
+  unhush() {
+    this.hushedUntil = 0;
+  }
+
+  /**
+   * A new battle: nothing said yet. A hush stays: online, phase 2's first word (which resets the God King's voice) can land just after
+   * the cutscene has hushed both. Left mid-scene, the scene's unmount lifts it (`unhush`; review of #679, m2).
+   */
   reset() {
     this.now = null;
     this.queue = [];
@@ -319,10 +338,14 @@ export function SpeechBox({ class: cls, text, at, until, now, fits = 0, balanced
     // stands him further from the board, and his words came out under the menu.)
     const nav = document.querySelector(".gm-frame > .fd-side")?.getBoundingClientRect();
     const minX = nav && nav.width > 0 && nav.right < innerWidth / 2 ? Math.ceil(nav.right) : 0;
-    const out = r.top < 0 || r.left < minX || r.right > innerWidth;
+    // (The game screen's own right edge clips a box before the window's does (Eric, Nov 13: the God King's words cut off on a computer):
+    // the box keeps inside the screen, over the pawn if need be.)
+    const clip = e.closest(".screen")?.getBoundingClientRect();
+    const maxX = clip && clip.width > 0 ? Math.min(innerWidth, Math.floor(clip.right)) : innerWidth;
+    const out = r.top < 0 || r.left < minX || r.right > maxX;
     if (!out) return;
     if (fit.step < fits) setFit({ step: fit.step + 1, dx: 0, dy: 0 });
-    else setFit({ step: fit.step, dx: r.left < minX ? minX - r.left : r.right > innerWidth ? innerWidth - r.right : 0, dy: r.top < 0 ? -r.top : 0 });
+    else setFit({ step: fit.step, dx: r.left < minX ? minX - r.left : r.right > maxX ? maxX - r.right : 0, dy: r.top < 0 ? -r.top : 0 });
   }, [fit]);
   const { shown, rest } = sliceLine(text, typed ?? typedCount(text, at, now));
   const leaving = until - now < SPEECH.fadeMs;

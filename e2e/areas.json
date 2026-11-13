@@ -459,12 +459,17 @@
         "packages/chess/src/bosses/recluse*.ts",
         "packages/app/src/recluse-phase2.ts",
         "packages/app/src/recluse-talk.ts",
+        "packages/app/src/recluse-cutscene.ts",
+        "packages/app/src/components/RecluseCutscene.tsx",
         "packages/app/src/characters/recluse*.ts",
         "packages/app/src/characters/effects/recluse.ts",
         "packages/app/src/components/Recluse.tsx",
-        "packages/app/src/screens/Recluse2.tsx"
+        "packages/app/src/components/RecluseChild.ts",
+        "packages/app/src/screens/Recluse2.tsx",
+        "packages/app/src/recluse-online.ts",
+        "packages/server/src/bosses/recluse.ts"
       ],
-      "specs": ["e2e/crowd-hidden.spec.ts", "e2e/formats.spec.ts", "e2e/recluse.spec.ts"]
+      "specs": ["e2e/crowd-hidden.spec.ts", "e2e/formats.spec.ts", "e2e/hidden-boss-room.spec.ts", "e2e/recluse.spec.ts"]
     },
     "Sawyer": {
       "paths": [

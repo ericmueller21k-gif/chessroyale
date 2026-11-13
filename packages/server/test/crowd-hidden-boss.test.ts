@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { BOSS_POWERS, CROWD_KNOCKOUTS, DEFAULT_SETTINGS, bossDef, crowdFinalists, fixedLevel, maiaTopRating, modeSettings, mulberry32, type Settings } from "@chessroyale/core";
-import { RECLUSE_FALL_MS, legalMoves, sanLineToUci, type BoardScore, type Opening, type ServerMessage } from "@chessroyale/chess";
+import { BOSS_POWERS, CROWD_KNOCKOUTS, DEFAULT_SETTINGS, RECLUSE_PHASE2, bossDef, crowdFinalists, fixedLevel, maiaTopRating, modeSettings, mulberry32, type Settings } from "@chessroyale/core";
+import { legalMoves, sanLineToUci, type BoardScore, type Opening, type ServerMessage } from "@chessroyale/chess";
 import { LobbyCore, newLobbyRecord } from "../src/lobby.ts";
 
 /**
  * The Crowd's boss final online (Eric, Oct 14): always the Hidden Boss, the top 4 against him, his phase 1 run by the
- * lobby as solo runs it (his brain on the host's device, his powers, his collapse); phase 2 isn't online yet, so phase 1
- * won is the crowd's victory.
+ * lobby as solo runs it (his brain on the host's device, his powers, his collapse); since Nov 13 phase 1 won brings his
+ * phase 2 online (his phase change and the four boards, the server's: bosses/recluse.ts), as his room's fight does.
  */
 
 const hash = (s: string) => {
@@ -228,34 +228,36 @@ describe("the Crowd's boss final online: always the Hidden Boss (Eric, Oct 14)",
     expect(Object.keys(res.placements)).toHaveLength(100);
   });
 
-  it("beaten online: the board holds for his fall (`fall`, as long as solo's), then the results, the crowd's victory: no phase 2 online", () => {
+  it("beaten online: the board holds for his fall (`fall`, phase 2's, `toPhase2`), then his phase 2 for the top 4 (Nov 13: as his room's fight); its boards decide it", () => {
     const L = crowdFinal();
     // Scholar's mate: the crowd (White) plays it, everyone picking it; the host plays his replies into it.
     L.script = sanLineToUci(["e4", "e5", "Bc4", "Nc6", "Qh5", "Nf6", "Qxf7#"]).filter((_, i) => i % 2 === 0);
     L.bossScript = sanLineToUci(["e4", "e5", "Bc4", "Nc6", "Qh5", "Nf6"]).filter((_, i) => i % 2 === 1);
     let fall: Extract<Msg, { t: "boss" }> | undefined;
-    let fallAt = 0;
-    for (let i = 0; i < 2000 && L.core.record.phase !== "results"; i++) {
+    for (let i = 0; i < 2000 && !fall; i++) {
       L.step();
-      const f = L.all("p2", "boss").find((m) => m.fall);
-      if (f && !fall) {
-        fall = f;
-        fallAt = L.now;
-        // Meanwhile nothing else: the match is over, the board holds.
-        expect(L.core.record.phase).toBe("boss");
-        expect(L.last("p2", "results")).toBeUndefined();
-      }
+      fall = L.all("p2", "boss").find((m) => m.fall);
     }
     expect(fall).toBeTruthy();
     expect(fall!.boss.result).toBe("crowd");
-    expect(fall!.until - fall!.now).toBe(RECLUSE_FALL_MS);
+    // (Not the results: his phase change follows, after phase 2's shorter fall.)
+    expect(fall!.toPhase2).toBe(true);
+    expect(fall!.until - fall!.now).toBe(RECLUSE_PHASE2.change.fallMs);
+    expect(L.core.record.phase).toBe("boss");
+    for (let i = 0; i < 10 && L.core.record.phase === "boss"; i++) L.advance(1000);
+    expect(L.core.record.phase).toBe("phase2");
+    const p2 = L.last("p2", "phase2")!.p2;
+    // The top 4 on its four boards (the two people among them: everyone reached the final here), the same view for everyone.
+    expect(p2.boards).toHaveLength(RECLUSE_PHASE2.boards);
+    expect(new Set(p2.boards.map((b) => b.player)).size).toBe(RECLUSE_PHASE2.boards);
+    expect(L.last("p1", "phase2")!.p2.clocksAt).toBe(p2.clocksAt);
+    // Nobody moves (the host's device is asked for his and the bots' moves and never answers: the server's quick moves): every
+    // board runs out of time, so he wins, and the results say how many of the four were won.
+    for (let i = 0; i < 2000 && L.core.record.phase !== "results"; i++) L.advance(1000);
     expect(L.core.record.phase).toBe("results");
     const res = L.last("p2", "results")!;
-    expect(res.bossResult).toBe("crowd");
-    expect(res.timeout).toBeUndefined();
-    expect(res.now - fallAt).toBeLessThanOrEqual(RECLUSE_FALL_MS + 1000);
-    expect(res.now).toBeGreaterThanOrEqual(fall!.until);
-    // Those who fought him share the win on their records.
-    for (const r of L.core.humanResults()) if (r.placement <= crowdFinalists("boss")) expect(r.survived).toBe(true);
+    expect(res.bossResult).toBe("boss");
+    expect(res.simul).toEqual({ won: 0, of: 4 });
+    expect(res.now).toBeGreaterThanOrEqual(p2.clocksAt);
   });
 });

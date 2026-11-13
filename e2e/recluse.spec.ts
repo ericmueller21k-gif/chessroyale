@@ -84,8 +84,12 @@ async function quietMove(page: Page): Promise<string> {
   return (moves.find((m) => m.piece === "p" && !"de".includes(m.from[0]!)) ?? moves[0]!).lan;
 }
 
-/** Into Boss alone against him through the boss menu, as an admin. */
+/**
+ * Into Boss alone against him through the boss menu, as an admin. At his adult form (`?form=adult`: these tests are about it) unless
+ * the query names a form (his child form, Nov 13, comes first otherwise).
+ */
 async function meetHim(page: Page, query = "laststand=0&clock=60") {
+  if (!/(^|&)form=/.test(query)) query = `${query}&form=adult`;
   await asAdmin(page);
   // (The menu lists him once your profile says you're an admin: wait for it.)
   const me = page.waitForResponse((r) => r.url().includes("/api/me") && r.request().method() === "GET");
@@ -460,7 +464,8 @@ test("beaten in phase 1 (?win=1): he collapses and mumbles, then the phase chang
   await page.addInitScript(() => ((window as any).__soundLog = []));
   const music: string[] = [];
   page.on("request", (r) => void (/^\/music\/.*\.mp3$/.test(new URL(r.url()).pathname) && music.push(new URL(r.url()).pathname)));
-  await meetHim(page, "win=1");
+  // (?cutscene=6: his cutscene after the fall sped up into 6 s; the Win this form test below watches it.)
+  await meetHim(page, "win=1&cutscene=6");
   await yourMove(page);
   const fall = await watchFor(page, {
     collapse: { selector: `${figure()}[data-anim="collapse"]` },
@@ -480,7 +485,9 @@ test("beaten in phase 1 (?win=1): he collapses and mumbles, then the phase chang
     cry: { selector: ".gk-bubble", text: /what are you doing\?!|That power is mine!|My strength!/ },
     seized: { selector: `${figure()}[data-anim="seized"]` },
     ignite: { selector: `${figure()} .bc-engine.on.fresh` },
-    absorbLine: { selector: ".bc-bubble", text: /All game you leaned on an engine\. Now see how you like it\.|Mind and machine\. Both mine now\./ },
+    // (Paged as his chant's lines are, Nov 13: a phone's bar shows a sentence at a time.)
+    absorbLine: { selector: ".bc-bubble", text: /^(All game you leaned on an engine|Mind and machine)\.$/ },
+    absorbLineB: { selector: ".bc-bubble", text: /^(Now see how you like it|Both mine now)\.$/ },
     fading: { selector: ".gk-unit.gk-fading" },
     gone: { selector: ".gk-unit.gone" },
     rage: { selector: `${figure()}[data-anim="rage"]` },
@@ -782,7 +789,7 @@ test("the board keeps its size from the mate until the split (Eric, Oct 18: it s
   // the fold is one remembered from another match, which must change neither screen's board. (A computer's is beside the
   // board, its size the board's own.)
   if (phone) await page.addInitScript(() => localStorage.setItem("brc.underBoardView", JSON.stringify({ layout: "split", open: false })));
-  await meetHim(page, "win=1");
+  await meetHim(page, "win=1&cutscene=6");
   await yourMove(page);
   // (The board resized for the minimized scoreboard before the watch starts: its squares are drawn by a ResizeObserver,
   // which runs after an animation frame's callbacks, so a frame read just after the fold sees the wrap's new size and
@@ -830,19 +837,41 @@ test("the board keeps its size from the mate until the split (Eric, Oct 18: it s
   expect(off.slice(0, 3), `the board's size (${w0} x ${h0}, squares ${s0}) changed in ${off.length} of ${frames.length} frames`).toEqual([]);
 });
 
-test("the admins' Win this form (Nov 13, Eric's timing test): pressed, your next move beats his adult form, then his phase change; pressed in phase 2, your next move wins all four boards", { tag: "@phone-only" }, async ({ page }) => {
+test("the admins' Win this form (Nov 13, Eric's timing test): pressed, your next move beats his adult form, then his cutscene (the light, the child, the first line to the last), then his phase change; pressed in phase 2, your next move wins all four boards", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(4 * 60_000);
-  await meetHim(page);
+  // (?cutscene=30: his cutscene, about 104 s, sped up into 30 s: every line still shown.)
+  await meetHim(page, "laststand=0&clock=60&cutscene=30");
   const win = page.getByRole("button", { name: /Win this form|Your next move wins this form/ });
   const mv = await quietMove(page);
   await win.click();
   await expect(win).toBeDisabled();
   await expect(win).toHaveAccessibleName(/Your next move wins this form/);
   expect((await bossNow(page)).result, "nothing ends before your move").toBeFalsy();
+  // His cutscene (Eric, Nov 12): over his fall's screen, the light on the board, the child's arrival, Eric's 17 lines in their own
+  // boxes (the first and the last watched, typed out in full), his figure in its place hidden meanwhile; then gone.
+  const scene = await watchFor(page, {
+    light: { selector: ".cs-layer .cs-dim" },
+    kid: { selector: '.cs-fig .sprite-anim, .cs-fig canvas' },
+    hidden: { selector: "body.cs-on" },
+    first: { selector: '.cs-say[data-line="1"]', text: /^Why are you on the floor\?$/ },
+    last: { selector: '.cs-say[data-line="17"]', text: /^I'm not sure\. The only one who can prove it is right next to me\.$/ },
+  });
   await play(page, mv);
   await expect.poll(() => page.evaluate(() => !!(window as any).match.phase.fall), { timeout: 30_000 }).toBe(true);
   expect((await bossNow(page)).result).toBe("crowd");
-  await expect.poll(() => phase(page), { timeout: 30_000 }).toBe("phaseChange");
+  await expect.poll(() => page.locator(".cs-layer").count(), { timeout: 10_000 }).toBe(1);
+  // (No skip: the phase holds through it, the 🏆 greyed.)
+  expect(await phase(page)).toBe("boss");
+  // (Nothing to tap: the ⋯ greyed in its place, not hidden; a tap on it opens nothing (review of #679, m1).)
+  const more = page.getByRole("button", { name: "Match options" });
+  await expect(more).toBeVisible();
+  await expect(more).toHaveCSS("pointer-events", "none");
+  await more.click({ force: true });
+  await expect(page.locator(".mm-scrim")).toHaveCount(0);
+  await expect.poll(() => phase(page), { timeout: 60_000 }).toBe("phaseChange");
+  expect(await scene.seen()).toEqual({ light: true, kid: true, hidden: true, first: true, last: true });
+  await expect(page.locator(".cs-layer")).toHaveCount(0);
+  expect(await page.evaluate(() => document.body.classList.contains("cs-on"))).toBe(false);
   await expect.poll(async () => (await simulNow(page))?.playing ?? false, { timeout: 30_000 + ADDED_MS }).toBe(true);
   const fen = (await simulNow(page)).boards[0].fen as string;
   const pawn = new Chess(fen.replace(/ [A-Ha-h]+ - /, " - - ")).moves({ verbose: true }).find((m) => m.piece === "p")!;
@@ -851,6 +880,59 @@ test("the admins' Win this form (Nov 13, Eric's timing test): pressed, your next
   await simulPlay(page, pawn.lan);
   await expect.poll(() => phase(page), { timeout: 30_000 }).toBe("results");
   expect(await page.evaluate(() => (window as any).match.phase.simul)).toEqual({ won: 4, of: 4 });
+});
+
+test("his child form first (Nov 13): the kid, his level a step up every 4 moves with a pop, growing a step older as it climbs, his room's theme; Win this form beats him, he grows up into the man, and a new match starts against his adult form, its theme after", { tag: "@phone-only" }, async ({ page }) => {
+  test.setTimeout(4 * 60_000);
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await page.addInitScript(() => ((window as any).__soundLog = []));
+  const musicLog = () => page.evaluate(() => ((window as any).__soundLog as string[]).filter((l) => l.startsWith("music:")));
+  await meetHim(page, "laststand=0&clock=60&form=child");
+  await yourMove(page);
+  const first = await bossNow(page);
+  expect(first).toMatchObject({ id: "recluse", name: "Hidden Boss", form: "child", formStep: 0 });
+  // (No powers: no meter, no bullet clock, nothing blocking the God King.)
+  expect(first.powers).toBeUndefined();
+  expect(typeof first.level).toBe("number");
+  await expect(page.locator(".boss-bar .boss-level")).toHaveAttribute("data-level", String(first.level));
+  await expect(page.locator(figure())).toHaveClass(/ch-recluse-growing/);
+  // (Its loop alone: his room's theme has no intro.)
+  await expect.poll(async () => (await musicLog()).some((l) => l.startsWith("music:start:recluse-house")), { timeout: 30_000 }).toBe(true);
+  // His level climbs a step every 4 moves on the board, each step popping as it comes; at step 2 he grows up a step (to 13).
+  const grew = await watchFor(page, { pop: { selector: ".boss-bar .boss-level.lv-up" }, grow: { selector: `${figure()}[data-anim="grow1"]` }, teen: { selector: `${figure()}[data-anim="age1"]` } });
+  const levels = [first.level as number];
+  for (let i = 0; i < 8 && ((await bossNow(page)).formStep ?? 0) < 2; i++) {
+    await play(page, await quietMove(page));
+    levels.push((await bossNow(page)).level as number);
+  }
+  await expect.poll(async () => (await bossNow(page)).formStep, { timeout: 30_000 }).toBeGreaterThanOrEqual(2);
+  await expect.poll(() => grew.seen(), { timeout: 15_000 }).toEqual({ pop: true, grow: true, teen: true });
+  expect((await bossNow(page)).level).toBeGreaterThan(first.level);
+  for (let i = 1; i < levels.length; i++) expect(levels[i]!).toBeGreaterThanOrEqual(levels[i - 1]!);
+  // Win this form: your next move beats the child; his line, he grows up into the man (from 13), then a new match.
+  const win = page.getByRole("button", { name: /Win this form|Your next move wins this form/ });
+  const mv = await quietMove(page);
+  await win.click();
+  await expect(win).toBeDisabled();
+  const up = await watchFor(page, { dock: { selector: ".boss-dock-status", text: /You beat him!/ }, up: { selector: `${figure()}[data-anim="up1"]` }, man: { selector: `${figure()}[data-anim="age3"]` } });
+  await play(page, mv);
+  await expect.poll(() => page.evaluate(() => !!(window as any).match.phase.fall), { timeout: 30_000 }).toBe(true);
+  expect(await bossNow(page)).toMatchObject({ form: "child", result: "crowd" });
+  await expect.poll(() => up.seen(), { timeout: 15_000 }).toEqual({ dock: true, up: true, man: true });
+  // His adult form: a new match from the starting position, "LVL ???", his powers; his theme after the room's.
+  await expect.poll(async () => (await bossNow(page))?.form ?? "adult", { timeout: 15_000 }).toBe("adult");
+  const adult = await bossNow(page);
+  expect(adult.result).toBeUndefined();
+  expect(adult.level).toBeNull();
+  expect(adult.powers).toMatchObject({ passive: "nohelp", ultimate: "bullet" });
+  expect(adult.board.history).toEqual([]);
+  await expect(page.locator(figure())).not.toHaveClass(/ch-recluse-growing/);
+  await expect.poll(async () => (await musicLog()).some((l) => l.startsWith("music:start:recluse-phase2")), { timeout: 30_000 }).toBe(true);
+  await yourMove(page);
+  await expect(page.locator(".boss-bar .boss-level")).toHaveAttribute("data-level", "unknown");
+  await expect(win).toBeEnabled();
+  expect(errors).toEqual([]);
 });
 
 test("a loss (?win=1&phase=2): you resign your board, the bots win theirs: defeated, 3 of 4 won", { tag: "@phone-only" }, async ({ page }) => {

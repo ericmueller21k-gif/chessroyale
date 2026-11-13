@@ -11,7 +11,7 @@ import { HOLLOW } from "./hollow.ts";
 import { BIGBOY } from "./bigboy.ts";
 import { SAWYER } from "./sawyer.ts";
 import { PIG } from "./pig.ts";
-import { RECLUSE } from "./recluse.ts";
+import { RECLUSE, RECLUSE_CHILD_RULES } from "./recluse.ts";
 import { ALFIL } from "./alfil.ts";
 import { HOPPER } from "./hopper.ts";
 import { SMUDGY } from "./smudgy.ts";
@@ -26,5 +26,6 @@ import { ZEBRA } from "./zebra.ts";
 /** Every boss with powers, by its BOSS_ROSTER id. */
 const BOSS_RULES: ReadonlyMap<string, BossRules> = new Map([GINGER, BOINGO, GREX, HOLLOW, BIGBOY, SAWYER, PIG, RECLUSE, ALFIL, HOPPER, SMUDGY, MOO, GARDENER, TIGER, FOLIO, TIMBER, DASH, ZEBRA].map((r) => [r.id, r]));
 
-/** A boss's rules (null: a boss without powers). */
-export const bossRules = (boss: Pick<BossState, "id"> | null | undefined): BossRules | null => (boss?.id ? (BOSS_RULES.get(boss.id) ?? null) : null);
+/** A boss's rules (null: a boss without powers); in a form of its own, that form's (the Hidden Boss's child: RECLUSE_CHILD_RULES). */
+export const bossRules = (boss: (Pick<BossState, "id"> & { form?: BossState["form"] }) | null | undefined): BossRules | null =>
+  boss?.form === "child" && boss.id === RECLUSE.id ? RECLUSE_CHILD_RULES : boss?.id ? (BOSS_RULES.get(boss.id) ?? null) : null;

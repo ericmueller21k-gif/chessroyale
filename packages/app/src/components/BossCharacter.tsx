@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef } from "preact/hooks";
 import { bossBeat, type Beat, type BeatResult, type Stage } from "../characters/boss-beats.ts";
-import { BOSS_KITS, artOf, bossKit, poweredKit, type BossKit } from "../characters/kits.ts";
+import { BOSS_KITS, artOf, bossKit, bossKitOf, poweredKit, type BossKit } from "../characters/kits.ts";
+import { growingRun, resetGrowing } from "./RecluseChild.ts";
 import { SELECT_FRAMING } from "../characters/boss-select.ts";
 import { stanceAt } from "../characters/stance.ts";
 import { resetMoo } from "../characters/moo-state.ts";
@@ -70,6 +71,7 @@ export function resetBeats() {
   resetMoo();
   resetGarden();
   resetTiger();
+  resetGrowing();
 }
 
 /**
@@ -77,9 +79,9 @@ export function resetBeats() {
  * until `since`, then `anims` in turn (a loop given with `ms` plays that long; a one-shot given with `ms` plays once and
  * holds its last frame for the rest), then `loop` for good. Its beat's lines and
  * fall lines are quiet meanwhile (his phase 2 says its own). Runs in place (playInPlace) still play over it. Cleared by a
- * new battle (resetBeats).
+ * new battle (resetBeats). `talks`: its beat's lines are said as usual meanwhile (the Hidden Boss's child growing up).
  */
-export type FigureRun = { since: number; anims: readonly (string | { readonly anim: string; readonly ms: number })[]; loop: string; before?: string };
+export type FigureRun = { since: number; anims: readonly (string | { readonly anim: string; readonly ms: number })[]; loop: string; before?: string; talks?: boolean };
 const figure: { run: FigureRun | null } = { run: null };
 export function setFigureRun(run: FigureRun | null) {
   figure.run = run;
@@ -233,11 +235,16 @@ export const hasCharacter = (match: GameView) => !!bossKit(match.boss?.name);
 
 export function BossCharacter({ match, place }: { match: GameView; place: "bar" | "side" | "results" }) {
   const boss = match.boss;
-  return boss && bossKit(boss.name) ? <Character boss={boss} stage={bossStage(match.phase, boss)} place={place} /> : null;
+  return boss && bossKitOf(boss) ? <Character boss={boss} stage={bossStage(match.phase, boss)} place={place} /> : null;
 }
 
 function Character({ boss, stage, place }: { boss: BossView; stage: Stage; place: "bar" | "side" | "results" }) {
-  const full = bossKit(boss.name);
+  // (A form of its own: the Hidden Boss's child, his growing figure; his age followed by a figure run, RecluseChild.ts.)
+  const full = bossKitOf(boss);
+  useLayoutEffect(() => {
+    const run = growingRun(boss);
+    if (run) setFigureRun(run);
+  }, [boss.form, boss.formStep, boss.result]);
   // (A phone's boss bar may have a drawing of its own: the Hidden Boss's bust, with the same animations.)
   const kit = useMemo(() => (full && place === "bar" && full.bar ? { ...full, ch: full.bar } : full), [full, place]);
   // This battle's lights (Hollow's bulbs), for everything of his drawn from now on.
@@ -386,7 +393,7 @@ function Character({ boss, stage, place }: { boss: BossView; stage: Stage; place
     // (A line of its own for the moment, from the battle, over its kit's: the Hidden Boss's "Best by test.")
     const said = beat ? (kit?.lineOf?.(beat.anim, boss) ?? beat.line) : null;
     // (The result's line is his alone since Nov 9: the God King no longer answers it there, so no hold for him.)
-    if (said && !quiet && !figure.run) bossVoice.say(said, `${boss.id}:${boss.startMove}:${beat!.key}`, BEAT_PRIORITY[beat!.anim] ?? LOW);
+    if (said && !quiet && (!figure.run || figure.run.talks)) bossVoice.say(said, `${boss.id}:${boss.startMove}:${beat!.key}`, BEAT_PRIORITY[beat!.anim] ?? LOW);
   }, [beat?.key]);
   // Beaten: its fall lines (the Hidden Boss's mumbling), one after another once its defeat's animation is over, each
   // as the last one goes; carried on by whichever screen draws it next (the result screen), from the same moment.
@@ -434,8 +441,9 @@ export function BossTag({ boss }: { boss: Pick<BossView, "name" | "icon"> }) {
   );
 }
 
-export function BossFace({ boss, class: cls = "", label }: { boss: Pick<BossView, "name" | "icon">; class?: string; /** Its name for a screen reader (the boss's own unless given; "": none, its button names it). */ label?: string }) {
-  const kit = bossKit(boss.name);
+export function BossFace({ boss, class: cls = "", label }: { boss: Pick<BossView, "name" | "icon"> & { form?: BossView["form"] }; class?: string; /** Its name for a screen reader (the boss's own unless given; "": none, its button names it). */ label?: string }) {
+  // (In a form of its own, that form's face: the Hidden Boss's child.)
+  const kit = bossKitOf(boss);
   const cv = useRef<HTMLCanvasElement>(null);
   useLayoutEffect(() => {
     if (!kit || !cv.current) return;
@@ -625,5 +633,5 @@ function fitSides(side: HTMLElement | null, name: string) {
   screen.style.setProperty("--first-d", `${Math.round((place.firstMid - edge) * 10) / 10}px`);
   // (The room his words and his menu open into: from his box's left edge (and their 4 px in) to the window's, less the margin.)
   const kingLeft = place.firstMid + (pawn ? 60 : -60) * place.k;
-  screen.style.setProperty("--king-room", `${Math.floor(document.documentElement.clientWidth - SIDE_FEEL.margin - kingLeft - 4)}px`);
+  screen.style.setProperty("--king-room", `${Math.floor(screen.getBoundingClientRect().right - SIDE_FEEL.margin - kingLeft - 4)}px`);
 }

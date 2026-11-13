@@ -48,8 +48,8 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
   adult form (phase 1) `recluse-phase2` from the start (online too); beaten with the phase change next (solo, the fall's `toPhase2`)
   `recluse-beaten` at once (0.3 s fade); the phase change `recluse-phase3`, its loop on the board's crack (`phaseChange.splitAt` =
   `at + PHASE_CHANGE.crackAt`), its intro started `introSeconds` before (from themes.json, never code; the beaten theme fades 0.5 s
-  from there; late, the loop alone on the drop), on through phase 2 until every board is decided. `recluse-house` (the child form)
-  isn't played yet: its hook is `recluseMusic`. Not in the town's loading: fetched as his fight starts (`ahead`), the transformation's
+  from there; late, the loop alone on the drop), on through phase 2 until every board is decided. `recluse-house` plays through his child form
+  (`recluseMusic`'s `child`, its fall too), his adult theme after it with MUSIC_SWITCH's 1.5 s fade. Not in the town's loading: fetched as his fight starts (`ahead`), the transformation's
   decoded as he's beaten (`next`). With the 8.740 s intro (handoff f12f1c5b) his transformation started as he rose in his rage and
   `marks.slam` landed on the book hitting the floor; since his chant's two lines (Nov 13) the rise to the crack is 17.435 s, and
   until the music session's matching cut is in, the 8.74 s intro starts later, mid-chant; the drop lands on the split's first frame (4 to 8 ms measured). Tests: `music.test.ts` ("the Hidden
@@ -162,18 +162,29 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
   `packages/app/test/engine-move.test.ts`, `e2e/recluse.spec.ts`.
 - **His fight from his room in the town** (Nov 13; town-square.md, "His room's challenge"): the room's four are one team on Boss
   Battle's party rule (`hiddenRoomSettings`: `partyMove`, the team's one clock, any member's God King call, which his No help blocks), a
-  party battle of four (seats 0 to 3, the fourth seat green, `PARTY_COLORS`), always him (`bossHidden`), his adult form only: online his
-  phase 2 doesn't exist yet, so beating his adult form ends the fight as a win, as the Crowd's final does. **A tie at the top** (2-2 in a
+  party battle of four (seats 0 to 3, the fourth seat green, `PARTY_COLORS`), always him (`bossHidden`); beating his adult form brings his
+  phase change and the four boards online, to the real result (Nov 13: "Phase 2 online", below). **A tie at the top** (2-2 in a
   team of four) goes by strength, as a no-majority turn does: the engine's best of the tied moves, or one within `closeCp` at random
   (Eric, Nov 12: "a deliberate blunder never wins a tie"; a party of three never ties at two, so its draws are as before).
-- **Win this form** (admins only, Boss alone, the Hidden Boss only, Nov 13: for Eric's timing test of his music and phase
+- **His child form** (Nov 13; [decision](../decisions/2026-11-13-hidden-boss-child-form.md); RECLUSE_CHILD): his first form, solo (an
+  admin's Boss alone, a solo Crowd's final: `settings.recluseChild`, set by solo only; `?form=adult` starts at the man). `BossState.form`
+  "child": no powers (`bossPowers` none; `RECLUSE_CHILD_RULES`: never strikes, the God King's help works), Maia raw at core
+  `childRating` (1800, +100 every 4 moves on the board, to Maia's top 2500, the man's), Stockfish at `levelForMaia` of it while Maia
+  loads; his level from that rating (`formStep` in the view), popping at each step (BossLevel). His figure: `RECLUSE_CHILD_KIT`
+  (`bossKitOf`) draws `RECLUSE_GROWING` (recluse-ages.ts: each age's idle and the growing steps), stepped by a figure run from
+  `formStep` (components/RecluseChild.ts, once each); the kid's lines `RECLUSE_CHILD_LINES`. Beaten: nobody placed
+  (finishBossBattle), his line, he grows up into the man (`growUpAt`, `fallMs`), then the runner's `nextBossForm`: a new match
+  against his adult form (solo `nextForm`: his entrance again). Online waits for the server's form list. Tests:
+  `chess/test/recluse-child.test.ts`, `app/test/recluse-child.test.ts`, `e2e/recluse.spec.ts` ("his child form first").
+- **Win this form** (admins only, Boss alone, the Hidden Boss only, Nov 13; his child form too: for Eric's timing test of his music and phase
   change): a 🏆 after the 🐟 (a computer: in the title line). Pressed, your next move beats his adult form by the end a mate takes
   (the runner's `bossForceWin`: `stageComplete`, then `finishBossBattle`'s "crowd"; his fall, phase change and music follow as for
   real), or in phase 2 wins every board still on (`phase2WinAll`) and the result plays. Greyed once pressed. Gated by
   `winFormAllowed` (`boss-brain.ts`). **Online, in his fight from his room** (Nov 13, Eric's test kit): the same 🏆 for an admin in the
   party (`NetMatch.winForm`, the message `winForm`): the server checks the admin and the battle (`LobbyCore.winFormTrigger`: his room's
   fight only, `PartyLobby.room`) and the team's next move beats his adult form (the runner's `bossForceWin`, kept in the lobby's record
-  as `winForm`); the battle is a test game (no XP). Tests: `engine-move.test.ts`, `chess/test/recluse*.test.ts`,
+  as `winForm`); in the four boards (Nov 13) the team's next move (a person's or a bot's, any board) wins every board still on
+  (`recluse2.winNext`; pressed in his fall or phase change, it waits for the boards); the battle is a test game (no XP). Tests: `engine-move.test.ts`, `chess/test/recluse*.test.ts`,
   `server/test/hidden-room.test.ts`, `e2e/recluse.spec.ts` ("Win this form"), `e2e/hidden-boss-room.spec.ts`.
 - **The ground rules of every power** (the server decides, the same everywhere):
   - Every power comes from the battle's seed (drawn once, as it starts) and the position, so the server, the solo game
@@ -261,10 +272,43 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
 | Dash (`dash`; Eric's design and art approved Nov 1, his name Nov 3 ("Blitz" is a time control): a lanky, cocky cheetah in a backwards orange cap and a teal and orange track jacket, a chess clock (ticks, never numerals), his tortoise Tick; **admins first** (`BOSS_ADMIN_FIRST` in settings.ts: his tile and Boss alone only for admins until Eric says go; take `"dash"` out of the list to put him live for everyone); test links `?boss=dash`, `&power=clockslap`, `&power=scramble`; docs/decisions/2026-11-03-dash.md; tuned: offset −250, `rageSpeed` 1, `flagTop` 4, 30 s a slap: the crowd scores 0.15 in 46 moves over 20 battles with the player's clock in the sim, reports/dash-sim.md. Round 1 of 3; his home and store round 2 (Nov 3), his challenge intro round 3 (Nov 5: town-square.md, "Dash's challenge")) | the game so far; **he never thinks**: his least wait before his move is `dashThinkMs` (350 ms; `bossThinkMs`, every other boss 1200) | **Clock Slap** (`dash.ts`): "your time" is the clock you already have (the dock's): a **bank** where the battle has one (`bossClock`: Boss alone, a Boss Battle party's one team bank) or a raid's **move timer**. Each capture of his, at the end of his turn (`afterBossMove`: `dashBattle.slap`), takes `slapBankSeconds` (30) from every bank still in, or makes the crowd's next move's clock `slapMoveSeconds` (6) shorter, never under `slapMoveMin` (8) (`dashMoveClock`, read by the runner's `moveClock` and `allowedMsFor`, so solo's, the lobby's and the bots' deadlines follow); none that would take nothing. Moment `slap` (`ms`, `bank`) as your turn begins. **Out of time is never a loss** (`noTimeLoss`: `bossOutOfTime` false): nobody picking in time gets a move from the judge's top `flagTop` (4) played at random, seeded (`outOfTime` in `resolveBoard`: solo's and the lobby's), the round marked `flag`; moment `flag` (`move`) as your next turn begins. `?power=clockslap`: his first move slaps as a capture would | **Time Scramble** (the rage meter, `rageSpeed.dash`; at most `maxUltimates.dash` (2) a battle, Nov 6): the usual warning, then from the next crowd turn your next `scrambleMoves` (5) moves get `scrambleSeconds` (3) each (`scrambleOn`, `ultimateRunning`); on a bank they still come out of it with its increment. Moment `scramble` (`count`, `seconds`) as it comes. No `powerTurn` (nothing on the board changes: fair play and the God King's Last Stand as ever). **On screen** (`components/Dash.tsx`): **every moment of his plays where he stands** (`BossUi.inPlace`: `pm-stay` and `InPlace`, the RAGE warning's too; he never steps up to the board's corner, so he never covers a square): the slap's `clockSlap` and the time ("−30s") flying from your clock (`.dk-clock`) to his figure (a fixed portal, placed once as it shows, then CSS); TIME SCRAMBLE! ("Your next 5 moves: 3 seconds each") and his `timeScramble`; on each scrambled move the app's big 3-2-1 (`.cc-num`) in his orange over the board (`ScrambleCount` in `Play.tsx`, drawn again as the second changes, never per frame, taking no taps; it stands in for "Round end"); his flag, his finger gun (`check`), his jab and the dock's "Out of time: a random move was played for you". **Tick** in the boss bar's prop slot (`barProp`, fixed): his still (`characters/sidekicks/blitz.ts`), a bob at a slap, a rattle through a scramble, and under him the time stolen ("−5:00") or the scramble's moves left ("3s × 4"). His art: the art branch's `boss-blitz`, copied as drawn (`characters/boss-blitz.ts`, the export `BOSS_BLITZ`; its battle intro in `dash-intro.ts`, loaded with his challenge), in a frame 33 px wider on the right for his zip-in (`dash-figure.ts`); his token `token-blitz.ts`. His lines (`dash-lines.ts`), his sounds his own, sneakers and a clock (`dash-sounds.ts`; select: `dashHello`). **Dash v2** (Eric, Nov 6; docs/decisions/2026-11-06-dash-v2.md): one smack of his clock a move (his rest loops quiet, `dash-figure.ts`), a **clock fit** at most twice (`clockFit`, `dashClockFit`); his **Scramble Rush** once a battle (`dashScramble`; `?power=rush`): from turn 7, his meter half full, warned a turn ahead as an ultimate (event `rushWarn`: RAGE!, "Next turn: Scramble Rush", his line; `DashState.rushWarn`; Nov 6), then as the next crowd turn begins a screen-only sweep of 3 of your pieces and 3 of his (`chooseRush`), ten seconds to put them back, each piece at most `movesPerPiece` (2) times (`rushKeep`, the server's too; a third try shakes it, "No more tries") (`components/DashRush.tsx`, whose pointer handlers read the live drag and pick from refs, never the last render's state: a quick drag's drop was lost, Nov 9, docs/decisions/2026-11-09-flaky-batch-sweep.md; a drag counts once it's 8 px from where it was picked up, never from its last move: a slow drag's drop was lost, Nov 10, docs/decisions/2026-11-10-flaky-batch-4.md; online `server/src/bosses/dash.ts`, "rushPlace"), judged by `rushJudge` in the runner (`finishRush`): under `needCorrect` (4) back, Hollow's quiet extra move (`rushExtra`). **Solo only your own put-back counts** (`finishRush`'s `only`: no bots, no mean); online the crowd's mean (Eric, Nov 8; docs/decisions/2026-11-08-dash-solo-rush.md). **Once due he never skips it** (`dashExtraMoveFrom`: within Hollow's cap, else the quiet move closest to it; no engine answer, `rushStandIn` from the seed); the Rush waits out a check (a passed turn can't be in check); no quiet move at all is `"skipped"` in the verdict itself, so the dock (`rushDock`: yours solo, "Crowd: 3.4 of 6" online) and his `fail` line always say what happens. The move list numbers each row from its own position (`rowNumber`), so his extra reads "14…" after his "13…". His attack on a king: `DASH_ATTACK` (a dash in, ten claw swipes) |
 | Don Dough (`zebra`; Eric's design Nov 10-11, his art approved Nov 11: a pudgy zebra kingpin in a fedora who runs "just a bakery" and fires a bread roll like a rifle; **admins first** (`BOSS_ADMIN_FIRST`: take `"zebra"` out to put him live); test links `?boss=zebra`, `&power=dough`, `&power=goldplate`; docs/decisions/2026-11-11-don-dough.md; tuned by `reports/zebra-sim.md`) | the game so far; about move 4 his comment on your opening (`openingTalk`: the library's name, `openingNameFor`; his family lines, "starts with", in `zebra-lines.ts`) | **Rising Dough** (`zebra.ts`): at most `doughDrops` lumps a battle, early (`doughFirst`, `doughGap`, `doughLast`), `doughLive` at once, dropped at his turn's end on his half (never his back rank; pawn/minor on the two middle ranks, rook/queen behind them over a crowd pawn's file); the kind from `doughOdds` stepping down to one he can have (`landRefused`, `doughLeadMax`; a queen's free); an oven timer per lump, `doughTimers` (Eric's 8/13/13/16/21, Nov 12; was 4/7/7/10/15), a minute off per move (`afterCrowdMove`, `afterBossMove`); at 00:00 it rises if `riseCheck` allows (hoopsGuard's checks), else waits; a crowd move onto it squashes it; his own moves never land on it (`bossStops`, "dough"). Moments `doughDrop`, `doughRise`, `doughSquash` (`by: "crowd"` at the start of his turn: `zebraTurnMs`) | **Gold Plate** (`rageSpeed.zebra`, at most `maxUltimates.zebra`): the warning, then at the start of his turn (he keeps his move; `zebraTurnMs` holds his move for its 10 s) his queen, else his strongest other piece, is gilded (`gildPick`); the crowd's pawns can't capture a gold piece for the rest of the battle (`crowdFilter`, `stopReason` "gold"; lifted when it's the only move); `gold` follows the piece (`goldAfter`). **On screen** (`components/Zebra.tsx`): oven timers in the bar's prop slot (a slot per `doughLive`, drawn on timeouts, never per frame; a rise after your move rings from his turn's moments, `zebraTurnMoments`; a roll is chosen once per minute in the timer's effect, `timerRun`), the dough under the pieces, the gold pieces (`OwnBoard`'s `gold`, `board/pieces/zebra/`) with a quiet glint, a pawn's clink (`goldClink`), his volley as his attack on a king (`zebra-figure.ts`) |
 
-**The Hidden Boss's phase 2** (Oct 14; DECISIONS.md, "The Hidden Boss, phase 2"; solo only: an admin's Boss alone, and a
-solo Crowd's boss final you reached, where the other three finalists take the other boards (`phase2Follows`,
-`phase2Mates`). **Not online yet** (four boards online, his server-side Stockfish and its fair-play hooks are a separate
-build): online, phase 1 won is the crowd's victory):
+**The Hidden Boss's phase 2** (Oct 14; DECISIONS.md, "The Hidden Boss, phase 2"; solo: an admin's Boss alone, and a solo Crowd's
+boss final you reached, where the other three finalists take the other boards (`phase2Follows`, `phase2Mates`); online since Nov 13,
+below):
+- **Phase 2 online** (Nov 13, Eric: "it plays through till the end"; [decision](../decisions/2026-11-13-recluse-online-phase2.md)): his
+  room's fight and the Crowd's boss final. His forms are a list (`RECLUSE_FORMS`: adult, then four; the child form goes first once
+  built). Beaten, his fall (the boss message's `fall` with `toPhase2`, `RECLUSE_PHASE2.change.fallMs`), the cutscene's hold
+  (`RECLUSE_CUTSCENE.holdMs`, the scene's length: the event `recluseCutscene`, its start and end, `NetMatch.cutscene`; below), then his phase
+  change for everyone from one start (`phase2`'s `at`; `RECLUSE_ONLINE.changeMs`, the screens' `PHASE_CHANGE.total` within 300 ms),
+  the countdown, and the four boards to the real result. The server runs them (`packages/server/src/bosses/recluse.ts`, on the same
+  rules, `LobbyRecord.recluse2`, the lobby phase `phase2`): each person plays their own board (`phase2Move`: theirs, their move, on
+  the position it was made on (`ply`), legal; refused, they're told phase 2 again with `refused`); his moves and the bots' from the
+  engine server (woken as his fall begins), every legal move scored in groups of at most 8 (`serverAllMovesAt`, the first group tried
+  twice, `RECLUSE_ONLINE.groupNodes`; one budget search a position), he the best, a bot one within `botLoss`, either the quickest mate
+  when one scores; where it can't answer, the host's device (`phase2Ask`/`phase2Answer`, solo's strengths; re-asked of a new host or
+  a host back from a reload, `resend`), and with no answer in `askMs`, the server's quick move. A move of HIS from a device or the
+  quick move leaves phase 2's result unvouched (`recluse2.unvouched`, `phase2Unvouched`): the board players' results pay as a solo
+  game's and aren't ranked; phase 1's, its fair play and the watchers' stand. A bot's never does. Each person's move is scored too, a
+  `FairMove` with no crowd (fair play; not in a test fight). Leaving (resign, or away past `LEAVING.awayMs`): a bot plays their board
+  on; for them a loss, from his fall on (its message names the board players: `phase2Boards`). The results carry `simul` ("won N of
+  4"). The Crowd final's top 4 take the boards (fresh bots for any empty one); the others watch. Everyone's told phase 2 lean; what a
+  reconnect gets (`last`) adds the battle and the standings, and `cutAt` (the cutscene's hold). The app: `recluse-online.ts`
+  (`OnlinePhase2`: the view with your board first, the phase at the server's moments, his lines and sounds as solo's, your move shown
+  at once and kept over the server's word until it has it or refuses it, sent again on a reconnect), `NetMatch`'s `simul`,
+  `simulMove`, `bossNote`, `phase2Ahead` (his themes fetched ahead). Tests: `server/test/recluse-online.test.ts`,
+  `crowd-hidden-boss.test.ts`, `engine-server.test.ts`, `app/test/recluse-online.test.ts`, `e2e/hidden-boss-room.spec.ts`.
+- **His cutscene** (Eric, Nov 12; in the fight since Nov 13, solo and online; [decision](../decisions/2026-11-13-recluse-cutscene-wired.md)):
+  after his fall, before the phase change, about 104 s (`RECLUSE_CUTSCENE.holdMs`; a unit test keeps it the timeline's length):
+  everything dims but a soft round spotlight on the board's middle; he kneels in it while the ghost of him as a child poofs in above
+  the board, drops, lands, his knees buckling; Eric's 17 lines, each its own typed box by its speaker (a line of two sentences typed
+  one, a second's pause, the next; `RECLUSE_CUTSCENE_LINES`); the child fades; the man alone a moment; the light lifts (`outMs`) and
+  the phase change carries on, him on his knees in his place, quiet (`kneel`, `phaseChangeRun`'s `before`), until he seizes the God
+  King's power. Solo: from the fall's end (`SoloMatch.cutscene`), the phase change as it ends; online from the server's
+  `recluseCutscene`, everyone at once. Drawn by App over the fall's screen (`components/RecluseCutscene.tsx`, `recluse-cutscene.ts`'s
+  timeline, the figure `recluse-cutscene` in `recluse-ages.ts`); meanwhile his figure in its place is hidden (`body.cs-on`) and both
+  voices are quiet (`Voice.hush`). Music: his beaten theme on through it (`recluseMusic`: the fall with `toPhase2`). No skip, the 🏆
+  included. A test's shorter hold plays it sped up to fit (`fitCutscene`; solo `?cutscene=SECONDS`, a test server's
+  `CUTSCENE_HOLD_MS`, the e2e's 12 s). Tests: `app/test/recluse-cutscene.test.ts`, `e2e/recluse.spec.ts` ("Win this form").
 - **The phase change** (Eric, Oct 14, reworked, then opened with the God King's absorption; `PHASE_CHANGE` in
   `packages/app/src/recluse-phase2.ts`, about 33.5 s after a 1.8 s fall (24.8 s before his chant's two lines, Nov 13) (its "PHASE 2" banner 1.4 s, `BOSS_BANNER.phase2Ms`, Oct 16, and the banners' extra since Oct 24), one timeline, not skippable like a boss's
   intro; drawn by `screens/Recluse2.tsx`, `PhaseChangeScreen`). **Its pace** (Eric, Oct 17, after playing it: "everything's
@@ -283,7 +327,7 @@ build): online, phase 1 won is the crowd's victory):
     drawings) while he's drained through his Last Stand's blows, flashing and cracking (his own frames, `lastStand`
     from its blows, drawn ahead by `prewarmKing`), flickering, his aura shrinking, and cries out
     (`KING_VS_RECLUSE.drained`); as it lands the boss's fist closes (`seized`, its spark `recluseSpark`), his half-engine
-    look ignites (`setEngineAt`) and he says so (`RECLUSE_LINES.absorb`, CRITICAL: it cuts in on his word before the
+    look ignites (`setEngineAt`) and he says so (`RECLUSE_LINES.absorb`, paged a sentence at a time as his chant's lines are since Nov 13, `absorbPaced`; CRITICAL: it cuts in on his word before the
     seize), and the God King fades up and away in light (`gkLeave`); he holds his fist, its last frame (a one-shot given
     a time in a figure run holds its last frame), the dock saying "The God King's power is his!". Sounds: `gkHyuah`, `recluseDrain`, `gkLastGrunt2`, `recluseSpark`, `gkLeave`.
   - **Then**, where he stands, he gets up in a rage (`rage`, both drawings); then the board draws his whole figure (a
@@ -1106,6 +1150,8 @@ sampling, the guards, `forPlayers`), `BOSS_TIERS` and each boss's `offset` in `b
   His younger ages (a mockup, Nov 12; wired into nothing): `characters/recluse-ages.ts` (the child, 13 and 20, their busts
   and idles, the growing step `recluse-grow`, the ghost child beside him kneeling `recluse-ghost`):
   `extra=packages/app/src/characters/recluse-ages.ts only=recluse-child,recluse-teen,recluse-young,recluse-grow,recluse-ghost`.
+  His cutscene between the adult form and the cyborg (in the fight since Nov 13: "His cutscene" above):
+  `npm run preview:cutscene -- <dir> [phone|computer]` plays it alone over a real fight (a dev-only module; videos and stills).
 - The Hidden Boss in the Crowd's final: `packages/chess/test/crowd.test.ts` ("50 v 50 boss final"),
   `packages/server/test/crowd-hidden-boss.test.ts` (online), e2e `e2e/crowd-hidden.spec.ts`; [crowd.md](crowd.md).
 - The Hidden Boss: unit `packages/chess/test/recluse.test.ts` (hidden from players, his brain, the bullet clock and

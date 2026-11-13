@@ -1,7 +1,7 @@
 /**
- * The Hidden Boss (code id `recluse`) at his younger ages: a MOCKUP for Eric (Nov 12, 2026), registered only for the
- * preview, wired into no match, kit or list (a test checks). Today's sprite (`recluse.ts`) is the fourth and oldest age,
- * unchanged; these three grow into it:
+ * The Hidden Boss (code id `recluse`) at his younger ages (Eric liked the mockup, Nov 12, 2026): since Nov 13 his child form's
+ * figure in a match (RECLUSE_GROWING and its bust, below; kits.ts RECLUSE_CHILD_KIT), in no character list or BOSS_KITS (a test
+ * checks). Today's sprite (`recluse.ts`) is the fourth and oldest age, unchanged; these three grow into it:
  * - `RECLUSE_CHILD`, about 9: a skinny kid in a 1950s red-and-cream striped tee, cuffed dungarees and canvas sneakers.
  * - `RECLUSE_TEEN`, about 13: a 1950s schoolboy, a maroon V-neck sweater over a white collar, khaki slacks, white socks and
  *   loafers, his hands in his pockets.
@@ -17,7 +17,7 @@
  * Previews: npm run preview:characters -- <dir> extra=packages/app/src/characters/recluse-ages.ts only=<ids>
  */
 import { canvas, inEllipse, inPoly, roundLight, toGrid, type Canvas } from "./paint.ts";
-import { RECLUSE, RECLUSE_PALETTE, recluseLayers, type Brows, type Eyes, type ReclusePose } from "./recluse.ts";
+import { RECLUSE, RECLUSE_BUST, RECLUSE_PALETTE, recluseLayers, type Brows, type Eyes, type Mouth, type ReclusePose } from "./recluse.ts";
 import { frameKeys, joinParts, lazyAnim, lazyParts, mapFrames, type Anim, type Character, type Frame, type Layer, type Part, type Speck } from "./sprite.ts";
 
 type Pt = readonly [number, number];
@@ -439,18 +439,22 @@ function paintLimb(pts: readonly Pt[], r: number, r1: number, keys: string, base
 /** Each age's trousers: the ramp (dark to light), and the hem: the child's turned-up cuffs, the 13-year-old's socks. */
 const TROUSERS: Record<Age, string> = { child: "Z%&", teen: "<>?$", young: SUIT };
 
-/** His hips and legs for an age; `toe`: one foot's heel lifted (the child scuffing his toe): `l` or `r`. */
-function legs(age: Age, splay = 0): { part: Part; at: Pt } {
+/**
+ * His hips and legs for an age; `toe`: one foot's heel lifted (the child scuffing his toe): `l` or `r`. `crouch`: his knees
+ * bent (a landing's buckle): his hips that many pixels lower, his knees pushed out to the sides, his feet where they were.
+ */
+function legs(age: Age, splay = 0, crouch = 0): { part: Part; at: Pt } {
   const b = BODY[age];
   const X0 = Math.floor(46 - b.waist - 6);
-  const Y0 = b.waistY - 4;
+  const Y0 = b.waistY - 4 + crouch;
   const cv = canvas(Math.ceil(2 * b.waist) + 14, 128 - Y0);
   const keys = TROUSERS[age];
   const w = b.waist;
-  const hips = inPoly([[46 - w - 0.4, b.waistY - 1], [46 + w + 0.4, b.waistY - 1], [46 + w + 1, b.hipY + 1], [46 + w - 2, b.hipY + 4], [46, b.hipY + 2], [46 - w + 2, b.hipY + 4], [46 - w - 1, b.hipY + 1]]);
-  fill(cv, X0, Y0, hips, (x, y) => ramp(keys, roundLight(46 - w * 0.4, b.waistY, w + 2, 8, 0.1)(x, y)));
+  const c = crouch;
+  const hips = inPoly([[46 - w - 0.4, b.waistY - 1 + c], [46 + w + 0.4, b.waistY - 1 + c], [46 + w + 1, b.hipY + 1 + c], [46 + w - 2, b.hipY + 4 + c], [46, b.hipY + 2 + c], [46 - w + 2, b.hipY + 4 + c], [46 - w - 1, b.hipY + 1 + c]]);
+  fill(cv, X0, Y0, hips, (x, y) => ramp(keys, roundLight(46 - w * 0.4, b.waistY + c, w + 2, 8, 0.1)(x, y)));
   const hx = w * 0.55;
-  const legPts = (side: -1 | 1): Pt[] => [[46 + side * hx, b.hipY + 1], [46 + side * (hx + 0.2 + splay * 0.5), b.knee], [46 + side * (hx + 0.3 + splay), 122]];
+  const legPts = (side: -1 | 1): Pt[] => [[46 + side * hx, b.hipY + 1 + c], [46 + side * (hx + 0.2 + splay * 0.5 + c * 0.75), b.knee + c * 0.6], [46 + side * (hx + 0.3 + splay), 122]];
   for (const side of [-1, 1] as const) {
     const l = paintLimb(legPts(side), b.rLeg, b.rLeg - 0.6, keys, side < 0 ? 0.66 : 0.48);
     l.cv.forEach((row, y) => row.forEach((k, x) => k !== "." && cv[l.at[1] - Y0 + y]?.[l.at[0] - X0 + x] !== undefined && (cv[l.at[1] - Y0 + y]![l.at[0] - X0 + x] = k)));
@@ -467,7 +471,7 @@ function legs(age: Age, splay = 0): { part: Part; at: Pt } {
     }
   }
   // The seam down the middle.
-  stamp(cv, X0, Y0, [keys[0]!, keys[0]!, keys[0]!], 46, b.hipY);
+  stamp(cv, X0, Y0, [keys[0]!, keys[0]!, keys[0]!], 46, b.hipY + c);
   return { part: { grid: toGrid(cv) }, at: [X0, Y0] };
 }
 
@@ -505,7 +509,7 @@ const { parts: PARTS, add } = lazyParts();
 const TORSO = new Map<Age, { part: Part; at: Pt }>();
 const torsoOf = (a: Age) => TORSO.get(a) ?? TORSO.set(a, torso(a)).get(a)!;
 const LEGS = new Map<string, { part: Part; at: Pt }>();
-const legsOf = (a: Age, splay: number) => LEGS.get(`${a}:${splay}`) ?? LEGS.set(`${a}:${splay}`, legs(a, splay)).get(`${a}:${splay}`)!;
+const legsOf = (a: Age, splay: number, crouch = 0) => LEGS.get(`${a}:${splay}:${crouch}`) ?? LEGS.set(`${a}:${splay}:${crouch}`, legs(a, splay, crouch)).get(`${a}:${splay}:${crouch}`)!;
 const TIES = new Map<number, { part: Part; at: Pt }>();
 const tieOf = (s: number) => TIES.get(s) ?? TIES.set(s, tie(s)).get(s)!;
 for (const a of AGES) {
@@ -516,7 +520,7 @@ for (const a of AGES) {
 for (const s of [-1, 0, 1]) add(`ntie:${s}`, () => tieOf(s).part);
 for (const k of ["child", "young"] as const) for (const g of ["rest", "flex"] as const) add(`hand:${k}:${g}`, () => ({ grid: HANDS[k][g], outline: false }));
 const headName = (a: Age, f: KidFace) => add(`head:${a}:${f.eyes}.${f.brows}.${f.mouth}`, () => kidHead(a, f));
-const legsName = (a: Age, splay: number) => add(`legs:${a}:${splay}`, () => legsOf(a, splay).part);
+const legsName = (a: Age, splay: number, crouch = 0) => add(`legs:${a}:${splay}${crouch ? `:${crouch}` : ""}`, () => legsOf(a, splay, crouch).part);
 const r2 = (v: number) => Math.round(v * 2) / 2;
 function armPart(a: Age, sh: Pt, el: Pt, wr: Pt): { name: string; at: Pt } {
   const q = [sh, el, wr].map((p): Pt => [r2(p[0]), r2(p[1])]) as [Pt, Pt, Pt];
@@ -554,13 +558,16 @@ export interface AgePose {
   tie?: number;
   /** Hands in his pockets (the 13-year-old). */
   pockets?: boolean;
+  /** His knees bent (whole pixels): everything above his knees lower, his feet where they are (a landing's buckle). */
+  crouch?: number;
 }
 
 export function ageLayers(age: Age, p: AgePose): Layer[] {
   const b = BODY[age];
   const at = (part: string, x: number, y: number, flipX = false): Layer => ({ part, x: OX + Math.round(x), y: OY + Math.round(y), ...(flipX ? { flipX } : {}) });
   const rise = p.rise ?? 0;
-  const upY = -(p.breath ?? 0) - rise;
+  const crouch = p.crouch ?? 0;
+  const upY = -(p.breath ?? 0) - rise + crouch;
   const sx = p.shift ?? 0;
   const face: KidFace = { ...KID_REST, ...p.face };
   const pockets = p.pockets ?? age === "teen";
@@ -573,8 +580,8 @@ export function ageLayers(age: Age, p: AgePose): Layer[] {
   const toeL = p.toe === "l" ? 1 : 0;
   const toeR = p.toe === "r" ? 1 : 0;
   layers.push(at(`shoe:${age}`, 46 - ax - shoeW + 3, 128 - shoeH - rise - toeL), at(`shoe:${age}`, 46 + ax - 2, 128 - shoeH - rise - toeR, true));
-  const lg = legsOf(age, 0);
-  const legLayer = at(legsName(age, 0), lg.at[0], lg.at[1] - rise);
+  const lg = legsOf(age, 0, crouch);
+  const legLayer = at(legsName(age, 0, crouch), lg.at[0], lg.at[1] - rise);
   const t = torsoOf(age);
   const torsoLayer = at(`torso:${age}`, t.at[0] + sx, t.at[1] + upY);
   const sh = (side: -1 | 1): Pt => [46 + side * b.shoulder + sx, b.shoulderY + 1 + upY];
@@ -802,6 +809,60 @@ export const RECLUSE_GROW: Character = {
   },
 };
 
+// ---- His child form in a match (Nov 13; RECLUSE_CHILD): every age in one drawing, so his figure steps up in place.
+
+const WHO: readonly Who[] = ["child", "teen", "young", "today"];
+/**
+ * The loop his figure rests in at each age (core childAge: 0 about 9, 1 about 13, 2 about 20, 3 his adult look, the adult form's
+ * own idle): `idle` is the child's, so his figure is the child wherever nothing else is set.
+ */
+export const GROWING_LOOPS = ["idle", "age1", "age2", "age3"] as const;
+/** The step up to age `to` (1 to 3) from the age before: one-shots, about 1.9 s each (growFrames). */
+export const growAnim = (to: number): string => `grow${to}`;
+/** Beaten in the child form: from age `from` (0 to 2) straight up to his adult look, the man the next match meets. */
+export const growUpAnim = (from: number): string => `up${from}`;
+
+/** The growing one-shots' frames, cut by `crop(age)` (a bust's window); a step's window is the older age's from its flash on. */
+function growingAnims(crop: (w: Who) => (f: Frame) => Frame, todayIdle: () => Frame[]): Record<string, Anim> {
+  const cut = (from: Who, to: Who) => () => {
+    const frames = growFrames(from, to);
+    const flash = frames.findIndex((f) => f.cue === "flash");
+    return { loop: false, frames: frames.map((f, i) => crop(i < flash ? from : to)(f)) };
+  };
+  const anims: Record<string, Anim> = {};
+  WHO.forEach((w, i) => {
+    anims[GROWING_LOOPS[i]!] = lazyAnim(() => ({ loop: true, frames: w === "today" ? todayIdle() : idleFrames(w).map(crop(w)) }));
+    if (i > 0) anims[growAnim(i)] = lazyAnim(cut(WHO[i - 1]!, w));
+    if (i < 3) anims[growUpAnim(i)] = lazyAnim(cut(w, "today"));
+  });
+  return anims;
+}
+
+/** His figure in his child form: the child, 13, 20 and his adult look, each with its idle, and the steps up between them. */
+export const RECLUSE_GROWING: Character = {
+  id: "recluse-growing",
+  name: "Hidden Boss (child form)",
+  w: W,
+  h: H,
+  foot: [OX + 46, OY + 128],
+  palette: AGES_PALETTE,
+  halo: "#2a2733",
+  parts: PARTS_ALL,
+  anims: growingAnims(() => (f) => f, () => [...RECLUSE.anims.idle!.frames]),
+};
+/** The same in a phone's boss bar: each age's bust (its own window, as RECLUSE_BUST's for his adult look), the same animations. */
+export const RECLUSE_GROWING_BUST: Character = {
+  id: "recluse-growing-bust",
+  name: "Hidden Boss (child form, bust)",
+  w: BUST_W,
+  h: BUST_H,
+  foot: [46 - 21, BUST_H],
+  palette: AGES_PALETTE,
+  halo: "#2a2733",
+  parts: PARTS_ALL,
+  anims: growingAnims((w) => bustOf(TOPS[w]), () => [...RECLUSE_BUST.anims.idle!.frames]),
+};
+
 // ---- The ghost of the child (the cutscene after his adult form is beaten), beside today's sprite on his knees.
 
 /** The ghost's keys: its outline, a pale ramp (dark to light), the glow (outer, inner), a bright mote. All see-through. */
@@ -820,7 +881,7 @@ const lum = (c: string) => {
   return (((n >> 16) & 255) * 0.3 + ((n >> 8) & 255) * 0.55 + (n & 255) * 0.15) / 255;
 };
 /** A drawing turned into the ghost: each key to the pale ramp by its brightness, the outline and halo to the glow, two soft rings. */
-function ghostPart(ch: Character, f: Frame): { part: Part; at: Pt } {
+function ghostPart(ch: Character, f: Frame, feet: "dissolve" | "faint" = "dissolve"): { part: Part; at: Pt } {
   const keys = frameKeys(ch, f);
   let x0 = Infinity;
   let y0 = Infinity;
@@ -834,7 +895,8 @@ function ghostPart(ch: Character, f: Frame): { part: Part; at: Pt } {
       const k = keys[y]![x];
       if (!k || k === "Q") continue;
       // (His feet dissolve: the last rows thin out to the faint glow, a projection that doesn't quite reach the ground.)
-      const fade = y1 - y < 4 ? 2 : y1 - y < 10 ? 1 : 0;
+      // (`faint`: the cutscene's child, who lands on the board: only his soles thin out, so his shoes still meet it.)
+      const fade = feet === "faint" ? (y1 - y < 2 ? 1 : 0) : y1 - y < 4 ? 2 : y1 - y < 10 ? 1 : 0;
       cv[y - y0 + pad]![x - x0 + pad] = fade === 2 ? ((x + y) % 2 ? "v" : "u") : fade === 1 && (x + y) % 2 ? "v" : k === "k" ? "g" : k === "@" ? "v" : ramp("finp", lum(AGES_PALETTE[k]!) * 1.25 + 0.05);
     }
   // The soft glow: two rings outside the silhouette.
@@ -864,8 +926,8 @@ const ghostLayer = (i: number, bob: number, look: Eyes): Layer => {
   return { part: name, x: GHOST_DX + g.at[0], y: g.at[1] - 4 - bob };
 };
 /** Today's sprite on his knees, the book flat on the ground before him, his eyes down or turned to the child. */
-const kneeling = (eyes: Eyes, breath = 0, dip = 6): Layer[] =>
-  recluseLayers({ stance: "kneel", dip, breath, face: { eyes, brows: "up", mouth: "tight" }, hold: { book: "flat", at: [46, 125], loose: true, clutched: false, elbowR: [32, 58], wristR: [38, 78], elbowL: [60, 58], wristL: [55, 78] } });
+const kneeling = (eyes: Eyes, breath = 0, dip = 6, mouth: Mouth = "tight"): Layer[] =>
+  recluseLayers({ stance: "kneel", dip, breath, face: { eyes, brows: "up", mouth }, hold: { book: "flat", at: [46, 125], loose: true, clutched: false, elbowR: [32, 58], wristR: [38, 78], elbowL: [60, 58], wristL: [55, 78] } });
 /** Motes drifting up off the ghost. */
 const motes = (i: number): Speck[] =>
   Array.from({ length: 6 }, (_, k): Speck => {
@@ -1427,5 +1489,162 @@ export const RECLUSE_CHILD_SIT: Character = {
   },
 };
 
+// ---- The cutscene (a mockup, Nov 12): the ghost child poofs into being above the board, drops, lands, his knees buckle,
+// he straightens, and the two talk; then he fades out. One drawing for both, so they line up to the pixel.
+
+/** How far above the ground the child appears (drawing pixels: about a foot and a half at his size, 82 px tall). */
+const LIFT = 38;
+// (Four more rows under the ground: the ghost's glow at his soles as he lands.)
+const CUT_H = H + LIFT + 4;
+/** The poof's sparkle: white to pale blue, keys of its own, so the ghost's fade-in doesn't dim it. */
+const POOF_PALETTE: Record<string, string> = { Y: "#f4fbff", A: "#bfe2ff", C: "#7fb0e6" };
+/** The growing step's motes (`shimmer`: gold `8` to ember `0`) in the poof's colors. */
+const TO_POOF: Record<string, string> = { "8": "Y", "9": "A", "0": "C" };
+const { parts: CUT_PARTS, add: addCut } = lazyParts();
+const CUT_GHOSTS = new Map<string, { part: Part; at: Pt }>();
+/** The child as the ghost in pose `p`, `air` pixels above the ground. */
+function cutKid(p: AgePose, air = 0): Layer {
+  const name = `cg:${JSON.stringify(p)}`;
+  let g = CUT_GHOSTS.get(name);
+  if (!g) CUT_GHOSTS.set(name, (g = ghostPart(RECLUSE_CHILD, frame("child", 0, p), "faint")));
+  const made = g;
+  addCut(name, () => made.part);
+  return { part: name, x: GHOST_DX + g.at[0], y: LIFT + g.at[1] - air };
+}
+/** Today's sprite on his knees (as in the ghost loop), moved down below the child's air. */
+const kneelAt = (eyes: Eyes, breath = 0, dip = 6, mouth: Mouth = "tight"): Layer[] => kneeling(eyes, breath, dip, mouth).map((l) => ({ ...l, y: l.y + LIFT }));
+const inScene = ([x, y]: Speck) => x >= 1 && y >= 1 && x <= SCENE_W - 2 && y <= CUT_H - 2;
+/** The child's middle (x) and the ground under him (y), in the scene. */
+const KID_X = GHOST_DX + OX + 46;
+const GROUND = LIFT + OY + 128;
+/** The poof: a ring of sparkle bursting out from the child's middle, step `i` (0 small and white, then wider and bluer). */
+function burst(i: number, air: number): Speck[] {
+  const cy = GROUND - air - 42;
+  const r = 3 + i * 7;
+  const key = i < 2 ? "Y" : i < 4 ? "A" : "C";
+  const out: Speck[] = [];
+  // (The first: a bright star at the middle, its four arms three pixels long.)
+  if (i === 0) for (let d = -3; d <= 3; d++) out.push([KID_X + d, cy, "Y"], [KID_X, cy + d, "Y"]);
+  for (let k = 0; k < 16; k++) {
+    if (i >= 4 && k % 2) continue;
+    const a = (k / 16) * Math.PI * 2 + i * 0.13;
+    const X = Math.round(KID_X + Math.cos(a) * r);
+    const Y = Math.round(cy + Math.sin(a) * r * 1.15);
+    out.push([X, Y, key]);
+    if (i < 3 && k % 3 === 0) out.push([X - 1, Y, key], [X + 1, Y, key], [X, Y - 1, key], [X, Y + 1, key]);
+  }
+  return out.filter(inScene);
+}
+/** The growing step's rising motes around the child, in the poof's colors, `air` pixels up. */
+const kidMotes = (i: number, air: number, n = 12): Speck[] => shimmer(BODY.child.top, i, n).map(([x, y, k]): Speck => [x + GHOST_DX, y + LIFT - air, TO_POOF[k] ?? k]).filter(inScene);
+/** The dust of his landing: a puff of sparkle out to each side of his shoes, step `i`. */
+const landPuff = (i: number): Speck[] =>
+  [-1, 1]
+    .flatMap((side) => [0, 1, 2].map((k): Speck => [KID_X + side * (9 + i * 3 + k * 2), GROUND - 1 - k - (i > 1 ? 1 : 0), i < 2 ? "Y" : "A"]))
+    .filter(inScene);
+const ARMS_UP: AgePose = { handL: [-3, -7], handR: [3, -7], face: { eyes: "ahead", brows: "up", mouth: "o" } };
+
+/**
+ * The poof (one-shot, about 0.9 s, cue `poof`): a small white flash in the air beside him, a ring of sparkle bursting out
+ * as the child fades in inside it (the growing step's motes rising round him), and he hangs there a moment, startled.
+ * The man hasn't looked up yet.
+ */
+const CUT_POOF = (): Frame[] => [
+  { ms: 70, layers: kneelAt("down"), specks: burst(0, LIFT), cue: "poof" },
+  ...[0.15, 0.3, 0.5, 0.7, 0.85, 1].map(
+    (a, i): Frame => ({ ms: 90, layers: [...kneelAt(i < 3 ? "down" : "readR", 0, i < 3 ? 6 : 5), cutKid(ARMS_UP, LIFT)], specks: [...burst(i + 1, LIFT), ...kidMotes(i, LIFT, 8 + i)], pal: faded(a) }),
+  ),
+  ...[0, 1, 0].map((b, i): Frame => ({ ms: 90, layers: [...kneelAt("readR", 0, 4), cutKid(ARMS_UP, LIFT + b)], specks: kidMotes(6 + i, LIFT, 8 - i * 2) })),
+];
+/** The drop (one-shot, 0.36 s, cue `drop`): he falls, arms up, faster each frame (gravity), from `LIFT` to the ground. */
+const CUT_DROP = (): Frame[] =>
+  Array.from({ length: 9 }, (_, k): Frame => {
+    const air = Math.round(LIFT * (1 - ((k + 1) / 9) ** 2));
+    return { ms: 40, layers: [...kneelAt("readR", 0, 4), cutKid({ ...ARMS_UP, handL: [-3, -8], handR: [3, -8] }, air)], ...(k < 3 ? { specks: kidMotes(9 + k, LIFT, 6 - k * 2) } : {}), ...(k === 0 ? { cue: "drop" } : {}) };
+  });
+/**
+ * The landing (one-shot, about 1.1 s, cue `land`): his knees buckle under him (he fell from thin air), his arms fly out,
+ * a puff of sparkle at his shoes; he wobbles, then straightens up, a little bounce, his arms back down, and looks at the man.
+ */
+const CUT_LAND = (): Frame[] => {
+  const steps: { ms: number; crouch: number; arms: number; headDy?: number; rise?: number; mouth?: KidFace["mouth"]; brows?: Brows }[] = [
+    { ms: 50, crouch: 4, arms: 6 },
+    { ms: 80, crouch: 6, arms: 7, headDy: 1 },
+    { ms: 140, crouch: 6, arms: 6, headDy: 1 },
+    { ms: 90, crouch: 5, arms: 4 },
+    { ms: 90, crouch: 4, arms: 3 },
+    { ms: 90, crouch: 3, arms: 2, mouth: "stern" },
+    { ms: 90, crouch: 2, arms: 1, mouth: "stern" },
+    { ms: 90, crouch: 1, arms: 1, mouth: "stern" },
+    { ms: 110, crouch: 0, arms: 0, rise: 1, mouth: "stern", brows: "stern" },
+    { ms: 280, crouch: 0, arms: 0, mouth: "stern", brows: "stern" },
+  ];
+  return steps.map((s, i): Frame => {
+    const p: AgePose = { crouch: s.crouch, rise: s.rise, headDy: s.headDy, handL: [-s.arms, -s.arms], handR: [s.arms, -s.arms], face: { eyes: i < 8 ? "ahead" : "readL", brows: s.brows ?? "up", mouth: s.mouth ?? "o" } };
+    return { ms: s.ms, layers: [...kneelAt("readR", 0, i < 2 ? 5 : 4), cutKid(p)], ...(i < 4 ? { specks: landPuff(i) } : {}), ...(i === 0 ? { cue: "land" } : {}) };
+  });
+};
+/** The child's pose in the conversation: his idle (CHILD_IDLE), his eyes on the man except his blinks, his mouth `mouth`. */
+const kidTalkPose = (i: number, mouth?: KidFace["mouth"]): AgePose => {
+  const s = CHILD_IDLE[i % CHILD_IDLE.length]!.p;
+  return { ...s, toe: undefined, face: { ...s.face, eyes: s.face?.eyes === "shut" ? "shut" : "readL", mouth: mouth ?? s.face?.mouth ?? "stern" } };
+};
+/** The man's eyes in the conversation: on the child, dropping to the floor now and then. */
+const manEyes = (i: number): Eyes => (i >= 26 && i < 33 ? "down" : "readR");
+/** Mouths while a line types (a word, a word, a gap), the child's and the man's. */
+const KID_FLAP: readonly KidFace["mouth"][] = ["o", "stern", "open", "stern", "o", "tight"];
+const MAN_FLAP: readonly Mouth[] = ["mumble1", "mumble2", "tight", "mumble3", "mumble1", "tight"];
+/**
+ * The conversation's loops (about 4.3 s): the man kneels, slumped, breathing slowly, looking up at the child; the child
+ * stands on the board, pale and see-through in his soft glow, fidgeting as a child does; motes drift up off him and his
+ * glow breathes. `talk`: whose mouth moves (while his line types).
+ */
+const CUT_TALK = (talk: "kid" | "man" | null): Frame[] =>
+  Array.from({ length: 36 }, (_, i): Frame => {
+    const eyes = talk === "man" ? (i % 12 < 9 ? "readR" : "down") : manEyes(i);
+    return {
+      ms: 120,
+      layers: [...kneelAt(eyes, i >= 6 && i < 20 ? 1 : 0, eyes === "down" ? 6 : 4, talk === "man" ? MAN_FLAP[i % MAN_FLAP.length] : "tight"), cutKid(kidTalkPose(i, talk === "kid" ? KID_FLAP[i % KID_FLAP.length] : undefined))],
+      specks: motes(i).map(([x, y, k]): Speck => [x, y + LIFT, k]).filter(inScene),
+      pal: pulse(i),
+    };
+  });
+/** He fades out (one-shot, about 1.4 s, cue `fade`), looking at the man to the last; the man is left alone. */
+const CUT_FADE = (): Frame[] =>
+  [1, 0.85, 0.7, 0.55, 0.4, 0.28, 0.16, 0.06]
+    .map((a, i): Frame => ({ ms: 160, layers: [...kneelAt("readR", 0, 4), cutKid(kidTalkPose(0))], specks: a > 0.5 ? motes(i).map(([x, y, k]): Speck => [x, y + LIFT, k]).filter(inScene) : [], pal: faded(a), ...(i === 0 ? { cue: "fade" } : {}) }))
+    .concat([{ ms: 160, layers: kneelAt("readR", 0, 4) }]);
+/** The man alone on his knees (a loop, 3.8 s): before the child comes, and after (`after`: still looking where he stood). */
+const CUT_ALONE = (after: boolean): Frame[] =>
+  Array.from({ length: 16 }, (_, i): Frame => ({ ms: 240, layers: kneelAt(after ? (i < 12 ? "readR" : "down") : i === 9 ? "shut" : "down", i >= 4 && i < 11 ? 1 : 0, after && i < 12 ? 4 : 6) }));
+
+/**
+ * The cutscene's figures (a mockup): today's sprite on his knees, and room above and beside him for the ghost child's
+ * arrival. Its loops and one-shots, played by `components/RecluseCutscene.tsx` on the times in `RECLUSE_CUTSCENE`.
+ */
+export const RECLUSE_CUTSCENE: Character = {
+  id: "recluse-cutscene",
+  name: "Hidden Boss cutscene",
+  w: SCENE_W,
+  h: CUT_H,
+  foot: [OX + 46, GROUND],
+  palette: { ...AGES_PALETTE, ...GHOST_PALETTE, ...POOF_PALETTE },
+  halo: "#2a2733",
+  parts: joinParts(CUT_PARTS, RECLUSE.parts),
+  anims: {
+    idle: lazyAnim(() => ({ loop: true, frames: CUT_ALONE(false) })),
+    poof: lazyAnim(() => ({ loop: false, frames: CUT_POOF() })),
+    drop: lazyAnim(() => ({ loop: false, frames: CUT_DROP() })),
+    land: lazyAnim(() => ({ loop: false, frames: CUT_LAND() })),
+    together: lazyAnim(() => ({ loop: true, frames: CUT_TALK(null) })),
+    kidTalk: lazyAnim(() => ({ loop: true, frames: CUT_TALK("kid") })),
+    manTalk: lazyAnim(() => ({ loop: true, frames: CUT_TALK("man") })),
+    fade: lazyAnim(() => ({ loop: false, frames: CUT_FADE() })),
+    alone: lazyAnim(() => ({ loop: true, frames: CUT_ALONE(true) })),
+  },
+};
+/** Where things are in the cutscene's drawing, for its text boxes: each one's middle (x) and the top of his head (y). */
+export const CUTSCENE_SPOTS = { kid: { x: KID_X, head: GROUND - 82 }, man: { x: OX + 46, head: GROUND - 64 } } as const;
+
 /** Everything this mockup draws, for the preview and the tests; none of it is in CHARACTERS or any kit. */
-export const RECLUSE_AGES_PREVIEW: readonly Character[] = [RECLUSE_CHILD, RECLUSE_TEEN, RECLUSE_YOUNG, RECLUSE_CHILD_BUST, RECLUSE_TEEN_BUST, RECLUSE_YOUNG_BUST, RECLUSE_GROW, RECLUSE_GHOST, RECLUSE_CHILD_SIT, RECLUSE_CHILD_SIDE];
+export const RECLUSE_AGES_PREVIEW: readonly Character[] = [RECLUSE_GROWING, RECLUSE_GROWING_BUST, RECLUSE_CHILD, RECLUSE_TEEN, RECLUSE_YOUNG, RECLUSE_CHILD_BUST, RECLUSE_TEEN_BUST, RECLUSE_YOUNG_BUST, RECLUSE_GROW, RECLUSE_GHOST, RECLUSE_CHILD_SIT, RECLUSE_CHILD_SIDE, RECLUSE_CUTSCENE];

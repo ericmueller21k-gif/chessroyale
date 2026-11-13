@@ -75,7 +75,7 @@ import {
   ShowdownScout,
   kingHelpBlocked,
 } from "@chessroyale/chess";
-import type { BossView, BoardView, DarkNote, ExitKind, FinalView, GameView, Hint, LightsView, MoveRecord, Phase, RushView, Standing, VoteView } from "./game.ts";
+import type { BossView, BoardView, DarkNote, ExitKind, FinalView, GameView, Hint, LightsView, MoveRecord, Phase, RushView, SimulView, Standing, VoteView } from "./game.ts";
 import { hintsFrom, whiteExpected } from "./hints.ts";
 import { account } from "./account.ts";
 import { crumb } from "./problems.ts";
@@ -92,6 +92,7 @@ import { setGardenSource } from "./garden-clock.ts";
 import { timingOnDevice } from "./test-switches.ts";
 import { gameKey, onYours, yours } from "./board/yours.ts";
 import { premoveUci } from "./board/logic.ts";
+import { OnlinePhase2 } from "./recluse-online.ts";
 
 /** Your result in a lobby's match (once it's over), from the server: for "See your result". */
 export interface LobbyResult {
@@ -188,6 +189,45 @@ export class NetMatch implements GameView {
    */
   hiddenRoom = false;
   private winFormSent = false;
+  /**
+   * The Hidden Boss's phase 2 online (Nov 13; recluse-online.ts): his phase change and the four boards, run by the server, after his
+   * adult form beaten in his room's fight or the Crowd's boss final.
+   */
+  readonly phase2 = new OnlinePhase2({
+    myId: () => this.myId,
+    local: (t) => this.local(t),
+    phase: () => this.phase,
+    setPhase: (p) => this.setPhase(p),
+    emit: () => this.emit(),
+    send: (m) => this.send(m),
+    turnBegins: () => this.lookAways.start(),
+    turnEnds: () => this.lookAways.stop(),
+  });
+  /** His fall's word on who takes his four boards (player ids): leaving is resigning a board for them from the fall on. */
+  private phase2Boards: readonly string[] = [];
+  /** You take (or play) a board of his phase 2: leaving is resigning it (a loss), and a bot plays it on. */
+  private get phase2Seat(): boolean {
+    if (this.phase2.onBoard) return true;
+    return this.phase.kind === "boss" && !!this.phase.toPhase2 && !!this.myId && this.phase2Boards.includes(this.myId);
+  }
+  /** His phase 2 can follow here (his room's fight, a Crowd final): its themes are fetched as his fight starts. */
+  get phase2Ahead(): boolean {
+    return this.hiddenRoom || (this.settings.mode === "crowd" && !this.settings.raid);
+  }
+  /** His cutscene's hold, as the server said (`recluseCutscene`), while his fall is up. */
+  get cutscene(): { at: number; until: number } | null {
+    return this.phase2.cutscene;
+  }
+  get simul(): SimulView | null {
+    const k = this.phase.kind;
+    return k === "phaseChange" || k === "simul" ? this.phase2.view() : null;
+  }
+  simulMove(boardId: number, move: string) {
+    this.phase2.move(boardId, move);
+  }
+  get bossNote(): string | null {
+    return this.simul ? this.phase2.note() : null;
+  }
   party: { seats: Record<string, number>; leader: string | null } | null = null;
   /** Back into a match that's already being played (the app opened from scratch): the splash until it shows. */
   resuming = false;
@@ -320,6 +360,9 @@ export class NetMatch implements GameView {
     const k = this.phase.kind;
     if (this.closed || this.resigning || k === "results" || k === "loading" || (k === "lobby" && !this.started)) return null;
     if (!this.begun) return "leave";
+    // (His phase 2: you play a board, so leaving is resigning: a loss, and a bot plays it on. From his fall on, as his fall says who
+    // takes the boards: his room's fight and a Crowd final's top 4 alike, a reload included.)
+    if (this.phase2Seat) return "resign";
     const me = this.standingsList.find((s) => s.id === this.myId);
     return me && !me.out ? "resign" : "leave";
   }
@@ -331,7 +374,7 @@ export class NetMatch implements GameView {
 
   /** The lobby fills seats with bots (Default, and private Crowd lobbies; not Bots off, nor a private raid), or it's a final. */
   get seatToBot(): boolean {
-    return (!this.botsOff && !(this.settings.raid && !this.auto)) || (!!this.final && this.final.order.includes(this.myId ?? ""));
+    return (!this.botsOff && !(this.settings.raid && !this.auto)) || (!!this.final && this.final.order.includes(this.myId ?? "")) || this.phase2Seat;
   }
 
   /**
@@ -535,6 +578,7 @@ export class NetMatch implements GameView {
 
   dispose() {
     this.closed = true;
+    this.phase2.dispose();
     this.unPremoves();
     setGardenSource(null);
     if (this.resignTimer) clearTimeout(this.resignTimer);
@@ -552,11 +596,15 @@ export class NetMatch implements GameView {
     return this.hiddenRoom && isAdmin() && this.boss?.id === HIDDEN_ROOM.boss;
   }
   get winFormArmed(): boolean {
+    const p2 = this.phase2.p;
+    if (p2) return (this.winFormSent || !!p2.winNext) && !p2.done;
     return this.winFormSent && !this.boss?.result;
   }
   /** "Win this form" (Eric's test kit, Nov 13): the team's next move beats his form, by the same end a mate takes, on the server. */
   winForm() {
-    if (!this.winFormShown || this.winFormSent || this.boss?.result) return;
+    // (His phase 2: the team's next move wins every board still on. Before it, his adult form.)
+    const p2 = this.phase2.p;
+    if (!this.winFormShown || this.winFormSent || (p2 ? !!p2.done || !!p2.winNext : !!this.boss?.result)) return;
     this.winFormSent = true;
     this.send({ t: "winForm" });
     this.emit();
@@ -584,8 +632,9 @@ export class NetMatch implements GameView {
         if (this.phase.kind === "loading") this.setPhase({ kind: "lobby" });
         // (A resign sent while the connection was down: again, now it's back.)
         if (this.resigning) this.send({ t: "resign" });
-        // (A premove the server may have missed while the connection was down: again.)
+        // (A premove the server may have missed while the connection was down: again. And a move on his phase 2 board.)
         if (this.premoveTold) this.send({ t: "premove", move: this.premoveTold });
+        this.phase2.onWelcome();
         this.chat.onWelcome();
         // This device's engine speed, so the lobby can share out the judging (once per page; sent again on reconnect).
         void this.reportSpeed();
@@ -766,8 +815,13 @@ export class NetMatch implements GameView {
         this.lights = null;
         // (Dash's Scramble Rush: its beats on this device's clock, your placements kept through the server's verdict.)
         this.rush = m.rush ? { key: m.rush.key, at: this.local(m.rush.at), ...(this.rush?.key === m.rush.key ? { places: this.rush.places, moved: this.rush.moved } : { places: {}, moved: {} }) } : null;
-        // (`fall`: beaten, the Hidden Boss collapses on the board until the results come.)
-        return this.setPhase({ kind: "boss", boss: this.boss, until: m.until ? this.local(m.until) : 0, thinking: m.thinking, intro: m.intro, ...(m.fall ? { fall: true } : {}), ...(this.rush ? { rush: { ...this.rush, places: { ...this.rush.places }, moved: { ...this.rush.moved } } } : {}) });
+        // (`fall`: beaten, the Hidden Boss collapses on the board until the results come, or (`toPhase2`) his phase change: his words are
+        // cleared as he falls, so his mumbling carries on into it, as solo's.)
+        if (m.fall && m.toPhase2) {
+          bossVoice.reset();
+          this.phase2Boards = m.phase2Boards ?? [];
+        }
+        return this.setPhase({ kind: "boss", boss: this.boss, until: m.until ? this.local(m.until) : 0, thinking: m.thinking, intro: m.intro, ...(m.fall ? { fall: true } : {}), ...(m.fall && m.toPhase2 ? { toPhase2: true } : {}), ...(this.rush ? { rush: { ...this.rush, places: { ...this.rush.places }, moved: { ...this.rush.moved } } } : {}) });
       case "darkTry": {
         if (m.key !== this.key || this.phase.kind !== "play") return;
         if (m.ok) {
@@ -825,6 +879,27 @@ export class NetMatch implements GameView {
         // (Chub & Chirp's Carrot Patch cast spends his whole turn: only the pass guard to ask.)
         if (m.pass) return void this.hostPick(m.key, (engines) => castAnswer(engines, m.fen));
         return void this.hostBoss(m.key, m.fen, m.elo, m.nodes, m.best ? "best" : m.stumble ? "stumble" : m.stagger ? "stagger" : "elo", m.allowed ?? null, !!m.funhouse, m.brain, m.seed !== undefined ? { seed: m.seed, ...(m.pull ? { pull: m.pull } : {}), ...(m.drag ? { drag: true as const } : {}), ...(m.showdown ? { showdown: m.showdown } : {}) } : null, m.land ?? null, m.race ?? null, m.beam ?? null, m.balloon ?? null, m.hoops ?? null, m.crease ?? null, typeof m.draw === "number" ? m.draw : null, !!m.check, !!m.share);
+      case "recluseCutscene":
+        return this.phase2.onCutscene(m.at, m.until);
+      case "phase2":
+        // (His phase 2 is the whole battle from here: Maia, phase 1's brain, is freed; a "Win this form" pressed before it is spent.)
+        if (this.phase2.p?.key !== m.p2.key) {
+          this.freeBrain();
+          this.winFormSent = false;
+          this.begun = true;
+        }
+        // (Back in the middle of it, a reload: the battle and the standings come with it.)
+        if (m.boss) this.boss = { ...m.boss, board: this.toView(m.boss.board) };
+        if (m.standings) this.standingsList = m.standings;
+        // (Back during his cutscene's hold, a reload (review of #679, M1): his fall's screen, so the scene draws over it from its
+        // moment and the beaten theme plays, never "Connecting…" until his phase change. Who takes the boards: the view's.)
+        if (this.boss && Date.now() < this.local(m.p2.at) && !(this.phase.kind === "boss" && this.phase.fall && this.phase.toPhase2)) {
+          this.phase2Boards = m.p2.boards.map((b) => b.player);
+          this.phase = { kind: "boss", boss: this.boss, until: this.local(m.p2.cutAt), fall: true, toPhase2: true };
+        }
+        return this.phase2.onMessage(m.p2, !!m.refused);
+      case "phase2Ask":
+        return void this.hostPhase2(m.id, m.fen, m.elo, m.nodes, m.moveMs);
       case "bossBrain":
         // The battle is on the Maia brain and this device plays the boss (Maia loads during the intro), or (`check`) it was drawn
         // to check his moves (BOSS_CHECK): a computer loads it, a phone only if its files are saved here already.
@@ -863,6 +938,8 @@ export class NetMatch implements GameView {
       // (The Hidden Boss's bullet clock ran out: he won on time.)
       ...(m.timeout ? { timeout: true } : {}),
       ...(m.carrots ? { carrots: true } : {}),
+      // (His phase 2: how many of its boards were won.)
+      ...(m.simul ? { simul: m.simul } : {}),
     });
   }
 
@@ -1008,6 +1085,20 @@ export class NetMatch implements GameView {
     const maia = (this.maia = startMaia(BOSS_BRAIN.loadTimeoutMs));
     void maia?.loaded().then((ok) => ok && this.maia === maia && this.send({ t: "maiaReady" }));
     if (maia) maia.onFail = () => void (this.maia === maia && this.send({ t: "maiaReady", off: true }));
+  }
+
+  /**
+   * The host plays a move of the Hidden Boss's phase 2 the engine server couldn't (his, or a bot's): its engine at the strength asked.
+   * No answer (an engine error): none sent, and the server plays its own quick move.
+   */
+  private async hostPhase2(id: string, fen: string, elo: number, nodes: number, moveMs: number) {
+    try {
+      const engines = await this.engines();
+      const move = await engines[0]!.playAtElo(fen, elo, nodes, moveMs);
+      this.send({ t: "phase2Answer", id, move });
+    } catch (e) {
+      crumb(`phase 2 move failed: ${e instanceof Error ? e.message : String(e)}`);
+    }
   }
 
   /** Frees Maia (its model holds a few hundred MB). */

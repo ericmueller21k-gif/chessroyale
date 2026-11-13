@@ -9,8 +9,8 @@ import { forgetLobby, recordWait, reportLobby, type LiveMode } from "./live.ts";
 import type { Env } from "./index.ts";
 import { countCall } from "./ops.ts";
 import { liveHub } from "./live-hub.ts";
-import { SERVER_RECHECK_NODES, serverRecheck, serverScoreAt, warmEngine } from "./engine.ts";
-import { CAPACITY, CHAT_MOD, DEFAULT_SETTINGS, MATCH_SAVE, XP, battleCounts } from "@chessroyale/core";
+import { SERVER_RECHECK_NODES, serverAllMovesAt, serverRecheck, serverScoreAt, warmEngine } from "./engine.ts";
+import { CAPACITY, CHAT_MOD, DEFAULT_SETTINGS, MATCH_SAVE, RECLUSE_ONLINE, XP, battleCounts } from "@chessroyale/core";
 import type { ChatBlock } from "@chessroyale/chess";
 import { chatBlock } from "./chat-mod.ts";
 import { BANNED_MESSAGE, banCheck, eligibleForRanked, recordFairPlay } from "./fairplay.ts";
@@ -20,6 +20,7 @@ import { isPaused, pausedBosses } from "./kill-switches.ts";
 import { countBossBattle } from "./boss-tokens.ts";
 import { opKeys } from "./ledger.ts";
 import { grantXp, type XpGame } from "./xp.ts";
+import { phase2Unvouched } from "./bosses/recluse.ts";
 import { serverError } from "./problems.ts";
 import type { Sql } from "./accounts.ts";
 
@@ -55,6 +56,8 @@ export class Lobby extends DurableObject<Env> {
   private reportQueued = false;
   /** Many judges: deep searches the lobby asked of the engine server, sent once the lobby is stored. */
   private serverQueue: ServerScoreRequest[] = [];
+  /** The Hidden Boss's phase 2: positions to score on the engine server (every legal move), sent in the background like the judges'. */
+  private phase2Queue: { id: string; fen: string }[] = [];
   /**
    * Fair play: the record's `fair` (each person's picks with their signals) as last stored, by its count. Stored under
    * its own key "fair" and only when a round added to it, so a pick or a chat line never rewrites it.
@@ -113,6 +116,9 @@ export class Lobby extends DurableObject<Env> {
       serverEngine: this.engineUp,
       icon: (playerId) => this.icons.get(playerId),
       serverScore: (req) => void this.serverQueue.push(req),
+      phase2Search: (req) => void this.phase2Queue.push(req),
+      // (The Hidden Boss's phase 2 is coming: the engine server boots during his fall and phase change, before his first search.)
+      warmEngine: () => this.ctx.waitUntil(warmEngine(this.env).then((up) => void (this.engineUp = up))),
       send: (playerId, msg) => {
         const text = JSON.stringify({ ...msg, now: Date.now() } as ServerMessage);
         for (const ws of this.socketsOf(playerId)) {
@@ -133,7 +139,7 @@ export class Lobby extends DurableObject<Env> {
           }
         }
       },
-    }, library, undefined, { ...DEFAULT_SETTINGS, bossesOff: pausedBosses(this.env) });
+    }, library, undefined, { ...DEFAULT_SETTINGS, bossesOff: pausedBosses(this.env), ...cutsceneHold(this.env) });
   }
 
   /** Re-checks each board's close calls on the engine server (the host's numbers stand where it can't). */
@@ -258,6 +264,7 @@ export class Lobby extends DurableObject<Env> {
     void this.reportLive(core).catch(() => undefined);
     // Many judges: the engine server's searches run in the background; each answer is a new event for the lobby.
     for (const req of this.serverQueue.splice(0)) this.ctx.waitUntil(this.serve(req));
+    for (const req of this.phase2Queue.splice(0)) this.ctx.waitUntil(this.servePhase2(req));
     // The results, written in the background too: a slow D1 never holds up the match's next event (the review of #610, m2). The alarm
     // just armed is already their next try (a second on), which finds the write done, or still running and shares it.
     if (this.record.saveQueue?.length && Date.now() >= this.saveRetryAt) this.ctx.waitUntil(this.writeResults());
@@ -287,6 +294,15 @@ export class Lobby extends DurableObject<Env> {
     if (!this.record) return;
     const core = this.core(this.record.code);
     core.serverScored(req.id, moves);
+    await this.persist(core);
+  }
+
+  /** One position of the Hidden Boss's phase 2 scored on the engine server (every legal move); its answer goes back to the lobby. */
+  private async servePhase2(req: { id: string; fen: string }) {
+    const moves = await serverAllMovesAt(this.env, req.fen, RECLUSE_ONLINE.groupNodes).catch(() => null);
+    if (!this.record) return;
+    const core = this.core(this.record.code);
+    core.phase2Searched(req.id, moves);
     await this.persist(core);
   }
 
@@ -697,8 +713,9 @@ export function lobbyXpGame(
       test: forced === null && (!!o.tested || practice),
     },
     // (One device's word stood alone somewhere in the match (LobbyRecord.unvouched): it pays as a solo game does, under solo's
-    // daily caps on wins and minutes; the outside review of Nov 10, finding 5.)
-    cap: rec.unvouched ? "solo" : vs,
+    // daily caps on wins and minutes; the outside review of Nov 10, finding 5. Or a move of the Hidden Boss's in a phase 2 they
+    // played a board of: phase2Unvouched, theirs alone; the review of #677, M2.)
+    cap: rec.unvouched || phase2Unvouched(rec, r.playerId) ? "solo" : vs,
     signedInOnly,
     now,
     // (Quests, phase 3: a raid is "boss", Crowd "crowd" (50 v 50), the rest "classic".)
@@ -752,4 +769,10 @@ export async function writeResult(c: SaveContext, rec: LobbyRecord, p: PendingRe
     const op = opKeys.onlineDrop(rec.code, rec.startedAt ?? rec.createdAt);
     await soft("bossToken", countBossBattle(c.sql, p.userId, p.at, { battle: rec.code, op, off: c.off, signedInOnly: c.signedInOnly }), undefined);
   }
+}
+
+/** The cutscene's hold for a test server (CUTSCENE_HOLD_MS, only with TEST_SWITCHES on): 1 s to 120 s, else the setting's own. */
+function cutsceneHold(env: Pick<Env, "TEST_SWITCHES" | "CUTSCENE_HOLD_MS">): { cutsceneHoldMs?: number } {
+  const ms = Number(env.CUTSCENE_HOLD_MS);
+  return env.TEST_SWITCHES === "1" && Number.isFinite(ms) && ms >= 1000 && ms <= 120_000 ? { cutsceneHoldMs: Math.round(ms) } : {};
 }

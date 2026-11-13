@@ -161,8 +161,9 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
   everywhere else (`adminOnly`). His rules there are his phase 1 (from the starting position, Maia at its top, raw, the
   God King blocked, no strikes, the bullet clock; [bosses.md](bosses.md)). **Online** the lobby runs them through the
   shared runner, his brain on the host's device; beaten, the board holds `RECLUSE_FALL_MS` for his collapse (the boss
-  message's `fall`), then the results (`timeout` when he won on time). **Phase 2 isn't online:** phase 1 won is the
-  crowd's victory there. **Solo** (you and bots), if you reached him, his phase 2 follows as in Boss alone, the other
+  message's `fall`), then the results (`timeout` when he won on time). **Phase 2 online** (Nov 13): beaten, his phase change
+  and the four boards follow for the top 4 (the server's, as his room's fight: bosses.md, "Phase 2 online"); the others watch.
+  **Solo** (you and bots), if you reached him, his phase 2 follows as in Boss alone, the other
   three finalists on the other boards (`phase2Follows`, `phase2Mates` in `recluse-phase2.ts`). No reward comes from this
   path (rewards only via Squads: ROADMAP.md). Duel: the last two. `finalMaxTurns` caps a final; the engine
   adjudicates.
@@ -320,7 +321,7 @@ time controls themselves are in the vote data (`PREGAME_VOTES` in `votes.ts`).
   e2e `e2e/resign.spec.ts` (Boss alone, a Solo 50 v 50, Squads, an online raid; phone and computer).
 - The boss final (the Hidden Boss): unit `packages/core/test/votes.test.ts` (his card, the knockouts), `boss.test.ts`
   (`crowdFinalBoss`), `packages/chess/test/crowd.test.ts` ("50 v 50 boss final"), `packages/server/test/crowd-hidden-boss.test.ts`
-  (online: his brain and strength, the God King tried, the bullet clock and a loss on time, his fall then the results),
+  (online: his brain and strength, the God King tried, the bullet clock and a loss on time, his fall then phase 2 to the result),
   `packages/app/test/recluse-phase2.test.ts` (phase 2 in a solo Crowd's final), `faq.test.ts`; e2e
   `e2e/crowd-hidden.spec.ts` (the card; solo through phase 2, no strikes, the God King never comes; online to the result,
   his replies played by the host's browser: formats.spec.ts' two boss-battle tests merged in, Nov 2).

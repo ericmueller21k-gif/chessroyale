@@ -4,7 +4,7 @@ import { animLength, cueAt } from "./characters/power-art.ts";
 import { lazyTable } from "./characters/sprite.ts";
 import { RECLUSE_LINES } from "./characters/recluse-lines.ts";
 import { holdMs, readMs, typeMs } from "./speech.tsx";
-import { pacedSeries } from "./paced-line.ts";
+import { pacedLine, pacedSeries, type PacedLine } from "./paced-line.ts";
 import {
   LAST_STAND,
   legalMoves,
@@ -56,10 +56,11 @@ import {
 export const PHASE_CHANGE = lazyTable(() => {
   const a = RECLUSE.anims;
   const len = (n: string) => animLength(a[n]!);
-  const fallMs = 1800;
   // (Eric, Oct 17: "it happens way too fast". About 10 s more from the mate to the split, the animations unchanged: his
   // words before he seizes the power, a hold as it lands, a longer cast; then a countdown before the clocks.)
   const pace = RECLUSE_PHASE2.change;
+  // (His fall before it: a setting since Nov 13, as the lobby server times it too.)
+  const fallMs = pace.fallMs;
   // The absorption. (His drain lasts the God King's Last Stand blows to his stagger: its flashes and cracks, his frames.)
   const kingAt = 0;
   // His words first, still on his knees while the God King gloats: his fall's mumbling (its first line, from the end of
@@ -173,8 +174,21 @@ export function absorbReadMs(text: string): number {
 }
 
 /**
- * His figure where he stands through the phase change (BossCharacter's figure run, from `at`, the change's start): slumped
- * and mumbling, then he seizes the God King's power, his hand held up while it streams in, his fist as it lands, up in a
+ * His word as the power lands, paged as his chant's lines are (Nov 13: on a phone's boss bar, two rows, "All game you leaned on an
+ * engine. Now see how you like it." was cut off): typed sentence by sentence at the speech rule's pace, the chant's pause between
+ * (a phone's bar shows a sentence at a time, each its own page: `pacedPage`), then readable until `absorbGoneAt` at most, as
+ * `absorbReadMs` keeps it; so it ends no later than the unpaged line did, and his chant's first line keeps its time.
+ */
+export function absorbPaced(text: string): PacedLine {
+  const C = PHASE_CHANGE;
+  const sentences = text.match(/[^.!?]+[.!?]+(?:\s+|$)/g)?.map((x) => x.trim()) ?? [text];
+  const line = pacedLine(sentences, { typeMs: SPEECH.typeMs, sentencePauseMs: RECLUSE_PHASE2.change.chantLines.sentencePauseMs, readMs: SPEECH.readMs, perCharMs: SPEECH.perCharMs, maxReadMs: SPEECH.maxReadMs, fadeMs: SPEECH.fadeMs });
+  return { ...line, holdMs: Math.min(line.typedMs + readMs(text) + SPEECH.fadeMs, C.absorbGoneAt - C.absorbLineAt) };
+}
+
+/**
+ * His figure where he stands through the phase change (BossCharacter's figure run, from `at`, the change's start): on his
+ * knees, quiet after his cutscene (`kneel`), then he seizes the God King's power, his hand held up while it streams in, his fist as it lands, up in a
  * rage; from his leap the board draws him, and once he's back he rests in phase 2's idle.
  */
 export function phaseChangeRun(at: number) {
@@ -182,7 +196,7 @@ export function phaseChangeRun(at: number) {
   const seize = animLength(RECLUSE.anims.seize!);
   // (`seized` held on its last frame, his fist closed, for the absorb's hold.)
   const seized = animLength(RECLUSE.anims.seized!) + C.absorbHoldMs;
-  return { since: at + C.seizeAt, anims: ["seize", { anim: "seizeLoop", ms: C.igniteAt - C.seizeAt - seize }, { anim: "seized", ms: seized }, "rage"], loop: "idle2", before: "collapseLoop" } as const;
+  return { since: at + C.seizeAt, anims: ["seize", { anim: "seizeLoop", ms: C.igniteAt - C.seizeAt - seize }, { anim: "seized", ms: seized }, "rage"], loop: "idle2", before: "kneel" } as const;
 }
 
 /** What the God King shows in his place at `t` ms into the phase change, or "gone" (absorbed: from then on, phase 2 too). */
@@ -284,7 +298,7 @@ export const phase2UltBannerMs = (): number => bossBannerMs();
 /**
  * Whether his phase 2 follows phase 1 won, on this device (solo): alone (Boss alone), or in a solo Crowd's boss final
  * (Oct 14: it's always him there), whose other finalists take the other boards. Never a Solo raid (its 49 bots have no
- * boards), and never online, where phase 2 isn't built yet: there phase 1 won is the crowd's victory.
+ * boards). Online (Nov 13) the server runs it (his room's fight, a Crowd final: recluse-online.ts, NetMatch), not this.
  */
 export function phase2Follows(o: { bossId: string | null | undefined; result: string | null | undefined; raid: boolean; raidBots: boolean; crowdFinal: boolean }): boolean {
   if (o.bossId !== "recluse" || o.result !== "crowd" || RECLUSE_PHASE2.boards < 1) return false;
