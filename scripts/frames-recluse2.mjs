@@ -173,8 +173,9 @@ const change = async (ctx) => {
   // (PHASE_CHANGE's beats: the God King triumphant, the boss's hand raised, the drain, the power landing (his look
   // ignites), the God King gone, his rage, the leap, landed, the book brandished, thrown down, the chant and its light, the
   // cracks and the arcs, the split, the boards growing, the book back in his hands, the leap back, "PHASE 2".)
-  // (Oct 17, its pace: his line before the seize, the fist held as the power lands, the cast held; RECLUSE_PHASE2.change.)
-  const beats = [[600, "01-king"], [5200, "01b-talk"], [6450, "02-seize"], [7700, "03-drain"], [8900, "04-ignite"], [9550, "05-gone"], [10200, "05b-hold"], [11400, "06-rage"], [12100, "07-leap"], [12600, "08-landed"], [13000, "09-brandish"], [13600, "10-thrown"], [14600, "11-chant"], [17500, "11b-cast"], [19700, "12-crack-arcs"], [20450, "13-split-arcs"], [21200, "14-grow"], [22300, "15-book-back"], [23000, "16-leap-back"], [23900, "17-banner"]];
+  // (Oct 17, its pace: his line before the seize, the fist held as the power lands, the cast held; RECLUSE_PHASE2.change. Nov 13:
+  // the cast as long as his two chant lines, each shot once typed out; the beats after it 8.7 s later.)
+  const beats = [[600, "01-king"], [5200, "01b-talk"], [6450, "02-seize"], [7700, "03-drain"], [8900, "04-ignite"], [9550, "05-gone"], [10200, "05b-hold"], [11400, "06-rage"], [12100, "07-leap"], [12600, "08-landed"], [13000, "09-brandish"], [13600, "10-thrown"], [14600, "11-chant"], [19400, "11b-chant-line1"], [27400, "11c-chant-line2"], [28400, "12-crack-arcs"], [29150, "13-split-arcs"], [29900, "14-grow"], [31000, "15-book-back"], [31700, "16-leap-back"], [32600, "17-banner"]];
   for (const [ms, label] of beats) {
     const wait = ch.now + ms - Date.now();
     if (wait > 0) await p.waitForTimeout(wait);
