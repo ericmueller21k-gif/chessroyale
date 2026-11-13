@@ -2760,6 +2760,7 @@ export class LobbyCore {
       from: runner.boards.get(runner.state.boards[0]!)!.fen,
       seed: runner.state.boss?.powers?.seed ?? Math.floor(this.rng() * 2 ** 32),
       win: !!this.settings.bossWinTest,
+      ...(this.settings.cutsceneHoldMs ? { holdMs: this.settings.cutsceneHoldMs } : {}),
     });
     // (Who takes the boards, so their leave confirm says it's a loss from his fall on: the review of #677, m3.)
     this.broadcast({ ...this.bossMessage(p2.cutAt, { fall: true }), toPhase2: true, phase2Boards: players.map((x) => x.id) } as Outgoing);

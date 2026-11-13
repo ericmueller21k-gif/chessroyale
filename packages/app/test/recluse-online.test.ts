@@ -154,6 +154,20 @@ describe("phase 2 online on this device", () => {
     D.g.onMessage(serverView(now, "me", { cutAt: now - 1000, at: now + 9000, clocksAt: now + 9000 + RECLUSE_ONLINE.changeMs + 5000 }));
     expect(D.g.cutscene).toEqual({ at: now - 1000 - 5000, until: now + 9000 - 5000 });
     D.g.dispose();
+    // (A reload into it (the review of #679, M1): the page starts on "loading"; the view brings it to his fall's screen, the scene
+    // over it drawn from its moment, not "Connecting…" until his phase change. Who takes the boards: the view's.)
+    const m = new NetMatch("TEST", "Ann", async () => []);
+    const tell = (msg: object) => (m as unknown as { onMessage(x: object): void }).onMessage({ now: Date.now(), ...msg });
+    tell({ t: "welcome", playerId: "me", token: "t", code: "TEST" });
+    expect(m.phase.kind).not.toBe("boss");
+    const t = Date.now();
+    const fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+    const boss = { id: "recluse", name: "Hidden Boss", result: "crowd", lastMove: "e2e4", board: { id: 0, fen, lastMove: "e2e4", ply: 9 } };
+    tell({ t: "phase2", p2: serverView(t, "me", { cutAt: t - 20_000, at: t + 80_000, clocksAt: t + 80_000 + RECLUSE_ONLINE.changeMs + 5000 }), boss, standings: [{ id: "me", name: "Ann", out: true }] });
+    expect(m.phase).toMatchObject({ kind: "boss", fall: true, toPhase2: true, boss: { id: "recluse" } });
+    expect(m.cutscene!.until - m.cutscene!.at).toBe(100_000);
+    expect(m.exit).toBe("resign");
+    (m as unknown as { phase2: { dispose(): void } }).phase2.dispose();
   });
 
   it("a Crowd final's watcher: no board is yours, and leaving isn't resigning a board", () => {

@@ -142,6 +142,11 @@ export interface Settings {
    */
   bossWinTest?: boolean;
   /**
+   * Testing only (e2e): the Hidden Boss's cutscene's hold (ms) instead of RECLUSE_CUTSCENE.holdMs; the scene plays sped up to fit it
+   * (fitCutscene). Solo: `?cutscene=SECONDS`; online: the lobby server's CUTSCENE_HOLD_MS where TEST_SWITCHES is on.
+   */
+  cutsceneHoldMs?: number;
+  /**
    * Test switch, solo (?carrots=N, 0 to 5, with ?boss=hopper&power=carrotpatch): Chub & Chirp's cast plants N carrots
    * each a step from one of his pieces and out of the crowd's reach, and the rest each a step from one of the crowd's
    * and out of his, and his race brain takes a carrot whenever a move of his pulls one (BossRace.eager): each side
@@ -1968,12 +1973,46 @@ export function recluseNextForm(form: RecluseForm, forms: readonly RecluseForm[]
 }
 
 /**
- * The cutscene between his adult form's end and his transformation (Eric, Nov 12; its scene is being built on
- * claude/recluse-cutscene). Online, after his fall the server holds `holdMs` for it, telling everyone when it starts
- * (`recluseCutscene`, with its start and end), then his phase change starts for everyone at once. 0 until the scene lands.
+ * The Hidden Boss's cutscene between his adult form and the cyborg (Nov 12; `components/RecluseCutscene.tsx`): after his fall,
+ * before his phase change, solo and online (Nov 13). Eric: everything dims and a soft-edged spotlight shines on the board's middle; his ghost as a
+ * child poofs into being above the board, drops and lands; then the 17 lines, each its own text box by its speaker,
+ * typed out, a line of two sentences typing the first, holding about a second, then the second; each box up long enough
+ * to read ("err on the slow side"); after the last, the child fades. Times in ms.
  */
 export const RECLUSE_CUTSCENE = {
-  holdMs: 0,
+  /** Everything dims and the spotlight comes up over this long. */
+  dimMs: 1000,
+  /** How dark the dimmed screen is outside the light (0 to 1). */
+  dimAlpha: 0.86,
+  /** The light's radius, a share of the board's width: fully lit inside `spotInner` of it, then a soft fade to the dark. */
+  spot: 0.4,
+  spotInner: 0.45,
+  /** The child poofs in this long after the light is fully up. */
+  poofAfterMs: 600,
+  /** The first line this long after he has landed and straightened. */
+  firstLineAfterMs: 600,
+  /** Typing: a character every `typeMs` (the game's lines type at 28: slower here, to read along). */
+  typeMs: 45,
+  /** Between the two sentences of a line: the first typed, then this pause, then the second. */
+  sentencePauseMs: 1000,
+  /** Once typed, a box stays fully readable `readMs` plus `perCharMs` a character, at most `maxReadMs`, then fades. */
+  readMs: 1700,
+  perCharMs: 40,
+  maxReadMs: 5500,
+  /** A box's fade, and the quiet between it and the next box. */
+  boxFadeMs: 260,
+  gapMs: 400,
+  /** After the last box has gone, the child fades out this much later (his fade is his frames'), then the scene holds. */
+  kidFadeAfterMs: 500,
+  endHoldMs: 1500,
+  /** Then the light lifts and the scene fades away (the dim and the man on the board), and his phase change begins. */
+  outMs: 600,
+  /**
+   * Online (claude/recluse-online-phase2): after his fall the server holds this long for the scene, telling everyone when it
+   * starts (`recluseCutscene`), then his phase change starts for everyone at once. The scene's whole length (the app's
+   * `recluseCutsceneTimeline().endAt`: a unit test keeps the two equal; change it with the lines or the times above).
+   */
+  holdMs: 104_085,
 } as const;
 
 /**

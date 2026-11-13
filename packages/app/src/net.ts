@@ -216,6 +216,10 @@ export class NetMatch implements GameView {
   get phase2Ahead(): boolean {
     return this.hiddenRoom || (this.settings.mode === "crowd" && !this.settings.raid);
   }
+  /** His cutscene's hold, as the server said (`recluseCutscene`), while his fall is up. */
+  get cutscene(): { at: number; until: number } | null {
+    return this.phase2.cutscene;
+  }
   get simul(): SimulView | null {
     const k = this.phase.kind;
     return k === "phaseChange" || k === "simul" ? this.phase2.view() : null;
@@ -909,6 +913,12 @@ export class NetMatch implements GameView {
         // (Back in the middle of it, a reload: the battle and the standings come with it.)
         if (m.boss) this.setBoss(m.boss);
         if (m.standings) this.standingsList = m.standings;
+        // (Back during his cutscene's hold, a reload (review of #679, M1): his fall's screen, so the scene draws over it from its
+        // moment and the beaten theme plays, never "Connecting…" until his phase change. Who takes the boards: the view's.)
+        if (this.boss && Date.now() < this.local(m.p2.at) && !(this.phase.kind === "boss" && this.phase.fall && this.phase.toPhase2)) {
+          this.phase2Boards = m.p2.boards.map((b) => b.player);
+          this.phase = { kind: "boss", boss: this.boss, until: this.local(m.p2.cutAt), fall: true, toPhase2: true };
+        }
         return this.phase2.onMessage(m.p2, !!m.refused);
       case "phase2Ask":
         return void this.hostPhase2(m.id, m.fen, m.elo, m.nodes, m.moveMs);

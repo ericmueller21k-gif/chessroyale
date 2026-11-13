@@ -633,5 +633,5 @@ function fitSides(side: HTMLElement | null, name: string) {
   screen.style.setProperty("--first-d", `${Math.round((place.firstMid - edge) * 10) / 10}px`);
   // (The room his words and his menu open into: from his box's left edge (and their 4 px in) to the window's, less the margin.)
   const kingLeft = place.firstMid + (pawn ? 60 : -60) * place.k;
-  screen.style.setProperty("--king-room", `${Math.floor(document.documentElement.clientWidth - SIDE_FEEL.margin - kingLeft - 4)}px`);
+  screen.style.setProperty("--king-room", `${Math.floor(screen.getBoundingClientRect().right - SIDE_FEEL.margin - kingLeft - 4)}px`);
 }

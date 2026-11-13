@@ -281,7 +281,7 @@ boss final you reached, where the other three finalists take the other boards (`
 below):
 - **Phase 2 online** (Nov 13, Eric: "it plays through till the end"; [decision](../decisions/2026-11-13-recluse-online-phase2.md)): his
   room's fight and the Crowd's boss final. His forms are a list (`RECLUSE_FORMS`: the child, the adult form, then four). Beaten, his fall (the boss message's `fall` with `toPhase2`, `RECLUSE_PHASE2.change.fallMs`), the cutscene's hold
-  (`RECLUSE_CUTSCENE.holdMs`, 0 for now: the event `recluseCutscene`, its start and end, for the cutscene's scene), then his phase
+  (`RECLUSE_CUTSCENE.holdMs`, the scene's length: the event `recluseCutscene`, its start and end, `NetMatch.cutscene`; below), then his phase
   change for everyone from one start (`phase2`'s `at`; `RECLUSE_ONLINE.changeMs`, the screens' `PHASE_CHANGE.total` within 300 ms),
   the countdown, and the four boards to the real result. The server runs them (`packages/server/src/bosses/recluse.ts`, on the same
   rules, `LobbyRecord.recluse2`, the lobby phase `phase2`): each person plays their own board (`phase2Move`: theirs, their move, on
@@ -300,6 +300,18 @@ below):
   at once and kept over the server's word until it has it or refuses it, sent again on a reconnect), `NetMatch`'s `simul`,
   `simulMove`, `bossNote`, `phase2Ahead` (his themes fetched ahead). Tests: `server/test/recluse-online.test.ts`,
   `crowd-hidden-boss.test.ts`, `engine-server.test.ts`, `app/test/recluse-online.test.ts`, `e2e/hidden-boss-room.spec.ts`.
+- **His cutscene** (Eric, Nov 12; in the fight since Nov 13, solo and online; [decision](../decisions/2026-11-13-recluse-cutscene-wired.md)):
+  after his fall, before the phase change, about 104 s (`RECLUSE_CUTSCENE.holdMs`; a unit test keeps it the timeline's length):
+  everything dims but a soft round spotlight on the board's middle; he kneels in it while the ghost of him as a child poofs in above
+  the board, drops, lands, his knees buckling; Eric's 17 lines, each its own typed box by its speaker (a line of two sentences typed
+  one, a second's pause, the next; `RECLUSE_CUTSCENE_LINES`); the child fades; the man alone a moment; the light lifts (`outMs`) and
+  the phase change carries on, him on his knees in his place, quiet (`kneel`, `phaseChangeRun`'s `before`), until he seizes the God
+  King's power. Solo: from the fall's end (`SoloMatch.cutscene`), the phase change as it ends; online from the server's
+  `recluseCutscene`, everyone at once. Drawn by App over the fall's screen (`components/RecluseCutscene.tsx`, `recluse-cutscene.ts`'s
+  timeline, the figure `recluse-cutscene` in `recluse-ages.ts`); meanwhile his figure in its place is hidden (`body.cs-on`) and both
+  voices are quiet (`Voice.hush`). Music: his beaten theme on through it (`recluseMusic`: the fall with `toPhase2`). No skip, the 🏆
+  included. A test's shorter hold plays it sped up to fit (`fitCutscene`; solo `?cutscene=SECONDS`, a test server's
+  `CUTSCENE_HOLD_MS`, the e2e's 12 s). Tests: `app/test/recluse-cutscene.test.ts`, `e2e/recluse.spec.ts` ("Win this form").
 - **The phase change** (Eric, Oct 14, reworked, then opened with the God King's absorption; `PHASE_CHANGE` in
   `packages/app/src/recluse-phase2.ts`, about 33.5 s after a 1.8 s fall (24.8 s before his chant's two lines, Nov 13) (its "PHASE 2" banner 1.4 s, `BOSS_BANNER.phase2Ms`, Oct 16, and the banners' extra since Oct 24), one timeline, not skippable like a boss's
   intro; drawn by `screens/Recluse2.tsx`, `PhaseChangeScreen`). **Its pace** (Eric, Oct 17, after playing it: "everything's
@@ -318,7 +330,7 @@ below):
     drawings) while he's drained through his Last Stand's blows, flashing and cracking (his own frames, `lastStand`
     from its blows, drawn ahead by `prewarmKing`), flickering, his aura shrinking, and cries out
     (`KING_VS_RECLUSE.drained`); as it lands the boss's fist closes (`seized`, its spark `recluseSpark`), his half-engine
-    look ignites (`setEngineAt`) and he says so (`RECLUSE_LINES.absorb`, CRITICAL: it cuts in on his word before the
+    look ignites (`setEngineAt`) and he says so (`RECLUSE_LINES.absorb`, paged a sentence at a time as his chant's lines are since Nov 13, `absorbPaced`; CRITICAL: it cuts in on his word before the
     seize), and the God King fades up and away in light (`gkLeave`); he holds his fist, its last frame (a one-shot given
     a time in a figure run holds its last frame), the dock saying "The God King's power is his!". Sounds: `gkHyuah`, `recluseDrain`, `gkLastGrunt2`, `recluseSpark`, `gkLeave`.
   - **Then**, where he stands, he gets up in a rage (`rage`, both drawings); then the board draws his whole figure (a
@@ -1141,6 +1153,8 @@ sampling, the guards, `forPlayers`), `BOSS_TIERS` and each boss's `offset` in `b
   His younger ages (a mockup, Nov 12; since Nov 13 his child form's growing figure, `recluse-growing`): `characters/recluse-ages.ts` (the child, 13 and 20, their busts
   and idles, the growing step `recluse-grow`, the ghost child beside him kneeling `recluse-ghost`):
   `extra=packages/app/src/characters/recluse-ages.ts only=recluse-child,recluse-teen,recluse-young,recluse-grow,recluse-ghost`.
+  His cutscene between the adult form and the cyborg (in the fight since Nov 13: "His cutscene" above):
+  `npm run preview:cutscene -- <dir> [phone|computer]` plays it alone over a real fight (a dev-only module; videos and stills).
 - The Hidden Boss in the Crowd's final: `packages/chess/test/crowd.test.ts` ("50 v 50 boss final"),
   `packages/server/test/crowd-hidden-boss.test.ts` (online), e2e `e2e/crowd-hidden.spec.ts`; [crowd.md](crowd.md).
 - The Hidden Boss: unit `packages/chess/test/recluse.test.ts` (hidden from players, his brain, the bullet clock and

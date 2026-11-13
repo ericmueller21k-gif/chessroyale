@@ -1,4 +1,4 @@
-import { RECLUSE_CHILD, RECLUSE_PHASE2, BOSS_ALONE_SCORING, bossClockSettings, BOSS_BRAIN, BOSS_POWERS, DEFAULT_SETTINGS, MATCHMAKING, type ItemLook, type MatchmakingType, botVotes, castPregameVote, clockAfterVote, closePregameVote, cutSeconds, pregameVotes, voteResultMs, type Augment, type BossBrain, type PlayerState, type Settings } from "@chessroyale/core";
+import { RECLUSE_CHILD, RECLUSE_CUTSCENE, RECLUSE_PHASE2, BOSS_ALONE_SCORING, bossClockSettings, BOSS_BRAIN, BOSS_POWERS, DEFAULT_SETTINGS, MATCHMAKING, type ItemLook, type MatchmakingType, botVotes, castPregameVote, clockAfterVote, closePregameVote, cutSeconds, pregameVotes, voteResultMs, type Augment, type BossBrain, type PlayerState, type Settings } from "@chessroyale/core";
 import { GUARD_WORDS, MatchRunner, START_FEN, baseAt, ShowdownScout, brainLine as brainWords, boardSlots, type HumanUciEngine, netBoard, type LobbyPlayer, type LivePick, toSan, type BoardSlot, type BoardState, type NetFinal, type Opening, type RoundReport, type UciEngine } from "@chessroyale/chess";
 import { bulletClock, crowdRace, phase2Numbers, phase2ToMove, botRoster, bossIntroTimeline, bossThinkMs, landedEarlyMs, fullMoonMs, folioTurnMs, popOffMs, zebraTurnMs, bossTurnShowMs, judgeTaps, bossRules, kingHelpBlocked, kingMoveMs, kingStrikeMs, lightsDeadline, lightsOutTimeline, lightsRoundEnd, lastStandMs, powerMomentMs, rushKeep, rushMovesLeft, rushSquares, rushTimeline } from "@chessroyale/chess";
 import type { BossView, BoardView, DarkNote, ExitKind, FinalView, GameView, Hint, LightsView, MoveRecord, RushView, Phase, SimulView, Standing, VoteView } from "./game.ts";
@@ -1301,6 +1301,12 @@ export class SoloMatch implements GameView {
     this.phase2?.move(boardId, move);
   }
 
+  /** The Hidden Boss's cutscene, after his fall (its times, this device's). */
+  private cutsceneAt: { at: number; until: number } | null = null;
+  get cutscene(): { at: number; until: number } | null {
+    return this.cutsceneAt;
+  }
+
   get simul(): SimulView | null {
     const g = this.phase2;
     if (!g || (this.phase.kind !== "phaseChange" && this.phase.kind !== "simul")) return null;
@@ -1373,9 +1379,14 @@ export class SoloMatch implements GameView {
         const fallMs = this.runner.boss?.result !== "crowd" ? undefined : phase2 ? PHASE_CHANGE.fallMs : bossRules(this.runner.boss)?.fallMs;
         if (fallMs) {
           if (phase2) bossVoice.reset();
+          // (Then, before his phase change, his cutscene (Eric, Nov 12): from the fall's end, its hold long; the fall's screen stays up
+          // under it, and the phase change starts as it ends, as online.)
+          const now = Date.now();
+          const hold = this.settings.cutsceneHoldMs ?? RECLUSE_CUTSCENE.holdMs;
+          if (phase2) this.cutsceneAt = { at: now + fallMs, until: now + fallMs + hold };
           const next = phase2 ? () => this.startPhaseChange(true, mates) : () => this.finish();
-          this.set({ kind: "boss", boss: this.bossSnapshot(), until: Date.now() + fallMs, fall: true, ...(phase2 ? { toPhase2: true } : {}) });
-          this.timer = setTimeout(next, fallMs);
+          this.set({ kind: "boss", boss: this.bossSnapshot(), until: now + fallMs, fall: true, ...(phase2 ? { toPhase2: true } : {}) });
+          this.timer = setTimeout(next, phase2 ? fallMs + hold : fallMs);
           return;
         }
         return this.finish();

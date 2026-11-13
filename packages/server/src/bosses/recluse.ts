@@ -123,10 +123,11 @@ const boardOf = (p: Recluse2Record, id: number | string): Phase2Board | undefine
  * His phase 2 follows his fall: everything timed from now, once (the fall `fallMs`, the cutscene's hold, his phase change, the
  * countdown), the boards set from the battle's seed (`players` in board order: one each). Told to everyone as the fall ends (`step`).
  */
-export function begin(lobby: Phase2Lobby, o: { players: readonly { id: string; name: string }[]; from: string; seed: number; win?: boolean; fallMs?: number }): Recluse2Record {
+export function begin(lobby: Phase2Lobby, o: { players: readonly { id: string; name: string }[]; from: string; seed: number; win?: boolean; fallMs?: number; holdMs?: number }): Recluse2Record {
   const now = lobby.now();
   const cutAt = now + (o.fallMs ?? RECLUSE_PHASE2.change.fallMs);
-  const at = cutAt + RECLUSE_CUTSCENE.holdMs;
+  // (`holdMs`: a test server's shorter hold, Settings.cutsceneHoldMs; the scene plays sped up to fit it.)
+  const at = cutAt + (o.holdMs ?? RECLUSE_CUTSCENE.holdMs);
   const clocksAt = at + RECLUSE_ONLINE.changeMs + RECLUSE_PHASE2.change.countdownSeconds * 1000;
   const players = o.players.slice(0, RECLUSE_PHASE2.boards);
   const p: Recluse2Record = {

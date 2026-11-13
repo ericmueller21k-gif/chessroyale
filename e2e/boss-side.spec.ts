@@ -196,3 +196,27 @@ test("Hollow's darkness on a computer: he casts where he stands, by the board's 
     }
   }
 });
+
+/**
+ * Eric (Nov 13): the God King's words were cut off at the right edge of the game screen on a computer. Their box keeps inside the screen
+ * (over the pawn if need be), at a computer's and a phone's sizes: forced line `inCheck`, its right edge within the screen's.
+ */
+test("the God King's words stay whole inside the game screen (Eric, Nov 13)", async ({ page }) => {
+  await page.goto(`/?debug&pace=quick&clock=60&laststand=0&brain=stockfish&boss=folio`);
+  await bossAloneFromHome(page);
+  await expect.poll(() => page.evaluate(() => (window as any).match?.phase.kind ?? "none"), { timeout: 60_000 }).toBe("play");
+  for (const [w, h] of [[1280, 800], [1440, 900], [390, 844]] as const) {
+    await page.setViewportSize({ width: w, height: h });
+    await page.evaluate(() => (window as any).__kingSay("inCheck", `check-${Date.now()}`));
+    const bubble = page.locator(".gk-bubble:not(.leaving)").first();
+    await expect(bubble).toBeVisible({ timeout: 5_000 });
+    const r = await page.evaluate(() => {
+      const e = document.querySelector(".gk-bubble:not(.leaving)")!;
+      const b = e.getBoundingClientRect();
+      const s = e.closest(".screen")!.getBoundingClientRect();
+      return { right: b.right, left: b.left, screenRight: s.right, screenLeft: s.left };
+    });
+    expect(r.right, `${w}: words within the screen's right edge`).toBeLessThanOrEqual(r.screenRight + 0.5);
+    expect(r.left, `${w}: words within the screen's left edge`).toBeGreaterThanOrEqual(r.screenLeft - 0.5);
+  }
+});

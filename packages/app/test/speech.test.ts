@@ -127,3 +127,15 @@ describe("?talkplus= (Eric, Oct 24: a URL to try the lengths)", () => {
     expect(sp.readMs("Freeze!")).toBe(2700 + 7 * 35);
   });
 });
+
+describe("the cutscene's hush doesn't outlive it (review of #679, m2: left mid-scene, the next battle's lines were dropped)", () => {
+  it("unhush (the scene taken off early) lifts it; a reset alone doesn't (online, phase 2's first word can come just after the hush)", () => {
+    const v = new Voice(true);
+    v.hush(Date.now() + 100_000);
+    expect(v.say("Hello", "a")).toBe(false);
+    v.reset();
+    expect(v.say("Hello", "a")).toBe(false);
+    v.unhush();
+    expect(v.say("Hello", "a")).toBe(true);
+  });
+});
