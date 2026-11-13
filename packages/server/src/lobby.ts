@@ -1,6 +1,6 @@
 import { hollowLobby } from "./bosses/hollow.ts";
 import { dashLobby } from "./bosses/dash.ts";
-import { recluseLobby, type Phase2Lobby, type Recluse2Record } from "./bosses/recluse.ts";
+import { phase2Unvouched, recluseLobby, type Phase2Lobby, type Recluse2Record } from "./bosses/recluse.ts";
 import type { BossLobby } from "./bosses/base.ts";
 import { hearsTyped, typedReads, typedSay, typedSeat, type TypedSeats } from "./typed-chat.ts";
 import { QUICK_CHAT, botChatLines, canSay, canSayToAll, chatCheck, chatSay, chatSent, mulberry32, noChatSent, ownedChatPacks, type BotChatMoment, type ChatSent } from "@chessroyale/core";
@@ -108,6 +108,8 @@ export interface LobbyIO {
    * through phase2Searched(id, …), null if the server couldn't answer. Missing (tests, no server): the host's device plays instead.
    */
   phase2Search?(req: { id: string; fen: string }): void;
+  /** Wakes the engine server (the Hidden Boss's phase 2 is coming: his fall and phase change are its time to boot). */
+  warmEngine?(): void;
 }
 
 /** A deep search the lobby asks of the engine server (a verdict, a re-check of close calls, a spot check). */
@@ -774,15 +776,25 @@ export class LobbyCore {
     // eslint-disable-next-line @typescript-eslint/no-this-alias
     const lobby = this;
     const search = lobby.io.phase2Search;
+    const warm = lobby.io.warmEngine;
     return {
       get r() {
         return lobby.r;
       },
       now: () => lobby.io.now(),
       rng: () => lobby.rng(),
-      // (Phase 2's whole view carries the battle and the standings, so a device back in the middle of it (a reload) has them.)
-      broadcast: (msg) => lobby.broadcast(msg.t === "phase2" ? ({ ...msg, ...lobby.phase2Extras() } as Outgoing) : msg),
-      send: (id, msg, remember) => lobby.send(id, msg.t === "phase2" ? ({ ...msg, ...lobby.phase2Extras() } as Outgoing) : msg, remember),
+      broadcast: (msg) => {
+        if (msg.t !== "phase2") return lobby.broadcast(msg);
+        // (Everyone's told phase 2 lean, on every move: in a Crowd final the standings alone are about 22 KB, unchanged all phase 2.
+        // What a device back in the middle of it gets (`last`: a reload) carries the battle and the standings too, one copy shared by
+        // everyone's, so it's stored once. The review of #677, m1.)
+        const full = { ...msg, ...lobby.phase2Extras() } as Outgoing;
+        for (const h of lobby.r.humans) {
+          lobby.r.last[h.id] = full;
+          lobby.io.send(h.id, msg);
+        }
+      },
+      send: (id, msg, remember) => lobby.send(id, msg, remember),
       setTimer: (kind, at) => lobby.setTimer(kind, at),
       host: () => lobby.hostNow(),
       fairPlayer: (id) => {
@@ -790,8 +802,9 @@ export class LobbyCore {
         return !!h && !h.practice;
       },
       person: (id) => !!lobby.human(id),
+      anyoneHere: (except) => lobby.r.humans.some((h) => h.id !== except && lobby.present(h)),
       ...(search ? { search: (req: { id: string; fen: string }) => search(req) } : {}),
-      unvouched: (why) => lobby.unvouch(why),
+      ...(warm ? { warm: () => warm() } : {}),
       finish: () => lobby.finishMatch(),
     };
   }
@@ -1064,6 +1077,8 @@ export class LobbyCore {
     const last = this.r.last[playerId];
     if (last) this.io.send(playerId, last);
     if (playerId === this.r.hostId) this.resendHostWork();
+    // (The Hidden Boss's phase 2: a host back from a reload is asked again what it was asked: bosses/recluse.ts resend.)
+    recluseLobby.resend(this.phase2Lobby, playerId);
     this.resendJudgeWork(playerId);
     this.sendChatLog(playerId);
   }
@@ -1078,6 +1093,8 @@ export class LobbyCore {
       this.r.hostId = this.pickHost(playerId) ?? playerId;
       this.resendHostWork();
     }
+    // (The Hidden Boss's phase 2: a move asked of this device goes to the host now: bosses/recluse.ts resend.)
+    recluseLobby.resend(this.phase2Lobby);
     this.judgeGone(playerId);
     this.broadcast(this.lobbyMessage(), false);
     // (A person away doesn't hold the round up: if everyone here has moved, it locks now.)
@@ -1198,7 +1215,7 @@ export class LobbyCore {
       rating: row?.rating ?? null,
       brilliant: f?.brilliant ?? 0,
       bestMove: f?.best?.san ?? null,
-      ranked: this.ranked() && !h.practice,
+      ranked: this.rankedFor(h),
       evalBar: h.evalBar ?? null,
       ...feats,
       // (A Boss Battle party plays at its own difficulty: never an online tier win; partyFeats.)
@@ -1376,6 +1393,7 @@ export class LobbyCore {
       this.r.hostId = this.pickHost(id);
       this.resendHostWork();
     }
+    recluseLobby.resend(this.phase2Lobby);
     this.judgeGone(id);
     console.log(`lobby ${this.r.code}: ${id} left the match (${how}${result ? `, ${result.placement} of ${result.players}` : ""})`);
     // Them: how they left and what was recorded, then their sockets close. (Gone already, they hear it if they come back.)
@@ -1598,7 +1616,7 @@ export class LobbyCore {
       case "kick":
         return this.partyKick(playerId, msg.playerId);
       case "phase2Move":
-        return recluseLobby.move(this.phase2Lobby, playerId, msg.key, msg.board, msg.move, msg.away);
+        return recluseLobby.move(this.phase2Lobby, playerId, msg.key, msg.board, msg.move, msg.away, msg.ply);
       case "phase2Answer":
         return recluseLobby.answer(this.phase2Lobby, playerId, msg.id, msg.move);
       case "hello":
@@ -2731,7 +2749,8 @@ export class LobbyCore {
       seed: runner.state.boss?.powers?.seed ?? Math.floor(this.rng() * 2 ** 32),
       win: !!this.settings.bossWinTest,
     });
-    this.broadcast({ ...this.bossMessage(p2.cutAt, { fall: true }), toPhase2: true } as Outgoing);
+    // (Who takes the boards, so their leave confirm says it's a loss from his fall on: the review of #677, m3.)
+    this.broadcast({ ...this.bossMessage(p2.cutAt, { fall: true }), toPhase2: true, phase2Boards: players.map((x) => x.id) } as Outgoing);
   }
 
   /** Every board slot, for the strip of tiny boards. */
@@ -4055,7 +4074,7 @@ export class LobbyCore {
           rating: row.rating ?? null,
           brilliant: f?.brilliant ?? 0,
           bestMove: f?.best?.san ?? null,
-          ranked: this.ranked() && !h.practice,
+          ranked: this.rankedFor(h),
           evalBar: h.evalBar ?? null,
           ...matchFeats(p, stages, boss, !!this.settings.raid),
           // (A Boss Battle party's boss plays at the party's difficulty, Very easy to Very hard, not a tier: recorded, but
@@ -4072,6 +4091,14 @@ export class LobbyCore {
    * Everyone who played counts, whoever left since (a bot playing their seat now): leaving never makes a match
    * unranked for those who stay, nor for the one who left. Only someone who left before move 1 doesn't count.
    */
+  /**
+   * Whether `h`'s result counts for ranking: the match's (ranked), not practicing, and not resting on a Hidden Boss's phase 2 whose
+   * moves of his stood on one device's word (phase2Unvouched: the players of its boards only).
+   */
+  private rankedFor(h: { id: string; practice?: boolean }): boolean {
+    return this.ranked() && !h.practice && !phase2Unvouched(this.r, h.id);
+  }
+
   ranked(): boolean {
     // (A Boss Battle party is a private team: never ranked. Nor a match where one device's word stood alone: unvouched.)
     if (this.r.party || this.r.unvouched) return false;
@@ -4171,7 +4198,9 @@ export class LobbyCore {
       // (One device's word stood alone somewhere in it: it pays as a solo game, and the results say why.)
       ...(this.r.unvouched ? { unvouched: true as const } : {}),
     };
-    this.broadcast(msg);
+    // (A Hidden Boss's phase 2 his moves of which stood on one device's word: its players' results say so, nobody else's.)
+    const lone = { ...msg, ranked: false, unvouched: true as const };
+    for (const h of this.r.humans) this.send(h.id, phase2Unvouched(this.r, h.id) ? lone : msg);
     this.botChat({ kind: "end" });
     const js = this.r.judges;
     if (js?.stats.jobs) console.log(`judges in ${this.r.code}: ${JSON.stringify(js.stats)}`);

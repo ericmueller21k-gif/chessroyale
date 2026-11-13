@@ -20,6 +20,7 @@ import { isPaused, pausedBosses } from "./kill-switches.ts";
 import { countBossBattle } from "./boss-tokens.ts";
 import { opKeys } from "./ledger.ts";
 import { grantXp, type XpGame } from "./xp.ts";
+import { phase2Unvouched } from "./bosses/recluse.ts";
 import { serverError } from "./problems.ts";
 import type { Sql } from "./accounts.ts";
 
@@ -116,6 +117,8 @@ export class Lobby extends DurableObject<Env> {
       icon: (playerId) => this.icons.get(playerId),
       serverScore: (req) => void this.serverQueue.push(req),
       phase2Search: (req) => void this.phase2Queue.push(req),
+      // (The Hidden Boss's phase 2 is coming: the engine server boots during his fall and phase change, before his first search.)
+      warmEngine: () => this.ctx.waitUntil(warmEngine(this.env).then((up) => void (this.engineUp = up))),
       send: (playerId, msg) => {
         const text = JSON.stringify({ ...msg, now: Date.now() } as ServerMessage);
         for (const ws of this.socketsOf(playerId)) {
@@ -710,8 +713,9 @@ export function lobbyXpGame(
       test: forced === null && (!!o.tested || practice),
     },
     // (One device's word stood alone somewhere in the match (LobbyRecord.unvouched): it pays as a solo game does, under solo's
-    // daily caps on wins and minutes; the outside review of Nov 10, finding 5.)
-    cap: rec.unvouched ? "solo" : vs,
+    // daily caps on wins and minutes; the outside review of Nov 10, finding 5. Or a move of the Hidden Boss's in a phase 2 they
+    // played a board of: phase2Unvouched, theirs alone; the review of #677, M2.)
+    cap: rec.unvouched || phase2Unvouched(rec, r.playerId) ? "solo" : vs,
     signedInOnly,
     now,
     // (Quests, phase 3: a raid is "boss", Crowd "crowd" (50 v 50), the rest "classic".)

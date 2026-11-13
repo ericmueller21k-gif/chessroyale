@@ -1,9 +1,13 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { DEFAULT_SETTINGS, HIDDEN_ROOM, LEAVING, RECLUSE_CUTSCENE, RECLUSE_FORMS, RECLUSE_ONLINE, RECLUSE_PHASE2, hiddenRoomSettings, mulberry32, recluseNextForm, type Settings } from "@chessroyale/core";
 import { legalMoves, type BoardScore, type MatchRunner, type MoveScore, type ServerMessage } from "@chessroyale/chess";
 import { LobbyCore, newLobbyRecord, type PartyLobby } from "../src/lobby.ts";
-import { pick, quickMove } from "../src/bosses/recluse.ts";
+import { phase2Unvouched, pick, quickMove } from "../src/bosses/recluse.ts";
 import { library } from "./lobby-fixture.ts";
+
+// (The engine server is a Container, which needs the Workers runtime: the match rooms import it.)
+vi.mock("../src/engine.ts", () => ({ SERVER_RECHECK_NODES: 2_000_000, serverRecheck: async () => null, serverScoreAt: async () => null, serverAllMovesAt: async () => null, warmEngine: async () => false }));
+const { lobbyXpGame } = await import("../src/lobby-do.ts");
 
 /**
  * The Hidden Boss's phase 2 online (Eric, Nov 13: "it plays through till the end"; bosses/recluse.ts): his adult form beaten in his
@@ -21,6 +25,7 @@ function roomFight(people: number, bots: number, o: { engine?: boolean } = {}) {
   let now = 1_000_000;
   const inbox = new Map<string, Msg[]>();
   const searches: { id: string; fen: string }[] = [];
+  let warms = 0;
   const party: PartyLobby = {
     admits: Object.fromEntries(Array.from({ length: people }, (_, i) => [`pass${i}`, { seat: i, member: `u${i}`, userId: `u${i}` }])),
     size: people,
@@ -38,7 +43,7 @@ function roomFight(people: number, bots: number, o: { engine?: boolean } = {}) {
     {
       now: () => now,
       send: (id, msg) => inbox.set(id, [...(inbox.get(id) ?? []), { ...msg, now } as Msg]),
-      ...(o.engine ? { phase2Search: (req: { id: string; fen: string }) => void searches.push(req) } : {}),
+      ...(o.engine ? { phase2Search: (req: { id: string; fen: string }) => void searches.push(req), warmEngine: () => void warms++ } : {}),
     },
     library,
     mulberry32(7),
@@ -115,6 +120,9 @@ function roomFight(people: number, bots: number, o: { engine?: boolean } = {}) {
     get now() {
       return now;
     },
+    get warms() {
+      return warms;
+    },
   };
 }
 
@@ -170,7 +178,7 @@ describe("his phase change online: synced for everyone, after his fall and the c
     const key = F.p2().key;
     const mine = F.boardOf("p1");
     const told = F.all("p1", "phase2").length;
-    F.core.message("p1", { t: "phase2Move", key, board: mine.id, move: legalMoves(mine.board.fen)[0]! });
+    F.core.message("p1", { t: "phase2Move", key, board: mine.id, move: legalMoves(mine.board.fen)[0]!, ply: 0 });
     expect(F.boardOf("p1").board.history).toHaveLength(0);
     expect(F.all("p1", "phase2").length).toBe(told + 1);
     // (The host's device is asked: no engine server here.)
@@ -185,19 +193,21 @@ describe("the four boards online: the server runs them", () => {
   it("a person's move: only theirs, on their move, legal; his reply from the engine server is its best; a bot's within botLoss, after its thinking", () => {
     const F = roomFight(2, 2, { engine: true });
     F.beatAdult();
+    // (As a real fight: the 🏆 that brought phase 2 here made this one a test, and a test fight's moves aren't kept for fair play.)
+    delete F.core.record.overrides!.tested;
     F.toBoards();
     const key = F.p2().key;
     const mine = F.boardOf("p1");
     const theirs = F.boardOf("p2");
     const move = legalMoves(mine.board.fen)[0]!;
     // (Not your board; not legal: refused.)
-    F.core.message("p1", { t: "phase2Move", key, board: theirs.id, move: legalMoves(theirs.board.fen)[0]! });
-    F.core.message("p1", { t: "phase2Move", key, board: mine.id, move: "a1a1" });
+    F.core.message("p1", { t: "phase2Move", key, board: theirs.id, move: legalMoves(theirs.board.fen)[0]!, ply: 0 });
+    F.core.message("p1", { t: "phase2Move", key, board: mine.id, move: "a1a1", ply: 0 });
     expect(F.boardOf("p2").board.history).toHaveLength(0);
     expect(F.boardOf("p1").board.history).toHaveLength(0);
     F.advance(300);
     const thought = F.now - F.p2().clocksAt;
-    F.core.message("p1", { t: "phase2Move", key, board: mine.id, move, away: 2 });
+    F.core.message("p1", { t: "phase2Move", key, board: mine.id, move, away: 2, ply: 0 });
     expect(F.boardOf("p1").board.history).toEqual([move]);
     // His reply: the engine server's best (here the last legal move scores highest).
     const his = F.searches.find((s) => s.fen === F.boardOf("p1").board.fen)!;
@@ -231,14 +241,17 @@ describe("the four boards online: the server runs them", () => {
     expect(F.all("p1", "phase2Ask")).toHaveLength(0);
   });
 
-  it("no engine server: the host's device plays his moves and the bots' (one device's word: the match pays as a solo game); none from it in time, the server's quick move", () => {
+  it("no engine server: the host's device plays his moves and the bots' (a bot's: nothing unvouched, a bot only plays for its own team); none from it in time, the server's quick move", () => {
     const F = roomFight(1, 3);
     F.beatAdult();
+    // (Phase 1 vouched for, as with judges in production: the harness's host scored its rounds alone.)
+    delete F.core.record.unvouched;
     F.toBoards();
     const ask = F.last("p1", "phase2Ask")!;
     const bot = F.p2().state.boards.find((b) => b.board.fen === ask.fen && b.player !== "p1")!;
     F.core.message("p1", { t: "phase2Answer", id: ask.id, move: legalMoves(ask.fen)[1]! });
-    expect(F.core.record.unvouched).toBeTruthy();
+    expect(F.core.record.unvouched).toBeUndefined();
+    expect(F.p2().unvouched).toBeUndefined();
     F.advance(RECLUSE_PHASE2.botMoveMs[1] + 100);
     expect(F.p2().state.boards.find((b) => b.id === bot.id)!.board.history).toEqual([legalMoves(ask.fen)[1]]);
     // Another bot's ask, never answered: the quick move after askMs.
@@ -247,6 +260,9 @@ describe("the four boards online: the server runs them", () => {
       F.advance(RECLUSE_ONLINE.askMs + 100);
       expect(F.p2().state.boards.find((b) => b.id === other.id)!.board.history.length).toBeGreaterThan(0);
     }
+    // (His reply to that bot's move was asked of the host too, never answered: the quick move, which unvouches phase 2's result.)
+    expect(F.p2().unvouched).toBe("his move was the server's quick move");
+    expect(F.core.record.unvouched).toBeUndefined();
   });
 
   it("every board won: the results are his defeat, \"4 of 4\", after his reaction; a board lost on time: his, however many are won", () => {
@@ -297,7 +313,7 @@ describe("the admin's Win this form in every form online (server-checked)", () =
     const key = F.p2().key;
     const mine = F.boardOf("p1");
     // A person's move is the team's next move: every board won.
-    F.core.message("p1", { t: "phase2Move", key, board: mine.id, move: legalMoves(mine.board.fen)[0]! });
+    F.core.message("p1", { t: "phase2Move", key, board: mine.id, move: legalMoves(mine.board.fen)[0]!, ply: 0 });
     expect(F.p2().done).toMatchObject({ beaten: true, won: 4 });
     expect(F.p2().winNext).toBeUndefined();
     // (Once it's decided: nothing more to win.)
@@ -353,6 +369,202 @@ describe("leaving and disconnects in phase 2: a seat gone, its bot plays the boa
   });
 });
 
+/** Phase 1 vouched for (as with judges in production), on to the boards; `by`'s first move made: his reply asked of the host's device. */
+function hisMoveAsked(F: ReturnType<typeof roomFight>, by = "p1") {
+  delete F.core.record.unvouched;
+  delete F.core.record.overrides!.tested;
+  F.toBoards();
+  const mine = F.boardOf(by);
+  F.core.message(by, { t: "phase2Move", key: F.p2().key, board: mine.id, move: legalMoves(mine.board.fen)[0]!, ply: 0 });
+  const fen = F.boardOf(by).board.fen;
+  const w = Object.values(F.p2().work).find((x) => x.fen === fen)!;
+  expect(w).toMatchObject({ who: "boss", via: "device" });
+  return { fen, w, board: mine.id };
+}
+
+describe("the review of #677, M1: his moves never quietly weak; a phase 2 ask follows the host", () => {
+  it("a host that never answers: his move is the server's quick move, and phase 2's result is unvouched (its players' results pay as a solo game's); the match's own flag stays", () => {
+    const F = roomFight(1, 3);
+    F.beatAdult();
+    const { fen, board } = hisMoveAsked(F);
+    F.advance(RECLUSE_ONLINE.askMs + 100);
+    const b = F.p2().state.boards.find((x) => x.id === board)!;
+    expect(b.board.history).toHaveLength(2);
+    expect(b.board.history[1]).toBe(quickMove(fen));
+    expect(F.p2().unvouched).toBeTruthy();
+    expect(F.core.record.unvouched).toBeUndefined();
+    expect(phase2Unvouched(F.core.record, "p1")).toBe(true);
+  });
+
+  it("the host drops with his move asked of it: the new host is asked, with a fresh time, and its answer plays (not the quick move)", () => {
+    const F = roomFight(2, 2);
+    F.beatAdult();
+    const { fen, w, board } = hisMoveAsked(F, "p2");
+    expect(w.device).toBe("p1");
+    F.advance(RECLUSE_ONLINE.askMs - 1000);
+    const before = F.all("p2", "phase2Ask").length;
+    F.core.disconnect("p1");
+    const asks = F.all("p2", "phase2Ask").slice(before);
+    expect(asks.find((a) => a.id === w.id)).toMatchObject({ fen, elo: RECLUSE_PHASE2.elo });
+    expect(F.p2().work[board]).toMatchObject({ device: "p2", at: F.now });
+    // (Past the first ask's time: still waiting for the new host's answer.)
+    F.advance(2000);
+    expect(F.p2().state.boards.find((x) => x.id === board)!.board.history).toHaveLength(1);
+    const move = legalMoves(fen).at(-1)!;
+    // (The old host's late answer: refused; the new host's: played.)
+    F.core.message("p1", { t: "phase2Answer", id: w.id, move: legalMoves(fen)[0]! });
+    expect(F.p2().state.boards.find((x) => x.id === board)!.board.history).toHaveLength(1);
+    F.core.message("p2", { t: "phase2Answer", id: w.id, move });
+    expect(F.p2().state.boards.find((x) => x.id === board)!.board.history).toEqual([expect.any(String), move]);
+  });
+
+  it("an honest host's reload: back (resendTo, as the Durable Object does), it's asked again for every move still asked of it, with a fresh time", () => {
+    const F = roomFight(1, 3);
+    F.beatAdult();
+    const { fen, w, board } = hisMoveAsked(F);
+    const open = () =>
+      Object.values(F.p2().work)
+        .filter((x) => x.via === "device" && !x.move)
+        .map((x) => x.id)
+        .sort();
+    F.advance(RECLUSE_ONLINE.askMs - 1000);
+    F.core.disconnect("p1");
+    const before = F.all("p1", "phase2Ask").length;
+    const token = F.core.record.humans.find((h) => h.id === "p1")!.token;
+    expect(F.core.connect(token, "M0", "computer", false, 1500, undefined, "u0", null, null, true).ok).toBe(true);
+    F.core.resendTo("p1");
+    const again = F.all("p1", "phase2Ask").slice(before);
+    expect(again.map((a) => a.id).sort()).toEqual(open());
+    expect(again.map((a) => a.id)).toContain(w.id);
+    F.advance(2000);
+    const move = legalMoves(fen).at(-1)!;
+    F.core.message("p1", { t: "phase2Answer", id: w.id, move });
+    expect(F.p2().state.boards.find((x) => x.id === board)!.board.history[1]).toBe(move);
+  });
+});
+
+describe("the review of #677, M2: an engine server miss in phase 2 reaches phase 2's result only", () => {
+  it("the engine server woken as phase 2 begins (his fall and phase change are its time to boot)", () => {
+    const F = roomFight(1, 3, { engine: true });
+    expect(F.warms).toBe(0);
+    F.beatAdult();
+    expect(F.warms).toBe(1);
+  });
+
+  it("his move on the host's device: phase 2's result unvouched (its players: not ranked, a solo game's XP, the results say so); the match's flag, its fair play and anyone else's result stand", () => {
+    const F = roomFight(2, 2);
+    F.beatAdult();
+    const fair = { ply: 1 } as never;
+    F.core.record.fair = { p1: [fair] };
+    const { fen, w } = hisMoveAsked(F, "p2");
+    F.core.message("p1", { t: "phase2Answer", id: w.id, move: legalMoves(fen)[0]! });
+    expect(F.p2().unvouched).toBeTruthy();
+    expect(F.core.record.unvouched).toBeUndefined();
+    expect(F.core.record.fair?.["p1"]).toEqual([fair]);
+    // (Everyone who played a board: p1 and p2; nobody else.)
+    expect(phase2Unvouched(F.core.record, "p1")).toBe(true);
+    expect(phase2Unvouched(F.core.record, "p2")).toBe(true);
+    expect(phase2Unvouched(F.core.record, "someone watching")).toBe(false);
+    const result = { playerId: "p1", placement: 1, teamWon: true };
+    expect(lobbyXpGame(F.core.record, result, "u0", { moves: 20, ms: 600_000 }, "crowd", [], true, F.now).cap).toBe("solo");
+    expect(lobbyXpGame(F.core.record, { ...result, playerId: "someone watching" }, "u9", { moves: 20, ms: 600_000 }, "crowd", [], true, F.now).cap).not.toBe("solo");
+    // To the results (the admin's 🏆, the team's next move): theirs say it pays as a solo game; not ranked even where the match is.
+    (F.core as unknown as { ranked: () => boolean }).ranked = () => true;
+    expect(F.core.winFormTrigger("p1", true)).toBe(true);
+    F.advance(RECLUSE_PHASE2.botMoveMs[1] + RECLUSE_ONLINE.askMs + 100);
+    F.advance(RECLUSE_PHASE2.endMs + 100);
+    expect(F.core.record.phase).toBe("results");
+    for (const id of ["p1", "p2"]) expect(F.last(id, "results")).toMatchObject({ unvouched: true, ranked: false });
+    expect(F.core.humanResults().every((r) => r.ranked === false)).toBe(true);
+  });
+});
+
+describe("the review of #677, minors", () => {
+  it("m1: everyone's told phase 2 lean (no standings, no battle); what a reconnect gets carries them", () => {
+    const F = roomFight(2, 2, { engine: true });
+    F.beatAdult();
+    F.toBoards();
+    const told = F.all("p2", "phase2");
+    expect(told.length).toBeGreaterThan(1);
+    for (const m of told) expect(m.standings === undefined && m.boss === undefined).toBe(true);
+    const last = F.core.record.last["p2"] as Extract<Msg, { t: "phase2" }>;
+    expect(last.t).toBe("phase2");
+    expect(last.standings?.length).toBeGreaterThan(0);
+    expect(last.boss?.id).toBe("recluse");
+    // (One copy for everyone's, so it's stored once.)
+    expect(F.core.record.last["p1"]).toBe(last);
+  });
+
+  it("m2: a move carries its board's move count; one made on a position gone is refused (told so), never played as the next", () => {
+    const F = roomFight(1, 3, { engine: true });
+    F.beatAdult();
+    F.toBoards();
+    const key = F.p2().key;
+    const mine = F.boardOf("p1");
+    const first = legalMoves(mine.board.fen)[0]!;
+    F.core.message("p1", { t: "phase2Move", key, board: mine.id, move: first, ply: 0 });
+    const his = F.searches.find((s) => s.fen === F.boardOf("p1").board.fen)!;
+    F.answer(his);
+    const history = [...F.boardOf("p1").board.history];
+    expect(history).toHaveLength(2);
+    // (A second move chosen on the start position, sent with its ply 0: refused, even where it's legal now.)
+    const stale = legalMoves(F.boardOf("p1").board.fen).find((m) => legalMoves(mine.board.fen).includes(m))!;
+    expect(stale).toBeTruthy();
+    const told = F.all("p1", "phase2").length;
+    F.core.message("p1", { t: "phase2Move", key, board: mine.id, move: stale, ply: 0 });
+    expect(F.boardOf("p1").board.history).toEqual(history);
+    expect(F.all("p1", "phase2").length).toBe(told + 1);
+    expect(F.all("p1", "phase2").at(-1)!.refused).toBe(true);
+    // (Not remembered: a reconnect gets the last told to everyone, with the battle and the standings.)
+    expect((F.core.record.last["p1"] as Extract<Msg, { t: "phase2" }>).refused).toBeUndefined();
+    // Its right count: played.
+    F.core.message("p1", { t: "phase2Move", key, board: mine.id, move: stale, ply: 2 });
+    expect(F.boardOf("p1").board.history).toEqual([...history, stale]);
+  });
+
+  it("m3: his fall says who takes the boards (the four, in board order)", () => {
+    const F = roomFight(2, 2);
+    F.beatAdult();
+    const fall = F.last("p1", "boss")!;
+    expect(fall.toPhase2).toBe(true);
+    expect(fall.phase2Boards).toEqual(F.p2().state.boards.map((b) => b.player));
+    expect(fall.phase2Boards!.slice(0, 2)).toEqual(["p1", "p2"]);
+  });
+
+  it("m4: a test fight (the admins' 🏆 or ultimate trigger) keeps no fair-play moves, and spends no search on them", () => {
+    const F = roomFight(1, 3, { engine: true });
+    F.beatAdult();
+    expect(F.core.record.overrides?.tested).toBe(true);
+    F.toBoards();
+    const mine = F.boardOf("p1");
+    F.core.message("p1", { t: "phase2Move", key: F.p2().key, board: mine.id, move: legalMoves(mine.board.fen)[0]!, ply: 0 });
+    expect(F.boardOf("p1").board.history).toHaveLength(1);
+    expect(F.searches.some((s) => s.fen === mine.board.fen)).toBe(false);
+    expect(Object.keys(F.p2().fair)).toHaveLength(0);
+  });
+
+  it("m5: the last one here resigns, so the match ends at once: the bot that takes their board asks no search (it would be thrown away)", () => {
+    const F = roomFight(1, 3, { engine: true });
+    F.beatAdult();
+    F.toBoards();
+    const mine = F.boardOf("p1");
+    const asked = F.searches.length;
+    F.core.message("p1", { t: "resign" });
+    expect(F.core.record.phase).toBe("results");
+    expect(F.searches.slice(asked).filter((s) => s.fen === mine.board.fen)).toHaveLength(0);
+    // (While someone else is here, the bot's move is asked as ever: the resign test above.)
+  });
+
+  it("m6: phase 2's view says when the cutscene's hold begins (`cutAt`), so a device back during it knows the scene", () => {
+    const F = roomFight(1, 3);
+    F.beatAdult();
+    F.advance(F.p2().cutAt - F.now);
+    const v = F.last("p1", "phase2")!.p2;
+    expect(v.cutAt).toBe(F.p2().cutAt);
+    expect(v.at - v.cutAt).toBe(RECLUSE_CUTSCENE.holdMs);
+  });
+});
+
 describe("his move and the bots' from the engine server's numbers; the quick move with none", () => {
   it("he plays the best; a bot one within botLoss of it", () => {
     const scores = [
@@ -364,6 +576,17 @@ describe("his move and the bots' from the engine server's numbers; the quick mov
     expect(pick(scores, "boss", () => 0.99)).toBe("b");
     const seen = new Set(Array.from({ length: 20 }, (_, i) => pick(scores, "bot", () => i / 20)));
     expect([...seen].sort()).toEqual(["b", "c"]);
+  });
+
+  it("a mate scored: the quickest, a bot's too (the review's nit: in a won position every move scores near 1)", () => {
+    const won = [
+      { move: "a", expected: 0.999 },
+      { move: "b", expected: 0.999, mate: 3 },
+      { move: "c", expected: 0.998, mate: 1 },
+      { move: "d", expected: 0.2, mate: -2 },
+    ];
+    for (let i = 0; i < 10; i++) expect(pick(won, "bot", () => i / 10)).toBe("c");
+    expect(pick(won, "boss", () => 0)).toBe("c");
   });
 
   it("the quick move takes the most valuable piece it can, else plays the first legal move", () => {

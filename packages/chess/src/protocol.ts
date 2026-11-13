@@ -661,10 +661,11 @@ export type ClientMessage =
    */
   | { t: "winForm" }
   /**
-   * The Hidden Boss's phase 2 online (NetPhase2): your move on your board (`key`: its phase 2; `away`: your look-aways during it,
-   * as with a pick). The server checks it's your board, your move and legal.
+   * The Hidden Boss's phase 2 online (NetPhase2): your move on your board (`key`: its phase 2; `ply`: the board's move count it was
+   * made on; `away`: your look-aways during it, as with a pick). The server checks it's your board, your move, on that position and
+   * legal; else it's refused (`phase2` with `refused`).
    */
-  | { t: "phase2Move"; key: string; board: number; move: string; away?: number }
+  | { t: "phase2Move"; key: string; board: number; move: string; ply: number; away?: number }
   /** The host's answer to phase2Ask: the move its engine played (the server checks it's legal there). */
   | { t: "phase2Answer"; id: string; move: string }
   /**
@@ -869,7 +870,20 @@ export type ServerMessage = { now: number } & (
    * (the Hidden Boss, BossRules.fallMs) collapses on the board until `until`, then the results come (an older app shows
    * the board with the result in it meanwhile).
    */
-  | { t: "boss"; boss: NetBoss; standings: NetStanding[]; until: number; thinking?: boolean; intro?: boolean; fall?: boolean; rush?: NetRush; /** With `fall`: the Hidden Boss's phase change follows (his phase 2 online), not the results. */ toPhase2?: true }
+  | {
+      t: "boss";
+      boss: NetBoss;
+      standings: NetStanding[];
+      until: number;
+      thinking?: boolean;
+      intro?: boolean;
+      fall?: boolean;
+      rush?: NetRush;
+      /** With `fall`: the Hidden Boss's phase change follows (his phase 2 online), not the results. */
+      toPhase2?: true;
+      /** With `toPhase2`: who takes his four boards (player ids, board order): for them, leaving from here on is resigning a board. */
+      phase2Boards?: string[];
+    }
   /**
    * Hollow's dark, to the player who tried: `ok` the attempt was legal and is their pick (`move`, as played); else it
    * cost darkTryCost (`tries` wrong so far this turn) and they pick again, or (`out`) their turn is over, as a miss.
@@ -1041,8 +1055,12 @@ export type ServerMessage = { now: number } & (
    * time) to `until`, when his phase change starts for everyone (the `phase2` message's `at`). Sent once, as the hold begins.
    */
   | { t: "recluseCutscene"; at: number; until: number }
-  /** The Hidden Boss's phase 2 online: his phase change, then the four boards, all of it as it stands (sent whole on every change). */
-  | { t: "phase2"; p2: NetPhase2; /** The battle and the standings, for a device that comes back in the middle of it (a reload). */ boss?: NetBoss; standings?: NetStanding[] }
+  /**
+   * The Hidden Boss's phase 2 online: his phase change, then the four boards, all of it as it stands (sent whole on every change).
+   * `boss` and `standings` (the battle as it ended, the standings) only in what a device back in the middle of it gets (a reload);
+   * `refused`: to one player, their move wasn't played (their app drops the move it showed ahead).
+   */
+  | { t: "phase2"; p2: NetPhase2; boss?: NetBoss; standings?: NetStanding[]; refused?: true }
   /**
    * To the host: the engine server can't play this move of phase 2 (his, or a bot's): play it on your engine, at this strength
    * (UciEngine.playAtElo), and answer with phase2Answer. The server plays its own quick move if no answer comes in time.
@@ -1097,6 +1115,8 @@ export interface NetPhase2Board {
  */
 export interface NetPhase2 {
   key: string;
+  /** His fall ends and the cutscene's hold begins (`cutAt`, to `at`: a device back during it still knows the scene). */
+  cutAt: number;
   at: number;
   clocksAt: number;
   /** Phase 1's last position, the one his phase change splits. */

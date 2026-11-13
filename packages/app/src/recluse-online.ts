@@ -3,8 +3,9 @@
  * The server sends the whole of it on every change (`phase2`); this keeps it, turns the server's times into this device's, switches
  * the match's phase at the server's moments (the cutscene's hold, his phase change from `at`, the boards and their countdown, the
  * clocks from `clocksAt`), so everyone in the fight sees each at the same time, and plays his words and sounds as solo's do
- * (solo.ts: startPhaseChange, startClocks, phase2Slow, phase2Ult, phase2Result, phase2Done). Your move is shown at once and sent;
- * the server's next word confirms it. The screens are solo's (screens/Recluse2.tsx), through NetMatch's GameView.
+ * (solo.ts: startPhaseChange, startClocks, phase2Slow, phase2Ult, phase2Result, phase2Done). Your move is shown at once and sent,
+ * and kept over the server's word until that has it, decides your board, or refuses it (a word sent before it got your move, from
+ * another board's, never puts your piece back). The screens are solo's (screens/Recluse2.tsx), through NetMatch's GameView.
  */
 import { applyMove, legalMoves, sideToMove, type ClientMessage, type NetPhase2 } from "@chessroyale/chess";
 import type { Phase, SimulView } from "./game.ts";
@@ -41,6 +42,11 @@ export class OnlinePhase2 {
   private lines = { won: 0, lost: 0, slow: 0 };
   /** Your board's turn the look-aways count for (its turnAt), so a new turn starts them once. */
   private turnFrom: number | null = null;
+  /**
+   * Your move sent and shown, until the server's word has it (its board's history past `ply`), decides the board, or refuses it
+   * (the review of #677, m2): its key, board, the move count it was made on, the move, and your board as shown with it.
+   */
+  private pending: { key: string; board: number; ply: number; move: string; shown: NetPhase2["boards"][number] } | null = null;
 
   constructor(private readonly m: OnlinePhase2Match) {}
 
@@ -55,18 +61,37 @@ export class OnlinePhase2 {
     this.m.emit();
   }
 
-  /** The server's word: phase 2 as it stands. */
-  onMessage(p: NetPhase2) {
+  /** The server's word: phase 2 as it stands (`refused`: your move wasn't played). Your move still on its way stays shown over it. */
+  onMessage(p: NetPhase2, refused = false) {
     const prev = this.p?.key === p.key ? this.p : null;
-    this.p = p;
+    this.p = this.withPending(p, refused);
     if (!prev) this.begins(p);
     else this.cues(prev, p);
     this.show();
   }
 
+  /** The server's word with your move on its way shown over it, until the server has it, decides your board, or refuses it. */
+  private withPending(p: NetPhase2, refused: boolean): NetPhase2 {
+    const w = this.pending;
+    const b = w && p.boards.find((x) => x.id === w.board);
+    if (!w || !b || refused || w.key !== p.key || b.result || b.history.length !== w.ply) {
+      this.pending = null;
+      return p;
+    }
+    return { ...p, boards: p.boards.map((x) => (x === b ? w.shown : x)) };
+  }
+
+  /** The connection is back: your move on its way, sent again (the server refuses it if it has it already: its `ply`). */
+  onWelcome() {
+    const w = this.pending;
+    if (w) this.m.send({ t: "phase2Move", key: w.key, board: w.board, move: w.move, ply: w.ply });
+  }
+
   /** Its first word (or this device's first, joining late): his figure's run through the phase change, his look, the sounds made ahead. */
   private begins(p: NetPhase2) {
     const at = this.m.local(p.at);
+    // (The cutscene's hold, from his fall's end to his phase change: also for a device back during it, which missed its event.)
+    this.cutscene = { at: this.m.local(p.cutAt), until: at };
     this.lines = { won: 0, lost: 0, slow: 0 };
     this.playing = false;
     // (Phase 1's words are over: the God King says nothing more; his mumbling carries on into the phase change, as solo's.)
@@ -177,10 +202,13 @@ export class OnlinePhase2 {
     const p = this.p;
     const b = p?.boards.find((x) => x.id === boardId);
     if (!p || !b || !this.playing || p.done || b.player !== this.m.myId() || b.result || sideToMove(b.fen) !== "w" || !legalMoves(b.fen).includes(mv)) return;
-    this.m.send({ t: "phase2Move", key: p.key, board: boardId, move: mv, away: this.m.turnEnds() });
+    const ply = b.history.length;
+    this.m.send({ t: "phase2Move", key: p.key, board: boardId, move: mv, ply, away: this.m.turnEnds() });
     const now = Date.now();
     const left = b.turnAt === null || p.ultAt !== null ? b.bankMs : Math.max(0, b.bankMs - (now - this.m.local(b.turnAt)));
-    this.p = { ...p, boards: p.boards.map((x) => (x === b ? { ...x, fen: applyMove(x.fen, mv), lastMove: mv, history: [...x.history, mv], turnAt: null, bankMs: left } : x)) };
+    const shown = { ...b, fen: applyMove(b.fen, mv), lastMove: mv, history: [...b.history, mv], turnAt: null, bankMs: left };
+    this.pending = { key: p.key, board: boardId, ply, move: mv, shown };
+    this.p = { ...p, boards: p.boards.map((x) => (x === b ? shown : x)) };
     this.turnFrom = null;
     this.m.emit();
   }

@@ -154,7 +154,8 @@ const ALL_MOVES_GROUP_MS = 6000;
  * Every legal move of a position scored on the engine server (the Hidden Boss's phase 2 online: his moves, his bots', a person's
  * fair-play numbers; bosses/recluse.ts): the moves in groups of at most 8 (its limit; fairplay-deep.ts moveGroups), one search a
  * group at `nodes`, the whole position counted once against the day's budget (its groups together search fewer nodes than one
- * re-check). Null when there's no server, no budget left, a position Stockfish refuses, or any group without an answer in time.
+ * re-check). The first group is tried twice (a container still waking answers the second: the review of #677, M2). Null when
+ * there's no server, no budget left, a position Stockfish refuses, or any group without an answer in time.
  */
 export async function serverAllMovesAt(env: EngineEnv, fen: string, nodes: number): Promise<MoveScore[] | null> {
   if (!engineOn(env)) return null;
@@ -167,7 +168,8 @@ export async function serverAllMovesAt(env: EngineEnv, fen: string, nodes: numbe
   if (!legal.length || !(await takeBudget(env))) return null;
   const out: MoveScore[] = [];
   for (const group of moveGroups(legal, legal[0]!)) {
-    const got = await containerScore(env, "engine-1", fen, group, nodes, ALL_MOVES_GROUP_MS);
+    const search = () => containerScore(env, "engine-1", fen, group, nodes, ALL_MOVES_GROUP_MS);
+    const got = (await search()) ?? (out.length ? null : await search());
     if (!got) return null;
     out.push(...got);
   }
