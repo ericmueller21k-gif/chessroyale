@@ -1484,9 +1484,11 @@ test("rides (Oct 31; Nov 1, every boss's): your pawn sits on its ride, the ride'
   await walkTo(c0 - 1, r0 + 5);
   // Stopped: the idle again, its side, facing left as it came.
   expect([(await rideNow(page)).you.anim, (await rideNow(page)).you.view, (await rideNow(page)).you.facing]).toEqual(["idle", 0, -1]);
-  // (Down by the walk hook, as a tap would walk you: 3 rows down is behind you, below a phone's chase camera, so no tap reaches it. Nov 13.)
-  await page.evaluate(([c, r]) => (window as unknown as { __townWalk: (s: readonly [number, number]) => boolean }).__townWalk([c, r]), [c0 - 1, r0 + 2] as const);
-  await expect.poll(() => you(page), { message: "down 3 rows" }).toEqual([c0 - 1, r0 + 2]);
+  // (Down by the walk hook, as a tap would walk you: 3 rows down is behind you, below a phone's chase camera, so no tap reaches it. Down the
+  // lane's column, a step right and then straight down: the park's fountain stands on rows 28 and 29 of column 23, and a walk round it ends
+  // sideways. Nov 13.)
+  await page.evaluate(([c, r]) => (window as unknown as { __townWalk: (s: readonly [number, number]) => boolean }).__townWalk([c, r]), [c0, r0 + 2] as const);
+  await expect.poll(() => you(page), { message: "down 3 rows" }).toEqual([c0, r0 + 2]);
   await expect.poll(async () => (await rideNow(page)).you.anim).toBe("idle");
   // Standing after walking down: its front view's idle.
   expect([(await rideNow(page)).you.anim, (await rideNow(page)).you.view]).toEqual(["idle", 2]);
