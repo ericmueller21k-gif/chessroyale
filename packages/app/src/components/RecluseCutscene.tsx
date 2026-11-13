@@ -103,6 +103,15 @@ export function RecluseCutscene({ at, until, board: given, lines = RECLUSE_CUTSC
     bossVoice.hush(until);
     kingVoice.hush(until);
   }, [on, until]);
+  // (Taken off the screen early, the match left: the voices speak again, so the next battle's lines aren't dropped (review of #679,
+  // m2). Only as it unmounts, never as the scene ends within its hold; taken off at the phase change, `until` is past anyway.)
+  useEffect(
+    () => () => {
+      bossVoice.unhush();
+      kingVoice.unhush();
+    },
+    [],
+  );
   // (Hidden from its start until this is taken off the screen with the fall's, as the phase change starts: never a frame of his
   // fall's mumbling between the two, even when the scene ends a little before its hold.)
   const started = t >= 0;

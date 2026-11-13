@@ -163,8 +163,15 @@ export class Voice {
     for (const f of this.listeners) f();
   }
   private hushedUntil = 0;
+  /** The hush lifted early: its scene taken off the screen (the match left during it). */
+  unhush() {
+    this.hushedUntil = 0;
+  }
 
-  /** A new battle: nothing said yet. */
+  /**
+   * A new battle: nothing said yet. A hush stays: online, phase 2's first word (which resets the God King's voice) can land just after
+   * the cutscene has hushed both. Left mid-scene, the scene's unmount lifts it (`unhush`; review of #679, m2).
+   */
   reset() {
     this.now = null;
     this.queue = [];

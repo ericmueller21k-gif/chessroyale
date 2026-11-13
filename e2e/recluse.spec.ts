@@ -858,6 +858,12 @@ test("the admins' Win this form (Nov 13, Eric's timing test): pressed, your next
   await expect.poll(() => page.locator(".cs-layer").count(), { timeout: 10_000 }).toBe(1);
   // (No skip: the phase holds through it, the 🏆 greyed.)
   expect(await phase(page)).toBe("boss");
+  // (Nothing to tap: the ⋯ greyed in its place, not hidden; a tap on it opens nothing (review of #679, m1).)
+  const more = page.getByRole("button", { name: "Match options" });
+  await expect(more).toBeVisible();
+  await expect(more).toHaveCSS("pointer-events", "none");
+  await more.click({ force: true });
+  await expect(page.locator(".mm-scrim")).toHaveCount(0);
   await expect.poll(() => phase(page), { timeout: 60_000 }).toBe("phaseChange");
   expect(await scene.seen()).toEqual({ light: true, kid: true, hidden: true, first: true, last: true });
   await expect(page.locator(".cs-layer")).toHaveCount(0);

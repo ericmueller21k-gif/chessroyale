@@ -101,7 +101,8 @@ const PACED = ["dimMs", "poofAfterMs", "firstLineAfterMs", "typeMs", "sentencePa
  * The scene in a window of `windowMs` (its hold: RECLUSE_CUTSCENE.holdMs, the server's online): itself, unchanged, when the window
  * is its own length (within a second: two devices' clocks) or longer (it ends early and the light stays down, never stretched); in a
  * shorter one (a test's hold: `cutsceneHoldMs`) every paced time shrinks by one factor, the child's frames as they are, so it
- * still ends by the window's end.
+ * still ends by the window's end. Test-only: a window shorter than the child's fixed frames plus 2% of the rest (`?cutscene=` of
+ * about 3 s or less, or `cutsceneHoldMs` under about 3 s) overruns it (the 0.02 floor), and the phase change cuts the scene off.
  */
 export function fitCutscene(lines: readonly CutLine[], arrival: CutArrival, windowMs: number, c: Settings = RECLUSE_CUTSCENE): { timeline: CutTimeline; c: Settings } {
   const full = cutsceneTimeline(lines, arrival, c);

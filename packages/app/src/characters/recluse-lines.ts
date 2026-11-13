@@ -188,7 +188,7 @@ export const KING_VS_RECLUSE = {
 } as const;
 
 /**
- * The cutscene between his adult form and the cyborg (Eric's version, Nov 12, night; a MOCKUP, wired into no match): the
+ * The cutscene between his adult form and the cyborg (Eric's version, Nov 12, night; in the fight since Nov 13, solo and online): the
  * ghost of him as a child, and him on his knees. Each line is its own text box; a line of two sentences is typed one
  * sentence, a pause, then the next (each entry here is one sentence; one long sentence types all at once). The real quotes
  * stay unattributed and he is never named (RULES.md).

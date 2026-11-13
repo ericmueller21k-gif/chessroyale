@@ -27053,6 +27053,15 @@ button.sq-tiny {
 body.cs-on .boss-char {
   visibility: hidden;
 }
+/* Nothing to tap during it (review of #679, m1): the ⋯ greyed in its place, as the 🏆 is, never hidden. A sheet already open when it
+   starts stays readable over its dark. */
+body.cs-on .mm .mm-more {
+  opacity: 0.55;
+  pointer-events: none;
+}
+body.cs-on .mm-scrim {
+  z-index: 901;
+}
 /* The Hidden Boss's cutscene (Nov 12: components/RecluseCutscene.tsx; after his fall, before his phase change). One fixed layer over the
    whole screen: everything dims but a round pool of light on the board's middle, its edge feathered over the outer part of
    its radius (eased stops, so no ring shows); the figure and the text boxes on a stage laid over the board, above the dark. */
