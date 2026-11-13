@@ -112,6 +112,12 @@ export const TOWN_FEEL = {
       tall: { h: 9.3, th: 42, back: 5.7, R: 30, kx: 0.42, fW: 1.31, cy: 0.36, rim: 12.5, rimX: 1.16 },
       wide: { h: 7.8, th: 36, back: 6.7, R: 30, kx: 0.4, fW: 0.72, cy: 0.39, rim: 11.5, rimX: 2.3 },
     },
+    // (Eric, Nov 13: "one more zoom out ... to that old one that we used to have ... That should be the furthest zoom you can go": the
+    // old town's zoomed-out camera, the overview with zoomOutHeight, zoomOutBack, zoomOutPitch and zoomOutRim applied in full.)
+    {
+      tall: { h: 16.275, th: 48, back: 8.265, R: 30, kx: 0.42, fW: 1.31, cy: 0.36, rim: 15.625, rimX: 1.16 },
+      wide: { h: 13.65, th: 42, back: 9.715, R: 30, kx: 0.4, fW: 0.72, cy: 0.39, rim: 14.375, rimX: 2.3 },
+    },
   ] as readonly { tall: CamSet; wide: CamSet }[],
   /**
    * The step the street town opens at and how long a press of − or + glides (ms). Eric, Nov 5: "If number one is the closest, then we're
@@ -120,6 +126,8 @@ export const TOWN_FEEL = {
    */
   streetZoomStart: 2,
   streetZoomMs: 350,
+  /** The furthest the park's step out goes: the overview (3). The farthest step (4, Nov 13) is only ever chosen with −. */
+  streetZoomParkMax: 3,
   /**
    * The park zooms out a step (Nov 5, round 4; Eric, a trial he may revert: "make it zoom out one level when you hit the area that's the
    * … center town square … if it's like a nice transition"): coming into the park (the plus with the chess tables) eases the camera

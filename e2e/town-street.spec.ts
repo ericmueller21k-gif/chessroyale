@@ -519,11 +519,12 @@ test("the town's loading fetches every boss theme once and decodes none (Eric, N
 });
 
 /**
- * The Hidden Boss's building (Nov 13; docs/areas/town-square.md, "The Walk-up"), an admin's (admins first): its door, the hall (a flat's
- * door's line), up the stairs to the landing, up again to his room (the child at his game; his card's Challenge greyed, "Coming soon"),
- * and back down both flights. A player's town has no walk-up. `STILLS=<dir>` writes the stills for the PR.
+ * The Hidden Boss's building (Nov 13; docs/areas/town-square.md, "The Walk-up"), in everyone's town since Nov 13: its door, the hall (a
+ * flat's door's line), up the stairs to the landing, up again to his room (the child at his game; his card's Challenge, greyed for a
+ * guest: "Sign in to challenge him."; the challenge itself: hidden-boss-room.spec.ts), and back down both flights. `STILLS=<dir>` writes
+ * the stills for the PR.
  */
-test("the Hidden Boss's walk-up (admins first): its door, the hall, up two flights to his room, his Challenge greyed, and back down", async ({ page }) => {
+test("the Hidden Boss's walk-up: its door, the hall, up two flights to his room, his Challenge (greyed for a guest), and back down", async ({ page }) => {
   test.setTimeout(150_000);
   const errors = watchErrors(page);
   type Hooks = { __townAt?: (k: string, id: string) => { x: number; y: number } | null; __townGlide?: (to: string) => void; __shopAt?: (k: string, s?: unknown) => { x: number; y: number } | null; __shopLook?: (k: string, to?: string) => boolean };
@@ -613,7 +614,7 @@ test("the Hidden Boss's walk-up (admins first): its door, the hall, up two fligh
   await still("landing", 3500);
   await climb("top", "Go up");
   await still("room-arrive", 3500);
-  // His room: a tap on his board walks you round to its front, and his card: Challenge greyed, "Coming soon".
+  // His room: a tap on his board walks you round to its front, and his card: Challenge and Cancel, greyed for a guest, who's told why.
   const his = page.getByRole("dialog", { name: "Hidden Boss", exact: true });
   await expect(async () => {
     if (await his.isVisible()) return;
@@ -623,7 +624,8 @@ test("the Hidden Boss's walk-up (admins first): its door, the hall, up two fligh
     await expect(his).toBeVisible({ timeout: 8000 });
   }).toPass({ timeout: 30_000 });
   await expect(his.getByRole("button", { name: "Challenge" })).toBeDisabled();
-  await expect(his.locator(".town-soon")).toHaveText("Coming soon");
+  await expect(his.getByRole("button", { name: "Cancel" })).toBeDisabled();
+  await expect(his.locator(".hb-card-line")).toHaveText("Sign in to challenge him.");
   await page.waitForTimeout(800);
   await still("room", 3500);
   await page.keyboard.press("Escape");

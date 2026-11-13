@@ -7,10 +7,11 @@ import { APRON, BOTS, APRON_ROWS, COLISEUM, GRASS, HOMES, PARK, PAVING, PROPS, S
 
 const king = (a: Sq, b: Sq) => Math.max(Math.abs(wrapF(a.c - b.c)), Math.abs(wrapF(a.r - b.r)));
 /**
- * Open ground between Jefferson's Fireworks and Chub & Chirp's Grassland: no homes, bosses, bots or park things
- * within two squares. (The Colosseum's middle until slice 5 built it; (24, 2) until slice 6's bigger map.)
+ * Open ground north of the Hidden Boss's walk-up: no homes, bosses, bots or park things within three squares. (The Colosseum's
+ * middle until slice 5 built it; (24, 2) until slice 6's bigger map; (45, 6) until the walk-up, there since Nov 13, opened for
+ * everyone.)
  */
-const SPOT: Sq = { c: 45, r: 6 };
+const SPOT: Sq = { c: 44, r: 2 };
 
 /** A town with nobody wandering off on their own (the bots stay put; the bosses are far from the middle). */
 function still(): Town {

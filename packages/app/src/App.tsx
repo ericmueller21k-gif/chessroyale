@@ -1,6 +1,6 @@
 import type { ComponentChildren } from "preact";
 import { useEffect, useLayoutEffect, useReducer, useRef, useState } from "preact/hooks";
-import { type Activity, type MatchmakingType, CROWD_MISSES, RECLUSE_MUSIC, SQUADS, botLevelMean, POWER_IDS, WEAK_BOTS, bossDef, bossIdFromLink, CROWD_KNOCKOUTS, RAID_SETTINGS, bossPartySettings, raidBossElo, DEFAULT_SETTINGS, DRAW_RULES, QUICK_PACE, bestMoveOf, definedOnly, matchFeats, modeSettings, pausedLine, speedOption, startOption, type DrawRule, type FinalFormat, type ModeChoiceId, type Settings } from "@chessroyale/core";
+import { type Activity, type MatchmakingType, CROWD_MISSES, RECLUSE_MUSIC, SQUADS, botLevelMean, POWER_IDS, WEAK_BOTS, bossDef, bossIdFromLink, CROWD_KNOCKOUTS, RAID_SETTINGS, bossPartySettings, hiddenRoomSettings, HIDDEN_ROOM, raidBossElo, DEFAULT_SETTINGS, DRAW_RULES, QUICK_PACE, bestMoveOf, definedOnly, matchFeats, modeSettings, pausedLine, speedOption, startOption, type DrawRule, type FinalFormat, type ModeChoiceId, type Settings } from "@chessroyale/core";
 import { bossInUrl, bossTierFromUrl, chosenBoss, chosenHomeMode, chosenMode, lobbyModeOf, prefetchBossAlone, raidInUrl, rememberBossPick } from "./screens/Home.tsx";
 import { lastBoss } from "./boss-history.ts";
 import { unlockAudio } from "./components/Countdown.tsx";
@@ -29,7 +29,7 @@ import { setInviteHost } from "./friends.ts";
 import { FriendsScreen } from "./screens/Friends.tsx";
 import { SettingsScreen } from "./screens/Settings.tsx";
 import { TownPage, type BotGameAsk, type Stand } from "./town/TownPage.tsx";
-import { LeaveTownConfirm, TOWN_BACK_TO } from "./town/LeaveTown.tsx";
+import { LeaveTownConfirm, TOWN_BACK_TO, requestWaiting } from "./town/LeaveTown.tsx";
 import { setGoodbyeFrom } from "./town/goodbye.ts";
 import { ColosseumPage } from "./colosseum/ColosseumPage.tsx";
 import { Logo } from "./components/FrontDoor.tsx";
@@ -775,6 +775,22 @@ export function App() {
     // (Two frames: the battle's screen is drawn under the transition before it slides off.)
     await new Promise<void>((ok) => requestAnimationFrame(() => requestAnimationFrame(() => ok())));
   };
+  /**
+   * The Hidden Boss's room's four go in (Nov 13; town/hidden-net.ts): the summoning has played to black in the room; you join his fight,
+   * a party battle with your own pass into your seat. Its result's "Back to town" puts you at his walk-up's door (`stand`).
+   */
+  const hiddenFight = (lobby: string, pass: string, seat: number, stand: Stand | null) => {
+    bossFromTown.current = null;
+    townReturn.current = stand ?? { c: -1, r: -1, facing: 1, view: 0 };
+    setExitTo("town");
+    setShowTown(false);
+    setTownSeat(null);
+    setTownStand(null);
+    setHomeIntent(null);
+    setRaidOpen(false);
+    history.replaceState(null, "", `/${location.search}`);
+    joinLobby(lobby, { party: { pass, seat, boss: HIDDEN_ROOM.boss, difficulty: "normal", hidden: true } });
+  };
   /** Out of the game, back to the town at its table (its result's "Back to town", or the back button: `popped`). */
   const backToTown = (popped = false) => {
     const seat = townGame.current;
@@ -1233,7 +1249,7 @@ export function App() {
    * Into a lobby by code. A queue lobby (PLAY) brings the queue's own settings (the server's, remembered with the
    * code for a reload); a lobby you made, the mode you made it in.
    */
-  const joinLobby = (code: string, opts: { queue?: "crowd" | "raid"; mode?: ModeChoiceId; typed?: boolean; resume?: boolean; away?: number; party?: { pass: string; seat: number; boss: string; difficulty: string } } = {}) => {
+  const joinLobby = (code: string, opts: { queue?: "crowd" | "raid"; mode?: ModeChoiceId; typed?: boolean; resume?: boolean; away?: number; party?: { pass: string; seat: number; boss: string; difficulty: string; hidden?: boolean } } = {}) => {
     const key = `brc.queue.${code.toUpperCase()}`;
     let queue = opts.queue;
     try {
@@ -1246,7 +1262,9 @@ export function App() {
     unlockAudio();
     setError(null);
     const m = new NetMatch(code.toUpperCase(), playerName(), enginePool, queue ? false : practiceOn());
-    m.settings = opts.party
+    m.settings = opts.party?.hidden
+      ? { ...DEFAULT_SETTINGS, ...hiddenRoomSettings() }
+      : opts.party
       ? { ...DEFAULT_SETTINGS, ...bossPartySettings(opts.party.difficulty), ...(opts.party.boss ? { bossId: opts.party.boss } : {}) }
       : queue
         ? { ...DEFAULT_SETTINGS, ...(queue === "raid" ? RAID_SETTINGS : modeSettings("crowd", { augments: true })) }
@@ -1255,6 +1273,7 @@ export function App() {
       m.partyPass = opts.party.pass;
       m.partySeat = opts.party.seat;
       m.auto = true;
+      m.hiddenRoom = !!opts.party.hidden;
     }
     // The queue shows at once (not "Connecting…"); the lobby confirms it.
     if (queue) m.auto = true;
@@ -1830,6 +1849,7 @@ export function App() {
           seat={townSeat}
           stand={townStand}
           onBossChallenge={challengeFromTown}
+          onHiddenFight={hiddenFight}
           onPlayBot={playTownBot}
           onColosseum={() => {
             setShowTown(false);
@@ -1879,6 +1899,7 @@ export function App() {
         {townAsk && (
           <LeaveTownConfirm
             dest={townAsk.dest}
+            request={requestWaiting()}
             onStay={() => {
               setTownAsk(null);
               townAsk.stay?.();

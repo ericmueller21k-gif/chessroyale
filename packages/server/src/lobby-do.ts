@@ -612,6 +612,7 @@ export class Lobby extends DurableObject<Env> {
       core.chatTyping(playerId, { may: on, young: false });
     }
     if (msg.t === "ultimate") core.ultimateTrigger(playerId, !!attached?.admin);
+    else if (msg.t === "winForm") core.winFormTrigger(playerId, !!attached?.admin);
     else core.message(playerId, msg);
     await this.persist(core);
     await this.tellParty(core);

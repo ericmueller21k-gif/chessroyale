@@ -4,7 +4,7 @@ import type { BossLobby } from "./bosses/base.ts";
 import { hearsTyped, typedReads, typedSay, typedSeat, type TypedSeats } from "./typed-chat.ts";
 import { QUICK_CHAT, botChatLines, canSay, canSayToAll, chatCheck, chatSay, chatSent, mulberry32, noChatSent, ownedChatPacks, type BotChatMoment, type ChatSent } from "@chessroyale/core";
 import { FAIRPLAY, type FairMove } from "@chessroyale/core";
-import { BOSS_BRAIN, BOSS_CHECK, BOSS_PARTY, BOSS_POWERS, DEFAULT_SETTINGS, JUDGES, isTeamMatch, type JudgeConfig, FRONT_DOOR, LEAVING, LOBBY_LIFE, MATCHMAKING, isRankedMatch, type PlayerState, brilliance, cleanLook, matchFeats, type ItemLook, type MatchFeats, botVotes, castPregameVote, closePregameVote, raidBossElo, bossDef, clockAfterVote, cutSeconds, pregameVotes, voteResultMs, type Augment, type DrawRule, type Settings } from "@chessroyale/core";
+import { BOSS_BRAIN, BOSS_CHECK, BOSS_PARTY, BOSS_POWERS, HIDDEN_ROOM, DEFAULT_SETTINGS, JUDGES, isTeamMatch, type JudgeConfig, FRONT_DOOR, LEAVING, LOBBY_LIFE, MATCHMAKING, isRankedMatch, type PlayerState, brilliance, cleanLook, matchFeats, type ItemLook, type MatchFeats, botVotes, castPregameVote, closePregameVote, raidBossElo, bossDef, clockAfterVote, cutSeconds, pregameVotes, voteResultMs, type Augment, type DrawRule, type Settings } from "@chessroyale/core";
 import {
   MatchRunner,
   BOT_NAMES,
@@ -410,6 +410,11 @@ export interface LobbyRecord {
    */
   party?: PartyLobby;
   /**
+   * Testing (an admin's "Win this form" in the Hidden Boss's room's fight, Nov 13): the team's next move beats his form (the runner's
+   * bossForceWin, which lives on the runner, not in its state: kept here so a restored lobby still has it).
+   */
+  winForm?: true;
+  /**
    * Matchmade by the engine pool's queue (fair play's pooled accounts: docs/decisions/2026-11-10-engine-pool.md): it seats only pooled
    * accounts, and a lobby without it none, whoever has the code (lobby-do.ts). The #618 review, m4.
    */
@@ -589,6 +594,11 @@ export interface PartyLobby {
   kickedMembers?: string[];
   /** The party has been told this battle is over (takePartyOver). */
   overTold?: true;
+  /**
+   * The Hidden Boss's fight from his room in the town (hidden-room.ts, Nov 13): no party Durable Object behind it (`partyCode` empty),
+   * so nothing to tell one; and the admin's "Win this form" may be pressed in it (winFormTrigger).
+   */
+  room?: true;
 }
 
 export function newLobbyRecord(code: string, now: number, overrides?: LobbyRecord["overrides"], party?: PartyLobby): LobbyRecord {
@@ -673,6 +683,7 @@ export class LobbyCore {
     if (record.runner) {
       // (The clock for powers that run in real time, the hippo gardener's seeds: the server's.)
       this.runner = MatchRunner.restore(record.runner, { settings: this.settings, rng, engines: [], library, clock: () => this.io.now() });
+      if (record.winForm) this.runner.bossForceWin = true;
     }
   }
 
@@ -1195,7 +1206,7 @@ export class LobbyCore {
   /** A party's battle is over: once, for its Durable Object to tell the party (its passes then go). */
   takePartyOver(): { party: string; start: number } | null {
     const pl = this.r.party;
-    if (!pl || pl.overTold || this.r.phase !== "results") return null;
+    if (!pl || pl.room || pl.overTold || this.r.phase !== "results") return null;
     pl.overTold = true;
     return { party: pl.partyCode, start: pl.startId };
   }
@@ -1204,6 +1215,11 @@ export class LobbyCore {
   takePartyKicks(): { party: string; members: string[] } | null {
     const pl = this.r.party;
     if (!pl?.kickedMembers?.length) return null;
+    // (The Hidden Boss's room's fight: no party to tell. A kicked member is out of the fight, as ever.)
+    if (pl.room) {
+      delete pl.kickedMembers;
+      return null;
+    }
     const members = pl.kickedMembers;
     delete pl.kickedMembers;
     return { party: pl.partyCode, members };
@@ -1383,6 +1399,23 @@ export class LobbyCore {
     return ok;
   }
 
+  /**
+   * Testing (Eric, Nov 13: "buttons to instantly win and trigger next phase on the next move"): an admin's "Win this form" in the
+   * Hidden Boss's fight from his room (PartyLobby.room; the Durable Object checks ADMIN_EMAILS and passes `admin`): the team's next
+   * move beats his form by the same end a mate takes (the runner's bossForceWin: stageComplete, then finishBossBattle's "crowd"); online
+   * that's his adult form, and the fight ends as a win (no phase 2 online yet). Anyone else, any other battle, a boss not his, a
+   * battle over: nothing. The battle is a test game then (no XP), as the ultimate's trigger makes it.
+   */
+  winFormTrigger(playerId: string, admin: boolean): boolean {
+    const runner = this.runner;
+    if (!admin || !this.r.party?.room || !this.human(playerId) || !runner?.boss || runner.boss.id !== HIDDEN_ROOM.boss || runner.boss.result || this.r.phase === "results") return false;
+    runner.bossForceWin = true;
+    this.r.winForm = true;
+    this.r.overrides = { ...this.r.overrides, tested: true };
+    console.log(`test trigger: ${playerId} wins the Hidden Boss's form in ${this.r.code}`);
+    return true;
+  }
+
   // ---------------- Messages ----------------
 
   message(playerId: string, msg: ClientMessage) {
@@ -1477,8 +1510,9 @@ export class LobbyCore {
       case "kick":
         return this.partyKick(playerId, msg.playerId);
       case "hello":
-      // (The test trigger goes through ultimateTrigger, from the Durable Object, which knows who's an admin.)
+      // (The test triggers go through ultimateTrigger and winFormTrigger, from the Durable Object, which knows who's an admin.)
       case "ultimate":
+      case "winForm":
         return;
     }
   }
@@ -1515,8 +1549,10 @@ export class LobbyCore {
     const empty = this.r.party ? this.r.party.bots : this.r.auto?.botsOff || (this.settings.raid && !this.r.auto) ? 0 : this.settings.lobbySize - this.r.humans.length;
     const bots = botRoster(this.rng, empty, this.settings);
     if (this.r.party) {
-      const free = Array.from({ length: BOSS_PARTY.max }, (_, i) => i).filter((i) => !Object.values(this.r.party!.seats).includes(i));
-      bots.forEach((b, i) => (this.r.party!.seats[b.id] = free[i] ?? BOSS_PARTY.max + i));
+      // (Seats 0 to 2 in a party; 0 to 3 in the Hidden Boss's room's fight of four.)
+      const seats = Math.max(BOSS_PARTY.max, this.settings.lobbySize);
+      const free = Array.from({ length: seats }, (_, i) => i).filter((i) => !Object.values(this.r.party!.seats).includes(i));
+      bots.forEach((b, i) => (this.r.party!.seats[b.id] = free[i] ?? seats + i));
     }
     this.r.bots = bots.map((b) => ({ id: b.id, name: b.name, skill: b.skill ?? 5 }));
     this.runner = new MatchRunner({

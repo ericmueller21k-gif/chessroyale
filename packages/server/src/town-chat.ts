@@ -309,6 +309,14 @@ export class TownChat {
     this.notice(enterText(names), now, "enter");
   }
 
+  /**
+   * The Hidden Boss's room's four go into his fight (Nov 13): "Ann, Bo, Cy and Di are fighting the Hidden Boss." in the challenge
+   * lines' blue (hidden-room.ts `fightingText`). The line.
+   */
+  fighting(text: string, now: number): TownLine {
+    return this.notice(text, now);
+  }
+
   /** A line the server says itself (`sys`), held as players' lines are, for TOWN_CHAT.lineMs. */
   private notice(text: string, now: number, sys: TownSys = "challenge"): TownLine {
     const line: TownLine = { n: ++this.n, at: now, from: "", name: "", text, sys };

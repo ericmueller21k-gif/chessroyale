@@ -629,7 +629,11 @@
     },
     "the Hidden Boss's walk-up (Nov 13: the building in the town, the hall, the landing and his room, the stairs between them)": {
       "paths": ["packages/app/src/town/houses/recluse.ts", "packages/app/src/town/shops/recluse-*.ts"],
-      "specs": ["e2e/town-street.spec.ts"]
+      "specs": ["e2e/town-street.spec.ts", "e2e/hidden-boss-room.spec.ts"]
+    },
+    "the Hidden Boss's room challenge (Nov 13: four at most in his room, the request's count, the locked door, the summoning, his fight of four, the admin's test bots and online trophy)": {
+      "paths": ["e2e/hidden-boss-room.spec.ts", "packages/server/src/hidden-room.ts", "packages/server/src/hidden-room-api.ts", "packages/app/src/town/hidden-net.ts", "packages/app/src/town/HiddenRoom.tsx", "packages/app/src/town/LeaveTown.tsx"],
+      "specs": ["e2e/hidden-boss-room.spec.ts", "e2e/town-leave.spec.ts", "e2e/town-street.spec.ts"]
     },
     "Boingo's claw machine in his Funhouse (the play on the server, the cabinet in the room)": {
       "paths": ["packages/server/src/claw.ts", "packages/app/src/town/shops/boingo-art.ts", "packages/app/src/town/shops/claw-cabinet.ts", "packages/app/src/town/kit/models/claw-cabinet.ts"],

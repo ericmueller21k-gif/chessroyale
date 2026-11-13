@@ -151,7 +151,22 @@ describe("Win this form: who sees it", () => {
     expect(shown(false, raid({ bossId: "clown", bossHidden: false }))).toBe(false);
     expect(shown(true)).toBe(false);
   });
-  it("online matches have none", () => {
-    expect("winForm" in NetMatch.prototype).toBe(false);
+  it("online, only in the Hidden Boss's room's fight, for an admin (Nov 13, Eric's test kit; the server checks again)", () => {
+    const shownOnline = (hiddenRoom: boolean, boss: string) => {
+      const m = new NetMatch("ABCDE", "Ann", null as never, false);
+      m.hiddenRoom = hiddenRoom;
+      (m as unknown as { boss: unknown }).boss = { id: boss, result: null };
+      const sent: unknown[] = [];
+      (m as unknown as { send: (x: unknown) => void }).send = (x) => void sent.push(x);
+      const on = m.winFormShown;
+      m.winForm();
+      return { on, sent: sent.length, armed: m.winFormArmed };
+    };
+    // (A player, in his room's fight or anywhere: none, and pressing sends nothing.)
+    expect(shownOnline(true, "recluse")).toEqual({ on: false, sent: 0, armed: false });
+    who.admin = true;
+    expect(shownOnline(false, "recluse")).toEqual({ on: false, sent: 0, armed: false });
+    expect(shownOnline(true, "clown")).toEqual({ on: false, sent: 0, armed: false });
+    expect(shownOnline(true, "recluse")).toEqual({ on: true, sent: 1, armed: true });
   });
 });

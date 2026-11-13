@@ -154,6 +154,13 @@ export function Hud({ match, stripFrozen = false, keepTitle = false }: { match: 
             <WinForm match={match} icon />
           </span>
         )}
+        {/* (A phone's party battle, the Hidden Boss's room's fight: the 🏆 here, before the gear; beside the God King it lay on the
+            panel's tabs, where a tap on Chat could hit it.) */}
+        {!computer && boss && match.party && (
+          <span class="match-tools">
+            <WinForm match={match} icon />
+          </span>
+        )}
         {/* The gear: its list has Sound, Animations, Resign and Report a bug (a crowd match, Crowd or a raid, adds the Motion trail row). */}
         <MatchMenu exit={exitFor(match)} crowd={crowd} />
       </div>

@@ -1,0 +1,232 @@
+import { mkdirSync } from "node:fs";
+import { devices, expect, type Page } from "@playwright/test";
+import { HIDDEN_ROOM } from "@chessroyale/core";
+import { legalMoves } from "@chessroyale/chess";
+import { asServerAdmin, asSignedIn, submitMove, test } from "./helpers.ts";
+
+/**
+ * The Hidden Boss's room challenge (Eric, Nov 12 and 13; docs/areas/town-square.md, "His room's challenge"): up his walk-up to the top
+ * floor, his card's Challenge ("1 of 4" for everyone in the room), leaving asks "Cancel your game request?", an admin's "Fill with 3 bots"
+ * (they join the request one by one: 2 of 4, 3 of 4, 4 of 4), the summoning in the room, and the four into his fight (a party battle
+ * online), where the admin's 🏆 ("Win this form") makes the team's next move beat his form. And a 5th at his door: "The door is
+ * locked." Each test in its own town (`?townroom=`). `STILLS=<dir>` writes the stills for the PR.
+ */
+
+const STILLS = process.env.STILLS;
+const canvas = (p: Page) => p.locator("canvas.town-canvas");
+const room = (p: Page) => p.locator("canvas.town-shop-canvas");
+type Hooks = {
+  __townAt?: (k: string, id: string) => { x: number; y: number } | null;
+  __townGlide?: (to: string) => void;
+  __shopAt?: (k: string, s?: unknown) => { x: number; y: number } | null;
+  __shopLook?: (k: string, to?: string) => boolean;
+  __hiddenRoom?: () => { info: { in: boolean; people: number; count: number; yours: boolean; bots: boolean; admin?: boolean } | null; summonT: number | null; frozen: boolean } | null;
+};
+const hook = (p: Page) => p.evaluate(() => (window as unknown as Hooks).__hiddenRoom?.() ?? null);
+
+async function still(page: Page, name: string) {
+  if (!STILLS) return;
+  mkdirSync(STILLS, { recursive: true });
+  await page.screenshot({ path: `${STILLS}/${name}-${test.info().project.name}.png` });
+}
+
+/** Where the room's hook says to tap, on the page; null: not on screen. */
+async function shopAt(page: Page, kind: string, s?: unknown) {
+  const xy = await page.evaluate(([k, q]) => (window as unknown as Hooks).__shopAt?.(k as string, q) ?? null, [kind, s] as const);
+  const cv = xy && (await room(page).boundingBox());
+  return xy && cv ? { x: cv.x + xy.x, y: cv.y + xy.y } : null;
+}
+
+/** Taps the stairs to `to` until their card shows (it walks you there), and answers the card. */
+async function stairsCard(page: Page, to: "landing" | "top" | "front") {
+  const card = page.getByRole("dialog", { name: "Stairs", exact: true });
+  await expect(async () => {
+    if (await card.isVisible()) return;
+    if (!(await shopAt(page, "pass", to))) await page.evaluate((t) => (window as unknown as Hooks).__shopLook?.("pass", t), to);
+    const at = await shopAt(page, "pass", to);
+    expect(at, `the stairs to ${to} on screen`).not.toBeNull();
+    await page.mouse.click(at!.x, at!.y);
+    await expect(card).toBeVisible({ timeout: 8000 });
+  }).toPass({ timeout: 40_000 });
+  return card;
+}
+
+/** Up or down the stairs to `to`. */
+async function climb(page: Page, to: "landing" | "top", button: "Go up" | "Go down") {
+  // (A tap on the stairs while the room still fades in from the last flight is dropped, as a door's is: tapped again until you go.)
+  await expect(async () => {
+    if ((await room(page).getAttribute("data-part")) === to) return;
+    const card = await stairsCard(page, to);
+    await card.getByRole("button", { name: button }).click();
+    await expect(room(page)).toHaveAttribute("data-part", to, { timeout: 6000 });
+  }).toPass({ timeout: 45_000 });
+  await expect(room(page)).toHaveAttribute("data-ready", "1", { timeout: 20_000 });
+}
+
+/** The town (your own: `townroom`), into the walk-up's hall, and up to the landing. */
+async function toLanding(page: Page, townroom: string) {
+  await page.goto(`/town?sky=day&debug&townroom=${townroom}`);
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
+  await page.evaluate(() => (window as unknown as Hooks).__townGlide?.("recluse"));
+  const homeAt = async () => {
+    const xy = await page.evaluate(() => (window as unknown as Hooks).__townAt?.("home", "recluse") ?? null);
+    const cv = xy && (await canvas(page).boundingBox());
+    return xy && cv ? { x: cv.x + xy.x, y: cv.y + xy.y } : null;
+  };
+  await expect.poll(homeAt, { message: "the walk-up comes into view", timeout: 20_000 }).not.toBeNull();
+  await page.waitForTimeout(1200);
+  const card = page.getByRole("dialog", { name: "The Walk-up", exact: true });
+  await expect(async () => {
+    if (await card.isVisible()) return;
+    const at = await homeAt();
+    expect(at).not.toBeNull();
+    await page.mouse.click(at!.x, at!.y);
+    await expect(card).toBeVisible({ timeout: 1500 });
+  }).toPass({ timeout: 20_000 });
+  await card.getByRole("button", { name: "Go in" }).click();
+  await expect(room(page)).toHaveAttribute("data-ready", "1", { timeout: 20_000 });
+  await climb(page, "landing", "Go up");
+}
+
+/** His card (a tap on his board walks you round to it). */
+async function hisCard(page: Page) {
+  const his = page.getByRole("dialog", { name: "Hidden Boss", exact: true });
+  await expect(async () => {
+    if (await his.isVisible()) return;
+    const at = await shopAt(page, "square", [4, 4]);
+    expect(at, "his board on screen").not.toBeNull();
+    await page.mouse.click(at!.x, at!.y);
+    await expect(his).toBeVisible({ timeout: 8000 });
+  }).toPass({ timeout: 30_000 });
+  return his;
+}
+
+test("his room (Eric, Nov 12 and 13): Challenge is 1 of 4; leaving asks; an admin's 3 bots join (2, 3, 4 of 4); the summoning; the fight, and the online 🏆 wins it", async ({ page }) => {
+  test.setTimeout(300_000);
+  const townroom = `hb-${test.info().project.name}-${Date.now().toString(36)}`;
+  await page.goto("/");
+  await asServerAdmin(page, "ops");
+  await toLanding(page, townroom);
+  await climb(page, "top", "Go up");
+  await expect.poll(async () => (await hook(page))?.info?.in ?? false, { message: "in his room, by the server's count", timeout: 15_000 }).toBe(true);
+  // His card: Challenge, Cancel greyed (nothing hidden), and the admin's test tool.
+  const his = await hisCard(page);
+  await expect(his.getByRole("button")).toHaveText(["Challenge", "Cancel", "Fill with 3 bots"]);
+  await expect(his.getByRole("button", { name: "Cancel" })).toBeDisabled();
+  // The count is there from the start, in its place (review n2: it never appears from nothing).
+  const count = page.locator(".hb-count");
+  await expect(count).toHaveText(/Challengers\s*0 of 4/);
+  await his.getByRole("button", { name: "Challenge" }).click();
+  await expect(count).toHaveText(/1 of 4/, { timeout: 10_000 });
+  await expect(his.getByRole("button", { name: "Challenge" })).toBeDisabled();
+  await expect(his.getByRole("button", { name: "Cancel" })).toBeEnabled();
+  // Leaving asks: the stairs down, "Cancel your game request?"; Stay keeps your place.
+  await page.keyboard.press("Escape");
+  const down = await stairsCard(page, "landing");
+  await down.getByRole("button", { name: "Go down" }).click();
+  const ask = page.getByRole("alertdialog", { name: "Cancel your game request?" });
+  await expect(ask).toBeVisible();
+  await expect(ask.getByRole("button")).toHaveText(["Stay", "Leave and cancel"]);
+  await ask.getByRole("button", { name: "Stay" }).click();
+  await expect(ask).toBeHidden();
+  await expect(room(page)).toHaveAttribute("data-part", "top");
+  await expect(count).toHaveText(/1 of 4/);
+  // The admin's bots: three stand in the room, and join the request one by one, as players would.
+  const card = await hisCard(page);
+  const counts: string[] = [];
+  await page.exposeFunction("__hbCount", (t: string) => void counts.push(t));
+  await page.evaluate(() => {
+    const seen = new Set<string>();
+    const tick = () => {
+      const t = document.querySelector(".hb-count")?.textContent ?? "";
+      if (t && !seen.has(t)) {
+        seen.add(t);
+        (window as unknown as { __hbCount: (t: string) => void }).__hbCount(t);
+      }
+      requestAnimationFrame(tick);
+    };
+    tick();
+  });
+  await card.getByRole("button", { name: "Fill with 3 bots" }).click();
+  await expect.poll(async () => (await hook(page))?.info?.people ?? 0, { timeout: 10_000 }).toBe(4);
+  await expect.poll(() => counts.join(" | "), { timeout: 15_000 }).toMatch(/2 of 4/);
+  await expect(count).toHaveText(/2 of 4/);
+  await still(page, "room-2-of-4");
+  // At four: the summoning (frozen, the scene's clock running), then his fight.
+  await expect.poll(async () => (await hook(page))?.frozen ?? false, { message: "the summoning starts", timeout: 20_000 }).toBe(true);
+  expect(counts.join(" | ")).toMatch(/1 of 4.*2 of 4.*3 of 4/);
+  await page.waitForTimeout(2200);
+  await still(page, "summoning");
+  await expect.poll(async () => (await hook(page))?.summonT ?? 0, { timeout: 5000 }).toBeGreaterThan(1500);
+  await expect(page).toHaveURL(/\/lobby\/[A-Z2-9]{5}/, { timeout: 30_000 });
+  // The fight: against him, a party of four (you and the three bots), the team's turn.
+  const phase = () => page.evaluate(() => (window as any).match?.phase.kind ?? "none").catch(() => "none");
+  await expect.poll(phase, { message: "the team's first turn", timeout: 120_000 }).toBe("play");
+  const fight = await page.evaluate(() => {
+    const m = (window as any).match;
+    return { boss: m.boss?.id, seats: Object.keys(m.party?.seats ?? {}).length, hidden: m.hiddenRoom };
+  });
+  expect(fight).toEqual({ boss: HIDDEN_ROOM.boss, seats: 4, hidden: true });
+  await page.waitForTimeout(1500);
+  await still(page, "fight");
+  // The online 🏆 (admins only; the server checks): the team's next move beats his form, as a mate's end.
+  const trophy = page.getByRole("button", { name: "Win this form (testing)" });
+  await expect(trophy).toBeVisible();
+  await trophy.click();
+  await expect(page.getByRole("button", { name: "Your next move wins this form (testing)" })).toBeDisabled();
+  const turn = await page.evaluate(() => {
+    const m = (window as any).match;
+    return { fen: m.phase.board.fen as string, allowed: (m.phase.allowed ?? null) as string[] | null };
+  });
+  await submitMove(page, turn.allowed?.[0] ?? legalMoves(turn.fen)[0], turn.fen);
+  await expect.poll(phase, { message: "his form beaten: the results", timeout: 90_000 }).toBe("results");
+  expect(await page.evaluate(() => (window as any).match.boss?.result)).toBe("crowd");
+});
+
+test("a 5th at his door: \"The door is locked.\", and you stay on the landing; a player can't fill the room with bots", async ({ page: admin, browser }) => {
+  test.setTimeout(240_000);
+  const townroom = `hb5-${test.info().project.name}-${Date.now().toString(36)}`;
+  const phone = test.info().project.name === "phone";
+  const b = await browser.newContext(phone ? { ...devices["iPhone 13"] } : { viewport: { width: 1280, height: 800 } });
+  try {
+    await admin.goto("/");
+    await asServerAdmin(admin, "ops");
+    await toLanding(admin, townroom);
+    await climb(admin, "top", "Go up");
+    const his = await hisCard(admin);
+    await his.getByRole("button", { name: "Fill with 3 bots" }).click();
+    await expect.poll(async () => (await hook(admin))?.info?.people ?? 0, { timeout: 10_000 }).toBe(4);
+    // A player: up to the landing, the stairs up: locked.
+    const player = await b.newPage();
+    await player.goto("/");
+    await asSignedIn(player, "hb5");
+    await toLanding(player, townroom);
+    const note = player.getByRole("alertdialog", { name: "The door is locked." });
+    // (A tap while the landing still fades in is dropped, as a door's is: tapped again until the answer shows.)
+    await expect(async () => {
+      if (await note.isVisible()) return;
+      const up = await stairsCard(player, "top");
+      await up.getByRole("button", { name: "Go up" }).click();
+      await expect(note).toBeVisible({ timeout: 6000 });
+    }).toPass({ timeout: 45_000 });
+    await expect(room(player)).toHaveAttribute("data-part", "landing");
+    await expect(player.getByRole("dialog", { name: "Stairs", exact: true })).toBeHidden();
+    await player.waitForTimeout(700);
+    await still(player, "door-locked");
+    await note.getByRole("button", { name: "OK" }).click();
+    await expect(note).toBeHidden();
+    await expect(room(player)).toHaveAttribute("data-part", "landing");
+    // (The server refuses a player's "Fill with 3 bots", whatever the app shows.)
+    const res = await player.request.post("/api/town/hidden", { data: { action: "fill", room: townroom } });
+    expect(await res.json()).toMatchObject({ message: "Admins only.", bots: true, people: 4 });
+    // Someone leaves (the admin, and the bots with them): the door opens.
+    await admin.close();
+    await expect(async () => {
+      const r = await player.request.post("/api/town/hidden", { data: { action: "look", room: townroom } });
+      expect(((await r.json()) as { people: number }).people).toBe(0);
+    }).toPass({ timeout: (HIDDEN_ROOM.silentSec + 15) * 1000 });
+    await climb(player, "top", "Go up");
+  } finally {
+    await b.close();
+  }
+});
