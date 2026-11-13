@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-import { DEFAULT_SETTINGS, HIDDEN_ROOM, LEAVING, RECLUSE_CUTSCENE, RECLUSE_FORMS, RECLUSE_ONLINE, RECLUSE_PHASE2, hiddenRoomSettings, mulberry32, recluseNextForm, type Settings } from "@chessroyale/core";
-import { applyMove, bankLeft, legalMoves, type BoardScore, type MatchRunner, type MoveScore, type ServerMessage } from "@chessroyale/chess";
+import { DEFAULT_SETTINGS, HIDDEN_ROOM, LEAVING, RECLUSE_CUTSCENE, RECLUSE_FORMS, RECLUSE_ONLINE, RECLUSE_PHASE2, hiddenRoomSettings, mulberry32, recluseNextForm, type FairMove, type Settings } from "@chessroyale/core";
+import { START_FEN, applyMove, bankLeft, legalMoves, type BoardScore, type MatchRunner, type MoveScore, type ServerMessage } from "@chessroyale/chess";
 import { LobbyCore, newLobbyRecord, type PartyLobby } from "../src/lobby.ts";
-import { phase2NoResult, phase2Unvouched, pick, quickMove, withMates } from "../src/bosses/recluse.ts";
+import { phase2NoResult, phase2NoResultFor, phase2Unvouched, pick, quickMove, withMates, type Phase2SearchRequest } from "../src/bosses/recluse.ts";
 import { library } from "./lobby-fixture.ts";
 
 // (The engine server is a Container, which needs the Workers runtime: the match rooms import it.)
@@ -19,13 +19,15 @@ type Msg = ServerMessage;
 
 /**
  * His room's fight (a party battle of four, as the hub makes it: hiddenRoomSettings, PartyLobby.room): `people` (p1 the admin's,
- * the host) and bots in the other seats. `engine`: an engine server (its searches answered by the test: `searches`, `answer`); `auto`:
- * one that answers every search as time goes on (`advance`), each legal move scored as `answer` does.
+ * the host) and bots in the other seats. `engine`: an engine server (its searches answered by the test: `searches`, `answer`; the
+ * host's device's asks for a bot's move by `answerAsks`); `auto`: one that answers every search as time goes on (`advance`), each
+ * legal move scored as `answer` does, and a host's device that answers every ask.
  */
 function roomFight(people: number, bots: number, o: { engine?: boolean; auto?: boolean } = {}) {
   let now = 1_000_000;
   const inbox = new Map<string, Msg[]>();
-  const searches: { id: string; fen: string; boss?: true }[] = [];
+  const searches: Phase2SearchRequest[] = [];
+  const noResults: number[] = [];
   let warms = 0;
   const party: PartyLobby = {
     admits: Object.fromEntries(Array.from({ length: people }, (_, i) => [`pass${i}`, { seat: i, member: `u${i}`, userId: `u${i}` }])),
@@ -44,7 +46,7 @@ function roomFight(people: number, bots: number, o: { engine?: boolean; auto?: b
     {
       now: () => now,
       send: (id, msg) => inbox.set(id, [...(inbox.get(id) ?? []), { ...msg, now } as Msg]),
-      ...(o.engine || o.auto ? { phase2Search: (req: { id: string; fen: string; boss?: true }) => void searches.push(req), warmEngine: () => void warms++ } : {}),
+      ...(o.engine || o.auto ? { phase2Search: (req: Phase2SearchRequest) => void searches.push(req), warmEngine: () => void warms++, phase2NoResult: () => void noResults.push(now) } : {}),
     },
     library,
     mulberry32(7),
@@ -52,9 +54,9 @@ function roomFight(people: number, bots: number, o: { engine?: boolean; auto?: b
   );
   const last = <K extends Msg["t"]>(id: string, t: K) => [...(inbox.get(id) ?? [])].reverse().find((m) => m.t === t) as Extract<Msg, { t: K }> | undefined;
   const all = <K extends Msg["t"]>(id: string, t: K) => (inbox.get(id) ?? []).filter((m) => m.t === t) as Extract<Msg, { t: K }>[];
-  // (`auto`: every search waiting answered, and those its answers bring, as time goes on.)
+  // (`auto`: every search waiting answered, and every ask of a device, and those their answers bring, as time goes on.)
   const drain = () => {
-    for (let i = 0; o.auto && i < 20 && searches.length; i++) for (const s of searches.splice(0)) answer(s);
+    for (let i = 0; o.auto && i < 20 && (searches.length || answerAsks()); i++) for (const s of searches.splice(0)) answer(s);
   };
   const advance = (ms: number) => {
     const to = now + ms;
@@ -80,6 +82,23 @@ function roomFight(people: number, bots: number, o: { engine?: boolean; auto?: b
   };
   for (let i = 0; i < people; i++) expect(core.connect(undefined, `M${i}`, i === 0 ? "computer" : "phone", false, 1500, undefined, `u${i}`, null, null, i === 0, { pass: `pass${i}`, seat: i }).ok).toBe(true);
   const runner = () => (core as unknown as { runner: MatchRunner }).runner;
+  /**
+   * The host's device answers the bots' moves asked of it (phase2Ask) and not answered yet (`fen`: that position's only), with
+   * `pickOf`'s move (default the first legal one). How many it answered.
+   */
+  const answered = new Set<string>();
+  const answerAsks = (fen?: string, pickOf: (fen: string) => string = (f) => legalMoves(f)[0]!) => {
+    let n = 0;
+    for (const [id, msgs] of inbox) {
+      for (const m of msgs) {
+        if (m.t !== "phase2Ask" || (fen !== undefined && m.fen !== fen) || answered.has(`${id} ${m.id} ${m.now}`)) continue;
+        answered.add(`${id} ${m.id} ${m.now}`);
+        core.message(id, { t: "phase2Answer", id: m.id, move: pickOf(m.fen) });
+        n++;
+      }
+    }
+    return n;
+  };
   /** The engine server's answer to a search: every legal move scored by `score` (default: all equal but the first, best). */
   const answer = (s: { id: string; fen: string }, score: (m: string, i: number) => number = (_m, i) => (i === 0 ? 0.6 : 0.4)) => {
     const moves: MoveScore[] = legalMoves(s.fen).map((m, i) => ({ move: m, expected: score(m, i) }));
@@ -119,7 +138,9 @@ function roomFight(people: number, bots: number, o: { engine?: boolean; auto?: b
     runner,
     inbox,
     searches,
+    noResults,
     answer,
+    answerAsks,
     beatAdult,
     toBoards,
     p2,
@@ -197,7 +218,7 @@ describe("his phase change online: synced for everyone, after his fall and the c
 });
 
 describe("the four boards online: the server runs them", () => {
-  it("a person's move: only theirs, on their move, legal; his reply from the engine server is its best; a bot's within botLoss, after its thinking", () => {
+  it("a person's move: only theirs, on their move, legal; his reply from the engine server is its best; a bot's from the host's device, after its thinking. The match engine's queue holds his moves alone (the review of #683, M1)", () => {
     const F = roomFight(2, 2, { engine: true });
     F.beatAdult();
     // (As a real fight: the 🏆 that brought phase 2 here made this one a test, and a test fight's moves aren't kept for fair play.)
@@ -222,30 +243,37 @@ describe("the four boards online: the server runs them", () => {
     const legal = legalMoves(his.fen);
     F.answer(his, (_m, i) => (i === legal.length - 1 ? 0.7 : 0.3));
     expect(F.boardOf("p1").board.history).toEqual([move, legal[legal.length - 1]]);
-    // Fair play: your move's position scored on the engine server, kept as a FairMove (no crowd: your board alone).
+    // Fair play: your move's position scored on fair play's own instance (`fair`), kept as a FairMove (no crowd: your board alone).
     const fairSearch = F.searches.find((s) => s.fen === mine.board.fen)!;
+    expect(fairSearch).toMatchObject({ fair: true });
+    expect(fairSearch.boss).toBeUndefined();
     F.answer(fairSearch, (_m, i) => (i === 0 ? 0.62 : 0.5));
     const fair = F.core.record.fair?.["p1"] ?? [];
     expect(fair).toHaveLength(1);
     expect(fair[0]).toMatchObject({ move, best: legalMoves(mine.board.fen)[0], loss: 0, crowd: 0, away: 2, thinkMs: thought });
-    // A bot's move comes after its thinking, whatever the engine server's speed.
+    // A bot's move: asked of the host's device first (a bot plays for its own team), at a bot's strength; it plays after its
+    // thinking, whatever the device's speed.
     // (The bot that thinks longest: its move waits for its time; a bot whose time has passed plays as the answer comes.)
     const bots = F.p2().state.boards.filter((b) => !["p1", "p2"].includes(b.player));
+    for (const b of bots) expect(F.all("p1", "phase2Ask").find((a) => a.fen === b.board.fen)).toMatchObject({ elo: RECLUSE_PHASE2.botElo, nodes: RECLUSE_PHASE2.botNodes });
     const bot = bots.reduce((a, b) => (F.p2().botAt[b.id]! > F.p2().botAt[a.id]! ? b : a));
     const early = bots.find((b) => b !== bot)!;
     const moved = (id: number) => F.p2().state.boards.find((b) => b.id === id)!.board.history.length;
     F.advance(-1);
     const due = F.p2().botAt[bot.id]!;
     expect(due).toBeGreaterThan(F.now);
-    F.answer(F.searches.find((s) => s.fen === bot.board.fen)!);
+    expect(F.answerAsks(bot.board.fen)).toBe(1);
     expect(moved(bot.id)).toBe(0);
     F.advance(due - F.now + 1);
     expect(moved(bot.id)).toBe(1);
     expect(F.p2().botAt[early.id]!).toBeLessThan(F.now);
-    F.answer(F.searches.find((s) => s.fen === early.board.fen)!);
+    expect(F.answerAsks(early.board.fen)).toBe(1);
     expect(moved(early.id)).toBe(1);
-    // (Nothing asked of a device: the engine server played it all.)
-    expect(F.all("p1", "phase2Ask")).toHaveLength(0);
+    // (The match engine's queue: his moves alone. Fair play's on its own instance; no bot's searched while a device answers.)
+    expect(F.searches.length).toBeGreaterThanOrEqual(2);
+    expect(F.searches.every((s) => (s.boss && !s.fair) || (s.fair && !s.boss))).toBe(true);
+    // (Every move of his is asked once, counted once: a first try carries no `again`.)
+    expect(F.searches.filter((s) => s.boss).every((s) => !s.again)).toBe(true);
   });
 
   it("no engine server set up (local runs, the e2e suite): a bot's move from the host's device (nothing unvouched), none in time the quick move; his, the server's quick move at once (phase 2's result unvouched), never a device's", () => {
@@ -285,6 +313,7 @@ describe("the four boards online: the server runs them", () => {
     expect(F.core.winFormTrigger("p1", true)).toBe(true);
     expect(F.last("p1", "phase2")!.p2.winNext).toBe(true);
     for (const s of F.searches.splice(0)) F.answer(s);
+    F.answerAsks();
     F.advance(RECLUSE_PHASE2.botMoveMs[1] + 100);
     const done = F.p2().done!;
     expect(done).toMatchObject({ beaten: true, won: 4, of: 4 });
@@ -362,8 +391,8 @@ describe("leaving and disconnects in phase 2: a seat gone, its bot plays the boa
     expect(now.player).not.toBe("p2");
     expect(F.p2().names[now.player]).toBeTruthy();
     expect(F.last("p1", "phase2")!.p2.boards.find((b) => b.id === board)!.player).toBe(now.player);
-    // (Its move is asked as a bot's: a search of its position.)
-    expect(F.searches.some((s) => s.fen === now.board.fen)).toBe(true);
+    // (Its move is asked as a bot's: of the host's device, at a bot's strength.)
+    expect(F.all("p1", "phase2Ask").find((a) => a.fen === now.board.fen)).toMatchObject({ elo: RECLUSE_PHASE2.botElo });
     const left = F.core.record.left!.find((l) => l.id === "p2")!;
     expect(left.how).toBe("resigned");
     expect(left.result?.teamWon).toBe(false);
@@ -374,9 +403,13 @@ describe("leaving and disconnects in phase 2: a seat gone, its bot plays the boa
     const F = roomFight(2, 2, { auto: true });
     F.beatAdult();
     F.toBoards();
+    // (The people's banks 10 minutes, so the sweep comes before their flags: a 2:00 bank is LEAVING.awayMs itself, and only his
+    // ultimate, which the bots' slow moves bring by chance, kept it from falling first.)
+    F.p2().state = { ...F.p2().state, boards: F.p2().state.boards.map((b) => (["p1", "p2"].includes(b.player) ? { ...b, bankMs: 600_000 } : b)) };
     F.core.disconnect("p2");
     F.advance(LEAVING.awayMs + 1000);
     expect(F.p2().state.boards.some((b) => b.player === "p2")).toBe(false);
+    expect(F.p2().done).toBeUndefined();
     F.core.disconnect("p1");
     F.advance(LEAVING.awayMs + 1000);
     expect(F.core.record.phase).toBe("results");
@@ -614,18 +647,20 @@ describe("his moves from the engine server only (Eric, Nov 13: \"we can't have h
     return { fen, from: mine.board.fen, tries: () => F.searches.filter((s) => s.boss && s.fen === fen) };
   };
 
-  it("an empty answer is tried again (retryMs, then twice as long); an earlier try's empty answer adds no try; any try's answer plays; nothing is asked of a device. A bot's empty answer: the host's device, at a bot's strength", () => {
+  it("an empty answer is tried again (retryMs, then twice as long), counted once; an earlier try's empty answer adds no try; any try's answer plays; nothing is asked of a device", () => {
     const F = roomFight(1, 3, { engine: true });
     F.beatAdult();
     const { fen, tries } = hisReply(F);
     expect(tries()).toHaveLength(1);
-    // (His searches are his own share's: `boss`. A bot's or a person's fair play: the match's.)
+    // (His searches are his own: `boss`. A person's fair play: fair play's instance, `fair`.)
     expect(F.searches.filter((s) => s.boss).every((s) => s.fen === fen)).toBe(true);
     F.core.phase2Searched(tries()[0]!.id, null);
     F.advance(RECLUSE_ONLINE.retryMs - 1);
     expect(tries()).toHaveLength(1);
     F.advance(2);
     expect(tries()).toHaveLength(2);
+    // (A try again at the same position: not counted again (the review of #683, m2).)
+    expect(tries().map((t) => !!t.again)).toEqual([false, true]);
     // (The first try's empty answer again, late: no third try; the second's: one, twice as long after.)
     F.core.phase2Searched(tries()[0]!.id, null);
     F.core.phase2Searched(tries()[1]!.id, null);
@@ -638,10 +673,39 @@ describe("his moves from the engine server only (Eric, Nov 13: \"we can't have h
     F.answer(tries()[1]!, (_m, i) => (i === legal.length - 1 ? 0.7 : 0.3));
     expect(F.boardOf("p1").board.history[1]).toBe(legal.at(-1));
     expect(F.all("p1", "phase2Ask").some((a) => a.fen === fen || a.elo === RECLUSE_PHASE2.elo)).toBe(false);
-    // A bot's search come back empty: the host's device plays it, at a bot's strength.
-    const bot = F.searches.find((s) => !s.boss && F.p2().state.boards.some((b) => b.player !== "p1" && b.board.fen === s.fen))!;
-    F.core.phase2Searched(bot.id, null);
-    expect(F.last("p1", "phase2Ask")).toMatchObject({ fen: bot.fen, elo: RECLUSE_PHASE2.botElo });
+  });
+
+  it("a try still unanswered is never sent again while it could still be running (searchMs, every group's wait in it): only once it's lost, past it (the review of #683, M1)", () => {
+    const F = roomFight(1, 3, { engine: true });
+    F.beatAdult();
+    const { tries } = hisReply(F);
+    const asked = F.now;
+    F.advance(RECLUSE_ONLINE.searchMs + 1000);
+    expect(tries()).toHaveLength(1);
+    F.advance(asked + RECLUSE_ONLINE.searchMs + 5000 - F.now + 10);
+    expect(tries()).toHaveLength(2);
+    expect(tries()[1]!.again).toBe(true);
+  });
+
+  it("a bot's move: the host's device first; no answer in askMs, the engine server's (a bot's search, never his); empty there too, the server's quick move", () => {
+    const F = roomFight(1, 3, { engine: true });
+    F.beatAdult();
+    F.toBoards();
+    const bot = F.p2().state.boards.find((b) => b.player !== "p1")!;
+    const ask = F.all("p1", "phase2Ask").find((a) => a.fen === bot.board.fen)!;
+    expect(ask).toMatchObject({ elo: RECLUSE_PHASE2.botElo });
+    expect(F.searches.some((s) => s.fen === bot.board.fen)).toBe(false);
+    F.advance(RECLUSE_ONLINE.askMs + 10);
+    const search = F.searches.find((s) => s.fen === bot.board.fen)!;
+    expect(search).toBeTruthy();
+    expect(search.boss ?? search.fair).toBeUndefined();
+    // (The device's answer, late: it's the engine server's now.)
+    F.core.message("p1", { t: "phase2Answer", id: ask.id, move: legalMoves(bot.board.fen)[1]! });
+    expect(F.p2().work[bot.id]?.move).toBeUndefined();
+    F.core.phase2Searched(search.id, null);
+    F.advance(RECLUSE_PHASE2.botSlowMs[1]);
+    expect(F.p2().state.boards.find((b) => b.id === bot.id)!.board.history[0]).toBe(quickMove(bot.board.fen));
+    expect(F.p2().unvouched).toBeUndefined();
   });
 
   it("a slow answer: every board's clock pauses at pauseMs (told to everyone; no move, flag or ultimate meanwhile), then runs on from where it stood once his move is in", () => {
@@ -680,12 +744,12 @@ describe("his moves from the engine server only (Eric, Nov 13: \"we can't have h
     expect(F.boardOf("p2").board.history).toHaveLength(1);
   });
 
-  it("no answer in serverWaitMs: the fight ends with no result; nothing counts (not ranked, no XP or result row), phase 2's fair-play moves dropped, those before it kept", async () => {
+  it("no answer in serverWaitMs: the fight ends with no result; nothing counts for its board players (not ranked, no XP or result row), phase 2's fair-play moves dropped, those before it kept and written; counted for the health view", async () => {
     const F = roomFight(2, 2, { engine: true });
     F.beatAdult();
     // (Phase 1 vouched for, as with judges in production; and a fair-play move of its, before phase 2.)
     delete F.core.record.unvouched;
-    const before = { ply: 1 } as never;
+    const before: FairMove = { ply: 1, fen: START_FEN, move: "e2e4", best: "e2e4", loss: 0, bestExp: 0.55, near: 3, gap: 1.2, crowd: 0, crowdFound: 0, thinkMs: 4000, away: 0, legal: 20, top: ["e2e4", "d2d4"] };
     F.core.record.fair = { p1: [before] };
     F.p2().fairFrom = { p1: 1, p2: 0 };
     const { from, tries } = hisReply(F);
@@ -701,30 +765,103 @@ describe("his moves from the engine server only (Eric, Nov 13: \"we can't have h
     // (Tried again all along, never a device: each try lost on the way (no answer at all), again after 20 s: at 0, 20 and 40 s.)
     expect(tries()).toHaveLength(3);
     expect(F.all("p1", "phase2Ask").some((a) => a.elo === RECLUSE_PHASE2.elo)).toBe(false);
+    expect(F.noResults).toEqual([]);
     F.advance(200);
     expect(F.p2().done).toMatchObject({ noResult: true, beaten: false });
     expect(F.last("p2", "phase2")!.p2.done?.noResult).toBe(true);
     expect(phase2NoResult(F.core.record)).toBe(true);
+    expect(F.noResults).toHaveLength(1);
     expect(F.core.record.fair!["p1"]).toEqual([before]);
     F.answer(late);
     expect(F.core.record.fair!["p2"] ?? []).toEqual([]);
     F.advance(RECLUSE_PHASE2.endMs + 100);
     expect(F.core.record.phase).toBe("results");
-    for (const id of ["p1", "p2"]) expect(F.last(id, "results")).toMatchObject({ noResult: true, ranked: false, bossResult: "draw" });
+    // (Both played its boards: nothing counts for or against them, the results say so.)
+    for (const id of ["p1", "p2"]) expect(F.last(id, "results")).toMatchObject({ noResult: "board", ranked: false, bossResult: "draw" });
     const results = F.core.humanResults();
     expect(results).toHaveLength(2);
-    expect(results.every((r) => r.noResult === true && r.ranked === false)).toBe(true);
-    // Written: fair play's (phase 1's moves), and nothing else: no XP, no result row, no Welcome Crate, no token.
-    const queries: string[] = [];
+    expect(results.every((r) => r.noResult === true && r.ranked === false && r.teamWon === null)).toBe(true);
+    // Written: fair play's, with phase 1's move alone, and nothing else: no XP, no result row, no Welcome Crate, no token.
+    const queries: { q: string; args: unknown[] }[] = [];
     const sql = {
-      run: async (q: string) => void queries.push(q),
-      first: async (q: string) => (queries.push(q), null),
-      all: async (q: string) => (queries.push(q), []),
-      batch: async (st: readonly { sql: string }[]) => void queries.push(...st.map((x) => x.sql)),
+      run: async (q: string, ...args: unknown[]) => void queries.push({ q, args }),
+      first: async (q: string, ...args: unknown[]) => (queries.push({ q, args }), q.startsWith("SELECT rating FROM users") ? { rating: null } : null),
+      all: async (q: string, ...args: unknown[]) => (queries.push({ q, args }), []),
+      batch: async (st: readonly { sql: string }[]) => void queries.push(...st.map((x) => ({ q: x.sql, args: [] }))),
     };
     const ctx = { sql, mode: "boss", mail: undefined, signedInOnly: true, paused: false, off: undefined } as never;
     await writeResult(ctx, F.core.record, { playerId: "p1", userId: "u0", result: results.find((r) => r.playerId === "p1")!, at: F.now, span: { moves: 30, ms: 600_000 }, opponents: [], battle: { moves: 30, ms: 600_000 } });
-    expect(queries).toEqual(["SELECT rating FROM users WHERE id = ?"]);
+    const kept = queries.find((x) => x.q.includes("INSERT INTO fairplay_matches"));
+    expect(kept?.args).toContain(JSON.stringify([before]));
+    expect(queries.every((x) => /fairplay_|FROM users WHERE id/.test(x.q))).toBe(true);
+  });
+});
+
+describe("the review of #683, minors", () => {
+  it("m1: a board handed to a bot during a pause: the bot thinks from the pause's end, its clock charged as it stood (never the pause)", () => {
+    const F = roomFight(2, 2, { engine: true });
+    F.beatAdult();
+    delete F.core.record.overrides!.tested;
+    F.toBoards();
+    const mine = F.boardOf("p1");
+    F.core.message("p1", { t: "phase2Move", key: F.p2().key, board: mine.id, move: legalMoves(mine.board.fen)[0]!, ply: 0 });
+    const his = F.searches.find((s) => s.boss)!;
+    F.advance(RECLUSE_ONLINE.pauseMs + 10);
+    const paused = F.p2().paused!;
+    expect(paused).toBeDefined();
+    const board = F.boardOf("p2").id;
+    const left = bankLeft(F.boardOf("p2"), paused);
+    // (40 s into the pause, p2 resigns: their board is a bot's, its move asked of the host's device, and in.)
+    F.advance(40_000);
+    F.core.message("p2", { t: "resign" });
+    const bot = F.p2().state.boards.find((b) => b.id === board)!.player;
+    expect(F.p2().botAt[board]! - paused).toBeLessThanOrEqual(RECLUSE_PHASE2.botSlowMs[1]);
+    expect(F.answerAsks(F.p2().state.boards.find((b) => b.id === board)!.board.fen)).toBe(1);
+    // (His move in: the clocks run on; the bot plays its while after, charged its while alone.)
+    F.answer(his);
+    const resumed = F.now;
+    expect(F.p2().paused).toBeUndefined();
+    F.advance(RECLUSE_PHASE2.botSlowMs[1] + 10);
+    const b = F.p2().state.boards.find((x) => x.id === board)!;
+    expect(b.player).toBe(bot);
+    expect(b.board.history).toHaveLength(1);
+    expect(b.bankMs).toBeLessThan(left);
+    expect(b.bankMs).toBeGreaterThanOrEqual(left - RECLUSE_PHASE2.botSlowMs[1]);
+    expect(F.now - resumed).toBeLessThan(RECLUSE_PHASE2.botSlowMs[1] + 100);
+  });
+
+  it("m3: the engine server gone mid-fight (a deploy without it): his next try is the quick move (phase 2 unvouched), never a throw", () => {
+    const F = roomFight(1, 3, { engine: true });
+    F.beatAdult();
+    delete F.core.record.overrides!.tested;
+    F.toBoards();
+    const mine = F.boardOf("p1");
+    F.core.message("p1", { t: "phase2Move", key: F.p2().key, board: mine.id, move: legalMoves(mine.board.fen)[0]!, ply: 0 });
+    const his = F.searches.find((s) => s.boss)!;
+    F.core.phase2Searched(his.id, null);
+    delete (F.core as unknown as { io: { phase2Search?: unknown } }).io.phase2Search;
+    expect(() => F.advance(RECLUSE_ONLINE.retryMs + 10)).not.toThrow();
+    expect(F.boardOf("p1").board.history).toEqual([legalMoves(mine.board.fen)[0], quickMove(his.fen)]);
+    expect(F.p2().unvouched).toBe("his move was the server's quick move (no engine server here)");
+  });
+
+  it("nit: a host's reload re-asks a bot's moves only (a move of his an older server asked of a device goes to the engine server)", () => {
+    const F = roomFight(1, 3, { engine: true });
+    F.beatAdult();
+    F.toBoards();
+    const mine = F.boardOf("p1");
+    F.core.message("p1", { t: "phase2Move", key: F.p2().key, board: mine.id, move: legalMoves(mine.board.fen)[0]!, ply: 0 });
+    // (As an older server left it: his move asked of the host's device, no `since`.)
+    const w = Object.values(F.p2().work).find((x) => x.who === "boss")!;
+    Object.assign(w, { via: "device", device: "p1", since: undefined, tries: undefined, ask: undefined });
+    const asks = F.all("p1", "phase2Ask").length;
+    F.core.disconnect("p1");
+    const token = F.core.record.humans.find((h) => h.id === "p1")!.token;
+    expect(F.core.connect(token, "M0", "computer", false, 1500, undefined, "u0", null, null, true).ok).toBe(true);
+    F.core.resendTo("p1");
+    const again = F.all("p1", "phase2Ask").slice(asks);
+    expect(again.length).toBeGreaterThan(0);
+    expect(again.some((a) => a.fen === w.fen || a.id === w.id)).toBe(false);
   });
 });
 
