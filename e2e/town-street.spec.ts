@@ -1,5 +1,6 @@
 import { mkdirSync, readFileSync, statSync } from "node:fs";
 import { expect, type Page } from "@playwright/test";
+import { RECLUSE_MUSIC } from "@chessroyale/core";
 import { asAdmin, test } from "./helpers.ts";
 
 /**
@@ -456,10 +457,13 @@ test("the town's loading screen (Eric, Nov 11: \"loads it all in at once and the
   expect(errors).toEqual([]);
 });
 
-test("the town's loading fetches every boss theme once and decodes none (Eric, Nov 12: \"loading music in the loading bar\"); Music off fetches none", { tag: "@phone-only" }, async ({ page }) => {
+test("the town's loading fetches every boss theme once and decodes none (Eric, Nov 12: \"loading music in the loading bar\"), but the Hidden Boss's (Nov 13: fetched as his fight starts); Music off fetches none", { tag: "@phone-only" }, async ({ page }) => {
   const dir = "packages/app/public/music";
   const themes = JSON.parse(readFileSync(`${dir}/themes.json`, "utf8")) as { themes: Record<string, { intro: string | null; loop: string }> };
-  const names = Object.values(themes.themes).flatMap((t) => (t.intro ? [t.intro, t.loop] : [t.loop]));
+  const hidden: string[] = Object.values(RECLUSE_MUSIC);
+  const names = Object.entries(themes.themes)
+    .filter(([k]) => !hidden.includes(k))
+    .flatMap(([, t]) => (t.intro ? [t.intro, t.loop] : [t.loop]));
   const sizes = names.map((n) => statSync(`${dir}/${n}.mp3`).size);
   // (Every decode's size: a theme's would be its file's.)
   await page.addInitScript(() => {
