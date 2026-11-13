@@ -1010,3 +1010,4 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 13 22:00: #686 (phase 1 no random move) MERGED 4d9bccb2. Bans DONE -> PR (see GitHub) full-e2e; review brief review-bans.md.
 - Nov 13 22:15: #687 review: 2 major (shared-device lockout; session token cache after delete) + 7 minor -> fix round (brief bans-fixes.md). Call: the mark only refuses the banned account / no session; family on the same device can sign in.
 - Nov 13 22:28: main green on 4d9bccb2 (#686). #676 CI round DONE (shared tapInTown/townTapPoint; root causes; guard 'a home's door' tap delivery only -> TELL ERIC); prepped 95135cb7, full CI running. Running Opus: bans fix round only (slot free).
+- Nov 13 22:50: #688 (Wrangler theme) MERGED 9c3c2ea1. Bans fix round DONE; delta re-review (brief review-bans-delta.md).
