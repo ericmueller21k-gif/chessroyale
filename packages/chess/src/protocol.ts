@@ -1095,8 +1095,11 @@ export type ServerMessage = { now: number } & (
       unvouched?: true;
       /** The Hidden Boss's phase 2 decided it: how many of its boards were won (all of them beat him). */
       simul?: { won: number; of: number };
-      /** No result: the Hidden Boss's phase 2 couldn't go on (his move never came from the engine server). Nothing counts. */
-      noResult?: true;
+      /**
+       * No result: the Hidden Boss's phase 2 couldn't go on (his move never came from the engine server). `board`: you played one of
+       * its boards, and nothing counts for or against you; `watched`: you didn't (a Crowd final's others), and your place stands.
+       */
+      noResult?: "board" | "watched";
     }
 );
 

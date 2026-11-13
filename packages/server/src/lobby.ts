@@ -1,6 +1,6 @@
 import { hollowLobby } from "./bosses/hollow.ts";
 import { dashLobby } from "./bosses/dash.ts";
-import { phase2NoResult, phase2Unvouched, recluseLobby, type Phase2Lobby, type Recluse2Record } from "./bosses/recluse.ts";
+import { phase2NoResult, phase2NoResultFor, phase2Unvouched, recluseLobby, type Phase2Lobby, type Phase2SearchRequest, type Recluse2Record } from "./bosses/recluse.ts";
 import type { BossLobby } from "./bosses/base.ts";
 import { hearsTyped, typedReads, typedSay, typedSeat, type TypedSeats } from "./typed-chat.ts";
 import { QUICK_CHAT, botChatLines, canSay, canSayToAll, chatCheck, chatSay, chatSent, mulberry32, noChatSent, ownedChatPacks, type BotChatMoment, type ChatSent } from "@chessroyale/core";
@@ -104,13 +104,16 @@ export interface LobbyIO {
   /** Someone has left the match (resigned): close their sockets. */
   close?(playerId: string): void;
   /**
-   * The Hidden Boss's phase 2 (bosses/recluse.ts): every legal move of a position scored on the engine server (`boss`: his own move,
-   * from his own share of its day); the answer comes back through phase2Searched(id, …), null if the server couldn't answer. Missing
-   * (no engine server set up: local runs, the e2e suite, staging, tests): the bots' moves from the host's device, his the quick move.
+   * The Hidden Boss's phase 2 (bosses/recluse.ts): every legal move of a position scored on the engine server (Phase2SearchRequest:
+   * his move, a bot's, or a person's fair-play numbers); the answer comes back through phase2Searched(id, …), null if the server
+   * couldn't answer. Missing (no engine server set up: local runs, the e2e suite, staging, tests): the bots' moves from the host's
+   * device, his the quick move.
    */
-  phase2Search?(req: { id: string; fen: string; boss?: true }): void;
+  phase2Search?(req: Phase2SearchRequest): void;
   /** Wakes the engine server (the Hidden Boss's phase 2 is coming: his fall and phase change are its time to boot). */
   warmEngine?(): void;
+  /** The Hidden Boss's phase 2 ended with no result (his move never came): counted for the health view. */
+  phase2NoResult?(): void;
 }
 
 /** A deep search the lobby asks of the engine server (a verdict, a re-check of close calls, a spot check). */
@@ -783,6 +786,7 @@ export class LobbyCore {
     const lobby = this;
     const search = lobby.io.phase2Search;
     const warm = lobby.io.warmEngine;
+    const none = lobby.io.phase2NoResult;
     return {
       get r() {
         return lobby.r;
@@ -809,8 +813,9 @@ export class LobbyCore {
       },
       person: (id) => !!lobby.human(id),
       anyoneHere: (except) => lobby.r.humans.some((h) => h.id !== except && lobby.present(h)),
-      ...(search ? { search: (req: { id: string; fen: string; boss?: true }) => search(req) } : {}),
+      ...(search ? { search: (req: Phase2SearchRequest) => search(req) } : {}),
       ...(warm ? { warm: () => warm() } : {}),
+      ...(none ? { noResult: () => none() } : {}),
       finish: () => lobby.finishMatch(),
     };
   }
@@ -4050,8 +4055,9 @@ export class LobbyCore {
   }
 
   /**
-   * Each human's result once the match is over (for their profiles). No result (the Hidden Boss's phase 2 couldn't go on): each marked
-   * so, and not ranked; only fair play is written for them (Eric, Nov 13: nothing counts for or against anyone).
+   * Each human's result once the match is over (for their profiles). No result (the Hidden Boss's phase 2 couldn't go on): its board
+   * players' marked so, and not ranked, only fair play written for them (Eric, Nov 13: nothing counts for or against them); everyone
+   * else's stands at their placement, the boss's part none (`teamWon` null), a Crowd final's watchers too (the review of #683, M3).
    */
   humanResults(): HumanResult[] {
     const runner = this.runner;
@@ -4072,7 +4078,9 @@ export class LobbyCore {
       const p = runner.player(h.id);
       const reachedBoss = p.outInStage === null || p.outInStage >= stages;
       const survived = !!boss && reachedBoss && !boss.kills.some((k) => k.id === h.id);
-      const teamWon = boss?.result ? (survived && boss.result !== "draw" ? boss.result === "crowd" : null) : team && winner ? team === winner : null;
+      // (No result: the boss's part is nobody's (his result stands at his adult form's defeat, never phase 2's).)
+      const teamWon = none ? null : boss?.result ? (survived && boss.result !== "draw" ? boss.result === "crowd" : null) : team && winner ? team === winner : null;
+      const mine = phase2NoResultFor(this.r, h.id);
       const f = this.r.feats?.[h.id];
       return [
         {
@@ -4085,8 +4093,8 @@ export class LobbyCore {
           rating: row.rating ?? null,
           brilliant: f?.brilliant ?? 0,
           bestMove: f?.best?.san ?? null,
-          ranked: !none && this.rankedFor(h),
-          ...(none ? { noResult: true as const } : {}),
+          ranked: !mine && this.rankedFor(h),
+          ...(mine ? { noResult: true as const } : {}),
           evalBar: h.evalBar ?? null,
           ...matchFeats(p, stages, boss, !!this.settings.raid),
           // (A Boss Battle party's boss plays at the party's difficulty, Very easy to Very hard, not a tier: recorded, but
@@ -4210,12 +4218,15 @@ export class LobbyCore {
       ranked: this.ranked(),
       // (One device's word stood alone somewhere in it: it pays as a solo game, and the results say why.)
       ...(this.r.unvouched ? { unvouched: true as const } : {}),
-      // (No result: his phase 2 couldn't go on. Nobody won; nothing counts: the results say so. The duo stands, as a draw's.)
-      ...(phase2NoResult(this.r) ? { noResult: true as const, ranked: false, bossResult: "draw" as const } : {}),
+      // (No result: his phase 2 couldn't go on. Nobody beat him or lost to him: the results say so, the duo standing as a draw's.
+      // For those who watched it, a Crowd final's others, only that: their place stands (the review of #683, M3).)
+      ...(phase2NoResult(this.r) ? { noResult: "watched" as const, bossResult: "draw" as const } : {}),
     };
-    // (A Hidden Boss's phase 2 his moves of which stood on one device's word: its players' results say so, nobody else's.)
+    // (A Hidden Boss's phase 2 his moves of which stood on one device's word: its players' results say so, nobody else's. No result:
+    // its players', nothing counts for or against them.)
     const lone = { ...msg, ranked: false, unvouched: true as const };
-    for (const h of this.r.humans) this.send(h.id, phase2Unvouched(this.r, h.id) && !phase2NoResult(this.r) ? lone : msg);
+    const board = { ...msg, ranked: false, noResult: "board" as const };
+    for (const h of this.r.humans) this.send(h.id, phase2NoResultFor(this.r, h.id) ? board : phase2Unvouched(this.r, h.id) ? lone : msg);
     this.botChat({ kind: "end" });
     const js = this.r.judges;
     if (js?.stats.jobs) console.log(`judges in ${this.r.code}: ${JSON.stringify(js.stats)}`);

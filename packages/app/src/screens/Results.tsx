@@ -44,7 +44,8 @@ export function ResultsScreen({ match, placement, winner, onAgain, onHome, homeT
   const byBlackout = match.phase.kind === "results" && !!match.phase.blackout;
   // (The Hidden Boss's phase 2: how many of the four boards were won; or no result, his move never came from the engine server.)
   const simul = match.phase.kind === "results" ? match.phase.simul : undefined;
-  const noResult = match.phase.kind === "results" && !!match.phase.noResult;
+  // (`board`: you played one of its boards, nothing counts for or against you; `watched`: a Crowd final's others, your place stands.)
+  const noResult = match.phase.kind === "results" ? match.phase.noResult : undefined;
   // Boss battle: those still standing at the end share the result (a raid's whole crowd fought; the Crowd's, its
   // finalists: crowdFinalists, the top 4).
   const survived = !!match.boss && !match.boss.kills.some((k) => match.isYou(k.id)) && (match.boss.raid || placement <= crowdFinalists("boss"));
@@ -129,7 +130,7 @@ export function ResultsScreen({ match, placement, winner, onAgain, onHome, homeT
           <p class={`team-result ${noResult ? "" : bossResult === "crowd" && survived ? "good" : bossResult === "boss" ? "bad" : ""}`}>
             {hasCharacter(match) ? null : <><BossTag boss={match.boss} /> </>}
             {noResult
-              ? `${NO_RESULT_LINE} Nothing counts for or against anyone.`
+              ? `${NO_RESULT_LINE} ${noResult === "board" ? "Nothing counts for or against you." : "Your place stands."}`
               : simul
               ? // (The Hidden Boss's phase 2: every board must be won.)
                 simul.won === simul.of
@@ -158,8 +159,8 @@ export function ResultsScreen({ match, placement, winner, onAgain, onHome, homeT
         {/* Whether it counted for your ranking, in words (the rule: RANKING in settings.ts). */}
         {/* (A boss battle's solo note: it says nothing of ranking, Eric, Nov 8; a lobby's line stays.) */}
         {/* (One device's word stood alone somewhere in it: why it pays as a solo game, in place of the unranked line.) */}
-        {match.unvouched && !noResult && <p class="results-unranked">{UNVOUCHED_LINE}</p>}
-        {match.ranked === false && !match.unvouched && !noResult && (match.serverPaced || !bossResult) && (
+        {match.unvouched && noResult !== "board" && <p class="results-unranked">{UNVOUCHED_LINE}</p>}
+        {match.ranked === false && !match.unvouched && noResult !== "board" && (match.serverPaced || !bossResult) && (
           <p class="results-unranked">
             {match.serverPaced
               ? `Unranked: fewer than ${rankedMinHumans(match.settings.lobbySize)} real players, so your ranking didn't change.`

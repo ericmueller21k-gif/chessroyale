@@ -411,6 +411,24 @@ export function legalMoves960(fen: string): string[] {
   return legal(readFen(fen)).map(uciOf);
 }
 
+/**
+ * Every legal move that checkmates here (UCI, as legalMoves960): the position read once, each move made on it, its replies looked
+ * for only where it gives check. [] for a position it can't read.
+ */
+export function matingMoves960(fen: string): string[] {
+  try {
+    const pos = readFen(fen);
+    return legal(pos)
+      .filter((m) => {
+        const next = make(pos, m);
+        return inCheckPos(next) && !legal(next).length;
+      })
+      .map(uciOf);
+  } catch {
+    return [];
+  }
+}
+
 /** The position after a move (UCI; castling as the king taking its own rook). Throws on an illegal move. */
 export function applyMove960(fen: string, uci: string): string {
   const pos = readFen(fen);

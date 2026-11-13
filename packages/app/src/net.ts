@@ -940,7 +940,7 @@ export class NetMatch implements GameView {
       ...(m.carrots ? { carrots: true } : {}),
       // (His phase 2: how many of its boards were won; or no result, his move never came.)
       ...(m.simul ? { simul: m.simul } : {}),
-      ...(m.noResult ? { noResult: true } : {}),
+      ...(m.noResult ? { noResult: m.noResult } : {}),
     });
   }
 
