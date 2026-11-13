@@ -2233,7 +2233,8 @@ function startTown(
   /** How long the town waited on the music once built (the "Loading music…" step). */
   let loadMusicMs = 0;
   if (loading) void loadTown();
-  else {
+  // (The street town failed as it started: the loading card stays up until the page reloads, or the message has replaced it.)
+  else if (!failed) {
     void preloadMusic();
     onLoading(null);
     run();

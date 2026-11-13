@@ -296,7 +296,7 @@ test("Alfil's Pyramid (Eric, Nov 12: \"more grace\"): a tap on the half-hidden t
   expect(errors, "no page or console errors").toEqual([]);
 });
 
-test("the street town's WebGL context lost: nothing drawn until it's back, then it draws again; lost twice within a minute, the page opens again in today's town (Canvas 2D)", async ({ page }) => {
+test("the street town's WebGL context lost: nothing drawn until it's back, then it draws again, twice in a minute too; not back, the street town reloads once (never today's town); not back again, the town says it couldn't load, with Reload (Nov 13)", async ({ page }) => {
   test.setTimeout(200_000);
   await openStreet(page);
   const lose = (restore: boolean) =>
@@ -323,19 +323,40 @@ test("the street town's WebGL context lost: nothing drawn until it's back, then 
       for (let i = 0; i < d.length; i += 4 * 97) seen.add((d[i]! << 16) | (d[i + 1]! << 8) | d[i + 2]!);
       return seen.size;
     });
-  await lose(true);
-  // Back: drawing again with WebGL (its textures made again), the world not blank, still the street town.
-  await expect.poll(async () => (await paint())?.lost, { message: "back" }).toBe(false);
-  expect((await paint())!.backend).toBe("webgl");
-  expect(await colors(), "the world drawn again with WebGL").toBeGreaterThan(40);
-  expect(await you(page)).toEqual([22, 25]);
-  // Lost again within the minute: the page opens again (`?street=off`) in today's town, drawn with Canvas 2D, where a player's opens.
+  // (A mark on this page: gone once the page has loaded again.)
+  const mark = () => page.evaluate(() => void ((window as unknown as { __mark?: number }).__mark = 1));
+  const marked = () => page.evaluate(() => (window as unknown as { __mark?: number }).__mark === 1);
+  await mark();
+  for (let i = 0; i < 2; i++) {
+    await lose(true);
+    // Back: drawing again with WebGL (its textures made again), the world not blank, still the street town, the same page.
+    await expect.poll(async () => (await paint())?.lost, { message: "back" }).toBe(false);
+    expect((await paint())!.backend).toBe("webgl");
+    expect(await colors(), "the world drawn again with WebGL").toBeGreaterThan(40);
+    expect(await you(page)).toEqual([22, 25]);
+  }
+  expect(await marked(), "lost twice within a minute and back each time: no reload").toBe(true);
+  // Lost and not back within 5 s: the street town loads again (the same address, never `?street=off`), drawn with WebGL.
   await lose(false);
-  await page.waitForURL(/[?&]street=off/, { timeout: 30_000 });
-  await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 30_000 });
-  await expect(canvas(page)).toHaveAttribute("data-backend", "2d");
-  expect(await you(page), "today's town").toEqual([22, 17]);
-  expect(await colors(), "the world drawn with Canvas 2D").toBeGreaterThan(40);
+  await expect.poll(marked, { timeout: 30_000, message: "reloaded" }).toBe(false);
+  expect(page.url()).not.toMatch(/street=off/);
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
+  await expect(canvas(page)).toHaveAttribute("data-backend", "webgl");
+  expect(await you(page), "the street town").toEqual([22, 25]);
+  await expect(page.locator(".town-broken")).toHaveCount(0);
+  // Not back again soon after: no second reload; the town's box says so, with a Reload button, and nothing else.
+  await mark();
+  await lose(false);
+  const box = page.locator(".town-broken");
+  await expect(box).toBeVisible({ timeout: 15_000 });
+  await expect(box).toHaveText(/^The town couldn't load on this device\.\s*Reload$/);
+  expect(await marked(), "no second reload").toBe(true);
+  if (STILLS) await page.screenshot({ path: `${STILLS}/town-couldnt-load-${test.info().project.name}.png` });
+  // Reload loads the street town again.
+  await box.getByRole("button", { name: "Reload" }).click();
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
+  await expect(canvas(page)).toHaveAttribute("data-backend", "webgl");
+  await expect(box).toHaveCount(0);
 });
 
 test("/town?report (Eric, Nov 11): it waits for your first move, records 3 s of walking and turning, and Done shows one panel with the numbers, inside the box; without ?report there's no pill and no panel", { tag: "@phone-only" }, async ({ page }) => {
