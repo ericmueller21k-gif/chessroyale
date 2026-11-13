@@ -56,10 +56,11 @@ import {
 export const PHASE_CHANGE = lazyTable(() => {
   const a = RECLUSE.anims;
   const len = (n: string) => animLength(a[n]!);
-  const fallMs = 1800;
   // (Eric, Oct 17: "it happens way too fast". About 10 s more from the mate to the split, the animations unchanged: his
   // words before he seizes the power, a hold as it lands, a longer cast; then a countdown before the clocks.)
   const pace = RECLUSE_PHASE2.change;
+  // (His fall before it: a setting since Nov 13, as the lobby server times it too.)
+  const fallMs = pace.fallMs;
   // The absorption. (His drain lasts the God King's Last Stand blows to his stagger: its flashes and cracks, his frames.)
   const kingAt = 0;
   // His words first, still on his knees while the God King gloats: his fall's mumbling (its first line, from the end of
@@ -284,7 +285,7 @@ export const phase2UltBannerMs = (): number => bossBannerMs();
 /**
  * Whether his phase 2 follows phase 1 won, on this device (solo): alone (Boss alone), or in a solo Crowd's boss final
  * (Oct 14: it's always him there), whose other finalists take the other boards. Never a Solo raid (its 49 bots have no
- * boards), and never online, where phase 2 isn't built yet: there phase 1 won is the crowd's victory.
+ * boards). Online (Nov 13) the server runs it (his room's fight, a Crowd final: recluse-online.ts, NetMatch), not this.
  */
 export function phase2Follows(o: { bossId: string | null | undefined; result: string | null | undefined; raid: boolean; raidBots: boolean; crowdFinal: boolean }): boolean {
   if (o.bossId !== "recluse" || o.result !== "crowd" || RECLUSE_PHASE2.boards < 1) return false;

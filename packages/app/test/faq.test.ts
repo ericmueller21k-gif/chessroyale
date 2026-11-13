@@ -558,7 +558,7 @@ describe("the FAQ on the Crowd's boss final (Eric, Oct 14: always the Hidden Bos
     expect(t).toContain(`${RECLUSE_PHASE2.boards} boards of Freestyle chess at once`);
     expect(t).toContain(`against Stockfish at ${RECLUSE_PHASE2.elo}`);
     expect(t).toContain(`A ${RECLUSE_PHASE2.change.countdownSeconds}-second countdown on every board, then`);
-    expect(t).toContain("online, that's the crowd's victory");
+    expect(t).toContain("his second phase follows, online and in a Solo game");
     // "Still to come" lists only bosses without their art and powers.
     expect(t).toMatch(/Still to come/);
     expect(t.slice(t.indexOf("Still to come"))).not.toContain(him.name);

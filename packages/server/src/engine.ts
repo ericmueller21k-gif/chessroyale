@@ -1,6 +1,7 @@
 import { Container, getContainer } from "@cloudflare/containers";
 import { ENGINE_SERVER } from "@chessroyale/core";
-import { recheckCloseCalls, stockfishRefuses, type EngineLike, type MoveScore, type RecheckSettings } from "@chessroyale/chess";
+import { legalMoves, recheckCloseCalls, stockfishRefuses, type EngineLike, type MoveScore, type RecheckSettings } from "@chessroyale/chess";
+import { moveGroups } from "./fairplay-deep.ts";
 
 /**
  * The engine server: native Stockfish 17.1 (the full network) in a Cloudflare Container (engine/Dockerfile).
@@ -144,6 +145,35 @@ export async function serverScoreAt(env: EngineEnv, fen: string, moves: readonly
   if (!engineOn(env) || !moves.length) return null;
   if (!(await takeBudget(env, pool))) return null;
   return containerScore(env, "engine-1", fen, moves, nodes, TIMEOUT_MS);
+}
+
+/** How long one group's search may take for the Hidden Boss's phase 2 before the position goes to a device instead (ms). */
+const ALL_MOVES_GROUP_MS = 6000;
+
+/**
+ * Every legal move of a position scored on the engine server (the Hidden Boss's phase 2 online: his moves, his bots', a person's
+ * fair-play numbers; bosses/recluse.ts): the moves in groups of at most 8 (its limit; fairplay-deep.ts moveGroups), one search a
+ * group at `nodes`, the whole position counted once against the day's budget (its groups together search fewer nodes than one
+ * re-check). The first group is tried twice (a container still waking answers the second: the review of #677, M2). Null when
+ * there's no server, no budget left, a position Stockfish refuses, or any group without an answer in time.
+ */
+export async function serverAllMovesAt(env: EngineEnv, fen: string, nodes: number): Promise<MoveScore[] | null> {
+  if (!engineOn(env)) return null;
+  let legal: string[];
+  try {
+    legal = legalMoves(fen);
+  } catch {
+    return null;
+  }
+  if (!legal.length || !(await takeBudget(env))) return null;
+  const out: MoveScore[] = [];
+  for (const group of moveGroups(legal, legal[0]!)) {
+    const search = () => containerScore(env, "engine-1", fen, group, nodes, ALL_MOVES_GROUP_MS);
+    const got = (await search()) ?? (out.length ? null : await search());
+    if (!got) return null;
+    out.push(...got);
+  }
+  return out;
 }
 
 /** Wakes the engine server (a match is starting), so the first re-check doesn't wait for it to boot. */
