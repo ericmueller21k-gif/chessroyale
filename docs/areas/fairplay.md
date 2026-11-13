@@ -44,22 +44,21 @@ Lane: `fairplay`. The reviewer's brief: `docs/fairplay-reviewer.md`. The numbers
     (`signInBan`): the ban answer, no session made, an emailed code spent. So is ban evasion: an account whose identities a banned
     account had, or that would take Google's verified email that is a banned account's address (banned by evasion as it signs in);
     an identity new to us that a banned account had (its own new account, banned by evasion, made once the sign-in can finish,
-    behind the age question: `evasionAccount`; a person can clear it). A refused sign-in ends only the banned account's session or a
-    guest's (`refusalEnds`), never another account's.
+    behind the age question: `evasionAccount`; a person can clear it). A refused sign-in ends whatever session the browser carried.
   - **The ban gate** (`ban-gate.ts`, run by the Worker before every `/api/*` route, the lobbies' WebSockets included; not the admin
     pages): a session of a banned account gets the ban answer. Each instance keeps a "not banned" answer per session
     `FAIRPLAY.banCheckMs` (60 s; `ban-cache.ts`), so the live line's and the town's polls need no database read most of the time; a
     ban made on the same instance counts at once (`setCase` forgets its answers). A session that's gone or expired: its token is
     forgotten in presence's cache too, so no route serves the banned account from it.
   - **The ban answer:** 403 `{banned: true, message}` (core's `BANNED_LINE`: "Your account has been banned. For more information,
-    email support@hunchess.com.") with the `x-hc-banned` header, the banned account's session ended, the browser marked
+    email support@hunchess.com.") with the `x-hc-banned` header, the browser's session ended (whatever account), the browser marked
     (`hc_banned`, the banned account's id). The Worker never takes a mark away over a route's own ban answer.
-  - **The mark** (a shared device: the review of #687, M1): while its account is banned, a request from that browser with no live
-    session gets the ban answer, except on the sign-in's own routes (`SIGN_IN_ROUTES`, which run without a session); a live session
-    of an account that isn't banned passes, and the mark stays. Lifting the ban takes it away on the next request (the account
-    signs in as before); clearing the browser's data clears it too.
+  - **The mark bans the whole device** (Eric, Nov 13: "If you get banned and your sister gets upset about it, so be it"): while
+    its account is banned, every request from that browser gets the ban answer, the sign-in's own routes included, whatever session
+    it carries (another account's is ended). Lifting the ban takes it away on the next request (the account signs in as before);
+    clearing the browser's data clears it too.
   - **The app** (`ban.ts`) watches every answer for the header and draws only the ban screen (`FairPlay.tsx`: the line, the
-    address a mailto link, and under it "Sign in to another account", the app's own sign-in box; no menus, town, solo or chat) on
+    address a mailto link, and nothing else: no sign-in, menus, town, solo or chat) on
     every URL. The device remembers it (`brc.banned`) and asks the server while the screen is up (at load, a minute after each ban
     answer, 5 s doubling after a failed ask, at once when the page is back in view or online), leaving it once the server lets the
     browser in. The appeal form and its routes are gone; the admin side (lift, old appeals) is as it was; its button says "Ban
@@ -149,10 +148,10 @@ Lane: `fairplay`. The reviewer's brief: `docs/fairplay-reviewer.md`. The numbers
 
 - Unit: `packages/core/test/fairplay.test.ts`, `packages/server/test/fairplay.test.ts`, `fairplay-lobby.test.ts`,
   `fairplay-deep.test.ts`, `fairplay-admin.test.ts`, `engine-pool.test.ts`, `ban-sign-in.test.ts` (sign-ins refused, evasion and
-  its clearable account, the gate on a signed-in session and a marked browser, a shared device, the stale token, lifting, the pool
+  its clearable account, the gate on a signed-in session and a marked browser, the whole device (the sister's tablet), the stale token, lifting, the pool
   and guests passing, test accounts); app `ban.test.ts` (the ban screen's asks).
 - e2e: `e2e/fairplay.spec.ts` (a ban means you can't sign in: a tab open drops to the ban line, every URL and API route answers
-  only it, signing in again is refused, another account signs in on the marked browser and plays, a lifted ban signs in, phone and
+  only it (sign-in's included), signing in again is refused, a lifted ban signs in, phone and
   computer; reporting; the engine pool; the review token is set in `playwright.config.ts`).
 
 ## Rules for this area
