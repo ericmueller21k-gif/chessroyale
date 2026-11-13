@@ -143,15 +143,22 @@ describe("town square camera", () => {
 });
 
 describe("town square walking", () => {
-  it("fourteen homes spread over the world: neighbors 8 or more squares apart, none near your start, the Colosseum's ground clear", () => {
-    expect(HOMES).toHaveLength(14);
-    expect(new Set(HOMES.map((h) => h.id)).size).toBe(14);
+  it("fifteen homes spread over the world: neighbors 8 or more squares apart, none near your start, the Colosseum's ground clear", () => {
+    // (Fourteen, and the Hidden Boss's walk-up in everyone's town since Nov 13: his room's challenge.)
+    expect(HOMES).toHaveLength(15);
+    expect(new Set(HOMES.map((h) => h.id)).size).toBe(15);
     const dist = (ax: number, ay: number, bx: number, by: number) => Math.hypot(wrapF(ax - bx), wrapF(ay - by));
+    // (The ring's fourteen keep 8 to 10 from each other; the walk-up, placed in the corner on Nov 13 when it was an admin's only (as
+    // Timber's and Dash's are, off this ring), stands 7 or more from any home.)
+    const ring = HOMES.filter((h) => h.id !== "recluse");
     for (const h of HOMES) {
       expect(dist(h.cx, h.cy, START.c, START.r), `${h.id} from the start`).toBeGreaterThanOrEqual(7.5);
       const near = Math.min(...HOMES.filter((o) => o !== h).map((o) => dist(h.cx, h.cy, o.cx, o.cy)));
-      expect(near, `${h.id}'s nearest neighbor`).toBeGreaterThanOrEqual(8);
-      expect(near, `${h.id}'s nearest neighbor`).toBeLessThanOrEqual(10);
+      expect(near, `${h.id}'s nearest neighbor`).toBeGreaterThanOrEqual(7);
+      if (h.id === "recluse") continue;
+      const inRing = Math.min(...ring.filter((o) => o !== h).map((o) => dist(h.cx, h.cy, o.cx, o.cy)));
+      expect(inRing, `${h.id}'s nearest neighbor on the ring`).toBeGreaterThanOrEqual(8);
+      expect(inRing, `${h.id}'s nearest neighbor on the ring`).toBeLessThanOrEqual(10);
     }
     // No home stands on the Colosseum's 12 x 12 ground (slice 5 built the Colosseum there: solid; slice 6 made it twice the
     // size), nor in its park, and you start south of it, in the park in front of its gate (slice 6: the park between; since

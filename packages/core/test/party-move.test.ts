@@ -40,6 +40,28 @@ describe("a Boss Battle party's move (Eric, Oct 29 and 30)", () => {
     expect([...seen].sort()).toEqual(["d2d4", "e2e4"]);
   });
 
+  it("a room of four (the Hidden Boss, Nov 13): 2-1-1 plays the 2; a 2-2 tie goes by strength, the far worse never (Eric: \"a deliberate blunder never wins a tie\"), two within 30 cp either", () => {
+    const expected = { e2e4: exp(40), d2d4: exp(-300), c2c4: exp(25), g1f3: exp(-10) };
+    const seen = new Set<string>();
+    for (let seed = 1; seed < 60; seed++) {
+      expect(partyMove(["d2d4", "d2d4", "e2e4", "c2c4"], {}, mulberry32(seed), expected)).toBe("d2d4");
+      expect(partyMove(["d2d4", "d2d4", "e2e4", "e2e4"], {}, mulberry32(seed), expected)).toBe("e2e4");
+      seen.add(partyMove(["e2e4", "c2c4", "c2c4", "e2e4"], {}, mulberry32(seed), expected));
+      // (Each picked once: all four tie, by strength as before.)
+      expect(partyMove(["e2e4", "d2d4", "g1f3", "c2c4"], {}, mulberry32(seed), expected)).not.toBe("d2d4");
+    }
+    expect([...seen].sort()).toEqual(["c2c4", "e2e4"]);
+  });
+
+  it("one draw from the random source whatever the picks (a party of three's draws, and everything after, as before)", () => {
+    for (const picks of [["d2d4", "d2d4", "e2e4"], ["e2e4", "d2d4", "c2c4"], ["h2h3"], ["d2d4", "d2d4", "e2e4", "e2e4"]]) {
+      let n = 0;
+      const rng = () => (n++, 0.4);
+      partyMove(picks, {}, rng, { e2e4: exp(40), d2d4: exp(30), c2c4: exp(-200), h2h3: 0.5 });
+      expect(n).toBe(1);
+    }
+  });
+
   it("one pick: it", () => {
     expect(partyMove(["h2h3"], {}, mulberry32(1), { h2h3: exp(-900) })).toBe("h2h3");
   });

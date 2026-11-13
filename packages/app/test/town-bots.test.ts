@@ -6,7 +6,7 @@ import type { Character } from "../src/characters/sprite.ts";
 import { SIDEKICK_SHEETS } from "../src/town/sidekick-sheets.ts";
 import { N, wrapF, wrapI } from "../src/town/camera.ts";
 import { TOWN_FEEL } from "../src/town/feel.ts";
-import { ADMIN_BOTS, APRON, BOTS, CROWD_MAX, HOMES, TOWN_BOTS, addCrowd, START, TABLES, Walker, anyTableFree, canGoHome, homeDoor, inSquare, plotDist, sendHome, botLabel, cancelMeet, comeOut, createTown, tdist, walkable, holdBot, isSprite, meet, meetReady, meetSeat, playAtTableText, ratingText, seatOf, seatText, seated, sidekickText, spriteAnim, stepsFrom, tableFor, tableStates, tick, townLine, waitingBot, waveMs, walkWalker, type HomeId, type Person, type Sq, type Town } from "../src/town/world.ts";
+import { ADMIN_BOTS, hasFigure, APRON, BOTS, CROWD_MAX, HOMES, TOWN_BOTS, addCrowd, START, TABLES, Walker, anyTableFree, canGoHome, homeDoor, inSquare, plotDist, sendHome, botLabel, cancelMeet, comeOut, createTown, tdist, walkable, holdBot, isSprite, meet, meetReady, meetSeat, playAtTableText, ratingText, seatOf, seatText, seated, sidekickText, spriteAnim, stepsFrom, tableFor, tableStates, tick, townLine, waitingBot, waveMs, walkWalker, type HomeId, type Person, type Sq, type Town } from "../src/town/world.ts";
 
 /** Each sidekick's sprite file (and its id, `sidekick-<file>`), by its boss's home. */
 const HOME_FILE: Record<HomeId, string> = { clown: "boingo", pig: "wrangler", smudgy: "smudgy", bigboy: "bigboy", hopper: "chubchirp", folio: "folio", moo: "moo", gardener: "puddles", sawyer: "sawyer", tiger: "babur", alfil: "alfil", gingerbread: "ginger", grex: "jefferson", hollow: "hollow", timber: "timber", dash: "blitz" };
@@ -75,7 +75,8 @@ describe("town square: the bots (Oct 27)", () => {
     const kids = BOTS.filter((b) => isSprite(b.look));
     expect(kids).toHaveLength(14);
     expect(new Set(kids.map((b) => b.boss)).size).toBe(14);
-    for (const h of HOMES) expect(kids.some((b) => b.boss === h.id), h.id).toBe(true);
+    // (Every home with a boss out front: the Hidden Boss's walk-up has nobody there, and no kid: world.ts hasFigure.)
+    for (const h of HOMES.filter(hasFigure)) expect(kids.some((b) => b.boss === h.id), h.id).toBe(true);
     for (const b of kids) {
       if (!isSprite(b.look)) continue;
       expect(b.look.sprite.id).toBe(`sidekick-${HOME_FILE[b.boss!]}`);

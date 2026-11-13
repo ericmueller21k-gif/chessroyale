@@ -1,5 +1,5 @@
 import { DurableObject } from "cloudflare:workers";
-import { CAPACITY, FRIENDS, FRONT_DOOR, type Activity, type ItemLook, type PawnColor } from "@chessroyale/core";
+import { BOSS_ROSTER, CAPACITY, FRIENDS, FRONT_DOOR, HIDDEN_ROOM, bossInText, hiddenRoomSettings, type Activity, type ItemLook, type PawnColor } from "@chessroyale/core";
 import { d1Sql, ensureSchema } from "./accounts.ts";
 import { LiveBoard, pruneLive, typicalWait, writeLastSeen, type LiveCounts, type LiveHealth, type LobbySummary, type Presence } from "./live.ts";
 import { countCall } from "./ops.ts";
@@ -7,6 +7,10 @@ import { GlobalChat, TEST_GLOBAL_CHAT, type GlobalChatSnapshot, type GlobalLine,
 import { TOWN_CHAT_ROOM, TownChat, type ChallengeNote, type TownLine, type TownPost, type TownSender, type TownSnapshot } from "./town-chat.ts";
 import { pruneFriends, recentNews } from "./friends.ts";
 import { TownHere, type HereBeat, type HereLimits, type HereOther } from "./town-here.ts";
+import { HiddenRooms, fightingText, type RoomBeat, type RoomLimits, type RoomStart, type RoomView } from "./hidden-room.ts";
+import type { RoomAction } from "./hidden-room-api.ts";
+import type { LobbyRecord, PartyLobby } from "./lobby.ts";
+import { openLobbyCode } from "./codes.ts";
 import type { Env } from "./index.ts";
 
 /** The one live hub (its name). */
@@ -40,6 +44,8 @@ export class LiveHub extends DurableObject<Env> {
   private towns = new Map<string, TownChat>();
   /** Who's in the town square now (town-here.ts): in memory only, from each device's beat; a restart forgets it. */
   private here = new TownHere();
+  /** The Hidden Boss's room in each town (hidden-room.ts): its people and its request; in memory only, a restart forgets it. */
+  private hidden = new HiddenRooms();
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -283,6 +289,77 @@ export class LiveHub extends DurableObject<Env> {
     return this.here.view(room, now, id);
   }
 
+  /**
+   * A device at the Hidden Boss's room (hidden-room-api.ts has checked the account; `admin` is the server's word). A request this makes
+   * full (or the bots' joining does) gets its fight made here: a party battle's lobby for its four, each with their own pass, and the
+   * town's chat line naming them. The view after it.
+   */
+  async hiddenRoom(a: { id: string; name: string; room: string; action: RoomAction; admin: boolean; beat?: RoomBeat; limits?: RoomLimits }): Promise<RoomView> {
+    countCall("hub.hidden");
+    const now = Date.now();
+    const R = this.hidden;
+    let view: RoomView;
+    let start: RoomStart | null = null;
+    switch (a.action) {
+      case "enter":
+        view = R.enter(a.id, a.name, a.room, now, a.beat, a.limits);
+        break;
+      case "challenge":
+        ({ view, start } = R.challenge(a.id, a.room, now));
+        break;
+      case "cancel":
+        R.cancel(a.id, now);
+        view = R.look(a.id, a.room, now, a.beat);
+        break;
+      case "leave":
+        R.leave(a.id, now);
+        view = R.view(a.id, a.room, now);
+        break;
+      case "fill":
+        view = R.fill(a.id, a.room, a.admin, now);
+        break;
+      default:
+        view = R.look(a.id, a.room, now, a.beat);
+    }
+    const starts = [...(start ? [start] : []), ...R.due(now)];
+    for (const s of starts) await this.hiddenFight(s);
+    return starts.length ? { ...R.view(a.id, a.room, Date.now()), ...(view.message ? { message: view.message } : {}) } : view;
+  }
+
+  /** One game request at a time (Eric, Nov 12): a boss battle begun elsewhere ends this account's place in any room's request. */
+  async hiddenDrop(id: string): Promise<void> {
+    this.hidden.drop(id, Date.now());
+  }
+
+  /**
+   * The room's four into the Hidden Boss's fight (hiddenRoomSettings): a party battle's lobby (lobby.ts PartyLobby, `room`: no party
+   * Durable Object to tell), each person's own pass into their own seat from their own account, the bots its bot members; then the
+   * line in that town's chat. Not made (five codes refused): everyone in it reads "Couldn't start the fight."
+   */
+  private async hiddenFight(s: RoomStart): Promise<void> {
+    const now = Date.now();
+    const people = s.seats.map((x, seat) => ({ ...x, seat })).filter((x) => !x.bot);
+    const passes: Record<string, string> = Object.fromEntries(people.map((p) => [p.id, randomPass()]));
+    const party: PartyLobby = {
+      admits: Object.fromEntries(people.map((p) => [passes[p.id]!, { seat: p.seat, member: p.id, userId: p.id }])),
+      size: people.length,
+      bots: s.seats.length - people.length,
+      leaderSeat: 0,
+      startBy: now + HIDDEN_ROOM.joinWaitSec * 1000,
+      seats: {},
+      partyCode: "",
+      startId: 1,
+      room: true,
+    };
+    const lobbies = this.env.LOBBIES;
+    const lobby = lobbies ? await openLobbyCode(async (c) => (await lobbies.get(lobbies.idFromName(c)).create(c, JSON.parse(JSON.stringify(hiddenRoomSettings())) as NonNullable<LobbyRecord["overrides"]>, undefined, undefined, party)) !== false).catch(() => null) : null;
+    this.hidden.started(s, lobby, passes, Date.now());
+    if (!lobby) return;
+    const him = BOSS_ROSTER.find((b) => b.id === HIDDEN_ROOM.boss);
+    this.townIn(s.room).fighting(fightingText(s.seats.map((x) => x.name), him ? bossInText(him.name) : "the boss"), Date.now());
+    await this.townAlarm();
+  }
+
   /** A guest watching the town square (no pawn of their own): everyone there, their looks and "zzz"s, no names. */
   async townWatch(room: string): Promise<HereOther[]> {
     countCall("hub.townWatch");
@@ -338,4 +415,11 @@ export class LiveHub extends DurableObject<Env> {
     const next = Math.min(seen || lobbies ? now + CAPACITY.presence.lastSeenWriteMs : Infinity, this.townNext() ?? Infinity);
     if (next !== Infinity) await this.ctx.storage.setAlarm(Math.max(next, now + 1));
   }
+}
+
+/** A pass into a fight's seat: 24 hex digits from the platform's random source. */
+function randomPass(): string {
+  const b = new Uint8Array(12);
+  crypto.getRandomValues(b);
+  return Array.from(b, (x) => x.toString(16).padStart(2, "0")).join("");
 }

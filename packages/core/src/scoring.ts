@@ -208,19 +208,23 @@ export function drawMove(
 }
 
 /**
- * A Boss Battle party's move (Eric, Oct 29 and 30): two or more on one move, it's played, always. No majority: the
- * engine's best pick, unless another is within BOSS_PARTY.closeCp centipawns of it (cpFromExpected on the judge's
- * expected scores; without them, the losses' points read as expected scores from the best), then one of those at random.
+ * A Boss Battle party's move (Eric, Oct 29 and 30): the move most picked, two or more on it, is played, always. No majority (each
+ * picked once, or a tie at the top: 2-2 in the Hidden Boss's room of four, Nov 13): among the tied moves, the engine's best, unless
+ * another is within BOSS_PARTY.closeCp centipawns of it (cpFromExpected on the judge's expected scores; without them, the losses'
+ * points read as expected scores from the best), then one of those at random (Eric, Nov 12: "if far apart, the stronger": a
+ * deliberate blunder never wins a tie). A party of three never ties at two, so its draws are as before.
  */
 export function partyMove(moves: readonly string[], losses: Readonly<Record<string, number>>, rng: Rng, expected?: Readonly<Record<string, number>>, closeCp: number = BOSS_PARTY.closeCp): string {
   const among = (xs: readonly string[]) => xs[Math.floor(rng() * xs.length)]!;
   const distinct = [...new Set(moves)];
   const count = (m: string) => moves.filter((x) => x === m).length;
   const top = Math.max(...distinct.map(count));
-  if (top >= 2) return among(distinct.filter((m) => count(m) === top));
+  const tied = distinct.filter((m) => count(m) === top);
+  // (One draw from the random source either way, as before: everything drawn after it stays where it was.)
+  if (tied.length === 1) return among(tied);
   const cp = (m: string) => cpFromExpected(expected?.[m] ?? 0.5 - (losses[m] ?? 0) / 100);
-  const best = Math.max(...distinct.map(cp));
-  return among(distinct.filter((m) => best - cp(m) <= closeCp + 1e-9));
+  const best = Math.max(...tied.map(cp));
+  return among(tied.filter((m) => best - cp(m) <= closeCp + 1e-9));
 }
 
 /** The opening allowance on move number `move` (the position's fullmove number): see OPENING_ALLOWANCE. */

@@ -655,6 +655,11 @@ export type ClientMessage =
   /** Boss battle, admins only (testing): bring the boss's ultimate as the next crowd turn begins. */
   | { t: "ultimate" }
   /**
+   * The Hidden Boss's fight from his room in the town, admins only (testing, Nov 13): the team's next move beats his form (the server
+   * checks the admin and the battle: LobbyCore.winFormTrigger). Optional for everyone else: never sent.
+   */
+  | { t: "winForm" }
+  /**
    * Hollow's dark: a move attempt that touches a dark square, sent unchecked (the app can't show what's there). The
    * server judges it: a legal move is this player's pick; an illegal one costs points and they pick again.
    */

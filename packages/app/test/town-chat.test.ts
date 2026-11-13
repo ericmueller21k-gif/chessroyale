@@ -612,7 +612,8 @@ describe("the chatter table (placeholders until real players chat)", () => {
 
   it("never has the Hidden Boss talk", () => {
     expect(Object.keys(CHATTER)).not.toContain("recluse");
-    expect(HOMES.map((h) => h.boss)).not.toContain("Hidden Boss");
+    // (His walk-up is in everyone's town since Nov 13; the chatter is CHATTER's speakers only, so never him.)
+    for (let i = 0; i < 400; i++) expect(pickChatter(() => i / 400).name).not.toBe("Hidden Boss");
   });
 
   it("picks anyone but the one who spoke last, a line of theirs, and reaches all 28", () => {

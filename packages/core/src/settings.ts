@@ -126,7 +126,8 @@ export interface Settings {
   /**
    * Testing, admins only, Boss alone: `bossId` may be a boss hidden from players (BossDef.adminOnly: the Hidden Boss,
    * Eric, Oct 14: "for testing available in boss mode with bots for now"). Off everywhere else. (The Crowd's boss final
-   * meets him for everyone without it: `crowdFinalBoss` in boss.ts.)
+   * meets him for everyone without it: `crowdFinalBoss` in boss.ts; and the fight from his room in the town, set by the
+   * server alone: hiddenRoomSettings, Nov 13.)
    */
   bossHidden?: boolean;
   /**
@@ -984,6 +985,21 @@ export const BOSS_CLOCK = { bankSeconds: 600, incrementSeconds: 10 } as const;
 export const BOSS_PARTY = { max: 3, closeCp: 30, afkKickSec: 60, joinWaitSec: 30 } as const;
 
 /**
+ * The Hidden Boss's room challenge (Eric, Nov 12 and 13; docs/decisions/2026-11-13-hidden-boss-challenge.md): in the top-floor room
+ * of his walk-up in the town, each player's Challenge counts toward one request per town instance ("1 of 4"…); at `players` the
+ * summoning plays and they fight him together (one team on the party rule: hiddenRoomSettings).
+ * - `players`: the request's size, and the most people in the room at once (a 5th finds "The door is locked.");
+ * - `capSec`: a request without its four by then ends for everyone in it ("Sorry, not enough players."); not shown anywhere;
+ * - `pollMs`: how often a device in his room asks the server (the count, the room's people, the start);
+ * - `silentSec`: a device in the room that hasn't asked for this long has gone (a disconnect): out of the room and the request;
+ * - `outcomeSec`: how long the start (or the end) waits for a device to read it;
+ * - `bots`: the admin's test bots ("Fill with 3 bots": admins only, server-checked), and `botJoinMs`: each joins a challenge
+ *   this long after the one before, as a player would;
+ * - `joinWaitSec`: the fight waits this long for the four to arrive (the summoning plays first), then begins with those who came.
+ */
+export const HIDDEN_ROOM = { players: 4, capSec: 300, pollMs: 1500, silentSec: 20, outcomeSec: 60, bots: 3, botJoinMs: 700, joinWaitSec: 60, boss: "recluse" } as const;
+
+/**
  * A Boss Battle party's battle's settings (docs/decisions/2026-10-30-boss-party.md), the server's and the app's alike: a
  * raid of up to BOSS_PARTY.max on the draw rule "party", BOSS_CLOCK as the team's one clock, any member's God King call
  * for the team, and the boss at the leader's difficulty (its Maia rating and its offset, as Boss alone). The boss itself
@@ -1002,6 +1018,16 @@ export function bossPartySettings(difficulty: string): Partial<Settings> {
     bossDifficulty: d.elo,
     bossAloneMaia: d.maia,
   };
+}
+
+/**
+ * The Hidden Boss's fight from his room (HIDDEN_ROOM; Eric, Nov 13): Boss Battle's party battle for the room's four (the party rule:
+ * a move two or more picked is played, a tie between moves by their strength: partyMove), the team's one clock, any member's God
+ * King call; the boss always him (`bossHidden`: he's hidden from players everywhere else). His adult form only online: winning it ends
+ * the fight, as the Crowd's final does (his phase 2's four boards are solo only). The server's alone: a player can't ask for it.
+ */
+export function hiddenRoomSettings(): Partial<Settings> {
+  return { ...bossPartySettings("normal"), lobbySize: HIDDEN_ROOM.players, groupSize: HIDDEN_ROOM.players, bossId: HIDDEN_ROOM.boss, bossHidden: true };
 }
 
 /**
@@ -1827,9 +1853,10 @@ export const BOSS_POWERS = {
  * them (the boss select, Boss alone and a Solo raid), until Eric says go. **To put one live for everyone, take its id out of
  * this list** (core boss.ts's `adminFirst`; nothing else changes).
  */
-// (Nov 13: "recluse", the Hidden Boss, so his walk-up in the town is an admin's only (town/world.ts HOMES), as Don Dough's bakery was. His
-// Boss Battle tile stays locked whatever this says: he's `adminOnly` in the roster, and adminFirstBosses leaves those out.)
-export const BOSS_ADMIN_FIRST: readonly string[] = ["timber", "dash", "zebra", "recluse"];
+// (Nov 13: "recluse", the Hidden Boss, was here for a day, so his walk-up was an admin's only; Eric, Nov 13: "It doesn't need to be admin
+// only... the site is behind Cloudflare": out again, his building, rooms and challenge for everyone signed in. His Boss Battle tile
+// stays locked: he's `adminOnly` in the roster, met only from his room and the Crowd's final.)
+export const BOSS_ADMIN_FIRST: readonly string[] = ["timber", "dash", "zebra"];
 
 /**
  * How Sawyer's split pawn looks (packages/app/src/components/Sawyer.tsx). Looks only: the rules, the engine and the
