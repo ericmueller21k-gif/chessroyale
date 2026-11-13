@@ -215,6 +215,20 @@ test("the match screen's rows never move (Nov 8, Eric: nothing on the match scre
   ]) {
     await page.setViewportSize(vp);
     const name = `${vp.width}×${vp.height}`;
+    // (The screens re-fit a moment after a resize (their resize listeners): wait until the power-up row holds still for 300 ms, so the
+    // first phase isn't snapped mid re-fit. Nov 13: a desktop run's first snapshot at 390×844 was taken before it settled.)
+    let held = "";
+    let since = Date.now();
+    await expect
+      .poll(
+        async () => {
+          const t = await page.evaluate(() => String(document.querySelector(".screen.game .history-nav")?.getBoundingClientRect().top ?? ""));
+          if (t !== held) ((held = t), (since = Date.now()));
+          return t !== "" && Date.now() - since >= 300;
+        },
+        { message: `the layout settles at ${name}`, intervals: [50], timeout: 10_000 },
+      )
+      .toBe(true);
     const seen = new Map<string, Awaited<ReturnType<typeof snap>>>();
     let submitted = "";
     const stopAt = Date.now() + 3 * 60_000;
