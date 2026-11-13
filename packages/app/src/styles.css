@@ -27098,6 +27098,16 @@ button.sq-tiny {
 .cs-tail.leaving {
   opacity: 0;
 }
+/* (A phone: the board fills the width, so a box running 32 px past the speaker reaches the screen's edge; there it runs 110 px past
+   him, so a long line sits inside the screen with room on both sides, still over him.) */
+@media (max-width: 599px) {
+  .cs-kid .cs-say {
+    left: -110px;
+  }
+  .cs-man .cs-say {
+    right: -110px;
+  }
+}
 @media (min-width: 900px) {
   .cs-say {
     max-width: 320px;
