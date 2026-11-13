@@ -58,6 +58,7 @@ import { evalBarOn, practiceOn } from "./prefs.ts";
 import { noteSoloBattle } from "./boss-tokens.ts";
 import { noteSoloGame, settleSoloXp, soloGameId, soloTestGame } from "./xp.ts";
 import { isPaused, pausedBosses } from "./status.ts";
+import { kingSay, type KingCue } from "./godKing.ts";
 
 // Off the first load (Nov 10, phone load: home starts fast), each its own chunk: a match's screens (preloaded when play is
 // near), solo play with its runner and the boss rules, the FAQ, the legal pages and Auto chess (loaded on entry).
@@ -1026,7 +1027,8 @@ export function App() {
   // ?debug (a test switch): the match, the Squads clients and the 1 v 1 game on `window`, for tests and the console. (Each render, so
   // they're there once your account says you may, and a match joined before that, from a link, is too.)
   const debug = testParams().has("debug");
-  if (debug) Object.assign(window as unknown as Record<string, unknown>, { squads, party, duel, __measureSound: measureSound, ...(match ? { match } : {}) });
+  // (__kingSay: a God King line on cue, for the layout checks; the roll always lands.)
+  if (debug) Object.assign(window as unknown as Record<string, unknown>, { squads, party, duel, __measureSound: measureSound, __kingSay: (cue: KingCue, key: string) => kingSay(cue, key, Date.now(), () => 0), ...(match ? { match } : {}) });
 
   // ---------------- Squads ----------------
 
