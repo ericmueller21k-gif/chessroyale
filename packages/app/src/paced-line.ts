@@ -62,3 +62,16 @@ export function pacedSeries(lines: readonly (readonly string[])[], pace: LinePac
   }
   return out;
 }
+
+/**
+ * The sentence up `t` ms after it starts, for a box too small for the whole line (a phone's boss bar, two rows: Nov 13): each
+ * sentence its own page, typed in turn, the last started shown until the next starts. Its index, words, when it starts (ms
+ * from the line's start), and how many of its characters are typed.
+ */
+export function pacedPage(line: PacedLine, t: number): { i: number; text: string; at: number; typed: number } {
+  let i = 0;
+  while (i + 1 < line.sentences.length && t >= line.starts[i + 1]!) i++;
+  const text = line.sentences[i]!;
+  const typed = Math.max(0, Math.min(lineLength(text), Math.floor((t - line.starts[i]!) / line.typeMs) + 1));
+  return { i, text, at: line.starts[i]!, typed };
+}

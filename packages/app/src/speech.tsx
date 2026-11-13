@@ -36,7 +36,7 @@ import { lineLength, plainLine, sliceLine, type LineSeg } from "./speech-icons.t
 import { mooIconSprite, type MooIconId } from "./characters/moo.ts";
 import { renderFrame } from "./characters/sprite.ts";
 import { play, type SoundName } from "./sound.ts";
-import { pacedTyped, type PacedLine } from "./paced-line.ts";
+import { pacedPage, pacedTyped, type PacedLine } from "./paced-line.ts";
 
 /** How much a line matters: only a critical line cuts in on another (and any line on chatter); the rest wait their turn. */
 export const CHATTER = -1;
@@ -224,7 +224,12 @@ export function VoiceBubble({ voice, class: cls, hidden = false, balanced = fals
   useEffect(() => {
     if (voice === bossVoice && testSwitchesAllowed()) (globalThis as { sayBoss?: (text: string) => boolean }).sayBoss = (text) => voice.replace(text, `test:${Date.now()}:${text}`);
   }, [voice]);
-  return line && !hidden ? <SpeechBox key={line.key} class={cls} text={line.text} at={line.at} until={line.until} now={now} fits={1} balanced={balanced} typed={line.paced && pacedTyped(line.paced, now - line.at)} /> : null;
+  if (!line || hidden) return null;
+  // (A paced line in a boss bar (`balanced`: two rows, too few for a whole line of two sentences): a sentence at a time, each its
+  // own page, typed in turn (pacedPage). Elsewhere the whole line, its sentences typed in turn.)
+  const page = line.paced && balanced ? pacedPage(line.paced, now - line.at) : null;
+  if (page) return <SpeechBox key={`${line.key}:${page.i}`} class={cls} text={page.text} at={line.at + page.at} until={line.until} now={now} fits={1} balanced typed={page.typed} />;
+  return <SpeechBox key={line.key} class={cls} text={line.text} at={line.at} until={line.until} now={now} fits={1} balanced={balanced} typed={line.paced && pacedTyped(line.paced, now - line.at)} />;
 }
 
 /**

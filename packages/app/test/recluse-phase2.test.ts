@@ -4,7 +4,7 @@ import { LAST_STAND, legalMoves, phase2Numbers, type MoveScore } from "@chessroy
 import { ARC_LIFE, ARC_STRIKES, PHASE_CHANGE, Phase2Game, absorbKing, absorbReadMs, arcPoints, phase2Follows, phase2Mates, phaseChangeRun, smoothPath } from "../src/recluse-phase2.ts";
 import { ON_BOARD_ANIMS, RECLUSE, RECLUSE_BUST } from "../src/characters/recluse.ts";
 import { CRITICAL, NORMAL, Voice, bossVoice, holdMs, readMs, typeMs } from "../src/speech.tsx";
-import { pacedLine, pacedTyped } from "../src/paced-line.ts";
+import { pacedLine, pacedPage, pacedTyped } from "../src/paced-line.ts";
 import { loadOpenings, SoloMatch } from "../src/solo.ts";
 import { KING_LINES, kingLine, kingSay, resetKingSpeech } from "../src/godKing.ts";
 import { KING_VS_RECLUSE, RECLUSE_LINES } from "../src/characters/recluse-lines.ts";
@@ -125,6 +125,10 @@ describe("the phase change", () => {
     expect(pacedTyped(l, 17 * 45 + 500)).toBe(17);
     expect(l.text.slice(0, pacedTyped(l, l.starts[1]!))).toBe("Prepare yourself. T");
     expect(pacedTyped(l, l.typedMs)).toBe(l.text.length);
+    // (A phone's bar, two rows: a sentence at a time, each its own page; the first held through the pause.)
+    expect(pacedPage(l, 17 * 45 + 900)).toEqual({ i: 0, text: "Prepare yourself.", at: 0, typed: 17 });
+    expect(pacedPage(l, l.starts[1]!)).toEqual({ i: 1, text: "This is the ultimate test of your skill.", at: l.starts[1], typed: 1 });
+    expect(pacedPage(l, l.holdMs).typed).toBe(40);
     // In his voice: his word as the power landed gone by then; each line up from its time, typed at its pace, whole until it's
     // gone; the second after the first.
     for (const absorb of RECLUSE_LINES.absorb) {
