@@ -1023,8 +1023,8 @@ export function bossPartySettings(difficulty: string): Partial<Settings> {
 /**
  * The Hidden Boss's fight from his room (HIDDEN_ROOM; Eric, Nov 13): Boss Battle's party battle for the room's four (the party rule:
  * a move two or more picked is played, a tie between moves by their strength: partyMove), the team's one clock, any member's God
- * King call; the boss always him (`bossHidden`: he's hidden from players everywhere else). His adult form only online: winning it ends
- * the fight, as the Crowd's final does (his phase 2's four boards are solo only). The server's alone: a player can't ask for it.
+ * King call; the boss always him (`bossHidden`: he's hidden from players everywhere else). His adult form beaten, his phase change and
+ * the four boards follow online (Nov 13: RECLUSE_ONLINE), as in the Crowd's final. The server's alone: a player can't ask for it.
  */
 export function hiddenRoomSettings(): Partial<Settings> {
   return { ...bossPartySettings("normal"), lobbySize: HIDDEN_ROOM.players, groupSize: HIDDEN_ROOM.players, bossId: HIDDEN_ROOM.boss, bossHidden: true };
@@ -1920,6 +1920,49 @@ export const RECLUSE_TALK = {
   2: { middleFromMs: 45_000, lateFromMs: 105_000 },
 } as const;
 
+/**
+ * The Hidden Boss's forms, in the order his fight meets them (Eric, Nov 13: "it plays through till the end";
+ * docs/decisions/2026-11-13-recluse-online-phase2.md). Each one beaten brings the next; the last beaten is his defeat.
+ * `adult`: his phase 1 (Bullet, No help, his chatter); `four`: his phase change and the four boards (RECLUSE_PHASE2).
+ * The child form (`child`, being built on claude/recluse-child-form) goes first: `["child", "adult", "four"]`, with no change
+ * to the online code that reads this (recluseNextForm).
+ */
+export type RecluseForm = "child" | "adult" | "four";
+export const RECLUSE_FORMS: readonly RecluseForm[] = ["adult", "four"];
+/** The form his fight meets after `form` (null: `form` is his last, or isn't in his fight). */
+export function recluseNextForm(form: RecluseForm, forms: readonly RecluseForm[] = RECLUSE_FORMS): RecluseForm | null {
+  const i = forms.indexOf(form);
+  return i >= 0 ? (forms[i + 1] ?? null) : null;
+}
+
+/**
+ * The cutscene between his adult form's end and his transformation (Eric, Nov 12; its scene is being built on
+ * claude/recluse-cutscene). Online, after his fall the server holds `holdMs` for it, telling everyone when it starts
+ * (`recluseCutscene`, with its start and end), then his phase change starts for everyone at once. 0 until the scene lands.
+ */
+export const RECLUSE_CUTSCENE = {
+  holdMs: 0,
+} as const;
+
+/**
+ * His phase 2 online (Nov 13; docs/decisions/2026-11-13-recluse-online-phase2.md): the lobby server runs the four boards
+ * (packages/server/src/bosses/recluse.ts), his moves and the bots' from the engine server, the host's device where it can't
+ * answer (the result then pays as a solo game), the server's own quick move where neither does.
+ * - `changeMs`: his phase change's length on every screen, from its start to the boards (the app's PHASE_CHANGE.total: a test
+ *   keeps the two within 300 ms); the clocks start `RECLUSE_PHASE2.change.countdownSeconds` after it.
+ * - `groupNodes`: the engine server's search per group of moves (every legal move scored, at most 8 a search: its limit), so one
+ *   move of his (about five groups) searches less than one judge's re-check, and counts once against the day's budget.
+ * - `botLoss`: a bot's move is one of those within this much of the best (expected score, 0 to 1), at random: a bot's strength,
+ *   never his (he plays the best).
+ * - `askMs`: how long the host's device has to play a move when the engine server can't; then the server's quick move.
+ */
+export const RECLUSE_ONLINE = {
+  changeMs: 34_300,
+  groupNodes: 120_000,
+  botLoss: 0.06,
+  askMs: 6000,
+} as const;
+
 export const RECLUSE_PHASE2 = {
   /** How many boards (all of them must be won to beat him). */
   boards: 4,
@@ -2001,6 +2044,8 @@ export const RECLUSE_PHASE2 = {
     chantLines: { typeMs: 45, sentencePauseMs: 1000, readMs: 1700, perCharMs: 40, maxReadMs: 5500, fadeMs: 260, gapMs: 400, firstAfterMs: 1500 },
     /** The boards split and set: a big 5, 4, 3, 2, 1 on every board before phase 2's clocks run (s). */
     countdownSeconds: 5,
+    /** Beaten where his phase change follows: the board holds this long while he collapses (ms; solo and online). */
+    fallMs: 1800,
   },
 };
 

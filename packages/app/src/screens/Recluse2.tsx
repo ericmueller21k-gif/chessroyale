@@ -534,7 +534,8 @@ export function SimulScreen({ match }: { match: GameView }) {
   const mine = v.boards[0]!;
   const big = v.boards.find((b) => b.id === watch) ?? mine;
   const others = v.boards.filter((b) => b.id !== big.id);
-  const yourTurn = v.playing && mine.toMove === "crowd";
+  // (Online a Crowd final's watcher has no board: none is "yours".)
+  const yourTurn = v.playing && mine.you && mine.toMove === "crowd";
   // His ultimate as it comes: "5 SECONDS!" over the boards.
   // (On every board at once; nobody waits for it: the 5 s start now.)
   const ultOn = v.ultAt !== null && now - v.ultAt < phase2UltBannerMs();
@@ -544,7 +545,7 @@ export function SimulScreen({ match }: { match: GameView }) {
   // Your board's clock in the dock (DockClock): running on your move, holding (undefined) while he answers, none (null)
   // once your board is decided or before the clocks start.
   const run: DockClockRun | null | undefined =
-    mine.result || !v.playing ? null : yourTurn && mine.turnAt !== null ? { startsAt: mine.turnAt, deadline: mine.turnAt + (v.ultAt !== null ? RECLUSE_PHASE2.ultMoveSeconds * 1000 : mine.bankMs) } : undefined;
+    mine.result || !v.playing || !mine.you ? null : yourTurn && mine.turnAt !== null ? { startsAt: mine.turnAt, deadline: mine.turnAt + (v.ultAt !== null ? RECLUSE_PHASE2.ultMoveSeconds * 1000 : mine.bankMs) } : undefined;
   // (How many are won: the boss bar's right side.)
   const status = v.decided
     ? v.beaten
