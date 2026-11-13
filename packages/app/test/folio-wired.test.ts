@@ -282,7 +282,7 @@ describe("Revision on the board and in the move list", () => {
 describe("its home: Folio's Folded House", () => {
   it("stands on the town square with its name, its picture in Folio's own colors (its faded ink its own), its lights in its picture", () => {
     const home = HOMES.find((h) => h.id === "folio")!;
-    expect(home).toMatchObject({ boss: "Folio", name: "Folio's Folded House", cx: 35, cy: 30 });
+    expect(home).toMatchObject({ boss: "Folio", name: "Folio's Folded House" });
     const art = HOUSES.folio;
     expect([art.ch.w, art.ch.h, art.ch.foot]).toEqual([144, 136, [72, 132]]);
     for (const [k, c] of Object.entries(FOLIO_PALETTE)) if (k in art.ch.palette && !"ij123".includes(k)) expect(art.ch.palette[k], k).toBe(c);
@@ -294,7 +294,9 @@ describe("its home: Folio's Folded House", () => {
 
   it("stands well clear of the Colosseum: at least 5 open squares between its plot and the Colosseum's ground (Eric, Oct 28: \"like 2 inches from the colosseum\", it was 3 squares)", () => {
     const home = HOMES.find((h) => h.id === "folio")!;
-    const gap = home.cx - 1 - (COLISEUM.c0 + COLISEUM.size);
-    expect(gap).toBeGreaterThanOrEqual(5);
+    // (The street town's, everyone's since Nov 13: open squares between its lot and the Colosseum's ground, east-west or north-south.)
+    const gapC = Math.max(COLISEUM.c0 - (home.cx + home.hw) - 1, home.cx - home.hw - (COLISEUM.c0 + COLISEUM.size));
+    const gapR = Math.max(COLISEUM.r0 - (home.cy + home.hd) - 1, home.cy - home.hd - (COLISEUM.r0 + COLISEUM.size));
+    expect(Math.max(gapC, gapR)).toBeGreaterThanOrEqual(5);
   });
 });

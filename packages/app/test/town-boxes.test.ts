@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
-// An admin's town is the street town (admin-town.ts STREET_TOWN): its boxes and its turning camera (Nov 5, round 3).
-vi.mock("../src/town/admin-town.ts", () => ({ ADMIN_TOWN: true, STREET_TOWN: true }));
+// The street town (everyone's since Nov 13), as an admin's (every home): its boxes and its turning camera (Nov 5, round 3).
+vi.mock("../src/town/admin-town.ts", () => ({ ADMIN_TOWN: true }));
 
 const { N, newView, pickSquare, proj, rel, setHeading, setView, wrapI } = await import("../src/town/camera.ts");
 const PLAN = (await import("../src/town/street-plan.json")).default;

@@ -1,17 +1,16 @@
 import { describe, expect, it } from "vitest";
 import { N, wrapF, wrapI } from "../src/town/camera.ts";
 import { TOWN_FEEL } from "../src/town/feel.ts";
-import { APRON, BOTS, APRON_ROWS, COLISEUM, GRASS, HOMES, PARK, PAVING, PROPS, START, STATUES, TABLES, Walker, createTown, destFor, findPath, groundAt, homeNear, onColiseum, plotDist, seated, statueAt, stoolAt, tableAt, tableStates, taken, tick, walkWalker, walkable, type Sq, type Town } from "../src/town/world.ts";
+import { APRON, BOTS, COLISEUM, HOMES, START, STATUES, TABLES, Walker, createTown, destFor, onColiseum, seated, statueAt, stoolAt, tableStates, taken, tick, walkWalker, walkable, type Sq, type Town } from "../src/town/world.ts";
 
 /** One pawn a square (src/town/world.ts): where a walk ends, and rings of people round someone. */
 
 const king = (a: Sq, b: Sq) => Math.max(Math.abs(wrapF(a.c - b.c)), Math.abs(wrapF(a.r - b.r)));
 /**
- * Open ground north of the Hidden Boss's walk-up: no homes, bosses, bots or park things within three squares. (The Colosseum's
- * middle until slice 5 built it; (24, 2) until slice 6's bigger map; (45, 6) until the walk-up, there since Nov 13, opened for
- * everyone.)
+ * Open ground: Fountain Street's board between Seam Avenue and the east, no homes, bosses' boxes, bots or anything standing within two
+ * squares. (The Colosseum's middle until slice 5 built it; then open ground in the old town until it went, Nov 13.)
  */
-const SPOT: Sq = { c: 44, r: 2 };
+const SPOT: Sq = { c: 28, r: 13 };
 
 /** A town with nobody wandering off on their own (the bots stay put; the bosses are far from the middle). */
 function still(): Town {
@@ -54,13 +53,15 @@ describe("town square: one pawn a square", () => {
     apart(t);
   });
 
-  it("tapping a home walks you in front of its door (Eric, Nov 5): the square before its plot's middle, or one either side if that's taken", () => {
+  it("tapping a home walks you in front of its door (Eric, Nov 5): its door square (the sidewalk before its door), or one either side if that's taken", () => {
+    // (The street town for everyone since Nov 13: a home's door square is its plan's, before its lot's front; the old town's was the row
+    // before its plot's middle.)
     for (const h of HOMES) {
       const t = still();
       const to = destFor(t, t.you.walker, { kind: "home", home: h })!;
       expect(to, h.name).not.toBeNull();
-      expect(wrapI(to.r), `${h.name}: the row before its plot's front row`).toBe(wrapI(h.cy - 2));
-      expect(Math.abs(wrapF(to.c - h.cx)), `${h.name}: before its door, or one either side`).toBeLessThanOrEqual(1);
+      expect(wrapI(to.r), `${h.name}: its door square's row`).toBe(wrapI(h.door.r));
+      expect(Math.abs(wrapF(to.c - h.door.c)), `${h.name}: on its door square, or one either side`).toBeLessThanOrEqual(1);
       expect(walkable(to.c, to.r) && !taken(t, to.c, to.r, t.you.walker)).toBe(true);
     }
   });
@@ -135,15 +136,12 @@ describe("town square: one pawn a square", () => {
 describe("town square: the Colosseum", () => {
   const front = (s: Sq) => s.r === COLISEUM.r0 - 1 && (s.c === COLISEUM.c0 + COLISEUM.size / 2 - 1 || s.c === COLISEUM.c0 + COLISEUM.size / 2);
 
-  it("its 12 x 12 ground is solid, and a walk goes round it", () => {
-    for (let r = COLISEUM.r0; r < COLISEUM.r0 + COLISEUM.size; r++) for (let c = COLISEUM.c0; c < COLISEUM.c0 + COLISEUM.size; c++) expect(walkable(c, r)).toBe(false);
-    expect(walkable(COLISEUM.c0 - 1, COLISEUM.r0)).toBe(true);
-    // From the apron to the square behind its middle: round it, never across it.
-    const from = { c: COLISEUM.c0 + 2, r: COLISEUM.r0 - 1 };
-    const goal = { c: COLISEUM.c0 + 2, r: COLISEUM.r0 + COLISEUM.size };
-    const path = findPath(from, (c, r) => c === goal.c && r === goal.r, walkable)!;
-    expect(path.at(-1)).toEqual(goal);
-    for (const s of path) expect(onColiseum(s.c, s.r)).toBe(false);
+  it("its ground is solid: none of it walked on (the street town's, at the north edge: nothing behind it)", () => {
+    for (let r = COLISEUM.r0; r < COLISEUM.r0 + COLISEUM.size; r++)
+      for (let c = COLISEUM.c0; c < COLISEUM.c0 + COLISEUM.size; c++) {
+        expect(onColiseum(c, r)).toBe(true);
+        expect(walkable(c, r)).toBe(false);
+      }
   });
 
   it("the apron in front of its gate is open ground, nearest the gate first", () => {
@@ -211,84 +209,17 @@ describe("town square: the statues", () => {
   });
 });
 
-describe("town square: the park (slice 6)", () => {
-  const inPark = (c: number, r: number) => c >= PARK.c0 && c < PARK.c0 + PARK.w && r <= PARK.r1 && r > PARK.r1 - PARK.d;
-
-  it("lies in front of the Colosseum's gate, back from it past its apron and a walk: paving and grass, no home's roaming ground on it", () => {
-    // Eric, Oct 26: "It shouldn't literally be right next to it… 8 to 10 tiles away."
-    expect(COLISEUM.r0 - PARK.r1).toBeGreaterThanOrEqual(8);
-    expect(COLISEUM.r0 - PARK.r1).toBeLessThanOrEqual(10);
-    expect(PARK.c0 + PARK.w / 2).toBe(COLISEUM.c0 + COLISEUM.size / 2);
-    let grass = 0;
-    let paving = 0;
-    for (let r = PARK.r1 - PARK.d + 1; r <= PARK.r1; r++)
-      for (let c = PARK.c0; c < PARK.c0 + PARK.w; c++) {
-        const g = groundAt[r * N + c];
-        if (g === GRASS) grass++;
-        else if (g === PAVING) paving++;
-        // Bosses roam two squares round their plots: never into the park.
-        for (const h of HOMES) expect(plotDist(h, c, r), `${h.id} roams into the park at ${c},${r}`).toBeGreaterThan(2);
-      }
-    expect(grass + paving).toBe(PARK.w * PARK.d);
-    expect(grass).toBeGreaterThan(40);
-    expect(paving).toBeGreaterThan(60);
-    // The apron is paved, and so is the promenade across the walk to it, and nothing stands there; you start in the park.
-    for (const s of APRON) expect(groundAt[s.r * N + s.c]).toBe(PAVING);
-    for (let r = PARK.r1 + 1; r < COLISEUM.r0 - APRON_ROWS; r++)
-      for (let c = START.c - 1; c <= START.c + 2; c++) {
-        expect(groundAt[r * N + c], `the promenade at ${c},${r}`).toBe(PAVING);
-        expect(walkable(c, r)).toBe(true);
-        for (const h of HOMES) expect(plotDist(h, c, r), `${h.id} roams onto the walk at ${c},${r}`).toBeGreaterThan(2);
-      }
-    expect(inPark(START.c, START.r)).toBe(true);
-  });
-
-  it("ten chess tables, each solid with two stools you stand on facing each other across it (west and east)", () => {
-    expect(TABLES).toHaveLength(10);
-    for (const t of TABLES) {
-      expect(inPark(t.c, t.r)).toBe(true);
-      expect(walkable(t.c, t.r), `table ${t.i} is walked round`).toBe(false);
-      expect(tableAt(t.c, t.r)).toBe(t);
-      const [w, e] = t.stools;
-      expect(w).toEqual({ c: t.c - 1, r: t.r });
-      expect(e).toEqual({ c: t.c + 1, r: t.r });
-      for (const s of t.stools) {
-        expect(walkable(s.c, s.r)).toBe(true);
-        expect(stoolAt(s.c, s.r)).toBe(t);
-      }
-    }
-    // Five either side of the promenade up the middle.
-    expect(TABLES.filter((t) => t.c < COLISEUM.c0 + COLISEUM.size / 2)).toHaveLength(5);
-  });
-
-  it("the fountain stands in its middle; the trees, benches and fountain are walked round", () => {
-    const fountain = PROPS.filter((p) => p.kind === "fountain");
-    expect(fountain).toHaveLength(1);
-    const f = fountain[0]!;
-    // Its 2 x 2 squares: the park's middle two columns, and the middle two of its rows south of its north walk.
-    expect(f.c).toBe(PARK.c0 + PARK.w / 2 - 1);
-    expect(f.r).toBe(PARK.r1 - 1 - (PARK.d - 1) / 2);
-    for (const [dc, dr] of [[0, 0], [1, 0], [0, 1], [1, 1]] as const) expect(walkable(f.c + dc, f.r + dr)).toBe(false);
-    expect(PROPS.filter((p) => p.kind === "tree").length).toBeGreaterThanOrEqual(8);
-    expect(PROPS.filter((p) => p.kind === "bench").length).toBeGreaterThanOrEqual(4);
-    for (const p of PROPS) expect(walkable(p.c, p.r), `${p.kind} at ${p.c},${p.r}`).toBe(false);
-  });
-
-  it("the paths lead in from the plaza, past the fountain, up to the Colosseum's gate, all on paving", () => {
-    // From the park's south walk, straight up the promenade to the apron at the gate.
-    const from = { c: START.c, r: PARK.r1 - PARK.d + 1 };
-    const gate = APRON[0]!;
-    const path = findPath(from, (c, r) => c === gate.c && r === gate.r, (c, r) => walkable(c, r) && groundAt[r * N + c] === PAVING)!;
-    expect(path, "a paved way to the gate").not.toBeNull();
-    // ... and every stool can be reached.
-    for (const t of TABLES) for (const s of t.stools) expect(findPath(START, (c, r) => c === s.c && r === s.r, walkable)).not.toBeNull();
-  });
+// (The park's layout, the street town's since Nov 13 for everyone: town-street.test.ts, "has twelve tables where the plan has them…".)
+describe("town square: the park's tables", () => {
+  /** The table nearest your start, and its stool nearer you. */
+  const near = TABLES.reduce((a, b) => (king(b, START) < king(a, START) ? b : a));
+  const nearStool = near.stools.reduce((a, b) => (Math.hypot(b.c - START.c, b.r - START.r) < Math.hypot(a.c - START.c, a.r - START.r) ? b : a));
 
   it("a tap on a table walks you to its nearest free stool, where you sit; both taken, beside it; walking on, you stand", () => {
     const t = still();
-    const table = TABLES.find((x) => x.r === START.r && x.c < START.c)!; // the table beside your start, on your left
+    const table = near;
     const to = destFor(t, t.you.walker, { kind: "table", table })!;
-    expect(to).toEqual(table.stools[1]); // its east stool: nearer you
+    expect(to).toEqual(nearStool);
     walkWalker(t.you.walker, to);
     t.you.sit = true;
     settle(t);
@@ -309,7 +240,7 @@ describe("town square: the park (slice 6)", () => {
   });
 
   it("a table's state from who sits (Eric, Oct 27): two others play, one waits (the ring under the free stool), you at it: still", () => {
-    const table = TABLES.find((x) => x.r === START.r && x.c < START.c)!;
+    const table = near;
     const t = still();
     const [a, b] = t.bots;
     expect(tableStates(t.people)[table.i]).toEqual({ kind: "still" });
@@ -352,19 +283,5 @@ describe("town square: the park (slice 6)", () => {
       apart(t, tripping);
     }
     expect(sat).toBeGreaterThan(0);
-  });
-});
-
-describe("a tap on or near a home's foot is that home (today's town; Nov 12, homeNear)", () => {
-  it("its plot, its door square and the row in front across the plot are the home; two rows out and the corners are not", () => {
-    for (const h of HOMES) {
-      const foot = h.door.r;
-      for (const dc of [-1, 0, 1]) {
-        expect(homeNear(h.cx + dc, foot)?.id, `${h.id}: its foot`).toBe(h.id);
-        expect(homeNear(h.cx + dc, wrapI(foot + 1))?.id, `${h.id}: its plot's front row`).toBe(h.id);
-        expect(homeNear(h.cx + dc, wrapI(foot - 1))?.id ?? null, `${h.id}: two out`).not.toBe(h.id);
-      }
-      for (const dc of [-2, 2]) expect(homeNear(wrapI(h.cx + dc), foot)?.id ?? null, `${h.id}: the corner`).not.toBe(h.id);
-    }
   });
 });

@@ -515,9 +515,10 @@ describe("town square: the bots take turns (Oct 28, Eric: ten out, one goes home
       if (kid) {
         // Its boss's home's door: the plot's front row, by the middle.
         const h = HOMES.find((x) => x.id === b.bot!.boss)!;
-        expect(at.r).toBe(wrapI(h.cy - 1));
-        expect(Math.abs(at.c - h.cx)).toBeLessThanOrEqual(1);
-        expect(same(homeDoor(b.bot!), { c: h.cx, r: wrapI(h.cy - 1) })).toBe(true);
+        // (The street town's: its entry, the lot's square behind the door square, or one either side.)
+        expect(at.r).toBe(h.entry.r);
+        expect(Math.abs(at.c - h.entry.c)).toBeLessThanOrEqual(1);
+        expect(same(homeDoor(b.bot!), h.entry)).toBe(true);
       } else {
         // The gate: the apron's squares nearest it.
         expect(APRON.slice(0, 4).some((s) => same(s, at)), `${at.c},${at.r}`).toBe(true);
@@ -609,7 +610,7 @@ describe("town square: the bots take turns (Oct 28, Eric: ten out, one goes home
 describe("town square: back from a game with a bot", () => {
   it("a seat as the address carries it, and back; anything else is none", () => {
     for (const s of [{ table: 0, stool: 0, bot: 0 }, { table: 9, stool: 1, bot: 5 }] as const) expect(seatOf(seatText(s))).toEqual(s);
-    for (const bad of [null, "", "6.2.1", "10.0.1", "1.0.20", "a.b.c", "1.0"]) expect(seatOf(bad)).toBeNull();
+    for (const bad of [null, "", "6.2.1", "12.0.1", "1.0.20", "a.b.c", "1.0"]) expect(seatOf(bad)).toBeNull();
   });
 
   it("you sit on your stool at that table, the bot across, its card closed; after a short while it gets up and wanders off", () => {

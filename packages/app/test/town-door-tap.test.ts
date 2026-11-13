@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
-// The street town (an admin's: admin-town.ts STREET_TOWN), where Eric tapped Alfil's door (Nov 12).
-vi.mock("../src/town/admin-town.ts", () => ({ ADMIN_TOWN: true, STREET_TOWN: true }));
+// The street town (everyone's since Nov 13; here an admin's), where Eric tapped Alfil's door (Nov 12).
+vi.mock("../src/town/admin-town.ts", () => ({ ADMIN_TOWN: true }));
 
 const PLAN = (await import("../src/town/street-plan.json")).default;
 const { HOMES, createTown, destFor, homeNear, plotAt, walkable } = await import("../src/town/world.ts");

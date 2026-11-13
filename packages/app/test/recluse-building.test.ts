@@ -6,7 +6,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 
-vi.mock("../src/town/admin-town.ts", () => ({ ADMIN_TOWN: true, STREET_TOWN: false }));
+vi.mock("../src/town/admin-town.ts", () => ({ ADMIN_TOWN: true }));
 
 const { ALL_HOMES, HOMES, createTown, hasFigure } = await import("../src/town/world.ts");
 const { adminFirst, BOSS_ROSTER, isPlayable, menuBosses } = await import("@chessroyale/core");

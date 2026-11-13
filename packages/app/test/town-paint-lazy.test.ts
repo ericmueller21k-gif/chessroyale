@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
-// An admin's town is the street town (admin-town.ts STREET_TOWN): its buildings are built too.
-vi.mock("../src/town/admin-town.ts", () => ({ ADMIN_TOWN: true, STREET_TOWN: true }));
+// The street town (everyone's since Nov 13), as an admin's (every home): its buildings are built too.
+vi.mock("../src/town/admin-town.ts", () => ({ ADMIN_TOWN: true }));
 
 /**
  * The pictures painted when first drawn (Nov 10, phone load 3; houses/kit.ts `paint`): every picture the town, its shops, the rides,
