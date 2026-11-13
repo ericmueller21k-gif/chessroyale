@@ -1149,7 +1149,8 @@ export class SoloMatch implements GameView {
     // as the power lands, for the rest of the fight.
     setFigureRun(phaseChangeRun(at));
     setEngineAt(at + PHASE_CHANGE.igniteAt);
-    this.set({ kind: "phaseChange", at });
+    // (The board cracks into four at `splitAt`: his music's drop is put there, music.ts.)
+    this.set({ kind: "phaseChange", at, splitAt: at + PHASE_CHANGE.crackAt });
     this.timer = setTimeout(() => this.startSimul(), PHASE_CHANGE.total);
   }
   private phase2Names = new Map<string, string>();
@@ -1318,7 +1319,7 @@ export class SoloMatch implements GameView {
         if (fallMs) {
           if (phase2) bossVoice.reset();
           const next = phase2 ? () => this.startPhaseChange(true, mates) : () => this.finish();
-          this.set({ kind: "boss", boss: this.bossSnapshot(), until: Date.now() + fallMs, fall: true });
+          this.set({ kind: "boss", boss: this.bossSnapshot(), until: Date.now() + fallMs, fall: true, ...(phase2 ? { toPhase2: true } : {}) });
           this.timer = setTimeout(next, fallMs);
           return;
         }

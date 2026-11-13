@@ -1,6 +1,6 @@
 import type { ComponentChildren } from "preact";
 import { useEffect, useLayoutEffect, useReducer, useRef, useState } from "preact/hooks";
-import { type Activity, type MatchmakingType, CROWD_MISSES, SQUADS, botLevelMean, POWER_IDS, WEAK_BOTS, bossDef, bossIdFromLink, CROWD_KNOCKOUTS, RAID_SETTINGS, bossPartySettings, raidBossElo, DEFAULT_SETTINGS, DRAW_RULES, QUICK_PACE, bestMoveOf, definedOnly, matchFeats, modeSettings, pausedLine, speedOption, startOption, type DrawRule, type FinalFormat, type ModeChoiceId, type Settings } from "@chessroyale/core";
+import { type Activity, type MatchmakingType, CROWD_MISSES, RECLUSE_MUSIC, SQUADS, botLevelMean, POWER_IDS, WEAK_BOTS, bossDef, bossIdFromLink, CROWD_KNOCKOUTS, RAID_SETTINGS, bossPartySettings, raidBossElo, DEFAULT_SETTINGS, DRAW_RULES, QUICK_PACE, bestMoveOf, definedOnly, matchFeats, modeSettings, pausedLine, speedOption, startOption, type DrawRule, type FinalFormat, type ModeChoiceId, type Settings } from "@chessroyale/core";
 import { bossInUrl, bossTierFromUrl, chosenBoss, chosenHomeMode, chosenMode, lobbyModeOf, prefetchBossAlone, raidInUrl, rememberBossPick } from "./screens/Home.tsx";
 import { lastBoss } from "./boss-history.ts";
 import { unlockAudio } from "./components/Countdown.tsx";
@@ -51,7 +51,7 @@ import { confirmLeaveSearch, keepInQueue, saveAwayLobby, savedAwayLobby, searchF
 import { chosenBotLevel } from "./components/BotLevelBox.tsx";
 import { clockShown } from "./clock-text.ts";
 import { measureSound } from "./sound.ts";
-import { bossMusic, type MusicBattle } from "./music.ts";
+import { bossMusic, recluseMusic, type MusicBattle } from "./music.ts";
 import { noteWhere } from "./problems.ts";
 import { queuePool, testParams } from "./test-switches.ts";
 import { evalBarOn, practiceOn } from "./prefs.ts";
@@ -2310,8 +2310,16 @@ function musicBattle(match: AnyMatch | null): MusicBattle | null {
   const p = match?.phase;
   if (!match || !p || p.kind === "results") return null;
   const boss = p.kind === "boss" ? p.boss : match.boss;
-  if (!boss?.id || boss.result) return null;
-  return { key: match, boss: boss.id, live: !(p.kind === "boss" && (p.intro || p.loading)) };
+  if (!boss?.id) return null;
+  const live = !(p.kind === "boss" && (p.intro || p.loading));
+  // (The Hidden Boss: a theme for each point of his fight, switched as it goes (recluseMusic). His later themes are fetched as his
+  // fight starts where his phase change can follow (solo); online his phase 1 is the whole fight.)
+  if (boss.id === "recluse") {
+    const r = recluseMusic(p, !!boss.result, !!match.simul?.decided);
+    return r && { key: match, boss: boss.id, live, ...r, ...(isSolo(match) ? { ahead: [RECLUSE_MUSIC.beaten, RECLUSE_MUSIC.transform] } : {}) };
+  }
+  if (boss.result) return null;
+  return { key: match, boss: boss.id, live };
 }
 
 /** A profile as a page (outside a match): its address, and back to where you were. */

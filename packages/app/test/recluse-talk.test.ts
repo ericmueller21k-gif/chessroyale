@@ -226,7 +226,7 @@ describe("his chatter", () => {
     expect(talkWhen(v({ kind: "boss", until: 0, intro: true }), 100)).toBeNull();
     expect(talkWhen(v({ kind: "play", startsAt: 0 }, { id: "recluse", result: "crowd" } as GameView["boss"]), 100)).toBeNull();
     expect(talkWhen(v({ kind: "play", startsAt: 0 }, { id: "clown" } as GameView["boss"]), 100)).toBeNull();
-    expect(talkWhen(v({ kind: "phaseChange", at: 0 }), 100)).toBeNull();
+    expect(talkWhen(v({ kind: "phaseChange", at: 0, splitAt: 0 }), 100)).toBeNull();
     expect(talkWhen(v({ kind: "simul", at: 50 }, boss, { playing: true, decided: false }), 100)).toEqual({ phase: 2, startAt: 50 });
     expect(talkWhen(v({ kind: "simul", at: 50 }, boss, { playing: true, decided: true }), 100)).toBeNull();
     expect(talkWhen(v({ kind: "results" }), 100)).toBeNull();

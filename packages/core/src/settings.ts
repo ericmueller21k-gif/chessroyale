@@ -4258,6 +4258,29 @@ export const BOARD: { readonly checkHighlight: boolean } = { checkHighlight: fal
 export const MUSIC = { volume: 0.25, fadeMs: 300, endFadeMs: 1500, startDelayS: 0.05, splashHoldMs: 2000, townShare: 0.15, townWaitMs: 3000 } as const;
 
 /**
+ * The Hidden Boss's music (Nov 13; docs/decisions/2026-11-13-hidden-boss-music.md; the handoff's README, "The Hidden Boss"): one
+ * theme for each point of his fight, by its key in themes.json, switched mid-fight (music.ts, `switchPlan`).
+ * - `child`: his room and the fight with the child. Not played yet (the child form isn't built): App.tsx's `recluseTheme` is the hook.
+ * - `adult`: his adult form (today's phase 1), from the fight's start.
+ * - `beaten`: his adult form beaten, through his talk and the absorption (its intro is a book's slam).
+ * - `transform`: from his transformation's start; its loop starts as the boards split, which is when its intro ends
+ *   (`introSeconds`, read from themes.json: the transformation's start is the split minus that).
+ * Fetched (not decoded) as his fight starts, never in the town's loading (2.5 MB, a boss only admins meet).
+ */
+export const RECLUSE_MUSIC = { child: "recluse-house", adult: "recluse-phase2", beaten: "recluse-beaten", transform: "recluse-phase3" } as const;
+
+/**
+ * How one theme gives way to the next mid-fight, by the theme coming in (the handoff's switching rules): what's playing fades out
+ * over `fadeMs`; `after`: the new theme starts once that fade is done, else at once (at full level). Any other: at once, over
+ * MUSIC.fadeMs.
+ */
+export const MUSIC_SWITCH: Readonly<Record<string, { readonly fadeMs: number; readonly after: boolean }>> = {
+  [RECLUSE_MUSIC.adult]: { fadeMs: 1500, after: true },
+  [RECLUSE_MUSIC.beaten]: { fadeMs: 300, after: false },
+  [RECLUSE_MUSIC.transform]: { fadeMs: 500, after: false },
+};
+
+/**
  * The area banner (Eric, Nov 11, approving its mockup: "super clean. That's exactly what I was imagining";
  * docs/decisions/2026-11-11-area-banner-room-music.md): as you walk into a home's room through its door (once the door's
  * black lifts), its name across a dark band a third down the room's view, the boss's name above it in gold. Taps pass
