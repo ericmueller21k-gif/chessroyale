@@ -557,7 +557,8 @@ function layoutOf(sideCards: boolean): ShopPlace[] {
   }
   // -- The front: the low band, and the door out at its east end (columns 6 and 7), clear of the board.
   for (let col = 0; col < N; col++) if (col !== 6 && col !== 7) at("hem", col, N - 1, true, col >= 5 ? { flip: true } : {});
-  at("entrance", 6, N - 1, false, { exit: true });
+  // (Since the building, Nov 13: the door down to the landing, a room-to-room door; the way out to the town is the hall's.)
+  at("entrance", 6, N - 1, false, { door: "landing" });
   // -- The bed (north-east corner, its foot just onto the rug), the rocking horse (north-west), the little table and its chairs (west).
   at("bed", 6, 3, true);
   at("horse", 1, 1, true);

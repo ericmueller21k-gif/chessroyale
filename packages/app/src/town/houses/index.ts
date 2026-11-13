@@ -22,10 +22,11 @@ import { HOUSE_FOLIO, HOUSE_FOLIO_SIGN, HOUSE_FOLIO_LIGHTS, HOUSE_FOLIO_POOLS } 
 import { HOUSE_TIMBER, HOUSE_TIMBER_SIGN, HOUSE_TIMBER_LIGHTS, HOUSE_TIMBER_POOLS } from "./timber.ts";
 import { HOUSE_BLITZ, HOUSE_BLITZ_SIGN, HOUSE_BLITZ_LIGHTS, HOUSE_BLITZ_POOLS } from "./blitz.ts";
 import { HOUSE_ZEBRA, HOUSE_ZEBRA_SIGN, HOUSE_ZEBRA_LIGHTS } from "./zebra.ts";
+import { HOUSE_RECLUSE, HOUSE_RECLUSE_SIGN, HOUSE_RECLUSE_LIGHTS, HOUSE_RECLUSE_POOLS } from "./recluse.ts";
 
 export interface HouseArt {
   ch: Character;
-  /** The sign's blank face, in the picture's pixels: the game writes the home's name there. */
+  /** The sign's blank face, in the picture's pixels: the game writes the home's name there (an empty face, w 0: no sign, nothing written). */
   sign: { x: number; y: number; w: number; h: number };
   /** Where it glows from inside at dusk and night (its windows, its doorway, its lanterns), in the picture's pixels (Oct 27). */
   lights: readonly LightSpot[];
@@ -54,6 +55,9 @@ export const HOUSES: Record<HomeId, HouseArt> = {
   dash: { ch: HOUSE_BLITZ, sign: HOUSE_BLITZ_SIGN, lights: HOUSE_BLITZ_LIGHTS, pools: HOUSE_BLITZ_POOLS },
   // (Rolling Dough, Don Dough's bakery, Nov 11: the art's house-zebra; in an admin's town only while he's in the game for admins first.)
   zebra: { ch: HOUSE_ZEBRA, sign: HOUSE_ZEBRA_SIGN, lights: HOUSE_ZEBRA_LIGHTS, pools: [] },
+  // (The Walk-up, the Hidden Boss's building, Nov 13: no sign (an empty face: Eric, "no address plate or name on it"); in an admin's town
+  // only while he's in the game for admins first.)
+  recluse: { ch: HOUSE_RECLUSE, sign: HOUSE_RECLUSE_SIGN, lights: HOUSE_RECLUSE_LIGHTS, pools: HOUSE_RECLUSE_POOLS },
 };
 
 /**

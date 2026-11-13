@@ -639,7 +639,7 @@ export interface RecluseScene {
   /** (The preview's stills) Jump the child's loop to `ms` now. */
   seek: (ms: number) => void;
 }
-export function recluseScene(t0 = 0, walls = true): RecluseScene {
+export function recluseScene(t0 = 0, walls = true, opts: { live?: boolean } = {}): RecluseScene {
   let start: number | null = null;
   let lastNow = 0;
   let burstDone = false;
@@ -697,8 +697,9 @@ export function recluseScene(t0 = 0, walls = true): RecluseScene {
       drawPawn(d, i, now, !!s);
     },
   }));
+  // (In the town's room (`live`, Nov 13): you're drawn, and the four stand-in pawns aren't: the real players come with the challenge.)
   const fx: RoomFx = {
-    hideYou: () => true,
+    hideYou: () => !opts.live,
     figures: (now) => {
       lastNow = now;
       figures.length = 0;
@@ -706,7 +707,8 @@ export function recluseScene(t0 = 0, walls = true): RecluseScene {
       const k = curOf(now).k;
       kidFig.z = k.byBoard ? Math.max(k.r, B.r + 0.01) : k.r;
       if (walls) figures.push(wallFig);
-      figures.push(kidFig, boardFig, ...pawnFigs);
+      figures.push(kidFig, boardFig);
+      if (!opts.live) figures.push(...pawnFigs);
       return figures;
     },
     over: (d, now) => {

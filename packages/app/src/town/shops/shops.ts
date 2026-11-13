@@ -12,7 +12,7 @@ import { BOSS_CRATE_PRICE, BOSS_CRATE_POOL, BOSS_ROSTER, adminPlayable, bossCrat
 import { buyBossCrateOnServer, tokenCount } from "../../account.ts";
 import type { HomeId } from "../world.ts";
 import type { SkyTone } from "../sky.ts";
-import type { Sq } from "./room.ts";
+import type { RoomPart, Sq } from "./room.ts";
 import { ZEBRA_BACK_LINES } from "./zebra-lines.ts";
 
 export interface ShopDef {
@@ -28,7 +28,19 @@ export interface ShopDef {
    * The home's second room (Rolling Dough's back room, Nov 11): reached through its door from the front room, not from the town; its
    * "Shopkeeper" is the boss himself (`name`), drawn as one of the room's people (`hideKid`), talked to from `talkAt`.
    */
-  part?: "back";
+  part?: Exclude<RoomPart, "front">;
+  /**
+   * The theme its room plays (themes.json; none: its home's id, as every home's room). Null: none (the walk-up's hall and landing; Nov 13,
+   * the brief: his theme plays in his room, "not in the hall").
+   */
+  music?: string | null;
+  /**
+   * A talk card with lines and no button but OK (the walk-up's hall, Nov 13: the flats' doors you can't open): one line a time, in turn.
+   * Its pieces are `talk`'s, each spoken to from its own square of `talkAt` (`talkNear`).
+   */
+  locked?: readonly string[];
+  /** A tap on a talk piece walks you to the `talkAt` square nearest it (room.ts Room.talkNear). */
+  talkNear?: true;
   /** The talk card's name ("Don Dough"); none: "Shopkeeper". */
   name?: string;
   /** No Shopkeeper sidekick drawn (the back room: Don Dough is one of its people, shops/zebra-scene.ts). */
@@ -149,17 +161,72 @@ export const BACK_ROOMS: Readonly<Partial<Record<HomeId, ShopDef>>> = {
     chatTone: "night",
   },
 };
+/** The Hidden Boss's name: core's one string (his real one never appears anywhere). */
+const RECLUSE_NAME: string = BOSS_ROSTER.find((b) => b.id === "recluse")!.name;
+/**
+ * The Hidden Boss's walk-up (Nov 13, the brief's three rooms; docs/decisions/2026-11-13-hidden-boss-building.md). The hall (its front,
+ * from the town): three flats' doors you can't open (a short line on its card), the stairs up. The landing: the next flight up, the stairs
+ * down. The top floor: his room (the child playing his 1956 game on the floor: shops/recluse-scene.ts), his theme playing; his card's
+ * Challenge greyed, "Coming soon" (the room's challenge, the four players and the summoning are the next job: server). None of them has a
+ * Shopkeeper (`hideKid`; `kid` only names a sheet the loader wants).
+ */
+const RECLUSE_HALL: ShopDef = {
+  home: "recluse",
+  boss: RECLUSE_NAME,
+  name: "Apartment door",
+  crate: null,
+  kid: "zebrakeeper",
+  hideKid: true,
+  at: [0, 0],
+  keeper: [],
+  talk: ["flat-door"],
+  // (In front of each flat's door: 1A's in the back wall, 1B's in the west wall, 1C's in the east (row 2): shops/recluse-stairs-art.ts.)
+  talkAt: [{ c: 1, r: 1 }, { c: 1, r: 2 }, { c: 5, r: 2 }],
+  talkNear: true,
+  locked: ["No answer.", "A radio's playing in there. Nobody comes.", "Locked.", "Somebody shuffles to the door, then away again."],
+  prizes: [],
+  roof: "lodge",
+  chatTone: "night",
+  music: null,
+};
+export const RECLUSE_ROOMS: Readonly<Record<"front" | "landing" | "top", ShopDef>> = {
+  front: RECLUSE_HALL,
+  landing: { ...RECLUSE_HALL, part: "landing", talkAt: [{ c: 1, r: 1 }], name: "Apartment door" },
+  top: {
+    home: "recluse",
+    part: "top",
+    boss: RECLUSE_NAME,
+    name: RECLUSE_NAME,
+    crate: null,
+    kid: "zebrakeeper",
+    hideKid: true,
+    at: [0, 0],
+    // (He's on the rug with his board: a tap on it walks you round to its front. Its 3 x 3 squares, nobody walks on: recluse-art.ts
+    // SHOP_RECLUSE_STANDING.)
+    keeper: [3, 4, 5].flatMap((r) => [3, 4, 5].map((c) => ({ c, r }))),
+    talkAt: [{ c: 3, r: 6 }, { c: 4, r: 6 }, { c: 5, r: 6 }],
+    prizes: [],
+    roof: "lodge",
+    chatTone: "day",
+    music: "recluse-house",
+  },
+};
 /**
  * A boss met inside his home can be fought (Don Dough, Nov 11): his boss is in the game (core's roster, with his character and powers;
  * in the game for admins first, so his home is in an admin's town only). Until his boss lands (another helper's round), his card's
  * Challenge stays greyed, "Coming soon", and the talk beat still plays.
  */
-export const canChallengeInside = (id: HomeId): boolean => BOSS_ROSTER.some((b) => b.id === id && adminPlayable(b));
-/** A home's room: its front (the shop, from the town) or its back room. */
-export const roomDef = (id: HomeId, part: "front" | "back" = "front"): ShopDef | null => (part === "back" ? BACK_ROOMS[id] : SHOPS[id]) ?? null;
+export const canChallengeInside = (id: HomeId): boolean => id !== "recluse" && BOSS_ROSTER.some((b) => b.id === id && adminPlayable(b));
+/** A home's room: its front (the shop, from the town), its back room, or a floor of the walk-up. */
+export const roomDef = (id: HomeId, part: RoomPart = "front"): ShopDef | null =>
+  (id === "recluse" && part !== "back" ? RECLUSE_ROOMS[part] : part === "back" ? BACK_ROOMS[id] : part === "front" ? SHOPS[id] : null) ?? null;
 
+/** The theme a room plays as it shows (themes.json): its own (`music`), or its home's; null: none. */
+export const roomTheme = (def: ShopDef): string | null => (def.music === undefined ? def.home : def.music);
+/** The theme to load as you go in at a home's door (its rooms' theme: the walk-up's is its top floor's, his room's). */
+export const homeTheme = (id: HomeId): string => (id === "recluse" ? RECLUSE_ROOMS.top.music! : id);
 /** The shop inside a home, or null: every other home has no "Go in" yet. */
-export const shopOf = (id: HomeId): ShopDef | null => SHOPS[id] ?? null;
+export const shopOf = (id: HomeId): ShopDef | null => roomDef(id);
 
 /** "3 Babur tokens" / "1 crate key". */
 const count = (n: number, one: string) => `${n} ${one}${n === 1 ? "" : "s"}`;

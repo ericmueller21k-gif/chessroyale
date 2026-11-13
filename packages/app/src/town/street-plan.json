@@ -915,6 +915,36 @@
     "y0": 15.7,
     "y1": 16.85
    }
+  },
+  {
+   "kind": "home",
+   "id": "recluse",
+   "v": 0,
+   "c0": 47,
+   "r0": 32,
+   "w": 4,
+   "d": 3,
+   "facing": "S",
+   "street": "fountain-st",
+   "side": false,
+   "art": "homeBox(\"recluse\")",
+   "name": "The Walk-up",
+   "inset": 0.45,
+   "depth": 2.3,
+   "door": {
+    "c": 49,
+    "r": 31
+   },
+   "rest": {
+    "c": 48,
+    "r": 31
+   },
+   "wander": {
+    "x0": 46.7,
+    "x1": 50.3,
+    "y0": 30.7,
+    "y1": 31.85
+   }
   }
  ],
  "park": {
