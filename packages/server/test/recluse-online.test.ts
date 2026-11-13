@@ -691,6 +691,11 @@ describe("his moves from the engine server only (Eric, Nov 13: \"we can't have h
     const { from, tries } = hisReply(F);
     for (const s of F.searches.filter((x) => !x.boss && x.fen === from)) F.answer(s);
     expect(F.core.record.fair!["p1"]).toHaveLength(2);
+    // (Your partner's move too, its fair-play numbers still on their way when the fight ends.)
+    const theirs = F.boardOf("p2");
+    F.core.message("p2", { t: "phase2Move", key: F.p2().key, board: theirs.id, move: legalMoves(theirs.board.fen)[0]!, ply: 0 });
+    const late = F.searches.find((x) => !x.boss && x.fen === theirs.board.fen)!;
+    expect(late).toBeTruthy();
     F.advance(RECLUSE_ONLINE.serverWaitMs - 100);
     expect(F.p2().done).toBeUndefined();
     // (Tried again all along, never a device: each try lost on the way (no answer at all), again after 20 s: at 0, 20 and 40 s.)
@@ -701,6 +706,8 @@ describe("his moves from the engine server only (Eric, Nov 13: \"we can't have h
     expect(F.last("p2", "phase2")!.p2.done?.noResult).toBe(true);
     expect(phase2NoResult(F.core.record)).toBe(true);
     expect(F.core.record.fair!["p1"]).toEqual([before]);
+    F.answer(late);
+    expect(F.core.record.fair!["p2"] ?? []).toEqual([]);
     F.advance(RECLUSE_PHASE2.endMs + 100);
     expect(F.core.record.phase).toBe("results");
     for (const id of ["p1", "p2"]) expect(F.last(id, "results")).toMatchObject({ noResult: true, ranked: false, bossResult: "draw" });

@@ -231,8 +231,15 @@ export function step(lobby: Phase2Lobby) {
     for (const w of Object.values(p.work)) {
       if (w.move) continue;
       if (w.who === "boss") {
+        // (A move of his an older server asked of a device (a deploy mid-fight): the engine server's from now, timed from then.)
+        if (w.since === undefined) {
+          w.since = w.at;
+          if (!lobby.search) quick(lobby, p, w);
+          else searchHis(lobby, w);
+          continue;
+        }
         // (His move never in: the fight ends with no result. A try come back empty, its wait over, or lost on the way: again.)
-        if (w.since !== undefined && now >= w.since + RECLUSE_ONLINE.serverWaitMs) return noResult(lobby, p);
+        if (now >= w.since + RECLUSE_ONLINE.serverWaitMs) return noResult(lobby, p);
         if (w.retryAt !== undefined ? now >= w.retryAt : now >= w.at + SERVER_LOST_MS) searchHis(lobby, w);
         continue;
       }
@@ -342,6 +349,7 @@ function queue(lobby: Phase2Lobby, p: Recluse2Record, b: Phase2Board) {
 
 /** His move asked of the engine server (again): a try of its own (`ask`, its search id), from his own share of the server's day. */
 function searchHis(lobby: Phase2Lobby, w: Work) {
+  w.via = "server";
   w.tries = (w.tries ?? 0) + 1;
   w.at = lobby.now();
   w.retryAt = undefined;
@@ -407,6 +415,8 @@ function noResult(lobby: Phase2Lobby, p: Recluse2Record) {
   p.done = { at: now, until: now + RECLUSE_PHASE2.endMs, beaten: false, won: o.won, of: o.of, noResult: true };
   p.paused ??= now;
   p.work = {};
+  // (Phase 2's fair-play numbers still on their way: never kept.)
+  p.fair = {};
   p.winNext = undefined;
   const fair = lobby.r.fair;
   if (fair) {
