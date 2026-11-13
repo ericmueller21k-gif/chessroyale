@@ -86,6 +86,11 @@ const PALETTE: Record<string, string> = {
   v: "#2a3754",
   x: "#7c8a4a",
   z: "#5c6836",
+  // The braids in the sun (Nov 13, Eric: "almost shining on the rug a little bit more"): cream, rust, navy, moss, lit.
+  "7": "#fbf1d8",
+  "8": "#dc7a52",
+  "9": "#5f74a0",
+  "0": "#a3b067",
   // The chessboard on the table: light, dark.
   D: "#efe0bf",
   E: "#6b3f24",
@@ -167,9 +172,14 @@ function floorPx(X: number, Y: number): string {
     const band = (d * 9) % 1;
     k = band < 0.18 ? deep : (Math.floor(a * 22 + ring) + twist) % 2 ? lit : deep;
     if (d > 0.965) k = deep;
-    // (The sun on the rug: a touch lighter.)
-    const sunny = Y >= SUN.y0 && Y <= SUN.y1 && X > SUN.x0 + ((Y - SUN.y0) / (SUN.y1 - SUN.y0)) * SUN.slant * T && X < SUN.x1 + ((Y - SUN.y0) / (SUN.y1 - SUN.y0)) * SUN.slant * T;
-    if (sunny && k === deep) k = lit;
+    // (The sun on the rug: each braid a step lighter in the two panes, the sash's shadow between them, the edge dithered as on the boards.)
+    const su = (Y - SUN.y0) / (SUN.y1 - SUN.y0);
+    const sx0 = SUN.x0 + su * SUN.slant * T;
+    const sx1 = SUN.x1 + su * SUN.slant * T;
+    const sEdge = Math.min(X - sx0, sx1 - X, (Y - SUN.y0) * 0.6, (SUN.y1 - Y) * 0.8);
+    const sunny = su >= 0 && su <= 1 && X > sx0 && X < sx1 && Math.abs(X - (sx0 + sx1) / 2) > 2 && (sEdge > 2 || hash(X, Y, 3) < 0.5 - su * 0.3);
+    const SUNLIT: Record<string, string> = { i: "7", j: "i", l: "8", m: "l", u: "9", v: "u", x: "0", z: "x" };
+    if (sunny) k = SUNLIT[k] ?? k;
   }
   return k;
 }

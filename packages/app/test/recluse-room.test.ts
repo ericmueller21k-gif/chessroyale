@@ -2,7 +2,7 @@
 // room plays it from its stored squares without any rules, and they agree; his loop and the summoning's beats run in order.
 import { describe, expect, it } from "vitest";
 import { Chess } from "chess.js";
-import { LOOP_MS, PLY_MS, RECLUSE_GAME, RECLUSE_GAME_SAN, RECLUSE_GAME_UCI, kidAt, startBoard } from "../src/town/shops/recluse-game.ts";
+import { KID_SPOTS, LOOP_MS, PLY_AT, RECLUSE_GAME, RECLUSE_GAME_SAN, RECLUSE_GAME_UCI, kidAt, startBoard, stepsOf, walkPath } from "../src/town/shops/recluse-game.ts";
 import { HIDDEN_ROOM_FEEL } from "../src/town/feel.ts";
 
 /** A chess.js board as the room's 64 squares (a1 = 0). */
@@ -44,23 +44,69 @@ describe("the child's game (his 1956 game, stored)", () => {
     const F = HIDDEN_ROOM_FEEL.play;
     expect(kidAt(0).ply).toBe(-1);
     let last = -1;
-    for (let t = F.first; t < F.first + 82 * PLY_MS; t += PLY_MS / 5) {
+    for (let t = F.first; t < PLY_AT[82]!; t += 400) {
       const n = kidAt(t);
       expect(n.ply).toBeGreaterThanOrEqual(last);
       last = n.ply;
     }
     expect(last).toBe(81);
     // The piece is down from the step after the carry: the board after the move.
-    const back = kidAt(F.first + F.think + F.reach + F.carry + 1);
-    expect(back.step).toBe("back");
-    expect(back.board).toBe(RECLUSE_GAME.boards[1]);
-    const end = kidAt(F.first + 82 * PLY_MS + 10);
+    const carryEnd = (i: number) => PLY_AT[i]! + stepsOf(i).slice(0, stepsOf(i).findIndex(([s]) => s === "carry") + 1).reduce((n, [, ms]) => n + ms, 0);
+    for (const i of [0, 1, 40, 81]) {
+      expect(kidAt(carryEnd(i) - 1).board, `ply ${i}`).toBe(RECLUSE_GAME.boards[i]);
+      const back = kidAt(carryEnd(i) + 1);
+      expect(back.step).toBe("back");
+      expect(back.board).toBe(RECLUSE_GAME.boards[i + 1]);
+    }
+    const end = kidAt(PLY_AT[82]! + 10);
     expect(end.step).toBe("end");
     expect(end.board).toBe(RECLUSE_GAME.boards[82]);
-    const fadeOut = kidAt(F.first + 82 * PLY_MS + F.end + F.fade * 0.25);
+    const fadeOut = kidAt(PLY_AT[82]! + F.end + F.fade * 0.25);
     expect(fadeOut.fade).toBeGreaterThan(0);
     expect(kidAt(LOOP_MS - 1).board).toBe(RECLUSE_GAME.boards[0]);
     expect(kidAt(LOOP_MS + 5).ply).toBe(-1);
+  });
+});
+
+describe("how he plays (Eric, Nov 13)", () => {
+  it("plays Black from his seat, and for each White move gets up, walks round, kneels, plays, walks back and sits", () => {
+    for (let i = 0; i < 82; i++) {
+      const steps = stepsOf(i).map(([s]) => s);
+      if (i % 2) expect(steps, `ply ${i}`).toEqual(["think", "reach", "carry", "back", "look"]);
+      else expect(steps, `ply ${i}`).toEqual(["rise", "walk", "turn", "kneel", "think", "reach", "carry", "back", "stand", "walkBack", "turnBack", "sit", "look"]);
+    }
+  });
+
+  it("kneels beside the board, never in front of it (his back would hide it), and goes round the side nearer the piece", () => {
+    const half = HIDDEN_ROOM_FEEL.kid.board / 2;
+    for (let i = 0; i < 82; i += 2) {
+      const path = walkPath(i);
+      expect(path[0]).toEqual(KID_SPOTS.seat);
+      const [x, y] = path[path.length - 1]!;
+      // (His drawing is about 0.3 of a square either side of his middle.)
+      expect(Math.abs(x) - 0.3, `ply ${i}`).toBeGreaterThanOrEqual(half - 0.001);
+      expect(y).toBeLessThanOrEqual(half + 0.35);
+      // (Every point on the way round outside the board.)
+      for (const [px, py] of path) expect(Math.abs(px) > half || Math.abs(py) > half, `ply ${i}`).toBe(true);
+      const p = RECLUSE_GAME.plies[i]!;
+      expect(Math.sign(x)).toBe((p.from % 8) + (p.to % 8) < 7 ? -1 : 1);
+    }
+  });
+
+  it("takes a while: the whole game is many minutes (Eric: 'that's the point')", () => {
+    expect(LOOP_MS).toBeGreaterThan(10 * 60_000);
+  });
+
+  it("the room is about half round 1's floor (12 x 12), and its side walls are one surface each unless the cards are asked for", async () => {
+    const art = await import("../src/town/shops/recluse-art.ts");
+    expect(art.SHOP_RECLUSE_N ** 2 / 144).toBeGreaterThan(0.45);
+    expect(art.SHOP_RECLUSE_N ** 2 / 144).toBeLessThan(0.6);
+    const side = (l: readonly { name: string; col: number; row: number }[]) => l.filter((p) => (p.col === 0 || p.col === art.SHOP_RECLUSE_N - 1) && p.row > 0 && p.row < art.SHOP_RECLUSE_N - 1 && !p.name.startsWith("floor"));
+    expect(side(art.SHOP_RECLUSE_LAYOUT).every((p) => p.name === "wall-none")).toBe(true);
+    expect(side(art.SHOP_RECLUSE_LAYOUT_CARDS).every((p) => p.name.startsWith("wall-") && p.name !== "wall-none")).toBe(true);
+    const wall = art.sideWallGrid(true, art.SHOP_RECLUSE_N + 2);
+    expect(wall.grid.length).toBe(art.SHOP_RECLUSE_WALL_H);
+    expect(wall.grid[0]!.length).toBe((art.SHOP_RECLUSE_N + 2) * 37);
   });
 });
 
