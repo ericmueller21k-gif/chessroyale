@@ -1140,6 +1140,273 @@ export function playLayers(p: PlayPose): Layer[] {
   return layers;
 }
 
+// ---- From the side (Nov 13, round 3; Eric: "the board should be left and right so you can see him walk on left and right and still
+// see the board when he plays, and he should be centered on each side when he plays moves, have him lean in more over the board so the
+// arm stretch isn't as obvious"). The board's sides are now left and right of it, so he's seen side on: kneeling back on his heels,
+// up on his knees leaning in over the board (five depths, and a dip toward us for the near files), standing, crouching, and a 4-step
+// walk. Drawn facing our right; the scene mirrors him for the board's other side. His near arm, out over the board, is the scene's.
+// Every part painted from the body's points (a hip, a knee, an ankle, a shoulder, the neck), so a lean is just new angles.
+
+/** How far he leans in, each level: his thighs tipped forward from his knees, his back from upright (degrees), his head bowed. */
+export const SIDE_LEANS: readonly { thigh: number; back: number; head: number }[] = [
+  { thigh: 0, back: 10, head: 14 },
+  { thigh: -4, back: 28, head: 16 },
+  { thigh: 2, back: 44, head: 20 },
+  { thigh: 10, back: 58, head: 23 },
+  { thigh: 18, back: 69, head: 25 },
+  { thigh: 26, back: 78, head: 27 },
+];
+/** A dip toward us (his near shoulder lower, for the board's near files): drawing pixels down, each level. */
+const SIDE_DIP = [0, 4, 8] as const;
+export interface SidePose {
+  /** Back on his heels, up on his knees (leaning), standing or walking, or crouched half way between. */
+  stance: "heels" | "knees" | "stand" | "crouch";
+  /** Walking (standing): the step, 0 to 3; -1 still. */
+  step: -1 | 0 | 1 | 2 | 3;
+  /** On his knees: how far in (SIDE_LEANS; 0 is back on his heels). */
+  lean: 0 | 1 | 2 | 3 | 4 | 5;
+  dip: 0 | 1 | 2;
+  /** His near arm out over the board (the scene draws it); otherwise his hand rests on his thigh. */
+  reach: boolean;
+  eyes: "down" | "ahead" | "shut";
+  mouth: "stern" | "smile";
+}
+export const sideName = (p: SidePose): string => `side-${p.stance}-${p.step < 0 ? "n" : p.step}-${p.lean}-${p.dip}-${p.reach ? "r" : "n"}-${p.eyes}-${p.mouth}`;
+const deg = (d: number) => (d * Math.PI) / 180;
+/** His points for a pose (drawing space, facing our right): hip, the two knees and ankles (near, far), shoulder, the neck's top. */
+function sideBody(p: SidePose): { hip: Pt; knee: [Pt, Pt]; ankle: [Pt, Pt]; sh: Pt; neck: Pt; head: number; up: number } {
+  const TORSO_LEN = 25;
+  const NECK = 6;
+  if (p.stance === "stand") {
+    // Walking: each leg's knee and ankle by the step (0: near foot forward; 2: far foot forward; 1 and 3: passing, the body up a pixel).
+    const s = p.step;
+    const up = s === 1 || s === 3 ? 1 : 0;
+    const hip: Pt = [46, 97 - up];
+    const fwd = (lead: boolean): { k: Pt; a: Pt } =>
+      s < 0 ? { k: [46.5, 111], a: [46, 124] } : s === 1 || s === 3 ? (lead === (s === 1) ? { k: [48.5, 110], a: [44, 121] } : { k: [46.5, 111 - up], a: [46, 124] }) : lead ? { k: [49, 110], a: [51, 124] } : { k: [44, 111], a: [40.5, 123] };
+    const n = fwd(s === 0 || s === 3);
+    const f = fwd(s === 2 || s === 1);
+    const lean = s < 0 ? 2 : 5;
+    const sh: Pt = [hip[0] + TORSO_LEN * Math.sin(deg(lean)), hip[1] - TORSO_LEN * Math.cos(deg(lean))];
+    return { hip, knee: [n.k, f.k], ankle: [n.a, f.a], sh, neck: [sh[0] + NECK * Math.sin(deg(lean)), sh[1] - NECK], head: 4, up };
+  }
+  if (p.stance === "crouch") {
+    // Half way between standing and his heels: knees bent forward, his weight over his feet, a lean.
+    const hip: Pt = [42, 111];
+    const sh: Pt = [hip[0] + TORSO_LEN * Math.sin(deg(24)), hip[1] - TORSO_LEN * Math.cos(deg(24))];
+    return { hip, knee: [[54, 113], [53, 112]], ankle: [[45, 125], [44, 125]], sh, neck: [sh[0] + NECK * Math.sin(deg(24)), sh[1] - NECK * Math.cos(deg(24))], head: 16, up: 0 };
+  }
+  const L = SIDE_LEANS[p.stance === "heels" ? 0 : p.lean]!;
+  const knee: Pt = [54, 124];
+  // Back on his heels: his seat on his heels, the thighs forward along the floor to his knees; up on his knees: the thighs up from them.
+  const hip: Pt = p.stance === "heels" ? [41, 119] : [knee[0] + 14 * Math.sin(deg(L.thigh)), knee[1] - 14 * Math.cos(deg(L.thigh))];
+  const dip = SIDE_DIP[p.dip];
+  const sh: Pt = [hip[0] + TORSO_LEN * Math.sin(deg(L.back)), hip[1] - TORSO_LEN * Math.cos(deg(L.back)) + dip];
+  // (His neck bends up out of a deep lean, so he looks at the board, not into it.)
+  const nb = deg(L.back * 0.55 + 4);
+  const neck: Pt = [sh[0] + NECK * Math.sin(nb), sh[1] - NECK * Math.cos(nb)];
+  return { hip, knee: [knee, [knee[0] - 1, knee[1] - 1]], ankle: [[40, 126], [39, 125]], sh, neck, head: L.head + dip * 1.5, up: 0 };
+}
+/** His near shoulder in the frame's pixels (facing our right): the scene's arm starts there. */
+export function sideShoulder(p: SidePose): Pt {
+  const b = sideBody(p);
+  return [OX_S + b.sh[0] + 1, OY + b.sh[1] + 1];
+}
+/** Where his near hand rests in the frame's pixels (on his thigh by the knee): a reach starts and ends there. */
+export function sideRest(p: SidePose): Pt {
+  const b = sideBody(p);
+  const k = b.knee[0];
+  if (p.stance === "knees" && p.lean >= 2) {
+    // (Leaning in, his arm hangs under his shoulder, the hand just over the floor.)
+    return [OX_S + b.sh[0] + 3, OY + Math.min(124, b.sh[1] + 20)];
+  }
+  return [OX_S + (b.hip[0] + k[0]) / 2 + 3, OY + (b.hip[1] + k[1]) / 2 - 3];
+}
+
+/** The head side on, facing our right, bowed `tilt` degrees: painted from its shapes (skull, jaw, nose, ear, hair), the features stamped. */
+function sideHead(tilt: number, eyes: SidePose["eyes"], mouth: SidePose["mouth"]): { part: Part; at: Pt } {
+  // (Its own space: the skull's middle at the origin, the face toward +u. A box round it, then each pixel's middle turned back into it.)
+  const R = 15;
+  const cv = canvas(2 * R, 2 * R);
+  const a = deg(tilt);
+  const ca = Math.cos(a);
+  const sa = Math.sin(a);
+  const local = (x: number, y: number): Pt => {
+    const dx = x + 0.5 - R;
+    const dy = y + 0.5 - R;
+    return [dx * ca + dy * sa, -dx * sa + dy * ca];
+  };
+  const toPx = (u: number, v: number): Pt => [R + u * ca - v * sa, R + u * sa + v * ca];
+  const inE = (u: number, v: number, cu: number, cv0: number, ru: number, rv: number) => ((u - cu) / ru) ** 2 + ((v - cv0) / rv) ** 2 <= 1;
+  const skull = (u: number, v: number) => inE(u, v, -1, -2, 9, 9.5);
+  const face = (u: number, v: number) => u > -2.5 && (inE(u, v, 2.6, 3.6, 6.4, 6.8) || inE(u, v, 4.4, 7.4, 3.9, 2.9));
+  const nose = (u: number, v: number) => u >= 7 && v >= -0.5 && v <= 4.6 && u <= 7.4 + (v + 0.5) * 0.62 && !(v > 3.6 && u > 9.4);
+  const neck = (u: number, v: number) => u >= -3.6 && u <= 1.8 && v >= 6 && v <= 13;
+  const ear = (u: number, v: number) => inE(u, v, -1.4, 2.2, 1.9, 2.6);
+  const hairBottom = (u: number) => (u >= 2.6 ? -4.2 : u >= 0.9 ? 0.8 : u >= -3.4 ? -0.9 : 6);
+  const hair = (u: number, v: number) => (inE(u, v, -1.4, -2.7, 9.9, 10.2) && v < hairBottom(u) && (u < 7.6 || v < -5.4)) || inE(u, v, 6.4, -6.2, 3.1, 2);
+  for (let y = 0; y < 2 * R; y++)
+    for (let x = 0; x < 2 * R; x++) {
+      const [u, v] = local(x, y);
+      const sx = x + 0.5 - R;
+      const sy = y + 0.5 - R;
+      const l = 0.6 - 0.42 * (sx / 10) - 0.45 * (sy / 11);
+      if (hair(u, v)) {
+        // (Clumps swept back from his brow, darker in the grooves and at the edges.)
+        const groove = (u * 0.55 - v * 0.8 + 30) % 3 < 0.85;
+        cv[y]![x] = ramp("HhjJ", l + 0.05 - (groove ? 0.24 : 0) - (inE(u, v, -1.4, -2.7, 8.6, 9) ? 0 : 0.12));
+      } else if (ear(u, v) && !face(u, v)) cv[y]![x] = inE(u, v, -1.2, 2.3, 0.9, 1.4) ? "a" : ramp("bcd", l);
+      else if (skull(u, v) || face(u, v) || nose(u, v)) cv[y]![x] = ramp("abcde", l + 0.08 + (nose(u, v) && u > 8 ? 0.1 : 0) - (v > 7 && u < 4 ? 0.15 : 0));
+      else if (neck(u, v)) cv[y]![x] = ramp("abc", l - 0.05);
+    }
+  // The features, each at its place turned with the head (stamped upright: a pixel's eye can't be turned).
+  const put = (rows: readonly string[], u: number, v: number) => {
+    const [x, y] = toPx(u, v);
+    stamp(cv, 0, 0, rows, Math.round(x), Math.round(y));
+  };
+  put(["HHHH"], 4.2, -2.6);
+  put(eyes === "shut" ? ["bb", "xx"] : eyes === "down" ? ["bb", "wx"] : ["wx", "wx"], 5, -0.5);
+  put(mouth === "smile" ? ["m..", ".mm"] : ["mm"], mouth === "smile" ? 6.6 : 7.6, mouth === "smile" ? 5.6 : 6.6);
+  // (The nostril.)
+  put(["b"], 8.6, 3.4);
+  // Where it joins his neck: the neck's top (0, 11) of its own space.
+  const [jx, jy] = toPx(-0.9, 11);
+  return { part: { grid: toGrid(cv) }, at: [-jx, -jy] };
+}
+/** His torso side on, from his hip to his neck: the dungarees' waist, then the striped tee across it, a sleeve's cap at the shoulder. */
+function sideTorso(hip: Pt, sh: Pt): { part: Part; at: Pt } {
+  const len = Math.hypot(sh[0] - hip[0], sh[1] - hip[1]);
+  const ax = (sh[0] - hip[0]) / len;
+  const ay = (sh[1] - hip[1]) / len;
+  const box = boxOf([hip, sh], 8);
+  const cv = canvas(box.w, box.h);
+  for (let y = 0; y < box.h; y++)
+    for (let x = 0; x < box.w; x++) {
+      const px = box.x0 + x + 0.5 - hip[0];
+      const py = box.y0 + y + 0.5 - hip[1];
+      const t = px * ax + py * ay;
+      // (Across: + toward his front, his chest; the back flatter.)
+      const d = -px * ay + py * ax;
+      const front = -d;
+      if (t < -1.5 || t > len + 3) continue;
+      const half = t < 5 ? 4.8 : t < len - 4 ? 5.1 + 0.7 * Math.sin(((t - 5) / (len - 9)) * Math.PI) : 4.9 - Math.max(0, t - len) * 0.9;
+      const off = t > 9 && t < len - 3 ? 0.6 : 0;
+      if (Math.abs(front - off) > half) continue;
+      const l = 0.6 - 0.45 * (front > 0 ? -0.2 : 0.3) * (Math.abs(front) / half) - 0.3 * ((y + box.y0 - (hip[1] + sh[1]) / 2) / 14) - 0.25 * (Math.abs(front - off) / half) ** 2;
+      if (t < 3) cv[y]![x] = ramp(TROUSERS.child, l - 0.05);
+      else {
+        const red = Math.floor((len - t) / 2) % 2 === 1;
+        cv[y]![x] = l > 0.46 ? (red ? "R" : "I") : red ? "P" : "S";
+      }
+    }
+  return { part: { grid: toGrid(cv) }, at: [box.x0, box.y0] };
+}
+/** A leg side on: the thigh and shin in dungarees, the cuff turned up, the sneaker (toe forward; on his knees, the sole up behind). */
+function sideLeg(hip: Pt, knee: Pt, ankle: Pt, kneeling: boolean, near: boolean): { part: Part; at: Pt } {
+  const box = boxOf([hip, knee, ankle], 9);
+  const cv = canvas(box.w, box.h);
+  const l = paintLimb([hip, knee, ankle], 2.9, 2.3, TROUSERS.child, near ? 0.62 : 0.46);
+  l.cv.forEach((row, y) => row.forEach((k, x) => k !== "." && cv[l.at[1] - box.y0 + y]?.[l.at[0] - box.x0 + x] !== undefined && (cv[l.at[1] - box.y0 + y]![l.at[0] - box.x0 + x] = k)));
+  const ax = Math.round(ankle[0]);
+  const ay = Math.round(ankle[1]);
+  if (kneeling) {
+    // The foot lying on its top behind him: the canvas, its white toe cap on the floor, the sole up at the back.
+    stamp(cv, box.x0, box.y0, ["r###", "rt##", "rrtt"], ax - 6, ay - 2);
+  } else {
+    // The cuff, then the sneaker, toe forward.
+    stamp(cv, box.x0, box.y0, ["Z=&=", "&=&="], ax - 2, ay - 4);
+    stamp(cv, box.x0, box.y0, ["..##...", ".######", "######t", "rrrrrrr"], ax - 2, Math.min(ay, 124));
+  }
+  return { part: { grid: toGrid(cv) }, at: [box.x0, box.y0] };
+}
+const SIDE = new Map<string, { part: Part; at: Pt }>();
+const sidePart = (name: string, make: () => { part: Part; at: Pt }): { name: string; at: Pt } => {
+  const n = add(name, () => (SIDE.get(name) ?? SIDE.set(name, make()).get(name)!).part);
+  return { name: n, at: (SIDE.get(name) ?? SIDE.set(name, make()).get(name)!).at };
+};
+const key = (...pts: Pt[]) => pts.map((p) => `${r2(p[0])},${r2(p[1])}`).join(";");
+/** The frame for his side poses: wider (he leans out over the board ahead of him), his foot at x 36. */
+const OX_S = -10;
+const W_S = 124;
+add("shadow:side", () => shadow(30));
+export function sideLayers(p: SidePose): Layer[] {
+  const b = sideBody(p);
+  const at = (part: string, x: number, y: number): Layer => ({ part, x: OX_S + Math.round(x), y: OY + Math.round(y) });
+  const kneeling = p.stance === "heels" || p.stance === "knees";
+  const layers: Layer[] = [at("shadow:side", 46 - 15 + (kneeling ? 1 : 0), 126)];
+  const leg = (i: 0 | 1) => sidePart(`sleg:${key(b.hip, b.knee[i], b.ankle[i])}:${kneeling ? 1 : 0}:${i}`, () => sideLeg(b.hip, b.knee[i], b.ankle[i], kneeling, i === 0));
+  const arm = (sh: Pt, el: Pt, wr: Pt) => armPart("child", sh, el, wr);
+  const hand = (wr: Pt, flex: boolean) => {
+    const hw = HANDS.child.rest[0]!.length;
+    return at(`hand:child:${flex ? "flex" : "rest"}`, wr[0] - (hw - 3), wr[1] - 1);
+  };
+  // His far arm (behind him): swinging as he walks, on his far thigh, or leaning in, under his chest, the hand on the floor.
+  const swing = p.stance === "stand" && p.step >= 0 ? (p.step === 0 ? 1 : p.step === 2 ? -1 : 0) : 0;
+  const farSh: Pt = [b.sh[0] - 1, b.sh[1] - 1];
+  let farWr: Pt;
+  let farEl: Pt;
+  if (p.stance === "knees" && p.lean >= 2) {
+    farWr = [farSh[0] - 1, Math.min(124, farSh[1] + 21)];
+    farEl = [farSh[0] - 4, (farSh[1] + farWr[1]) / 2];
+  } else if (kneeling || p.stance === "crouch") {
+    farWr = [(b.hip[0] + b.knee[1][0]) / 2 + 2, (b.hip[1] + b.knee[1][1]) / 2 - 4];
+    farEl = [farSh[0] - 2, (farSh[1] + farWr[1]) / 2 + 1];
+  } else {
+    farWr = [farSh[0] + swing * 4, farSh[1] + 23];
+    farEl = [farSh[0] + swing * 2 - 1, farSh[1] + 12];
+  }
+  const fa = arm(farSh, farEl, farWr);
+  layers.push(at(fa.name, fa.at[0], fa.at[1]), hand(farWr, true));
+  const fl = leg(1);
+  layers.push(at(fl.name, fl.at[0], fl.at[1]));
+  const nl = leg(0);
+  layers.push(at(nl.name, nl.at[0], nl.at[1]));
+  const t = sidePart(`storso:${key(b.hip, b.sh)}`, () => sideTorso(b.hip, b.sh));
+  layers.push(at(t.name, t.at[0], t.at[1]));
+  const tilt = Math.round(b.head / 2) * 2;
+  const h = sidePart(`shead:${tilt}:${p.eyes}:${p.mouth}`, () => sideHead(tilt, p.eyes, p.mouth));
+  layers.push(at(h.name, b.neck[0] + h.at[0], b.neck[1] + h.at[1]));
+  if (!p.reach) {
+    // His near arm: swinging as he walks, or the hand on his thigh (or hanging under him, leaning in).
+    const rest = sideRest(p);
+    const wr: Pt = p.stance === "stand" ? [b.sh[0] - swing * 4, b.sh[1] + 23] : [rest[0] - OX_S, rest[1] - OY];
+    const el: Pt = p.stance === "stand" ? [b.sh[0] - swing * 2 + 0.5, b.sh[1] + 12] : [Math.min(b.sh[0], wr[0]) - 2.5, (b.sh[1] + wr[1]) / 2 + 1];
+    const na = arm(b.sh, el, wr);
+    layers.push(at(na.name, na.at[0], na.at[1]), hand(wr, p.stance !== "stand"));
+  }
+  return layers;
+}
+const SIDE_FACES = [
+  ["down", "stern"],
+  ["ahead", "stern"],
+  ["shut", "stern"],
+  ["ahead", "smile"],
+  ["down", "smile"],
+] as const;
+export const SIDE_POSES: readonly SidePose[] = [
+  ...([-1, 0, 1, 2, 3] as const).map((step): SidePose => ({ stance: "stand", step, lean: 0, dip: 0, reach: false, eyes: "down", mouth: "stern" })),
+  { stance: "crouch", step: -1, lean: 0, dip: 0, reach: false, eyes: "down", mouth: "stern" },
+  ...SIDE_FACES.map(([eyes, mouth]): SidePose => ({ stance: "heels", step: -1, lean: 0, dip: 0, reach: false, eyes, mouth })),
+  ...([1, 2, 3, 4, 5] as const).flatMap((lean) =>
+    ([0, 1, 2] as const).flatMap((dip) => ([false, true] as const).map((reach): SidePose => ({ stance: "knees", step: -1, lean, dip, reach, eyes: "down", mouth: "stern" }))),
+  ),
+];
+/** The child side on: every pose the scene draws him in (one frame each, cue `pose`), and an idle (thinking on his heels, a blink). */
+export const RECLUSE_CHILD_SIDE: Character = {
+  id: "recluse-child-side",
+  name: "Hidden Boss age 9, side on",
+  w: W_S,
+  h: H,
+  foot: [OX_S + 46, OY + 128],
+  palette: AGES_PALETTE,
+  halo: "#2a2733",
+  parts: PARTS_ALL,
+  anims: {
+    idle: lazyAnim(() => ({ loop: true, frames: Array.from({ length: 10 }, (_, i): Frame => ({ ms: 220, layers: sideLayers({ stance: "heels", step: -1, lean: 0, dip: 0, reach: false, eyes: i === 6 ? "shut" : "down", mouth: "stern" }) })) })),
+    ...Object.fromEntries(SIDE_POSES.map((p) => [sideName(p), lazyAnim(() => ({ loop: false, frames: [{ ms: 1000, cue: "pose", layers: sideLayers(p) }] }))])),
+  },
+};
+
 /** Thinking over the board (his idle when nothing's played): eyes down, a blink, a glance up. */
 const SIT_IDLE = (): Frame[] =>
   Array.from({ length: 12 }, (_, i): Frame => ({ ms: 200, layers: sitLayers({ lean: 1, reach: "", eyes: i === 5 ? "shut" : i >= 8 && i < 10 ? "ahead" : "down", mouth: "stern" }) }));
@@ -1161,4 +1428,4 @@ export const RECLUSE_CHILD_SIT: Character = {
 };
 
 /** Everything this mockup draws, for the preview and the tests; none of it is in CHARACTERS or any kit. */
-export const RECLUSE_AGES_PREVIEW: readonly Character[] = [RECLUSE_CHILD, RECLUSE_TEEN, RECLUSE_YOUNG, RECLUSE_CHILD_BUST, RECLUSE_TEEN_BUST, RECLUSE_YOUNG_BUST, RECLUSE_GROW, RECLUSE_GHOST, RECLUSE_CHILD_SIT];
+export const RECLUSE_AGES_PREVIEW: readonly Character[] = [RECLUSE_CHILD, RECLUSE_TEEN, RECLUSE_YOUNG, RECLUSE_CHILD_BUST, RECLUSE_TEEN_BUST, RECLUSE_YOUNG_BUST, RECLUSE_GROW, RECLUSE_GHOST, RECLUSE_CHILD_SIT, RECLUSE_CHILD_SIDE];
