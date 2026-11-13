@@ -943,7 +943,7 @@ function startTown(
   const loss = lossWatch(() => painter.lost, () => document.hidden, LOST_WAIT_MS, () => alive && fail("not-back"));
   const onLost = (lost: boolean) => {
     loss.changed();
-    if (!lost && alive) draw(performance.now());
+    if (!lost && alive && !failed) draw(performance.now());
   };
   const makePainter = (): Painter => {
     if (!STREET_TOWN) return painter2d(cv);
