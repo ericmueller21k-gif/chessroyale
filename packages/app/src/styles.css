@@ -24123,6 +24123,9 @@ button.sq-tiny {
   .boss-dock.dk-strip.dk-pawn > .engine-move.gk-tool {
     left: calc(var(--dk-left, 0px) + var(--dk-w, 100%) - 116px - 64px);
   }
+  .boss-dock.dk-strip.dk-pawn > .win-form.gk-tool {
+    left: calc(var(--dk-left, 0px) + var(--dk-w, 100%) - 116px - 94px);
+  }
   .boss-dock.dk-strip.dk-pawn > .dk-race-below {
     right: calc(100% - var(--dk-left, 0px) - var(--dk-w, 100%) + 124px);
   }
@@ -24193,6 +24196,9 @@ button.sq-tiny {
   }
   .boss-dock.dk-strip.dk-pawn.dk-stack > .engine-move.gk-tool {
     left: calc(var(--dk-left, 0px) + var(--dk-w, 100%) - 58px * var(--dk-k, 1) - 64px);
+  }
+  .boss-dock.dk-strip.dk-pawn.dk-stack > .win-form.gk-tool {
+    left: calc(var(--dk-left, 0px) + var(--dk-w, 100%) - 58px * var(--dk-k, 1) - 94px);
   }
   .boss-dock.dk-strip.dk-pawn.dk-stack > .dk-race-below {
     right: calc(100% - var(--dk-left, 0px) - var(--dk-w, 100%) + 58px * var(--dk-k, 1) + 8px);
