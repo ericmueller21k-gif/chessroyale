@@ -319,10 +319,14 @@ export function SpeechBox({ class: cls, text, at, until, now, fits = 0, balanced
     // stands him further from the board, and his words came out under the menu.)
     const nav = document.querySelector(".gm-frame > .fd-side")?.getBoundingClientRect();
     const minX = nav && nav.width > 0 && nav.right < innerWidth / 2 ? Math.ceil(nav.right) : 0;
-    const out = r.top < 0 || r.left < minX || r.right > innerWidth;
+    // (The game screen's own right edge clips a box before the window's does (Eric, Nov 13: the God King's words cut off on a computer):
+    // the box keeps inside the screen, over the pawn if need be.)
+    const clip = e.closest(".screen")?.getBoundingClientRect();
+    const maxX = clip && clip.width > 0 ? Math.min(innerWidth, Math.floor(clip.right)) : innerWidth;
+    const out = r.top < 0 || r.left < minX || r.right > maxX;
     if (!out) return;
     if (fit.step < fits) setFit({ step: fit.step + 1, dx: 0, dy: 0 });
-    else setFit({ step: fit.step, dx: r.left < minX ? minX - r.left : r.right > innerWidth ? innerWidth - r.right : 0, dy: r.top < 0 ? -r.top : 0 });
+    else setFit({ step: fit.step, dx: r.left < minX ? minX - r.left : r.right > maxX ? maxX - r.right : 0, dy: r.top < 0 ? -r.top : 0 });
   }, [fit]);
   const { shown, rest } = sliceLine(text, typed ?? typedCount(text, at, now));
   const leaving = until - now < SPEECH.fadeMs;

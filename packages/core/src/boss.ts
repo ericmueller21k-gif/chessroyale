@@ -1,6 +1,6 @@
 import { PRIOR_RATING } from "./rating.ts";
 import { mulberry32, randomInt } from "./rng.ts";
-import { BOSS_ADMIN_FIRST, BOSS_BRAIN, BOSS_LEVEL, type BossBrain, type BossBrainSettings, type Settings } from "./settings.ts";
+import { BOSS_ADMIN_FIRST, BOSS_BRAIN, BOSS_LEVEL, RECLUSE_CHILD, type BossBrain, type BossBrainSettings, type Settings } from "./settings.ts";
 
 /**
  * Boss battle: the Crowd's finalists team up against a boss. Its strength comes
@@ -405,6 +405,35 @@ export function maiaRatingFor(level: number, s: Pick<BossBrainSettings, "maiaRat
   }
   return pts[pts.length - 1]![1];
 }
+
+/**
+ * The strength on the game's rating scale at which Maia plays `rating` (BOSS_BRAIN.maiaRating's lines read the other way), for
+ * a boss whose Maia rating is set rather than worked out from his strength (the Hidden Boss's child: Stockfish at this strength
+ * while Maia loads or if it fails). Above Maia's top: the level it's reached at (fixedLevel).
+ */
+export function levelForMaia(rating: number, s: Pick<BossBrainSettings, "maiaRating"> = BOSS_BRAIN): number {
+  const pts = s.maiaRating;
+  if (rating >= pts[pts.length - 1]![1]) return pts[pts.length - 1]![0];
+  for (let i = 1; i < pts.length; i++) {
+    const [xa, ya] = pts[i - 1]!;
+    const [xb, yb] = pts[i]!;
+    if (rating <= yb) return Math.round(xa + ((Math.max(ya, rating) - ya) * (xb - xa)) / Math.max(1, yb - ya));
+  }
+  return pts[pts.length - 1]![0];
+}
+
+type ChildRamp = Pick<typeof RECLUSE_CHILD, "startRating" | "stepRating" | "everyPlies">;
+/** The child form's last step: where his rating reaches Maia's top (`top`, his adult form's). */
+export const childSteps = (s: ChildRamp = RECLUSE_CHILD, top = maiaTopRating()): number => Math.max(0, Math.ceil((top - s.startRating) / s.stepRating));
+/**
+ * The Hidden Boss's child form (RECLUSE_CHILD): the step of his ramp after `plies` moves on the board in this form (both sides'),
+ * 0 at the start, one more every `everyPlies`, up to childSteps.
+ */
+export const childStep = (plies: number, s: ChildRamp = RECLUSE_CHILD, top = maiaTopRating()): number => Math.min(childSteps(s, top), Math.floor(Math.max(0, plies) / s.everyPlies));
+/** His Maia rating after `plies` moves in the child form: startRating plus stepRating a step, held at Maia's top (`top`). */
+export const childRating = (plies: number, s: ChildRamp = RECLUSE_CHILD, top = maiaTopRating()): number => Math.min(top, s.startRating + s.stepRating * childStep(plies, s, top));
+/** Which of his drawings shows at a Maia `rating` in the child form (RECLUSE_CHILD.ages): 0 about 9, 1 about 13, 2 about 20, 3 his adult look. */
+export const childAge = (rating: number, ages: readonly number[] = RECLUSE_CHILD.ages): number => Math.max(0, ages.filter((a) => rating >= a).length - 1);
 
 /** How a boss plays a battle: its brain, the rating Maia plays at (null: Stockfish), and the bridge's share of Stockfish's moves. */
 export interface BossBrainPlan {

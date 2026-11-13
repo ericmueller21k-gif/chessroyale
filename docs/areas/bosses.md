@@ -48,8 +48,8 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
   adult form (phase 1) `recluse-phase2` from the start (online too); beaten with the phase change next (solo, the fall's `toPhase2`)
   `recluse-beaten` at once (0.3 s fade); the phase change `recluse-phase3`, its loop on the board's crack (`phaseChange.splitAt` =
   `at + PHASE_CHANGE.crackAt`), its intro started `introSeconds` before (from themes.json, never code; the beaten theme fades 0.5 s
-  from there; late, the loop alone on the drop), on through phase 2 until every board is decided. `recluse-house` (the child form)
-  isn't played yet: its hook is `recluseMusic`. Not in the town's loading: fetched as his fight starts (`ahead`), the transformation's
+  from there; late, the loop alone on the drop), on through phase 2 until every board is decided. `recluse-house` plays through his child form
+  (`recluseMusic`'s `child`, its fall too), his adult theme after it with MUSIC_SWITCH's 1.5 s fade. Not in the town's loading: fetched as his fight starts (`ahead`), the transformation's
   decoded as he's beaten (`next`). With the 8.740 s intro (handoff f12f1c5b) his transformation started as he rose in his rage and
   `marks.slam` landed on the book hitting the floor; since his chant's two lines (Nov 13) the rise to the crack is 17.435 s, and
   until the music session's matching cut is in, the 8.74 s intro starts later, mid-chant; the drop lands on the split's first frame (4 to 8 ms measured). Tests: `music.test.ts` ("the Hidden
@@ -166,7 +166,17 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
   phase change and the four boards online, to the real result (Nov 13: "Phase 2 online", below). **A tie at the top** (2-2 in a
   team of four) goes by strength, as a no-majority turn does: the engine's best of the tied moves, or one within `closeCp` at random
   (Eric, Nov 12: "a deliberate blunder never wins a tie"; a party of three never ties at two, so its draws are as before).
-- **Win this form** (admins only, Boss alone, the Hidden Boss only, Nov 13: for Eric's timing test of his music and phase
+- **His child form** (Nov 13; [decision](../decisions/2026-11-13-hidden-boss-child-form.md); RECLUSE_CHILD): his first form, solo (an
+  admin's Boss alone, a solo Crowd's final: `settings.recluseChild`, set by solo only; `?form=adult` starts at the man). `BossState.form`
+  "child": no powers (`bossPowers` none; `RECLUSE_CHILD_RULES`: never strikes, the God King's help works), Maia raw at core
+  `childRating` (1800, +100 every 4 moves on the board, to Maia's top 2500, the man's), Stockfish at `levelForMaia` of it while Maia
+  loads; his level from that rating (`formStep` in the view), popping at each step (BossLevel). His figure: `RECLUSE_CHILD_KIT`
+  (`bossKitOf`) draws `RECLUSE_GROWING` (recluse-ages.ts: each age's idle and the growing steps), stepped by a figure run from
+  `formStep` (components/RecluseChild.ts, once each); the kid's lines `RECLUSE_CHILD_LINES`. Beaten: nobody placed
+  (finishBossBattle), his line, he grows up into the man (`growUpAt`, `fallMs`), then the runner's `nextBossForm`: a new match
+  against his adult form (solo `nextForm`: his entrance again). Online waits for the server's form list. Tests:
+  `chess/test/recluse-child.test.ts`, `app/test/recluse-child.test.ts`, `e2e/recluse.spec.ts` ("his child form first").
+- **Win this form** (admins only, Boss alone, the Hidden Boss only, Nov 13; his child form too: for Eric's timing test of his music and phase
   change): a 🏆 after the 🐟 (a computer: in the title line). Pressed, your next move beats his adult form by the end a mate takes
   (the runner's `bossForceWin`: `stageComplete`, then `finishBossBattle`'s "crowd"; his fall, phase change and music follow as for
   real), or in phase 2 wins every board still on (`phase2WinAll`) and the result plays. Greyed once pressed. Gated by

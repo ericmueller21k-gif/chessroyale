@@ -217,6 +217,13 @@ export interface NetBoss {
   level?: number | null;
   /** The level at its usual strength: the bar shows a lift or a slash as `level` against it (missing with `level`; none for "???"). */
   levelBase?: number;
+  /**
+   * The boss's form, when it isn't his usual one (BossState.form): "child", the Hidden Boss's first (RECLUSE_CHILD), and the step
+   * of his ramp now (`formStep`, core childStep: 0 at the start, one more every RECLUSE_CHILD.everyPlies moves): his level and his
+   * drawing (core childAge) follow it. Missing: his usual form.
+   */
+  form?: "child";
+  formStep?: number;
   /** The side the crowd plays. */
   crowdSide: "w" | "b";
   crowdMoves: number;

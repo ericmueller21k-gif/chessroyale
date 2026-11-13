@@ -48,6 +48,7 @@ import {
   RAID_SETTINGS,
   RANKED_1V1,
   RANKING,
+  RECLUSE_CHILD,
   RECLUSE_PHASE2,
   GLOBAL_CHAT,
   TOWN_CHAT,
@@ -924,6 +925,7 @@ function crowdFinalBlock(src: FaqSources, b: BossDef): string {
   return `
 Met in the Crowd's boss final, where it's always him, against the top ${n2}, and in Chess Town: up the stairs of his walk-up to the top floor, where up to ${n(HIDDEN_ROOM.players, "player")} in his room challenge him together (each taps **Challenge**; at ${HIDDEN_ROOM.players} you fight him as one team: the move most of you picked is played, and a tie goes to the stronger move; if ${HIDDEN_ROOM.players} haven't challenged within ${n(HIDDEN_ROOM.capSec / 60, "minute")}, the request ends). He plays from the starting position (he has no memorized openings), with the crowd as White, and his strength never follows anyone's rating: Maia at its top, raw. More in [his strength and brain](#boss-strength).
 
+- **First, the child** (in a Solo game; online his fight starts at the man for now): he begins as a boy with no powers at all (no No Help, no Bullet: the God King's help works), Maia at ${num(RECLUSE_CHILD.startRating)}, ${num(RECLUSE_CHILD.stepRating)} stronger every ${n(RECLUSE_CHILD.everyPlies, "move")} on the board (yours and his), up to ${num(maiaTopRating())}, the man's own strength. His level climbs with it, and he grows older as it does. Beat him and he grows up: a new game starts from the beginning, against the man below. If the boy wins or it's a draw, the fight is over.
 - **No Help** (passive): the God King's help doesn't work against him: his move, his strike and his Last Stand never come. Calling him spends a charge all the same, and ${bossInText(b.name, false, src.roster)} mocks it. He never strikes anyone down either: all ${n2} of you play to the end.
 - **Bullet** (ultimate): a meter of his own, full as turn ${p.bulletTurn} begins, when it comes with no warning. From then on every bank is ${clock(p.bulletBankSeconds)}, with no cap on a move${increment}. If everyone still in runs out of time, he wins on time.
 - **Beaten:** his second phase follows, online and in a Solo game: he absorbs the God King (gone for the rest of the fight), then ${n(P.boards, "board")} of Freestyle chess at once (the back-row pieces shuffled), each from its own start, one for each of you who fought him (bots on any left over; online, a bot plays on for anyone who leaves), against Stockfish at ${num(P.elo)}. A ${num(P.change.countdownSeconds)}-second countdown on every board, then ${clock(P.bankSeconds)} a board with no added time, and a board whose clock runs out is lost; all ${num(P.boards)} must be won. A move slower than ${num(P.slowMoveSeconds)} s counts against the team, and the team's ${ordinal(P.slowMovesForUlt)} brings his last power: from then on ${num(P.ultMoveSeconds)} s a move on every board, and a move out of time is played at random for you.`;
@@ -984,7 +986,7 @@ Then the meter empties and fills again for the next one. While an ultimate is st
 
 ### The level in a boss's bar {#boss-level}
 
-Under each boss's name the bar shows a level, like "LVL 54": a number from 1 to ${src.level.max} for how strong the boss plays. It starts from the boss's strength (its rating over ${src.level.divisor}) and moves up or down by up to ${src.level.spread} for each battle, so the same boss can show a different level next time; it's the same for everyone in a battle. It follows his strength as it changes: while the boss plays at full strength (Moo & Moon's Full Moon, Wrangler's reply to his showdown) the level rises, gold with a small arrow, and for the one move the God King's strike weakens it falls ${src.level.weakDrop / src.level.divisor} levels, red with a slash, then it's back. The Crowd's final boss shows "LVL ???".
+Under each boss's name the bar shows a level, like "LVL 54": a number from 1 to ${src.level.max} for how strong the boss plays. It starts from the boss's strength (its rating over ${src.level.divisor}) and moves up or down by up to ${src.level.spread} for each battle, so the same boss can show a different level next time; it's the same for everyone in a battle. It follows his strength as it changes: while the boss plays at full strength (Moo & Moon's Full Moon, Wrangler's reply to his showdown) the level rises, gold with a small arrow, and for the one move the God King's strike weakens it falls ${src.level.weakDrop / src.level.divisor} levels, red with a slash, then it's back. The Crowd's final boss shows "LVL ???" (as the child, his first form, his level shows and climbs a step at a time).
 
 ${blocks}
 ${later.length ? `\n### Still to come {#bosses-later}\n\n${n(later.length, "more boss", "more bosses")} are waiting for their art and powers: ${later.join(", ")}.` : ""}

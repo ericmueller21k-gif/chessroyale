@@ -58,6 +58,7 @@ import { evalBarOn, practiceOn } from "./prefs.ts";
 import { noteSoloBattle } from "./boss-tokens.ts";
 import { noteSoloGame, settleSoloXp, soloGameId, soloTestGame } from "./xp.ts";
 import { isPaused, pausedBosses } from "./status.ts";
+import { kingSay, type KingCue } from "./godKing.ts";
 
 // Off the first load (Nov 10, phone load: home starts fast), each its own chunk: a match's screens (preloaded when play is
 // near), solo play with its runner and the boss rules, the FAQ, the legal pages and Auto chess (loaded on entry).
@@ -1026,7 +1027,8 @@ export function App() {
   // ?debug (a test switch): the match, the Squads clients and the 1 v 1 game on `window`, for tests and the console. (Each render, so
   // they're there once your account says you may, and a match joined before that, from a link, is too.)
   const debug = testParams().has("debug");
-  if (debug) Object.assign(window as unknown as Record<string, unknown>, { squads, party, duel, __measureSound: measureSound, ...(match ? { match } : {}) });
+  // (__kingSay: a God King line on cue, for the layout checks; the roll always lands.)
+  if (debug) Object.assign(window as unknown as Record<string, unknown>, { squads, party, duel, __measureSound: measureSound, __kingSay: (cue: KingCue, key: string) => kingSay(cue, key, Date.now(), () => 0), ...(match ? { match } : {}) });
 
   // ---------------- Squads ----------------
 
@@ -1234,7 +1236,10 @@ export function App() {
     setLoading(false);
     const fill = !!opts.fill;
     // (`botLevel`: home's Bot level box, the bots' average rating: Settings.botLevel.)
-    const m = new SoloMatch(engines, playerName(), { ...DEFAULT_SETTINGS, ...overridesFromUrl(mode, fill), ...(opts.botLevel !== undefined ? { botLevel: opts.botLevel } : {}) }, practiceOn(), fill);
+    // (The Hidden Boss starts as the child, solo (RECLUSE_CHILD); ?form=adult, a test switch, starts at his adult form, and so does
+    // ?phase=2, which jumps to his phase change from the man. Online waits for the server's form list: never in an online lobby's settings.)
+    const child = testParams().get("form") !== "adult" && testParams().get("phase") !== "2";
+    const m = new SoloMatch(engines, playerName(), { ...DEFAULT_SETTINGS, ...overridesFromUrl(mode, fill), ...(child ? { recluseChild: true } : {}), ...(opts.botLevel !== undefined ? { botLevel: opts.botLevel } : {}) }, practiceOn(), fill);
     // A boss battle (Boss alone, a Solo raid): the server notes its start, to time it for a boss token (boss-tokens.ts).
     // (`town`: a boss challenged from the town: the server announces it in the town's chat, and how it ended.)
     if (m.settings.raid) noteSoloBattle(m, opts.town);
@@ -2336,7 +2341,7 @@ function musicBattle(match: AnyMatch | null): MusicBattle | null {
   // (The Hidden Boss: a theme for each point of his fight, switched as it goes (recluseMusic). His later themes are fetched as his
   // fight starts where his phase change can follow: solo, and online his room's fight and the Crowd's final (Nov 13).)
   if (boss.id === "recluse") {
-    const r = recluseMusic(p, !!boss.result, !!match.simul?.decided);
+    const r = recluseMusic(p, !!boss.result, !!match.simul?.decided, boss.form === "child");
     const ahead = isSolo(match) || !!(match as { phase2Ahead?: boolean }).phase2Ahead;
     return r && { key: match, boss: boss.id, live, ...r, ...(ahead ? { ahead: [RECLUSE_MUSIC.beaten, RECLUSE_MUSIC.transform] } : {}) };
   }
