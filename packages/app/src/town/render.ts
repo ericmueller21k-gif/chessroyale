@@ -987,7 +987,7 @@ export class Renderer {
 
   /**
    * Draws one frame. `zoom`: 0 normal, 1 zoomed out (and between, while it glides); the street town: its zoom step (feel.ts
-   * streetZoomSteps: 0 in, 1 the default, 2 out, 3 the overview; between, while it glides). `dt`: seconds since the last.
+   * streetZoomSteps: 0 in, 1 the default, 2 out, 3 the overview, 4 the farthest (Nov 13); between, while it glides). `dt`: seconds since the last.
    */
   /** Frames drawn so far (what's worked out once a frame keys on it; the tags drawn once remember when each was last used). */
   private frameNo = 0;

@@ -83,7 +83,8 @@ export class StreetZoom {
     this.inPark = side;
     if (!TOWN_FEEL.parkZoomOut) return;
     if (side) {
-      if (this.step >= this.last) return;
+      // (Never past the overview: the farthest step, the old town's zoomed-out camera, is only ever chosen with −.)
+      if (this.step >= Math.min(this.last, TOWN_FEEL.streetZoomParkMax)) return;
       this.before = this.step;
       this.aim(this.step + 1, now, TOWN_FEEL.parkZoomMs);
     } else if (this.before !== null) {
