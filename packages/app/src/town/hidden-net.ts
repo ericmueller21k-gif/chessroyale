@@ -1,4 +1,4 @@
-import { BANNED_LINE, HIDDEN_ROOM } from "@chessroyale/core";
+import { HIDDEN_ROOM } from "@chessroyale/core";
 import { testParams, testSwitchesAllowed } from "../test-switches.ts";
 import { tooYoung } from "../account.ts";
 import { mayTownChat } from "./chat-net.ts";
@@ -106,9 +106,9 @@ export class HiddenRoomClient {
       const b = (await res.json().catch(() => null)) as unknown;
       if (res.status === 401 || res.status === 403) {
         const no = b as { message?: string; banned?: boolean } | null;
-        // (Banned for fair play: fair play's notice, as PLAY shows it, with its appeal; the card's line the short of it, so the card
-        // keeps its size; the room watches on, uncounted. Review M1.)
-        this.refused = no?.banned ? BANNED_LINE : (no?.message ?? "Sign in to challenge him.");
+        // (Banned for fair play: the app drops to its ban screen (the answer's header, and here too); the card's line the short of it,
+        // so the card keeps its size meanwhile. Review M1; Nov 13, a ban means you can't sign in.)
+        this.refused = no?.banned ? "Your account has been banned." : (no?.message ?? "Sign in to challenge him.");
         if (no?.banned) showBanNotice();
         this.emit();
         return null;
