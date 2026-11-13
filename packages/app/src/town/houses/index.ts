@@ -2,8 +2,7 @@
 import type { Character } from "../../characters/sprite.ts";
 import type { LightPool, LightSpot } from "./kit.ts";
 import type { HomeId, Place } from "../world.ts";
-import { STREET_TOWN } from "../admin-town.ts";
-import { COLISEUM_CHIP, HOUSE_COLISEUM, HOUSE_COLISEUM_SIGN, HOUSE_COLISEUM_LIGHTS, HOUSE_COLISEUM_POOLS } from "./coliseum.ts";
+import { COLISEUM_CHIP } from "./coliseum.ts";
 import { PORTAL } from "./coliseum-ring.ts";
 import { HOUSE_GINGER, HOUSE_GINGER_SIGN, HOUSE_GINGER_LIGHTS, HOUSE_GINGER_POOLS } from "./gingerbread.ts";
 import { HOUSE_GREX, HOUSE_GREX_SIGN, HOUSE_GREX_LIGHTS } from "./grex.ts";
@@ -65,9 +64,7 @@ export const HOUSES: Record<HomeId, HouseArt> = {
  * north edge round) is a solid (houses/coliseum-ring.ts): its place's picture is its portal's front, the gate and the tablet the game
  * writes "The Colosseum" on; the ring round it is boxes of its own.
  */
-export const COLISEUM_ART: HouseArt = STREET_TOWN
-  ? { ch: PORTAL.ch, sign: PORTAL.sign, lights: PORTAL.lights, pools: PORTAL.pools }
-  : { ch: HOUSE_COLISEUM, sign: HOUSE_COLISEUM_SIGN, lights: HOUSE_COLISEUM_LIGHTS, pools: HOUSE_COLISEUM_POOLS };
+export const COLISEUM_ART: HouseArt = { ch: PORTAL.ch, sign: PORTAL.sign, lights: PORTAL.lights, pools: PORTAL.pools };
 export { COLISEUM_CHIP };
 
 /** A place's picture: its home's, or the Colosseum's. */

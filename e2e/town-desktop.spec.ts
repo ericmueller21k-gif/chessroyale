@@ -64,7 +64,7 @@ for (const [w, h] of [[1280, 800], [1440, 900], [1920, 1080]] as const) {
     await expect(page.getByRole("complementary", { name: "Live" })).toBeVisible();
     await expect(page.getByRole("region", { name: "Global chat" })).toBeVisible();
 
-    // No bar on a computer (Eric's mockup, Nov 7): "TOWN" and the town's tools (the chat icon, the gear; an admin's map) centered in the
+    // No bar on a computer (Eric's mockup, Nov 7): "TOWN" and the town's tools (the chat icon, the gear and the map, everyone's since Nov 13) centered in the
     // right column's top slot, under it; the world fills the whole box.
     await expect(page.locator(".town-bar")).toHaveCount(0);
     const slot = (await box(page, ".rc-slot"))!;

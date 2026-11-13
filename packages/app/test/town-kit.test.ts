@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 // An admin's town is the street town: its boxes (the box path goes through the kit).
-vi.mock("../src/town/admin-town.ts", () => ({ ADMIN_TOWN: true, STREET_TOWN: true }));
+vi.mock("../src/town/admin-town.ts", () => ({ ADMIN_TOWN: true }));
 
 const { area, facesOf, lightStep } = await import("../src/town/kit/prims.ts");
 const { bakeFace, gridOf, gridTexel, rampColors, rampOf, rampsOf, stepChar, toHex, rgba } = await import("../src/town/kit/bake.ts");

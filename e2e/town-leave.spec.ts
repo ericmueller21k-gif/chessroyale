@@ -1,6 +1,6 @@
 import { mkdirSync } from "node:fs";
 import { expect, type Page } from "@playwright/test";
-import { asSignedIn, test } from "./helpers.ts";
+import { asSignedIn, tapInTown, test } from "./helpers.ts";
 
 /**
  * "Leave Chess Town?" (Eric: "a little pop-up that just says you are about to leave Chess Town, click yes and no … you should always
@@ -53,30 +53,11 @@ async function expectStayed(p: Page, square: string) {
   expect(new URL(p.url()).pathname).toBe("/town");
 }
 
-const tapPoint = async (p: Page, kind: "boss" | "home", id: string) => {
-  const xy = await p.evaluate(([k, i]) => (window as unknown as { __townAt?: (k: string, id: string) => { x: number; y: number } | null }).__townAt?.(k, i) ?? null, [kind, id] as const);
-  if (!xy) return null;
-  const cv = (await canvas(p).boundingBox())!;
-  return { x: cv.x + xy.x, y: cv.y + xy.y };
-};
 /**
- * Opens a boss's or a home's card by tapping it (it may stroll a step; the card's own tap then opens it). A tap that met
- * someone else first (Babur strolling in front of his circus, Nov 9) opened their card, which then covers the home's point:
- * closed first, or every later tap lands on that card (as e2e/town.spec.ts).
+ * Opens a boss's or a home's card by tapping it (helpers.ts tapInTown: the view held still, the camera glided there if it's off the screen;
+ * it may stroll a step; a tap that met someone else first, Babur strolling in front of his circus, Nov 9, opened their card: closed first).
  */
-async function openCard(p: Page, kind: "boss" | "home", name: string, id: string) {
-  const card = p.getByRole("dialog", { name, exact: true });
-  await expect(async () => {
-    if (await card.isVisible()) return;
-    if (await p.locator(".town-card").isVisible()) await p.keyboard.press("Escape");
-    if (!(await tapPoint(p, kind, id))) await p.evaluate((i) => (window as unknown as { __townGlide?: (id: string) => void }).__townGlide?.(i), id);
-    await expect.poll(() => tapPoint(p, kind, id), { message: `${name} comes into view` }).not.toBeNull();
-    const at = await tapPoint(p, kind, id);
-    await p.mouse.click(at!.x, at!.y);
-    await expect(card).toBeVisible({ timeout: 1500 });
-  }).toPass({ timeout: 20_000 });
-  return card;
-}
+const openCard = (p: Page, kind: "boss" | "home", name: string, id: string) => tapInTown(p, kind, id, p.getByRole("dialog", { name, exact: true }));
 /** Walks to Babur's Circus, opens its card and goes in: the room is drawn. */
 async function goInBabur(p: Page) {
   const card = await openCard(p, "home", "Babur's Circus", "tiger");

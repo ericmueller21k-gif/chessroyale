@@ -2,53 +2,42 @@ import { describe, expect, it } from "vitest";
 import { frameKeys, type Character } from "../src/characters/sprite.ts";
 import { N } from "../src/town/camera.ts";
 import { TOWN_FEEL } from "../src/town/feel.ts";
-import { statueSpot } from "../src/town/houses/coliseum.ts";
 import { COLISEUM_ART, HOUSES, type HouseArt } from "../src/town/houses/index.ts";
 import { PARK_LAMP, PARK_LAMP_HEAD, PARK_LAMP_LIGHTS, PARK_LAMP_POOLS } from "../src/town/houses/park.ts";
-import { STATUE_W, statueH } from "../src/town/houses/statues.ts";
 import { mixLights, skyOverride, skyWeights } from "../src/town/sky.ts";
-import { ALL_HOMES, APRON, COLISEUM, HOMES, LAMPS, PARK, PAVING, PROPS, START, STATUES, TABLES, findPath, groundAt, plotDist, stepsFrom, stoolAt, tableAt, walkable } from "../src/town/world.ts";
+import { ALL_HOMES, APRON, HOMES, LAMPS, PROPS, START, STATUES, TABLES, findPath, stepsFrom, stoolAt, tableAt, walkable } from "../src/town/world.ts";
 
 /** The lights at dusk and night (Oct 27): the park's lamps, and the homes and the Colosseum glowing from inside. */
 
-describe("town square lights: the park's lamps", () => {
-  const inPark = (c: number, r: number) => c >= PARK.c0 && c < PARK.c0 + PARK.w && r <= PARK.r1 && r > PARK.r1 - PARK.d;
-  /** The promenade's four middle columns, from the plaza to the apron. */
-  const onPromenade = (c: number, r: number) => c >= PARK.c0 + 8 && c < PARK.c0 + 12 && r >= PARK.r1 - PARK.d && r <= COLISEUM.r0 - 1;
-
-  it("eight to twelve lamps stand in the park (or on the square just outside its walk), each solid, on paving, a lamp in the park's things", () => {
+// (The street town's lamps for everyone since Nov 13: on its park's walks and its sidewalks, as its plan has them; town-street.test.ts keeps
+// them from a home's frontage.)
+describe("town square lights: the lamps", () => {
+  it("each stands on a square of its own, solid (walked round), a lamp in the town's things", () => {
     expect(LAMPS.length).toBeGreaterThanOrEqual(8);
-    expect(LAMPS.length).toBeLessThanOrEqual(12);
     const seen = new Set<number>();
     for (const l of LAMPS) {
       expect(seen.has(l.r * N + l.c), `two lamps on ${l.c},${l.r}`).toBe(false);
       seen.add(l.r * N + l.c);
-      const outside = !inPark(l.c, l.r);
-      // In the park, or on the row just outside its north or south walk.
-      if (outside) expect(l.r === PARK.r1 + 1 || l.r === PARK.r1 - PARK.d, `lamp at ${l.c},${l.r}`).toBe(true);
-      expect(l.c >= PARK.c0 && l.c < PARK.c0 + PARK.w).toBe(true);
       expect(walkable(l.c, l.r), `the lamp at ${l.c},${l.r} is walked round`).toBe(false);
-      expect(groundAt[l.r * N + l.c], `the lamp at ${l.c},${l.r} stands on paving`).toBe(PAVING);
       expect(PROPS.filter((p) => p.kind === "lamp" && p.c === l.c && p.r === l.r)).toHaveLength(1);
     }
     expect(PROPS.filter((p) => p.kind === "lamp")).toHaveLength(LAMPS.length);
   });
 
-  it("no lamp stands on a path: not on the promenade, a stool, a table, the fountain, the apron, a statue's square or a home's roaming ground", () => {
+  it("no lamp stands on a path: not a stool, a table, the fountain, the apron, a statue's square or a home's door square", () => {
     const fountain = PROPS.find((p) => p.kind === "fountain")!;
     for (const l of LAMPS) {
       const at = `${l.c},${l.r}`;
-      expect(onPromenade(l.c, l.r), `on the promenade at ${at}`).toBe(false);
       expect(stoolAt(l.c, l.r), `on a stool at ${at}`).toBeNull();
       expect(tableAt(l.c, l.r), `on a table at ${at}`).toBeNull();
       expect(l.c >= fountain.c && l.c <= fountain.c + 1 && l.r >= fountain.r && l.r <= fountain.r + 1, `on the fountain at ${at}`).toBe(false);
       expect(APRON.some((s) => s.c === l.c && s.r === l.r), `on the apron at ${at}`).toBe(false);
       expect(STATUES.some((s) => s.c === l.c && s.r === l.r), `on a statue's square at ${at}`).toBe(false);
-      for (const h of HOMES) expect(plotDist(h, l.c, l.r), `${h.id} roams onto the lamp at ${at}`).toBeGreaterThan(TOWN_FEEL.bossRoam);
+      for (const h of HOMES) expect(h.door.c === l.c && h.door.r === l.r, `on ${h.id}'s door square at ${at}`).toBe(false);
     }
   });
 
-  it("the lamps wall nothing off: every square you can stand on is still reached from your start, every stool too, and the walk still goes round the park's corners", () => {
+  it("the lamps wall nothing off: every square you can stand on is still reached from your start, every stool too", () => {
     const d = stepsFrom(START);
     let open = 0;
     for (let r = 0; r < N; r++)
@@ -57,17 +46,9 @@ describe("town square lights: the park's lamps", () => {
         open++;
         expect(d[r * N + c], `${c},${r} cut off`).toBeGreaterThanOrEqual(0);
       }
-    expect(open).toBeGreaterThan(N * N * 0.6);
+    // (The street town's lots, gardens and the Colosseum take a little over half its squares.)
+    expect(open).toBeGreaterThan(N * N * 0.4);
     for (const t of TABLES) for (const s of t.stools) expect(findPath(START, (c, r) => c === s.c && r === s.r, walkable), `table ${t.i}'s stool`).not.toBeNull();
-    // A lamp on a corner of the park's walk: round it on the grass inside the corner, no further than round the corner itself.
-    for (const l of LAMPS.filter((x) => (x.c === PARK.c0 || x.c === PARK.c0 + PARK.w - 1) && (x.r === PARK.r1 || x.r === PARK.r1 - PARK.d + 1))) {
-      const ic = l.c === PARK.c0 ? 1 : -1;
-      const ir = l.r === PARK.r1 ? -1 : 1;
-      const a = { c: l.c + ic, r: l.r };
-      const b = { c: l.c, r: l.r + ir };
-      const path = findPath(a, (c, r) => c === b.c && r === b.r, walkable);
-      expect(path, `round the lamp at ${l.c},${l.r}`).toHaveLength(2);
-    }
   });
 
   it("is a classic park lamp about a pawn and a half tall, its glass lit at dusk and night with a halo, and a pool of light under it", () => {
@@ -140,23 +121,6 @@ describe("town square lights: the homes and the Colosseum glow from inside", () 
     }
     // Hollow's own window glows green in its idle; its lights don't touch those keys.
     for (const l of HOUSES.hollow.lights) expect(l.keys ?? "", "Hollow's lights").not.toMatch(/[gG]/);
-  });
-
-  it("the Colosseum: its gate's tunnel and a scattered few of its arches, none behind the statues (no glare on their quotes)", () => {
-    const L = COLISEUM_ART.lights;
-    expect(L.length).toBeGreaterThanOrEqual(3);
-    expect(L.length).toBeLessThanOrEqual(8);
-    const foot = COLISEUM_ART.ch.foot;
-    // The gate: the first, round its middle, at its foot.
-    expect(Math.abs(L[0]!.x + L[0]!.w / 2 - foot[0])).toBeLessThan(2);
-    expect(L[0]!.y + L[0]!.h).toBe(foot[1]);
-    for (const st of STATUES) {
-      const [sx, sy] = statueSpot(st.id);
-      for (const l of L) {
-        const clear = l.x + l.w + TOWN_FEEL.lightSpill[1][0] < sx || l.x - TOWN_FEEL.lightSpill[1][0] > sx + STATUE_W || l.y > sy + statueH(st.id) || l.y + l.h < sy;
-        expect(clear, `a light at ${l.x},${l.y} glows over the ${st.id} statue`).toBe(true);
-      }
-    }
   });
 });
 

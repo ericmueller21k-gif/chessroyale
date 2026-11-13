@@ -9,8 +9,8 @@ import { BOSS_ROSTER, adminFirst, type ItemLook } from "@chessroyale/core";
 import { GOODBYE_LINES, SELECT_LINES } from "../characters/boss-select.ts";
 import { takeGoodbyeFrom } from "./goodbye.ts";
 import { N, WRAP, colI, rowI, wrapF, wrapFX, wrapFY, wrapI } from "./camera.ts";
-import { ADMIN_TOWN, STREET_TOWN } from "./admin-town.ts";
-import { STREET_BUILDINGS, STREET_COLISEUM, STREET_FOUNTAIN, STREET_GROUND, STREET_HOMES, STREET_PARK, STREET_PROPS, STREET_START, STREET_TABLES, STREET_WRAP, type SqBox } from "./street.ts";
+import { ADMIN_TOWN } from "./admin-town.ts";
+import { PLAN_HOMES, STREET_BUILDINGS, STREET_COLISEUM, STREET_FOUNTAIN, STREET_GROUND, STREET_HOMES, STREET_PARK, STREET_PROPS, STREET_START, STREET_TABLES, STREET_WRAP, type SqBox } from "./street.ts";
 import { TOWN_FEEL } from "./feel.ts";
 import { SIDEKICK_SHEETS, type SidekickSheet } from "./sidekick-sheets.ts";
 
@@ -20,36 +20,27 @@ export interface Sq {
 }
 
 /**
- * The Colosseum's ground in the world's middle (12 x 12 squares since slice 6, which made it about twice its size; slice 5
- * built it on 6 x 6: solid, you walk round it). `c0`, `r0` its first column and row. Its gate faces south, over the park
- * toward your start. (Row 28 since the park moved away from it: `WALK_ROWS`.)
+ * The Colosseum's ground, at the street town's north edge (its plan's: solid, you walk round it). `c0`, `r0` its first column and row.
+ * Its gate faces south onto the plaza.
  */
-export const COLISEUM: { readonly c0: number; readonly r0: number; readonly size: number } = STREET_TOWN ? STREET_COLISEUM : { c0: 17, r0: 28, size: 12 };
+export const COLISEUM: { readonly c0: number; readonly r0: number; readonly size: number } = STREET_COLISEUM;
 // The street town wraps east-west only (Nov 5, round 4: its plan's switch; the Colosseum at the north edge, nothing behind it).
-if (STREET_TOWN) ((WRAP.ew = STREET_WRAP.ew), (WRAP.ns = STREET_WRAP.ns));
+((WRAP.ew = STREET_WRAP.ew), (WRAP.ns = STREET_WRAP.ns));
 /** Whether (c, r) is the Colosseum's ground. */
 export const onColiseum = (c: number, r: number): boolean => {
   const i = wrapI(c) - COLISEUM.c0;
   const j = rowI(r) - COLISEUM.r0;
   return i >= 0 && i < COLISEUM.size && j >= 0 && j < COLISEUM.size;
 };
-/**
- * The apron: the open squares in front of the Colosseum's gate, as wide as the Colosseum and `APRON_ROWS` deep, where people
- * gather (nothing is built there; your start is on it). Nearest the gate first: a tap on the Colosseum ends you on the
- * first free one (`destFor`), so a crowd at the gate grows outward from it in a half ring.
- */
-export const APRON_ROWS = 3;
-/**
- * Between the apron and the park's north walk, the promenade carries on across this many rows of the town's board, so
- * the park stands back from the Colosseum (Eric, Oct 26: "It shouldn't literally be right next to it… 8 to 10 tiles away";
- * its nearest tables are 8 rows from its wall).
- */
-export const WALK_ROWS = 4;
 /** The middle of the gate's sill, on the Colosseum's front edge (between its two middle columns). */
 const GATE_X = COLISEUM.c0 + (COLISEUM.size - 1) / 2;
 const GATE_Y = COLISEUM.r0 - 0.5;
-/** (The street town, the north edge round: two rows, the plaza's; the third is its front wall's.) */
-const APRON_DEEP = STREET_TOWN ? 2 : APRON_ROWS;
+/**
+ * The apron: the open squares in front of the Colosseum's gate, as wide as the Colosseum and two rows deep (the plaza's; the third is its
+ * front wall's), where people gather. Nearest the gate first: a tap on the Colosseum ends you on the first free one (`destFor`), so a
+ * crowd at the gate grows outward from it in a half ring.
+ */
+const APRON_DEEP = 2;
 export const APRON: readonly Sq[] = Array.from({ length: COLISEUM.size * APRON_DEEP }, (_, i) => ({ c: COLISEUM.c0 + (i % COLISEUM.size), r: COLISEUM.r0 - 1 - Math.floor(i / COLISEUM.size) })).sort(
   (a, b) => Math.hypot(a.c - GATE_X, a.r - GATE_Y) - Math.hypot(b.c - GATE_X, b.r - GATE_Y),
 );
@@ -83,36 +74,11 @@ export const statueAt = (c: number, r: number): Statue | null => STATUES.find((s
 // and sit… benches, sidewalks, even a water fountain in the middle, trees… a very cozy city park feel. I'd say 10 chess
 // boards to start with… open up the space in front of the coliseum and it can go there").
 
+/** The park (the street town's plus-shaped one): `c0` its first column, `r1` its row nearest the Colosseum, `w` across, `d` deep. */
+export const PARK: { readonly c0: number; readonly r1: number; readonly w: number; readonly d: number } = STREET_PARK;
 /**
- * The park in front of the Colosseum's gate, south of its apron and the walk: 20 squares across (the Colosseum's 12 and 4
- * more each side), 11 deep. `c0` its first column, `r1` its row nearest the gate (the camera looks north, r rising).
- */
-export const PARK: { readonly c0: number; readonly r1: number; readonly w: number; readonly d: number } = STREET_TOWN ? STREET_PARK : { c0: COLISEUM.c0 - 4, r1: COLISEUM.r0 - APRON_ROWS - WALK_ROWS - 1, w: 20, d: 11 };
-/**
- * Its plan, a row a line from the gate's side (north) to the plaza's (south), a square a letter: `=` paving, `.` grass,
- * `t` a tree (on grass), `b` a bench (on grass, facing south), `B` a bench on paving, `T` a chess table (its two stools
- * `s` either side, facing each other across it), `F` the fountain (2 x 2, on paving; `f` its other squares). A paved
- * walk all round; the promenade (4 wide) runs up the middle from the plaza to the gate, round the fountain in the
- * middle; five tables either side of it; lawns with trees and benches outside them.
- */
-const PARK_PLAN = [
-  "====================",
-  "=.t..sTs====sTs..t.=",
-  "=...b...====...b...=",
-  "=t...sTs====sTs...t=",
-  "=......B====B......=",
-  "=.t..sTs=Ff=sTs..t.=",
-  "=......==ff==......=",
-  "=t...sTs====sTs...t=",
-  "=...b...====...b...=",
-  "=.t..sTs====sTs..t.=",
-  "====================",
-] as const;
-
-/**
- * What a square of ground is: the town's board, paving (the park's walks, the Colosseum's apron) or the park's grass. The street
- * town (STREET_TOWN, Nov 5) adds back gardens (and the Colosseum's grove), the lots under its buildings and the Colosseum's own
- * ground; there the board is the streets and the paving their sidewalks too.
+ * What a square of ground is (the street town, Nov 5): the board (the streets), paving (their sidewalks, the park's walks, the plaza), the
+ * park's grass, back gardens (and the Colosseum's grove), the lots under its buildings and the Colosseum's own ground.
  */
 export const BOARD_GROUND = 0;
 export const PAVING = 1;
@@ -158,40 +124,13 @@ const props: Prop[] = [];
 const parkSolid = new Uint8Array(N * N);
 /** The street town's lamps' squares: a boss passes one in its own wander box (round it, in front), never stopping there. */
 const lampSq = new Uint8Array(N * N);
-if (!STREET_TOWN) PARK_PLAN.forEach((line, v) => {
-  const r = PARK.r1 - v;
-  for (let u = 0; u < PARK.w; u++) {
-    const ch = line[u]!;
-    const c = PARK.c0 + u;
-    const k = r * N + c;
-    groundAt[k] = ch === "." || ch === "t" || ch === "b" ? GRASS : PAVING;
-    if (ch === "t" || ch === "b" || ch === "B") {
-      parkSolid[k] = 1;
-      props.push({ kind: ch === "t" ? "tree" : "bench", c, r, x: c, y: r, v: (u * 7 + v * 3) % 3, table: -1 });
-    } else if (ch === "T") {
-      parkSolid[k] = 1;
-      const t: Table = { i: tables.length, c, r, stools: [{ c: c - 1, r }, { c: c + 1, r }] };
-      tables.push(t);
-      props.push({ kind: "table", c, r, x: c, y: r, v: 0, table: t.i });
-    } else if (ch === "F" || ch === "f") {
-      parkSolid[k] = 1;
-      if (ch === "F" && line[u + 1] === "f") props.push({ kind: "fountain", c, r: r - 1, x: c + 0.5, y: r - 1.5, v: 0, table: -1 });
-    }
-  }
-});
-// The Colosseum's apron is paved too, and the promenade's 4 squares across the walk between them.
-if (!STREET_TOWN) {
-  for (let r = COLISEUM.r0 - APRON_ROWS; r < COLISEUM.r0; r++) for (let c = COLISEUM.c0; c < COLISEUM.c0 + COLISEUM.size; c++) groundAt[r * N + c] = PAVING;
-  for (let r = PARK.r1 + 1; r < COLISEUM.r0 - APRON_ROWS; r++) for (let c = PARK.c0 + 8; c < PARK.c0 + 12; c++) groundAt[r * N + c] = PAVING;
-}
-
 /**
  * The street town (Nov 5): its ground, its park's tables, the fountain and every prop (trees, benches, lamps, the gardens' hedges,
  * bushes, beds and sheds) as the plan has them (street.ts). Walked round: the trees, benches, lamps, tables, sheds and the
  * fountain's four squares where they stand on walkable ground (a stool is a square you stand on). The everyday buildings' fronts
  * (props too, `front`) come after, from STREET_BUILDINGS.
  */
-if (STREET_TOWN) {
+{
   groundAt.set(STREET_GROUND);
   for (const t of STREET_TABLES) tables.push({ i: tables.length, c: t.c, r: t.r, stools: [{ c: t.c - 1, r: t.r }, { c: t.c + 1, r: t.r }] });
   for (const f of STREET_FOUNTAIN) parkSolid[f.r * N + f.c] = 1;
@@ -216,34 +155,9 @@ if (STREET_TOWN) {
   });
 }
 
-/**
- * The park's lamps (Oct 27, Eric: "street lamps or like park style lamps, so when it's night and also dusk that they turn
- * on for the little park"): ten, each on a square of its own, solid (walked round) and on paving, where no path needs the
- * square. A pair flanking the promenade where it leaves the park toward the Colosseum and where it comes in from the
- * plaza (on the board's square just outside the park's walk either side of it, paved for its foot), a pair beside the
- * fountain (on the paving either side of its front row, between the tables' stools), and one at each corner of the
- * park's walk (a corner square: walking round it on the grass inside is no longer). The first is the one ahead on your
- * left as the page opens (the e2e test finds it there).
- */
-export const LAMPS: readonly Sq[] = STREET_TOWN ? props.filter((p) => p.kind === "lamp").map((p) => ({ c: p.c, r: p.r })) : [
-  { c: PARK.c0 + 7, r: PARK.r1 + 1 },
-  { c: PARK.c0 + 12, r: PARK.r1 + 1 },
-  { c: PARK.c0 + 7, r: PARK.r1 - 6 },
-  { c: PARK.c0 + 12, r: PARK.r1 - 6 },
-  { c: PARK.c0, r: PARK.r1 },
-  { c: PARK.c0 + PARK.w - 1, r: PARK.r1 },
-  { c: PARK.c0 + 7, r: PARK.r1 - PARK.d },
-  { c: PARK.c0 + 12, r: PARK.r1 - PARK.d },
-  { c: PARK.c0, r: PARK.r1 - PARK.d + 1 },
-  { c: PARK.c0 + PARK.w - 1, r: PARK.r1 - PARK.d + 1 },
-];
-for (const l of STREET_TOWN ? [] : LAMPS) {
-  const k = l.r * N + l.c;
-  parkSolid[k] = 1;
-  groundAt[k] = PAVING;
-  props.push({ kind: "lamp", c: l.c, r: l.r, x: l.c, y: l.r, v: 0, table: -1 });
-}
-/** The ten chess tables, in the plan's order (north to south, west to east); the street town's park has twelve. */
+/** The park's and the streets' lamps (lit at dusk and night), each on a square of its own, solid (walked round). */
+export const LAMPS: readonly Sq[] = props.filter((p) => p.kind === "lamp").map((p) => ({ c: p.c, r: p.r }));
+/** The street town's park's twelve chess tables, in the plan's order. */
 export const TABLES: readonly Table[] = tables;
 /** Everything standing in the park. */
 export const PROPS: readonly Prop[] = props;
@@ -256,12 +170,8 @@ export const stoolAt = (c: number, r: number): Table | null => {
 /** The table on square (c, r), or null. */
 export const tableAt = (c: number, r: number): Table | null => TABLES.find((t) => t.c === wrapI(c) && t.r === wrapI(r)) ?? null;
 
-/**
- * Your square when the page opens: in the park on its promenade, between its two rows of tables nearest the Colosseum,
- * facing it (the camera looks north, r rising): the tables round you, the fountain behind you, and the walk across to
- * the Colosseum looming beyond (near enough to stand inside the view's rim, not on its horizon).
- */
-export const START: Sq = STREET_TOWN ? STREET_START : { c: PARK.c0 + 9, r: PARK.r1 - 3 };
+/** Your square when the page opens: the street town's start (its plan's). */
+export const START: Sq = STREET_START;
 
 export type HomeId = "tiger" | "gingerbread" | "grex" | "hollow" | "moo" | "clown" | "bigboy" | "sawyer" | "pig" | "smudgy" | "hopper" | "gardener" | "alfil" | "folio" | "timber" | "dash" | "zebra" | "recluse";
 /**
@@ -389,19 +299,21 @@ export const ALL_HOMES: readonly Home[] = (
     // adminOnly). His name is core's one string. docs/decisions/2026-11-13-hidden-boss-building.md.)
     { id: "recluse", boss: RECLUSE_NAME, name: "The Walk-up", color: "#8a3b2a", cx: 45, cy: 7 },
   ] satisfies Omit<Home, "half" | "foot" | "hw" | "hd" | "door" | "entry" | "rest" | "wander">[]
-).map((h) => (STREET_TOWN ? streetHome(h) : { ...h, half: 1.5, foot: 0.5, hw: 1, hd: 1, door: { c: h.cx, r: wrapI(h.cy - 2) }, entry: { c: h.cx, r: wrapI(h.cy - 1) }, rest: { c: h.cx, r: wrapI(h.cy - 2) }, wander: null }));
+).map(streetHome);
 /**
  * A home where the street town's plan has it (Nov 5, street.ts): on its lot (the art calls Dash's "blitz"), its picture's foot on
  * its front line, its door square, its boss's rest square and wander box as the plan says.
  */
 function streetHome(h: Omit<Home, "half" | "foot" | "hw" | "hd" | "door" | "entry" | "rest" | "wander">): Home {
-  const lot = STREET_HOMES.find((l) => l.id === (h.id === "dash" ? "blitz" : h.id))!;
+  const id = h.id === "dash" ? "blitz" : h.id;
+  // (A home not in this town, street.ts lotHere: its plan's lot, never drawn or walked to.)
+  const lot = STREET_HOMES.find((l) => l.id === id) ?? PLAN_HOMES.find((l) => l.id === id)!;
   const cy = lot.r0 + (lot.d - 1) / 2;
   return { ...h, cx: lot.c0 + (lot.w - 1) / 2, cy, half: 1.5, foot: cy - (lot.r0 - 0.5 + lot.inset), hw: (lot.w - 1) / 2, hd: (lot.d - 1) / 2, door: { ...lot.door }, entry: { c: lot.door.c, r: lot.r0 }, rest: { ...lot.rest }, wander: { ...lot.wander } };
 }
 /**
  * Every home in this town: all of them in an admin's (ADMIN_TOWN), and none of a boss in the game for admins first (core's
- * BOSS_ADMIN_FIRST: Timber's) in anyone else's, so its plot is open ground there.
+ * BOSS_ADMIN_FIRST: Timber's, Dash's, Rolling Dough) in anyone else's, where its row's look-alike fronts fill its place (street.ts lotHere).
  */
 export const HOMES: readonly Home[] = ALL_HOMES.filter((h) => ADMIN_TOWN || !adminFirst(h));
 /** Every place: the homes (in the bosses' order), then the Colosseum. */
@@ -548,8 +460,7 @@ export const walkable = (c: number, r: number): boolean => {
   // (Off the world: past the street town's north or south edge.)
   if (rr < 0 || cc < 0) return false;
   const k = rr * N + cc;
-  if (STREET_TOWN) return groundAt[k]! <= GRASS && !parkSolid[k];
-  return plotAt[k] === null && !parkSolid[k] && !onColiseum(c, r);
+  return groundAt[k]! <= GRASS && !parkSolid[k];
 };
 /** Whether square (c, r) is in a boss's wander box (the street town: its square's middle inside; its foot stays inside). */
 export const inWander = (h: Home, c: number, r: number): boolean => {
@@ -1079,7 +990,10 @@ export function addCrowd(t: Town, n: number): void {
  */
 export function addTestPlayer(t: Town, who: { uid: string; name: string; icon?: string; rating?: number; wear?: ItemLook | null }): number {
   const at = t.you.walker.here();
-  const sq = spotNear(t, t.you.walker, at, true) ?? freeSpot(t.rnd, at, 2, [], t, 1);
+  // Beside you, right or left as the town opens (the camera faces north there): the nearest free square otherwise. (Nov 13: from the
+  // street town's chase camera a square behind you is at the box's foot, where a figure fades out and a tap can't reach it.)
+  const side = [1, -1].map((dc) => ({ c: colI(at.c + dc), r: at.r })).find((s) => walkable(s.c, s.r) && !taken(t, s.c, s.r, null));
+  const sq = side ?? spotNear(t, t.you.walker, at, true) ?? freeSpot(t.rnd, at, 2, [], t, 1);
   const p: Person = {
     id: `player:${who.uid}`,
     name: who.name,
@@ -1415,11 +1329,8 @@ function botsWander(t: Town, now: number): void {
  */
 export const inSquare = (c: number, r: number): boolean => rowI(r) >= 0 && colI(c) >= 0 && SQUARE_AREA[rowI(r) * N + colI(c)] === 1;
 const SQUARE_AREA = new Uint8Array(N * N);
-if (!STREET_TOWN)
-  for (let r = PARK.r1 - PARK.d + 1; r < COLISEUM.r0; r++)
-    for (let c = PARK.c0; c < PARK.c0 + PARK.w; c++) if (!HOMES.some((h) => plotDist(h, c, r) <= TOWN_FEEL.bossRoam)) SQUARE_AREA[r * N + c] = 1;
 // The street town (Nov 5): the bots walk the streets, the sidewalks and the park, never a boss's wander box (so never a door square).
-if (STREET_TOWN) for (let k = 0; k < N * N; k++) if (groundAt[k]! <= GRASS && !HOMES.some((h) => bossGround(h, k % N, Math.floor(k / N)))) SQUARE_AREA[k] = 1;
+for (let k = 0; k < N * N; k++) if (groundAt[k]! <= GRASS && !HOMES.some((h) => bossGround(h, k % N, Math.floor(k / N)))) SQUARE_AREA[k] = 1;
 
 /**
  * A bot's door: a sidekick's is its boss's home's (the middle of its front: its plot's front row, where the bosses start
@@ -1445,7 +1356,7 @@ function doorway(t: Town, b: TownBot, w: Walker | null): Sq | null {
   for (const dc of [0, -1, 1]) {
     const c = wrapI(door.c + dc);
     // (The street town: a lamp may stand on the sidewalk beside the door.)
-    if (!taken(t, c, wrapI(door.r - 1), w) && (!STREET_TOWN || walkable(c, door.r - 1))) return { c, r: door.r };
+    if (!taken(t, c, wrapI(door.r - 1), w) && walkable(c, door.r - 1)) return { c, r: door.r };
   }
   return null;
 }
@@ -1598,7 +1509,7 @@ function wander(t: Town, bot: Person, sitting: boolean): void {
   }
   // (Only in the square, Oct 28; never on a statue's viewing square: it's kept free for whoever comes to look.)
   // (The street town: inSquare already leaves out every boss's ground.)
-  const ok = (c: number, r: number) => inSquare(c, r) && walkable(c, r) && !taken(t, c, r, w) && (STREET_TOWN || !t.bosses.some((b) => plotDist(b.home, c, r) === 1)) && !statueAt(c, r);
+  const ok = (c: number, r: number) => inSquare(c, r) && walkable(c, r) && !taken(t, c, r, w) && !statueAt(c, r);
   const targets: Sq[] = [];
   const reach = sitting ? f.botSitReach : hi;
   for (let dc = -reach; dc <= reach; dc++)

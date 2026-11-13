@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-// An admin's town is the street town (admin-town.ts STREET_TOWN): its controls and minimap.
-vi.mock("../src/town/admin-town.ts", () => ({ ADMIN_TOWN: true, STREET_TOWN: true }));
+// The street town (everyone's since Nov 13), as an admin's (every home): its controls and minimap.
+vi.mock("../src/town/admin-town.ts", () => ({ ADMIN_TOWN: true }));
 
 const { Press } = await import("../src/town/press.ts");
 const { FingerRun, runDir } = await import("../src/town/run.ts");

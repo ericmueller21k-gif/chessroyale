@@ -1,6 +1,6 @@
 import { expect, type Page } from "@playwright/test";
 import { BOTS, STATUES, TABLES, TOWN_LINES, sidekickText } from "../packages/app/src/town/world.ts";
-import { BOARD_SEL, giveItems, test, wearItem } from "./helpers.ts";
+import { BOARD_SEL, giveItems, quickTap, tapInTown, test, townTapPoint, wearItem } from "./helpers.ts";
 
 /**
  * The town square (/town; hidden: docs/areas/town-square.md), on a phone and a computer: the page loads, its world is
@@ -87,22 +87,39 @@ test("the town square at /town: the world is drawn and fills its box under the b
   await page.mouse.click(cv.x + cv.width / 2, cv.y + cv.height / 3);
   await expect.poll(async () => (await you(page))[1], { message: "you walk ahead", timeout: 5000 }).toBeGreaterThanOrEqual(r0 + 2);
 
-  // The zoom pair: the page opens zoomed out (− pressed; Eric, Oct 26); + zooms in (and the view changes), − back out.
+  // The zoom pair (the street town's, everyone's since Nov 13: steps, opening at the default step with + pressed; the look round and the
+  // steps are tested in full in e2e/town-controls.spec.ts and e2e/town-fixed.spec.ts).
   const zoomOut = page.getByRole("button", { name: "Zoom out" });
   const zoomIn = page.getByRole("button", { name: "Zoom in" });
-  await expect(zoomOut).toHaveAttribute("aria-pressed", "true");
-  await expect(zoomIn).toHaveAttribute("aria-pressed", "false");
-  await page.waitForTimeout(1200); // (the walk and the camera settle)
-  const before = await fingerprint(page);
-  await zoomIn.click();
   await expect(zoomIn).toHaveAttribute("aria-pressed", "true");
   await expect(zoomOut).toHaveAttribute("aria-pressed", "false");
-  await expect.poll(() => fingerprint(page), { message: "the view zooms in" }).not.toBe(before);
+  await page.waitForTimeout(1200); // (the walk and the camera settle)
+  const before = await fingerprint(page);
   await zoomOut.click();
   await expect(zoomOut).toHaveAttribute("aria-pressed", "true");
+  await expect(zoomIn).toHaveAttribute("aria-pressed", "false");
+  await expect.poll(() => fingerprint(page), { message: "the view zooms out" }).not.toBe(before);
+  await zoomIn.click();
+  await expect(zoomIn).toHaveAttribute("aria-pressed", "true");
   // The controls stay put whatever the zoom (nothing shifts).
   const focus = page.getByRole("button", { name: "Back to me" });
   await expect(focus).toBeVisible();
+  // What it does (moved from the old town's drag, Nov 13 review m3): the camera glided away (as a chip's tap glides it), a tap on it
+  // brings the camera's focus back onto you, within about 2 squares.
+  const fromYou = () =>
+    page.evaluate(() => {
+      const w = window as unknown as { __townCam: () => { focus: [number, number] }; __townYou: () => { c: number; r: number } };
+      const [x, y] = w.__townCam().focus;
+      const me = w.__townYou();
+      return Math.hypot(x - me.c, y - me.r);
+    });
+  await page.evaluate(() => {
+    const me = (window as unknown as { __townYou: () => { c: number; r: number } }).__townYou();
+    (window as unknown as { __townGlide: (to: readonly [number, number]) => void }).__townGlide([me.c + 8, me.r - 6]);
+  });
+  await expect.poll(fromYou, { message: "the camera glides away" }).toBeGreaterThan(6);
+  await focus.click();
+  await expect.poll(fromYou, { message: "back on you", timeout: 15_000 }).toBeLessThan(2);
 
   // The buttons (Eric, Oct 28): one row in the map's bottom right corner, the −/+ pair on the left and the round focus button to its
   // right (an icon, no words; its name, "Back to me", is for screen readers), 14 px in from the corner, as high as the pair.
@@ -118,23 +135,6 @@ test("the town square at /town: the world is drawn and fills its box under the b
   expect(await focus.evaluate((el) => getComputedStyle(el).borderRadius)).toBe("50%");
   await expect(focus, "an icon, no words").toHaveText("");
   await expect(focus.locator("svg")).toHaveCount(1);
-  // It does what "Back to me" did: after a look around, the camera comes back to you.
-  const lookAt = () => page.evaluate(() => (window as unknown as { __townCam: () => { focus: number[] } }).__townCam().focus);
-  const home = await lookAt();
-  await page.mouse.move(cv.x + cv.width / 2, cv.y + cv.height / 2);
-  await page.mouse.down();
-  await page.mouse.move(cv.x + cv.width / 2 + 120, cv.y + cv.height / 2 + 160, { steps: 8 });
-  await page.mouse.up();
-  const away = await lookAt();
-  expect(Math.hypot(away[0]! - home[0]!, away[1]! - home[1]!), "you looked around").toBeGreaterThan(1);
-  await focus.click();
-  await expect
-    .poll(async () => {
-      const f = await lookAt();
-      const [c, r] = await you(page);
-      return Math.hypot(f[0]! - c, f[1]! - r);
-    }, { message: "the camera is back on you", timeout: 6000 })
-    .toBeLessThan(2.5);
 
   // Back asks first ("Leave Chess Town?", e2e/town-leave.spec.ts), and Leave goes home, with the address back to /. (A computer's is the
   // side menu's Play since Nov 7, no bar: it asks the same.)
@@ -237,26 +237,13 @@ async function toBabur(p: Page, id = "tiger", home = "Babur's Circus") {
   const chip = p.getByRole("button", { name: `Go to ${home}` });
   if (await chip.count()) await chip.dispatchEvent("click");
   else await p.evaluate((i) => (window as unknown as { __townGlide?: (id: string) => void }).__townGlide?.(i), id);
-  await expect.poll(() => tapPoint(p, "home", id), { message: `${home} comes into view` }).not.toBeNull();
+  expect(await townTapPoint(p, "home", id, 20_000), `${home} comes into view (the glide landed)`).not.toBeNull();
 }
 /**
- * Taps Babur or his circus until its card opens (he may stroll a step between the look and the tap; the hook's point is
- * one a tap would hit then).
+ * Taps Babur or his circus until its card opens (helpers.ts tapInTown: the view held still; he may stroll a step between the look and the
+ * tap; a tap that met someone else first, Babur strolling in front of his home, opened their card: closed first).
  */
-async function openCard(p: Page, kind: "boss" | "home", name: string, id = "tiger") {
-  const card = p.getByRole("dialog", { name, exact: true });
-  await expect(async () => {
-    if (await card.isVisible()) return;
-    // A tap that met someone else first (Babur strolling in front of his home) opened their card: close it, so the next
-    // tap can't land on its buttons.
-    if (await p.getByRole("dialog").isVisible()) await p.keyboard.press("Escape");
-    const at = await tapPoint(p, kind, id);
-    expect(at, "drawn").not.toBeNull();
-    await p.mouse.click(at!.x, at!.y);
-    await expect(card).toBeVisible({ timeout: 1500 });
-  }).toPass({ timeout: 20_000 });
-  return card;
-}
+const openCard = (p: Page, kind: "boss" | "home", name: string, id = "tiger") => tapInTown(p, kind, id, p.getByRole("dialog", { name, exact: true }));
 
 /**
  * The average color of the canvas round a test hook's point (`__townAt(kind, id)`: a lamp's glass, a home's lit pixel),
@@ -290,7 +277,8 @@ test("the lights at dusk and night: at ?sky=night a park lamp's glass and Babur'
     // The lamp ahead on your left as the page opens (a bot may stroll in front of it a moment: wait till it's clear).
     let lamp: number[] | null = null;
     await expect(async () => {
-      lamp = await glowAt(page, "lamp", 0);
+      // (The street town's first lamp drawn at the start: its park's and streets' lamps, the old park's ten gone with it.)
+      lamp = await glowAt(page, "lamp", 1);
       expect(lamp, "the lamp's glass shows").not.toBeNull();
     }).toPass({ timeout: 20_000 });
     // Babur's Circus: its doorway (Babur and his balloons may stand in front of it a moment).
@@ -397,8 +385,9 @@ test("the Colosseum: a tap on its gate walks you to the apron in front of it and
   await expect(raids).toBeVisible();
   await expect(raids).toBeDisabled();
   await expect(card.getByText("Coming soon", { exact: true })).toBeVisible();
-  // You end on the apron at the gate: the row just in front of its ground (row 27), one of its two middle columns.
-  await expect.poll(async () => (await you(page)).join(","), { message: "you walk to the gate", timeout: 5000 }).toMatch(/^(22|23),27$/);
+  // You end on the apron at the gate: the row just in front of its ground (the street town's Colosseum is at the north edge, its gate row
+  // 41), one of its two middle columns.
+  await expect.poll(async () => (await you(page)).join(","), { message: "you walk to the gate", timeout: 5000 }).toMatch(/^(22|23),41$/);
   // A tap on the world elsewhere (low on the left) closes it.
   await page.mouse.click(cv.x + cv.width * 0.3, cv.y + cv.height * 0.85);
   await expect(card).toBeHidden();
@@ -440,20 +429,29 @@ for (const st of [
     await expect(live).toHaveText("");
     // (The marble one from the zoomed-in view: the camera comes back to whichever zoom you had.)
     if (st.zoomIn) {
+      // (The street town's zoom is a step, everyone's since Nov 13: one click in from the default step (2) is step 1; the camera comes
+      // back to whichever step you had.)
       await page.getByRole("button", { name: "Zoom in" }).click();
-      await expect.poll(async () => (await cam(page)).zoom, { message: "zoomed in" }).toBe(0);
+      // (Settled on the step, not mid-ease: the close-up's checks compare against this zoom; the review of #676's delta, B1.)
+      await expect.poll(async () => { const c = await cam(page); return c.zoom === c.zoomTarget ? c.zoom : -1; }, { message: "zoomed in a step, settled" }).toBe(1);
     }
     const before = await cam(page);
     expect(before.mag, "no close-up yet").toBe(1);
     expect(before.statue).toBeNull();
     const cv = (await canvas(page).boundingBox())!;
-    // Both statues stand on the Colosseum's front, in view from the start.
+    // The statues stand on the Colosseum's plaza at the north edge (the street town's, everyone's since Nov 13): glide to the one's
+    // viewing square so it comes into view (the old town's stood in view from the start), and let the camera settle before the tap.
+    await page.evaluate((sq) => (window as unknown as { __townGlide: (to: readonly [number, number]) => void }).__townGlide(sq), st.sq);
+    await expect.poll(async () => (await page.evaluate((id) => (window as unknown as { __townAt: (k: string, id: string) => { x: number; y: number } | null }).__townAt("statue", id), st.id)) !== null, { message: "the statue comes into view", timeout: 20_000 }).toBe(true);
+    let lastFocus = "";
+    await expect.poll(async () => { const f = (await cam(page)).focus.map((v) => v.toFixed(2)).join(","); const same = f === lastFocus; lastFocus = f; return same; }, { message: "the camera settles on the statue", timeout: 20_000, intervals: [300] }).toBe(true);
     const at = await page.evaluate((id) => (window as unknown as { __townAt: (k: string, id: string) => { x: number; y: number } | null }).__townAt("statue", id), st.id);
     expect(at, "the statue is drawn").not.toBeNull();
     await page.mouse.click(cv.x + at!.x, cv.y + at!.y);
     // You walk to the square right in front of it; the camera glides in close on it; the quote renders in.
-    await expect.poll(async () => (await you(page)).join(","), { message: "you walk up to the statue", timeout: 6000 }).toBe(st.sq.join(","));
-    await expect.poll(async () => (await cam(page)).quote, { message: "the camera arrives and the quote shows", timeout: 6000 }).toBe(true);
+    // (The street town's statues are at the Colosseum's north edge, a long walk from the start: everyone's town since Nov 13.)
+    await expect.poll(async () => (await you(page)).join(","), { message: "you walk up to the statue", timeout: 25_000 }).toBe(st.sq.join(","));
+    await expect.poll(async () => (await cam(page)).quote, { message: "the camera arrives and the quote shows", timeout: 8000 }).toBe(true);
     const close = await cam(page);
     expect(close.statue).toBe(st.id);
     expect(close.close).toBe(1);
@@ -487,8 +485,8 @@ test("a chess table in the park: a tap on one walks you to a free stool and you 
   await page.goto("/town");
   await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
   await expect(canvas(page)).toHaveAttribute("data-sit", "0");
-  // The table on your left as you start (the park's seventh, on your row: its square (19, 13), its stools (18, 13) and (20, 13)).
-  const at = await page.evaluate(() => (window as unknown as { __townAt: (k: string, id: number) => { x: number; y: number } | null }).__townAt("table", 6));
+  // The park table nearest your start (the street town's, everyone's since Nov 13: table 7, square (19, 26), its stools (18, 26) and (20, 26)).
+  const at = await page.evaluate(() => (window as unknown as { __townAt: (k: string, id: number) => { x: number; y: number } | null }).__townAt("table", 7));
   expect(at, "the table is drawn at the start").not.toBeNull();
   const cv = (await canvas(page).boundingBox())!;
   await page.mouse.click(cv.x + at!.x, cv.y + at!.y);
@@ -502,7 +500,7 @@ test("a chess table in the park: a tap on one walks you to a free stool and you 
   }
   await expect(card.getByText("Coming soon", { exact: true })).toBeVisible();
   // You walk to its nearer stool (nobody on it at the start) and sit.
-  await expect.poll(async () => (await you(page)).join(","), { message: "you walk to a stool", timeout: 5000 }).toMatch(/^(18|20),13$/);
+  await expect.poll(async () => (await you(page)).join(","), { message: "you walk to a stool", timeout: 5000 }).toMatch(/^(18|20),26$/);
   await expect(canvas(page)).toHaveAttribute("data-sit", "1");
   const stool = (await you(page)).join(",");
   // A tap on the world elsewhere (low on the left) closes it, and you stand up where you are.
@@ -516,30 +514,10 @@ test("a chess table in the park: a tap on one walks you to a free stool and you 
 test("Folio's Folded House: a tap walks you there and opens its card with its name; at ?sky=night its doorway's lamplight keeps its brightness, warm, as the town darkens", { tag: "@phone-only" }, async ({ page }) => {
   const errors = watchErrors(page);
   const name = "Folio's Folded House";
-  const at = async () => {
-    const xy = await page.evaluate(() => (window as unknown as { __townAt?: (k: string, id: string) => { x: number; y: number } | null }).__townAt?.("home", "folio") ?? null);
-    if (!xy) return null;
-    const cv = (await canvas(page).boundingBox())!;
-    return { x: cv.x + xy.x, y: cv.y + xy.y };
-  };
   const card = page.getByRole("dialog", { name, exact: true });
-  /** Taps the house (its chip first when it's off screen) until its card opens: you walk to it, the camera with you, till you stop. */
+  /** Taps the house until its card opens (the camera glides there when it's off screen, as a chip would): you walk to it, the camera with you, till you stop. */
   const visit = async () => {
-    const chip = page.getByRole("button", { name: `Go to ${name}` });
-    // (Off screen: its chip, if it has one; only the nearest four places get chips (`maxChips`), and from your start Folio's house
-    // is the fifth since Oct 28, so otherwise the camera glides there, as a chip's tap would.)
-    if (!(await at())) {
-      if (await chip.count()) await chip.click({ force: true });
-      else await page.evaluate(() => (window as unknown as { __townGlide?: (id: string) => void }).__townGlide?.("folio"));
-    }
-    await expect(async () => {
-      if (await card.isVisible()) return;
-      if (await page.getByRole("dialog").isVisible()) await page.keyboard.press("Escape");
-      const p = await at();
-      expect(p, "drawn").not.toBeNull();
-      await page.mouse.click(p!.x, p!.y);
-      await expect(card).toBeVisible({ timeout: 1500 });
-    }).toPass({ timeout: 30_000 });
+    await tapInTown(page, "home", "folio", card);
     const you = () => canvas(page).getAttribute("data-you");
     await expect(async () => {
       const a = await you();
@@ -558,16 +536,19 @@ test("Folio's Folded House: a tap walks you there and opens its card with its na
     // (A home you can go into since Nov 5, its sanctuary: its name and Go in, no Coming soon.)
     await expect(card.getByRole("button")).toHaveText(["Go in"]);
     await expect(card.getByText("Coming soon", { exact: true })).toHaveCount(0);
-    // Its place (Eric, Oct 28: "folio's house is like 2 inches from the colosseum it's gotta get moved a bit"): its plot is columns
-    // 34 to 36 now (it was 32 to 34), so you stop on the ring round it, column 33 or further east; the Colosseum's ground ends at
-    // column 28 (5 open squares between them, 3 before).
-    const [col] = await you(page);
-    expect(col, "you stand beside Folio's house, east of the Colosseum's 5 open squares").toBeGreaterThanOrEqual(33);
-    expect(col).toBeLessThanOrEqual(37);
-    // Folio's paper crane steps round behind its house and stays: its picture's box is wide, and standing in front it
-    // covered the doorway for the whole wait (seen Oct 27, 1 run in 10 on a computer).
+    // Its lot (the street town's, everyone's since Nov 13: on Fountain Street, columns 25 to 28, its door square (26, 16)): you stop on
+    // its door square or one either side.
+    const [col, row] = await you(page);
+    expect(row, "you stand before Folio's door").toBe(16);
+    expect(Math.abs(col - 26), "on its door square or one either side").toBeLessThanOrEqual(1);
+    // Folio's paper crane goes to his rest and stays (his picture's box is wide: strolling in front, it covered the doorway, Oct 27).
     await expect.poll(() => page.evaluate(() => (window as unknown as { __townBossBack: (id: string) => boolean }).__townBossBack("folio")), { timeout: 15_000 }).toBe(true);
-    await page.waitForTimeout(300);
+    // The doorway seen from the side, off his lot's corner at (29, 14) (Nov 13): in the street town you stand right in front of the door, so
+    // your pawn and your tag cover it from the camera behind you, and from straight on his rest square, beside the door, puts his wings over it.
+    await page.keyboard.press("Escape");
+    await page.evaluate(() => (window as unknown as { __townWalk: (s: readonly [number, number]) => boolean }).__townWalk([29, 14]));
+    await expect.poll(() => you(page), { message: "at the corner", timeout: 15_000 }).toEqual([29, 14]);
+    expect(await townTapPoint(page, "home", "folio", 10_000), "the view still on the house").not.toBeNull();
     await expect(async () => {
       const c = await glowAt(page, "light", "folio");
       expect(c, "its doorway shows").not.toBeNull();
@@ -593,13 +574,13 @@ test("the tables' boards (Eric, Oct 27): one bot sitting waits (a green ring und
   await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
   expect((await tables(page)).every((s) => s === "still" || s.startsWith("waiting") || s === "playing")).toBe(true);
   // One bot on the west stool of the table on your left: it waits, the east stool free.
-  await seat(page, 6, 1);
-  await expect.poll(async () => (await tables(page))[6], { message: "a bot sits and waits", timeout: 15_000 }).toBe("waiting:1");
+  await seat(page, 7, 1);
+  await expect.poll(async () => (await tables(page))[7], { message: "a bot sits and waits", timeout: 15_000 }).toBe("waiting:1");
   // A second on the east stool: a game.
-  await seat(page, 6, 2);
-  await expect.poll(async () => (await tables(page))[6], { message: "two bots play", timeout: 15_000 }).toBe("playing");
+  await seat(page, 7, 2);
+  await expect.poll(async () => (await tables(page))[7], { message: "two bots play", timeout: 15_000 }).toBe("playing");
   // The board changes as they play (its pixels over the table differ a couple of moves apart).
-  const at = await page.evaluate(() => (window as unknown as { __townAt: (k: string, id: number) => { x: number; y: number } | null }).__townAt("table", 6));
+  const at = await page.evaluate(() => (window as unknown as { __townAt: (k: string, id: number) => { x: number; y: number } | null }).__townAt("table", 7));
   expect(at).not.toBeNull();
   const cv = (await canvas(page).boundingBox())!;
   const shot = async () => (await page.screenshot({ clip: { x: cv.x + at!.x - 40, y: cv.y + at!.y - 50, width: 80, height: 80 } })).toString("base64");
@@ -720,21 +701,21 @@ test("a bot sitting at a table: a tap on the table walks you to the free stool; 
   const errors = watchErrors(page);
   await page.goto("/town?debug");
   await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
-  await seat(page, 6, 1);
-  await expect.poll(async () => (await tables(page))[6], { message: "a bot sits and waits", timeout: 15_000 }).toBe("waiting:1");
-  const sitter = (await bots(page)).find((b) => b.table === 6)!;
+  await seat(page, 7, 1);
+  await expect.poll(async () => (await tables(page))[7], { message: "a bot sits and waits", timeout: 15_000 }).toBe("waiting:1");
+  const sitter = (await bots(page)).find((b) => b.table === 7)!;
   const bot = BOTS.find((b) => `${b.name} (bot)` === sitter.name)!;
-  await tapAt(page, "table", 6);
+  await tapAt(page, "table", 7);
   const card = page.getByRole("dialog", { name: "Chess table", exact: true });
   const play = card.getByRole("button").first();
   await expect(play).toHaveText(`Play ${bot.name} (bot) · ${bot.rating}`);
   await expect(play).toBeEnabled();
   for (const name of ["Casual", "Ranked"]) await expect(card.getByRole("button", { name, exact: true })).toBeDisabled();
   // You walk to the free (east) stool and sit, across from it; it stays while the card is open.
-  await expect.poll(async () => (await you(page)).join(","), { timeout: 5000 }).toBe("20,13");
+  await expect.poll(async () => (await you(page)).join(","), { timeout: 5000 }).toBe("20,26");
   await expect(canvas(page)).toHaveAttribute("data-sit", "1");
   await page.waitForTimeout(600);
-  expect((await bots(page)).find((b) => b.name === sitter.name)!.table).toBe(6);
+  expect((await bots(page)).find((b) => b.name === sitter.name)!.table).toBe(7);
   await play.click();
   await expect(page.locator(".duel-screen")).toBeVisible({ timeout: 15_000 });
   await expect(page.locator(".dv-strip.dv-them .dv-name")).toHaveText(`${bot.name} (bot)`);
@@ -745,18 +726,18 @@ test("a bot sitting at a table: a tap on the table walks you to the free stool; 
   // (Every bot holds still from here, the one across too: it would get up after a while.)
   await page.evaluate(() => (window as unknown as { __townCall: (i: number) => void }).__townCall(-1));
   await expect(page).toHaveURL(/\/town(\?debug)?$/);
-  expect((await you(page)).join(",")).toBe("20,13");
+  expect((await you(page)).join(",")).toBe("20,26");
   await expect(canvas(page)).toHaveAttribute("data-sit", "1");
-  expect((await bots(page)).find((b) => b.name === sitter.name)).toMatchObject({ at: "18,13", table: 6 });
+  expect((await bots(page)).find((b) => b.name === sitter.name)).toMatchObject({ at: "18,26", table: 7 });
   // Again (the bot still there), and this time the back button.
-  await tapAt(page, "table", 6);
+  await tapAt(page, "table", 7);
   await card.getByRole("button", { name: `Play ${bot.name} (bot) · ${bot.rating}` }).click();
   await expect(page.locator(".duel-screen")).toBeVisible({ timeout: 15_000 });
   await page.goBack();
   await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
-  expect((await you(page)).join(",")).toBe("20,13");
+  expect((await you(page)).join(",")).toBe("20,26");
   await expect(canvas(page)).toHaveAttribute("data-sit", "1");
-  expect((await bots(page)).find((b) => b.name === sitter.name)).toMatchObject({ at: "18,13", table: 6 });
+  expect((await bots(page)).find((b) => b.name === sitter.name)).toMatchObject({ at: "18,26", table: 7 });
   expect(errors).toEqual([]);
 });
 
@@ -1176,7 +1157,8 @@ test("a long name or line shrinks its own words to fit its row (Eric, Oct 29), n
 });
 
 test("the other cards on the same dark look: the boss's, the home's, the Colosseum's, a table's and 'Leave the town square?' keep their words and buttons; gold primary buttons, greyed ones and 'Coming soon' read on the dark (4.5:1)", async ({ page }) => {
-  test.setTimeout(120_000);
+  // (Five cards, each tapped once the view holds still: under a full shard's slow frames that can outlast 2 minutes, Nov 13.)
+  test.setTimeout(180_000);
   const errors = watchErrors(page);
   await page.goto("/town");
   await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
@@ -1210,10 +1192,10 @@ test("the other cards on the same dark look: the boss's, the home's, the Colosse
   await onDark("the Colosseum's card", ["h2"]);
   await page.keyboard.press("Escape");
   // A chess table's (no title): the camera goes to the park's seventh table, which is out of view from the Colosseum's gate.
-  await page.evaluate(() => (window as unknown as { __townGlide: (to: [number, number]) => void }).__townGlide([19, 14]));
-  await expect.poll(() => page.evaluate(() => (window as unknown as { __townAt: (k: string, i: number) => unknown }).__townAt("table", 6)), { message: "the table is in view" }).not.toBeNull();
+  await page.evaluate(() => (window as unknown as { __townGlide: (to: [number, number]) => void }).__townGlide([19, 27]));
+  await expect.poll(() => page.evaluate(() => (window as unknown as { __townAt: (k: string, i: number) => unknown }).__townAt("table", 7)), { message: "the table is in view" }).not.toBeNull();
   await page.waitForTimeout(600);
-  await tapAt(page, "table", 6);
+  await tapAt(page, "table", 7);
   card = page.getByRole("dialog", { name: "Chess table", exact: true });
   for (const b of ["Casual", "Ranked"]) await expect(card.getByRole("button", { name: b, exact: true })).toBeDisabled();
   await expect(card.getByText("Coming soon", { exact: true })).toBeVisible();
@@ -1270,12 +1252,8 @@ test("a real player's card (a test player; no real players walk in the town yet)
     },
     [uid],
   );
-  await expect.poll(() => page.evaluate((id) => (window as unknown as { __townAt: (k: string, id: string) => unknown }).__townAt("player", id), uid), { message: "the test player is drawn" }).not.toBeNull();
-  const at = (await page.evaluate((id) => (window as unknown as { __townAt: (k: string, id: string) => { x: number; y: number } }).__townAt("player", id), uid))!;
-  const cv = (await canvas(page).boundingBox())!;
-  await page.mouse.click(cv.x + at.x, cv.y + at.y);
-  const card = page.getByRole("dialog", { name: "Cyrus", exact: true });
-  await expect(card).toBeVisible();
+  // (Beside you, on your right as the town opens: a real tap on them, helpers.ts tapInTown.)
+  const card = await tapInTown(page, "player", uid, page.getByRole("dialog", { name: "Cyrus", exact: true }));
   // The same size and row as a bot's; no "(bot)", no line; their rating; Play greyed (challenging a player isn't built yet), with its note.
   const size = await rectIn(page, ".town-card");
   expect([size.w, size.h].map((v) => Math.round(v * 10) / 10)).toEqual([CARD_SIZE.w, CARD_SIZE.h]);
@@ -1351,19 +1329,31 @@ const tagOverHead = (p: Page, id: string, name: string) =>
  * drawn over its middle on a phone, and a tap there is a tap on them (their card; you don't move).
  */
 async function squareSettled(page: Page, c: number, r: number): Promise<{ x: number; y: number }> {
-  type At = (k: string, id: [number, number]) => { x: number; y: number } | null;
-  const at = () => page.evaluate(([c, r]) => ({ mid: (window as unknown as { __townAt: At }).__townAt("square", [c, r]), tap: (window as unknown as { __townAt: At }).__townAt("tap-square", [c, r]) }), [c, r] as [number, number]);
-  let prev = (await at()).mid;
-  for (let i = 0; i < 40; i++) {
-    await page.waitForTimeout(50);
-    const now = await at();
-    if (now.mid && prev && Math.abs(now.mid.x - prev.x) < 0.25 && Math.abs(now.mid.y - prev.y) < 0.25) {
-      if (!now.tap) throw new Error(`square ${c},${r}: no point of it a tap reaches (someone is drawn over all of it)`);
-      return now.tap;
-    }
-    prev = now.mid;
-  }
-  throw new Error(`square ${c},${r}: the camera never settled`);
+  // (Nov 13: counted in drawn frames, up to 10 s, not 40 reads 50 ms apart: on a slow software-WebGL runner the camera's trail after a walk
+  // outlasted 2 s of wall time.)
+  const got = await page.evaluate(
+    ([c, r]) =>
+      new Promise<{ tap: { x: number; y: number } | null; mid: boolean; still: boolean }>((done) => {
+        type At = (k: string, id: [number, number]) => { x: number; y: number } | null;
+        const at = (k: string) => (window as unknown as { __townAt: At }).__townAt(k, [c, r]);
+        const until = performance.now() + 10_000;
+        let prev = at("square");
+        let same = 0;
+        const look = () => {
+          const mid = at("square");
+          same = mid && prev && Math.abs(mid.x - prev.x) < 0.25 && Math.abs(mid.y - prev.y) < 0.25 ? same + 1 : 0;
+          prev = mid;
+          if (same >= 3) done({ tap: at("tap-square"), mid: true, still: true });
+          else if (performance.now() > until) done({ tap: null, mid: !!mid, still: false });
+          else requestAnimationFrame(look);
+        };
+        requestAnimationFrame(look);
+      }),
+    [c, r] as [number, number],
+  );
+  if (!got.still) throw new Error(`square ${c},${r}: ${got.mid ? "the camera never settled" : "not on the screen"}`);
+  if (!got.tap) throw new Error(`square ${c},${r}: no point of it a tap reaches (someone is drawn over all of it)`);
+  return got.tap;
 }
 
 test("rides (Oct 31; Nov 1, every boss's): your pawn sits on its ride, the ride's idle standing and its move walking, its side, back or front the way it goes; its trail instead of the droplets; its tag over its top; nothing fetched for it; another rider as others see them", { tag: "@phone-only" }, async ({ page }) => {
@@ -1449,22 +1439,39 @@ test("rides (Oct 31; Nov 1, every boss's): your pawn sits on its ride, the ride'
   const walkTo = async (c: number, r: number) => {
     const at = await squareSettled(page, c, r);
     const cv = (await canvas(page).boundingBox())!;
-    await page.mouse.click(cv.x + at.x, cv.y + at.y);
+    // (A quick tap: a slow frame between a separate press and release would make it a run, helpers.ts quickTap.)
+    await quickTap(page, cv.x + at.x, cv.y + at.y);
     // (There, or beside it if a bot stands there: one pawn a square.)
     await expect.poll(async () => Math.abs((await you(page))[0] - c) + Math.abs((await you(page))[1] - r)).toBeLessThanOrEqual(1);
     await expect.poll(async () => (await rideNow(page)).you.anim).toBe("idle");
   };
-  // (The bots held still from the start, above: none walks across your way, and none stands within 2 steps of you, on or in front of
-  // the squares beside you.)
+  // (The bots held still from the start, above: none walks across your way, and none stands on or in front of the squares tapped.)
   await expect.poll(() => page.evaluate(() => (window as unknown as { __townBots: () => { name: string; moving: boolean }[] }).__townBots().filter((b) => b.moving).map((b) => b.name)), { message: "the bots stand still", timeout: 15_000 }).toEqual([]);
+  // (The street town's start sits just below the park's fountain, so move onto column 24, a clear lane from the park up to the gate, for
+  // the directional walks; everyone's town since Nov 13.)
+  await page.evaluate(() => (window as unknown as { __townWalk: (s: readonly [number, number]) => boolean }).__townWalk([24, 25]));
+  await expect.poll(() => you(page), { message: "onto the clear lane", timeout: 10_000 }).toEqual([24, 25]);
+  await expect.poll(async () => (await rideNow(page)).you.anim).toBe("idle");
   const [c0, r0] = await you(page);
-  const near = await page.evaluate(([c0, r0]) => (window as unknown as { __townBots: () => { name: string; at: string; home: boolean }[] }).__townBots().filter((b) => !b.home && b.at.split(",").map(Number).reduce((d, v, k) => d + Math.abs(v - (k ? r0 : c0)), 0) <= 2).map((b) => `${b.name} ${b.at}`), [c0, r0] as const);
-  expect(near, "no bot within 2 steps of you").toEqual([]);
+  // No bot on the two squares the taps below aim at (yours and the one on your right), nor in front of them toward the camera (the two rows
+  // below, a column either side), where it would be drawn over them. (Nov 13: "within 2 steps of you" counted Gambit Gus, frozen at 26,25
+  // beside the lane, two columns over on your row, where he covers neither: every run, on CI and locally.)
+  const near = await page.evaluate(
+    ([c0, r0]) =>
+      (window as unknown as { __townBots: () => { name: string; at: string; home: boolean }[] }).__townBots()
+        .filter((b) => {
+          const [c, r] = b.at.split(",").map(Number) as [number, number];
+          return !b.home && ((r === r0 && c >= c0 && c <= c0 + 1) || (r < r0 && r >= r0 - 2 && c >= c0 - 1 && c <= c0 + 2));
+        })
+        .map((b) => `${b.name} ${b.at}`),
+    [c0, r0] as const,
+  );
+  expect(near, "no bot on the squares tapped or in front of them").toEqual([]);
   // A tap on the square right beside you walks you there, as on foot: your ride's reach isn't you (taps take the pawn's box).
   for (const c of [c0 + 1, c0]) {
     const at = await squareSettled(page, c, r0);
     const cv = (await canvas(page).boundingBox())!;
-    await page.mouse.click(cv.x + at.x, cv.y + at.y);
+    await quickTap(page, cv.x + at.x, cv.y + at.y);
     await expect.poll(() => you(page), { message: `beside you: ${c},${r0}` }).toEqual([c, r0]);
     await expect.poll(async () => (await rideNow(page)).you.anim).toBe("idle");
   }
@@ -1473,10 +1480,17 @@ test("rides (Oct 31; Nov 1, every boss's): your pawn sits on its ride, the ride'
   // Standing after walking up: its back view's idle.
   expect([(await rideNow(page)).you.anim, (await rideNow(page)).you.view]).toEqual(["idle", 1]);
   await walkTo(c0 + 3, r0 + 5);
+  // (In two taps: from 3 columns right, 4 to the left is off a phone's screen, Nov 13.)
+  await walkTo(c0 + 1, r0 + 5);
   await walkTo(c0 - 1, r0 + 5);
   // Stopped: the idle again, its side, facing left as it came.
   expect([(await rideNow(page)).you.anim, (await rideNow(page)).you.view, (await rideNow(page)).you.facing]).toEqual(["idle", 0, -1]);
-  await walkTo(c0 - 1, r0 + 2);
+  // (Down by the walk hook, as a tap would walk you: 3 rows down is behind you, below a phone's chase camera, so no tap reaches it. Down the
+  // lane's column, a step right and then straight down: the park's fountain stands on rows 28 and 29 of column 23, and a walk round it ends
+  // sideways. Nov 13.)
+  await page.evaluate(([c, r]) => (window as unknown as { __townWalk: (s: readonly [number, number]) => boolean }).__townWalk([c, r]), [c0, r0 + 2] as const);
+  await expect.poll(() => you(page), { message: "down 3 rows" }).toEqual([c0, r0 + 2]);
+  await expect.poll(async () => (await rideNow(page)).you.anim).toBe("idle");
   // Standing after walking down: its front view's idle.
   expect([(await rideNow(page)).you.anim, (await rideNow(page)).you.view]).toEqual(["idle", 2]);
   const steps = await page.evaluate(() => [...(window as unknown as { __rideSeen: Set<string> }).__rideSeen]);
@@ -1596,19 +1610,11 @@ test("a home's door (Eric, Nov 5): a tap on Folio's house walks you to the squar
   await page.waitForTimeout(800); // (the first walk settles)
   const name = "Folio's Folded House";
   const card = page.getByRole("dialog", { name, exact: true });
-  await page.evaluate(() => (window as unknown as { __townGlide?: (id: string) => void }).__townGlide?.("folio"));
-  // Its plot is columns 34 to 36, rows 29 to 31: the square before its door is (35, 28) (or one either side, if someone stands there).
-  await expect(async () => {
-    if (await card.isVisible()) return;
-    // (Folio strolling in front of his house may take the tap: close his card and tap again, as Folio's test does.)
-    if (await page.getByRole("dialog").isVisible()) await page.keyboard.press("Escape");
-    const xy = await page.evaluate(() => (window as unknown as { __townAt?: (k: string, id: string) => { x: number; y: number } | null }).__townAt?.("home", "folio") ?? null);
-    expect(xy, "drawn").not.toBeNull();
-    const cv = (await canvas(page).boundingBox())!;
-    await page.mouse.click(cv.x + xy!.x, cv.y + xy!.y);
-    await expect(card).toBeVisible({ timeout: 1500 });
-  }).toPass({ timeout: 30_000 });
-  await expect.poll(async () => { const [c, r] = await you(page); return r === 28 && Math.abs(c - 35) <= 1; }, { message: "before its door", timeout: 30_000 }).toBe(true);
+  // Its lot is columns 25 to 28, rows 17 to 19: the square before its door is (26, 16) (or one either side, if someone stands there). (The
+  // camera glides there first, as a chip would; Folio strolling in front of his house may take the tap: his card is closed and the house
+  // tapped again: helpers.ts tapInTown.)
+  await tapInTown(page, "home", "folio", card);
+  await expect.poll(async () => { const [c, r] = await you(page); return r === 16 && Math.abs(c - 26) <= 1; }, { message: "before its door", timeout: 30_000 }).toBe(true);
   await page.waitForTimeout(600);
   await page.keyboard.press("Escape");
   await expect(card).toBeHidden();
@@ -1627,6 +1633,9 @@ test("the arrow keys: holding ArrowUp walks you up and the up key lights while i
   await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
   await page.waitForTimeout(800); // (the first walk settles)
   const up = page.locator(".town-key-up");
+  // (The street town's start is just below the fountain; move onto column 24, a clear lane up to the gate, before holding up. Nov 13.)
+  await page.evaluate(() => (window as unknown as { __townWalk: (s: readonly [number, number]) => boolean }).__townWalk([24, 25]));
+  await expect.poll(() => you(page), { message: "onto the clear lane", timeout: 10_000 }).toEqual([24, 25]);
   const [, r0] = await you(page);
   await page.keyboard.down("ArrowUp");
   await expect(up, "the key lights while it's held").toHaveClass(/\bon\b/);

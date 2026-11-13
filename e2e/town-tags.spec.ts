@@ -166,6 +166,11 @@ test("tags fade as you walk away from a figure (not a pop), are gone past the ra
   await page.waitForTimeout(500);
   expect((await read(page)).tags.find((t) => t.text === name)?.alpha, "beside you: shown").toBe(1);
 
+  // (The street town's camera chases you: zoomed all the way out first, so the bot stays on screen as you walk off and what's seen is the
+  // tag's fade with distance, not the bot leaving the view; a press wins over the park's own step in and out.)
+  for (let k = 0; k < 5; k++) await page.getByRole("button", { name: "Zoom out" }).click();
+  await expect(page.getByRole("button", { name: "Zoom out" })).toHaveAttribute("aria-pressed", "true");
+  await page.waitForTimeout(600);
   // Walk away (taps toward the far side of the map) while a recorder in the page notes the tag's alpha every frame. The bot holds still.
   await page.evaluate((n) => {
     const w = window as unknown as { __rec: number[]; __recGo: boolean } & Hooks;
@@ -177,16 +182,17 @@ test("tags fade as you walk away from a figure (not a pop), are gone past the ra
     };
     requestAnimationFrame(tick);
   }, name);
-  const cv = (await canvas(page).boundingBox())!;
   let far = 0;
-  for (const [fx, fy] of [[0.5, 0.12], [0.85, 0.3], [0.15, 0.3], [0.5, 0.9], [0.9, 0.9]] as const) {
-    await page.mouse.click(cv.x + cv.width * fx, cv.y + cv.height * fy);
+  // (The street town's open ground, everyone's since Nov 13: up column 24, a clear lane from the park to the gate, a square at a time so
+  // the tag's fade over the last square is caught; before, taps on the old town's open map.)
+  for (const sq of [[24, 25], [24, 27], [24, 29], [24, 31], [24, 33], [24, 35]] as const) {
+    await page.evaluate((s) => (window as unknown as { __townWalk: (s: readonly [number, number]) => boolean }).__townWalk(s), sq);
     let last = "";
-    for (let n = 0; n < 40; n++) {
+    for (let n = 0; n < 20; n++) {
       const you = await canvas(page).getAttribute("data-you");
       if (you === last) break;
       last = you!;
-      await page.waitForTimeout(500);
+      await page.waitForTimeout(400);
     }
     const now = await read(page);
     far = dist(now.bots[i]!.at, now.you);

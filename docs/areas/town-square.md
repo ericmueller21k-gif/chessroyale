@@ -9,6 +9,13 @@ twice its size, the map bigger, and put **the park** with its ten chess tables i
 opens it, and the computer's side menu's Chess Town item; the address `/town` opens it directly too (`hunchess.com/town`,
 behind Cloudflare Access like the rest of the site). Phone and computer; **on a computer it sits in the front door's frame** (Oct 29, below).
 
+
+**Since Nov 13 the street town (below, "The street town") is everyone's town, players' and guests' alike, and the old Canvas 2D town's
+code is gone** ([2026-11-13-street-town-for-everyone.md](../decisions/2026-11-13-street-town-for-everyone.md)): its 46 × 46 map, park,
+lamps, start (22, 17), zoom-out camera, drag-to-pan and Colosseum picture. Much of "How it works" below tells the old town's story (its
+layout, its camera); where it and "The street town" differ, the street town is how it works now. `ADMIN_TOWN` (`town/admin-town.ts`) still
+gates the admin-first bosses' homes (core's `BOSS_ADMIN_FIRST`: Timber's, Dash's, Rolling Dough): in a player's town their lots are left out
+before the rows are laid (`street.ts lotHere`), so each row fills the place with look-alike fronts. Test: `packages/app/test/town-player.test.ts`.
 ## How it works
 
 - **The page.** `App.tsx` mounts it at `/town` the way it mounts `/autochess`; `town/TownPage.tsx` loads the rest with a
@@ -72,7 +79,7 @@ behind Cloudflare Access like the rest of the site). Phone and computer; **on a 
   `town.people`; the bots are one source that moves its people. The drawing and the taps read only that list, so real
   players (rooms of up to about 75 to 100, fed by a server, later) can replace the bots without touching either.
 - **Away and guests (Nov 7, #542; [2026-11-07-town-afk.md](../decisions/2026-11-07-town-afk.md)).** No input for 1 min (`TOWN_AFK`): a pixel "zzz" by your pawn (`zzz.ts`), town and shops; 5 min idle or hidden: home, "You've been dropped from the town" (`afk.ts`, `here-net.ts`, `AwayNote.tsx`). A challenge and the claw machine hold the clock.
-  Signed-in devices beat `POST /api/town/here`: real players walk in each other's town in their outfits; the server drops away ones itself (`server/src/town-here.ts`). Guests watch (outfits, no names), read the chat (typing greyed: "Make a free account to chat."), and after 30 s get "Make an account to keep exploring". Switches `?townafk=`, `?townroom=`, `?townguest=`; hook `__townHere()`.
+  Signed-in devices beat `POST /api/town/here`: real players walk in each other's town in their outfits; the server drops away ones itself (`server/src/town-here.ts`). Guests watch (outfits, no names), read the chat (typing greyed: "Make a free account to chat."), and after 30 s get "Make an account to keep exploring" (their clock starts once the town is drawn, not under its loading screen, Nov 13). Switches `?townafk=`, `?townroom=`, `?townguest=`; hook `__townHere()`.
 - **The drawing** (`town/render.ts`): one canvas, one `requestAnimationFrame` loop (in `Town.tsx`), stopped when the screen
   closes or the tab is hidden; device pixel ratio capped at 2; nothing allocated per frame on the hot path (square colors,
   fonts, gradients, clouds, pawns and every boss and home frame are made once, the frames the first time they show).
@@ -80,7 +87,8 @@ behind Cloudflare Access like the rest of the site). Phone and computer; **on a 
   function must not lean on anything that changes after the call; `test/town-paint-lazy.test.ts` checks every picture), and each
   statue's world-scale picture is made when first drawn: opening took 5.8 s to its first frame on a slowed phone, now 2.1 s
   (`e2e/perf.spec.ts`, "Chess Town on a slow phone").
-  It draws through a **drawing layer** (`town/paint.ts`, Oct 30) with two backends: Canvas 2D (today's town, everyone's) and
+  It draws through a **drawing layer** (`town/paint.ts`, Oct 30) with two backends: Canvas 2D (the old town's, gone since Nov 13; it stays
+  only as the blank canvas under the failure message) and
   WebGL 2 (the street town's only drawing since Nov 6, `town/paint-gl.ts`; below, "WebGL").
 - **WebGL (Oct 30; docs/decisions/2026-10-30-town-webgl.md; the street town's only drawing since Nov 6,
   docs/decisions/2026-11-06-street-webgl-only.md).** It draws the same picture with WebGL 2 in a few draw calls a frame instead of hundreds of canvas calls. `paint-gl.ts` stands in for the part of the 2D
@@ -157,7 +165,8 @@ behind Cloudflare Access like the rest of the site). Phone and computer; **on a 
   Numbers: `TOWN_FEEL.youStepMs` (the same pace as a tap); the sizes are the CSS in `town.css`. Test: `e2e/town.spec.ts`, "the arrow
   keys"; unit: `packages/app/test/town-arrows.test.ts`. Decision: `docs/decisions/2026-11-04-town-arrow-keys.md`.
 - **Looking around.** Drag to look
-  around; the focus button ("Back to me") brings the camera back; − / + (and the mouse wheel) zoom. The chips at the box's edge show the
+  around; the focus button ("Back to me") brings the camera back (and, since Nov 13, eases a look round snapped to another quarter back
+  to the normal view); − / + (and the mouse wheel) zoom. The chips at the box's edge show the
   bosses whose homes are off screen (the nearest few: `maxChips` in `feel.ts`, 4), and the Colosseum's crown when none of
   it is on screen (among the nearest four, it's placed first, so it always shows); a tap glides the camera there. A chip
   never covers a name tag, a home's floating name, the speech bubble, the −/+ and "Back to me" buttons or a nearer
@@ -176,7 +185,7 @@ behind Cloudflare Access like the rest of the site). Phone and computer; **on a 
   homes' names are drawn after it, so they read as well at night), the sun (the moon at night: craters, stars, a few
   twinkling) and the clouds' colors; dawn adds a morning mist (more haze over the far ground, into its own pale gold) and
   its sun rises on the other side of the sky from dusk's. The prototype's far-band softening (a blurred copy laid over
-  the far ground) is off (`softenFarBand`): it ghosted the far squares. The sun and moon sit low over the horizon and shift only a little as you walk round the world.
+  the far ground) is gone (it ghosted the far squares; deleted Nov 13 with the 2D town). The sun and moon sit low over the horizon and shift only a little as you walk round the world.
 - **`?sky=dawn|day|dusk|night`** on `/town` holds one look whatever the clock says (for Eric and the tests; nothing else
   reads it).
 - **The clouds** are pixel art like the homes (`cloudPixel`): puffs on flat-ish bottoms, each puff shaded as a ball lit
@@ -1060,10 +1069,9 @@ standing where the chair blocks are"): [2026-11-02-challenge-pacing.md](../decis
   dark lifting off the battle, nobody moving and the table there throughout the drain), `e2e/shop.spec.ts` (Alfil's Pyramid's, Big Boy's Crib's and Dash's Kicks' crates), `e2e/town.spec.ts` (a boss without an inside, Folio: the
   Boss raid screen).
 
-## The street town (Nov 5, round 2: admins only)
+## The street town (Nov 5, round 2: admins only; everyone's since Nov 13)
 
-An admin's town is the street town (`STREET_TOWN`, `town/admin-town.ts`; everyone else keeps the town above until round 3, the boxes
-and Seam Avenue's camera turn, is done; then the switch goes). Eric approved its art and plan Nov 5 (`claude/boss-art` 11a4d903).
+The street town was an admin's town only (`STREET_TOWN`, gone Nov 13) until it became everyone's town on Nov 13. Eric approved its art and plan Nov 5 (`claude/boss-art` 11a4d903).
 - **From the plan:** `town/street-plan.json` (the art's `town-plan-nov5.json`, as made) read by `town/street.ts`; `world.ts` builds
   the ground (the streets are the board, their sidewalks paving, the park's walks and lawns, back gardens, lots, the Colosseum), the
   props (trees, benches, lamps, the twelve tables, the fountain, hedges, bushes, beds, sheds, and every everyday building's front),
@@ -1258,6 +1266,10 @@ noted wherever a slice changed one.
 
 ## Tests
 
+- **Tapping in the street town from a spec (Nov 13):** `tapInTown(page, kind, id, card)` in `e2e/helpers.ts` opens a figure's or a
+  place's card. It waits until the view holds still over 3 drawn frames (`townTapPoint`), glides there once if the target is off the screen
+  or covered, and taps with the press and release together (`quickTap`). Read a point mid-glide, or a separate `page.mouse.click`, and
+  the tap fails on CI's software WebGL ([2026-11-13-street-town-taps-on-ci.md](../decisions/2026-11-13-street-town-taps-on-ci.md)).
 - `e2e/shop.spec.ts` (Nov 2, inside a shop; phone and computer): Babur's card's "Go in", inside zoomed out (+ and − switch to Close and back), a tap
   on the Shopkeeper walks you up and its card's Talk opens "Babur's Boss Crate" (the price line, Balloon Pup, what you have, both buys
   greyed with nothing to pay), the header saying "Babur's Circus", then the view dragged back to the door, "Go out" and you're outside

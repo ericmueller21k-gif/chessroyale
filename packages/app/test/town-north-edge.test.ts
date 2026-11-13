@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
-// An admin's town is the street town (admin-town.ts STREET_TOWN): the north edge round's one back line and its Colosseum as a solid.
-vi.mock("../src/town/admin-town.ts", () => ({ ADMIN_TOWN: true, STREET_TOWN: true }));
+// The street town (everyone's since Nov 13), as an admin's (every home): the north edge round's one back line and its Colosseum as a solid.
+vi.mock("../src/town/admin-town.ts", () => ({ ADMIN_TOWN: true }));
 
 const { N, newView, setHeading, setView } = await import("../src/town/camera.ts");
 const PLAN = (await import("../src/town/street-plan.json")).default;

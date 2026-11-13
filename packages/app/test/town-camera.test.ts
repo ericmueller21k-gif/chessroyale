@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { N, forEachSquare, newPt, newView, pickSquare, proj, rowsInView, setView, tableLift, wrapF, wrapI, type TableLift } from "../src/town/camera.ts";
 import { TOWN_FEEL } from "../src/town/feel.ts";
 import { TABLE_BOARD } from "../src/town/houses/park.ts";
-import { COLISEUM, HOMES, PARK, PAVING, START, ease, findPath, groundAt, plotAt, walkable } from "../src/town/world.ts";
+import { HOMES, START, ease, findPath, walkable } from "../src/town/world.ts";
 
 /** The town square's camera (src/town/camera.ts): pure projection math, on a phone's box and a computer's. */
 const BOXES = [
@@ -80,7 +80,8 @@ describe("town square camera", () => {
     for (const [camX, camY] of [
       [20, 10],
       [0.3, 39.6],
-      [39.2, 0.4],
+      // (Across the east-west wrap; the street town doesn't wrap north-south: near its south edge, inside it.)
+      [53.6, 3.4],
     ] as const) {
       let checked = 0;
       for (const [dc, dr] of [
@@ -143,40 +144,10 @@ describe("town square camera", () => {
 });
 
 describe("town square walking", () => {
-  it("fifteen homes spread over the world: neighbors 8 or more squares apart, none near your start, the Colosseum's ground clear", () => {
-    // (Fourteen, and the Hidden Boss's walk-up in everyone's town since Nov 13: his room's challenge.)
-    expect(HOMES).toHaveLength(15);
-    expect(new Set(HOMES.map((h) => h.id)).size).toBe(15);
-    const dist = (ax: number, ay: number, bx: number, by: number) => Math.hypot(wrapF(ax - bx), wrapF(ay - by));
-    // (The ring's fourteen keep 8 to 10 from each other; the walk-up, placed in the corner on Nov 13 when it was an admin's only (as
-    // Timber's and Dash's are, off this ring), stands 7 or more from any home.)
-    const ring = HOMES.filter((h) => h.id !== "recluse");
-    for (const h of HOMES) {
-      expect(dist(h.cx, h.cy, START.c, START.r), `${h.id} from the start`).toBeGreaterThanOrEqual(7.5);
-      const near = Math.min(...HOMES.filter((o) => o !== h).map((o) => dist(h.cx, h.cy, o.cx, o.cy)));
-      expect(near, `${h.id}'s nearest neighbor`).toBeGreaterThanOrEqual(7);
-      if (h.id === "recluse") continue;
-      const inRing = Math.min(...ring.filter((o) => o !== h).map((o) => dist(h.cx, h.cy, o.cx, o.cy)));
-      expect(inRing, `${h.id}'s nearest neighbor on the ring`).toBeGreaterThanOrEqual(8);
-      expect(inRing, `${h.id}'s nearest neighbor on the ring`).toBeLessThanOrEqual(10);
-    }
-    // No home stands on the Colosseum's 12 x 12 ground (slice 5 built the Colosseum there: solid; slice 6 made it twice the
-    // size), nor in its park, and you start south of it, in the park in front of its gate (slice 6: the park between; since
-    // the park stood back from it, 11 rows south, still inside the view's rim).
-    for (let r = COLISEUM.r0; r < COLISEUM.r0 + COLISEUM.size; r++) for (let c = COLISEUM.c0; c < COLISEUM.c0 + COLISEUM.size; c++) expect(plotAt[r * N + c]).toBeNull();
-    for (let r = PARK.r1 - PARK.d + 1; r <= PARK.r1; r++) for (let c = PARK.c0; c < PARK.c0 + PARK.w; c++) expect(plotAt[r * N + c]).toBeNull();
-    expect(START.r).toBeLessThan(COLISEUM.r0);
-    expect(COLISEUM.r0 - START.r).toBeLessThanOrEqual(11);
-    expect(START.c).toBeGreaterThanOrEqual(COLISEUM.c0);
-    expect(START.c).toBeLessThan(COLISEUM.c0 + COLISEUM.size);
-    expect(groundAt[START.r * N + START.c], "on the park's promenade").toBe(PAVING);
-    expect(walkable(START.c, START.r)).toBe(true);
-  });
-
   it("a path walks around a home", () => {
     const ginger = HOMES.find((h) => h.id === "gingerbread")!;
-    // From the start to the square behind Ginger's house: around it, never through it.
-    const goal = { c: ginger.cx, r: ginger.cy + 2 };
+    // From the start to Ginger Igloo's door square: round the buildings, never through one (the street town's: its door on the sidewalk).
+    const goal = ginger.door;
     const path = findPath(START, (c, r) => c === goal.c && r === goal.r, walkable)!;
     expect(path.at(-1)).toEqual(goal);
     for (const s of path) expect(walkable(s.c, s.r)).toBe(true);

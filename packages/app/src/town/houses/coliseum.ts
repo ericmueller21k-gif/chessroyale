@@ -19,10 +19,10 @@
  * redrew it at about twice its size (twice as wide and deep, half as tall again: three tiers of arches where it had two,
  * 27 bays where it had 15): at the homes' scale (37 pixels a square) it is about 17 squares across with its statues.
  */
-import type { Anim, Character, Frame, Layer, Part } from "../../characters/sprite.ts";
+import type { Character, Part } from "../../characters/sprite.ts";
 import { TOWN_FEEL } from "../feel.ts";
 import { COLISEUM } from "../world.ts";
-import { grain, groundShadow, paint, signBoard, signFace, TORCH, type LightPool, type LightSpot, type Pt } from "./kit.ts";
+import { paint, signBoard, type Pt } from "./kit.ts";
 import { PED_W, STATUE_W, statueH, type StatueId } from "./statues.ts";
 import { lazyAnim } from "../../characters/sprite.ts";
 
@@ -72,187 +72,16 @@ const PLINTH_H = 20;
 /** The chess pieces beyond the statues: the nearer pair just past a statue's pedestal, the outer pair past them. */
 const PIECE_1 = STATUE_OFF + PED_W / 2 + PLINTH_W / 2 + 8;
 const PIECE_2 = PIECE_1 + PLINTH_W + 6;
-/** The queen and king either side of the gate. */
-const GUARD = 86;
 const W = 2 * (PIECE_2 + PLINTH_W / 2 + 6);
 const FOOT = 364;
-const H = FOOT + 8;
 const CX = W / 2;
-/** The oval wall: half its width and half its depth as drawn (seen a little from above), its height. */
-const RX = 236;
-const RY = 70;
-const HW = 150;
-/** The middles of its foot's oval and its top's. */
-const BASE_CY = FOOT - RY;
-const TOP_CY = BASE_CY - HW;
-
-/** Light from the top left: how lit the wall's face is where it faces sideways by `s` (-1 left, 0 ahead, 1 right). */
-const wallLight = (s: number, c: number) => 0.56 - 0.42 * s + 0.25 * (c - 0.7);
-const STONE = "123456";
-const stone = (l: number): string => (l > 0.8 ? "1" : l > 0.62 ? "2" : l > 0.44 ? "3" : l > 0.26 ? "4" : l > 0.1 ? "5" : "6");
-/** One step darker (a joint, a shadow). */
-const darker = (k: string): string => STONE[Math.min(5, STONE.indexOf(k) + 1)]!;
 
 // ---- The wall: three tiers of arches round its curve, a tier of windows, the cornices between them, the checkered
 // attic band on top; the portal in the middle of its front.
 
-/** Its tiers, in pixels above its foot: where each starts, how tall its arches stand (0: square windows), where it ends. */
-const TIERS = [
-  { h0: 6, arch: 32, h1: 42 },
-  { h0: 48, arch: 28, h1: 78 },
-  { h0: 84, arch: 24, h1: 108 },
-  { h0: 114, arch: 0, h1: 130 },
-] as const;
-/** The attic's checkered band (two rows of squares) and its lip. */
-const ATTIC = 130;
-const CHECK = 7;
-/** Bays (arches) across its front half: odd, so one is in the middle (the gate's). */
-const BAYS = 27;
-const BAY = Math.PI / BAYS;
-/** The portal: its pilasters' outer edge, the gate's half-width and height. */
-const PORTAL = 54;
-const GATE_R = 22;
-const GATE_H = 64;
-
-/** Is (ax, h) inside an arch `r` wide (half) whose top is at `top`, its foot at h0? (ax: across from its middle.) */
-const inArch = (ax: number, h: number, h0: number, top: number, r: number) => h >= h0 && (h < top - r ? Math.abs(ax) < r : ax * ax + (h - (top - r)) ** 2 < r * r);
-
-/** A small marble pawn standing in an arch (the middle tier's, every other bay): `ax` across its arch, `j` up from its foot, `r` the arch's half-width. */
-function archPawn(ax: number, j: number, r: number): string | null {
-  const u = r / 9; // its size follows the arch's, foreshortened round the curve
-  const X = ax / u;
-  const J = j / u;
-  if (J < 0 || J > 19) return null;
-  const hw = J < 3 ? 5.5 : J < 11 ? 4.5 - ((J - 3) / 8) * 2 : J < 12.5 ? 4.6 : J < 13 ? 2 : Math.sqrt(Math.max(0, 9.6 - (J - 16) ** 2));
-  if (Math.abs(X) > hw) return null;
-  return X < -hw * 0.3 ? "M" : X > hw * 0.45 ? "o" : "m";
-}
-
-function wallPixel(x: number, y: number): string | null {
-  const X = x + 0.5 - CX;
-  const s = X / RX;
-  if (Math.abs(s) >= 1) return null;
-  const c = Math.sqrt(1 - s * s);
-  const Y = y + 0.5;
-  const yb = BASE_CY + RY * c;
-  if (Y < TOP_CY + RY * c || Y >= yb) return null;
-  const h = yb - Y; // height above its foot
-  const th = Math.asin(s);
-  const lit = wallLight(s, c);
-  const base = stone(lit + (grain(Math.floor((th + 2) * 70), Math.floor(h / 6), 4) - 0.5) * 0.1);
-  // The portal: the gate, its arch of voussoirs and keystone, the pilasters either side (the tablet and relief are parts).
-  if (Math.abs(X) < PORTAL && h < ATTIC) {
-    const ax = Math.abs(X);
-    if (inArch(X, h, 0, GATE_H, GATE_R)) {
-      // The tunnel: dark, a smaller arch at its far end lit by the arena, the board's squares on the floor there.
-      if (inArch(X, h, 6, 40, 13)) return h < 14 ? ((Math.floor((X + 16) / 4) + Math.floor(h / 3.5)) % 2 ? "L" : "D") : h < 18 ? "X" : "x";
-      // The portcullis, raised: its teeth hang under the arch, a bar across them.
-      if (h > 48 && (Math.floor(X + 30) % 5 === 0 || (h > 55 && h < 58))) return "5";
-      return "z";
-    }
-    if (inArch(X, h, 0, GATE_H + 7, GATE_R + 7)) {
-      if (ax < 4 && h > GATE_H - 2) return ax < 3 ? "1" : "3"; // the keystone
-      const k = Math.floor(Math.atan2(h - (GATE_H - GATE_R), X) * 7) % 2;
-      return h > GATE_H + 5 || ax > GATE_R + 5.5 ? "4" : k ? "2" : "3"; // the voussoirs, a shadowed rim
-    }
-    // Pilasters, each with a capital and a fluted shaft.
-    if (ax >= PORTAL - 10) {
-      if (ax >= PORTAL - 1) return "5";
-      if (h > ATTIC - 6) return h > ATTIC - 2 ? "1" : "3"; // the capital
-      if (h < 6) return "4"; // the base
-      const f = Math.floor(ax) % 3 === 0;
-      return X < 0 ? (f ? "2" : "1") : f ? "5" : "4";
-    }
-    if (h < 6) return "4";
-    // The portal's face: dressed blocks.
-    const row = Math.floor(h / 8);
-    if (h % 8 < 1 || Math.floor(X + 200 + (row % 2) * 9) % 18 < 1) return X < 0 ? "3" : "4";
-    return X < 0 ? "2" : "3";
-  }
-  // The plinth course at its foot.
-  if (h < 6) return h > 5 ? stone(lit) : h > 3 ? darker(base) : darker(darker(base));
-  // The attic: two rows of the board's squares round the curve, a lit lip on top.
-  if (h >= ATTIC) {
-    if (h >= ATTIC + 2 * CHECK) return h >= HW - 1 ? "1" : h >= HW - 3 ? stone(lit + 0.2) : darker(stone(lit + 0.1));
-    const col = Math.floor((th + Math.PI / 2) / (BAY / 4));
-    const sq = (col + Math.floor((h - ATTIC) / CHECK)) % 2 ? "L" : "D";
-    return lit < 0.15 && sq === "L" ? "4" : sq;
-  }
-  for (let ti = 0; ti < TIERS.length; ti++) {
-    const t = TIERS[ti]!;
-    if (h >= t.h1) continue;
-    if (h < t.h0) return h >= t.h0 - 1 ? "1" : h >= t.h0 - 3 ? stone(lit) : darker(base); // a cornice: a lit lip over its band
-    // The bay this pixel is in, and how far across it (in pixels, foreshortened round the curve).
-    const i = Math.floor((th + Math.PI / 2) / BAY);
-    const a = (th + Math.PI / 2) / BAY - i - 0.5;
-    const bayW = RX * BAY * c;
-    const ax = a * bayW;
-    const r = 0.32 * bayW;
-    if (r < 1.6) return base; // too far round the curve for an arch to show
-    if (t.arch) {
-      if (inArch(ax, h, t.h0, t.h0 + t.arch, r)) {
-        // A marble pawn in every other arch of the middle tier, where the arches face us enough to show one.
-        if (ti === 1 && i % 2 === 0 && c > 0.55) {
-          const k = archPawn(ax, h - t.h0 - 1, r);
-          if (k) return k;
-        }
-        return ax > r - 1.6 ? "X" : "x";
-      }
-      if (inArch(ax, h, t.h0, t.h0 + t.arch + 2, r + 2)) {
-        if (Math.abs(ax) < 1.2 && h > t.h0 + t.arch) return "1"; // the keystone
-        return stone(lit + 0.18); // the arch's lit stone frame
-      }
-    } else if (Math.abs(ax) < r * 0.7 && h >= t.h0 + 4 && h < t.h1 - 3) return ax > r * 0.7 - 1.6 ? "X" : "x"; // a window
-    // Half-columns between the bays, with a capital under each cornice.
-    if (Math.abs(a) > 0.42) return h >= t.h1 - 2 ? stone(lit + 0.25) : a < 0 ? darker(base) : stone(lit + 0.15);
-    return base;
-  }
-  return base;
-}
-const wall = paint(CX - RX, TOP_CY, 2 * RX, BASE_CY + RY - TOP_CY + 1, wallPixel);
-
 // ---- The open top: its rim, the seats inside (rows stepping down to the arena), the podium's checkered wall, the
 // arena's floor (a chessboard). Each pixel shows the row whose far edge passes through it.
 
-const RIM = 11;
-/** The seats' ovals step down from the rim (s = 0) to the arena's edge (s = 1): middle, half-width, half-depth. */
-const SEAT_DROP = 46;
-const ARENA_RX = 124;
-const ARENA_RY = 23;
-const rowAt = (s: number) => ({ cy: TOP_CY + s * SEAT_DROP, rx: RX - RIM - s * (RX - RIM - ARENA_RX), ry: RY - 4 - s * (RY - 4 - ARENA_RY) });
-const ROWS = 14;
-const PODIUM = 0.88;
-const bowl = paint(CX - RX, TOP_CY - RY, 2 * RX, 2 * RY + 1, (x, y) => {
-  const X = x + 0.5 - CX;
-  const Y = y + 0.5;
-  if ((X / RX) ** 2 + ((Y - TOP_CY) / RY) ** 2 > 1) return null;
-  const inside = (s: number) => {
-    const o = rowAt(s);
-    return (X / o.rx) ** 2 + ((Y - o.cy) / o.ry) ** 2 <= 1;
-  };
-  if (!inside(0)) {
-    // The rim's walk: lit on the left, a joint every so often round it.
-    if (Math.floor(Math.atan2(Y - TOP_CY, X) * 30 + 100) % 6 === 0) return "4";
-    return X < -RX * 0.5 ? "1" : X < RX * 0.6 ? "2" : "3";
-  }
-  let s = 0;
-  while (s < 1 && inside(s)) s += 1 / 160;
-  const side = X / RX; // the right side faces the light (it faces left); the left side faces away
-  if (s >= 1) {
-    // The arena: a chessboard, eight squares across.
-    const u = Math.floor((X + ARENA_RX) / ((2 * ARENA_RX) / 8));
-    const v = Math.floor((Y - (TOP_CY + SEAT_DROP - ARENA_RY)) / ((2 * ARENA_RY) / 8));
-    return (u + v) % 2 ? "L" : "D";
-  }
-  if (s >= PODIUM) return s < PODIUM + 0.02 ? "1" : Math.floor(X / 7 + 80) % 2 ? "L" : "D"; // the podium's wall, a lit lip on it
-  const f = (s / PODIUM) * ROWS;
-  const tread = f - Math.floor(f) < 0.45;
-  // Dark doorways (vomitoria) in three of the rows, spaced round the bowl; gold seats for the honored in the front row.
-  if (!tread && (Math.floor(f) === 3 || Math.floor(f) === 7 || Math.floor(f) === 11) && Math.floor(X / 12 + 80 + Math.floor(f)) % 5 === 0) return "x";
-  if (Math.floor(f) === ROWS - 1 && tread) return side > 0 ? "Y" : "O";
-  if (tread) return side > -0.35 ? "2" : "3";
-  return side > 0.25 ? "3" : side > -0.45 ? "4" : "5";
-});
 
 // ---- The chess pieces, as profiles: each piece's half-width at each height j above its foot (<= 0: nothing there),
 // in the first Colosseum's units; and its cuts (a crenel, a coronet's gaps). The statues are turned on a lathe from these
@@ -429,9 +258,6 @@ function banner(): Part {
   }
   return { grid };
 }
-/** The banners' places across its face; each hangs from the attic's foot there. */
-const BANNERS = [-164, -124, 124, 164];
-const banY = (bx: number) => TOP_CY + Math.round(RY * Math.sqrt(1 - (bx / RX) ** 2)) + HW - ATTIC + 1;
 
 const PEN_W = 22;
 const PEN_H = 12;
@@ -448,13 +274,6 @@ function pennant(main: string, stripe: string): Part {
   }
   return { grid };
 }
-const mast = (px: number, top: number, foot: number) => paint(px, top, 2, foot - top, (x, y) => (y < top + 2 ? "y" : x === px ? "w" : "W"));
-/** The pennants' masts on the far rim (gold and navy pennants in turn). */
-const MASTS = [-196, -116, 116, 196];
-const mastFoot = (mx: number) => TOP_CY - Math.round(RY * Math.sqrt(1 - (mx / RX) ** 2)) + 1;
-const MAST_H = 30;
-const FLAG_FOOT = TOP_CY - RY + 3;
-const FLAG_TOP = FLAG_FOOT - 70;
 const FLAG_W = 44;
 const FLAG_H = 26;
 /** The flag: navy with a gold border, a gold crown over a band of the board's squares. */
@@ -468,109 +287,19 @@ const flag: Part = { grid: Array.from({ length: FLAG_H }, (_, j) => Array.from({
 
 /** The statues' rows: the front plinths' foot (just in front of its own), the back corners' (behind its oval's ends). */
 const FRONT = FOOT + 4;
-const BACK = BASE_CY - 8;
-const STAND = FRONT - PLINTH_H;
-const BACK_X = RX + 16;
 
 // ---- Parts and frames.
 
 const parts: Record<string, Part> = {};
-const at: Record<string, Pt> = {};
-const add = (name: string, p: { part: Part; at: Pt }) => ((parts[name] = p.part), (at[name] = p.at), name);
 parts.banner = banner();
 parts.flag = flag;
 parts.penGold = pennant("Y", "O");
 parts.penNavy = pennant("N", "Y");
-const shadow = add("shadow", groundShadow(CX, BASE_CY + 14, RX + 40, RY + 18));
-const back = [
-  add("plinthPL", plinth(CX - BACK_X, BACK)),
-  add("pawnL", lathe(CX - BACK_X, BACK - PLINTH_H, PAWN, MARBLE)),
-  add("plinthPR", plinth(CX + BACK_X, BACK)),
-  add("pawnR", lathe(CX + BACK_X, BACK - PLINTH_H, PAWN, MARBLE)),
-  ...MASTS.map((mx, i) => add(`mast${i}`, mast(CX + mx - 1, mastFoot(mx) - MAST_H, mastFoot(mx)))),
-  add("flagMast", mast(CX - 1, FLAG_TOP, FLAG_FOOT)),
-];
-const body = [add("bowl", bowl), add("wall", wall), add("tablet", tablet), add("relief", relief)];
-const front = [
-  add("plinthRk", plinth(CX - PIECE_2, FRONT)),
-  add("rook", lathe(CX - PIECE_2, STAND, ROOK, MARBLE)),
-  add("plinthB", plinth(CX - PIECE_1, FRONT)),
-  add("bishop", lathe(CX - PIECE_1, STAND, BISHOP, MARBLE)),
-  add("plinthN", plinth(CX + PIECE_1, FRONT)),
-  add("knight", knight(CX + PIECE_1, STAND, false)),
-  add("plinthP", plinth(CX + PIECE_2, FRONT)),
-  add("pawn", lathe(CX + PIECE_2, STAND, PAWN, MARBLE)),
-  add("plinthQ", plinth(CX - GUARD, FRONT)),
-  add("queen", lathe(CX - GUARD, STAND, QUEEN, BRONZE)),
-  add("plinthK", plinth(CX + GUARD, FRONT)),
-  add("king", lathe(CX + GUARD, STAND, KING, BRONZE)),
-];
-const L = (part: string): Layer => ({ part, x: at[part]![0], y: at[part]![1] });
-
-const frames: Frame[] = [0, 1, 2, 3].map((f) => {
-  const ph = (f * Math.PI) / 2;
-  const hang = (p: number) => ({ along: "rows" as const, amp: 1.4, len: 48, phase: p, pin: "top" as const });
-  const fly = (p: number, amp: number, len: number) => ({ along: "cols" as const, amp, len, phase: p, pin: "left" as const });
-  return {
-    ms: 260,
-    layers: [
-      L(shadow),
-      ...back.map(L),
-      ...MASTS.map((mx, i) => ({ part: i % 2 ? "penNavy" : "penGold", x: CX + mx + 1, y: mastFoot(mx) - MAST_H + 1, wave: fly(ph + i * 0.9, 1.4, 18) })),
-      { part: "flag", x: CX + 1, y: FLAG_TOP + 1, wave: fly(ph + 0.6, 2.4, 34) },
-      ...body.map(L),
-      ...BANNERS.map((bx, i) => ({ part: "banner", x: CX + bx - BAN_W / 2, y: banY(bx), wave: hang(ph + i * 1.4) })),
-      ...front.map(L),
-    ],
-  };
-});
-
-const idle: Anim = lazyAnim(() => ({ loop: true, frames }));
-
-export const HOUSE_COLISEUM: Character = {
-  id: "house-coliseum",
-  name: "The Colosseum",
-  w: W,
-  h: H,
-  foot: [CX, FOOT],
-  palette: PALETTE,
-  parts,
-  anims: { idle },
-};
-
 /**
  * Where a statue's picture stands over this one (frame pixels: its top left; it is STATUE_W x statueH(id)), its
  * pedestal's foot on the front row's line, either side of the gate.
  */
 export const statueSpot = (id: StatueId): Pt => [CX + (id === "marble" ? -1 : 1) * STATUE_OFF - STATUE_W / 2, FRONT + 1 - statueH(id)];
-
-/** Where the tablet's blank face is (frame pixels), for the game to write "The Colosseum" on. */
-export const HOUSE_COLISEUM_SIGN = signFace(BOARD[0], BOARD[1], BW, BH);
-
-/** A bay's arch on a tier (the box round its opening, a little wider, in picture pixels): where its light shines. */
-function archBox(tier: number, i: number): { x: number; y: number; w: number; h: number } {
-  const t = TIERS[tier]!;
-  const th = (i + 0.5) * BAY - Math.PI / 2;
-  const c = Math.cos(th);
-  const r = 0.32 * RX * BAY * c;
-  const yb = BASE_CY + RY * c;
-  const x = Math.floor(CX + RX * Math.sin(th) - r - 2);
-  return { x, y: Math.floor(yb - t.h0 - t.arch - 3), w: Math.ceil(2 * r) + 5, h: t.arch + 6 };
-}
-/**
- * Its lights at dusk and night (Oct 27): the gate's tunnel glows as if torches burn inside, and so do a scattered few of
- * its arches (two of the lower tier's, one of the middle tier's without a marble pawn; none near the statues, the queen
- * and the king, or under a banner), all flickering; a little of the gate's light falls on the apron in front.
- */
-export const HOUSE_COLISEUM_LIGHTS: readonly LightSpot[] = [
-  { x: CX - GATE_R, y: FOOT - GATE_H, w: 2 * GATE_R + 1, h: GATE_H, keys: "zxXLD", color: TORCH, strength: 0.85, flicker: true },
-  ...([
-    [0, 7],
-    [1, 9],
-    [0, 18],
-  ] as const).map(([tier, i]) => ({ ...archBox(tier, i), keys: "xX", color: TORCH, strength: 0.75, flicker: true })),
-];
-export const HOUSE_COLISEUM_POOLS: readonly LightPool[] = [{ x: CX, y: FOOT - 1, rx: 34, ry: 8, color: TORCH, strength: 0.3 }];
 
 // ---- Its edge chip: a gold crown over a band of the board's squares, on the chip's white (24 x 24).
 

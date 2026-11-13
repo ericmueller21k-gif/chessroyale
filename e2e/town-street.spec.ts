@@ -5,16 +5,16 @@ import { asAdmin, test } from "./helpers.ts";
 
 /**
  * The street town, round 2: the layout (Nov 5; docs/decisions/2026-11-05-street-town-layout.md), in an admin's town only
- * (admin-town.ts STREET_TOWN) until round 3. On a phone and a computer: it opens zoomed in, at the start (22, 11), the camera facing
+ * (everyone's since Nov 13; was admin-only via admin-town.ts STREET_TOWN until then). On a phone and a computer: it opens zoomed in, at the start (22, 25), the camera facing
  * north; a tap on Ginger Igloo walks you down Fountain Street to its door square and its card opens; the up arrow into Smudgy's Art
- * Gallery from its door opens his card; a park table works. A player's town is today's (e2e/town.spec.ts and the rest, unchanged).
+ * Gallery from its door opens his card; a park table works. Since Nov 13 it is everyone's town (players and guests): the old one is gone.
  * `STILLS=docs/street-town` also writes the stills: each street, the park and a home's card.
  * Round 3 (Nov 5): the buildings are boxes and the camera turns: the turn walked on both renderers (a tap and an arrow mid-turn and
  * after, every figure on screen at rest). Round 4 (the rows, the chase camera, the plan wrapping east-west only, its rows 6 up): the
  * squares moved with the plan; the turn is the chase camera's (behind you, the way you walk); round 2's and 3's stills tests went with
  * their plans (round 4's are in e2e/town-rows.spec.ts). Round 5 (one fixed view): the chase camera's turn test went with it
- * (e2e/town-fixed.spec.ts has the fixed view, the strips and the look round). Nov 6: on WebGL only; a context lost for good opens the
- * page again in today's town.
+ * (e2e/town-fixed.spec.ts has the fixed view, the strips and the look round). Nov 6: on WebGL only. Nov 13: never the old town (a context
+ * lost for good reloads the street town once, then says so).
  */
 test.use({ actionTimeout: 15_000 });
 
@@ -92,14 +92,15 @@ async function tapHome(page: Page, id: string, name: string) {
   return card;
 }
 
-test("an admin's street town opens at its default zoom step, at the start (22, 25; the north edge round: 8 rows on), the camera facing north; a player's opens as today (zoomed out, at (22, 17))", async ({ page }) => {
+test("the street town opens at its default zoom step, at the start (22, 25; the north edge round: 8 rows on), the camera facing north; a player's town (a guest's) is the street town too, on WebGL, from the same start (Nov 13: the old town is gone)", async ({ page }) => {
   const errors = watchErrors(page);
-  // A player's town: today's.
+  // A player's town (a guest here): the street town, as an admin's (Nov 13; before, the old Canvas 2D town at (22, 17), zoomed out).
   await page.goto("/town?sky=day");
-  await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 20_000 });
-  expect(await you(page)).toEqual([22, 17]);
-  await expect(page.getByRole("button", { name: "Zoom out" })).toHaveAttribute("aria-pressed", "true");
-  // An admin's: the street town.
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
+  await expect(canvas(page)).toHaveAttribute("data-backend", "webgl");
+  expect(await you(page)).toEqual([22, 25]);
+  await expect(page.getByRole("button", { name: "Zoom in" })).toHaveAttribute("aria-pressed", "true");
+  // An admin's: the same.
   await openStreet(page);
   expect(await you(page)).toEqual([22, 25]);
   await expect(page.getByRole("button", { name: "Zoom in" })).toHaveAttribute("aria-pressed", "true");

@@ -321,6 +321,13 @@ Tests check *what* ends up on the screen, not *how it gets there*, nor how long 
   - Before fixing "the boss broke the rule", rebuild the position from the screenshot and list its legal moves: the
     rule's own exceptions come first.
 
+- **Street-town taps on CI** (Nov 13, `docs/decisions/2026-11-13-street-town-taps-on-ci.md`):
+  - A spec taps a figure or a place in the street town with `tapInTown` / `quickTap` (e2e/helpers.ts), never a separate press and
+    release: a slow frame between them is a run. It waits for the view to hold still in drawn frames, not wall time: at a few frames a
+    second, reads 100 ms apart see a gliding camera as at rest.
+  - A tap point that's null for a whole wait is a placement question before it's a timing one: under the chase camera, a figure behind
+    you sits at the box's foot and fades out, and you stand in front of a door you just walked to.
+
 - **Hollow's dark at Babur's mate** (Nov 11, [story](../docs/history/lessons.md#hollows-dark-at-baburs-mate-nov-11-2026)):
   - Code shared by every boss draws nothing of one boss's (his effect, his color): a boss's own look goes in its kit,
     and a test walks every kit (king-attack.test.ts: each boss's hits and mate its own).
