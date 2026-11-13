@@ -1,9 +1,10 @@
-import { BOSS_BANNER, RECLUSE_PHASE2, bannerPlusMs, bossBannerMs } from "@chessroyale/core";
+import { BOSS_BANNER, RECLUSE_PHASE2, SPEECH, bannerPlusMs, bossBannerMs } from "@chessroyale/core";
 import { RECLUSE, RECLUSE_JUMP } from "./characters/recluse.ts";
 import { animLength, cueAt } from "./characters/power-art.ts";
 import { lazyTable } from "./characters/sprite.ts";
 import { RECLUSE_LINES } from "./characters/recluse-lines.ts";
-import { holdMs, typeMs } from "./speech.tsx";
+import { holdMs, readMs, typeMs } from "./speech.tsx";
+import { pacedSeries } from "./paced-line.ts";
 import {
   LAST_STAND,
   legalMoves,
@@ -39,8 +40,9 @@ import {
  * - he leaps from there onto the middle of the board (the board draws his whole figure, on a phone too), landing with a
  *   thud and a burst of dust (the board jolts);
  * - he brandishes the book over his head and throws it down at his feet, where it lands open;
- * - light pours up out of it while he chants over it, arms raised, his hair lifting (phase 2's face from here), his
- *   chant in his bubble, for `castMs` (Eric, Oct 17: a few seconds longer);
+ * - light pours up out of it while he chants over it, arms raised, his hair lifting (phase 2's face from here), for
+ *   `castMs`: his two lines in his bubble (Eric, Nov 13: `chantLines`, each typed sentence by sentence), the last typed out
+ *   a second before the crack, as his transformation theme falls silent before its drop;
  * - the boards crack (Sawyer's board-saw gap, down and across the middle) and the quarters part, each growing into a
  *   whole board at its corner, as the light dies; blue arcs strike the board from his hands meanwhile (`arcAt` to
  *   `arcEnd`: the engine's power splits it);
@@ -86,9 +88,15 @@ export const PHASE_CHANGE = lazyTable(() => {
   const thudAt = dropAt + (cueAt(a.drop!, "thud") ?? 0);
   const chantAt = dropAt + len("drop");
   const lightMs = 500;
-  // (His cast held longer before the board cracks: the chant loops on, the light pouring up: Eric, Oct 17.)
-  const castMs = 1700 + pace.castHoldMs;
-  const crackAt = chantAt + castMs;
+  // (His cast as long as his two lines need, the chant looping on, the light pouring up (Eric, Nov 13; a fixed 5.7 s before):
+  // the first a moment after the light is up, the next after it, the last typed out a second before the crack, as the music
+  // falls silent before its drop. His word as the power landed is gone by the first (`absorbGoneAt`, absorbReadMs).)
+  const cl = pace.chantLines;
+  const chantLines = pacedSeries(RECLUSE_LINES.chantSay, cl, chantAt + cl.firstAfterMs);
+  const absorbGoneAt = chantLines[0]!.at - cl.gapMs;
+  const lastLine = chantLines[chantLines.length - 1]!;
+  const crackAt = lastLine.at + lastLine.line.typedMs + pace.crackAfterLineMs;
+  const castMs = crackAt - chantAt;
   const partAt = crackAt + 750;
   const growAt = partAt + 400;
   const growMs = 900;
@@ -116,6 +124,7 @@ export const PHASE_CHANGE = lazyTable(() => {
     drainMs,
     igniteAt,
     absorbLineAt,
+    absorbGoneAt,
     fadeMs,
     goneAt,
     absorbHoldMs,
@@ -128,6 +137,7 @@ export const PHASE_CHANGE = lazyTable(() => {
     thudAt,
     chantAt,
     lightMs,
+    chantLines,
     castMs,
     crackAt,
     partAt,
@@ -151,6 +161,16 @@ export const PHASE_CHANGE = lazyTable(() => {
     countdownMs,
   };
 });
+
+/**
+ * How long his word as the power lands stays readable once typed (ms): its usual time (the speech rule's readMs), but gone by
+ * his chant's first line (`absorbGoneAt`; Nov 13: the longer of them would otherwise hold the chant, and the music's cut, about
+ * 1.5 s later).
+ */
+export function absorbReadMs(text: string): number {
+  const C = PHASE_CHANGE;
+  return Math.min(readMs(text), C.absorbGoneAt - C.absorbLineAt - typeMs(text) - SPEECH.fadeMs);
+}
 
 /**
  * His figure where he stands through the phase change (BossCharacter's figure run, from `at`, the change's start): slumped

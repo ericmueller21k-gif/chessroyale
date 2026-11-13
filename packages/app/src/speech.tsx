@@ -36,6 +36,7 @@ import { lineLength, plainLine, sliceLine, type LineSeg } from "./speech-icons.t
 import { mooIconSprite, type MooIconId } from "./characters/moo.ts";
 import { renderFrame } from "./characters/sprite.ts";
 import { play, type SoundName } from "./sound.ts";
+import { pacedPage, pacedTyped, type PacedLine } from "./paced-line.ts";
 
 /** How much a line matters: only a critical line cuts in on another (and any line on chatter); the rest wait their turn. */
 export const CHATTER = -1;
@@ -55,6 +56,8 @@ export interface Spoken {
   at: number;
   until: number;
   firm: number;
+  /** Typed at its own pace, sentence by sentence (`sayPaced`: the Hidden Boss's chant), not SPEECH's. */
+  paced?: PacedLine;
 }
 
 /** How long a line takes to type out (ms; an icon in it, Moo's `{heart}`, counts as one character: speech-icons.ts). */
@@ -79,6 +82,7 @@ interface Waiting {
   saidAt: number;
   /** Stays this long after it has typed out (then fades), instead of its usual time (`holdMs`). */
   hold?: number;
+  paced?: PacedLine;
 }
 
 /**
@@ -101,20 +105,28 @@ export class Voice {
    * time runs from when this device says it, as a boss's animations run from when it first saw their moment, so a
    * busy frame never eats into it). Returns whether it was taken (shown now, or waiting its turn).
    */
-  say(text: string | null | undefined, key: string, priority: Priority = NORMAL, at = Date.now(), hold?: number): boolean {
+  say(text: string | null | undefined, key: string, priority: Priority = NORMAL, at = Date.now(), hold?: number, paced?: PacedLine): boolean {
     if (!text || this.said.has(key)) return false;
     this.said.add(key);
     if (this.said.size > 400) this.said.delete(this.said.values().next().value!);
     this.advance(at);
     const cur = this.now;
-    if (!cur || at >= cur.until || (cutsIn(priority, cur) && at >= cur.firm)) this.start({ text, key, priority, saidAt: at, hold }, at);
+    if (!cur || at >= cur.until || (cutsIn(priority, cur) && at >= cur.firm)) this.start({ text, key, priority, saidAt: at, hold, paced }, at);
     else {
-      this.queue.push({ text, key, priority, saidAt: at, hold });
+      this.queue.push({ text, key, priority, saidAt: at, hold, paced });
       // Highest priority first; in the order said within one.
       this.queue.sort((a, b) => b.priority - a.priority || a.saidAt - b.saidAt);
     }
     for (const f of this.listeners) f();
     return true;
+  }
+
+  /**
+   * A line typed at its own pace, sentence by sentence, and up for its own time (paced-line.ts: the Hidden Boss's chant,
+   * Nov 13); otherwise as `say` (its turn, its priority, never taken off unread).
+   */
+  sayPaced(line: PacedLine, key: string, priority: Priority = NORMAL, at = Date.now()): boolean {
+    return this.say(line.text, key, priority, at, undefined, line);
   }
 
   /**
@@ -149,8 +161,11 @@ export class Voice {
   }
 
   private start(w: Waiting, at: number) {
-    // (A hold: the line stays `hold` ms after it has typed out, then fades; the result screen's conversation, RESULT_TALK.)
-    this.now = { text: w.text, key: w.key, priority: w.priority, at, until: at + (w.hold === undefined ? holdMs(w.text) : typeMs(w.text) + w.hold + SPEECH.fadeMs), firm: at + typeMs(w.text) + SPEECH.minReadMs };
+    // (A hold: the line stays `hold` ms after it has typed out, then fades; the result screen's conversation, RESULT_TALK. Paced: its
+    // own typing and time.)
+    const p = w.paced;
+    const until = at + (p ? p.holdMs : w.hold === undefined ? holdMs(w.text) : typeMs(w.text) + w.hold + SPEECH.fadeMs);
+    this.now = { text: w.text, key: w.key, priority: w.priority, at, until, firm: at + (p ? p.typedMs : typeMs(w.text)) + SPEECH.minReadMs, ...(p ? { paced: p } : {}) };
     // (Its sound once, as it starts: a line is started once.)
     const sound = this.heard ? lineSounds.get(w.text) : undefined;
     if (sound) play(sound);
@@ -209,7 +224,12 @@ export function VoiceBubble({ voice, class: cls, hidden = false, balanced = fals
   useEffect(() => {
     if (voice === bossVoice && testSwitchesAllowed()) (globalThis as { sayBoss?: (text: string) => boolean }).sayBoss = (text) => voice.replace(text, `test:${Date.now()}:${text}`);
   }, [voice]);
-  return line && !hidden ? <SpeechBox key={line.key} class={cls} text={line.text} at={line.at} until={line.until} now={now} fits={1} balanced={balanced} /> : null;
+  if (!line || hidden) return null;
+  // (A paced line in a boss bar (`balanced`: two rows, too few for a whole line of two sentences): a sentence at a time, each its
+  // own page, typed in turn (pacedPage). Elsewhere the whole line, its sentences typed in turn.)
+  const page = line.paced && balanced ? pacedPage(line.paced, now - line.at) : null;
+  if (page) return <SpeechBox key={`${line.key}:${page.i}`} class={cls} text={page.text} at={line.at + page.at} until={line.until} now={now} fits={1} balanced typed={page.typed} />;
+  return <SpeechBox key={line.key} class={cls} text={line.text} at={line.at} until={line.until} now={now} fits={1} balanced={balanced} typed={line.paced && pacedTyped(line.paced, now - line.at)} />;
 }
 
 /**
@@ -270,7 +290,7 @@ export function Say({ voice, text, sayKey, priority = NORMAL }: { voice: Voice; 
  * would run off the screen takes a smaller size (`fits` steps: its CSS's `.fit1`…), and past the last step is moved
  * back into view. It's never hidden.
  */
-export function SpeechBox({ class: cls, text, at, until, now, fits = 0, balanced = false, children, ...props }: { class: string; text: string; at: number; until: number; now: number; fits?: number; /** Fitted to its line, two balanced rows or three (bubbleFit): a boss's bar. */ balanced?: boolean; children?: ComponentChildren } & Omit<JSX.HTMLAttributes<HTMLDivElement>, "class">) {
+export function SpeechBox({ class: cls, text, at, until, now, fits = 0, balanced = false, typed, children, ...props }: { class: string; text: string; at: number; until: number; now: number; fits?: number; /** Fitted to its line, two balanced rows or three (bubbleFit): a boss's bar. */ balanced?: boolean; /** How many characters are typed, when the line keeps its own pace (paced-line.ts); else SPEECH's. */ typed?: number; children?: ComponentChildren } & Omit<JSX.HTMLAttributes<HTMLDivElement>, "class">) {
   const el = useRef<HTMLDivElement>(null);
   const [fit, setFit] = useState<{ step: number; dx: number; dy: number }>({ step: 0, dx: 0, dy: 0 });
   const [fitted, setFitted] = useState<{ width: number; three: boolean } | null>(null);
@@ -304,7 +324,7 @@ export function SpeechBox({ class: cls, text, at, until, now, fits = 0, balanced
     if (fit.step < fits) setFit({ step: fit.step + 1, dx: 0, dy: 0 });
     else setFit({ step: fit.step, dx: r.left < minX ? minX - r.left : r.right > innerWidth ? innerWidth - r.right : 0, dy: r.top < 0 ? -r.top : 0 });
   }, [fit]);
-  const { shown, rest } = sliceLine(text, typedCount(text, at, now));
+  const { shown, rest } = sliceLine(text, typed ?? typedCount(text, at, now));
   const leaving = until - now < SPEECH.fadeMs;
   // (Whole pixels, rounded away from the edge it came off: rounded to the nearest, a box 12.25 px over the top moved 12
   // and stayed a quarter pixel above the window, every frame of its line.)
