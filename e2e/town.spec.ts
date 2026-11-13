@@ -432,7 +432,8 @@ for (const st of [
       // (The street town's zoom is a step, everyone's since Nov 13: one click in from the default step (2) is step 1; the camera comes
       // back to whichever step you had.)
       await page.getByRole("button", { name: "Zoom in" }).click();
-      await expect.poll(async () => (await cam(page)).zoom, { message: "zoomed in a step" }).toBeLessThan(2);
+      // (Settled on the step, not mid-ease: the close-up's checks compare against this zoom; the review of #676's delta, B1.)
+      await expect.poll(async () => { const c = await cam(page); return c.zoom === c.zoomTarget ? c.zoom : -1; }, { message: "zoomed in a step, settled" }).toBe(1);
     }
     const before = await cam(page);
     expect(before.mag, "no close-up yet").toBe(1);
