@@ -1134,6 +1134,13 @@ noted wherever a slice changed one.
   surface (`sideWallGrid`, the scene's `drawSideWalls`: about 70 affine strips a wall, the layout's side squares solid blanks);
   `?walls=cards` shows round 1's cards; `__hiddenSeek(ms)` jumps the game for stills.
   [2026-11-13-hidden-boss-room-r2.md](../decisions/2026-11-13-hidden-boss-room-r2.md).
+  **Round 3 (Nov 13):** the board sideways (White's rank 1 on our left, the a-file farthest). For every half-move he walks round
+  behind the board (never between us and it) to that color's side and sits back on his heels centered on it, side on to us; to play
+  he comes up on his knees and leans in (`recluse-ages.ts` `RECLUSE_CHILD_SIDE`, `SIDE_POSES`: five leans, four dips toward us, a
+  4-step side walk; mirrored for Black's side), shuffling up to a quarter square toward the move's files and back. `recluse-scene.ts`
+  `leanFor` picks each move's pose so his reach is short; his arm is two fixed lengths jointed at the elbow (`drawArm`), longer only
+  when straight; the test holds every move under half again his arm (worst about 1.07; on screen 1.08 computer, 1.13 phone).
+  [2026-11-13-hidden-boss-room-r3.md](../decisions/2026-11-13-hidden-boss-room-r3.md).
 
 ## Adding a home
 
