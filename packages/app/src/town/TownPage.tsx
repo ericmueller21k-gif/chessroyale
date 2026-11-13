@@ -34,6 +34,8 @@ type Props = {
   onBossAlone: (id: string) => void;
   /** A boss with an intro challenged (Alfil, Big Boy, Babur, Puddles): start its battle under its transition; resolves once the battle shows. */
   onBossChallenge: (id: string, stand: Stand | null) => Promise<void>;
+  /** The Hidden Boss's room's four go in (hidden-net.ts): the summoning has played to black; into his fight with your pass and seat. */
+  onHiddenFight: (lobby: string, pass: string, seat: number, stand: Stand | null) => void;
   onPlayBot: (game: BotGameAsk) => void;
   onColosseum: () => void;
   seat: string | null;

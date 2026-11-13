@@ -2,7 +2,7 @@ import { LookAways } from "./lookaway.ts";
 import { engineSpeed, ownEngine } from "./engine.ts";
 import { lastBoss } from "./boss-history.ts";
 import { showBanNotice } from "./components/FairPlay.tsx";
-import { BOSS_BRAIN, BOSS_POWERS, DEFAULT_SETTINGS, LEAVING, PREGAME_VOTES, mulberry32, type MatchmakingType, botChoose, botLeanFor, botThinkMs as thinkMs, castPregameVote, type Augment, type ItemLook, type Settings, type SlamPiece } from "@chessroyale/core";
+import { BOSS_BRAIN, BOSS_POWERS, DEFAULT_SETTINGS, HIDDEN_ROOM, LEAVING, PREGAME_VOTES, mulberry32, type MatchmakingType, botChoose, botLeanFor, botThinkMs as thinkMs, castPregameVote, type Augment, type ItemLook, type Settings, type SlamPiece } from "@chessroyale/core";
 import {
   legalMoves,
   toSan,
@@ -182,6 +182,12 @@ export class NetMatch implements GameView {
    */
   partyPass: string | null = null;
   partySeat = 0;
+  /**
+   * The Hidden Boss's fight from his room in the town (Nov 13; town/hidden-net.ts): its party battle of four. An admin in it gets "Win
+   * this form" (winFormShown): the team's next move beats his form, the server's doing (LobbyCore.winFormTrigger checks the admin).
+   */
+  hiddenRoom = false;
+  private winFormSent = false;
   party: { seats: Record<string, number>; leader: string | null } | null = null;
   /** Back into a match that's already being played (the app opened from scratch): the splash until it shows. */
   resuming = false;
@@ -539,6 +545,21 @@ export class NetMatch implements GameView {
     this.progress.reset();
     this.ws?.close();
     this.listeners.clear();
+  }
+
+  /** Testing, an admin in the Hidden Boss's room's fight: "Win this form" shows (never for a player; the server checks again). */
+  get winFormShown(): boolean {
+    return this.hiddenRoom && isAdmin() && this.boss?.id === HIDDEN_ROOM.boss;
+  }
+  get winFormArmed(): boolean {
+    return this.winFormSent && !this.boss?.result;
+  }
+  /** "Win this form" (Eric's test kit, Nov 13): the team's next move beats his form, by the same end a mate takes, on the server. */
+  winForm() {
+    if (!this.winFormShown || this.winFormSent || this.boss?.result) return;
+    this.winFormSent = true;
+    this.send({ t: "winForm" });
+    this.emit();
   }
 
   private send(msg: ClientMessage) {

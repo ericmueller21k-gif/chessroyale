@@ -11,10 +11,23 @@ import { useLayoutEffect, useRef } from "preact/hooks";
 
 export const LEAVE_TOWN_TITLE = "Leave Chess Town?";
 export const leaveTownText = (dest: string) => `You'll head back to ${dest}.`;
+
+/**
+ * Leaving the Hidden Boss's room with your game request in (Eric, Nov 12: "leaving asks 'Cancel your game request?' (yes = leave and
+ * cancel)"): the stairs, back, the side menu, closing the town. The same sheet, its words these. (Town.tsx says whether a request is in:
+ * `setRequestWaiting`; the town's own code stays out of the main bundle.)
+ */
+export const CANCEL_REQUEST_TITLE = "Cancel your game request?";
+export const CANCEL_REQUEST_TEXT = "Leaving his room gives up your place.";
+export const CANCEL_REQUEST_LEAVE = "Leave and cancel";
+let waiting: () => boolean = () => false;
+/** The town's: whether your game request is in now (null: the town is gone). */
+export const setRequestWaiting = (f: (() => boolean) | null) => void (waiting = f ?? (() => false));
+export const requestWaiting = () => waiting();
 /** Where the town's back button and the phone's back gesture go: the front door. */
 export const TOWN_BACK_TO = "Play";
 
-export function LeaveTownConfirm({ dest, onStay, onLeave }: { dest: string; onStay: () => void; onLeave: () => void }) {
+export function LeaveTownConfirm({ dest, onStay, onLeave, request = false }: { dest: string; onStay: () => void; onLeave: () => void; /** Your Hidden Boss's request is in: "Cancel your game request?" */ request?: boolean }) {
   const stay = useRef<HTMLButtonElement>(null);
   const stayRef = useRef(onStay);
   stayRef.current = onStay;
@@ -34,16 +47,16 @@ export function LeaveTownConfirm({ dest, onStay, onLeave }: { dest: string; onSt
     <div class="fd-sheet-scrim town-leave-scrim" onClick={(e) => e.target === e.currentTarget && onStay()}>
       <div class="fd-sheet town-leave" role="alertdialog" aria-modal="true" aria-labelledby="town-leave-title" aria-describedby="town-leave-text">
         <div class="fd-sheet-head">
-          <h2 id="town-leave-title">{LEAVE_TOWN_TITLE}</h2>
+          <h2 id="town-leave-title">{request ? CANCEL_REQUEST_TITLE : LEAVE_TOWN_TITLE}</h2>
         </div>
         <p class="fd-sub" id="town-leave-text">
-          {leaveTownText(dest)}
+          {request ? CANCEL_REQUEST_TEXT : leaveTownText(dest)}
         </p>
         <button type="button" class="fd-btn primary" ref={stay} onClick={onStay}>
           Stay
         </button>
         <button type="button" class="fd-btn" onClick={onLeave}>
-          Leave
+          {request ? CANCEL_REQUEST_LEAVE : "Leave"}
         </button>
       </div>
     </div>

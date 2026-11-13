@@ -994,10 +994,10 @@ export const BOSS_PARTY = { max: 3, closeCp: 30, afkKickSec: 60, joinWaitSec: 30
  * - `silentSec`: a device in the room that hasn't asked for this long has gone (a disconnect): out of the room and the request;
  * - `outcomeSec`: how long the start (or the end) waits for a device to read it;
  * - `bots`: the admin's test bots ("Fill with 3 bots": admins only, server-checked), and `botJoinMs`: each joins a challenge
- *   this long after the one before, as a player would;
+ * *   this long after the one before, as a player would (longer than `pollMs`, so everyone in the room sees each count);
  * - `joinWaitSec`: the fight waits this long for the four to arrive (the summoning plays first), then begins with those who came.
  */
-export const HIDDEN_ROOM = { players: 4, capSec: 300, pollMs: 1500, silentSec: 20, outcomeSec: 60, bots: 3, botJoinMs: 700, joinWaitSec: 60, boss: "recluse" } as const;
+export const HIDDEN_ROOM = { players: 4, capSec: 300, pollMs: 1500, silentSec: 20, outcomeSec: 60, bots: 3, botJoinMs: 2000, joinWaitSec: 60, boss: "recluse" } as const;
 
 /**
  * A Boss Battle party's battle's settings (docs/decisions/2026-10-30-boss-party.md), the server's and the app's alike: a

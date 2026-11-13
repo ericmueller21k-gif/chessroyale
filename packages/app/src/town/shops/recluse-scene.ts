@@ -457,10 +457,15 @@ function drawArm(d: FxDraw, k: KidDraw, box: KidBox) {
 
 const PAWN = typeof Path2D === "undefined" ? null : new Path2D(PAWN_PATH);
 const PAWN_FOOT = (39.5 + 0.75) / 45;
-const STAND_INS = ["#ffffff", "#2b2b33", "#8fc7ff", "#ffb3c9"] as const;
+export const STAND_INS = ["#ffffff", "#2b2b33", "#8fc7ff", "#ffb3c9"] as const;
+const STAND_IN_PAWNS = SHOP_RECLUSE_SCENE.players.map(([c, r], i) => ({ c, r, color: STAND_INS[i]! }));
 function drawPawn(d: FxDraw, i: number, now: number, still: boolean, alpha = 1) {
-  if (!PAWN) return;
   const [c, r] = SHOP_RECLUSE_SCENE.players[i]!;
+  drawPawnAt(d, c, r, STAND_INS[i]!, i, now, still, alpha);
+}
+/** A plain pawn standing at (c, r) in `color`, its own sway and bob (`i`), or still (the freeze: a photo's white edge round it). */
+function drawPawnAt(d: FxDraw, c: number, r: number, color: string, i: number, now: number, still: boolean, alpha = 1) {
+  if (!PAWN) return;
   if (!at(d, c, r, 0)) return;
   const g = d.g;
   const h = TOWN_FEEL.youSquares * pt.k;
@@ -480,7 +485,7 @@ function drawPawn(d: FxDraw, i: number, now: number, still: boolean, alpha = 1) 
   const u = h / 45;
   g.translate(-h / 2, -PAWN_FOOT * h);
   g.scale(u, u);
-  g.fillStyle = STAND_INS[i]!;
+  g.fillStyle = color;
   g.fill(PAWN);
   g.lineWidth = 1.5;
   g.lineCap = "round";
@@ -515,11 +520,11 @@ interface Bit {
 let bits: Bit[] = [];
 let frozenAt = 0;
 let kidFrozen: { n: KidNow; k: KidDraw } | null = null;
-/** Each player's pixels at the freeze, into particles (screen pixels). */
-function burst(d: FxDraw) {
+/** Each player's pixels at the freeze, into particles (screen pixels): `pawns`, the four where they stood (the mockup's stand-ins). */
+function burst(d: FxDraw, pawns: readonly { c: number; r: number; color: string }[] = STAND_IN_PAWNS) {
   bits = [];
-  for (let i = 0; i < 4; i++) {
-    const [c, r] = SHOP_RECLUSE_SCENE.players[i]!;
+  for (let i = 0; i < pawns.length; i++) {
+    const { c, r, color } = pawns[i]!;
     if (!at(d, c, r, 0)) continue;
     const h = TOWN_FEEL.youSquares * pt.k;
     for (let b = 0; b < S.bits; b++) {
@@ -531,7 +536,7 @@ function burst(d: FxDraw) {
       const x = pt.x + Math.cos(a) * wHalf * ((b * 7919) % 100) / 100;
       const out = Math.atan2(y - (pt.y - h * 0.4), x - pt.x);
       const sp = (0.6 + ((b * 37) % 10) / 10) * pt.k * 0.012;
-      bits.push({ x, y, vx: Math.cos(out) * sp, vy: Math.sin(out) * sp - pt.k * 0.004, color: b % 5 === 0 ? "#fff6cf" : STAND_INS[i]!, size: Math.max(1.2, (pt.k / SQ) * (1.2 + (b % 3) * 0.5)), up: ((b * 0.618) % 1) * 0.9 + 0.1, turn: (b * 1.3) % (Math.PI * 2) });
+      bits.push({ x, y, vx: Math.cos(out) * sp, vy: Math.sin(out) * sp - pt.k * 0.004, color: b % 5 === 0 ? "#fff6cf" : color, size: Math.max(1.2, (pt.k / SQ) * (1.2 + (b % 3) * 0.5)), up: ((b * 0.618) % 1) * 0.9 + 0.1, turn: (b * 1.3) % (Math.PI * 2) });
     }
   }
 }
@@ -579,7 +584,29 @@ export interface RecluseScene {
   /** (The preview's stills) Jump the child's loop to `ms` now. */
   seek: (ms: number) => void;
 }
-export function recluseScene(t0 = 0, walls = true, opts: { live?: boolean } = {}): RecluseScene {
+/**
+ * Someone in the town's room (Nov 13, the room's challenge): where they stand (the room's squares) and their pawn's color. Others glide
+ * to where the server last said (a few times a second at most, LIVE_WALK squares a second), a newcomer from the door.
+ */
+export interface LivePawn {
+  id: string;
+  /** Where they stand; null (a bot, which the server doesn't place): at the board's place `spot` (SHOP_RECLUSE_SCENE.players). */
+  c: number | null;
+  r: number | null;
+  spot?: number;
+}
+/** Each person's pawn color, the same on every screen: one of the mockup's four, by their id. */
+export function liveColor(id: string): string {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
+  return STAND_INS[h % STAND_INS.length]!;
+}
+/** How fast another player's pawn glides to where they stand (squares a second). */
+const LIVE_WALK = 2.6;
+/** The most others drawn (the room holds four: three others). */
+const LIVE_MAX = 3;
+
+export function recluseScene(t0 = 0, walls = true, opts: { live?: boolean; people?: () => readonly LivePawn[]; you?: () => LivePawn | null } = {}): RecluseScene {
   let start: number | null = null;
   let lastNow = 0;
   let burstDone = false;
@@ -637,9 +664,58 @@ export function recluseScene(t0 = 0, walls = true, opts: { live?: boolean } = {}
       drawPawn(d, i, now, !!s);
     },
   }));
-  // (In the town's room (`live`, Nov 13): you're drawn, and the four stand-in pawns aren't: the real players come with the challenge.)
+  // ---- The town's room (`live`): the others in it, and at the summoning everyone, you too, frozen where they stood.
+  const glide = new Map<string, { c: number; r: number; color: string }>();
+  let glideAt = -1;
+  /** The pawns frozen at the summoning (null: not yet). */
+  let frozen: { c: number; r: number; color: string }[] | null = null;
+  const liveNow: { c: number; r: number; color: string; i: number }[] = Array.from({ length: LIVE_MAX + 1 }, () => ({ c: 0, r: 0, color: "", i: 0 }));
+  let liveN = 0;
+  const liveFigs = liveNow.map((p) => ({
+    z: 0,
+    draw: (d: FxDraw, now: number) => {
+      const s = start === null ? null : summonAt(now - start);
+      if (s && s.burst > 0) return;
+      drawPawnAt(d, p.c, p.r, p.color, p.i, now, !!s);
+    },
+  }));
+  /** This frame's others (gliding to where they stand), or the frozen four: into `liveNow`. */
+  const livePeople = (now: number) => {
+    liveN = 0;
+    if (frozen) {
+      for (const f of frozen) if (liveN < liveNow.length) Object.assign(liveNow[liveN]!, f, { i: liveN++ });
+      return;
+    }
+    const people = opts.people?.() ?? [];
+    const dt = glideAt < 0 ? 0 : Math.min(0.1, (now - glideAt) / 1000);
+    glideAt = now;
+    for (const p of people) {
+      if (liveN >= LIVE_MAX) break;
+      let g = glide.get(p.id);
+      if (!g) glide.set(p.id, (g = { c: SHOP_RECLUSE_SCENE.you[0], r: SHOP_RECLUSE_SCENE.you[1], color: liveColor(p.id) }));
+      const spot = SHOP_RECLUSE_SCENE.players[(p.spot ?? liveN + 1) % SHOP_RECLUSE_SCENE.players.length]!;
+      const tc = p.c ?? spot[0];
+      const tr = p.r ?? spot[1];
+      const dc = tc - g.c;
+      const dr = tr - g.r;
+      const dist = Math.hypot(dc, dr);
+      const step = LIVE_WALK * dt;
+      if (dist <= step) ((g.c = tc), (g.r = tr));
+      else ((g.c += (dc / dist) * step), (g.r += (dr / dist) * step));
+      const o = liveNow[liveN]!;
+      o.c = g.c;
+      o.r = g.r;
+      o.color = g.color;
+      o.i = liveN + 1;
+      liveN++;
+    }
+    // (Gone from the room: forgotten, so coming back walks in from the door again.)
+    if (glide.size > people.length) for (const id of [...glide.keys()]) if (!people.some((p) => p.id === id)) glide.delete(id);
+  };
+  // (In the town's room (`live`, Nov 13): you're drawn, and the four stand-in pawns aren't: the real players are (`people`), and at the
+  // summoning you're a still pawn among them.)
   const fx: RoomFx = {
-    hideYou: () => !opts.live,
+    hideYou: () => !opts.live || frozen !== null,
     figures: (now) => {
       lastNow = now;
       figures.length = 0;
@@ -649,13 +725,20 @@ export function recluseScene(t0 = 0, walls = true, opts: { live?: boolean } = {}
       if (walls) figures.push(wallFig);
       figures.push(kidFig, boardFig);
       if (!opts.live) figures.push(...pawnFigs);
+      else {
+        livePeople(now);
+        for (let i = 0; i < liveN; i++) {
+          liveFigs[i]!.z = liveNow[i]!.r;
+          figures.push(liveFigs[i]!);
+        }
+      }
       return figures;
     },
     over: (d, now) => {
       if (start === null) return;
       const s = summonAt(now - start);
       if (!burstDone && s.burst > 0) {
-        burst(d);
+        burst(d, frozen ?? STAND_IN_PAWNS);
         burstDone = true;
       }
       drawSummon(d, s);
@@ -668,10 +751,18 @@ export function recluseScene(t0 = 0, walls = true, opts: { live?: boolean } = {}
       frozenAt = when;
       burstDone = false;
       kidFrozen = kidState(when);
+      if (opts.live) {
+        // (Everyone where they stand at this moment: the others as drawn last, and you.)
+        frozen = [];
+        for (let i = 0; i < liveN; i++) frozen.push({ c: liveNow[i]!.c, r: liveNow[i]!.r, color: liveNow[i]!.color });
+        const me = opts.you?.();
+        if (me && me.c !== null && me.r !== null) frozen.push({ c: me.c, r: me.r, color: liveColor(me.id) });
+      }
     },
     reset: () => {
       start = null;
       kidFrozen = null;
+      frozen = null;
       bits = [];
     },
     seek: (ms) => {

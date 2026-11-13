@@ -29,6 +29,7 @@
  * | "door" | "square", [c, r]?)` where to tap; `__shopLook("door")` the view to the door; `__shopCam()` the camera (its zoom: 0 Close, 1 the town's); `__shopBench(n)` ms a draw; `__shopStill()` the back kept while the view rests (frames drawn from it, copies made) and how it was drawn (WebGL, the 2D floor's triangles); `__shopBackDiff()` the back drawn both ways, compared.
  */
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
+import type { ComponentChildren } from "preact";
 import { onAccountChange } from "../../account.ts";
 import { renderFrame, type Character } from "../../characters/sprite.ts";
 import { mirrorFor } from "../../characters/sprite-kit.ts";
@@ -433,6 +434,10 @@ export type ShopCard = "talk" | "crate" | "door" | "pass";
 export interface ShopCtl {
   zoom: (out: boolean) => void;
   recenter: () => void;
+  /** Where you stand now (the room's squares; mid-step, between two): the Hidden Boss's room tells the server, and freezes you there. */
+  youAt?: () => { c: number; r: number };
+  /** Closes the card. */
+  close?: () => void;
   /** The claw machine's controls are open (the away rule's clock holds: afk.ts). */
   busy?: () => boolean;
 }
@@ -472,7 +477,7 @@ export interface RoomIntro {
   onDone: () => void;
 }
 
-export function ShopRoom({ room, youArt, youRider, youName, onZoom, onOut, onReady, ctl, intro = null, zzz = () => false, arrived = false, onPass, onChallenge, canChallenge = false, fx = null }: { /** The room's own scene (RoomFx), or none. */ fx?: RoomFx | null; /** You're away (afk.ts): a "zzz" over your pawn. */ zzz?: () => boolean; room: LoadedRoom; youArt: () => YouArt | null; /** The town's rider you're on (its frames ready), or null: on foot. */ youRider: () => Rider | null; youName: () => string; onZoom: (out: boolean) => void; onOut: () => void; onReady: () => void; ctl: { current: ShopCtl | null }; /** A boss's challenge to play here (none: the shop as usual). */ intro?: RoomIntro | null; /** You came in through the door from the home's other room (you start just inside it; the room you left, when a room has more than one such door: the walk-up's landing). */ arrived?: boolean | RoomPart; /** Through a door to another of the home's rooms (Rolling Dough's, the walk-up's stairs): the room it leads to. */ onPass?: (to: RoomPart) => void; /** The boss's challenge (Don Dough's: once his beat and the walk-out from his back room have played). */ onChallenge?: () => void; /** His boss is in the game to fight (none yet: Challenge greyed). */ canChallenge?: boolean }) {
+export function ShopRoom({ room, youArt, youRider, youName, onZoom, onOut, onReady, ctl, intro = null, zzz = () => false, arrived = false, onPass, onChallenge, canChallenge = false, fx = null, challengeCard = null }: { /** The boss's card's own challenge (the Hidden Boss's room, Nov 13: its count, Challenge and Cancel), in place of Challenge alone. */ challengeCard?: ComponentChildren; /** The room's own scene (RoomFx), or none. */ fx?: RoomFx | null; /** You're away (afk.ts): a "zzz" over your pawn. */ zzz?: () => boolean; room: LoadedRoom; youArt: () => YouArt | null; /** The town's rider you're on (its frames ready), or null: on foot. */ youRider: () => Rider | null; youName: () => string; onZoom: (out: boolean) => void; onOut: () => void; onReady: () => void; ctl: { current: ShopCtl | null }; /** A boss's challenge to play here (none: the shop as usual). */ intro?: RoomIntro | null; /** You came in through the door from the home's other room (you start just inside it; the room you left, when a room has more than one such door: the walk-up's landing). */ arrived?: boolean | RoomPart; /** Through a door to another of the home's rooms (Rolling Dough's, the walk-up's stairs): the room it leads to. */ onPass?: (to: RoomPart) => void; /** The boss's challenge (Don Dough's: once his beat and the walk-out from his back room have played). */ onChallenge?: () => void; /** His boss is in the game to fight (none yet: Challenge greyed). */ canChallenge?: boolean }) {
   const box = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const cardEl = useRef<HTMLDivElement>(null);
@@ -563,6 +568,8 @@ export function ShopRoom({ room, youArt, youRider, youName, onZoom, onOut, onRea
                   OK
                 </button>
               </>
+            ) : bossCard && challengeCard ? (
+              challengeCard
             ) : bossCard ? (
               <>
                 <button type="button" class="town-btn primary" disabled={!canChallenge} onClick={() => eng.current?.challenge()}>
@@ -4655,6 +4662,10 @@ function startRoom(
     },
     /** Closes the card (its OK: the walk-up's flats' doors). */
     close,
+    youAt: () => {
+      you.pose(performance.now(), pose);
+      return { c: pose.x, r: pose.y };
+    },
     busy: () => !!cab && CLAW_PLAY.open,
     stop: () => {
       alive = false;
