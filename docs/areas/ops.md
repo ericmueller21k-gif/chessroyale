@@ -358,15 +358,16 @@ Built Oct 15; why it's built this way: `docs/decisions/2026-10-15-health-view-an
   - errors this hour, the hour before and in the last 24 hours (rows are per clock hour), how many kinds, the top 10
     (the town's WebGL fallbacks left out: they have their own count, next);
   - **the town's WebGL fallbacks** (Oct 30; docs/decisions/2026-10-30-town-webgl.md, "Oct 30, later"; Nov 6: the street town's): page
-    loads whose street town couldn't draw with WebGL (since Nov 13 it reloads once, then says "The town couldn't load on this device."
-    with a Reload button, never today's town: reason `message`), in the last 24 hours and 7 days, in all and by reason
+    loads whose street town couldn't draw with WebGL (since Nov 13 never today's town: no WebGL 2 says "Chess Town can't run on this
+    device."; the others reload once, then say "The town didn't load. Please retry.", reason `retry`), in the last 24 hours and 7
+    days, in all and by reason
     (`townFallbacks`). The page reports one at most (`reportTownFallback` in the app's problems.ts, never on the frame
     loop, nothing shown to the player) through the error reporting, as the kind `town-gl-fallback` with its reason as the
-    message (`TOWN_GL_FALLBACK` in core's settings.ts: `no-webgl2`, `no-context`, `shader`, `lost-twice` (not raised since Nov 13), `not-back`, `message`):
+    message (`TOWN_GL_FALLBACK` in core's settings.ts: `no-webgl2`, `no-context`, `shader`, `lost-twice` (not raised since Nov 13), `not-back`, `retry`):
     exactly what an error sends (no GPU name, nothing typed), under the same limits, caps, fair counts and 30 days in
     `ops_errors` (no new table or column). Only those six reasons are counted (anyone can post an error of any kind);
     each reason's row, with its latest device, is in `/admin/ops`'s error list. `/admin/ops` shows a line, and
-    `npm run ops:report` prints one ("Town WebGL fallbacks (reloaded once, or "message": couldn't load): 3 in 24 hours, 10 in 7 days (…)");
+    `npm run ops:report` prints one ("Town WebGL fallbacks (reloaded once, "retry", or "no-webgl2": can't run): 3 in 24 hours, 10 in 7 days (…)");
     never "Needs attention".
   - the Durable Objects' own errors (kinds named `Class.method`) by class and entry point;
   - players' reports in the last 24 hours by kind, and the latest 5;

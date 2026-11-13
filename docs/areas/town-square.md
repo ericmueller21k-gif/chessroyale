@@ -96,11 +96,12 @@ behind Cloudflare Access like the rest of the site). Phone and computer; **on a 
   later). **It never falls back to today's town** (Eric, Nov 13: he saw the old town on his iPhone; `town/gl-fail.ts`,
   [2026-11-13-town-no-old-fallback.md](../decisions/2026-11-13-town-no-old-fallback.md)). Context lost: nothing drawn until it's back
   (textures made again), however often; lost while the page is hidden (iOS drops WebGL in the background) it waits for the page to
-  show, then gets 5 s (`LOST_WAIT_MS`) to come back. Not back, or WebGL failing as it starts (no WebGL 2, no context, its shader
-  fails): the street town reloads once (`/town`, the same query); failing again within 2 minutes of that (`RETRY_WINDOW_MS`, the
-  time kept in the tab's session storage), the town's box shows the loading card's look with "The town couldn't load on this
-  device." and a **Reload** button, nothing else (`.town-broken`). Each page reports once with its reason (`message` for the page
-  that gives up), nothing shown (the health view counts them: docs/areas/ops.md, "Health"). The canvas says which backend
+  show, then gets 5 s (`LOST_WAIT_MS`) to come back. Not back, or WebGL failing as it starts (no context, its shader fails): the
+  street town reloads once (`/town`, the same query); failing again within 2 minutes of that (`RETRY_WINDOW_MS`, the time kept in
+  the tab's session storage), the town's box shows the loading card's look with "The town didn't load. Please retry." and a
+  **Retry** button, nothing else (`.town-broken`). No WebGL 2 at all: "Chess Town can't run on this device.", no button, no reload.
+  A standing rule (docs/rules/eric.md, "The town never shows an old version"). Each page reports once with its reason (`retry` for
+  the page that gives up), nothing else shown (the health view counts them: docs/areas/ops.md, "Health"). The canvas says which backend
   (`data-backend`). Tests: `test/town-gl-fail.test.ts`, `e2e/town-street.spec.ts` ("context lost"), `e2e/problems.spec.ts`
   ("without WebGL 2").
 - **Taps** (slice 4: `town/press.ts`; cleaned up in slice 5). A finger down presses the square you'd walk to like a

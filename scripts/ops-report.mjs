@@ -94,7 +94,7 @@ for (const x of e.top.slice(0, 5)) {
 const fb = h.townFallbacks;
 if (fb) {
   const reasons = Object.entries(fb.byReason).filter(([r, n]) => /^[a-z0-9-]{1,20}$/.test(r) && n.week > 0);
-  lines.push(`Town WebGL fallbacks (reloaded once, or "message": couldn't load): ${fb.day} in 24 hours, ${fb.week} in 7 days${reasons.length ? ` (${reasons.map(([r, n]) => `${r} ${n.day} / ${n.week}`).join(", ")})` : ""}`);
+  lines.push(`Town WebGL fallbacks (reloaded once, "retry", or "no-webgl2": can't run): ${fb.day} in 24 hours, ${fb.week} in 7 days${reasons.length ? ` (${reasons.map(([r, n]) => `${r} ${n.day} / ${n.week}`).join(", ")})` : ""}`);
 }
 const doEntries = Object.entries(h.durableObjects.byEntry);
 lines.push(`Durable Objects: ${doEntries.length ? doEntries.map(([k, n]) => `${k} ${n}`).join(", ") : "no errors"} in 24 hours`);

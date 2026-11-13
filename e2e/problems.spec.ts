@@ -195,7 +195,7 @@ test("the health view: JSON for an admin (deployed version, live numbers, errors
   expect(await opsPage(page)).toContain("<h2>Health</h2>");
 });
 
-test("an admin's town on a device without WebGL 2 never falls back to today's town (Nov 13): it reloads the street town once, then says the town couldn't load with a Reload button; each page says so once, as its own kind with its reason; the health view counts them by reason, apart from the errors", async ({ page }) => {
+test("an admin's town on a device without WebGL 2 never falls back to today's town (Nov 13, Eric's rule): the town's box says \"Chess Town can't run on this device.\", no reload; it says so once, as its own kind with its reason; the health view counts it by reason, apart from the errors", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
   const desktop = project() === "desktop";
@@ -205,42 +205,32 @@ test("an admin's town on a device without WebGL 2 never falls back to today's to
   let before = 0;
   if (desktop) {
     await asServerAdmin(page);
-    before = (await healthNow()).townFallbacks.byReason["message"]!.day;
+    before = (await healthNow()).townFallbacks.byReason["no-webgl2"]!.day;
   }
   await page.addInitScript(() => delete (window as { WebGL2RenderingContext?: unknown }).WebGL2RenderingContext);
   // (An admin's town is the street town, which needs WebGL 2: admin-town.ts.)
   await asAdmin(page);
-  const bodies: { kind: string; errors: { kind: string; message: string; stack: string }[] }[] = [];
-  page.on("request", (r) => {
-    // (The first page's goes by sendBeacon as it unloads, whose body Playwright doesn't always see.)
-    if (r.url().endsWith("/api/problems") && r.method() === "POST" && r.postData()) bodies.push(r.postDataJSON());
-  });
   let loads = 0;
   page.on("framenavigated", (f) => void (f === page.mainFrame() && new URL(f.url()).pathname === "/town" && loads++));
+  const sent = page.waitForRequest((r) => r.url().endsWith("/api/problems") && r.method() === "POST");
   await page.goto("/town?sky=day");
-  // Reloaded once (the street town again, not `?street=off`), then the message in the town's box, nothing else: never today's town.
+  // The message in the town's box, nothing else (no button: retrying can't help): never today's town.
   const box = page.locator(".town-broken");
   await expect(box).toBeVisible({ timeout: 30_000 });
-  await expect(box).toHaveText(/^The town couldn't load on this device\.\s*Reload$/);
-  await expect(box.getByRole("button", { name: "Reload" })).toBeVisible();
-  expect(page.url(), "the street town's address, no fallback").not.toMatch(/street=off/);
-  expect(loads, "loaded once, reloaded once").toBe(2);
+  await expect(box).toHaveText("Chess Town can't run on this device.");
   await expect(page.locator("canvas.town-canvas"), "nothing drawn under it").not.toHaveAttribute("data-ready", "1");
-  // What every error request carries, nothing more: its kind, the reason as its message, no stack. The first page's reason (when seen),
-  // then the message's (sent a few seconds after it shows), each once.
-  await expect.poll(() => bodies.flatMap((b) => b.errors.map((e) => e.message)).at(-1), { timeout: 20_000 }).toBe("message");
-  expect(["no-webgl2,message", "message"]).toContain(bodies.flatMap((b) => b.errors.map((e) => e.message)).join());
-  for (const body of bodies) {
-    expect(body.kind).toBe("errors");
-    expect(Object.keys(body).sort()).toEqual(["account", "device", "errors", "kind", "version"]);
-    for (const e of body.errors) expect([e.kind, e.stack]).toEqual(["town-gl-fallback", ""]);
-  }
+  // What every error request carries, nothing more: its kind, the reason as its message, no stack.
+  const body = (await sent).postDataJSON() as { kind: string; errors: { kind: string; message: string; stack: string }[] };
+  expect(body.kind).toBe("errors");
+  expect(Object.keys(body).sort()).toEqual(["account", "device", "errors", "kind", "version"]);
+  expect(body.errors.map((e) => [e.kind, e.message, e.stack])).toEqual([["town-gl-fallback", "no-webgl2", ""]]);
+  expect(loads, "no reload").toBe(1);
   await expect(page.getByText(/Something went wrong|WebGL/i)).toHaveCount(0);
   if (!desktop) return;
-  await expect.poll(async () => (await healthNow()).townFallbacks.byReason["message"]!.day, { timeout: 40_000 }).toBeGreaterThan(before);
+  await expect.poll(async () => (await healthNow()).townFallbacks.byReason["no-webgl2"]!.day, { timeout: 40_000 }).toBeGreaterThan(before);
   const h = await healthNow();
   expect(h.townFallbacks.week).toBeGreaterThanOrEqual(h.townFallbacks.day);
-  expect(h.townFallbacks.day).toBeGreaterThanOrEqual(h.townFallbacks.byReason["message"]!.day + h.townFallbacks.byReason["no-webgl2"]!.day);
+  expect(h.townFallbacks.day).toBeGreaterThanOrEqual(h.townFallbacks.byReason["no-webgl2"]!.day);
   expect(h.errors.top.map((e) => e.kind), "not among the errors").not.toContain("town-gl-fallback");
   expect(await opsPage(page)).toContain("Town WebGL fallbacks");
 });

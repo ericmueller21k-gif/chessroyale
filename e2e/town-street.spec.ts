@@ -296,7 +296,7 @@ test("Alfil's Pyramid (Eric, Nov 12: \"more grace\"): a tap on the half-hidden t
   expect(errors, "no page or console errors").toEqual([]);
 });
 
-test("the street town's WebGL context lost: nothing drawn until it's back, then it draws again, twice in a minute too; not back, the street town reloads once (never today's town); not back again, the town says it couldn't load, with Reload (Nov 13)", async ({ page }) => {
+test("the street town's WebGL context lost: nothing drawn until it's back, then it draws again, twice in a minute too; not back, the street town reloads once (never today's town); not back again, \"The town didn't load. Please retry.\" with Retry (Nov 13, Eric's rule)", async ({ page }) => {
   test.setTimeout(200_000);
   await openStreet(page);
   const lose = (restore: boolean) =>
@@ -344,16 +344,16 @@ test("the street town's WebGL context lost: nothing drawn until it's back, then 
   await expect(canvas(page)).toHaveAttribute("data-backend", "webgl");
   expect(await you(page), "the street town").toEqual([22, 25]);
   await expect(page.locator(".town-broken")).toHaveCount(0);
-  // Not back again soon after: no second reload; the town's box says so, with a Reload button, and nothing else.
+  // Not back again soon after: no second reload; the town's box says so, with a Retry button, and nothing else.
   await mark();
   await lose(false);
   const box = page.locator(".town-broken");
   await expect(box).toBeVisible({ timeout: 15_000 });
-  await expect(box).toHaveText(/^The town couldn't load on this device\.\s*Reload$/);
+  await expect(box).toHaveText(/^The town didn't load\. Please retry\.\s*Retry$/);
   expect(await marked(), "no second reload").toBe(true);
-  if (STILLS) await page.screenshot({ path: `${STILLS}/town-couldnt-load-${test.info().project.name}.png` });
-  // Reload loads the street town again.
-  await box.getByRole("button", { name: "Reload" }).click();
+  if (STILLS) await page.screenshot({ path: `${STILLS}/town-didnt-load-${test.info().project.name}.png` });
+  // Retry loads the street town again.
+  await box.getByRole("button", { name: "Retry" }).click();
   await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
   await expect(canvas(page)).toHaveAttribute("data-backend", "webgl");
   await expect(box).toHaveCount(0);
