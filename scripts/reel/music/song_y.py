@@ -26,7 +26,13 @@ the acid line creeping, the chords echoing off; in the second the overdriven lea
 Dash is the gritty lead; the square answers him in the gaps and trades with him in the drop; the overdriven lead has
 the solo. His sounds, built as the game builds them (packages/app/src/characters/dash-sounds.ts): his sneakers'
 squeak, a finger snap (on 2 and 4 before the clap comes), a whoosh, his zip-in, the clock's tick, its slam, his yawn.
-  python3 song_y.py <out.wav>
+  python3 song_y.py <out.wav> [the voice of Tick's line: acid, pan, handpan, vibes, tines or koto]
+Tick's line (the motif of seven 16ths, in the two calms) was the acid synth's at first. Eric, on the first go ("it's
+pretty much perfect ... the beat is great"): "the sound that starts around like 1:03 ... almost sounds like a cheetah
+... it just almost sounds like it was on accident in the song ... something a bit more like echoey, like steel pan
+possibly, but throw me like five ... come up with some new instruments you haven't used before." So it can be played
+on five struck ones (synth.py's `struck`: a steel pan, a handpan, a vibraphone, an electric piano, a koto), an octave
+higher, each note with its own echo; he is choosing.
 
   bars  1-8    the street at night: the clock's ticks, a shaker, a rim, snaps; the organ's chords echoing; no kick
   bars  9-16   the clock slapped: the kick on every beat, the piano, the slap bass
@@ -137,8 +143,16 @@ for _line, _beats in ((TUNE, 32), (VERSE, 32), (ANSWERS, 32), (D_DASH, 48), (D_S
 last4 = lambda text: " | ".join(text.split("|")[4:])
 
 
-def main(out: str) -> None:
+# Tick's line on a struck instrument: how loud each is, set by measuring (each as loud as the others, and a little over
+# what the acid synth was there).
+TAP = {"pan": 0.168, "handpan": 0.227, "vibes": 0.174, "tines": 0.212, "koto": 0.28}
+
+
+def render(voice: str = "acid", window=None) -> np.ndarray:
+    """The song as heard (stereo, at the mix's own level). `voice`: what plays Tick's line in the calms. `window`:
+    (from beat, to beat), to make only that passage (a sample, to compare voices on)."""
     x = Ride(RIDE, BEATS, None, os=2, seed=181, tape_secs=TAPE)
+    x.window = window
     put, at = x.put, x.at
     rng = np.random.default_rng(41)
     sr = x.sr
@@ -486,16 +500,32 @@ def main(out: str) -> None:
             w += np.sin(ph) + 0.35 * np.sin(2 * ph) + 0.1 * np.sin(3 * ph)
         put("dub", b, w / len(ms) * (0.2 + 0.8 * np.exp(-t / 0.16)) * np.minimum(1, t / 0.002) * tail(k, 0.1) * vol, 0.3)
 
-    def creeping(first, bars_, top0, top1):
+    def tapped(kind, b, m, vol=1.0, pan=0.0):
+        """A note of Tick's line on a struck instrument, and its echo: three more of it, a dotted 8th apart (by the
+        beat, so they land on the line's own 16ths at any pace), from side to side, each duller and under half as loud."""
+        k = int(1.2 * sr)
+        w = x.struck(kind, m)[:k] * tail(k, 0.2) * TAP[kind] * vol
+        for i in range(4):
+            put("line", b + 0.75 * i, w * 0.42**i, pan if i == 0 else 0.6 * (-1) ** i)
+            size = 8 + 8 * i
+            w = np.convolve(w, np.ones(size) / size, "same")
+
+    def creeping(first, bars_, top0, top1, voice="acid", vol=1.0):
         """The acid line over a run of bars: seven 16ths long, so it starts somewhere new in each bar; each bar on its
-        own chord's root; the filter opening from `top0` to `top1` as it goes."""
+        own chord's root; the filter opening from `top0` to `top1` as it goes. `voice`: on a struck instrument
+        instead, an octave higher: the two notes of the seven that the acid synth leaned on are the loud ones, and
+        it grows a little as it goes."""
         count = 16 * bars_
         last = None
         for j in range(count):
             bar = first + j // 16
             over, slides = ACID[j % 7]
             m = of(bar)[0] + 24 + (color(bar)[0] if over == "3" else color(bar)[1] if over == "7" else over)
-            acid(bar0(first) + sw(j % 16) + 4 * (j // 16), m, 0.24, top0 + (top1 - top0) * j / count, last if slides else None, j % 7 in (1, 4))
+            b = bar0(first) + sw(j % 16) + 4 * (j // 16)
+            if voice == "acid":
+                acid(b, m, 0.24, top0 + (top1 - top0) * j / count, last if slides else None, j % 7 in (1, 4))
+            else:
+                tapped(voice, b, m + 12, vol * (1.0 if j % 7 in (1, 4) else 0.6) * (0.75 + 0.25 * j / count), 0.3 * np.sin(0.9 * j))
             last = m
 
     # Bars 1-8: the street at night. No kick: the clock, the shaker and closed hats, a rim, his snaps on 2 and 4; the
@@ -537,7 +567,7 @@ def main(out: str) -> None:
     for bar in range(33, 41):
         ticks_dub(bar)
         strings(bar, 0.03)
-    creeping(33, 8, 700, 2000)
+    creeping(33, 8, 700, 2000, voice)
     ding(bar0(33) + 1.5, 83), ding(bar0(35) + 3, 86, 0.04, 0.3), ding(bar0(37) + 1.5, 83), ding(bar0(39) + 2.5, 79, 0.04, 0.3)
     chomp(bar0(36) + 2.5), chomp(bar0(40) + 0.5, 0.045, -0.3)
 
@@ -579,7 +609,7 @@ def main(out: str) -> None:
     for bar in range(55, 63):
         ticks_dub(bar)
         strings(bar, 0.032)
-    creeping(55, 8, 500, 1100)
+    creeping(55, 8, 500, 1100, voice, 0.7)
     driven(bar0(55), SLOW, 0.9)
     ding(bar0(56) + 3.5, 86, 0.04, 0.3), ding(bar0(58) + 1.5, 83), ding(bar0(61) + 1, 79, 0.045, 0.3), ding(bar0(62) + 2, 83)
     yawn(bar0(61) + 2, 0.05), chomp(bar0(59) + 2.5)
@@ -641,9 +671,13 @@ def main(out: str) -> None:
     x.echo("square", 0.75, 0.16, 0.06)
     x.echo("drive", 0.75, 0.16, 0.07)
     levels = {"lead": 1.0, "square": 1.2, "drive": 1.2, "bass": 0.55, "sub": 0.5, "acid": 0.9, "kick": 0.9, "snare": 3.5, "hats": 4.0, "toms": 1.1, "drum": 1.5,
-              "clock": 9.0, "chime": 1.8, "organ": 6.0, "piano": 6.0, "dub": 6.0, "pad": 2.0, "fx": 2.0}
-    write_wav(out, x.play(x.mixdown(levels, lowpass=8500, room=0.22)))
+              "clock": 9.0, "chime": 1.8, "organ": 6.0, "piano": 6.0, "dub": 6.0, "pad": 2.0, "fx": 2.0, "line": 1.0}
+    return x.play(x.mixdown(levels, lowpass=8500, room=0.22))
+
+
+def main(out: str, voice: str = "acid") -> None:
+    write_wav(out, render(voice))
 
 
 if __name__ == "__main__":
-    main(sys.argv[1])
+    main(*sys.argv[1:3])

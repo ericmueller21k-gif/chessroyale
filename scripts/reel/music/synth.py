@@ -228,13 +228,23 @@ class Mix:
     def struck(self, kind, m, cents=0.0) -> np.ndarray:
         """One note, its loudest point 1, two and a half seconds, kept once made. "felt": a soft piano, felt on its
         hammers (built from its harmonics, the high ones few and quick to die; two strings a hair apart; a soft
-        thump). "box": a music box's tooth. `cents`: how far out of tune."""
+        thump). "box": a music box's tooth. "pan": a steel pan's note. "handpan": a handpan's, rounder and longer.
+        "vibes": a vibraphone's bar, its motor turning. "tines": an electric piano. "koto": a koto's string, picked.
+        `cents`: how far out of tune."""
         made = self.__dict__.setdefault("_struck", {})
         key = (kind, m, round(cents))
         if key not in made:
             k = int(2.5 * self.sr)
             t = np.arange(k) / self.sr
+            tau = 2 * np.pi
             f0 = self.hz(m + cents / 100)
+            far = (262 / f0) ** 0.35  # a low note rings longer
+            rise, hit, dull = 0.001, 0.0, 1400  # the touch: how quick; how much of a thump (noise) and how dull it is
+
+            def ring(rows):
+                """Partials that ring and die: (times the note's pitch, how loud, seconds to die away at middle C)."""
+                return sum(a * np.sin(tau * f0 * r * t + 1.7 * i) * np.exp(-t / (d * far)) for i, (r, a, d) in enumerate(rows))
+
             if kind == "felt":
                 h = np.arange(1, max(2, int(3500 / f0) + 1))
                 loud = (1 + 0.5 * np.exp(-(((h * f0 - 450) / 300) ** 2))) / h**1.7
@@ -243,13 +253,50 @@ class Mix:
                     f = f0 * 2 ** (off / 1200)
                     w += (loud[:, None] * np.sin(np.outer(h * np.sqrt(1 + 0.0004 * h * h), 2 * np.pi * f * t) + h[:, None])
                           * np.exp(-np.outer(1 + 0.3 * h, t) / (1.1 * (262 / f0) ** 0.35))).sum(axis=0)
-                size = max(2, int(self.sr / 1400))
-                thump = np.convolve(self.rng.uniform(-1, 1, k + 2 * size), np.ones(size) / size, "same")[size : size + k]
-                w = w / (np.max(np.abs(w)) + 1e-9) + 0.125 * thump / (np.sqrt(np.mean(thump**2)) + 1e-9) * np.exp(-t / 0.006)
-                rise = 0.004
-            else:
+                rise, hit = 0.004, 0.125
+            elif kind == "box":
                 w = np.sin(2 * np.pi * f0 * t + 1.2 * np.exp(-t / 0.25) * np.sin(2 * np.pi * 3.5 * f0 * t)) * np.exp(-t / 0.5)
-                rise = 0.001
+            elif kind == "pan":
+                # The dent's own pitch (two modes a hair apart, so it shimmers), its octave swelling in just after the
+                # stick, its twelfth a little sharp, a quick high ping; hit, the steel brightens it (the soft clip).
+                w = ring([(1, 1.0, 0.5), (1.004, 0.3, 0.45), (3.012, 0.22, 0.2), (4.02, 0.1, 0.14), (5.93, 0.1, 0.05), (8.2, 0.06, 0.03)])
+                w = np.tanh(1.3 * (w + 0.6 * np.sin(tau * 2 * f0 * t + 0.5) * (1 - 0.7 * np.exp(-t / 0.02)) * np.exp(-t / (0.32 * far))))
+                size = int(round(4 * self.sr / f0))  # (the clip leaves a slow push under the note: taken out, four periods at a time)
+                w -= np.convolve(w, np.ones(size) / size, "same")
+                rise, hit, dull = 0.0015, 0.06, 3000
+            elif kind == "handpan":
+                # Its pitch, its octave and the fifth over that (tuned 1 : 2 : 3), round and long; a finger's touch.
+                w = ring([(1, 1.0, 1.1), (1.003, 0.25, 1.0), (2, 0.5, 0.8), (3, 0.28, 0.55), (4.03, 0.05, 0.2)])
+                rise, hit, dull = 0.004, 0.1, 700
+            elif kind == "vibes":
+                # A bar cut so its second partial is two octaves up; a soft mallet; the motor's slow tremolo.
+                w = ring([(1, 1.0, 1.7), (4, 0.2, 0.4), (10.1, 0.05, 0.09)]) * (1 - 0.28 * (0.5 - 0.5 * np.cos(tau * 5.2 * t)))
+                rise, hit = 0.003, 0.05
+            elif kind == "tines":
+                # A tine and its pickup: a sine that pushes itself about while it's loud (the bark) and a quick, very
+                # high ting on the front of it; a second, quieter, a hair off (quieter, so the two never cancel).
+                w = np.zeros(k)
+                for off, loud in ((-1.2, 1.0), (1.8, 0.4)):
+                    ph = tau * f0 * 2 ** (off / 1200) * t
+                    w += loud * (np.sin(ph + 1.1 * np.exp(-t / 0.3) * np.sin(ph)) + 0.5 * np.exp(-t / 0.2) * np.sin(ph + 1.2 * np.exp(-t / 0.07) * np.sin(14 * ph)))
+                w *= np.exp(-t / (1.1 * far))
+                rise = 0.002
+            elif kind == "koto":
+                # A string picked a ninth of the way along: every harmonic but the ninth, the high ones dying first;
+                # the pick's pull bends it sharp for an instant. (The harmonics start out of step, so no spike.)
+                ph = tau * np.cumsum(f0 * 2 ** (0.3 * np.exp(-t / 0.03) / 12)) / self.sr
+                h = np.arange(1, max(2, min(36, int(8000 / f0)) + 1))
+                w = (np.abs(np.sin(np.pi * h / 9) / h)[:, None] * np.sin(np.outer(h * np.sqrt(1 + 0.0002 * h * h), ph) + (np.pi * h * h / len(h))[:, None])
+                     * np.exp(-np.outer(1 + 0.22 * h, t) / far)).sum(axis=0)
+                rise, hit, dull = 0.0008, 0.12, 6000
+            else:
+                raise ValueError(kind)
+            if hit:
+                # (A newer kind's noise is its own, so adding one to a song leaves the song's other noises as they were.)
+                rng = self.rng if kind == "felt" else np.random.default_rng(1000 + int(m))
+                size = max(2, int(self.sr / dull))
+                thump = np.convolve(rng.uniform(-1, 1, k + 2 * size), np.ones(size) / size, "same")[size : size + k]
+                w = w / (np.max(np.abs(w)) + 1e-9) + hit * thump / (np.sqrt(np.mean(thump**2)) + 1e-9) * np.exp(-t / 0.006)
             made[key] = w / (np.max(np.abs(w)) + 1e-9) * np.minimum(1, t / rise) * np.minimum(1, (k - 1 - np.arange(k)) / (0.05 * self.sr))
         return made[key]
 
