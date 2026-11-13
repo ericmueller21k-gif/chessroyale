@@ -73,6 +73,10 @@ Lane: `engine`. The bosses' strength is here; their powers are on [bosses.md](bo
   class `EngineServer`, binding `ENGINE`, instance `standard-2`) at 2M nodes (`SERVER_RECHECK_NODES`). If it doesn't
   answer in time, the host re-checks on its own device. Server searches are capped per day by
   `ENGINE_DAILY_SEARCHES` (3000), counted in D1 (`engine_usage`); `ENGINE_OFF=1` turns the server off (local, e2e).
+  The Hidden Boss's own moves in his phase 2 online (Nov 13; docs/decisions/2026-11-13-recluse-server-only.md) come from the
+  engine server alone and count on their own row (`<day>:recluse`, the pool `"recluse"`) up to `RECLUSE_ONLINE.dailySearches`
+  (3000), apart from the day's budget, so the judges can't starve him; past it, the day's budget. Each is about a third of a
+  re-check's nodes: at the cap, under about $0.30 a day.
   The reports measured the re-check with the full-network Stockfish 19 build standing in for the server; the
   container's own 17.1 reads the same re-checks 3.2 points apart on average (`reports/container-accuracy.md`), so
   moving it to Stockfish 19 (built from the browsers' stockfish.js source) is recommended (DECISIONS.md, "The engine

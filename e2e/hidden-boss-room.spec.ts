@@ -180,7 +180,7 @@ test("his room (Eric, Nov 12 and 13): Challenge is 1 of 4; leaving asks; an admi
   });
   await submitMove(page, turn.allowed?.[0] ?? legalMoves(turn.fen)[0], turn.fen);
   // His adult form beaten (Nov 13: "it plays through till the end"): his fall, then his phase change for everyone, the four boards
-  // (the server runs them; with no engine server here, this device's engine plays him and the bots), and the 🏆 again.
+  // (the server runs them; with no engine server here, this device's engine plays the bots and the server's quick move him), and the 🏆 again.
   await expect.poll(phase, { message: "his adult form beaten: his phase change", timeout: 90_000 }).toBe("phaseChange");
   expect(await page.evaluate(() => (window as any).match.boss?.result)).toBe("crowd");
   await page.waitForTimeout(20_000);
