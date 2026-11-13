@@ -48,14 +48,16 @@ with `marks` in `themes.json` (seconds from t0):
 | (t0) | 0.000 | the childhood tune's three notes once more, sour, the tape sinking; a low thump at 1.53; a screech rising from 1.81 | he rises; he leaps (lands at 1.55); he swings the book up (1.84) |
 | `pause` | 2.440 | a hush | the book coming down |
 | `slam` | 2.640 | the book, slammed | the book lands open at his feet |
-| `build` | 3.040 | the build: the figure, the strings, kicks, a drone opening, slides and a screech rising, faster with each of four bars | his chant, the light pouring up |
-| `breath` | 8.540 | everything stops but one tick | the arcs start |
+| `build` | 3.040 | the build: the figure, the strings, kicks, a drone opening, slides and a screech rising, faster with each of three bars | his chant, the light pouring up |
+| `breath` | 7.740 | everything stops: one tick, then a full second of silence (Eric, Nov 13: "we need that pause longer like a full second it will make it more epic before going into the drop"; it was 0.2 s, at 8.540) | the last second of his chant (the arcs, if they're moved to start here) |
 | `drop` | 8.740 | the loop starts (`drop` is `introSeconds`) | the boards crack |
 
 Read `introSeconds` and `marks` from `themes.json`, never from code. If the animation's times change, send the music
 session the new ones and the piece is made again to fit (`phases_v.py`, about eleven minutes): never stretch or cut the
 audio in the game. The talk before it can be any length. (The first handoff's intro was the score's own souring, 19.293
-s: commit 91a3f0b2 has it.)
+s: commit 91a3f0b2 has it.) Eric also wants about five seconds more on the picture, in the chant: the music for that is
+ready (the same piece with a longer build, 13.740 s in all with +5.0 s) and is built and pushed here when the picture's
+new time is sent.
 
 **Levels:** one music volume fits all four. The house's loop is 6 dB under the other themes on purpose (-22 LUFS; it is
 that far under in the score), so nothing in the game needs a gain of its own.
