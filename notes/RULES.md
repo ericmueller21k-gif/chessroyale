@@ -24,15 +24,18 @@ notes to a private place or strip them). Never put a secret value here or anywhe
   - Watch children through PR events and `list_events` (kinds `result`); they can't message back.
   - Stills come on `stills/<PR#>` orphan branches. Deleting a remote branch is blocked from the session (Nov 8, again Nov 10: proxy 403).
     Eric OK'd deleting merged branches (Nov 10): run `.github/workflows/branch-cleanup.yml` by hand (dry run first).
-- **Effort cap: `high` (Eric, Nov 13: "nothing ever runs above high... high should be more than sufficient").** Replaces
-  the xhigh tier below and in CLAUDE.md ("Effort per task"); CLAUDE.md to be updated in the next small docs PR. Helpers and
-  reviews: `medium` or `high` only. Two Opus helpers at once in total.
+- **Effort cap stays `xhigh` (Eric, Nov 13, correcting himself: "I just didn't want it above extra high... it's probably
+  worth it"). Never max.** The Oct 11 tiers in CLAUDE.md stand.
+- **Fix the cause, not add a checker (Eric, Nov 13; standing).** After each batch, look at what every step of the process
+  actually caught (reviews, delta reviews, tests, sims). A step that keeps catching real bugs stays. A bug or issue that
+  keeps coming back is not answered with another check that finds it: find out why it keeps happening and fix that.
+  Written into CLAUDE.md and docs/decisions/2026-11-13-fix-the-cause.md.
 - **Opus helpers at once (Eric, Nov 9):** one at `xhigh`, up to two at `medium`/`high`; Haiku helpers for simple jobs
   may run beside. CI and deploy watchers (scripts) don't count. (October, after ~10 at once used ~30% of a week.)
 - **Models by complexity, not length (Eric, Nov 10; CLAUDE.md updated):** Opus for logic, code, the engine, rules, server,
   stored data, and ALL drawings/rendering/animation (Haiku did badly at those). Haiku for UI/copy/docs jobs I can hand
-  plain step-by-step directions, however long. Never Sonnet. Opus `high` (cap, Nov 13) for money, sign-in, stored data,
-  fair play, engine/judge; never xhigh or max.
+  plain step-by-step directions, however long. Never Sonnet. Opus xhigh for money, sign-in, stored data, fair play,
+  engine/judge; never max.
 - Working lean (CLAUDE.md): a fresh helper per round with a one-page handoff; helpers wait in one foreground Bash call
   (`timeout 590 bash -c 'until <done>; do sleep 30; done'`), never Monitor, never poll faster than 30 s; run only the
   tests being changed; about 10 images a job; `flock /tmp/claude-0/e2e.lock` for local e2e; stop servers with
