@@ -177,10 +177,11 @@ test("tags fade as you walk away from a figure (not a pop), are gone past the ra
     };
     requestAnimationFrame(tick);
   }, name);
-  const cv = (await canvas(page).boundingBox())!;
   let far = 0;
-  for (const [fx, fy] of [[0.5, 0.12], [0.85, 0.3], [0.15, 0.3], [0.5, 0.9], [0.9, 0.9]] as const) {
-    await page.mouse.click(cv.x + cv.width * fx, cv.y + cv.height * fy);
+  // (The street town's open ground, everyone's since Nov 13: up the park, then along its north walk and the street beyond; before, taps
+  // at points on the old town's open map.)
+  for (const sq of [[21, 33], [33, 37], [12, 37], [33, 14]] as const) {
+    await page.evaluate((s) => (window as unknown as { __townWalk: (s: readonly [number, number]) => boolean }).__townWalk(s), sq);
     let last = "";
     for (let n = 0; n < 40; n++) {
       const you = await canvas(page).getAttribute("data-you");
