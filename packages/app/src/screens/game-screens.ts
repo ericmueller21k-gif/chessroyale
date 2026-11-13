@@ -5,6 +5,7 @@ export { LobbyScreen } from "./Lobby.tsx";
 export { OpeningGrid } from "./OpeningGrid.tsx";
 export { PlayScreen } from "./Play.tsx";
 export { PhaseChangeScreen, SimulScreen } from "./Recluse2.tsx";
+export { RecluseCutscene } from "../components/RecluseCutscene.tsx";
 export { ResultsScreen } from "./Results.tsx";
 export { RevealScreen } from "./Reveal.tsx";
 export { CrowdCut, CrowdReveal, WatchScreen } from "./Crowd.tsx";

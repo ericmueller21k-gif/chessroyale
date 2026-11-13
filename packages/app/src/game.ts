@@ -374,6 +374,11 @@ export interface GameView {
    * it does nothing when the ultimate is spent or the battle's over (online, the server checks the admin too).
    */
   triggerUltimate(): void;
+  /**
+   * The Hidden Boss's cutscene (his adult form beaten, his phase change next): from `at` to `until` (this device's clock), once it's
+   * due; null (or absent) otherwise. Solo's own times, or the server's (`recluseCutscene`).
+   */
+  readonly cutscene?: { at: number; until: number } | null;
   /** The Hidden Boss's phase 2 (solo only), while it's on: its boards; null otherwise. */
   readonly simul?: SimulView | null;
   /** Your move on your phase 2 board. */

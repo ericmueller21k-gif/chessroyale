@@ -164,10 +164,10 @@ describe("the phase change", () => {
     }
   });
 
-  it("where he stands: slumped while the God King gloats, his hand up through the drain, his fist as it lands, up in a rage at riseAt", () => {
+  it("where he stands: on his knees (quiet after his cutscene) while the God King gloats, his hand up through the drain, his fist as it lands, up in a rage at riseAt", () => {
     const C = PHASE_CHANGE;
     const run = phaseChangeRun(1000);
-    expect(run).toMatchObject({ since: 1000 + C.seizeAt, before: "collapseLoop", loop: "idle2" });
+    expect(run).toMatchObject({ since: 1000 + C.seizeAt, before: "kneel", loop: "idle2" });
     const len = (n: string) => animLength(RECLUSE.anims[n]!);
     const steps = run.anims.map((a) => (typeof a === "string" ? [a, len(a)] : [a.anim, a.ms]) as const);
     expect(steps.map(([n]) => n)).toEqual(["seize", "seizeLoop", "seized", "rage"]);

@@ -2,7 +2,7 @@ import { render } from "preact";
 import { RecluseCutscene, recluseCutsceneTimeline } from "../components/RecluseCutscene.tsx";
 
 /**
- * Dev only: the Hidden Boss's cutscene (a MOCKUP) played over whatever board is on screen. Nothing in the app imports
+ * Dev only: the Hidden Boss's cutscene played over whatever board is on screen. Nothing in the app imports
  * this: `scripts/preview-recluse-cutscene.mjs` loads it through the Vite dev server into a real boss battle mid-game, so
  * it can't reach production. His figure in its usual place is hidden while the scene plays (he kneels in the light).
  */
@@ -15,6 +15,7 @@ export function playCutscene(): { at: number; timeline: ReturnType<typeof reclus
   const host = document.createElement("div");
   document.body.appendChild(host);
   const at = Date.now();
-  render(<RecluseCutscene at={at} board={board} />, host);
-  return { at, timeline: recluseCutsceneTimeline() };
+  const timeline = recluseCutsceneTimeline();
+  render(<RecluseCutscene at={at} until={at + timeline.endAt} board={board} />, host);
+  return { at, timeline };
 }

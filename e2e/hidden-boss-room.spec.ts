@@ -8,8 +8,8 @@ import { asServerAdmin, asSignedIn, submitMove, test } from "./helpers.ts";
  * The Hidden Boss's room challenge (Eric, Nov 12 and 13; docs/areas/town-square.md, "His room's challenge"): up his walk-up to the top
  * floor, his card's Challenge ("1 of 4" for everyone in the room), leaving asks "Cancel your game request?", an admin's "Fill with 3 bots"
  * (they join the request one by one: 2 of 4, 3 of 4, 4 of 4), the summoning in the room, and the four into his fight (a party battle
- * online), where the admin's 🏆 ("Win this form") makes the team's next move beat his form. And a 5th at his door: "The door is
- * locked." Each test in its own town (`?townroom=`). `STILLS=<dir>` writes the stills for the PR.
+ * online), where the admin's 🏆 ("Win this form") makes the team's next move beat his form: his adult form, then (Nov 13) his phase
+ * change and the four boards online, to the result. And a 5th at his door: "The door is locked." Each test in its own town (`?townroom=`). `STILLS=<dir>` writes the stills for the PR.
  */
 
 const STILLS = process.env.STILLS;
@@ -179,8 +179,41 @@ test("his room (Eric, Nov 12 and 13): Challenge is 1 of 4; leaving asks; an admi
     return { fen: m.phase.board.fen as string, allowed: (m.phase.allowed ?? null) as string[] | null };
   });
   await submitMove(page, turn.allowed?.[0] ?? legalMoves(turn.fen)[0], turn.fen);
-  await expect.poll(phase, { message: "his form beaten: the results", timeout: 90_000 }).toBe("results");
+  // His adult form beaten (Nov 13: "it plays through till the end"): his fall, then his phase change for everyone, the four boards
+  // (the server runs them; with no engine server here, this device's engine plays him and the bots), and the 🏆 again.
+  await expect.poll(phase, { message: "his adult form beaten: his phase change", timeout: 90_000 }).toBe("phaseChange");
   expect(await page.evaluate(() => (window as any).match.boss?.result)).toBe("crowd");
+  await page.waitForTimeout(20_000);
+  await still(page, "phase-change");
+  await expect.poll(phase, { message: "the four boards", timeout: 60_000 }).toBe("simul");
+  const simulNow = () => page.evaluate(() => (window as any).match?.simul ?? null);
+  await expect.poll(async () => (await simulNow())?.playing ?? false, { message: "the clocks start", timeout: 20_000 }).toBe(true);
+  const four = await simulNow();
+  expect({ boards: four.boards.length, mine: four.boards[0].you, others: four.boards.slice(1).every((b: { you: boolean }) => !b.you) }).toEqual({ boards: 4, mine: true, others: true });
+  // (The bots' boards are played: their first moves come from this device's engine, asked by the server.)
+  await expect.poll(async () => ((await simulNow())?.boards ?? []).slice(1).filter((b: { history: string[] }) => b.history.length > 0).length, { message: "the bots move", timeout: 30_000 }).toBeGreaterThan(0);
+  await still(page, "four-boards");
+  // The 🏆 in the four boards: the team's next move wins every board still on. Your move, with real taps on your board.
+  await expect(trophy).toBeEnabled({ timeout: 10_000 });
+  await trophy.click();
+  await expect(page.getByRole("button", { name: "Your next move wins this form (testing)" })).toBeDisabled();
+  const mine = (await simulNow()).boards[0] as { fen: string; toMove: string | null; history: string[] };
+  if (mine.toMove === "crowd") {
+    const move = legalMoves(mine.fen).find((m) => m.startsWith("b") || m.startsWith("g")) ?? legalMoves(mine.fen)[0]!;
+    const board = page.locator(".rc-simul .rc-q2 .hb-board, .rc-simul .board-row > .board-wrap:not(.rc-stage) .hb-board").first();
+    const box = (await board.boundingBox())!;
+    for (const sq of [move.slice(0, 2), move.slice(2, 4)]) {
+      const f = sq.charCodeAt(0) - 97;
+      const r = Number(sq[1]) - 1;
+      await page.mouse.click(box.x + (f + 0.5) * (box.width / 8), box.y + (7 - r + 0.5) * (box.height / 8));
+    }
+  }
+  await expect.poll(async () => (await simulNow())?.decided ?? false, { message: "every board won", timeout: 30_000 }).toBe(true);
+  expect((await simulNow()).won).toBe(4);
+  await expect.poll(phase, { message: "the results", timeout: 30_000 }).toBe("results");
+  expect(await page.evaluate(() => (window as any).match.phase.simul)).toEqual({ won: 4, of: 4 });
+  await expect(page.getByText(/on all 4 boards!/)).toBeVisible();
+  await still(page, "results");
 });
 
 test("a 5th at his door: \"The door is locked.\", and you stay on the landing; a player can't fill the room with bots", async ({ page: admin, browser }) => {

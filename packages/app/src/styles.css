@@ -27049,7 +27049,11 @@ button.sq-tiny {
   }
 }
 
-/* The Hidden Boss's cutscene (a MOCKUP, Nov 12: components/RecluseCutscene.tsx; in no match yet). One fixed layer over the
+/* While it plays, his figure in its usual place is hidden: he kneels in the light. */
+body.cs-on .boss-char {
+  visibility: hidden;
+}
+/* The Hidden Boss's cutscene (Nov 12: components/RecluseCutscene.tsx; after his fall, before his phase change). One fixed layer over the
    whole screen: everything dims but a round pool of light on the board's middle, its edge feathered over the outer part of
    its radius (eased stops, so no ring shows); the figure and the text boxes on a stage laid over the board, above the dark. */
 .cs-layer {

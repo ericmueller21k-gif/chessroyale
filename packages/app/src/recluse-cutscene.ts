@@ -1,8 +1,9 @@
 /**
- * The Hidden Boss's cutscene between his adult form and the cyborg (a MOCKUP, Nov 12): its one timeline, pure. The
- * times are RECLUSE_CUTSCENE in settings.ts; the arrival's lengths come from the figures' own frames
- * (`RECLUSE_CUTSCENE` in characters/recluse-ages.ts), so the picture and the timeline can't drift apart. Drawn by
- * `components/RecluseCutscene.tsx`; wired into no match yet.
+ * The Hidden Boss's cutscene between his adult form and the cyborg (Nov 12; played after his fall, before his phase change,
+ * since Nov 13): its one timeline, pure. The times are RECLUSE_CUTSCENE in settings.ts; the arrival's lengths come from the
+ * figures' own frames (`RECLUSE_CUTSCENE` in characters/recluse-ages.ts), so the picture and the timeline can't drift apart.
+ * Drawn by `components/RecluseCutscene.tsx`. Its whole length is RECLUSE_CUTSCENE.holdMs, the server's hold online (a unit
+ * test keeps the two equal).
  */
 import { RECLUSE_CUTSCENE } from "@chessroyale/core";
 
@@ -32,6 +33,8 @@ export interface CutTimeline {
   boxes: readonly CutBox[];
   /** The child fades (his frames' `fade`), and the scene is over (the light and the man held a moment). */
   fadeAt: number;
+  /** The light lifts and the scene fades away (`outMs`), over at `endAt`. */
+  outAt: number;
   endAt: number;
 }
 
@@ -86,7 +89,29 @@ export function cutsceneTimeline(lines: readonly CutLine[], arrival: { poofMs: n
     t = b.until + c.gapMs;
   }
   const fadeAt = (boxes.at(-1)?.until ?? standAt) + c.kidFadeAfterMs;
-  return { litAt, poofAt, dropAt, landAt, standAt, boxes, fadeAt, endAt: fadeAt + arrival.fadeMs + c.endHoldMs };
+  const outAt = fadeAt + arrival.fadeMs + c.endHoldMs;
+  return { litAt, poofAt, dropAt, landAt, standAt, boxes, fadeAt, outAt, endAt: outAt + c.outMs };
+}
+
+export type CutArrival = Parameters<typeof cutsceneTimeline>[1];
+/** The times in RECLUSE_CUTSCENE that pace the scene (all but the light's size and darkness), for `fitCutscene`. */
+const PACED = ["dimMs", "poofAfterMs", "firstLineAfterMs", "typeMs", "sentencePauseMs", "readMs", "perCharMs", "maxReadMs", "boxFadeMs", "gapMs", "kidFadeAfterMs", "endHoldMs", "outMs"] as const;
+
+/**
+ * The scene in a window of `windowMs` (its hold: RECLUSE_CUTSCENE.holdMs, the server's online): itself, unchanged, when the window
+ * is its own length (within a second: two devices' clocks) or longer (it ends early and the light stays down, never stretched); in a
+ * shorter one (a test's hold: `cutsceneHoldMs`) every paced time shrinks by one factor, the child's frames as they are, so it
+ * still ends by the window's end.
+ */
+export function fitCutscene(lines: readonly CutLine[], arrival: CutArrival, windowMs: number, c: Settings = RECLUSE_CUTSCENE): { timeline: CutTimeline; c: Settings } {
+  const full = cutsceneTimeline(lines, arrival, c);
+  if (windowMs >= full.endAt - 1000) return { timeline: full, c };
+  const fixed = arrival.poofMs + arrival.dropMs + arrival.landMs + arrival.fadeMs;
+  const f = Math.max(0.02, (windowMs - fixed) / (full.endAt - fixed));
+  const scaled = { ...c } as Record<string, number>;
+  for (const k of PACED) scaled[k] = Math.max(1, Math.floor(c[k] * f));
+  const fc = scaled as unknown as Settings;
+  return { timeline: cutsceneTimeline(lines, arrival, fc), c: fc };
 }
 
 /** The box up at `t` (from the scene's start), if any. */

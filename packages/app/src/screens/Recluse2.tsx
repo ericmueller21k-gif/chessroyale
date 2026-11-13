@@ -21,7 +21,7 @@ import { useMedia } from "../components/QuickChat.tsx";
 import { STRIP_LAYOUT } from "../components/MovePanel.tsx";
 import type { GameView, SimulBoardView, SimulView } from "../game.ts";
 import type { ComponentChildren } from "preact";
-import { ARC_LIFE, ARC_REDRAW, ARC_STRIKES, PHASE_CHANGE, phase2UltBannerMs, absorbKing, absorbReadMs, arcPoints, smoothPath, type ArcStrike } from "../recluse-phase2.ts";
+import { ARC_LIFE, ARC_REDRAW, ARC_STRIKES, PHASE_CHANGE, phase2UltBannerMs, absorbKing, absorbPaced, arcPoints, smoothPath, type ArcStrike } from "../recluse-phase2.ts";
 import { CRITICAL, NORMAL, bossVoice } from "../speech.tsx";
 import { Hud } from "./Hud.tsx";
 import { useStillKey } from "../hooks.ts";
@@ -279,10 +279,10 @@ export function PhaseChangeScreen({ match, at }: { match: GameView; at: number }
   cue(t >= C.igniteAt + 80, "leave", () => play("gkLeave"));
   // (CRITICAL, Oct 17: it cuts in on his word before the seize, so it comes as the power lands; since the hold and the
   // longer cast it has its whole time before his chant, or nearly: the chant's line waits for it, a second at most.)
-  // (Gone by his chant's first line since Nov 13: absorbReadMs.)
+  // (Gone by his chant's first line since Nov 13, paged as the chant's lines are: absorbPaced.)
   cue(t >= C.absorbLineAt, "absorb", () => {
     const line = RECLUSE_LINES.absorb[at % RECLUSE_LINES.absorb.length]!;
-    bossVoice.say(line, `recluse:absorb:${at}`, CRITICAL, at + C.absorbLineAt, absorbReadMs(line));
+    bossVoice.sayPaced(absorbPaced(line), `recluse:absorb:${at}`, CRITICAL, at + C.absorbLineAt);
   });
   cue(t >= C.arcAt, "arcs", () => play("recluseArc"));
   // His look over his figure on the board, placed on his head frame by frame.
@@ -534,7 +534,8 @@ export function SimulScreen({ match }: { match: GameView }) {
   const mine = v.boards[0]!;
   const big = v.boards.find((b) => b.id === watch) ?? mine;
   const others = v.boards.filter((b) => b.id !== big.id);
-  const yourTurn = v.playing && mine.toMove === "crowd";
+  // (Online a Crowd final's watcher has no board: none is "yours".)
+  const yourTurn = v.playing && mine.you && mine.toMove === "crowd";
   // His ultimate as it comes: "5 SECONDS!" over the boards.
   // (On every board at once; nobody waits for it: the 5 s start now.)
   const ultOn = v.ultAt !== null && now - v.ultAt < phase2UltBannerMs();
@@ -544,7 +545,7 @@ export function SimulScreen({ match }: { match: GameView }) {
   // Your board's clock in the dock (DockClock): running on your move, holding (undefined) while he answers, none (null)
   // once your board is decided or before the clocks start.
   const run: DockClockRun | null | undefined =
-    mine.result || !v.playing ? null : yourTurn && mine.turnAt !== null ? { startsAt: mine.turnAt, deadline: mine.turnAt + (v.ultAt !== null ? RECLUSE_PHASE2.ultMoveSeconds * 1000 : mine.bankMs) } : undefined;
+    mine.result || !v.playing || !mine.you ? null : yourTurn && mine.turnAt !== null ? { startsAt: mine.turnAt, deadline: mine.turnAt + (v.ultAt !== null ? RECLUSE_PHASE2.ultMoveSeconds * 1000 : mine.bankMs) } : undefined;
   // (How many are won: the boss bar's right side.)
   const status = v.decided
     ? v.beaten
