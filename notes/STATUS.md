@@ -1024,3 +1024,7 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   Already doing: online briefs answer "what if the device/server/engine is silent?"; parallel helpers never share files.
 - Still pending Eric: town-leave:148 wait fix (guard). Later list unchanged (match-history forms, 100-v-him idea, phase-1
   server move for all bosses, Smudgy/Babur music, #676/#687 minors).
+- Nov 13 23:58: Eric OK'd all: flaky-causes helper (session_01JuCWRvjdprdwJQgKozojUT, high) on claude/flaky-causes; town-leave
+  helper (session_01JuCWRrjGQAogSBc7ZTCeKR, high) on claude/town-leave-everywhere: confirm "Leave Chess Town?" from inside
+  buildings too (Eric's new ask) + the town-leave:148 flake (guard edits OK'd). #690 (CLAUDE.md: commits name no model) in CI.
+  Running Opus: 2 (both high). Check-in 00:35 covers both.
