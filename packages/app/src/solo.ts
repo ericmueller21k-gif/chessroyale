@@ -1,10 +1,11 @@
-import { RECLUSE_CUTSCENE, RECLUSE_PHASE2, BOSS_ALONE_SCORING, bossClockSettings, BOSS_BRAIN, BOSS_POWERS, DEFAULT_SETTINGS, MATCHMAKING, type ItemLook, type MatchmakingType, botVotes, castPregameVote, clockAfterVote, closePregameVote, cutSeconds, pregameVotes, voteResultMs, type Augment, type BossBrain, type PlayerState, type Settings } from "@chessroyale/core";
+import { RECLUSE_CHILD, RECLUSE_CUTSCENE, RECLUSE_PHASE2, BOSS_ALONE_SCORING, bossClockSettings, BOSS_BRAIN, BOSS_POWERS, DEFAULT_SETTINGS, MATCHMAKING, type ItemLook, type MatchmakingType, botVotes, castPregameVote, clockAfterVote, closePregameVote, cutSeconds, pregameVotes, voteResultMs, type Augment, type BossBrain, type PlayerState, type Settings } from "@chessroyale/core";
 import { GUARD_WORDS, MatchRunner, START_FEN, baseAt, ShowdownScout, brainLine as brainWords, boardSlots, type HumanUciEngine, netBoard, type LobbyPlayer, type LivePick, toSan, type BoardSlot, type BoardState, type NetFinal, type Opening, type RoundReport, type UciEngine } from "@chessroyale/chess";
 import { bulletClock, crowdRace, phase2Numbers, phase2ToMove, botRoster, bossIntroTimeline, bossThinkMs, landedEarlyMs, fullMoonMs, folioTurnMs, popOffMs, zebraTurnMs, bossTurnShowMs, judgeTaps, bossRules, kingHelpBlocked, kingMoveMs, kingStrikeMs, lightsDeadline, lightsOutTimeline, lightsRoundEnd, lastStandMs, powerMomentMs, rushKeep, rushMovesLeft, rushSquares, rushTimeline } from "@chessroyale/chess";
 import type { BossView, BoardView, DarkNote, ExitKind, FinalView, GameView, Hint, LightsView, MoveRecord, RushView, Phase, SimulView, Standing, VoteView } from "./game.ts";
 import { PHASE2_ULT_ANIMS, PHASE_CHANGE, Phase2Game, phase2Follows, phase2Mates, phaseChangeRun } from "./recluse-phase2.ts";
 import { RECLUSE_LINES } from "./characters/recluse-lines.ts";
-import { playInPlace, setEngineAt, setFigureRun } from "./components/BossCharacter.tsx";
+import { playInPlace, resetBeats, setEngineAt, setFigureRun } from "./components/BossCharacter.tsx";
+import { resetBattleBanners } from "./battle-banners.ts";
 import { BLACKOUT, DARK_FORCED } from "./components/Hollow.tsx";
 import { play, warmSounds } from "./sound.ts";
 import { trackCamo } from "./camo.ts";
@@ -546,6 +547,23 @@ export class SoloMatch implements GameView {
     });
   }
 
+  /**
+   * The Hidden Boss's child beaten and grown up: a new match against his adult form (the runner's nextBossForm: the board from the
+   * start, his powers, the clocks), his entrance again as a new battle's (his beats, lines and banners forgotten: the boss screen
+   * stays up through it, so it doesn't reset them itself), then play. His brain carries on (Maia, at his adult form's rating).
+   */
+  private nextForm() {
+    if (this.stopped) return;
+    if (!this.runner.nextBossForm()) return this.finish();
+    resetKingSpeech();
+    bossVoice.reset();
+    resetBeats();
+    resetBattleBanners();
+    this.kingCalled = false;
+    this.frozen = null;
+    this.bossIntro();
+  }
+
   /** The boss's intro (bossIntroTimeline), then the battle. `afterLoading`: the loading step was on screen. */
   private bossIntro(afterLoading = false) {
     const powers = this.runner.state.boss?.powers;
@@ -583,7 +601,10 @@ export class SoloMatch implements GameView {
     const note = this.runner.brainNote;
     // (Maia failed to load: why, for the admin reading it, e.g. "load timed out" or the worker's error.)
     if (note) return `${brainWords(note)}${this.maia?.status === "failed" ? ` · ${this.maia.error ?? "no reason"}` : ""}`;
-    const hb = this.runner.humanBrain ?? this.brainPlan;
+    const plan = this.runner.humanBrain ?? this.brainPlan;
+    // (The Hidden Boss's child: the rating his next move is played at, rising with the game.)
+    const child = this.runner.childRatingNow();
+    const hb = plan && child !== null ? { ...plan, rating: child } : plan;
     if (!hb) return this.brainDropped ? "Stockfish (Maia closed: Stockfish didn't start again beside it)" : "Stockfish";
     const share = hb.stockfishShare ? ` · ${Math.round(hb.stockfishShare * 100)}% Stockfish` : "";
     const status = this.maia?.status === "ready" ? "ready" : this.maia?.status === "failed" ? `failed: Stockfish (${this.maia.error ?? "no reason"})` : this.gateEnd === "timeout" ? `loading (waited ${Math.round(BOSS_BRAIN.loadGateMs / 1000)} s)` : "loading";
@@ -1341,6 +1362,13 @@ export class SoloMatch implements GameView {
         // (Who fought it beside you: a solo Crowd's finalists, phase 2's other players if it follows.)
         const mates = this.runner.alive().filter((p) => p.id !== HUMAN);
         this.runner.finishBossBattle();
+        // (The Hidden Boss's child beaten: the board holds while he says so and grows up into the man (RecluseChild.ts), then a new
+        // match against his adult form.)
+        if (this.runner.boss?.form === "child" && this.runner.boss.result === "crowd") {
+          this.set({ kind: "boss", boss: this.bossSnapshot(), until: Date.now() + RECLUSE_CHILD.fallMs, fall: true });
+          this.timer = setTimeout(() => this.nextForm(), RECLUSE_CHILD.fallMs);
+          return;
+        }
         // (A boss with a fall beaten, the Hidden Boss: the board holds while he collapses and starts to mumble; then his
         // phase change and phase 2 (Boss alone, a solo Crowd's final), or the result screen, where he goes on mumbling.
         // Before his phase change the fall is short, and his words are cleared as he falls, so his mumbling carries on.)
@@ -1603,6 +1631,8 @@ export class SoloMatch implements GameView {
       if (this.runner.boss) {
         if (this.runner.stageComplete()) {
           this.runner.finishBossBattle();
+          // (The Hidden Boss's child beaten: the bots play his adult form out too.)
+          if (this.runner.nextBossForm()) continue;
           break;
         }
         if (this.runner.bossToMove()) {

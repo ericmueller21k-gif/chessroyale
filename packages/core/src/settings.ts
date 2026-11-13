@@ -131,6 +131,11 @@ export interface Settings {
    */
   bossHidden?: boolean;
   /**
+   * The Hidden Boss starts in his child form (RECLUSE_CHILD), then a new match against his adult form once the child is beaten.
+   * Solo sets it (`?form=adult`, a test switch, starts at his adult form); online waits for the server's form list.
+   */
+  recluseChild?: boolean;
+  /**
    * Test switch, solo (?win=1): the boss battle starts after 1.e4 e5 2.Bc4 Nc6 3.Qh5 Nf6 with the crowd White to move,
    * so Qxf7 mates the boss at once (to see a boss beaten: the Hidden Boss's collapse).
    */
@@ -1923,6 +1928,29 @@ export const RECLUSE_TALK = {
   retryMs: 1_500,
   1: { middleFromMs: 75_000, lateFromMs: 180_000 },
   2: { middleFromMs: 45_000, lateFromMs: 105_000 },
+} as const;
+
+/**
+ * The Hidden Boss's first form, the child (Eric, Nov 12-13; docs/decisions/2026-11-13-hidden-boss-child-form.md): no powers
+ * (no "No help", no bullet clock; he never strikes, as his adult form), a kid's lines, and a brain that grows with the game.
+ * - **His strength:** Maia, raw (his adult form's brain), at `startRating` for his first moves, `stepRating` more every
+ *   `everyPlies` moves on the board (both sides' moves: Eric's "every 4 moves (all moves)"), up to Maia's top rating in our
+ *   setup (core `maiaTopRating`: 2500, BOSS_BRAIN.maiaRating's last point), which is his adult form's own: the child at the top
+ *   plays as the man does. 1800 to 2500: seven steps, the last after 28 moves on the board (his 14th move).
+ * - **He grows:** `ages`, the Maia rating from which each drawing shows (`recluse-ages.ts`): about 9, 13, 20 (the black suit),
+ *   then his adult look, the last at the top (a test checks), so the child at his strongest is the man you meet next.
+ * - **Beaten** (by mate, or the admins' "Win this form"): his line, then he grows up into the man (`fallMs` in all), and a new
+ *   match starts from the starting position against his adult form (today's phase 1), solo and, once its form list is in,
+ *   online. A draw or a loss ends the fight, as his adult form's does.
+ */
+export const RECLUSE_CHILD = {
+  startRating: 1800,
+  stepRating: 100,
+  everyPlies: 4,
+  ages: [1800, 2000, 2200, 2500],
+  /** Beaten: his line first, then he grows up into the man at `growUpAt` ms into his fall (about 2.3 s), the fall `fallMs` in all. */
+  growUpAt: 1200,
+  fallMs: 4200,
 } as const;
 
 /**

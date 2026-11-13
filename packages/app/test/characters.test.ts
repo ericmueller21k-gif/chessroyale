@@ -36,7 +36,8 @@ describe("boss characters (code-drawn pixel art)", () => {
   }
 });
 
-// The Hidden Boss's younger ages (Nov 12): a mockup for the preview only, wired into nothing yet.
+// The Hidden Boss's younger ages (Nov 12): drawn for the preview; since Nov 13 also his child form's growing figure (RECLUSE_GROWING),
+// in its own kit (RECLUSE_CHILD_KIT, kits.ts bossKitOf), never in a character list or BOSS_KITS.
 describe("the Hidden Boss's ages (mockup)", async () => {
   const { RECLUSE_AGES_PREVIEW } = await import("../src/characters/recluse-ages.ts");
   const { BOSS_KITS } = await import("../src/characters/kits.ts");

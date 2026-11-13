@@ -1,7 +1,7 @@
 /**
- * The Hidden Boss (code id `recluse`) at his younger ages: a MOCKUP for Eric (Nov 12, 2026), registered only for the
- * preview, wired into no match, kit or list (a test checks). Today's sprite (`recluse.ts`) is the fourth and oldest age,
- * unchanged; these three grow into it:
+ * The Hidden Boss (code id `recluse`) at his younger ages (Eric liked the mockup, Nov 12, 2026): since Nov 13 his child form's
+ * figure in a match (RECLUSE_GROWING and its bust, below; kits.ts RECLUSE_CHILD_KIT), in no character list or BOSS_KITS (a test
+ * checks). Today's sprite (`recluse.ts`) is the fourth and oldest age, unchanged; these three grow into it:
  * - `RECLUSE_CHILD`, about 9: a skinny kid in a 1950s red-and-cream striped tee, cuffed dungarees and canvas sneakers.
  * - `RECLUSE_TEEN`, about 13: a 1950s schoolboy, a maroon V-neck sweater over a white collar, khaki slacks, white socks and
  *   loafers, his hands in his pockets.
@@ -17,7 +17,7 @@
  * Previews: npm run preview:characters -- <dir> extra=packages/app/src/characters/recluse-ages.ts only=<ids>
  */
 import { canvas, inEllipse, inPoly, roundLight, toGrid, type Canvas } from "./paint.ts";
-import { RECLUSE, RECLUSE_PALETTE, recluseLayers, type Brows, type Eyes, type Mouth, type ReclusePose } from "./recluse.ts";
+import { RECLUSE, RECLUSE_BUST, RECLUSE_PALETTE, recluseLayers, type Brows, type Eyes, type Mouth, type ReclusePose } from "./recluse.ts";
 import { frameKeys, joinParts, lazyAnim, lazyParts, mapFrames, type Anim, type Character, type Frame, type Layer, type Part, type Speck } from "./sprite.ts";
 
 type Pt = readonly [number, number];
@@ -809,6 +809,60 @@ export const RECLUSE_GROW: Character = {
   },
 };
 
+// ---- His child form in a match (Nov 13; RECLUSE_CHILD): every age in one drawing, so his figure steps up in place.
+
+const WHO: readonly Who[] = ["child", "teen", "young", "today"];
+/**
+ * The loop his figure rests in at each age (core childAge: 0 about 9, 1 about 13, 2 about 20, 3 his adult look, the adult form's
+ * own idle): `idle` is the child's, so his figure is the child wherever nothing else is set.
+ */
+export const GROWING_LOOPS = ["idle", "age1", "age2", "age3"] as const;
+/** The step up to age `to` (1 to 3) from the age before: one-shots, about 1.9 s each (growFrames). */
+export const growAnim = (to: number): string => `grow${to}`;
+/** Beaten in the child form: from age `from` (0 to 2) straight up to his adult look, the man the next match meets. */
+export const growUpAnim = (from: number): string => `up${from}`;
+
+/** The growing one-shots' frames, cut by `crop(age)` (a bust's window); a step's window is the older age's from its flash on. */
+function growingAnims(crop: (w: Who) => (f: Frame) => Frame, todayIdle: () => Frame[]): Record<string, Anim> {
+  const cut = (from: Who, to: Who) => () => {
+    const frames = growFrames(from, to);
+    const flash = frames.findIndex((f) => f.cue === "flash");
+    return { loop: false, frames: frames.map((f, i) => crop(i < flash ? from : to)(f)) };
+  };
+  const anims: Record<string, Anim> = {};
+  WHO.forEach((w, i) => {
+    anims[GROWING_LOOPS[i]!] = lazyAnim(() => ({ loop: true, frames: w === "today" ? todayIdle() : idleFrames(w).map(crop(w)) }));
+    if (i > 0) anims[growAnim(i)] = lazyAnim(cut(WHO[i - 1]!, w));
+    if (i < 3) anims[growUpAnim(i)] = lazyAnim(cut(w, "today"));
+  });
+  return anims;
+}
+
+/** His figure in his child form: the child, 13, 20 and his adult look, each with its idle, and the steps up between them. */
+export const RECLUSE_GROWING: Character = {
+  id: "recluse-growing",
+  name: "Hidden Boss (child form)",
+  w: W,
+  h: H,
+  foot: [OX + 46, OY + 128],
+  palette: AGES_PALETTE,
+  halo: "#2a2733",
+  parts: PARTS_ALL,
+  anims: growingAnims(() => (f) => f, () => [...RECLUSE.anims.idle!.frames]),
+};
+/** The same in a phone's boss bar: each age's bust (its own window, as RECLUSE_BUST's for his adult look), the same animations. */
+export const RECLUSE_GROWING_BUST: Character = {
+  id: "recluse-growing-bust",
+  name: "Hidden Boss (child form, bust)",
+  w: BUST_W,
+  h: BUST_H,
+  foot: [46 - 21, BUST_H],
+  palette: AGES_PALETTE,
+  halo: "#2a2733",
+  parts: PARTS_ALL,
+  anims: growingAnims((w) => bustOf(TOPS[w]), () => [...RECLUSE_BUST.anims.idle!.frames]),
+};
+
 // ---- The ghost of the child (the cutscene after his adult form is beaten), beside today's sprite on his knees.
 
 /** The ghost's keys: its outline, a pale ramp (dark to light), the glow (outer, inner), a bright mote. All see-through. */
@@ -1593,4 +1647,4 @@ export const RECLUSE_CUTSCENE: Character = {
 export const CUTSCENE_SPOTS = { kid: { x: KID_X, head: GROUND - 82 }, man: { x: OX + 46, head: GROUND - 64 } } as const;
 
 /** Everything this mockup draws, for the preview and the tests; none of it is in CHARACTERS or any kit. */
-export const RECLUSE_AGES_PREVIEW: readonly Character[] = [RECLUSE_CHILD, RECLUSE_TEEN, RECLUSE_YOUNG, RECLUSE_CHILD_BUST, RECLUSE_TEEN_BUST, RECLUSE_YOUNG_BUST, RECLUSE_GROW, RECLUSE_GHOST, RECLUSE_CHILD_SIT, RECLUSE_CHILD_SIDE, RECLUSE_CUTSCENE];
+export const RECLUSE_AGES_PREVIEW: readonly Character[] = [RECLUSE_GROWING, RECLUSE_GROWING_BUST, RECLUSE_CHILD, RECLUSE_TEEN, RECLUSE_YOUNG, RECLUSE_CHILD_BUST, RECLUSE_TEEN_BUST, RECLUSE_YOUNG_BUST, RECLUSE_GROW, RECLUSE_GHOST, RECLUSE_CHILD_SIT, RECLUSE_CHILD_SIDE, RECLUSE_CUTSCENE];

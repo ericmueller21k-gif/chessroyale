@@ -173,6 +173,38 @@ export const RECLUSE_LINES = {
 } as const;
 
 /**
+ * His child form (Eric, Nov 12-13: "new lines fitting a kid"; RECLUSE_CHILD): a skinny 1950s kid of about 9 who has just fallen
+ * for the game, short and eager, in a boy's voice, a little older at each step up (`grow`). All PLACEHOLDERS (ours, waiting for
+ * Eric's): none is a real quote, none names him or hints at his name, nothing about any nation.
+ */
+export const RECLUSE_CHILD_LINES = {
+  /** His entrance (the fight's start): one. */
+  intro: ["Wanna play? I set the pieces up myself.", "You want to play me? Okay. I'm ready.", "I've been practicing all week."],
+  /** He takes a piece (now and then). */
+  capture: ["Gotcha!", "That one's mine now.", "Ha! Didn't see that, huh?"],
+  /** He loses one. */
+  hurt: ["Hey! No fair.", "Aw, nuts.", "Okay. That was a good one."],
+  /** He gives check. */
+  check: ["Check! Your king's in trouble.", "Check! I saw that coming."],
+  /** Behind on material. */
+  rattled: ["Wait. Let me think.", "Hmm. I'll figure it out."],
+  /** Ahead. */
+  smug: ["This is the fun part.", "I love this game."],
+  /** He wins. */
+  victory: ["I won! Can we play again?", "Again! Let's go again!"],
+  /** His level rising, a step of his ramp that isn't a step up in age (now and then). */
+  levelUp: ["I'm getting it now.", "Oh! I see how it works.", "Every move is a little puzzle."],
+  /** Each step up in age, by the age he reaches (13, 20, his adult look): one, picked by the battle. */
+  grow: [
+    ["I'm not a little kid anymore.", "I read every chess book in the library."],
+    ["Every move should be beautiful.", "I don't play for draws."],
+    ["No more games. Now I'm ready.", "Now you'll see real chess."],
+  ],
+  /** Beaten (then he grows up into the man the next match meets): one, picked by the battle. */
+  beaten: ["Okay. You win this one.", "Just wait till I'm bigger.", "Fine. Now I'll play for real."],
+} as const;
+
+/**
  * The God King's lines in this fight (his usual ones about calling him are left out: his help doesn't work here). He has
  * none in phase 2: the boss absorbs him as it begins (Eric, Oct 14), so his last words are his cry as he's drained.
  */

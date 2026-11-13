@@ -100,6 +100,9 @@ export interface FinalState {
   out?: { id: string; turn: number }[];
 }
 
+/** A boss form other than his usual one (BossState.form): the Hidden Boss's child. */
+export type BossForm = "child";
+
 /** Boss battle: the crowd (playing White) against Stockfish at `elo`. */
 export interface BossState {
   elo: number;
@@ -151,6 +154,11 @@ export interface BossState {
   barred?: string;
   /** Which boss this is (a BOSS_ROSTER id), and its powers as they stand. */
   id?: string;
+  /**
+   * The boss's form, when it isn't his usual one: "child", the Hidden Boss's first (RECLUSE_CHILD: no powers, his strength
+   * growing with the game). Beaten, the runner starts a new match against his usual form (`nextBossForm`).
+   */
+  form?: BossForm;
   /** The strength it was set at before its own offset (a raid's tier): what a profile's "bosses beaten" counts. */
   tier?: number;
   powers?: BossPowerState;
