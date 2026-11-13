@@ -139,7 +139,8 @@ test("online: a Crowd boss final meets him: his intro by name for everyone, four
   test.skip(test.info().project.name !== "desktop", "one run is enough: a computer");
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
-  await page.goto("/?debug&pace=quick&mode=crowd&format=boss&rounds=2&clock=30&bossMoves=8&power=bullet&weakbots=1");
+  // (At his adult form, ?form=adult (a lobby's test switch): this test is about it; his child form comes first otherwise, Nov 13.)
+  await page.goto("/?debug&pace=quick&mode=crowd&format=boss&rounds=2&clock=30&bossMoves=8&power=bullet&weakbots=1&form=adult");
   await createLobbyFromHome(page);
   await page.getByRole("button", { name: /Start with 1 player/ }).click();
   await knockouts(page, 9);
