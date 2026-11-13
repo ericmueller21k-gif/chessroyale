@@ -113,8 +113,10 @@ test("his room (Eric, Nov 12 and 13): Challenge is 1 of 4; leaving asks; an admi
   const his = await hisCard(page);
   await expect(his.getByRole("button")).toHaveText(["Challenge", "Cancel", "Fill with 3 bots"]);
   await expect(his.getByRole("button", { name: "Cancel" })).toBeDisabled();
-  await his.getByRole("button", { name: "Challenge" }).click();
+  // The count is there from the start, in its place (review n2: it never appears from nothing).
   const count = page.locator(".hb-count");
+  await expect(count).toHaveText(/Challengers\s*0 of 4/);
+  await his.getByRole("button", { name: "Challenge" }).click();
   await expect(count).toHaveText(/1 of 4/, { timeout: 10_000 });
   await expect(his.getByRole("button", { name: "Challenge" })).toBeDisabled();
   await expect(his.getByRole("button", { name: "Cancel" })).toBeEnabled();

@@ -1,5 +1,5 @@
 import { DurableObject } from "cloudflare:workers";
-import { BOSS_ROSTER, CAPACITY, FRIENDS, FRONT_DOOR, HIDDEN_ROOM, bossInText, hiddenRoomSettings, type Activity, type ItemLook, type PawnColor } from "@chessroyale/core";
+import { BOSS_ROSTER, CAPACITY, FRIENDS, FRONT_DOOR, HIDDEN_ROOM, bossInText, hiddenRoomSettings, pausedLine, type Activity, type ItemLook, type PawnColor } from "@chessroyale/core";
 import { d1Sql, ensureSchema } from "./accounts.ts";
 import { LiveBoard, pruneLive, typicalWait, writeLastSeen, type LiveCounts, type LiveHealth, type LobbySummary, type Presence } from "./live.ts";
 import { countCall } from "./ops.ts";
@@ -11,6 +11,7 @@ import { HiddenRooms, fightingText, type RoomBeat, type RoomLimits, type RoomSta
 import type { RoomAction } from "./hidden-room-api.ts";
 import type { LobbyRecord, PartyLobby } from "./lobby.ts";
 import { openLobbyCode } from "./codes.ts";
+import { isPaused } from "./kill-switches.ts";
 import type { Env } from "./index.ts";
 
 /** The one live hub (its name). */
@@ -46,6 +47,8 @@ export class LiveHub extends DurableObject<Env> {
   private here = new TownHere();
   /** The Hidden Boss's room in each town (hidden-room.ts): its people and its request; in memory only, a restart forgets it. */
   private hidden = new HiddenRooms();
+  /** Each room's fight being made now (`hiddenFight` awaits the lobby's Durable Object): the room's next answers wait for it. */
+  private hiddenMaking = new Map<string, Promise<void>>();
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -296,6 +299,9 @@ export class LiveHub extends DurableObject<Env> {
    */
   async hiddenRoom(a: { id: string; name: string; room: string; action: RoomAction; admin: boolean; beat?: RoomBeat; limits?: RoomLimits }): Promise<RoomView> {
     countCall("hub.hidden");
+    // (Its four's fight being made: wait for it, so a cancel, a leave or a look racing the start answers with your pass. Review m1.)
+    const making = this.hiddenMaking.get(a.room);
+    if (making) await making.catch(() => undefined);
     const now = Date.now();
     const R = this.hidden;
     let view: RoomView;
@@ -322,7 +328,7 @@ export class LiveHub extends DurableObject<Env> {
         view = R.look(a.id, a.room, now, a.beat);
     }
     const starts = [...(start ? [start] : []), ...R.due(now)];
-    for (const s of starts) await this.hiddenFight(s);
+    for (const s of starts) await this.hiddenStart(s);
     return starts.length ? { ...R.view(a.id, a.room, Date.now()), ...(view.message ? { message: view.message } : {}) } : view;
   }
 
@@ -331,12 +337,24 @@ export class LiveHub extends DurableObject<Env> {
     this.hidden.drop(id, Date.now());
   }
 
+  /** `hiddenFight`, held in `hiddenMaking` while it runs (the room's other answers wait for it). */
+  private hiddenStart(s: RoomStart): Promise<void> {
+    const p = this.hiddenFight(s).finally(() => {
+      if (this.hiddenMaking.get(s.room) === p) this.hiddenMaking.delete(s.room);
+    });
+    this.hiddenMaking.set(s.room, p);
+    return p;
+  }
+
   /**
    * The room's four into the Hidden Boss's fight (hiddenRoomSettings): a party battle's lobby (lobby.ts PartyLobby, `room`: no party
    * Durable Object to tell), each person's own pass into their own seat from their own account, the bots its bot members; then the
-   * line in that town's chat. Not made (five codes refused): everyone in it reads "Couldn't start the fight."
+   * line in that town's chat. Not made (five codes refused): everyone in it reads "Couldn't start the fight." Resting (a raid's kill
+   * switch, or his own): no fight, and everyone reads the rest's line, so no other boss is met under his name (review m2).
    */
   private async hiddenFight(s: RoomStart): Promise<void> {
+    const rest = isPaused(this.env, "raid") ? "raid" : isPaused(this.env, `boss:${HIDDEN_ROOM.boss}`) ? (`boss:${HIDDEN_ROOM.boss}` as const) : null;
+    if (rest) return this.hidden.started(s, null, {}, Date.now(), pausedLine(rest));
     const now = Date.now();
     const people = s.seats.map((x, seat) => ({ ...x, seat })).filter((x) => !x.bot);
     const passes: Record<string, string> = Object.fromEntries(people.map((p) => [p.id, randomPass()]));

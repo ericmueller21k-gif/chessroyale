@@ -8,8 +8,10 @@ import { HERE_LIMITS, TownHere, type HereLimits } from "./town-here.ts";
  * Per town instance (the town's `room`: production has one, "town"; each test its own):
  * - **The room** (the walk-up's top floor) holds at most HIDDEN_ROOM.players people at once: a device asks to `enter` on the stairs
  *   up, and a 5th is refused ("The door is locked."). Bots an admin filled in count. Each device in the room asks again every
- *   HIDDEN_ROOM.pollMs (`look`, with where it stands and its idle time); one silent for HIDDEN_ROOM.silentSec has gone (a disconnect),
- *   and one past the town's own away limits (TOWN_AFK, as town-here.ts drops a pawn) too: out of the room and its request.
+ *   HIDDEN_ROOM.pollMs (`look`, with where it stands, whether its page is hidden, and an idle time the app sends as 0); one silent for
+ *   HIDDEN_ROOM.silentSec has gone (a disconnect), and one hidden past the town's away limits (TOWN_AFK, as town-here.ts drops a pawn)
+ *   too: out of the room and its request. A player idle in the room is dropped by the town's own away rule (the app's watchAway runs
+ *   in rooms too): it takes them out of the town, and out of the room with it (`leave`).
  * - **The request**: each Challenge adds its player ("1 of 4", "2 of 4"…); you're in one at a time (a request in another instance, a
  *   solo boss battle: `drop`). Leaving the room, a cancel or a disconnect takes you out. At HIDDEN_ROOM.players it's `starting`: the
  *   hub makes the fight (a party battle's lobby) and `started` gives each person their pass, read on their next look; then they're out
@@ -20,7 +22,10 @@ import { HERE_LIMITS, TownHere, type HereLimits } from "./town-here.ts";
  * Everything ends: a room with nobody in it and nothing to read is forgotten at the next sweep; an outcome waits HIDDEN_ROOM.outcomeSec.
  */
 
-/** What a device in the room says on a look: where it stands (the room's squares), and the town's away numbers (town-here.ts). */
+/**
+ * What a device in the room says on a look: where it stands (the room's squares), and the town's away numbers (town-here.ts). The app
+ * sends `idleMs` 0 (its own away rule drops an idle player: the header); a test may send more.
+ */
 export interface RoomBeat {
   c: number;
   r: number;
@@ -131,8 +136,11 @@ export class HiddenRooms {
   private rooms = new Map<string, Inst>();
   /** Which instance's room each account is in. */
   private where = new Map<string, string>();
-  /** Each account's request's end, until read or HIDDEN_ROOM.outcomeSec. */
-  private outcomes = new Map<string, { o: RoomOutcome; at: number }>();
+  /**
+   * Each account's request's end, told on every answer until HIDDEN_ROOM.outcomeSec (`read`: some answer has carried it). A fight's is
+   * kept through a cancel, and through a new visit until read (review m1): a seat in a starting request is kept.
+   */
+  private outcomes = new Map<string, { o: RoomOutcome; at: number; read?: true }>();
   private serial = 0;
 
   get size(): number {
@@ -156,6 +164,9 @@ export class HiddenRooms {
       this.touch(this.rooms.get(room)!.members.get(id)!, now, beat);
       return this.view(id, room, now);
     }
+    // (Your fight was made and nobody has told you yet, say a disconnect's look raced the start: into it, not back into the room.)
+    const o = this.outcomes.get(id);
+    if (o?.o.kind === "fight" && !o.read) return this.view(id, room, now);
     if (was !== undefined) this.leave(id, now);
     const i = this.inst(room, limits);
     if (!i || i.members.size >= HIDDEN_ROOM.players) return { ...this.view(id, room, now), message: DOOR_LOCKED };
@@ -164,7 +175,7 @@ export class HiddenRooms {
     this.touch(m, now, beat);
     i.members.set(id, m);
     this.where.set(id, room);
-    // (A new visit: an old outcome nobody read is stale now.)
+    // (A new visit: an old end is stale now.)
     this.outcomes.delete(id);
     return this.view(id, room, now);
   }
@@ -236,15 +247,16 @@ export class HiddenRooms {
   }
 
   /**
-   * The fight for `start` is made (`lobby`, and each person's pass by account), or couldn't be (null). Everyone in it reads their
-   * outcome on their next look, and is out of the room (the next four may come in); the bots go with them.
+   * The fight for `start` is made (`lobby`, and each person's pass by account), or couldn't be (null; `why`: the words, NO_FIGHT or a
+   * rest's line). Everyone in it reads their outcome on their next look, and is out of the room (the next four may come in); the bots
+   * go with them.
    */
-  started(start: RoomStart, lobby: string | null, passes: Record<string, string>, now: number) {
+  started(start: RoomStart, lobby: string | null, passes: Record<string, string>, now: number, why: string = NO_FIGHT) {
     const i = this.rooms.get(start.room);
     const names = start.seats.map((s) => s.name);
     start.seats.forEach((s, seat) => {
       if (s.bot) return;
-      this.setOutcome(s.id, lobby && passes[s.id] ? { n: 0, kind: "fight", lobby, pass: passes[s.id]!, seat, names } : { n: 0, kind: "ended", message: NO_FIGHT }, now);
+      this.setOutcome(s.id, lobby && passes[s.id] ? { n: 0, kind: "fight", lobby, pass: passes[s.id]!, seat, names } : { n: 0, kind: "ended", message: why }, now);
     });
     if (!i) return;
     if (!lobby) {
@@ -262,12 +274,15 @@ export class HiddenRooms {
     this.outcomes.set(id, { o: { ...o, n: ++this.serial }, at: now });
   }
 
-  /** Your cancel: out of the request (you stay in the room). Only bots left in it: it ends. */
+  /**
+   * Your cancel: out of the request (you stay in the room). Only bots left in it: it ends. Too late, the four full (review m1): the
+   * fight is being made for everyone, your seat in it too, and its outcome stays for this answer and the next.
+   */
   cancel(id: string, now: number) {
     const room = this.where.get(id);
     const i = room === undefined ? null : this.rooms.get(room);
     if (i) this.unrequest(i, id);
-    this.outcomes.delete(id);
+    if (this.outcomes.get(id)?.o.kind !== "fight") this.outcomes.delete(id);
     this.sweep(now);
   }
 
@@ -276,7 +291,10 @@ export class HiddenRooms {
     this.cancel(id, now);
   }
 
-  /** Out of the room (the stairs down, back, the town closed): out of its request too; the bots you filled go with you. */
+  /**
+   * Out of the room (the stairs down, back, the town closed): out of its request too; the bots you filled go with you. Not out of a
+   * request being made (its four are set): the answer carries your fight once it's made (review m1).
+   */
   leave(id: string, now: number) {
     const room = this.where.get(id);
     const i = room === undefined ? undefined : this.rooms.get(room);
@@ -352,13 +370,15 @@ export class HiddenRooms {
     return this.where.get(id) === room;
   }
 
-  /** What `id` is told about `room` (its outcome too, if any). */
+  /** What `id` is told about `room` (its outcome too, if any): only ever `id`'s own answer (it marks the outcome told). */
   view(id: string, room: string, now: number): RoomView {
     void now;
     const i = this.rooms.get(room);
     const inRoom = this.where.get(id) === room;
     const q = i?.request ?? null;
     const outcome = this.outcomes.get(id);
+    // (Told: a new visit may forget it now.)
+    if (outcome) outcome.read = true;
     const members = i ? [...i.members.values()] : [];
     return {
       in: inRoom,

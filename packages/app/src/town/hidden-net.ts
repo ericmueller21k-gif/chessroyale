@@ -2,11 +2,13 @@ import { HIDDEN_ROOM } from "@chessroyale/core";
 import { testParams, testSwitchesAllowed } from "../test-switches.ts";
 import { tooYoung } from "../account.ts";
 import { mayTownChat } from "./chat-net.ts";
+import { showBanNotice } from "../components/FairPlay.tsx";
 
 /**
  * The Hidden Boss's room challenge, the app's side (Eric, Nov 12 and 13; the server's: server/src/hidden-room.ts; POST /api/town/hidden).
  * One client while you're at his room: `enter` on the stairs up (four at most: "The door is locked."), then a look every
- * HIDDEN_ROOM.pollMs while you're in it (where you stand, your idle time: the server drops a disconnect and the AFK drop), Challenge,
+ * HIDDEN_ROOM.pollMs while you're in it (where you stand, whether the page is hidden: the server drops a disconnect and a page hidden
+ * too long; an idle player is dropped by the town's own away rule, watchAway, which takes them out of the town and so out of the room), Challenge,
  * Cancel, "Fill with 3 bots" (admins; the server checks), and `leave` (the stairs down, back, the town closed). Its answers are the
  * room as the server has it (`info`): the count ("2 of 4"), who's waiting, the others in the room, and your request's end (`onOutcome`,
  * once per end: into the fight, or "Sorry, not enough players."). Nothing here runs in a frame loop.
@@ -70,7 +72,7 @@ export class HiddenRoomClient {
   private inFlight = false;
 
   constructor(
-    /** Where you stand in the room (its squares), and how long since your last input (afk.ts). */
+    /** Where you stand in the room (its squares); `idleMs` 0 (the town's own away rule handles idle: the header). */
     private readonly self: () => { c: number; r: number; idleMs: number } | null,
     /** Your request's end, once each. */
     private readonly onOutcome: (o: RoomOutcome) => void,
@@ -103,7 +105,10 @@ export class HiddenRoomClient {
       const res = await fetch("/api/town/hidden", { method: "POST", credentials: "same-origin", keepalive, headers: { "content-type": "application/json" }, body: JSON.stringify(body), signal: keepalive ? undefined : AbortSignal.timeout(10_000) });
       const b = (await res.json().catch(() => null)) as unknown;
       if (res.status === 401 || res.status === 403) {
-        this.refused = (b as { message?: string } | null)?.message ?? "Sign in to challenge him.";
+        const no = b as { message?: string; banned?: boolean } | null;
+        this.refused = no?.message ?? "Sign in to challenge him.";
+        // (Banned for fair play: fair play's notice, as PLAY shows it; the room watches on, uncounted. Review M1.)
+        if (no?.banned) showBanNotice();
         this.emit();
         return null;
       }
@@ -117,6 +122,12 @@ export class HiddenRoomClient {
       this.info = b;
       if (b.outcome && !this.seen.has(b.outcome.n)) {
         this.seen.add(b.outcome.n);
+        // (Into the fight, from any answer, a cancel's or a leave's racing the start too: the server has taken you out of the room, so
+        // nothing more to ask. Review m1.)
+        if (b.outcome.kind === "fight") {
+          this.done = true;
+          this.stop();
+        }
         this.onOutcome(b.outcome);
       }
       this.emit();
@@ -128,12 +139,13 @@ export class HiddenRoomClient {
 
   /**
    * The stairs up: in, or "The door is locked." (`locked`). A guest (or a device too young) watches: in, uncounted. No answer (the
-   * server down): in, as a guest is, so the stairs never strand you.
+   * server down): in, as a guest is, so the stairs never strand you. Your fight made meanwhile (a lost answer): not in, no words
+   * (`message` null): its summoning takes you.
    */
-  async enter(): Promise<{ ok: true } | { ok: false; message: string }> {
+  async enter(): Promise<{ ok: true } | { ok: false; message: string | null }> {
     this.done = false;
     const b = await this.ask("enter");
-    if (b && !b.in) return { ok: false, message: b.message ?? "The door is locked." };
+    if (b && !b.in) return { ok: false, message: this.done ? null : (b.message ?? "The door is locked.") };
     return { ok: true };
   }
 

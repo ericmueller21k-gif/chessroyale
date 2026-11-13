@@ -1,10 +1,14 @@
-import { describe, expect, it } from "vitest";
-import { BOSS_PARTY, DEFAULT_SETTINGS, HIDDEN_ROOM, TOWN_AFK, hiddenRoomSettings, mulberry32, type Settings } from "@chessroyale/core";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { BOSS_PARTY, DEFAULT_SETTINGS, HIDDEN_ROOM, TOWN_AFK, hiddenRoomSettings, mulberry32, pausedLine, type Settings } from "@chessroyale/core";
 import { legalMoves, type BoardScore, type MatchRunner, type ServerMessage } from "@chessroyale/chess";
-import { ADMINS_ONLY, DOOR_LOCKED, HiddenRooms, NOT_ENOUGH, NO_FIGHT, ROOM_LIMITS, fightingText, type RoomStart } from "../src/hidden-room.ts";
-import { readRoomLimits } from "../src/hidden-room-api.ts";
+import { ADMINS_ONLY, DOOR_LOCKED, HiddenRooms, NOT_ENOUGH, NO_FIGHT, ROOM_LIMITS, fightingText, type RoomStart, type RoomView } from "../src/hidden-room.ts";
+import { hiddenRoomResponse, readRoomLimits, type RoomAction, type RoomHub } from "../src/hidden-room-api.ts";
 import { LobbyCore, newLobbyRecord, type PartyLobby } from "../src/lobby.ts";
 import { TownChat } from "../src/town-chat.ts";
+import { LiveHub } from "../src/live-hub.ts";
+import { createGuest, createSession, ensureSchema, signInWithIdentity } from "../src/accounts.ts";
+import { BANNED_MESSAGE, setCase } from "../src/fairplay.ts";
+import { memoryDb } from "./memory-db.ts";
 import { library } from "./lobby-fixture.ts";
 
 /**
@@ -324,5 +328,170 @@ describe("the fight from the room: the four on the party rule, against him; the 
     delete F.core.record.party!.room;
     F.advance(61_000);
     expect(F.core.winFormTrigger("p1", true)).toBe(false);
+  });
+});
+
+/**
+ * A live hub with in-memory storage and a fake lobby namespace: each `create` waits for the test's `open` (true: made), so a test can
+ * act while the fight is being made.
+ */
+function roomHub(env: Record<string, unknown> = {}) {
+  const storage = {
+    get: async () => undefined,
+    put: async () => undefined,
+    delete: async () => undefined,
+    list: async () => new Map(),
+    getAlarm: async () => null,
+    setAlarm: async () => undefined,
+  };
+  const ctx = { storage, blockConcurrencyWhile: (fn: () => Promise<unknown>) => fn() };
+  const creates: { code: string; party: PartyLobby; open: (ok: boolean) => void }[] = [];
+  const LOBBIES = {
+    idFromName: (c: string) => c,
+    get: (c: string) => ({ create: (_c: string, _o: unknown, _a: unknown, _b: unknown, party: PartyLobby) => new Promise<boolean>((open) => creates.push({ code: c, party, open })) }),
+  };
+  const hub = new LiveHub(ctx as unknown as DurableObjectState, { LOBBIES, ...env } as never);
+  const act = (id: string, action: RoomAction, extra: { admin?: boolean } = {}) =>
+    hub.hiddenRoom({ id, name: id.toUpperCase(), room: "test:review", action, admin: !!extra.admin, beat: at() });
+  return { hub, creates, act };
+}
+
+/** Lets the hub's awaits run (the fake lobby's `create` is a promise). */
+const settle = () => new Promise<void>((ok) => setTimeout(ok, 0));
+
+describe("review round (Nov 13): a ban at his door, a start racing a cancel or a leave, a rest", () => {
+  afterEach(() => vi.useRealTimers());
+
+  it("M1: an account banned for fair play can't go in or challenge (403, `banned`, as PLAY answers: the ban notice); a look goes on; the device cookie goes to fair play as every way in sends it; checked at most once a minute", async () => {
+    const { sql } = memoryDb();
+    await ensureSchema(sql);
+    const signed = async (name: string) => {
+      const g = await createGuest(sql, 1000, name);
+      const u = await signInWithIdentity(sql, g.user, "email", `${name.toLowerCase()}@example.com`, {}, 1000);
+      return { id: u.id, token: await createSession(sql, u.id, 1000) };
+    };
+    const ann = await signed("Ann");
+    const bo = await signed("Bo");
+    await setCase(sql, bo.id, "banned", "admin:eric", "engine moves", 1500);
+    const asked: string[] = [];
+    const hub: RoomHub = { hiddenRoom: async (a) => (asked.push(`${a.name} ${a.action}`), new HiddenRooms().view(a.id, a.room, 0)) };
+    const post = (who: { token: string }, action: RoomAction, now: number, device: string | null = null) =>
+      hiddenRoomResponse(new Request("https://hunchess.test/api/town/hidden", { method: "POST", body: JSON.stringify({ action }) }), sql, hub, { token: who.token, device, tooYoung: false, testSwitches: false, admin: () => false, paused: null }, now);
+    for (const action of ["enter", "challenge"] as const) {
+      const r = await post(bo, action, 2000, "device-of-bo-0001");
+      expect(r.status).toBe(403);
+      expect(await r.json()).toEqual({ message: BANNED_MESSAGE, banned: true });
+    }
+    // (A look, a cancel, leaving: nothing to refuse, and they never add anyone.)
+    for (const action of ["look", "cancel", "leave"] as const) expect((await post(bo, action, 2000)).status).toBe(200);
+    expect(asked).toEqual(["Bo look", "Bo cancel", "Bo leave"]);
+    // Not banned: in, and the device recorded against the account (banCheck's evasion check reads it).
+    expect((await post(ann, "enter", 2000, "device-of-ann-001")).status).toBe(200);
+    expect(await sql.first("SELECT user_id FROM fairplay_devices WHERE device = ?", "device-of-ann-001")).toEqual({ user_id: ann.id });
+    // Banned a moment later: the answer stands for a minute at most, then the door shuts.
+    await setCase(sql, ann.id, "banned", "admin:eric", "engine moves", 2500);
+    expect((await post(ann, "challenge", 61_999)).status).toBe(200);
+    expect((await post(ann, "challenge", 62_000)).status).toBe(403);
+  });
+
+  /** a, b, c and d in the room, all four challenged: the start, being made. */
+  const four = () => {
+    const R = new HiddenRooms();
+    for (const id of ["a", "b", "c", "d"]) R.enter(id, id.toUpperCase(), T, 0, at());
+    let start: RoomStart | null = null;
+    for (const [k, id] of ["a", "b", "c", "d"].entries()) start = R.challenge(id, T, k + 1).start ?? start;
+    return { R, start: start!, passes: { a: "pa", b: "pb", c: "pc", d: "pd" } };
+  };
+  const fight = (v: RoomView) => (v.outcome?.kind === "fight" ? { pass: v.outcome.pass, seat: v.outcome.seat } : null);
+
+  it("m1 a: Cancel just after the fourth joined: the seat is kept and the cancel's answer carries the fight (the summoning for you too); a cancel while it's being made, the same", () => {
+    const { R, start, passes } = four();
+    // (Being made: a's cancel changes nothing, the four are set.)
+    R.cancel("a", 5);
+    R.started(start, "ABCDE", passes, 6);
+    // (The hub answers a cancel with a look after it.)
+    R.cancel("a", 7);
+    expect(fight(R.look("a", T, 7))).toEqual({ pass: "pa", seat: 0 });
+    R.cancel("b", 8);
+    R.cancel("b", 9);
+    expect(fight(R.look("b", T, 9))).toEqual({ pass: "pb", seat: 1 });
+    // (An end that isn't a fight still goes with a cancel, as before.)
+    const S = new HiddenRooms();
+    S.enter("e", "E", T, 0, at(), readRoomLimits({ cap: 3 }));
+    S.challenge("e", T, 0);
+    expect(S.look("e", T, 3000).outcome).toMatchObject({ kind: "ended", message: NOT_ENOUGH });
+    S.cancel("e", 3001);
+    expect(S.look("e", T, 3002).outcome).toBeUndefined();
+  });
+
+  it("m1 b: \"Leave and cancel\" just as the fourth joined: the leave's answer carries the fight (made before or after the leave)", () => {
+    const { R, start, passes } = four();
+    // (c leaves while it's being made; d just after.)
+    R.leave("c", 5);
+    expect(R.view("c", T, 5).outcome).toBeUndefined();
+    R.started(start, "ABCDE", passes, 6);
+    R.leave("d", 7);
+    // (The hub answers a leave with the view after it; c's next answer, once made, too.)
+    expect(fight(R.view("d", T, 7))).toEqual({ pass: "pd", seat: 3 });
+    expect(fight(R.view("c", T, 8))).toEqual({ pass: "pc", seat: 2 });
+  });
+
+  it("m1 c: a device swept out while it's being made comes back in: its fight, not a place in the room; told once, a new visit forgets it", () => {
+    const { R, start, passes } = four();
+    // (Everyone but b silent for HIDDEN_ROOM.silentSec while the lobby is made: swept, their seats kept.)
+    const t = HIDDEN_ROOM.silentSec * 1000 + 10;
+    R.look("b", T, t, at());
+    expect(R.look("a", T, t + 1)).toMatchObject({ in: false });
+    expect(R.look("a", T, t + 1).outcome).toBeUndefined();
+    R.started(start, "ABCDE", passes, t + 2);
+    // (a's app, told "not in", asks to come in: it's told its fight; the room stays empty for the next four.)
+    const e = R.enter("a", "A", T, t + 3, at());
+    expect(e).toMatchObject({ in: false, people: 0 });
+    expect(fight(e)).toEqual({ pass: "pa", seat: 0 });
+    expect(R.has("a", T)).toBe(false);
+    // (Told on every answer until it goes; a new visit after that, back from the fight say, starts clean.)
+    expect(fight(R.look("a", T, t + 4))).toEqual({ pass: "pa", seat: 0 });
+    expect(R.enter("a", "A", T, t + 5, at())).toMatchObject({ in: true, people: 1 });
+    expect(R.look("a", T, t + 6).outcome).toBeUndefined();
+  });
+
+  it("m1, the hub: a leave (or a cancel, a look) that lands while the lobby is being made waits for it, and answers with the pass", async () => {
+    const { creates, act } = roomHub();
+    for (const id of ["a", "b", "c", "d"]) await act(id, "enter");
+    for (const id of ["a", "b", "c"]) await act(id, "challenge");
+    const last = act("d", "challenge");
+    await settle();
+    expect(creates).toHaveLength(1);
+    const left = act("b", "leave");
+    const cancelled = act("c", "cancel");
+    await settle();
+    // (Nothing answered yet: the lobby's Durable Object hasn't said.)
+    let answered = false;
+    void left.then(() => (answered = true));
+    await settle();
+    expect(answered).toBe(false);
+    creates[0]!.open(true);
+    const passOf = (v: RoomView) => (v.outcome?.kind === "fight" ? v.outcome : null);
+    const [d, b, c] = await Promise.all([last, left, cancelled]);
+    for (const [v, seat] of [[d, 3], [b, 1], [c, 2]] as const) {
+      expect(passOf(v)).toMatchObject({ lobby: creates[0]!.code, seat });
+      expect(creates[0]!.party.admits[passOf(v)!.pass]).toMatchObject({ seat });
+    }
+  });
+
+  it("m2: resting (his own switch, or a raid's): the bots filling the four start nothing; everyone reads the rest's line and stays in the room", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    for (const rest of ["boss:recluse", "raid"] as const) {
+      vi.setSystemTime(1_000_000);
+      const { hub, creates, act } = roomHub(rest === "raid" ? { PAUSE_RAID: "1" } : { PAUSE_BOSS_RECLUSE: "1" });
+      await act("eric", "enter");
+      await act("eric", "fill", { admin: true });
+      await act("eric", "challenge");
+      vi.setSystemTime(1_000_000 + HIDDEN_ROOM.bots * HIDDEN_ROOM.botJoinMs);
+      const v = await act("eric", "look");
+      expect(creates).toEqual([]);
+      expect(v).toMatchObject({ in: true, people: 4, count: 0, outcome: { kind: "ended", message: pausedLine(rest) } });
+      expect((await hub.townRead("test:review")).lines).toEqual([]);
+    }
   });
 });

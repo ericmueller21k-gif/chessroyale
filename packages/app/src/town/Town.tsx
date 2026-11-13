@@ -67,7 +67,7 @@ import { StreetZoom, parkSide } from "./zoom-steps.ts";
 import { PAWN_HEAD, PAWN_PX, Renderer, pawnImage, type Hit, type YouArt } from "./render.ts";
 import { dropRiders, leaveRider, ridersHeld, rideArt, shareRider, type Rider, type RiderPawn } from "./rides.ts";
 import { rideSpeed } from "../components/rides/scale.ts";
-import { MUSIC, mountOf, secondColor, shownLook, sideOfPawn } from "@chessroyale/core";
+import { HIDDEN_ROOM, MUSIC, mountOf, secondColor, shownLook, sideOfPawn } from "@chessroyale/core";
 import { painter2d, type Backend, type Painter } from "./paint.ts";
 import { painterGL } from "./paint-gl.ts";
 import { reportTownFallback } from "../problems.ts";
@@ -239,10 +239,13 @@ export function TownScreen({
   /** The summoning is playing: nothing else happens (no taps, no keys, no leaving), then his fight. */
   const summoning = useRef(false);
   const [frozen, setFrozen] = useState(false);
+  /** The town has closed (the side menu, the back gesture): a fight told after that goes straight in. */
+  const gone = useRef(false);
   const hiddenClient = () =>
     (hidden.current ??= new HiddenRoomClient(
       () => {
         const p = shopCtl.current?.youAt?.();
+        // (Idle 0: the town's own away rule, watchAway, runs in rooms too and takes an idle player out of the town, so out of his room.)
         return p ? { c: Math.round(p.c), r: Math.round(p.r), idleMs: 0 } : null;
       },
       (o) => (o.kind === "fight" ? void summon(o) : setNote(o.message)),
@@ -388,9 +391,9 @@ export function TownScreen({
     if (at.room.def.home === "recluse" && to === "top") {
       const r = await hiddenClient().enter();
       if (!r.ok) {
-        // (The stairs' card closes under the note: you stay on the landing.)
+        // (The stairs' card closes under the note: you stay on the landing. No words: your fight's summoning is taking you.)
         shopCtl.current?.close?.();
-        setNote(r.message);
+        if (r.message) setNote(r.message);
         doorBusy.current = false;
         return;
       }
@@ -511,6 +514,9 @@ export function TownScreen({
   const summon = async (o: Extract<RoomOutcome, { kind: "fight" }>) => {
     if (summoning.current) return;
     summoning.current = true;
+    // (The town closed with "Leave and cancel" just as the fourth joined: the summoning has started for everyone, so straight into the
+    // fight with them; review m1.)
+    if (gone.current) return onHiddenFight?.(o.lobby, o.pass, o.seat, null);
     hidden.current?.stop();
     setRequestWaiting(null);
     setFrozen(true);
@@ -601,6 +607,7 @@ export function TownScreen({
       setGated(true);
     });
     return () => {
+      gone.current = true;
       stopGuest();
       stopAway();
       t.stop();
@@ -688,7 +695,7 @@ export function TownScreen({
         )}
         {/* The room's name as you walk in (under the cards and chat; taps pass through it). */}
         {inside && banner && <AreaBanner key={banner.n} text={banner} onDone={() => setBanner(null)} />}
-        {/* His room's count ("Challengers 2 of 4"), for everyone in it while a request is on; the summoning's freeze over it all. */}
+        {/* His room's count ("Challengers 2 of 4"), for everyone in it from the start (0 of 4); the summoning's freeze over it all. */}
         {inTop && <HiddenCount client={hiddenClient()} />}
         {frozen && <div class="hb-freeze" aria-hidden="true" />}
         {note && <RoomNote text={note} onOk={() => setNote(null)} />}
@@ -701,8 +708,9 @@ export function TownScreen({
               setAsking(false);
               const go = cancelGo.current;
               cancelGo.current = null;
-              hidden.current?.cancel();
-              go?.();
+              // (The cancel's answer first, for a moment at most: just as the fourth joined, it hands you into the fight with the others,
+              // the summoning here, instead of out; review m1.)
+              void Promise.race([hidden.current?.cancel(), later(HIDDEN_ROOM.pollMs)]).then(() => !summoning.current && go?.());
             }}
           />
         )}

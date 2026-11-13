@@ -315,7 +315,7 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
   // of his fight; "Fill with 3 bots" for admins only). No session lookup past the cached ones.
   if (path === "/api/town/hidden" && request.method === "POST") {
     if (!env.LIVE) return json({ message: "The town isn't set up here." }, 503);
-    return hiddenRoomResponse(request, sql, liveHub(env as Required<Pick<AccountEnv, "LIVE">>), { token, tooYoung: ageAnswer(request) === "under", testSwitches: (env as AdminEnv).TEST_SWITCHES === "1", admin: (email) => isAdmin(env as AdminEnv, { email }), paused: isPaused(env, "raid", now) ? "raid" : isPaused(env, `boss:${HIDDEN_ROOM.boss}`, now) ? `boss:${HIDDEN_ROOM.boss}` : null }, now);
+    return hiddenRoomResponse(request, sql, liveHub(env as Required<Pick<AccountEnv, "LIVE">>), { token, device: readCookie(request, DEVICE_COOKIE), tooYoung: ageAnswer(request) === "under", testSwitches: (env as AdminEnv).TEST_SWITCHES === "1", admin: (email) => isAdmin(env as AdminEnv, { email }), paused: isPaused(env, "raid", now) ? "raid" : isPaused(env, `boss:${HIDDEN_ROOM.boss}`, now) ? `boss:${HIDDEN_ROOM.boss}` : null }, now);
   }
 
   // GET /api/chat/icon/KEY: a drawn icon on a line in the global chat (anyone may read the chat).
@@ -590,8 +590,13 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
       env.LIVE ? townChallengeNote(sql, liveHub(env as Required<Pick<AccountEnv, "LIVE">>), asker, boss, n, now).catch(() => null) : null;
     if (path === "/api/boss/solo/start") {
       const battle = await startSoloBattle(sql, current.id, now, signInRequired(env));
-      // (One game request at a time, Eric, Nov 12: a boss battle begun ends your place in the Hidden Boss's room's request.)
-      if (env.LIVE) await liveHub(env as Required<Pick<AccountEnv, "LIVE">>).hiddenDrop(current.id).catch(() => undefined);
+      // (One game request at a time, Eric, Nov 12: a boss battle begun ends your place in the Hidden Boss's room's request. Off the
+      // battle's critical path: after the answer, where the platform lets it run on; review m4.)
+      if (env.LIVE) {
+        const drop = liveHub(env as Required<Pick<AccountEnv, "LIVE">>).hiddenDrop(current.id).catch(() => undefined);
+        if (waitUntil) waitUntil(drop);
+        else await drop;
+      }
       // (Not a boss in the game for admins first, Timber: everyone reads the town's chat, and only admins meet him. Nov 3.)
       if (typeof b?.town === "string" && bossDef(b.town) && !adminFirst(bossDef(b.town))) await note(b.town, { kind: "start", boss: b.town, battle });
       return json({ battle });

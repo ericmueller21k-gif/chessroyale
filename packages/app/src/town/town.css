@@ -1078,6 +1078,9 @@ button.town-pic.player {
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
+.hb-count.off {
+  opacity: 0.5;
+}
 .hb-count-label {
   font-weight: 500;
   opacity: 0.8;

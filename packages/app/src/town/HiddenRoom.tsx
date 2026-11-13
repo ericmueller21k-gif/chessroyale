@@ -44,13 +44,15 @@ export function HiddenCard({ client }: { client: HiddenRoomClient }) {
   );
 }
 
-/** The count over his room ("2 of 4"), for everyone in it while a request is on. */
+/**
+ * The count over his room ("2 of 4"), for everyone in it from the start ("0 of 4"), so it never appears from nothing (review n2).
+ * Greyed for someone not in the count (a guest, a device too young, a banned account: the server tells them nothing).
+ */
 export function HiddenCount({ client }: { client: HiddenRoomClient }) {
   useClient(client);
   const n = client.info?.count ?? 0;
-  if (!n) return null;
   return (
-    <div class="hb-count" role="status" aria-label={`Challengers: ${countText(n)}`}>
+    <div class={`hb-count${client.refused ? " off" : ""}`} role="status" aria-label={`Challengers: ${countText(n)}`}>
       <span class="hb-count-label">Challengers</span> {countText(n)}
     </div>
   );
