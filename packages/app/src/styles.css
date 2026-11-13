@@ -14564,7 +14564,33 @@ img.qicon {
   cursor: pointer;
 }
 
-/* -- Fair play: the ban notice and its appeal, a banned profile's pill -- */
+/* -- Fair play: the ban screen (the whole page for a banned account: FairPlay.tsx), a banned profile's pill; .fp-appeal is the
+   feedback sheet's note box now -- */
+.ban-screen {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+  background: var(--bg);
+  color: var(--text);
+}
+.ban-line {
+  margin: 0;
+  max-width: 28em;
+  font-size: 18px;
+  line-height: 1.5;
+  text-align: center;
+  overflow-wrap: anywhere;
+  user-select: text;
+  -webkit-user-select: text;
+}
+.ban-line a {
+  color: var(--accent);
+  font-weight: 700;
+}
 .fp-appeal {
   font: inherit;
   font-size: 16px;

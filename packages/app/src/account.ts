@@ -744,15 +744,6 @@ export async function reportPlayer(target: string, reason: string, match?: strin
   return r.message ?? "Thanks, we'll look into it.";
 }
 
-/** Your fair-play standing: banned or not, and your latest appeal (the ban notice). */
-export interface FairStatus {
-  banned: boolean;
-  appeal: { status: "open" | "upheld" | "overturned"; at: number; reply: string | null } | null;
-}
-export const fairStatus = () => api<FairStatus>("/api/fairplay/status");
-/** A banned account's appeal, for a person to read. */
-export const sendAppeal = (text: string) => api<FairStatus>("/api/appeal", { method: "POST", body: JSON.stringify({ text }) });
-
 export async function fetchProfile(id: string): Promise<PublicProfile> {
   return api<PublicProfile>(`/api/profile/${encodeURIComponent(id)}`);
 }

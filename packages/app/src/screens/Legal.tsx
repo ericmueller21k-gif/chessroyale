@@ -1,5 +1,5 @@
 import type { ComponentChildren } from "preact";
-import { AGE_GATE, CHAT_MOD, ENGINE_SERVER, FAIRPLAY, FRIENDS, GLOBAL_CHAT, LOBBY_LIFE, LEAVES, OPS, RANKED_1V1, TOWN_CHAT } from "@chessroyale/core";
+import { AGE_GATE, CHAT_MOD, ENGINE_SERVER, FAIRPLAY, FRIENDS, GLOBAL_CHAT, LOBBY_LIFE, LEAVES, OPS, RANKED_1V1, SUPPORT_EMAIL, TOWN_CHAT } from "@chessroyale/core";
 
 /**
  * The privacy policy (/privacy), terms of service (/terms) and copyright page (/copyright): drafts written from what
@@ -8,8 +8,8 @@ import { AGE_GATE, CHAT_MOD, ENGINE_SERVER, FAIRPLAY, FRIENDS, GLOBAL_CHAT, LOBB
  * accounts.ts). A PR that changes what the game stores changes these words too.
  */
 
-/** The contact address: a placeholder until Eric sets up its forwarding (ROADMAP.md, "Needs Eric"). */
-export const CONTACT = "support@hunchess.com";
+/** The contact address (core's SUPPORT_EMAIL, the ban screen's too): a placeholder until Eric sets up its forwarding (ROADMAP.md, "Needs Eric"). */
+export const CONTACT = SUPPORT_EMAIL;
 export const UPDATED = "October 16, 2026";
 
 const hours = (ms: number) => Math.round(ms / 3_600_000);
@@ -355,8 +355,8 @@ function Privacy() {
 
       <h2>Cookies and storage on your device</h2>
       <p>
-        Only what the game needs to work: signing in, the answer to the age question, and fair play's device marker against ban
-        dodging. Nothing for advertising or analytics and nothing from other companies, so there's nothing to accept.
+        Only what the game needs to work: signing in, the answer to the age question, and fair play's device marker and ban mark
+        against ban dodging. Nothing for advertising or analytics and nothing from other companies, so there's nothing to accept.
       </p>
       <ul>
         <li>
@@ -364,6 +364,11 @@ function Privacy() {
         </li>
         <li>
           <strong>hc_device</strong> is the fair-play device marker: a random value and nothing else. 400 days.
+        </li>
+        <li>
+          <strong>hc_banned</strong> is set only if an account banned for fair play (or for getting around a ban) was used or signed
+          in to on this device: that account's random id. While the ban stands, the whole device is banned: it shows only the ban to
+          everyone who uses it, and no account can sign in on it. 400 days, or until the ban is lifted.
         </li>
         <li>
           <strong>hc_oauth</strong> and <strong>hc_next</strong> exist only during "Continue with Google". 10 minutes.
@@ -376,7 +381,8 @@ function Privacy() {
         </li>
         <li>
           <strong>Local storage</strong> keeps your settings and choices on this device: theme, sound, eval bar, chat on or off,
-          players you muted, your boss picks, the match you're in, so you can rejoin it, and an "under {AGE_GATE.minAge}" answer.
+          players you muted, your boss picks, the match you're in, so you can rejoin it, an "under {AGE_GATE.minAge}" answer, and
+          that a banned account was used here.
         </li>
         <li>
           <strong>The app's files</strong> are kept on your device (a service worker) so it opens quickly. No personal data.
@@ -529,8 +535,9 @@ function Terms() {
         <li>No second accounts to get around a ban, and no arranging results with other players.</li>
         <li>Don't exploit bugs. Report them.</li>
         <li>
-          We check online moves for engine help. While an account is under review, its online results are held off the rankings. A ban
-          stops online play; solo games against bots stay open. Borderline cases go to a person, and you can appeal a ban.
+          We check online moves for engine help. While an account is under review, its online results are held off the rankings. A
+          banned account can't sign in or play at all. Borderline cases go to a person, and you can appeal a ban by email to
+          support@hunchess.com.
         </li>
       </ul>
 

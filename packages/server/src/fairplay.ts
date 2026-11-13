@@ -6,8 +6,10 @@
  *   - watch: recorded only (their matches' evidence is kept, see FAIRPLAY.evidenceDays);
  *   - review: a person or the automated reviewer decides; meanwhile their online results are held off ranking
  *     (results.held: the rating, its chart, "Top N%", later leaderboards and ranked) and eligibleForRanked says no;
- *   - banned: no online play (solo stays open), with an appeal a person decides; their sign-in identities are kept
- *     (hashed) so a new account made with them is banned too, and a device it played from puts new accounts in review;
+ *   - banned: no sign-in at all (Eric, Nov 13; docs/decisions/2026-11-13-ban-blocks-sign-in.md): every request with their session, or
+ *     from a browser marked banned, gets the ban answer (ban-gate.ts), and signing in to them is refused (signInBan); appeals come by
+ *     email and a person decides; their sign-in identities are kept (hashed) so a new account made with them is banned too, and a
+ *     device it played from puts new accounts in review;
  *   - pool: the engine pool (FAIRPLAY.pool; docs/decisions/2026-11-10-engine-pool.md): every queue seats them only with other pooled
  *     accounts or bots, and nothing on their screen differs (their results count on their own profile, not held); kept off public
  *     leaderboards (NOT_POOLED), their evidence kept while pooled. Detection puts them there; only a person takes them out (Release);
@@ -19,8 +21,9 @@
  * FAIRPLAY.evidenceDaysUnflagged days, so a report made after a match still finds its games; for FAIRPLAY.evidenceDays
  * when the player was flagged or reported, and never deleted while their case is open (see purgeEvidence).
  */
-import { FAIRPLAY, matchSignals, newAccountPool, playerLevel, referenceStrength, type FairLevel, type FairMove, type FairSummary, type LevelInput, type LevelVerdict } from "@chessroyale/core";
-import { getUser, identityHashes, refreshRating, type Sql, type User } from "./accounts.ts";
+import { BANNED_LINE, FAIRPLAY, matchSignals, newAccountPool, playerLevel, referenceStrength, type FairLevel, type FairMove, type FairSummary, type LevelInput, type LevelVerdict } from "@chessroyale/core";
+import { getUser, identityHashes, markAgeOk, refreshRating, signInWithIdentity, type Sql, type User } from "./accounts.ts";
+import { forgetBanChecks } from "./ban-cache.ts";
 
 /** A case's status; "closed": a watch with nothing new for FAIRPLAY.evidenceDays (not a decision on the merits). */
 export type CaseStatus = "watch" | "review" | "pool" | "banned" | "cleared" | "closed";
@@ -99,6 +102,8 @@ export async function setCase(sql: Sql, userId: string, status: CaseStatus, by: 
     );
   }
   await logCase(sql, userId, status, by, reason, now);
+  // (Banned or lifted here: this instance's ban gate reads the case again on the account's next request, ban-cache.ts.)
+  if (status === "banned" || before?.status === "banned") forgetBanChecks(userId);
   // Flagged or reported: their recent matches' evidence is kept the full time, and waits for the deep re-check.
   if (status === "watch" || status === "review" || status === "pool" || status === "banned") {
     await sql.run(
@@ -133,10 +138,97 @@ export async function setCase(sql: Sql, userId: string, status: CaseStatus, by: 
 
 // ---------------- Bans: identities, devices, the check ----------------
 
-export const BANNED_MESSAGE = "Your account can't play online: it was banned for fair play. Solo games against bots are still open.";
+/** Every answer to a banned account (Eric, Nov 13): core's BANNED_LINE. */
+export const BANNED_MESSAGE = BANNED_LINE;
 
 /**
- * Whether an account may play online, checked when it asks to (PLAY, a new lobby, joining one). Banned: no. Also
+ * Which account owns this identity in fair play's kept identities (banned accounts', and those of accounts deleted while banned, in
+ * review or pooled: account-data.ts), as `userId` should weigh it: an account cleared by a person or the reviewer leaves out the rows
+ * that clearing weighed (written by then) and later evasion bans, which only repeat bans already weighed (so a cousin cleared of an
+ * evasion ban stays cleared through a report, a watch or its closing, while a later real ban of an account with its identity catches
+ * it: docs/decisions/2026-10-16-integrity-followups.md). Each owner has its own row; a banned one counts first. `userId` "" (an identity
+ * with no account yet): every row counts. banCheck's and signInBan's one query.
+ */
+async function identityOwner(sql: Sql, kind: string, hash: string, userId: string): Promise<{ user_id: string; status: string | null } | null> {
+  // The account's last clearing by a person or the reviewer (a closing on its own, or an evasion review, isn't one).
+  const cleared = `(SELECT MAX(at) FROM fairplay_log WHERE user_id = ?3 AND action = 'cleared' AND (by LIKE 'admin:%' OR by = 'reviewer'))`;
+  return sql.first<{ user_id: string; status: string | null }>(
+    `SELECT i.user_id, c.status FROM fairplay_identities i LEFT JOIN fairplay_cases c ON c.user_id = i.user_id
+     WHERE i.kind = ?1 AND i.hash = ?2 AND i.user_id != ?3
+       AND (${cleared} IS NULL OR (i.at > ${cleared} AND (c.status IS NOT 'banned' OR c.decided_by IS NOT 'evasion')))
+     ORDER BY COALESCE(c.status, 'banned') = 'banned' DESC LIMIT 1`,
+    kind,
+    hash,
+    userId,
+  );
+}
+/** An owner banned, or gone with no case left (counted as banned, as ever). */
+const bannedOwner = (o: { status: string | null } | null) => !!o && (o.status === "banned" || o.status === null);
+const identityWord = (kind: string) => (kind === "email" ? "email address" : "Google account");
+
+/**
+ * signInBan's answer: refuse now (`banned`: the account signing in, banned, or banned by evasion just now), or `evades`: an identity new
+ * to us that's a banned account's, whose own account evasionAccount makes, banned, once the sign-in can finish (the age question).
+ */
+export type SignInBan = { banned: string } | { evades: string; reason: string };
+
+/**
+ * A ban means you can't sign in (Eric, Nov 13: "If you try to sign in, it would say your account has been banned"): checked when a
+ * sign-in's identity is proven (the emailed code right, or Google's answer), before any account is made, joined or switched to. Null to
+ * go ahead; else:
+ * - the identity's account is banned: `banned`;
+ * - its account's own identities, or Google's verified `email` it doesn't have yet (it would take it), are a banned account's
+ *   (banCheck's evasion rule, the same query): that account is banned by evasion now, as its next PLAY would have been: `banned`;
+ * - an identity new to us that's a banned account's: `evades` (evasionAccount).
+ * Every refusal names the account the person tried to sign in to, so a person can clear it (an email to support) and the browser's
+ * mark is that account's own id (ban-gate.ts). A pooled account signs in as any (the engine pool is never a ban).
+ */
+export async function signInBan(sql: Sql, kind: "google" | "email", value: string, email: string | null, now: number): Promise<SignInBan | null> {
+  const col = kind === "google" ? "google_sub" : "email";
+  const found = await sql.first<User>(`SELECT id, name, icon, email, google_sub, created_at FROM users WHERE ${col} = ?`, value);
+  if (found && (await caseOf(sql, found.id))?.status === "banned") return { banned: found.id };
+  if (found) {
+    const brought = kind === "google" && !found.email && email ? await identityHashes({ email, google_sub: null }) : [];
+    for (const [k, hash] of [...(await identityHashes(found)), ...brought]) {
+      const owner = await identityOwner(sql, k, hash, found.id);
+      if (bannedOwner(owner)) {
+        await setCase(sql, found.id, "banned", "evasion", `signed in with the ${identityWord(k)} of banned account ${owner!.user_id}`, now);
+        return { banned: found.id };
+      }
+    }
+    return null;
+  }
+  for (const [k, hash] of await identityHashes(kind === "google" ? { email, google_sub: value } : { email: value, google_sub: null })) {
+    const owner = await identityOwner(sql, k, hash, "");
+    if (bannedOwner(owner)) return { evades: owner!.user_id, reason: `signed in with the ${identityWord(k)} of banned account ${owner!.user_id}` };
+  }
+  return null;
+}
+
+/**
+ * An identity new to us that's a banned account's (signInBan's `evades`), once the sign-in can finish: its own new account (never
+ * joined to the one signed in on this browser, a guest's or another person's), banned by evasion at once, so a person can clear it, as
+ * PLAY's evasion check let them (docs/decisions/2026-10-16-integrity-followups.md: a cousin sharing a mailbox). `answered`: this device
+ * just said its holder is old enough (kept, as a sign-in keeps it). Answers the account's id.
+ */
+export async function evasionAccount(
+  sql: Sql,
+  kind: "google" | "email",
+  value: string,
+  extra: { email?: string | null },
+  evades: { reason: string },
+  answered: boolean,
+  now: number,
+): Promise<string> {
+  const made = await signInWithIdentity(sql, null, kind, value, extra, now);
+  if (answered) await markAgeOk(sql, made.id, now);
+  await setCase(sql, made.id, "banned", "evasion", evades.reason, now);
+  return made.id;
+}
+
+/**
+ * Whether an account may play online, checked when it asks to (PLAY, a new lobby, joining one). Banned: no (and a banned account
+ * meets the ban gate first: ban-gate.ts). Also
  * catches evasion: an account signed in with a banned account's identity (the same normalized email or Google
  * account) is banned too; one seen on a device a banned account played from goes to review (families share devices).
  * `device`: the device marker cookie, recorded against the account.
@@ -156,25 +248,12 @@ export async function banCheck(sql: Sql, user: User | null, device: string | nul
       now,
     );
   }
-  // The account's last clearing by a person or the reviewer (a closing on its own, or an evasion review, isn't one).
-  const cleared = `(SELECT MAX(at) FROM fairplay_log WHERE user_id = ?3 AND action = 'cleared' AND (by LIKE 'admin:%' OR by = 'reviewer'))`;
   for (const [kind, hash] of await identityHashes(user)) {
-    // (A banned account's identities, or those of an account deleted while banned or in review: account-data.ts. Each
-    // owner has its own row; a banned one counts first.) An account cleared by a person or the reviewer leaves out the
-    // rows that clearing weighed (written by then) and later evasion bans, which only repeat bans already weighed. So
-    // a cousin cleared of an evasion ban stays cleared through a report, a watch or its closing, while a later real
-    // ban of an account with its identity catches it (docs/decisions/2026-10-16-integrity-followups.md).
-    const owner = await sql.first<{ user_id: string; status: string | null }>(
-      `SELECT i.user_id, c.status FROM fairplay_identities i LEFT JOIN fairplay_cases c ON c.user_id = i.user_id
-       WHERE i.kind = ?1 AND i.hash = ?2 AND i.user_id != ?3
-         AND (${cleared} IS NULL OR (i.at > ${cleared} AND (c.status IS NOT 'banned' OR c.decided_by IS NOT 'evasion')))
-       ORDER BY COALESCE(c.status, 'banned') = 'banned' DESC LIMIT 1`,
-      kind,
-      hash,
-      user.id,
-    );
-    const what = kind === "email" ? "email address" : "Google account";
-    if (owner?.status === "banned" || (owner && owner.status === null)) {
+    // (A banned account's identities, or those of an account deleted while banned or in review, as this account weighs them:
+    // identityOwner.)
+    const owner = await identityOwner(sql, kind, hash, user.id);
+    const what = identityWord(kind);
+    if (owner && bannedOwner(owner)) {
       await setCase(sql, user.id, "banned", "evasion", `signed in with the ${what} of banned account ${owner.user_id}`, now);
       return { banned: true };
     }
@@ -240,7 +319,8 @@ export type Decision = "ban" | "clear" | "watch" | "review" | "release";
 const DECIDES: Record<Decision, CaseStatus> = { ban: "banned", clear: "cleared", watch: "watch", review: "review", release: "cleared" };
 
 /** Sends a player an email about their case (a ban, a clearing after a review, an appeal turned down); set up by the Worker. */
-export type CaseMailer = (user: User, kind: "banned" | "cleared" | "upheld", notice: string | null) => Promise<void>;
+/** Fair play's emails (fairplay-mail.ts): "lifted" is a ban cleared (its sessions were ended: sign in again), "cleared" a review cleared. */
+export type CaseMailer = (user: User, kind: "banned" | "cleared" | "lifted" | "upheld", notice: string | null) => Promise<void>;
 
 /**
  * A decision on a case by `by` ("admin:<email>" or "reviewer"), with a written reason for the log, and optionally a
@@ -290,7 +370,7 @@ export async function decide(
   await setCase(sql, userId, status, by, why, now);
   const notice = typeof opts.notice === "string" && opts.notice.trim() ? opts.notice.trim().slice(0, 1000) : null;
   if (user && opts.mail && (status === "banned" || (status === "cleared" && (before?.status === "review" || before?.status === "banned")))) {
-    await opts.mail(user, status === "banned" ? "banned" : "cleared", notice).catch((e: unknown) => console.log(`fair play email to ${userId}: ${String(e)}`));
+    await opts.mail(user, status === "banned" ? "banned" : before?.status === "banned" ? "lifted" : "cleared", notice).catch((e: unknown) => console.log(`fair play email to ${userId}: ${String(e)}`));
   }
   return { ok: true, status };
 }
@@ -314,7 +394,7 @@ export async function decideAppeal(
   await logCase(sql, a.user_id, `appeal ${outcome}`, by, text, now);
   const u = await getUser(sql, a.user_id);
   if (outcome === "overturned") await setCase(sql, a.user_id, "cleared", by, `appeal overturned: ${text}`, now);
-  if (u && mail) await mail(u, outcome === "overturned" ? "cleared" : "upheld", text).catch(() => undefined);
+  if (u && mail) await mail(u, outcome === "overturned" ? "lifted" : "upheld", text).catch(() => undefined);
   return { ok: true };
 }
 

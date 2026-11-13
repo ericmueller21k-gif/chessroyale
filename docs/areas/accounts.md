@@ -97,7 +97,12 @@ Lane: `hub`. What a profile shows is on [hub.md](hub.md).
   address: 409) and signs a script in as it (not an admin's own browser), GET lists their fair play, DELETE removes them all as any deleted
   account (results re-keyed, ledger kept), fair play's file too. They play as anyone (nothing granted), are left out of the "Top N%" and 1 v
   1's top places, and their reports never count toward a review. `scripts/cheater-demo.ts` plays with them ([fairplay.md](fairplay.md)).
-- **Bans** (from [fairplay.md](fairplay.md)) stop online play; solo stays open.
+- **Bans** (from [fairplay.md](fairplay.md), "A ban means you can't sign in"; Eric, Nov 13): a banned account can't sign in at all.
+  Each sign-in's finish (the emailed code checked, Google's callback, a test account's script) asks `signInBan` before anything is
+  made or switched: refused with the ban line, no session. The Worker's ban gate (`ban-gate.ts`) gives a banned session the ban
+  answer on every `/api/*` route, ends that session and marks the browser; the app then shows only the ban screen (the line). The
+  whole device is banned (Eric, Nov 13): a marked browser gets the ban answer on every route, sign-in's included, whatever session
+  it carries (another account's is ended). The sign-in routes run without a session. A lifted ban signs in as before.
 - **The default pawn color** (Nov 7; `users.pawn_color`, NULL: white): PATCH `/api/me` `{pawn}` (only "white" or "black"); shown on the profile and
   in the town's presence (`town-here.ts`). A guest keeps it on the device (`brc.pawnColor`, `prefs.ts`). See `core/src/pawn-color.ts`.
 - **Names** pass the server's name filter (slurs and hate: [chat.md](chat.md), "Moderation"): a profile can't take
@@ -149,7 +154,8 @@ Lane: `hub`. What a profile shows is on [hub.md](hub.md).
 - **Round trips (Nov 10, [load regression](../decisions/2026-11-10-load-regression.md)):** every D1 read from the Worker is a round trip
   (about 40 ms), so a route reads what it can at once (`Promise.all`): `/api/me` in 4 (5 with the D1 touch; it was 28 one after another),
   `/api/quests` and `/api/friends` in 3. `packages/server/test/me-round-trips.test.ts` counts them on a fake D1; keep new reads beside
-  the others, not after them.
+  the others, not after them. In front of every route, the ban gate (Nov 13, [fairplay.md](fairplay.md)) adds one read for a request
+  with a session, at most once per session per Worker instance every `FAIRPLAY.banCheckMs` (60 s); none without a session.
 
 ## Data stored by friends (for the privacy page and account deletion)
 
@@ -201,7 +207,8 @@ offered, how long each answer lasts).
   the weekly, the pause, merge, download and delete, the API); `e2e/quests.spec.ts`.
 - XP: `packages/core/test/xp.test.ts` (the rules, the fill), `packages/server/test/xp.test.ts` (granted once, races, the caps, each "No
   XP" reason, the result row, the solo clock, merge, download and delete, each match room's facts); `e2e/xp.spec.ts`.
-- Unit: `packages/server/test/accounts.test.ts` (an in-memory SQLite, `memory-db.ts`); `age-gate.test.ts` (Sign up behind the
+- Unit: `packages/server/test/accounts.test.ts` (an in-memory SQLite, `memory-db.ts`); `ban-sign-in.test.ts` (each sign-in refused
+  for a banned account and ban evasion, no session; [fairplay.md](fairplay.md)); `age-gate.test.ts` (Sign up behind the
   answer; Sign in with no question into an account that answered; asked first, with nothing written, for an unknown email or
   Google account and an account from before the question, and the finish; a too-young device refused with every kind of
   account; the kept code's limits; between steps, two tabs, a replayed callback; the guest's defaults; nothing but the answer
@@ -223,6 +230,8 @@ offered, how long each answer lasts).
 
 - Secrets never in the repo or in output; Eric does sign-ups and purchases.
 - A profile others can see never shows an email, a sign-in method or anything not on the approved list.
+- Every way to sign in is refused for a banned account (`signInBan`, once the identity is proven, before the age question; Eric,
+  Nov 13), and every request passes the Worker's ban gate first.
 - Every way to sign in goes through `ageRefusal` (a device that's too young is refused at every step, Sign in included) and
   finishes only through `signInWithIdentity` after an "old enough" answer or `signInIfAnswered` without one; a guest under the
   gate gets nothing that takes typed text or lets others reach them (the decision file's guest audit). A new way to sign in, or

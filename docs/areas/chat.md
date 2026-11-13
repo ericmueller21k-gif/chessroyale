@@ -148,7 +148,7 @@ The preset lines are all friendly, so what can offend is a player's name and dra
   name and icon ("Player", a pawn; only their lines leave the global chat too, `LiveHub.dropChatLines`). Each needs a
   reason for the log; a warning or a ban can carry a note to the player. A link opens the player's profile in the
   game, to see the name and icon. A chat decision doesn't close the report's watch case (fair play's Clear does; its
-  own ban button is "Ban from online play"). Known and rare: a ban lifted while its panel is on screen shows there
+  own ban button is "Ban (can't sign in)" since Nov 13, "Ban from online play" before). Known and rare: a ban lifted while its panel is on screen shows there
   until the panel is shown again or the page reloads.
 - **A chat ban only stops sending** (lobby: refused with reason "mod" and the `ChatBlock`; global chat: 403 with it).
   The player still reads chat and plays. A lobby reads a chatting player's ban as they join and again at most every

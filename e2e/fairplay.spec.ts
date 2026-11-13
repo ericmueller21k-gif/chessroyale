@@ -1,96 +1,152 @@
+import { createHash } from "node:crypto";
 import { devices, expect, type Page } from "@playwright/test";
-import { asServerAdmin, createLobbyFromHome, joinFromInvite, localSql, named, test, pickMode, startBotLevel } from "./helpers.ts";
+import { BANNED_LINE, SUPPORT_EMAIL } from "@chessroyale/core";
+import { asServerAdmin, asSignedIn, localSql, named, test, pickMode } from "./helpers.ts";
 
 /** The automated reviewer's token in the local Worker (playwright.config.ts). */
 const REVIEW = { authorization: "Bearer e2e-review-token-0123456789" };
 
 const myId = (page: Page) => page.evaluate(async () => ((await (await fetch("/api/me")).json()) as { user: { id: string } }).user.id);
 
-test("a banned account: PLAY, a new lobby and an invite show the ban notice with an appeal; solo still plays; the profile says Banned", async ({ page, browser }) => {
+/** The ban screen and nothing else (Eric, Nov 13): only the line, its address a mailto link; no button, menu or board; no sideways scroll. */
+async function onlyTheBan(page: Page) {
+  await expect(page.locator(".ban-screen")).toBeVisible();
+  await expect(page.locator(".ban-line")).toHaveText(BANNED_LINE);
+  await expect(page.getByRole("link", { name: SUPPORT_EMAIL })).toHaveAttribute("href", `mailto:${SUPPORT_EMAIL}`);
+  expect((await page.evaluate(() => document.body.innerText)).trim()).toBe(BANNED_LINE);
+  await expect(page.getByRole("button")).toHaveCount(0);
+  await expect(page.locator("canvas, .fd-home, .landing, .board-wrap")).toHaveCount(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBe(0);
+}
+
+/**
+ * Every answer the server gives this browser on these routes: the ban answer (403, the line, the app's header). The sign-in's own
+ * routes too: the whole device is banned (Eric, Nov 13; ban-gate.ts).
+ */
+async function everyRouteBanned(page: Page) {
+  const routes: [string, "GET" | "POST"][] = [
+    ["/api/me", "GET"],
+    ["/api/status", "GET"],
+    ["/api/auth/config", "GET"],
+    ["/api/live", "GET"],
+    ["/api/shop", "GET"],
+    ["/api/lobby/ABCDE", "GET"],
+    ["/api/play", "POST"],
+    ["/api/lobby", "POST"],
+    ["/api/town/here", "POST"],
+    ["/api/auth/logout", "POST"],
+    ["/api/auth/email/start", "POST"],
+  ];
+  for (const [path, method] of routes) {
+    const res = method === "GET" ? await page.request.get(path) : await page.request.post(path, { data: {} });
+    expect([path, res.status(), res.headers()["x-hc-banned"], await res.json()]).toEqual([path, 403, "1", { banned: true, message: BANNED_LINE }]);
+  }
+}
+
+/** The real config with email sign-in shown (as where it's set up), and its emailed code planted in the local database. */
+async function emailSignIn(page: Page, email: string, code: string) {
+  await page.route("**/api/auth/config", async (route) => {
+    const real = await route.fetch();
+    const body = (await real.json()) as Record<string, unknown>;
+    await route.fulfill({ status: real.status(), headers: real.headers(), json: real.ok() ? { ...body, google: true, email: true, onlineNeedsSignIn: true } : body });
+  });
+  await page.route("**/api/auth/email/start", (route) => route.fulfill({ json: { ok: true } }));
+  const at = Date.now();
+  const hash = createHash("sha256").update(`${email}:${code}`).digest("hex");
+  await localSql(page, `INSERT OR REPLACE INTO email_codes (email, code_hash, expires_at, attempts, sent_at, hour_start, sends_this_hour) VALUES ('${email}', '${hash}', ${at + 600_000}, 0, ${at}, ${at}, 1)`);
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: "Sign in to play online" })).toBeVisible();
+  await page.getByLabel("Email").fill(email);
+  await page.getByRole("button", { name: "Email me a code" }).click();
+  await page.getByLabel("6-digit code").fill(code);
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+}
+
+test("a ban means you can't sign in (Eric, Nov 13): a tab open drops to the ban line; every URL and API route answers only it; signing in again is refused with no session; a lifted ban signs in as before", async ({ page, browser }) => {
   test.setTimeout(3 * 60_000);
-  test.skip(test.info().project.name !== "phone", "one run covers it (the notice is the same sheet on a computer)");
   await named(page, "Banny");
-  await page.goto("/?debug&pool=fairplay");
+  await page.goto("/?debug");
   await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
   const id = await myId(page);
+  // Signed in (an email on the account, its holder old enough), home open in this tab.
+  await asSignedIn(page, "banny");
+  await localSql(page, "UPDATE users SET age_ok_at = 1 WHERE id = ?", id);
+  const [{ email }] = await localSql<{ email: string }>(page, "SELECT email FROM users WHERE id = ?", id);
+  await page.reload();
+  await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
 
-  // The reviewer's API: a decision needs a written reason.
+  // The reviewer's API: a decision needs a written reason; its token never bans (the outside review's finding 6; its review's M1).
   expect((await page.request.post(`/api/admin/fairplay/cases/${id}/decision`, { headers: REVIEW, data: { decision: "ban" } })).status()).toBe(400);
-  // The reviewer's token never bans (the outside review's finding 6; its review's M1): a person does.
   const refused = await page.request.post(`/api/admin/fairplay/cases/${id}/decision`, { headers: REVIEW, data: { decision: "ban", reason: "e2e: a banned account" } });
   expect(refused.status()).toBe(409);
   expect(((await refused.json()) as { message: string }).message).toMatch(/^a ban is for a person/);
+  // Without the token, the API and the review page aren't there.
+  expect((await page.request.get(`/api/admin/fairplay/cases/${id}`)).status()).toBe(404);
+  const reviewPage = await page.request.get("/admin/fairplay");
+  expect([reviewPage.status(), await reviewPage.text()]).toEqual([404, "Not found"]);
+
+  // A person bans the account (from another browser): the tab still open drops to the ban line by itself, on its next request.
   const adminCtx = await browser.newContext();
   const adminPage = await adminCtx.newPage();
   await adminPage.goto("/?debug");
   const adminEmail = `ops-admin-fairplay-${test.info().project.name}@e2e.test`;
   await asServerAdmin(adminPage);
-  const ban = await adminPage.request.post(`/api/admin/fairplay/cases/${id}/decision`, { data: { decision: "ban", reason: "e2e: a banned account" } });
-  expect(await ban.json()).toEqual({ ok: true, status: "banned", by: `admin:${adminEmail}` });
-  await adminCtx.close();
-  // Without the token, the API and the review page aren't there.
-  expect((await page.request.get(`/api/admin/fairplay/cases/${id}`)).status()).toBe(404);
-  const admin = await page.request.get("/admin/fairplay");
-  expect(admin.status()).toBe(404);
-  expect(await admin.text()).toBe("Not found");
+  const decide = (decision: "ban" | "clear") => adminPage.request.post(`/api/admin/fairplay/cases/${id}/decision`, { data: { decision, reason: `e2e: ${decision}` } });
+  expect(await (await decide("ban")).json()).toEqual({ ok: true, status: "banned", by: `admin:${adminEmail}` });
+  await expect(page.locator(".ban-screen")).toBeVisible({ timeout: 15_000 });
+  await onlyTheBan(page);
+  // Signed out: the account has no session left, and this browser is marked with it.
+  expect(await localSql(page, "SELECT COUNT(*) AS n FROM sessions WHERE user_id = ?", id)).toEqual([{ n: 0 }]);
+  expect((await page.context().cookies()).find((c) => c.name === "hc_banned")?.value).toBe(id);
 
-  // PLAY (Default): the ban notice, not a queue.
-  await pickMode(page);
-  await page.getByRole("button", { name: "PLAY", exact: true }).click();
-  const notice = page.getByRole("dialog", { name: "Your account can't play online" });
-  await expect(notice).toBeVisible();
-  await expect(notice).toContainText("Solo games against bots are still open.");
-  await expect(page.locator(".fd-seats")).toHaveCount(0);
-  // The appeal: a sentence at least, then sent.
-  const send = notice.getByRole("button", { name: "Send appeal" });
-  await expect(send).toBeDisabled();
-  await notice.getByRole("textbox").fill("I play at a chess club and I didn't use an engine.");
-  await send.click();
-  await expect(notice).toContainText("Your appeal is with us. A person will read it");
-  await expect(notice.getByRole("textbox")).toHaveCount(0);
-  // Fits a phone: nothing wider than the screen, the button big enough to tap.
-  expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBe(0);
-  await notice.getByRole("button", { name: "Close" }).click();
-  await expect(notice).toHaveCount(0);
-
-  // Again: the notice remembers the appeal.
-  await pickMode(page);
-  await page.getByRole("button", { name: "PLAY", exact: true }).click();
-  await expect(notice).toContainText("Your appeal is with us");
-  await notice.getByRole("button", { name: "Close" }).click();
-
-  // A new lobby: the same.
-  await createLobbyFromHome(page);
-  await expect(notice).toBeVisible();
-  await notice.getByRole("button", { name: "Close" }).click();
-  await page.getByRole("dialog", { name: "Play with friends" }).getByRole("button", { name: "Close" }).click();
-
-  // An invite to someone else's lobby: the lobby turns the banned account away with the notice.
-  const hostCtx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
-  const host = await hostCtx.newPage();
-  await named(host, "Hosty");
-  await host.goto("/?debug&mode=crowd");
-  await createLobbyFromHome(host);
-  await expect(host.getByRole("heading", { name: /^Lobby / })).toBeVisible();
-  const code = (await host.locator(".invite-code").textContent())!.trim();
-  await page.goto(`/lobby/${code}?debug`);
-  await joinFromInvite(page);
-  await expect(notice).toBeVisible();
-  await expect(host.locator(".lobby-players li")).toHaveCount(1);
+  // Every URL, deep links included: only the ban line.
+  for (const url of ["/", "/town", "/play", "/profile", `/profile/${id}`, "/settings", "/lobby/ABCDE", "/boss", "/squads/party/ABCDE", "/faq"]) {
+    await page.goto(url);
+    await onlyTheBan(page);
+  }
+  // Every API route, asked directly: the ban answer.
+  await everyRouteBanned(page);
 
   // Anyone looking at the banned player's profile sees "Banned" (and nothing else about it).
-  await host.goto(`/profile/${id}`);
-  await expect(host.getByRole("heading", { name: "Banny" })).toBeVisible();
-  await expect(host.locator(".fp-banned")).toHaveText("Banned");
+  const viewerCtx = await browser.newContext();
+  const viewer = await viewerCtx.newPage();
+  await viewer.goto(`/profile/${id}`);
+  await expect(viewer.getByRole("heading", { name: "Banny" })).toBeVisible();
+  await expect(viewer.locator(".fp-banned")).toHaveText("Banned");
+  await viewerCtx.close();
 
-  // Solo stays open: the queue fills with bots and the match begins.
-  await page.goto("/?debug&pool=fairplay");
-  await pickMode(page);
-  await page.getByRole("radiogroup", { name: "Matchmaking" }).getByRole("radio", { name: /^Bots/ }).click();
-  await page.getByRole("button", { name: "PLAY", exact: true }).click();
-  await startBotLevel(page);
-  await expect(page.locator(".fd-seats")).toBeVisible();
-  await expect(notice).toHaveCount(0);
+  // The device forgetting (its storage cleared, cookies kept): the server still answers only the ban.
+  await page.evaluate(() => localStorage.clear());
+  await page.reload();
+  await onlyTheBan(page);
+  // The account's own sign-in cookie never gets it past: a session of its own (the mark cleared) is refused, and ended.
+  const token = `e2e${Date.now().toString(36)}${"x".repeat(30)}`;
+  await localSql(page, "INSERT INTO sessions (token_hash, user_id, created_at, expires_at) VALUES (?, ?, ?, ?)", createHash("sha256").update(token).digest("hex"), id, Date.now(), Date.now() + 86_400_000);
+  await page.context().clearCookies();
+  await page.context().addCookies([{ name: "hc_session", value: token, url: page.url() }]);
+  await page.evaluate(() => localStorage.clear());
+  await page.reload();
+  await onlyTheBan(page);
+  expect(await localSql(page, "SELECT COUNT(*) AS n FROM sessions WHERE user_id = ?", id)).toEqual([{ n: 0 }]);
+
+  // A fresh browser (cookies and storage cleared): signing in to the banned account shows only the ban line, and makes no session.
+  await page.context().clearCookies();
+  await page.evaluate(() => localStorage.clear());
+  await emailSignIn(page, email, "424242");
+  await onlyTheBan(page);
+  expect(await localSql(page, "SELECT COUNT(*) AS n FROM sessions WHERE user_id = ?", id)).toEqual([{ n: 0 }]);
+  await page.unrouteAll();
+  await page.goto("/town");
+  await onlyTheBan(page);
+
+  // Lifted (an appeal by email, answered by a person): the next load is the game again, and the account signs in as before.
+  expect(await (await decide("clear")).json()).toMatchObject({ ok: true, status: "cleared" });
+  await adminCtx.close();
+  await page.reload();
+  await expect(page.locator(".ban-screen")).toHaveCount(0);
+  await emailSignIn(page, email, "535353");
+  await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
+  expect(((await (await page.request.get("/api/me")).json()) as { user: { id: string } }).user.id).toBe(id);
 });
 
 test("the reviewer's API lists a reported player's case with its evidence", { tag: "@phone-only" }, async ({ page, browser }) => {

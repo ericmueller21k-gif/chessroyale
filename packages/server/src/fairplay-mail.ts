@@ -1,7 +1,9 @@
 /**
- * Fair play's emails: a ban notice and a clearing after a review, sent to the player's sign-in address (email or
- * Google) through Resend, the same service and key that send sign-in codes. No key, or no address: nothing is sent.
+ * Fair play's emails: a ban notice (the ban screen's words), an appeal turned down, and a clearing after a review, sent to the
+ * player's sign-in address (email or Google) through Resend, the same service and key that send sign-in codes. No key, or no
+ * address: nothing is sent.
  */
+import { BANNED_LINE, SUPPORT_EMAIL } from "@chessroyale/core";
 import type { User } from "./accounts.ts";
 import type { CaseMailer } from "./fairplay.ts";
 
@@ -17,30 +19,22 @@ export function fairplayFrom(env: MailEnv): string {
   return `HunChess <fairplay@${domain}>`;
 }
 
-/** The email for a ban or a clearing: subject and plain text (no names of anyone else, no evidence). */
-export function caseEmail(user: Pick<User, "name">, kind: "banned" | "cleared" | "upheld", notice: string | null): { subject: string; text: string } {
+/**
+ * The email for a ban, an appeal turned down or a clearing: subject and plain text (no names of anyone else, no evidence). A ban's
+ * says what the ban screen says (Eric, Nov 13: BANNED_LINE; appeals by email), with the admin's note for the player, if any.
+ */
+export function caseEmail(user: Pick<User, "name">, kind: "banned" | "cleared" | "lifted" | "upheld", notice: string | null): { subject: string; text: string } {
   const hi = `Hi ${user.name},`;
   if (kind === "upheld") {
     return {
       subject: "Your HunChess appeal",
-      text: [hi, "", "A person read your appeal against the ban on your account, and the ban stands.", ...(notice ? ["", notice] : []), "", "Solo games against bots are still open.", "", "HunChess"].join("\n"),
+      text: [hi, "", "A person read your appeal against the ban on your account, and the ban stands.", ...(notice ? ["", notice] : []), "", `For more information, email ${SUPPORT_EMAIL}.`, "", "HunChess"].join("\n"),
     };
   }
   if (kind === "banned") {
     return {
-      subject: "Your HunChess account can't play online",
-      text: [
-        hi,
-        "",
-        notice ??
-          "Our fair-play checks found that the moves in your online matches matched a chess engine's far more closely than a person's would, so your account has been banned from online play.",
-        "",
-        "Solo games against bots are still open.",
-        "",
-        "If you think this is a mistake, you can appeal: open hunchess.com and tap PLAY, and you'll see a form. A person reads every appeal.",
-        "",
-        "HunChess",
-      ].join("\n"),
+      subject: "Your HunChess account has been banned",
+      text: [hi, "", BANNED_LINE, ...(notice ? ["", notice] : []), "", "HunChess"].join("\n"),
     };
   }
   return {
@@ -50,7 +44,10 @@ export function caseEmail(user: Pick<User, "name">, kind: "banned" | "cleared" |
       "",
       notice ?? "We reviewed your recent online matches and found nothing wrong. Thanks for playing fair.",
       "",
-      "Any results we held back while we looked now count again, and you can play online as usual.",
+      // (A lifted ban: the ban ended every session the account had, so it signs in again. A review cleared: nothing was ended.)
+      kind === "lifted"
+        ? "Your ban is lifted, and any results we held back while we looked now count again. Sign in again to play online."
+        : "Any results we held back while we looked now count again, and you can play online as usual.",
       "",
       "HunChess",
     ].join("\n"),

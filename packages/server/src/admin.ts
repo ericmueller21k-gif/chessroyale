@@ -748,7 +748,7 @@ function casePage(d: CaseDetail, note: string | null, chat: { block: ChatBlock |
   const decision = `<form class="row" method="post">
   <input type="text" name="reason" placeholder="Reason (for the log; required)" required minlength="5">
   <input type="text" name="notice" placeholder="Note to the player (optional; in the email)">
-  <button class="ban" name="action" value="ban">Ban from online play</button><button class="clear" name="action" value="clear">Clear</button>
+  <button class="ban" name="action" value="ban">Ban (can't sign in)</button><button class="clear" name="action" value="clear">Clear</button>
   <button name="action" value="watch">Watch</button><button name="action" value="review">Review</button></form>`;
   const appealForm = openAppeal
     ? `<div class="card"><b>Open appeal</b> (${when(openAppeal.at)})<p>${esc(openAppeal.text)}</p><form class="row" method="post"><input type="hidden" name="action" value="appeal"><input type="hidden" name="appeal" value="${openAppeal.id}">

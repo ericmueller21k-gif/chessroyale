@@ -813,8 +813,8 @@ exception: about 7 squares from Ginger's igloo (`town-camera.test.ts`).
     `POST /api/town/hidden`, `hidden-room-api.ts`): per town instance (the town's `room`: production's one, each test's own with
     `?townroom=`), the room's people and one request. Signed-in accounts only (a guest goes up and watches, uncounted, Challenge greyed:
     "Sign in to challenge him."; the app asks nothing for them). An account banned for fair play can't go in or challenge: the same
-    `banCheck` as PLAY (the account and the device cookie, at most once a minute), 403 with `banned`, and the app shows the ban notice
-    (review M1). A rest (`boss:recluse` or `raid`) refuses a challenge and ends a request the bots fill with its line. Every number in core's `HIDDEN_ROOM`: `players` 4, `capSec` 300,
+    `banCheck` as PLAY (the account and the device cookie, at most once a minute), 403 with `banned` and the ban header, and the app shows only
+    the ban screen (review M1; since Nov 13 a ban means you can't sign in: [fairplay.md](fairplay.md)). A rest (`boss:recluse` or `raid`) refuses a challenge and ends a request the bots fill with its line. Every number in core's `HIDDEN_ROOM`: `players` 4, `capSec` 300,
     `pollMs` 1500, `silentSec` 20, `outcomeSec` 60, `bots` 3, `botJoinMs` 2000, `joinWaitSec` 60.
   - **The door:** the stairs up from the landing ask the server first (`enter`): with four people in the room (bots and those who haven't
     challenged count), "The door is locked." with OK, and you stay on the landing.

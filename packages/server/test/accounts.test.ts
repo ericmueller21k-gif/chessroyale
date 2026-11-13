@@ -193,6 +193,8 @@ describe("accounts", () => {
 
 describe("account API", () => {
   const origin = "https://hunchess.com";
+  /** JSON from this site's own page, as the app sends it (the emailed code's routes check both: the review of #687, minor 2). */
+  const PAGE = { origin, "content-type": "application/json" };
   const call = async (env: object, path: string, init: RequestInit & { cookie?: string } = {}, fetcher?: typeof fetch) => {
     const headers = new Headers(init.headers);
     if (init.cookie) headers.set("cookie", init.cookie);
@@ -217,11 +219,11 @@ describe("account API", () => {
     }) as unknown as typeof fetch;
     // (This device answered the age question "old enough": age-gate.test.ts has the question itself.)
     const answered = `${me.cookie}; hc_age=ok`;
-    const start = await call(env, "/api/auth/email/start", { method: "POST", body: JSON.stringify({ email: "Eric@Example.com" }), cookie: answered }, fakeResend);
+    const start = await call(env, "/api/auth/email/start", { method: "POST", headers: PAGE, body: JSON.stringify({ email: "Eric@Example.com" }), cookie: answered }, fakeResend);
     expect(start.body).toEqual({ ok: true });
-    const bad = await call(env, "/api/auth/email/verify", { method: "POST", body: JSON.stringify({ email: "eric@example.com", code: "000000" === sentCode ? "111111" : "000000" }), cookie: answered });
+    const bad = await call(env, "/api/auth/email/verify", { method: "POST", headers: PAGE, body: JSON.stringify({ email: "eric@example.com", code: "000000" === sentCode ? "111111" : "000000" }), cookie: answered });
     expect(bad.res.status).toBe(400);
-    const ok = await call(env, "/api/auth/email/verify", { method: "POST", body: JSON.stringify({ email: "eric@example.com", code: sentCode }), cookie: answered });
+    const ok = await call(env, "/api/auth/email/verify", { method: "POST", headers: PAGE, body: JSON.stringify({ email: "eric@example.com", code: sentCode }), cookie: answered });
     expect(ok.body.user.signedIn).toBe(true);
     expect(ok.body.user.email).toBe("eric@example.com");
     // Results go on the profile.
@@ -307,8 +309,8 @@ describe("account API", () => {
         return new Response("{}", { status: 200 });
       }) as unknown as typeof fetch;
       const answered = `${me.cookie}; hc_age=ok`;
-      await call(prod, "/api/auth/email/start", { method: "POST", body: JSON.stringify({ email: "boss@example.com" }), cookie: answered }, fakeResend);
-      const admin = await call(prod, "/api/auth/email/verify", { method: "POST", body: JSON.stringify({ email: "boss@example.com", code }), cookie: answered });
+      await call(prod, "/api/auth/email/start", { method: "POST", headers: PAGE, body: JSON.stringify({ email: "boss@example.com" }), cookie: answered }, fakeResend);
+      const admin = await call(prod, "/api/auth/email/verify", { method: "POST", headers: PAGE, body: JSON.stringify({ email: "boss@example.com", code }), cookie: answered });
       expect(admin.body.user.signedIn).toBe(true);
       const b = await start(prod, admin.cookie, { xpgame: 12 });
       at(T + 20 * 60_000);

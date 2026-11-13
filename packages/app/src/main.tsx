@@ -1,9 +1,10 @@
 import { render } from "preact";
+import { checkBan, isBanned, watchBans } from "./ban.ts";
 import "./board/pieces.css";
 import { App } from "./App.tsx";
 import { watchShell } from "./shell.ts";
 import { loadStep } from "./loadbar.ts";
-import { BanNotice } from "./components/FairPlay.tsx";
+import { BanScreen, useBanned } from "./components/FairPlay.tsx";
 import { ErrorBoundary, ReportSheet } from "./components/Problems.tsx";
 import { MaintenanceBanner } from "./components/MaintenanceBanner.tsx";
 import { SearchBar } from "./components/SearchBar.tsx";
@@ -32,6 +33,11 @@ document.addEventListener("gesturestart", (e) => e.preventDefault());
 document.addEventListener("touchmove", (e) => {
   if (e.touches.length > 1) e.preventDefault();
 }, { passive: false });
+
+// A ban means you can't sign in (Eric, Nov 13; ban.ts): every answer the page gets is looked at for the server's ban answer, from
+// the first request on; a device that remembers the ban asks the server once whether it still holds.
+watchBans();
+if (isBanned()) void checkBan();
 
 // The app's script has run: the loading bar (index.html's shell, if it's showing) moves on to signing in (loadbar.ts).
 loadStep("signIn");
@@ -69,20 +75,21 @@ startStatus();
 hapticsDebug();
 // (The shell in index.html goes as soon as #app draws anything but the splash: shell.ts.)
 watchShell();
-// (Fair play's ban notice sits over any screen: PLAY, a new lobby or joining one can bring it up; so does the
-// feedback sheet, from the match menu or Settings, and the maintenance banner, at the top, with the 1 v 1 search's bar
-// under it while you browse. A render error anywhere
-// shows "Something went wrong" instead of a blank page.)
-render(
-  <ErrorBoundary>
-    <App />
-    <BanNotice />
-    <ReportSheet />
-    <MaintenanceBanner />
-    <SearchBar />
-  </ErrorBoundary>,
-  document.getElementById("app")!,
-);
+// (A banned account sees fair play's ban screen and nothing else, on every URL: no menus, no town, no solo, no chat. Otherwise the
+// feedback sheet sits over any screen, from the match menu or Settings, and the maintenance banner, at the top, with the 1 v 1
+// search's bar under it while you browse. A render error anywhere shows "Something went wrong" instead of a blank page.)
+function Root() {
+  if (useBanned()) return <BanScreen />;
+  return (
+    <ErrorBoundary>
+      <App />
+      <ReportSheet />
+      <MaintenanceBanner />
+      <SearchBar />
+    </ErrorBoundary>
+  );
+}
+render(<Root />, document.getElementById("app")!);
 
 // Your own worn ride's drawing (its own chunk, rides/load.ts), asked for after the first paint and again whenever your look
 // changes (once a ride: it's kept), so your pawn on home, in your ring and in the town rarely waits for it (Nov 1, rides lazy).

@@ -823,6 +823,11 @@ export async function verifyEmailCode(sql: Sql, email: string, code: string, now
   return row?.ok === 1;
 }
 
+/** A code spent without signing in (a sign-in refused for a ban, api.ts): it can't be checked again. */
+export async function spendEmailCode(sql: Sql, email: string): Promise<void> {
+  await sql.run("UPDATE email_codes SET expires_at = 0 WHERE email = ?", email);
+}
+
 // ---------------- Results and profiles ----------------
 
 export interface MatchResult {

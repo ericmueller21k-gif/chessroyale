@@ -1,6 +1,7 @@
 import { pausedLine, type Pausable } from "@chessroyale/core";
 import { getUser, type Sql } from "./accounts.ts";
 import { BANNED_MESSAGE, banCheck } from "./fairplay.ts";
+import { BAN_HEADER } from "./ban-gate.ts";
 import { isBlockedText } from "./text-filter.ts";
 import { signedInReader } from "./town-chat-api.ts";
 import { readLimits } from "./town-here-api.ts";
@@ -26,7 +27,8 @@ export type RoomHub = {
   hiddenRoom(a: { id: string; name: string; room: string; action: RoomAction; admin: boolean; beat?: RoomBeat; limits?: RoomLimits }): Promise<RoomView>;
 };
 
-const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json", "cache-control": "no-store" } });
+const json = (body: unknown, status = 200, headers: Record<string, string> = {}) =>
+  new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json", "cache-control": "no-store", ...headers } });
 
 export const SIGN_IN_TO_CHALLENGE = "Sign in to challenge him.";
 export const CHALLENGE_AGE = "Online games are for accounts 13 and older.";
@@ -114,7 +116,9 @@ export async function hiddenRoomResponse(
   // (A raid's kill switch rests his fight as it rests Boss Battle's parties, and his own rests him: no new request, the rest as ever.)
   if (action === "challenge" && a.paused) return json({ message: pausedLine(a.paused), paused: a.paused }, 503);
   // (Banned for fair play: not into his room, nor into a request; review M1. A look, a cancel or leaving go on as ever.)
-  if ((action === "enter" || action === "challenge") && (await bannedNow(sql, id, a.device, now))) return json({ message: BANNED_MESSAGE, banned: true }, 403);
+  // (Banned: the ban header too, so the app drops to its ban screen at once; the Worker's gate ends the session and marks the browser on
+  // its next request: ban-gate.ts.)
+  if ((action === "enter" || action === "challenge") && (await bannedNow(sql, id, a.device, now))) return json({ message: BANNED_MESSAGE, banned: true }, 403, { [BAN_HEADER]: "1" });
   const room = !a.testSwitches ? "town" : typeof body.room === "string" && /^[\w-]{1,40}$/.test(body.room) ? `test:${body.room}` : `alone:${id}`;
   const me = await whoIs(sql, id, now, a.admin);
   const view = await hub.hiddenRoom({ id, name: me.name, room, action, admin: me.admin, beat: readRoomBeat(body), ...(a.testSwitches ? { limits: readRoomLimits(body.limits) } : {}) });
