@@ -1103,7 +1103,8 @@ export const RECLUSE_CHILD_KIT: BossKit = {
     defeat: RECLUSE_CHILD_LINES.beaten,
   },
   chance: { entrance: 1, capture: 0.35, hurt: 0.4, check: 0.5, rattled: 0.3, smug: 0.2, victory: 1, defeat: 1 },
-  portrait: ADULT.portrait,
+  // (His face as the child: the man's window, moved down to the child's head, 45 px lower in the same drawing space.)
+  portrait: { ...ADULT.portrait, y: ADULT.portrait.y + 45, anim: "idle", frame: 0 },
   wide: true,
 };
 

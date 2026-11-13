@@ -441,8 +441,9 @@ export function BossTag({ boss }: { boss: Pick<BossView, "name" | "icon"> }) {
   );
 }
 
-export function BossFace({ boss, class: cls = "", label }: { boss: Pick<BossView, "name" | "icon">; class?: string; /** Its name for a screen reader (the boss's own unless given; "": none, its button names it). */ label?: string }) {
-  const kit = bossKit(boss.name);
+export function BossFace({ boss, class: cls = "", label }: { boss: Pick<BossView, "name" | "icon"> & { form?: BossView["form"] }; class?: string; /** Its name for a screen reader (the boss's own unless given; "": none, its button names it). */ label?: string }) {
+  // (In a form of its own, that form's face: the Hidden Boss's child.)
+  const kit = bossKitOf(boss);
   const cv = useRef<HTMLCanvasElement>(null);
   useLayoutEffect(() => {
     if (!kit || !cv.current) return;
