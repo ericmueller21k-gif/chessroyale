@@ -6,7 +6,7 @@ import { phase2NoResult, phase2Unvouched, pick, quickMove, withMates } from "../
 import { library } from "./lobby-fixture.ts";
 
 // (The engine server is a Container, which needs the Workers runtime: the match rooms import it.)
-vi.mock("../src/engine.ts", () => ({ SERVER_RECHECK_NODES: 2_000_000, engineOn: () => false, serverRecheck: async () => null, serverScoreAt: async () => null, serverAllMovesAt: async () => null, warmEngine: async () => false }));
+vi.mock("../src/engine.ts", () => ({ SERVER_RECHECK_NODES: 2_000_000, serverRecheck: async () => null, serverScoreAt: async () => null, serverAllMovesAt: async () => null, warmEngine: async () => false }));
 const { lobbyXpGame, writeResult } = await import("../src/lobby-do.ts");
 
 /**

@@ -24,8 +24,7 @@ export interface EngineEnv {
   ENGINE_OFF?: string;
 }
 
-/** The engine server is set up here (production): not in local runs, the e2e suite or staging (no container, or ENGINE_OFF). */
-export const engineOn = (env: EngineEnv): boolean => !!env.ENGINE && env.ENGINE_OFF !== "1";
+const engineOn = (env: EngineEnv) => !!env.ENGINE && env.ENGINE_OFF !== "1";
 
 /** The server's re-check budget per search (about 3 s on one core, depth ~30). */
 export const SERVER_RECHECK_NODES = 2_000_000;

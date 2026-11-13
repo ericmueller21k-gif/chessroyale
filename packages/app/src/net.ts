@@ -928,8 +928,9 @@ export class NetMatch implements GameView {
       // (The Hidden Boss's bullet clock ran out: he won on time.)
       ...(m.timeout ? { timeout: true } : {}),
       ...(m.carrots ? { carrots: true } : {}),
-      // (His phase 2: how many of its boards were won.)
+      // (His phase 2: how many of its boards were won; or no result, his move never came.)
       ...(m.simul ? { simul: m.simul } : {}),
+      ...(m.noResult ? { noResult: true } : {}),
     });
   }
 

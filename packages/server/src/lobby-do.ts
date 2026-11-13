@@ -9,7 +9,7 @@ import { forgetLobby, recordWait, reportLobby, type LiveMode } from "./live.ts";
 import type { Env } from "./index.ts";
 import { countCall } from "./ops.ts";
 import { liveHub } from "./live-hub.ts";
-import { SERVER_RECHECK_NODES, engineOn, serverAllMovesAt, serverRecheck, serverScoreAt, warmEngine } from "./engine.ts";
+import { SERVER_RECHECK_NODES, serverAllMovesAt, serverRecheck, serverScoreAt, warmEngine } from "./engine.ts";
 import { CAPACITY, CHAT_MOD, DEFAULT_SETTINGS, MATCH_SAVE, RECLUSE_ONLINE, XP, battleCounts } from "@chessroyale/core";
 import type { ChatBlock } from "@chessroyale/chess";
 import { chatBlock } from "./chat-mod.ts";
@@ -116,8 +116,9 @@ export class Lobby extends DurableObject<Env> {
       serverEngine: this.engineUp,
       icon: (playerId) => this.icons.get(playerId),
       serverScore: (req) => void this.serverQueue.push(req),
-      // (Only where the engine server is set up: with none (local runs, the e2e suite, staging), phase 2 knows it has none.)
-      ...(engineOn(this.env) ? { phase2Search: (req: { id: string; fen: string; boss?: true }) => void this.phase2Queue.push(req) } : {}),
+      // (Only where the engine server is set up (engine.ts engineOn, as squads-do.ts checks it): with none (local runs, the e2e suite,
+      // staging), phase 2 knows it has none.)
+      ...(this.env.ENGINE && this.env.ENGINE_OFF !== "1" ? { phase2Search: (req: { id: string; fen: string; boss?: true }) => void this.phase2Queue.push(req) } : {}),
       // (The Hidden Boss's phase 2 is coming: the engine server boots during his fall and phase change, before his first search.)
       warmEngine: () => this.ctx.waitUntil(warmEngine(this.env).then((up) => void (this.engineUp = up))),
       send: (playerId, msg) => {

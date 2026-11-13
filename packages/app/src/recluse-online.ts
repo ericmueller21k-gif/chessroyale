@@ -40,8 +40,14 @@ export class OnlinePhase2 {
   private timer: ReturnType<typeof setTimeout> | null = null;
   private cache: { p: NetPhase2; playing: boolean; me: string | null; view: SimulView } | null = null;
   private lines = { won: 0, lost: 0, slow: 0 };
-  /** Your board's turn the look-aways count for (its turnAt), so a new turn starts them once. */
+  /** Your board's turn the look-aways count for (its move count), so a new turn starts them once (a pause ending isn't one). */
   private turnFrom: number | null = null;
+  /**
+   * The look-aways are counting (your turn, not paused), and those of this turn counted before a pause: one while the clocks are
+   * paused (his move late) never counts, as your clock doesn't run then.
+   */
+  private counting = false;
+  private awayHeld = 0;
   /**
    * Your move sent and shown, until the server's word has it (its board's history past `ply`), decides the board, or refuses it
    * (the review of #677, m2): its key, board, the move count it was made on, the move, and your board as shown with it.
@@ -141,11 +147,19 @@ export class OnlinePhase2 {
     bossVoice.say(lines[Math.abs(hash(p.key)) % lines.length]!, `recluse:phase2:${p.key}`, NORMAL);
   }
 
-  /** Your board's turn begun: fair play's look-aways count from it. */
+  /** Your board's turn begun: fair play's look-aways count from it, but not while the clocks are paused. */
   private turns() {
     const b = this.mine();
-    const t = this.playing && b && !b.result && b.turnAt !== null && sideToMove(b.fen) === "w" ? b.turnAt : null;
-    if (t !== null && t !== this.turnFrom) this.m.turnBegins();
+    const t = this.playing && b && !b.result && b.turnAt !== null && sideToMove(b.fen) === "w" ? b.history.length : null;
+    const on = t !== null && this.p?.paused === undefined && !this.p?.done;
+    if (t !== this.turnFrom) this.awayHeld = 0;
+    if (on && (!this.counting || t !== this.turnFrom)) {
+      this.m.turnBegins();
+      this.counting = true;
+    } else if (!on && this.counting) {
+      this.awayHeld += this.m.turnEnds();
+      this.counting = false;
+    }
     this.turnFrom = t;
   }
 
@@ -173,7 +187,8 @@ export class OnlinePhase2 {
         if (b.result.winner === "boss") bossVoice.say(RECLUSE_LINES.boardWon[this.lines.lost++ % RECLUSE_LINES.boardWon.length]!, key, CRITICAL);
         else bossVoice.say(RECLUSE_LINES.boardLost[this.lines.won++ % RECLUSE_LINES.boardLost.length]!, key, CRITICAL);
       }
-    if (p.done && !prev.done) {
+    // (No result: his move never came. He says nothing; the screen says why.)
+    if (p.done && !prev.done && !p.done.noResult) {
       const now = Date.now();
       const pickLine = (lines: readonly string[]) => lines[Math.abs(hash(p.key)) % lines.length]!;
       if (p.done.beaten) {
@@ -201,9 +216,11 @@ export class OnlinePhase2 {
   move(boardId: number, mv: string) {
     const p = this.p;
     const b = p?.boards.find((x) => x.id === boardId);
-    if (!p || !b || !this.playing || p.done || b.player !== this.m.myId() || b.result || sideToMove(b.fen) !== "w" || !legalMoves(b.fen).includes(mv)) return;
+    if (!p || !b || !this.playing || p.done || p.paused !== undefined || b.player !== this.m.myId() || b.result || sideToMove(b.fen) !== "w" || !legalMoves(b.fen).includes(mv)) return;
     const ply = b.history.length;
-    this.m.send({ t: "phase2Move", key: p.key, board: boardId, move: mv, ply, away: this.m.turnEnds() });
+    this.m.send({ t: "phase2Move", key: p.key, board: boardId, move: mv, ply, away: this.awayHeld + (this.counting ? this.m.turnEnds() : 0) });
+    this.counting = false;
+    this.awayHeld = 0;
     const now = Date.now();
     const left = b.turnAt === null || p.ultAt !== null ? b.bankMs : Math.max(0, b.bankMs - (now - this.m.local(b.turnAt)));
     const shown = { ...b, fen: applyMove(b.fen, mv), lastMove: mv, history: [...b.history, mv], turnAt: null, bankMs: left };
@@ -226,7 +243,8 @@ export class OnlinePhase2 {
     const lost = p.boards.filter((b) => b.result?.winner === "boss").length;
     const drawn = p.boards.filter((b) => b.result?.winner === "draw").length;
     const of = p.boards.length;
-    const decided = won + lost + drawn === of;
+    const noResult = !!p.done?.noResult;
+    const decided = won + lost + drawn === of || noResult;
     const view: SimulView = {
       from: p.from,
       playing: this.playing,
@@ -235,10 +253,12 @@ export class OnlinePhase2 {
       drawn,
       of,
       decided,
-      beaten: decided && won === of,
+      beaten: !noResult && decided && won === of,
       slow: p.slow,
       lastSlow: p.lastSlow ? { board: p.lastSlow.board, at: this.m.local(p.lastSlow.at) } : null,
       ultAt: p.ultAt === null ? null : this.m.local(p.ultAt),
+      paused: p.paused === undefined ? null : this.m.local(p.paused),
+      ...(noResult ? { noResult: true } : {}),
       boards: order.map((b) => ({
         id: b.id,
         you: b.player === me,
