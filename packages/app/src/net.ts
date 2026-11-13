@@ -891,6 +891,12 @@ export class NetMatch implements GameView {
         // (Back in the middle of it, a reload: the battle and the standings come with it.)
         if (m.boss) this.boss = { ...m.boss, board: this.toView(m.boss.board) };
         if (m.standings) this.standingsList = m.standings;
+        // (Back during his cutscene's hold, a reload (review of #679, M1): his fall's screen, so the scene draws over it from its
+        // moment and the beaten theme plays, never "Connecting…" until his phase change. Who takes the boards: the view's.)
+        if (this.boss && Date.now() < this.local(m.p2.at) && !(this.phase.kind === "boss" && this.phase.fall && this.phase.toPhase2)) {
+          this.phase2Boards = m.p2.boards.map((b) => b.player);
+          this.phase = { kind: "boss", boss: this.boss, until: this.local(m.p2.cutAt), fall: true, toPhase2: true };
+        }
         return this.phase2.onMessage(m.p2, !!m.refused);
       case "phase2Ask":
         return void this.hostPhase2(m.id, m.fen, m.elo, m.nodes, m.moveMs);
