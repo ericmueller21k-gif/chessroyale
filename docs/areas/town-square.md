@@ -1127,6 +1127,13 @@ noted wherever a slice changed one.
   and the summoning with four stand-in pawns. Times: `feel.ts` `HIDDEN_ROOM_FEEL`. Seen only on the dev server,
   `/hidden-room-preview.html` (`src/dev/hidden-room-preview.tsx`; `?t=`, `?summon=`, `?ui=0`). Test: `test/recluse-room.test.ts`.
   [2026-11-12-hidden-boss-room-mockup.md](../decisions/2026-11-12-hidden-boss-room-mockup.md).
+  **Round 2 (Nov 13):** 9 x 9 (about half the floor), everything brought in (the bed's foot just onto the rug, the sun's panes across the
+  rug), the door at the front's east end; a 1.15-square board. He plays Black seated (a lean, a short reach) and walks round for every
+  White move, kneeling beside the board on the piece's side (`recluse-game.ts` `stepsOf`, `walkPath`; `recluse-ages.ts` `PLAY_POSES`:
+  standing, walking, kneeling, from the front and behind); the game takes about 14 minutes. In this room only, each side wall is one
+  surface (`sideWallGrid`, the scene's `drawSideWalls`: about 70 affine strips a wall, the layout's side squares solid blanks);
+  `?walls=cards` shows round 1's cards; `__hiddenSeek(ms)` jumps the game for stills.
+  [2026-11-13-hidden-boss-room-r2.md](../decisions/2026-11-13-hidden-boss-room-r2.md).
 
 ## Adding a home
 
