@@ -50,7 +50,8 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
   `at + PHASE_CHANGE.crackAt`), its intro started `introSeconds` before (from themes.json, never code; the beaten theme fades 0.5 s
   from there; late, the loop alone on the drop), on through phase 2 until every board is decided. `recluse-house` (the child form)
   isn't played yet: its hook is `recluseMusic`. Not in the town's loading: fetched as his fight starts (`ahead`), the transformation's
-  decoded as he's beaten (`next`). The drop lands on the split's first frame (5 to 8 ms measured). Tests: `music.test.ts` ("the Hidden
+  decoded as he's beaten (`next`). With the 8.740 s intro (handoff f12f1c5b) his transformation starts as he rises in his rage and
+  `marks.slam` lands on the book hitting the floor; the drop lands on the split's first frame (4 to 8 ms measured). Tests: `music.test.ts` ("the Hidden
   Boss"), `e2e/recluse.spec.ts` ("beaten in phase 1").
 - **Banners and lines (Eric, Nov 5):** a power's banner shows your pawn on the right (the God King only for his save, LastStand); a boss's name is his small portrait plus his name, never his emoji (`BossTag`, the status line); the banner's name stays whole. [decision](../decisions/2026-11-05-banners-emoji-cards.md); rules in [eric.md](../rules/eric.md).
 - **A boss can be rested** (`PAUSE_BOSS_<ID>`, [ops.md](ops.md) "Kill switches"): the boss menu hides him, a raid
@@ -158,6 +159,12 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
   the power-up hints' search (`topMovesFor`, 250,000 nodes over eight lines). Its title: **"Engine move (Stockfish) · Boss:
   …"**, the boss's brain line second (Maia's is the boss's). Gated by `engineMoveAllowed` in `boss-brain.ts`; online matches (`NetMatch`) have none. Tests:
   `packages/app/test/engine-move.test.ts`, `e2e/recluse.spec.ts`.
+- **Win this form** (admins only, Boss alone, the Hidden Boss only, Nov 13: for Eric's timing test of his music and phase
+  change): a 🏆 after the 🐟 (a computer: in the title line). Pressed, your next move beats his adult form by the end a mate takes
+  (the runner's `bossForceWin`: `stageComplete`, then `finishBossBattle`'s "crowd"; his fall, phase change and music follow as for
+  real), or in phase 2 wins every board still on (`phase2WinAll`) and the result plays. Greyed once pressed. Gated by
+  `winFormAllowed` (`boss-brain.ts`); online has none. Tests: `engine-move.test.ts`, `chess/test/recluse*.test.ts`,
+  `e2e/recluse.spec.ts` ("Win this form").
 - **The ground rules of every power** (the server decides, the same everywhere):
   - Every power comes from the battle's seed (drawn once, as it starts) and the position, so the server, the solo game
     and every screen work out the same thing (`powerRoll`).
