@@ -166,16 +166,20 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
   phase change and the four boards online, to the real result (Nov 13: "Phase 2 online", below). **A tie at the top** (2-2 in a
   team of four) goes by strength, as a no-majority turn does: the engine's best of the tied moves, or one within `closeCp` at random
   (Eric, Nov 12: "a deliberate blunder never wins a tie"; a party of three never ties at two, so its draws are as before).
-- **His child form** (Nov 13; [decision](../decisions/2026-11-13-hidden-boss-child-form.md); RECLUSE_CHILD): his first form, solo (an
-  admin's Boss alone, a solo Crowd's final: `settings.recluseChild`, set by solo only; `?form=adult` starts at the man). `BossState.form`
+- **His child form** (Nov 13; [decision](../decisions/2026-11-13-hidden-boss-child-form.md), [online](../decisions/2026-11-13-hidden-boss-child-online.md);
+  RECLUSE_CHILD): his first form wherever he's fought (`RECLUSE_FORMS` starts with it: `recluseChildFirst`; the settings' `recluseChild`
+  from it in `hiddenRoomSettings`, `modeSettings("crowd")` and solo; `?form=adult`, solo's and a lobby's test switch, starts at the man). `BossState.form`
   "child": no powers (`bossPowers` none; `RECLUSE_CHILD_RULES`: never strikes, the God King's help works), Maia raw at core
   `childRating` (1800, +100 every 4 moves on the board, to Maia's top 2500, the man's), Stockfish at `levelForMaia` of it while Maia
   loads; his level from that rating (`formStep` in the view), popping at each step (BossLevel). His figure: `RECLUSE_CHILD_KIT`
   (`bossKitOf`) draws `RECLUSE_GROWING` (recluse-ages.ts: each age's idle and the growing steps), stepped by a figure run from
   `formStep` (components/RecluseChild.ts, once each); the kid's lines `RECLUSE_CHILD_LINES`. Beaten: nobody placed
   (finishBossBattle), his line, he grows up into the man (`growUpAt`, `fallMs`), then the runner's `nextBossForm`: a new match
-  against his adult form (solo `nextForm`: his entrance again). Online waits for the server's form list. Tests:
-  `chess/test/recluse-child.test.ts`, `app/test/recluse-child.test.ts`, `e2e/recluse.spec.ts` ("his child form first").
+  against his adult form (solo `nextForm`: his entrance again). **Online** (his room's fight, the Crowd's final): the lobby's fall path
+  (his rules' `fallMs`), then `nextRound` calls `nextBossForm` and plays the adult form's intro; each move request carries the child's
+  rating (`childRatingNow`) and strength (`bossEloNow`) to the host and its checker alike; `NetMatch` resets his beats, words, banners
+  and its 🏆 as the form goes. Tests: `chess/test/recluse-child.test.ts`, `app/test/recluse-child.test.ts`, server
+  `recluse-online.test.ts` ("his child form online"), `e2e/recluse.spec.ts` ("his child form first"), `e2e/hidden-boss-room.spec.ts`.
 - **Win this form** (admins only, Boss alone, the Hidden Boss only, Nov 13; his child form too: for Eric's timing test of his music and phase
   change): a 🏆 after the 🐟 (a computer: in the title line). Pressed, your next move beats his adult form by the end a mate takes
   (the runner's `bossForceWin`: `stageComplete`, then `finishBossBattle`'s "crowd"; his fall, phase change and music follow as for
@@ -276,8 +280,7 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
 boss final you reached, where the other three finalists take the other boards (`phase2Follows`, `phase2Mates`); online since Nov 13,
 below):
 - **Phase 2 online** (Nov 13, Eric: "it plays through till the end"; [decision](../decisions/2026-11-13-recluse-online-phase2.md)): his
-  room's fight and the Crowd's boss final. His forms are a list (`RECLUSE_FORMS`: adult, then four; the child form goes first once
-  built). Beaten, his fall (the boss message's `fall` with `toPhase2`, `RECLUSE_PHASE2.change.fallMs`), the cutscene's hold
+  room's fight and the Crowd's boss final. His forms are a list (`RECLUSE_FORMS`: the child, the adult form, then four). Beaten, his fall (the boss message's `fall` with `toPhase2`, `RECLUSE_PHASE2.change.fallMs`), the cutscene's hold
   (`RECLUSE_CUTSCENE.holdMs`, the scene's length: the event `recluseCutscene`, its start and end, `NetMatch.cutscene`; below), then his phase
   change for everyone from one start (`phase2`'s `at`; `RECLUSE_ONLINE.changeMs`, the screens' `PHASE_CHANGE.total` within 300 ms),
   the countdown, and the four boards to the real result. The server runs them (`packages/server/src/bosses/recluse.ts`, on the same
@@ -1165,7 +1168,7 @@ sampling, the guards, `forPlayers`), `BOSS_TIERS` and each boss's `offset` in `b
 - Previews: `npm run preview:characters -- <dir>` (GIFs and sheets of every boss and effect; `only=pig` for Wrangler).
   The Hidden Boss's bust and his book (art only, not shown) aren't in the character lists: add
   `extra=packages/app/src/characters/recluse.ts only=recluse,recluse-bust,recluse-book`.
-  His younger ages (a mockup, Nov 12; wired into nothing): `characters/recluse-ages.ts` (the child, 13 and 20, their busts
+  His younger ages (a mockup, Nov 12; since Nov 13 his child form's growing figure, `recluse-growing`): `characters/recluse-ages.ts` (the child, 13 and 20, their busts
   and idles, the growing step `recluse-grow`, the ghost child beside him kneeling `recluse-ghost`):
   `extra=packages/app/src/characters/recluse-ages.ts only=recluse-child,recluse-teen,recluse-young,recluse-grow,recluse-ghost`.
   His cutscene between the adult form and the cyborg (in the fight since Nov 13: "His cutscene" above):

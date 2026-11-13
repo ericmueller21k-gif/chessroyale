@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { BOSS_BRAIN, BOSS_DIFFICULTY, BOSS_POWERS, BOSS_ROSTER, BOSS_TIERS, CROWD_KNOCKOUTS, CROWD_START, DEFAULT_SETTINGS, LEAVES, LEAVING, RANKED_1V1, RECLUSE_PHASE2, HIDDEN_ROOM, crowdFinalBoss, crowdFinalists, fixedLevel, isPlayable, lastStandBar, maiaRatingFor, maiaTopRating } from "@chessroyale/core";
-import { BOSS_BLOCKS, FAQ_DEFAULTS, eloExpected, faqAnchors, faqPage, faqPlainText, faqSections, ranked1v1, rankedLeaving, type FaqSources } from "../src/faq/content.ts";
+import { BOSS_BRAIN, BOSS_DIFFICULTY, BOSS_POWERS, BOSS_ROSTER, BOSS_TIERS, CROWD_KNOCKOUTS, CROWD_START, DEFAULT_SETTINGS, LEAVES, LEAVING, RANKED_1V1, RECLUSE_CHILD, RECLUSE_PHASE2, HIDDEN_ROOM, crowdFinalBoss, crowdFinalists, fixedLevel, isPlayable, lastStandBar, maiaRatingFor, maiaTopRating } from "@chessroyale/core";
+import { BOSS_BLOCKS, FAQ_DEFAULTS, eloExpected, faqAnchors, faqPage, faqPlainText, faqSections, num, ranked1v1, rankedLeaving, type FaqSources } from "../src/faq/content.ts";
 import { inlineText, linksOf, parse, plainText } from "../src/faq/markdown.ts";
 
 /** The FAQ's text, built from these sources. */
@@ -568,11 +568,13 @@ describe("the FAQ on the Crowd's boss final (Eric, Oct 14: always the Hidden Bos
     expect(moved).toContain("the team's 6th brings his last power");
   });
 
-  it("his strength and brain are fixed (the Crowd's battle no longer follows the finalists' ratings); the God King can't help against him", () => {
+  it("his strength and brain are fixed (the Crowd's battle no longer follows the finalists' ratings), the boy's climbing first (Nov 13); the God King can't help against the man", () => {
     const t = section("boss-brain");
-    expect(t).toContain(`The Crowd's boss final is always the ${him.name}, whose strength is fixed at ${fixedLevel()}`);
+    expect(t).toContain(`The Crowd's boss final is always the ${him.name}. He starts as a boy: Maia at ${num(RECLUSE_CHILD.startRating)}, ${num(RECLUSE_CHILD.stepRating)} stronger every ${RECLUSE_CHILD.everyPlies} moves on the board, up to ${num(maiaTopRating())}.`);
+    expect(t).toContain(`Beat the boy and the man comes next, whose strength is fixed at ${fixedLevel()}. Neither follows anyone's rating`);
     expect(t).toContain(`Maia at its top rating, ${maiaTopRating()}, with no guard`);
-    expect(section("god-king")).toContain(`His help doesn't work against the ${him.name}, the Crowd's boss`);
+    expect(t).toContain("The boy he starts as has the same brain at his own rating");
+    expect(section("god-king")).toContain(`His help doesn't work against the ${him.name}, the Crowd's boss, once he's grown up: calling him then only spends a charge. Against the boy he starts as, it works.`);
   });
 });
 

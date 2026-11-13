@@ -132,7 +132,8 @@ export interface Settings {
   bossHidden?: boolean;
   /**
    * The Hidden Boss starts in his child form (RECLUSE_CHILD), then a new match against his adult form once the child is beaten.
-   * Solo sets it (`?form=adult`, a test switch, starts at his adult form); online waits for the server's form list.
+   * Set where he's fought, from his forms (recluseChildFirst): his room's fight (hiddenRoomSettings), the Crowd's boss final
+   * (modeSettings("crowd")) and solo; `?form=adult`, a test switch (solo and a lobby's), starts at his adult form.
    */
   recluseChild?: boolean;
   /**
@@ -1033,11 +1034,11 @@ export function bossPartySettings(difficulty: string): Partial<Settings> {
 /**
  * The Hidden Boss's fight from his room (HIDDEN_ROOM; Eric, Nov 13): Boss Battle's party battle for the room's four (the party rule:
  * a move two or more picked is played, a tie between moves by their strength: partyMove), the team's one clock, any member's God
- * King call; the boss always him (`bossHidden`: he's hidden from players everywhere else). His adult form beaten, his phase change and
- * the four boards follow online (Nov 13: RECLUSE_ONLINE), as in the Crowd's final. The server's alone: a player can't ask for it.
+ * King call; the boss always him (`bossHidden`: he's hidden from players everywhere else). His forms in turn (RECLUSE_FORMS): the child
+ * first, then his adult form, then his phase change and the four boards online (Nov 13: RECLUSE_ONLINE), as in the Crowd's final. The server's alone: a player can't ask for it.
  */
 export function hiddenRoomSettings(): Partial<Settings> {
-  return { ...bossPartySettings("normal"), lobbySize: HIDDEN_ROOM.players, groupSize: HIDDEN_ROOM.players, bossId: HIDDEN_ROOM.boss, bossHidden: true };
+  return { ...bossPartySettings("normal"), lobbySize: HIDDEN_ROOM.players, groupSize: HIDDEN_ROOM.players, bossId: HIDDEN_ROOM.boss, bossHidden: true, recluseChild: recluseChildFirst() };
 }
 
 /**
@@ -1940,8 +1941,8 @@ export const RECLUSE_TALK = {
  * - **He grows:** `ages`, the Maia rating from which each drawing shows (`recluse-ages.ts`): about 9, 13, 20 (the black suit),
  *   then his adult look, the last at the top (a test checks), so the child at his strongest is the man you meet next.
  * - **Beaten** (by mate, or the admins' "Win this form"): his line, then he grows up into the man (`fallMs` in all), and a new
- *   match starts from the starting position against his adult form (today's phase 1), solo and, once its form list is in,
- *   online. A draw or a loss ends the fight, as his adult form's does.
+ *   match starts from the starting position against his adult form (today's phase 1), solo and online (RECLUSE_FORMS). A draw
+ *   or a loss ends the fight, as his adult form's does.
  */
 export const RECLUSE_CHILD = {
   startRating: 1800,
@@ -1956,12 +1957,15 @@ export const RECLUSE_CHILD = {
 /**
  * The Hidden Boss's forms, in the order his fight meets them (Eric, Nov 13: "it plays through till the end";
  * docs/decisions/2026-11-13-recluse-online-phase2.md). Each one beaten brings the next; the last beaten is his defeat.
+ * `child`: his first form (RECLUSE_CHILD: no powers, his strength growing with the game; beaten, a new match against the man);
  * `adult`: his phase 1 (Bullet, No help, his chatter); `four`: his phase change and the four boards (RECLUSE_PHASE2).
- * The child form (`child`, being built on claude/recluse-child-form) goes first: `["child", "adult", "four"]`, with no change
- * to the online code that reads this (recluseNextForm).
+ * Where he's fought (his room's fight: hiddenRoomSettings; the Crowd's boss final: modeSettings("crowd"); solo), `child` first here
+ * starts his fight as the child (`recluseChildFirst`, the settings' `recluseChild`).
  */
 export type RecluseForm = "child" | "adult" | "four";
-export const RECLUSE_FORMS: readonly RecluseForm[] = ["adult", "four"];
+export const RECLUSE_FORMS: readonly RecluseForm[] = ["child", "adult", "four"];
+/** His fight starts as the child: his forms (RECLUSE_FORMS) begin with it. The settings' `recluseChild` where he's fought. */
+export const recluseChildFirst = (forms: readonly RecluseForm[] = RECLUSE_FORMS): boolean => forms[0] === "child";
 /** The form his fight meets after `form` (null: `form` is his last, or isn't in his fight). */
 export function recluseNextForm(form: RecluseForm, forms: readonly RecluseForm[] = RECLUSE_FORMS): RecluseForm | null {
   const i = forms.indexOf(form);
@@ -2455,7 +2459,8 @@ export function definedOnly<T extends object>(o: T): Partial<T> {
 /** Settings for a mode (Classic is the default). */
 export function modeSettings(mode: GameMode, opts: { augments?: boolean } = {}): Partial<Settings> {
   if (mode !== "crowd") return {};
-  return { ...CROWD_SETTINGS, ...(opts.augments !== undefined ? { augments: opts.augments } : {}) };
+  // (Its boss final meets the Hidden Boss: as the child first, by his forms.)
+  return { ...CROWD_SETTINGS, recluseChild: recluseChildFirst(), ...(opts.augments !== undefined ? { augments: opts.augments } : {}) };
 }
 
 export type Augment = "more" | "same" | "less";

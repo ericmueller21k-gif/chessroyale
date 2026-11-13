@@ -135,11 +135,12 @@ test("solo Crowd: the top 4 meet him; the God King's help tried spends a charge;
 });
 
 test("online: a Crowd boss final meets him: his intro by name for everyone, four in the battle; a try at the God King spends a charge and your move goes on; his bullet clock", { tag: "@phone-only" }, async ({ page }) => {
+  // (On the phone alone, its tag; until Nov 13 it skipped everywhere but the computer, where the tag leaves it out: it never ran.)
   test.setTimeout(16 * 60_000);
-  test.skip(test.info().project.name !== "desktop", "one run is enough: a computer");
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
-  await page.goto("/?debug&pace=quick&mode=crowd&format=boss&rounds=2&clock=30&bossMoves=8&power=bullet&weakbots=1");
+  // (At his adult form, ?form=adult (a lobby's test switch): this test is about it; his child form comes first otherwise, Nov 13.)
+  await page.goto("/?debug&pace=quick&mode=crowd&format=boss&rounds=2&clock=30&bossMoves=8&power=bullet&weakbots=1&form=adult");
   await createLobbyFromHome(page);
   await page.getByRole("button", { name: /Start with 1 player/ }).click();
   await knockouts(page, 9);

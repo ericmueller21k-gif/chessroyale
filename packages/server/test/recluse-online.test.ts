@@ -1,8 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import { DEFAULT_SETTINGS, HIDDEN_ROOM, LEAVING, RECLUSE_CUTSCENE, RECLUSE_FORMS, RECLUSE_ONLINE, RECLUSE_PHASE2, hiddenRoomSettings, mulberry32, recluseNextForm, type FairMove, type Settings } from "@chessroyale/core";
+import { DEFAULT_SETTINGS, HIDDEN_ROOM, LEAVING, RECLUSE_CHILD, RECLUSE_CUTSCENE, RECLUSE_FORMS, RECLUSE_ONLINE, RECLUSE_PHASE2, childRating, hiddenRoomSettings, levelForMaia, maiaTopRating, modeSettings, mulberry32, recluseChildFirst, recluseNextForm, type FairMove, type Settings } from "@chessroyale/core";
 import { START_FEN, applyMove, bankLeft, legalMoves, type BoardScore, type MatchRunner, type MoveScore, type ServerMessage } from "@chessroyale/chess";
 import { LobbyCore, newLobbyRecord, type PartyLobby } from "../src/lobby.ts";
 import { phase2NoResult, phase2NoResultFor, phase2Unvouched, pick, quickMove, withMates, type Phase2SearchRequest } from "../src/bosses/recluse.ts";
+import { lobbyOptions } from "../src/lobby-options.ts";
 import { library } from "./lobby-fixture.ts";
 
 // (The engine server is a Container, which needs the Workers runtime: the match rooms import it.)
@@ -23,7 +24,7 @@ type Msg = ServerMessage;
  * host's device's asks for a bot's move by `answerAsks`); `auto`: one that answers every search as time goes on (`advance`), each
  * legal move scored as `answer` does, and a host's device that answers every ask.
  */
-function roomFight(people: number, bots: number, o: { engine?: boolean; auto?: boolean } = {}) {
+function roomFight(people: number, bots: number, o: { engine?: boolean; auto?: boolean; child?: boolean } = {}) {
   let now = 1_000_000;
   const inbox = new Map<string, Msg[]>();
   const searches: Phase2SearchRequest[] = [];
@@ -40,7 +41,8 @@ function roomFight(people: number, bots: number, o: { engine?: boolean; auto?: b
     startId: 1,
     room: true,
   };
-  const overrides = JSON.parse(JSON.stringify(hiddenRoomSettings()));
+  // (At his adult form, as `?form=adult`: these tests are about it and his phase 2. `child`: his fight as it starts, the child first.)
+  const overrides = JSON.parse(JSON.stringify({ ...hiddenRoomSettings(), ...(o.child ? {} : { recluseChild: false }) }));
   const core = new LobbyCore(
     newLobbyRecord("FIGHT", now, overrides, party),
     {
@@ -104,9 +106,9 @@ function roomFight(people: number, bots: number, o: { engine?: boolean; auto?: b
     const moves: MoveScore[] = legalMoves(s.fen).map((m, i) => ({ move: m, expected: score(m, i) }));
     core.phase2Searched(s.id, moves);
   };
-  /** The fight begun, then his adult form beaten by the admin's "Win this form" (the team's next move), up to his fall. */
-  const beatAdult = () => {
-    advance(1000);
+  /** The fight begun (or `begun`: the form's intro shown), then his form beaten by the admin's "Win this form" (the team's next move), up to his fall. */
+  const beatAdult = (begun = false) => {
+    if (!begun) advance(1000);
     advance(60_000);
     expect(core.record.phase).toBe("play");
     expect(core.winFormTrigger("p1", true)).toBe(true);
@@ -155,12 +157,109 @@ function roomFight(people: number, bots: number, o: { engine?: boolean; auto?: b
 }
 
 describe("his forms: a list in settings, the child form to go first without touching the online code", () => {
-  it("the adult form, then the four boards; the child form, once first, leads to the adult one", () => {
-    expect(RECLUSE_FORMS).toEqual(["adult", "four"]);
+  it("the child first (Nov 13), then the adult form, then the four boards", () => {
+    expect(RECLUSE_FORMS).toEqual(["child", "adult", "four"]);
+    expect(recluseNextForm("child")).toBe("adult");
     expect(recluseNextForm("adult")).toBe("four");
     expect(recluseNextForm("four")).toBeNull();
-    expect(recluseNextForm("child", ["child", "adult", "four"])).toBe("adult");
-    expect(recluseNextForm("adult", ["child", "adult", "four"])).toBe("four");
+    expect(recluseNextForm("adult", ["adult", "four"])).toBe("four");
+    // (Where he's fought, the settings follow the list: his room's fight and the Crowd's final start as the child.)
+    expect(recluseChildFirst()).toBe(true);
+    expect(recluseChildFirst(["adult", "four"])).toBe(false);
+    expect(hiddenRoomSettings().recluseChild).toBe(true);
+    expect(modeSettings("crowd").recluseChild).toBe(true);
+    // (?form=adult, a test switch: a lobby that starts at the man; dropped for a player.)
+    expect(lobbyOptions(new URLSearchParams("mode=crowd&form=adult"), true).overrides.recluseChild).toBe(false);
+    expect(lobbyOptions(new URLSearchParams("mode=crowd&form=adult"), false).overrides.recluseChild).toBe(true);
+  });
+});
+
+describe("his child form online (Nov 13: RECLUSE_CHILD, the first of his forms)", () => {
+  /** Plays the fight on (the team's first legal move; the host's Maia loaded, his move the first legal one) until `plies` moves are on the board, or his form is beaten. */
+  const playOn = (F: ReturnType<typeof roomFight>, plies: number, people = 1) => {
+    const asked: { brain?: { rating: number }; elo: number; ply: number }[] = [];
+    for (let i = 0; i < 400 && F.runner().boards.get(F.runner().state.boards[0]!)!.history.length < plies && !F.runner().boss!.result; i++) {
+      const round = F.core.record.round;
+      const board = F.runner().boards.get(F.runner().state.boards[0]!)!;
+      if (F.core.record.phase === "play" && round) {
+        for (let k = 1; k <= people; k++) if (!round.picks[`p${k}`]) F.core.message(`p${k}`, { t: "pick", key: round.key, move: legalMoves(board.fen)[0]! });
+      }
+      F.hostScores();
+      const req = F.last("p1", "bossRequest");
+      if (F.core.record.phase === "boss" && req && req.key === F.core.record.bossKey) {
+        asked.push({ ...(req.brain ? { brain: { rating: req.brain.rating } } : {}), elo: req.elo, ply: board.history.length });
+        F.core.message("p1", { t: "bossMove", key: req.key, move: (req.allowed ?? legalMoves(req.fen))[0]! });
+      }
+      F.advance(1000);
+    }
+    return asked;
+  };
+
+  it("his room's fight starts as the child: no powers, his level known; the host asked for his moves at the child's rating (Maia) and strength (Stockfish's stand-in), rising every 4 moves", () => {
+    const F = roomFight(1, 3, { child: true });
+    // (The host's Maia loaded: his own moves go out as Maia's, with their rating.)
+    F.core.message("p1", { t: "maiaReady" });
+    F.advance(1000);
+    const intro = F.last("p1", "boss")!;
+    expect(intro.intro).toBe(true);
+    expect(intro.boss).toMatchObject({ id: HIDDEN_ROOM.boss, form: "child", formStep: 0 });
+    expect(intro.boss.powers).toBeUndefined();
+    expect(typeof intro.boss.level).toBe("number");
+    F.advance(60_000);
+    const asked = playOn(F, 12);
+    expect(asked.length).toBeGreaterThanOrEqual(5);
+    for (const a of asked) {
+      expect(a.brain?.rating, `his move at ply ${a.ply}`).toBe(childRating(a.ply));
+      expect(a.elo).toBe(levelForMaia(childRating(a.ply)));
+    }
+    expect(asked[0]!.brain!.rating).toBe(RECLUSE_CHILD.startRating);
+    expect(asked.at(-1)!.brain!.rating).toBeGreaterThan(RECLUSE_CHILD.startRating);
+    expect(F.last("p1", "boss")!.boss.formStep).toBeGreaterThanOrEqual(2);
+  });
+
+  it("the admin's 🏆 on the child: the team's next move beats him; nobody placed; his fall (he grows up), then a new match against his adult form, his own 🏆 next, then his phase 2", () => {
+    const F = roomFight(1, 3, { child: true });
+    F.core.message("p1", { t: "maiaReady" });
+    F.advance(1000);
+    F.advance(60_000);
+    playOn(F, 4);
+    expect(F.core.winFormTrigger("p2", true)).toBe(false);
+    expect(F.core.winFormTrigger("p1", true)).toBe(true);
+    playOn(F, 99);
+    expect(F.runner().boss).toMatchObject({ form: "child", result: "crowd" });
+    expect(F.runner().isOver()).toBe(false);
+    expect(Object.keys(F.core.record.placements)).toEqual([]);
+    // His fall: not his phase change's, the child's (RECLUSE_CHILD.fallMs), and a 🏆 can't be pressed in it.
+    const fall = F.last("p1", "boss")!;
+    expect(fall).toMatchObject({ fall: true });
+    expect(fall.toPhase2).toBeUndefined();
+    expect(fall.until! - fall.now).toBe(RECLUSE_CHILD.fallMs);
+    expect(F.core.winFormTrigger("p1", true)).toBe(false);
+    expect(F.core.record.winForm).toBeUndefined();
+    // The new match: his adult form's intro, from the starting position, at his own rating.
+    F.advance(RECLUSE_CHILD.fallMs);
+    const intro = F.last("p1", "boss")!;
+    expect(intro.intro).toBe(true);
+    expect(intro.boss.form).toBeUndefined();
+    expect(intro.boss.result).toBeUndefined();
+    expect(intro.boss.level).toBeNull();
+    expect(intro.boss.powers).toMatchObject({ passive: "nohelp", ultimate: "bullet" });
+    expect(intro.boss.board.history).toEqual([]);
+    expect(F.runner().boss!.form).toBeUndefined();
+    const asked = playOn(F, 1);
+    F.advance(60_000);
+    asked.push(...playOn(F, 4));
+    for (const a of asked) expect(a.brain?.rating).toBe(maiaTopRating());
+    // His adult form beaten (the 🏆 again): his fall says the phase change follows, then the four boards.
+    F.beatAdult(true);
+    expect(F.last("p1", "boss")!.toPhase2).toBe(true);
+    F.advance(F.p2().cutAt - F.now);
+    expect(F.core.record.phase).toBe("phase2");
+  });
+
+  it("the Crowd's final starts him as the child too (its settings, from his forms)", () => {
+    const overrides = JSON.parse(JSON.stringify(modeSettings("crowd")));
+    expect(newLobbyRecord("CROWD", 0, overrides).overrides?.recluseChild).toBe(true);
   });
 });
 

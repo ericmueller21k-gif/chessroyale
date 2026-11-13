@@ -1,9 +1,10 @@
 import { beforeAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { BOSS_POWERS, DEFAULT_SETTINGS, RAID_SETTINGS, type Settings } from "@chessroyale/core";
+import { BOSS_POWERS, DEFAULT_SETTINGS, RAID_SETTINGS, RECLUSE_CHILD, type Settings } from "@chessroyale/core";
 import { legalMoves, type UciEngine } from "@chessroyale/chess";
 import { loadOpenings, SoloMatch } from "../src/solo.ts";
 import { engineMoveTitle } from "../src/components/BossDock.tsx";
 import { NetMatch } from "../src/net.ts";
+import { seatKey, setQueue, yours } from "../src/board/yours.ts";
 
 // (The opening library is its own chunk, loaded on first use: solo.ts.)
 beforeAll(() => loadOpenings());
@@ -169,4 +170,30 @@ describe("Win this form: who sees it", () => {
     expect(shownOnline(true, "clown")).toEqual({ on: false, sent: 0, armed: false });
     expect(shownOnline(true, "recluse")).toEqual({ on: true, sent: 1, armed: true });
   });
+
+  it("his child beaten (🏆) and grown up: a premove queued in his fall is dropped as the man's game starts, from the start on the same board (the review of the child form online, m2)", async () => {
+    who.admin = true;
+    const engine = {
+      topMoves: async (fen: string, n: number) => legalMoves(fen).slice(0, n).map((move, i) => ({ move, expected: 0.5 - 0.01 * i })),
+      scoreMoves: async (_fen: string, moves: string[]) => moves.map((move) => ({ move, expected: 0.5 })),
+      topMovesAt: async (fen: string, n: number) => legalMoves(fen).slice(0, n).map((move) => ({ move, expected: 0.5 })),
+      playAtElo: async (fen: string) => legalMoves(fen)[0]!,
+    } as unknown as UciEngine;
+    const m = new SoloMatch([engine], "Ann", raid({ bossId: "recluse", bossHidden: true, recluseChild: true }), false, false);
+    m.start();
+    for (let i = 0; i < 200 && m.phase.kind !== "play"; i++) await vi.advanceTimersByTimeAsync(500);
+    expect(m.phase.kind).toBe("play");
+    expect(m.boss!.form).toBe("child");
+    m.winForm();
+    m.submit(legalMoves((m.phase as { board: { fen: string } }).board.fen)[0]!);
+    const falling = () => m.phase.kind === "boss" && !!m.phase.fall;
+    for (let i = 0; i < 100 && !falling(); i++) await vi.advanceTimersByTimeAsync(100);
+    expect(falling()).toBe(true);
+    const key = seatKey(m, m.boss!.board.id, m.boss!.crowdSide);
+    setQueue(key, [{ from: "g1", to: "f3" }]);
+    await vi.advanceTimersByTimeAsync(RECLUSE_CHILD.fallMs + 100);
+    expect(m.boss!.form).toBeUndefined();
+    expect(yours(key).queue).toEqual([]);
+    m.dispose();
+  }, 30_000);
 });
