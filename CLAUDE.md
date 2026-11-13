@@ -58,6 +58,11 @@ spelling in names too; older names (e.g. `colour`) stay until touched.
   3. **Use our servers when they're truly needed:** too few capable devices, devices disagreeing, or a check that
      must be beyond any player's reach. Never skimp on the server when it's needed; never use it when a device would
      do.
+- **Fix the cause, not add a checker (Eric, Nov 13, a standing rule).** Every step of the process (reviews, delta
+  reviews, tests, sims, bug hunts) is itself reviewed: after each batch, the director looks at what each step actually
+  caught. A step that keeps catching real problems stays. When the same kind of bug or issue keeps coming back, the
+  answer is not another check that finds it: find out why it keeps happening and fix that cause.
+  `docs/decisions/2026-11-13-fix-the-cause.md`.
 - Never merge red: every PR runs the typecheck and unit tests on GitHub (`.github/workflows/check.yml`) and the e2e
   fast check (`.github/workflows/e2e.yml`: the specs of the areas it changes plus a smoke set); wait for `check` to pass
   and read the e2e run's result before merging anything that changes gameplay or screens.
