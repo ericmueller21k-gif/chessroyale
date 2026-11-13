@@ -92,7 +92,7 @@ import { bossVoice } from "./speech.tsx";
 import { maiaSaved, prefetchMaia, startMaia } from "./maia.ts";
 import { setGardenSource } from "./garden-clock.ts";
 import { timingOnDevice } from "./test-switches.ts";
-import { gameKey, onYours, yours } from "./board/yours.ts";
+import { clearPremoves, gameKey, onYours, yours } from "./board/yours.ts";
 import { premoveUci } from "./board/logic.ts";
 import { OnlinePhase2 } from "./recluse-online.ts";
 
@@ -608,6 +608,26 @@ export class NetMatch implements GameView {
     this.emit();
   }
 
+  /**
+   * The boss battle as the server says it now: every message that brings it (`boss`, `round`, `lights`, `phase2`, a reveal) comes
+   * here. The Hidden Boss's form changed (his child beaten and grown up: a new match against the man from the start): the boss screen
+   * stays up through it, so it doesn't forget the child's beats, words and banners itself. They're forgotten here, as in solo's
+   * nextForm, whichever message brings the new form first: a device that was away through the man's intro hears `round` first (the
+   * review of the child form online, m1, Nov 13). A "Win this form" pressed on the child is spent (the man's own may be pressed), and
+   * your premoves on the child's last position are dropped: they'd play themselves on the man's first move (m2).
+   */
+  private setBoss(next: NetBoss) {
+    if (this.boss && this.boss.form !== next.form) {
+      this.winFormSent = false;
+      resetKingSpeech();
+      bossVoice.reset();
+      resetBeats();
+      resetBattleBanners();
+      clearPremoves(this);
+    }
+    this.boss = { ...next, board: this.toView(next.board) };
+  }
+
   private send(msg: ClientMessage) {
     if (this.ws?.readyState === WebSocket.OPEN) this.ws.send(JSON.stringify(msg));
   }
@@ -682,7 +702,7 @@ export class NetMatch implements GameView {
         this.kingCalled = false;
         this.darkNote = null;
         // Boss battle: the battle as it stands (his charges; after his Last Stand, the move he took back).
-        if (m.boss) this.boss = { ...m.boss, board: this.toView(m.boss.board) };
+        if (m.boss) this.setBoss(m.boss);
         // (Wrangler's showdown may follow this turn: the host scouts line-ups while the crowd thinks.)
         if (m.boss) this.scoutShowdown(m.boss);
         this.tally = null;
@@ -807,17 +827,7 @@ export class NetMatch implements GameView {
       case "boss":
         // (The boss's first move, when it moves first, is move 1 too; its intro isn't.)
         if (!m.intro && m.boss.lastMove) this.begun = true;
-        // (The Hidden Boss's child beaten and grown up: a new match against his adult form, his entrance again as a new battle's. The
-        // boss screen stays up through it, so it doesn't reset his beats, words and banners itself: here, as solo's nextForm.)
-        if (this.boss?.form === "child" && !m.boss.form) {
-          // (A "Win this form" pressed on the child is spent: the man's own may be pressed.)
-          this.winFormSent = false;
-          resetKingSpeech();
-          bossVoice.reset();
-          resetBeats();
-          resetBattleBanners();
-        }
-        this.boss = { ...m.boss, board: this.toView(m.boss.board) };
+        this.setBoss(m.boss);
         this.standingsList = m.standings;
         this.currentBoard = m.boss.board;
         this.lights = null;
@@ -853,7 +863,7 @@ export class NetMatch implements GameView {
         return this.emit();
       }
       case "lights": {
-        this.boss = { ...m.boss, board: this.toView(m.boss.board) };
+        this.setBoss(m.boss);
         this.standingsList = m.standings;
         this.currentBoard = m.boss.board;
         const local: LightsView = { ...m.lights, at: this.local(m.lights.at) };
@@ -897,7 +907,7 @@ export class NetMatch implements GameView {
           this.begun = true;
         }
         // (Back in the middle of it, a reload: the battle and the standings come with it.)
-        if (m.boss) this.boss = { ...m.boss, board: this.toView(m.boss.board) };
+        if (m.boss) this.setBoss(m.boss);
         if (m.standings) this.standingsList = m.standings;
         return this.phase2.onMessage(m.p2, !!m.refused);
       case "phase2Ask":
@@ -951,7 +961,7 @@ export class NetMatch implements GameView {
     this.roundsPlayed = m.roundsPlayed;
     this.standingsList = m.standings;
     this.cutoff = m.cutoff;
-    if (m.boss) this.boss = { ...m.boss, board: this.toView(m.boss.board) };
+    if (m.boss) this.setBoss(m.boss);
     if (!m.fenBefore || !this.currentBoard) return this.emit();
     const mine: GroupReveal = {
       fenBefore: m.fenBefore,
