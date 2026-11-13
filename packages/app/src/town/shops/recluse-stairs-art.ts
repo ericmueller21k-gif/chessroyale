@@ -3,9 +3,9 @@
  * rooms are (the camera looks north, things stand upright at their foot, 37 px a square), built as his room is (shops/recluse-art.ts:
  * every piece its own Character, `shop-recluse-<name>`, the layout). Drawn by hand in code. Smaller inside than out, as Eric allowed.
  *
- * - **The hall** (the ground floor, from the street): a tenement lobby's white hexagon mosaic with a black border and a little black rosette;
- *   walls of dark green paint to the chair rail, cream plaster over it; three flats' doors you can't open (1A in the back wall, 1B in the
- *   west, 1C in the east); a bank of brass mailboxes; a wall sconce; the stairs up at the back right (the door to the landing); the street
+ * - **The hall** (the ground floor, from the street): a tenement lobby's white hexagon mosaic with a black border; walls of dark green
+ *   paint to the chair rail, cream plaster over it; two flats' doors you can't open (1A and 1B, in the back wall) with a bank of brass
+ *   mailboxes between them; a wall sconce; a radiator; the stairs up at the back right (the door to the landing); the street
  *   door at the front, its glass bright with the day.
  * - **The landing** (the second floor): worn oak boards and a red runner from the stairs down (the front) to the stairs up (the back right);
  *   the same walls; flat 2A's door; a window over the airshaft; a sconce.
@@ -98,7 +98,7 @@ function def(name: string, sq: readonly [number, number], w: number, h: number, 
 
 // ==== The floors: one picture of each room's floor (7 x 7 squares), cut into its tiles (`floor-<room>-<col>-<row>`).
 
-/** The hall's mosaic: little white hexagons, a black band round the room's edge, a black rosette in the middle. */
+/** The hall's mosaic: little white hexagons, a black band round the room's edge. */
 function hallPx(X: number, Y: number): string {
   const S = N * T;
   const edge = Math.min(X, Y, S - 1 - X, S - 1 - Y);
@@ -109,12 +109,15 @@ function hallPx(X: number, Y: number): string {
   const grout = yy === 0 || ((xx === 0 || xx === 5) && yy !== 2);
   // The border band, two hexagons deep, a hand from the walls.
   const band = edge >= 8 && edge < 16;
-  // The rosette: a ring of black hexagons round the middle.
-  const d = Math.hypot(X - S / 2, Y - S / 2.1);
-  const rosette = (d > 26 && d < 36) || d < 7;
-  if (grout) return band || rosette ? "4" : "2";
-  return band || rosette ? "3" : hash(Math.floor((X + (row % 2) * 3) / 6), row, 5) < 0.06 ? "2" : "1";
+  if (grout) return band ? "4" : "2";
+  return band ? "3" : hash(Math.floor((X + (row % 2) * 3) / 6), row, 5) < 0.06 ? "2" : "1";
 }
+/** Whether a point of the landing's floor (px) is on its runner. */
+const inRun = (X: number, Y: number) => {
+  const cx = X / T;
+  const cy = Y / T;
+  return (cx > 2.2 && cx < 3.8 && cy > 0.95 && cy < N) || (cx > 2.2 && cx < 5.8 && cy > 0.95 && cy < 2.0);
+};
 /** The landing's oak boards running east to west, the red runner from the stairs down (front) to the stairs up (back right). */
 function landingPx(X: number, Y: number): string {
   const row = Math.floor(Y / 9.25);
@@ -123,15 +126,9 @@ function landingPx(X: number, Y: number): string {
   let k = yy === 0 || joint ? "5" : row % 3 === 0 ? "6" : "7";
   if (k !== "5" && yy === 1) k = "8";
   else if (k !== "5" && hash(X >> 2, row, 4) < 0.06) k = "6";
-  // The runner: across the landing from the front stairs (columns 2-3) back to the stairs up (columns 4-5), an L along row 3.
-  const cx = X / T;
-  const cy = Y / T;
-  const inRun = (cx > 2.15 && cx < 3.85 && cy > 3.2) || (cy > 2.15 && cy < 3.85 && cx > 2.15 && cx < 5.85) || (cx > 4.15 && cx < 5.85 && cy > 0.9 && cy < 3.85);
-  if (inRun) {
-    const near = (a: number, b: number) => Math.abs(a - b) < 0.09;
-    const border = near(cx, 2.15) || near(cx, 3.85) || near(cy, 3.85) || near(cx, 5.85) || (near(cy, 2.15) && cx > 3.85) || (near(cx, 4.15) && cy < 2.15) || near(cy, 0.9);
-    return border ? "q" : (X + Y) % 7 === 0 ? "R" : "r";
-  }
+  // The runner: from the stairs down (the front, columns 2-3) straight back, then along before the stairs up (columns 4-5): an L, its
+  // cream border round its outside edge only.
+  if (inRun(X, Y)) return !inRun(X - 3, Y) || !inRun(X + 3, Y) || !inRun(X, Y - 3) || !inRun(X, Y + 3) ? "q" : (X + Y) % 7 === 0 ? "R" : "r";
   return k;
 }
 for (const [room, px] of [["hall", hallPx], ["landing", landingPx]] as const)
@@ -345,16 +342,16 @@ function layoutOf(room: "hall" | "landing"): ShopPlace[] {
   };
   for (let row = 0; row < N; row++) for (let col = 0; col < N; col++) at(`floor-${room}-${col}-${row}`, col, row, false);
   const floors = out.length;
-  // -- The back wall: the hall's flat 1A, its mailboxes, a sconce; the landing's flat 2A, the sconce, the window; the stairs up (4-5).
-  const back = room === "hall" ? ["wall-0", "flat-door", "mailboxes", "sconce"] : ["wall-1", "flat-door", "sconce", "window"];
+  // -- The back wall (the flats' doors there: a side wall's card is seen edge on, a door on it wouldn't read): the hall's flats 1A and 1B
+  // with the mailboxes between, the sconce in the corner; the landing's flat 2A, the sconce, the window; the stairs up (4-5).
+  const back = room === "hall" ? ["wall-0", "flat-door", "mailboxes", "flat-door"] : ["wall-1", "flat-door", "sconce", "window"];
   back.forEach((name, col) => at(name, col, 0, true));
   at("stairs-up", 4, 0, false, { door: room === "hall" ? "landing" : "top" });
-  at("wall-2", 6, 0, true);
-  // -- The side walls: the hall's flats 1B (west, row 2) and 1C (east, row 2); the landing's plain.
+  at(room === "hall" ? "sconce" : "wall-2", 6, 0, true);
+  // -- The side walls: plain.
   for (let row = 1; row < N - 1; row++) {
-    const flat = room === "hall" && row === 2;
-    at(flat ? "flat-door" : `wall-${(row * 5) % 4}`, 0, row, true);
-    at(flat ? "flat-door" : `wall-${(row * 5 + 2) % 4}`, N - 1, row, true, { flip: true });
+    at(`wall-${(row * 5) % 4}`, 0, row, true);
+    at(`wall-${(row * 5 + 2) % 4}`, N - 1, row, true, { flip: true });
   }
   // -- A radiator by a side wall.
   if (room === "hall") at("radiator", 1, 5, true);
@@ -375,5 +372,5 @@ export const RECLUSE_STAIRS_PIECES: Readonly<Record<string, Character>> = Object
 /** The camera's fixed look at the town's zoom (a small room seen whole). */
 export const RECLUSE_HALL_CAM = { x: 3.0, y: 2.6 } as const;
 /** The squares where each room's flats' doors are talked to (shops.ts RECLUSE_ROOMS: `talkAt`), in front of each. */
-export const RECLUSE_HALL_TALK = [{ c: 1, r: 1 }, { c: 1, r: 2 }, { c: 5, r: 2 }] as const;
+export const RECLUSE_HALL_TALK = [{ c: 1, r: 1 }, { c: 3, r: 1 }] as const;
 export const RECLUSE_LANDING_TALK = [{ c: 1, r: 1 }] as const;

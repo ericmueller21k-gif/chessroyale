@@ -216,8 +216,8 @@ describe("the rooms' own pieces", () => {
 });
 
 describe("the shops", () => {
-  it("only Babur's, Puddles', Alfil's, Big Boy's, Timber's, Dash's, Hollow's, Wrangler's, Jefferson's, Ginger's, Folio's, Smudgy's, Boingo's and Rolling Dough's homes have an inside", () => {
-    expect(ALL_HOMES.filter((h) => shopOf(h.id)).map((h) => h.id).sort()).toEqual(["alfil", "bigboy", "clown", "dash", "folio", "gardener", "gingerbread", "grex", "hollow", "pig", "smudgy", "tiger", "timber", "zebra"]);
+  it("only Babur's, Puddles', Alfil's, Big Boy's, Timber's, Dash's, Hollow's, Wrangler's, Jefferson's, Ginger's, Folio's, Smudgy's, Boingo's, Rolling Dough's and the Walk-up's (the Hidden Boss's, Nov 13) homes have an inside", () => {
+    expect(ALL_HOMES.filter((h) => shopOf(h.id)).map((h) => h.id).sort()).toEqual(["alfil", "bigboy", "clown", "dash", "folio", "gardener", "gingerbread", "grex", "hollow", "pig", "recluse", "smudgy", "tiger", "timber", "zebra"]);
   });
 
   it("the crates' words: names, the price line, what you have; the boss's ride is a prize", () => {

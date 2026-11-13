@@ -165,7 +165,7 @@ export const BACK_ROOMS: Readonly<Partial<Record<HomeId, ShopDef>>> = {
 const RECLUSE_NAME: string = BOSS_ROSTER.find((b) => b.id === "recluse")!.name;
 /**
  * The Hidden Boss's walk-up (Nov 13, the brief's three rooms; docs/decisions/2026-11-13-hidden-boss-building.md). The hall (its front,
- * from the town): three flats' doors you can't open (a short line on its card), the stairs up. The landing: the next flight up, the stairs
+ * from the town): two flats' doors you can't open (and one on the landing) (a short line on its card), the stairs up. The landing: the next flight up, the stairs
  * down. The top floor: his room (the child playing his 1956 game on the floor: shops/recluse-scene.ts), his theme playing; his card's
  * Challenge greyed, "Coming soon" (the room's challenge, the four players and the summoning are the next job: server). None of them has a
  * Shopkeeper (`hideKid`; `kid` only names a sheet the loader wants).
@@ -180,8 +180,8 @@ const RECLUSE_HALL: ShopDef = {
   at: [0, 0],
   keeper: [],
   talk: ["flat-door"],
-  // (In front of each flat's door: 1A's in the back wall, 1B's in the west wall, 1C's in the east (row 2): shops/recluse-stairs-art.ts.)
-  talkAt: [{ c: 1, r: 1 }, { c: 1, r: 2 }, { c: 5, r: 2 }],
+  // (In front of each flat's door, 1A's and 1B's in the back wall: shops/recluse-stairs-art.ts RECLUSE_HALL_TALK.)
+  talkAt: [{ c: 1, r: 1 }, { c: 3, r: 1 }],
   talkNear: true,
   locked: ["No answer.", "A radio's playing in there. Nobody comes.", "Locked.", "Somebody shuffles to the door, then away again."],
   prizes: [],

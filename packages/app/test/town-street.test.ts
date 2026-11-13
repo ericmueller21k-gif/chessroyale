@@ -45,7 +45,7 @@ describe("the street town's layout is the plan's (Nov 5)", () => {
 
   it("has all seventeen homes (an admin's, Rolling Dough the seventeenth since Nov 11), each on its lot, its picture's foot on the lot's front line, centred", () => {
     expect(HOMES).toEqual(ALL_HOMES);
-    expect(HOMES).toHaveLength(17);
+    expect(HOMES).toHaveLength(18);
     for (const h of HOMES) {
       const l = lotOf(h.id);
       expect(h.cx, h.id).toBe(l.c0 + (l.w - 1) / 2);
@@ -94,13 +94,13 @@ describe("the street town's layout is the plan's (Nov 5)", () => {
     expect(LAMPS).toHaveLength(PLAN.props.filter((p) => p.kind === "lamp").length);
     // (A lamp stands on a sidewalk, never under a row.)
     for (const l of LAMPS) expect(ROW_GROUND[l.r * N + l.c], at(l.c, l.r)).toBe(0);
-    expect(STREET_LOTS.filter((l) => l.kind === "home")).toHaveLength(17);
+    expect(STREET_LOTS.filter((l) => l.kind === "home")).toHaveLength(18);
   });
 
   it("no lamp stands in front of a boss's home (Eric, Nov 7: \"lamp posts right in front of Big Boy's Crib and Dash's Kicks… it just looks bad\"): none in any home's frontage box, its lot's width (its picture's, shifted) and half a square either side, from its front to the street's walking line", () => {
     const MARGIN = 0.5;
     const homes = STREET_LOTS.filter((l) => l.kind === "home");
-    expect(homes).toHaveLength(17);
+    expect(homes).toHaveLength(18);
     for (const h of homes) {
       // (Every home's front faces south, onto the sidewalk row just south of it: the walking line is that row's street edge.)
       expect(h.facing, h.id).toBe("S");

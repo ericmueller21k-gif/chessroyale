@@ -626,6 +626,10 @@
       "paths": ["e2e/zebra-home.spec.ts", "packages/app/src/town/shops/zebra-*.ts", "packages/app/src/town/shops/bakery-kit.ts", "packages/app/src/town/shops/intros/zebra.ts", "packages/app/src/town/houses/zebra.ts", "packages/app/src/characters/zebra-sounds.ts", "packages/app/src/characters/sidekicks/zebrakeeper.ts"],
       "specs": ["e2e/zebra-home.spec.ts"]
     },
+    "the Hidden Boss's walk-up (Nov 13: the building in the town, the hall, the landing and his room, the stairs between them)": {
+      "paths": ["packages/app/src/town/houses/recluse.ts", "packages/app/src/town/shops/recluse-*.ts"],
+      "specs": ["e2e/town-street.spec.ts"]
+    },
     "Boingo's claw machine in his Funhouse (the play on the server, the cabinet in the room)": {
       "paths": ["packages/server/src/claw.ts", "packages/app/src/town/shops/boingo-art.ts", "packages/app/src/town/shops/claw-cabinet.ts", "packages/app/src/town/kit/models/claw-cabinet.ts"],
       "specs": ["e2e/claw.spec.ts", "e2e/shop.spec.ts"]
