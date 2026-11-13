@@ -35,7 +35,7 @@ MP3 = ["-c:a", "libmp3lame", "-b:a", "64k"] if MONO else ["-c:a", "libmp3lame", 
 # start is part of the ride each time round. (The Hidden Boss's pieces are phases_v.py's.)
 SONGS = [("grex", "song_m", 16, "Jefferson"), ("bigboy", "song_k", 0, "Big Boy"), ("hollow", "song_l", 16, "Hollow"), ("folio", "song_o", 54, "Folio"), ("zebra", "song_n", 16, "Don Dough"),
          ("sawyer", "song_p", 32, "Sawyer"), ("timber", "song_q", 32, "Timber"), ("moo", "song_r", 16, "Moo & Moon"), ("clown", "song_s", 0, "Boingo the Clown"),
-         ("gingerbread", "song_t", 0, "Ginger"), ("alfil", "song_u", 0, "Alfil"), ("dash", "song_y", 0, "Dash"), ("gardener", "song_z", 0, "Puddles")]
+         ("gingerbread", "song_t", 0, "Ginger"), ("alfil", "song_u", 0, "Alfil"), ("dash", "song_y", 0, "Dash"), ("gardener", "song_z", 0, "Puddles"), ("pig", "song_ac", 0, "Wrangler")]
 
 
 def render(module: str, intro_beats: float, part: str) -> np.ndarray:

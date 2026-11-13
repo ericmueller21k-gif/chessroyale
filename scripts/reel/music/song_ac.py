@@ -20,10 +20,16 @@ So, its rules, all kept here:
     whistle trading; the guitar's anthem, brass stabs on the D7; a high-noon showdown in stops and starts; the guitar
     and the whistle trading two bars each; and (the recipe's, SOUNDS.md) the tune once more a minor third up, all
     three together.
-What is not used: its notes asked for the "iconic" call of a famous western film's theme and gave a line for the
-whistle; neither is here. The call, the whistle's lines and the guitar's are written for this song: none of it is
-any song's, any film's or any game's (the hard rule). Nor is the first write-up's bass run (minor third, major
-third, fourth, fifth), which its notes asked for again: this bass's turns walk by step to the next chord's note.
+The call and the whistle's answer are the ones its notes gave, by Eric's decision (Nov 13). The first go had its
+own in their place, under the hard rule (never imitate a tune); he asked to hear the notes' ("forget the rule for
+this one ... let me be the judge"), and chose that for the game: "when I say iconic, it's not because it has anything
+to do with iconic films. It's just describing an iconic theme that people relate to Western cowboy style. It's used
+in games ... in movies, plays." So the call is a fourth up and back, held, then three notes stepping down (as the
+notes wrote it: D, G, D; C, B flat, A; over E flat its last note is G), and the whistle's answer is the notes' line
+(G, A, B flat, D, C, B flat, A), each time. The rule stands for every other song and for the rest of this one: the
+chorus, high noon's whistle, the licks, the solo and the bass are written for it (`OWN` keeps the first go's own call
+and answers). Nor is the first write-up's bass run used (minor third, major third, fourth, fifth), which the notes
+asked for again: this bass's turns walk by step to the next chord's note.
 About 137 beats a minute, 88 bars, 2:34. Its notes gave 1:30 to 1:45; the first go here was two minutes, and Eric: "I
 didn't realize that the AI said to make it shorter. Can you actually make it like 2 minutes 30, 2 minutes 40". What
 the longer one has more: a chorus (the round begun from B flat, the whistle's own tune), four more bars of high noon
@@ -72,16 +78,21 @@ CHORDS = (
 assert len(CHORDS) == BARS, len(CHORDS)
 
 # ---- the lines. Lengths in beats; 2/3 is a note of three-across-two, .25 a 16th. Rests between the phrases. ----
-# The call (the "wah" voice): two quick notes and a long high one; then two more, the second held.
-CALL1 = "Bb5:.25 G5:.25 D6:2.5 -:1 | F5:.5 G5:2.5 -:1"
-CALL2 = "G5:.25 Eb5:.25 Bb5:2.5 -:1 | D5:.5 Eb5:2.5 -:1"
-# The whistle's answers: over F, and over D7 (the Spanish turn, then a leap).
-ANS1 = "-:.5 A5:.5 C6:1 D6:1.5 C6:.5 | A5:1 G5:.5 F5:.5 A5:2"
-ANS2 = "A5:.5 Bb5:.5 A5:.5 F#5:.5 Eb5:1 D5:1 | F#5:.5 A5:.5 D6:2 -:1"
-ANS3 = "C6:.5 D6:.5 -:.5 C6:.5 A5:1 F5:1 | A5:2/3 C6:2/3 A5:2/3 G5:2"
-ANS4 = "D6:1.5 C6:.5 Bb5:.5 A5:.5 F#5:1 | A5:.5 F#5:.5 D5:2 -:1"
-# The standoff's whistle, over the bell.
-LONE = "-:1 D6:2 Bb5:.5 C6:.5 | G5:1.5 F5:.5 G5:2"
+# The call (the "wah" voice) and the whistle's answer, as his notes gave them: a fourth up and back, held, and three
+# notes stepping down (over E flat the last is G); the whistle's line climbs to D and comes down a step short.
+CALL1 = "D5:.25 G5:.25 D5:2.5 -:1 | C5:1 Bb4:1 A4:2"
+CALL2 = "D5:.25 G5:.25 D5:2.5 -:1 | C5:1 Bb4:1 G4:2"
+ANS1 = ANS2 = ANS3 = ANS4 = LONE = "G5:.5 A5:.5 Bb5:1 D6:1.5 C6:.5 | Bb5:1 A5:2 -:1"
+# The first go's own call, answers (over F, over D7, and the second round's) and standoff whistle: not played now.
+OWN = {
+    "CALL1": "Bb5:.25 G5:.25 D6:2.5 -:1 | F5:.5 G5:2.5 -:1",
+    "CALL2": "G5:.25 Eb5:.25 Bb5:2.5 -:1 | D5:.5 Eb5:2.5 -:1",
+    "ANS1": "-:.5 A5:.5 C6:1 D6:1.5 C6:.5 | A5:1 G5:.5 F5:.5 A5:2",
+    "ANS2": "A5:.5 Bb5:.5 A5:.5 F#5:.5 Eb5:1 D5:1 | F#5:.5 A5:.5 D6:2 -:1",
+    "ANS3": "C6:.5 D6:.5 -:.5 C6:.5 A5:1 F5:1 | A5:2/3 C6:2/3 A5:2/3 G5:2",
+    "ANS4": "D6:1.5 C6:.5 Bb5:.5 A5:.5 F#5:1 | A5:.5 F#5:.5 D5:2 -:1",
+    "LONE": "-:1 D6:2 Bb5:.5 C6:.5 | G5:1.5 F5:.5 G5:2",
+}
 # The chorus: the whistle's tune (three bars and a breath, twice, then the turn), and the call's voice in its rests.
 CHOR = (
     "F5:.5 Bb5:.5 D6:2.5 C6:.5 | Bb5:1 F5:2/3 G5:2/3 Bb5:2/3 C6:1 | A5:2.5 F5:.5 C5:.5 F5:.5 | A5:1.5 C6:.5 A5:1 -:1 | "
@@ -425,7 +436,7 @@ def render(window=None) -> np.ndarray:
     shot(bar0(8) + 3.5, 0.12)
 
     # Bars 9-24: the gallop. The call (two bars, on G minor and on E flat) and the whistle (two bars, on F and on D7)
-    # trade, twice round; the whistle's answers are new the second time.
+    # trade, twice round.
     x.crash(bar0(9), 0.2, decay=0.6)
     for bar in range(9, 25):
         ridden(bar, chugs=0.0 if bar < 17 else 0.9)  # (the distorted guitar's muted chords come in under the second round)

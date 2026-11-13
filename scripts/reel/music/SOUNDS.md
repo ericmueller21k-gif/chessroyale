@@ -41,6 +41,7 @@ from the liked list, keep off the other one. Eric's words are quoted; the date i
 | A swung mid-tempo funk strut on a console's chips: dry short notes and rests set against a part with held chords and echo; a nasal lead that scoops into its phrases; a square-wave whistle with a note flicked in from below; a few of the boss's made-up syllables | song_z.py | Nov 13, of Puddles's first go: "I have zero issue. It's great." |
 | The boss's own timer running the song: a seed every 30 seconds, a new part from each; a line that grows a note longer each time round; a bass that climbs an octave a step a bar | song_z.py | the same |
 | Biker funk-rock (a slap bass in 16ths, an overdriven guitar, chugging chords, a guitar-and-fiddle duel) | song_aa.py | Nov 13, as Wrangler's first theme: "The Wrangler one is good", but the style "didn't really fit him" (his own pick of write-up, he said): shelved, to be an unreleased track. A boss's theme has to sound like the boss: for Wrangler he then asked for "common like Western cowboyness" and "a little bit of his grunting"; song_ab.py (below) missed, and he had song AA rebuilt from a listener's notes on it (song_ac.py) |
+| A spaghetti-western gallop: a "wah" voice calling and a lone whistle (a glide, a waver, an echo) answering, two bars each, over a galloping slap bass, a kick on 1 and 3 and a cracking snare, a dry strummed guitar with runs of three; then a distorted guitar (clipped hard, through a speaker's curve) with the same tune an octave lower; a standoff of a bell, timpani and a gunshot | song_ac.py | Nov 13, Wrangler's third go: chosen for the game, in the version with the call and whistle line his notes gave |
 | A fast pattern racing under everything | every song since song_i.py | asked for in all of them |
 | The NES's four voices | song_c.py, song_f.py | "much much better" than the 16-bit orchestra |
 
@@ -124,6 +125,13 @@ track): "take these notes and make your own version. Same rules as always." Use 
 swing, the kinds of voices, how dry or echoing it is, how the parts contrast); never the write-up's chords, riffs or
 tune, nor its "original" version in another key (that is the track's chords moved); don't listen to the track. Say
 in the song's docstring and to Eric which was which. Both passed first go.
+
+One exception, his own (Nov 13, Wrangler's song_ac.py): the notes he sent for it gave a call and a whistle line
+("the cliche Western wah-wah-wah"); the first go had its own lines there, under the rule; he asked to hear the notes'
+("forget the rule for this one ... let me be the judge") and chose it: "when I say iconic, it's not because it has
+anything to do with iconic films. It's just describing an iconic theme that people relate to Western cowboy style."
+That is his call to make and applies to that song's call and whistle line only: the rule stands for everything else,
+unless he says so again for a song.
 
 Two minutes from the start (or a little more when the intro wants it: Nov 12, "it's our game ... let's just make it a
 little bit longer than 2 minutes and it'll still loop"; for the Hidden Boss, "if this song is 2:30-3 that's fine"),
