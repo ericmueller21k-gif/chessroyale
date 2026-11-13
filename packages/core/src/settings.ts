@@ -1936,8 +1936,8 @@ export const RECLUSE_TALK = {
  * - **He grows:** `ages`, the Maia rating from which each drawing shows (`recluse-ages.ts`): about 9, 13, 20 (the black suit),
  *   then his adult look, the last at the top (a test checks), so the child at his strongest is the man you meet next.
  * - **Beaten** (by mate, or the admins' "Win this form"): his line, then he grows up into the man (`fallMs` in all), and a new
- *   match starts from the starting position against his adult form (today's phase 1), solo and, once its form list is in,
- *   online. A draw or a loss ends the fight, as his adult form's does.
+ *   match starts from the starting position against his adult form (today's phase 1), solo and online (RECLUSE_FORMS). A draw
+ *   or a loss ends the fight, as his adult form's does.
  */
 export const RECLUSE_CHILD = {
   startRating: 1800,

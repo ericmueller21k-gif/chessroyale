@@ -1877,7 +1877,7 @@ export class MatchRunner {
 
   /**
    * The form a boss battle against `id` starts in: the Hidden Boss's child (RECLUSE_CHILD), where the settings ask for it
-   * (`recluseChild`: solo; online once the server's form list is in), else his usual form (nothing set).
+   * (`recluseChild`, from RECLUSE_FORMS: solo, his room's fight and the Crowd's boss final online), else his usual form (nothing set).
    */
   private firstForm(id: string): { form?: BossForm } {
     return id === "recluse" && this.settings.recluseChild ? { form: "child" } : {};

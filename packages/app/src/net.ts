@@ -616,7 +616,7 @@ export class NetMatch implements GameView {
    * review of the child form online, m1, Nov 13). A "Win this form" pressed on the child is spent (the man's own may be pressed), and
    * your premoves on the child's last position are dropped: they'd play themselves on the man's first move (m2).
    */
-  private setBoss(next: NetBoss) {
+  private setBoss(next: NetBoss): BossView {
     if (this.boss && this.boss.form !== next.form) {
       this.winFormSent = false;
       resetKingSpeech();
@@ -625,7 +625,7 @@ export class NetMatch implements GameView {
       resetBattleBanners();
       clearPremoves(this);
     }
-    this.boss = { ...next, board: this.toView(next.board) };
+    return (this.boss = { ...next, board: this.toView(next.board) });
   }
 
   private send(msg: ClientMessage) {
@@ -827,7 +827,7 @@ export class NetMatch implements GameView {
       case "boss":
         // (The boss's first move, when it moves first, is move 1 too; its intro isn't.)
         if (!m.intro && m.boss.lastMove) this.begun = true;
-        this.setBoss(m.boss);
+        const boss = this.setBoss(m.boss);
         this.standingsList = m.standings;
         this.currentBoard = m.boss.board;
         this.lights = null;
@@ -839,7 +839,7 @@ export class NetMatch implements GameView {
           bossVoice.reset();
           this.phase2Boards = m.phase2Boards ?? [];
         }
-        return this.setPhase({ kind: "boss", boss: this.boss, until: m.until ? this.local(m.until) : 0, thinking: m.thinking, intro: m.intro, ...(m.fall ? { fall: true } : {}), ...(m.fall && m.toPhase2 ? { toPhase2: true } : {}), ...(this.rush ? { rush: { ...this.rush, places: { ...this.rush.places }, moved: { ...this.rush.moved } } } : {}) });
+        return this.setPhase({ kind: "boss", boss, until: m.until ? this.local(m.until) : 0, thinking: m.thinking, intro: m.intro, ...(m.fall ? { fall: true } : {}), ...(m.fall && m.toPhase2 ? { toPhase2: true } : {}), ...(this.rush ? { rush: { ...this.rush, places: { ...this.rush.places }, moved: { ...this.rush.moved } } } : {}) });
       case "darkTry": {
         if (m.key !== this.key || this.phase.kind !== "play") return;
         if (m.ok) {

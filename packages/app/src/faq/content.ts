@@ -663,7 +663,7 @@ A boss's strength is a rating on Stockfish's scale, set as the battle starts:
 - **Play with bots and Boss alone** work the same way from your own rating (unrated, ${src.priorRating}).
 ${
   fixed
-    ? `- **The Crowd's boss final** is always ${bossInText(fixed.name, false, src.roster)}, whose strength is fixed at ${fixedLevel(M)}, whatever anyone's rating: no tier, offset or difficulty ([his block](#boss-${fixed.id})).`
+    ? `- **The Crowd's boss final** is always ${bossInText(fixed.name, false, src.roster)}. He starts as a boy: Maia at ${num(RECLUSE_CHILD.startRating)}, ${num(RECLUSE_CHILD.stepRating)} stronger every ${n(RECLUSE_CHILD.everyPlies, "move")} on the board, up to ${num(maiaTopRating(M))}. Beat the boy and the man comes next, whose strength is fixed at ${fixedLevel(M)}. Neither follows anyone's rating: no tier, offset or difficulty ([his block](#boss-${fixed.id})).`
     : `- **The Crowd's boss final** comes from how the people among the last ${finalists} played that match (bots count only if no person is left among them): a weighted average of their ratings (the best counts ${finalists} times, the next ${finalists - 1}, down to the weakest once), ${S.bossEloOffset < 0 ? "minus" : "plus"} ${Math.abs(S.bossEloOffset)} (a crowd picking together plays better than its average member), kept within ${range(S.bossEloRange)}. The weighting makes it a real fight for the best players.`
 }
 - Then each boss's **offset** is added: bosses with nastier powers play a little weaker underneath.
@@ -715,7 +715,7 @@ ${
 3. A **guard**, where there is one ([the bridge](#handover)), may veto that move, judged against the boss's own Stockfish search of its best moves (a move outside that search is turned down). Maia's next likeliest moves are then tried in turn (at most ${M.candidates} in all, each at least ${pct(M.minP, 0)} likely); if none passes, the boss plays Stockfish's best.
 4. If Maia hasn't loaded, fails, or takes more than ${num(M.timeoutMs / 1000)} s for a move (an older phone, say), the boss plays its usual Stockfish move. In Solo games and Boss alone, a boss battle waits for Maia to load before it starts, ${num(M.loadGateMs / 1000)} s at most; online, nobody waits for it. Online, two players' devices play each boss move with the same seed, so they agree, and the server compares them; a computer may load Maia for this, a phone only if it already has it.
 
-${fixed ? `**${bossInText(fixed.name, true, src.roster)}** has a brain of his own: Maia at its top rating, ${maiaTopRating(M)}, with no guard and none of Stockfish's moves, whatever the crowd (Stockfish only while Maia loads, or where it can't run).
+${fixed ? `**${bossInText(fixed.name, true, src.roster)}** has a brain of his own: Maia at its top rating, ${maiaTopRating(M)}, with no guard and none of Stockfish's moves, whatever the crowd (Stockfish only while Maia loads, or where it can't run). The boy he starts as has the same brain at his own rating, climbing to that top as he grows.
 
 ` : ""}A Maia boss doesn't slip on purpose: its own mistakes take the slips' place. Its special moments keep their own engine picks: the move it makes when the God King strikes it, Boingo's move for the crowd as his Funhouse comes, Hollow's extra move after Lights Out and Big Boy's Big Bounce.
 
@@ -1020,11 +1020,11 @@ function godKing(src: FaqSources): FaqSection {
     body: `
 ### Who he is {#king-who}
 
-The crowd's champion in every Boss Battle (alone, in a party or in a group) and the Crowd's boss final. He stands by the board in your side's colors, talks now and then, and acts when the crowd calls him. He's there for the big moments, not to play the game for you.${finalBoss ? ` His help doesn't work against [${bossInText(finalBoss.name, false, src.roster)}](#boss-${finalBoss.id}), the Crowd's boss: calling him there only spends a charge.` : ""}
+The crowd's champion in every Boss Battle (alone, in a party or in a group) and the Crowd's boss final. He stands by the board in your side's colors, talks now and then, and acts when the crowd calls him. He's there for the big moments, not to play the game for you.${finalBoss ? ` His help doesn't work against [${bossInText(finalBoss.name, false, src.roster)}](#boss-${finalBoss.id}), the Crowd's boss, once he's grown up: calling him then only spends a charge. Against the boy he starts as, it works.` : ""}
 
 ### Strike or play: his charges {#king-charges}
 
-He has up to ${n(S.kingChargesMax, "charge")}. In a Boss Battle he starts with ${S.kingChargesMax}. In the Crowd's boss final, the finalists' leftover power-ups become his charges: one for every ${S.kingPowerUpsPerCharge}, rounded, at least ${kingCharges(0, S)} and at most ${S.kingChargesMax}.${finalBoss ? ` There a call only spends one: his help doesn't work against [${bossInText(finalBoss.name, false, src.roster)}](#boss-${finalBoss.id}).` : ""} Tap him to open his menu:
+He has up to ${n(S.kingChargesMax, "charge")}. In a Boss Battle he starts with ${S.kingChargesMax}. In the Crowd's boss final, the finalists' leftover power-ups become his charges: one for every ${S.kingPowerUpsPerCharge}, rounded, at least ${kingCharges(0, S)} and at most ${S.kingChargesMax}.${finalBoss ? ` Once [${bossInText(finalBoss.name, false, src.roster)}](#boss-${finalBoss.id}) has grown up there, a call only spends one: his help doesn't work against the man.` : ""} Tap him to open his menu:
 
 - **Play this move:** he plays the judge's best move for the crowd (stronger than the boss).
 - **Strike the boss:** three bolts on the boss's king, and the boss's next move is one that gives away ${range(S.kingStrikeLoss)} points (never a piece for nothing). One strike a move. It enrages the boss too: ${src.powers.rageStrike} on its [rage meter](#rage-meter) (unless an ultimate is under way; Wrangler's meter is his own, and a strike adds nothing to it).
