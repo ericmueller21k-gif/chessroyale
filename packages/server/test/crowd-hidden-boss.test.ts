@@ -297,6 +297,35 @@ describe("the Crowd's boss final online: always the Hidden Boss (Eric, Oct 14)",
     expect(boRow.placement).toBeGreaterThan(crowdFinalists("boss"));
   });
 
+  it("no result in phase 1 (no device answered his move, then nothing from the engine server: Eric, Nov 13, option 1): the finalists' results none; a watcher's stands at their place", () => {
+    const searches: { id: string; boss?: true }[] = [];
+    // (Bo picks the worst move all along: cut early, Bo watches the final. An engine server that never answers.)
+    const L = crowdFinal({}, 7, { worst: ["p2"], io: { phase2Search: (req) => void searches.push(req), warmEngine: () => undefined } });
+    // On to his first move, asked of the host, which never answers it.
+    for (let i = 0; i < 400 && !(L.core.record.phase === "boss" && L.core.record.bossKey); i++) L.step();
+    expect(L.core.record.bossKey).toBeTruthy();
+    const battle = () => {
+      const r = L.core.save().runner!;
+      return r.boards.find((b) => b.id === r.state.boards[0])!;
+    };
+    const ply = battle().history.length;
+    for (let i = 0; i < 200 && L.core.record.phase !== "results"; i++) L.advance(1000);
+    expect(L.core.record.phase).toBe("results");
+    // (Never a random move: his move asked of the engine server, never in.)
+    expect(searches.some((x) => x.boss && x.id.startsWith("p1-"))).toBe(true);
+    expect(battle().history).toHaveLength(ply);
+    expect(L.core.record.recluse2).toBeUndefined();
+    // (Ann fought him: nothing counts. Bo watched: Bo's place stands, ranked as the match is; the boss's part is nobody's.)
+    expect(L.last("p1", "results")).toMatchObject({ noResult: "board", ranked: false, bossResult: "draw" });
+    expect(L.last("p2", "results")).toMatchObject({ noResult: "watched", bossResult: "draw", ranked: L.core.ranked() });
+    const results = L.core.humanResults();
+    expect(results.find((r) => r.playerId === "p1")).toMatchObject({ noResult: true, ranked: false, teamWon: null });
+    const bo = results.find((r) => r.playerId === "p2")!;
+    expect(bo.noResult).toBeUndefined();
+    expect(bo.teamWon).toBeNull();
+    expect(bo.placement).toBeGreaterThan(crowdFinalists("boss"));
+  });
+
   it("the child first (Nov 13; the review of the child form online, m3): mated, his fall (not phase 2's), then one new match against the man from the start, at the man's strength; mated, phase 2, the results", () => {
     const L = crowdFinal({ recluseChild: true });
     expect(L.last("p2", "boss")!.boss).toMatchObject({ form: "child", formStep: 0 });

@@ -250,7 +250,7 @@ describe("the engine server's last answer and failure", () => {
       cap: 3000,
       lastOk: NOW + 61_000,
       lastFail: { at: NOW, why: "no answer in time" },
-      recluse: { searches: 0, noResults: 0 },
+      recluse: { searches: 0, noResults: 0, noResultsYesterday: 0 },
     });
     vi.useRealTimers();
   });

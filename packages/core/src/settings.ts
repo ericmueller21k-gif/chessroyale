@@ -2019,9 +2019,11 @@ export const RECLUSE_CUTSCENE = {
  * His phase 2 online (Nov 13; docs/decisions/2026-11-13-recluse-online-phase2.md): the lobby server runs the four boards
  * (packages/server/src/bosses/recluse.ts). His moves come from the engine server alone, never a player's device and never a quick
  * move (Eric, Nov 13: "we can't have him breaking"; docs/decisions/2026-11-13-recluse-server-only.md). The bots' from the host's
- * device first (a bot plays for its own team), the engine server where no device answers, the server's own quick move where neither
- * does; a person's fair-play numbers from fair play's own instance of the engine server: so the engine server's queue holds his
- * moves (the review of #683, M1).
+ * device first (it chooses them, checked only for legality, as phase 1's bot picks: accepted, the delta review of #683, m3), the
+ * engine server where no device answers, the server's own quick move where neither does; a person's fair-play numbers from fair
+ * play's own instance of the engine server: so the engine server's queue holds his moves (the review of #683, M1). Phase 1's moves of
+ * his that no device answered come from the engine server too (`serverWaitMs`, the tries: docs/decisions/2026-11-13-recluse-phase1-
+ * pause.md).
  * - `changeMs`: his phase change's length on every screen, from its start to the boards (the app's PHASE_CHANGE.total: a test
  *   keeps the two within 300 ms); the clocks start `RECLUSE_PHASE2.change.countdownSeconds` after it.
  * - `groupNodes`: the engine server's search per group of moves (every legal move scored, at most 8 a search: its limit), so one
@@ -2037,7 +2039,9 @@ export const RECLUSE_CUTSCENE = {
  * - `retryMs`, `retryMaxMs`: a search of his that came back empty is tried again after `retryMs`, then twice as long each time, at
  *   most `retryMaxMs` apart (one lost on the way, no answer in `searchMs` plus 5 s: at once).
  * - `serverWaitMs`: his move not in this long after it was asked: the fight ends with no result ("the Hidden Boss couldn't
- *   connect"); nothing counts for or against those who played its boards (everyone else's result stands).
+ *   connect"); nothing counts for or against those who played its boards (everyone else's result stands). In phase 1 (his move no
+ *   device answered in its window, asked of the engine server; `retryMs`, `retryMaxMs` and `searchMs` the same), counted from that
+ *   ask: nothing counts for or against those fighting him then. His turn is the pause there: nobody's clock runs on it.
  * His searches are never refused for the engine server's day budget (ENGINE_DAILY_SEARCHES): they're bounded by the fights. Each
  * position is counted once on his own row ("<day>:recluse", the health view), whatever its tries. A long fight is about 150 of his
  * (four boards, about 40 moves each); each searches about a third of one re-check's nodes.

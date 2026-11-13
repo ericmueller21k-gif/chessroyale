@@ -553,6 +553,34 @@ async function pickBossMove(
 }
 
 /**
+ * The boss's move at his strength from every move of the position already scored (the engine server's numbers: the Hidden Boss's
+ * phase 1 online when no device answered his move, docs/decisions/2026-11-13-recluse-phase1-pause.md), picked as pickBossMove picks
+ * Stockfish's seeded move from its top-8 search: "elo" drawn at `elo` (eloDraw), swapped for a slip if it gives away more than the
+ * guard allows; "stumble" a slip; "stagger" the King's strike's step back (its own wider guard); "best" the best. From the 8 best of
+ * those he may play (`allowed`; null: any scored). No second, head-to-head look at a move other than the best (pickBossMove's
+ * `confirm`): that needs an engine, and every move here was scored at one budget already. Null: nothing scored that he may play.
+ */
+export function bossMoveFromScores(
+  scores: readonly MoveScore[],
+  kind: BossMoveKind,
+  elo: number,
+  rng: Rng,
+  strikeLoss: readonly [number, number] = [5, 15],
+  guard: BossGuard = DEFAULT_BOSS_GUARD,
+  allowed: readonly string[] | null = null,
+): string | null {
+  const ok = allowed ? new Set(allowed) : null;
+  const top = scores.filter((s) => (!ok || ok.has(s.move)) && Number.isFinite(s.expected)).sort((a, b) => b.expected - a.expected).slice(0, 8);
+  if (!top.length) return null;
+  if (kind === "best") return top[0]!.move;
+  if (kind === "stumble") return pickByLoss(top, guard.slipLoss, guard);
+  if (kind === "stagger") return pickByLoss(top, strikeLoss, strikeGuard(guard, strikeLoss));
+  const move = eloDraw(top, elo, rng);
+  const got = top.find((m) => m.move === move)!.expected;
+  return withinGuard(moveLoss(top[0]!.expected, got), guard) ? move : pickByLoss(top, guard.slipLoss, guard);
+}
+
+/**
  * Stockfish at a strength, drawn from its top moves with a given random source (an online boss move two devices play with one seed:
  * BOSS_CHECK; UCI_LimitStrength draws with the clock): each move weighed exp(−loss ÷ T) (eloDrawT), so the best is the likeliest
  * and a move T points worse about a third as likely. The guard and the head-to-head check after it are the same as for

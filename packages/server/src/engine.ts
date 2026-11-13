@@ -82,7 +82,7 @@ async function takeBudget(env: EngineEnv, pool: EnginePool = "match"): Promise<b
 }
 
 /**
- * A Hidden Boss's phase 2 ended with no result (his move never came from the engine server): counted on today's row
+ * A Hidden Boss's fight ended with no result (his move never came from the engine server, phase 1 or 2): counted on today's row
  * "<day>:recluse-none", for the health view (the review of #683, M2). Never throws.
  */
 export async function countRecluseNoResult(env: EngineEnv): Promise<void> {
@@ -155,18 +155,21 @@ export async function containerScore(env: EngineEnv, instance: string, fen: stri
 
 /**
  * The engine server today, for the health view: searches used of the day's budget, its last answer and last failure; and the
- * Hidden Boss's phase 2 today (`recluse`): his positions searched (his own row, outside the budget) and the fights that ended with
- * no result (his move never came: the review of #683, M2).
+ * Hidden Boss's fights today (`recluse`): his positions searched (his own row, outside the budget: phase 2's moves, and phase 1's no
+ * device answered) and the fights that ended with no result (his move never came: the review of #683, M2), today and yesterday (UTC
+ * days: the morning digest names both, the delta review of #683, m2).
  */
 export async function engineHealth(
   env: EngineEnv,
   now: number,
-): Promise<{ on: boolean; searches: number; cap: number; lastOk: number | null; lastFail: { at: number; why: string } | null; recluse: { searches: number; noResults: number } }> {
+): Promise<{ on: boolean; searches: number; cap: number; lastOk: number | null; lastFail: { at: number; why: string } | null; recluse: { searches: number; noResults: number; noResultsYesterday: number } }> {
   const day = new Date(now).toISOString().slice(0, 10);
+  const yesterday = new Date(now - 86_400_000).toISOString().slice(0, 10);
   const read = async <T>(sql: string, ...params: unknown[]) => (env.DB ? await env.DB.prepare(sql).bind(...params).first<T>().catch(() => null) : null);
   const used = await read<{ searches: number }>("SELECT searches FROM engine_usage WHERE day = ?", day);
   const his = await read<{ searches: number }>("SELECT searches FROM engine_usage WHERE day = ?", `${day}:recluse`);
   const none = await read<{ searches: number }>("SELECT searches FROM engine_usage WHERE day = ?", `${day}:recluse-none`);
+  const noneBefore = await read<{ searches: number }>("SELECT searches FROM engine_usage WHERE day = ?", `${yesterday}:recluse-none`);
   const ok = await read<{ value: string }>("SELECT value FROM meta WHERE key = 'engine.ok'");
   const fail = await read<{ value: string }>("SELECT value FROM meta WHERE key = 'engine.fail'");
   let lastFail: { at: number; why: string } | null = null;
@@ -181,7 +184,7 @@ export async function engineHealth(
     cap: Number(env.ENGINE_DAILY_SEARCHES ?? 3000),
     lastOk: ok ? Number(ok.value) : null,
     lastFail,
-    recluse: { searches: his?.searches ?? 0, noResults: none?.searches ?? 0 },
+    recluse: { searches: his?.searches ?? 0, noResults: none?.searches ?? 0, noResultsYesterday: noneBefore?.searches ?? 0 },
   };
 }
 
@@ -196,8 +199,9 @@ export async function serverScoreAt(env: EngineEnv, fen: string, moves: readonly
  * Every legal move of a position scored on the engine server (the Hidden Boss's phase 2 online, bosses/recluse.ts: his moves, a
  * bot's no device played, a person's fair-play numbers): the moves in groups of at most 8 (its limit; fairplay-deep.ts moveGroups),
  * one search a group at `nodes`, one after another, the whole position counted once against `pool`'s budget (its groups together
- * search fewer nodes than one re-check; his: "recluse", never refused) unless `uncounted` (a try again at a position already
- * counted: the review of #683, m2). The first group is tried twice (a container still waking answers the second: the review of
+ * search fewer nodes than one re-check; his: "recluse", never refused, so never waited on: counted beside the search, handed to
+ * `background` (the Durable Object's waitUntil) to finish, the delta review of #683, m1) unless `uncounted` (a try again at a position
+ * already counted: the review of #683, m2). The first group is tried twice (a container still waking answers the second: the review of
  * #677, M2). The whole try takes at most `withinMs` (from its start, every group's wait included; a group still running then is
  * left to the container, nothing more is sent), so a try's worst case is known and the caller never sends a new one while an earlier
  * one could still be running (the review of #683, M1). `instance`: the match engine's ("engine-1", his queue) or fair play's
@@ -208,7 +212,7 @@ export async function serverAllMovesAt(
   env: EngineEnv,
   fen: string,
   nodes: number,
-  o: { pool?: EnginePool; instance?: "engine-1" | "fairplay-1"; withinMs: number; uncounted?: boolean },
+  o: { pool?: EnginePool; instance?: "engine-1" | "fairplay-1"; withinMs: number; uncounted?: boolean; background?: (p: Promise<unknown>) => void },
 ): Promise<MoveScore[] | null> {
   if (!engineOn(env)) return null;
   const end = Date.now() + o.withinMs;
@@ -218,7 +222,15 @@ export async function serverAllMovesAt(
   } catch {
     return null;
   }
-  if (!legal.length || (!o.uncounted && !(await takeBudget(env, o.pool)))) return null;
+  if (!legal.length) return null;
+  if (!o.uncounted) {
+    // (His: the groups go at once, the count beside them: a slow or hung D1 never holds up his move. The others: the budget decides.)
+    if (o.pool === "recluse") {
+      const counting = takeBudget(env, "recluse");
+      if (o.background) o.background(counting);
+      else void counting.catch(() => undefined);
+    } else if (!(await takeBudget(env, o.pool))) return null;
+  }
   const out: MoveScore[] = [];
   for (const group of moveGroups(legal, legal[0]!)) {
     const search = () => {

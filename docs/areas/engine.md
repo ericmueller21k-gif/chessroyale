@@ -82,7 +82,12 @@ Lane: `engine`. The bosses' strength is here; their powers are on [bosses.md](bo
   at his move takes at most `RECLUSE_ONLINE.searchMs` (15 s, every group's wait included; a group still running then is left to
   the container and nothing more is sent), and is tried again only once answered empty, or past that plus 5 s (lost), so a try
   never goes out while an earlier one could still be running. Each of his searches is logged with its time ("engine server for
-  the Hidden Boss: … in N ms"), and the health view shows his row and the fights that ended with no result (`<day>:recluse-none`).
+  the Hidden Boss: … in N ms"), and the health view shows his row and the fights that ended with no result (`<day>:recluse-none`,
+  today and yesterday). His count never holds his search up: it runs beside the groups, finished under the Durable Object's
+  `waitUntil` (the delta review of #683, m1). **His phase 1 moves** stay the devices' (Maia), but one no device answered in its
+  window goes to the engine server the same way (`p1-…` searches, his row), and he plays one at the strength the devices were asked
+  for (`bossMoveFromScores`: a device's seeded Stockfish pick from the server's numbers), never a random move
+  (docs/decisions/2026-11-13-recluse-phase1-pause.md).
   The reports measured the re-check with the full-network Stockfish 19 build standing in for the server; the
   container's own 17.1 reads the same re-checks 3.2 points apart on average (`reports/container-accuracy.md`), so
   moving it to Stockfish 19 (built from the browsers' stockfish.js source) is recommended (DECISIONS.md, "The engine
