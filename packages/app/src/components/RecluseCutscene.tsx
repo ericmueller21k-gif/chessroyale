@@ -103,11 +103,14 @@ export function RecluseCutscene({ at, until, board: given, lines = RECLUSE_CUTSC
     bossVoice.hush(until);
     kingVoice.hush(until);
   }, [on, until]);
+  // (Hidden from its start until this is taken off the screen with the fall's, as the phase change starts: never a frame of his
+  // fall's mumbling between the two, even when the scene ends a little before its hold.)
+  const started = t >= 0;
   useLayoutEffect(() => {
-    if (!on) return;
+    if (!started) return;
     document.body.classList.add("cs-on");
     return () => document.body.classList.remove("cs-on");
-  }, [on]);
+  }, [started]);
   if (!rect || !on) return null;
   const fig = figAt(tl, t);
   // The light: centered on the board, its radius a share of the board's width (the CSS turns it into the feathered pool). It comes
