@@ -1073,6 +1073,10 @@ sampling, the guards, `forPlayers`), `BOSS_TIERS` and each boss's `offset` in `b
   His younger ages (a mockup, Nov 12; wired into nothing): `characters/recluse-ages.ts` (the child, 13 and 20, their busts
   and idles, the growing step `recluse-grow`, the ghost child beside him kneeling `recluse-ghost`):
   `extra=packages/app/src/characters/recluse-ages.ts only=recluse-child,recluse-teen,recluse-young,recluse-grow,recluse-ghost`.
+  His cutscene between the adult form and the cyborg (a mockup, Nov 12; in no match): `components/RecluseCutscene.tsx` (the dim and
+  the spotlight, the figure `recluse-cutscene` in `recluse-ages.ts`, the lines `RECLUSE_CUTSCENE_LINES` in typed boxes),
+  `recluse-cutscene.ts` (its timeline), times `RECLUSE_CUTSCENE` in settings.ts; seen only through
+  `npm run preview:cutscene -- <dir> [phone|computer]` (a real fight, a dev-only module; videos and stills).
 - The Hidden Boss in the Crowd's final: `packages/chess/test/crowd.test.ts` ("50 v 50 boss final"),
   `packages/server/test/crowd-hidden-boss.test.ts` (online), e2e `e2e/crowd-hidden.spec.ts`; [crowd.md](crowd.md).
 - The Hidden Boss: unit `packages/chess/test/recluse.test.ts` (hidden from players, his brain, the bullet clock and

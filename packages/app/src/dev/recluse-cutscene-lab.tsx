@@ -10,7 +10,7 @@ export function playCutscene(): { at: number; timeline: ReturnType<typeof reclus
   const boards = [...document.querySelectorAll<HTMLElement>(".board-wrap")].filter((b) => b.offsetParent);
   const board = boards.sort((a, b) => b.getBoundingClientRect().width - a.getBoundingClientRect().width)[0] ?? null;
   const style = document.createElement("style");
-  style.textContent = ".boss-char canvas, .boss-char .bc-bubble { visibility: hidden !important; }";
+  style.textContent = ".boss-char canvas, .bc-bubble:not(.cs-say) { visibility: hidden !important; }";
   document.head.appendChild(style);
   const host = document.createElement("div");
   document.body.appendChild(host);
