@@ -137,3 +137,5 @@ checks it (stills at phone + computer sizes). Guard: docs/rules/eric.md + a chec
 - Complex features: get a whole playable pass live first, start to finish, then polish from Eric's playtest (Eric, Nov 13: "the only way I can truly give you good feedback is testing it from start to finish. Not just going off of screenshots."). Screenshots are for looks; feel and flow come from his play.
 
 - **A ban means you can't sign in** (Eric, Nov 13): "If you're banned, you can't sign in. Just like every other game." Signing in shows only "Your account has been banned. For more information, email support@hunchess.com." Appeals come by email (no in-game appeal box). "Banned" in talk with Eric means this hard ban; the detection pool is "the engine pool" (quiet), never called a ban.
+
+- **Never show players an old version** (Eric, Nov 13: "It should never throw back an old version. It should just fail or something, or we try to reload."). A failure retries the current thing once, then a plain Reload message. No fallbacks to older screens or looks.
