@@ -186,11 +186,7 @@ export function step(lobby: Phase2Lobby) {
     if (now >= p.done.until - 50) return lobby.finish();
     return arm(lobby);
   }
-  if (p.told && !p.playing && now >= p.clocksAt - 50) {
-    p.playing = true;
-    for (const b of p.state.boards) queue(lobby, p, b);
-    tell(lobby, p);
-  }
+  startClocks(lobby, p);
   if (p.playing) {
     apply(lobby, p, phase2Timeouts(phase2Flags(p.state, now), now, () => lobby.rng()), "clock");
     for (const w of Object.values(p.work)) {
@@ -201,6 +197,14 @@ export function step(lobby: Phase2Lobby) {
     playReady(lobby, p);
   }
   arm(lobby);
+}
+
+/** The clocks start once it's time (the timer's, or a person's first move a moment ahead of it): the bots' first moves asked. */
+function startClocks(lobby: Phase2Lobby, p: Recluse2Record) {
+  if (!p.told || p.playing || p.done || lobby.now() < p.clocksAt - 50) return;
+  p.playing = true;
+  for (const b of p.state.boards) queue(lobby, p, b);
+  tell(lobby, p);
 }
 
 /** A search on the engine server that never came back (the object restarted under it): the host's device is asked instead. */
@@ -314,12 +318,15 @@ function winIfArmed(lobby: Phase2Lobby, p: Recluse2Record) {
  */
 export function move(lobby: Phase2Lobby, playerId: string, key: unknown, boardId: unknown, mv: unknown, away: unknown) {
   const p = lobby.r.recluse2;
-  if (!p || !p.playing || p.done || key !== p.key || typeof mv !== "string" || mv.length > 8) return;
+  if (!p || key !== p.key) return;
+  startClocks(lobby, p);
   const b = boardOf(p, typeof boardId === "number" ? boardId : -1);
-  if (!b || b.player !== playerId || phase2ToMove(b) !== "crowd" || !legalMoves(b.board.fen).includes(mv)) return;
+  // (Refused: they're told phase 2 as it stands, so the move their screen showed ahead goes back.)
+  const refuse = () => lobby.send(playerId, { t: "phase2", p2: view(p) });
+  if (!p.playing || p.done || typeof mv !== "string" || mv.length > 8 || !b || b.player !== playerId || phase2ToMove(b) !== "crowd" || !legalMoves(b.board.fen).includes(mv)) return refuse();
   const now = lobby.now();
   const before = b;
-  if (!apply(lobby, p, phase2Move(p.state, b.id, mv, now), "person")) return;
+  if (!apply(lobby, p, phase2Move(p.state, b.id, mv, now), "person")) return refuse();
   const after = boardOf(p, b.id)!;
   if (lobby.search && lobby.fairPlayer(playerId) && after.board.history.length > before.board.history.length) {
     const id = `f${++p.seq}`;

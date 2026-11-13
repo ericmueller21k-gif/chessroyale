@@ -9,8 +9,8 @@ import { forgetLobby, recordWait, reportLobby, type LiveMode } from "./live.ts";
 import type { Env } from "./index.ts";
 import { countCall } from "./ops.ts";
 import { liveHub } from "./live-hub.ts";
-import { SERVER_RECHECK_NODES, serverRecheck, serverScoreAt, warmEngine } from "./engine.ts";
-import { CAPACITY, CHAT_MOD, DEFAULT_SETTINGS, MATCH_SAVE, XP, battleCounts } from "@chessroyale/core";
+import { SERVER_RECHECK_NODES, serverAllMovesAt, serverRecheck, serverScoreAt, warmEngine } from "./engine.ts";
+import { CAPACITY, CHAT_MOD, DEFAULT_SETTINGS, MATCH_SAVE, RECLUSE_ONLINE, XP, battleCounts } from "@chessroyale/core";
 import type { ChatBlock } from "@chessroyale/chess";
 import { chatBlock } from "./chat-mod.ts";
 import { BANNED_MESSAGE, banCheck, eligibleForRanked, recordFairPlay } from "./fairplay.ts";
@@ -55,6 +55,8 @@ export class Lobby extends DurableObject<Env> {
   private reportQueued = false;
   /** Many judges: deep searches the lobby asked of the engine server, sent once the lobby is stored. */
   private serverQueue: ServerScoreRequest[] = [];
+  /** The Hidden Boss's phase 2: positions to score on the engine server (every legal move), sent in the background like the judges'. */
+  private phase2Queue: { id: string; fen: string }[] = [];
   /**
    * Fair play: the record's `fair` (each person's picks with their signals) as last stored, by its count. Stored under
    * its own key "fair" and only when a round added to it, so a pick or a chat line never rewrites it.
@@ -113,6 +115,7 @@ export class Lobby extends DurableObject<Env> {
       serverEngine: this.engineUp,
       icon: (playerId) => this.icons.get(playerId),
       serverScore: (req) => void this.serverQueue.push(req),
+      phase2Search: (req) => void this.phase2Queue.push(req),
       send: (playerId, msg) => {
         const text = JSON.stringify({ ...msg, now: Date.now() } as ServerMessage);
         for (const ws of this.socketsOf(playerId)) {
@@ -258,6 +261,7 @@ export class Lobby extends DurableObject<Env> {
     void this.reportLive(core).catch(() => undefined);
     // Many judges: the engine server's searches run in the background; each answer is a new event for the lobby.
     for (const req of this.serverQueue.splice(0)) this.ctx.waitUntil(this.serve(req));
+    for (const req of this.phase2Queue.splice(0)) this.ctx.waitUntil(this.servePhase2(req));
     // The results, written in the background too: a slow D1 never holds up the match's next event (the review of #610, m2). The alarm
     // just armed is already their next try (a second on), which finds the write done, or still running and shares it.
     if (this.record.saveQueue?.length && Date.now() >= this.saveRetryAt) this.ctx.waitUntil(this.writeResults());
@@ -287,6 +291,15 @@ export class Lobby extends DurableObject<Env> {
     if (!this.record) return;
     const core = this.core(this.record.code);
     core.serverScored(req.id, moves);
+    await this.persist(core);
+  }
+
+  /** One position of the Hidden Boss's phase 2 scored on the engine server (every legal move); its answer goes back to the lobby. */
+  private async servePhase2(req: { id: string; fen: string }) {
+    const moves = await serverAllMovesAt(this.env, req.fen, RECLUSE_ONLINE.groupNodes).catch(() => null);
+    if (!this.record) return;
+    const core = this.core(this.record.code);
+    core.phase2Searched(req.id, moves);
     await this.persist(core);
   }
 
