@@ -969,3 +969,4 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 13 08:00: #674 (farthest zoom) MERGED 28ab34a8. #675 (town never shows an old version) open, CI running. Street-for-everyone helper session_01JuCWRvf6UnWNVv6iG4b6zw (high, full lane) on claude/street-for-everyone, based on #675's branch.
 - Nov 13 08:12: #675 MERGED 1bb9b73b (targeted e2e green). Watch main's full run.
 - Nov 13 ~08:45: main full run on 1bb9b73b (#674 + #675) GREEN, all 15 shards.
+- Nov 13 16:10: street-for-everyone helper had STALLED at 10:20 (8 town.spec tests left, last push 502561ba); container restart killed my watcher. Nudged; watcher re-armed; check-in trig_01PGUheXFZtUzroJmNXgHFp7 at 16:51.
