@@ -138,8 +138,6 @@ export const TOWN_FEEL = {
   /** The box shapes (width / height) where the blend is all phone and all computer. */
   aspectTall: 0.6,
   aspectWide: 1.4,
-  /** The page opens zoomed out (Eric, Oct 26: "it feels a little nicer"); − / + work as before. (Slice 1: zoomed in.) */
-  startZoomedOut: true,
   /** The street town (an admin's, Nov 5) opens zoomed in instead (Eric, Nov 5); − / + work as before. */
   streetStartZoomedOut: false,
   /**
@@ -564,13 +562,6 @@ export const TOWN_FEEL = {
    */
   sitCut: 0.34,
   sitSeat: 0.3,
-  /**
-   * The Colosseum from afar (slice 6): seen up to this many squares past the rim, standing on the horizon, sunk this many
-   * squares behind the world's curve a square past the rim (its top looming over the horizon), and as hazy as this far
-   * into the far band (0 to 1).
-   */
-  farReach: 16,
-  farSink: 0.35,
   farHaze: 0.7,
   /** A house's pixels per square (the tent, 144 pixels wide, is about 3.9 squares). */
   housePxPerSquare: 37,

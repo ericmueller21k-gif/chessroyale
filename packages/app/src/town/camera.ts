@@ -10,19 +10,17 @@
  * Nothing here allocates once a view is made: projections write into a point the caller owns.
  */
 import { TOWN_FEEL, type CamSet } from "./feel.ts";
-import { STREET_TOWN } from "./admin-town.ts";
 import PLAN from "./street-plan.json" with { type: "json" };
 
 /**
- * The world is N x N squares and wraps on both axes (the street town, round 4: east-west only, `WRAP`). (Slices 1 to 5: 40; slice 6
- * made room for the park and the bigger Colosseum.) The street town's is its plan's (the north edge round, Nov 5: 54, grown 8 rows
- * south for Meadow Street and so 8 columns east too).
+ * The world is N x N squares, its plan's (the street town, the north edge round, Nov 5: 54, grown 8 rows south for Meadow Street and so
+ * 8 columns east too). It wraps east-west only (round 4: `WRAP`). (The old town, everyone's but admins' until Nov 13: 46, both ways.)
  */
-export const N: number = STREET_TOWN ? PLAN.size : 46;
+export const N: number = PLAN.size;
 
 /**
- * Which ways the world wraps. Today's town: both. The street town (Nov 5, round 4; Eric: "the Colosseum sits at the top centre, at the
- * north edge ... nothing is behind it"): east-west only, as its plan's `wrap` switch says (world.ts sets it as the street town loads).
+ * Which ways the world wraps. The street town (Nov 5, round 4; Eric: "the Colosseum sits at the top centre, at the north edge ... nothing
+ * is behind it"): east-west only, as its plan's `wrap` switch says (world.ts sets it as the town loads).
  * North of row N - 1 and south of row 0 is off the world: nothing stands or walks there.
  */
 export const WRAP = { ew: true, ns: true };
