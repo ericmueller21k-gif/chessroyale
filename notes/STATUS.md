@@ -1,3 +1,4 @@
+- Nov 13 ~03:30 UTC: #670 Hidden Boss music MERGED (d0689a7). Chant-lines helper started (claude/hidden-boss-chant). Watching main.
 - Nov 13 03:00 UTC: Eric settled the chant lines (final). Brief hidden-boss-chant-lines.md ready; start after #670 merges.
 - Nov 13 02:55 UTC: chant lines from Eric (via music session) noted in hidden-boss-house-NOTES.md; asked Eric to settle line 2; build after #670.
 - Nov 13 02:30 UTC: music session: newer cut 0032cd61 (breath 8.54->7.74, a full second of silence) copied into #670 (fb77ea7). PENDING Eric: +5 s in the chant between book landing and crack, with 1-2 extra lines from the man (the power he feels); music ready for exactly +5.0 s (crack 13.740 s after he rises); send the music session the final rise-to-crack time when settled.
