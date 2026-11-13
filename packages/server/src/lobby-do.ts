@@ -9,7 +9,7 @@ import { forgetLobby, recordWait, reportLobby, type LiveMode } from "./live.ts";
 import type { Env } from "./index.ts";
 import { countCall } from "./ops.ts";
 import { liveHub } from "./live-hub.ts";
-import { SERVER_RECHECK_NODES, serverAllMovesAt, serverRecheck, serverScoreAt, warmEngine } from "./engine.ts";
+import { SERVER_RECHECK_NODES, engineOn, serverAllMovesAt, serverRecheck, serverScoreAt, warmEngine } from "./engine.ts";
 import { CAPACITY, CHAT_MOD, DEFAULT_SETTINGS, MATCH_SAVE, RECLUSE_ONLINE, XP, battleCounts } from "@chessroyale/core";
 import type { ChatBlock } from "@chessroyale/chess";
 import { chatBlock } from "./chat-mod.ts";
@@ -57,7 +57,7 @@ export class Lobby extends DurableObject<Env> {
   /** Many judges: deep searches the lobby asked of the engine server, sent once the lobby is stored. */
   private serverQueue: ServerScoreRequest[] = [];
   /** The Hidden Boss's phase 2: positions to score on the engine server (every legal move), sent in the background like the judges'. */
-  private phase2Queue: { id: string; fen: string }[] = [];
+  private phase2Queue: { id: string; fen: string; boss?: true }[] = [];
   /**
    * Fair play: the record's `fair` (each person's picks with their signals) as last stored, by its count. Stored under
    * its own key "fair" and only when a round added to it, so a pick or a chat line never rewrites it.
@@ -116,7 +116,8 @@ export class Lobby extends DurableObject<Env> {
       serverEngine: this.engineUp,
       icon: (playerId) => this.icons.get(playerId),
       serverScore: (req) => void this.serverQueue.push(req),
-      phase2Search: (req) => void this.phase2Queue.push(req),
+      // (Only where the engine server is set up: with none (local runs, the e2e suite, staging), phase 2 knows it has none.)
+      ...(engineOn(this.env) ? { phase2Search: (req: { id: string; fen: string; boss?: true }) => void this.phase2Queue.push(req) } : {}),
       // (The Hidden Boss's phase 2 is coming: the engine server boots during his fall and phase change, before his first search.)
       warmEngine: () => this.ctx.waitUntil(warmEngine(this.env).then((up) => void (this.engineUp = up))),
       send: (playerId, msg) => {
@@ -297,9 +298,12 @@ export class Lobby extends DurableObject<Env> {
     await this.persist(core);
   }
 
-  /** One position of the Hidden Boss's phase 2 scored on the engine server (every legal move); its answer goes back to the lobby. */
-  private async servePhase2(req: { id: string; fen: string }) {
-    const moves = await serverAllMovesAt(this.env, req.fen, RECLUSE_ONLINE.groupNodes).catch(() => null);
+  /**
+   * One position of the Hidden Boss's phase 2 scored on the engine server (every legal move); its answer goes back to the lobby. His
+   * own moves (`boss`) count against his own share of the day (RECLUSE_ONLINE.dailySearches), so the judges can't starve him.
+   */
+  private async servePhase2(req: { id: string; fen: string; boss?: true }) {
+    const moves = await serverAllMovesAt(this.env, req.fen, RECLUSE_ONLINE.groupNodes, req.boss ? "recluse" : "match").catch(() => null);
     if (!this.record) return;
     const core = this.core(this.record.code);
     core.phase2Searched(req.id, moves);
@@ -755,6 +759,9 @@ export async function writeResult(c: SaveContext, rec: LobbyRecord, p: PendingRe
   // (A match that rested on one device's word (unvouched) builds no fair-play case: its numbers are that device's alone.)
   const moves = rec.unvouched ? [] : (rec.fair?.[p.playerId] ?? []);
   if (moves.length) await soft("fairPlay", recordFairPlay(c.sql, p.userId, { lobby: rec.code, mode: c.mode, moves, since }, p.at, c.mail), null);
+  // (No result (the Hidden Boss's phase 2 couldn't go on: his move never came from the engine server): fair play from before it, and
+  // nothing else: no XP, no result row (no win or loss, no rank), no Welcome Crate, no token. Eric, Nov 13: "nothing counts".)
+  if (p.result.noResult) return;
   // (A player in review, or banned, has their results held off ranking until they're cleared.)
   const held = !(await eligibleForRanked(c.sql, p.userId));
   // XP (Nov 9): decided from this room's own count and clock, granted once (keyed by this match), kept on the result row for the result

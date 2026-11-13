@@ -1062,8 +1062,9 @@ export type ServerMessage = { now: number } & (
    */
   | { t: "phase2"; p2: NetPhase2; boss?: NetBoss; standings?: NetStanding[]; refused?: true }
   /**
-   * To the host: the engine server can't play this move of phase 2 (his, or a bot's): play it on your engine, at this strength
-   * (UciEngine.playAtElo), and answer with phase2Answer. The server plays its own quick move if no answer comes in time.
+   * To the host: the engine server can't play this bot's move of phase 2 (never his: his come from the engine server alone): play it
+   * on your engine, at this strength (UciEngine.playAtElo), and answer with phase2Answer. The server plays its own quick move if no
+   * answer comes in time.
    */
   | { t: "phase2Ask"; id: string; fen: string; elo: number; nodes: number; moveMs: number }
   | {
@@ -1087,6 +1088,8 @@ export type ServerMessage = { now: number } & (
       unvouched?: true;
       /** The Hidden Boss's phase 2 decided it: how many of its boards were won (all of them beat him). */
       simul?: { won: number; of: number };
+      /** No result: the Hidden Boss's phase 2 couldn't go on (his move never came from the engine server). Nothing counts. */
+      noResult?: true;
     }
 );
 
@@ -1126,8 +1129,16 @@ export interface NetPhase2 {
   slow: number;
   lastSlow: { board: number; at: number } | null;
   ultAt: number | null;
-  /** Every board decided: when, whether he's beaten (all of them won) and how many were; the result screen at `until`. */
-  done?: { at: number; until: number; beaten: boolean; won: number; of: number };
+  /**
+   * Every clock paused since then (server time): his move is late from the engine server (RECLUSE_ONLINE.pauseMs). Every board shows
+   * "He's thinking…" and takes no move; the clocks run on from where they stood once it's in. Missing: not paused.
+   */
+  paused?: number;
+  /**
+   * Every board decided: when, whether he's beaten (all of them won) and how many were; the result screen at `until`. `noResult`: his
+   * move never came from the engine server (RECLUSE_ONLINE.serverWaitMs): the fight ended there, with no result.
+   */
+  done?: { at: number; until: number; beaten: boolean; won: number; of: number; noResult?: true };
   /** Testing (an admin's "Win this form"): the team's next move wins every board still on. */
   winNext?: true;
 }

@@ -1946,21 +1946,36 @@ export const RECLUSE_CUTSCENE = {
 
 /**
  * His phase 2 online (Nov 13; docs/decisions/2026-11-13-recluse-online-phase2.md): the lobby server runs the four boards
- * (packages/server/src/bosses/recluse.ts), his moves and the bots' from the engine server, the host's device where it can't
- * answer (the result then pays as a solo game), the server's own quick move where neither does.
+ * (packages/server/src/bosses/recluse.ts). His moves come from the engine server alone, never a player's device and never a quick
+ * move (Eric, Nov 13: "we can't have him breaking"; docs/decisions/2026-11-13-recluse-server-only.md); the bots' from it too, the
+ * host's device where it can't answer, the server's own quick move where neither does.
  * - `changeMs`: his phase change's length on every screen, from its start to the boards (the app's PHASE_CHANGE.total: a test
  *   keeps the two within 300 ms); the clocks start `RECLUSE_PHASE2.change.countdownSeconds` after it.
  * - `groupNodes`: the engine server's search per group of moves (every legal move scored, at most 8 a search: its limit), so one
  *   move of his (about five groups) searches less than one judge's re-check, and counts once against the day's budget.
  * - `botLoss`: a bot's move is one of those within this much of the best (expected score, 0 to 1), at random: a bot's strength,
  *   never his (he plays the best).
- * - `askMs`: how long the host's device has to play a move when the engine server can't; then the server's quick move.
+ * - `askMs`: how long the host's device has to play a bot's move when the engine server can't; then the server's quick move.
+ * - `pauseMs`: his move not in this long after it was asked (an answer usually takes about a second: five groups of 120,000 nodes
+ *   at about 0.8 million a second, an estimate): every board's clock pauses, and every board shows "He's thinking…", until it is.
+ * - `retryMs`, `retryMaxMs`: a search of his that came back empty is tried again after `retryMs`, then twice as long each time, at
+ *   most `retryMaxMs` apart (one lost on the way, no answer in 20 s: at once).
+ * - `serverWaitMs`: his move not in this long after it was asked: the fight ends with no result ("the Hidden Boss couldn't
+ *   connect"); nothing counts for or against anyone.
+ * - `dailySearches`: his searches' own share of the engine server's day (the row "<day>:recluse"), apart from the judges' re-checks
+ *   and solo's (ENGINE_DAILY_SEARCHES), so they can't starve him. Spent: his searches take from the day's budget as a match's do.
+ *   A long fight is about 150 of his (four boards, about 40 moves each); each searches about a third of one re-check's nodes.
  */
 export const RECLUSE_ONLINE = {
   changeMs: 34_300,
   groupNodes: 120_000,
   botLoss: 0.06,
   askMs: 6000,
+  pauseMs: 3000,
+  retryMs: 1000,
+  retryMaxMs: 8000,
+  serverWaitMs: 60_000,
+  dailySearches: 3000,
 } as const;
 
 export const RECLUSE_PHASE2 = {

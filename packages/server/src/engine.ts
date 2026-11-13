@@ -1,5 +1,5 @@
 import { Container, getContainer } from "@cloudflare/containers";
-import { ENGINE_SERVER } from "@chessroyale/core";
+import { ENGINE_SERVER, RECLUSE_ONLINE } from "@chessroyale/core";
 import { legalMoves, recheckCloseCalls, stockfishRefuses, type EngineLike, type MoveScore, type RecheckSettings } from "@chessroyale/chess";
 import { moveGroups } from "./fairplay-deep.ts";
 
@@ -24,7 +24,8 @@ export interface EngineEnv {
   ENGINE_OFF?: string;
 }
 
-const engineOn = (env: EngineEnv) => !!env.ENGINE && env.ENGINE_OFF !== "1";
+/** The engine server is set up here (production): not in local runs, the e2e suite or staging (no container, or ENGINE_OFF). */
+export const engineOn = (env: EngineEnv): boolean => !!env.ENGINE && env.ENGINE_OFF !== "1";
 
 /** The server's re-check budget per search (about 3 s on one core, depth ~30). */
 export const SERVER_RECHECK_NODES = 2_000_000;
@@ -33,11 +34,14 @@ const TIMEOUT_MS = 12_000;
 let tableReady = false;
 
 /**
- * Whose search it is: a match's (its re-checks and verdicts, Squads' bot work) or a solo game's (/api/engine/score). Solo's are
- * counted twice: against their own share (ENGINE_SERVER.soloDailySearches, the row "<day>:solo") and the day's budget, so however
- * busy solo is, matches always keep the rest of the day (the outside review of Nov 10, finding 4).
+ * Whose search it is: a match's (its re-checks and verdicts, Squads' bot work), a solo game's (/api/engine/score), or the Hidden
+ * Boss's own moves in his phase 2 online ("recluse"). Solo's are counted twice: against their own share
+ * (ENGINE_SERVER.soloDailySearches, the row "<day>:solo") and the day's budget, so however busy solo is, matches always keep the
+ * rest of the day (the outside review of Nov 10, finding 4). His are counted against his own share alone
+ * (RECLUSE_ONLINE.dailySearches, the row "<day>:recluse"), so the judges can't starve him (Eric, Nov 13); once it's spent, against
+ * the day's budget as a match's.
  */
-export type EnginePool = "match" | "solo";
+export type EnginePool = "match" | "solo" | "recluse";
 
 /** Solo's share of a day's `cap`: ENGINE_SERVER.soloDailySearches, and never more than `soloShare` of it (a lowered cap, staging). */
 export const soloCap = (cap: number): number => Math.min(ENGINE_SERVER.soloDailySearches, Math.floor(cap * ENGINE_SERVER.soloShare));
@@ -57,6 +61,7 @@ async function takeBudget(env: EngineEnv, pool: EnginePool = "match"): Promise<b
         .bind(key)
         .first<{ searches: number }>();
     const cap = Number(env.ENGINE_DAILY_SEARCHES ?? 3000);
+    if (pool === "recluse" && ((await take(`${day}:recluse`))?.searches ?? Infinity) <= RECLUSE_ONLINE.dailySearches) return true;
     if (pool === "solo" && ((await take(`${day}:solo`))?.searches ?? Infinity) > soloCap(cap)) return false;
     const row = await take(day);
     return (row?.searches ?? 0) <= cap;
@@ -153,11 +158,12 @@ const ALL_MOVES_GROUP_MS = 6000;
 /**
  * Every legal move of a position scored on the engine server (the Hidden Boss's phase 2 online: his moves, his bots', a person's
  * fair-play numbers; bosses/recluse.ts): the moves in groups of at most 8 (its limit; fairplay-deep.ts moveGroups), one search a
- * group at `nodes`, the whole position counted once against the day's budget (its groups together search fewer nodes than one
- * re-check). The first group is tried twice (a container still waking answers the second: the review of #677, M2). Null when
- * there's no server, no budget left, a position Stockfish refuses, or any group without an answer in time.
+ * group at `nodes`, the whole position counted once against `pool`'s budget (its groups together search fewer nodes than one
+ * re-check; his moves: "recluse", his own share). The first group is tried twice (a container still waking answers the second: the
+ * review of #677, M2). Null when there's no server, no budget left, a position Stockfish refuses, or any group without an answer in
+ * time.
  */
-export async function serverAllMovesAt(env: EngineEnv, fen: string, nodes: number): Promise<MoveScore[] | null> {
+export async function serverAllMovesAt(env: EngineEnv, fen: string, nodes: number, pool: EnginePool = "match"): Promise<MoveScore[] | null> {
   if (!engineOn(env)) return null;
   let legal: string[];
   try {
@@ -165,7 +171,7 @@ export async function serverAllMovesAt(env: EngineEnv, fen: string, nodes: numbe
   } catch {
     return null;
   }
-  if (!legal.length || !(await takeBudget(env))) return null;
+  if (!legal.length || !(await takeBudget(env, pool))) return null;
   const out: MoveScore[] = [];
   for (const group of moveGroups(legal, legal[0]!)) {
     const search = () => containerScore(env, "engine-1", fen, group, nodes, ALL_MOVES_GROUP_MS);
