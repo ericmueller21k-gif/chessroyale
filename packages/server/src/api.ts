@@ -3,7 +3,7 @@ import { liveCounts, pruneLive, type LiveCounts } from "./live.ts";
 import { liveHub, type LiveHub } from "./live-hub.ts";
 import { cachedUserId, firstSighting, forgetToken, inboxOf, markSeen, rememberInbox } from "./presence.ts";
 import { REPORT_THANKS, evasionAccount, reportPlayer, signInBan } from "./fairplay.ts";
-import { banAnswer, banRedirect } from "./ban-gate.ts";
+import { banAnswer, banRedirect, refusalEnds } from "./ban-gate.ts";
 import { NAME_NOT_ALLOWED, isBlockedText } from "./text-filter.ts";
 import { chatNoticeSeen } from "./chat-mod.ts";
 import { isAdmin, testSwitchesOn, type AdminEnv } from "./admin.ts";
@@ -384,8 +384,8 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
   // banned has none, and anyone else may still sign in on it (a shared device: the review of #687, M1; ban-gate.ts SIGN_IN_ROUTES). ----
 
   // A sign-in refused for a ban (Eric, Nov 13: signInBan) ends this browser's session only if it's the banned account's own or a guest's
-  // (the one signing in); another account signed in here stays signed in (a shared device: the review of #687, M1).
-  const endOnRefusal = (banned: string) => (token && (!current || !isSignedIn(current) || current.id === banned) ? token : null);
+  // (the one signing in); another account signed in here stays signed in (a shared device: ban-gate.ts refusalEnds).
+  const endOnRefusal = (banned: string) => refusalEnds(token, current, banned);
 
   // POST /api/auth/age {oldEnough}: the age question's answer, asked before any sign-in (the app works it out from the
   // birth month and year and sends only this; the date never leaves the device). Old enough: this device may sign in

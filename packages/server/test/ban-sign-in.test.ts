@@ -14,8 +14,9 @@ const { default: worker } = await import("../src/index.ts");
  * A ban means you can't sign in (Eric, Nov 13: "When I think of the word banned, I think of you can't sign in anymore"; "No URLs
  * work"; docs/decisions/2026-11-13-ban-blocks-sign-in.md). Through the whole Worker, its ban gate included (ban-gate.ts): signing in to
  * a banned account (by email or Google, or by ban evasion) is refused with Eric's line and no session; a session signed in when the
- * ban lands gets the ban answer on its next request, and is ended; the browser is marked, so every route answers the same until the
- * ban is lifted; a lifted ban signs in as before; the engine pool and guests pass as ever.
+ * ban lands gets the ban answer on its next request, and is ended; the browser is marked, so every route answers the same to it until
+ * the ban is lifted, unless someone else signs in to their own account on it (a shared device); a lifted ban signs in as before; the
+ * engine pool and guests pass as ever.
  */
 
 const origin = "https://hunchess.test";
@@ -56,7 +57,9 @@ function browser(w: World) {
   const call = async (path: string, init: RequestInit & { json?: unknown } = {}) => {
     const headers = new Headers(init.headers);
     if (jar.size) headers.set("cookie", [...jar].map(([k, v]) => `${k}=${v}`).join("; "));
+    // (JSON from this site's own page, as the app sends it: the sign-in routes check both.)
     if (init.json !== undefined) headers.set("content-type", "application/json");
+    if (init.json !== undefined && !headers.has("origin")) headers.set("origin", origin);
     const body = init.json !== undefined ? JSON.stringify(init.json) : init.body;
     const res = await worker.fetch(new Request(origin + path, { method: init.method ?? (init.json !== undefined ? "POST" : "GET"), headers, body }), w.env as never, ctx);
     for (const c of res.headers.getSetCookie()) {
@@ -102,22 +105,24 @@ function isBanAnswer(r: { status: number; body: Record<string, unknown> | null; 
 const sessionsOf = async (sql: Sql, userId: string) => (await sql.first<{ n: number }>("SELECT COUNT(*) AS n FROM sessions WHERE user_id = ?", userId))!.n;
 const users = async (sql: Sql) => (await sql.first<{ n: number }>("SELECT COUNT(*) AS n FROM users"))!.n;
 
-/** Routes a banned browser tries (a lobby link's, the town's, the shop's, PLAY, the sign-in's own): each the ban answer. */
+/**
+ * Routes a banned browser tries (a lobby link's and its WebSocket, the town's, the shop's, PLAY, signing out): each the ban answer.
+ * (Not the sign-in's own routes: anyone may sign in to their own account on a marked browser, SIGN_IN_ROUTES; nor the admin pages.)
+ */
 const ROUTES: [string, RequestInit & { json?: unknown }][] = [
   ["/api/me", {}],
   ["/api/status", {}],
-  ["/api/auth/config", {}],
   ["/api/live", {}],
   ["/api/shop", {}],
   ["/api/quests", {}],
   ["/api/lobby/ABCDE", {}],
+  ["/api/lobby/ABCDE/ws", { headers: { upgrade: "websocket" } }],
   ["/api/friends", {}],
   ["/api/profile/someone", {}],
   ["/api/play", { method: "POST" }],
   ["/api/town/here", { json: { at: [1, 1] } }],
-  ["/api/auth/email/start", { json: { email: "other@example.com" } }],
+  ["/api/auth/logout", { method: "POST" }],
   ["/api/fairplay/status", {}],
-  ["/admin/fairplay", {}],
 ];
 
 beforeEach(() => vi.unstubAllGlobals());
@@ -176,20 +181,28 @@ describe("signing in to a banned account (Eric, Nov 13)", () => {
     expect(b.jar.has("hc_session")).toBe(false);
     // (The page it lands on asks the server first thing: the ban answer.)
     isBanAnswer(await b.call("/api/me"));
-    // Google's verified email a banned account's address (a new Google account): refused, and no account made for it.
+    // Google's verified email a banned account's address (a new Google account): ban evasion. Asked the age question first, as any new
+    // account is (nothing made); then its own account is made, banned by evasion (a person can clear it), and the browser marked with it.
     const cleo = await account(w.sql, "email", "cleo@gmail.com");
     await setCase(w.sql, cleo.id, "banned", "admin:eric@example.com", "engine moves", 1600);
     Object.assign(w.google, { sub: "g-new-cleo", email: "c.l.e.o@gmail.com" });
     const c = browser(w);
     await c.call("/api/me");
     const made = await users(w.sql);
-    expect(await c.googleSignIn()).toBe(`${origin}/town?signin=banned`);
+    expect(await c.googleSignIn()).toBe(`${origin}/town?signin=age-google`);
     expect(await users(w.sql)).toBe(made);
-    expect(await w.sql.first("SELECT id FROM users WHERE google_sub = ?", "g-new-cleo")).toBeNull();
-    expect(c.jar.get("hc_banned")).toBe(cleo.id);
+    expect(c.jar.has("hc_banned")).toBe(false);
+    await c.call("/api/auth/age", { json: { oldEnough: true } });
+    expect(await c.googleSignIn()).toBe(`${origin}/town?signin=banned`);
+    const evader = await w.sql.first<{ id: string }>("SELECT id FROM users WHERE google_sub = ?", "g-new-cleo");
+    expect(await caseOf(w.sql, evader!.id)).toMatchObject({ status: "banned", decided_by: "evasion" });
+    expect(c.jar.get("hc_banned")).toBe(evader!.id);
+    expect(await sessionsOf(w.sql, evader!.id)).toBe(0);
+    // (Its guest, the one signing in, is ended; nothing joined it to the new account.)
+    expect(c.jar.has("hc_session")).toBe(false);
   });
 
-  it("ban evasion: a banned account's identity, new to us (a +tag, or the account deleted while banned), is refused; an account with one is banned by evasion as it signs in", async () => {
+  it("ban evasion: an account with a banned account's identity is banned by evasion as it signs in; one new to us (a +tag, or the account deleted while banned) gets its own account, banned by evasion, which a person can clear", async () => {
     const w = await setUp();
     const cheat = await account(w.sql, "email", "a.b@gmail.com");
     // An alias made before the ban (making it runs no check): banned by evasion the moment it signs in.
@@ -199,21 +212,36 @@ describe("signing in to a banned account (Eric, Nov 13)", () => {
     isBanAnswer(await b.emailSignIn("ab+chess@gmail.com"));
     expect(await caseOf(w.sql, alias.id)).toMatchObject({ status: "banned", decided_by: "evasion" });
     expect(b.jar.get("hc_banned")).toBe(alias.id);
-    // A new address that's the cheat's (Gmail's dots and a +tag): refused, nothing made, the browser marked with the cheat.
+    // A new address that's the cheat's (Gmail's dots and a +tag): refused, with its own account made and banned by evasion (as PLAY's
+    // check did, so a person can clear it: the review of #687, minor 4); the browser marked with that account, its guest ended.
     const c = browser(w);
     const made = await users(w.sql);
     isBanAnswer(await c.emailSignIn("a.b+2@gmail.com"));
-    expect(await users(w.sql) - made).toBe(1); // (only this browser's own guest, from its first request)
-    expect(await w.sql.first("SELECT id FROM users WHERE email = ?", "a.b+2@gmail.com")).toBeNull();
-    // (Marked with a banned account that had the address: the cheat, or the alias banned for it a moment ago.)
-    expect([cheat.id, alias.id]).toContain(c.jar.get("hc_banned"));
-    // Deleted while banned: its address can't come back as a new account.
+    const evader = (await w.sql.first<{ id: string }>("SELECT id FROM users WHERE email = ?", "a.b+2@gmail.com"))!;
+    expect(await caseOf(w.sql, evader.id)).toMatchObject({ status: "banned", decided_by: "evasion" });
+    expect(await users(w.sql) - made).toBe(2); // (this browser's own guest, from its first request, and the new account)
+    expect(c.jar.get("hc_banned")).toBe(evader.id);
+    expect(await sessionsOf(w.sql, evader.id)).toBe(0);
+    // The code is spent: it can't be refused again (and mark another browser).
+    const again = browser(w);
+    await again.call("/api/me");
+    expect((await again.call("/api/auth/email/verify", { json: { email: "a.b+2@gmail.com", code: w.codes.get("a.b+2@gmail.com") } })).status).toBe(400);
+    // A person clears it (an email to support: a cousin sharing the mailbox): the browser's mark goes, it signs in, and stays cleared.
+    await decide(w.sql, evader.id, "clear", "admin:eric@example.com", "a cousin, not the cheat", Date.now());
+    await w.sql.run("UPDATE email_codes SET sent_at = sent_at - 60000");
+    const signed = await c.emailSignIn("a.b+2@gmail.com");
+    expect([signed.status, (signed.body as { user: { id: string } }).user.id]).toEqual([200, evader.id]);
+    expect(c.jar.has("hc_banned")).toBe(false);
+    expect((await c.call("/api/live")).status).toBe(200);
+    // Deleted while banned: its address comes back only as a new account banned by evasion.
     const dee = await account(w.sql, "email", "dee@example.com");
     await setCase(w.sql, dee.id, "banned", "admin:eric@example.com", "engine moves", 1700);
     await deleteAccount(w.sql, (await w.sql.first<User>("SELECT id, name, icon, email, google_sub, created_at FROM users WHERE id = ?", dee.id))!, 1800);
     const d = browser(w);
     isBanAnswer(await d.emailSignIn("dee@example.com"));
-    expect(await w.sql.first("SELECT id FROM users WHERE email = ?", "dee@example.com")).toBeNull();
+    const back = (await w.sql.first<{ id: string }>("SELECT id FROM users WHERE email = ?", "dee@example.com"))!;
+    expect(await caseOf(w.sql, back.id)).toMatchObject({ status: "banned", decided_by: "evasion" });
+    expect(d.jar.get("hc_banned")).toBe(back.id);
   });
 });
 
@@ -316,5 +344,121 @@ describe("what passes the gate", () => {
     const refused = await post("Eddie");
     expect([refused.status, refused.headers.get("x-hc-banned"), await refused.json()]).toEqual([403, "1", { banned: true, message: BANNED_LINE }]);
     expect(await sessionsOf(w.sql, id)).toBe(before);
+  });
+});
+
+describe("a shared device: the mark keeps out only the banned account (the review of #687, M1)", () => {
+  it("a family tablet marked by one banned account: anyone else signs in to their own account there and plays; the banned one still gets only the line", async () => {
+    const w = await setUp();
+    const bro = await account(w.sql, "email", "bro@example.com");
+    const sis = await account(w.sql, "email", "sis@example.com");
+    const tablet = browser(w);
+    tablet.jar.set("hc_session", await createSession(w.sql, bro.id, Date.now()));
+    expect((await tablet.call("/api/me")).status).toBe(200);
+    await decide(w.sql, bro.id, "ban", "admin:eric@example.com", "engine moves", Date.now());
+    isBanAnswer(await tablet.call("/api/live"));
+    expect([tablet.jar.get("hc_banned"), tablet.jar.has("hc_session")]).toEqual([bro.id, false]);
+    // Signed out, the tablet gets only the line (no guest made for it)...
+    isBanAnswer(await tablet.call("/api/me"));
+    // ...except on the sign-in's own routes, which run with no session: the options, Google's start, the age question, a code.
+    expect((await tablet.call("/api/auth/config")).status).toBe(200);
+    const google = await tablet.call("/api/auth/google/start?next=/");
+    expect([google.status, new URL(google.res.headers.get("location")!).origin]).toEqual([302, "https://accounts.google.com"]);
+    // His sister signs in to her own account on it: a session of hers, which passes the mark on every route.
+    const made = await users(w.sql);
+    const signed = await tablet.emailSignIn("sis@example.com");
+    expect([signed.status, signed.banHeader, (signed.body as { user: { id: string } }).user.id]).toEqual([200, null, sis.id]);
+    expect(await users(w.sql)).toBe(made);
+    for (const path of ["/api/me", "/api/live", "/api/shop", "/api/quests"]) expect([path, (await tablet.call(path)).status]).toEqual([path, 200]);
+    expect(await sessionsOf(w.sql, sis.id)).toBe(1);
+    expect(tablet.jar.get("hc_banned")).toBe(bro.id);
+    // He tries his own account on it: refused (the line), and her session isn't ended: the next request is hers again.
+    await w.sql.run("UPDATE email_codes SET sent_at = sent_at - 60000");
+    isBanAnswer(await tablet.emailSignIn("bro@example.com"));
+    expect(await sessionsOf(w.sql, bro.id)).toBe(0);
+    expect(await sessionsOf(w.sql, sis.id)).toBe(1);
+    expect(tablet.jar.get("hc_banned")).toBe(bro.id);
+    expect(((await tablet.call("/api/me")).body as { user: { id: string } }).user.id).toBe(sis.id);
+    // A session of his own on it (made some other way): refused and ended, as ever; with none, only the line again.
+    const hers = tablet.jar.get("hc_session")!;
+    tablet.jar.set("hc_session", await createSession(w.sql, bro.id, Date.now()));
+    isBanAnswer(await tablet.call("/api/live"));
+    expect(await sessionsOf(w.sql, bro.id)).toBe(0);
+    isBanAnswer(await tablet.call("/api/live"));
+    // Her session brought back: in, and nothing of hers was ended or opened as a case.
+    tablet.jar.set("hc_session", hers);
+    expect((await tablet.call("/api/live")).status).toBe(200);
+    expect(await caseOf(w.sql, sis.id)).toBeNull();
+    // Signing out of hers on it: a guest of the tablet's, made from her live session, plays on as any guest.
+    expect((await tablet.call("/api/auth/logout", { method: "POST" })).status).toBe(200);
+    expect((await tablet.call("/api/live")).status).toBe(200);
+    // The admin pages aren't behind the gate (only admins see them: an admin's browser that met a ban can still lift it).
+    const marked = browser(w);
+    marked.jar.set("hc_banned", bro.id);
+    const admin = await marked.call("/admin/fairplay");
+    expect([admin.status, admin.banHeader]).toEqual([404, null]);
+  });
+
+  it("the stale-token case: once a banned session's row is gone (ended by another instance's gate), this instance's presence cache can't serve the account (M2)", async () => {
+    const w = await setUp();
+    vi.useFakeTimers({ now: Date.UTC(2026, 10, 13, 12), toFake: ["Date"] });
+    const pat = await account(w.sql, "email", "pat3@example.com");
+    const token = await createSession(w.sql, pat.id, Date.now());
+    const b = browser(w);
+    b.jar.set("hc_session", token);
+    expect((await b.call("/api/friends/online")).status).toBe(200);
+    // Another instance bans Pat and its gate ends the session (this one hears of neither).
+    await w.sql.run("INSERT INTO fairplay_cases (user_id, status, opened_at, updated_at) VALUES (?, 'banned', ?, ?)", pat.id, Date.now(), Date.now());
+    await w.sql.run("DELETE FROM sessions WHERE token_hash = ?", await sha256(token));
+    vi.setSystemTime(Date.now() + FAIRPLAY.banCheckMs + 1);
+    const after = await b.call("/api/friends/online");
+    expect([after.status, after.banHeader]).toEqual([401, null]);
+    // (As a made-up token.)
+    const c = browser(w);
+    c.jar.set("hc_session", "e2enotarealtoken0123456789abcdefgh");
+    expect((await c.call("/api/friends/online")).status).toBe(401);
+  });
+
+  it("a mark that no longer holds isn't taken away over a route's own ban answer: the browser stays marked (minor 1)", async () => {
+    const w = await setUp();
+    const old = await account(w.sql, "email", "old@example.com");
+    const pat = await account(w.sql, "email", "pat5@example.com");
+    await setCase(w.sql, pat.id, "banned", "admin:eric@example.com", "engine moves", 1500);
+    const b = browser(w);
+    await b.call("/api/me");
+    await b.call("/api/auth/age", { json: { oldEnough: true } });
+    expect((await b.call("/api/auth/email/start", { json: { email: "pat5@example.com" } })).status).toBe(200);
+    b.jar.set("hc_banned", old.id);
+    const refused = await b.call("/api/auth/email/verify", { json: { email: "pat5@example.com", code: w.codes.get("pat5@example.com") } });
+    isBanAnswer(refused);
+    expect(refused.res.headers.getSetCookie().filter((c) => c.startsWith("hc_banned="))).toEqual([expect.stringMatching(new RegExp(`^hc_banned=${pat.id};.*Max-Age=34560000`))]);
+    expect(b.jar.get("hc_banned")).toBe(pat.id);
+    isBanAnswer(await b.call("/api/me"));
+  });
+
+  it("the emailed code's routes take JSON from this site's own page only, and a refused code is spent (minor 2)", async () => {
+    const w = await setUp();
+    const cheat = await account(w.sql, "email", "cheat@example.com");
+    await setCase(w.sql, cheat.id, "banned", "admin:eric@example.com", "engine moves", 1500);
+    // (An account from before the age question: a code for it is kept while the device hasn't answered.)
+    await w.sql.run("UPDATE users SET age_ok_at = NULL WHERE id = ?", cheat.id);
+    const b = browser(w);
+    await b.call("/api/me");
+    const xsite = { origin: "https://evil.example", "content-type": "text/plain" };
+    expect((await b.call("/api/auth/email/start", { method: "POST", headers: xsite, body: `{"email":"cheat@example.com"}` })).status).toBe(403);
+    expect((await b.call("/api/auth/email/start", { method: "POST", headers: { origin, "content-type": "text/plain" }, body: `{"email":"cheat@example.com"}` })).status).toBe(415);
+    expect(w.codes.has("cheat@example.com")).toBe(false);
+    expect((await b.call("/api/auth/email/start", { json: { email: "cheat@example.com" } })).status).toBe(200);
+    const body = JSON.stringify({ email: "cheat@example.com", code: w.codes.get("cheat@example.com") });
+    for (const headers of [xsite, { origin, "content-type": "text/plain" }]) {
+      const r = await b.call("/api/auth/email/verify", { method: "POST", headers, body });
+      expect([r.status, r.banHeader, b.jar.has("hc_banned")]).toEqual([headers === xsite ? 403 : 415, null, false]);
+    }
+    // From the page: the ban answer (before the age question), and the code is spent, not kept.
+    isBanAnswer(await b.call("/api/auth/email/verify", { json: JSON.parse(body) }));
+    const other = browser(w);
+    await other.call("/api/me");
+    const again = await other.call("/api/auth/email/verify", { json: JSON.parse(body) });
+    expect([again.status, other.jar.has("hc_banned")]).toEqual([400, false]);
   });
 });

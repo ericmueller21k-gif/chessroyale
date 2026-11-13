@@ -21,7 +21,7 @@ import { cleanName, createSession, d1Sql, ensureSchema, getUser, userFromToken, 
 import { viaAccess, type AccessEnv } from "./access.ts";
 import { isAdmin, type AdminEnv } from "./admin.ts";
 import { SESSION_COOKIE, readCookie, sessionCookie } from "./api.ts";
-import { banAnswer } from "./ban-gate.ts";
+import { banAnswer, refusalEnds } from "./ban-gate.ts";
 import { deleteAccount } from "./account-data.ts";
 import { caseOf } from "./fairplay.ts";
 import { e2eSqlAllowed, type E2eSqlEnv } from "./e2e-sql.ts";
@@ -182,7 +182,12 @@ export async function handleTestAccounts(
     // (An admin on the site isn't signed in as it: that would sign them out of their own account in that browser. The review, minor 1.)
     if (who.startsWith("admin:")) return json(answer);
     // (A ban means you can't sign in, here too (Eric, Nov 13): a banned test account gets the ban answer, no session. ban-gate.ts.)
-    if ((await caseOf(sql, r.user.id))?.status === "banned") return banAnswer(sql, readCookie(request, SESSION_COOKIE), r.user.id);
+    // (The browser's session ended only if it's the banned account's or a guest's, as for any sign-in: refusalEnds.)
+    if ((await caseOf(sql, r.user.id))?.status === "banned") {
+      const token = readCookie(request, SESSION_COOKIE);
+      const current = await userFromToken(sql, token, now, () => undefined);
+      return banAnswer(sql, refusalEnds(token, current, r.user.id), r.user.id);
+    }
     return json(answer, 200, { "set-cookie": sessionCookie(await createSession(sql, r.user.id, now)) });
   }
   return json({ message: "GET, POST or DELETE" }, 405);

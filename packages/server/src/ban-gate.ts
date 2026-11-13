@@ -79,6 +79,14 @@ async function endSession(sql: Sql, token: string): Promise<void> {
 }
 
 /**
+ * The session a sign-in refused for a ban ends (api.ts, test-accounts.ts): this browser's own when it's the banned account's or a guest's
+ * (the one signing in), or one that's gone; never another account's, which stays signed in (a shared device: the review of #687, M1).
+ */
+export function refusalEnds(token: string | null, current: { id: string; email: string | null; google_sub: string | null } | null, banned: string): string | null {
+  return token && (!current || !(current.email || current.google_sub) || current.id === banned) ? token : null;
+}
+
+/**
  * The ban answer (every route's, and a refused sign-in's): 403 with Eric's line, the browser marked with `userId` (the banned account
  * the request reached), and `end` ended: the banned account's own session (or a guest's that tried to sign in to it), never another
  * account's (null: none to end).

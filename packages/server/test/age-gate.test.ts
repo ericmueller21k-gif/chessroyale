@@ -522,10 +522,11 @@ describe("the age gate: too young", () => {
 });
 
 describe("the age gate: what's sent and kept", () => {
-  it("the answer comes only from this site's page, as JSON, from a device with its guest account, and must be one", async () => {
+  it("the answer comes only from this site's page, as JSON, and must be one; a device with no session yet may answer (a browser marked banned has none, and anyone else may sign in on it: ban-gate.ts)", async () => {
     const s = await setUp();
     const p = phone(s);
-    expect((await p.answer(true)).res.status).toBe(401); // (no account on this device yet)
+    expect((await p.answer(true)).res.status).toBe(200);
+    p.jar.delete("hc_age");
     await p.call("/api/me");
     const send = (headers: Record<string, string>, body = JSON.stringify({ oldEnough: false })) => p.call("/api/auth/age", { method: "POST", headers, body });
     expect((await send({ "content-type": "application/json" })).res.status).toBe(403);
