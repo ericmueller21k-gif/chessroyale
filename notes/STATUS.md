@@ -1,3 +1,4 @@
+- Nov 13 ~01:50 UTC: room r3 DONE (claude/hidden-boss-room 182dbaa): board sideways, walks behind it, centered each side, leans in, jointed arm (max 1.13x). Sent 4 to Eric; my note: the lean pose reads stiff (straight arm, head over the board). Music helper running.
 - Nov 13 ~01:45 UTC: Eric wants a test kit: 3 bots as humans in the room (when the room is live) + admin "Win this form" buttons. Win button added to the music helper now; bots noted for the room build.
 - Nov 13 ~01:35 UTC: Eric: music timing gets tuned from one test of his with a timing sheet; told the music helper to stay lean and write the sheet.
 - Nov 13 ~01:30 UTC: music handoff for the Hidden Boss (stills/trailer-v2 91a3f0b2, boss-music/). Brief hidden-boss-music.md (god-king, Opus high), wire to TODAY's fight: adult=phase2 theme, beaten->recluse-beaten, transformation=split-introSeconds->phase3. No town preload. Room r3 also running.
