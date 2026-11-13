@@ -28,7 +28,7 @@ export function noteSoloGame(match: object): void {
 export const soloGameId = (match: object): Promise<string | null> => soloGames.get(match) ?? Promise.resolve(null);
 
 /** The address's switches that make a solo game a test game (no XP: "No XP: test game."): docs/areas/ops.md, "Test switches". */
-const SOLO_TEST_SWITCHES = ["rounds", "clock", "finalTurns", "bossMoves", "draw", "power", "format", "speed", "weakbots", "pace", "augments", "start", "win", "mate", "phase", "laststand", "side"];
+const SOLO_TEST_SWITCHES = ["rounds", "clock", "finalTurns", "bossMoves", "draw", "power", "format", "speed", "weakbots", "pace", "augments", "start", "win", "mate", "phase", "laststand", "side", "form"];
 /** This solo game is a test's: a test switch is on (only where they apply: testParams), or practice mode. */
 export const soloTestGame = (practice: boolean): boolean => practice || SOLO_TEST_SWITCHES.some((k) => testParams().has(k));
 

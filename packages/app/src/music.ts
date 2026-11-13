@@ -368,14 +368,17 @@ export function bossMusic(b: MusicBattle | null) {
 }
 
 /**
- * The Hidden Boss's theme at this point of his fight (Nov 13, RECLUSE_MUSIC): his adult form's from the fight's start (the child
- * form, once built, plays RECLUSE_MUSIC.child before it: that goes here); beaten with his phase change to follow (`toPhase2`:
+ * The Hidden Boss's theme at this point of his fight (Nov 13, RECLUSE_MUSIC): his child form's (`child`: his room's theme) from the
+ * fight's start until the new match against his adult form, then his adult form's; beaten with his phase change to follow (`toPhase2`:
  * solo), his beaten theme at once, through his talk and the absorption; from the phase change, the transformation's, its loop
  * starting exactly as the board cracks into four (`dropAt`: the phase's `splitAt`; its intro starts that intro's length before,
  * `switchPlan`), on through phase 2 until every board is decided. Null: the music ends (the result, or phase 1 won where no phase 2
  * follows: as for any boss).
  */
-export function recluseMusic(phase: Phase, result: boolean, simulDecided: boolean): { theme: string; dropAt?: number; next?: string } | null {
+export function recluseMusic(phase: Phase, result: boolean, simulDecided: boolean, child = false): { theme: string; dropAt?: number; next?: string } | null {
+  // (His child form: his room's theme, through his fall as he grows up; the new match against his adult form switches to its theme
+  // with MUSIC_SWITCH's fade, the adult's decoded meanwhile.)
+  if (child && phase.kind !== "results") return { theme: RECLUSE_MUSIC.child, next: RECLUSE_MUSIC.adult };
   if (phase.kind === "phaseChange") return { theme: RECLUSE_MUSIC.transform, dropAt: phase.splitAt };
   if (phase.kind === "simul") return simulDecided ? null : { theme: RECLUSE_MUSIC.transform };
   if (phase.kind === "results") return null;

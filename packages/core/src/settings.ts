@@ -1943,6 +1943,8 @@ export const RECLUSE_CHILD = {
   stepRating: 100,
   everyPlies: 4,
   ages: [1800, 2000, 2200, 2500],
+  /** Beaten: his line first, then he grows up into the man at `growUpAt` ms into his fall (about 2.3 s), the fall `fallMs` in all. */
+  growUpAt: 1200,
   fallMs: 4200,
 } as const;
 

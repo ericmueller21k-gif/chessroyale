@@ -86,7 +86,8 @@ export class Chatter {
  * `startAt` is when its clocks started.
  */
 export function talkWhen(view: Pick<GameView, "boss" | "phase" | "simul" | "standings">, now: number): { phase: TalkPhase; startAt?: number } | null {
-  if (view.boss?.id !== "recluse") return null;
+  // (Not his child form: the kid has his own lines, none of the man's muttering.)
+  if (view.boss?.id !== "recluse" || view.boss.form === "child") return null;
   // (Only for those fighting him: a player knocked out before his final watches it without his muttering.)
   if (view.standings().some((s) => s.isYou && s.out)) return null;
   const p = view.phase;
