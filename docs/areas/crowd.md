@@ -158,11 +158,17 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
   card in the vote is his roster name and icon ("Hidden Boss", 📕) with "Top 4 team up against him" (`bossFinalOption`
   in `votes.ts`: renaming him is one edit, in `BOSS_ROSTER`). The rule: `BossDef.crowdFinal` and `crowdFinalBoss()`
   (`boss.ts`), which the runner's `startBoss` meets whatever boss was picked or met last; he stays hidden from players
-  everywhere else (`adminOnly`). His rules there are his phase 1 (from the starting position, Maia at its top, raw, the
-  God King blocked, no strikes, the bullet clock; [bosses.md](bosses.md)). **Online** the lobby runs them through the
-  shared runner, his brain on the host's device; beaten, the board holds `RECLUSE_FALL_MS` for his collapse (the boss
-  message's `fall`), then the results (`timeout` when he won on time). **Phase 2 online** (Nov 13): beaten, his phase change
-  and the four boards follow for the top 4 (the server's, as his room's fight: bosses.md, "Phase 2 online"); the others watch.
+  everywhere else (`adminOnly`). **His child first** (Nov 13, solo and online; the settings' `recluseChild`, from
+  `RECLUSE_FORMS` in `modeSettings("crowd")`): no powers (the God King's help works), Maia from `RECLUSE_CHILD.startRating`
+  rising every `everyPlies` moves on the board to his top (online, each move request carries the rating and Stockfish's
+  stand-in, `runner.childRatingNow` and `bossEloNow`); his level shows and climbs. Beaten, his fall (`RECLUSE_CHILD.fallMs`:
+  he grows up), then one new match against the man from the starting position, for everyone (`runner.nextBossForm()`, his
+  intro again); the boy winning or drawing ends the fight. `?form=adult` (a lobby test switch) starts at the man. **The man**
+  is his phase 1 (from the starting position, Maia at its top, raw, the God King blocked, no strikes, the bullet clock;
+  [bosses.md](bosses.md)). **Online** the lobby runs both through the shared runner, his brain on the host's device; the
+  man beaten, the board holds for his collapse (the boss message's `fall`), then the results (`timeout` when he won on time).
+  **Phase 2 online** (Nov 13): the man beaten, his phase change and the four boards follow for the top 4 (the server's, as
+  his room's fight: bosses.md, "Phase 2 online"); the others watch.
   **Solo** (you and bots), if you reached him, his phase 2 follows as in Boss alone, the other
   three finalists on the other boards (`phase2Follows`, `phase2Mates` in `recluse-phase2.ts`). No reward comes from this
   path (rewards only via Squads: ROADMAP.md). Duel: the last two. `finalMaxTurns` caps a final; the engine
@@ -321,10 +327,13 @@ time controls themselves are in the vote data (`PREGAME_VOTES` in `votes.ts`).
   e2e `e2e/resign.spec.ts` (Boss alone, a Solo 50 v 50, Squads, an online raid; phone and computer).
 - The boss final (the Hidden Boss): unit `packages/core/test/votes.test.ts` (his card, the knockouts), `boss.test.ts`
   (`crowdFinalBoss`), `packages/chess/test/crowd.test.ts` ("50 v 50 boss final"), `packages/server/test/crowd-hidden-boss.test.ts`
-  (online: his brain and strength, the God King tried, the bullet clock and a loss on time, his fall then phase 2 to the result),
-  `packages/app/test/recluse-phase2.test.ts` (phase 2 in a solo Crowd's final), `faq.test.ts`; e2e
-  `e2e/crowd-hidden.spec.ts` (the card; solo through phase 2, no strikes, the God King never comes; online to the result,
-  his replies played by the host's browser: formats.spec.ts' two boss-battle tests merged in, Nov 2).
+  (online: his brain and strength, the God King tried, the bullet clock and a loss on time, his fall then phase 2 to the result;
+  the child first: his rising strength, his fall, one new match against the man, phase 2, the results; Maia's loaders told once),
+  `packages/app/test/recluse-phase2.test.ts` (phase 2 in a solo Crowd's final), `recluse-online.test.ts` (the man however a
+  device hears of him first: the child's lines, beats, banners, 🏆 and premoves dropped), `faq.test.ts`; e2e
+  `e2e/crowd-hidden.spec.ts` (the card; solo through phase 2, no strikes, the God King never comes; online to the result at the
+  man, `?form=adult`, his replies played by the host's browser, on the phone since Nov 13: it never ran before;
+  formats.spec.ts' two boss-battle tests merged in, Nov 2).
 - e2e: `e2e/crowd.spec.ts`, `formats.spec.ts`, `votes.spec.ts`, `match-screen.spec.ts`, `panel.spec.ts`,
   `solo.spec.ts`, `multiplayer.spec.ts`, `castling.spec.ts`, `perf.spec.ts`.
 - Frames: `npm run frames:boss` (one move, real taps), `frames:flash` (white flashes), `frames:vote`, `frames:chat`.

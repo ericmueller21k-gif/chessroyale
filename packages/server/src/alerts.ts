@@ -324,7 +324,7 @@ export async function digest(env: AlertEnvFull, sql: Sql, now: number, state: Al
     `**Errors:** ${h.errors.day} (the 24 hours before: ${before?.n ?? 0}), ${h.errors.kinds} kinds; ${newKinds.length ? `${newKinds.length === 5 ? "5 or more" : newKinds.length} new` : "no new"} kinds. **Durable Objects:** ${counts(h.durableObjects.byEntry)}.`,
     `**Players' reports:** ${r.bug ?? 0} bugs, ${r.feedback ?? 0} feedback, ${r.idea ?? 0} ideas.`,
     `**Live now:** ${h.live ? `${h.live.online} online, ${h.live.players} in lobbies` : "no answer from the live hub"}. **D1:** ${h.d1.ok ? `ok (${h.d1.ms} ms)` : "failing"}. **Deployed:** ${plain(h.deploy.version, 20)}.`,
-    `**Engine server:** ${h.engine.on ? "on" : "off"}, ${h.engine.searches} of ${h.engine.cap} searches today${h.engine.lastFail && now - h.engine.lastFail.at < DAY ? `, last failure ${clock(h.engine.lastFail.at)}` : ""}. **Fair play's re-checks:** ${h.fairplay.searches} of ${h.fairplay.cap}.`,
+    `**Engine server:** ${h.engine.on ? "on" : "off"}, ${h.engine.searches} of ${h.engine.cap} searches today${h.engine.lastFail && now - h.engine.lastFail.at < DAY ? `, last failure ${clock(h.engine.lastFail.at)}` : ""}${h.engine.recluse.noResults || h.engine.recluse.noResultsYesterday ? `; the Hidden Boss's fights with no result (UTC days): yesterday ${h.engine.recluse.noResultsYesterday}, today so far ${h.engine.recluse.noResults}` : ""}. **Fair play's re-checks:** ${h.fairplay.searches} of ${h.fairplay.cap}.`,
     `<${ALERTS.opsPage}>`,
   ];
   const head = lines.join("\n");

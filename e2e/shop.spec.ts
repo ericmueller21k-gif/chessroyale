@@ -928,7 +928,8 @@ test("Ginger Igloo (Nov 5): Go in (its card its name and Go in), the round igloo
   await page.keyboard.up("ArrowUp");
   await page.keyboard.down("ArrowLeft");
   // (A step is 90 ms: watched every frame, in the page.)
-  await page.waitForFunction(() => document.querySelector<HTMLCanvasElement>("canvas.town-shop-canvas")?.dataset.you === "10,4", null, { timeout: 10_000 });
+  // (10,4 or any catwalk square west of it: on a loaded machine a frame can carry two steps, so 10,4 itself may never be seen.)
+  await page.waitForFunction(() => ["10,4", "9,4", "8,4", "7,5"].includes(document.querySelector<HTMLCanvasElement>("canvas.town-shop-canvas")?.dataset.you ?? ""), null, { timeout: 10_000 });
   await page.keyboard.up("ArrowLeft");
   await page.waitForTimeout(400);
   const keyed = (await room(page).getAttribute("data-you"))!;

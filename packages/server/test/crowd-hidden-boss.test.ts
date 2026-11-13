@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { BOSS_POWERS, CROWD_KNOCKOUTS, DEFAULT_SETTINGS, RECLUSE_PHASE2, bossDef, crowdFinalists, fixedLevel, maiaTopRating, modeSettings, mulberry32, type Settings } from "@chessroyale/core";
+import { BOSS_POWERS, CROWD_KNOCKOUTS, DEFAULT_SETTINGS, RECLUSE_CHILD, RECLUSE_PHASE2, bossDef, childRating, crowdFinalists, fixedLevel, levelForMaia, maiaTopRating, modeSettings, mulberry32, type Settings } from "@chessroyale/core";
 import { legalMoves, sanLineToUci, type BoardScore, type Opening, type ServerMessage } from "@chessroyale/chess";
-import { LobbyCore, newLobbyRecord } from "../src/lobby.ts";
+import { LobbyCore, newLobbyRecord, type LobbyIO } from "../src/lobby.ts";
 
 /**
  * The Crowd's boss final online (Eric, Oct 14): always the Hidden Boss, the top 4 against him, his phase 1 run by the
@@ -33,14 +33,15 @@ const hashBest = (fen: string) => legalMoves(fen).reduce((a, b) => (exp(fen, b) 
 
 /**
  * A fake lobby (clock, outboxes, a host that scores with the hash), Crowd 50 v 50 ending in the boss final, two people
- * (Ann, the host, and Bo) and 98 bots. `script`: the crowd's moves once the battle is on, each picked by everyone.
+ * (Ann, the host, and Bo) and 98 bots. `script`: the crowd's moves once the battle is on, each picked by everyone. `o.worst`: people
+ * who pick the hash's worst move (cut early, then watching); `o.io`: more of the lobby's io (an engine server for phase 2).
  */
-function crowdFinal(patch: Partial<Settings> = {}, seed = 7) {
+function crowdFinal(patch: Partial<Settings> = {}, seed = 7, o: { worst?: string[]; io?: Partial<LobbyIO> } = {}) {
   let now = 1_000_000;
   const inbox = new Map<string, Msg[]>();
   const core = new LobbyCore(
     newLobbyRecord("ABCDE", now),
-    { now: () => now, send: (id, msg) => inbox.set(id, [...(inbox.get(id) ?? []), { ...msg, now } as Msg]), icon: () => undefined },
+    { now: () => now, send: (id, msg) => inbox.set(id, [...(inbox.get(id) ?? []), { ...msg, now } as Msg]), icon: () => undefined, ...o.io },
     library,
     mulberry32(seed),
     {
@@ -53,6 +54,8 @@ function crowdFinal(patch: Partial<Settings> = {}, seed = 7) {
       firstStageRounds: 2,
       roundsPerStage: 2,
       boardIntroSeconds: 0,
+      // (At his adult form, as `?form=adult`: these tests are about it. His child form comes first otherwise, Nov 13: recluse-online.test.ts.)
+      recluseChild: false,
       ...patch,
     },
   );
@@ -104,7 +107,11 @@ function crowdFinal(patch: Partial<Settings> = {}, seed = 7) {
       for (const id of people) {
         const r = last(id, "round");
         const round = core.record.round;
-        if (!miss && r?.board && !r.watching && r.alive && round?.key === r.key && !round.picks[id]) core.message(id, { t: "pick", key: r.key, move: crowdPick(r.board.fen) });
+        if (!miss && r?.board && !r.watching && r.alive && round?.key === r.key && !round.picks[id]) {
+          const fen = r.board.fen;
+          const move = o.worst?.includes(id) ? legalMoves(fen).reduce((a, b) => (exp(fen, b) < exp(fen, a) ? b : a)) : crowdPick(fen);
+          core.message(id, { t: "pick", key: r.key, move });
+        }
       }
       advance(1000);
     } else if (phase === "scoring") {
@@ -259,5 +266,120 @@ describe("the Crowd's boss final online: always the Hidden Boss (Eric, Oct 14)",
     expect(res.bossResult).toBe("boss");
     expect(res.simul).toEqual({ won: 0, of: 4 });
     expect(res.now).toBeGreaterThanOrEqual(p2.clocksAt);
+  });
+
+  it("no result in phase 2 (his move never came from the engine server): its board players' results none; a watcher's stands at their place, the boss's part none (the review of #683, M3)", () => {
+    const searches: { id: string; boss?: true }[] = [];
+    // (Bo picks the worst move all along: cut early, Bo watches the final. An engine server that never answers.)
+    const L = crowdFinal({}, 7, { worst: ["p2"], io: { phase2Search: (req) => void searches.push(req), warmEngine: () => undefined } });
+    L.script = sanLineToUci(["e4", "e5", "Bc4", "Nc6", "Qh5", "Nf6", "Qxf7#"]).filter((_, i) => i % 2 === 0);
+    L.bossScript = sanLineToUci(["e4", "e5", "Bc4", "Nc6", "Qh5", "Nf6"]).filter((_, i) => i % 2 === 1);
+    for (let i = 0; i < 2000 && L.core.record.phase !== "phase2"; i++) L.step();
+    expect(L.core.record.phase).toBe("phase2");
+    const p2 = L.core.record.recluse2!;
+    expect(Object.keys(p2.names)).toContain("p1");
+    expect(Object.keys(p2.names)).not.toContain("p2");
+    for (let i = 0; i < 2000 && L.core.record.phase !== "results"; i++) L.advance(1000);
+    expect(L.core.record.phase).toBe("results");
+    expect(p2.done ?? L.core.record.recluse2!.done).toMatchObject({ noResult: true });
+    expect(searches.some((s) => s.boss)).toBe(true);
+    // (Ann played a board: nothing counts. Bo watched: Bo's place stands, ranked as the match is; the boss's part is nobody's.)
+    expect(L.last("p1", "results")).toMatchObject({ noResult: "board", ranked: false, bossResult: "draw" });
+    const bo = L.last("p2", "results")!;
+    expect(bo).toMatchObject({ noResult: "watched", bossResult: "draw", ranked: L.core.ranked() });
+    const results = L.core.humanResults();
+    const ann = results.find((r) => r.playerId === "p1")!;
+    const boRow = results.find((r) => r.playerId === "p2")!;
+    expect(ann).toMatchObject({ noResult: true, ranked: false, teamWon: null });
+    expect(boRow.noResult).toBeUndefined();
+    expect(boRow.teamWon).toBeNull();
+    expect(boRow.placement).toBe(L.core.record.placements["p2"]);
+    expect(boRow.placement).toBeGreaterThan(crowdFinalists("boss"));
+  });
+
+  it("no result in phase 1 (no device answered his move, then nothing from the engine server: Eric, Nov 13, option 1): the finalists' results none; a watcher's stands at their place", () => {
+    const searches: { id: string; boss?: true }[] = [];
+    // (Bo picks the worst move all along: cut early, Bo watches the final. An engine server that never answers.)
+    const L = crowdFinal({}, 7, { worst: ["p2"], io: { phase2Search: (req) => void searches.push(req), warmEngine: () => undefined } });
+    // On to his first move, asked of the host, which never answers it.
+    for (let i = 0; i < 400 && !(L.core.record.phase === "boss" && L.core.record.bossKey); i++) L.step();
+    expect(L.core.record.bossKey).toBeTruthy();
+    const battle = () => {
+      const r = L.core.save().runner!;
+      return r.boards.find((b) => b.id === r.state.boards[0])!;
+    };
+    const ply = battle().history.length;
+    for (let i = 0; i < 200 && L.core.record.phase !== "results"; i++) L.advance(1000);
+    expect(L.core.record.phase).toBe("results");
+    // (Never a random move: his move asked of the engine server, never in.)
+    expect(searches.some((x) => x.boss && x.id.startsWith("p1-"))).toBe(true);
+    expect(battle().history).toHaveLength(ply);
+    expect(L.core.record.recluse2).toBeUndefined();
+    // (Ann fought him: nothing counts. Bo watched: Bo's place stands, ranked as the match is; the boss's part is nobody's.)
+    expect(L.last("p1", "results")).toMatchObject({ noResult: "board", ranked: false, bossResult: "draw" });
+    expect(L.last("p2", "results")).toMatchObject({ noResult: "watched", bossResult: "draw", ranked: L.core.ranked() });
+    const results = L.core.humanResults();
+    expect(results.find((r) => r.playerId === "p1")).toMatchObject({ noResult: true, ranked: false, teamWon: null });
+    const bo = results.find((r) => r.playerId === "p2")!;
+    expect(bo.noResult).toBeUndefined();
+    expect(bo.teamWon).toBeNull();
+    expect(bo.placement).toBeGreaterThan(crowdFinalists("boss"));
+  });
+
+  it("the child first (Nov 13; the review of the child form online, m3): mated, his fall (not phase 2's), then one new match against the man from the start, at the man's strength; mated, phase 2, the results", () => {
+    const L = crowdFinal({ recluseChild: true });
+    expect(L.last("p2", "boss")!.boss).toMatchObject({ form: "child", formStep: 0 });
+    expect(L.last("p2", "boss")!.boss.powers).toBeUndefined();
+    // (The host's Maia loaded: his moves go out as Maia's, with their rating.)
+    L.core.message(L.core.record.hostId!, { t: "maiaReady" });
+    // Scholar's mate on each, the crowd White; the host plays his replies into it.
+    L.script = sanLineToUci(["e4", "e5", "Bc4", "Nc6", "Qh5", "Nf6", "Qxf7#"]).filter((_, i) => i % 2 === 0);
+    L.bossScript = sanLineToUci(["e4", "e5", "Bc4", "Nc6", "Qh5", "Nf6"]).filter((_, i) => i % 2 === 1);
+    let fall: Extract<Msg, { t: "boss" }> | undefined;
+    for (let i = 0; i < 2000 && !fall; i++) (L.step(), (fall = L.all("p2", "boss").find((m) => m.fall)));
+    expect(fall!.boss).toMatchObject({ form: "child", result: "crowd" });
+    expect(fall!.toPhase2).toBeUndefined();
+    expect(fall!.until - fall!.now).toBe(RECLUSE_CHILD.fallMs);
+    // (The child's moves at his rating as it rises, Maia's and Stockfish's stand-in alike: the host and its checker play the same.)
+    const plyOf = (fen: string) => { const [, side, , , , full] = fen.split(" "); return (Number(full) - 1) * 2 + (side === "b" ? 1 : 0); };
+    const childAsked = [...L.bossRequests];
+    expect(childAsked.length).toBeGreaterThanOrEqual(3);
+    for (const a of childAsked) {
+      expect(a.brain?.rating).toBe(childRating(plyOf(a.fen)));
+      expect(a.elo).toBe(levelForMaia(childRating(plyOf(a.fen))));
+    }
+    expect(childAsked[0]!.brain!.rating).toBe(RECLUSE_CHILD.startRating);
+    let fall2: Extract<Msg, { t: "boss" }> | undefined;
+    for (let i = 0; i < 3000 && !fall2; i++) (L.step(), (fall2 = L.all("p2", "boss").find((m) => m.fall && !m.boss.form)));
+    // (One new match, one intro: the man's, from the start.)
+    expect(L.all("p2", "boss").filter((m) => m.intro).map((m) => m.boss.form ?? "adult")).toEqual(["child", "adult"]);
+    const manAsked = L.bossRequests.slice(childAsked.length);
+    expect(manAsked[0]!.fen.split(" ")[5]).toBe("1");
+    for (const a of manAsked) expect(a).toMatchObject({ elo: fixedLevel(), brain: { rating: maiaTopRating() } });
+    expect(fall2!.toPhase2).toBe(true);
+    for (let i = 0; i < 20 && L.core.record.phase === "boss"; i++) L.advance(1000);
+    expect(L.core.record.phase).toBe("phase2");
+    for (let i = 0; i < 2000 && L.core.record.phase !== "results"; i++) L.advance(1000);
+    const res = L.last("p2", "results")!;
+    expect(res.bossResult).toBe("boss");
+    expect(Object.keys(res.placements)).toHaveLength(100);
+  });
+
+  it("the man's intro after the child's tells no more devices to load Maia: those told at the child's intro stand (the review of the child form online, n1)", () => {
+    const L = crowdFinal({ recluseChild: true });
+    L.core.message(L.core.record.hostId!, { t: "maiaReady" });
+    L.script = sanLineToUci(["e4", "e5", "Bc4", "Nc6", "Qh5", "Nf6", "Qxf7#"]).filter((_, i) => i % 2 === 0);
+    L.bossScript = sanLineToUci(["e4", "e5", "Bc4", "Nc6", "Qh5", "Nf6"]).filter((_, i) => i % 2 === 1);
+    for (let i = 0; i < 2000 && !L.all("p2", "boss").some((m) => m.fall); i++) L.step();
+    // (In his fall, Bo's phone comes back able to check, its Maia saved: one the man's intro would have told to load it.)
+    const bo = L.core.record.humans.find((h) => h.id === "p2")!;
+    expect(bo.id).not.toBe(L.core.record.hostId);
+    L.core.connect(bo.token, "Bo", "phone", false, null, undefined, undefined, null, null, false, {}, true);
+    L.core.message("p2", { t: "speed", nps: 300_000, maiaSaved: true });
+    const told = () => L.all("p2", "bossBrain").filter((m) => m.check).length;
+    expect(told()).toBe(0);
+    for (let i = 0; i < 100 && !L.all("p2", "boss").some((m) => m.intro && !m.boss.form); i++) L.advance(1000);
+    expect(L.all("p2", "boss").filter((m) => m.intro).map((m) => m.boss.form ?? "adult")).toEqual(["child", "adult"]);
+    expect(told()).toBe(0);
   });
 });

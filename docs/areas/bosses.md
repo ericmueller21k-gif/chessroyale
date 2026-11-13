@@ -137,6 +137,17 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
   when they match, else as the engine server settles it (a host can't throw the battle); alone (a party's battle too), the host's
   plays and the match pays as a solo game ("Only one device checked this match" on the results). His powers' picks and extras
   are still the host's (for the move that plays, asked again if needed), checked by their rules. [engine.md](engine.md), "Two devices play each online boss move".
+  **No device answering in its window** (`bossTimeout`): another device is asked; with none, a random allowed move. **The Hidden
+  Boss excepted** (Nov 13, Eric's option 1; [decision](../decisions/2026-11-13-recluse-phase1-pause.md)): his move (child or man,
+  his room's fight and the Crowd's final) goes to the engine server once the host's window has passed unanswered (another device
+  hosts his moves to come), never a random move: every legal move scored, he plays one at the strength the devices were asked for
+  (the child's `levelForMaia` stand-in or the man's fixed level, `bossEloNow`) as the turn drew it (`bossMoveFromScores`: a
+  device's seeded Stockfish pick, from the server's numbers). His turn is the pause (nobody's clock runs on it; "The boss is
+  thinking…"); once asked, that move is the server's alone (a device's late answer isn't heard). Tried again as phase 2's are; not
+  in after `RECLUSE_ONLINE.serverWaitMs`: **no result** for those fighting him (`LobbyRecord.recluse1.none`; the battle a draw),
+  everyone else's result standing, counted for the health view. No engine server set up: the quick move, the match unvouched.
+  Tests: server `recluse-online.test.ts` ("his phase 1 move when no device answers"), `crowd-hidden-boss.test.ts` ("no result in
+  phase 1"), chess `boss-brain.test.ts` (`bossMoveFromScores`).
 - **The brain (Oct 12: every boss on Maia; DECISIONS.md, "Every boss on Maia"):** every boss plays its normal moves
   with **Maia-3** (a human-like model, a separate AGPL program in its own worker: `packages/maia-worker/`), no guard,
   at a Maia rating for its level (its strength, plus a crowd's margin), clearly favored in plain chess (Eric, Oct 12:
@@ -166,16 +177,20 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
   phase change and the four boards online, to the real result (Nov 13: "Phase 2 online", below). **A tie at the top** (2-2 in a
   team of four) goes by strength, as a no-majority turn does: the engine's best of the tied moves, or one within `closeCp` at random
   (Eric, Nov 12: "a deliberate blunder never wins a tie"; a party of three never ties at two, so its draws are as before).
-- **His child form** (Nov 13; [decision](../decisions/2026-11-13-hidden-boss-child-form.md); RECLUSE_CHILD): his first form, solo (an
-  admin's Boss alone, a solo Crowd's final: `settings.recluseChild`, set by solo only; `?form=adult` starts at the man). `BossState.form`
+- **His child form** (Nov 13; [decision](../decisions/2026-11-13-hidden-boss-child-form.md), [online](../decisions/2026-11-13-hidden-boss-child-online.md);
+  RECLUSE_CHILD): his first form wherever he's fought (`RECLUSE_FORMS` starts with it: `recluseChildFirst`; the settings' `recluseChild`
+  from it in `hiddenRoomSettings`, `modeSettings("crowd")` and solo; `?form=adult`, solo's and a lobby's test switch, starts at the man). `BossState.form`
   "child": no powers (`bossPowers` none; `RECLUSE_CHILD_RULES`: never strikes, the God King's help works), Maia raw at core
   `childRating` (1800, +100 every 4 moves on the board, to Maia's top 2500, the man's), Stockfish at `levelForMaia` of it while Maia
   loads; his level from that rating (`formStep` in the view), popping at each step (BossLevel). His figure: `RECLUSE_CHILD_KIT`
   (`bossKitOf`) draws `RECLUSE_GROWING` (recluse-ages.ts: each age's idle and the growing steps), stepped by a figure run from
   `formStep` (components/RecluseChild.ts, once each); the kid's lines `RECLUSE_CHILD_LINES`. Beaten: nobody placed
   (finishBossBattle), his line, he grows up into the man (`growUpAt`, `fallMs`), then the runner's `nextBossForm`: a new match
-  against his adult form (solo `nextForm`: his entrance again). Online waits for the server's form list. Tests:
-  `chess/test/recluse-child.test.ts`, `app/test/recluse-child.test.ts`, `e2e/recluse.spec.ts` ("his child form first").
+  against his adult form (solo `nextForm`: his entrance again). **Online** (his room's fight, the Crowd's final): the lobby's fall path
+  (his rules' `fallMs`), then `nextRound` calls `nextBossForm` and plays the adult form's intro; each move request carries the child's
+  rating (`childRatingNow`) and strength (`bossEloNow`) to the host and its checker alike; `NetMatch` resets his beats, words, banners
+  and its 🏆 as the form goes. Tests: `chess/test/recluse-child.test.ts`, `app/test/recluse-child.test.ts`, server
+  `recluse-online.test.ts` ("his child form online"), `e2e/recluse.spec.ts` ("his child form first"), `e2e/hidden-boss-room.spec.ts`.
 - **Win this form** (admins only, Boss alone, the Hidden Boss only, Nov 13; his child form too: for Eric's timing test of his music and phase
   change): a 🏆 after the 🐟 (a computer: in the title line). Pressed, your next move beats his adult form by the end a mate takes
   (the runner's `bossForceWin`: `stageComplete`, then `finishBossBattle`'s "crowd"; his fall, phase change and music follow as for
@@ -276,19 +291,38 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
 boss final you reached, where the other three finalists take the other boards (`phase2Follows`, `phase2Mates`); online since Nov 13,
 below):
 - **Phase 2 online** (Nov 13, Eric: "it plays through till the end"; [decision](../decisions/2026-11-13-recluse-online-phase2.md)): his
-  room's fight and the Crowd's boss final. His forms are a list (`RECLUSE_FORMS`: adult, then four; the child form goes first once
-  built). Beaten, his fall (the boss message's `fall` with `toPhase2`, `RECLUSE_PHASE2.change.fallMs`), the cutscene's hold
+  room's fight and the Crowd's boss final. His forms are a list (`RECLUSE_FORMS`: the child, the adult form, then four). Beaten, his fall (the boss message's `fall` with `toPhase2`, `RECLUSE_PHASE2.change.fallMs`), the cutscene's hold
   (`RECLUSE_CUTSCENE.holdMs`, the scene's length: the event `recluseCutscene`, its start and end, `NetMatch.cutscene`; below), then his phase
   change for everyone from one start (`phase2`'s `at`; `RECLUSE_ONLINE.changeMs`, the screens' `PHASE_CHANGE.total` within 300 ms),
   the countdown, and the four boards to the real result. The server runs them (`packages/server/src/bosses/recluse.ts`, on the same
   rules, `LobbyRecord.recluse2`, the lobby phase `phase2`): each person plays their own board (`phase2Move`: theirs, their move, on
-  the position it was made on (`ply`), legal; refused, they're told phase 2 again with `refused`); his moves and the bots' from the
-  engine server (woken as his fall begins), every legal move scored in groups of at most 8 (`serverAllMovesAt`, the first group tried
-  twice, `RECLUSE_ONLINE.groupNodes`; one budget search a position), he the best, a bot one within `botLoss`, either the quickest mate
-  when one scores; where it can't answer, the host's device (`phase2Ask`/`phase2Answer`, solo's strengths; re-asked of a new host or
-  a host back from a reload, `resend`), and with no answer in `askMs`, the server's quick move. A move of HIS from a device or the
-  quick move leaves phase 2's result unvouched (`recluse2.unvouched`, `phase2Unvouched`): the board players' results pay as a solo
-  game's and aren't ranked; phase 1's, its fair play and the watchers' stand. A bot's never does. Each person's move is scored too, a
+  the position it was made on (`ply`), legal, not while paused; refused, they're told phase 2 again with `refused`). **His moves from
+  the engine server alone** (Eric, Nov 13: "we can't have him breaking"; [decision](../decisions/2026-11-13-recluse-server-only.md)):
+  every legal move scored in groups of at most 8 (`serverAllMovesAt`, the first group tried twice, `RECLUSE_ONLINE.groupNodes`), he
+  plays the best, a mate in one always (`withMates`: the rules mark it, `matingMoves`/`matingMoves960`, the engine server never says
+  `mate`); never a player's device, never a quick move. **His queue is his own** (the review of #683, M1): the bots' moves go to
+  the host's device first and each person's fair-play numbers to fair play's instance, so the match engine's queue holds his moves.
+  His searches are never refused for the day's budget (bounded by the fights; each position counted once on his own row,
+  `<day>:recluse`, the pool `"recluse"`: M2). An empty answer is tried again (`retryMs`, doubling to `retryMaxMs`); a try takes at
+  most `searchMs` (15 s) and one never answered is tried again 5 s past that (lost), so no try goes out while an earlier one could
+  still be running. The engine server gone mid-fight (a deploy without it): his next try is the quick move, phase 2 unvouched
+  (m3). His count on his row never holds his search up (the delta review of #683, m1: counted beside it). His move not in after `pauseMs` (3 s): **every board's clock pauses**
+  (`recluse2.paused`, the view's `paused`): every board says "He's thinking…" and takes no move, nothing flags or times out, the
+  admins' ultimate waits; once it's in, every running clock goes on from where it stood (`hold`: turn starts and bots' thinking moved
+  on by the pause; a board handed to a bot during a pause thinks from its end, m1). Not in after `serverWaitMs` (60 s): **no
+  result** (`done.noResult`; "No result: the Hidden Boss couldn't connect."), counted for the health view (`<day>:recluse-none`).
+  **For phase 2's board players only** (`phase2NoResultFor`: `recluse2.names`, as `phase2Unvouched`; the review of #683, M3): their
+  results say "Nothing counts for or against you." (`noResult: "board"`, `bossResult` "draw" for the duo, not ranked;
+  `humanResults` marks each `noResult`: writeResult writes their fair play from before phase 2 and nothing else, no XP, result row,
+  Welcome Crate or token; phase 2's fair-play moves are dropped, `fairFrom`). Everyone else, a Crowd final's watchers, keeps their
+  result at their placement, the boss's part none (`teamWon` null), and their results say "Your place stands." (`noResult:
+  "watched"`). The bots' moves: the host's device first (`phase2Ask`/`phase2Answer`, a bot's strength; re-asked of a new host or a
+  host back from a reload, `resend`, a bot's only), with no answer in `askMs` (or no host) the engine server (one within `botLoss`
+  of the best), where that can't either the server's quick move; a bot's move never unvouches anything. The host chooses the bots'
+  moves, checked only for legality (as phase 1's bot picks): accepted (the delta review of #683, m3: a modified host could play them
+  strong, or throw them in a Crowd final it watches). With no engine server set up at all (local runs, the e2e suite, staging: no `phase2Search`), his move is the server's
+  quick move at once and phase 2's result is unvouched (`recluse2.unvouched`, `phase2Unvouched`: the board players' results pay as a
+  solo game's and aren't ranked). Each person's move is scored too (on fair play's instance), a
   `FairMove` with no crowd (fair play; not in a test fight). Leaving (resign, or away past `LEAVING.awayMs`): a bot plays their board
   on; for them a loss, from his fall on (its message names the board players: `phase2Boards`). The results carry `simul` ("won N of
   4"). The Crowd final's top 4 take the boards (fresh bots for any empty one); the others watch. Everyone's told phase 2 lean; what a
@@ -1147,7 +1181,7 @@ sampling, the guards, `forPlayers`), `BOSS_TIERS` and each boss's `offset` in `b
 - Previews: `npm run preview:characters -- <dir>` (GIFs and sheets of every boss and effect; `only=pig` for Wrangler).
   The Hidden Boss's bust and his book (art only, not shown) aren't in the character lists: add
   `extra=packages/app/src/characters/recluse.ts only=recluse,recluse-bust,recluse-book`.
-  His younger ages (a mockup, Nov 12; wired into nothing): `characters/recluse-ages.ts` (the child, 13 and 20, their busts
+  His younger ages (a mockup, Nov 12; since Nov 13 his child form's growing figure, `recluse-growing`): `characters/recluse-ages.ts` (the child, 13 and 20, their busts
   and idles, the growing step `recluse-grow`, the ghost child beside him kneeling `recluse-ghost`):
   `extra=packages/app/src/characters/recluse-ages.ts only=recluse-child,recluse-teen,recluse-young,recluse-grow,recluse-ghost`.
   His cutscene between the adult form and the cyborg (in the fight since Nov 13: "His cutscene" above):

@@ -67,6 +67,8 @@ if (h.durableObjects.thisHour) attention.push(`Durable Objects threw ${count(h.d
 const en = h.engine;
 if (en.on && en.lastFail && (!en.lastOk || en.lastFail.at > en.lastOk)) attention.push(`The engine server's last search failed (${ago(en.lastFail.at)}: ${en.lastFail.why}); players' devices' numbers stand meanwhile.`);
 if (share(en.searches, en.cap) >= 0.8) attention.push(`The engine server has used ${en.searches} of today's ${en.cap} searches.`);
+// (His fight with no result: his move never came from the engine server, phase 1 or 2. A server older than this has no `recluse`.)
+if (en.recluse?.noResults) attention.push(`${count(en.recluse.noResults, "Hidden Boss fight")} ended with no result today (his move never came from the engine server): the Worker's logs say why.`);
 if (share(h.fairplay.searches, h.fairplay.cap) >= 0.8) attention.push(`Fair play's deep re-checks have used ${h.fairplay.searches} of today's ${h.fairplay.cap} searches.`);
 if (h.alerts?.paging.length) attention.push(`Alerts paging: ${h.alerts.paging.join(", ")}.`);
 if (h.reports.day.bug) attention.push(`${count(h.reports.day.bug, "bug report")} in the last 24 hours to read: /admin/ops?kind=bug.`);
@@ -102,6 +104,7 @@ const kinds = [count(h.reports.day.bug ?? 0, "bug"), `${h.reports.day.feedback ?
 lines.push(`Reports (24 hours): ${kinds.join(", ")}`);
 for (const r of h.reports.latest) lines.push(`  ${r.id} ${r.kind} ${utc(r.at)}: ${r.note ? `note ${quote(`${r.kind} note`, r.note)}` : "(no note)"}`);
 lines.push(`Engine server: ${en.on ? "on" : "off"}, ${en.searches} of ${en.cap} searches today; last answer ${ago(en.lastOk)}; last failure ${en.lastFail ? `${ago(en.lastFail.at)}: ${en.lastFail.why}` : "never"}`);
+if (en.recluse) lines.push(`The Hidden Boss: ${en.recluse.searches} positions searched today (outside the budget), ${en.recluse.noResults} fights with no result`);
 lines.push(`Fair play's deep re-checks: ${h.fairplay.searches} of ${h.fairplay.cap} searches today`);
 lines.push(`D1: ${h.d1.ok ? `ok (${h.d1.ms} ms)` : `failing (${h.d1.error})`}`);
 if (h.alerts) lines.push(`Alerts to Discord: ${h.alerts.on ? "on" : `off (${h.alerts.why})`}; paging now: ${h.alerts.paging.length ? h.alerts.paging.join(", ") : "nothing"}`);

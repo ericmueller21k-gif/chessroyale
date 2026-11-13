@@ -261,8 +261,20 @@ describe("Crowd mode", () => {
     expect(board.fen).toBe(START_FEN);
     expect(runner.alive()).toHaveLength(4);
     expect(runner.alive().every((p) => p.colour === null)).toBe(true);
+    // (His child form first, Nov 13 (the Crowd's settings, RECLUSE_FORMS): no powers. Beaten, a new match against the man, as here.)
+    expect(boss.form).toBe("child");
+    expect(runner.bossView()!.powers).toBeUndefined();
+    runner.bossForceWin = true;
+    runner.deal();
+    await runner.score(new Map());
+    expect(runner.stageComplete()).toBe(true);
+    expect(runner.finishBossBattle()).toBe("crowd");
+    expect(runner.isOver()).toBe(false);
+    expect(runner.nextBossForm()).toBe(true);
+    expect(runner.boss!.form).toBeUndefined();
+    expect(runner.boards.get(runner.state.boards[0]!)!.fen).toBe(START_FEN);
     // His strength and brain are fixed: Maia at its top, raw, whatever the crowd (a crowd of four too).
-    expect(boss.elo).toBe(fixedLevel());
+    expect(runner.boss!.elo).toBe(fixedLevel());
     expect(runner.bossBrainPlan("", true)).toEqual({ brain: "maia-raw", rating: maiaTopRating(), stockfishShare: 0 });
     expect(runner.bossBrainPlan("", false)).toMatchObject({ brain: "stockfish" });
     // His ultimate is the bullet clock, his passive the God King blocked.
@@ -270,7 +282,8 @@ describe("Crowd mode", () => {
   });
 
   it("50 v 50 boss final: the four play the battle out against him; the God King's help never comes, nobody is struck, and everyone is placed", async () => {
-    const settings: Settings = { ...base, finalFormat: "boss", knockoutsPerStage: CROWD_KNOCKOUTS.boss, bossMaxMoves: 9 };
+    // (At his adult form, as `?form=adult`: the God King's help works against the child he starts as, Nov 13.)
+    const settings: Settings = { ...base, finalFormat: "boss", knockoutsPerStage: CROWD_KNOCKOUTS.boss, bossMaxMoves: 9, recluseChild: false };
     const { runner } = await playKnockouts(settings, 4);
     const boss = runner.boss!;
     expect(boss.id).toBe("recluse");

@@ -1,14 +1,16 @@
 import { hollowLobby } from "./bosses/hollow.ts";
 import { dashLobby } from "./bosses/dash.ts";
-import { phase2Unvouched, recluseLobby, type Phase2Lobby, type Recluse2Record } from "./bosses/recluse.ts";
+import { SERVER_LOST_MS, phase2Unvouched, quickMove, recluseLobby, mateFirst, recluseNoResult, recluseNoResultFor, retryDelay, type Phase2Lobby, type Phase2SearchRequest, type Recluse1Ask, type Recluse2Record } from "./bosses/recluse.ts";
 import type { BossLobby } from "./bosses/base.ts";
 import { hearsTyped, typedReads, typedSay, typedSeat, type TypedSeats } from "./typed-chat.ts";
 import { QUICK_CHAT, botChatLines, canSay, canSayToAll, chatCheck, chatSay, chatSent, mulberry32, noChatSent, ownedChatPacks, type BotChatMoment, type ChatSent } from "@chessroyale/core";
 import { FAIRPLAY, type FairMove } from "@chessroyale/core";
-import { BOSS_BRAIN, BOSS_CHECK, BOSS_PARTY, BOSS_POWERS, HIDDEN_ROOM, RECLUSE_PHASE2, recluseNextForm, DEFAULT_SETTINGS, JUDGES, isTeamMatch, type JudgeConfig, FRONT_DOOR, LEAVING, LOBBY_LIFE, MATCHMAKING, isRankedMatch, type PlayerState, brilliance, cleanLook, matchFeats, type ItemLook, type MatchFeats, botVotes, castPregameVote, closePregameVote, raidBossElo, bossDef, clockAfterVote, cutSeconds, pregameVotes, voteResultMs, type Augment, type DrawRule, type Settings } from "@chessroyale/core";
+import { BOSS_BRAIN, BOSS_CHECK, BOSS_PARTY, BOSS_POWERS, HIDDEN_ROOM, RECLUSE_ONLINE, RECLUSE_PHASE2, finishBoss, recluseNextForm, DEFAULT_SETTINGS, JUDGES, isTeamMatch, type JudgeConfig, FRONT_DOOR, LEAVING, LOBBY_LIFE, MATCHMAKING, isRankedMatch, type PlayerState, brilliance, cleanLook, matchFeats, type ItemLook, type MatchFeats, botVotes, castPregameVote, closePregameVote, raidBossElo, bossDef, clockAfterVote, cutSeconds, pregameVotes, voteResultMs, type Augment, type DrawRule, type Settings } from "@chessroyale/core";
 import {
   MatchRunner,
   BOT_NAMES,
+  bossGuardFrom,
+  bossMoveFromScores,
   bossRules,
   botRoster,
   bossIntroTimeline,
@@ -104,12 +106,16 @@ export interface LobbyIO {
   /** Someone has left the match (resigned): close their sockets. */
   close?(playerId: string): void;
   /**
-   * The Hidden Boss's phase 2 (bosses/recluse.ts): every legal move of a position scored on the engine server; the answer comes back
-   * through phase2Searched(id, …), null if the server couldn't answer. Missing (tests, no server): the host's device plays instead.
+   * The Hidden Boss (bosses/recluse.ts): every legal move of a position scored on the engine server (Phase2SearchRequest: his move in
+   * phase 2, or in phase 1 when no device answered it (`boss`, an id "p1-…": Recluse1Ask); a bot's in phase 2; or a person's fair-play
+   * numbers there); the answer comes back through phase2Searched(id, …), null if the server couldn't answer. Missing (no engine server
+   * set up: local runs, the e2e suite, staging, tests): phase 2's bots' moves from the host's device, his the quick move (phase 1's too).
    */
-  phase2Search?(req: { id: string; fen: string }): void;
+  phase2Search?(req: Phase2SearchRequest): void;
   /** Wakes the engine server (the Hidden Boss's phase 2 is coming: his fall and phase change are its time to boot). */
   warmEngine?(): void;
+  /** The Hidden Boss's fight ended with no result (his move never came from the engine server, phase 1 or 2): counted for the health view. */
+  phase2NoResult?(): void;
 }
 
 /** A deep search the lobby asks of the engine server (a verdict, a re-check of close calls, a spot check). */
@@ -186,9 +192,14 @@ export interface Human {
   maiaSaved?: true;
 }
 
-/** A person's result in a match, for their profile (humanResults; a resign's is taken as they leave). */
+/**
+ * A person's result in a match, for their profile (humanResults; a resign's is taken as they leave). `noResult`: the match ended with
+ * no result (the Hidden Boss's phase 2: his move never came from the engine server): only its fair play (from before phase 2) is
+ * written, nothing else (lobby-do.ts writeResult).
+ */
 export type HumanResult = {
   playerId: string;
+  noResult?: true;
   placement: number;
   players: number;
   team: "w" | "b" | null;
@@ -430,6 +441,12 @@ export interface LobbyRecord {
    * fall to the results, everything the server runs of it (the four boards, their clocks, his moves and the bots').
    */
   recluse2?: Recluse2Record;
+  /**
+   * The Hidden Boss's phase 1 move (the child's or the man's) that no device answered, asked of the engine server (bossTimeout; Eric,
+   * Nov 13, option 1; bosses/recluse.ts Recluse1Ask): while it's out, his turn waits for it alone. Once he's fought to no result, it
+   * stays, `none` naming who was fighting him.
+   */
+  recluse1?: Recluse1Ask;
   /**
    * Matchmade by the engine pool's queue (fair play's pooled accounts: docs/decisions/2026-11-10-engine-pool.md): it seats only pooled
    * accounts, and a lobby without it none, whoever has the code (lobby-do.ts). The #618 review, m4.
@@ -777,6 +794,7 @@ export class LobbyCore {
     const lobby = this;
     const search = lobby.io.phase2Search;
     const warm = lobby.io.warmEngine;
+    const none = lobby.io.phase2NoResult;
     return {
       get r() {
         return lobby.r;
@@ -803,8 +821,9 @@ export class LobbyCore {
       },
       person: (id) => !!lobby.human(id),
       anyoneHere: (except) => lobby.r.humans.some((h) => h.id !== except && lobby.present(h)),
-      ...(search ? { search: (req: { id: string; fen: string }) => search(req) } : {}),
+      ...(search ? { search: (req: Phase2SearchRequest) => search(req) } : {}),
       ...(warm ? { warm: () => warm() } : {}),
+      ...(none ? { noResult: () => none() } : {}),
       finish: () => lobby.finishMatch(),
     };
   }
@@ -815,8 +834,9 @@ export class LobbyCore {
     return { ...(boss ? { boss } : {}), standings: this.standings() };
   }
 
-  /** The engine server's answer to a phase 2 search (io.phase2Search): null when it couldn't answer. */
+  /** The engine server's answer to a search of the Hidden Boss's (io.phase2Search): null when it couldn't answer. Phase 1's: "p1-…". */
   phase2Searched(id: string, scores: MoveScore[] | null) {
+    if (id.startsWith("p1-")) return this.hisSearched(id, scores);
     recluseLobby.searched(this.phase2Lobby, id, scores);
   }
 
@@ -827,7 +847,8 @@ export class LobbyCore {
   private phase2Online(): boolean {
     const boss = this.runner?.boss;
     if (!boss || boss.id !== HIDDEN_ROOM.boss || boss.result !== "crowd" || this.r.recluse2 || RECLUSE_PHASE2.boards < 1) return false;
-    if (recluseNextForm("adult") !== "four") return false;
+    // (The form beaten: his child's brings his adult form, a new match (nextRound), not the boards.)
+    if (recluseNextForm(boss.form ?? "adult") !== "four") return false;
     return !!this.r.party?.room || (this.settings.mode === "crowd" && !this.settings.raid);
   }
 
@@ -1474,8 +1495,9 @@ export class LobbyCore {
     if (this.r.phase === "scoring" && this.r.scoreRequest && !this.r.judges?.tasks) {
       this.io.send(host, { t: "scoreRequest", ...this.r.scoreRequest });
     }
-    // (A checked move: re-asked around the host as it is now, the answers in kept: reaskBoss.)
-    if (this.r.phase === "boss" && this.r.bossKey) {
+    // (A checked move: re-asked around the host as it is now, the answers in kept: reaskBoss. The Hidden Boss's out to the engine
+    // server: nothing asked of a device.)
+    if (this.r.phase === "boss" && this.r.bossKey && this.r.recluse1?.key !== this.r.bossKey) {
       if (this.r.bossCheck) this.reaskBoss(host);
       else this.sendBossRequest(host);
     }
@@ -1579,6 +1601,8 @@ export class LobbyCore {
       case "bossMove": {
         if (this.r.phase !== "boss" || this.r.bossKey !== msg.key || typeof msg.move !== "string" || msg.move.length > 128) return;
         const extras: BossExtras = { ...(typeof msg.drag === "string" ? { drag: msg.drag } : {}), ...(typeof msg.showdown === "string" ? { showdown: msg.showdown } : {}), ...(msg.outside === true ? { outside: true } : {}), ...(Array.isArray(msg.beam) ? { beam: msg.beam.filter((x): x is string => typeof x === "string").slice(0, 32) } : {}), ...(typeof msg.balloon === "string" ? { balloon: msg.balloon.slice(0, 2) } : {}), ...(typeof msg.hoops === "string" ? { hoops: msg.hoops.slice(0, 32) } : {}), ...(typeof msg.crease === "string" ? { crease: msg.crease.slice(0, 8) } : {}) };
+        // (The Hidden Boss's move out to the engine server, no device having answered in time: the server's alone now.)
+        if (this.r.recluse1?.key === msg.key) return;
         // (His own move and the funhouse's: the host's and a second device's, compared. His powers' picks: the host's, checked by their rules.)
         // ("Maia played it" is heard only where Maia could have: a Maia move, not the share, the strike or a power's: D1.)
         if (this.r.bossCheck) return this.bossAnswer(playerId, msg.move, extras, msg.by === "maia" && this.r.bossCheck.maia);
@@ -2228,12 +2252,13 @@ export class LobbyCore {
     // alike (D6). The strike's goes to the host alone, for its note.)
     const mine = c && (kind === "elo" || kind === "stumble") ? c.maia : !checker;
     const b = this.r.bossBrain && !funhouse && !pick && kind !== "extra" && kind !== "best" && mine && !only ? this.r.bossBrain : null;
-    const brain = b ? { brain: b.brain, rating: b.rating } : null;
+    // (The Hidden Boss's child: Maia at his rating now, Stockfish at the strength it stands for: runner.childRatingNow, bossEloNow.)
+    const brain = b ? { brain: b.brain, rating: runner.childRatingNow() ?? b.rating } : null;
     this.io.send(host, {
       t: "bossRequest",
       key: this.r.bossKey!,
       fen,
-      elo: runner.boss!.elo,
+      elo: runner.bossEloNow(),
       nodes: this.settings.bossNodes,
       ...(this.r.bossKind === "stumble" ? { stumble: true } : this.r.bossKind === "stagger" ? { stagger: true } : this.r.bossKind === "best" ? { best: true } : {}),
       ...(funhouse ? { funhouse: true } : {}),
@@ -2446,6 +2471,7 @@ export class LobbyCore {
   private playBoss(move: string, extras: BossExtras = {}) {
     this.r.bossKey = undefined;
     this.r.bossCheck = undefined;
+    this.r.recluse1 = undefined;
     // Too soon (your queen banner is still up): hold the move (or Big Boy's bounce) until then.
     if (this.r.bossMinAt && this.io.now() < this.r.bossMinAt - 50) {
       this.r.bossPending = move;
@@ -2554,6 +2580,8 @@ export class LobbyCore {
 
   private bossTimeout() {
     if (this.r.phase !== "boss" || !this.r.bossKey) return;
+    // (The Hidden Boss's move out to the engine server, no device having answered it: in yet, tried again, or no result.)
+    if (this.r.recluse1?.key === this.r.bossKey) return this.hisStep();
     const c = this.r.bossCheck;
     // (The host didn't give the extras of the move that plays in its time: that move's own answer's, N2.)
     if (c?.reask) return this.playBoss(c.reask.move, c.reask.extras);
@@ -2564,6 +2592,13 @@ export class LobbyCore {
     // (Nobody answered a checked move: each device asked missed it.)
     if (c) this.bossMissedAll(c);
     const next = this.pickHost(this.r.hostId ?? undefined);
+    // The Hidden Boss's own move (his room's fight, the Crowd's final), no device having answered it: never a random move, nor
+    // another device's window on top (another 15 s for everyone, and two silent devices took turns forever): the engine server's, at
+    // his strength, while his turn waits for it (Eric, Nov 13, option 1). Another device hosts his moves to come, as below.
+    if (this.hisOwnMove() && this.io.phase2Search) {
+      if (next) this.r.hostId = next;
+      return this.askHis();
+    }
     if (next && next !== this.r.hostId) {
       this.r.hostId = next;
       if (c) {
@@ -2576,12 +2611,120 @@ export class LobbyCore {
       this.setTimer("bossTimeout", this.io.now() + bossTimeoutMs(this.bossAsks()) + hoopsMs(this.runner));
       return;
     }
+    // (The Hidden Boss with no engine server set up (local runs, the e2e suite, staging): the server's quick move, never a random one,
+    // and the match unvouched, as his phase 2's quick move is.)
+    if (this.hisOwnMove()) return this.hisQuick();
     // Nobody can run the engine: the boss plays a random allowed move so the match can go on (in his funhouse, the
     // crowd's: a random allowed one too). His extra move needs the engine to stay small: without one, he skips it.
     const runner = this.runner!;
     if (this.r.bossKind === "extra" || this.r.bossKind === "bounce" || this.r.bossKind === "tusks" || this.r.bossKind === "fuse" || this.r.bossKind === "slam" || this.r.bossKind === "hop" || this.r.bossKind === "carrots" || this.r.bossKind === "repaint" || this.r.bossKind === "water") return this.playBoss("");
     const legal = (this.r.bossKind === "funhouse" ? runner.crowdAllowed() : runner.bossAllowed()) ?? legalMoves(runner.boards.get(runner.state.boards[0]!)!.fen);
     this.playBoss(legal[Math.floor(this.rng() * legal.length)]!);
+  }
+
+  // ---------------- The Hidden Boss's phase 1 move from the engine server ----------------
+  // (Eric, Nov 13, option 1: "Keep Maia on the devices, but replace the random-move fallback with the same pause plus a server move";
+  // docs/decisions/2026-11-13-recluse-phase1-pause.md. His turn is the pause: nobody's clock runs on it, nothing flags or times out,
+  // and every screen says the boss is thinking, from his move's ask to his move.)
+
+  /** This boss turn is the Hidden Boss's own move (not another boss's, nor a power's step): his phase 1 online, child or man. */
+  private hisOwnMove(): boolean {
+    const kind = this.r.bossKind;
+    return this.runner?.boss?.id === HIDDEN_ROOM.boss && (kind === "elo" || kind === "stumble" || kind === "stagger" || kind === "best");
+  }
+
+  /**
+   * His move to the engine server (no device answered it): every legal move scored, he plays one at his strength now (the runner's
+   * bossEloNow: the child's Maia rating's Stockfish stand-in, or the man's fixed level), as the turn drew it (`kind`). From now the turn
+   * is the server's alone: a device's late answer isn't heard, nor is the host asked again (his next move goes to the devices again).
+   */
+  private askHis() {
+    const runner = this.runner!;
+    const now = this.io.now();
+    const kind = this.r.bossKind as Recluse1Ask["kind"];
+    this.r.recluse1 = { key: this.r.bossKey!, fen: this.bossFen(), kind, elo: runner.bossEloNow(), since: now, at: now, tries: 0, ask: "" };
+    console.log(`lobby ${this.r.code}: no device answered the Hidden Boss's move: the engine server's, his turn held`);
+    this.searchHis();
+  }
+
+  /** A try at his move on the engine server (on his own row of the day: counted once, `again` after the first); none set up any more (a deploy without it): the quick move. */
+  private searchHis() {
+    const a = this.r.recluse1!;
+    if (!this.io.phase2Search) return this.hisQuick();
+    a.tries++;
+    a.at = this.io.now();
+    a.retryAt = undefined;
+    a.ask = `p1-${a.key}.${a.tries}`;
+    this.io.phase2Search({ id: a.ask, fen: a.fen, boss: true, ...(a.tries > 1 ? { again: true as const } : {}) });
+    this.armHis();
+  }
+
+  /** The turn's timer while his move is out: the next try (one come back empty: `retryAt`; none back: lost, past SERVER_LOST_MS), or no result. */
+  private armHis() {
+    const a = this.r.recluse1!;
+    this.setTimer("bossTimeout", Math.max(this.io.now(), Math.min(a.retryAt ?? a.at + SERVER_LOST_MS, a.since + RECLUSE_ONLINE.serverWaitMs)));
+  }
+
+  /** His move still out at the turn's timer: never in after RECLUSE_ONLINE.serverWaitMs, no result; a try's wait over, the next. */
+  private hisStep() {
+    const a = this.r.recluse1!;
+    const now = this.io.now();
+    if (now >= a.since + RECLUSE_ONLINE.serverWaitMs) return this.hisNoResult();
+    if (a.retryAt !== undefined ? now >= a.retryAt : now >= a.at + SERVER_LOST_MS) return this.searchHis();
+    this.armHis();
+  }
+
+  /**
+   * The engine server's answer for his phase 1 move: played at once (as the turn drew it, at the strength asked: bossMoveFromScores)
+   * if it has a move he may play; any try's answer (the same position). Empty, the latest try's: the next after retryDelay.
+   */
+  private hisSearched(id: string, scores: MoveScore[] | null) {
+    const a = this.r.recluse1;
+    if (!a || a.none || this.r.phase !== "boss" || a.key !== this.r.bossKey || !id.startsWith(`p1-${a.key}.`)) return;
+    const runner = this.runner!;
+    const legal = new Set(legalMoves(a.fen));
+    const ok = (scores ?? []).filter((x) => legal.has(x.move));
+    // (A mate in one is played first: the engine server never says `mate`, and in a won position every move scores 1, so the sort alone
+    // would keep the first legal moves, not the mate. The review of #686, m1; as phase 2's pick.)
+    const allowed = runner.bossAllowed();
+    const mate = ok.length ? mateFirst(a.fen, ok, allowed) : undefined;
+    const move = mate ?? (ok.length ? bossMoveFromScores(ok, a.kind, a.elo, () => this.rng(), this.settings.kingStrikeLoss, bossGuardFrom(this.settings), allowed) : null);
+    if (!move) {
+      if (id === a.ask) {
+        a.retryAt = this.io.now() + retryDelay(a.tries);
+        this.armHis();
+      }
+      return;
+    }
+    console.log(`lobby ${this.r.code}: the Hidden Boss's move from the engine server after ${this.io.now() - a.since} ms (${a.tries} ${a.tries === 1 ? "try" : "tries"})`);
+    this.playBoss(move);
+  }
+
+  /** No engine server set up (or gone mid-fight): his move is the server's quick move (one he may play), and the match unvouched. */
+  private hisQuick() {
+    const runner = this.runner!;
+    const fen = this.bossFen();
+    const allowed = runner.bossAllowed() ?? legalMoves(fen);
+    const quick = quickMove(fen);
+    this.unvouch("the Hidden Boss's move was the server's quick move (no engine server here)");
+    this.playBoss(allowed.includes(quick) ? quick : allowed[0]!);
+  }
+
+  /**
+   * His move never came from the engine server (RECLUSE_ONLINE.serverWaitMs): the fight ends with no result, "the Hidden Boss couldn't
+   * connect", as his phase 2's does. Nothing counts for or against those fighting him now (`none`: their results say so, and only
+   * their fair play is written, every move of it really played); everyone else's result stands at their placement (a Crowd final's
+   * others). The battle ends as a draw (the duo on the results stand as a draw's). Counted for the health view.
+   */
+  private hisNoResult() {
+    const runner = this.runner!;
+    this.r.recluse1!.none = runner.alive().map((p) => p.id);
+    this.r.bossKey = undefined;
+    this.r.bossCheck = undefined;
+    runner.state = finishBoss(runner.state, () => this.rng(), "draw", this.settings);
+    console.log(`lobby ${this.r.code}: the Hidden Boss's move never came from the engine server: no result`);
+    this.io.phase2NoResult?.();
+    this.finishMatch();
   }
 
   /** Humans playing this round (everyone alive in the knockout stages; just the mover in a final turn). */
@@ -2595,6 +2738,13 @@ export class LobbyCore {
     if (!runner) return;
     if (runner.isOver()) return this.finishMatch();
     if (runner.boss) {
+      // (The Hidden Boss's child beaten, his fall over (he grew up: the fall path below, his rules' fallMs): a new match against his
+      // adult form, the next of his forms (RECLUSE_FORMS), from the starting position, with its own intro, as solo's nextForm.)
+      if (runner.boss.form === "child" && runner.boss.result === "crowd") {
+        runner.nextBossForm();
+        this.r.winForm = undefined;
+        this.r.bossIntroDone = false;
+      }
       if (!this.r.bossIntroDone) {
         // The boss arrives: it takes over from an even position of the game just played.
         this.r.bossIntroDone = true;
@@ -2603,8 +2753,9 @@ export class LobbyCore {
         this.r.bossBrain = this.bossBrainNow();
         const host = this.hostNow();
         if (this.r.bossBrain && host) this.io.send(host, { t: "bossBrain", brain: this.r.bossBrain });
-        // (Devices drawn to check his moves load it too: BOSS_CHECK.loaders.)
-        if (host) this.moreLoaders(host, BOSS_CHECK.loaders);
+        // (Devices drawn to check his moves load it too: BOSS_CHECK.loaders. Once a battle: the Hidden Boss's adult form, after his
+        // child's, keeps the devices told at the child's intro, and more only as his moves need them (checkBoss).)
+        if (host && !this.r.bossLoaders) this.moreLoaders(host, BOSS_CHECK.loaders);
         const until = this.io.now() + bossIntroTimeline(runner.boards.get(runner.state.boards[0]!)!.history.length, !!runner.boss.powers?.claimed, !!runner.boss.powers?.snack).total;
         this.broadcast({ ...this.bossMessage(until), intro: true } as Outgoing);
         return this.setTimer("nextRound", until);
@@ -2619,6 +2770,8 @@ export class LobbyCore {
         // Beaten, a boss with a fall (the Hidden Boss, BossRules.fallMs): the board holds while he collapses and mumbles,
         // as solo's does, then the results (this again, the match over).
         const fallMs = runner.boss.result === "crowd" ? bossRules(runner.boss)?.fallMs : undefined;
+        // (The Hidden Boss's child: the 🏆 that beat him is spent, so a lobby restored in his fall doesn't arm it again.)
+        if (runner.boss.form === "child") this.r.winForm = undefined;
         if (fallMs) {
           this.r.phase = "boss";
           const until = this.io.now() + fallMs;
@@ -4043,10 +4196,15 @@ export class LobbyCore {
     return this.r.fair?.[playerId] ?? [];
   }
 
-  /** Each human's result once the match is over (for their profiles). */
+  /**
+   * Each human's result once the match is over (for their profiles). No result (the Hidden Boss's phase 2 couldn't go on): its board
+   * players' marked so, and not ranked, only fair play written for them (Eric, Nov 13: nothing counts for or against them); everyone
+   * else's stands at their placement, the boss's part none (`teamWon` null), a Crowd final's watchers too (the review of #683, M3).
+   */
   humanResults(): HumanResult[] {
     const runner = this.runner;
     if (!runner || this.r.phase !== "results") return [];
+    const none = recluseNoResult(this.r);
     const st = this.standings();
     const winner = this.settings.mode === "crowd" ? runner.gameWinner() : null;
     const boss = runner.boss;
@@ -4062,7 +4220,9 @@ export class LobbyCore {
       const p = runner.player(h.id);
       const reachedBoss = p.outInStage === null || p.outInStage >= stages;
       const survived = !!boss && reachedBoss && !boss.kills.some((k) => k.id === h.id);
-      const teamWon = boss?.result ? (survived && boss.result !== "draw" ? boss.result === "crowd" : null) : team && winner ? team === winner : null;
+      // (No result: the boss's part is nobody's (his result stands at his adult form's defeat, never phase 2's).)
+      const teamWon = none ? null : boss?.result ? (survived && boss.result !== "draw" ? boss.result === "crowd" : null) : team && winner ? team === winner : null;
+      const mine = recluseNoResultFor(this.r, h.id);
       const f = this.r.feats?.[h.id];
       return [
         {
@@ -4075,7 +4235,8 @@ export class LobbyCore {
           rating: row.rating ?? null,
           brilliant: f?.brilliant ?? 0,
           bestMove: f?.best?.san ?? null,
-          ranked: this.rankedFor(h),
+          ranked: !mine && this.rankedFor(h),
+          ...(mine ? { noResult: true as const } : {}),
           evalBar: h.evalBar ?? null,
           ...matchFeats(p, stages, boss, !!this.settings.raid),
           // (A Boss Battle party's boss plays at the party's difficulty, Very easy to Very hard, not a tier: recorded, but
@@ -4167,7 +4328,8 @@ export class LobbyCore {
   private phase2Result() {
     const p = this.r.recluse2;
     const runner = this.runner;
-    if (!p || !runner?.state.boss) return;
+    // (No result (his move never came): nobody's; the results say so, and nothing is written but fair play: humanResults.)
+    if (!p || !runner?.state.boss || p.done?.noResult) return;
     p.work = {};
     runner.state = { ...runner.state, boss: { ...runner.state.boss, result: p.done?.beaten ? "crowd" : "boss" } };
   }
@@ -4198,10 +4360,15 @@ export class LobbyCore {
       ranked: this.ranked(),
       // (One device's word stood alone somewhere in it: it pays as a solo game, and the results say why.)
       ...(this.r.unvouched ? { unvouched: true as const } : {}),
+      // (No result: his phase 2 couldn't go on. Nobody beat him or lost to him: the results say so, the duo standing as a draw's.
+      // For those who watched it, a Crowd final's others, only that: their place stands (the review of #683, M3).)
+      ...(recluseNoResult(this.r) ? { noResult: "watched" as const, bossResult: "draw" as const } : {}),
     };
-    // (A Hidden Boss's phase 2 his moves of which stood on one device's word: its players' results say so, nobody else's.)
+    // (A Hidden Boss's phase 2 his moves of which stood on one device's word: its players' results say so, nobody else's. No result:
+    // its players', nothing counts for or against them.)
     const lone = { ...msg, ranked: false, unvouched: true as const };
-    for (const h of this.r.humans) this.send(h.id, phase2Unvouched(this.r, h.id) ? lone : msg);
+    const board = { ...msg, ranked: false, noResult: "board" as const };
+    for (const h of this.r.humans) this.send(h.id, recluseNoResultFor(this.r, h.id) ? board : phase2Unvouched(this.r, h.id) ? lone : msg);
     this.botChat({ kind: "end" });
     const js = this.r.judges;
     if (js?.stats.jobs) console.log(`judges in ${this.r.code}: ${JSON.stringify(js.stats)}`);

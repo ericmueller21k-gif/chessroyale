@@ -1,10 +1,20 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { RECLUSE_ONLINE, RECLUSE_PHASE2 } from "@chessroyale/core";
 import { chess960Fen, legalMoves, type ClientMessage, type NetPhase2 } from "@chessroyale/chess";
 import { PHASE_CHANGE } from "../src/recluse-phase2.ts";
 import { OnlinePhase2 } from "../src/recluse-online.ts";
 import { NetMatch } from "../src/net.ts";
 import type { Phase } from "../src/game.ts";
+import { bannerOn, resetBattleBanners } from "../src/battle-banners.ts";
+import { seatKey, setQueue, yours } from "../src/board/yours.ts";
+import { bossVoice } from "../src/speech.tsx";
+
+/** Whether this device's profile says admin (as /api/me does for an email in ADMIN_EMAILS): his room's "Win this form". */
+const who = vi.hoisted(() => ({ admin: false }));
+vi.mock("../src/account.ts", async (orig) => {
+  const real = await orig<typeof import("../src/account.ts")>();
+  return { ...real, account: () => (who.admin ? { ...real.account(), profile: { admin: true, user: { signedIn: false } } as never } : real.account()) };
+});
 
 /**
  * The Hidden Boss's phase 2 online on this device (recluse-online.ts; the server's: packages/server/src/bosses/recluse.ts): the
@@ -198,5 +208,110 @@ describe("his fall online says who takes the boards (the review of #677, m3)", (
   it("a watcher (out, no board): leaving is going home, the result standing", () => {
     const m = fallen(["p1", "p2", "p3", "b4"]);
     expect(m.exit).toBe("leave");
+  });
+});
+
+describe("his move late from the engine server online (Eric, Nov 13): the fight pauses, or ends with no result", () => {
+  it("paused: every clock shows where it stood, your board takes no move, look-aways stop; the pause over, they count on and your move carries both", () => {
+    const D = device();
+    const now = Date.now() + 5000;
+    D.g.onMessage(serverView(now, "me"));
+    expect(D.looks()).toBe(1);
+    D.g.onMessage(serverView(now, "me", { paused: now }));
+    const v = D.g.view()!;
+    expect(v.paused).toBe(now - 5000);
+    expect(v.decided).toBe(false);
+    // (Your move while paused: neither shown nor sent.)
+    const mine = v.boards[0]!;
+    D.g.move(mine.id, legalMoves(mine.fen)[0]!);
+    expect(D.sent).toHaveLength(0);
+    expect(D.g.view()!.boards[0]!.history).toHaveLength(0);
+    // (The pause over: the clocks run on (the server moved your turn's start on by the pause); look-aways count again, the same turn.)
+    D.g.onMessage(serverView(now, "me", { boards: serverView(now, "me").boards.map((b) => ({ ...b, turnAt: now + 9000 })) }));
+    expect(D.g.view()!.paused).toBeNull();
+    expect(D.looks()).toBe(2);
+    D.g.move(mine.id, legalMoves(mine.fen)[0]!);
+    // (3 counted before the pause, 3 after it: the harness's turnEnds.)
+    expect(D.sent.at(-1)).toMatchObject({ t: "phase2Move", board: mine.id, away: 6 });
+    D.g.dispose();
+  });
+
+  it("no result: the fight is over (decided, not beaten), and no move is taken", () => {
+    const D = device();
+    const now = Date.now() + 5000;
+    D.g.onMessage(serverView(now, "me", { paused: now - 60_000, done: { at: now, until: now + 3200, beaten: false, won: 0, of: 4, noResult: true } }));
+    const v = D.g.view()!;
+    expect(v).toMatchObject({ noResult: true, decided: true, beaten: false });
+    D.g.move(v.boards[0]!.id, legalMoves(v.boards[0]!.fen)[0]!);
+    expect(D.sent).toHaveLength(0);
+    D.g.dispose();
+    // (The results say whose: a board's player, nothing counts for you; a Crowd final's watcher, your place stands. The review of
+    // #683, M3.)
+    for (const kind of ["board", "watched"] as const) {
+      const m = new NetMatch("TEST", "Ann", async () => []);
+      const tell = (msg: object) => (m as unknown as { onMessage(x: object): void }).onMessage({ now: Date.now(), ...msg });
+      tell({ t: "welcome", playerId: "me", token: "t", code: "TEST" });
+      tell({ t: "results", placements: { me: kind === "board" ? 2 : 40 }, winner: "Bo", lossesByStage: {}, standings: [], ranked: kind === "watched", bossResult: "draw", noResult: kind });
+      expect(m.phase).toMatchObject({ kind: "results", noResult: kind, bossResult: "draw" });
+    }
+  });
+});
+
+describe("his child form online: whichever message brings the man forgets the child's (the review of the child form online, m1 and m2)", () => {
+  afterEach(() => void (who.admin = false));
+  const START = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+  /** Scholar's mate on the child, the crowd White: his board as he falls. */
+  const MATED = "r1bqkb1r/pppp1Qpp/2n2n2/4p3/2B1P3/8/PPPP1PPP/RNB1K1NR b KQkq - 0 4";
+  const boss = (o: object = {}) => ({ id: "recluse", name: "Hidden Boss", crowdSide: "w", startMove: 1, kingCharges: 0, board: { id: 0, fen: START, lastMove: null, ply: 0 }, ...o });
+  const child = (o: object = {}) => boss({ form: "child", formStep: 0, level: 74, ...o });
+  const man = (o: object = {}) => boss({ level: null, ...o });
+  const round = (key: string, b: object) => ({ t: "round", key, stage: 0, round: 1, standings: [], cutoff: 0, deadline: Date.now() + 20_000, boss: b });
+
+  /** An admin in his room's fight, through the child's game to his fall: the 🏆 pressed on him, a line and a banner of his, your premove. */
+  function throughTheChild() {
+    who.admin = true;
+    bossVoice.reset();
+    resetBattleBanners();
+    const m = new NetMatch("TEST", "Ann", async () => []);
+    m.hiddenRoom = true;
+    const tell = (msg: object) => (m as unknown as { onMessage(x: object): void }).onMessage({ now: Date.now(), ...msg });
+    tell({ t: "welcome", playerId: "me", token: "t", code: "TEST" });
+    tell({ t: "boss", boss: child(), standings: [], until: Date.now() + 5000, intro: true });
+    tell(round("k1", child()));
+    m.winForm();
+    expect(m.winFormArmed).toBe(true);
+    // (Another of the child's turns forgets nothing: the same form.)
+    tell(round("k2", child({ formStep: 1 })));
+    expect(m.winFormArmed).toBe(true);
+    const t0 = Date.now();
+    expect(bossVoice.say("Mine!", "recluse:child:line")).toBe(true);
+    expect(bossVoice.say("Mine!", "recluse:child:line")).toBe(false);
+    expect(bannerOn("recluse:child:banner", t0, 1000)).toBe(true);
+    expect(bannerOn("recluse:child:banner", t0 + 5000, 1000)).toBe(false);
+    // (Beaten: his fall, and a premove queued on the mated position, the boss to move.)
+    tell({ t: "boss", boss: child({ result: "crowd", board: { id: 0, fen: MATED, lastMove: "h5f7", ply: 7 } }), standings: [], until: Date.now() + 4200, fall: true });
+    const key = seatKey(m, 0, "w");
+    setQueue(key, [{ from: "g1", to: "f3" }]);
+    expect(yours(key).queue).toHaveLength(1);
+    return { m, tell, key, t0 };
+  }
+
+  it.each([
+    ["his intro (as it should come)", "intro"],
+    ["the man's first turn (`round`: a device away through his intro, back for it)", "round"],
+    ["a reveal of the man's game (away longer)", "reveal"],
+  ] as const)("the man brought by %s: the 🏆 may be pressed again; the child's lines, beats and banners are forgotten; your premove is dropped", (_, by) => {
+    const { m, tell, key, t0 } = throughTheChild();
+    if (by === "intro") tell({ t: "boss", boss: man(), standings: [], until: Date.now() + 5000, intro: true });
+    else if (by === "round") tell(round("k3", man()));
+    else tell({ t: "reveal", stage: 0, roundsPlayed: 2, standings: [], cutoff: 0, picks: [], boss: man({ board: { id: 0, fen: START, lastMove: null, ply: 2 } }) });
+    expect(m.boss!.form).toBeUndefined();
+    expect(m.winFormArmed).toBe(false);
+    expect(yours(key).queue).toEqual([]);
+    expect(bossVoice.say("Mine!", "recluse:child:line")).toBe(true);
+    expect(bannerOn("recluse:child:banner", t0 + 5000, 1000)).toBe(true);
+    // (The man's own 🏆.)
+    m.winForm();
+    expect(m.winFormArmed).toBe(true);
   });
 });

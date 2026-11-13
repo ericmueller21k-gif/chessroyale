@@ -73,6 +73,21 @@ Lane: `engine`. The bosses' strength is here; their powers are on [bosses.md](bo
   class `EngineServer`, binding `ENGINE`, instance `standard-2`) at 2M nodes (`SERVER_RECHECK_NODES`). If it doesn't
   answer in time, the host re-checks on its own device. Server searches are capped per day by
   `ENGINE_DAILY_SEARCHES` (3000), counted in D1 (`engine_usage`); `ENGINE_OFF=1` turns the server off (local, e2e).
+  The Hidden Boss's own moves in his phase 2 online (Nov 13; docs/decisions/2026-11-13-recluse-server-only.md) come from the
+  engine server alone (`serverAllMovesAt`, instance `engine-1`) and are **never refused for the day's budget** (they're bounded by
+  the fights; the review of #683, M2): each position is counted once on his own row (`<day>:recluse`, the pool `"recluse"`), never
+  the day's, so the judges can't starve him nor he them. Each is about a third of a re-check's nodes: a long fight's 150 or so,
+  about 1.5 cents. **His queue is his own** (M1): phase 2's bots ask the host's device first (the engine server only where no
+  device answers), and each person's fair-play numbers go to fair play's instance (`fairplay-1`, up to 60 s, not urgent). A try
+  at his move takes at most `RECLUSE_ONLINE.searchMs` (15 s, every group's wait included; a group still running then is left to
+  the container and nothing more is sent), and is tried again only once answered empty, or past that plus 5 s (lost), so a try
+  never goes out while an earlier one could still be running. Each of his searches is logged with its time ("engine server for
+  the Hidden Boss: … in N ms"), and the health view shows his row and the fights that ended with no result (`<day>:recluse-none`,
+  today and yesterday). His count never holds his search up: it runs beside the groups, finished under the Durable Object's
+  `waitUntil` (the delta review of #683, m1). **His phase 1 moves** stay the devices' (Maia), but one no device answered in its
+  window goes to the engine server the same way (`p1-…` searches, his row), and he plays one at the strength the devices were asked
+  for (`bossMoveFromScores`: a device's seeded Stockfish pick from the server's numbers), never a random move
+  (docs/decisions/2026-11-13-recluse-phase1-pause.md).
   The reports measured the re-check with the full-network Stockfish 19 build standing in for the server; the
   container's own 17.1 reads the same re-checks 3.2 points apart on average (`reports/container-accuracy.md`), so
   moving it to Stockfish 19 (built from the browsers' stockfish.js source) is recommended (DECISIONS.md, "The engine
