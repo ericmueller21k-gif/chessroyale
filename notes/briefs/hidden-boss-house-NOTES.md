@@ -180,3 +180,8 @@ transition (director's choice) into the match.
 **Order (director):** mockups first, two helpers in parallel: (A) the cutscene staging + the kid's arrival + the typed lines, (B) the room:
 the child playing his real game on the floor, and the summoning animation with four stand-in players. Then, after Eric's look: the
 building and inside in town (targeted); the room's rules and challenge (server, full lane, xhigh, alone); the child form in a match.
+
+## Nov 13: room mockup round 1 reviewed (Eric)
+Smaller board; he leans onto the board for his side, then gets up and walks round to play the other (slow and real; that's the point);
+little arm stretch only. Room about half the floor area, snug: bed nearly on the rug, light falling more on the rug (he loves the light).
+Asked whether side walls can be one continuous 3D surface instead of stacked flat panels: trying it in this room only (round 2).
