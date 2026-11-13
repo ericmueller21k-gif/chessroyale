@@ -967,3 +967,4 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - QUEUE (one Opus at a time): town-no-old-fallback -> street town for everyone -> bans block sign-in -> phase change + four boards online -> child form -> cutscene.
 - #674 (one more zoom out, light lane) open, CI running.
 - Nov 13 08:00: #674 (farthest zoom) MERGED 28ab34a8. #675 (town never shows an old version) open, CI running. Street-for-everyone helper session_01JuCWRvf6UnWNVv6iG4b6zw (high, full lane) on claude/street-for-everyone, based on #675's branch.
+- Nov 13 08:12: #675 MERGED 1bb9b73b (targeted e2e green). Watch main's full run.
