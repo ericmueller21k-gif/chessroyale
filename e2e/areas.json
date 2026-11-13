@@ -459,6 +459,8 @@
         "packages/chess/src/bosses/recluse*.ts",
         "packages/app/src/recluse-phase2.ts",
         "packages/app/src/recluse-talk.ts",
+        "packages/app/src/recluse-cutscene.ts",
+        "packages/app/src/components/RecluseCutscene.tsx",
         "packages/app/src/characters/recluse*.ts",
         "packages/app/src/characters/effects/recluse.ts",
         "packages/app/src/components/Recluse.tsx",

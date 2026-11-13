@@ -1920,6 +1920,41 @@ export const RECLUSE_TALK = {
   2: { middleFromMs: 45_000, lateFromMs: 105_000 },
 } as const;
 
+/**
+ * The Hidden Boss's cutscene between his adult form and the cyborg (a MOCKUP, Nov 12: `components/RecluseCutscene.tsx`,
+ * wired into no match yet). Eric: everything dims and a soft-edged spotlight shines on the board's middle; his ghost as a
+ * child poofs into being above the board, drops and lands; then the 17 lines, each its own text box by its speaker,
+ * typed out, a line of two sentences typing the first, holding about a second, then the second; each box up long enough
+ * to read ("err on the slow side"); after the last, the child fades. Times in ms.
+ */
+export const RECLUSE_CUTSCENE = {
+  /** Everything dims and the spotlight comes up over this long. */
+  dimMs: 1000,
+  /** How dark the dimmed screen is outside the light (0 to 1). */
+  dimAlpha: 0.86,
+  /** The light's radius, a share of the board's width: fully lit inside `spotInner` of it, then a soft fade to the dark. */
+  spot: 0.4,
+  spotInner: 0.45,
+  /** The child poofs in this long after the light is fully up. */
+  poofAfterMs: 600,
+  /** The first line this long after he has landed and straightened. */
+  firstLineAfterMs: 600,
+  /** Typing: a character every `typeMs` (the game's lines type at 28: slower here, to read along). */
+  typeMs: 45,
+  /** Between the two sentences of a line: the first typed, then this pause, then the second. */
+  sentencePauseMs: 1000,
+  /** Once typed, a box stays fully readable `readMs` plus `perCharMs` a character, at most `maxReadMs`, then fades. */
+  readMs: 1700,
+  perCharMs: 40,
+  maxReadMs: 5500,
+  /** A box's fade, and the quiet between it and the next box. */
+  boxFadeMs: 260,
+  gapMs: 400,
+  /** After the last box has gone, the child fades out this much later (his fade is his frames'), then the scene holds. */
+  kidFadeAfterMs: 500,
+  endHoldMs: 1500,
+} as const;
+
 export const RECLUSE_PHASE2 = {
   /** How many boards (all of them must be won to beat him). */
   boards: 4,
