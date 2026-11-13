@@ -1,6 +1,6 @@
 /**
  * The Hidden Boss's room (Nov 12, a MOCKUP for Eric; no home opens it yet): the top floor of an old Brooklyn walk-up, a 1950s child's
- * room. A box room of 12 x 12 squares seen as the other rooms are (the camera looks north, things stand upright at their foot, 37 px a
+ * room. A box room of 9 x 9 squares (Nov 13, Eric: "shrink the room to actually feel snug... about half the square footage") seen as the other rooms are (the camera looks north, things stand upright at their foot, 37 px a
  * square), built as Smudgy's and Big Boy's are: every piece its own Character (`shop-recluse-<name>`), the layout. Drawn by hand in code.
  *
  * Eric (Nov 12, "Update 3"): "a little rocking horse in the corner, a little table with a chessboard, a poster on the wall, a kid's
@@ -22,7 +22,7 @@ import type { ShopPlace } from "./room.ts";
 
 const T = 37;
 /** The room's size in squares, each way (`RoomArt.n`). */
-export const SHOP_RECLUSE_N = 12;
+export const SHOP_RECLUSE_N = 9;
 
 const PALETTE: Record<string, string> = {
   k: "#2a1a14", // outline
@@ -128,8 +128,10 @@ const whole = (c: Cv, outline = false): Bit => ({ part: { grid: c.map((r) => r.j
 // ==== The floor: one picture of the whole room's floor (12 x 12 squares), cut into its tiles.
 
 /** The rug (an oval braided rag rug) and the sun's two panes on the boards, in the floor's pixels. */
-export const SHOP_RECLUSE_RUG = { c: 5.5, r: 5.6, rc: 2.3, rr: 1.75 } as const;
-const SUN = { x0: 5.3 * T, x1: 7.6 * T, y0: 1 * T, y1: 4.2 * T, slant: 0.55 } as const;
+export const SHOP_RECLUSE_RUG = { c: 4.0, r: 3.85, rc: 2.05, rr: 1.55 } as const;
+/** The window's column (2 wide) in the back wall; the sun's two panes on the floor fall from it, as in round 1, now across the rug. */
+const WINDOW_COL = 3;
+const SUN = { x0: (WINDOW_COL - 0.7) * T, x1: (WINDOW_COL + 1.6) * T, y0: 1 * T, y1: 4.6 * T, slant: 0.55 } as const;
 function floorPx(X: number, Y: number): string {
   // Boards running north to south, 9 px wide, their end joints staggered.
   const col = Math.floor(X / 9.25);
@@ -304,6 +306,29 @@ for (let i = 0; i < 4; i++) wallDef(`wall-${i}`, paper(i + 1));
   for (let y = 40; y < 61; y++) put(c, 7, y, "n");
   wallDef("wall-pennant", c);
 }
+
+/** A free blank piece: solid, drawn as nothing (a side wall's square when the scene draws the wall as one surface). */
+def("wall-none", [1, 1], 1, 1, [0, 0], [[whole(cv(1, 1))]]);
+
+/**
+ * A side wall as ONE picture (Nov 13, Eric: "make the left and right walls not just like straight pieces of paper that look stacked"):
+ * the paper, the picture rail and the baseboard running unbroken from the back wall forward, `squares` long; the pennant on the west's.
+ * The scene draws it receding in perspective (recluse-scene.ts `drawSideWalls`).
+ */
+export function sideWallGrid(west: boolean, squares: number): { grid: string[]; palette: Record<string, string> } {
+  const c = paper(west ? 5 : 7, squares * T);
+  if (west) {
+    // The pennant, about the third square back from the front... at its row in the cards' layout (row 3), its point toward the window.
+    const x0 = Math.round(3 * T) - 13;
+    face(c, [[x0 + 26, 40], [x0, 50], [x0 + 26, 60]], "N");
+    rect(c, x0 + 26, 39, 3, 22, "F");
+    stamp(c, x0 + 9, 46, ["..F..", "FFFFF", ".FFF.", "F...F"]);
+    for (let y = 40; y < 61; y++) put(c, x0 + 25, y, "n");
+  }
+  return { grid: c.map((r) => r.join("")), palette: PALETTE };
+}
+/** The height of the walls (room pixels). */
+export const SHOP_RECLUSE_WALL_H = WALL_H;
 
 // -- The front: a low band of the baseboard under the wallpaper's foot, and the door out to the stair hall in its middle.
 {
@@ -482,7 +507,7 @@ for (let i = 0; i < 4; i++) wallDef(`wall-${i}`, paper(i + 1));
 
 const SUNLIGHT = "#ffe7a8";
 export const SHOP_RECLUSE_LIGHTS: readonly (LightSpot & { piece: string })[] = [{ piece: "window", x: 14, y: 27, w: 46, h: 68, color: SUNLIGHT, strength: 0.35, halo: 40 }];
-export const SHOP_RECLUSE_POOLS: readonly (LightPool & { piece: string })[] = [{ piece: "window", x: 46, y: WALL_H + 48, rx: 50, ry: 30, color: SUNLIGHT, strength: 0.32 }];
+export const SHOP_RECLUSE_POOLS: readonly (LightPool & { piece: string })[] = [{ piece: "window", x: 52, y: WALL_H + 64, rx: 50, ry: 30, color: SUNLIGHT, strength: 0.32 }];
 
 // ==== The layout.
 
@@ -495,45 +520,62 @@ const at = (name: string, col: number, row: number, solid: boolean, more: Partia
 const N = SHOP_RECLUSE_N;
 for (let row = 0; row < N; row++) for (let col = 0; col < N; col++) at(`floor-${col}-${row}`, col, row, false);
 const FLOOR_COUNT = LAYOUT.length;
-// -- The back wall: the window (columns 6 and 7), the poster's panel (column 3), the paper elsewhere.
-for (let col = 0; col < N; col++) {
-  if (col === 6) at("window", 6, 0, true);
-  if (col === 6 || col === 7) continue;
-  if (col === 3) at("wall-poster", 3, 0, true);
-  else at(`wall-${(col * 3) % 4}`, col, 0, true, col >= 8 ? { flip: true } : {});
+/** The side walls: each square its paper card (round 1's look), or solid blanks with the scene drawing each wall as one surface. */
+function layoutOf(sideCards: boolean): ShopPlace[] {
+  LAYOUT.length = FLOOR_COUNT;
+  // -- The back wall: the window, the poster's panel (over the rocking horse), the paper elsewhere.
+  for (let col = 0; col < N; col++) {
+    if (col === WINDOW_COL) at("window", WINDOW_COL, 0, true);
+    if (col === WINDOW_COL || col === WINDOW_COL + 1) continue;
+    // (The corners: the side walls' surfaces run from there.)
+    if (!sideCards && (col === 0 || col === N - 1)) {
+      at("wall-none", col, 0, true);
+      continue;
+    }
+    if (col === 1) at("wall-poster", 1, 0, true);
+    else at(`wall-${(col * 3) % 4}`, col, 0, true, col > WINDOW_COL ? { flip: true } : {});
+  }
+  // -- The side walls: the paper, the pennant on the west wall.
+  for (let row = 1; row < N - 1; row++) {
+    if (!sideCards) {
+      at("wall-none", 0, row, true);
+      at("wall-none", N - 1, row, true);
+      continue;
+    }
+    at(row === 3 ? "wall-pennant" : `wall-${(row * 5) % 4}`, 0, row, true);
+    at(`wall-${(row * 5 + 2) % 4}`, N - 1, row, true, { flip: true });
+  }
+  // -- The front: the low band, and the door out at its east end (columns 6 and 7), clear of the board.
+  for (let col = 0; col < N; col++) if (col !== 6 && col !== 7) at("hem", col, N - 1, true, col >= 5 ? { flip: true } : {});
+  at("entrance", 6, N - 1, false, { exit: true });
+  // -- The bed (north-east corner, its foot just onto the rug), the rocking horse (north-west), the little table and its chairs (west).
+  at("bed", 6, 3, true);
+  at("horse", 1, 1, true);
+  at("table", 1, 6, true);
+  at("chair", 1, 7, true);
+  at("chair", 2, 7, true, { flip: true });
+  return [...LAYOUT.slice(0, FLOOR_COUNT), ...LAYOUT.slice(FLOOR_COUNT).sort((a, b) => a.row - b.row || a.col - b.col)];
 }
-// -- The side walls: the paper, the pennant on the west wall.
-for (let row = 1; row < N - 1; row++) {
-  at(row === 6 ? "wall-pennant" : `wall-${(row * 5) % 4}`, 0, row, true);
-  at(`wall-${(row * 5 + 2) % 4}`, N - 1, row, true, { flip: true });
-}
-// -- The front: the low band, and the door out in its middle (columns 5 and 6).
-for (let col = 0; col < N; col++) if (col !== 5 && col !== 6) at("hem", col, N - 1, true, col >= 6 ? { flip: true } : {});
-at("entrance", 5, N - 1, false, { exit: true });
-// -- The bed (north-east corner), the rocking horse (north-west), the little table and its chairs (west).
-at("bed", 9, 3, true);
-at("horse", 1, 2, true);
-at("table", 1, 8, true);
-at("chair", 1, 9, true);
-at("chair", 2, 9, true, { flip: true });
 
-/** Where every piece goes: floor tiles first, then the upright pieces north to south. */
-export const SHOP_RECLUSE_LAYOUT: readonly ShopPlace[] = [...LAYOUT.slice(0, FLOOR_COUNT), ...LAYOUT.slice(FLOOR_COUNT).sort((a, b) => a.row - b.row || a.col - b.col)];
+/** Where every piece goes: floor tiles first, then the upright pieces north to south (the side walls drawn as one surface each). */
+export const SHOP_RECLUSE_LAYOUT: readonly ShopPlace[] = layoutOf(false);
+/** Round 1's look: each side wall a row of paper cards (for the before and after; `?walls=cards` on the preview). */
+export const SHOP_RECLUSE_LAYOUT_CARDS: readonly ShopPlace[] = layoutOf(true);
 /** Every piece by its name, each its own Character `shop-recluse-<name>`. */
 export const SHOP_RECLUSE_PIECES: Readonly<Record<string, Character>> = Object.fromEntries(Object.values(PIECES).map((p) => [p.name, toChar(p)]));
 
 /**
- * Where the scene stands (squares): the child on the rug, facing us, his board on the floor in front of him (its middle), and the
- * four stand-in players for the summoning (the mockup's: real players later), round the rug's front.
+ * Where the scene stands (squares): the board on the rug (its middle; its size is feel.ts `HIDDEN_ROOM_FEEL.kid.board`), the child's
+ * place behind it on Black's side (he goes round to White's side for White's moves: recluse-scene.ts), and the four stand-in players
+ * for the summoning (the mockup's: real players later), round the rug's front.
  */
 export const SHOP_RECLUSE_SCENE = {
-  kid: [5.5, 5.0] as const,
-  board: [5.5, 5.95] as const,
-  players: [[3.0, 6.9], [4.2, 8.0], [6.8, 8.0], [8.0, 6.9]] as const,
+  board: [4.0, 4.05] as const,
+  players: [[2.1, 4.9], [3.0, 6.0], [5.0, 6.0], [5.9, 4.9]] as const,
   /** Where you stand as you come in (the mockup hides you). */
-  you: [5, 10] as const,
+  you: [6, 7] as const,
 };
-/** The squares nobody walks on: the child and his board (the scene's, not a room piece's). */
-export const SHOP_RECLUSE_STANDING = [{ c: 5, r: 5 }, { c: 6, r: 5 }, { c: 5, r: 6 }, { c: 6, r: 6 }] as const;
-/** The camera's fixed look at the town's zoom (a small room seen whole, as Rolling Dough's back room). */
-export const SHOP_RECLUSE_CAM = { x: 5.5, y: 5.9 } as const;
+/** The squares nobody walks on: the board and the child's way round it (the scene's, not a room piece's). */
+export const SHOP_RECLUSE_STANDING = [{ c: 3, r: 3 }, { c: 4, r: 3 }, { c: 5, r: 3 }, { c: 3, r: 4 }, { c: 4, r: 4 }, { c: 5, r: 4 }, { c: 3, r: 5 }, { c: 4, r: 5 }, { c: 5, r: 5 }] as const;
+/** The camera's fixed look at the town's zoom (a small room seen whole). */
+export const SHOP_RECLUSE_CAM = { x: 4.0, y: 3.2 } as const;

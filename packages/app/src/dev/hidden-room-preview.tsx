@@ -3,8 +3,9 @@
  * with its scene (town/shops/recluse-scene.ts). `npm run dev`, then /hidden-room-preview.html. No home in the town opens the room yet.
  *
  * Switches in the address: `?t=<ms>` starts the child's game that far in (a still mid-game); `?summon=<ms>` starts the summoning that
- * long after the room is ready; `?ui=0` hides the preview's buttons (for stills). Test hooks: `window.__hiddenRoom()` (the summoning's
- * time, the child's half-move), `window.__hiddenSummon()`.
+ * long after the room is ready; `?ui=0` hides the preview's buttons (for stills); `?walls=cards` draws the side walls as round 1 did (a
+ * paper card a square) instead of one surface each. Test hooks: `window.__hiddenRoom()` (the summoning's
+ * time, the child's half-move and step), `window.__hiddenSummon()`, `window.__hiddenSeek(ms)` (the child's loop to that time).
  */
 import { render } from "preact";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
@@ -30,10 +31,11 @@ const DEF: ShopDef = {
   roof: "lodge",
   chatTone: "day",
 };
+const cards = new URLSearchParams(location.search).get("walls") === "cards";
 const art = (): Promise<RoomArt> =>
   import("../town/shops/recluse-art.ts").then((m) => ({
     n: m.SHOP_RECLUSE_N,
-    layout: m.SHOP_RECLUSE_LAYOUT,
+    layout: cards ? m.SHOP_RECLUSE_LAYOUT_CARDS : m.SHOP_RECLUSE_LAYOUT,
     pieces: m.SHOP_RECLUSE_PIECES,
     crateAt: [0, 0] as const,
     lights: m.SHOP_RECLUSE_LIGHTS,
@@ -46,7 +48,7 @@ const art = (): Promise<RoomArt> =>
 
 function Preview() {
   const q = new URLSearchParams(location.search);
-  const scene = useMemo(() => recluseScene(Number(q.get("t") ?? 0)), []);
+  const scene = useMemo(() => recluseScene(Number(q.get("t") ?? 0), !cards), []);
   const [room, setRoom] = useState<LoadedRoom | null>(null);
   const [ended, setEnded] = useState(false);
   const ctl = useRef<ShopCtl | null>(null);
@@ -59,6 +61,7 @@ function Preview() {
     const w = window as unknown as Record<string, unknown>;
     w.__hiddenRoom = () => scene.state();
     w.__hiddenSummon = summon;
+    w.__hiddenSeek = (ms: number) => scene.seek(ms);
     const id = setInterval(() => {
       const t = scene.state().summonT;
       if (t !== null && t > 6900) setEnded(true);

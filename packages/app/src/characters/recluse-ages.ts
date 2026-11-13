@@ -979,6 +979,167 @@ export function sitLayers(p: SitPose): Layer[] {
   }
   return layers;
 }
+// ---- On his feet and round the board (Nov 13, Eric: "he'll have to literally like lean onto the board and move a piece. And then he
+// like gets up and walks to the other side and places it"): standing and walking facing us or from behind, kneeling up (half way up
+// or down), and kneeling back on his heels from behind at White's side of his board, leaning in to play.
+
+/** The back of his head: the same head, all hair (swept the other way, as from behind), the ears, the nape under it. */
+function kidHeadBack(): Part {
+  const s = HEAD.child;
+  const cv = headBase("child");
+  const light = roundLight(CX + 5, 1, 13, 16, 0.25);
+  const nape = s.rows - 4;
+  for (let y = 0; y < s.rows; y++)
+    for (let x = 0; x < HW; x++) {
+      const k = cv[y]![x]!;
+      if (k === ".") continue;
+      const hw = halfWidth(s, Math.max(y, 2));
+      const ear = y >= s.eye && y < s.eye + 4 && Math.abs(x - CX) > hw;
+      if (ear) continue;
+      if (y >= nape) {
+        // The nape: his neck under the hair's edge, narrower; shaded on our left (the light is behind him now).
+        cv[y]![x] = Math.abs(x - CX) > hw - 2 ? "." : x < CX - 1 ? "c" : "b";
+        continue;
+      }
+      // Clumps running down from the crown, darker in the grooves and at the edges.
+      const groove = (x * 0.7 + y * 0.35) % 3 < 0.8;
+      cv[y]![x] = ramp("HhjJ", light(x, y) - (groove ? 0.22 : 0) - (Math.abs(x - CX) > hw - 1 ? 0.15 : 0) - (y > nape - 3 ? 0.12 : 0));
+    }
+  return { grid: toGrid(cv.map((r) => [...r].reverse())) };
+}
+/** A sneaker from behind: its heel, the white rubber under it. */
+const SHOE_BACK = ["..###..", ".#####.", "#######", "ttttttt", "rrrrrrr"];
+/** His legs kneeling upright (thighs straight down to his knees on the floor): from the front, or from behind with his soles showing. */
+function kneelLegs(view: "f" | "b", drop: number): { part: Part; at: Pt } {
+  const b = BODY.child;
+  const X0 = 46 - 14;
+  const Y0 = b.waistY - 4 + drop;
+  const cv = canvas(28, 129 - Y0);
+  const w = b.waist;
+  const keys = TROUSERS.child;
+  const top = b.waistY + drop;
+  fill(cv, X0, Y0, inPoly([[46 - w - 0.4, top - 1], [46 + w + 0.4, top - 1], [46 + w + 1, top + 4], [46 - w - 1, top + 4]]), (x, y) => ramp(keys, roundLight(46 - w * 0.4, top, w + 2, 8, 0.1)(x, y)));
+  for (const side of [-1, 1] as const) {
+    const l = paintLimb([[46 + side * w * 0.55, top + 3], [46 + side * (w * 0.55 + 0.4), 125]], b.rLeg, b.rLeg - 0.3, keys, side < 0 ? 0.66 : 0.48);
+    l.cv.forEach((row, y) => row.forEach((k, x) => k !== "." && cv[l.at[1] - Y0 + y]?.[l.at[0] - X0 + x] !== undefined && (cv[l.at[1] - Y0 + y]![l.at[0] - X0 + x] = k)));
+  }
+  if (view === "b") {
+    // The soles behind his knees, toes on the floor.
+    stamp(cv, X0, Y0, ["#tt#", "rrrr"], 46 - 9, 125);
+    stamp(cv, X0, Y0, ["#tt#", "rrrr"], 46 + 6, 125);
+  } else stamp(cv, X0, Y0, ["Z".repeat(15)], 46 - 7, 125);
+  return { part: { grid: toGrid(cv) }, at: [X0, Y0] };
+}
+/** Kneeling back on his heels, seen from behind: the seat of his dungarees on his heels, the two soles under it. */
+function heelsPart(): { part: Part; at: Pt } {
+  const X0 = 46 - 13;
+  const Y0 = 106;
+  const cv = canvas(26, 129 - Y0);
+  fill(cv, X0, Y0, inEllipse(46, 116, 10.5, 8), (x, y) => ramp(TROUSERS.child, roundLight(50, 110, 12, 10, 0.12)(x, y)));
+  stamp(cv, X0, Y0, ["Z".repeat(1)], 46, 110);
+  stamp(cv, X0, Y0, ["Z", "Z", "Z", "Z"], 46, 113);
+  stamp(cv, X0, Y0, [".#tt#", "#ttt#", "rrrrr"], 46 - 9, 123);
+  stamp(cv, X0, Y0, ["#tt#.", "#ttt#", "rrrrr"], 46 + 4, 123);
+  return { part: { grid: toGrid(cv) }, at: [X0, Y0] };
+}
+add("head:child:back", kidHeadBack);
+add("shoe:child:back", () => ({ grid: SHOE_BACK }));
+const KNEEL = new Map<string, { part: Part; at: Pt }>();
+const kneelOf = (v: "f" | "b") => KNEEL.get(v) ?? KNEEL.set(v, kneelLegs(v, KNEEL_UP)).get(v)!;
+const heelsOf = () => KNEEL.get("heels") ?? KNEEL.set("heels", heelsPart()).get("heels")!;
+add("kneel:child:f", () => kneelOf("f").part);
+add("kneel:child:b", () => kneelOf("b").part);
+add("heels:child", () => heelsOf().part);
+
+/** How far kneeling upright drops him (his thighs straight down, knees on the floor). */
+const KNEEL_UP = 15;
+/** Leaning in from his heels: his shoulders and head down (away from us), and toward the side he plays on. */
+const HEELS_BODY = [0, 1, 2] as const;
+const HEELS_HEAD = [0, 2, 4] as const;
+const HEELS_SIDE = [0, 1, 2] as const;
+
+/** On his feet or his knees: facing us (`f`) or from behind (`b`); standing (a walk step 0 to 3, or none), kneeling up, or back on his heels (behind only). */
+export interface PlayPose {
+  view: "f" | "b";
+  stance: "stand" | "up" | "heels";
+  /** Walking: the step (0 to 3); -1 standing still. */
+  step: -1 | 0 | 1 | 2 | 3;
+  /** On his heels: how far he leans in, and to which side (our left or right), whose arm is out (the scene draws it). */
+  lean: 0 | 1 | 2;
+  side: "" | "l" | "r";
+}
+export const PLAY_POSES: readonly PlayPose[] = [
+  ...(["f", "b"] as const).flatMap((view) => ([-1, 0, 1, 2, 3] as const).map((step): PlayPose => ({ view, stance: "stand", step, lean: 0, side: "" }))),
+  ...(["f", "b"] as const).map((view): PlayPose => ({ view, stance: "up", step: -1, lean: 0, side: "" })),
+  ...([0, 1, 2] as const).flatMap((lean) => (["", "l", "r"] as const).map((side): PlayPose => ({ view: "b", stance: "heels", step: -1, lean, side }))),
+];
+export const playName = (p: PlayPose): string => `play-${p.view}-${p.stance}-${p.step < 0 ? "n" : p.step}-${p.lean}-${p.side || "n"}`;
+/** What his upper body sits on: how far down from standing, and sideways. */
+function playDrop(p: PlayPose): { drop: number; head: number; sx: number } {
+  if (p.stance === "up") return { drop: KNEEL_UP, head: 0, sx: 0 };
+  if (p.stance === "heels") {
+    const dir = p.side === "l" ? -1 : p.side === "r" ? 1 : 0;
+    return { drop: SIT_DROP + HEELS_BODY[p.lean], head: HEELS_HEAD[p.lean] - HEELS_BODY[p.lean], sx: dir * HEELS_SIDE[p.lean] };
+  }
+  return { drop: p.step === 1 || p.step === 3 ? -1 : 0, head: 0, sx: 0 };
+}
+/** His shoulder on that side (our left or right) in the drawing's frame pixels: the scene's reaching arm starts there. */
+export function playShoulder(p: PlayPose, side: "l" | "r"): Pt {
+  const b = BODY.child;
+  const d = playDrop(p);
+  return [OX + 46 + d.sx + (side === "l" ? -1 : 1) * (b.shoulder - 0.5), OY + b.shoulderY + 2 + d.drop];
+}
+/** Where a hand rests by his side on his heels (the reach starts and ends there). */
+export const heelsHand = (side: "l" | "r"): Pt => [OX + 46 + (side === "l" ? -1 : 1) * 9, OY + 116];
+export function playLayers(p: PlayPose): Layer[] {
+  const b = BODY.child;
+  const at = (part: string, x: number, y: number, flipX = false): Layer => ({ part, x: OX + Math.round(x), y: OY + Math.round(y), ...(flipX ? { flipX } : {}) });
+  if (p.view === "f" && p.stance === "stand") {
+    // Facing us: today's standing drawing, walking a step at a time (a heel up, a bob, the arms swinging a little).
+    const s = p.step;
+    return ageLayers("child", {
+      rise: s === 1 || s === 3 ? 1 : 0,
+      toe: s === 0 ? "l" : s === 2 ? "r" : undefined,
+      handL: s === 0 ? [0, -1] : s === 2 ? [0, 1] : [0, 0],
+      handR: s === 2 ? [0, -1] : s === 0 ? [0, 1] : [0, 0],
+      face: { eyes: "down" },
+    });
+  }
+  const d = playDrop(p);
+  const layers: Layer[] = [at(p.stance === "heels" ? "shadow:sit" : "shadow:child", 46 - (p.stance === "heels" ? 20 : 12), 126)];
+  if (p.stance === "stand") {
+    // From behind: the heels of his sneakers (one lifted as he walks), his legs, as standing.
+    const lift = (s: "l" | "r") => (p.step === 0 && s === "l") || (p.step === 2 && s === "r") ? 1 : 0;
+    const ax = b.waist * 0.55 + 0.3;
+    layers.push(at("shoe:child:back", 46 - ax - 4, 128 - 5 - lift("l") - (d.drop < 0 ? 1 : 0)), at("shoe:child:back", 46 + ax - 3, 128 - 5 - lift("r") - (d.drop < 0 ? 1 : 0)));
+    const lg = legsOf("child", 0);
+    layers.push(at(legsName("child", 0), lg.at[0], lg.at[1] + d.drop));
+  } else if (p.stance === "up") {
+    const k = kneelOf(p.view);
+    layers.push(at(`kneel:child:${p.view}`, k.at[0], k.at[1]));
+  } else {
+    const h = heelsOf();
+    layers.push(at("heels:child", h.at[0], h.at[1]));
+  }
+  const t = torsoOf("child");
+  layers.push(at("torso:child", t.at[0] + d.sx, t.at[1] + d.drop));
+  const head = p.view === "f" ? headName("child", { eyes: "down", brows: "stern", mouth: "stern" }) : "head:child:back";
+  // (From behind his head is drawn under his arms, as from the front; on his heels, leaning in, it dips toward the board.)
+  layers.push(at(head, HEAD_X + d.sx * 1.5, b.top + d.drop + d.head));
+  for (const side of [-1, 1] as const) {
+    if ((side < 0 && p.side === "l") || (side > 0 && p.side === "r")) continue;
+    const sh: Pt = [46 + d.sx + side * b.shoulder, b.shoulderY + 1 + d.drop];
+    const swing = p.stance === "stand" && p.step >= 0 ? ((p.step === 0) === (side < 0) ? -1 : p.step === 2 ? 1 : 0) : 0;
+    const wr: Pt = p.stance === "heels" ? [46 + side * 9, 116] : [46 + d.sx + side * (b.shoulder + b.armOut + 0.6), b.wristY + d.drop + swing];
+    const el: Pt = p.stance === "heels" ? [46 + d.sx + side * (b.shoulder + 2.5), (sh[1] + wr[1]) / 2] : [46 + d.sx + side * (b.shoulder + b.armOut), b.elbowY + d.drop + swing * 0.4];
+    const arm = armPart("child", sh, el, wr);
+    layers.push(at(arm.name, arm.at[0], arm.at[1]));
+    const hw = HANDS.child.rest[0]!.length;
+    layers.push(at("hand:child:rest", side > 0 ? wr[0] - 3 : wr[0] - (hw - 3), wr[1] - 1, side < 0));
+  }
+  return layers;
+}
+
 /** Thinking over the board (his idle when nothing's played): eyes down, a blink, a glance up. */
 const SIT_IDLE = (): Frame[] =>
   Array.from({ length: 12 }, (_, i): Frame => ({ ms: 200, layers: sitLayers({ lean: 1, reach: "", eyes: i === 5 ? "shut" : i >= 8 && i < 10 ? "ahead" : "down", mouth: "stern" }) }));
@@ -995,6 +1156,7 @@ export const RECLUSE_CHILD_SIT: Character = {
   anims: {
     idle: lazyAnim(() => ({ loop: true, frames: SIT_IDLE() })),
     ...Object.fromEntries(SIT_POSES.map((p) => [sitName(p), lazyAnim(() => ({ loop: false, frames: [{ ms: 1000, cue: "pose", layers: sitLayers(p) }] }))])),
+    ...Object.fromEntries(PLAY_POSES.map((p) => [playName(p), lazyAnim(() => ({ loop: false, frames: [{ ms: 1000, cue: "pose", layers: playLayers(p) }] }))])),
   },
 };
 

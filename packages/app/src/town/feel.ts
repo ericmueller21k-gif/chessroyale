@@ -868,8 +868,15 @@ export const SHOP_FEEL = {
  * across), the piece's lift as it's carried (board squares). `summon`: the summoning's beats, each from its start.
  */
 export const HIDDEN_ROOM_FEEL = {
-  play: { first: 1400, think: 760, reach: 300, carry: 460, back: 300, look: 480, end: 1800, fade: 1100 },
-  kid: { scale: 0.8, board: 1.5, lift: 0.7 },
+  /**
+   * His game's pace (ms; Nov 13, Eric: "it would take him realistically like a while to play out the game. Cause that's the point").
+   * His own moves (Black), sitting: think (each move its own, `think` times 0.6 to 1.6), reach, carry, back, look up. White's: he gets
+   * up (`rise`), walks round to White's side (`walk` squares a second), turns, kneels, thinks, plays, gets up, walks back, turns, sits.
+   * About 22 s a pair of moves: the whole game about 15 minutes.
+   */
+  play: { first: 1400, think: 2600, reach: 520, carry: 700, back: 480, look: 900, rise: 760, walk: 0.8, turn: 260, kneel: 520, stand: 520, sit: 760, end: 3200, fade: 1100 },
+  /** His drawing's size in the room, the board's size (squares; small, still real chess), a carried piece's lift, a walk step (ms). */
+  kid: { scale: 0.8, board: 1.15, lift: 0.7, stepMs: 240 },
   summon: {
     /** The freeze frame: the players' figures still images (a flash). */
     freeze: 0,
