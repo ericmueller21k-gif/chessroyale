@@ -216,3 +216,5 @@ Eric thought the four boards were already online (from 50 v 50). They aren't: ph
 reached solo against bots); online, beating his adult form ends the fight. Eric: "it should be... it plays through to the four boards...
 It plays through till the end." New order: 1 room challenge (+3 bots, online 🏆) -> 2 his phase change + four boards ONLINE (xhigh, full
 lane; it serves 50 v 50 finals too) -> 3 the child form -> 4 the cutscene. Then tell Eric.
+- Eric, Nov 13: no admin gate for the Hidden Boss's building, rooms or challenge (the site is behind Cloudflare anyway); "push it live". The
+  room-challenge job takes him out of BOSS_ADMIN_FIRST. Test bots and the 🏆 stay admin-only (test tools). #672 merges as is (his OK to push live).

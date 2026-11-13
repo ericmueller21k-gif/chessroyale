@@ -22,7 +22,9 @@ The rules (Eric's):
 7. **The fight:** the four are one team that picks every move together: the majority's move is played; a tie goes to the boss party's
    existing rule (`partyMove`). Use the online path his fight already has (his adult form online, today's crowd final rules). Online his
    phase 2 (four boards) doesn't exist yet: winning his adult form online ends the fight as it does today. Say this plainly in your PR.
-8. **Admins first:** only admins can see the building (already so); the challenge is admin-only too until Eric opens it.
+8. **Not hidden behind admin (Eric, Nov 13: "It doesn't need to be admin only... the site is behind Cloudflare")**: take "recluse" out of
+   `BOSS_ADMIN_FIRST` so his building, rooms and challenge are there for everyone signed in (fix the home counts the tests pin). His Boss
+   Battle tile stays locked (`adminOnly` stays: he's met only from his room). The test tools below stay admin-only: they're test tools.
 
 Eric's test kit (admins only, server-checked):
 - **Three test bots:** an admin-only option on his card ("Fill with 3 bots")

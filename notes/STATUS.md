@@ -1,3 +1,4 @@
+- Nov 13 ~05:40 UTC: Eric: no admin gate, push live. #672 merges when green (took "push it live" as the OK for the guard count). Room-challenge brief: remove recluse from BOSS_ADMIN_FIRST.
 - Nov 13 ~05:30 UTC: Eric: the room fight must play through to the four boards online. Order now: challenge -> online phase change + 4 boards -> child form -> cutscene.
 - Nov 13 ~05:25 UTC: main full run on a2036cb (#671) GREEN, no flakes (43366594856).
 - Nov 13 ~05:20 UTC: room challenge brief ready (hidden-boss-room-challenge.md, xhigh, full lane); start after #672 merges. Note for Eric: online phase 2 (four boards) is unbuilt; the room fight online ends at his adult form until it is built.
