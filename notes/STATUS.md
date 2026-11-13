@@ -1,3 +1,4 @@
+- Nov 13 ~05:15 UTC: #672 Hidden Boss building open (fec149d): walk-up, hall, landing, child room, one-surface walls, admins first, Challenge greyed. Guard count edit (no-lamp guard 17->18 homes): ASKED Eric OK; merge after OK and green. Known: phone camera puts arrival under the arrow pad. Helper archived. Next (one Opus): room challenge, after #672.
 - Nov 13 ~05:00 UTC: #671 chant lines + music cut MERGED (a2036cb). Building helper running. Next (one Opus): room challenge.
 - Nov 13 ~04:30 UTC: #671 chant lines + 17.435 s music cut (b5b33e8c) open (46d302a). Merge when green. Building helper running.
 - Nov 13 ~04:30 UTC: chant helper DONE (claude/hidden-boss-chant 0e2c21e, rise-to-crack 17.435 s). Sent to music session for the cut; then copy in and open the PR. Leftovers: his absorb line is cut off on the phone bar (needs paging or a shorter line); frames:recluse2 not run. Building helper running.
