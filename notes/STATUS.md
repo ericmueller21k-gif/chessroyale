@@ -1,3 +1,4 @@
+- Nov 13 ~04:00 UTC: main d0689a7 (#670) RED by retry-pass only: town-chat:1477 [phone] apiRequestContext.get ECONNRESET (the test-server connection-drop family; batch 6). Not #670.
 - Nov 13 ~03:30 UTC: #670 Hidden Boss music MERGED (d0689a7). Chant-lines helper started (claude/hidden-boss-chant). Watching main.
 - Nov 13 03:00 UTC: Eric settled the chant lines (final). Brief hidden-boss-chant-lines.md ready; start after #670 merges.
 - Nov 13 02:55 UTC: chant lines from Eric (via music session) noted in hidden-boss-house-NOTES.md; asked Eric to settle line 2; build after #670.
