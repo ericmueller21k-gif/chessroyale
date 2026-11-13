@@ -233,6 +233,16 @@ export function TownScreen({
   };
   const later = (ms: number) => new Promise<void>((ok) => setTimeout(ok, ms));
   /**
+   * A room's own scene (RoomFx), loaded with it, or null: none (every room but the walk-up's, Nov 13: its hall's and landing's side walls,
+   * one surface each; his room's walls and the child at his game, on the clock, so his game is where it is whenever you come up).
+   */
+  const roomFxOf = (id: HomeId, part: RoomPart): Promise<RoomFx | null> | null =>
+    id !== "recluse"
+      ? null
+      : part === "top"
+        ? import("./shops/recluse-scene.ts").then((m) => m.recluseScene(Date.now() - performance.now(), true, { live: true }).fx)
+        : import("./shops/recluse-stairs-scene.ts").then((m) => m.RECLUSE_STAIRS_FX);
+  /**
    * You stand at a shop's door (its "Go in"): the town zooms in on the door (`x`, `y` in the box) and fades to black; the room opens.
    * A boss's challenge (`challenge`) goes in the same way, the boss beside you, with its intro's art loading too; the room plays it.
    */
@@ -252,6 +262,7 @@ export function TownScreen({
     roomMusicLoad(homeTheme(id));
     // (Its code and art load now, while the town zooms: nothing of a shop loads while you walk round the town.)
     const load = import("./shops/ShopRoom.tsx").then((m) => m.loadRoom(id).then((room) => ({ room, View: m.ShopRoom })));
+    const scene = roomFxOf(id, "front");
     // (A challenge's intro art too: loaded only now, as you go in to fight.)
     const intro = challenge ? import("./shops/intro.ts").then(async (m) => ({ m, intro: await m.loadIntro(id)! })) : null;
     const cv = townCanvas();
@@ -265,7 +276,8 @@ export function TownScreen({
     roomLoadSlice(0);
     const got = await load.catch(() => null);
     const fight = intro ? await intro.catch(() => null) : null;
-    if (!got || !box.current || (challenge && !fight)) {
+    const fx = scene ? await scene.catch(() => null) : null;
+    if (!got || !box.current || (challenge && !fight) || (scene && !fx)) {
       // (It didn't load: back out to the town as you were.)
       roomMusic(null);
       if (cv) cv.style.transform = "";
@@ -282,7 +294,7 @@ export function TownScreen({
     // (You start inside zoomed out, the − pressed: SHOP_FEEL.startZoom, a challenge's camera too.)
     setShopOut(F.startZoom === 1);
     if (fight) step("inside");
-    setInside({ ...got, intro: fight ? { intro: fight.intro, onMarks: () => step("onMarks"), onDone: () => void stormIn(id, fight.m, fight.intro) } : null });
+    setInside({ ...got, fx, intro: fight ? { intro: fight.intro, onMarks: () => step("onMarks"), onDone: () => void stormIn(id, fight.m, fight.intro) } : null });
   };
   /**
    * The intro is done: the boss's transition sweeps in (outside the town's tree: it stays as the town closes), the battle starts
@@ -325,11 +337,11 @@ export function TownScreen({
     doorPhase(RF.goIn);
     // (The back door's creak is off with the bakery's other room sounds: Eric, Nov 11.)
     const load = import("./shops/ShopRoom.tsx").then((m) => m.loadRoom(at.room.def.home, to));
-    const scene = at.room.def.home === "recluse" && to === "top" ? import("./shops/recluse-scene.ts").then((m) => m.recluseScene(Date.now() - performance.now(), true, { live: true })) : null;
+    const scene = roomFxOf(at.room.def.home, to);
     fadeTo(1, F.fadeMs);
     await later(F.fadeMs);
     const room = await load.catch(() => null);
-    const fx = scene ? ((await scene.catch(() => null))?.fx ?? null) : null;
+    const fx = scene ? await scene.catch(() => null) : null;
     if (!room || !box.current || (scene && !fx)) {
       fadeTo(0, F.fadeMs);
       doorBusy.current = false;

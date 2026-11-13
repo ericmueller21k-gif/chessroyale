@@ -56,11 +56,14 @@ describe("the Walk-up in the town (Nov 13)", () => {
 });
 
 describe("its three rooms and the stairs (Nov 13)", () => {
-  it("every square of each room has its floor tile baked in (isFloor), and no flat tile stands up", () => {
+  it("every square of each room has its floor tile baked in (isFloor), no flat tile stands up, and the side walls are blanks (one surface each)", () => {
     for (const [layout, n] of [[S.RECLUSE_HALL_LAYOUT, S.RECLUSE_HALL_N], [S.RECLUSE_LANDING_LAYOUT, S.RECLUSE_HALL_N]] as const) {
       const tiles = new Set(layout.filter((p) => isFloor(p.name)).map((p) => `${p.col},${p.row}`));
       for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) expect(tiles.has(`${c},${r}`), `${c},${r}`).toBe(true);
       for (const p of layout) expect(S.RECLUSE_STAIRS_PIECES[p.name], p.name).toBeTruthy();
+      // (Their side walls one surface each, as his room's (Eric, Nov 13): solid blanks in the layout, the scene draws the walls.)
+      for (let r = 0; r < n - 1; r++)
+        for (const c of [0, n - 1]) expect(layout.filter((p) => !isFloor(p.name) && p.col === c && p.row === r).map((p) => p.name), `${c},${r}`).toEqual(["wall-none"]);
     }
   });
 

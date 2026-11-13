@@ -26,6 +26,7 @@ import { pieceImg } from "./intro.ts";
 import { KID_SPOTS, RECLUSE_GAME, kidAt, sideOf, stepsOf, walkPath, type Board, type KidNow } from "./recluse-game.ts";
 import { SHOP_RECLUSE_N, SHOP_RECLUSE_SCENE, SHOP_RECLUSE_WALL_H, sideWallGrid } from "./recluse-art.ts";
 import type { FxDraw, RoomFx } from "./ShopRoom.tsx";
+import { sideWalls } from "./side-walls.ts";
 
 const SQ = 37;
 const K = HIDDEN_ROOM_FEEL.kid;
@@ -341,70 +342,9 @@ function drawPiece(d: FxDraw, p: string, c: number, r: number, lift: number) {
   d.g.drawImage(img, q.x - (img.width * ps) / 2, q.y - (img.height - 2.5) * ps, img.width * ps, img.height * ps);
 }
 
-// ---- The side walls, each one surface (Nov 13, Eric: "one long thing that actually makes it look like a 3D room").
+// ---- The side walls, each one surface (Nov 13, Eric: "one long thing that actually makes it look like a 3D room"): side-walls.ts.
 
-const WALL_RUN = SHOP_RECLUSE_N + 2;
-const wallImgs: (HTMLCanvasElement | null)[] = [null, null];
-/** A side wall's picture (the paper, the rail and the baseboard unbroken, `WALL_RUN` squares long), made once. */
-function wallImg(west: boolean): HTMLCanvasElement {
-  const i = west ? 0 : 1;
-  const have = wallImgs[i];
-  if (have) return have;
-  const { grid, palette } = sideWallGrid(west, WALL_RUN);
-  const w = grid[0]!.length;
-  const h = grid.length;
-  const data = new Uint8ClampedArray(w * h * 4);
-  for (let y = 0; y < h; y++)
-    for (let x = 0; x < w; x++) {
-      const hex = palette[grid[y]![x]!];
-      if (!hex) continue;
-      const o = (y * w + x) * 4;
-      data[o] = parseInt(hex.slice(1, 3), 16);
-      data[o + 1] = parseInt(hex.slice(3, 5), 16);
-      data[o + 2] = parseInt(hex.slice(5, 7), 16);
-      data[o + 3] = hex.length > 7 ? parseInt(hex.slice(7, 9), 16) : 255;
-    }
-  const c = document.createElement("canvas");
-  c.width = w;
-  c.height = h;
-  c.getContext("2d")!.putImageData(new ImageData(data, w, h), 0, 0);
-  return (wallImgs[i] = c);
-}
-const wa = newPt();
-const wb = newPt();
-/**
- * Both side walls, each drawn as one surface from the back wall's corner forward past the camera: its foot along the floor's edge, its
- * top `SHOP_RECLUSE_WALL_H` room pixels over the foot as every upright thing is (so it meets the back wall's top and the rooms' scale),
- * in thin slices, each its strip of the wall's picture (about 70 drawImage calls a wall).
- */
-function drawSideWalls(d: FxDraw) {
-  const g = d.g;
-  const H = SHOP_RECLUSE_WALL_H;
-  const STRIPS = 72;
-  g.imageSmoothingEnabled = false;
-  for (const west of [true, false]) {
-    const img = wallImg(west);
-    // (The wall's face: the inner edge of its column of squares.)
-    const c = west ? 0.5 : SHOP_RECLUSE_N - 1.5;
-    for (let i = 0; i < STRIPS; i++) {
-      // (Slices thinner far off, where the wall is foreshortened most... evenly in depth is fine at this room's size.)
-      const ra = (i / STRIPS) * (WALL_RUN - 0.01);
-      const rb = ((i + 1) / STRIPS) * (WALL_RUN - 0.01);
-      if (!at(d, c, ra, 0, wa) || !at(d, c, rb, 0, wb)) break;
-      const ha = (H * wa.k) / SQ;
-      const hb = (H * wb.k) / SQ;
-      const sx = ra * SQ;
-      const sw = (rb - ra) * SQ;
-      const hm = (ha + hb) / 2;
-      // (An affine strip: its two ends' tops, its height the two ends' mean; a hair wider so no seam shows.)
-      g.save();
-      g.transform((wb.x - wa.x) / sw, (wb.y - hb - (wa.y - ha)) / sw, 0, hm / H, wa.x, wa.y - ha - (hm - ha) / 2);
-      g.drawImage(img, sx, 0, sw, H, 0, 0, sw + 0.6, H);
-      g.restore();
-      if (wb.x < -50 || wb.x > d.W + 50) break;
-    }
-  }
-}
+const drawSideWalls = sideWalls(sideWallGrid, SHOP_RECLUSE_N, SHOP_RECLUSE_WALL_H);
 
 // ---- The child.
 

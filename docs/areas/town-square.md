@@ -769,9 +769,11 @@ string ("Hidden Boss"), never his real one. [2026-11-13-hidden-boss-building.md]
   (50, 31) is gone (Eric's no-lamp-in-front rule). Today's town: (45, 7). On the map and its chip: the lit top window (`BOSS_FACE`).
 - **Nobody out front:** `hasFigure` (world.ts) is false for it, so the town's figures (`Town.bosses`) skip it; it's the last home, so
   every figure keeps its home's index.
-- **Inside, three rooms** (`shops.ts` `RECLUSE_ROOMS`; smaller in than out): the **hall** (its front, from the street door; 7 x 7,
-  `shops/recluse-stairs-art.ts`: a white hexagon mosaic with a black band, dark green dado, flats 1A and 1B and the mailboxes in the back
-  wall, a sconce, a radiator, the stairs up at the back right); the **landing** (7 x 7: oak boards and a red runner, flat 2A, a window
+- **Inside, three rooms** (`shops.ts` `RECLUSE_ROOMS`; smaller in than out), **all three with his room's walls**: each side wall one
+  surface (Eric, Nov 13: "build the walls in the room like we did for his room"; `shops/side-walls.ts`, shared by his room's scene and
+  the hall's and landing's, `recluse-stairs-scene.ts`; the layouts' side squares and back corners solid blanks). The **hall** (its front,
+  from the street door; 7 x 7, `shops/recluse-stairs-art.ts`: a white hexagon mosaic with a black band, dark green dado, flats 1A and 1B
+  and the mailboxes under a sconce in the back wall, a radiator, the stairs up at the back right); the **landing** (7 x 7: oak boards and a red runner, flat 2A, a window
   on the airshaft, the stairs down at the front, the stairs up at the back right); the **top floor**, his room (the mockup's 9 x 9 child's
   room, `recluse-art.ts`, its one-surface side walls; the child playing his 1956 game: `recluse-scene.ts`, given to the room as its `fx`
   with `{ live: true }`, so you're drawn and the four stand-in pawns aren't; on the wall clock, so his game is where it is whenever you

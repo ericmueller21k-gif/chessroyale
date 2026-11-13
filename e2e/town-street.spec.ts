@@ -591,6 +591,7 @@ test("the Hidden Boss's walk-up (admins first): its door, the hall, up two fligh
   await page.waitForTimeout(800);
   await still("landing", 3500);
   await climb("top", "Go up");
+  await still("room-arrive", 3500);
   // His room: a tap on his board walks you round to its front, and his card: Challenge greyed, "Coming soon".
   const his = page.getByRole("dialog", { name: "Hidden Boss", exact: true });
   await expect(async () => {

@@ -203,6 +203,9 @@ def("wall-none", [1, 1], 1, 1, [0, 0], cv(1, 1));
       put(c, bx + 3, by + 8, "Y");
       if (i === 2 && j === 1) put(c, bx + 2, by + 5, "Y");
     }
+  // (The hall's sconce over them: its corners are the side walls' now.)
+  rect(c, 17, 22, 3, 7, "Y");
+  ellipse(c, 18.5, 18, 5, 4, (x, y, d) => (d < 0.4 ? "L" : "G"));
   wallDef("mailboxes", c);
 }
 /** The sconce: a little brass bracket and a frosted shade, its glow (the room's light). */
@@ -321,10 +324,10 @@ function stairsUp(seed: number): Cv {
 // ==== The lights: each room's sconce, and the hall's day through the street door.
 
 export const RECLUSE_HALL_LIGHTS: readonly (LightSpot & { piece: string })[] = [
-  { piece: "sconce", x: 13, y: 21, w: 11, h: 10, color: "#ffd890", strength: 0.6, halo: 30 },
+  { piece: "mailboxes", x: 13, y: 14, w: 11, h: 9, color: "#ffd890", strength: 0.6, halo: 30 },
   { piece: "entrance", x: 12, y: 18, w: 50, h: 60, color: "#e8f4ff", strength: 0.35, halo: 26 },
 ];
-export const RECLUSE_HALL_POOLS: readonly (LightPool & { piece: string })[] = [{ piece: "sconce", x: 18, y: WALL_H + 40, rx: 44, ry: 26, color: "#ffd890", strength: 0.22 }];
+export const RECLUSE_HALL_POOLS: readonly (LightPool & { piece: string })[] = [{ piece: "mailboxes", x: 18, y: WALL_H + 40, rx: 44, ry: 26, color: "#ffd890", strength: 0.22 }];
 export const RECLUSE_LANDING_LIGHTS: readonly (LightSpot & { piece: string })[] = [
   { piece: "sconce", x: 13, y: 21, w: 11, h: 10, color: "#ffd890", strength: 0.6, halo: 30 },
   { piece: "window", x: 6, y: 20, w: 25, h: 46, color: "#dde6ee", strength: 0.25, halo: 18 },
@@ -342,16 +345,17 @@ function layoutOf(room: "hall" | "landing"): ShopPlace[] {
   };
   for (let row = 0; row < N; row++) for (let col = 0; col < N; col++) at(`floor-${room}-${col}-${row}`, col, row, false);
   const floors = out.length;
-  // -- The back wall (the flats' doors there: a side wall's card is seen edge on, a door on it wouldn't read): the hall's flats 1A and 1B
-  // with the mailboxes between, the sconce in the corner; the landing's flat 2A, the sconce, the window; the stairs up (4-5).
-  const back = room === "hall" ? ["wall-0", "flat-door", "mailboxes", "flat-door"] : ["wall-1", "flat-door", "sconce", "window"];
+  // -- The back wall: the hall's flats 1A and 1B with the mailboxes (and the sconce over them) between; the landing's flat 2A, the sconce,
+  // the window; the stairs up (4-5). Its corners blank: the side walls run from there.
+  const back = room === "hall" ? ["wall-none", "flat-door", "mailboxes", "flat-door"] : ["wall-none", "flat-door", "sconce", "window"];
   back.forEach((name, col) => at(name, col, 0, true));
   at("stairs-up", 4, 0, false, { door: room === "hall" ? "landing" : "top" });
-  at(room === "hall" ? "sconce" : "wall-2", 6, 0, true);
-  // -- The side walls: plain.
+  at("wall-none", 6, 0, true);
+  // -- The side walls: each ONE surface, as his room's (Eric, Nov 13: "build the walls in the room like we did for his room"), drawn by
+  // the room's scene (side-walls.ts, `RECLUSE_STAIRS_WALLS`); here, solid blanks.
   for (let row = 1; row < N - 1; row++) {
-    at(`wall-${(row * 5) % 4}`, 0, row, true);
-    at(`wall-${(row * 5 + 2) % 4}`, N - 1, row, true, { flip: true });
+    at("wall-none", 0, row, true);
+    at("wall-none", N - 1, row, true);
   }
   // -- A radiator by a side wall.
   if (room === "hall") at("radiator", 1, 5, true);
@@ -369,6 +373,13 @@ export const RECLUSE_HALL_LAYOUT: readonly ShopPlace[] = layoutOf("hall");
 export const RECLUSE_LANDING_LAYOUT: readonly ShopPlace[] = layoutOf("landing");
 /** Every piece of both rooms by its name, each its own Character `shop-recluse-<name>`. */
 export const RECLUSE_STAIRS_PIECES: Readonly<Record<string, Character>> = Object.fromEntries(Object.values(PIECES).map((p) => [p.name, toChar(p)]));
+/** A side wall's picture, one surface `run` squares long (side-walls.ts): the plaster over the green dado, unbroken. */
+export function stairsSideWallGrid(west: boolean, run: number): { grid: string[]; palette: Record<string, string> } {
+  const c = wall(west ? 3 : 4, run * T);
+  return { grid: c.map((r) => r.join("")), palette: PALETTE };
+}
+/** The height of the walls (room pixels). */
+export const RECLUSE_STAIRS_WALL_H = WALL_H;
 /** The camera's fixed look at the town's zoom (a small room seen whole). */
 export const RECLUSE_HALL_CAM = { x: 3.0, y: 2.6 } as const;
 /** The squares where each room's flats' doors are talked to (shops.ts RECLUSE_ROOMS: `talkAt`), in front of each. */
