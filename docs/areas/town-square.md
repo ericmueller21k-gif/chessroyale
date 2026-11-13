@@ -831,8 +831,8 @@ exception: about 7 squares from Ginger's igloo (`town-camera.test.ts`).
   - **Eric's test kit (admins only, server-checked):** "Fill with 3 bots" on his card: three bots stand at the board's places, count
     toward the four, join a request one by one (`botJoinMs`, so each count shows), go through the summoning and play as the fight's bot
     members; they leave with the admin. A player's "fill" is refused ("Admins only."). The fight's 🏆: see bosses.md, "Win this form".
-  - **The fight plays through** (Nov 13): his adult form beaten, his phase change and the four boards online, to the result (bosses.md,
-    "Phase 2 online").
+  - **The fight plays through** (Nov 13): the child first (beaten, a new match against the man), his adult form beaten, his phase change
+    and the four boards online, to the result (bosses.md, "His child form", "Phase 2 online").
 - Tests: `test/recluse-building.test.ts`; server `test/hidden-room.test.ts` (the room count, the lock, the cap, leaving and disconnects,
   one request at a time, the bots' admin gate, the fight of four, the online 🏆's admin gate; a ban at the door, a cancel, a leave or a
   swept device racing the start, the hub's wait, a rest); e2e `hidden-boss-room.spec.ts` (an admin up,
