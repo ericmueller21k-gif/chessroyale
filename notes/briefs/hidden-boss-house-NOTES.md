@@ -206,3 +206,7 @@ described. No rush; one Opus builder at a time. Order: building -> chant lines +
 locked door, wait in room / cancel on leave, 5-min cap, summoning, the 3 admin test bots, Win this form in every form) -> the child form in
 a match (Maia ramp, the ages growing, the house music) -> the cutscene before the transformation (ghost kid, spotlight, typed lines,
 kneeling pose) -> tell Eric it's ready.
+
+## Nov 13: walls inside his building (Eric)
+All three rooms in his building (hall, landing, top room) use the one-surface side walls (the room mockup's drawSideWalls), not the
+stacked cards. Sent to the building helper. (Other homes' rooms unchanged unless Eric asks; a later sweep is possible.)
