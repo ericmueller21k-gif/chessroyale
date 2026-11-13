@@ -194,3 +194,10 @@ instantly win and trigger next phase on the next move."
 - Admin-only buttons in every form: "Win this form": the next move beats the current form and the next phase starts (child -> adult ->
   cutscene/transformation -> four boards -> result).
 - Now (Nov 13): the "Win this form" button for today's fight (adult form, phase 2) was added to the music helper's job.
+
+## Nov 13: the chant's new lines (Eric, via the music session)
+- During the chant, between the book landing and the crack: "Computation without creativity is nothing. // Now I have both." (Eric's pick.)
+- Then (not final wording): "prepare yourself for the ultimate test of your skill". Director's draft: "Now prepare yourself. // This is the ultimate test."
+- Lengthen rise-to-crack to fit both lines at the cutscene's typing pace (up to about 18 s; today 8.74 s); the last line can finish in the
+  final second of silence before the drop. Send the final rise-to-crack time to the music session (session_01JuCWRs7vACHciUbhC3eY8V); it
+  builds that cut in about 11 minutes. Build after #670 merges.
