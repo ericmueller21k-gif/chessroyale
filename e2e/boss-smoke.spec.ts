@@ -33,7 +33,8 @@ const PASSIVE_EVENTS: Partial<Record<PowerId, PowerEventKind[]>> = {
 };
 
 // (A boss in the game for admins first, Timber and Dash, is checked too: the test plays as an admin.)
-const PLAYABLE = BOSS_ROSTER.filter((b) => isPlayable(b) || adminFirst(b));
+// (Admins-first bosses too, but not an admin-only one: the Hidden Boss joined admins first for his town building, Nov 13; e2e/recluse.spec.ts covers him.)
+const PLAYABLE = BOSS_ROSTER.filter((b) => isPlayable(b) || (adminFirst(b) && !b.adminOnly));
 /**
  * A boss whose ultimate needs a position the usual start doesn't give: his own test switch's start instead of his
  * passive's. Smudgy's Repaint can't come while the crowd has all eight pawns (a ninth is a position the engine refuses),
