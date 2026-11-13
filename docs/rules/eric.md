@@ -160,13 +160,16 @@ removed (old → new) and says whether any of them guards a rule here.
   support@hunchess.com." (the address a mailto link) on every URL and from every API route, a tab already open included: no
   menus, town, solo or chat, and no appeal box in the game (appeals come by email, a person answers them). Enforced on the
   server; the account's own sign-in cookie never gets it past. A lifted ban signs in as before. Guests and the engine pool are
-  unchanged.
+  unchanged. "No URLs work" is about the banned account, not the device (the review of #687, M1): the browser it was used on keeps
+  showing the line to anyone not signed in, with a sign-in to another account under it; anyone else signs in to their own
+  account there (a shared device) and plays, and a refused sign-in never ends another account's session on it.
   - Eric, Nov 13: "When I think of the word banned, I think of you can't sign in anymore. Just like every other game works."
     "If you try to sign in, it would say your account has been banned. For more information, email support." "Make sure that
     when someone's banned, it's not just the landing page. No URLs work."
   - Guards: `e2e/fairplay.spec.ts`, "a ban means you can't sign in (Eric, Nov 13)…", phone and computer (a tab open drops to the
-    line; a list of URLs and API routes; signing in again refused with no session; the account's own session refused; lifted, it
-    signs in); `packages/server/test/ban-sign-in.test.ts` (every check).
+    line; a list of URLs and API routes; signing in again refused with no session; the account's own session refused; another
+    account signs in on the marked browser and plays; lifted, it signs in); `packages/server/test/ban-sign-in.test.ts` (every
+    check, the shared device's included).
   - Decision: [2026-11-13-ban-blocks-sign-in.md](../decisions/2026-11-13-ban-blocks-sign-in.md).
 
 ## Writing

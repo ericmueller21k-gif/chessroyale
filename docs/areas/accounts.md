@@ -99,9 +99,10 @@ Lane: `hub`. What a profile shows is on [hub.md](hub.md).
   1's top places, and their reports never count toward a review. `scripts/cheater-demo.ts` plays with them ([fairplay.md](fairplay.md)).
 - **Bans** (from [fairplay.md](fairplay.md), "A ban means you can't sign in"; Eric, Nov 13): a banned account can't sign in at all.
   Each sign-in's finish (the emailed code checked, Google's callback, a test account's script) asks `signInBan` before anything is
-  made or switched: refused with the ban line, no session. The Worker's ban gate (`ban-gate.ts`) gives a banned session, or a
-  browser marked banned, the ban answer on every route, ends that session and marks the browser; the app then shows only the ban
-  screen. A lifted ban signs in as before.
+  made or switched: refused with the ban line, no session. The Worker's ban gate (`ban-gate.ts`) gives a banned session the ban
+  answer on every `/api/*` route, ends that session and marks the browser; the app then shows only the ban screen, with a sign-in
+  to another account under the line. A marked browser with no live session gets the ban answer too, except on the sign-in routes,
+  which run without a session (a shared device: anyone else signs in to their own account there). A lifted ban signs in as before.
 - **The default pawn color** (Nov 7; `users.pawn_color`, NULL: white): PATCH `/api/me` `{pawn}` (only "white" or "black"); shown on the profile and
   in the town's presence (`town-here.ts`). A guest keeps it on the device (`brc.pawnColor`, `prefs.ts`). See `core/src/pawn-color.ts`.
 - **Names** pass the server's name filter (slurs and hate: [chat.md](chat.md), "Moderation"): a profile can't take
@@ -154,7 +155,7 @@ Lane: `hub`. What a profile shows is on [hub.md](hub.md).
   (about 40 ms), so a route reads what it can at once (`Promise.all`): `/api/me` in 4 (5 with the D1 touch; it was 28 one after another),
   `/api/quests` and `/api/friends` in 3. `packages/server/test/me-round-trips.test.ts` counts them on a fake D1; keep new reads beside
   the others, not after them. In front of every route, the ban gate (Nov 13, [fairplay.md](fairplay.md)) adds one read for a request
-  with a session, at most once per session per Worker instance every `FAIRPLAY.banCheckMs` (30 s); none without a session.
+  with a session, at most once per session per Worker instance every `FAIRPLAY.banCheckMs` (60 s); none without a session.
 
 ## Data stored by friends (for the privacy page and account deletion)
 
