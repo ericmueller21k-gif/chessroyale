@@ -436,13 +436,12 @@ for (const st of [
     expect(before.statue).toBeNull();
     const cv = (await canvas(page).boundingBox())!;
     // The statues stand on the Colosseum's plaza at the north edge (the street town's, everyone's since Nov 13): glide to the one's
-    // viewing square so it comes into view (the old town's stood in view from the start).
+    // viewing square so it comes into view (the old town's stood in view from the start), and let the camera settle before the tap.
     await page.evaluate((sq) => (window as unknown as { __townGlide: (to: readonly [number, number]) => void }).__townGlide(sq), st.sq);
-    const at = await (async () => {
-      let p: { x: number; y: number } | null = null;
-      await expect.poll(async () => (p = await page.evaluate((id) => (window as unknown as { __townAt: (k: string, id: string) => { x: number; y: number } | null }).__townAt("statue", id), st.id)) !== null, { message: "the statue comes into view", timeout: 20_000 }).toBe(true);
-      return p;
-    })();
+    await expect.poll(async () => (await page.evaluate((id) => (window as unknown as { __townAt: (k: string, id: string) => { x: number; y: number } | null }).__townAt("statue", id), st.id)) !== null, { message: "the statue comes into view", timeout: 20_000 }).toBe(true);
+    let lastFocus = "";
+    await expect.poll(async () => { const f = (await cam(page)).focus.map((v) => v.toFixed(2)).join(","); const same = f === lastFocus; lastFocus = f; return same; }, { message: "the camera settles on the statue", timeout: 20_000, intervals: [300] }).toBe(true);
+    const at = await page.evaluate((id) => (window as unknown as { __townAt: (k: string, id: string) => { x: number; y: number } | null }).__townAt("statue", id), st.id);
     expect(at, "the statue is drawn").not.toBeNull();
     await page.mouse.click(cv.x + at!.x, cv.y + at!.y);
     // You walk to the square right in front of it; the camera glides in close on it; the quote renders in.
