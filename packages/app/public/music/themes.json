@@ -110,6 +110,72 @@
         "breath": 16.435,
         "drop": 17.435
       }
+    },
+    "sawyer": {
+      "boss": "Sawyer",
+      "source": "scripts/reel/music/song_p.py",
+      "intro": "sawyer-intro",
+      "loop": "sawyer-loop",
+      "introSeconds": 10.909083,
+      "loopSeconds": 109.090917,
+      "bpm": 176.0,
+      "lufs": -16.6,
+      "peakDb": -1.2
+    },
+    "timber": {
+      "boss": "Timber",
+      "source": "scripts/reel/music/song_q.py",
+      "intro": "timber-intro",
+      "loop": "timber-loop",
+      "introSeconds": 10.909083,
+      "loopSeconds": 109.090917,
+      "bpm": 176.0,
+      "lufs": -16.6,
+      "peakDb": -1.1
+    },
+    "moo": {
+      "boss": "Moo & Moon",
+      "source": "scripts/reel/music/song_r.py",
+      "intro": "moo-intro",
+      "loop": "moo-loop",
+      "introSeconds": 7.058833,
+      "loopSeconds": 112.941167,
+      "bpm": 136.0,
+      "lufs": -16.7,
+      "peakDb": -1.1
+    },
+    "clown": {
+      "boss": "Boingo the Clown",
+      "source": "scripts/reel/music/song_s.py",
+      "intro": null,
+      "loop": "clown-loop",
+      "introSeconds": 0.0,
+      "loopSeconds": 120.0,
+      "bpm": null,
+      "lufs": -16.8,
+      "peakDb": -1.1
+    },
+    "gingerbread": {
+      "boss": "Ginger",
+      "source": "scripts/reel/music/song_t.py",
+      "intro": null,
+      "loop": "gingerbread-loop",
+      "introSeconds": 0.0,
+      "loopSeconds": 131.11,
+      "bpm": null,
+      "lufs": -16.9,
+      "peakDb": -1.0
+    },
+    "alfil": {
+      "boss": "Alfil",
+      "source": "scripts/reel/music/song_u.py",
+      "intro": null,
+      "loop": "alfil-loop",
+      "introSeconds": 0.0,
+      "loopSeconds": 131.06,
+      "bpm": null,
+      "lufs": -16.9,
+      "peakDb": -1.0
     }
   }
 }
