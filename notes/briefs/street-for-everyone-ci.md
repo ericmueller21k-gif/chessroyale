@@ -7,6 +7,8 @@ full shard, each on its first try and often its retry:
 - `e2e/boss-challenge.spec.ts:155` (Alfil: `alfilAt` null, "drawn", card never opens in 20 s), run 43470292666 shard 4;
 - `e2e/town-leave.spec.ts:202` (Sawyer's card), flaky in run 43466523939;
 - `e2e/shop.spec.ts:251` and `:521` (Puddles, Hollow: "comes into view"; the director gave the glide wait 15 s, which passed once).
+- run 43470292666 shard 14 too: `e2e/town.spec.ts:510` (Folio's house), `:1362` (rides), `:1590` (Folio's door: "drawn" null for 30 s),
+  `:1239` [desktop] (a test player "is drawn" null). Read the whole run's failures first (`result` job), not just these.
 Find the cause, don't just lengthen waits: e.g. `glideTo` re-fired on every retry keeps the camera moving; `__townAt` returns null while
 a figure is covered by a house from the chase camera; the park's zoom step changes the frame mid-tap; the camera never "rests" on slow
 frames. Fix the shared approach once (one helper in `e2e/helpers.ts` if several specs need it), so taps on a figure or home are reliable
