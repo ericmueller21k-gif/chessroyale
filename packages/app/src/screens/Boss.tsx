@@ -161,7 +161,8 @@ export function BossBar({ boss, match, move }: { boss: BossView; match?: GameVie
  * His level under his name: "LVL 50", Eric's RPG number (the battle's own, from his rating: NetBoss.level). It follows the
  * strength he plays his next move at: up (the Full Moon, the showdown's reply) it's gold with a small arrow, down (the King's
  * strike) it's red with a quick slash, for as long as that lasts; screen readers hear "Level 99". "LVL ???" (Level unknown)
- * for the Hidden Boss; nothing from a server that sends none.
+ * for the Hidden Boss; nothing from a server that sends none. His child form's level (Nov 13) climbs a step at a time from his
+ * first and stays up: each step pops as it comes.
  */
 export function BossLevel({ boss }: { boss: BossView }) {
   const lv = boss.level;
@@ -170,10 +171,12 @@ export function BossLevel({ boss }: { boss: BossView }) {
   const dir = lv === null || base === null || lv === base ? "" : lv > base ? "up" : "down";
   // (The match's screens are drawn anew at every phase, and the bar with them: a badge drawn again carries on its pop from
   // when the lift began, so the pop plays once, not at every phase (Nov 12).)
-  const since = levelSince(`${boss.name}:${boss.startMove}`, dir);
+  // (The Hidden Boss's child climbs a step at a time, staying up: each new level pops once too, as a new lift.)
+  const mark = dir === "up" ? `up:${lv}` : dir;
+  const since = levelSince(`${boss.name}:${boss.startMove}`, mark);
   return (
-    // (Its own element for each direction: a lift or a slash plays as it begins, then stays as a color.)
-    <span key={dir} class={`boss-level${dir ? ` lv-${dir}` : ""}`} data-level={lv ?? "unknown"} style={dir ? { animationDelay: `${since - Date.now()}ms` } : undefined}>
+    // (Its own element for each direction, and each new level up: a lift or a slash plays as it begins, then stays as a color.)
+    <span key={mark} class={`boss-level${dir ? ` lv-${dir}` : ""}`} data-level={lv ?? "unknown"} style={dir ? { animationDelay: `${since - Date.now()}ms` } : undefined}>
       <span class="lv-text" aria-hidden="true">
         LVL {lv ?? "???"}
       </span>

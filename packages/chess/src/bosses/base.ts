@@ -71,8 +71,9 @@ export function powerRoll(seed: number, ...parts: readonly (string | number)[]):
   return mulberry32(h)();
 }
 
-/** The boss's powers, if it has any (its template's passive and ultimate). */
-export function bossPowers(boss: Pick<BossState, "id"> | null | undefined): { passive: PowerId; ultimate: PowerId } | null {
+/** The boss's powers, if it has any (its template's passive and ultimate); none in a form without them (the Hidden Boss's child). */
+export function bossPowers(boss: (Pick<BossState, "id"> & { form?: BossState["form"] }) | null | undefined): { passive: PowerId; ultimate: PowerId } | null {
+  if (boss?.form === "child") return null;
   return bossDef(boss?.id)?.powers ?? null;
 }
 

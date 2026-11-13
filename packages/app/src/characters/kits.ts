@@ -41,7 +41,8 @@ import { DASH_CHANCE, DASH_LINES } from "./dash-lines.ts";
 import { lineSounds } from "../speech.tsx";
 import type { Stance } from "./stance.ts";
 import { mooPowered } from "./moo-state.ts";
-import { RECLUSE_LINES } from "./recluse-lines.ts";
+import { RECLUSE_CHILD_LINES, RECLUSE_LINES } from "./recluse-lines.ts";
+import { RECLUSE_GROWING, RECLUSE_GROWING_BUST } from "./recluse-ages.ts";
 import type { BossView } from "../game.ts";
 import { mapFrames, type Character } from "./sprite.ts";
 import { ankusItem, balloonItem, bonkItem, chipItem, clawItem, darkItem, flourItem, inkItem, carrotItem, frostItem, lashItem, lassoItem, moonItem, paintItem, pieItem, popItem, sawItem, waterItem, type SquareItem } from "./power-art.ts";
@@ -1075,6 +1076,41 @@ export const BOSS_KITS: Record<string, BossKit> = {
     engine: true,
   },
 };
+
+/**
+ * The Hidden Boss in his child form (BossView.form "child", RECLUSE_CHILD; Nov 13): his growing figure (the child, 13, 20, then his
+ * adult look: recluse-ages.ts), the same size and place as his adult kit's in a phone's bar and beside the board, and the kid's lines.
+ * His figure follows his age by a figure run (components/RecluseChild.ts); every moment rests in it. Not in BOSS_KITS: a form of the
+ * Hidden Boss's, by `bossKitOf`.
+ */
+const ADULT = BOSS_KITS["Hidden Boss"]!;
+export const RECLUSE_CHILD_KIT: BossKit = {
+  barScale: ADULT.barScale,
+  barShift: ADULT.barShift,
+  ch: RECLUSE_GROWING,
+  bar: RECLUSE_GROWING_BUST,
+  anims: {},
+  // (His adult look's idle keeps its sounds; each step up has a shimmer and a flash.)
+  sounds: { ...ADULT.sounds, shimmer: "recluseGlow", flash: "recluseSpark" },
+  lines: {
+    entrance: RECLUSE_CHILD_LINES.intro,
+    capture: RECLUSE_CHILD_LINES.capture,
+    hurt: RECLUSE_CHILD_LINES.hurt,
+    check: RECLUSE_CHILD_LINES.check,
+    rattled: RECLUSE_CHILD_LINES.rattled,
+    smug: RECLUSE_CHILD_LINES.smug,
+    victory: RECLUSE_CHILD_LINES.victory,
+    defeat: RECLUSE_CHILD_LINES.beaten,
+  },
+  chance: { entrance: 1, capture: 0.35, hurt: 0.4, check: 0.5, rattled: 0.3, smug: 0.2, victory: 1, defeat: 1 },
+  // (His face as the child: the man's window, moved down to the child's head, 45 px lower in the same drawing space.)
+  portrait: { ...ADULT.portrait, y: ADULT.portrait.y + 45, anim: "idle", frame: 0 },
+  wide: true,
+};
+
+/** A boss's kit for the form it's in: the Hidden Boss's child (RECLUSE_CHILD_KIT), else its own (bossKit). */
+export const bossKitOf = (boss: { name: string; form?: string } | null | undefined): BossKit | null =>
+  boss?.form === "child" && bossKit(boss.name) === ADULT ? RECLUSE_CHILD_KIT : bossKit(boss?.name);
 
 // Folio's voice (Eric, Oct 27): each of its lines heard as it starts, its chirp (speech.tsx, `lineSounds`).
 for (const lines of Object.values(FOLIO_LINES)) for (const line of lines ?? []) lineSounds.set(line, "folioVoice");

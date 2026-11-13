@@ -75,7 +75,7 @@ import { freestyleStart } from "./chess960.ts";
 import { pickOpenings, type Opening } from "./openings.ts";
 import { START_FEN, applyMove, baseAt, gameEnd, legalMoves, materialSlips, moveNumber, sideToMove, toSan } from "./rules.ts";
 import type { MoveScore } from "./uci.ts";
-import { BOSS_BRAIN, BOSS_LEVEL, ENGINE_MAX_ELO, bossBrainFor, bossLevelBase, bossLevelNow, bossRatingShown, type BossBrain, type BossBrainPlan } from "@chessroyale/core";
+import { BOSS_BRAIN, BOSS_LEVEL, ENGINE_MAX_ELO, RECLUSE_CHILD, bossBrainFor, bossLevelBase, bossLevelNow, bossRatingShown, childRating, childStep, levelForMaia, type BossBrain, type BossBrainPlan, type BossForm } from "@chessroyale/core";
 import { humanBrainMove, within, type BrainNote, type HumanEngineLike } from "./boss-brain.ts";
 import {
   allowedSearch,
@@ -379,6 +379,7 @@ export class MatchRunner {
       players: this.state.players.map((p) => ({ ...p, colour: null, powerUps: 0 })),
       boss: {
         id: def.id,
+        ...this.firstForm(def.id),
         powers: { ...initPowers(seed, fen, crowdSide), ...(claimed ? { claimed: true } : {}), ...(setUp ?? {}) },
         tier: this.settings.bossFixedElo || raidBossElo([]),
         elo: bossStrength(this.settings.bossFixedElo || raidBossElo([]), def, this.settings.bossDifficulty),
@@ -1338,7 +1339,10 @@ export class MatchRunner {
     const mate = this.settings.bossMateTest ? (this.bossAllowed() ?? legalMoves(fen)).find((m) => gameEnd(applyMove(fen, m), []) === "checkmate") : undefined;
     // (Test switch ?paint=1: Smudgy's hidden rook steps like a pawn, whose name the e2e reads.)
     const paint = this.settings.bossPaintTest ? smudgyBattle.paintStep(this.battle, this.bossAllowed() ?? legalMoves(fen)) : undefined;
-    const brain = this.humanBrain;
+    // (The Hidden Boss's child: Maia at his rating now, and Stockfish at the strength that rating stands for while Maia isn't there.)
+    const child = this.childRatingNow();
+    const brain = this.humanBrain && child !== null ? { ...this.humanBrain, rating: child } : this.humanBrain;
+    const elo = child !== null ? levelForMaia(child) : this.state.boss!.elo;
     // (Alfil's Slam's pieces land as the crowd's turn after this move begins: his move is judged with them down.)
     const look = this.bossAhead();
     this.landingCheck = null;
@@ -1350,7 +1354,7 @@ export class MatchRunner {
     const ordinary = async () =>
       mate ??
       paint ??
-      (await bossMoveFrom(engine, fen, this.state.boss!.elo, this.settings.bossNodes, kind, this.opts.rng, this.settings.kingStrikeLoss, bossGuardFrom(this.settings), this.bossAllowed(), brain ? { ...brain, onNote: (n) => (this.brainNote = n) } : undefined, ahead, race));
+      (await bossMoveFrom(engine, fen, elo, this.settings.bossNodes, kind, this.opts.rng, this.settings.kingStrikeLoss, bossGuardFrom(this.settings), this.bossAllowed(), brain ? { ...brain, onNote: (n) => (this.brainNote = n) } : undefined, ahead, race));
     const asks = this.bossAsks();
     if (asks) {
       // (His long pull, drag or showdown on every engine of this device; his ordinary move on `engine`, as ever.)
@@ -1853,6 +1857,12 @@ export class MatchRunner {
     const winner = this.gameWinner();
     // (Hollow's last bulb out, Boss alone: his, whatever the board says.)
     const result = this.bossForceWin ? "crowd" : timeout || this.bossCarrotWin || blackedOut(b) ? "boss" : winner === null ? "draw" : winner === b.crowdSide ? "crowd" : "boss";
+    // (The Hidden Boss's child beaten: the fight goes on, a new match against his adult form (nextBossForm). Nobody is placed.)
+    if (b.form === "child" && result === "crowd") {
+      this.state = { ...this.state, boss: { ...b, result } };
+      this.bossForceWin = false;
+      return result;
+    }
     this.state = finishBoss(this.state, this.opts.rng, result, this.settings);
     this.bossTimedOut = timeout;
     return result;
@@ -1864,6 +1874,56 @@ export class MatchRunner {
    * press in his room's fight from the town sets it (LobbyCore.winFormTrigger, which keeps it in the lobby's record).
    */
   bossForceWin = false;
+
+  /**
+   * The form a boss battle against `id` starts in: the Hidden Boss's child (RECLUSE_CHILD), where the settings ask for it
+   * (`recluseChild`: solo; online once the server's form list is in), else his usual form (nothing set).
+   */
+  private firstForm(id: string): { form?: BossForm } {
+    return id === "recluse" && this.settings.recluseChild ? { form: "child" } : {};
+  }
+
+  /** Moves played on the board in this form (both sides'): the child's ramp counts them (RECLUSE_CHILD.everyPlies). */
+  private formPlies(b: BossState): number {
+    return Math.max(0, this.boards.get(this.state.boards[0]!)!.history.length - (b.startPly ?? 0));
+  }
+
+  /** The step of the child's ramp now (core childStep), or 0 in any other form. */
+  childStepNow(b: BossState | null | undefined = this.state.boss): number {
+    return b?.form === "child" ? childStep(this.formPlies(b)) : 0;
+  }
+
+  /** The Hidden Boss's child: the Maia rating he plays his next move at (core childRating); null in any other form. */
+  childRatingNow(b: BossState | null | undefined = this.state.boss): number | null {
+    return b?.form === "child" ? childRating(this.formPlies(b)) : null;
+  }
+
+  /**
+   * The Hidden Boss's child beaten (finishBossBattle left him "crowd" and placed nobody): a new match against his adult form
+   * (Eric, Nov 12: "after beating the child, a new match starts (reset)"), from the starting position (a mate in one again under
+   * the ?win=1 test switch), the same sides and the same seed; his powers from scratch (his bullet meter from empty), fresh
+   * clocks, the crowd's move count, strikes and the God King's record of this match cleared (his charges carry on: the crowd's
+   * for the whole fight; and he's back if he fell in a Last Stand). False when there's no next form.
+   */
+  nextBossForm(): boolean {
+    const b = this.state.boss;
+    if (!b || b.form !== "child" || b.result !== "crowd") return false;
+    const id = this.state.boards[0]!;
+    const old = this.boards.get(id)!;
+    const generation = old.generation + 1;
+    const win = !!this.settings.bossWinTest;
+    this.boards.set(id, win ? newBoard(id, { ...BOSS_OPENING, moves: [...WIN_TEST_MOVES] }, WIN_TEST_MOVES.length, generation) : { ...newBoard(id, BOSS_OPENING, 0, generation), opening: BOSS_OPENING });
+    const fen = this.boards.get(id)!.fen;
+    const { form: _form, result: _result, lastStand: _stand, barred: _barred, staggerNext: _stagger, ...rest } = b;
+    const next: BossState = { ...rest, startPly: this.boards.get(id)!.history.length, crowdMoves: 0, sinceKill: 0, kills: [], kingMoves: [], kingStrikes: [], powers: initPowers(b.powers?.seed ?? 0, fen, b.crowdSide) };
+    this.state = { ...startBanks(this.state, this.settings), boss: next };
+    this.bossLast = null;
+    this.bossForceWin = false;
+    this.bossTimedOut = false;
+    this.brainNote = null;
+    this.preparePowers();
+    return true;
+  }
 
   /**
    * The boss battle was lost on time (the bullet clock ran out): for the result screen. Kept on the runner, not in the
@@ -1901,10 +1961,13 @@ export class MatchRunner {
     const def = chooseBoss(0, b.id, null, undefined, true, true);
     const info = { name: def.name, icon: def.icon, threat: bossThreat(b.elo) };
     // (His bar's level: the battle's own, and what his strength now makes of it; "???" for the Hidden Boss.)
-    const rating = bossRatingShown(b.elo, this.settings);
-    const levelBase = def.levelUnknown ? null : bossLevelBase(rating, b.powers?.seed ?? 0);
+    // (The Hidden Boss's child: his level from his Maia rating, rising a step at a time from his first: RECLUSE_CHILD.)
+    const child = b.form === "child" ? this.childRatingNow(b) : null;
+    const rating = child !== null ? RECLUSE_CHILD.startRating : bossRatingShown(b.elo, this.settings);
+    const levelBase = def.levelUnknown && child === null ? null : bossLevelBase(rating, b.powers?.seed ?? 0);
     const strength = this.bossStrengthNow(b);
-    const levelNow = levelBase === null ? null : bossLevelNow(levelBase, rating, strength === "full" ? ENGINE_MAX_ELO : strength === "weak" ? rating - BOSS_LEVEL.weakDrop : rating);
+    const nowRating = child ?? rating;
+    const levelNow = levelBase === null ? null : bossLevelNow(levelBase, rating, strength === "full" ? ENGINE_MAX_ELO : strength === "weak" ? nowRating - BOSS_LEVEL.weakDrop : nowRating);
     const fen = this.boards.get(this.state.boards[0]!)!.fen;
     const powers = bossPowers(b);
     const p = b.powers;
@@ -1935,6 +1998,7 @@ export class MatchRunner {
       barred: b.barred ?? null,
       ...(b.result ? { result: b.result } : {}),
       id: def.id,
+      ...(b.form ? { form: b.form, formStep: this.childStepNow(b) } : {}),
       ...(powers && p
         ? {
             powers: {
@@ -2012,6 +2076,7 @@ export class MatchRunner {
       players: this.state.players.map((p) => (p.alive ? { ...p, colour: null, finalLosses: [], powerUps: 0 } : p)),
       boss: {
         id: def.id,
+        ...this.firstForm(def.id),
         powers: { ...initPowers(seed, this.boards.get(id)!.fen, "w"), ...(setUp ?? {}) },
         tier,
         elo,

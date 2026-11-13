@@ -98,7 +98,8 @@ for (const [name, kit] of Object.entries(BOSS_KITS)) {
     const project = test.info().project.name as keyof typeof SIZES;
     await asAdmin(page);
     await page.addInitScript(() => localStorage.setItem("brc.evalBar", "0"));
-    await page.goto(`/?debug&pace=quick&clock=60&laststand=0&brain=stockfish&boss=${id}`);
+    // (The Hidden Boss opens as the child since Nov 13: `form=adult` meets the man these kits measure.)
+    await page.goto(`/?debug&pace=quick&clock=60&laststand=0&brain=stockfish&boss=${id}${id === "recluse" ? "&form=adult" : ""}`);
     await bossAloneFromHome(page);
     await expect.poll(() => page.evaluate(() => (window as any).match?.phase.kind ?? "none"), { timeout: 60_000 }).toBe("play");
     // (A phone's bar may draw its own figure: the Hidden Boss's bust.)
