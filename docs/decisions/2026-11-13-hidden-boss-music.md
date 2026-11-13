@@ -1,6 +1,6 @@
 # The Hidden Boss's music (Nov 13)
 
-The director's brief: his four themes switched mid-fight (`MUSIC_SWITCH`, `RECLUSE_MUSIC`). Calls:
+Brief: his four themes switched mid-fight (`MUSIC_SWITCH`, `RECLUSE_MUSIC`). Calls:
 - The split is the board's crack (`PHASE_CHANGE.crackAt`); the transformation starts `introSeconds` before.
 - His beaten theme starts at the mate.
 - 19.293 s started the transformation before the absorption; I asked the music session for 8.740 s (from his rage, the book's
