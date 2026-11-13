@@ -284,7 +284,8 @@ build): online, phase 1 won is the crowd's victory):
     cone behind him, and `.rc-glow` on the pages; only opacity and transform move) and **Eric's two lines** (Nov 13,
     `RECLUSE_LINES.chantSay`; [decision](../decisions/2026-11-13-hidden-boss-chant-lines.md)), each its own box in his bubble,
     typed sentence by sentence at the cutscene mockup's pace (`RECLUSE_PHASE2.change.chantLines`: 45 ms a character, 1 s between
-    sentences, readable 1.7 s plus 40 ms a character; `paced-line.ts`, the voice's `sayPaced`), the first 1.5 s after the book
+    sentences, readable 1.7 s plus 40 ms a character; `paced-line.ts`, the voice's `sayPaced`; a phone's bar bubble, two rows,
+    shows a sentence at a time, each its own page, `pacedPage`), the first 1.5 s after the book
     lands (his absorb line gone by then, `absorbReadMs`), the last typed out `crackAfterLineMs` (1 s) before the crack, as the
     transformation theme falls silent before its drop; so `castMs` (about 14.4 s) follows the lines, and the rise to the crack is
     17.435 s (`.rise-to-crack`); Sawyer's board-saw gap runs down and across the middle, the quarters part and each grows

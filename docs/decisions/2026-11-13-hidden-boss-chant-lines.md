@@ -1,5 +1,5 @@
 # Hidden Boss: two lines in his chant (Nov 13)
 
-Eric's two lines, typed at the cutscene's pace (settings `chantLines`). Calls: the cast follows the lines (no fixed `castHoldMs`);
-the first 1.5 s after the book lands; his absorb line now ends before it (`absorbReadMs`, at least 4 s readable), else the rise
-to the crack was 18.9 s. Now 17.435 s.
+Eric's lines, typed at the cutscene's pace (`chantLines`). Calls: the cast follows the lines; the first comes 1.5 s after the book;
+his absorb line ends before it (`absorbReadMs`; else 18.9 s rise-to-crack, now 17.435). A phone's two-row bar shows one sentence
+at a time.
