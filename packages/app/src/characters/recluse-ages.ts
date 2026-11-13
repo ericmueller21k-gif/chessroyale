@@ -1157,7 +1157,7 @@ export const SIDE_LEANS: readonly { thigh: number; back: number; head: number }[
   { thigh: 26, back: 78, head: 27 },
 ];
 /** A dip toward us (his near shoulder lower, for the board's near files): drawing pixels down, each level. */
-const SIDE_DIP = [0, 4, 8] as const;
+const SIDE_DIP = [0, 5, 10, 15] as const;
 export interface SidePose {
   /** Back on his heels, up on his knees (leaning), standing or walking, or crouched half way between. */
   stance: "heels" | "knees" | "stand" | "crouch";
@@ -1165,7 +1165,7 @@ export interface SidePose {
   step: -1 | 0 | 1 | 2 | 3;
   /** On his knees: how far in (SIDE_LEANS; 0 is back on his heels). */
   lean: 0 | 1 | 2 | 3 | 4 | 5;
-  dip: 0 | 1 | 2;
+  dip: 0 | 1 | 2 | 3;
   /** His near arm out over the board (the scene draws it); otherwise his hand rests on his thigh. */
   reach: boolean;
   eyes: "down" | "ahead" | "shut";
@@ -1205,7 +1205,7 @@ function sideBody(p: SidePose): { hip: Pt; knee: [Pt, Pt]; ankle: [Pt, Pt]; sh: 
   // (His neck bends up out of a deep lean, so he looks at the board, not into it.)
   const nb = deg(L.back * 0.55 + 4);
   const neck: Pt = [sh[0] + NECK * Math.sin(nb), sh[1] - NECK * Math.cos(nb)];
-  return { hip, knee: [knee, [knee[0] - 1, knee[1] - 1]], ankle: [[40, 126], [39, 125]], sh, neck, head: L.head + dip * 1.5, up: 0 };
+  return { hip, knee: [knee, [knee[0] - 1, knee[1] - 1]], ankle: [[40, 126], [39, 125]], sh, neck, head: L.head + dip * 1.2, up: 0 };
 }
 /** His near shoulder in the frame's pixels (facing our right): the scene's arm starts there. */
 export function sideShoulder(p: SidePose): Pt {
@@ -1388,7 +1388,7 @@ export const SIDE_POSES: readonly SidePose[] = [
   { stance: "crouch", step: -1, lean: 0, dip: 0, reach: false, eyes: "down", mouth: "stern" },
   ...SIDE_FACES.map(([eyes, mouth]): SidePose => ({ stance: "heels", step: -1, lean: 0, dip: 0, reach: false, eyes, mouth })),
   ...([1, 2, 3, 4, 5] as const).flatMap((lean) =>
-    ([0, 1, 2] as const).flatMap((dip) => ([false, true] as const).map((reach): SidePose => ({ stance: "knees", step: -1, lean, dip, reach, eyes: "down", mouth: "stern" }))),
+    ([0, 1, 2, 3] as const).flatMap((dip) => ([false, true] as const).map((reach): SidePose => ({ stance: "knees", step: -1, lean, dip, reach, eyes: "down", mouth: "stern" }))),
   ),
 ];
 /** The child side on: every pose the scene draws him in (one frame each, cue `pose`), and an idle (thinking on his heels, a blink). */

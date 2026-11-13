@@ -2,7 +2,7 @@
 // room plays it from its stored squares without any rules, and they agree; his loop and the summoning's beats run in order.
 import { describe, expect, it } from "vitest";
 import { Chess } from "chess.js";
-import { KID_SPOTS, LOOP_MS, PLY_AT, RECLUSE_GAME, RECLUSE_GAME_SAN, RECLUSE_GAME_UCI, kidAt, startBoard, stepsOf, walkPath } from "../src/town/shops/recluse-game.ts";
+import { KID_SPOTS, LOOP_MS, PLY_AT, RECLUSE_GAME, RECLUSE_GAME_SAN, RECLUSE_GAME_UCI, kidAt, sideOf, startBoard, stepsOf, walkPath } from "../src/town/shops/recluse-game.ts";
 import { HIDDEN_ROOM_FEEL } from "../src/town/feel.ts";
 
 /** A chess.js board as the room's 64 squares (a1 = 0). */
@@ -68,33 +68,60 @@ describe("the child's game (his 1956 game, stored)", () => {
   });
 });
 
-describe("how he plays (Eric, Nov 13)", () => {
-  it("plays Black from his seat, and for each White move gets up, walks round, kneels, plays, walks back and sits", () => {
-    for (let i = 0; i < 82; i++) {
-      const steps = stepsOf(i).map(([s]) => s);
-      if (i % 2) expect(steps, `ply ${i}`).toEqual(["think", "reach", "carry", "back", "look"]);
-      else expect(steps, `ply ${i}`).toEqual(["rise", "walk", "turn", "kneel", "think", "reach", "carry", "back", "stand", "walkBack", "turnBack", "sit", "look"]);
-    }
+describe("how he plays (Eric, Nov 13; round 3: the board sideways, he plays from beside it)", () => {
+  it("for every half-move gets up, walks round to that side, sits, thinks, leans in and plays, and looks up", () => {
+    for (let i = 0; i < 82; i++) expect(stepsOf(i).map(([s]) => s), `ply ${i}`).toEqual(["rise", "walk", "sit", "think", "reach", "carry", "back", "look"]);
   });
 
-  it("kneels beside the board, never in front of it (his back would hide it), and goes round the side nearer the piece", () => {
+  it("sits centered on White's side (our left) for White's moves and Black's (our right) for Black's, and walks round behind the board, never between us and it", () => {
     const half = HIDDEN_ROOM_FEEL.kid.board / 2;
-    for (let i = 0; i < 82; i += 2) {
+    for (let i = 0; i < 82; i++) {
       const path = walkPath(i);
-      expect(path[0]).toEqual(KID_SPOTS.seat);
-      const [x, y] = path[path.length - 1]!;
-      // (His drawing is about 0.3 of a square either side of his middle.)
-      expect(Math.abs(x) - 0.3, `ply ${i}`).toBeGreaterThanOrEqual(half - 0.001);
-      expect(y).toBeLessThanOrEqual(half + 0.35);
-      // (Every point on the way round outside the board.)
-      for (const [px, py] of path) expect(Math.abs(px) > half || Math.abs(py) > half, `ply ${i}`).toBe(true);
-      const p = RECLUSE_GAME.plies[i]!;
-      expect(Math.sign(x)).toBe((p.from % 8) + (p.to % 8) < 7 ? -1 : 1);
+      const s = i % 2 ? 1 : -1;
+      expect(sideOf(i)).toBe(s);
+      expect(path[0]).toEqual([-s * KID_SPOTS.seat, 0]);
+      expect(path[path.length - 1]).toEqual([s * KID_SPOTS.seat, 0]);
+      // (Beside the board, just off its edge: his drawing's knees reach it.)
+      expect(KID_SPOTS.seat).toBeGreaterThan(half);
+      expect(KID_SPOTS.seat).toBeLessThan(half + 0.3);
+      for (let k = 1; k < path.length; k++) {
+        const [x0, y0] = path[k - 1]!;
+        const [x1, y1] = path[k]!;
+        for (let u = 0; u <= 1; u += 0.05) {
+          const x = x0 + (x1 - x0) * u;
+          const y = y0 + (y1 - y0) * u;
+          // (Off the board, and anywhere in line with it, behind it; never nearer us than the board's middle.)
+          expect(Math.abs(x) > half || y < -half, `ply ${i}`).toBe(true);
+          expect(y).toBeLessThanOrEqual(0);
+          if (Math.abs(x) < half + 0.15) expect(y, `ply ${i}`).toBeLessThan(-half);
+        }
+      }
     }
   });
 
-  it("takes a while: the whole game is many minutes (Eric: 'that's the point')", () => {
-    expect(LOOP_MS).toBeGreaterThan(10 * 60_000);
+  it("leans in so his reach is short: every move's squares within his arm (never more than half again its length), and every square on the board within reach from either side", async () => {
+    const { leanFor, reachOf, scootFor, SCOOT_MAX } = await import("../src/town/shops/recluse-scene.ts");
+    let worst = 0;
+    RECLUSE_GAME.plies.forEach((p, i) => {
+      const pose = leanFor(i);
+      const r = Math.max(reachOf(pose, sideOf(i), p.from, scootFor(i)), reachOf(pose, sideOf(i), p.to, scootFor(i)));
+      expect(r, `ply ${i + 1}: ${RECLUSE_GAME_SAN[i]}`).toBeLessThan(1.5);
+      worst = Math.max(worst, r);
+    });
+    // (Nov 13: the worst of his 82 moves about 1.07 of his arm: an arm straight, not stretched.)
+    expect(worst).toBeLessThan(1.15);
+    for (const side of [-1, 1] as const)
+      for (let sq = 0; sq < 64; sq++) {
+        const scoot = Math.max(-SCOOT_MAX, Math.min(SCOOT_MAX, ((sq % 8) - 3.5) * (HIDDEN_ROOM_FEEL.kid.board / 8) * 0.9));
+        let best = Infinity;
+        for (const lean of [1, 2, 3, 4, 5] as const) for (const dip of [0, 1, 2, 3] as const) best = Math.min(best, reachOf({ stance: "knees", step: -1, lean, dip, reach: true, eyes: "down", mouth: "stern" }, side, sq, scoot));
+        expect(best, `side ${side} square ${sq}`).toBeLessThan(1.5);
+      }
+  });
+
+  it("takes a while: the whole game about 14 minutes (Eric: 'that's the point')", () => {
+    expect(LOOP_MS).toBeGreaterThan(12 * 60_000);
+    expect(LOOP_MS).toBeLessThan(16 * 60_000);
   });
 
   it("the room is about half round 1's floor (12 x 12), and its side walls are one surface each unless the cards are asked for", async () => {

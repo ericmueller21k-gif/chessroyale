@@ -870,11 +870,11 @@ export const SHOP_FEEL = {
 export const HIDDEN_ROOM_FEEL = {
   /**
    * His game's pace (ms; Nov 13, Eric: "it would take him realistically like a while to play out the game. Cause that's the point").
-   * His own moves (Black), sitting: think (each move its own, `think` times 0.6 to 1.6), reach, carry, back, look up. White's: he gets
-   * up (`rise`), walks round to White's side (`walk` squares a second), turns, kneels, thinks, plays, gets up, walks back, turns, sits.
-   * About 22 s a pair of moves: the whole game about 15 minutes.
+   * Round 3 (Nov 13): every half-move he gets up (`rise`), walks round behind the board to that side (`walk` squares a second), sits
+   * back on his heels (`sit`), thinks (each move its own, `think` times 0.6 to 1.6), leans in and reaches, carries, comes back, and
+   * looks up. About 10.5 s a half-move: the whole game about 14 minutes.
    */
-  play: { first: 1400, think: 2600, reach: 520, carry: 700, back: 480, look: 900, rise: 760, walk: 0.8, turn: 260, kneel: 520, stand: 520, sit: 760, end: 3200, fade: 1100 },
+  play: { first: 1400, think: 2000, reach: 900, carry: 700, back: 800, look: 600, rise: 640, walk: 1.0, sit: 640, end: 3200, fade: 1100 },
   /** His drawing's size in the room, the board's size (squares; small, still real chess), a carried piece's lift, a walk step (ms). */
   kid: { scale: 0.8, board: 1.15, lift: 0.7, stepMs: 240 },
   summon: {

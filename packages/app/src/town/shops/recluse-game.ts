@@ -79,11 +79,11 @@ export const RECLUSE_GAME: { plies: readonly Ply[]; boards: readonly Board[] } =
 })();
 
 /**
- * The steps of one half-move, in order. His own (Black's), sitting behind his side: think, reach, carry, back, look. White's: he gets
- * up (`rise`), walks round the board (`walk`), turns to face it (`turn`), kneels, thinks, plays (reach, carry, back), gets up (`stand`),
- * walks back (`walkBack`), turns to face us (`turnBack`), sits, and looks up.
+ * The steps of one half-move, in order (round 3, Nov 13: the board turned sideways, White's side on our left, Black's on our right).
+ * Each half-move he gets up from the side he just played (`rise`), walks round behind the board to the side whose move it is
+ * (`walk`), sits back on his heels centered on that side (`sit`), thinks, leans in and plays (reach, carry, back), and looks up.
  */
-export type Step = "rise" | "walk" | "turn" | "kneel" | "think" | "reach" | "carry" | "back" | "stand" | "walkBack" | "turnBack" | "sit" | "look";
+export type Step = "rise" | "walk" | "sit" | "think" | "reach" | "carry" | "back" | "look";
 /** Where the child is in his loop. */
 export interface KidNow {
   /** The half-move being played (or just played, while he looks); -1 before the first; 82 once the game's over. */
@@ -98,41 +98,29 @@ export interface KidNow {
 }
 
 const F = HIDDEN_ROOM_FEEL.play;
-const HALF = HIDDEN_ROOM_FEEL.kid.board / 2;
+const K = HIDDEN_ROOM_FEEL.kid;
+const HALF = K.board / 2;
 /**
- * His places round the board, in squares from its middle (+y toward us, White's side): his seat behind Black's side; for White's
- * moves, down the side of the board nearer the piece (our left for the a to d files, our right for e to h) to kneel at that near
- * corner, just outside the board so his back never hides it; for a move deep in Black's half, partway up that side, beside it.
+ * His places round the board, in squares from its middle (+y toward us): `seat`, how far out from the middle he sits on each side
+ * (his knees 8 of his drawing's pixels from his foot, just short of the board's edge: recluse-ages.ts `sideBody`); `lane`, how far out
+ * he walks past the board's sides; `behind`, the row he walks along behind it (never between us and the board).
  */
-export const KID_SPOTS = { seat: [0, -(HALF + 0.22)], side: HALF + 0.45, kneel: [HALF + 0.34, HALF + 0.3] } as const;
-/** Which side he goes round for White's half-move `i`: -1 our left, 1 our right. */
-export function sideOf(i: number): -1 | 1 {
-  const p = RECLUSE_GAME.plies[i]!;
-  return (p.from % 8) + (p.to % 8) < 7 ? -1 : 1;
-}
-/** A square's row on the board, in squares from its middle (+ toward us). */
-const rowOf = (sq: number) => HALF - (Math.floor(sq / 8) + 0.5) * (HALF / 4);
-/** How far toward us he kneels for White's half-move `i`: White's near corner, or level with a deep move's farther square (a little behind it). */
-export function kneelRow(i: number): number {
-  const p = RECLUSE_GAME.plies[i]!;
-  return Math.max(-HALF * 0.2, Math.min(KID_SPOTS.kneel[1], Math.min(rowOf(p.from), rowOf(p.to)) + 0.8));
-}
-/** His way round for White's half-move `i`, from his seat to his knees, in squares from the board's middle. */
+export const KID_SPOTS = { seat: HALF + (8 * K.scale) / 37, lane: HALF + 0.4, behind: HALF + 0.38 } as const;
+/** Which side he plays half-move `i` from: -1 White's (our left), 1 Black's (our right). Before the first move he's on Black's. */
+export const sideOf = (i: number): -1 | 1 => (i % 2 ? 1 : -1);
+/** His way from the side he last played to half-move `i`'s side, round behind the board, in squares from its middle. */
 export function walkPath(i: number): readonly (readonly [number, number])[] {
-  const K = KID_SPOTS;
+  const { seat, lane, behind } = KID_SPOTS;
   const s = sideOf(i);
-  const y = kneelRow(i);
-  return [K.seat, [s * K.side, K.seat[1]], [s * K.side, y], [s * K.kneel[0], y]];
+  return [[-s * seat, 0], [-s * lane, -0.25], [-s * lane, -behind], [s * lane, -behind], [s * lane, -0.25], [s * seat, 0]];
 }
 const pathLen = (pts: readonly (readonly [number, number])[]) => pts.slice(1).reduce((n, q, i) => n + Math.hypot(q[0] - pts[i]![0], q[1] - pts[i]![1]), 0);
 /** Each half-move's own think (ms): each move different, 0.6 to 1.6 times the setting (a fixed pattern, no randomness). */
 export const thinkOf = (i: number): number => Math.round(F.think * (0.6 + ((Math.sin(i * 12.9898) * 43758.5453) % 1 + 1) % 1));
 /** The steps of half-move `i` and their lengths (ms). */
 export function stepsOf(i: number): readonly (readonly [Step, number])[] {
-  const play: [Step, number][] = [["think", thinkOf(i)], ["reach", F.reach], ["carry", F.carry], ["back", F.back]];
-  if (i % 2) return [...play, ["look", F.look]];
   const walk = Math.round((pathLen(walkPath(i)) / F.walk) * 1000);
-  return [["rise", F.rise], ["walk", walk], ["turn", F.turn], ["kneel", F.kneel], ...play, ["stand", F.stand], ["walkBack", walk], ["turnBack", F.turn], ["sit", F.sit], ["look", F.look]];
+  return [["rise", F.rise], ["walk", walk], ["sit", F.sit], ["think", thinkOf(i)], ["reach", F.reach], ["carry", F.carry], ["back", F.back], ["look", F.look]];
 }
 /** When each half-move starts in the loop (ms), and the last one's end: `PLY_AT[82]`. */
 export const PLY_AT: readonly number[] = (() => {
@@ -142,7 +130,7 @@ export const PLY_AT: readonly number[] = (() => {
 })();
 /** The whole loop: every half-move, the pause on the mate, the fade back to the start, and its hold. */
 export const LOOP_MS = PLY_AT[RECLUSE_GAME_UCI.length]! + F.end + F.fade;
-const PUT_DOWN = new Set<Step>(["back", "stand", "walkBack", "turnBack", "sit", "look"]);
+const PUT_DOWN = new Set<Step>(["back", "look"]);
 
 /** Where the child is in his loop at `t` (ms on the room's clock). */
 export function kidAt(t: number): KidNow {

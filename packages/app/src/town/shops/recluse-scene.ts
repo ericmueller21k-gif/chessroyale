@@ -1,13 +1,15 @@
 /**
  * The Hidden Boss's room's scene (Nov 12, a MOCKUP for Eric): drawn into the room (ShopRoom.tsx's `RoomFx`) by its caller.
  *
- * **The child playing himself** on the rug: his famous 1956 game (shops/recluse-game.ts), all 41 moves to the mate, on a loop. He sits
- * behind the board facing us (Black's side, his side in that game); for each move he thinks, reaches out, lifts the piece, carries it
- * over and puts it down, sits back and looks up. White's moves are on our side of the board: he leans well over to play them. The last
- * move's squares stay tinted, as a board app shows them, so each move reads. At the mate he sits back and smiles; the pieces fade out
- * and the start fades in, and it plays again. His drawing is the age-9 one (characters/recluse-ages.ts, sitting); his reaching arm is
- * drawn here (from his shoulder to the piece), the board flat on the floor through the room's own camera, its pieces the park tables'
- * (intro.ts `pieceImg`). Nothing runs an engine.
+ * **The child playing himself** on the rug: his famous 1956 game (shops/recluse-game.ts), all 41 moves to the mate, on a loop. Since
+ * round 3 (Nov 13) the board lies sideways: White's side on our left, Black's on our right, its whole face seen between them. For each
+ * half-move he gets up, walks round behind the board to that side, sits back on his heels centered on it, side on to us, thinks, then
+ * comes up on his knees and leans in over the board (as deep as the squares need: `leanFor`) to lift the piece, carry it and put it
+ * down, sits back and looks up. The last move's squares stay tinted, as a board app shows them, so each move reads. At the mate he
+ * smiles; the pieces fade out and the start fades in, and it plays again. His drawings are the age-9 ones (characters/recluse-ages.ts:
+ * side on, and from the front and behind as he walks toward or away from us); his reaching arm is drawn here, an upper arm and a forearm
+ * of fixed lengths jointed at the elbow (`drawArm`), the board flat on the floor through the room's own camera, its pieces the park
+ * tables' (intro.ts `pieceImg`). Nothing runs an engine.
  *
  * **The summoning** (Eric, Nov 12, night), with four stand-in players (plain pawns in four colors; real players later): a freeze frame
  * (a flash: the four, and the child, become still images); the board shoots rays of light outward along the floor and upward; the four
@@ -15,8 +17,8 @@
  * splash into it; the board wobbles up and down and settles; quiet. Then the transition: the room closes in on the board (an iris) to
  * black, and the match. Times in feel.ts `HIDDEN_ROOM_FEEL`. One canvas, the room's; a few hundred particles at most.
  */
-import { renderFrame } from "../../characters/sprite.ts";
-import { RECLUSE_CHILD_SIT, heelsHand, playName, playShoulder, sitKnee, sitName, sitShoulder, type PlayPose, type SitPose } from "../../characters/recluse-ages.ts";
+import { renderFrame, type Character } from "../../characters/sprite.ts";
+import { RECLUSE_CHILD_SIDE, RECLUSE_CHILD_SIT, playName, sideName, sideRest, sideShoulder, type PlayPose, type SidePose } from "../../characters/recluse-ages.ts";
 import { proj, newPt } from "../camera.ts";
 import { HIDDEN_ROOM_FEEL, TOWN_FEEL } from "../feel.ts";
 import { PAWN_PATH } from "../render.ts";
@@ -40,22 +42,86 @@ function at(d: FxDraw, c: number, r: number, lift: number, out = pt): boolean {
   return true;
 }
 
-// ---- Where the board's squares are: file 0 (a) on our left, rank 0 (White's first) nearest us.
+// ---- Where the board's squares are (round 3: sideways): rank 1 (White's) on our left, rank 8 on our right; the a-file farthest from
+// us, the h-file nearest (as White, on our left facing right, and Black, on our right facing left, each see their own board).
 
 const B = { c: SHOP_RECLUSE_SCENE.board[0], r: SHOP_RECLUSE_SCENE.board[1], size: K.board } as const;
-const B0 = B;
 const cell = B.size / 8;
 /** A board square's middle in the room's squares. */
-const sqC = (i: number) => B.c - B.size / 2 + ((i % 8) + 0.5) * cell;
-const sqR = (i: number) => B.r + B.size / 2 - (Math.floor(i / 8) + 0.5) * cell;
+const sqC = (i: number) => B.c - B.size / 2 + (Math.floor(i / 8) + 0.5) * cell;
+const sqR = (i: number) => B.r - B.size / 2 + ((i % 8) + 0.5) * cell;
+
+// ---- How far he leans in for a move (pure: the test checks every move, and every square).
+
+/** His arm at rest, shoulder to the middle of his hand (drawing pixels: the upper arm 13, the forearm 11, half the hand 2). */
+export const ARM = { upper: 13, fore: 13 } as const;
+const ARM_LEN = ARM.upper + ARM.fore;
+/**
+ * The floor's depth on screen against its width, at the board (the room's fixed camera looks down steeply: a square on the floor is
+ * drawn about 0.85 as tall as it is wide; measured in the preview).
+ */
+const FORE = 0.85;
+/**
+ * A board square's place from where he kneels on `side`, `scoot` squares toward us along that side, in his drawing's pixels as he's
+ * drawn facing the board (facing our right).
+ */
+export function squareFrom(side: -1 | 1, i: number, scoot = 0): readonly [number, number] {
+  const px = (cell * SQ) / K.scale;
+  const rank = Math.floor(i / 8);
+  // (How far in from his edge, and how far toward us; the hand holds the piece by its top, about 6 room pixels up.)
+  const d = (side < 0 ? rank + 0.5 : 7.5 - rank) * px;
+  const z = (((i % 8) - 3.5) * px - (scoot * SQ) / K.scale) * FORE;
+  const edge = ((KID_SPOTS.seat - B.size / 2) * SQ) / K.scale;
+  const [fx, fy] = RECLUSE_CHILD_SIDE.foot;
+  return [fx + edge + d, fy + z - 6 / K.scale];
+}
+/** His reach to a square in a pose, against his arm's rest length (1: his arm just straight). */
+export function reachOf(p: SidePose, side: -1 | 1, i: number, scoot = 0): number {
+  const [sx, sy] = sideShoulder(p);
+  const [tx, ty] = squareFrom(side, i, scoot);
+  return Math.hypot(tx - sx, ty - sy) / ARM_LEN;
+}
+const leanPose = (lean: SidePose["lean"], dip: SidePose["dip"], reach = true): SidePose => ({ stance: lean ? "knees" : "heels", step: -1, lean, dip, reach, eyes: "down", mouth: "stern" });
+/** How far he shuffles along his side toward a move's files as he leans in (squares, + toward us); back to the middle as he sits back. */
+export const SCOOT_MAX = 0.25;
+export function scootFor(i: number): number {
+  const p = RECLUSE_GAME.plies[i]!;
+  const mid = ((p.from % 8) + (p.to % 8)) / 2 - 3.5;
+  return Math.max(-SCOOT_MAX, Math.min(SCOOT_MAX, mid * cell * 0.9));
+}
+/**
+ * How far he leans in for half-move `i` (one pose for its whole play: lift, carry, put down): the pose with the shortest reach to
+ * both squares, counting anything under nine tenths of his arm as no reach at all and anything past its full length three times over, and a little against each step of lean and of dip
+ * (so he leans no more than the move needs), and against a square behind his shoulder (reaching back under himself).
+ */
+export function leanFor(i: number): SidePose {
+  const ply = RECLUSE_GAME.plies[i]!;
+  const side = sideOf(i);
+  const scoot = scootFor(i);
+  let best: SidePose | null = null;
+  let bestCost = Infinity;
+  for (const lean of [1, 2, 3, 4, 5] as const)
+    for (const dip of [0, 1, 2, 3] as const) {
+      const p = leanPose(lean, dip);
+      const sx = sideShoulder(p)[0];
+      const r = Math.max(reachOf(p, side, ply.from, scoot), reachOf(p, side, ply.to, scoot));
+      const back = Math.max(0, sx - 4 - Math.min(squareFrom(side, ply.from)[0], squareFrom(side, ply.to)[0]));
+      const cost = Math.max(r, 0.9) + 2 * Math.max(0, r - 1) + 0.035 * lean + 0.03 * dip + 0.012 * back;
+      if (cost < bestCost) {
+        best = p;
+        bestCost = cost;
+      }
+    }
+  return best!;
+}
+const LEANS = RECLUSE_GAME.plies.map((_, i) => leanFor(i));
 
 // ---- The child's drawings, each pose drawn once into a canvas the first time it's shown.
 
 const kidImgs = new Map<string, HTMLCanvasElement>();
-function kidImg(name: string): HTMLCanvasElement {
+function kidImg(ch: Character, name: string): HTMLCanvasElement {
   let c = kidImgs.get(name);
   if (c) return c;
-  const ch = RECLUSE_CHILD_SIT;
   const { w, h, data } = renderFrame(ch, ch.anims[name]!.frames[0]!);
   c = document.createElement("canvas");
   c.width = w;
@@ -67,116 +133,117 @@ function kidImg(name: string): HTMLCanvasElement {
 
 /** The child's hand and the piece in it now: where (squares and lift), and which piece (null: an empty hand). */
 interface Hand {
-  side: "l" | "r";
   c: number;
   r: number;
   lift: number;
   piece: string | null;
+  /** How far out it is: 0 at rest by his knee (`rest`, his drawing's pixels), 1 at the square. */
+  out: number;
+  rest: readonly [number, number];
 }
-/** The child now: where he is (his foot, squares), his drawing, his shoulder in it for the arm out, his hand; seen from behind or not. */
+/** The child now: where he is (his foot, squares), which drawing (side on, or walking toward or away from us), facing our left, his hand. */
 interface KidDraw {
   c: number;
   r: number;
+  ch: Character;
   img: string;
+  /** Drawn mirrored: side on, facing our left (on Black's side, or walking that way). */
+  flip: boolean;
   shoulder: readonly [number, number] | null;
   hand: Hand | null;
-  back: boolean;
+  /** Over the board (sitting or leaning by it): drawn after it. */
+  byBoard: boolean;
   moving: number;
   skip: readonly number[];
 }
 const lerp = (a: number, b: number, u: number) => a + (b - a) * u;
-const SEAT = { c: B0.c + KID_SPOTS.seat[0], r: B0.r + KID_SPOTS.seat[1] };
-const play = (view: "f" | "b", stance: PlayPose["stance"], step: PlayPose["step"] = -1, lean: PlayPose["lean"] = 0, side: PlayPose["side"] = ""): PlayPose => ({ view, stance, step, lean, side });
-/** A point `d` squares along a path (squares from the board's middle), in the room's squares. */
-function along(pts: readonly (readonly [number, number])[], d: number): { c: number; r: number } {
+const seatOf = (side: -1 | 1): { c: number; r: number } => ({ c: B.c + side * KID_SPOTS.seat, r: B.r });
+const play = (view: "f" | "b", step: PlayPose["step"]): PlayPose => ({ view, stance: "stand", step, lean: 0, side: "" });
+const side = (p: Partial<SidePose>): SidePose => ({ stance: "heels", step: -1, lean: 0, dip: 0, reach: false, eyes: "down", mouth: "stern", ...p });
+/** A point `d` squares along a path (squares from the board's middle), in the room's squares, and the way it's heading there. */
+function along(pts: readonly (readonly [number, number])[], d: number): { c: number; r: number; dc: number; dr: number } {
   for (let i = 1; i < pts.length; i++) {
     const a = pts[i - 1]!;
     const b = pts[i]!;
     const l = Math.hypot(b[0] - a[0], b[1] - a[1]);
     if (d <= l || i === pts.length - 1) {
       const u = l ? clamp01(d / l) : 1;
-      return { c: B0.c + lerp(a[0], b[0], u), r: B0.r + lerp(a[1], b[1], u) };
+      return { c: B.c + lerp(a[0], b[0], u), r: B.r + lerp(a[1], b[1], u), dc: b[0] - a[0], dr: b[1] - a[1] };
     }
     d -= l;
   }
-  return { c: B0.c + pts[0]![0], r: B0.r + pts[0]![1] };
+  return { c: B.c + pts[0]![0], r: B.r + pts[0]![1], dc: 0, dr: 0 };
 }
 const lenOf = (pts: readonly (readonly [number, number])[]) => pts.slice(1).reduce((n, q, i) => n + Math.hypot(q[0] - pts[i]![0], q[1] - pts[i]![1]), 0);
-/** A room point from a drawing pixel of his, his foot at (c, r): across in squares, up as lift (room pixels). */
-const fromPx = (c: number, r: number, px: readonly [number, number]) => ({ c: c + ((px[0] - RECLUSE_CHILD_SIT.foot[0]) * K.scale) / SQ, r: r - 0.02, lift: (RECLUSE_CHILD_SIT.foot[1] - px[1]) * K.scale });
 
 /** Him now, from where he is in his loop. */
 function kidOf(n: KidNow): KidDraw {
   const { plies } = RECLUSE_GAME;
   const ply = n.ply >= 0 && n.ply < plies.length ? plies[n.ply]! : null;
-  const rest: SitPose = { lean: 0, reach: "", eyes: "down", mouth: "stern" };
-  const seated = (p: SitPose, hand: Hand | null = null, moving = -1, skip: readonly number[] = []): KidDraw => ({ ...SEAT, img: sitName(p), shoulder: hand ? sitShoulder(hand.side, p.lean) : null, hand, back: false, moving, skip });
-  if (n.step === "end" || n.step === "fade") return seated({ ...rest, eyes: n.step === "end" && n.u > 0.2 ? "ahead" : "down", mouth: "smile" });
-  if (!ply) return seated({ ...rest, eyes: n.u < 0.6 ? "ahead" : "down" });
-  const white = n.ply % 2 === 0;
+  // (Before the first move, and after the mate, he's on Black's side: his last move was Black's.)
+  const s: -1 | 1 = ply ? sideOf(n.ply) : 1;
+  const seat = seatOf(s);
+  const sat = (p: SidePose, at = seat, faceSide = s, hand: Hand | null = null, moving = -1, skip: readonly number[] = []): KidDraw => ({
+    ...at,
+    ch: RECLUSE_CHILD_SIDE,
+    img: sideName(p),
+    flip: faceSide > 0,
+    shoulder: hand ? sideShoulder(p) : null,
+    hand,
+    byBoard: true,
+    moving,
+    skip,
+  });
+  const look = (u: number) => side({ eyes: u > 0.45 && u < 0.55 ? "shut" : u < 0.8 ? "ahead" : "down" });
+  if (n.step === "end" || n.step === "fade") return sat(side({ eyes: n.step === "end" && n.u > 0.2 ? "ahead" : "down", mouth: "smile" }));
+  if (!ply) return sat(look(n.u));
   const from = { c: sqC(ply.from), r: sqR(ply.from) };
   const to = { c: sqC(ply.to), r: sqR(ply.to) };
-  // (A move's hand: from where it rests, to the piece, the piece over, and back; the castling rook a step behind.)
-  const handAt = (side: "l" | "r", rest: { c: number; r: number; lift: number }): Hand | null => {
-    const u = ease(n.u);
-    if (n.step === "reach") return { side, c: lerp(rest.c, from.c, u), r: lerp(rest.r, from.r, u), lift: lerp(rest.lift, 0, u) + 6 * Math.sin(u * Math.PI), piece: null };
-    if (n.step === "carry") return { side, c: lerp(from.c, to.c, u), r: lerp(from.r, to.r, u), lift: Math.sin(u * Math.PI) * K.lift * cell * SQ, piece: ply.piece };
-    if (n.step === "back") return { side, c: lerp(to.c, rest.c, u), r: lerp(to.r, rest.r, u), lift: lerp(0, rest.lift, u) + 6 * Math.sin(u * Math.PI), piece: null };
-    return null;
-  };
+  const lean = LEANS[n.ply]!;
+  const scoot = scootFor(n.ply);
   const moving = n.step === "carry" ? ply.from : -1;
   const skip = n.step === "carry" && ply.rook ? [ply.rook[0]] : [];
-  if (!white) {
-    // His own move, sitting behind Black: he leans onto the board, the hand on the piece's side (a to d our left), a little stretch.
-    const side: "l" | "r" = ply.from % 8 < 4 ? "l" : "r";
-    const far = (i: number) => Math.floor(i / 8);
-    const lean: 0 | 1 | 2 = Math.min(far(ply.from), far(ply.to)) <= 3 ? 2 : 1;
-    if (n.step === "think") return seated({ ...rest, lean: n.u > 0.55 ? 1 : 0, eyes: n.u > 0.82 && n.u < 0.88 ? "shut" : "down" });
-    if (n.step === "look") return seated({ ...rest, eyes: n.u > 0.45 && n.u < 0.52 ? "shut" : n.u < 0.75 ? "ahead" : "down" });
-    const pose: SitPose = { lean: n.step === "back" && n.u > 0.6 ? 1 : lean, reach: side, eyes: n.step === "back" && n.u > 0.7 ? "ahead" : "down", mouth: "stern" };
-    const knee = { c: SEAT.c + ((sitKnee(side)[0] - RECLUSE_CHILD_SIT.foot[0]) * K.scale) / SQ, r: SEAT.r - 0.02, lift: 0 };
-    return seated(pose, handAt(side, knee), moving, skip);
-  }
-  // White's move: up, round the board, kneel beside White's near corner, play, back round, sit.
-  const s = sideOf(n.ply);
   const path = walkPath(n.ply);
   const len = lenOf(path);
-  const kneel = along(path, len);
-  const stood = (c: number, r: number, p: PlayPose): KidDraw => ({ c, r, img: playName(p), shoulder: null, hand: null, back: p.view === "b", moving: -1, skip: [] });
-  const stepMs = (n.step === "walk" || n.step === "walkBack" ? stepsOf(n.ply).find(([st]) => st === n.step)![1] : 0) * n.u;
-  const walkStep = (Math.floor(stepMs / K.stepMs) % 4) as 0 | 1 | 2 | 3;
+  const prev = seatOf(-s as -1 | 1);
+  // (Leaning in step by step: lean 0 is back on his heels.)
+  const toward = (u: number): SidePose => {
+    const l = Math.round(lean.lean * clamp01(u)) as SidePose["lean"];
+    return side({ stance: l ? "knees" : "heels", lean: l, dip: l === lean.lean ? lean.dip : 0 });
+  };
   switch (n.step) {
     case "rise":
-      return n.u < 0.35 ? seated(rest) : stood(SEAT.c, SEAT.r, play("f", n.u < 0.7 ? "up" : "stand"));
+      return sat(n.u < 0.33 ? side({}) : side({ stance: n.u < 0.66 ? "crouch" : "stand" }), prev, -s as -1 | 1);
     case "walk": {
-      const at = along(path, n.u * len);
-      return stood(at.c, at.r, play("f", "stand", walkStep));
+      const w = along(path, n.u * len);
+      const ms = stepsOf(n.ply)[1]![1] * n.u;
+      const step = (Math.floor(ms / K.stepMs) % 4) as 0 | 1 | 2 | 3;
+      // (Across: side on, facing the way he goes; away from us or toward us: from behind or the front.)
+      if (Math.abs(w.dc) >= Math.abs(w.dr)) return { ...sat(side({ stance: "stand", step }), w, w.dc > 0 ? -1 : 1), byBoard: false };
+      return { c: w.c, r: w.r, ch: RECLUSE_CHILD_SIT, img: playName(play(w.dr < 0 ? "b" : "f", step)), flip: false, shoulder: null, hand: null, byBoard: false, moving: -1, skip: [] };
     }
-    case "turn":
-      return stood(kneel.c, kneel.r, play(n.u < 0.5 ? "f" : "b", "stand"));
-    case "kneel":
-      return stood(kneel.c, kneel.r, n.u < 0.5 ? play("b", "up") : play("b", "heels"));
-    case "stand":
-      return stood(kneel.c, kneel.r, n.u < 0.5 ? play("b", "up") : play("b", "stand"));
-    case "walkBack": {
-      const at = along(path, (1 - n.u) * len);
-      return stood(at.c, at.r, play("b", "stand", walkStep));
-    }
-    case "turnBack":
-      return stood(SEAT.c, SEAT.r, play(n.u < 0.5 ? "b" : "f", "stand"));
     case "sit":
-      return n.u < 0.35 ? stood(SEAT.c, SEAT.r, play("f", "stand")) : n.u < 0.7 ? stood(SEAT.c, SEAT.r, play("f", "up")) : seated(rest);
+      return sat(n.u < 0.33 ? side({ stance: "stand" }) : n.u < 0.66 ? side({ stance: "crouch" }) : side({}));
+    case "think":
+      return sat(side({ eyes: n.u > 0.82 && n.u < 0.88 ? "shut" : "down" }));
     case "look":
-      return seated({ ...rest, eyes: n.u > 0.45 && n.u < 0.52 ? "shut" : n.u < 0.75 ? "ahead" : "down" });
+      return sat(look(n.u));
     default: {
-      // On his heels at the corner, the board on his inner side: thinking (leaning in), then the move with that hand.
-      const side: "l" | "r" = s < 0 ? "r" : "l";
-      if (n.step === "think") return stood(kneel.c, kneel.r, play("b", "heels", -1, n.u > 0.4 ? 1 : 0, ""));
-      const reach = Math.max(Math.abs(from.c - kneel.c), Math.abs(to.c - kneel.c)) + Math.max(kneel.r - from.r, kneel.r - to.r) * 0.5;
-      const lean: 0 | 1 | 2 = n.step === "back" && n.u > 0.6 ? 1 : reach > 0.75 ? 2 : 1;
-      const p = play("b", "heels", -1, lean, side);
-      const restAt = fromPx(kneel.c, kneel.r, heelsHand(side));
-      return { c: kneel.c, r: kneel.r, img: playName(p), shoulder: playShoulder(p, side), hand: handAt(side, restAt), back: true, moving, skip };
+      // The move: he comes up on his knees and leans in (the first part of the reach), his hand out to the piece, lifts it, carries it
+      // over and puts it down, his hand back to his thigh, and he sits back (the last part of `back`).
+      const IN = 0.4;
+      const OUT = 0.55;
+      // (As he leans in he shuffles along his side toward the move's files, and back to the middle as he sits back.)
+      const shuffled = (u: number) => ({ c: seat.c, r: seat.r + scoot * ease(clamp01(u)) });
+      if (n.step === "reach" && n.u < IN) return sat(toward(n.u / IN), shuffled(n.u / IN));
+      if (n.step === "back" && n.u > OUT) return sat(toward(1 - (n.u - OUT) / (1 - OUT)), shuffled(1 - (n.u - OUT) / (1 - OUT)));
+      const rest = sideRest(lean);
+      const u = ease(n.step === "reach" ? (n.u - IN) / (1 - IN) : n.step === "back" ? n.u / OUT : n.u);
+      const tgt = n.step === "reach" ? from : n.step === "back" ? to : { c: lerp(from.c, to.c, u), r: lerp(from.r, to.r, u) };
+      // (`out`: how far the hand is from his thigh to the square; it holds the piece by its top, 6 room pixels up.)
+      const out = n.step === "reach" ? u : n.step === "back" ? 1 - u : 1;
+      const lift = 6 + (n.step === "carry" ? Math.sin(u * Math.PI) * K.lift * cell * SQ : 0);
+      return sat(lean, shuffled(1), s, { c: tgt.c, r: tgt.r, lift, piece: n.step === "carry" ? ply.piece : null, out, rest }, moving, skip);
     }
   }
 }
@@ -214,8 +281,8 @@ function drawBoard(d: FxDraw, board: Board, last: { from: number; to: number } |
     g.beginPath();
     for (let gi = 0; gi < 8; gi++)
       for (let fi = 0; fi < 8; fi++) {
-        // (Row gi from the far edge: rank 7 - gi; a1 dark, as a board's is.)
-        if (((fi + (7 - gi)) % 2 === 0) !== dark) continue;
+        // (Row gi from the far edge: the file, a farthest; column fi from our left: the rank, White's first; a1 dark, as a board's is.)
+        if (((fi + gi) % 2 === 0) !== dark) continue;
         const p0 = grid[gi * 9 + fi]!;
         const p1 = grid[gi * 9 + fi + 1]!;
         const p2 = grid[(gi + 1) * 9 + fi + 1]!;
@@ -233,8 +300,8 @@ function drawBoard(d: FxDraw, board: Board, last: { from: number; to: number } |
   if (last) {
     g.fillStyle = INK.tint;
     for (const s of [last.from, last.to]) {
-      const fi = s % 8;
-      const gi = 7 - Math.floor(s / 8);
+      const fi = Math.floor(s / 8);
+      const gi = s % 8;
       const p0 = grid[gi * 9 + fi]!;
       const p2 = grid[(gi + 1) * 9 + fi + 1]!;
       g.fillRect(p0.x, p0.y, p2.x - p0.x, p2.y - p0.y);
@@ -254,11 +321,11 @@ function drawBoard(d: FxDraw, board: Board, last: { from: number; to: number } |
     g.globalCompositeOperation = "source-over";
     g.globalAlpha = 1;
   }
-  // The pieces, far ranks first.
+  // The pieces, the far files first.
   g.imageSmoothingEnabled = false;
   g.globalAlpha = 1 - fade;
-  for (let rank = 7; rank >= 0; rank--)
-    for (let file = 0; file < 8; file++) {
+  for (let file = 0; file < 8; file++)
+    for (let rank = 0; rank < 8; rank++) {
       const i = rank * 8 + file;
       const p = board[i];
       if (!p || skip.includes(i)) continue;
@@ -343,40 +410,76 @@ function drawSideWalls(d: FxDraw) {
 
 const SKIN = { dark: "#9c522f", mid: "#c87a4a", light: "#e4a06c" } as const;
 const SLEEVE = { red: "#c4443a", cream: "#efe7d6", line: "#2a1a14" } as const;
-/** The child at his place, in a pose (his drawing, scaled to the room as the bosses are), and his reaching arm and hand. */
-function drawKid(d: FxDraw, k: KidDraw, alpha = 1) {
-  const g = d.g;
-  if (!at(d, k.c, k.r, 0)) return;
-  const ch = RECLUSE_CHILD_SIT;
-  const s = (pt.k / SQ) * K.scale;
-  const img = kidImg(k.img);
-  const x0 = pt.x - ch.foot[0] * s;
-  const y0 = pt.y - ch.foot[1] * s;
-  g.globalAlpha = alpha;
-  g.imageSmoothingEnabled = s < 1.5;
-  g.drawImage(img, x0, y0, img.width * s, img.height * s);
-  g.imageSmoothingEnabled = false;
-  g.globalAlpha = 1;
-  return { x0, y0, s };
+/** Where his drawing goes this frame: his foot on screen, its scale, and a pixel of his drawing on screen (mirrored if he faces left). */
+interface KidBox {
+  x: number;
+  y: number;
+  s: number;
+  px: (p: readonly [number, number]) => readonly [number, number];
 }
-/** Where his drawing goes this frame (as drawKid places it), without drawing it. */
-function kidBox(d: FxDraw, k: KidDraw): { x0: number; y0: number; s: number } | null {
+function kidBox(d: FxDraw, k: KidDraw): KidBox | null {
   if (!at(d, k.c, k.r, 0, q)) return null;
   const s = (q.k / SQ) * K.scale;
-  return { x0: q.x - RECLUSE_CHILD_SIT.foot[0] * s, y0: q.y - RECLUSE_CHILD_SIT.foot[1] * s, s };
+  const [fx, fy] = k.ch.foot;
+  const x = q.x;
+  const y = q.y;
+  return { x, y, s, px: (p) => [x + (k.flip ? -1 : 1) * (p[0] - fx) * s, y + (p[1] - fy) * s] };
 }
-/** His arm out to his hand (drawn over the board): a short striped sleeve, the forearm, the hand round the piece. */
-function drawArm(d: FxDraw, sh: readonly [number, number], hand: Hand, kid: { x0: number; y0: number; s: number }) {
+/** The child at his place, in a pose (his drawing, scaled to the room as the bosses are; mirrored facing our left). */
+function drawKid(d: FxDraw, k: KidDraw, alpha = 1) {
   const g = d.g;
-  const sx = kid.x0 + sh[0] * kid.s;
-  const sy = kid.y0 + sh[1] * kid.s;
-  if (!at(d, hand.c, hand.r, hand.lift + (hand.piece ? 6 : 2), q)) return;
-  const hx = q.x;
-  const hy = q.y;
-  const w = 3.6 * kid.s;
-  // (Elbow: a little out to his side, a little down, so the arm bends.)
-  const ex = sx + (hx - sx) * 0.45 + (hand.side === "l" ? -1 : 1) * 2.5 * kid.s;
-  const ey = sy + (hy - sy) * 0.55 + 2 * kid.s;
+  const box = kidBox(d, k);
+  if (!box) return;
+  const img = kidImg(k.ch, k.img);
+  const [fx, fy] = k.ch.foot;
+  g.save();
+  g.globalAlpha = alpha;
+  g.imageSmoothingEnabled = box.s < 1.5;
+  g.translate(box.x, box.y);
+  if (k.flip) g.scale(-1, 1);
+  g.drawImage(img, -fx * box.s, -fy * box.s, img.width * box.s, img.height * box.s);
+  g.restore();
+}
+/** The longest his arm has been drawn, against its rest length (the preview reads it: never more than about 1.5). */
+let armMax = 0;
+/**
+ * His arm out from his shoulder to his hand (drawn over the board): an upper arm and a forearm of their own lengths, jointed at the
+ * elbow (bent down and back when the hand is nearer than his arm is long; straight, and only then longer, when it's farther), a
+ * short striped sleeve, the hand round the piece.
+ */
+function drawArm(d: FxDraw, k: KidDraw, box: KidBox) {
+  const g = d.g;
+  const hand = k.hand!;
+  const [sx, sy] = box.px(k.shoulder!);
+  const [rx, ry] = box.px(hand.rest);
+  if (!at(d, hand.c, hand.r, hand.lift, q)) return;
+  const hx = lerp(rx, q.x, hand.out);
+  const hy = lerp(ry, q.y, hand.out);
+  const U = ARM.upper * box.s;
+  const F = ARM.fore * box.s;
+  const dx = hx - sx;
+  const dy = hy - sy;
+  const dist = Math.hypot(dx, dy) || 1;
+  armMax = Math.max(armMax, dist / (U + F));
+  let ex: number;
+  let ey: number;
+  if (dist >= U + F) {
+    ex = sx + (dx * U) / (U + F);
+    ey = sy + (dy * U) / (U + F);
+  } else {
+    const a = (dist * dist + U * U - F * F) / (2 * dist);
+    const h = Math.sqrt(Math.max(0, U * U - a * a));
+    // (The elbow on the side that's down and back from the way he faces.)
+    let px = -dy / dist;
+    let py = dx / dist;
+    if (px * (k.flip ? 0.5 : -0.5) + py < 0) {
+      px = -px;
+      py = -py;
+    }
+    ex = sx + (dx / dist) * a + px * h;
+    ey = sy + (dy / dist) * a + py * h;
+  }
+  const w = 3.4 * box.s;
   g.lineCap = "round";
   g.lineJoin = "round";
   const stroke = (pts: readonly (readonly [number, number])[], width: number, color: string) => {
@@ -388,24 +491,24 @@ function drawArm(d: FxDraw, sh: readonly [number, number], hand: Hand, kid: { x0
     g.stroke();
   };
   const arm = [[sx, sy], [ex, ey], [hx, hy]] as const;
-  stroke(arm, w + 2 * kid.s, SLEEVE.line);
+  stroke(arm, w + 2 * box.s, SLEEVE.line);
   stroke(arm, w, SKIN.mid);
   // (A lit stripe down the arm's top.)
   stroke([[sx, sy - w * 0.2], [ex, ey - w * 0.2], [hx, hy - w * 0.2]], w * 0.35, SKIN.light);
   // The short sleeve: red and cream stripes over the shoulder.
-  const ux = sx + (ex - sx) * 0.5;
-  const uy = sy + (ey - sy) * 0.5;
-  stroke([[sx, sy], [ux, uy]], w + 2.6 * kid.s, SLEEVE.line);
-  stroke([[sx, sy], [ux, uy]], w + 1.2 * kid.s, SLEEVE.red);
-  stroke([[sx + (ux - sx) * 0.35, sy + (uy - sy) * 0.35], [sx + (ux - sx) * 0.6, sy + (uy - sy) * 0.6]], w + 1.2 * kid.s, SLEEVE.cream);
-  // The piece in his fingers, then the hand round it.
-  if (hand.piece) drawPiece(d, hand.piece, hand.c, hand.r, hand.lift);
+  const ux = sx + (ex - sx) * 0.55;
+  const uy = sy + (ey - sy) * 0.55;
+  stroke([[sx, sy], [ux, uy]], w + 2.6 * box.s, SLEEVE.line);
+  stroke([[sx, sy], [ux, uy]], w + 1.2 * box.s, SLEEVE.red);
+  stroke([[sx + (ux - sx) * 0.35, sy + (uy - sy) * 0.35], [sx + (ux - sx) * 0.6, sy + (uy - sy) * 0.6]], w + 1.2 * box.s, SLEEVE.cream);
+  // The piece in his fingers (held by its top), then the hand round it.
+  if (hand.piece) drawPiece(d, hand.piece, hand.c, hand.r, hand.lift - 6);
   g.beginPath();
   g.ellipse(hx, hy, w * 0.9, w * 0.75, 0, 0, Math.PI * 2);
   g.fillStyle = SLEEVE.line;
   g.fill();
   g.beginPath();
-  g.ellipse(hx, hy, w * 0.9 - kid.s, w * 0.75 - kid.s, 0, 0, Math.PI * 2);
+  g.ellipse(hx, hy, w * 0.9 - box.s, w * 0.75 - box.s, 0, 0, Math.PI * 2);
   g.fillStyle = SKIN.light;
   g.fill();
 }
@@ -532,7 +635,7 @@ export interface RecluseScene {
   summon: (at: number) => void;
   reset: () => void;
   /** Where the summoning is (null: not started), for the preview and its tests. */
-  state: () => { summonT: number | null; ply: number; step: string };
+  state: () => { summonT: number | null; ply: number; step: string; armMax: number };
   /** (The preview's stills) Jump the child's loop to `ms` now. */
   seek: (ms: number) => void;
 }
@@ -559,7 +662,7 @@ export function recluseScene(t0 = 0, walls = true): RecluseScene {
     draw: (d: FxDraw, now: number) => {
       const s = start === null ? null : summonAt(now - start);
       const { n, k } = curOf(now);
-      const putDown = n.step === "back" || n.step === "stand" || n.step === "walkBack" || n.step === "turnBack" || n.step === "sit" || n.step === "look";
+      const putDown = n.step === "back" || n.step === "look";
       const last = n.ply > 0 && !putDown && n.step !== "fade" ? RECLUSE_GAME.plies[n.ply - 1] ?? null : putDown ? RECLUSE_GAME.plies[n.ply] ?? null : null;
       const lift = s ? wobbleLift(s.wobble) : 0;
       const glow = s ? Math.max(s.rays * 0.5, s.splash > 0 ? (1 - s.splash) * 0.8 : 0) : 0;
@@ -568,12 +671,8 @@ export function recluseScene(t0 = 0, walls = true): RecluseScene {
       if (k.skip.length && k.hand) {
         const ply = RECLUSE_GAME.plies[n.ply]!;
         const u = Math.max(0, n.u - 0.25) / 0.75;
-        drawPiece(d, n.board[ply.rook![0]]!, sqC(ply.rook![0]) + (sqC(ply.rook![1]) - sqC(ply.rook![0])) * ease(u), sqR(ply.rook![0]), Math.sin(u * Math.PI) * cell * SQ * 0.4);
-      }
-      // (Sitting behind the board, facing us: his arm comes over the board, so it's drawn after it.)
-      if (!k.back && k.hand && k.shoulder) {
-        const box = kidBox(d, k);
-        if (box) drawArm(d, k.shoulder, k.hand, box);
+        const [r0, r1] = ply.rook!;
+        drawPiece(d, n.board[r0]!, lerp(sqC(r0), sqC(r1), ease(u)), lerp(sqR(r0), sqR(r1), ease(u)), Math.sin(u * Math.PI) * cell * SQ * 0.4);
       }
     },
   };
@@ -581,12 +680,12 @@ export function recluseScene(t0 = 0, walls = true): RecluseScene {
     z: 0,
     draw: (d: FxDraw, now: number) => {
       const { k } = curOf(now);
-      // (From behind, on White's side: his arm goes out from his shoulder to the board, under his back.)
-      if (k.back && k.hand && k.shoulder) {
-        const box = kidBox(d, k);
-        if (box) drawArm(d, k.shoulder, k.hand, box);
-      }
       drawKid(d, k);
+      // (His arm out over the board, over him and the board both.)
+      if (k.hand && k.shoulder) {
+        const box = kidBox(d, k);
+        if (box) drawArm(d, k, box);
+      }
     },
   };
   const wallFig = { z: 0.01, draw: (d: FxDraw) => drawSideWalls(d) };
@@ -603,9 +702,9 @@ export function recluseScene(t0 = 0, walls = true): RecluseScene {
     figures: (now) => {
       lastNow = now;
       figures.length = 0;
-      // (From behind, beside or in front of the board: after it, so his arm reaches over it and his back is nearer us.)
+      // (Sitting or leaning by the board: after it, so he leans and reaches over it; walking: by his row, behind it as he goes round.)
       const k = curOf(now).k;
-      kidFig.z = k.back ? Math.max(k.r, B.r + 0.01) : k.r;
+      kidFig.z = k.byBoard ? Math.max(k.r, B.r + 0.01) : k.r;
       if (walls) figures.push(wallFig);
       figures.push(kidFig, boardFig, ...pawnFigs);
       return figures;
@@ -636,7 +735,7 @@ export function recluseScene(t0 = 0, walls = true): RecluseScene {
     seek: (ms) => {
       t0 = ms - lastNow;
     },
-    state: () => ({ summonT: start === null ? null : lastNow - start, ply: kidAt(lastNow + t0).ply, step: kidAt(lastNow + t0).step }),
+    state: () => ({ summonT: start === null ? null : lastNow - start, ply: kidAt(lastNow + t0).ply, step: kidAt(lastNow + t0).step, armMax }),
   };
 }
 
