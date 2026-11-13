@@ -185,3 +185,12 @@ building and inside in town (targeted); the room's rules and challenge (server, 
 Smaller board; he leans onto the board for his side, then gets up and walks round to play the other (slow and real; that's the point);
 little arm stretch only. Room about half the floor area, snug: bed nearly on the rug, light falling more on the rug (he loves the light).
 Asked whether side walls can be one continuous 3D surface instead of stacked flat panels: trying it in this room only (round 2).
+
+## Nov 13: Eric's test kit (for the room-challenge build)
+Eric: "What I need when it's live, 3 bots in the room already that join the fight when I challenge, as real humans, then buttons to
+instantly win and trigger next phase on the next move."
+- When the room and its challenge are built: an admin-only test mode where 3 bots already stand in the child's room and join his
+  challenge as if they were real players (they count toward the 4, go through the summoning, play as party members).
+- Admin-only buttons in every form: "Win this form": the next move beats the current form and the next phase starts (child -> adult ->
+  cutscene/transformation -> four boards -> result).
+- Now (Nov 13): the "Win this form" button for today's fight (adult form, phase 2) was added to the music helper's job.

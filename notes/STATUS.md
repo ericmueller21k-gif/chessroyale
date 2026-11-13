@@ -1,3 +1,4 @@
+- Nov 13 ~01:45 UTC: Eric wants a test kit: 3 bots as humans in the room (when the room is live) + admin "Win this form" buttons. Win button added to the music helper now; bots noted for the room build.
 - Nov 13 ~01:35 UTC: Eric: music timing gets tuned from one test of his with a timing sheet; told the music helper to stay lean and write the sheet.
 - Nov 13 ~01:30 UTC: music handoff for the Hidden Boss (stills/trailer-v2 91a3f0b2, boss-music/). Brief hidden-boss-music.md (god-king, Opus high), wire to TODAY's fight: adult=phase2 theme, beaten->recluse-beaten, transformation=split-introSeconds->phase3. No town preload. Room r3 also running.
 - Nov 13 ~01:20 UTC: Eric: board sideways (walks left/right, board visible), centered on each side, lean in more. Round 3 brief hidden-boss-room-r3.md.
