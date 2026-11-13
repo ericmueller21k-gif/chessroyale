@@ -106,8 +106,9 @@ export class HiddenRoomClient {
       const b = (await res.json().catch(() => null)) as unknown;
       if (res.status === 401 || res.status === 403) {
         const no = b as { message?: string; banned?: boolean } | null;
-        this.refused = no?.message ?? "Sign in to challenge him.";
-        // (Banned for fair play: fair play's notice, as PLAY shows it; the room watches on, uncounted. Review M1.)
+        // (Banned for fair play: fair play's notice, as PLAY shows it, with its appeal; the card's line the short of it, so the card
+        // keeps its size; the room watches on, uncounted. Review M1.)
+        this.refused = no?.banned ? "Your account can't play online." : (no?.message ?? "Sign in to challenge him.");
         if (no?.banned) showBanNotice();
         this.emit();
         return null;
