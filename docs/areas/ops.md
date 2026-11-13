@@ -138,7 +138,8 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
   keyed; a failure retries each minute for up to 24 h (fair play, XP and rewards stop holding a result up `strictMinutes`, 30, after
   its first failure) and shows on the ops page as a server error (`Lobby.saveResults`; `Lobby.resultsLost` if it gave up).
 - **Costs and guards:** engine server re-checks capped by `ENGINE_DAILY_SEARCHES` (3000 a day, D1 `engine_usage`; solo at most
-  `ENGINE_SERVER.soloDailySearches`, and only for accounts: [engine.md](engine.md));
+  `ENGINE_SERVER.soloDailySearches`, and only for accounts; the Hidden Boss's phase 2 moves never capped, bounded by the fights,
+  about 1.5 cents a long fight: [engine.md](engine.md));
   fair play's deep re-checks by `FAIRPLAY.deep.dailySearches` (D1 `fairplay_budget`) on their own instance; the
   deep re-check's cron runs every 15 minutes (`triggers.crons`). Suggested budget alert: $20/month. The engine server
   never gets a position Stockfish refuses, which would take it down (`containerScore`; `/api/engine/score` answers
@@ -376,6 +377,9 @@ Built Oct 15; why it's built this way: `docs/decisions/2026-10-15-health-view-an
   - the engine server: on or off, searches used of today's budget (`engine_usage`, UTC day), its last answer and last
     failure (D1 `meta` "engine.ok" / "engine.fail", the match engine's instance "engine-1" only, written at most once a
     minute or every 10 s per instance, never waited on by a search);
+  - the Hidden Boss's phase 2 (the review of #683, M2): his positions searched today (`<day>:recluse`, outside the budget) and the
+    fights that ended with no result, his move never in (`<day>:recluse-none`); the daily digest names any no-result, and
+    `npm run ops:report` lists them under "Needs attention";
   - fair play's deep re-checks used of today's budget (`fairplay_budget`);
   - a timed D1 read (a database that doesn't answer leaves zeros and its error; the rest still shows).
 - **Who may read it:** an admin (`isAdmin`, the session), or a script whose request came through Cloudflare Access for

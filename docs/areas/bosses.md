@@ -285,21 +285,28 @@ below):
   the position it was made on (`ply`), legal, not while paused; refused, they're told phase 2 again with `refused`). **His moves from
   the engine server alone** (Eric, Nov 13: "we can't have him breaking"; [decision](../decisions/2026-11-13-recluse-server-only.md)):
   every legal move scored in groups of at most 8 (`serverAllMovesAt`, the first group tried twice, `RECLUSE_ONLINE.groupNodes`), he
-  plays the best, a mate in one always (`withMates`: the rules mark it, the engine server never says `mate`); never a player's device,
-  never a quick move. His searches come from his own share of the server's day (`RECLUSE_ONLINE.dailySearches`, the pool
-  `"recluse"`, then the day's budget), so the judges can't starve him. An empty answer is tried again (`retryMs`, doubling to
-  `retryMaxMs`; one lost on the way, after 20 s). His move not in after `pauseMs` (3 s): **every board's clock pauses**
+  plays the best, a mate in one always (`withMates`: the rules mark it, `matingMoves`/`matingMoves960`, the engine server never says
+  `mate`); never a player's device, never a quick move. **His queue is his own** (the review of #683, M1): the bots' moves go to
+  the host's device first and each person's fair-play numbers to fair play's instance, so the match engine's queue holds his moves.
+  His searches are never refused for the day's budget (bounded by the fights; each position counted once on his own row,
+  `<day>:recluse`, the pool `"recluse"`: M2). An empty answer is tried again (`retryMs`, doubling to `retryMaxMs`); a try takes at
+  most `searchMs` (15 s) and one never answered is tried again 5 s past that (lost), so no try goes out while an earlier one could
+  still be running. The engine server gone mid-fight (a deploy without it): his next try is the quick move, phase 2 unvouched
+  (m3). His move not in after `pauseMs` (3 s): **every board's clock pauses**
   (`recluse2.paused`, the view's `paused`): every board says "He's thinking…" and takes no move, nothing flags or times out, the
   admins' ultimate waits; once it's in, every running clock goes on from where it stood (`hold`: turn starts and bots' thinking moved
-  on by the pause). Not in after `serverWaitMs` (60 s): **no result** (`done.noResult`; "No result: the Hidden Boss couldn't
-  connect."): the results say so (`noResult`, `bossResult` "draw" for the duo, not ranked), and nothing counts for or against anyone
-  (`humanResults` marks each `noResult`: writeResult writes their fair play from before phase 2 and nothing else, no XP, result row,
-  Welcome Crate or token; phase 2's fair-play moves are dropped, `fairFrom`). The bots' moves: the engine server too (one within
-  `botLoss` of the best), where it can't answer the host's device (`phase2Ask`/`phase2Answer`, a bot's strength; re-asked of a new
-  host or a host back from a reload, `resend`), with no answer in `askMs` the server's quick move; a bot's move never unvouches
-  anything. With no engine server set up at all (local runs, the e2e suite, staging: no `phase2Search`), his move is the server's
+  on by the pause; a board handed to a bot during a pause thinks from its end, m1). Not in after `serverWaitMs` (60 s): **no
+  result** (`done.noResult`; "No result: the Hidden Boss couldn't connect."), counted for the health view (`<day>:recluse-none`).
+  **For phase 2's board players only** (`phase2NoResultFor`: `recluse2.names`, as `phase2Unvouched`; the review of #683, M3): their
+  results say "Nothing counts for or against you." (`noResult: "board"`, `bossResult` "draw" for the duo, not ranked;
+  `humanResults` marks each `noResult`: writeResult writes their fair play from before phase 2 and nothing else, no XP, result row,
+  Welcome Crate or token; phase 2's fair-play moves are dropped, `fairFrom`). Everyone else, a Crowd final's watchers, keeps their
+  result at their placement, the boss's part none (`teamWon` null), and their results say "Your place stands." (`noResult:
+  "watched"`). The bots' moves: the host's device first (`phase2Ask`/`phase2Answer`, a bot's strength; re-asked of a new host or a
+  host back from a reload, `resend`, a bot's only), with no answer in `askMs` (or no host) the engine server (one within `botLoss`
+  of the best), where that can't either the server's quick move; a bot's move never unvouches anything. With no engine server set up at all (local runs, the e2e suite, staging: no `phase2Search`), his move is the server's
   quick move at once and phase 2's result is unvouched (`recluse2.unvouched`, `phase2Unvouched`: the board players' results pay as a
-  solo game's and aren't ranked). Each person's move is scored too, a
+  solo game's and aren't ranked). Each person's move is scored too (on fair play's instance), a
   `FairMove` with no crowd (fair play; not in a test fight). Leaving (resign, or away past `LEAVING.awayMs`): a bot plays their board
   on; for them a loss, from his fall on (its message names the board players: `phase2Boards`). The results carry `simul` ("won N of
   4"). The Crowd final's top 4 take the boards (fresh bots for any empty one); the others watch. Everyone's told phase 2 lean; what a

@@ -235,5 +235,14 @@ describe("his move late from the engine server online (Eric, Nov 13): the fight 
     D.g.move(v.boards[0]!.id, legalMoves(v.boards[0]!.fen)[0]!);
     expect(D.sent).toHaveLength(0);
     D.g.dispose();
+    // (The results say whose: a board's player, nothing counts for you; a Crowd final's watcher, your place stands. The review of
+    // #683, M3.)
+    for (const kind of ["board", "watched"] as const) {
+      const m = new NetMatch("TEST", "Ann", async () => []);
+      const tell = (msg: object) => (m as unknown as { onMessage(x: object): void }).onMessage({ now: Date.now(), ...msg });
+      tell({ t: "welcome", playerId: "me", token: "t", code: "TEST" });
+      tell({ t: "results", placements: { me: kind === "board" ? 2 : 40 }, winner: "Bo", lossesByStage: {}, standings: [], ranked: kind === "watched", bossResult: "draw", noResult: kind });
+      expect(m.phase).toMatchObject({ kind: "results", noResult: kind, bossResult: "draw" });
+    }
   });
 });

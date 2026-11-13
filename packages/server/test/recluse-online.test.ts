@@ -876,4 +876,12 @@ describe("a mate in one, his or a bot's (the delta review of #677: the engine se
     expect(pick(marked, "boss", () => 0)).toBe("d8h4");
     for (let i = 0; i < 10; i++) expect(pick(marked, "bot", () => i / 10)).toBe("d8h4");
   });
+
+  it("in a Chess960 position too (phase 2's boards), the rules' own: Ra8 mates, castling (the king taking its own rook) doesn't", () => {
+    const fen = "6k1/5ppp/8/8/8/8/5PPP/R5K1 w A - 0 1";
+    const scores = legalMoves(fen).map((m) => ({ move: m, expected: m === "a1a8" ? 0.9 : 0.95 }));
+    expect(legalMoves(fen)).toContain("g1a1");
+    expect(withMates(fen, scores).filter((s) => s.mate !== undefined).map((s) => s.move)).toEqual(["a1a8"]);
+    expect(pick(withMates(fen, scores), "boss", () => 0)).toBe("a1a8");
+  });
 });
