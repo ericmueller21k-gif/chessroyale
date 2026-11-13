@@ -701,7 +701,7 @@ const pieceImgs = new Map<string, HTMLCanvasElement>();
  * A piece in pixels (TABLE_PIECES, in the town's TABLE_INK: its fill shaded on the right, an outline round it), made once. `flip`:
  * its knight turned to face left (the art's faces right).
  */
-function pieceImg(kind: string, light: boolean, flip: boolean): HTMLCanvasElement {
+export function pieceImg(kind: string, light: boolean, flip: boolean): HTMLCanvasElement {
   const key = kind + (light ? "l" : "d") + (flip && kind === "N" ? "f" : "");
   let c = pieceImgs.get(key);
   if (c) return c;

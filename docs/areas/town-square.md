@@ -753,6 +753,47 @@ and [2026-11-02-bigger-showpieces.md](../decisions/2026-11-02-bigger-showpieces.
 - **Test hooks** (test switches on): the room's canvas `canvas.town-shop-canvas` carries `data-room`, `data-you`, `data-ready`;
   `__shopAt("keeper" | "door" | "square", [c, r])`, `__shopCam()`, `__shopBench(n)`, `__shopRide()` (your ride inside).
 
+## The Walk-up, the Hidden Boss's building (Nov 13)
+
+An old Brooklyn corner walk-up (Eric's 1940s photo, `notes/mockups/2026-11-12-eric-hidden-boss-building-ref.webp` on the director's
+notes branch): **an admin's only** while the Hidden Boss is in the game for admins first (`"recluse"` in core's `BOSS_ADMIN_FIRST`,
+as Don Dough's bakery was; his Boss Battle tile stays locked: he's `adminOnly`). Its name is "The Walk-up"; the boss's is core's one
+string ("Hidden Boss"), never his real one. [2026-11-13-hidden-boss-building.md](../decisions/2026-11-13-hidden-boss-building.md).
+
+- **Outside** (`houses/recluse.ts`, 144 x 224, drawn in code): four stories of red-brown brick with stone quoins, a bracketed cornice and
+  a little pediment, arched stone hoods (the top floor's windows round-headed), a black iron fire escape zigzagging down the east bays, a
+  striped awning over a little shop, the stoop and the front door (x 90), a barred window. **No sign** (Eric: "no address plate or name
+  on it"): its sign face is empty (`w: 0`) and render.ts writes nothing on it. The top floor's lit window (the child's) has a lace
+  curtain that stirs. The street town: the corner lot of Fountain Street and Seam Avenue (`street-plan.json`, 47-50; the row shifts it
+  0.23 onto the corner), its box brick with arched side windows and a water tank on its roof (`home-boxes.ts`); the lamp that stood at
+  (50, 31) is gone (Eric's no-lamp-in-front rule). Today's town: (45, 7). On the map and its chip: the lit top window (`BOSS_FACE`).
+- **Nobody out front:** `hasFigure` (world.ts) is false for it, so the town's figures (`Town.bosses`) skip it; it's the last home, so
+  every figure keeps its home's index.
+- **Inside, three rooms** (`shops.ts` `RECLUSE_ROOMS`; smaller in than out), **all three with his room's walls**: each side wall one
+  surface (Eric, Nov 13: "build the walls in the room like we did for his room"; `shops/side-walls.ts`, shared by his room's scene and
+  the hall's and landing's, `recluse-stairs-scene.ts`; the layouts' side squares and back corners solid blanks). The **hall** (its front,
+  from the street door; 7 x 7, `shops/recluse-stairs-art.ts`: a white hexagon mosaic with a black band, dark green dado, flats 1A and 1B
+  and the mailboxes under a sconce in the back wall, a radiator, the stairs up at the back right); the **landing** (7 x 7: oak boards and a red runner, flat 2A, a window
+  on the airshaft, the stairs down at the front, the stairs up at the back right); the **top floor**, his room (the mockup's 9 x 9 child's
+  room, `recluse-art.ts`, its one-surface side walls; the child playing his 1956 game: `recluse-scene.ts`, given to the room as its `fx`
+  with `{ live: true }`, so you're drawn and the four stand-in pawns aren't; on the wall clock, so his game is where it is whenever you
+  come up). Its door in the front wall leads down to the landing.
+- **The stairs** are room-to-room doors (Rolling Dough's back door's kind, room.ts `door: RoomPart`): a room can have several now
+  (`Room.passes`; `pass` is the first), each naming the room it leads to; its card says **Go up** or **Go down** (by the floors), and you
+  arrive at the stairs you came by (`passArrive(room, from)`). The same fade as Rolling Dough's door.
+- **The flats' doors** are talk pieces with `locked` lines: a tap walks you to that door's own spot (`talkNear`), and its card
+  ("Apartment door") says a short line in turn, with OK. His room: a tap on his board walks you round to its front; his card ("Hidden
+  Boss") has **Challenge greyed, "Coming soon"** (`canChallengeInside` is false for him): the room's challenge, the 4-player count, the
+  locked door and the summoning are the next job (server).
+- **Music:** `recluse-house` (themes.json) plays in his room only (`ShopDef.music`; `roomTheme`); the hall and the landing have none.
+  It loads as you go in at the street door (`homeTheme`).
+- **Banners:** the hall "Hidden Boss's / The Walk-up", the landing "Second floor", his room "Top floor".
+- **See-through:** each room's front door (the street door, the stairs down, his room's door) and front band go see-through over you
+  (`RoomArt.seeThru`, which a box room may list now too: you walk in, or come up, just behind them).
+- The dev preview (`/hidden-room-preview.html`) stays a dev page: the build has only `index.html`.
+- Tests: `test/recluse-building.test.ts`; e2e `town-street.spec.ts` ("the Hidden Boss's walk-up": the door, up two flights, his card,
+  back down; `STILLS=<dir>` writes the stills).
+
 ## Challenging a boss (Nov 2: Pokémon-gym style)
 
 Eric, Nov 2: challenge a boss in the town and it walks into its home with you; you each walk to your start mark on its battle
@@ -1118,6 +1159,30 @@ sets, the zoom, the camera's follow and glide, the drag, the haze, the clouds' p
 how often bots walk, the sizes, the names, the sky's hours and its four looks' colors, the lights at dusk and night (`lightsAt`, their glow's bands, the flicker), the rim line. The earlier value is
 noted wherever a slice changed one.
 
+- **The Hidden Boss's child's room (Nov 12, a mockup; since Nov 13 the Walk-up's top floor: "The Walk-up" above).** A 12 x 12 room (`shops/recluse-art.ts`: oak boards
+  and the window's sun baked into the floor, a braided rug, sailboat wallpaper, a rocket poster, the bed, the rocking horse, the little
+  table) drawn by the real room: `loadRoomWith(key, def, art)` loads a room no home lists, and `ShopRoom`'s optional `fx` (`RoomFx`:
+  figures sorted by row among the pieces and you, a pass over everything, `hideYou`) lets a caller draw its own scene; no `fx`, no
+  change. The scene (`shops/recluse-scene.ts`): the child (age 9, `recluse-ages.ts` `RECLUSE_CHILD_SIT`) plays his 1956 game against
+  himself on a board on the floor (`shops/recluse-game.ts`, stored squares, no engine; the last move tinted, a fade back to the start),
+  and the summoning with four stand-in pawns. Times: `feel.ts` `HIDDEN_ROOM_FEEL`. Seen only on the dev server,
+  `/hidden-room-preview.html` (`src/dev/hidden-room-preview.tsx`; `?t=`, `?summon=`, `?ui=0`). Test: `test/recluse-room.test.ts`.
+  [2026-11-12-hidden-boss-room-mockup.md](../decisions/2026-11-12-hidden-boss-room-mockup.md).
+  **Round 2 (Nov 13):** 9 x 9 (about half the floor), everything brought in (the bed's foot just onto the rug, the sun's panes across the
+  rug), the door at the front's east end; a 1.15-square board. He plays Black seated (a lean, a short reach) and walks round for every
+  White move, kneeling beside the board on the piece's side (`recluse-game.ts` `stepsOf`, `walkPath`; `recluse-ages.ts` `PLAY_POSES`:
+  standing, walking, kneeling, from the front and behind); the game takes about 14 minutes. In this room only, each side wall is one
+  surface (`sideWallGrid`, the scene's `drawSideWalls`: about 70 affine strips a wall, the layout's side squares solid blanks);
+  `?walls=cards` shows round 1's cards; `__hiddenSeek(ms)` jumps the game for stills.
+  [2026-11-13-hidden-boss-room-r2.md](../decisions/2026-11-13-hidden-boss-room-r2.md).
+  **Round 3 (Nov 13):** the board sideways (White's rank 1 on our left, the a-file farthest). For every half-move he walks round
+  behind the board (never between us and it) to that color's side and sits back on his heels centered on it, side on to us; to play
+  he comes up on his knees and leans in (`recluse-ages.ts` `RECLUSE_CHILD_SIDE`, `SIDE_POSES`: five leans, four dips toward us, a
+  4-step side walk; mirrored for Black's side), shuffling up to a quarter square toward the move's files and back. `recluse-scene.ts`
+  `leanFor` picks each move's pose so his reach is short; his arm is two fixed lengths jointed at the elbow (`drawArm`), longer only
+  when straight; the test holds every move under half again his arm (worst about 1.07; on screen 1.08 computer, 1.13 phone).
+  [2026-11-13-hidden-boss-room-r3.md](../decisions/2026-11-13-hidden-boss-room-r3.md).
+
 ## Adding a home
 
 1. Draw it in `town/houses/<boss>.ts` like the others (the game's pixel art: `characters/sprite.ts` parts and frames,
@@ -1138,7 +1203,8 @@ noted wherever a slice changed one.
   (one file per home, fourteen in all, the Colosseum's `coliseum.ts`, the park's `park.ts`, the kit of shared pieces and the index),
   `sidekick-sheets.ts` and `sidekicks/*.png` (the sidekicks' baked frames, generated), `CardIcons.tsx` (the card's crossed swords and
   rating bars, inline SVG), `shops/` (inside a shop: `shops.ts` which homes and the crate's words and the buy stub, `room.ts` the room's
-  walking, `ShopRoom.tsx` the room, `babur-art.ts` and `puddles-art.ts` the rooms' art).
+  walking, `ShopRoom.tsx` the room, `babur-art.ts` and `puddles-art.ts` the rooms' art; the Walk-up's: `houses/recluse.ts`, `shops/recluse-stairs-art.ts`,
+  `recluse-art.ts`, `recluse-scene.ts`, `recluse-game.ts`).
 - The sidekicks' art: `packages/app/src/characters/sidekicks/<boss>.ts` (one `Character` each, `sidekick-<boss>`, copied
   as drawn from `claude/boss-art`), baked by `scripts/bake-sidekicks.ts` (`npx tsx scripts/bake-sidekicks.ts`).
 - References: `docs/mockups/town-square/` (the prototype Eric tested, and the pictures for the homes: Eric's for the

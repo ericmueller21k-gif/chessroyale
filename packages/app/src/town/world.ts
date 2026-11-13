@@ -5,7 +5,7 @@
  * bots without touching either. The bots are one source that moves its people. Ported from the prototype Eric tested (docs/mockups/town-square/prototype.html): the same
  * square-to-square walk, the same hobble, the same pauses. Every number that shapes the feel is in feel.ts.
  */
-import { adminFirst, type ItemLook } from "@chessroyale/core";
+import { BOSS_ROSTER, adminFirst, type ItemLook } from "@chessroyale/core";
 import { GOODBYE_LINES, SELECT_LINES } from "../characters/boss-select.ts";
 import { takeGoodbyeFrom } from "./goodbye.ts";
 import { N, WRAP, colI, rowI, wrapF, wrapFX, wrapFY, wrapI } from "./camera.ts";
@@ -263,23 +263,32 @@ export const tableAt = (c: number, r: number): Table | null => TABLES.find((t) =
  */
 export const START: Sq = STREET_TOWN ? STREET_START : { c: PARK.c0 + 9, r: PARK.r1 - 3 };
 
-export type HomeId = "tiger" | "gingerbread" | "grex" | "hollow" | "moo" | "clown" | "bigboy" | "sawyer" | "pig" | "smudgy" | "hopper" | "gardener" | "alfil" | "folio" | "timber" | "dash" | "zebra";
+export type HomeId = "tiger" | "gingerbread" | "grex" | "hollow" | "moo" | "clown" | "bigboy" | "sawyer" | "pig" | "smudgy" | "hopper" | "gardener" | "alfil" | "folio" | "timber" | "dash" | "zebra" | "recluse";
 /**
  * The homes whose boss isn't out in the town: Rolling Dough (Nov 11, Eric's design: Don Dough is the kingpin "in the back room (not
  * out in the town)"; you meet him in his bakery's back room). They're last in ALL_HOMES, so the town's bosses keep the homes' order.
  */
-export type IndoorId = "zebra";
+export type IndoorId = "zebra" | "recluse";
+/** The Hidden Boss's name: core's one string (Eric names him later; the real one never appears anywhere). */
+const RECLUSE_NAME: string = BOSS_ROSTER.find((b) => b.id === "recluse")!.name;
 /** A home whose boss roams the town round it. */
 export type TownBossId = Exclude<HomeId, IndoorId>;
-export const hasTownBoss = <H extends { id: HomeId }>(h: H): h is H & { id: TownBossId } => h.id !== "zebra";
+export const hasTownBoss = <H extends { id: HomeId }>(h: H): h is H & { id: TownBossId } => h.id !== "zebra" && h.id !== "recluse";
+/**
+ * The homes with nobody out front (Nov 13: the Hidden Boss's walk-up; he's upstairs, and no stand-in waits at its door). They're last in
+ * ALL_HOMES, so the town's figures (its bosses and stand-ins, `Town.bosses`) keep the homes' order, each at its home's index.
+ */
+export type NoFigureId = "recluse";
+/** A home with someone out front: its boss, or its stand-in. */
+export const hasFigure = (h: { id: HomeId }): boolean => h.id !== "recluse";
 /**
  * A home whose boss is inside has a stand-in out front, where the others' bosses stand (Eric, Nov 11: "people are going to be used to
  * seeing a guy out front"): Rolling Dough's guard. He stands still on its rest square, says nothing on his own, and his card's Talk says
  * the boss is inside (`ZEBRA_OUTSIDE_LINES`). His name here; his drawing is render.ts's BOSS_ART.
  */
-export const STAND_IN: Readonly<Record<IndoorId, string>> = { zebra: "Bakery guard" };
+export const STAND_IN: Readonly<Record<Exclude<IndoorId, NoFigureId>, string>> = { zebra: "Bakery guard" };
 /** The name a town figure goes by: its boss's, or its stand-in's. */
-export const figureName = (h: Home): string => (hasTownBoss(h) ? h.boss : STAND_IN[h.id as IndoorId]);
+export const figureName = (h: Home): string => (hasTownBoss(h) ? h.boss : STAND_IN[h.id as Exclude<IndoorId, NoFigureId>]);
 
 /**
  * A place with a picture, a name (floating over it and on its sign) and an edge chip: a boss's home, or the Colosseum.
@@ -372,6 +381,13 @@ export const ALL_HOMES: readonly Home[] = (
     // keep the homes' order. Its ring the awning's burgundy. In an admin's town only while he's in the game for admins first.
     // docs/decisions/2026-11-11-zebra-home.md.)
     { id: "zebra", boss: "Don Dough", name: "Rolling Dough", color: "#8e2b3a", cx: 9, cy: 1 },
+    // (Nov 13: the Hidden Boss's walk-up, an old Brooklyn corner apartment building (Eric's photo). The street town: the corner lot of
+    // Fountain Street and Seam Avenue (street-plan.json, 47-50; the row shifts it onto the corner). Today's town: (45, 7) on the east edge,
+    // the most open ground left (7.1 squares from its nearest neighbor). Nobody out front (hasFigure): he's upstairs, the child on the
+    // top floor; inside, a hall, a landing and his room (shops/shops.ts RECLUSE_ROOMS). Last of the homes. Its ring the brick's red-brown.
+    // In an admin's town only while he's in the game for admins first (core's BOSS_ADMIN_FIRST; his Boss Battle tile stays locked:
+    // adminOnly). His name is core's one string. docs/decisions/2026-11-13-hidden-boss-building.md.)
+    { id: "recluse", boss: RECLUSE_NAME, name: "The Walk-up", color: "#8a3b2a", cx: 45, cy: 7 },
   ] satisfies Omit<Home, "half" | "foot" | "hw" | "hd" | "door" | "entry" | "rest" | "wander">[]
 ).map((h) => (STREET_TOWN ? streetHome(h) : { ...h, half: 1.5, foot: 0.5, hw: 1, hd: 1, door: { c: h.cx, r: wrapI(h.cy - 2) }, entry: { c: h.cx, r: wrapI(h.cy - 1) }, rest: { c: h.cx, r: wrapI(h.cy - 2) }, wander: null }));
 /**
@@ -993,7 +1009,7 @@ export function createTown(now: number, seed = 20261025, seat: Seat | null = nul
   }
   // Each boss starts on the square in front of its home's middle (toward the camera); in the street town, on its rest square. (A home
   // whose boss is inside: its stand-in, there for good; in today's town, beside its door rather than on it, the others' start.)
-  const bosses: Boss[] = HOMES.map((home) => ({ home, walker: new Walker(hasTownBoss(home) || home.wander ? home.rest : { c: wrapI(home.cx + 1), r: home.rest.r }, f.bossStepMs, false), nextAt: null, onScreen: false, held: false, lastLine: null }));
+  const bosses: Boss[] = HOMES.filter(hasFigure).map((home) => ({ home, walker: new Walker(hasTownBoss(home) || home.wander ? home.rest : { c: wrapI(home.cx + 1), r: home.rest.r }, f.bossStepMs, false), nextAt: null, onScreen: false, held: false, lastLine: null }));
   // Who's out (`botsOut` of them, shuffled by the town's seed, so the town opens the same way every time, as the tests
   // need; back from a game, the bot you played among them); the others are at home, and the turns change who's out.
   const order = TOWN_BOTS.map((_, i) => i);

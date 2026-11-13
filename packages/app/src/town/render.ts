@@ -57,7 +57,7 @@ import { seenEither, seenFrom, seenReady, seenWorked } from "./seen.ts";
 import { P, REC, type PartId } from "./frame-report.ts";
 import { bakeRoof, type Piece, type RoofArt } from "./box-draw.ts";
 import { stepChar } from "./kit/bake.ts";
-import { ARENA, COLISEUM_PLACE, GARDEN, WALL, GRASS, LAMPS, LOT, PAVING, PROPS, STATUES, TABLES, figureName, groundAt, hasTownBoss, isSprite, onColiseum, plotAt, plotDist, seated, spriteAnim, tableStates, type Boss, type SpriteAnim, type Home, type HomeId, type IndoorId, type TownBossId, type Person, type Place, type Pose, type Prop, type Statue, type StatueId, type Table, type TableState, type Town, type Walker } from "./world.ts";
+import { ARENA, COLISEUM_PLACE, GARDEN, WALL, GRASS, LAMPS, LOT, PAVING, PROPS, STATUES, TABLES, figureName, groundAt, hasTownBoss, isSprite, onColiseum, plotAt, plotDist, seated, spriteAnim, tableStates, type Boss, type SpriteAnim, type Home, type HomeId, type IndoorId, type NoFigureId, type TownBossId, type Person, type Place, type Pose, type Prop, type Statue, type StatueId, type Table, type TableState, type Town, type Walker } from "./world.ts";
 import { drawZzz } from "./zzz.ts";
 import { TAG_STYLE, TagCache, easeTag, namesMode, tagAlpha, type NamesMode, type TagKind } from "./tags.ts";
 
@@ -84,9 +84,9 @@ export const BOSS_ART: Record<TownBossId, Character> = {
 };
 /** A home whose boss is inside: its stand-in's sprite out front (world.ts STAND_IN). Rolling Dough's guard (Nov 11): the front room's
  * flat-cap door guard, his roll at port arms; Don's size, as drawn. */
-const STAND_IN_ART: Record<IndoorId, Character> = { zebra: NPC_ZEBRA_GUARD_A };
-/** The town figure's sprite for a home: its boss's, or its stand-in's. */
-const figureArt = (id: HomeId): Character => (id === "zebra" ? STAND_IN_ART[id] : BOSS_ART[id]);
+const STAND_IN_ART: Record<Exclude<IndoorId, NoFigureId>, Character> = { zebra: NPC_ZEBRA_GUARD_A };
+/** The town figure's sprite for a home: its boss's, or its stand-in's (a home with nobody out front, world.ts hasFigure, has none). */
+const figureArt = (id: HomeId): Character => (id === "zebra" ? STAND_IN_ART[id] : BOSS_ART[id as TownBossId]);
 /**
  * Each boss's head in its first idle frame (x, y and a side, in its pixels): what its edge chip shows. (Slice 1 cropped
  * the top of the frame, which showed Babur's balloons, not Babur.)
@@ -114,6 +114,8 @@ export const BOSS_FACE: Record<HomeId, readonly [x: number, y: number, size: num
   // (Rolling Dough has no boss in the town, Don Dough being in his back room: its chip shows the bakery's door, the eyes peeking
   // through its blinds, in the home's own picture: chipFace.)
   zebra: [72, 82, 44],
+  // (The Walk-up has nobody out front, the Hidden Boss upstairs: its chip shows the top floor's lit window, the child's, under its hood.)
+  recluse: [32, 34, 44],
 };
 
 // ---- Colors (the prototype's, sampled from Eric's reference picture).
@@ -2024,7 +2026,7 @@ export class Renderer {
       if (s > 0.02) this.blitSoft(img, x0, y0, W, H, s, 0.88 * s);
       else ctx.drawImage(img, x0, y0, W, H);
       const ta = alpha * clamp(1 - 2 * s, 0, 1);
-      if (sign && TOWN_FEEL.signNames && ta > 0.02) this.writeSign(it.i, x0 + sign.x * px, y0 + sign.y * px, sign.w * px, sign.h * px, ta);
+      if (sign && sign.w > 0 && TOWN_FEEL.signNames && ta > 0.02) this.writeSign(it.i, x0 + sign.x * px, y0 + sign.y * px, sign.w * px, sign.h * px, ta);
       ctx.restore();
       this.cover(img, x0, y0, W, H, alpha);
       if (glow) this.lightUp(glow, x0, y0, px, alpha * (1 - 0.88 * s), now, phase);
@@ -2032,7 +2034,7 @@ export class Renderer {
     } else {
       this.drawWall(w, img, ch, alpha, glow, false, now, phase);
       const ta = alpha * clamp(1 - 2 * s, 0, 1);
-      if (sign && TOWN_FEEL.signNames && ta > 0.02) {
+      if (sign && sign.w > 0 && TOWN_FEEL.signNames && ta > 0.02) {
         this.wallAffine(w, ch, sign.x, sign.x + sign.w, false);
         this.writeSignT(it.i, sign, px, ta);
       }
@@ -3375,7 +3377,7 @@ export class Renderer {
     else ctx.drawImage(img, x0, y0, w, h);
     // The name on the sign, written by the game (fading out in the far band, where it's too small to read anyway).
     const ta = alpha * clamp(1 - 2 * s, 0, 1);
-    if (TOWN_FEEL.signNames && ta > 0.02) this.writeSign(it.i, x0 + art.sign.x * px, y0 + art.sign.y * px, art.sign.w * px, art.sign.h * px, ta);
+    if (art.sign.w > 0 && TOWN_FEEL.signNames && ta > 0.02) this.writeSign(it.i, x0 + art.sign.x * px, y0 + art.sign.y * px, art.sign.w * px, art.sign.h * px, ta);
     if (it.i === this.homes.length) this.drawStatues(x0, y0, px, alpha, s, now);
     ctx.restore();
     this.cover(img, x0, y0, w, h, alpha);

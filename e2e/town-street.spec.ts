@@ -496,3 +496,120 @@ test("the town's loading fetches every boss theme once and decodes none (Eric, N
   await page.waitForTimeout(1500);
   expect(gets, "Music off: nothing fetched").toEqual([]);
 });
+
+/**
+ * The Hidden Boss's building (Nov 13; docs/areas/town-square.md, "The Walk-up"), an admin's (admins first): its door, the hall (a flat's
+ * door's line), up the stairs to the landing, up again to his room (the child at his game; his card's Challenge greyed, "Coming soon"),
+ * and back down both flights. A player's town has no walk-up. `STILLS=<dir>` writes the stills for the PR.
+ */
+test("the Hidden Boss's walk-up (admins first): its door, the hall, up two flights to his room, his Challenge greyed, and back down", async ({ page }) => {
+  test.setTimeout(150_000);
+  const errors = watchErrors(page);
+  type Hooks = { __townAt?: (k: string, id: string) => { x: number; y: number } | null; __townGlide?: (to: string) => void; __shopAt?: (k: string, s?: unknown) => { x: number; y: number } | null; __shopLook?: (k: string, to?: string) => boolean };
+  const room = page.locator("canvas.town-shop-canvas");
+  const still = async (name: string, settle = 0) => {
+    if (!STILLS) return;
+    mkdirSync(STILLS, { recursive: true });
+    // (Inside: after the room's name banner has gone.)
+    await page.waitForTimeout(settle);
+    await page.screenshot({ path: `${STILLS}/${name}-${test.info().project.name}.png` });
+  };
+  /** Where the room's hook says to tap (`kind`, its square or the room a door leads to), on the page; null: not on screen. */
+  const shopAt = async (kind: string, s?: unknown) => {
+    const xy = await page.evaluate(([k, q]) => (window as unknown as Hooks).__shopAt?.(k as string, q) ?? null, [kind, s] as const);
+    const cv = xy && (await room.boundingBox());
+    return xy && cv ? { x: cv.x + xy.x, y: cv.y + xy.y } : null;
+  };
+  /** Up or down the stairs to `to`: a tap on them walks you there, their card's button takes you through. */
+  const climb = async (to: "landing" | "top" | "front", button: "Go up" | "Go down") => {
+    const card = page.getByRole("dialog", { name: "Stairs", exact: true });
+    await expect(async () => {
+      if (await card.isVisible()) return;
+      if (!(await shopAt("pass", to))) await page.evaluate((t) => (window as unknown as Hooks).__shopLook?.("pass", t), to);
+      const at = await shopAt("pass", to);
+      expect(at, `the stairs to ${to} on screen`).not.toBeNull();
+      await page.mouse.click(at!.x, at!.y);
+      await expect(card).toBeVisible({ timeout: 8000 });
+    }).toPass({ timeout: 40_000 });
+    await expect(card.getByRole("button")).toHaveText([button]);
+    await card.getByRole("button", { name: button }).click();
+    if (to === "front") await expect(room).not.toHaveAttribute("data-part", /./, { timeout: 20_000 });
+    else await expect(room).toHaveAttribute("data-part", to, { timeout: 20_000 });
+    await expect(room).toHaveAttribute("data-ready", "1", { timeout: 20_000 });
+  };
+  await asAdmin(page);
+  await page.goto("/town?sky=day");
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
+  // The building, on its corner of Fountain Street and Seam Avenue: its card, its name and Go in.
+  await page.evaluate(() => (window as unknown as Hooks).__townGlide?.("recluse"));
+  const homeAt = async () => {
+    const xy = await page.evaluate(() => (window as unknown as Hooks).__townAt?.("home", "recluse") ?? null);
+    const cv = xy && (await canvas(page).boundingBox());
+    return xy && cv ? { x: cv.x + xy.x, y: cv.y + xy.y } : null;
+  };
+  await expect.poll(homeAt, { message: "the walk-up comes into view", timeout: 20_000 }).not.toBeNull();
+  await page.waitForTimeout(1500);
+  await still("outside");
+  if (STILLS) {
+    const map = page.getByRole("button", { name: "Open the map" });
+    if (await map.count()) {
+      await map.click();
+      await page.waitForTimeout(700);
+      await still("map");
+      await page.keyboard.press("Escape");
+    }
+  }
+  const card = page.getByRole("dialog", { name: "The Walk-up", exact: true });
+  await expect(async () => {
+    if (await card.isVisible()) return;
+    const at = await homeAt();
+    expect(at).not.toBeNull();
+    await page.mouse.click(at!.x, at!.y);
+    await expect(card).toBeVisible({ timeout: 1500 });
+  }).toPass({ timeout: 20_000 });
+  await expect(card.getByRole("button")).toHaveText(["Go in"]);
+  await card.getByRole("button", { name: "Go in" }).click();
+  await expect(room).toHaveAttribute("data-ready", "1", { timeout: 20_000 });
+  await expect(room).toHaveAttribute("data-room", "recluse");
+  await expect(room).not.toHaveAttribute("data-part", /./);
+  await expect(page.getByRole("heading", { name: "The Walk-up" })).toBeVisible();
+  await still("hall", 3500);
+  // A flat's door you can't open: a tap walks you to it, its card says a line, OK closes it.
+  const flat = page.getByRole("dialog", { name: "Apartment door", exact: true });
+  await expect(async () => {
+    if (await flat.isVisible()) return;
+    const at = await shopAt("square", [1, 0]);
+    expect(at, "flat 1A's door on screen").not.toBeNull();
+    await page.mouse.click(at!.x, at!.y);
+    await expect(flat).toBeVisible({ timeout: 8000 });
+  }).toPass({ timeout: 30_000 });
+  await expect(flat.locator(".town-card-text")).toHaveText(/\S/);
+  await flat.getByRole("button", { name: "OK" }).click();
+  await expect(flat).toBeHidden();
+  // Up to the landing, and up again to his room.
+  await climb("landing", "Go up");
+  await page.waitForTimeout(800);
+  await still("landing", 3500);
+  await climb("top", "Go up");
+  await still("room-arrive", 3500);
+  // His room: a tap on his board walks you round to its front, and his card: Challenge greyed, "Coming soon".
+  const his = page.getByRole("dialog", { name: "Hidden Boss", exact: true });
+  await expect(async () => {
+    if (await his.isVisible()) return;
+    const at = await shopAt("square", [4, 4]);
+    expect(at, "his board on screen").not.toBeNull();
+    await page.mouse.click(at!.x, at!.y);
+    await expect(his).toBeVisible({ timeout: 8000 });
+  }).toPass({ timeout: 30_000 });
+  await expect(his.getByRole("button", { name: "Challenge" })).toBeDisabled();
+  await expect(his.locator(".town-soon")).toHaveText("Coming soon");
+  await page.waitForTimeout(800);
+  await still("room", 3500);
+  await page.keyboard.press("Escape");
+  await expect(his).toBeHidden();
+  // Back down both flights to the hall.
+  await climb("landing", "Go down");
+  await climb("front", "Go down");
+  await expect(room).toHaveAttribute("data-room", "recluse");
+  expect(errors).toEqual([]);
+});

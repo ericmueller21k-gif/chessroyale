@@ -1827,7 +1827,9 @@ export const BOSS_POWERS = {
  * them (the boss select, Boss alone and a Solo raid), until Eric says go. **To put one live for everyone, take its id out of
  * this list** (core boss.ts's `adminFirst`; nothing else changes).
  */
-export const BOSS_ADMIN_FIRST: readonly string[] = ["timber", "dash", "zebra"];
+// (Nov 13: "recluse", the Hidden Boss, so his walk-up in the town is an admin's only (town/world.ts HOMES), as Don Dough's bakery was. His
+// Boss Battle tile stays locked whatever this says: he's `adminOnly` in the roster, and adminFirstBosses leaves those out.)
+export const BOSS_ADMIN_FIRST: readonly string[] = ["timber", "dash", "zebra", "recluse"];
 
 /**
  * How Sawyer's split pawn looks (packages/app/src/components/Sawyer.tsx). Looks only: the rules, the engine and the

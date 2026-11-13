@@ -72,7 +72,7 @@ describe("one back line across the whole town", () => {
 
 describe("Upper Street's homes moved south: Meadow Street", () => {
   it("every boss home is in the town, each with its door, strip and rest square, reached from the start", () => {
-    expect(HOMES).toHaveLength(17);
+    expect(HOMES).toHaveLength(18);
     const d = stepsFrom(START);
     for (const h of HOMES) {
       const strip = STRIPS.find((s) => s.home === (h.id === "dash" ? "blitz" : h.id));
@@ -218,7 +218,7 @@ describe("boss homes are never neighbors, and no look-alike is a sliver (Eric, N
         }
       });
     }
-    expect(homes).toBe(17);
+    expect(homes).toBe(18);
     expect(ROW_MIN_W).toBe(1);
   });
 });

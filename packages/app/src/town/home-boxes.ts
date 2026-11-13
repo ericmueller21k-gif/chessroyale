@@ -26,6 +26,9 @@
  *   hollow     Hollow Peak                  dark crystal rock rising to its peak (no walls)
  *   zebra      Rolling Dough                cream plaster with a brick string course, a flat tar roof behind its parapet and a
  *                                           chimney (Nov 11: the bakery's front is the art's; its box is the director's helper's)
+ *   recluse    The Walk-up                  red-brown brick, three rows of arched windows down each side (it's a corner building:
+ *                                           its east side faces Seam Avenue), a flat tar roof behind its cornice, a water tank on
+ *                                           its bulkhead (Nov 13, the Hidden Boss's)
  */
 import type { Character } from "../characters/sprite.ts";
 import type { LightSpot } from "./houses/kit.ts";
@@ -35,7 +38,7 @@ import {
   type Face, type SideSpec, type TownBox,
 } from "./town-kit.ts";
 
-export type HomeId = "tiger" | "gingerbread" | "grex" | "hollow" | "moo" | "clown" | "bigboy" | "sawyer" | "pig" | "smudgy" | "hopper" | "gardener" | "alfil" | "folio" | "timber" | "blitz" | "zebra";
+export type HomeId = "tiger" | "gingerbread" | "grex" | "hollow" | "moo" | "clown" | "bigboy" | "sawyer" | "pig" | "smudgy" | "hopper" | "gardener" | "alfil" | "folio" | "timber" | "blitz" | "zebra" | "recluse";
 
 /** A home's box: its sides (null: its roof runs to the ground there), roof, palette, and where its door is on its front. */
 interface HomeSpec {
@@ -163,6 +166,14 @@ export const HOME_SPECS: Record<HomeId, HomeSpec> = {
     side: { mat: "plaster", rows: [{ y: 40, h: 22 }, { y: 76, h: 22 }], every: 34, trim: [0, 14] },
     roof: [...flatRoof(12, 132, 118), ...blockF(98, 114, 0.2, 0.42, 118, 134, "clay", "tar")],
     pal: { ...ramp("#c9b38c", "#efe2c4", "#fbf3df"), g: "#a8483a", G: "#7a2e26" },
+  },
+  // (The Walk-up, Nov 13: its cornice's cap 10 px under the picture's top, 208 px over its foot (218), from x 4 to 140; the walls 8 to
+  // 136; the stair bulkhead and its water tank on the roof; the front door's middle at 90 (houses/recluse.ts HOUSE_RECLUSE_DOOR).)
+  recluse: {
+    body: [8, 136], eave: [208, 208], door: 90,
+    side: { mat: "brick", rows: [{ y: 33, h: 25, arch: true }, { y: 77, h: 25, arch: true }, { y: 121, h: 25, arch: true }], every: 28, trim: [0, 18, 154], plinth: 49 },
+    roof: [...flatRoof(8, 136, 208), ...blockF(96, 122, 0.25, 0.6, 208, 222, "clay", "tar"), ...blockF(100, 118, 0.3, 0.55, 222, 236, "plank", "plank")],
+    pal: { ...ramp("#6e4a3c", "#93412f", "#a8523b"), g: "#87684f", G: "#5d4636" },
   },
   hollow: {
     body: [28, 124], eave: null, door: 81, taper: 0.55,

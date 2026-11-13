@@ -860,3 +860,42 @@ export const SHOP_FEEL = {
     boardUp: 23,
   },
 } as const;
+
+/**
+ * The Hidden Boss's child's room (Nov 12: a mockup, shops/recluse-scene.ts; not reachable from the town yet). Times in ms.
+ * `play`: one half-move of the child playing himself: he thinks, reaches, carries the piece over, sits back, looks; the start's pause,
+ * the pause on the mate and the fade back to the start. `kid`: his drawing's size (room pixels a drawing pixel), the board's (squares
+ * across), the piece's lift as it's carried (board squares). `summon`: the summoning's beats, each from its start.
+ */
+export const HIDDEN_ROOM_FEEL = {
+  /**
+   * His game's pace (ms; Nov 13, Eric: "it would take him realistically like a while to play out the game. Cause that's the point").
+   * Round 3 (Nov 13): every half-move he gets up (`rise`), walks round behind the board to that side (`walk` squares a second), sits
+   * back on his heels (`sit`), thinks (each move its own, `think` times 0.6 to 1.6), leans in and reaches, carries, comes back, and
+   * looks up. About 10.5 s a half-move: the whole game about 14 minutes.
+   */
+  play: { first: 1400, think: 2000, reach: 900, carry: 700, back: 800, look: 600, rise: 640, walk: 1.0, sit: 640, end: 3200, fade: 1100 },
+  /** His drawing's size in the room, the board's size (squares; small, still real chess), a carried piece's lift, a walk step (ms). */
+  kid: { scale: 0.8, board: 1.15, lift: 0.7, stepMs: 240 },
+  summon: {
+    /** The freeze frame: the players' figures still images (a flash). */
+    freeze: 0,
+    /** The rays shoot from the board, outward and upward, growing. */
+    rays: 350,
+    /** The four burst into particles all at once; drawn into the light. */
+    burst: 1300,
+    /** The light and particles draw back over the board, then fall and splash into it. */
+    drawBack: 2350,
+    fall: 2850,
+    splash: 3150,
+    /** The board wobbles up and down, settling; then quiet. */
+    wobbleMs: 1100,
+    quiet: 4500,
+    /** Then the transition: the room closes in on the board (an iris), black, and the match. */
+    iris: 5500,
+    irisMs: 900,
+    end: 6900,
+    /** The particles each player bursts into. */
+    bits: 90,
+  },
+} as const;

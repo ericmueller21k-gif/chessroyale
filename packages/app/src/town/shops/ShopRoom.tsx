@@ -46,7 +46,7 @@ import { TAG_STYLE, type TagKind } from "../tags.ts";
 import { Walker, type HomeId } from "../world.ts";
 import type { Rider } from "../rides.ts";
 import { rideSpeed } from "../../components/rides/scale.ts";
-import { STORE_PANELS, driftAt, type PoolDrift, camFocus, ceilingPanel, inTalkRange, lightsAt, litDx, overlaps, upAlpha, walkable, youBox, isFloor, makeRoom, onDoor, onPass, passArrive, tapTarget, findPath, stepFor, type Room, type ShopPlace, type Sq } from "./room.ts";
+import { STORE_PANELS, driftAt, type PoolDrift, camFocus, ceilingPanel, inTalkRange, lightsAt, litDx, overlaps, upAlpha, walkable, youBox, isFloor, makeRoom, onDoor, onPass, passArrive, passAt, type RoomPart, tapTarget, findPath, stepFor, type Room, type ShopPlace, type Sq } from "./room.ts";
 import { POOL_LINE, bossHoldings, buyBossCrate, canAfford, gotLine, holdLine, priceLine, prizeRows, roomDef, wayText, type CrateWay, type ShopDef } from "./shops.ts";
 import { CrateOpening } from "../../screens/Crates.tsx";
 import type { BossCrateDef } from "@chessroyale/core";
@@ -76,7 +76,7 @@ import { CLAW_PLAY, clawPose, newPose as newClawPose } from "../../claw/view.ts"
 import { closeClawMachine, openClawMachine } from "../../claw/index.ts";
 
 /** A room's art, as its file exports it. */
-interface RoomArt {
+export interface RoomArt {
   /** Its size in squares, each way (20 unless the art says: Boingo's Funhouse is 24). */
   n?: number;
   layout: readonly ShopPlace[];
@@ -122,7 +122,8 @@ interface RoomArt {
   people?: Readonly<Record<string, { readonly ch: Character; readonly anims: readonly string[] }>>;
   scene?: "zebra-front" | "zebra-back";
   /**
-   * Only these pieces go see-through over you (its near wall and its door), though it has a floor's shape (Rolling Dough's rooms: the
+   * Only these pieces go see-through over you (its near wall and its door), though it has a floor's shape, or has none (the walk-up's
+   * box rooms, Nov 13) (Rolling Dough's rooms: the
    * table and its board, the counter and the lamps stay solid; Eric, Nov 11, saw the table and its board ghosted as "artifacts"). Without
    * it, a room with a floor's shape ghosts any piece nearer than you and over you (SHOP_FEEL.seeThrough: a cave's rock, the warehouse's
    * door, the igloo's walls).
@@ -204,6 +205,26 @@ const ART: Partial<Record<string, () => Promise<RoomArt>>> = {
   // elves at work.)
   // (Rolling Dough, Nov 11: the front room, a floor's shape as Hollow's (16 x 12: the back room is behind its back wall), the guards by
   // the door; and its back room, its own room through the door at the back left: Don Dough and his crew at the table, dim.)
+  // (The Hidden Boss's walk-up, Nov 13: the hall and the landing, small box rooms of 7 x 7, each seen whole; and the top floor, his room
+  // (9 x 9), its side walls drawn by its scene as one surface each (shops/recluse-scene.ts, the room's `fx` from the town).)
+  recluse: () =>
+    import("./recluse-stairs-art.ts").then((m) => ({ n: m.RECLUSE_HALL_N, layout: m.RECLUSE_HALL_LAYOUT, pieces: m.RECLUSE_STAIRS_PIECES, crateAt: [0, 0] as const, lights: m.RECLUSE_HALL_LIGHTS, pools: m.RECLUSE_HALL_POOLS, outside: "#8d8a82", fixCam: m.RECLUSE_HALL_CAM, seeThru: ["entrance", "hem"] })),
+  "recluse-landing": () =>
+    import("./recluse-stairs-art.ts").then((m) => ({ n: m.RECLUSE_HALL_N, layout: m.RECLUSE_LANDING_LAYOUT, pieces: m.RECLUSE_STAIRS_PIECES, crateAt: [0, 0] as const, lights: m.RECLUSE_LANDING_LIGHTS, pools: m.RECLUSE_LANDING_POOLS, outside: "#140d0a", fixCam: m.RECLUSE_HALL_CAM, seeThru: ["stairs-down", "hem"] })),
+  "recluse-top": () =>
+    import("./recluse-art.ts").then((m) => ({
+      n: m.SHOP_RECLUSE_N,
+      layout: m.SHOP_RECLUSE_LAYOUT,
+      pieces: m.SHOP_RECLUSE_PIECES,
+      crateAt: [0, 0] as const,
+      lights: m.SHOP_RECLUSE_LIGHTS,
+      pools: m.SHOP_RECLUSE_POOLS,
+      upright: ["bed"],
+      standing: m.SHOP_RECLUSE_STANDING,
+      outside: "#2a1d14",
+      fixCam: m.SHOP_RECLUSE_CAM,
+      seeThru: ["entrance", "hem"],
+    })),
   zebra: () =>
     Promise.all([import("./zebra-art.ts"), import("./zebra-crew.ts")]).then(([m, c]) => ({
       layout: m.SHOP_ZEBRA_LAYOUT,
@@ -300,7 +321,7 @@ export interface LoadedRoom {
 /** A person's frames, by animation: each drawn once into a canvas, each one's ms and top row, and whether it loops. */
 type PersonFrames = Record<string, { frames: HTMLCanvasElement[]; ms: number[]; top: number[]; loop: boolean }>;
 /** A room's key: its home's id, or "<id>-back" for its back room (ART's, the loads'). */
-export const roomKey = (home: HomeId, part: "front" | "back" = "front"): string => (part === "back" ? `${home}-back` : home);
+export const roomKey = (home: HomeId, part: RoomPart = "front"): string => (part === "front" ? home : `${home}-${part}`);
 
 const toCanvas = (ch: Character, i: number, anim = "idle"): HTMLCanvasElement => {
   const { w, h, data } = renderFrame(ch, ch.anims[anim]!.frames[i]!);
@@ -337,11 +358,17 @@ const picture = (url: string, what: string) =>
   });
 const loading = new Map<string, Promise<LoadedRoom>>();
 /** Loads a home's room (its art's chunk, every piece's frames drawn, the kid's sheet), once: its front, or its back room (`part`). */
-export function loadRoom(home: HomeId, part: "front" | "back" = "front"): Promise<LoadedRoom> {
-  const key = roomKey(home, part);
+export function loadRoom(home: HomeId, part: RoomPart = "front"): Promise<LoadedRoom> {
+  return loadRoomWith(roomKey(home, part), roomDef(home, part)!, ART[roomKey(home, part)]!);
+}
+/**
+ * Loads a room from its def and its art's loader, once by `key`: a home's room (`loadRoom`), or a room no home opens yet (the Hidden
+ * Boss's child's room, Nov 12: a mockup, shops/recluse-preview.tsx, reachable only on the dev server).
+ */
+export function loadRoomWith(key: string, def: ShopDef, artOf: () => Promise<RoomArt>): Promise<LoadedRoom> {
   let p = loading.get(key);
   if (p) return p;
-  const def = roomDef(home, part)!;
+  const home = def.home;
   const sheet = SIDEKICK_SHEETS[def.kid];
   const img = new Image();
   const kid = new Promise<void>((ok, no) => {
@@ -351,7 +378,7 @@ export function loadRoom(home: HomeId, part: "front" | "back" = "front"): Promis
   });
   // (Jefferson's warehouse: his crew's nine sheets too.)
   const crew = home === "grex" ? Promise.all((Object.keys(CREW_SHEETS) as CrewName[]).map((k) => picture(CREW_URL[k]!, `the ${k} sheet`).then((img) => [k, img] as const))).then((l) => Object.fromEntries(l) as Record<CrewName, HTMLImageElement>) : Promise.resolve(null);
-  p = Promise.all([ART[key]!(), kid, crew]).then(async ([art, , crewImgs]) => {
+  p = Promise.all([artOf(), kid, crew]).then(async ([art, , crewImgs]) => {
     const frames: Record<string, Frames> = {};
     // (While the town zooms on the door: a slice a frame, load-slice.ts; behind the black, all at once.)
     let t0 = performance.now();
@@ -397,6 +424,8 @@ export function loadRoom(home: HomeId, part: "front" | "back" = "front"): Promis
   return p;
 }
 
+/** Which floor each room is on (the walk-up's stairs say "Go up" or "Go down" by it). */
+const FLOOR_OF: Readonly<Record<RoomPart, number>> = { front: 0, back: 0, landing: 1, top: 2 };
 /** The card open inside: the Shopkeeper's, the crate's, the way out's, or the door to the home's other room's. */
 export type ShopCard = "talk" | "crate" | "door" | "pass";
 
@@ -409,6 +438,30 @@ export interface ShopCtl {
 }
 
 /**
+ * A room's own scene, drawn by the room's caller (the Hidden Boss's child's room, Nov 12: the child playing on the floor and the
+ * summoning; shops/recluse-scene.ts): its figures, each by its row among the room's pieces and you, and what goes over everything.
+ * None: the room as it always was.
+ */
+export interface RoomFx {
+  /** Your figure isn't drawn (the mockup's preview: its four stand-in players are the scene's). */
+  hideYou?: () => boolean;
+  /** Its figures this frame: each drawn at its row (`z`, squares) among the room's pieces, far to near. At most FX_MAX. */
+  figures?: (now: number) => readonly { readonly z: number; readonly draw: (d: FxDraw, now: number) => void }[];
+  /** Drawn over the whole room (its lights and effects), before the tags and cards. */
+  over?: (d: FxDraw, now: number) => void;
+}
+/** What a scene draws with: the room's canvas (CSS pixels), its camera and focus this frame, and the box's size. */
+export interface FxDraw {
+  g: CanvasRenderingContext2D;
+  v: ReturnType<typeof newView>;
+  camX: number;
+  camY: number;
+  W: number;
+  H: number;
+}
+const FX_MAX = 16;
+
+/**
  * A boss's challenge played in its room (shops/challenge.ts): you and the boss walk in to the battle circle's marks, it says its
  * line, the board comes in between you; then `onDone` (the town starts the boss's transition and the battle).
  */
@@ -419,19 +472,21 @@ export interface RoomIntro {
   onDone: () => void;
 }
 
-export function ShopRoom({ room, youArt, youRider, youName, onZoom, onOut, onReady, ctl, intro = null, zzz = () => false, arrived = false, onPass, onChallenge, canChallenge = false }: { /** You're away (afk.ts): a "zzz" over your pawn. */ zzz?: () => boolean; room: LoadedRoom; youArt: () => YouArt | null; /** The town's rider you're on (its frames ready), or null: on foot. */ youRider: () => Rider | null; youName: () => string; onZoom: (out: boolean) => void; onOut: () => void; onReady: () => void; ctl: { current: ShopCtl | null }; /** A boss's challenge to play here (none: the shop as usual). */ intro?: RoomIntro | null; /** You came in through the door from the home's other room (you start just inside it). */ arrived?: boolean; /** Through the door to the home's other room (Rolling Dough's). */ onPass?: () => void; /** The boss's challenge (Don Dough's: once his beat and the walk-out from his back room have played). */ onChallenge?: () => void; /** His boss is in the game to fight (none yet: Challenge greyed). */ canChallenge?: boolean }) {
+export function ShopRoom({ room, youArt, youRider, youName, onZoom, onOut, onReady, ctl, intro = null, zzz = () => false, arrived = false, onPass, onChallenge, canChallenge = false, fx = null }: { /** The room's own scene (RoomFx), or none. */ fx?: RoomFx | null; /** You're away (afk.ts): a "zzz" over your pawn. */ zzz?: () => boolean; room: LoadedRoom; youArt: () => YouArt | null; /** The town's rider you're on (its frames ready), or null: on foot. */ youRider: () => Rider | null; youName: () => string; onZoom: (out: boolean) => void; onOut: () => void; onReady: () => void; ctl: { current: ShopCtl | null }; /** A boss's challenge to play here (none: the shop as usual). */ intro?: RoomIntro | null; /** You came in through the door from the home's other room (you start just inside it; the room you left, when a room has more than one such door: the walk-up's landing). */ arrived?: boolean | RoomPart; /** Through a door to another of the home's rooms (Rolling Dough's, the walk-up's stairs): the room it leads to. */ onPass?: (to: RoomPart) => void; /** The boss's challenge (Don Dough's: once his beat and the walk-out from his back room have played). */ onChallenge?: () => void; /** His boss is in the game to fight (none yet: Challenge greyed). */ canChallenge?: boolean }) {
   const box = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const cardEl = useRef<HTMLDivElement>(null);
   const [card, setCard] = useState<ShopCard | null>(null);
   const [msg, setMsg] = useState("");
   const eng = useRef<ReturnType<typeof startRoom> | null>(null);
+  const cardWas = useRef<ShopCard | null>(null);
+  const lockedN = useRef(0);
   const { def } = room;
   useLayoutEffect(() => {
     const r = (eng.current = startRoom(box.current!, canvas.current!, cardEl.current!, room, youArt, youRider, youName, onZoom, (c) => {
       setCard(c);
       setMsg("");
-    }, intro, zzz, arrived, () => onChallenge?.(), onReady));
+    }, intro, zzz, arrived, () => onChallenge?.(), onReady, fx));
     ctl.current = r;
 
     return () => {
@@ -478,23 +533,43 @@ export function ShopRoom({ room, youArt, youRider, youName, onZoom, onOut, onRea
     return () => removeEventListener("keydown", key, true);
   }, [gotOpen, opening]);
   const held = bossHoldings(def.home);
-  const label = card === "talk" ? (def.name ?? "Shopkeeper") : card === "crate" ? (def.crate ?? undefined) : card === "door" || card === "pass" ? "Door" : undefined;
+  const label = card === "talk" ? (def.name ?? "Shopkeeper") : card === "crate" ? (def.crate ?? undefined) : card === "door" ? "Door" : card === "pass" ? (def.home === "recluse" ? "Stairs" : "Door") : undefined;
   // (Don Dough's card, Nov 11: his Challenge alone. It plays his beat, the walk-out, then the challenge: Eric, "when you hit challenge,
-  // it just goes through the talk animation no matter what".)
+  // it just goes through the talk animation no matter what". The Hidden Boss's on his top floor, Nov 13, the same card: his Challenge
+  // greyed, "Coming soon", until his room's challenge is built.)
   const back = def.part === "back";
+  const bossCard = back || def.part === "top";
+  // (The walk-up's flats' doors: the next of their lines each time the card opens; Nov 13.)
+  if (card !== cardWas.current) {
+    if (card === "talk" && def.locked) lockedN.current++;
+    cardWas.current = card;
+  }
+  // (The door's card at the stairs (the walk-up's): up or down, by the floors; Rolling Dough's: in to the back room, or out front.)
+  const passTo = card === "pass" ? (eng.current?.passTo() ?? null) : null;
+  const passWord = passTo === null ? "" : def.home === "recluse" ? (FLOOR_OF[passTo] > FLOOR_OF[def.part ?? "front"] ? "Go up" : "Go down") : back ? "Go out front" : "Go in";
   return (
     <div class="town-shop" ref={box}>
       <canvas class="town-shop-canvas" ref={canvas} aria-label={back ? `Inside ${def.boss}'s back room` : `Inside ${def.boss}'s shop`} />
-      <div class={card === "crate" ? "town-card shop-crate" : back && card === "talk" ? "town-card shop-don" : "town-card"} ref={cardEl} role="dialog" aria-label={label} style={{ display: card ? "" : "none" }}>
+      <div class={card === "crate" ? "town-card shop-crate" : bossCard && card === "talk" ? "town-card shop-don" : "town-card"} ref={cardEl} role="dialog" aria-label={label} style={{ display: card ? "" : "none" }}>
         {card === "talk" && (
           <>
             <h2>{def.name ?? "Shopkeeper"}</h2>
             {/* (A shop with a crate: Talk opens it. Rolling Dough's counter zebra has none yet: Talk has him say a line. Don Dough: his
                 Challenge alone.) */}
-            {back ? (
-              <button type="button" class="town-btn primary" disabled={!canChallenge} onClick={() => eng.current?.challenge()}>
-                Challenge
-              </button>
+            {def.locked ? (
+              <>
+                <p class="town-card-text">{def.locked[(lockedN.current - 1 + def.locked.length) % def.locked.length]}</p>
+                <button type="button" class="town-btn" onClick={() => eng.current?.close()}>
+                  OK
+                </button>
+              </>
+            ) : bossCard ? (
+              <>
+                <button type="button" class="town-btn primary" disabled={!canChallenge} onClick={() => eng.current?.challenge()}>
+                  Challenge
+                </button>
+                {!canChallenge && <div class="town-soon">Coming soon</div>}
+              </>
             ) : (
               <button type="button" class="town-btn primary" onClick={() => (def.crate ? eng.current?.show("crate") : eng.current?.talk())}>
                 Talk
@@ -508,8 +583,8 @@ export function ShopRoom({ room, youArt, youRider, youName, onZoom, onOut, onRea
           </button>
         )}
         {card === "pass" && (
-          <button type="button" class="town-btn primary" onClick={onPass}>
-            {back ? "Go out front" : "Go in"}
+          <button type="button" class="town-btn primary" onClick={() => passTo && onPass?.(passTo)}>
+            {passWord}
           </button>
         )}
         {card === "crate" && def.crate && (
@@ -656,11 +731,13 @@ function startRoom(
   onCard: (c: ShopCard | null) => void,
   challenge: RoomIntro | null = null,
   zzz: () => boolean = () => false,
-  arrived = false,
+  arrived: boolean | RoomPart = false,
   /** Don Dough's walk-out is through the back door: his challenge goes on in the front room. */
   onWalkedOut: () => void = () => {},
   /** The room has drawn its first `warmFrames` frames (or `warmMaxMs` went by): the black may lift. */
   onWarm: () => void = () => {},
+  /** The room's own scene (RoomFx), or none. */
+  fx: RoomFx | null = null,
 ) {
   const f = TOWN_FEEL;
   const S = SHOP_FEEL;
@@ -668,7 +745,7 @@ function startRoom(
   const { def, art, frames } = loaded;
   // (Ginger's igloo: its catwalk and staircases, a second walking level: levels.ts.)
   const lv = art.levels ? makeLevels(art.levels, art.n ?? 20) : null;
-  const room: Room = makeRoom(art.layout, def.keeper, art.n ?? 20, art.floor, def.talk, lv, def.talkAt ?? null);
+  const room: Room = makeRoom(art.layout, def.keeper, art.n ?? 20, art.floor, def.talk, lv, def.talkAt ?? null, !!def.talkNear);
   // (Rolling Dough's people stand on their squares: the guards by the door. Nobody walks through them.)
   for (const q of art.standing ?? []) room.blocked[q.r * room.n + q.c] = 1;
   // (Jefferson's idle crew stand on their squares: nobody walks through them. His machines and the floor pallet block where they are
@@ -677,12 +754,13 @@ function startRoom(
   const n = room.n;
   const g = cv.getContext("2d")!;
   // (Through the door from the home's other room: just inside it, facing away from it, into the room.)
-  const arrive = arrived ? passArrive(room) : null;
+  const arrive = arrived ? passArrive(room, typeof arrived === "string" ? arrived : undefined) : null;
   const you = new Walker(arrive ?? room.start, f.youStepMs, true, f.walkEase);
   // (A room's rows run toward the camera, the town's away: up the screen is a row less. The walker's views and the arrow keys
   // follow it: Walker.rowsUp. Facing the counter, north: up the screen, its back.)
   you.rowsUp = -1;
-  you.view = arrive && room.pass?.to === "back" ? 2 : 1;
+  // (Through a door in the back wall: facing us, into the room; through one in the front: facing away, into it.)
+  you.view = arrive && arrive.r < room.n / 2 ? 2 : 1;
   /** The rider drawn inside now (your ride's, its frames ready; SHOP_FEEL.rideInside), or null: on foot. */
   const riding = (): Rider | null => {
     if (!S.rideInside) return null;
@@ -2275,8 +2353,9 @@ function startRoom(
     // (Jefferson's warehouse too: its tall roll-up door, nearer the camera than you just inside it.)
     // (Ginger's igloo too: its near walls, the tunnel's and its doorway's arch, nearer the camera than you; there only over your
     // figure's middle, so the candy wall beside a stair's foot, a row nearer, isn't ghosted for covering your edge.)
-    // (Rolling Dough's two rooms: only their doors and near walls, `seeThru`.)
-    const thru = !!cave || (!!art.floor && (!art.seeThru || art.seeThru.includes(u.name)));
+    // (Rolling Dough's two rooms: only their doors and near walls, `seeThru`. The walk-up's box rooms, Nov 13: their front doors and near
+    // walls too, listed though they have no floor's shape: you walk in, or come up, just behind them.)
+    const thru = !!cave || ((!!art.floor || !!art.seeThru) && (!art.seeThru || art.seeThru.includes(u.name)));
     const over = lv ? overlaps(youMid(), x, y, x + w, y + h * s) : overlaps(youFig, x, y, x + w, y + h * s);
     const ghost = thru && youFig.on && u.z > youFig.z && over;
     g.globalAlpha = upAlpha(pt.depth, ghost, thru);
@@ -2442,6 +2521,7 @@ function startRoom(
     youHead.on = false;
     youFig.on = false;
     seen.anim = "";
+    if (fx?.hideYou?.()) return;
     you.pose(now, pose);
     // (Jefferson's intro: your lift under you, you standing on its plate, lifted with it.)
     if (cw && introNow?.crew) drawLift();
@@ -3309,8 +3389,11 @@ function startRoom(
    * What stands among the pieces this frame (the Shopkeeper 0, you 1, the boss 2, the board 3, facing the boss's stool 4 and yours 5,
    * and Timber's shavings' fog 6), by row: drawn far to near.
    */
-  const figZ = new Float64Array(8 + CREW_MAX);
-  const figK = new Uint8Array(8 + CREW_MAX);
+  const figZ = new Float64Array(8 + CREW_MAX + FX_MAX);
+  const figK = new Uint8Array(8 + CREW_MAX + FX_MAX);
+  /** The scene's figures this frame (RoomFx), drawn as figure 100 + i, and what they draw with. */
+  let fxFigs: ReturnType<NonNullable<RoomFx["figures"]>> = [];
+  const fxd: FxDraw = { g: null as unknown as CanvasRenderingContext2D, v: null as unknown as FxDraw["v"], camX: 0, camY: 0, W: 0, H: 0 };
   let figN = 0;
   const addFig = (z: number, k: number) => {
     let i = figN++;
@@ -3323,7 +3406,7 @@ function startRoom(
     figK[i] = k;
   };
   const drawFigure = (k: number, now: number) =>
-    k >= 8 ? drawCrewFig(k - 8) : k === 0 ? drawKid(now) : k === 1 ? drawYou(now) : k === 2 ? drawBoss(now) : k === 3 ? (ci?.ice ? drawIceCenter(now) : cw && ci?.crew ? drawCrewCenter(now) : rp ? drawRopeCenter() : drawCenter()) : k === 6 ? drawCast(true) : rp ? drawBucket(k === 4 ? "b" : "w") : drawStool(k === 4 ? marks!.bossStool : marks!.youStool);
+    k >= 100 ? fxFigs[k - 100]!.draw(fxd, now) : k >= 8 ? drawCrewFig(k - 8) : k === 0 ? drawKid(now) : k === 1 ? drawYou(now) : k === 2 ? drawBoss(now) : k === 3 ? (ci?.ice ? drawIceCenter(now) : cw && ci?.crew ? drawCrewCenter(now) : rp ? drawRopeCenter() : drawCenter()) : k === 6 ? drawCast(true) : rp ? drawBucket(k === 4 ? "b" : "w") : drawStool(k === 4 ? marks!.bossStool : marks!.youStool);
   /** A figure drawn, and (`?report`) its time marked: you, the boss, the fight's set as props, everyone else as other players. */
   const drawFig = (k: number, now: number, rc: typeof REC) => {
     drawFigure(k, now);
@@ -3873,6 +3956,11 @@ function startRoom(
     collectElves();
     collectPeople(now);
     for (let i = 0; i < crewN; i++) addFig(crewFigs[i]!.z, 8 + i);
+    if (fx) {
+      Object.assign(fxd, { g, v, camX, camY, W, H });
+      fxFigs = fx.figures?.(now) ?? [];
+      for (let i = 0; i < Math.min(fxFigs.length, FX_MAX); i++) addFig(fxFigs[i]!.z, 100 + i);
+    }
     rc?.mark(RP.plan);
     let k = 0;
     for (const u of ups) {
@@ -3890,6 +3978,7 @@ function startRoom(
     if (fo && introNow?.folio?.plane) drawFolioPlane(introNow.folio.plane);
     if (rp && introNow?.rope) drawRopeLines();
     if (dk) drawDarkPass(now);
+    fx?.over?.(fxd, now);
     rc?.mark(RP.lights);
     if (kidBox.on && !ci && !cave) drawTag("Shopkeeper", "sidekick", kidBox.hx, kidBox.hy);
     // (Hollow's intro: your tag fades as the drain starts, so the dark isn't broken by a bright label.)
@@ -4255,7 +4344,7 @@ function startRoom(
   cv.dataset.room = def.home;
   // (Rolling Dough: which of its rooms.)
   if (def.part) cv.dataset.part = def.part;
-  const hookAt = (kind: "keeper" | "door" | "pass" | "square" | "slot" | "guard-a" | "guard-b", sq?: readonly [number, number]) => {
+  const hookAt = (kind: "keeper" | "door" | "pass" | "square" | "slot" | "guard-a" | "guard-b", sq?: readonly [number, number] | RoomPart) => {
     if (!testSwitchesAllowed()) return null;
     // (Rolling Dough's front room: the middle of the part of a guard's tap box (`guardAt`, head to feet) that's on screen this frame.
     // On a computer, with the camera at rest on you in the middle of the room, his feet are below the room's bottom edge: his middle was
@@ -4276,7 +4365,10 @@ function startRoom(
       const y = kidBox.y0 + (kidBox.y1 - kidBox.y0) * 0.7;
       return kidBox.on && x > 0 && x < W && y > 0 && y < H ? { x, y } : null;
     }
-    const s = kind === "door" ? room.doors[0]! : kind === "pass" ? room.pass!.squares[0]! : { c: sq![0], r: sq![1] };
+    // (A door to another room: the first, or the one to the room named (the walk-up's landing: "front" down, "top" up).)
+    const ps = kind === "pass" ? (typeof sq === "string" ? room.passes.find((q) => q.to === sq) : room.pass) : null;
+    if (kind === "pass" && !ps) return null;
+    const s = kind === "door" ? room.doors[0]! : ps ? ps.squares[0]! : { c: (sq as readonly [number, number])[0], r: (sq as readonly [number, number])[1] };
     if (!P(s.c, s.r)) return null;
     // (Ginger's catwalk and stairs: up where its deck or its step is drawn.)
     if (isUp(lv, s.c, s.r)) pt.y -= (liftAt(lv, s.c, s.r) * pt.k) / SQ;
@@ -4493,9 +4585,10 @@ function startRoom(
     return { px, over8: over8 / px, over48: over48 / px, mean: sum / px };
   };
   /** (Tests) The view brought to the door, as a drag there would (a computer has no back button since Nov 7: e2e leaves by the door). */
-  const hookLook = (kind: "door" | "pass") => {
-    if (!testSwitchesAllowed() || (kind === "door" ? !room.doors.length : !room.pass)) return false;
-    const d = kind === "door" ? room.doors[0]! : room.pass!.inside[0]!;
+  const hookLook = (kind: "door" | "pass", to?: RoomPart) => {
+    const ps = to ? room.passes.find((q) => q.to === to) : room.pass;
+    if (!testSwitchesAllowed() || (kind === "door" ? !room.doors.length : !ps)) return false;
+    const d = kind === "door" ? room.doors[0]! : ps!.inside[0]!;
     follow = false;
     camFocus(room, d.c, d.r, focus);
     camX = focus.x;
@@ -4555,6 +4648,13 @@ function startRoom(
     recenter: () => {
       follow = true;
     },
+    /** The room the door you stand at leads to (its card's), or null: you aren't at one. */
+    passTo: (): RoomPart | null => {
+      const h = you.here();
+      return passAt(room, h.c, h.r)?.to ?? null;
+    },
+    /** Closes the card (its OK: the walk-up's flats' doors). */
+    close,
     busy: () => !!cab && CLAW_PLAY.open,
     stop: () => {
       alive = false;
