@@ -1023,8 +1023,8 @@ export function bossPartySettings(difficulty: string): Partial<Settings> {
 /**
  * The Hidden Boss's fight from his room (HIDDEN_ROOM; Eric, Nov 13): Boss Battle's party battle for the room's four (the party rule:
  * a move two or more picked is played, a tie between moves by their strength: partyMove), the team's one clock, any member's God
- * King call; the boss always him (`bossHidden`: he's hidden from players everywhere else). His adult form only online: winning it ends
- * the fight, as the Crowd's final does (his phase 2's four boards are solo only). The server's alone: a player can't ask for it.
+ * King call; the boss always him (`bossHidden`: he's hidden from players everywhere else). His adult form beaten, his phase change and
+ * the four boards follow online (Nov 13: RECLUSE_ONLINE), as in the Crowd's final. The server's alone: a player can't ask for it.
  */
 export function hiddenRoomSettings(): Partial<Settings> {
   return { ...bossPartySettings("normal"), lobbySize: HIDDEN_ROOM.players, groupSize: HIDDEN_ROOM.players, bossId: HIDDEN_ROOM.boss, bossHidden: true };

@@ -1484,8 +1484,8 @@ export class LobbyCore {
    * Testing (Eric, Nov 13: "buttons to instantly win and trigger next phase on the next move"): an admin's "Win this form" in the
    * Hidden Boss's fight from his room (PartyLobby.room; the Durable Object checks ADMIN_EMAILS and passes `admin`): the team's next
    * move beats his form by the same end a mate takes (the runner's bossForceWin: stageComplete, then finishBossBattle's "crowd"); online
-   * that's his adult form, and the fight ends as a win (no phase 2 online yet). Anyone else, any other battle, a boss not his, a
-   * battle over: nothing. The battle is a test game then (no XP), as the ultimate's trigger makes it.
+   * that's his adult form, then (Nov 13) his phase change and the four boards, where the team's next move wins every board still on
+   * (bosses/recluse.ts). Anyone else, any other battle, a boss not his, a battle over: nothing. The battle is a test game then (no XP), as the ultimate's trigger makes it.
    */
   winFormTrigger(playerId: string, admin: boolean): boolean {
     const runner = this.runner;

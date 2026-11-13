@@ -349,8 +349,8 @@ export class NetMatch implements GameView {
     const k = this.phase.kind;
     if (this.closed || this.resigning || k === "results" || k === "loading" || (k === "lobby" && !this.started)) return null;
     if (!this.begun) return "leave";
-    // (His phase 2: you play a board, so leaving is resigning: a loss, and a bot plays it on.)
-    if (this.phase2.onBoard) return "resign";
+    // (His phase 2: you play a board, so leaving is resigning: a loss, and a bot plays it on. In his room's fight, from his fall on.)
+    if (this.phase2.onBoard || (this.hiddenRoom && this.phase.kind === "boss" && !!this.phase.toPhase2)) return "resign";
     const me = this.standingsList.find((s) => s.id === this.myId);
     return me && !me.out ? "resign" : "leave";
   }
