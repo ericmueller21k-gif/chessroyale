@@ -18,16 +18,20 @@ So four themes, each an intro (or none) and a loop, started one after another as
                                                                loop: the chant, the duel, the book, the build again
   recluse-beaten   he's beaten; he talks (as long as it takes) once: the book slammed shut (1.8 s)
                                                                loop: the house's minute again (the same file)
-  recluse-phase3   he transforms; the boards split; the rest   once: the souring and the pause (2:10-2:29): it ends
-                                                                     on the drop, where the boards split
+  recluse-phase3   he transforms; the boards split; the rest   once: the souring at the game's pace (song_v.py's
+                                                                     RAGE, 8.74 s): it ends on the drop, where the
+                                                                     boards split
                                                                loop: the chant again (bigger) to the score's end
 
 My calls (his to reverse): phase 2 keeps the score's first half and phase 3 its second, so the drop brings music the
 player hasn't heard; phase 2's loop goes round through the build each time; phase 3's loop ends on the score's tag as
 its breath before the chant comes back; and the talk has the house's loop, not the score's 31 seconds of memory, so
 the talk can be any length (its text's pace is a setting) and only one length has to match: the souring's, from the
-transformation's start to the boards' split. When Eric or the director sends that length, the souring is re-timed in
-song_v.py to fit and this is run again.
+transformation's start to the boards' split. The session wiring it sent that length and the picture's beats (Nov 13,
+from the phase change on main: he rises in a rage; his book lands open at 2.640 s; his chant runs from 3.040 s; arcs
+at 8.540 s; the boards crack at 8.740 s), so the souring has a layout of its own for the game (song_v.py's RAGE: the
+score's 19 seconds of it stay as they are). Two dips are put on it here, on the sound itself: a hush before the book
+and a breath before the drop (the notes' tails ring through both otherwise). A new length: RAGE, and this again.
 Each piece is made by itself (song_v.render with a window: its notes only, their tails ringing on), so a cut never
 slices an echo, and each loop begins with the ring of what leads into it; so an intro here stops dead at its
 `introSeconds` (no tail of its own to overlap) and the loop starts there, as for every theme. The score's pieces share
@@ -46,7 +50,7 @@ import numpy as np
 import master
 import song_w
 from handoff import HEADROOM, MP3, PAD, ceiling, fold, save
-from song_v import BEATS, PLAN, T_CALC, T_CHANT, T_CHANT2, T_MEMORY, T_PAUSE, T_SPIRAL, TAPE, render
+from song_v import BEATS, PLAN, RAGE_AT, RAGE_BREATH, RAGE_BUILD, RAGE_SLAM, T_CALC, T_CHANT, T_CHANT2, T_MEMORY, TAPE, rage_plan, render
 from synth import SR, Ride
 
 RING = 8.0  # seconds of ring-out carried over a join
@@ -87,6 +91,8 @@ def main(out: str) -> None:
     first = piece(T_CHANT, T_MEMORY + 0.001)  # the chant, the duel, and the book that stops them
     beaten = piece(T_MEMORY, T_CHANT2)  # the book, the memory, its souring, the pause
     last = piece(T_CHANT2, BEATS)  # from the drop to the end
+    rage = fold(render((RAGE_AT, T_CHANT2), 0, rage=True))  # the souring at the game's pace
+    gc.collect()
     house = fold(song_w.render())
 
     intro2 = body(start, 0, T_CHANT)
@@ -98,9 +104,13 @@ def main(out: str) -> None:
     slam = body(beaten, T_MEMORY, T_MEMORY + 2)  # the book and its ring, up to where the memory's tune began
     out_s = int(0.6 * SR)
     slam[:, -out_s:] *= np.linspace(1, 0, out_s)
-    intro3 = body(beaten, T_SPIRAL, T_CHANT2)  # the souring (the memory's last chord still ringing in it) and the pause
-    intro3[:, : len(edge)] *= edge
-    intro3[:, -len(edge):] *= edge[::-1]
+    game = Ride(rage_plan(), BEATS, None, tape_secs=TAPE)  # the game's cut has its own clock from its start to the drop
+    at = lambda beat: round(game.when(beat) - game.when(RAGE_AT), 3)
+    intro3 = rage[:, int(round(game.when(RAGE_AT) * SR)) : int(round(game.when(T_CHANT2) * SR))].copy()
+    # (The hush before the book, and the breath before the drop, its one tick left as it is: down, held, and back.)
+    t = np.arange(intro3.shape[1]) / SR
+    for down, low, up, depth in ((at(RAGE_AT + 4) - 0.06, at(RAGE_AT + 4) + 0.06, at(RAGE_SLAM) - 0.006, 0.12), (at(RAGE_BREATH) + 0.06, at(RAGE_BREATH) + 0.12, at(T_CHANT2), 0.25)):
+        intro3 *= 1 - (1 - depth) * np.clip((t - down) / (low - down), 0, 1) * np.clip((up - t) / 0.005, 0, 1)
     loop3 = body(last, T_CHANT2, BEATS)
     loop3[:, :ring] += after(last, BEATS)  # the tag's ring, over the chant's first bar
 
@@ -135,7 +145,8 @@ def main(out: str) -> None:
                                     marks={"buildAgain": secs(T_CHANT, T_MEMORY)}),
             "recluse-beaten": theme("Hidden Boss: beaten; he talks", "song_v.py, song_w.py (phases_v.py)", "recluse-beaten-intro", "recluse-house-loop"),
             "recluse-phase3": theme("Hidden Boss: he transforms (the intro), the boards split (the loop starts), the rest of the fight", "song_v.py (phases_v.py)",
-                                    "recluse-phase3-intro", "recluse-phase3-loop", marks={"pause": secs(T_SPIRAL, T_PAUSE), "drop": secs(T_SPIRAL, T_CHANT2)}),
+                                    "recluse-phase3-intro", "recluse-phase3-loop",
+                                    marks={"pause": at(RAGE_AT + 4), "slam": at(RAGE_SLAM), "build": at(RAGE_BUILD), "breath": at(RAGE_BREATH), "drop": at(T_CHANT2)}),
         }
     path = f"{out}/themes.json"
     manifest = {"pad": PAD, "note": "Play <intro> once at t0. Start <loop> at t0 + introSeconds from offset pad, looping between pad and pad + loopSeconds.", "themes": {}}

@@ -122,6 +122,45 @@ PACE = ([(0, T_CALC, 60, 60)] + _calc + [(T_FLAG, T_CHANT, 90, 90), (T_CHANT, T_
         + [(T_DUEL2 + 15.5 * i, T_DUEL2 + 15.5 * (i + 1), 188 + 4 * i, 188 + 4 * i) for i in range(4)]
         + [(T_CALM, T_PLUS, 70, 70)] + _plus + [(T_LAST, T_TAG, 212, 212), (T_TAG, BEATS, 212, 60)])
 PLAN = [part if len(part) == 7 else (*part, 1.0, 1.0, 0.0) for part in PACE]
+# The souring as the game plays it (phases_v.py), fitted to his transformation as the game shows it (Nov 13, measured by
+# the session wiring it, from his rising in a rage: his book lands open at his feet at 2.640 s; his chant, the book's
+# light pouring up, runs from 3.040 s; arcs start at 8.540 s; the boards crack at 8.740 s, the drop). It has the same
+# 32 beats of tape as the souring and its pause, and they last as long on the tape, so every other beat of the song is
+# where it always is: nine idle beats first (the time the game's cut is shorter by), then (beats, seconds as heard):
+# one unit of the souring at its sourest, a hush, the book and its ring, the spiral's last four units, each faster than
+# the one before as the score's are, and a breath before the drop. The tape sinks as he rises and climbs back through
+# the build.
+RAGE_AT = T_SPIRAL + 9
+_fast = [1 / t for t in SPIRAL[3:]]
+RAGE = [(4, 2.44, 1.0, 0.93, 0.012), (1, 0.2, 0.93, 0.935, 0.012), (1, 0.4, 0.935, 0.95, 0.012)] \
+    + [(4, 5.5 * f / sum(_fast), 0.95 + 0.0125 * i, 0.9625 + 0.0125 * i, 0.012 - 0.0025 * i) for i, f in enumerate(_fast)] + [(1, 0.2, 1.0, 1.0, 0.0)]
+RAGE_SLAM, RAGE_BUILD, RAGE_BREATH = RAGE_AT + 5, RAGE_AT + 6, RAGE_AT + 22
+assert RAGE_AT + sum(part[0] for part in RAGE) == T_CHANT2 and abs(sum(part[1] for part in RAGE) - 8.74) < 1e-9
+
+
+def rage_plan():
+    """PLAN with the souring's 32 beats at the game's pace (RAGE): each part's tempo found by trying it (the tape's
+    waver moves how long a part is heard a little), the idle beats taking up the rest of the tape's time."""
+    from synth import Ride  # (here: the pace is worked out before the song's own imports are needed)
+
+    a = next(i for i, part in enumerate(PLAN) if part[0] == T_SPIRAL)
+    b = next(i for i, part in enumerate(PLAN) if part[0] == T_CHANT2)
+    span = sum(60 * (p1 - p0) / t0 for p0, p1, t0, *_ in PLAN[a:b])  # the souring's and the pause's time on the tape, before the fit
+    tempos = [60 * beats / secs for beats, secs, *_ in RAGE]
+    for _ in range(6):
+        idle = 60 * 9 / (span - sum(60 * part[0] / t for part, t in zip(RAGE, tempos)))
+        plan, at = PLAN[:a] + [(T_SPIRAL, RAGE_AT, idle, idle, 1.0, 1.0, 0.0)], RAGE_AT
+        for (beats, _, s0, s1, waver), t in zip(RAGE, tempos):
+            plan.append((at, at + beats, t, t, s0, s1, waver))
+            at += beats
+        plan += PLAN[b:]
+        clock, at = Ride(plan, BEATS, None, tape_secs=TAPE), RAGE_AT
+        for i, (beats, secs, *_) in enumerate(RAGE):
+            tempos[i] *= (clock.when(at + beats) - clock.when(at)) / secs
+            at += beats
+    return plan
+
+
 # The tape's length: the pace's own, to the nearest 2.5 s (a length whose samples have only small factors: a tape of
 # an awkward length made the mix's transforms take twelve minutes). The song as heard is a third of a second longer.
 TAPE = round(sum(60 * (b - a) / t0 if t0 == t1 else 60 * (b - a) * np.log(t1 / t0) / (t1 - t0) for a, b, t0, t1, *_ in PLAN) / 2.5) * 2.5
@@ -191,10 +230,11 @@ assert beats(CHILD) == 32
 assert (T_FLAG, T_MEMORY, T_CHANT2, T_LAST, BEATS, len(SWEEP)) == (138, 268, 334, 519, 591, 30)
 
 
-def render(window=None, lead: float = 8.0) -> np.ndarray:
+def render(window=None, lead: float = 8.0, rage: bool = False) -> np.ndarray:
     """The song as heard (stereo, at the mix's own level). `window`: (from beat, to beat), to make only that passage
-    (a sample; or, with `lead` 0, a piece cut clean for phases_v.py: its notes only, their tails ringing on)."""
-    x = Ride(PLAN, BEATS, None, os=2, seed=227, tape_secs=TAPE)
+    (a sample; or, with `lead` 0, a piece cut clean for phases_v.py: its notes only, their tails ringing on). `rage`:
+    the souring and its pause as the game plays them (RAGE), not as the score has them."""
+    x = Ride(rage_plan() if rage else PLAN, BEATS, None, os=2, seed=227, tape_secs=TAPE)
     x.window, x.lead = window, lead
     put, at = x.put, x.at
     rng = np.random.default_rng(59)
@@ -848,8 +888,9 @@ def render(window=None, lead: float = 8.0) -> np.ndarray:
     # behind; the music box goes on at the pace it had, so it falls out of step with everything, its notes going
     # sour; a children's note sinks and opens to a cry; the tape runs flatter and wavers more. The solo violin's figure creeps back under it, then the violins and violas; strings
     # screech; a kick, the bass, slides rising, low brass. The birds stop.
-    for u in range(7):
-        b = T_SPIRAL + 4 * u
+    def sour(b, u, band=True):
+        """One unit of the souring, four beats from `b`, as sour as the `u`th of the seven; `band`: with the figure, the
+        strings, the screeches and the kicks that unit has."""
         press(b, 0.08 + 0.012 * u)
         for over, d, m in ((0, 1, 67), (1, 1, 74), (2, 2, 78)):
             ocarina(b + over, d, m - (1 if rng.uniform() < u / 7 else 0) - rng.uniform(0, 0.1) * u, 0.06 + 0.005 * u)
@@ -863,6 +904,8 @@ def render(window=None, lead: float = 8.0) -> np.ndarray:
             tick(b + i * 0.5, 0.04 + 0.014 * u, i % 2 == 0)
         if u < 2:
             bird(b + rng.uniform(0, 3), 0.02, rng.uniform(-0.8, 0.8))
+        if not band:
+            return
         if u >= 2:
             for i in range(16):
                 bow(b + i * 0.25, 0.25, 67 + HEAD[u % 2][i % 8], "solo", 0.12 + 0.11 * (u - 2), -0.15)
@@ -875,19 +918,43 @@ def render(window=None, lead: float = 8.0) -> np.ndarray:
                 screech(b + rng.uniform(0, 3), rng.uniform(0.6, 1.4), rng.integers(84, 96), rng.integers(86, 101), 0.055 + 0.014 * u, rng.uniform(-0.7, 0.7))
             for i in range(4 if u >= 5 else 2):
                 kick(b + i * (1 if u >= 5 else 2), 0.3 + 0.05 * u)
-    slow = x.t(T_SPIRAL) - x.t(T_SPIRAL - 1)  # the memory's beat, in seconds: the music box keeps to it
-    for j in range(int((x.t(T_PAUSE) - x.t(T_SPIRAL)) / (1.5 * slow))):
-        box(T_SPIRAL, (86, 83, 86, 79)[j % 4] - (1 if rng.uniform() < j / 14 else 0), 0.035 + 0.002 * j, 0.4, rng.uniform(-1, 1) * 4 * j, late=j * 1.5 * slow)
-    for i in range(16):
-        synth(T_SPIRAL + 12 + i, 43, 0.9, 0.2 + 0.01 * i, 200 * 10 ** (i / 16))
-    slide(T_SPIRAL + 8, 20, 67, 91, 0.05, 0.3), slide(T_SPIRAL + 12, 16, 62, 80, 0.05, -0.3)
-    brass(T_SPIRAL + 12, 16, 43, 0.14)
-    screech(T_PAUSE - 4, 4, 88, 101, 0.18, 0.0)
 
-    # 2:27 The pause ("another slight pause before the big drop again"): silence; one bird; a tick; the book.
-    bird(T_PAUSE + 0.5, 0.05, 0.3)
-    tick(T_PAUSE + 2, 0.3, True, 0.0)
-    shut(T_PAUSE + 3, 1.0)
+    def rising(b, early=4):
+        """The long voices over the souring's last four units, from `b`: the synth's drone, its filter opening; slides
+        rising (the first from `early` beats before); low brass; and a last screech."""
+        for i in range(16):
+            synth(b + i, 43, 0.9, 0.2 + 0.01 * i, 200 * 10 ** (i / 16))
+        slide(b - early, 16 + early, 67, 91, 0.05, 0.3), slide(b, 16, 62, 80, 0.05, -0.3)
+        brass(b, 16, 43, 0.14)
+        screech(b + 12, 4, 88, 101, 0.18, 0.0)
+
+    slow = x.t(T_SPIRAL) - x.t(T_SPIRAL - 1)  # the memory's beat, in seconds: the music box keeps to it
+    if not rage:
+        for u in range(7):
+            sour(T_SPIRAL + 4 * u, u)
+        for j in range(int((x.t(T_PAUSE) - x.t(T_SPIRAL)) / (1.5 * slow))):
+            box(T_SPIRAL, (86, 83, 86, 79)[j % 4] - (1 if rng.uniform() < j / 14 else 0), 0.035 + 0.002 * j, 0.4, rng.uniform(-1, 1) * 4 * j, late=j * 1.5 * slow)
+        rising(T_SPIRAL + 12)
+
+        # 2:27 The pause ("another slight pause before the big drop again"): silence; one bird; a tick; the book.
+        bird(T_PAUSE + 0.5, 0.05, 0.3)
+        tick(T_PAUSE + 2, 0.3, True, 0.0)
+        shut(T_PAUSE + 3, 1.0)
+    else:
+        # The game's cut (RAGE): he rises in a rage, and the tune's three notes come once more, as sour as they got,
+        # the tape sinking under them; he lands on the board (a low thump) and swings the book up (a screech, rising);
+        # a hush; the book, slammed down; then, as he chants over it, the spiral's last four units with all they have,
+        # faster each; the music box at its own pace through it all; a breath, one tick as the arcs start; the drop.
+        sour(RAGE_AT, 5, band=False)
+        kick(RAGE_AT + 4 * 1.55 / 2.44, 0.5)
+        screech(RAGE_AT + 3, 1, 84, 97, 0.16, 0.0)
+        shut(RAGE_SLAM, 1.0)
+        for i in range(4):
+            sour(RAGE_BUILD + 4 * i, 3 + i)
+        for j in range(int((x.t(RAGE_BREATH) - x.t(RAGE_AT)) / (1.5 * slow))):
+            box(RAGE_AT, (86, 83, 86, 79)[j % 4] - (1 if rng.uniform() < (2 * j + 2) / 14 else 0), 0.035 + 0.004 * j, 0.4, rng.uniform(-1, 1) * 8 * j, late=j * 1.5 * slow)
+        rising(RAGE_BUILD, 0)
+        tick(RAGE_BREATH, 0.3, True, 0.0)
 
     # 2:29 The chant again ("a bit more layers on top, a bit more like big sound, kind of pause, a bit more like long
     # note, short note"), a little faster, and the duel again, its chords in another order (E flat minor, G minor, B
