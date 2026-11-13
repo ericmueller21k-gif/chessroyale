@@ -1478,6 +1478,8 @@ test("rides (Oct 31; Nov 1, every boss's): your pawn sits on its ride, the ride'
   // Standing after walking up: its back view's idle.
   expect([(await rideNow(page)).you.anim, (await rideNow(page)).you.view]).toEqual(["idle", 1]);
   await walkTo(c0 + 3, r0 + 5);
+  // (In two taps: from 3 columns right, 4 to the left is off a phone's screen, Nov 13.)
+  await walkTo(c0 + 1, r0 + 5);
   await walkTo(c0 - 1, r0 + 5);
   // Stopped: the idle again, its side, facing left as it came.
   expect([(await rideNow(page)).you.anim, (await rideNow(page)).you.view, (await rideNow(page)).you.facing]).toEqual(["idle", 0, -1]);

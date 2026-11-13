@@ -633,7 +633,8 @@ export type TownThing = "boss" | "home" | "coliseum" | "statue" | "table" | "bot
 
 /**
  * Where to tap a figure or a place in the street town once the view holds still (on the page): its tap point (`__townAt`, clear of
- * whatever stands in front) the same, within half a pixel, over 3 drawn frames in a row; null if it isn't drawn and clear then, or still
+ * whatever stands in front, inside the canvas by 10 px and with nothing of the page laid over it) the same, within half a pixel, over 3
+ * drawn frames in a row; null if it isn't drawn and clear then, or still
  * moving after `waitMs`. Counted in frames, not wall time: on CI's software WebGL under a full shard a frame can take a few hundred
  * milliseconds, and reads 100 ms apart saw a camera mid-glide as at rest (Nov 13, the street town for everyone).
  */
@@ -641,7 +642,16 @@ export async function townTapPoint(page: Page, kind: TownThing, id: string | num
   const xy = await page.evaluate(
     ([kind, id, waitMs]) =>
       new Promise<{ x: number; y: number } | null>((done) => {
-        const at = () => (window as unknown as { __townAt?: (k: string, id: string | number) => { x: number; y: number } | null }).__townAt?.(kind, id) ?? null;
+        const cv = document.querySelector<HTMLCanvasElement>("canvas.town-canvas");
+        // (A point a finger reaches: 10 px inside the canvas, and the canvas itself under it, not a chip, the map, a button or a card
+        // laid over it. Nov 13: Big Boy's Crib's point was at x 389.8 of a 390 px phone, so every tap missed it.)
+        const at = () => {
+          const p = (window as unknown as { __townAt?: (k: string, id: string | number) => { x: number; y: number } | null }).__townAt?.(kind, id) ?? null;
+          if (!p || !cv) return null;
+          const r = cv.getBoundingClientRect();
+          if (p.x < 10 || p.y < 10 || p.x > r.width - 10 || p.y > r.height - 10) return null;
+          return document.elementFromPoint(r.left + p.x, r.top + p.y) === cv ? p : null;
+        };
         const until = performance.now() + waitMs;
         let last = at();
         let same = 0;
