@@ -53,6 +53,8 @@ function crowdFinal(patch: Partial<Settings> = {}, seed = 7) {
       firstStageRounds: 2,
       roundsPerStage: 2,
       boardIntroSeconds: 0,
+      // (At his adult form, as `?form=adult`: these tests are about it. His child form comes first otherwise, Nov 13: recluse-online.test.ts.)
+      recluseChild: false,
       ...patch,
     },
   );

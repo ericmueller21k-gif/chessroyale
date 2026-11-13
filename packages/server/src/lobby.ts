@@ -2628,6 +2628,8 @@ export class LobbyCore {
         // Beaten, a boss with a fall (the Hidden Boss, BossRules.fallMs): the board holds while he collapses and mumbles,
         // as solo's does, then the results (this again, the match over).
         const fallMs = runner.boss.result === "crowd" ? bossRules(runner.boss)?.fallMs : undefined;
+        // (The Hidden Boss's child: the 🏆 that beat him is spent, so a lobby restored in his fall doesn't arm it again.)
+        if (runner.boss.form === "child") this.r.winForm = undefined;
         if (fallMs) {
           this.r.phase = "boss";
           const until = this.io.now() + fallMs;
