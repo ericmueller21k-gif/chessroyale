@@ -198,6 +198,17 @@
       "bpm": 104,
       "lufs": -16.7,
       "peakDb": -1.1
+    },
+    "pig": {
+      "boss": "Wrangler",
+      "source": "scripts/reel/music/song_ac.py",
+      "intro": null,
+      "loop": "pig-loop",
+      "introSeconds": 0.0,
+      "loopSeconds": 154.0,
+      "bpm": null,
+      "lufs": -16.0,
+      "peakDb": -1.6
     }
   }
 }
