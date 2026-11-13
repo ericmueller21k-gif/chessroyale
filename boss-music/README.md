@@ -11,9 +11,20 @@ whole folder (needs python3 with numpy, and ffmpeg).
 | Hollow (`hollow`) | `hollow-intro`, `hollow-loop` | 6.0 s | 114.0 s | Final (two minutes) |
 | Folio (`folio`) | `folio-intro`, `folio-loop` | 24.545 s | 95.455 s | Final (two minutes; its intro is the soft opening, the loop starts on the first drop) |
 | Don Dough (`zebra`) | `zebra-intro`, `zebra-loop` | 6.857 s | 113.143 s | Final (two minutes) |
+| Sawyer (`sawyer`) | `sawyer-intro`, `sawyer-loop` | 10.909 s | 109.091 s | Final (two minutes; added Nov 13) |
+| Timber (`timber`) | `timber-intro`, `timber-loop` | 10.909 s | 109.091 s | Final (two minutes; Sawyer's woodshop with the beaver's own tunes; added Nov 13) |
+| Moo & Moon (`moo`) | `moo-intro`, `moo-loop` | 7.059 s | 112.941 s | Final (two minutes; added Nov 13) |
+| Boingo the Clown (`clown`) | `clown-loop` | none | 120.0 s | Final (two minutes; added Nov 13) |
+| Ginger (`gingerbread`) | `gingerbread-loop` | none | 131.11 s | Final (2:11; added Nov 13) |
+| Alfil (`alfil`) | `alfil-loop` | none | 131.06 s | Final (2:11; added Nov 13) |
 
-Ginger's (`gingerbread`) is not ready. Later songs and longer versions will keep these names and this shape, so
-the wiring shouldn't hard-code lengths: read them from `themes.json`.
+The six added Nov 13 were finished and approved by Eric earlier but had not been handed over (that is why they were
+not in the game); they need no code, only their `.mp3` files and their `themes.json` entries, as
+`packages/app/public/music/README.md` says. They are mono, MP3 at 64 kbps (the handoff's default since Nov 12). Boingo's,
+Ginger's and Alfil's have no intro piece: their pace changes through the song, so the whole song is the loop. Not
+written yet: Wrangler (`pig`), Smudgy, Puddles (`gardener`), Babur (`tiger`), Dash; Chub & Chirp's (`hopper`) is with
+Eric. Later songs and longer versions will keep these names and this shape, so the wiring shouldn't hard-code lengths:
+read them from `themes.json`.
 
 ## The Hidden Boss (`recluse`): four themes, one for each point of his fight (Nov 13)
 
