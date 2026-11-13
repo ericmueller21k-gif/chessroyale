@@ -1,3 +1,4 @@
+- Nov 13 ~02:00 UTC: Eric: room r3 "fine for now". Mockups done: ages (claude/hidden-boss-ages), cutscene (claude/hidden-boss-cutscene), room (claude/hidden-boss-room), all unmerged until the build. Next: music PR when the helper finishes.
 - Nov 13 ~01:50 UTC: room r3 DONE (claude/hidden-boss-room 182dbaa): board sideways, walks behind it, centered each side, leans in, jointed arm (max 1.13x). Sent 4 to Eric; my note: the lean pose reads stiff (straight arm, head over the board). Music helper running.
 - Nov 13 ~01:45 UTC: Eric wants a test kit: 3 bots as humans in the room (when the room is live) + admin "Win this form" buttons. Win button added to the music helper now; bots noted for the room build.
 - Nov 13 ~01:35 UTC: Eric: music timing gets tuned from one test of his with a timing sheet; told the music helper to stay lean and write the sheet.
