@@ -1,3 +1,4 @@
+- Nov 13 ~05:20 UTC: room challenge brief ready (hidden-boss-room-challenge.md, xhigh, full lane); start after #672 merges. Note for Eric: online phase 2 (four boards) is unbuilt; the room fight online ends at his adult form until it is built.
 - Nov 13 ~05:15 UTC: #672 Hidden Boss building open (fec149d): walk-up, hall, landing, child room, one-surface walls, admins first, Challenge greyed. Guard count edit (no-lamp guard 17->18 homes): ASKED Eric OK; merge after OK and green. Known: phone camera puts arrival under the arrow pad. Helper archived. Next (one Opus): room challenge, after #672.
 - Nov 13 ~05:00 UTC: #671 chant lines + music cut MERGED (a2036cb). Building helper running. Next (one Opus): room challenge.
 - Nov 13 ~04:30 UTC: #671 chant lines + 17.435 s music cut (b5b33e8c) open (46d302a). Merge when green. Building helper running.
