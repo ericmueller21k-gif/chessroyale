@@ -1234,9 +1234,9 @@ export function App() {
     setLoading(false);
     const fill = !!opts.fill;
     // (`botLevel`: home's Bot level box, the bots' average rating: Settings.botLevel.)
-    // (The Hidden Boss starts as the child, solo (RECLUSE_CHILD); ?form=adult, a test switch, starts at his adult form. Online waits
-    // for the server's form list: never in an online lobby's settings.)
-    const child = testParams().get("form") !== "adult";
+    // (The Hidden Boss starts as the child, solo (RECLUSE_CHILD); ?form=adult, a test switch, starts at his adult form, and so does
+    // ?phase=2, which jumps to his phase change from the man. Online waits for the server's form list: never in an online lobby's settings.)
+    const child = testParams().get("form") !== "adult" && testParams().get("phase") !== "2";
     const m = new SoloMatch(engines, playerName(), { ...DEFAULT_SETTINGS, ...overridesFromUrl(mode, fill), ...(child ? { recluseChild: true } : {}), ...(opts.botLevel !== undefined ? { botLevel: opts.botLevel } : {}) }, practiceOn(), fill);
     // A boss battle (Boss alone, a Solo raid): the server notes its start, to time it for a boss token (boss-tokens.ts).
     // (`town`: a boss challenged from the town: the server announces it in the town's chat, and how it ended.)
