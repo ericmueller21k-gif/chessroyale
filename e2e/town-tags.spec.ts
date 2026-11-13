@@ -166,6 +166,11 @@ test("tags fade as you walk away from a figure (not a pop), are gone past the ra
   await page.waitForTimeout(500);
   expect((await read(page)).tags.find((t) => t.text === name)?.alpha, "beside you: shown").toBe(1);
 
+  // (The street town's camera chases you: zoomed all the way out first, so the bot stays on screen as you walk off and what's seen is the
+  // tag's fade with distance, not the bot leaving the view; a press wins over the park's own step in and out.)
+  for (let k = 0; k < 5; k++) await page.getByRole("button", { name: "Zoom out" }).click();
+  await expect(page.getByRole("button", { name: "Zoom out" })).toHaveAttribute("aria-pressed", "true");
+  await page.waitForTimeout(600);
   // Walk away (taps toward the far side of the map) while a recorder in the page notes the tag's alpha every frame. The bot holds still.
   await page.evaluate((n) => {
     const w = window as unknown as { __rec: number[]; __recGo: boolean } & Hooks;
