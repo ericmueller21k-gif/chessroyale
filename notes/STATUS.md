@@ -1,3 +1,4 @@
+- Nov 13 ~05:00 UTC: #671 chant lines + music cut MERGED (a2036cb). Building helper running. Next (one Opus): room challenge.
 - Nov 13 ~04:30 UTC: #671 chant lines + 17.435 s music cut (b5b33e8c) open (46d302a). Merge when green. Building helper running.
 - Nov 13 ~04:30 UTC: chant helper DONE (claude/hidden-boss-chant 0e2c21e, rise-to-crack 17.435 s). Sent to music session for the cut; then copy in and open the PR. Leftovers: his absorb line is cut off on the phone bar (needs paging or a shorter line); frames:recluse2 not run. Building helper running.
 - Nov 13 ~04:15 UTC: Eric: one Opus at a time (RULES); he tests when the whole Hidden Boss is live; order in NOTES. Two were already running (chant, building): let them finish, then strictly one.
