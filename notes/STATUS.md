@@ -1,3 +1,4 @@
+- Nov 13 ~04:30 UTC: chant helper DONE (claude/hidden-boss-chant 0e2c21e, rise-to-crack 17.435 s). Sent to music session for the cut; then copy in and open the PR. Leftovers: his absorb line is cut off on the phone bar (needs paging or a shorter line); frames:recluse2 not run. Building helper running.
 - Nov 13 ~04:15 UTC: Eric: one Opus at a time (RULES); he tests when the whole Hidden Boss is live; order in NOTES. Two were already running (chant, building): let them finish, then strictly one.
 - Nov 13 ~04:10 UTC: Eric asked where his home is (not built). Building brief hidden-boss-building.md (admins first, three rooms, room from the mockup, house theme, no challenge yet). Removed the old caveat paragraph from the NOTES.
 - Nov 13 ~04:00 UTC: main d0689a7 (#670) RED by retry-pass only: town-chat:1477 [phone] apiRequestContext.get ECONNRESET (the test-server connection-drop family; batch 6). Not #670.
