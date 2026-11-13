@@ -115,11 +115,15 @@ Tried on that memory and not chosen (Nov 12; none of them disliked, he just pick
 the choir as children (its first go: "that one's not bad"), a breathy flute, a pan flute, a wet finger on a glass's
 rim, a celesta; for the rolling chords, the harp, a soft-mallet marimba, a vibraphone, a small organ's flutes.
 
-A score played in pieces, by a boss's phase (Nov 12, the Hidden Boss: phases_v.py has his words and the layout):
-the house's loop while he is a child; the score's first half for the first fight; its quiet middle only when he's
-beaten (the memory while he talks, the souring while he transforms), the big part dropping when the boards split;
-then the second half looping, the childhood music never again. "They don't have to be exact ... they have to
-trigger at certain points." Each piece is made by itself so no echo is cut, and all take the whole score's gain.
+A score played in pieces, by a boss's phase (Nov 12 and 13, the Hidden Boss: phases_v.py has his words and the layout):
+the house's loop while he is a child; the score's first half for the first fight; the childhood music again only
+when he's beaten and talks; the souring while he transforms, the big part dropping when the boards split; then the
+second half looping, the childhood music never again. "We don't know how long the games run ... every part should
+be self-contained, but also be able to be strung into the next part." So each point of the fight is a theme of the
+usual shape (an intro or none, and a loop) and the game only switches between them; the one length that has to
+match an animation is the souring's. Each piece is made by itself so no echo is cut, and the score's pieces take the
+whole score's gain. Handed over Nov 13 when he asked what the director needs to wire it (`boss-music/` on
+`stills/trailer-v2`).
 
 A place's own loop from a song's quiet part (Nov 12, the Hidden Boss's house as a child: song_w.py): "just that soft,
 cozy thing ... like a 1-minute loop that doesn't do any of the crazy like spiraling stuff ... nice and cozy". The

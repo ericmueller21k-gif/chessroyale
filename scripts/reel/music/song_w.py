@@ -40,7 +40,8 @@ ANSWER = "B5:1 A5:1 G5:3 E5:.5 G5:.5 E5:2 | D5:1 E5:1 G5:2 | F#5:2 E5:1 D5:1"
 assert (beats(BOX_TUNE), beats(UNDER), beats(ANSWER)) == (16, 16, 16)
 
 
-def main(out: str) -> None:
+def render() -> np.ndarray:
+    """The loop as heard (stereo, at the mix's own level)."""
     x = Ride([(0, BEATS, BPM, BPM, 1.0, 1.0, 0.003)], BEATS, None, os=2, seed=61, tape_secs=SECS)
     put, at, sr, rng, tau = x.put, x.at, x.sr, np.random.default_rng(1943), 2 * np.pi
 
@@ -137,7 +138,11 @@ def main(out: str) -> None:
 
     levels = {"tune": 2.5, "keys": 2.5, "box": 2.5, "pads": 1.0, "clock": 3.0, "yard": 3.0}
     room("keys"), room("tune"), room("box", 2.5, 0.45), room("yard", 1.6, 0.7)
-    write_wav(out, x.play(x.mixdown(levels, lowpass=8500, room=0.34, room_s=2.0)))
+    return x.play(x.mixdown(levels, lowpass=8500, room=0.34, room_s=2.0))
+
+
+def main(out: str) -> None:
+    write_wav(out, render())
 
 
 if __name__ == "__main__":

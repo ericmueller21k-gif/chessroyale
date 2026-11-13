@@ -1,59 +1,77 @@
-"""The Hidden Boss's score (song_v.py) cut into the pieces the game plays, by his phase (Eric, Nov 12).
+"""The Hidden Boss's music for the game, by his phase (Eric, Nov 12 and 13): the game-ready pieces, in the shape the
+boss themes are handed over in (handoff.py: an intro played once and a loop, mono, OGG and MP3, entries in themes.json),
+so the game's player (packages/app/src/music.ts) plays each as it plays any boss's theme.
 How he laid it out: "we're gonna have three phases of him ... when you walk into this house ... and he's a child ...
 it's playing ... that 1 minute version [song_w.py] ... when you actually beat him, we want to fade out the ... child
-song, and then start into the score for the longer one ... that middle ... part where it goes back to his ...
-childhood ... theme ... needs to only trigger when you beat him, because ... he does like an animation where he ...
-starts talking ... it'll basically be only about 20 seconds or 30 seconds of ... that childhood theme. And then ...
-while he's doing his like phase three transformation ... it will turn into ... that part where it starts to go all
-like off key ... right when he ... finishes his transformation and then like splits the boards into four ... it
-starts into like the epic kind of drop ... then we continue the song, and then we loop ... the epic play style ...
-And it basically never again does the childhood segment ... they don't have to be exact."
-So each phase is a piece played once and a piece that loops:
+song, and then start into the score for the longer one [song_v.py] ... that middle ... part where it goes back to his
+... childhood ... theme ... needs to only trigger when you beat him, because ... he does like an animation where he
+... starts talking ... And then ... while he's doing his like phase three transformation ... it will turn into ...
+that part where it starts to go all like off key ... right when he ... finishes his transformation and then like
+splits the boards into four ... it starts into like the epic kind of drop ... then we continue the song, and then we
+loop ... the epic play style ... And it basically never again does the childhood segment"; "we don't know how long
+the games run ... every part should be self-contained, but also be able to be strung into the next part".
+So four themes, each an intro (or none) and a loop, started one after another as the game reaches each point:
 
-  phase 1  (the child, in his house)   loop: track W (song_w.py). The same music sits about 6 dB lower inside the
-                                       score, so the game plays this loop about 6 dB down ("house_gain_db").
-  phase 2  (the first fight)           once: the stare, the calculation, the flag (0:00 to 0:59 of the score)
-                                       loop: the chant, the duel, the book slammed, the calculation again, the flag
-  phase 3  (he's beaten: he talks,     once: the book slammed, the memory, its souring, the pause (1:39 to 2:29);
-            transforms, splits the           the drop is where this piece ends
-            boards)                    loop: the chant again (bigger), the duel, the choir alone, the climb, the
-                                             last theme, the tag: from the drop to the score's end
+  recluse-house    his room, and the fight with the child      loop: the house's minute (song_w.py), 6 dB under the
+                                                               other themes (where the same music sits in the score)
+  recluse-phase2   the first fight after the child             once: the stare, the calculation, the flag (0:00-0:59)
+                                                               loop: the chant, the duel, the book, the build again
+  recluse-beaten   he's beaten; he talks (as long as it takes) once: the book slammed shut (1.8 s)
+                                                               loop: the house's minute again (the same file)
+  recluse-phase3   he transforms; the boards split; the rest   once: the souring and the pause (2:10-2:29): it ends
+                                                                     on the drop, where the boards split
+                                                               loop: the chant again (bigger) to the score's end
 
-My calls (his to reverse): phase 2 keeps the score's first half and phase 3 its second, so the drop at the boards'
-split brings music the player hasn't heard; phase 2's loop goes round through the build each time (a breather, and
-the flag into the chant each time) rather than the chant and duel alone; phase 3's loop ends on the score's tag (the
-book, the clock slowing) as its breath before the chant comes back.
-Every join is "start the next file the moment this one ends": a piece played once stops dead where the next starts,
-and each loop begins with the ring of what leads into it, so nothing is cut off. The one free join is into phase 3's
-first piece, which starts on the book's slam: stop phase 2's loop wherever it is (a quick fade) and play it.
-When Eric sends the animation's times, the memory and the souring are re-timed in song_v.py to fit and this is run
-again.
+My calls (his to reverse): phase 2 keeps the score's first half and phase 3 its second, so the drop brings music the
+player hasn't heard; phase 2's loop goes round through the build each time; phase 3's loop ends on the score's tag as
+its breath before the chant comes back; and the talk has the house's loop, not the score's 31 seconds of memory, so
+the talk can be any length (its text's pace is a setting) and only one length has to match: the souring's, from the
+transformation's start to the boards' split. When Eric or the director sends that length, the souring is re-timed in
+song_v.py to fit and this is run again.
 Each piece is made by itself (song_v.render with a window: its notes only, their tails ringing on), so a cut never
-slices an echo; all take the whole score's gain (master.py), so they sit together as they do in the score.
-  python3 phases_v.py <out folder>   ->  track-V-phase{2,3}-{intro,loop}.wav, track-V-phases.json   (about 9 minutes)
+slices an echo, and each loop begins with the ring of what leads into it; so an intro here stops dead at its
+`introSeconds` (no tail of its own to overlap) and the loop starts there, as for every theme. The score's pieces share
+the whole score's gain, so they sit together as they do in it.
+  python3 phases_v.py <the handoff's folder>   (about 10 minutes; themes.json there keeps its other themes)
 """
 import gc
 import json
 import os
+import subprocess
 import sys
 import tempfile
 
 import numpy as np
 
 import master
+import song_w
+from handoff import HEADROOM, MP3, PAD, ceiling, fold, save
 from song_v import BEATS, PLAN, T_CALC, T_CHANT, T_CHANT2, T_MEMORY, T_PAUSE, T_SPIRAL, TAPE, render
-from synth import SR, Ride, write_wav
+from synth import SR, Ride
 
 RING = 8.0  # seconds of ring-out carried over a join
+HOUSE_DB = -6.0  # the house's loop against the themes' level
+EDGE = 0.03  # a piece that stops dead, or starts mid-ring, is faded over this long
+
+
+def level(x: np.ndarray, target: float, tmp: str) -> float:
+    """The gain that puts `x`, through the ceiling, at `target` LUFS."""
+    g = 0.5 / float(np.max(np.abs(x)))
+    for _ in range(4):
+        save(tmp, ceiling(x * g))
+        g *= 10 ** ((target - master.lufs(tmp)) / 20)
+    return g
 
 
 def main(out: str) -> None:
     clock = Ride(PLAN, BEATS, None, tape_secs=TAPE)  # for when each beat is heard
     n = lambda beat: int(round(clock.when(beat) * SR))
+    secs = lambda a, b: round((n(b) - n(a)) / SR, 6)
     ring = int(RING * SR)
+    edge = np.linspace(0, 1, int(EDGE * SR))
 
     def piece(a, b):
-        got = render((a, b), 0)
+        got = fold(render((a, b), 0))
         gc.collect()
         return got
 
@@ -69,38 +87,67 @@ def main(out: str) -> None:
     first = piece(T_CHANT, T_MEMORY + 0.001)  # the chant, the duel, and the book that stops them
     beaten = piece(T_MEMORY, T_CHANT2)  # the book, the memory, its souring, the pause
     last = piece(T_CHANT2, BEATS)  # from the drop to the end
+    house = fold(song_w.render())
 
-    # The whole score's gain: the pieces together are the score (the book at the memory twice, which moves nothing).
-    whole = start + first + beaten + last
-    with tempfile.TemporaryDirectory() as tmp:
-        write_wav(os.path.join(tmp, "raw.wav"), whole)
-        gain = min(1.0, 0.98 / float(np.max(np.abs(whole)))) * 10 ** (master.main(os.path.join(tmp, "raw.wav"), os.path.join(tmp, "out.wav")) / 20)
-    del whole
-
-    fade = np.linspace(0, 1, int(0.002 * SR))
     intro2 = body(start, 0, T_CHANT)
+    intro2[:, -len(edge):] *= edge[::-1]
     loop2 = np.concatenate([body(first, T_CHANT, T_MEMORY), body(build, T_CALC, T_CHANT)], axis=1)
     join = n(T_MEMORY) - n(T_CHANT)
     loop2[:, join : join + ring] += after(first, T_MEMORY)  # the duel's ring and the book, over the build's first bars
-    loop2[:, :ring] += after(start, T_CHANT)  # the flag's ring, over the chant's first bar: as the first piece leaves it
-    intro3 = body(beaten, T_MEMORY, T_CHANT2)
-    intro3[:, : len(fade)] *= fade
+    loop2[:, :ring] += after(start, T_CHANT)  # the flag's ring, over the chant's first bar: as the intro leaves it
+    slam = body(beaten, T_MEMORY, T_MEMORY + 2)  # the book and its ring, up to where the memory's tune began
+    out_s = int(0.6 * SR)
+    slam[:, -out_s:] *= np.linspace(1, 0, out_s)
+    intro3 = body(beaten, T_SPIRAL, T_CHANT2)  # the souring (the memory's last chord still ringing in it) and the pause
+    intro3[:, : len(edge)] *= edge
+    intro3[:, -len(edge):] *= edge[::-1]
     loop3 = body(last, T_CHANT2, BEATS)
     loop3[:, :ring] += after(last, BEATS)  # the tag's ring, over the chant's first bar
 
-    marks = {"house_gain_db": -6.0}
-    for name, x in (("phase2-intro", intro2), ("phase2-loop", loop2), ("phase3-intro", intro3), ("phase3-loop", loop3)):
-        y = master.ceiling(x * gain)
-        path = os.path.join(out, f"track-V-{name}.wav")
-        write_wav(path, y)
-        marks[name] = {"file": f"track-V-{name}", "secs": round(y.shape[1] / SR, 3)}
-        print(f"{name}: {y.shape[1] / SR:.2f} s, {master.lufs(path):.1f} LUFS, peak {20 * np.log10(np.max(np.abs(y))):.1f} dBFS, jump across its ends {np.max(np.abs(y[:, 0] - y[:, -1])):.4f}")
-    secs = lambda a, b: round((n(b) - n(a)) / SR, 3)
-    marks["phase2-loop"]["build_at"] = secs(T_CHANT, T_MEMORY)  # the book; the calculation starts again
-    marks["phase3-intro"].update(memory_at=0.0, sours_at=secs(T_MEMORY, T_SPIRAL), pause_at=secs(T_MEMORY, T_PAUSE), drop_at=secs(T_MEMORY, T_CHANT2))
-    with open(os.path.join(out, "track-V-phases.json"), "w") as f:
-        json.dump(marks, f, indent=2)
-    print(json.dumps(marks))
+    with tempfile.TemporaryDirectory() as tmp:
+        wav = os.path.join(tmp, "x.wav")
+        # The whole score's gain: the pieces together are the score (the book at the memory twice, which moves nothing).
+        g = level(start + first + beaten + last, master.TARGET, wav)
+        # (A little down, towards the handoff's headroom: an encoder's overshoot then stays under full scale.)
+        g *= min(1.0, HEADROOM / max(float(np.max(np.abs(ceiling(x * g)))) for x in (intro2, loop2, slam, intro3, loop3)))
+        gh = level(house, master.TARGET, wav) * 10 ** (HOUSE_DB / 20)
+        files = {"recluse-phase2-intro": intro2 * g, "recluse-phase2-loop": loop2 * g, "recluse-beaten-intro": slam * g, "recluse-phase3-intro": intro3 * g,
+                 "recluse-phase3-loop": loop3 * g, "recluse-house-loop": house * gh}
+        pad = int(PAD * SR)
+        for name, x in files.items():
+            x = files[name] = ceiling(x)
+            if name.endswith("-loop"):
+                x = np.concatenate([x[:, -pad:], x, x[:, :pad]], axis=1)
+            save(wav, x[:1])
+            for ext, codec in (("ogg", ["-c:a", "libvorbis", "-q:a", "3"]), ("mp3", MP3)):
+                subprocess.run(["ffmpeg", "-hide_banner", "-v", "error", "-y", "-i", wav, *codec, f"{out}/{name}.{ext}"], check=True)
+
+        def theme(what, source, intro, loop, **more):
+            a, b = (files[intro] if intro else np.zeros((2, 0))), files[loop]
+            once = np.concatenate([a, b], axis=1)  # one play-through: the intro, then one pass of the loop
+            save(wav, once)
+            return {"boss": what, "source": f"scripts/reel/music/{source}", "intro": intro, "loop": loop, "introSeconds": round(a.shape[1] / SR, 6),
+                    "loopSeconds": round(b.shape[1] / SR, 6), "bpm": None, "lufs": round(master.lufs(wav), 1), "peakDb": round(float(20 * np.log10(np.max(np.abs(once)))), 1), **more}
+
+        themes = {
+            "recluse-house": theme("Hidden Boss: his room, and the fight with the child", "song_w.py", None, "recluse-house-loop"),
+            "recluse-phase2": theme("Hidden Boss: the first fight after the child", "song_v.py (phases_v.py)", "recluse-phase2-intro", "recluse-phase2-loop",
+                                    marks={"buildAgain": secs(T_CHANT, T_MEMORY)}),
+            "recluse-beaten": theme("Hidden Boss: beaten; he talks", "song_v.py, song_w.py (phases_v.py)", "recluse-beaten-intro", "recluse-house-loop"),
+            "recluse-phase3": theme("Hidden Boss: he transforms (the intro), the boards split (the loop starts), the rest of the fight", "song_v.py (phases_v.py)",
+                                    "recluse-phase3-intro", "recluse-phase3-loop", marks={"pause": secs(T_SPIRAL, T_PAUSE), "drop": secs(T_SPIRAL, T_CHANT2)}),
+        }
+    path = f"{out}/themes.json"
+    manifest = {"pad": PAD, "note": "Play <intro> once at t0. Start <loop> at t0 + introSeconds from offset pad, looping between pad and pad + loopSeconds.", "themes": {}}
+    if os.path.exists(path):
+        with open(path) as f:
+            manifest = json.load(f)
+    manifest["themes"].update(themes)
+    with open(path, "w") as f:
+        json.dump(manifest, f, indent=2)
+        f.write("\n")
+    for key, t in themes.items():
+        print(key, t)
 
 
 if __name__ == "__main__":
