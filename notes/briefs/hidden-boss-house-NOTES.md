@@ -210,3 +210,9 @@ kneeling pose) -> tell Eric it's ready.
 ## Nov 13: walls inside his building (Eric)
 All three rooms in his building (hall, landing, top room) use the one-surface side walls (the room mockup's drawSideWalls), not the
 stacked cards. Sent to the building helper. (Other homes' rooms unchanged unless Eric asks; a later sweep is possible.)
+
+## Nov 13: it plays through to the end, online (Eric)
+Eric thought the four boards were already online (from 50 v 50). They aren't: phase 2 runs only solo (Boss alone, or a 50 v 50 final
+reached solo against bots); online, beating his adult form ends the fight. Eric: "it should be... it plays through to the four boards...
+It plays through till the end." New order: 1 room challenge (+3 bots, online 🏆) -> 2 his phase change + four boards ONLINE (xhigh, full
+lane; it serves 50 v 50 finals too) -> 3 the child form -> 4 the cutscene. Then tell Eric.

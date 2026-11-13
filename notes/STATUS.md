@@ -1,3 +1,4 @@
+- Nov 13 ~05:30 UTC: Eric: the room fight must play through to the four boards online. Order now: challenge -> online phase change + 4 boards -> child form -> cutscene.
 - Nov 13 ~05:25 UTC: main full run on a2036cb (#671) GREEN, no flakes (43366594856).
 - Nov 13 ~05:20 UTC: room challenge brief ready (hidden-boss-room-challenge.md, xhigh, full lane); start after #672 merges. Note for Eric: online phase 2 (four boards) is unbuilt; the room fight online ends at his adult form until it is built.
 - Nov 13 ~05:15 UTC: #672 Hidden Boss building open (fec149d): walk-up, hall, landing, child room, one-surface walls, admins first, Challenge greyed. Guard count edit (no-lamp guard 17->18 homes): ASKED Eric OK; merge after OK and green. Known: phone camera puts arrival under the arrow pad. Helper archived. Next (one Opus): room challenge, after #672.
