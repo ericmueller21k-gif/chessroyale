@@ -3,6 +3,7 @@ import { Chess } from "chess.js";
 import { BOSS_POWERS, RECLUSE_PHASE2 } from "@chessroyale/core";
 import { BOARD_SEL, test, watchFor, watchSpans, bossAloneFromHome } from "./helpers.ts";
 import { RECLUSE_LINES } from "../packages/app/src/characters/recluse-lines.ts";
+import { pacedSeries } from "../packages/app/src/paced-line.ts";
 
 /**
  * The Hidden Boss, phase 1 (admins only, in Boss alone), on a phone and a computer with real taps:
@@ -25,7 +26,12 @@ import { RECLUSE_LINES } from "../packages/app/src/characters/recluse-lines.ts";
  * power lands, the longer cast and the countdown, from the settings; the waits for phase 2 allow for it.
  */
 const P = RECLUSE_PHASE2.change;
-const ADDED_MS = P.talkMs + P.absorbHoldMs + P.castHoldMs + P.countdownSeconds * 1000;
+/** His chant's two lines (Nov 13): from the book landing open to the last typed out, then a second to the crack (PHASE_CHANGE). */
+const CHANT = pacedSeries(RECLUSE_LINES.chantSay, P.chantLines, P.chantLines.firstAfterMs);
+const CAST_MS = CHANT.at(-1)!.at + CHANT.at(-1)!.line.typedMs + P.crackAfterLineMs;
+/** The cast's length over its 1.7 s before Oct 17. */
+const CAST_ADDED_MS = CAST_MS - 1700;
+const ADDED_MS = P.talkMs + P.absorbHoldMs + CAST_ADDED_MS + P.countdownSeconds * 1000;
 const phase = (p: Page) => p.evaluate(() => (window as any).match?.phase.kind ?? "none").catch(() => "none");
 const bossNow = (p: Page) => p.evaluate(() => (window as any).match?.boss ?? null);
 /** His figure on this screen: the bust in a phone's boss bar, the whole figure by the board on a computer. */
@@ -488,7 +494,8 @@ test("beaten in phase 1 (?win=1): he collapses and mumbles, then the phase chang
     drop: { selector: '.rc-fig[data-anim="drop"] canvas' },
     chant: { selector: '.rc-fig[data-anim="chantRaise"] canvas' },
     light: { selector: ".rc-light" },
-    chantLine: { selector: ".bc-bubble", text: /Petrosian|Keres|Geller|Korchnoi|They worked as a team\./ },
+    chantLine: { selector: ".bc-bubble", text: /^Computation without creativity is nothing\. Now I have both\.$/ },
+    chantLine2: { selector: ".bc-bubble", text: /^Prepare yourself\. This is the ultimate test of your skill\.$/ },
     crack: { selector: ".rc-crack canvas" },
     split: { selector: ".rc-split.rc-q3" },
     pickup: { selector: '.rc-fig[data-anim="pickup"] canvas' },
@@ -511,6 +518,9 @@ test("beaten in phase 1 (?win=1): he collapses and mumbles, then the phase chang
     note: { selector: ".boss-dock-status", text: /The God King's power is his!/ },
     rage: { selector: `${figure()}[data-anim="rage"]` },
     chant: { selector: '.rc-fig[data-anim="chantRaise"], .rc-fig[data-anim="chant"]' },
+    // (His second chant line's box, and its second sentence as it starts to type: the typed part, `.speech-line`'s first span.)
+    chant2: { selector: ".bc-bubble", text: /^Prepare yourself\./ },
+    chant2b: { selector: ".bc-bubble .speech-line > span:first-child", text: /This is/ },
     crack: { selector: ".rc-crack canvas" },
     banner: { selector: ".fight-banner", text: /PHASE 2/ },
     c5: count(5),
@@ -603,7 +613,13 @@ test("beaten in phase 1 (?win=1): he collapses and mumbles, then the phase chang
   expect(s.talk!.last).toBeGreaterThanOrEqual(first("seize"));
   expect(first("rage") - first("ignite")).toBeGreaterThanOrEqual(P.absorbHoldMs);
   expect(s.held!.last - s.held!.first).toBeGreaterThanOrEqual(P.absorbHoldMs);
-  expect(first("crack") - first("chant")).toBeGreaterThanOrEqual(P.castHoldMs);
+  expect(first("crack") - first("chant")).toBeGreaterThanOrEqual(CAST_MS - 300);
+  // His last chant line (Nov 13): "Prepare yourself.", a second's pause, then its second sentence, typed out a second before
+  // the crack (the music's silence before its drop).
+  const last = CHANT.at(-1)!.line;
+  expect(first("chant2b") - first("chant2")).toBeGreaterThanOrEqual(last.starts[1]! - 150);
+  expect(first("crack") - first("chant2b")).toBeGreaterThanOrEqual(last.typedMs - last.starts[1]! + P.crackAfterLineMs - 300);
+  expect(first("crack") - first("chant2b")).toBeLessThanOrEqual(last.typedMs - last.starts[1]! + P.crackAfterLineMs + 400);
   // A second each, by the countdown's own schedule (`shown`: when the app put each number in the page, against when the
   // clocks were due): the 5 is up before its second begins (the count starts once the boards are on screen), each of 4,
   // 3, 2, 1 comes no sooner than its second and within a quarter second of it, and the clocks likewise at the end.
@@ -641,6 +657,7 @@ test("beaten in phase 1 (?win=1): he collapses and mumbles, then the phase chang
     chant: true,
     light: true,
     chantLine: true,
+    chantLine2: true,
     crack: true,
     split: true,
     pickup: true,

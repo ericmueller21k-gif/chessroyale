@@ -51,3 +51,14 @@ export function pacedTyped(line: PacedLine, t: number): number {
   });
   return n;
 }
+
+/** Lines one after another from `at`, each `gapMs` after the last has gone: when each starts, and the line. */
+export function pacedSeries(lines: readonly (readonly string[])[], pace: LinePace & { gapMs: number }, at: number): { at: number; line: PacedLine }[] {
+  const out: { at: number; line: PacedLine }[] = [];
+  for (const say of lines) {
+    const line = pacedLine(say, pace);
+    out.push({ at, line });
+    at += line.holdMs + pace.gapMs;
+  }
+  return out;
+}

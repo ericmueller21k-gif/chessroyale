@@ -4,7 +4,7 @@ import { animLength, cueAt } from "./characters/power-art.ts";
 import { lazyTable } from "./characters/sprite.ts";
 import { RECLUSE_LINES } from "./characters/recluse-lines.ts";
 import { holdMs, readMs, typeMs } from "./speech.tsx";
-import { pacedLine, type PacedLine } from "./paced-line.ts";
+import { pacedSeries } from "./paced-line.ts";
 import {
   LAST_STAND,
   legalMoves,
@@ -92,14 +92,8 @@ export const PHASE_CHANGE = lazyTable(() => {
   // the first a moment after the light is up, the next after it, the last typed out a second before the crack, as the music
   // falls silent before its drop. His word as the power landed is gone by the first (`absorbGoneAt`, absorbReadMs).)
   const cl = pace.chantLines;
-  const chantLines: { at: number; line: PacedLine }[] = [];
-  let lineAt = chantAt + cl.firstAfterMs;
-  const absorbGoneAt = lineAt - cl.gapMs;
-  for (const say of RECLUSE_LINES.chantSay) {
-    const line = pacedLine(say, cl);
-    chantLines.push({ at: lineAt, line });
-    lineAt += line.holdMs + cl.gapMs;
-  }
+  const chantLines = pacedSeries(RECLUSE_LINES.chantSay, cl, chantAt + cl.firstAfterMs);
+  const absorbGoneAt = chantLines[0]!.at - cl.gapMs;
   const lastLine = chantLines[chantLines.length - 1]!;
   const crackAt = lastLine.at + lastLine.line.typedMs + pace.crackAfterLineMs;
   const castMs = crackAt - chantAt;

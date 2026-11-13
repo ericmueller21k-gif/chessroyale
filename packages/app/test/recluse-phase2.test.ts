@@ -1,9 +1,10 @@
 import { beforeAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_SETTINGS, RAID_SETTINGS, RECLUSE_PHASE2, SPEECH, bossBannerMs } from "@chessroyale/core";
 import { LAST_STAND, legalMoves, phase2Numbers, type MoveScore } from "@chessroyale/chess";
-import { ARC_LIFE, ARC_STRIKES, PHASE_CHANGE, Phase2Game, absorbKing, arcPoints, phase2Follows, phase2Mates, phaseChangeRun, smoothPath } from "../src/recluse-phase2.ts";
+import { ARC_LIFE, ARC_STRIKES, PHASE_CHANGE, Phase2Game, absorbKing, absorbReadMs, arcPoints, phase2Follows, phase2Mates, phaseChangeRun, smoothPath } from "../src/recluse-phase2.ts";
 import { ON_BOARD_ANIMS, RECLUSE, RECLUSE_BUST } from "../src/characters/recluse.ts";
-import { CRITICAL, NORMAL, Voice, bossVoice, holdMs, typeMs } from "../src/speech.tsx";
+import { CRITICAL, NORMAL, Voice, bossVoice, holdMs, readMs, typeMs } from "../src/speech.tsx";
+import { pacedLine, pacedTyped } from "../src/paced-line.ts";
 import { loadOpenings, SoloMatch } from "../src/solo.ts";
 import { KING_LINES, kingLine, kingSay, resetKingSpeech } from "../src/godKing.ts";
 import { KING_VS_RECLUSE, RECLUSE_LINES } from "../src/characters/recluse-lines.ts";
@@ -42,12 +43,12 @@ describe("when phase 2 follows, and who plays it beside you", () => {
 });
 
 describe("the phase change", () => {
-  it("is 25 to 30 s with its short fall (Eric: \"this epic thing\"; Oct 17: about 10 s slower), its beats in order: the God King's absorption, rage, leap, the book thrown down, the chant, the split, the book back, the leap back", () => {
+  it("is 33 to 38 s with its short fall (Eric: \"this epic thing\"; Oct 17: about 10 s slower; Nov 13: his two lines in the chant), its beats in order: the God King's absorption, rage, leap, the book thrown down, the chant, the split, the book back, the leap back", () => {
     const C = PHASE_CHANGE;
     expect(C.fallMs).toBeGreaterThanOrEqual(1500);
     expect(C.fallMs).toBeLessThanOrEqual(2000);
-    expect(C.fallMs + C.total).toBeGreaterThanOrEqual(25_000);
-    expect(C.fallMs + C.total).toBeLessThanOrEqual(30_000);
+    expect(C.fallMs + C.total).toBeGreaterThanOrEqual(33_000);
+    expect(C.fallMs + C.total).toBeLessThanOrEqual(38_000);
     const order = [0, C.kingAt, C.talkAt, C.seizeAt, C.drainAt, C.igniteAt, C.riseAt, C.leapAt, C.upAt, C.landAt, C.dropAt, C.thudAt, C.chantAt, C.arcAt, C.crackAt, C.partAt, C.growAt, C.growAt + C.growMs, C.pickupAt, C.catchAt, C.backAt, C.homeAt, C.bannerAt, C.total];
     expect([...order].sort((a, b) => a - b)).toEqual(order);
     // The absorption first (about 5 s): the God King triumphant, then drained into the boss's raised hand for as long as
@@ -79,22 +80,64 @@ describe("the phase change", () => {
     const C = PHASE_CHANGE;
     const P = RECLUSE_PHASE2.change;
     // His words before the seize, a hold as the power lands, a longer cast: about 10 s in all, the talk 4 to 5 s of it and
-    // the cast 3 to 5 s longer.
-    expect(P.talkMs + P.absorbHoldMs + P.castHoldMs).toBeGreaterThanOrEqual(9_000);
-    expect(P.talkMs + P.absorbHoldMs + P.castHoldMs).toBeLessThanOrEqual(11_000);
+    // the cast 3 to 5 s longer. (Since Nov 13 the cast is as long as his two lines need: the chant's own test, below.)
+    expect(P.talkMs + P.absorbHoldMs).toBeGreaterThanOrEqual(5_000);
     expect(P.talkMs).toBeGreaterThanOrEqual(4_000);
     expect(P.talkMs).toBeLessThanOrEqual(5_000);
-    expect(P.castHoldMs).toBeGreaterThanOrEqual(3_000);
-    expect(P.castHoldMs).toBeLessThanOrEqual(5_000);
+    expect(C.castMs).toBeGreaterThanOrEqual(1700 + 3_000);
     expect(P.countdownSeconds).toBe(5);
     // Where each lands: the seize after the talk, the rise after the hold, the crack after the cast.
     // (Or once his line about the power has typed out, after his mumbling: Oct 24, the speech rule's longer lines.)
     expect(C.seizeAt).toBe(Math.max(1700 + P.talkMs, C.talkAt + Math.max(...RECLUSE_LINES.seizeTalk.map(typeMs)) + 100));
     expect(C.riseAt).toBe(C.igniteAt + animLength(RECLUSE.anims.seized!) + P.absorbHoldMs);
-    expect(C.crackAt - C.chantAt).toBe(1700 + P.castHoldMs);
+    expect(C.crackAt - C.chantAt).toBe(C.castMs);
     // (The beats themselves keep their lengths: the drain, the rage, the split, the shuffle, the leap back.)
     expect(C.drainMs).toBe(LAST_STAND.staggerAt - LAST_STAND.slashAt);
     expect([C.partAt - C.crackAt, C.growAt - C.partAt, C.growMs, C.shuffleMs]).toEqual([750, 400, 900, 900]);
+  });
+
+  it("Eric, Nov 13: his two lines in the chant, typed at the cutscene's pace; the last typed out a second before the crack (the music's silence), the rise to the crack at most 18 s", () => {
+    const C = PHASE_CHANGE;
+    const P = RECLUSE_PHASE2.change;
+    const L = P.chantLines;
+    // (The cutscene mockup's numbers: 45 ms a character, a second between sentences, readable 1.7 s plus 40 ms a character.)
+    expect([L.typeMs, L.sentencePauseMs, L.readMs, L.perCharMs]).toEqual([45, 1000, 1700, 40]);
+    expect(RECLUSE_LINES.chantSay).toEqual([
+      ["Computation without creativity is nothing.", "Now I have both."],
+      ["Prepare yourself.", "This is the ultimate test of your skill."],
+    ]);
+    expect(C.chantLines.map((l) => l.line.text)).toEqual(["Computation without creativity is nothing. Now I have both.", "Prepare yourself. This is the ultimate test of your skill."]);
+    // Both during the chant: the first once the light is up, each after the last has gone, the last typed out a second before
+    // the crack.
+    const [a, b] = C.chantLines;
+    expect(a!.at).toBeGreaterThanOrEqual(C.chantAt + C.lightMs);
+    expect(b!.at).toBe(a!.at + a!.line.holdMs + L.gapMs);
+    expect(C.crackAt - (b!.at + b!.line.typedMs)).toBe(P.crackAfterLineMs);
+    expect(P.crackAfterLineMs).toBe(1000);
+    // (The rise, where his transformation theme starts, to the split: at most 18 s.)
+    expect(C.crackAt - C.riseAt).toBeLessThanOrEqual(18_000);
+    // Each sentence typed at 45 ms a character, a second's pause between; each box readable at least 1.7 s once typed.
+    const l = pacedLine(["Prepare yourself.", "This is the ultimate test of your skill."], L);
+    expect(l.starts).toEqual([0, 17 * 45 + 1000]);
+    expect(l.typedMs).toBe(17 * 45 + 1000 + 40 * 45);
+    expect(l.holdMs - l.typedMs - L.fadeMs).toBe(1700 + 40 * l.text.length);
+    expect(pacedTyped(l, 0)).toBe(1);
+    expect(pacedTyped(l, 17 * 45 + 500)).toBe(17);
+    expect(l.text.slice(0, pacedTyped(l, l.starts[1]!))).toBe("Prepare yourself. T");
+    expect(pacedTyped(l, l.typedMs)).toBe(l.text.length);
+    // In his voice: his word as the power landed gone by then; each line up from its time, typed at its pace, whole until it's
+    // gone; the second after the first.
+    for (const absorb of RECLUSE_LINES.absorb) {
+      const v = new Voice();
+      v.say(absorb, "absorb", CRITICAL, C.absorbLineAt, absorbReadMs(absorb));
+      v.sayPaced(a!.line, "c1", CRITICAL, a!.at);
+      expect(v.line(a!.at)?.text, absorb).toBe(a!.line.text);
+      expect(v.line(a!.at)?.paced).toBe(a!.line);
+      expect(v.line(b!.at - L.gapMs - 1)?.text).toBe(a!.line.text);
+      v.sayPaced(b!.line, "c2", CRITICAL, b!.at);
+      expect(v.line(b!.at)?.text).toBe(b!.line.text);
+      expect(v.line(b!.at + b!.line.holdMs - 1)?.text).toBe(b!.line.text);
+    }
   });
 
   it("before the seize he says he'll take the God King's power: after his mumbling, typed out before his hand goes up, and read before the power lands", () => {
@@ -192,7 +235,7 @@ describe("the phase change", () => {
 
 describe("his phase 2 lines", () => {
   it("has a line for each moment; the God King's last are his triumph and his cry as he's drained (none in phase 2)", () => {
-    for (const k of ["absorb", "engine", "revive", "phase2", "boardWon", "boardLost", "beaten2", "chant"] as const) expect(RECLUSE_LINES[k].length, k).toBeGreaterThan(0);
+    for (const k of ["absorb", "engine", "revive", "phase2", "boardWon", "boardLost", "beaten2", "chantSay"] as const) expect(RECLUSE_LINES[k].length, k).toBeGreaterThan(0);
     for (const p of [1, 2] as const) for (const k of ["early", "middle", "late"] as const) expect(RECLUSE_LINES.talk[p][k].length, `${p} ${k}`).toBeGreaterThan(0);
     expect(Object.keys(KING_VS_RECLUSE).sort()).toEqual(["blocked", "drained", "intro", "triumph"]);
     expect(Object.keys(KING_LINES).filter((c) => c.startsWith("foe")).sort()).toEqual(["foeBlocked", "foeDrained", "foeIntro", "foeTriumph"]);
@@ -202,24 +245,24 @@ describe("his phase 2 lines", () => {
     expect(RECLUSE_LINES.engine).toEqual(expect.arrayContaining(["Fun, isn't it?", "Look how much fun we're having.", "Not so nice when the engine's on my side, is it?"]));
   });
 
-  it("the boss's word as the power lands comes as it lands (cutting in on his word before the seize), whole until his chant, whose line follows it before the board cracks", () => {
+  it("the boss's word as the power lands comes as it lands (cutting in on his word before the seize), whole until his chant's first line, which follows it", () => {
     const C = PHASE_CHANGE;
     expect(C.absorbLineAt).toBeGreaterThanOrEqual(C.igniteAt);
     for (const line of RECLUSE_LINES.absorb) {
       const v = new Voice();
       v.say(RECLUSE_LINES.seizeTalk[0], "talk", NORMAL, C.talkAt);
-      v.say(line, "absorb", CRITICAL, C.absorbLineAt);
+      v.say(line, "absorb", CRITICAL, C.absorbLineAt, absorbReadMs(line));
       expect(v.line(C.absorbLineAt)?.text).toBe(line);
-      // (Its whole time, up to the chant at most.)
-      expect(v.line(Math.min(C.chantAt, C.absorbLineAt + holdMs(line)) - 1)?.text).toBe(line);
-      v.say(RECLUSE_LINES.chant[0], "chant", CRITICAL, C.chantAt);
-      // (The chant's line as soon as it's over, while he chants: before the board cracks. Within about a second of the
-      // chant until Oct 24; up to about 2.6 s since, the speech rule's longer lines.)
-      const chantShows = Math.max(C.chantAt, C.absorbLineAt + holdMs(line));
-      expect(v.line(chantShows)?.text, line).toBe(RECLUSE_LINES.chant[0]);
-      expect(chantShows + typeMs(RECLUSE_LINES.chant[0]), line).toBeLessThan(C.crackAt);
-      // (Typed out, and on screen whole for at least two seconds and a half.)
-      expect(C.absorbLineAt + holdMs(line) - SPEECH.fadeMs - (C.absorbLineAt + typeMs(line)), line).toBeGreaterThanOrEqual(2500);
+      // (Its whole time, gone by the chant's first line: its usual time, or less (Nov 13).)
+      const gone = C.absorbLineAt + typeMs(line) + absorbReadMs(line) + SPEECH.fadeMs;
+      expect(absorbReadMs(line)).toBeLessThanOrEqual(readMs(line));
+      expect(gone).toBeLessThanOrEqual(C.absorbGoneAt);
+      expect(v.line(gone - 1)?.text).toBe(line);
+      const first = C.chantLines[0]!;
+      v.sayPaced(first.line, "chant", CRITICAL, first.at);
+      expect(v.line(first.at)?.text, line).toBe(first.line.text);
+      // (Typed out, and on screen whole for at least four seconds.)
+      expect(absorbReadMs(line), line).toBeGreaterThanOrEqual(4000);
     }
   });
 
@@ -238,9 +281,9 @@ describe("his phase 2 lines", () => {
   it("names his rivals but never their country or its people (Eric, Oct 14); his own words from the article word for word", () => {
     const all = (o: unknown): string[] => (typeof o === "string" ? [o] : Array.isArray(o) ? o.flatMap(all) : o && typeof o === "object" ? Object.values(o).flatMap(all) : []);
     for (const line of all(RECLUSE_LINES)) expect(line, line).not.toMatch(/soviet|russia/i);
-    expect(RECLUSE_LINES.chant.some((l) => /Petrosian/.test(l) && /Keres/.test(l) && /Geller/.test(l))).toBe(true);
+    expect(all(RECLUSE_LINES.talk).some((l) => /Petrosian/.test(l) && /Keres/.test(l) && /Geller/.test(l))).toBe(true);
     // (Verified on the printed pages of his Sports Illustrated article, Aug 20, 1962: never altered.)
-    expect(RECLUSE_LINES.chant).toContain("They worked as a team.");
+    expect(all(RECLUSE_LINES.talk)).toContain("They worked as a team.");
     // (Each in one phase's chatter only, so a fight never says one twice there.)
     const { 1: p1, 2: p2 } = RECLUSE_LINES.talk;
     expect(p1.middle).toEqual(expect.arrayContaining(["They consulted during the games.", "They would openly analyze my game while I was still playing it."]));
