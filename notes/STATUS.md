@@ -1,3 +1,4 @@
+- Nov 13 ~01:20 UTC: Eric: board sideways (walks left/right, board visible), centered on each side, lean in more. Round 3 brief hidden-boss-room-r3.md.
 - Nov 13 ~01:05 UTC: Eric picked the music session's summoning light; applied to claude/hidden-boss-room (tsc + recluse-room tests pass).
 - Nov 13 ~01:30 UTC: room r2 DONE (claude/hidden-boss-room e1bf664): 9x9 room, smaller board, walks round to play White (~14 min game), one-surface side walls (this room; ?walls=cards for the old). Sent 6 to Eric. No helpers running.
 - Nov 13 ~00:50 UTC: cutscene mockup DONE (claude/hidden-boss-cutscene 12b7265; stills/hidden-boss-cutscene). Sent 5 to Eric. My notes: about 104 s (long); the man reads as standing, not kneeling (same as the ghost still); silent. Helper archived. Room r2 running.
