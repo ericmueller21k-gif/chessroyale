@@ -3,6 +3,7 @@ import { BOSS_POWERS } from "@chessroyale/core";
 import { LAST_STAND, RECLUSE_FX, bulletIncrementAt, kingHelpBlocked } from "@chessroyale/chess";
 import { ENGINE_EYE, HEAD_SIZE, ON_BOARD_ANIMS, RECLUSE, RECLUSE_BUST, headOf } from "../characters/recluse.ts";
 import { GOD_KING } from "../characters/god-king.ts";
+import { RECLUSE_CUTSCENE } from "../characters/recluse-ages.ts";
 import { lazyTable, type Character, type Frame } from "../characters/sprite.ts";
 import { RECLUSE_LINES } from "../characters/recluse-lines.ts";
 import { animLength, cueAt } from "../characters/power-art.ts";
@@ -114,14 +115,18 @@ export function prewarmRecluse(side: "w" | "b"): void {
   if (warmed === side) return;
   warmed = side;
   const frames = (ch: typeof RECLUSE, names: readonly string[]) => names.flatMap((n) => ch.anims[n]?.frames ?? []);
-  const PLACE = ["seize", "seizeLoop", "seized", "rage"];
+  const PLACE = ["kneel", "seize", "seizeLoop", "seized", "rage"];
+  // (His cutscene's first frames, before his phase change: the man alone in the light, the child's poof, drop and landing.)
+  const SCENE = ["idle", "poof", "drop", "land"];
   // (The God King: triumphant, then his Last Stand from its blows, as the drain shows it.)
   let t = LAST_STAND.fallAt;
   const drained = GOD_KING.anims.lastStand!.frames.filter((f) => (t += f.ms) > LAST_STAND.slashAt);
-  // One after another, in the order they show (the God King's from the start, his seizing, then the board's figure),
+  // One after another, in the order they show (his cutscene's arrival, the God King's, his seizing, then the board's figure),
   // so only one slice of drawing ahead is ever at work in a frame.
-  prewarmKing(side, [...GOD_KING.anims.raise!.frames, ...GOD_KING.anims.raised!.frames, ...drained], () =>
-    prewarmSprite(RECLUSE_BUST, frames(RECLUSE_BUST, PLACE), undefined, () => prewarmSprite(RECLUSE, frames(RECLUSE, [...PLACE, ...ON_BOARD_ANIMS]))),
+  prewarmSprite(RECLUSE_CUTSCENE, frames(RECLUSE_CUTSCENE, SCENE), undefined, () =>
+    prewarmKing(side, [...GOD_KING.anims.raise!.frames, ...GOD_KING.anims.raised!.frames, ...drained], () =>
+      prewarmSprite(RECLUSE_BUST, frames(RECLUSE_BUST, PLACE), undefined, () => prewarmSprite(RECLUSE, frames(RECLUSE, [...PLACE, ...ON_BOARD_ANIMS]))),
+    ),
   );
   warmSounds(["recluseDrain", "recluseSpark", "recluseArc"]);
 }

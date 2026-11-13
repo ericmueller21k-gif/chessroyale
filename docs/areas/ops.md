@@ -157,10 +157,12 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
     own `pool` (`/api/play`, `/api/squads/play`, `/api/squads/party`, `/api/1v1/play`: `testPool` in `index.ts`); a 1 v 1
     game's own `clock=SECONDS` (each side's clock, no increment: `/api/1v1/play`); a crate's forced
     `fischer` and `shiny` (`/api/locker/open`: since Nov 9 only where `TEST_SWITCHES` is "1", never an admin's on production). One check,
-    `testSwitchesOn` (`admin.ts`).
+    `testSwitchesOn` (`admin.ts`). And the Worker variable `CUTSCENE_HOLD_MS` (1 000 to 120 000, only with `TEST_SWITCHES` "1"; the e2e
+    server's is 12 000): the Hidden Boss's cutscene's hold online instead of `RECLUSE_CUTSCENE.holdMs`, the scene sped up to fit it.
   - **The app's** (read only through `testParams()` in `packages/app/src/test-switches.ts`; `/api/auth/config` says
     `testSwitches` where the server has them on, `/api/me` says `admin`): all of the above, and `debug` (the match on
-    `window`), `nolanding`, `boss=<id>` (skips the boss menu), `win`, `mate`, `phase`, `laststand`, `side`, `wip` and
+    `window`), `nolanding`, `boss=<id>` (skips the boss menu), `win`, `mate`, `phase`, `cutscene=SECONDS` (1 to 120: the Hidden Boss's
+    cutscene sped up into that long, solo), `laststand`, `side`, `wip` and
     `kit`, a crate page's `fischer` and `shiny` and its "Testing:" boxes, and 1 v 1's `fewAfter=SECONDS` (the "Few players
     online" choice sooner) and `clock` (the bot game's clock too), and `quests=mock|done|entry` (the daily quests overlay mockup over home with fake data, Nov 9: `quests-mock.ts`), and `cardMs=MS` (home's Boss Battle card turns to the
   next boss this often instead of every 30 s), and `town=A` or `town=B` (home's Chess Town button shows that picture instead of a random one: not gated, anyone's address), and `barslot=1` (the boss bar's free room for a boss's own prop drawn with a
