@@ -75,6 +75,19 @@ removed (old → new) and says whether any of them guards a rule here.
 
 ## The town square
 
+- **The town never shows an old version (Eric, Nov 13: "It should be working 100% of the time. It should never throw back an old
+  version. It should just fail or something, or we try to reload."; later the same day: the old town must never load for a player, by
+  any path, as old code is an exploit risk; "If it covers 99.99% of devices, which it does, then that's fine").** The street town
+  never falls back to the old Canvas 2D town, and no switch opens it (`?street=off` is gone). A context lost while the page is hidden
+  doesn't count; one not back within 5 s of the page showing, or WebGL failing to start, reloads the street town once, then shows
+  "The town didn't load. Please retry." with Retry. A device without WebGL 2 shows "Chess Town can't run on this device." Each is
+  reported once (`TOWN_GL_FALLBACK`, counted in the health view). (Nov 13: the street town is still admin-only, so other players'
+  town is today's Canvas 2D one until the street town is everyone's.)
+  - Guard: `packages/app/test/town-gl-fail.test.ts` (the loss rules: hidden losses ignored, a loss not back fails once, one reload then
+    the message); `e2e/town-street.spec.ts`, "the street town's WebGL context lost: …"; `e2e/problems.spec.ts`, "an admin's town on a
+    device without WebGL 2 never falls back to today's town …", phone and computer.
+  - Decision: [2026-11-13-town-no-old-fallback.md](../decisions/2026-11-13-town-no-old-fallback.md).
+
 - **Keep the frame rate (Eric, Oct 27): "we don't want any frame drops from a clever programming solution… we can always
   cut corners on this… if it keeps our FPS intact."** Nothing new per frame on the town's hot path and nothing allocated per
   frame; anything heavy (Maia, an engine) never loads or warms while you walk round the town, only when a game opens (a

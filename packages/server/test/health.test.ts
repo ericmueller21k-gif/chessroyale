@@ -337,7 +337,7 @@ describe("the health view", () => {
     await fall(5, NOW - HOUR, "made up");
     const h = await health({ DB: d1, ASSETS }, sql, NOW);
     const none = { day: 0, week: 0 };
-    expect(h.townFallbacks).toEqual({ day: 5, week: 6, byReason: { "no-webgl2": none, "no-context": { day: 3, week: 3 }, shader: none, "lost-twice": { day: 2, week: 3 }, "not-back": none } });
+    expect(h.townFallbacks).toEqual({ day: 5, week: 6, byReason: { "no-webgl2": none, "no-context": { day: 3, week: 3 }, shader: none, "lost-twice": { day: 2, week: 3 }, "not-back": none, retry: none } });
     // Not errors: the errors' numbers are what they were without them.
     expect(h.errors).toMatchObject({ thisHour: 4, lastHour: 2, day: 12, kinds: 4 });
     expect(h.errors.top.map((e) => e.kind)).not.toContain(TOWN_GL_FALLBACK.kind);

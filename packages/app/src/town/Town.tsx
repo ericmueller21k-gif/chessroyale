@@ -74,7 +74,8 @@ import { reportTownFallback } from "../problems.ts";
 import type { TownGlFallback } from "@chessroyale/core";
 import { sameWeights, skyOverride, skyWeights, type SkyWeights } from "./sky.ts";
 import { TOWN_BOTS, COLISEUM_PLACE, CROWD_MAX, HOMES, addCrowd, figureName, hasTownBoss, walkYou, addTestPlayer, fillTables, homeDoor, inSquare, stayOut, START, STATUES, TABLES, anyTableFree, botLabel, cancelMeet, comeOut, createTown, destFor, holdBot, homeNear, isSprite, spotNear, meet, meetReady, meetSeat, onColiseum, playAtTableText, plotAt, ratingLine, ratingText, seated, sidekickText, spriteAnim, statueAt, stoolAt, tableAt, tableFor, tableStates, taken, tdist, tick, townLine, walkable, waitingBot, walkWalker, type HomeId, seatOf, seatText, standOf, type Person, type Place, type Seat, type Sq, type Stand, type StatueId, type Target } from "./world.ts";
-import { NO_WEBGL_STREET, STREET_TOWN } from "./admin-town.ts";
+import { STREET_TOWN } from "./admin-town.ts";
+import { afterFail, lossWatch } from "./gl-fail.ts";
 import { guestLimitMs, watchAway, watchGuest } from "./here-net.ts";
 import { FdButton } from "../components/FrontDoor.tsx";
 import { LeaveTownConfirm, TOWN_BACK_TO, setRequestWaiting } from "./LeaveTown.tsx";
@@ -191,8 +192,10 @@ export function TownScreen({
    * seconds… loads it all in at once and then it stays there"): up while every picture is painted and uploaded (startTown's `loadTown`).
    * Its bar is moved directly (`loadBar`), not by a render a step.
    */
-  const [loading, setLoading] = useState(STREET_TOWN && !NO_WEBGL_STREET);
+  const [loading, setLoading] = useState(STREET_TOWN);
   const loadBar = useRef<HTMLElement>(null);
+  /** The street town can't run here (no WebGL 2), or didn't load even after a reload (startTown's `onFail`; gl-fail.ts): a plain message in its box. */
+  const [broken, setBroken] = useState<TownBroken | null>(null);
   /** Its last step (Nov 12): the bosses' music still on its way once the town is built ("Loading music…"). */
   const [loadingMusic, setLoadingMusic] = useState(false);
   useLayoutEffect(() => {
@@ -587,6 +590,9 @@ export function TownScreen({
         bar.style.transform = `scaleX(${share})`;
         bar.parentElement!.setAttribute("aria-valuenow", String(Math.round(share * 100)));
       }
+    }, (why) => {
+      setLoading(false);
+      setBroken(why);
     });
     ctl.current = t;
     // Away (Eric, Nov 7; afk.ts, here-net.ts): the "zzz" over your pawn (the town's and a shop's), out to home after too long, and the
@@ -901,6 +907,18 @@ export function TownScreen({
             </span>
           </div>
         )}
+        {/* The street town can't run here or didn't load (Eric, Nov 13: never the old town instead): the loading card's look, a line, and
+            Retry when retrying can help. */}
+        {broken && (
+          <div class="boss-loading town-loading town-broken" role="alert">
+            <strong class="boss-loading-title">{broken === "unsupported" ? "Chess Town can't run on this device." : "The town didn't load. Please retry."}</strong>
+            {broken === "retry" && (
+              <button type="button" class="town-btn" onClick={() => location.reload()}>
+                Retry
+              </button>
+            )}
+          </div>
+        )}
         {/* The black the town zooms into as you go in, and the room fades in from (and back, going out). */}
         <div class="town-fade" ref={fade} />
         <div class="town-controls">
@@ -1055,39 +1073,48 @@ function startTown(
   onChallengeOff: () => void = () => {},
   /** The loading screen's progress (0 to 1; `music`: its "Loading music…" step), then null once the town is loaded (`loadTown`). */
   onLoading: (share: number | null, music?: boolean) => void = () => {},
+  /** The street town can't run here (no WebGL 2), or didn't load again after its reload (gl-fail.ts): the town's box says so. */
+  onFail: (why: TownBroken) => void = () => {},
 ) {
   const f = TOWN_FEEL;
   /** The world's canvas (a new one if the street town's WebGL fails as it starts: a canvas keeps the first kind of context it gave). */
   let cv = cv0;
-  // The drawing (paint.ts): today's town with Canvas 2D; the street town with WebGL 2 only (Nov 6; admin-town.ts: a device without
-  // WebGL 2 gets today's town). The street's WebGL failing as it starts (no context, or its shader fails), or its context lost twice
-  // within a minute or not back within LOST_WAIT_MS: the page opens again in today's town (`?street=off`). A lost context: nothing is
-  // drawn until it's back. Each is reported once a page with its reason (problems.ts, `reportTownFallback`: nothing shows; never on the
-  // frame loop; what's waiting goes as the page is hidden).
-  const losses: number[] = [];
-  let lostWait = 0;
-  const leaveStreet = (why: TownGlFallback) => {
+  // The drawing (paint.ts): today's town with Canvas 2D; the street town with WebGL 2 only (Nov 6). The street town never falls back to
+  // today's town (Eric, Nov 13, a standing rule: docs/rules/eric.md; gl-fail.ts). No WebGL 2: "Chess Town can't run on this device." Its
+  // WebGL failing as it starts (no context, or its shader fails), or its context lost and not back within LOST_WAIT_MS of the page showing
+  // (a loss while hidden waits), reloads the street town once; failing again soon after, "The town didn't load. Please retry." with Retry
+  // (`onFail`). A lost context: nothing is drawn until it's back. Each page reports its failure once (problems.ts, `reportTownFallback`:
+  // nothing shows; never on the frame loop; what's waiting goes as the page is hidden): its reason, or `retry` when it gives up.
+  let failed = false;
+  const fail = (why: TownGlFallback) => {
+    if (failed) return;
+    failed = true;
+    loss.stop();
+    if (why === "no-webgl2") {
+      reportTownFallback(why);
+      return onFail("unsupported");
+    }
+    if (afterFail() === "message") {
+      reportTownFallback("retry");
+      return onFail("retry");
+    }
     reportTownFallback(why);
     const u = new URL(location.href);
     u.pathname = "/town";
-    u.searchParams.set("street", "off");
     location.replace(u.href);
   };
+  const loss = lossWatch(() => painter.lost, () => document.hidden, LOST_WAIT_MS, () => alive && fail("not-back"));
   const onLost = (lost: boolean) => {
-    clearTimeout(lostWait);
-    if (!lost) return void (alive && draw(performance.now()));
-    const now = performance.now();
-    losses.push(now);
-    // (And one that isn't back within a few seconds: the browser isn't giving it back.)
-    if (losses.length >= 2 && now - losses[losses.length - 2]! < 60_000) setTimeout(() => alive && leaveStreet("lost-twice"));
-    else lostWait = window.setTimeout(() => alive && painter.lost && leaveStreet("not-back"), LOST_WAIT_MS);
+    loss.changed();
+    if (!lost && alive && !failed) draw(performance.now());
   };
   const makePainter = (): Painter => {
     if (!STREET_TOWN) return painter2d(cv);
     const p = painterGL(cv, onLost);
     if (typeof p !== "string") return shim(p);
-    leaveStreet(p);
-    // (Until the page goes: Canvas 2D on a new canvas, as this one may have given a WebGL context before failing.)
+    fail(p);
+    // (Until the page goes, or under the message: Canvas 2D on a new canvas, as this one may have given a WebGL context before failing.
+    // No frames run: `run` checks `failed`.)
     const n = cv.cloneNode() as HTMLCanvasElement;
     cv.replaceWith(n);
     cv = n;
@@ -1110,8 +1137,6 @@ function startTown(
       return painter.pixels(x, y, w, h);
     },
   };
-  // (An admin's device without WebGL 2 is in today's town: said once a page, as a fallback is.)
-  if (NO_WEBGL_STREET) reportTownFallback("no-webgl2");
   const painter: Painter = makePainter();
   cv.dataset.backend = painter.kind;
   const town = createTown(performance.now(), undefined, seat, undefined, stand);
@@ -1515,7 +1540,7 @@ function startTown(
 
   const frame = (now: number) => {
     raf = 0;
-    if (!alive) return;
+    if (!alive || failed) return;
     REC?.begin(now);
     const dt = Math.min(0.1, (now - last) / 1000);
     last = now;
@@ -1581,7 +1606,7 @@ function startTown(
   /** The frames start again. `gap`: after a pause (a hidden tab, a test's hold): the recorder and the pill start afresh. Back from a
    * room (`resume`) they don't: the room's frames led up to this one, and its time is seen. */
   const run = (gap = true) => {
-    if (raf || !alive || document.hidden || held || away || loading) return;
+    if (raf || !alive || failed || document.hidden || held || away || loading) return;
     if (gap) {
       rec?.pause();
       FPS?.restart();
@@ -1593,7 +1618,11 @@ function startTown(
     if (raf) cancelAnimationFrame(raf);
     raf = 0;
   };
-  const onVisibility = () => (document.hidden ? halt() : run());
+  const onVisibility = () => {
+    loss.changed();
+    if (document.hidden) halt();
+    else run();
+  };
   document.addEventListener("visibilitychange", onVisibility);
 
   // ---- The chips: moved only when they move; a boss's face drawn into its chip when the chip changes home.
@@ -2367,7 +2396,8 @@ function startTown(
   /** How long the town waited on the music once built (the "Loading music…" step). */
   let loadMusicMs = 0;
   if (loading) void loadTown();
-  else {
+  // (The street town failed as it started: the loading card stays up until the page reloads, or the message has replaced it.)
+  else if (!failed) {
     void preloadMusic();
     onLoading(null);
     run();
@@ -2533,7 +2563,7 @@ function startTown(
       r.riders.clear();
       r.ridersSoon.clear();
       dropRiders();
-      clearTimeout(lostWait);
+      loss.stop();
       offAccount();
       fpsEl?.remove();
       if (FPS === fps) setFps(null);
@@ -2580,7 +2610,9 @@ function startTown(
 }
 
 const POSE = { x: 0, y: 0, hop: 0, tilt: 0, step: false, t: 0 };
-/** How long the street town's lost WebGL context may stay lost before the page opens in today's town (it's usually back within a second). */
+/** Why the street town shows a message instead of itself (gl-fail.ts): no WebGL 2 here, or it didn't load after its one reload. */
+type TownBroken = "unsupported" | "retry";
+/** How long the street town's lost WebGL context may stay lost while the page shows before the street town reloads (it's usually back within a second). */
 const LOST_WAIT_MS = 5000;
 /** The frame-rate pill's name for each backend. */
 const BACKEND_LABEL: Record<Backend, string> = { "2d": "2D", webgl: "WebGL" };

@@ -195,7 +195,7 @@ test("the health view: JSON for an admin (deployed version, live numbers, errors
   expect(await opsPage(page)).toContain("<h2>Health</h2>");
 });
 
-test("an admin's town on a device without WebGL 2 is today's town (Canvas 2D, not the street town) and says so once, as its own kind with its reason, and nothing shows; the health view counts it by reason, apart from the errors", async ({ page }) => {
+test("an admin's town on a device without WebGL 2 never falls back to today's town (Nov 13, Eric's rule): the town's box says \"Chess Town can't run on this device.\", no reload; it says so once, as its own kind with its reason; the health view counts it by reason, apart from the errors", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
   const desktop = project() === "desktop";
@@ -210,18 +210,21 @@ test("an admin's town on a device without WebGL 2 is today's town (Canvas 2D, no
   await page.addInitScript(() => delete (window as { WebGL2RenderingContext?: unknown }).WebGL2RenderingContext);
   // (An admin's town is the street town, which needs WebGL 2: admin-town.ts.)
   await asAdmin(page);
+  let loads = 0;
+  page.on("framenavigated", (f) => void (f === page.mainFrame() && new URL(f.url()).pathname === "/town" && loads++));
   const sent = page.waitForRequest((r) => r.url().endsWith("/api/problems") && r.method() === "POST");
   await page.goto("/town?sky=day");
-  const cv = page.locator("canvas.town-canvas");
-  await expect(cv).toHaveAttribute("data-ready", "1", { timeout: 30_000 });
-  await expect(cv, "drawn with Canvas 2D").toHaveAttribute("data-backend", "2d");
-  expect(await cv.getAttribute("data-you"), "today's town: where a player's opens").toBe("22,17");
+  // The message in the town's box, nothing else (no button: retrying can't help): never today's town.
+  const box = page.locator(".town-broken");
+  await expect(box).toBeVisible({ timeout: 30_000 });
+  await expect(box).toHaveText("Chess Town can't run on this device.");
+  await expect(page.locator("canvas.town-canvas"), "nothing drawn under it").not.toHaveAttribute("data-ready", "1");
   // What every error request carries, nothing more: its kind, the reason as its message, no stack.
   const body = (await sent).postDataJSON() as { kind: string; errors: { kind: string; message: string; stack: string }[] };
   expect(body.kind).toBe("errors");
   expect(Object.keys(body).sort()).toEqual(["account", "device", "errors", "kind", "version"]);
   expect(body.errors.map((e) => [e.kind, e.message, e.stack])).toEqual([["town-gl-fallback", "no-webgl2", ""]]);
-  // Nothing shows: not an error to the player.
+  expect(loads, "no reload").toBe(1);
   await expect(page.getByText(/Something went wrong|WebGL/i)).toHaveCount(0);
   if (!desktop) return;
   await expect.poll(async () => (await healthNow()).townFallbacks.byReason["no-webgl2"]!.day, { timeout: 40_000 }).toBeGreaterThan(before);
