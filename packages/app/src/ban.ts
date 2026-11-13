@@ -5,9 +5,10 @@
  * counts, old and new), or a lobby's "banned" message (`showBanNotice` in components/FairPlay.tsx), drops the app to its ban screen
  * and nothing else: no menus, no town, no solo, no chat (main.tsx draws only that).
  *
- * This device remembers it (`brc.banned`), so a reload, a deep link or another tab shows the ban screen from its first frame; it
- * then asks the server (`checkBan`) and leaves the screen only if the server lets it in (the ban lifted, or the browser's data
- * cleared: a guest again).
+ * This device remembers it (`brc.banned`), so a reload, a deep link or another tab shows the ban screen from its first frame. While the
+ * screen is up it asks the server (`checkBan`: at load, a minute after each ban answer, sooner after a failed ask, and whenever the page
+ * comes back into view or online), and leaves the screen once the server lets this browser in: the ban lifted, the browser's data
+ * cleared (a guest again), or someone signed in to their own account on it (a shared device: the ban screen's sign-in box).
  */
 
 const KEY = "brc.banned";
@@ -23,9 +24,20 @@ function readFlag(): boolean {
 }
 
 let banned = readFlag();
-/** The ban was remembered when this page loaded (checkBan asks the server about it). */
-const atLoad = banned;
 const listeners = new Set<() => void>();
+/** While the screen is up: ask the server again this long after a ban answer, so a lifted ban counts in an open tab (minor 3). */
+export const RECHECK_MS = 60_000;
+/** After no answer, or one that's neither the ban nor a way in (a 429, a 5xx), again after this, doubling up to RECHECK_MS. */
+export const RETRY_MS = 5_000;
+let timer: ReturnType<typeof setTimeout> | null = null;
+let failures = 0;
+let asking = false;
+
+/** The next ask while the screen is up (none once it's down). */
+function askAgainIn(ms: number) {
+  if (timer) clearTimeout(timer);
+  timer = banned ? setTimeout(() => void checkBan(), ms) : null;
+}
 
 export const isBanned = () => banned;
 export function onBanChange(fn: () => void): () => void {
@@ -42,6 +54,9 @@ function set(next: boolean) {
   }
   if (banned === next) return;
   banned = next;
+  failures = 0;
+  // (Up: ask again in a while; down: no more asking.)
+  askAgainIn(RECHECK_MS);
   listeners.forEach((l) => l());
 }
 
@@ -65,20 +80,35 @@ export function watchBans(): void {
     if (isBanAnswer(res)) enterBan();
     return res;
   };
+  // (Back on screen, or back online: the screen asks at once, so an installed app opened again doesn't wait for its next ask.)
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") void checkBan();
+  });
+  window.addEventListener("online", () => void checkBan());
 }
 
 /**
- * A device that remembered the ban as this page loaded asks the server once (main.tsx; `/api/me`: the gate answers before anything
- * else runs). The ban answer keeps the screen; any other answer from the server means it let this browser in (the ban lifted, or
- * its data cleared), so the app loads as usual. No answer (offline): the screen stays.
+ * While the ban screen is up, asks the server whether it still holds (`/api/me`: the gate answers before anything else runs). The ban
+ * answer keeps the screen, and asks again in RECHECK_MS; a 2xx means the server let this browser in (the ban lifted, its data cleared,
+ * or a sign-in here to an account that isn't banned), so the app loads as usual. No answer (offline), or any other (a 429, a 5xx, the
+ * database down): the screen stays, and asks again after RETRY_MS, doubling, up to RECHECK_MS. A player who isn't banned is never kept
+ * there for a page's life by one failed ask (the review of #687, minor 3).
  */
 export async function checkBan(): Promise<void> {
-  if (!atLoad || !banned) return;
+  if (!banned || asking) return;
+  asking = true;
+  if (timer) clearTimeout(timer);
+  timer = null;
+  let next: number | null = RECHECK_MS;
   try {
     const res = await fetch("/api/me", { credentials: "same-origin" });
-    if (isBanAnswer(res)) return enterBan();
-    if (res.ok) set(false);
+    if (isBanAnswer(res)) failures = 0;
+    else if (res.ok) next = null;
+    else failures++;
   } catch {
-    // Offline: the ban screen stays until the server can say.
+    failures++;
   }
+  asking = false;
+  if (next === null) return set(false);
+  askAgainIn(failures ? Math.min(RECHECK_MS, RETRY_MS * 2 ** (failures - 1)) : RECHECK_MS);
 }

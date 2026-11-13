@@ -1,6 +1,7 @@
 import { ASK_AGE_LINE, CHAT_MOD, oldEnough, pawnColorOf, type ChatPicks, type PawnColor, type ShopState } from "@chessroyale/core";
 import { devicePawnColor, setDevicePawnColor } from "./prefs.ts";
 import { loadStep } from "./loadbar.ts";
+import { isBanned } from "./ban.ts";
 import type { CrateRoll, ItemInstance, ItemLook, ItemSlot, QuestsAnswer, RankedLeaves, RankedSummary, XpGrant } from "@chessroyale/core";
 import type { ChatBlock } from "@chessroyale/chess";
 
@@ -220,10 +221,27 @@ export async function loadAccount(name?: string): Promise<void> {
     // The server forgot (its cookie was cleared): tell it again, which also puts the guest back to the defaults.
     if (young && config.age !== "under") await sendAgeAnswer(false).catch(() => undefined);
   } catch {
+    // (Your profile was the ban answer: the ban screen keeps the sign-in options, for signing in to another account there. ban.ts.)
+    if (config && isBanned()) return loadStep("last");
     // No server (local dev) or offline: play on without an account. A server that did answer keeps its test switch when
     // only your profile failed (Oct 25: a CI run lost its ?boss= link that way, the switch going with the profile).
     set({ config: { accounts: false, google: false, email: false, ...(config?.testSwitches ? { testSwitches: true } : {}) } });
     loadStep("last");
+  }
+}
+
+/**
+ * The sign-in options alone, for the ban screen's "Sign in to another account" (a shared device: the server answers a browser marked
+ * banned only the ban on /api/me, but lets anyone sign in to their own account on it). Nothing if they're known already.
+ */
+export async function loadSignInOptions(): Promise<void> {
+  if (state.config?.accounts) return;
+  try {
+    const config = await api<NonNullable<AccountState["config"]>>("/api/auth/config");
+    const young = storedTooYoung() || config.age === "under";
+    set({ config, age: young ? "under" : (config.age ?? null) });
+  } catch {
+    // Offline: no sign-in box until the server can say what's set up (the screen asks again when it's back).
   }
 }
 
