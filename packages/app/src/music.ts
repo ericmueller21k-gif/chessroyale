@@ -306,7 +306,8 @@ async function loadTheme(boss: string): Promise<Theme | null> {
 /**
  * The battle the app is in: `key` names it (its match), `live` once it has started (past its intro). `theme`: the theme it wants
  * now (a key in themes.json; its boss's if none), switched to by MUSIC_SWITCH's fades as it changes; `dropAt` (Date.now()'s clock,
- * ms): that theme's loop starts exactly then (`switchPlan`). `ahead`: themes it may switch to, fetched (not decoded) as it begins.
+ * ms): that theme's loop starts exactly then (`switchPlan`). `ahead`: themes it may switch to, fetched (not decoded) as it begins;
+ * `next`: the one due next, decoded now so it's ready.
  */
 export interface MusicBattle {
   key: unknown;
@@ -315,12 +316,15 @@ export interface MusicBattle {
   theme?: string;
   dropAt?: number;
   ahead?: readonly string[];
+  next?: string;
 }
 const themeOf = (b: MusicBattle) => b.theme ?? b.boss;
 let battle: MusicBattle | null = null;
 let playing: (Playing & { key: unknown; boss: string; theme: string }) | null = null;
 /** What a switch left playing until its fade is done (stopped at once by the result, Music off or the page hiding). */
 let leaving: Playing[] = [];
+/** The theme a battle said is due next, decoded as it said so (`next`). */
+let nextLoaded: string | undefined;
 /** The battle and theme whose start is waiting for it to load. */
 let starting: { b: MusicBattle; theme: string } | null = null;
 
@@ -356,6 +360,10 @@ export function bossMusic(b: MusicBattle | null) {
     battle.dropAt = b.dropAt;
   }
   if (b.live && !battle.live) battle.live = true;
+  if (b.next !== nextLoaded) {
+    nextLoaded = b.next;
+    if (b.next && wanted()) void loadTheme(b.next);
+  }
   maybeStart(false);
 }
 
@@ -367,11 +375,11 @@ export function bossMusic(b: MusicBattle | null) {
  * `switchPlan`), on through phase 2 until every board is decided. Null: the music ends (the result, or phase 1 won where no phase 2
  * follows: as for any boss).
  */
-export function recluseMusic(phase: Phase, result: boolean, simulDecided: boolean): { theme: string; dropAt?: number } | null {
+export function recluseMusic(phase: Phase, result: boolean, simulDecided: boolean): { theme: string; dropAt?: number; next?: string } | null {
   if (phase.kind === "phaseChange") return { theme: RECLUSE_MUSIC.transform, dropAt: phase.splitAt };
   if (phase.kind === "simul") return simulDecided ? null : { theme: RECLUSE_MUSIC.transform };
   if (phase.kind === "results") return null;
-  if (phase.kind === "boss" && phase.fall && phase.toPhase2) return { theme: RECLUSE_MUSIC.beaten };
+  if (phase.kind === "boss" && phase.fall && phase.toPhase2) return { theme: RECLUSE_MUSIC.beaten, next: RECLUSE_MUSIC.transform };
   return result ? null : { theme: RECLUSE_MUSIC.adult };
 }
 
@@ -433,7 +441,10 @@ function stopLeaving(ms: number) {
 
 function endBattle() {
   const was = battle && themeOf(battle);
+  const next = nextLoaded;
   battle = null;
+  nextLoaded = undefined;
+  if (next && next !== was) setTimeout(() => forgetTheme(next), MUSIC.endFadeMs + 250);
   starting = null;
   const p = playing;
   playing = null;

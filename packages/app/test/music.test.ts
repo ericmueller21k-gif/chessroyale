@@ -499,7 +499,8 @@ describe("the Hidden Boss: a theme for each point of his fight, switched mid-fig
   it("which theme when: his adult form's from the start; beaten, with the phase change next, his beaten theme; the phase change and phase 2, the transformation's, its drop on the split; the result, none", () => {
     expect(recluseMusic(boss({ intro: true }), false, false)).toEqual({ theme: H.adult });
     expect(recluseMusic({ kind: "play" } as never, false, false)).toEqual({ theme: H.adult });
-    expect(recluseMusic(boss({ fall: true, toPhase2: true }), true, false)).toEqual({ theme: H.beaten });
+    // (The transformation's decoded now, ready before the phase change.)
+    expect(recluseMusic(boss({ fall: true, toPhase2: true }), true, false)).toEqual({ theme: H.beaten, next: H.transform });
     // (Beaten where no phase 2 follows (online, a Solo raid), or he won: the result, as for any boss.)
     expect(recluseMusic(boss({ fall: true }), true, false)).toBeNull();
     expect(recluseMusic(boss(), true, false)).toBeNull();
@@ -577,10 +578,12 @@ describe("the Hidden Boss: a theme for each point of his fight, switched mid-fig
         await vi.advanceTimersByTimeAsync(0);
         const adult = ctx.gains[0]!;
         ctx.currentTime = 100;
-        fight(H.beaten);
+        files.length = 0;
+        fight(H.beaten, { next: H.transform });
         await vi.advanceTimersByTimeAsync(0);
         const t = 100 + MUSIC.startDelayS;
         expect(musicTheme()).toBe(H.beaten);
+        expect(files, "the transformation's decoded as he's beaten").toEqual(expect.arrayContaining(["/music/recluse-phase3-intro.mp3", "/music/recluse-phase3-loop.mp3"]));
         const [bi, bl] = ctx.sources.slice(2);
         expect(bi!.started).toEqual([t, undefined]);
         expect(bl!.started![0]).toBeCloseTo(t + 1.815, 9);

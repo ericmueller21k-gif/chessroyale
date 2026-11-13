@@ -450,6 +450,10 @@ test("beaten in phase 1 (?win=1): he collapses and mumbles, then the phase chang
   test.setTimeout(5 * 60_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
+  // (His music, Nov 13: the sound log, and the pieces fetched.)
+  await page.addInitScript(() => ((window as any).__soundLog = []));
+  const music: string[] = [];
+  page.on("request", (r) => void (/^\/music\/.*\.mp3$/.test(new URL(r.url()).pathname) && music.push(new URL(r.url()).pathname)));
   await meetHim(page, "win=1");
   await yourMove(page);
   const fall = await watchFor(page, {
@@ -526,11 +530,28 @@ test("beaten in phase 1 (?win=1): he collapses and mumbles, then the phase chang
     c2: count(2),
     c1: count(1),
   });
+  // His music (Nov 13): the first frame showing the board cracked into four, on Date.now()'s clock (the frame's own time: the
+  // app draws in its frame callback, so the timeline's time as the change lands is that frame's).
+  await page.evaluate(() => {
+    const w = window as any;
+    const obs = new MutationObserver(() => {
+      if (w.__crackFrame || !document.querySelector('.rc-stage[data-step="crack"]')) return;
+      w.__crackFrame = (document.timeline.currentTime as number) + (Date.now() - performance.now());
+    });
+    obs.observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ["data-step"] });
+  });
+  const musicLog = () => page.evaluate(() => ((window as any).__soundLog as string[]).filter((l) => l.startsWith("music:")));
+  await expect.poll(musicLog, { timeout: 30_000 }).toContain("music:start:recluse-phase2");
+  // (His later themes fetched as his fight starts, not decoded until they play.)
+  await expect.poll(() => music.filter((m) => /recluse-(beaten|phase3|house)/.test(m)).sort()).toEqual(["/music/recluse-beaten-intro.mp3", "/music/recluse-house-loop.mp3", "/music/recluse-phase3-intro.mp3", "/music/recluse-phase3-loop.mp3"]);
   await play(page, "h5f7");
   // The board holds while he falls, then (no result screen) the phase change, then phase 2's four boards.
   await expect.poll(() => page.evaluate(() => !!(window as any).match.phase.fall), { timeout: 60_000 }).toBe(true);
   expect((await bossNow(page)).result).toBe("crowd");
+  // (Beaten: his beaten theme at once.)
+  await expect.poll(musicLog).toContain("music:start:recluse-beaten");
   await expect.poll(() => phase(page), { timeout: 30_000 }).toBe("phaseChange");
+  const splitAt: number = await page.evaluate(() => (window as any).match.phase.splitAt);
   // (No clock runs from here until the countdown is over: neither the dock's nor any board's.)
   const clocks = await watchSpans(page, { running: { selector: ".dk-clock.running, .rc-tag.running" } });
   const clockShown = await watchShown(page, { running: { selector: ".dk-clock.running, .rc-tag.running" } });
@@ -547,6 +568,16 @@ test("beaten in phase 1 (?win=1): he collapses and mumbles, then the phase chang
   const at = Date.now();
   // The boards set, a countdown on every one (a phone's three small ones too), its banner on yours; no clock yet.
   await expect.poll(() => phase(page), { timeout: 30_000 + ADDED_MS }).toBe("simul");
+  // His music through it: his adult form's theme, then his beaten one (the first faded), then the transformation's (the beaten
+  // one faded), its drop on the split: scheduled within a frame of it, and the split's first frame within a frame of the drop.
+  const ml = await musicLog();
+  expect(ml.filter((l) => /^music:(start|out):/.test(l))).toEqual(["music:start:recluse-phase2", "music:start:recluse-beaten", "music:out:recluse-phase2", "music:start:recluse-phase3", "music:out:recluse-beaten"]);
+  const drop = Number(ml.find((l) => l.startsWith("music:drop:recluse-phase3:"))!.split(":").at(-1));
+  const crackFrame: number = await page.evaluate(() => (window as any).__crackFrame);
+  test.info().annotations.push({ type: "drop vs split", description: `drop − split ${drop - splitAt} ms; the split's first frame − drop ${(crackFrame - drop).toFixed(1)} ms` });
+  expect(Math.abs(drop - splitAt), "the drop scheduled on the split").toBeLessThanOrEqual(17);
+  // (A frame or two of slack for CI's slow, busy runners: the drop is measured within one on a computer, the decision note.)
+  expect(Math.abs(crackFrame - drop), "the split's first frame on the drop").toBeLessThan(50);
   await expect.poll(() => page.locator(".rc-simul .cc-num").count(), { timeout: P.countdownSeconds * 1000 }).toBe(4);
   expect((await simulNow(page)).playing).toBe(false);
   // (Reduced motion: the same countdown, its numbers still.)
