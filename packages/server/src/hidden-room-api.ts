@@ -1,6 +1,7 @@
 import { pausedLine, type Pausable } from "@chessroyale/core";
 import { getUser, type Sql } from "./accounts.ts";
-import { BANNED_MESSAGE, banCheck } from "./fairplay.ts";
+import { banCheck } from "./fairplay.ts";
+import { banAnswer } from "./ban-gate.ts";
 import { isBlockedText } from "./text-filter.ts";
 import { signedInReader } from "./town-chat-api.ts";
 import { readLimits } from "./town-here-api.ts";
@@ -114,7 +115,8 @@ export async function hiddenRoomResponse(
   // (A raid's kill switch rests his fight as it rests Boss Battle's parties, and his own rests him: no new request, the rest as ever.)
   if (action === "challenge" && a.paused) return json({ message: pausedLine(a.paused), paused: a.paused }, 503);
   // (Banned for fair play: not into his room, nor into a request; review M1. A look, a cancel or leaving go on as ever.)
-  if ((action === "enter" || action === "challenge") && (await bannedNow(sql, id, a.device, now))) return json({ message: BANNED_MESSAGE, banned: true }, 403);
+  // (An evasion ban found now: the ban answer, as the Worker's gate gives a banned session: ban-gate.ts.)
+  if ((action === "enter" || action === "challenge") && (await bannedNow(sql, id, a.device, now))) return banAnswer(sql, a.token, id);
   const room = !a.testSwitches ? "town" : typeof body.room === "string" && /^[\w-]{1,40}$/.test(body.room) ? `test:${body.room}` : `alone:${id}`;
   const me = await whoIs(sql, id, now, a.admin);
   const view = await hub.hiddenRoom({ id, name: me.name, room, action, admin: me.admin, beat: readRoomBeat(body), ...(a.testSwitches ? { limits: readRoomLimits(body.limits) } : {}) });

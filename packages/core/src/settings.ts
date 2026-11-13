@@ -3797,6 +3797,13 @@ export const FAIRPLAY = {
    */
   enforcement: "pool" as "watch" | "review" | "pool" | "ban",
   /**
+   * A ban means you can't sign in (Eric, Nov 13; docs/decisions/2026-11-13-ban-blocks-sign-in.md): every request to the server with a
+   * session (or a browser marked banned) is checked against fair play's cases before its route runs (server/ban-gate.ts). Each Worker
+   * instance keeps a "not banned" answer this long per session, so the live line's and the town's polls stay without a database read
+   * most of the time; a ban made on the same instance counts at once, one made elsewhere within this long.
+   */
+  banCheckMs: 30_000,
+  /**
    * The engine pool (Eric, Nov 10; docs/decisions/2026-11-10-engine-pool.md): an account detection puts here only ever meets other
    * pooled accounts (or bots) in every queue, and nothing on its screen differs. In: a level that used to ban (`enforcement` "pool"),
    * or a new account with `newHits` of its first `newGames` fair-play matches at the one-match ban bar (`levels.banOne*`), with no

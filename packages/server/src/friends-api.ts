@@ -2,7 +2,8 @@ import { isGameCode, isInviteKind, pausedLine, type InviteKind } from "@chessroy
 import { d1Sql, ensureSchema } from "./accounts.ts";
 import { DEVICE_COOKIE, SESSION_COOKIE, accountOf, isSignedIn, readCookie, signInRequired, type AccountEnv, type WaitUntil } from "./api.ts";
 import { cachedUserId } from "./presence.ts";
-import { BANNED_MESSAGE, banCheck } from "./fairplay.ts";
+import { banCheck } from "./fairplay.ts";
+import { banAnswer } from "./ban-gate.ts";
 import {
   answerRequest,
   block,
@@ -98,7 +99,7 @@ export async function handleFriendsApi(request: Request, env: FriendsEnv, waitUn
   let done: Done;
   switch (action) {
     case "request":
-      if (await banned()) return json({ message: BANNED_MESSAGE, banned: true }, 403);
+      if (await banned()) return banAnswer(sql, readCookie(request, SESSION_COOKIE), me.id);
       done = await sendRequest(sql, me.id, id, needSignIn, now);
       break;
     case "answer":
@@ -121,7 +122,7 @@ export async function handleFriendsApi(request: Request, env: FriendsEnv, waitUn
       break;
     case "invite": {
       const { kind, code } = body;
-      if (await banned()) return json({ message: BANNED_MESSAGE, banned: true }, 403);
+      if (await banned()) return banAnswer(sql, readCookie(request, SESSION_COOKIE), me.id);
       // {check: true}: only whether they'd take it (before making a lobby or party to invite them into).
       if (body.check === true) {
         done = await mayInvite(sql, me.id, id, needSignIn, now);

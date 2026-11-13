@@ -2,7 +2,8 @@ import { deleteLockerItems, equipLocker, lockerState, openCrate, type AdminCheck
 import { liveCounts, pruneLive, type LiveCounts } from "./live.ts";
 import { liveHub, type LiveHub } from "./live-hub.ts";
 import { cachedUserId, firstSighting, forgetToken, inboxOf, markSeen, rememberInbox } from "./presence.ts";
-import { REPORT_THANKS, appeal, fairStatus, reportPlayer } from "./fairplay.ts";
+import { REPORT_THANKS, reportPlayer, signInBan } from "./fairplay.ts";
+import { banAnswer, banRedirect } from "./ban-gate.ts";
 import { NAME_NOT_ALLOWED, isBlockedText } from "./text-filter.ts";
 import { chatNoticeSeen } from "./chat-mod.ts";
 import { isAdmin, testSwitchesOn, type AdminEnv } from "./admin.ts";
@@ -195,8 +196,6 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
     !path.startsWith("/api/profile/") &&
     !path.startsWith("/api/shop") &&
     !path.startsWith("/api/locker") &&
-    path !== "/api/fairplay/status" &&
-    path !== "/api/appeal" &&
     path !== "/api/chat" &&
     path !== "/api/chat/notice" &&
     !path.startsWith("/api/chat/icon/") &&
@@ -547,14 +546,6 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
     return json({ ok: true, ...(r.already ? { already: true } : {}), message: r.already ? already : REPORT_THANKS });
   }
 
-  // GET /api/fairplay/status: banned or not, and your latest appeal (the ban notice). POST /api/appeal {text}.
-  if (path === "/api/fairplay/status" && request.method === "GET") return json(await fairStatus(sql, current.id));
-  if (path === "/api/appeal" && request.method === "POST") {
-    const b = (await request.json().catch(() => ({}))) as { text?: unknown };
-    const r = await appeal(sql, current.id, b.text, now);
-    return r.ok ? json({ ok: true, ...(await fairStatus(sql, current.id)) }) : json({ message: r.message }, 400);
-  }
-
   // POST /api/chat/notice: the player has read the notice of a moderator's warning or chat ban (chat-mod.ts).
   if (path === "/api/chat/notice" && request.method === "POST") {
     await chatNoticeSeen(sql, current.id);
@@ -744,6 +735,10 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
     const answered = ageAnswer(request) === "ok";
     const finish = answered || (await answeredSignIn(sql, current, "email", address));
     if (!(await verifyEmailCode(sql, address, b.code, now, !finish))) return json({ message: "That code didn't work. Check it, or send a new one." }, 400);
+    // A ban means you can't sign in (Eric, Nov 13): once the code shows the address is theirs, a banned account (or ban evasion:
+    // signInBan) gets the ban answer and nothing else, before the age question: no session, this browser marked (ban-gate.ts).
+    const banned = await signInBan(sql, "email", address, null, now);
+    if (banned) return banAnswer(sql, token, banned);
     if (!finish) return askAgeFirst();
     const user = answered ? await signInWithIdentity(sql, current, "email", address, {}, now) : await signInIfAnswered(sql, current, "email", address, {}, now);
     // (The account went between the two reads: asked first, and the code's used: the finish fails and the player sends a new code.)
@@ -790,6 +785,15 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
     if (!claims?.sub || claims.aud !== env.GOOGLE_CLIENT_ID) return Response.redirect(`${url.origin}/?signin=failed`, 302);
     const answered = ageAnswer(request) === "ok";
     const extra = { email: claims.email_verified ? (claims.email ?? null) : null };
+    // A ban means you can't sign in (Eric, Nov 13): back to the page with no session, this browser marked; the app's first request
+    // there shows the ban screen (ban-gate.ts). Before the age question, as for the emailed code.
+    const banned = await signInBan(sql, "google", claims.sub, extra.email, now);
+    if (banned) {
+      const refused = await banRedirect(sql, token, banned, `${url.origin}${safeNext(readCookie(request, NEXT_COOKIE))}?signin=banned`);
+      refused.headers.append("set-cookie", cookie(STATE_COOKIE, "", 0));
+      refused.headers.append("set-cookie", cookie(NEXT_COOKIE, "", 0));
+      return refused;
+    }
     const user = answered ? await signInWithIdentity(sql, current, "google", claims.sub, extra, now) : await signInIfAnswered(sql, current, "google", claims.sub, extra, now);
     const back = `${url.origin}${safeNext(readCookie(request, NEXT_COOKIE))}`;
     if (!user) {

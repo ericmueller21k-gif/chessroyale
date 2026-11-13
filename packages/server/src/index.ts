@@ -13,7 +13,8 @@ import { purgeTokenDrops } from "./boss-tokens.ts";
 import { ledgerCheck, ledgerCheckDue } from "./ledger.ts";
 import { duelEntrant, purgeConduct, purgeDuelGames, rankedLeaves } from "./ranked.ts";
 import { DEVICE_COOKIE, SESSION_COOKIE, SIGN_IN_TO_PLAY, accountOf, handleAccountApi, isSignedIn, readCookie, signInRequired, withSecrets, type AccountEnv, type WaitUntil } from "./api.ts";
-import { BANNED_MESSAGE, banCheck } from "./fairplay.ts";
+import { banCheck } from "./fairplay.ts";
+import { UNMARK, banAnswer, banGate } from "./ban-gate.ts";
 import { caseMailer } from "./fairplay-mail.ts";
 import { handleAdmin, isAdmin, testSwitchesOn, type AdminEnv } from "./admin.ts";
 import { handleTestAccounts } from "./test-accounts.ts";
@@ -175,6 +176,13 @@ async function handle(request: Request, rawEnv: Env, ctx: ExecutionContext): Pro
     countRoute("429", 0);
     return json({ message: TOO_MANY, retryMs: wait }, 429, { "retry-after": String(Math.ceil(wait / 1000)) });
   }
+  // A ban means you can't sign in (Eric, Nov 13; ban-gate.ts): a banned session, or a browser marked banned, gets the ban answer on
+  // every route here (the lobbies' WebSockets and the admin pages too), before the route runs. (Not the e2e's own database route.)
+  const gate = rawEnv.DB && !(rawEnv.E2E_SQL && url.pathname === "/api/e2e/sql") ? await banGate(d1Sql(rawEnv.DB), rawEnv.DB, request, t) : null;
+  if (gate && "refused" in gate) {
+    countRoute("banned", Date.now() - t);
+    return gate.refused;
+  }
   const res = await route(request, rawEnv, url, (p) => ctx.waitUntil(p));
   const ms = Date.now() - t;
   countRoute(routeOf(request.method, url.pathname), ms);
@@ -182,6 +190,8 @@ async function handle(request: Request, rawEnv: Env, ctx: ExecutionContext): Pro
   if (res.status === 101 || res.webSocket) return res;
   const out = new Response(res.body, res);
   out.headers.append("server-timing", `app;dur=${ms}`);
+  // (A browser's ban mark whose account isn't banned any more: taken away. The browser is a guest again, free to sign in.)
+  if (gate) out.headers.append("set-cookie", UNMARK);
   return out;
 }
 
@@ -521,13 +531,14 @@ async function engineCaller(request: Request, env: Env, waitUntil: WaitUntil): P
 
 /**
  * Whether this request may start online play (PLAY, a new lobby): signed in where sign-in is set up (401 otherwise),
- * and not banned for fair play (403, with `banned` so the app shows the ban notice and its appeal). Else go ahead, with
- * whether the account is in fair play's engine pool (its queues are the pool's own; nothing in the answer says so).
+ * and not banned for fair play (an evasion ban banCheck finds now: the ban answer, ban-gate.ts, as the gate gives a banned session).
+ * Else go ahead, with whether the account is in fair play's engine pool (its queues are the pool's own; nothing in the answer says so).
  */
 async function mayPlay(request: Request, env: Env, waitUntil: WaitUntil): Promise<Response | { pooled: boolean }> {
   if (!env.DB) return { pooled: false };
   const me: User | null = await accountOf(request, env, waitUntil);
   if (signInRequired(env) && !isSignedIn(me)) return json({ message: SIGN_IN_TO_PLAY }, 401);
   const ban: { banned: boolean; pooled?: boolean } = await banCheck(d1Sql(env.DB), me, readCookie(request, DEVICE_COOKIE), Date.now()).catch(() => ({ banned: false }));
-  return ban.banned ? json({ message: BANNED_MESSAGE, banned: true }, 403) : { pooled: !!ban.pooled };
+  if (ban.banned && me) return banAnswer(d1Sql(env.DB), readCookie(request, SESSION_COOKIE), me.id);
+  return { pooled: !!ban.pooled };
 }

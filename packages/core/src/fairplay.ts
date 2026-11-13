@@ -15,6 +15,15 @@
 import { FAIRPLAY } from "./settings.ts";
 import { lossForRating, ratingForLoss } from "./rating.ts";
 
+/** Where a banned player writes for more information (Eric, Nov 13): appeals come by email and a person answers them. */
+export const SUPPORT_EMAIL = "support@hunchess.com";
+/**
+ * The one line a banned account sees (Eric, Nov 13: "Your account has been banned. For more information, email support."): on the ban
+ * screen (the address a mailto link), in every answer the server gives a banned session or sign-in, and in the ban email.
+ * docs/decisions/2026-11-13-ban-blocks-sign-in.md.
+ */
+export const BANNED_LINE = `Your account has been banned. For more information, email ${SUPPORT_EMAIL}.`;
+
 /** One person's pick in one position, from the match's judged numbers. */
 export interface FairMove {
   /** Plies played before this move from the starting position (0: White's first move). */
