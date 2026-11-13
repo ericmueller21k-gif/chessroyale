@@ -272,8 +272,8 @@ Built Oct 15; why it's built this way: `docs/decisions/2026-10-15-error-capture-
 - **The feedback sheet** (Eric, Oct 15): "We'd love your feedback", with three kinds: 🐞 Report a bug (an optional
   note, sent with the same diagnostics and the page's last 3 errors; the answer is "Report AB12CD — share this id": 6
   characters, no look-alikes), 💬 Feedback and 💡 Suggest an idea (a note, required, sent alone: no diagnostics, no
-  account; the answer is a thank-you). One sheet over any screen (rendered beside the ban notice, so a match redrawing
-  never takes the form away). Opened on Report a bug from the match menu (the gear, its list and a confirm first, on a phone and a computer;
+  account; the answer is a thank-you). One sheet over any screen (rendered beside the app at its root, so a match redrawing
+  never takes the form away; a banned account sees only the ban screen: [fairplay.md](fairplay.md)). Opened on Report a bug from the match menu (the gear, its list and a confirm first, on a phone and a computer;
   Oct 25), and on Feedback from Settings
   (HELP).
 - **Under the age gate** (Oct 16; [docs/decisions/2026-10-16-age-gate-and-real-money.md](../decisions/2026-10-16-age-gate-and-real-money.md)):

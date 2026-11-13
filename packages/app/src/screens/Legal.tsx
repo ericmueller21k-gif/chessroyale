@@ -355,8 +355,8 @@ function Privacy() {
 
       <h2>Cookies and storage on your device</h2>
       <p>
-        Only what the game needs to work: signing in, the answer to the age question, and fair play's device marker against ban
-        dodging. Nothing for advertising or analytics and nothing from other companies, so there's nothing to accept.
+        Only what the game needs to work: signing in, the answer to the age question, and fair play's device marker and ban mark
+        against ban dodging. Nothing for advertising or analytics and nothing from other companies, so there's nothing to accept.
       </p>
       <ul>
         <li>
@@ -364,6 +364,10 @@ function Privacy() {
         </li>
         <li>
           <strong>hc_device</strong> is the fair-play device marker: a random value and nothing else. 400 days.
+        </li>
+        <li>
+          <strong>hc_banned</strong> is set only if an account banned for fair play was used or signed in to on this device: that
+          account's random id, so the device shows only the ban. 400 days, or until the ban is lifted.
         </li>
         <li>
           <strong>hc_oauth</strong> and <strong>hc_next</strong> exist only during "Continue with Google". 10 minutes.
@@ -376,7 +380,8 @@ function Privacy() {
         </li>
         <li>
           <strong>Local storage</strong> keeps your settings and choices on this device: theme, sound, eval bar, chat on or off,
-          players you muted, your boss picks, the match you're in, so you can rejoin it, and an "under {AGE_GATE.minAge}" answer.
+          players you muted, your boss picks, the match you're in, so you can rejoin it, an "under {AGE_GATE.minAge}" answer, and
+          that a banned account was used here.
         </li>
         <li>
           <strong>The app's files</strong> are kept on your device (a service worker) so it opens quickly. No personal data.

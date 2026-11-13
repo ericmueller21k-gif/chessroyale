@@ -153,7 +153,8 @@ Lane: `hub`. What a profile shows is on [hub.md](hub.md).
 - **Round trips (Nov 10, [load regression](../decisions/2026-11-10-load-regression.md)):** every D1 read from the Worker is a round trip
   (about 40 ms), so a route reads what it can at once (`Promise.all`): `/api/me` in 4 (5 with the D1 touch; it was 28 one after another),
   `/api/quests` and `/api/friends` in 3. `packages/server/test/me-round-trips.test.ts` counts them on a fake D1; keep new reads beside
-  the others, not after them.
+  the others, not after them. In front of every route, the ban gate (Nov 13, [fairplay.md](fairplay.md)) adds one read for a request
+  with a session, at most once per session per Worker instance every `FAIRPLAY.banCheckMs` (30 s); none without a session.
 
 ## Data stored by friends (for the privacy page and account deletion)
 
