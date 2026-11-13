@@ -1956,8 +1956,20 @@ export const RECLUSE_PHASE2 = {
     talkMs: 4500,
     /** The power landed: he holds his closed fist, his engine eye newly lit, before he rises (ms). */
     absorbHoldMs: 1500,
-    /** His cast on the board: the chant over the open book held this much longer before the board cracks (ms). */
-    castHoldMs: 4000,
+    /**
+     * His cast on the board: since Nov 13 as long as his two lines over the open book need (Eric's: RECLUSE_LINES.chantSay), the
+     * last typed out `crackAfterLineMs` before the board cracks, as the transformation theme falls silent before its drop (its
+     * `breath` mark, a second before the split). (Until Nov 13 a fixed 4 s more than the chant's 1.7 s.)
+     */
+    crackAfterLineMs: 1000,
+    /**
+     * How his chant's lines type and hold (Eric, Nov 13: the cutscene mockup's pace, its RECLUSE_CUTSCENE numbers; "err slow"):
+     * a character every `typeMs`, `sentencePauseMs` between a line's two sentences, then fully readable `readMs` plus
+     * `perCharMs` a character (at most `maxReadMs`), its fade `fadeMs`, `gapMs` before the next line. The first comes
+     * `firstAfterMs` after the book lands open (the light up, a moment's silent chant first); his word as the power landed is
+     * gone `gapMs` before it.
+     */
+    chantLines: { typeMs: 45, sentencePauseMs: 1000, readMs: 1700, perCharMs: 40, maxReadMs: 5500, fadeMs: 260, gapMs: 400, firstAfterMs: 1500 },
     /** The boards split and set: a big 5, 4, 3, 2, 1 on every board before phase 2's clocks run (s). */
     countdownSeconds: 5,
   },
