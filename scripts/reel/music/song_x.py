@@ -10,7 +10,14 @@ chop), E minor with a raised sixth, about 126 beats a minute. The idea from thei
 push, a moment in the air and a landing, and crickets go quiet when something big lands near them. Twice the whole band
 takes off (a spring's boing rising, a roll, the tape itself running a half step sharp), hangs for a beat of nothing,
 and lands: one deep thump with its echoes going out over the meadow, the crickets silent, coming back one by one. The
-first landing is the hush before the drop; the second is the downbeat of the last tune; a small one is the loop's seam.
+first landing is the hush before the drop; a small one is the loop's seam. The second go's other landing (Eric, Nov 13,
+of the first go's takeoff into the last tune: "before that final, strong part ... it starts doing like a drum beat.
+Like a tap, tap, tap ... like the marching ... something is getting closer and closer to you. It's getting like
+louder. And then the final one is like a big thud ... all the other background stuff kind of pauses for a second when
+the thud hits, and then ... softly echoes out like 4 or 5 times ... a rippling thud effect where it's like getting
+quieter, and then ... it jumps into that big ending"; the song "a bit longer, even if it's like 10, 15 seconds"): out
+of the calm come footfalls, one a beat for three bars, each nearer (louder, deeper, drier, a drum's tap on each); the
+twelfth's place is the thud; everything stops; five echoes go out, each quieter and duller; then the last tune.
 The thumping: a rabbit's hind foot (as the game makes it) keeps its own time, every five 8ths against the bar's twelve,
 so it lands somewhere new each bar; in the second tune it is his three stamps (one, two, THREE) at the start of a
 motif seven 8ths long, twelve of them in seven bars, the chords climbing a whole step every seven beats under them.
@@ -33,9 +40,10 @@ Every melody, riff and chord progression here is original: none of it is any son
   bar  33      the landing: one deep thump, its echoes; the crickets silent, then one
   bars 34-45   the drop: an 808, a wobble bass; Chirp and the gritty synth trade two bars each, then play together
   bars 46-53   the calm: night again, slower; the pan flute and the low marimba; carrots pulled; a far landing
-  bar  54      takeoff
-  bars 55-62   the landing and the last tune, a minor third up: both leads, then their tumble in harmony
-  bars 63-64   the tag: home by way of C and B; a last hop, which lands on bar 1
+  bars 54-56   something coming: a footfall a beat, nearer each time, the night going on round it
+  bar  57      the thud; everything stops; its echoes going out, five of them
+  bars 58-65   the last tune, a minor third up: both leads, then their tumble in harmony
+  bars 66-67   the tag: home by way of C and B; a last hop, which lands on bar 1
 """
 import sys
 
@@ -44,9 +52,9 @@ import numpy as np
 from song_r import beats, notes
 from synth import Ride, n, write_wav
 
-BARS = 64
+BARS = 67
 BEATS = 4 * BARS  # a beat is three 8ths: a note of 1/3 is an 8th
-TAPE = 122.5
+TAPE = 130.0
 bar0 = lambda bar: 4 * (bar - 1)  # the beat a bar (from 1) starts at
 # The pace: beats a minute (from, to), and the tape's speed (the takeoffs run it sharp; it comes down through the landing).
 RIDE = [
@@ -58,10 +66,10 @@ RIDE = [
     (bar0(33) + 2, bar0(34), 126, 126, 1.0, 1.0, 0.0),
     (bar0(34), bar0(46), 132, 132, 1.0, 1.0, 0.0),  # the drop
     (bar0(46), bar0(54), 104, 104, 1.0, 1.0, 0.0),  # the calm
-    (bar0(54), bar0(54) + 3, 104, 126, 1.0, 1.06, 0.0),  # takeoff
-    (bar0(54) + 3, bar0(55) + 2, 126, 134, 1.06, 1.0, 0.0),
-    (bar0(55) + 2, bar0(63), 134, 134, 1.0, 1.0, 0.0),  # the last tune
-    (bar0(63), BEATS, 134, 108, 1.0, 1.0, 0.0),  # the tag, slowing into the night
+    (bar0(54), bar0(57), 108, 108, 1.0, 1.0, 0.0),  # something coming, at a march
+    (bar0(57), bar0(58), 80, 80, 1.0, 1.0, 0.0),  # the thud and its echoes, half a second apart
+    (bar0(58), bar0(66), 134, 134, 1.0, 1.0, 0.0),  # the last tune
+    (bar0(66), BEATS, 134, 108, 1.0, 1.0, 0.0),  # the tag, slowing into the night
 ]
 
 # A chord: its bass note; the strings' three; the fireflies' five (low, middle, the one they keep coming back to, a
@@ -87,7 +95,7 @@ MEADOW = {
 }
 CHORDS = (
     "Em Em G Asus2 Cmaj7 Bm Cmaj7 B7  Em G Bm/F# Asus2 G6 Bm Cmaj7 B7  Em G Bm/F# Asus2 G6 Bm Cmaj7 B7  "
-    "Em Em F#m F#m G#m G#m A#m B7 B7  Em Em Cm Cm Abm Abm B7 B7 Em Cm Abm B7  Cl Cl Em9 Em9 Cl Cl Am7 D7  D7  "
+    "Em Em F#m F#m G#m G#m A#m B7 B7  Em Em Cm Cm Abm Abm B7 B7 Em Cm Abm B7  Cl Cl Em9 Em9 Cl Cl Am7 D7  D7 D7 D7 D7  "
     "Em+3 G+3 Bm/F#+3 Asus2+3 G6+3 Bm+3 Cmaj7+3 B7+3  Cmaj7 B7"
 ).split()
 assert len(CHORDS) == BARS
@@ -211,20 +219,33 @@ def main(out: str) -> None:
         for i, loud in enumerate((0.6, 0.72, 1.0)):
             thump(b + i / 3, vol * loud, (-0.3, 0.0, 0.3)[i])
 
-    def land(b, vol=1.0, echoes=6):
-        """A big landing: one deep thump, the dust it throws, and its echoes going out, each further and duller."""
+    def land(b, vol=1.0, echoes=6, gap=0.41, fall=0.55, ring=0.4, bus="land"):
+        """A big landing: one deep thump (ringing for `ring` s), the dust it throws, and its echoes going out (`gap`
+        seconds apart), each further, duller and `fall` as loud as the one before."""
         k = int(1.5 * sr)
         t = np.arange(k) / sr
         ph = tau * np.cumsum(36 + 95 * np.exp(-t / 0.05)) / sr
-        w = np.tanh(2.2 * np.sin(ph) * np.exp(-t / 0.4)) + 0.3 * np.sin(2 * ph) * np.exp(-t / 0.25) + 0.9 * murk(k, 500) * np.exp(-t / 0.3)
+        w = np.tanh(2.2 * np.sin(ph) * np.exp(-t / ring)) + 0.3 * np.sin(2 * ph) * np.exp(-t / (ring * 0.6)) + 0.9 * murk(k, 500) * np.exp(-t / (ring * 0.75))
         w += 0.35 * hiss(k, 2500, 0.3) * np.sin(np.pi * np.minimum(1, t / 0.25)) * (t < 0.25)
         w *= tail(k, 0.05) * vol
-        put("land", b, w)
+        put(bus, b, w)
         put("duck", b, np.ones(1))
         for i in range(1, echoes + 1):
             size = 1 + 40 * i
             far = np.convolve(w, np.ones(size) / size, "same")
-            put("land", b, far * 0.55**i, (-0.5, 0.5)[i % 2] * min(1.0, 0.3 * i), late=0.41 * i)
+            put(bus, b, far * fall**i, (-0.5, 0.5)[i % 2] * min(1.0, 0.3 * i), late=gap * i)
+
+    def step(b, near, pan=0.0):
+        """A footfall of something coming, `near` from 0 (far: faint, dull, all echo) to 1 (here): the rabbit's thump
+        growing into the landing's, a drum's tap on it."""
+        k = int(0.6 * sr)
+        t = np.arange(k) / sr
+        ph = tau * np.cumsum(62 - 22 * near + (78 + 20 * near) * np.exp(-t / (0.025 + 0.02 * near))) / sr
+        w = (np.sin(ph) + 0.3 * np.sin(2 * ph)) * np.exp(-t / (0.05 + 0.14 * near)) + (0.7 + 0.5 * near) * murk(k, 500 + 300 * near) * np.exp(-t / 0.06)
+        w += (0.2 + 0.4 * near) * hiss(k, 5000, 0.4) * np.exp(-t / 0.004)
+        w *= tail(k) * 0.07 * (0.42 / 0.07) ** near
+        put("steps", b, w * (1 - near) ** 0.7, pan)  # (far: into the meadow's echo)
+        put("thump", b, w * near, pan)  # (near: dry)
 
     def boing(b, length, f0=110.0, f1=880.0, vol=0.12, pan=0.0):
         """A spring: a note rising, wobbling as it goes (their hop, long)."""
@@ -570,28 +591,40 @@ def main(out: str) -> None:
     pop(bar0(47) + 2 + 2 / 3, 0.07, -0.5), pop(bar0(50) + 3 + 1 / 3, 0.06, 0.5), pop(bar0(52) + 1 + 2 / 3, 0.07, -0.2)
     land(bar0(49) + 2, 0.22, 4)
 
-    # Bar 54: takeoff. Bars 55-62: the landing is the last tune's downbeat, a minor third up. Both leads on the tune's
-    # first four bars (the fiddle an octave under); then their tumble and the turn, in harmony; the 808 under each bar.
-    takeoff(54, n("D2"))
-    land(bar0(55), 0.8, 3)
-    x.crash(bar0(55), 0.22, decay=0.6)
-    for bar in range(55, 63):
+    # Bars 54-56: something coming. The night goes on (the strings swelling on the chord, the crickets, the fireflies)
+    # and through it a footfall on every beat, twelve of them, each nearer. Bar 57: the twelfth's place is the thud;
+    # everything stops; five echoes go out, two 8ths apart, each quieter and duller.
+    for bar in range(54, 57):
+        strings(bar, 0.04 + 0.012 * (bar - 54), slow=True)
+        at(bar0(bar), 4)
+        bass(bar0(bar), chord("D7")[0], 3.6, 0.2 + 0.04 * (bar - 54))
+        crickets(bar, 1.3, a=3)
+        flies(bar, 0.75, keep=2)
+    for i in range(12):
+        step(bar0(54) + i, i / 11.5, 0.2 if i % 2 else -0.2)
+    b = bar0(57)
+    land(b, 1.05, 5, gap=x.t(b + 2 / 3) - x.t(b), fall=0.62, ring=0.26, bus="thud")  # (its own bus: less of the meadow's echo, so each echo is heard)
+
+    # Bars 58-65: the last tune, a minor third up, out of the last echo. Both leads on the tune's first four bars (the
+    # fiddle an octave under); then their tumble and the turn, in harmony; the 808 under each bar.
+    x.crash(bar0(58), 0.22, decay=0.6)
+    for bar in range(58, 66):
         band(bar, lower=True)
         sub(bar0(bar), chord(CHORDS[bar - 1])[0], 1.6, 0.42)
         for j in range(12):
             x.hat(bar0(bar) + j / 3, 0.022)
-    chirped(bar0(55), first4(TUNE), up=3), fiddled(bar0(55), first4(TUNE), 0.9, up=3 - 12)
-    chirped(bar0(59), last4(V_CHIRP), up=3), fiddled(bar0(59), last4(V_CHUB), up=3)
-    stamps(bar0(59) - 1, 0.45), stamps(bar0(63) - 1, 0.45)
-    squeak(bar0(57) + 3 + 1 / 3, 0.045)
+    chirped(bar0(58), first4(TUNE), up=3), fiddled(bar0(58), first4(TUNE), 0.9, up=3 - 12)
+    chirped(bar0(62), last4(V_CHIRP), up=3), fiddled(bar0(62), last4(V_CHUB), up=3)
+    stamps(bar0(62) - 1, 0.45), stamps(bar0(66) - 1, 0.45)
+    squeak(bar0(60) + 3 + 1 / 3, 0.045)
 
-    # Bars 63-64: the tag. Home by way of C and B; the band stops after two beats of the last bar; a last hop, which
+    # Bars 66-67: the tag. Home by way of C and B; the band stops after two beats of the last bar; a last hop, which
     # lands on bar 1.
-    band(63, lower=True)
-    b = bar0(64)
-    kick(b, 0.5), clap(b + 1, 0.2), strings(64, 0.04, length=2.0), crickets(64, 0.8, a=3)
+    band(66, lower=True)
+    b = bar0(67)
+    kick(b, 0.5), clap(b + 1, 0.2), strings(67, 0.04, length=2.0), crickets(67, 0.8, a=3)
     bass(b, chord("B7")[0], 0.6, 0.4), bass(b + 2 / 3, chord("B7")[0] + 12, 0.3, 0.3), bass(b + 1, chord("B7")[0] + 12, 0.6, 0.3)
-    chirped(bar0(63), TAG), fiddled(bar0(63), TAG, 0.8, up=-12)
+    chirped(bar0(66), TAG), fiddled(bar0(66), TAG, 0.8, up=-12)
     boing(b + 2, 1.5, 150, 700, 0.1)
     for i in range(6):
         snare(b + 2 + i / 4, 0.05 + 0.012 * i)
@@ -604,14 +637,14 @@ def main(out: str) -> None:
     x.buses["pad"] *= 0.45 + 0.55 * gain
     x.buses["flies"] *= 0.75 + 0.25 * gain
 
-    hall("land", 3.5, 0.6), hall("night", 2.0, 0.5), hall("flute", 2.0, 0.3), hall("marimba", 1.6, 0.25)
+    hall("land", 3.5, 0.6), hall("thud", 1.6, 0.22), hall("steps", 3.0, 1.3), hall("night", 2.0, 0.5), hall("flute", 2.0, 0.3), hall("marimba", 1.6, 0.25)
     x.beat_s = 60 / 126  # the echoes' beat
     x.echo("lead", 2 / 3, 0.14, 0.06)
     x.echo("fiddle", 2 / 3, 0.16, 0.06)
     x.echo("flies", 1 / 3, 0.2, 0.08)
     x.echo("flute", 1.0, 0.2, 0.08)
     levels = {"lead": 1.0, "fiddle": 1.0, "grit": 1.1, "bass": 0.5, "sub": 0.5, "wobble": 0.8, "kick": 1.0, "snare": 2.4, "drum": 1.5, "thump": 1.6,
-              "land": 0.65, "bugs": 4.8, "flies": 2.1, "pad": 1.7, "fx": 1.4, "flute": 0.6, "marimba": 0.9, "night": 2.2}
+              "land": 0.65, "thud": 0.65, "steps": 1.6, "bugs": 4.8, "flies": 2.1, "pad": 1.7, "fx": 1.4, "flute": 0.6, "marimba": 0.9, "night": 2.2}
     write_wav(out, x.play(x.mixdown(levels, lowpass=9000, room=0.25)))
 
 
