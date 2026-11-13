@@ -1,4 +1,5 @@
-"""Song AB (Eric, Nov 13): Wrangler the cowboy pig's theme, the second one, a loop of two and a half minutes. Song AA
+"""Song AB (Eric, Nov 13): Wrangler the cowboy pig's theme, the second one; not used: "The second one, I'm going to be
+honest, I didn't care for that one." (His theme is song_ac.py, song AA rebuilt.) A loop of two and a half minutes. Song AA
 was his first: "The Wrangler one is good, and ... it was my fault for sending you a song that I realized didn't
 really fit him ... let's shelve the other one." This one starts over from another write-up of a style (made from
 another game's track), with his asks: "you can add a little bit of his grunting, his pig sound at some point ... see

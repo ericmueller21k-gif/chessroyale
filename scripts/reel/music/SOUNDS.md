@@ -40,7 +40,7 @@ from the liked list, keep off the other one. Eric's words are quoted; the date i
 | A koto (a string picked near the bridge, built from its harmonics) on a calm's running line, an octave up, each note with three echoes placed by the beat | `Mix.struck("koto", ...)`; song_y.py (Tick's line) | Nov 13, of five struck voices tried there (steel pan, handpan, vibraphone, electric piano, koto; he had asked for "something a bit more like echoey, like steel pan possibly"): the koto, "that's perfect" |
 | A swung mid-tempo funk strut on a console's chips: dry short notes and rests set against a part with held chords and echo; a nasal lead that scoops into its phrases; a square-wave whistle with a note flicked in from below; a few of the boss's made-up syllables | song_z.py | Nov 13, of Puddles's first go: "I have zero issue. It's great." |
 | The boss's own timer running the song: a seed every 30 seconds, a new part from each; a line that grows a note longer each time round; a bass that climbs an octave a step a bar | song_z.py | the same |
-| Biker funk-rock (a slap bass in 16ths, an overdriven guitar, chugging chords, a guitar-and-fiddle duel) | song_aa.py | Nov 13, as Wrangler's first theme: "The Wrangler one is good", but the style "didn't really fit him" (his own pick of write-up, he said): shelved, to be an unreleased track. A boss's theme has to sound like the boss: for Wrangler he then asked for "common like Western cowboyness" and "a little bit of his grunting" (song_ab.py) |
+| Biker funk-rock (a slap bass in 16ths, an overdriven guitar, chugging chords, a guitar-and-fiddle duel) | song_aa.py | Nov 13, as Wrangler's first theme: "The Wrangler one is good", but the style "didn't really fit him" (his own pick of write-up, he said): shelved, to be an unreleased track. A boss's theme has to sound like the boss: for Wrangler he then asked for "common like Western cowboyness" and "a little bit of his grunting"; song_ab.py (below) missed, and he had song AA rebuilt from a listener's notes on it (song_ac.py) |
 | A fast pattern racing under everything | every song since song_i.py | asked for in all of them |
 | The NES's four voices | song_c.py, song_f.py | "much much better" than the 16-bit orchestra |
 
@@ -96,7 +96,22 @@ boss's world that reaches into how the song itself runs, not only its sounds.
 | A slow-down in the middle of a song (song_g.py) | "the slowdown didn't land, the speed up was cool tho". (A plain one. Boingo's song slows twice with the pitch sinking as it goes, the ride dying, which he asked for and called flawless.) |
 | Tunes built from the same rhythm as the last boss's: 8ths on the grid, two-bar phrases, a chord every two bars (song_r.py, second go) | "it just feels like the other ones a lot ... work up the timings a little bit. Some of the chord progression and maybe even ... be adventurous a little" |
 | A tune that runs up and down its chords, the same shape on chord after chord (song_j.py) | "very dull and boring, sounds like all the rest ... that style chord progression is slop" |
+| A Western march: a lone trumpet's tune, a whistle doubling it, hooves, a high square-wave line of even 16ths all through (song_ab.py) | Nov 13: "I'm going to be honest, I didn't care for that one" (no more said; a brass tune had missed twice before) |
 | An acid synth (a sawtooth through a ringing filter, sliding between notes) as a calm's main voice (song_y.py's first go, 1:01) | "almost sounds like a cheetah ... it just almost sounds like it was on accident in the song" (short bursts of it in the drop he passed) |
+
+## What another pair of ears heard (Nov 13)
+
+Eric had another listener describe song AA and sent its notes: the only description there is of how these synthesized
+voices come across, so check a new song against it. A kick on 1 and 3 with extra hits and open hats off the beat read
+as "four-on-the-floor ... synth-disco"; the slap bass (FM, thumbed and popped) as "a dry, mechanical 16th-note
+synth-bass"; `Mix.drive` as "a polite, clean synth-brass/sawtooth patch"; a banjo's roll (short picked notes in
+16ths) as "shimmering 16th-note Euro-synthpop arpeggios"; the picked-string twang as "harpsichord/bell-like"; a
+strings pad as "polite synth-pads"; long slides from note to note as "a wobbly, drunken ambulance siren"; runs of
+16ths as "frantic ... scale runs". Its rules for a rock or Western song, which he passed on: no kick on every beat
+(1 and 3, pickups, a heavy snare on 2 and 4); no runs of 16ths up and down a scale, no cheerful arpeggios, rests
+between phrases; a guitar's bend goes up one or two half steps into the note and is held with vibrato, never a slow
+wide slide; a galloping bass (an 8th and two 16ths); a dry strummed guitar, not pads. song_ac.py is built to them:
+its distorted guitar is clipped hard and put through a speaker's curve (`axe`, `speaker`).
 
 ## What he asks of every theme
 
