@@ -2,6 +2,7 @@ import { BOSS_BRAIN, BOSS_CHECK, BOSS_ROSTER, bossBrainFor, isPlayable, lossForR
 import { describe, expect, it } from "vitest";
 import {
   bossMoveFrom,
+  bossMoveFromScores,
   eloDrawT,
   brainGuard,
   brainLine,
@@ -427,5 +428,38 @@ describe("speaking to the Maia box (HumanUciEngine)", () => {
     const maia = new HumanUciEngine(fakeWorker((cmd, say) => cmd === "uci" && say("uciok")));
     expect(await maia.init(50)).toBe(false);
     expect(maia.error).toBe("load timed out");
+  });
+});
+
+describe("his move at a strength from the engine server's numbers (bossMoveFromScores: the Hidden Boss's phase 1 move no device answered)", () => {
+  // (Every legal move scored, in no order: the 8 best are TOP's, the rest far behind.)
+  const ALL = [...TOP.slice(4), { move: "h2h3", expected: 0.05 }, { move: "a2a3", expected: 0.04 }, ...TOP.slice(0, 4), { move: "h2h4", expected: 0.03 }, { move: "b2b3", expected: 0.02 }];
+
+  it("the same move as a device's seeded Stockfish from its top-8 search, from the same seed, at every strength and kind", async () => {
+    for (const kind of ["elo", "stumble", "stagger", "best"] as const) {
+      for (const elo of [1400, 2000, 2600]) {
+        for (let seed = 1; seed <= 60; seed++) {
+          const device = await bossMoveFrom(scripted(), START_FEN, elo, 1000, kind, mulberry32(seed), [5, 15], undefined, null, undefined, null, null, true);
+          expect(bossMoveFromScores(ALL, kind, elo, mulberry32(seed), [5, 15]), `${kind} at ${elo}, seed ${seed}`).toBe(device);
+        }
+      }
+    }
+  });
+
+  it("weaker plays worse: at 1400 his draws give away more than at 2600 (the guard keeps both within it)", () => {
+    const loss = (elo: number) => {
+      let sum = 0;
+      for (let seed = 1; seed <= 300; seed++) sum += 0.55 - ALL.find((m) => m.move === bossMoveFromScores(ALL, "elo", elo, mulberry32(seed)))!.expected;
+      return sum / 300;
+    };
+    expect(loss(1400)).toBeGreaterThan(loss(2600));
+    for (let seed = 1; seed <= 300; seed++) expect(["e2e4", "d2d4", "g1f3", "c2c4"]).toContain(bossMoveFromScores(ALL, "elo", 1400, mulberry32(seed)));
+  });
+
+  it("only moves he may play (`allowed`), numbers that aren't numbers dropped; none he may play: null", () => {
+    expect(bossMoveFromScores(ALL, "best", 2000, mulberry32(1), [5, 15], undefined, ["d2d4", "h2h3"])).toBe("d2d4");
+    expect(bossMoveFromScores([{ move: "e2e4", expected: Number.NaN }, ...ALL.filter((m) => m.move !== "e2e4")], "best", 2000, mulberry32(1))).toBe("d2d4");
+    expect(bossMoveFromScores(ALL, "elo", 2000, mulberry32(1), [5, 15], undefined, ["e7e5"])).toBeNull();
+    expect(bossMoveFromScores([], "elo", 2000, mulberry32(1))).toBeNull();
   });
 });
