@@ -1,7 +1,7 @@
 import { useEffect, useState } from "preact/hooks";
 import { LeaderboardSheet } from "../components/LeaderboardSheet.tsx";
 import { LiveNumber } from "../components/LiveNumber.tsx";
-import { BrainDebug, EngineMove, UltimateTest } from "../components/BossDock.tsx";
+import { BrainDebug, EngineMove, UltimateTest, WinForm } from "../components/BossDock.tsx";
 import { COMPUTER_LAYOUT, MatchMenu, MOUSE_LAYOUT } from "../components/MatchMenu.tsx";
 import { useMedia } from "../components/QuickChat.tsx";
 import { exitFor } from "../match-exit.ts";
@@ -151,6 +151,7 @@ export function Hud({ match, stripFrozen = false, keepTitle = false }: { match: 
             <BrainDebug match={match} hidden />
             <UltimateTest match={match} icon />
             <EngineMove match={match} icon />
+            <WinForm match={match} icon />
           </span>
         )}
         {/* The gear: its list has Sound, Animations, Resign and Report a bug (a crowd match, Crowd or a raid, adds the Motion trail row). */}
@@ -173,6 +174,7 @@ function BossTools({ match, crowd }: { match: GameView; crowd: boolean }) {
         <BrainDebug match={match} hidden />
         <UltimateTest match={match} icon />
         <EngineMove match={match} icon />
+        <WinForm match={match} icon />
       </span>
       <MatchMenu exit={exitFor(match)} crowd={crowd} />
     </div>

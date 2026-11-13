@@ -15,6 +15,11 @@ export const isAdmin = () => !!account().profile?.admin;
  * (`bossAlone`: you alone against a boss, on this device) and nowhere else. Online matches never have it.
  */
 export const engineMoveAllowed = (bossAlone: boolean) => BOSS_POWERS.engineMoveButton && bossAlone && isAdmin();
+/**
+ * Testing, admins only, Boss alone against the Hidden Boss (Nov 13, for Eric's timing test of his music and phase change): "Win
+ * this form" (SoloMatch.winForm). Never for a player.
+ */
+export const winFormAllowed = (bossAlone: boolean, bossId: string | null | undefined) => bossAlone && bossId === "recluse" && isAdmin();
 
 /** The brain an admin asked for in the link ("" for the boss's own). */
 export function pickedBrain(): BossBrain | "" {

@@ -17,7 +17,7 @@ import { CRITICAL, LOW, NORMAL, bossVoice } from "./speech.tsx";
 import { SoloLobbyChat } from "./chat.ts";
 import { account } from "./account.ts";
 import { crumb } from "./problems.ts";
-import { engineMoveAllowed, isAdmin, maiaAllowed, soloBrain } from "./boss-brain.ts";
+import { engineMoveAllowed, isAdmin, maiaAllowed, soloBrain, winFormAllowed } from "./boss-brain.ts";
 import { prefetchMaia, startMaia } from "./maia.ts";
 import { MaiaGate, type GateEnd } from "./maia-gate.ts";
 import { testParams, timingOnDevice } from "./test-switches.ts";
@@ -819,6 +819,30 @@ export class SoloMatch implements GameView {
     // Your last try ends the round at once (as online, once everyone's done); otherwise it now ends later.
     if (this.lightsRoundEnd() <= t) return this.lightsStep();
     this.armLights();
+  }
+
+  /** Testing, admins in Boss alone against the Hidden Boss: "Win this form" shows (winFormAllowed). */
+  get winFormShown(): boolean {
+    return winFormAllowed(this.settings.raid && !this.raidBots, this.runner?.boss?.id);
+  }
+  get winFormArmed(): boolean {
+    return this.phase.kind === "simul" ? !!this.phase2?.winNext : !!this.runner?.bossForceWin;
+  }
+  /**
+   * "Win this form" (Nov 13, Eric's timing test): your next move beats his adult form, the same end a mate takes (the runner's
+   * bossForceWin: his fall, the phase change and its music follow as for real); in phase 2, your next move wins every board and
+   * the result plays.
+   */
+  winForm() {
+    if (!this.winFormShown || this.stopped) return;
+    if (this.phase.kind === "simul") {
+      if (!this.phase2 || !this.phase2Playing || this.phase2.outcome.decided) return;
+      this.phase2.winNext = true;
+    } else {
+      if (this.phase.kind === "phaseChange" || this.runner.boss?.result) return;
+      this.runner.bossForceWin = true;
+    }
+    this.emit();
   }
 
   /** Testing, admins in Boss alone: the "Engine move" button shows (see engineMoveAllowed). */

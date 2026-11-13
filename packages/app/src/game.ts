@@ -389,6 +389,12 @@ export interface GameView {
   readonly engineThinking?: boolean;
   /** Plays Stockfish's best move as your own, through the normal move path. */
   engineMove?(): void;
+  /** Testing, admins in Boss alone against the Hidden Boss: the "Win this form" button shows (solo only). */
+  readonly winFormShown?: boolean;
+  /** It was pressed: your next move wins the form (his adult form, or phase 2's four boards). */
+  readonly winFormArmed?: boolean;
+  /** Arms it: your next move beats his adult form (the phase change follows as for a mate), or in phase 2 wins every board. */
+  winForm?(): void;
   /** You called the King to play this move. */
   readonly kingCalled: boolean;
   /** Testing, admins (Boss alone): what the boss's brain did with its last move (Maia or Stockfish), or null. */
