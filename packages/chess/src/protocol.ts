@@ -1042,7 +1042,7 @@ export type ServerMessage = { now: number } & (
    */
   | { t: "recluseCutscene"; at: number; until: number }
   /** The Hidden Boss's phase 2 online: his phase change, then the four boards, all of it as it stands (sent whole on every change). */
-  | { t: "phase2"; p2: NetPhase2 }
+  | { t: "phase2"; p2: NetPhase2; /** The battle and the standings, for a device that comes back in the middle of it (a reload). */ boss?: NetBoss; standings?: NetStanding[] }
   /**
    * To the host: the engine server can't play this move of phase 2 (his, or a bot's): play it on your engine, at this strength
    * (UciEngine.playAtElo), and answer with phase2Answer. The server plays its own quick move if no answer comes in time.

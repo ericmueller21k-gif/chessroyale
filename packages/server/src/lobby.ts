@@ -70,6 +70,7 @@ import {
   type JudgeReport,
   type MoveScore,
   type NetBossBrain,
+  type NetBoss,
 } from "@chessroyale/chess";
 import { seatName } from "./text-filter.ts";
 import { assignJudges, cutBubble, drawJudges, emptyStats, seedFor, type JudgeCandidate, type JudgeDevice, type JudgeHow, type JudgeStats, type JudgeTask } from "./judges.ts";
@@ -779,8 +780,9 @@ export class LobbyCore {
       },
       now: () => lobby.io.now(),
       rng: () => lobby.rng(),
-      broadcast: (msg) => lobby.broadcast(msg),
-      send: (id, msg, remember) => lobby.send(id, msg, remember),
+      // (Phase 2's whole view carries the battle and the standings, so a device back in the middle of it (a reload) has them.)
+      broadcast: (msg) => lobby.broadcast(msg.t === "phase2" ? ({ ...msg, ...lobby.phase2Extras() } as Outgoing) : msg),
+      send: (id, msg, remember) => lobby.send(id, msg.t === "phase2" ? ({ ...msg, ...lobby.phase2Extras() } as Outgoing) : msg, remember),
       setTimer: (kind, at) => lobby.setTimer(kind, at),
       host: () => lobby.hostNow(),
       fairPlayer: (id) => {
@@ -792,6 +794,12 @@ export class LobbyCore {
       unvouched: (why) => lobby.unvouch(why),
       finish: () => lobby.finishMatch(),
     };
+  }
+
+  /** What phase 2's view carries for a device back in its middle: the battle as it ended, and the standings. */
+  private phase2Extras(): { boss?: NetBoss; standings: NetStanding[] } {
+    const boss = this.runner?.bossView() ?? null;
+    return { ...(boss ? { boss } : {}), standings: this.standings() };
   }
 
   /** The engine server's answer to a phase 2 search (io.phase2Search): null when it couldn't answer. */

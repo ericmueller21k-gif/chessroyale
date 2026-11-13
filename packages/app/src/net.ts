@@ -872,6 +872,9 @@ export class NetMatch implements GameView {
           this.winFormSent = false;
           this.begun = true;
         }
+        // (Back in the middle of it, a reload: the battle and the standings come with it.)
+        if (m.boss) this.boss = { ...m.boss, board: this.toView(m.boss.board) };
+        if (m.standings) this.standingsList = m.standings;
         return this.phase2.onMessage(m.p2);
       case "phase2Ask":
         return void this.hostPhase2(m.id, m.fen, m.elo, m.nodes, m.moveMs);
