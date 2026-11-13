@@ -1126,7 +1126,7 @@ export class LobbyCore {
     const at = this.r.humans.flatMap((h) => {
       if (h.connected || h.goneAt === undefined) return [];
       const t = h.goneAt + LEAVING.awayMs;
-      const inPlay = this.runner!.state.players.find((p) => p.id === h.id)?.alive !== false;
+      const inPlay = this.runner!.state.players.find((p) => p.id === h.id)?.alive !== false || recluseLobby.onBoard(this.r, h.id);
       return t > now || inPlay ? [t] : [];
     });
     return at.length ? Math.min(...at) : null;
@@ -1400,7 +1400,8 @@ export class LobbyCore {
     for (const h of [...this.r.humans]) {
       if (this.present(h, now)) continue;
       const p = this.runner!.state.players.find((x) => x.id === h.id);
-      if (!p || p.alive) this.leaveMatch(h, "away");
+      // (The Hidden Boss's phase 2: everyone's out on the runner, but a board is still theirs.)
+      if (!p || p.alive || recluseLobby.onBoard(this.r, h.id)) this.leaveMatch(h, "away");
     }
   }
 
