@@ -74,17 +74,12 @@ export const RECLUSE_LINES = {
   /** He revives, as he snaps upright and the book flies back to his hand (placeholders). */
   revive: ["Not yet. Now we play real chess.", "On your feet, all of you. Again!"],
   /**
-   * The phase change's chant over the book (one, picked per phase change; one bubble): half-mad mumbling about Curaçao.
-   * Ours (placeholders), but for one quote.
+   * The phase change's chant over the open book (Eric's final lines, Nov 13; until then half-mad mumbling about Curaçao): both,
+   * in turn, each its own box, each typed sentence by sentence with a pause between (RECLUSE_PHASE2.change.chantLines).
    */
-  chant: [
-    "Petrosian... Keres... Geller...",
-    // QUOTE: his article "The Russians Have Fixed World Chess", Sports Illustrated, Aug 20, 1962, p. 19 (read on a scan
-    // of the printed page; the same passage word for word in Dominic Lawson, "Collusion in Curaçao", Standpoint, 2012).
-    "They worked as a team.",
-    "Keres... Geller... draw... draw...",
-    "Petrosian... half a point... draw...",
-    "Tal... Korchnoi... Keres... Geller...",
+  chantSay: [
+    ["Computation without creativity is nothing.", "Now I have both."],
+    ["Prepare yourself.", "This is the ultimate test of your skill."],
   ],
   /** Phase 2 begins, the four boards set up (placeholders). */
   phase2: ["No more memorized openings. Find your moves now!", "Four boards. No theory. Let's see who can play.", "Now nobody has a book. Except me."],

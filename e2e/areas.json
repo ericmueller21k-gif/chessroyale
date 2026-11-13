@@ -215,7 +215,8 @@
         "packages/app/src/components/PowerParts.tsx",
         "packages/app/src/components/KingAttack.tsx",
         "packages/app/src/components/WipPreview.tsx",
-        "packages/app/src/speech.tsx"
+        "packages/app/src/speech.tsx",
+        "packages/app/src/paced-line.ts"
       ],
       "specs": [
         "e2e/boss-bar-same.spec.ts",

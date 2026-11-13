@@ -21,7 +21,7 @@ import { useMedia } from "../components/QuickChat.tsx";
 import { STRIP_LAYOUT } from "../components/MovePanel.tsx";
 import type { GameView, SimulBoardView, SimulView } from "../game.ts";
 import type { ComponentChildren } from "preact";
-import { ARC_LIFE, ARC_REDRAW, ARC_STRIKES, PHASE_CHANGE, phase2UltBannerMs, absorbKing, arcPoints, smoothPath, type ArcStrike } from "../recluse-phase2.ts";
+import { ARC_LIFE, ARC_REDRAW, ARC_STRIKES, PHASE_CHANGE, phase2UltBannerMs, absorbKing, absorbReadMs, arcPoints, smoothPath, type ArcStrike } from "../recluse-phase2.ts";
 import { CRITICAL, NORMAL, bossVoice } from "../speech.tsx";
 import { Hud } from "./Hud.tsx";
 import { useStillKey } from "../hooks.ts";
@@ -279,17 +279,22 @@ export function PhaseChangeScreen({ match, at }: { match: GameView; at: number }
   cue(t >= C.igniteAt + 80, "leave", () => play("gkLeave"));
   // (CRITICAL, Oct 17: it cuts in on his word before the seize, so it comes as the power lands; since the hold and the
   // longer cast it has its whole time before his chant, or nearly: the chant's line waits for it, a second at most.)
-  cue(t >= C.absorbLineAt, "absorb", () => bossVoice.say(RECLUSE_LINES.absorb[at % RECLUSE_LINES.absorb.length]!, `recluse:absorb:${at}`, CRITICAL));
+  // (Gone by his chant's first line since Nov 13: absorbReadMs.)
+  cue(t >= C.absorbLineAt, "absorb", () => {
+    const line = RECLUSE_LINES.absorb[at % RECLUSE_LINES.absorb.length]!;
+    bossVoice.say(line, `recluse:absorb:${at}`, CRITICAL, at + C.absorbLineAt, absorbReadMs(line));
+  });
   cue(t >= C.arcAt, "arcs", () => play("recluseArc"));
   // His look over his figure on the board, placed on his head frame by frame.
   const figEngine = useRef<HTMLSpanElement>(null);
   const onFigFrame = useCallback((f: Frame) => placeEngine(figEngine.current, f), []);
-  // His chant over the book as the light comes (one line, picked by the phase change), and his word as the book is back
-  // in his hands.
-  const chanting = t >= C.chantAt;
+  // His two lines over the book as the light comes (Eric, Nov 13), each typed at its own pace at its time (`chantLines`), and
+  // his word as the book is back in his hands.
+  const chantLine = C.chantLines.filter((l) => t >= l.at).length;
   useLayoutEffect(() => {
-    if (chanting) bossVoice.say(RECLUSE_LINES.chant[at % RECLUSE_LINES.chant.length]!, `recluse:chant:${at}`, CRITICAL);
-  }, [chanting]);
+    const l = C.chantLines[chantLine - 1];
+    if (l) bossVoice.sayPaced(l.line, `recluse:chant${chantLine}:${at}`, CRITICAL, at + l.at);
+  }, [chantLine]);
   const revived = t >= C.catchAt;
   useLayoutEffect(() => {
     if (revived) bossVoice.say(RECLUSE_LINES.revive[at % RECLUSE_LINES.revive.length]!, `recluse:revive:${at}`, CRITICAL);

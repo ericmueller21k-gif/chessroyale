@@ -50,8 +50,9 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
   `at + PHASE_CHANGE.crackAt`), its intro started `introSeconds` before (from themes.json, never code; the beaten theme fades 0.5 s
   from there; late, the loop alone on the drop), on through phase 2 until every board is decided. `recluse-house` (the child form)
   isn't played yet: its hook is `recluseMusic`. Not in the town's loading: fetched as his fight starts (`ahead`), the transformation's
-  decoded as he's beaten (`next`). With the 8.740 s intro (handoff f12f1c5b) his transformation starts as he rises in his rage and
-  `marks.slam` lands on the book hitting the floor; the drop lands on the split's first frame (4 to 8 ms measured). Tests: `music.test.ts` ("the Hidden
+  decoded as he's beaten (`next`). With the 8.740 s intro (handoff f12f1c5b) his transformation started as he rose in his rage and
+  `marks.slam` landed on the book hitting the floor; since his chant's two lines (Nov 13) the rise to the crack is 17.435 s, and
+  until the music session's matching cut is in, the 8.74 s intro starts later, mid-chant; the drop lands on the split's first frame (4 to 8 ms measured). Tests: `music.test.ts` ("the Hidden
   Boss"), `e2e/recluse.spec.ts` ("beaten in phase 1").
 - **Banners and lines (Eric, Nov 5):** a power's banner shows your pawn on the right (the God King only for his save, LastStand); a boss's name is his small portrait plus his name, never his emoji (`BossTag`, the status line); the banner's name stays whole. [decision](../decisions/2026-11-05-banners-emoji-cards.md); rules in [eric.md](../rules/eric.md).
 - **A boss can be rested** (`PAUSE_BOSS_<ID>`, [ops.md](ops.md) "Kill switches"): the boss menu hides him, a raid
@@ -256,11 +257,11 @@ solo Crowd's boss final you reached, where the other three finalists take the ot
 `phase2Mates`). **Not online yet** (four boards online, his server-side Stockfish and its fair-play hooks are a separate
 build): online, phase 1 won is the crowd's victory):
 - **The phase change** (Eric, Oct 14, reworked, then opened with the God King's absorption; `PHASE_CHANGE` in
-  `packages/app/src/recluse-phase2.ts`, about 24.8 s after a 1.8 s fall (its "PHASE 2" banner 1.4 s, `BOSS_BANNER.phase2Ms`, Oct 16, and the banners' extra since Oct 24), one timeline, not skippable like a boss's
+  `packages/app/src/recluse-phase2.ts`, about 33.5 s after a 1.8 s fall (24.8 s before his chant's two lines, Nov 13) (its "PHASE 2" banner 1.4 s, `BOSS_BANNER.phase2Ms`, Oct 16, and the banners' extra since Oct 24), one timeline, not skippable like a boss's
   intro; drawn by `screens/Recluse2.tsx`, `PhaseChangeScreen`). **Its pace** (Eric, Oct 17, after playing it: "everything's
   perfect, but it happens way too fast"; docs/decisions/2026-10-17-phase-change-pace.md): about 10 s more from the mate
   to the split, the animations unchanged, every added time a setting (`RECLUSE_PHASE2.change`): his words before the
-  seize (`talkMs`, 4.5 s), a hold as the power lands (`absorbHoldMs`, 1.5 s), a longer cast (`castHoldMs`, 4 s); then
+  seize (`talkMs`, 4.5 s), a hold as the power lands (`absorbHoldMs`, 1.5 s), a longer cast (since Nov 13 as long as his two chant lines need, below); then
   a 5-4-3-2-1 on every board before phase 2's clocks run (`countdownSeconds`), counted from the boards' first frame on
   screen so the 5 is up a whole second (`afterFirstFrame` in solo.ts; docs/decisions/2026-10-28-two-flaky-tests.md):
   - **The absorption** (Eric, Oct 14: he plays with an engine in phase 2, so he takes the God King's; DECISIONS.md, "The
@@ -280,8 +281,14 @@ build): online, phase 1 won is the crowd's victory):
     phone too; `.rc-fig`, his place empty meanwhile: `.rc-away`) for his leap onto the middle (`leap`: a thud, dust, the
     board jolts), the book brandished and thrown down open at his feet (`drop`), his chant over it (`chantRaise`,
     `chant`: arms raised, his hair lifting into phase 2's) as light pours up out of it (CSS only: `.rc-light`, a pulsing
-    cone behind him, and `.rc-glow` on the pages; only opacity and transform move) and one chant line
-    (`RECLUSE_LINES.chant`; it waits up to about a second for his absorb line to end), for `castMs` (5.7 s) before the crack; Sawyer's board-saw gap runs down and across the middle, the quarters part and each grows
+    cone behind him, and `.rc-glow` on the pages; only opacity and transform move) and **Eric's two lines** (Nov 13,
+    `RECLUSE_LINES.chantSay`; [decision](../decisions/2026-11-13-hidden-boss-chant-lines.md)), each its own box in his bubble,
+    typed sentence by sentence at the cutscene mockup's pace (`RECLUSE_PHASE2.change.chantLines`: 45 ms a character, 1 s between
+    sentences, readable 1.7 s plus 40 ms a character; `paced-line.ts`, the voice's `sayPaced`; a phone's bar bubble, two rows,
+    shows a sentence at a time, each its own page, `pacedPage`), the first 1.5 s after the book
+    lands (his absorb line gone by then, `absorbReadMs`), the last typed out `crackAfterLineMs` (1 s) before the crack, as the
+    transformation theme falls silent before its drop; so `castMs` (about 14.4 s) follows the lines, and the rise to the crack is
+    17.435 s (`.rise-to-crack`); Sawyer's board-saw gap runs down and across the middle, the quarters part and each grows
     into a whole board (a transform and a clip only) as the light dies, while blue arcs strike the cracks from his
     raised hands (`Arcs`, `ARC_STRIKES`: a thin bright core in two soft glows, smooth paths redrawn every 70 ms, gone in
     260 ms, two big ones as the board cracks and as it parts, a blue flash where each lands and a blue pulse on the
