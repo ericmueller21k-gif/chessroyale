@@ -1,7 +1,7 @@
 import { expect, type Page } from "@playwright/test";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { CHALLENGE_FEEL, introOf } from "../packages/app/src/town/shops/challenge.ts";
-import { BOARD_SEL, asAdmin, asSignedIn, named, test } from "./helpers.ts";
+import { BOARD_SEL, asAdmin, asSignedIn, named, tapInTown, test } from "./helpers.ts";
 
 /**
  * A boss challenged from the town, Pokémon-gym style (Eric, Nov 2; docs/areas/town-square.md, "Challenging a boss"), Alfil first, on a
@@ -78,59 +78,11 @@ async function clearOfStools(p: Page, r: number) {
   await expect.poll(at, { message: "hopped back clear of the stools", intervals: [50] }).toEqual([9.5 + CHALLENGE_FEEL.clear.you, r, 9.5 - CHALLENGE_FEEL.clear.boss, r]);
 }
 
-/** Where to tap Alfil (or another boss, `id`) now (in the page); null while he isn't drawn. */
-async function alfilAt(p: Page, id = "alfil") {
-  const xy = await p.evaluate((i) => (window as unknown as Hooks).__townAt?.("boss", i) ?? null, id);
-  if (!xy) return null;
-  const cv = (await town(p).boundingBox())!;
-  return { x: cv.x + xy.x, y: cv.y + xy.y };
-}
-
-/**
- * The camera at rest: the same focus square on three reads 100 ms apart (its follow spring or its glide has landed). The camera runs in
- * frame time (dt capped at 0.1 s), so under load this takes longer in wall time than on a quiet machine.
- */
-async function cameraAtRest(p: Page) {
-  let last = "";
-  let same = 0;
-  await expect
-    .poll(
-      async () => {
-        const f = await p.evaluate(() => (window as unknown as Hooks).__townCam?.()?.focus ?? null);
-        const k = f ? f.map((v) => Math.round(v * 100)).join(",") : "";
-        same = k && k === last ? same + 1 : 0;
-        last = k;
-        return same >= 3;
-      },
-      { message: "the camera has come to rest", intervals: [100], timeout: 20_000 },
-    )
-    .toBe(true);
-}
-/** The camera glides onto a boss (as his chip would): from where it rests, he may be off the screen, or hidden behind a figure or a house. */
-const glideTo = (p: Page, id: string) => p.evaluate((i) => (window as unknown as { __townGlide?: (id: string) => void }).__townGlide?.(i), id);
-
 /** Opens Alfil's card (his Pyramid is across the map: the camera glides there, as its chip would) and his challenge's confirm (or another boss's). */
 async function toConfirm(page: Page, id = "alfil", name = "Alfil") {
-  // The camera comes to rest first: a town opens with it still on its way to your pawn, and a boss in view while it moves can be off the
-  // screen (or hidden) once it lands (Timber, Nov 7: at rest on you, his picture was covered and the taps found nothing for 20 s).
-  await cameraAtRest(page);
-  if (!(await alfilAt(page, id))) {
-    await glideTo(page, id);
-    await cameraAtRest(page);
-  }
-  await expect.poll(() => alfilAt(page, id), { message: `${name} comes into view` }).not.toBeNull();
-  // His card (he may stroll a step between the look and the tap: tap again; another's card that opened is closed first).
-  const card = page.getByRole("dialog", { name, exact: true });
-  await expect(async () => {
-    if (await card.isVisible()) return;
-    if (await page.getByRole("dialog").isVisible()) await page.keyboard.press("Escape");
-    const at = await alfilAt(page, id);
-    // (Not drawn, or covered from here: the camera glides onto him, and the tap is tried again once it has.)
-    if (!at) await glideTo(page, id);
-    expect(at, "drawn").not.toBeNull();
-    await page.mouse.click(at!.x, at!.y);
-    await expect(card).toBeVisible({ timeout: 1500 });
-  }).toPass({ timeout: 20_000 });
+  // His card, by a real tap once the view holds still (helpers.ts tapInTown: the camera glides onto him when he's off the screen or hidden
+  // behind a figure or a house; he may stroll a step between the look and the tap: tapped again; another's card that opened is closed).
+  const card = await tapInTown(page, "boss", id, page.getByRole("dialog", { name, exact: true }));
   // The entry is today's: "Challenge alone", then its confirm, his own (a boss with an intro): you fight him and come back here.
   await card.getByRole("button", { name: "Challenge alone" }).click();
   const confirm = page.getByRole("dialog", { name: `Challenge ${name}?` });

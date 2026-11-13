@@ -440,5 +440,7 @@ for (const who of ["a player's town", "an admin's town"] as const)
     // (Nov 10, headless Chromium: about 2.1 s and 1.4 s for the street town; before phone load 3, 5.8 s and 4.6 s. The old town, a player's
     // until Nov 13: about 1.7 s to its first frame.)
     expect(shown, "tap to the loading screen (ms)").toBeLessThan(3000);
+    // (A loose bound on the town playable, Nov 13 review m2: a load regression for every player shows here; Eric took "3 or 5 seconds".)
+    expect(loaded, "tap to the town's first frame (ms)").toBeLessThan(8000);
     expect(long, "longest task (ms)").toBeLessThan(2000);
   });

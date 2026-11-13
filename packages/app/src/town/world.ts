@@ -990,7 +990,10 @@ export function addCrowd(t: Town, n: number): void {
  */
 export function addTestPlayer(t: Town, who: { uid: string; name: string; icon?: string; rating?: number; wear?: ItemLook | null }): number {
   const at = t.you.walker.here();
-  const sq = spotNear(t, t.you.walker, at, true) ?? freeSpot(t.rnd, at, 2, [], t, 1);
+  // Beside you, right or left as the town opens (the camera faces north there): the nearest free square otherwise. (Nov 13: from the
+  // street town's chase camera a square behind you is at the box's foot, where a figure fades out and a tap can't reach it.)
+  const side = [1, -1].map((dc) => ({ c: colI(at.c + dc), r: at.r })).find((s) => walkable(s.c, s.r) && !taken(t, s.c, s.r, null));
+  const sq = side ?? spotNear(t, t.you.walker, at, true) ?? freeSpot(t.rnd, at, 2, [], t, 1);
   const p: Person = {
     id: `player:${who.uid}`,
     name: who.name,

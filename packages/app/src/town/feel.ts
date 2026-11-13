@@ -270,11 +270,6 @@ export const TOWN_FEEL = {
   bandMix: 0.93,
   /** How much sprites fade at the rim (0 to 1). */
   bandFade: 0.7,
-  /**
-   * The far band of ground softened by a blurred copy of itself laid back over it (the prototype's). Off: its low-res copy
-   * ghosted the far squares (doubled, smeared), most at dawn (Eric, Oct 26); the haze alone fades them cleanly.
-   */
-  softenFarBand: false,
   /** How much sprites blur in the far band (a shrink, then a stretch back). */
   bandBlur: 2.6,
   /** A light haze with distance before the band (at the rim, before the band's own). */

@@ -1,5 +1,5 @@
 import { resolve } from "node:path";
-import { test as base, expect, type Page } from "@playwright/test";
+import { test as base, expect, type Locator, type Page } from "@playwright/test";
 
 /** The local server's state folder (playwright.config.ts: a fresh temp folder each run, unless E2E_KEEP_STATE=1). */
 export const E2E_STATE = resolve(process.env.E2E_STATE_DIR || ".wrangler/state");
@@ -626,4 +626,67 @@ export async function quickTap(page: Page, x: number, y: number) {
   await ev("mouseMoved", 0);
   await Promise.all([ev("mousePressed", 1), ev("mouseReleased", 0)]);
   await cdp.detach();
+}
+
+/** What `__townAt` finds in the street town: a boss or a home (by its id), the Colosseum, a statue, a table, a bot (by its index) or a player. */
+export type TownThing = "boss" | "home" | "coliseum" | "statue" | "table" | "bot" | "player";
+
+/**
+ * Where to tap a figure or a place in the street town once the view holds still (on the page): its tap point (`__townAt`, clear of
+ * whatever stands in front) the same, within half a pixel, over 3 drawn frames in a row; null if it isn't drawn and clear then, or still
+ * moving after `waitMs`. Counted in frames, not wall time: on CI's software WebGL under a full shard a frame can take a few hundred
+ * milliseconds, and reads 100 ms apart saw a camera mid-glide as at rest (Nov 13, the street town for everyone).
+ */
+export async function townTapPoint(page: Page, kind: TownThing, id: string | number, waitMs = 3000): Promise<{ x: number; y: number } | null> {
+  const xy = await page.evaluate(
+    ([kind, id, waitMs]) =>
+      new Promise<{ x: number; y: number } | null>((done) => {
+        const at = () => (window as unknown as { __townAt?: (k: string, id: string | number) => { x: number; y: number } | null }).__townAt?.(kind, id) ?? null;
+        const until = performance.now() + waitMs;
+        let last = at();
+        let same = 0;
+        const look = () => {
+          const now = at();
+          same = now && last && Math.hypot(now.x - last.x, now.y - last.y) < 0.5 ? same + 1 : 0;
+          last = now;
+          if (same >= 3) done(now);
+          else if (performance.now() > until) done(null);
+          else requestAnimationFrame(look);
+        };
+        requestAnimationFrame(look);
+      }),
+    [kind, id, waitMs] as const,
+  );
+  if (!xy) return null;
+  const cv = (await page.locator("canvas.town-canvas").boundingBox())!;
+  return { x: cv.x + xy.x, y: cv.y + xy.y };
+}
+
+/**
+ * Opens `card` by a real tap on a figure or a place in the street town (Nov 13: one way for every spec, after taps on far figures and
+ * homes failed on CI's software WebGL). Each try: another card open is closed; the view held still (`townTapPoint`); off the screen or
+ * covered, the camera glides to `glide` once (a home's or a boss's id, as its chip would glide it, or a square) and the tap waits for it to
+ * land; then a quick tap (`quickTap`: the press and the release together, so a slow frame between them can't make it a run). A tap that
+ * misses walks you, the camera following: the next try glides again.
+ */
+export async function tapInTown(page: Page, kind: TownThing, id: string | number, card: Locator, opts: { glide?: string | readonly [number, number] | null; timeout?: number } = {}) {
+  const glide = opts.glide === undefined ? (kind === "boss" || kind === "home" ? String(id) : null) : opts.glide;
+  await expect(async () => {
+    if (await card.isVisible()) return;
+    const open = page.locator(".town-card").filter({ visible: true });
+    if (await open.count()) {
+      await page.keyboard.press("Escape");
+      await expect(open).toHaveCount(0, { timeout: 2000 });
+    }
+    let at = await townTapPoint(page, kind, id);
+    if (!at && glide !== null) {
+      await page.evaluate((to) => (window as unknown as { __townGlide?: (to: string | readonly [number, number]) => void }).__townGlide?.(to), glide);
+      // (The glide across the street town: a few seconds of frames, longer on a slow runner.)
+      at = await townTapPoint(page, kind, id, 20_000);
+    }
+    expect(at, `${kind} ${id} drawn and clear, the view still`).not.toBeNull();
+    await quickTap(page, at!.x, at!.y);
+    await expect(card).toBeVisible({ timeout: 3000 });
+  }).toPass({ timeout: opts.timeout ?? 45_000 });
+  return card;
 }

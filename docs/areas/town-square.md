@@ -79,7 +79,7 @@ before the rows are laid (`street.ts lotHere`), so each row fills the place with
   `town.people`; the bots are one source that moves its people. The drawing and the taps read only that list, so real
   players (rooms of up to about 75 to 100, fed by a server, later) can replace the bots without touching either.
 - **Away and guests (Nov 7, #542; [2026-11-07-town-afk.md](../decisions/2026-11-07-town-afk.md)).** No input for 1 min (`TOWN_AFK`): a pixel "zzz" by your pawn (`zzz.ts`), town and shops; 5 min idle or hidden: home, "You've been dropped from the town" (`afk.ts`, `here-net.ts`, `AwayNote.tsx`). A challenge and the claw machine hold the clock.
-  Signed-in devices beat `POST /api/town/here`: real players walk in each other's town in their outfits; the server drops away ones itself (`server/src/town-here.ts`). Guests watch (outfits, no names), read the chat (typing greyed: "Make a free account to chat."), and after 30 s get "Make an account to keep exploring". Switches `?townafk=`, `?townroom=`, `?townguest=`; hook `__townHere()`.
+  Signed-in devices beat `POST /api/town/here`: real players walk in each other's town in their outfits; the server drops away ones itself (`server/src/town-here.ts`). Guests watch (outfits, no names), read the chat (typing greyed: "Make a free account to chat."), and after 30 s get "Make an account to keep exploring" (their clock starts once the town is drawn, not under its loading screen, Nov 13). Switches `?townafk=`, `?townroom=`, `?townguest=`; hook `__townHere()`.
 - **The drawing** (`town/render.ts`): one canvas, one `requestAnimationFrame` loop (in `Town.tsx`), stopped when the screen
   closes or the tab is hidden; device pixel ratio capped at 2; nothing allocated per frame on the hot path (square colors,
   fonts, gradients, clouds, pawns and every boss and home frame are made once, the frames the first time they show).
@@ -184,7 +184,7 @@ before the rows are laid (`street.ts lotHere`), so each row fills the place with
   homes' names are drawn after it, so they read as well at night), the sun (the moon at night: craters, stars, a few
   twinkling) and the clouds' colors; dawn adds a morning mist (more haze over the far ground, into its own pale gold) and
   its sun rises on the other side of the sky from dusk's. The prototype's far-band softening (a blurred copy laid over
-  the far ground) is off (`softenFarBand`): it ghosted the far squares. The sun and moon sit low over the horizon and shift only a little as you walk round the world.
+  the far ground) is gone (it ghosted the far squares; deleted Nov 13 with the 2D town). The sun and moon sit low over the horizon and shift only a little as you walk round the world.
 - **`?sky=dawn|day|dusk|night`** on `/town` holds one look whatever the clock says (for Eric and the tests; nothing else
   reads it).
 - **The clouds** are pixel art like the homes (`cloudPixel`): puffs on flat-ish bottoms, each puff shaded as a ball lit

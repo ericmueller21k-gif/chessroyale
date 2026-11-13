@@ -600,17 +600,6 @@ function bakeGlow(ch: Character, spots: readonly LightSpot[], pools: readonly Li
   return { pieces, lit };
 }
 
-// Can the canvas blur (not in older iOS Safari; there the shrink alone does the work)?
-const BLUR_OK = (() => {
-  try {
-    const c = document.createElement("canvas").getContext("2d")!;
-    c.filter = "blur(2px)";
-    return c.filter === "blur(2px)";
-  } catch {
-    return false;
-  }
-})();
-
 /** A piece on a table's board: its square (f: rank from white's side, g: file), where it slid from, when, and when it's gone. */
 interface TablePiece {
   f: number;
@@ -682,8 +671,6 @@ export class Renderer {
    */
   private readonly softs: { cv: HTMLCanvasElement; g: CanvasRenderingContext2D }[] = [];
   private nSoft = 0;
-  private readonly bandCv = document.createElement("canvas");
-  private readonly bg = this.bandCv.getContext("2d")!;
   private readonly sky = new SkyPainter();
   /**
    * The close-up on a statue (Town.tsx sets it every frame): which (its index in STATUES; -1: none), how far the camera's
@@ -741,8 +728,6 @@ export class Renderer {
   private tagNames: NamesMode = "near";
   private youTable: Table | null = null;
   private readonly bubble = { on: false, text: "", x: 0, y: 0 };
-  private bandGrad: CanvasGradient | null = null;
-  private bandKey = "";
   /** The pressed square (slice 4): where, when the finger went down, when it lifted (-1: still down), and whether it pulses. */
   private readonly pressSq = { on: false, c: 0, r: 0, upAt: -1, pulse: false };
   /** Your trail's droplets (squares, unwrapped near where they fell; t0 -1e9: none), and the square you were last on. */
@@ -1430,7 +1415,6 @@ export class Renderer {
     this.nSq = 0;
     forEachSquare(v, this.camX, this.camY, false, this.drawSquare);
     this.fillSquares();
-    if (TOWN_FEEL.softenFarBand && this.paint.kind === "2d") this.softenBand(); // (it reads the canvas back: Canvas 2D only)
     ctx.restore();
   }
 
@@ -1469,55 +1453,6 @@ export class Renderer {
       ctx.fillStyle = colors[k]!;
       ctx.fill();
     }
-  }
-
-  /**
-   * The far band of ground, softened: a copy of that strip of the canvas at a third of the size (blurred a little more
-   * where the filter exists), laid back over it, fully at the horizon and fading out to where the band starts.
-   */
-  private softenBand(): void {
-    const { ctx, W, H, DPR, view: v, p } = this;
-    let top = Infinity;
-    for (let i = 0; i < v.rimN; i++) if (v.rimPx[i]! >= -20 && v.rimPx[i]! <= W + 20) top = Math.min(top, v.rimPy[i]!);
-    const b0 = TOWN_FEEL.bandStart;
-    let botC = v.hy;
-    if (proj(v, 0, v.rim * b0, 0, p)) botC = p.y;
-    let botE = -Infinity;
-    for (let i = 0; i <= 32; i++) {
-      const a = -Math.PI / 2 + (Math.PI * i) / 32;
-      if (proj(v, v.rim * b0 * v.rimX * Math.sin(a), v.rim * b0 * Math.cos(a), 0, p) && p.x >= 0 && p.x <= W) botE = Math.max(botE, p.y);
-    }
-    const bot = Math.min(botC + (Math.max(botC, botE) - botC) * 0.5, top + H * 0.3);
-    const y0 = Math.max(0, Math.floor(top - 6));
-    const y1 = Math.min(H, Math.ceil(bot));
-    if (!isFinite(top) || y1 - y0 < 6) return;
-    const bw = Math.max(1, Math.ceil(W / 3));
-    const bh = Math.max(1, Math.ceil((y1 - y0) / 3));
-    const g = this.bg;
-    if (this.bandCv.width !== bw || this.bandCv.height !== bh) {
-      this.bandCv.width = bw;
-      this.bandCv.height = bh;
-      this.bandKey = "";
-    } else g.clearRect(0, 0, bw, bh);
-    g.globalCompositeOperation = "source-over";
-    if (BLUR_OK) g.filter = "blur(0.7px)";
-    g.drawImage(ctx.canvas, 0, Math.round(y0 * DPR), ctx.canvas.width, Math.round((y1 - y0) * DPR), 0, 0, bw, bh);
-    if (BLUR_OK) g.filter = "none";
-    g.globalCompositeOperation = "destination-in";
-    const stop = clamp((v.hy + 2 - y0) / (y1 - y0), 0, 1);
-    // (The fade's gradient changes only with the view: made again only then.)
-    if (this.bandGrad === null || this.bandKey !== `${bh}:${stop.toFixed(3)}`) {
-      const gr = g.createLinearGradient(0, 0, 0, bh);
-      gr.addColorStop(0, "rgba(0,0,0,1)");
-      gr.addColorStop(stop, "rgba(0,0,0,1)");
-      gr.addColorStop(1, "rgba(0,0,0,0)");
-      this.bandGrad = gr;
-      this.bandKey = `${bh}:${stop.toFixed(3)}`;
-    }
-    g.fillStyle = this.bandGrad;
-    g.fillRect(0, 0, bw, bh);
-    g.globalCompositeOperation = "source-over";
-    ctx.drawImage(this.bandCv, 0, y0, W, y1 - y0);
   }
 
   /** A soft haze strip just under the horizon, fading out downward. Drawn before the homes, bosses and pawns. */

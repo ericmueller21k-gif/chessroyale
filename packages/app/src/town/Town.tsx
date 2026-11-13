@@ -582,12 +582,25 @@ export function TownScreen({
     let loaded = false;
     /** The town failed (its message shows instead): the away clock runs again, so a player who can't play is dropped as idle, never held present. */
     let broken = false;
+    // A guest's town time (Eric, on #542: 30 s, then "make an account"): the town stops under the pop-up; its rooms count too. It starts
+    // once the town is drawn (Nov 13: everyone's town has a loading screen now, which can take seconds on a slow phone); a town that
+    // fails never starts it.
+    const guestMs = guestLimitMs();
+    let stopGuest = () => {};
+    const startGuest = () => {
+      if (guestMs === null || gone.current) return;
+      stopGuest = watchGuest(guestMs, () => {
+        if (!shopIn.current) t.pause();
+        setGated(true);
+      });
+    };
     const t = startTown(box.current!, canvas.current!, chips.current, cardEl.current!, live.current!, setZoomedOut, setCard, seatOf(seat), (s, face) => {
       const b = TOWN_BOTS[s.bot]!;
       onPlayBot?.({ seat: seatText(s), name: botLabel(b), rating: b.rating, look: isSprite(b.look) ? null : b.look.wear, face });
     }, (id, x, y, challenge) => void goIn(id, x, y, challenge), stand, () => step("cancel"), (share, music) => {
       if (share === null) {
         loaded = true;
+        startGuest();
         return setLoading(false);
       }
       if (music) setLoadingMusic(true);
@@ -612,12 +625,6 @@ export function TownScreen({
       onState: (st) => void (t.town.you.zzz = st === "zzz"),
       onOut: () => awayOut.current(),
       onOthers: t.others,
-    });
-    // A guest's town time (Eric, on #542: 30 s, then "make an account"): the town stops under the pop-up; its rooms count too.
-    const guestMs = guestLimitMs();
-    const stopGuest = guestMs === null ? () => {} : watchGuest(guestMs, () => {
-      if (!shopIn.current) t.pause();
-      setGated(true);
     });
     return () => {
       gone.current = true;
@@ -2395,14 +2402,9 @@ function startTown(
   let loadPaintMs = 0;
   /** How long the town waited on the music once built (the "Loading music…" step). */
   let loadMusicMs = 0;
+  // (The street town failed as it started (its painter is Canvas 2D then): the loading card stays up until the page reloads, or the
+  // message has replaced it. No frames ever run on a 2D painter.)
   if (loading) void loadTown();
-  // (The street town failed as it started: the loading card stays up until the page reloads, or the message has replaced it.)
-  else if (!failed) {
-    void preloadMusic();
-    onLoading(null);
-    run();
-    draw(performance.now()); // the first frame, before the screen shows
-  }
 
   return {
     /**
@@ -2424,6 +2426,8 @@ function startTown(
       leaveClose();
       follow = true;
       glide = null;
+      // (A look round snapped to another quarter eases back too: "Back to me" is the normal view on you. Nov 13, review m3.)
+      look.back(performance.now());
     },
     town,
     closeCard: () => setCard(null),
