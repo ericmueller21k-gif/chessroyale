@@ -11,7 +11,7 @@
  *   browser marked (`hc_banned`, the banned account's id, HttpOnly). Signing in to a banned account gives it too (api.ts), with no
  *   session made.
  * - **The mark** keeps the banned person out once signed out: while its account is banned, a request from that browser with no live
- *   session gets the ban answer, on every route but the sign-in's own (SIGN_IN). A shared device (a family's tablet, a library's
+ *   session gets the ban answer, on every route but the sign-in's own (SIGN_IN_ROUTES). A shared device (a family's tablet, a library's
  *   computer: the review of #687, M1) stays open to anyone else: signing in to an account that isn't banned works there, and a live
  *   session of an account that isn't banned passes the mark (the banned account's own never does: the gate ends it). Lifting the ban
  *   takes the mark away on the browser's next request; clearing the browser's data clears it too.
