@@ -277,18 +277,35 @@ describe("the Hidden Boss's searches: never refused for the day's budget, counte
     const { d1, db, usage } = await accountsDb();
     const env = { ENGINE: {} as never, DB: d1 };
     const day = new Date().toISOString().slice(0, 10);
-    const o = { withinMs: RECLUSE_ONLINE.searchMs };
+    // (His count runs beside his search, handed to the Durable Object's waitUntil: awaited here before reading the row.)
+    const counts: Promise<unknown>[] = [];
+    const o = { withinMs: RECLUSE_ONLINE.searchMs, background: (p: Promise<unknown>) => void counts.push(p) };
     db.prepare("INSERT INTO engine_usage (day, searches) VALUES (?, ?)").run(day, 3000);
     expect(await serverAllMovesAt(env, C960, 1000, o)).toBeNull();
     expect(sent).toHaveLength(0);
     // (However many he's searched today, and the day's budget long spent: he searches, the day's row untouched.)
     db.prepare("INSERT INTO engine_usage (day, searches) VALUES (?, ?)").run(`${day}:recluse`, 99_999);
     expect(await serverAllMovesAt(env, C960, 1000, { ...o, pool: "recluse" })).toHaveLength(legalMoves960(C960).length);
+    await Promise.all(counts);
     expect(usage(`${day}:recluse`)).toBe(100_000);
     expect(usage(day)).toBe(3001);
     // (A try again at the same position (`uncounted`): not counted again.)
     expect(await serverAllMovesAt(env, C960, 1000, { ...o, pool: "recluse", uncounted: true })).not.toBeNull();
+    await Promise.all(counts);
     expect(usage(`${day}:recluse`)).toBe(100_000);
+  });
+
+  it("his search never waits on D1's count (the delta review of #683, m1): a D1 that hangs, his groups go at once and he has his answer; the count is handed to the background", async () => {
+    const hung = { prepare: () => ({ run: () => new Promise<never>(() => undefined), bind: () => ({ first: () => new Promise<never>(() => undefined) }) }) } as unknown as D1Database;
+    const env = { ENGINE: {} as never, DB: hung };
+    const counts: Promise<unknown>[] = [];
+    expect(await serverAllMovesAt(env, C960, 1000, { pool: "recluse", withinMs: 15_000, background: (p) => void counts.push(p) })).toHaveLength(legalMoves960(C960).length);
+    expect(counts).toHaveLength(1);
+    // (A match's search still waits on its budget: the hung D1 holds it, nothing sent.)
+    const before = sent.length;
+    const match = serverAllMovesAt(env, C960, 1000, { withinMs: 15_000 });
+    expect(await Promise.race([match, new Promise((r) => setTimeout(() => r("waiting"), 50))])).toBe("waiting");
+    expect(sent).toHaveLength(before);
   });
 
   it("counting fails (D1 down): his search still goes; a match's doesn't", async () => {
@@ -302,10 +319,14 @@ describe("the Hidden Boss's searches: never refused for the day's budget, counte
   it("the health view: his positions today and the fights with no result", async () => {
     const { d1 } = await accountsDb();
     const env = { ENGINE: {} as never, DB: d1 };
-    await serverAllMovesAt(env, C960, 1000, { pool: "recluse", withinMs: 15_000 });
-    await serverAllMovesAt(env, C960, 1000, { pool: "recluse", withinMs: 15_000 });
+    const counts: Promise<unknown>[] = [];
+    await serverAllMovesAt(env, C960, 1000, { pool: "recluse", withinMs: 15_000, background: (p) => void counts.push(p) });
+    await serverAllMovesAt(env, C960, 1000, { pool: "recluse", withinMs: 15_000, background: (p) => void counts.push(p) });
+    await Promise.all(counts);
     await countRecluseNoResult(env);
-    expect((await engineHealth(env, Date.now())).recluse).toEqual({ searches: 2, noResults: 1 });
-    expect((await engineHealth({ ENGINE: {} as never }, Date.now())).recluse).toEqual({ searches: 0, noResults: 0 });
+    expect((await engineHealth(env, Date.now())).recluse).toEqual({ searches: 2, noResults: 1, noResultsYesterday: 0 });
+    // (Yesterday's (UTC) too, for the morning digest: m2.)
+    expect((await engineHealth(env, Date.now() + 86_400_000)).recluse).toEqual({ searches: 0, noResults: 0, noResultsYesterday: 1 });
+    expect((await engineHealth({ ENGINE: {} as never }, Date.now())).recluse).toEqual({ searches: 0, noResults: 0, noResultsYesterday: 0 });
   });
 });
