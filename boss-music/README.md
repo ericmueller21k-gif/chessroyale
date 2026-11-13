@@ -28,22 +28,34 @@ from one theme to the next.
 | `recluse-house` | walking into his room; it carries on through the fight with the child | none | the house's minute, 60.0 s |
 | `recluse-phase2` | the child is beaten | the stare, the build, the flag: 58.870 s | the chant, the duel, the book, the build again: 89.276 s |
 | `recluse-beaten` | that form is beaten: he talks | the book slammed shut: 1.815 s | the house's minute again (the same file as `recluse-house`'s) |
-| `recluse-phase3` | his transformation starts | the music souring, then a pause: 19.293 s. **It ends on the drop: the boards split at t0 + `introSeconds`** | the big chant to the score's end: 88.371 s |
+| `recluse-phase3` | he rises in a rage (his transformation starts) | the music souring, fitted to the phase change's beats: 8.740 s. **It ends on the drop: the boards crack at t0 + `introSeconds`** | the big chant to the score's end: 88.371 s |
 
 **Switching:**
 - `recluse-house` to `recluse-phase2`: fade the house out (about 1.5 s), then start the theme.
 - to `recluse-beaten`: whatever is playing (the intro too, if the fight was short), fade it fast (about 0.3 s) and start
   the theme at once: it opens on a book's slam, which covers the cut. Its loop runs for as long as the talk does.
-- to `recluse-phase3`: as the transformation starts, start the theme at once at full level and fade the house's loop
-  out over about half a second. Its intro begins with the childhood music's last chord still ringing, so it joins the
-  loop wherever that is.
+- to `recluse-phase3`: as he rises in his rage, start the theme at once at full level and fade the house's loop out
+  over about half a second. Its intro opens on the childhood tune's own three notes gone sour, so it joins the loop
+  wherever that is.
 - The result: as for any boss.
 
-**The one length that has to match:** from the transformation's start to the boards' split is `recluse-phase3`'s
-`introSeconds` (19.293 s now; `marks.pause`, 16.631 s in, is where the music stops for a tick and the book: `marks.drop`
-is the same as `introSeconds`). Read it from `themes.json`. If the animation wants another length, say what it is and the
-music is made again to fit (`phases_v.py`, about ten minutes): never stretch or cut the audio in the game. The talk can be
-any length, and its text's pace can change freely.
+**The one length that has to match, and what is in it.** `recluse-phase3`'s intro is fitted to the phase change as it
+is on main (e50befe4, `PHASE_CHANGE`; the numbers the wiring session measured, Nov 13). From t0, his rising in a rage,
+with `marks` in `themes.json` (seconds from t0):
+
+| `marks` | At | The music | The picture it was fitted to |
+|---|---|---|---|
+| (t0) | 0.000 | the childhood tune's three notes once more, sour, the tape sinking; a low thump at 1.53; a screech rising from 1.81 | he rises; he leaps (lands at 1.55); he swings the book up (1.84) |
+| `pause` | 2.440 | a hush | the book coming down |
+| `slam` | 2.640 | the book, slammed | the book lands open at his feet |
+| `build` | 3.040 | the build: the figure, the strings, kicks, a drone opening, slides and a screech rising, faster with each of four bars | his chant, the light pouring up |
+| `breath` | 8.540 | everything stops but one tick | the arcs start |
+| `drop` | 8.740 | the loop starts (`drop` is `introSeconds`) | the boards crack |
+
+Read `introSeconds` and `marks` from `themes.json`, never from code. If the animation's times change, send the music
+session the new ones and the piece is made again to fit (`phases_v.py`, about eleven minutes): never stretch or cut the
+audio in the game. The talk before it can be any length. (The first handoff's intro was the score's own souring, 19.293
+s: commit 91a3f0b2 has it.)
 
 **Levels:** one music volume fits all four. The house's loop is 6 dB under the other themes on purpose (-22 LUFS; it is
 that far under in the score), so nothing in the game needs a gain of its own.
