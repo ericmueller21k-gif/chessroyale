@@ -249,12 +249,13 @@ describe("the town wraps east-west only (round 4; Eric: the Colosseum at the nor
 
 describe("the zoom steps and the park's step out (round 4)", () => {
   const steps = TOWN_FEEL.streetZoomSteps;
-  it("has four steps (in, the mockup's camera, out, the overview); the town opens at the third (Eric, Nov 5: \"we're going with number three for the default\")", () => {
-    expect(steps).toHaveLength(4);
+  it("has five steps (in, the mockup's camera, out, the overview, and since Nov 13 the old town's zoomed-out camera, the furthest); the town opens at the third (Eric, Nov 5: \"we're going with number three for the default\")", () => {
+    expect(steps).toHaveLength(5);
     expect(TOWN_FEEL.streetZoomStart).toBe(2);
     expect(steps[1]!.tall).toEqual(TOWN_FEEL.camStreetTall);
     expect(steps[1]!.wide).toEqual(TOWN_FEEL.camStreetWide);
-    for (let k = 1; k < 4; k++) expect(steps[k]!.tall.h).toBeGreaterThan(steps[k - 1]!.tall.h);
+    for (let k = 1; k < 5; k++) expect(steps[k]!.tall.h).toBeGreaterThan(steps[k - 1]!.tall.h);
+    for (let k = 1; k < 5; k++) expect(steps[k]!.wide.h).toBeGreaterThan(steps[k - 1]!.wide.h);
   });
   it("the park: its square of slack at the edge (fully in, fully out, between)", () => {
     // (The north edge round: the park 8 rows on.)
@@ -270,8 +271,9 @@ describe("the zoom steps and the park's step out (round 4)", () => {
     expect(z.at(TOWN_FEEL.streetZoomMs / 2)).toBeCloseTo(1.5, 6);
     expect(z.at(TOWN_FEEL.streetZoomMs)).toBe(2);
     expect(z.press(true, 1000)).toBe(3);
-    expect(z.press(true, 2000)).toBe(3);
-    for (let k = 0; k < 5; k++) z.press(false, 3000 + k);
+    expect(z.press(true, 2000)).toBe(4);
+    expect(z.press(true, 3000)).toBe(4);
+    for (let k = 0; k < 6; k++) z.press(false, 3000 + k);
     expect(z.step).toBe(0);
   });
   it("coming into the park eases one step out over parkZoomMs; leaving eases back; the slack changes nothing", () => {
@@ -292,12 +294,17 @@ describe("the zoom steps and the park's step out (round 4)", () => {
     z.where(false, 2000);
     expect(z.step).toBe(1);
     expect(z.before).toBe(null);
-    // From the overview: nothing further out, and nothing back.
+    // From the overview: nothing further out (the farthest step is only chosen with −), and nothing back; nor from the farthest.
     const top = new StreetZoom(3, false);
     top.where(true, 0);
     expect(top.step).toBe(3);
     top.where(false, 1000);
     expect(top.step).toBe(3);
+    const far = new StreetZoom(4, false);
+    far.where(true, 0);
+    expect(far.step).toBe(4);
+    far.where(false, 1000);
+    expect(far.step).toBe(4);
   });
   it("a press in the park wins: you leave at the step you chose", () => {
     const z = new StreetZoom(1, false);

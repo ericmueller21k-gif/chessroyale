@@ -120,7 +120,7 @@ test("no sky between the fronts at street level: Fountain Street and South Stree
   }
 });
 
-test("the zoom steps: − and + move a step at a time (in, the mockup's, out (the default since Nov 5), the overview); every figure on screen at each", async ({ page }) => {
+test("the zoom steps: − and + move a step at a time (in, the mockup's, out (the default since Nov 5), the overview, the farthest (Nov 13)); every figure on screen at each", async ({ page }) => {
   test.setTimeout(150_000);
   await open(page, "day");
   await walkAlong(page, [1, 28], [4, 28]);
@@ -129,15 +129,17 @@ test("the zoom steps: − and + move a step at a time (in, the mockup's, out (th
   for (let k = 0; k < 2; k++) await page.getByRole("button", { name: "Zoom in" }).click();
   await expect.poll(async () => (await cam(page)).zoom, { timeout: 3000 }).toBe(0);
   await figuresOnScreen(page, "in");
-  for (const step of [1, 2, 3]) {
+  for (const step of [1, 2, 3, 4]) {
     await page.getByRole("button", { name: "Zoom out" }).click();
     await expect.poll(async () => (await cam(page)).zoom, { timeout: 3000 }).toBe(step);
     await figuresOnScreen(page, `step ${step}`);
   }
+  if (process.env.ZOOM_SHOT) await page.screenshot({ path: `${process.env.ZOOM_SHOT}-${test.info().project.name}.png` });
   await page.getByRole("button", { name: "Zoom out" }).click();
-  expect((await cam(page)).zoomTarget, "the overview is the last").toBe(3);
+  // (Eric, Nov 13: the old town's zoomed-out camera "should be the furthest zoom you can go".)
+  expect((await cam(page)).zoomTarget, "the farthest is the last").toBe(4);
   await expect(page.getByRole("button", { name: "Zoom out" })).toHaveAttribute("aria-pressed", "true");
-  for (let k = 0; k < 2; k++) await page.getByRole("button", { name: "Zoom in" }).click();
+  for (let k = 0; k < 3; k++) await page.getByRole("button", { name: "Zoom in" }).click();
   await expect.poll(async () => (await cam(page)).zoom, { timeout: 3000 }).toBe(1);
   await expect(page.getByRole("button", { name: "Zoom in" })).toHaveAttribute("aria-pressed", "true");
 });
