@@ -1860,7 +1860,8 @@ export class MatchRunner {
 
   /**
    * Testing (admins, solo: "Win this form", the Hidden Boss): the boss is beaten as the crowd's next move lands, by the same end a
-   * mate takes (stageComplete, then finishBossBattle's "crowd"). Kept on the runner, never in the match state; online never sets it.
+   * mate takes (stageComplete, then finishBossBattle's "crowd"). Kept on the runner, never in the match state; online, only an admin's
+   * press in his room's fight from the town sets it (LobbyCore.winFormTrigger, which keeps it in the lobby's record).
    */
   bossForceWin = false;
 
