@@ -1,0 +1,317 @@
+The Hidden Boss's room, the summoning's light: a second go at it (Eric, Nov 13, of the mockup's first: "the light doesn't look
+right ... it's close, but maybe you could try, take a shot at it"). For the room's own branch to take or leave; nothing here is in
+the game.
+
+Applies to branch claude/hidden-boss-room at 73f64556 (one file, the light's section at its end; the beats and their times are
+untouched):   git apply scripts/reel/patches/hidden-room-summoning-light.patch
+Seen on the dev server at /hidden-room-preview.html?ui=0 (the Summon button, or ?summon=<ms>).
+
+What changed: the board is the lamp. Its face blazes; a shaft of light stands on it; rays rise from its face up and outward, each a
+line in the room through the room's own camera (proj), soft-edged, coming up out of nothing at its foot and gone at its tip; more
+rays lie along the floor, flattened as the floor is; a pool of light spreads on the boards round it; and the room dims while the
+light is on, so it reads as light. The splash's rings and drops are on the floor through the camera too. Five small sprites made
+once and stretched: no gradient is built in a frame. About 45 draws a frame while the light is on; frame rate not measured.
+Checked: typecheck, packages/app/test/recluse-room.test.ts, and frames on a computer (960 x 600) and a phone (390 x 760).
+
+diff --git a/packages/app/src/town/shops/recluse-scene.ts b/packages/app/src/town/shops/recluse-scene.ts
+index bf8c738b..eaefe108 100644
+--- a/packages/app/src/town/shops/recluse-scene.ts
++++ b/packages/app/src/town/shops/recluse-scene.ts
+@@ -471,67 +471,176 @@ export function recluseScene(t0 = 0): RecluseScene {
+ }
+ 
+ // ---- The summoning's light: drawn over the room.
++// (The second go, Eric, Nov 13, of the first's flat wedges from one point: "the light doesn't look right".) The board is the lamp: its
++// face blazes; a shaft of light stands on it; rays shoot from its face up and outward, each a line in the room (the camera's own
++// projection), soft-edged, bright at its foot and gone at its tip; more rays lie along the floor, flattened as the floor is; a pool of
++// light spreads on the boards round it; and the room dims, so the light reads as light. All sprites made once and stretched: no
++// gradient is built in a frame.
+ 
+-/** A soft round glow, made once. */
+-let glowImg: HTMLCanvasElement | null = null;
+-function glow(): HTMLCanvasElement {
+-  if (glowImg) return glowImg;
++/** A sprite made once from its alpha at each point (0 to 1 across, 0 at its top to 1 at its foot). */
++function lightImg(w: number, h: number, rgb: readonly [number, number, number], alpha: (x: number, y: number) => number): HTMLCanvasElement {
+   const c = document.createElement("canvas");
+-  c.width = c.height = 128;
++  c.width = w;
++  c.height = h;
+   const g = c.getContext("2d")!;
+-  const gr = g.createRadialGradient(64, 64, 0, 64, 64, 64);
+-  gr.addColorStop(0, "rgba(255,248,214,1)");
+-  gr.addColorStop(0.35, "rgba(255,226,140,0.55)");
+-  gr.addColorStop(1, "rgba(255,210,110,0)");
+-  g.fillStyle = gr;
+-  g.fillRect(0, 0, 128, 128);
+-  return (glowImg = c);
++  const im = g.createImageData(w, h);
++  for (let y = 0; y < h; y++)
++    for (let x = 0; x < w; x++) {
++      const i = (y * w + x) * 4;
++      im.data[i] = rgb[0];
++      im.data[i + 1] = rgb[1];
++      im.data[i + 2] = rgb[2];
++      im.data[i + 3] = 255 * clamp01(alpha((x + 0.5) / w, (y + 0.5) / h));
++    }
++  g.putImageData(im, 0, 0);
++  return c;
++}
++/**
++ * A beam's alpha: soft sides, `foot` of the sprite's width at its foot widening to all of it at its tip; it comes up out of nothing
++ * over `rise` of its length (so a dozen feet in one place don't add up to a white blob) and fades to its tip along `fade`.
++ */
++const beam = (foot: number, fade: number, rise: number) => (x: number, y: number) => {
++  const half = foot + (1 - foot) * (1 - y);
++  const dx = Math.abs(2 * x - 1) / half;
++  return dx >= 1 ? 0 : (1 - dx * dx) ** 2 * y ** fade * Math.min(1, (1 - y) / rise);
++};
++const round = (x: number, y: number) => {
++  const r = Math.hypot(2 * x - 1, 2 * y - 1);
++  return r >= 1 ? 0 : (1 - r) ** 1.7;
++};
++let LIGHT: { ray: HTMLCanvasElement; gold: HTMLCanvasElement; shaft: HTMLCanvasElement; pool: HTMLCanvasElement; glow: HTMLCanvasElement } | null = null;
++const light = () =>
++  (LIGHT ??= {
++    ray: lightImg(48, 192, [255, 247, 220], beam(0.22, 1.4, 0.14)),
++    gold: lightImg(48, 192, [255, 214, 120], beam(0.3, 1.1, 0.16)),
++    shaft: lightImg(96, 192, [255, 240, 196], beam(0.7, 0.75, 0.04)),
++    pool: lightImg(128, 128, [255, 206, 112], round),
++    glow: lightImg(96, 96, [255, 248, 214], round),
++  });
++/** `img` drawn from its foot (its bottom's middle) at (x0, y0) to its tip at (x1, y1), (wx, wy) its width across. */
++function streak(g: CanvasRenderingContext2D, img: HTMLCanvasElement, x0: number, y0: number, x1: number, y1: number, wx: number, wy: number, alpha: number) {
++  if (alpha < 0.01) return;
++  g.save();
++  g.globalAlpha = Math.min(1, alpha);
++  g.transform(wx / img.width, wy / img.width, (x0 - x1) / img.height, (y0 - y1) / img.height, x1 - wx / 2, y1 - wy / 2);
++  g.drawImage(img, 0, 0);
++  g.restore();
++}
++const p0 = newPt();
++const p1 = newPt();
++const p2 = newPt();
++/** A point in the room: on the floor at (c, r), `up` squares above it. */
++const at3 = (d: FxDraw, c: number, r: number, up: number, out: ReturnType<typeof newPt>) => proj(d.v, c - d.camX, d.camY - r, up, out);
++/** A number from 0 to 1 that is always the same for the same two numbers. */
++const dice = (i: number, k: number) => {
++  const v = Math.sin(i * 127.1 + k * 311.7) * 43758.5453;
++  return v - Math.floor(v);
++};
++const easeOut = (u: number) => 1 - (1 - clamp01(u)) ** 3;
++const RAYS_UP = 13;
++const RAYS_FLOOR = 11;
++const MOTES = 26;
++/** A round sprite laid on the floor round (c, r), `rad` squares out. */
++function onFloor(d: FxDraw, img: HTMLCanvasElement, c: number, r: number, rad: number, alpha: number) {
++  if (alpha < 0.01 || !at3(d, c, r, 0, p0) || !at3(d, c + rad, r, 0, p1) || !at3(d, c, r + rad, 0, p2)) return;
++  const g = d.g;
++  const ax = p1.x - p0.x;
++  const ay = p1.y - p0.y;
++  const bx = p2.x - p0.x;
++  const by = p2.y - p0.y;
++  g.save();
++  g.globalAlpha = Math.min(1, alpha);
++  g.transform((2 * ax) / img.width, (2 * ay) / img.width, (2 * bx) / img.height, (2 * by) / img.height, p0.x - ax - bx, p0.y - ay - by);
++  g.drawImage(img, 0, 0);
++  g.restore();
+ }
+-const RAYS_UP = 9;
+-const RAYS_FLOOR = 12;
+ function drawSummon(d: FxDraw, s: SummonNow) {
+   const g = d.g;
+   if (!at(d, B.c, B.r, 0, q)) return;
+   const bx = q.x;
+   const by = q.y;
+   const k = q.k;
++  const L = light();
++  // How much light there is (it comes on, holds, and is drawn back), and how long since the rays began.
++  const lit = s.rays;
++  const since = s.t - S.rays;
++  const back = ease(s.drawBack);
++  // The room dims as the light comes on.
++  if (lit > 0) {
++    g.fillStyle = `rgba(16,10,30,${0.42 * ease(lit)})`;
++    g.fillRect(0, 0, d.W, d.H);
++  }
+   g.save();
+   g.globalCompositeOperation = "lighter";
+-  // The rays: along the floor, outward (flattened as the floor is), and upward in a fan; flickering, turning slowly.
+-  if (s.rays > 0) {
+-    const len = ease(s.rays) * k * 4.2;
+-    const spin = s.t / 2600;
+-    g.fillStyle = "#ffe7a0";
++  g.imageSmoothingEnabled = true;
++  if (lit > 0) {
++    const grow = easeOut(since / 420) * (1 - back);
++    const half = B.size / 2;
++    // The pool of light on the floor round the board, breathing a little; and the rays along the floor, out from the board's edge.
++    onFloor(d, L.pool, B.c, B.r, (3.2 + 1.4 * grow) * (1 + 0.03 * Math.sin(s.t / 160)), 0.5 * lit);
++    const spin = s.t / 5200;
+     for (let i = 0; i < RAYS_FLOOR; i++) {
+-      const a = (i / RAYS_FLOOR) * Math.PI * 2 + spin;
+-      const wd = 0.07 + 0.03 * Math.sin(i * 3.1 + s.t / 140);
+-      g.globalAlpha = 0.28 * s.rays * (0.7 + 0.3 * Math.sin(s.t / 90 + i));
+-      g.beginPath();
+-      g.moveTo(bx, by);
+-      g.lineTo(bx + Math.cos(a - wd) * len, by + Math.sin(a - wd) * len * 0.42);
+-      g.lineTo(bx + Math.cos(a + wd) * len, by + Math.sin(a + wd) * len * 0.42);
+-      g.fill();
++      const a = (i / RAYS_FLOOR) * Math.PI * 2 + spin + (dice(i, 1) - 0.5) * 0.3;
++      const shot = easeOut((since - i * 28) / 340) * (1 - back);
++      const far = 0.7 + (2.6 + 2.2 * dice(i, 2)) * shot;
++      const wide = 0.32 + 0.3 * dice(i, 3);
++      const ca = Math.cos(a);
++      const sa = Math.sin(a);
++      if (!at3(d, B.c + ca * 0.55, B.r + sa * 0.55, 0, p0) || !at3(d, B.c + ca * far, B.r + sa * far, 0, p1)) continue;
++      const mid = (0.55 + far) / 2;
++      if (!at3(d, B.c + ca * mid - sa * wide, B.r + sa * mid + ca * wide, 0, p2)) continue;
++      const mx = (p0.x + p1.x) / 2;
++      const my = (p0.y + p1.y) / 2;
++      streak(g, L.gold, p0.x, p0.y, p1.x, p1.y, 2 * (p2.x - mx), 2 * (p2.y - my), 0.5 * lit * (0.75 + 0.25 * Math.sin(s.t / 150 + i * 2.1)));
+     }
++    // The board's face, blazing.
++    for (const [dc, dr, out] of [[-half, -half, p0], [half, -half, p1]] as const) at3(d, B.c + dc, B.r + dr, 0, out);
++    g.globalAlpha = Math.min(1, 0.8 * lit);
++    g.fillStyle = "#fff3c8";
++    g.beginPath();
++    g.moveTo(p0.x, p0.y);
++    g.lineTo(p1.x, p1.y);
++    at3(d, B.c + half, B.r + half, 0, p1);
++    g.lineTo(p1.x, p1.y);
++    at3(d, B.c - half, B.r + half, 0, p0);
++    g.lineTo(p0.x, p0.y);
++    g.fill();
++    const nearY = p0.y;
++    const faceW = p1.x - p0.x;
++    // The shaft standing on it: wide and soft, and a brighter one inside it.
++    const tall = k * 6.4 * grow;
++    streak(g, L.shaft, bx, nearY, bx, nearY - tall, faceW * 1.45, 0, 0.42 * lit);
++    streak(g, L.shaft, bx, nearY, bx, nearY - tall * 0.94, faceW * 0.8, 0, 0.55 * lit * (0.9 + 0.1 * Math.sin(s.t / 90)));
++    // The rays from its face, up and outward all round: each leans away from the middle, turning slowly, shimmering.
+     for (let i = 0; i < RAYS_UP; i++) {
+-      const a = -Math.PI / 2 + ((i - (RAYS_UP - 1) / 2) / RAYS_UP) * 2.2 + Math.sin(spin * 2 + i) * 0.05;
+-      const wd = 0.035 + 0.02 * Math.sin(i * 1.7 + s.t / 120);
+-      const l = len * (1.1 + 0.25 * Math.sin(i * 2.3));
+-      g.globalAlpha = 0.34 * s.rays * (0.7 + 0.3 * Math.sin(s.t / 70 + i * 2));
+-      g.beginPath();
+-      g.moveTo(bx - k * 0.1, by);
+-      g.lineTo(bx + Math.cos(a - wd) * l, by + Math.sin(a - wd) * l);
+-      g.lineTo(bx + Math.cos(a + wd) * l, by + Math.sin(a + wd) * l);
+-      g.lineTo(bx + k * 0.1, by);
+-      g.fill();
++      const a = (i / RAYS_UP) * Math.PI * 2 - spin * 1.6 + (dice(i, 4) - 0.5) * 0.25;
++      const lean = 0.3 + 0.55 * dice(i, 5) + 0.04 * Math.sin(s.t / 300 + i);
++      const shot = easeOut((since - 60 - i * 34) / 300) * (1 - back);
++      const len = (3.4 + 2.8 * dice(i, 6)) * shot * (0.9 + 0.1 * Math.sin(s.t / 170 + i * 1.3));
++      const ca = Math.cos(a);
++      const sa = Math.sin(a);
++      if (!at3(d, B.c + ca * 0.4, B.r + sa * 0.4, 0, p0)) continue;
++      if (!at3(d, B.c + ca * (0.4 + len * Math.sin(lean)), B.r + sa * (0.4 + len * Math.sin(lean)), len * Math.cos(lean), p1)) continue;
++      const lx = p1.x - p0.x;
++      const ly = p1.y - p0.y;
++      const ll = Math.hypot(lx, ly) || 1;
++      const shimmer = 0.72 + 0.28 * Math.sin(s.t / 110 + i * 1.9);
++      const wd = k * (0.5 + 0.45 * dice(i, 7));
++      streak(g, L.gold, p0.x, p0.y, p1.x, p1.y, (-ly / ll) * wd * 1.7, (lx / ll) * wd * 1.7, 0.3 * lit * shimmer);
++      streak(g, L.ray, p0.x, p0.y, p1.x, p1.y, (-ly / ll) * wd * 0.6, (lx / ll) * wd * 0.6, 0.6 * lit * shimmer);
++    }
++    // Its glow at the foot, and motes rising in the shaft.
++    const gs = k * (0.95 + 0.08 * Math.sin(s.t / 120));
++    g.globalAlpha = Math.min(1, 0.5 * lit);
++    g.drawImage(L.glow, bx - gs, by - gs * 0.62, gs * 2, gs * 1.24);
++    g.fillStyle = "#fff6cf";
++    for (let i = 0; i < MOTES; i++) {
++      const up = ((since / (900 + 700 * dice(i, 8)) + dice(i, 9)) % 1) * 5.2 * grow;
++      if (!at3(d, B.c + (dice(i, 10) - 0.5) * 1.3, B.r + (dice(i, 11) - 0.5) * 1.3, up, p0)) continue;
++      g.globalAlpha = lit * (1 - up / 5.3) * 0.9;
++      const sz = Math.max(1.5, (p0.k / SQ) * (1.4 + dice(i, 12)));
++      g.fillRect(p0.x - sz / 2, p0.y - sz / 2, sz, sz);
+     }
+-    // The column of light over the board, and its glow.
+-    g.globalAlpha = 0.5 * s.rays;
+-    const cw = k * 0.5 * (1 - s.drawBack * 0.7);
+-    const ch = len * 1.2;
+-    g.fillRect(bx - cw / 2, by - ch, cw, ch);
+-    g.globalAlpha = 0.9 * s.rays;
+-    const gs = k * (1.6 + 0.2 * Math.sin(s.t / 110));
+-    g.drawImage(glow(), bx - gs, by - gs * 0.6, gs * 2, gs * 1.2);
+   }
+   // The particles: out from where each player stood, then drawn into the light column, round it and up; then all of them, and the
+   // light, drawn back to a point over the board; then falling into it.
+@@ -561,37 +670,55 @@ function drawSummon(d: FxDraw, s: SummonNow) {
+       g.fillRect(x - sz / 2, y - sz / 2, sz, sz);
+     }
+     if (s.drawBack > 0) {
+-      g.globalAlpha = 0.85;
+-      const gs = k * (0.5 + 0.5 * s.drawBack) * (1 - 0.4 * s.fall);
+-      g.drawImage(glow(), px - gs, py - gs, gs * 2, gs * 2);
++      // (The light gathered: a ball over the board, its glow on the floor under it; then it falls.)
++      onFloor(d, L.pool, B.c, B.r, 1.6 + 1.2 * (1 - s.fall), 0.6 * s.drawBack);
++      g.globalAlpha = 0.95 * Math.min(1, s.drawBack * 1.6);
++      const gs = k * (0.45 + 0.6 * s.drawBack) * (1 - 0.35 * s.fall);
++      g.drawImage(L.glow, px - gs, py - gs, gs * 2, gs * 2);
++      g.drawImage(L.glow, px - gs * 0.45, py - gs * 0.45, gs * 0.9, gs * 0.9);
+     }
+   }
+-  // The splash: a ring of light out across the floor from the board, and drops of light thrown up and falling back.
++  // The splash: the board's face flashes, a ring of light runs out across the floor from it, and drops of light are thrown up and
++  // fall back; all on the floor as the room's camera sees it.
+   if (s.splash > 0 && s.splash < 1) {
+     const u = s.splash;
+-    g.globalAlpha = 0.8 * (1 - u);
++    const half = B.size / 2;
++    onFloor(d, L.pool, B.c, B.r, 1.2 + 3.4 * easeOut(u), 0.9 * (1 - u) ** 1.5);
+     g.strokeStyle = "#fff1c0";
+-    g.lineWidth = Math.max(1.5, k * 0.06 * (1 - u));
+-    g.beginPath();
+-    g.ellipse(bx, by, k * (0.6 + 2 * u), k * (0.6 + 2 * u) * 0.42, 0, 0, Math.PI * 2);
+-    g.stroke();
++    for (const [rad, a] of [[0.7 + 2.6 * easeOut(u), 0.85 * (1 - u)], [0.5 + 1.5 * easeOut(u), 0.5 * (1 - u)]] as const) {
++      g.beginPath();
++      for (let i = 0; i <= 28; i++) {
++        const an = (i / 28) * Math.PI * 2;
++        if (!at3(d, B.c + Math.cos(an) * rad, B.r + Math.sin(an) * rad, 0, p0)) continue;
++        if (i) g.lineTo(p0.x, p0.y);
++        else g.moveTo(p0.x, p0.y);
++      }
++      // (A soft wide stroke under a thin bright one.)
++      g.lineWidth = 4 + k * 0.3 * (1 - u) ** 2;
++      g.globalAlpha = a * 0.28;
++      g.stroke();
++      g.lineWidth = 1.5 + k * 0.08 * (1 - u) ** 2;
++      g.globalAlpha = a;
++      g.stroke();
++    }
+     g.fillStyle = "#fff6cf";
+-    for (let i = 0; i < 18; i++) {
+-      const a = (i / 18) * Math.PI * 2;
+-      const r = k * (0.5 + 1.2 * u);
+-      const hgt = k * 1.1 * Math.sin(u * Math.PI) * (0.6 + 0.4 * Math.sin(i * 2.7));
+-      const sz = Math.max(1.5, k * 0.05);
+-      g.globalAlpha = 0.9 * (1 - u);
+-      g.fillRect(bx + Math.cos(a) * r - sz / 2, by + Math.sin(a) * r * 0.42 - hgt - sz / 2, sz, sz);
++    for (let i = 0; i < 28; i++) {
++      const an = (i / 28) * Math.PI * 2 + dice(i, 13);
++      const rad = half * 0.6 + (0.5 + 1.3 * dice(i, 14)) * u;
++      const up = (0.7 + 0.9 * dice(i, 15)) * Math.sin(u * Math.PI);
++      if (!at3(d, B.c + Math.cos(an) * rad, B.r + Math.sin(an) * rad, up, p0)) continue;
++      const sz = Math.max(2, (p0.k / SQ) * 3);
++      g.globalAlpha = 0.95 * (1 - u * u);
++      g.fillRect(p0.x - sz / 2, p0.y - sz / 2, sz, sz);
+     }
+-    g.globalAlpha = 0.9 * (1 - u);
+-    const gs = k * 1.4 * (1 - u * 0.5);
+-    g.drawImage(glow(), bx - gs, by - gs * 0.5, gs * 2, gs);
++    const gs = k * 1.5 * (1 - u * 0.5);
++    g.globalAlpha = 0.95 * (1 - u) ** 2;
++    g.drawImage(L.glow, bx - gs, by - gs * 0.55, gs * 2, gs * 1.1);
+   }
+   g.restore();
+   // The freeze frame's flash.
+   if (s.flash > 0) {
+-    g.fillStyle = `rgba(255,255,255,${0.6 * s.flash})`;
++    g.fillStyle = `rgba(255,250,235,${0.32 * s.flash})`;
+     g.fillRect(0, 0, d.W, d.H);
+   }
+   // The quiet: the room a touch dimmer; then the iris closing on the board, to black.
