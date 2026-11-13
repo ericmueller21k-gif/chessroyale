@@ -198,10 +198,14 @@ test("a 5th at his door: \"The door is locked.\", and you stay on the landing; a
     await player.goto("/");
     await asSignedIn(player, "hb5");
     await toLanding(player, townroom);
-    const up = await stairsCard(player, "top");
-    await up.getByRole("button", { name: "Go up" }).click();
     const note = player.getByRole("alertdialog", { name: "The door is locked." });
-    await expect(note).toBeVisible({ timeout: 10_000 });
+    // (A tap while the landing still fades in is dropped, as a door's is: tapped again until the answer shows.)
+    await expect(async () => {
+      if (await note.isVisible()) return;
+      const up = await stairsCard(player, "top");
+      await up.getByRole("button", { name: "Go up" }).click();
+      await expect(note).toBeVisible({ timeout: 6000 });
+    }).toPass({ timeout: 45_000 });
     await expect(room(player)).toHaveAttribute("data-part", "landing");
     await still(player, "door-locked");
     await note.getByRole("button", { name: "OK" }).click();
@@ -216,9 +220,7 @@ test("a 5th at his door: \"The door is locked.\", and you stay on the landing; a
       const r = await player.request.post("/api/town/hidden", { data: { action: "look", room: townroom } });
       expect(((await r.json()) as { people: number }).people).toBe(0);
     }).toPass({ timeout: (HIDDEN_ROOM.silentSec + 15) * 1000 });
-    const again = await stairsCard(player, "top");
-    await again.getByRole("button", { name: "Go up" }).click();
-    await expect(room(player)).toHaveAttribute("data-part", "top", { timeout: 20_000 });
+    await climb(player, "top", "Go up");
   } finally {
     await b.close();
   }

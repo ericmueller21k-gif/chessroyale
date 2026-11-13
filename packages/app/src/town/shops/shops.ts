@@ -214,7 +214,8 @@ export const RECLUSE_ROOMS: Readonly<Record<"front" | "landing" | "top", ShopDef
 /**
  * A boss met inside his home can be fought (Don Dough, Nov 11): his boss is in the game (core's roster, with his character and powers;
  * in the game for admins first, so his home is in an admin's town only). Until his boss lands (another helper's round), his card's
- * Challenge stays greyed, "Coming soon", and the talk beat still plays.
+ * Challenge stays greyed, "Coming soon", and the talk beat still plays. (The Hidden Boss's room has its own card since Nov 13: the
+ * room's challenge of four, HiddenRoom.tsx, never this path.)
  */
 export const canChallengeInside = (id: HomeId): boolean => id !== "recluse" && BOSS_ROSTER.some((b) => b.id === id && adminPlayable(b));
 /** A home's room: its front (the shop, from the town), its back room, or a floor of the walk-up. */

@@ -540,8 +540,8 @@ export function ShopRoom({ room, youArt, youRider, youName, onZoom, onOut, onRea
   const held = bossHoldings(def.home);
   const label = card === "talk" ? (def.name ?? "Shopkeeper") : card === "crate" ? (def.crate ?? undefined) : card === "door" ? "Door" : card === "pass" ? (def.home === "recluse" ? "Stairs" : "Door") : undefined;
   // (Don Dough's card, Nov 11: his Challenge alone. It plays his beat, the walk-out, then the challenge: Eric, "when you hit challenge,
-  // it just goes through the talk animation no matter what". The Hidden Boss's on his top floor, Nov 13, the same card: his Challenge
-  // greyed, "Coming soon", until his room's challenge is built.)
+  // it just goes through the talk animation no matter what". The Hidden Boss's on his top floor, Nov 13: the room's own challenge, from
+  // the town (`challengeCard`: HiddenRoom.tsx), the count, Challenge and Cancel.)
   const back = def.part === "back";
   const bossCard = back || def.part === "top";
   // (The walk-up's flats' doors: the next of their lines each time the card opens; Nov 13.)

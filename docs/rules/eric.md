@@ -108,6 +108,13 @@ removed (old → new) and says whether any of them guards a rule here.
   - Guard: `e2e/town-leave.spec.ts`, "the town's back button asks…", "the phone's back gesture asks too…", "a computer's side menu
     asks first…", "inside a room…", "a boss's challenge from the town…", "no input for the limit…", phone and computer.
   - Decision: [2026-11-07-leave-town-confirm.md](../decisions/2026-11-07-leave-town-confirm.md).
+- **The Hidden Boss's room (Eric, Nov 12 and 13): you challenge him from his room only and wait there; leaving it with your game request
+  in asks "Cancel your game request?" (Stay / Leave and cancel): the stairs, back, the side menu, closing the town; four at most in the
+  room, a 5th at its door gets "The door is locked." and stays out; no four in 5 minutes (not shown): "Sorry, not enough players." with
+  OK.** The one exception to "rooms don't ask" above. The test bots and the online 🏆 are admins' only, the server checking.
+  - Guards: `packages/server/test/hidden-room.test.ts` (every check); `e2e/hidden-boss-room.spec.ts`, "his room (Eric, Nov 12 and 13)…"
+    and "a 5th at his door…", phone and computer.
+  - Decision: [2026-11-13-hidden-boss-challenge.md](../decisions/2026-11-13-hidden-boss-challenge.md).
 - **Name tags show only near you by default (Eric, Oct 28); "Everyone" in Town settings shows them all.** The figures are always drawn;
   a tag shows within 5 squares of you (|dc| and |dr|, so about a 10 × 10 area), fading over the last square; your own tag, an open card's
   figure and a table partner always show. The one more named exception to "nothing hidden".

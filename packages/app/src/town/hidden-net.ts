@@ -1,5 +1,7 @@
 import { HIDDEN_ROOM } from "@chessroyale/core";
 import { testParams, testSwitchesAllowed } from "../test-switches.ts";
+import { tooYoung } from "../account.ts";
+import { mayTownChat } from "./chat-net.ts";
 
 /**
  * The Hidden Boss's room challenge, the app's side (Eric, Nov 12 and 13; the server's: server/src/hidden-room.ts; POST /api/town/hidden).
@@ -87,6 +89,14 @@ export class HiddenRoomClient {
 
   /** One request to the server; its answer (null: none). `keepalive`: as the page closes. */
   async ask(action: RoomAction, keepalive = false): Promise<RoomInfo | null> {
+    // (A guest, or a device the age gate marked too young: never in the room's count, so nothing to ask. The server refuses them too.)
+    if (!mayTownChat() || tooYoung()) {
+      if (!this.refused) {
+        this.refused = tooYoung() ? "Online games are for accounts 13 and older." : "Sign in to challenge him.";
+        this.emit();
+      }
+      return null;
+    }
     const me = this.self();
     const body = { action, ...(me ? { c: me.c, r: me.r, idleMs: me.idleMs } : {}), hidden: document.hidden, ...testRoom() };
     try {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BOSS_BRAIN, BOSS_DIFFICULTY, BOSS_POWERS, BOSS_ROSTER, BOSS_TIERS, CROWD_KNOCKOUTS, CROWD_START, DEFAULT_SETTINGS, LEAVES, LEAVING, RANKED_1V1, RECLUSE_PHASE2, crowdFinalBoss, crowdFinalists, fixedLevel, isPlayable, lastStandBar, maiaRatingFor, maiaTopRating } from "@chessroyale/core";
+import { BOSS_BRAIN, BOSS_DIFFICULTY, BOSS_POWERS, BOSS_ROSTER, BOSS_TIERS, CROWD_KNOCKOUTS, CROWD_START, DEFAULT_SETTINGS, LEAVES, LEAVING, RANKED_1V1, RECLUSE_PHASE2, HIDDEN_ROOM, crowdFinalBoss, crowdFinalists, fixedLevel, isPlayable, lastStandBar, maiaRatingFor, maiaTopRating } from "@chessroyale/core";
 import { BOSS_BLOCKS, FAQ_DEFAULTS, eloExpected, faqAnchors, faqPage, faqPlainText, faqSections, ranked1v1, rankedLeaving, type FaqSources } from "../src/faq/content.ts";
 import { inlineText, linksOf, parse, plainText } from "../src/faq/markdown.ts";
 
@@ -547,10 +547,12 @@ describe("the FAQ on the Crowd's boss final (Eric, Oct 14: always the Hidden Bos
     expect(moved).not.toContain(him.name);
   });
 
-  it("his block: met only in the Crowd's final; no God King help, no strikes; the bullet clock and his second phase, numbers from the settings", () => {
+  it("his block: met in the Crowd's final and in his room in the town (Nov 13); no God King help, no strikes; the bullet clock and his second phase, numbers from the settings", () => {
     const t = section("boss-powers");
     expect(anchorsOf(faqPage().sections.find((s) => s.id === "boss-powers")!.blocks)).toContain(`boss-${him.id}`);
-    expect(t).toContain(`Met only in the Crowd's boss final, where it's always him, against the top ${crowdFinalists("boss")}.`);
+    expect(t).toContain(`Met in the Crowd's boss final, where it's always him, against the top ${crowdFinalists("boss")}, and in Chess Town`);
+    expect(t).toContain(`up to ${HIDDEN_ROOM.players} players in his room challenge him together`);
+    expect(t).toContain(`within ${HIDDEN_ROOM.capSec / 60} minutes, the request ends`);
     expect(t).toContain(`full as turn ${BOSS_POWERS.bulletTurn} begins`);
     expect(t).toContain(`every bank is ${BOSS_POWERS.bulletBankSeconds / 60} minute`);
     expect(t).toContain(`${RECLUSE_PHASE2.boards} boards of Freestyle chess at once`);
