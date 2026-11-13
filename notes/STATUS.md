@@ -1,5 +1,6 @@
 - Nov 13 ~06:30 UTC: main full run on 0429629 (#672) GREEN, no flakes (43371241300).
 - Nov 13 06:45 UTC: room challenge done -> PR #673 (full-e2e label). Reviewer session_01JuCWRv5TAH8JGMXyvbXRrq (xhigh) -> review/hidden-challenge. Next after merge: phase change + four boards online.
+- #673 first head ffffd16: check green, full e2e green (43380882315), one retry-pass: town-desktop:36 [desktop] 'Cannot read properties of null (reading x)' -> flaky batch 6. Review: 1 major (bans), 4 minor; fix helper session_01JuCWRu1P4Wr4mHzwhGZpTT (brief hidden-challenge-fixes.md).
 - Nov 13 ~06:00 UTC: #672 building MERGED (0429629). PR run retry-pass crate-banner:44 phone (first sighting) -> flaky list. Room challenge helper started (xhigh, alone; claude/hidden-boss-challenge).
 - Nov 13 ~05:40 UTC: Eric: no admin gate, push live. #672 merges when green (took "push it live" as the OK for the guard count). Room-challenge brief: remove recluse from BOSS_ADMIN_FIRST.
 - Nov 13 ~05:30 UTC: Eric: the room fight must play through to the four boards online. Order now: challenge -> online phase change + 4 boards -> child form -> cutscene.
