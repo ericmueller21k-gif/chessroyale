@@ -76,7 +76,7 @@ import { CLAW_PLAY, clawPose, newPose as newClawPose } from "../../claw/view.ts"
 import { closeClawMachine, openClawMachine } from "../../claw/index.ts";
 
 /** A room's art, as its file exports it. */
-interface RoomArt {
+export interface RoomArt {
   /** Its size in squares, each way (20 unless the art says: Boingo's Funhouse is 24). */
   n?: number;
   layout: readonly ShopPlace[];
@@ -338,10 +338,16 @@ const picture = (url: string, what: string) =>
 const loading = new Map<string, Promise<LoadedRoom>>();
 /** Loads a home's room (its art's chunk, every piece's frames drawn, the kid's sheet), once: its front, or its back room (`part`). */
 export function loadRoom(home: HomeId, part: "front" | "back" = "front"): Promise<LoadedRoom> {
-  const key = roomKey(home, part);
+  return loadRoomWith(roomKey(home, part), roomDef(home, part)!, ART[roomKey(home, part)]!);
+}
+/**
+ * Loads a room from its def and its art's loader, once by `key`: a home's room (`loadRoom`), or a room no home opens yet (the Hidden
+ * Boss's child's room, Nov 12: a mockup, shops/recluse-preview.tsx, reachable only on the dev server).
+ */
+export function loadRoomWith(key: string, def: ShopDef, artOf: () => Promise<RoomArt>): Promise<LoadedRoom> {
   let p = loading.get(key);
   if (p) return p;
-  const def = roomDef(home, part)!;
+  const home = def.home;
   const sheet = SIDEKICK_SHEETS[def.kid];
   const img = new Image();
   const kid = new Promise<void>((ok, no) => {
@@ -351,7 +357,7 @@ export function loadRoom(home: HomeId, part: "front" | "back" = "front"): Promis
   });
   // (Jefferson's warehouse: his crew's nine sheets too.)
   const crew = home === "grex" ? Promise.all((Object.keys(CREW_SHEETS) as CrewName[]).map((k) => picture(CREW_URL[k]!, `the ${k} sheet`).then((img) => [k, img] as const))).then((l) => Object.fromEntries(l) as Record<CrewName, HTMLImageElement>) : Promise.resolve(null);
-  p = Promise.all([ART[key]!(), kid, crew]).then(async ([art, , crewImgs]) => {
+  p = Promise.all([artOf(), kid, crew]).then(async ([art, , crewImgs]) => {
     const frames: Record<string, Frames> = {};
     // (While the town zooms on the door: a slice a frame, load-slice.ts; behind the black, all at once.)
     let t0 = performance.now();
@@ -409,6 +415,30 @@ export interface ShopCtl {
 }
 
 /**
+ * A room's own scene, drawn by the room's caller (the Hidden Boss's child's room, Nov 12: the child playing on the floor and the
+ * summoning; shops/recluse-scene.ts): its figures, each by its row among the room's pieces and you, and what goes over everything.
+ * None: the room as it always was.
+ */
+export interface RoomFx {
+  /** Your figure isn't drawn (the mockup's preview: its four stand-in players are the scene's). */
+  hideYou?: () => boolean;
+  /** Its figures this frame: each drawn at its row (`z`, squares) among the room's pieces, far to near. At most FX_MAX. */
+  figures?: (now: number) => readonly { readonly z: number; readonly draw: (d: FxDraw, now: number) => void }[];
+  /** Drawn over the whole room (its lights and effects), before the tags and cards. */
+  over?: (d: FxDraw, now: number) => void;
+}
+/** What a scene draws with: the room's canvas (CSS pixels), its camera and focus this frame, and the box's size. */
+export interface FxDraw {
+  g: CanvasRenderingContext2D;
+  v: ReturnType<typeof newView>;
+  camX: number;
+  camY: number;
+  W: number;
+  H: number;
+}
+const FX_MAX = 16;
+
+/**
  * A boss's challenge played in its room (shops/challenge.ts): you and the boss walk in to the battle circle's marks, it says its
  * line, the board comes in between you; then `onDone` (the town starts the boss's transition and the battle).
  */
@@ -419,7 +449,7 @@ export interface RoomIntro {
   onDone: () => void;
 }
 
-export function ShopRoom({ room, youArt, youRider, youName, onZoom, onOut, onReady, ctl, intro = null, zzz = () => false, arrived = false, onPass, onChallenge, canChallenge = false }: { /** You're away (afk.ts): a "zzz" over your pawn. */ zzz?: () => boolean; room: LoadedRoom; youArt: () => YouArt | null; /** The town's rider you're on (its frames ready), or null: on foot. */ youRider: () => Rider | null; youName: () => string; onZoom: (out: boolean) => void; onOut: () => void; onReady: () => void; ctl: { current: ShopCtl | null }; /** A boss's challenge to play here (none: the shop as usual). */ intro?: RoomIntro | null; /** You came in through the door from the home's other room (you start just inside it). */ arrived?: boolean; /** Through the door to the home's other room (Rolling Dough's). */ onPass?: () => void; /** The boss's challenge (Don Dough's: once his beat and the walk-out from his back room have played). */ onChallenge?: () => void; /** His boss is in the game to fight (none yet: Challenge greyed). */ canChallenge?: boolean }) {
+export function ShopRoom({ room, youArt, youRider, youName, onZoom, onOut, onReady, ctl, intro = null, zzz = () => false, arrived = false, onPass, onChallenge, canChallenge = false, fx = null }: { /** The room's own scene (RoomFx), or none. */ fx?: RoomFx | null; /** You're away (afk.ts): a "zzz" over your pawn. */ zzz?: () => boolean; room: LoadedRoom; youArt: () => YouArt | null; /** The town's rider you're on (its frames ready), or null: on foot. */ youRider: () => Rider | null; youName: () => string; onZoom: (out: boolean) => void; onOut: () => void; onReady: () => void; ctl: { current: ShopCtl | null }; /** A boss's challenge to play here (none: the shop as usual). */ intro?: RoomIntro | null; /** You came in through the door from the home's other room (you start just inside it). */ arrived?: boolean; /** Through the door to the home's other room (Rolling Dough's). */ onPass?: () => void; /** The boss's challenge (Don Dough's: once his beat and the walk-out from his back room have played). */ onChallenge?: () => void; /** His boss is in the game to fight (none yet: Challenge greyed). */ canChallenge?: boolean }) {
   const box = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const cardEl = useRef<HTMLDivElement>(null);
@@ -431,7 +461,7 @@ export function ShopRoom({ room, youArt, youRider, youName, onZoom, onOut, onRea
     const r = (eng.current = startRoom(box.current!, canvas.current!, cardEl.current!, room, youArt, youRider, youName, onZoom, (c) => {
       setCard(c);
       setMsg("");
-    }, intro, zzz, arrived, () => onChallenge?.(), onReady));
+    }, intro, zzz, arrived, () => onChallenge?.(), onReady, fx));
     ctl.current = r;
 
     return () => {
@@ -661,6 +691,8 @@ function startRoom(
   onWalkedOut: () => void = () => {},
   /** The room has drawn its first `warmFrames` frames (or `warmMaxMs` went by): the black may lift. */
   onWarm: () => void = () => {},
+  /** The room's own scene (RoomFx), or none. */
+  fx: RoomFx | null = null,
 ) {
   const f = TOWN_FEEL;
   const S = SHOP_FEEL;
@@ -2442,6 +2474,7 @@ function startRoom(
     youHead.on = false;
     youFig.on = false;
     seen.anim = "";
+    if (fx?.hideYou?.()) return;
     you.pose(now, pose);
     // (Jefferson's intro: your lift under you, you standing on its plate, lifted with it.)
     if (cw && introNow?.crew) drawLift();
@@ -3309,8 +3342,11 @@ function startRoom(
    * What stands among the pieces this frame (the Shopkeeper 0, you 1, the boss 2, the board 3, facing the boss's stool 4 and yours 5,
    * and Timber's shavings' fog 6), by row: drawn far to near.
    */
-  const figZ = new Float64Array(8 + CREW_MAX);
-  const figK = new Uint8Array(8 + CREW_MAX);
+  const figZ = new Float64Array(8 + CREW_MAX + FX_MAX);
+  const figK = new Uint8Array(8 + CREW_MAX + FX_MAX);
+  /** The scene's figures this frame (RoomFx), drawn as figure 100 + i, and what they draw with. */
+  let fxFigs: ReturnType<NonNullable<RoomFx["figures"]>> = [];
+  const fxd: FxDraw = { g: null as unknown as CanvasRenderingContext2D, v: null as unknown as FxDraw["v"], camX: 0, camY: 0, W: 0, H: 0 };
   let figN = 0;
   const addFig = (z: number, k: number) => {
     let i = figN++;
@@ -3323,7 +3359,7 @@ function startRoom(
     figK[i] = k;
   };
   const drawFigure = (k: number, now: number) =>
-    k >= 8 ? drawCrewFig(k - 8) : k === 0 ? drawKid(now) : k === 1 ? drawYou(now) : k === 2 ? drawBoss(now) : k === 3 ? (ci?.ice ? drawIceCenter(now) : cw && ci?.crew ? drawCrewCenter(now) : rp ? drawRopeCenter() : drawCenter()) : k === 6 ? drawCast(true) : rp ? drawBucket(k === 4 ? "b" : "w") : drawStool(k === 4 ? marks!.bossStool : marks!.youStool);
+    k >= 100 ? fxFigs[k - 100]!.draw(fxd, now) : k >= 8 ? drawCrewFig(k - 8) : k === 0 ? drawKid(now) : k === 1 ? drawYou(now) : k === 2 ? drawBoss(now) : k === 3 ? (ci?.ice ? drawIceCenter(now) : cw && ci?.crew ? drawCrewCenter(now) : rp ? drawRopeCenter() : drawCenter()) : k === 6 ? drawCast(true) : rp ? drawBucket(k === 4 ? "b" : "w") : drawStool(k === 4 ? marks!.bossStool : marks!.youStool);
   /** A figure drawn, and (`?report`) its time marked: you, the boss, the fight's set as props, everyone else as other players. */
   const drawFig = (k: number, now: number, rc: typeof REC) => {
     drawFigure(k, now);
@@ -3873,6 +3909,11 @@ function startRoom(
     collectElves();
     collectPeople(now);
     for (let i = 0; i < crewN; i++) addFig(crewFigs[i]!.z, 8 + i);
+    if (fx) {
+      Object.assign(fxd, { g, v, camX, camY, W, H });
+      fxFigs = fx.figures?.(now) ?? [];
+      for (let i = 0; i < Math.min(fxFigs.length, FX_MAX); i++) addFig(fxFigs[i]!.z, 100 + i);
+    }
     rc?.mark(RP.plan);
     let k = 0;
     for (const u of ups) {
@@ -3890,6 +3931,7 @@ function startRoom(
     if (fo && introNow?.folio?.plane) drawFolioPlane(introNow.folio.plane);
     if (rp && introNow?.rope) drawRopeLines();
     if (dk) drawDarkPass(now);
+    fx?.over?.(fxd, now);
     rc?.mark(RP.lights);
     if (kidBox.on && !ci && !cave) drawTag("Shopkeeper", "sidekick", kidBox.hx, kidBox.hy);
     // (Hollow's intro: your tag fades as the drain starts, so the dark isn't broken by a bright label.)

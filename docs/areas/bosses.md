@@ -1087,6 +1087,9 @@ sampling, the guards, `forPlayers`), `BOSS_TIERS` and each boss's `offset` in `b
 - Previews: `npm run preview:characters -- <dir>` (GIFs and sheets of every boss and effect; `only=pig` for Wrangler).
   The Hidden Boss's bust and his book (art only, not shown) aren't in the character lists: add
   `extra=packages/app/src/characters/recluse.ts only=recluse,recluse-bust,recluse-book`.
+  His younger ages (a mockup, Nov 12; wired into nothing): `characters/recluse-ages.ts` (the child, 13 and 20, their busts
+  and idles, the growing step `recluse-grow`, the ghost child beside him kneeling `recluse-ghost`):
+  `extra=packages/app/src/characters/recluse-ages.ts only=recluse-child,recluse-teen,recluse-young,recluse-grow,recluse-ghost`.
 - The Hidden Boss in the Crowd's final: `packages/chess/test/crowd.test.ts` ("50 v 50 boss final"),
   `packages/server/test/crowd-hidden-boss.test.ts` (online), e2e `e2e/crowd-hidden.spec.ts`; [crowd.md](crowd.md).
 - The Hidden Boss: unit `packages/chess/test/recluse.test.ts` (hidden from players, his brain, the bullet clock and

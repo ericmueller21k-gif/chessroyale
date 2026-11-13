@@ -1118,6 +1118,30 @@ sets, the zoom, the camera's follow and glide, the drag, the haze, the clouds' p
 how often bots walk, the sizes, the names, the sky's hours and its four looks' colors, the lights at dusk and night (`lightsAt`, their glow's bands, the flicker), the rim line. The earlier value is
 noted wherever a slice changed one.
 
+- **The Hidden Boss's child's room (Nov 12, a mockup; no home opens it yet).** A 12 x 12 room (`shops/recluse-art.ts`: oak boards
+  and the window's sun baked into the floor, a braided rug, sailboat wallpaper, a rocket poster, the bed, the rocking horse, the little
+  table) drawn by the real room: `loadRoomWith(key, def, art)` loads a room no home lists, and `ShopRoom`'s optional `fx` (`RoomFx`:
+  figures sorted by row among the pieces and you, a pass over everything, `hideYou`) lets a caller draw its own scene; no `fx`, no
+  change. The scene (`shops/recluse-scene.ts`): the child (age 9, `recluse-ages.ts` `RECLUSE_CHILD_SIT`) plays his 1956 game against
+  himself on a board on the floor (`shops/recluse-game.ts`, stored squares, no engine; the last move tinted, a fade back to the start),
+  and the summoning with four stand-in pawns. Times: `feel.ts` `HIDDEN_ROOM_FEEL`. Seen only on the dev server,
+  `/hidden-room-preview.html` (`src/dev/hidden-room-preview.tsx`; `?t=`, `?summon=`, `?ui=0`). Test: `test/recluse-room.test.ts`.
+  [2026-11-12-hidden-boss-room-mockup.md](../decisions/2026-11-12-hidden-boss-room-mockup.md).
+  **Round 2 (Nov 13):** 9 x 9 (about half the floor), everything brought in (the bed's foot just onto the rug, the sun's panes across the
+  rug), the door at the front's east end; a 1.15-square board. He plays Black seated (a lean, a short reach) and walks round for every
+  White move, kneeling beside the board on the piece's side (`recluse-game.ts` `stepsOf`, `walkPath`; `recluse-ages.ts` `PLAY_POSES`:
+  standing, walking, kneeling, from the front and behind); the game takes about 14 minutes. In this room only, each side wall is one
+  surface (`sideWallGrid`, the scene's `drawSideWalls`: about 70 affine strips a wall, the layout's side squares solid blanks);
+  `?walls=cards` shows round 1's cards; `__hiddenSeek(ms)` jumps the game for stills.
+  [2026-11-13-hidden-boss-room-r2.md](../decisions/2026-11-13-hidden-boss-room-r2.md).
+  **Round 3 (Nov 13):** the board sideways (White's rank 1 on our left, the a-file farthest). For every half-move he walks round
+  behind the board (never between us and it) to that color's side and sits back on his heels centered on it, side on to us; to play
+  he comes up on his knees and leans in (`recluse-ages.ts` `RECLUSE_CHILD_SIDE`, `SIDE_POSES`: five leans, four dips toward us, a
+  4-step side walk; mirrored for Black's side), shuffling up to a quarter square toward the move's files and back. `recluse-scene.ts`
+  `leanFor` picks each move's pose so his reach is short; his arm is two fixed lengths jointed at the elbow (`drawArm`), longer only
+  when straight; the test holds every move under half again his arm (worst about 1.07; on screen 1.08 computer, 1.13 phone).
+  [2026-11-13-hidden-boss-room-r3.md](../decisions/2026-11-13-hidden-boss-room-r3.md).
+
 ## Adding a home
 
 1. Draw it in `town/houses/<boss>.ts` like the others (the game's pixel art: `characters/sprite.ts` parts and frames,
