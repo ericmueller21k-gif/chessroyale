@@ -1011,6 +1011,12 @@ button.town-pic.player {
   z-index: 30;
   background: #1b1830;
 }
+/* The street town couldn't load (Nov 13; gl-fail.ts): the same card, its line and a Reload button. */
+.town-broken .town-btn {
+  width: auto;
+  min-width: 160px;
+  min-height: 44px;
+}
 
 /* ---- The area banner (Eric's mockup, Nov 11; AreaBanner.tsx): a room's name as you walk in through its door. Over the room, under
    the cards and chat; taps pass through it. Sized from the room's view (the box's container units), so it stays within it on a phone

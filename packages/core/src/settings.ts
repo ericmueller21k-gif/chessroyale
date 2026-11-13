@@ -3395,15 +3395,17 @@ export const ALERTS = {
 } as const;
 
 /**
- * The town's WebGL fallbacks (Oct 30; docs/areas/ops.md, "Health"): a page whose town asked for WebGL and drew with Canvas 2D
- * instead says so once, through the error reporting (the app's problems.ts, `reportTownFallback`), as this kind with its
- * reason as the message. The health view counts them by reason, apart from the errors. The reasons: no WebGL 2 in the
- * browser; it has it, but no context could be made; the shader didn't compile or link; the context was lost twice within a
- * minute; or it was lost and not given back within 5 s.
+ * The street town's WebGL failures (Oct 30; Nov 13: it reloads once, then says the town couldn't load, never today's town; the
+ * app's town/gl-fail.ts; docs/areas/ops.md, "Health"): each page says so once, through the error reporting (the app's
+ * problems.ts, `reportTownFallback`), as this kind with its reason as the message. The health view counts them by reason, apart
+ * from the errors. The reasons a page reloads: no WebGL 2 in the browser; it has it, but no context could be made; the shader
+ * didn't compile or link; or the context was lost and not given back within 5 s of the page showing. `message`: it failed again
+ * after that reload, and the town's box says so. (`lost-twice`, a context lost twice within a minute, isn't a failure since
+ * Nov 13; kept so the week's count still reads it.)
  */
 export const TOWN_GL_FALLBACK = {
   kind: "town-gl-fallback",
-  reasons: ["no-webgl2", "no-context", "shader", "lost-twice", "not-back"],
+  reasons: ["no-webgl2", "no-context", "shader", "lost-twice", "not-back", "message"],
 } as const;
 export type TownGlFallback = (typeof TOWN_GL_FALLBACK.reasons)[number];
 

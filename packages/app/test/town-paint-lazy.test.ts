@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 // An admin's town is the street town (admin-town.ts STREET_TOWN): its buildings are built too.
-vi.mock("../src/town/admin-town.ts", () => ({ ADMIN_TOWN: true, STREET_TOWN: true, NO_WEBGL_STREET: false, hasWebGL2: () => true }));
+vi.mock("../src/town/admin-town.ts", () => ({ ADMIN_TOWN: true, STREET_TOWN: true }));
 
 /**
  * The pictures painted when first drawn (Nov 10, phone load 3; houses/kit.ts `paint`): every picture the town, its shops, the rides,
