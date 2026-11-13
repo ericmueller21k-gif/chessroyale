@@ -50,7 +50,7 @@ import numpy as np
 import master
 import song_w
 from handoff import HEADROOM, MP3, PAD, ceiling, fold, save
-from song_v import BEATS, PLAN, RAGE_AT, RAGE_BREATH, RAGE_BUILD, RAGE_SLAM, T_CALC, T_CHANT, T_CHANT2, T_MEMORY, TAPE, rage_plan, render
+from song_v import BEATS, PLAN, RAGE, T_CALC, T_CHANT, T_CHANT2, T_MEMORY, TAPE, rage_layout, rage_plan, render
 from synth import SR, Ride
 
 RING = 8.0  # seconds of ring-out carried over a join
@@ -91,7 +91,9 @@ def main(out: str) -> None:
     first = piece(T_CHANT, T_MEMORY + 0.001)  # the chant, the duel, and the book that stops them
     beaten = piece(T_MEMORY, T_CHANT2)  # the book, the memory, its souring, the pause
     last = piece(T_CHANT2, BEATS)  # from the drop to the end
-    rage = fold(render((RAGE_AT, T_CHANT2), 0, rage=True))  # the souring at the game's pace
+    RAGE_AT = rage_layout()[0]  # the beat he rises at; the book lands five beats on, the build starts six on, the breath is the last
+    RAGE_SLAM, RAGE_BUILD, RAGE_BREATH = RAGE_AT + 5, RAGE_AT + 6, T_CHANT2 - 1
+    rage = fold(render((RAGE_AT, T_CHANT2), 0, rage=RAGE))  # the souring at the game's pace
     gc.collect()
     house = fold(song_w.render())
 
