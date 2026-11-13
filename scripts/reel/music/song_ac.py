@@ -24,18 +24,22 @@ What is not used: its notes asked for the "iconic" call of a famous western film
 whistle; neither is here. The call, the whistle's lines and the guitar's are written for this song: none of it is
 any song's, any film's or any game's (the hard rule). Nor is the first write-up's bass run (minor third, major
 third, fourth, fifth), which its notes asked for again: this bass's turns walk by step to the next chord's note.
-About 136 beats a minute (its notes said 138; 136 makes the loop two minutes exactly), 68 bars. Two minutes, not the
-1:30 to 1:45 its notes gave: every theme in the game runs two minutes or more (Eric's own rule).
+About 137 beats a minute, 88 bars, 2:34. Its notes gave 1:30 to 1:45; the first go here was two minutes, and Eric: "I
+didn't realize that the AI said to make it shorter. Can you actually make it like 2 minutes 30, 2 minutes 40". What
+the longer one has more: a chorus (the round begun from B flat, the whistle's own tune), four more bars of high noon
+before its hits, and the guitar's solo (short licks, bends, rests: no runs).
 His world: the showdown (the stops and starts, the silence, the shot), his spurs, a snort and his laugh, quiet.
   python3 song_ac.py <out.wav>
 
   bars  1-8    0:00  the standoff: a bell tolling, timpani, the call, the whistle; his spurs, a snort; a gunshot
   bars  9-24   0:14  the gallop: the call and the whistle trade, two bars each
-  bars 25-40   0:42  the guitar's anthem: the same tune an octave lower, two guitars the second time; brass on the D7
-  bars 41-48   1:11  high noon: the band's hits and silences, the strums' runs of three, the whistle far off; a shot
-  bars 49-56   1:25  the guitar and the whistle trade two bars each
-  bars 57-64   1:39  the tune a minor third up: the call, the whistle and the guitar together
-  bars 65-68   1:53  the turn home: hits on D7, a timpani roll into the bell
+  bars 25-32   0:42  the chorus: the whistle's tune over the round begun from B flat, the call's voice in its rests
+  bars 33-48   0:56  the guitar's anthem: the first tune an octave lower, two guitars the second time; brass on the D7
+  bars 49-60   1:24  high noon: the bell and the whistle far off; then the band's hits and silences; a shot
+  bars 61-68   1:45  the guitar and the whistle trade two bars each
+  bars 69-76   1:59  the guitar's solo
+  bars 77-84   2:13  the tune a minor third up: the call, the whistle and the guitar together
+  bars 85-88   2:27  the turn home: hits on D7, a timpani roll into the bell
 """
 import sys
 
@@ -44,22 +48,24 @@ import numpy as np
 from song_r import beats, notes
 from synth import Ride, n, write_wav
 
-BARS = 68
+BARS = 88
 BEATS = 4 * BARS
-TAPE = 120.0  # 136 beats a minute
+TAPE = 154.0  # 137 beats a minute
 bar0 = lambda bar: 4 * (bar - 1)  # the beat a bar (from 1) starts at
-RIDE = [(0, BEATS, 136, 136, 1.0, 1.0, 0.0)]
+RIDE = [(0, BEATS, 137, 137, 1.0, 1.0, 0.0)]
 
 # A chord: its bass note; the strummed guitar's five strings (the top one is the D that never moves).
 TOWN = {
     "Gm": ("G2", "G3 D4 G4 Bb4 D5"),
+    "Bb": ("Bb2", "Bb3 D4 F4 Bb4 D5"),
     "F": ("F2", "F3 C4 F4 A4 D5"),
     "Eb": ("Eb2", "Eb3 Bb3 G4 Bb4 D5"),
     "D7": ("D2", "D3 A3 F#4 C5 D5"),
 }
 ROUND = "Gm Gm F F Eb Eb D7 D7"
+LIFT = "Bb Bb F F Eb Eb D7 D7"  # the chorus: the round begun from B flat
 CHORDS = (
-    f"Gm Gm Gm Gm Gm Gm Gm Gm  {ROUND}  {ROUND}  {ROUND}  {ROUND}  Gm Gm D7 D7 Gm Eb D7 D7  {ROUND}  "
+    f"Gm Gm Gm Gm Gm Gm Gm Gm  {ROUND}  {ROUND}  {LIFT}  {ROUND}  {ROUND}  Gm Gm Gm Gm  Gm Gm D7 D7 Gm Eb D7 D7  {ROUND}  {ROUND}  "
     + " ".join(c + "+3" for c in ROUND.split())
     + "  D7 D7 D7 D7"
 ).split()
@@ -76,14 +82,26 @@ ANS3 = "C6:.5 D6:.5 -:.5 C6:.5 A5:1 F5:1 | A5:2/3 C6:2/3 A5:2/3 G5:2"
 ANS4 = "D6:1.5 C6:.5 Bb5:.5 A5:.5 F#5:1 | A5:.5 F#5:.5 D5:2 -:1"
 # The standoff's whistle, over the bell.
 LONE = "-:1 D6:2 Bb5:.5 C6:.5 | G5:1.5 F5:.5 G5:2"
-# High noon: the whistle far off.
+# The chorus: the whistle's tune (three bars and a breath, twice, then the turn), and the call's voice in its rests.
+CHOR = (
+    "F5:.5 Bb5:.5 D6:2.5 C6:.5 | Bb5:1 F5:2/3 G5:2/3 Bb5:2/3 C6:1 | A5:2.5 F5:.5 C5:.5 F5:.5 | A5:1.5 C6:.5 A5:1 -:1 | "
+    "G5:.5 Bb5:.5 Eb6:2 D6:1 | Bb5:1.5 G5:.5 Bb5:1 -:1 | A5:1 F#5:.5 A5:.5 D6:2 | C6:.5 A5:.5 F#5:1 -:2"
+)
+CHOR_WAH = "-:4 | -:4 | -:4 | -:3 C5:.5 F5:.5 | -:4 | -:3 Bb4:.5 Eb5:.5 | -:4 | -:2 D5:.5 F#5:.5 A5:1"
+# High noon: the whistle far off (over the bell, then between the hits).
+NOON0 = "-:1 D6:2.5 -:.5 | -:4 | -:1 Bb5:1.5 A5:1.5 | G5:3 -:1"
 NOON = "-:4 | -:1 D6:2.5 -:.5 | -:4 | -:1 C6:.5 A5:.5 F#5:2 | -:4 | -:1 Bb5:2 G5:1 | -:4 | -:4"
 # The guitar's licks and the whistle's replies, two bars each.
 LICK1 = "G4:.5 Bb4:.5 -:.5 C5:.25 D5:.25 F5:1.5 -:.5 | D5:2/3 F5:2/3 D5:2/3 C5:.5 Bb4:.5 G4:1"
 REPLY1 = "C6:1.5 A5:.5 F5:1 -:1 | G5:.5 A5:.5 C6:2 -:1"
 LICK2 = "Bb4:.5 Bb4:.5 -:.5 D5:.5 G5:1.5 -:.5 | F5:.5 Eb5:.5 -:.5 D5:.5 Bb4:1 G4:1"
 REPLY2 = "A5:.5 C6:.5 Eb6:1 D6:1 -:1 | F#5:.5 A5:.5 D6:2 -:1"
-for _line, _beats in ((CALL1, 8), (CALL2, 8), (ANS1, 8), (ANS2, 8), (ANS3, 8), (ANS4, 8), (LONE, 8), (NOON, 32), (LICK1, 8), (REPLY1, 8), (LICK2, 8), (REPLY2, 8)):
+# The guitar's solo: licks and breaths, a bend into each long note.
+SOLO = (
+    "D5:.5 F5:.5 G5:2 -:1 | Bb5:2/3 G5:2/3 F5:2/3 G5:1.5 -:.5 | A5:1.5 C6:.5 A5:.5 F5:.5 -:1 | C5:.5 F5:.5 A5:.5 C6:2 -:.5 | "
+    "Bb5:.5 Bb5:.5 -:.5 G5:.5 Eb5:1 G5:1 | Bb5:2/3 G5:2/3 Eb5:2/3 D5:2 | F#5:.5 A5:.5 C6:1.5 -:.5 A5:.5 C6:.5 | D6:3 -:1"
+)
+for _line, _beats in ((CHOR, 32), (CHOR_WAH, 32), (NOON0, 16), (SOLO, 32), (CALL1, 8), (CALL2, 8), (ANS1, 8), (ANS2, 8), (ANS3, 8), (ANS4, 8), (LONE, 8), (NOON, 32), (LICK1, 8), (REPLY1, 8), (LICK2, 8), (REPLY2, 8)):
     assert beats(_line) == _beats, (_line[:30], beats(_line))
 
 
@@ -403,7 +421,7 @@ def render(window=None) -> np.ndarray:
     roll(bar0(2) + 2, 2.0, n("G2"), 0.05, 0.16), roll(bar0(6) + 2, 2.0, n("D3"), 0.05, 0.16)
     wah(bar0(3), CALL1), whistled(bar0(5), LONE)
     stomp(bar0(7) + 1, 0.2), stomp(bar0(7) + 3, 0.22), snort(bar0(8), 0.05, 112, 0.2)
-    roll(bar0(8) + 1, 2.0, n("G2"), 0.06, 0.3)
+    roll(bar0(8) + 1, 2.0, n("G2"), 0.06, 0.2)
     shot(bar0(8) + 3.5, 0.12)
 
     # Bars 9-24: the gallop. The call (two bars, on G minor and on E flat) and the whistle (two bars, on F and on D7)
@@ -415,74 +433,92 @@ def render(window=None) -> np.ndarray:
         wah(bar0(first), CALL1), whistled(bar0(first + 2), one), wah(bar0(first + 4), CALL2), whistled(bar0(first + 6), two)
     x.crash(bar0(17), 0.16, decay=0.5), fill(bar0(17) - 1), fill(bar0(25) - 1, (55, 50, 50, 45))
 
-    # Bars 25-40: the guitar's anthem. The same tune an octave lower on the distorted guitar; its muted chords gallop
+    # Bars 25-32: the chorus. The round begun from B flat; the whistle sings its own tune, the call's voice has a word
+    # or two in its rests.
+    x.crash(bar0(25), 0.2, decay=0.6)
+    for bar in range(25, 33):
+        ridden(bar, 1.05, chugs=0.9)
+    whistled(bar0(25), CHOR, 1.05), wah(bar0(25), CHOR_WAH, 0.8)
+    fill(bar0(33) - 1)
+
+    # Bars 33-48: the guitar's anthem. The first tune an octave lower on the distorted guitar; its muted chords gallop
     # with the bass; brass stabs on the D7. The second time round a second guitar has it an octave over the first.
-    x.crash(bar0(25), 0.22, decay=0.6), x.crash(bar0(33), 0.2, decay=0.6)
-    for bar in range(25, 41):
+    x.crash(bar0(33), 0.22, decay=0.6), x.crash(bar0(41), 0.2, decay=0.6)
+    for bar in range(33, 49):
         ridden(bar, 1.05, chugs=1.0)
         if CHORDS[bar - 1] == "D7":
             for i in ((2, 6, 11) if bar % 2 == 1 else (0, 3, 6)):
                 stab(bar0(bar) + i / 4, [n(c) for c in "F#4 A4 C5".split()], 0.05)
-    for first, one, two, twin in ((25, ANS1, ANS2, False), (33, ANS3, ANS4, True)):
+    for first, one, two, twin in ((33, ANS1, ANS2, False), (41, ANS3, ANS4, True)):
         for at_bar, line in ((first, CALL1), (first + 2, one), (first + 4, CALL2), (first + 6, two)):
             axe(bar0(at_bar), line, 1.0, -0.15, up=-12)
             if twin:
                 axe(bar0(at_bar), line, 0.55, 0.3)
-    fill(bar0(33) - 1)
+    fill(bar0(41) - 1)
 
-    # Bars 41-48: high noon. The band's hits (the kick, the bass, a chord let ring, the timpani) and silence; the dry
-    # guitar's runs of three; the whistle far off; the bell; his spurs; he laughs. The last bar: nothing, then a shot.
-    for bar, hits in ((41, (0, 6)), (43, (0, 6)), (45, (0, 6, 8)), (46, (0,)), (47, (0, 4, 8, 12))):
+    def struck(bar, hits):
+        """The whole band's hits in a bar (the kick, the bass, a chord let ring, the timpani, a strum), on these 16ths."""
         b = bar0(bar)
         root, ms = of(bar)
         for i in hits:
             kick(b + i / 4, 0.55), thumb(b + i / 4, root, 0.46, 0.5), chug(b + i / 4, root + 12, 0.13, open_=True), put("timp", b + i / 4, x.timp(root, 0.7, 0.22))
             strum(b + i / 4, ms, 0.05, long=0.25)
-    toll(bar0(41), n("G3"), 0.06), toll(bar0(45), n("G3"), 0.06)
-    for bar in (42, 44, 46):
+
+    # Bars 49-60: high noon. One hit, and the street is empty: the bell, timpani far off, his spurs, the whistle. From
+    # its fifth bar the band's hits and silences; the dry guitar's runs of three; the whistle; he laughs. The last
+    # bar: nothing, then a shot.
+    struck(49, (0,))
+    toll(bar0(49), n("G3"), 0.07), toll(bar0(51), n("G3"), 0.07), toll(bar0(57), n("G3"), 0.06)
+    roll(bar0(50) + 2, 2.0, n("G2"), 0.04, 0.12), roll(bar0(52) + 2, 2.0, n("D3"), 0.05, 0.16)
+    stomp(bar0(50), 0.18), stomp(bar0(50) + 1.5, 0.2), clink(bar0(52), 0.03)
+    whistled(bar0(49), NOON0, 0.8), whistled(bar0(53), NOON, 0.8)
+    for bar, hits in ((53, (0, 6)), (55, (0, 6)), (57, (0, 6, 8)), (58, (0,)), (59, (0, 4, 8, 12))):
+        struck(bar, hits)
+    for bar in (54, 56, 58):
         three(bar0(bar) + 2, of(bar)[1], 0.06), three(bar0(bar) + 3, of(bar)[1], 0.075)
     for i in range(4):
-        three(bar0(47) + i, of(47)[1], 0.05 + 0.012 * i), tap(bar0(47) + i + 0.5, 0.05 + 0.02 * i), tap(bar0(47) + i + 0.75, 0.06 + 0.02 * i)
-    whistled(bar0(41), NOON, 0.8)
-    clink(bar0(42) + 0.5, 0.03), clink(bar0(44) + 0.5, 0.03, -0.3), laugh(bar0(46) + 1, 0.05)
-    stomp(bar0(48), 0.2), stomp(bar0(48) + 1.5, 0.22)
-    shot(bar0(48) + 3.5, 0.12)
+        three(bar0(59) + i, of(59)[1], 0.05 + 0.012 * i), tap(bar0(59) + i + 0.5, 0.05 + 0.02 * i), tap(bar0(59) + i + 0.75, 0.06 + 0.02 * i)
+    clink(bar0(54) + 0.5, 0.03), clink(bar0(56) + 0.5, 0.03, -0.3), laugh(bar0(58) + 1, 0.05)
+    stomp(bar0(60), 0.2), stomp(bar0(60) + 1.5, 0.22)
+    shot(bar0(60) + 3.5, 0.12)
 
-    # Bars 49-56: the guitar and the whistle trade, two bars each, over the gallop.
-    x.crash(bar0(49), 0.22, decay=0.6)
-    for bar in range(49, 57):
+    # Bars 61-68: the guitar and the whistle trade, two bars each, over the gallop. Bars 69-76: the guitar's solo.
+    x.crash(bar0(61), 0.22, decay=0.6), x.crash(bar0(69), 0.2, decay=0.6)
+    for bar in range(61, 77):
         ridden(bar, 1.05, chugs=1.0)
-    axe(bar0(49), LICK1), whistled(bar0(51), REPLY1), axe(bar0(53), LICK2), whistled(bar0(55), REPLY2)
-    fill(bar0(57) - 1, (55, 55, 50, 45))
+    axe(bar0(61), LICK1), whistled(bar0(63), REPLY1), axe(bar0(65), LICK2), whistled(bar0(67), REPLY2)
+    fill(bar0(69) - 1)
+    axe(bar0(69), SOLO, 0.85)
+    fill(bar0(77) - 1, (55, 55, 50, 45))
 
-    # Bars 57-64: the tune a minor third up, all three: the guitar has all of it, the call's voice its two bars with
+    # Bars 77-84: the tune a minor third up, all three: the guitar has all of it, the call's voice its two bars with
     # him, the whistle its answers; a deep kick under each new chord.
-    x.crash(bar0(57), 0.24, decay=0.6)
-    for bar in range(57, 65):
+    x.crash(bar0(77), 0.24, decay=0.6)
+    for bar in range(77, 85):
         ridden(bar, 1.1, chugs=1.0)
         if bar % 2 == 1:
             sub(bar0(bar), of(bar)[0], 2.0, 0.4)
         if CHORDS[bar - 1] == "D7+3":
             for i in ((2, 6, 11) if bar % 2 == 1 else (0, 3, 6)):
                 stab(bar0(bar) + i / 4, [n(c) + 3 for c in "F#4 A4 C5".split()], 0.05)
-    for at_bar, line, voice in ((57, CALL1, wah), (59, ANS1, whistled), (61, CALL2, wah), (63, ANS2, whistled)):
+    for at_bar, line, voice in ((77, CALL1, wah), (79, ANS1, whistled), (81, CALL2, wah), (83, ANS2, whistled)):
         axe(bar0(at_bar), line, 1.0, -0.15, up=3 - 12), voice(bar0(at_bar), line, 0.85, up=3)
 
-    # Bars 65-68: the turn home. Two bars of hits on D7 and silence, the guitar's last bent note; then the timpani roll
+    # Bars 85-88: the turn home. Two bars of hits on D7 and silence, the guitar's last bent note; then the timpani roll
     # up into the bell.
-    for bar, hits in ((65, (0, 3, 6)), (66, (0,))):
+    for bar, hits in ((85, (0, 3, 6)), (86, (0,))):
         b = bar0(bar)
         root, ms = of(bar)
         for i in hits:
             kick(b + i / 4, 0.55), thumb(b + i / 4, root, 0.46, 0.5), chug(b + i / 4, root + 12, 0.13, open_=True), strum(b + i / 4, ms, 0.05, long=0.25)
         crack(b + 3, 0.3)
-    x.crash(bar0(65), 0.2, decay=0.6)
-    axe(bar0(65) + 2, "A4:.5 C5:.5 D5:3", 0.9, -0.15)
-    three(bar0(66) + 2, of(66)[1], 0.06)
-    clink(bar0(67), 0.03), snort(bar0(67) + 1, 0.04)
-    roll(bar0(67) + 2, 6.0, n("D3"), 0.04, 0.28)
+    x.crash(bar0(85), 0.2, decay=0.6)
+    axe(bar0(85) + 2, "A4:.5 C5:.5 D5:3", 0.9, -0.15)
+    three(bar0(86) + 2, of(86)[1], 0.06)
+    clink(bar0(87), 0.03), snort(bar0(87) + 1, 0.04)
+    roll(bar0(87) + 2, 6.0, n("D3"), 0.04, 0.16)
 
-    x.beat_s = 60 / 136
+    x.beat_s = TAPE / BEATS
     x.echo("whistle", 0.75, 0.3, 0.15), x.echo("wah", 0.75, 0.16, 0.07), x.echo("lead", 0.75, 0.12, 0.05)
     levels = {"lead": 1.2, "wah": 2.0, "whistle": 1.75, "bass": 0.55, "sub": 0.5, "chug": 2.2, "kick": 0.8, "snare": 1.2, "hats": 5.5, "toms": 1.1, "drum": 1.5,
               "gtr": 1.8, "bell": 1.5, "timp": 1.0, "brass": 1.6, "pig": 2.0, "fx": 2.0}
