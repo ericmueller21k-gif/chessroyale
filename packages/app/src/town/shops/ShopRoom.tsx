@@ -122,7 +122,8 @@ export interface RoomArt {
   people?: Readonly<Record<string, { readonly ch: Character; readonly anims: readonly string[] }>>;
   scene?: "zebra-front" | "zebra-back";
   /**
-   * Only these pieces go see-through over you (its near wall and its door), though it has a floor's shape (Rolling Dough's rooms: the
+   * Only these pieces go see-through over you (its near wall and its door), though it has a floor's shape, or has none (the walk-up's
+   * box rooms, Nov 13) (Rolling Dough's rooms: the
    * table and its board, the counter and the lamps stay solid; Eric, Nov 11, saw the table and its board ghosted as "artifacts"). Without
    * it, a room with a floor's shape ghosts any piece nearer than you and over you (SHOP_FEEL.seeThrough: a cave's rock, the warehouse's
    * door, the igloo's walls).
@@ -207,9 +208,9 @@ const ART: Partial<Record<string, () => Promise<RoomArt>>> = {
   // (The Hidden Boss's walk-up, Nov 13: the hall and the landing, small box rooms of 7 x 7, each seen whole; and the top floor, his room
   // (9 x 9), its side walls drawn by its scene as one surface each (shops/recluse-scene.ts, the room's `fx` from the town).)
   recluse: () =>
-    import("./recluse-stairs-art.ts").then((m) => ({ n: m.RECLUSE_HALL_N, layout: m.RECLUSE_HALL_LAYOUT, pieces: m.RECLUSE_STAIRS_PIECES, crateAt: [0, 0] as const, lights: m.RECLUSE_HALL_LIGHTS, pools: m.RECLUSE_HALL_POOLS, outside: "#8d8a82", fixCam: m.RECLUSE_HALL_CAM })),
+    import("./recluse-stairs-art.ts").then((m) => ({ n: m.RECLUSE_HALL_N, layout: m.RECLUSE_HALL_LAYOUT, pieces: m.RECLUSE_STAIRS_PIECES, crateAt: [0, 0] as const, lights: m.RECLUSE_HALL_LIGHTS, pools: m.RECLUSE_HALL_POOLS, outside: "#8d8a82", fixCam: m.RECLUSE_HALL_CAM, seeThru: ["entrance", "hem"] })),
   "recluse-landing": () =>
-    import("./recluse-stairs-art.ts").then((m) => ({ n: m.RECLUSE_HALL_N, layout: m.RECLUSE_LANDING_LAYOUT, pieces: m.RECLUSE_STAIRS_PIECES, crateAt: [0, 0] as const, lights: m.RECLUSE_LANDING_LIGHTS, pools: m.RECLUSE_LANDING_POOLS, outside: "#140d0a", fixCam: m.RECLUSE_HALL_CAM })),
+    import("./recluse-stairs-art.ts").then((m) => ({ n: m.RECLUSE_HALL_N, layout: m.RECLUSE_LANDING_LAYOUT, pieces: m.RECLUSE_STAIRS_PIECES, crateAt: [0, 0] as const, lights: m.RECLUSE_LANDING_LIGHTS, pools: m.RECLUSE_LANDING_POOLS, outside: "#140d0a", fixCam: m.RECLUSE_HALL_CAM, seeThru: ["stairs-down", "hem"] })),
   "recluse-top": () =>
     import("./recluse-art.ts").then((m) => ({
       n: m.SHOP_RECLUSE_N,
@@ -222,6 +223,7 @@ const ART: Partial<Record<string, () => Promise<RoomArt>>> = {
       standing: m.SHOP_RECLUSE_STANDING,
       outside: "#2a1d14",
       fixCam: m.SHOP_RECLUSE_CAM,
+      seeThru: ["entrance", "hem"],
     })),
   zebra: () =>
     Promise.all([import("./zebra-art.ts"), import("./zebra-crew.ts")]).then(([m, c]) => ({
@@ -2351,8 +2353,9 @@ function startRoom(
     // (Jefferson's warehouse too: its tall roll-up door, nearer the camera than you just inside it.)
     // (Ginger's igloo too: its near walls, the tunnel's and its doorway's arch, nearer the camera than you; there only over your
     // figure's middle, so the candy wall beside a stair's foot, a row nearer, isn't ghosted for covering your edge.)
-    // (Rolling Dough's two rooms: only their doors and near walls, `seeThru`.)
-    const thru = !!cave || (!!art.floor && (!art.seeThru || art.seeThru.includes(u.name)));
+    // (Rolling Dough's two rooms: only their doors and near walls, `seeThru`. The walk-up's box rooms, Nov 13: their front doors and near
+    // walls too, listed though they have no floor's shape: you walk in, or come up, just behind them.)
+    const thru = !!cave || ((!!art.floor || !!art.seeThru) && (!art.seeThru || art.seeThru.includes(u.name)));
     const over = lv ? overlaps(youMid(), x, y, x + w, y + h * s) : overlaps(youFig, x, y, x + w, y + h * s);
     const ghost = thru && youFig.on && u.z > youFig.z && over;
     g.globalAlpha = upAlpha(pt.depth, ghost, thru);

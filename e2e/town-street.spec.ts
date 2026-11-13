@@ -507,9 +507,11 @@ test("the Hidden Boss's walk-up (admins first): its door, the hall, up two fligh
   const errors = watchErrors(page);
   type Hooks = { __townAt?: (k: string, id: string) => { x: number; y: number } | null; __townGlide?: (to: string) => void; __shopAt?: (k: string, s?: unknown) => { x: number; y: number } | null; __shopLook?: (k: string, to?: string) => boolean };
   const room = page.locator("canvas.town-shop-canvas");
-  const still = async (name: string) => {
+  const still = async (name: string, settle = 0) => {
     if (!STILLS) return;
     mkdirSync(STILLS, { recursive: true });
+    // (Inside: after the room's name banner has gone.)
+    await page.waitForTimeout(settle);
     await page.screenshot({ path: `${STILLS}/${name}-${test.info().project.name}.png` });
   };
   /** Where the room's hook says to tap (`kind`, its square or the room a door leads to), on the page; null: not on screen. */
@@ -571,6 +573,7 @@ test("the Hidden Boss's walk-up (admins first): its door, the hall, up two fligh
   await expect(room).toHaveAttribute("data-room", "recluse");
   await expect(room).not.toHaveAttribute("data-part", /./);
   await expect(page.getByRole("heading", { name: "The Walk-up" })).toBeVisible();
+  await still("hall", 3500);
   // A flat's door you can't open: a tap walks you to it, its card says a line, OK closes it.
   const flat = page.getByRole("dialog", { name: "Apartment door", exact: true });
   await expect(async () => {
@@ -581,14 +584,12 @@ test("the Hidden Boss's walk-up (admins first): its door, the hall, up two fligh
     await expect(flat).toBeVisible({ timeout: 8000 });
   }).toPass({ timeout: 30_000 });
   await expect(flat.locator(".town-card-text")).toHaveText(/\S/);
-  await page.waitForTimeout(500);
-  await still("hall");
   await flat.getByRole("button", { name: "OK" }).click();
   await expect(flat).toBeHidden();
   // Up to the landing, and up again to his room.
   await climb("landing", "Go up");
   await page.waitForTimeout(800);
-  await still("landing");
+  await still("landing", 3500);
   await climb("top", "Go up");
   // His room: a tap on his board walks you round to its front, and his card: Challenge greyed, "Coming soon".
   const his = page.getByRole("dialog", { name: "Hidden Boss", exact: true });
@@ -602,7 +603,7 @@ test("the Hidden Boss's walk-up (admins first): its door, the hall, up two fligh
   await expect(his.getByRole("button", { name: "Challenge" })).toBeDisabled();
   await expect(his.locator(".town-soon")).toHaveText("Coming soon");
   await page.waitForTimeout(800);
-  await still("room");
+  await still("room", 3500);
   await page.keyboard.press("Escape");
   await expect(his).toBeHidden();
   // Back down both flights to the hall.
