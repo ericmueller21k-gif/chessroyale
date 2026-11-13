@@ -5,7 +5,7 @@ import { asAdmin, test } from "./helpers.ts";
 
 /**
  * The street town, round 2: the layout (Nov 5; docs/decisions/2026-11-05-street-town-layout.md), in an admin's town only
- * (admin-town.ts STREET_TOWN) until round 3. On a phone and a computer: it opens zoomed in, at the start (22, 11), the camera facing
+ * (everyone's since Nov 13; was admin-only via admin-town.ts STREET_TOWN until then). On a phone and a computer: it opens zoomed in, at the start (22, 25), the camera facing
  * north; a tap on Ginger Igloo walks you down Fountain Street to its door square and its card opens; the up arrow into Smudgy's Art
  * Gallery from its door opens his card; a park table works. Since Nov 13 it is everyone's town (players and guests): the old one is gone.
  * `STILLS=docs/street-town` also writes the stills: each street, the park and a home's card.
