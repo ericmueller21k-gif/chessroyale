@@ -463,9 +463,11 @@
         "packages/app/src/characters/effects/recluse.ts",
         "packages/app/src/components/Recluse.tsx",
         "packages/app/src/components/RecluseChild.ts",
-        "packages/app/src/screens/Recluse2.tsx"
+        "packages/app/src/screens/Recluse2.tsx",
+        "packages/app/src/recluse-online.ts",
+        "packages/server/src/bosses/recluse.ts"
       ],
-      "specs": ["e2e/crowd-hidden.spec.ts", "e2e/formats.spec.ts", "e2e/recluse.spec.ts"]
+      "specs": ["e2e/crowd-hidden.spec.ts", "e2e/formats.spec.ts", "e2e/hidden-boss-room.spec.ts", "e2e/recluse.spec.ts"]
     },
     "Sawyer": {
       "paths": [

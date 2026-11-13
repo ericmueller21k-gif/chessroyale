@@ -2337,10 +2337,11 @@ function musicBattle(match: AnyMatch | null): MusicBattle | null {
   if (!boss?.id) return null;
   const live = !(p.kind === "boss" && (p.intro || p.loading));
   // (The Hidden Boss: a theme for each point of his fight, switched as it goes (recluseMusic). His later themes are fetched as his
-  // fight starts where his phase change can follow (solo); online his phase 1 is the whole fight.)
+  // fight starts where his phase change can follow: solo, and online his room's fight and the Crowd's final (Nov 13).)
   if (boss.id === "recluse") {
     const r = recluseMusic(p, !!boss.result, !!match.simul?.decided, boss.form === "child");
-    return r && { key: match, boss: boss.id, live, ...r, ...(isSolo(match) ? { ahead: [RECLUSE_MUSIC.beaten, RECLUSE_MUSIC.transform] } : {}) };
+    const ahead = isSolo(match) || !!(match as { phase2Ahead?: boolean }).phase2Ahead;
+    return r && { key: match, boss: boss.id, live, ...r, ...(ahead ? { ahead: [RECLUSE_MUSIC.beaten, RECLUSE_MUSIC.transform] } : {}) };
   }
   if (boss.result) return null;
   return { key: match, boss: boss.id, live };
