@@ -153,6 +153,22 @@ removed (old → new) and says whether any of them guards a rule here.
     end on drawn that way of where you were, your feet moving that way on screen, and on a ride the view drawn while moving;
     `packages/app/test/town-arrows.test.ts`, "Eric's rule (Nov 5): up is up the screen in the town and in every room (Walker.rowsUp)".
 
+## Accounts and fair play
+
+- **A ban means you can't sign in (Eric, Nov 13).** A banned account (a person's ban, or ban evasion) can't sign in by any way
+  (an emailed code, Google, any other), and sees only "Your account has been banned. For more information, email
+  support@hunchess.com." (the address a mailto link) on every URL and from every API route, a tab already open included: no
+  menus, town, solo or chat, and no appeal box in the game (appeals come by email, a person answers them). Enforced on the
+  server; the account's own sign-in cookie never gets it past. A lifted ban signs in as before. Guests and the engine pool are
+  unchanged.
+  - Eric, Nov 13: "When I think of the word banned, I think of you can't sign in anymore. Just like every other game works."
+    "If you try to sign in, it would say your account has been banned. For more information, email support." "Make sure that
+    when someone's banned, it's not just the landing page. No URLs work."
+  - Guards: `e2e/fairplay.spec.ts`, "a ban means you can't sign in (Eric, Nov 13)…", phone and computer (a tab open drops to the
+    line; a list of URLs and API routes; signing in again refused with no session; the account's own session refused; lifted, it
+    signs in); `packages/server/test/ban-sign-in.test.ts` (every check).
+  - Decision: [2026-11-13-ban-blocks-sign-in.md](../decisions/2026-11-13-ban-blocks-sign-in.md).
+
 ## Writing
 
 - **The Hidden Boss's lines:** never "Soviet(s)" or "Russian(s)", nothing that implies Korchnoi threw games, and real quotes

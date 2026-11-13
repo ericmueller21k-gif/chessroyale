@@ -36,9 +36,25 @@ Lane: `fairplay`. The reviewer's brief: `docs/fairplay-reviewer.md`. The numbers
 - **The suspicion score** turns a player's evidence into a level; every threshold is in `FAIRPLAY`.
 - **A case** is one player's file. Its status: **watch** (recorded only), **review** (a person or the automated
   reviewer decides; meanwhile their online results are held off ranking and `eligibleForRanked` says no), **pool** (below), **banned**
-  (no online play, solo stays open; an appeal a person decides; their sign-in identities are kept hashed so a new
-  account with them is banned too, and a device they played from puts new accounts in review), **cleared** (held
+  (can't sign in at all: below; appeals by email to support@hunchess.com, a person decides; their sign-in identities are kept
+  hashed so a new account with them is banned too, and a device they played from puts new accounts in review), **cleared** (held
   results count again), **closed** (a watch with nothing new for `FAIRPLAY.evidenceDays`).
+- **A ban means you can't sign in** (Eric, Nov 13; [2026-11-13-ban-blocks-sign-in.md](../decisions/2026-11-13-ban-blocks-sign-in.md)):
+  - **Signing in** to a banned account (an emailed code, Google, a test account's script) is refused once the identity is proven
+    (`signInBan`): the ban answer, no session made. So is ban evasion: an identity new to us that a banned account had (refused,
+    nothing made), an account whose identities a banned account had (banned by evasion as it signs in), Google's verified email a
+    banned account's address (refused).
+  - **The ban gate** (`ban-gate.ts`, run by the Worker before any route): a session of a banned account, or a browser marked banned,
+    gets the ban answer on every `/api/*` route and the admin pages, the lobbies' WebSockets included. Each instance keeps a "not
+    banned" answer per session `FAIRPLAY.banCheckMs` (30 s; `ban-cache.ts`), so the live line's and the town's polls need no
+    database read most of the time; a ban made on the same instance counts at once (`setCase` forgets its answers).
+  - **The ban answer:** 403 `{banned: true, message}` (core's `BANNED_LINE`: "Your account has been banned. For more information,
+    email support@hunchess.com.") with the `x-hc-banned` header, the session ended, the browser marked (`hc_banned`, the banned
+    account's id). The mark holds whatever cookie the browser brings, until the ban is lifted (the gate takes it away; the account
+    signs in as before) or the browser's data is cleared.
+  - **The app** (`ban.ts`) watches every answer for the header and draws only the ban screen (`FairPlay.tsx`: the line, the
+    address a mailto link; no menus, town, solo or chat) on every URL; the device remembers it (`brc.banned`) and asks the server
+    once as it loads. The appeal form and its routes are gone; the admin side (lift, old appeals) is as it was.
 - **The engine pool** (Eric, Nov 10; [2026-11-10-engine-pool.md](../decisions/2026-11-10-engine-pool.md)): detection's ban level (one
   deep-checked match past every one-match bar, the two-match path, or sustained strength: the 5 newest matches of 8+ counted moves
   averaging 3,000 (`levels.poolStrength*`; the judges' numbers alone, so under `enforcement: "ban"` it opens a review, never a ban); Nov 11, [2026-11-11-near-best.md](../decisions/2026-11-11-near-best.md)),
@@ -98,7 +114,8 @@ Lane: `fairplay`. The reviewer's brief: `docs/fairplay-reviewer.md`. The numbers
   reads no email: admins are "admin", typed addresses "[email]" (`forReviewer`; Nov 10). A player's page also has chat moderation's section (warn, chat
   ban, lift, reset the name and icon; admins only: [chat.md](chat.md), "Moderation"), and a box on the list opens any
   player's page by id or profile link.
-- **Emails:** a ban notice and a clearing go to the player's sign-in address through Resend.
+- **Emails:** a ban notice (the ban screen's line, with the admin's note if any) and a clearing go to the player's sign-in address
+  through Resend.
 
 ## Where the code is
 
@@ -108,9 +125,9 @@ Lane: `fairplay`. The reviewer's brief: `docs/fairplay-reviewer.md`. The numbers
 | Recording each human pick's signals | `packages/server/src/lobby.ts` (`noteFair`, the `fair` record only; premoves told ahead: `premoveAhead`, `sealPremoves`, `takePremoves`) |
 | Reports, cases, bans, appeals, device markers, `eligibleForRanked` | `packages/server/src/fairplay.ts`, tables `fairplay-schema.ts`, emails `fairplay-mail.ts` |
 | The deep re-check | `packages/server/src/fairplay-deep.ts`, `fairplay-engine.ts`; the cron in `wrangler.jsonc`, `scheduled()` in `index.ts` |
-| Enforcing bans | small checks in `index.ts` (PLAY, lobbies) and `lobby-do.ts` (the lobby's hello) |
+| Enforcing bans | the ban gate `ban-gate.ts` (its answers kept per instance: `ban-cache.ts`), run in `index.ts` before every route; `signInBan` in `fairplay.ts`, called by `api.ts`'s sign-ins and `test-accounts.ts`; `banCheck`'s evasion at PLAY (`index.ts`), the lobby's hello (`lobby-do.ts`) and the Hidden Boss's door |
 | The review page and API | `packages/server/src/admin.ts` |
-| The report sheet, ban notice and appeal form, look-away counter | `packages/app/src/screens/PlayerProfile.tsx`, `components/FairPlay.tsx`, `lookaway.ts`, `net.ts` |
+| The report sheet, the ban screen and the app's watch for the ban answer, look-away counter | `packages/app/src/screens/PlayerProfile.tsx`, `components/FairPlay.tsx`, `ban.ts`, `main.tsx`, `lookaway.ts`, `net.ts` |
 | Simulations | `packages/sim/scripts/fairplay-bank.ts` (the position bank in `packages/sim/data/`), `fairplay-sim.ts` → `reports/fairplay.md` |
 | The cheater demo on a real server (test accounts: Engine Eddie, Strong Sam, two judges; its result comes from the deep re-check later: `--report`) | `scripts/cheater-demo.ts`; accounts `test-accounts.ts` ([accounts.md](accounts.md)) |
 
@@ -122,8 +139,11 @@ Lane: `fairplay`. The reviewer's brief: `docs/fairplay-reviewer.md`. The numbers
 ## Tests
 
 - Unit: `packages/core/test/fairplay.test.ts`, `packages/server/test/fairplay.test.ts`, `fairplay-lobby.test.ts`,
-  `fairplay-deep.test.ts`, `fairplay-admin.test.ts`, `engine-pool.test.ts`.
-- e2e: `e2e/fairplay.spec.ts` (reporting, a banned account, the engine pool; the review token is set in `playwright.config.ts`).
+  `fairplay-deep.test.ts`, `fairplay-admin.test.ts`, `engine-pool.test.ts`, `ban-sign-in.test.ts` (sign-ins refused, evasion, the
+  gate on a signed-in session and a marked browser, lifting, the pool and guests passing, test accounts).
+- e2e: `e2e/fairplay.spec.ts` (a ban means you can't sign in: a tab open drops to the ban line, every URL and API route answers
+  only it, signing in again is refused, a lifted ban signs in, phone and computer; reporting; the engine pool; the review token is
+  set in `playwright.config.ts`).
 
 ## Rules for this area
 
@@ -131,3 +151,5 @@ Lane: `fairplay`. The reviewer's brief: `docs/fairplay-reviewer.md`. The numbers
   within 1, 2 and 5 matches; false flags and bans per 1,000 honest players at every strength).
 - Borderline cases go to review (a person), not a ban. A false ban of an honest player is the worst outcome.
 - No invasive fingerprinting; admin emails live in a Worker variable or secret, never in the repo.
+- A ban means you can't sign in (Eric's rule: `docs/rules/eric.md`): a new way to sign in, or a new route outside the Worker's
+  `route()`, goes through `signInBan` or the ban gate in the same PR.
