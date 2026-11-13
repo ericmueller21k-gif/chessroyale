@@ -578,11 +578,16 @@ export function TownScreen({
 
   // (A layout effect: the world's first frame is drawn before the screen first shows.)
   useLayoutEffect(() => {
+    /** The town is drawn (its loading screen gone): until then the away clock holds, as under a challenge. */
+    let loaded = false;
     const t = startTown(box.current!, canvas.current!, chips.current, cardEl.current!, live.current!, setZoomedOut, setCard, seatOf(seat), (s, face) => {
       const b = TOWN_BOTS[s.bot]!;
       onPlayBot?.({ seat: seatText(s), name: botLabel(b), rating: b.rating, look: isSprite(b.look) ? null : b.look.wear, face });
     }, (id, x, y, challenge) => void goIn(id, x, y, challenge), stand, () => step("cancel"), (share, music) => {
-      if (share === null) return setLoading(false);
+      if (share === null) {
+        loaded = true;
+        return setLoading(false);
+      }
       if (music) setLoadingMusic(true);
       const bar = loadBar.current;
       if (bar) {
@@ -596,11 +601,11 @@ export function TownScreen({
     ctl.current = t;
     // Away (Eric, Nov 7; afk.ts, here-net.ts): the "zzz" over your pawn (the town's and a shop's), out to home after too long, and the
     // beats that put you (and your "zzz") in everyone else's town. A boss's challenge (from the fight to the battle) and the claw
-    // machine hold the clock: they aren't idle presence.
+    // machine hold the clock: they aren't idle presence. So does the loading screen (Nov 13: everyone's town has one now).
     const stopAway = watchAway({
       town: t.town,
       shop: () => shopIn.current,
-      busy: () => flow.current !== "town" || summoning.current || !!shopCtl.current?.busy?.(),
+      busy: () => !loaded || flow.current !== "town" || summoning.current || !!shopCtl.current?.busy?.(),
       onState: (st) => void (t.town.you.zzz = st === "zzz"),
       onOut: () => awayOut.current(),
       onOthers: t.others,
@@ -1138,6 +1143,8 @@ function startTown(
   const painter: Painter = makePainter();
   cv.dataset.backend = painter.kind;
   const town = createTown(performance.now(), undefined, seat, undefined, stand);
+  /** (Its speech, for the loading's end: loadTown's `town` is a share.) */
+  const speech = town.speech;
   const r = new Renderer(painter, town, HOMES);
   // The arrow keys (arrows.ts): hold one and you walk that way, on squares you can stand on and nobody's (the walker's own check).
   // (The street town's turning camera, Nov 5, round 3: the keys go through its heading, so up is always up the screen.)
@@ -2367,6 +2374,11 @@ function startTown(
     loadMs = performance.now() - t0;
     loading = false;
     onLoading(null);
+    // (A boss's goodbye as you come back from its battle, set as the town was made: its time starts with the first frame, not under the
+    // loading screen, which can outlast it. Nov 13: the street town's loading screen is everyone's now.)
+    const sp = speech;
+    const late = sp.boss ? performance.now() + f.speechMs - sp.until : 0;
+    if (late > 0) ((sp.until += late), (sp.next += late));
     run();
     draw(performance.now());
   };

@@ -488,7 +488,9 @@ async function folioChallenge(page: Page, opts: { noGl: boolean; gif: boolean })
     await page.addInitScript(() => {
       const get = HTMLCanvasElement.prototype.getContext;
       HTMLCanvasElement.prototype.getContext = function (this: HTMLCanvasElement, kind: string, ...rest: unknown[]) {
-        if (/webgl/.test(kind)) return null;
+        // (Nov 13: but the town's own canvas, as the street town is everyone's and needs WebGL 2; a device without it never gets this far:
+        // e2e/problems.spec.ts. The crumple's own WebGL is what's off.)
+        if (/webgl/.test(kind) && !this.classList.contains("town-canvas")) return null;
         return (get as (...a: unknown[]) => RenderingContext | null).call(this, kind, ...rest);
       } as typeof get;
     });

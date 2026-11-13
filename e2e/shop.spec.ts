@@ -185,7 +185,8 @@ test("Babur's tent: Go in, start zoomed out, talk to the Shopkeeper, the crate's
   // Outside, you stood at the tent's door (the square in front of it) as you went in.
   const door = await town(page).getAttribute("data-you");
   const [dc, dr] = door!.split(",").map(Number) as [number, number];
-  expect(Math.abs(dc - 28) + Math.abs(dr - 2), `at the door (28, 2): ${door}`).toBeLessThanOrEqual(2);
+  // (The street town's door square, everyone's town since Nov 13; the old town's was (28, 2).)
+  expect(Math.abs(dc - 9) + Math.abs(dr - 39), `at the door (9, 39): ${door}`).toBeLessThanOrEqual(2);
   // Inside: a step in from the door, zoomed out (the − is the pressed one: Eric, Nov 3), the town's chips put away; the header says the shop's name.
   await expect(room(page)).toHaveAttribute("data-room", "tiger");
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Babur's Circus");
@@ -303,7 +304,9 @@ test("?fps in a room (Nov 11, Eric's iPhone: frozen at 42-44 inside, 2-4 going o
   await page.waitForTimeout(1500);
   const out = await page.evaluate(() => [...(window as unknown as Seen).__pill]);
   expect(out.length).toBeGreaterThanOrEqual(2);
-  expect(Math.min(...out.map((x) => Number.parseInt(x))), `going out, against ${room} fps inside: ${out.join(" | ")}`).toBeGreaterThan(room / 5);
+  // (Nov 13: room / 8, was room / 5 against the old town. Back in the street town, on the tests' software WebGL, the first second out reads
+  // about 12 against 60 inside; a reading spanning the visit read 1 to 4.)
+  expect(Math.min(...out.map((x) => Number.parseInt(x))), `going out, against ${room} fps inside: ${out.join(" | ")}`).toBeGreaterThan(room / 8);
 });
 
 test("a room's report records while walking, and walking lays no floor triangles (Nov 11, Eric: inside it's \"just like capped\"; ?report \"is pausing when I run into the building\"): the pill counts on inside; WebGL draws the back, the same picture as the 2D way's", { tag: "@phone-only" }, async ({ page }) => {
@@ -345,9 +348,12 @@ test("a room's report records while walking, and walking lays no floor triangles
     w.__stop = true;
     return { pill: [...w.__pill], backs: [...w.__backs] };
   });
-  // The pill counts the seconds inside (before: it stood still on "walk or turn to start" or the town's last second).
+  // The pill counts the seconds inside (before: it stood still on "walk or turn to start" or the town's last second). (Nov 13: the street
+  // town, everyone's, starts recording as you walk there, so the count goes on from the town's: at least two counts inside, rising.)
   await expect(page.locator(".tfr-pill")).toBeVisible();
-  expect(seen.pill.filter((x) => /Recording [1-9] s/.test(x)).length, `the pill inside: ${seen.pill.join(" | ")}`).toBeGreaterThanOrEqual(2);
+  const counts = seen.pill.map((x) => /Recording (\d+) s/.exec(x)?.[1]).filter((x) => x !== undefined).map(Number);
+  expect(new Set(counts).size, `the pill inside: ${seen.pill.join(" | ")}`).toBeGreaterThanOrEqual(2);
+  expect(counts.every((n, i) => i === 0 || n >= counts[i - 1]!), `the pill inside counts up: ${seen.pill.join(" | ")}`).toBe(true);
   const rep = await page.evaluate(() => (window as unknown as { __townReport?: (raw: boolean) => { raw: { flags: number[] } } | null }).__townReport?.(true) ?? null);
   // (Frames in a room (256) while walking (1), not going in or out.)
   expect(rep!.raw.flags.filter((f) => f & 256 && f & 1 && !(f & 1536)).length, "the room's walking frames recorded").toBeGreaterThan(30);
@@ -1088,24 +1094,13 @@ async function followsFinger(p: Page, at: () => Promise<{ x: number; y: number }
   return moved;
 }
 
-test("inside, a drag looks around as the town's does (Eric, Nov 2: \"when I drag from down to up, it should be the same as the town movement\"): what's under the finger follows it, both ways", async ({ page }) => {
+test("inside, a drag looks around (Eric, Nov 2: \"when I drag from down to up, it should be the same as the town movement\"): what's under the finger follows it, both ways", async ({ page }) => {
+  // (The old town's half went with it, Nov 13: there a drag moved the map under the finger; the street town's drag turns the camera round
+  // you (e2e/town-fixed.spec.ts, the look round).)
   await page.goto("/town?sky=day");
   await townReady(page);
-  // The town: Babur's tent, dragged down, up and sideways, follows the finger.
-  if (!(await homeAt(page, "tiger"))) await page.getByRole("button", { name: "Go to Babur's Circus" }).dispatchEvent("click");
-  await expect.poll(() => homeAt(page, "tiger"), { message: "Babur's tent in view" }).not.toBeNull();
   const d = Math.round(((await town(page).boundingBox())!.height * 0.1) / 2) * 2;
-  await page.waitForTimeout(1500); // (the camera's glide settles)
-  // (A fixed point of the world, as inside: the middle of the tent's plot, under its picture. Not `homeAt`: that's where a tap lands
-  // on the tent, found round whatever stands in front of it, and Babur juggling on his square there covers a little more or less of
-  // it from frame to frame, so it hops between the tent's left and right corners (about 110 px) whichever way the camera goes.)
-  const tent = async () => {
-    const xy = await page.evaluate(() => (window as unknown as Hooks).__townAt?.("square", [28, 4]) ?? null);
-    const cv = (await town(page).boundingBox())!;
-    return xy && { x: cv.x + xy.x, y: cv.y + xy.y };
-  };
-  await followsFinger(page, tent, d);
-  // Inside: a square in front of you, the same.
+  // Inside Babur's tent: a square in front of you, dragged down, up and sideways, follows the finger.
   await goIn(page, "tiger", "Babur's Circus");
   await expect.poll(async () => (await shopCam(page))?.zoom).toBe(1);
   await page.waitForTimeout(800); // (the camera's spring settles on you)
