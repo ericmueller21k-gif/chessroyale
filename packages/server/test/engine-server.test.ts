@@ -23,7 +23,7 @@ vi.mock("@cloudflare/containers", () => ({
   }),
 }));
 
-import { ENGINE_SERVER } from "@chessroyale/core";
+import { ENGINE_SERVER, RECLUSE_ONLINE } from "@chessroyale/core";
 import worker, { type Env } from "../src/index.ts";
 import { createGuest, ensureSchema, signInWithIdentity } from "../src/accounts.ts";
 import { SESSION_COOKIE } from "../src/api.ts";
@@ -235,5 +235,27 @@ describe("the engine server's open routes need an account and stop at a cap (Nov
     expect((await score(env, legal, guest)).status).toBe(503);
     expect(sent).toHaveLength(1);
     expect(usage(day)).toBe(soloCap(600));
+  });
+});
+
+describe("the Hidden Boss's own share of the engine server's day (Eric, Nov 13: the judges can't starve him)", () => {
+  it("his searches count on his own row: the day's budget spent by the judges, he still searches; his share spent, the day's budget", async () => {
+    const { d1, db, usage } = await accountsDb();
+    const env = { ENGINE: {} as never, DB: d1 };
+    const day = new Date().toISOString().slice(0, 10);
+    // (The day's budget spent, by the judges' re-checks: a match's search stops; his doesn't, counted on his row alone.)
+    db.prepare("INSERT INTO engine_usage (day, searches) VALUES (?, ?)").run(day, 3000);
+    expect(await serverAllMovesAt(env, C960, 1000)).toBeNull();
+    expect(sent).toHaveLength(0);
+    expect(await serverAllMovesAt(env, C960, 1000, "recluse")).toHaveLength(legalMoves960(C960).length);
+    expect(usage(`${day}:recluse`)).toBe(1);
+    expect(usage(day)).toBe(3001);
+    // (His share spent: the day's budget, as a match's search; that spent too, none.)
+    db.prepare("UPDATE engine_usage SET searches = ? WHERE day = ?").run(RECLUSE_ONLINE.dailySearches, `${day}:recluse`);
+    db.prepare("UPDATE engine_usage SET searches = ? WHERE day = ?").run(10, day);
+    expect(await serverAllMovesAt(env, C960, 1000, "recluse")).not.toBeNull();
+    expect(usage(day)).toBe(11);
+    db.prepare("UPDATE engine_usage SET searches = ? WHERE day = ?").run(3000, day);
+    expect(await serverAllMovesAt(env, C960, 1000, "recluse")).toBeNull();
   });
 });

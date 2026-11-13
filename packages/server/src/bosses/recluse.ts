@@ -270,7 +270,8 @@ function arm(lobby: Phase2Lobby) {
   else if (!p.playing) times.push(p.clocksAt);
   else {
     const ult = p.state.ultAt !== null;
-    for (const b of p.state.boards) {
+    // (Paused: no clock runs out meanwhile; their times are moved on by the pause as it ends.)
+    for (const b of p.paused === undefined ? p.state.boards : []) {
       if (b.result || b.turnAt === null || phase2ToMove(b) !== "crowd") continue;
       times.push(b.turnAt + (ult ? RECLUSE_PHASE2.ultMoveSeconds * 1000 : b.bankMs));
     }
