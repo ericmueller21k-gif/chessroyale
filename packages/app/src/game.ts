@@ -240,7 +240,7 @@ export type Phase =
    * you left before the end (see GameView.resign): you resigned (a loss; `bot`: online, a bot plays your seat), or you
    * left once you were already out (your place as it stood; the winner isn't known).
    */
-  | { kind: "results"; placement: number; winner: string; youWon: boolean; gameWinner?: "w" | "b" | null; bossResult?: "crowd" | "boss" | "draw"; left?: LeftResult; timeout?: boolean; carrots?: boolean; blackout?: boolean; simul?: { won: number; of: number } };
+  | { kind: "results"; placement: number; winner: string; youWon: boolean; gameWinner?: "w" | "b" | null; bossResult?: "crowd" | "boss" | "draw"; left?: LeftResult; timeout?: boolean; carrots?: boolean; blackout?: boolean; simul?: { won: number; of: number }; noResult?: "board" | "watched" };
 
 /** One of the Hidden Boss's phase 2 boards as the screens see it (board 0 is yours). */
 export interface SimulBoardView {
@@ -281,6 +281,13 @@ export interface SimulView {
   lastSlow: { board: number; at: number } | null;
   /** When his ultimate came (then every move has ultMoveSeconds, no bank), or null. */
   ultAt: number | null;
+  /**
+   * Online: every clock paused since then (this device's time): his move is late from the engine server. Every board shows "He's
+   * thinking…", takes no move, and its clock shows where it stood. Missing or null: not paused (solo never is).
+   */
+  paused?: number | null;
+  /** Online: the fight ended with no result (his move never came from the engine server); `decided` is true with it. */
+  noResult?: boolean;
 }
 
 /** How you left a match before its end (the results screen says so). */

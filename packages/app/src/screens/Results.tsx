@@ -15,6 +15,7 @@ import { FlagIcon, MOUSE_LAYOUT, MatchMenu } from "../components/MatchMenu.tsx";
 import { exitFor } from "../match-exit.ts";
 import { TokenBox } from "../components/TokenBox.tsx";
 import { XpResult, useGameXp } from "../components/XpResult.tsx";
+import { NO_RESULT_LINE } from "./Recluse2.tsx";
 
 /** An online match where one device's word stood alone (LobbyRecord.unvouched: nobody could check a host's scores or the boss's move). */
 export const UNVOUCHED_LINE = "Only one device checked this match: it pays as a solo game.";
@@ -41,8 +42,10 @@ export function ResultsScreen({ match, placement, winner, onAgain, onHome, homeT
   const byCarrots = match.phase.kind === "results" && !!match.phase.carrots;
   // (Hollow in Boss alone: the last of your ten bulbs went out.)
   const byBlackout = match.phase.kind === "results" && !!match.phase.blackout;
-  // (The Hidden Boss's phase 2: how many of the four boards were won.)
+  // (The Hidden Boss's phase 2: how many of the four boards were won; or no result, his move never came from the engine server.)
   const simul = match.phase.kind === "results" ? match.phase.simul : undefined;
+  // (`board`: you played one of its boards, nothing counts for or against you; `watched`: a Crowd final's others, your place stands.)
+  const noResult = match.phase.kind === "results" ? match.phase.noResult : undefined;
   // Boss battle: those still standing at the end share the result (a raid's whole crowd fought; the Crowd's, its
   // finalists: crowdFinalists, the top 4).
   const survived = !!match.boss && !match.boss.kills.some((k) => match.isYou(k.id)) && (match.boss.raid || placement <= crowdFinalists("boss"));
@@ -124,9 +127,11 @@ export function ResultsScreen({ match, placement, winner, onAgain, onHome, homeT
             King (Eric, Nov 9: ResultDuo). */}
         {bossResult && match.boss && <ResultDuo match={match} result={bossResult} xp={xp} />}
         {bossResult && match.boss && (
-          <p class={`team-result ${bossResult === "crowd" && survived ? "good" : bossResult === "boss" ? "bad" : ""}`}>
+          <p class={`team-result ${noResult ? "" : bossResult === "crowd" && survived ? "good" : bossResult === "boss" ? "bad" : ""}`}>
             {hasCharacter(match) ? null : <><BossTag boss={match.boss} /> </>}
-            {simul
+            {noResult
+              ? `${NO_RESULT_LINE} ${noResult === "board" ? "Nothing counts for or against you." : "Your place stands."}`
+              : simul
               ? // (The Hidden Boss's phase 2: every board must be won.)
                 simul.won === simul.of
                 ? `You beat ${bossInText(match.boss.name)} on all ${simul.of} boards!`
@@ -154,8 +159,8 @@ export function ResultsScreen({ match, placement, winner, onAgain, onHome, homeT
         {/* Whether it counted for your ranking, in words (the rule: RANKING in settings.ts). */}
         {/* (A boss battle's solo note: it says nothing of ranking, Eric, Nov 8; a lobby's line stays.) */}
         {/* (One device's word stood alone somewhere in it: why it pays as a solo game, in place of the unranked line.) */}
-        {match.unvouched && <p class="results-unranked">{UNVOUCHED_LINE}</p>}
-        {match.ranked === false && !match.unvouched && (match.serverPaced || !bossResult) && (
+        {match.unvouched && noResult !== "board" && <p class="results-unranked">{UNVOUCHED_LINE}</p>}
+        {match.ranked === false && !match.unvouched && noResult !== "board" && (match.serverPaced || !bossResult) && (
           <p class="results-unranked">
             {match.serverPaced
               ? `Unranked: fewer than ${rankedMinHumans(match.settings.lobbySize)} real players, so your ranking didn't change.`

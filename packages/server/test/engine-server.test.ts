@@ -9,12 +9,16 @@ import { START_FEN, chess960Fen, legalMoves960, stockfishRefuses } from "@chessr
 
 // (The real container needs the Workers runtime: a stub that records what it's sent and scores every move 0.5.)
 const sent = vi.hoisted(() => [] as { instance: string; fen: string; moves: string[] }[]);
-// (Searches that fail, by their number from the test's start (a container still waking: no answer).)
-const failing = vi.hoisted(() => ({ calls: 0, at: new Set<number>() }));
+// (Searches that fail, by their number from the test's start (a container still waking: no answer); `hang`: ones never answered.)
+const failing = vi.hoisted(() => ({ calls: 0, at: new Set<number>(), hang: new Set<number>() }));
 vi.mock("@cloudflare/containers", () => ({
   Container: class {},
   getContainer: (_ns: unknown, instance: string) => ({
     fetch: async (_url: string, init: { body: string }) => {
+      if (failing.hang.has(failing.calls)) {
+        failing.calls++;
+        return new Promise<never>(() => undefined);
+      }
       if (failing.at.has(failing.calls++)) return new Response("", { status: 503 });
       const body = JSON.parse(init.body) as { fen: string; moves: string[] };
       sent.push({ instance, fen: body.fen, moves: body.moves });
@@ -23,12 +27,12 @@ vi.mock("@cloudflare/containers", () => ({
   }),
 }));
 
-import { ENGINE_SERVER } from "@chessroyale/core";
+import { ENGINE_SERVER, RECLUSE_ONLINE } from "@chessroyale/core";
 import worker, { type Env } from "../src/index.ts";
 import { createGuest, ensureSchema, signInWithIdentity } from "../src/accounts.ts";
 import { SESSION_COOKIE } from "../src/api.ts";
 import { memoryDb } from "./memory-db.ts";
-import { serverAllMovesAt, serverScoreAt, soloCap } from "../src/engine.ts";
+import { countRecluseNoResult, engineHealth, serverAllMovesAt, serverScoreAt, soloCap } from "../src/engine.ts";
 import { containerSearch } from "../src/fairplay-engine.ts";
 
 /** Positions Stockfish refuses, one of each kind the game could be handed (stockfishRefuses). */
@@ -86,6 +90,7 @@ beforeEach(() => {
   sent.length = 0;
   failing.calls = 0;
   failing.at.clear();
+  failing.hang.clear();
   log = vi.spyOn(console, "log").mockImplementation(() => undefined);
 });
 afterEach(() => log.mockRestore());
@@ -141,26 +146,55 @@ describe("the engine server never gets a position Stockfish refuses", () => {
     const all = legalMoves960(C960);
     const groups = Math.ceil(all.length / 8);
     expect(groups).toBeGreaterThan(2);
-    expect((await serverAllMovesAt({ ENGINE: {} as never }, C960, 1000))?.map((s) => s.move).sort()).toEqual([...all].sort());
+    const o = { withinMs: 15_000 };
+    expect((await serverAllMovesAt({ ENGINE: {} as never }, C960, 1000, o))?.map((s) => s.move).sort()).toEqual([...all].sort());
     expect(sent).toHaveLength(groups);
+    expect(new Set(sent.map((s) => s.instance))).toEqual(new Set(["engine-1"]));
     // (The first group's first try fails: tried again, and the position is scored.)
     sent.length = 0;
     failing.calls = 0;
     failing.at.add(0);
-    expect(await serverAllMovesAt({ ENGINE: {} as never }, C960, 1000)).toHaveLength(all.length);
+    expect(await serverAllMovesAt({ ENGINE: {} as never }, C960, 1000, o)).toHaveLength(all.length);
     expect(sent).toHaveLength(groups);
     expect(failing.calls).toBe(groups + 1);
     // (Both tries fail: no answer; the device's turn.)
     failing.calls = 0;
     failing.at.add(1);
-    expect(await serverAllMovesAt({ ENGINE: {} as never }, C960, 1000)).toBeNull();
+    expect(await serverAllMovesAt({ ENGINE: {} as never }, C960, 1000, o)).toBeNull();
     expect(failing.calls).toBe(2);
     // (A later group fails: no answer at once, no second try.)
     failing.calls = 0;
     failing.at.clear();
     failing.at.add(1);
-    expect(await serverAllMovesAt({ ENGINE: {} as never }, C960, 1000)).toBeNull();
+    expect(await serverAllMovesAt({ ENGINE: {} as never }, C960, 1000, o)).toBeNull();
     expect(failing.calls).toBe(2);
+  });
+
+  it("a try takes at most `withinMs`, every group's wait included: then no answer, nothing more sent (the review of #683, M1)", async () => {
+    const all = legalMoves960(C960);
+    // (The first group never answered: no answer once the time is up, and no second try with none of it left.)
+    failing.hang.add(0);
+    let t = Date.now();
+    expect(await serverAllMovesAt({ ENGINE: {} as never }, C960, 1000, { withinMs: 60 })).toBeNull();
+    expect(Date.now() - t).toBeLessThan(1000);
+    expect(failing.calls).toBe(1);
+    // (A later group never answered: the same, the try's time counted from its start.)
+    failing.calls = 0;
+    failing.hang.clear();
+    failing.hang.add(2);
+    t = Date.now();
+    expect(await serverAllMovesAt({ ENGINE: {} as never }, C960, 1000, { withinMs: 60 })).toBeNull();
+    expect(Date.now() - t).toBeLessThan(1000);
+    expect(failing.calls).toBe(3);
+    // (In time: every move scored.)
+    failing.hang.clear();
+    expect(await serverAllMovesAt({ ENGINE: {} as never }, C960, 1000, { withinMs: 60 })).toHaveLength(all.length);
+  });
+
+  it("phase 2's fair-play numbers go to fair play's own instance, never the match engine's (his queue: the review of #683, M1)", async () => {
+    expect(await serverAllMovesAt({ ENGINE: {} as never }, C960, 1000, { instance: "fairplay-1", withinMs: 60_000 })).toHaveLength(legalMoves960(C960).length);
+    expect(sent.length).toBeGreaterThan(2);
+    expect(new Set(sent.map((s) => s.instance))).toEqual(new Set(["fairplay-1"]));
   });
 
   it("fair play's deep search goes the same way: refused, nothing sent; legal, sent to its own instance", async () => {
@@ -235,5 +269,43 @@ describe("the engine server's open routes need an account and stop at a cap (Nov
     expect((await score(env, legal, guest)).status).toBe(503);
     expect(sent).toHaveLength(1);
     expect(usage(day)).toBe(soloCap(600));
+  });
+});
+
+describe("the Hidden Boss's searches: never refused for the day's budget, counted on his own row (the review of #683, M2)", () => {
+  it("the day's budget spent by the judges: a match's search stops, his doesn't; his row counts each position once, a try again not", async () => {
+    const { d1, db, usage } = await accountsDb();
+    const env = { ENGINE: {} as never, DB: d1 };
+    const day = new Date().toISOString().slice(0, 10);
+    const o = { withinMs: RECLUSE_ONLINE.searchMs };
+    db.prepare("INSERT INTO engine_usage (day, searches) VALUES (?, ?)").run(day, 3000);
+    expect(await serverAllMovesAt(env, C960, 1000, o)).toBeNull();
+    expect(sent).toHaveLength(0);
+    // (However many he's searched today, and the day's budget long spent: he searches, the day's row untouched.)
+    db.prepare("INSERT INTO engine_usage (day, searches) VALUES (?, ?)").run(`${day}:recluse`, 99_999);
+    expect(await serverAllMovesAt(env, C960, 1000, { ...o, pool: "recluse" })).toHaveLength(legalMoves960(C960).length);
+    expect(usage(`${day}:recluse`)).toBe(100_000);
+    expect(usage(day)).toBe(3001);
+    // (A try again at the same position (`uncounted`): not counted again.)
+    expect(await serverAllMovesAt(env, C960, 1000, { ...o, pool: "recluse", uncounted: true })).not.toBeNull();
+    expect(usage(`${day}:recluse`)).toBe(100_000);
+  });
+
+  it("counting fails (D1 down): his search still goes; a match's doesn't", async () => {
+    const down = { prepare: () => ({ run: async () => Promise.reject(new Error("D1 down")), bind: () => ({ first: async () => Promise.reject(new Error("D1 down")) }) }) } as unknown as D1Database;
+    const env = { ENGINE: {} as never, DB: down };
+    expect(await serverAllMovesAt(env, C960, 1000, { withinMs: 15_000 })).toBeNull();
+    expect(sent).toHaveLength(0);
+    expect(await serverAllMovesAt(env, C960, 1000, { pool: "recluse", withinMs: 15_000 })).not.toBeNull();
+  });
+
+  it("the health view: his positions today and the fights with no result", async () => {
+    const { d1 } = await accountsDb();
+    const env = { ENGINE: {} as never, DB: d1 };
+    await serverAllMovesAt(env, C960, 1000, { pool: "recluse", withinMs: 15_000 });
+    await serverAllMovesAt(env, C960, 1000, { pool: "recluse", withinMs: 15_000 });
+    await countRecluseNoResult(env);
+    expect((await engineHealth(env, Date.now())).recluse).toEqual({ searches: 2, noResults: 1 });
+    expect((await engineHealth({ ENGINE: {} as never }, Date.now())).recluse).toEqual({ searches: 0, noResults: 0 });
   });
 });

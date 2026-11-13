@@ -436,9 +436,10 @@ const RESULT_WORD = (b: SimulBoardView) => {
  */
 function Tag({ b, v, now, small, big }: { b: SimulBoardView; v: SimulView; now: number; small?: boolean; big?: boolean }) {
   if (big) return b.you ? null : <span class="rc-tag">{b.name}</span>;
-  // (His ultimate: the move's own few seconds, not the bank.)
-  const left = moveLeft(v, b, now);
-  const running = v.playing && b.toMove === "crowd";
+  // (His ultimate: the move's own few seconds, not the bank. Paused online (his move late): where it stood as the pause began.)
+  const paused = v.paused ?? null;
+  const left = moveLeft(v, b, paused ?? now);
+  const running = v.playing && b.toMove === "crowd" && paused === null;
   const low = running && left < (v.ultAt !== null ? 2_000 : 15_000);
   return (
     <span class={`rc-tag${b.you ? " you" : ""}${running ? " running" : ""}${low ? " low" : ""}`}>
@@ -448,8 +449,14 @@ function Tag({ b, v, now, small, big }: { b: SimulBoardView; v: SimulView; now: 
   );
 }
 
-function Outcome({ b }: { b: SimulBoardView }) {
-  if (!b.result) return null;
+/** Online, the fight paused for his late move, or ended with no result: what every board still on says, where a result would. */
+export const PAUSED_WORD = "He's thinking…";
+export const NO_RESULT_WORD = "No result";
+/** The dock's words (and the results screen's) when the fight ended with no result: his move never came from the engine server. */
+export const NO_RESULT_LINE = "No result: the Hidden Boss couldn't connect.";
+
+function Outcome({ b, v }: { b: SimulBoardView; v: SimulView }) {
+  if (!b.result) return v.noResult ? <span class="rc-result">{NO_RESULT_WORD}</span> : v.paused != null ? <span class="rc-result">{PAUSED_WORD}</span> : null;
   return <span class={`rc-result ${b.result.winner === "crowd" ? "won" : b.result.winner === "boss" ? "lost" : "draw"}`}>{RESULT_WORD(b)}</span>;
 }
 
@@ -491,7 +498,7 @@ function SlowMarks({ n, flash }: { n: number; flash: boolean }) {
  * `big`: a phone's big board.
  */
 function SimulBoard({ match, v, b, now, small, big, marks: withMarks, count, children }: { match: GameView; v: SimulView; b: SimulBoardView; now: number; small?: boolean; big?: boolean; marks?: boolean; count?: number | null; children?: ComponentChildren }) {
-  const mine = b.you && v.playing && b.toMove === "crowd";
+  const mine = b.you && v.playing && b.toMove === "crowd" && v.paused == null && !v.decided;
   const recent = !!v.lastSlow && now - v.lastSlow.at < SLOW_NOTE_MS;
   // (The note marks the board the slow move was on; the marks flash at any slow move.)
   const flash = recent && v.lastSlow!.board === b.id;
@@ -501,7 +508,7 @@ function SimulBoard({ match, v, b, now, small, big, marks: withMarks, count, chi
   return (
     <Board fen={b.fen} orientation="white" lastMove={b.lastMove} interactive={mine} onMove={(m) => match.simulMove?.(b.id, m)} small={small} silent={!b.you}>
       <Tag b={b} v={v} now={now} small={small} big={big} />
-      <Outcome b={b} />
+      <Outcome b={b} v={v} />
       {v.playing && withMarks && marks}
       {/* (Which board the last slow move was on: a small note over its top-right corner, for a moment.) */}
       {flash && <span class="rc-slow-note">slow move</span>}
@@ -535,7 +542,8 @@ export function SimulScreen({ match }: { match: GameView }) {
   const big = v.boards.find((b) => b.id === watch) ?? mine;
   const others = v.boards.filter((b) => b.id !== big.id);
   // (Online a Crowd final's watcher has no board: none is "yours".)
-  const yourTurn = v.playing && mine.you && mine.toMove === "crowd";
+  // (Paused online, his move late: nobody's turn runs; ended with no result: none.)
+  const yourTurn = v.playing && mine.you && mine.toMove === "crowd" && v.paused == null && !v.decided;
   // His ultimate as it comes: "5 SECONDS!" over the boards.
   // (On every board at once; nobody waits for it: the 5 s start now.)
   const ultOn = v.ultAt !== null && now - v.ultAt < phase2UltBannerMs();
@@ -545,9 +553,11 @@ export function SimulScreen({ match }: { match: GameView }) {
   // Your board's clock in the dock (DockClock): running on your move, holding (undefined) while he answers, none (null)
   // once your board is decided or before the clocks start.
   const run: DockClockRun | null | undefined =
-    mine.result || !v.playing || !mine.you ? null : yourTurn && mine.turnAt !== null ? { startsAt: mine.turnAt, deadline: mine.turnAt + (v.ultAt !== null ? RECLUSE_PHASE2.ultMoveSeconds * 1000 : mine.bankMs) } : undefined;
+    mine.result || !v.playing || !mine.you || v.noResult ? null : yourTurn && mine.turnAt !== null ? { startsAt: mine.turnAt, deadline: mine.turnAt + (v.ultAt !== null ? RECLUSE_PHASE2.ultMoveSeconds * 1000 : mine.bankMs) } : undefined;
   // (How many are won: the boss bar's right side.)
-  const status = v.decided
+  const status = v.noResult
+    ? NO_RESULT_LINE
+    : v.decided
     ? v.beaten
       ? "All four boards won!"
       : "The boss wins."
@@ -556,6 +566,8 @@ export function SimulScreen({ match }: { match: GameView }) {
       : !v.playing
         ? // (Before the clocks run: the clock you'll have, as "PHASE 2" said it.)
           `${clockShown(RECLUSE_PHASE2.bankSeconds * 1000)} on your clock`
+        : v.paused != null
+        ? PAUSED_WORD
         : yourTurn
         ? "Your move"
         : "The boss is thinking…";

@@ -211,6 +211,52 @@ describe("his fall online says who takes the boards (the review of #677, m3)", (
   });
 });
 
+describe("his move late from the engine server online (Eric, Nov 13): the fight pauses, or ends with no result", () => {
+  it("paused: every clock shows where it stood, your board takes no move, look-aways stop; the pause over, they count on and your move carries both", () => {
+    const D = device();
+    const now = Date.now() + 5000;
+    D.g.onMessage(serverView(now, "me"));
+    expect(D.looks()).toBe(1);
+    D.g.onMessage(serverView(now, "me", { paused: now }));
+    const v = D.g.view()!;
+    expect(v.paused).toBe(now - 5000);
+    expect(v.decided).toBe(false);
+    // (Your move while paused: neither shown nor sent.)
+    const mine = v.boards[0]!;
+    D.g.move(mine.id, legalMoves(mine.fen)[0]!);
+    expect(D.sent).toHaveLength(0);
+    expect(D.g.view()!.boards[0]!.history).toHaveLength(0);
+    // (The pause over: the clocks run on (the server moved your turn's start on by the pause); look-aways count again, the same turn.)
+    D.g.onMessage(serverView(now, "me", { boards: serverView(now, "me").boards.map((b) => ({ ...b, turnAt: now + 9000 })) }));
+    expect(D.g.view()!.paused).toBeNull();
+    expect(D.looks()).toBe(2);
+    D.g.move(mine.id, legalMoves(mine.fen)[0]!);
+    // (3 counted before the pause, 3 after it: the harness's turnEnds.)
+    expect(D.sent.at(-1)).toMatchObject({ t: "phase2Move", board: mine.id, away: 6 });
+    D.g.dispose();
+  });
+
+  it("no result: the fight is over (decided, not beaten), and no move is taken", () => {
+    const D = device();
+    const now = Date.now() + 5000;
+    D.g.onMessage(serverView(now, "me", { paused: now - 60_000, done: { at: now, until: now + 3200, beaten: false, won: 0, of: 4, noResult: true } }));
+    const v = D.g.view()!;
+    expect(v).toMatchObject({ noResult: true, decided: true, beaten: false });
+    D.g.move(v.boards[0]!.id, legalMoves(v.boards[0]!.fen)[0]!);
+    expect(D.sent).toHaveLength(0);
+    D.g.dispose();
+    // (The results say whose: a board's player, nothing counts for you; a Crowd final's watcher, your place stands. The review of
+    // #683, M3.)
+    for (const kind of ["board", "watched"] as const) {
+      const m = new NetMatch("TEST", "Ann", async () => []);
+      const tell = (msg: object) => (m as unknown as { onMessage(x: object): void }).onMessage({ now: Date.now(), ...msg });
+      tell({ t: "welcome", playerId: "me", token: "t", code: "TEST" });
+      tell({ t: "results", placements: { me: kind === "board" ? 2 : 40 }, winner: "Bo", lossesByStage: {}, standings: [], ranked: kind === "watched", bossResult: "draw", noResult: kind });
+      expect(m.phase).toMatchObject({ kind: "results", noResult: kind, bossResult: "draw" });
+    }
+  });
+});
+
 describe("his child form online: whichever message brings the man forgets the child's (the review of the child form online, m1 and m2)", () => {
   afterEach(() => void (who.admin = false));
   const START = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";

@@ -33,35 +33,64 @@ const TIMEOUT_MS = 12_000;
 let tableReady = false;
 
 /**
- * Whose search it is: a match's (its re-checks and verdicts, Squads' bot work) or a solo game's (/api/engine/score). Solo's are
- * counted twice: against their own share (ENGINE_SERVER.soloDailySearches, the row "<day>:solo") and the day's budget, so however
- * busy solo is, matches always keep the rest of the day (the outside review of Nov 10, finding 4).
+ * Whose search it is: a match's (its re-checks and verdicts, Squads' bot work), a solo game's (/api/engine/score), or the Hidden
+ * Boss's own moves in his phase 2 online ("recluse"). Solo's are counted twice: against their own share
+ * (ENGINE_SERVER.soloDailySearches, the row "<day>:solo") and the day's budget, so however busy solo is, matches always keep the
+ * rest of the day (the outside review of Nov 10, finding 4). His are never refused (they're bounded by the fights, and a refusal
+ * would end a fight with no result: the review of #683, M2): each position is counted on his own row alone ("<day>:recluse", the
+ * health view), never the day's budget, so the judges can't starve him and he can't starve them.
  */
-export type EnginePool = "match" | "solo";
+export type EnginePool = "match" | "solo" | "recluse";
 
 /** Solo's share of a day's `cap`: ENGINE_SERVER.soloDailySearches, and never more than `soloShare` of it (a lowered cap, staging). */
 export const soloCap = (cap: number): number => Math.min(ENGINE_SERVER.soloDailySearches, Math.floor(cap * ENGINE_SERVER.soloShare));
 
-/** Counts one search against today's budget (and solo's share); false once it's spent (or if counting fails). */
+/** Today's day (UTC), the key of the day's rows in engine_usage. */
+const today = () => new Date().toISOString().slice(0, 10);
+
+/** One more on a row of engine_usage (the day's budget, a share, a count): its new total. Throws if counting fails. */
+async function bump(env: EngineEnv, key: string): Promise<number | null> {
+  if (!tableReady) {
+    await env.DB!.prepare("CREATE TABLE IF NOT EXISTS engine_usage (day TEXT PRIMARY KEY, searches INTEGER NOT NULL)").run();
+    tableReady = true;
+  }
+  const row = await env
+    .DB!.prepare("INSERT INTO engine_usage (day, searches) VALUES (?, 1) ON CONFLICT(day) DO UPDATE SET searches = searches + 1 RETURNING searches")
+    .bind(key)
+    .first<{ searches: number }>();
+  return row?.searches ?? null;
+}
+
+/**
+ * Counts one search against today's budget (and solo's share); false once it's spent (or if counting fails). His ("recluse"): on
+ * his own row only, and always true (never refused, even if counting fails).
+ */
 async function takeBudget(env: EngineEnv, pool: EnginePool = "match"): Promise<boolean> {
   if (!env.DB) return true;
   try {
-    if (!tableReady) {
-      await env.DB.prepare("CREATE TABLE IF NOT EXISTS engine_usage (day TEXT PRIMARY KEY, searches INTEGER NOT NULL)").run();
-      tableReady = true;
+    const day = today();
+    if (pool === "recluse") {
+      await bump(env, `${day}:recluse`);
+      return true;
     }
-    const day = new Date().toISOString().slice(0, 10);
-    const take = (key: string) =>
-      env
-        .DB!.prepare("INSERT INTO engine_usage (day, searches) VALUES (?, 1) ON CONFLICT(day) DO UPDATE SET searches = searches + 1 RETURNING searches")
-        .bind(key)
-        .first<{ searches: number }>();
     const cap = Number(env.ENGINE_DAILY_SEARCHES ?? 3000);
-    if (pool === "solo" && ((await take(`${day}:solo`))?.searches ?? Infinity) > soloCap(cap)) return false;
-    const row = await take(day);
-    return (row?.searches ?? 0) <= cap;
+    if (pool === "solo" && ((await bump(env, `${day}:solo`)) ?? Infinity) > soloCap(cap)) return false;
+    return ((await bump(env, day)) ?? 0) <= cap;
   } catch {
-    return false;
+    return pool === "recluse";
+  }
+}
+
+/**
+ * A Hidden Boss's phase 2 ended with no result (his move never came from the engine server): counted on today's row
+ * "<day>:recluse-none", for the health view (the review of #683, M2). Never throws.
+ */
+export async function countRecluseNoResult(env: EngineEnv): Promise<void> {
+  if (!env.DB) return;
+  try {
+    await bump(env, `${today()}:recluse-none`);
+  } catch {
+    // (The health view just shows one fewer.)
   }
 }
 
@@ -124,11 +153,20 @@ export async function containerScore(env: EngineEnv, instance: string, fen: stri
   }
 }
 
-/** The engine server today, for the health view: searches used of the day's budget, its last answer and last failure. */
-export async function engineHealth(env: EngineEnv, now: number): Promise<{ on: boolean; searches: number; cap: number; lastOk: number | null; lastFail: { at: number; why: string } | null }> {
+/**
+ * The engine server today, for the health view: searches used of the day's budget, its last answer and last failure; and the
+ * Hidden Boss's phase 2 today (`recluse`): his positions searched (his own row, outside the budget) and the fights that ended with
+ * no result (his move never came: the review of #683, M2).
+ */
+export async function engineHealth(
+  env: EngineEnv,
+  now: number,
+): Promise<{ on: boolean; searches: number; cap: number; lastOk: number | null; lastFail: { at: number; why: string } | null; recluse: { searches: number; noResults: number } }> {
   const day = new Date(now).toISOString().slice(0, 10);
   const read = async <T>(sql: string, ...params: unknown[]) => (env.DB ? await env.DB.prepare(sql).bind(...params).first<T>().catch(() => null) : null);
   const used = await read<{ searches: number }>("SELECT searches FROM engine_usage WHERE day = ?", day);
+  const his = await read<{ searches: number }>("SELECT searches FROM engine_usage WHERE day = ?", `${day}:recluse`);
+  const none = await read<{ searches: number }>("SELECT searches FROM engine_usage WHERE day = ?", `${day}:recluse-none`);
   const ok = await read<{ value: string }>("SELECT value FROM meta WHERE key = 'engine.ok'");
   const fail = await read<{ value: string }>("SELECT value FROM meta WHERE key = 'engine.fail'");
   let lastFail: { at: number; why: string } | null = null;
@@ -137,7 +175,14 @@ export async function engineHealth(env: EngineEnv, now: number): Promise<{ on: b
   } catch {
     // An unreadable mark: none.
   }
-  return { on: engineOn(env), searches: used?.searches ?? 0, cap: Number(env.ENGINE_DAILY_SEARCHES ?? 3000), lastOk: ok ? Number(ok.value) : null, lastFail };
+  return {
+    on: engineOn(env),
+    searches: used?.searches ?? 0,
+    cap: Number(env.ENGINE_DAILY_SEARCHES ?? 3000),
+    lastOk: ok ? Number(ok.value) : null,
+    lastFail,
+    recluse: { searches: his?.searches ?? 0, noResults: none?.searches ?? 0 },
+  };
 }
 
 /** One restricted search on the engine server; null if there's no server, no budget left, or no answer in time. `pool`: whose. */
@@ -147,28 +192,39 @@ export async function serverScoreAt(env: EngineEnv, fen: string, moves: readonly
   return containerScore(env, "engine-1", fen, moves, nodes, TIMEOUT_MS);
 }
 
-/** How long one group's search may take for the Hidden Boss's phase 2 before the position goes to a device instead (ms). */
-const ALL_MOVES_GROUP_MS = 6000;
-
 /**
- * Every legal move of a position scored on the engine server (the Hidden Boss's phase 2 online: his moves, his bots', a person's
- * fair-play numbers; bosses/recluse.ts): the moves in groups of at most 8 (its limit; fairplay-deep.ts moveGroups), one search a
- * group at `nodes`, the whole position counted once against the day's budget (its groups together search fewer nodes than one
- * re-check). The first group is tried twice (a container still waking answers the second: the review of #677, M2). Null when
- * there's no server, no budget left, a position Stockfish refuses, or any group without an answer in time.
+ * Every legal move of a position scored on the engine server (the Hidden Boss's phase 2 online, bosses/recluse.ts: his moves, a
+ * bot's no device played, a person's fair-play numbers): the moves in groups of at most 8 (its limit; fairplay-deep.ts moveGroups),
+ * one search a group at `nodes`, one after another, the whole position counted once against `pool`'s budget (its groups together
+ * search fewer nodes than one re-check; his: "recluse", never refused) unless `uncounted` (a try again at a position already
+ * counted: the review of #683, m2). The first group is tried twice (a container still waking answers the second: the review of
+ * #677, M2). The whole try takes at most `withinMs` (from its start, every group's wait included; a group still running then is
+ * left to the container, nothing more is sent), so a try's worst case is known and the caller never sends a new one while an earlier
+ * one could still be running (the review of #683, M1). `instance`: the match engine's ("engine-1", his queue) or fair play's
+ * ("fairplay-1": phase 2's fair-play numbers, never in his queue). Null when there's no server, no budget left, a position
+ * Stockfish refuses, or any group without an answer in time.
  */
-export async function serverAllMovesAt(env: EngineEnv, fen: string, nodes: number): Promise<MoveScore[] | null> {
+export async function serverAllMovesAt(
+  env: EngineEnv,
+  fen: string,
+  nodes: number,
+  o: { pool?: EnginePool; instance?: "engine-1" | "fairplay-1"; withinMs: number; uncounted?: boolean },
+): Promise<MoveScore[] | null> {
   if (!engineOn(env)) return null;
+  const end = Date.now() + o.withinMs;
   let legal: string[];
   try {
     legal = legalMoves(fen);
   } catch {
     return null;
   }
-  if (!legal.length || !(await takeBudget(env))) return null;
+  if (!legal.length || (!o.uncounted && !(await takeBudget(env, o.pool)))) return null;
   const out: MoveScore[] = [];
   for (const group of moveGroups(legal, legal[0]!)) {
-    const search = () => containerScore(env, "engine-1", fen, group, nodes, ALL_MOVES_GROUP_MS);
+    const search = () => {
+      const left = end - Date.now();
+      return left > 0 ? containerScore(env, o.instance ?? "engine-1", fen, group, nodes, left) : Promise.resolve(null);
+    };
     const got = (await search()) ?? (out.length ? null : await search());
     if (!got) return null;
     out.push(...got);
