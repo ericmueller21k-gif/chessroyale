@@ -1,6 +1,6 @@
 import { hollowLobby } from "./bosses/hollow.ts";
 import { dashLobby } from "./bosses/dash.ts";
-import { SERVER_LOST_MS, phase2Unvouched, quickMove, recluseLobby, recluseNoResult, recluseNoResultFor, retryDelay, type Phase2Lobby, type Phase2SearchRequest, type Recluse1Ask, type Recluse2Record } from "./bosses/recluse.ts";
+import { SERVER_LOST_MS, phase2Unvouched, quickMove, recluseLobby, mateFirst, recluseNoResult, recluseNoResultFor, retryDelay, type Phase2Lobby, type Phase2SearchRequest, type Recluse1Ask, type Recluse2Record } from "./bosses/recluse.ts";
 import type { BossLobby } from "./bosses/base.ts";
 import { hearsTyped, typedReads, typedSay, typedSeat, type TypedSeats } from "./typed-chat.ts";
 import { QUICK_CHAT, botChatLines, canSay, canSayToAll, chatCheck, chatSay, chatSent, mulberry32, noChatSent, ownedChatPacks, type BotChatMoment, type ChatSent } from "@chessroyale/core";
@@ -2684,7 +2684,11 @@ export class LobbyCore {
     const runner = this.runner!;
     const legal = new Set(legalMoves(a.fen));
     const ok = (scores ?? []).filter((x) => legal.has(x.move));
-    const move = ok.length ? bossMoveFromScores(ok, a.kind, a.elo, () => this.rng(), this.settings.kingStrikeLoss, bossGuardFrom(this.settings), runner.bossAllowed()) : null;
+    // (A mate in one is played first: the engine server never says `mate`, and in a won position every move scores 1, so the sort alone
+    // would keep the first legal moves, not the mate. The review of #686, m1; as phase 2's pick.)
+    const allowed = runner.bossAllowed();
+    const mate = ok.length ? mateFirst(a.fen, ok, allowed) : undefined;
+    const move = mate ?? (ok.length ? bossMoveFromScores(ok, a.kind, a.elo, () => this.rng(), this.settings.kingStrikeLoss, bossGuardFrom(this.settings), allowed) : null);
     if (!move) {
       if (id === a.ask) {
         a.retryAt = this.io.now() + retryDelay(a.tries);

@@ -39,8 +39,10 @@ was asked; with none left, he played a random legal move.
 4. **The pick:** `bossMoveFromScores` is pickBossMove's seeded Stockfish move (`eloDraw` within the guard, else a slip; the slip;
    the strike's step back) made from the server's numbers' top 8. A test checks it gives a device's move, from the same seed, at
    every strength and kind. It skips pickBossMove's head-to-head second look at a move other than the best (that needs an engine;
-   every move here was scored at one budget). A mate in one: the server scores it 1 (Stockfish's win/draw/loss), so no other move
-   is within the guard and he plays it.
+   every move here was scored at one budget). A mate in one is played first, found by the rules (`mateFirst`, as phase 2's `withMates`):
+   the engine server never says `mate`, and in a won position every move scores 1, so the sort alone kept the first legal moves, not
+   the mate (the review of #686, m1, measured with real Stockfish). He mates a little more surely than a device would here, the right
+   side to err on.
 5. **Whose no result:** those still in the battle (`runner.alive()`: `LobbyRecord.recluse1.none`). Someone who left it before had
    their loss written as they left: it stands. Fair play keeps every move (each was really played and judged; phase 2's no result
    drops only phase 2's).

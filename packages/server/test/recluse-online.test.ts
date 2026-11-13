@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { DEFAULT_SETTINGS, HIDDEN_ROOM, LEAVING, RECLUSE_CHILD, RECLUSE_CUTSCENE, RECLUSE_FORMS, RECLUSE_ONLINE, RECLUSE_PHASE2, childRating, hiddenRoomSettings, levelForMaia, maiaTopRating, modeSettings, mulberry32, recluseChildFirst, recluseNextForm, type FairMove, type Settings } from "@chessroyale/core";
 import { START_FEN, applyMove, bankLeft, legalMoves, type BoardScore, type MatchRunner, type MoveScore, type ServerMessage } from "@chessroyale/chess";
 import { LobbyCore, newLobbyRecord, type PartyLobby } from "../src/lobby.ts";
-import { phase2NoResult, phase2NoResultFor, phase2Unvouched, pick, quickMove, withMates, type Phase2SearchRequest } from "../src/bosses/recluse.ts";
+import { mateFirst, phase2NoResult, phase2NoResultFor, phase2Unvouched, pick, quickMove, withMates, type Phase2SearchRequest } from "../src/bosses/recluse.ts";
 import { lobbyOptions } from "../src/lobby-options.ts";
 import { library } from "./lobby-fixture.ts";
 
@@ -982,6 +982,19 @@ describe("a mate in one, his or a bot's (the delta review of #677: the engine se
     expect(legalMoves(fen)).toContain("g1a1");
     expect(withMates(fen, scores).filter((s) => s.mate !== undefined).map((s) => s.move)).toEqual(["a1a8"]);
     expect(pick(withMates(fen, scores), "boss", () => 0)).toBe("a1a8");
+  });
+});
+
+describe("his phase 1 server move takes a mate in one (the review of #686, m1)", () => {
+  it("every move scored 1 (a won position, the engine server's numbers): the mate is played, even outside the first 8 legal moves; one he may not play isn't", () => {
+    // (The review's position: Black (him) to move, Ra1# and Qd1# both mate; a8a1 is the 9th legal move in generation order.)
+    const fen = "r5k1/5ppp/8/3q4/8/8/5PPP/6K1 b - - 0 1";
+    const scores = legalMoves(fen).map((move) => ({ move, expected: 1 }));
+    const m = mateFirst(fen, scores, null);
+    expect(["a8a1", "d5d1"]).toContain(m);
+    expect(mateFirst(fen, scores, ["a8a1"])).toBe("a8a1");
+    expect(mateFirst(fen, scores, ["a8b8"])).toBeUndefined();
+    expect(mateFirst("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", [{ move: "e2e4", expected: 0.5 }], null)).toBeUndefined();
   });
 });
 

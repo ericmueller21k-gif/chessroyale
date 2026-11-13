@@ -620,6 +620,12 @@ export function withMates(fen: string, scores: readonly MoveScore[]): MoveScore[
   return scores.map((s) => (mates.has(s.move) ? { ...s, mate: 1 } : s));
 }
 
+/** A mate in one among the engine server's numbers (one he may play, `allowed` null: any), or undefined: his phase 1 server move plays it
+ * first (the review of #686, m1: in a won position every move scores 1, so the sort alone kept the first legal moves, not the mate). */
+export function mateFirst(fen: string, scores: readonly MoveScore[], allowed: readonly string[] | null | undefined): string | undefined {
+  return withMates(fen, scores).find((x) => x.mate === 1 && (!allowed || allowed.includes(x.move)))?.move;
+}
+
 /**
  * The host's answer to a phase2Ask (a bot's move: his are never asked of a device): its move, if legal there and still wanted. A bot's
  * move from a device unvouches nothing (the review of #677, M2), though the host chooses it, as phase 1's bot picks: accepted (the
