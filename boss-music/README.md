@@ -34,8 +34,9 @@ from one theme to the next.
 - `recluse-house` to `recluse-phase2`: fade the house out (about 1.5 s), then start the theme.
 - to `recluse-beaten`: whatever is playing (the intro too, if the fight was short), fade it fast (about 0.3 s) and start
   the theme at once: it opens on a book's slam, which covers the cut. Its loop runs for as long as the talk does.
-- to `recluse-phase3`: cross-fade over about half a second as the transformation starts. Its intro begins with the
-  childhood music's last chord still ringing, so it joins the loop wherever that is.
+- to `recluse-phase3`: as the transformation starts, start the theme at once at full level and fade the house's loop
+  out over about half a second. Its intro begins with the childhood music's last chord still ringing, so it joins the
+  loop wherever that is.
 - The result: as for any boss.
 
 **The one length that has to match:** from the transformation's start to the boards' split is `recluse-phase3`'s
