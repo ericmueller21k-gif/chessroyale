@@ -36,6 +36,10 @@ from the liked list, keep off the other one. Eric's words are quoted; the date i
 | An ocarina (round and hollow, almost no breath, each note leaning up into place) for a soft tune | `Mix.ocarina` (synth.py); song_v.py's memory, song_w.py | Nov 12, of six voices tried on the Hidden Boss's memory (he asked for "lighter kind of softer ... a really light flute sort of thing, like a whistle, but not really like a whistle"): "the ocarina sounds real nice" |
 | A soft piano (felt on the hammers) rolling the chords under it | `Mix.struck("felt", ...)`; the same songs | Nov 12, of six instruments tried under the ocarina: "Number 2 for sure ... the soft piano" |
 | A music box, softly in the background of a quiet part (two or three high notes a bar), or taking the tune for a phrase | `Mix.struck("box", ...)`; the same songs | Nov 12: "incorporate a little bit of the music box in softly ... I really do like that music box" |
+| A house groove at about 126 with its 16ths swung, an organ's short chords in a dub echo, a slap bass, a clock ticking on every 16th; a drop whose turns shrink (two bars each, one, half a bar) | song_y.py | Nov 13, of Dash's first go: "It's pretty much perfect ... the beat is great" |
+| A koto (a string picked near the bridge, built from its harmonics) on a calm's running line, an octave up, each note with three echoes placed by the beat | `Mix.struck("koto", ...)`; song_y.py (Tick's line) | Nov 13, of five struck voices tried there (steel pan, handpan, vibraphone, electric piano, koto; he had asked for "something a bit more like echoey, like steel pan possibly"): the koto, "that's perfect" |
+| A swung mid-tempo funk strut on a console's chips: dry short notes and rests set against a part with held chords and echo; a nasal lead that scoops into its phrases; a square-wave whistle with a note flicked in from below; a few of the boss's made-up syllables | song_z.py | Nov 13, of Puddles's first go: "I have zero issue. It's great." |
+| The boss's own timer running the song: a seed every 30 seconds, a new part from each; a line that grows a note longer each time round; a bass that climbs an octave a step a bar | song_z.py | the same |
 | A fast pattern racing under everything | every song since song_i.py | asked for in all of them |
 | The NES's four voices | song_c.py, song_f.py | "much much better" than the 16-bit orchestra |
 
@@ -91,8 +95,15 @@ boss's world that reaches into how the song itself runs, not only its sounds.
 | A slow-down in the middle of a song (song_g.py) | "the slowdown didn't land, the speed up was cool tho". (A plain one. Boingo's song slows twice with the pitch sinking as it goes, the ride dying, which he asked for and called flawless.) |
 | Tunes built from the same rhythm as the last boss's: 8ths on the grid, two-bar phrases, a chord every two bars (song_r.py, second go) | "it just feels like the other ones a lot ... work up the timings a little bit. Some of the chord progression and maybe even ... be adventurous a little" |
 | A tune that runs up and down its chords, the same shape on chord after chord (song_j.py) | "very dull and boring, sounds like all the rest ... that style chord progression is slop" |
+| An acid synth (a sawtooth through a ringing filter, sliding between notes) as a calm's main voice (song_y.py's first go, 1:01) | "almost sounds like a cheetah ... it just almost sounds like it was on accident in the song" (short bursts of it in the drop he passed) |
 
 ## What he asks of every theme
+
+A theme from a write-up of a style (Nov 13: Dash's and Puddles's, each from a write-up made from another game's
+track): "take these notes and make your own version. Same rules as always." Use the style's means (the pace, the
+swing, the kinds of voices, how dry or echoing it is, how the parts contrast); never the write-up's chords, riffs or
+tune, nor its "original" version in another key (that is the track's chords moved); don't listen to the track. Say
+in the song's docstring and to Eric which was which. Both passed first go.
 
 Two minutes from the start (or a little more when the intro wants it: Nov 12, "it's our game ... let's just make it a
 little bit longer than 2 minutes and it'll still loop"; for the Hidden Boss, "if this song is 2:30-3 that's fine"),

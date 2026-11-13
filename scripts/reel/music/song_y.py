@@ -32,13 +32,14 @@ pretty much perfect ... the beat is great"): "the sound that starts around like 
 ... it just almost sounds like it was on accident in the song ... something a bit more like echoey, like steel pan
 possibly, but throw me like five ... come up with some new instruments you haven't used before." So it can be played
 on five struck ones (synth.py's `struck`: a steel pan, a handpan, a vibraphone, an electric piano, a koto), an octave
-higher, each note with its own echo; he is choosing.
+higher, each note with its own echo. His pick, from 19 seconds of each: the koto ("that'll be perfect"). The acid
+synth keeps its short bursts in the drop and the rise before the clock is slammed.
 
   bars  1-8    the street at night: the clock's ticks, a shaker, a rim, snaps; the organ's chords echoing; no kick
   bars  9-16   the clock slapped: the kick on every beat, the piano, the slap bass
   bars 17-24   Dash's tune
   bars 25-32   the second verse: the square answers in the gaps
-  bars 33-40   Tick's (the first calm): half the pace; the acid line, the chords thrown into the echo, his bell
+  bars 33-40   Tick's (the first calm): half the pace; his line on the koto, the chords thrown into the echo, his bell
   bars 41-42   your time stolen: the ticks racing away; a hush, a tick-tock
   bars 43-54   the clock slammed, and the Time Scramble (the drop): the turns shrinking, then both leads together
   bars 55-62   Tick's again (the second calm): the overdriven lead plays the tune slowly; a yawn
@@ -148,7 +149,7 @@ last4 = lambda text: " | ".join(text.split("|")[4:])
 TAP = {"pan": 0.168, "handpan": 0.227, "vibes": 0.174, "tines": 0.212, "koto": 0.28}
 
 
-def render(voice: str = "acid", window=None) -> np.ndarray:
+def render(voice: str = "koto", window=None) -> np.ndarray:
     """The song as heard (stereo, at the mix's own level). `voice`: what plays Tick's line in the calms. `window`:
     (from beat, to beat), to make only that passage (a sample, to compare voices on)."""
     x = Ride(RIDE, BEATS, None, os=2, seed=181, tape_secs=TAPE)
@@ -675,7 +676,7 @@ def render(voice: str = "acid", window=None) -> np.ndarray:
     return x.play(x.mixdown(levels, lowpass=8500, room=0.22))
 
 
-def main(out: str, voice: str = "acid") -> None:
+def main(out: str, voice: str = "koto") -> None:
     write_wav(out, render(voice))
 
 
