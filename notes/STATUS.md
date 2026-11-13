@@ -1015,3 +1015,12 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 13 23:00: #676 delta review: 1 blocker (statue test reads zoom mid-ease, this PR's change) FIXED by director 830a9800 (4/4 local); minors m1 (no test for failed-town away), m2 (Back to me snapped-look untested), m3 (PR body stale) -> follow-up. Full CI running; merge when green.
 - Nov 13 23:05: #687 delta review: no blockers/majors; 2 minor (ban screen's sign-in box options fetched once; evasion strands a cleared person's guest progress), nits. CI GREEN (09462707; retry-pass global-chat:46 desktop). HOLDING merge for Eric's OK on the rule wording ('No URLs work' = the banned account, not the device) + the 'Sign in to another account' box. Eric asked about usage (~20% of week); answered with a cost table and offered process trims (pending his call).
 - Nov 13 23:10: Eric: whole device banned (no sister exception). Helper (high) reverts M1 on #687; no further review round (reverting toward the first-reviewed design).
+
+## Nov 13, 23:40 UTC
+- Merged: #676 (street town for everyone + 5th zoom step; Eric OK'd the door guard), #689 (CLAUDE.md: fix the cause, not
+  add a checker; cap stays xhigh), #687 (bans: whole device; no further review by Eric's call). Waiting: the live deploy of 4d1b052.
+- No helpers running. Proposed to Eric, awaiting yes/no: (1) a shared "wait until settled" e2e step + sweep of tests that
+  grab moving things (root cause of most flakes); (3) a repo commit-msg hook stripping model-name Co-Authored-By lines.
+  Already doing: online briefs answer "what if the device/server/engine is silent?"; parallel helpers never share files.
+- Still pending Eric: town-leave:148 wait fix (guard). Later list unchanged (match-history forms, 100-v-him idea, phase-1
+  server move for all bosses, Smudgy/Babur music, #676/#687 minors).
