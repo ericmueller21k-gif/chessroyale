@@ -35,7 +35,7 @@
 import { roomLoadSlice } from "./shops/load-slice.ts";
 import { F as RF, FPS, FpsCount, FrameRec, NP, P, REC, browserOf, setFps, setRec, summarize, timerStep } from "./frame-report.ts";
 import { reportPanel, reportPill, type Device } from "./frame-report-panel.ts";
-import { useLayoutEffect, useRef, useState } from "preact/hooks";
+import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import { createPortal } from "preact/compat";
 import { RIGHT_SLOT_TOOLS } from "../components/FrontMenu.tsx";
 import { UserIcon } from "../components/PixelIcon.tsx";
@@ -47,7 +47,7 @@ import { musicWanted, preloadMusic, roomMusic, roomMusicLoad, splashDone, splash
 import { AreaBanner, areaBannerOf, type AreaBannerText } from "./AreaBanner.tsx";
 import { SELECT_SOUND, TOWN_SOUNDS, townSound } from "../characters/boss-select.ts";
 import { N, colI, fromCam, newPt, proj, rel, rowI, wrapFX, wrapFY, wrapI } from "./camera.ts";
-import { SHOP_FEEL, TOWN_FEEL } from "./feel.ts";
+import { HIDDEN_ROOM_FEEL, SHOP_FEEL, TOWN_FEEL } from "./feel.ts";
 import { ZEBRA_OUTSIDE_LINES, pickLine } from "./shops/zebra-lines.ts";
 import { canChallengeInside, homeTheme, roomTheme, shopOf } from "./shops/shops.ts";
 import type { RoomPart } from "./shops/room.ts";
@@ -67,7 +67,7 @@ import { StreetZoom, parkSide } from "./zoom-steps.ts";
 import { PAWN_HEAD, PAWN_PX, Renderer, pawnImage, type Hit, type YouArt } from "./render.ts";
 import { dropRiders, leaveRider, ridersHeld, rideArt, shareRider, type Rider, type RiderPawn } from "./rides.ts";
 import { rideSpeed } from "../components/rides/scale.ts";
-import { MUSIC, mountOf, secondColor, shownLook, sideOfPawn } from "@chessroyale/core";
+import { HIDDEN_ROOM, MUSIC, mountOf, secondColor, shownLook, sideOfPawn } from "@chessroyale/core";
 import { painter2d, type Backend, type Painter } from "./paint.ts";
 import { painterGL } from "./paint-gl.ts";
 import { reportTownFallback } from "../problems.ts";
@@ -77,7 +77,10 @@ import { TOWN_BOTS, COLISEUM_PLACE, CROWD_MAX, HOMES, addCrowd, figureName, hasT
 import { NO_WEBGL_STREET, STREET_TOWN } from "./admin-town.ts";
 import { guestLimitMs, watchAway, watchGuest } from "./here-net.ts";
 import { FdButton } from "../components/FrontDoor.tsx";
-import { TOWN_BACK_TO } from "./LeaveTown.tsx";
+import { LeaveTownConfirm, TOWN_BACK_TO, setRequestWaiting } from "./LeaveTown.tsx";
+import { HiddenRoomClient, type RoomOutcome } from "./hidden-net.ts";
+import { HiddenCard, HiddenCount, RoomNote } from "./HiddenRoom.tsx";
+import type { LivePawn, RecluseScene } from "./shops/recluse-scene.ts";
 import { tooYoung } from "../account.ts";
 import { dressedPawn, lookKey, offFace, offRide } from "./you-look.ts";
 import type { ItemLook } from "@chessroyale/core";
@@ -132,6 +135,7 @@ export function TownScreen({
   askLeave,
   onBossAlone,
   onBossChallenge,
+  onHiddenFight,
   onPlayBot,
   onColosseum,
   seat = null,
@@ -153,6 +157,8 @@ export function TownScreen({
    * screen's START does) and resolve once the battle shows (the transition slides off it). `stand`: where you stood, to come back to.
    */
   onBossChallenge?: (id: HomeId, stand: Stand | null) => Promise<void>;
+  /** The Hidden Boss's room's four go in (hidden-net.ts): the summoning has played to black; into his fight with your pass and seat. */
+  onHiddenFight?: (lobby: string, pass: string, seat: number, stand: Stand | null) => void;
   onPlayBot?: (game: BotGameAsk) => void;
   onColosseum?: () => void;
   seat?: string | null;
@@ -219,6 +225,42 @@ export function TownScreen({
   const byDoor = useRef(false);
   const [banner, setBanner] = useState<(AreaBannerText & { n: number }) | null>(null);
   const bannerN = useRef(0);
+  // ---- The Hidden Boss's room challenge (Eric, Nov 12 and 13; hidden-net.ts, HiddenRoom.tsx; the server's: server/src/hidden-room.ts).
+  /** The room's client (made as you first climb to his room), and his room's scene (the child, the others, the summoning). */
+  const hidden = useRef<HiddenRoomClient | null>(null);
+  const recluse = useRef<RecluseScene | null>(null);
+  /** The others in his room as the scene draws them (a new list only when the server answers: nothing made per frame). */
+  const livePeople = useRef<readonly LivePawn[]>([]);
+  /** A small note with OK ("The door is locked.", "Sorry, not enough players."). */
+  const [note, setNote] = useState<string | null>(null);
+  /** "Cancel your game request?" before leaving his room with your request in: where you were going. */
+  const [asking, setAsking] = useState(false);
+  const cancelGo = useRef<(() => void) | null>(null);
+  /** The summoning is playing: nothing else happens (no taps, no keys, no leaving), then his fight. */
+  const summoning = useRef(false);
+  const [frozen, setFrozen] = useState(false);
+  /** The town has closed (the side menu, the back gesture): a fight told after that goes straight in. */
+  const gone = useRef(false);
+  const hiddenClient = () =>
+    (hidden.current ??= new HiddenRoomClient(
+      () => {
+        const p = shopCtl.current?.youAt?.();
+        // (Idle 0: the town's own away rule, watchAway, runs in rooms too and takes an idle player out of the town, so out of his room.)
+        return p ? { c: Math.round(p.c), r: Math.round(p.r), idleMs: 0 } : null;
+      },
+      (o) => (o.kind === "fight" ? void summon(o) : setNote(o.message)),
+      (message) => {
+        setNote(message);
+        void goThrough("landing");
+      },
+    ));
+  /** In his room with your request in, leaving asks first ("Cancel your game request?"); anywhere else it goes at once. */
+  const askIfWaiting = (go: () => void) => {
+    if (summoning.current) return;
+    if (!hidden.current?.waiting) return go();
+    cancelGo.current = go;
+    setAsking(true);
+  };
   const fadeTo = (to: 0 | 1, ms: number, delay = 0) => {
     const el = fade.current;
     if (!el) return;
@@ -240,7 +282,19 @@ export function TownScreen({
     id !== "recluse"
       ? null
       : part === "top"
-        ? import("./shops/recluse-scene.ts").then((m) => m.recluseScene(Date.now() - performance.now(), true, { live: true }).fx)
+        ? import("./shops/recluse-scene.ts").then((m) => {
+            const me = account().profile?.user.id ?? "you";
+            const sc = m.recluseScene(Date.now() - performance.now(), true, {
+              live: true,
+              people: () => livePeople.current,
+              you: () => {
+                const p = shopCtl.current?.youAt?.();
+                return p ? { id: me, c: p.c, r: p.r } : null;
+              },
+            });
+            recluse.current = sc;
+            return sc.fx;
+          })
         : import("./shops/recluse-stairs-scene.ts").then((m) => m.RECLUSE_STAIRS_FX);
   /**
    * You stand at a shop's door (its "Go in"): the town zooms in on the door (`x`, `y` in the box) and fades to black; the room opens.
@@ -328,11 +382,22 @@ export function TownScreen({
    */
   const goThrough = async (to: RoomPart) => {
     const at = insideNow.current;
-    if (doorBusy.current || !at || flow.current !== "town") return;
+    if (doorBusy.current || !at || flow.current !== "town" || summoning.current) return;
     doorBusy.current = true;
     outNext.current = false;
     const F = SHOP_FEEL;
     const from: RoomPart = at.room.def.part ?? "front";
+    // (Up to his room: four at most, Eric, Nov 12. A 5th: "The door is locked." and stays out.)
+    if (at.room.def.home === "recluse" && to === "top") {
+      const r = await hiddenClient().enter();
+      if (!r.ok) {
+        // (The stairs' card closes under the note: you stay on the landing. No words: your fight's summoning is taking you.)
+        shopCtl.current?.close?.();
+        if (r.message) setNote(r.message);
+        doorBusy.current = false;
+        return;
+      }
+    }
     byDoor.current = true;
     doorPhase(RF.goIn);
     // (The back door's creak is off with the bakery's other room sounds: Eric, Nov 11.)
@@ -404,6 +469,7 @@ export function TownScreen({
   };
   /** "Go out" (or the back button inside): the room fades to black, and the town zooms back out from the door. */
   const goOut = async () => {
+    if (summoning.current) return;
     if (doorBusy.current) {
       // (Tapped as the room fades in: it waits for the room, then goes out. Not while already going out.)
       if (insideNow.current && !outNext.current && !leaving.current) outNext.current = true;
@@ -439,6 +505,75 @@ export function TownScreen({
     doorPhase(0);
   };
 
+  /**
+   * His room's four go in (Eric, Nov 12: "a freeze frame… the frozen players burst into particles… absorbed into the light… the board
+   * wobbles up and down, settles; the room goes quiet. Then a transition into the match"): the scene's summoning (shops/recluse-scene.ts,
+   * HIDDEN_ROOM_FEEL.summon), everyone frozen where they stand, no taps or keys; at its end (the room irised to black) a black cover over
+   * the page while his fight opens (the app's onHiddenFight: your pass, your seat). "Back to town" brings you to his door.
+   */
+  const summon = async (o: Extract<RoomOutcome, { kind: "fight" }>) => {
+    if (summoning.current) return;
+    summoning.current = true;
+    // (The town closed with "Leave and cancel" just as the fourth joined: the summoning has started for everyone, so straight into the
+    // fight with them; review m1.)
+    if (gone.current) return onHiddenFight?.(o.lobby, o.pass, o.seat, null);
+    hidden.current?.stop();
+    setRequestWaiting(null);
+    setFrozen(true);
+    setNote(null);
+    setAsking(false);
+    shopCtl.current?.close?.();
+    // (The room goes quiet: its music stops at the freeze.)
+    roomMusic(null);
+    recluse.current?.summon(performance.now());
+    await later(HIDDEN_ROOM_FEEL.summon.end);
+    const cover = document.createElement("div");
+    cover.className = "hb-cover";
+    document.body.append(cover);
+    ctl.current?.standHere();
+    onHiddenFight?.(o.lobby, o.pass, o.seat, ctl.current?.challengeStand() ?? null);
+    setTimeout(() => {
+      cover.style.opacity = "0";
+      setTimeout(() => cover.remove(), 700);
+    }, 900);
+  };
+  /** In the walk-up's top floor, his room: the room's client asks the server while you're there (its count, its people, your start). */
+  const inTop = inside?.room.def.home === "recluse" && inside.room.def.part === "top";
+  useEffect(() => {
+    if (!inTop) return;
+    const c = hiddenClient();
+    c.start();
+    setRequestWaiting(() => c.waiting);
+    const others = () => {
+      let bot = 0;
+      livePeople.current = (c.info?.others ?? []).map((o) => (o.bot ? { id: o.id, c: null, r: null, spot: 1 + bot++ } : { id: o.id, c: o.c, r: o.r }));
+    };
+    others();
+    const off = c.subscribe(others);
+    const onHide = () => c.leave(true);
+    addEventListener("pagehide", onHide);
+    // (Tests) The room's challenge now: the server's last answer, the summoning's time, and whether you're frozen.
+    const hooks = window as unknown as { __hiddenRoom?: () => unknown };
+    if (testSwitchesAllowed()) hooks.__hiddenRoom = () => ({ info: c.info, refused: c.refused, summonT: recluse.current?.state().summonT ?? null, frozen: summoning.current });
+    return () => {
+      off();
+      removeEventListener("pagehide", onHide);
+      setRequestWaiting(null);
+      // (Into his fight: the server has taken you out of the room already.)
+      if (summoning.current) c.stop();
+      else c.leave(true);
+      livePeople.current = [];
+      delete hooks.__hiddenRoom;
+    };
+  }, [inTop, inside?.n]);
+  // (The summoning: no key reaches the room or the town.)
+  useLayoutEffect(() => {
+    if (!frozen) return;
+    const stop = (e: KeyboardEvent) => e.stopImmediatePropagation();
+    addEventListener("keydown", stop, true);
+    return () => removeEventListener("keydown", stop, true);
+  }, [frozen]);
+
   // (A layout effect: the world's first frame is drawn before the screen first shows.)
   useLayoutEffect(() => {
     const t = startTown(box.current!, canvas.current!, chips.current, cardEl.current!, live.current!, setZoomedOut, setCard, seatOf(seat), (s, face) => {
@@ -460,7 +595,7 @@ export function TownScreen({
     const stopAway = watchAway({
       town: t.town,
       shop: () => shopIn.current,
-      busy: () => flow.current !== "town" || !!shopCtl.current?.busy?.(),
+      busy: () => flow.current !== "town" || summoning.current || !!shopCtl.current?.busy?.(),
       onState: (st) => void (t.town.you.zzz = st === "zzz"),
       onOut: () => awayOut.current(),
       onOthers: t.others,
@@ -472,6 +607,7 @@ export function TownScreen({
       setGated(true);
     });
     return () => {
+      gone.current = true;
       stopGuest();
       stopAway();
       t.stop();
@@ -516,7 +652,7 @@ export function TownScreen({
       ) : (
         <header class="town-bar">
           {/* (Inside a shop, back takes you out to the town square.) */}
-          <button type="button" class="town-back" aria-label="Back" onClick={inside ? () => void goOut() : () => askLeave(TOWN_BACK_TO, onBack)}>
+          <button type="button" class="town-back" aria-label="Back" onClick={inside ? () => askIfWaiting(() => void goOut()) : () => askLeave(TOWN_BACK_TO, onBack)}>
             ‹
           </button>
           {/* (Inside a shop, the shop's name: "Babur's Circus"; Nov 2. On a computer's narrow header, on up to two smaller lines.) */}
@@ -544,20 +680,40 @@ export function TownScreen({
             youRider={() => ctl.current?.youRider() ?? null}
             youName={playerName}
             onZoom={setShopOut}
-            onOut={() => void goOut()}
+            onOut={() => askIfWaiting(() => void goOut())}
             onReady={shopReady}
             ctl={shopCtl}
             intro={inside.intro}
             zzz={() => !!ctl.current?.town.you.zzz}
             arrived={!!inside.arrived}
-            onPass={(to) => void goThrough(to)}
+            onPass={(to) => askIfWaiting(() => void goThrough(to))}
             fx={inside.fx ?? null}
+            challengeCard={inTop ? <HiddenCard client={hiddenClient()} /> : null}
             onChallenge={() => void challengeHere()}
             canChallenge={canChallengeInside(inside.room.def.home)}
           />
         )}
         {/* The room's name as you walk in (under the cards and chat; taps pass through it). */}
         {inside && banner && <AreaBanner key={banner.n} text={banner} onDone={() => setBanner(null)} />}
+        {/* His room's count ("Challengers 2 of 4"), for everyone in it from the start (0 of 4); the summoning's freeze over it all. */}
+        {inTop && <HiddenCount client={hiddenClient()} />}
+        {frozen && <div class="hb-freeze" aria-hidden="true" />}
+        {note && <RoomNote text={note} onOk={() => setNote(null)} />}
+        {asking && (
+          <LeaveTownConfirm
+            dest=""
+            request
+            onStay={() => setAsking(false)}
+            onLeave={() => {
+              setAsking(false);
+              const go = cancelGo.current;
+              cancelGo.current = null;
+              // (The cancel's answer first, for a moment at most: just as the fourth joined, it hands you into the fight with the others,
+              // the summoning here, instead of out; review m1.)
+              void Promise.race([hidden.current?.cancel(), later(HIDDEN_ROOM.pollMs)]).then(() => !summoning.current && go?.());
+            }}
+          />
+        )}
         <div class="town-overlay">
           {/* The chat log, top left (its own file): under the cards; while it shows it takes every touch on its own area (the map under it gets none), faded none; the chips keep off its box (CHAT_BOX). */}
           <TownChat tone={inside?.room.def.chatTone} onSignIn={onSignIn && (() => askLeave("Sign in", onSignIn))} />

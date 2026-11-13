@@ -299,7 +299,7 @@ export function pickedUp(p: Press, selected: string | null, to: string | null, h
 
 // ---------------- Arrows ----------------
 
-export type Brush = "green" | "blue" | "red" | "yellow" | "paleGrey" | "paleBlue" | "party0" | "party1" | "party2";
+export type Brush = "green" | "blue" | "red" | "yellow" | "paleGrey" | "paleBlue" | "party0" | "party1" | "party2" | "party3";
 
 /** Each arrow color: its color, see-through-ness and line width (in 64ths of a square). */
 export const BRUSHES: Record<Brush, { color: string; opacity: number; width: number }> = {
@@ -313,11 +313,16 @@ export const BRUSHES: Record<Brush, { color: string; opacity: number; width: num
   party0: { color: "#e8820c", opacity: 0.85, width: 13 },
   party1: { color: "#2f6fe0", opacity: 0.85, width: 13 },
   party2: { color: "#c2349b", opacity: 0.85, width: 13 },
+  // (Seat 3: the Hidden Boss's room's fight of four, Nov 13.)
+  party3: { color: "#2f9e5a", opacity: 0.85, width: 13 },
 };
 
-/** A Boss Battle party's seat colors (seat 0 orange, 1 blue, 2 pink), the same on every device: arrows and the discs under pawns. */
-export const PARTY_COLORS = [BRUSHES.party0.color, BRUSHES.party1.color, BRUSHES.party2.color] as const;
-export const partyBrush = (seat: number): Brush => (seat === 1 ? "party1" : seat === 2 ? "party2" : "party0");
+/**
+ * A Boss Battle party's seat colors (seat 0 orange, 1 blue, 2 pink; 3 green, the Hidden Boss's room's fight of four), the same on every
+ * device: arrows and the discs under pawns.
+ */
+export const PARTY_COLORS = [BRUSHES.party0.color, BRUSHES.party1.color, BRUSHES.party2.color, BRUSHES.party3.color] as const;
+export const partyBrush = (seat: number): Brush => (seat === 1 ? "party1" : seat === 2 ? "party2" : seat === 3 ? "party3" : "party0");
 
 export interface ArrowShape {
   move: string;

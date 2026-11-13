@@ -23,6 +23,7 @@ import {
   XP,
   QUESTS,
   BOSS_PARTY,
+  HIDDEN_ROOM,
   BOSS_DIFFICULTY,
   BOSS_LEVEL,
   BOSS_POWERS,
@@ -280,7 +281,7 @@ function modes(src: FaqSources): FaqSection {
 - The battle ends in checkmate or a draw, or after ${n(S.bossMaxMoves, "crowd move")}, when the engine judges the position.
 - **With friends** (up to ${BOSS_PARTY.max} of you): invite them from the spots behind you. The leader (with the crown) picks the boss and the difficulty; everyone else taps **READY**, and the leader's **START** works once everyone is ready. In the battle everyone picks every move and sees the others' picks as they come. Two or more on one move: it's played. Otherwise the engine's best pick is played, or, if two are within ${BOSS_PARTY.closeCp} centipawns, one of those at random. The team shares one ${BOSS_CLOCK.bankSeconds / 60} + ${BOSS_CLOCK.incrementSeconds} clock, and the turn waits for everyone: ${BOSS_PARTY.afkKickSec} seconds after the turn's first pick, the leader can remove someone who hasn't picked. The boss never strikes anyone down.
 - **Boss alone** (**START** on the Boss Battle screen): just you against the boss you picked there, at a difficulty from ${src.difficulty[0]?.label} to ${src.difficulty.at(-1)?.label}. You pick every move, on a ${BOSS_CLOCK.bankSeconds / 60} + ${BOSS_CLOCK.incrementSeconds} clock: ${BOSS_CLOCK.bankSeconds / 60} minutes for the battle, and ${BOSS_CLOCK.incrementSeconds} seconds added as each move begins. The boss has no clock, and never strikes you down. If your clock runs out, the boss wins on time.
-- **The Crowd's boss final** is ${finalBoss ? `always ${finalFoe}, for` : "the same fight for"} the last ${left(src.crowdKnockouts.boss)} of a 50 v 50.${finalBoss ? " He's met nowhere else." : ""}
+- **The Crowd's boss final** is ${finalBoss ? `always ${finalFoe}, for` : "the same fight for"} the last ${left(src.crowdKnockouts.boss)} of a 50 v 50.${finalBoss ? ` He's met in one other place: [his room in Chess Town](#boss-${finalBoss.id}).` : ""}
 
 ### Squads {#mode-squads}
 
@@ -911,7 +912,7 @@ Your time is the clock at the right of the box under the board: alone or in a pa
 };
 
 /**
- * The Crowd's boss final's boss (Eric, Oct 14: always the Hidden Boss, met nowhere else by players): his opening, his
+ * The Crowd's boss final's boss (Eric, Oct 14: always the Hidden Boss; since Nov 13 also from his room in the town, HIDDEN_ROOM): his opening, his
  * passive and ultimate, and his second phase, every number from the settings (BOSS_POWERS, RECLUSE_PHASE2, BOSS_BRAIN).
  */
 function crowdFinalBlock(src: FaqSources, b: BossDef): string {
@@ -921,7 +922,7 @@ function crowdFinalBlock(src: FaqSources, b: BossDef): string {
   const clock = (sec: number) => (sec % 60 ? `${num(sec)} s` : n(sec / 60, "minute"));
   const increment = p.bulletIncrementSeconds > 0 ? `; the first ${n(p.bulletPlainMoves, "move")} on it add no time, then each move made in time adds ${num(p.bulletIncrementSeconds)} s` : ", and nothing adds time";
   return `
-Met only in the Crowd's boss final, where it's always him, against the top ${n2}. He plays from the starting position (he has no memorized openings), with the crowd as White, and his strength never follows anyone's rating: Maia at its top, raw. More in [his strength and brain](#boss-strength).
+Met in the Crowd's boss final, where it's always him, against the top ${n2}, and in Chess Town: up the stairs of his walk-up to the top floor, where up to ${n(HIDDEN_ROOM.players, "player")} in his room challenge him together (each taps **Challenge**; at ${HIDDEN_ROOM.players} you fight him as one team: the move most of you picked is played, and a tie goes to the stronger move; if ${HIDDEN_ROOM.players} haven't challenged within ${n(HIDDEN_ROOM.capSec / 60, "minute")}, the request ends). He plays from the starting position (he has no memorized openings), with the crowd as White, and his strength never follows anyone's rating: Maia at its top, raw. More in [his strength and brain](#boss-strength).
 
 - **No Help** (passive): the God King's help doesn't work against him: his move, his strike and his Last Stand never come. Calling him spends a charge all the same, and ${bossInText(b.name, false, src.roster)} mocks it. He never strikes anyone down either: all ${n2} of you play to the end.
 - **Bullet** (ultimate): a meter of his own, full as turn ${p.bulletTurn} begins, when it comes with no warning. From then on every bank is ${clock(p.bulletBankSeconds)}, with no cap on a move${increment}. If everyone still in runs out of time, he wins on time.

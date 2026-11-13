@@ -756,9 +756,11 @@ and [2026-11-02-bigger-showpieces.md](../decisions/2026-11-02-bigger-showpieces.
 ## The Walk-up, the Hidden Boss's building (Nov 13)
 
 An old Brooklyn corner walk-up (Eric's 1940s photo, `notes/mockups/2026-11-12-eric-hidden-boss-building-ref.webp` on the director's
-notes branch): **an admin's only** while the Hidden Boss is in the game for admins first (`"recluse"` in core's `BOSS_ADMIN_FIRST`,
-as Don Dough's bakery was; his Boss Battle tile stays locked: he's `adminOnly`). Its name is "The Walk-up"; the boss's is core's one
-string ("Hidden Boss"), never his real one. [2026-11-13-hidden-boss-building.md](../decisions/2026-11-13-hidden-boss-building.md).
+notes branch): **in everyone's town** since Nov 13 (Eric: "It doesn't need to be admin only... the site is behind Cloudflare"; it was an
+admin's only for a day, `"recluse"` in core's `BOSS_ADMIN_FIRST`); his Boss Battle tile stays locked (he's `adminOnly`: met only from
+his room, below, and the Crowd's final). Its name is "The Walk-up"; the boss's is core's one string ("Hidden Boss"), never his real one.
+[2026-11-13-hidden-boss-building.md](../decisions/2026-11-13-hidden-boss-building.md). On the ring of fourteen's spacing it's the
+exception: about 7 squares from Ginger's igloo (`town-camera.test.ts`).
 
 - **Outside** (`houses/recluse.ts`, 144 x 224, drawn in code): four stories of red-brown brick with stone quoins, a bracketed cornice and
   a little pediment, arched stone hoods (the top floor's windows round-headed), a black iron fire escape zigzagging down the east bays, a
@@ -783,15 +785,51 @@ string ("Hidden Boss"), never his real one. [2026-11-13-hidden-boss-building.md]
   arrive at the stairs you came by (`passArrive(room, from)`). The same fade as Rolling Dough's door.
 - **The flats' doors** are talk pieces with `locked` lines: a tap walks you to that door's own spot (`talkNear`), and its card
   ("Apartment door") says a short line in turn, with OK. His room: a tap on his board walks you round to its front; his card ("Hidden
-  Boss") has **Challenge greyed, "Coming soon"** (`canChallengeInside` is false for him): the room's challenge, the 4-player count, the
-  locked door and the summoning are the next job (server).
+  Boss") has the room's own challenge (below: **His room's challenge**).
 - **Music:** `recluse-house` (themes.json) plays in his room only (`ShopDef.music`; `roomTheme`); the hall and the landing have none.
   It loads as you go in at the street door (`homeTheme`).
 - **Banners:** the hall "Hidden Boss's / The Walk-up", the landing "Second floor", his room "Top floor".
 - **See-through:** each room's front door (the street door, the stairs down, his room's door) and front band go see-through over you
   (`RoomArt.seeThru`, which a box room may list now too: you walk in, or come up, just behind them).
 - The dev preview (`/hidden-room-preview.html`) stays a dev page: the build has only `index.html`.
-- Tests: `test/recluse-building.test.ts`; e2e `town-street.spec.ts` ("the Hidden Boss's walk-up": the door, up two flights, his card,
+- **His room's challenge (Nov 13; [2026-11-13-hidden-boss-challenge.md](../decisions/2026-11-13-hidden-boss-challenge.md)).** Eric's
+  rules: you challenge from his room only, and wait there; four at most in it; at four, the summoning, then his fight together.
+  - **The server** (`server/src/hidden-room.ts`, in the live hub's memory: a restart forgets it, and each device in the room goes back in;
+    `POST /api/town/hidden`, `hidden-room-api.ts`): per town instance (the town's `room`: production's one, each test's own with
+    `?townroom=`), the room's people and one request. Signed-in accounts only (a guest goes up and watches, uncounted, Challenge greyed:
+    "Sign in to challenge him."; the app asks nothing for them). An account banned for fair play can't go in or challenge: the same
+    `banCheck` as PLAY (the account and the device cookie, at most once a minute), 403 with `banned`, and the app shows the ban notice
+    (review M1). A rest (`boss:recluse` or `raid`) refuses a challenge and ends a request the bots fill with its line. Every number in core's `HIDDEN_ROOM`: `players` 4, `capSec` 300,
+    `pollMs` 1500, `silentSec` 20, `outcomeSec` 60, `bots` 3, `botJoinMs` 2000, `joinWaitSec` 60.
+  - **The door:** the stairs up from the landing ask the server first (`enter`): with four people in the room (bots and those who haven't
+    challenged count), "The door is locked." with OK, and you stay on the landing.
+  - **The count:** his card (`HiddenRoom.tsx`) has Challenge and Cancel (each greyed while it doesn't apply: nothing hidden) and a line,
+    "Up to 4 fight him together." or "2 of 4: Ann, Bo"; over the room, **"Challengers 2 of 4"** for everyone in it, from "0 of 4" as you
+    come in, so it never appears from nothing (`.hb-count`; greyed for a guest, a device too young or a banned account). The app asks every `pollMs` (`hidden-net.ts`, with where you stand), and the others in the room are drawn as pawns
+    gliding to where they stand (`recluse-scene.ts` `people`; a newcomer from the door; each a mockup color by their id: `liveColor`).
+  - **Leaving asks:** with your request in, the stairs down, back and the town's leaving (the side menu, the back gesture) ask **"Cancel
+    your game request?"** (Stay / Leave and cancel; `LeaveTown.tsx`, `requestWaiting`). A disconnect (no ask for `silentSec`), the AFK
+    drop (the town's own away rule, `watchAway`, which runs in rooms too: the app sends no idle time) and a solo boss battle begun
+    elsewhere (one request at a time: `/api/boss/solo/start` → the hub's `hiddenDrop`, after the answer) end your place too. The other
+    ways into a game (PLAY, a party's START, Squads, 1v1) don't: a known gap, two tabs only.
+  - **Too late to leave:** once the fourth has joined, the four are set. A Cancel or "Leave and cancel" racing the start keeps your seat,
+    and its answer hands you into the fight with the others (in the room, the summoning; out of the town, straight in). The hub's answers
+    wait while the fight is being made, and a device swept out meanwhile is told its fight when it asks to come back in. Only a closed tab
+    leaves its seat empty: the others start at `joinWaitSec`.
+  - **The cap:** not four by `capSec` (shown nowhere): everyone waiting gets "Sorry, not enough players." with OK, and stays in the room.
+  - **At four:** the hub makes the fight (a party battle's lobby: `hiddenRoomSettings`, `PartyLobby.room`, each person's own pass into
+    their seat) and posts the town's line, "Ann, Bo, Cy and Di are fighting the Hidden Boss." (the challenge lines' blue). Each of the four
+    reads their start on their next ask: the room's music stops, everyone freezes where they stand (you too: the scene's pawn), and the
+    scene's summoning plays (`HIDDEN_ROOM_FEEL.summon`, about 7 s, to black); a black cover holds while his fight opens (the app's
+    `hiddenFight` → `joinLobby`, `NetMatch.hiddenRoom`). Its result's "Back to town" brings you to his door.
+  - **Eric's test kit (admins only, server-checked):** "Fill with 3 bots" on his card: three bots stand at the board's places, count
+    toward the four, join a request one by one (`botJoinMs`, so each count shows), go through the summoning and play as the fight's bot
+    members; they leave with the admin. A player's "fill" is refused ("Admins only."). The fight's 🏆: see bosses.md, "Win this form".
+- Tests: `test/recluse-building.test.ts`; server `test/hidden-room.test.ts` (the room count, the lock, the cap, leaving and disconnects,
+  one request at a time, the bots' admin gate, the fight of four, the online 🏆's admin gate; a ban at the door, a cancel, a leave or a
+  swept device racing the start, the hub's wait, a rest); e2e `hidden-boss-room.spec.ts` (an admin up,
+  the count at 0 of 4, Challenge 1 of 4, leaving asks, 3 bots join to 4 of 4, the summoning, the fight, the 🏆; a 5th locked out); `town-street.spec.ts` ("the
+  Hidden Boss's walk-up": the door, up two flights, his card,
   back down; `STILLS=<dir>` writes the stills).
 
 ## Challenging a boss (Nov 2: Pokémon-gym style)

@@ -1056,3 +1056,61 @@ button.town-pic.player {
   text-align: center;
   text-shadow: 0 3px 0 #2a1a10, 0 0 18px rgba(0, 0, 0, 0.6);
 }
+
+/*
+ * The Hidden Boss's room challenge (Eric, Nov 12 and 13; HiddenRoom.tsx): the count over his room ("Challengers 2 of 4", for everyone in
+ * it while a request is on; the room's bottom left, level with the buttons' row on the right: clear of the chat log at the top and the
+ * buttons; under the cards, taps pass through), his card's line (its row kept: nothing moves as the count changes), the summoning's
+ * freeze (no taps reach the room), and the black that covers the page as his fight opens (outside the town).
+ */
+.hb-count {
+  position: absolute;
+  left: 14px;
+  bottom: 14px;
+  z-index: 5;
+  pointer-events: none;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: rgba(20, 12, 8, 0.82);
+  border: 1px solid #c9a24a;
+  color: #f6e7c1;
+  font: 700 14px/1 Archivo, system-ui, sans-serif;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.hb-count.off {
+  opacity: 0.5;
+}
+.hb-count-label {
+  font-weight: 500;
+  opacity: 0.8;
+}
+.hb-card-line {
+  min-height: 2.6em;
+  max-width: 15em;
+  margin-left: auto;
+  margin-right: auto;
+}
+.town-card .town-btn.hb-bots {
+  font-size: 13px;
+}
+.hb-freeze {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+}
+.hb-cover {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: #000;
+  transition: opacity 0.6s linear;
+  pointer-events: none;
+}
+.hb-note {
+  text-align: center;
+}
+.hb-note-text {
+  font-size: 17px;
+  margin: 6px 0 14px;
+}

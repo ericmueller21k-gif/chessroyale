@@ -230,7 +230,7 @@ export function BossDock({
       {/* (Admins' testing: tiny icons beside the God King's head, styles.css .gk-tool; a computer has them in its title line.) */}
       {!computer && <UltimateTest match={match} icon />}
       {!computer && <EngineMove match={match} icon />}
-      {!computer && <WinForm match={match} icon />}
+      {!computer && !match.party && <WinForm match={match} icon />}
     </div>
     {/* (A phone keeps the brain's line in the page, hidden: its words are the 🐟 icon's title, and the tests read them.) */}
     {!computer && <BrainDebug match={match} hidden />}

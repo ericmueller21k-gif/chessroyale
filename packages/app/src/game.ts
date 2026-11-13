@@ -389,7 +389,7 @@ export interface GameView {
   readonly engineThinking?: boolean;
   /** Plays Stockfish's best move as your own, through the normal move path. */
   engineMove?(): void;
-  /** Testing, admins in Boss alone against the Hidden Boss: the "Win this form" button shows (solo only). */
+  /** Testing, admins against the Hidden Boss: the "Win this form" button shows (Boss alone, and online in his room's fight from the town). */
   readonly winFormShown?: boolean;
   /** It was pressed: your next move wins the form (his adult form, or phase 2's four boards). */
   readonly winFormArmed?: boolean;

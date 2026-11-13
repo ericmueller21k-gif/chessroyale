@@ -26,16 +26,17 @@ for (const q of TOP.SHOP_RECLUSE_STANDING) top.blocked[q.r * top.n + q.c] = 1;
 const sq = (s: { c: number; r: number }) => `${s.c},${s.r}`;
 
 describe("the Walk-up in the town (Nov 13)", () => {
-  it("is in an admin's town only: the Hidden Boss is in the game for admins first, and his Boss Battle tile stays locked (adminOnly)", () => {
+  it("is in everyone's town (Eric, Nov 13: \"It doesn't need to be admin only\"), and his Boss Battle tile stays locked (adminOnly)", () => {
     const him = BOSS_ROSTER.find((b) => b.id === "recluse")!;
-    expect(adminFirst(him)).toBe(true);
+    expect(adminFirst(him)).toBe(false);
     expect(him.adminOnly).toBe(true);
     expect(isPlayable(him)).toBe(false);
-    // (Admins first doesn't put him on an admin's raid menu: only Boss alone's hidden list had him, as before.)
+    // (Never on a raid menu, an admin's included: only Boss alone's hidden list has him, as before.)
     expect(menuBosses({ admin: true, raid: true }).map((b) => b.id)).not.toContain("recluse");
+    expect(menuBosses({ admin: false, raid: false }).map((b) => b.id)).not.toContain("recluse");
     expect(HOMES.map((h) => h.id)).toContain("recluse");
-    // (A player's town filters it as world.ts HOMES does: admins first.)
-    expect(ALL_HOMES.filter((h) => !adminFirst(h)).map((h) => h.id)).not.toContain("recluse");
+    // (A player's town filters as world.ts HOMES does: admins first, which he no longer is.)
+    expect(ALL_HOMES.filter((h) => !adminFirst(h)).map((h) => h.id)).toContain("recluse");
   });
 
   it("is the last home, with nobody out front: the town's figures stay one per home, each at its home's index", () => {
