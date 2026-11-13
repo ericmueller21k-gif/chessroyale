@@ -1012,3 +1012,4 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 13 22:28: main green on 4d9bccb2 (#686). #676 CI round DONE (shared tapInTown/townTapPoint; root causes; guard 'a home's door' tap delivery only -> TELL ERIC); prepped 95135cb7, full CI running. Running Opus: bans fix round only (slot free).
 - Nov 13 22:50: #688 (Wrangler theme) MERGED 9c3c2ea1. Bans fix round DONE; delta re-review (brief review-bans-delta.md).
 - Nov 13 22:52: #676 full CI GREEN on 95135cb7 (retry-pass town.spec:424 statue, both projects). Delta re-review queued (brief review-676-delta.md).
+- Nov 13 23:00: #676 delta review: 1 blocker (statue test reads zoom mid-ease, this PR's change) FIXED by director 830a9800 (4/4 local); minors m1 (no test for failed-town away), m2 (Back to me snapped-look untested), m3 (PR body stale) -> follow-up. Full CI running; merge when green.
