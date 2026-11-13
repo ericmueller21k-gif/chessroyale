@@ -201,3 +201,5 @@ instantly win and trigger next phase on the next move."
 - Lengthen rise-to-crack to fit both lines at the cutscene's typing pace (up to about 18 s; today 8.74 s); the last line can finish in the
   final second of silence before the drop. Send the final rise-to-crack time to the music session (session_01JuCWRs7vACHciUbhC3eY8V); it
   builds that cut in about 11 minutes. Build after #670 merges.
+- FINAL (Eric, Nov 13, via the music session): 1 "Computation without creativity is nothing. // Now I have both."
+  2 "Prepare yourself. // This is the ultimate test of your skill."
