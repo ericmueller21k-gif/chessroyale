@@ -28,7 +28,7 @@ from one theme to the next.
 | `recluse-house` | walking into his room; it carries on through the fight with the child | none | the house's minute, 60.0 s |
 | `recluse-phase2` | the child is beaten | the stare, the build, the flag: 58.870 s | the chant, the duel, the book, the build again: 89.276 s |
 | `recluse-beaten` | that form is beaten: he talks | the book slammed shut: 1.815 s | the house's minute again (the same file as `recluse-house`'s) |
-| `recluse-phase3` | he rises in a rage (his transformation starts) | the music souring, fitted to the phase change's beats: 8.740 s. **It ends on the drop: the boards crack at t0 + `introSeconds`** | the big chant to the score's end: 88.371 s |
+| `recluse-phase3` | he rises in a rage (his transformation starts) | the music souring, fitted to the phase change's beats: 17.435 s. **It ends on the drop: the boards crack at t0 + `introSeconds`** | the big chant to the score's end: 88.371 s |
 
 **Switching:**
 - `recluse-house` to `recluse-phase2`: fade the house out (about 1.5 s), then start the theme.
@@ -39,25 +39,24 @@ from one theme to the next.
   wherever that is.
 - The result: as for any boss.
 
-**The one length that has to match, and what is in it.** `recluse-phase3`'s intro is fitted to the phase change as it
-is on main (e50befe4, `PHASE_CHANGE`; the numbers the wiring session measured, Nov 13). From t0, his rising in a rage,
-with `marks` in `themes.json` (seconds from t0):
+**The one length that has to match, and what is in it.** `recluse-phase3`'s intro is fitted to the phase change with
+his chant's two lines (branch `claude/hidden-boss-chant`, the director's times, Nov 13: 17.435 s from his rising to the
+crack). From t0, his rising in a rage, with `marks` in `themes.json` (seconds from t0):
 
 | `marks` | At | The music | The picture it was fitted to |
 |---|---|---|---|
 | (t0) | 0.000 | the childhood tune's three notes once more, sour, the tape sinking; a low thump at 1.53; a screech rising from 1.81 | he rises; he leaps (lands at 1.55); he swings the book up (1.84) |
 | `pause` | 2.440 | a hush | the book coming down |
 | `slam` | 2.640 | the book, slammed | the book lands open at his feet |
-| `build` | 3.040 | the build: the figure, the strings, kicks, a drone opening, slides and a screech rising, faster with each of three bars | his chant, the light pouring up |
-| `breath` | 7.740 | everything stops: one tick, then a full second of silence (Eric, Nov 13: "we need that pause longer like a full second it will make it more epic before going into the drop"; it was 0.2 s, at 8.540) | the last second of his chant (the arcs, if they're moved to start here) |
-| `drop` | 8.740 | the loop starts (`drop` is `introSeconds`) | the boards crack |
+| `build` | 3.040 | the build, six bars, each faster (they start at 3.04, 6.27, 9.01, 11.35, 13.32 and 15.00): the first has only the sour childhood notes; then the solo violin's figure creeps in; then kicks and screeches; then the strings, a drone opening, slides rising, low brass | his chant, the light pouring up; line 1 at 4.540 and 7.430, line 2 at 12.870 and 14.635 |
+| `breath` | 16.435 | everything stops: one tick, then a full second of silence (Eric: "we need that pause longer like a full second it will make it more epic before going into the drop") | his last line is typed; it is read in the silence |
+| `drop` | 17.435 | the loop starts (`drop` is `introSeconds`) | the boards crack |
 
 Read `introSeconds` and `marks` from `themes.json`, never from code. If the animation's times change, send the music
-session the new ones and the piece is made again to fit (`phases_v.py`, about eleven minutes): never stretch or cut the
-audio in the game. The talk before it can be any length. (The first handoff's intro was the score's own souring, 19.293
-s: commit 91a3f0b2 has it.) Eric also wants about five seconds more on the picture, in the chant: the music for that is
-ready (the same piece with a longer build, 13.740 s in all with +5.0 s) and is built and pushed here when the picture's
-new time is sent.
+session the new rise-to-crack time and the piece is made again to fit (`phases_v.py`, about eleven minutes; up to about
+18 s as it is built: longer needs a word first): never stretch or cut the audio in the game. The talk before it can be
+any length. (Earlier intros: the score's own souring, 19.293 s, commit 91a3f0b2; the first fitted one, 8.740 s, commit
+0032cd61.)
 
 **Levels:** one music volume fits all four. The house's loop is 6 dB under the other themes on purpose (-22 LUFS; it is
 that far under in the score), so nothing in the game needs a gain of its own.
