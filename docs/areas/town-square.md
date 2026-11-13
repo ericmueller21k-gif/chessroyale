@@ -1059,7 +1059,7 @@ and Seam Avenue's camera turn, is done; then the switch goes). Eric approved its
     - the tall lots are towers over the rows.
   - **The camera:**
     - the chase camera (`turn.ts chaseTarget`; down steps back without turning, left and right turn you);
-    - four zoom steps (`feel.ts streetZoomSteps`; `zoom-steps.ts StreetZoom`);
+    - five zoom steps (`feel.ts streetZoomSteps`; `zoom-steps.ts StreetZoom`): in, the mockup's, out, the overview and, since Nov 13, the old town's zoomed-out camera, the farthest ([decision](../decisions/2026-11-13-town-farthest-zoom.md));
     - the park's step out (`parkZoomOut`).
   - **Drawing only what the rows let you see:** `seen.ts`, at the in and default steps (`streetCull`).
   - **Smaller fixes:** a home's name only with its home; slanted sign lettering snapped.
@@ -1113,7 +1113,7 @@ and Seam Avenue's camera turn, is done; then the switch goes). Eric approved its
     the screen step and runs follow. Not snapped, or an arrow first: the first step eases back. The town opening and a building's in and
     out reset it to north (`freshView`); a home's strip turns the view but leaves the base alone.
   - **The opening zoom step** is the third (`streetZoomStart` 2, Eric: "number three"); the park's step out goes from there to the
-    overview. The rows' culling stays at the in and mockup steps (`zoom <= 1`).
+    overview, never further (`streetZoomParkMax`). The rows' culling stays at the in and mockup steps (`zoom <= 1`).
   - **The minimap** (`town/minimap.ts`, `TownMap.tsx`), built from the plan's data (`street.ts`: ground, lots, walls, park,
     Colosseum): small at the box's top right (`mapShare` 26% on a phone, `mapShareComputer` 13% in a computer's frame, at most
     `mapMaxPx`), `mapOpacity` 0.7, rounded; under the chat where the chat takes the whole top (a narrow frame). Drawn once a size to its
