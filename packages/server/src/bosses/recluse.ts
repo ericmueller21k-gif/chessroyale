@@ -40,6 +40,7 @@ import {
   phase2Ult,
   phase2WinAll,
   startPhase2,
+  type BossMoveKind,
   type MoveScore,
   type NetPhase2,
   type Phase2Board,
@@ -77,6 +78,29 @@ export interface Phase2SearchRequest {
   boss?: true;
   again?: true;
   fair?: true;
+}
+
+/**
+ * His phase 1 move (the child's or the man's) that no device answered (lobby.ts bossTimeout), asked of the engine server instead of
+ * the random move it was (Eric, Nov 13, option 1: "Keep Maia on the devices, but replace the random-move fallback with the same pause
+ * plus a server move"; docs/decisions/2026-11-13-recluse-phase1-pause.md). Kept with the lobby (LobbyRecord.recluse1) for the boss turn
+ * `key`: the position, how the turn plays (`kind`, as it was drawn) and his strength now (`elo`: the child's Maia rating's Stockfish
+ * stand-in, levelForMaia, or the man's fixed level: the runner's bossEloNow); when it was first asked (`since`: no result counts from
+ * it), this try's start, number and search id; the next try's time once one came back empty (`retryAt`). Tried again as phase 2's are
+ * (retryDelay; one lost on the way past SERVER_LOST_MS). No answer in RECLUSE_ONLINE.serverWaitMs: the fight ends with no result,
+ * `none` the people fighting him then (nothing counts for or against them; everyone else's result stands).
+ */
+export interface Recluse1Ask {
+  key: string;
+  fen: string;
+  kind: BossMoveKind;
+  elo: number;
+  since: number;
+  at: number;
+  tries: number;
+  ask: string;
+  retryAt?: number;
+  none?: string[];
 }
 
 /** A person's move waiting for the engine server's numbers (fair play). */
@@ -294,7 +318,10 @@ function startClocks(lobby: Phase2Lobby, p: Recluse2Record) {
  * Past a try's worst case (RECLUSE_ONLINE.searchMs, every group's wait included) and a margin for counting it, so a try still running
  * is never sent again: its answer is on its way (the review of #683, M1).
  */
-const SERVER_LOST_MS = RECLUSE_ONLINE.searchMs + 5000;
+export const SERVER_LOST_MS = RECLUSE_ONLINE.searchMs + 5000;
+
+/** How long after a try of his comes back empty the next goes: RECLUSE_ONLINE.retryMs after the first, twice as long each time, at most retryMaxMs. */
+export const retryDelay = (tries: number): number => Math.min(RECLUSE_ONLINE.retryMaxMs, RECLUSE_ONLINE.retryMs * 2 ** (Math.max(1, tries) - 1));
 
 /** The next time phase 2 needs the timer. */
 function arm(lobby: Phase2Lobby) {
@@ -573,7 +600,7 @@ export function searched(lobby: Phase2Lobby, id: string, scores: readonly MoveSc
   const ok = (scores ?? []).filter((s) => legal.has(s.move) && Number.isFinite(s.expected));
   if (ok.length) w.move = pick(withMates(w.fen, ok), w.who, () => lobby.rng());
   else if (w.who === "bot") quick(lobby, p, w);
-  else if (id === w.ask) w.retryAt = lobby.now() + Math.min(RECLUSE_ONLINE.retryMaxMs, RECLUSE_ONLINE.retryMs * 2 ** ((w.tries ?? 1) - 1));
+  else if (id === w.ask) w.retryAt = lobby.now() + retryDelay(w.tries ?? 1);
   hold(lobby, p);
   playReady(lobby, p);
   arm(lobby);
@@ -658,6 +685,20 @@ export function phase2NoResult(r: Pick<LobbyRecord, "recluse2">): boolean {
 export function phase2NoResultFor(r: Pick<LobbyRecord, "recluse2">, id: string): boolean {
   const p = r.recluse2;
   return !!p?.done?.noResult && Object.hasOwn(p.names, id);
+}
+
+/** Whether his fight ended with no result (his move never came from the engine server), in phase 1 or in phase 2. */
+export function recluseNoResult(r: Pick<LobbyRecord, "recluse1" | "recluse2">): boolean {
+  return !!r.recluse1?.none || phase2NoResult(r);
+}
+
+/**
+ * Whether `id`'s result is none: his fight ended with no result and they were fighting him then (phase 1: still in the battle,
+ * `recluse1.none`; phase 2: one of its boards, phase2NoResultFor). Someone who left before had their loss written as they left: it
+ * stands. Everyone else's result stands (a Crowd final's others).
+ */
+export function recluseNoResultFor(r: Pick<LobbyRecord, "recluse1" | "recluse2">, id: string): boolean {
+  return !!r.recluse1?.none?.includes(id) || phase2NoResultFor(r, id);
 }
 
 /** Whether `id` plays a board of phase 2 (still on). */
