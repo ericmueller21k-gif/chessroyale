@@ -1,5 +1,5 @@
 import type { ComponentChildren } from "preact";
-import { AGE_GATE, CHAT_MOD, ENGINE_SERVER, FAIRPLAY, FRIENDS, GLOBAL_CHAT, LOBBY_LIFE, LEAVES, OPS, RANKED_1V1, TOWN_CHAT } from "@chessroyale/core";
+import { AGE_GATE, CHAT_MOD, ENGINE_SERVER, FAIRPLAY, FRIENDS, GLOBAL_CHAT, LOBBY_LIFE, LEAVES, OPS, RANKED_1V1, SUPPORT_EMAIL, TOWN_CHAT } from "@chessroyale/core";
 
 /**
  * The privacy policy (/privacy), terms of service (/terms) and copyright page (/copyright): drafts written from what
@@ -8,8 +8,8 @@ import { AGE_GATE, CHAT_MOD, ENGINE_SERVER, FAIRPLAY, FRIENDS, GLOBAL_CHAT, LOBB
  * accounts.ts). A PR that changes what the game stores changes these words too.
  */
 
-/** The contact address: a placeholder until Eric sets up its forwarding (ROADMAP.md, "Needs Eric"). */
-export const CONTACT = "support@hunchess.com";
+/** The contact address (core's SUPPORT_EMAIL, the ban screen's too): a placeholder until Eric sets up its forwarding (ROADMAP.md, "Needs Eric"). */
+export const CONTACT = SUPPORT_EMAIL;
 export const UPDATED = "October 16, 2026";
 
 const hours = (ms: number) => Math.round(ms / 3_600_000);
@@ -366,8 +366,9 @@ function Privacy() {
           <strong>hc_device</strong> is the fair-play device marker: a random value and nothing else. 400 days.
         </li>
         <li>
-          <strong>hc_banned</strong> is set only if an account banned for fair play was used or signed in to on this device: that
-          account's random id, so the device shows only the ban. 400 days, or until the ban is lifted.
+          <strong>hc_banned</strong> is set only if an account banned for fair play (or for getting around a ban) was used or signed
+          in to on this device: that account's random id. While the ban stands, this device shows only the ban to anyone not signed in
+          to another account, and anyone may still sign in to theirs on it (a shared device). 400 days, or until the ban is lifted.
         </li>
         <li>
           <strong>hc_oauth</strong> and <strong>hc_next</strong> exist only during "Continue with Google". 10 minutes.

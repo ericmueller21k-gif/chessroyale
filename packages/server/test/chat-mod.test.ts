@@ -146,7 +146,7 @@ describe("fair play's review page: a player's chat", () => {
       const page = await (await get(`/admin/fairplay/case/${troll.id}`)).text();
       expect(page).toContain("<h2>Chat</h2>");
       // Fair play's own ban says what it bans, apart from the chat bans; a chat decision leaves the watch case open.
-      expect(page).toContain('value="ban">Ban from online play</button>');
+      expect(page).toContain('value="ban">Ban (can\'t sign in)</button>');
       expect(page).toContain("A reset or a chat ban doesn't close the report's watch case: click Clear (under Decide) for that.");
       expect(page).toContain(`Chat: <span class="cleared">open</span> · <a href="/profile/${troll.id}">Their profile (name and icon)</a>`);
       const form = (fields: Record<string, string>, origin = "https://x") =>

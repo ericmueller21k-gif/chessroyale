@@ -14,7 +14,7 @@ import { ledgerCheck, ledgerCheckDue } from "./ledger.ts";
 import { duelEntrant, purgeConduct, purgeDuelGames, rankedLeaves } from "./ranked.ts";
 import { DEVICE_COOKIE, SESSION_COOKIE, SIGN_IN_TO_PLAY, accountOf, handleAccountApi, isSignedIn, readCookie, signInRequired, withSecrets, type AccountEnv, type WaitUntil } from "./api.ts";
 import { banCheck } from "./fairplay.ts";
-import { UNMARK, banAnswer, banGate } from "./ban-gate.ts";
+import { BAN_COOKIE, BAN_HEADER, UNMARK, banAnswer, banGate } from "./ban-gate.ts";
 import { caseMailer } from "./fairplay-mail.ts";
 import { handleAdmin, isAdmin, testSwitchesOn, type AdminEnv } from "./admin.ts";
 import { handleTestAccounts } from "./test-accounts.ts";
@@ -176,9 +176,10 @@ async function handle(request: Request, rawEnv: Env, ctx: ExecutionContext): Pro
     countRoute("429", 0);
     return json({ message: TOO_MANY, retryMs: wait }, 429, { "retry-after": String(Math.ceil(wait / 1000)) });
   }
-  // A ban means you can't sign in (Eric, Nov 13; ban-gate.ts): a banned session, or a browser marked banned, gets the ban answer on
-  // every route here (the lobbies' WebSockets and the admin pages too), before the route runs. (Not the e2e's own database route.)
-  const gate = rawEnv.DB && !(rawEnv.E2E_SQL && url.pathname === "/api/e2e/sql") ? await banGate(d1Sql(rawEnv.DB), rawEnv.DB, request, t) : null;
+  // A ban means you can't sign in (Eric, Nov 13; ban-gate.ts): a banned session, or a browser marked banned with no live session, gets
+  // the ban answer on every /api/* route (the lobbies' WebSockets too), before the route runs. Not the admin pages (only admins see them,
+  // and an admin's browser that met a ban can still lift it: the review of #687, M1), nor the e2e's own database route.
+  const gate = !admin && rawEnv.DB && !(rawEnv.E2E_SQL && url.pathname === "/api/e2e/sql") ? await banGate(d1Sql(rawEnv.DB), rawEnv.DB, request, t) : null;
   if (gate && "refused" in gate) {
     countRoute("banned", Date.now() - t);
     return gate.refused;
@@ -190,8 +191,9 @@ async function handle(request: Request, rawEnv: Env, ctx: ExecutionContext): Pro
   if (res.status === 101 || res.webSocket) return res;
   const out = new Response(res.body, res);
   out.headers.append("server-timing", `app;dur=${ms}`);
-  // (A browser's ban mark whose account isn't banned any more: taken away. The browser is a guest again, free to sign in.)
-  if (gate) out.headers.append("set-cookie", UNMARK);
+  // (A browser's ban mark whose account isn't banned any more: taken away. The browser is a guest again, free to sign in. Not when the
+  // route itself gave the ban answer, a mark of its own: a refused sign-in, PLAY's evasion check. The review of #687, minor 1.)
+  if (gate && !res.headers.has(BAN_HEADER) && !res.headers.getSetCookie().some((c) => c.startsWith(`${BAN_COOKIE}=`))) out.headers.append("set-cookie", UNMARK);
   return out;
 }
 

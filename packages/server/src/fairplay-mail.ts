@@ -23,7 +23,7 @@ export function fairplayFrom(env: MailEnv): string {
  * The email for a ban, an appeal turned down or a clearing: subject and plain text (no names of anyone else, no evidence). A ban's
  * says what the ban screen says (Eric, Nov 13: BANNED_LINE; appeals by email), with the admin's note for the player, if any.
  */
-export function caseEmail(user: Pick<User, "name">, kind: "banned" | "cleared" | "upheld", notice: string | null): { subject: string; text: string } {
+export function caseEmail(user: Pick<User, "name">, kind: "banned" | "cleared" | "lifted" | "upheld", notice: string | null): { subject: string; text: string } {
   const hi = `Hi ${user.name},`;
   if (kind === "upheld") {
     return {
@@ -44,7 +44,10 @@ export function caseEmail(user: Pick<User, "name">, kind: "banned" | "cleared" |
       "",
       notice ?? "We reviewed your recent online matches and found nothing wrong. Thanks for playing fair.",
       "",
-      "Any results we held back while we looked now count again, and you can play online as usual.",
+      // (A lifted ban: the ban ended every session the account had, so it signs in again. A review cleared: nothing was ended.)
+      kind === "lifted"
+        ? "Your ban is lifted, and any results we held back while we looked now count again. Sign in again to play online."
+        : "Any results we held back while we looked now count again, and you can play online as usual.",
       "",
       "HunChess",
     ].join("\n"),

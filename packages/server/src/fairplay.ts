@@ -22,7 +22,7 @@
  * when the player was flagged or reported, and never deleted while their case is open (see purgeEvidence).
  */
 import { BANNED_LINE, FAIRPLAY, matchSignals, newAccountPool, playerLevel, referenceStrength, type FairLevel, type FairMove, type FairSummary, type LevelInput, type LevelVerdict } from "@chessroyale/core";
-import { getUser, identityHashes, refreshRating, type Sql, type User } from "./accounts.ts";
+import { getUser, identityHashes, markAgeOk, refreshRating, signInWithIdentity, type Sql, type User } from "./accounts.ts";
 import { forgetBanChecks } from "./ban-cache.ts";
 
 /** A case's status; "closed": a watch with nothing new for FAIRPLAY.evidenceDays (not a decision on the merits). */
@@ -167,36 +167,63 @@ const bannedOwner = (o: { status: string | null } | null) => !!o && (o.status ==
 const identityWord = (kind: string) => (kind === "email" ? "email address" : "Google account");
 
 /**
- * A ban means you can't sign in (Eric, Nov 13: "If you try to sign in, it would say your account has been banned"): checked when a
- * sign-in's identity is proven (the emailed code right, or Google's answer), before any account is made, joined or switched to. Answers
- * the banned account's id (the browser is marked with it: ban-gate.ts), or null to go ahead:
- * - the identity's account is banned;
- * - its account's own identities are a banned account's (banCheck's evasion rule, the same query): that account is banned by evasion
- *   now, as its next PLAY would have;
- * - an identity new to us (it would make an account, or join the one signed in here) that is a banned account's;
- * - Google's verified `email`, when the account doesn't already have it, is a banned account's (the one signing in owns that address):
- *   refused, with nothing else changed.
- * A pooled account signs in as any (the engine pool is never a ban).
+ * signInBan's answer: refuse now (`banned`: the account signing in, banned, or banned by evasion just now), or `evades`: an identity new
+ * to us that's a banned account's, whose own account evasionAccount makes, banned, once the sign-in can finish (the age question).
  */
-export async function signInBan(sql: Sql, kind: "google" | "email", value: string, email: string | null, now: number): Promise<string | null> {
+export type SignInBan = { banned: string } | { evades: string; reason: string };
+
+/**
+ * A ban means you can't sign in (Eric, Nov 13: "If you try to sign in, it would say your account has been banned"): checked when a
+ * sign-in's identity is proven (the emailed code right, or Google's answer), before any account is made, joined or switched to. Null to
+ * go ahead; else:
+ * - the identity's account is banned: `banned`;
+ * - its account's own identities, or Google's verified `email` it doesn't have yet (it would take it), are a banned account's
+ *   (banCheck's evasion rule, the same query): that account is banned by evasion now, as its next PLAY would have been: `banned`;
+ * - an identity new to us that's a banned account's: `evades` (evasionAccount).
+ * Every refusal names the account the person tried to sign in to, so a person can clear it (an email to support) and the browser's
+ * mark is that account's own id (ban-gate.ts). A pooled account signs in as any (the engine pool is never a ban).
+ */
+export async function signInBan(sql: Sql, kind: "google" | "email", value: string, email: string | null, now: number): Promise<SignInBan | null> {
   const col = kind === "google" ? "google_sub" : "email";
   const found = await sql.first<User>(`SELECT id, name, icon, email, google_sub, created_at FROM users WHERE ${col} = ?`, value);
-  if (found && (await caseOf(sql, found.id))?.status === "banned") return found.id;
+  if (found && (await caseOf(sql, found.id))?.status === "banned") return { banned: found.id };
   if (found) {
-    for (const [k, hash] of await identityHashes(found)) {
+    const brought = kind === "google" && !found.email && email ? await identityHashes({ email, google_sub: null }) : [];
+    for (const [k, hash] of [...(await identityHashes(found)), ...brought]) {
       const owner = await identityOwner(sql, k, hash, found.id);
       if (bannedOwner(owner)) {
         await setCase(sql, found.id, "banned", "evasion", `signed in with the ${identityWord(k)} of banned account ${owner!.user_id}`, now);
-        return found.id;
+        return { banned: found.id };
       }
     }
+    return null;
   }
-  const asked = kind === "google" ? { email: found?.email ? null : email, google_sub: found ? null : value } : { email: found ? null : value, google_sub: null };
-  for (const [k, hash] of await identityHashes(asked)) {
-    const owner = await identityOwner(sql, k, hash, found?.id ?? "");
-    if (bannedOwner(owner)) return owner!.user_id;
+  for (const [k, hash] of await identityHashes(kind === "google" ? { email, google_sub: value } : { email: value, google_sub: null })) {
+    const owner = await identityOwner(sql, k, hash, "");
+    if (bannedOwner(owner)) return { evades: owner!.user_id, reason: `signed in with the ${identityWord(k)} of banned account ${owner!.user_id}` };
   }
   return null;
+}
+
+/**
+ * An identity new to us that's a banned account's (signInBan's `evades`), once the sign-in can finish: its own new account (never
+ * joined to the one signed in on this browser, a guest's or another person's), banned by evasion at once, so a person can clear it, as
+ * PLAY's evasion check let them (docs/decisions/2026-10-16-integrity-followups.md: a cousin sharing a mailbox). `answered`: this device
+ * just said its holder is old enough (kept, as a sign-in keeps it). Answers the account's id.
+ */
+export async function evasionAccount(
+  sql: Sql,
+  kind: "google" | "email",
+  value: string,
+  extra: { email?: string | null },
+  evades: { reason: string },
+  answered: boolean,
+  now: number,
+): Promise<string> {
+  const made = await signInWithIdentity(sql, null, kind, value, extra, now);
+  if (answered) await markAgeOk(sql, made.id, now);
+  await setCase(sql, made.id, "banned", "evasion", evades.reason, now);
+  return made.id;
 }
 
 /**
@@ -292,7 +319,8 @@ export type Decision = "ban" | "clear" | "watch" | "review" | "release";
 const DECIDES: Record<Decision, CaseStatus> = { ban: "banned", clear: "cleared", watch: "watch", review: "review", release: "cleared" };
 
 /** Sends a player an email about their case (a ban, a clearing after a review, an appeal turned down); set up by the Worker. */
-export type CaseMailer = (user: User, kind: "banned" | "cleared" | "upheld", notice: string | null) => Promise<void>;
+/** Fair play's emails (fairplay-mail.ts): "lifted" is a ban cleared (its sessions were ended: sign in again), "cleared" a review cleared. */
+export type CaseMailer = (user: User, kind: "banned" | "cleared" | "lifted" | "upheld", notice: string | null) => Promise<void>;
 
 /**
  * A decision on a case by `by` ("admin:<email>" or "reviewer"), with a written reason for the log, and optionally a
@@ -342,7 +370,7 @@ export async function decide(
   await setCase(sql, userId, status, by, why, now);
   const notice = typeof opts.notice === "string" && opts.notice.trim() ? opts.notice.trim().slice(0, 1000) : null;
   if (user && opts.mail && (status === "banned" || (status === "cleared" && (before?.status === "review" || before?.status === "banned")))) {
-    await opts.mail(user, status === "banned" ? "banned" : "cleared", notice).catch((e: unknown) => console.log(`fair play email to ${userId}: ${String(e)}`));
+    await opts.mail(user, status === "banned" ? "banned" : before?.status === "banned" ? "lifted" : "cleared", notice).catch((e: unknown) => console.log(`fair play email to ${userId}: ${String(e)}`));
   }
   return { ok: true, status };
 }
@@ -366,7 +394,7 @@ export async function decideAppeal(
   await logCase(sql, a.user_id, `appeal ${outcome}`, by, text, now);
   const u = await getUser(sql, a.user_id);
   if (outcome === "overturned") await setCase(sql, a.user_id, "cleared", by, `appeal overturned: ${text}`, now);
-  if (u && mail) await mail(u, outcome === "overturned" ? "cleared" : "upheld", text).catch(() => undefined);
+  if (u && mail) await mail(u, outcome === "overturned" ? "lifted" : "upheld", text).catch(() => undefined);
   return { ok: true };
 }
 

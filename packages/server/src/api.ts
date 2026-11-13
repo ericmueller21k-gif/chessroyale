@@ -2,7 +2,7 @@ import { deleteLockerItems, equipLocker, lockerState, openCrate, type AdminCheck
 import { liveCounts, pruneLive, type LiveCounts } from "./live.ts";
 import { liveHub, type LiveHub } from "./live-hub.ts";
 import { cachedUserId, firstSighting, forgetToken, inboxOf, markSeen, rememberInbox } from "./presence.ts";
-import { REPORT_THANKS, reportPlayer, signInBan } from "./fairplay.ts";
+import { REPORT_THANKS, evasionAccount, reportPlayer, signInBan } from "./fairplay.ts";
 import { banAnswer, banRedirect } from "./ban-gate.ts";
 import { NAME_NOT_ALLOWED, isBlockedText } from "./text-filter.ts";
 import { chatNoticeSeen } from "./chat-mod.ts";
@@ -43,6 +43,7 @@ import {
   shopState,
   signInIfAnswered,
   signInWithIdentity,
+  spendEmailCode,
   startEmailCode,
   touchSession,
   updateProfile,
@@ -379,6 +380,153 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
     headers.append("set-cookie", sessionCookie(g.token));
     return new Response(JSON.stringify(await profile(sql, g.user, admins, leaves)), { headers });
   }
+  // ---- Signing in: the age question, an emailed code, Google. These run without a session too (Nov 13): a browser the ban gate marked
+  // banned has none, and anyone else may still sign in on it (a shared device: the review of #687, M1; ban-gate.ts SIGN_IN_ROUTES). ----
+
+  // A sign-in refused for a ban (Eric, Nov 13: signInBan) ends this browser's session only if it's the banned account's own or a guest's
+  // (the one signing in); another account signed in here stays signed in (a shared device: the review of #687, M1).
+  const endOnRefusal = (banned: string) => (token && (!current || !isSignedIn(current) || current.id === banned) ? token : null);
+
+  // POST /api/auth/age {oldEnough}: the age question's answer, asked before any sign-in (the app works it out from the
+  // birth month and year and sends only this; the date never leaves the device). Old enough: this device may sign in
+  // once within AGE_GATE.answerMinutes. Too young: for AGE_GATE.tooYoungDays this device can't sign in, a later answer
+  // doesn't change that, and its guest goes back to the default name and icon. From this site's own page, as JSON.
+  if (path === "/api/auth/age" && request.method === "POST") {
+    if (request.headers.get("origin") !== url.origin) return json({ message: "Not from here." }, 403);
+    if (!/^application\/json\b/i.test(request.headers.get("content-type") ?? "")) return json({ message: "Send JSON." }, 415);
+    const b = (await request.json().catch(() => ({}))) as { oldEnough?: unknown };
+    if (typeof b?.oldEnough !== "boolean") return json({ message: "Answer the question." }, 400);
+    if (b.oldEnough && ageAnswer(request) !== "under") return json({ age: "ok" }, 200, { "set-cookie": ageOk() });
+    if (current && !isSignedIn(current)) await resetNameAndIcon(sql, current.id);
+    return json({ age: "under" }, 200, { "set-cookie": cookie(AGE_COOKIE, "under", AGE_GATE.tooYoungDays * 86_400) });
+  }
+
+  // ---- Email: a 6-digit code (no email is taken from a device that answered "too young"; one that hasn't answered is asked once
+  // the code shows whose email it is, unless that account has answered). From this site's own page, as JSON (as the age question:
+  // the review of #687, minor 2). ----
+  if (path === "/api/auth/email/start" && request.method === "POST") {
+    if (request.headers.get("origin") !== url.origin) return json({ message: "Not from here." }, 403);
+    if (!/^application\/json\b/i.test(request.headers.get("content-type") ?? "")) return json({ message: "Send JSON." }, 415);
+    if (!email) return json({ message: "Email sign-in isn't set up yet." }, 503);
+    const tooYoung = ageRefusal(request);
+    if (tooYoung) return tooYoung;
+    const { email: raw } = (await request.json().catch(() => ({}))) as { email?: unknown };
+    const address = cleanEmail(raw);
+    if (!address) return json({ message: "That doesn't look like an email address." }, 400);
+    const started = await startEmailCode(sql, address, now);
+    if (!started.ok) return json({ message: started.message }, 429);
+    const sent = await fetcher("https://api.resend.com/emails", {
+      method: "POST",
+      headers: { authorization: `Bearer ${env.RESEND_API_KEY}`, "content-type": "application/json" },
+      body: JSON.stringify({
+        from: env.EMAIL_FROM ?? "HunChess <login@hunchess.com>",
+        to: [address],
+        subject: `${started.code} is your HunChess code`,
+        text: `Your HunChess sign-in code is ${started.code}. It works for 10 minutes. If you didn't ask for it, ignore this email.`,
+        html: `<p>Your HunChess sign-in code is</p><p style="font-size:28px;font-weight:800;letter-spacing:6px">${started.code}</p><p>It works for 10 minutes. If you didn't ask for it, ignore this email.</p>`,
+      }),
+    });
+    if (!sent.ok) return json({ message: "We couldn't send the email. Try again in a minute." }, 502);
+    // (An answer starts its time again, so it outlasts the code.)
+    return json({ ok: true }, 200, ageAnswer(request) === "ok" ? { "set-cookie": ageOk() } : {});
+  }
+  if (path === "/api/auth/email/verify" && request.method === "POST") {
+    if (request.headers.get("origin") !== url.origin) return json({ message: "Not from here." }, 403);
+    if (!/^application\/json\b/i.test(request.headers.get("content-type") ?? "")) return json({ message: "Send JSON." }, 415);
+    const tooYoung = ageRefusal(request);
+    if (tooYoung) return tooYoung;
+    const b = (await request.json().catch(() => ({}))) as { email?: unknown; code?: unknown };
+    const address = cleanEmail(b.email);
+    if (!address || typeof b.code !== "string") return json({ message: "Enter the 6-digit code." }, 400);
+    // Whether it can finish now: this device just answered "old enough", or the account it lands on has. Read before the code is
+    // checked, so a right code is used up only by a check that signs in; one that must ask first keeps it live, and the app sends it
+    // again with the answer (no new code). The answer is the same for a wrong code either way.
+    const answered = ageAnswer(request) === "ok";
+    const finish = answered || (await answeredSignIn(sql, current, "email", address));
+    if (!(await verifyEmailCode(sql, address, b.code, now, !finish))) return json({ message: "That code didn't work. Check it, or send a new one." }, 400);
+    // A ban means you can't sign in (Eric, Nov 13): once the code shows the address is theirs, a banned account (or ban evasion:
+    // signInBan) gets the ban answer and nothing else: no session for it, this browser marked (ban-gate.ts), the code spent (so one
+    // code can't be refused again and again). An account that exists is refused before the age question; an address new to us that's
+    // a banned account's makes its own account, banned by evasion, once it can finish (the age question first, as for any new account).
+    const ban = await signInBan(sql, "email", address, null, now);
+    const refuse = async (id: string) => {
+      await spendEmailCode(sql, address);
+      return banAnswer(sql, endOnRefusal(id), id);
+    };
+    if (ban && "banned" in ban) return refuse(ban.banned);
+    if (!finish) return askAgeFirst();
+    if (ban) return refuse(await evasionAccount(sql, "email", address, {}, ban, answered, now));
+    const user = answered ? await signInWithIdentity(sql, current, "email", address, {}, now) : await signInIfAnswered(sql, current, "email", address, {}, now);
+    // (The account went between the two reads: asked first, and the code's used: the finish fails and the player sends a new code.)
+    return user ? signInAs(user, answered) : askAgeFirst();
+  }
+
+  // ---- Google (behind the age gate too: a device that's too young goes back to the page; one that hasn't answered is asked when it
+  // comes back, unless the Google account's own account has answered) ----
+  const redirectUri = `${url.origin}/api/auth/google/callback`;
+  if (path === "/api/auth/google/start" && request.method === "GET") {
+    if (!google) return json({ message: "Google sign-in isn't set up yet." }, 503);
+    // (?signin=age: the app shows the friendly line to a device that's too young.)
+    if (ageRefusal(request)) return Response.redirect(`${url.origin}${safeNext(url.searchParams.get("next"))}?signin=age`, 302);
+    const state = randomToken(16);
+    const q = new URLSearchParams({
+      client_id: env.GOOGLE_CLIENT_ID!,
+      redirect_uri: redirectUri,
+      response_type: "code",
+      scope: "openid email profile",
+      state,
+      prompt: "select_account",
+    });
+    const headers = new Headers({ location: `https://accounts.google.com/o/oauth2/v2/auth?${q}`, "cache-control": "no-store" });
+    headers.append("set-cookie", cookie(STATE_COOKIE, state, 600));
+    headers.append("set-cookie", cookie(NEXT_COOKIE, safeNext(url.searchParams.get("next")), 600));
+    // (An answer starts its time again, so it outlasts the trip to Google.)
+    if (ageAnswer(request) === "ok") headers.append("set-cookie", ageOk());
+    return new Response(null, { status: 302, headers });
+  }
+  if (path === "/api/auth/google/callback" && request.method === "GET") {
+    if (!google) return json({ message: "Google sign-in isn't set up yet." }, 503);
+    const state = url.searchParams.get("state");
+    const code = url.searchParams.get("code");
+    if (!state || state !== readCookie(request, STATE_COOKIE) || !code || ageRefusal(request)) return Response.redirect(`${url.origin}/?signin=failed`, 302);
+    const res = await fetcher("https://oauth2.googleapis.com/token", {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ code, client_id: env.GOOGLE_CLIENT_ID!, client_secret: env.GOOGLE_CLIENT_SECRET!, redirect_uri: redirectUri, grant_type: "authorization_code" }),
+    });
+    if (!res.ok) return Response.redirect(`${url.origin}/?signin=failed`, 302);
+    const { id_token } = (await res.json()) as { id_token?: string };
+    // The token came straight from Google over TLS, so its claims can be read without checking the signature.
+    const claims = id_token ? (JSON.parse(atob(id_token.split(".")[1]!.replace(/-/g, "+").replace(/_/g, "/"))) as { sub?: string; email?: string; email_verified?: boolean; aud?: string }) : null;
+    if (!claims?.sub || claims.aud !== env.GOOGLE_CLIENT_ID) return Response.redirect(`${url.origin}/?signin=failed`, 302);
+    const answered = ageAnswer(request) === "ok";
+    const extra = { email: claims.email_verified ? (claims.email ?? null) : null };
+    const back = `${url.origin}${safeNext(readCookie(request, NEXT_COOKIE))}`;
+    // A ban means you can't sign in (Eric, Nov 13): back to the page with no session for it, this browser marked; the app's first
+    // request there shows the ban screen (ban-gate.ts). As for the emailed code: an account that exists is refused before the age
+    // question; a Google account new to us that's a banned account's (or brings its address) makes its own account, banned by evasion,
+    // once it can finish.
+    const ban = await signInBan(sql, "google", claims.sub, extra.email, now);
+    const refuse = async (id: string) => {
+      const refused = await banRedirect(sql, endOnRefusal(id), id, `${back}?signin=banned`);
+      refused.headers.append("set-cookie", cookie(STATE_COOKIE, "", 0));
+      refused.headers.append("set-cookie", cookie(NEXT_COOKIE, "", 0));
+      return refused;
+    };
+    if (ban && "banned" in ban) return refuse(ban.banned);
+    if (ban && (answered || (await answeredSignIn(sql, current, "google", claims.sub)))) return refuse(await evasionAccount(sql, "google", claims.sub, extra, ban, answered, now));
+    const user = ban ? null : answered ? await signInWithIdentity(sql, current, "google", claims.sub, extra, now) : await signInIfAnswered(sql, current, "google", claims.sub, extra, now);
+    if (!user) {
+      // Asked first (?signin=age-google): nothing was made or kept, not even who the Google account is. After the answer the app
+      // goes to Google again (one more pick of the account), and this time the callback finishes. This trip's state is spent.
+      const headers = new Headers({ location: `${back}?signin=age-google`, "cache-control": "no-store" });
+      headers.append("set-cookie", cookie(STATE_COOKIE, "", 0));
+      headers.append("set-cookie", cookie(NEXT_COOKIE, "", 0));
+      return new Response(null, { status: 302, headers });
+    }
+    return signInAs(user, answered, `${back}?signin=google`);
+  }
+
   if (!current) return json({ message: "No account on this device yet." }, 401);
 
   // PATCH /api/me {name?, icon?, pawn?, chatOn?}. Not from a guest on a device that answered "too young": it keeps the default name and
@@ -395,20 +543,6 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
     const updated = await updateProfile(sql, current.id, body);
     if (body.pawn !== undefined) forgetLook(current.id);
     return json(await profile(sql, updated, admins, leaves));
-  }
-
-  // POST /api/auth/age {oldEnough}: the age question's answer, asked before any sign-in (the app works it out from the
-  // birth month and year and sends only this; the date never leaves the device). Old enough: this device may sign in
-  // once within AGE_GATE.answerMinutes. Too young: for AGE_GATE.tooYoungDays this device can't sign in, a later answer
-  // doesn't change that, and its guest goes back to the default name and icon. From this site's own page, as JSON.
-  if (path === "/api/auth/age" && request.method === "POST") {
-    if (request.headers.get("origin") !== url.origin) return json({ message: "Not from here." }, 403);
-    if (!/^application\/json\b/i.test(request.headers.get("content-type") ?? "")) return json({ message: "Send JSON." }, 415);
-    const b = (await request.json().catch(() => ({}))) as { oldEnough?: unknown };
-    if (typeof b?.oldEnough !== "boolean") return json({ message: "Answer the question." }, 400);
-    if (b.oldEnough && ageAnswer(request) !== "under") return json({ age: "ok" }, 200, { "set-cookie": ageOk() });
-    if (!isSignedIn(current)) await resetNameAndIcon(sql, current.id);
-    return json({ age: "under" }, 200, { "set-cookie": cookie(AGE_COOKIE, "under", AGE_GATE.tooYoungDays * 86_400) });
   }
 
   // GET /api/me/data: "Download my data" (Settings), everything kept about your account as a JSON file, the global
@@ -695,116 +829,6 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
     }
     const g = await createGuest(sql, now, "Player");
     return json(await profile(sql, g.user, admins, leaves), 200, { "set-cookie": sessionCookie(g.token) });
-  }
-
-  // ---- Email: a 6-digit code (no email is taken from a device that answered "too young"; one that hasn't answered is asked once
-  // the code shows whose email it is, unless that account has answered) ----
-  if (path === "/api/auth/email/start" && request.method === "POST") {
-    if (!email) return json({ message: "Email sign-in isn't set up yet." }, 503);
-    const tooYoung = ageRefusal(request);
-    if (tooYoung) return tooYoung;
-    const { email: raw } = (await request.json().catch(() => ({}))) as { email?: unknown };
-    const address = cleanEmail(raw);
-    if (!address) return json({ message: "That doesn't look like an email address." }, 400);
-    const started = await startEmailCode(sql, address, now);
-    if (!started.ok) return json({ message: started.message }, 429);
-    const sent = await fetcher("https://api.resend.com/emails", {
-      method: "POST",
-      headers: { authorization: `Bearer ${env.RESEND_API_KEY}`, "content-type": "application/json" },
-      body: JSON.stringify({
-        from: env.EMAIL_FROM ?? "HunChess <login@hunchess.com>",
-        to: [address],
-        subject: `${started.code} is your HunChess code`,
-        text: `Your HunChess sign-in code is ${started.code}. It works for 10 minutes. If you didn't ask for it, ignore this email.`,
-        html: `<p>Your HunChess sign-in code is</p><p style="font-size:28px;font-weight:800;letter-spacing:6px">${started.code}</p><p>It works for 10 minutes. If you didn't ask for it, ignore this email.</p>`,
-      }),
-    });
-    if (!sent.ok) return json({ message: "We couldn't send the email. Try again in a minute." }, 502);
-    // (An answer starts its time again, so it outlasts the code.)
-    return json({ ok: true }, 200, ageAnswer(request) === "ok" ? { "set-cookie": ageOk() } : {});
-  }
-  if (path === "/api/auth/email/verify" && request.method === "POST") {
-    const tooYoung = ageRefusal(request);
-    if (tooYoung) return tooYoung;
-    const b = (await request.json().catch(() => ({}))) as { email?: unknown; code?: unknown };
-    const address = cleanEmail(b.email);
-    if (!address || typeof b.code !== "string") return json({ message: "Enter the 6-digit code." }, 400);
-    // Whether it can finish now: this device just answered "old enough", or the account it lands on has. Read before the code is
-    // checked, so a right code is used up only by a check that signs in; one that must ask first keeps it live, and the app sends it
-    // again with the answer (no new code). The answer is the same for a wrong code either way.
-    const answered = ageAnswer(request) === "ok";
-    const finish = answered || (await answeredSignIn(sql, current, "email", address));
-    if (!(await verifyEmailCode(sql, address, b.code, now, !finish))) return json({ message: "That code didn't work. Check it, or send a new one." }, 400);
-    // A ban means you can't sign in (Eric, Nov 13): once the code shows the address is theirs, a banned account (or ban evasion:
-    // signInBan) gets the ban answer and nothing else, before the age question: no session, this browser marked (ban-gate.ts).
-    const banned = await signInBan(sql, "email", address, null, now);
-    if (banned) return banAnswer(sql, token, banned);
-    if (!finish) return askAgeFirst();
-    const user = answered ? await signInWithIdentity(sql, current, "email", address, {}, now) : await signInIfAnswered(sql, current, "email", address, {}, now);
-    // (The account went between the two reads: asked first, and the code's used: the finish fails and the player sends a new code.)
-    return user ? signInAs(user, answered) : askAgeFirst();
-  }
-
-  // ---- Google (behind the age gate too: a device that's too young goes back to the page; one that hasn't answered is asked when it
-  // comes back, unless the Google account's own account has answered) ----
-  const redirectUri = `${url.origin}/api/auth/google/callback`;
-  if (path === "/api/auth/google/start" && request.method === "GET") {
-    if (!google) return json({ message: "Google sign-in isn't set up yet." }, 503);
-    // (?signin=age: the app shows the friendly line to a device that's too young.)
-    if (ageRefusal(request)) return Response.redirect(`${url.origin}${safeNext(url.searchParams.get("next"))}?signin=age`, 302);
-    const state = randomToken(16);
-    const q = new URLSearchParams({
-      client_id: env.GOOGLE_CLIENT_ID!,
-      redirect_uri: redirectUri,
-      response_type: "code",
-      scope: "openid email profile",
-      state,
-      prompt: "select_account",
-    });
-    const headers = new Headers({ location: `https://accounts.google.com/o/oauth2/v2/auth?${q}`, "cache-control": "no-store" });
-    headers.append("set-cookie", cookie(STATE_COOKIE, state, 600));
-    headers.append("set-cookie", cookie(NEXT_COOKIE, safeNext(url.searchParams.get("next")), 600));
-    // (An answer starts its time again, so it outlasts the trip to Google.)
-    if (ageAnswer(request) === "ok") headers.append("set-cookie", ageOk());
-    return new Response(null, { status: 302, headers });
-  }
-  if (path === "/api/auth/google/callback" && request.method === "GET") {
-    if (!google) return json({ message: "Google sign-in isn't set up yet." }, 503);
-    const state = url.searchParams.get("state");
-    const code = url.searchParams.get("code");
-    if (!state || state !== readCookie(request, STATE_COOKIE) || !code || ageRefusal(request)) return Response.redirect(`${url.origin}/?signin=failed`, 302);
-    const res = await fetcher("https://oauth2.googleapis.com/token", {
-      method: "POST",
-      headers: { "content-type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({ code, client_id: env.GOOGLE_CLIENT_ID!, client_secret: env.GOOGLE_CLIENT_SECRET!, redirect_uri: redirectUri, grant_type: "authorization_code" }),
-    });
-    if (!res.ok) return Response.redirect(`${url.origin}/?signin=failed`, 302);
-    const { id_token } = (await res.json()) as { id_token?: string };
-    // The token came straight from Google over TLS, so its claims can be read without checking the signature.
-    const claims = id_token ? (JSON.parse(atob(id_token.split(".")[1]!.replace(/-/g, "+").replace(/_/g, "/"))) as { sub?: string; email?: string; email_verified?: boolean; aud?: string }) : null;
-    if (!claims?.sub || claims.aud !== env.GOOGLE_CLIENT_ID) return Response.redirect(`${url.origin}/?signin=failed`, 302);
-    const answered = ageAnswer(request) === "ok";
-    const extra = { email: claims.email_verified ? (claims.email ?? null) : null };
-    // A ban means you can't sign in (Eric, Nov 13): back to the page with no session, this browser marked; the app's first request
-    // there shows the ban screen (ban-gate.ts). Before the age question, as for the emailed code.
-    const banned = await signInBan(sql, "google", claims.sub, extra.email, now);
-    if (banned) {
-      const refused = await banRedirect(sql, token, banned, `${url.origin}${safeNext(readCookie(request, NEXT_COOKIE))}?signin=banned`);
-      refused.headers.append("set-cookie", cookie(STATE_COOKIE, "", 0));
-      refused.headers.append("set-cookie", cookie(NEXT_COOKIE, "", 0));
-      return refused;
-    }
-    const user = answered ? await signInWithIdentity(sql, current, "google", claims.sub, extra, now) : await signInIfAnswered(sql, current, "google", claims.sub, extra, now);
-    const back = `${url.origin}${safeNext(readCookie(request, NEXT_COOKIE))}`;
-    if (!user) {
-      // Asked first (?signin=age-google): nothing was made or kept, not even who the Google account is. After the answer the app
-      // goes to Google again (one more pick of the account), and this time the callback finishes. This trip's state is spent.
-      const headers = new Headers({ location: `${back}?signin=age-google`, "cache-control": "no-store" });
-      headers.append("set-cookie", cookie(STATE_COOKIE, "", 0));
-      headers.append("set-cookie", cookie(NEXT_COOKIE, "", 0));
-      return new Response(null, { status: 302, headers });
-    }
-    return signInAs(user, answered, `${back}?signin=google`);
   }
 
   return json({ message: "Not found" }, 404);

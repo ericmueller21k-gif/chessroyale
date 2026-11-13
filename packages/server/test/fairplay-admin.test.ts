@@ -44,7 +44,8 @@ describe("bans", () => {
     // Cleared (an appeal overturned): everything counts again, and an email says so.
     await decide(sql, p.id, "clear", "admin:eric@example.com", "appeal: a strong honest player", 42 * DAY, { mail });
     expect((await publicProfile(sql, p.id, 42 * DAY))!).toMatchObject({ banned: false, rating: 2700 });
-    expect(sent[1]).toMatchObject({ kind: "cleared" });
+    // (A ban lifted: its email says to sign in again, the ban having ended its sessions.)
+    expect(sent[1]).toMatchObject({ kind: "lifted" });
   });
 
   it("a ban needs a reason and a real decision; clearing a watch nobody knew about sends no email", async () => {
@@ -208,7 +209,7 @@ describe("appeals", () => {
     const id2 = (await sql.first<{ id: number }>("SELECT id FROM fairplay_appeals WHERE status = 'open'"))!.id;
     await decideAppeal(sql, id2, "overturned", "admin:e", "Thanks for the video: you're cleared.", 7000, mail);
     expect((await caseOf(sql, p.id))?.status).toBe("cleared");
-    expect(sent[1]).toMatchObject({ kind: "cleared" });
+    expect(sent[1]).toMatchObject({ kind: "lifted" });
   });
 });
 
@@ -223,7 +224,8 @@ describe("emails", () => {
     // (Nothing says solo stays open, or to appeal in the game, any more.)
     for (const kind of ["banned", "upheld"] as const) expect(caseEmail({ name: "Pat" }, kind, null).text).not.toMatch(/Solo|tap PLAY|see a form/);
     expect(caseEmail({ name: "Pat" }, "upheld", null).text).toContain("For more information, email support@hunchess.com.");
-    expect(caseEmail({ name: "Pat" }, "cleared", null).text).toMatch(/now count again/);
+    expect(caseEmail({ name: "Pat" }, "cleared", null).text).toMatch(/now count again, and you can play online as usual/);
+    expect(caseEmail({ name: "Pat" }, "lifted", null).text).toMatch(/Your ban is lifted.*Sign in again to play online\./);
     expect(caseMailer({})).toBeUndefined();
     const calls: { url: string; body: { to: string[]; from: string } }[] = [];
     const fetcher = (async (url: string, init: RequestInit) => {
