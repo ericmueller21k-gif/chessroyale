@@ -1,4 +1,7 @@
-"""Song AA (Eric, Nov 13): Wrangler the cowboy pig's theme, a loop of about two minutes forty. He sent a write-up of a
+"""Song AA (Eric, Nov 13): Wrangler the cowboy pig's first theme, shelved the same day: "The Wrangler one is good, and
+... it was my fault for sending you a song that I realized didn't really fit him ... let's shelve the other one, and
+I'll probably release it as ... an unreleased for the game." His theme is song_ab.py; this stays as it is.
+A loop of about two minutes forty. He sent a write-up of a
 style, made from another game's track ("this is for wrangler"; the rules as for Dash's and Puddles's: "take these
 notes and make your own version. Same rules as always"): early-90s biker funk-rock on a 16-bit console's chips.
 What is used from the write-up is the style's own means, none of them one song's: a driving rock pace (about 126), a

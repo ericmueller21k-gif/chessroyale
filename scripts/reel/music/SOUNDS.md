@@ -40,6 +40,7 @@ from the liked list, keep off the other one. Eric's words are quoted; the date i
 | A koto (a string picked near the bridge, built from its harmonics) on a calm's running line, an octave up, each note with three echoes placed by the beat | `Mix.struck("koto", ...)`; song_y.py (Tick's line) | Nov 13, of five struck voices tried there (steel pan, handpan, vibraphone, electric piano, koto; he had asked for "something a bit more like echoey, like steel pan possibly"): the koto, "that's perfect" |
 | A swung mid-tempo funk strut on a console's chips: dry short notes and rests set against a part with held chords and echo; a nasal lead that scoops into its phrases; a square-wave whistle with a note flicked in from below; a few of the boss's made-up syllables | song_z.py | Nov 13, of Puddles's first go: "I have zero issue. It's great." |
 | The boss's own timer running the song: a seed every 30 seconds, a new part from each; a line that grows a note longer each time round; a bass that climbs an octave a step a bar | song_z.py | the same |
+| Biker funk-rock (a slap bass in 16ths, an overdriven guitar, chugging chords, a guitar-and-fiddle duel) | song_aa.py | Nov 13, as Wrangler's first theme: "The Wrangler one is good", but the style "didn't really fit him" (his own pick of write-up, he said): shelved, to be an unreleased track. A boss's theme has to sound like the boss: for Wrangler he then asked for "common like Western cowboyness" and "a little bit of his grunting" (song_ab.py) |
 | A fast pattern racing under everything | every song since song_i.py | asked for in all of them |
 | The NES's four voices | song_c.py, song_f.py | "much much better" than the 16-bit orchestra |
 
@@ -98,6 +99,10 @@ boss's world that reaches into how the song itself runs, not only its sounds.
 | An acid synth (a sawtooth through a ringing filter, sliding between notes) as a calm's main voice (song_y.py's first go, 1:01) | "almost sounds like a cheetah ... it just almost sounds like it was on accident in the song" (short bursts of it in the drop he passed) |
 
 ## What he asks of every theme
+
+Later, not now (Nov 13): "at some point ... we'll need to maybe create midis of them ... just something to keep in
+your notes." Every song's notes are already lists in its file (the lines' `name:beats` text, the bass and kit
+patterns), so a MIDI file of a theme is a small script over those, not a transcription.
 
 A theme from a write-up of a style (Nov 13: Dash's and Puddles's, each from a write-up made from another game's
 track): "take these notes and make your own version. Same rules as always." Use the style's means (the pace, the
