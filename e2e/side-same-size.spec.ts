@@ -21,7 +21,8 @@ test("one size beside the board on a computer: every boss the same screen px a s
   const seen: Record<string, Record<string, { s: number; pawn: number; king: number; pump: string | null; board: number }>> = {};
   for (const id of BOSSES) {
     await page.setViewportSize({ width: 1280, height: 800 });
-    await page.goto(`/?debug&pace=quick&clock=60&laststand=0&brain=stockfish&boss=${id}`);
+    // (The Hidden Boss opens as the child since Nov 13: `form=adult` meets the man these kits measure.)
+    await page.goto(`/?debug&pace=quick&clock=60&laststand=0&brain=stockfish&boss=${id}${id === "recluse" ? "&form=adult" : ""}`);
     await bossAloneFromHome(page);
     await expect.poll(() => page.evaluate(() => (window as any).match?.phase.kind ?? "none"), { timeout: 60_000 }).toBe("play");
     await expect(page.locator(".boss-char.place-side .boss-char-sprite")).toBeVisible();
