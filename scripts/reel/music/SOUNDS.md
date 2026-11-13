@@ -126,8 +126,11 @@ whole score's gain. Handed over Nov 13 when he asked what the director needs to 
 `stills/trailer-v2`).
 The same day the session wiring it sent the transformation's real length and beats (8.74 s from his rising to the
 boards' crack, the book landing 2.64 s in), so the game's souring has its own layout (song_v.py's `RAGE`): the tune's
-three notes once, sour; a hush; the book; the spiral's last four units as the build; a breath; the drop. The score's
-own souring is untouched. Eric hasn't heard this cut yet.
+three notes once, sour; a hush; the book; the spiral's last units as the build; a breath; the drop. The score's own
+souring is untouched. He heard it and asked for two things: about five seconds more on the picture "so we get the
+souring longer" (the build's length is `RAGE`'s first number; the longer cut ships when the animation is lengthened),
+and the pause before the drop "longer like a full second it will make it more epic" (it was a fifth of one: a tick,
+then the sound dying to nothing).
 
 A place's own loop from a song's quiet part (Nov 12, the Hidden Boss's house as a child: song_w.py): "just that soft,
 cozy thing ... like a 1-minute loop that doesn't do any of the crazy like spiraling stuff ... nice and cozy". The

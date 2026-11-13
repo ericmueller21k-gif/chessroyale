@@ -130,26 +130,29 @@ PLAN = [part if len(part) == 7 else (*part, 1.0, 1.0, 0.0) for part in PACE]
 # unit of the souring at its sourest, a hush, the book and its ring, the build (the spiral's last units, each faster
 # than the one before as the score's are), and a breath before the drop. The tape sinks as he rises and climbs back
 # through the build. The build's length is the part that can change with the picture (his chant: Eric, Nov 13, "kinda
-# wanna add a few more seconds like 5 to the transition animation so we get the souring longer"): RAGE is its
-# seconds and how many of the spiral's last units it has (4 to 6: up to about 18 s in all).
-RAGE = (5.5, 4)
+# wanna add a few more seconds like 5 to the transition animation so we get the souring longer"), and the breath is a
+# full second ("we need that pause longer like a full second it will make it more epic before going into the drop":
+# it was a fifth of one). RAGE: the build's seconds, how many of the spiral's last units it has (3 to 6: up to about 18
+# s in all), and the breath's seconds. As it is, the build is the spiral's last three units at very nearly the score's
+# own pace; five seconds more on the picture, RAGE (9.7, 5, 1.0), is its last five at exactly the score's.
+RAGE = (4.7, 3, 1.0)
 
 
-def rage_layout(build: float = RAGE[0], units: int = RAGE[1]):
+def rage_layout(build: float = RAGE[0], units: int = RAGE[1], breath: float = RAGE[2]):
     """The game's cut: the beat he rises at, and its parts (beats, seconds as heard, the tape's speed from and to, its waver)."""
     fast = [1 / t for t in SPIRAL[7 - units:]]
     parts = [(4, 2.44, 1.0, 0.93, 0.012), (1, 0.2, 0.93, 0.935, 0.012), (1, 0.4, 0.935, 0.95, 0.012)]
     parts += [(4, build * f / sum(fast), 0.95 + 0.05 * i / units, 0.95 + 0.05 * (i + 1) / units, 0.012 - 0.01 * i / units) for i, f in enumerate(fast)]
-    parts += [(1, 0.2, 1.0, 1.0, 0.0)]
+    parts += [(1, breath, 1.0, 1.0, 0.0)]
     return T_CHANT2 - sum(part[0] for part in parts), parts
 
 
-def rage_plan(build: float = RAGE[0], units: int = RAGE[1]):
+def rage_plan(build: float = RAGE[0], units: int = RAGE[1], breath: float = RAGE[2]):
     """PLAN with the souring's 32 beats at the game's pace: each part's tempo found by trying it (the tape's waver
     moves how long a part is heard a little), the idle beats taking up the rest of the tape's time."""
     from synth import Ride  # (here: the pace is worked out before the song's own imports are needed)
 
-    start, parts = rage_layout(build, units)
+    start, parts = rage_layout(build, units, breath)
     a = next(i for i, part in enumerate(PLAN) if part[0] == T_SPIRAL)
     b = next(i for i, part in enumerate(PLAN) if part[0] == T_CHANT2)
     span = sum(60 * (p1 - p0) / t0 for p0, p1, t0, *_ in PLAN[a:b])  # the souring's and the pause's time on the tape, before the fit
@@ -240,8 +243,8 @@ assert (T_FLAG, T_MEMORY, T_CHANT2, T_LAST, BEATS, len(SWEEP)) == (138, 268, 334
 def render(window=None, lead: float = 8.0, rage=None) -> np.ndarray:
     """The song as heard (stereo, at the mix's own level). `window`: (from beat, to beat), to make only that passage
     (a sample; or, with `lead` 0, a piece cut clean for phases_v.py: its notes only, their tails ringing on). `rage`:
-    the souring and its pause as the game plays them, not as the score has them: (the build's seconds, its units), as
-    RAGE is."""
+    the souring and its pause as the game plays them, not as the score has them: (the build's seconds, its units, the
+    breath's seconds), as RAGE is."""
     x = Ride(rage_plan(*rage) if rage else PLAN, BEATS, None, os=2, seed=227, tape_secs=TAPE)
     x.window, x.lead = window, lead
     put, at = x.put, x.at
@@ -929,14 +932,14 @@ def render(window=None, lead: float = 8.0, rage=None) -> np.ndarray:
             for i in range(4 if u >= 5 else 2):
                 kick(b + i * (1 if u >= 5 else 2), 0.3 + 0.05 * u)
 
-    def rising(b, early=4):
-        """The long voices over the souring's last four units, from `b`: the synth's drone, its filter opening; slides
-        rising (the first from `early` beats before); low brass; and a last screech."""
-        for i in range(16):
-            synth(b + i, 43, 0.9, 0.2 + 0.01 * i, 200 * 10 ** (i / 16))
-        slide(b - early, 16 + early, 67, 91, 0.05, 0.3), slide(b, 16, 62, 80, 0.05, -0.3)
-        brass(b, 16, 43, 0.14)
-        screech(b + 12, 4, 88, 101, 0.18, 0.0)
+    def rising(b, early=4, n=16):
+        """The long voices over the souring's last units (`n` beats: its last four, in the score), from `b`: the synth's
+        drone, its filter opening; slides rising (the first from `early` beats before); low brass; and a last screech."""
+        for i in range(n):
+            synth(b + i, 43, 0.9, 0.2 + 0.16 * i / n, 200 * 10 ** (i / n))
+        slide(b - early, n + early, 67, 91, 0.05, 0.3), slide(b, n, 62, 80, 0.05, -0.3)
+        brass(b, n, 43, 0.14)
+        screech(b + n - 4, 4, 88, 101, 0.18, 0.0)
 
     slow = x.t(T_SPIRAL) - x.t(T_SPIRAL - 1)  # the memory's beat, in seconds: the music box keeps to it
     if not rage:
@@ -956,7 +959,7 @@ def render(window=None, lead: float = 8.0, rage=None) -> np.ndarray:
         # hush; the book, slammed down; then, as he chants over it, the spiral's last units with all they have, faster
         # each (a longer build starts further back in the spiral, where the band is thin and the sour notes are heard:
         # those stay as sour as when he rose); the music box at its own pace through it all; a breath, one tick as the
-        # arcs start; the drop.
+        # build stops (as the arcs start, on the picture as it was); a second of nothing; the drop.
         start, units = rage_layout(*rage)[0], rage[1]
         build, breath = start + 6, T_CHANT2 - 1
         sour(start, 5, band=False)
@@ -967,7 +970,7 @@ def render(window=None, lead: float = 8.0, rage=None) -> np.ndarray:
             sour(build + 4 * i, 7 - units + i, bitter=5 if 7 - units + i < 3 else None)
         for j in range(int((x.t(breath) - x.t(start)) / (1.5 * slow))):
             box(start, (86, 83, 86, 79)[j % 4] - (1 if rng.uniform() < (2 * j + 2) / 14 else 0), 0.035 + 0.004 * j, 0.4, rng.uniform(-1, 1) * 8 * j, late=j * 1.5 * slow)
-        rising(build + 4 * (units - 4), 4 if units > 4 else 0)
+        rising(build + 4 * max(0, units - 4), 4 if units > 4 else 0, 4 * min(units, 4))
         tick(breath, 0.3, True, 0.0)
 
     # 2:29 The chant again ("a bit more layers on top, a bit more like big sound, kind of pause, a bit more like long

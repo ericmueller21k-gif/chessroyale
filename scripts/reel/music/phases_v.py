@@ -31,7 +31,8 @@ transformation's start to the boards' split. The session wiring it sent that len
 from the phase change on main: he rises in a rage; his book lands open at 2.640 s; his chant runs from 3.040 s; arcs
 at 8.540 s; the boards crack at 8.740 s), so the souring has a layout of its own for the game (song_v.py's RAGE: the
 score's 19 seconds of it stay as they are). Two dips are put on it here, on the sound itself: a hush before the book
-and a breath before the drop (the notes' tails ring through both otherwise). A new length: RAGE, and this again.
+and a breath before the drop (the notes' tails ring through both otherwise): a full second of it, at Eric's word
+("we need that pause longer like a full second it will make it more epic"). A new length: RAGE, and this again.
 Each piece is made by itself (song_v.render with a window: its notes only, their tails ringing on), so a cut never
 slices an echo, and each loop begins with the ring of what leads into it; so an intro here stops dead at its
 `introSeconds` (no tail of its own to overlap) and the loop starts there, as for every theme. The score's pieces share
@@ -109,10 +110,13 @@ def main(out: str) -> None:
     game = Ride(rage_plan(), BEATS, None, tape_secs=TAPE)  # the game's cut has its own clock from its start to the drop
     at = lambda beat: round(game.when(beat) - game.when(RAGE_AT), 3)
     intro3 = rage[:, int(round(game.when(RAGE_AT) * SR)) : int(round(game.when(T_CHANT2) * SR))].copy()
-    # (The hush before the book, and the breath before the drop, its one tick left as it is: down, held, and back.)
+    # (The hush before the book: down, held, and back. The breath before the drop, its one tick left as it is: down,
+    # and on down to nothing, so most of its second is silence.)
     t = np.arange(intro3.shape[1]) / SR
-    for down, low, up, depth in ((at(RAGE_AT + 4) - 0.06, at(RAGE_AT + 4) + 0.06, at(RAGE_SLAM) - 0.006, 0.12), (at(RAGE_BREATH) + 0.06, at(RAGE_BREATH) + 0.12, at(T_CHANT2), 0.25)):
-        intro3 *= 1 - (1 - depth) * np.clip((t - down) / (low - down), 0, 1) * np.clip((up - t) / 0.005, 0, 1)
+    for down, low, up, depth, fall in ((at(RAGE_AT + 4) - 0.06, at(RAGE_AT + 4) + 0.06, at(RAGE_SLAM) - 0.006, 0.12, None),
+                                       (at(RAGE_BREATH) + 0.06, at(RAGE_BREATH) + 0.12, at(T_CHANT2), 0.25, 0.12)):
+        dip = (1 - depth) * np.clip((t - down) / (low - down), 0, 1) * np.clip((up - t) / 0.005, 0, 1)
+        intro3 *= (1 - dip) * (np.exp(-np.clip(t - low, 0, None) / fall) if fall else 1)
     loop3 = body(last, T_CHANT2, BEATS)
     loop3[:, :ring] += after(last, BEATS)  # the tag's ring, over the chant's first bar
 
