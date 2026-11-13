@@ -308,8 +308,9 @@ export class Lobby extends DurableObject<Env> {
   }
 
   /**
-   * One position of the Hidden Boss's phase 2 scored on the engine server (every legal move); its answer goes back to the lobby. His
-   * moves (`boss`) on his own row of the day, never refused (each position counted once: not `again`); a try takes at most
+   * One position of the Hidden Boss's scored on the engine server (every legal move: phase 2's, and his phase 1 move no device
+   * answered); its answer goes back to the lobby. His moves (`boss`) on his own row of the day, never refused (each position counted
+   * once: not `again`; the count never waited on, finished in the background: the delta review of #683, m1); a try takes at most
    * RECLUSE_ONLINE.searchMs, so none goes out while an earlier one could still be running. A person's fair-play numbers (`fair`) on
    * fair play's own instance, never in his queue; they're not urgent, so they may wait for it (PHASE2_FAIR_MS). The review of #683,
    * M1 and M2. Each of his searches is logged with its time, to measure his answers on production.
@@ -320,7 +321,7 @@ export class Lobby extends DurableObject<Env> {
       this.env,
       req.fen,
       RECLUSE_ONLINE.groupNodes,
-      req.fair ? { instance: "fairplay-1", withinMs: PHASE2_FAIR_MS } : { pool: req.boss ? "recluse" : "match", withinMs: RECLUSE_ONLINE.searchMs, uncounted: !!req.again },
+      req.fair ? { instance: "fairplay-1", withinMs: PHASE2_FAIR_MS } : { pool: req.boss ? "recluse" : "match", withinMs: RECLUSE_ONLINE.searchMs, uncounted: !!req.again, background: (p) => this.ctx.waitUntil(p) },
     ).catch(() => null);
     if (req.boss) console.log(`engine server for the Hidden Boss: ${req.id} ${moves ? `${moves.length} moves` : "no answer"} in ${Date.now() - t} ms`);
     if (!this.record) return;

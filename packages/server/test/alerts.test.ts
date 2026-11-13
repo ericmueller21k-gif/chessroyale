@@ -200,4 +200,14 @@ describe("alerts to Discord", () => {
     expect(await check(morning + DAY - 15 * MIN)).toEqual([]);
     expect(await check(morning + DAY)).toEqual(["digest"]);
   });
+
+  it("the digest names the Hidden Boss's fights with no result yesterday too (UTC days), not only since midnight UTC (the delta review of #683, m2)", async () => {
+    const { check, posts, sql } = await setup();
+    const morning = Date.UTC(2026, 10, 10, 14, 5); // 8:05 am Central, 14:05 UTC
+    await sql.run("CREATE TABLE IF NOT EXISTS engine_usage (day TEXT PRIMARY KEY, searches INTEGER NOT NULL)");
+    // (A fight at 9 am Central the day before: yesterday's UTC row, which the digest read as "today" missed.)
+    await sql.run("INSERT INTO engine_usage (day, searches) VALUES ('2026-11-09:recluse-none', 2)");
+    expect(await check(morning)).toEqual(["digest"]);
+    expect(posts[0]!.content).toContain("the Hidden Boss's fights with no result (UTC days): yesterday 2, today so far 0.");
+  });
 });

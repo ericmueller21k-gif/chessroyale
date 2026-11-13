@@ -15,15 +15,19 @@
  *   (`noResult`: nothing counts for or against its board players; phase 2's fair-play moves dropped; everyone else's result stands).
  *   With no engine server set up at all (local runs, the e2e suite, staging: no `search`), his move is the server's quick move and
  *   phase 2's result unvouched (`unvouched`: it pays as a solo game);
- * - the bots' moves come from the host's device first (`phase2Ask`, at a bot's strength: a bot plays for its own team, and the
- *   engine server's queue stays his), the engine server where no device answers in RECLUSE_ONLINE.askMs or there's no host (one
- *   near the best), the server's own quick move where that can't either (never a stall); a bot's never unvouches anything. The host
- *   gone, or back: its open asks go to the host now (`resend`);
+ * - the bots' moves come from the host's device first (`phase2Ask`, at a bot's strength, so the engine server's queue stays his), the
+ *   engine server where no device answers in RECLUSE_ONLINE.askMs or there's no host (one near the best), the server's own quick
+ *   move where that can't either (never a stall); a bot's never unvouches anything. The host's device chooses them, checked only for
+ *   legality, as phase 1's bot picks are: a modified host could play them strong (his room's fight) or throw them (a Crowd final's
+ *   host watching), and that's accepted (the director's call on the delta review of #683, m3; docs/decisions/2026-11-13-recluse-
+ *   phase1-pause.md). The host gone, or back: its open asks go to the host now (`resend`);
  * - fair play: each person's move is scored on fair play's own instance of the engine server (`fair`: never in his queue; when it
  *   answers) and kept as a FairMove (no crowd: each board is its player's alone);
  * - someone who leaves (resigns, or gone longer than LEAVING.awayMs) hands their board to a bot, which plays it on;
  * - the admins' "Win this form" (his room's fight): the team's next move (a person's or a bot's, any board) wins every board still on.
  * Every board decided: his reaction holds the boards (RECLUSE_PHASE2.endMs), then the results (all four won beats him).
+ * His phase 1 moves (child and man) stay the devices' (BOSS_CHECK); one no device answered in its window goes to the engine server
+ * too (lobby.ts bossTimeout, Recluse1Ask: at his strength, never a random move; never in, no result for those fighting him).
  */
 import { FAIRPLAY, RECLUSE_CUTSCENE, RECLUSE_ONLINE, RECLUSE_PHASE2, type FairMove } from "@chessroyale/core";
 import {
@@ -40,6 +44,7 @@ import {
   phase2Ult,
   phase2WinAll,
   startPhase2,
+  type BossMoveKind,
   type MoveScore,
   type NetPhase2,
   type Phase2Board,
@@ -77,6 +82,29 @@ export interface Phase2SearchRequest {
   boss?: true;
   again?: true;
   fair?: true;
+}
+
+/**
+ * His phase 1 move (the child's or the man's) that no device answered (lobby.ts bossTimeout), asked of the engine server instead of
+ * the random move it was (Eric, Nov 13, option 1: "Keep Maia on the devices, but replace the random-move fallback with the same pause
+ * plus a server move"; docs/decisions/2026-11-13-recluse-phase1-pause.md). Kept with the lobby (LobbyRecord.recluse1) for the boss turn
+ * `key`: the position, how the turn plays (`kind`, as it was drawn) and his strength now (`elo`: the child's Maia rating's Stockfish
+ * stand-in, levelForMaia, or the man's fixed level: the runner's bossEloNow); when it was first asked (`since`: no result counts from
+ * it), this try's start, number and search id; the next try's time once one came back empty (`retryAt`). Tried again as phase 2's are
+ * (retryDelay; one lost on the way past SERVER_LOST_MS). No answer in RECLUSE_ONLINE.serverWaitMs: the fight ends with no result,
+ * `none` the people fighting him then (nothing counts for or against them; everyone else's result stands).
+ */
+export interface Recluse1Ask {
+  key: string;
+  fen: string;
+  kind: BossMoveKind;
+  elo: number;
+  since: number;
+  at: number;
+  tries: number;
+  ask: string;
+  retryAt?: number;
+  none?: string[];
 }
 
 /** A person's move waiting for the engine server's numbers (fair play). */
@@ -294,7 +322,10 @@ function startClocks(lobby: Phase2Lobby, p: Recluse2Record) {
  * Past a try's worst case (RECLUSE_ONLINE.searchMs, every group's wait included) and a margin for counting it, so a try still running
  * is never sent again: its answer is on its way (the review of #683, M1).
  */
-const SERVER_LOST_MS = RECLUSE_ONLINE.searchMs + 5000;
+export const SERVER_LOST_MS = RECLUSE_ONLINE.searchMs + 5000;
+
+/** How long after a try of his comes back empty the next goes: RECLUSE_ONLINE.retryMs after the first, twice as long each time, at most retryMaxMs. */
+export const retryDelay = (tries: number): number => Math.min(RECLUSE_ONLINE.retryMaxMs, RECLUSE_ONLINE.retryMs * 2 ** (Math.max(1, tries) - 1));
 
 /** The next time phase 2 needs the timer. */
 function arm(lobby: Phase2Lobby) {
@@ -573,7 +604,7 @@ export function searched(lobby: Phase2Lobby, id: string, scores: readonly MoveSc
   const ok = (scores ?? []).filter((s) => legal.has(s.move) && Number.isFinite(s.expected));
   if (ok.length) w.move = pick(withMates(w.fen, ok), w.who, () => lobby.rng());
   else if (w.who === "bot") quick(lobby, p, w);
-  else if (id === w.ask) w.retryAt = lobby.now() + Math.min(RECLUSE_ONLINE.retryMaxMs, RECLUSE_ONLINE.retryMs * 2 ** ((w.tries ?? 1) - 1));
+  else if (id === w.ask) w.retryAt = lobby.now() + retryDelay(w.tries ?? 1);
   hold(lobby, p);
   playReady(lobby, p);
   arm(lobby);
@@ -589,9 +620,16 @@ export function withMates(fen: string, scores: readonly MoveScore[]): MoveScore[
   return scores.map((s) => (mates.has(s.move) ? { ...s, mate: 1 } : s));
 }
 
+/** A mate in one among the engine server's numbers (one he may play, `allowed` null: any), or undefined: his phase 1 server move plays it
+ * first (the review of #686, m1: in a won position every move scores 1, so the sort alone kept the first legal moves, not the mate). */
+export function mateFirst(fen: string, scores: readonly MoveScore[], allowed: readonly string[] | null | undefined): string | undefined {
+  return withMates(fen, scores).find((x) => x.mate === 1 && (!allowed || allowed.includes(x.move)))?.move;
+}
+
 /**
  * The host's answer to a phase2Ask (a bot's move: his are never asked of a device): its move, if legal there and still wanted. A bot's
- * move from a device unvouches nothing (a bot only plays for its own team; the review of #677, M2).
+ * move from a device unvouches nothing (the review of #677, M2), though the host chooses it, as phase 1's bot picks: accepted (the
+ * delta review of #683, m3).
  */
 export function answer(lobby: Phase2Lobby, playerId: string, id: unknown, mv: unknown) {
   const p = lobby.r.recluse2;
@@ -658,6 +696,20 @@ export function phase2NoResult(r: Pick<LobbyRecord, "recluse2">): boolean {
 export function phase2NoResultFor(r: Pick<LobbyRecord, "recluse2">, id: string): boolean {
   const p = r.recluse2;
   return !!p?.done?.noResult && Object.hasOwn(p.names, id);
+}
+
+/** Whether his fight ended with no result (his move never came from the engine server), in phase 1 or in phase 2. */
+export function recluseNoResult(r: Pick<LobbyRecord, "recluse1" | "recluse2">): boolean {
+  return !!r.recluse1?.none || phase2NoResult(r);
+}
+
+/**
+ * Whether `id`'s result is none: his fight ended with no result and they were fighting him then (phase 1: still in the battle,
+ * `recluse1.none`; phase 2: one of its boards, phase2NoResultFor). Someone who left before had their loss written as they left: it
+ * stands. Everyone else's result stands (a Crowd final's others).
+ */
+export function recluseNoResultFor(r: Pick<LobbyRecord, "recluse1" | "recluse2">, id: string): boolean {
+  return !!r.recluse1?.none?.includes(id) || phase2NoResultFor(r, id);
 }
 
 /** Whether `id` plays a board of phase 2 (still on). */

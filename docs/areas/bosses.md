@@ -137,6 +137,17 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
   when they match, else as the engine server settles it (a host can't throw the battle); alone (a party's battle too), the host's
   plays and the match pays as a solo game ("Only one device checked this match" on the results). His powers' picks and extras
   are still the host's (for the move that plays, asked again if needed), checked by their rules. [engine.md](engine.md), "Two devices play each online boss move".
+  **No device answering in its window** (`bossTimeout`): another device is asked; with none, a random allowed move. **The Hidden
+  Boss excepted** (Nov 13, Eric's option 1; [decision](../decisions/2026-11-13-recluse-phase1-pause.md)): his move (child or man,
+  his room's fight and the Crowd's final) goes to the engine server once the host's window has passed unanswered (another device
+  hosts his moves to come), never a random move: every legal move scored, he plays one at the strength the devices were asked for
+  (the child's `levelForMaia` stand-in or the man's fixed level, `bossEloNow`) as the turn drew it (`bossMoveFromScores`: a
+  device's seeded Stockfish pick, from the server's numbers). His turn is the pause (nobody's clock runs on it; "The boss is
+  thinking…"); once asked, that move is the server's alone (a device's late answer isn't heard). Tried again as phase 2's are; not
+  in after `RECLUSE_ONLINE.serverWaitMs`: **no result** for those fighting him (`LobbyRecord.recluse1.none`; the battle a draw),
+  everyone else's result standing, counted for the health view. No engine server set up: the quick move, the match unvouched.
+  Tests: server `recluse-online.test.ts` ("his phase 1 move when no device answers"), `crowd-hidden-boss.test.ts` ("no result in
+  phase 1"), chess `boss-brain.test.ts` (`bossMoveFromScores`).
 - **The brain (Oct 12: every boss on Maia; DECISIONS.md, "Every boss on Maia"):** every boss plays its normal moves
   with **Maia-3** (a human-like model, a separate AGPL program in its own worker: `packages/maia-worker/`), no guard,
   at a Maia rating for its level (its strength, plus a crowd's margin), clearly favored in plain chess (Eric, Oct 12:
@@ -295,7 +306,7 @@ below):
   `<day>:recluse`, the pool `"recluse"`: M2). An empty answer is tried again (`retryMs`, doubling to `retryMaxMs`); a try takes at
   most `searchMs` (15 s) and one never answered is tried again 5 s past that (lost), so no try goes out while an earlier one could
   still be running. The engine server gone mid-fight (a deploy without it): his next try is the quick move, phase 2 unvouched
-  (m3). His move not in after `pauseMs` (3 s): **every board's clock pauses**
+  (m3). His count on his row never holds his search up (the delta review of #683, m1: counted beside it). His move not in after `pauseMs` (3 s): **every board's clock pauses**
   (`recluse2.paused`, the view's `paused`): every board says "He's thinking…" and takes no move, nothing flags or times out, the
   admins' ultimate waits; once it's in, every running clock goes on from where it stood (`hold`: turn starts and bots' thinking moved
   on by the pause; a board handed to a bot during a pause thinks from its end, m1). Not in after `serverWaitMs` (60 s): **no
@@ -307,7 +318,9 @@ below):
   result at their placement, the boss's part none (`teamWon` null), and their results say "Your place stands." (`noResult:
   "watched"`). The bots' moves: the host's device first (`phase2Ask`/`phase2Answer`, a bot's strength; re-asked of a new host or a
   host back from a reload, `resend`, a bot's only), with no answer in `askMs` (or no host) the engine server (one within `botLoss`
-  of the best), where that can't either the server's quick move; a bot's move never unvouches anything. With no engine server set up at all (local runs, the e2e suite, staging: no `phase2Search`), his move is the server's
+  of the best), where that can't either the server's quick move; a bot's move never unvouches anything. The host chooses the bots'
+  moves, checked only for legality (as phase 1's bot picks): accepted (the delta review of #683, m3: a modified host could play them
+  strong, or throw them in a Crowd final it watches). With no engine server set up at all (local runs, the e2e suite, staging: no `phase2Search`), his move is the server's
   quick move at once and phase 2's result is unvouched (`recluse2.unvouched`, `phase2Unvouched`: the board players' results pay as a
   solo game's and aren't ranked). Each person's move is scored too (on fair play's instance), a
   `FairMove` with no crowd (fair play; not in a test fight). Leaving (resign, or away past `LEAVING.awayMs`): a bot plays their board
