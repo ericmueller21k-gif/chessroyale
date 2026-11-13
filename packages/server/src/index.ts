@@ -68,6 +68,11 @@ export interface Env extends AccountEnv, EngineEnv, AdminEnv, AccessEnv, KillSwi
   ASSETS: Fetcher;
   /** Seconds a matchmade lobby waits for players before bots fill it (default 60; shorter for local tests). */
   MATCH_FILL_SECONDS?: string;
+  /**
+   * Milliseconds of the Hidden Boss's cutscene's hold (RECLUSE_CUTSCENE.holdMs, about 104 s), only where TEST_SWITCHES is "1" (the
+   * e2e: the scene plays sped up to fit it, fitCutscene); ignored elsewhere.
+   */
+  CUTSCENE_HOLD_MS?: string;
   /** Load-test counters at /api/ops/stats, for requests with this as their x-ops-key (unset in production). */
   OPS_STATS?: string;
   /** "1" on staging for load tests from one machine: the per-address rate limit is off (never in production). */

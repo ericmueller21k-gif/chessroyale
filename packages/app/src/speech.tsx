@@ -106,7 +106,7 @@ export class Voice {
    * busy frame never eats into it). Returns whether it was taken (shown now, or waiting its turn).
    */
   say(text: string | null | undefined, key: string, priority: Priority = NORMAL, at = Date.now(), hold?: number, paced?: PacedLine): boolean {
-    if (!text || this.said.has(key)) return false;
+    if (!text || this.said.has(key) || at < this.hushedUntil) return false;
     this.said.add(key);
     if (this.said.size > 400) this.said.delete(this.said.values().next().value!);
     this.advance(at);
@@ -152,7 +152,26 @@ export class Voice {
     return () => this.listeners.delete(f);
   }
 
-  /** A new battle: nothing said yet. */
+  /**
+   * Quiet until `until` (the Hidden Boss's cutscene, whose own boxes speak): the line up and those waiting are dropped, and nothing
+   * said for a moment before `until` is taken (his fall's mumbling, the God King's remarks).
+   */
+  hush(until: number) {
+    this.hushedUntil = until;
+    this.now = null;
+    this.queue = [];
+    for (const f of this.listeners) f();
+  }
+  private hushedUntil = 0;
+  /** The hush lifted early: its scene taken off the screen (the match left during it). */
+  unhush() {
+    this.hushedUntil = 0;
+  }
+
+  /**
+   * A new battle: nothing said yet. A hush stays: online, phase 2's first word (which resets the God King's voice) can land just after
+   * the cutscene has hushed both. Left mid-scene, the scene's unmount lifts it (`unhush`; review of #679, m2).
+   */
   reset() {
     this.now = null;
     this.queue = [];

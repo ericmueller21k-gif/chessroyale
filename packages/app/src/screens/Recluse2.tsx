@@ -21,7 +21,7 @@ import { useMedia } from "../components/QuickChat.tsx";
 import { STRIP_LAYOUT } from "../components/MovePanel.tsx";
 import type { GameView, SimulBoardView, SimulView } from "../game.ts";
 import type { ComponentChildren } from "preact";
-import { ARC_LIFE, ARC_REDRAW, ARC_STRIKES, PHASE_CHANGE, phase2UltBannerMs, absorbKing, absorbReadMs, arcPoints, smoothPath, type ArcStrike } from "../recluse-phase2.ts";
+import { ARC_LIFE, ARC_REDRAW, ARC_STRIKES, PHASE_CHANGE, phase2UltBannerMs, absorbKing, absorbPaced, arcPoints, smoothPath, type ArcStrike } from "../recluse-phase2.ts";
 import { CRITICAL, NORMAL, bossVoice } from "../speech.tsx";
 import { Hud } from "./Hud.tsx";
 import { useStillKey } from "../hooks.ts";
@@ -279,10 +279,10 @@ export function PhaseChangeScreen({ match, at }: { match: GameView; at: number }
   cue(t >= C.igniteAt + 80, "leave", () => play("gkLeave"));
   // (CRITICAL, Oct 17: it cuts in on his word before the seize, so it comes as the power lands; since the hold and the
   // longer cast it has its whole time before his chant, or nearly: the chant's line waits for it, a second at most.)
-  // (Gone by his chant's first line since Nov 13: absorbReadMs.)
+  // (Gone by his chant's first line since Nov 13, paged as the chant's lines are: absorbPaced.)
   cue(t >= C.absorbLineAt, "absorb", () => {
     const line = RECLUSE_LINES.absorb[at % RECLUSE_LINES.absorb.length]!;
-    bossVoice.say(line, `recluse:absorb:${at}`, CRITICAL, at + C.absorbLineAt, absorbReadMs(line));
+    bossVoice.sayPaced(absorbPaced(line), `recluse:absorb:${at}`, CRITICAL, at + C.absorbLineAt);
   });
   cue(t >= C.arcAt, "arcs", () => play("recluseArc"));
   // His look over his figure on the board, placed on his head frame by frame.

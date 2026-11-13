@@ -218,3 +218,29 @@ export const KING_VS_RECLUSE = {
   /** The phase change: his cry as the boss drains his power (placeholders). */
   drained: ["No! My light... what are you doing?!", "Release me! That power is mine!", "Aaagh! My strength!"],
 } as const;
+
+/**
+ * The cutscene between his adult form and the cyborg (Eric's version, Nov 12, night; in the fight since Nov 13, solo and online): the
+ * ghost of him as a child, and him on his knees. Each line is its own text box; a line of two sentences is typed one
+ * sentence, a pause, then the next (each entry here is one sentence; one long sentence types all at once). The real quotes
+ * stay unattributed and he is never named (RULES.md).
+ */
+export const RECLUSE_CUTSCENE_LINES: readonly { who: "kid" | "man"; say: readonly string[] }[] = [
+  { who: "kid", say: ["Why are you on the floor?"] },
+  { who: "man", say: ["I lost."] },
+  { who: "kid", say: ["Do you still find them?"] },
+  { who: "man", say: ["Find what?"] },
+  { who: "kid", say: ["The moves that make you laugh out loud."] },
+  { who: "man", say: ["The machines find them now.", "They don't need us anymore."] },
+  { who: "kid", say: ["That's not the point."] },
+  { who: "man", say: ["All that matters on the chessboard is good moves."] },
+  { who: "kid", say: ["And how do you know they're good?", "Because a machine says so?"] },
+  { who: "man", say: ["..."] },
+  { who: "kid", say: ["Best by test, right?"] },
+  { who: "man", say: ["I just wanted to play the most beautiful game anyone ever played."] },
+  { who: "kid", say: ["Then why'd you stop?"] },
+  { who: "man", say: ["The computers.", "They ruined everything."] },
+  { who: "kid", say: ["Computers or no computers.", "The best player in the world is still the best."] },
+  { who: "man", say: ["Do you really believe that?"] },
+  { who: "kid", say: ["I'm not sure.", "The only one who can prove it is right next to me."] },
+];
