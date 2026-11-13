@@ -808,6 +808,29 @@ test("the board keeps its size from the mate until the split (Eric, Oct 18: it s
   expect(off.slice(0, 3), `the board's size (${w0} x ${h0}, squares ${s0}) changed in ${off.length} of ${frames.length} frames`).toEqual([]);
 });
 
+test("the admins' Win this form (Nov 13, Eric's timing test): pressed, your next move beats his adult form, then his phase change; pressed in phase 2, your next move wins all four boards", { tag: "@phone-only" }, async ({ page }) => {
+  test.setTimeout(4 * 60_000);
+  await meetHim(page);
+  const win = page.getByRole("button", { name: /Win this form|Your next move wins this form/ });
+  const mv = await quietMove(page);
+  await win.click();
+  await expect(win).toBeDisabled();
+  await expect(win).toHaveAccessibleName(/Your next move wins this form/);
+  expect((await bossNow(page)).result, "nothing ends before your move").toBeFalsy();
+  await play(page, mv);
+  await expect.poll(() => page.evaluate(() => !!(window as any).match.phase.fall), { timeout: 30_000 }).toBe(true);
+  expect((await bossNow(page)).result).toBe("crowd");
+  await expect.poll(() => phase(page), { timeout: 30_000 }).toBe("phaseChange");
+  await expect.poll(async () => (await simulNow(page))?.playing ?? false, { timeout: 30_000 + ADDED_MS }).toBe(true);
+  const fen = (await simulNow(page)).boards[0].fen as string;
+  const pawn = new Chess(fen.replace(/ [A-Ha-h]+ - /, " - - ")).moves({ verbose: true }).find((m) => m.piece === "p")!;
+  await expect(win).toBeEnabled();
+  await win.click();
+  await simulPlay(page, pawn.lan);
+  await expect.poll(() => phase(page), { timeout: 30_000 }).toBe("results");
+  expect(await page.evaluate(() => (window as any).match.phase.simul)).toEqual({ won: 4, of: 4 });
+});
+
 test("a loss (?win=1&phase=2): you resign your board, the bots win theirs: defeated, 3 of 4 won", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(4 * 60_000);
   const errors: string[] = [];
