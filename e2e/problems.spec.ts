@@ -1,5 +1,5 @@
 import { expect, type Page } from "@playwright/test";
-import { asAdmin, asServerAdmin, test, bossAloneFromHome } from "./helpers.ts";
+import { asServerAdmin, test, bossAloneFromHome } from "./helpers.ts";
 
 /**
  * Error capture and the feedback sheet (docs/areas/ops.md, "Errors and player reports"): errors on a device reach the
@@ -195,7 +195,7 @@ test("the health view: JSON for an admin (deployed version, live numbers, errors
   expect(await opsPage(page)).toContain("<h2>Health</h2>");
 });
 
-test("an admin's town on a device without WebGL 2 never falls back to today's town (Nov 13, Eric's rule): the town's box says \"Chess Town can't run on this device.\", no reload; it says so once, as its own kind with its reason; the health view counts it by reason, apart from the errors", async ({ page }) => {
+test("the town on a device without WebGL 2 never falls back to the old town (Nov 13, Eric's rule; a player's on the phone, everyone's town since Nov 13): the town's box says \"Chess Town can't run on this device.\", no reload; it says so once, as its own kind with its reason; the health view counts it by reason, apart from the errors", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
   const desktop = project() === "desktop";
@@ -208,8 +208,8 @@ test("an admin's town on a device without WebGL 2 never falls back to today's to
     before = (await healthNow()).townFallbacks.byReason["no-webgl2"]!.day;
   }
   await page.addInitScript(() => delete (window as { WebGL2RenderingContext?: unknown }).WebGL2RenderingContext);
-  // (An admin's town is the street town, which needs WebGL 2: admin-town.ts.)
-  await asAdmin(page);
+  // (Everyone's town is the street town, which needs WebGL 2: a player's here (a guest) on the phone; on the computer, an admin's, for the
+  // health view.)
   let loads = 0;
   page.on("framenavigated", (f) => void (f === page.mainFrame() && new URL(f.url()).pathname === "/town" && loads++));
   const sent = page.waitForRequest((r) => r.url().endsWith("/api/problems") && r.method() === "POST");

@@ -9,6 +9,13 @@ twice its size, the map bigger, and put **the park** with its ten chess tables i
 opens it, and the computer's side menu's Chess Town item; the address `/town` opens it directly too (`hunchess.com/town`,
 behind Cloudflare Access like the rest of the site). Phone and computer; **on a computer it sits in the front door's frame** (Oct 29, below).
 
+
+**Since Nov 13 the street town (below, "The street town") is everyone's town, players' and guests' alike, and the old Canvas 2D town's
+code is gone** ([2026-11-13-street-town-for-everyone.md](../decisions/2026-11-13-street-town-for-everyone.md)): its 46 × 46 map, park,
+lamps, start (22, 17), zoom-out camera, drag-to-pan and Colosseum picture. Much of "How it works" below tells the old town's story (its
+layout, its camera); where it and "The street town" differ, the street town is how it works now. `ADMIN_TOWN` (`town/admin-town.ts`) still
+gates the admin-first bosses' homes (core's `BOSS_ADMIN_FIRST`: Timber's, Dash's, Rolling Dough): in a player's town their lots are left out
+before the rows are laid (`street.ts lotHere`), so each row fills the place with look-alike fronts. Test: `packages/app/test/town-player.test.ts`.
 ## How it works
 
 - **The page.** `App.tsx` mounts it at `/town` the way it mounts `/autochess`; `town/TownPage.tsx` loads the rest with a
@@ -80,7 +87,8 @@ behind Cloudflare Access like the rest of the site). Phone and computer; **on a 
   function must not lean on anything that changes after the call; `test/town-paint-lazy.test.ts` checks every picture), and each
   statue's world-scale picture is made when first drawn: opening took 5.8 s to its first frame on a slowed phone, now 2.1 s
   (`e2e/perf.spec.ts`, "Chess Town on a slow phone").
-  It draws through a **drawing layer** (`town/paint.ts`, Oct 30) with two backends: Canvas 2D (today's town, everyone's) and
+  It draws through a **drawing layer** (`town/paint.ts`, Oct 30) with two backends: Canvas 2D (the old town's, gone since Nov 13; it stays
+  only as the blank canvas under the failure message) and
   WebGL 2 (the street town's only drawing since Nov 6, `town/paint-gl.ts`; below, "WebGL").
 - **WebGL (Oct 30; docs/decisions/2026-10-30-town-webgl.md; the street town's only drawing since Nov 6,
   docs/decisions/2026-11-06-street-webgl-only.md).** It draws the same picture with WebGL 2 in a few draw calls a frame instead of hundreds of canvas calls. `paint-gl.ts` stands in for the part of the 2D
@@ -1058,10 +1066,9 @@ standing where the chair blocks are"): [2026-11-02-challenge-pacing.md](../decis
   dark lifting off the battle, nobody moving and the table there throughout the drain), `e2e/shop.spec.ts` (Alfil's Pyramid's, Big Boy's Crib's and Dash's Kicks' crates), `e2e/town.spec.ts` (a boss without an inside, Folio: the
   Boss raid screen).
 
-## The street town (Nov 5, round 2: admins only)
+## The street town (Nov 5, round 2: admins only; everyone's since Nov 13)
 
-An admin's town is the street town (`STREET_TOWN`, `town/admin-town.ts`; everyone else keeps the town above until round 3, the boxes
-and Seam Avenue's camera turn, is done; then the switch goes). Eric approved its art and plan Nov 5 (`claude/boss-art` 11a4d903).
+The street town was an admin's town only (`STREET_TOWN`, gone Nov 13) until it became everyone's town on Nov 13. Eric approved its art and plan Nov 5 (`claude/boss-art` 11a4d903).
 - **From the plan:** `town/street-plan.json` (the art's `town-plan-nov5.json`, as made) read by `town/street.ts`; `world.ts` builds
   the ground (the streets are the board, their sidewalks paving, the park's walks and lawns, back gardens, lots, the Colosseum), the
   props (trees, benches, lamps, the twelve tables, the fountain, hedges, bushes, beds, sheds, and every everyday building's front),

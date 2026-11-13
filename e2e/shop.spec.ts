@@ -388,10 +388,11 @@ test("Timber's Lumber Lodge (Nov 3): in an admin's town only; its card is its na
   page.on("pageerror", (e) => errors.push(String(e)));
   type Hook = { __townBots?: () => { name: string }[] | null; __townGlide?: (to: string | readonly [number, number]) => void };
   const bots = async () => (await page.evaluate(() => (window as unknown as Hook).__townBots?.() ?? []))!.map((b) => b.name);
-  // A player's town: no lodge on its ground west of the Colosseum (open ground there), no Rivet (Timber is in the game for admins first).
+  // A player's town: no lodge on its lot on Fountain Street (the row's look-alike fronts there since Nov 13), no Rivet (Timber is in the game
+  // for admins first).
   await page.goto("/town?sky=day");
   await townReady(page);
-  await page.evaluate(() => (window as unknown as Hook).__townGlide?.([11, 31]));
+  await page.evaluate(() => (window as unknown as Hook).__townGlide?.([5, 31]));
   await page.waitForTimeout(1500);
   expect(await homeAt(page, "timber")).toBeNull();
   expect(await bots()).toContain("Glim (bot)");
@@ -449,10 +450,10 @@ test("Dash's Kicks (Nov 3): in an admin's town only; its card is its name and Go
   page.on("pageerror", (e) => errors.push(String(e)));
   type Hook = { __townBots?: () => { name: string }[] | null; __townGlide?: (to: string | readonly [number, number]) => void; __townBossBack?: (id: string) => void };
   const bots = async () => (await page.evaluate(() => (window as unknown as Hook).__townBots?.() ?? []))!.map((b) => b.name);
-  // A player's town: no store on its ground beside Timber's (open ground there), no Tick (Dash is in the game for admins first).
+  // A player's town: no store on its lot (the row's look-alike fronts there since Nov 13), no Tick (Dash is in the game for admins first).
   await page.goto("/town?sky=day");
   await townReady(page);
-  await page.evaluate(() => (window as unknown as Hook).__townGlide?.([4, 33]));
+  await page.evaluate(() => (window as unknown as Hook).__townGlide?.([41, 39]));
   await page.waitForTimeout(1500);
   expect(await homeAt(page, "dash")).toBeNull();
   expect(await bots()).toContain("Glim (bot)");
