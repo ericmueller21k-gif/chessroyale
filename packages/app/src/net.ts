@@ -86,6 +86,8 @@ import { moveRecordFrom, type GroupReveal } from "./game.ts";
 import { MatchChat } from "./chat.ts";
 import { isAdmin, maiaAllowed } from "./boss-brain.ts";
 import { resetKingSpeech } from "./godKing.ts";
+import { resetBeats } from "./components/BossCharacter.tsx";
+import { resetBattleBanners } from "./battle-banners.ts";
 import { bossVoice } from "./speech.tsx";
 import { maiaSaved, prefetchMaia, startMaia } from "./maia.ts";
 import { setGardenSource } from "./garden-clock.ts";
@@ -805,6 +807,16 @@ export class NetMatch implements GameView {
       case "boss":
         // (The boss's first move, when it moves first, is move 1 too; its intro isn't.)
         if (!m.intro && m.boss.lastMove) this.begun = true;
+        // (The Hidden Boss's child beaten and grown up: a new match against his adult form, his entrance again as a new battle's. The
+        // boss screen stays up through it, so it doesn't reset his beats, words and banners itself: here, as solo's nextForm.)
+        if (this.boss?.form === "child" && !m.boss.form) {
+          // (A "Win this form" pressed on the child is spent: the man's own may be pressed.)
+          this.winFormSent = false;
+          resetKingSpeech();
+          bossVoice.reset();
+          resetBeats();
+          resetBattleBanners();
+        }
         this.boss = { ...m.boss, board: this.toView(m.boss.board) };
         this.standingsList = m.standings;
         this.currentBoard = m.boss.board;

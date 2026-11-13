@@ -827,7 +827,8 @@ export class LobbyCore {
   private phase2Online(): boolean {
     const boss = this.runner?.boss;
     if (!boss || boss.id !== HIDDEN_ROOM.boss || boss.result !== "crowd" || this.r.recluse2 || RECLUSE_PHASE2.boards < 1) return false;
-    if (recluseNextForm("adult") !== "four") return false;
+    // (The form beaten: his child's brings his adult form, a new match (nextRound), not the boards.)
+    if (recluseNextForm(boss.form ?? "adult") !== "four") return false;
     return !!this.r.party?.room || (this.settings.mode === "crowd" && !this.settings.raid);
   }
 
@@ -2228,12 +2229,13 @@ export class LobbyCore {
     // alike (D6). The strike's goes to the host alone, for its note.)
     const mine = c && (kind === "elo" || kind === "stumble") ? c.maia : !checker;
     const b = this.r.bossBrain && !funhouse && !pick && kind !== "extra" && kind !== "best" && mine && !only ? this.r.bossBrain : null;
-    const brain = b ? { brain: b.brain, rating: b.rating } : null;
+    // (The Hidden Boss's child: Maia at his rating now, Stockfish at the strength it stands for: runner.childRatingNow, bossEloNow.)
+    const brain = b ? { brain: b.brain, rating: runner.childRatingNow() ?? b.rating } : null;
     this.io.send(host, {
       t: "bossRequest",
       key: this.r.bossKey!,
       fen,
-      elo: runner.boss!.elo,
+      elo: runner.bossEloNow(),
       nodes: this.settings.bossNodes,
       ...(this.r.bossKind === "stumble" ? { stumble: true } : this.r.bossKind === "stagger" ? { stagger: true } : this.r.bossKind === "best" ? { best: true } : {}),
       ...(funhouse ? { funhouse: true } : {}),
@@ -2595,6 +2597,13 @@ export class LobbyCore {
     if (!runner) return;
     if (runner.isOver()) return this.finishMatch();
     if (runner.boss) {
+      // (The Hidden Boss's child beaten, his fall over (he grew up: the fall path below, his rules' fallMs): a new match against his
+      // adult form, the next of his forms (RECLUSE_FORMS), from the starting position, with its own intro, as solo's nextForm.)
+      if (runner.boss.form === "child" && runner.boss.result === "crowd") {
+        runner.nextBossForm();
+        this.r.winForm = undefined;
+        this.r.bossIntroDone = false;
+      }
       if (!this.r.bossIntroDone) {
         // The boss arrives: it takes over from an even position of the game just played.
         this.r.bossIntroDone = true;
