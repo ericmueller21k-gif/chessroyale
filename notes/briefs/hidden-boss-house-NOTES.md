@@ -199,3 +199,10 @@ instantly win and trigger next phase on the next move."
   builds that cut in about 11 minutes. Build after #670 merges.
 - FINAL (Eric, Nov 13, via the music session): 1 "Computation without creativity is nothing. // Now I have both."
   2 "Prepare yourself. // This is the ultimate test of your skill."
+
+## Nov 13: Eric tests only when the whole thing is live
+Eric: he'll test once everything is live: the 3-story house, the stairs, the room, all the animation, the 3 test bots, everything he's
+described. No rush; one Opus builder at a time. Order: building -> chant lines + music cut -> the room challenge (server, xhigh: 4 max,
+locked door, wait in room / cancel on leave, 5-min cap, summoning, the 3 admin test bots, Win this form in every form) -> the child form in
+a match (Maia ramp, the ages growing, the house music) -> the cutscene before the transformation (ghost kid, spotlight, typed lines,
+kneeling pose) -> tell Eric it's ready.

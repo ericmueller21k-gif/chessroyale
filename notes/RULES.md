@@ -132,3 +132,4 @@ checks it (stills at phone + computer sizes). Guard: docs/rules/eric.md + a chec
 - Briefs: say "stills go on a stills/<name> branch, never committed under docs/ (check.yml fails the PR)". #654 hit this Nov 12.
 - RULE (Nov 12 miss): Boingo pie helper finished 08:37 UTC; director told Eric "still working" for 6 h without checking the branch. Before any status line about a helper, fetch its branch for .done (or get_session). Run a background .done watcher for every running helper.
 - The director cannot re-run failed GitHub jobs (403 for this integration). A flake on a PR: fix at cause or ask Eric to press Re-run.
+- One Opus helper at a time (Eric, Nov 13: "One Opus builder at a time... no rush"). Overrides the two-at-high allowance until he says otherwise. Haiku jobs may still run beside it.
