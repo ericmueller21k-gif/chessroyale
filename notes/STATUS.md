@@ -1110,3 +1110,6 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 14 07:48: Eric's music session (session_01JuCWRs7vACHciUbhC3eY8V) lengthened recluse-phase2's intro (+60 s looming; introSeconds
   118.887167, mark calculation 70.0) on claude/trailer-v2 e774edfd; a stereo-192 set coming to stills/trailer-v2/boss-music-stereo-192/.
   Forwarded to the music HQ helper to ship with the stereo 192 set.
+- Nov 14 08:00: transform build done -> #707 (CI 82d4b2e7). Boss-lane review: session_01JuCWRv1WnTZR5bs8yfkb8q -> review/707.
+  Music HQ helper (#tbd) adding the long recluse-phase2 intro in stereo 192 (watcher bnv3aw9q1). Running Opus: music HQ + review.
+  After #707: visual QA, flaky round 4.
