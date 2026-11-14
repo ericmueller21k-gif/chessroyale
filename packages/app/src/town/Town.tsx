@@ -1808,6 +1808,8 @@ function startTown(
   let drag: { id: number; x: number; y: number; cx: number; cy: number; kx: number; ky: number } | null = null;
   /** This press only closes the open card (a tap anywhere else closes it, as in the prototype). */
   let closing = false;
+  /** What the press's finger went down on (a tap a busy frame took for a run walks to it: press.ts). */
+  let downHit: Hit | null = null;
   const local = (e: PointerEvent) => {
     const rc = box.getBoundingClientRect();
     return { x: e.clientX - rc.left, y: e.clientY - rc.top };
@@ -1947,7 +1949,8 @@ function startTown(
     const now = evAt(e);
     if (closing) return press.down(e.clientX, e.clientY, "", now);
     const xy = local(e);
-    const p = plan(pickTap(xy.x, xy.y));
+    downHit = pickTap(xy.x, xy.y);
+    const p = plan(downHit);
     if (p?.dest) r.pressSquare(p.dest.c, p.dest.r);
     press.down(e.clientX, e.clientY, p?.dest || p?.card ? p.key : "", now);
   };
@@ -1983,17 +1986,24 @@ function startTown(
     look.release(now, turn.to);
     // (Letting go of a run: you stop at the next square.)
     finger.stop();
+    // (The release's own time: a frame that ran while a quick tap's release waited in the queue made it a run, and this says it was a tap.)
+    const at = evAt(e);
     if (closing) {
-      if (press.up("") !== "drag") setCard(null);
+      if (press.up("", at) !== "drag") setCard(null);
       return;
     }
     const xy = local(e);
-    const p = plan(pickTap(xy.x, xy.y));
-    const res = press.up(p ? p.key : "");
+    let p = plan(pickTap(xy.x, xy.y));
+    const was = press.gesture();
+    const res = press.up(p ? p.key : "", at);
+    // (A tap a busy frame took for a run, press.ts: its finger never moved, the run's camera did. It taps what it pressed.)
+    if (was === "run" && res === "walk") p = plan(downHit);
     if (res !== "walk" || !p) {
       if (res === "cancel") r.release(now, false);
       return;
     }
+    // (A tap a busy frame took for a run: the run let its square go; it presses again, to pulse as you set off.)
+    if (was === "run" && p.dest) r.pressSquare(p.dest.c, p.dest.r);
     // Released on the same thing: the border pulses once and you set off (no sound, no vibration: Eric).
     r.release(now, true);
     // (A tap's walk after a look round snapped to a quarter locks it in: the new base heading, the camera staying where it is.)
