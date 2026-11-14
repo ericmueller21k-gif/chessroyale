@@ -1155,3 +1155,7 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 14 14:56: #713 CI green with 2 retry-passes: hidden-boss-room:116 [phone] GK line over .dk-mate-art (phone party layout; #713
   only measured computer) -> fix helper session_01JuCWRszzyFCoSZEGdN2uWj (high, on #713's branch, briefs/fix-713-phone.md), watcher
   bnoki6vwk; and autochess:238 [phone] (unrelated; add to flaky leftovers).
+- Nov 14 15:50: #713 MERGED b6d26aa8 (phase 2 result + main's red after #712, computer and phone GK box). Deploy + main run watcher
+  running. No helpers. Flaky leftovers now: alfil:247, town-chat:1367/1370, fairplay:65, shop:238, shop:1144 [desktop, Eric guard],
+  town-afk:116, town-street:155, autochess:238 [phone], other specs still on __townAt+click. Follow-ups: #707 m2/m4/m5, MovePanel boss
+  portrait in phase 2, QA #11 nits, the 🏆 button's words online ("Your next move…" though a bot's can win), subscribe-in-useEffect.
