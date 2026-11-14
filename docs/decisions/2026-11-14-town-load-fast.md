@@ -27,3 +27,7 @@ which every deploy drops, so the first visit after any deploy fetched it all aga
 - The town's code itself (its chunk, before the card can show) still shows the plain page: a card there would have to match the
   town's box on every layout (the phone's bar, the computer's frame) before the town's styles are in. Measured below; left for now.
 - 2 s after the first frame: the town's first moves (your ride, the players near you) get the link first.
+
+**Measured** (tap Chess Town → first frame, headless, 6 Mbps / 40 ms; the full table is in the PR): first visit 10.1 → 7.1 s on a
+computer, 26.0 → 19.8 s on a slowed phone; the open after a deploy that changed the music 7.3 → 4.6 s and 21.3 → 17.4 s. The rest is
+the town's painting, unchanged.
