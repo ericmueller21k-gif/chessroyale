@@ -307,6 +307,20 @@ test("his room (Eric, Nov 12 and 13): Challenge is 1 of 4; leaving asks; an admi
   await expect.poll(phase, { message: "the results", timeout: 30_000 }).toBe("results");
   expect(await page.evaluate(() => (window as any).match.phase.simul)).toEqual({ won: 4, of: 4 });
   await expect(page.getByText(/on all 4 boards!/)).toBeVisible();
+  // The result (QA #12, Nov 14): all four played a board, so the headline is the boards' verdict, not "4th of 4"; your place under
+  // it; the review is your board from its end (not phase 1's first form, "Move 1 of 11"), stepped back with ◀.
+  await expect(page.locator(".results h1")).toHaveText("Victory!");
+  await expect(page.locator(".results-top > p.muted:not(.small)")).toHaveText(/^(You were the best in the crowd: 1st of 4\.|[234](nd|rd|th) of 4 in the crowd\. .+ was the best\.)$/);
+  const plies: number = await page.evaluate(() => (window as any).match.phase.simulBoard.history.length);
+  const review = page.locator(".board-review");
+  await expect(review.locator("h2")).toHaveText("Your board, move by move");
+  const stepText = review.locator(".bm-step-text");
+  await expect(stepText).toHaveText(plies ? new RegExp(`^Move ${plies} of ${plies} · `) : "The start · Chess960");
+  await expect(review.getByRole("button", { name: "Next move" })).toBeDisabled();
+  if (plies) {
+    await review.getByRole("button", { name: "Previous move" }).click();
+    await expect(stepText).toHaveText(plies > 1 ? new RegExp(`^Move ${plies - 1} of ${plies} · `) : "The start · Chess960");
+  }
   await still(page, "results");
 });
 
