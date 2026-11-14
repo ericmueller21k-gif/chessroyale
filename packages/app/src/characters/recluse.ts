@@ -75,29 +75,29 @@ export const RECLUSE_PALETTE: Record<string, string> = {
   "8": "#fff3b8", // the spell's glow (and the glint in his eyes): pale, gold, ember
   "9": "#ffc44a",
   "0": "#ff7a3c",
-  // The suit (MOCKUP round 3, Nov 14): deep blue, dark to light; red, dark to light; the gloves and boots; the yellow traces
-  // and their nodes; the visor's glass.
-  n: "#0c1840",
-  u: "#16307e",
-  v: "#2550bb",
-  z: "#4a82e8",
-  R: "#560d1d",
-  S: "#8c1a2f",
-  P: "#c02a3e",
-  I: "#e6566b",
-  Z: "#0a0e22",
-  g: "#f6c62b",
-  i: "#fff4a6",
-  f: "#a77c12",
-  p: "#0b1430",
-  "#": "#1d2f6a",
-  "@": "#9fd0ff",
+  // The suit (MOCKUP round 3b, Nov 14): a matte near-black navy, dark to light; slim charcoal panels, dark to light; the
+  // gloves and boots; the glowing traces, red and cool blue, and their tiny yellow nodes; the visor's glass.
+  n: "#090c17",
+  u: "#111829",
+  v: "#1b2540",
+  z: "#2b3a5c",
+  R: "#121319",
+  S: "#1d1f29",
+  P: "#2a2d39",
+  I: "#3d4152",
+  Z: "#05070d",
+  f: "#d83a4c",
+  g: "#ff8a95",
+  i: "#ffd84a",
+  p: "#070a14",
+  "#": "#131d36",
+  "=": "#5ab4e6",
 };
 
 type Pt = readonly [number, number];
 const SHIRT = "qrst";
 const NAVY = "NMLl";
-const SUIT_RED = "RSPI";
+const SUIT_PANEL = "RSPI";
 const SUIT_BLUE = "nuvz";
 
 const ramp = (r: string, l: number) => r[Math.max(0, Math.min(r.length - 1, Math.floor(l * r.length)))]!;
@@ -391,10 +391,11 @@ function paintArm(sh: Pt, el: Pt, wr: Pt, fore: boolean, full = false, suit = fa
       const s = inLo && (!inUp || lo.d - rLo < up.d - rUp) ? lo : up;
       const rr = s === lo ? rLo : rUp;
       const l = 0.6 - 0.5 * (s.nx / rr) - 0.4 * (s.ny / rr);
-      // (The suit: the upper arm red, a yellow-ringed blue cuff where his sleeve was rolled, the forearm blue.)
+      // (The suit: a charcoal panel over the upper arm, a dark seam each end of the cuff where his sleeve was rolled, the
+      // forearm dark navy.)
       if (s === lo && !inCuff) cv[y]![x] = ramp(suit ? "nuv" : "bcd", l);
-      else if (s === lo) cv[y]![x] = lo.t > cuff - 0.1 || lo.t < 0.06 ? (suit ? "g" : "q") : ramp(suit ? "uvz" : "rst", l + 0.1);
-      else cv[y]![x] = ramp(suit ? SUIT_RED : SHIRT, l - 0.12);
+      else if (s === lo) cv[y]![x] = lo.t > cuff - 0.1 || lo.t < 0.06 ? (suit ? "Z" : "q") : ramp(suit ? "nuv" : "rst", l + 0.1);
+      else cv[y]![x] = ramp(suit ? SUIT_PANEL : SHIRT, l - 0.12);
     }
   return { grid: toGrid(cv) };
 }
@@ -553,19 +554,20 @@ function armPart(sh: Pt, el: Pt, wr: Pt, fore = false, full = false): { name: st
   return { name, at };
 }
 
-// ---- The suit (a MOCKUP, round 3, Eric, Nov 14: "a full exoskeleton-style futuristic armor… don't make it look like war…
-// more like computer networking, that sort of wiring… a matching full-head helmet… the full front visor flips up… red and kind
-// of blue, some yellow… fairly fit to his body"). Fitted, deep blue with red panels, thin yellow circuit traces with pale
-// nodes; a full helmet shaped to his long head, one smooth tinted visor over his whole face that flips up into the dome. Every
-// part has its suit version, the same size and place (`suitName`), so any pose wears it by its part names (`suitFrame`).
+// ---- The suit (a MOCKUP, round 3b, Eric and the director, Nov 14: "a full exoskeleton-style futuristic armor… don't make it
+// look like war… more like computer networking, that sort of wiring… a matching full-head helmet… the full front visor flips
+// up… fairly fit to his body"; darker, its own look). Fitted, a matte near-black navy with slim charcoal panels, thin glowing
+// traces in red and cool blue, tiny yellow nodes; an angular helmet of its own, one smooth visor over his whole face that
+// flips up into the dome. Every part has its suit version, the same size and place (`suitName`), so any pose wears it by its
+// part names (`suitFrame`).
 
 export type Visor = "down" | "mid" | "up";
 const GLOVE: Record<string, string> = { a: "Z", b: "Z", c: "n", d: "u", e: "v" };
-const BOOT: Record<string, string> = { D: "Z", E: "n", F: "u", G: "g" };
+const BOOT: Record<string, string> = { D: "Z", E: "n", F: "u", G: "=" };
 const toCanvas = (p: Part): Canvas => p.grid.map((r) => [...r]);
 const remap = (p: Part, map: Record<string, string>): Part => ({ ...p, grid: p.grid.map((r) => [...r].map((c) => map[c] ?? c).join("")) });
-/** Thin traces (lines in `line`, their ends a node in `node`) on a canvas whose top-left is drawing (x0, y0), only over its drawn pixels. */
-function traces(cv: Canvas, x0: number, y0: number, paths: readonly (readonly Pt[])[], line = "g", node = "i"): void {
+/** Thin traces (lines in `line`, their ends a tiny node in `node`) on a canvas whose top-left is drawing (x0, y0), only over its drawn pixels. */
+function traces(cv: Canvas, x0: number, y0: number, paths: readonly (readonly Pt[])[], line = "f", node = "i"): void {
   const on = (x: number, y: number) => {
     const k = cv[y - y0]?.[x - x0];
     return k !== undefined && k !== "." && k !== "k";
@@ -579,16 +581,16 @@ function traces(cv: Canvas, x0: number, y0: number, paths: readonly (readonly Pt
       for (let t = 0; t <= n; t++) put(Math.round(ax + ((bx - ax) * t) / n), Math.round(ay + ((by - ay) * t) / n), line);
     }
     const end = path[path.length - 1]!;
-    put(Math.round(end[0]), Math.round(end[1]), node);
+    if (node) put(Math.round(end[0]), Math.round(end[1]), node);
   }
 }
-/** The suit's torso: a blue panel down his chest narrowing to the waist, red at his sides and over his shoulders, a high blue
- * collar; the circuit: a spine down the middle with branches out to his sides, a node at each end; the belt a dark band. */
+/** The suit's torso: dark navy down the middle, slim charcoal panels at his sides and shoulders split by seams, a high collar;
+ * the circuit: a cool-blue spine down the middle, red runs branching to his sides, a tiny node at each end. */
 function suitTorso(): Part {
   const X0 = 30;
   const Y0 = 26;
   const cv = toCanvas(torso());
-  const NECK: Record<string, string> = { a: "n", b: "u", c: "v", d: "v", e: "z", E: "n", D: "Z", O: "f", Y: "g", y: "i" };
+  const NECK: Record<string, string> = { a: "n", b: "u", c: "u", d: "v", e: "v", E: "Z", D: "Z", O: "n", Y: "=", y: "i" };
   cv.forEach((row, y) =>
     row.forEach((k, x) => {
       const X = x + X0;
@@ -596,59 +598,67 @@ function suitTorso(): Part {
       const i = SHIRT.indexOf(k);
       if (i >= 0) {
         const half = Y < 36 ? 4.5 : 8.6 - (Y - 36) * 0.07;
-        row[x] = Math.abs(X + 0.5 - 46) <= half ? SUIT_BLUE[i]! : SUIT_RED[i]!;
+        const d = Math.abs(X + 0.5 - 46) - half;
+        // (A seam where the side panels meet the middle, and across them every 9 rows: segmented.)
+        row[x] = d > 0 && d < 1 ? "Z" : d > 0 ? (Y % 9 === 0 ? "Z" : SUIT_PANEL[i]!) : SUIT_BLUE[Math.min(2, i)]!;
       } else if (NECK[k]) row[x] = NECK[k]!;
     }),
   );
+  traces(cv, X0, Y0, [[[46, 37], [46, 69]]], "=");
   traces(cv, X0, Y0, [
-    [[46, 37], [46, 69]],
-    [[46, 42], [43, 45], [43, 51], [39, 55]],
-    [[46, 46], [49, 49], [49, 57], [53, 61]],
-    [[46, 58], [42, 62], [40, 62]],
-    [[46, 53], [50, 53], [52, 55]],
-    [[46, 64], [51, 66]],
+    [[46, 42], [43, 45], [43, 51], [40, 54]],
+    [[46, 47], [49, 50], [49, 57], [52, 60]],
+    [[46, 60], [42, 64]],
+    [[46, 54], [50, 54]],
   ]);
-  stamp(cv, X0, Y0, [".g.", "gig", ".g."], 45, 36);
+  stamp(cv, X0, Y0, ["i"], 46, 36);
   return { grid: toGrid(cv) };
 }
-/** The suit's legs: blue, a red stripe down the outside of each, a trace down the front to a node at the knee. */
+/** The suit's legs: dark navy, a thin red glowing line down the outside of each, a cool-blue trace down the front to a tiny
+ * node at the knee, a seam across each knee. */
 function suitLegs(stance: Stance): Part {
   const { part, at } = legsOf(stance);
-  const cv = toCanvas(remap(part, { N: "n", M: "u", L: "v", l: "z" }));
+  const cv = toCanvas(remap(part, { N: "n", M: "u", L: "v", l: "u" }));
   const dy = STANCE_DROP[stance];
-  cv.forEach((row, y) => {
-    if (y + at[1] < 82 + dy) return;
-    const first = row.findIndex((k) => k !== "." && k !== "k");
-    let last = -1;
-    row.forEach((k, x) => k !== "." && k !== "k" && (last = x));
-    if (first < 0) return;
-    for (const x of [first, first + 1, last - 1, last]) if (row[x] && row[x] !== ".") row[x] = x <= first + 1 ? "S" : "R";
-  });
   const legsPts = STANCE_LEGS[stance];
-  traces(
-    cv,
-    at[0],
-    at[1],
-    // (From below the hips to the knee, a little inside the middle of each leg.)
-    legsPts.map((leg, i) => leg.slice(0, 2).map(([x, y], j): Pt => [x + (i ? -1.4 : 1.4), y + (j ? 0 : 7)])),
-  );
+  // Circuit runs, not stripes: down the front of each thigh to a node above the knee (cool blue); down the outside of each
+  // thigh, jogging in to a node (red); down each shin, jogging out to a node (red).
+  legsPts.forEach((leg, i) => {
+    const s1 = i ? -1 : 1;
+    const [hx, hy] = leg[0]!;
+    const [kx, ky] = leg[1]!;
+    const mid = (u: number): Pt => [hx + (kx - hx) * u, hy + (ky - hy) * u];
+    traces(cv, at[0], at[1], [[[hx + s1 * 1.4, hy + 7], [kx + s1 * 1.4, ky - 3]]], "=");
+    const m = mid(0.35);
+    const m2 = mid(0.7);
+    traces(cv, at[0], at[1], [[[m[0] - s1 * 3.4, m[1]], [m2[0] - s1 * 3.4, m2[1]], [m2[0] - s1 * 1.6, m2[1] + 2]]]);
+    if (leg[2]) {
+      const [ax, ay] = leg[2]!;
+      traces(cv, at[0], at[1], [[[kx - s1 * 0.5, ky + 4], [kx + (ax - kx) * 0.45 - s1 * 0.5, ky + (ay - ky) * 0.45], [kx + (ax - kx) * 0.45 - s1 * 2.5, ky + (ay - ky) * 0.45 + 2]]]);
+    }
+  });
+  if (stance !== "kneel")
+    for (const leg of legsPts) {
+      const [kx, ky] = leg[1]!;
+      traces(cv, at[0], at[1], [[[kx - 3, ky + 2], [kx + 3, ky + 2]]], "Z", "");
+    }
   return { grid: toGrid(cv) };
 }
-/** Facing his head part's own pixels (25 x 35): the helmet's shell (his long head's shape), the face opening, the visor. */
-const SHELL = (x: number, y: number) => inEllipse(12.5, 15.4, 12.3, 12.6)(x, y) || inPoly([[1.8, 16], [23.2, 16], [21, 28], [16, 34.8], [9, 34.8], [4, 28]])(x, y);
+/** Facing his head part's own pixels (25 x 35): the helmet's shell (angular, faceted, his long head's proportions), the face
+ * opening, the visor. */
+const SHELL = inPoly([[8.4, 1.2], [16.6, 1.2], [21.6, 4.6], [24.2, 11.5], [24.2, 19.5], [22.4, 27.5], [16.8, 34.8], [8.2, 34.8], [2.6, 27.5], [0.8, 19.5], [0.8, 11.5], [3.4, 4.6]]);
 const OPENING = inPoly([[6.6, 13.6], [18.4, 13.6], [20.8, 16.6], [20.6, 21], [19.2, 27.5], [15.4, 33.8], [9.6, 33.8], [5.8, 27.5], [4.4, 21], [4.2, 16.6]]);
-/** The visor's glass down over his face: dark blue, a soft sheen down its left, one long highlight, its lower rim lit. */
+/** The visor's glass down over his face: near black with a cool-blue tint low down, one long highlight, its rim lit. */
 function glass(x: number, y: number): string {
   if (!OPENING(x, y + 1) || !OPENING(x - 1, y) || !OPENING(x + 1, y)) return "#";
   const d = x - 7 + (y - 15) * 0.45;
-  if (d >= 0 && d < 1.2 && y < 24) return "@";
-  if (d >= 1.6 && d < 2.4 && y < 21) return "z";
+  if (d >= 0 && d < 1.2 && y < 24) return "=";
+  if (d >= 1.6 && d < 2.4 && y < 21) return "#";
   return y < 17 ? "Z" : y > 29 || x < 7 ? "#" : "p";
 }
 /** His head in the helmet (`visor`: down over his face, on its way up, up in the dome): the face drawn as ever, inside. */
 function helmet(face: Face, dark: boolean, visor: Visor): Part {
   const cv = toCanvas(head(face, 0, dark));
-  const light = roundLight(9, 8, 15, 18, 0.18);
   for (let y = 0; y < cv.length; y++)
     for (let x = 0; x < 25; x++) {
       if (!SHELL(x, y)) {
@@ -659,26 +669,28 @@ function helmet(face: Face, dark: boolean, visor: Visor): Part {
         if ("HhjJ".includes(cv[y]![x]!)) cv[y]![x] = "n";
         continue;
       }
-      const crest = Math.abs(x + 0.5 - 12.5) <= 1.6 && y < 13;
-      const pod = inEllipse(1.8, 20.5, 2.4, 3)(x, y) || inEllipse(23.2, 20.5, 2.4, 3)(x, y);
-      cv[y]![x] = ramp(crest || pod ? SUIT_RED : SUIT_BLUE, light(x, y));
+      // Facets: the crown's top plate lit, the side plates darker, the right side darkest (lit from the top left).
+      const top = y < 6 + Math.abs(x + 0.5 - 12.5) * -0.2 && Math.abs(x + 0.5 - 12.5) < 5;
+      const side = x + 0.5 < 5 + (y > 12 ? 0 : (12 - y) * 0.35) ? "L" : x + 0.5 > 20 - (y > 12 ? 0 : (12 - y) * 0.35) ? "R" : "M";
+      cv[y]![x] = top ? "z" : side === "L" ? "v" : side === "R" ? "n" : y < 13 ? "v" : "u";
     }
-  // The circuit up the sides of the dome from the pods, and the nodes in the pods.
-  traces(cv, 0, 0, [
-    [[3, 17], [3, 12], [5, 9], [8, 7]],
-    [[22, 17], [22, 12], [20, 9], [17, 7]],
-  ]);
-  stamp(cv, 0, 0, ["g", "i", "g"], 1, 19);
-  stamp(cv, 0, 0, ["g", "i", "g"], 23, 19);
+  // The seams between the plates and round the opening; a red run down each side jogging in to a node; a short cool-blue run
+  // over the brow; one tiny node at his temple.
+  traces(cv, 0, 0, [[[8, 2], [6, 7], [4, 12]], [[16, 2], [19, 7], [20, 12]], [[7, 6], [18, 6]]], "Z", "");
+  for (let y = 0; y < cv.length; y++)
+    for (let x = 0; x < 25; x++) if (SHELL(x, y) && !OPENING(x, y) && (OPENING(x + 1, y) || OPENING(x - 1, y) || OPENING(x, y + 1) || OPENING(x, y - 1))) cv[y]![x] = "Z";
+  traces(cv, 0, 0, [[[2, 12], [2, 18], [4, 20]], [[23, 14], [23, 21], [21, 23]]], "f", "");
+  traces(cv, 0, 0, [[[9, 8], [12, 8], [14, 10], [16, 10]]], "=", "");
+  stamp(cv, 0, 0, ["i"], 22, 11);
   if (visor === "down") {
     for (let y = 0; y < cv.length; y++) for (let x = 0; x < 25; x++) if (OPENING(x, y)) cv[y]![x] = glass(x, y);
   } else {
     // On its way up: the glass tilted back, its lower half gone over the brow; or up, a band of it across the dome.
-    const [top, bottom] = visor === "mid" ? [8, 20] : [4, 10];
+    const [top, bottom] = visor === "mid" ? [7, 19] : [3, 9];
     for (let y = top; y <= bottom; y++)
       for (let x = 0; x < 25; x++) {
-        if (!SHELL(x, y) || Math.abs(x + 0.5 - 12.5) > 9.6 - (y < top + 2 ? (top + 2 - y) * 1.4 : 0)) continue;
-        cv[y]![x] = y === bottom ? "#" : y === top ? "u" : x - 5 + (y - top) * 0.6 > 0 && x - 5 + (y - top) * 0.6 < 1.2 ? "@" : y < top + 2 ? "Z" : "p";
+        if (!SHELL(x, y) || Math.abs(x + 0.5 - 12.5) > 9.8 - (y < top + 2 ? (top + 2 - y) * 1.6 : 0)) continue;
+        cv[y]![x] = y === bottom ? "=" : y === top ? "#" : x - 5 + (y - top) * 0.6 > 0 && x - 5 + (y - top) * 0.6 < 1.2 ? "=" : y < top + 2 ? "Z" : "p";
       }
   }
   return { grid: toGrid(cv) };
