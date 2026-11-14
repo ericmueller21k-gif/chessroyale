@@ -3,7 +3,7 @@ import { BOSS_ROSTER } from "@chessroyale/core";
 import { CHARACTERS } from "../src/characters/index.ts";
 import { EFFECT_SPRITES } from "../src/characters/effects.ts";
 import { BOSS_KITS, bossKit, kitName } from "../src/characters/kits.ts";
-import { ENGINE_EYE, HEAD_SIZE, RECLUSE, RECLUSE_BOOK, RECLUSE_BUST, headOf, palmOf } from "../src/characters/recluse.ts";
+import { RECLUSE, RECLUSE_BOOK, RECLUSE_BUST, suitFrame, suited } from "../src/characters/recluse.ts";
 import { frameKeys, renderFrame, type Character } from "../src/characters/sprite.ts";
 
 // The Hidden Boss (code id `recluse`): his art. Since phase 1 (Oct 14) he's registered (his kit, his full figure among the
@@ -118,36 +118,25 @@ describe("the Hidden Boss's art", () => {
     expect(Math.max(...bust)).toBeLessThanOrEqual(75);
   });
 
-  it("seizes the God King's power on his knees, his open hand raised towards him, then his fist (both drawings)", () => {
-    for (const ch of [RECLUSE, RECLUSE_BUST]) {
-      const kneel = (f: { layers: readonly { part: string }[] }) => ch === RECLUSE_BUST || f.layers.some((l) => l.part === "legs:kneel");
-      for (const name of ["seize", "seizeLoop", "seized"]) ch.anims[name]!.frames.forEach((f, i) => expect(kneel(f), `${ch.id} ${name} ${i + 1}`).toBe(true));
-      // (His raised hand, open, while the power streams in: where it goes; it's inside his frame, above his shoulder.)
-      for (const f of ch.anims.seizeLoop!.frames) {
-        const palm = palmOf(f)!;
-        expect(palm, ch.id).not.toBeNull();
-        expect(palm[0]).toBeLessThan(ch.w - 2);
-        expect(palm[1]).toBeLessThan(headOf(f)![1] + HEAD_SIZE[1] + 8);
-      }
-      expect(ch.anims.seized!.frames.every((f) => palmOf(f) === null && f.layers.some((l) => l.part === "fist:a"))).toBe(true);
-    }
-  });
-
-  it("finds his head on every frame of either drawing, so his half-engine look sits on his eye whatever he does", () => {
+  it("wears his suit on every frame of either drawing (Eric, Nov 14): each part's suit version is its size, so it sits where the part did; the tie off, the helmet over his head; the visor's three ways", () => {
+    const size = (name: string) => {
+      const g = RECLUSE.parts[name]!.grid;
+      return [Math.max(...g.map((r) => r.length)), g.length];
+    };
     for (const ch of [RECLUSE, RECLUSE_BUST])
       for (const [name, anim] of Object.entries(ch.anims))
         anim.frames.forEach((f, i) => {
-          const at = headOf(f);
-          expect(at, `${ch.id} ${name} ${i + 1}`).not.toBeNull();
-          // The engine eye lands on his eye: the iris's pixels there are drawn (never off the frame or on empty space).
-          const keys = frameKeys(ch, f);
-          const x = at![0] + ENGINE_EYE[0] - 1;
-          const y = at![1] + ENGINE_EYE[1] - 1;
-          expect(keys[y]?.[x], `${ch.id} ${name} ${i + 1}`).toBeTruthy();
+          const s = suited(f);
+          expect(suited(f), "made once").toBe(s);
+          const kept = f.layers.filter((l) => !l.part.startsWith("tie:"));
+          expect(s.layers.map((l) => [l.x, l.y]), `${ch.id} ${name} ${i + 1}`).toEqual(kept.map((l) => [l.x, l.y]));
+          s.layers.forEach((l, j) => expect(size(l.part), `${ch.id} ${name} ${i + 1}: ${l.part}`).toEqual(size(kept[j]!.part)));
+          expect(s.layers.some((l) => l.part.startsWith("head:")), `${ch.id} ${name} ${i + 1}`).toBe(false);
         });
-    // (The head part is the size the overlay assumes.)
-    const head = Object.entries(RECLUSE.parts).find(([n]) => n.startsWith("head:"))!;
-    expect([head[1].grid[0]!.length, head[1].grid.length]).toEqual([...HEAD_SIZE]);
+    for (const v of ["down", "mid", "up"] as const) {
+      const f = suitFrame(RECLUSE.anims.idle2!.frames[0]!, v);
+      expect(f.layers.find((l) => l.part.startsWith("helmet:"))!.part).toMatch(new RegExp(`^helmet:${v}:`));
+    }
   });
 
   it("puts the book effect on one board square", () => {

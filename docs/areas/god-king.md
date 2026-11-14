@@ -83,15 +83,10 @@ Lane: `god-king`. The bosses' own rules and art are on [bosses.md](bosses.md).
   `foeIntro`, said by the boss screen's intro), and his
   lines about calling him (the nudge, "spent", "A charge might turn it") are left out (`turnCues`' `noHelp`). His
   lines for this fight are in the Hidden Boss's table, `characters/recluse-lines.ts`.
-- **The Hidden Boss absorbs him** (Eric, Oct 14; DECISIONS.md, "The Hidden Boss absorbs the God King"): his phase
-  change opens with it. In his place in the dock (BossDock's `king`) he raises his sword over the beaten boss, his aura
-  swelling, and gloats (`foeTriumph`, a `lead` cue: always said, but a critical line cuts in; since Oct 17 it has its
-  whole time, the boss saying he'll take his power meanwhile: docs/decisions/2026-10-17-phase-change-pace.md); then the boss drains his
-  power into a raised hand: his Last Stand's blows flash and crack him (his own frames), he flickers and cries out
-  (`foeDrained`); and as it lands he fades up and away in light. No new frames of his: the aura, the flicker and the fade
-  are CSS over his figure (`.gk-aura`, `.gk-unit.gk-drained`, `.gk-fading`). Gone until the four boards (`king="gone"`); in phase 2
-  he's back in his place, greyed and never to be called (`king="benched"`, Eric, Nov 14: "the king will still be with you,
-  but you can't use him anymore"), and he says nothing in phase 2 (his phase 2 lines are gone).
+- **The Hidden Boss's phase change and phase 2** (Eric, Nov 14: "the king will still be with you, but you can't use him
+  anymore"; docs/decisions/2026-11-14-recluse-transformation.md): no absorption since Nov 14 (it was Oct 14's, in
+  docs/history). From the phase change on he stays in his place in the dock, greyed and never to be called
+  (BossDock's `king="benched"`: a disabled button, his bubble hidden), and says nothing (his phase 2 lines are gone).
 - **His lines** come from cues (a new danger to your queen or king, a mate threat, a queen taken, his own acts, a boss
   power…). Critical cues always speak; everything else is paced by `KING_SPEECH` (about 5 to 10 lines a game). His praise of
   a move ("Masterful! Even I'd play that.", `greatMove`; "A fine move.", `goodMove`) never comes in a game's first 10 moves
@@ -145,10 +140,9 @@ Lane: `god-king`. The bosses' own rules and art are on [bosses.md](bosses.md).
   time, in the sound worker's table); e2e `e2e/recluse.spec.ts` (the sound and the shake, no menu).
 - Against the Hidden Boss: unit `packages/chess/test/recluse.test.ts` (blocked; a try spends its charge, the Last Stand
   nothing), `packages/app/test/recluse-boss.test.ts` (the mocks, his cues, solo's `callKing` spending),
-  `packages/app/test/recluse-phase2.test.ts` (absorbed: his look at each moment of the phase change, gone for good, his
-  triumph giving way to his cry, silent in phase 2), `packages/server/test/crowd-hidden-boss.test.ts` (online: a try is
-  never a turn or a strike, and spends a charge); e2e `e2e/recluse.spec.ts` (the dock's count drops in phase 1; the
-  absorption's beats; no button, no figure and no word from him in phase 2), `e2e/crowd-hidden.spec.ts` (the Crowd's
+  `packages/app/test/recluse-phase2.test.ts` (no lines of his in the phase change or phase 2; silent in phase 2), `packages/server/test/crowd-hidden-boss.test.ts` (online: a try is
+  never a turn or a strike, and spends a charge); e2e `e2e/recluse.spec.ts` (the dock's count drops in phase 1; greyed in
+  his place, never to be called, through the phase change and phase 2), `e2e/crowd-hidden.spec.ts` (the Crowd's
   final, solo and online).
 - On a board a boss has changed: unit `packages/chess/test/king-save-altered.test.ts` (Eric's hoop; every boss's states,
   audited from the roster; a stub boss's new filter); e2e `e2e/king-save-altered.spec.ts` (Babur's hoops).

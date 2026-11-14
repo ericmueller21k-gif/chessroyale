@@ -11,7 +11,7 @@ import { applyMove, legalMoves, sideToMove, type ClientMessage, type NetPhase2 }
 import type { Phase, SimulView } from "./game.ts";
 import { PHASE2_ULT_ANIMS, PHASE_CHANGE, phaseChangeRun } from "./recluse-phase2.ts";
 import { RECLUSE_LINES } from "./characters/recluse-lines.ts";
-import { playInPlace, setEngineAt, setFigureRun } from "./components/BossCharacter.tsx";
+import { playInPlace, setSuitAt, setFigureRun } from "./components/BossCharacter.tsx";
 import { play, warmSounds } from "./sound.ts";
 import { CRITICAL, LOW, NORMAL, bossVoice } from "./speech.tsx";
 import { resetKingSpeech } from "./godKing.ts";
@@ -102,9 +102,9 @@ export class OnlinePhase2 {
     this.playing = false;
     // (Phase 1's words are over: the God King says nothing more; his mumbling carries on into the phase change, as solo's.)
     resetKingSpeech();
-    warmSounds(["recluseSlow", "recluseDrain", "recluseSpark", "recluseArc"]);
+    warmSounds(["recluseSlow", "recluseSpark", "recluseArc"]);
     setFigureRun(phaseChangeRun(at));
-    setEngineAt(at + PHASE_CHANGE.igniteAt);
+    setSuitAt(at + PHASE_CHANGE.whiteFull);
   }
 
   /** The match's phase for now: the fall held through the cutscene's hold, his phase change, then the boards (counting down, then play). */
@@ -140,7 +140,7 @@ export class OnlinePhase2 {
     this.turns();
   }
 
-  /** The clocks start: his line (the God King is gone, absorbed). */
+  /** The clocks start: his line (the God King stays greyed in his place). */
   private clocksStart() {
     const p = this.p!;
     const lines = RECLUSE_LINES.phase2;

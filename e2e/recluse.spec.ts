@@ -1,9 +1,9 @@
 import { expect, type Page } from "@playwright/test";
 import { Chess } from "chess.js";
-import { BOSS_POWERS, RECLUSE_PHASE2 } from "@chessroyale/core";
+import { BOSS_POWERS, RECLUSE_ONLINE, RECLUSE_PHASE2 } from "@chessroyale/core";
 import { BOARD_SEL, test, watchFor, watchSpans, bossAloneFromHome } from "./helpers.ts";
 import { RECLUSE_LINES } from "../packages/app/src/characters/recluse-lines.ts";
-import { pacedSeries } from "../packages/app/src/paced-line.ts";
+import { pacedLine } from "../packages/app/src/paced-line.ts";
 
 /**
  * The Hidden Boss, phase 1 (admins only, in Boss alone), on a phone and a computer with real taps:
@@ -16,22 +16,16 @@ import { pacedSeries } from "../packages/app/src/paced-line.ts";
  *   bullet clock (the whole bullet bank on the move, the dock's time left, no increment for 3 moves); then he adds time
  *   per move (his line, "+2 s a move from now on" across the board, "Bullet 1+2" in the dock, +2 s a move made in time);
  * - beaten (?win=1: you mate in one): he collapses and mumbles on the board, then (Boss alone) his phase change (it
- *   opens with the God King's absorption: triumphant, drained into the boss's raised hand, gone; the boss's half-engine
- *   look ignites) and phase 2's four boards, with no God King; at its pace (Eric, Oct 17: "way too fast"): his words
- *   before he seizes the power, a hold as it lands, a longer cast, then a 5-4-3-2-1 on every board before any clock runs
- *   (each from RECLUSE_PHASE2.change).
- */
-/**
- * What the phase change's pace added before phase 2's clocks (Eric, Oct 17): his words before the seize, the hold as the
- * power lands, the longer cast and the countdown, from the settings; the waits for phase 2 allow for it.
+ *   is his transformation by the book's light, Nov 14: his eyes white, the white-out, his suit, the visor up for his line, the
+ *   split on the music's drop; the God King greyed in his place) and phase 2's four boards, then a 5-4-3-2-1 on every board
+ *   before any clock runs (each from RECLUSE_PHASE2.change).
  */
 const P = RECLUSE_PHASE2.change;
-/** His chant's two lines (Nov 13): from the book landing open to the last typed out, then a second to the crack (PHASE_CHANGE). */
-const CHANT = pacedSeries(RECLUSE_LINES.chantSay, P.chantLines, P.chantLines.firstAfterMs);
-const CAST_MS = CHANT.at(-1)!.at + CHANT.at(-1)!.line.typedMs + P.crackAfterLineMs;
-/** The cast's length over its 1.7 s before Oct 17. */
-const CAST_ADDED_MS = CAST_MS - 1700;
-const ADDED_MS = P.talkMs + P.absorbHoldMs + CAST_ADDED_MS + P.countdownSeconds * 1000;
+/** His transformation's beats (Nov 14; PHASE_CHANGE), and his second line, after the landing. */
+const T = P.transform;
+const LINE2 = pacedLine(RECLUSE_LINES.chantSay[1]!, P.chantLines);
+/** What his phase change and the countdown add over the phase change's 15 s before Oct 17 (the server's length is the screens'). */
+const ADDED_MS = RECLUSE_ONLINE.changeMs - 15_000 + P.countdownSeconds * 1000;
 const phase = (p: Page) => p.evaluate(() => (window as any).match?.phase.kind ?? "none").catch(() => "none");
 const bossNow = (p: Page) => p.evaluate(() => (window as any).match?.boss ?? null);
 /** His figure on this screen: the bust in a phone's boss bar, the whole figure by the board on a computer. */
@@ -456,7 +450,7 @@ test("his chatter all through phase 1 (Eric, Oct 15: he went quiet after move 10
   expect(errors).toEqual([]);
 });
 
-test("beaten in phase 1 (?win=1): he collapses and mumbles, then the phase change (he says he'll take the God King's power and absorbs it, holds it, up in a rage, his leap onto the board, the book thrown down, the chant and its light held, the split, the book back, the leap back, the shuffle), a countdown on four boards, then their clocks; all four won: Victory!", { tag: "@phone-only" }, async ({ page }) => {
+test("beaten in phase 1 (?win=1): he collapses and mumbles, his cutscene, then the phase change (his transformation by the book's light: his eyes white, lifted in it, the white-out, revealed in his suit, the visor up for his line and down, the leap, the split on the drop, the book back, the leap home, the shuffle; the God King greyed in his place throughout), a countdown on four boards, then their clocks; all four won: Victory!", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(5 * 60_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
@@ -473,65 +467,56 @@ test("beaten in phase 1 (?win=1): he collapses and mumbles, then the phase chang
     mumble: { selector: ".bc-bubble", text: /the book said|Morphy, I think everyone agrees|Sixty-four squares/ },
   });
   const change = await watchFor(page, {
-    // The God King's absorption: triumphant in his place (his line), the boss's head up and his hand raised, the stream
-    // between them, the God King drained (his cry), the power landing (the boss's look ignites, his line), the God King
-    // fading and gone.
-    triumph: { selector: ".gk-unit.gk-triumph .god-king" },
-    triumphLine: { selector: ".gk-bubble", text: /Kneel\. The crown always wins\.|Down you stay, bookworm!|Your book is closed\. Kneel!/ },
-    seize: { selector: `${figure()}[data-anim="seize"]` },
-    reach: { selector: `${figure()}[data-anim="seizeLoop"]` },
-    stream: { selector: ".rc-absorb .rc-mote" },
-    drained: { selector: ".gk-unit.gk-drained .god-king[data-anim='lastStand']" },
-    cry: { selector: ".gk-bubble", text: /what are you doing\?!|That power is mine!|My strength!/ },
-    seized: { selector: `${figure()}[data-anim="seized"]` },
-    ignite: { selector: `${figure()} .bc-engine.on.fresh` },
-    // (Paged as his chant's lines are, Nov 13: a phone's bar shows a sentence at a time.)
-    absorbLine: { selector: ".bc-bubble", text: /^(All game you leaned on an engine|Mind and machine)\.$/ },
-    absorbLineB: { selector: ".bc-bubble", text: /^(Now see how you like it|Both mine now)\.$/ },
-    fading: { selector: ".gk-unit.gk-fading" },
-    gone: { selector: ".gk-unit.gone" },
-    rage: { selector: `${figure()}[data-anim="rage"]` },
-    // (His look over his whole figure on the board too, and the arcs that split it.)
-    figEngine: { selector: ".rc-fig .bc-engine.on" },
-    arcs: { selector: ".rc-arcs .rc-arc-core" },
-    // (From the leap to his return the board draws his whole figure, a phone too, and his place stands empty.)
+    // His transformation over the board (Eric, Nov 14), carrying on from his cutscene: the book opening at his feet in the lens, the
+    // child beside him, the light taking him and lifting him, the screen whiting out, him revealed in the suit, the visor up for his
+    // line and down, the leap; his place empty meanwhile; the God King greyed in his place and silent.
+    open: { selector: '.rc-tf-fig[data-anim="open"] canvas' },
+    lens: { selector: ".rc-transform .cs-dim" },
+    kid: { selector: ".rc-tf-kid canvas" },
+    taken: { selector: '.rc-tf-fig[data-anim="burst"]' },
+    rise: { selector: '.rc-tf-fig[data-anim="rise"]' },
+    beam: { selector: '.rc-tf-fig[data-anim="beam"]' },
+    light: { selector: ".rc-transform .rc-light-cv" },
+    white: { selector: '.rc-stage[data-step="white"]' },
+    revealed: { selector: '.rc-tf-fig[data-anim="revealed"]' },
+    visorUp: { selector: '.rc-tf-fig[data-anim="flipUp"]' },
+    visorDown: { selector: '.rc-tf-fig[data-anim="flipDown"]' },
+    jump: { selector: '.rc-tf-fig[data-anim="air"]' },
+    land: { selector: '.rc-tf-fig[data-anim="land"]' },
     away: { selector: ".rc-away" },
-    leap: { selector: '.rc-fig[data-anim="leap"] canvas' },
-    shadow: { selector: ".rc-shadow" },
-    drop: { selector: '.rc-fig[data-anim="drop"] canvas' },
-    chant: { selector: '.rc-fig[data-anim="chantRaise"] canvas' },
-    light: { selector: ".rc-light" },
-    // (Over his head on the board while he's there, a phone too (Eric, Nov 14): the whole line, its sentences typed in turn; the
-    // typed part (the box's first span) shows each sentence typed out.)
+    benched: { selector: ".rc-change .gk-unit.benched" },
+    kingWord: { selector: ".rc-change .gk-bubble" },
+    arcs: { selector: ".rc-arcs .rc-arc-core" },
+    // (Over his head on the board, a phone too (Eric, Nov 14): the whole line, its sentences typed in turn; the typed part (the box's
+    // first span) shows each sentence typed out.)
     chantLine: { selector: ".rc-say", text: /^Computation without creativity is nothing\. Now I have both\.$/ },
     chantLineB: { selector: ".rc-say .speech-line > span:first-child", text: /Now I have both\.$/ },
     chantLine2: { selector: ".rc-say", text: /^Prepare yourself\. This is the ultimate test of your skill\.$/ },
-    chantLine2B: { selector: ".rc-say .speech-line > span:first-child", text: /This is the ultimate test of your skill\.$/ },
+    // (Its last words typed as he's home again: in his place's bubble by then, his words where he is.)
+    chantLine2B: { selector: ".bc-bubble .speech-line > span:first-child", text: /This is the ultimate test of your skill\.$/ },
     crack: { selector: ".rc-crack canvas" },
     split: { selector: ".rc-split.rc-q3" },
-    pickup: { selector: '.rc-fig[data-anim="pickup"] canvas' },
-    leapBack: { selector: '.rc-fig[data-anim="leap2"] canvas' },
+    pickup: { selector: '.rc-tf-fig[data-anim="pickup"] canvas' },
+    leapBack: { selector: '.rc-tf-fig[data-anim="leap2"] canvas' },
     banner: { selector: ".fight-banner", text: /PHASE 2/ },
     idle2: { selector: `${figure()}[data-anim="idle2"]` },
-    reviveLine: { selector: ".bc-bubble", text: /Not yet\. Now we play real chess\.|On your feet, all of you\. Again!/ },
     // (One book on screen: his own, in his frames; never a second one flying in.)
     book: { selector: ".rc-book" },
   });
   // Its pace (Eric, Oct 17): every beat's first and last frame on screen, for their order and the time added between.
-  const esc = (l: string) => l.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const count = (n: number) => ({ selector: ".rc-simul .cc-num", text: new RegExp(`^${n}$`) });
   const pace = await watchSpans(page, {
-    triumph: { selector: ".gk-unit.gk-triumph .god-king" },
-    talk: { selector: ".bc-bubble", text: new RegExp(RECLUSE_LINES.seizeTalk.map(esc).join("|")) },
-    seize: { selector: `${figure()}[data-anim="seize"]` },
-    ignite: { selector: `${figure()} .bc-engine.on.fresh` },
-    held: { selector: `${figure()}[data-anim="seized"]` },
-    note: { selector: ".boss-dock-status", text: /The God King's power is his!/ },
-    rage: { selector: `${figure()}[data-anim="rage"]` },
-    chant: { selector: '.rc-fig[data-anim="chantRaise"], .rc-fig[data-anim="chant"]' },
-    // (His second chant line over his head, and its second sentence as it starts to type: its first letter typed.)
-    chant2: { selector: ".rc-say", text: /^Prepare yourself\./ },
-    chant2b: { selector: ".rc-say .speech-line > span:first-child", text: /^Prepare yourself\.\s*\S/ },
+    open: { selector: '.rc-tf-fig[data-anim="open"]' },
+    taken: { selector: '.rc-tf-fig[data-anim="burst"]' },
+    white: { selector: '.rc-stage[data-step="white"]' },
+    revealed: { selector: '.rc-stage[data-step="revealed"]' },
+    visorUp: { selector: '.rc-tf-fig[data-anim="flipUp"]' },
+    line1: { selector: ".rc-say", text: /^Computation without creativity/ },
+    visorDown: { selector: '.rc-tf-fig[data-anim="flipDown"]' },
+    jump: { selector: '.rc-tf-fig[data-anim="air"]' },
+    // (His second line over his head, and its second sentence as it starts to type: its first letter typed.)
+    chant2: { selector: ".bc-bubble", text: /^Prepare yourself\./ },
+    chant2b: { selector: ".bc-bubble .speech-line > span:first-child", text: /^Prepare yourself\.\s*\S/ },
     crack: { selector: ".rc-crack canvas" },
     banner: { selector: ".fight-banner", text: /PHASE 2/ },
     c5: count(5),
@@ -611,26 +596,32 @@ test("beaten in phase 1 (?win=1): he collapses and mumbles, then the phase chang
   // (The phase change was about 15 s before Oct 17, under 20 s here.)
   expect(Date.now() - at).toBeLessThan(20_000 + ADDED_MS);
   expect(await phase(page)).toBe("simul");
-  // The beats in order, each at least its added time: his words before the seize (the seize came 1.7 s into the change;
-  // now that and talkMs more, the God King gloating meanwhile, his line up through it), the fist held as the power
-  // lands, the cast before the crack, then 5, 4, 3, 2, 1, a second each; then the clocks.
+  // The beats in order, at their times (Nov 14): the book opening as the phase change starts, the light taking him on the music's
+  // slam, the white-out, the reveal, the visor up for his first line and down after it, the leap on the music's breath, the crack
+  // on its drop; then "PHASE 2" and 5, 4, 3, 2, 1, a second each; then the clocks.
   const s = await pace.spans();
   const c = await clocks.spans();
-  const order = ["triumph", "talk", "seize", "ignite", "note", "rage", "chant", "crack", "banner", "c5", "c4", "c3", "c2", "c1"] as const;
-  for (const k of [...order, "held", "ready"] as const) expect(s[k], k).not.toBeNull();
+  const order = ["open", "taken", "white", "revealed", "visorUp", "line1", "visorDown", "jump", "crack", "banner", "c5", "c4", "c3", "c2", "c1"] as const;
+  for (const k of [...order, "chant2", "chant2b", "ready"] as const) expect(s[k], k).not.toBeNull();
   const first = (k: keyof typeof s) => s[k]!.first;
   for (let i = 1; i < order.length; i++) expect(first(order[i]!), `${order[i - 1]} then ${order[i]}`).toBeGreaterThan(first(order[i - 1]!));
-  expect(first("seize") - first("triumph")).toBeGreaterThanOrEqual(P.talkMs);
-  expect(s.talk!.last).toBeGreaterThanOrEqual(first("seize"));
-  expect(first("rage") - first("ignite")).toBeGreaterThanOrEqual(P.absorbHoldMs);
-  expect(s.held!.last - s.held!.first).toBeGreaterThanOrEqual(P.absorbHoldMs);
-  expect(first("crack") - first("chant")).toBeGreaterThanOrEqual(CAST_MS - 300);
-  // His last chant line (Nov 13): "Prepare yourself.", a second's pause, then its second sentence, typed out a second before
-  // the crack (the music's silence before its drop).
-  const last = CHANT.at(-1)!.line;
-  expect(first("chant2b") - first("chant2")).toBeGreaterThanOrEqual(last.starts[1]! - 150);
-  expect(first("crack") - first("chant2b")).toBeGreaterThanOrEqual(last.typedMs - last.starts[1]! + P.crackAfterLineMs - 300);
-  expect(first("crack") - first("chant2b")).toBeLessThanOrEqual(last.typedMs - last.starts[1]! + P.crackAfterLineMs + 400);
+  // (Each beat a setting from the music's start, `musicAtMs` into the phase change.)
+  const near = (k: keyof typeof s, at: number) => expect(Math.abs(first(k) - first("open") - T.musicAtMs - at), k).toBeLessThanOrEqual(400);
+  near("taken", T.burstAt);
+  near("white", T.whiteFull);
+  near("revealed", T.revealAt);
+  near("visorUp", T.flipUpAt);
+  near("visorDown", T.flipDownAt);
+  near("crack", T.introMs);
+  // (The theme from its intro: the phase change's start was never too late for it.)
+  expect(first("crack") - first("jump")).toBeGreaterThanOrEqual(T.leapMs - 300);
+  // (His first line held after the visor comes down, through the crouch (Nov 14 review, M2), gone as he leaps.)
+  expect(s.line1!.last).toBeGreaterThan(first("visorDown"));
+  expect(s.line1!.last).toBeLessThanOrEqual(first("jump") + 100);
+  // His second line after the landing: "Prepare yourself.", a second's pause, then its second sentence.
+  expect(first("chant2") - first("crack")).toBeGreaterThanOrEqual(T.line2AfterMs - 300);
+  expect(first("chant2") - first("crack")).toBeLessThanOrEqual(T.line2AfterMs + 400);
+  expect(first("chant2b") - first("chant2")).toBeGreaterThanOrEqual(LINE2.starts[1]! - 150);
   // A second each, by the countdown's own schedule (`shown`: when the app put each number in the page, against when the
   // clocks were due): the 5 is up before its second begins (the count starts once the boards are on screen), each of 4,
   // 3, 2, 1 comes no sooner than its second and within a quarter second of it, and the clocks likewise at the end.
@@ -646,27 +637,23 @@ test("beaten in phase 1 (?win=1): he collapses and mumbles, then the phase chang
   expect(first("c5")).toBeGreaterThanOrEqual(s.banner!.last);
   expect(c.running, "a clock running once play starts").not.toBeNull();
   expect(await change.seen()).toMatchObject({
-    triumph: true,
-    triumphLine: true,
-    seize: true,
-    reach: true,
-    stream: true,
-    drained: true,
-    cry: true,
-    seized: true,
-    ignite: true,
-    absorbLine: true,
-    fading: true,
-    gone: true,
-    rage: true,
-    figEngine: true,
-    arcs: true,
-    away: true,
-    leap: true,
-    shadow: true,
-    drop: true,
-    chant: true,
+    open: true,
+    lens: true,
+    kid: true,
+    taken: true,
+    rise: true,
+    beam: true,
     light: true,
+    white: true,
+    revealed: true,
+    visorUp: true,
+    visorDown: true,
+    jump: true,
+    land: true,
+    away: true,
+    benched: true,
+    kingWord: false,
+    arcs: true,
     chantLine: true,
     chantLineB: true,
     chantLine2: true,
@@ -687,12 +674,12 @@ test("beaten in phase 1 (?win=1): he collapses and mumbles, then the phase chang
   await expect(page.locator(".boss-bar .rage-meter")).toHaveCount(0);
   // (Freestyle is in the dock's line, where the line above the board said it: Eric, Oct 24.)
   await expect(page.locator(".boss-dock-status .dock-line").first()).toHaveText(/· Freestyle$/);
-  // Phase 2: the God King in his place, greyed, nothing to tap (Eric, Nov 14: "you can't use him anymore"), the boss's look on
+  // Phase 2: the God King in his place, greyed, nothing to tap (Eric, Nov 14: "you can't use him anymore"), the boss in his suit
   // where he stands.
   await expect(page.locator(".gk-unit.benched")).toHaveCount(1);
   await expect(page.getByRole("button", { name: /God King/ })).toHaveCount(1);
   await expect(page.getByRole("button", { name: "God King: can't be called in phase 2" })).toBeDisabled();
-  await expect(page.locator(`${figure()} .bc-engine.on`)).toHaveCSS("visibility", "visible");
+  await expect(page.locator(`${figure()}[data-suit]`)).toBeVisible();
   // (Back in his place, seen again.)
   await expect(page.locator(".rc-away")).toHaveCount(0);
   const v = await simulNow(page);
@@ -712,7 +699,7 @@ test("beaten in phase 1 (?win=1): he collapses and mumbles, then the phase chang
   expect(after).toEqual(["music:start:recluse-phase2", "music:start:recluse-beaten", "music:out:recluse-phase2", "music:start:recluse-phase3", "music:out:recluse-beaten", "music:end:recluse"]);
   // His defeat in phase 2 (a placeholder for his transformation: the spellbook's glow, his hair in the wind).
   await expect(page.locator(".boss-char.place-results")).toHaveAttribute("data-anim", /spellbook2|spellLoop2/, { timeout: 10_000 });
-  expect(await change.seen()).toMatchObject({ idle2: true, reviveLine: true });
+  expect(await change.seen()).toMatchObject({ idle2: true });
   expect(errors).toEqual([]);
 });
 
@@ -739,16 +726,8 @@ test("phase 2 (?phase=2): four boards, each its own Chess960 start; Stockfish 27
   await expect(page.getByRole("button", { name: /God King/ })).toHaveCount(1);
   await expect(page.getByRole("button", { name: "God King: can't be called in phase 2" })).toBeDisabled();
   await expect(page.locator(".gk-command")).toHaveCount(0);
-  // His look: one eye cold blue, the circuit lines, over his figure where it stands (on screen, on his head).
-  const eng = page.locator(`${figure()} .bc-engine.on`);
-  await expect(eng).toHaveCount(1);
-  await expect(eng).toHaveCSS("visibility", "visible");
-  const eye = (await eng.locator(".rc-eng-eye").boundingBox())!;
-  const fig = (await page.locator(`${figure()} .boss-char-sprite`).boundingBox())!;
-  expect(eye.x).toBeGreaterThan(fig.x);
-  expect(eye.x + eye.width).toBeLessThan(fig.x + fig.width);
-  expect(eye.y).toBeGreaterThan(fig.y);
-  expect(eye.y + eye.height / 2).toBeLessThan(fig.y + fig.height * 0.6);
+  // His suit and helmet where he stands, from his transformation on (Eric, Nov 14).
+  await expect(page.locator(`${figure()}[data-suit] .boss-char-sprite`)).toBeVisible();
   if (test.info().project.name !== "phone") {
     // A computer: each board's tag (name and clock) in the row above it, never over its back rank (Chess960's is random),
     // inside the square of four; and the scoreboard has no Bank column (each clock is its board's, on its tag).
@@ -838,7 +817,7 @@ test("the board keeps its size from the mate until the split (Eric, Oct 18: it s
   // (Your move may be scored for a moment before his fall: phase 1's own screen.)
   const kinds = new Set(frames.map((f) => f.kind));
   expect([...kinds].filter((k) => k !== "scoring").sort()).toEqual(["boss", "phaseChange", "play"]);
-  expect(new Set(frames.map((f) => f.step).filter(Boolean))).toEqual(new Set(["king", "drain", "rage", "leap", "drop", "chant", "crack"]));
+  expect(new Set(frames.map((f) => f.step).filter(Boolean))).toEqual(new Set(["book", "light", "white", "revealed", "crack"]));
   const [w0, h0] = frames[0]!.wrap!;
   const [s0] = frames[0]!.squares!;
   const off = frames.filter((f) => !f.wrap || !f.squares || Math.abs(f.wrap[0]! - w0!) > 1 || Math.abs(f.wrap[1]! - h0!) > 1 || Math.abs(f.squares[0]! - s0!) > 1);
@@ -878,7 +857,9 @@ test("the admins' Win this form (Nov 13, Eric's timing test): pressed, your next
   await expect(page.locator(".mm-scrim")).toHaveCount(0);
   await expect.poll(() => phase(page), { timeout: 60_000 }).toBe("phaseChange");
   expect(await scene.seen()).toEqual({ light: true, kid: true, hidden: true, first: true, last: true });
-  await expect(page.locator(".cs-layer")).toHaveCount(0);
+  // (The scene's own layer gone; his transformation carries on from it in its own, Nov 14.)
+  await expect(page.locator(".cs-layer:not(.rc-transform)")).toHaveCount(0);
+  await expect(page.locator(".cs-layer.rc-transform")).toHaveCount(1);
   expect(await page.evaluate(() => document.body.classList.contains("cs-on"))).toBe(false);
   await expect.poll(async () => (await simulNow(page))?.playing ?? false, { timeout: 30_000 + ADDED_MS }).toBe(true);
   const fen = (await simulNow(page)).boards[0].fen as string;

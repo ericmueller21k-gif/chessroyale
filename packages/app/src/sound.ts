@@ -956,7 +956,6 @@ export type SoundName =
   | "recluseThump"
   | "recluseGlow"
   | "recluseSlow"
-  | "recluseDrain"
   | "recluseSpark"
   | "recluseArc"
   // Alfil (a raid boss, the woolly mammoth): synthesised, see characters/alfil-sounds.ts.
@@ -1362,7 +1361,6 @@ const SOUNDS: Record<SoundName, (t: number) => void> = {
   recluseThump: recluse("thump"),
   recluseGlow: recluse("glow"),
   recluseSlow: recluse("slow"),
-  recluseDrain: recluse("drain"),
   recluseSpark: recluse("spark"),
   recluseArc: recluse("arc"),
   alfilTrumpet: alfil("trumpet"),
@@ -1689,7 +1687,6 @@ const MAKE: Partial<Record<SoundName, readonly BossSound[]>> = {
   recluseThump: [["recluse", "thump"]],
   recluseGlow: [["recluse", "glow"]],
   recluseSlow: [["recluse", "slow"]],
-  recluseDrain: [["recluse", "drain"]],
   recluseSpark: [["recluse", "spark"]],
   recluseArc: [["recluse", "arc"]],
   alfilTrumpet: [["alfil", "trumpet"]],

@@ -60,20 +60,6 @@ export const RECLUSE_LINES = {
   ],
   // ---- Phase 2 (DECISIONS.md, "The Hidden Boss, phase 2"): four boards of Chess960. ----
   /**
-   * The phase change's opening (Eric, Oct 17: "more talking after the mate", so a first-time player sees what comes):
-   * still on his knees, his mumbling over and the God King gloating over him, he says he'll take the God King's power;
-   * then he seizes it. One, picked per phase change (NEW, Oct 17: drafts for Eric, ours, not his words). Short enough to
-   * be typed out before his hand goes up (a unit test checks).
-   */
-  seizeTalk: ["An engine in a golden crown... Give me that power!", "So he's your engine. I'll take his power myself."],
-  /**
-   * The phase change's start: he absorbs the God King (Eric, Oct 14: "brain and engine combined"), said as the power
-   * lands in his fist; one, picked per phase change (placeholders: ours, not his words).
-   */
-  absorb: ["All game you leaned on an engine. Now see how you like it.", "Mind and machine. Both mine now."],
-  /** He revives, as he snaps upright and the book flies back to his hand (placeholders). */
-  revive: ["Not yet. Now we play real chess.", "On your feet, all of you. Again!"],
-  /**
    * The phase change's chant over the open book (Eric's final lines, Nov 13; until then half-mad mumbling about Curaçao): both,
    * in turn, each its own box, each typed sentence by sentence with a pause between (RECLUSE_PHASE2.change.chantLines).
    */
@@ -219,17 +205,13 @@ export const RECLUSE_GROWUP_EXCHANGES: readonly { readonly kid: string; readonly
 
 /**
  * The God King's lines in this fight (his usual ones about calling him are left out: his help doesn't work here). He has
- * none in phase 2: the boss absorbs him as it begins (Eric, Oct 14), so his last words are his cry as he's drained.
+ * none in the phase change or phase 2: he stays in his place, greyed (Eric, Nov 14).
  */
 export const KING_VS_RECLUSE = {
   /** His opening line (the first is Eric's own, ROADMAP.md, Oct 14; the others are placeholders). */
   intro: ["I sense a tremendous power within this foe.", "Careful. My strength feels faint against this one.", "This is no ordinary boss. Trust your own moves."],
   /** His help tried, and blocked (placeholders). */
   blocked: ["My power... it won't take hold!", "Nothing! He shrugs off my strength.", "I can't reach him. This fight is yours alone."],
-  /** The phase change: he stands over the beaten boss, triumphant (short: his cry cuts in about two seconds later; placeholders). */
-  triumph: ["Kneel. The crown always wins.", "Down you stay, bookworm!", "Your book is closed. Kneel!"],
-  /** The phase change: his cry as the boss drains his power (placeholders). */
-  drained: ["No! My light... what are you doing?!", "Release me! That power is mine!", "Aaagh! My strength!"],
 } as const;
 
 /**

@@ -57,8 +57,6 @@ export type KingCue =
   | "queenWon"
   | "foeIntro"
   | "foeBlocked"
-  | "foeTriumph"
-  | "foeDrained"
   | "rushAsk"
   | "rushWell"
   // Don Dough's dough landing on the board (Nov 11).
@@ -133,12 +131,10 @@ export const KING_LINES: Record<KingCue, readonly string[]> = {
   queenLost: ["Our queen has fallen. Fight on!", "The queen! She'll be avenged.", "They took the queen. Hold the line."],
   queenWon: ["Their queen falls!", "The tyrant's queen is ours!", "Down goes the queen. Press on!"],
   // The Hidden Boss (characters/recluse-lines.ts, every line of his fight in one table): his opening line in this fight,
-  // his help tried and blocked (it doesn't work against him), and his last words: triumphant over the beaten boss, then
-  // his cry as the boss drains his power (the phase change: he's absorbed, and says nothing in phase 2).
+  // and his help tried and blocked (it doesn't work against him). From the phase change on he stays greyed in his place
+  // and says nothing.
   foeIntro: KING_VS_RECLUSE.intro,
   foeBlocked: KING_VS_RECLUSE.blocked,
-  foeTriumph: KING_VS_RECLUSE.triumph,
-  foeDrained: KING_VS_RECLUSE.drained,
   // G-REX: the first time a piece of ours steps onto a burning tile (once a match).
   fireTile: [
     "Careful on that tile, don't stand there too long!",
@@ -156,8 +152,7 @@ export const KING_LINES: Record<KingCue, readonly string[]> = {
 
 /**
  * Each cue's kind: critical cues always speak; remarks and small talk (`paced`) roll KING_SPEECH.chance. A `lead` always
- * speaks too, but a critical line cuts in on it (the Hidden Boss's phase change: his triumph, then his cry as he's
- * drained, two seconds later).
+ * speaks too, but a critical line cuts in on it.
  */
 type Kind = "critical" | "lead" | "remark" | "paced" | "info";
 const KIND: Record<KingCue, Kind> = {
@@ -195,8 +190,6 @@ const KIND: Record<KingCue, Kind> = {
   fireTile: "critical",
   foeIntro: "critical",
   foeBlocked: "critical",
-  foeTriumph: "lead",
-  foeDrained: "critical",
   rushAsk: "critical",
   rushWell: "critical",
   dough: "critical",

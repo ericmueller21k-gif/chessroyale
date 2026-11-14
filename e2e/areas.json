@@ -463,6 +463,8 @@
         "packages/app/src/recluse-talk.ts",
         "packages/app/src/recluse-cutscene.ts",
         "packages/app/src/components/RecluseCutscene.tsx",
+        "packages/app/src/components/RecluseTransform.tsx",
+        "packages/app/src/components/recluse-light*.ts",
         "packages/app/src/characters/recluse*.ts",
         "packages/app/src/characters/effects/recluse.ts",
         "packages/app/src/components/Recluse.tsx",

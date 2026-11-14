@@ -358,63 +358,60 @@ below):
   after his fall, before the phase change, about 104 s (`RECLUSE_CUTSCENE.holdMs`; a unit test keeps it the timeline's length):
   everything dims but a soft round spotlight on the board's middle; he kneels in it while the ghost of him as a child poofs in above
   the board, drops, lands, his knees buckling; Eric's 18 lines, each its own typed box by its speaker (a line of two sentences typed
-  one, a second's pause, the next; `RECLUSE_CUTSCENE_LINES`); the child fades; the man alone a moment; the light lifts (`outMs`) and
-  the phase change carries on, him on his knees in his place, quiet (`kneel`, `phaseChangeRun`'s `before`), until he seizes the God
-  King's power. Solo: from the fall's end (`SoloMatch.cutscene`), the phase change as it ends; online from the server's
+  one, a second's pause, the next; `RECLUSE_CUTSCENE_LINES`); 0.4 s after the last box (`endAfterMs`) his phase change carries on from
+  it with no break (Nov 14: the man and the child still in the light, the book at his feet opening; held on its last picture to its
+  window's end, should it end a little early). Solo: from the fall's end (`SoloMatch.cutscene`), the phase change as it ends; online from the server's
   `recluseCutscene`, everyone at once. Drawn by App over the fall's screen (`components/RecluseCutscene.tsx`, `recluse-cutscene.ts`'s
   timeline, the figure `recluse-cutscene` in `recluse-ages.ts`; each box over its speaker's head, `CUTSCENE_SPOTS`, measured from the
   frames by `recluse-cutscene.test.ts`: the man's was 38 rows low until Nov 14, his words over his face); meanwhile his figure in its place is hidden (`body.cs-on`) and both
   voices are quiet (`Voice.hush`). Music: his beaten theme on through it (`recluseMusic`: the fall with `toPhase2`). No skip, the 🏆
   included. A test's shorter hold plays it sped up to fit (`fitCutscene`; solo `?cutscene=SECONDS`, a test server's
   `CUTSCENE_HOLD_MS`, the e2e's 12 s). Tests: `app/test/recluse-cutscene.test.ts`, `e2e/recluse.spec.ts` ("Win this form").
-- **The phase change** (Eric, Oct 14, reworked, then opened with the God King's absorption; `PHASE_CHANGE` in
-  `packages/app/src/recluse-phase2.ts`, about 33.5 s after a 1.8 s fall (24.8 s before his chant's two lines, Nov 13) (its "PHASE 2" banner 1.4 s, `BOSS_BANNER.phase2Ms`, Oct 16, and the banners' extra since Oct 24), one timeline, not skippable like a boss's
-  intro; drawn by `screens/Recluse2.tsx`, `PhaseChangeScreen`). **Its pace** (Eric, Oct 17, after playing it: "everything's
-  perfect, but it happens way too fast"; docs/decisions/2026-10-17-phase-change-pace.md): about 10 s more from the mate
-  to the split, the animations unchanged, every added time a setting (`RECLUSE_PHASE2.change`): his words before the
-  seize (`talkMs`, 4.5 s), a hold as the power lands (`absorbHoldMs`, 1.5 s), a longer cast (since Nov 13 as long as his two chant lines need, below); then
-  a 5-4-3-2-1 on every board before phase 2's clocks run (`countdownSeconds`), counted from the boards' first frame on
-  screen so the 5 is up a whole second (`afterFirstFrame` in solo.ts; docs/decisions/2026-10-28-two-flaky-tests.md):
-  - **The absorption** (Eric, Oct 14: he plays with an engine in phase 2, so he takes the God King's; DECISIONS.md, "The
-    Hidden Boss absorbs the God King"): in his place in the dock (BossDock's `king`, from `absorbKing`) the God King
-    raises his sword, his golden aura swelling (`.gk-aura`), and gloats (`KING_VS_RECLUSE.triumph`, a `lead` cue: whole
-    since Oct 17, before his cry); the boss, kneeling, mumbles on (his fall's first line), then says he'll take that
-    power (`RECLUSE_LINES.seizeTalk`, `talkAt`: as his mumbling ends; typed out before his hand goes up); his head snaps up and he raises his open hand to him (`seize`, then
-    `seizeLoop`, a figure run step held for the drain, `phaseChangeRun`); a golden stream runs from the God King into
-    that hand (`AbsorbStream`: a beam of two strokes and motes moved by transform, over the page, measured from both
-    drawings) while he's drained through his Last Stand's blows, flashing and cracking (his own frames, `lastStand`
-    from its blows, drawn ahead by `prewarmKing`), flickering, his aura shrinking, and cries out
-    (`KING_VS_RECLUSE.drained`); as it lands the boss's fist closes (`seized`, its spark `recluseSpark`), his half-engine
-    look ignites (`setEngineAt`) and he says so (`RECLUSE_LINES.absorb`, paged a sentence at a time as his chant's lines are since Nov 13, `absorbPaced`; CRITICAL: it cuts in on his word before the
-    seize), and the God King fades up and away in light (`gkLeave`); he holds his fist, its last frame (a one-shot given
-    a time in a figure run holds its last frame), the dock saying "The God King's power is his!". Sounds: `gkHyuah`, `recluseDrain`, `gkLastGrunt2`, `recluseSpark`, `gkLeave`.
-  - **Then**, where he stands, he gets up in a rage (`rage`, both drawings); then the board draws his whole figure (a
-    phone too; `.rc-fig`, his place empty meanwhile: `.rc-away`; his words over his head there, `.rc-say`, his place's box and a phone's bar
-    bubble hidden meanwhile: Eric, Nov 14, they floated by his empty place) for his leap onto the middle (`leap`: a thud, dust, the
-    board jolts), the book brandished and thrown down open at his feet (`drop`), his chant over it (`chantRaise`,
-    `chant`: arms raised, his hair lifting into phase 2's) as light pours up out of it (CSS only: `.rc-light`, a pulsing
-    cone behind him, and `.rc-glow` on the pages; only opacity and transform move) and **Eric's two lines** (Nov 13,
-    `RECLUSE_LINES.chantSay`; [decision](../decisions/2026-11-13-hidden-boss-chant-lines.md)), each its own box in his bubble,
-    typed sentence by sentence at the cutscene mockup's pace (`RECLUSE_PHASE2.change.chantLines`: 45 ms a character, 1 s between
-    sentences, readable 1.7 s plus 40 ms a character; `paced-line.ts`, the voice's `sayPaced`; a phone's bar bubble, two rows,
-    shows a sentence at a time, each its own page, `pacedPage`), the first 1.5 s after the book
-    lands (his absorb line gone by then, `absorbReadMs`), the last typed out `crackAfterLineMs` (1 s) before the crack, as the
-    transformation theme falls silent before its drop; so `castMs` (about 14.4 s) follows the lines, and the rise to the crack is
-    17.435 s (`.rise-to-crack`); Sawyer's board-saw gap runs down and across the middle, the quarters part and each grows
-    into a whole board (a transform and a clip only) as the light dies, while blue arcs strike the cracks from his
-    raised hands (`Arcs`, `ARC_STRIKES`: a thin bright core in two soft glows, smooth paths redrawn every 70 ms, gone in
-    260 ms, two big ones as the board cracks and as it parts, a blue flash where each lands and a blue pulse on the
-    board; one SVG, no filter; `recluseArc`); the book snaps shut and flies up into his hands (`pickup`, his revive's
-    frames) while every board's pieces fly to their Chess960 squares; he leaps back to his place (`leap2`) and rests in
-    `idle2`; "PHASE 2".
+- **The phase change: his transformation by the book's light** (Eric, Oct 14, reworked; since Nov 14 his transformation, no God King
+  absorption: [decision](../decisions/2026-11-14-recluse-transformation.md); `PHASE_CHANGE` in `packages/app/src/recluse-phase2.ts`,
+  its beats settings, `RECLUSE_PHASE2.change.transform`), about 23.7 s from his cutscene's end to the end of "PHASE 2" (after a 1.8 s
+  fall and his cutscene), one timeline, not skippable like a boss's intro. Drawn over the board by `components/RecluseTransform.tsx`
+  (one fixed layer, carrying on the cutscene's: the lens, the child, the man, the open book, and the light on two screen-size canvases,
+  behind and over him: the summoning's light from his room, its sprites made once and stretched, `recluse-light.ts`; drawn in a
+  worker, off the main thread, at 1 pixel per CSS pixel, each canvas hidden while it has nothing to draw: the Nov 14 review, a
+  slowed phone's frames, with the look kept; `recluse-light.worker.ts`, or the main thread where a browser can't hand a canvas to a
+  worker) from its start to his leap home,
+  his place empty meanwhile (`.rc-away`, his words over his head, `.rc-say`); the board's square, the split, the arcs and the dock by
+  `screens/Recluse2.tsx` (`PhaseChangeScreen`); the figures in `characters/recluse-transform.ts` (`RECLUSE_CHANGE`, the book and the
+  child apart). The transformation theme's intro starts `musicAtMs` (0.3 s) in, so a device a moment late still plays it whole, and
+  every beat is from it (`recluse-phase3`'s marks):
+  - the book flat before him falls open, its pages lighting up; on the music's **slam** (2.64 s) the light bursts out and takes him:
+    his head back, **his eyes totally white** (`possessed`, a glow drawn on each); on its **build** (3.04 s) a shaft lifts him off his
+    knees, **his arms hanging relaxed at his sides the whole time** (never raised), his hair pushed back, and he hovers in it while the
+    light grows faster and faster: it engulfs him, **shoots up off the screen** (5.6 s), **radiates over the whole screen** (6.3 s),
+    and **whites the screen out** (7.3 to 8 s);
+  - **unseen in the white** he's set down in his suit and helmet (`setSuitAt`), the child and the lens gone; the white **dies back
+    into the center** (8.7 to 10 s) and shows him, the visor down (`recluseSpark`);
+  - **the visor flips up** (10.3 s; a frame on its way), his face with **his eyes glowing blue**, for his first line over his head
+    ("Computation without creativity is nothing. / Now I have both.", 10.6 s, typed a little faster, 30 ms a character, by about
+    13.3; the visor **flips back down** at 15.75 s, and the line stays up through the crouch, gone as he leaps: readable whole 2.8 s);
+  - he crouches and **leaps on the music's breath**, hangs a second, and **lands on its drop** (17.435 s after the intro starts): the
+    board cracks under him (Sawyer's board-saw gap), **the big board never drawn behind the quarters** (they're the whole board until
+    they part), blue arcs strike the cracks from his hands at his sides (`Arcs`, `ARC_STRIKES`, `CHANGE_HANDS`: two big ones as it
+    cracks and as it parts; `recluseArc`), the quarters part and grow into four boards as the light dies; his second line 0.8 s after
+    the landing ("Prepare yourself. / This is the ultimate test of your skill.", over his head, ending in his place's bubble once he's
+    home); the book snaps shut into his hands (`pickup`) while the pieces fly to their Chess960 squares; he leaps home (`leap2`),
+    `idle2` in the suit from then on; "PHASE 2". The dock: "The book's light takes him!", "He's transformed!", "One board becomes
+    four…", then the clock line. **The God King stays in his place, greyed** (`king="benched"`), silent, throughout.
+  Its lines (`RECLUSE_LINES.chantSay`, Eric's, Nov 13) type at the cutscene's pace (`chantLines`: 45 ms a character, 1 s between
+  sentences, readable 1.7 s plus 40 ms a character; the first line `firstTypeMs`, 30 ms; `paced-line.ts`, `sayPaced`; a phone's bar shows a sentence at a time,
+  `pacedPage`). His frames, the child's, the book's and his suit where he stands (idle, ultimate, results) are drawn ahead from his
+  battle's start (`prewarmRecluse`, into BossEffect's frame cache, the one his place draws from). The reveal's spark and the arcs'
+  crackle play only within 0.5 s of their moment (a device joining later doesn't play them). Online the server times it by `RECLUSE_ONLINE.changeMs` (the screens' `PHASE_CHANGE.total`) and holds the
+  cutscene `RECLUSE_CUTSCENE.holdMs` (its timeline's length); nothing else in the protocol changed. Tests:
+  `app/test/recluse-phase2.test.ts` (its beats, the music's marks, the lines' times, his figure: no raised hand, white eyes, the
+  suit, the visor), `recluse.test.ts` (the suit on every frame), `recluse-cutscene.test.ts`, `recluse-online.test.ts`,
+  `e2e/recluse.spec.ts` ("beaten in phase 1": its beats in order and at their times, the split's first frame on the drop).
   - **Then the countdown** (Oct 17): phase 2's screen (`SimulScreen`, the boards where you'll play them: a phone's big
     board and three small ones) with no clock running and no move possible: the round's countdown (`CenterCount`) on
     every board, 5 to 1 a second each with a tick, "Get ready" over yours, the dock saying "2:00 on your clock" "No added
     time."; the phase's `at` is when the clocks start (solo's `startSimul`, then `startClocks`), and his phase 2 line
     comes with them. Reduced motion: the same times, the numbers without their pop.
-  - One book on screen throughout, in his frames (`RECLUSE_BOOK` isn't shown). His frames and the God King's are drawn
-    ahead from his battle's start (`prewarmRecluse`), its sounds made ahead in the sound worker. Other sounds: his
-    rustle, `recluseThump` (landing), `recluseShut` (the book), `recluseGlow` (the light), the saw's crack.
   - **The board keeps phase 1's size until the split** (Eric, Oct 18: it shrank on his phone as the boss fell;
     docs/decisions/2026-10-18-phase-change-board-size.md): the phase change has no scoreboard, so on a phone where
     phase 1's was minimized (`underBoardView().open` false) its screen carries `rc-folded`, which gives the board the
@@ -424,19 +421,18 @@ below):
   on the Hidden Boss's screens"): the subtitle adds nothing before the split (the title says "phase 2"), then
   "Chess960"; the boss bar's right side is empty (in phase 2, "N of 4 won": `bossNote`, `""` in the phase change, null
   outside phase 2, so it's tested against null); the dock never says what his or the God King's bubble or the banner
-  says: no sub-line under "The boss rises!", and as "PHASE 2" "Win all four boards" shows, "2:00 on your clock" over
-  "No added time." (two lines: one was cut off at 360 px). The God King's bubble goes with him once he's absorbed
-  (`king="gone"`: none from an empty place). Phase 2's end: "The boss wins." (the bar says how many were won) or "All
+  says: no sub-line under the dock's line, and as "PHASE 2" "Win all four boards" shows, "2:00 on your clock" over
+  "No added time." (two lines: one was cut off at 360 px). The God King says nothing from the phase change on. Phase 2's end: "The boss wins." (the bar says how many were won) or "All
   four boards won!". "5 SECONDS!" is its name alone; the dock says "5 s a move, or a random one", and his `ult2` lines
   never name the seconds (placeholders; the number is a setting).
-- **His half-engine look** (Eric, Oct 14: "if we can avoid doing any sort of changing to the sprite and just do an
-  overlay, that would be sick"): from the absorption to the end of the battle (the result screen too), over every
-  drawing of him (the bust, his figure by the board, his figure on the board, the results): his left eye (our right)
-  glows cold blue, faint circuit lines run from it to his temple and down his cheek, and now and then it flickers
-  (`EngineOverlay` in `components/Recluse.tsx`: a box his drawing's size holding one his head's size, moved onto his head
-  each frame by a transform, `placeEngine`, from the head part's place in the frame, `headOf`; the kit's `engine`;
-  styles `.bc-engine`, opacity and transform animations only). It ignites only as it comes (`fresh`); a new battle
-  clears it (`resetBeats`).
+- **His suit and helmet** (Eric, Nov 14, mockup rounds 3, 3b and the eyes; replacing his half-engine eye): from his transformation's
+  white-out to the end of the battle (the result screen too), on every drawing of him where he stands (the bust, his figure by the
+  board, his figure on the board): a fitted suit, matte near-black navy with slim charcoal panels, thin glowing circuit runs in red
+  and cool blue ending in tiny yellow nodes; an angular helmet of its own with one smooth near-black visor over his whole face. Not
+  an overlay: every part of his drawing has its suit version, the same size and place (`suitName`, `suitFrame`, `suited` in
+  `characters/recluse.ts`), so any pose wears it by its part names; BossCharacter draws `suited(frame)` from `setSuitAt`'s time (the
+  kit's `suit`; `data-suit` on his place). The visor's three ways (`down`, `mid`, `up`); with it up his eyes glow electric blue,
+  a thin line of light down each cheek (`glow` eyes and a see-through `eyeGlow` layer). A new battle clears it (`resetBeats`).
 - **The same frame in every phase** (Eric, Nov 14: "the board split only replaces the single board";
   [decision](../decisions/2026-11-14-recluse-same-frame.md)): the phase change and phase 2 draw phase 1's whole boss screen:
   a computer's boss bar at the top (no title line; "Phase 2" where it said the move) and its tools, his figure or bust, the
@@ -447,7 +443,7 @@ below):
 - **The God King in phase 2** (Eric, Nov 14: "the king will still be with you, but you can't use him anymore"): in his place,
   greyed (`king="benched"`, `.gk-unit.benched`: grayscale, half opacity), his button disabled ("God King: can't be called in
   phase 2"), and not a word from him (his phase 2 lines are gone; a board's result is on the board's own tag, and his word
-  on it is the boss's). The phase change still absorbs him (`absorbKing`; another job removes that).
+  on it is the boss's). The same through the phase change since Nov 14 (no absorption).
 - **Phase 2** (rules `packages/chess/src/bosses/recluse-phase2.ts`; driver `Phase2Game`; screen `SimulScreen`): four
   boards, each its own Chess960 start (`phase2Numbers`, from the battle's seed, all different), each a BoardState from
   a base at ply 0 (`phase2Board`). The players are White; you play board 0, bots the other three. His brain is
@@ -464,7 +460,7 @@ below):
   (`phase2Flags`) or resigning (`phase2Resign`); the others play on;
   the battle ends when every board is decided, won only with all four won (`phase2Outcome`). Then his reaction
   (`RECLUSE_PHASE2.endMs`: beaten, the spellbook's glow as a placeholder for his transformation; he won, his laugh) and
-  the result (`results.simul`: "won N of 4"). No power-ups, no items, no God King (absorbed). Engine move (admins)
+  the result (`results.simul`: "won N of 4"). No power-ups, no items, no God King (greyed in his place). Engine move (admins)
   works on your board.
 - **His phase 2 ultimate** (Eric, Oct 14): a move longer than `slowMoveSeconds` (5 s; anyone's, any board, before it
   comes) is a slow move for the team (`Phase2State.slow`; his line, `slow`, low priority: it never stacks; a soft sound,
@@ -1219,7 +1215,7 @@ sampling, the guards, `forPlayers`), `BOSS_TIERS` and each boss's `offset` in `b
   His younger ages (a mockup, Nov 12; since Nov 13 his child form's growing figure, `recluse-growing`): `characters/recluse-ages.ts` (the child, 13 and 20, their busts
   and idles, the growing step `recluse-grow`, the ghost child beside him kneeling `recluse-ghost`):
   `extra=packages/app/src/characters/recluse-ages.ts only=recluse-child,recluse-teen,recluse-young,recluse-grow,recluse-ghost`.
-  His cutscene between the adult form and the cyborg (in the fight since Nov 13: "His cutscene" above):
+  His cutscene between the adult form and his transformation (in the fight since Nov 13: "His cutscene" above):
   `npm run preview:cutscene -- <dir> [phone|computer]` plays it alone over a real fight (a dev-only module; videos and stills).
 - The Hidden Boss in the Crowd's final: `packages/chess/test/crowd.test.ts` ("50 v 50 boss final"),
   `packages/server/test/crowd-hidden-boss.test.ts` (online), e2e `e2e/crowd-hidden.spec.ts`; [crowd.md](crowd.md).

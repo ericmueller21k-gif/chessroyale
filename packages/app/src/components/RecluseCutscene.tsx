@@ -1,5 +1,5 @@
 /**
- * The Hidden Boss's cutscene between his adult form and the cyborg (Eric, Nov 12; in the fight since Nov 13): after his fall,
+ * The Hidden Boss's cutscene between his adult form and his transformation (Eric, Nov 12; in the fight since Nov 13): after his fall,
  * before his phase change, solo and online (online the server holds for it and says when: `recluseCutscene`, so everyone sees it
  * at once). Drawn by App over whatever screen is up (his fall's), from `at` to `until`:
  * 1. Everything dims, and a round spotlight with a soft, feathered edge shines on the board's middle (one fixed layer,
@@ -8,8 +8,8 @@
  *    knees buckle, and he straightens (`RECLUSE_CUTSCENE` in characters/recluse-ages.ts: one drawing for both).
  * 3. The 17 lines, each its own text box by its speaker (the game's speech box, `SpeechBox`), typed out; a line of two
  *    sentences types the first, pauses, then the second. Times: RECLUSE_CUTSCENE in settings.ts.
- * 4. After the last line the child fades out, and the man is left on his knees in the light; the light lifts and the scene fades,
- *    and his phase change (the God King's power, the book, the light, the chant, the crack) carries on.
+ * 4. After the last line his phase change carries on from it with no break (Eric, Nov 14): the man and the child still in the
+ *    light, the book at his feet opens and his transformation begins (RecluseTransform.tsx).
  * While it plays his figure in its usual place is hidden (he kneels in the light: `cs-on` on the page) and the two voices are
  * quiet (`hush`: his fall's mumbling, the God King's remarks). No skip: the admins' 🏆 doesn't skip it either.
  * Sizes are the board's own: the figure and the boxes sit on a stage laid exactly over `board`.
@@ -30,7 +30,7 @@ import { useFrameNow } from "./Countdown.tsx";
 const ch = RECLUSE_CUTSCENE;
 const animMs = (name: string) => ch.anims[name]!.frames.reduce((s, f) => s + f.ms, 0);
 
-const arrival = () => ({ poofMs: animMs("poof"), dropMs: animMs("drop"), landMs: animMs("land"), fadeMs: animMs("fade") });
+const arrival = () => ({ poofMs: animMs("poof"), dropMs: animMs("drop"), landMs: animMs("land") });
 /** The scene's timeline for these lines (the arrival's lengths from the figures' frames). */
 export function recluseCutsceneTimeline(lines: readonly CutLine[] = RECLUSE_CUTSCENE_LINES): CutTimeline {
   return cutsceneTimeline(lines, arrival());
@@ -49,7 +49,6 @@ function figAt(tl: CutTimeline, t: number): { anim: string; then?: string; since
   if (t < tl.dropAt) return { anim: "poof", since: tl.poofAt };
   if (t < tl.landAt) return { anim: "drop", since: tl.dropAt };
   if (t < tl.standAt) return { anim: "land", since: tl.landAt };
-  if (t >= tl.fadeAt) return { anim: "fade", then: "alone", since: tl.fadeAt };
   const up = boxAt(tl, t);
   // (The three loops share one clock, so a mouth starting or stopping never jumps the rest of the frame.)
   if (up && t < up.box.typed) return { anim: up.box.who === "kid" ? "kidTalk" : "manTalk", since: tl.standAt };
@@ -63,7 +62,7 @@ function boardOnScreen(): HTMLElement | null {
 }
 
 /** The board's box on the screen, kept current (it can move with a resize). */
-function useRect(board: HTMLElement | null): DOMRect | null {
+export function useRect(board: HTMLElement | null): DOMRect | null {
   const [r, setR] = useState<DOMRect | null>(() => board?.getBoundingClientRect() ?? null);
   useLayoutEffect(() => {
     if (!board) return;
@@ -95,8 +94,9 @@ export function RecluseCutscene({ at, until, board: given, lines = RECLUSE_CUTSC
   const board = given === undefined ? found : given;
   const rect = useRect(board);
   const t = now - at;
-  // (Drawn from his fall's start, it waits for its moment, the fall's end.)
-  const on = t >= 0 && t < tl.endAt;
+  // (Drawn from his fall's start, it waits for its moment, the fall's end; held on its last picture until its window's end, should
+  // the scene end a little before it, so the phase change carries on from it with no gap.)
+  const on = t >= 0 && t < Math.max(tl.endAt, until - at);
   // (From then, both voices quiet until it's over, and his figure in its place hidden while he kneels in the light.)
   useEffect(() => {
     if (!on) return;
@@ -123,9 +123,8 @@ export function RecluseCutscene({ at, until, board: given, lines = RECLUSE_CUTSC
   if (!rect || !on) return null;
   const fig = figAt(tl, t);
   // The light: centered on the board, its radius a share of the board's width (the CSS turns it into the feathered pool). It comes
-  // up as the scene starts and lifts at its end, the figure with it.
-  const out = Math.max(0, Math.min(1, (t - tl.outAt) / Math.max(1, c.outMs)));
-  const dim = Math.max(0, Math.min(1, t / Math.max(1, c.dimMs))) * (1 - out);
+  // up as the scene starts and stays up: the phase change's transformation carries on in it (RecluseTransform).
+  const dim = Math.max(0, Math.min(1, t / Math.max(1, c.dimMs)));
   const cx = rect.x + rect.width / 2;
   const cy = rect.y + rect.height / 2;
   // The figure on the stage (shares of the board's width; the board is square).
@@ -140,7 +139,7 @@ export function RecluseCutscene({ at, until, board: given, lines = RECLUSE_CUTSC
   return createPortal(
     <div class="cs-layer" aria-live="polite" data-cutscene={at}>
       <div class="cs-dim" style={{ opacity: String(dim), "--cs-x": `${cx}px`, "--cs-y": `${cy}px`, "--cs-r": `${rect.width * C.spot}px`, "--cs-in": `${C.spotInner * 100}%`, "--cs-a": String(C.dimAlpha) }} />
-      <div class="cs-stage" style={{ left: `${rect.x}px`, top: `${rect.y}px`, width: `${rect.width}px`, height: `${rect.height}px`, ...(out > 0 ? { opacity: String(1 - out) } : {}) }}>
+      <div class="cs-stage" style={{ left: `${rect.x}px`, top: `${rect.y}px`, width: `${rect.width}px`, height: `${rect.height}px` }}>
         <span class="cs-fig" style={{ left: `${left * 100}%`, top: `${top * rect.width}px`, width: `${w * 100}%`, aspectRatio: `${ch.w} / ${ch.h}` }}>
           <SpriteAnim ch={ch} anim={fig.anim} then={fig.then} since={at + fig.since} id="cs-fig" />
         </span>

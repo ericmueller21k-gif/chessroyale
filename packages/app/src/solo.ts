@@ -4,7 +4,7 @@ import { bulletClock, crowdRace, phase2Numbers, phase2Standings, phase2ToMove, b
 import type { BossView, BoardView, DarkNote, ExitKind, FinalView, GameView, Hint, LightsView, MoveRecord, RushView, Phase, SimulView, Standing, VoteView } from "./game.ts";
 import { PHASE2_ULT_ANIMS, PHASE_CHANGE, Phase2Game, phase2Follows, phase2Mates, phaseChangeRun } from "./recluse-phase2.ts";
 import { RECLUSE_LINES } from "./characters/recluse-lines.ts";
-import { playInPlace, resetBeats, setEngineAt, setFigureRun } from "./components/BossCharacter.tsx";
+import { playInPlace, resetBeats, setSuitAt, setFigureRun } from "./components/BossCharacter.tsx";
 import { resetBattleBanners } from "./battle-banners.ts";
 import { clearPremoves } from "./board/yours.ts";
 import { BLACKOUT, DARK_FORCED } from "./components/Hollow.tsx";
@@ -628,8 +628,8 @@ export class SoloMatch implements GameView {
    * Calling the God King. To play the move: your whole turn, no move of your own. To strike the boss: he comes
    * now if enough of the crowd has called, the clock stands still while he strikes, and then you pick as usual.
    * Against the Hidden Boss neither comes, but the try spends its charge as if it had (Eric, Oct 14), on your move in
-   * phase 1; the dock has him mock it, and your move goes on (its clock too). In phase 2 there's no God King to call: the
-   * boss absorbed him in the phase change (Eric, Oct 14), and the dock has no button for him.
+   * phase 1; the dock has him mock it, and your move goes on (its clock too). In phase 2 the God King can't be called: he stays
+   * in his place, greyed (Eric, Nov 14).
    */
   callKing(strike = false) {
     if (kingHelpBlocked(this.runner?.boss)) {
@@ -1157,10 +1157,10 @@ export class SoloMatch implements GameView {
   }
 
   /**
-   * His phase change (PHASE_CHANGE, about 25 s; not skippable, like a boss's intro): he absorbs the God King (who's gone
-   * from then on: he says nothing in phase 2, and can't be called), his half-engine look igniting; up in a rage, his leap
-   * onto the board, the book thrown down, the chant and its light, the split and its arcs, the book back in his hands, the
-   * shuffle, his leap back. Phase 2's boards are set up now (each its own Chess960 start, from the battle's seed), so the
+   * His phase change (PHASE_CHANGE, about 23 s; not skippable, like a boss's intro): his transformation by the book's light,
+   * carrying on from his cutscene (the white-out, his suit, his visor up for his line), his leap and the split on the music's drop,
+   * the book back in his hands, the shuffle, his leap back. The God King stays in his place, greyed (he says nothing in phase 2,
+   * and can't be called). Phase 2's boards are set up now (each its own Chess960 start, from the battle's seed), so the
    * shuffle shows where they go; their clocks start after it, and a countdown on them (startSimul). `fromFall`: after phase 1's fall, whose mumbling carries
    * on into it.
    * `mates`: who fought phase 1 beside you (a solo Crowd's finalists), on the other boards; fresh bots for the rest.
@@ -1196,12 +1196,11 @@ export class SoloMatch implements GameView {
     });
     this.lastSlow = null;
     // (The slow move's sound made ahead, off the page, before play begins.)
-    warmSounds(["recluseSlow", "recluseDrain", "recluseSpark", "recluseArc"]);
-    // Where he stands: slumped while the God King gloats, then he seizes his power and gets up in a rage; from his leap the
-    // board draws him (his place stands empty), and once he's back he rests in phase 2's idle. His half-engine look comes on
-    // as the power lands, for the rest of the fight.
+    warmSounds(["recluseSlow", "recluseSpark", "recluseArc"]);
+    // Where he stands: empty while the board draws him (from the start, as in his cutscene), and once he's back he rests in
+    // phase 2's idle. His suit from the white-out on, for the rest of the fight.
     setFigureRun(phaseChangeRun(at));
-    setEngineAt(at + PHASE_CHANGE.igniteAt);
+    setSuitAt(at + PHASE_CHANGE.whiteFull);
     // (The board cracks into four at `splitAt`: his music's drop is put there, music.ts.)
     this.set({ kind: "phaseChange", at, splitAt: at + PHASE_CHANGE.crackAt });
     this.timer = setTimeout(() => this.startSimul(), PHASE_CHANGE.total);
@@ -1227,7 +1226,7 @@ export class SoloMatch implements GameView {
     });
   }
 
-  /** Phase 2's play: every clock starts. His line (the God King is gone: absorbed in the phase change). */
+  /** Phase 2's play: every clock starts. His line (the God King stays greyed in his place: he can't be called in phase 2). */
   private startClocks() {
     if (!this.phase2 || this.stopped) return;
     this.phase2Playing = true;
@@ -1263,7 +1262,7 @@ export class SoloMatch implements GameView {
     const lines = RECLUSE_LINES.ult2;
     bossVoice.say(lines[Math.floor(this.rng() * lines.length)]!, `recluse:p2:ult:${at}`, CRITICAL);
   }
-  /** A board decided: his word on it (a draw: nothing). The board's own tag says won or lost; the God King is gone. */
+  /** A board decided: his word on it (a draw: nothing). The board's own tag says won or lost; the God King says nothing. */
   private phase2Result(winner: "crowd" | "boss" | "draw") {
     if (winner === "draw" || this.phase2?.outcome.decided) return;
     const key = `recluse:p2:${winner}:${this.phase2Lines.won + this.phase2Lines.lost}`;
