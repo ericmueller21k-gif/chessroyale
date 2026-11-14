@@ -1079,3 +1079,6 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   (moves, chat, God King + 2x2 team), #700's exclusion dropped. Night-room helper started: session_01JuCWRvEPBw8VTUtLuTFiRr.
   Running Opus: transform (waiting for Eric's go) + night room. Queue: standings "out" bug in phase 2 (xhigh, core/server) ->
   visual QA (after transform) -> flaky round 3.
+- Nov 14 03:30: main 6c8657e full run: red only on a retry-pass of fairplay:65 (Eric's ban guard; 3rd time seen: PR #695, now
+  main). Flaky round 3 FIRST item: fairplay:65 (the snapshot shows the guest home instead of the landing after cookies+storage
+  cleared: find why; game-side fix only, guard checks unchanged).
