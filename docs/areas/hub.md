@@ -353,7 +353,9 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
   (visibilitychange, pageshow, focus) tries `resume()`; the first tap or key after it (`wakeAudio`, a capture listener ahead of
   the page's) makes a new audio context if the old one isn't running with its clock moving (iOS: suspended, interrupted, closed,
   or "running" but stopped), warms the boss sounds again and moves the Colosseum's ambience to a new element
-  (`onAudioRebuilt`). That tap's own sound plays as the new context wakes; nothing plays while the page is hidden.
+  (`onAudioRebuilt`). That tap's own sound plays as the new context wakes; nothing plays while the page is hidden. The old
+  context is closed at once, unless a listener still needs it: the boss music fades out on it once the new one has taken over (Nov 14,
+  at most 2 s; [bosses.md](bosses.md) "Music").
   `packages/app/test/sound-return.test.ts`, `e2e/sound.spec.ts`; docs/decisions/2026-11-03-sound-after-app-switch.md.
 - **The FAQ, "How HunChess works"** (Eric, Oct 11): Settings → HOW TO PLAY → "📖 FAQ · How it works" (`/faq`; back
   goes to Settings), or "📖 How each mode works" (`/faq#faq-modes`). Settings keeps no rules of its own: the FAQ is

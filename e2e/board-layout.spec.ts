@@ -293,8 +293,9 @@ test("a computer: Boss alone has no scoreboard and your pawn left of the God Kin
     const main = raid ? RAID_BOARD_BOX[size]! : MAIN_BOARD_BOX[size]!;
     if (!raid || size === "1280x800") for (const [k, v] of [["x", board.x - main.x], ["y", board.y - main.y], ["width", board.r - board.x - main.w], ["height", board.b - board.y - main.w]] as const) expect(Math.abs(v), `${at}: the board's ${k}`).toBeLessThanOrEqual(1);
     // The moves: from the board's top, half as tall as they were, the column's width, a small gap off the board; over nothing.
-    // (Nov 1: the column's ⚡, fish and gear sit at the board's top, the list 36 px under them.)
-    expect(Math.abs(side.y - board.y - 36), `${at}: 36 px under the board's top, the tools above`).toBeLessThanOrEqual(1);
+    // (Eric, Nov 14: the list's top is the board's top; the column's ⚡, fish and gear moved up into the banner's row. Was, Nov 1:
+    // the tools at the board's top, the list 36 px under them.)
+    expect(Math.abs(side.y - board.y), `${at}: from the board's top, the tools above`).toBeLessThanOrEqual(1);
     expect(side.x - board.r, `${at}: a small gap off the board`).toBeGreaterThanOrEqual(12);
     expect(side.x - board.r, `${at}: a small gap off the board`).toBeLessThanOrEqual(16.5);
     // (The column: 340 px where the window's height limits the board, 280 px (its least) where its width does: Nov 1, round 2.)

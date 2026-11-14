@@ -6,7 +6,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 type State = "suspended" | "running" | "interrupted" | "closed";
-const node = (extra: object = {}) => ({ connect: (n: unknown) => n, ...extra });
+/** A node: what it's connected to (`to`). */
+const node = (extra: object = {}) => {
+  const n = { to: [] as unknown[], connect: (x: unknown) => (n.to.push(x), x), ...extra };
+  return n;
+};
 class FakeContext {
   static made: FakeContext[] = [];
   static rate = 48000;
@@ -366,6 +370,19 @@ describe("the computer's sound changing under the page (Eric, Nov 3, Chrome: mov
     expect(FakeContext.made).toHaveLength(2);
   });
 
+  it("a listener still using the old context (the music, fading out on it once the new one has taken over) keeps it open as long as it asks", async () => {
+    const old = last();
+    let heard: unknown = null;
+    sound.onAudioRebuilt((o) => ((heard = o), 300));
+    otherApp(5000);
+    clickAt();
+    expect(heard).toBe(old);
+    expect(FakeContext.made).toHaveLength(2);
+    expect(old.state).toBe("running");
+    await new Promise((ok) => setTimeout(ok, 350));
+    expect(old.state).toBe("closed");
+  });
+
   it("before sound was ever switched on, a device change does nothing", async () => {
     vi.resetModules();
     FakeContext.made = [];
@@ -377,5 +394,25 @@ describe("the computer's sound changing under the page (Eric, Nov 3, Chrome: mov
     sound.wakeAudio();
     await flush();
     expect(FakeContext.made).toHaveLength(1);
+  });
+});
+
+describe("the music's way out (Eric, Nov 14: \"it sounds much lower quality... we can't compromise on these songs\")", () => {
+  it("its own gain, at the master's level, straight to the speakers: not through the game sounds' low-pass", () => {
+    const c = last();
+    const bus = sound.musicBus()! as unknown as { ctx: FakeContext; out: ReturnType<typeof node> & { gain: { value: number } } };
+    expect(bus.ctx).toBe(c);
+    expect(bus.out.to).toEqual([c.destination]);
+    expect(bus.out.gain.value).toBe(0.9);
+  });
+  it("a new context: a new way out on it", () => {
+    const first = sound.musicBus()!.out;
+    last().on.get("error")?.();
+    clock += 1000;
+    sound.wakeAudio();
+    const bus = sound.musicBus()! as unknown as { ctx: FakeContext; out: ReturnType<typeof node> };
+    expect(bus.ctx).toBe(last());
+    expect(bus.out).not.toBe(first);
+    expect(bus.out.to).toEqual([last().destination]);
   });
 });

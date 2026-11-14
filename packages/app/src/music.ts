@@ -123,28 +123,86 @@ export function fadeTo(param: AudioParam, to: number, now: number, ms: number) {
 }
 
 /** The minimum of the audio graph the player needs (an AudioContext; a fake in the unit tests). */
-export type MusicContext = Pick<BaseAudioContext, "currentTime" | "createGain" | "createBufferSource">;
+export type MusicContext = Pick<BaseAudioContext, "currentTime" | "createGain" | "createBufferSource"> & HeardClock & { state?: AudioContextState };
 
 export interface Playing {
   ctx: MusicContext;
   gain: GainNode;
   sources: AudioBufferSourceNode[];
+  /** Where its loop is, on the wall clock: to pick it up there on a new audio context (`loopPlace`). */
+  place?: LoopPlace;
+  /** What it plays (its plan on `ctx`'s clock, and its buffers): to carry it onto a new audio context (`handOver`). */
+  plan?: MusicPlan;
+  intro?: AudioBuffer | null;
+  loop?: AudioBuffer;
+}
+
+/** A loop's timing on Date.now()'s clock: when it starts (from `offset`), and its loop points (s into its file). */
+export interface LoopPlace {
+  wallAt: number;
+  offset: number;
+  loopStart: number;
+  loopEnd: number;
 }
 
 /**
- * Starts a plan on `ctx` into `out`, at gain `level`: the intro once (if it has one and its buffer), the loop looping. Returns
- * what's playing, to fade and stop.
+ * Where a loop is at `nowMs` (s into its file), or null while it hasn't started yet (its intro still playing). A new audio context
+ * (sound.ts rebuilds one after the window was away, or the sound device changed) picks the music up here, not from its start
+ * (Eric, Nov 14: "a hiccup... it sounds like it's restarting").
  */
-export function startPlan(ctx: MusicContext, out: AudioNode, plan: MusicPlan, intro: AudioBuffer | null, loop: AudioBuffer, level: number): Playing {
+export function loopPlace(l: LoopPlace, nowMs: number): number | null {
+  const t = (nowMs - l.wallAt) / 1000;
+  return t >= 0 ? loopAfter(l, t) : null;
+}
+
+/** Where a loop started from `offset` is `t` s after it started (s into its file), or null for a loop that can't loop. */
+function loopAfter(l: Pick<LoopPlace, "offset" | "loopStart" | "loopEnd">, t: number): number | null {
+  const len = l.loopEnd - l.loopStart;
+  const first = l.loopEnd - l.offset;
+  if (!(len > 0)) return null;
+  return t < first ? l.offset + t : l.loopStart + ((t - first) % len);
+}
+
+/** When each piece starts (s, its context's clock) and how far into its file: the intro's (null: none, or it's over) and the loop's. */
+export interface Starts {
+  intro: [at: number, offset: number] | null;
+  loop: [at: number, offset: number];
+}
+const planStarts = (plan: MusicPlan): Starts => ({ intro: plan.intro && [plan.intro.at, 0], loop: [plan.loop.at, plan.loop.offset] });
+
+/**
+ * A plan carried onto a new audio context (Nov 14, `handOver`): every time on it moved by `d` (the new clock less the old, for the
+ * same moment heard), nothing starting before `from` (the new clock): a piece already under way starts at `from`, as far into its
+ * file as it has got (the loop by its loop points; the intro, `introLength` s long, if it hasn't ended).
+ */
+export function carriedStarts(plan: MusicPlan, d: number, from: number, introLength: number): Starts {
+  let intro: Starts["intro"] = null;
+  if (plan.intro) {
+    const at = plan.intro.at + d;
+    if (at >= from) intro = [at, 0];
+    else if (from - at < introLength) intro = [from, from - at];
+  }
+  const at = plan.loop.at + d;
+  const loop: Starts["loop"] = at >= from ? [at, plan.loop.offset] : [from, loopAfter(plan.loop, from - at) ?? plan.loop.offset];
+  return { intro, loop };
+}
+
+/**
+ * Starts a plan on `ctx` into `out`, at gain `level`: the intro once (if it has one and its buffer), the loop looping (at `starts`:
+ * the plan's own times, or where a carried plan picks up). Returns what's playing, to fade and stop.
+ */
+export function startPlan(ctx: MusicContext, out: AudioNode, plan: MusicPlan, intro: AudioBuffer | null, loop: AudioBuffer, level: number, starts: Starts = planStarts(plan)): Playing {
   const gain = ctx.createGain();
   gain.gain.value = level;
   gain.connect(out);
   const sources: AudioBufferSourceNode[] = [];
-  if (plan.intro && intro) {
+  if (starts.intro && intro) {
     const a = ctx.createBufferSource();
     a.buffer = intro;
     a.connect(gain);
-    a.start(plan.intro.at);
+    const [at, into] = starts.intro;
+    if (into > 0) a.start(at, into);
+    else a.start(at);
     sources.push(a);
   }
   const b = ctx.createBufferSource();
@@ -153,9 +211,10 @@ export function startPlan(ctx: MusicContext, out: AudioNode, plan: MusicPlan, in
   b.loopStart = plan.loop.loopStart;
   b.loopEnd = plan.loop.loopEnd;
   b.connect(gain);
-  b.start(plan.loop.at, plan.loop.offset);
+  b.start(starts.loop[0], starts.loop[1]);
   sources.push(b);
-  return { ctx, gain, sources };
+  const place = { wallAt: Date.now() + (plan.loop.at - ctx.currentTime) * 1000, offset: plan.loop.offset, loopStart: plan.loop.loopStart, loopEnd: plan.loop.loopEnd };
+  return { ctx, gain, sources, place, plan, intro, loop };
 }
 
 /** Fades what's playing out over `ms` and stops it there: from now, or from `at` (the audio clock, s) if that's later. */
@@ -364,7 +423,7 @@ export function bossMusic(b: MusicBattle | null) {
     nextLoaded = b.next;
     if (b.next && wanted()) void loadTheme(b.next);
   }
-  maybeStart(false);
+  maybeStart();
 }
 
 /**
@@ -396,7 +455,7 @@ async function fetchAhead(keys: readonly string[]) {
 }
 
 /** Its battle's theme starts, or takes over from the one playing (`switchPlan`), as soon as it's loaded. */
-function maybeStart(loopOnly: boolean) {
+function maybeStart() {
   const b = battle;
   if (!b || !b.live || !wanted()) return;
   const theme = themeOf(b);
@@ -413,10 +472,10 @@ function maybeStart(loopOnly: boolean) {
     // (A moment on screen, Date.now()'s clock, onto the audio clock: when it's heard.)
     const dropAt = b.dropAt === undefined ? null : heard + (b.dropAt - nowMs) / 1000;
     const from = playing;
-    const sw = switchPlan(got.themes, theme, now, !!from, dropAt, loopOnly || !got.intro);
+    const sw = switchPlan(got.themes, theme, now, !!from, dropAt, !got.intro);
     if (!sw) return;
     try {
-      playing = { ...startPlan(bus.ctx, bus.master, sw.plan, got.intro, got.loop, level()), key: b.key, boss: b.boss, theme };
+      playing = { ...startPlan(bus.ctx, bus.out, sw.plan, got.intro, got.loop, level()), key: b.key, boss: b.boss, theme };
       log(`music:start:${theme}${sw.plan.intro ? "" : ":loop"}`);
       // (Where its loop lands on Date.now()'s clock, for the tests: the Hidden Boss's drop on his boards' split.)
       if (dropAt !== null) log(`music:drop:${theme}:${Math.round(nowMs + (sw.plan.loop.at - heard) * 1000)}`);
@@ -426,7 +485,8 @@ function maybeStart(loopOnly: boolean) {
     }
     if (!from) return;
     log(`music:out:${from.theme}`);
-    stopPlaying(from, sw.outMs, sw.outAt);
+    // (On its own context's clock: one a new context is taking over, `handOver`, may still be on the old one.)
+    stopPlaying(from, sw.outMs, sw.outAt + (from.ctx.currentTime - bus.ctx.currentTime));
     leaving.push(from);
     const doneMs = (sw.outAt - bus.ctx.currentTime) * 1000 + sw.outMs;
     setTimeout(() => {
@@ -501,13 +561,13 @@ export function roomMusicLoad(boss: string) {
  * null: you left (a fade over MUSIC.endFadeMs, then it stops and its theme is let go). A battle on: nothing (the battle's own plays).
  */
 export function roomMusic(boss: string | null) {
-  if (boss && boss === room) return maybeStartRoom(false);
+  if (boss && boss === room) return maybeStartRoom();
   endRoom();
   room = boss;
-  maybeStartRoom(false);
+  maybeStartRoom();
 }
 
-function maybeStartRoom(loopOnly: boolean) {
+function maybeStartRoom() {
   const r = room;
   if (!r || battle || roomPlaying || roomStarting === r || !wanted()) return;
   roomStarting = r;
@@ -516,10 +576,10 @@ function maybeStartRoom(loopOnly: boolean) {
     if (!got || room !== r || battle || roomPlaying || !wanted()) return;
     const bus = musicBus();
     if (!bus) return;
-    const plan = musicPlan(got.themes, r, bus.ctx.currentTime + MUSIC.startDelayS, loopOnly || !got.intro);
+    const plan = musicPlan(got.themes, r, bus.ctx.currentTime + MUSIC.startDelayS, !got.intro);
     if (!plan) return;
     try {
-      roomPlaying = { ...startPlan(bus.ctx, bus.master, plan, got.intro, got.loop, level()), boss: r };
+      roomPlaying = { ...startPlan(bus.ctx, bus.out, plan, got.intro, got.loop, level()), boss: r };
       log(`music:room:${r}${plan.intro ? "" : ":loop"}`);
     } catch {
       // Ignore audio errors: the room goes on in silence.
@@ -570,7 +630,7 @@ export function splashMusic(boss: string): Promise<void> {
     const plan = musicPlan(got.themes, boss, bus.ctx.currentTime + MUSIC.startDelayS, !got.intro);
     if (!plan) return;
     try {
-      const p = startPlan(bus.ctx, bus.master, plan, got.intro, got.loop, level());
+      const p = startPlan(bus.ctx, bus.out, plan, got.intro, got.loop, level());
       // (Late, the battle already picked: it's the battle's now.)
       if (battle && themeOf(battle) === boss) playing = { ...p, key: battle.key, boss: battle.boss, theme: boss };
       else carried = { ...p, boss };
@@ -607,8 +667,8 @@ function relevel() {
     }
   }
   // (A battle's theme that changed while Music was off: switched to now.)
-  maybeStart(false);
-  if (!roomPlaying) maybeStartRoom(false);
+  maybeStart();
+  if (!roomPlaying) maybeStartRoom();
 }
 
 /** For the tests and the sound report: the boss whose battle music is playing, and its gain's target. */
@@ -621,22 +681,64 @@ export const roomMusicNow = () => (roomPlaying ? { boss: roomPlaying.boss, level
 onMuteChange(relevel);
 onMusicChange(relevel);
 if (typeof document !== "undefined") document.addEventListener("visibilitychange", relevel);
-// A new audio context (the old one died: sound.ts, wakeAudio): the loop starts again on it, from its start.
-onAudioRebuilt(() => {
-  const p = playing;
-  const r = roomPlaying;
-  const c = carried;
-  playing = null;
-  roomPlaying = null;
-  carried = null;
-  for (const q of [p, r, c, ...leaving]) {
-    try {
-      q?.gain.disconnect();
-    } catch {
-      // Already gone with its context.
-    }
-  }
-  leaving = [];
-  if (p) maybeStart(true);
-  if (r) maybeStartRoom(true);
+/**
+ * A new audio context (sound.ts, `wakeAudio`: the old one died, or may have: the window away 2 s+, the device changed) takes the music
+ * over with no break (Eric, Nov 14: "it froze, stopped for a second, and then it was almost like it restarted at a different part").
+ * Once the new one's clock runs (at most MUSIC.handoffWaitMs), each piece playing starts on it at the place the old one is heard at
+ * then (`carriedStarts`: by the old one's clock while it keeps time, else by the wall clock), and the old one fades out over
+ * MUSIC.handoffMs from there: still sounding, nothing is heard; dead, the new one simply comes in. Until then the old one plays on
+ * (sound.ts keeps its context open as long as asked: the returned ms).
+ */
+onAudioRebuilt((old) => {
+  // (A switch's fading theme: its fade ends on the old one.)
+  stopLeaving(MUSIC.fadeMs);
+  const all = [playing, roomPlaying, carried].filter((q): q is NonNullable<typeof q> => !!q);
+  if (!all.length) return 0;
+  const bus = musicBus();
+  if (!bus) return 0;
+  const go = () => {
+    // (Each still the one playing: one that ended, or was switched, meanwhile is left as it was.)
+    if (playing && all.includes(playing)) playing = handOver(playing, bus);
+    if (roomPlaying && all.includes(roomPlaying)) roomPlaying = handOver(roomPlaying, bus);
+    if (carried && all.includes(carried)) carried = handOver(carried, bus);
+  };
+  whenRunning(bus.ctx, go);
+  // (Kept open for the wait, the start and the fade; a context that isn't running isn't sounding: closed at once.)
+  return old?.state === "running" ? MUSIC.handoffWaitMs + MUSIC.startDelayS * 1000 + MUSIC.handoffMs + 200 : 0;
 });
+
+/** `fn` once `c`'s clock is running (a new context opens its device after the tap that made it), or after MUSIC.handoffWaitMs. */
+function whenRunning(c: MusicContext, fn: () => void) {
+  const t0 = c.currentTime;
+  const until = Date.now() + MUSIC.handoffWaitMs;
+  const check = () => {
+    if ((c.state === undefined || c.state === "running") && c.currentTime > t0) fn();
+    else if (Date.now() >= until) fn();
+    else setTimeout(check, 20);
+  };
+  check();
+}
+
+/** `q` carried onto the new context (`bus`) as described above, the old one faded out from there; `q` itself if it can't be. */
+function handOver<P extends Playing>(q: P, bus: { ctx: MusicContext; out: AudioNode }): P {
+  const { plan, loop, place } = q;
+  if (!plan || !loop || !place || bus.ctx === q.ctx) return q;
+  const perf = performance.now();
+  const from = bus.ctx.currentTime + MUSIC.startDelayS;
+  // (The old clock at the moment `from` is heard: its own while it keeps time with the wall clock, else the wall clock's.)
+  const lead = from - heardNow(bus.ctx, perf);
+  const oldHeard = heardNow(q.ctx, perf);
+  const byWall = (Date.now() - place.wallAt) / 1000;
+  const keepsTime = (q.ctx.state === undefined || q.ctx.state === "running") && Math.abs(oldHeard - plan.loop.at - byWall) < 0.5;
+  const d = from - ((keepsTime ? oldHeard : plan.loop.at + byWall) + lead);
+  const moved: MusicPlan = { intro: plan.intro && { ...plan.intro, at: plan.intro.at + d }, loop: { ...plan.loop, at: plan.loop.at + d } };
+  let next: Playing;
+  try {
+    next = startPlan(bus.ctx, bus.out, moved, q.intro ?? null, loop, level(), carriedStarts(plan, d, from, q.intro?.duration ?? 0));
+  } catch {
+    return q; // Ignore audio errors: the old one plays on while its context does.
+  }
+  log(`music:handover:${next.sources.length}`);
+  stopPlaying(q, MUSIC.handoffMs, q.ctx.currentTime + (from - bus.ctx.currentTime));
+  return { ...q, ...next };
+}

@@ -37,7 +37,11 @@ before the rows are laid (`street.ts lotHere`), so each row fills the place with
   after the "Town square" title and the gear alone at the right end** (`town-chat.css`: the tools' box `display: contents`, the gear
   `margin-left: auto`): the chat's place was hard to see at the far right. Every side-menu item leaves the town (`goHome` in
   `App.tsx` closes it), Chess Town opens it again. Leaving asks "Leave Chess Town?" first (`town/LeaveTown.tsx`; Stay focused,
-  Escape is Stay; both set in layout effects so a key in the sheet's first frame isn't lost, Nov 10). Known limit: resizing a mouse window across 1024 px adds or takes away the
+  Escape is Stay; both set in layout effects so a key in the sheet's first frame isn't lost, Nov 10), from the street and inside any building
+  (Nov 13): the side menu, back, the back gesture, an invite's Join (`setInviteHost` in `App.tsx`: Stay keeps the invite) and a profile's
+  Challenge over the town (Stay makes no game). The town pushes a step of its own into the history as it shows (`TOWN_STEP`, App.tsx), so
+  the back gesture always has a step to take and asks, even with nothing of the app's before the town; the town left another way leaves
+  that step behind, and a back onto it just puts the address back to `/`. Known limit: resizing a mouse window across 1024 px adds or takes away the
   frame, which starts the town again at its start square. The world never assumes a screen size: it fills its box and works its camera out
   from the box's shape, so the panels Eric designs around it can change without touching it. The back button, the chat icon, the
   gear and the buttons stay put. **The buttons** (Eric, Oct 28: "remove the 'Back to me' button … replace with circular focus

@@ -36,6 +36,13 @@ import { CASTLE_SOUND, MOVE_SOUNDS, CAPTURE_SOUNDS, defaultPieceSound, onPieceSo
 
 let ctx: AudioContext | null = null;
 let master: GainNode | null = null;
+/**
+ * The boss music's own way to the speakers (music.ts, `musicBus`): at the master's level, but straight to them, not through the
+ * low-pass (Eric, Nov 14: "it sounds much lower quality... we can't compromise on these songs").
+ */
+let musicOut: GainNode | null = null;
+/** The master's level (and the music's, beside it). */
+const MASTER_LEVEL = 0.9;
 /** The last node before the speakers (the soft low-pass): the sound report listens here. */
 let out: AudioNode | null = null;
 /** Audio contexts made this visit (the sound report). */
@@ -114,8 +121,11 @@ function ensureContext() {
   // (Chrome: the audio device failed under it. It may still say "running", its clock moving, and play nothing.)
   c.addEventListener?.("error", () => markStale("context error"));
   master = ctx.createGain();
-  master.gain.value = 0.9;
-  // A gentle low-pass keeps every sound soft on phone speakers.
+  master.gain.value = MASTER_LEVEL;
+  musicOut = ctx.createGain();
+  musicOut.gain.value = MASTER_LEVEL;
+  musicOut.connect(ctx.destination);
+  // A gentle low-pass keeps the game's sounds soft on phone speakers (not the music: `musicOut`).
   const soften = ctx.createBiquadFilter();
   soften.type = "lowpass";
   soften.frequency.value = 6000;
@@ -203,9 +213,14 @@ const nowMs = () => (typeof performance !== "undefined" ? performance.now() : Da
 const pageHidden = () => typeof document !== "undefined" && document.visibilityState === "hidden";
 /** Every boss sound `warmSounds` has made, to make again for a new context. */
 const warmed = new Set<SoundName>();
-const rebuiltListeners = new Set<() => void>();
+/**
+ * A listener hears the old context (null: none) and may return how long (ms) it still needs it: the music, still sounding on it,
+ * fades out there once the new one has taken over (music.ts). The old one is closed after the longest of those, else at once.
+ */
+type RebuiltListener = (old: AudioContext | null) => number | void;
+const rebuiltListeners = new Set<RebuiltListener>();
 /** Calls `fn` whenever the audio context is replaced (`mediaGain`'s elements then need a new element). */
-export function onAudioRebuilt(fn: () => void): () => void {
+export function onAudioRebuilt(fn: RebuiltListener): () => void {
   rebuiltListeners.add(fn);
   return () => rebuiltListeners.delete(fn);
 }
@@ -254,19 +269,33 @@ function rebuildAudio() {
   const old = ctx;
   ctx = null;
   master = null;
-  try {
-    void old?.close().catch(() => undefined);
-  } catch {
-    // Already closed.
-  }
+  musicOut = null;
+  const close = () => {
+    try {
+      void old?.close().catch(() => undefined);
+    } catch {
+      // Already closed.
+    }
+  };
   try {
     ensureContext();
   } catch {
+    close();
     return; // No audio now: the game works silently.
   }
   wakingUntil = nowMs() + WAKE_MS;
   warmSounds([...warmed]);
-  rebuiltListeners.forEach((l) => l());
+  let keep = 0;
+  rebuiltListeners.forEach((l) => {
+    try {
+      keep = Math.max(keep, Number(l(old)) || 0);
+    } catch {
+      // (One listener's trouble doesn't stop the others.)
+    }
+  });
+  // (Kept a moment for a listener still using it, at most REBUILD_GAP_MS: never more than two contexts at once.)
+  if (keep > 0) setTimeout(close, Math.min(keep, REBUILD_GAP_MS));
+  else close();
 }
 
 // ---- Dying while the page stays (Eric, Nov 3, Safari on his iPhone, no switching away: he tapped Timber in the town, who
@@ -363,16 +392,16 @@ export function onMuteChange(fn: () => void): () => void {
 }
 
 /**
- * The boss music's way out (music.ts): the audio context and the master gain every sound goes through (the same softening,
- * the same speakers), made if it hasn't been (suspended until a tap, as ever). Null without audio.
+ * The boss music's way out (music.ts): the audio context and the music's own gain to the speakers (`musicOut`: the master's level,
+ * no low-pass), made if it hasn't been (suspended until a tap, as ever). Null without audio.
  */
-export function musicBus(): { ctx: AudioContext; master: GainNode } | null {
+export function musicBus(): { ctx: AudioContext; out: GainNode } | null {
   try {
     ensureContext();
   } catch {
     return null;
   }
-  return ctx && master ? { ctx, master } : null;
+  return ctx && musicOut ? { ctx, out: musicOut } : null;
 }
 /** A recorded file fetched and decoded once a visit (by its path; a failure is tried again next time). Null without audio. */
 export function loadAudioFile(url: string): Promise<AudioBuffer | null> {
