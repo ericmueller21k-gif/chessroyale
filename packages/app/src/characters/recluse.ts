@@ -75,11 +75,30 @@ export const RECLUSE_PALETTE: Record<string, string> = {
   "8": "#fff3b8", // the spell's glow (and the glint in his eyes): pale, gold, ember
   "9": "#ffc44a",
   "0": "#ff7a3c",
+  // The suit (MOCKUP round 3, Nov 14): deep blue, dark to light; red, dark to light; the gloves and boots; the yellow traces
+  // and their nodes; the visor's glass.
+  n: "#0c1840",
+  u: "#16307e",
+  v: "#2550bb",
+  z: "#4a82e8",
+  R: "#560d1d",
+  S: "#8c1a2f",
+  P: "#c02a3e",
+  I: "#e6566b",
+  Z: "#0a0e22",
+  g: "#f6c62b",
+  i: "#fff4a6",
+  f: "#a77c12",
+  p: "#0b1430",
+  "#": "#1d2f6a",
+  "@": "#9fd0ff",
 };
 
 type Pt = readonly [number, number];
 const SHIRT = "qrst";
 const NAVY = "NMLl";
+const SUIT_RED = "RSPI";
+const SUIT_BLUE = "nuvz";
 
 const ramp = (r: string, l: number) => r[Math.max(0, Math.min(r.length - 1, Math.floor(l * r.length)))]!;
 /** Fills every pixel of `cv` (its top-left at drawing-space (x0, y0)) inside `inside` with `key(x, y)`, in drawing space. */
@@ -354,7 +373,7 @@ function boxOf(pts: readonly Pt[], pad: number): { x0: number; y0: number; w: nu
  * front of the book he clutches). `full`: a fuller forearm, for his free arm hanging in full view (the book arm's
  * forearm is mostly behind the book or across it).
  */
-function paintArm(sh: Pt, el: Pt, wr: Pt, fore: boolean, full = false): Part {
+function paintArm(sh: Pt, el: Pt, wr: Pt, fore: boolean, full = false, suit = false): Part {
   const cuff = 0.36;
   const b = boxOf([sh, el, wr], 6);
   const cv = canvas(b.w, b.h);
@@ -372,9 +391,10 @@ function paintArm(sh: Pt, el: Pt, wr: Pt, fore: boolean, full = false): Part {
       const s = inLo && (!inUp || lo.d - rLo < up.d - rUp) ? lo : up;
       const rr = s === lo ? rLo : rUp;
       const l = 0.6 - 0.5 * (s.nx / rr) - 0.4 * (s.ny / rr);
-      if (s === lo && !inCuff) cv[y]![x] = ramp("bcd", l);
-      else if (s === lo) cv[y]![x] = lo.t > cuff - 0.1 || lo.t < 0.06 ? "q" : ramp("rst", l + 0.1);
-      else cv[y]![x] = ramp(SHIRT, l - 0.12);
+      // (The suit: the upper arm red, a yellow-ringed blue cuff where his sleeve was rolled, the forearm blue.)
+      if (s === lo && !inCuff) cv[y]![x] = ramp(suit ? "nuv" : "bcd", l);
+      else if (s === lo) cv[y]![x] = lo.t > cuff - 0.1 || lo.t < 0.06 ? (suit ? "g" : "q") : ramp(suit ? "uvz" : "rst", l + 0.1);
+      else cv[y]![x] = ramp(suit ? SUIT_RED : SHIRT, l - 0.12);
     }
   return { grid: toGrid(cv) };
 }
@@ -532,6 +552,161 @@ function armPart(sh: Pt, el: Pt, wr: Pt, fore = false, full = false): { name: st
   }
   return { name, at };
 }
+
+// ---- The suit (a MOCKUP, round 3, Eric, Nov 14: "a full exoskeleton-style futuristic armor… don't make it look like war…
+// more like computer networking, that sort of wiring… a matching full-head helmet… the full front visor flips up… red and kind
+// of blue, some yellow… fairly fit to his body"). Fitted, deep blue with red panels, thin yellow circuit traces with pale
+// nodes; a full helmet shaped to his long head, one smooth tinted visor over his whole face that flips up into the dome. Every
+// part has its suit version, the same size and place (`suitName`), so any pose wears it by its part names (`suitFrame`).
+
+export type Visor = "down" | "mid" | "up";
+const GLOVE: Record<string, string> = { a: "Z", b: "Z", c: "n", d: "u", e: "v" };
+const BOOT: Record<string, string> = { D: "Z", E: "n", F: "u", G: "g" };
+const toCanvas = (p: Part): Canvas => p.grid.map((r) => [...r]);
+const remap = (p: Part, map: Record<string, string>): Part => ({ ...p, grid: p.grid.map((r) => [...r].map((c) => map[c] ?? c).join("")) });
+/** Thin traces (lines in `line`, their ends a node in `node`) on a canvas whose top-left is drawing (x0, y0), only over its drawn pixels. */
+function traces(cv: Canvas, x0: number, y0: number, paths: readonly (readonly Pt[])[], line = "g", node = "i"): void {
+  const on = (x: number, y: number) => {
+    const k = cv[y - y0]?.[x - x0];
+    return k !== undefined && k !== "." && k !== "k";
+  };
+  const put = (x: number, y: number, k: string) => on(x, y) && (cv[y - y0]![x - x0] = k);
+  for (const path of paths) {
+    for (let i = 1; i < path.length; i++) {
+      const [ax, ay] = path[i - 1]!;
+      const [bx, by] = path[i]!;
+      const n = Math.max(Math.abs(bx - ax), Math.abs(by - ay)) || 1;
+      for (let t = 0; t <= n; t++) put(Math.round(ax + ((bx - ax) * t) / n), Math.round(ay + ((by - ay) * t) / n), line);
+    }
+    const end = path[path.length - 1]!;
+    put(Math.round(end[0]), Math.round(end[1]), node);
+  }
+}
+/** The suit's torso: a blue panel down his chest narrowing to the waist, red at his sides and over his shoulders, a high blue
+ * collar; the circuit: a spine down the middle with branches out to his sides, a node at each end; the belt a dark band. */
+function suitTorso(): Part {
+  const X0 = 30;
+  const Y0 = 26;
+  const cv = toCanvas(torso());
+  const NECK: Record<string, string> = { a: "n", b: "u", c: "v", d: "v", e: "z", E: "n", D: "Z", O: "f", Y: "g", y: "i" };
+  cv.forEach((row, y) =>
+    row.forEach((k, x) => {
+      const X = x + X0;
+      const Y = y + Y0;
+      const i = SHIRT.indexOf(k);
+      if (i >= 0) {
+        const half = Y < 36 ? 4.5 : 8.6 - (Y - 36) * 0.07;
+        row[x] = Math.abs(X + 0.5 - 46) <= half ? SUIT_BLUE[i]! : SUIT_RED[i]!;
+      } else if (NECK[k]) row[x] = NECK[k]!;
+    }),
+  );
+  traces(cv, X0, Y0, [
+    [[46, 37], [46, 69]],
+    [[46, 42], [43, 45], [43, 51], [39, 55]],
+    [[46, 46], [49, 49], [49, 57], [53, 61]],
+    [[46, 58], [42, 62], [40, 62]],
+    [[46, 53], [50, 53], [52, 55]],
+    [[46, 64], [51, 66]],
+  ]);
+  stamp(cv, X0, Y0, [".g.", "gig", ".g."], 45, 36);
+  return { grid: toGrid(cv) };
+}
+/** The suit's legs: blue, a red stripe down the outside of each, a trace down the front to a node at the knee. */
+function suitLegs(stance: Stance): Part {
+  const { part, at } = legsOf(stance);
+  const cv = toCanvas(remap(part, { N: "n", M: "u", L: "v", l: "z" }));
+  const dy = STANCE_DROP[stance];
+  cv.forEach((row, y) => {
+    if (y + at[1] < 82 + dy) return;
+    const first = row.findIndex((k) => k !== "." && k !== "k");
+    let last = -1;
+    row.forEach((k, x) => k !== "." && k !== "k" && (last = x));
+    if (first < 0) return;
+    for (const x of [first, first + 1, last - 1, last]) if (row[x] && row[x] !== ".") row[x] = x <= first + 1 ? "S" : "R";
+  });
+  const legsPts = STANCE_LEGS[stance];
+  traces(
+    cv,
+    at[0],
+    at[1],
+    // (From below the hips to the knee, a little inside the middle of each leg.)
+    legsPts.map((leg, i) => leg.slice(0, 2).map(([x, y], j): Pt => [x + (i ? -1.4 : 1.4), y + (j ? 0 : 7)])),
+  );
+  return { grid: toGrid(cv) };
+}
+/** Facing his head part's own pixels (25 x 35): the helmet's shell (his long head's shape), the face opening, the visor. */
+const SHELL = (x: number, y: number) => inEllipse(12.5, 15.4, 12.3, 12.6)(x, y) || inPoly([[1.8, 16], [23.2, 16], [21, 28], [16, 34.8], [9, 34.8], [4, 28]])(x, y);
+const OPENING = inPoly([[6.6, 13.6], [18.4, 13.6], [20.8, 16.6], [20.6, 21], [19.2, 27.5], [15.4, 33.8], [9.6, 33.8], [5.8, 27.5], [4.4, 21], [4.2, 16.6]]);
+/** The visor's glass down over his face: dark blue, a soft sheen down its left, one long highlight, its lower rim lit. */
+function glass(x: number, y: number): string {
+  if (!OPENING(x, y + 1) || !OPENING(x - 1, y) || !OPENING(x + 1, y)) return "#";
+  const d = x - 7 + (y - 15) * 0.45;
+  if (d >= 0 && d < 1.2 && y < 24) return "@";
+  if (d >= 1.6 && d < 2.4 && y < 21) return "z";
+  return y < 17 ? "Z" : y > 29 || x < 7 ? "#" : "p";
+}
+/** His head in the helmet (`visor`: down over his face, on its way up, up in the dome): the face drawn as ever, inside. */
+function helmet(face: Face, dark: boolean, visor: Visor): Part {
+  const cv = toCanvas(head(face, 0, dark));
+  const light = roundLight(9, 8, 15, 18, 0.18);
+  for (let y = 0; y < cv.length; y++)
+    for (let x = 0; x < 25; x++) {
+      if (!SHELL(x, y)) {
+        cv[y]![x] = ".";
+        continue;
+      }
+      if (OPENING(x, y)) {
+        if ("HhjJ".includes(cv[y]![x]!)) cv[y]![x] = "n";
+        continue;
+      }
+      const crest = Math.abs(x + 0.5 - 12.5) <= 1.6 && y < 13;
+      const pod = inEllipse(1.8, 20.5, 2.4, 3)(x, y) || inEllipse(23.2, 20.5, 2.4, 3)(x, y);
+      cv[y]![x] = ramp(crest || pod ? SUIT_RED : SUIT_BLUE, light(x, y));
+    }
+  // The circuit up the sides of the dome from the pods, and the nodes in the pods.
+  traces(cv, 0, 0, [
+    [[3, 17], [3, 12], [5, 9], [8, 7]],
+    [[22, 17], [22, 12], [20, 9], [17, 7]],
+  ]);
+  stamp(cv, 0, 0, ["g", "i", "g"], 1, 19);
+  stamp(cv, 0, 0, ["g", "i", "g"], 23, 19);
+  if (visor === "down") {
+    for (let y = 0; y < cv.length; y++) for (let x = 0; x < 25; x++) if (OPENING(x, y)) cv[y]![x] = glass(x, y);
+  } else {
+    // On its way up: the glass tilted back, its lower half gone over the brow; or up, a band of it across the dome.
+    const [top, bottom] = visor === "mid" ? [8, 20] : [4, 10];
+    for (let y = top; y <= bottom; y++)
+      for (let x = 0; x < 25; x++) {
+        if (!SHELL(x, y) || Math.abs(x + 0.5 - 12.5) > 9.6 - (y < top + 2 ? (top + 2 - y) * 1.4 : 0)) continue;
+        cv[y]![x] = y === bottom ? "#" : y === top ? "u" : x - 5 + (y - top) * 0.6 > 0 && x - 5 + (y - top) * 0.6 < 1.2 ? "@" : y < top + 2 ? "Z" : "p";
+      }
+  }
+  return { grid: toGrid(cv) };
+}
+/** A part's suit version (null: not worn with it, the tie), made the first time it's asked for. */
+export function suitName(name: string, visor: Visor = "down"): string | null {
+  if (name.startsWith("tie:")) return null;
+  if (name.startsWith("head:")) {
+    const [, f, , dark] = name.split(":");
+    const [eyes, brows, mouth] = f!.split(".") as [Eyes, Brows, Mouth];
+    return add(`helmet:${visor}:${f}${dark ? ":dark" : ""}`, () => helmet({ eyes, brows, mouth }, !!dark, visor));
+  }
+  if (name.startsWith("arm")) {
+    const [kind, pts] = name.split(":");
+    const q = pts!.split(";").map((p) => p.split(",").map(Number) as unknown as Pt) as [Pt, Pt, Pt];
+    return add(`suit:${name}`, () => paintArm(q[0], q[1], q[2], kind!.includes("fore"), kind!.includes("full"), true));
+  }
+  if (name === "torso") return add("suit:torso", suitTorso);
+  if (name.startsWith("legs:")) return add(`suit:${name}`, () => suitLegs(name.slice(5) as Stance));
+  if (name === "shoe" || name === "heels") return add(`suit:${name}`, () => remap(PARTS[name]!, BOOT));
+  if (name.startsWith("fist:") || name.startsWith("hand:") || name === "clutch") return add(`suit:${name}`, () => remap(PARTS[name]!, GLOVE));
+  return name;
+}
+/** A frame of him in the suit (the visor as given). */
+export const suitFrame = (f: Frame, visor: Visor = "down"): Frame => ({ ...f, layers: f.layers.flatMap((l) => {
+  const n = suitName(l.part, visor);
+  return n ? [{ ...l, part: n }] : [];
+}) });
 
 // ---- Poses.
 

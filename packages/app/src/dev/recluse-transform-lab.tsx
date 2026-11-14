@@ -3,15 +3,13 @@ import { createPortal } from "preact/compat";
 import { useLayoutEffect, useRef, useState } from "preact/hooks";
 import { RECLUSE_CUTSCENE as CS, RECLUSE_PHASE2, bannerPlusMs, BOSS_BANNER } from "@chessroyale/core";
 import { chess960Fen } from "@chessroyale/chess";
-import { RECLUSE, RECLUSE_JUMP, recluseLayers, headOf, type ReclusePose } from "../characters/recluse.ts";
+import { RECLUSE, RECLUSE_JUMP, recluseLayers, headOf, suitFrame, type ReclusePose, type Visor } from "../characters/recluse.ts";
 import { CUTSCENE_SPOTS, RECLUSE_CUTSCENE } from "../characters/recluse-ages.ts";
 import { RECLUSE_CUTSCENE_LINES, RECLUSE_LINES } from "../characters/recluse-lines.ts";
 import type { Character, Frame, Layer } from "../characters/sprite.ts";
 import { EFFECTS } from "../characters/power-art.ts";
 import { Board } from "../components/Board.tsx";
 import { SpriteAnim } from "../components/BossEffect.tsx";
-import { placeEngine } from "../components/Recluse.tsx";
-import { VisorOverlay } from "../components/RecluseVisor.tsx";
 import { FightBanner } from "../components/FightBanner.tsx";
 import { useFrameNow } from "../components/Countdown.tsx";
 import { recluseCutsceneTimeline } from "../components/RecluseCutscene.tsx";
@@ -22,7 +20,7 @@ import { CRITICAL, SpeechBox, bossVoice } from "../speech.tsx";
 import { kingVoice } from "../godKing.ts";
 
 /**
- * Dev only (a MOCKUP for Eric, round 2, Nov 14): the Hidden Boss's transformation redone. Nothing in the app imports this:
+ * Dev only (a MOCKUP for Eric, round 3, Nov 14): the Hidden Boss's transformation redone. Nothing in the app imports this:
  * `scripts/preview-recluse-transform.mjs` loads it into a real boss battle mid-game through the Vite dev server.
  *
  * From the cutscene's last line: the book lying flat on the board before him opens and light radiates out of it (the
@@ -30,11 +28,11 @@ import { kingVoice } from "../godKing.ts";
  * head goes back and his eyes go totally white. A shaft of it lifts him off his knees, his arms hanging relaxed at his sides
  * the whole time, his hair pushed back by it; and it keeps pouring out, more and more, until it engulfs him, shoots up off
  * the board and off the screen, radiates in every direction and whites out the whole screen. Unseen in the white, he
- * changes (and the child and the lens are gone). The light dies back down into the center and shows him: phase 2's look and
- * a robotic visor across his eyes, code flowing down its glass (RecluseVisor.tsx). Then his line about computation and
- * creativity; he leaps on the music's breath and lands on its drop: the board cracks under him and splits as today (the
- * arcs from his hands, the four boards, the book back in his hands, his leap home, "PHASE 2"), the big board gone from the
- * crack's first frame. His second line after the landing. No God King.
+ * changes (and the child and the lens are gone). The light dies back down into the center and shows him in a fitted suit
+ * and full helmet (recluse.ts, `suitFrame`), the visor down; it flips up for his line about computation and creativity and
+ * back down. He leaps on the music's breath and lands on its drop: the board cracks under him and splits as today (the arcs
+ * from his hands, the four boards, the book back in his hands, his leap home, "PHASE 2"), the big board gone from the crack's
+ * first frame. His second line after the landing. No God King.
  */
 
 // ---- The timeline (ms from T0: the book starts to open, the transformation theme's intro starts).
@@ -52,8 +50,11 @@ export const TB = (() => {
   const whiteAt = 7300; // the screen whites out (to full at whiteFull)
   const whiteFull = 8000; // unseen: he changes, the child and the lens are gone
   const downAt = 8700; // the light dies back down into the center
-  const revealAt = 10_000; // him, with the visor
-  const line1At = revealAt + 250;
+  const revealAt = 10_000; // him, in the suit and helmet, the visor down
+  const flipUpAt = revealAt + 300; // the visor flips up: his face
+  const line1At = flipUpAt + 300;
+  const flipDownAt = 15_750; // and back down over it, his line said
+
   const crouchAt = MARK.breath - 200;
   const upAt = MARK.breath; // off the ground as the music falls silent
   const crackAt = MARK.drop; // down on the drop: the crack (the big board gone from here)
@@ -70,7 +71,7 @@ export const TB = (() => {
   const homeAt = C.homeAt + d;
   const bannerAt = C.bannerAt + d;
   const bannerMs = BOSS_BANNER.phase2Ms + bannerPlusMs();
-  return { openAt, openMs, burstAt, riseAt, riseMs, beamAt, upShootAt, radiateAt, whiteAt, whiteFull, downAt, revealAt, line1At, crouchAt, upAt, crackAt, line2At, d, partAt, growAt, growMs, pickupAt, shuffleAt, backAt, homeAt, bannerAt, bannerMs, endAt: bannerAt + bannerMs };
+  return { openAt, openMs, burstAt, riseAt, riseMs, beamAt, upShootAt, radiateAt, whiteAt, whiteFull, downAt, revealAt, flipUpAt, line1At, flipDownAt, crouchAt, upAt, crackAt, line2At, d, partAt, growAt, growMs, pickupAt, shuffleAt, backAt, homeAt, bannerAt, bannerMs, endAt: bannerAt + bannerMs };
 })();
 
 // ---- The figures: the man in his own drawing (RECLUSE's size, so his look and the board's leap work as today), the child in
@@ -97,6 +98,11 @@ const onGround = (book: "flat" | "half" | "read", at: readonly [number, number] 
 const kneelP = (eyes: string, extra: Partial<ReclusePose> = {}): ReclusePose => ({ stance: "kneel", dip: 4, face: { eyes, brows: "up", mouth: "tight" }, ...extra }) as ReclusePose;
 const TAKEN = { eyes: "possessed", brows: "up", mouth: "tight" } as const;
 const wind3 = (i: number) => ((i % 3) + 1) as 1 | 2 | 3;
+
+/** Phase 2 standing in the suit: his stance, arms at his sides; `extra` over it. (The suit hides his hair: no wind.) */
+const P2 = (i: number, extra: Partial<ReclusePose> = {}): ReclusePose => ({ phase: 2, stance: "wide", tie: i % 2 ? 1 : 0, face: { eyes: "hard", brows: "stern", mouth: "stern" }, hold: onGround("read", OPEN_AT, SIDE_ARMS), ...extra }) as ReclusePose;
+/** A frame in the suit, its visor as given; the book left on the board (drawn apart). */
+const S = (f: Frame, visor: Visor = "down") => suitFrame(noBook(f), visor);
 
 const MAN: Character = {
   ...RECLUSE,
@@ -131,23 +137,30 @@ const MAN: Character = {
     },
     // In the beam: hovering, head back, eyes white, arms at his sides drifting a little out, hair streaming back.
     beam: { loop: true, frames: Array.from({ length: 6 }, (_, i) => noBook(fr(110, { stance: "stand", air: true, wind: wind3(i), headDy: -1, breath: i % 3 === 1 ? 1 : 0, tie: i % 2 ? 1 : -1, face: { ...TAKEN, mouth: i % 6 < 3 ? "tight" : "grit" }, hold: onGround("read", OPEN_AT, i % 6 < 3 ? SIDE_ARMS : SIDE_ARMS_OUT) } as ReclusePose, i))) },
-    // Revealed: phase 2's look (the visor over his eyes: RecluseVisor.tsx), standing, arms at his sides, hair streaming.
-    revealed: { loop: true, frames: Array.from({ length: 6 }, (_, i) => noBook(fr(120, { phase: 2, stance: "wide", wind: wind3(i), breath: i >= 3 ? 1 : 0, face: { eyes: "hard", brows: "stern", mouth: "stern" }, hold: onGround("read", OPEN_AT, SIDE_ARMS) } as ReclusePose))) },
+    // Revealed: in the suit and helmet, the visor down (recluse.ts, `suitFrame`), standing, arms at his sides.
+    revealed: { loop: true, frames: Array.from({ length: 6 }, (_, i) => S(fr(120, P2(i, { breath: i >= 3 ? 1 : 0 })))) },
+    // The visor flips up into the dome (a frame on its way), his face for his line; then back down.
+    flipUp: { loop: false, frames: [S(fr(90, P2(0)), "mid"), S(fr(90, P2(1)), "up")] },
+    faceOpen: { loop: true, frames: Array.from({ length: 6 }, (_, i) => S(fr(130, P2(i, { breath: i >= 3 ? 1 : 0, face: { eyes: i === 4 ? "narrow" : "hard", brows: "stern", mouth: "stern" } })), "up")) },
+    flipDown: { loop: false, frames: [S(fr(90, P2(0)), "mid"), S(fr(90, P2(1)), "down")] },
     // The jump: crouched over the book, then up, and down on the drop; his arms stay at his sides.
-    crouch: { loop: false, frames: [noBook(fr(200, { phase: 2, wind: 2, stance: "bend", dip: 1, face: { eyes: "hard", brows: "stern", mouth: "stern" }, hold: onGround("read", OPEN_AT, SIDE_ARMS_OUT) } as ReclusePose))] },
-    air: { loop: true, frames: [1, 2, 3].map((w) => noBook(fr(120, { phase: 2, wind: w, air: true, stance: "bend", tie: 1, headDy: -1, face: { eyes: "hard", brows: "stern", mouth: "stern" }, hold: onGround("read", OPEN_AT, SIDE_ARMS) } as ReclusePose))) },
+    crouch: { loop: false, frames: [S(fr(200, P2(1, { stance: "bend", dip: 1, hold: onGround("read", OPEN_AT, SIDE_ARMS_OUT) })))] },
+    air: { loop: true, frames: [0, 1, 2].map((w) => S(fr(120, P2(w, { air: true, stance: "bend", tie: 1, headDy: -1 })))) },
     land: {
       loop: false,
       frames: [
-        { ...noBook(fr(90, { phase: 2, wind: 1, stance: "low", dip: 1, face: { eyes: "hard", brows: "stern", mouth: "shout" }, hold: onGround("read", OPEN_AT, SIDE_ARMS_OUT) } as ReclusePose, 0)), specks: A.leap!.frames[3]!.specks, shake: [0, 1] },
-        noBook(fr(110, { phase: 2, wind: 2, stance: "bend", face: { eyes: "hard", brows: "stern", mouth: "shout" }, hold: onGround("read", OPEN_AT, SIDE_ARMS_OUT) } as ReclusePose, 1)),
+        { ...S(fr(90, P2(0, { stance: "low", dip: 1, hold: onGround("read", OPEN_AT, SIDE_ARMS_OUT) }), 0)), specks: A.leap!.frames[3]!.specks, shake: [0, 1] },
+        S(fr(110, P2(1, { stance: "bend", hold: onGround("read", OPEN_AT, SIDE_ARMS_OUT) }), 1)),
       ],
     },
     // Landed, the arcs striking out from his hands at his sides.
-    landed: { loop: true, frames: Array.from({ length: 6 }, (_, i) => noBook(fr(110, { phase: 2, stance: "wide", wind: wind3(i), face: { eyes: "hard", brows: "stern", mouth: i % 3 === 0 ? "grit" : "stern" }, hold: onGround("read", OPEN_AT, SIDE_ARMS_OUT) } as ReclusePose, i))) },
-    pickup: A.pickup!,
-    leap2: A.leap2!,
-    idle2: A.idle2!,
+    landed: { loop: true, frames: Array.from({ length: 6 }, (_, i) => S(fr(110, P2(i, { hold: onGround("read", OPEN_AT, SIDE_ARMS_OUT) }), i))) },
+    // (The rest of today's sequence, in the suit.)
+    pickup: { ...A.pickup!, frames: A.pickup!.frames.map((f) => suitFrame(f)) },
+    leap2: { ...A.leap2!, frames: A.leap2!.frames.map((f) => suitFrame(f)) },
+    idle2: { ...A.idle2!, frames: A.idle2!.frames.map((f) => suitFrame(f)) },
+    // (The close-up's: the visor down, up and down again, over and over.)
+    flipCycle: { loop: true, frames: [S(fr(900, P2(0))), S(fr(90, P2(1)), "mid"), S(fr(1100, P2(2)), "up"), S(fr(90, P2(0)), "mid")] },
   },
 };
 const BOOK: Character = { ...RECLUSE, id: "recluse-transform-book", anims: { glow: { loop: true, frames: chantF().map(bookOnly) } } };
@@ -194,7 +207,9 @@ function manAt(t: number, pre: { kidTalking: boolean; standAt: number }, desk: b
   if (t < T.beamAt) return { anim: "rise", since: T.riseAt, feet };
   // (Hovering in the beam, a little higher as the light grows; set down unseen in the white.)
   if (t < T.whiteFull) return { anim: "beam", since: T.beamAt, feet: { x: feet.x, y: feet.y - 0.03 * ease((t - T.beamAt) / (T.whiteFull - T.beamAt)) } };
-  if (t < T.crouchAt) return { anim: "revealed", since: T.whiteFull, feet };
+  if (t < T.flipUpAt) return { anim: "revealed", since: T.whiteFull, feet };
+  if (t < T.flipDownAt) return { anim: "flipUp", then: "faceOpen", since: T.flipUpAt, feet };
+  if (t < T.crouchAt) return { anim: "flipDown", then: "revealed", since: T.flipDownAt, feet };
   if (t < T.upAt) return { anim: "crouch", since: T.crouchAt, feet };
   if (t < T.crackAt) {
     const u = (t - T.upAt) / (T.crackAt - T.upAt);
@@ -482,7 +497,6 @@ function Transform({ at, board, fen, pre }: { at: number; board: HTMLElement; fe
   const desk = innerWidth >= 900;
   const back = useRef<HTMLCanvasElement>(null);
   const front = useRef<HTMLCanvasElement>(null);
-  const eng = useRef<HTMLSpanElement>(null);
   const headAt = useRef<readonly [number, number] | null>(null);
   const [fens] = useState(() => [0, 1, 2, 3].map((i) => chess960Fen([212, 77, 518 - 9, 333][i]!)));
   const lines = RECLUSE_CUTSCENE_LINES;
@@ -526,7 +540,7 @@ function Transform({ at, board, fen, pre }: { at: number; board: HTMLElement; fe
   const typeMs = CS.typeMs;
   const l1Typed = l1.say.reduce((s, x) => s + x.length * typeMs, 0) + CS.sentencePauseMs;
   const l1Text = l1.say.join(" ");
-  const l1Until = Math.min(T.crouchAt, T.line1At + l1Typed + Math.min(CS.maxReadMs, CS.readMs + CS.perCharMs * l1Text.length) + CS.boxFadeMs);
+  const l1Until = Math.min(T.flipDownAt - 50, T.line1At + l1Typed + Math.min(CS.maxReadMs, CS.readMs + CS.perCharMs * l1Text.length) + CS.boxFadeMs);
   const said = useRef(false);
   useLayoutEffect(() => {
     if (t >= T.line2At && !said.current) {
@@ -587,12 +601,8 @@ function Transform({ at, board, fen, pre }: { at: number; board: HTMLElement; fe
               id="lab-man"
               onFrame={(f) => {
                 headAt.current = headOf(f);
-                placeEngine(eng.current, f);
               }}
             />
-            <span style={{ position: "absolute", inset: 0 }}>
-              <VisorOverlay ch={MAN} elRef={eng} on={t >= T.whiteFull} fresh={t >= T.whiteFull && t < T.revealAt + 900} />
-            </span>
           </span>
         )}
         {lastShown && (
@@ -642,28 +652,23 @@ export function playTransform(): { at: number; t0: number; tb: typeof TB } {
   return { at, t0: preMs, tb: TB };
 }
 
-/** The visor up close: his revealed figure, big, on a dark backdrop (the close-up still and its flowing code). */
-export function showCloseup(): void {
+/** The suit up close: his head and shoulders (`whole`: all of him), big, on a dark backdrop, the visor flipping up and down. */
+export function showCloseup(whole = false): void {
   const style = document.createElement("style");
   style.textContent = LAB_STYLE;
   document.head.appendChild(style);
   const host = document.createElement("div");
   document.body.appendChild(host);
   const at = Date.now();
-  function Closeup() {
-    const eng = useRef<HTMLSpanElement>(null);
-    // (His head and shoulders filling the screen: the figure scaled so his head is about 60% of the width.)
-    const w = Math.min(innerWidth, innerHeight) * 1.5;
-    return (
-      <div class="lab-closeup" style={{ position: "fixed", inset: 0, zIndex: 50, background: "radial-gradient(circle at 50% 35%, #2a2440, #0c0a14 70%)", overflow: "hidden" }}>
-        <span style={{ position: "absolute", left: `${innerWidth / 2 - w * (RECLUSE.foot[0] / RECLUSE.w)}px`, top: `${innerHeight * 0.1 - w * (10 / RECLUSE.w)}px`, width: `${w}px`, aspectRatio: `${RECLUSE.w} / ${RECLUSE.h}` }}>
-          <SpriteAnim ch={MAN} anim="revealed" since={at} id="lab-close" onFrame={(f) => placeEngine(eng.current, f)} />
-          <span style={{ position: "absolute", inset: 0 }}>
-            <VisorOverlay ch={MAN} elRef={eng} on />
-          </span>
-        </span>
-      </div>
-    );
-  }
-  render(<Closeup />, host);
+  // (Whole: his figure 90% of the height; else his head about 37% of the width.)
+  const w = whole ? (innerHeight * 0.9 * RECLUSE.w) / RECLUSE.h : Math.min(innerWidth, innerHeight) * 1.5;
+  const top = whole ? innerHeight * 0.05 : innerHeight * 0.1 - w * (10 / RECLUSE.w);
+  render(
+    <div class="lab-closeup" style={{ position: "fixed", inset: 0, zIndex: 50, background: "radial-gradient(circle at 50% 35%, #3a3450, #14111e 70%)", overflow: "hidden" }}>
+      <span style={{ position: "absolute", left: `${innerWidth / 2 - w * (RECLUSE.foot[0] / RECLUSE.w)}px`, top: `${top}px`, width: `${w}px`, aspectRatio: `${RECLUSE.w} / ${RECLUSE.h}` }}>
+        <SpriteAnim ch={MAN} anim="flipCycle" since={at} id="lab-close" />
+      </span>
+    </div>,
+    host,
+  );
 }

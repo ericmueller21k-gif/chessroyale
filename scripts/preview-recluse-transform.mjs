@@ -1,4 +1,4 @@
-// The Hidden Boss's transformation redone (a MOCKUP, round 2, Nov 14: the book's light, no God King) over his real fight mid-game, on a
+// The Hidden Boss's transformation redone (a MOCKUP, round 3, Nov 14: the book's light, no God King) over his real fight mid-game, on a
 // phone (390 x 844) and a computer (1440 x 900): from the cutscene's last line to "PHASE 2", a GIF and an MP4 per platform (each
 // frame drawn on a paused clock, 40 ms apart) and stills of each beat.
 //   node scripts/preview-recluse-transform.mjs <outDir> [phone|computer|closeup|both]
@@ -126,7 +126,7 @@ async function run(name, use) {
   console.log(name, "wrote", mp4, gif);
 }
 
-/** The visor up close: 2.4 s of his revealed figure, big, its code flowing (a GIF and two stills). */
+/** The suit up close: his head with the visor flipping up and down (a GIF, stills down, on its way and up), and all of him. */
 async function closeup() {
   const frames = join(outDir, ".frames-closeup");
   rmSync(frames, { recursive: true, force: true });
@@ -141,16 +141,32 @@ async function closeup() {
   await p.waitForTimeout(3000);
   await p.clock.pauseAt(await p.evaluate(() => Date.now() + 200));
   await p.evaluate(async () => (await import("/src/dev/recluse-transform-lab.tsx")).showCloseup());
-  for (let i = 0; i <= 60; i++) {
+  const STILL = { 10: "suit-closeup-visor-down", 23: "suit-closeup-visor-flipping", 40: "suit-closeup-visor-up" };
+  for (let i = 0; i <= 55; i++) {
     if (i) await p.clock.runFor(FRAME_MS);
     await p.evaluate(() => new Promise((r) => queueMicrotask(r)));
     await p.screenshot({ path: join(frames, `${String(i).padStart(5, "0")}.png`) });
-    if (i === 10 || i === 40) await p.screenshot({ path: join(outDir, `visor-closeup-${i === 10 ? "a" : "b"}.png`) });
+    if (STILL[i]) await p.screenshot({ path: join(outDir, `${STILL[i]}.png`) });
   }
   await context.close();
-  execFileSync("ffmpeg", ["-y", "-loglevel", "error", "-framerate", String(1000 / FRAME_MS), "-i", join(frames, "%05d.png"), "-vf", "scale=480:-1:flags=neighbor,split[a][b];[a]palettegen=max_colors=128[p];[b][p]paletteuse=dither=none", join(outDir, "visor-closeup.gif")]);
+  execFileSync("ffmpeg", ["-y", "-loglevel", "error", "-framerate", String(1000 / FRAME_MS), "-i", join(frames, "%05d.png"), "-vf", "scale=480:-1:flags=neighbor,split[a][b];[a]palettegen=max_colors=128[p];[b][p]paletteuse=dither=none", join(outDir, "suit-closeup-visor-flip.gif")]);
   rmSync(frames, { recursive: true, force: true });
-  console.log("closeup wrote", join(outDir, "visor-closeup.gif"));
+  // All of him: the visor down, then up.
+  const c2 = await browser.newContext({ viewport: { width: 520, height: 900 }, deviceScaleFactor: 1 });
+  const q = await c2.newPage();
+  await q.clock.install();
+  await fakeApi(q);
+  await q.addInitScript(() => localStorage.setItem("hunchess.tutorial.dismissed", "1"));
+  await q.goto(url);
+  await q.waitForTimeout(3000);
+  await q.clock.pauseAt(await q.evaluate(() => Date.now() + 200));
+  await q.evaluate(async () => (await import("/src/dev/recluse-transform-lab.tsx")).showCloseup(true));
+  await q.clock.runFor(400);
+  await q.screenshot({ path: join(outDir, "suit-whole-visor-down.png") });
+  await q.clock.runFor(1200);
+  await q.screenshot({ path: join(outDir, "suit-whole-visor-up.png") });
+  await c2.close();
+  console.log("closeup wrote", outDir);
 }
 
 try {
