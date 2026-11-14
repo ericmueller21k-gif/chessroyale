@@ -3692,14 +3692,17 @@ export class Renderer {
    */
   tapPoint(kind: "boss" | "home" | "statue" | "table" | "person", i: number, out: { x: number; y: number }): boolean {
     if (kind === "person") {
-      // Its body's middle, or higher or lower on it if something nearer stands in front.
+      // Its body's middle, or higher or lower on it if something nearer stands in front; then off the middle, either side (Nov 14,
+      // round 6: Glim called beside you stood half behind your pawn on a computer, its middle covered top to bottom, and read as not
+      // drawn though its other half took taps).
       const it = this.personItem(i);
       if (!it?.on || it.faded) return false;
-      for (const v of [0.6, 0.45, 0.75, 0.3]) {
-        out.x = (it.x0 + it.x1) / 2;
-        out.y = it.y0 + v * (it.y1 - it.y0);
-        if (this.clearAt(out.x, out.y, (h) => h?.kind === "person" && h.person === this.town.people[i])) return true;
-      }
+      for (const u of [0.5, 0.38, 0.62, 0.26, 0.74])
+        for (const v of [0.6, 0.45, 0.75, 0.3]) {
+          out.x = it.x0 + u * (it.x1 - it.x0);
+          out.y = it.y0 + v * (it.y1 - it.y0);
+          if (this.clearAt(out.x, out.y, (h) => h?.kind === "person" && h.person === this.town.people[i])) return true;
+        }
       return false;
     }
     if (kind === "table") {

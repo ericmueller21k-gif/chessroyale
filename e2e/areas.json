@@ -44,6 +44,7 @@
     "tsconfig.base.json",
     "packages/*/tsconfig.json",
     "playwright.config.ts",
+    "e2e/dev-proxy-retry.mjs",
     "wrangler.jsonc",
     "e2e/helpers.ts",
     "packages/core/src/**",
