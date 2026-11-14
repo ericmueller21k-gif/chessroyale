@@ -4,24 +4,20 @@ import { RECLUSE_CUTSCENE_LINES } from "../src/characters/recluse-lines.ts";
 import { CUTSCENE_SPOTS, RECLUSE_CUTSCENE } from "../src/characters/recluse-ages.ts";
 import { renderFrame } from "../src/characters/sprite.ts";
 import { boxAt, cutBox, cutReadMs, cutTyped, cutsceneTimeline, fitCutscene } from "../src/recluse-cutscene.ts";
-import { RECLUSE } from "../src/characters/recluse.ts";
-import { PHASE_CHANGE, absorbPaced } from "../src/recluse-phase2.ts";
-import { RECLUSE_LINES } from "../src/characters/recluse-lines.ts";
-import { pacedPage } from "../src/paced-line.ts";
 
 // The Hidden Boss's cutscene (Nov 12; in his fight since Nov 13): Eric's 17 lines, typed a sentence at a time, each box up long
 // enough to read.
 describe("the Hidden Boss's cutscene", () => {
   const ms = (a: string) => RECLUSE_CUTSCENE.anims[a]!.frames.reduce((s, f) => s + f.ms, 0);
-  const arrival = { poofMs: ms("poof"), dropMs: ms("drop"), landMs: ms("land"), fadeMs: ms("fade") };
+  const arrival = { poofMs: ms("poof"), dropMs: ms("drop"), landMs: ms("land") };
   const tl = cutsceneTimeline(RECLUSE_CUTSCENE_LINES, arrival);
 
   it("lasts exactly its hold (RECLUSE_CUTSCENE.holdMs: the server's online, solo's after his fall): change the two together", () => {
     expect(tl.endAt).toBe(C.holdMs);
-    // (Its parts, from the settings: the light, the arrival from his frames, the lines, the child's fade, the man alone, the light lifting.)
+    // (Its parts, from the settings: the light, the arrival from his frames, the lines, then the moment before his transformation
+    // carries on from it, Nov 14.)
     const lines = tl.boxes.reduce((n, b, i) => n + (b.until - b.at) + (i ? C.gapMs : 0), 0);
-    expect(tl.endAt).toBe(C.dimMs + C.poofAfterMs + arrival.poofMs + arrival.dropMs + arrival.landMs + C.firstLineAfterMs + lines + C.kidFadeAfterMs + arrival.fadeMs + C.endHoldMs + C.outMs);
-    expect(tl.outAt).toBe(tl.endAt - C.outMs);
+    expect(tl.endAt).toBe(C.dimMs + C.poofAfterMs + arrival.poofMs + arrival.dropMs + arrival.landMs + C.firstLineAfterMs + lines + C.endAfterMs);
     // (Each line's box: its sentences typed at typeMs a character, the pause between, then read and faded.)
     tl.boxes.forEach((b, i) => {
       const say = RECLUSE_CUTSCENE_LINES[i]!.say;
@@ -83,15 +79,15 @@ describe("the Hidden Boss's cutscene", () => {
     });
   });
 
-  it("dims, then the child poofs, drops, lands and straightens before the first line, and fades after the last", () => {
+  it("dims, then the child poofs, drops, lands and straightens before the first line; his transformation carries on 0.4 s after the last (Nov 14: the child stays)", () => {
     expect(tl.litAt).toBe(C.dimMs);
     expect(tl.poofAt).toBeGreaterThan(tl.litAt);
     expect(tl.dropAt - tl.poofAt).toBe(ms("poof"));
     expect(tl.landAt - tl.dropAt).toBe(ms("drop"));
     expect(tl.standAt - tl.landAt).toBe(ms("land"));
     expect(tl.boxes[0]!.at).toBe(tl.standAt + C.firstLineAfterMs);
-    expect(tl.fadeAt).toBe(tl.boxes.at(-1)!.until + C.kidFadeAfterMs);
-    expect(tl.endAt).toBeGreaterThan(tl.fadeAt + ms("fade"));
+    expect(tl.endAt).toBe(tl.boxes.at(-1)!.until + C.endAfterMs);
+    expect(C.endAfterMs).toBe(400);
   });
 
   it("has the cues its one-shots play on", () => {
@@ -118,27 +114,3 @@ describe("the Hidden Boss's cutscene", () => {
   });
 });
 
-// His word as the power lands, paged as his chant's lines are (Nov 13: cut off on a phone's bar).
-describe("his absorb line, paged", () => {
-  it("types a sentence a page, the chant's pause between, and is gone by his chant's first line", () => {
-    const P = PHASE_CHANGE;
-    for (const text of RECLUSE_LINES.absorb) {
-      const line = absorbPaced(text);
-      expect(line.text).toBe(text);
-      expect(line.sentences.length).toBe(2);
-      expect(pacedPage(line, 0).text).toBe(line.sentences[0]);
-      expect(pacedPage(line, line.starts[1]!).text).toBe(line.sentences[1]);
-      expect(line.starts[1]! - line.sentences[0]!.length * line.typeMs).toBeGreaterThanOrEqual(900);
-      expect(P.absorbLineAt + line.holdMs).toBeLessThanOrEqual(P.absorbGoneAt);
-      // (Readable a good while once typed.)
-      expect(line.holdMs - line.typedMs).toBeGreaterThanOrEqual(2500);
-    }
-  });
-});
-
-// His place after the scene: on his knees, quiet (no mumbling), until he seizes the God King's power.
-it("his kneel: a loop on his knees, his mouth still", () => {
-  const k = RECLUSE.anims.kneel!;
-  expect(k.loop).toBe(true);
-  expect(k.frames.length).toBeGreaterThan(8);
-});

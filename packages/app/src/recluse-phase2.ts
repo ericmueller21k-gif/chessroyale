@@ -64,8 +64,9 @@ export const PHASE_CHANGE = lazyTable(() => {
   const partAt = crackAt + 750;
   const growAt = partAt + 400;
   const growMs = 900;
-  // (The arcs from the landing until the boards settle.)
-  const arcAt = crackAt;
+  // (The arcs from the landing until the boards settle; their crackle starts a moment before, so its two snaps fall on the big
+  // ones: recluse-sounds.ts, `arc`.)
+  const arcAt = crackAt - 200;
   const arcEnd = growAt + growMs - 100;
   const pickupAt = growAt + growMs + 100;
   const catchAt = pickupAt + (cueAt(a.pickup!, "catch") ?? 0);
@@ -145,7 +146,8 @@ export const ARC_STRIKES: readonly ArcStrike[] = lazyTable(() => {
     if (r < 0.55) return [50, 72 + rnd() * 24];
     return [50 + side * (12 + rnd() * 38), 50];
   };
-  for (let t = C.arcAt, i = 0; t < C.arcEnd - ARC_LIFE / 2; t += 85 + rnd() * 60, i++) {
+  // (The small ones from his landing on: his hands are at his sides from then.)
+  for (let t = C.crackAt + 60, i = 0; t < C.arcEnd - ARC_LIFE / 2; t += 85 + rnd() * 60, i++) {
     const hand = (i % 2) as 0 | 1;
     out.push({ at: Math.round(t), hand, to: target(hand), seed: 1 + Math.floor(rnd() * 1e6), big: false });
   }

@@ -2016,7 +2016,7 @@ export const RECLUSE_CUTSCENE = {
    * starts (`recluseCutscene`), then his phase change starts for everyone at once. The scene's whole length (the app's
    * `recluseCutsceneTimeline().endAt`: a unit test keeps the two equal; change it with the lines or the times above).
    */
-  holdMs: 111_120,
+  holdMs: 107_480,
 } as const;
 
 /**
@@ -2051,7 +2051,7 @@ export const RECLUSE_CUTSCENE = {
  * (four boards, about 40 moves each); each searches about a third of one re-check's nodes.
  */
 export const RECLUSE_ONLINE = {
-  changeMs: 34_300,
+  changeMs: 23_400,
   groupNodes: 120_000,
   botLoss: 0.06,
   askMs: 6000,
