@@ -189,7 +189,9 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
   animation's tallest frame over his feet, measured from the art by `recluse-child.test.ts`) sets `--bc-head` as his animation changes
   (`.bc-heads` in styles.css); a step up counts the age he grows into from its first frame, so a line said as he grows is already above
   the new size. A phone's words are in his bar, as every boss's. Beaten: nobody placed
-  (finishBossBattle), his line, he grows up into the man (`growUpAt`, `fallMs`), then the runner's `nextBossForm`: a new match
+  (finishBossBattle), the kid's line, he grows up into the man (`growUpAt`, `fallMs`, 7.5 s since Nov 14), and the man answers as he's
+  grown (Eric, Nov 14: "there was no conversation"; `RECLUSE_GROWUP_EXCHANGES`, five pairs, one a fight by `growUpExchange`: the
+  battle's start and its seeded level offset, the same on every device; the kid's half is his `defeat` line, the kit's `lineOf`), then the runner's `nextBossForm`: a new match
   against his adult form (solo `nextForm`: his entrance again). **Online** (his room's fight, the Crowd's final): the lobby's fall path
   (his rules' `fallMs`), then `nextRound` calls `nextBossForm` and plays the adult form's intro; each move request carries the child's
   rating (`childRatingNow`) and strength (`bossEloNow`) to the host and its checker alike; `NetMatch` resets his beats, words, banners

@@ -1949,9 +1949,13 @@ export const RECLUSE_CHILD = {
   stepRating: 100,
   everyPlies: 4,
   ages: [1800, 2000, 2200, 2500],
-  /** Beaten: his line first, then he grows up into the man at `growUpAt` ms into his fall (about 2.3 s), the fall `fallMs` in all. */
+  /**
+   * Beaten: his line first, then he grows up into the man at `growUpAt` ms into his fall (about 2.3 s), the fall `fallMs` in all.
+   * 7.5 s since Nov 14 (was 4.2 s): the man answers the kid once he's grown, about 3.5 s in (Eric: "there was no conversation"),
+   * and his longest answer types out by about 5.2 s and stays readable 2.3 s before the man's match starts (a test checks).
+   */
   growUpAt: 1200,
-  fallMs: 4200,
+  fallMs: 7500,
 } as const;
 
 /**

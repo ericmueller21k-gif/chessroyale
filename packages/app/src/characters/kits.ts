@@ -43,6 +43,7 @@ import type { Stance } from "./stance.ts";
 import { mooPowered } from "./moo-state.ts";
 import { RECLUSE_CHILD_LINES, RECLUSE_LINES } from "./recluse-lines.ts";
 import { GROWING_HEADS, RECLUSE_GROWING, RECLUSE_GROWING_BUST } from "./recluse-ages.ts";
+import { growUpExchange } from "../components/RecluseChild.ts";
 import type { BossView } from "../game.ts";
 import { mapFrames, type Character } from "./sprite.ts";
 import { ankusItem, balloonItem, bonkItem, chipItem, clawItem, darkItem, flourItem, inkItem, carrotItem, frostItem, lashItem, lassoItem, moonItem, paintItem, pieItem, popItem, sawItem, waterItem, type SquareItem } from "./power-art.ts";
@@ -1110,6 +1111,8 @@ export const RECLUSE_CHILD_KIT: BossKit = {
     defeat: RECLUSE_CHILD_LINES.beaten,
   },
   chance: { entrance: 1, capture: 0.35, hurt: 0.4, check: 0.5, rattled: 0.3, smug: 0.2, victory: 1, defeat: 1 },
+  // (Beaten: the kid's half of this fight's exchange as he grows up, the man answering once grown: RecluseChild.ts. Nov 14.)
+  lineOf: (beat, boss) => (beat === "defeat" ? growUpExchange(boss).kid : undefined),
   // (His face as the child: the man's window, moved down to the child's head, 45 px lower in the same drawing space.)
   portrait: { ...ADULT.portrait, y: ADULT.portrait.y + 45, anim: "idle", frame: 0 },
   // (His words above his head at whichever age is drawn now, beside the board: Eric, Nov 14.)

@@ -14,3 +14,11 @@ place, far from him on the board).
   rather than holding the line until the growth ends: the simpler one, and it never covers his face.
 - **Call (phone, phase change):** the chant lines show whole over his head (sentences typed in turn), not paged in the bar; the bar's
   pages were for its two rows.
+
+## Add-on: a conversation as he grows up (Eric, Nov 14)
+
+Eric: "there was no conversation" when the beaten child grows into the man; "add them all and mix in". `RECLUSE_GROWUP_EXCHANGES` (five
+pairs), one a fight (`growUpExchange`: `startMove` plus `levelBase`, the level's offset drawn from the battle's seed, since `startMove`
+alone is 1 in every Boss alone fight). The kid's line replaces his `beaten` line; the man's is said (critical) as he's grown, about
+3.5 s in. The fall was 4.2 s, so the man's match (which clears his voice) started 0.7 s after his first letter: `RECLUSE_CHILD.fallMs`
+is 7.5 s (one setting, solo and the server alike; the longest answer typed by 5.2 s, readable 2.3 s; a unit test checks the fit).

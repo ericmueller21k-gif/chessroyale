@@ -2,11 +2,13 @@ import { describe, expect, it } from "vitest";
 import { RECLUSE_CHILD, RECLUSE_MUSIC, childSteps } from "@chessroyale/core";
 import { BOSS_KITS, RECLUSE_CHILD_KIT, bossKitOf } from "../src/characters/kits.ts";
 import { GROWING_HEADS, GROWING_LOOPS, RECLUSE_GROWING, RECLUSE_GROWING_BUST, growAnim, growUpAnim } from "../src/characters/recluse-ages.ts";
-import { RECLUSE_CHILD_LINES, RECLUSE_LINES } from "../src/characters/recluse-lines.ts";
-import { ageAtStep, growingRun, resetGrowing } from "../src/components/RecluseChild.ts";
+import { RECLUSE_CHILD_LINES, RECLUSE_GROWUP_EXCHANGES, RECLUSE_LINES } from "../src/characters/recluse-lines.ts";
+import { ageAtStep, growUpExchange, growUpMs, growingRun, resetGrowing } from "../src/components/RecluseChild.ts";
 import { recluseMusic } from "../src/music.ts";
 import { talkWhen } from "../src/recluse-talk.ts";
-import { bossVoice } from "../src/speech.tsx";
+import { bossVoice, typeMs } from "../src/speech.tsx";
+import type { BossView } from "../src/game.ts";
+import { SPEECH } from "@chessroyale/core";
 import { BAR_TOP_GAP } from "../src/characters/kits.ts";
 import { REST_UP, barFit, restExtent, restOk } from "./bar-fit.ts";
 import { renderFrame } from "../src/characters/sprite.ts";
@@ -64,6 +66,24 @@ describe("his figure grows with his level (RecluseChild.ts)", () => {
     expect(growingRun(view(3, "crowd"), 2100)).toBeNull();
     // (The slowest: from the child at the start.)
     for (let a = 0; a < 3; a++) expect(RECLUSE_CHILD.growUpAt + animMs(growUpAnim(a)) + 300).toBeLessThanOrEqual(RECLUSE_CHILD.fallMs);
+  });
+
+  // Eric, Nov 14: "there was no conversation" as he grew up. Each fight one exchange of the five, the same on every device (the
+  // battle's start and its seeded level offset); the kid's line his `defeat`, the man's as he's grown, both read before the man's match.
+  it("beaten: one exchange a fight, the same for everyone in it, all five coming up; the kid's line, then the man's, both read in his fall", () => {
+    const fight = (levelBase: number, startMove = 1) => growUpExchange({ startMove, levelBase });
+    expect(fight(71)).toBe(fight(71));
+    expect(new Set(Array.from({ length: 40 }, (_, i) => fight(60 + i)))).toEqual(new Set(RECLUSE_GROWUP_EXCHANGES));
+    expect(RECLUSE_GROWUP_EXCHANGES).toHaveLength(5);
+    const child = { ...view(3, "crowd"), name: "Hidden Boss", levelBase: 72 } as unknown as BossView;
+    expect(RECLUSE_CHILD_KIT.lineOf!("defeat", child)).toBe(growUpExchange(child).kid);
+    expect(RECLUSE_CHILD_KIT.lineOf!("capture", child)).toBeUndefined();
+    // (The kid's line firm before the man answers; the man's typed and read 2 s or more before the fall ends, the longest too.)
+    const grown = RECLUSE_CHILD.growUpAt + growUpMs(0);
+    for (const { kid, man } of RECLUSE_GROWUP_EXCHANGES) {
+      expect(typeMs(kid) + SPEECH.minReadMs, kid).toBeLessThanOrEqual(grown);
+      expect(grown + typeMs(man) + 2000, man).toBeLessThanOrEqual(RECLUSE_CHILD.fallMs);
+    }
   });
 
   it("a battle first seen part way (a new screen, a reload): his age as it is, no step up played", () => {
