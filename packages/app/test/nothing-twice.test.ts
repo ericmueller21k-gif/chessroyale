@@ -7,7 +7,7 @@ import { GREX_LINES } from "../src/characters/grex.ts";
 import { PIG_LINES } from "../src/characters/pig.ts";
 import { BIGBOY_LINES } from "../src/characters/bigboy.ts";
 import { RECLUSE_LINES } from "../src/characters/recluse-lines.ts";
-import { DESK } from "../src/screens/Recluse2.tsx";
+import { FOUR } from "../src/screens/Recluse2.tsx";
 
 /**
  * Nothing said twice at once during a boss's power (DECISIONS.md, "Nothing said twice"): the banner names the power, the
@@ -50,11 +50,23 @@ describe("a power's words: banner, dock and bubble each say their own", () => {
   });
 });
 
-describe("the Hidden Boss's phase 2 on a computer: a tag's row above each board", () => {
-  it("fits two boards and two rows in the square's height, with a gap between them", () => {
-    const cross = 100 - 2 * DESK.tag - 2 * DESK.cell * 100;
-    expect(cross).toBeGreaterThan(1);
-    // (Between the columns: the rest of the width, room for the slow moves beside your board.)
-    expect(100 - 2 * DESK.cell * 100).toBeGreaterThan(cross);
+describe("the Hidden Boss's phase 2: the four boards inside phase 1's square (Eric, Nov 14)", () => {
+  it("a computer's: each square, the gaps between them and to the square's edges all equal", () => {
+    const [tl, tr, bl] = FOUR.desk;
+    const gaps = [tl.x, tr.x - (tl.x + tl.s), 1 - (tr.x + tr.s), tl.y, bl.y - (tl.y + tl.s), 1 - (bl.y + bl.s)];
+    for (const g of gaps) expect(g).toBeCloseTo(gaps[0]!, 9);
+    // (Each board's tag sits in the gap above it: room for its row, about 4% of the square.)
+    expect(gaps[0]).toBeGreaterThan(0.04);
+  });
+  it("a phone's: your board big at the bottom, the three small in a row above it, all inside the square", () => {
+    const [big, ...minis] = FOUR.phone;
+    for (const b of FOUR.phone) {
+      expect(b.x).toBeGreaterThanOrEqual(0);
+      expect(b.x + b.s).toBeLessThanOrEqual(1 + 1e-9);
+      expect(b.y + b.s).toBeLessThanOrEqual(1 + 1e-9);
+    }
+    expect(big!.y + big!.s).toBeCloseTo(1, 9);
+    for (const m of minis) expect(m.y + m.s).toBeLessThan(big!.y);
+    expect(big!.s).toBeGreaterThan(2 * minis[0]!.s);
   });
 });

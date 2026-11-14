@@ -30,6 +30,18 @@ async function still(page: Page, name: string) {
   await page.screenshot({ path: `${STILLS}/${name}-${test.info().project.name}.png` });
 }
 
+/**
+ * What stays put through his fight (Eric, Nov 14: "the board split only replaces the single board"): the board's square, the Moves
+ * panel and the chat (a computer's column, a phone's panel), your pawn and your team's, the God King. Each box, or null.
+ */
+const frameBoxes = (p: Page) =>
+  p.evaluate(() => {
+    const sels = [".board-row > .board-wrap", ".mv-side", ".under-board", ".bp", ".you-pawn", ".dk-mate-art", ".gk-unit"];
+    return Object.fromEntries(
+      sels.map((sel) => [sel, [...document.querySelectorAll(sel)].map((e) => e.getBoundingClientRect()).map((r) => [r.x, r.y, r.width, r.height].map(Math.round))]),
+    );
+  });
+
 /** Where the room's hook says to tap, on the page; null: not on screen. */
 async function shopAt(page: Page, kind: string, s?: unknown) {
   const xy = await page.evaluate(([k, q]) => (window as unknown as Hooks).__shopAt?.(k as string, q) ?? null, [kind, s] as const);
@@ -104,6 +116,9 @@ async function hisCard(page: Page) {
 test("his room (Eric, Nov 12 and 13): Challenge is 1 of 4; leaving asks; an admin's 3 bots join (2, 3, 4 of 4); the summoning; the fight, and the online 🏆 wins each form: the child, the man, the four boards", async ({ page }) => {
   test.setTimeout(400_000);
   const townroom = `hb-${test.info().project.name}-${Date.now().toString(36)}`;
+  // (Stills at another window size: STILLS_SIZE=1920x1080.)
+  const size = STILLS && process.env.STILLS_SIZE?.split("x").map(Number);
+  if (size && test.info().project.name === "desktop") await page.setViewportSize({ width: size[0]!, height: size[1]! });
   await page.goto("/");
   await asServerAdmin(page, "ops");
   await toLanding(page, townroom);
@@ -199,15 +214,28 @@ test("his room (Eric, Nov 12 and 13): Challenge is 1 of 4; leaving asks; an admi
   // His adult form's own 🏆.
   await expect(trophy).toBeEnabled({ timeout: 60_000 });
   await expect.poll(phase, { message: "the team's turn against the man", timeout: 120_000 }).toBe("play");
+  await page.waitForTimeout(1500);
+  await still(page, "man");
+  const manFrame = await frameBoxes(page);
   await trophy.click();
   await expect(page.getByRole("button", { name: "Your next move wins this form (testing)" })).toBeDisabled();
   await yourTurnMove();
   // His adult form beaten (Nov 13: "it plays through till the end"): his fall, then his phase change for everyone, the four boards
   // (the server runs them; with no engine server here, this device's engine plays the bots and the server's quick move him), and the 🏆 again.
+  if (STILLS) {
+    await expect.poll(() => page.evaluate(() => document.body.classList.contains("cs-on")), { message: "his cutscene", timeout: 60_000 }).toBe(true);
+    await page.waitForTimeout(4000);
+    await still(page, "cutscene");
+  }
   await expect.poll(phase, { message: "his adult form beaten: his phase change", timeout: 90_000 }).toBe("phaseChange");
   expect(await page.evaluate(() => (window as any).match.boss?.result)).toBe("crowd");
   await page.waitForTimeout(20_000);
   await still(page, "phase-change");
+  if (STILLS) {
+    await expect.poll(() => page.evaluate(() => document.querySelector(".rc-stage")?.getAttribute("data-step")), { timeout: 30_000 }).toBe("shuffle");
+    await page.waitForTimeout(1500);
+    await still(page, "phase-change-split");
+  }
   await expect.poll(phase, { message: "the four boards", timeout: 60_000 }).toBe("simul");
   const simulNow = () => page.evaluate(() => (window as any).match?.simul ?? null);
   await expect.poll(async () => (await simulNow())?.playing ?? false, { message: "the clocks start", timeout: 20_000 }).toBe(true);
@@ -216,6 +244,25 @@ test("his room (Eric, Nov 12 and 13): Challenge is 1 of 4; leaving asks; an admi
   // (The bots' boards are played: their first moves come from this device's engine, asked by the server.)
   await expect.poll(async () => ((await simulNow())?.boards ?? []).slice(1).filter((b: { history: string[] }) => b.history.length > 0).length, { message: "the bots move", timeout: 30_000 }).toBeGreaterThan(0);
   await still(page, "four-boards");
+  // Everything around the board where it was against the man, within 2 px: the square, the Moves panel and chat, the pawns, the
+  // God King (Eric, Nov 14). And the four boards inside the square, square, the gaps between them and to its edges equal.
+  const fourFrame = await frameBoxes(page);
+  expect(manFrame[".mv-side"]!.length + manFrame[".bp"]!.length, "the Moves panel").toBe(1);
+  expect(manFrame[".you-pawn"], "your pawn").toHaveLength(1);
+  expect(manFrame[".dk-mate-art"], "your team's pawns").toHaveLength(3);
+  for (const [sel, boxes] of Object.entries(manFrame)) {
+    expect(fourFrame[sel], `${sel}: as many`).toHaveLength(boxes.length);
+    boxes.forEach((b, i) => b.forEach((n, k) => expect(Math.abs(fourFrame[sel]![i]![k]! - n), `${sel} ${i} [${k}]: ${b} -> ${fourFrame[sel]![i]}`).toBeLessThanOrEqual(2)));
+  }
+  if (test.info().project.name === "desktop") {
+    const gaps = await page.evaluate(() => {
+      const sq = document.querySelector(".rc-simul .rc-stage")!.getBoundingClientRect();
+      const [tl, tr, bl] = [".rc-q0", ".rc-q1", ".rc-q2"].map((q) => document.querySelector(`.rc-simul ${q} .hb-board`)!.getBoundingClientRect());
+      return { square: [tl!.width - tl!.height], gaps: [tl!.left - sq.left, tr!.left - tl!.right, sq.right - tr!.right, tl!.top - sq.top, bl!.top - tl!.bottom, sq.bottom - bl!.bottom] };
+    });
+    expect(Math.abs(gaps.square[0]!), "each board square").toBeLessThanOrEqual(1);
+    for (const g of gaps.gaps) expect(Math.abs(g - gaps.gaps[0]!), `the gaps ${gaps.gaps.map(Math.round)}`).toBeLessThanOrEqual(2);
+  }
   // The 🏆 in the four boards: the team's next move wins every board still on. Your move, with real taps on your board.
   await expect(trophy).toBeEnabled({ timeout: 10_000 });
   await trophy.click();
@@ -223,7 +270,7 @@ test("his room (Eric, Nov 12 and 13): Challenge is 1 of 4; leaving asks; an admi
   const mine = (await simulNow()).boards[0] as { fen: string; toMove: string | null; history: string[] };
   if (mine.toMove === "crowd") {
     const move = legalMoves(mine.fen).find((m) => m.startsWith("b") || m.startsWith("g")) ?? legalMoves(mine.fen)[0]!;
-    const board = page.locator(".rc-simul .rc-q2 .hb-board, .rc-simul .board-row > .board-wrap:not(.rc-stage) .hb-board").first();
+    const board = page.locator(".rc-simul .rc-q2 .hb-board, .rc-simul .rc-big .hb-board").first();
     const box = (await board.boundingBox())!;
     for (const sq of [move.slice(0, 2), move.slice(2, 4)]) {
       const f = sq.charCodeAt(0) - 97;

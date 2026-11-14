@@ -89,9 +89,9 @@ Lane: `god-king`. The bosses' own rules and art are on [bosses.md](bosses.md).
   whole time, the boss saying he'll take his power meanwhile: docs/decisions/2026-10-17-phase-change-pace.md); then the boss drains his
   power into a raised hand: his Last Stand's blows flash and crack him (his own frames), he flickers and cries out
   (`foeDrained`); and as it lands he fades up and away in light. No new frames of his: the aura, the flicker and the fade
-  are CSS over his figure (`.gk-aura`, `.gk-unit.gk-drained`, `.gk-fading`). From then on he's gone: his place in the
-  dock stays, empty (`king="gone"`), nothing to tap, and he says nothing in phase 2 (his phase 2 lines are gone). (On a
-  phone, where his place is a line under the dock's row, that line closes up instead: the row above doesn't move.)
+  are CSS over his figure (`.gk-aura`, `.gk-unit.gk-drained`, `.gk-fading`). Gone until the four boards (`king="gone"`); in phase 2
+  he's back in his place, greyed and never to be called (`king="benched"`, Eric, Nov 14: "the king will still be with you,
+  but you can't use him anymore"), and he says nothing in phase 2 (his phase 2 lines are gone).
 - **His lines** come from cues (a new danger to your queen or king, a mate threat, a queen taken, his own acts, a boss
   power…). Critical cues always speak; everything else is paced by `KING_SPEECH` (about 5 to 10 lines a game). His praise of
   a move ("Masterful! Even I'd play that.", `greatMove`; "A fine move.", `goodMove`) never comes in a game's first 10 moves
