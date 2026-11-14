@@ -197,6 +197,22 @@ test("his room (Eric, Nov 12 and 13): Challenge is 1 of 4; leaving asks; an admi
     });
     await submitMove(page, turn.allowed?.[0] ?? legalMoves(turn.fen)[0], turn.fen);
   };
+  // The God King's words in the party layout (Nov 14's visual check, #5): every frame of the child's match, never into the chat or
+  // onto a teammate's pawn.
+  await page.evaluate(() => {
+    const w = window as any;
+    w.__gkOver = [] as string[];
+    const hit = (a: DOMRect, b: DOMRect) => a.left < b.right - 1 && a.right > b.left + 1 && a.top < b.bottom - 1 && a.bottom > b.top + 1;
+    const tick = () => {
+      const gk = document.querySelector(".boss-dock.dk-party .gk-bubble");
+      if (gk && Number(getComputedStyle(gk).opacity) > 0.5) {
+        const r = gk.getBoundingClientRect();
+        for (const e of document.querySelectorAll(".under-board, .dk-mate-art")) if (hit(r, e.getBoundingClientRect())) w.__gkOver.push(`${e.className}: ${gk.textContent}`);
+      }
+      if (!w.__gkDone) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  });
   await expect(trophy).toBeVisible();
   await trophy.click();
   await expect(page.getByRole("button", { name: "Your next move wins this form (testing)" })).toBeDisabled();
@@ -216,6 +232,7 @@ test("his room (Eric, Nov 12 and 13): Challenge is 1 of 4; leaving asks; an admi
   await expect.poll(phase, { message: "the team's turn against the man", timeout: 120_000 }).toBe("play");
   await page.waitForTimeout(1500);
   await still(page, "man");
+  expect(await page.evaluate(() => ((window as any).__gkDone = true) && (window as any).__gkOver), "the God King's words over the chat or a teammate").toEqual([]);
   const manFrame = await frameBoxes(page);
   await trophy.click();
   await expect(page.getByRole("button", { name: "Your next move wins this form (testing)" })).toBeDisabled();
@@ -300,6 +317,8 @@ test("his room (Eric, Nov 12 and 13): Challenge is 1 of 4; leaving asks; an admi
   }
   await expect.poll(async () => (await simulNow())?.decided ?? false, { message: "every board won", timeout: 30_000 }).toBe(true);
   expect((await simulNow()).won).toBe(4);
+  // The Moves panel lists your own board's game in phase 2 (Nov 14's visual check, #6): a computer's beside the board.
+  if (desk && mine.toMove === "crowd") await expect(page.locator(".mv-side .mv-list .mv-row").first()).toHaveAttribute("aria-label", /^1\. You: /);
   // Each row says its board was won (a computer's table, the word; a phone's panel, its mark), until the results.
   const shownRows = await panel.locator(".tower-row").count();
   await expect(panel.locator(".t-board")).toHaveText(Array(shownRows).fill(desk ? "Won" : "✓"));

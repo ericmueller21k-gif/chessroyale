@@ -571,6 +571,26 @@ test("beaten in phase 1 (?win=1): he collapses and mumbles, his cutscene, then t
     clockLine: { selector: ".boss-dock-status .dk-text", text: /^2:00 on your clockNo added time\.$/ },
   });
   expect(await fall.seen()).toMatchObject({ collapse: true, dock: true });
+  // Every frame of the phase change into phase 2 (Nov 14's visual check): his bar box at the countdown holds its words, never a sliver
+  // narrower than them (#1: measured while his place was hidden); his words over his helmet never straddle the bar's bottom edge
+  // (#9); the boards at the split's last frame are where phase 2 draws them in play, within a pixel (#10: they snapped 3 to 6 px).
+  await page.evaluate(() => {
+    const w = window as any;
+    const q = (w.__qaChange = { narrow: [] as number[][], straddle: [] as number[][], split: null as number[][] | null, played: null as number[][] | null });
+    const boards = (sel: string) => [...document.querySelectorAll(`.rc-stage > ${sel} .hb-board`)].map((e) => { const r = e.getBoundingClientRect(); return [r.left, r.top, r.width].map(Math.round); }).sort((a, b) => a[1]! - b[1]! || a[0]! - b[0]!);
+    const tick = () => {
+      const bar = document.querySelector(".bc-bar-bubble");
+      const words = bar?.querySelector(".speech-line");
+      if (bar && words && Number(getComputedStyle(bar).opacity) > 0.5 && (bar as HTMLElement).clientWidth > 0 && (bar as HTMLElement).clientWidth < (words as HTMLElement).offsetWidth) q.narrow.push([(bar as HTMLElement).clientWidth, (words as HTMLElement).offsetWidth]);
+      const say = document.querySelector(".rc-say");
+      const edge = document.querySelector(".boss-bar")?.getBoundingClientRect().bottom;
+      if (say && edge && Number(getComputedStyle(say).opacity) > 0.5) { const r = say.getBoundingClientRect(); if (r.top < edge - 1 && r.bottom > edge + 1) q.straddle.push([Math.round(r.top), Math.round(r.bottom), Math.round(edge)]); }
+      if (document.querySelector(".rc-stage > .rc-split") && document.querySelector('.rc-stage[data-step="shuffle"]')) q.split = boards(".rc-split");
+      if (!q.played && document.querySelector(".rc-stage > .rc-played")) q.played = boards(".rc-played");
+      if (!q.played || q.narrow.length < 5) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  });
   const at = Date.now();
   // The boards set, a countdown on every one (a phone's three small ones too), its banner on yours; no clock yet.
   await expect.poll(() => phase(page), { timeout: 30_000 + ADDED_MS }).toBe("simul");
@@ -666,6 +686,11 @@ test("beaten in phase 1 (?win=1): he collapses and mumbles, his cutscene, then t
     book: false,
   });
   expect(await words.seen()).toEqual({ dockRepeat: false, barPhase: false, beaten: false, clockLine: true });
+  const qa = await page.evaluate(() => (window as any).__qaChange);
+  expect(qa.narrow, "his bar box narrower than its words").toEqual([]);
+  expect(qa.straddle, "his words over his helmet across the bar's edge").toEqual([]);
+  expect(qa.split?.length, "the split's boards").toBe(4);
+  qa.split.forEach((b: number[], i: number) => b.forEach((n, k) => expect(Math.abs(qa.played[i][k] - n), `board ${i} [${k}]: split ${b} -> play ${qa.played[i]}`).toBeLessThanOrEqual(1)));
   // Phase 2's bar: how many are won, nothing the title says; its subtitle: the variant alone.
   await expect(page.locator(".boss-next")).toHaveText(/^\d of 4 won$/);
   // His level is unknown in phase 2 too ("LVL ???", Eric, Oct 23: Fischer's is not 100), his bar's meters gone as before.
@@ -753,6 +778,16 @@ test("phase 2 (?phase=2): four boards, each its own Chess960 start; Stockfish 27
   const pawn = new Chess(fen.replace(/ [A-Ha-h]+ - /, " - - ")).moves({ verbose: true }).find((m) => m.piece === "p" && m.from[0] === "d" && m.to[1] === "4")!;
   await simulPlay(page, pawn.lan);
   await expect.poll(async () => (await simulNow(page)).boards[0].history.length, { timeout: 30_000 }).toBe(2);
+  // The Moves panel, in its place, lists your board's game now, not phase 1's (Nov 14's visual check, #6): your move first.
+  const moves = page.locator(test.info().project.name === "phone" ? ".bp .mv-list .mv-row" : ".mv-side .mv-list .mv-row");
+  await expect(moves.first()).toHaveAttribute("aria-label", new RegExp(`^1\\. You: pawn to ${pawn.to}`));
+  await expect(moves).toHaveCount(2);
+  // A phone's small boards: whose each is, by name, cut short to the board's width, the clock whole (#7).
+  if (test.info().project.name === "phone") {
+    const tags = await page.evaluate(() => [...document.querySelectorAll(".rc-mini")].map((m) => { const t = m.querySelector(".rc-tag")!.getBoundingClientRect(); const r = m.getBoundingClientRect(); return { name: m.querySelector(".rc-tag-name")?.textContent?.trim() ?? "", clock: m.querySelector(".rc-tag-clock")!.textContent, inside: t.left >= r.left - 0.5 && t.right <= r.right + 0.5 }; }));
+    expect(tags).toHaveLength(3);
+    for (const t of tags) expect(t).toMatchObject({ name: expect.stringMatching(/\S/), clock: expect.stringMatching(/^\d+:\d\d$/), inside: true });
+  }
   // Engine move (admins): Stockfish's best on your Chess960 board, played as yours.
   const btn = page.getByRole("button", { name: "Engine move", exact: true });
   await expect(btn).toBeEnabled({ timeout: 30_000 });
@@ -843,6 +878,21 @@ test("the admins' Win this form (Nov 13, Eric's timing test): pressed, your next
     first: { selector: '.cs-say[data-line="1"]', text: /^Why are you on the floor\?$/ },
     last: { selector: '.cs-say[data-line="18"]', text: /^Why don't you show us\?$/ },
   });
+  // (Every frame: the tail over the speaker goes in and out with its box, never shown without it (Nov 14's visual check, #2).)
+  await page.evaluate(() => {
+    const w = window as any;
+    w.__lone = [] as number[][];
+    const tick = () => {
+      const tail = document.querySelector(".cs-tail");
+      const box = document.querySelector(".cs-say");
+      if (tail && box) {
+        const [a, b] = [Number(getComputedStyle(tail).opacity), Number(getComputedStyle(box).opacity)];
+        if (a > b + 0.2) w.__lone.push([a, b]);
+      }
+      if (!w.__loneDone) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  });
   await play(page, mv);
   await expect.poll(() => page.evaluate(() => !!(window as any).match.phase.fall), { timeout: 30_000 }).toBe(true);
   expect((await bossNow(page)).result).toBe("crowd");
@@ -857,6 +907,7 @@ test("the admins' Win this form (Nov 13, Eric's timing test): pressed, your next
   await expect(page.locator(".mm-scrim")).toHaveCount(0);
   await expect.poll(() => phase(page), { timeout: 60_000 }).toBe("phaseChange");
   expect(await scene.seen()).toEqual({ light: true, kid: true, hidden: true, first: true, last: true });
+  expect(await page.evaluate(() => ((window as any).__loneDone = true) && (window as any).__lone), "a tail shown without its box").toEqual([]);
   // (The scene's own layer gone; his transformation carries on from it in its own, Nov 14.)
   await expect(page.locator(".cs-layer:not(.rc-transform)")).toHaveCount(0);
   await expect(page.locator(".cs-layer.rc-transform")).toHaveCount(1);
@@ -950,6 +1001,34 @@ test("his words stand above his head at every age beside the board (Eric, Nov 14
     await expect(page.locator(figure())).toHaveAttribute("data-anim", loop);
     await expect(page.locator(`${figure()} .bc-bubble`)).toHaveAttribute("aria-label", "That one's mine now.");
     await expect.poll(gap, { message: loop }).toBeGreaterThan(0);
+    // (A computer's bar face follows his age as a phone's bust does (Nov 14's visual check, #3): the bust's own frame, that loop.)
+    await expect(page.locator(".boss-icon-face .boss-portrait")).toHaveAttribute("data-face", `${loop}:false`);
+  }
+});
+
+test("beaten, his fall's words stand over him as he kneels, not where his head was (Nov 14's visual check: 82 px over it)", async ({ page }) => {
+  test.skip(test.info().project.name === "phone", "a computer: on a phone his words are in his bar");
+  test.setTimeout(3 * 60_000);
+  await meetHim(page, "laststand=0&clock=60");
+  await yourMove(page);
+  const gap = () =>
+    page.evaluate(() => {
+      const fig = document.querySelector<HTMLElement>(".boss-char.place-side")!;
+      const cv = fig.querySelector("canvas")!;
+      const px = cv.getContext("2d")!.getImageData(0, 0, cv.width, cv.height).data;
+      let top = cv.height;
+      for (let y = 0; y < cv.height && top === cv.height; y++) for (let x = 0; x < cv.width; x++) if (px[(y * cv.width + x) * 4 + 3]! > 0) top = y;
+      const r = cv.getBoundingClientRect();
+      return Math.round(r.top + (top / cv.height) * r.height - fig.querySelector(".bc-bubble")!.getBoundingClientRect().bottom);
+    });
+  for (const loop of ["idle", "collapseLoop"]) {
+    await page.evaluate((loop) => {
+      (window as any).bossFigure(loop);
+      (window as any).sayBoss("The book said… no… no…");
+    }, loop);
+    await expect(page.locator(figure())).toHaveAttribute("data-anim", loop);
+    await expect.poll(gap, { message: loop }).toBeGreaterThan(0);
+    await expect.poll(gap, { message: loop }).toBeLessThan(50);
   }
 });
 
