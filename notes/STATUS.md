@@ -1052,3 +1052,8 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 14 00:50: #693 (ring switch) MERGED. #694 red on town.spec "a deploy landed" (framenavigated counted the town's new pushState):
   fixed (count navigation requests), passed locally, CI on 87f056c0. #695 kid line (Eric's rewrite) + holdMs 103745: CI.
   QUEUE: bubble -> same-frame -> transform mockup -> visual QA (briefs/recluse-visual-qa.md, Eric asked) -> night room.
+- Nov 14 01:20: #695 (kid line) MERGED. Music helper done -> #697 (CI fa5ee3dc): music skips the low-pass, seamless rebuild
+  handoff; phase-3 "restart" = the rebuild (no theme flip, proved). #696 (desktop column) CI on bbb21cfd (fixed board-layout's
+  old 36 px check). #694 CI on be0ecaf5 (unit job hung once, 15 min timeout; watch for a repeat). Bubble helper started:
+  session_01JuCWRw3sSyFZwagswauntc (high). Running Opus: flaky + bubble. Queue: same-frame (after #696) -> transform mockup ->
+  visual QA -> night room. wait-any.sh now fetches into refs/watch/* (FETCH_HEAD race gave a false DONE).
