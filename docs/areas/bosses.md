@@ -367,7 +367,9 @@ below):
   its beats settings, `RECLUSE_PHASE2.change.transform`), about 23.7 s from his cutscene's end to the end of "PHASE 2" (after a 1.8 s
   fall and his cutscene), one timeline, not skippable like a boss's intro. Drawn over the board by `components/RecluseTransform.tsx`
   (one fixed layer, carrying on the cutscene's: the lens, the child, the man, the open book, and the light on two screen-size canvases,
-  behind and over him: the summoning's light from his room, its sprites made once and stretched) from its start to his leap home,
+  behind and over him: the summoning's light from his room, its sprites made once and stretched; backed at a third of a pixel per CSS
+  pixel, each left out while it has nothing to draw, the full-screen dark and the white-out as opacity layers, the beam's motes on a
+  small canvas of their own at the screen's pixels: the Nov 14 review, a slowed phone's frames) from its start to his leap home,
   his place empty meanwhile (`.rc-away`, his words over his head, `.rc-say`); the board's square, the split, the arcs and the dock by
   `screens/Recluse2.tsx` (`PhaseChangeScreen`); the figures in `characters/recluse-transform.ts` (`RECLUSE_CHANGE`, the book and the
   child apart). The transformation theme's intro starts `musicAtMs` (0.3 s) in, so a device a moment late still plays it whole, and
@@ -380,8 +382,8 @@ below):
   - **unseen in the white** he's set down in his suit and helmet (`setSuitAt`), the child and the lens gone; the white **dies back
     into the center** (8.7 to 10 s) and shows him, the visor down (`recluseSpark`);
   - **the visor flips up** (10.3 s; a frame on its way), his face with **his eyes glowing blue**, for his first line over his head
-    ("Computation without creativity is nothing. / Now I have both.", 10.6 s, typed by about 14.3, gone as the visor **flips back
-    down**, 15.75 s);
+    ("Computation without creativity is nothing. / Now I have both.", 10.6 s, typed a little faster, 30 ms a character, by about
+    13.3; the visor **flips back down** at 15.75 s, and the line stays up through the crouch, gone as he leaps: readable whole 2.8 s);
   - he crouches and **leaps on the music's breath**, hangs a second, and **lands on its drop** (17.435 s after the intro starts): the
     board cracks under him (Sawyer's board-saw gap), **the big board never drawn behind the quarters** (they're the whole board until
     they part), blue arcs strike the cracks from his hands at his sides (`Arcs`, `ARC_STRIKES`, `CHANGE_HANDS`: two big ones as it
@@ -391,9 +393,10 @@ below):
     `idle2` in the suit from then on; "PHASE 2". The dock: "The book's light takes him!", "He's transformed!", "One board becomes
     four…", then the clock line. **The God King stays in his place, greyed** (`king="benched"`), silent, throughout.
   Its lines (`RECLUSE_LINES.chantSay`, Eric's, Nov 13) type at the cutscene's pace (`chantLines`: 45 ms a character, 1 s between
-  sentences, readable 1.7 s plus 40 ms a character; `paced-line.ts`, `sayPaced`; a phone's bar shows a sentence at a time,
-  `pacedPage`). His frames, the child's, the book's and his suit where he stands are drawn ahead from his battle's start
-  (`prewarmRecluse`). Online the server times it by `RECLUSE_ONLINE.changeMs` (the screens' `PHASE_CHANGE.total`) and holds the
+  sentences, readable 1.7 s plus 40 ms a character; the first line `firstTypeMs`, 30 ms; `paced-line.ts`, `sayPaced`; a phone's bar shows a sentence at a time,
+  `pacedPage`). His frames, the child's, the book's and his suit where he stands (idle, ultimate, results) are drawn ahead from his
+  battle's start (`prewarmRecluse`, into BossEffect's frame cache, the one his place draws from). The reveal's spark and the arcs'
+  crackle play only within 0.5 s of their moment (a device joining later doesn't play them). Online the server times it by `RECLUSE_ONLINE.changeMs` (the screens' `PHASE_CHANGE.total`) and holds the
   cutscene `RECLUSE_CUTSCENE.holdMs` (its timeline's length); nothing else in the protocol changed. Tests:
   `app/test/recluse-phase2.test.ts` (its beats, the music's marks, the lines' times, his figure: no raised hand, white eyes, the
   suit, the visor), `recluse.test.ts` (the suit on every frame), `recluse-cutscene.test.ts`, `recluse-online.test.ts`,
