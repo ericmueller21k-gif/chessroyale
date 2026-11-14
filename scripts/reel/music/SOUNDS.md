@@ -215,3 +215,13 @@ note itself". That was `Mix.ocarina`'s air (noise under each note, about 24 dB u
 mix, plain here. The town's ocarina and flute are now the bare tones. The rule: a breath or air layer on a held note
 needs other sound over it; in a sparse passage leave it out. (Found by playing each voice alone and measuring what it
 has above 2.5 kHz: scratch `noise.py`'s way.)
+Fourth go (the full song with each voice): "I like your V4 flute ... leaning more towards the flute now than the
+vibraphone" (the flute has the second turn; the struck-over-blown line above did not hold here). Of the quiet part,
+which had dropped the bass-and-chords stroll and the brush: "we lost like the backdrop ... that sort of shake sort of
+beat that rings throughout ... without it, it's not quite like working the same ... throw that back in, the whole
+song": a breakdown that stops the beat is not wanted in a theme to leave on; change what plays over the beat instead.
+"Tune down that piano that's going, and ... work in a vibraphone with the piano" (the piano's solo was the loudest
+lead in the song, 2 dB over the clarinet). The music box there "sounds a little off ... tweak it ... to sound more
+melodic with the song": `struck("box")` has an overtone at 2.5 times its note (a major third, two octaves up), fine in
+a tune of its own, sour over minor chords; and its notes were picked from each chord by rule and not swung. Over
+chords, use a bell whose overtones are the note's own harmonics, and write it a line.

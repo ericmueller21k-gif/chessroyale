@@ -4,8 +4,8 @@ are like, I want to turn this song on while I'm in the chess town because it's s
 He sent a write-up of a style, made from another game's playground tune (a 1920s bandstand stroll), and of what would
 wear on the ear over three minutes. What is used from it is the style's own means and its cautions, none of them one
 song's: the 8ths swung a little; no drum kit: a plucked upright bass on 1 and 3, soft chords on 2 and 4, a brush, a
-wood block; warm, rounded voices that hand the tune to one another (a clarinet, a vibraphone, a soft piano, a
-guitar); ragtime's kind of chords (a chord borrowed from the minor, a chord a fifth above the one it leads to); no
+wood block; warm, rounded voices that hand the tune to one another (a clarinet, a flute, a vibraphone, a soft
+piano, a guitar); ragtime's kind of chords (a chord borrowed from the minor, a chord a fifth above the one it leads to); no
 tune over the staff's top space but in the one lifted passage, no whistles or slides, nothing shrill; and several
 places in one walk, with a quiet one in the middle, so the three minutes are never one half minute six times.
 What is not used: the write-up's chord progressions (its stroll's eight bars, its bridge, its duet's circle), its
@@ -19,11 +19,21 @@ with the second one better", so that one is the tune and the other is gone. Of t
 second time (three reeds a hair apart, at the clarinet's level): "some loud synth obnoxious instrument starts playing.
 We need to change that to like something very light ... like a flute or a timpani ... it's way too loud. It should be
 just like more background, quiet, lighter". He was sent a soft flute there and, second, a vibraphone (a timpani is a
-drum: a mallet voice was a guess at what he meant): "2 is dope ... I love everything about that sample, so you can keep
-that on rough repeat. Feel free to play around a bit mid track for a verse": read as the second clip, the vibraphone
-(`second` picks the flute). Of the pace, 107 beats a minute at first, then 116: "I tried a couple different BPMs ...
-right in between, 129."
-So the song is that sample (the stroll's four bars, the tune on the clarinet, the tune on the vibraphone) three times,
+drum: a mallet voice was a guess at what he meant): "I love everything about that sample, so you can keep that on
+rough repeat. Feel free to play around a bit mid track for a verse." Of the pace, 107 beats a minute at first, then
+116: "I tried a couple different BPMs ... right in between, 129." Of the full song, sent with each voice: "I like your
+V4 flute ... I am leaning more towards the flute now than the vibraphone", so the flute has the second turn, and
+three things about the quiet part, which then had no beat under it, a soft piano's solo and a music box: "we lost like
+the backdrop ... that sort of shake sort of beat that rings throughout ... without it, it's not quite like working
+the same ... Let's throw that back in, the whole song" (the stroll now goes on under it); "tune down that piano
+that's going, and you could probably work in a vibraphone with the piano ... kind of cool to still get a little
+vibraphone in the song" (the vibraphone has the phrases there, the piano with it and well under it); and the bell
+"sounds a little off ... tweak it a little bit to sound more melodic with the song" (it played the top notes of each
+chord, an 8th ahead of the swing, on the synth's music box, which has an overtone a third off its note: now a small
+bell whose overtones are the note's own harmonics, a written line that answers the guitar, swung with the rest).
+Earlier (0:40, the ocarina): "staticky ... some artifact embedded in every time it plays a note": the breath in the
+synth's ocarina; the town's ocarina and flute are the bare tones.
+So the song is that sample (the stroll's four bars, the tune on the clarinet, the tune on the flute) three times,
 a little different each time, with other places between: the gazebo, the cafe, a conversation, and the tune a minor
 third up before it comes home.
 The idea from the game: a walk round the town. The bass walks down a step a bar under a D that never moves (G, F
@@ -31,18 +41,18 @@ sharp, F, E, E flat, D: the E flat bar is the chord borrowed from the minor, the
 handed from voice to voice as the walk passes the square, the gazebo and the cafe; and near the end the pawn reaches
 the far side and is promoted: the tune a minor third up, everyone together. A wood block's knock is a piece set down.
 G major; 96 bars of four at 129 beats a minute: 178.6 s.
-  python3 song_ad.py <out.wav> [the second voice: vibes or flute]
+  python3 song_ad.py <out.wav>
 
   bars  1-4    0:00  the stroll starts: the bass, the chords, a brush
   bars  5-12   0:07  the square: the tune on the clarinet
-  bars 13-20   0:22  again on the vibraphone, lightly, the clarinet's long notes far under it
+  bars 13-20   0:22  again on the flute, lightly, the clarinet's long notes far under it
   bars 21-28   0:37  the gazebo: a slow tune on the ocarina over the piano's rolling chords, the bass walking
-  bars 29-44   0:52  the square again: the clarinet with the vibraphone beside it, then the vibraphone's turn
-  bars 45-60   1:22  the cafe (the quiet part): the tune's pieces on the soft piano over a guitar, then on the guitar,
-                     a music box far off; in E minor
-  bars 61-68   1:52  a conversation: the clarinet and the vibraphone trade two bars each
+  bars 29-44   0:52  the square again: the clarinet with the flute beside it, then the flute's turn
+  bars 45-60   1:22  the cafe, in E minor, the stroll going on under it: short phrases on the vibraphone and the soft
+                     piano together over a guitar, then on the guitar, a small bell answering
+  bars 61-68   1:52  a conversation: the clarinet and the flute trade two bars each
   bars 69-76   2:07  promoted: the tune a minor third up, everyone
-  bars 77-92   2:21  home: the clarinet's turn and the vibraphone's once more, the brush thinning out
+  bars 77-92   2:21  home: the clarinet's turn and the flute's once more, the brush thinning out
   bars 93-96   2:51  the stroll alone again, for the way round
 """
 import sys
@@ -81,7 +91,7 @@ TUNE = (
     "E5:.5 C#5:.5 -:.5 A4:.5 B4:.5 C#5:.5 E5:1 | D5:1 C5:.5 A4:.5 F#4:1 -:1"
 )
 PICKUP = "D4:.5 F#4:.5"  # the two notes into it
-# Under the tune when the second voice has it: the clarinet's long notes.
+# Under the tune when the flute has it: the clarinet's long notes.
 UNDER = "D4:4 | D4:4 | D4:2 F4:2 | E4:2 G4:2 | G4:4 | G4:2 B4:2 | G4:2 E4:2 | F#4:3 -:1"
 # Beside the tune, in its rhythm: a third or a sixth under it.
 BESIDE = (
@@ -94,7 +104,7 @@ BESIDE = (
 HOME, HOME_BESIDE = "F5:1 Eb5:.5 C5:.5 A4:1 -:1", "C5:1 C5:.5 A4:.5 F#4:1 -:1"
 # The gazebo: the ocarina's slow tune.
 SLOW = "E5:3 D5:1 | D5:2 B4:1 A4:1 | C5:3 B4:.5 A4:.5 | A4:2 F#4:1 A4:1 | G4:1 B4:1 E5:2 | D5:2 G#4:1 B4:1 | C5:1.5 B4:.5 A4:1 E4:1 | F#4:2 A4:1 -:1"
-# The cafe: short phrases with air between them: the piano's eight bars, then the guitar's.
+# The cafe: short phrases with air between them: the vibraphone's and piano's eight bars, then the guitar's.
 CAFE_1 = (
     "-:1 B4:.5 C5:.5 D5:1 B4:1 | G4:2 -:2 | -:1 A4:.5 B4:.5 C5:1 A4:1 | F#4:2 D#4:1 -:1 | "
     "-:.5 E4:.5 G4:.5 B4:.5 D5:2 | E5:1 D5:2/3 B4:2/3 G4:2/3 E4:1 | G4:1.5 E4:.5 C#4:1 E4:1 | D4:2 F#4:1 A4:1"
@@ -103,19 +113,21 @@ CAFE_2 = (
     "B4:1.5 G4:.5 E4:1 -:1 | -:1 F#4:.5 G4:.5 A4:1 B4:1 | C5:2.5 B4:.5 G4:1 | A4:1 F#4:1 D#4:1 -:1 | "
     "-:.5 B4:.5 D5:.5 E5:.5 D5:1 B4:1 | C#5:1.5 B4:.5 A4:1 G4:1 | E4:1 G4:1 A4:1 C5:1 | B4:1.5 A4:.5 F#4:1 -:1"
 )
-# The conversation: the clarinet's two bars, the second voice's two, twice.
+# The bell's answers to the guitar: in the guitar's rests and under its long notes; each one's echoes (a beat and two
+# beats on) fall on chords it belongs to.
+BELL = "-:3 B5:.5 G5:.5 | E5:1 -:3 | -:1 E5:.5 G5:.5 B5:1 -:1 | -:3 B5:.5 F#5:.5 | E5:1 -:3 | -:3 A5:.5 G5:.5 | E5:1 -:3 | D5:.5 F#5:.5 A5:1 -:2"
+# The conversation: the clarinet's two bars, the flute's two, twice.
 TALK_C = "D5:.5 B4:.5 G4:1 A4:.5 B4:.5 D5:1 | D#5:1.5 B4:.5 F#4:1 A4:1 | -:8 | E5:1 C5:.5 G4:.5 E4:1 G4:1 | A4:.5 C#5:.5 E5:1.5 C#5:.5 A4:1 | -:8"
 TALK_A = "-:8 | G4:.5 B4:.5 E5:1.5 D5:.5 B4:1 | D5:1 B4:.5 G4:.5 F4:1 D4:1 | -:8 | G4:1 A4:1 C5:1 D5:1 | D5:.5 C5:.5 A4:1 C5:1 Eb5:1"
 # The stroll's last bars: the tune's first hop on the piano, far off.
 LAST = "-:4 | G4:.5 B4:.5 -:.5 D5:.5 E5:2 | -:8"
-for _line, _beats in ((TUNE, 32), (UNDER, 32), (BESIDE, 32), (HOME, 4), (HOME_BESIDE, 4), (SLOW, 32), (CAFE_1, 32), (CAFE_2, 32), (TALK_C, 32), (TALK_A, 32), (LAST, 16)):
+for _line, _beats in ((TUNE, 32), (UNDER, 32), (BESIDE, 32), (HOME, 4), (HOME_BESIDE, 4), (SLOW, 32), (CAFE_1, 32), (CAFE_2, 32), (BELL, 32), (TALK_C, 32), (TALK_A, 32), (LAST, 16)):
     assert beats(_line) == _beats, (_line[:30], beats(_line))
 
 
-def render(second: str = "vibes", window=None) -> np.ndarray:
-    """The song as heard (stereo, at the mix's own level). `second`: the light voice that shares the tune with the
-    clarinet ("vibes", or "flute" to compare). `window`: (from beat, to beat), to make only that passage (a sample,
-    to compare voices on)."""
+def render(window=None) -> np.ndarray:
+    """The song as heard (stereo, at the mix's own level). `window`: (from beat, to beat), to make only that passage
+    (a sample, to compare voices on)."""
     x = Ride(RIDE, BEATS, None, os=2, seed=233, tape_secs=TAPE)
     x.window = window
     put, at = x.put, x.at
@@ -288,16 +300,18 @@ def render(second: str = "vibes", window=None) -> np.ndarray:
             w = x.tone(m, d * 0.95, harm, 0.13 * vol, vib=0.004 if d >= 1 else 0.0, vib_hz=5.0, scoop=0.25, scoop_s=0.03, attack=0.03, release=0.06)
             put("clarinet", b, w, pan)
 
-    def light(start, text, vol=1.0, pan=0.25, up=0):
-        """The light voice beside the clarinet: a vibraphone, each note left to ring a little (or a flute, low and soft)."""
+    def flute(start, text, vol=1.0, pan=0.25, up=0):
+        """The light voice beside the clarinet: a flute, low and soft, with no breath in it (see the ocarina)."""
         for b, d, m in notes(start, text):
             b, d, m = sway(b), float(d), m + up
             at(b, d)
-            if second == "vibes":
-                w = x.struck("vibes", m)
-                put("light", b, w * np.exp(-np.arange(len(w)) / sr / 0.7) * 0.07 * vol, pan)
-            else:
-                put("light", b, x.add(m, d * 0.95, x.FLUTE, 0.05 * vol, vib=0.006, attack=0.04, sustain=0.8, decay=0.2, release=0.08), pan)  # no breath: see the ocarina
+            put("flute", b, x.add(m, d * 0.95, x.FLUTE, 0.05 * vol, vib=0.006, attack=0.04, sustain=0.8, decay=0.2, release=0.08), pan)
+
+    def vibes(start, text, vol=1.0, pan=0.2):
+        """A vibraphone, each note left to ring a little."""
+        for b, d, m in notes(start, text):
+            w = x.struck("vibes", m)
+            put("vibes", sway(b), w * np.exp(-np.arange(len(w)) / sr / 0.7) * 0.07 * vol, pan)
 
     def ocarina(start, text, vol=0.055, pan=0.1, up=0):
         """The ocarina's note with no breath in it. The synth's own has a little air under each note, and here, with
@@ -315,8 +329,17 @@ def render(second: str = "vibes", window=None) -> np.ndarray:
         for b, d, m in notes(start, text):
             put("guitar", sway(b), string(m + up, 0.5) * vol, pan)
 
-    def box(b, m, vol=0.03, pan=0.45):
-        put("box", b, x.struck("box", m) * vol, pan)
+    def bell(start, text, vol=0.03, pan=0.45):
+        """A small bell, far off: its overtones are the note's own harmonics, the octaves first. (The synth's music
+        box has one a third off its note: in a tune of its own that is its charm; over these chords Eric heard it as
+        "a little off".)"""
+        for b, d, m in notes(start, text):
+            b = sway(b)
+            at(b, 2)
+            k = int(1.8 * sr)
+            t = np.arange(k) / sr
+            ph = tau * x.hz(m) * t
+            put("bell", b, np.sin(ph + np.exp(-t / 0.25) * np.sin(3 * ph)) * np.exp(-t / 0.5) * np.minimum(1, t / 0.002) * tail(k, 0.2) * vol, pan)
 
     # Bars 1-4: the stroll starts. The bass and the chords; the brush from the third bar.
     for bar in range(1, 5):
@@ -324,8 +347,8 @@ def render(second: str = "vibes", window=None) -> np.ndarray:
 
     def sample(first, beside=0.0, glow=False, thin=False):
         """Sixteen bars, the ones Eric kept ("I love everything about that sample, so you can keep that on rough
-        repeat"): two notes in and the tune on the clarinet; then on the second voice, lightly, the clarinet's long
-        notes far under it and the guitar joining the chords. `beside`: the second voice plays beside the clarinet
+        repeat"): two notes in and the tune on the clarinet; then on the flute, lightly, the clarinet's long
+        notes far under it and the guitar joining the chords. `beside`: the flute plays beside the clarinet
         too, this loud; `glow`: strings far off under the clarinet's turn; `thin`: the wood block and then the brush
         drop out towards the end."""
         for bar in range(first, first + 16):
@@ -335,8 +358,8 @@ def render(second: str = "vibes", window=None) -> np.ndarray:
                 pad(bar, 0.016)
         clarinet(bar0(first) - 1, PICKUP, 0.9), clarinet(bar0(first), TUNE)
         if beside:
-            light(bar0(first), BESIDE, beside)
-        light(bar0(first + 8) - 1, PICKUP, 0.9), light(bar0(first + 8), TUNE), clarinet(bar0(first + 8), UNDER, 0.28)
+            flute(bar0(first), BESIDE, beside)
+        flute(bar0(first + 8) - 1, PICKUP, 0.9), flute(bar0(first + 8), TUNE), clarinet(bar0(first + 8), UNDER, 0.28)
 
     # Bars 5-20: the square: the sample as he heard it.
     sample(5)
@@ -345,41 +368,35 @@ def render(second: str = "vibes", window=None) -> np.ndarray:
     for bar in range(21, 29):
         walking(bar, 0.95), rolled(bar, 0.045), pad(bar, 0.018)
         for i in range(8):
-            brush(bar0(bar) + sway(i * 0.5), 0.011 if i % 2 == 0 else 0.007)
+            brush(bar0(bar) + sway(i * 0.5), 0.014 if i % 2 == 0 else 0.009)  # as loud as in the stroll: the shake never drops
     ocarina(bar0(21), SLOW)
 
-    # Bars 29-44: the square again: this time the second voice plays beside the clarinet before its own turn.
+    # Bars 29-44: the square again: this time the flute plays beside the clarinet before its own turn.
     sample(29, beside=0.6)
 
-    # Bars 45-60: the cafe (the quiet part), in E minor. No brush, no wood block; the bass a note or two a bar. The
-    # soft piano has short phrases over the guitar's picking; then the guitar has them over the piano's chords, a
-    # music box far off.
+    # Bars 45-60: the cafe, in E minor. The stroll goes on under it, a little softer (Eric: the backdrop "that rings
+    # throughout" stays in the whole song). The vibraphone has the short phrases, the soft piano with it and well
+    # under it, over the guitar's picking; then the guitar has them over the piano's chords, the bell answering.
     for bar in range(45, 61):
-        b = bar0(bar)
-        root, between = of(bar)
-        bass(b, root, 2.5, 0.3)
-        if len(halves(bar)) == 2:
-            bass(b + 2, halves(bar)[1][0], 1.6, 0.28)
+        stroll(bar, 0.85, "keys")
         if bar < 53:
-            picked(bar, 0.085)
+            picked(bar, 0.06)
         else:
-            rolled(bar, 0.03)
-            if bar % 2 == 1:
-                tones = between(72, 84)
-                box(b + 1.5, tones[-1], 0.028), box(b + 3, tones[len(tones) // 2], 0.022)
-    piano(bar0(45), CAFE_1), guitar(bar0(53), CAFE_2, 0.2)
+            rolled(bar, 0.02)
+    vibes(bar0(45), CAFE_1, 1.6), piano(bar0(45), CAFE_1, 0.045)
+    guitar(bar0(53), CAFE_2, 0.2), bell(bar0(53), BELL)
 
-    # Bars 61-68: a conversation: the clarinet's two bars, the second voice's two, twice; the stroll back under them, lightly.
+    # Bars 61-68: a conversation: the clarinet's two bars, the flute's two, twice, over the stroll.
     for bar in range(61, 69):
         stroll(bar, 0.9, "keys", wood=bar % 2 == 0)
-    clarinet(bar0(61), TALK_C), light(bar0(61), TALK_A)
+    clarinet(bar0(61), TALK_C), flute(bar0(61), TALK_A)
 
-    # Bars 69-76: promoted: the tune a minor third up; the clarinet has it, the second voice beside it, the ocarina
+    # Bars 69-76: promoted: the tune a minor third up; the clarinet has it, the flute beside it, the ocarina
     # over its one long note; strings; the fullest the song gets, and still easy.
     for bar in range(69, 77):
         stroll(bar, 1.08, "both"), pad(bar, 0.02)
     clarinet(bar0(69), seven(TUNE), 1.05, up=3), clarinet(bar0(76), HOME, 1.05)
-    light(bar0(69), seven(BESIDE), 0.7, up=3), light(bar0(76), HOME_BESIDE, 0.7)
+    flute(bar0(69), seven(BESIDE), 0.7, up=3), flute(bar0(76), HOME_BESIDE, 0.7)
     ocarina(bar0(69), "-:20 | -:1.5 F5:2.5 | -:8", 0.045)
 
     # Bars 77-92: home: the sample once more, strings far off under the clarinet, the wood block and the brush
@@ -390,14 +407,14 @@ def render(second: str = "vibes", window=None) -> np.ndarray:
     piano(bar0(93), LAST, 0.08)
 
     x.beat_s = 60 / BPM
-    x.echo("clarinet", 1.5, 0.1, 0.04), x.echo("light", 1.5, 0.1, 0.04), x.echo("box", 1.0, 0.3, 0.15), x.echo("guitar", 1.5, 0.1, 0.04)
-    levels = {"clarinet": 1.0, "light": 2.0, "ocarina": 2.2, "piano": 2.2, "guitar": 2.0, "keys": 4.0, "box": 2.0, "bass": 0.62, "brush": 4.0, "wood": 4.0, "pad": 2.0}
+    x.echo("clarinet", 1.5, 0.1, 0.04), x.echo("flute", 1.5, 0.1, 0.04), x.echo("bell", 1.0, 0.3, 0.15), x.echo("guitar", 1.5, 0.1, 0.04)
+    levels = {"clarinet": 1.0, "flute": 2.0, "vibes": 2.0, "ocarina": 2.2, "piano": 2.2, "guitar": 2.0, "keys": 4.0, "bell": 2.0, "bass": 0.62, "brush": 4.0, "wood": 4.0, "pad": 2.0}
     return x.play(x.mixdown(levels, lowpass=8000, room=0.26, room_s=1.6))
 
 
-def main(out: str, second: str = "vibes") -> None:
-    write_wav(out, render(second))
+def main(out: str) -> None:
+    write_wav(out, render())
 
 
 if __name__ == "__main__":
-    main(*sys.argv[1:3])
+    main(sys.argv[1])
