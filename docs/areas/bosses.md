@@ -354,6 +354,15 @@ below):
   (RaceTower's `t-board`: Won, Lost, Drawn; a phone panel's small rows ✓, ✕, ½); everyone else as they were, someone who left a
   board out. A computer's table lists the four; a phone's Players tab the rows its box fits (three on an iPhone 13), its sheet all four. Tests: `chess/test/recluse-phase2.test.ts`, `server/test/recluse-online.test.ts`, `app/test/recluse-online.test.ts`,
   `app/test/recluse-phase2.test.ts` ("the scoreboard"), `e2e/hidden-boss-room.spec.ts`.
+- **The result after phase 2** (Nov 14, visual check #12; [decision](../decisions/2026-11-14-recluse-phase2-result.md)): where everyone
+  in the match played a board (his room's fight: `phase2Headline`, the match's players no more than the boards) the headline is the
+  boards' verdict, "Victory!" or "Defeated", as a boss alone's, and your place goes under it ("3rd of 4 in the crowd. Roy was the
+  best.", or "You were the best in the crowd: 1st of 4."). A Crowd final's headline stays your place in its crowd. The review on the
+  result is the board you played (`BoardReview` in `components/Breakdown.tsx`, from `boardSteps`; the results phase's `simulBoard`,
+  this device's view as the result came, never sent or stored), from its Chess960 start to its end, opening on the end, who moved and
+  what, no scores; someone who watched (a Crowd final's others) or left their board keeps phase 1's judged moves. Placements, XP, rank
+  and everything stored are untouched. Tests: `app/test/recluse-phase2.test.ts` ("the result", "a phase 2 board, move by move"),
+  `app/test/recluse-online.test.ts` ("the result"), `e2e/hidden-boss-room.spec.ts`.
 - **His cutscene** (Eric, Nov 12; in the fight since Nov 13, solo and online; [decision](../decisions/2026-11-13-recluse-cutscene-wired.md)):
   after his fall, before the phase change, about 104 s (`RECLUSE_CUTSCENE.holdMs`; a unit test keeps it the timeline's length):
   everything dims but a soft round spotlight on the board's middle; he kneels in it while the ghost of him as a child poofs in above

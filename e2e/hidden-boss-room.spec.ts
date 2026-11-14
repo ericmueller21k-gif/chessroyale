@@ -317,6 +317,7 @@ test("his room (Eric, Nov 12 and 13): Challenge is 1 of 4; leaving asks; an admi
   const stepText = review.locator(".bm-step-text");
   await expect(stepText).toHaveText(plies ? new RegExp(`^Move ${plies} of ${plies} · `) : "The start · Chess960");
   await expect(review.getByRole("button", { name: "Next move" })).toBeDisabled();
+  await expect(review.locator(".bm-text")).toHaveText(plies ? /^(You|He) played \S+\. Your board is won\.$/ : "No moves were played on your board. Your board is won.");
   if (plies) {
     await review.getByRole("button", { name: "Previous move" }).click();
     await expect(stepText).toHaveText(plies > 1 ? new RegExp(`^Move ${plies - 1} of ${plies} · `) : "The start · Chess960");
