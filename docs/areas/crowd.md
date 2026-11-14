@@ -168,7 +168,8 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
   [bosses.md](bosses.md)). **Online** the lobby runs both through the shared runner, his brain on the host's device; the
   man beaten, the board holds for his collapse (the boss message's `fall`), then the results (`timeout` when he won on time).
   **Phase 2 online** (Nov 13): the man beaten, his phase change and the four boards follow for the top 4 (the server's, as
-  his room's fight: bosses.md, "Phase 2 online"); the others watch.
+  his room's fight: bosses.md, "Phase 2 online"); the others watch. The scoreboard keeps the top 4 in from his fall until the
+  results, each with their board's state, the others out (Nov 14: bosses.md, "The scoreboard through phase 2").
   **Solo** (you and bots), if you reached him, his phase 2 follows as in Boss alone, the other
   three finalists on the other boards (`phase2Follows`, `phase2Mates` in `recluse-phase2.ts`). No reward comes from this
   path (rewards only via Squads: ROADMAP.md). Duel: the last two. `finalMaxTurns` caps a final; the engine
