@@ -1189,3 +1189,6 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   POST with 500 (town beat); e2e/dev-proxy-retry.mjs patches it before wrangler dev (fails loudly on a wrangler upgrade). Also
   tapPoint("person") looks off-middle. Recording every first try measured +22% run time (not the flake cause): leave it OFF.
   #718 ride sounds: e2e check fixed (sample every 15 ms, not per frame), CI watcher b4x6kbky9 on a5e615db.
+- Nov 14 19:50: #719 flaky round 6 MERGED d783aaca (PR run green, 0 retries, full suite). Main run watcher b1yvy2s07 (lists flaky).
+  #718 ride sounds: e2e check rewritten (no read count; one source the whole walk, a dip allowed; one start, one end), main merged in
+  -> 9d49e620, CI watcher boxfkswit. Removed stale worktree scratchpad/wt-rule (it held claude/nifty-goodall-2sr1si).
