@@ -1162,3 +1162,7 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 14 16:02: main b6d26aa8 (#713) LIVE and full run GREEN (no retries). Started two high helpers: flaky round 5
   session_01JuCWRw3QR98S4tYQ3NPKR1 (claude/flaky-round5, watcher beg71blse) and Hidden Boss polish (claude/recluse-polish:
   #707 m2/m4/m5, MovePanel suited face, QA #11 nits; told to keep out of e2e/helpers.ts). Check-in 16:46.
+- Nov 14 16:46: #714 recluse polish (cb0362e1, CI watcher bljqrllf8) and #715 flaky round 5 (cd522eb8, CI watcher bbhh2lt0g) opened;
+  no conflict between them (merge-tree clean). Merge each when green; the second merges main first if needed. No helpers running.
+  Left: shop:238 (proposal: reading-window check), town-chat:1367/1370, fairplay:65, alfil:247, town-street:155; the 🏆 button words
+  online; subscribe-in-useEffect gap.
