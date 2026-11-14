@@ -2,10 +2,9 @@ import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "preact/
 import { createPortal, memo } from "preact/compat";
 import { RECLUSE_PHASE2 } from "@chessroyale/core";
 import { moveLeft } from "@chessroyale/chess";
-import { RECLUSE, RECLUSE_BUST, RECLUSE_JUMP, palmOf } from "../characters/recluse.ts";
-import { lazyTable, type Frame } from "../characters/sprite.ts";
-import { EngineOverlay, placeEngine } from "../components/Recluse.tsx";
-import { kingSay } from "../godKing.ts";
+import { CHANGE_HANDS } from "../characters/recluse-transform.ts";
+import { RecluseTransform } from "../components/RecluseTransform.tsx";
+import { recluseCutsceneTimeline, useRect } from "../components/RecluseCutscene.tsx";
 import { play } from "../sound.ts";
 import { BOSS_KITS } from "../characters/kits.ts";
 import { RECLUSE_LINES } from "../characters/recluse-lines.ts";
@@ -21,7 +20,7 @@ import { BossPanel, STRIP_LAYOUT, besideBoard, useBossLayout } from "../componen
 import { UnderBoard, useMedia } from "../components/QuickChat.tsx";
 import type { GameView, SimulBoardView, SimulView } from "../game.ts";
 import type { ComponentChildren } from "preact";
-import { ARC_LIFE, ARC_REDRAW, ARC_STRIKES, PHASE_CHANGE, phase2UltBannerMs, absorbKing, absorbPaced, arcPoints, smoothPath, type ArcStrike } from "../recluse-phase2.ts";
+import { ARC_LIFE, ARC_REDRAW, ARC_STRIKES, PHASE_CHANGE, phase2UltBannerMs, arcPoints, smoothPath, type ArcStrike } from "../recluse-phase2.ts";
 import { CRITICAL, NORMAL, VoiceBubble, bossVoice } from "../speech.tsx";
 import { Hud } from "./Hud.tsx";
 import { useStillKey } from "../hooks.ts";
@@ -99,36 +98,6 @@ function quarterStyle(q: number, t: number, desk: boolean): Record<string, strin
   };
 }
 
-type Pt = { x: number; y: number };
-/** His whole figure on the board: its width (% of the board; about his own 2x by a computer's board, larger than his bust on a phone). */
-const FIG_W = 24;
-const FIG_H = (FIG_W * RECLUSE.h) / RECLUSE.w;
-/** Where his feet land, in the middle of the board (% of it); the book lies open just in front of them. */
-const MIDDLE: Pt = { x: 50, y: 60 };
-/** His raised hands as he chants in the middle of the board (% of it, our left first): where the arcs strike from. */
-const CHANT_HANDS = lazyTable(() => {
-  const f = RECLUSE.anims.chant!.frames[0]!;
-  const left = MIDDLE.x - (FIG_W * RECLUSE.foot[0]) / RECLUSE.w;
-  const top = MIDDLE.y - (FIG_H * RECLUSE.foot[1]) / RECLUSE.h;
-  return f.layers
-    .filter((l) => l.part === "hand:palm")
-    .map((l) => [left + ((l.x + 3.5) / RECLUSE.w) * FIG_W, top + ((l.y + 2) / RECLUSE.h) * FIG_H] as const)
-    .sort((a, b) => a[0] - b[0]);
-});
-/** Where he leaps from and back to (his feet), by his place: a phone's boss bar above the board's top left; a computer's figure by its bottom left. */
-const PLACE = { phone: { x: 10, y: 38 }, computer: { x: -12, y: 100 } } as const;
-const FLIGHT = RECLUSE_JUMP.landAt - RECLUSE_JUMP.upAt;
-/** A leap from `a` to `b`, off the ground at `upAt` (ms into the phase change): where his feet are. */
-function leapAt(t: number, a: Pt, b: Pt, upAt: number): Pt {
-  const u = clamp01((t - upAt) / FLIGHT);
-  return { x: a.x + (b.x - a.x) * u, y: a.y + (b.y - a.y) * u - 22 * 4 * u * (1 - u) };
-}
-/** The light's strength at `t`: rising out of the book as he begins to chant, dying as the boards settle. */
-function lightAt(t: number): number {
-  const C = PHASE_CHANGE;
-  return Math.min(clamp01((t - C.chantAt) / C.lightMs), 1 - clamp01((t - (C.growAt + C.growMs - 300)) / 500));
-}
-
 /** Sounds and lines of the phase change already started (by its start time and name): each once, as its beat comes. */
 const cued = new Set<string>();
 /** Runs `fn` once, as `on` turns true (a layout effect: as the beat shows, whatever the screen does next). */
@@ -139,87 +108,6 @@ function useCue(on: boolean, key: string, fn: () => void) {
     if (cued.size > 200) cued.delete(cued.values().next().value!);
     fn();
   }, [on]);
-}
-
-type Xy = { x: number; y: number };
-/** His raised hand in the frame he holds it up in while the power streams in (`seizeLoop`), on either drawing. */
-let seizePalm: Record<string, readonly [number, number]> | undefined;
-const SEIZE_PALM = () => (seizePalm ??= { [RECLUSE.id]: palmOf(RECLUSE.anims.seizeLoop!.frames[0]!)!, [RECLUSE_BUST.id]: palmOf(RECLUSE_BUST.anims.seizeLoop!.frames[0]!)! });
-/** Golden motes in the stream, and how long one takes from the God King to the boss (ms). */
-const MOTES = 16;
-const MOTE_MS = 650;
-const easeIn = (x: number) => x * x * (1.6 - 0.6 * x);
-/** A point along the stream (a cubic from him to the boss: low along the board's bottom first, then up into the hand). */
-function along(p: number, g: Xy, c1: Xy, c2: Xy, b: Xy): Xy {
-  const q = 1 - p;
-  const w = [q * q * q, 3 * q * q * p, 3 * q * p * p, p * p * p];
-  return { x: w[0]! * g.x + w[1]! * c1.x + w[2]! * c2.x + w[3]! * b.x, y: w[0]! * g.y + w[1]! * c1.y + w[2]! * c2.y + w[3]! * b.y };
-}
-
-/**
- * The God King's power drained into the boss (PHASE_CHANGE's `drainAt` to `igniteAt`): a soft golden beam from him to
- * the boss's raised hand, golden motes flowing along it, a glow gathering in the hand, a cold flash as it lands. They
- * stand in different parts of the screen (his dock, the boss's bar or the board's corner), so it's drawn over the whole
- * page, in its pixels, measured from their drawings as it starts (and again if the page changes size). Only the motes'
- * transforms and the layers' opacity change from frame to frame.
- */
-function AbsorbStream({ t }: { t: number }) {
-  const C = PHASE_CHANGE;
-  const [geo, setGeo] = useState<{ g: Xy; b: Xy; c1: Xy; c2: Xy; u: number; w: number; h: number } | null>(null);
-  useLayoutEffect(() => {
-    const measure = () => {
-      const him = document.querySelector(".gk-unit .god-king")?.getBoundingClientRect();
-      // (His figure where he stands on this screen: the bust in a phone's bar, the whole figure by a computer's board.)
-      const box = [...document.querySelectorAll<HTMLElement>(".boss-char.ch-recluse, .boss-char.ch-recluse-bust")].find((e) => e.getBoundingClientRect().width > 0);
-      const cv = box?.querySelector(".boss-char-sprite")?.getBoundingClientRect();
-      if (!him || !box || !cv?.width) return setGeo(null);
-      const ch = box.classList.contains(`ch-${RECLUSE_BUST.id}`) ? RECLUSE_BUST : RECLUSE;
-      const palm = SEIZE_PALM()[ch.id]!;
-      const b = { x: cv.left + (palm[0] / ch.w) * cv.width, y: cv.top + (palm[1] / ch.h) * cv.height };
-      const g = { x: him.left + him.width * 0.5, y: him.top + him.height * 0.55 };
-      // (Out of him sideways, low, then up into the hand from below: clear of both their words above them.)
-      const low = Math.max(g.y, b.y) + him.height * 0.15;
-      setGeo({ g, b, c1: { x: (g.x + b.x) / 2, y: low }, c2: { x: b.x, y: low }, u: Math.max(0.8, him.width / 50), w: innerWidth, h: innerHeight });
-    };
-    measure();
-    addEventListener("resize", measure);
-    return () => removeEventListener("resize", measure);
-  }, []);
-  if (!geo) return null;
-  const { g, b, c1, c2, u } = geo;
-  const d = t - C.drainAt;
-  // The beam: in over a quarter second, a slow shimmer, out as the power lands.
-  const beam = Math.max(0, Math.min(1, d / 250, (C.igniteAt + 120 - t) / 200)) * (0.85 + 0.15 * Math.sin(t / 70));
-  const path = `M${g.x} ${g.y} C${c1.x} ${c1.y} ${c2.x} ${c2.y} ${b.x} ${b.y}`;
-  const motes: { x: number; y: number; s: number; o: number }[] = [];
-  for (let i = 0; i < MOTES; i++) {
-    const start = C.drainAt + (i * MOTE_MS) / MOTES;
-    if (t < start) continue;
-    const cycle = Math.floor((t - start) / MOTE_MS);
-    // (None sets off that couldn't arrive by the time the power lands: the stream empties into his hand.)
-    if (start + (cycle + 1) * MOTE_MS > C.igniteAt + 40) continue;
-    const p = easeIn(((t - start) % MOTE_MS) / MOTE_MS);
-    const at = along(p, g, c1, c2, b);
-    const wob = Math.sin(p * Math.PI) * Math.sin(i * 1.7 + t / 110) * 7 * u;
-    motes.push({ x: at.x + wob * 0.6, y: at.y + wob, s: 1 - 0.45 * p, o: Math.min(1, p * 6) });
-  }
-  // The glow gathering in his hand, and the cold flash as it lands.
-  const gather = Math.max(0, Math.min(1, d / C.drainMs));
-  const flash = t >= C.igniteAt ? Math.max(0, 1 - (t - C.igniteAt) / 450) : 0;
-  return createPortal(
-    <div class="rc-absorb" aria-hidden="true">
-      <svg class="rc-absorb-beam" width={geo.w} height={geo.h} style={{ opacity: String(beam) }}>
-        <path d={path} class="rc-beam-glow" style={{ strokeWidth: 12 * u }} />
-        <path d={path} class="rc-beam-core" style={{ strokeWidth: 2.4 * u }} />
-      </svg>
-      {motes.map((m, i) => (
-        <i key={i} class="rc-mote" style={{ transform: `translate(${m.x.toFixed(1)}px, ${m.y.toFixed(1)}px) scale(${(m.s * u).toFixed(2)})`, opacity: String(m.o) }} />
-      ))}
-      {t < C.igniteAt && <i class="rc-gather" style={{ transform: `translate(${b.x}px, ${b.y}px) scale(${((0.4 + 0.9 * gather) * u).toFixed(2)})`, opacity: String(Math.min(1, d / 300)) }} />}
-      {flash > 0 && <i class="rc-landflash" style={{ transform: `translate(${b.x}px, ${b.y}px) scale(${((0.6 + 2.2 * (1 - flash)) * u).toFixed(2)})`, opacity: String(flash) }} />}
-    </div>,
-    document.body,
-  );
 }
 
 /** One arc's path: its main stroke from his hand to the cracks, and now and then a short branch off it. */
@@ -273,13 +161,12 @@ function Arcs({ t, hands }: { t: number; hands: readonly (readonly [number, numb
 }
 
 /**
- * The phase change on one square stage (PHASE_CHANGE has its beats). Not skippable, like a boss's intro. It opens with the
- * God King's absorption: in his place in the dock (BossDock's `king`: absorbKing) he stands triumphant, is drained and
- * fades, the stream between them drawn over the page (AbsorbStream). The boss's place (BossCharacter, from the figure run
- * solo.ts sets) plays his seizing and his rage, his half-engine look igniting as the power lands (its time set by solo.ts:
- * setEngineAt); from the leap to his return the board draws his whole figure instead (RECLUSE's on-board animations, the
- * look over it too) and his place stands empty (`rc-away`), his words over his head there (Nov 14). Blue arcs strike the board as it
- * splits (Arcs).
+ * The phase change on one square stage (PHASE_CHANGE has its beats): his transformation by the book's light, carrying on from his
+ * cutscene (Eric, Nov 14). Not skippable, like a boss's intro. Over the board, RecluseTransform draws the lens, the light, the
+ * child and him from the start to his leap home (his place stands empty meanwhile: `rc-away`, his words over his head there); the
+ * board's square here: the four quarters (together the whole board until they part; the big board is never drawn behind them), the
+ * crack and the blue arcs from his hands as he lands on the music's drop, the shuffle, "PHASE 2". The God King stays in his place,
+ * greyed. His suit shows where he stands from the white-out on (solo.ts and recluse-online.ts: setSuitAt).
  */
 export function PhaseChangeScreen({ match, at }: { match: GameView; at: number }) {
   const v = match.simul;
@@ -287,41 +174,16 @@ export function PhaseChangeScreen({ match, at }: { match: GameView; at: number }
   const computer = useMedia(COMPUTER_LAYOUT);
   const t = now - at;
   const C = PHASE_CHANGE;
-  // The absorption: the God King's triumph (his shout as he raises his sword, his line), his cry as he's drained (and
-  // the drain's whoosh), the boss's line as the power lands (its spark is his frames' cue), the God King gone in light.
   const cue = (on: boolean, name: string, fn: () => void) => useCue(on, `${at}:${name}`, fn);
-  cue(t >= C.kingAt + 80, "hyuah", () => play("gkHyuah"));
-  cue(t >= C.kingAt + 150, "triumph", () => kingSay("foeTriumph", `recluse:absorb:${at}`));
-  // (Before he seizes it, on his knees: he'll take that power. NORMAL: it waits for his mumbling to end.)
-  cue(t >= C.talkAt, "talk", () => bossVoice.say(RECLUSE_LINES.seizeTalk[at % RECLUSE_LINES.seizeTalk.length]!, `recluse:talk:${at}`, NORMAL));
-  cue(t >= C.drainAt, "drain", () => {
-    play("recluseDrain");
-    play("gkLastGrunt2");
-    kingSay("foeDrained", `recluse:drained:${at}`);
-  });
-  cue(t >= C.igniteAt + 80, "leave", () => play("gkLeave"));
-  // (CRITICAL, Oct 17: it cuts in on his word before the seize, so it comes as the power lands; since the hold and the
-  // longer cast it has its whole time before his chant, or nearly: the chant's line waits for it, a second at most.)
-  // (Gone by his chant's first line since Nov 13, paged as the chant's lines are: absorbPaced.)
-  cue(t >= C.absorbLineAt, "absorb", () => {
-    const line = RECLUSE_LINES.absorb[at % RECLUSE_LINES.absorb.length]!;
-    bossVoice.sayPaced(absorbPaced(line), `recluse:absorb:${at}`, CRITICAL, at + C.absorbLineAt);
-  });
+  cue(t >= C.revealAt, "reveal", () => play("recluseSpark"));
   cue(t >= C.arcAt, "arcs", () => play("recluseArc"));
-  // His look over his figure on the board, placed on his head frame by frame.
-  const figEngine = useRef<HTMLSpanElement>(null);
-  const onFigFrame = useCallback((f: Frame) => placeEngine(figEngine.current, f), []);
-  // His two lines over the book as the light comes (Eric, Nov 13), each typed at its own pace at its time (`chantLines`), and
-  // his word as the book is back in his hands.
+  // His two lines (Eric, Nov 13 and 14), each typed at its own pace at its time (`chantLines`): the first with his visor up, the
+  // second as the board splits.
   const chantLine = C.chantLines.filter((l) => t >= l.at).length;
   useLayoutEffect(() => {
     const l = C.chantLines[chantLine - 1];
     if (l) bossVoice.sayPaced(l.line, `recluse:chant${chantLine}:${at}`, CRITICAL, at + l.at);
   }, [chantLine]);
-  const revived = t >= C.catchAt;
-  useLayoutEffect(() => {
-    if (revived) bossVoice.say(RECLUSE_LINES.revive[at % RECLUSE_LINES.revive.length]!, `recluse:revive:${at}`, CRITICAL);
-  }, [revived]);
   // (The header and the boss's place don't move with the frame: drawn as the match changes, useStillKey.)
   const still = useStillKey(match, now);
   const hud = useMemo(() => <Hud match={match} />, [match, still]);
@@ -331,30 +193,16 @@ export function PhaseChangeScreen({ match, at }: { match: GameView; at: number }
   const under = useMemo(() => besideBoard(match, layout, <UnderBoard match={match} />), [match, still, layout.strip, layout.computer]);
   const panel = useMemo(() => (layout.strip ? <BossPanel match={match} /> : undefined), [match, still, layout.strip]);
   const strip = layout.strip;
+  const [stage, setStage] = useState<HTMLElement | null>(null);
+  const rect = useRect(stage);
   if (!v) return null;
   const split = t >= C.partAt;
   const shuffled = t >= C.shuffleAt;
-  const away = t >= C.leapAt && t < C.homeAt;
-  // (The board jolts as he lands.)
-  const jolt = t >= C.landAt && t < C.landAt + 320;
-  const place = computer ? PLACE.computer : PLACE.phone;
-  // His figure on the board: the leap in, the book thrown down, the chant, the book back in his hands, the leap back.
-  const fig =
-    t < C.leapAt || t >= C.homeAt
-      ? null
-      : t < C.dropAt
-        ? { anim: "leap", since: at + C.leapAt, feet: leapAt(t, place, MIDDLE, C.upAt) }
-        : t < C.chantAt
-          ? { anim: "drop", since: at + C.dropAt, feet: MIDDLE }
-          : t < C.pickupAt
-            ? { anim: "chantRaise", then: "chant", since: at + C.chantAt, feet: MIDDLE }
-            : t < C.backAt
-              ? { anim: "pickup", since: at + C.pickupAt, feet: MIDDLE }
-              : { anim: "leap2", since: at + C.backAt, feet: leapAt(t, MIDDLE, place, C.backAt + RECLUSE_JUMP.upAt) };
-  // (His shadow where he'll come down: on the way in only, since on the way back he's gone before he lands.)
-  const flying = fig?.anim === "leap" && t >= C.upAt && t < C.landAt;
-  const light = lightAt(t);
+  const away = t < C.homeAt;
   const cracking = t >= C.crackAt && t < C.growAt;
+  // (The cutscene's loop of him and the child, carried on: its start, ms into the phase change.)
+  const scene = recluseCutsceneTimeline();
+  const sceneStand = scene.standAt - scene.endAt;
   // (No scoreboard here: phase 1's, minimized, gave the board more of a phone's height, so its size is kept until the
   // split by the same rule: styles.css, rc-folded. A phone upright has no scoreboard to minimize in phase 1 since Oct 25,
   // its panel beside the God King keeping one size: there a fold remembered from another match changes nothing.)
@@ -364,14 +212,15 @@ export function PhaseChangeScreen({ match, at }: { match: GameView; at: number }
       {hud}
       {/* (No line above the board (Eric, Oct 24): the dock's second line says "Freestyle" once the boards split, the variant
           players see: FIDE's name for Chess960.) */}
-      <div class={`board-area${jolt ? " pw-crash" : ""}`}>
+      <div class={`board-area${t >= C.crackAt && t < C.crackAt + 320 ? " pw-crash" : ""}`}>
         <div class="board-row">
           {bossSide}
           {/* (The eval bar's slot as phase 1 has it: none while it's off, prefs.ts, so the square is phase 1's board's.) */}
           {evalBarOn() && <div class="eval-bar rc-evalgap" aria-hidden="true" />}
           <div
+            ref={setStage}
             class="board-wrap rc-stage"
-            data-step={shuffled ? "shuffle" : split ? "split" : cracking ? "crack" : t >= C.chantAt ? "chant" : t >= C.dropAt ? "drop" : t >= C.leapAt ? "leap" : t >= C.riseAt ? "rage" : t >= C.drainAt ? "drain" : "king"}
+            data-step={shuffled ? "shuffle" : split ? "split" : cracking ? "crack" : t >= C.revealAt ? "revealed" : t >= C.whiteFull ? "white" : t >= C.burstAt ? "light" : "book"}
           >
             {/* (The four boards from the start, each clipped to its quarter: together they are the whole board until they
                 part, so the split mounts nothing new on a slow phone.) */}
@@ -390,62 +239,33 @@ export function PhaseChangeScreen({ match, at }: { match: GameView; at: number }
                 </span>
               </>
             )}
-            {light > 0 && (
-              <>
-                {/* The light pouring up out of the book: behind him a pulsing cone of it, in front a glow on the pages. */}
-                <span class="rc-light" style={{ left: `${MIDDLE.x}%`, top: `${MIDDLE.y - 1}%`, opacity: String(light), transform: `scaleY(${0.3 + 0.7 * light})` }} />
-                <span class="rc-glow" style={{ left: `${MIDDLE.x}%`, top: `${MIDDLE.y - 1}%`, opacity: String(light) }} />
-              </>
-            )}
-            {flying && <span class="rc-shadow" style={{ left: `${MIDDLE.x}%`, top: `${MIDDLE.y}%` }} />}
-            {fig && (
-              <span
-                class="rc-fig"
-                data-anim={fig.anim}
-                style={{ width: `${FIG_W}%`, transform: `translate(${(fig.feet.x - (FIG_W * RECLUSE.foot[0]) / RECLUSE.w).toFixed(2)}cqw, ${(fig.feet.y - (FIG_H * RECLUSE.foot[1]) / RECLUSE.h).toFixed(2)}cqw)` }}
-              >
-                <SpriteAnim ch={RECLUSE} anim={fig.anim} then={fig.then} since={fig.since} sounds={BOSS_KITS["Hidden Boss"]!.sounds} id="rc-fig" onFrame={onFigFrame} />
-                <EngineOverlay ch={RECLUSE} elRef={figEngine} on />
-                {/* His words over his head while he's on the board (Eric, Nov 14: they floated by his empty place, far from him), his
-                    place's box hidden meanwhile (styles.css, .rc-away). Mounted again with each of his animations, so a box moved into
-                    view is placed again where he stands now. */}
-                <span class="rc-say-at">
-                  <VoiceBubble key={fig.anim} voice={bossVoice} class="bc-bubble rc-say" />
-                </span>
-              </span>
-            )}
-            {t >= C.arcAt && t < C.arcEnd + ARC_LIFE && <Arcs t={t} hands={CHANT_HANDS} />}
+            {t >= C.arcAt && t < C.arcEnd + ARC_LIFE && <Arcs t={t} hands={CHANGE_HANDS} />}
             {t >= C.bannerAt && <FightBanner text="PHASE 2" sub="Win all four boards" tone="boss" sound="bannerStart" ms={C.bannerMs} />}
           </div>
         </div>
       </div>
-      {t >= C.drainAt - 50 && t < C.igniteAt + 500 && <AbsorbStream t={t} />}
+      {away && rect && <RecluseTransform at={at} t={t} rect={rect} computer={computer} sceneStand={sceneStand} />}
       <BossDock
         match={match}
         side="w"
-        king={absorbKing(t, at)}
+        // (The God King stays in his place, greyed, as in phase 2: Eric, Nov 14.)
+        king="benched"
         panel={panel}
         // (No move is anyone's during the phase change: no clock.)
         clock={null}
-        // (Never what his bubble or the banner says at the same moment, Eric, Oct 15: his "Mind and machine" line had
-        // "Mind and engine, one." under it, and "PHASE 2" "win all four boards" had "Phase 2!" "Every board must be
-        // won."; as the banner shows, the clock you'll have, which nothing else on screen says yet: on two lines, so
-        // a phone shows it whole.)
+        // (Never what his bubble or the banner says at the same moment, Eric, Oct 15; as the banner shows, the clock you'll have,
+        // which nothing else on screen says yet: on two lines, so a phone shows it whole.)
         status={
           <>
             <span class="dock-line">
               <strong>
-                {t < C.drainAt
-                  ? "The God King triumphs!"
-                  : t < C.goneAt
-                    ? "He's draining the God King!"
-                    : t < C.riseAt
-                      ? "The God King's power is his!"
-                      : t < C.chantAt
-                      ? "The boss rises!"
-                      : t < C.bannerAt
-                        ? "One board becomes four…"
-                        : `${clockShown(RECLUSE_PHASE2.bankSeconds * 1000)} on your clock`}
+                {t < C.whiteFull
+                  ? "The book's light takes him!"
+                  : t < C.crackAt
+                    ? "He's transformed!"
+                    : t < C.bannerAt
+                      ? "One board becomes four…"
+                      : `${clockShown(RECLUSE_PHASE2.bankSeconds * 1000)} on your clock`}
               </strong>
             </span>
             {/* (The second line kept, empty until then, so the box keeps its height.) */}

@@ -25,7 +25,8 @@ import { prewarmGardener, resetGarden } from "./Gardener.tsx";
 import { prewarmTiger } from "./Tiger.tsx";
 import { resetTiger } from "../tiger-show.ts";
 import { prewarmFolio } from "./Folio.tsx";
-import { EngineOverlay, placeEngine, prewarmRecluse } from "./Recluse.tsx";
+import { prewarmRecluse } from "./Recluse.tsx";
+import { suited } from "../characters/recluse.ts";
 import { CRITICAL, LOW, NORMAL, VoiceBubble, bossVoice, holdMs, type Priority } from "../speech.tsx";
 import { mateAttack, prewarmKingAttack } from "./KingAttack.tsx";
 import { lightsId, syncLights } from "../characters/lights.ts";
@@ -68,7 +69,7 @@ export function resetBeats() {
   played.clear();
   inPlace.run = null;
   figure.run = null;
-  engine.at = null;
+  suit.at = null;
   resetMoo();
   resetGarden();
   resetTiger();
@@ -89,13 +90,13 @@ export function setFigureRun(run: FigureRun | null) {
 }
 
 /**
- * The Hidden Boss's half-engine look (Eric, Oct 14: an overlay, never his frames): from `at` (his phase change, as the God
- * King's power lands in him) to the end of the battle, on every drawing of him (Recluse.tsx, EngineOverlay). Cleared by a
- * new battle (resetBeats).
+ * The Hidden Boss's suit and helmet (Eric, Nov 14): from `at` (his transformation's white-out) to the end of the battle, worn on
+ * every drawing of him where he stands (his frames' parts swapped for the suit's: recluse.ts, `suited`). Cleared by a new battle
+ * (resetBeats).
  */
-const engine: { at: number | null } = { at: null };
-export function setEngineAt(at: number | null) {
-  engine.at = at;
+const suit: { at: number | null } = { at: null };
+export function setSuitAt(at: number | null) {
+  suit.at = at;
 }
 /** The loop the figure rests in now, when a figure run is set (phase 2's `idle2`), else null. */
 export const figureLoop = (): string | null => figure.run?.loop ?? null;
@@ -320,8 +321,6 @@ function Character({ boss, stage, place }: { boss: BossView; stage: Stage; place
   nowRef.current = { boss, stage };
   const box = useRef<HTMLDivElement>(null);
   const cv = useRef<HTMLCanvasElement>(null);
-  // (The Hidden Boss's half-engine look over his drawing, placed on his head frame by frame: Recluse.tsx.)
-  const eng = useRef<HTMLSpanElement>(null);
   // Drawn before the paint (no empty first frame), then on every animation frame that changes the picture.
   useLayoutEffect(() => {
     if (!kit || !beat || !cv.current) return;
@@ -329,7 +328,6 @@ function Character({ boss, stage, place }: { boss: BossView; stage: Stage; place
     let raf = 0;
     let last = "";
     let moved = "";
-    let lit: boolean | null = null;
     // (A figure whose height changes with what's drawn, the Hidden Boss's child growing up: his words stand on the top of the drawing
     // shown now, set as its animation changes (BossKit.heads); the tallest of them for one not listed.)
     let head = -1;
@@ -357,16 +355,9 @@ function Character({ boss, stage, place }: { boss: BossView; stage: Stage; place
         if (rest) s = rest;
       }
       const look = lookRef.current();
-      const id = `${s.anim}:${s.frame}:${look}:${lightsId()}`;
-      if (eng.current) {
-        const on = engine.at !== null && now >= engine.at;
-        if (on !== lit) {
-          lit = on;
-          eng.current.classList.toggle("on", on);
-          // (It ignites only as it comes; a screen drawn later shows it already on.)
-          eng.current.classList.toggle("fresh", on && now - engine.at! < 400);
-        }
-      }
+      // (The Hidden Boss in his suit from his transformation on: the same frames, worn.)
+      const suitOn = !!kit.suit && suit.at !== null && now >= suit.at;
+      const id = `${s.anim}:${s.frame}:${look}:${lightsId()}:${suitOn ? "suit" : ""}`;
       if (kit.heads) {
         const h = kit.heads[s.anim] ?? tallest;
         if (h !== head && box.current) {
@@ -376,9 +367,9 @@ function Character({ boss, stage, place }: { boss: BossView; stage: Stage; place
       }
       if (id !== last) {
         last = id;
-        const frame = kit.ch.anims[s.anim]!.frames[s.frame]!;
+        const drawn = kit.ch.anims[s.anim]!.frames[s.frame]!;
+        const frame = suitOn ? suited(drawn) : drawn;
         g?.putImageData(frameImage(kit.ch, frame, look), 0, 0);
-        placeEngine(eng.current, frame);
         box.current?.setAttribute("data-anim", s.anim);
         // (Each frame's number and cue, so a test counts a clock smack by its own click, not by timing.)
         box.current?.setAttribute("data-frame", String(s.frame));
@@ -436,7 +427,6 @@ function Character({ boss, stage, place }: { boss: BossView; stage: Stage; place
   return (
     <div ref={box} class={`boss-char place-${place} ch-${ch.id}${kit.tall ? " tall" : ""}${kit.wide ? " wide" : ""}${kit.heads ? " bc-heads" : ""}${place === "results" && kit.artFacesLeft ? " art-left" : ""}`} data-anim={beat.anim} data-faces={kit.sprite ? drawnFacing(kit.sprite, ch) : undefined} aria-hidden="true" style={{ "--bc-w": ch.w, "--bc-h": ch.h, "--bc-fx": ch.foot[0], "--bc-fy": ch.foot[1], ...barSize }}>
       <canvas ref={cv} class="boss-char-sprite" width={ch.w} height={ch.h} />
-      {kit.engine && <EngineOverlay ch={ch} elRef={eng} />}
       {/* Its words: a pixel text box beside it that types itself out and fades at the end (like the God King's). In the
           boss bar, the bar holds them instead, in its name's room (BossBar): never over its status or the board. */}
       {place !== "bar" && <VoiceBubble voice={bossVoice} class="bc-bubble" />}

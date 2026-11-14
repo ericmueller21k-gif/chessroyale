@@ -2006,11 +2006,11 @@ export const RECLUSE_CUTSCENE = {
   /** A box's fade, and the quiet between it and the next box. */
   boxFadeMs: 260,
   gapMs: 400,
-  /** After the last box has gone, the child fades out this much later (his fade is his frames'), then the scene holds. */
-  kidFadeAfterMs: 500,
-  endHoldMs: 1500,
-  /** Then the light lifts and the scene fades away (the dim and the man on the board), and his phase change begins. */
-  outMs: 600,
+  /**
+   * After the last box has gone, his phase change carries on from the scene this much later (Eric, Nov 14: his transformation,
+   * the book at his feet opening, the man and the child still in the light).
+   */
+  endAfterMs: 400,
   /**
    * Online (claude/recluse-online-phase2): after his fall the server holds this long for the scene, telling everyone when it
    * starts (`recluseCutscene`), then his phase change starts for everyone at once. The scene's whole length (the app's
@@ -2120,27 +2120,38 @@ export const RECLUSE_PHASE2 = {
    */
   change: {
     /**
-     * After the mate, more of his words before he seizes the God King's power (ms added before the seize): his
-     * mumbling, then his new lines (RECLUSE_LINES.seizeTalk), the last about taking that power, while the God King
-     * gloats over him.
+     * His transformation (Eric, Nov 14; docs/decisions/2026-11-14-recluse-transformation.md), ms from its start, which is the moment
+     * the book at his feet opens, 400 ms after his cutscene's last box is gone (so `introMs` after it, the music's drop, the board
+     * cracks): the light takes him on the music's slam (`burstAt`: his eyes go white) and lifts him on its build (`riseAt`, for
+     * `riseMs`); it grows, shoots up off the screen (`shootAt`), radiates in every direction (`radiateAt`), whites out the screen
+     * (`whiteAt` to `whiteFull`; unseen, the suit), holds, and dies back into the center (`downAt` to `revealAt`); the visor flips
+     * up (`flipUpAt`) for his first line (`line1At`) and back down (`flipDownAt`); he leaps on the music's breath, a second before
+     * the drop (`leapMs` of hang time), and lands as the board cracks; his second line `line2AfterMs` after the crack.
+     * `introMs` is `recluse-phase3`'s introSeconds (public/music/themes.json; a test keeps them equal).
      */
-    talkMs: 4500,
-    /** The power landed: he holds his closed fist, his engine eye newly lit, before he rises (ms). */
-    absorbHoldMs: 1500,
-    /**
-     * His cast on the board: since Nov 13 as long as his two lines over the open book need (Eric's: RECLUSE_LINES.chantSay), the
-     * last typed out `crackAfterLineMs` before the board cracks, as the transformation theme falls silent before its drop (its
-     * `breath` mark, a second before the split). (Until Nov 13 a fixed 4 s more than the chant's 1.7 s.)
-     */
-    crackAfterLineMs: 1000,
+    transform: {
+      introMs: 17_435,
+      burstAt: 2640,
+      riseAt: 3040,
+      riseMs: 1900,
+      shootAt: 5600,
+      radiateAt: 6300,
+      whiteAt: 7300,
+      whiteFull: 8000,
+      downAt: 8700,
+      revealAt: 10_000,
+      flipUpAt: 10_300,
+      line1At: 10_600,
+      flipDownAt: 15_750,
+      leapMs: 1000,
+      line2AfterMs: 800,
+    },
     /**
      * How his chant's lines type and hold (Eric, Nov 13: the cutscene mockup's pace, its RECLUSE_CUTSCENE numbers; "err slow"):
      * a character every `typeMs`, `sentencePauseMs` between a line's two sentences, then fully readable `readMs` plus
-     * `perCharMs` a character (at most `maxReadMs`), its fade `fadeMs`, `gapMs` before the next line. The first comes
-     * `firstAfterMs` after the book lands open (the light up, a moment's silent chant first); his word as the power landed is
-     * gone `gapMs` before it.
+     * `perCharMs` a character (at most `maxReadMs`), its fade `fadeMs`. Their times: `transform`'s `line1At` and `line2AfterMs`.
      */
-    chantLines: { typeMs: 45, sentencePauseMs: 1000, readMs: 1700, perCharMs: 40, maxReadMs: 5500, fadeMs: 260, gapMs: 400, firstAfterMs: 1500 },
+    chantLines: { typeMs: 45, sentencePauseMs: 1000, readMs: 1700, perCharMs: 40, maxReadMs: 5500, fadeMs: 260 },
     /** The boards split and set: a big 5, 4, 3, 2, 1 on every board before phase 2's clocks run (s). */
     countdownSeconds: 5,
     /** Beaten where his phase change follows: the board holds this long while he collapses (ms; solo and online). */

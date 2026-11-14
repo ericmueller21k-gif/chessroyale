@@ -2,15 +2,15 @@
  * The Hidden Boss's sounds, synthesized (no files, no licenses): the red book's pages fluttering as it opens, the book
  * slammed shut (a dull thump with a slap of paper), a soft rustle of cloth as he moves it or himself, his laugh as breath
  * through the nose (no real voice: a few huffs), a low swell under his stare, and for his phase change a thump as he
- * lands on the board and the light pouring out of the book (a soft chord swelling over the hum), the God King's power
- * drained into him (a rising whoosh under a golden shimmer gliding down), the engine in him igniting (a few sparks and a
- * cold tone rising) and the arcs that split the board (a soft crackle, never a buzz), and phase 2's slow move (two soft
+ * lands on the board and the light pouring out of the book (a soft chord swelling over the hum), his visor's light as he's
+ * revealed in his suit (a few sparks and a cold tone rising) and the arcs that split the board (a soft crackle, never a buzz),
+ * and phase 2's slow move (two soft
  * notes falling). Each is a pure function of the sample rate (its noise is seeded), so a test can measure
  * it: every one stays quieter than a piece's move (peak and loudness). Made ahead in the sound worker (warmSounds).
  */
 import { bandpass, lowpass, noise, osc, render, rng, saw, sine, soft, type Voice, soundCache } from "./synth.ts";
 
-export type RecluseSound = "flip" | "shut" | "rustle" | "huff" | "hum" | "thump" | "glow" | "slow" | "drain" | "spark" | "arc";
+export type RecluseSound = "flip" | "shut" | "rustle" | "huff" | "hum" | "thump" | "glow" | "slow" | "spark" | "arc";
 
 /** Noise with its highs rolled off: paper, never a hiss. */
 const paper = (rate: number, cut: number, seed: number): Voice => lowpass(rate, cut, noise(seed));
@@ -91,22 +91,8 @@ const SOUNDS: Record<RecluseSound, (rate: number) => Float32Array> = {
     const pluck = (age: number, decay: number) => (age < 0 ? 0 : Math.min(1, age / 0.01) * Math.exp(-age / decay));
     return render(rate, 0.42, (t) => pluck(t, 0.06) * d(t) + pluck(t - 0.13, 0.09) * a(t));
   },
-  // The God King's power drained into him (the phase change, 2.15 s, as long as the drain): a whoosh rising through
-  // the band (noise, its center climbing) and swelling, under a golden shimmer (two tones a fifth apart) gliding down and
-  // fading, its tremolo quickening: his power leaving him.
-  drain: (rate) => {
-    const dur = 2.15;
-    const air = bandpass(rate, (t) => 380 + 2100 * (t / dur) ** 1.4, 1.3, lowpass(rate, 7000, noise(631)));
-    const g1 = osc(rate, (t) => 880 * 2 ** (-t / dur), sine);
-    const g2 = osc(rate, (t) => 1320 * 2 ** (-t / dur), sine);
-    return render(rate, dur, (t) => {
-      const swell = Math.min(1, t / 0.25) * (t / dur) ** 1.2 * Math.min(1, (dur - t) / 0.12);
-      const gold = Math.min(1, t / 0.15) * (1 - t / dur) ** 0.8 * (0.7 + 0.3 * Math.sin(2 * Math.PI * (6 + 8 * t / dur) * t));
-      return 2.6 * swell * air(t) + gold * (g1(t) + 0.6 * g2(t));
-    });
-  },
-  // The engine in him igniting as the power lands (0.6 s): three quick soft sparks, and a cold tone sweeping up and
-  // dying away (its octave over it, faint).
+  // His visor's light as he's revealed in his suit (0.6 s): three quick soft sparks, and a cold tone sweeping up and dying
+  // away (its octave over it, faint).
   spark: (rate) => {
     const fizz = bandpass(rate, () => 3600, 1.4, lowpass(rate, 6500, noise(641)));
     const tone = osc(rate, (t) => 320 + 1100 * (1 - Math.exp(-t / 0.08)), sine);
@@ -146,7 +132,7 @@ const SOUNDS: Record<RecluseSound, (rate: number) => Float32Array> = {
 };
 
 /** Trims each to sit a little under a move's loudness, as the other bosses' do; a soft ceiling keeps the peaks well under its. */
-const LEVEL: Record<RecluseSound, number> = { flip: 0.11, shut: 0.26, rustle: 0.18, huff: 0.1, hum: 0.09, thump: 0.24, glow: 0.05, slow: 0.12, drain: 0.07, spark: 0.13, arc: 0.15 };
+const LEVEL: Record<RecluseSound, number> = { flip: 0.11, shut: 0.26, rustle: 0.18, huff: 0.1, hum: 0.09, thump: 0.24, glow: 0.05, slow: 0.12, spark: 0.13, arc: 0.15 };
 
 const cache = soundCache("recluse");
 /** The samples for one of his sounds at a sample rate (made once, then reused). */

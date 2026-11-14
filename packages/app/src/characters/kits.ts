@@ -166,10 +166,10 @@ export interface BossKit extends BeatLines {
   /** A figure that now and then changes how it rests (Moo hugs the moon, then sits on it): see characters/stance.ts. */
   rest?: Stance;
   /**
-   * A half-engine look that comes on over its drawing (the Hidden Boss, from his phase change: components/Recluse.tsx's
-   * EngineOverlay, placed on his head frame by frame; BossCharacter's `setEngineAt`). An overlay, never its frames.
+   * Wears a suit from a moment on (the Hidden Boss, from his transformation: BossCharacter's `setSuitAt`): the same frames, their
+   * parts swapped for the suit's (recluse.ts, `suited`).
    */
-  engine?: boolean;
+  suit?: boolean;
   /**
    * Its drawing faces our left as drawn (not on the sprite kit). On the result screen, where the God King stands to its right, its
    * image is mirrored about its feet (styles.css, `.art-left`); its bubble and words never are. Judged by eye, Nov 8.
@@ -1062,8 +1062,7 @@ export const BOSS_KITS: Record<string, BossKit> = {
       book: "recluseShut",
       rise: "recluseRustle",
       catch: "recluseShut",
-      // (The phase change: his hand raised to the God King, his fist closing on his power as the engine in him ignites,
-      // up in a rage, the leap onto the board, the book thrown down, the chant's light.)
+      // (His older phase change's frames, kept: his hand raised, his fist closing, up in a rage, the leap, the book thrown, the light.)
       reach: "recluseRustle",
       grab: "recluseSpark",
       snatch: "recluseRustle",
@@ -1080,8 +1079,8 @@ export const BOSS_KITS: Record<string, BossKit> = {
     portrait: { ...RECLUSE_PORTRAIT, anim: "idle", frame: 0 },
     // (The bust is 50 px wide: the wider box on a phone, as Sawyer's and Wrangler's.)
     wide: true,
-    // (Phase 2: one eye glowing cold blue, faint circuit lines down that side of his face: the God King's power, absorbed.)
-    engine: true,
+    // (Phase 2: his suit and helmet, from his transformation on.)
+    suit: true,
   },
 };
 

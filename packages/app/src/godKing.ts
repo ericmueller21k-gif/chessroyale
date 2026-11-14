@@ -57,8 +57,6 @@ export type KingCue =
   | "queenWon"
   | "foeIntro"
   | "foeBlocked"
-  | "foeTriumph"
-  | "foeDrained"
   | "rushAsk"
   | "rushWell"
   // Don Dough's dough landing on the board (Nov 11).
@@ -137,8 +135,6 @@ export const KING_LINES: Record<KingCue, readonly string[]> = {
   // his cry as the boss drains his power (the phase change: he's absorbed, and says nothing in phase 2).
   foeIntro: KING_VS_RECLUSE.intro,
   foeBlocked: KING_VS_RECLUSE.blocked,
-  foeTriumph: KING_VS_RECLUSE.triumph,
-  foeDrained: KING_VS_RECLUSE.drained,
   // G-REX: the first time a piece of ours steps onto a burning tile (once a match).
   fireTile: [
     "Careful on that tile, don't stand there too long!",
@@ -195,8 +191,6 @@ const KIND: Record<KingCue, Kind> = {
   fireTile: "critical",
   foeIntro: "critical",
   foeBlocked: "critical",
-  foeTriumph: "lead",
-  foeDrained: "critical",
   rushAsk: "critical",
   rushWell: "critical",
   dough: "critical",

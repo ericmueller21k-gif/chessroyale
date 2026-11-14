@@ -1,12 +1,10 @@
-import { BOSS_BANNER, RECLUSE_PHASE2, SPEECH, bannerPlusMs, bossBannerMs } from "@chessroyale/core";
-import { RECLUSE, RECLUSE_JUMP } from "./characters/recluse.ts";
+import { BOSS_BANNER, RECLUSE_PHASE2, bannerPlusMs, bossBannerMs } from "@chessroyale/core";
+import { RECLUSE } from "./characters/recluse.ts";
 import { animLength, cueAt } from "./characters/power-art.ts";
 import { lazyTable } from "./characters/sprite.ts";
 import { RECLUSE_LINES } from "./characters/recluse-lines.ts";
-import { holdMs, readMs, typeMs } from "./speech.tsx";
-import { pacedLine, pacedSeries, type PacedLine } from "./paced-line.ts";
+import { pacedLine } from "./paced-line.ts";
 import {
-  LAST_STAND,
   legalMoves,
   phase2BossMove,
   phase2Flags,
@@ -26,83 +24,48 @@ import {
 } from "@chessroyale/chess";
 
 /**
- * The phase change (Eric, Oct 14), ms from its start (screens/Recluse2.tsx draws it), about 25 s after a short fall
- * (`fallMs`: phase 1 beaten, the board holds while he collapses and starts to mumble), all on one square stage:
- * - **the God King's absorption** (Eric, Oct 14: he plays with an engine now, so he takes the God King's): the God King
- *   stands over him in his place, his sword raised and his aura swelling, and gloats (`kingAt`); the boss, on his knees,
- *   mumbles on, then says he'll take that power (`talkAt`, Eric, Oct 17: so a first-time player sees it coming); the
- *   boss's head snaps up and he raises his hand to the God King (`seizeAt`); the God King's golden power streams out of
- *   him into that hand while he flickers and cracks (`drainAt`: his Last Stand's blows, its flashes and cracks, are his
- *   frames); as it lands the boss's fist closes, his half-engine look ignites and he says so (`igniteAt`), and the God
- *   King fades away (`goneAt`: absorbed; he is gone for the rest of the fight); he holds his fist a moment
- *   (`absorbHoldMs`);
- * - he gets up in a rage where he stands (`rage`: the book flies back into his hand);
- * - he leaps from there onto the middle of the board (the board draws his whole figure, on a phone too), landing with a
- *   thud and a burst of dust (the board jolts);
- * - he brandishes the book over his head and throws it down at his feet, where it lands open;
- * - light pours up out of it while he chants over it, arms raised, his hair lifting (phase 2's face from here), for
- *   `castMs`: his two lines in his bubble (Eric, Nov 13: `chantLines`, each typed sentence by sentence), the last typed out
- *   a second before the crack, as his transformation theme falls silent before its drop;
- * - the boards crack (Sawyer's board-saw gap, down and across the middle) and the quarters part, each growing into a
- *   whole board at its corner, as the light dies; blue arcs strike the board from his hands meanwhile (`arcAt` to
- *   `arcEnd`: the engine's power splits it);
- * - the book snaps shut and flies up into his hands (his revive's own frames) while every board's pieces fly to their
- *   Chess960 squares; he leaps back to his place, in phase 2's idle from then on;
- * - "PHASE 2"; then phase 2's boards, still, with a big 5, 4, 3, 2, 1 on every one (`countdownMs`, Eric, Oct 17: so
- *   players can get ready), and the clocks start.
- * One book on screen throughout: his own, in his frames. Every added duration is a setting (RECLUSE_PHASE2.change).
- * (Until Oct 17 it was about 15 s after the fall, and the clocks ran as "PHASE 2" ended.)
+ * The phase change (Eric, Oct 14; since Nov 14 his transformation by the book's light, no God King: docs/decisions/
+ * 2026-11-14-recluse-transformation.md), ms from its start, which follows his cutscene with no break: the man still kneeling in its
+ * light beside the child (components/RecluseTransform.tsx draws it over the board; screens/Recluse2.tsx the board, the split and
+ * the dock). The beats are settings (RECLUSE_PHASE2.change.transform):
+ * - the book flat on the board before him falls open, its pages lighting up (the transformation theme's intro starts);
+ * - on the music's slam the light bursts out and takes him: his head goes back, his eyes go totally white (`burstAt`);
+ * - on its build a shaft of it lifts him off his knees, his arms hanging at his sides (`riseAt`), and it grows faster and faster:
+ *   it engulfs him, shoots up off the screen (`shootAt`), radiates in every direction (`radiateAt`) and whites out the whole
+ *   screen (`whiteAt` to `whiteFull`); unseen in the white he's set down in his suit and helmet, and the child and the lens go;
+ * - the light dies back into the center (`downAt`) and shows him (`revealAt`); his visor flips up (`flipUpAt`), his eyes glowing,
+ *   for his first line (`chantLines[0]`, over his head) and back down (`flipDownAt`);
+ * - he crouches and leaps on the music's breath (`upAt`), and lands as it drops: the board cracks under him (`crackAt`, the
+ *   music's drop: `introMs`), the big board gone from that frame on; blue arcs strike from his hands at his sides (`arcAt` to
+ *   `arcEnd`); the quarters part and grow into four boards as the light dies; his second line (`chantLines[1]`);
+ * - the book snaps shut and flies up into his hands while every board's pieces fly to their Chess960 squares; he leaps back to his
+ *   place, in phase 2's idle (in the suit) from then on;
+ * - "PHASE 2"; then phase 2's boards, still, with a big 5, 4, 3, 2, 1 on every one (`countdownMs`), and the clocks start.
+ * The God King stays in his place, greyed, throughout (Eric, Nov 14).
  */
 export const PHASE_CHANGE = lazyTable(() => {
   const a = RECLUSE.anims;
   const len = (n: string) => animLength(a[n]!);
-  // (Eric, Oct 17: "it happens way too fast". About 10 s more from the mate to the split, the animations unchanged: his
-  // words before he seizes the power, a hold as it lands, a longer cast; then a countdown before the clocks.)
   const pace = RECLUSE_PHASE2.change;
+  const T = pace.transform;
   // (His fall before it: a setting since Nov 13, as the lobby server times it too.)
   const fallMs = pace.fallMs;
-  // The absorption. (His drain lasts the God King's Last Stand blows to his stagger: its flashes and cracks, his frames.)
-  const kingAt = 0;
-  // His words first, still on his knees while the God King gloats: his fall's mumbling (its first line, from the end of
-  // his collapse), then his new line about taking that power (`seizeTalk`), said as the mumbling ends; then he seizes it.
-  const mumbleEnd = -fallMs + len("collapse") + holdMs(RECLUSE_LINES.fall[0]);
-  const talkAt = Math.max(kingAt, mumbleEnd + 150);
-  // (And never before that line has typed out: the mumbling before it is as long as the speech rule makes it, 1.5 s
-  // longer since Oct 24.)
-  const seizeAt = Math.max(1700 + pace.talkMs, talkAt + Math.max(...RECLUSE_LINES.seizeTalk.map(typeMs)) + 100);
-  const drainAt = seizeAt + (cueAt(a.seize!, "reach") ?? 0);
-  const drainMs = LAST_STAND.staggerAt - LAST_STAND.slashAt;
-  const igniteAt = drainAt + drainMs;
-  // (His word on it, a moment after: his chant cuts in on it.)
-  const absorbLineAt = igniteAt + 120;
-  const fadeMs = 700;
-  const goneAt = igniteAt + fadeMs;
-  // (He holds his closed fist a moment as it sinks in, his engine eye newly lit, the God King fading: Eric, Oct 17.)
-  const absorbHoldMs = pace.absorbHoldMs;
-  const riseAt = igniteAt + len("seized") + absorbHoldMs;
-  const rageMs = len("rage");
-  // (The board's figure takes over where he stood as the leap's crouch begins: his place is empty until he's back.)
-  const leapAt = riseAt + rageMs;
-  const upAt = leapAt + RECLUSE_JUMP.upAt;
-  const landAt = leapAt + RECLUSE_JUMP.landAt;
-  const dropAt = leapAt + len("leap");
-  const thudAt = dropAt + (cueAt(a.drop!, "thud") ?? 0);
-  const chantAt = dropAt + len("drop");
-  const lightMs = 500;
-  // (His cast as long as his two lines need, the chant looping on, the light pouring up (Eric, Nov 13; a fixed 5.7 s before):
-  // the first a moment after the light is up, the next after it, the last typed out a second before the crack, as the music
-  // falls silent before its drop. His word as the power landed is gone by the first (`absorbGoneAt`, absorbReadMs).)
+  const crackAt = T.introMs;
+  const upAt = crackAt - T.leapMs;
+  const crouchAt = upAt - 200;
+  // (His two lines, each typed sentence by sentence at the cutscene's pace: the first while the visor is up, gone as it comes
+  // down; the second as the board splits.)
   const cl = pace.chantLines;
-  const chantLines = pacedSeries(RECLUSE_LINES.chantSay, cl, chantAt + cl.firstAfterMs);
-  const absorbGoneAt = chantLines[0]!.at - cl.gapMs;
-  const lastLine = chantLines[chantLines.length - 1]!;
-  const crackAt = lastLine.at + lastLine.line.typedMs + pace.crackAfterLineMs;
-  const castMs = crackAt - chantAt;
+  const first = pacedLine(RECLUSE_LINES.chantSay[0]!, cl);
+  const chantLines = [
+    { at: T.line1At, line: { ...first, holdMs: Math.min(first.holdMs, T.flipDownAt - 50 - T.line1At) } },
+    { at: crackAt + T.line2AfterMs, line: pacedLine(RECLUSE_LINES.chantSay[1]!, cl) },
+  ];
   const partAt = crackAt + 750;
   const growAt = partAt + 400;
   const growMs = 900;
-  // (The arcs start just before the crack and stop as the boards settle.)
-  const arcAt = crackAt - 200;
+  // (The arcs from the landing until the boards settle.)
+  const arcAt = crackAt;
   const arcEnd = growAt + growMs - 100;
   const pickupAt = growAt + growMs + 100;
   const catchAt = pickupAt + (cueAt(a.pickup!, "catch") ?? 0);
@@ -118,28 +81,10 @@ export const PHASE_CHANGE = lazyTable(() => {
   const countdownMs = pace.countdownSeconds * 1000;
   return {
     fallMs,
-    kingAt,
-    talkAt,
-    seizeAt,
-    drainAt,
-    drainMs,
-    igniteAt,
-    absorbLineAt,
-    absorbGoneAt,
-    fadeMs,
-    goneAt,
-    absorbHoldMs,
-    riseAt,
-    rageMs,
-    leapAt,
+    ...T,
+    crouchAt,
     upAt,
-    landAt,
-    dropAt,
-    thudAt,
-    chantAt,
-    lightMs,
     chantLines,
-    castMs,
     crackAt,
     partAt,
     growAt,
@@ -164,55 +109,16 @@ export const PHASE_CHANGE = lazyTable(() => {
 });
 
 /**
- * How long his word as the power lands stays readable once typed (ms): its usual time (the speech rule's readMs), but gone by
- * his chant's first line (`absorbGoneAt`; Nov 13: the longer of them would otherwise hold the chant, and the music's cut, about
- * 1.5 s later).
- */
-export function absorbReadMs(text: string): number {
-  const C = PHASE_CHANGE;
-  return Math.min(readMs(text), C.absorbGoneAt - C.absorbLineAt - typeMs(text) - SPEECH.fadeMs);
-}
-
-/**
- * His word as the power lands, paged as his chant's lines are (Nov 13: on a phone's boss bar, two rows, "All game you leaned on an
- * engine. Now see how you like it." was cut off): typed sentence by sentence at the speech rule's pace, the chant's pause between
- * (a phone's bar shows a sentence at a time, each its own page: `pacedPage`), then readable until `absorbGoneAt` at most, as
- * `absorbReadMs` keeps it; so it ends no later than the unpaged line did, and his chant's first line keeps its time.
- */
-export function absorbPaced(text: string): PacedLine {
-  const C = PHASE_CHANGE;
-  const sentences = text.match(/[^.!?]+[.!?]+(?:\s+|$)/g)?.map((x) => x.trim()) ?? [text];
-  const line = pacedLine(sentences, { typeMs: SPEECH.typeMs, sentencePauseMs: RECLUSE_PHASE2.change.chantLines.sentencePauseMs, readMs: SPEECH.readMs, perCharMs: SPEECH.perCharMs, maxReadMs: SPEECH.maxReadMs, fadeMs: SPEECH.fadeMs });
-  return { ...line, holdMs: Math.min(line.typedMs + readMs(text) + SPEECH.fadeMs, C.absorbGoneAt - C.absorbLineAt) };
-}
-
-/**
- * His figure where he stands through the phase change (BossCharacter's figure run, from `at`, the change's start): on his
- * knees, quiet after his cutscene (`kneel`), then he seizes the God King's power, his hand held up while it streams in, his fist as it lands, up in a
- * rage; from his leap the board draws him, and once he's back he rests in phase 2's idle.
+ * His figure where he stands through the phase change (BossCharacter's figure run, from `at`, the change's start): his place
+ * stands empty while the board draws him (`rc-away`), and once he's back he rests in phase 2's idle, in the suit.
  */
 export function phaseChangeRun(at: number) {
-  const C = PHASE_CHANGE;
-  const seize = animLength(RECLUSE.anims.seize!);
-  // (`seized` held on its last frame, his fist closed, for the absorb's hold.)
-  const seized = animLength(RECLUSE.anims.seized!) + C.absorbHoldMs;
-  return { since: at + C.seizeAt, anims: ["seize", { anim: "seizeLoop", ms: C.igniteAt - C.seizeAt - seize }, { anim: "seized", ms: seized }, "rage"], loop: "idle2", before: "kneel" } as const;
-}
-
-/** What the God King shows in his place at `t` ms into the phase change, or "gone" (absorbed: from then on, phase 2 too). */
-export type AbsorbKing = { anim: "raise" | "lastStand"; since: number; then?: "raised"; class: "gk-triumph" | "gk-drained" | "gk-fading" } | "gone";
-export function absorbKing(t: number, at: number): AbsorbKing {
-  const C = PHASE_CHANGE;
-  // Triumphant: his sword raised (his aura swelling). Drained: his Last Stand's blows, its flashes and cracks, timed so
-  // its stagger comes as the power lands; then he fades as he staggers.
-  if (t < C.drainAt) return { anim: "raise", since: at + C.kingAt, then: "raised", class: "gk-triumph" };
-  if (t >= C.goneAt) return "gone";
-  return { anim: "lastStand", since: at + C.igniteAt - (LAST_STAND.staggerAt - LAST_STAND.fallAt), class: t < C.igniteAt ? "gk-drained" : "gk-fading" };
+  return { since: at, anims: [], loop: "idle2" } as const;
 }
 
 /**
  * The arcs that strike the board as it splits (Eric, Oct 14: smooth, thin bright cores with a soft glow): when each
- * strikes (ms into the phase change), from which of his raised hands (0: our left), where on the cracks it lands (% of
+ * strikes (ms into the phase change), from which of his hands (0: our left), where on the cracks it lands (% of
  * the board), its shape's seed, and whether it's one of the two big ones (both hands at once, as the board cracks and
  * as it parts). The same every time.
  */

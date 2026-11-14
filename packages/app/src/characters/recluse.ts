@@ -749,6 +749,13 @@ export const suitFrame = (f: Frame, visor: Visor = "down"): Frame => ({
     return [{ ...l, part: n }];
   }),
 });
+/** A frame of his in the suit, the visor down, made once (where he stands: BossCharacter draws it every time the frame shows). */
+const SUITED = new WeakMap<Frame, Frame>();
+export function suited(f: Frame): Frame {
+  let s = SUITED.get(f);
+  if (!s) SUITED.set(f, (s = suitFrame(f)));
+  return s;
+}
 
 // ---- Poses.
 
@@ -1380,10 +1387,6 @@ export function headOf(frame: Frame): readonly [number, number] | null {
   }
   return at;
 }
-/** A head part's size (its own pixels: 25 x 35, the rows for the hair in the wind on top). */
-export const HEAD_SIZE = [25, LIFT + HEAD_BASE.length] as const;
-/** His engine eye in the head part's pixels: the middle of his left eye's iris (our right, the side towards the board). */
-export const ENGINE_EYE = [16, 18] as const;
 /** His raised open hand's middle on a frame (frame pixels), when he holds one up (`reach`): where the God King's power goes. */
 export function palmOf(frame: Frame): readonly [number, number] | null {
   const l = frame.layers.find((x) => x.part === "hand:palm" && !x.flipX);

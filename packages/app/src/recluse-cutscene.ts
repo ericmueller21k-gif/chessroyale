@@ -31,10 +31,7 @@ export interface CutTimeline {
   /** He has straightened: the conversation's loop from here. */
   standAt: number;
   boxes: readonly CutBox[];
-  /** The child fades (his frames' `fade`), and the scene is over (the light and the man held a moment). */
-  fadeAt: number;
-  /** The light lifts and the scene fades away (`outMs`), over at `endAt`. */
-  outAt: number;
+  /** The scene is over and his transformation carries on from it (the phase change: the book at his feet opens), `endAfterMs` after the last box. */
   endAt: number;
 }
 
@@ -75,7 +72,7 @@ export function cutTyped(line: CutLine, box: CutBox, now: number, c: Settings = 
  * The scene's beats from its start (0: the dimming begins). `arrival`: the lengths of the child's poof, drop and landing
  * (from his frames).
  */
-export function cutsceneTimeline(lines: readonly CutLine[], arrival: { poofMs: number; dropMs: number; landMs: number; fadeMs: number }, c: Settings = RECLUSE_CUTSCENE): CutTimeline {
+export function cutsceneTimeline(lines: readonly CutLine[], arrival: { poofMs: number; dropMs: number; landMs: number }, c: Settings = RECLUSE_CUTSCENE): CutTimeline {
   const litAt = c.dimMs;
   const poofAt = litAt + c.poofAfterMs;
   const dropAt = poofAt + arrival.poofMs;
@@ -88,14 +85,12 @@ export function cutsceneTimeline(lines: readonly CutLine[], arrival: { poofMs: n
     boxes.push(b);
     t = b.until + c.gapMs;
   }
-  const fadeAt = (boxes.at(-1)?.until ?? standAt) + c.kidFadeAfterMs;
-  const outAt = fadeAt + arrival.fadeMs + c.endHoldMs;
-  return { litAt, poofAt, dropAt, landAt, standAt, boxes, fadeAt, outAt, endAt: outAt + c.outMs };
+  return { litAt, poofAt, dropAt, landAt, standAt, boxes, endAt: (boxes.at(-1)?.until ?? standAt) + c.endAfterMs };
 }
 
 export type CutArrival = Parameters<typeof cutsceneTimeline>[1];
 /** The times in RECLUSE_CUTSCENE that pace the scene (all but the light's size and darkness), for `fitCutscene`. */
-const PACED = ["dimMs", "poofAfterMs", "firstLineAfterMs", "typeMs", "sentencePauseMs", "readMs", "perCharMs", "maxReadMs", "boxFadeMs", "gapMs", "kidFadeAfterMs", "endHoldMs", "outMs"] as const;
+const PACED = ["dimMs", "poofAfterMs", "firstLineAfterMs", "typeMs", "sentencePauseMs", "readMs", "perCharMs", "maxReadMs", "boxFadeMs", "gapMs", "endAfterMs"] as const;
 
 /**
  * The scene in a window of `windowMs` (its hold: RECLUSE_CUTSCENE.holdMs, the server's online): itself, unchanged, when the window
@@ -107,7 +102,7 @@ const PACED = ["dimMs", "poofAfterMs", "firstLineAfterMs", "typeMs", "sentencePa
 export function fitCutscene(lines: readonly CutLine[], arrival: CutArrival, windowMs: number, c: Settings = RECLUSE_CUTSCENE): { timeline: CutTimeline; c: Settings } {
   const full = cutsceneTimeline(lines, arrival, c);
   if (windowMs >= full.endAt - 1000) return { timeline: full, c };
-  const fixed = arrival.poofMs + arrival.dropMs + arrival.landMs + arrival.fadeMs;
+  const fixed = arrival.poofMs + arrival.dropMs + arrival.landMs;
   const f = Math.max(0.02, (windowMs - fixed) / (full.endAt - fixed));
   const scaled = { ...c } as Record<string, number>;
   for (const k of PACED) scaled[k] = Math.max(1, Math.floor(c[k] * f));
