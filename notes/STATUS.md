@@ -1138,3 +1138,8 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   deploy + main run watcher bbus1dwec. #712 QA fixes (#1-#10) opened, CI watcher br4q7rk71 on 90cea61d; quick boss-lane review running
   as an in-window subagent. Then: phase 2 standings (xhigh, alone; brief includes QA #12). Leftover flakies: alfil:247, town-chat:1367/
   1370, fairplay:65, shop:238, town-afk:116, town-street:155 (500), other specs still calling __townAt+click (move to townTap).
+- Nov 14 13:15: main 53bf1ed4 (#711) GREEN. #712 QA fixes + review fixes (observer disconnect, transform words once per box, BossFace
+  live only in battle) final head 455382a9, body updated, CI watcher bew5s7cke: merge when green, deploy + main run. Phase 2 standings
+  helper session_01JuCWRrcU7Qm3pRuQssFV1J (xhigh, ALONE, claude/recluse-phase2-standings; brief incl. QA #12), watcher b05uf7u6t.
+  Follow-ups: MovePanel boss rows plain portrait in phase 2; QA #11 nits; flaky leftovers (alfil:247, town-chat:1367/1370,
+  fairplay:65, shop:238, town-afk:116, town-street:155, specs still using __townAt+click).
