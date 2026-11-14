@@ -2184,7 +2184,7 @@ function startTown(
     }
   };
   const hookTables = () => (testSwitchesAllowed() ? tableStates(town.people).map((s) => (s.kind === "waiting" ? `waiting:${s.free}` : s.kind)) : null);
-  // ... `__townCall(i)`: the bot TOWN_BOTS[i] walks to stand beside you, off the camera's line through you (out from home first, if it's there), and every bot holds
+  // ... `__townCall(i)`: the bot TOWN_BOTS[i] walks to stand beside you where the camera sees it whole (out from home first, if it's there), and every bot holds
   // still from then on (to tap it);
   // `__townBots()`: each bot (TOWN_BOTS' order): its name, its square ("c,r"), the table it sits at (-1: none), whether it walks.
   const hookCall = (i: number) => {
@@ -2194,12 +2194,11 @@ function startTown(
     const b = town.bots.find((p) => p.bot === TOWN_BOTS[i]);
     if (b?.home) comeOut(town, b, performance.now(), 3);
     if (b) stayOut(b);
-    // Beside you off the camera's line through you (main 65902dc3, round 7): a bot coming from straight behind you stopped on the square
-    // behind your pawn, hidden by it (the tap a test then asked for found no point of it); straight in front it hides you. The heading's
-    // quarter: north or south, that line is your column; east or west, your row. (None free off it: any square beside you.)
-    const q = ((Math.round(heading / 90) % 4) + 4) % 4;
+    // Beside you where the camera sees it whole, on its own (`figureSeenAt`; #720): not faded low on the screen, not behind you or another
+    // figure, not hiding one. Main 65902dc3: one stopped behind your pawn, hidden by it; #720's fixed rule (off the camera's line through
+    // you) then put the third bot called on the row behind you, faded at the screen's bottom on a computer. (None seen: any square beside you.)
     const here = town.you.walker.here();
-    const to = b && (spotNear(town, b.walker, here, true, (dc, dr) => (q % 2 ? dr : dc) !== 0) ?? destFor(town, b.walker, { kind: "beside", at: here }));
+    const to = b && (spotNear(town, b.walker, here, true, (c, rr) => r.figureSeenAt(c, rr, b)) ?? destFor(town, b.walker, { kind: "beside", at: here }));
     if (b && to) walkWalker(b.walker, to);
   };
   const hookBots = () =>
