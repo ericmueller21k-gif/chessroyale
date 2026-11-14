@@ -67,7 +67,7 @@ try {
   await p.clock.install();
   await fakeApi(p);
   await p.addInitScript(() => localStorage.setItem("hunchess.tutorial.dismissed", "1"));
-  await p.goto(url + `bosses?debug&laststand=0&nolanding&win=1&cutscene=${hold}`);
+  await p.goto(url + `bosses?debug&laststand=0&nolanding&form=adult&win=1&cutscene=${hold}`);
   const menu = p.getByRole("dialog", { name: "Choose your boss" });
   await menu.waitFor({ timeout: 60_000 });
   await menu.getByRole("button", { name: /^Hidden Boss/ }).click();

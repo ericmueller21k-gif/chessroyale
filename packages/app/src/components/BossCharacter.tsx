@@ -32,6 +32,7 @@ import { lightsId, syncLights } from "../characters/lights.ts";
 import { seenFen } from "../camo.ts";
 import { KING_REACH, SIDE_FEEL, SIDE_REACH, sideSizes } from "../characters/side-size.ts";
 import { GOD_KING } from "../characters/god-king.ts";
+import { testSwitchesAllowed } from "../test-switches.ts";
 
 /**
  * A raid boss as a character (if it has one: see characters/kits.ts), standing across the board from the God King: on a
@@ -399,6 +400,11 @@ function Character({ boss, stage, place }: { boss: BossView; stage: Stage; place
   // next (the boss's turn ends, a power's moment begins). A move that brings a power's moment says nothing of its
   // own: the moment's line is what the boss says that turn.
   // (Nor does its mate when it attacks the crowd's king: the attack's line is its word then.)
+  // A test hook (test switches only), as `sayBoss`: `bossFigure(loop)` sets a figure whose height changes (BossKit.heads) resting in
+  // that loop, so a check can measure his words over his head at each of the Hidden Boss's ages (e2e/recluse.spec.ts).
+  useEffect(() => {
+    if (kit?.heads && testSwitchesAllowed()) (globalThis as { bossFigure?: (loop: string) => void }).bossFigure = (loop) => setFigureRun({ since: Date.now(), anims: [], loop, talks: true });
+  }, [kit]);
   const quiet = stage === "bossMove" && (!!boss.powers?.events.length || mateAttack(boss));
   useLayoutEffect(() => {
     // (A line of its own for the moment, from the battle, over its kit's: the Hidden Boss's "Best by test.")

@@ -935,6 +935,35 @@ test("his child form first (Nov 13): the kid, his level a step up every 4 moves 
   expect(errors).toEqual([]);
 });
 
+test("his words stand above his head at every age beside the board (Eric, Nov 14: grown to 20, they sat over his face)", async ({ page }) => {
+  test.skip(test.info().project.name === "phone", "a computer: on a phone his words are in his bar");
+  test.setTimeout(3 * 60_000);
+  await meetHim(page, "laststand=0&clock=60&form=child");
+  await yourMove(page);
+  // (The top of his drawing on the screen, from his canvas, and his words' bottom.)
+  const gap = () =>
+    page.evaluate(() => {
+      const fig = document.querySelector<HTMLElement>(".boss-char.place-side")!;
+      const cv = fig.querySelector("canvas")!;
+      const px = cv.getContext("2d")!.getImageData(0, 0, cv.width, cv.height).data;
+      let top = cv.height;
+      for (let y = 0; y < cv.height && top === cv.height; y++) for (let x = 0; x < cv.width; x++) if (px[(y * cv.width + x) * 4 + 3]! > 0) top = y;
+      const r = cv.getBoundingClientRect();
+      const bubble = fig.querySelector(".bc-bubble")!.getBoundingClientRect();
+      return Math.round(r.top + (top / cv.height) * r.height - bubble.bottom);
+    });
+  // The child, 13, 20 and the man: his words over his head at each (the age's loop, set by the test switch's hook).
+  for (const loop of ["idle", "age1", "age2", "age3"]) {
+    await page.evaluate((loop) => {
+      (window as any).bossFigure(loop);
+      (window as any).sayBoss("That one's mine now.");
+    }, loop);
+    await expect(page.locator(figure())).toHaveAttribute("data-anim", loop);
+    await expect(page.locator(`${figure()} .bc-bubble`)).toHaveAttribute("aria-label", "That one's mine now.");
+    await expect.poll(gap, { message: loop }).toBeGreaterThan(0);
+  }
+});
+
 test("a loss (?win=1&phase=2): you resign your board, the bots win theirs: defeated, 3 of 4 won", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(4 * 60_000);
   const errors: string[] = [];

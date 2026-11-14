@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { RECLUSE_CHILD, RECLUSE_MUSIC, childSteps } from "@chessroyale/core";
 import { BOSS_KITS, RECLUSE_CHILD_KIT, bossKitOf } from "../src/characters/kits.ts";
-import { GROWING_LOOPS, RECLUSE_GROWING, RECLUSE_GROWING_BUST, growAnim, growUpAnim } from "../src/characters/recluse-ages.ts";
+import { GROWING_HEADS, GROWING_LOOPS, RECLUSE_GROWING, RECLUSE_GROWING_BUST, growAnim, growUpAnim } from "../src/characters/recluse-ages.ts";
 import { RECLUSE_CHILD_LINES, RECLUSE_LINES } from "../src/characters/recluse-lines.ts";
 import { ageAtStep, growingRun, resetGrowing } from "../src/components/RecluseChild.ts";
 import { recluseMusic } from "../src/music.ts";
@@ -9,6 +9,7 @@ import { talkWhen } from "../src/recluse-talk.ts";
 import { bossVoice } from "../src/speech.tsx";
 import { BAR_TOP_GAP } from "../src/characters/kits.ts";
 import { REST_UP, barFit, restExtent, restOk } from "./bar-fit.ts";
+import { renderFrame } from "../src/characters/sprite.ts";
 
 /** The Hidden Boss's child form on screen (Nov 13; RECLUSE_CHILD): his growing figure, his lines, his music. */
 
@@ -16,6 +17,24 @@ const animMs = (name: string) => RECLUSE_GROWING.anims[name]!.frames.reduce((t, 
 const view = (step: number, result?: "crowd" | "boss") => ({ id: "recluse", startMove: 1, form: "child" as const, formStep: step, ...(result ? { result } : {}) });
 
 describe("his figure grows with his level (RecluseChild.ts)", () => {
+  // Eric, Nov 14: at 20 his words sat over his face, placed for the child. Beside the board they stand on GROWING_HEADS (the kit's
+  // `heads`): for every animation, how far over his feet its tallest frame reaches, as drawn.
+  it("his words' heights are his drawing's: every animation, its tallest frame over his feet (GROWING_HEADS)", () => {
+    const ch = RECLUSE_GROWING;
+    const tallest = (a: string) =>
+      Math.max(
+        ...ch.anims[a]!.frames.map((f) => {
+          const r = renderFrame(ch, f);
+          for (let y = 0; y < r.h; y++) for (let x = 0; x < r.w; x++) if (r.data[(y * r.w + x) * 4 + 3]! > 0) return ch.foot[1] - y;
+          return 0;
+        }),
+      );
+    expect(RECLUSE_CHILD_KIT.heads).toBe(GROWING_HEADS);
+    expect(GROWING_HEADS).toEqual(Object.fromEntries(Object.keys(ch.anims).map((a) => [a, tallest(a)])));
+    // (Each age taller than the one before, so his words climb as he grows.)
+    const ages = GROWING_LOOPS.map((a) => GROWING_HEADS[a]!);
+    expect([...ages].sort((a, b) => a - b)).toEqual(ages);
+  });
   it("the ages by step: the child for his first steps, then 13, 20, and his adult look exactly at the last step", () => {
     const ages = Array.from({ length: childSteps() + 1 }, (_, i) => ageAtStep(i));
     expect(ages).toEqual([0, 0, 1, 1, 2, 2, 2, 3]);
