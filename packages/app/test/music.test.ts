@@ -110,7 +110,7 @@ vi.stubGlobal("fetch", (url: string) => {
   return Promise.resolve({ ok: true, json: () => Promise.resolve(THEMES) });
 });
 
-const { bossMusic, musicFiles, musicLevel, musicNow, musicPlan, musicTheme, musicWanted, preloadMusic, recluseMusic, roomMusic, roomMusicLoad, roomMusicNow, setMusicOn, splashDone, splashMusic, switchPlan, heardNow } = await import(
+const { bossMusic, loopPlace, musicFiles, musicLevel, musicNow, musicPlan, musicTheme, musicWanted, preloadMusic, recluseMusic, roomMusic, roomMusicLoad, roomMusicNow, setMusicOn, splashDone, splashMusic, switchPlan, heardNow } = await import(
   "../src/music.ts"
 );
 const settle = () => new Promise((r) => setTimeout(r, 0));
@@ -644,5 +644,21 @@ describe("the Hidden Boss: a theme for each point of his fight, switched mid-fig
       const [bi, bl] = ctx.sources;
       for (const s of [bi, bl]) expect(s!.stoppedAt).toBeCloseTo(10 + MUSIC.fadeMs / 1000, 6);
     });
+  });
+});
+
+describe("a new audio context picks the music up where it was (Eric, Nov 14: a hiccup, as if it restarted)", () => {
+  const l = { wallAt: 10_000, offset: 0.5, loopStart: 0.5, loopEnd: 60.5 };
+  it("before the loop starts (its intro still playing): null, it starts over", () => {
+    expect(loopPlace(l, 9_999)).toBeNull();
+  });
+  it("in its first pass: the offset plus the time since it started", () => {
+    expect(loopPlace(l, 10_000)).toBeCloseTo(0.5);
+    expect(loopPlace(l, 40_000)).toBeCloseTo(30.5);
+  });
+  it("after it wraps: back between its loop points", () => {
+    expect(loopPlace(l, 10_000 + 60_000)).toBeCloseTo(0.5);
+    expect(loopPlace(l, 10_000 + 95_000)).toBeCloseTo(35.5);
+    expect(loopPlace({ ...l, offset: 20.5 }, 10_000 + 45_000)).toBeCloseTo(5.5);
   });
 });
