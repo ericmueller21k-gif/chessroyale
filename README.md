@@ -4,3 +4,4 @@
 - phone-ages.png: 390 px, the same lines in his bar (a phone's place for every boss's words).
 - phase-change.png: his chant line over his head on the board, computer and phone.
 - cutscene.png: the man's line over his head, computer and phone.
+- growup-exchange.png: beaten, the kid's line, then the man's once grown (computer, then phone).
