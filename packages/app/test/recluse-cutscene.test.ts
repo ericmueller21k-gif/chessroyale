@@ -40,16 +40,17 @@ describe("the Hidden Boss's cutscene", () => {
       expect(f.timeline.endAt).toBeLessThanOrEqual(hold);
       expect(f.timeline.endAt).toBeGreaterThan(hold * 0.9);
       // (Every line still shown, in order, the child's frames as they are.)
-      expect(f.timeline.boxes).toHaveLength(17);
+      expect(f.timeline.boxes).toHaveLength(18);
       expect(f.timeline.standAt - f.timeline.poofAt).toBe(arrival.poofMs + arrival.dropMs + arrival.landMs);
       expect(f.c.typeMs).toBeLessThan(C.typeMs);
     }
   });
 
-  it("has Eric's 17 lines, line 15 two sentences, and never names him", () => {
-    expect(RECLUSE_CUTSCENE_LINES).toHaveLength(17);
-    expect(RECLUSE_CUTSCENE_LINES[14]).toEqual({ who: "kid", say: ["Everyone has the same computers.", "So the best player is still the best."] });
-    expect(RECLUSE_CUTSCENE_LINES.map((l) => l.who).join(" ")).toBe("kid man kid man kid man kid man kid man kid man kid man kid man kid");
+  it("has Eric's 18 lines (Nov 14: the kid's two points, then \"Why don't you show us?\"), line 15 two sentences, and never names him", () => {
+    expect(RECLUSE_CUTSCENE_LINES).toHaveLength(18);
+    expect(RECLUSE_CUTSCENE_LINES[14]).toEqual({ who: "kid", say: ["Everyone has the same computers.", "So the only thing that separates anyone is creativity."] });
+    expect(RECLUSE_CUTSCENE_LINES[15]).toEqual({ who: "kid", say: ["They just made the game deeper.", "The computers never changed who the best player was."] });
+    expect(RECLUSE_CUTSCENE_LINES.map((l) => l.who).join(" ")).toBe("kid man kid man kid man kid man kid man kid man kid man kid kid man kid");
     // (A line of two sentences is two entries; one sentence, however long, is one: it types all at once.)
     for (const l of RECLUSE_CUTSCENE_LINES) for (const s of l.say) expect(s.slice(0, -1)).not.toMatch(/[.?!] /);
   });
@@ -67,11 +68,11 @@ describe("the Hidden Boss's cutscene", () => {
     expect(b.starts[1]).toBe(firstDone + C.sentencePauseMs);
     expect(cutTyped(line, b, b.starts[1]!)).toBe(first + 2);
     expect(cutTyped(line, b, b.typed)).toBe(b.text.length);
-    expect(b.text).toBe("Everyone has the same computers. So the best player is still the best.");
+    expect(b.text).toBe("Everyone has the same computers. So the only thing that separates anyone is creativity.");
   });
 
   it("shows one box at a time, in order, each fully readable for its time once typed", () => {
-    expect(tl.boxes).toHaveLength(17);
+    expect(tl.boxes).toHaveLength(18);
     tl.boxes.forEach((b, i) => {
       expect(b.until - C.boxFadeMs - b.typed).toBe(cutReadMs(b.text));
       expect(cutReadMs(b.text)).toBeGreaterThanOrEqual(C.readMs);

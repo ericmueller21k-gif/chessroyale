@@ -858,7 +858,7 @@ test("the admins' Win this form (Nov 13, Eric's timing test): pressed, your next
     kid: { selector: '.cs-fig .sprite-anim, .cs-fig canvas' },
     hidden: { selector: "body.cs-on" },
     first: { selector: '.cs-say[data-line="1"]', text: /^Why are you on the floor\?$/ },
-    last: { selector: '.cs-say[data-line="17"]', text: /^I'm not sure\. The only one who can prove it is right next to me\.$/ },
+    last: { selector: '.cs-say[data-line="18"]', text: /^Why don't you show us\?$/ },
   });
   await play(page, mv);
   await expect.poll(() => page.evaluate(() => !!(window as any).match.phase.fall), { timeout: 30_000 }).toBe(true);
