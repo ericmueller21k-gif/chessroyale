@@ -17,8 +17,8 @@ import { BossDock, clockLeft, type DockClockRun } from "../components/BossDock.t
 import { CenterCount, useFrameNow, useTicks } from "../components/Countdown.tsx";
 import { FightBanner } from "../components/FightBanner.tsx";
 import { COMPUTER_LAYOUT } from "../components/MatchMenu.tsx";
-import { useMedia } from "../components/QuickChat.tsx";
-import { STRIP_LAYOUT } from "../components/MovePanel.tsx";
+import { BossPanel, STRIP_LAYOUT, besideBoard, useBossLayout } from "../components/MovePanel.tsx";
+import { UnderBoard, useMedia } from "../components/QuickChat.tsx";
 import type { GameView, SimulBoardView, SimulView } from "../game.ts";
 import type { ComponentChildren } from "preact";
 import { ARC_LIFE, ARC_REDRAW, ARC_STRIKES, PHASE_CHANGE, phase2UltBannerMs, absorbKing, absorbPaced, arcPoints, smoothPath, type ArcStrike } from "../recluse-phase2.ts";
@@ -26,35 +26,59 @@ import { CRITICAL, NORMAL, VoiceBubble, bossVoice } from "../speech.tsx";
 import { Hud } from "./Hud.tsx";
 import { useStillKey } from "../hooks.ts";
 import { clockShown } from "../clock-text.ts";
-import { underBoardView } from "../prefs.ts";
+import { evalBarOn, underBoardView } from "../prefs.ts";
 
 /**
  * The Hidden Boss's phase change and his phase 2 (rules: packages/chess/src/bosses/recluse-phase2.ts; the driver:
- * recluse-phase2.ts). Both keep the boss screen's frame (the header and his bust on a phone, his figure by the board on a
- * computer, the God King's dock below), so nothing jumps from phase 1's board.
+ * recluse-phase2.ts). Both keep phase 1's whole boss screen (Eric, Nov 14: "the board split only replaces the single board"):
+ * the header (a computer's boss bar and tools), his bust or figure, the Moves panel and the chat beside the board (a phone's
+ * panel left of the God King), your pawn and your team's, and the God King in his place. Only the board's square changes:
+ * one board, then the four boards inside that same square (FOUR).
  *
- * The four boards sit in the board's own square as a 2x2, each at its corner (a computer plays them there, as the phase
- * change leaves them). On a phone your board is big and the other three are small above it; tap one to watch it big.
+ * A computer plays the four as a 2x2, the gaps between them and to the square's edges all equal, each board's tag in the gap
+ * above it. A phone: your board big at the square's bottom, the other three small in a row above it (tap one to watch it big).
  */
 
 /** Which board each quarter of the square holds (top left, top right, bottom left, bottom right): yours at bottom left. */
 const QUARTER_BOARD = [1, 2, 0, 3] as const;
-/** Each board's share of the square once split (the rest is the cross between them). */
-const CELL = 0.48;
+
+/** Where a board sits in the square: its left and top and its size, as fractions of the square. */
+type Slot = { x: number; y: number; s: number };
+/** A computer's four boards: each `cell` of the square, the gap between them and to the edges the same (DESK_GAP). */
+const DESK_CELL = 0.435;
+const DESK_GAP = (1 - 2 * DESK_CELL) / 3;
 /**
- * A computer's four boards (played where the phase change leaves them): a little smaller, each with a row above it for
- * its tag (who plays it and their clock), so no tag covers a board's back rank (Chess960's back rank is random). `cell`:
- * a board's share of the square; `tag`: the row above each, in % of the square. The cross between the rows is what's left
- * (1.8%), between the columns 11%. Written on the stage for styles.css (.rc-desk .rc-played).
+ * A phone's: the three small boards in a row at the square's top (`mini` of it each, equal gaps across, a `tag` row above them
+ * for their clocks), yours big under them at the square's bottom, centered (the slow-move marks in the room at its right).
  */
-export const DESK = { cell: 0.445, tag: 4.6 } as const;
+const PHONE = { tag: 0.06, mini: 0.26, big: 0.65 } as const;
+const PHONE_GAP = (1 - 3 * PHONE.mini) / 4;
+/**
+ * The slots: a computer's by quarter (top left, top right, bottom left, bottom right); a phone's, the big one first, then the
+ * three small ones from the left. (A computer's top boards: their tag in the gap above them, as the bottom ones'.)
+ */
+export const FOUR = {
+  desk: [
+    { x: DESK_GAP, y: DESK_GAP, s: DESK_CELL },
+    { x: 1 - DESK_GAP - DESK_CELL, y: DESK_GAP, s: DESK_CELL },
+    { x: DESK_GAP, y: 1 - DESK_GAP - DESK_CELL, s: DESK_CELL },
+    { x: 1 - DESK_GAP - DESK_CELL, y: 1 - DESK_GAP - DESK_CELL, s: DESK_CELL },
+  ],
+  phone: [
+    { x: (1 - PHONE.big) / 2, y: 1 - PHONE.big, s: PHONE.big },
+    ...[0, 1, 2].map((i) => ({ x: PHONE_GAP + i * (PHONE.mini + PHONE_GAP), y: PHONE.tag, s: PHONE.mini })),
+  ],
+} as const satisfies Record<string, readonly Slot[]>;
+/** A phone's slot for each quarter at the split's end: yours (bottom left) big, the others small in quarter order. */
+const PHONE_SLOT_OF_QUARTER = [1, 2, 0, 3] as const;
+const slotStyle = (b: Slot) => ({ left: `${b.x * 100}%`, top: `${b.y * 100}%`, width: `${b.s * 100}%`, height: `${b.s * 100}%` });
 
 const ease = (x: number) => (x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x));
 const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
 
 /**
  * A quarter's look at `t` (ms into the phase change): its quarter of the whole board, parting from the middle, then
- * growing into a whole board at its corner (its clip opening to the full board as it shrinks toward its corner; the board
+ * growing into a whole board in its slot (its clip opening to the full board as it shrinks into the slot; the board
  * itself keeps its size: only a transform, which it measures without).
  */
 function quarterStyle(q: number, t: number, desk: boolean): Record<string, string> {
@@ -64,15 +88,14 @@ function quarterStyle(q: number, t: number, desk: boolean): Record<string, strin
   const part = ease((t - C.partAt) / (C.growAt - C.partAt));
   const grow = ease((t - C.growAt) / C.growMs);
   const gap = (1 - grow) * part * 3;
-  const scale = 1 - (1 - (desk ? DESK.cell : CELL)) * grow;
-  // (A computer's top boards end a tag's row down from the square's top: DESK.)
-  const down = desk && !bottom ? DESK.tag * grow : 0;
+  const to = desk ? FOUR.desk[q]! : FOUR.phone[PHONE_SLOT_OF_QUARTER[q]!]!;
+  const scale = 1 - (1 - to.s) * grow;
   const half = 50 * (1 - grow);
   const clip = `inset(${bottom ? half : 0}% ${right ? 0 : half}% ${bottom ? 0 : half}% ${right ? half : 0}%)`;
   return {
     clipPath: clip,
-    transformOrigin: `${right ? "100%" : "0"} ${bottom ? "100%" : "0"}`,
-    transform: `translate(${right ? gap : -gap}%, ${bottom ? gap : down - gap}%) scale(${scale})`,
+    transformOrigin: "0 0",
+    transform: `translate(${(right ? gap : -gap) + to.x * 100 * grow}%, ${(bottom ? gap : -gap) + to.y * 100 * grow}%) scale(${scale})`,
   };
 }
 
@@ -301,9 +324,13 @@ export function PhaseChangeScreen({ match, at }: { match: GameView; at: number }
   }, [revived]);
   // (The header and the boss's place don't move with the frame: drawn as the match changes, useStillKey.)
   const still = useStillKey(match, now);
-  const hud = useMemo(() => <Hud match={match} keepTitle />, [match, still]);
+  const hud = useMemo(() => <Hud match={match} />, [match, still]);
   const bossSide = useMemo(() => <BossSide match={match} />, [match, still]);
-  const strip = useMedia(STRIP_LAYOUT);
+  // (Phase 1's Moves panel and chat, beside the board on a computer, left of the God King on a phone: kept in their places.)
+  const layout = useBossLayout();
+  const under = useMemo(() => besideBoard(match, layout, <UnderBoard match={match} />), [match, still, layout.strip, layout.computer]);
+  const panel = useMemo(() => (layout.strip ? <BossPanel match={match} /> : undefined), [match, still, layout.strip]);
+  const strip = layout.strip;
   if (!v) return null;
   const split = t >= C.partAt;
   const shuffled = t >= C.shuffleAt;
@@ -340,7 +367,8 @@ export function PhaseChangeScreen({ match, at }: { match: GameView; at: number }
       <div class={`board-area${jolt ? " pw-crash" : ""}`}>
         <div class="board-row">
           {bossSide}
-          <div class="eval-bar rc-evalgap" aria-hidden="true" />
+          {/* (The eval bar's slot as phase 1 has it: none while it's off, prefs.ts, so the square is phase 1's board's.) */}
+          {evalBarOn() && <div class="eval-bar rc-evalgap" aria-hidden="true" />}
           <div
             class="board-wrap rc-stage"
             data-step={shuffled ? "shuffle" : split ? "split" : cracking ? "crack" : t >= C.chantAt ? "chant" : t >= C.dropAt ? "drop" : t >= C.leapAt ? "leap" : t >= C.riseAt ? "rage" : t >= C.drainAt ? "drain" : "king"}
@@ -396,6 +424,7 @@ export function PhaseChangeScreen({ match, at }: { match: GameView; at: number }
         match={match}
         side="w"
         king={absorbKing(t, at)}
+        panel={panel}
         // (No move is anyone's during the phase change: no clock.)
         clock={null}
         // (Never what his bubble or the banner says at the same moment, Eric, Oct 15: his "Mind and machine" line had
@@ -424,6 +453,7 @@ export function PhaseChangeScreen({ match, at }: { match: GameView; at: number }
           </>
         }
       />
+      {under}
     </div>
   );
 }
@@ -533,8 +563,12 @@ export function SimulScreen({ match }: { match: GameView }) {
   const [watch, setWatch] = useState(0);
   // (The header and the boss's place don't move with the frame: drawn as the match changes, useStillKey.)
   const still = useStillKey(match, now);
-  const hud = useMemo(() => <Hud match={match} keepTitle />, [match, still]);
+  const hud = useMemo(() => <Hud match={match} />, [match, still]);
   const bossSide = useMemo(() => <BossSide match={match} />, [match, still]);
+  // (Phase 1's Moves panel and chat, in their places: PhaseChangeScreen.)
+  const layout = useBossLayout();
+  const under = useMemo(() => besideBoard(match, layout, <UnderBoard match={match} />), [match, still, layout.strip, layout.computer]);
+  const panel = useMemo(() => (layout.strip ? <BossPanel match={match} /> : undefined), [match, still, layout.strip]);
   // (Back to your board, the first: the same callback every frame, so the dock isn't drawn again for it.)
   const back = useCallback(() => setWatch(match.simul?.boards[0]?.id ?? 0), [match]);
   // The boards set, before the clocks run (Eric, Oct 17: a player who's never seen the split needs a moment): a big 5, 4,
@@ -581,33 +615,33 @@ export function SimulScreen({ match }: { match: GameView }) {
     // (The small boards' "5 s!" as his ultimate comes, from the setting: styles.css, .rc-ult .rc-mini.)
     <div class={`screen game boss-screen rc-simul ${computer ? "rc-desk" : "rc-phone"}${ultOn ? " rc-ult" : ""}`} style={{ "--rc-ult-note": `"${RECLUSE_PHASE2.ultMoveSeconds} s!"` }}>
       {hud}
-      {!computer && (
-        <div class="rc-minis" role="list" aria-label="The other boards">
-          {others.map((b) => (
-            <button type="button" key={b.id} role="listitem" class={`rc-mini${b.you ? " you" : ""}`} aria-label={b.you ? "Back to your board" : `Watch ${b.name}'s board`} onClick={() => setWatch(b.id)}>
-              <SimulBoard match={match} v={v} b={b} now={now} small count={count} />
-            </button>
-          ))}
-        </div>
-      )}
       <div class="board-area">
         <div class="board-row">
           {bossSide}
-          <div class="eval-bar rc-evalgap" aria-hidden="true" />
-          {computer ? (
-            <div class="board-wrap rc-stage" style={{ "--rc-cell": `${DESK.cell * 100}%`, "--rc-tagrow": `${DESK.tag}%` }}>
-              {QUARTER_BOARD.map((id, q) => (
-                <div key={q} class={`rc-cell rc-q${q} rc-played`}>
+          {/* (The eval bar's slot as phase 1 has it: none while it's off, prefs.ts, so the square is phase 1's board's.) */}
+          {evalBarOn() && <div class="eval-bar rc-evalgap" aria-hidden="true" />}
+          {/* (The four boards inside phase 1's one board's square: FOUR.) */}
+          <div class="board-wrap rc-stage">
+            {computer ? (
+              QUARTER_BOARD.map((id, q) => (
+                <div key={q} class={`rc-cell rc-q${q} rc-played`} style={slotStyle(FOUR.desk[q]!)}>
                   <SimulBoard match={match} v={v} b={v.boards[id]!} now={now} marks={v.boards[id]!.you} count={count} />
                 </div>
-              ))}
-              {ultBanner}
-            </div>
-          ) : (
-            <SimulBoard key={big.id} match={match} v={v} b={big} now={now} big marks count={count}>
-              {ultBanner}
-            </SimulBoard>
-          )}
+              ))
+            ) : (
+              <>
+                <div key={`big${big.id}`} class="rc-cell rc-played rc-big" style={slotStyle(FOUR.phone[0])}>
+                  <SimulBoard match={match} v={v} b={big} now={now} big marks count={count} />
+                </div>
+                {others.map((b, i) => (
+                  <button type="button" key={b.id} class={`rc-cell rc-played rc-mini${b.you ? " you" : ""}`} style={slotStyle(FOUR.phone[i + 1]!)} aria-label={b.you ? "Back to your board" : `Watch ${b.name}'s board`} onClick={() => setWatch(b.id)}>
+                    <SimulBoard match={match} v={v} b={b} now={now} small count={count} />
+                  </button>
+                ))}
+              </>
+            )}
+            {ultBanner}
+          </div>
         </div>
       </div>
       <SimulDock
@@ -620,7 +654,9 @@ export function SimulScreen({ match }: { match: GameView }) {
         runFrom={run ? run.startsAt : null}
         runTo={run ? run.deadline : null}
         held={run === undefined}
+        panel={panel}
       />
+      {under}
     </div>
   );
 }
@@ -639,6 +675,7 @@ const SimulDock = memo(function SimulDock({
   runFrom,
   runTo,
   held,
+  panel,
 }: {
   match: GameView;
   still: string;
@@ -649,12 +686,15 @@ const SimulDock = memo(function SimulDock({
   runFrom: number | null;
   runTo: number | null;
   held: boolean;
+  panel?: ComponentChildren;
 }) {
   return (
     <BossDock
       match={match}
       side="w"
-      king="gone"
+      // (The God King stays in his place, his powers greyed: he can't be called in phase 2. Eric, Nov 14.)
+      king="benched"
+      panel={panel}
       // Your board's clock at the box's right: its bank (from his ultimate, the few seconds a move) running on your move,
       // holding while he answers; none once your board is decided or before the clocks start.
       clock={runFrom !== null && runTo !== null ? { startsAt: runFrom, deadline: runTo } : held ? undefined : null}

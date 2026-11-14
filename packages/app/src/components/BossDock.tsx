@@ -140,9 +140,9 @@ export function BossDock({
   // Chub & Chirp's carrot race count: in the status box where it has the room (a computer, or the God King beside the
   // row), else at the left of the God King's line under the row (a phone: the box keeps the room for its words).
   const strip = !!panel;
-  // Your pawn, in Boss alone's own screens only (not the Hidden Boss's phase change or phase 2, which pass `king`), and where
-  // there's a strip or a computer's corner for it.
-  const pawn = !king && !!boss && (bossAlone(match) || !!match.party) && (strip || computer);
+  // Your pawn, in Boss alone's and a party's screens (the Hidden Boss's phase change and phase 2 too: Eric, Nov 14, "your pawns
+  // aren't here anymore"), where there's a strip or a computer's corner for it.
+  const pawn = !!boss && (bossAlone(match) || !!match.party) && (strip || computer);
   const raceInBox = computer || (beside && !strip);
   const view = nav?.view;
   const moveNo = (p: number) => `${Math.ceil(p / 2)}${p % 2 === 1 ? "" : "…"}`;
@@ -316,7 +316,9 @@ function PartyMates({ match, side }: { match: GameView; side: "w" | "b" }) {
   const leader = party.leader;
   const mayKick = (id: string) => playing && !!me && !picked(id) && (me === leader || (!!leader && !picked(leader) && picked(me)) || (leader === id && picked(me)));
   const mates = Object.entries(party.seats)
-    .filter(([id]) => id !== me && match.standings().some((s) => s.id === id && !s.out))
+    // (Once the Hidden Boss's phase 1 ends, the match places everyone, "out": in his phase change and phase 2 they're still your
+    // team, on the four boards, so they stay. Eric, Nov 14: "your pawns aren't here anymore".)
+    .filter(([id]) => id !== me && match.standings().some((s) => s.id === id && (!s.out || !!match.simul)))
     .sort((a, b) => a[1] - b[1]);
   const standing = (id: string) => match.standings().find((s) => s.id === id);
   return (
@@ -628,7 +630,7 @@ export function BrainDebug({ match, hidden = false }: { match: GameView; hidden?
 }
 
 /** The God King's place in the dock shown another way (BossDock's `king`). */
-export type KingShow = { anim: GodKingAnim; since: number; then?: GodKingAnim; class: string } | "gone";
+export type KingShow = { anim: GodKingAnim; since: number; then?: GodKingAnim; class: string } | "gone" | "benched";
 
 /** How long his "can't" shake and dimming last (ms; styles.css, .gk-unit.nope). */
 const NOPE_MS = 400;
@@ -674,7 +676,7 @@ const GodKingUnit = memo(function GodKingUnit({
   const act = command ? kingCommandAct(command.mode, command.startAt, now) : undefined;
   // His leap (his Last Stand) plays from when it starts.
   const leapAt = useMemo(() => (leaping ? Date.now() : 0), [leaping]);
-  if (show) {
+  if (show && show !== "benched") {
     // (The Hidden Boss absorbs him: his aura behind him, his figure as the phase change says, motes as he fades; his place
     // kept, empty once he's gone, so the dock doesn't move. Gone, his words go with him: no bubble from an empty place.)
     const gone = show === "gone";
@@ -732,6 +734,21 @@ const GodKingUnit = memo(function GodKingUnit({
   }
   // No charges left (Eric, Oct 15): a tap gets his soft "can't" and a tiny shake, dimmed a moment; nothing else.
   const spent = charges <= 0 && !away && !leaping && !act;
+  // (The Hidden Boss's phase 2, Eric, Nov 14: "the king will still be with you, but you can't use him anymore": in his place,
+  // greyed, his button off.)
+  if (show === "benched")
+    return (
+      <div class="gk-unit benched">
+        {/* (Silent: his words in this fight ended with phase 1.) */}
+        <VoiceBubble voice={kingVoice} class="gk-bubble" hidden />
+        <button type="button" class="gk-unit-btn" disabled aria-label="God King: can't be called in phase 2">
+          <GodKingSprite side={side} anim="idle" since={0} class="idle" />
+        </button>
+        <span class="gk-unit-charges" aria-hidden="true">
+          {charges > 0 ? "👑".repeat(charges) : "—"}
+        </span>
+      </div>
+    );
   return (
     <div class={`gk-unit${ready ? " ready" : ""}${away ? " away" : ""}${leaping ? " leaping" : ""}${act ? " acting" : ""}${charges <= 0 ? " spent" : ""}${menu ? " open" : ""}${nope ? " nope" : ""}`}>
       {menu}
