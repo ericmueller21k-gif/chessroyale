@@ -4450,8 +4450,12 @@ export const BOARD: { readonly checkHighlight: boolean } = { checkHighlight: fal
  *   only, decoded when a battle or a room needs it), from the bar's start, beside the town's painting. The last `townShare` of the bar
  *   is its "Loading music…" step; if the music isn't all in by the time the town is built, the town waits at most `townWaitMs` for it,
  *   then opens and the rest lands in the background.
+ * - `handoffMs`, `handoffWaitMs`: a new audio context (sound.ts rebuilds one after the window was away, or the device changed) takes
+ *   the music over seamlessly (Eric, Nov 14: "it froze, stopped for a second... restarted at a different part"): it starts on the new
+ *   one at the place the old one is heard at, once the new one's clock runs (waiting at most `handoffWaitMs`), and the old one fades
+ *   out over `handoffMs` from there.
  */
-export const MUSIC = { volume: 0.25, fadeMs: 300, endFadeMs: 1500, startDelayS: 0.05, splashHoldMs: 2000, townShare: 0.15, townWaitMs: 3000 } as const;
+export const MUSIC = { volume: 0.25, fadeMs: 300, endFadeMs: 1500, startDelayS: 0.05, splashHoldMs: 2000, townShare: 0.15, townWaitMs: 3000, handoffMs: 300, handoffWaitMs: 1000 } as const;
 
 /**
  * The Hidden Boss's music (Nov 13; docs/decisions/2026-11-13-hidden-boss-music.md; the handoff's README, "The Hidden Boss"): one

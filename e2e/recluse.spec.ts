@@ -704,6 +704,10 @@ test("beaten in phase 1 (?win=1): he collapses and mumbles, then the phase chang
   await expect.poll(() => phase(page), { timeout: 30_000 }).toBe("results");
   await expect(page.locator(".results h1")).toHaveText("Victory!");
   await expect(page.locator(".team-result")).toContainText("You beat the Hidden Boss on all 4 boards!");
+  // (His transformation's theme started once, at the split, and never again through the four boards as each was decided
+  // (Eric, Nov 14: "this music keeps restarting on the third phase"); then it ends with the result.)
+  const after = (await musicLog()).filter((l) => /^music:(start|out|end):/.test(l));
+  expect(after).toEqual(["music:start:recluse-phase2", "music:start:recluse-beaten", "music:out:recluse-phase2", "music:start:recluse-phase3", "music:out:recluse-beaten", "music:end:recluse"]);
   // His defeat in phase 2 (a placeholder for his transformation: the spellbook's glow, his hair in the wind).
   await expect(page.locator(".boss-char.place-results")).toHaveAttribute("data-anim", /spellbook2|spellLoop2/, { timeout: 10_000 });
   expect(await change.seen()).toMatchObject({ idle2: true, reviveLine: true });
@@ -1069,5 +1073,9 @@ test("phase 2's slow moves (?phase=2): each marks a red X for the team in one co
   await expect(page.locator('.rc-slow[data-slow="10"]').first().locator(".rc-slow-x")).toHaveCount(10 * 9);
   await expect.poll(() => seen.seen(), { timeout: 10_000 }).toEqual({ flash: true, note: true, banner: true, minis: phone });
   expect(((await page.evaluate(() => (window as any).__soundLog)) as string[]).filter((x) => x.startsWith("recluseSlow")).length).toBeGreaterThanOrEqual(1);
+  // (His transformation's theme, started at the split, plays on through a minute and more of the four boards, the slow moves and his
+  // ultimate: never started again nor ended (Eric, Nov 14: "this music keeps restarting on the third phase").)
+  const music = ((await page.evaluate(() => (window as any).__soundLog)) as string[]).filter((x) => /^music:(start|out|end):/.test(x));
+  expect(music, "no restart through phase 2").toEqual([]);
   expect(errors).toEqual([]);
 });

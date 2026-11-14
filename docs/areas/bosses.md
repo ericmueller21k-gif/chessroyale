@@ -20,7 +20,12 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
   "START!" done) until it's decided (`boss.result`; then a 1.5 s fade, `MUSIC.endFadeMs`, and nothing on the result screen); solo,
   raids, online and the Crowd's boss final alike, one check in `App.tsx` (`musicBattle` → `bossMusic`). The intro once at t0, the
   loop from t0 + `introSeconds`, from `pad`, looping between `pad` and `pad + loopSeconds` (`musicPlan`), Web Audio only, on its own
-  gain into sound.ts's master (`musicBus`) at `MUSIC.volume` (0.25: about 7 dB under the boss sounds). MP3 only, **mono at 64 kbps**
+  gain at `MUSIC.volume` (0.25: about 7 dB under the boss sounds), **straight to the speakers** (`musicBus`: at the master's level,
+  not through the game sounds' 6 kHz low-pass; Nov 14, Eric: "it sounds much lower quality"). **A new audio context** (sound.ts
+  rebuilds one after the window was away 2 s+, the device changed, or it died) **takes it over with no break** (Nov 14): once the new
+  one's clock runs (at most `MUSIC.handoffWaitMs`), it starts there at the place the old one is heard at (`carriedStarts`; its intro
+  too, if it's in it), and the old one fades out over `MUSIC.handoffMs` from there, its context kept open that long
+  ([decision](../decisions/2026-11-14-music-clean.md)). MP3 only, **mono at 64 kbps**
   (Nov 12, Eric: "Mono 64 sounds... it's totally fine"; about 1 MB a theme, 23 MB decoded for two minutes). **Fetched during the town's
   loading bar** (Nov 12, `preloadMusic`: every theme, fetched only, kept by the service worker; its last step "Loading music…",
   `MUSIC.townShare`, waits at most `MUSIC.townWaitMs`, 3 s, once the town is built), never at app start, not precached; **decoded** when
