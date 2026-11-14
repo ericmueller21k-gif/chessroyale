@@ -319,19 +319,24 @@ export function SpeechBox({ class: cls, text, at, until, now, fits = 0, balanced
     const e = el.current;
     if (!balanced || !e) return;
     // (Measured only when it can be laid out (bubbleFit): a box drawn hidden is measured as it first shows, by the ResizeObserver,
-    // which runs before that frame's paint. A width once fitted is kept until the line changes.)
+    // which runs before that frame's paint. A width once fitted is kept until the line changes. The observer stops once it has
+    // measured, before the box takes its width: a box resized while its observer still watched it made Chrome report "ResizeObserver
+    // loop completed with undelivered notifications" as an error, sent to /api/problems (#712's review, Nov 14).)
+    let ro: ResizeObserver | null = null;
     let done = false;
     const measure = () => {
       const f = el.current && bubbleFit(el.current);
       if (!f) return;
       done = true;
+      ro?.disconnect();
+      ro = null;
       setFitted(f);
     };
     measure();
-    const ro = new ResizeObserver(() => {
-      if (!done) measure();
-    });
-    ro.observe(e);
+    if (!done) {
+      ro = new ResizeObserver(measure);
+      ro.observe(e);
+    }
     // (The pixel font may still be loading (font-display: swap): measure again once it's in, so the box fits the font it's drawn in.)
     let live = true;
     void document.fonts?.load(`${getComputedStyle(e).fontSize} "Press Start 2P"`).then(
@@ -342,7 +347,7 @@ export function SpeechBox({ class: cls, text, at, until, now, fits = 0, balanced
     );
     return () => {
       live = false;
-      ro.disconnect();
+      ro?.disconnect();
     };
   }, [text, balanced]);
   useLayoutEffect(() => {

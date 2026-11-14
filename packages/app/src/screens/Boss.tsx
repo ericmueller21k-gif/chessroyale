@@ -111,7 +111,7 @@ export function BossBar({ boss, match, move }: { boss: BossView; match?: GameVie
     <div class={`boss-bar${char ? " has-char" : ""}${slot ? " barslot" : ""}`} style={{ "--bc-name": `${bossKit(boss.name)?.barName ?? 0}px` }} role="status" aria-label={`${boss.name}, threat ${boss.threat} of 5`}>
       {char && <BossCharacter match={match!} place="bar" />}
       <span class={`boss-icon${char ? " boss-icon-face" : ""}`} aria-hidden="true">
-        <BossFace boss={boss} />
+        <BossFace boss={boss} live />
       </span>
       <span class="boss-main">
         <span class="boss-name">
@@ -465,13 +465,13 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
                   the dock keeps the turn's own line, unless the moment has words of its own for you, dockLine.) */}
               {rushLines ? (
                 <>
-                  <BossTag boss={boss} />: <strong>{rushLines.line}</strong>
+                  <BossTag boss={boss} live />: <strong>{rushLines.line}</strong>
                 </>
               ) : lightsStart ? (
                 <strong>Remember where his pieces are.</strong>
               ) : snacking ? (
                 <>
-                  <BossTag boss={boss} />: <strong>You start a pawn down.</strong>
+                  <BossTag boss={boss} live />: <strong>You start a pawn down.</strong>
                 </>
               ) : intro ? (
                 <strong>{boss.raid ? (alone ? "You vs the boss." : "All of you vs the boss.") : finalistsLine()}</strong>
@@ -484,11 +484,11 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
                 // (Short enough for a phone's dock with the move in it: his icon says who.)
                 <>
                   {/* (Only his picture here, as the line always had: the name would push "Not scored." out of a phone's dock.) */}
-                  <BossFace boss={boss} class="boss-tag-face" label={boss.name} /> Plays <strong>your</strong> move{funPlayed ? <>: <strong>{funMove.san}</strong></> : "…"}
+                  <BossFace boss={boss} class="boss-tag-face" label={boss.name} live /> Plays <strong>your</strong> move{funPlayed ? <>: <strong>{funMove.san}</strong></> : "…"}
                 </>
               ) : momentLine ? (
                 <>
-                  <BossTag boss={boss} />: <strong>{momentLine}</strong>
+                  <BossTag boss={boss} live />: <strong>{momentLine}</strong>
                 </>
               ) : victim ? (
                 <strong class="bad">
@@ -505,11 +505,11 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
               ) : boss.lastMove ? (
                 <>
                   {/* (His reveal isn't named until the paint drips: "Boss plays …", smudgyFen's `hush`.) */}
-                  <BossTag boss={boss} /> plays <strong>{smudgy?.hush ? "…" : boss.lastMove.san}</strong>
+                  <BossTag boss={boss} live /> plays <strong>{smudgy?.hush ? "…" : boss.lastMove.san}</strong>
                 </>
               ) : noMove ? (
                 <>
-                  <BossTag boss={boss} />: <strong>{noMove}</strong>
+                  <BossTag boss={boss} live />: <strong>{noMove}</strong>
                 </>
               ) : null}
             </span>
@@ -595,7 +595,7 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
                   💀
                 </span>
                 <span class="boss-strike-text">
-                  <BossTag boss={boss} /> struck down
+                  <BossTag boss={boss} live /> struck down
                 </span>
                 <strong class="boss-strike-name">{name(victim)}</strong>
               </div>
