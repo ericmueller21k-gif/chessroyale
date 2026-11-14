@@ -1331,17 +1331,18 @@ test("rides (Oct 31; Nov 1, every boss's): your pawn sits on its ride, the ride'
   // (Your profile: "View profile" on your card on a phone, the side menu's Profile on a computer.)
   await expect(page.getByRole("button", { name: "View profile", exact: true }).or(page.getByRole("navigation", { name: "Menu" }).getByRole("button", { name: "Profile" })).filter({ visible: true }).first()).toBeVisible();
   // (No crate holds a ride yet: given straight, as only admins have them.)
-  const [chirp, shoes] = await giveItems(page, [
+  const [chirp, shoes, dozer] = await giveItems(page, [
     { def: "riding-chirp", color: "cobalt", blemish: 40 },
     { def: "cheetah-shoes", color: "red", blemish: 0 },
+    { def: "sawyer-dozer", color: "gold", blemish: 0 },
   ]);
   await wearItem(page, "ride", chirp!);
   // Nothing is fetched for a ride but its drawing (Nov 1: its frames are drawn from it, no sheets; Nov 1, rides lazy: each ride's
-  // drawing is its own chunk, loaded when it's worn).
+  // drawing is its own chunk, loaded when it's worn) and, for a ride that has one, its moving sound (Nov 14: /sounds/rides/<id>.wav).
   const fetched: string[] = [];
   page.on("request", (r) => {
     const path = new URL(r.url()).pathname;
-    if (/ride/i.test(path) && !DRAWING_CHUNK.test(path)) fetched.push(r.url());
+    if (/ride/i.test(path) && !DRAWING_CHUNK.test(path) && !/^\/sounds\/rides\/[\w-]+\.wav$/.test(path)) fetched.push(r.url());
   });
   // The bots hold still from the town's first moment (`__townCall(-1)`, called as the town sets its hooks: no walk, no turns), where it
   // places them: each at least 3 steps from you (world.ts `freeSpot`). So none stands on the squares beside you that the taps below aim
@@ -1511,6 +1512,70 @@ test("rides (Oct 31; Nov 1, every boss's): your pawn sits on its ride, the ride'
   await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
   await expect.poll(async () => (await rideNow(page)).you.ready, { message: "your shoes' frames are ready", timeout: 30_000 }).toBe(true);
   expect([(await rideNow(page)).you.ride, (await rideNow(page)).you.stepMs]).toEqual(["cheetah-shoes", 45]);
+  // Its moving sound (Nov 14, Eric: "one continuous sound"; RIDE_SOUND): Cheetah Shoes have none, so walking on them is silent; Sawyer's
+  // Dozer plays one looping source from its first step, and standing still it fades out (holdMs, then fadeOutMs) and is let go.
+  // (Each ride line of the sound log with its time, as the app writes it: ride-sound.ts.)
+  const logRides = () =>
+    page.evaluate(() => {
+      const w = window as unknown as { __soundLog: string[]; __rideLog: [string, number][] };
+      w.__rideLog = [];
+      w.__soundLog = new Proxy([] as string[], { get: (a, k) => (k === "push" ? (l: string) => (/^ride:/.test(l) && w.__rideLog.push([l, performance.now()]), a.push(l)) : Reflect.get(a, k)) });
+    });
+  await logRides();
+  const rideLog = () => page.evaluate(() => (window as unknown as { __rideLog: [string, number][] }).__rideLog);
+  const stillAt = () => page.evaluate(() => (window as unknown as { __townYou: () => { moving: boolean } }).__townYou().moving);
+  /** A walk up the clear lane and back (the walk hook, after a key has switched the sound on), until you stand. */
+  const ride = async (to: readonly [number, number]) => {
+    await page.evaluate((sq) => (window as unknown as { __townWalk: (s: readonly [number, number]) => boolean }).__townWalk(sq), to);
+    await expect.poll(stillAt, { message: `walked to ${to}`, timeout: 10_000 }).toBe(false);
+  };
+  // (A key switches the sound on, as a player's first tap or key does.)
+  await page.keyboard.press("Shift");
+  await ride([24, 25]);
+  await ride([24, 29]);
+  await page.waitForTimeout(400);
+  expect(await rideLog(), "Cheetah Shoes walk silently").toEqual([]);
+  expect((await rideNow(page)).you.sound).toMatchObject({ ride: null, live: 0 });
+  await wearItem(page, "ride", dozer!);
+  await page.goto("/town?sky=day");
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
+  await expect.poll(async () => (await rideNow(page)).you.ready, { message: "your dozer's frames are ready", timeout: 30_000 }).toBe(true);
+  expect((await rideNow(page)).you.ride).toBe("sawyer-dozer");
+  await logRides();
+  await page.keyboard.press("Shift");
+  await ride([24, 25]);
+  // (The first walk may come before the loop is decoded: from here, a walk with it ready.)
+  await expect.poll(async () => (await rideNow(page)).you.sound.live, { message: "the first walk's loop let go", timeout: 5_000 }).toBe(0);
+  await page.evaluate(() => ((window as unknown as { __rideLog: unknown[] }).__rideLog.length = 0));
+  // Moving: one source, looping 0.1 to 1.1 s, coming up (read as it moves, on the frames: walking 4 squares takes 360 ms).
+  const heard = page.evaluate(
+    () =>
+      new Promise<unknown[]>((done) => {
+        const w = window as unknown as { __townRide: () => { you: { sound: unknown } }; __townYou: () => { moving: boolean } };
+        const all: unknown[] = [];
+        let went = false;
+        const look = () => {
+          const m = w.__townYou().moving;
+          if (m) all.push(w.__townRide().you.sound);
+          went ||= m;
+          if (went && !m) return done(all);
+          requestAnimationFrame(look);
+        };
+        requestAnimationFrame(look);
+      }),
+  );
+  await ride([24, 29]);
+  const during = (await heard) as { ride: string | null; up: boolean; live: number; loop: unknown[] | null }[];
+  expect(during.length, "frames seen moving").toBeGreaterThan(5);
+  expect(Math.max(...during.map((d) => d.live)), "never more than one source").toBe(1);
+  const playing = during.filter((d) => d.live === 1);
+  expect(playing.length, "the loop plays as you ride").toBeGreaterThan(during.length / 2);
+  for (const d of playing) expect([d.ride, d.up, d.loop]).toEqual(["sawyer-dozer", true, [true, 0.1, 1.1]]);
+  // Standing still: it fades out (RIDE_SOUND.holdMs after the last step, over the dozer's fadeOutMs) and is let go.
+  await expect.poll(async () => (await rideNow(page)).you.sound, { message: "standing: faded out and let go", timeout: 5_000 }).toMatchObject({ ride: null, live: 0 });
+  const log = await rideLog();
+  expect(log.map(([l]) => l), "started once, faded once, let go").toEqual(["ride:start:sawyer-dozer", "ride:fade:sawyer-dozer", "ride:end:sawyer-dozer"]);
+  expect(log[2]![1] - log[1]![1], "let go only once the fade is done (700 ms)").toBeGreaterThanOrEqual(700);
   expect(fetched).toEqual([]);
   expect(errors).toEqual([]);
 });
