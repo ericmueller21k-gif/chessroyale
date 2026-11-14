@@ -1580,8 +1580,13 @@ test("rides (Oct 31; Nov 1, every boss's): your pawn sits on its ride, the ride'
   // Standing still: it fades out (RIDE_SOUND.holdMs after the last step, over the dozer's fadeOutMs) and is let go.
   await expect.poll(async () => (await rideNow(page)).you.sound, { message: "standing: faded out and let go", timeout: 5_000 }).toMatchObject({ ride: null, live: 0 });
   const log = await rideLog();
-  expect(log.map(([l]) => l), "started once, faded once, let go").toEqual(["ride:start:sawyer-dozer", "ride:fade:sawyer-dozer", "ride:end:sawyer-dozer"]);
-  expect(log[2]![1] - log[1]![1], "let go only once the fade is done (700 ms)").toBeGreaterThanOrEqual(700);
+  // Started once, let go once, after its last fade. (A CI frame longer than holdMs may dip it mid-walk: a fade then "back", on the
+  // same source, never a second start.)
+  const said = log.map(([l]) => l.replace(/:sawyer-dozer$/, ""));
+  expect([said[0], ...said.slice(-2)], "started once, faded, let go").toEqual(["ride:start", "ride:fade", "ride:end"]);
+  expect(said.filter((l) => l === "ride:start" || l === "ride:end"), "one start, one end").toEqual(["ride:start", "ride:end"]);
+  for (let i = 1; i < said.length - 2; i++) if (said[i] === "ride:fade") expect(said[i + 1], "a dip comes straight back").toBe("ride:back");
+  expect(log.at(-1)![1] - log.at(-2)![1], "let go only once the fade is done (700 ms)").toBeGreaterThanOrEqual(700);
   expect(fetched).toEqual([]);
   expect(errors).toEqual([]);
 });
