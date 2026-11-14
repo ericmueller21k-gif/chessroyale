@@ -200,7 +200,12 @@ game's playground tune, a 1920s bandstand stroll), used as above: its pace, swin
 the tune on, nothing shrill, several places in one walk; none of its chords, key or tune. Two changes for his ear: an
 ocarina where it has a horn, and the soft piano and music box in the quiet part. It is far darker than the boss themes
 by design (4 to 8 kHz about 14 dB lower): if he calls it muffled, raise the mix's low-pass and the brush first.
-First go (107 beats a minute, two candidate tunes): "I think I'm vibing with the second one better" (tune b); the
-accordion out for a light flute (the table above); "speed up the BPM slightly": 116 now, which makes its 80 bars
-2:45, so the full version needs eight more bars to be three minutes. Second go sent as a 43-second clip (the flute,
-and the same on a vibraphone, as he had also said "or a timpani", which is a drum: perhaps a mallet voice was meant).
+First go (107 beats a minute, two candidate tunes): "I think I'm vibing with the second one better"; the accordion
+out for something light (the table above); "speed up the BPM slightly". Second go, two 43-second clips at 116 (a soft
+flute, then a vibraphone: he had said "a flute or a timpani", which is a drum, so a mallet voice was a guess): "2 is
+dope ... I love everything about that sample, so you can keep that on rough repeat. Feel free to play around a bit mid
+track for a verse up to you", and the pace his own, tried by ear: "right in between, 129". Read as the second clip,
+the vibraphone. Third go: the full song, 96 bars at 129 (2:59): that sample three times with the gazebo, the cafe, a
+conversation and the lifted tune between; sent on the vibraphone, and on the flute in case "2" meant otherwise.
+A struck, ringing voice (vibraphone, koto, music box, soft piano) has now won over a blown or bowed one each time he
+was given the choice.
