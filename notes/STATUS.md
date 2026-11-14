@@ -1043,3 +1043,5 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 14 00:40: Eric playtest: music muffled (6 kHz low-pass on master + mono 64k files) and a break on rebuild. QUEUE TOP:
   briefs/music-clean.md. Then recluse-bubble-grows, recluse-room-night. Asked Eric: re-render his songs stereo/high bitrate
   (reverses his Nov 12 "mono 64 is fine"), a longer build-up for song 2 (the music chat), a kid->man conversation (new content?).
+- Nov 14 00:31: town-leave DONE -> PR #694 (CI). Music helper session_01JuCWRsAD5VCZQP4Gd1BFCT (high) on claude/music-clean.
+  Running Opus: flaky + music; Haiku: desktop side column. Queue: bubble (fight + cutscene), night room.
