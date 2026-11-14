@@ -339,7 +339,7 @@ below):
 - **His cutscene** (Eric, Nov 12; in the fight since Nov 13, solo and online; [decision](../decisions/2026-11-13-recluse-cutscene-wired.md)):
   after his fall, before the phase change, about 104 s (`RECLUSE_CUTSCENE.holdMs`; a unit test keeps it the timeline's length):
   everything dims but a soft round spotlight on the board's middle; he kneels in it while the ghost of him as a child poofs in above
-  the board, drops, lands, his knees buckling; Eric's 17 lines, each its own typed box by its speaker (a line of two sentences typed
+  the board, drops, lands, his knees buckling; Eric's 18 lines, each its own typed box by its speaker (a line of two sentences typed
   one, a second's pause, the next; `RECLUSE_CUTSCENE_LINES`); the child fades; the man alone a moment; the light lifts (`outMs`) and
   the phase change carries on, him on his knees in his place, quiet (`kneel`, `phaseChangeRun`'s `before`), until he seizes the God
   King's power. Solo: from the fall's end (`SoloMatch.cutscene`), the phase change as it ends; online from the server's

@@ -2012,7 +2012,7 @@ export const RECLUSE_CUTSCENE = {
    * starts (`recluseCutscene`), then his phase change starts for everyone at once. The scene's whole length (the app's
    * `recluseCutsceneTimeline().endAt`: a unit test keeps the two equal; change it with the lines or the times above).
    */
-  holdMs: 103_745,
+  holdMs: 111_120,
 } as const;
 
 /**

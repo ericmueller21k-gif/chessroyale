@@ -240,7 +240,8 @@ export const RECLUSE_CUTSCENE_LINES: readonly { who: "kid" | "man"; say: readonl
   { who: "man", say: ["I just wanted to play the most beautiful game anyone ever played."] },
   { who: "kid", say: ["Then why'd you stop?"] },
   { who: "man", say: ["The computers.", "They ruined everything."] },
-  { who: "kid", say: ["Everyone has the same computers.", "So the best player is still the best."] },
+  { who: "kid", say: ["Everyone has the same computers.", "So the only thing that separates anyone is creativity."] },
+  { who: "kid", say: ["They just made the game deeper.", "The computers never changed who the best player was."] },
   { who: "man", say: ["Do you really believe that?"] },
-  { who: "kid", say: ["I'm not sure.", "The only one who can prove it is right next to me."] },
+  { who: "kid", say: ["Why don't you show us?"] },
 ];
