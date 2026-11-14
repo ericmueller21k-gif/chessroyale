@@ -353,7 +353,8 @@ describe("the scoreboard from his fall until the results (Eric's playtest, Nov 1
   });
 
   it("each board's state as it ends: won, lost, drawn; someone who left (their board a bot's under a new id) shows out; a fresh bot has no row", () => {
-    const st = withBoards(start(), (id) => [{ result: { winner: "crowd", how: "mate" } }, { result: { winner: "boss", how: "time" } }, { result: { winner: "draw", how: "stalemate" } }, { player: "rb9" }][id]!);
+    const edits: Partial<Phase2State["boards"][number]>[] = [{ result: { winner: "crowd", how: "mate" } }, { result: { winner: "boss", how: "time" } }, { result: { winner: "draw", how: "stalemate" } }, { player: "rb9" }];
+    const st = withBoards(start(), (id) => edits[id]!);
     const shown = phase2Standings(placed, st.boards);
     // (Boards 0 to 3: you won, bot1 lost, bot2 drew, bot3 left (a bot plays it). The rows keep phase 1's order.)
     expect(shown.map((s) => [s.id, s.out, s.board ?? null])).toEqual([
