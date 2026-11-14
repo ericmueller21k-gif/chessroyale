@@ -1123,3 +1123,9 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   #707: helper's light-before-after showed the body bloom weaker and the rays softer after the 1/3-res fix -> sent back; it moved the
   light to 1 px per CSS px in a worker (3d0215c5). Waiting for its new stills + perf + "Done" (watcher b8d5ihz1a). Judge at 1:1
   (6.3 s body glow) before merging. Check-in send_later 11:05.
+- Nov 14 10:51: #710 music-level MERGED 5ff16634 (live 10:33). #707 transformation MERGED f239f7dd (main merged in first; PR CI
+  green, retry-passes sound.spec:61 + town.spec:1049 "bot 9 is drawn"). Light: worker at 1 px/CSS px, director's 1:1 check = same
+  (1.3-1.6 levels mean); Eric: "I can't tell the difference". Deploy + main run watcher b0msuof1s.
+  Helpers: visual QA session_01JuCWRujcKXA1DiRWZhunC9 (high, review/recluse-visual-qa); flaky round 4 session_01JuCWRsXFcmuGijdu8ktgKv
+  (high, claude/flaky-round4, briefs/flaky-round4.md). wait-any watcher on both. prep-pr.sh fixed (no model line), saved in notes/tools.
+  Follow-ups: #707 m2/m4/m5; subscribe-in-useEffect gap (~10 places). Pending Eric: Fill-also-challenges (guard OK), CI trace OK.
