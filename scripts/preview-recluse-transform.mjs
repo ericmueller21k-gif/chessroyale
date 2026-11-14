@@ -107,7 +107,8 @@ async function run(name, use) {
       [t0 + tb.bannerAt + 500, "15-phase-2"],
     ].map(([ms, n]) => [Math.round(ms / FRAME_MS), n]),
   );
-  const n = Math.ceil((t0 + tb.endAt + 300) / FRAME_MS);
+  const stop = opt("stop");
+  const n = stop ? Math.round((t0 + Number(stop)) / FRAME_MS) : Math.ceil((t0 + tb.endAt + 300) / FRAME_MS);
   for (let i = 0; i <= n; i++) {
     if (i) await p.clock.runFor(FRAME_MS);
     await p.evaluate(() => new Promise((r) => queueMicrotask(r)));
@@ -117,6 +118,7 @@ async function run(name, use) {
     if (i % 200 === 0) console.log(name, "frame", i, "of", n);
   }
   await context.close();
+  if (stop) return rmSync(frames, { recursive: true, force: true });
   const mp4 = join(outDir, `${name}-transform.mp4`);
   execFileSync("ffmpeg", ["-y", "-loglevel", "error", "-framerate", String(1000 / FRAME_MS), "-i", join(frames, "%05d.jpg"), "-vf", "scale=trunc(iw/4)*2:trunc(ih/4)*2", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "22", "-movflags", "+faststart", mp4]);
   const gif = join(outDir, `${name}-transform.gif`);
@@ -169,7 +171,29 @@ async function closeup() {
   console.log("closeup wrote", outDir);
 }
 
+/** His glowing eyes up close, the visor up: blue, then yellow-gold (two stills). */
+async function eyes() {
+  for (const yellow of [false, true]) {
+    const context = await browser.newContext({ viewport: { width: 640, height: 640 }, deviceScaleFactor: 1 });
+    const p = await context.newPage();
+    await p.clock.install();
+    await fakeApi(p);
+    await p.addInitScript(() => localStorage.setItem("hunchess.tutorial.dismissed", "1"));
+    await p.goto(url);
+    await p.waitForTimeout(3000);
+    await p.clock.pauseAt(await p.evaluate(() => Date.now() + 200));
+    await p.evaluate(async (y) => (await import("/src/dev/recluse-transform-lab.tsx")).showCloseup(false, "faceOpen", y), yellow);
+    await p.clock.runFor(400);
+    await p.screenshot({ path: join(outDir, `eyes-${yellow ? "yellow" : "blue"}.png`) });
+    await context.close();
+  }
+}
+
 try {
+  if (which === "eyes") {
+    await eyes();
+    process.exit(0);
+  }
   if (which === "closeup" || which === "both") await closeup();
   if (which === "closeup") process.exit(0);
   if (which !== "computer") await run("phone", { ...devices["iPhone 13"], viewport: { width: 390, height: 844 } });

@@ -141,7 +141,7 @@ const MAN: Character = {
     revealed: { loop: true, frames: Array.from({ length: 6 }, (_, i) => S(fr(120, P2(i, { breath: i >= 3 ? 1 : 0 })))) },
     // The visor flips up into the dome (a frame on its way), his face for his line; then back down.
     flipUp: { loop: false, frames: [S(fr(90, P2(0)), "mid"), S(fr(90, P2(1)), "up")] },
-    faceOpen: { loop: true, frames: Array.from({ length: 6 }, (_, i) => S(fr(130, P2(i, { breath: i >= 3 ? 1 : 0, face: { eyes: i === 4 ? "narrow" : "hard", brows: "stern", mouth: "stern" } })), "up")) },
+    faceOpen: { loop: true, frames: Array.from({ length: 6 }, (_, i) => S(fr(130, P2(i, { breath: i >= 3 ? 1 : 0, face: { eyes: "glow", brows: "stern", mouth: "stern" } })), "up")) },
     flipDown: { loop: false, frames: [S(fr(90, P2(0)), "mid"), S(fr(90, P2(1)), "down")] },
     // The jump: crouched over the book, then up, and down on the drop; his arms stay at his sides.
     crouch: { loop: false, frames: [S(fr(200, P2(1, { stance: "bend", dip: 1, hold: onGround("read", OPEN_AT, SIDE_ARMS_OUT) })))] },
@@ -652,8 +652,11 @@ export function playTransform(): { at: number; t0: number; tb: typeof TB } {
   return { at, t0: preMs, tb: TB };
 }
 
+/** His glowing eyes in yellow-gold instead (for Eric to compare, Nov 14). */
+const MAN_GOLD: Character = { ...MAN, id: "recluse-transform-gold", palette: { ...MAN.palette, "!": "#fffbe6", "+": "#ffc93a", "(": "#ffc23a99", ")": "#ffc23a33", "[": "#ffe27acc" } };
+
 /** The suit up close: his head and shoulders (`whole`: all of him), big, on a dark backdrop, the visor flipping up and down. */
-export function showCloseup(whole = false): void {
+export function showCloseup(whole = false, anim = "flipCycle", yellow = false): void {
   const style = document.createElement("style");
   style.textContent = LAB_STYLE;
   document.head.appendChild(style);
@@ -666,7 +669,7 @@ export function showCloseup(whole = false): void {
   render(
     <div class="lab-closeup" style={{ position: "fixed", inset: 0, zIndex: 50, background: "radial-gradient(circle at 50% 35%, #3a3450, #14111e 70%)", overflow: "hidden" }}>
       <span style={{ position: "absolute", left: `${innerWidth / 2 - w * (RECLUSE.foot[0] / RECLUSE.w)}px`, top: `${top}px`, width: `${w}px`, aspectRatio: `${RECLUSE.w} / ${RECLUSE.h}` }}>
-        <SpriteAnim ch={MAN} anim="flipCycle" since={at} id="lab-close" />
+        <SpriteAnim ch={yellow ? MAN_GOLD : MAN} anim={anim} since={at} id="lab-close" />
       </span>
     </div>,
     host,

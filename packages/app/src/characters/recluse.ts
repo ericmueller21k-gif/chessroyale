@@ -92,6 +92,12 @@ export const RECLUSE_PALETTE: Record<string, string> = {
   p: "#070a14",
   "#": "#131d36",
   "=": "#5ab4e6",
+  // His glowing eyes (MOCKUP, Nov 14): the core, the glow, the glow on his skin.
+  "!": "#f2fdff",
+  "+": "#38b6ff",
+  "(": "#38b6ff99",
+  ")": "#38b6ff33",
+  "[": "#7fd2ffcc",
 };
 
 type Pt = readonly [number, number];
@@ -122,7 +128,7 @@ const mirror = (rows: readonly string[]) => rows.map((r) => [...r].reverse().joi
 // ---- The head: one per face, typed (the face is what must read, so every pixel of it is placed by hand). Head space:
 // 25 x 35 (5 rows on top for the hair lifting in the wind), the face's middle on x 12 (the nose).
 
-export type Eyes = "ahead" | "down" | "readL" | "readR" | "shut" | "hard" | "narrow" | "wild" | "squeeze" | "glare" | "possessed";
+export type Eyes = "ahead" | "down" | "readL" | "readR" | "shut" | "hard" | "narrow" | "wild" | "squeeze" | "glare" | "possessed" | "glow";
 export type Brows = "stern" | "hard" | "twitch" | "up" | "wild" | "fury";
 export type Mouth = "stern" | "tight" | "grin" | "laugh" | "grit" | "mumble1" | "mumble2" | "mumble3" | "scowl" | "shout";
 export interface Face {
@@ -205,6 +211,9 @@ const EYES: Record<Eyes, { l: readonly string[]; r?: readonly string[] }> = {
   glare: { l: ["bbbb", "wxxw", "wxxw", "cbbc"] },
   // Possessed (the light taking him, his transformation, Eric, Nov 14): wide open, totally white, no iris.
   possessed: { l: ["wwww", "wwww", "wwww", "bwwb"] },
+  // Glowing (the suit, visor up: Eric, Nov 14, "his eyes glow bright electric blue"): a bright core in the glow's color, a
+  // soft glow round each and a thin line of light down each cheek (`eyeGlow`, see-through, over the face).
+  glow: { l: ["b++b", "+!!+", "+!!+", "b++b"] },
 };
 /** The mouth, 7 wide, rows 23 to 27 from x 9: thin lips, at rest pressed into a knowing half-smirk. */
 const MOUTHS: Record<Mouth, readonly string[]> = {
@@ -273,6 +282,7 @@ function head(face: Face, wind: Wind, dark: boolean): Part {
   put(eyes.l, 7, 12);
   put(eyes.r ?? eyes.l, 14, 12);
   put(MOUTHS[face.mouth], 9, 23);
+
   if (dark) {
     // Deeper shadows: the sockets under his brows, the hollows of his cheeks, the shaded side; a glint in each iris.
     for (let y = 11 + LIFT; y < cv.length; y++)
@@ -695,6 +705,20 @@ function helmet(face: Face, dark: boolean, visor: Visor): Part {
   }
   return { grid: toGrid(cv) };
 }
+/** The glow over his glowing eyes (no outline, see-through, on his head part's own pixels): soft round each eye, a thin line of
+ * light down each cheek from under it. */
+function eyeGlow(): Part {
+  const cv = canvas(25, 35);
+  for (let y = 0; y < 35; y++)
+    for (let x = 0; x < 25; x++) {
+      const d = Math.min(...[9, 16].map((ex) => Math.hypot(x + 0.5 - ex, y + 0.5 - (14 + LIFT))));
+      if (d >= 1.6 && d < 2.3) cv[y]![x] = "(";
+      else if (d >= 2.3 && d < 3.1) cv[y]![x] = ")";
+    }
+  for (const x of [9, 16]) for (let y = 16; y < 22; y++) cv[y + LIFT]![x] = "[";
+  return { grid: toGrid(cv), outline: false };
+}
+
 /** A part's suit version (null: not worn with it, the tie), made the first time it's asked for. */
 export function suitName(name: string, visor: Visor = "down"): string | null {
   if (name.startsWith("tie:")) return null;
@@ -715,10 +739,16 @@ export function suitName(name: string, visor: Visor = "down"): string | null {
   return name;
 }
 /** A frame of him in the suit (the visor as given). */
-export const suitFrame = (f: Frame, visor: Visor = "down"): Frame => ({ ...f, layers: f.layers.flatMap((l) => {
-  const n = suitName(l.part, visor);
-  return n ? [{ ...l, part: n }] : [];
-}) });
+export const suitFrame = (f: Frame, visor: Visor = "down"): Frame => ({
+  ...f,
+  layers: f.layers.flatMap((l) => {
+    const n = suitName(l.part, visor);
+    if (!n) return [];
+    // (His glowing eyes' glow over his face, when it shows.)
+    if (visor !== "down" && l.part.startsWith("head:glow.")) return [{ ...l, part: n }, { ...l, part: add("eyeGlow", eyeGlow) }];
+    return [{ ...l, part: n }];
+  }),
+});
 
 // ---- Poses.
 
