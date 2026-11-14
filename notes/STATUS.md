@@ -1103,3 +1103,5 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 14 06:50: standings done -> #706 (CI b8bcd267; display only, nothing stored; his phase 2 chatter now plays; guard
   hidden-boss-room "his room" gained checks only). Eye mockup sent (blue vs yellow + in game). Transform helper
   (session_01JuCWRtesHR7mFg3Lkou6hn) waits for .go "round3" + eye pick. Slot free: transform build can start the moment Eric says go.
+- Nov 14 06:55: Eric: "blue eyes, go" -> .go written (9c0b5bbb). Transform helper building round 3b + blue eyes; watcher for .done.
+  After it: visual QA of the whole fight (briefs/recluse-visual-qa.md), flaky round 4.
