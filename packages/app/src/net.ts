@@ -74,6 +74,7 @@ import {
   beamLines,
   ShowdownScout,
   kingHelpBlocked,
+  phase2Standings,
 } from "@chessroyale/chess";
 import type { BossView, BoardView, DarkNote, ExitKind, FinalView, GameView, Hint, LightsView, MoveRecord, Phase, RushView, SimulView, Standing, VoteView } from "./game.ts";
 import { hintsFrom, whiteExpected } from "./hints.ts";
@@ -450,7 +451,18 @@ export class NetMatch implements GameView {
     return id === this.myId;
   }
   standings(): Standing[] {
-    return this.standingsList.map((s) => ({ ...s, isYou: s.id === this.myId }));
+    return this.shownStandings().map((s) => ({ ...s, isYou: s.id === this.myId }));
+  }
+  /**
+   * The server's standings, with the Hidden Boss's phase 2 players still in from his fall until the results (phase2Standings: the
+   * server places everyone as phase 1 ends, and that stays the truth for the results). Who's on his boards: the phase 2 view's, or,
+   * before it comes, his fall's word (`phase2Boards`).
+   */
+  private shownStandings() {
+    const p = this.phase;
+    const k = p.kind;
+    if (k !== "phaseChange" && k !== "simul" && !(k === "boss" && p.toPhase2)) return this.standingsList;
+    return phase2Standings(this.standingsList, this.phase2.p?.boards ?? this.phase2Boards.map((player) => ({ player })));
   }
   slots(): BoardSlot[] {
     return this.slotList;

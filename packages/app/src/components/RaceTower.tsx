@@ -8,6 +8,8 @@ import { StreakFire } from "./StreakFire.tsx";
 
 /** Points with their sign, to `dp` decimals (Crowd 50 v 50's are kept to 2: scoreDp). */
 const signed = (x: number, dp: number) => (x >= 0 ? "+" : "") + x.toFixed(dp);
+/** A phase 2 board's state on its player's row (Standing.board). */
+const BOARD_WORD: Record<NonNullable<Standing["board"]>, string> = { playing: "Playing", won: "Won", lost: "Lost", drawn: "Drawn" };
 /** A row moving more places than this fades in at its new place rather than sliding there. */
 const JUMP_ROWS = 4;
 
@@ -159,6 +161,8 @@ export function RaceTower({
                     💡
                   </span>
                 )}
+                {/* (The Hidden Boss's phase 2: how their board stands, after the name; the name gives way, never this.) */}
+                {r.board && <span class={`t-board ${r.board}`}>{BOARD_WORD[r.board]}</span>}
               </span>
               <span class="t-pts">{r.out ? "out" : <LiveNumber value={r.points} format={pts} />}</span>
               <span class="t-avg">{r.out ? "" : pts(r.avg)}</span>
