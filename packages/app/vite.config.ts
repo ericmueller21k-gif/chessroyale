@@ -88,14 +88,21 @@ function serviceWorker(): Plugin {
         // Nor pictures and video (Nov 10, phone load): the service worker keeps a picture the first time it's shown (LAZY in
         // sw-template.js), and the landing page's demo video (one format, MP4) streams like the ambience.
         .filter((f) => !LAZY_FILES.test(f) && !f.startsWith("/media/"))
-        // Nor the bosses' music (Nov 11, 1 to 2 MB a piece): fetched when its boss's battle is picked (music.ts), then kept like a
-        // picture (MUSIC in sw-template.js).
+        // Nor the bosses' music (Nov 11, 1 to 2 MB a piece): fetched after the town's first frame or when its battle needs it
+        // (music.ts), then kept in a cache of its own, piece by piece (MUSIC_HASHES below, MUSIC in sw-template.js).
         .filter((f) => !f.startsWith("/music/"))
         // Hosts redirect /index.html to /, and a cached redirect can't answer a page load.
         .map((f) => (f === "/index.html" ? "/" : f))
         .sort();
       const hash = createHash("sha256");
       for (const f of files) hash.update(f).update(readFileSync(join(outDir, f === "/" ? "index.html" : f)));
+      // The music: each piece's contents' hash (Nov 14). The worker keeps it in a cache every version shares and answers a piece from
+      // it only while its hash is this one: a deploy that changes a song fetches that song again, and only it; any other deploy keeps
+      // all of it (one that dropped it, as the version's cache, made the next visit fetch all 44 MB again).
+      const musicDir = join(outDir, "music");
+      const musicHashes = existsSync(musicDir)
+        ? Object.fromEntries(readdirSync(musicDir).sort().map((f) => [`/music/${f}`, createHash("sha256").update(readFileSync(join(musicDir, f))).digest("hex").slice(0, 12)]))
+        : {};
       // The Maia box's cache is named by its own files, so an app update keeps it and a new model replaces it. (Not its
       // source archive: the game never fetches it, so a change to the box's README or tests leaves players' copies be.)
       const maiaDir = join(outDir, "engine/maia");
@@ -109,6 +116,7 @@ function serviceWorker(): Plugin {
       const sw = readFileSync(join(APP, "sw-template.js"), "utf8")
         .replace("__VERSION__", `brc-${hash.digest("hex").slice(0, 12)}`)
         .replace("__HASHES__", JSON.stringify(hashes))
+        .replace("__MUSIC_HASHES__", JSON.stringify(musicHashes))
         .replace("__MAIA__", `brc-maia-${maia.digest("hex").slice(0, 12)}`)
         .replace("__FILES__", JSON.stringify(files));
       writeFileSync(join(outDir, "sw.js"), sw);

@@ -1205,8 +1205,10 @@ The street town was an admin's town only (`STREET_TOWN`, gone Nov 13) until it b
 ## Frame report (`?report`, Nov 11)
 `/town?report`, anyone's: from your first move, every frame for 30 s (or until **Done** on the pill at the top) is recorded in typed arrays made once (`town/frame-report.ts`; `REC` null without it, so the marks in `Town.tsx`, `render.ts` and `paint-gl.ts` are null checks): its time, the time of each part (logic, camera, sky, ground, placing and sorting, buildings, props, bosses, you, other players, lights, labels, WebGL submit, chips, minimap, and wherever they happen new pictures painted, sight lines and texture uploads; the rest is "outside our code": the browser, the GPU, garbage collection), and what was happening (walking, turning and how fast, zoom, pictures painted, uploads, an atlas reset, a long gap). Then one panel the size of the box to screenshot (`frame-report-panel.ts`): device, fps median / 5th / 1st percentile, the mean and worst ms a part, all and split by walk / turn / load, where the most time went, the worst 10 frames. The chat does no per-frame work. Hook `__townReport()`; tests `packages/app/test/town-frame-report.test.ts`, `e2e/town-street.spec.ts`.
 **Rooms (Nov 11):** a room's own loop (`shops/ShopRoom.tsx`) records into the same run, its parts under the town's names (ceiling and what's past the walls: sky; floor: ground; sorting: placing; pieces and the fight's set: props; you, the boss, everyone else; glows and darks: lights; tags and bubbles: labels; the card: chips), each frame marked "in a room"; from a home's Go in until the room's black lifts the frames are "going in", from Go out until the town's zoom ends "going out" (`REC.door`, set by `TownScreen`). Two columns more: **Room** and **In/out** (Walk, Turn and Load are the town's own frames); a room's first frame is recorded with the wait before it (the room's art painting behind the black on a first visit), not dropped as a pause. The pill's seconds come from the recorder (`FrameRec.onSec`), so they count on inside a room too (Nov 11: they were set by the town's loop alone, and Eric saw the report "pausing" as he went in). Tests: the same unit file, "rooms, and going in and out"; `e2e/shop.spec.ts`, "?fps in a room" and "a room's report records while walking".
-**The loading screen (Nov 11; [decision](../decisions/2026-11-11-town-loading.md)):** the street town opens on "Building the town…"
-(`.town-loading`, the boss loading card's look, its bar real progress: half painting, half uploading; `Town.tsx` `loadTown`,
+**The loading screen (Nov 11; [decision](../decisions/2026-11-11-town-loading.md)):** the street town opens on "Loading Chess Town…"
+(`.town-loading`, the boss loading card's look, its bar real progress: half painting, half uploading; under the bar, the step it's on (Nov 14,
+Eric: "what happened to it showing what it's downloading?"; `LOAD_STEPS` in `Town.tsx`, the boss card's `.boss-loading-note`): "Loading the
+town's pictures…" while it paints (and waits for the sidekicks' sheets), "Building the town…" while it uploads; `Town.tsx` `loadTown`,
 `f.loadSliceMs`, `f.loadPaintShare`, `f.loadSheetWaitMs`). It paints every picture (`render.ts` `warm`) and uploads them for good
 (`paint-gl.ts` `keep`, `kept`: tallest first, the atlas made once as deep as they need, plus 2 spare pages for tags, boards, the
 bubble, signs and text, the only ones that start again). Then the frames start. Measured headless at 1x: 4.5 s (painting 4.3,
@@ -1214,11 +1216,13 @@ uploading 0.2); slowed 4x: about 21 s. 10 kept pages, 12 in all (192 MB). After 
 0 uploads, 0 resets. A building in and out uploads nothing of the town. The town's 2D pictures are made in memory (`paint.ts`
 `art2d`): uploading a GPU canvas waits for the GPU. Hooks: `__townPaint()`'s `loading`, `loadMs`, `loadPaintMs`, `atlas`. Tests:
 `packages/app/test/town-atlas.test.ts`, `e2e/town-street.spec.ts` ("the town's loading screen…").
-**Its music step (Nov 12; [decision](../decisions/2026-11-12-music-mono-preload.md)):** from the bar's start every boss theme is fetched
-beside the painting (`music.ts` `preloadMusic`: fetched, never decoded); with Music on the town takes the bar to 85% and "Loading music…"
-the rest (`MUSIC.townShare`), only for what hasn't landed once the town is built, at most `MUSIC.townWaitMs` (3 s; then the town opens and
-the rest lands behind it). Music or Sound off: nothing fetched, no step. Hook: `__townPaint()`'s `loadMusicMs`. Test: `e2e/town-street.spec.ts`
-("the town's loading fetches every boss theme once").
+**The music is no step (Nov 14; [decision](../decisions/2026-11-14-town-load-fast.md)):** until Nov 14 every boss theme was fetched from the
+bar's start beside the painting, and "Loading music…" waited up to 3 s more once the town was built (Nov 12, [decision](../decisions/2026-11-12-music-mono-preload.md));
+at 44 MB (stereo 192 kbps) Eric found the town "taking forever". Now `preloadMusic` starts `MUSIC.townPreloadAfterMs` (2 s) after the first
+frame, in the background, one piece at a time at low priority; a theme not in yet is fetched as its battle or room needs it. The service worker
+keeps the music in a cache of its own across deploys (`brc-music`, `MUSIC_HASHES` in `sw-template.js`). Music or Sound off: nothing fetched.
+Test: `e2e/town-street.spec.ts` ("the town's first frame doesn't wait for the music": every piece held unanswered, the first frame drawn, then
+one piece at a time).
 
 **Painting ahead (Nov 11):** each frame `planBoxes` paints, nearest first, the pictures of the boxes in reach: always the faced quarter's roofs and the sides' and backs' pictures (and shaded steps), mid-turn the next quarter's roofs (`boxBakeMs`, 1.5 ms); standing still, also the fronts' shaded frames and the other quarters' roofs (`boxBakeStillMs`, 4 ms, while the view is at rest). Before, a first look round painted hundreds of them as they showed. [Decision](../decisions/2026-11-11-town-frame-report.md). (Since the loading screen, it finds nothing left to paint.)
 
