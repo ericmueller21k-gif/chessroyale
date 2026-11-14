@@ -367,7 +367,7 @@ below):
   (SpeechBox's `balanced`) measures only once it can be laid out (a ResizeObserver as it first shows), never keeping a width taken
   while hidden; the cutscene's tail goes in and out from its box's own `fresh` / `leaving` (`.cs-say + .cs-tail`); a computer's bar
   face is his bust as drawn now (BossKit `barFace`: his age's loop, his suit); the man's words stand on `RECLUSE_HEADS` (beaten, his
-  kneel); in the party layout the God King's box sits above the team, three rows at 8 px, the chat stopping 200 px over the board's
+  kneel); in the party layout the God King's box sits above the team, at 8 px and as wide as the team reaches (252 px: every line he has in two rows, none into the chat; [main red after #712](../decisions/2026-11-14-fix-main-712.md)), the chat stopping 200 px over the board's
   foot; phase 2's Moves panel lists your own board; a phone's small boards name their player; the white-out's dying disc starts whole on
   a tall phone; his words over his helmet never straddle the bar's edge (moved into the bar, or onto the board); the split ends where
   phase 2 draws each board (`playedBox`). Checks in `e2e/recluse.spec.ts` and `e2e/hidden-boss-room.spec.ts`.
