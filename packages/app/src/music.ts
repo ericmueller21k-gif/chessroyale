@@ -2,8 +2,8 @@
  * Boss battle music (Eric, Nov 11: "Wire boss battle music into the game"; docs/decisions/2026-11-11-boss-music.md).
  *
  * Each boss with a theme in `public/music/themes.json` has an intro played once and a loop played until the battle's
- * result; a boss without one plays nothing. Every theme is fetched (not decoded) during the town's loading bar (`preloadMusic`,
- * Nov 12), into the service worker's cache; a theme is decoded when its battle is picked (its loading step and intro) or its room
+ * result; a boss without one plays nothing. Every theme is fetched (not decoded) in the background once the town has drawn its
+ * first frame (`preloadMusic`, Nov 12; after the town's loading since Nov 14), into the service worker's music cache; a theme is decoded when its battle is picked (its loading step and intro) or its room
  * is walked into, never at app start, and let go after (`forgetTheme`). It starts as the battle starts (the intro's end: `bossMusic`'s `live`),
  * or as soon as it arrives if it's late (from its intro), never holding the battle. It plays on its own gain into the game's
  * master (sound.ts's `musicBus`), at MUSIC.volume, under the effects; Settings → Sound's "Music" and "Sound" switches and
@@ -329,11 +329,11 @@ const preloaded = new Set<string>();
  */
 const NOT_IN_TOWN: readonly string[] = Object.values(RECLUSE_MUSIC);
 /**
- * The town's loading bar's "Loading music…" step (Eric, Nov 12: "why not just add all of the songs to the town when you load into the
- * town?"): every theme's pieces fetched, never decoded, so the service worker keeps them and a battle's or a room's theme never waits
- * on the network (decoding stays with `loadTheme`, one theme at a time in memory). Music or Sound off: nothing. Each piece once a
- * visit. `onShare` hears the share of the pieces in (0 to 1) as each lands; resolves once all have landed or failed (a failure is
- * fetched again as its theme is needed).
+ * Every theme fetched ahead (Eric, Nov 12: "why not just add all of the songs to the town when you load into the town?"): each
+ * theme's pieces fetched, never decoded, so the service worker keeps them and a battle's or a room's theme never waits on the network
+ * (decoding stays with `loadTheme`, one theme at a time in memory). The town calls it after its first frame (Nov 14: about 44 MB, it
+ * must never hold the town up). Music or Sound off: nothing. Each piece once a visit. `onShare` hears the share of the pieces in (0 to
+ * 1) as each lands; resolves once all have landed or failed (a failure is fetched again as its theme is needed).
  */
 export async function preloadMusic(onShare: (share: number) => void = () => {}): Promise<void> {
   if (!wanted()) return;
@@ -342,21 +342,22 @@ export async function preloadMusic(onShare: (share: number) => void = () => {}):
   await fetchPieces(musicFiles(themes, NOT_IN_TOWN), onShare);
 }
 
-/** Fetches (never decodes) each of these pieces not fetched yet this visit; `onShare` as preloadMusic's. */
+/**
+ * Fetches (never decodes) each of these pieces not fetched yet this visit, one at a time (Nov 14: all at once, 44 MB took the whole
+ * link from whatever else the page asked for); `onShare` as preloadMusic's.
+ */
 async function fetchPieces(all: readonly string[], onShare: (share: number) => void = () => {}): Promise<void> {
   const urls = all.filter((u) => !preloaded.has(u));
+  urls.forEach((u) => preloaded.add(u));
   let done = 0;
-  await Promise.all(
-    urls.map((url) => {
-      preloaded.add(url);
-      // (Low priority: the town's own files first. Read to the end, as a blob, not into the page's memory: the service worker
-      // copies it into its cache as it passes.)
-      return fetch(url, { priority: "low" } as RequestInit)
-        .then((r) => (r.ok ? r.blob() : Promise.reject(new Error(String(r.status)))))
-        .catch(() => void preloaded.delete(url))
-        .then(() => onShare(++done / urls.length));
-    }),
-  );
+  for (const url of urls) {
+    // (Low priority: anything else the page asks for first. Read to the end, as a blob, not into the page's memory: the service worker
+    // copies it into its cache as it passes.)
+    await fetch(url, { priority: "low" } as RequestInit)
+      .then((r) => (r.ok ? r.blob() : Promise.reject(new Error(String(r.status)))))
+      .catch(() => void preloaded.delete(url));
+    onShare(++done / urls.length);
+  }
 }
 
 interface Theme {
@@ -406,7 +407,7 @@ let nextLoaded: string | undefined;
 let starting: { b: MusicBattle; theme: string } | null = null;
 
 const wanted = () => on && !isMuted();
-/** Music is wanted (its switch and Sound's on): the town's loading bar then has its "Loading music…" step. */
+/** Music is wanted (its switch and Sound's on): `preloadMusic` fetches then. */
 export const musicWanted = () => wanted();
 const level = () => musicLevel(on, isMuted(), isPageHidden());
 

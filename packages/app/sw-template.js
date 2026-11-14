@@ -12,8 +12,12 @@ const STREAMED = ["/sounds/colosseum/ambient.mp3"];
 // Pictures (not precached: vite.config.ts's LAZY_FILES, the same test): kept in this version's cache the first time they're
 // shown, then answered from it. The landing page's demo video (/media/) streams from the network like the ambience.
 const LAZY = /\.(png|jpe?g|webp|gif|avif)$/;
-// The bosses' music (/music/, not precached: fetched when a boss's battle is picked, music.ts): kept like a picture once fetched.
+// The bosses' music (/music/, not precached: fetched after the town's first frame or when a battle needs it, music.ts): kept once
+// fetched in MUSIC_CACHE, which every version shares, each piece with its contents' hash (HASH_HEADER), and answered from it only
+// while that's the hash in MUSIC_HASHES (Nov 14): a deploy fetches again only the songs it changed.
 const MUSIC = "/music/";
+const MUSIC_CACHE = "brc-music";
+const MUSIC_HASHES = __MUSIC_HASHES__;
 
 // Each precached file's contents' hash (but under /assets/, where Vite puts it in the name), kept on its cached copy as HASH_HEADER.
 const HASHES = __HASHES__;
@@ -48,11 +52,21 @@ self.addEventListener("install", (event) => {
   event.waitUntil(precache().then(() => self.skipWaiting()));
 });
 
+// (The music cache's pieces that this version doesn't have, or has with other contents: let go.)
+async function dropOldMusic() {
+  const cache = await caches.open(MUSIC_CACHE);
+  for (const req of await cache.keys()) {
+    const kept = await cache.match(req);
+    if (!kept || kept.headers.get(HASH_HEADER) !== MUSIC_HASHES[new URL(req.url).pathname]) await cache.delete(req);
+  }
+}
+
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches
       .keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== VERSION && k !== MAIA).map((k) => caches.delete(k))))
+      .then((keys) => Promise.all(keys.filter((k) => k !== VERSION && k !== MAIA && k !== MUSIC_CACHE).map((k) => caches.delete(k))))
+      .then(dropOldMusic)
       .then(() => self.clients.claim()),
   );
 });
@@ -90,13 +104,34 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
+  if (url.pathname.startsWith(MUSIC)) {
+    const hash = MUSIC_HASHES[url.pathname];
+    event.respondWith(
+      caches.open(MUSIC_CACHE).then((cache) =>
+        cache.match(request).then((cached) =>
+          cached && hash && cached.headers.get(HASH_HEADER) === hash
+            ? cached
+            : fetch(request).then((res) => {
+                if (hash && res.ok && res.status === 200) {
+                  const headers = new Headers(res.headers);
+                  headers.set(HASH_HEADER, hash);
+                  void cache.put(request, new Response(res.clone().body, { status: 200, statusText: res.statusText, headers }));
+                }
+                return res;
+              }),
+        ),
+      ),
+    );
+    return;
+  }
+
   event.respondWith(
     caches.match(request).then(
       (cached) =>
         cached ||
         fetch(request).then((res) => {
           // (And a Vite asset fetched here, a new version's while the old worker still answers: the next version's precache copies it.)
-          if ((LAZY.test(url.pathname) || url.pathname.startsWith("/assets/") || url.pathname.startsWith(MUSIC)) && res.ok && res.status === 200) {
+          if ((LAZY.test(url.pathname) || url.pathname.startsWith("/assets/")) && res.ok && res.status === 200) {
             const copy = res.clone();
             void caches.open(VERSION).then((cache) => cache.put(request, copy));
           }
