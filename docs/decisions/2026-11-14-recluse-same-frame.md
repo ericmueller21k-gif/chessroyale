@@ -11,5 +11,9 @@ the center?"; the God King "will still be with you, but you can't use him anymor
   its board; each board's squares are centered in its slot (they snap to whole pixels). The God King in phase 2: greyed (grayscale,
   half opacity), button disabled, silent. The hidden eval-bar slot is gone (the bar is off for everyone since Nov 1), so the square
   is phase 1's board's exactly.
+- A party's battle on a computer (the director, Nov 14; the room fight is one): the column right of the board is the Moves panel
+  flush with the board's top, the chat under it at the same width, then the God King in his place on the board's bottom line
+  with the team in a 2 x 2 right of him (you at its bottom left); the chat ends above them. Before, the team stood stacked above
+  him and the chat overlapped them (boss-party.spec.ts:159 at 1920).
 - Left for later: from phase 1's end the match places everyone, so the scoreboard reads "out" for all and a phone's Players tab is
   empty in phase 2 (a logic change in the match's standings, not layout). The phase change still absorbs the God King (another job).

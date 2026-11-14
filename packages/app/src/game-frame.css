@@ -160,11 +160,10 @@
   .screen.game:has(> .boss-bar):not(:has(> .hud-row)) > .boss-dock > .gk-unit.fallen.has-power {
     bottom: calc(100% + 6px);
   }
-  .screen.game:has(> .boss-bar):not(:has(> .hud-row)) > .boss-dock.dk-party > .you-pawn {
-    bottom: calc(100% - 8px + 132px);
-  }
+  /* (A party's 2 x 2 beside the God King: its foot on the same line. styles.css, "by the board's corner".) */
+  .screen.game:has(> .boss-bar):not(:has(> .hud-row)) > .boss-dock.dk-party > .you-pawn,
   .screen.game:has(> .boss-bar):not(:has(> .hud-row)) > .boss-dock.dk-party > .dk-mates {
-    bottom: calc(100% - 8px + 132px + 104px);
+    bottom: calc(100% - 8px);
   }
   /* "Move 1", in the bar, left of the status ("60 moves left"). */
   .boss-move {

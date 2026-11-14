@@ -24539,48 +24539,75 @@ button.sq-tiny {
     margin-top: 84px;
   }
 }
-/* A computer: stacked by the board's corner (Eric, Oct 30: "stack them… rather than shrinking the board"): the God King
-   in his raid place, your pawn above him, your teammates above you. A party's battle has the raid's chat beside the
-   corner, so a row has no room at any width. */
+/* A computer: by the board's corner, in the column under the moves and the chat (Eric, Nov 14: the chat under the Moves panel,
+   the same width; the pawns below it). The God King in his raid place on the board's bottom line; right of him the team in a
+   2 x 2 (--pt-cell each), you at the bottom left beside him, your teammates above you and beside you; the chat stops above them
+   (--gk-zone). Every phase of a battle the same (the Hidden Boss's phase change and phase 2 too). Eric, Oct 30: "stack them…
+   rather than shrinking the board". */
 @media (min-width: 900px) and (min-height: 600px) {
+  .screen.game > .boss-dock.dk-party {
+    --pt-cell: 74px;
+    --pt-row: 84px;
+    --pt-left: calc(100% + var(--gk-off, 2px) + var(--bs-out, 0px) + 112px);
+  }
   .screen.game > .boss-dock.dk-party > .gk-unit {
     left: calc(100% + var(--gk-off, 2px) + var(--bs-out, 0px));
   }
-  /* (The chat beside the corner stands a little further out, clear of the God King's cape and sword: nothing hidden.) */
+  /* (Without the Moves panel, the chat beside the corner stands a little further out, clear of the God King and the team.) */
   .screen.game:has(> .boss-dock.dk-party) > .under-board {
-    margin-left: calc(var(--gk-clear) + 32px);
+    margin-left: calc(var(--gk-clear) + 32px + 2 * var(--pt-cell, 74px));
+  }
+  /* (With it, the chat in the column under the moves, ending above the team: the 2 x 2 and their checks over their heads.) */
+  .screen.game:has(> .mv-side):has(> .boss-dock.dk-party) > .under-board.side {
+    margin-left: 0;
+    --gk-zone: calc(2 * var(--pt-row, 84px) + 24px);
   }
   .screen.game > .boss-dock.dk-party > .you-pawn {
-    --pw: 116px;
-    --feet: 10px;
-    width: 92px;
-    height: 100px;
-    left: calc(100% + var(--gk-off, 2px) + var(--bs-out, 0px) + 14px);
-    bottom: calc(100% - 4px + 132px);
+    --pw: 92px;
+    --feet: 6px;
+    width: var(--pt-cell);
+    height: var(--pt-row);
+    left: var(--pt-left);
+    bottom: calc(100% - 4px);
   }
   .screen.game > .boss-dock.dk-party > .you-pawn > .pt-disc {
-    width: 50px;
-    height: 9px;
-    margin-left: -25px;
-    bottom: 8px;
+    width: 44px;
+    height: 8px;
+    margin-left: -22px;
+    bottom: 6px;
   }
   .screen.game > .boss-dock.dk-party > .dk-mates {
     position: absolute;
-    left: calc(100% + var(--gk-off, 2px) + var(--bs-out, 0px));
-    bottom: calc(100% - 4px + 132px + 104px);
-    width: 120px;
+    left: var(--pt-left);
+    bottom: calc(100% - 4px);
+    display: grid;
+    grid-template-columns: var(--pt-cell) var(--pt-cell);
+    grid-template-rows: var(--pt-row) var(--pt-row);
+    width: calc(2 * var(--pt-cell));
     gap: 0;
   }
   .screen.game > .boss-dock.dk-party > .dk-mates .dk-mate {
     width: 60px;
     height: 58px;
+    justify-self: center;
+    align-self: end;
+  }
+  /* (Your teammates above you and beside you: the cell at the bottom left is yours.) */
+  .screen.game > .boss-dock.dk-party > .dk-mates .dk-mate:nth-child(1) {
+    grid-area: 1 / 1;
+  }
+  .screen.game > .boss-dock.dk-party > .dk-mates .dk-mate:nth-child(2) {
+    grid-area: 1 / 2;
+  }
+  .screen.game > .boss-dock.dk-party > .dk-mates .dk-mate:nth-child(3) {
+    grid-area: 2 / 2;
   }
   .screen.game > .boss-dock.dk-party > .dk-mates .dk-mate-art {
     width: 62px;
     height: 62px;
     margin-left: -31px;
   }
-  /* (Over the teammate's feet: your pawn stands just under them.) */
+  /* (Over the teammate's feet: the row under them stays clear.) */
   .screen.game > .boss-dock.dk-party > .dk-mates .dk-kick {
     top: auto;
     bottom: -4px;
