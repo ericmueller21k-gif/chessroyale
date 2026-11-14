@@ -23,8 +23,12 @@ import { SpriteAnim } from "./BossEffect.tsx";
 const ease = (x: number) => (x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x));
 const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
 const easeOut = (u: number) => 1 - (1 - clamp01(u)) ** 3;
-/** The back canvas's device pixels per CSS pixel: its light is all soft, blurred sprites, so half is plenty. */
-const BACK_DPR = 0.5;
+/**
+ * The light canvases' pixels per CSS pixel: their light is all soft, stretched sprites, so a third is plenty (Nov 14 review: at a
+ * phone's 3, the slowed phone's frames went to 100 ms; their cost is their area, the rays up out of the book the most). The small,
+ * sharp things (the beam's motes, his eyes' glow) have their own small canvas round him at the screen's own pixels (SHARP_BOX).
+ */
+const LIGHT_DPR = 1 / 3;
 
 let OPEN_MS: number | undefined;
 /** His animations standing on the same spot after the reveal (his box stays put over them). */
@@ -134,10 +138,11 @@ const darkNow = (s: Light) => (0.32 + 0.22 * s.grow) * ease(Math.max(s.rays, s.s
 function canvasesOn(s: Light, t: number, eyes: boolean) {
   const T = PHASE_CHANGE;
   // (Under the whole white, nothing behind it shows.)
-  if (s.white >= 1) return { back: false, front: false };
+  if (s.white >= 1) return { back: false, front: false, sharp: false };
   return {
     back: s.pages > 0 || s.rays > 0 || s.shaft > 0 || s.slam > 0,
-    front: s.shaft > 0 || (eyes && t >= T.burstAt && t < T.whiteFull) || s.grow > 0 || s.radiate > 0 || s.down > 0 || s.slam > 0,
+    front: s.shaft > 0 || s.grow > 0 || s.radiate > 0 || s.down > 0 || s.slam > 0,
+    sharp: s.shaft > 0 || (eyes && t >= T.burstAt && t < T.whiteFull),
   };
 }
 /** Behind him: the pool on the board, the rays along it and up out of the book, the shaft. */
@@ -201,10 +206,41 @@ function drawBack(g: CanvasRenderingContext2D, s: Light, t: number, bx: number, 
   g.restore();
 }
 /**
- * Over him: the bright core of the beam and the motes in it; the glow engulfing him; the light radiating out over the whole
- * screen; his white eyes' glow; the light dying back into the center; the slam's flash. (The white-out itself: a layer of its own.)
+ * The sharp canvas's box round the book's middle, in squares (`k`): wide enough for the beam at its widest, as tall as its motes
+ * rise (his head well inside it).
  */
-function drawFront(g: CanvasRenderingContext2D, s: Light, t: number, bx: number, by: number, bw: number, W: number, H: number, mid: { x: number; y: number }, eyes: readonly { x: number; y: number }[]) {
+const SHARP_BOX = { left: -1.5, right: 1.5, top: -6, bottom: 0.2 } as const;
+/** The small, sharp light (on its own canvas, SHARP_BOX; `bx`, `by`: the book's middle, `eyes`: his, in its coordinates). */
+function drawSharp(g: CanvasRenderingContext2D, s: Light, t: number, bx: number, by: number, bw: number, eyes: readonly { x: number; y: number }[]) {
+  const k = bw / 8;
+  // His eyes, white and glowing, from the moment the light takes him.
+  if (eyes.length && t >= PHASE_CHANGE.burstAt && t < PHASE_CHANGE.whiteFull) {
+    const L = light();
+    g.imageSmoothingEnabled = true;
+    const e = Math.min(1, (t - PHASE_CHANGE.burstAt) / 200) * (0.85 + 0.15 * Math.sin(t / 70));
+    for (const p of eyes) {
+      const r = k * (0.22 + 0.1 * s.grow);
+      g.globalAlpha = e;
+      g.drawImage(L.glow, p.x - r, p.y - r, r * 2, r * 2);
+    }
+  }
+  if (s.shaft <= 0) return;
+  // The motes rising in the beam.
+  g.fillStyle = "#fff6cf";
+  const motes = 26 + Math.round(30 * s.grow);
+  for (let i = 0; i < motes; i++) {
+    const up = ((t / ((900 + 700 * dice(i, 8)) * (1 - 0.5 * s.grow)) + dice(i, 9)) % 1) * 5.6 * s.shaft;
+    g.globalAlpha = s.shaft * (1 - up / 5.7) * 0.9;
+    const sz = Math.max(1.5, k * (0.04 + 0.03 * dice(i, 12)));
+    g.fillRect(bx + (dice(i, 10) - 0.5) * k * 1.3 * (1 + s.grow) - sz / 2, by - up * k - sz / 2, sz, sz);
+  }
+  g.globalAlpha = 1;
+}
+/**
+ * Over him: the bright core of the beam; the glow engulfing him; the light radiating out over the whole screen; the light dying
+ * back into the center; the slam's flash. (The white-out itself: a layer of its own; the motes and his eyes: drawSharp.)
+ */
+function drawFront(g: CanvasRenderingContext2D, s: Light, t: number, bx: number, by: number, bw: number, W: number, H: number, mid: { x: number; y: number }) {
   const L = light();
   const k = bw / 8;
   g.save();
@@ -213,23 +249,6 @@ function drawFront(g: CanvasRenderingContext2D, s: Light, t: number, bx: number,
   if (s.shaft > 0) {
     const tall = k * 5.8 * s.shaft + (by + H * 0.3) * s.shoot;
     streak(g, L.shaft, bx, by, bx, by - tall, k * 1.1 * (1 + 1.8 * s.grow), 0, Math.min(1, 0.38 * s.shaft * (0.9 + 0.1 * Math.sin(t / 90)) * (1 + 1.4 * s.grow)));
-    g.fillStyle = "#fff6cf";
-    const motes = 26 + Math.round(30 * s.grow);
-    for (let i = 0; i < motes; i++) {
-      const up = ((t / ((900 + 700 * dice(i, 8)) * (1 - 0.5 * s.grow)) + dice(i, 9)) % 1) * 5.6 * s.shaft;
-      g.globalAlpha = s.shaft * (1 - up / 5.7) * 0.9;
-      const sz = Math.max(1.5, k * (0.04 + 0.03 * dice(i, 12)));
-      g.fillRect(bx + (dice(i, 10) - 0.5) * k * 1.3 * (1 + s.grow) - sz / 2, by - up * k - sz / 2, sz, sz);
-    }
-  }
-  // His eyes, white and glowing, from the moment the light takes him.
-  if (eyes.length && t >= PHASE_CHANGE.burstAt && t < PHASE_CHANGE.whiteFull) {
-    const e = Math.min(1, (t - PHASE_CHANGE.burstAt) / 200) * (0.85 + 0.15 * Math.sin(t / 70));
-    for (const p of eyes) {
-      const r = k * (0.22 + 0.1 * s.grow);
-      g.globalAlpha = e;
-      g.drawImage(L.glow, p.x - r, p.y - r, r * 2, r * 2);
-    }
   }
   // Engulfing him: a glow round him that grows till he's lost in it.
   if (s.grow > 0) {
@@ -287,6 +306,7 @@ export function RecluseTransform({ at, t, rect, computer, sceneStand }: { at: nu
   const T = PHASE_CHANGE;
   const back = useRef<HTMLCanvasElement>(null);
   const front = useRef<HTMLCanvasElement>(null);
+  const sharp = useRef<HTMLCanvasElement>(null);
   const headAt = useRef<readonly [number, number] | null>(null);
   const fig = changeFigAt(t, computer);
   const W = innerWidth;
@@ -296,6 +316,11 @@ export function RecluseTransform({ at, t, rect, computer, sceneStand }: { at: nu
   const by = rect.y + BOOK_MID.y * bw;
   const lit = t < T.pickupAt + 600;
   const s = lightNow(t);
+  const k = bw / 8;
+  const sx = bx + SHARP_BOX.left * k;
+  const sy = by + SHARP_BOX.top * k;
+  const sw = (SHARP_BOX.right - SHARP_BOX.left) * k;
+  const sh = (SHARP_BOX.bottom - SHARP_BOX.top) * k;
   const on = canvasesOn(s, t, !!headAt.current);
   const dark = lit ? darkNow(s) : 0;
   const white = lit ? s.white : 0;
@@ -305,19 +330,22 @@ export function RecluseTransform({ at, t, rect, computer, sceneStand }: { at: nu
     const mid = { x: rect.x + chest.x * bw, y: rect.y + chest.y * bw };
     const h = headAt.current;
     const eyes = h && t >= T.burstAt && t < T.whiteFull ? [onBoard(feet, h[0] + 9, h[1] + 18.5), onBoard(feet, h[0] + 16, h[1] + 18.5)].map((p) => ({ x: rect.x + p.x * bw, y: rect.y + p.y * bw })) : [];
-    // (Backed at fewer device pixels than the screen's, as the light is soft and stretched anyway: at a phone's 3, two
-    // screen-size canvases redrawn every frame cost more than the frame. The front's motes keep 1 per CSS pixel.)
-    for (const [c, f, dpr] of [[back.current, "b", BACK_DPR], [front.current, "f", Math.min(devicePixelRatio || 1, 1)]] as const) {
+    for (const [c, f, dpr, w, h] of [
+      [back.current, "b", LIGHT_DPR, W, H],
+      [front.current, "f", LIGHT_DPR, W, H],
+      [sharp.current, "s", Math.min(devicePixelRatio || 1, 2), sw, sh],
+    ] as const) {
       if (!c) continue;
-      if (c.width !== Math.round(W * dpr) || c.height !== Math.round(H * dpr)) {
-        c.width = Math.round(W * dpr);
-        c.height = Math.round(H * dpr);
+      if (c.width !== Math.round(w * dpr) || c.height !== Math.round(h * dpr)) {
+        c.width = Math.round(w * dpr);
+        c.height = Math.round(h * dpr);
       }
       const g = c.getContext("2d")!;
       g.setTransform(dpr, 0, 0, dpr, 0, 0);
-      g.clearRect(0, 0, W, H);
+      g.clearRect(0, 0, w, h);
       if (f === "b") drawBack(g, s, t, bx, by, bw, H);
-      else drawFront(g, s, t, bx, by, bw, W, H, mid, eyes);
+      else if (f === "f") drawFront(g, s, t, bx, by, bw, W, H, mid);
+      else drawSharp(g, s, t, bx - sx, by - sy, bw, eyes.map((p) => ({ x: p.x - sx, y: p.y - sy })));
     }
   });
   const px = (x: number) => `${x * 100}%`;
@@ -361,6 +389,7 @@ export function RecluseTransform({ at, t, rect, computer, sceneStand }: { at: nu
         )}
       </div>
       {lit && on.front && <canvas ref={front} class="rc-light-cv rc-light-front" style={{ width: `${W}px`, height: `${H}px` }} />}
+      {lit && on.sharp && <canvas ref={sharp} class="rc-light-cv rc-light-front" style={{ left: `${sx}px`, top: `${sy}px`, width: `${sw}px`, height: `${sh}px` }} />}
       {white > 0 && <div class="rc-light-white" style={{ opacity: white }} />}
     </div>,
     document.body,

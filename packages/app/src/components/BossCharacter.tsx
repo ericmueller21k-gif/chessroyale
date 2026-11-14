@@ -5,13 +5,14 @@ import { growingRun, resetGrowing } from "./RecluseChild.ts";
 import { SELECT_FRAMING } from "../characters/boss-select.ts";
 import { stanceAt } from "../characters/stance.ts";
 import { resetMoo } from "../characters/moo-state.ts";
-import { renderFrame, type Anim, type Character, type Frame } from "../characters/sprite.ts";
+import { type Anim, type Character, type Frame } from "../characters/sprite.ts";
 import { drawnFacing } from "../characters/sprite-kit.ts";
 import type { BossView, GameView, Phase } from "../game.ts";
 import { play, warmSounds } from "../sound.ts";
 import { cueHaptic } from "../haptics.ts";
 import { EFFECTS, POWER_MOMENTS } from "../characters/power-art.ts";
-import { prewarmAnims } from "./BossEffect.tsx";
+// (Each frame's pixels from BossEffect's one cache, so what's drawn ahead there (prewarmSprite) is what's drawn here: Nov 14 review.)
+import { frameImage, prewarmAnims } from "./BossEffect.tsx";
 import { prewarmBigBoy } from "./BigBoy.tsx";
 import { prewarmGinger } from "./Ginger.tsx";
 import { prewarmGrex } from "./Grex.tsx";
@@ -175,26 +176,6 @@ export function figureBusy(ch: Character, now = Date.now()): boolean {
   return typeof document !== "undefined" && !!document.querySelector(".power-moment:not(.pm-stay)");
 }
 
-/**
- * Each frame's pixels, made once per look ("" its own colors; Big Boy's `blackPawn`) and per recolor
- * from the battle (Hollow's lights: `ch.swap`).
- */
-const images = new WeakMap<Frame, Map<string, ImageData>>();
-function frameImage(ch: Character, frame: Frame, look = ""): ImageData {
-  const swap = ch.swap?.() ?? null;
-  let byLook = images.get(frame);
-  if (!byLook) images.set(frame, (byLook = new Map()));
-  const key = `${swap?.id ?? ""}|${look}`;
-  let img = byLook.get(key);
-  if (!img) {
-    const r = renderFrame(ch, frame, { look: look || undefined, swap });
-    img = new ImageData(new Uint8ClampedArray(r.data), r.w, r.h);
-    // (A new battle's lights replace the last one's: its frames go.)
-    if (swap) for (const k of [...byLook.keys()]) if (!k.startsWith("|") && !k.startsWith(`${swap.id}|`)) byLook.delete(k);
-    byLook.set(key, img);
-  }
-  return img;
-}
 
 const length = (a: Anim) => a.frames.reduce((s, f) => s + f.ms, 0);
 function frameAt(a: Anim, t: number): number {

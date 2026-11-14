@@ -160,6 +160,8 @@ function Arcs({ t, hands }: { t: number; hands: readonly (readonly [number, numb
   );
 }
 
+/** How late a phase change's sound may still start (a frame or a slow phone's few late): later, it's left out. */
+const CUE_LATE_MS = 500;
 /**
  * The phase change on one square stage (PHASE_CHANGE has its beats): his transformation by the book's light, carrying on from his
  * cutscene (Eric, Nov 14). Not skippable, like a boss's intro. Over the board, RecluseTransform draws the lens, the light, the
@@ -175,8 +177,9 @@ export function PhaseChangeScreen({ match, at }: { match: GameView; at: number }
   const t = now - at;
   const C = PHASE_CHANGE;
   const cue = (on: boolean, name: string, fn: () => void) => useCue(on, `${at}:${name}`, fn);
-  cue(t >= C.revealAt, "reveal", () => play("recluseSpark"));
-  cue(t >= C.arcAt, "arcs", () => play("recluseArc"));
+  // (Each at its moment only: a device that joins or reloads later doesn't play it as it comes in. Nov 14 review, m3.)
+  cue(t >= C.revealAt && t < C.revealAt + CUE_LATE_MS, "reveal", () => play("recluseSpark"));
+  cue(t >= C.arcAt && t < C.arcAt + CUE_LATE_MS, "arcs", () => play("recluseArc"));
   // His two lines (Eric, Nov 13 and 14), each typed at its own pace at its time (`chantLines`): the first with his visor up, the
   // second as the board splits.
   const chantLine = C.chantLines.filter((l) => t >= l.at).length;

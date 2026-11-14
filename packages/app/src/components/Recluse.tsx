@@ -6,6 +6,7 @@ import { RECLUSE_CUTSCENE } from "../characters/recluse-ages.ts";
 import { RECLUSE_CHANGE, RECLUSE_CHANGE_BOOK, RECLUSE_CHANGE_KID } from "../characters/recluse-transform.ts";
 import { lazyTable, type Character } from "../characters/sprite.ts";
 import { RECLUSE_LINES } from "../characters/recluse-lines.ts";
+import { PHASE2_ULT_ANIMS } from "../recluse-phase2.ts";
 import { animLength, cueAt } from "../characters/power-art.ts";
 import type { BossView } from "../game.ts";
 import { kingSay } from "../godKing.ts";
@@ -108,7 +109,8 @@ let warmed: "w" | "b" | null = null;
  * His phase change's frames drawn ahead, a slice each animation frame, from when his battle shows (it comes only once he's beaten,
  * minutes later), so none stalls a slow phone the first time it shows (.claude/LESSONS.md: "A stall the first time an effect
  * shows"): his cutscene's first frames, his transformation's (the man, the child, the book), then his suit where he stands (the
- * bust's and the figure's phase 2 idle); and its sounds, made ahead in the sound worker.
+ * bust's and the figure's phase 2 idle and ultimate; the figure's results, beaten or laughing); and its sounds, made ahead in the
+ * sound worker. (Into BossEffect's frame cache, the one BossCharacter draws from too.)
  */
 export function prewarmRecluse(side: "w" | "b"): void {
   if (warmed === side) return;
@@ -117,12 +119,15 @@ export function prewarmRecluse(side: "w" | "b"): void {
   // (His cutscene's first frames: the man alone in the light, the child's poof, drop and landing.)
   const SCENE = ["idle", "poof", "drop", "land"];
   const CHANGE = Object.keys(RECLUSE_CHANGE.anims);
+  // (In his suit where he stands: phase 2's idle and ultimate; on the results, beaten (and slumped) or laughing.)
+  const SUITED = ["idle2", ...PHASE2_ULT_ANIMS];
+  const SUITED_RESULTS = ["collapse", "collapseLoop", "laugh"];
   // One after another, in the order they show, so only one slice of drawing ahead is ever at work in a frame.
   prewarmSprite(RECLUSE_CUTSCENE, frames(RECLUSE_CUTSCENE, SCENE), undefined, () =>
     prewarmSprite(RECLUSE_CHANGE, frames(RECLUSE_CHANGE, CHANGE), undefined, () =>
       prewarmSprite(RECLUSE_CHANGE_KID, frames(RECLUSE_CHANGE_KID, ["together"]), undefined, () =>
         prewarmSprite(RECLUSE_CHANGE_BOOK, frames(RECLUSE_CHANGE_BOOK, ["glow"]), undefined, () =>
-          prewarmSprite(RECLUSE_BUST, frames(RECLUSE_BUST, ["idle2"]).map(suited), undefined, () => prewarmSprite(RECLUSE, frames(RECLUSE, ["idle2"]).map(suited))),
+          prewarmSprite(RECLUSE_BUST, frames(RECLUSE_BUST, SUITED).map(suited), undefined, () => prewarmSprite(RECLUSE, frames(RECLUSE, [...SUITED, ...SUITED_RESULTS]).map(suited))),
         ),
       ),
     ),
