@@ -344,7 +344,7 @@ test("the Hidden Boss's phase 2 on a slow phone: the phase change and four board
   // (The phase change and the countdown after it: about 30 s since Oct 17, its added beats settings; since Nov 13 the cast about
   // 10 s longer, his two lines in it, 15 s allowed.)
   const P = RECLUSE_PHASE2.change;
-  await expect.poll(() => page.evaluate(() => !!(window as any).match.simul?.playing), { timeout: 30_000 + P.talkMs + P.absorbHoldMs + 15_000 + P.countdownSeconds * 1000 }).toBe(true);
+  await expect.poll(() => page.evaluate(() => !!(window as any).match.simul?.playing), { timeout: 30_000 + P.transform.introMs + 6000 + 15_000 + P.countdownSeconds * 1000 }).toBe(true);
   const change = frameStats((await page.evaluate(() => (window as any).__perf.frames.splice(0))).map((f: [number, number]) => f[0]));
   // Four boards in play: the bots and he move on theirs (you don't), for eight seconds.
   await page.waitForTimeout(8000);

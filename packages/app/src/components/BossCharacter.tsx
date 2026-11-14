@@ -371,6 +371,7 @@ function Character({ boss, stage, place }: { boss: BossView; stage: Stage; place
         const frame = suitOn ? suited(drawn) : drawn;
         g?.putImageData(frameImage(kit.ch, frame, look), 0, 0);
         box.current?.setAttribute("data-anim", s.anim);
+        box.current?.toggleAttribute("data-suit", suitOn);
         // (Each frame's number and cue, so a test counts a clock smack by its own click, not by timing.)
         box.current?.setAttribute("data-frame", String(s.frame));
         box.current?.setAttribute("data-cue", frame.cue ?? "");

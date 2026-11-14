@@ -116,9 +116,8 @@ test("solo Crowd: the top 4 meet him; the God King's help tried spends a charge;
   // He never struck, and the God King, tried, never came (formats.spec.ts' solo boss battle, merged here Nov 2).
   expect((await bossNow(page)).kills).toEqual([]);
   expect((await bossNow(page)).kingMoves).toEqual([]);
-  // (The phase change is about 25 s since Oct 17: its added beats are settings.)
-  // (And since Nov 13 the cast as long as his two lines need: about 14.4 s, 10 more than its 4 s before.)
-  const added = RECLUSE_PHASE2.change.talkMs + RECLUSE_PHASE2.change.absorbHoldMs + 15_000;
+  // (The phase change is about 23 s since Nov 14: his transformation to the split on the music's drop, then the split's beats.)
+  const added = RECLUSE_PHASE2.change.transform.introMs + 6000;
   await expect.poll(() => phase(page), { timeout: 30_000 + added }).toBe("simul");
   const v = await page.evaluate(() => (window as any).match.simul);
   expect(v.boards).toHaveLength(4);
