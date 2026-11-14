@@ -232,6 +232,16 @@ test("his room (Eric, Nov 12 and 13): Challenge is 1 of 4; leaving asks; an admi
   await expect.poll(phase, { message: "the team's turn against the man", timeout: 120_000 }).toBe("play");
   await page.waitForTimeout(1500);
   await still(page, "man");
+  // A computer's chat under the Moves panel shows its chips in whole rows, the rest a scroll down (Nov 14's visual check: the third row
+  // cut in half at 1280 x 800): each chip wholly in the chat's box or wholly under it.
+  if (test.info().project.name === "desktop") {
+    const cut = await page.evaluate(() => {
+      // (What shows: the buttons' box, inside the chat's.)
+      const bottom = Math.min(...[".under-board.side .qbuttons", ".under-board.side > .qchat"].map((q) => document.querySelector(q)!.getBoundingClientRect().bottom));
+      return [...document.querySelectorAll(".under-board.side .qbuttons .qchip")].map((c) => c.getBoundingClientRect()).filter((r) => r.top < bottom - 0.5 && r.bottom > bottom + 0.5).length;
+    });
+    expect(cut, "chips cut by the chat's bottom").toBe(0);
+  }
   expect(await page.evaluate(() => ((window as any).__gkDone = true) && (window as any).__gkOver), "the God King's words over the chat or a teammate").toEqual([]);
   const manFrame = await frameBoxes(page);
   await trophy.click();
@@ -324,9 +334,12 @@ test("his room (Eric, Nov 12 and 13): Challenge is 1 of 4; leaving asks; an admi
   expect((await simulNow()).won).toBe(4);
   // (And still, once every board is won.)
   if (desk) await expect(yourRow).toHaveAttribute("aria-label", /^1\. You: /);
-  // Each row says its board was won (a computer's table, the word; a phone's panel, its mark), until the results.
+  // Each row says its board was won (its mark, the word its title: a computer's table and a phone's panel), until the results; on a
+  // computer the names keep their room (Nov 14's visual check: the word cut them, "Discover…").
   const shownRows = await panel.locator(".tower-row").count();
-  await expect(panel.locator(".t-board")).toHaveText(Array(shownRows).fill(desk ? "Won" : "✓"));
+  await expect(panel.locator(".t-board")).toHaveText(Array(shownRows).fill("✓"));
+  // (The tag and its margin take at most 16 px of the name's room; the word took about 30. Bots' names vary, so not "no name cut".)
+  if (desk) for (const w of await panel.locator(".t-board").evaluateAll((ts) => ts.map((t) => t.getBoundingClientRect().width + parseFloat(getComputedStyle(t).marginLeft)))) expect(w).toBeLessThanOrEqual(16);
   await still(page, "boards-won");
   await expect.poll(phase, { message: "the results", timeout: 30_000 }).toBe("results");
   expect(await page.evaluate(() => (window as any).match.phase.simul)).toEqual({ won: 4, of: 4 });

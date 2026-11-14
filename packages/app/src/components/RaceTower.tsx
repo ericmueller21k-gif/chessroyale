@@ -37,6 +37,7 @@ export function RaceTower({
   bank = true,
   dp = 1,
   teams = false,
+  marks = false,
 }: {
   standings: readonly Standing[];
   cutoff: number;
@@ -64,6 +65,11 @@ export function RaceTower({
   dp?: number;
   /** Everyone's rows ("All"): a small mark in each row's name cell for its team (white or black). */
   teams?: boolean;
+  /**
+   * A phase 2 board's result as its mark (✓, ✕, ½; the word its title), as the small rows show it: a computer's table beside the board,
+   * whose names it cut ("Discover…": Nov 14's visual check). The phone's sheet, wider, keeps the word.
+   */
+  marks?: boolean;
 }) {
   const pts = (x: number) => signed(x, dp);
   const ROW = mini ? 22 : 30;
@@ -168,7 +174,7 @@ export function RaceTower({
                 {/* (The Hidden Boss's phase 2: their board's result once it ends, after the name; the name gives way, never this.) */}
                 {r.board && r.board !== "playing" && (
                   <span class={`t-board ${r.board}`} title={BOARD_WORD[r.board]}>
-                    {mini ? BOARD_MARK[r.board] : BOARD_WORD[r.board]}
+                    {mini || marks ? BOARD_MARK[r.board] : BOARD_WORD[r.board]}
                   </span>
                 )}
               </span>

@@ -540,9 +540,14 @@ describe("the Hidden Boss: a theme for each point of his fight, switched mid-fig
     const shorter = { ...THEMES, themes: { ...THEMES.themes, [H.transform]: { ...THEMES.themes[H.transform], introSeconds: 8.74 } } };
     expect(switchPlan(shorter, H.transform, 10, true, 40)!.plan.intro!.at).toBeCloseTo(31.26, 9);
     expect(switchPlan(shorter, H.transform, 10, true, 40)!.plan.loop.at).toBe(40);
-    // (Too late for its intro (it loaded late): its loop alone, still on the drop; past the drop too: at once.)
-    expect(switchPlan(THEMES, H.transform, 30, true, 40)).toMatchObject({ outAt: 40, plan: { intro: null, loop: { at: 40 } } });
+    // (Late for its intro's start (it loaded late, or the device joined late; #707's review, m2): its intro now, from where it would
+    // be, what's playing fading from now, the loop still on the drop. Past the drop: its loop alone, at once. No intro decoded: the
+    // loop alone, on the drop.)
+    const late = switchPlan(THEMES, H.transform, 30, true, 40)!;
+    expect(late).toMatchObject({ outAt: 30, plan: { intro: { at: 30 }, loop: { at: 40 } } });
+    expect(late.plan.intro!.offset).toBeCloseTo(30 - (40 - 19.29325), 9);
     expect(switchPlan(THEMES, H.transform, 50, true, 40)).toMatchObject({ outAt: 50, plan: { intro: null, loop: { at: 50 } } });
+    expect(switchPlan(THEMES, H.transform, 30, true, 40, true)).toMatchObject({ outAt: 40, plan: { intro: null, loop: { at: 40 } } });
   });
 
   it("a moment on screen onto the audio clock: the output's own timestamp, else the clock less its output latency", () => {
@@ -663,6 +668,30 @@ describe("the Hidden Boss: a theme for each point of his fight, switched mid-fig
       expect(recluseMusic({ kind: "simul", at: split + 9_120 }, true, true)).toBeNull();
       bossMusic(null);
       expect(musicTheme()).toBeNull();
+    });
+
+    it("a device late for the transformation's intro (#707's review, m2): it hears the intro from where it is now, the loop still on the split", async () => {
+      vi.useFakeTimers({ toFake: ["setTimeout", "Date"] });
+      try {
+        fight(H.beaten);
+        await vi.advanceTimersByTimeAsync(0);
+        // (The board splits 5 s from now: 14.29 s of its 19.29 s intro already gone.)
+        const split = Date.now() + 5_000;
+        fight(H.transform, { dropAt: split });
+        await vi.advanceTimersByTimeAsync(0);
+        expect(musicTheme()).toBe(H.transform);
+        const [ti, tl] = ctx.sources.slice(2);
+        const now = 10 + MUSIC.startDelayS;
+        expect(ti!.buffer).toMatchObject({ url: "/music/recluse-phase3-intro.mp3" });
+        expect(ti!.started![0]).toBeCloseTo(now, 6);
+        expect(ti!.started![1]).toBeCloseTo(now - (15 - 19.29325), 6);
+        expect(tl!.started![0]).toBeCloseTo(15, 6);
+        expect(tl!.started![1]).toBe(0.5);
+        // (What was playing fades from now, not from the intro's start.)
+        expect(ctx.gains[0]!.gain.lastRamp![1]).toBeCloseTo(now + 0.5, 6);
+      } finally {
+        vi.useRealTimers();
+      }
     });
 
     it("the result while a switch's fade waits (his beaten theme till the transformation): both stop", async () => {

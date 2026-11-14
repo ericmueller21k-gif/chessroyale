@@ -58,7 +58,7 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
   adult form (phase 1) `recluse-phase2` from the start (online too); beaten with the phase change next (solo, the fall's `toPhase2`)
   `recluse-beaten` at once (0.3 s fade); the phase change `recluse-phase3`, its loop on the board's crack (`phaseChange.splitAt` =
   `at + PHASE_CHANGE.crackAt`), its intro started `introSeconds` before (from themes.json, never code; the beaten theme fades 0.5 s
-  from there; late, the loop alone on the drop), on through phase 2 until every board is decided. `recluse-house` plays through his child form
+  from there; a device late for that hears the intro from where it is now, the loop still on the drop, Nov 14; past the drop, the loop alone), on through phase 2 until every board is decided. `recluse-house` plays through his child form
   (`recluseMusic`'s `child`, its fall too), his adult theme after it with MUSIC_SWITCH's 1.5 s fade. Not in the town's loading: fetched as his fight starts (`ahead`), the transformation's
   decoded as he's beaten (`next`). With the 8.740 s intro (handoff f12f1c5b) his transformation started as he rose in his rage and
   `marks.slam` landed on the book hitting the floor; since his chant's two lines (Nov 13) the rise to the crack is 17.435 s, and
@@ -371,6 +371,11 @@ below):
   foot; phase 2's Moves panel lists your own board; a phone's small boards name their player; the white-out's dying disc starts whole on
   a tall phone; his words over his helmet never straddle the bar's edge (moved into the bar, or onto the board); the split ends where
   phase 2 draws each board (`playedBox`). Checks in `e2e/recluse.spec.ts` and `e2e/hidden-boss-room.spec.ts`.
+- **The small follow-ups** (Nov 14; [decision](../decisions/2026-11-14-recluse-polish.md)): a device late for the transformation's
+  intro starts it where it is (`switchPlan`); his transformation picks up the cutscene's loop of the two from the scene as fitted to its
+  hold (`sceneStandAt`); the Moves list's boss rows show his face as the bar draws it now (`useLiveFace`: one loop and one image for the
+  list); a phone bar's bubble casts its shadow 2 px down, ending on the bar's edge; a computer's chat under the Moves panel shows its
+  chips in whole rows (the rest a scroll down); the computer's phase 2 table marks each board's result (✓ ✕ ½, the word its title).
 - **His cutscene** (Eric, Nov 12; in the fight since Nov 13, solo and online; [decision](../decisions/2026-11-13-recluse-cutscene-wired.md)):
   after his fall, before the phase change, about 104 s (`RECLUSE_CUTSCENE.holdMs`; a unit test keeps it the timeline's length):
   everything dims but a soft round spotlight on the board's middle; he kneels in it while the ghost of him as a child poofs in above
