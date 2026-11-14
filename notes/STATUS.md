@@ -1199,3 +1199,4 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   cooldown line), town.spec:966 [desktop] flaky again ("bot 9 is drawn"). Fix helper (high, claude/fix-main-718, briefs/fix-main-718.md),
   watcher running.
 - Nov 14 21:36: fix for main's red -> #720 (7494858f, CI watcher bkvebppev): town-chat:1054 tries both inside the wait first, checks data-id + N bounds; __townCall stands off the camera's line. Merge when green.
+- Nov 14 22:35: #720 MERGED 7453120e (town-chat:1054 test order; __townCall picks a square the camera sees whole: figureSeenAt). Main run watcher running. No helpers.
