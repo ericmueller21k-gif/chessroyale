@@ -79,7 +79,7 @@ async function battle(name, context, query, script) {
   };
   const at = async (sq) => {
     // (Phase 2: your board, big on a phone, at the bottom left of the four on a computer.)
-    const sel = (await p.locator(".rc-simul").count()) ? ".rc-simul .board-row > .board-wrap .hb-board, .rc-simul .rc-q2 .hb-board" : ".hb-board";
+    const sel = (await p.locator(".rc-simul").count()) ? ".rc-simul .rc-big .hb-board, .rc-simul .rc-q2 .hb-board" : ".hb-board";
     const board = await p.locator(sel).first().boundingBox();
     const flip = await p.evaluate(() => document.querySelector(".hb")?.classList.contains("orientation-black"));
     const f = sq.charCodeAt(0) - 97;
@@ -147,7 +147,7 @@ async function battle(name, context, query, script) {
 /** Tap a move on your phase 2 board until it's taken (its history grows). */
 const simulPlay = async ({ p, st, log }, move) => {
   const tapSq = async (sq) => {
-    const sel = (await p.locator(".rc-simul .rc-q2").count()) ? ".rc-simul .rc-q2 .hb-board" : ".rc-simul .board-row > .board-wrap .hb-board";
+    const sel = (await p.locator(".rc-simul .rc-q2").count()) ? ".rc-simul .rc-q2 .hb-board" : ".rc-simul .rc-big .hb-board";
     const b = await p.locator(sel).first().boundingBox();
     const f = sq.charCodeAt(0) - 97;
     const r = Number(sq[1]) - 1;

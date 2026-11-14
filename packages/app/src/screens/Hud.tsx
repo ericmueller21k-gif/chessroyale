@@ -44,7 +44,7 @@ const pts = (x: number) => (Math.abs(x) < 0.05 ? "0.0" : (x > 0 ? "+" : "−") +
  * score on the cut line. Tap it for the full leaderboard. Then every board as
  * a tiny live board (yours ringed).
  */
-export function Hud({ match, stripFrozen = false, keepTitle = false }: { match: GameView; stripFrozen?: boolean; keepTitle?: boolean }) {
+export function Hud({ match, stripFrozen = false }: { match: GameView; stripFrozen?: boolean }) {
   const [open, setOpen] = useState(false);
   const computer = useMedia(COMPUTER_LAYOUT);
   const mouse = useMedia(MOUSE_LAYOUT);
@@ -82,11 +82,12 @@ export function Hud({ match, stripFrozen = false, keepTitle = false }: { match: 
   const team = view.teamLabel ? (alive.find((s) => s.isYou)?.team ?? null) : null;
   // A boss battle on a computer with a mouse (Nov 1, Eric: "completely gone from the top"): no title line. The boss's bar
   // is the top of the screen and says the move; the ⚡, the fish and the gear go at the top of the column beside the board
-  // (BossTools, the move list under them). Phones, tablets and the Hidden Boss's phases (keepTitle) keep the line.
-  if (boss && mouse && !keepTitle)
+  // (BossTools, the move list under them). Phones and tablets keep the line. The Hidden Boss's phase change and phase 2 too
+  // (Eric, Nov 14: everything but the board stays put), the bar saying "Phase 2" there.
+  if (boss && mouse)
     return (
       <>
-        <BossBar boss={boss} match={match} move={`Move ${Math.min(boss.crowdMoves + 1, boss.maxMoves)}`} />
+        <BossBar boss={boss} match={match} move={match.bossNote != null ? "Phase 2" : `Move ${Math.min(boss.crowdMoves + 1, boss.maxMoves)}`} />
         <BossTools match={match} crowd={crowd} />
       </>
     );

@@ -19426,28 +19426,10 @@ button.sq-tiny {
 .rc-stage > .rc-split {
   will-change: transform, clip-path;
 }
-/* Played on a computer: each board at its corner, as the phase change leaves them (Recluse2.tsx's DESK: --rc-cell of the
-   square, the top two a tag's row down, --rc-tagrow, so each board's tag sits above it, off its back rank). */
+/* Phase 2's boards, each in its slot of the square, as the phase change leaves them (Recluse2.tsx's FOUR: the place and size
+   inline; a computer's tags in the gap above each board, off its back rank). */
 .rc-stage > .rc-played {
   inset: auto;
-  width: var(--rc-cell, 48%);
-  height: var(--rc-cell, 48%);
-}
-.rc-stage > .rc-played.rc-q0 {
-  top: var(--rc-tagrow, 0);
-  left: 0;
-}
-.rc-stage > .rc-played.rc-q1 {
-  top: var(--rc-tagrow, 0);
-  right: 0;
-}
-.rc-stage > .rc-played.rc-q2 {
-  bottom: 0;
-  left: 0;
-}
-.rc-stage > .rc-played.rc-q3 {
-  bottom: 0;
-  right: 0;
 }
 /* The crack lines: Sawyer's board-saw gap down the middle, and the same turned across. */
 .rc-crack {
@@ -19599,6 +19581,12 @@ button.sq-tiny {
 .gk-unit.gone .gk-unit-btn,
 .gk-unit.gone .gk-unit-charges {
   visibility: hidden;
+}
+/* The Hidden Boss's phase 2 (Eric, Nov 14): the God King in his place, greyed, never to be called. Opacity and filter only. */
+.gk-unit.benched .god-king,
+.gk-unit.benched .gk-unit-charges {
+  filter: grayscale(1);
+  opacity: 0.5;
 }
 .gk-motes {
   position: absolute;
@@ -19965,7 +19953,7 @@ button.sq-tiny {
 .rc-tag.low .rc-tag-clock {
   color: #ff7a7a;
 }
-/* A computer's four boards: the tag in the row above each (DESK in Recluse2.tsx), at its left, off its back rank; its
+/* A computer's four boards: the tag in the gap above each (FOUR in Recluse2.tsx), at its left, off its back rank; its
    text in the board's own width (cqw), so it fits the row at any size. The slow-move note likewise, at its right. */
 .rc-played .rc-tag {
   top: auto;
@@ -20015,17 +20003,7 @@ button.sq-tiny {
 .rc-result.lost {
   color: #ff8a8a;
 }
-/* A phone: the other three boards small above yours; tap one to watch it big. (Room above them for their row of slow
-   moves.) */
-.rc-minis {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-  width: min(100%, 420px);
-  margin: 14px auto 0;
-  padding: 0 16px;
-  box-sizing: border-box;
-}
+/* A phone: the other three boards small in a row above yours, inside the square (FOUR); tap one to watch it big. */
 /* Each board keeps its own layers (pieces, tags, results) to itself, so nothing on it shows through his words: his
    bubble sits over every board, whatever their own stacking (Eric, Oct 14: a long line was cut off by the boards). */
 .rc-mini,
@@ -20146,9 +20124,6 @@ button.sq-tiny {
 }
 .rc-mini.you {
   border-color: #ffd451;
-}
-.screen.game.rc-phone .board-row > .board-wrap {
-  width: min(100%, calc(var(--app-h) - 440px));
 }
 .rc-back {
   padding: 0;

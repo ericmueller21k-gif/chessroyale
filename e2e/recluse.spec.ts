@@ -343,7 +343,7 @@ test("a player in Boss alone never sees Engine move", async ({ page }) => {
 });
 
 /** Your phase 2 board: big on a phone, at the bottom left of the four on a computer. */
-const myBoard = (page: Page) => page.locator(".rc-simul .rc-q2 .hb-board, .rc-simul .board-row > .board-wrap:not(.rc-stage) .hb-board").first();
+const myBoard = (page: Page) => page.locator(".rc-simul .rc-q2 .hb-board, .rc-simul .rc-big .hb-board").first();
 const simulNow = (p: Page) => p.evaluate(() => (window as any).match?.simul ?? null);
 /**
  * When the app first put each of these in the page (performance.now, from a MutationObserver: the moment it happens, not
