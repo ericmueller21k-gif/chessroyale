@@ -233,11 +233,12 @@ export async function serverAllMovesAt(
   }
   const out: MoveScore[] = [];
   for (const group of moveGroups(legal, legal[0]!)) {
-    const search = () => {
+    const search = (atLeast: number) => {
       const left = end - Date.now();
-      return left > 0 ? containerScore(env, o.instance ?? "engine-1", fen, group, nodes, left) : Promise.resolve(null);
+      return left > atLeast ? containerScore(env, o.instance ?? "engine-1", fen, group, nodes, left) : Promise.resolve(null);
     };
-    const got = (await search()) ?? (out.length ? null : await search());
+    // (A second try for the first group only, and only with real time left: see ENGINE_SERVER.retryMinMs.)
+    const got = (await search(0)) ?? (out.length ? null : await search(ENGINE_SERVER.retryMinMs));
     if (!got) return null;
     out.push(...got);
   }

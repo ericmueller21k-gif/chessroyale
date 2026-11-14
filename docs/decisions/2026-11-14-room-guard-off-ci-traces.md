@@ -5,3 +5,6 @@
   5th at his door…") change like any other test, without his OK. The online 🏆 is an admin testing tool, to be deleted later.
 - Eric, Nov 14: "sounds good" to keeping a recording of a test's failing first try. CI's e2e runs `--trace retain-on-first-failure`
   (was `on-first-retry`, which recorded the retry, usually the passing one). Cost: about 8% more time per run (measured Oct).
+- Also (this PR's CI): `engine-server.test.ts:180` saw a second engine search after the first timed out. The timer and `Date.now()` are
+  different clocks, so the code read ~1 ms "left" and sent a useless search. A first group's second try now needs
+  `ENGINE_SERVER.retryMinMs` (250 ms) left. Not reproduced locally (0 of 15 before and after); the guard removes the dependence.
