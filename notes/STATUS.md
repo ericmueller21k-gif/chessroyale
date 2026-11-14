@@ -1195,3 +1195,6 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 14 20:20: main d783aaca (#719) full run GREEN, 0 retries (the dev proxy fix works). #718 ride sounds MERGED 65902dc3; deploy +
   main run watcher running. No helpers. Next for Eric: try the dozer and the pogo; RIDE_SOUND to tune. Flaky leftovers (8): see round 6
   PR body "Not done". CI recording stays OFF (+22% run time measured).
+- Nov 14 20:40: #718 ride sounds LIVE 65902dc3 (20:14). Main full run RED: town-chat:1054 [phone] both tries (same-second N in the
+  cooldown line), town.spec:966 [desktop] flaky again ("bot 9 is drawn"). Fix helper (high, claude/fix-main-718, briefs/fix-main-718.md),
+  watcher running.
