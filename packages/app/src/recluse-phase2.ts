@@ -5,6 +5,8 @@ import { lazyTable } from "./characters/sprite.ts";
 import { RECLUSE_LINES } from "./characters/recluse-lines.ts";
 import { pacedLine } from "./paced-line.ts";
 import {
+  applyMove,
+  baseAt,
   legalMoves,
   phase2BossMove,
   phase2Flags,
@@ -17,6 +19,8 @@ import {
   phase2Ult,
   phase2WinAll,
   startPhase2,
+  toSan,
+  type Base,
   type MoveScore,
   type Phase2Board,
   type Phase2Engine,
@@ -225,6 +229,46 @@ export function phase2Mates(mates: readonly { id: string; name: string }[], boar
   const need = Math.max(0, boards - 1 - kept.length);
   const added = need ? fresh(need).map((b) => ({ id: kept.some((k) => k.id === b.id) ? `${b.id}-p2` : b.id, name: b.name })) : [];
   return [...kept, ...added];
+}
+
+/**
+ * The result's headline after his phase 2 (QA #12, Nov 14). Where everyone in the match played one of his boards (his room's
+ * fight: the four of them), the boards decided it, so the headline is the fight's, as a boss alone's: "Victory!" (every board
+ * won) or "Defeated"; the place goes in the line under it ("4th of 4" over "You beat the Hidden Boss on all 4 boards!" read as a
+ * loss). A Crowd final's headline stays your place in its crowd, as before (crowd-hidden.spec.ts). Null: the usual headline (no
+ * phase 2, no result, or a crowd beyond the boards). Only what's shown: the placement itself is untouched.
+ */
+export function phase2Headline(r: { simul?: { won: number; of: number }; noResult?: string }, totalPlayers: number): "Victory!" | "Defeated" | null {
+  if (!r.simul || r.noResult || totalPlayers > r.simul.of) return null;
+  return r.simul.won === r.simul.of ? "Victory!" : "Defeated";
+}
+
+/** One step of a phase 2 board's review: the position after `ply` moves (0: its start) and the move that made it (SAN), or null. */
+export interface BoardStep {
+  ply: number;
+  fen: string;
+  move: string | null;
+  san: string | null;
+}
+
+/**
+ * A phase 2 board, move by move, for the result's review (QA #12, Nov 14: it replayed phase 1's first form instead): its start
+ * (the base at ply 0, its Chess960 position) and the position after each move, in one pass. A move that can't be read ends it
+ * there rather than break the result screen.
+ */
+export function boardSteps(b: { history: readonly string[]; bases?: readonly Base[] | null }): BoardStep[] {
+  const steps: BoardStep[] = [{ ply: 0, fen: baseAt(0, b.bases).fen, move: null, san: null }];
+  for (let ply = 1; ply <= b.history.length; ply++) {
+    const prev = steps[ply - 1]!.fen;
+    const move = b.history[ply - 1]!;
+    try {
+      const base = baseAt(ply, b.bases);
+      steps.push({ ply, fen: base.ply === ply ? base.fen : applyMove(prev, move), move, san: toSan(prev, move) });
+    } catch {
+      break;
+    }
+  }
+  return steps;
 }
 
 /** What the bots' engine must do: play at a strength (UciEngine), or its best (the test switch, ?win=1). */

@@ -241,9 +241,10 @@ export type Phase =
   /**
    * `gameWinner`: Crowd, who won the game on the board (null for a draw). `bossResult`: who won a boss battle. `left`:
    * you left before the end (see GameView.resign): you resigned (a loss; `bot`: online, a bot plays your seat), or you
-   * left once you were already out (your place as it stood; the winner isn't known).
+   * left once you were already out (your place as it stood; the winner isn't known). `simulBoard`: the Hidden Boss's phase 2, the
+   * board you played as it ended (this device's view, never sent or stored), for the result's review (QA #12, Nov 14).
    */
-  | { kind: "results"; placement: number; winner: string; youWon: boolean; gameWinner?: "w" | "b" | null; bossResult?: "crowd" | "boss" | "draw"; left?: LeftResult; timeout?: boolean; carrots?: boolean; blackout?: boolean; simul?: { won: number; of: number }; noResult?: "board" | "watched" };
+  | { kind: "results"; placement: number; winner: string; youWon: boolean; gameWinner?: "w" | "b" | null; bossResult?: "crowd" | "boss" | "draw"; left?: LeftResult; timeout?: boolean; carrots?: boolean; blackout?: boolean; simul?: { won: number; of: number }; noResult?: "board" | "watched"; simulBoard?: SimulBoardView };
 
 /** One of the Hidden Boss's phase 2 boards as the screens see it (board 0 is yours). */
 export interface SimulBoardView {

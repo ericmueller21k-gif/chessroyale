@@ -1295,9 +1295,11 @@ export class SoloMatch implements GameView {
    */
   private finishPhase2() {
     const o = this.phase2?.outcome ?? { won: 0, of: RECLUSE_PHASE2.boards, beaten: false };
+    // (Your board as it ended, for the result's review: read while the phase is still phase 2's.)
+    const simulBoard = this.simul?.boards.find((b) => b.you);
     this.halt();
     const top = this.runner.state.players.find((p) => p.placement === 1);
-    this.phase = { kind: "results", placement: this.you.placement ?? 1, winner: top?.name ?? "", youWon: o.beaten, bossResult: o.beaten ? "crowd" : "boss", simul: { won: o.won, of: o.of } };
+    this.phase = { kind: "results", placement: this.you.placement ?? 1, winner: top?.name ?? "", youWon: o.beaten, bossResult: o.beaten ? "crowd" : "boss", simul: { won: o.won, of: o.of }, ...(simulBoard ? { simulBoard } : {}) };
     this.emit();
   }
 

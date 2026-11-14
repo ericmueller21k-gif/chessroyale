@@ -962,6 +962,8 @@ export class NetMatch implements GameView {
 
   private showResults(m: Extract<ServerMessage, { t: "results" }>) {
     const placement = (this.myId && m.placements[this.myId]) || this.placement || this.totalPlayers;
+    // (His phase 2: the board you played, as it ended, for the result's review. None if you watched, or left it.)
+    const simulBoard = m.simul ? this.phase2.view()?.boards.find((b) => b.you) : undefined;
     this.setPhase({
       kind: "results",
       placement,
@@ -975,6 +977,7 @@ export class NetMatch implements GameView {
       // (His phase 2: how many of its boards were won; or no result, his move never came.)
       ...(m.simul ? { simul: m.simul } : {}),
       ...(m.noResult ? { noResult: m.noResult } : {}),
+      ...(simulBoard ? { simulBoard } : {}),
     });
   }
 

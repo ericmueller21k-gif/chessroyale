@@ -354,11 +354,20 @@ below):
   (RaceTower's `t-board`: Won, Lost, Drawn; a phone panel's small rows ✓, ✕, ½); everyone else as they were, someone who left a
   board out. A computer's table lists the four; a phone's Players tab the rows its box fits (three on an iPhone 13), its sheet all four. Tests: `chess/test/recluse-phase2.test.ts`, `server/test/recluse-online.test.ts`, `app/test/recluse-online.test.ts`,
   `app/test/recluse-phase2.test.ts` ("the scoreboard"), `e2e/hidden-boss-room.spec.ts`.
+- **The result after phase 2** (Nov 14, visual check #12; [decision](../decisions/2026-11-14-recluse-phase2-result.md)): where everyone
+  in the match played a board (his room's fight: `phase2Headline`, the match's players no more than the boards) the headline is the
+  boards' verdict, "Victory!" or "Defeated", as a boss alone's, and your place goes under it ("3rd of 4 in the crowd. Roy was the
+  best.", or "You were the best in the crowd: 1st of 4."). A Crowd final's headline stays your place in its crowd. The review on the
+  result is the board you played (`BoardReview` in `components/Breakdown.tsx`, from `boardSteps`; the results phase's `simulBoard`,
+  this device's view as the result came, never sent or stored), from its Chess960 start to its end, opening on the end, who moved and
+  what, no scores; someone who watched (a Crowd final's others) or left their board keeps phase 1's judged moves. Placements, XP, rank
+  and everything stored are untouched. Tests: `app/test/recluse-phase2.test.ts` ("the result", "a phase 2 board, move by move"),
+  `app/test/recluse-online.test.ts` ("the result"), `e2e/hidden-boss-room.spec.ts`.
 - **What the visual check of his fight fixed** (Nov 14; [decision](../decisions/2026-11-14-recluse-qa-fixes.md)): a fitted bar box
   (SpeechBox's `balanced`) measures only once it can be laid out (a ResizeObserver as it first shows), never keeping a width taken
   while hidden; the cutscene's tail goes in and out from its box's own `fresh` / `leaving` (`.cs-say + .cs-tail`); a computer's bar
   face is his bust as drawn now (BossKit `barFace`: his age's loop, his suit); the man's words stand on `RECLUSE_HEADS` (beaten, his
-  kneel); in the party layout the God King's box sits above the team, three rows at 8 px, the chat stopping 200 px over the board's
+  kneel); in the party layout the God King's box sits above the team, at 8 px and as wide as the team reaches (252 px: every line he has in two rows, none into the chat; [main red after #712](../decisions/2026-11-14-fix-main-712.md); on a phone, under the panel's switch, up to 248 px into the screen's margin, rows as tight, so no line reaches a teammate at 320 to 430 px wide: [the phone's party](../decisions/2026-11-14-gk-words-phone-party.md)), the chat stopping 200 px over the board's
   foot; phase 2's Moves panel lists your own board; a phone's small boards name their player; the white-out's dying disc starts whole on
   a tall phone; his words over his helmet never straddle the bar's edge (moved into the bar, or onto the board); the split ends where
   phase 2 draws each board (`playedBox`). Checks in `e2e/recluse.spec.ts` and `e2e/hidden-boss-room.spec.ts`.

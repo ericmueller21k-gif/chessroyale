@@ -24147,6 +24147,18 @@ button.sq-tiny {
     align-self: start;
     margin-top: 84px;
   }
+  /* (His words in the same place, just under the panel's switch, and every line he has above the team's heads (Nov 14, #713's CI: "Another
+     tyrant on a borrowed throne. Let's take it back." took three rows at an iPhone 13's 245 px and ran 11 px onto a teammate; at 320 x 568
+     82 of his 128 lines did, five rows at most). The box may run past the strip's left edge into the screen's margin, to 4 px from the
+     screen's edge, up to 248 px: 28 of the pixel font's 8 px letters a row, so every line he has is two rows. Its rows as tight as a
+     computer's party: two rows end 3 px above the team's marks, so from 360 px wide no line touches a teammate or their mark; at 320 px his
+     longest lines take three rows, over the marks, still above the pawns. Measured with all 128 lines at 320 to 430 px wide.) */
+  .screen.game > .boss-dock.dk-strip.dk-party > .gk-unit > .gk-bubble {
+    top: 31px;
+    max-width: max(calc(var(--dk-w, 100vw) - 58px - 30px), min(248px, calc(var(--dk-left, 0px) + var(--dk-w, 100vw) - 58px - 18px + var(--gutter, 14px) - 4px)));
+    padding: 5px 9px 4px;
+    line-height: 1.4;
+  }
 }
 /* A computer: by the board's corner, in the column under the moves and the chat (Eric, Nov 14: the chat under the Moves panel,
    the same width; the pawns below it). The God King in his raid place on the board's bottom line; right of him the team in a
@@ -24179,6 +24191,13 @@ button.sq-tiny {
     padding: 8px 9px 7px;
     font-size: 8px;
     line-height: 1.4;
+  }
+  /* (As wide as the team reaches: the 2 x 2 starts 112 px right of his unit, his box 4 px in, so it ends 4 px inside the team's right
+     edge, 252 px, inside the chat's column. Every line he has is then two rows at most, and none reaches the chat (Nov 14, main red
+     after #712: "Careful. My strength feels faint against this one." took four rows at the side column's 182 px and ran 8 px into
+     it). The :has outranks the side column's cap, `.screen.game:has(> .boss-dock):has(.you-pawn) > .boss-dock .gk-bubble`.) */
+  .screen.game:has(> .boss-dock.dk-party):has(.you-pawn) > .boss-dock.dk-party > .gk-unit > .gk-bubble {
+    max-width: calc(112px + 2 * var(--pt-cell) - 8px);
   }
   .screen.game > .boss-dock.dk-party > .gk-unit.fallen.has-power > .gk-bubble {
     bottom: calc(100% + 8px);

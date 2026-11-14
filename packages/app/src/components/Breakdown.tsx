@@ -1,9 +1,10 @@
-import { useEffect, useLayoutEffect, useState } from "preact/hooks";
+import { useEffect, useLayoutEffect, useMemo, useState } from "preact/hooks";
 import { toSan } from "@chessroyale/chess";
 import { Board } from "./Board.tsx";
 import { Chevrons } from "./HistoryNav.tsx";
-import type { MoveRecord } from "../game.ts";
+import type { MoveRecord, SimulBoardView } from "../game.ts";
 import { ordinal } from "../screens/StageBreak.tsx";
+import { boardSteps } from "../recluse-phase2.ts";
 
 const fmt = (x: number, dp = 1) => (x >= 0 ? "+" : "") + x.toFixed(dp);
 const moveNo = (fen: string) => Number(fen.split(" ")[5] ?? 1);
@@ -161,19 +162,7 @@ function InlineReview({ moves, dp, solo }: { moves: readonly MoveRecord[]; dp: n
   const last = played.length - 1;
   const [at, setAt] = useState(0);
   const step = (d: number) => setAt((p) => Math.min(last, Math.max(0, p + d)));
-  useLayoutEffect(() => {
-    // The arrow keys step through the review, but not while typing in a field.
-    const onKey = (e: KeyboardEvent) => {
-      const t = e.target;
-      if (t instanceof HTMLElement && (t.isContentEditable || t.closest("input, textarea, select"))) return;
-      if (e.key === "ArrowLeft") setAt((p) => Math.max(0, p - 1));
-      else if (e.key === "ArrowRight") setAt((p) => Math.min(last, p + 1));
-      else return;
-      e.preventDefault();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [last]);
+  useStepKeys(last, setAt);
   const m = played[at];
   if (!m) return null;
   const same = m.move === m.bestMove;
@@ -226,6 +215,71 @@ function InlineReview({ moves, dp, solo }: { moves: readonly MoveRecord[]; dp: n
             {m.avgRaw !== undefined ? `${m.avgRaw.toFixed(1)} (${m.avgLoss?.toFixed(1) ?? "?"} after the opening allowance)` : (m.avgLoss?.toFixed(1) ?? "?")}.
           </>
         )}
+      </p>
+    </div>
+  );
+}
+
+/** The arrow keys step a review (0 to `last`), but not while typing in a field. */
+function useStepKeys(last: number, setAt: (f: (p: number) => number) => void) {
+  useLayoutEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target;
+      if (t instanceof HTMLElement && (t.isContentEditable || t.closest("input, textarea, select"))) return;
+      if (e.key === "ArrowLeft") setAt((p) => Math.max(0, p - 1));
+      else if (e.key === "ArrowRight") setAt((p) => Math.min(last, p + 1));
+      else return;
+      e.preventDefault();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [last]);
+}
+
+/** How your phase 2 board ended, in words (the board's own tag says it the same way: Won, Lost on time, Lost: resigned, Draw). */
+function boardEnd(r: SimulBoardView["result"]): string {
+  if (!r) return "";
+  if (r.winner === "draw") return "Your board is drawn.";
+  if (r.winner === "crowd") return "Your board is won.";
+  return `Your board is lost${r.how === "time" ? " on time" : r.how === "resign" ? ": you resigned" : ""}.`;
+}
+
+/**
+ * The result page's review after the Hidden Boss's phase 2 (QA #12, Nov 14: it replayed phase 1's first form, "Move 1 of 11", not
+ * the fight just won): the board you played, from its Chess960 start to its end, stepped with ◀ ▶ (and the ← → keys) in
+ * InlineReview's places (the same stepper, board and text under it). It opens on the end. Phase 2's moves aren't judged: it says
+ * who moved and what, no scores (you're White on every board, he's Black).
+ */
+export function BoardReview({ board }: { board: Pick<SimulBoardView, "history" | "bases" | "result"> }) {
+  const steps = useMemo(() => boardSteps(board), [board]);
+  const last = steps.length - 1;
+  const [at, setAt] = useState(last);
+  const step = (d: number) => setAt((p) => Math.min(last, Math.max(0, p + d)));
+  useStepKeys(last, setAt);
+  const s = steps[Math.min(at, last)]!;
+  const said = s.ply === 0 ? (last === 0 ? "No moves were played on your board." : "Your board's start: its own Chess960 position.") : `${steps[s.ply - 1]!.fen.split(" ")[1] === "w" ? "You" : "He"} played ${s.san}.`;
+  return (
+    <div class="breakdown inline board-review">
+      <div class="breakdown-head">
+        <h2>Your board, move by move</h2>
+      </div>
+      <div class="history-nav bm-step">
+        <button type="button" class="nav-btn" aria-label="Previous move" disabled={at === 0} onClick={() => step(-1)}>
+          <Chevrons back />
+        </button>
+        <div class="nav-middle bm-step-mid">
+          <span class="bm-step-text">{s.ply === 0 ? "The start · Chess960" : `Move ${s.ply} of ${last} · ${s.san}`}</span>
+        </div>
+        <button type="button" class="nav-btn" aria-label="Next move" disabled={at === last} onClick={() => step(1)}>
+          <Chevrons />
+        </button>
+      </div>
+      <div class="bm-board-wrap">
+        <Board fen={s.fen} orientation="white" lastMove={s.move} small animate={false} silent />
+      </div>
+      <p class="small bm-text">
+        {said}
+        {at === last && board.result ? ` ${boardEnd(board.result)}` : ""}
       </p>
     </div>
   );

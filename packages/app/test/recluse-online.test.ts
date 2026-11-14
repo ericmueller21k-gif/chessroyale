@@ -232,6 +232,29 @@ describe("his fall online says who takes the boards (the review of #677, m3)", (
     expect(m.standings().map(row)).toEqual([[true, null]]);
     (m as unknown as { phase2: { dispose(): void } }).phase2.dispose();
   });
+
+  it("the result (QA #12, Nov 14): your board as it ended, for its review; a watcher has none; the placement as the server sent it", () => {
+    const tell = (m: NetMatch, msg: object) => (m as unknown as { onMessage(x: object): void }).onMessage({ now: Date.now(), ...msg });
+    const t = Date.now();
+    const view = serverView(t, "me");
+    const fen = view.boards[2]!.fen;
+    const [w] = legalMoves(fen);
+    const done = { winner: "crowd", how: "mate" } as const;
+    const ended = { ...view, boards: view.boards.map((b) => ({ ...b, ...(b.id === 2 ? { history: [w!], lastMove: w! } : {}), result: done, turnAt: null })), done: { at: t, until: t + 3200, beaten: true, won: 4, of: 4 } };
+    const results = { t: "results", placements: { me: 4 }, winner: "Bo", lossesByStage: {}, standings: [{ id: "me", name: "Ann", out: true, placement: 4 }], ranked: false, bossResult: "crowd", simul: { won: 4, of: 4 } };
+    const m = fallen(["p1", "p2", "me", "b4"]);
+    tell(m, { t: "phase2", p2: ended });
+    tell(m, results);
+    const r = m.phase as Extract<Phase, { kind: "results" }>;
+    expect([r.placement, r.simul, r.simulBoard?.id, r.simulBoard?.you, r.simulBoard?.history, r.simulBoard?.bases, r.simulBoard?.result]).toEqual([4, { won: 4, of: 4 }, 2, true, [w], [{ ply: 0, fen }], done]);
+    // (A Crowd final's watcher: no board was theirs.)
+    const watcher = fallen(["p1", "p2", "p3", "b4"]);
+    tell(watcher, { t: "phase2", p2: { ...ended, boards: ended.boards.map((b) => ({ ...b, player: b.id === 2 ? "p3" : b.player })) } });
+    tell(watcher, { ...results, placements: { me: 37 } });
+    expect(watcher.phase).toMatchObject({ kind: "results", placement: 37, simul: { won: 4, of: 4 } });
+    expect((watcher.phase as Extract<Phase, { kind: "results" }>).simulBoard).toBeUndefined();
+    for (const x of [m, watcher]) (x as unknown as { phase2: { dispose(): void } }).phase2.dispose();
+  });
 });
 
 describe("his move late from the engine server online (Eric, Nov 13): the fight pauses, or ends with no result", () => {

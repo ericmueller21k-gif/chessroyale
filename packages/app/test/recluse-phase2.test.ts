@@ -1,8 +1,8 @@
 import { beforeAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { DEFAULT_SETTINGS, RAID_SETTINGS, RECLUSE_PHASE2, bossBannerMs, finishBoss } from "@chessroyale/core";
-import { legalMoves, phase2Numbers, type MoveScore } from "@chessroyale/chess";
-import { ARC_LIFE, ARC_STRIKES, PHASE_CHANGE, Phase2Game, arcPoints, phase2Follows, phase2Mates, phaseChangeRun, smoothPath } from "../src/recluse-phase2.ts";
+import { PHASE2_WIN_FEN, applyMove, chess960Fen, fenAtPly, legalMoves, phase2Numbers, type MoveScore } from "@chessroyale/chess";
+import { ARC_LIFE, ARC_STRIKES, PHASE_CHANGE, Phase2Game, arcPoints, boardSteps, phase2Follows, phase2Headline, phase2Mates, phaseChangeRun, smoothPath } from "../src/recluse-phase2.ts";
 import { RECLUSE, RECLUSE_BUST, suited } from "../src/characters/recluse.ts";
 import { CHANGE_HANDS, RECLUSE_CHANGE, RECLUSE_CHANGE_BOOK } from "../src/characters/recluse-transform.ts";
 import { CRITICAL, NORMAL, Voice, bossVoice } from "../src/speech.tsx";
@@ -397,6 +397,47 @@ describe("phase 2 without the God King's help (Eric, Nov 14: greyed in his place
     m.phase = { kind: "results", placement: 1, winner: "Ann", youWon: false, bossResult: "boss", simul: { won: 0, of: 4 } };
     expect(rows()).toEqual([[true, null, 1]]);
     m.stop?.();
+  });
+
+  it("the result (QA #12, Nov 14): where everyone played a board, the boards' verdict is the headline; a Crowd final's is the place; your board kept for the review, the placement as it was", () => {
+    // (His room's fight: four players, four boards. A Crowd final: 100, most of whom watched. Boss alone: one.)
+    const won = { simul: { won: 4, of: 4 } };
+    const lost = { simul: { won: 3, of: 4 } };
+    expect([phase2Headline(won, 4), phase2Headline(lost, 4), phase2Headline(won, 1), phase2Headline(lost, 2)]).toEqual(["Victory!", "Defeated", "Victory!", "Defeated"]);
+    expect([phase2Headline(won, 100), phase2Headline({ ...won, noResult: "board" }, 4), phase2Headline({}, 4)]).toEqual([null, null, null]);
+    // (Solo: the board you played, read as the result comes; your place stays phase 1's end's.)
+    type Solo = { runner: { state: Parameters<typeof finishBoss>[0] }; createRunner(): void; phase2: unknown; phase: { kind: string } & Record<string, unknown>; finishPhase2(): void; stop?(): void };
+    const m = new SoloMatch([], "Ann", { ...DEFAULT_SETTINGS, ...RAID_SETTINGS }) as unknown as Solo;
+    m.createRunner();
+    m.runner.state = finishBoss(m.runner.state, () => 0.5, "crowd");
+    const fen = chess960Fen(100);
+    const mv = legalMoves(fen)[0]!;
+    const board = (id: number, player: string) => ({ id, player, number: 100, board: { fen: applyMove(fen, mv), lastMove: mv, history: [mv], bases: [{ ply: 0, fen }] }, bankMs: 1000, turnAt: null, result: { winner: "crowd", how: "mate" } });
+    m.phase2 = { stop() {}, outcome: { won: 4, of: 4, beaten: true }, state: { boards: [board(0, HUMAN), board(1, "b1"), board(2, "b2"), board(3, "b3")], slow: 0, ultAt: null } };
+    m.phase = { kind: "simul", at: 0 };
+    m.finishPhase2();
+    expect(m.phase).toMatchObject({ kind: "results", placement: 1, bossResult: "crowd", simul: { won: 4, of: 4 }, simulBoard: { id: 0, you: true, history: [mv], bases: [{ ply: 0, fen }], result: { winner: "crowd", how: "mate" } } });
+    m.stop?.();
+  });
+
+  it("a phase 2 board, move by move, for the result's review: its Chess960 start, then each move's position and SAN (as fenAtPly), in one pass", () => {
+    const start = chess960Fen(100);
+    const history: string[] = [];
+    let fen = start;
+    for (let i = 0; i < 6; i++) {
+      const mv = legalMoves(fen)[i % 3]!;
+      history.push(mv);
+      fen = applyMove(fen, mv);
+    }
+    const steps = boardSteps({ history, bases: [{ ply: 0, fen: start }] });
+    expect(steps.map((s) => s.ply)).toEqual([0, 1, 2, 3, 4, 5, 6]);
+    expect(steps.map((s) => s.fen)).toEqual(steps.map((s) => fenAtPly(history, s.ply, [{ ply: 0, fen: start }])));
+    expect([steps[0]!.move, steps[0]!.san, steps[6]!.move]).toEqual([null, null, history[5]]);
+    expect(steps.slice(1).every((s) => typeof s.san === "string" && s.san.length >= 2)).toBe(true);
+    // (The test switch's position, ?win=1: Qxf7 mates. No moves: the start alone. A move that can't be read ends it there.)
+    expect(boardSteps({ history: ["h5f7"], bases: [{ ply: 0, fen: PHASE2_WIN_FEN }] }).map((s) => s.san)).toEqual([null, "Qxf7#"]);
+    expect(boardSteps({ history: [], bases: [{ ply: 0, fen: start }] })).toEqual([{ ply: 0, fen: start, move: null, san: null }]);
+    expect(boardSteps({ history: [history[0]!, "a1a8"], bases: [{ ply: 0, fen: start }] })).toHaveLength(2);
   });
 
   it("the countdown counts from the boards' first frame on screen, so the 5 is up a whole second however long that frame takes", () => {

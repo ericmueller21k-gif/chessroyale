@@ -3,7 +3,7 @@ import { WelcomeNotice } from "../components/WelcomeNotice.tsx";
 import { MiniBoard } from "../components/MiniBoard.tsx";
 import { elimination, lossRows, myTeam, scoreDp, type GameView } from "../game.ts";
 import { useState } from "preact/hooks";
-import { Breakdown } from "../components/Breakdown.tsx";
+import { BoardReview, Breakdown } from "../components/Breakdown.tsx";
 import { ordinal } from "./StageBreak.tsx";
 import { LastStandCard } from "../components/LastStand.tsx";
 import { PlayerName } from "../components/PlayerName.tsx";
@@ -16,6 +16,7 @@ import { exitFor } from "../match-exit.ts";
 import { TokenBox } from "../components/TokenBox.tsx";
 import { XpResult, useGameXp } from "../components/XpResult.tsx";
 import { NO_RESULT_LINE } from "./Recluse2.tsx";
+import { phase2Headline } from "../recluse-phase2.ts";
 
 /** An online match where one device's word stood alone (LobbyRecord.unvouched: nobody could check a host's scores or the boss's move). */
 export const UNVOUCHED_LINE = "Only one device checked this match: it pays as a solo game.";
@@ -62,6 +63,11 @@ export function ResultsScreen({ match, placement, winner, onAgain, onHome, homeT
   // (Crowd 50 v 50's removal for being away counts as resigning: CrowdMisses.)
   const afk = left?.how === "afk";
   const resigned = left?.how === "resigned" || afk;
+  // (The Hidden Boss's phase 2 where everyone played a board, his room's fight: the headline is the boards' verdict, your place
+  // under it. QA #12, Nov 14: "4th of 4" over "You beat the Hidden Boss on all 4 boards!".)
+  const p2Head = match.phase.kind === "results" && !left ? phase2Headline(match.phase, match.totalPlayers) : null;
+  // (And its review: the board you played, not phase 1's moves. None if you watched it, or left your board.)
+  const simulBoard = match.phase.kind === "results" ? match.phase.simulBoard : undefined;
   const topName = (() => {
     const w = standings.find((s) => s.placement === 1);
     return w ? <PlayerName name={winner} uid={w.uid} bot={w.isBot} /> : winner;
@@ -89,6 +95,8 @@ export function ResultsScreen({ match, placement, winner, onAgain, onHome, homeT
             "You resigned"
           ) : alone ? (
             bossResult === "crowd" ? "Victory!" : bossResult === "boss" ? "Defeated" : "A draw"
+          ) : p2Head ? (
+            p2Head
           ) : (
             <>
               {placement}
@@ -110,7 +118,17 @@ export function ResultsScreen({ match, placement, winner, onAgain, onHome, homeT
           )
         ) : !alone && (
           <p class="muted">
-            {bossResult ? (
+            {p2Head ? (
+              // (Your place, under the boards' verdict: it's still what your result is written with.)
+              placement === 1 ? (
+                `You were the best in the crowd: 1st of ${match.totalPlayers}.`
+              ) : (
+                <>
+                  {placement}
+                  {ordinal(placement)} of {match.totalPlayers} in the crowd. {topName} was the best.
+                </>
+              )
+            ) : bossResult ? (
               placement === 1 ? (
                 "You were the best in the crowd."
               ) : (
@@ -263,9 +281,9 @@ export function ResultsScreen({ match, placement, winner, onAgain, onHome, homeT
         </div>
       </div>
       {/* A boss battle's review: every move, on the page (the first costly move's board open), no tap needed (Eric's brief). */}
-      {bossResult && played.some((m) => m.bestMove) && (
+      {bossResult && (simulBoard || played.some((m) => m.bestMove)) && (
         <div class="results-review">
-          <Breakdown inline moves={match.moves} dp={scoreDp(match.settings)} solo={!match.serverPaced} />
+          {simulBoard ? <BoardReview board={simulBoard} /> : <Breakdown inline moves={match.moves} dp={scoreDp(match.settings)} solo={!match.serverPaced} />}
         </div>
       )}
       {/* A boss battle that dropped you a token: its box, over the screen (Eric, Nov 2). */}
