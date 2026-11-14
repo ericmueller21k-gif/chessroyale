@@ -16,6 +16,17 @@ the light growing until it whites out the screen, the change unseen, the light d
   (Round 3's first, brighter suit was replaced before Eric saw it; its files are gone from this branch, its commit is
   in the branch's history.)
 
+## His eyes (face mockup, Nov 14, after round 3b)
+
+Eric: "right now he looks too much like a kid in a Halloween costume… I think blue is the way to go." With the visor up his eyes
+glow: a bright core in the eye, a soft see-through glow round each (no outline, over his face), and a thin line of light down
+each cheek from under the eye, like tears of light (from Eric's own edit).
+
+- `eyes-blue-vs-yellow.png`: the visor-up close-up, blue as in Eric's reference beside a yellow-gold one to compare.
+- `eyes-in-game.png`: the blue ones at the game's real size on the board (a phone, during his line).
+- In the build: a `glow` eye in his drawing plus one see-through glow layer over his head (`eyeGlow`), shown only while the
+  visor is up; whichever color Eric picks is three palette entries.
+
 ## The suit (round 3b: darker, an original design)
 
 Round 3's first suit (bright royal blue, red and yellow, a rounded blue helmet with a red center stripe and yellow ear lights)
