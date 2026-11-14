@@ -1092,3 +1092,8 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 14 04:25: Eric's notes on the transform mockup -> round 2 brief (briefs/recluse-transform-book-2.md): relaxed arms, white
   eyes, light engulfs him and whites out the screen, change unseen, NEW final look = an original robotic visor with flowing matrix
   text (no cyborg), reveal as the light dies down, then the creativity line; fix: big board visible behind the four during the split.
+- Nov 14 05:00: #704 night room, #705 flaky round 3 (tap-as-run game fix, status/account hook gap, preloads back) MERGED.
+  Transform: Eric changed the final look -> round 3 mockup (fitted circuit-wired suit + full helmet, visor flips up for his line;
+  red/blue/yellow; ORIGINAL, not Iron Man). Helper session_01JuCWRtesHR7mFg3Lkou6hn redoing it; watcher bo760yy6p.
+  Pending Eric: CI trace retain-on-first-failure OK; music chat paste; Fill-also-challenges. Queue: standings (xhigh, alone)
+  after the transform build; visual QA after.
