@@ -501,11 +501,12 @@ test("beaten in phase 1 (?win=1): he collapses and mumbles, then the phase chang
     drop: { selector: '.rc-fig[data-anim="drop"] canvas' },
     chant: { selector: '.rc-fig[data-anim="chantRaise"] canvas' },
     light: { selector: ".rc-light" },
-    // (A phone's bar bubble, two rows: a sentence at a time, each its own page; Nov 13.)
-    chantLine: { selector: ".bc-bubble", text: /^Computation without creativity is nothing\.$/ },
-    chantLineB: { selector: ".bc-bubble", text: /^Now I have both\.$/ },
-    chantLine2: { selector: ".bc-bubble", text: /^Prepare yourself\.$/ },
-    chantLine2B: { selector: ".bc-bubble", text: /^This is the ultimate test of your skill\.$/ },
+    // (Over his head on the board while he's there, a phone too (Eric, Nov 14): the whole line, its sentences typed in turn; the
+    // typed part (the box's first span) shows each sentence typed out.)
+    chantLine: { selector: ".rc-say", text: /^Computation without creativity is nothing\. Now I have both\.$/ },
+    chantLineB: { selector: ".rc-say .speech-line > span:first-child", text: /Now I have both\.$/ },
+    chantLine2: { selector: ".rc-say", text: /^Prepare yourself\. This is the ultimate test of your skill\.$/ },
+    chantLine2B: { selector: ".rc-say .speech-line > span:first-child", text: /This is the ultimate test of your skill\.$/ },
     crack: { selector: ".rc-crack canvas" },
     split: { selector: ".rc-split.rc-q3" },
     pickup: { selector: '.rc-fig[data-anim="pickup"] canvas' },
@@ -528,9 +529,9 @@ test("beaten in phase 1 (?win=1): he collapses and mumbles, then the phase chang
     note: { selector: ".boss-dock-status", text: /The God King's power is his!/ },
     rage: { selector: `${figure()}[data-anim="rage"]` },
     chant: { selector: '.rc-fig[data-anim="chantRaise"], .rc-fig[data-anim="chant"]' },
-    // (His second chant line's first page, and its second sentence's page as it starts to type.)
-    chant2: { selector: ".bc-bubble", text: /^Prepare yourself\.$/ },
-    chant2b: { selector: ".bc-bubble", text: /^This is the ultimate test of your skill\.$/ },
+    // (His second chant line over his head, and its second sentence as it starts to type: its first letter typed.)
+    chant2: { selector: ".rc-say", text: /^Prepare yourself\./ },
+    chant2b: { selector: ".rc-say .speech-line > span:first-child", text: /^Prepare yourself\.\s*\S/ },
     crack: { selector: ".rc-crack canvas" },
     banner: { selector: ".fight-banner", text: /PHASE 2/ },
     c5: count(5),
@@ -937,6 +938,35 @@ test("his child form first (Nov 13): the kid, his level a step up every 4 moves 
   await expect(page.locator(".boss-bar .boss-level")).toHaveAttribute("data-level", "unknown");
   await expect(win).toBeEnabled();
   expect(errors).toEqual([]);
+});
+
+test("his words stand above his head at every age beside the board (Eric, Nov 14: grown to 20, they sat over his face)", async ({ page }) => {
+  test.skip(test.info().project.name === "phone", "a computer: on a phone his words are in his bar");
+  test.setTimeout(3 * 60_000);
+  await meetHim(page, "laststand=0&clock=60&form=child");
+  await yourMove(page);
+  // (The top of his drawing on the screen, from his canvas, and his words' bottom.)
+  const gap = () =>
+    page.evaluate(() => {
+      const fig = document.querySelector<HTMLElement>(".boss-char.place-side")!;
+      const cv = fig.querySelector("canvas")!;
+      const px = cv.getContext("2d")!.getImageData(0, 0, cv.width, cv.height).data;
+      let top = cv.height;
+      for (let y = 0; y < cv.height && top === cv.height; y++) for (let x = 0; x < cv.width; x++) if (px[(y * cv.width + x) * 4 + 3]! > 0) top = y;
+      const r = cv.getBoundingClientRect();
+      const bubble = fig.querySelector(".bc-bubble")!.getBoundingClientRect();
+      return Math.round(r.top + (top / cv.height) * r.height - bubble.bottom);
+    });
+  // The child, 13, 20 and the man: his words over his head at each (the age's loop, set by the test switch's hook).
+  for (const loop of ["idle", "age1", "age2", "age3"]) {
+    await page.evaluate((loop) => {
+      (window as any).bossFigure(loop);
+      (window as any).sayBoss("That one's mine now.");
+    }, loop);
+    await expect(page.locator(figure())).toHaveAttribute("data-anim", loop);
+    await expect(page.locator(`${figure()} .bc-bubble`)).toHaveAttribute("aria-label", "That one's mine now.");
+    await expect.poll(gap, { message: loop }).toBeGreaterThan(0);
+  }
 });
 
 test("a loss (?win=1&phase=2): you resign your board, the bots win theirs: defeated, 3 of 4 won", { tag: "@phone-only" }, async ({ page }) => {

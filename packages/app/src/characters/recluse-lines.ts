@@ -205,6 +205,19 @@ export const RECLUSE_CHILD_LINES = {
 } as const;
 
 /**
+ * Beaten, the child says his line, grows up, and the man answers once he's grown (Eric, Nov 14: "there was no conversation"; "add them
+ * all and mix in, so people who challenge multiple times get a random one"): one pair a fight, the same for everyone in it
+ * (RecluseChild.ts `growUpExchange`). The kid's line replaces his `beaten` one.
+ */
+export const RECLUSE_GROWUP_EXCHANGES: readonly { readonly kid: string; readonly man: string }[] = [
+  { kid: "One more game. I'll find the move this time.", man: "The move was found years ago. Not by us." },
+  { kid: "I'm not finished yet.", man: "You never are. Then one day you look up and you're me." },
+  { kid: "That's not fair. I was supposed to win.", man: "Nobody's supposed to win. You just stop losing for a while." },
+  { kid: "How did you beat me?", man: "Practice. Let me show you what practice turns into." },
+  { kid: "Okay. You're good.", man: "He was good. I'm better." },
+];
+
+/**
  * The God King's lines in this fight (his usual ones about calling him are left out: his help doesn't work here). He has
  * none in phase 2: the boss absorbs him as it begins (Eric, Oct 14), so his last words are his cry as he's drained.
  */

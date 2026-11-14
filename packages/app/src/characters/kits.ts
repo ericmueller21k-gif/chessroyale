@@ -42,7 +42,8 @@ import { lineSounds } from "../speech.tsx";
 import type { Stance } from "./stance.ts";
 import { mooPowered } from "./moo-state.ts";
 import { RECLUSE_CHILD_LINES, RECLUSE_LINES } from "./recluse-lines.ts";
-import { RECLUSE_GROWING, RECLUSE_GROWING_BUST } from "./recluse-ages.ts";
+import { GROWING_HEADS, RECLUSE_GROWING, RECLUSE_GROWING_BUST } from "./recluse-ages.ts";
+import { growUpExchange } from "../components/RecluseChild.ts";
 import type { BossView } from "../game.ts";
 import { mapFrames, type Character } from "./sprite.ts";
 import { ankusItem, balloonItem, bonkItem, chipItem, clawItem, darkItem, flourItem, inkItem, carrotItem, frostItem, lashItem, lassoItem, moonItem, paintItem, pieItem, popItem, sawItem, waterItem, type SquareItem } from "./power-art.ts";
@@ -122,6 +123,13 @@ export interface BossKit extends BeatLines {
   sounds: Record<string, SoundName>;
   /** The part of a frame a portrait shows, and from which animation and frame. */
   portrait: { x: number; y: number; w: number; h: number; anim: string; frame: number };
+  /**
+   * A figure whose height changes with what's drawn (the Hidden Boss's child form, growing up: one drawing for the child, 13, 20 and the
+   * man): for each animation, how far above its feet its tallest frame reaches, sprite px (measured from the art: a test checks). Beside
+   * the board his words stand on it, so they stay above his head at every size (BossCharacter sets `--bc-head`; styles.css `.bc-heads`).
+   * Undefined: the bubble's place is the box's (one size).
+   */
+  heads?: Readonly<Record<string, number>>;
   /** Taller than the boss bar's usual box (Jefferson's long neck): on a phone the bar grows to hold him. */
   tall?: boolean;
   /** Wider than the boss bar's usual box (Sawyer's saw and tail): on a phone his box is wider, so neither the screen's
@@ -1103,8 +1111,12 @@ export const RECLUSE_CHILD_KIT: BossKit = {
     defeat: RECLUSE_CHILD_LINES.beaten,
   },
   chance: { entrance: 1, capture: 0.35, hurt: 0.4, check: 0.5, rattled: 0.3, smug: 0.2, victory: 1, defeat: 1 },
+  // (Beaten: the kid's half of this fight's exchange as he grows up, the man answering once grown: RecluseChild.ts. Nov 14.)
+  lineOf: (beat, boss) => (beat === "defeat" ? growUpExchange(boss).kid : undefined),
   // (His face as the child: the man's window, moved down to the child's head, 45 px lower in the same drawing space.)
   portrait: { ...ADULT.portrait, y: ADULT.portrait.y + 45, anim: "idle", frame: 0 },
+  // (His words above his head at whichever age is drawn now, beside the board: Eric, Nov 14.)
+  heads: GROWING_HEADS,
   wide: true,
 };
 

@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { RECLUSE_CUTSCENE as C } from "@chessroyale/core";
 import { RECLUSE_CUTSCENE_LINES } from "../src/characters/recluse-lines.ts";
-import { RECLUSE_CUTSCENE } from "../src/characters/recluse-ages.ts";
+import { CUTSCENE_SPOTS, RECLUSE_CUTSCENE } from "../src/characters/recluse-ages.ts";
+import { renderFrame } from "../src/characters/sprite.ts";
 import { boxAt, cutBox, cutReadMs, cutTyped, cutsceneTimeline, fitCutscene } from "../src/recluse-cutscene.ts";
 import { RECLUSE } from "../src/characters/recluse.ts";
 import { PHASE_CHANGE, absorbPaced } from "../src/recluse-phase2.ts";
@@ -96,6 +97,24 @@ describe("the Hidden Boss's cutscene", () => {
   it("has the cues its one-shots play on", () => {
     const cue = (a: string) => RECLUSE_CUTSCENE.anims[a]!.frames[0]!.cue;
     expect([cue("poof"), cue("drop"), cue("land"), cue("fade")]).toEqual(["poof", "drop", "land", "fade"]);
+  });
+
+  // Eric, Nov 14: the man's words sat over his face, his spot 38 rows low (the scene's headroom). Each box stands just above the top
+  // of its speaker's drawing in the conversation (his own half of the scene, its motes left out), at its tallest frame.
+  it("puts each speaker's box at the top of his drawing in the conversation (CUTSCENE_SPOTS)", () => {
+    const ch = RECLUSE_CUTSCENE;
+    const mid = Math.round((CUTSCENE_SPOTS.man.x + CUTSCENE_SPOTS.kid.x) / 2);
+    const topIn = (x0: number, x1: number) =>
+      Math.min(
+        ...["together", "kidTalk", "manTalk"].flatMap((a) =>
+          ch.anims[a]!.frames.map((f) => {
+            const r = renderFrame(ch, { ...f, specks: [] });
+            for (let y = 0; y < r.h; y++) for (let x = x0; x < x1; x++) if (r.data[(y * r.w + x) * 4 + 3]! > 0) return y;
+            return r.h;
+          }),
+        ),
+      );
+    expect({ man: CUTSCENE_SPOTS.man.head, kid: CUTSCENE_SPOTS.kid.head }).toEqual({ man: topIn(0, mid), kid: topIn(mid, ch.w) });
   });
 });
 

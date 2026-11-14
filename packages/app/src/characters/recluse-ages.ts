@@ -850,6 +850,13 @@ export const RECLUSE_GROWING: Character = {
   parts: PARTS_ALL,
   anims: growingAnims(() => (f) => f, () => [...RECLUSE.anims.idle!.frames]),
 };
+/**
+ * How far above his feet each of RECLUSE_GROWING's animations reaches at its tallest frame, sprite px (BossKit.heads: his words stand on
+ * it beside the board; Eric, Nov 14: at 20 his words sat over his face, placed for the child). A step up counts the age he grows into
+ * (and its rising motes) from its first frame, so a line said as he grows is above the new size at once and never covers his face.
+ * Measured from the frames: test/recluse-child.test.ts.
+ */
+export const GROWING_HEADS: Readonly<Record<string, number>> = { idle: 85, age1: 105, age2: 127, age3: 130, grow1: 111, grow2: 134, grow3: 134, up0: 134, up1: 134, up2: 134 };
 /** The same in a phone's boss bar: each age's bust (its own window, as RECLUSE_BUST's for his adult look), the same animations. */
 export const RECLUSE_GROWING_BUST: Character = {
   id: "recluse-growing-bust",
@@ -1643,8 +1650,12 @@ export const RECLUSE_CUTSCENE: Character = {
     alone: lazyAnim(() => ({ loop: true, frames: CUT_ALONE(true) })),
   },
 };
-/** Where things are in the cutscene's drawing, for its text boxes: each one's middle (x) and the top of his head (y). */
-export const CUTSCENE_SPOTS = { kid: { x: KID_X, head: GROUND - 82 }, man: { x: OX + 46, head: GROUND - 64 } } as const;
+/**
+ * Where things are in the cutscene's drawing, for its text boxes: each one's middle (x) and the top of his drawing over it in the
+ * conversation (y: the man on his knees, his hair; the child, his hair), measured from the frames (test/recluse-cutscene.test.ts). Nov 14:
+ * the man's was 38 rows low (the scene's headroom, LIFT), so his words sat over his face.
+ */
+export const CUTSCENE_SPOTS = { kid: { x: KID_X, head: GROUND - 87 }, man: { x: OX + 46, head: GROUND - 102 } } as const;
 
 /** Everything this mockup draws, for the preview and the tests; none of it is in CHARACTERS or any kit. */
 export const RECLUSE_AGES_PREVIEW: readonly Character[] = [RECLUSE_GROWING, RECLUSE_GROWING_BUST, RECLUSE_CHILD, RECLUSE_TEEN, RECLUSE_YOUNG, RECLUSE_CHILD_BUST, RECLUSE_TEEN_BUST, RECLUSE_YOUNG_BUST, RECLUSE_GROW, RECLUSE_GHOST, RECLUSE_CHILD_SIT, RECLUSE_CHILD_SIDE, RECLUSE_CUTSCENE];

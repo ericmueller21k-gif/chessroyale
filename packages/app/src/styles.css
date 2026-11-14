@@ -14989,6 +14989,12 @@ img.qicon {
 .place-side.ch-recluse .bc-bubble {
   bottom: calc(137px * var(--bc-scale) + 6px);
 }
+/* (A figure whose height changes with what's drawn: the Hidden Boss's child form, growing up from 9 to the man. His words stand on the
+   top of the drawing shown now, `--bc-head` sprite px above his feet (BossKit.heads, set as his animation changes), 16 px over it so the
+   tail clears his hair: Eric, Nov 14, at 20 his words sat over his face, placed for the child.) */
+.boss-char.place-side.bc-heads .bc-bubble {
+  bottom: calc(var(--bc-head, 134) * var(--bc-scale) * 1px + 16px);
+}
 .boss-char.place-results.ch-recluse {
   --bc-scale: 1.25;
   --bc-box: 172px;
@@ -19441,7 +19447,7 @@ button.sq-tiny {
 }
 /* His whole figure on the board (from his leap in to his leap back): placed by a transform in the board's own width
    (cqw), his feet on the point he's at (his frames draw his shadow: no filter); his place stands empty meanwhile, his
-   words still beside it. */
+   words over his head here (.rc-say, Nov 14). */
 .rc-fig {
   position: absolute;
   top: 0;
@@ -19454,6 +19460,30 @@ button.sq-tiny {
 .rc-away .boss-char-sprite,
 .rc-away .boss-char > .bc-engine.on {
   visibility: hidden;
+}
+/* (While he's on the board his words are over his head there, not by his empty place, a phone's bar too: Eric, Nov 14.) */
+.rc-away .bc-bubble:not(.rc-say) {
+  display: none;
+}
+/* The point over his figure on the board his words stand on: centered on him (a wide box, so the words can center in it without a
+   translate, which SpeechBox uses to move a box into view), the frame's top, 12 px over it. */
+.rc-say-at {
+  position: absolute;
+  left: calc(50% - 300px);
+  top: 0;
+  width: 600px;
+  height: 0;
+}
+.rc-say-at > .rc-say {
+  left: 0;
+  right: 0;
+  bottom: 12px;
+  margin-inline: auto;
+}
+.rc-say-at > .rc-say::after {
+  left: 50%;
+  right: auto;
+  margin-left: -6px;
 }
 /* His shadow on the board where he's coming down. */
 .rc-shadow {

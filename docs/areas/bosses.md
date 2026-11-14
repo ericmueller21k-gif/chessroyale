@@ -189,13 +189,19 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
   `childRating` (1800, +100 every 4 moves on the board, to Maia's top 2500, the man's), Stockfish at `levelForMaia` of it while Maia
   loads; his level from that rating (`formStep` in the view), popping at each step (BossLevel). His figure: `RECLUSE_CHILD_KIT`
   (`bossKitOf`) draws `RECLUSE_GROWING` (recluse-ages.ts: each age's idle and the growing steps), stepped by a figure run from
-  `formStep` (components/RecluseChild.ts, once each); the kid's lines `RECLUSE_CHILD_LINES`. Beaten: nobody placed
-  (finishBossBattle), his line, he grows up into the man (`growUpAt`, `fallMs`), then the runner's `nextBossForm`: a new match
+  `formStep` (components/RecluseChild.ts, once each); the kid's lines `RECLUSE_CHILD_LINES`. **His words beside the board stand on the
+  drawing shown now** (Eric, Nov 14: grown to 20 they sat over his face, placed for the child): the kit's `heads` (`GROWING_HEADS`, each
+  animation's tallest frame over his feet, measured from the art by `recluse-child.test.ts`) sets `--bc-head` as his animation changes
+  (`.bc-heads` in styles.css); a step up counts the age he grows into from its first frame, so a line said as he grows is already above
+  the new size. A phone's words are in his bar, as every boss's. Beaten: nobody placed
+  (finishBossBattle), the kid's line, he grows up into the man (`growUpAt`, `fallMs`, 7.5 s since Nov 14), and the man answers as he's
+  grown (Eric, Nov 14: "there was no conversation"; `RECLUSE_GROWUP_EXCHANGES`, five pairs, one a fight by `growUpExchange`: the
+  battle's start and its seeded level offset, the same on every device; the kid's half is his `defeat` line, the kit's `lineOf`), then the runner's `nextBossForm`: a new match
   against his adult form (solo `nextForm`: his entrance again). **Online** (his room's fight, the Crowd's final): the lobby's fall path
   (his rules' `fallMs`), then `nextRound` calls `nextBossForm` and plays the adult form's intro; each move request carries the child's
   rating (`childRatingNow`) and strength (`bossEloNow`) to the host and its checker alike; `NetMatch` resets his beats, words, banners
   and its 🏆 as the form goes. Tests: `chess/test/recluse-child.test.ts`, `app/test/recluse-child.test.ts`, server
-  `recluse-online.test.ts` ("his child form online"), `e2e/recluse.spec.ts` ("his child form first"), `e2e/hidden-boss-room.spec.ts`.
+  `recluse-online.test.ts` ("his child form online"), `e2e/recluse.spec.ts` ("his child form first"; "his words stand above his head at every age", a computer, with the test switches' `bossFigure(loop)` hook), `e2e/hidden-boss-room.spec.ts`.
 - **Win this form** (admins only, Boss alone, the Hidden Boss only, Nov 13; his child form too: for Eric's timing test of his music and phase
   change): a 🏆 after the 🐟 (a computer: in the title line). Pressed, your next move beats his adult form by the end a mate takes
   (the runner's `bossForceWin`: `stageComplete`, then `finishBossBattle`'s "crowd"; his fall, phase change and music follow as for
@@ -344,7 +350,8 @@ below):
   the phase change carries on, him on his knees in his place, quiet (`kneel`, `phaseChangeRun`'s `before`), until he seizes the God
   King's power. Solo: from the fall's end (`SoloMatch.cutscene`), the phase change as it ends; online from the server's
   `recluseCutscene`, everyone at once. Drawn by App over the fall's screen (`components/RecluseCutscene.tsx`, `recluse-cutscene.ts`'s
-  timeline, the figure `recluse-cutscene` in `recluse-ages.ts`); meanwhile his figure in its place is hidden (`body.cs-on`) and both
+  timeline, the figure `recluse-cutscene` in `recluse-ages.ts`; each box over its speaker's head, `CUTSCENE_SPOTS`, measured from the
+  frames by `recluse-cutscene.test.ts`: the man's was 38 rows low until Nov 14, his words over his face); meanwhile his figure in its place is hidden (`body.cs-on`) and both
   voices are quiet (`Voice.hush`). Music: his beaten theme on through it (`recluseMusic`: the fall with `toPhase2`). No skip, the 🏆
   included. A test's shorter hold plays it sped up to fit (`fitCutscene`; solo `?cutscene=SECONDS`, a test server's
   `CUTSCENE_HOLD_MS`, the e2e's 12 s). Tests: `app/test/recluse-cutscene.test.ts`, `e2e/recluse.spec.ts` ("Win this form").
@@ -370,7 +377,8 @@ below):
     seize), and the God King fades up and away in light (`gkLeave`); he holds his fist, its last frame (a one-shot given
     a time in a figure run holds its last frame), the dock saying "The God King's power is his!". Sounds: `gkHyuah`, `recluseDrain`, `gkLastGrunt2`, `recluseSpark`, `gkLeave`.
   - **Then**, where he stands, he gets up in a rage (`rage`, both drawings); then the board draws his whole figure (a
-    phone too; `.rc-fig`, his place empty meanwhile: `.rc-away`) for his leap onto the middle (`leap`: a thud, dust, the
+    phone too; `.rc-fig`, his place empty meanwhile: `.rc-away`; his words over his head there, `.rc-say`, his place's box and a phone's bar
+    bubble hidden meanwhile: Eric, Nov 14, they floated by his empty place) for his leap onto the middle (`leap`: a thud, dust, the
     board jolts), the book brandished and thrown down open at his feet (`drop`), his chant over it (`chantRaise`,
     `chant`: arms raised, his hair lifting into phase 2's) as light pours up out of it (CSS only: `.rc-light`, a pulsing
     cone behind him, and `.rc-glow` on the pages; only opacity and transform move) and **Eric's two lines** (Nov 13,

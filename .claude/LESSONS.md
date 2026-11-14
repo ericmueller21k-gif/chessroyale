@@ -343,4 +343,8 @@ Tests check *what* ends up on the screen, not *how it gets there*, nor how long 
   - Code shared by every boss draws nothing of one boss's (his effect, his color): a boss's own look goes in its kit,
     and a test walks every kit (king-attack.test.ts: each boss's hits and mate its own).
 
+- **His words over his face as he grew** (Nov 14, [story](../docs/history/lessons.md#his-words-over-his-face-as-he-grew-nov-14-2026)):
+  - A speech bubble stands on the drawing shown now: a figure whose height or place changes (grows, leaps onto the board) carries its
+    heights from the art (measured in a unit test), never one number per character, and a check measures the bubble against his head.
+
 - **The FAQ follows the rules** (Oct 11): a PR that changes a rule, a number's meaning or a boss updates its words in `packages/app/src/faq/content.ts` in the same PR; numbers there come from the settings objects, never typed in.
