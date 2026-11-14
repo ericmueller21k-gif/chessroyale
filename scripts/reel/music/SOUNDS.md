@@ -99,6 +99,7 @@ boss's world that reaches into how the song itself runs, not only its sounds.
 | A tune that runs up and down its chords, the same shape on chord after chord (song_j.py) | "very dull and boring, sounds like all the rest ... that style chord progression is slop" |
 | A Western march: a lone trumpet's tune, a whistle doubling it, hooves, a high square-wave line of even 16ths all through (song_ab.py) | Nov 13: "I'm going to be honest, I didn't care for that one" (no more said; a brass tune had missed twice before) |
 | An acid synth (a sawtooth through a ringing filter, sliding between notes) as a calm's main voice (song_y.py's first go, 1:01) | "almost sounds like a cheetah ... it just almost sounds like it was on accident in the song" (short bursts of it in the drop he passed) |
+| An accordion (three sawtooth-like reeds a few cents apart, one an octave up) with the tune, at the lead's level (song_ad.py's first go, 0:27) | Nov 14: "some loud synth obnoxious instrument starts playing ... something very light ... like a flute ... it's way too loud. It should be just like more background, quiet, lighter" (detuned sawtooth stacks read as "synth" to him: see the acid line above) |
 
 ## What another pair of ears heard (Nov 13)
 
@@ -191,7 +192,7 @@ Into a drop (Nov 12, Ginger's): more of the build's own sound right before it ("
 "a little bit of ... pause with ... quiet, like jingling", "and then all of a sudden like the big ice shatter, and
 then it jumps back into it": a hush of a bar, one big hit from the boss's world with room to be heard, then the drop.
 
-## The town's theme (Nov 14, song_ad.py): sent, no verdict yet
+## The town's theme (Nov 14, song_ad.py): in progress
 
 Eric: "make a theme, a town theme ... about 3 minutes ... the goal is it's a song where people literally are like, I
 want to turn this song on while I'm in the chess town because it's so good." From a write-up of a style (another
@@ -199,4 +200,7 @@ game's playground tune, a 1920s bandstand stroll), used as above: its pace, swin
 the tune on, nothing shrill, several places in one walk; none of its chords, key or tune. Two changes for his ear: an
 ocarina where it has a horn, and the soft piano and music box in the quiet part. It is far darker than the boss themes
 by design (4 to 8 kHz about 14 dB lower): if he calls it muffled, raise the mix's low-pass and the brush first.
-Sent with a 45-second clip of a second main tune (`python3 song_ad.py out.wav b`): the tune decides this one.
+First go (107 beats a minute, two candidate tunes): "I think I'm vibing with the second one better" (tune b); the
+accordion out for a light flute (the table above); "speed up the BPM slightly": 116 now, which makes its 80 bars
+2:45, so the full version needs eight more bars to be three minutes. Second go sent as a 43-second clip (the flute,
+and the same on a vibraphone, as he had also said "or a timpani", which is a drum: perhaps a mallet voice was meant).

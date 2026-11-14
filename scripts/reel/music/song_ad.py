@@ -3,11 +3,10 @@ theme, a town theme ... it's going to need to be about 3 minutes ... the goal is
 are like, I want to turn this song on while I'm in the chess town because it's so good."
 He sent a write-up of a style, made from another game's playground tune (a 1920s bandstand stroll), and of what would
 wear on the ear over three minutes. What is used from it is the style's own means and its cautions, none of them one
-song's: a strolling pace (about 107 beats a minute) with the 8ths swung a little; no drum kit: a plucked upright bass
-on 1 and 3, soft chords on 2 and 4, a brush, a wood block; warm, rounded voices that hand the tune to one another
-(a clarinet, an accordion, a soft piano, a guitar); ragtime's kind of chords (a chord borrowed from the minor, a
-chord a fifth above the one it leads to); no tune over the staff's top space but in the one lifted passage, no whistles or slides, nothing
-shrill; and several places in one walk, with a quiet one in the middle, so the three minutes are never one half
+song's: a strolling pace with the 8ths swung a little; no drum kit: a plucked upright bass on 1 and 3, soft chords
+on 2 and 4, a brush, a wood block; warm, rounded voices that hand the tune to one another (a clarinet, a flute, a
+soft piano, a guitar); ragtime's kind of chords (a chord borrowed from the minor, a chord a fifth above the one it
+leads to); no tune over the staff's top space but in the one lifted passage, no whistles or slides, nothing shrill; and several places in one walk, with a quiet one in the middle, so the three minutes are never one half
 minute six times.
 What is not used: the write-up's chord progressions (its stroll's eight bars, its bridge, its duet's circle), its
 key, or any tune of it. The tune itself was not listened to, measured or transcribed, and every melody, riff and
@@ -15,25 +14,32 @@ chord progression here is original: none of it is any song's or any game's.
 Two changes from its list of voices, for Eric's ear (SOUNDS.md): where it has a horn take the slow tune, an ocarina
 does (he has turned down a brass lead three times and picked the ocarina himself); and the quiet part has the soft
 piano and the music box he likes.
+His notes on the first go (Nov 14), of the two main tunes sent: "I think I'm vibing with the second one better" (so
+tune b is the one played; a is kept to compare). Of the accordion that had the tune the second time (three reeds a hair
+apart, at the clarinet's level): "some loud synth obnoxious instrument starts playing. We need to change that to like
+something very light ... like a flute ... it's way too loud. It should be just like more background, quiet, lighter":
+a flute has those parts now, well under the clarinet's level, and the accordion is gone from the song. "I actually
+think we need to speed up the BPM slightly": 107 beats a minute became 116.
 The idea from the game: a pawn's walk. The tune goes by step, as a pawn does; the bass walks down a step a bar under a
 D that never moves (G, F sharp, F, E, E flat, D: the E flat bar is the chord borrowed from the minor, the walk's one
 wistful step); the tune is handed from voice to voice as the walk passes the square, the gazebo and the cafe; and near
 the end the pawn reaches the far side and is promoted: the tune a minor third up, everyone together, before it comes
 home. A wood block's knock is a piece set down.
-G major; 80 bars of four, 180.0 s.
-  python3 song_ad.py <out.wav> [the main tune: a or b]
+G major; 80 bars of four at 116 beats a minute: 165.0 s. (Three minutes at this pace is 88 bars: eight more to
+write once he has settled the pace.)
+  python3 song_ad.py <out.wav> [the main tune: b or a] [the second voice: flute or vibes]
 
   bars  1-4    0:00  the stroll starts: the bass, the chords, a brush
-  bars  5-12   0:09  the square: the tune on the clarinet
-  bars 13-20   0:27  again on the accordion, the clarinet's long notes under it
-  bars 21-28   0:45  the gazebo: a slow tune on the ocarina over the piano's rolling chords, the bass walking
-  bars 29-36   1:03  the square again: the clarinet and the accordion together
-  bars 37-52   1:21  the cafe (the quiet part): the tune's pieces on the soft piano over a guitar, then on the guitar,
+  bars  5-12   0:08  the square: the tune on the clarinet
+  bars 13-20   0:25  again on the flute, lightly, the clarinet's long notes far under it
+  bars 21-28   0:41  the gazebo: a slow tune on the ocarina over the piano's rolling chords, the bass walking
+  bars 29-36   0:58  the square again: the clarinet, the flute beside it
+  bars 37-52   1:14  the cafe (the quiet part): the tune's pieces on the soft piano over a guitar, then on the guitar,
                      a music box far off; in E minor
-  bars 53-60   1:57  a conversation: the clarinet and the accordion trade two bars each
-  bars 61-68   2:15  promoted: the tune a minor third up, everyone
-  bars 69-76   2:33  home: the tune once more, softer, the accordion's
-  bars 77-80   2:51  the stroll alone again, for the way round
+  bars 53-60   1:47  a conversation: the clarinet and the flute trade two bars each
+  bars 61-68   2:04  promoted: the tune a minor third up, everyone
+  bars 69-76   2:20  home: the tune once more, softer, the flute's
+  bars 77-80   2:37  the stroll alone again, for the way round
 """
 import sys
 
@@ -44,10 +50,11 @@ from synth import Ride, n, write_wav
 
 BARS = 80
 BEATS = 4 * BARS
-TAPE = 180.0  # 106.67 beats a minute
+TAPE = 165.0
+BPM = BEATS * 60 / TAPE  # 116.4 beats a minute
 SWING = 0.08  # an off 8th is this much of a beat late
 bar0 = lambda bar: 4 * (bar - 1)  # the beat a bar (from 1) starts at
-RIDE = [(0, BEATS, 106.67, 106.67, 1.0, 1.0, 0.0)]
+RIDE = [(0, BEATS, BPM, BPM, 1.0, 1.0, 0.0)]
 
 # A bar's chord (two with a comma: half a bar each); "/X": the bass's note. "+3" after it: a minor third up.
 WALK = "G D/F# G7/F Cadd9/E Cmadd9/Eb G/D A9 D7"  # the tune's eight bars: the bass steps down under the D
@@ -93,7 +100,7 @@ CAFE_2 = (
     "B4:1.5 G4:.5 E4:1 -:1 | -:1 F#4:.5 G4:.5 A4:1 B4:1 | C5:2.5 B4:.5 G4:1 | A4:1 F#4:1 D#4:1 -:1 | "
     "-:.5 B4:.5 D5:.5 E5:.5 D5:1 B4:1 | C#5:1.5 B4:.5 A4:1 G4:1 | E4:1 G4:1 A4:1 C5:1 | B4:1.5 A4:.5 F#4:1 -:1"
 )
-# The conversation: the clarinet's two bars, the accordion's two, twice.
+# The conversation: the clarinet's two bars, the flute's two, twice.
 TALK_C = "D5:.5 B4:.5 G4:1 A4:.5 B4:.5 D5:1 | D#5:1.5 B4:.5 F#4:1 A4:1 | -:8 | E5:1 C5:.5 G4:.5 E4:1 G4:1 | A4:.5 C#5:.5 E5:1.5 C#5:.5 A4:1 | -:8"
 TALK_A = "-:8 | G4:.5 B4:.5 E5:1.5 D5:.5 B4:1 | D5:1 B4:.5 G4:.5 F4:1 D4:1 | -:8 | G4:1 A4:1 C5:1 D5:1 | D5:.5 C5:.5 A4:1 C5:1 Eb5:1"
 # The stroll's last bars: three notes of the tune, far off.
@@ -106,9 +113,10 @@ for _line, _beats in ((TUNE_A, 32), (TUNE_B, 32), (UNDER, 32), (BESIDE, 32), (SL
     assert beats(_line) == _beats, (_line[:30], beats(_line))
 
 
-def render(tune: str = "a", window=None) -> np.ndarray:
-    """The song as heard (stereo, at the mix's own level). `tune`: which main tune ("a" or "b"). `window`: (from
-    beat, to beat), to make only that passage (a sample, to compare voices or tunes on)."""
+def render(tune: str = "b", second: str = "flute", window=None) -> np.ndarray:
+    """The song as heard (stereo, at the mix's own level). `tune`: which main tune ("b", Eric's, or "a"). `second`:
+    the light voice that shares the tune with the clarinet ("flute", or "vibes" to compare). `window`: (from beat, to
+    beat), to make only that passage (a sample, to compare voices or tunes on)."""
     x = Ride(RIDE, BEATS, None, os=2, seed=233, tape_secs=TAPE)
     x.window = window
     put, at = x.put, x.at
@@ -282,16 +290,16 @@ def render(tune: str = "a", window=None) -> np.ndarray:
             w = x.tone(m, d * 0.95, harm, 0.13 * vol, vib=0.004 if d >= 1 else 0.0, vib_hz=5.0, scoop=0.25, scoop_s=0.03, attack=0.03, release=0.06)
             put("clarinet", b, w, pan)
 
-    def accordion(start, text, vol=1.0, pan=0.25, up=0):
-        """An accordion: three reeds a hair apart and one an octave over them, the bellows swelling each note in."""
+    def light(start, text, vol=1.0, pan=0.25, up=0):
+        """The light voice beside the clarinet: a flute, low and soft (or a vibraphone, each note left to ring a little)."""
         for b, d, m in notes(start, text):
             b, d, m = sway(b), float(d), m + up
             at(b, d)
-            f0 = x.hz(m)
-            harm = [1 / h / np.sqrt(1 + (h * f0 / 2400) ** 4) for h in range(1, max(2, int(4200 / f0)) + 1)]
-            w = x.tone(m, d * 0.95, harm, 0.075 * vol, detune=(-9, 0, 8), attack=0.06, release=0.09, trem=0.06, trem_hz=5.5)
-            w = w + x.tone(m + 12, d * 0.95, harm[: max(2, len(harm) // 2)], 0.02 * vol, attack=0.07, release=0.09)[: len(w)]
-            put("accordion", b, w, pan)
+            if second == "vibes":
+                w = x.struck("vibes", m)
+                put("light", b, w * np.exp(-np.arange(len(w)) / sr / 0.7) * 0.07 * vol, pan)
+            else:
+                put("light", b, x.flute(m, d * 0.95, 0.05 * vol, attack=0.04, release=0.08), pan)
 
     def ocarina(start, text, vol=0.055, pan=0.1, up=0):
         for b, d, m in notes(start, text):
@@ -315,12 +323,12 @@ def render(tune: str = "a", window=None) -> np.ndarray:
         stroll(bar, 0.9, brushes=bar >= 3, wood=bar >= 3)
     clarinet(bar0(4) + 3, PICKUP[tune], 0.9)
 
-    # Bars 5-12: the square: the tune on the clarinet. Bars 13-20: again on the accordion, the clarinet's long notes
-    # under it, the guitar joining the chords.
+    # Bars 5-12: the square: the tune on the clarinet. Bars 13-20: again on the flute, lightly, the clarinet's long
+    # notes far under it, the guitar joining the chords.
     for bar in range(5, 21):
         stroll(bar, 1.0, "keys" if bar < 13 else "both")
     clarinet(bar0(5), TUNE)
-    accordion(bar0(13) - 1, PICKUP[tune], 0.9), accordion(bar0(13), TUNE), clarinet(bar0(13), UNDER, 0.4)
+    light(bar0(13) - 1, PICKUP[tune], 0.9), light(bar0(13), TUNE), clarinet(bar0(13), UNDER, 0.28)
 
     # Bars 21-28: the gazebo. The ocarina's slow tune; the soft piano rolls the chords; the bass walks; strings, far off; no wood block.
     for bar in range(21, 29):
@@ -329,10 +337,10 @@ def render(tune: str = "a", window=None) -> np.ndarray:
             brush(bar0(bar) + sway(i * 0.5), 0.011 if i % 2 == 0 else 0.007)
     ocarina(bar0(21), SLOW)
 
-    # Bars 29-36: the square again: the clarinet has the tune, the accordion beside it a third or so under.
+    # Bars 29-36: the square again: the clarinet has the tune, the flute beside it.
     for bar in range(29, 37):
         stroll(bar, 1.0, "both")
-    clarinet(bar0(29) - 1, PICKUP[tune], 0.9), clarinet(bar0(29), TUNE), accordion(bar0(29), BESIDE if tune == "a" else UNDER, 0.7)
+    clarinet(bar0(29) - 1, PICKUP[tune], 0.9), clarinet(bar0(29), TUNE), light(bar0(29), BESIDE if tune == "a" else UNDER, 0.7)
 
     # Bars 37-52: the cafe (the quiet part), in E minor. No brush, no wood block; the bass a note or two a bar. The
     # soft piano has the tune's pieces over the guitar's picking; then the guitar has them over the piano's chords,
@@ -352,38 +360,38 @@ def render(tune: str = "a", window=None) -> np.ndarray:
                 box(b + 1.5, tones[-1], 0.028), box(b + 3, tones[len(tones) // 2], 0.022)
     piano(bar0(37), CAFE_1), guitar(bar0(45), CAFE_2, 0.2)
 
-    # Bars 53-60: a conversation: the clarinet's two bars, the accordion's two, twice; the stroll back under them, lightly.
+    # Bars 53-60: a conversation: the clarinet's two bars, the flute's two, twice; the stroll back under them, lightly.
     for bar in range(53, 61):
         stroll(bar, 0.9, "keys", wood=bar % 2 == 0)
-    clarinet(bar0(53), TALK_C), accordion(bar0(53), TALK_A)
+    clarinet(bar0(53), TALK_C), light(bar0(53), TALK_A)
 
-    # Bars 61-68: promoted: the tune a minor third up; the clarinet has it, the accordion beside it, the ocarina over
+    # Bars 61-68: promoted: the tune a minor third up; the clarinet has it, the flute beside it, the ocarina over
     # the long notes; strings; the fullest the song gets, and still easy.
     for bar in range(61, 69):
         stroll(bar, 1.08, "both"), pad(bar, 0.02)
     clarinet(bar0(61), seven(TUNE), 1.05, up=3), clarinet(bar0(68), HOME_A if tune == "a" else HOME_B, 1.05)
-    accordion(bar0(61), BESIDE if tune == "a" else UNDER, 0.75, up=3)
+    light(bar0(61), BESIDE if tune == "a" else UNDER, 0.75, up=3)
     if tune == "a":
         ocarina(bar0(61), "-:8 | -:2 G5:2 | -:8 | F5:2.5 -:1.5 | -:8", 0.045)
 
-    # Bars 69-76: home: the tune once more, softer, on the accordion, the clarinet's long notes under it; the brush
+    # Bars 69-76: home: the tune once more, softer, on the flute, the clarinet's long notes under it; the brush
     # thins out. Bars 77-80: the stroll alone again; three notes of the tune on the piano, far off.
     for bar in range(69, 77):
         stroll(bar, 0.92, "keys", brushes=bar < 75, wood=bar < 73)
-    accordion(bar0(69), TUNE, 0.9), clarinet(bar0(69), UNDER, 0.4)
+    light(bar0(69), TUNE, 0.9), clarinet(bar0(69), UNDER, 0.28)
     for bar in range(77, 81):
         stroll(bar, 0.85, brushes=False, wood=False)
     piano(bar0(77), LAST, 0.08)
 
-    x.beat_s = 60 / 106.67
-    x.echo("clarinet", 1.5, 0.1, 0.04), x.echo("accordion", 1.5, 0.08, 0.03), x.echo("box", 1.0, 0.3, 0.15), x.echo("guitar", 1.5, 0.1, 0.04)
-    levels = {"clarinet": 1.0, "accordion": 2.6, "ocarina": 2.2, "piano": 2.2, "guitar": 2.0, "keys": 4.0, "box": 2.0, "bass": 0.62, "brush": 4.0, "wood": 4.0, "pad": 2.0}
+    x.beat_s = 60 / BPM
+    x.echo("clarinet", 1.5, 0.1, 0.04), x.echo("light", 1.5, 0.1, 0.04), x.echo("box", 1.0, 0.3, 0.15), x.echo("guitar", 1.5, 0.1, 0.04)
+    levels = {"clarinet": 1.0, "light": 2.0, "ocarina": 2.2, "piano": 2.2, "guitar": 2.0, "keys": 4.0, "box": 2.0, "bass": 0.62, "brush": 4.0, "wood": 4.0, "pad": 2.0}
     return x.play(x.mixdown(levels, lowpass=8000, room=0.26, room_s=1.6))
 
 
-def main(out: str, tune: str = "a") -> None:
-    write_wav(out, render(tune))
+def main(out: str, tune: str = "b", second: str = "flute") -> None:
+    write_wav(out, render(tune, second))
 
 
 if __name__ == "__main__":
-    main(*sys.argv[1:3])
+    main(*sys.argv[1:4])
