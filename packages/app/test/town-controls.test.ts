@@ -55,6 +55,29 @@ describe("three gestures (Eric, Nov 5: \"if you hold it in the direction … rig
     expect(p.up("sq:3,4")).toBe("run");
     expect(p.gesture()).toBe("idle");
   });
+  it("judged on the touch's own times (Nov 14): a quick tap whose release waited behind a slow frame is a tap, not a run", () => {
+    // (The page handles the press late, on a busy frame; the frame after it runs before the release that came with it.)
+    const p = new Press(DRAG, HOLD);
+    p.down(100, 200, "home:alfil", 1000);
+    expect(p.hold(1000 + 400)).toBe(true);
+    expect(p.up("home:alfil", 1000 + 30)).toBe("walk");
+    p.down(100, 200, "home:alfil", 1000);
+    p.hold(1000 + 400);
+    // (What it pressed, whatever is under it now: the run moved the camera, not the finger.)
+    expect(p.up("sq:9,9", 1000 + 30)).toBe("walk");
+    p.down(100, 200, "home:alfil", 1000);
+    p.hold(1000 + 400);
+    p.move(100 + DRAG + 1, 200, 1000 + 20);
+    expect(p.up("home:alfil", 1000 + 30)).toBe("none");
+    // A real hold still ends as a run: its release is stamped past the hold time.
+    p.down(100, 200, "home:alfil", 1000);
+    p.hold(1000 + HOLD);
+    expect(p.up("home:alfil", 1000 + HOLD + 5)).toBe("run");
+    // And a run a late move made (on the move's own time) stays one, whenever the release.
+    p.down(100, 200, "home:alfil", 1000);
+    p.move(101, 200, 1000 + HOLD);
+    expect(p.up("home:alfil", 1000 + 30)).toBe("run");
+  });
   it("a move that comes in after the hold time (no frame between) makes it a run, not a look round, however far", () => {
     const p = new Press(DRAG, HOLD);
     p.down(100, 200, "", 0);
