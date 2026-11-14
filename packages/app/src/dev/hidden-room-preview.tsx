@@ -13,6 +13,7 @@ import type { HomeId } from "../town/world.ts";
 import type { ShopDef } from "../town/shops/shops.ts";
 import { ShopRoom, loadRoomWith, type LoadedRoom, type RoomArt, type ShopCtl } from "../town/shops/ShopRoom.tsx";
 import { recluseScene } from "../town/shops/recluse-scene.ts";
+import { roomLight, skyNow } from "../town/sky.ts";
 import "../styles.css";
 import "../town/town.css";
 
@@ -36,10 +37,9 @@ const art = (): Promise<RoomArt> =>
   import("../town/shops/recluse-art.ts").then((m) => ({
     n: m.SHOP_RECLUSE_N,
     layout: cards ? m.SHOP_RECLUSE_LAYOUT_CARDS : m.SHOP_RECLUSE_LAYOUT,
-    pieces: m.SHOP_RECLUSE_PIECES,
+    // (`?sky=day|dawn|dusk|night` as on /town, else the device's clock: the room's light, as the town's room loads it.)
+    ...m.recluseLit(roomLight(skyNow())),
     crateAt: [0, 0] as const,
-    lights: m.SHOP_RECLUSE_LIGHTS,
-    pools: m.SHOP_RECLUSE_POOLS,
     upright: ["bed"],
     standing: [...m.SHOP_RECLUSE_STANDING, ...m.SHOP_RECLUSE_SCENE.players.map(([c, r]) => ({ c: Math.round(c), r: Math.round(r) }))],
     outside: "#2a1d14",
