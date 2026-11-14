@@ -1,4 +1,4 @@
-# The Hidden Boss's transformation, round 3: the suit and helmet (MOCKUP, Nov 14)
+# The Hidden Boss's transformation, round 3b: the suit and helmet, darker (MOCKUP, Nov 14)
 
 Eric, after round 2's visor: a full futuristic suit instead, "more like computer networking, that sort of wiring", not war, not
 fused with a computer, fairly fitted, red and blue with some yellow, and a matching full helmet whose front visor flips up when
@@ -13,20 +13,30 @@ the light growing until it whites out the screen, the change unseen, the light d
 - Stills `phone-NN-*.png` / `computer-NN-*.png`: one per beat, numbered as in the table.
 - Made by `scripts/preview-recluse-transform.mjs` over the dev lab `packages/app/src/dev/recluse-transform-lab.tsx`; the suit is
   real art in his drawing (`characters/recluse.ts`: `suitName`, `suitFrame`, the helmet), used only by the lab so far.
+  (Round 3's first, brighter suit was replaced before Eric saw it; its files are gone from this branch, its commit is
+  in the branch's history.)
 
-## The suit (an original design, and how it stays clear of Iron Man)
+## The suit (round 3b: darker, an original design)
 
-- **Fitted, not armored:** it is his own body's outline, the same slim shapes as his shirt and trousers, with no added plates,
-  bulk, weapons or machine parts. Nothing is fused into him: when the visor is up it's his own face.
-- **Blue first:** deep blue is the main color (chest panel, forearms, legs, the helmet's shell); red is for the side panels,
-  the shoulders and upper arms, a stripe down the outside of each leg, the helmet's crest and its two side pods. Yellow is only
-  thin lines: circuit traces running down his chest and branching to his sides, down the front of each leg to a node at the knee,
-  up the helmet's sides; a ring at each forearm; pale nodes at the trace ends. No gold anywhere as a surface.
-- **No chest circle:** the middle of his chest is a trace spine with a small node at the collar, not a round light.
-- **One smooth visor, not a faceplate:** the front is a single piece of tinted glass from his brow to his chin (a highlight
-  across it), like a racer's or an astronaut's visor, with no eye slits and no mouth shape. It tilts up into the dome and comes
-  back down. The helmet follows his own long head and narrow chin.
-- **Gloves and boots** dark navy; the boots with a yellow trim.
+Round 3's first suit (bright royal blue, red and yellow, a rounded blue helmet with a red center stripe and yellow ear lights)
+read close to a famous blue robot game hero, so before Eric saw it the director asked for a darker take with a helmet of its own.
+Round 3b:
+
+- **Fitted, not armored:** his own body's outline, the same slim shapes as his shirt and trousers, with no added plates, bulk,
+  weapons or machine parts. Nothing is fused into him: with the visor up it's his own face.
+- **Matte near-black navy** all over, with slim charcoal panels down his sides, over his shoulders and upper arms, split into
+  segments by dark seams. Dark navy gloves and boots.
+- **Circuit wiring, thin and glowing:** short runs that branch and turn at angles and end in a node, like a circuit board or a
+  network map: a cool-blue spine down his chest with red runs branching to his sides; on each leg a cool-blue run down the front
+  of the thigh, and red runs down the outside of the thigh and the shin that jog in or out to a node. Yellow is only the tiny
+  nodes (one at his collar, the trace ends, one at his temple).
+- **The helmet, its own shape:** an angular, faceted dome (a flat top plate, side plates meeting at seams) that keeps his long
+  head and narrow chin; no center stripe, no ear lights; a red run down each side and a short cool-blue run over the brow.
+- **One smooth visor:** a single piece of near-black tinted glass from his brow to his chin with one highlight; no eye slits, no
+  mouth shape. It tilts up into the dome (a band of glass across it) and comes back down.
+- **How it stays clear of famous looks:** no gold or red plating and no chest circle (Iron Man); no bright blue body, rounded
+  helmet, center stripe or ear lights (the blue robot game hero); and the lines are short branching circuit runs ending in nodes,
+  not continuous glowing stripes along the body's outline (the glowing-line suits of a famous sci-fi film).
 
 ## Beat by beat (s from T0, when the book starts to open; T0 is also when `recluse-phase3`'s intro starts)
 
