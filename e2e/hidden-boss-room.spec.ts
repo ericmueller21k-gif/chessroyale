@@ -338,7 +338,8 @@ test("his room (Eric, Nov 12 and 13): Challenge is 1 of 4; leaving asks; an admi
   // computer the names keep their room (Nov 14's visual check: the word cut them, "Discover…").
   const shownRows = await panel.locator(".tower-row").count();
   await expect(panel.locator(".t-board")).toHaveText(Array(shownRows).fill("✓"));
-  if (desk) expect(await panel.locator(".t-name-text").evaluateAll((ns) => ns.filter((n) => n.scrollWidth > n.clientWidth).map((n) => n.textContent)), "names cut").toEqual([]);
+  // (The tag and its margin take at most 16 px of the name's room; the word took about 30. Bots' names vary, so not "no name cut".)
+  if (desk) for (const w of await panel.locator(".t-board").evaluateAll((ts) => ts.map((t) => t.getBoundingClientRect().width + parseFloat(getComputedStyle(t).marginLeft)))) expect(w).toBeLessThanOrEqual(16);
   await still(page, "boards-won");
   await expect.poll(phase, { message: "the results", timeout: 30_000 }).toBe("results");
   expect(await page.evaluate(() => (window as any).match.phase.simul)).toEqual({ won: 4, of: 4 });

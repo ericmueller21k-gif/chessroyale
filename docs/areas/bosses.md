@@ -371,6 +371,11 @@ below):
   foot; phase 2's Moves panel lists your own board; a phone's small boards name their player; the white-out's dying disc starts whole on
   a tall phone; his words over his helmet never straddle the bar's edge (moved into the bar, or onto the board); the split ends where
   phase 2 draws each board (`playedBox`). Checks in `e2e/recluse.spec.ts` and `e2e/hidden-boss-room.spec.ts`.
+- **The small follow-ups** (Nov 14; [decision](../decisions/2026-11-14-recluse-polish.md)): a device late for the transformation's
+  intro starts it where it is (`switchPlan`); his transformation picks up the cutscene's loop of the two from the scene as fitted to its
+  hold (`sceneStandAt`); the Moves list's boss rows show his face as the bar draws it now (`useLiveFace`: one loop and one image for the
+  list); a phone bar's bubble casts its shadow 2 px down, ending on the bar's edge; a computer's chat under the Moves panel shows its
+  chips in whole rows (the rest a scroll down); the computer's phase 2 table marks each board's result (✓ ✕ ½, the word its title).
 - **His cutscene** (Eric, Nov 12; in the fight since Nov 13, solo and online; [decision](../decisions/2026-11-13-recluse-cutscene-wired.md)):
   after his fall, before the phase change, about 104 s (`RECLUSE_CUTSCENE.holdMs`; a unit test keeps it the timeline's length):
   everything dims but a soft round spotlight on the board's middle; he kneels in it while the ghost of him as a child poofs in above
