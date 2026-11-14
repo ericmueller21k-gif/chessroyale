@@ -1368,8 +1368,23 @@ export const RECLUSE_BUST: Character = {
   anims: mapFrames(anims(true), toBust),
 };
 
+/**
+ * How far above his feet each of his animations reaches at its tallest frame, sprite px (BossKit.heads: beside the board his words stand
+ * on it, as the child's do: GROWING_HEADS). Beaten he kneels (`collapseLoop`, 99) and his fall's lines come then, so they sit over his
+ * head, not 30 px over where it stood (Nov 14: 82 px on a computer). Measured from the frames: test/recluse-child.test.ts.
+ */
+export const RECLUSE_HEADS: Readonly<Record<string, number>> = {
+  idle: 130, consult: 129, stare: 129, laugh: 132, spellbook: 136, spellLoop: 135, spellClose: 135, slam: 130, collapse: 129, collapseLoop: 99,
+  kneel: 101, revive: 135, idle2: 135, consult2: 134, stare2: 134, laugh2: 137, spellbook2: 136, spellLoop2: 135, spellClose2: 135, slam2: 135,
+  seize: 103, seizeLoop: 103, seized: 103, rage: 130, leap: 131, drop: 131, chantRaise: 134, chant: 135, pickup: 135, leap2: 136,
+};
 /** The part of him a portrait shows (his face and hair), in the full figure's frame pixels. */
 export const RECLUSE_PORTRAIT = { x: OX + HEAD_AT[0] - 2, y: OY - 1, w: 29, h: 36 } as const;
+/**
+ * The same face in his bust's pixels (RECLUSE_BUST's window; each age's bust in recluse-ages.ts has its own window on its own head, so
+ * the same one fits all): a portrait taken from the bust as it's drawn now, his age and his suit (BossKit.barFace, Nov 14).
+ */
+export const RECLUSE_BUST_PORTRAIT = { x: RECLUSE_PORTRAIT.x - OX - BUST.x0, y: RECLUSE_PORTRAIT.y - OY - BUST.y0, w: RECLUSE_PORTRAIT.w, h: RECLUSE_PORTRAIT.h } as const;
 
 /**
  * Where his head sits on a frame: its part's top-left pixel, in that frame's pixels (the frame's shake included). His

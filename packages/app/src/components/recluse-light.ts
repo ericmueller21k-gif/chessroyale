@@ -234,7 +234,11 @@ function drawFront(g: Ctx, s: Light, t: number, T: LightBeats, bx: number, by: n
     g.fillRect(0, 0, W, H);
     g.globalAlpha = 1;
   } else if (s.down > 0) {
-    const r = reach * s.down ** 1.6 + 1;
+    // (Its solid half reaches the corner farthest from the center as it starts, so the white is whole on its first frame: from the
+    // screen's diagonal, a tall phone's bottom corners (the board's center high on it) were in its soft edge at once, the panel and
+    // the pawns showing through, Nov 14.)
+    const far = Math.max(Math.hypot(mid.x, mid.y), Math.hypot(W - mid.x, mid.y), Math.hypot(mid.x, H - mid.y), Math.hypot(W - mid.x, H - mid.y));
+    const r = 2 * far * s.down ** 1.6 + 1;
     const grad = g.createRadialGradient(mid.x, mid.y, 0, mid.x, mid.y, r);
     grad.addColorStop(0, "rgba(255,253,246,1)");
     grad.addColorStop(0.5, `rgba(255,250,230,${Math.min(1, 0.4 + s.down).toFixed(3)})`);

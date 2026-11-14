@@ -111,7 +111,7 @@ export function BossBar({ boss, match, move }: { boss: BossView; match?: GameVie
     <div class={`boss-bar${char ? " has-char" : ""}${slot ? " barslot" : ""}`} style={{ "--bc-name": `${bossKit(boss.name)?.barName ?? 0}px` }} role="status" aria-label={`${boss.name}, threat ${boss.threat} of 5`}>
       {char && <BossCharacter match={match!} place="bar" />}
       <span class={`boss-icon${char ? " boss-icon-face" : ""}`} aria-hidden="true">
-        <BossFace boss={boss} />
+        <BossFace boss={boss} live />
       </span>
       <span class="boss-main">
         <span class="boss-name">
@@ -484,7 +484,7 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
                 // (Short enough for a phone's dock with the move in it: his icon says who.)
                 <>
                   {/* (Only his picture here, as the line always had: the name would push "Not scored." out of a phone's dock.) */}
-                  <BossFace boss={boss} class="boss-tag-face" label={boss.name} /> Plays <strong>your</strong> move{funPlayed ? <>: <strong>{funMove.san}</strong></> : "…"}
+                  <BossFace boss={boss} class="boss-tag-face" label={boss.name} live /> Plays <strong>your</strong> move{funPlayed ? <>: <strong>{funMove.san}</strong></> : "…"}
                 </>
               ) : momentLine ? (
                 <>
