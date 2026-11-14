@@ -1185,3 +1185,7 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   wasn't the main cause (my call was wrong; told Eric). Flaky round 6 helper started (high, claude/flaky-round6, brief flaky-round6.md:
   look for a shared cause after #715's townTap, use run 43625203937's first-try traces). Consider restoring retain-on-first-failure
   once main is green (Eric approved it). #718 ride sounds CI running (watcher bebehldx3).
+- Nov 14 19:35: flaky round 6 -> #719 (c57c4222, CI watcher b4tal1s69): shared cause = wrangler dev's ProxyWorker answers a dropped
+  POST with 500 (town beat); e2e/dev-proxy-retry.mjs patches it before wrangler dev (fails loudly on a wrangler upgrade). Also
+  tapPoint("person") looks off-middle. Recording every first try measured +22% run time (not the flake cause): leave it OFF.
+  #718 ride sounds: e2e check fixed (sample every 15 ms, not per frame), CI watcher b4x6kbky9 on a5e615db.
