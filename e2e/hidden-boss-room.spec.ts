@@ -300,25 +300,30 @@ test("his room (Eric, Nov 12 and 13): Challenge is 1 of 4; leaving asks; an admi
     await page.getByRole("dialog", { name: "Leaderboard" }).getByRole("button", { name: "Close" }).click();
     await expect(page.getByRole("dialog", { name: "Leaderboard" })).toBeHidden();
   }
-  // The 🏆 in the four boards: the team's next move wins every board still on. Your move, with real taps on your board.
+  // Your move first, with real taps on your board (White moves first on every board). Then the 🏆 in the four boards: the team's next
+  // move (a bot's or yours, any board) wins every board still on. (Your move before it, Nov 14: pressed first, a bot's move often won
+  // all four before your tap landed, and your board had no move for the Moves panel to list: main's red after #712.)
+  const mine = (await simulNow()).boards[0] as { fen: string; toMove: string | null; history: string[] };
+  expect(mine.toMove).toBe("crowd");
+  const move = legalMoves(mine.fen).find((m) => m.startsWith("b") || m.startsWith("g")) ?? legalMoves(mine.fen)[0]!;
+  const board = page.locator(".rc-simul .rc-q2 .hb-board, .rc-simul .rc-big .hb-board").first();
+  const box = (await board.boundingBox())!;
+  for (const sq of [move.slice(0, 2), move.slice(2, 4)]) {
+    const f = sq.charCodeAt(0) - 97;
+    const r = Number(sq[1]) - 1;
+    await page.mouse.click(box.x + (f + 0.5) * (box.width / 8), box.y + (7 - r + 0.5) * (box.height / 8));
+  }
+  await expect.poll(async () => (await simulNow()).boards[0].history[0] ?? null, { message: "your move on your board" }).toBe(move);
+  // The Moves panel lists your own board's game in phase 2 (Nov 14's visual check, #6): a computer's beside the board.
+  const yourRow = page.locator(".mv-side .mv-list .mv-row").first();
+  if (desk) await expect(yourRow).toHaveAttribute("aria-label", /^1\. You: /);
   await expect(trophy).toBeEnabled({ timeout: 10_000 });
   await trophy.click();
   await expect(page.getByRole("button", { name: "Your next move wins this form (testing)" })).toBeDisabled();
-  const mine = (await simulNow()).boards[0] as { fen: string; toMove: string | null; history: string[] };
-  if (mine.toMove === "crowd") {
-    const move = legalMoves(mine.fen).find((m) => m.startsWith("b") || m.startsWith("g")) ?? legalMoves(mine.fen)[0]!;
-    const board = page.locator(".rc-simul .rc-q2 .hb-board, .rc-simul .rc-big .hb-board").first();
-    const box = (await board.boundingBox())!;
-    for (const sq of [move.slice(0, 2), move.slice(2, 4)]) {
-      const f = sq.charCodeAt(0) - 97;
-      const r = Number(sq[1]) - 1;
-      await page.mouse.click(box.x + (f + 0.5) * (box.width / 8), box.y + (7 - r + 0.5) * (box.height / 8));
-    }
-  }
   await expect.poll(async () => (await simulNow())?.decided ?? false, { message: "every board won", timeout: 30_000 }).toBe(true);
   expect((await simulNow()).won).toBe(4);
-  // The Moves panel lists your own board's game in phase 2 (Nov 14's visual check, #6): a computer's beside the board.
-  if (desk && mine.toMove === "crowd") await expect(page.locator(".mv-side .mv-list .mv-row").first()).toHaveAttribute("aria-label", /^1\. You: /);
+  // (And still, once every board is won.)
+  if (desk) await expect(yourRow).toHaveAttribute("aria-label", /^1\. You: /);
   // Each row says its board was won (a computer's table, the word; a phone's panel, its mark), until the results.
   const shownRows = await panel.locator(".tower-row").count();
   await expect(panel.locator(".t-board")).toHaveText(Array(shownRows).fill(desk ? "Won" : "✓"));
