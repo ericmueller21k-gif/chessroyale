@@ -142,7 +142,9 @@ const bubbleOf = (page: Page) =>
     const cs = getComputedStyle(b);
     const frame = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom) + parseFloat(cs.borderTopWidth) + parseFloat(cs.borderBottomWidth);
     const lineH = parseFloat(cs.lineHeight);
-    return { x: r.x, y: r.y, w: r.width, h: r.height, r: r.right, b: r.bottom, lines: (r.height - frame) / lineH, text: b.getAttribute("aria-label") ?? "", status: { x: s.x, y: s.y, r: s.right, b: s.bottom }, nameX: n.x, bar: document.querySelector(".boss-bar")!.getBoundingClientRect().bottom, fit: b.getAttribute("data-fit") };
+    // (Its shadow's drop: computed as "rgba(…) Xpx Ypx …".)
+    const drop = Number(/\)\s+-?[\d.]+px\s+(-?[\d.]+)px/.exec(cs.boxShadow)?.[1] ?? 0);
+    return { x: r.x, y: r.y, w: r.width, h: r.height, r: r.right, b: r.bottom, drop, lines: (r.height - frame) / lineH, text: b.getAttribute("aria-label") ?? "", status: { x: s.x, y: s.y, r: s.right, b: s.bottom }, nameX: n.x, bar: document.querySelector(".boss-bar")!.getBoundingClientRect().bottom, fit: b.getAttribute("data-fit") };
   });
 
 PLAYABLE.forEach((def) => {
@@ -175,6 +177,7 @@ PLAYABLE.forEach((def) => {
         expect(b.r, `${at}: inside the screen`).toBeLessThanOrEqual(w);
         expect(b.y, `${at}: inside the screen`).toBeGreaterThanOrEqual(0);
         expect(b.b, `${at}: over the bar's bottom, not under it`).toBeLessThanOrEqual(b.bar);
+        expect(b.b + b.drop, `${at}: its shadow too, never on the board's line under the bar`).toBeLessThanOrEqual(b.bar + 0.5);
         // Small: one or two lines at 428 (a long line may take a third), and no taller than the line needs.
         if (w === 428) expect(Math.round(b.lines), `${at}: 428 px`).toBeLessThanOrEqual(3);
       }

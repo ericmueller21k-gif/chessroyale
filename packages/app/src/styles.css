@@ -14939,6 +14939,9 @@ img.qicon {
      bar's 99 px under the meter, 5 px clear: e2e/boss-bubble-header.spec.ts. A line too long for two rows is shortened: lines.test.ts.) */
   line-height: 1.4;
   text-wrap: balance;
+  /* (Its shadow drops 2 px, not 4: its bottom sits 2 px over the bar's, so the shadow ends on the bar's edge, never on the board's line
+     under it. Nov 14's visual check of the Hidden Boss's fight.) */
+  box-shadow: 4px 2px 0 rgba(26, 20, 6, 0.85);
 }
 /* Its tail points at the portrait, at the bar's left (the God King's tail, turned): the same square, its left and bottom edges. */
 .bc-bar-bubble::after {
@@ -23699,6 +23702,20 @@ button.sq-tiny {
     --gk-zone: 200px;
     height: calc(var(--board-px, 456px) - var(--mv-h) - 12px - var(--gk-zone));
     min-height: 0;
+  }
+  /* (Its chips in whole rows (Nov 14's visual check: the third row cut in half at 1280 x 800): the buttons' box is as many 34 px rows
+     (a chip 30, the gap 4) as the chat has room for under its head, the box's size unchanged; the rest a scroll down. The two groups
+     (lines, emoji) on the same pitch.) */
+  .screen.game:has(> .mv-side) > .under-board.side > .qchat {
+    container-type: size;
+  }
+  .screen.game:has(> .mv-side) > .under-board.side .qbuttons.groups {
+    gap: 4px;
+    padding: 8px 10px 4px;
+    max-height: calc(9px + round(down, 100cqh - 37px, 34px));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
   }
 }
 /* ---- Boss alone: your pawn beside the God King (Eric, Oct 28; components/BossDock.tsx, YourPawn) ----
