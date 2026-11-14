@@ -96,6 +96,10 @@ function serviceWorker(): Plugin {
         .sort();
       const hash = createHash("sha256");
       for (const f of files) hash.update(f).update(readFileSync(join(outDir, f === "/" ? "index.html" : f)));
+      // The music too, though not precached (Nov 14): the worker keeps it cache-first, so a deploy that changes only a song must
+      // still make a new version, whose activation drops the old copies (not left to the commit that's built into the bundle).
+      const musicDir = join(outDir, "music");
+      if (existsSync(musicDir)) for (const f of readdirSync(musicDir).sort()) hash.update(`/music/${f}`).update(readFileSync(join(musicDir, f)));
       // The Maia box's cache is named by its own files, so an app update keeps it and a new model replaces it. (Not its
       // source archive: the game never fetches it, so a change to the box's README or tests leaves players' copies be.)
       const maiaDir = join(outDir, "engine/maia");

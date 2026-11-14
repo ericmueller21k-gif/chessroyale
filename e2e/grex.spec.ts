@@ -87,6 +87,20 @@ test("Jefferson's music: fetched when his battle is picked (not at app start), s
       return Array.prototype.push.apply(log, xs);
     };
     w.__soundLog = log;
+    // (Every connection made, to read the music's way to the speakers: Nov 14, "fuck the filter and the compression".)
+    const ins = new Map<AudioNode, AudioNode[]>();
+    const connect = AudioNode.prototype.connect as any;
+    (AudioNode.prototype as any).connect = function (this: AudioNode, to: any, ...rest: any[]) {
+      if (to instanceof AudioNode) ins.set(this, [...(ins.get(this) ?? []), to]);
+      return connect.call(this, to, ...rest);
+    };
+    w.__musicPaths = () => {
+      const kind = (x: AudioNode) => (x instanceof AudioBufferSourceNode ? "source" : x instanceof GainNode ? "gain" : x instanceof AudioDestinationNode ? "speakers" : x.constructor.name);
+      const out: string[] = [];
+      const walk = (x: AudioNode, path: string[]): void => void ((ins.get(x) ?? []).length ? ins.get(x)!.forEach((y) => walk(y, [...path, kind(y)])) : out.push(path.join(" > ")));
+      for (const x of ins.keys()) if (x instanceof AudioBufferSourceNode && x.loop && (x.buffer?.duration ?? 0) > 30) walk(x, ["source"]);
+      return out;
+    };
   });
   const music: string[] = [];
   page.on("request", (r) => {
@@ -104,6 +118,8 @@ test("Jefferson's music: fetched when his battle is picked (not at app start), s
   await expect.poll(() => page.evaluate(() => (window as any).match?.phase?.kind), { timeout: 60_000 }).toBe("play");
   await expect.poll(log, { timeout: 30_000 }).toContain("music:start:grex");
   expect(await page.evaluate(() => (window as any).__musicStartPhase), "started after the intro").toEqual({ kind: "play", intro: false, loading: false });
+  // Its way out: its gain, the music's own (the master's level), the speakers; no filter, no compressor (Nov 14).
+  expect(await page.evaluate(() => (window as any).__musicPaths()), "the music's path").toEqual(["source > gain > gain > speakers"]);
   // The match's options: Music off fades it to nothing, on brings it back (the loop keeping its place: no new start).
   await page.getByRole("button", { name: "Match options" }).click();
   const row = page.getByRole("dialog", { name: "Match options" }).getByRole("switch", { name: /Music/ });
