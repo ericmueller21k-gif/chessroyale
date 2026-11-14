@@ -1170,3 +1170,6 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   Main full run watcher running (covers both). No helpers. Left: shop:238 (reading-window proposal), town-chat:1367/1370, fairplay:65,
   alfil:247, town-street:155; the 🏆 button's words online; subscribe-in-useEffect gap. Pending Eric: Fill-also-challenges, CI trace,
   #713/#714 guard-test calls (room-rule checks unchanged; phase 2 bits reordered / ✓).
+- Nov 14 17:40: main 7993f4fc (#714+#715) LIVE, full run GREEN, no retries. Eric back: (1) Fill with 3 bots: leave as is. (2) CI traces
+  OK -> #716 (retain-on-first-failure, ~8% time). (3) Room tests: "I don't even care about the room rule testing… holding us up"
+  -> no longer guards (eric.md in #716); the online 🏆 is admin-only, to be deleted later: don't spend on it. #716 CI running.
