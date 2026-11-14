@@ -1567,11 +1567,13 @@ test("rides (Oct 31; Nov 1, every boss's): your pawn sits on its ride, the ride'
   );
   await ride([24, 29]);
   const during = (await heard) as { ride: string | null; up: boolean; live: number; loop: unknown[] | null }[];
-  expect(during.length, "reads while moving").toBeGreaterThan(5);
+  // (No count of reads: CI's software WebGL draws only 3 or 4 frames in this walk. What matters: once the loop starts, it plays on
+  // one source for the rest of the walk, never dropping out between steps.)
+  expect(during.length, "read while moving").toBeGreaterThan(0);
   expect(Math.max(...during.map((d) => d.live)), "never more than one source").toBe(1);
-  const playing = during.filter((d) => d.live === 1);
-  expect(playing.length, "the loop plays as you ride").toBeGreaterThan(during.length / 2);
-  for (const d of playing) expect([d.ride, d.up, d.loop]).toEqual(["sawyer-dozer", true, [true, 0.1, 1.1]]);
+  const from = during.findIndex((d) => d.live === 1);
+  expect(from, "the loop plays as you ride").toBeGreaterThanOrEqual(0);
+  for (const d of during.slice(from)) expect([d.live, d.ride, d.up, d.loop]).toEqual([1, "sawyer-dozer", true, [true, 0.1, 1.1]]);
   // Standing still: it fades out (RIDE_SOUND.holdMs after the last step, over the dozer's fadeOutMs) and is let go.
   await expect.poll(async () => (await rideNow(page)).you.sound, { message: "standing: faded out and let go", timeout: 5_000 }).toMatchObject({ ride: null, live: 0 });
   const log = await rideLog();
