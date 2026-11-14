@@ -712,7 +712,9 @@ and [2026-11-02-bigger-showpieces.md](../decisions/2026-11-02-bigger-showpieces.
   (`pause`: no frames, nothing moves, its chips put away) and the room fades in from black. **Going out** ("Go out", or the back button,
   which inside a shop means out, not home): the room fades to black and the town zooms back out from the door, you where you stood.
   A Back or Go out tapped while the room still fades in waits for it, then goes out (`outNext`, Nov 12: it was lost); a way through to
-  another room (the stairs' Go up, a back door) tapped then waits the same way and goes through (`passNext`, Nov 13).
+  another room (the stairs' Go up, a back door) tapped then waits the same way and goes through (`passNext`, Nov 13). A way through
+  to the room you have just come into is that same way tapped twice, and you stay; a Go up tapped again while the server answers the
+  walk-up's top floor is that same climb (Nov 14: kept, it went through to the top again as the top faded in).
   **The area banner (Nov 11, Eric's mockup):** as the black lifts on a room you walked into through its door (the town's, or Rolling
   Dough's door between rooms; never one you arrive in by a challenge), its name across a soft dark band a third down the room's view:
   the boss's name and 's in gold in the pixel font ("DON DOUGH'S"; Rolling Dough's back room "BACK ROOM"; a room with no boss nothing),
@@ -1290,6 +1292,11 @@ noted wherever a slice changed one.
   place's card. It waits until the view holds still over 3 drawn frames (`townTapPoint`), glides there once if the target is off the screen
   or covered, and taps with the press and release together (`quickTap`). Read a point mid-glide, or a separate `page.mouse.click`, and
   the tap fails on CI's software WebGL ([2026-11-13-street-town-taps-on-ci.md](../decisions/2026-11-13-street-town-taps-on-ci.md)).
+  Since Nov 14 the tap lands on the frame its point was read from: `townTap` holds the town's frames (`__townHold`) in the frame
+  `townTapPoint` reads the point, taps, and lets them go, so a figure walking about (Big Boy by his crib, a bot) can't move off it
+  first. `__townAt`'s points keep 2 px of room on their target (`clearAt`): a point on the edge of what's clear became your pawn once the
+  tap was rounded to a whole pixel. A tap on a town figure or place from a spec goes through `townTap` or `tapInTown`, never its own
+  `__townAt` and click ([2026-11-14-flaky-round4.md](../decisions/2026-11-14-flaky-round4.md)).
 - `e2e/shop.spec.ts` (Nov 2, inside a shop; phone and computer): Babur's card's "Go in", inside zoomed out (+ and − switch to Close and back), a tap
   on the Shopkeeper walks you up and its card's Talk opens "Babur's Boss Crate" (the price line, Balloon Pup, what you have, both buys
   greyed with nothing to pay), the header saying "Babur's Circus", then the view dragged back to the door, "Go out" and you're outside
