@@ -118,6 +118,8 @@ export const BOSS_FACE: Record<HomeId, readonly [x: number, y: number, size: num
 };
 
 // ---- Colors (the prototype's, sampled from Eric's reference picture).
+/** (Tests) How far round a test hook's tap point must still be on its target: a tap's whole pixel, and then some (`clearAt`). */
+const TAP_ROOM_PX = 2;
 const SQ_LIGHT = [238, 197, 139] as const;
 const SQ_DARK = [173, 128, 88] as const;
 const MIX_STEPS = 64;
@@ -3696,8 +3698,7 @@ export class Renderer {
       for (const v of [0.6, 0.45, 0.75, 0.3]) {
         out.x = (it.x0 + it.x1) / 2;
         out.y = it.y0 + v * (it.y1 - it.y0);
-        const h = out.x > 0 && out.x < this.W && out.y > 0 && out.y < this.H ? this.pick(out.x, out.y) : null;
-        if (h?.kind === "person" && h.person === this.town.people[i]) return true;
+        if (this.clearAt(out.x, out.y, (h) => h?.kind === "person" && h.person === this.town.people[i])) return true;
       }
       return false;
     }
@@ -3709,8 +3710,7 @@ export class Renderer {
       for (const [u, y] of [[0, top + 2], [0, (top + it.fy) / 2], [-0.33, it.fy - 3], [0.33, it.fy - 3]] as const) {
         out.x = it.fx + u * (it.x1 - it.x0);
         out.y = y;
-        const h = out.x > 0 && out.x < this.W && out.y > 0 && out.y < this.H ? this.pick(out.x, out.y) : null;
-        if (h?.kind === "table" && h.table === TABLES[i]) return true;
+        if (this.clearAt(out.x, out.y, (h) => h?.kind === "table" && h.table === TABLES[i])) return true;
       }
       return false;
     }
@@ -3721,19 +3721,14 @@ export class Renderer {
       for (const v of [0.82, 0.6, 0.4, 0.25]) {
         out.x = (b.x0 + b.x1) / 2;
         out.y = b.y0 + v * (b.y1 - b.y0);
-        const h = out.x > 0 && out.x < this.W && out.y > 0 && out.y < this.H ? this.pick(out.x, out.y) : null;
-        if (h?.kind === "statue" && h.statue === STATUES[i]) return true;
+        if (this.clearAt(out.x, out.y, (h) => h?.kind === "statue" && h.statue === STATUES[i])) return true;
       }
       return false;
     }
     const it = kind === "boss" ? this.bossItems[i]! : this.houseItems[i]!;
     if (!it.on) return false;
-    const ok = (x: number, y: number) => {
-      if (!(x > 0 && x < this.W && y > 0 && y < this.H)) return false;
-      const h = this.pick(x, y);
-      if (kind === "boss") return h?.kind === "boss" && h.boss === this.town.bosses[i];
-      return i >= this.homes.length ? h?.kind === "coliseum" : h?.kind === "house" && h.home === this.homes[i];
-    };
+    const ok = (x: number, y: number) =>
+      this.clearAt(x, y, (h) => (kind === "boss" ? h?.kind === "boss" && h.boss === this.town.bosses[i] : i >= this.homes.length ? h?.kind === "coliseum" : h?.kind === "house" && h.home === this.homes[i]));
     out.x = kind === "boss" ? (it.x0 + it.x1) / 2 : it.fx;
     out.y = kind === "boss" ? it.y0 + 0.6 * (it.y1 - it.y0) : it.y0 + (this.places[it.i] === COLISEUM_PLACE ? 0.88 : 0.8) * (it.y1 - it.y0);
     if (ok(out.x, out.y)) return true;
@@ -3748,6 +3743,21 @@ export class Renderer {
         }
       }
     return false;
+  }
+
+  /**
+   * (Tests, `tapPoint`) Is (x, y) a point a tap reaches `is` at, with room round it: the point and the points `TAP_ROOM_PX` across and
+   * along from it all on screen and on it. Nov 14: Glim's point lay 0.2 px above your pawn's box, and the tap's whole pixel (CDP rounds)
+   * landed on your pawn: nothing opened.
+   */
+  private clearAt(x: number, y: number, is: (h: Hit | null) => boolean): boolean {
+    const d = TAP_ROOM_PX;
+    for (const [u, v] of [[0, 0], [-d, 0], [d, 0], [0, -d], [0, d]] as const) {
+      const px = x + u;
+      const py = y + v;
+      if (!(px > 0 && px < this.W && py > 0 && py < this.H) || !is(this.pick(px, py))) return false;
+    }
+    return true;
   }
 
   /** A sidekick's face for the game's strip (its idle's first frame, an image's address), or null for a pawn. */

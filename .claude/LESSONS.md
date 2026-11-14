@@ -317,6 +317,16 @@ Tests check *what* ends up on the screen, not *how it gets there*, nor how long 
   - CI's trace is of the retry (`--trace on-first-retry`): for a retry-pass it shows the run that passed. The failure's own record is
     its error-context page snapshot; read that first.
 
+- **The flaky causes of Nov 14, round 4** (`docs/decisions/2026-11-14-flaky-round4.md`):
+  - A spec's tap on a town figure or place lands on the frame its point was read from (`townTap`, `tapInTown`: the frames held as the
+    point is read). Never its own `__townAt` and click: a figure walking about moves off the point in the round trips between.
+  - A test hook's tap point has room round it on its target (2 px, `clearAt`): a point on an edge becomes something else once a tap is
+    rounded to a whole pixel.
+  - Holding the frames for a test showed what a busy phone shows for a frame: anything placed by the frame loop (a card) is placed in a
+    layout effect as it appears too.
+  - A test that holds something the game times from its first frame (the bot across, 4 s) holds it from the page as that frame is drawn
+    (an init script on the ready attribute), not after the test's own poll sees it.
+
 ## Eric's rules hold
 
 - **An options panel that disappeared** (Oct 25, [story](../docs/history/lessons.md#an-options-panel-that-disappeared-oct-25-2026)):

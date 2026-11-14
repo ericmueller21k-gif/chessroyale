@@ -638,9 +638,9 @@ export type TownThing = "boss" | "home" | "coliseum" | "statue" | "table" | "bot
  * moving after `waitMs`. Counted in frames, not wall time: on CI's software WebGL under a full shard a frame can take a few hundred
  * milliseconds, and reads 100 ms apart saw a camera mid-glide as at rest (Nov 13, the street town for everyone).
  */
-export async function townTapPoint(page: Page, kind: TownThing, id: string | number, waitMs = 3000): Promise<{ x: number; y: number } | null> {
+export async function townTapPoint(page: Page, kind: TownThing, id: string | number, waitMs = 3000, hold = false): Promise<{ x: number; y: number } | null> {
   const xy = await page.evaluate(
-    ([kind, id, waitMs]) =>
+    ([kind, id, waitMs, hold]) =>
       new Promise<{ x: number; y: number } | null>((done) => {
         const cv = document.querySelector<HTMLCanvasElement>("canvas.town-canvas");
         // (A point a finger reaches: 10 px inside the canvas, and the canvas itself under it, not a chip, the map, a button or a card
@@ -660,55 +660,73 @@ export async function townTapPoint(page: Page, kind: TownThing, id: string | num
           same = now && last && Math.hypot(now.x - last.x, now.y - last.y) < 0.5 ? same + 1 : 0;
           last = now;
           // (In the page's coordinates, read as it's found: the canvas's box can move as the page changes, out of a room say.)
-          if (same >= 3 && cv) done({ x: cv.getBoundingClientRect().left + now!.x, y: cv.getBoundingClientRect().top + now!.y });
+          if (same >= 3 && cv) {
+            // (`hold`: the town's frames held in this same frame (`__townHold`), so the frame on screen when the tap comes is the one
+            // this point was read from. A figure walking about (Big Boy by his crib, a bot) moved off it between the read and the tap.)
+            if (hold) (window as unknown as { __townHold?: (on: boolean) => void }).__townHold?.(true);
+            done({ x: cv.getBoundingClientRect().left + now!.x, y: cv.getBoundingClientRect().top + now!.y });
+          }
           else if (performance.now() > until) done(null);
           else requestAnimationFrame(look);
         };
         requestAnimationFrame(look);
       }),
-    [kind, id, waitMs] as const,
+    [kind, id, waitMs, hold] as const,
   );
   return xy;
+}
+
+/** The town's frames going again after `townTapPoint(…, hold)` (`__townHold(false)`; a page that has gone on is left alone). */
+export const townLetGo = (page: Page) =>
+  page.evaluate(() => (window as unknown as { __townHold?: (on: boolean) => void }).__townHold?.(false)).catch(() => undefined);
+
+/**
+ * A quick tap on a figure or a place in the street town, on the frame its point was read from (`townTapPoint` with `hold`): no frame
+ * runs between the read and the tap, so nothing walks off the point first (Nov 14: Big Boy wandered in front of or behind his crib, a
+ * bot stepped behind you, and the tap opened the crib's card or nothing). False if it isn't drawn and clear within `waitMs`.
+ */
+export async function townTap(page: Page, kind: TownThing, id: string | number, waitMs = 3000): Promise<boolean> {
+  const cdp = await page.context().newCDPSession(page);
+  try {
+    const at = await townTapPoint(page, kind, id, waitMs, true);
+    if (!at) return false;
+    const ev = (type: "mousePressed" | "mouseReleased", buttons: number) =>
+      cdp.send("Input.dispatchMouseEvent", { type, x: Math.round(at.x), y: Math.round(at.y), button: "left", buttons, clickCount: 1, pointerType: "mouse" });
+    await Promise.all([ev("mousePressed", 1), ev("mouseReleased", 0)]);
+    return true;
+  } finally {
+    await townLetGo(page);
+    await cdp.detach().catch(() => undefined);
+  }
 }
 
 /**
  * Opens `card` by a real tap on a figure or a place in the street town (Nov 13: one way for every spec, after taps on far figures and
  * homes failed on CI's software WebGL). Each try: another card open is closed; the view held still (`townTapPoint`); off the screen or
  * covered, the camera glides to `glide` once (a home's or a boss's id, as its chip would glide it, or a square) and the tap waits for it to
- * land; then a quick tap (as `quickTap`: the press and the release together, so a slow frame between them can't make it a run). A tap that
- * misses walks you, the camera following: the next try glides again.
+ * land; then a quick tap on the frame the point was read from (`townTap`: the press and the release together, so a slow frame between
+ * them can't make it a run, and none between the read and the tap). A tap that misses walks you, the camera following: the next try glides
+ * again.
  */
 export async function tapInTown(page: Page, kind: TownThing, id: string | number, card: Locator, opts: { glide?: string | readonly [number, number] | null; timeout?: number } = {}) {
   const glide = opts.glide === undefined ? (kind === "boss" || kind === "home" ? String(id) : null) : opts.glide;
-  // (The input session made once: between the view found still and the tap, nothing but the tap goes to the browser, so a boss strolling
-  // a step off his point has the least time to. Locally, under 4 workers, Alfil stepped away in that gap, Nov 13.)
-  const cdp = await page.context().newCDPSession(page);
-  const tap = (x: number, y: number) => {
-    const ev = (type: "mousePressed" | "mouseReleased", buttons: number) =>
-      cdp.send("Input.dispatchMouseEvent", { type, x: Math.round(x), y: Math.round(y), button: "left", buttons, clickCount: 1, pointerType: "mouse" });
-    return Promise.all([ev("mousePressed", 1), ev("mouseReleased", 0)]);
-  };
-  try {
-    await expect(async () => {
-      if (await card.isVisible()) return;
-      const open = page.locator(".town-card").filter({ visible: true });
-      if (await open.count()) {
-        await page.keyboard.press("Escape");
-        await expect(open).toHaveCount(0, { timeout: 2000 });
-      }
-      let at = await townTapPoint(page, kind, id, 3000);
-      if (!at && glide !== null) {
-        await page.evaluate((to) => (window as unknown as { __townGlide?: (to: string | readonly [number, number]) => void }).__townGlide?.(to), glide);
-        // (The glide across the street town: a few seconds of frames, longer on a slow runner.)
-        at = await townTapPoint(page, kind, id, 20_000);
-      }
-      expect(at, `${kind} ${id} drawn and clear, the view still`).not.toBeNull();
-      await tap(at!.x, at!.y);
-      await expect(card).toBeVisible({ timeout: 3000 });
-    }).toPass({ timeout: opts.timeout ?? 60_000 });
-  } finally {
-    await cdp.detach().catch(() => undefined);
-  }
+  await expect(async () => {
+    if (await card.isVisible()) return;
+    const open = page.locator(".town-card").filter({ visible: true });
+    if (await open.count()) {
+      await page.keyboard.press("Escape");
+      await expect(open).toHaveCount(0, { timeout: 2000 });
+    }
+    // (The tap on the frame its point came from: `townTap`.)
+    let tapped = await townTap(page, kind, id, 3000);
+    if (!tapped && glide !== null) {
+      await page.evaluate((to) => (window as unknown as { __townGlide?: (to: string | readonly [number, number]) => void }).__townGlide?.(to), glide);
+      // (The glide across the street town: a few seconds of frames, longer on a slow runner.)
+      tapped = await townTap(page, kind, id, 20_000);
+    }
+    expect(tapped, `${kind} ${id} drawn and clear, the view still`).toBe(true);
+    await expect(card).toBeVisible({ timeout: 3000 });
+  }).toPass({ timeout: opts.timeout ?? 60_000 });
   return card;
 }
 

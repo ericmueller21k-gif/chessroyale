@@ -1,7 +1,7 @@
 import { mkdirSync, readFileSync, statSync } from "node:fs";
 import { expect, type Page, type Route } from "@playwright/test";
 import { RECLUSE_MUSIC } from "@chessroyale/core";
-import { asAdmin, test } from "./helpers.ts";
+import { asAdmin, tapInTown, test } from "./helpers.ts";
 
 /**
  * The street town, round 2: the layout (Nov 5; docs/decisions/2026-11-05-street-town-layout.md), in an admin's town only
@@ -34,7 +34,8 @@ const STILLS = process.env.STILLS;
 function watchErrors(page: Page) {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(String(e)));
-  page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
+  // (A failed load names its address: Nov 13's "status of 500" on Meadow Street said nothing of which.)
+  page.on("console", (m) => m.type() === "error" && errors.push(m.text().startsWith("Failed to load resource") ? `${m.text()} (${m.location().url})` : m.text()));
   return errors;
 }
 const canvas = (p: Page) => p.locator("canvas.town-canvas");
@@ -72,24 +73,8 @@ async function tapHome(page: Page, id: string, name: string) {
   const card = page.getByRole("dialog", { name, exact: true });
   // (Its boss to its rest square first, so a tap on the home can't land on the boss passing in front of it: its card is the boss's.)
   await expect.poll(() => page.evaluate((h) => (window as unknown as Hooks).__townBossBack?.(h) ?? false, id), { timeout: 30_000 }).toBe(true);
-  await page.evaluate((h) => (window as unknown as Hooks).__townGlide?.(h), id);
-  // (Round 4: let the glide settle before the first tap, so it lands on the home, not on someone passing. On WebGL, software in the
-  // tests, frames are slower: wait for the camera to stop rather than a set time.)
-  await settled(page);
-  await expect(async () => {
-    if (await card.isVisible()) return;
-    const xy = await page.evaluate((h) => (window as unknown as Hooks).__townAt?.("home", h) ?? null, id);
-    // (Not drawn from where the camera is now (a tap that missed walked you off): look at it again, and try once more.)
-    if (!xy) {
-      await page.evaluate((h) => (window as unknown as Hooks).__townGlide?.(h), id);
-      await settled(page);
-    }
-    expect(xy, "drawn").not.toBeNull();
-    const cv = (await canvas(page).boundingBox())!;
-    await page.mouse.click(cv.x + xy!.x, cv.y + xy!.y);
-    await expect(card).toBeVisible({ timeout: 1500 });
-  }).toPass({ timeout: 30_000 });
-  return card;
+  // (Then the shared tap: the glide, the view held still, and the tap on the frame its point was read from, `tapInTown`.)
+  return tapInTown(page, "home", id, card, { timeout: 30_000 });
 }
 
 test("the street town opens at its default zoom step, at the start (22, 25; the north edge round: 8 rows on), the camera facing north; a player's town (a guest's) is the street town too, on WebGL, from the same start (Nov 13: the old town is gone)", async ({ page }) => {
@@ -600,14 +585,9 @@ test("the Hidden Boss's walk-up: its door, the hall, up two flights to his room,
       await page.keyboard.press("Escape");
     }
   }
-  const card = page.getByRole("dialog", { name: "The Walk-up", exact: true });
-  await expect(async () => {
-    if (await card.isVisible()) return;
-    const at = await homeAt();
-    expect(at).not.toBeNull();
-    await page.mouse.click(at!.x, at!.y);
-    await expect(card).toBeVisible({ timeout: 1500 });
-  }).toPass({ timeout: 20_000 });
+  // (The shared tap, `tapInTown`: a tap that missed (someone walking past) walked you off and the camera followed, so every later look
+  // here found the walk-up off screen; it glides back.)
+  const card = await tapInTown(page, "home", "recluse", page.getByRole("dialog", { name: "The Walk-up", exact: true }));
   await expect(card.getByRole("button")).toHaveText(["Go in"]);
   await card.getByRole("button", { name: "Go in" }).click();
   await expect(room).toHaveAttribute("data-ready", "1", { timeout: 20_000 });
