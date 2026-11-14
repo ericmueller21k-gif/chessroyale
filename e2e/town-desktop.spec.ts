@@ -1,5 +1,5 @@
 import { devices, expect, type Page } from "@playwright/test";
-import { test } from "./helpers.ts";
+import { settled, tapInTown, test } from "./helpers.ts";
 
 /**
  * The town square on a computer (Oct 29, Eric; docs/decisions/2026-10-29-town-on-computer.md, docs/areas/town-square.md): in the front
@@ -27,9 +27,18 @@ const onlyComputer = () => test.skip(test.info().project.name !== "desktop", "a 
 /** The bar's parts and the box's, measured. */
 const PARTS = { screen: ".town-screen", bar: ".town-bar", back: ".town-back", title: ".town-bar h1", chatBtn: ".tc-mode", gear: '[aria-label="Town settings"]', box: ".town-box", canvas: "canvas.town-canvas", controls: ".town-controls", zoom: ".town-zoom", focus: ".town-recenter", chat: ".town-chat" } as const;
 async function parts(p: Page) {
-  const out = {} as Record<keyof typeof PARTS, Box>;
-  for (const k of Object.keys(PARTS) as (keyof typeof PARTS)[]) out[k] = (await box(p, PARTS[k]))!;
-  return out;
+  // (One read of every box, as the page is now; a part that isn't there is null. Read one by one, each missing part waited the action
+  // timeout, 15 s: a computer has no bar, so 45 s a read.)
+  return (await p.evaluate(
+    (sels) =>
+      Object.fromEntries(
+        Object.entries(sels).map(([k, sel]) => {
+          const r = document.querySelector(sel)?.getBoundingClientRect();
+          return [k, r ? [r.x, r.y, r.width, r.height] : null];
+        }),
+      ),
+    PARTS,
+  )) as Record<keyof typeof PARTS, Box>;
 }
 
 for (const [w, h] of [[1280, 800], [1440, 900], [1920, 1080]] as const) {
@@ -52,8 +61,8 @@ for (const [w, h] of [[1280, 800], [1440, 900], [1920, 1080]] as const) {
 
     await page.goto("/town?sky=day");
     await ready(page);
-    await page.waitForTimeout(600);
-    const t = await parts(page);
+    // (Measured once every box holds still: the page right after the town's first frame can still be laying out.)
+    const t = await settled(page, () => parts(page));
     // Everything between the menu's right edge and the right column's left edge, from the window's top to its bottom (no width limit).
     const between: Box = [home.side[0] + home.side[2], 0, home.right[0] - (home.side[0] + home.side[2]), h];
     nearBox(t.screen, between, 1, "the town's box is the space between the menu and the right column, full height");
@@ -86,15 +95,9 @@ for (const [w, h] of [[1280, 800], [1440, 900], [1920, 1080]] as const) {
     const chips = await page.locator(".town-chip-face").evaluateAll((els) => els.map((el) => { const r = el.getBoundingClientRect(); return [r.x, r.y, r.width, r.height] as Box; }));
     expect(chips.length, "chips show").toBeGreaterThan(0);
     for (const c of chips) expect(inside(c, t.screen), `a chip ${JSON.stringify(c)} is inside the box`).toBe(true);
-    // A card: Babur's Circus (brought into view by its chip if it isn't), tapped.
-    const at = () => page.evaluate(() => (window as unknown as { __townAt: (k: string, id: string) => { x: number; y: number } | null }).__townAt("home", "tiger"));
-    if (!(await at())) await page.getByRole("button", { name: "Go to Babur's Circus" }).click({ force: true });
-    await expect.poll(at, { message: "the circus is in view" }).not.toBeNull();
-    await expect(async () => {
-      const tap = (await at())!;
-      await page.mouse.click(t.canvas[0] + tap.x, t.canvas[1] + tap.y);
-      await expect(page.locator(".town-card")).toBeVisible({ timeout: 1500 });
-    }).toPass({ timeout: 20_000 });
+    // A card: Babur's Circus, tapped (the camera glides to it if it isn't in view; the tap waits for the view to hold still: a tap read
+    // mid-glide landed beside it and walked you off, Nov 13).
+    await tapInTown(page, "home", "tiger", page.locator(".town-card"));
     expect(inside((await box(page, ".town-card"))!, t.screen), "an open card is inside the box").toBe(true);
     const scroll = await page.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.scrollHeight, innerWidth, innerHeight]);
     expect(scroll, "the page doesn't scroll").toEqual([w, h, w, h]);

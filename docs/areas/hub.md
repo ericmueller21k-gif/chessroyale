@@ -448,3 +448,5 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
   `white-space: nowrap`, and a text whose `normal` line height differs between Archivo and the fallback font gets a px one. Run
   the guard (`home-ranked.spec.ts`, "Eric's rule") with `--repeat-each=16 --workers=4`: one run in five failing means something
   moves late. A `PerformanceObserver` of type `layout-shift` in the page names what moved and when.
+  Since Nov 13 the three fonts (Archivo, Archivo Black, Press Start 2P) are preloaded in `index.html`, fetched beside the app's script,
+  so they're in by its first paint and nothing reflows when one arrives (crate-banner:44: the pixel font's swap moved the crates' rows 5 px).
