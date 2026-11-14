@@ -1176,3 +1176,6 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 14 18:20: #716 MERGED 3635a561 (CI traces retain-on-first-failure; room tests no longer guards; engine retry needs
   ENGINE_SERVER.retryMinMs 250 ms left, found by its unit run). Its PR run retry-passes: town.spec:646 [phone], lobby-chat:28 [phone]
   -> flaky list. Main run watcher running. No helpers.
+- Nov 14 18:45: main 3635a561 (#716) RED: 5 retry-passes (town.spec:1165, town-chat:1480, hidden-boss-room:111, town-controls:253,
+  town-street:294) on the first full run with retain-on-first-failure; 0 in the 3 runs before. Reverting the trace flag: #717
+  (3f98685a), CI watcher bdm5n8hqg. Run 43625203937's first-try traces (artifacts, 7 days) -> flaky round 6.
