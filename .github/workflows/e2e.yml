@@ -17,10 +17,10 @@
 # e2e/ci-summary.ts, ci-summary-merge.mjs) and is red if the plan or any shard is.
 #
 # Retries: 1 here until the flaky-test batch lands (the goal is 0, as playwright.config.ts has it). A test that passes
-# on the retry is "flaky": listed at the top of the summary, never hidden. Each test's first try is recorded and the
-# recording kept only if that try fails (`retain-on-first-failure`, Eric Nov 14: the failing try is the one worth
-# watching; recording every first try costs about 8% more time). A shard with a failed or flaky test uploads its HTML
-# report with those traces (artifact `e2e-report-shard-N`, kept 7 days).
+# on the retry is "flaky": listed at the top of the summary, never hidden. Traces only on that retry: recording every
+# first try (`retain-on-first-failure`, tried Nov 14) slowed every test enough that five timing-sensitive specs failed
+# their first try on main's next run (none in the three runs before). A shard with a failed or flaky test uploads its
+# HTML report with those traces (artifact `e2e-report-shard-N`, kept 7 days).
 #
 # Left out here: the @perf specs (e2e/perf.spec.ts), whose frame budgets depend on the machine's speed. Run them
 # locally, or from Actions → e2e → Run workflow with "perf" ticked (instead of the suite).
@@ -152,7 +152,7 @@ jobs:
           echo "Files: $files"
           # (No files would run the whole suite here: never expected, as the plan has a file for every shard.)
           [ -n "$files" ] || { echo "No spec files for this shard"; exit 1; }
-          npx playwright test $files --grep-invert @perf --forbid-only --retries 1 --trace retain-on-first-failure \
+          npx playwright test $files --grep-invert @perf --forbid-only --retries 1 --trace on-first-retry \
             --reporter=list,github,html,./e2e/ci-summary.ts
       # (Kept 90 days, the most GitHub keeps: each run's failed and flaky tests, for a look at which tests catch real bugs
       # and which only flake (Eric, Oct 18). Under a kilobyte a shard.)
@@ -201,7 +201,7 @@ jobs:
           FLAKY_RED: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}
         run: node e2e/ci-summary-merge.mjs "$SHARDS" e2e-summary "$NOTE" >> "$GITHUB_STEP_SUMMARY"
       # A test that passed only on its retry fails main's run (Nov 10, audit F1, after the second flaky batch): the retry
-      # stays, but no longer hides a flake; the failed first try's trace shows why. Pull requests aren't held up by one.
+      # stays for the trace it records, but no longer hides a flake. Pull requests aren't held up by one.
       - name: No flaky test on main
         if: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && needs.shard.result == 'success' }}
         run: |
