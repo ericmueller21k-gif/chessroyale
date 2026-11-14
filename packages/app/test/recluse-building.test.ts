@@ -17,6 +17,7 @@ const TOP = await import("../src/town/shops/recluse-art.ts");
 const { HOUSES } = await import("../src/town/houses/index.ts");
 const { HOUSE_RECLUSE_DOOR } = await import("../src/town/houses/recluse.ts");
 const { HOME_SPECS } = await import("../src/town/home-boxes.ts");
+const SKY = await import("../src/town/sky.ts");
 
 const defs = RECLUSE_ROOMS;
 const hall = makeRoom(S.RECLUSE_HALL_LAYOUT, defs.front.keeper, S.RECLUSE_HALL_N, undefined, defs.front.talk, null, defs.front.talkAt ?? null, !!defs.front.talkNear);
@@ -136,5 +137,47 @@ describe("its three rooms and the stairs (Nov 13)", () => {
     expect(roomTheme(roomDef("zebra")!)).toBe("zebra");
     expect(roomTheme(roomDef("zebra", "back")!)).toBe("zebra");
     expect([roomDef("recluse"), roomDef("recluse", "landing"), roomDef("recluse", "top")]).toEqual([defs.front, defs.landing, defs.top]);
+  });
+});
+
+describe("the walk-up by the time of day (Nov 14, Eric: \"the outside shining should be like a moon at night\")", () => {
+  const { roomLight, skyOverride, skyWeights } = SKY;
+  it("each look of the town's sky picks one light (dawn and dusk the warm one), and the blends flip half way", () => {
+    expect((["day", "dawn", "dusk", "night"] as const).map((l) => roomLight(skyOverride(l)!))).toEqual(["day", "dusk", "dusk", "night"]);
+    expect(roomLight({ dawn: 0, day: 0, dusk: 0.5, night: 0.5 })).toBe("night");
+    expect(roomLight({ dawn: 0, day: 0.6, dusk: 0.4, night: 0 })).toBe("day");
+    // (The device's clock, as the town reads it: noon is day, midnight night.)
+    expect([roomLight(skyWeights(12 * 60)), roomLight(skyWeights(0))]).toEqual(["day", "night"]);
+  });
+  it("his room: the day as drawn; dusk and night their own window and floor (the moon in the night's window), a gentle wash, the same pieces", () => {
+    const day = TOP.recluseLit("day");
+    expect(day.pieces).toBe(TOP.SHOP_RECLUSE_PIECES);
+    expect(day.dim).toBeUndefined();
+    for (const light of ["dusk", "night"] as const) {
+      const l = TOP.recluseLit(light);
+      expect(Object.keys(l.pieces).sort()).toEqual(Object.keys(day.pieces).sort());
+      expect(l.pieces.window).not.toBe(day.pieces.window);
+      expect(l.pieces["floor-3-2"]).not.toBe(day.pieces["floor-3-2"]);
+      // (Only the window and the floor change: the bed, the horse, the walls are the day's.)
+      expect(l.pieces.bed).toBe(day.pieces.bed);
+      // A gentle wash: the child, his board and the rug stay easy to see.
+      expect(l.dim).toBeGreaterThan(0);
+      expect(l.dim).toBeLessThanOrEqual(0.4);
+    }
+    const win = TOP.recluseLit("night").pieces.window!;
+    const grid = (win.parts.f0p0 as { grid: string[] }).grid;
+    expect(grid.slice(26, 45).some((r) => r.slice(40, 60).includes("*")), "the moon high on the right").toBe(true);
+    expect(grid.some((r) => r.includes(":")), "a window lit across the street").toBe(true);
+    expect(win.palette["<"]).not.toBe(day.pieces.window!.palette["<"]);
+  });
+  it("the hall and the landing: the street door's glass and the landing's window darken at night, the sconces stay lit", () => {
+    const day = S.recluseStairsLit("day");
+    const night = S.recluseStairsLit("night");
+    expect(day.pieces).toBe(S.RECLUSE_STAIRS_PIECES);
+    expect(night.pieces.entrance!.palette.s).not.toBe(day.pieces.entrance!.palette.s);
+    expect(night.pieces.window!.palette.A).not.toBe(day.pieces.window!.palette.A);
+    expect(night.hall[0]).toBe(day.hall[0]);
+    expect(night.landing[0]).toBe(day.landing[0]);
+    expect(night.dim).toBeLessThanOrEqual(0.4);
   });
 });

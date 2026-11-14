@@ -411,8 +411,8 @@ const LIGHT_OF: Readonly<Record<Exclude<RoomLight, "day">, { hall: readonly (Lig
   night: {
     hall: [RECLUSE_HALL_LIGHTS[0]!, { ...RECLUSE_HALL_LIGHTS[1]!, color: "#8ea4e0", strength: 0.12 }],
     landing: [RECLUSE_LANDING_LIGHTS[0]!, { ...RECLUSE_LANDING_LIGHTS[1]!, color: "#8a9cd0", strength: 0.08 }],
-    dim: 0.24,
-    dimRGB: "14,20,52",
+    dim: 0.32,
+    dimRGB: "16,26,74",
   },
 };
 /** The hall and the landing at one time of day: their pieces (both rooms'), each room's lights, the wash (none by day). */

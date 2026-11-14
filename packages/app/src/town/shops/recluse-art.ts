@@ -728,14 +728,14 @@ const LIGHT_OF: Readonly<Record<Exclude<RoomLight, "day">, Omit<RecluseLit, "pie
   dusk: {
     lights: [{ piece: "window", x: 14, y: 27, w: 46, h: 68, color: "#ffb47a", strength: 0.32, halo: 40 }],
     pools: [{ piece: "window", x: 60, y: WALL_H + 92, rx: 56, ry: 42, color: "#ffa868", strength: 0.24 }],
-    dim: 0.16,
-    dimRGB: "70,32,40",
+    dim: 0.2,
+    dimRGB: "84,36,40",
   },
   night: {
     lights: [{ piece: "window", x: 14, y: 27, w: 46, h: 68, color: "#c4d2ff", strength: 0.3, halo: 36 }],
     pools: [{ piece: "window", x: 48, y: WALL_H + 58, rx: 44, ry: 26, color: "#aebfff", strength: 0.16 }],
-    dim: 0.3,
-    dimRGB: "14,20,52",
+    dim: 0.38,
+    dimRGB: "16,26,74",
   },
 };
 const LIT = new Map<RoomLight, RecluseLit>();
