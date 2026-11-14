@@ -19431,6 +19431,11 @@ button.sq-tiny {
 .rc-stage > .rc-played {
   inset: auto;
 }
+/* Each board's squares centered in its slot (they're a whole multiple of 8 device pixels, a hair smaller than the slot), so the
+   gaps between the boards and to the square's edges match (Eric, Nov 14). The whole wrap moves: its overlays with it. */
+.rc-stage > .rc-played > .board-wrap {
+  translate: calc((100% - var(--board-size)) / 2) calc((100% - var(--board-size)) / 2);
+}
 /* The crack lines: Sawyer's board-saw gap down the middle, and the same turned across. */
 .rc-crack {
   position: absolute;

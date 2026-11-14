@@ -686,9 +686,11 @@ test("beaten in phase 1 (?win=1): he collapses and mumbles, then the phase chang
   await expect(page.locator(".boss-bar .rage-meter")).toHaveCount(0);
   // (Freestyle is in the dock's line, where the line above the board said it: Eric, Oct 24.)
   await expect(page.locator(".boss-dock-status .dock-line").first()).toHaveText(/· Freestyle$/);
-  // Phase 2: the God King gone (nothing to tap), the boss's look on where he stands.
-  await expect(page.locator(".gk-unit.gone")).toHaveCount(1);
-  await expect(page.getByRole("button", { name: /God King/ })).toHaveCount(0);
+  // Phase 2: the God King in his place, greyed, nothing to tap (Eric, Nov 14: "you can't use him anymore"), the boss's look on
+  // where he stands.
+  await expect(page.locator(".gk-unit.benched")).toHaveCount(1);
+  await expect(page.getByRole("button", { name: /God King/ })).toHaveCount(1);
+  await expect(page.getByRole("button", { name: "God King: can't be called in phase 2" })).toBeDisabled();
   await expect(page.locator(`${figure()} .bc-engine.on`)).toHaveCSS("visibility", "visible");
   // (Back in his place, seen again.)
   await expect(page.locator(".rc-away")).toHaveCount(0);
@@ -713,7 +715,7 @@ test("beaten in phase 1 (?win=1): he collapses and mumbles, then the phase chang
   expect(errors).toEqual([]);
 });
 
-test("phase 2 (?phase=2): four boards, each its own Chess960 start; Stockfish 2750 answers your move; Engine move on your board; no God King (absorbed), the boss's half-engine look on", { tag: "@phone-only" }, async ({ page }) => {
+test("phase 2 (?phase=2): four boards, each its own Chess960 start; Stockfish 2750 answers your move; Engine move on your board; the God King greyed in his place, never called, the boss's half-engine look on", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(5 * 60_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
@@ -729,11 +731,12 @@ test("phase 2 (?phase=2): four boards, each its own Chess960 start; Stockfish 27
     expect(b.fen).toMatch(/ w [A-H]{2}[a-h]{2} - 0 1$/);
     expect(b.bases).toEqual([{ ply: 0, fen: b.fen }]);
   }
-  // The God King is gone (the boss absorbed him in the phase change): his place in the dock empty, nothing to tap, and
-  // not a word from him all through phase 2.
+  // The God King stays in his place, greyed (Eric, Nov 14: "the king will still be with you, but you can't use him anymore"):
+  // his button off, and not a word from him all through phase 2.
   const king = await watchFor(page, { bubble: { selector: ".gk-bubble" }, figure: { selector: ".boss-dock .god-king" } });
-  await expect(page.locator(".gk-unit.gone")).toHaveCount(1);
-  await expect(page.getByRole("button", { name: /God King/ })).toHaveCount(0);
+  await expect(page.locator(".gk-unit.benched")).toHaveCount(1);
+  await expect(page.getByRole("button", { name: /God King/ })).toHaveCount(1);
+  await expect(page.getByRole("button", { name: "God King: can't be called in phase 2" })).toBeDisabled();
   await expect(page.locator(".gk-command")).toHaveCount(0);
   // His look: one eye cold blue, the circuit lines, over his figure where it stands (on screen, on his head).
   const eng = page.locator(`${figure()} .bc-engine.on`);
@@ -777,8 +780,8 @@ test("phase 2 (?phase=2): four boards, each its own Chess960 start; Stockfish 27
   await expect.poll(async () => (await simulNow(page)).boards[0].history.length, { timeout: 30_000 }).toBeGreaterThanOrEqual(3);
   // The bots play their boards meanwhile.
   await expect.poll(async () => (await simulNow(page)).boards.slice(1).every((b: { history: string[] }) => b.history.length >= 2), { timeout: 30_000 }).toBe(true);
-  expect(await king.seen()).toEqual({ bubble: false, figure: false });
-  await expect(page.getByRole("button", { name: /God King/ })).toHaveCount(0);
+  expect(await king.seen()).toEqual({ bubble: false, figure: true });
+  await expect(page.getByRole("button", { name: "God King: can't be called in phase 2" })).toBeDisabled();
   expect(errors).toEqual([]);
 });
 
