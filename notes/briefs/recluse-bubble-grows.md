@@ -13,6 +13,9 @@ smallest size... the chat box is out of line for all of it now." His screenshot:
   "The machines find them" in a bubble over the man's face (his eyes and mouth hidden; the tail at his chest). Every speaker's bubble in
   the cutscene (`components/RecluseCutscene.tsx`, `recluse-cutscene.ts`) sits above that speaker's head, at his drawn size, on phone
   and computer. Likely the same cause as below: fix it once for both.
+- **The phase change too** (Eric's third screenshot, computer): the man glowing on the middle of the board, and his line
+  "Computation without creativity is nothing. Now I have both." in a bubble floating at the far left of the screen, beside the crowd
+  table, nowhere near him. Every line of his, in every phase, comes from above his head where he's drawn at that moment.
 - Find how a boss's line bubble is placed over the sprite (`packages/app/src/speech.tsx` `bossVoice`, `components/RecluseChild.ts`,
   `characters/recluse-ages.ts`, `components/BossCharacter.tsx`/`BossDock.tsx`). It must sit above his head for whichever age is drawn
   now (9, 13, 20, and the man), on phone and computer, in his room's fight, a Crowd final and solo.
