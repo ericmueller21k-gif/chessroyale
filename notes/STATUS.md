@@ -1100,3 +1100,6 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 14 05:15: #705 live (19ea09d). Main's run: red only on a retry-pass of town-street:155 [desktop] (Meadow Street's moved homes'
   cards) -> flaky round 4 list (+ shop:238, town-street:528, town-chat:1367, fairplay:65). Transform round 3 came out bright
   blue/red/yellow (too close to a famous blue robot hero) -> sent back for "round 3b", darker, own helmet shape; not shown to Eric.
+- Nov 14 06:50: standings done -> #706 (CI b8bcd267; display only, nothing stored; his phase 2 chatter now plays; guard
+  hidden-boss-room "his room" gained checks only). Eye mockup sent (blue vs yellow + in game). Transform helper
+  (session_01JuCWRtesHR7mFg3Lkou6hn) waits for .go "round3" + eye pick. Slot free: transform build can start the moment Eric says go.
