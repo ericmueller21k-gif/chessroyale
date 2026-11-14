@@ -1129,3 +1129,8 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   Helpers: visual QA session_01JuCWRujcKXA1DiRWZhunC9 (high, review/recluse-visual-qa); flaky round 4 session_01JuCWRsXFcmuGijdu8ktgKv
   (high, claude/flaky-round4, briefs/flaky-round4.md). wait-any watcher on both. prep-pr.sh fixed (no model line), saved in notes/tools.
   Follow-ups: #707 m2/m4/m5; subscribe-in-useEffect gap (~10 places). Pending Eric: Fill-also-challenges (guard OK), CI trace OK.
+- Nov 14 11:20: main f239f7dd full run RED: sound.spec:61 [phone] both tries (Big Boy wanders). Fix = flaky-round4's 3af0873d; asked
+  its helper to prove it, then I cherry-pick to its own hotfix PR. Visual QA done (review/recluse-visual-qa, 12 findings; worst: phone
+  countdown line an empty sliver; computer portrait not following his form; cutscene lone tail). Fixes helper
+  session_01JuCWRvpR4Le7tfBkPeMMDa (high, claude/recluse-qa-fixes, briefs/recluse-qa-fixes.md). #12 (4th of 4, result replays kid's
+  match) folded into the phase 2 standings job (xhigh: start alone after the two high helpers). wait-any bnjjmecxs.
