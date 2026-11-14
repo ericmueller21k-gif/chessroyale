@@ -264,14 +264,26 @@ test("his room (Eric, Nov 12 and 13): Challenge is 1 of 4; leaving asks; an admi
     for (const g of gaps.gaps) expect(Math.abs(g - gaps.gaps[0]!), `the gaps ${gaps.gaps.map(Math.round)}`).toBeLessThanOrEqual(2);
   }
   // The scoreboard in phase 2 (Eric's playtest, Nov 14: every row read "out", a phone's Players tab empty): the four on his boards
-  // are in, each with their board's state, never "out": a computer's table beside the board; a phone's Players tab lists them.
+  // are in, each with their board's state, never "out": a computer's table beside the board; a phone's Players tab (the rows its
+  // box fits, as in phase 1), and the four in full when it's tapped open.
   const desk = test.info().project.name === "desktop";
-  if (!desk) await page.locator(".bp-tab", { hasText: "Players" }).click();
-  const table = page.locator(desk ? ".tower-side" : ".bp-tower");
-  await expect(table.locator(".tower-row")).toHaveCount(4);
-  await expect(table.locator(".tower-row.out")).toHaveCount(0);
-  await expect(table.locator(".t-board")).toHaveText(Array(4).fill(/^(Playing|Won|Lost|Drawn)$/));
-  await expect(table.locator(".t-pts", { hasText: /^out$/ })).toHaveCount(0);
+  const inFour = async (table: ReturnType<Page["locator"]>, rows: number) => {
+    await expect(table.locator(".tower-row")).toHaveCount(rows);
+    await expect(table.locator(".tower-row.out")).toHaveCount(0);
+    await expect(table.locator(".t-board")).toHaveText(Array(rows).fill(/^(Playing|Won|Lost|Drawn)$/));
+    await expect(table.locator(".t-pts", { hasText: /^out$/ })).toHaveCount(0);
+  };
+  if (desk) await inFour(page.locator(".tower-side"), 4);
+  else {
+    await page.locator(".bp-tab", { hasText: "Players" }).click();
+    const panel = page.locator(".bp-tower");
+    await expect(panel.locator(".tower-row")).not.toHaveCount(0);
+    await inFour(panel, await panel.locator(".tower-row").count());
+    await panel.click();
+    await inFour(page.getByRole("dialog", { name: "Leaderboard" }), 4);
+    await page.getByRole("dialog", { name: "Leaderboard" }).getByRole("button", { name: "Close" }).click();
+    await expect(page.getByRole("dialog", { name: "Leaderboard" })).toBeHidden();
+  }
   // The 🏆 in the four boards: the team's next move wins every board still on. Your move, with real taps on your board.
   await expect(trophy).toBeEnabled({ timeout: 10_000 });
   await trophy.click();
