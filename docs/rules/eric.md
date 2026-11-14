@@ -131,9 +131,11 @@ removed (old → new) and says whether any of them guards a rule here.
   in asks "Cancel your game request?" (Stay / Leave and cancel): the stairs, back, the side menu, closing the town; four at most in the
   room, a 5th at its door gets "The door is locked." and stays out; no four in 5 minutes (not shown): "Sorry, not enough players." with
   OK.** The one exception to "rooms don't ask" above. The test bots and the online 🏆 are admins' only, the server checking.
-  - Guards: `packages/server/test/hidden-room.test.ts` (every check); `e2e/hidden-boss-room.spec.ts`, "his room (Eric, Nov 12 and 13)…"
-    and "a 5th at his door…", phone and computer.
-  - Decision: [2026-11-13-hidden-boss-challenge.md](../decisions/2026-11-13-hidden-boss-challenge.md).
+  - Tests (not guards since Eric, Nov 14: "I don't even care about the room rule testing at all… I think that was just holding us
+    up"; they change like any other test): `packages/server/test/hidden-room.test.ts`; `e2e/hidden-boss-room.spec.ts`, "his room
+    (Eric, Nov 12 and 13)…" and "a 5th at his door…".
+  - Decisions: [2026-11-13-hidden-boss-challenge.md](../decisions/2026-11-13-hidden-boss-challenge.md),
+    [2026-11-14-room-guard-off-ci-traces.md](../decisions/2026-11-14-room-guard-off-ci-traces.md).
 - **Name tags show only near you by default (Eric, Oct 28); "Everyone" in Town settings shows them all.** The figures are always drawn;
   a tag shows within 5 squares of you (|dc| and |dr|, so about a 10 × 10 area), fading over the last square; your own tag, an open card's
   figure and a table partner always show. The one more named exception to "nothing hidden".
