@@ -1,0 +1,9 @@
+Mockup ready: branch stills/recluse-transform-book (README.md has the beat-by-beat timing and the calls made).
+GIFs: phone-transform.gif, computer-transform.gif (cutscene's last line -> "PHASE 2"); stills 1-11 per platform; MP4s too.
+Sequence: the book opens on the floor (T0 = recluse-phase3 intro start) -> light bursts on the slam (2.64 s), the summoning's look ->
+beam lifts him on the build (3.04) -> his arms up, hair lifting, chant line 1 in a cutscene box -> white flare, engine eye: cyborg
+(7.6) -> lens lifts, child fades (11.3) -> line 2 in his bubble (12.8) -> leaps on the breath (16.435), lands on the drop (17.435):
+crack, arcs, four boards, book to his hands, leap home, PHASE 2 (as today). 23.4 s from the book to PHASE 2's end (about 35 s today).
+No God King anywhere (he stays in his place, unused). He jumps and lands where he knelt (42.5% across, a little left of the middle).
+Lab code (dev only, nothing imports it): packages/app/src/dev/recluse-transform-lab.tsx, scripts/preview-recluse-transform.mjs.
+Waiting for .go.
