@@ -24068,8 +24068,7 @@ button.sq-tiny {
   }
   /* The chat box under the moves (Eric, Nov 14: "put the chat box below it, make it the same width… the height would just come
      down"): the same column, left edge and width as the moves (the same translate), a 12 px gap under them, its foot on the
-     board's bottom line. Its top margin is the rule above (with the tools' 36 px, game-frame.css), so its height is what the
-     board has left under it. It no longer runs down beside the pawns and the God King (the boss dock's rule, grid rows 3 to 5). */
+     board's bottom line. Its top margin is the rule above, so its height is what the board has left under it. It no longer runs down beside the pawns and the God King (the boss dock's rule, grid rows 3 to 5). */
   .screen.game:has(> .mv-side) > .under-board.side {
     grid-row: 3;
     align-self: start;
@@ -24079,10 +24078,6 @@ button.sq-tiny {
     --gk-zone: 200px;
     height: calc(var(--board-px, 456px) - var(--mv-h) - 12px - var(--gk-zone));
     min-height: 0;
-  }
-  .screen.game:has(> .mv-side):has(> .gm-tools) > .under-board.side {
-    height: calc(var(--board-px, 456px) - var(--mv-h) - 48px - var(--gk-zone));
-    margin-left: 0;
   }
 }
 /* ---- Boss alone: your pawn beside the God King (Eric, Oct 28; components/BossDock.tsx, YourPawn) ----

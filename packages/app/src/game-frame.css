@@ -179,14 +179,15 @@
     color: #fff;
     white-space: nowrap;
   }
-  /* The admins' ⚡ and 🐟 and the gear: the column beside the board, at the board's top (the move list's column, the same
-     place as its translate), 36 px above the list. Moved by `left`, not a translate: a transform would make this row the
-     box the gear's fixed layer (.mm-scrim) is laid out in and stacked in, so its list would open 28 px tall under the move
-     list (round 3: CI's Report a bug and Resign could not be clicked). */
+  /* The admins' ⚡ and 🐟 and the gear: the column beside the board, in the boss bar's row (Eric, Nov 14: "move up the moves
+     thing so it's flush with the top of the chessboard… move up the tools so it sits level with the banner"), so the move list
+     starts on the board's top line. The bar is in the board's column, so the two never share a width. Moved by `left`, not a
+     translate: a transform would make this row the box the gear's fixed layer (.mm-scrim) is laid out in and stacked in, so its
+     list would open 28 px tall under the move list (round 3: CI's Report a bug and Resign could not be clicked). */
   .screen.game > .gm-tools {
     grid-column: 2;
-    grid-row: 3;
-    align-self: start;
+    grid-row: 1;
+    align-self: center;
     display: flex;
     align-items: center;
     justify-content: flex-end;
@@ -195,18 +196,6 @@
     min-width: 0;
     position: relative;
     left: calc(13px - 28px - (var(--gk-column) - var(--board-px, 456px)) / 2);
-  }
-  .screen.game:has(> .gm-tools) > .mv-side {
-    margin-top: 36px;
-  }
-  /* (A party's battle: its pawns stand stacked above the God King under the list, so the list gives the tools' 36 px back from its
-     height, at least 120 px: its foot where it was, clear of the top pawns. Round 3: at 1280 × 800 it ran 21 px over two of them.) */
-  .screen.game:has(> .gm-tools):has(> .boss-dock.dk-party) {
-    --mv-h: max(120px, calc(var(--board-px, 456px) / 2 - 73px - 36px));
-  }
-  .screen.game:has(> .gm-tools) > .under-board,
-  .screen.game:has(> .gm-tools) > .mini-tower {
-    margin-top: calc(var(--mv-h) + 48px);
   }
 }
 

@@ -99,6 +99,9 @@ Lane: the director (every screen draws it; a boss's powers draw over it). How ea
     Nov 14: on a computer's boss battle with chat, the chat box sits under the moves panel: the same left edge and width, 12 px under
     it, and its foot stops 200 px above the board's bottom line (`--gk-zone`: the room the God King and your pawn stand in).
     Guard: `e2e/desktop-board.spec.ts`, "a computer's boss battle with chat". Decision: `docs/decisions/2026-11-14-desktop-side-column.md`.
+    Nov 14, round 2: the moves panel's top is the board's top (flush; no 36 px gap), and the ⚡ / fish / gear row moved up into the
+    boss bar's row, level with the banner, above the board's top line (`.gm-tools` in game-frame.css; the bar is in the board's
+    column, so the row never shares its width). Guard: the "the moves' top = the board's top" check in `e2e/desktop-board.spec.ts`.
     without the eval bar (room for the boss and his words; Babur's is 153 px + his share of the height, for his pump). A computer is a window
     900 × 600 and up **with a mouse** (`pointer: fine`; the side menu beside the screen, from Nov 1, `game-frame.css`, takes its width
     (`--win-w`): 60 px from 900 to 1099, 80 below 1800, 232 from there): phones and tablets, a tablet on its side included, keep their

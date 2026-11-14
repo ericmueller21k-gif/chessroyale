@@ -188,9 +188,16 @@ async function check(page: Page, screen: Screen, size: Size) {
   // What sits beside the board follows it.
   const m = g.around.moves?.[0];
   if (m) {
-    // (A boss battle's ⚡, fish and gear sit at the board's top, the list 36 px under them: Nov 1.)
-    expect(Math.abs(m.y - g.board.y - (g.around.tools ? 36 : 0)), `${at}: the moves from the board's top (under the tools)`).toBeLessThanOrEqual(1);
-    if (g.around.tools) expect(Math.abs(g.around.tools[0]!.y - g.board.y), `${at}: the tools from the board's top`).toBeLessThanOrEqual(1);
+    // (Nov 14, Eric: "move up the moves thing so it's flush with the top of the chessboard… move up the tools so it sits level with
+    // the banner". A boss battle's ⚡, fish and gear sit in the banner's row, above the board's top line, right of the banner's text.
+    // Was: the moves 36 px under the tools, the tools at the board's top (Nov 1).)
+    expect(Math.abs(m.y - g.board.y), `${at}: the moves' top = the board's top`).toBeLessThanOrEqual(1);
+    if (g.around.tools) {
+      const t = g.around.tools[0]!;
+      expect(t.b, `${at}: the tools above the board's top line`).toBeLessThanOrEqual(g.board.y);
+      const bar = g.around.bar?.[0];
+      if (bar) expect(t.y >= bar.y - 1 && t.b <= bar.b + 1, `${at}: the tools level with the banner`).toBe(true);
+    }
     expect(m.x - g.board.r, `${at}: the moves a small gap off the board`).toBeGreaterThanOrEqual(12);
     expect(m.x - g.board.r, `${at}: the moves a small gap off the board`).toBeLessThanOrEqual(16.5);
     expect(Math.abs(m.b - m.y - Math.max(120, b / 2 - 73)), `${at}: the moves half the board less 73 px`).toBeLessThanOrEqual(2);

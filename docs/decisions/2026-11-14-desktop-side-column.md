@@ -16,3 +16,25 @@ the board's bottom line (`--gk-zone`).
 
 Guard: `e2e/desktop-board.spec.ts`, "a computer's boss battle with chat…" (the chat box is put into the screen for the check, since a
 bot raid has no chat).
+
+## Round 2 (Nov 14, Eric): the moves flush with the board's top
+
+**Eric, Nov 14:** "move up the moves thing so it's flush with the top of the chessboard. … move up the chat box and put it below it,
+make it the same width… we have all this nice space for the pawns."
+
+**What changed (computers, boss battles):**
+- The ⚡ / fish / gear row (`.gm-tools`) moved from the board's top row into the boss bar's row, vertically centered on the banner,
+  right-aligned to the moves panel's right edge. It sits above the board's top line and never shares the banner's width (the bar is in
+  the board's column), so it covers no banner text.
+- The moves panel's 36 px gap is gone: its top is the board's top. The party-battle height rule that gave back those 36 px is gone
+  too, so a party's list keeps the foot it had (`--mv-h`: half the board less 73 px, at least 120 px) and the chat keeps its height.
+
+**Call made:** the tools are centered on the banner's height, not top-aligned with it, so they read as level with the banner text.
+Tops are 27 px and bottoms 55 px at 1280 × 800 against the bar's 6 to 67 px.
+
+**Checks, old → new:** `e2e/desktop-board.spec.ts`, the "what sits beside the board follows it" check: "the moves 36 px under the
+tools" → "the moves' top = the board's top"; "the tools from the board's top" → "the tools above the board's top line" and "the tools
+level with the banner". Nothing else changed. Stills: `stills/desktop-side-column` branch.
+
+Not in `docs/rules/eric.md` (its rules do not state the Nov 1 offset).
+
