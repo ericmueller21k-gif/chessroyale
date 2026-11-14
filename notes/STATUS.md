@@ -1159,3 +1159,6 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   running. No helpers. Flaky leftovers now: alfil:247, town-chat:1367/1370, fairplay:65, shop:238, shop:1144 [desktop, Eric guard],
   town-afk:116, town-street:155, autochess:238 [phone], other specs still on __townAt+click. Follow-ups: #707 m2/m4/m5, MovePanel boss
   portrait in phase 2, QA #11 nits, the 🏆 button's words online ("Your next move…" though a bot's can win), subscribe-in-useEffect.
+- Nov 14 16:02: main b6d26aa8 (#713) LIVE and full run GREEN (no retries). Started two high helpers: flaky round 5
+  session_01JuCWRw3QR98S4tYQ3NPKR1 (claude/flaky-round5, watcher beg71blse) and Hidden Boss polish (claude/recluse-polish:
+  #707 m2/m4/m5, MovePanel suited face, QA #11 nits; told to keep out of e2e/helpers.ts). Check-in 16:46.
