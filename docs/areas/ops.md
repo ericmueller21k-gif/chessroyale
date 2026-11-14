@@ -222,7 +222,8 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
 - **The maintenance banner** (`MAINTENANCE_BANNER`, at most 200 characters): a slim band at the top of every screen
   while it's set (`components/MaintenanceBanner.tsx`). The page starts under it and is that much shorter
   (`--banner-h`, `--app-h` in styles.css), so it never covers a control; sheets and menus opened over the page cover
-  it. ✕ hides it on that device until the message changes.
+  it. ✕ hides it on that device until the message changes. `useServerStatus` (status.ts) draws an answer that came between its
+  first render and its effect (Nov 14: a banner missed that way stayed away a minute; `useAccount` likewise).
 - **Rolling back** (`npm run rollback`, `scripts/rollback.ts`, its choice in `rollback-pick.ts`; needs
   `CLOUDFLARE_API_TOKEN`, never printed):
   - With no arguments, it lists the Worker's latest versions, newest first: live now, was live, code upload or

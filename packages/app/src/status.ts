@@ -47,10 +47,15 @@ export function startStatus() {
 /** The status, kept up to date in a component. */
 export function useServerStatus(): ServerStatus {
   const [, setTick] = useState(0);
+  const read = state;
   useEffect(() => {
     const l = () => setTick((t) => t + 1);
     listeners.add(l);
+    // An answer that came between this render and this effect (which runs after the paint) had no listener to tell: drawn now. A
+    // banner that came in that gap stayed away until the next minute's ask (kill-switches.spec.ts, Nov 14: the fonts' preloads moved
+    // the first answer into it).
+    if (state !== read) l();
     return () => void listeners.delete(l);
   }, []);
-  return state;
+  return read;
 }

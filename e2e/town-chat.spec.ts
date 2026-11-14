@@ -1133,9 +1133,12 @@ test("the typing line (a signed-in player's): no placeholder, 80 characters, a c
   await expect(field).toBeEnabled();
   await expect(page.locator(".town-chat"), "a refused try keeps typing open").toHaveAttribute("data-typing", "1");
   // Another try replaces it (one at a time); the stream is scrolled to it; it isn't sent either.
+  const first = (await sorry.textContent())!;
   await page.waitForTimeout(2200);
   await field.press("Enter");
   await expect(sorry).toHaveCount(1);
+  // (The try is answered after a promise (TownChat's submit): the first line stays a moment, so its N was read twice. Its replacement.)
+  await expect(sorry, "the line replaced").not.toHaveText(first);
   const n2 = Number((await sorry.textContent())!.match(/for (\d+) second/)![1]);
   expect(n2, "less left").toBeLessThan(n1);
   expect((await scrollOf(page)).fromFoot, "at the foot, in view").toBeLessThanOrEqual(2);
