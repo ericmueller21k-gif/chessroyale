@@ -5,8 +5,9 @@ import { useLayoutEffect, useRef } from "preact/hooks";
  * always have a confirm if you're going back out to a different menu or you're trying to exit"). The app's sheet (`fd-sheet`,
  * as AwayNote's and the town's gate), over the town wherever you are in it. Stay (focused, so Enter or a stray tap never
  * leaves; Escape and a tap outside too) changes nothing; Leave goes where you asked (App.tsx, askTownLeave).
- * What asks: the computer's side menu, the town's back button, the phone's back gesture, a guest's chat sign-up. Not what
- * happens inside the town: its rooms, a boss's challenge, the claw machine, its settings, map and chat.
+ * What asks, on the street and inside any building (Eric, Nov 13): the computer's side menu, the town's back button, the phone's back
+ * gesture, a guest's chat sign-up, an invite's Join, a profile's Challenge. Not what happens inside the town: going in and out of its
+ * rooms, a boss's challenge, the claw machine, its settings, map and chat.
  */
 
 export const LEAVE_TOWN_TITLE = "Leave Chess Town?";

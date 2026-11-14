@@ -180,8 +180,10 @@ test("a deploy landed while the page was open: the town square's files are gone,
   await page.route(/\/assets\/Town-[^/]*\.css$/, (route) => (asked++ === 0 ? route.fulfill({ status: 404, body: "" }) : route.continue()));
   // (Counted as the page's documents arrive, not by "load": on a slow run the town's chunk is asked for, refused and the page
   // loads again before the first page's own "load" ever fires, Oct 30.)
+  // (Documents only: since Nov 14 the town pushes a history step of its own as it shows (App.tsx `TOWN_STEP`, "Leave Chess Town?" on
+  // back), and Playwright's framenavigated fires for a pushState too.)
   let loads = 0;
-  page.on("framenavigated", (frame) => frame === page.mainFrame() && loads++);
+  page.on("request", (r) => r.isNavigationRequest() && r.frame() === page.mainFrame() && loads++);
   await page.goto("/town");
   await expect.poll(() => loads, { message: "the page loaded again" }).toBe(2);
   // (The second load fetches the town's chunk again, from the network now: a busy runner took over 5 s.)
