@@ -1134,3 +1134,7 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   countdown line an empty sliver; computer portrait not following his form; cutscene lone tail). Fixes helper
   session_01JuCWRvpR4Le7tfBkPeMMDa (high, claude/recluse-qa-fixes, briefs/recluse-qa-fixes.md). #12 (4th of 4, result replays kid's
   match) folded into the phase 2 standings job (xhigh: start alone after the two high helpers). wait-any bnjjmecxs.
+- Nov 14 12:06: #711 flaky round 4 MERGED 53bf1ed4 (fixes main's sound:61; PR retry-pass town-afk:116 phone, not touched by it);
+  deploy + main run watcher bbus1dwec. #712 QA fixes (#1-#10) opened, CI watcher br4q7rk71 on 90cea61d; quick boss-lane review running
+  as an in-window subagent. Then: phase 2 standings (xhigh, alone; brief includes QA #12). Leftover flakies: alfil:247, town-chat:1367/
+  1370, fairplay:65, shop:238, town-afk:116, town-street:155 (500), other specs still calling __townAt+click (move to townTap).
