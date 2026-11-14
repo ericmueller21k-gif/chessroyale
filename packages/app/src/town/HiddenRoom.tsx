@@ -22,7 +22,10 @@ export function HiddenCard({ client }: { client: HiddenRoomClient }) {
   const waiting = !!info?.yours;
   const count = info?.count ?? 0;
   // (A refusal's words while they're news: a rest's kill switch, "The room is full." Gone with the next answer.)
-  const line = client.refused ?? info?.message ?? (count ? `${countText(count)}${info?.names.length ? `: ${info.names.join(", ")}` : ""}` : `Up to ${HIDDEN_ROOM.players} fight him together.`);
+  // (The admin's bots only join a challenge someone has made: filled with no challenge yet, the line says so. Eric, Nov 14: he tapped
+  // Fill alone and waited 10 minutes for nothing.)
+  const idle = info?.bots && !waiting ? "The bots are ready. Tap Challenge to start." : `Up to ${HIDDEN_ROOM.players} fight him together.`;
+  const line = client.refused ?? info?.message ?? (count ? `${countText(count)}${info?.names.length ? `: ${info.names.join(", ")}` : ""}` : idle);
   return (
     <>
       <p class="town-card-text hb-card-line" aria-live="polite">

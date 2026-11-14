@@ -129,6 +129,30 @@ export interface Playing {
   ctx: MusicContext;
   gain: GainNode;
   sources: AudioBufferSourceNode[];
+  /** Where its loop is, on the wall clock: to pick it up there on a new audio context (`loopPlace`). */
+  place?: LoopPlace;
+}
+
+/** A loop's timing on Date.now()'s clock: when it starts (from `offset`), and its loop points (s into its file). */
+export interface LoopPlace {
+  wallAt: number;
+  offset: number;
+  loopStart: number;
+  loopEnd: number;
+}
+
+/**
+ * Where a loop is at `nowMs` (s into its file), or null while it hasn't started yet (its intro still playing). A new audio context
+ * (sound.ts rebuilds one after the window was away, or the sound device changed) picks the music up here, not from its start
+ * (Eric, Nov 14: "a hiccup... it sounds like it's restarting").
+ */
+export function loopPlace(l: LoopPlace, nowMs: number): number | null {
+  const t = (nowMs - l.wallAt) / 1000;
+  if (!(t >= 0)) return null;
+  const len = l.loopEnd - l.loopStart;
+  const first = l.loopEnd - l.offset;
+  if (!(len > 0)) return null;
+  return t < first ? l.offset + t : l.loopStart + ((t - first) % len);
 }
 
 /**
@@ -155,7 +179,8 @@ export function startPlan(ctx: MusicContext, out: AudioNode, plan: MusicPlan, in
   b.connect(gain);
   b.start(plan.loop.at, plan.loop.offset);
   sources.push(b);
-  return { ctx, gain, sources };
+  const place = { wallAt: Date.now() + (plan.loop.at - ctx.currentTime) * 1000, offset: plan.loop.offset, loopStart: plan.loop.loopStart, loopEnd: plan.loop.loopEnd };
+  return { ctx, gain, sources, place };
 }
 
 /** Fades what's playing out over `ms` and stops it there: from now, or from `at` (the audio clock, s) if that's later. */
@@ -396,7 +421,7 @@ async function fetchAhead(keys: readonly string[]) {
 }
 
 /** Its battle's theme starts, or takes over from the one playing (`switchPlan`), as soon as it's loaded. */
-function maybeStart(loopOnly: boolean) {
+function maybeStart(loopOnly: boolean, resumeAt: number | null = null) {
   const b = battle;
   if (!b || !b.live || !wanted()) return;
   const theme = themeOf(b);
@@ -415,6 +440,8 @@ function maybeStart(loopOnly: boolean) {
     const from = playing;
     const sw = switchPlan(got.themes, theme, now, !!from, dropAt, loopOnly || !got.intro);
     if (!sw) return;
+    // (Picked up on a new audio context: where it was.)
+    if (resumeAt !== null) sw.plan.loop.offset = resumeAt;
     try {
       playing = { ...startPlan(bus.ctx, bus.master, sw.plan, got.intro, got.loop, level()), key: b.key, boss: b.boss, theme };
       log(`music:start:${theme}${sw.plan.intro ? "" : ":loop"}`);
@@ -507,7 +534,7 @@ export function roomMusic(boss: string | null) {
   maybeStartRoom(false);
 }
 
-function maybeStartRoom(loopOnly: boolean) {
+function maybeStartRoom(loopOnly: boolean, resumeAt: number | null = null) {
   const r = room;
   if (!r || battle || roomPlaying || roomStarting === r || !wanted()) return;
   roomStarting = r;
@@ -518,6 +545,7 @@ function maybeStartRoom(loopOnly: boolean) {
     if (!bus) return;
     const plan = musicPlan(got.themes, r, bus.ctx.currentTime + MUSIC.startDelayS, loopOnly || !got.intro);
     if (!plan) return;
+    if (resumeAt !== null) plan.loop.offset = resumeAt;
     try {
       roomPlaying = { ...startPlan(bus.ctx, bus.master, plan, got.intro, got.loop, level()), boss: r };
       log(`music:room:${r}${plan.intro ? "" : ":loop"}`);
@@ -621,8 +649,11 @@ export const roomMusicNow = () => (roomPlaying ? { boss: roomPlaying.boss, level
 onMuteChange(relevel);
 onMusicChange(relevel);
 if (typeof document !== "undefined") document.addEventListener("visibilitychange", relevel);
-// A new audio context (the old one died: sound.ts, wakeAudio): the loop starts again on it, from its start.
+// A new audio context (the old one died: sound.ts, wakeAudio): the loop goes on on it from where it was (`loopPlace`; Nov 14: it
+// started again from its start, heard as a hiccup each time Eric clicked back into the game from another window).
 onAudioRebuilt(() => {
+  const nowMs = Date.now();
+  const at = (q: Playing | null) => (q?.place ? loopPlace(q.place, nowMs) : null);
   const p = playing;
   const r = roomPlaying;
   const c = carried;
@@ -637,6 +668,6 @@ onAudioRebuilt(() => {
     }
   }
   leaving = [];
-  if (p) maybeStart(true);
-  if (r) maybeStartRoom(true);
+  if (p) maybeStart(true, at(p));
+  if (r) maybeStartRoom(true, at(r));
 });
