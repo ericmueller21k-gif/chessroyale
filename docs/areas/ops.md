@@ -72,7 +72,8 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
     run's `e2e-summary-N` records (Nov 6; `e2e/ci-timings.json` for files they lack, and a new spec counts as the median),
     simulating Playwright's order (project by project, files by name, 2 workers). Inside a file the tests run in order. Each runner builds the app once (`E2E_PREBUILT=1` tells Playwright's web server to start
     wrangler without building again) and serves it with the same `wrangler dev` and test variables as locally
-    (`playwright.config.ts`). A test tagged `@phone-only` (logic, server and flow; Nov 6) skips the desktop project;
+    (`playwright.config.ts`; first `e2e/dev-proxy-retry.mjs`, so wrangler's dev proxy sends a request again after a dropped
+    connection to the Worker whatever its method, not GET and HEAD only: Nov 14, the town beat's stray 500s). A test tagged `@phone-only` (logic, server and flow; Nov 6) skips the desktop project;
     layout, the board, home, desktop input (mouse drags, the wheel, arrow keys) and every guard test of `docs/rules/eric.md` run
     on both (Nov 10: long boss intros, room tours and town flows went phone-only). No spec file over about 6 minutes a project:
     split a long one in two (autochess, crowd; Nov 10). 2 workers per runner, as locally
