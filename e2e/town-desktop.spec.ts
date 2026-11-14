@@ -27,9 +27,18 @@ const onlyComputer = () => test.skip(test.info().project.name !== "desktop", "a 
 /** The bar's parts and the box's, measured. */
 const PARTS = { screen: ".town-screen", bar: ".town-bar", back: ".town-back", title: ".town-bar h1", chatBtn: ".tc-mode", gear: '[aria-label="Town settings"]', box: ".town-box", canvas: "canvas.town-canvas", controls: ".town-controls", zoom: ".town-zoom", focus: ".town-recenter", chat: ".town-chat" } as const;
 async function parts(p: Page) {
-  const out = {} as Record<keyof typeof PARTS, Box>;
-  for (const k of Object.keys(PARTS) as (keyof typeof PARTS)[]) out[k] = (await box(p, PARTS[k]))!;
-  return out;
+  // (One read of every box, as the page is now; a part that isn't there is null. Read one by one, each missing part waited the action
+  // timeout, 15 s: a computer has no bar, so 45 s a read.)
+  return (await p.evaluate(
+    (sels) =>
+      Object.fromEntries(
+        Object.entries(sels).map(([k, sel]) => {
+          const r = document.querySelector(sel)?.getBoundingClientRect();
+          return [k, r ? [r.x, r.y, r.width, r.height] : null];
+        }),
+      ),
+    PARTS,
+  )) as Record<keyof typeof PARTS, Box>;
 }
 
 for (const [w, h] of [[1280, 800], [1440, 900], [1920, 1080]] as const) {
