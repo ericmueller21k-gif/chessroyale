@@ -1049,3 +1049,6 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   layout must stay identical in every phase (pawns/chat gone in phase 2; uneven gaps) -> briefs/recluse-boards-same-frame.md (after
   desktop-side-column merges); transformation redo: the book's light, no King absorb -> briefs/recluse-transform-book.md (mockup).
   QUEUE: bubble -> same-frame -> transform mockup -> night room.
+- Nov 14 00:50: #693 (ring switch) MERGED. #694 red on town.spec "a deploy landed" (framenavigated counted the town's new pushState):
+  fixed (count navigation requests), passed locally, CI on 87f056c0. #695 kid line (Eric's rewrite) + holdMs 103745: CI.
+  QUEUE: bubble -> same-frame -> transform mockup -> visual QA (briefs/recluse-visual-qa.md, Eric asked) -> night room.
