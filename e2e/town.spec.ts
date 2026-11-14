@@ -1,6 +1,6 @@
 import { expect, type Page } from "@playwright/test";
 import { BOTS, STATUES, TABLES, TOWN_LINES, sidekickText } from "../packages/app/src/town/world.ts";
-import { BOARD_SEL, giveItems, quickTap, tapInTown, test, townTapPoint, wearItem } from "./helpers.ts";
+import { BOARD_SEL, giveItems, quickTap, tapInTown, test, townTap, townTapPoint, wearItem } from "./helpers.ts";
 
 /**
  * The town square (/town; hidden: docs/areas/town-square.md), on a phone and a computer: the page loads, its world is
@@ -604,11 +604,9 @@ test("the tables' boards (Eric, Oct 27): one bot sitting waits (a green ring und
 
 type BotRow = { name: string; at: string; table: number; moving: boolean; home: boolean; anim: "idle" | "walk" | "sit" | "wave" | null };
 const bots = (p: Page) => p.evaluate(() => (window as unknown as { __townBots: () => BotRow[] }).__townBots());
-const tapAt = async (p: Page, kind: string, id: number) => {
-  const at = await p.evaluate(([k, i]) => (window as unknown as { __townAt: (k: string, id: number) => { x: number; y: number } | null }).__townAt(k, i), [kind, id] as const);
-  expect(at, `${kind} ${id} is drawn`).not.toBeNull();
-  const cv = (await canvas(p).boundingBox())!;
-  await p.mouse.click(cv.x + at!.x, cv.y + at!.y);
+/** A tap on a bot or a table, on the frame its point was read from (`townTap`: a bot strolling past moved off a point read a few frames before). */
+const tapAt = async (p: Page, kind: "bot" | "table", id: number) => {
+  expect(await townTap(p, kind, id, 5000), `${kind} ${id} is drawn`).toBe(true);
 };
 const sideOf = async (p: Page) => (await p.locator(".dv-strip.dv-you").getAttribute("data-side")) as "w" | "b";
 /** A move by two taps on the game's board. */
@@ -723,10 +721,18 @@ test("a bot sitting at a table: a tap on the table walks you to the free stool; 
   await expect(page.locator(".dv-strip.dv-them .dv-name")).toHaveText(`${bot.name} (bot)`);
   await expect(page.locator(".dv-strip.dv-you .dv-rank")).toHaveText("Casual");
   // A reload: back in the town at the table, the bot across.
+  // (Every bot holds still from the town's first frame, the one across too: it gets up `botLeaveAfterGameMs` (4 s) after that frame.
+  // Held from the page as that frame is drawn, not after the test sees it ready: the attribute's poll and the evaluate took 1 to 1.3 s
+  // locally, and on main's CI run of 5ff1663 more than 4, so it had stood up and walked to 20,24. The same after the back button.)
+  await page.addInitScript(() => {
+    const hold = () => {
+      const c = document.querySelector("canvas.town-canvas");
+      if (c?.getAttribute("data-ready") === "1") (window as unknown as { __townCall?: (i: number) => void }).__townCall?.(-1);
+    };
+    document.addEventListener("DOMContentLoaded", () => new MutationObserver(hold).observe(document.body, { subtree: true, attributes: true, attributeFilter: ["data-ready"] }));
+  });
   await page.reload();
   await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
-  // (Every bot holds still from here, the one across too: it would get up after a while.)
-  await page.evaluate(() => (window as unknown as { __townCall: (i: number) => void }).__townCall(-1));
   await expect(page).toHaveURL(/\/town(\?debug)?$/);
   expect((await you(page)).join(",")).toBe("20,26");
   await expect(canvas(page)).toHaveAttribute("data-sit", "1");

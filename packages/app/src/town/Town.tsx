@@ -401,6 +401,9 @@ export function TownScreen({
     // (Up to his room: four at most, Eric, Nov 12. A 5th: "The door is locked." and stays out.)
     if (at.room.def.home === "recluse" && to === "top") {
       const r = await hiddenClient().enter();
+      // (A Go up tapped again while the server answered is this same climb, not one to keep for the next room's fade: kept, it went
+      // through to the top again as the top room faded in, or after "The door is locked." on the next room you came to.)
+      passNext.current = null;
       if (!r.ok) {
         // (The stairs' card closes under the note: you stay on the landing. No words: your fight's summoning is taking you.)
         shopCtl.current?.close?.();
@@ -478,7 +481,8 @@ export function TownScreen({
       const through = passNext.current;
       passNext.current = null;
       if (outNext.current) void goOut();
-      else if (through) void goThrough(through);
+      // (A way through to the room you've just come into is that same way, tapped twice: you stay.)
+      else if (through && through !== (insideNow.current?.room.def.part ?? "front")) void goThrough(through);
     }, SHOP_FEEL.fadeMs);
   };
   /** "Go out" (or the back button inside): the room fades to black, and the town zooms back out from the door. */
@@ -649,6 +653,11 @@ export function TownScreen({
   }, []);
   const home = card && (card.kind === "boss" || card.kind === "home") ? HOMES[card.i]! : null;
   const people = ctl.current?.town.people;
+  // (A card that opens is put over what it's on before it's painted, not at the town's next frame: it showed for a frame where the last
+  // card was, or at the box's top-left, then jumped. Nov 14, seen with the frames held for a test's tap.)
+  useLayoutEffect(() => {
+    if (card) ctl.current?.placeCard();
+  }, [card]);
   // A person's card (a bot's; a real player's), or the bot waiting at a table's (a bot from BOTS: its name and rating).
   const person = card?.kind === "person" ? (people?.[card.i] ?? null) : null;
   const bot = person ? person.bot : card?.kind === "table" && card.bot !== undefined ? people?.[card.bot]?.bot : null;
@@ -2433,6 +2442,8 @@ function startTown(
   if (loading) void loadTown();
 
   return {
+    /** The open card put over what it's on now (the screen's layout effect as a card opens: drawn there on its first frame). */
+    placeCard,
     /**
      * The server's list put in the town (here-net.ts): a card open on someone who left closes; someone in new clothes is dressed as
      * the bots are (their pictures made once, off the frame loop).

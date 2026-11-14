@@ -1,7 +1,7 @@
 import { expect } from "@playwright/test";
 import { test } from "./helpers.ts";
 import { Chess } from "chess.js";
-import { soloFromHome, soundOff } from "./helpers.ts";
+import { soloFromHome, soundOff, tapInTown } from "./helpers.ts";
 
 const phase = (p: any) => p.evaluate(() => (window as any).match?.phase.kind ?? "none");
 
@@ -92,30 +92,11 @@ test("coming back from another app, sound is back on the first tap: a suspended 
   const heard = () => page.evaluate(() => ((window as any).__soundLog as string[]).filter((l) => l.startsWith("bigboyClack:")));
   await page.goto("/town?sky=day");
   await expect(page.locator("canvas.town-canvas")).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
-  await page.evaluate(() => (window as any).__townGlide?.("bigboy"));
-  /** Whether the camera stood still over the last two frames (a glide over). */
-  const camStill = () =>
-    page.evaluate(
-      () =>
-        new Promise<boolean>((done) => {
-          const at = () => (window as any).__townCam().focus as [number, number];
-          const a = at();
-          requestAnimationFrame(() => requestAnimationFrame(() => done(Math.hypot(at()[0] - a[0], at()[1] - a[1]) < 1e-3)));
-        }),
-    );
   /** A tap on Big Boy (his card opens and he makes his sound), then the card closed again. */
   const tapBigBoy = async () => {
-    const card = page.getByRole("dialog", { name: "Big Boy", exact: true });
-    await expect(async () => {
-      // (The camera at rest first: aimed while it still glided to him, a tap landed on the map, so you walked off there and the
-      // camera followed you away from him. Main run 1171.)
-      await expect.poll(camStill, { timeout: 10_000 }).toBe(true);
-      const xy = await page.evaluate(() => (window as any).__townAt?.("boss", "bigboy") ?? null);
-      expect(xy, "Big Boy drawn").not.toBeNull();
-      const cv = (await page.locator("canvas.town-canvas").boundingBox())!;
-      await page.mouse.click(cv.x + xy.x, cv.y + xy.y);
-      await expect(card).toBeVisible({ timeout: 1500 });
-    }).toPass({ timeout: 20_000 });
+    // (On the frame his point was read from, `tapInTown`: he wanders by his crib, and a tap aimed a few frames late landed on the crib.
+    // Nov 14, logged: read at x 117 in his box 57 to 177, tapped as he stood at 127 to 247.)
+    const card = await tapInTown(page, "boss", "bigboy", page.getByRole("dialog", { name: "Big Boy", exact: true }));
     await page.keyboard.press("Escape");
     await expect(card).toBeHidden();
   };
