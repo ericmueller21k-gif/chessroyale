@@ -1057,3 +1057,6 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   old 36 px check). #694 CI on be0ecaf5 (unit job hung once, 15 min timeout; watch for a repeat). Bubble helper started:
   session_01JuCWRw3sSyFZwagswauntc (high). Running Opus: flaky + bubble. Queue: same-frame (after #696) -> transform mockup ->
   visual QA -> night room. wait-any.sh now fetches into refs/watch/* (FETCH_HEAD race gave a false DONE).
+- Nov 14 01:40: all of tonight's merges live (f1618e4). Eric: (1) stereo music YES -> he pastes the handoff note to his music chat
+  (stereo 192 kbps, +1 min build-up for recluse-phase2); (3) ring: testing; (4) town-street:226 guard change OK'd -> sent to the
+  flaky helper; (2) kid->man lines: options sent, awaiting his pick (then a small job in RecluseChild after the bubble job).
