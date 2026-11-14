@@ -1,7 +1,7 @@
-// The Hidden Boss's transformation redone (a MOCKUP, Nov 14: the book's light, no God King) over his real fight mid-game, on a
+// The Hidden Boss's transformation redone (a MOCKUP, round 2, Nov 14: the book's light, no God King) over his real fight mid-game, on a
 // phone (390 x 844) and a computer (1440 x 900): from the cutscene's last line to "PHASE 2", a GIF and an MP4 per platform (each
 // frame drawn on a paused clock, 40 ms apart) and stills of each beat.
-//   node scripts/preview-recluse-transform.mjs <outDir> [phone|computer|both]
+//   node scripts/preview-recluse-transform.mjs <outDir> [phone|computer|closeup|both]
 // The dev server serves the app (no API: the script answers /api itself, as an admin, the way e2e's asAdmin does, so the
 // boss menu lists him); it plays a few real moves, then loads src/dev/recluse-transform-lab.tsx, which nothing in the app
 // imports, and plays the scene. Needs ffmpeg for the MP4s.
@@ -90,17 +90,21 @@ async function run(name, use) {
   console.log(name, "pre-roll", t0, "ms;", beats.map(([k, v]) => `${k}=${v}`).join(" "));
   const stills = new Map(
     [
-      [t0 - 1500, "1-last-line"],
-      [t0 + 1500, "2-book-opens"],
-      [t0 + 3300, "3-light-bursts"],
-      [t0 + 6200, "4-beamed-chant-line"],
-      [t0 + tb.flareAt + 120, "5-flare-cyborg"],
-      [t0 + 10_000, "6-cyborg-in-lens"],
-      [t0 + 12_200, "7-lens-lifted-child-fading"],
-      [t0 + 16_935, "8-jump"],
-      [t0 + tb.crackAt + 250, "9-crack-on-the-drop"],
-      [t0 + tb.growAt + 300, "10-boards-part"],
-      [t0 + tb.bannerAt + 500, "11-phase-2"],
+      [t0 - 1500, "01-last-line"],
+      [t0 + 1500, "02-book-opens"],
+      [t0 + 2950, "03-light-takes-him-white-eyes"],
+      [t0 + 5300, "04-arms-relaxed-white-eyes"],
+      [t0 + 6450, "05-light-shoots-up"],
+      [t0 + 7250, "06-light-at-full"],
+      [t0 + 8300, "07-white-out"],
+      [t0 + 9300, "08-dies-back-to-center"],
+      [t0 + tb.revealAt + 500, "09-reveal-visor"],
+      [t0 + 13_000, "10-his-line"],
+      [t0 + 16_935, "11-jump"],
+      [t0 + tb.crackAt + 40, "12-split-first-frame-no-big-board"],
+      [t0 + tb.partAt + 300, "13-boards-part-no-big-board"],
+      [t0 + tb.growAt + 500, "14-four-boards"],
+      [t0 + tb.bannerAt + 500, "15-phase-2"],
     ].map(([ms, n]) => [Math.round(ms / FRAME_MS), n]),
   );
   const n = Math.ceil((t0 + tb.endAt + 300) / FRAME_MS);
@@ -122,7 +126,36 @@ async function run(name, use) {
   console.log(name, "wrote", mp4, gif);
 }
 
+/** The visor up close: 2.4 s of his revealed figure, big, its code flowing (a GIF and two stills). */
+async function closeup() {
+  const frames = join(outDir, ".frames-closeup");
+  rmSync(frames, { recursive: true, force: true });
+  mkdirSync(frames, { recursive: true });
+  const context = await browser.newContext({ viewport: { width: 640, height: 640 }, deviceScaleFactor: 1 });
+  const p = await context.newPage();
+  p.on("pageerror", (e) => console.log("closeup pageerror", e.message));
+  await p.clock.install();
+  await fakeApi(p);
+  await p.addInitScript(() => localStorage.setItem("hunchess.tutorial.dismissed", "1"));
+  await p.goto(url);
+  await p.waitForTimeout(3000);
+  await p.clock.pauseAt(await p.evaluate(() => Date.now() + 200));
+  await p.evaluate(async () => (await import("/src/dev/recluse-transform-lab.tsx")).showCloseup());
+  for (let i = 0; i <= 60; i++) {
+    if (i) await p.clock.runFor(FRAME_MS);
+    await p.evaluate(() => new Promise((r) => queueMicrotask(r)));
+    await p.screenshot({ path: join(frames, `${String(i).padStart(5, "0")}.png`) });
+    if (i === 10 || i === 40) await p.screenshot({ path: join(outDir, `visor-closeup-${i === 10 ? "a" : "b"}.png`) });
+  }
+  await context.close();
+  execFileSync("ffmpeg", ["-y", "-loglevel", "error", "-framerate", String(1000 / FRAME_MS), "-i", join(frames, "%05d.png"), "-vf", "scale=480:-1:flags=neighbor,split[a][b];[a]palettegen=max_colors=128[p];[b][p]paletteuse=dither=none", join(outDir, "visor-closeup.gif")]);
+  rmSync(frames, { recursive: true, force: true });
+  console.log("closeup wrote", join(outDir, "visor-closeup.gif"));
+}
+
 try {
+  if (which === "closeup" || which === "both") await closeup();
+  if (which === "closeup") process.exit(0);
   if (which !== "computer") await run("phone", { ...devices["iPhone 13"], viewport: { width: 390, height: 844 } });
   if (which !== "phone") await run("computer", { viewport: { width: 1440, height: 900 }, deviceScaleFactor: 2 });
 } finally {

@@ -103,7 +103,7 @@ const mirror = (rows: readonly string[]) => rows.map((r) => [...r].reverse().joi
 // ---- The head: one per face, typed (the face is what must read, so every pixel of it is placed by hand). Head space:
 // 25 x 35 (5 rows on top for the hair lifting in the wind), the face's middle on x 12 (the nose).
 
-export type Eyes = "ahead" | "down" | "readL" | "readR" | "shut" | "hard" | "narrow" | "wild" | "squeeze" | "glare";
+export type Eyes = "ahead" | "down" | "readL" | "readR" | "shut" | "hard" | "narrow" | "wild" | "squeeze" | "glare" | "possessed";
 export type Brows = "stern" | "hard" | "twitch" | "up" | "wild" | "fury";
 export type Mouth = "stern" | "tight" | "grin" | "laugh" | "grit" | "mumble1" | "mumble2" | "mumble3" | "scowl" | "shout";
 export interface Face {
@@ -184,6 +184,8 @@ const EYES: Record<Eyes, { l: readonly string[]; r?: readonly string[] }> = {
   squeeze: { l: ["bbbb", "bxxb", "x..x", "cccc"] },
   // Glaring straight at us under the drawn brows: a heavy lid, the iris full, white either side.
   glare: { l: ["bbbb", "wxxw", "wxxw", "cbbc"] },
+  // Possessed (the light taking him, his transformation, Eric, Nov 14): wide open, totally white, no iris.
+  possessed: { l: ["wwww", "wwww", "wwww", "bwwb"] },
 };
 /** The mouth, 7 wide, rows 23 to 27 from x 9: thin lips, at rest pressed into a knowing half-smirk. */
 const MOUTHS: Record<Mouth, readonly string[]> = {
