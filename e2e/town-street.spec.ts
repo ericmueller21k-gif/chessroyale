@@ -1,7 +1,7 @@
 import { mkdirSync, readFileSync, statSync } from "node:fs";
 import { expect, type Page, type Route } from "@playwright/test";
 import { RECLUSE_MUSIC } from "@chessroyale/core";
-import { asAdmin, tapInTown, test } from "./helpers.ts";
+import { asAdmin, tapInTown, test, townHeld, townTap } from "./helpers.ts";
 
 /**
  * The street town, round 2: the layout (Nov 5; docs/decisions/2026-11-05-street-town-layout.md), in an admin's town only
@@ -177,10 +177,9 @@ test("a park table: a tap on the one ahead on your left walks you to a free stoo
   await expect(canvas(page)).toHaveAttribute("data-sit", "0");
   // The park's fourth table, (19, 31), ahead on your left past the fountain: its stools (18, 31) and (20, 31). (The one on your row,
   // (19, 26), has a home's edge chip over it on a phone.)
-  const at = await page.evaluate(() => (window as unknown as Hooks).__townAt?.("table", 3) ?? null);
-  expect(at, "the table is drawn at the start").not.toBeNull();
+  // (The tap on the frame its point came from: `townTap`, Nov 14.)
+  expect(await townTap(page, "table", 3), "the table is drawn at the start").toBe(true);
   const cv = (await canvas(page).boundingBox())!;
-  await page.mouse.click(cv.x + at!.x, cv.y + at!.y);
   const card = page.getByRole("dialog", { name: "Chess table", exact: true });
   await expect(card).toBeVisible();
   for (const name of ["Casual", "Ranked"]) await expect(card.getByRole("button", { name, exact: true })).toBeDisabled();
@@ -240,43 +239,53 @@ test("Alfil's Pyramid (Eric, Nov 12: \"more grace\"): a tap on the half-hidden t
   const open = (await page.evaluate(() => (window as unknown as Hooks).__townAt?.("tap-square", [37, 14]) ?? null))!;
   expect(await pickAt(open.x, open.y), "two rows out: a square").toBe("sq:37,14");
   // 1. The tile in front of his door his picture half hides (the front of his lot's first row, 37, 17).
-  const tile = (await page.evaluate(() => (window as unknown as Hooks).__townAt?.("tap-square", [37, 17]) ?? null))!;
-  expect(tile, "the half-hidden tile drawn").not.toBeNull();
-  expect(await pickAt(tile.x, tile.y), "the half-hidden tile").toBe("home:alfil");
-  await tapAt(tile.x, tile.y);
+  // (Each point read and tapped with the town's frames held, `townHeld`: the frame on screen when the tap comes is the one the point was
+  // read from, so nobody walks onto it in between. Nov 14, round 5: the tap's mechanics only.)
+  await townHeld(page, async () => {
+    const tile = (await page.evaluate(() => (window as unknown as Hooks).__townAt?.("tap-square", [37, 17]) ?? null))!;
+    expect(tile, "the half-hidden tile drawn").not.toBeNull();
+    expect(await pickAt(tile.x, tile.y), "the half-hidden tile").toBe("home:alfil");
+    await tapAt(tile.x, tile.y);
+  });
   await arrives("the half-hidden tile");
   await page.keyboard.press("Escape");
   await expect(card).toBeHidden();
   // 2. The ground right in front of it: the sidewalk square beside his door square (a plain square until Nov 12).
   await stepBack();
-  const foot = (await page.evaluate(() => (window as unknown as Hooks).__townAt?.("tap-square", [38, 16]) ?? null))!;
-  expect(foot, "the sidewalk before his door drawn").not.toBeNull();
-  expect(await pickAt(foot.x, foot.y), "the sidewalk before his door").toBe("home:alfil");
-  await tapAt(foot.x, foot.y);
+  await townHeld(page, async () => {
+    const foot = (await page.evaluate(() => (window as unknown as Hooks).__townAt?.("tap-square", [38, 16]) ?? null))!;
+    expect(foot, "the sidewalk before his door drawn").not.toBeNull();
+    expect(await pickAt(foot.x, foot.y), "the sidewalk before his door").toBe("home:alfil");
+    await tapAt(foot.x, foot.y);
+  });
   await arrives("the sidewalk before his door");
   await page.keyboard.press("Escape");
   await expect(card).toBeHidden();
   // 3. The building's bottom edge: 3 px above its front's foot, at his door (the steps' foot).
   await stepBack();
-  // (His box: the home whose front's foot spans his door's column.)
-  const box = (await page.evaluate(() =>
-    (window as unknown as { __townCam?: () => { boxes: { kind: string; foot: number[] | null }[] } }).__townCam?.().boxes.find((b) => b.kind === "home" && !!b.foot && Math.min(b.foot[6]!, b.foot[8]!) < 37.5 && Math.max(b.foot[6]!, b.foot[8]!) > 37.5) ?? null,
-  ))!;
-  expect(box?.foot, "his front drawn").toBeTruthy();
-  const [x0, y0, x1, y1, , , wx0, , wx1] = box.foot!;
-  const s = (37.5 - wx0!) / (wx1! - wx0!);
-  const edge = { x: x0! + s * (x1! - x0!), y: y0! + s * (y1! - y0!) - 3 };
-  expect(await pickAt(edge.x, edge.y), "the bottom edge").toBe("home:alfil");
-  await tapAt(edge.x, edge.y);
+  await townHeld(page, async () => {
+    // (His box: the home whose front's foot spans his door's column.)
+    const box = (await page.evaluate(() =>
+      (window as unknown as { __townCam?: () => { boxes: { kind: string; foot: number[] | null }[] } }).__townCam?.().boxes.find((b) => b.kind === "home" && !!b.foot && Math.min(b.foot[6]!, b.foot[8]!) < 37.5 && Math.max(b.foot[6]!, b.foot[8]!) > 37.5) ?? null,
+    ))!;
+    expect(box?.foot, "his front drawn").toBeTruthy();
+    const [x0, y0, x1, y1, , , wx0, , wx1] = box.foot!;
+    const s = (37.5 - wx0!) / (wx1! - wx0!);
+    const edge = { x: x0! + s * (x1! - x0!), y: y0! + s * (y1! - y0!) - 3 };
+    expect(await pickAt(edge.x, edge.y), "the bottom edge").toBe("home:alfil");
+    await tapAt(edge.x, edge.y);
+  });
   await arrives("the bottom edge");
   // 4. Standing at his door, your own pawn over the tile in front of it: a tap there is still his (Eric's screenshot).
   await page.keyboard.press("Escape");
   await expect(card).toBeHidden();
-  const under = (await page.evaluate(() => (window as unknown as { __townCam?: () => { you: { x0: number; y0: number; x1: number; y1: number } | null } }).__townCam?.().you ?? null))!;
-  expect(under, "your pawn drawn").not.toBeNull();
-  const mid = { x: (under.x0 + under.x1) / 2, y: under.y0 + 0.4 * (under.y1 - under.y0) };
-  expect(await pickAt(mid.x, mid.y), "a tap on you at his door").toBe("home:alfil");
-  await tapAt(mid.x, mid.y);
+  await townHeld(page, async () => {
+    const under = (await page.evaluate(() => (window as unknown as { __townCam?: () => { you: { x0: number; y0: number; x1: number; y1: number } | null } }).__townCam?.().you ?? null))!;
+    expect(under, "your pawn drawn").not.toBeNull();
+    const mid = { x: (under.x0 + under.x1) / 2, y: under.y0 + 0.4 * (under.y1 - under.y0) };
+    expect(await pickAt(mid.x, mid.y), "a tap on you at his door").toBe("home:alfil");
+    await tapAt(mid.x, mid.y);
+  });
   await expect(card, "a tap on you at his door: the card").toBeVisible({ timeout: 5000 });
   if (STILLS) await page.screenshot({ path: `${STILLS}/alfil-door-tap-${test.info().project.name}.png` });
   expect(errors, "no page or console errors").toEqual([]);

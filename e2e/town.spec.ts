@@ -1,6 +1,6 @@
 import { expect, type Page } from "@playwright/test";
 import { BOTS, STATUES, TABLES, TOWN_LINES, sidekickText } from "../packages/app/src/town/world.ts";
-import { BOARD_SEL, giveItems, quickTap, tapInTown, test, townTap, townTapPoint, wearItem } from "./helpers.ts";
+import { BOARD_SEL, giveItems, tapInTown, test, townTap, townTapPoint, wearItem } from "./helpers.ts";
 
 /**
  * The town square (/town; hidden: docs/areas/town-square.md), on a phone and a computer: the page loads, its world is
@@ -379,8 +379,8 @@ test("the Colosseum: a tap on its gate walks you to the apron in front of it and
   // It stands just ahead of your start, in view from the first frame on a phone and a computer.
   const at = await page.evaluate(() => (window as unknown as { __townAt?: (k: string) => { x: number; y: number } | null }).__townAt?.("coliseum") ?? null);
   expect(at, "the Colosseum is drawn at the start").not.toBeNull();
-  const cv = (await canvas(page).boundingBox())!;
-  await page.mouse.click(cv.x + at!.x, cv.y + at!.y);
+  // (The tap on the frame its point came from: `townTap`, Nov 14.)
+  expect(await townTap(page, "coliseum", "coliseum"), "the Colosseum's gate tapped").toBe(true);
   const card = page.getByRole("dialog", { name: "The Colosseum", exact: true });
   await expect(card.getByRole("heading", { name: "The Colosseum" })).toBeVisible();
   const raids = card.getByRole("button", { name: "Raids with people" });
@@ -391,6 +391,7 @@ test("the Colosseum: a tap on its gate walks you to the apron in front of it and
   // 41), one of its two middle columns.
   await expect.poll(async () => (await you(page)).join(","), { message: "you walk to the gate", timeout: 5000 }).toMatch(/^(22|23),41$/);
   // A tap on the world elsewhere (low on the left) closes it.
+  const cv = (await canvas(page).boundingBox())!;
   await page.mouse.click(cv.x + cv.width * 0.3, cv.y + cv.height * 0.85);
   await expect(card).toBeHidden();
   expect(errors).toEqual([]);
@@ -447,9 +448,8 @@ for (const st of [
     await expect.poll(async () => (await page.evaluate((id) => (window as unknown as { __townAt: (k: string, id: string) => { x: number; y: number } | null }).__townAt("statue", id), st.id)) !== null, { message: "the statue comes into view", timeout: 20_000 }).toBe(true);
     let lastFocus = "";
     await expect.poll(async () => { const f = (await cam(page)).focus.map((v) => v.toFixed(2)).join(","); const same = f === lastFocus; lastFocus = f; return same; }, { message: "the camera settles on the statue", timeout: 20_000, intervals: [300] }).toBe(true);
-    const at = await page.evaluate((id) => (window as unknown as { __townAt: (k: string, id: string) => { x: number; y: number } | null }).__townAt("statue", id), st.id);
-    expect(at, "the statue is drawn").not.toBeNull();
-    await page.mouse.click(cv.x + at!.x, cv.y + at!.y);
+    // (The tap on the frame its point came from: `townTap`, Nov 14.)
+    expect(await townTap(page, "statue", st.id), "the statue is drawn").toBe(true);
     // You walk to the square right in front of it; the camera glides in close on it; the quote renders in.
     // (The street town's statues are at the Colosseum's north edge, a long walk from the start: everyone's town since Nov 13.)
     await expect.poll(async () => (await you(page)).join(","), { message: "you walk up to the statue", timeout: 25_000 }).toBe(st.sq.join(","));
@@ -488,10 +488,8 @@ test("a chess table in the park: a tap on one walks you to a free stool and you 
   await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
   await expect(canvas(page)).toHaveAttribute("data-sit", "0");
   // The park table nearest your start (the street town's, everyone's since Nov 13: table 7, square (19, 26), its stools (18, 26) and (20, 26)).
-  const at = await page.evaluate(() => (window as unknown as { __townAt: (k: string, id: number) => { x: number; y: number } | null }).__townAt("table", 7));
-  expect(at, "the table is drawn at the start").not.toBeNull();
-  const cv = (await canvas(page).boundingBox())!;
-  await page.mouse.click(cv.x + at!.x, cv.y + at!.y);
+  // (The tap on the frame its point came from: `townTap`, Nov 14.)
+  expect(await townTap(page, "table", 7), "the table is drawn at the start").toBe(true);
   const card = page.getByRole("dialog", { name: "Chess table", exact: true });
   await expect(card).toBeVisible();
   await expect(card.getByRole("heading")).toHaveCount(0);
@@ -506,6 +504,7 @@ test("a chess table in the park: a tap on one walks you to a free stool and you 
   await expect(canvas(page)).toHaveAttribute("data-sit", "1");
   const stool = (await you(page)).join(",");
   // A tap on the world elsewhere (low on the left) closes it, and you stand up where you are.
+  const cv = (await canvas(page).boundingBox())!;
   await page.mouse.click(cv.x + cv.width * 0.3, cv.y + cv.height * 0.85);
   await expect(card).toBeHidden();
   await expect(canvas(page)).toHaveAttribute("data-sit", "0");
@@ -588,8 +587,8 @@ test("the tables' boards (Eric, Oct 27): one bot sitting waits (a green ring und
   const shot = async () => (await page.screenshot({ clip: { x: cv.x + at!.x - 40, y: cv.y + at!.y - 50, width: 80, height: 80 } })).toString("base64");
   const before = await shot();
   await expect.poll(shot, { message: "the pieces move", timeout: 5000 }).not.toBe(before);
-  // A tap on it: you walk beside it (both stools taken) and don't sit; its card offers to watch, greyed.
-  await page.mouse.click(cv.x + at!.x, cv.y + at!.y);
+  // A tap on it: you walk beside it (both stools taken) and don't sit; its card offers to watch, greyed. (The tap on the frame its point came from: `townTap`, Nov 14.)
+  await tapAt(page, "table", 7);
   const card = page.getByRole("dialog", { name: "Chess table", exact: true });
   const watch = card.getByRole("button", { name: "Spectate", exact: true });
   await expect(watch).toBeVisible();
@@ -825,9 +824,8 @@ test("Hollow's card: one of his three lines (Eric's words), the next one each ti
       const name = await openCardName();
       if (name === "Hollow Peak") return;
       if (name) await page.keyboard.press("Escape");
-      const p = await at();
-      expect(p, "drawn").not.toBeNull();
-      await page.mouse.click(p!.x, p!.y);
+      // (The tap on the frame its point came from: `townTap`, Nov 14.)
+      expect(await townTap(page, "home", "hollow"), "drawn").toBe(true);
       await expect.poll(openCardName, { timeout: 1500 }).toBe("Hollow Peak");
     }).toPass({ timeout: 30_000 });
     await expect(card).toBeVisible({ timeout: 20_000 });
@@ -1190,10 +1188,8 @@ test("the other cards on the same dark look: the boss's, the home's, the Colosse
     }
   };
   // The Colosseum's (a tap on its gate; it's in view at the start).
-  const gate = (await page.evaluate(() => (window as unknown as { __townAt: (k: string) => { x: number; y: number } | null }).__townAt("coliseum")))!;
-  expect(gate, "the Colosseum is drawn at the start").not.toBeNull();
-  const cv = (await canvas(page).boundingBox())!;
-  await page.mouse.click(cv.x + gate.x, cv.y + gate.y);
+  // (The tap on the frame its point came from: `townTap`, Nov 14.)
+  expect(await townTap(page, "coliseum", "coliseum"), "the Colosseum is drawn at the start").toBe(true);
   let card = page.getByRole("dialog", { name: "The Colosseum", exact: true });
   await expect(card.getByRole("button", { name: "Raids with people" })).toBeDisabled();
   await expect(card.getByText("Coming soon", { exact: true })).toBeVisible();
@@ -1327,42 +1323,6 @@ const tagOverHead = (p: Page, id: string, name: string) =>
     },
     [id, name],
   );
-/**
- * Where to tap square (c, r) once the camera has settled (Nov 1). The camera trails your walk and keeps gliding a moment
- * after you stop; a square read while it glides moves before the click lands. Beside you on a phone, the next square's middle
- * is only about a quarter of a square (8 px) clear of your own tap box, so a click a few frames late tapped your own pawn and
- * you didn't move: what failed main's run on 60975fa ("beside you: 22,17").
- * Nov 5: the point of the square a tap reaches (`__townAt("tap-square")`: its middle, or the nearest point of it clear of whatever
- * is drawn over that), as a player would tap it, not its middle: someone standing on the square in front of it (toward the camera) is
- * drawn over its middle on a phone, and a tap there is a tap on them (their card; you don't move).
- */
-async function squareSettled(page: Page, c: number, r: number): Promise<{ x: number; y: number }> {
-  // (Nov 13: counted in drawn frames, up to 10 s, not 40 reads 50 ms apart: on a slow software-WebGL runner the camera's trail after a walk
-  // outlasted 2 s of wall time.)
-  const got = await page.evaluate(
-    ([c, r]) =>
-      new Promise<{ tap: { x: number; y: number } | null; mid: boolean; still: boolean }>((done) => {
-        type At = (k: string, id: [number, number]) => { x: number; y: number } | null;
-        const at = (k: string) => (window as unknown as { __townAt: At }).__townAt(k, [c, r]);
-        const until = performance.now() + 10_000;
-        let prev = at("square");
-        let same = 0;
-        const look = () => {
-          const mid = at("square");
-          same = mid && prev && Math.abs(mid.x - prev.x) < 0.25 && Math.abs(mid.y - prev.y) < 0.25 ? same + 1 : 0;
-          prev = mid;
-          if (same >= 3) done({ tap: at("tap-square"), mid: true, still: true });
-          else if (performance.now() > until) done({ tap: null, mid: !!mid, still: false });
-          else requestAnimationFrame(look);
-        };
-        requestAnimationFrame(look);
-      }),
-    [c, r] as [number, number],
-  );
-  if (!got.still) throw new Error(`square ${c},${r}: ${got.mid ? "the camera never settled" : "not on the screen"}`);
-  if (!got.tap) throw new Error(`square ${c},${r}: no point of it a tap reaches (someone is drawn over all of it)`);
-  return got.tap;
-}
 
 test("rides (Oct 31; Nov 1, every boss's): your pawn sits on its ride, the ride's idle standing and its move walking, its side, back or front the way it goes; its trail instead of the droplets; its tag over its top; nothing fetched for it; another rider as others see them", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(150_000);
@@ -1445,10 +1405,8 @@ test("rides (Oct 31; Nov 1, every boss's): your pawn sits on its ride, the ride'
     requestAnimationFrame(look);
   });
   const walkTo = async (c: number, r: number) => {
-    const at = await squareSettled(page, c, r);
-    const cv = (await canvas(page).boundingBox())!;
-    // (A quick tap: a slow frame between a separate press and release would make it a run, helpers.ts quickTap.)
-    await quickTap(page, cv.x + at.x, cv.y + at.y);
+    // (A quick tap on the frame its point came from, once the view holds still: `townTap`, Nov 14.)
+    expect(await townTap(page, "tap-square", [c, r], 10_000), `square ${c},${r}: drawn, clear and still`).toBe(true);
     // (There, or beside it if a bot stands there: one pawn a square.)
     await expect.poll(async () => Math.abs((await you(page))[0] - c) + Math.abs((await you(page))[1] - r)).toBeLessThanOrEqual(1);
     await expect.poll(async () => (await rideNow(page)).you.anim).toBe("idle");
@@ -1477,9 +1435,7 @@ test("rides (Oct 31; Nov 1, every boss's): your pawn sits on its ride, the ride'
   expect(near, "no bot on the squares tapped or in front of them").toEqual([]);
   // A tap on the square right beside you walks you there, as on foot: your ride's reach isn't you (taps take the pawn's box).
   for (const c of [c0 + 1, c0]) {
-    const at = await squareSettled(page, c, r0);
-    const cv = (await canvas(page).boundingBox())!;
-    await quickTap(page, cv.x + at.x, cv.y + at.y);
+    expect(await townTap(page, "tap-square", [c, r0], 10_000), `square ${c},${r0}: drawn, clear and still`).toBe(true);
     await expect.poll(() => you(page), { message: `beside you: ${c},${r0}` }).toEqual([c, r0]);
     await expect.poll(async () => (await rideNow(page)).you.anim).toBe("idle");
   }

@@ -1,6 +1,6 @@
 import { expect, type Page } from "@playwright/test";
 import { bossCrateOf, clawWins, mulberry32 } from "@chessroyale/core";
-import { asServerAdmin, test } from "./helpers.ts";
+import { asServerAdmin, tapInTown, test } from "./helpers.ts";
 
 /**
  * Boingo's claw machine (Nov 6; docs/decisions/2026-11-06-claw-machine.md and -boingo-home.md), on a phone and a computer: the machine
@@ -85,14 +85,8 @@ async function intoFunhouse(p: Page) {
   };
   await expect.poll(homeAt, { message: "Boingo's Funhouse comes into view" }).not.toBeNull();
   const card = p.getByRole("dialog", { name: "Boingo's Funhouse", exact: true });
-  await expect(async () => {
-    if (await card.isVisible()) return;
-    if (await p.getByRole("dialog").isVisible()) await p.keyboard.press("Escape");
-    const at = await homeAt();
-    expect(at, "drawn").not.toBeNull();
-    await p.mouse.click(at!.x, at!.y);
-    await expect(card).toBeVisible({ timeout: 1500 });
-  }).toPass({ timeout: 20_000 });
+  // (The tap on the frame its point came from: `tapInTown`, Nov 14.)
+  await tapInTown(p, "home", "clown", card);
   await card.getByRole("button", { name: "Go in" }).click();
   await expect(room(p)).toHaveAttribute("data-ready", "1", { timeout: 20_000 });
   await expect(room(p)).toHaveAttribute("data-room", "clown");

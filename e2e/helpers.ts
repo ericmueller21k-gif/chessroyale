@@ -628,8 +628,13 @@ export async function quickTap(page: Page, x: number, y: number) {
   await cdp.detach();
 }
 
-/** What `__townAt` finds in the street town: a boss or a home (by its id), the Colosseum, a statue, a table, a bot (by its index) or a player. */
-export type TownThing = "boss" | "home" | "coliseum" | "statue" | "table" | "bot" | "player";
+/**
+ * What `__townAt` finds in the street town: a boss or a home (by its id), the Colosseum, a statue, a table, a bot (by its index), a player,
+ * or a square (`[c, r]`: "tap-square", the point of it a tap reaches; "square", its middle).
+ */
+export type TownThing = "boss" | "home" | "coliseum" | "statue" | "table" | "bot" | "player" | "tap-square" | "square";
+/** A thing's id for `__townAt`: a home's or a boss's id, an index, a player's uid or a square. */
+export type TownId = string | number | readonly [number, number];
 
 /**
  * Where to tap a figure or a place in the street town once the view holds still (on the page): its tap point (`__townAt`, clear of
@@ -638,15 +643,15 @@ export type TownThing = "boss" | "home" | "coliseum" | "statue" | "table" | "bot
  * moving after `waitMs`. Counted in frames, not wall time: on CI's software WebGL under a full shard a frame can take a few hundred
  * milliseconds, and reads 100 ms apart saw a camera mid-glide as at rest (Nov 13, the street town for everyone).
  */
-export async function townTapPoint(page: Page, kind: TownThing, id: string | number, waitMs = 3000, hold = false): Promise<{ x: number; y: number } | null> {
+export async function townTapPoint(page: Page, kind: TownThing, id: TownId, waitMs = 3000, hold = false, still = 3): Promise<{ x: number; y: number } | null> {
   const xy = await page.evaluate(
-    ([kind, id, waitMs, hold]) =>
+    ([kind, id, waitMs, hold, still]) =>
       new Promise<{ x: number; y: number } | null>((done) => {
         const cv = document.querySelector<HTMLCanvasElement>("canvas.town-canvas");
         // (A point a finger reaches: 10 px inside the canvas, and the canvas itself under it, not a chip, the map, a button or a card
         // laid over it. Nov 13: Big Boy's Crib's point was at x 389.8 of a 390 px phone, so every tap missed it.)
         const at = () => {
-          const p = (window as unknown as { __townAt?: (k: string, id: string | number) => { x: number; y: number } | null }).__townAt?.(kind, id) ?? null;
+          const p = (window as unknown as { __townAt?: (k: string, id: unknown) => { x: number; y: number } | null }).__townAt?.(kind, id) ?? null;
           if (!p || !cv) return null;
           const r = cv.getBoundingClientRect();
           if (p.x < 10 || p.y < 10 || p.x > r.width - 10 || p.y > r.height - 10) return null;
@@ -660,7 +665,9 @@ export async function townTapPoint(page: Page, kind: TownThing, id: string | num
           same = now && last && Math.hypot(now.x - last.x, now.y - last.y) < 0.5 ? same + 1 : 0;
           last = now;
           // (In the page's coordinates, read as it's found: the canvas's box can move as the page changes, out of a room say.)
-          if (same >= 3 && cv) {
+          // (`still` 0: the first frame it's drawn and clear, for a figure that walks on whatever the view does: with `hold`, the tap
+          // comes on that same frame anyway.)
+          if (now && same >= still && cv) {
             // (`hold`: the town's frames held in this same frame (`__townHold`), so the frame on screen when the tap comes is the one
             // this point was read from. A figure walking about (Big Boy by his crib, a bot) moved off it between the read and the tap.)
             if (hold) (window as unknown as { __townHold?: (on: boolean) => void }).__townHold?.(true);
@@ -671,7 +678,7 @@ export async function townTapPoint(page: Page, kind: TownThing, id: string | num
         };
         requestAnimationFrame(look);
       }),
-    [kind, id, waitMs, hold] as const,
+    [kind, id, waitMs, hold, still] as const,
   );
   return xy;
 }
@@ -685,10 +692,10 @@ export const townLetGo = (page: Page) =>
  * runs between the read and the tap, so nothing walks off the point first (Nov 14: Big Boy wandered in front of or behind his crib, a
  * bot stepped behind you, and the tap opened the crib's card or nothing). False if it isn't drawn and clear within `waitMs`.
  */
-export async function townTap(page: Page, kind: TownThing, id: string | number, waitMs = 3000): Promise<boolean> {
+export async function townTap(page: Page, kind: TownThing, id: TownId, waitMs = 3000, still = 3): Promise<boolean> {
   const cdp = await page.context().newCDPSession(page);
   try {
-    const at = await townTapPoint(page, kind, id, waitMs, true);
+    const at = await townTapPoint(page, kind, id, waitMs, true, still);
     if (!at) return false;
     const ev = (type: "mousePressed" | "mouseReleased", buttons: number) =>
       cdp.send("Input.dispatchMouseEvent", { type, x: Math.round(at.x), y: Math.round(at.y), button: "left", buttons, clickCount: 1, pointerType: "mouse" });
@@ -706,9 +713,9 @@ export async function townTap(page: Page, kind: TownThing, id: string | number, 
  * covered, the camera glides to `glide` once (a home's or a boss's id, as its chip would glide it, or a square) and the tap waits for it to
  * land; then a quick tap on the frame the point was read from (`townTap`: the press and the release together, so a slow frame between
  * them can't make it a run, and none between the read and the tap). A tap that misses walks you, the camera following: the next try glides
- * again.
+ * again. Returns once you've stopped walking with the card showing (it hides while its home is off the screen on the way).
  */
-export async function tapInTown(page: Page, kind: TownThing, id: string | number, card: Locator, opts: { glide?: string | readonly [number, number] | null; timeout?: number } = {}) {
+export async function tapInTown(page: Page, kind: TownThing, id: TownId, card: Locator, opts: { glide?: string | readonly [number, number] | null; timeout?: number } = {}) {
   const glide = opts.glide === undefined ? (kind === "boss" || kind === "home" ? String(id) : null) : opts.glide;
   await expect(async () => {
     if (await card.isVisible()) return;
@@ -726,8 +733,26 @@ export async function tapInTown(page: Page, kind: TownThing, id: string | number
     }
     expect(tapped, `${kind} ${id} drawn and clear, the view still`).toBe(true);
     await expect(card).toBeVisible({ timeout: 3000 });
+    // (Open once you stand there. The tap walks you to it and the camera follows your walk, so a card whose home or figure leaves the
+    // screen meanwhile is hidden until it's back (Town.tsx placeCard): shop:93 read a far home's "Go in" in that gap, Nov 14.)
+    await expect.poll(() => page.evaluate(() => (window as unknown as { __townYou?: () => { moving: boolean } | null }).__townYou?.()?.moving ?? false), { timeout: 30_000 }).toBe(false);
+    await expect(card).toBeVisible({ timeout: 3000 });
   }).toPass({ timeout: opts.timeout ?? 60_000 });
   return card;
+}
+
+/**
+ * Runs `body` with the street town's frames held (`__townHold`), then lets them go: for a test that reads its own point on the canvas
+ * (a building's edge, your pawn's box) and taps it, so the frame on screen when the tap comes is the one the point was read from
+ * (Nov 14, round 5: the same race `townTap` closes, for points `__townAt` doesn't give).
+ */
+export async function townHeld<T>(page: Page, body: () => Promise<T>): Promise<T> {
+  await page.evaluate(() => (window as unknown as { __townHold?: (on: boolean) => void }).__townHold?.(true));
+  try {
+    return await body();
+  } finally {
+    await townLetGo(page);
+  }
 }
 
 /**
