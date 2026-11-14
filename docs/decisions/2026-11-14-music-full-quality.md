@@ -12,7 +12,11 @@ in his music chat and muffled in the game.
 - **Re-rendered from the songs**, never re-encoded: stereo, constant 192 kbps (`handoff.py --stereo --kbps 192`, `phases_v.py` the
   same, on `claude/trailer-v2`). Lengths unchanged; each level within 0.3 dB of before (measured as heard: a mono file plays on both
   speakers); every loop seam best lag 0 ms. themes.json: only the recorded `lufs`/`peakDb` moved (by 0.1 to 0.9 dB).
-- **Cost:** all themes 17.3 → 52.0 MB; the town's preload (all but the Hidden Boss's) 14.8 → 44.4 MB, about 20 → 59 s at 6 Mbps. The
+- **The Hidden Boss's phase 2 opens on a minute more of looming** (Eric, Nov 14: "too epic too fast"; the songs' session, e774edfd on
+  `claude/trailer-v2`): `recluse-phase2`'s intro 58.87 → 118.89 s, a new mark `calculation: 70.0`, its level -17.2 → -18.2 LUFS; its loop
+  and the other pieces byte for byte as rendered here. Nothing in the game is keyed to the old length (the theme starts with the adult's
+  match; the tests check the order of starts, not their times); the unit test's fixture takes the new length.
+- **Cost:** all themes 17.3 → 53.5 MB (52.0 before phase 2's longer intro); the town's preload (all but the Hidden Boss's) 14.8 → 44.4 MB, about 20 → 59 s at 6 Mbps. The
   town still waits at most 3 s (`MUSIC.townWaitMs`), and the rest lands behind it. Decoded, a two-minute theme is 22 → 44 MB (stereo),
   one theme at a time as before.
 - **Stale builds:** pages are fetched fresh (network-first) and the worker updates itself (skipWaiting, claim), but the music is

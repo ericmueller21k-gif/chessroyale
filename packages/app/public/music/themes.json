@@ -73,12 +73,13 @@
       "source": "scripts/reel/music/song_v.py (phases_v.py)",
       "intro": "recluse-phase2-intro",
       "loop": "recluse-phase2-loop",
-      "introSeconds": 58.869625,
+      "introSeconds": 118.887167,
       "loopSeconds": 89.275563,
       "bpm": null,
-      "lufs": -17.2,
+      "lufs": -18.2,
       "peakDb": -1.1,
       "marks": {
+        "calculation": 70.0,
         "buildAgain": 40.388396
       }
     },
