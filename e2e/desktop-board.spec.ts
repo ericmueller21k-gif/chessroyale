@@ -417,6 +417,48 @@ test("a computer's boss screen: no title line; the boss's bar at the top, 'Move 
 });
 
 /**
+ * Nov 14 (Eric: "put the chat box below [the moves], make it the same width"; styles.css, `.under-board.side` under `.mv-side`):
+ * a boss battle's chat box sits under the moves panel, the same left edge and width, 12 px under it, and its foot stops above the
+ * God King's line (the room he and your pawn stand in). A bot raid has no chat, so one is put in the screen for the check: this
+ * tests the placement only, not what the chat shows.
+ */
+test("a computer's boss battle with chat: the chat box under the moves, the same left edge and width, 12 px under them, above the God King", async ({ browser }) => {
+  test.skip(test.info().project.name !== "desktop", "a computer only; it opens its own windows");
+  test.setTimeout(4 * 60_000);
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+  const page = await ctx.newPage();
+  await into(page, "alone");
+  for (const size of ["1280x800", "1920x1080"] as Size[]) {
+    const [w, h] = dims(size);
+    await page.setViewportSize({ width: w, height: h });
+    await page.waitForTimeout(300);
+    await page.evaluate(() => {
+      const ub = document.createElement("div");
+      ub.className = "under-board side";
+      ub.setAttribute("data-probe", "chat");
+      ub.innerHTML = '<div class="qchat"></div>';
+      document.querySelector(".screen.game")!.appendChild(ub);
+    });
+    const g = await page.evaluate(() => {
+      const box = (s: string) => {
+        const e = document.querySelector(s);
+        return e ? e.getBoundingClientRect() : null;
+      };
+      const r = (b: DOMRect | null) => (b ? { x: b.left, y: b.top, r: b.right, b: b.bottom } : null);
+      return { moves: r(box(".mv-side")), chat: r(box('[data-probe="chat"]')), king: r(box(".boss-dock .gk-unit")) };
+    });
+    const at = `alone ${size} with chat`;
+    expect(g.moves && g.chat, `${at}: the moves and the chat box`).toBeTruthy();
+    expect(Math.abs(g.chat!.x - g.moves!.x), `${at}: the chat's left edge the moves'`).toBeLessThanOrEqual(1);
+    expect(Math.abs(g.chat!.r - g.moves!.r), `${at}: the chat's width the moves'`).toBeLessThanOrEqual(1);
+    expect(Math.abs(g.chat!.y - g.moves!.b - 12), `${at}: 12 px under the moves`).toBeLessThanOrEqual(1.5);
+    if (g.king) expect(g.chat!.b, `${at}: the chat's foot above the God King's line`).toBeLessThanOrEqual(g.king.y);
+    await page.evaluate(() => document.querySelector('[data-probe="chat"]')?.remove());
+  }
+  await ctx.close();
+});
+
+/**
  * Nov 1 (round 2: the labels from 1800 px, not 1366): the front door's side menu on a computer's game screens (Boss alone, the
  * Crowd, 1 v 1, Squads): icons only below 1800 px (the labels as tooltips, read by screen readers), the full menu from 1800 px.
  * A phone and a touch tablet have none (the touch test above keeps their boards to the pixel).
