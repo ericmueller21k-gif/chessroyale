@@ -22,7 +22,7 @@ import { STRIP_LAYOUT } from "../components/MovePanel.tsx";
 import type { GameView, SimulBoardView, SimulView } from "../game.ts";
 import type { ComponentChildren } from "preact";
 import { ARC_LIFE, ARC_REDRAW, ARC_STRIKES, PHASE_CHANGE, phase2UltBannerMs, absorbKing, absorbPaced, arcPoints, smoothPath, type ArcStrike } from "../recluse-phase2.ts";
-import { CRITICAL, NORMAL, bossVoice } from "../speech.tsx";
+import { CRITICAL, NORMAL, VoiceBubble, bossVoice } from "../speech.tsx";
 import { Hud } from "./Hud.tsx";
 import { useStillKey } from "../hooks.ts";
 import { clockShown } from "../clock-text.ts";
@@ -378,6 +378,12 @@ export function PhaseChangeScreen({ match, at }: { match: GameView; at: number }
               >
                 <SpriteAnim ch={RECLUSE} anim={fig.anim} then={fig.then} since={fig.since} sounds={BOSS_KITS["Hidden Boss"]!.sounds} id="rc-fig" onFrame={onFigFrame} />
                 <EngineOverlay ch={RECLUSE} elRef={figEngine} on />
+                {/* His words over his head while he's on the board (Eric, Nov 14: they floated by his empty place, far from him), his
+                    place's box hidden meanwhile (styles.css, .rc-away). Mounted again with each of his animations, so a box moved into
+                    view is placed again where he stands now. */}
+                <span class="rc-say-at">
+                  <VoiceBubble key={fig.anim} voice={bossVoice} class="bc-bubble rc-say" />
+                </span>
               </span>
             )}
             {t >= C.arcAt && t < C.arcEnd + ARC_LIFE && <Arcs t={t} hands={CHANT_HANDS} />}

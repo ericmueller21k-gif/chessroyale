@@ -329,6 +329,10 @@ function Character({ boss, stage, place }: { boss: BossView; stage: Stage; place
     let last = "";
     let moved = "";
     let lit: boolean | null = null;
+    // (A figure whose height changes with what's drawn, the Hidden Boss's child growing up: his words stand on the top of the drawing
+    // shown now, set as its animation changes (BossKit.heads); the tallest of them for one not listed.)
+    let head = -1;
+    const tallest = kit.heads ? Math.max(...Object.values(kit.heads)) : 0;
     const draw = () => {
       const now = Date.now();
       // (A run of its own animations in place, over its beat, while one lasts: the Hidden Boss's spellbook, his slam.)
@@ -360,6 +364,13 @@ function Character({ boss, stage, place }: { boss: BossView; stage: Stage; place
           eng.current.classList.toggle("on", on);
           // (It ignites only as it comes; a screen drawn later shows it already on.)
           eng.current.classList.toggle("fresh", on && now - engine.at! < 400);
+        }
+      }
+      if (kit.heads) {
+        const h = kit.heads[s.anim] ?? tallest;
+        if (h !== head && box.current) {
+          head = h;
+          box.current.style.setProperty("--bc-head", String(h));
         }
       }
       if (id !== last) {
@@ -417,7 +428,7 @@ function Character({ boss, stage, place }: { boss: BossView; stage: Stage; place
   // (A phone's bar: his size and his drawing's shift in the box (kits.ts barScale, barShift; styles.css). Full size and no shift otherwise.)
   const barSize = place === "bar" ? { "--bc-scale": kit.barScale ?? 1, "--bc-shift": kit.barShift ?? 0 } : {};
   return (
-    <div ref={box} class={`boss-char place-${place} ch-${ch.id}${kit.tall ? " tall" : ""}${kit.wide ? " wide" : ""}${place === "results" && kit.artFacesLeft ? " art-left" : ""}`} data-anim={beat.anim} data-faces={kit.sprite ? drawnFacing(kit.sprite, ch) : undefined} aria-hidden="true" style={{ "--bc-w": ch.w, "--bc-h": ch.h, "--bc-fx": ch.foot[0], "--bc-fy": ch.foot[1], ...barSize }}>
+    <div ref={box} class={`boss-char place-${place} ch-${ch.id}${kit.tall ? " tall" : ""}${kit.wide ? " wide" : ""}${kit.heads ? " bc-heads" : ""}${place === "results" && kit.artFacesLeft ? " art-left" : ""}`} data-anim={beat.anim} data-faces={kit.sprite ? drawnFacing(kit.sprite, ch) : undefined} aria-hidden="true" style={{ "--bc-w": ch.w, "--bc-h": ch.h, "--bc-fx": ch.foot[0], "--bc-fy": ch.foot[1], ...barSize }}>
       <canvas ref={cv} class="boss-char-sprite" width={ch.w} height={ch.h} />
       {kit.engine && <EngineOverlay ch={ch} elRef={eng} />}
       {/* Its words: a pixel text box beside it that types itself out and fades at the end (like the God King's). In the
