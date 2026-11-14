@@ -1192,3 +1192,6 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 14 19:50: #719 flaky round 6 MERGED d783aaca (PR run green, 0 retries, full suite). Main run watcher b1yvy2s07 (lists flaky).
   #718 ride sounds: e2e check rewritten (no read count; one source the whole walk, a dip allowed; one start, one end), main merged in
   -> 9d49e620, CI watcher boxfkswit. Removed stale worktree scratchpad/wt-rule (it held claude/nifty-goodall-2sr1si).
+- Nov 14 20:20: main d783aaca (#719) full run GREEN, 0 retries (the dev proxy fix works). #718 ride sounds MERGED 65902dc3; deploy +
+  main run watcher running. No helpers. Next for Eric: try the dozer and the pogo; RIDE_SOUND to tune. Flaky leftovers (8): see round 6
+  PR body "Not done". CI recording stays OFF (+22% run time measured).
