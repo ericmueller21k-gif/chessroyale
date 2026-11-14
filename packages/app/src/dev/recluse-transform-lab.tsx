@@ -271,7 +271,8 @@ function lightNow(t: number) {
   const grow = before ? clamp01((t - T.riseAt) / (T.whiteFull - T.riseAt)) ** 1.7 : 0;
   const shoot = before ? ease((t - T.upShootAt) / 700) : 0;
   const radiate = before ? ease((t - T.radiateAt) / (T.whiteFull - T.radiateAt)) : 0;
-  const white = t < T.whiteAt ? 0 : t < T.whiteFull ? ease((t - T.whiteAt) / (T.whiteFull - T.whiteAt)) ** 1.4 : t < T.downAt ? 1 : 1 - ease((t - T.downAt) / 500);
+  // (Then the white is drawn in to the center: `down`'s shrinking disc takes over from the full screen.)
+  const white = t < T.whiteAt ? 0 : t < T.whiteFull ? ease((t - T.whiteAt) / (T.whiteFull - T.whiteAt)) ** 1.4 : t < T.downAt ? 1 : 0;
   const down = t < T.downAt ? (t < T.whiteFull ? 0 : 1) : 1 - clamp01((t - T.downAt) / (T.revealAt - T.downAt));
   const slam = t < T.crackAt ? 0 : Math.max(0, 1 - (t - T.crackAt) / 900);
   // (The book's own glow: up as it opens, held on, dying as the boards settle, as today's light does.)
@@ -396,7 +397,7 @@ function drawFront(g: CanvasRenderingContext2D, t: number, bx: number, by: numbe
       streak(g, L.ray, mid.x, mid.y, x1, y1, -Math.sin(a) * wd, Math.cos(a) * wd, rad * (0.55 + 0.25 * Math.sin(t / 90 + i)));
     }
   }
-  // Dying back into the center: the light drawn in to a point.
+  // Dying back into the center: the light drawn in to a point (the glow left at its core).
   if (s.down > 0) {
     const gs = k * 0.4 + reach * 0.9 * s.down ** 2;
     g.globalAlpha = Math.min(1, 1.2 * s.down);
@@ -408,12 +409,20 @@ function drawFront(g: CanvasRenderingContext2D, t: number, bx: number, by: numbe
     g.drawImage(L.glow, bx - gs, by - gs * 0.45, gs * 2, gs * 0.9);
   }
   g.restore();
-  // The white-out: the whole screen.
+  // The white-out: the whole screen. Then it dies back: a disc of white shrinking into the center, a soft edge, gone at the reveal.
   if (s.white > 0) {
     g.globalAlpha = s.white;
     g.fillStyle = "#fffdf6";
     g.fillRect(0, 0, W, H);
     g.globalAlpha = 1;
+  } else if (s.down > 0) {
+    const r = reach * s.down ** 1.6 + 1;
+    const grad = g.createRadialGradient(mid.x, mid.y, 0, mid.x, mid.y, r);
+    grad.addColorStop(0, "rgba(255,253,246,1)");
+    grad.addColorStop(0.5, `rgba(255,250,230,${Math.min(1, 0.4 + s.down).toFixed(3)})`);
+    grad.addColorStop(1, "rgba(255,244,210,0)");
+    g.fillStyle = grad;
+    g.fillRect(0, 0, W, H);
   }
 }
 
