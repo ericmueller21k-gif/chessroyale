@@ -1,1 +1,0 @@
-Done: phase 2's result (QA #12). The scoreboard part had shipped in #706. Two #712 guard-test checks fail on the computer on main too: see .pr-body.md.
