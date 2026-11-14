@@ -264,19 +264,18 @@ test("his room (Eric, Nov 12 and 13): Challenge is 1 of 4; leaving asks; an admi
     for (const g of gaps.gaps) expect(Math.abs(g - gaps.gaps[0]!), `the gaps ${gaps.gaps.map(Math.round)}`).toBeLessThanOrEqual(2);
   }
   // The scoreboard in phase 2 (Eric's playtest, Nov 14: every row read "out", a phone's Players tab empty): the four on his boards
-  // are in, each with their board's state, never "out": a computer's table beside the board; a phone's Players tab (the rows its
-  // box fits, as in phase 1), and the four in full when it's tapped open.
+  // are in, never "out": a computer's table beside the board; a phone's Players tab (the rows its box fits, as in phase 1), and
+  // the four in full when it's tapped open. (Each board's result shows on its row as it ends: below.)
   const desk = test.info().project.name === "desktop";
   const inFour = async (table: ReturnType<Page["locator"]>, rows: number) => {
     await expect(table.locator(".tower-row")).toHaveCount(rows);
     await expect(table.locator(".tower-row.out")).toHaveCount(0);
-    await expect(table.locator(".t-board")).toHaveText(Array(rows).fill(/^(Playing|Won|Lost|Drawn)$/));
     await expect(table.locator(".t-pts", { hasText: /^out$/ })).toHaveCount(0);
   };
-  if (desk) await inFour(page.locator(".tower-side"), 4);
+  const panel = page.locator(desk ? ".tower-side" : ".bp-tower");
+  if (desk) await inFour(panel, 4);
   else {
     await page.locator(".bp-tab", { hasText: "Players" }).click();
-    const panel = page.locator(".bp-tower");
     await expect(panel.locator(".tower-row")).not.toHaveCount(0);
     await inFour(panel, await panel.locator(".tower-row").count());
     await panel.click();
@@ -301,6 +300,10 @@ test("his room (Eric, Nov 12 and 13): Challenge is 1 of 4; leaving asks; an admi
   }
   await expect.poll(async () => (await simulNow())?.decided ?? false, { message: "every board won", timeout: 30_000 }).toBe(true);
   expect((await simulNow()).won).toBe(4);
+  // Each row says its board was won (a computer's table, the word; a phone's panel, its mark), until the results.
+  const shownRows = await panel.locator(".tower-row").count();
+  await expect(panel.locator(".t-board")).toHaveText(Array(shownRows).fill(desk ? "Won" : "✓"));
+  await still(page, "boards-won");
   await expect.poll(phase, { message: "the results", timeout: 30_000 }).toBe("results");
   expect(await page.evaluate(() => (window as any).match.phase.simul)).toEqual({ won: 4, of: 4 });
   await expect(page.getByText(/on all 4 boards!/)).toBeVisible();
