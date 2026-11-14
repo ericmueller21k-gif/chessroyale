@@ -1064,3 +1064,8 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   reverted (worse). Next round of flakes: town-street:528, town-chat:1367 (+ fairplay:65, friends:40 unconfirmed).
   Same-frame helper started: session_01JuCWRswvB1cpPP2PTyBeWU (high), claude/recluse-same-frame. Running Opus: bubble (+ the
   kid->man exchanges, all five, seeded pick) + same-frame. Queue: transform mockup -> visual QA -> night room.
+- Nov 14 02:10: #700 (main red: problems:198 counter, party chat beside the corner) MERGED. #698 flaky: kill-switches:109 broke
+  (the font preloads hide the maintenance banner: proven locally, preloads dropped in 12a8636f; investigate next flaky round).
+  Bubble helper done -> #701 (bubble at every age/cutscene/phase change + five grow-up exchanges, fallMs 4200->7500). Transform
+  mockup helper started: session_01JuCWRuKMJWw3bLBbU5FDqK (waits for .go). Running Opus: same-frame + transform mockup.
+  Queue after: visual QA -> night room -> flaky round 3 (town-street:528, town-chat:1367, preloads vs banner, town-street:226 tap).
