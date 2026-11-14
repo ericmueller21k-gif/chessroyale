@@ -10,6 +10,9 @@ Eric, Nov 13: "fix the cause, not add a checker". Each test asked first: is the 
 - **Game (test hook): a tap point on the edge of what's clear** (found by the above). `__townAt` gave Glim's point 0.2 px above your
   pawn's box; the tap's whole pixel landed on your pawn and nothing opened. With the frames held it failed every time (6 of 6). The
   hook's points now keep 2 px of room on their target (`clearAt` in render.ts); 4 of 4 pass.
+- **Game: a card painted before it was placed** (town:1055 "card stays put", found by the held frames). A card's place was set only in
+  the town's next frame, so as it opened it showed for a frame where the last card was (or at the box's top-left), then jumped: what a
+  busy phone shows too. The screen now places it in a layout effect as it opens (`placeCard`).
 - **Test: the bot across held after its 4 s were up** (town:701, new on main 5ff1663). After a reload the bot across your table gets
   up `botLeaveAfterGameMs` after the town's first frame; the test held it after the attribute poll and an evaluate (1 to 1.3 s locally,
   more on CI). It's now held from the page as that frame is drawn. Proof: a 3.5 s pause added after the ready wait fails the old test
