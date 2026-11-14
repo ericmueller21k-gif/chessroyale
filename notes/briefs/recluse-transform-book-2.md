@@ -59,3 +59,6 @@ fit to his body… what I wanted to avoid was him fusing with a computer… he's
 - Phase 2: his figure, the bar's bust and the four boards' figure all wear it. Visor flip as a short animation (a few frames).
 Mockup round 3 as before (GIFs, stills incl. a suit close-up front/side, the visor up and down), `.mockup` "round 3", wait for `.go`
 containing "round3".
+- Eric, round 3 follow-up: darker. Matte near-black / deep navy base, slim segmented panels over a dark undersuit, thin glowing
+  circuit traces, red main accent, cool blue glow, yellow sparing. Sleek stealth-tech, no weapons. He named a specific game
+  character as the vibe: take only the general feel; no copied design (no white/silver exoskeleton, no copied helmet/visor shapes).
