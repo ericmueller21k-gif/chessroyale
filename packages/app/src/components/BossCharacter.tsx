@@ -423,7 +423,7 @@ function Character({ boss, stage, place }: { boss: BossView; stage: Stage; place
  * A boss's name with his small portrait, where a line used to put his emoji (Eric, Nov 5: "it should say Wrangler there or a
  * small picture of him or both"): "[portrait] Wrangler plays d4". `The ` is left off the name, as the banners do.
  */
-export function BossTag({ boss, live = false }: { boss: Pick<BossView, "name" | "icon">; /** In a battle: his face as he looks now (BossFace). */ live?: boolean }) {
+export function BossTag({ boss, live = true }: { boss: Pick<BossView, "name" | "icon">; /** His face as he looks now (BossFace's `live`): a battle's lines, where it's used (Results' is a boss without a character). */ live?: boolean }) {
   return (
     <span class="boss-tag">
       <BossFace boss={boss} class="boss-tag-face" label="" live={live} />
@@ -431,6 +431,13 @@ export function BossTag({ boss, live = false }: { boss: Pick<BossView, "name" | 
     </span>
   );
 }
+
+/**
+ * The drawing a boss's small face follows as he looks now (his phone's bar's bust: his age, his suit), or null for his portrait, drawn
+ * once. Only `live` (inside a battle): his look is module state (`suit`, `figure`) that only the next battle clears, so a face on a menu
+ * after a fight that reached phase 2 showed his helmet, each with its own frame loop (#712's review).
+ */
+export const faceBust = (kit: BossKit, live: boolean) => (live && kit.barFace && kit.bar) || null;
 
 export function BossFace({ boss, class: cls = "", label, live = false }: { boss: Pick<BossView, "name" | "icon"> & { form?: BossView["form"] }; class?: string; /** Its name for a screen reader (the boss's own unless given; "": none, its button names it). */ label?: string; /** Inside a battle (its bar, its lines): his look as it is now, for a boss whose look changes in it (BossKit.barFace). Elsewhere his portrait: the battle's state (his age, his suit) is the last battle's until the next begins (#712's review). */ live?: boolean }) {
   // (In a form of its own, that form's face: the Hidden Boss's child.)
@@ -440,7 +447,7 @@ export function BossFace({ boss, class: cls = "", label, live = false }: { boss:
     const g = kit && cv.current?.getContext("2d");
     if (!kit || !g) return;
     const p = kit.portrait;
-    const bust = live && kit.barFace && kit.bar;
+    const bust = faceBust(kit, live);
     if (!kit.barFace || !bust) {
       const art = artOf(kit);
       g.putImageData(frameImage(art, art.anims[p.anim]!.frames[p.frame]!), -p.x, -p.y, p.x, p.y, p.w, p.h);
@@ -470,7 +477,7 @@ export function BossFace({ boss, class: cls = "", label, live = false }: { boss:
   }, [kit, live]);
   // (A boss with no drawing shows nothing here: no emoji stands in for a boss, Eric, Nov 5; BossTag says his name.)
   if (!kit) return null;
-  const size = (live && kit.bar && kit.barFace) || kit.portrait;
+  const size = (faceBust(kit, live) && kit.barFace) || kit.portrait;
   return <canvas ref={cv} class={`boss-portrait ${cls}`} width={size.w} height={size.h} {...(label === "" ? { "aria-hidden": "true" } : { role: "img", "aria-label": label ?? boss.name })} />;
 }
 

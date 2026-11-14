@@ -458,6 +458,12 @@ test("beaten in phase 1 (?win=1): he collapses and mumbles, his cutscene, then t
   await page.addInitScript(() => ((window as any).__soundLog = []));
   const music: string[] = [];
   page.on("request", (r) => void (/^\/music\/.*\.mp3$/.test(new URL(r.url()).pathname) && music.push(new URL(r.url()).pathname)));
+  // (Errors on the window that aren't thrown, as problems.ts's watchErrors reports them: Chrome's ResizeObserver loop, #712's review.)
+  await page.addInitScript(() => {
+    const w = window as any;
+    w.__winErrors = [];
+    addEventListener("error", (e) => w.__winErrors.push(e.message));
+  });
   // (?cutscene=6: his cutscene after the fall sped up into 6 s; the Win this form test below watches it.)
   await meetHim(page, "win=1&cutscene=6");
   await yourMove(page);
@@ -725,6 +731,8 @@ test("beaten in phase 1 (?win=1): he collapses and mumbles, his cutscene, then t
   // His defeat in phase 2 (a placeholder for his transformation: the spellbook's glow, his hair in the wind).
   await expect(page.locator(".boss-char.place-results")).toHaveAttribute("data-anim", /spellbook2|spellLoop2/, { timeout: 10_000 });
   expect(await change.seen()).toMatchObject({ idle2: true });
+  // (#712's review: no "ResizeObserver loop completed" from his bar box, through the phase change and its countdown.)
+  expect(((await page.evaluate(() => (window as any).__winErrors)) as string[]).filter((m) => /ResizeObserver/.test(m))).toEqual([]);
   expect(errors).toEqual([]);
 });
 
