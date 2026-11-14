@@ -417,19 +417,29 @@ below):
   each frame by a transform, `placeEngine`, from the head part's place in the frame, `headOf`; the kit's `engine`;
   styles `.bc-engine`, opacity and transform animations only). It ignites only as it comes (`fresh`); a new battle
   clears it (`resetBeats`).
-- **The God King is gone in phase 2** (absorbed): his place in the dock stays, empty (`king="gone"`, so the dock doesn't
-  move), no button, no charges, and not a word from him (his phase 2 lines are gone; a board's result is on the board's
-  own tag, and his word on it is the boss's).
+- **The same frame in every phase** (Eric, Nov 14: "the board split only replaces the single board";
+  [decision](../decisions/2026-11-14-recluse-same-frame.md)): the phase change and phase 2 draw phase 1's whole boss screen:
+  a computer's boss bar at the top (no title line; "Phase 2" where it said the move) and its tools, his figure or bust, the
+  Moves panel and the chat (`besideBoard`; a phone's panel left of the God King, `BossPanel`), your pawn and your team's
+  (`PartyMates` keeps the placed "out" team from phase 1's end on, `match.simul`), the God King. Only the board's square
+  changes: the four boards inside it (`FOUR` in `Recluse2.tsx`). Test: `e2e/hidden-boss-room.spec.ts` (the square, the Moves
+  panel, chat, pawns and God King within 2 px of the man's fight; the four boards' gaps equal).
+- **The God King in phase 2** (Eric, Nov 14: "the king will still be with you, but you can't use him anymore"): in his place,
+  greyed (`king="benched"`, `.gk-unit.benched`: grayscale, half opacity), his button disabled ("God King: can't be called in
+  phase 2"), and not a word from him (his phase 2 lines are gone; a board's result is on the board's own tag, and his word
+  on it is the boss's). The phase change still absorbs him (`absorbKing`; another job removes that).
 - **Phase 2** (rules `packages/chess/src/bosses/recluse-phase2.ts`; driver `Phase2Game`; screen `SimulScreen`): four
   boards, each its own Chess960 start (`phase2Numbers`, from the battle's seed, all different), each a BoardState from
   a base at ply 0 (`phase2Board`). The players are White; you play board 0, bots the other three. His brain is
   Stockfish only (`phase2Brain`, `phase2BossMove`: `RECLUSE_PHASE2.elo` 2750, `nodes`, `moveMs` 900 a move), one engine
   serving the boards in turn (`phase2Next`: yours first). Each player's bank `bankSeconds` (120 s), no increment; he
   has no clock. Yours is the dock's clock, at the box's right (Oct 15). Each board's tag (`Tag`): on a computer, the
-  player's name and clock in a row of its own above each board, off its back rank (the four boards a little smaller for
-  it, `DESK` in `Recluse2.tsx`: 44.5% of the square each, a 4.6% row above; the phase change ends them there too; the
-  "slow move" note at the row's right); on a phone, each small board's clock just above it, off its pieces,
-  and the big board none when it's yours (the player's name on one you watch). The scoreboard has no Bank column from
+  player's name and clock in the gap above each board, off its back rank (`FOUR.desk` in `Recluse2.tsx`: 43.5% of the square
+  each, the gaps between them and to the square's edges equal, 4.3%; each board's squares centered in its slot; the phase
+  change ends them there too; the "slow move" note at the row's right); on a phone, inside the same square
+  (`FOUR.phone`), the other three small in a row at its top (26% each, equal gaps), each one's clock just above it, off its
+  pieces, and yours big under them (65%, centered, the slow marks at its right), with no tag when it's yours (the player's
+  name on one you watch; tap a small one to watch it big). The scoreboard has no Bank column from
   the phase change on (`RaceTower`'s `bank`): each clock is its board's. A board ends by mate, a draw, time
   (`phase2Flags`) or resigning (`phase2Resign`); the others play on;
   the battle ends when every board is decided, won only with all four won (`phase2Outcome`). Then his reaction
