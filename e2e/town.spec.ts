@@ -1573,7 +1573,10 @@ test("rides (Oct 31; Nov 1, every boss's): your pawn sits on its ride, the ride'
   expect(Math.max(...during.map((d) => d.live)), "never more than one source").toBe(1);
   const from = during.findIndex((d) => d.live === 1);
   expect(from, "the loop plays as you ride").toBeGreaterThanOrEqual(0);
-  for (const d of during.slice(from)) expect([d.live, d.ride, d.up, d.loop]).toEqual([1, "sawyer-dozer", true, [true, 0.1, 1.1]]);
+  for (const d of during.slice(from)) expect([d.live, d.ride, d.loop]).toEqual([1, "sawyer-dozer", [true, 0.1, 1.1]]);
+  // (Coming up while you ride; a CI frame longer than RIDE_SOUND.holdMs can start the fade for a frame and bring it straight back,
+  // on the same source, so not every read is "up".)
+  expect(during.some((d) => d.up), "coming up as you ride").toBe(true);
   // Standing still: it fades out (RIDE_SOUND.holdMs after the last step, over the dozer's fadeOutMs) and is let go.
   await expect.poll(async () => (await rideNow(page)).you.sound, { message: "standing: faded out and let go", timeout: 5_000 }).toMatchObject({ ride: null, live: 0 });
   const log = await rideLog();
