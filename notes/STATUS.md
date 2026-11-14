@@ -1030,3 +1030,8 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   Running Opus: 2 (both high). Check-in 00:35 covers both.
 - Nov 14 00:05: QUEUED (next free Opus slot): notes/briefs/recluse-room-night.md (his building follows the town's time of day:
   moon at night; Eric's screenshot of the sunny child's room). Opus high.
+- Nov 14 00:14: Eric playtest: (a) Fill with 3 bots alone -> nothing started (bots join only a challenge): #692 card line "The bots
+  are ready. Tap Challenge to start." (words only; behavior change would touch guards). (b) music "hiccup like restarting": files'
+  loop seamless; cause = audio context rebuilt after window switch restarted the loop from its start -> #691 loopPlace resumes in
+  place. (c) desktop chat box layout ("slop"): Haiku helper session_01JuCWRtzeue2mWZ6TQB9Ni7 on claude/desktop-side-column.
+  Running: 2 Opus (flaky, town-leave) + 1 Haiku. Queued: night room.
