@@ -188,6 +188,9 @@ Test switches (where they work): `?quick=1` short steps (buy 7 s with the last 2
 
 ## Rules for this area
 
+- An offer's silhouette appears on its square, growing in place (`ac-sil-appear` keeps its `translateY(-50%)`; Nov 14: the shared `ac-appear`
+  replaced it, so it showed half a square low and slid up, and a tap read then landed on the square below). An entrance animation
+  on an element with its own `transform` carries that transform in its keyframes.
 - A change to a rule or a number is made in `AUTOCHESS` or the pure files, with its unit test; the screen draws what the rules say.
 - Nothing is drawn per frame by the screen: its clock is read every 120 ms, the board draws only when its position changes; the rings, the floating
   gold, the level pop, the pawns' hops and the banners are CSS animations on still boxes. Nothing updates every frame (no timer bars since Nov 8).
