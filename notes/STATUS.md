@@ -1147,3 +1147,8 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   (235: GK line "Careful. My strength feels faint…" over .under-board in the party layout; 321: Moves panel no rows after the 🏆 wins
   all four). Standings helper was already reproducing it; handed it briefs/fix-main-712.md to fix in its branch (separate commits,
   own PR section). Next merge = that PR, which turns main green.
+- Nov 14 14:40: #713 opened (phase 2 result: Victory!/Defeated headline + review of your board; main's red after #712: GK box
+  252 px in the party layout, test makes your move before the 🏆). CI watcher bc9m3yh4z on 4e4dd4cf; merge when green -> main green.
+  Call made: the room guard test (eric.md) keeps its room-rule checks; only #712's own Moves-panel check was reordered -> told Eric,
+  offered to revert if he objects. No helpers running. Next: idle queue = #707 m2/m4/m5, MovePanel boss portrait, QA #11 nits,
+  flaky leftovers, subscribe-in-useEffect gap.
