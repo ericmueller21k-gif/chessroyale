@@ -225,6 +225,28 @@ export function phase2Outcome(st: Phase2State): { won: number; lost: number; dra
   return { won, lost, drawn, of, decided, beaten: decided && won === of };
 }
 
+/** A phase 2 board as its player's row on the scoreboard says it: still on, or how it ended for the players. */
+export type Phase2Seat = "playing" | "won" | "lost" | "drawn";
+
+export function phase2Seat(result: Phase2Result | null | undefined): Phase2Seat {
+  return !result ? "playing" : result.winner === "crowd" ? "won" : result.winner === "boss" ? "lost" : "drawn";
+}
+
+/**
+ * The scoreboard from his fall (phase 2 to follow) until the results (Eric's playtest, Nov 14). Phase 1's end places everyone
+ * still in (core finishBoss: the runner's leaderboard then reads every row "out"), but those who take his boards are still in the
+ * fight: each board's player is in (`out: false`) with their board's state (`board`), the points phase 1 left them (phase 2's
+ * boards are won or lost, no move scores points), first and in the order they stood. Everyone else stays as they were: knocked
+ * out before, or gone (someone who leaves a board hands it to a bot under a new id, so they're on none: out). A board's player
+ * with no row (a fresh bot) gets none. What's stored and rewarded comes from the placements, which this never touches: it's only
+ * what the screens show (packages/app: NetMatch and SoloMatch `standings()`).
+ */
+export function phase2Standings<T extends { id: string; out: boolean }>(rows: readonly T[], boards: readonly { player: string; result?: Phase2Result | null }[]): (T & { board?: Phase2Seat })[] {
+  const seat = new Map(boards.map((b) => [b.player, phase2Seat(b.result)]));
+  const on = rows.filter((r) => seat.has(r.id)).map((r) => ({ ...r, out: false, board: seat.get(r.id)! }));
+  return [...on, ...rows.filter((r) => !seat.has(r.id))];
+}
+
 /**
  * His brain in phase 2: Stockfish, always, at a fixed strength (RECLUSE_PHASE2), whatever BOSS_BRAIN says for him
  * (phase 1's `fixed` Maia), the player's rating, the difficulty or an admin's Brain picker. Maia can't play Chess960.

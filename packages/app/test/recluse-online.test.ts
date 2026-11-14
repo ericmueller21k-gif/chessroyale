@@ -4,6 +4,7 @@ import { chess960Fen, legalMoves, type ClientMessage, type NetPhase2 } from "@ch
 import { PHASE_CHANGE } from "../src/recluse-phase2.ts";
 import { OnlinePhase2 } from "../src/recluse-online.ts";
 import { NetMatch } from "../src/net.ts";
+import { exitNote } from "../src/match-exit.ts";
 import type { Phase } from "../src/game.ts";
 import { bannerOn, resetBattleBanners } from "../src/battle-banners.ts";
 import { seatKey, setQueue, yours } from "../src/board/yours.ts";
@@ -208,6 +209,28 @@ describe("his fall online says who takes the boards (the review of #677, m3)", (
   it("a watcher (out, no board): leaving is going home, the result standing", () => {
     const m = fallen(["p1", "p2", "p3", "b4"]);
     expect(m.exit).toBe("leave");
+  });
+
+  it("the scoreboard (Eric's playtest, Nov 14): from his fall to the results, a board's player is in, their board's state as it ends; a watcher out; the results, the server's rows as sent", () => {
+    const tell = (m: NetMatch, msg: object) => (m as unknown as { onMessage(x: object): void }).onMessage({ now: Date.now(), ...msg });
+    const row = (s: { out: boolean; board?: string }) => [s.out, s.board ?? null];
+    expect(fallen(["p1", "p2", "p3", "b4"]).standings().map(row)).toEqual([[true, null]]);
+    const m = fallen(["p1", "me", "p3", "b4"]);
+    expect(m.standings().map(row)).toEqual([[false, "playing"]]);
+    // (The boards: you on board 2, the view's word now. Yours won; then every board decided: leaving then is going home, your
+    // result standing, as the server has it.)
+    const t = Date.now();
+    const won = { winner: "crowd", how: "mate" } as const;
+    const view = serverView(t, "me");
+    tell(m, { t: "phase2", p2: { ...view, boards: view.boards.map((b) => (b.id === 2 ? { ...b, result: won, turnAt: null } : b)) } });
+    expect(m.phase.kind).toBe("simul");
+    expect(m.standings().map(row)).toEqual([[false, "won"]]);
+    tell(m, { t: "phase2", p2: { ...view, boards: view.boards.map((b) => ({ ...b, result: won, turnAt: null })), done: { at: t, until: t + 3200, beaten: true, won: 4, of: 4 } } });
+    expect(m.exit).toBe("leave");
+    expect(exitNote(m, "leave")).toBe("You're already out, so your result stands. You'll go home.");
+    tell(m, { t: "results", placements: { me: 2 }, winner: "Bo", lossesByStage: {}, standings: [{ id: "me", name: "Ann", out: true, placement: 2 }], ranked: false, bossResult: "crowd", simul: { won: 4, of: 4 } });
+    expect(m.standings().map(row)).toEqual([[true, null]]);
+    (m as unknown as { phase2: { dispose(): void } }).phase2.dispose();
   });
 });
 

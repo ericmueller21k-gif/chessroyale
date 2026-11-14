@@ -1446,6 +1446,27 @@ p {
 .t-practice {
   margin-left: 4px;
 }
+/* The Hidden Boss's phase 2: a board player's result once their board ends (RaceTower's BOARD_WORD; the small rows' BOARD_MARK),
+   in the boards' own colors. */
+.t-board {
+  margin-left: 5px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: #8a93a3;
+}
+.t-board.won {
+  color: #7dff9a;
+}
+.t-board.lost {
+  color: #ff8a8a;
+}
+.tower-mini .t-board {
+  margin-left: 3px;
+  font-size: 11px;
+  font-weight: 900;
+}
 /* A streak's fire beside the name (StreakFire, Crowd 50 v 50): our own flame and its count, small and steady in size
    (it never changes the row's height), a gentle flicker on the flame only, still under reduced motion. The tower is
    dark in both themes; the reveal's note sits on the page's own background (light mode below). */

@@ -1,13 +1,13 @@
 import { beforeAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
-import { DEFAULT_SETTINGS, RAID_SETTINGS, RECLUSE_PHASE2, bossBannerMs } from "@chessroyale/core";
+import { DEFAULT_SETTINGS, RAID_SETTINGS, RECLUSE_PHASE2, bossBannerMs, finishBoss } from "@chessroyale/core";
 import { legalMoves, phase2Numbers, type MoveScore } from "@chessroyale/chess";
 import { ARC_LIFE, ARC_STRIKES, PHASE_CHANGE, Phase2Game, arcPoints, phase2Follows, phase2Mates, phaseChangeRun, smoothPath } from "../src/recluse-phase2.ts";
 import { RECLUSE, RECLUSE_BUST, suited } from "../src/characters/recluse.ts";
 import { CHANGE_HANDS, RECLUSE_CHANGE, RECLUSE_CHANGE_BOOK } from "../src/characters/recluse-transform.ts";
 import { CRITICAL, NORMAL, Voice, bossVoice } from "../src/speech.tsx";
 import { pacedLine, pacedPage, pacedTyped } from "../src/paced-line.ts";
-import { loadOpenings, SoloMatch } from "../src/solo.ts";
+import { HUMAN, loadOpenings, SoloMatch } from "../src/solo.ts";
 import { KING_LINES, kingLine, kingSay, resetKingSpeech } from "../src/godKing.ts";
 import { KING_VS_RECLUSE, RECLUSE_LINES } from "../src/characters/recluse-lines.ts";
 import { animLength } from "../src/characters/power-art.ts";
@@ -368,6 +368,29 @@ describe("phase 2 without the God King (Eric, Oct 14: absorbed in the phase chan
     m.simulMove!(0, "e2e4");
     expect(moved).toBe(1);
     (m as unknown as { stop(): void }).stop?.();
+  });
+
+  it("the scoreboard (Eric's playtest, Nov 14): phase 1's end placed you, but from his fall on you're in, your board's state as it ends; the result, as placed", () => {
+    type Solo = { runner: { state: Parameters<typeof finishBoss>[0] }; createRunner(): void; phase2: unknown; phase2Seats: string[]; phase: object; standings(): { out: boolean; board?: string; placement: number | null }[]; stop?(): void };
+    const m = new SoloMatch([], "Ann", { ...DEFAULT_SETTINGS, ...RAID_SETTINGS }) as unknown as Solo;
+    // (Boss alone's runner: you alone. His battle over, phase 1's end places you, as core finishBoss does for everyone still in.)
+    m.createRunner();
+    m.runner.state = finishBoss(m.runner.state, () => 0.5, "crowd");
+    const rows = () => m.standings().map((s) => [s.out, s.board ?? null, s.placement]);
+    expect(rows()).toEqual([[true, null, 1]]);
+    m.phase = { kind: "boss", boss: {}, until: 0, fall: true, toPhase2: true };
+    m.phase2Seats = [HUMAN];
+    expect(rows()).toEqual([[false, "playing", 1]]);
+    const board = (result: object | null) => ({ boards: [{ id: 0, player: HUMAN, result }], slow: 0, ultAt: null });
+    m.phase2 = { stop() {}, state: board(null) };
+    m.phase = { kind: "phaseChange", at: 0, splitAt: 0 };
+    expect(rows()).toEqual([[false, "playing", 1]]);
+    m.phase2 = { stop() {}, state: board({ winner: "boss", how: "time" }) };
+    m.phase = { kind: "simul", at: 0 };
+    expect(rows()).toEqual([[false, "lost", 1]]);
+    m.phase = { kind: "results", placement: 1, winner: "Ann", youWon: false, bossResult: "boss", simul: { won: 0, of: 4 } };
+    expect(rows()).toEqual([[true, null, 1]]);
+    m.stop?.();
   });
 
   it("the countdown counts from the boards' first frame on screen, so the 5 is up a whole second however long that frame takes", () => {
