@@ -3430,6 +3430,11 @@ export const ENGINE_SERVER = {
   perAccountDaily: 200,
   soloDailySearches: 1000,
   soloShare: 1 / 3,
+  /**
+   * A search group's second try (a container still waking, serverAllMovesAt) goes only with at least this much of the try's time
+   * left. A timeout can fire a moment before the clock reads the deadline; without this it sent a pointless 1 ms search (Nov 14).
+   */
+  retryMinMs: 250,
 } as const;
 
 /**
