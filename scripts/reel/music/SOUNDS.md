@@ -145,6 +145,13 @@ voice in front: "that hymning ... really epic ... a holy sensation, but ... a lo
 it, a lot of fast-pacedness" (a wordless men's choir over a racing band). A build that pays off wants a faster part
 after it, not a slower one.
 
+A build needs its time in the game (Nov 14, playing the Hidden Boss's second phase, whose music opened with the
+score's ten seconds of his stare and then its 46-second build): "when phase 2 boss starts the music is too epic too
+fast"; he asked for about a minute more of "the looming build-up before the epic part". So the game's piece opens on
+seventy seconds of the stare, made of the score's own sounds from further off, staying 4 to 9 dB (as the ear weighs
+it) under where the build starts to climb (song_v.py's `LOOM`). A fight's music shouldn't reach its big part in the
+first minute.
+
 A longer song for a two-part boss (Nov 12, the Hidden Boss's): after the first big part, a quiet memory (a place,
 its background sounds, a soft warm tune) that builds, goes out of sync and out of key, and screeches; a slight pause;
 the big part again with more on it ("a bit more layers on top ... kind of pause ... long note, short note"); the

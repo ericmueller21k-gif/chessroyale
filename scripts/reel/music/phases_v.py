@@ -14,7 +14,8 @@ So four themes, each an intro (or none) and a loop, started one after another as
 
   recluse-house    his room, and the fight with the child      loop: the house's minute (song_w.py), 6 dB under the
                                                                other themes (where the same music sits in the score)
-  recluse-phase2   the first fight after the child             once: the stare, the calculation, the flag (0:00-0:59)
+  recluse-phase2   the first fight after the child             once: the stare, long (song_v.py's LOOM, 1:10), then
+                                                                     the calculation and the flag (1:59 in all)
                                                                loop: the chant, the duel, the book, the build again
   recluse-beaten   he's beaten; he talks (as long as it takes) once: the book slammed shut (1.8 s)
                                                                loop: the house's minute again (the same file)
@@ -34,6 +35,10 @@ score's 19 seconds of it stay as they are). Two dips are put on it here, on the 
 and a breath before the drop (the notes' tails ring through both otherwise): a full second of it, at Eric's word
 ("we need that pause longer like a full second it will make it more epic"). A new length: RAGE, and this again
 (as when the director gave his chant two more lines, the same day: 17.435 s from his rising to the crack).
+Phase 2's opening is longer than the score's (Eric, Nov 14, playing it: "when phase 2 boss starts the music is too
+epic too fast"; about one more minute of the looming build-up before the epic part): the score's ten seconds of his
+stare are seventy here (song_v.render with `loom`: made by itself, with its ring), and the calculation follows as it
+is. The loop's own way round (the build again, after the book) is as it was: only the first time is longer.
 Each piece is made by itself (song_v.render with a window: its notes only, their tails ringing on), so a cut never
 slices an echo, and each loop begins with the ring of what leads into it; so an intro here stops dead at its
 `introSeconds` (no tail of its own to overlap) and the loop starts there, as for every theme. The score's pieces share
@@ -53,7 +58,7 @@ import master
 import song_w
 import handoff
 from handoff import HEADROOM, PAD, ceiling, fold, save
-from song_v import BEATS, PLAN, RAGE, T_CALC, T_CHANT, T_CHANT2, T_MEMORY, TAPE, rage_layout, rage_plan, render
+from song_v import BEATS, LOOM, PLAN, RAGE, T_CALC, T_CHANT, T_CHANT2, T_MEMORY, TAPE, rage_layout, rage_plan, render
 from synth import SR, Ride
 
 RING = 8.0  # seconds of ring-out carried over a join
@@ -89,7 +94,9 @@ def main(out: str) -> None:
         """What rings on after a beat (round the tape's end, if it's the last)."""
         return np.take(h, np.arange(n(b), n(b) + ring), axis=1, mode="wrap")
 
-    start = piece(0, T_CHANT)  # the stare, the calculation, the flag
+    loom = fold(render(loom=True))  # the game's longer stare, and ten seconds of its ring
+    gc.collect()
+    start = piece(0, T_CHANT)  # the score's own opening (the stare, the calculation, the flag): for its ring and the score's gain
     build = piece(T_CALC, T_CHANT)  # the calculation and the flag without the stare's ring
     first = piece(T_CHANT, T_MEMORY + 0.001)  # the chant, the duel, and the book that stops them
     beaten = piece(T_MEMORY, T_CHANT2)  # the book, the memory, its souring, the pause
@@ -100,7 +107,8 @@ def main(out: str) -> None:
     gc.collect()
     house = fold(song_w.render())
 
-    intro2 = body(start, 0, T_CHANT)
+    intro2 = np.concatenate([loom[:, : LOOM * SR], body(build, T_CALC, T_CHANT)], axis=1)  # the long stare, then the calculation and the flag
+    intro2[:, LOOM * SR : LOOM * SR + ring] += loom[:, LOOM * SR : LOOM * SR + ring]  # the stare's ring, over the calculation's first bars
     intro2[:, -len(edge):] *= edge[::-1]
     loop2 = np.concatenate([body(first, T_CHANT, T_MEMORY), body(build, T_CALC, T_CHANT)], axis=1)
     join = n(T_MEMORY) - n(T_CHANT)
@@ -150,7 +158,7 @@ def main(out: str) -> None:
         themes = {
             "recluse-house": theme("Hidden Boss: his room, and the fight with the child", "song_w.py", None, "recluse-house-loop"),
             "recluse-phase2": theme("Hidden Boss: the first fight after the child", "song_v.py (phases_v.py)", "recluse-phase2-intro", "recluse-phase2-loop",
-                                    marks={"buildAgain": secs(T_CHANT, T_MEMORY)}),
+                                    marks={"calculation": float(LOOM), "buildAgain": secs(T_CHANT, T_MEMORY)}),
             "recluse-beaten": theme("Hidden Boss: beaten; he talks", "song_v.py, song_w.py (phases_v.py)", "recluse-beaten-intro", "recluse-house-loop"),
             "recluse-phase3": theme("Hidden Boss: he transforms (the intro), the boards split (the loop starts), the rest of the fight", "song_v.py (phases_v.py)",
                                     "recluse-phase3-intro", "recluse-phase3-loop",

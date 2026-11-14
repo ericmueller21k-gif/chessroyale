@@ -48,6 +48,15 @@ kept the strings ("I like the strings") and gave them their shape: "it hangs for
 drop down ... every time it comes through". The notes are this song's own: A sharp, which all three of the build's
 chords share, held, then falling to the nearest note of the chord under it. The game plays this score in pieces,
 by the boss's phase: phases_v.py cuts them.
+The game's first piece opens more slowly than the score does (Eric, Nov 14, playing his second phase: "when phase 2
+boss starts the music is too epic too fast"; about one more minute of the looming build-up before the epic part). So
+for the game the stare is seventy seconds, not ten (`render(loom=True)`, `LOOM`), made of nothing but this score's own
+sounds, each from further off: the clock at a tick a second all the way; his low tones; four phrases of sixteen
+seconds on the build's three chords (G, E flat, B, G), in each the strings' long note held and let fall, an octave
+lower than the build has it and nearer each time; the solo violin trying the figure at a crawl (three notes, five,
+a bar, then two bars and a run of 16ths); from the second phrase a slow thump, from the third the synth bass and
+the low brass; pages; the trembling note; and the clock pressed. The calculation follows as it is. The score itself
+is unchanged.
 591 beats, about 3:58.
   python3 song_v.py <out.wav>
 
@@ -102,6 +111,7 @@ def lay(start, units):
 
 
 T_CALC = 10
+LOOM = 70  # the game's longer stare (phases_v.py): its beats, a second each
 CALC_BARS, _calc, T_FLAG = lay(T_CALC, UNITS)
 T_CHANT, T_DUEL = T_FLAG + 4, T_FLAG + 68
 T_MEMORY, T_SPIRAL, T_PAUSE = T_DUEL + 62, T_DUEL + 96, T_DUEL + 124  # the memory (34 beats), its souring (28), the pause (4)
@@ -243,12 +253,16 @@ assert beats(CHILD) == 32
 assert (T_FLAG, T_MEMORY, T_CHANT2, T_LAST, BEATS, len(SWEEP)) == (138, 268, 334, 519, 591, 30)
 
 
-def render(window=None, lead: float = 8.0, rage=None) -> np.ndarray:
+def render(window=None, lead: float = 8.0, rage=None, loom: bool = False) -> np.ndarray:
     """The song as heard (stereo, at the mix's own level). `window`: (from beat, to beat), to make only that passage
     (a sample; or, with `lead` 0, a piece cut clean for phases_v.py: its notes only, their tails ringing on). `rage`:
     the souring and its pause as the game plays them, not as the score has them: (the build's seconds, its units, the
-    breath's seconds), as RAGE is."""
-    x = Ride(rage_plan(*rage) if rage else PLAN, BEATS, None, os=2, seed=227, tape_secs=TAPE)
+    breath's seconds), as RAGE is. `loom`: not the song but the game's longer stare, by itself: LOOM seconds and ten
+    more of its ring (so nothing wraps round to its start)."""
+    if loom:
+        x = Ride([(0, LOOM + 10, 60, 60, 1.0, 1.0, 0.0)], LOOM + 10, None, os=2, seed=227, tape_secs=float(LOOM + 10))
+    else:
+        x = Ride(rage_plan(*rage) if rage else PLAN, BEATS, None, os=2, seed=227, tape_secs=TAPE)
     x.window, x.lead = window, lead
     put, at = x.put, x.at
     rng = np.random.default_rng(59)
@@ -778,6 +792,50 @@ def render(window=None, lead: float = 8.0, rage=None) -> np.ndarray:
         bars = [(start + 2 * i, 8, i, i % 2) for i in range(length // 2)]
         poles = [root(2 * i, shift, stretch) - 43 for i in range(length // 2)]
         canon([(b, size, 2 * i, which) for b, size, i, which in bars], poles, [(0, *voice[1:]) for voice in voices], loud)
+
+    if loom:
+        # The game's longer stare (see the top). The clock, a tick a second, all the way; his low tones, swelling and
+        # sinking; pages.
+        for b, length, vol in ((0, 24, 0.1), (18, 24, 0.1), (36, 24, 0.1), (52, 18.5, 0.11)):
+            stare(b, length, vol)
+        for i in range(LOOM):
+            tick(i, 0.16, i % 2 == 0)
+        for b, vol in ((2.2, 0.1), (20.4, 0.08), (36.5, 0.08), (52.6, 0.09), (64.3, 0.08)):
+            flip(b, vol)
+        # Four phrases of sixteen beats, on the build's three chords.
+        for j, (b, pole) in enumerate(((6, 0), (22, -4), (38, 4), (54, 0))):
+            # The strings' long note (A sharp held, then let fall to the chord's nearest note), an octave under the
+            # build's, nearer each time; from the third phrase the build's own octave over it too.
+            for i, far in enumerate(((-12,), (-12,), (-12, 0), (-12, 0, 12))[j]):
+                slide(b + 3, 11, 70 + far, (67 if pole == 0 else 66) + far, (0.035, 0.045, 0.055, 0.05)[j] * (0.7 if i else 1.0), (-0.4, 0.4, 0.0)[i], "siren", hang=0.6)
+            # The solo violin tries the figure, an 8th a note: three notes, five, a bar, a bar.
+            loud = (0.3, 0.35, 0.4, 0.42)[j]
+            for i in range((3, 5, 8, 8)[j]):
+                bow(b + 1 + i * 0.5, 0.5, 67 + pole + HEAD[0][i], "solo", loud * (1.3 if i == 0 else 1.0), -0.15)
+            if j >= 1:  # a slow thump, closer together each phrase
+                for i in range(0, 16, (8, 4, 2)[j - 1]):
+                    thump(b + i, 0.08 + 0.02 * j)
+            if j >= 2:  # the synth bass, its filter barely open, and the low brass
+                for i in range(0, 16, 4 if j == 2 else 2):
+                    synth(b + i, 43 + pole, 3.5 if j == 2 else 1.8, 0.1 + 0.03 * (j - 2), 140 * (260 / 140) ** ((j - 2 + i / 16) / 2))
+                brass(b + (8, 5)[j - 2], (8, 10)[j - 2], 43 + pole, 0.05 + 0.015 * (j - 2))
+                shimmer(b, 16, 67 + pole, 0.018 + 0.008 * (j - 2), 0.3), shimmer(b, 16, 55 + pole, 0.016 + 0.006 * (j - 2), -0.3)
+        glow(28, 6, 51, 0.025), glow(56, 8, 55, 0.03)
+        # The last phrase: the figure's second bar too, then both bars in 16ths, twice, louder; the trembling note
+        # under it, growing; a thump on every beat; and the clock is pressed.
+        for i in range(8):
+            bow(54 + 5 + i * 0.5, 0.5, 67 + HEAD[1][i], "solo", 0.42 * (1.3 if i == 0 else 1.0), -0.15)
+        for i in range(24):
+            bow(64 + i * 0.25, 0.25, 67 + (HEAD[0] + HEAD[1] + HEAD[0])[i], "solo", (0.2 + 0.004 * i) * (1.3 if i % 8 == 0 else 1.0), -0.15)
+        at(60, 10)
+        put("solo", 60, x.swell(x.tone(67, 10, BRIDGE, 0.03, detune=(-5, 4), attack=0.3, release=0.2, trem=0.6, trem_hz=12.0), 0.92), -0.15)
+        for i in range(4):
+            thump(66 + i, 0.1)
+        press(LOOM - 0.5, 0.12)
+        cathedral("siren", 3.0, 0.35)
+        x.beat_s = 60 / 160  # the echoes' beat, as the song's
+        x.echo("solo", 0.75, 0.12, 0.05)
+        return x.play(x.mixdown(levels, lowpass=8500, room=0.34, room_s=2.0))
 
     # 0:00 The stare. His two low tones, beating; the clock, a tick a second; the red book opened, its pages turned; a
     # violin near the bridge, one note, trembling, growing. Then the clock is pressed.
