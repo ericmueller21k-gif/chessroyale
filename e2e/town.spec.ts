@@ -1547,7 +1547,8 @@ test("rides (Oct 31; Nov 1, every boss's): your pawn sits on its ride, the ride'
   // (The first walk may come before the loop is decoded: from here, a walk with it ready.)
   await expect.poll(async () => (await rideNow(page)).you.sound.live, { message: "the first walk's loop let go", timeout: 5_000 }).toBe(0);
   await page.evaluate(() => ((window as unknown as { __rideLog: unknown[] }).__rideLog.length = 0));
-  // Moving: one source, looping 0.1 to 1.1 s, coming up (read as it moves, on the frames: walking 4 squares takes 360 ms).
+  // Moving: one source, looping 0.1 to 1.1 s, coming up (read as it moves, every 15 ms rather than per frame, so a slow CI frame
+  // rate (software WebGL: about 4 frames in the walk) still gives enough reads: walking 4 squares takes 360 ms).
   const heard = page.evaluate(
     () =>
       new Promise<unknown[]>((done) => {
@@ -1559,14 +1560,14 @@ test("rides (Oct 31; Nov 1, every boss's): your pawn sits on its ride, the ride'
           if (m) all.push(w.__townRide().you.sound);
           went ||= m;
           if (went && !m) return done(all);
-          requestAnimationFrame(look);
+          setTimeout(look, 15);
         };
-        requestAnimationFrame(look);
+        setTimeout(look, 15);
       }),
   );
   await ride([24, 29]);
   const during = (await heard) as { ride: string | null; up: boolean; live: number; loop: unknown[] | null }[];
-  expect(during.length, "frames seen moving").toBeGreaterThan(5);
+  expect(during.length, "reads while moving").toBeGreaterThan(5);
   expect(Math.max(...during.map((d) => d.live)), "never more than one source").toBe(1);
   const playing = during.filter((d) => d.live === 1);
   expect(playing.length, "the loop plays as you ride").toBeGreaterThan(during.length / 2);
