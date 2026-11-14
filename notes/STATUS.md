@@ -1038,3 +1038,5 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 14 00:20: QUEUE for the next free Opus slots, in order: (1) briefs/recluse-bubble-grows.md (his bubble keeps the 9-year-old's
   size after he grows: covers his face; Eric playtest), (2) briefs/confirm-flash-fade.md (mockup GIF first, helper waits for `.go`
   with Eric's answer), (3) briefs/recluse-room-night.md.
+- Nov 14 00:28: confirm-flash mockup DROPPED from the queue (Eric: maybe no ring at all). Instead #693-ish: claude/ring-look-switch,
+  ?ring=off|fade|on (sessionStorage) so Eric compares live. Queue now: (1) recluse-bubble-grows, (2) recluse-room-night.
