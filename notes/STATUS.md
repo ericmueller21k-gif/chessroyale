@@ -1173,3 +1173,6 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 14 17:40: main 7993f4fc (#714+#715) LIVE, full run GREEN, no retries. Eric back: (1) Fill with 3 bots: leave as is. (2) CI traces
   OK -> #716 (retain-on-first-failure, ~8% time). (3) Room tests: "I don't even care about the room rule testing… holding us up"
   -> no longer guards (eric.md in #716); the online 🏆 is admin-only, to be deleted later: don't spend on it. #716 CI running.
+- Nov 14 18:20: #716 MERGED 3635a561 (CI traces retain-on-first-failure; room tests no longer guards; engine retry needs
+  ENGINE_SERVER.retryMinMs 250 ms left, found by its unit run). Its PR run retry-passes: town.spec:646 [phone], lobby-chat:28 [phone]
+  -> flaky list. Main run watcher running. No helpers.
