@@ -1,0 +1,61 @@
+{
+  "pad": 0.5,
+  "note": "Play <intro> once at t0. Start <loop> at t0 + introSeconds from offset pad, looping between pad and pad + loopSeconds.",
+  "themes": {
+    "recluse-house": {
+      "boss": "Hidden Boss: his room, and the fight with the child",
+      "source": "scripts/reel/music/song_w.py",
+      "intro": null,
+      "loop": "recluse-house-loop",
+      "introSeconds": 0.0,
+      "loopSeconds": 60.0,
+      "bpm": null,
+      "lufs": -22.0,
+      "peakDb": -10.2
+    },
+    "recluse-phase2": {
+      "boss": "Hidden Boss: the first fight after the child",
+      "source": "scripts/reel/music/song_v.py (phases_v.py)",
+      "intro": "recluse-phase2-intro",
+      "loop": "recluse-phase2-loop",
+      "introSeconds": 118.887167,
+      "loopSeconds": 89.275563,
+      "bpm": null,
+      "lufs": -18.2,
+      "peakDb": -1.1,
+      "marks": {
+        "calculation": 70.0,
+        "buildAgain": 40.388396
+      }
+    },
+    "recluse-beaten": {
+      "boss": "Hidden Boss: beaten; he talks",
+      "source": "scripts/reel/music/song_v.py, song_w.py (phases_v.py)",
+      "intro": "recluse-beaten-intro",
+      "loop": "recluse-house-loop",
+      "introSeconds": 1.815,
+      "loopSeconds": 60.0,
+      "bpm": null,
+      "lufs": -22.0,
+      "peakDb": -1.6
+    },
+    "recluse-phase3": {
+      "boss": "Hidden Boss: he transforms (the intro), the boards split (the loop starts), the rest of the fight",
+      "source": "scripts/reel/music/song_v.py (phases_v.py)",
+      "intro": "recluse-phase3-intro",
+      "loop": "recluse-phase3-loop",
+      "introSeconds": 17.435,
+      "loopSeconds": 88.371021,
+      "bpm": null,
+      "lufs": -15.1,
+      "peakDb": -1.0,
+      "marks": {
+        "pause": 2.44,
+        "slam": 2.64,
+        "build": 3.04,
+        "breath": 16.435,
+        "drop": 17.435
+      }
+    }
+  }
+}
