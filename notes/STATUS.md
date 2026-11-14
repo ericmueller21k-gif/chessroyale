@@ -1118,3 +1118,8 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   moved the music fetch after the first frame + per-file hash-checked brc-music cache).
 - Nov 14 09:35: main b5ffcdd: retry-passes only (town-chat:1370, alfil:247 new). #707 WIP dc5211cc: sound.spec:61 fails both tries
   (not on main) -> sent to the fix-707 helper.
+- Nov 14 10:25: #709 town-load MERGED 496d256f, LIVE, main full run GREEN. #710 music-level (vol 0.4, no doubled theme) opened;
+  conflict with #709 on MUSIC (kept 0.4 + townPreloadAfterMs), merged main -> bbcb99e3, CI watcher btqi23gc2; merge when green.
+  #707: helper's light-before-after showed the body bloom weaker and the rays softer after the 1/3-res fix -> sent back; it moved the
+  light to 1 px per CSS px in a worker (3d0215c5). Waiting for its new stills + perf + "Done" (watcher b8d5ihz1a). Judge at 1:1
+  (6.3 s body glow) before merging. Check-in send_later 11:05.
