@@ -1105,3 +1105,5 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   (session_01JuCWRtesHR7mFg3Lkou6hn) waits for .go "round3" + eye pick. Slot free: transform build can start the moment Eric says go.
 - Nov 14 06:55: Eric: "blue eyes, go" -> .go written (9c0b5bbb). Transform helper building round 3b + blue eyes; watcher for .done.
   After it: visual QA of the whole fight (briefs/recluse-visual-qa.md), flaky round 4.
+- Nov 14 07:05: #706 standings MERGED. Flaky round 4 list: town-street:155 [desktop], hidden-boss-room:313 [desktop, guard] (a 5th
+  at his door: not.toBeNull), shop:238, town-street:528, town-chat:1367, fairplay:65 (needs the CI trace change: Eric's OK pending).
