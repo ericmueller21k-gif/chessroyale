@@ -1,0 +1,4761 @@
+{
+ "01-kid-start": {
+  "vw": 390,
+  "vh": 664,
+  "scrollW": 390,
+  "scrollH": 664,
+  "boxes": {
+   ".board-row > .board-wrap": [
+    [
+     28,
+     153,
+     334,
+     334
+    ]
+   ],
+   ".mv-side": [],
+   ".under-board": [],
+   ".bp": [
+    [
+     28,
+     533,
+     217,
+     125
+    ]
+   ],
+   ".you-pawn": [
+    [
+     245,
+     533,
+     58,
+     62
+    ]
+   ],
+   ".dk-mate-art": [
+    [
+     239,
+     615,
+     42,
+     42
+    ],
+    [
+     282,
+     615,
+     42,
+     42
+    ],
+    [
+     325,
+     615,
+     42,
+     42
+    ]
+   ],
+   ".gk-unit": [
+    [
+     303,
+     533,
+     58,
+     62
+    ]
+   ],
+   ".boss-char": [
+    [
+     19,
+     53,
+     58,
+     88
+    ]
+   ],
+   ".boss-bar": [
+    [
+     14,
+     48,
+     362,
+     99
+    ]
+   ],
+   ".boss-dock": [
+    [
+     14,
+     493,
+     362,
+     165
+    ]
+   ],
+   ".tower-side": [],
+   ".bp-tower": [
+    [
+     28,
+     561,
+     217,
+     97
+    ]
+   ],
+   ".gchat-field": [],
+   ".rc-stage": [],
+   ".boss-level": [
+    [
+     89,
+     72,
+     37,
+     11
+    ]
+   ]
+  },
+  "bubbles": [
+   {
+    "cls": "gk-bubble",
+    "text": "Mind your queen. She's worth more than my crown.",
+    "box": [
+     40,
+     567,
+     245,
+     47
+    ]
+   },
+   {
+    "cls": "speech-clip",
+    "text": "Mind your queen. She's worth more than my crown.",
+    "box": [
+     52,
+     580,
+     200,
+     21
+    ]
+   },
+   {
+    "cls": "speech-line",
+    "text": "Mind your queen. She's worth more than my crown.",
+    "box": [
+     52,
+     580,
+     200,
+     21
+    ]
+   }
+  ],
+  "figs": [
+   {
+    "parent": "boss-char place-bar ch-recluse-growing-bust wide b",
+    "box": [
+     13,
+     47,
+     67,
+     94
+    ],
+    "drawnTop": 59,
+    "drawnX": [
+     30,
+     65
+    ]
+   }
+  ],
+  "quads": [],
+  "step": null,
+  "phase": "play",
+  "form": "child",
+  "formStep": 0
+ },
+ "02-kid-line": {
+  "vw": 390,
+  "vh": 664,
+  "scrollW": 390,
+  "scrollH": 664,
+  "boxes": {
+   ".board-row > .board-wrap": [
+    [
+     28,
+     153,
+     334,
+     334
+    ]
+   ],
+   ".mv-side": [],
+   ".under-board": [],
+   ".bp": [
+    [
+     28,
+     533,
+     217,
+     125
+    ]
+   ],
+   ".you-pawn": [
+    [
+     245,
+     533,
+     58,
+     62
+    ]
+   ],
+   ".dk-mate-art": [
+    [
+     239,
+     615,
+     42,
+     42
+    ],
+    [
+     282,
+     615,
+     42,
+     42
+    ],
+    [
+     325,
+     615,
+     42,
+     42
+    ]
+   ],
+   ".gk-unit": [
+    [
+     303,
+     533,
+     58,
+     62
+    ]
+   ],
+   ".boss-char": [
+    [
+     19,
+     53,
+     58,
+     88
+    ]
+   ],
+   ".boss-bar": [
+    [
+     14,
+     48,
+     362,
+     99
+    ]
+   ],
+   ".boss-dock": [
+    [
+     14,
+     493,
+     362,
+     165
+    ]
+   ],
+   ".tower-side": [],
+   ".bp-tower": [
+    [
+     28,
+     561,
+     217,
+     97
+    ]
+   ],
+   ".gchat-field": [],
+   ".rc-stage": [],
+   ".boss-level": [
+    [
+     89,
+     72,
+     37,
+     11
+    ]
+   ]
+  },
+  "bubbles": [
+   {
+    "cls": "gk-bubble",
+    "text": "Mind your queen. She's worth more than my crown.",
+    "box": [
+     40,
+     567,
+     245,
+     47
+    ]
+   },
+   {
+    "cls": "speech-clip",
+    "text": "Mind your queen. She's worth more than my crown.",
+    "box": [
+     52,
+     580,
+     200,
+     21
+    ]
+   },
+   {
+    "cls": "speech-line",
+    "text": "Mind your queen. She's worth more than my crown.",
+    "box": [
+     52,
+     580,
+     200,
+     21
+    ]
+   }
+  ],
+  "figs": [
+   {
+    "parent": "boss-char place-bar ch-recluse-growing-bust wide b",
+    "box": [
+     13,
+     47,
+     67,
+     94
+    ],
+    "drawnTop": 59,
+    "drawnX": [
+     30,
+     65
+    ]
+   }
+  ],
+  "quads": [],
+  "step": null,
+  "phase": "play",
+  "form": "child",
+  "formStep": 0
+ },
+ "03-kid-13": {
+  "vw": 390,
+  "vh": 664,
+  "scrollW": 390,
+  "scrollH": 664,
+  "boxes": {
+   ".board-row > .board-wrap": [
+    [
+     28,
+     153,
+     334,
+     334
+    ]
+   ],
+   ".mv-side": [],
+   ".under-board": [],
+   ".bp": [
+    [
+     28,
+     533,
+     217,
+     125
+    ]
+   ],
+   ".you-pawn": [
+    [
+     245,
+     533,
+     58,
+     62
+    ]
+   ],
+   ".dk-mate-art": [
+    [
+     239,
+     615,
+     42,
+     42
+    ],
+    [
+     282,
+     615,
+     42,
+     42
+    ],
+    [
+     325,
+     615,
+     42,
+     42
+    ]
+   ],
+   ".gk-unit": [
+    [
+     303,
+     533,
+     58,
+     62
+    ]
+   ],
+   ".boss-char": [
+    [
+     19,
+     53,
+     58,
+     88
+    ]
+   ],
+   ".boss-bar": [
+    [
+     14,
+     48,
+     362,
+     99
+    ]
+   ],
+   ".boss-dock": [
+    [
+     14,
+     493,
+     362,
+     165
+    ]
+   ],
+   ".tower-side": [],
+   ".bp-tower": [
+    [
+     28,
+     561,
+     217,
+     97
+    ]
+   ],
+   ".gchat-field": [],
+   ".rc-stage": [],
+   ".boss-level": [
+    [
+     89,
+     72,
+     49,
+     11
+    ]
+   ]
+  },
+  "bubbles": [
+   {
+    "cls": "bc-bubble bc-bar-bubble",
+    "text": "I read every chess book in the library.",
+    "box": [
+     89,
+     97,
+     274,
+     48
+    ]
+   },
+   {
+    "cls": "speech-clip",
+    "text": "I read every chess book in the library.",
+    "box": [
+     102,
+     109,
+     248,
+     25
+    ]
+   },
+   {
+    "cls": "speech-line",
+    "text": "I read every chess book in the library.",
+    "box": [
+     102,
+     110,
+     180,
+     22
+    ]
+   }
+  ],
+  "figs": [
+   {
+    "parent": "boss-char place-bar ch-recluse-growing-bust wide b",
+    "box": [
+     13,
+     47,
+     67,
+     94
+    ],
+    "drawnTop": 58,
+    "drawnX": [
+     26,
+     69
+    ]
+   }
+  ],
+  "quads": [],
+  "step": null,
+  "phase": "reveal",
+  "form": "child",
+  "formStep": 2
+ },
+ "04-kid-20": {
+  "vw": 390,
+  "vh": 664,
+  "scrollW": 390,
+  "scrollH": 664,
+  "boxes": {
+   ".board-row > .board-wrap": [
+    [
+     28,
+     153,
+     334,
+     334
+    ]
+   ],
+   ".mv-side": [],
+   ".under-board": [],
+   ".bp": [
+    [
+     28,
+     533,
+     217,
+     125
+    ]
+   ],
+   ".you-pawn": [
+    [
+     245,
+     533,
+     58,
+     62
+    ]
+   ],
+   ".dk-mate-art": [
+    [
+     239,
+     615,
+     42,
+     42
+    ],
+    [
+     282,
+     615,
+     42,
+     42
+    ],
+    [
+     325,
+     615,
+     42,
+     42
+    ]
+   ],
+   ".gk-unit": [
+    [
+     303,
+     533,
+     58,
+     62
+    ]
+   ],
+   ".boss-char": [
+    [
+     19,
+     53,
+     58,
+     88
+    ]
+   ],
+   ".boss-bar": [
+    [
+     14,
+     48,
+     362,
+     99
+    ]
+   ],
+   ".boss-dock": [
+    [
+     14,
+     493,
+     362,
+     165
+    ]
+   ],
+   ".tower-side": [],
+   ".bp-tower": [
+    [
+     28,
+     561,
+     217,
+     97
+    ]
+   ],
+   ".gchat-field": [],
+   ".rc-stage": [],
+   ".boss-level": [
+    [
+     89,
+     72,
+     49,
+     11
+    ]
+   ]
+  },
+  "bubbles": [],
+  "figs": [
+   {
+    "parent": "boss-char place-bar ch-recluse-growing-bust wide b",
+    "box": [
+     13,
+     47,
+     67,
+     94
+    ],
+    "drawnTop": 59,
+    "drawnX": [
+     23,
+     69
+    ]
+   }
+  ],
+  "quads": [],
+  "step": null,
+  "phase": "reveal",
+  "form": "child",
+  "formStep": 4
+ },
+ "05-kid-20-line": {
+  "vw": 390,
+  "vh": 664,
+  "scrollW": 390,
+  "scrollH": 664,
+  "boxes": {
+   ".board-row > .board-wrap": [
+    [
+     28,
+     153,
+     334,
+     334
+    ]
+   ],
+   ".mv-side": [],
+   ".under-board": [],
+   ".bp": [
+    [
+     28,
+     533,
+     217,
+     125
+    ]
+   ],
+   ".you-pawn": [
+    [
+     245,
+     533,
+     58,
+     62
+    ]
+   ],
+   ".dk-mate-art": [
+    [
+     239,
+     615,
+     42,
+     42
+    ],
+    [
+     282,
+     615,
+     42,
+     42
+    ],
+    [
+     325,
+     615,
+     42,
+     42
+    ]
+   ],
+   ".gk-unit": [
+    [
+     303,
+     533,
+     58,
+     62
+    ]
+   ],
+   ".boss-char": [
+    [
+     19,
+     53,
+     58,
+     88
+    ]
+   ],
+   ".boss-bar": [
+    [
+     14,
+     48,
+     362,
+     99
+    ]
+   ],
+   ".boss-dock": [
+    [
+     14,
+     493,
+     362,
+     165
+    ]
+   ],
+   ".tower-side": [],
+   ".bp-tower": [
+    [
+     28,
+     561,
+     217,
+     97
+    ]
+   ],
+   ".gchat-field": [],
+   ".rc-stage": [],
+   ".boss-level": [
+    [
+     89,
+     72,
+     49,
+     11
+    ]
+   ]
+  },
+  "bubbles": [
+   {
+    "cls": "bc-bubble bc-bar-bubble",
+    "text": "Hey! No fair.",
+    "box": [
+     89,
+     109,
+     143,
+     36
+    ]
+   },
+   {
+    "cls": "speech-clip",
+    "text": "Hey! No fair.",
+    "box": [
+     102,
+     121,
+     117,
+     13
+    ]
+   },
+   {
+    "cls": "speech-line",
+    "text": "Hey! No fair.",
+    "box": [
+     102,
+     122,
+     117,
+     9
+    ]
+   }
+  ],
+  "figs": [
+   {
+    "parent": "boss-char place-bar ch-recluse-growing-bust wide b",
+    "box": [
+     13,
+     47,
+     67,
+     94
+    ],
+    "drawnTop": 58,
+    "drawnX": [
+     23,
+     69
+    ]
+   }
+  ],
+  "quads": [],
+  "step": null,
+  "phase": "boss",
+  "form": "child",
+  "formStep": 4
+ },
+ "06-kid-beaten": {
+  "vw": 390,
+  "vh": 664,
+  "scrollW": 390,
+  "scrollH": 664,
+  "boxes": {
+   ".board-row > .board-wrap": [
+    [
+     28,
+     153,
+     334,
+     334
+    ]
+   ],
+   ".mv-side": [],
+   ".under-board": [],
+   ".bp": [
+    [
+     28,
+     533,
+     217,
+     125
+    ]
+   ],
+   ".you-pawn": [
+    [
+     245,
+     533,
+     58,
+     62
+    ]
+   ],
+   ".dk-mate-art": [
+    [
+     239,
+     615,
+     42,
+     42
+    ],
+    [
+     282,
+     615,
+     42,
+     42
+    ],
+    [
+     325,
+     615,
+     42,
+     42
+    ]
+   ],
+   ".gk-unit": [
+    [
+     303,
+     533,
+     58,
+     62
+    ]
+   ],
+   ".boss-char": [
+    [
+     19,
+     53,
+     58,
+     88
+    ]
+   ],
+   ".boss-bar": [
+    [
+     14,
+     48,
+     362,
+     99
+    ]
+   ],
+   ".boss-dock": [
+    [
+     14,
+     493,
+     362,
+     165
+    ]
+   ],
+   ".tower-side": [],
+   ".bp-tower": [
+    [
+     28,
+     561,
+     217,
+     97
+    ]
+   ],
+   ".gchat-field": [],
+   ".rc-stage": [],
+   ".boss-level": [
+    [
+     89,
+     72,
+     49,
+     11
+    ]
+   ]
+  },
+  "bubbles": [
+   {
+    "cls": "bc-bubble bc-bar-bubble",
+    "text": "Okay. You're good.",
+    "box": [
+     89,
+     97,
+     162,
+     48
+    ]
+   },
+   {
+    "cls": "speech-clip",
+    "text": "Okay. You're good.",
+    "box": [
+     102,
+     109,
+     136,
+     25
+    ]
+   },
+   {
+    "cls": "speech-line",
+    "text": "Okay. You're good.",
+    "box": [
+     102,
+     110,
+     108,
+     22
+    ]
+   }
+  ],
+  "figs": [
+   {
+    "parent": "boss-char place-bar ch-recluse-growing-bust wide b",
+    "box": [
+     13,
+     47,
+     67,
+     94
+    ],
+    "drawnTop": 53,
+    "drawnX": [
+     17,
+     73
+    ]
+   }
+  ],
+  "quads": [],
+  "step": null,
+  "phase": "boss",
+  "form": "child",
+  "formStep": 4
+ },
+ "07-kid-grows-up": {
+  "vw": 390,
+  "vh": 664,
+  "scrollW": 390,
+  "scrollH": 664,
+  "boxes": {
+   ".board-row > .board-wrap": [
+    [
+     28,
+     153,
+     334,
+     334
+    ]
+   ],
+   ".mv-side": [],
+   ".under-board": [],
+   ".bp": [
+    [
+     28,
+     533,
+     217,
+     125
+    ]
+   ],
+   ".you-pawn": [
+    [
+     245,
+     533,
+     58,
+     62
+    ]
+   ],
+   ".dk-mate-art": [
+    [
+     239,
+     615,
+     42,
+     42
+    ],
+    [
+     282,
+     615,
+     42,
+     42
+    ],
+    [
+     325,
+     615,
+     42,
+     42
+    ]
+   ],
+   ".gk-unit": [
+    [
+     303,
+     533,
+     58,
+     62
+    ]
+   ],
+   ".boss-char": [
+    [
+     19,
+     53,
+     58,
+     88
+    ]
+   ],
+   ".boss-bar": [
+    [
+     14,
+     48,
+     362,
+     99
+    ]
+   ],
+   ".boss-dock": [
+    [
+     14,
+     493,
+     362,
+     165
+    ]
+   ],
+   ".tower-side": [],
+   ".bp-tower": [
+    [
+     28,
+     561,
+     217,
+     97
+    ]
+   ],
+   ".gchat-field": [],
+   ".rc-stage": [],
+   ".boss-level": [
+    [
+     89,
+     72,
+     49,
+     11
+    ]
+   ]
+  },
+  "bubbles": [
+   {
+    "cls": "bc-bubble bc-bar-bubble",
+    "text": "He was good. I'm better.",
+    "box": [
+     89,
+     97,
+     198,
+     48
+    ]
+   },
+   {
+    "cls": "speech-clip",
+    "text": "He was good. I'm better.",
+    "box": [
+     102,
+     109,
+     172,
+     25
+    ]
+   },
+   {
+    "cls": "speech-line",
+    "text": "He was good. I'm better.",
+    "box": [
+     102,
+     110,
+     108,
+     22
+    ]
+   }
+  ],
+  "figs": [
+   {
+    "parent": "boss-char place-bar ch-recluse-growing-bust wide b",
+    "box": [
+     13,
+     47,
+     67,
+     94
+    ],
+    "drawnTop": 58,
+    "drawnX": [
+     17,
+     73
+    ]
+   }
+  ],
+  "quads": [],
+  "step": null,
+  "phase": "boss",
+  "form": "child",
+  "formStep": 4
+ },
+ "08-man-start": {
+  "vw": 390,
+  "vh": 664,
+  "scrollW": 390,
+  "scrollH": 664,
+  "boxes": {
+   ".board-row > .board-wrap": [
+    [
+     28,
+     153,
+     334,
+     334
+    ]
+   ],
+   ".mv-side": [],
+   ".under-board": [],
+   ".bp": [
+    [
+     28,
+     533,
+     217,
+     125
+    ]
+   ],
+   ".you-pawn": [
+    [
+     245,
+     533,
+     58,
+     62
+    ]
+   ],
+   ".dk-mate-art": [
+    [
+     239,
+     615,
+     42,
+     42
+    ],
+    [
+     282,
+     615,
+     42,
+     42
+    ],
+    [
+     325,
+     615,
+     42,
+     42
+    ]
+   ],
+   ".gk-unit": [
+    [
+     303,
+     533,
+     58,
+     62
+    ]
+   ],
+   ".boss-char": [
+    [
+     19,
+     53,
+     58,
+     88
+    ]
+   ],
+   ".boss-bar": [
+    [
+     14,
+     48,
+     362,
+     99
+    ]
+   ],
+   ".boss-dock": [
+    [
+     14,
+     493,
+     362,
+     165
+    ]
+   ],
+   ".tower-side": [],
+   ".bp-tower": [
+    [
+     28,
+     561,
+     217,
+     97
+    ]
+   ],
+   ".gchat-field": [],
+   ".rc-stage": [],
+   ".boss-level": [
+    [
+     89,
+     72,
+     42,
+     11
+    ]
+   ]
+  },
+  "bubbles": [],
+  "figs": [
+   {
+    "parent": "boss-char place-bar ch-recluse-bust wide",
+    "box": [
+     13,
+     47,
+     67,
+     94
+    ],
+    "drawnTop": 58,
+    "drawnX": [
+     17,
+     73
+    ]
+   }
+  ],
+  "quads": [],
+  "step": null,
+  "phase": "play",
+  "form": null,
+  "formStep": null
+ },
+ "09-man-line": {
+  "vw": 390,
+  "vh": 664,
+  "scrollW": 390,
+  "scrollH": 664,
+  "boxes": {
+   ".board-row > .board-wrap": [
+    [
+     28,
+     153,
+     334,
+     334
+    ]
+   ],
+   ".mv-side": [],
+   ".under-board": [],
+   ".bp": [
+    [
+     28,
+     533,
+     217,
+     125
+    ]
+   ],
+   ".you-pawn": [
+    [
+     245,
+     533,
+     58,
+     62
+    ]
+   ],
+   ".dk-mate-art": [
+    [
+     239,
+     615,
+     42,
+     42
+    ],
+    [
+     282,
+     615,
+     42,
+     42
+    ],
+    [
+     325,
+     615,
+     42,
+     42
+    ]
+   ],
+   ".gk-unit": [
+    [
+     303,
+     533,
+     58,
+     62
+    ]
+   ],
+   ".boss-char": [
+    [
+     19,
+     53,
+     58,
+     88
+    ]
+   ],
+   ".boss-bar": [
+    [
+     14,
+     48,
+     362,
+     99
+    ]
+   ],
+   ".boss-dock": [
+    [
+     14,
+     493,
+     362,
+     165
+    ]
+   ],
+   ".tower-side": [],
+   ".bp-tower": [
+    [
+     28,
+     561,
+     217,
+     97
+    ]
+   ],
+   ".gchat-field": [],
+   ".rc-stage": [],
+   ".boss-level": [
+    [
+     89,
+     72,
+     42,
+     11
+    ]
+   ]
+  },
+  "bubbles": [
+   {
+    "cls": "bc-bubble bc-bar-bubble",
+    "text": "I know an engine move when I see one.",
+    "box": [
+     89,
+     97,
+     247,
+     48
+    ]
+   },
+   {
+    "cls": "speech-clip",
+    "text": "I know an engine move when I see one.",
+    "box": [
+     102,
+     109,
+     221,
+     25
+    ]
+   },
+   {
+    "cls": "speech-line",
+    "text": "I know an engine move when I see one.",
+    "box": [
+     102,
+     110,
+     180,
+     22
+    ]
+   }
+  ],
+  "figs": [
+   {
+    "parent": "boss-char place-bar ch-recluse-bust wide",
+    "box": [
+     13,
+     47,
+     67,
+     94
+    ],
+    "drawnTop": 59,
+    "drawnX": [
+     17,
+     73
+    ]
+   }
+  ],
+  "quads": [],
+  "step": null,
+  "phase": "play",
+  "form": null,
+  "formStep": null
+ },
+ "10-man-fall": {
+  "vw": 390,
+  "vh": 664,
+  "scrollW": 390,
+  "scrollH": 664,
+  "boxes": {
+   ".board-row > .board-wrap": [
+    [
+     28,
+     153,
+     334,
+     334
+    ]
+   ],
+   ".mv-side": [],
+   ".under-board": [],
+   ".bp": [
+    [
+     28,
+     533,
+     217,
+     125
+    ]
+   ],
+   ".you-pawn": [
+    [
+     245,
+     533,
+     58,
+     62
+    ]
+   ],
+   ".dk-mate-art": [
+    [
+     239,
+     615,
+     42,
+     42
+    ],
+    [
+     282,
+     615,
+     42,
+     42
+    ],
+    [
+     325,
+     615,
+     42,
+     42
+    ]
+   ],
+   ".gk-unit": [
+    [
+     303,
+     533,
+     58,
+     62
+    ]
+   ],
+   ".boss-char": [
+    [
+     19,
+     53,
+     58,
+     88
+    ]
+   ],
+   ".boss-bar": [
+    [
+     14,
+     48,
+     362,
+     99
+    ]
+   ],
+   ".boss-dock": [
+    [
+     14,
+     493,
+     362,
+     165
+    ]
+   ],
+   ".tower-side": [],
+   ".bp-tower": [
+    [
+     28,
+     561,
+     217,
+     97
+    ]
+   ],
+   ".gchat-field": [],
+   ".rc-stage": [],
+   ".boss-level": [
+    [
+     89,
+     72,
+     42,
+     11
+    ]
+   ]
+  },
+  "bubbles": [
+   {
+    "cls": "bc-bubble bc-bar-bubble",
+    "text": "The book said... no... no...",
+    "box": [
+     89,
+     97,
+     216,
+     48
+    ]
+   },
+   {
+    "cls": "speech-clip",
+    "text": "The book said... no... no...",
+    "box": [
+     102,
+     109,
+     190,
+     25
+    ]
+   },
+   {
+    "cls": "speech-line",
+    "text": "The book said... no... no...",
+    "box": [
+     102,
+     110,
+     144,
+     22
+    ]
+   }
+  ],
+  "figs": [
+   {
+    "parent": "boss-char place-bar ch-recluse-bust wide",
+    "box": [
+     13,
+     47,
+     67,
+     94
+    ],
+    "drawnTop": 83,
+    "drawnX": [
+     22,
+     70
+    ]
+   }
+  ],
+  "quads": [],
+  "step": null,
+  "phase": "boss",
+  "form": null,
+  "formStep": null
+ },
+ "11-cutscene-start": {
+  "vw": 390,
+  "vh": 664,
+  "scrollW": 390,
+  "scrollH": 664,
+  "boxes": {
+   ".board-row > .board-wrap": [
+    [
+     28,
+     153,
+     334,
+     334
+    ]
+   ],
+   ".mv-side": [],
+   ".under-board": [],
+   ".bp": [
+    [
+     28,
+     533,
+     217,
+     125
+    ]
+   ],
+   ".you-pawn": [
+    [
+     245,
+     533,
+     58,
+     62
+    ]
+   ],
+   ".dk-mate-art": [
+    [
+     239,
+     615,
+     42,
+     42
+    ],
+    [
+     282,
+     615,
+     42,
+     42
+    ],
+    [
+     325,
+     615,
+     42,
+     42
+    ]
+   ],
+   ".gk-unit": [
+    [
+     303,
+     533,
+     58,
+     62
+    ]
+   ],
+   ".boss-char": [],
+   ".boss-bar": [
+    [
+     14,
+     48,
+     362,
+     99
+    ]
+   ],
+   ".boss-dock": [
+    [
+     14,
+     493,
+     362,
+     165
+    ]
+   ],
+   ".tower-side": [],
+   ".bp-tower": [
+    [
+     28,
+     561,
+     217,
+     97
+    ]
+   ],
+   ".gchat-field": [],
+   ".rc-stage": [],
+   ".boss-level": [
+    [
+     89,
+     72,
+     42,
+     11
+    ]
+   ]
+  },
+  "bubbles": [],
+  "figs": [
+   {
+    "parent": "cs-fig",
+    "box": [
+     130,
+     148,
+     130,
+     235
+    ],
+    "drawnTop": 248,
+    "drawnX": [
+     144,
+     245
+    ]
+   }
+  ],
+  "quads": [],
+  "step": null,
+  "phase": "boss",
+  "form": null,
+  "formStep": null
+ },
+ "12-cutscene-line1": {
+  "vw": 390,
+  "vh": 664,
+  "scrollW": 390,
+  "scrollH": 664,
+  "boxes": {
+   ".board-row > .board-wrap": [
+    [
+     28,
+     153,
+     334,
+     334
+    ]
+   ],
+   ".mv-side": [],
+   ".under-board": [],
+   ".bp": [
+    [
+     28,
+     533,
+     217,
+     125
+    ]
+   ],
+   ".you-pawn": [
+    [
+     245,
+     533,
+     58,
+     62
+    ]
+   ],
+   ".dk-mate-art": [
+    [
+     239,
+     615,
+     42,
+     42
+    ],
+    [
+     282,
+     615,
+     42,
+     42
+    ],
+    [
+     325,
+     615,
+     42,
+     42
+    ]
+   ],
+   ".gk-unit": [
+    [
+     303,
+     533,
+     58,
+     62
+    ]
+   ],
+   ".boss-char": [],
+   ".boss-bar": [
+    [
+     14,
+     48,
+     362,
+     99
+    ]
+   ],
+   ".boss-dock": [
+    [
+     14,
+     493,
+     362,
+     165
+    ]
+   ],
+   ".tower-side": [],
+   ".bp-tower": [
+    [
+     28,
+     561,
+     217,
+     97
+    ]
+   ],
+   ".gchat-field": [],
+   ".rc-stage": [],
+   ".boss-level": [
+    [
+     89,
+     72,
+     42,
+     11
+    ]
+   ]
+  },
+  "bubbles": [
+   {
+    "cls": "bc-bubble cs-say leaving",
+    "text": "The machines find them now. They don't need us anymore.",
+    "box": [
+     50,
+     161,
+     230,
+     71
+    ]
+   },
+   {
+    "cls": "speech-clip",
+    "text": "The machines find them now. They don't need us anymore.",
+    "box": [
+     63,
+     176,
+     200,
+     42
+    ]
+   },
+   {
+    "cls": "speech-line",
+    "text": "The machines find them now. They don't need us anymore.",
+    "box": [
+     63,
+     176,
+     200,
+     42
+    ]
+   }
+  ],
+  "figs": [
+   {
+    "parent": "cs-fig",
+    "box": [
+     130,
+     148,
+     130,
+     235
+    ],
+    "drawnTop": 246,
+    "drawnX": [
+     144,
+     240
+    ]
+   }
+  ],
+  "quads": [],
+  "step": null,
+  "phase": "boss",
+  "form": null,
+  "formStep": null
+ },
+ "12-cutscene-line2": {
+  "vw": 390,
+  "vh": 664,
+  "scrollW": 390,
+  "scrollH": 664,
+  "boxes": {
+   ".board-row > .board-wrap": [
+    [
+     28,
+     153,
+     334,
+     334
+    ]
+   ],
+   ".mv-side": [],
+   ".under-board": [],
+   ".bp": [
+    [
+     28,
+     533,
+     217,
+     125
+    ]
+   ],
+   ".you-pawn": [
+    [
+     245,
+     533,
+     58,
+     62
+    ]
+   ],
+   ".dk-mate-art": [
+    [
+     239,
+     615,
+     42,
+     42
+    ],
+    [
+     282,
+     615,
+     42,
+     42
+    ],
+    [
+     325,
+     615,
+     42,
+     42
+    ]
+   ],
+   ".gk-unit": [
+    [
+     303,
+     533,
+     58,
+     62
+    ]
+   ],
+   ".boss-char": [],
+   ".boss-bar": [
+    [
+     14,
+     48,
+     362,
+     99
+    ]
+   ],
+   ".boss-dock": [
+    [
+     14,
+     493,
+     362,
+     165
+    ]
+   ],
+   ".tower-side": [],
+   ".bp-tower": [
+    [
+     28,
+     561,
+     217,
+     97
+    ]
+   ],
+   ".gchat-field": [],
+   ".rc-stage": [],
+   ".boss-level": [
+    [
+     89,
+     72,
+     42,
+     11
+    ]
+   ]
+  },
+  "bubbles": [
+   {
+    "cls": "speech-clip",
+    "text": "Best by test, right?",
+    "box": [
+     123,
+     228,
+     200,
+     10
+    ]
+   },
+   {
+    "cls": "speech-line",
+    "text": "Best by test, right?",
+    "box": [
+     123,
+     228,
+     200,
+     10
+    ]
+   }
+  ],
+  "figs": [
+   {
+    "parent": "cs-fig",
+    "box": [
+     130,
+     148,
+     130,
+     235
+    ],
+    "drawnTop": 247,
+    "drawnX": [
+     144,
+     240
+    ]
+   }
+  ],
+  "quads": [],
+  "step": null,
+  "phase": "boss",
+  "form": null,
+  "formStep": null
+ },
+ "12-cutscene-line3": {
+  "vw": 390,
+  "vh": 664,
+  "scrollW": 390,
+  "scrollH": 664,
+  "boxes": {
+   ".board-row > .board-wrap": [
+    [
+     28,
+     153,
+     334,
+     334
+    ]
+   ],
+   ".mv-side": [],
+   ".under-board": [],
+   ".bp": [
+    [
+     28,
+     533,
+     217,
+     125
+    ]
+   ],
+   ".you-pawn": [
+    [
+     245,
+     533,
+     58,
+     62
+    ]
+   ],
+   ".dk-mate-art": [
+    [
+     239,
+     615,
+     42,
+     42
+    ],
+    [
+     282,
+     615,
+     42,
+     42
+    ],
+    [
+     325,
+     615,
+     42,
+     42
+    ]
+   ],
+   ".gk-unit": [
+    [
+     303,
+     533,
+     58,
+     62
+    ]
+   ],
+   ".boss-char": [],
+   ".boss-bar": [
+    [
+     14,
+     48,
+     362,
+     99
+    ]
+   ],
+   ".boss-dock": [
+    [
+     14,
+     493,
+     362,
+     165
+    ]
+   ],
+   ".tower-side": [],
+   ".bp-tower": [
+    [
+     28,
+     561,
+     217,
+     97
+    ]
+   ],
+   ".gchat-field": [],
+   ".rc-stage": [],
+   ".boss-level": [
+    [
+     89,
+     72,
+     42,
+     11
+    ]
+   ]
+  },
+  "bubbles": [
+   {
+    "cls": "bc-bubble cs-say leaving",
+    "text": "Everyone has the same computers. So the only thing that separates anyone is crea",
+    "box": [
+     110,
+     147,
+     230,
+     103
+    ]
+   },
+   {
+    "cls": "speech-clip",
+    "text": "Everyone has the same computers. So the only thing that separates anyone is crea",
+    "box": [
+     123,
+     162,
+     190,
+     74
+    ]
+   },
+   {
+    "cls": "speech-line",
+    "text": "Everyone has the same computers. So the only thing that separates anyone is crea",
+    "box": [
+     123,
+     162,
+     190,
+     74
+    ]
+   }
+  ],
+  "figs": [
+   {
+    "parent": "cs-fig",
+    "box": [
+     130,
+     148,
+     130,
+     235
+    ],
+    "drawnTop": 247,
+    "drawnX": [
+     144,
+     240
+    ]
+   }
+  ],
+  "quads": [],
+  "step": null,
+  "phase": "boss",
+  "form": null,
+  "formStep": null
+ },
+ "12-cutscene-line4": {
+  "vw": 390,
+  "vh": 664,
+  "scrollW": 390,
+  "scrollH": 664,
+  "boxes": {
+   ".board-row > .board-wrap": [
+    [
+     28,
+     153,
+     334,
+     334
+    ]
+   ],
+   ".mv-side": [],
+   ".under-board": [],
+   ".bp": [
+    [
+     28,
+     533,
+     218,
+     125
+    ]
+   ],
+   ".you-pawn": [
+    [
+     246,
+     533,
+     58,
+     62
+    ]
+   ],
+   ".dk-mate-art": [
+    [
+     240,
+     615,
+     42,
+     42
+    ],
+    [
+     283,
+     615,
+     42,
+     42
+    ],
+    [
+     326,
+     615,
+     42,
+     42
+    ]
+   ],
+   ".gk-unit": [
+    [
+     304,
+     533,
+     58,
+     62
+    ]
+   ],
+   ".boss-char": [
+    [
+     19,
+     53,
+     58,
+     88
+    ]
+   ],
+   ".boss-bar": [
+    [
+     14,
+     48,
+     362,
+     99
+    ]
+   ],
+   ".boss-dock": [
+    [
+     14,
+     493,
+     362,
+     165
+    ]
+   ],
+   ".tower-side": [],
+   ".bp-tower": [
+    [
+     28,
+     561,
+     218,
+     97
+    ]
+   ],
+   ".gchat-field": [],
+   ".rc-stage": [
+    [
+     28,
+     153,
+     334,
+     334
+    ]
+   ],
+   ".boss-level": [
+    [
+     89,
+     72,
+     42,
+     11
+    ]
+   ]
+  },
+  "bubbles": [],
+  "figs": [
+   {
+    "parent": "cs-fig rc-tf-kid",
+    "box": [
+     130,
+     148,
+     130,
+     235
+    ],
+    "drawnTop": 266,
+    "drawnX": [
+     202,
+     240
+    ]
+   },
+   {
+    "parent": "cs-fig rc-tf-fig",
+    "box": [
+     130,
+     196,
+     80,
+     183
+    ],
+    "drawnTop": 247,
+    "drawnX": [
+     144,
+     196
+    ]
+   }
+  ],
+  "quads": [
+   [
+    28,
+    153,
+    333,
+    333
+   ],
+   [
+    28,
+    153,
+    333,
+    333
+   ],
+   [
+    28,
+    153,
+    333,
+    333
+   ],
+   [
+    28,
+    153,
+    333,
+    333
+   ]
+  ],
+  "step": "book",
+  "phase": "phaseChange",
+  "form": null,
+  "formStep": null
+ },
+ "13-change-book": {
+  "vw": 390,
+  "vh": 664,
+  "scrollW": 390,
+  "scrollH": 664,
+  "boxes": {
+   ".board-row > .board-wrap": [
+    [
+     28,
+     153,
+     334,
+     334
+    ]
+   ],
+   ".mv-side": [],
+   ".under-board": [],
+   ".bp": [
+    [
+     28,
+     533,
+     218,
+     125
+    ]
+   ],
+   ".you-pawn": [
+    [
+     246,
+     533,
+     58,
+     62
+    ]
+   ],
+   ".dk-mate-art": [
+    [
+     240,
+     615,
+     42,
+     42
+    ],
+    [
+     283,
+     615,
+     42,
+     42
+    ],
+    [
+     326,
+     615,
+     42,
+     42
+    ]
+   ],
+   ".gk-unit": [
+    [
+     304,
+     533,
+     58,
+     62
+    ]
+   ],
+   ".boss-char": [
+    [
+     19,
+     53,
+     58,
+     88
+    ]
+   ],
+   ".boss-bar": [
+    [
+     14,
+     48,
+     362,
+     99
+    ]
+   ],
+   ".boss-dock": [
+    [
+     14,
+     493,
+     362,
+     165
+    ]
+   ],
+   ".tower-side": [],
+   ".bp-tower": [
+    [
+     28,
+     561,
+     218,
+     97
+    ]
+   ],
+   ".gchat-field": [],
+   ".rc-stage": [
+    [
+     28,
+     153,
+     334,
+     334
+    ]
+   ],
+   ".boss-level": [
+    [
+     89,
+     72,
+     42,
+     11
+    ]
+   ]
+  },
+  "bubbles": [],
+  "figs": [
+   {
+    "parent": "cs-fig rc-tf-kid",
+    "box": [
+     130,
+     148,
+     130,
+     235
+    ],
+    "drawnTop": 264,
+    "drawnX": [
+     202,
+     240
+    ]
+   },
+   {
+    "parent": "cs-fig rc-tf-fig",
+    "box": [
+     130,
+     196,
+     80,
+     183
+    ],
+    "drawnTop": 246,
+    "drawnX": [
+     144,
+     196
+    ]
+   }
+  ],
+  "quads": [
+   [
+    28,
+    153,
+    333,
+    333
+   ],
+   [
+    28,
+    153,
+    333,
+    333
+   ],
+   [
+    28,
+    153,
+    333,
+    333
+   ],
+   [
+    28,
+    153,
+    333,
+    333
+   ]
+  ],
+  "step": "book",
+  "phase": "phaseChange",
+  "form": null,
+  "formStep": null
+ },
+ "14-transform-lifted": {
+  "vw": 390,
+  "vh": 664,
+  "scrollW": 390,
+  "scrollH": 664,
+  "boxes": {
+   ".board-row > .board-wrap": [
+    [
+     28,
+     153,
+     334,
+     334
+    ]
+   ],
+   ".mv-side": [],
+   ".under-board": [],
+   ".bp": [
+    [
+     28,
+     533,
+     218,
+     125
+    ]
+   ],
+   ".you-pawn": [
+    [
+     246,
+     533,
+     58,
+     62
+    ]
+   ],
+   ".dk-mate-art": [
+    [
+     240,
+     615,
+     42,
+     42
+    ],
+    [
+     283,
+     615,
+     42,
+     42
+    ],
+    [
+     326,
+     615,
+     42,
+     42
+    ]
+   ],
+   ".gk-unit": [
+    [
+     304,
+     533,
+     58,
+     62
+    ]
+   ],
+   ".boss-char": [
+    [
+     19,
+     53,
+     58,
+     88
+    ]
+   ],
+   ".boss-bar": [
+    [
+     14,
+     48,
+     362,
+     99
+    ]
+   ],
+   ".boss-dock": [
+    [
+     14,
+     493,
+     362,
+     165
+    ]
+   ],
+   ".tower-side": [],
+   ".bp-tower": [
+    [
+     28,
+     561,
+     218,
+     97
+    ]
+   ],
+   ".gchat-field": [],
+   ".rc-stage": [
+    [
+     28,
+     153,
+     334,
+     334
+    ]
+   ],
+   ".boss-level": [
+    [
+     89,
+     72,
+     42,
+     11
+    ]
+   ]
+  },
+  "bubbles": [],
+  "figs": [
+   {
+    "parent": "cs-fig rc-tf-kid",
+    "box": [
+     130,
+     148,
+     130,
+     235
+    ],
+    "drawnTop": 264,
+    "drawnX": [
+     202,
+     240
+    ]
+   },
+   {
+    "parent": "cs-fig rc-tf-book",
+    "box": [
+     130,
+     196,
+     80,
+     183
+    ],
+    "drawnTop": 301,
+    "drawnX": [
+     151,
+     190
+    ]
+   },
+   {
+    "parent": "cs-fig rc-tf-fig",
+    "box": [
+     130,
+     196,
+     80,
+     183
+    ],
+    "drawnTop": 204,
+    "drawnX": [
+     144,
+     196
+    ]
+   }
+  ],
+  "quads": [
+   [
+    28,
+    153,
+    333,
+    333
+   ],
+   [
+    28,
+    153,
+    333,
+    333
+   ],
+   [
+    28,
+    153,
+    333,
+    333
+   ],
+   [
+    28,
+    153,
+    333,
+    333
+   ]
+  ],
+  "step": "light",
+  "phase": "phaseChange",
+  "form": null,
+  "formStep": null
+ },
+ "15-transform-radiate": {
+  "vw": 390,
+  "vh": 664,
+  "scrollW": 390,
+  "scrollH": 664,
+  "boxes": {
+   ".board-row > .board-wrap": [
+    [
+     28,
+     153,
+     334,
+     334
+    ]
+   ],
+   ".mv-side": [],
+   ".under-board": [],
+   ".bp": [
+    [
+     28,
+     533,
+     218,
+     125
+    ]
+   ],
+   ".you-pawn": [
+    [
+     246,
+     533,
+     58,
+     62
+    ]
+   ],
+   ".dk-mate-art": [
+    [
+     240,
+     615,
+     42,
+     42
+    ],
+    [
+     283,
+     615,
+     42,
+     42
+    ],
+    [
+     326,
+     615,
+     42,
+     42
+    ]
+   ],
+   ".gk-unit": [
+    [
+     304,
+     533,
+     58,
+     62
+    ]
+   ],
+   ".boss-char": [
+    [
+     19,
+     53,
+     58,
+     88
+    ]
+   ],
+   ".boss-bar": [
+    [
+     14,
+     48,
+     362,
+     99
+    ]
+   ],
+   ".boss-dock": [
+    [
+     14,
+     493,
+     362,
+     165
+    ]
+   ],
+   ".tower-side": [],
+   ".bp-tower": [
+    [
+     28,
+     561,
+     218,
+     97
+    ]
+   ],
+   ".gchat-field": [],
+   ".rc-stage": [
+    [
+     28,
+     153,
+     334,
+     334
+    ]
+   ],
+   ".boss-level": [
+    [
+     89,
+     72,
+     42,
+     11
+    ]
+   ]
+  },
+  "bubbles": [],
+  "figs": [
+   {
+    "parent": "cs-fig rc-tf-kid",
+    "box": [
+     130,
+     148,
+     130,
+     235
+    ],
+    "drawnTop": 266,
+    "drawnX": [
+     204,
+     241
+    ]
+   },
+   {
+    "parent": "cs-fig rc-tf-book",
+    "box": [
+     130,
+     196,
+     80,
+     183
+    ],
+    "drawnTop": 286,
+    "drawnX": [
+     151,
+     190
+    ]
+   },
+   {
+    "parent": "cs-fig rc-tf-fig",
+    "box": [
+     130,
+     186,
+     80,
+     183
+    ],
+    "drawnTop": 195,
+    "drawnX": [
+     142,
+     197
+    ]
+   }
+  ],
+  "quads": [
+   [
+    28,
+    153,
+    333,
+    333
+   ],
+   [
+    28,
+    153,
+    333,
+    333
+   ],
+   [
+    28,
+    153,
+    333,
+    333
+   ],
+   [
+    28,
+    153,
+    333,
+    333
+   ]
+  ],
+  "step": "light",
+  "phase": "phaseChange",
+  "form": null,
+  "formStep": null
+ },
+ "16-transform-white": {
+  "vw": 390,
+  "vh": 664,
+  "scrollW": 390,
+  "scrollH": 664,
+  "boxes": {
+   ".board-row > .board-wrap": [
+    [
+     28,
+     153,
+     334,
+     334
+    ]
+   ],
+   ".mv-side": [],
+   ".under-board": [],
+   ".bp": [
+    [
+     28,
+     533,
+     218,
+     125
+    ]
+   ],
+   ".you-pawn": [
+    [
+     246,
+     533,
+     58,
+     62
+    ]
+   ],
+   ".dk-mate-art": [
+    [
+     240,
+     615,
+     42,
+     42
+    ],
+    [
+     283,
+     615,
+     42,
+     42
+    ],
+    [
+     326,
+     615,
+     42,
+     42
+    ]
+   ],
+   ".gk-unit": [
+    [
+     304,
+     533,
+     58,
+     62
+    ]
+   ],
+   ".boss-char": [
+    [
+     19,
+     53,
+     58,
+     88
+    ]
+   ],
+   ".boss-bar": [
+    [
+     14,
+     48,
+     362,
+     99
+    ]
+   ],
+   ".boss-dock": [
+    [
+     14,
+     493,
+     362,
+     165
+    ]
+   ],
+   ".tower-side": [],
+   ".bp-tower": [
+    [
+     28,
+     561,
+     218,
+     97
+    ]
+   ],
+   ".gchat-field": [],
+   ".rc-stage": [
+    [
+     28,
+     153,
+     334,
+     334
+    ]
+   ],
+   ".boss-level": [
+    [
+     89,
+     72,
+     42,
+     11
+    ]
+   ]
+  },
+  "bubbles": [],
+  "figs": [
+   {
+    "parent": "cs-fig rc-tf-book",
+    "box": [
+     130,
+     196,
+     80,
+     183
+    ],
+    "drawnTop": 286,
+    "drawnX": [
+     151,
+     190
+    ]
+   },
+   {
+    "parent": "cs-fig rc-tf-fig",
+    "box": [
+     130,
+     196,
+     80,
+     183
+    ],
+    "drawnTop": 207,
+    "drawnX": [
+     144,
+     197
+    ]
+   }
+  ],
+  "quads": [
+   [
+    28,
+    153,
+    333,
+    333
+   ],
+   [
+    28,
+    153,
+    333,
+    333
+   ],
+   [
+    28,
+    153,
+    333,
+    333
+   ],
+   [
+    28,
+    153,
+    333,
+    333
+   ]
+  ],
+  "step": "white",
+  "phase": "phaseChange",
+  "form": null,
+  "formStep": null
+ },
+ "17-transform-reveal-line1": {
+  "vw": 390,
+  "vh": 664,
+  "scrollW": 390,
+  "scrollH": 664,
+  "boxes": {
+   ".board-row > .board-wrap": [
+    [
+     28,
+     153,
+     334,
+     334
+    ]
+   ],
+   ".mv-side": [],
+   ".under-board": [],
+   ".bp": [
+    [
+     28,
+     533,
+     218,
+     125
+    ]
+   ],
+   ".you-pawn": [
+    [
+     246,
+     533,
+     58,
+     62
+    ]
+   ],
+   ".dk-mate-art": [
+    [
+     240,
+     615,
+     42,
+     42
+    ],
+    [
+     283,
+     615,
+     42,
+     42
+    ],
+    [
+     326,
+     615,
+     42,
+     42
+    ]
+   ],
+   ".gk-unit": [
+    [
+     304,
+     533,
+     58,
+     62
+    ]
+   ],
+   ".boss-char": [
+    [
+     19,
+     53,
+     58,
+     88
+    ]
+   ],
+   ".boss-bar": [
+    [
+     14,
+     48,
+     362,
+     99
+    ]
+   ],
+   ".boss-dock": [
+    [
+     14,
+     493,
+     362,
+     165
+    ]
+   ],
+   ".tower-side": [],
+   ".bp-tower": [
+    [
+     28,
+     561,
+     218,
+     97
+    ]
+   ],
+   ".gchat-field": [],
+   ".rc-stage": [
+    [
+     28,
+     153,
+     334,
+     334
+    ]
+   ],
+   ".boss-level": [
+    [
+     89,
+     72,
+     42,
+     11
+    ]
+   ]
+  },
+  "bubbles": [
+   {
+    "cls": "bc-bubble rc-say",
+    "text": "Computation without creativity is nothing. Now I have both.",
+    "box": [
+     60,
+     103,
+     220,
+     81
+    ]
+   },
+   {
+    "cls": "speech-clip",
+    "text": "Computation without creativity is nothing. Now I have both.",
+    "box": [
+     73,
+     117,
+     171,
+     52
+    ]
+   },
+   {
+    "cls": "speech-line",
+    "text": "Computation without creativity is nothing. Now I have both.",
+    "box": [
+     73,
+     117,
+     171,
+     52
+    ]
+   }
+  ],
+  "figs": [
+   {
+    "parent": "cs-fig rc-tf-book",
+    "box": [
+     130,
+     196,
+     80,
+     183
+    ],
+    "drawnTop": 301,
+    "drawnX": [
+     151,
+     190
+    ]
+   },
+   {
+    "parent": "cs-fig rc-tf-fig",
+    "box": [
+     130,
+     196,
+     80,
+     183
+    ],
+    "drawnTop": 207,
+    "drawnX": [
+     144,
+     197
+    ]
+   }
+  ],
+  "quads": [
+   [
+    28,
+    153,
+    333,
+    333
+   ],
+   [
+    28,
+    153,
+    333,
+    333
+   ],
+   [
+    28,
+    153,
+    333,
+    333
+   ],
+   [
+    28,
+    153,
+    333,
+    333
+   ]
+  ],
+  "step": "revealed",
+  "phase": "phaseChange",
+  "form": null,
+  "formStep": null
+ },
+ "17b-transform-line1-whole": {
+  "vw": 390,
+  "vh": 664,
+  "scrollW": 390,
+  "scrollH": 664,
+  "boxes": {
+   ".board-row > .board-wrap": [
+    [
+     28,
+     153,
+     334,
+     334
+    ]
+   ],
+   ".mv-side": [],
+   ".under-board": [],
+   ".bp": [
+    [
+     28,
+     533,
+     218,
+     125
+    ]
+   ],
+   ".you-pawn": [
+    [
+     246,
+     533,
+     58,
+     62
+    ]
+   ],
+   ".dk-mate-art": [
+    [
+     240,
+     615,
+     42,
+     42
+    ],
+    [
+     283,
+     615,
+     42,
+     42
+    ],
+    [
+     326,
+     615,
+     42,
+     42
+    ]
+   ],
+   ".gk-unit": [
+    [
+     304,
+     533,
+     58,
+     62
+    ]
+   ],
+   ".boss-char": [
+    [
+     19,
+     53,
+     58,
+     88
+    ]
+   ],
+   ".boss-bar": [
+    [
+     14,
+     48,
+     362,
+     99
+    ]
+   ],
+   ".boss-dock": [
+    [
+     14,
+     493,
+     362,
+     165
+    ]
+   ],
+   ".tower-side": [],
+   ".bp-tower": [
+    [
+     28,
+     561,
+     218,
+     97
+    ]
+   ],
+   ".gchat-field": [],
+   ".rc-stage": [
+    [
+     28,
+     153,
+     334,
+     334
+    ]
+   ],
+   ".boss-level": [
+    [
+     89,
+     72,
+     42,
+     11
+    ]
+   ]
+  },
+  "bubbles": [
+   {
+    "cls": "bc-bubble rc-say",
+    "text": "Computation without creativity is nothing. Now I have both.",
+    "box": [
+     60,
+     103,
+     220,
+     81
+    ]
+   },
+   {
+    "cls": "speech-clip",
+    "text": "Computation without creativity is nothing. Now I have both.",
+    "box": [
+     73,
+     117,
+     171,
+     52
+    ]
+   },
+   {
+    "cls": "speech-line",
+    "text": "Computation without creativity is nothing. Now I have both.",
+    "box": [
+     73,
+     117,
+     171,
+     52
+    ]
+   }
+  ],
+  "figs": [
+   {
+    "parent": "cs-fig rc-tf-book",
+    "box": [
+     130,
+     196,
+     80,
+     183
+    ],
+    "drawnTop": 286,
+    "drawnX": [
+     151,
+     190
+    ]
+   },
+   {
+    "parent": "cs-fig rc-tf-fig",
+    "box": [
+     130,
+     196,
+     80,
+     183
+    ],
+    "drawnTop": 206,
+    "drawnX": [
+     144,
+     197
+    ]
+   }
+  ],
+  "quads": [
+   [
+    28,
+    153,
+    333,
+    333
+   ],
+   [
+    28,
+    153,
+    333,
+    333
+   ],
+   [
+    28,
+    153,
+    333,
+    333
+   ],
+   [
+    28,
+    153,
+    333,
+    333
+   ]
+  ],
+  "step": "revealed",
+  "phase": "phaseChange",
+  "form": null,
+  "formStep": null
+ },
+ "18-transform-leap": {
+  "vw": 390,
+  "vh": 664,
+  "scrollW": 390,
+  "scrollH": 664,
+  "boxes": {
+   ".board-row > .board-wrap": [
+    [
+     28,
+     153,
+     334,
+     334
+    ]
+   ],
+   ".mv-side": [],
+   ".under-board": [],
+   ".bp": [
+    [
+     28,
+     533,
+     218,
+     125
+    ]
+   ],
+   ".you-pawn": [
+    [
+     246,
+     533,
+     58,
+     62
+    ]
+   ],
+   ".dk-mate-art": [
+    [
+     240,
+     615,
+     42,
+     42
+    ],
+    [
+     283,
+     615,
+     42,
+     42
+    ],
+    [
+     326,
+     615,
+     42,
+     42
+    ]
+   ],
+   ".gk-unit": [
+    [
+     304,
+     533,
+     58,
+     62
+    ]
+   ],
+   ".boss-char": [
+    [
+     19,
+     53,
+     58,
+     88
+    ]
+   ],
+   ".boss-bar": [
+    [
+     14,
+     48,
+     362,
+     99
+    ]
+   ],
+   ".boss-dock": [
+    [
+     14,
+     493,
+     362,
+     165
+    ]
+   ],
+   ".tower-side": [],
+   ".bp-tower": [
+    [
+     28,
+     561,
+     218,
+     97
+    ]
+   ],
+   ".gchat-field": [],
+   ".rc-stage": [
+    [
+     28,
+     153,
+     334,
+     334
+    ]
+   ],
+   ".boss-level": [
+    [
+     89,
+     72,
+     42,
+     11
+    ]
+   ]
+  },
+  "bubbles": [],
+  "figs": [
+   {
+    "parent": "cs-fig rc-tf-book",
+    "box": [
+     130,
+     196,
+     80,
+     183
+    ],
+    "drawnTop": 286,
+    "drawnX": [
+     151,
+     190
+    ]
+   },
+   {
+    "parent": "cs-fig rc-tf-fig",
+    "box": [
+     130,
+     129,
+     80,
+     183
+    ],
+    "drawnTop": 152,
+    "drawnX": [
+     144,
+     196
+    ]
+   }
+  ],
+  "quads": [
+   [
+    28,
+    153,
+    333,
+    333
+   ],
+   [
+    28,
+    153,
+    333,
+    333
+   ],
+   [
+    28,
+    153,
+    333,
+    333
+   ],
+   [
+    28,
+    153,
+    333,
+    333
+   ]
+  ],
+  "step": "revealed",
+  "phase": "phaseChange",
+  "form": null,
+  "formStep": null
+ },
+ "19-crack-line2": {
+  "vw": 390,
+  "vh": 664,
+  "scrollW": 390,
+  "scrollH": 664,
+  "boxes": {
+   ".board-row > .board-wrap": [
+    [
+     28,
+     153,
+     334,
+     334
+    ]
+   ],
+   ".mv-side": [],
+   ".under-board": [],
+   ".bp": [
+    [
+     28,
+     533,
+     218,
+     125
+    ]
+   ],
+   ".you-pawn": [
+    [
+     246,
+     533,
+     58,
+     62
+    ]
+   ],
+   ".dk-mate-art": [
+    [
+     240,
+     615,
+     42,
+     42
+    ],
+    [
+     283,
+     615,
+     42,
+     42
+    ],
+    [
+     326,
+     615,
+     42,
+     42
+    ]
+   ],
+   ".gk-unit": [
+    [
+     304,
+     533,
+     58,
+     62
+    ]
+   ],
+   ".boss-char": [
+    [
+     19,
+     53,
+     58,
+     88
+    ]
+   ],
+   ".boss-bar": [
+    [
+     14,
+     48,
+     362,
+     99
+    ]
+   ],
+   ".boss-dock": [
+    [
+     14,
+     493,
+     362,
+     165
+    ]
+   ],
+   ".tower-side": [],
+   ".bp-tower": [
+    [
+     28,
+     561,
+     218,
+     97
+    ]
+   ],
+   ".gchat-field": [],
+   ".rc-stage": [
+    [
+     28,
+     153,
+     334,
+     334
+    ]
+   ],
+   ".boss-level": [
+    [
+     89,
+     72,
+     42,
+     11
+    ]
+   ]
+  },
+  "bubbles": [
+   {
+    "cls": "bc-bubble rc-say",
+    "text": "Prepare yourself. This is the ultimate test of your skill.",
+    "box": [
+     60,
+     117,
+     220,
+     66
+    ]
+   },
+   {
+    "cls": "speech-clip",
+    "text": "Prepare yourself. This is the ultimate test of your skill.",
+    "box": [
+     73,
+     131,
+     180,
+     38
+    ]
+   },
+   {
+    "cls": "speech-line",
+    "text": "Prepare yourself. This is the ultimate test of your skill.",
+    "box": [
+     73,
+     131,
+     180,
+     38
+    ]
+   }
+  ],
+  "figs": [
+   {
+    "parent": "cs-fig rc-tf-fig",
+    "box": [
+     130,
+     196,
+     80,
+     183
+    ],
+    "drawnTop": 207,
+    "drawnX": [
+     142,
+     197
+    ]
+   }
+  ],
+  "quads": [
+   [
+    22,
+    148,
+    295,
+    295
+   ],
+   [
+    55,
+    148,
+    295,
+    295
+   ],
+   [
+    29,
+    179,
+    315,
+    315
+   ],
+   [
+    72,
+    165,
+    295,
+    295
+   ]
+  ],
+  "step": "split",
+  "phase": "phaseChange",
+  "form": null,
+  "formStep": null
+ },
+ "20-split": {
+  "vw": 390,
+  "vh": 664,
+  "scrollW": 390,
+  "scrollH": 664,
+  "boxes": {
+   ".board-row > .board-wrap": [
+    [
+     28,
+     153,
+     334,
+     334
+    ]
+   ],
+   ".mv-side": [],
+   ".under-board": [],
+   ".bp": [
+    [
+     28,
+     533,
+     218,
+     125
+    ]
+   ],
+   ".you-pawn": [
+    [
+     246,
+     533,
+     58,
+     62
+    ]
+   ],
+   ".dk-mate-art": [
+    [
+     240,
+     615,
+     42,
+     42
+    ],
+    [
+     283,
+     615,
+     42,
+     42
+    ],
+    [
+     326,
+     615,
+     42,
+     42
+    ]
+   ],
+   ".gk-unit": [
+    [
+     304,
+     533,
+     58,
+     62
+    ]
+   ],
+   ".boss-char": [
+    [
+     19,
+     53,
+     58,
+     88
+    ]
+   ],
+   ".boss-bar": [
+    [
+     14,
+     48,
+     362,
+     99
+    ]
+   ],
+   ".boss-dock": [
+    [
+     14,
+     493,
+     362,
+     165
+    ]
+   ],
+   ".tower-side": [],
+   ".bp-tower": [
+    [
+     28,
+     561,
+     218,
+     97
+    ]
+   ],
+   ".gchat-field": [],
+   ".rc-stage": [
+    [
+     28,
+     153,
+     334,
+     334
+    ]
+   ],
+   ".boss-level": [
+    [
+     89,
+     72,
+     42,
+     11
+    ]
+   ]
+  },
+  "bubbles": [
+   {
+    "cls": "bc-bubble rc-say",
+    "text": "Prepare yourself. This is the ultimate test of your skill.",
+    "box": [
+     60,
+     117,
+     220,
+     66
+    ]
+   },
+   {
+    "cls": "speech-clip",
+    "text": "Prepare yourself. This is the ultimate test of your skill.",
+    "box": [
+     73,
+     131,
+     180,
+     38
+    ]
+   },
+   {
+    "cls": "speech-line",
+    "text": "Prepare yourself. This is the ultimate test of your skill.",
+    "box": [
+     73,
+     131,
+     180,
+     38
+    ]
+   }
+  ],
+  "figs": [
+   {
+    "parent": "cs-fig rc-tf-fig",
+    "box": [
+     130,
+     196,
+     80,
+     183
+    ],
+    "drawnTop": 207,
+    "drawnX": [
+     142,
+     197
+    ]
+   }
+  ],
+  "quads": [
+   [
+    46,
+    173,
+    87,
+    87
+   ],
+   [
+    152,
+    173,
+    87,
+    87
+   ],
+   [
+    86,
+    270,
+    217,
+    217
+   ],
+   [
+    257,
+    173,
+    87,
+    87
+   ]
+  ],
+  "step": "split",
+  "phase": "phaseChange",
+  "form": null,
+  "formStep": null
+ },
+ "21-shuffle-countdown": {
+  "vw": 390,
+  "vh": 664,
+  "scrollW": 390,
+  "scrollH": 664,
+  "boxes": {
+   ".board-row > .board-wrap": [
+    [
+     28,
+     153,
+     334,
+     334
+    ]
+   ],
+   ".mv-side": [],
+   ".under-board": [],
+   ".bp": [
+    [
+     28,
+     533,
+     218,
+     125
+    ]
+   ],
+   ".you-pawn": [
+    [
+     246,
+     533,
+     58,
+     62
+    ]
+   ],
+   ".dk-mate-art": [
+    [
+     240,
+     615,
+     42,
+     42
+    ],
+    [
+     283,
+     615,
+     42,
+     42
+    ],
+    [
+     326,
+     615,
+     42,
+     42
+    ]
+   ],
+   ".gk-unit": [
+    [
+     304,
+     533,
+     58,
+     62
+    ]
+   ],
+   ".boss-char": [
+    [
+     19,
+     53,
+     58,
+     88
+    ]
+   ],
+   ".boss-bar": [
+    [
+     14,
+     48,
+     362,
+     99
+    ]
+   ],
+   ".boss-dock": [
+    [
+     14,
+     493,
+     362,
+     165
+    ]
+   ],
+   ".tower-side": [],
+   ".bp-tower": [
+    [
+     28,
+     561,
+     218,
+     97
+    ]
+   ],
+   ".gchat-field": [],
+   ".rc-stage": [
+    [
+     28,
+     153,
+     334,
+     334
+    ]
+   ],
+   ".boss-level": [
+    [
+     89,
+     72,
+     42,
+     11
+    ]
+   ]
+  },
+  "bubbles": [
+   {
+    "cls": "bc-bubble bc-bar-bubble",
+    "text": "This is the ultimate test of your skill.",
+    "box": [
+     89,
+     97,
+     26,
+     48
+    ]
+   },
+   {
+    "cls": "speech-line",
+    "text": "This is the ultimate test of your skill.",
+    "box": [
+     102,
+     110,
+     72,
+     97
+    ]
+   }
+  ],
+  "figs": [
+   {
+    "parent": "boss-char place-bar ch-recluse-bust wide",
+    "box": [
+     13,
+     47,
+     67,
+     94
+    ],
+    "drawnTop": 54,
+    "drawnX": [
+     18,
+     74
+    ]
+   }
+  ],
+  "quads": [
+   [
+    46,
+    173,
+    87,
+    87
+   ],
+   [
+    152,
+    173,
+    87,
+    87
+   ],
+   [
+    86,
+    270,
+    217,
+    217
+   ],
+   [
+    257,
+    173,
+    87,
+    87
+   ]
+  ],
+  "step": "shuffle",
+  "phase": "phaseChange",
+  "form": null,
+  "formStep": null
+ },
+ "22-four-boards": {
+  "vw": 390,
+  "vh": 664,
+  "scrollW": 390,
+  "scrollH": 664,
+  "boxes": {
+   ".board-row > .board-wrap": [
+    [
+     28,
+     153,
+     334,
+     334
+    ]
+   ],
+   ".mv-side": [],
+   ".under-board": [],
+   ".bp": [
+    [
+     28,
+     533,
+     218,
+     125
+    ]
+   ],
+   ".you-pawn": [
+    [
+     246,
+     533,
+     58,
+     62
+    ]
+   ],
+   ".dk-mate-art": [
+    [
+     240,
+     615,
+     42,
+     42
+    ],
+    [
+     283,
+     615,
+     42,
+     42
+    ],
+    [
+     326,
+     615,
+     42,
+     42
+    ]
+   ],
+   ".gk-unit": [
+    [
+     304,
+     533,
+     58,
+     62
+    ]
+   ],
+   ".boss-char": [
+    [
+     19,
+     53,
+     58,
+     88
+    ]
+   ],
+   ".boss-bar": [
+    [
+     14,
+     48,
+     362,
+     99
+    ]
+   ],
+   ".boss-dock": [
+    [
+     14,
+     493,
+     362,
+     165
+    ]
+   ],
+   ".tower-side": [],
+   ".bp-tower": [
+    [
+     28,
+     561,
+     218,
+     97
+    ]
+   ],
+   ".gchat-field": [],
+   ".rc-stage": [
+    [
+     28,
+     153,
+     334,
+     334
+    ]
+   ],
+   ".boss-level": [
+    [
+     89,
+     72,
+     42,
+     11
+    ]
+   ]
+  },
+  "bubbles": [
+   {
+    "cls": "bc-bubble bc-bar-bubble",
+    "text": "Now nobody has a book. Except me.",
+    "box": [
+     89,
+     97,
+     229,
+     48
+    ]
+   },
+   {
+    "cls": "speech-clip",
+    "text": "Now nobody has a book. Except me.",
+    "box": [
+     102,
+     109,
+     203,
+     25
+    ]
+   },
+   {
+    "cls": "speech-line",
+    "text": "Now nobody has a book. Except me.",
+    "box": [
+     102,
+     110,
+     144,
+     22
+    ]
+   }
+  ],
+  "figs": [
+   {
+    "parent": "boss-char place-bar ch-recluse-bust wide",
+    "box": [
+     13,
+     47,
+     67,
+     94
+    ],
+    "drawnTop": 53,
+    "drawnX": [
+     18,
+     74
+    ]
+   }
+  ],
+  "quads": [],
+  "step": null,
+  "phase": "simul",
+  "form": null,
+  "formStep": null
+ },
+ "23-four-boards-line": {
+  "vw": 390,
+  "vh": 664,
+  "scrollW": 390,
+  "scrollH": 664,
+  "boxes": {
+   ".board-row > .board-wrap": [
+    [
+     28,
+     153,
+     334,
+     334
+    ]
+   ],
+   ".mv-side": [],
+   ".under-board": [],
+   ".bp": [
+    [
+     28,
+     533,
+     218,
+     125
+    ]
+   ],
+   ".you-pawn": [
+    [
+     246,
+     533,
+     58,
+     62
+    ]
+   ],
+   ".dk-mate-art": [
+    [
+     240,
+     615,
+     42,
+     42
+    ],
+    [
+     283,
+     615,
+     42,
+     42
+    ],
+    [
+     326,
+     615,
+     42,
+     42
+    ]
+   ],
+   ".gk-unit": [
+    [
+     304,
+     533,
+     58,
+     62
+    ]
+   ],
+   ".boss-char": [
+    [
+     19,
+     53,
+     58,
+     88
+    ]
+   ],
+   ".boss-bar": [
+    [
+     14,
+     48,
+     362,
+     99
+    ]
+   ],
+   ".boss-dock": [
+    [
+     14,
+     493,
+     362,
+     165
+    ]
+   ],
+   ".tower-side": [],
+   ".bp-tower": [
+    [
+     28,
+     561,
+     218,
+     97
+    ]
+   ],
+   ".gchat-field": [],
+   ".rc-stage": [
+    [
+     28,
+     153,
+     334,
+     334
+    ]
+   ],
+   ".boss-level": [
+    [
+     89,
+     72,
+     42,
+     11
+    ]
+   ]
+  },
+  "bubbles": [
+   {
+    "cls": "bc-bubble bc-bar-bubble",
+    "text": "Now nobody has a book. Except me.",
+    "box": [
+     89,
+     97,
+     229,
+     48
+    ]
+   },
+   {
+    "cls": "speech-clip",
+    "text": "Now nobody has a book. Except me.",
+    "box": [
+     102,
+     109,
+     203,
+     25
+    ]
+   },
+   {
+    "cls": "speech-line",
+    "text": "Now nobody has a book. Except me.",
+    "box": [
+     102,
+     110,
+     144,
+     22
+    ]
+   }
+  ],
+  "figs": [
+   {
+    "parent": "boss-char place-bar ch-recluse-bust wide",
+    "box": [
+     13,
+     47,
+     67,
+     94
+    ],
+    "drawnTop": 53,
+    "drawnX": [
+     18,
+     74
+    ]
+   }
+  ],
+  "quads": [],
+  "step": null,
+  "phase": "simul",
+  "form": null,
+  "formStep": null
+ },
+ "24-boards-ending": {
+  "vw": 390,
+  "vh": 664,
+  "scrollW": 390,
+  "scrollH": 664,
+  "boxes": {
+   ".board-row > .board-wrap": [
+    [
+     28,
+     153,
+     334,
+     334
+    ]
+   ],
+   ".mv-side": [],
+   ".under-board": [],
+   ".bp": [
+    [
+     28,
+     533,
+     218,
+     125
+    ]
+   ],
+   ".you-pawn": [
+    [
+     246,
+     533,
+     58,
+     62
+    ]
+   ],
+   ".dk-mate-art": [
+    [
+     240,
+     615,
+     42,
+     42
+    ],
+    [
+     283,
+     615,
+     42,
+     42
+    ],
+    [
+     326,
+     615,
+     42,
+     42
+    ]
+   ],
+   ".gk-unit": [
+    [
+     304,
+     533,
+     58,
+     62
+    ]
+   ],
+   ".boss-char": [
+    [
+     19,
+     53,
+     58,
+     88
+    ]
+   ],
+   ".boss-bar": [
+    [
+     14,
+     48,
+     362,
+     99
+    ]
+   ],
+   ".boss-dock": [
+    [
+     14,
+     493,
+     362,
+     165
+    ]
+   ],
+   ".tower-side": [],
+   ".bp-tower": [
+    [
+     28,
+     561,
+     218,
+     97
+    ]
+   ],
+   ".gchat-field": [],
+   ".rc-stage": [
+    [
+     28,
+     153,
+     334,
+     334
+    ]
+   ],
+   ".boss-level": [
+    [
+     89,
+     72,
+     42,
+     11
+    ]
+   ]
+  },
+  "bubbles": [
+   {
+    "cls": "bc-bubble bc-bar-bubble",
+    "text": "Impossible... all four...",
+    "box": [
+     89,
+     97,
+     250,
+     48
+    ]
+   },
+   {
+    "cls": "speech-clip",
+    "text": "Impossible... all four...",
+    "box": [
+     102,
+     109,
+     224,
+     25
+    ]
+   },
+   {
+    "cls": "speech-line",
+    "text": "Impossible... all four...",
+    "box": [
+     102,
+     110,
+     117,
+     22
+    ]
+   }
+  ],
+  "figs": [
+   {
+    "parent": "boss-char place-bar ch-recluse-bust wide",
+    "box": [
+     13,
+     47,
+     67,
+     94
+    ],
+    "drawnTop": 53,
+    "drawnX": [
+     18,
+     74
+    ]
+   }
+  ],
+  "quads": [],
+  "step": null,
+  "phase": "simul",
+  "form": null,
+  "formStep": null
+ },
+ "25-boards-won": {
+  "vw": 390,
+  "vh": 664,
+  "scrollW": 390,
+  "scrollH": 1724,
+  "boxes": {
+   ".board-row > .board-wrap": [],
+   ".mv-side": [],
+   ".under-board": [],
+   ".bp": [],
+   ".you-pawn": [
+    [
+     247,
+     336,
+     58,
+     62
+    ]
+   ],
+   ".dk-mate-art": [],
+   ".gk-unit": [],
+   ".boss-char": [
+    [
+     56,
+     208,
+     96,
+     178
+    ]
+   ],
+   ".boss-bar": [],
+   ".boss-dock": [],
+   ".tower-side": [],
+   ".bp-tower": [],
+   ".gchat-field": [],
+   ".rc-stage": [],
+   ".boss-level": []
+  },
+  "bubbles": [
+   {
+    "cls": "bc-bubble",
+    "text": "Impossible... all four...",
+    "box": [
+     52,
+     144,
+     220,
+     52
+    ]
+   },
+   {
+    "cls": "speech-clip",
+    "text": "Impossible... all four...",
+    "box": [
+     85,
+     158,
+     153,
+     23
+    ]
+   },
+   {
+    "cls": "speech-line",
+    "text": "Impossible... all four...",
+    "box": [
+     85,
+     158,
+     153,
+     23
+    ]
+   }
+  ],
+  "figs": [
+   {
+    "parent": "boss-char place-results ch-recluse wide",
+    "box": [
+     64,
+     208,
+     80,
+     183
+    ],
+    "drawnTop": 218,
+    "drawnX": [
+     78,
+     132
+    ]
+   }
+  ],
+  "quads": [],
+  "step": null,
+  "phase": "results",
+  "form": null,
+  "formStep": null
+ },
+ "26-results": {
+  "vw": 390,
+  "vh": 664,
+  "scrollW": 390,
+  "scrollH": 1724,
+  "boxes": {
+   ".board-row > .board-wrap": [],
+   ".mv-side": [],
+   ".under-board": [],
+   ".bp": [],
+   ".you-pawn": [
+    [
+     247,
+     336,
+     58,
+     62
+    ]
+   ],
+   ".dk-mate-art": [],
+   ".gk-unit": [],
+   ".boss-char": [
+    [
+     56,
+     208,
+     96,
+     178
+    ]
+   ],
+   ".boss-bar": [],
+   ".boss-dock": [],
+   ".tower-side": [],
+   ".bp-tower": [],
+   ".gchat-field": [],
+   ".rc-stage": [],
+   ".boss-level": []
+  },
+  "bubbles": [],
+  "figs": [
+   {
+    "parent": "boss-char place-results ch-recluse wide",
+    "box": [
+     64,
+     208,
+     80,
+     183
+    ],
+    "drawnTop": 218,
+    "drawnX": [
+     78,
+     132
+    ]
+   }
+  ],
+  "quads": [],
+  "step": null,
+  "phase": "results",
+  "form": null,
+  "formStep": null
+ }
+}
