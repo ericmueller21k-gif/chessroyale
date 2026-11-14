@@ -4455,7 +4455,9 @@ export const BOARD: { readonly checkHighlight: boolean } = { checkHighlight: fal
  * Boss battle music (Eric, Nov 11: "Wire boss battle music into the game"; docs/decisions/2026-11-11-boss-music.md;
  * `packages/app/src/music.ts`). Each boss's theme (`packages/app/public/music/themes.json`) plays from the moment the
  * battle starts (the intro's end) until its result, on its own gain into the game's sound, under its effects.
- * - `volume`: the music's gain, where a sound effect plays at 1 (the boss packs, a move's knock).
+ * - `volume`: the music's gain, where a sound effect plays at 1 (the boss packs, a move's knock). 0.4 (Eric, Nov 14: "a little quieter
+ *   than the game"; was 0.25): measured at the speakers, a theme's short-term loudness about -26 LUFS against a move's or the clock
+ *   tick's hit at -23 and a capture's at -21 (docs/decisions/2026-11-14-music-level.md).
  * - `fadeMs`: Music or Sound switched off, or the page hidden: faded out over this (and back in).
  * - `endFadeMs`: the battle's result (a win, a loss, leaving): faded out over this, then stopped.
  * - `startDelayS`: from asking to the first note (s), so the intro and the loop are scheduled together.
@@ -4469,7 +4471,7 @@ export const BOARD: { readonly checkHighlight: boolean } = { checkHighlight: fal
  *   one at the place the old one is heard at, once the new one's clock runs (waiting at most `handoffWaitMs`), and the old one fades
  *   out over `handoffMs` from there.
  */
-export const MUSIC = { volume: 0.25, fadeMs: 300, endFadeMs: 1500, startDelayS: 0.05, splashHoldMs: 2000, townPreloadAfterMs: 2000, handoffMs: 300, handoffWaitMs: 1000 } as const;
+export const MUSIC = { volume: 0.4, fadeMs: 300, endFadeMs: 1500, startDelayS: 0.05, splashHoldMs: 2000, townPreloadAfterMs: 2000, handoffMs: 300, handoffWaitMs: 1000 } as const;
 
 /**
  * The Hidden Boss's music (Nov 13; docs/decisions/2026-11-13-hidden-boss-music.md; the handoff's README, "The Hidden Boss"): one
