@@ -19431,10 +19431,30 @@ button.sq-tiny {
 .rc-stage > .rc-played {
   inset: auto;
 }
-/* Each board's squares centered in its slot (they're a whole multiple of 8 device pixels, a hair smaller than the slot), so the
-   gaps between the boards and to the square's edges match (Eric, Nov 14). The whole wrap moves: its overlays with it. */
+/* Each board's squares placed in its slot so the gaps match (Eric, Nov 14): the squares are a whole multiple of 8 device pixels,
+   a hair smaller than the slot (the rest, d). Centered on a phone (d/2); a computer's 2x2 moves its left and top boards 2d/3 in
+   and its right and bottom ones d/3, so the gap between them and to the square's edges is the same. The whole wrap moves: its
+   overlays with it. */
 .rc-stage > .rc-played > .board-wrap {
-  translate: calc((100% - var(--board-size)) / 2) calc((100% - var(--board-size)) / 2);
+  --rc-ox: 1.5;
+  --rc-oy: 1.5;
+  translate: calc((100% - var(--board-size)) * var(--rc-ox) / 3) calc((100% - var(--board-size)) * var(--rc-oy) / 3);
+}
+.rc-desk .rc-played.rc-q0 > .board-wrap,
+.rc-desk .rc-played.rc-q2 > .board-wrap {
+  --rc-ox: 2;
+}
+.rc-desk .rc-played.rc-q1 > .board-wrap,
+.rc-desk .rc-played.rc-q3 > .board-wrap {
+  --rc-ox: 1;
+}
+.rc-desk .rc-played.rc-q0 > .board-wrap,
+.rc-desk .rc-played.rc-q1 > .board-wrap {
+  --rc-oy: 2;
+}
+.rc-desk .rc-played.rc-q2 > .board-wrap,
+.rc-desk .rc-played.rc-q3 > .board-wrap {
+  --rc-oy: 1;
 }
 /* The crack lines: Sawyer's board-saw gap down the middle, and the same turned across. */
 .rc-crack {
