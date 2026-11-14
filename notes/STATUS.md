@@ -1097,3 +1097,6 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   red/blue/yellow; ORIGINAL, not Iron Man). Helper session_01JuCWRtesHR7mFg3Lkou6hn redoing it; watcher bo760yy6p.
   Pending Eric: CI trace retain-on-first-failure OK; music chat paste; Fill-also-challenges. Queue: standings (xhigh, alone)
   after the transform build; visual QA after.
+- Nov 14 05:15: #705 live (19ea09d). Main's run: red only on a retry-pass of town-street:155 [desktop] (Meadow Street's moved homes'
+  cards) -> flaky round 4 list (+ shop:238, town-street:528, town-chat:1367, fairplay:65). Transform round 3 came out bright
+  blue/red/yellow (too close to a famous blue robot hero) -> sent back for "round 3b", darker, own helmet shape; not shown to Eric.
