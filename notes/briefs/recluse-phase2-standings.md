@@ -20,3 +20,5 @@ blank, while all four are playing their boards (`stills/recluse-same-frame`, aft
 Typecheck; unit tests of packages you touch; the touched e2e specs. Push at each real step; `.pr-body.md` (cause, fix, player-visible,
 anything stored or rewarded touched: none expected; checks old -> new); `.done`. No PRs, no CI waits, no model names in commits (end
 commits with the Claude-Session line only). About an hour.
+
+Also (visual check #12, review/recluse-visual-qa): the result after beating all four boards reads "4th of 4" over "You beat the Hidden Boss on all 4 boards!", and its review board replays the kid's match ("Move 1 of 11") instead of the fight just won. Fix both with the standings.
