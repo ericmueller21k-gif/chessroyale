@@ -297,12 +297,15 @@ def render(second: str = "vibes", window=None) -> np.ndarray:
                 w = x.struck("vibes", m)
                 put("light", b, w * np.exp(-np.arange(len(w)) / sr / 0.7) * 0.07 * vol, pan)
             else:
-                put("light", b, x.flute(m, d * 0.95, 0.05 * vol, attack=0.04, release=0.08), pan)
+                put("light", b, x.add(m, d * 0.95, x.FLUTE, 0.05 * vol, vib=0.006, attack=0.04, sustain=0.8, decay=0.2, release=0.08), pan)  # no breath: see the ocarina
 
     def ocarina(start, text, vol=0.055, pan=0.1, up=0):
+        """The ocarina's note with no breath in it. The synth's own has a little air under each note, and here, with
+        little playing round it, Eric heard that as a fault (Nov 14: "staticky ... some artifact embedded in every time
+        it plays a note ... staticky below the note itself")."""
         for b, d, m in notes(start, text):
             at(float(b), float(d))
-            put("ocarina", float(b), x.ocarina(m + up, float(d) * 0.98, vol), pan)
+            put("ocarina", float(b), x.tone(m + up, float(d) * 0.98, [1, 0.03, 0.07, 0.01, 0.02], vol, vib=0.003, vib_hz=4.5, scoop=0.3, scoop_s=0.04, attack=0.04, release=0.08), pan)
 
     def piano(start, text, vol=0.11, pan=-0.1, up=0):
         for b, d, m in notes(start, text):

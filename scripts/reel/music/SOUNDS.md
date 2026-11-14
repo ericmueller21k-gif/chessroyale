@@ -209,3 +209,9 @@ the vibraphone. Third go: the full song, 96 bars at 129 (2:59): that sample thre
 conversation and the lifted tune between; sent on the vibraphone, and on the flute in case "2" meant otherwise.
 A struck, ringing voice (vibraphone, koto, music box, soft piano) has now won over a blown or bowed one each time he
 was given the choice.
+Third go, 0:40 to 0:50 (the ocarina's slow tune over little else): "it sounds almost like staticky or like a low
+audio, like some compression issue ... some artifact embedded in every time it plays a note ... staticky on below the
+note itself". That was `Mix.ocarina`'s air (noise under each note, about 24 dB under it): unheard in Puddles's busy
+mix, plain here. The town's ocarina and flute are now the bare tones. The rule: a breath or air layer on a held note
+needs other sound over it; in a sparse passage leave it out. (Found by playing each voice alone and measuring what it
+has above 2.5 kHz: scratch `noise.py`'s way.)
