@@ -1092,39 +1092,54 @@ test("the typing line (a signed-in player's): no placeholder, 80 characters, a c
   const asked: string[] = [];
   page.on("request", (r: Request) => void (r.method() === "POST" && r.url().includes("/api/town/chat") && asked.push(r.url())));
   await field.fill(`hello town ${run}`);
+  // The wait ends 15 s after the server's answer comes (it says `waitMs`: 15 s), so between `beforeSend` + 15 s and `seenAt` + 15 s.
+  const beforeSend = Date.now();
   await page.keyboard.press("Enter");
-
-  // Your line, back from the server: your name, kind "player", bold, in a palette color; the field empties and lets go, typing closes (the
-  // line hides, the blur goes; no "Wait N s" any more). (Only this test's lines are counted: other tests' players, in the same
-  // room, may be talking too.)
-  const sentAt = Date.now();
   const mine = page.locator(".tc-player").filter({ hasText: `hello town ${run}` });
   await expect(mine).toHaveCount(1);
-  await expect(mine).toHaveText(new RegExp(`^\\[\\d{1,2}:\\d{2}\\] .+: hello town ${run}$`));
-  await expect(mine.locator("b.tc-name")).not.toHaveText("");
-  const c1 = Number(await mine.locator("b.tc-name").getAttribute("data-c"));
-  expect(await mine.locator("b.tc-name").evaluate((el) => getComputedStyle(el).color), "a palette color (the day shade)").toBe(rgb(NAME_COLORS[c1]!.day));
+  const seenAt = Date.now();
+  // It went: the field empties and lets go, typing closes (the line hides, the blur goes; no "Wait N s" any more).
   await expect(field).toHaveValue("");
   await expect(field).toBeEnabled();
   await expect(field).not.toBeFocused();
   await expect(page.locator(".town-chat")).toHaveAttribute("data-typing", "0");
   await expect(field).toBeHidden();
   expect(await rectOf(page, ".town-chat"), "the box didn't change").toEqual(b);
-  expect(asked, "one message went").toHaveLength(1);
 
-  // A try inside the 15 s: a gray line in the stream that only you see, "Sorry, you can't send another message for N seconds."
-  // (N rounded up), with this device's time; your words stay; nothing goes to the server.
+  // Two tries inside the 15 s, first and at once, before the checks below: on a slow runner those checks took 14 s, and a second try
+  // after them came past the wait and went (main 65902dc3). A gray line in the stream that only you see, "Sorry, you can't send another
+  // message for N seconds." (N rounded up: the wait left as you try), with this device's time; your words stay; nothing goes to the server.
+  // N for a try between `from` and `to` (ms since 1970, the same clock as the page's): from the latest the wait can end, tried at
+  // `from`, to the earliest, tried at `to`.
+  const nRange = (from: number, to: number) => [Math.max(1, Math.ceil((beforeSend + 15_000 - to) / 1000)), Math.ceil((seenAt + 15_000 - from) / 1000)] as const;
+  const sorry = hush(page);
+  const nOf = async () => Number((await sorry.textContent())!.match(/for (\d+) second/)![1]);
   await openTyping(page);
   await field.fill(`too soon ${run}`);
+  const try1 = Date.now();
   await field.press("Enter");
-  const sorry = hush(page);
   await expect(sorry).toHaveCount(1);
+  const seen1 = Date.now();
+  const firstId = (await sorry.getAttribute("data-id"))!;
+  const n1 = await nOf();
+  // Another try replaces it (one at a time): a new line in its place (not the same line's text changed), with the wait left then.
+  const try2 = Date.now();
+  await field.press("Enter");
+  await expect(sorry, "the line replaced: a new line in its place").not.toHaveAttribute("data-id", firstId);
+  await expect(sorry, "one at a time").toHaveCount(1);
+  const seen2 = Date.now();
+  expect(asked, "nothing went to the server inside the wait").toHaveLength(1);
+  const n2 = await nOf();
+  const r1 = nRange(try1, seen1);
+  const r2 = nRange(try2, seen2);
+  expect(n1, `the first try's N: the wait left as it came (${r1.join(" to ")})`).toBeGreaterThanOrEqual(r1[0]);
+  expect(n1).toBeLessThanOrEqual(Math.min(15, r1[1]));
+  expect(n2, `the second try's N: the wait left as it came (${r2.join(" to ")})`).toBeGreaterThanOrEqual(r2[0]);
+  expect(n2).toBeLessThanOrEqual(Math.min(15, r2[1]));
+  expect(n2, "no more left than at the first try").toBeLessThanOrEqual(n1);
   const sorryText = /^\[(1[0-2]|[1-9]):[0-5]\d\] Sorry, you can't send another message for (1[0-5]|[1-9]) seconds?\.$/;
   await expect(sorry).toHaveText(sorryText);
-  const n1 = Number((await sorry.textContent())!.match(/for (\d+) second/)![1]);
-  expect((await sorry.textContent())!.replace(/^\[[^\]]*\] /, ""), "the words, with N rounded up").toBe(tooSoonText(n1 * 1000));
-  expect(n1, "about what's left of the 15 s").toBeGreaterThanOrEqual(Math.ceil((15_000 - (Date.now() - sentAt)) / 1000));
-  expect(n1).toBeLessThanOrEqual(15);
+  expect((await sorry.textContent())!.replace(/^\[[^\]]*\] /, ""), "the words, with N rounded up").toBe(tooSoonText(n2 * 1000));
   expect(await colorOf(page, ".tc-line.tc-system"), "gray, by day a darker one").toBe(GRAY.day);
   expect(await sorry.evaluate((el) => getComputedStyle(el).fontStyle)).toBe("italic");
   await expectBare(page, ".tc-line.tc-system");
@@ -1132,18 +1147,17 @@ test("the typing line (a signed-in player's): no placeholder, 80 characters, a c
   await expect(field, "your words stay").toHaveValue(`too soon ${run}`);
   await expect(field).toBeEnabled();
   await expect(page.locator(".town-chat"), "a refused try keeps typing open").toHaveAttribute("data-typing", "1");
-  // Another try replaces it (one at a time); the stream is scrolled to it; it isn't sent either.
-  const first = (await sorry.textContent())!;
-  await page.waitForTimeout(2200);
-  await field.press("Enter");
-  await expect(sorry).toHaveCount(1);
-  // (The try is answered after a promise (TownChat's submit): the first line stays a moment, so its N was read twice. Its replacement.)
-  await expect(sorry, "the line replaced").not.toHaveText(first);
-  const n2 = Number((await sorry.textContent())!.match(/for (\d+) second/)![1]);
-  expect(n2, "less left").toBeLessThan(n1);
+  // The stream is scrolled to it.
   expect((await scrollOf(page)).fromFoot, "at the foot, in view").toBeLessThanOrEqual(2);
   expect(await rectOf(page, ".town-chat"), "the box didn't change").toEqual(b);
-  expect(asked, "nothing went to the server inside the wait").toHaveLength(1);
+
+  // Your line, back from the server: your name, kind "player", bold, in a palette color. (Only this test's lines are counted: other
+  // tests' players, in the same room, may be talking too.)
+  await expect(mine).toHaveText(new RegExp(`^\\[\\d{1,2}:\\d{2}\\] .+: hello town ${run}$`));
+  await expect(mine.locator("b.tc-name")).not.toHaveText("");
+  const c1 = Number(await mine.locator("b.tc-name").getAttribute("data-c"));
+  expect(await mine.locator("b.tc-name").evaluate((el) => getComputedStyle(el).color), "a palette color (the day shade)").toBe(rgb(NAME_COLORS[c1]!.day));
+  expect(asked, "one message went").toHaveLength(1);
   // A tap on it is no one's menu (it's a tap on the box: typing stays open).
   await sorry.click();
   await page.waitForTimeout(300);
@@ -1151,7 +1165,7 @@ test("the typing line (a signed-in player's): no placeholder, 80 characters, a c
   await expect(field).toBeFocused();
 
   // Past the 15 s the same words go, and the line you got goes after the next one comes (or its minute).
-  await page.waitForTimeout(Math.max(0, 15_500 - (Date.now() - sentAt)));
+  await page.waitForTimeout(Math.max(0, seenAt + 15_500 - Date.now())); // (the wait ends by `seenAt` + 15 s)
   await field.press("Enter");
   await expect(lineOf(page, `too soon ${run}`)).toHaveCount(1);
   expect(asked, "the second message went once the wait was up").toHaveLength(2);

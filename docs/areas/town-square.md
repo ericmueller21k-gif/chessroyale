@@ -1473,7 +1473,7 @@ title; a bot waiting, two playing (the board's pixels change), a tap on their ga
   `window.__townCam()` (the zoom, the lens, the focus, the statue up close, whether its quote shows and its letters' size),
   `window.__townSeat(i, n)` (the nearest free bots sit on table i's first n stools, and every bot holds still from then on), `window.__townStill()` (no bot sets off from then on; the walks under way end: a check that a walker's name tag could nudge, Nov 9)
   and `window.__townTables()` (each table's state: "still", "waiting:<free stool>" or "playing"); the bots (Oct 27):
-  `window.__townAt("bot", i)` (where to tap BOTS[i]), `window.__townCall(i)` (BOTS[i] comes to stand beside you, out from home first if it's there, and every bot
+  `window.__townAt("bot", i)` (where to tap BOTS[i]), `window.__townCall(i)` (BOTS[i] comes to stand beside you where the camera sees it whole, on its own (`figureSeenAt`: on screen, clear of the edge fade, its box clear of every other figure's), out from home first if it's there, and every bot
   holds still; -1: only the holding still) and `window.__townBots()` (each bot: its name, square, the table it sits at, whether
   it walks, whether it's at home, a sidekick's animation; since Oct 28 whether it's going home, where it's headed, `fading`
   "out" or "in", its door, whether it stands in the square, its place in the queue home) and `window.__townTurns(ms)` (the

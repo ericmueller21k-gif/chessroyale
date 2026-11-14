@@ -3749,6 +3749,41 @@ export class Renderer {
   }
 
   /**
+   * (Tests: the call hook, `__townCall`) Would a bot standing on square (c, r) be seen whole from this frame's camera, on its own: on the
+   * screen and clear of the edges' fade (`edgeFade`, which draws a figure low on the screen see-through, and a see-through one takes no
+   * tap), head and all, and its box clear of every other figure's in the square, where it stands or is headed (`coming`: the bot itself,
+   * not counted). A box is estimated from the square's scale: a figure's height in squares (a bot's or your pawn's) by 0.6 of that
+   * across, its foot on the square's middle. Nov 14, #720: a fixed rule (beside you off the camera's line through you) put the third bot
+   * called on the row behind you, low on a computer's screen and faded; a rule by columns can't see that, the camera can.
+   */
+  figureSeenAt(c: number, r: number, coming: Person): boolean {
+    const f = TOWN_FEEL;
+    const box = (sc: number, sr: number, squares: number, out: { x0: number; x1: number; y0: number; y1: number }): boolean => {
+      rel(this.view, this.camX, this.camY, sc, sr, this.rq);
+      if (!proj(this.view, this.rq.dx, this.rq.dz, 0, this.p)) return false;
+      const h = squares * this.p.k;
+      out.x0 = this.p.x - 0.3 * h;
+      out.x1 = this.p.x + 0.3 * h;
+      out.y0 = this.p.y - h;
+      out.y1 = this.p.y;
+      return true;
+    };
+    const me = { x0: 0, x1: 0, y0: 0, y1: 0 };
+    if (!box(c, r, f.botSquares, me)) return false;
+    const { x, y, k } = this.p;
+    // (`edgeFade`'s test, a bot's half width 0.5 square: fully drawn at 1.)
+    if (Math.min(this.H - (y + 0.15 * k), x - 0.5 * k, this.W - (x + 0.5 * k)) < 0.5 * k || me.y0 - TAP_ROOM_PX < 0) return false;
+    const o = { x0: 0, x1: 0, y0: 0, y1: 0 };
+    for (const q of this.town.people) {
+      if (q === coming || q.home) continue;
+      const w = q.walker;
+      if (!box(w.goalC(), w.goalR(), q.you ? f.youSquares : f.botSquares, o)) continue;
+      if (o.x0 < me.x1 && me.x0 < o.x1 && o.y0 < me.y1 && me.y0 < o.y1) return false;
+    }
+    return true;
+  }
+
+  /**
    * (Tests, `tapPoint`) Is (x, y) a point a tap reaches `is` at, with room round it: the point and the points `TAP_ROOM_PX` across and
    * along from it all on screen and on it. Nov 14: Glim's point lay 0.2 px above your pawn's box, and the tap's whole pixel (CDP rounds)
    * landed on your pawn: nothing opened.
