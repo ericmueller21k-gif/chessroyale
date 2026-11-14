@@ -14,3 +14,9 @@ Eric, Nov 13: "fix the cause, not add a checker". Main's run on 65902dc3.
   it, so its tap point isn't found. (Here every fresh town puts the bots in the same places, so the CI frame couldn't be recreated.)
   The test hook now picks a square beside you off the camera's line through you (your column looking north or south, your row
   east or west), and falls back to any free square beside you. Only the hook changed. A player's own walk is untouched.
+- **#720's own CI: town:1091 [desktop], both tries: "bot 19 is drawn" (Glim, the third bot called, after Tempo Tess and Bun & Bug).**
+  The fixed rule above put Tess and Bun & Bug on your left column and Glim on the row behind you (the free off-line square it reached
+  first): low on a computer's screen, where the edge fade draws a figure see-through, and a see-through figure takes no tap. A rule by
+  columns can't see the screen; the camera can. The hook now asks the renderer (`figureSeenAt`) which free squares beside you, ring by
+  ring, show a bot whole: on screen, clear of the edge fade, its box (estimated from the square's scale) clear of every other figure's
+  where it stands or is headed. (None: any square beside you, as before.) The fixed rule is gone. Only the hook changed.
