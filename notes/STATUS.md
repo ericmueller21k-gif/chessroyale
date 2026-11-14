@@ -1072,7 +1072,7 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 14 02:40: #698 MERGED (preloads dropped). #702 (Eric's new cutscene lines, 18 lines, holdMs 111120) CI; merge AFTER #701.
   #701 red on town-chat:1054 (cooldown countdown "less left" 6 vs 6: unrelated timing flake) -> main merged in, CI on 60568b18.
   Transform mockup READY (stills/recluse-transform-book), sent to Eric; helper session_01JuCWRuKMJWw3bLBbU5FDqK waits for .go.
-  Flaky round 3 list: shop:238 (?fps going out read 4 vs >4 on CI; recurring: fix the cause), town-street:528, town-chat:1367, town-chat:1054, preloads vs maintenance banner, town-street:226 tap.
+  Flaky round 3 list: alfil:247 [phone] (new, main b5ffcdd), shop:238 (?fps going out read 4 vs >4 on CI; recurring: fix the cause), town-street:528, town-chat:1367, town-chat:1054, preloads vs maintenance banner, town-street:226 tap.
 - Nov 14 03:00: #699 ring off, #701 bubble + grow-up exchanges, #702 Eric's cutscene lines: all MERGED (main 6c8657e). Watching
   deploy + main's full run. Running: same-frame (session_01JuCWRswvB1cpPP2PTyBeWU), transform (waits for Eric's go).
 - Nov 14 03:20: same-frame done -> #703 (CI f721b3a7): phase 1's frame through phase 2, four boards with even gaps, party column
@@ -1116,3 +1116,5 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 14 09:25: music: Eric's cached file sounds fine; the songs' session proved the file exact; cause most likely LEVEL (music at
   -13 dB). briefs/music-level.md queued (next free slot; town-load helper refused the add-on, staying on its brief: it already
   moved the music fetch after the first frame + per-file hash-checked brc-music cache).
+- Nov 14 09:35: main b5ffcdd: retry-passes only (town-chat:1370, alfil:247 new). #707 WIP dc5211cc: sound.spec:61 fails both tries
+  (not on main) -> sent to the fix-707 helper.
