@@ -1,4 +1,75 @@
-# The Hidden Boss's transformation, round 2: white eyes, the light's white-out, the visor (MOCKUP, Nov 14)
+# The Hidden Boss's transformation, round 3: the suit and helmet (MOCKUP, Nov 14)
+
+Eric, after round 2's visor: a full futuristic suit instead, "more like computer networking, that sort of wiring", not war, not
+fused with a computer, fairly fitted, red and blue with some yellow, and a matching full helmet whose front visor flips up when
+he speaks and back down after. Everything else is round 2's sequence: the book, his white eyes, his arms relaxed at his sides,
+the light growing until it whites out the screen, the change unseen, the light dying back into the center to show him.
+
+- `phone-transform.gif` / `computer-transform.gif`: from the cutscene's last line ("Why don't you show us?", main's) to "PHASE 2"
+  (12.5 frames a second; the MP4s are 25).
+- `suit-closeup-visor-flip.gif`: his head, the visor down, flipping up, up, and back (2.2 s, looping).
+- `suit-closeup-visor-down.png`, `-flipping.png`, `-up.png`: the three visor positions up close. `suit-whole-visor-down.png`,
+  `-up.png`: all of him in the suit. (His drawing is front-facing only, as every pose of his is, so there is no side view.)
+- Stills `phone-NN-*.png` / `computer-NN-*.png`: one per beat, numbered as in the table.
+- Made by `scripts/preview-recluse-transform.mjs` over the dev lab `packages/app/src/dev/recluse-transform-lab.tsx`; the suit is
+  real art in his drawing (`characters/recluse.ts`: `suitName`, `suitFrame`, the helmet), used only by the lab so far.
+
+## The suit (an original design, and how it stays clear of Iron Man)
+
+- **Fitted, not armored:** it is his own body's outline, the same slim shapes as his shirt and trousers, with no added plates,
+  bulk, weapons or machine parts. Nothing is fused into him: when the visor is up it's his own face.
+- **Blue first:** deep blue is the main color (chest panel, forearms, legs, the helmet's shell); red is for the side panels,
+  the shoulders and upper arms, a stripe down the outside of each leg, the helmet's crest and its two side pods. Yellow is only
+  thin lines: circuit traces running down his chest and branching to his sides, down the front of each leg to a node at the knee,
+  up the helmet's sides; a ring at each forearm; pale nodes at the trace ends. No gold anywhere as a surface.
+- **No chest circle:** the middle of his chest is a trace spine with a small node at the collar, not a round light.
+- **One smooth visor, not a faceplate:** the front is a single piece of tinted glass from his brow to his chin (a highlight
+  across it), like a racer's or an astronaut's visor, with no eye slits and no mouth shape. It tilts up into the dome and comes
+  back down. The helmet follows his own long head and narrow chin.
+- **Gloves and boots** dark navy; the boots with a yellow trim.
+
+## Beat by beat (s from T0, when the book starts to open; T0 is also when `recluse-phase3`'s intro starts)
+
+| s | What happens | The music (`recluse-phase3` marks) | Still |
+|---|---|---|---|
+| before 0 | The cutscene's last line: the child's "Why don't you show us?" | his beaten theme | 01 |
+| 0.0 | The book flat on the board in front of him falls open (1.1 s), its pages light up | the intro starts | 02 |
+| 2.64 | The light bursts out and takes him: his head goes back, his eyes go totally white and glow | **slam** 2.64 | 03 |
+| 3.04 | The shaft lifts him off his knees (1.9 s), arms hanging at his sides, hair pushed back; the light grows faster and faster | **build** 3.04 | |
+| 4.94 | He hovers a little in the beam, head back | | 04 |
+| 5.6 | The beam shoots up off the board and off the top of the screen | | 05 |
+| 6.3 | Rays radiate across the whole screen; he's lost in the glow | | 06 |
+| 7.3–8.0 | The whole screen whites out | | 07 |
+| 8.0–8.7 | Full white. Unseen: he's in the suit and helmet, set back on his feet; the child and the lens are gone | | 07 |
+| 8.7–10.0 | The white dies back down into the center | | 08 |
+| 10.0 | **Him in the suit and helmet, the visor down** | | 12 (down), close-ups |
+| 10.3 | **The visor flips up** (a frame on its way, 0.18 s): his face | | 09 |
+| 10.6 | His line in a box over his head: "Computation without creativity is nothing. / Now I have both." (typed by 14.3) | | 10 |
+| 15.75 | **The visor flips back down** (0.18 s), the box gone; down from here on | | |
+| 16.24 | He crouches over the book | | |
+| 16.435 | He leaps high and hangs for a second; the open book stays glowing on the board | **breath** 16.435 | 11 |
+| **17.435** | **He lands on the drop.** The board cracks under him, the big board gone from this frame on; the arcs strike out from his hands at his sides | **drop** 17.435 | 12 |
+| 18.2 | The quarters part (nothing behind them) and grow into four boards; his second line in his bubble: "Prepare yourself. / This is the ultimate test of your skill." | | 13, 14 |
+| 19.6–21.1 | The book into his hands (`pickup`), the pieces to their Chess960 squares, his leap home (`leap2`), all in the suit | | |
+| 21.2 | "PHASE 2" (2.15 s), then the countdown and the clocks, as today | | 15 |
+
+## Calls I made (Eric can say otherwise)
+
+- **The visor's moment:** up 0.3 s after the reveal, so his face shows for the whole line, and down 1.4 s after the line is
+  typed, half a second before he crouches, so he jumps with it down. It stays down for the rest of the fight.
+- **His second line** stays where round 2 put it (after the landing), so the first has the time to be read with his face showing.
+- **His hair** is under the helmet from the reveal on (the light still pushes it back before that).
+- **In the build** the suit is the same art everywhere his phase 2 look shows (his figure by the board, the bar's bust, the
+  four boards' figure), made from his existing phase 2 animations by their part names, so every pose wears it without new
+  frames; the round 2 visor overlay and the engine eye are gone.
+- **What this mockup doesn't show:** the screen behind is phase 1's fight mid-game, so the boss bar's bust is still his phase 1
+  face, the God King is in color and the dock says "Your move." In the game it's the phase change's screen, the bust wears the
+  helmet and the God King stands greyed in his place. "PHASE 2" is CSS-animated and doesn't show on a paused clock (unchanged).
+
+
+---
+
+## Round 2 (history): the Hidden Boss's transformation, round 2: white eyes, the light's white-out, the visor (MOCKUP, Nov 14)
 
 Eric's notes on round 1, all in: his arms hang relaxed at his sides the whole time (never raised); his eyes go totally white
 as the light takes him; the light keeps pouring out more and more until it engulfs him, shoots up off the board and off the
@@ -14,7 +85,7 @@ the split's first frame (no big board hiding behind the four).
   and the visor `packages/app/src/components/RecluseVisor.tsx` (on `claude/recluse-transform-book`; nothing in the game uses
   them yet). The one game-code change: a `possessed` eye shape in his drawing (`characters/recluse.ts`), used only by the lab.
 
-## Beat by beat (s from T0, when the book starts to open; T0 is also when `recluse-phase3`'s intro starts)
+### Beat by beat (s from T0, when the book starts to open; T0 is also when `recluse-phase3`'s intro starts)
 
 | s | What happens | The music (`recluse-phase3` marks) | Still |
 |---|---|---|---|
@@ -41,7 +112,7 @@ the split's first frame (no big board hiding behind the four).
 The split still lands on the music's drop (the intro is 17.435 s). The whole thing runs 23.4 s from the book to the end of
 "PHASE 2", as in round 1.
 
-## Calls I made (Eric can say otherwise)
+### Calls I made (Eric can say otherwise)
 
 - **His second line moved after the landing.** Eric wants the computation line after the reveal (10 s in); it takes 3.7 s to
   type and should be read, so both lines no longer fit before the drop the way round 1 had them. Both lines stay (Eric, Nov 13):
@@ -62,7 +133,7 @@ The split still lands on the music's drop (the intro is 17.435 s). The whole thi
   instead of from raised hands.
 - **The big board:** from the crack's first frame only the four quarters show. In the build, the same in the game's split.
 
-## On "go": what changes in the game
+### On "go": what changes in the game
 
 The God King's absorption is removed: `absorbKing`, `AbsorbStream`, the seize/seizeLoop/seized/rage beats in `PHASE_CHANGE`,
 `king` in the dock (he stays in his place, greyed, as #703 left him), his triumph and drain lines, and his sounds there. The
@@ -72,6 +143,7 @@ The server's phase-change length (`RECLUSE_ONLINE.changeMs`) follows the new tot
 
 
 ---
+
 
 ## Round 1 (history): the Hidden Boss's transformation, redone: the book's light, no God King (MOCKUP, Nov 14)
 
