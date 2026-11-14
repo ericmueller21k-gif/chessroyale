@@ -17,5 +17,5 @@ test of `docs/rules/eric.md` (Eric's OK needed), it's written up in the PR inste
 - **Test: the server read before the save it waits for** (global-chat:46): polled until the save lands.
 - **Test: Node's fetch in a route met a reset kept-alive connection** (live-window:114, ECONNRESET): retried once, as a browser does.
 - Guard tests, written up only: town-street:226 (the phone's `touchscreen.tap` sends its start and end apart; a frame between them
-  on CI's software WebGL outlasts `streetHoldMs` and the tap is a run) and hidden-boss-room:242 (fixed in the game, above).
+  on CI's software WebGL can outlast `streetHoldMs`, making the tap a run: the likeliest cause, not proven) and hidden-boss-room:242 (fixed in the game, above).
 - Not reproduced, no failing log found: friends:40 (10/10 locally), desktop-board:260 (only Nov 10's, fixed then by #604).
