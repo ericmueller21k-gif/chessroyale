@@ -367,9 +367,10 @@ below):
   its beats settings, `RECLUSE_PHASE2.change.transform`), about 23.7 s from his cutscene's end to the end of "PHASE 2" (after a 1.8 s
   fall and his cutscene), one timeline, not skippable like a boss's intro. Drawn over the board by `components/RecluseTransform.tsx`
   (one fixed layer, carrying on the cutscene's: the lens, the child, the man, the open book, and the light on two screen-size canvases,
-  behind and over him: the summoning's light from his room, its sprites made once and stretched; backed at a third of a pixel per CSS
-  pixel, each left out while it has nothing to draw, the full-screen dark and the white-out as opacity layers, the beam's motes on a
-  small canvas of their own at the screen's pixels: the Nov 14 review, a slowed phone's frames) from its start to his leap home,
+  behind and over him: the summoning's light from his room, its sprites made once and stretched, `recluse-light.ts`; drawn in a
+  worker, off the main thread, at 1 pixel per CSS pixel, each canvas hidden while it has nothing to draw: the Nov 14 review, a
+  slowed phone's frames, with the look kept; `recluse-light.worker.ts`, or the main thread where a browser can't hand a canvas to a
+  worker) from its start to his leap home,
   his place empty meanwhile (`.rc-away`, his words over his head, `.rc-say`); the board's square, the split, the arcs and the dock by
   `screens/Recluse2.tsx` (`PhaseChangeScreen`); the figures in `characters/recluse-transform.ts` (`RECLUSE_CHANGE`, the book and the
   child apart). The transformation theme's intro starts `musicAtMs` (0.3 s) in, so a device a moment late still plays it whole, and
