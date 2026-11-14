@@ -1072,4 +1072,4 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 14 02:40: #698 MERGED (preloads dropped). #702 (Eric's new cutscene lines, 18 lines, holdMs 111120) CI; merge AFTER #701.
   #701 red on town-chat:1054 (cooldown countdown "less left" 6 vs 6: unrelated timing flake) -> main merged in, CI on 60568b18.
   Transform mockup READY (stills/recluse-transform-book), sent to Eric; helper session_01JuCWRuKMJWw3bLBbU5FDqK waits for .go.
-  Flaky round 3 list: town-street:528, town-chat:1367, town-chat:1054, preloads vs maintenance banner, town-street:226 tap.
+  Flaky round 3 list: shop:238 (?fps going out read 4 vs >4 on CI; recurring: fix the cause), town-street:528, town-chat:1367, town-chat:1054, preloads vs maintenance banner, town-street:226 tap.
