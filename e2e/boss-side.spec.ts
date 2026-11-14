@@ -4,7 +4,7 @@ import { BOSS_KITS } from "../packages/app/src/characters/kits.ts";
 import { GOD_KING } from "../packages/app/src/characters/god-king.ts";
 import { SIDE_FEEL } from "../packages/app/src/characters/side-size.ts";
 import { renderFrame, type Character } from "../packages/app/src/characters/sprite.ts";
-import { BOARD_SEL, asAdmin, bossAloneFromHome, submitMove, test } from "./helpers.ts";
+import { BOARD_SEL, asAdmin, bossAloneFromHome, settled, submitMove, test } from "./helpers.ts";
 
 /**
  * A boss beside the board on a computer stands by its bottom-left corner: a small gap off it where his room allows, and over its edge
@@ -207,6 +207,14 @@ test("the God King's words stay whole inside the game screen (Eric, Nov 13)", as
   await expect.poll(() => page.evaluate(() => (window as any).match?.phase.kind ?? "none"), { timeout: 60_000 }).toBe("play");
   for (const [w, h] of [[1280, 800], [1440, 900], [390, 844]] as const) {
     await page.setViewportSize({ width: w, height: h });
+    // (The line once the screen has taken the new size: the room his words get (`--king-room`) is set by the window's resize event, which
+    // can come after a line said at once, and a line is fitted as it shows. Main, Nov 13: at 390 its box was still the 1440 one's, 614.)
+    await settled(page, () =>
+      page.evaluate(() => {
+        const s = document.querySelector(".screen");
+        return s ? [s.getBoundingClientRect().width, getComputedStyle(s).getPropertyValue("--king-room")] : null;
+      }),
+    );
     await page.evaluate(() => (window as any).__kingSay("inCheck", `check-${Date.now()}`));
     const bubble = page.locator(".gk-bubble:not(.leaving)").first();
     await expect(bubble).toBeVisible({ timeout: 5_000 });

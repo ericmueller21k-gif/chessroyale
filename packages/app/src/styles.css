@@ -2427,40 +2427,6 @@ button.history-label {
   opacity: 0.12;
   transition: opacity 0.4s;
 }
-/* Exactly on its square: eighths of the board's own size (--board-size), at any size, zoom or display scale. Square
-   corners and the glow inside, so nothing of it reads as wider than the square. */
-.square-ring {
-  position: absolute;
-  left: calc(var(--board-size, 100%) * var(--sq-x, 0) / 8);
-  top: calc(var(--board-size, 100%) * var(--sq-y, 0) / 8);
-  width: calc(var(--board-size, 100%) / 8);
-  height: calc(var(--board-size, 100%) / 8);
-  box-sizing: border-box;
-  border: 4px solid #2fd27a;
-  border-radius: 2px;
-  box-shadow: inset 0 0 10px rgba(47, 210, 122, 0.65);
-  pointer-events: none;
-  z-index: 3;
-  animation: ring 500ms ease-out;
-}
-@keyframes ring {
-  from {
-    transform: scale(1.4);
-    opacity: 0;
-  }
-}
-/* Eric's look test (Nov 14, main.tsx): ?ring=off, no ring; ?ring=fade, it fades in at its size, no zoom. */
-:root[data-ring="off"] .square-ring {
-  display: none;
-}
-:root[data-ring="fade"] .square-ring {
-  animation-name: ring-fade;
-}
-@keyframes ring-fade {
-  from {
-    opacity: 0;
-  }
-}
 .selecting-label {
   position: absolute;
   left: 50%;
@@ -7634,6 +7600,9 @@ button.history-label {
   margin: 4px 0 0;
   font-family: "Press Start 2P", ui-monospace, monospace;
   font-size: 12px;
+  /* (Its own line height, so its box is the same whichever font draws it: the pixel font arrives after the first paint (swap), and the
+     fallback's taller line moved everything under it 2 to 5 px when it came. Nov 13, crate-banner:44.) */
+  line-height: 1;
   letter-spacing: 0.04em;
 }
 .ff-button {
@@ -15020,6 +14989,12 @@ img.qicon {
 .place-side.ch-recluse .bc-bubble {
   bottom: calc(137px * var(--bc-scale) + 6px);
 }
+/* (A figure whose height changes with what's drawn: the Hidden Boss's child form, growing up from 9 to the man. His words stand on the
+   top of the drawing shown now, `--bc-head` sprite px above his feet (BossKit.heads, set as his animation changes), 16 px over it so the
+   tail clears his hair: Eric, Nov 14, at 20 his words sat over his face, placed for the child.) */
+.boss-char.place-side.bc-heads .bc-bubble {
+  bottom: calc(var(--bc-head, 134) * var(--bc-scale) * 1px + 16px);
+}
 .boss-char.place-results.ch-recluse {
   --bc-scale: 1.25;
   --bc-box: 172px;
@@ -19479,7 +19454,7 @@ button.sq-tiny {
 }
 /* His whole figure on the board (from his leap in to his leap back): placed by a transform in the board's own width
    (cqw), his feet on the point he's at (his frames draw his shadow: no filter); his place stands empty meanwhile, his
-   words still beside it. */
+   words over his head here (.rc-say, Nov 14). */
 .rc-fig {
   position: absolute;
   top: 0;
@@ -19492,6 +19467,30 @@ button.sq-tiny {
 .rc-away .boss-char-sprite,
 .rc-away .boss-char > .bc-engine.on {
   visibility: hidden;
+}
+/* (While he's on the board his words are over his head there, not by his empty place, a phone's bar too: Eric, Nov 14.) */
+.rc-away .bc-bubble:not(.rc-say) {
+  display: none;
+}
+/* The point over his figure on the board his words stand on: centered on him (a wide box, so the words can center in it without a
+   translate, which SpeechBox uses to move a box into view), the frame's top, 12 px over it. */
+.rc-say-at {
+  position: absolute;
+  left: calc(50% - 300px);
+  top: 0;
+  width: 600px;
+  height: 0;
+}
+.rc-say-at > .rc-say {
+  left: 0;
+  right: 0;
+  bottom: 12px;
+  margin-inline: auto;
+}
+.rc-say-at > .rc-say::after {
+  left: 50%;
+  right: auto;
+  margin-left: -6px;
 }
 /* His shadow on the board where he's coming down. */
 .rc-shadow {
@@ -24081,7 +24080,9 @@ button.sq-tiny {
   /* The chat box under the moves (Eric, Nov 14: "put the chat box below it, make it the same width… the height would just come
      down"): the same column, left edge and width as the moves (the same translate), a 12 px gap under them, its foot on the
      board's bottom line. Its top margin is the rule above, so its height is what the board has left under it. It no longer runs down beside the pawns and the God King (the boss dock's rule, grid rows 3 to 5). */
-  .screen.game:has(> .mv-side) > .under-board.side {
+  /* (Not a party's battle yet: its teammates stand stacked above the God King in this column, so its chat keeps its place beside
+     the corner until that column is laid out for both: Nov 14, main's boss-party check.) */
+  .screen.game:has(> .mv-side):not(:has(> .boss-dock.dk-party)) > .under-board.side {
     grid-row: 3;
     align-self: start;
     margin-left: 0;

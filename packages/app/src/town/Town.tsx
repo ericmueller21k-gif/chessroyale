@@ -218,6 +218,11 @@ export function TownScreen({
   const doorBusy = useRef(false);
   /** The back button (or Go out) tapped while the room was still fading in: out as soon as it has (Nov 12: the tap was lost). */
   const outNext = useRef(false);
+  /**
+   * A way through to another room (the stairs' Go up, a back door) tapped while this one was still fading in: through as soon as it has
+   * (Nov 13, hidden-boss-room:242: the tap was dropped, as Go out's was on Nov 12).
+   */
+  const passNext = useRef<RoomPart | null>(null);
   /** Going out now (goOut, until the town is back). */
   const leaving = useRef(false);
   /**
@@ -306,6 +311,7 @@ export function TownScreen({
     if (doorBusy.current) return;
     doorBusy.current = true;
     outNext.current = false;
+    passNext.current = null;
     doorPhase(RF.goIn);
     const F = SHOP_FEEL;
     // (The room's pictures painted a slice a frame while the town zooms, the rest once it's black: shops/load-slice.ts.)
@@ -384,9 +390,12 @@ export function TownScreen({
    */
   const goThrough = async (to: RoomPart) => {
     const at = insideNow.current;
+    // (Tapped as the room fades in: it waits for the room, then goes through. Not while going out.)
+    if (doorBusy.current && at && !leaving.current && !outNext.current) passNext.current = to;
     if (doorBusy.current || !at || flow.current !== "town" || summoning.current) return;
     doorBusy.current = true;
     outNext.current = false;
+    passNext.current = null;
     const F = SHOP_FEEL;
     const from: RoomPart = at.room.def.part ?? "front";
     // (Up to his room: four at most, Eric, Nov 12. A 5th: "The door is locked." and stays out.)
@@ -466,7 +475,10 @@ export function TownScreen({
     setTimeout(() => {
       doorBusy.current = false;
       doorPhase(0);
+      const through = passNext.current;
+      passNext.current = null;
       if (outNext.current) void goOut();
+      else if (through) void goThrough(through);
     }, SHOP_FEEL.fadeMs);
   };
   /** "Go out" (or the back button inside): the room fades to black, and the town zooms back out from the door. */
@@ -478,6 +490,7 @@ export function TownScreen({
       return;
     }
     outNext.current = false;
+    passNext.current = null;
     // (A challenge can be called off, with the back button, until its transition starts: the battle is coming from then on.)
     if (flow.current !== "town" && flow.current !== "walkIn" && flow.current !== "intro") return;
     doorBusy.current = true;

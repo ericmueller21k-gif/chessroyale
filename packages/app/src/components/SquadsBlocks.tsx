@@ -6,7 +6,7 @@ import { blockName, coinText, tokenWords, squadName } from "../squads-view.ts";
  * Squads v2 on the board (docs/areas/squads.md, "The screens"): move blocks drawn as soft arrows that keep drawing
  * themselves with a lock pulsing on them, the block picker (tap their piece, then where it would go), teammates' picks
  * named on the board in the final, the squads' block banks and same-move tokens, and the post-match token breakdown.
- * Everything drawn over the squares is placed in eighths of the board's own size (`--board-size`), as SquareRing is.
+ * Everything drawn over the squares is placed in eighths of the board's own size (`--board-size`), as the old played-move ring was.
  */
 
 /** Where a square is drawn, in eighths of the board (its column and row from the top left). */

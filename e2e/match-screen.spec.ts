@@ -39,19 +39,7 @@ function furniture(p: Page) {
   }, BOARD_SEL);
 }
 
-/** How far the reveal's ring is from the square it marks (the move's own last-move square): the worst edge, in px. */
-function ringOff(p: Page) {
-  return p.evaluate((sel) => {
-    const ring = document.querySelector(".square-ring")!.getBoundingClientRect();
-    const squares = [...document.querySelectorAll(`.board-area ${sel.square}.last-move`)].map((s) => s.getBoundingClientRect());
-    const off = (s: DOMRect) => Math.max(Math.abs(s.left - ring.left), Math.abs(s.top - ring.top), Math.abs(s.right - ring.right), Math.abs(s.bottom - ring.bottom));
-    const board = document.querySelector(`.board-area ${sel.container}`)!.getBoundingClientRect().width;
-    const wrap = document.querySelector(".board-area .board-wrap")!.getBoundingClientRect().width;
-    return { off: Math.min(...squares.map(off)), size: ring.width, board, wrap, flipped: !!document.querySelector(".board-area .orientation-black") };
-  }, BOARD_SEL);
-}
-
-test("the reveal's ring sits exactly on its square at two widths; the bars and the board's clock stay off the squares", async ({ browser }, info) => {
+test("the bars and the board's clock stay off the squares, and the clock stays through the reveal at two widths (the played move's ring is gone: Eric, Nov 14)", async ({ browser }, info) => {
   test.setTimeout(3 * 60_000);
   const phone = info.project.name === "phone";
   // The board draws the squares in a box it rounds down to a whole multiple of 8 device pixels, a little smaller
@@ -84,20 +72,19 @@ test("the reveal's ring sits exactly on its square at two widths; the bars and t
   expect(f.textRight, where).toBeLessThanOrEqual(f.clock!.left);
   expect(f.textCut, where).toBe(false);
 
-  // The crowd's move lands with the ring on its square. Hold the reveal there and look at two widths.
+  // The crowd's move lands (its last-move square marked). Hold the reveal there and look at two widths.
   const best: string = await page.evaluate(async () => {
     const m = (window as any).match;
     return (await m.runner.topMovesFor(m.phase.board.fen))[0].move;
   });
   await submitMove(page, best);
-  await expect(page.locator(".square-ring")).toBeVisible({ timeout: 60_000 });
+  await expect.poll(() => phase(page), { timeout: 60_000 }).toBe("reveal");
+  await expect(page.locator(".square-ring"), "no ring round the played move (Eric, Nov 14)").toHaveCount(0);
   await page.evaluate(() => clearTimeout((window as any).match.timer));
   await page.waitForTimeout(700); // (its entrance)
   for (const width of phone ? [361, 425] : [1396, 1300]) {
     await page.setViewportSize({ width, height: phone ? Math.round(width * 2.16) : 733 });
     await page.waitForTimeout(400);
-    const r = await ringOff(page);
-    expect(r.off, `${width} px: ${JSON.stringify(r)}`).toBeLessThanOrEqual(1);
     // The clock stays through the reveal (your bank alone: no move clock runs).
     await expect(page.locator(".board-clock")).toHaveText(/^\d+:\d\d$/);
   }

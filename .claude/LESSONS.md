@@ -298,6 +298,17 @@ Tests check *what* ends up on the screen, not *how it gets there*, nor how long 
     result screen) keeps the object in use, as other players would. Read the room id in the recorder's answers first: a new one
     means a restart, not a lost line.
 
+- **The flaky causes of Nov 13** (`docs/decisions/2026-11-14-flaky-causes.md`; Eric: "fix the cause, not add a checker"):
+  - A font that arrives after the first paint reflows the page (`font-display: swap`): the fonts are preloaded in `index.html`, and a
+    text whose `normal` line height differs between fonts gets a fixed one. A test that measures "nothing moved" first waits for
+    `document.fonts.ready`, so it measures its own effect, not the font's.
+  - Every busy guard keeps its tap (Go out's `outNext`, then a way through's `passNext`): a test comment saying a tap "is dropped" is a
+    game bug to fix, not a retry to keep.
+  - "Wait until it holds still" in a test is `settled(page, read, ms)` (`e2e/helpers.ts`); a tap in the street town is `tapInTown`.
+    Never a fixed `waitForTimeout` before a measure or a tap.
+  - A route handler's `route.fetch()` is Node's, not the browser's: a reset kept-alive connection to the local server comes back
+    ECONNRESET where a browser would send the request again. It tries once more.
+
 ## Eric's rules hold
 
 - **An options panel that disappeared** (Oct 25, [story](../docs/history/lessons.md#an-options-panel-that-disappeared-oct-25-2026)):
@@ -331,5 +342,9 @@ Tests check *what* ends up on the screen, not *how it gets there*, nor how long 
 - **Hollow's dark at Babur's mate** (Nov 11, [story](../docs/history/lessons.md#hollows-dark-at-baburs-mate-nov-11-2026)):
   - Code shared by every boss draws nothing of one boss's (his effect, his color): a boss's own look goes in its kit,
     and a test walks every kit (king-attack.test.ts: each boss's hits and mate its own).
+
+- **His words over his face as he grew** (Nov 14, [story](../docs/history/lessons.md#his-words-over-his-face-as-he-grew-nov-14-2026)):
+  - A speech bubble stands on the drawing shown now: a figure whose height or place changes (grows, leaps onto the board) carries its
+    heights from the art (measured in a unit test), never one number per character, and a check measures the bubble against his head.
 
 - **The FAQ follows the rules** (Oct 11): a PR that changes a rule, a number's meaning or a boss updates its words in `packages/app/src/faq/content.ts` in the same PR; numbers there come from the settings objects, never typed in.

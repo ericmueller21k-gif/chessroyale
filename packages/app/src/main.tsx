@@ -57,17 +57,6 @@ try {
 // Light or dark: the page already shows the right one (index.html's script); from here on it follows the device
 // while nothing is picked.
 watchTheme();
-// Eric's look test (Nov 14): the green ring round a played move's square. `?ring=off` hides it, `?ring=fade` fades it in at the
-// square's size (no zoom), `?ring=on` puts it back. Remembered for the tab (sessionStorage), any page, any board.
-try {
-  const asked = new URLSearchParams(location.search).get("ring");
-  if (asked === "off" || asked === "fade") sessionStorage.setItem("brc.ring", asked);
-  else if (asked === "on") sessionStorage.removeItem("brc.ring");
-  const ring = sessionStorage.getItem("brc.ring");
-  if (ring) document.documentElement.dataset.ring = ring;
-} catch {
-  // (No storage: the usual ring.)
-}
 // The board colors picked on this device (Settings → Board): on the page before any board is drawn.
 applyBoardColors();
 // A tester's ?bannerplus= (test-switches.ts): the banners' extra for the games on this device.

@@ -211,7 +211,9 @@ test("the town on a device without WebGL 2 never falls back to the old town (Nov
   // (Everyone's town is the street town, which needs WebGL 2: a player's here (a guest) on the phone; on the computer, an admin's, for the
   // health view.)
   let loads = 0;
-  page.on("framenavigated", (f) => void (f === page.mainFrame() && new URL(f.url()).pathname === "/town" && loads++));
+  // (Documents only: since Nov 14 the town pushes a history step of its own as it shows ("Leave Chess Town?" on back), and
+  // Playwright's framenavigated fires for a pushState too. The check is the same: no reload.)
+  page.on("request", (r) => void (r.isNavigationRequest() && r.frame() === page.mainFrame() && new URL(r.url()).pathname === "/town" && loads++));
   const sent = page.waitForRequest((r) => r.url().endsWith("/api/problems") && r.method() === "POST");
   await page.goto("/town?sky=day");
   // The message in the town's box, nothing else (no button: retrying can't help): never today's town.
