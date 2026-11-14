@@ -1060,3 +1060,7 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 14 01:40: all of tonight's merges live (f1618e4). Eric: (1) stereo music YES -> he pastes the handoff note to his music chat
   (stereo 192 kbps, +1 min build-up for recluse-phase2); (3) ring: testing; (4) town-street:226 guard change OK'd -> sent to the
   flaky helper; (2) kid->man lines: options sent, awaiting his pick (then a small job in RecluseChild after the bubble job).
+- Nov 14 01:48: #694 #696 #697 MERGED + live (f1618e4). Flaky helper done -> #698 (CI 72befe84). town-street:226 change tried and
+  reverted (worse). Next round of flakes: town-street:528, town-chat:1367 (+ fairplay:65, friends:40 unconfirmed).
+  Same-frame helper started: session_01JuCWRswvB1cpPP2PTyBeWU (high), claude/recluse-same-frame. Running Opus: bubble (+ the
+  kid->man exchanges, all five, seeded pick) + same-frame. Queue: transform mockup -> visual QA -> night room.
