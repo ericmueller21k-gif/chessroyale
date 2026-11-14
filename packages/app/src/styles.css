@@ -26805,7 +26805,17 @@ body.cs-on .mm-scrim {
   transform: rotate(45deg);
   transition: opacity 240ms ease-in;
 }
-.cs-tail.leaving {
+/* (The tail goes in and out with its box, from the box's own classes (SpeechBox's `fresh` and `leaving`): one rule for both, so a
+   tail never shows without its box, Nov 14.) */
+.cs-say.fresh + .cs-tail {
+  animation: cs-tail-in 160ms steps(3, end) both;
+}
+@keyframes cs-tail-in {
+  from {
+    opacity: 0;
+  }
+}
+.cs-say.leaving + .cs-tail {
   opacity: 0;
 }
 /* (A phone: the board fills the width, so a box running 32 px past the speaker reaches the screen's edge; there it runs 110 px past

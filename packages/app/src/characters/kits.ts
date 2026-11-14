@@ -15,7 +15,7 @@ import { GREX, GREX_ATTACK, GREX_CHANCE, GREX_LINES, GREX_PORTRAIT } from "./gre
 import { HOLLOW, HOLLOW_ATTACK, HOLLOW_CHANCE, HOLLOW_LINES, HOLLOW_PORTRAIT } from "./hollow.ts";
 import { SAWYER, SAWYER_ATTACK, SAWYER_CHANCE, SAWYER_LINES, SAWYER_PORTRAIT } from "./sawyer.ts";
 import { PIG, PIG_ATTACK, PIG_CHANCE, PIG_LINES, PIG_PORTRAIT } from "./pig.ts";
-import { RECLUSE, RECLUSE_BUST, RECLUSE_PORTRAIT } from "./recluse.ts";
+import { RECLUSE, RECLUSE_BUST, RECLUSE_BUST_PORTRAIT, RECLUSE_HEADS, RECLUSE_PORTRAIT } from "./recluse.ts";
 import { ALFIL, ALFIL_ATTACK, ALFIL_CHANCE, ALFIL_LINES, ALFIL_PORTRAIT } from "./alfil.ts";
 import { HOPPER, HOPPER_ATTACK, HOPPER_CHANCE, HOPPER_LINES, HOPPER_PORTRAIT } from "./hopper.ts";
 import { SMUDGY_ATTACK, SMUDGY_CHANCE, SMUDGY_LINES, SMUDGY_PORTRAIT, SMUDGY_SPRITE } from "./smudgy.ts";
@@ -123,6 +123,12 @@ export interface BossKit extends BeatLines {
   sounds: Record<string, SoundName>;
   /** The part of a frame a portrait shows, and from which animation and frame. */
   portrait: { x: number; y: number; w: number; h: number; anim: string; frame: number };
+  /**
+   * A figure whose look changes in the battle (the Hidden Boss: his age, his suit): its portrait is this part of its bar's bust (`bar`)
+   * as the bust is drawn now (the loop his figure rests in, his suit), so a computer's face follows him as a phone's bust does
+   * (BossFace, Nov 14). Undefined: `portrait`, one picture.
+   */
+  barFace?: { x: number; y: number; w: number; h: number };
   /**
    * A figure whose height changes with what's drawn (the Hidden Boss's child form, growing up: one drawing for the child, 13, 20 and the
    * man): for each animation, how far above its feet its tallest frame reaches, sprite px (measured from the art: a test checks). Beside
@@ -1077,10 +1083,14 @@ export const BOSS_KITS: Record<string, BossKit> = {
     // (His real "Best by test.", word for word: only when he's White and the battle's game opened 1.e4.)
     lineOf: (beat, boss) => (beat === "entrance" && boss.crowdSide === "b" && boss.board.history[0] === "e2e4" ? RECLUSE_LINES.introE4 : undefined),
     portrait: { ...RECLUSE_PORTRAIT, anim: "idle", frame: 0 },
+    // (A computer's face: his bust's, as it's drawn now, so it wears his suit in phase 2.)
+    barFace: RECLUSE_BUST_PORTRAIT,
     // (The bust is 50 px wide: the wider box on a phone, as Sawyer's and Wrangler's.)
     wide: true,
     // (Phase 2: his suit and helmet, from his transformation on.)
     suit: true,
+    // (His words above his head as it's drawn now, beside the board: kneeling as he mumbles, beaten.)
+    heads: RECLUSE_HEADS,
   },
 };
 
@@ -1114,6 +1124,8 @@ export const RECLUSE_CHILD_KIT: BossKit = {
   lineOf: (beat, boss) => (beat === "defeat" ? growUpExchange(boss).kid : undefined),
   // (His face as the child: the man's window, moved down to the child's head, 45 px lower in the same drawing space.)
   portrait: { ...ADULT.portrait, y: ADULT.portrait.y + 45, anim: "idle", frame: 0 },
+  // (A computer's face follows his age, from each age's bust: 9, 13, 20, then the man.)
+  barFace: RECLUSE_BUST_PORTRAIT,
   // (His words above his head at whichever age is drawn now, beside the board: Eric, Nov 14.)
   heads: GROWING_HEADS,
   wide: true,

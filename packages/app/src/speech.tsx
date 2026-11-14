@@ -262,7 +262,9 @@ export function VoiceBubble({ voice, class: cls, hidden = false, balanced = fals
  */
 function bubbleFit(e: HTMLElement): { width: number; three: boolean } | null {
   const room = e.parentElement?.clientWidth ?? 0;
-  if (!room) return null;
+  // (Not laid out just now (it or a parent `display: none`: his place's box while he's on the board, `.rc-away`): nothing to measure.
+  // A width taken then is the frame's alone, 0 + padding, and kept: a phone's empty 26 px sliver at the countdown, Nov 14.)
+  if (!room || !e.getClientRects().length) return null;
   const cs = getComputedStyle(e);
   const padX = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight) + parseFloat(cs.borderLeftWidth) + parseFloat(cs.borderRightWidth);
   const padY = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom) + parseFloat(cs.borderTopWidth) + parseFloat(cs.borderBottomWidth);
@@ -316,17 +318,31 @@ export function SpeechBox({ class: cls, text, at, until, now, fits = 0, balanced
   useLayoutEffect(() => {
     const e = el.current;
     if (!balanced || !e) return;
-    setFitted(bubbleFit(e));
+    // (Measured only when it can be laid out (bubbleFit): a box drawn hidden is measured as it first shows, by the ResizeObserver,
+    // which runs before that frame's paint. A width once fitted is kept until the line changes.)
+    let done = false;
+    const measure = () => {
+      const f = el.current && bubbleFit(el.current);
+      if (!f) return;
+      done = true;
+      setFitted(f);
+    };
+    measure();
+    const ro = new ResizeObserver(() => {
+      if (!done) measure();
+    });
+    ro.observe(e);
     // (The pixel font may still be loading (font-display: swap): measure again once it's in, so the box fits the font it's drawn in.)
     let live = true;
     void document.fonts?.load(`${getComputedStyle(e).fontSize} "Press Start 2P"`).then(
       () => {
-        if (live && el.current) setFitted(bubbleFit(el.current));
+        if (live) measure();
       },
       () => undefined,
     );
     return () => {
       live = false;
+      ro.disconnect();
     };
   }, [text, balanced]);
   useLayoutEffect(() => {

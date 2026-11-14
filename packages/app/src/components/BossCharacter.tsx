@@ -99,6 +99,8 @@ const suit: { at: number | null } = { at: null };
 export function setSuitAt(at: number | null) {
   suit.at = at;
 }
+/** Whether a kit that wears a suit (BossKit.suit) has it on at `now`. */
+const suitOn = (kit: BossKit, now: number) => !!kit.suit && suit.at !== null && now >= suit.at;
 /** The loop the figure rests in now, when a figure run is set (phase 2's `idle2`), else null. */
 export const figureLoop = (): string | null => figure.run?.loop ?? null;
 /** What a figure run shows at `now`, or null: none is set. */
@@ -337,8 +339,8 @@ function Character({ boss, stage, place }: { boss: BossView; stage: Stage; place
       }
       const look = lookRef.current();
       // (The Hidden Boss in his suit from his transformation on: the same frames, worn.)
-      const suitOn = !!kit.suit && suit.at !== null && now >= suit.at;
-      const id = `${s.anim}:${s.frame}:${look}:${lightsId()}:${suitOn ? "suit" : ""}`;
+      const suitNow = suitOn(kit, now);
+      const id = `${s.anim}:${s.frame}:${look}:${lightsId()}:${suitNow ? "suit" : ""}`;
       if (kit.heads) {
         const h = kit.heads[s.anim] ?? tallest;
         if (h !== head && box.current) {
@@ -349,10 +351,10 @@ function Character({ boss, stage, place }: { boss: BossView; stage: Stage; place
       if (id !== last) {
         last = id;
         const drawn = kit.ch.anims[s.anim]!.frames[s.frame]!;
-        const frame = suitOn ? suited(drawn) : drawn;
+        const frame = suitNow ? suited(drawn) : drawn;
         g?.putImageData(frameImage(kit.ch, frame, look), 0, 0);
         box.current?.setAttribute("data-anim", s.anim);
-        box.current?.toggleAttribute("data-suit", suitOn);
+        box.current?.toggleAttribute("data-suit", suitNow);
         // (Each frame's number and cue, so a test counts a clock smack by its own click, not by timing.)
         box.current?.setAttribute("data-frame", String(s.frame));
         box.current?.setAttribute("data-cue", frame.cue ?? "");
@@ -435,14 +437,41 @@ export function BossFace({ boss, class: cls = "", label }: { boss: Pick<BossView
   const kit = bossKitOf(boss);
   const cv = useRef<HTMLCanvasElement>(null);
   useLayoutEffect(() => {
-    if (!kit || !cv.current) return;
+    const g = kit && cv.current?.getContext("2d");
+    if (!kit || !g) return;
     const p = kit.portrait;
-    const art = artOf(kit);
-    cv.current.getContext("2d")?.putImageData(frameImage(art, art.anims[p.anim]!.frames[p.frame]!), -p.x, -p.y, p.x, p.y, p.w, p.h);
+    const bust = kit.barFace && kit.bar;
+    if (!kit.barFace || !bust) {
+      const art = artOf(kit);
+      g.putImageData(frameImage(art, art.anims[p.anim]!.frames[p.frame]!), -p.x, -p.y, p.x, p.y, p.w, p.h);
+      return;
+    }
+    // (A look that changes in the battle (the Hidden Boss's age, his suit): the bust as the phone's bar draws it, the loop his figure rests
+    // in and his suit, read each frame and drawn again when either changes. Eric's computer showed the 9-year-old at 20, Nov 14.)
+    const f = kit.barFace;
+    let raf = 0;
+    let last = "";
+    const draw = () => {
+      const now = Date.now();
+      const loop = figureLoop();
+      const anim = loop && bust.anims[loop] ? loop : p.anim;
+      const on = suitOn(kit, now);
+      const id = `${anim}:${on}`;
+      if (id !== last) {
+        last = id;
+        const drawn = bust.anims[anim]!.frames[anim === p.anim ? p.frame : 0]!;
+        g.putImageData(frameImage(bust, on ? suited(drawn) : drawn), -f.x, -f.y, f.x, f.y, f.w, f.h);
+        cv.current?.setAttribute("data-face", id);
+      }
+      raf = requestAnimationFrame(draw);
+    };
+    draw();
+    return () => cancelAnimationFrame(raf);
   }, [kit]);
   // (A boss with no drawing shows nothing here: no emoji stands in for a boss, Eric, Nov 5; BossTag says his name.)
   if (!kit) return null;
-  return <canvas ref={cv} class={`boss-portrait ${cls}`} width={kit.portrait.w} height={kit.portrait.h} {...(label === "" ? { "aria-hidden": "true" } : { role: "img", "aria-label": label ?? boss.name })} />;
+  const size = kit.barFace ?? kit.portrait;
+  return <canvas ref={cv} class={`boss-portrait ${cls}`} width={size.w} height={size.h} {...(label === "" ? { "aria-hidden": "true" } : { role: "img", "aria-label": label ?? boss.name })} />;
 }
 
 /**
