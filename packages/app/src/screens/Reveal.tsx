@@ -4,7 +4,7 @@ import type { DrawRule } from "@chessroyale/core";
 import { Board } from "../components/Board.tsx";
 import { EvalBar } from "../components/EvalBar.tsx";
 import { UnderBoard } from "../components/QuickChat.tsx";
-import { ShadeMoves, SquareRing, type ShadeMove } from "../components/ShadeMoves.tsx";
+import { ShadeMoves, type ShadeMove } from "../components/ShadeMoves.tsx";
 import { allowanceNote, type BoardView, type GameView, type GroupReveal } from "../game.ts";
 import { seenKey, useStillKey } from "../hooks.ts";
 import { play } from "../sound.ts";
@@ -178,7 +178,6 @@ export function RevealScreen({ match, mine, board, until }: { match: GameView; m
           {!played && (
             <ShadeMoves fen={fen} moves={shades} orientation={orientation} highlight={reelOn} chosen={landed ? mine.result.playedMove : null} />
           )}
-          {played && <SquareRing square={mine.result.playedMove.slice(2, 4)} orientation={orientation} />}
           {selecting && <div class="selecting-label">Selecting move…</div>}
         </Board>
         </div>
