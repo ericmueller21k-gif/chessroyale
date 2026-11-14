@@ -1107,3 +1107,6 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   After it: visual QA of the whole fight (briefs/recluse-visual-qa.md), flaky round 4.
 - Nov 14 07:05: #706 standings MERGED. Flaky round 4 list: town-street:155 [desktop], hidden-boss-room:313 [desktop, guard] (a 5th
   at his door: not.toBeNull), shop:238, town-street:528, town-chat:1367, fairplay:65 (needs the CI trace change: Eric's OK pending).
+- Nov 14 07:48: Eric's music session (session_01JuCWRs7vACHciUbhC3eY8V) lengthened recluse-phase2's intro (+60 s looming; introSeconds
+  118.887167, mark calculation 70.0) on claude/trailer-v2 e774edfd; a stereo-192 set coming to stills/trailer-v2/boss-music-stereo-192/.
+  Forwarded to the music HQ helper to ship with the stereo 192 set.
