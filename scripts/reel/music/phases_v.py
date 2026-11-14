@@ -38,7 +38,7 @@ Each piece is made by itself (song_v.render with a window: its notes only, their
 slices an echo, and each loop begins with the ring of what leads into it; so an intro here stops dead at its
 `introSeconds` (no tail of its own to overlap) and the loop starts there, as for every theme. The score's pieces share
 the whole score's gain, so they sit together as they do in it.
-  python3 phases_v.py <the handoff's folder>   (about 10 minutes; themes.json there keeps its other themes)
+  python3 phases_v.py [--stereo] [--kbps N] <the handoff's folder>   (handoff.py's options; about 10 minutes; themes.json there keeps its other themes)
 """
 import gc
 import json
@@ -51,7 +51,8 @@ import numpy as np
 
 import master
 import song_w
-from handoff import HEADROOM, MP3, PAD, ceiling, fold, save
+import handoff
+from handoff import HEADROOM, PAD, ceiling, fold, save
 from song_v import BEATS, PLAN, RAGE, T_CALC, T_CHANT, T_CHANT2, T_MEMORY, TAPE, rage_layout, rage_plan, render
 from synth import SR, Ride
 
@@ -135,8 +136,8 @@ def main(out: str) -> None:
             x = files[name] = ceiling(x)
             if name.endswith("-loop"):
                 x = np.concatenate([x[:, -pad:], x, x[:, :pad]], axis=1)
-            save(wav, x[:1])
-            for ext, codec in (("ogg", ["-c:a", "libvorbis", "-q:a", "3"]), ("mp3", MP3)):
+            save(wav, x[:1] if handoff.MONO else x)
+            for ext, codec in (("ogg", ["-c:a", "libvorbis", "-q:a", "3"]), ("mp3", handoff.MP3)):
                 subprocess.run(["ffmpeg", "-hide_banner", "-v", "error", "-y", "-i", wav, *codec, f"{out}/{name}.{ext}"], check=True)
 
         def theme(what, source, intro, loop, **more):
@@ -169,4 +170,4 @@ def main(out: str) -> None:
 
 
 if __name__ == "__main__":
-    main(sys.argv[1])
+    main(*handoff.options(sys.argv[1:]))

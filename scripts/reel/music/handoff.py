@@ -1,7 +1,8 @@
 """Builds the game-ready boss themes: each song as an intro piece (played once) and a loop piece (repeated), as OGG and
 MP3 (mono, the MP3 at 64 kbps: Eric, Nov 12, "Mono 64 sounds... it's totally fine"), with a manifest. Both pieces get one fixed gain (about -16 LUFS for intro + one pass of the loop, a little under where the
 peaks need the room) and master.py's soft ceiling.
-  python3 handoff.py <out folder> [boss id ...]   (only those bosses; the folder's themes.json keeps the others)
+  python3 handoff.py [--stereo] [--kbps N] <out folder> [boss id ...]   (only those bosses; the folder's themes.json keeps the others)
+  --stereo --kbps 192: the game's files since Nov 14 (Eric: "fuck the filter and the compression"): stereo, constant 192 kbps.
 
 How the pieces are made: the song is rendered twice. Once keeping only the notes that start before the intro's end,
 so the intro's tails ring on past it (the intro file is the intro plus those tails). Once keeping only the rest, into
@@ -29,7 +30,23 @@ HEADROOM = 0.86  # the pieces' summed peak before encoding: -1.3 dBFS
 # after it's rendered, so the level, the ceiling and the manifest's numbers are all measured on what ships (played on both
 # speakers, as Web Audio plays a mono file). MP3 at a constant 64 kbps. MONO = False gives the old stereo pieces.
 MONO = True
-MP3 = ["-c:a", "libmp3lame", "-b:a", "64k"] if MONO else ["-c:a", "libmp3lame", "-q:a", "5"]
+MP3 = ["-c:a", "libmp3lame", "-b:a", "64k"]
+
+
+def options(args: list) -> list:
+    """Reads --stereo and --kbps N (constant bitrate) off the arguments, sets MONO and MP3, and returns the rest."""
+    global MONO, MP3
+    rest, kbps = [], 64
+    it = iter(args)
+    for a in it:
+        if a == "--stereo":
+            MONO = False
+        elif a == "--kbps":
+            kbps = int(next(it))
+        else:
+            rest.append(a)
+    MP3 = ["-c:a", "libmp3lame", "-b:a", f"{kbps}k"]
+    return rest
 # boss id (packages/core's), the song's module, the intro's length in beats (0: the whole song loops).
 # A song on a tape whose pace changes (synth.py's Ride: Boingo's, Ginger's, Alfil's) is handed over whole, as a loop: its
 # start is part of the ride each time round. (The Hidden Boss's pieces are phases_v.py's.)
@@ -155,4 +172,4 @@ def main(out: str, *only: str) -> None:
 
 
 if __name__ == "__main__":
-    main(*sys.argv[1:])
+    main(*options(sys.argv[1:]))
