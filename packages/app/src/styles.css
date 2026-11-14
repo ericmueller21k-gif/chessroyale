@@ -2449,6 +2449,18 @@ button.history-label {
     opacity: 0;
   }
 }
+/* Eric's look test (Nov 14, main.tsx): ?ring=off, no ring; ?ring=fade, it fades in at its size, no zoom. */
+:root[data-ring="off"] .square-ring {
+  display: none;
+}
+:root[data-ring="fade"] .square-ring {
+  animation-name: ring-fade;
+}
+@keyframes ring-fade {
+  from {
+    opacity: 0;
+  }
+}
 .selecting-label {
   position: absolute;
   left: 50%;
