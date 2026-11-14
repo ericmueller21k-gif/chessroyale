@@ -1029,3 +1029,17 @@ late, the plop's first drawing was already past its first frame (the one with th
 
 **The fix:** the first drawing plays the cues the one-shot passed over since it began, up to `LATE_CUE_MS` (1 s) late. A unit test.
 docs/decisions/2026-11-12-flaky-batch-5.md.
+
+## His words over his face as he grew (Nov 14, 2026)
+
+**What happened:** Eric, playing the Hidden Boss's child form on a computer: grown to 20, his line sat over his face, the tail at his
+chin. The cutscene's man and the phase change (his line by his empty place, far from him on the board) the same day.
+
+**Why:** a bubble's place was a number set once per drawing (CSS per character id; the cutscene's hand-typed head spots; the side
+box's place), never checked against the drawing shown. His child form is one drawing whose height changes by age; the cutscene's spot
+missed the scene's 38 rows of headroom; the phase change draws him somewhere his box isn't. Every test said a line showed, none where.
+
+**The fix:** the heights come from the art (a kit's `heads`, the cutscene's spots), each equal to the measured frames in a unit test; on
+the board his words go over his figure. An e2e check measures the bubble's bottom against his head at each age.
+docs/decisions/2026-11-14-recluse-bubble-grows.md.
+

@@ -19478,7 +19478,7 @@ button.sq-tiny {
 }
 /* His whole figure on the board (from his leap in to his leap back): placed by a transform in the board's own width
    (cqw), his feet on the point he's at (his frames draw his shadow: no filter); his place stands empty meanwhile, his
-   words still beside it. */
+   words over his head here (.rc-say, Nov 14). */
 .rc-fig {
   position: absolute;
   top: 0;

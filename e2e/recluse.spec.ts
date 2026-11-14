@@ -501,11 +501,12 @@ test("beaten in phase 1 (?win=1): he collapses and mumbles, then the phase chang
     drop: { selector: '.rc-fig[data-anim="drop"] canvas' },
     chant: { selector: '.rc-fig[data-anim="chantRaise"] canvas' },
     light: { selector: ".rc-light" },
-    // (A phone's bar bubble, two rows: a sentence at a time, each its own page; Nov 13.)
-    chantLine: { selector: ".bc-bubble", text: /^Computation without creativity is nothing\.$/ },
-    chantLineB: { selector: ".bc-bubble", text: /^Now I have both\.$/ },
-    chantLine2: { selector: ".bc-bubble", text: /^Prepare yourself\.$/ },
-    chantLine2B: { selector: ".bc-bubble", text: /^This is the ultimate test of your skill\.$/ },
+    // (Over his head on the board while he's there, a phone too (Eric, Nov 14): the whole line, its sentences typed in turn; the
+    // typed part (the box's first span) shows each sentence typed out.)
+    chantLine: { selector: ".rc-say", text: /^Computation without creativity is nothing\. Now I have both\.$/ },
+    chantLineB: { selector: ".rc-say .speech-line > span:first-child", text: /Now I have both\.$/ },
+    chantLine2: { selector: ".rc-say", text: /^Prepare yourself\. This is the ultimate test of your skill\.$/ },
+    chantLine2B: { selector: ".rc-say .speech-line > span:first-child", text: /This is the ultimate test of your skill\.$/ },
     crack: { selector: ".rc-crack canvas" },
     split: { selector: ".rc-split.rc-q3" },
     pickup: { selector: '.rc-fig[data-anim="pickup"] canvas' },
@@ -528,9 +529,9 @@ test("beaten in phase 1 (?win=1): he collapses and mumbles, then the phase chang
     note: { selector: ".boss-dock-status", text: /The God King's power is his!/ },
     rage: { selector: `${figure()}[data-anim="rage"]` },
     chant: { selector: '.rc-fig[data-anim="chantRaise"], .rc-fig[data-anim="chant"]' },
-    // (His second chant line's first page, and its second sentence's page as it starts to type.)
-    chant2: { selector: ".bc-bubble", text: /^Prepare yourself\.$/ },
-    chant2b: { selector: ".bc-bubble", text: /^This is the ultimate test of your skill\.$/ },
+    // (His second chant line over his head, and its second sentence as it starts to type: its first letter typed.)
+    chant2: { selector: ".rc-say", text: /^Prepare yourself\./ },
+    chant2b: { selector: ".rc-say .speech-line > span:first-child", text: /^Prepare yourself\.\s*\S/ },
     crack: { selector: ".rc-crack canvas" },
     banner: { selector: ".fight-banner", text: /PHASE 2/ },
     c5: count(5),

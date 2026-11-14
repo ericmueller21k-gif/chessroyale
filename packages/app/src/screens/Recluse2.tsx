@@ -255,7 +255,7 @@ function Arcs({ t, hands }: { t: number; hands: readonly (readonly [number, numb
  * fades, the stream between them drawn over the page (AbsorbStream). The boss's place (BossCharacter, from the figure run
  * solo.ts sets) plays his seizing and his rage, his half-engine look igniting as the power lands (its time set by solo.ts:
  * setEngineAt); from the leap to his return the board draws his whole figure instead (RECLUSE's on-board animations, the
- * look over it too) and his place stands empty (`rc-away`), his words still beside it. Blue arcs strike the board as it
+ * look over it too) and his place stands empty (`rc-away`), his words over his head there (Nov 14). Blue arcs strike the board as it
  * splits (Arcs).
  */
 export function PhaseChangeScreen({ match, at }: { match: GameView; at: number }) {
