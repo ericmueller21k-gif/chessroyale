@@ -40,9 +40,16 @@ from one theme to the next.
 | Theme (key in `themes.json`) | When it starts | Intro (once) | Loop |
 |---|---|---|---|
 | `recluse-house` | walking into his room; it carries on through the fight with the child | none | the house's minute, 60.0 s |
-| `recluse-phase2` | the child is beaten | the stare, the build, the flag: 58.870 s | the chant, the duel, the book, the build again: 89.276 s |
+| `recluse-phase2` | the child is beaten | the stare (long: 70 s), the build, the flag: 118.887 s (58.870 s until Nov 14) | the chant, the duel, the book, the build again: 89.276 s (unchanged) |
 | `recluse-beaten` | that form is beaten: he talks | the book slammed shut: 1.815 s | the house's minute again (the same file as `recluse-house`'s) |
 | `recluse-phase3` | he rises in a rage (his transformation starts) | the music souring, fitted to the phase change's beats: 17.435 s. **It ends on the drop: the boards crack at t0 + `introSeconds`** | the big chant to the score's end: 88.371 s |
+
+**Nov 14: `recluse-phase2`'s intro is a minute longer.** Eric, playing it: "when phase 2 boss starts the music is too
+epic too fast"; he asked for about one more minute of the looming build-up before the epic part. The intro now opens
+on 70 s of his stare (the clock, his low tones, the long string notes, scraps of the figure) before the build that
+was there; the build itself, the flag and the loop are as they were. Only `recluse-phase2-intro` (.mp3, .ogg) and its
+entry in `themes.json` changed (`introSeconds` 118.887167; a new mark, `calculation`: 70.0, where the build begins).
+Nothing else needs to change if the wiring reads the length from `themes.json`.
 
 **Switching:**
 - `recluse-house` to `recluse-phase2`: fade the house out (about 1.5 s), then start the theme.
