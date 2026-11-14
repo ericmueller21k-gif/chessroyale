@@ -856,7 +856,9 @@ test("the admins' Win this form (Nov 13, Eric's timing test): pressed, your next
   await expect(page.locator(".mm-scrim")).toHaveCount(0);
   await expect.poll(() => phase(page), { timeout: 60_000 }).toBe("phaseChange");
   expect(await scene.seen()).toEqual({ light: true, kid: true, hidden: true, first: true, last: true });
-  await expect(page.locator(".cs-layer")).toHaveCount(0);
+  // (The scene's own layer gone; his transformation carries on from it in its own, Nov 14.)
+  await expect(page.locator(".cs-layer:not(.rc-transform)")).toHaveCount(0);
+  await expect(page.locator(".cs-layer.rc-transform")).toHaveCount(1);
   expect(await page.evaluate(() => document.body.classList.contains("cs-on"))).toBe(false);
   await expect.poll(async () => (await simulNow(page))?.playing ?? false, { timeout: 30_000 + ADDED_MS }).toBe(true);
   const fen = (await simulNow(page)).boards[0].fen as string;
