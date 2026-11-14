@@ -39,11 +39,6 @@
     <link rel="manifest" href="/manifest.webmanifest" crossorigin="use-credentials" />
     <link rel="icon" href="/icons/icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
-    <!-- The three fonts every first screen uses, fetched beside the app's script: there by its first paint, so text doesn't reflow when a
-         font arrives late (font-display: swap; Nov 13, crate-banner:44). -->
-    <link rel="preload" href="/fonts/archivo.woff2" as="font" type="font/woff2" crossorigin />
-    <link rel="preload" href="/fonts/archivo-black.woff2" as="font" type="font/woff2" crossorigin />
-    <link rel="preload" href="/fonts/press-start-2p.woff2" as="font" type="font/woff2" crossorigin />
     <title>HunChess</title>
     <style>
       /* The shell (Nov 10, phone load): drawn before the app's script has run, then dropped (shell.ts) as the app draws
