@@ -1087,3 +1087,5 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   on Eric's go, a fresh helper builds it from there: brief recluse-transform-book.md, step "On go"). Flaky round 3 started
   (briefs/flaky-round3.md). Running Opus: night room + flaky round 3. Queue: standings "out" bug -> transform build (on go) ->
   visual QA.
+- Nov 14 04:05: night room done -> #704 (CI 52de274c). Brief ready: briefs/recluse-phase2-standings.md (xhigh: start ALONE when
+  flaky round 3 finishes). Running Opus: flaky round 3 only.
