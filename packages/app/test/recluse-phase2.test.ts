@@ -78,21 +78,27 @@ describe("the phase change", () => {
     expect([C.burstAt - C.musicAtMs, C.riseAt - C.musicAtMs]).toEqual([2640, 3040]);
   });
 
-  it("his two lines (Eric, Nov 13 and 14), typed at the cutscene's pace: the first with his visor up, typed out and readable before it comes down; the second after the landing, typed out by \"PHASE 2\" and gone before the clocks", () => {
+  it("his two lines (Eric, Nov 13 and 14), typed at the cutscene's pace: the first (a little faster) from his visor up, readable whole 2.8 s, gone as he leaps; the second after the landing, typed out by \"PHASE 2\" and gone before the clocks", () => {
     const C = PHASE_CHANGE;
     const L = RECLUSE_PHASE2.change.chantLines;
     // (The cutscene mockup's numbers: 45 ms a character, a second between sentences, readable 1.7 s plus 40 ms a character.)
     expect([L.typeMs, L.sentencePauseMs, L.readMs, L.perCharMs]).toEqual([45, 1000, 1700, 40]);
+    // (The first line, 30 ms a character: its window is the music's, from the visor up to the leap.)
+    expect(L.firstTypeMs).toBe(30);
     expect(RECLUSE_LINES.chantSay).toEqual([
       ["Computation without creativity is nothing.", "Now I have both."],
       ["Prepare yourself.", "This is the ultimate test of your skill."],
     ]);
     expect(C.chantLines.map((l) => l.line.text)).toEqual(["Computation without creativity is nothing. Now I have both.", "Prepare yourself. This is the ultimate test of your skill."]);
     const [a, b] = C.chantLines;
-    // The first: once the visor is up, typed out with at least a second to read it whole, gone before the visor comes down.
+    // The first: once the visor is up, typed at 30 ms a character, typed out before the visor comes down, then held (through the
+    // visor down and the crouch) till he leaps: readable whole 2.8 s, not the 1.2 s it had (Nov 14 review, M2), and gone as he leaps.
     expect(a!.at).toBeGreaterThan(C.flipUpAt);
-    expect(C.flipDownAt - (a!.at + a!.line.typedMs)).toBeGreaterThanOrEqual(1000);
-    expect(a!.at + a!.line.holdMs).toBeLessThanOrEqual(C.flipDownAt);
+    expect(a!.line.typeMs).toBe(30);
+    expect(a!.at + a!.line.typedMs).toBeLessThan(C.flipDownAt);
+    expect(a!.at + a!.line.holdMs).toBe(C.upAt);
+    const readable = a!.line.holdMs - a!.line.typedMs - L.fadeMs;
+    expect(readable).toBeGreaterThanOrEqual(2800);
     // The second: after he lands, typed out by "PHASE 2", gone before the clocks run.
     expect(b!.at).toBeGreaterThan(C.crackAt);
     expect(b!.at + b!.line.typedMs).toBeLessThanOrEqual(C.bannerAt + C.bannerMs);
@@ -340,7 +346,7 @@ describe("phase 2's four boards on this device", () => {
   });
 });
 
-describe("phase 2 without the God King (Eric, Oct 14: absorbed in the phase change)", () => {
+describe("phase 2 without the God King's help (Eric, Nov 14: greyed in his place from the phase change on)", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.stubGlobal("fetch", () => Promise.reject(new Error("offline")));

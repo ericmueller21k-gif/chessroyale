@@ -2152,8 +2152,10 @@ export const RECLUSE_PHASE2 = {
      * How his chant's lines type and hold (Eric, Nov 13: the cutscene mockup's pace, its RECLUSE_CUTSCENE numbers; "err slow"):
      * a character every `typeMs`, `sentencePauseMs` between a line's two sentences, then fully readable `readMs` plus
      * `perCharMs` a character (at most `maxReadMs`), its fade `fadeMs`. Their times: `transform`'s `line1At` and `line2AfterMs`.
+     * The first line types faster (`firstTypeMs` a character, Nov 14 review): the music fixes its window (the reveal to the leap),
+     * and its box stays up after the visor comes down, through the crouch, until he leaps, so it's readable whole about 2.8 s.
      */
-    chantLines: { typeMs: 45, sentencePauseMs: 1000, readMs: 1700, perCharMs: 40, maxReadMs: 5500, fadeMs: 260 },
+    chantLines: { typeMs: 45, firstTypeMs: 30, sentencePauseMs: 1000, readMs: 1700, perCharMs: 40, maxReadMs: 5500, fadeMs: 260 },
     /** The boards split and set: a big 5, 4, 3, 2, 1 on every board before phase 2's clocks run (s). */
     countdownSeconds: 5,
     /** Beaten where his phase change follows: the board holds this long while he collapses (ms; solo and online). */

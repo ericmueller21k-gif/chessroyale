@@ -26771,6 +26771,22 @@ body.cs-on .mm-scrim {
 .rc-light-front {
   z-index: 1;
 }
+/* The light's full-screen dark (under the back canvas) and its white-out (over everything): plain layers whose opacity the
+   compositor changes for next to nothing, not canvas fills. */
+.rc-light-dark,
+.rc-light-white {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  will-change: opacity;
+}
+.rc-light-dark {
+  background: rgb(16, 10, 30);
+}
+.rc-light-white {
+  z-index: 1;
+  background: #fffdf6;
+}
 /* The point above the speaker's head that his box stands on: the child's box runs right from it, the man's left; the tail (the
    bubble's own, drawn apart from the box so it stays over the speaker when the box is moved into view) points down at him. */
 .cs-anchor {

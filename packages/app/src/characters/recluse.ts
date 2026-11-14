@@ -1142,12 +1142,10 @@ const REVIVE: Spec[] = [
   { ms: 130, p: { phase: 2, wind: 2 } },
 ];
 
-// ---- The phase change (Eric, Oct 14): beaten, still on his knees he seizes the God King's power (his raised hand, then
-// his fist; the half-engine look is an overlay, components/Recluse.tsx, not his frames), gets up in a rage, leaps onto
-// the middle of the board, throws the book down at his feet, and chants over it as light pours out of it (his hair
-// lifting: phase 2 begins); the boards crack and split; the book flies back up into his hands and he leaps back to his
-// place. The board draws him (Recluse2.tsx); only the seizing and `rage` play where he stands, so they alone are in the
-// bust too.
+// ---- His older phase change (Eric, Oct 14; kept for now, unused since Nov 14: the transformation, characters/
+// recluse-transform.ts and components/RecluseTransform.tsx, plays it now): beaten, he seized the God King's power, got up
+// in a rage, leapt onto the middle of the board, threw the book down and chanted over it; the book flew back up into his
+// hands and he leapt back to his place.
 
 const ANGRY: Partial<Face> = { eyes: "glare", brows: "fury", mouth: "scowl" };
 /** His free arm raised beside his head, the hand open to us (he reaches for the God King's power), kneeling. */
@@ -1374,8 +1372,8 @@ export const RECLUSE_BUST: Character = {
 export const RECLUSE_PORTRAIT = { x: OX + HEAD_AT[0] - 2, y: OY - 1, w: 29, h: 36 } as const;
 
 /**
- * Where his head sits on a frame: its part's top-left pixel, in that frame's pixels (the frame's shake included). The
- * half-engine overlay of phase 2 (components/Recluse.tsx) is placed by it, frame by frame, on either drawing.
+ * Where his head sits on a frame: its part's top-left pixel, in that frame's pixels (the frame's shake included). His
+ * eyes' glow in the transformation (components/RecluseTransform.tsx) is placed by it, frame by frame.
  */
 const heads = new WeakMap<Frame, readonly [number, number] | null>();
 export function headOf(frame: Frame): readonly [number, number] | null {

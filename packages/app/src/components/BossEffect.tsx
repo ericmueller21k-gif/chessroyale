@@ -173,7 +173,7 @@ export interface SpriteAnimProps {
   style?: Record<string, string | number>;
   /** One of the character's looks (Hollow's bulbs: `bulbs0` to `bulbs3`). */
   look?: string;
-  /** Told each frame as it's drawn (the Hidden Boss's half-engine overlay follows his head). Read when the animation starts. */
+  /** Told each frame as it's drawn (the Hidden Boss's transformation: his eyes' glow follows his head). Read when the animation starts. */
   onFrame?: (frame: Frame) => void;
   /** Drawn once, at its first frame, and never again (reduced motion: a still). */
   still?: boolean;

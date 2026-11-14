@@ -55,12 +55,12 @@ export const PHASE_CHANGE = lazyTable(() => {
   const crackAt = musicAtMs + introMs;
   const upAt = crackAt - T.leapMs;
   const crouchAt = upAt - 200;
-  // (His two lines, each typed sentence by sentence at the cutscene's pace: the first while the visor is up, gone as it comes
-  // down; the second as the board splits.)
+  // (His two lines, each typed sentence by sentence at the cutscene's pace: the first, a little faster, once the visor is up, its
+  // box held through the visor coming down and the crouch, gone as he leaps; the second as the board splits.)
   const cl = pace.chantLines;
-  const first = pacedLine(RECLUSE_LINES.chantSay[0]!, cl);
+  const first = pacedLine(RECLUSE_LINES.chantSay[0]!, { ...cl, typeMs: cl.firstTypeMs });
   const chantLines = [
-    { at: T.line1At, line: { ...first, holdMs: Math.min(first.holdMs, T.flipDownAt - 50 - T.line1At) } },
+    { at: T.line1At, line: { ...first, holdMs: Math.min(first.holdMs, upAt - T.line1At) } },
     { at: crackAt + T.line2AfterMs, line: pacedLine(RECLUSE_LINES.chantSay[1]!, cl) },
   ];
   const partAt = crackAt + 750;

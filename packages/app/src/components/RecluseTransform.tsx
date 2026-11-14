@@ -23,12 +23,17 @@ import { SpriteAnim } from "./BossEffect.tsx";
 const ease = (x: number) => (x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x));
 const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
 const easeOut = (u: number) => 1 - (1 - clamp01(u)) ** 3;
+/** The back canvas's device pixels per CSS pixel: its light is all soft, blurred sprites, so half is plenty. */
+const BACK_DPR = 0.5;
 
+let OPEN_MS: number | undefined;
+/** His animations standing on the same spot after the reveal (his box stays put over them). */
+const STANDING = new Set(["revealed", "flipUp", "flipDown", "crouch"]);
 /** His figure at `t` (ms into the phase change): which animation, since when (ms into it), where his feet are (shares of the board). */
 export function changeFigAt(t: number, computer: boolean): { anim: string; then?: string; since: number; feet: { x: number; y: number } } | null {
   const T = PHASE_CHANGE;
   const feet = SPOT;
-  const openMs = RECLUSE_CHANGE.anims.open!.frames.reduce((s, f) => s + f.ms, 0);
+  const openMs = (OPEN_MS ??= RECLUSE_CHANGE.anims.open!.frames.reduce((s, f) => s + f.ms, 0));
   if (t < 0) return { anim: "together", since: 0, feet };
   if (t < openMs) return { anim: "open", since: 0, feet };
   if (t < T.burstAt) return { anim: "glowing", since: 0, feet };
@@ -105,7 +110,7 @@ const dice = (i: number, k: number) => {
  * more and more (0 to 1, faster and faster) till the white-out; `white`, the whole screen; `down`, the light dying back into
  * the center (1 to 0); the slam's flash on the drop.
  */
-function lightNow(t: number) {
+export function lightNow(t: number) {
   const T = PHASE_CHANGE;
   const pages = clamp01((t - 500) / 900);
   const before = t < T.whiteFull;
@@ -122,17 +127,24 @@ function lightNow(t: number) {
   const glow = pages * (1 - clamp01((t - (T.growAt + T.growMs - 300)) / 500)) * (t >= T.pickupAt ? 0 : 1);
   return { pages: glow, rays, shaft, grow, shoot, radiate, white, down, slam };
 }
-/** Behind him: the dark coming down round the light, the pool on the board, the rays along it and up out of the book, the shaft. */
-function drawBack(g: CanvasRenderingContext2D, t: number, bx: number, by: number, bw: number, W: number, H: number) {
+type Light = ReturnType<typeof lightNow>;
+/** The dark coming down round the light (a layer of its own under the back canvas: a full-screen fill costs a phone's frame). */
+const darkNow = (s: Light) => (0.32 + 0.22 * s.grow) * ease(Math.max(s.rays, s.shaft * 0.8));
+/** Whether each canvas has anything to draw at `t` (each is left out while it has nothing: a full-screen layer costs every frame). */
+function canvasesOn(s: Light, t: number, eyes: boolean) {
+  const T = PHASE_CHANGE;
+  // (Under the whole white, nothing behind it shows.)
+  if (s.white >= 1) return { back: false, front: false };
+  return {
+    back: s.pages > 0 || s.rays > 0 || s.shaft > 0 || s.slam > 0,
+    front: s.shaft > 0 || (eyes && t >= T.burstAt && t < T.whiteFull) || s.grow > 0 || s.radiate > 0 || s.down > 0 || s.slam > 0,
+  };
+}
+/** Behind him: the pool on the board, the rays along it and up out of the book, the shaft. */
+function drawBack(g: CanvasRenderingContext2D, s: Light, t: number, bx: number, by: number, bw: number, H: number) {
   const L = light();
-  const s = lightNow(t);
-  const lit = Math.max(s.rays, s.shaft * 0.8);
   const k = bw / 8; // a square
   const gr = 1 + s.grow;
-  if (lit > 0) {
-    g.fillStyle = `rgba(16,10,30,${(0.32 + 0.22 * s.grow) * ease(lit)})`;
-    g.fillRect(0, 0, W, H);
-  }
   g.save();
   g.globalCompositeOperation = "lighter";
   g.imageSmoothingEnabled = true;
@@ -190,11 +202,10 @@ function drawBack(g: CanvasRenderingContext2D, t: number, bx: number, by: number
 }
 /**
  * Over him: the bright core of the beam and the motes in it; the glow engulfing him; the light radiating out over the whole
- * screen; his white eyes' glow; the white-out; the light dying back into the center; the slam's flash.
+ * screen; his white eyes' glow; the light dying back into the center; the slam's flash. (The white-out itself: a layer of its own.)
  */
-function drawFront(g: CanvasRenderingContext2D, t: number, bx: number, by: number, bw: number, W: number, H: number, mid: { x: number; y: number }, eyes: readonly { x: number; y: number }[]) {
+function drawFront(g: CanvasRenderingContext2D, s: Light, t: number, bx: number, by: number, bw: number, W: number, H: number, mid: { x: number; y: number }, eyes: readonly { x: number; y: number }[]) {
   const L = light();
-  const s = lightNow(t);
   const k = bw / 8;
   g.save();
   g.globalCompositeOperation = "lighter";
@@ -252,20 +263,18 @@ function drawFront(g: CanvasRenderingContext2D, t: number, bx: number, by: numbe
     g.drawImage(L.glow, bx - gs, by - gs * 0.45, gs * 2, gs * 0.9);
   }
   g.restore();
-  // The white-out: the whole screen. Then it dies back: a disc of white shrinking into the center, a soft edge, gone at the reveal.
-  if (s.white > 0) {
-    g.globalAlpha = s.white;
-    g.fillStyle = "#fffdf6";
-    g.fillRect(0, 0, W, H);
-    g.globalAlpha = 1;
-  } else if (s.down > 0) {
+  // After the white-out (the whole screen, a layer of its own) it dies back: a disc of white shrinking into the center, a soft
+  // edge, gone at the reveal. (Filled over the disc's box only.)
+  if (s.white <= 0 && s.down > 0) {
     const r = reach * s.down ** 1.6 + 1;
     const grad = g.createRadialGradient(mid.x, mid.y, 0, mid.x, mid.y, r);
     grad.addColorStop(0, "rgba(255,253,246,1)");
     grad.addColorStop(0.5, `rgba(255,250,230,${Math.min(1, 0.4 + s.down).toFixed(3)})`);
     grad.addColorStop(1, "rgba(255,244,210,0)");
     g.fillStyle = grad;
-    g.fillRect(0, 0, W, H);
+    const x0 = Math.max(0, mid.x - r);
+    const y0 = Math.max(0, mid.y - r);
+    g.fillRect(x0, y0, Math.min(W, mid.x + r) - x0, Math.min(H, mid.y + r) - y0);
   }
 }
 
@@ -286,15 +295,20 @@ export function RecluseTransform({ at, t, rect, computer, sceneStand }: { at: nu
   const bx = rect.x + BOOK_MID.x * bw;
   const by = rect.y + BOOK_MID.y * bw;
   const lit = t < T.pickupAt + 600;
+  const s = lightNow(t);
+  const on = canvasesOn(s, t, !!headAt.current);
+  const dark = lit ? darkNow(s) : 0;
+  const white = lit ? s.white : 0;
   useLayoutEffect(() => {
     const feet = fig?.feet ?? SPOT;
     const chest = t < T.whiteFull ? onBoard(feet, RECLUSE.foot[0], RECLUSE.foot[1] - 70) : CHEST;
     const mid = { x: rect.x + chest.x * bw, y: rect.y + chest.y * bw };
     const h = headAt.current;
     const eyes = h && t >= T.burstAt && t < T.whiteFull ? [onBoard(feet, h[0] + 9, h[1] + 18.5), onBoard(feet, h[0] + 16, h[1] + 18.5)].map((p) => ({ x: rect.x + p.x * bw, y: rect.y + p.y * bw })) : [];
-    for (const [c, f] of [[back.current, "b"], [front.current, "f"]] as const) {
+    // (Backed at fewer device pixels than the screen's, as the light is soft and stretched anyway: at a phone's 3, two
+    // screen-size canvases redrawn every frame cost more than the frame. The front's motes keep 1 per CSS pixel.)
+    for (const [c, f, dpr] of [[back.current, "b", BACK_DPR], [front.current, "f", Math.min(devicePixelRatio || 1, 1)]] as const) {
       if (!c) continue;
-      const dpr = devicePixelRatio || 1;
       if (c.width !== Math.round(W * dpr) || c.height !== Math.round(H * dpr)) {
         c.width = Math.round(W * dpr);
         c.height = Math.round(H * dpr);
@@ -302,8 +316,8 @@ export function RecluseTransform({ at, t, rect, computer, sceneStand }: { at: nu
       const g = c.getContext("2d")!;
       g.setTransform(dpr, 0, 0, dpr, 0, 0);
       g.clearRect(0, 0, W, H);
-      if (f === "b") drawBack(g, t, bx, by, bw, W, H);
-      else drawFront(g, t, bx, by, bw, W, H, mid, eyes);
+      if (f === "b") drawBack(g, s, t, bx, by, bw, H);
+      else drawFront(g, s, t, bx, by, bw, W, H, mid, eyes);
     }
   });
   const px = (x: number) => `${x * 100}%`;
@@ -313,7 +327,8 @@ export function RecluseTransform({ at, t, rect, computer, sceneStand }: { at: nu
   return createPortal(
     <div class="cs-layer rc-transform" aria-hidden="true" data-t={Math.round(t)}>
       {lens > 0 && <div class="cs-dim" style={{ "--cs-x": `${rect.x + bw / 2}px`, "--cs-y": `${rect.y + bw / 2}px`, "--cs-r": `${bw * CS.spot}px`, "--cs-in": `${CS.spotInner * 100}%`, "--cs-a": String(CS.dimAlpha) }} />}
-      {lit && <canvas ref={back} class="rc-light-cv" style={{ width: `${W}px`, height: `${H}px` }} />}
+      {dark > 0 && <div class="rc-light-dark" style={{ opacity: dark }} />}
+      {lit && on.back && <canvas ref={back} class="rc-light-cv" style={{ width: `${W}px`, height: `${H}px` }} />}
       <div class="cs-stage rc-tf-stage" style={{ left: `${rect.x}px`, top: `${rect.y}px`, width: `${bw}px`, height: `${bw}px` }}>
         {t < T.whiteFull && (
           <span class="cs-fig rc-tf-kid" style={{ left: px(SCENE_LEFT), top: `${(GROUND_Y - (SCENE_SHARE * RECLUSE_CUTSCENE.foot[1]) / RECLUSE_CUTSCENE.w) * bw}px`, width: px(SCENE_SHARE), aspectRatio: `${RECLUSE_CUTSCENE.w} / ${RECLUSE_CUTSCENE.h}` }}>
@@ -337,14 +352,16 @@ export function RecluseTransform({ at, t, rect, computer, sceneStand }: { at: nu
               onFrame={(f) => void (headAt.current = headOf(f))}
             />
             {/* His words over his head (his voice's bubble), mounted again with each of his animations so a box moved into view is
-                placed again where he stands now. */}
+                placed again where he stands now; one mount while he stands in place (his first line runs from the visor up
+                through the crouch, and a box mounted again in its fade would vanish at once). */}
             <span class="rc-say-at">
-              <VoiceBubble key={fig.anim} voice={bossVoice} class="bc-bubble rc-say" />
+              <VoiceBubble key={STANDING.has(fig.anim) ? "stand" : fig.anim} voice={bossVoice} class="bc-bubble rc-say" />
             </span>
           </span>
         )}
       </div>
-      {lit && <canvas ref={front} class="rc-light-cv rc-light-front" style={{ width: `${W}px`, height: `${H}px` }} />}
+      {lit && on.front && <canvas ref={front} class="rc-light-cv rc-light-front" style={{ width: `${W}px`, height: `${H}px` }} />}
+      {white > 0 && <div class="rc-light-white" style={{ opacity: white }} />}
     </div>,
     document.body,
   );

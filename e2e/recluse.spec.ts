@@ -615,8 +615,9 @@ test("beaten in phase 1 (?win=1): he collapses and mumbles, his cutscene, then t
   near("crack", T.introMs);
   // (The theme from its intro: the phase change's start was never too late for it.)
   expect(first("crack") - first("jump")).toBeGreaterThanOrEqual(T.leapMs - 300);
-  // (His first line gone as the visor comes down.)
-  expect(s.line1!.last).toBeLessThanOrEqual(first("visorDown") + 100);
+  // (His first line held after the visor comes down, through the crouch (Nov 14 review, M2), gone as he leaps.)
+  expect(s.line1!.last).toBeGreaterThan(first("visorDown"));
+  expect(s.line1!.last).toBeLessThanOrEqual(first("jump") + 100);
   // His second line after the landing: "Prepare yourself.", a second's pause, then its second sentence.
   expect(first("chant2") - first("crack")).toBeGreaterThanOrEqual(T.line2AfterMs - 300);
   expect(first("chant2") - first("crack")).toBeLessThanOrEqual(T.line2AfterMs + 400);

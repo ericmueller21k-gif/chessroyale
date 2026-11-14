@@ -95,9 +95,9 @@ export function BossDock({
    */
   powerUp?: { enabled: boolean; inUse: boolean };
   /**
-   * What he shows instead of standing by, never to be called (the Hidden Boss's phase change: triumphant, drained, fading
-   * as the boss absorbs him), or "gone": absorbed, his place empty for the rest of the fight (phase 2), his words gone
-   * with him (a bubble from an empty place read as a slip).
+   * What he shows instead of standing by: "benched", in his place but greyed and never to be called, his bubble hidden
+   * (the Hidden Boss's phase change and phase 2: Eric, Nov 14, "the king will still be with you, but you can't use him
+   * anymore").
    */
   king?: KingShow;
   /**
