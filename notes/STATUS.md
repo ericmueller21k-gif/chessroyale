@@ -1200,3 +1200,4 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   watcher running.
 - Nov 14 21:36: fix for main's red -> #720 (7494858f, CI watcher bkvebppev): town-chat:1054 tries both inside the wait first, checks data-id + N bounds; __townCall stands off the camera's line. Merge when green.
 - Nov 14 22:35: #720 MERGED 7453120e (town-chat:1054 test order; __townCall picks a square the camera sees whole: figureSeenAt). Main run watcher running. No helpers.
+- Nov 14 22:50: main 7453120e (#720) LIVE, full run GREEN, 0 retries. No helpers, no open PRs. Eric to try the ride sounds (RIDE_SOUND to tune). Flaky leftovers per round 6's Not done.
