@@ -1152,3 +1152,6 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   Call made: the room guard test (eric.md) keeps its room-rule checks; only #712's own Moves-panel check was reordered -> told Eric,
   offered to revert if he objects. No helpers running. Next: idle queue = #707 m2/m4/m5, MovePanel boss portrait, QA #11 nits,
   flaky leftovers, subscribe-in-useEffect gap.
+- Nov 14 14:56: #713 CI green with 2 retry-passes: hidden-boss-room:116 [phone] GK line over .dk-mate-art (phone party layout; #713
+  only measured computer) -> fix helper session_01JuCWRszzyFCoSZEGdN2uWj (high, on #713's branch, briefs/fix-713-phone.md), watcher
+  bnoki6vwk; and autochess:238 [phone] (unrelated; add to flaky leftovers).
