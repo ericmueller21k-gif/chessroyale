@@ -1,0 +1,8 @@
+kid line natural: true
+kid20 line: true
+man line: true
+cut line: Why are you on the floor?
+cut line: The machines find them now. They don't need us anymore.
+cut line: Best by test, right?
+cut line: Everyone has the same computers. So the only thing that separates anyone is creativity.
+phase2 line: true
