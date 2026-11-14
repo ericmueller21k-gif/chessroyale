@@ -1198,3 +1198,4 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 14 20:40: #718 ride sounds LIVE 65902dc3 (20:14). Main full run RED: town-chat:1054 [phone] both tries (same-second N in the
   cooldown line), town.spec:966 [desktop] flaky again ("bot 9 is drawn"). Fix helper (high, claude/fix-main-718, briefs/fix-main-718.md),
   watcher running.
+- Nov 14 21:36: fix for main's red -> #720 (7494858f, CI watcher bkvebppev): town-chat:1054 tries both inside the wait first, checks data-id + N bounds; __townCall stands off the camera's line. Merge when green.
