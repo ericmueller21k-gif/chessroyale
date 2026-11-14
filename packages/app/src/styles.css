@@ -24180,6 +24180,13 @@ button.sq-tiny {
     font-size: 8px;
     line-height: 1.4;
   }
+  /* (As wide as the team reaches: the 2 x 2 starts 112 px right of his unit, his box 4 px in, so it ends 4 px inside the team's right
+     edge, 252 px, inside the chat's column. Every line he has is then two rows at most, and none reaches the chat (Nov 14, main red
+     after #712: "Careful. My strength feels faint against this one." took four rows at the side column's 182 px and ran 8 px into
+     it). The :has outranks the side column's cap, `.screen.game:has(> .boss-dock):has(.you-pawn) > .boss-dock .gk-bubble`.) */
+  .screen.game:has(> .boss-dock.dk-party):has(.you-pawn) > .boss-dock.dk-party > .gk-unit > .gk-bubble {
+    max-width: calc(112px + 2 * var(--pt-cell) - 8px);
+  }
   .screen.game > .boss-dock.dk-party > .gk-unit.fallen.has-power > .gk-bubble {
     bottom: calc(100% + 8px);
   }
