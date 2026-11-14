@@ -117,11 +117,16 @@ removed (old → new) and says whether any of them guards a rule here.
   - Decision: [2026-10-28-town-chat-v2.md](../decisions/2026-10-28-town-chat-v2.md), "v4"; the hint:
     [2026-11-12-town-chat-hints.md](../decisions/2026-11-12-town-chat-hints.md).
 - **Leaving Chess Town asks first (Eric, Nov 7: "you should always have a confirm if you're going back out to a different menu or
-  you're trying to exit").** The side menu, the town's back button, the phone's or browser's back gesture ask "Leave Chess Town?" with
-  Stay (the default, Escape) and Leave; Stay changes nothing. Rooms, boss challenges, the AFK drop and forced exits don't ask.
+  you're trying to exit"; Nov 13: "even if you're in a building … There should always be 'are you sure you want to exit' if you're in the
+  town").** Every way out of the town asks "Leave Chess Town?" with Stay (the default, Escape) and Leave, on the street and inside any
+  building alike: the side menu, the town's back button, the phone's or browser's back gesture (the town keeps a step of its own in the
+  history, so back never leaves the site unasked), an invite's Join, a profile's Challenge, the chat's sign-in. Stay changes nothing.
+  Stepping out of a building onto the street (still the town), boss challenges, the AFK drop and forced exits don't ask.
   - Guard: `e2e/town-leave.spec.ts`, "the town's back button asks…", "the phone's back gesture asks too…", "a computer's side menu
-    asks first…", "inside a room…", "a boss's challenge from the town…", "no input for the limit…", phone and computer.
-  - Decision: [2026-11-07-leave-town-confirm.md](../decisions/2026-11-07-leave-town-confirm.md).
+    asks first…", "inside a room…", "a computer's side menu inside a room…", "inside a room, an invite's Join asks first…", "a boss's
+    challenge from the town…", "no input for the limit…", phone and computer; `packages/app/test/friends.test.ts`, "in Chess Town, Stay…".
+  - Decisions: [2026-11-07-leave-town-confirm.md](../decisions/2026-11-07-leave-town-confirm.md),
+    [2026-11-13-town-leave-everywhere.md](../decisions/2026-11-13-town-leave-everywhere.md).
 - **The Hidden Boss's room (Eric, Nov 12 and 13): you challenge him from his room only and wait there; leaving it with your game request
   in asks "Cancel your game request?" (Stay / Leave and cancel): the stairs, back, the side menu, closing the town; four at most in the
   room, a 5th at its door gets "The door is locked." and stays out; no four in 5 minutes (not shown): "Sorry, not enough players." with

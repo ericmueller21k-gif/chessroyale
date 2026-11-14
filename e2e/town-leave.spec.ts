@@ -35,6 +35,8 @@ async function still(p: Page, name: string) {
   const dir = process.env.LEAVE_STILLS;
   if (!dir) return;
   mkdirSync(dir, { recursive: true });
+  // (The sheet's own fade in, done.)
+  await p.waitForTimeout(500);
   await p.screenshot({ path: `${dir}/${name}-${test.info().project.name}.png` });
 }
 
