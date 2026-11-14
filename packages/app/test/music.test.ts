@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MUSIC, MUSIC_SWITCH, RECLUSE_MUSIC } from "@chessroyale/core";
+import type { Phase } from "../src/game.ts";
 
 // The audio graph, faked: what was started where, and every move of the music's gain.
 type Call = [string, ...number[]];
@@ -45,8 +46,9 @@ class FakeGain {
   }
   disconnect() {}
 }
-const ctx = {
-  currentTime: 10,
+const fakeContext = (currentTime: number) => ({
+  currentTime,
+  state: undefined as AudioContextState | undefined,
   sources: [] as FakeSource[],
   gains: [] as FakeGain[],
   createGain() {
@@ -59,11 +61,15 @@ const ctx = {
     this.sources.push(s);
     return s;
   },
-};
+});
+const ctx = fakeContext(10);
+/** The context musicBus hands out (a new one once sound.ts has rebuilt it), and what heard of the rebuild. */
+let busCtx = ctx;
+const rebuilt: ((old: unknown) => number | void)[] = [];
 const files: string[] = [];
 const forgot: string[] = [];
 // (Decoded buffers kept as sound.ts keeps them, until forgotten: `fetched` lists the misses, each a real fetch and decode.)
-const bufs = new Map<string, { url: string }>();
+const bufs = new Map<string, { url: string; duration: number }>();
 const fetched: string[] = [];
 /** (Set: an intro's decode waits for it.) */
 const gate = { intro: null as Promise<void> | null };
@@ -71,15 +77,15 @@ const sound = vi.hoisted(() => ({ muted: false, hidden: false, muteListeners: []
 vi.mock("../src/sound.ts", () => ({
   isMuted: () => sound.muted,
   isPageHidden: () => sound.hidden,
-  musicBus: () => ({ ctx, master: {} }),
+  musicBus: () => ({ ctx: busCtx, out: {} }),
   loadAudioFile: (url: string) => {
     files.push(url);
-    if (!bufs.has(url)) (fetched.push(url), bufs.set(url, { url }));
+    if (!bufs.has(url)) (fetched.push(url), bufs.set(url, { url, duration: url.endsWith("-intro.mp3") ? 8 : 120 }));
     const buf = bufs.get(url)!;
     return gate.intro && url.endsWith("-intro.mp3") ? gate.intro.then(() => buf) : Promise.resolve(buf);
   },
   forgetAudioFile: (url: string) => void (forgot.push(url), bufs.delete(url)),
-  onAudioRebuilt: () => () => undefined,
+  onAudioRebuilt: (fn: (old: unknown) => number | void) => (rebuilt.push(fn), () => undefined),
   onMuteChange: (fn: () => void) => (sound.muteListeners.push(fn), () => undefined),
 }));
 
@@ -625,6 +631,36 @@ describe("the Hidden Boss: a theme for each point of his fight, switched mid-fig
       }
     });
 
+    it("the four boards (Eric, Nov 14: \"this music keeps restarting on the third phase\"): every state they pass through names the same theme, so it starts once at the split and plays on until the result", async () => {
+      // (Each state as solo.ts and recluse-online.ts set them: the phase change, the countdown (set twice: once more after the boards'
+      // first frame), the clocks, then boards decided one by one, his ultimate; phase 1 beaten (`result`) or joined at phase 2.)
+      const split = Date.now() + 20_000;
+      const states: [Phase, boolean][] = [
+        [{ kind: "phaseChange", at: split - 17_435, splitAt: split }, false],
+        [{ kind: "simul", at: split + 9_000 }, false],
+        [{ kind: "simul", at: split + 9_120 }, false],
+        [{ kind: "simul", at: split + 9_120 }, false],
+        [{ kind: "simul", at: split + 9_120 }, false],
+      ];
+      for (const result of [true, false]) {
+        const themes = states.map(([p, decided]) => recluseMusic(p, result, decided));
+        expect(themes.slice(1).every((t) => t?.theme === H.transform && t.dropAt === undefined)).toBe(true);
+        expect(themes[0]).toEqual({ theme: H.transform, dropAt: split });
+      }
+      // Through the player: one start (its intro, then the loop on the split), nothing more until the result.
+      for (const [p, decided] of states) {
+        const r = recluseMusic(p, true, decided)!;
+        bossMusic({ key, boss: "recluse", live: true, ...r });
+        await settle();
+      }
+      expect(ctx.sources).toHaveLength(2);
+      expect(musicTheme()).toBe(H.transform);
+      // (Every board decided: the result's fade, as any boss's.)
+      expect(recluseMusic({ kind: "simul", at: split + 9_120 }, true, true)).toBeNull();
+      bossMusic(null);
+      expect(musicTheme()).toBeNull();
+    });
+
     it("the result while a switch's fade waits (his beaten theme till the transformation): both stop", async () => {
       fight(H.beaten);
       await settle();
@@ -660,5 +696,121 @@ describe("a new audio context picks the music up where it was (Eric, Nov 14: a h
     expect(loopPlace(l, 10_000 + 60_000)).toBeCloseTo(0.5);
     expect(loopPlace(l, 10_000 + 95_000)).toBeCloseTo(35.5);
     expect(loopPlace({ ...l, offset: 20.5 }, 10_000 + 45_000)).toBeCloseTo(5.5);
+  });
+});
+
+describe("a new audio context takes the music over with no break (Eric, Nov 14: \"it froze, stopped for a second... restarted at a different part\")", () => {
+  let wall = 1_000_000;
+  let key = 1000;
+  const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+  /** grex's battle started at ctx 20 (intro at 20.05, loop at 26.72 from 0.5), then `s` seconds on, the clock and the wall alike. */
+  async function playFor(s: number) {
+    ctx.currentTime = 20;
+    bossMusic({ key: ++key, boss: "grex", live: true });
+    await settle();
+    expect(ctx.sources).toHaveLength(2);
+    ctx.currentTime += s;
+    wall += s * 1000;
+  }
+  /** sound.ts rebuilds: a new context (suspended, its clock at 0) and the listener hears the old one; returns what it asked to keep. */
+  function rebuild() {
+    const next = fakeContext(0);
+    next.state = "suspended";
+    busCtx = next;
+    return { next, keep: rebuilt[0]!(ctx) };
+  }
+  /** The new context's clock starts (and both clocks and the wall move on by `s`). */
+  async function runs(next: ReturnType<typeof fakeContext>, s = 0.5) {
+    next.state = "running";
+    next.currentTime += s;
+    ctx.currentTime += s;
+    wall += s * 1000;
+    await wait(40);
+  }
+  const loopAt = 20 + MUSIC.startDelayS + 6.666667;
+  beforeEach(() => {
+    vi.spyOn(Date, "now").mockImplementation(() => wall);
+    ctx.sources = [];
+    ctx.gains = [];
+    ctx.state = "running";
+    sound.muted = false;
+    sound.hidden = false;
+    setMusicOn(true);
+  });
+  afterEach(() => {
+    bossMusic(null);
+    busCtx = ctx;
+    ctx.state = undefined;
+    vi.restoreAllMocks();
+  });
+
+  it("the old one still sounding: the new starts at the place the old is heard at once its clock runs, then the old fades over handoffMs from there", async () => {
+    await playFor(40);
+    const { next, keep } = rebuild();
+    // (The old context kept open for the wait, the start and the fade: never past sound.ts's 2 s.)
+    expect(keep).toBeGreaterThanOrEqual(MUSIC.handoffWaitMs + MUSIC.handoffMs);
+    // (Nothing yet: the new one's clock hasn't started, and the old one plays on, untouched.)
+    expect(next.sources).toHaveLength(0);
+    expect(ctx.sources[1]!.stoppedAt).toBeNull();
+    await runs(next);
+    const [loop] = next.sources;
+    const from = 0.5 + MUSIC.startDelayS;
+    expect(next.sources).toHaveLength(1);
+    expect(loop!.started![0]).toBeCloseTo(from, 6);
+    // (Where the old one's loop is at its own clock's matching moment, 60.5 + the start delay.)
+    expect(loop!.started![1]).toBeCloseTo(0.5 + (60.5 + MUSIC.startDelayS - loopAt), 6);
+    expect([loop!.loop, loop!.loopStart, loop!.loopEnd]).toEqual([true, 0.5, 0.5 + 113.333333]);
+    expect(next.gains[0]!.gain.value).toBe(MUSIC.volume);
+    // The old one: held until the new one is heard, then faded out over handoffMs and stopped.
+    const handAt = 60.5 + MUSIC.startDelayS;
+    expect(ctx.gains[0]!.gain.lastRamp![0]).toBe(0);
+    expect(ctx.gains[0]!.gain.lastRamp![1]).toBeCloseTo(handAt + MUSIC.handoffMs / 1000, 6);
+    for (const s of ctx.sources) expect(s.stoppedAt).toBeCloseTo(handAt + MUSIC.handoffMs / 1000, 6);
+    expect(musicNow()).toEqual({ boss: "grex", level: MUSIC.volume });
+    // (Its result: the music on the new one ends, as ever.)
+    bossMusic(null);
+    expect(loop!.stoppedAt).toBeCloseTo(next.currentTime + MUSIC.endFadeMs / 1000, 6);
+  });
+
+  it("in its intro: the intro picks up where it is, and the loop follows at its own moment", async () => {
+    await playFor(3);
+    const { next } = rebuild();
+    await runs(next);
+    const [intro, loop] = next.sources;
+    const from = 0.5 + MUSIC.startDelayS;
+    expect(intro!.started![0]).toBeCloseTo(from, 6);
+    expect(intro!.started![1]).toBeCloseTo(23.5 + MUSIC.startDelayS - (20 + MUSIC.startDelayS), 6);
+    expect(loop!.started![0]).toBeCloseTo(from + (loopAt - (23.5 + MUSIC.startDelayS)), 6);
+    expect(loop!.started![1]).toBe(0.5);
+  });
+
+  it("the old one dead (its clock stopped): closed at once, and the new one comes in at the place the wall clock says", async () => {
+    await playFor(40);
+    // (Dead for 20 s: the wall moves on, its clock doesn't.)
+    wall += 20_000;
+    ctx.state = "suspended";
+    const { next, keep } = rebuild();
+    expect(keep).toBe(0);
+    await runs(next);
+    const [loop] = next.sources;
+    expect(loop!.started![1]).toBeCloseTo(0.5 + (60 + 20 + 0.5 + MUSIC.startDelayS - loopAt), 6);
+  });
+
+  it("the battle ends while the new one opens: nothing starts on it", async () => {
+    await playFor(40);
+    const { next } = rebuild();
+    bossMusic(null);
+    await runs(next);
+    expect(next.sources).toHaveLength(0);
+  });
+
+  it("the new one's clock never starts: the music is started on it after handoffWaitMs all the same", async () => {
+    await playFor(40);
+    const { next } = rebuild();
+    await wait(40);
+    expect(next.sources).toHaveLength(0);
+    wall += MUSIC.handoffWaitMs;
+    await wait(40);
+    expect(next.sources).toHaveLength(1);
   });
 });
