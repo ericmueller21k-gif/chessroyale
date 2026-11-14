@@ -148,7 +148,9 @@ export function RecluseCutscene({ at, until, board: given, lines = RECLUSE_CUTSC
           // SpeechBox moves a box that would run off the screen back into view; so the tail is drawn here, always over the speaker.)
           <span class={`cs-anchor cs-${up.box.who}`} style={{ left: `${px(CUTSCENE_SPOTS[up.box.who].x)}px`, top: `${py(CUTSCENE_SPOTS[up.box.who].head) - 14}px` }}>
             <SpeechBox key={up.i} class="bc-bubble cs-say" text={up.box.text} at={at + up.box.at} until={at + up.box.until} now={now} typed={cutTyped(line, up.box, t, c)} fits={1} data-line={up.i + 1} />
-            <span class={`cs-tail${at + up.box.until - now < c.boxFadeMs ? " leaving" : ""}`} />
+            {/* (Shown and faded by its box's own state, `.fresh` and `.leaving` (styles.css, `.cs-say + .cs-tail`): never a tail without
+                its box.) */}
+            <span class="cs-tail" />
           </span>
         )}
       </div>

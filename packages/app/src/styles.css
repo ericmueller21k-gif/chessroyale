@@ -19497,6 +19497,12 @@ button.sq-tiny {
   right: auto;
   margin-left: -6px;
 }
+/* (A computer: as wide as the cutscene's boxes, so his line takes two rows and stands on the board over his helmet, under the bar.) */
+@media (min-width: 900px) {
+  .rc-say-at > .rc-say {
+    max-width: 320px;
+  }
+}
 
 /* The Hidden Boss's phase 2 (Eric, Nov 14): the God King in his place, greyed, never to be called. Opacity and filter only. */
 .gk-unit.benched .god-king,
@@ -19582,14 +19588,27 @@ button.sq-tiny {
   font-size: min(11px, 5.4cqw);
   line-height: 1.3;
 }
-/* A phone's small boards: the clock just above each, off its pieces (Eric, Oct 15), in the room over the row. */
+/* A phone's small boards: the name and clock just above each, off its pieces (Eric, Oct 15), in the room over the row; the name cut
+   short ("Castling…") so the tag stays within its board's width, the clock whole (Nov 14). */
 .rc-mini .rc-tag {
   top: auto;
   bottom: calc(100% + 3px);
   left: 50%;
   translate: -50% 0;
+  display: flex;
+  gap: 0.35em;
+  box-sizing: border-box;
+  max-width: 100%;
   padding: 0 4px;
   font-size: 10px;
+}
+.rc-mini .rc-tag-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rc-mini .rc-tag-clock {
+  flex: none;
 }
 /* A decided board: its result across its middle. */
 .rc-result {
@@ -24150,7 +24169,19 @@ button.sq-tiny {
   /* (With it, the chat in the column under the moves, ending above the team: the 2 x 2 and their checks over their heads.) */
   .screen.game:has(> .mv-side):has(> .boss-dock.dk-party) > .under-board.side {
     margin-left: 0;
-    --gk-zone: calc(2 * var(--pt-row, 84px) + 24px);
+    --gk-zone: calc(2 * var(--pt-row, 84px) + 32px);
+  }
+  /* (His words above the team's heads and their checks, under the chat (Nov 14: a three-row line ran 17 px into the chat at 1280 and
+     onto the top-left teammate at 1920): the bottom 142 px over the board's bottom line, three rows at a phone's 8 px in the 58 px up
+     to the chat's foot (--gk-zone, 200 px). The same place when he lies fallen (his unit 14 px higher).) */
+  .screen.game > .boss-dock.dk-party > .gk-unit > .gk-bubble {
+    bottom: calc(100% + 22px);
+    padding: 8px 9px 7px;
+    font-size: 8px;
+    line-height: 1.4;
+  }
+  .screen.game > .boss-dock.dk-party > .gk-unit.fallen.has-power > .gk-bubble {
+    bottom: calc(100% + 8px);
   }
   .screen.game > .boss-dock.dk-party > .you-pawn {
     --pw: 92px;
@@ -26805,7 +26836,17 @@ body.cs-on .mm-scrim {
   transform: rotate(45deg);
   transition: opacity 240ms ease-in;
 }
-.cs-tail.leaving {
+/* (The tail goes in and out with its box, from the box's own classes (SpeechBox's `fresh` and `leaving`): one rule for both, so a
+   tail never shows without its box, Nov 14.) */
+.cs-say.fresh + .cs-tail {
+  animation: cs-tail-in 160ms steps(3, end) both;
+}
+@keyframes cs-tail-in {
+  from {
+    opacity: 0;
+  }
+}
+.cs-say.leaving + .cs-tail {
   opacity: 0;
 }
 /* (A phone: the board fills the width, so a box running 32 px past the speaker reaches the screen's edge; there it runs 110 px past

@@ -43,13 +43,27 @@ interface Shown {
 
 const caches = new WeakMap<object, PlyCache>();
 
+/**
+ * The Hidden Boss's phase 2 (the four boards): your own board, its moves from its Chess960 start (its base at ply 0), the team White on
+ * every board. Phase 1's game is over then: the panel keeps its size and place and lists the game you're playing (Nov 14). Else null.
+ */
+function yourSimulBoard(match: GameView) {
+  const b = match.phase.kind === "simul" ? match.simul?.boards.find((x) => x.you) : undefined;
+  return b ? { key: `simul:${b.id}`, history: b.history, bases: b.bases } : null;
+}
 /** The battle's rows now (and the opening's count before it), noting this moment's turns first. */
 function shownRows(match: GameView, boss: BossView): { rows: Shown[]; opening: number } {
   const board = boss.board;
   const book = turnBook(match);
-  noteTurns(book, { phase: match.phase, board }, Date.now());
   let cache = caches.get(match);
   if (!cache) caches.set(match, (cache = newPlyCache()));
+  const mine = yourSimulBoard(match);
+  if (mine) {
+    // (No move times or picks here: the turn book is phase 1's, ply by ply.)
+    const all = plyRows(cache, mine.key, mine.history, mine.bases);
+    return { rows: all.map((row) => ({ row, mover: moverOf(row, "w", 0, []), piece: row.piece, captured: row.captured, ms: null, picks: null })), opening: 0 };
+  }
+  noteTurns(book, { phase: match.phase, board }, Date.now());
   const all = plyRows(cache, `${board.id}:${board.generation}`, board.history, board.bases);
   const start = Math.min(battleStartPly(boss.startMove), all.length);
   const hidden = camoHidden();
@@ -169,9 +183,12 @@ export function MoveList({ match, hushLast = false, scroll = true, onOpen }: { m
     if (el && stuck.current) el.scrollTop = el.scrollHeight;
   }, [n]);
   if (!boss || !data) return null;
-  const alone = bossAlone(match);
-  // (Folio's Revision: the two moves it crossed out, struck through where they stand.)
-  const struck = crossedOut(boss.board.bases);
+  // (Phase 2: the board is yours, the team White: your moves read "You", with your pawn.)
+  const simul = !!yourSimulBoard(match);
+  const alone = simul || bossAlone(match);
+  const who: BossView = simul && boss.crowdSide !== "w" ? { ...boss, crowdSide: "w" } : boss;
+  // (Folio's Revision: the two moves it crossed out, struck through where they stand. None on phase 2's boards.)
+  const struck = simul ? new Set<number>() : crossedOut(boss.board.bases);
   // (Hollow's Lights out: the board's pieces are to be remembered, so the list waits until it's over.)
   const lights = match.phase.kind === "boss" && !!match.phase.lights;
   return (
@@ -197,7 +214,7 @@ export function MoveList({ match, hushLast = false, scroll = true, onOpen }: { m
             </li>
           )}
           {data.rows.map((s, i) => (
-            <MoveRow key={s.row.ply} s={s} boss={boss} alone={alone} hush={hushLast && i === data.rows.length - 1 && s.mover === "boss"} struck={struck.has(s.row.ply)} />
+            <MoveRow key={s.row.ply} s={s} boss={who} alone={alone} hush={hushLast && i === data.rows.length - 1 && s.mover === "boss"} struck={struck.has(s.row.ply)} />
           ))}
           {!data.rows.length && <li class="mv-empty">No moves yet.</li>}
         </ol>

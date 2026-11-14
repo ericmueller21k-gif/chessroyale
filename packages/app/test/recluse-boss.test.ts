@@ -2,14 +2,14 @@ import { beforeAll, afterEach, beforeEach, describe, expect, it, vi } from "vite
 import { BOSS_BANNER, BOSS_POWERS, BOSS_ROSTER, DEFAULT_SETTINGS, RAID_SETTINGS, isPlayable, menuBosses, type Settings } from "@chessroyale/core";
 import { RECLUSE_FX, legalMoves, type UciEngine } from "@chessroyale/chess";
 import { loadOpenings, SoloMatch } from "../src/solo.ts";
-import { BOSS_KITS } from "../src/characters/kits.ts";
+import { BOSS_KITS, bossKit } from "../src/characters/kits.ts";
 import { RECLUSE, RECLUSE_BUST } from "../src/characters/recluse.ts";
 import { KING_VS_RECLUSE, RECLUSE_LINES } from "../src/characters/recluse-lines.ts";
 import { RECLUSE_SOUNDS, recluseSound } from "../src/characters/recluse-sounds.ts";
 import { animLength } from "../src/characters/power-art.ts";
 import { MOVE_MEAN_DB, MOVE_PEAK } from "../src/characters/synth.ts";
 import { bossBeat, type Beat } from "../src/characters/boss-beats.ts";
-import { showing } from "../src/components/BossCharacter.tsx";
+import { faceBust, showing } from "../src/components/BossCharacter.tsx";
 import { dockLine, momentPriority, powerLine } from "../src/components/BossPowers.tsx";
 import { BULLET, BULLET_ANIMS, BULLET_PLUS, bulletControl, bulletIncrementOn, bulletOn, kingBlocked, mockKingHelp } from "../src/components/Recluse.tsx";
 import { CRITICAL } from "../src/speech.tsx";
@@ -224,5 +224,16 @@ describe("the God King's help tried in Boss alone: blocked, and the charge spent
     expect(m.boss!.kingCharges).toBe(0);
     expect(m.phase.kind).toBe("play");
     m.dispose();
+  });
+});
+
+describe("his small face (#712's review: after a fight that reached phase 2, the menus showed his helmet)", () => {
+  it("follows his look (his bar's bust, his suit) only inside a battle; elsewhere his portrait, drawn once", () => {
+    const kit = bossKit("Hidden Boss")!;
+    expect(kit.barFace && kit.bar).toBeTruthy();
+    expect(faceBust(kit, true)).toBe(kit.bar);
+    expect(faceBust(kit, false)).toBeNull();
+    // (A boss whose look never changes in a battle: his portrait, in a battle too.)
+    for (const k of Object.values(BOSS_KITS)) if (!k.barFace) expect(faceBust(k, true)).toBeNull();
   });
 });

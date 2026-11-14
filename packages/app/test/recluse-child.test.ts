@@ -33,6 +33,18 @@ describe("his figure grows with his level (RecluseChild.ts)", () => {
       );
     expect(RECLUSE_CHILD_KIT.heads).toBe(GROWING_HEADS);
     expect(GROWING_HEADS).toEqual(Object.fromEntries(Object.keys(ch.anims).map((a) => [a, tallest(a)])));
+    // (The man's too (RECLUSE_HEADS, Nov 14): beaten, his fall's lines come as he kneels, so they stand on the kneel, not where he stood.)
+    const man = BOSS_KITS["Hidden Boss"]!;
+    const manTallest = (a: string) =>
+      Math.max(
+        ...man.ch.anims[a]!.frames.map((f) => {
+          const r = renderFrame(man.ch, f);
+          for (let y = 0; y < r.h; y++) for (let x = 0; x < r.w; x++) if (r.data[(y * r.w + x) * 4 + 3]! > 0) return man.ch.foot[1] - y;
+          return 0;
+        }),
+      );
+    expect(man.heads).toEqual(Object.fromEntries(Object.keys(man.ch.anims).map((a) => [a, manTallest(a)])));
+    expect(man.heads![man.loops!.defeat!]!).toBeLessThan(man.heads!.idle! - 25);
     // (Each age taller than the one before, so his words climb as he grows.)
     const ages = GROWING_LOOPS.map((a) => GROWING_HEADS[a]!);
     expect([...ages].sort((a, b) => a - b)).toEqual(ages);

@@ -38,6 +38,8 @@ const beatsOf = (T: typeof PHASE_CHANGE): LightBeats => {
 let OPEN_MS: number | undefined;
 /** His animations standing on the same spot after the reveal (his box stays put over them). */
 const STANDING = new Set(["revealed", "flipUp", "flipDown", "crouch"]);
+/** His words' box stands this far over the top of his frame (styles.css, `.rc-say-at > .rc-say`'s bottom). */
+const SAY_GAP = 12;
 /** His figure at `t` (ms into the phase change): which animation, since when (ms into it), where his feet are (shares of the board). */
 export function changeFigAt(t: number, computer: boolean): { anim: string; then?: string; since: number; feet: { x: number; y: number } } | null {
   const T = PHASE_CHANGE;
@@ -120,6 +122,45 @@ export function RecluseTransform({ at, t, rect, computer, sceneStand }: { at: nu
     else drawLight(frame, T, back.current, front.current);
   });
 
+  // (His words over his head never straddle the bar's bottom edge, half in the bar and half on the board (Nov 14: 21 px on a computer,
+  // 44 on a phone, over the board's top rank): a box that would is held wholly in the bar above him, which is empty while he's on the
+  // board (a phone's), or, too tall for it, wholly on the board under it. The side is chosen once per box (a mount: one per animation,
+  // one through his standing ones) and kept: while he moves the box follows him on its side of the edge and stops at it, never jumping
+  // across (#712's review). Placed again only when his animation, his feet or his line change, never each frame: what's read (where
+  // the box's anchor stands, its height, the bar) is read once per box and line, and his feet's moves are worked out from those.)
+  const sayAt = useRef<HTMLSpanElement>(null);
+  const say = useRef<{ key: string; side: "above" | "below" | null; dy: number; base: { top: number; feetY: number; h: number; barBottom: number; barH: number } | null }>({ key: "", side: null, dy: 0, base: null });
+  const sayMount = fig ? (STANDING.has(fig.anim) ? "stand" : fig.anim) : "";
+  const lineKey = bossVoice.line()?.key ?? "";
+  const feetY = fig?.feet.y ?? 0;
+  // (The board's place too: the anchor stands on it.)
+  const readKey = `${sayMount}|${lineKey}|${Math.round(rect.y)}:${Math.round(bw)}`;
+  useLayoutEffect(() => {
+    const a = sayAt.current;
+    const k = say.current;
+    if (k.key !== readKey) {
+      // (A new box, line or board place: read where things stand, from the anchor's place less the move it carries now.)
+      if (k.key.split("|")[0] !== sayMount) k.side = null;
+      k.key = readKey;
+      k.base = null;
+      const box = a?.querySelector<HTMLElement>(".rc-say");
+      const bar = document.querySelector(".boss-bar")?.getBoundingClientRect();
+      if (a && box && bar?.height) k.base = { top: a.getBoundingClientRect().top - k.dy, feetY, h: box.offsetHeight, barBottom: bar.bottom, barH: bar.height };
+    }
+    const b = k.base;
+    let dy = 0;
+    if (b) {
+      const bottom = b.top + (feetY - b.feetY) * bw - SAY_GAP;
+      const top = bottom - b.h;
+      if (!k.side && top < b.barBottom + 4 && bottom > b.barBottom - 4) k.side = b.h <= b.barH - 8 ? "above" : "below";
+      if (k.side === "above") dy = Math.min(0, b.barBottom - 4 - bottom);
+      else if (k.side === "below") dy = Math.max(0, b.barBottom + 4 - top);
+    }
+    dy = Math.round(dy);
+    if (a && dy !== k.dy) a.style.translate = dy ? `0 ${dy}px` : "";
+    k.dy = dy;
+  }, [readKey, feetY]);
+
   const px = (x: number) => `${x * 100}%`;
   const figStyle = (feet: { x: number; y: number }) => ({ left: px(feet.x - (CHANGE_FIG * RECLUSE.foot[0]) / RECLUSE.w), top: `${(feet.y - (CHANGE_FIG * RECLUSE.foot[1]) / RECLUSE.w) * bw}px`, width: px(CHANGE_FIG), aspectRatio: `${RECLUSE.w} / ${RECLUSE.h}` });
   const lens = t < T.whiteFull ? 1 : 0;
@@ -153,7 +194,7 @@ export function RecluseTransform({ at, t, rect, computer, sceneStand }: { at: nu
             {/* His words over his head (his voice's bubble), mounted again with each of his animations so a box moved into view is
                 placed again where he stands now; one mount while he stands in place (his first line runs from the visor up
                 through the crouch, and a box mounted again in its fade would vanish at once). */}
-            <span class="rc-say-at">
+            <span class="rc-say-at" ref={sayAt}>
               <VoiceBubble key={STANDING.has(fig.anim) ? "stand" : fig.anim} voice={bossVoice} class="bc-bubble rc-say" />
             </span>
           </span>
