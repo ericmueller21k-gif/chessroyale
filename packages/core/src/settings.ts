@@ -3623,6 +3623,29 @@ export const RIDES = {
 };
 
 /**
+ * A ride's moving sound (Eric, Nov 14: "when you move around ... it sounds like ... a little bulldozer moving ... one continuous sound";
+ * "when you stop moving, it doesn't just like instantly stop ... it kind of fades over like a second or whatever ... I guess we'll have
+ * to test it"; docs/decisions/2026-11-14-ride-sounds.md). Your own pawn's ride only, only while it moves, and only a ride listed in
+ * `rides` (its loop is `/sounds/rides/<id>.wav`); standing, nothing. On the game's sounds (the Sound switch, a hidden page). App:
+ * `ride-sound.ts`.
+ * - `level`: its gain on the game's sounds (each loop is -20 dB RMS, so well under a move's knock).
+ * - `holdMs`: it counts as moving until this long after your last step (a step is 90 ms), so a turn or a tap between steps never
+ *   stops it.
+ * - `engine`: a ride with `engine: true` (the dozer) starts at `startRate` and comes up to speed (1) over `upMs`; as it fades out it
+ *   sinks to `stopRate`. Moving again mid-fade, it comes back up from where it is, at the same pace.
+ * - `rides[id]`: `fadeInMs` as it starts, `fadeOutMs` as it stops.
+ */
+export const RIDE_SOUND = {
+  level: 0.3,
+  holdMs: 120,
+  engine: { startRate: 0.8, upMs: 300, stopRate: 0.88 },
+  rides: {
+    "sawyer-dozer": { engine: true, fadeInMs: 60, fadeOutMs: 700 },
+    "boingo-pogo": { engine: false, fadeInMs: 60, fadeOutMs: 350 },
+  } as Readonly<Record<string, { readonly engine: boolean; readonly fadeInMs: number; readonly fadeOutMs: number }>>,
+} as const;
+
+/**
  * Outfits (Eric, Nov 10; docs/decisions/2026-11-10-outfit-slot.md): an outfit hides every other worn item. `eyewear`: face items
  * tagged eyewear (goggles, shades) still show, over its face hole ("the only exception"); false hides them too.
  */

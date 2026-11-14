@@ -463,9 +463,17 @@ before the rows are laid (`street.ts lotHere`), so each row fills the place with
   is drawn: the town (Canvas 2D and WebGL), the locker, the profiles, home's pawn and ring (`RideLayers`'s `k`; the boxes keep their
   size; the item's own tile keeps 1). **`?rideScale=K`** (0.5 to 1.25), a test switch (admins on the live site): every ride on that
   page at K, to try sizes; read once as the page opens (`test-switches.ts`).
+  **Its moving sound** (Nov 14, Eric: "one continuous sound"; [2026-11-14-ride-sounds.md](../decisions/2026-11-14-ride-sounds.md)): a
+  ride listed in `RIDE_SOUND.rides` (Sawyer's Dozer and Boingo's Pogo so far; its loop `/sounds/rides/<id>.wav`) plays its loop while
+  your own pawn moves on it, in the town and a shop's room; standing, nothing; any other ride silent. It counts as moving until `holdMs`
+  (120) after your last step, so it never stops between steps; it fades in over `fadeInMs`, out over `fadeOutMs` (the dozer 700, the pogo
+  350), an engine (the dozer) coming up to speed as it starts and sinking a little as it fades; moving again mid-fade brings it back from
+  where it is. On the game's sounds (the Sound switch, a hidden page). The frame loops only say "you moved, on this ride" on moving frames
+  (`rideMoving`); a timer off the frame sees you stop (`ride-sound.ts`). Your ride's loop is fetched after the town's first frame.
+  Tests: `test/ride-sound.test.ts`; `e2e/town.spec.ts`, "rides (Oct 31; …)", its end.
   Test hook: `__townRide()` (yours: its ride, color and size, ready, the
   animation, frame and view the last frame drew, which way it faced, your box, foot and head on screen, your step's time, your trail's
-  marks and droplets showing; every other rider's, with its step's time; and the sets of frames held); `__townAt("square", [c, r])` says where a square is on screen; `__townPlayer(…, wear)` dresses the
+  marks and droplets showing, its moving sound (`sound`: its ride, coming up or fading, the sources alive, its loop); every other rider's, with its step's time; and the sets of frames held); `__townAt("square", [c, r])` says where a square is on screen; `__townPlayer(…, wear)` dresses the
   test player (a ride too).
 - **The bots and playing them** (Oct 27, Eric: "a few bots… with different skill level… if you tap them you can invite
   them to a game and then you both run over to the chessboard"; `docs/decisions/2026-10-27-town-bots.md`). **Twenty bots

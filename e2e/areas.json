@@ -691,6 +691,10 @@
       "paths": ["packages/app/src/music.ts", "packages/app/public/music/**"],
       "specs": ["e2e/grex.spec.ts", "e2e/match-menu.spec.ts"]
     },
+    "ride sounds (Nov 14): your ride's moving loop in the town and its rooms": {
+      "paths": ["packages/app/src/ride-sound.ts", "packages/app/public/sounds/rides/**"],
+      "specs": ["e2e/town.spec.ts", "e2e/shop.spec.ts"]
+    },
     "sounds": {
       "paths": [
         "packages/app/src/sound.ts",
