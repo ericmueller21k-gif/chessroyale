@@ -39,7 +39,8 @@ export interface MusicThemes {
 
 /** What starts when, on the audio clock (s). */
 export interface MusicPlan {
-  intro: { name: string; at: number } | null;
+  /** `offset`: how far into its file it starts (a device late for it starts it where it is: s; none, its start). */
+  intro: { name: string; at: number; offset?: number } | null;
   loop: { name: string; at: number; offset: number; loopStart: number; loopEnd: number };
 }
 
@@ -67,8 +68,9 @@ export interface SwitchPlan {
 /**
  * `theme` taking over at `now` (MUSIC_SWITCH: what's playing fades over its `fadeMs`; `after`, the theme waits for that fade when
  * something is `playing`, else it starts at once, at full level). With `dropAt`, its loop must start exactly then (the Hidden Boss's
- * boards split on it): its intro starts at dropAt − introSeconds, and what's playing fades from there. Too late for that (or
- * `loopOnly`): its loop alone, from dropAt (or now, if that's past too). No theme: null.
+ * boards split on it): its intro starts at dropAt − introSeconds, and what's playing fades from there. Late for that (a device that
+ * loaded it late, or joined the phase change late; #707's review, m2): its intro now, from where it would be (now − its start), the
+ * loop still on the drop. Past the drop (or `loopOnly`): its loop alone, from dropAt (or now, if that's past too). No theme: null.
  */
 export function switchPlan(themes: MusicThemes | null, theme: string, now: number, playing: boolean, dropAt: number | null = null, loopOnly = false): SwitchPlan | null {
   const th = themes?.themes[theme];
@@ -76,9 +78,13 @@ export function switchPlan(themes: MusicThemes | null, theme: string, now: numbe
   const outMs = MUSIC_SWITCH[theme]?.fadeMs ?? MUSIC.fadeMs;
   if (dropAt !== null) {
     const t0 = dropAt - Math.max(0, th.introSeconds || 0);
-    const late = loopOnly || t0 < now;
-    const at = late ? Math.max(now, dropAt) : t0;
-    const plan = musicPlan(themes, theme, at, late);
+    if (!loopOnly && now < dropAt) {
+      const plan = musicPlan(themes, theme, t0);
+      if (plan?.intro && t0 >= now) return { plan, outAt: t0, outMs };
+      if (plan?.intro) return { plan: { ...plan, intro: { ...plan.intro, at: now, offset: now - t0 } }, outAt: now, outMs };
+    }
+    const at = Math.max(now, dropAt);
+    const plan = musicPlan(themes, theme, at, true);
     return plan && { plan, outAt: at, outMs };
   }
   const at = playing && MUSIC_SWITCH[theme]?.after ? now + outMs / 1000 : now;
@@ -168,7 +174,7 @@ export interface Starts {
   intro: [at: number, offset: number] | null;
   loop: [at: number, offset: number];
 }
-const planStarts = (plan: MusicPlan): Starts => ({ intro: plan.intro && [plan.intro.at, 0], loop: [plan.loop.at, plan.loop.offset] });
+const planStarts = (plan: MusicPlan): Starts => ({ intro: plan.intro && [plan.intro.at, plan.intro.offset ?? 0], loop: [plan.loop.at, plan.loop.offset] });
 
 /**
  * A plan carried onto a new audio context (Nov 14, `handOver`): every time on it moved by `d` (the new clock less the old, for the
@@ -179,8 +185,9 @@ export function carriedStarts(plan: MusicPlan, d: number, from: number, introLen
   let intro: Starts["intro"] = null;
   if (plan.intro) {
     const at = plan.intro.at + d;
-    if (at >= from) intro = [at, 0];
-    else if (from - at < introLength) intro = [from, from - at];
+    const o = plan.intro.offset ?? 0;
+    if (at >= from) intro = [at, o];
+    else if (o + from - at < introLength) intro = [from, o + from - at];
   }
   const at = plan.loop.at + d;
   const loop: Starts["loop"] = at >= from ? [at, plan.loop.offset] : [from, loopAfter(plan.loop, from - at) ?? plan.loop.offset];
@@ -496,7 +503,7 @@ function maybeStart() {
     try {
       cutEnding(theme);
       playing = { ...startPlan(bus.ctx, bus.out, sw.plan, got.intro, got.loop, level()), key: b.key, boss: b.boss, theme };
-      log(`music:start:${theme}${sw.plan.intro ? "" : ":loop"}`);
+      log(`music:start:${theme}${!sw.plan.intro ? ":loop" : sw.plan.intro.offset ? ":late" : ""}`);
       // (Where its loop lands on Date.now()'s clock, for the tests: the Hidden Boss's drop on his boards' split.)
       if (dropAt !== null) log(`music:drop:${theme}:${Math.round(nowMs + (sw.plan.loop.at - heard) * 1000)}`);
     } catch {

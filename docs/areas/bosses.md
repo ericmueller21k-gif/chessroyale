@@ -58,7 +58,7 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
   adult form (phase 1) `recluse-phase2` from the start (online too); beaten with the phase change next (solo, the fall's `toPhase2`)
   `recluse-beaten` at once (0.3 s fade); the phase change `recluse-phase3`, its loop on the board's crack (`phaseChange.splitAt` =
   `at + PHASE_CHANGE.crackAt`), its intro started `introSeconds` before (from themes.json, never code; the beaten theme fades 0.5 s
-  from there; late, the loop alone on the drop), on through phase 2 until every board is decided. `recluse-house` plays through his child form
+  from there; a device late for that hears the intro from where it is now, the loop still on the drop, Nov 14; past the drop, the loop alone), on through phase 2 until every board is decided. `recluse-house` plays through his child form
   (`recluseMusic`'s `child`, its fall too), his adult theme after it with MUSIC_SWITCH's 1.5 s fade. Not in the town's loading: fetched as his fight starts (`ahead`), the transformation's
   decoded as he's beaten (`next`). With the 8.740 s intro (handoff f12f1c5b) his transformation started as he rose in his rage and
   `marks.slam` landed on the book hitting the floor; since his chant's two lines (Nov 13) the rise to the crack is 17.435 s, and
