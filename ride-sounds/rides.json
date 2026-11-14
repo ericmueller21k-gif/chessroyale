@@ -1,0 +1,25 @@
+{
+  "note": "Play <file> looping between loopStart and loopEnd (seconds), starting at loopStart. See README.md.",
+  "rides": {
+    "sawyer-dozer": {
+      "file": "sawyer-dozer.wav",
+      "loopStart": 0.1,
+      "loopEnd": 1.1,
+      "engine": true,
+      "fadeInMs": 60,
+      "fadeOutMs": 700,
+      "rmsDb": -20.0,
+      "peakDb": -3.8
+    },
+    "boingo-pogo": {
+      "file": "boingo-pogo.wav",
+      "loopStart": 0.1,
+      "loopEnd": 1.1,
+      "engine": false,
+      "fadeInMs": 60,
+      "fadeOutMs": 350,
+      "rmsDb": -20.0,
+      "peakDb": -7.1
+    }
+  }
+}
