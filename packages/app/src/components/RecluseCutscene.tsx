@@ -20,7 +20,7 @@ import { RECLUSE_CUTSCENE as C } from "@chessroyale/core";
 import { RECLUSE } from "../characters/recluse.ts";
 import { CUTSCENE_SPOTS, RECLUSE_CUTSCENE } from "../characters/recluse-ages.ts";
 import { RECLUSE_CUTSCENE_LINES } from "../characters/recluse-lines.ts";
-import { boxAt, cutTyped, cutsceneTimeline, fitCutscene, type CutLine, type CutTimeline } from "../recluse-cutscene.ts";
+import { boxAt, cutTyped, cutsceneTimeline, fitCutscene, sceneStandAt, type CutLine, type CutTimeline } from "../recluse-cutscene.ts";
 import { bossVoice } from "../speech.tsx";
 import { kingVoice } from "../godKing.ts";
 import { SpeechBox } from "../speech.tsx";
@@ -37,6 +37,8 @@ export function recluseCutsceneTimeline(lines: readonly CutLine[] = RECLUSE_CUTS
 }
 /** The scene fitted to its window (`fitCutscene`: itself at its full hold; sped up in a test's shorter one). */
 export const recluseCutsceneFit = (windowMs: number, lines: readonly CutLine[] = RECLUSE_CUTSCENE_LINES) => fitCutscene(lines, arrival(), windowMs);
+/** When the scene's loop of the two began, ms from his phase change's start `at` (`sceneStandAt`: from its fitted timeline). */
+export const recluseSceneStand = (cut: { at: number; until: number } | null | undefined, at: number) => sceneStandAt(RECLUSE_CUTSCENE_LINES, arrival(), cut, at);
 
 /** The figure's width, a share of the board's: today's sprite at the phase change's size (24% for his own frame). */
 const FIG = (24 * ch.w) / RECLUSE.w;

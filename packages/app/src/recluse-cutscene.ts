@@ -110,6 +110,18 @@ export function fitCutscene(lines: readonly CutLine[], arrival: CutArrival, wind
   return { timeline: cutsceneTimeline(lines, arrival, fc), c: fc };
 }
 
+/**
+ * When the scene's loop of the man and the child began (its `standAt`), ms from the phase change's start `at`, so his transformation
+ * carries the loop on unbroken (#707's review, m5): from the scene as fitted to its hold (`cut`: its times on this device) where that
+ * hold led into this phase change (its end within 2 s of `at`: a solo timer's lateness, two clocks), else from the scene at its full
+ * length ending as the phase change starts (a device that joined at the phase change, a test link straight to it).
+ */
+export function sceneStandAt(lines: readonly CutLine[], arrival: CutArrival, cut: { at: number; until: number } | null | undefined, at: number, c: Settings = RECLUSE_CUTSCENE): number {
+  if (cut && Math.abs(cut.until - at) <= 2000) return cut.at + fitCutscene(lines, arrival, cut.until - cut.at, c).timeline.standAt - at;
+  const full = cutsceneTimeline(lines, arrival, c);
+  return full.standAt - full.endAt;
+}
+
 /** The box up at `t` (from the scene's start), if any. */
 export const boxAt = (tl: CutTimeline, t: number): { box: CutBox; i: number } | null => {
   const i = tl.boxes.findIndex((b) => t >= b.at && t < b.until);

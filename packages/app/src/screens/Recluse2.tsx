@@ -4,7 +4,7 @@ import { RECLUSE_PHASE2 } from "@chessroyale/core";
 import { moveLeft } from "@chessroyale/chess";
 import { CHANGE_HANDS } from "../characters/recluse-transform.ts";
 import { RecluseTransform } from "../components/RecluseTransform.tsx";
-import { recluseCutsceneTimeline, useRect } from "../components/RecluseCutscene.tsx";
+import { recluseSceneStand, useRect } from "../components/RecluseCutscene.tsx";
 import { play } from "../sound.ts";
 import { BOSS_KITS } from "../characters/kits.ts";
 import { RECLUSE_LINES } from "../characters/recluse-lines.ts";
@@ -226,9 +226,8 @@ export function PhaseChangeScreen({ match, at }: { match: GameView; at: number }
   const shuffled = t >= C.shuffleAt;
   const away = t < C.homeAt;
   const cracking = t >= C.crackAt && t < C.growAt;
-  // (The cutscene's loop of him and the child, carried on: its start, ms into the phase change.)
-  const scene = recluseCutsceneTimeline();
-  const sceneStand = scene.standAt - scene.endAt;
+  // (The cutscene's loop of him and the child, carried on: its start, ms into the phase change, from the scene as fitted to its hold.)
+  const sceneStand = recluseSceneStand(match.cutscene, at);
   // (No scoreboard here: phase 1's, minimized, gave the board more of a phone's height, so its size is kept until the
   // split by the same rule: styles.css, rc-folded. A phone upright has no scoreboard to minimize in phase 1 since Oct 25,
   // its panel beside the God King keeping one size: there a fold remembered from another match changes nothing.)
