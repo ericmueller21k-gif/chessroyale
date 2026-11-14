@@ -48,7 +48,7 @@ describe("the Hidden Boss's cutscene", () => {
 
   it("has Eric's 17 lines, line 15 two sentences, and never names him", () => {
     expect(RECLUSE_CUTSCENE_LINES).toHaveLength(17);
-    expect(RECLUSE_CUTSCENE_LINES[14]).toEqual({ who: "kid", say: ["Computers or no computers.", "The best player in the world is still the best."] });
+    expect(RECLUSE_CUTSCENE_LINES[14]).toEqual({ who: "kid", say: ["Everyone has the same computers.", "So the best player is still the best."] });
     expect(RECLUSE_CUTSCENE_LINES.map((l) => l.who).join(" ")).toBe("kid man kid man kid man kid man kid man kid man kid man kid man kid");
     // (A line of two sentences is two entries; one sentence, however long, is one: it types all at once.)
     for (const l of RECLUSE_CUTSCENE_LINES) for (const s of l.say) expect(s.slice(0, -1)).not.toMatch(/[.?!] /);
@@ -67,7 +67,7 @@ describe("the Hidden Boss's cutscene", () => {
     expect(b.starts[1]).toBe(firstDone + C.sentencePauseMs);
     expect(cutTyped(line, b, b.starts[1]!)).toBe(first + 2);
     expect(cutTyped(line, b, b.typed)).toBe(b.text.length);
-    expect(b.text).toBe("Computers or no computers. The best player in the world is still the best.");
+    expect(b.text).toBe("Everyone has the same computers. So the best player is still the best.");
   });
 
   it("shows one box at a time, in order, each fully readable for its time once typed", () => {
