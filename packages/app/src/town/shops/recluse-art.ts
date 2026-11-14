@@ -19,6 +19,7 @@ import type { Character, Frame, Part } from "../../characters/sprite.ts";
 import type { LightPool, LightSpot } from "../houses/kit.ts";
 import { cv, ellipse, face, hash, line, put, rect, shadow, stamp, type Cv, type Pt } from "./paper-kit.ts";
 import type { ShopPlace } from "./room.ts";
+import type { RoomLight } from "../sky.ts";
 
 const T = 37;
 /** The room's size in squares, each way (`RoomArt.n`). */
@@ -100,6 +101,73 @@ const PALETTE: Record<string, string> = {
   // Shadows on the floor (see-through): core, rim.
   "-": "#1a0e0866",
   "+": "#1a0e0833",
+  // The view through the window (its own keys, recolored by the time of day: LIGHT_PALETTE): the sky high, mid and low; the brick across
+  // the street and its mortar; its windows' glass (top, rest) and a lit one's (top, rest); the sun or moon (core, halo, the moon's
+  // marks); glints on the glass, or the stars.
+  "<": "#a9d6f2",
+  ">": "#d7eefa",
+  "^": "#7fbbe6",
+  "#": "#9c5038",
+  "=": "#c07a5a",
+  "~": "#d7eefa",
+  "!": "#7fbbe6",
+  ";": "#ffe3a0",
+  ":": "#f2c062",
+  "*": "#fff6cf",
+  "%": "#ffe28a",
+  ",": "#d8d4c4",
+  "&": "#fff6cf",
+  "@": "#d7eefa",
+};
+/**
+ * The room by the time of day (Nov 14, Eric: "it's always light in that room... the outside shining should be like a moon at night"):
+ * the view's keys and the light's panes on the floor (`5`, `6` the boards; `7` to `0` the rug's braids) recolored. Day: as drawn above.
+ */
+const LIGHT_PALETTE: Readonly<Record<RoomLight, Readonly<Record<string, string>>>> = {
+  day: {},
+  // Dusk (and dawn): a purple-to-orange sky over the roofline, the brick across the street in shade, its glass catching the glow, one
+  // window lit; the panes on the floor a warm orange, dimmer than the sun's.
+  dusk: {
+    "<": "#7a5f96",
+    ">": "#e98e83",
+    "^": "#f7b46e",
+    "#": "#7a3d2e",
+    "=": "#985b45",
+    "~": "#f6c393",
+    "!": "#b8705f",
+    "*": "#fff1c4",
+    "%": "#ffc77e",
+    "&": "#ffdcae",
+    "@": "#f2a98f",
+    "5": "#c98250",
+    "6": "#dc9a5e",
+    "7": "#f3cfa6",
+    "8": "#d4673f",
+    "9": "#64648f",
+    "0": "#a69a5a",
+  },
+  // Night: a deep blue sky, the moon and a few stars, the brick dark, two windows lit across the street; the panes on the floor pale,
+  // cool moonlight, a little lighter than the boards round them.
+  night: {
+    "<": "#0c1430",
+    ">": "#152147",
+    "^": "#22325e",
+    "#": "#3b2724",
+    "=": "#4c3631",
+    "~": "#1f2742",
+    "!": "#18203a",
+    "*": "#f6f2df",
+    "%": "#aab6d6",
+    ",": "#d3cdb8",
+    "&": "#eef1ff",
+    "@": "#8e9fcb",
+    "5": "#9b8f97",
+    "6": "#b3aab2",
+    "7": "#d8d5dc",
+    "8": "#a3716e",
+    "9": "#5f6d98",
+    "0": "#8f9a7e",
+  },
 };
 
 type Bit = { part: Part; at: Pt };
@@ -113,7 +181,7 @@ interface Piece {
   ms: number;
 }
 const PIECES: Record<string, Piece> = {};
-function toChar(p: Piece): Character {
+function toChar(p: Piece, palette: Record<string, string> = PALETTE): Character {
   const parts: Record<string, Part> = {};
   const frames: Frame[] = p.frames.map((bits, f) => ({
     ms: p.ms,
@@ -123,7 +191,7 @@ function toChar(p: Piece): Character {
       return { part: n, x: b.at[0], y: b.at[1] };
     }),
   }));
-  return { id: `shop-recluse-${p.name}`, name: `The child's room: ${p.name}`, w: p.w, h: p.h, foot: p.foot, palette: PALETTE, parts, anims: { idle: { loop: true, frames } } };
+  return { id: `shop-recluse-${p.name}`, name: `The child's room: ${p.name}`, w: p.w, h: p.h, foot: p.foot, palette, parts, anims: { idle: { loop: true, frames } } };
 }
 function def(name: string, sq: readonly [number, number], w: number, h: number, foot: Pt, frames: Bit[][], ms = 1000): void {
   PIECES[name] = { name, sq, w, h, foot, frames, ms };
@@ -136,8 +204,17 @@ const whole = (c: Cv, outline = false): Bit => ({ part: { grid: c.map((r) => r.j
 export const SHOP_RECLUSE_RUG = { c: 4.0, r: 3.85, rc: 2.05, rr: 1.55 } as const;
 /** The window's column (2 wide) in the back wall; the sun's two panes on the floor fall from it, as in round 1, now across the rug. */
 const WINDOW_COL = 3;
-const SUN = { x0: (WINDOW_COL - 0.7) * T, x1: (WINDOW_COL + 1.6) * T, y0: 1 * T, y1: 4.6 * T, slant: 0.55 } as const;
-function floorPx(X: number, Y: number): string {
+/**
+ * The window's two panes on the floor by the time of day: the day's sun; dusk's low sun, the panes longer and leaning further; the
+ * night's moon, a little shorter. Their colors are LIGHT_PALETTE's.
+ */
+const SUNS: Readonly<Record<RoomLight, { readonly x0: number; readonly x1: number; readonly y0: number; readonly y1: number; readonly slant: number }>> = {
+  day: { x0: (WINDOW_COL - 0.7) * T, x1: (WINDOW_COL + 1.6) * T, y0: 1 * T, y1: 4.6 * T, slant: 0.55 },
+  dusk: { x0: (WINDOW_COL - 0.7) * T, x1: (WINDOW_COL + 1.6) * T, y0: 1 * T, y1: 6.3 * T, slant: 1.05 },
+  night: { x0: (WINDOW_COL - 0.6) * T, x1: (WINDOW_COL + 1.5) * T, y0: 1 * T, y1: 4.2 * T, slant: 0.35 },
+};
+function floorPx(X: number, Y: number, light: RoomLight): string {
+  const SUN = SUNS[light];
   // Boards running north to south, 9 px wide, their end joints staggered.
   const col = Math.floor(X / 9.25);
   const xx = X - Math.floor(col * 9.25);
@@ -183,12 +260,18 @@ function floorPx(X: number, Y: number): string {
   }
   return k;
 }
-for (let row = 0; row < SHOP_RECLUSE_N; row++)
-  for (let col = 0; col < SHOP_RECLUSE_N; col++) {
-    const c = cv(T, T);
-    for (let y = 0; y < T; y++) for (let x = 0; x < T; x++) c[y]![x] = floorPx(col * T + x, row * T + y);
-    def(`floor-${col}-${row}`, [1, 1], T, T, [18, 18], [[whole(c)]]);
-  }
+/** The floor's tiles for one time of day, each `floor-<col>-<row>` (the day's are the room's pieces; the others replace them). */
+function floorTiles(light: RoomLight): Piece[] {
+  const out: Piece[] = [];
+  for (let row = 0; row < SHOP_RECLUSE_N; row++)
+    for (let col = 0; col < SHOP_RECLUSE_N; col++) {
+      const c = cv(T, T);
+      for (let y = 0; y < T; y++) for (let x = 0; x < T; x++) c[y]![x] = floorPx(col * T + x, row * T + y, light);
+      out.push({ name: `floor-${col}-${row}`, sq: [1, 1], w: T, h: T, foot: [18, 18], frames: [[whole(c)]], ms: 1000 });
+    }
+  return out;
+}
+for (const p of floorTiles("day")) PIECES[p.name] = p;
 
 // ==== The walls: faded cream wallpaper, little blue sailboats on it in rows, over a white baseboard and under a dark picture rail.
 
@@ -223,32 +306,68 @@ function paper(seed: number, w = T): Cv {
 const wallDef = (name: string, c: Cv, w = 1) => def(name, [w, 1], w * T, WALL_H, w === 1 ? WF : [Math.floor((w * T) / 2), WALL_H - 1], [[whole(c)]]);
 for (let i = 0; i < 4; i++) wallDef(`wall-${i}`, paper(i + 1));
 
-/** The window (2 squares): a white double-hung sash, gingham curtains, the sky and the brick across the street, the sun gleaming in. */
-{
+/**
+ * The window (2 squares): a white double-hung sash, gingham curtains, the view across the street, its light by the time of day. Day: the
+ * sky, the brick building across the street, the sun gleaming in at the top left, glints on the glass. Dusk: the sun's glow low over the
+ * roofline, a window lit across the street. Night (Eric, Nov 14: "like a moon at night"): the moon at the top right, a few stars, two
+ * windows lit across the street, no glints.
+ */
+function windowPiece(light: RoomLight): Piece {
   const W = 2 * T;
   const c = paper(9, W);
   const x0 = 13;
   const x1 = W - 14;
   const y0 = 26;
   const y1 = 96;
-  // The view: sky, then the brick building across the street (its windows), the sun's glare at the top left.
+  // (The lit windows across the street: [column, row] of their grid.)
+  const lit = light === "night" ? ["0,1", "2,0"] : light === "dusk" ? ["2,0"] : [];
+  // The view: sky, then the brick building across the street (its windows).
   for (let y = y0; y < y1; y++)
     for (let x = x0; x < x1; x++) {
-      let k = y < y0 + 18 ? "S" : y < y0 + 30 ? "t" : "s";
+      let k = y < y0 + 18 ? "<" : y < y0 + 30 ? ">" : "^";
       if (y > y0 + 34) {
-        const brick = (y - y0) % 4 === 0 || ((x + (((y - y0) >> 2) % 2) * 3) % 6 === 0 && (y - y0) % 4 !== 0) ? "C" : "B";
+        const brick = (y - y0) % 4 === 0 || ((x + (((y - y0) >> 2) % 2) * 3) % 6 === 0 && (y - y0) % 4 !== 0) ? "=" : "#";
         k = brick;
         const wx = (x - x0) % 16;
         const wy = (y - y0 - 40) % 18;
-        if (wx > 4 && wx < 11 && wy > 2 && wy < 13) k = wy < 5 ? "t" : "s";
+        if (wx > 4 && wx < 11 && wy > 2 && wy < 13) {
+          const on = lit.includes(`${Math.floor((x - x0) / 16)},${Math.floor((y - y0 - 40) / 18)}`);
+          k = on ? (wy < 5 ? ";" : ":") : wy < 5 ? "~" : "!";
+        }
       }
-      if (Math.hypot(x - (x0 + 8), y - (y0 + 6)) < 9) k = Math.hypot(x - (x0 + 8), y - (y0 + 6)) < 5 ? "Y" : "y";
       c[y]![x] = k;
     }
-  // Sun glints on the glass: two diagonal streaks.
-  for (let i = 0; i < 26; i++) {
-    put(c, x0 + 14 + i, y0 + 4 + i, "Y");
-    put(c, x0 + 18 + i, y0 + 4 + i, "t");
+  if (light === "day") {
+    // The sun's glare at the top left; two glints streaking down the glass.
+    for (let y = y0; y < y0 + 16; y++)
+      for (let x = x0; x < x0 + 18; x++) {
+        const d = Math.hypot(x - (x0 + 8), y - (y0 + 6));
+        if (d < 9) c[y]![x] = d < 5 ? "*" : "%";
+      }
+    for (let i = 0; i < 26; i++) {
+      put(c, x0 + 14 + i, y0 + 4 + i, "&");
+      put(c, x0 + 18 + i, y0 + 4 + i, "@");
+    }
+  } else if (light === "dusk") {
+    // The sun gone behind the roofs: its glow low on the left over the roofline; one faint glint.
+    for (let y = y0 + 20; y <= y0 + 34; y++)
+      for (let x = x0; x < x0 + 22; x++) {
+        const d = Math.hypot((x - (x0 + 7)) * 0.8, y - (y0 + 35));
+        if (d < 12) c[y]![x] = d < 6 ? "*" : "%";
+      }
+    for (let i = 0; i < 20; i++) put(c, x0 + 20 + i, y0 + 6 + i, "@");
+  } else {
+    // The moon, high on the right (a bright disc with a few grey marks and a pale ring round it); stars, a few bright, a few dim.
+    const mx = x1 - 11;
+    const my = y0 + 9;
+    for (let y = my - 7; y <= my + 7; y++)
+      for (let x = mx - 7; x <= mx + 7; x++) {
+        const d = Math.hypot(x - mx, y - my);
+        if (d < 4.6) c[y]![x] = "*";
+        else if (d < 5.6) c[y]![x] = "%";
+      }
+    for (const [dx, dy] of [[-1, -1], [1, 1], [2, -2], [-2, 2]] as const) put(c, mx + dx, my + dy, ",");
+    for (const [x, y, k] of [[x0 + 4, y0 + 4, "&"], [x0 + 11, y0 + 13, "@"], [x0 + 17, y0 + 3, "@"], [x0 + 23, y0 + 9, "&"], [x0 + 6, y0 + 22, "@"], [x0 + 15, y0 + 27, "&"], [x1 - 6, y0 + 23, "@"], [x0 + 26, y0 + 20, "@"]] as const) put(c, x, y, k);
   }
   // The frame and the sash: white, its shade; the meeting rail across the middle; the sill.
   rect(c, x0 - 3, y0 - 3, x1 - x0 + 6, 3, "F");
@@ -268,7 +387,7 @@ for (let i = 0; i < 4; i++) wallDef(`wall-${i}`, paper(i + 1));
   const ging = (x: number, y: number) => (((x >> 1) + (y >> 1)) % 2 ? ((x >> 1) % 2 ? "r" : "q") : (x >> 1) % 2 ? "R" : "r");
   for (const side of [-1, 1] as const)
     for (let y = y0 - 2; y < y1 + 12; y++) {
-      const wid = 9 + Math.round(3 * Math.sin((y - y0) / 10)) - (y > y1 - 10 ? 0 : 0);
+      const wid = 9 + Math.round(3 * Math.sin((y - y0) / 10));
       for (let i = 0; i < wid; i++) {
         const x = side < 0 ? x0 - 8 + i : x1 + 8 - i;
         put(c, x, y, ging(x, y));
@@ -277,8 +396,9 @@ for (let i = 0; i < 4; i++) wallDef(`wall-${i}`, paper(i + 1));
   for (let y = y0 - 8; y < y0 + 3; y++) for (let x = x0 - 9; x < x1 + 9; x++) put(c, x, y, ging(x, y));
   for (let x = x0 - 9; x < x1 + 9; x += 3) put(c, x, y0 + 3, "R");
   rect(c, x0 - 10, y0 - 9, x1 - x0 + 20, 1, "W");
-  def("window", [2, 1], W, WALL_H, [37, WALL_H - 1], [[whole(c)]]);
+  return { name: "window", sq: [2, 1], w: W, h: WALL_H, foot: [37, WALL_H - 1], frames: [[whole(c)]], ms: 1000 };
 }
+PIECES.window = windowPiece("day");
 
 /** The poster (on its panel): a red-finned rocket climbing over a ringed planet in a starry sky; four thumbtacks; no words. */
 {
@@ -590,3 +710,45 @@ export const SHOP_RECLUSE_SCENE = {
 export const SHOP_RECLUSE_STANDING = [{ c: 3, r: 3 }, { c: 4, r: 3 }, { c: 5, r: 3 }, { c: 3, r: 4 }, { c: 4, r: 4 }, { c: 5, r: 4 }, { c: 3, r: 5 }, { c: 4, r: 5 }, { c: 5, r: 5 }] as const;
 /** The camera's fixed look at the town's zoom (a small room seen whole). */
 export const SHOP_RECLUSE_CAM = { x: 4.0, y: 3.2 } as const;
+
+/** A room's light by the time of day: its pieces, its lights and pools, and its wash (RoomArt's `dim`, `dimRGB`; none by day). */
+export interface RecluseLit {
+  pieces: Readonly<Record<string, Character>>;
+  lights: readonly (LightSpot & { piece: string })[];
+  pools: readonly (LightPool & { piece: string })[];
+  dim?: number;
+  dimRGB?: string;
+}
+/**
+ * The window's light and the room's wash, by the time of day. Dusk: the glass's glow and the pool a warm orange, the pool further out
+ * along the longer panes, a light warm wash. Night: the moon's pale cool glow, a dim pool, a gentle blue wash (the child, his board and
+ * the rug still easy to see: the lights go on over it).
+ */
+const LIGHT_OF: Readonly<Record<Exclude<RoomLight, "day">, Omit<RecluseLit, "pieces">>> = {
+  dusk: {
+    lights: [{ piece: "window", x: 14, y: 27, w: 46, h: 68, color: "#ffb47a", strength: 0.32, halo: 40 }],
+    pools: [{ piece: "window", x: 60, y: WALL_H + 92, rx: 56, ry: 42, color: "#ffa868", strength: 0.24 }],
+    dim: 0.16,
+    dimRGB: "70,32,40",
+  },
+  night: {
+    lights: [{ piece: "window", x: 14, y: 27, w: 46, h: 68, color: "#c4d2ff", strength: 0.3, halo: 36 }],
+    pools: [{ piece: "window", x: 48, y: WALL_H + 58, rx: 44, ry: 26, color: "#aebfff", strength: 0.16 }],
+    dim: 0.3,
+    dimRGB: "14,20,52",
+  },
+};
+const LIT = new Map<RoomLight, RecluseLit>();
+/** The room at one time of day (sky.ts `roomLight`): made the first time it's asked for, then kept. */
+export function recluseLit(light: RoomLight): RecluseLit {
+  let l = LIT.get(light);
+  if (l) return l;
+  if (light === "day") l = { pieces: SHOP_RECLUSE_PIECES, lights: SHOP_RECLUSE_LIGHTS, pools: SHOP_RECLUSE_POOLS };
+  else {
+    const palette = { ...PALETTE, ...LIGHT_PALETTE[light] };
+    const own = [...floorTiles(light), windowPiece(light)];
+    l = { ...LIGHT_OF[light], pieces: { ...SHOP_RECLUSE_PIECES, ...Object.fromEntries(own.map((p) => [p.name, toChar(p, palette)])) } };
+  }
+  LIT.set(light, l);
+  return l;
+}

@@ -17,6 +17,7 @@ import type { Character, Frame, Part } from "../../characters/sprite.ts";
 import type { LightPool, LightSpot } from "../houses/kit.ts";
 import { cv, ellipse, face, hash, line, put, rect, shadow, type Cv, type Pt } from "./paper-kit.ts";
 import type { ShopPlace } from "./room.ts";
+import type { RoomLight } from "../sky.ts";
 
 const T = 37;
 /** Each room's size in squares, each way (`RoomArt.n`). */
@@ -65,6 +66,10 @@ const PALETTE: Record<string, string> = {
   v: "#9c6a42",
   // The sconce's glow.
   L: "#ffe2a0",
+  // The landing's window over the airshaft: the light from above, the next building's brick close outside, its mortar.
+  A: "#b6c1c7",
+  B: "#8d9aa3",
+  C: "#4a443e",
   // Shadows on the floor (see-through): core, rim.
   "-": "#1a0e0866",
   "+": "#1a0e0833",
@@ -80,7 +85,7 @@ interface Piece {
   frames: Bit[][];
 }
 const PIECES: Record<string, Piece> = {};
-function toChar(p: Piece): Character {
+function toChar(p: Piece, palette: Record<string, string> = PALETTE): Character {
   const parts: Record<string, Part> = {};
   const frames: Frame[] = p.frames.map((bits, f) => ({
     ms: 1000,
@@ -90,7 +95,7 @@ function toChar(p: Piece): Character {
       return { part: n, x: b.at[0], y: b.at[1] };
     }),
   }));
-  return { id: `shop-recluse-${p.name}`, name: `The walk-up: ${p.name}`, w: p.w, h: p.h, foot: p.foot, palette: PALETTE, parts, anims: { idle: { loop: true, frames } } };
+  return { id: `shop-recluse-${p.name}`, name: `The walk-up: ${p.name}`, w: p.w, h: p.h, foot: p.foot, palette, parts, anims: { idle: { loop: true, frames } } };
 }
 function def(name: string, sq: readonly [number, number], w: number, h: number, foot: Pt, c: Cv, outline = false): void {
   PIECES[name] = { name, sq, w, h, foot, frames: [[{ part: { grid: c.map((r) => r.join("")), outline }, at: [0, 0] }]] };
@@ -222,7 +227,7 @@ def("wall-none", [1, 1], 1, 1, [0, 0], cv(1, 1));
   const x0 = 6;
   const w = T - 12;
   rect(c, x0 - 2, 18, w + 4, 50, "F");
-  for (let y = 20; y < 66; y++) for (let x = x0; x < x0 + w; x++) c[y]![x] = y < 30 ? "G" : (y % 4 === 0 || (x + ((y >> 2) % 2) * 3) % 6 === 0 ? "4" : "g");
+  for (let y = 20; y < 66; y++) for (let x = x0; x < x0 + w; x++) c[y]![x] = y < 30 ? "A" : (y % 4 === 0 || (x + ((y >> 2) % 2) * 3) % 6 === 0 ? "C" : "B");
   rect(c, x0, 42, w, 2, "F");
   rect(c, x0 + w / 2, 20, 1, 46, "F");
   rect(c, x0 - 3, 66, w + 6, 3, "w");
@@ -385,3 +390,49 @@ export const RECLUSE_HALL_CAM = { x: 3.0, y: 2.6 } as const;
 /** The squares where each room's flats' doors are talked to (shops.ts RECLUSE_ROOMS: `talkAt`), in front of each. */
 export const RECLUSE_HALL_TALK = [{ c: 1, r: 1 }, { c: 3, r: 1 }] as const;
 export const RECLUSE_LANDING_TALK = [{ c: 1, r: 1 }] as const;
+
+/**
+ * The walk-up's glass by the time of day (Nov 14, as his room's: recluse-art.ts `recluseLit`): the street door's glass (`s`, `S`) and the
+ * landing's window over the airshaft (`A`, `B`, `C`) recolored; the sconces stay lit. Dusk: the glass warm, the light low. Night: the
+ * street dark blue through the door, the airshaft near black, the brick barely there; a gentle wash over the room, the sconce over it.
+ */
+const LIGHT_PALETTE: Readonly<Record<Exclude<RoomLight, "day">, Readonly<Record<string, string>>>> = {
+  dusk: { s: "#f6c9a0", S: "#d89a86", A: "#e0a98c", B: "#7c6a6c", C: "#4a3a3a" },
+  night: { s: "#2c3a66", S: "#1c2648", A: "#2a3558", B: "#1b2030", C: "#11141f" },
+};
+/** Each room's lights and wash by the time of day (the day's: as above). */
+const LIGHT_OF: Readonly<Record<Exclude<RoomLight, "day">, { hall: readonly (LightSpot & { piece: string })[]; landing: readonly (LightSpot & { piece: string })[]; dim: number; dimRGB: string }>> = {
+  dusk: {
+    hall: [RECLUSE_HALL_LIGHTS[0]!, { ...RECLUSE_HALL_LIGHTS[1]!, color: "#ffc896", strength: 0.28 }],
+    landing: [RECLUSE_LANDING_LIGHTS[0]!, { ...RECLUSE_LANDING_LIGHTS[1]!, color: "#ffcaa0", strength: 0.2 }],
+    dim: 0.1,
+    dimRGB: "60,30,36",
+  },
+  night: {
+    hall: [RECLUSE_HALL_LIGHTS[0]!, { ...RECLUSE_HALL_LIGHTS[1]!, color: "#8ea4e0", strength: 0.12 }],
+    landing: [RECLUSE_LANDING_LIGHTS[0]!, { ...RECLUSE_LANDING_LIGHTS[1]!, color: "#8a9cd0", strength: 0.08 }],
+    dim: 0.24,
+    dimRGB: "14,20,52",
+  },
+};
+/** The hall and the landing at one time of day: their pieces (both rooms'), each room's lights, the wash (none by day). */
+export interface RecluseStairsLit {
+  pieces: Readonly<Record<string, Character>>;
+  hall: readonly (LightSpot & { piece: string })[];
+  landing: readonly (LightSpot & { piece: string })[];
+  dim?: number;
+  dimRGB?: string;
+}
+const LIT = new Map<RoomLight, RecluseStairsLit>();
+/** The walk-up's hall and landing at one time of day (sky.ts `roomLight`): made the first time it's asked for, then kept. */
+export function recluseStairsLit(light: RoomLight): RecluseStairsLit {
+  let l = LIT.get(light);
+  if (l) return l;
+  if (light === "day") l = { pieces: RECLUSE_STAIRS_PIECES, hall: RECLUSE_HALL_LIGHTS, landing: RECLUSE_LANDING_LIGHTS };
+  else {
+    const palette = { ...PALETTE, ...LIGHT_PALETTE[light] };
+    l = { ...LIGHT_OF[light], pieces: { ...RECLUSE_STAIRS_PIECES, entrance: toChar(PIECES.entrance!, palette), window: toChar(PIECES.window!, palette) } };
+  }
+  LIT.set(light, l);
+  return l;
+}
