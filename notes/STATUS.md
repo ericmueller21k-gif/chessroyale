@@ -1166,3 +1166,7 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   no conflict between them (merge-tree clean). Merge each when green; the second merges main first if needed. No helpers running.
   Left: shop:238 (proposal: reading-window check), town-chat:1367/1370, fairplay:65, alfil:247, town-street:155; the 🏆 button words
   online; subscribe-in-useEffect gap.
+- Nov 14 17:30: #714 polish MERGED bde84fc5 (live 16:59). #715 flaky round 5 MERGED 7993f4fc (main merged in first, CI green no retries).
+  Main full run watcher running (covers both). No helpers. Left: shop:238 (reading-window proposal), town-chat:1367/1370, fairplay:65,
+  alfil:247, town-street:155; the 🏆 button's words online; subscribe-in-useEffect gap. Pending Eric: Fill-also-challenges, CI trace,
+  #713/#714 guard-test calls (room-rule checks unchanged; phase 2 bits reordered / ✓).
