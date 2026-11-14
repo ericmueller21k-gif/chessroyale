@@ -225,3 +225,9 @@ lead in the song, 2 dB over the clarinet). The music box there "sounds a little 
 melodic with the song": `struck("box")` has an overtone at 2.5 times its note (a major third, two octaves up), fine in
 a tune of its own, sour over minor chords; and its notes were picked from each chord by rule and not swung. Over
 chords, use a bell whose overtones are the note's own harmonics, and write it a line.
+Then his own piano solo for the middle (he played it and sent a write-up: his left hand's patterns, a right-hand
+solo written over them): "you're going to just transcribe exactly what it tells you to do ... keep that like quiet
+background thing ... this part, we just want to focus on the piano ... if it needs to be longer to fit it in, that's
+what I'm expecting". His own material is his to give: it is played note for note, and song_ad.py's docstring says
+which notes are his and what was decided in fitting it (the song's 129 not the write-up's 98, no swing for its twenty
+bars, where two runs sit, its place in the middle with the cafe moved after the lifted tune). The song is 3:36 now.
