@@ -1028,3 +1028,5 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   helper (session_01JuCWRrjGQAogSBc7ZTCeKR, high) on claude/town-leave-everywhere: confirm "Leave Chess Town?" from inside
   buildings too (Eric's new ask) + the town-leave:148 flake (guard edits OK'd). #690 (CLAUDE.md: commits name no model) in CI.
   Running Opus: 2 (both high). Check-in 00:35 covers both.
+- Nov 14 00:05: QUEUED (next free Opus slot): notes/briefs/recluse-room-night.md (his building follows the town's time of day:
+  moon at night; Eric's screenshot of the sunny child's room). Opus high.
