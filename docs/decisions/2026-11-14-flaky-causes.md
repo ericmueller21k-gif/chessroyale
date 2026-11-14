@@ -19,3 +19,6 @@ test of `docs/rules/eric.md` (Eric's OK needed), it's written up in the PR inste
 - Guard tests, written up only: town-street:226 (the phone's `touchscreen.tap` sends its start and end apart; a frame between them
   on CI's software WebGL can outlast `streetHoldMs`, making the tap a run: the likeliest cause, not proven) and hidden-boss-room:242 (fixed in the game, above).
 - Not reproduced, no failing log found: friends:40 (10/10 locally), desktop-board:260 (only Nov 10's, fixed then by #604).
+- Round 2: boss-side:204 (a line said before the resize event set its room: `settled()` first; main 1/10, now 10/10) and
+  public-profile:64 (the mockup's times computed at import, a midnight before the test ran: computed at use). fairplay:65 (a guard)
+  not reproduced (10/10), written up only.
