@@ -309,6 +309,14 @@ Tests check *what* ends up on the screen, not *how it gets there*, nor how long 
   - A route handler's `route.fetch()` is Node's, not the browser's: a reset kept-alive connection to the local server comes back
     ECONNRESET where a browser would send the request again. It tries once more.
 
+- **The flaky causes of Nov 14** (`docs/decisions/2026-11-14-flaky-round3.md`):
+  - A gesture is judged on the input's own times (`e.timeStamp`), at every step: a frame's check on `performance.now()` can run before
+    a release that already happened. Check what the tool really sends before blaming it (Playwright's tap sends start and end together).
+  - A hook that subscribes in `useEffect` misses a change between its render and the effect: compare with what the render read and
+    draw it then (`useServerStatus`, `useAccount`).
+  - CI's trace is of the retry (`--trace on-first-retry`): for a retry-pass it shows the run that passed. The failure's own record is
+    its error-context page snapshot; read that first.
+
 ## Eric's rules hold
 
 - **An options panel that disappeared** (Oct 25, [story](../docs/history/lessons.md#an-options-panel-that-disappeared-oct-25-2026)):

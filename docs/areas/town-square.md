@@ -123,7 +123,9 @@ before the rows are laid (`street.ts lotHere`), so each row fills the place with
   look-around drag. No sound and no vibration (Eric). A small gold ring marks your destination until you arrive. As you
   run you leave about three soft white droplets on the squares you leave, fading out in about half a second (yours only); on a
   ride with a trail, its own mark instead (Nov 1: "Rides", below).
-  All their numbers are in `feel.ts`.
+  All their numbers are in `feel.ts`. Every gesture is judged on the touch's own times (Nov 14): a frame that runs while a quick tap's
+  release still waits in the queue makes it a run (`press.hold`), but the release, stamped before `streetHoldMs`, makes it a tap again,
+  on what the finger pressed (`downHit`: the run had moved the camera, not the finger). `docs/decisions/2026-11-14-flaky-round3.md`.
 - **One pawn a square, like chess** (`world.ts`): a walk may pass through people, but nobody ends on a square someone
   stands on or is headed for (`taken`: a walker's goal). A free square is its own end; a taken one, a person or a boss
   ends you on the nearest free square beside it (`spotNear`: the 8 squares round it, then the next ring out, and in a
