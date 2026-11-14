@@ -1,5 +1,5 @@
 import { mkdirSync, readFileSync, statSync } from "node:fs";
-import { expect, type Page } from "@playwright/test";
+import { expect, type Page, type Route } from "@playwright/test";
 import { RECLUSE_MUSIC } from "@chessroyale/core";
 import { asAdmin, test } from "./helpers.ts";
 
@@ -428,13 +428,16 @@ test("/town?report (Eric, Nov 11): it waits for your first move, records 3 s of 
 test("the town's loading screen (Eric, Nov 11: \"loads it all in at once and then it stays there\"): its bar fills and goes, then walking and a full turn paint nothing new and start no atlas page again", { tag: "@phone-only" }, async ({ page }) => {
   type R = { __townReport: () => { state: string; summary: { frames: number; bakes: number; resets: number } | null } | null; __townHeading: (d: number | null) => void; __townWalk: (s: readonly [number, number]) => boolean; __townPaint: () => { loading: boolean; resets: number; atlas: { kept: number; keptPages: number; unkept: number } } };
   const errors = watchErrors(page);
-  const bar = page.locator(".town-loading").getByRole("progressbar", { name: "Building the town" });
-  // The bar's share as it shows (sampled every frame until it goes): it only goes up.
+  const bar = page.locator(".town-loading").getByRole("progressbar", { name: "Loading Chess Town" });
+  // The bar's share as it shows (sampled every frame until it goes): it only goes up. And the step named under it (Nov 14), each new one.
   await page.addInitScript(() => {
     const seen: number[] = ((window as unknown as { __bar: number[] }).__bar = []);
+    const steps: string[] = ((window as unknown as { __steps: string[] }).__steps = []);
     const f = () => {
       const v = document.querySelector(".town-loading [role=progressbar]")?.getAttribute("aria-valuenow");
       if (v !== null && v !== undefined) seen.push(Number(v));
+      const step = document.querySelector(".town-loading .boss-loading-note")?.textContent;
+      if (step && steps.at(-1) !== step) steps.push(step);
       requestAnimationFrame(f);
     };
     requestAnimationFrame(f);
@@ -447,6 +450,7 @@ test("the town's loading screen (Eric, Nov 11: \"loads it all in at once and the
   const shares = await page.evaluate(() => (window as unknown as { __bar: number[] }).__bar);
   expect(shares.length, "the bar showed").toBeGreaterThan(0);
   expect(shares.every((v, i) => i === 0 || v >= shares[i - 1]!), `the bar only goes up: ${shares.join(",")}`).toBe(true);
+  expect(await page.evaluate(() => (window as unknown as { __steps: string[] }).__steps), "its steps, named in order").toEqual(["Loading the town's pictures…", "Building the town…"]);
   const paint = await page.evaluate(() => (window as unknown as R).__townPaint());
   expect(paint.loading).toBe(false);
   expect(paint.atlas.kept, "the town's pictures kept").toBeGreaterThan(1000);
@@ -479,44 +483,58 @@ test("the town's loading screen (Eric, Nov 11: \"loads it all in at once and the
   expect(errors).toEqual([]);
 });
 
-test("the town's loading fetches every boss theme once and decodes none (Eric, Nov 12: \"loading music in the loading bar\"), but the Hidden Boss's (Nov 13: fetched as his fight starts); Music off fetches none", { tag: "@phone-only" }, async ({ page }) => {
-  const dir = "packages/app/public/music";
-  const themes = JSON.parse(readFileSync(`${dir}/themes.json`, "utf8")) as { themes: Record<string, { intro: string | null; loop: string }> };
-  const hidden: string[] = Object.values(RECLUSE_MUSIC);
-  const names = Object.entries(themes.themes)
-    .filter(([k]) => !hidden.includes(k))
-    .flatMap(([, t]) => (t.intro ? [t.intro, t.loop] : [t.loop]));
-  const sizes = names.map((n) => statSync(`${dir}/${n}.mp3`).size);
-  // (Every decode's size: a theme's would be its file's.)
-  await page.addInitScript(() => {
-    const w = window as unknown as { __soundLog: string[]; __decoded: number[] };
-    w.__soundLog = [];
-    w.__decoded = [];
-    const dec = AudioContext.prototype.decodeAudioData;
-    AudioContext.prototype.decodeAudioData = function (this: AudioContext, b: ArrayBuffer, ...rest: unknown[]) {
-      w.__decoded.push(b.byteLength);
-      return (dec as (...a: unknown[]) => Promise<AudioBuffer>).call(this, b, ...rest);
-    } as typeof dec;
+// (Its own service worker blocked: page.route sees only what the page fetches itself, never what a worker answers.)
+test.describe(() => {
+  test.use({ serviceWorkers: "block" });
+  test("the town's first frame doesn't wait for the music (Eric, Nov 14: \"christ it's taking forever\"); then every boss theme is fetched once, one piece at a time, none decoded, but the Hidden Boss's (fetched as his fight starts); Music off fetches none", { tag: "@phone-only" }, async ({ page }) => {
+    const dir = "packages/app/public/music";
+    const themes = JSON.parse(readFileSync(`${dir}/themes.json`, "utf8")) as { themes: Record<string, { intro: string | null; loop: string }> };
+    const hidden: string[] = Object.values(RECLUSE_MUSIC);
+    const names = Object.entries(themes.themes)
+      .filter(([k]) => !hidden.includes(k))
+      .flatMap(([, t]) => (t.intro ? [t.intro, t.loop] : [t.loop]));
+    const sizes = names.map((n) => statSync(`${dir}/${n}.mp3`).size);
+    // (Every decode's size: a theme's would be its file's.)
+    await page.addInitScript(() => {
+      const w = window as unknown as { __soundLog: string[]; __decoded: number[] };
+      w.__soundLog = [];
+      w.__decoded = [];
+      const dec = AudioContext.prototype.decodeAudioData;
+      AudioContext.prototype.decodeAudioData = function (this: AudioContext, b: ArrayBuffer, ...rest: unknown[]) {
+        w.__decoded.push(b.byteLength);
+        return (dec as (...a: unknown[]) => Promise<AudioBuffer>).call(this, b, ...rest);
+      } as typeof dec;
+    });
+    const gets: string[] = [];
+    page.on("request", (r) => void (/^\/music\/.*\.mp3$/.test(new URL(r.url()).pathname) && gets.push(new URL(r.url()).pathname)));
+    // Every piece held (never answered) until released: the town must draw its first frame all the same.
+    const held: Route[] = [];
+    let release = false;
+    await page.route(/\/music\/.*\.mp3$/, (route) => void (release ? route.continue() : held.push(route)));
+    await asAdmin(page);
+    await page.goto("/town?sky=day");
+    await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
+    // Then, in the background, one piece at a time: the first held, no second asked for meanwhile.
+    await expect.poll(() => held.length, { timeout: 15_000 }).toBe(1);
+    await page.waitForTimeout(1000);
+    expect(held.length, "one piece at a time").toBe(1);
+    release = true;
+    for (const r of held.splice(0)) await r.continue();
+    await expect.poll(() => gets.length, { timeout: 30_000 }).toBe(names.length);
+    await page.waitForTimeout(1000);
+    expect(gets.sort(), "each theme's pieces, once").toEqual(names.map((n) => `/music/${n}.mp3`).sort());
+    const decoded = await page.evaluate(() => (window as unknown as { __decoded: number[] }).__decoded);
+    expect(decoded.filter((b) => sizes.includes(b)), "no theme decoded").toEqual([]);
+    const log = await page.evaluate(() => (window as unknown as { __soundLog: string[] }).__soundLog);
+    expect(log.filter((l) => l.startsWith("music:load")), "no theme loaded to play").toEqual([]);
+    // Music off (Settings → Sound): none fetched.
+    await page.evaluate(() => localStorage.setItem("brc.music", "0"));
+    gets.length = 0;
+    await page.reload();
+    await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
+    await page.waitForTimeout(3000);
+    expect(gets, "Music off: nothing fetched").toEqual([]);
   });
-  const gets: string[] = [];
-  page.on("request", (r) => void (/^\/music\/.*\.mp3$/.test(new URL(r.url()).pathname) && gets.push(new URL(r.url()).pathname)));
-  await asAdmin(page);
-  await page.goto("/town?sky=day");
-  await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
-  await expect.poll(() => gets.length, { timeout: 15_000 }).toBe(names.length);
-  await page.waitForTimeout(1000);
-  expect(gets.sort(), "each theme's pieces, once").toEqual(names.map((n) => `/music/${n}.mp3`).sort());
-  const decoded = await page.evaluate(() => (window as unknown as { __decoded: number[] }).__decoded);
-  expect(decoded.filter((b) => sizes.includes(b)), "no theme decoded").toEqual([]);
-  const log = await page.evaluate(() => (window as unknown as { __soundLog: string[] }).__soundLog);
-  expect(log.filter((l) => l.startsWith("music:load")), "no theme loaded to play").toEqual([]);
-  // Music off (Settings → Sound): the town's loading fetches none.
-  await page.evaluate(() => localStorage.setItem("brc.music", "0"));
-  gets.length = 0;
-  await page.reload();
-  await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
-  await page.waitForTimeout(1500);
-  expect(gets, "Music off: nothing fetched").toEqual([]);
 });
 
 /**

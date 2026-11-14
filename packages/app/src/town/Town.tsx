@@ -43,7 +43,7 @@ import { openProfile } from "../profile-nav.ts";
 import { account, myPawnColor, onAccountChange, playerName } from "../account.ts";
 import { TOWN_ASKED, testSwitchesAllowed } from "../test-switches.ts";
 import { play, warmSounds } from "../sound.ts";
-import { musicWanted, preloadMusic, roomMusic, roomMusicLoad, splashDone, splashMusic } from "../music.ts";
+import { preloadMusic, roomMusic, roomMusicLoad, splashDone, splashMusic } from "../music.ts";
 import { AreaBanner, areaBannerOf, type AreaBannerText } from "./AreaBanner.tsx";
 import { SELECT_SOUND, TOWN_SOUNDS, townSound } from "../characters/boss-select.ts";
 import { N, colI, newPt, proj, rel, rowI, wrapFX, wrapFY, wrapI } from "./camera.ts";
@@ -195,8 +195,8 @@ export function TownScreen({
   const loadBar = useRef<HTMLElement>(null);
   /** The street town can't run here (no WebGL 2), or didn't load even after a reload (startTown's `onFail`; gl-fail.ts): a plain message in its box. */
   const [broken, setBroken] = useState<TownBroken | null>(null);
-  /** Its last step (Nov 12): the bosses' music still on its way once the town is built ("Loading music…"). */
-  const [loadingMusic, setLoadingMusic] = useState(false);
+  /** The step it's on, named under its title (Eric, Nov 14: "what happened to it showing what it's downloading?"): `LOAD_STEPS`. */
+  const [loadStep, setLoadStep] = useState<LoadStep>("pictures");
   useLayoutEffect(() => {
     if (!gated) return;
     // (No key reaches the town or a room under the pop-up: the arrow keys would walk you on.)
@@ -610,13 +610,13 @@ export function TownScreen({
     const t = startTown(box.current!, canvas.current!, chips.current, cardEl.current!, live.current!, setZoomedOut, setCard, seatOf(seat), (s, face) => {
       const b = TOWN_BOTS[s.bot]!;
       onPlayBot?.({ seat: seatText(s), name: botLabel(b), rating: b.rating, look: isSprite(b.look) ? null : b.look.wear, face });
-    }, (id, x, y, challenge) => void goIn(id, x, y, challenge), stand, () => step("cancel"), (share, music) => {
+    }, (id, x, y, challenge) => void goIn(id, x, y, challenge), stand, () => step("cancel"), (share, step) => {
       if (share === null) {
         loaded = true;
         startGuest();
         return setLoading(false);
       }
-      if (music) setLoadingMusic(true);
+      if (step) setLoadStep(step);
       const bar = loadBar.current;
       if (bar) {
         bar.style.transform = `scaleX(${share})`;
@@ -928,9 +928,12 @@ export function TownScreen({
         {/* The street town's loading screen (Nov 11): the boss's loading card's look, its bar real progress. */}
         {loading && (
           <div class="boss-loading town-loading" role="status" aria-live="polite">
-            <strong class="boss-loading-title">{loadingMusic ? "Loading music…" : "Building the town…"}</strong>
-            <span class="boss-loading-bar" role="progressbar" aria-label="Building the town" aria-valuemin={0} aria-valuemax={100} aria-valuenow={0}>
+            <strong class="boss-loading-title">Loading Chess Town…</strong>
+            <span class="boss-loading-bar" role="progressbar" aria-label="Loading Chess Town" aria-valuemin={0} aria-valuemax={100} aria-valuenow={0}>
               <i ref={loadBar} />
+            </span>
+            <span class="boss-loading-note" data-step={loadStep}>
+              {LOAD_STEPS[loadStep]}
             </span>
           </div>
         )}
@@ -1009,6 +1012,15 @@ export const GATE_FREE = "It's free.";
 export const GATE_YOUNG = "Accounts are for players 13 and older.";
 
 /** The on-screen arrows: their directions, and their chevrons (12 × 12, the stroke in the key's color). */
+/**
+ * The town's loading screen's steps, named under its title (Eric, Nov 14: "what happened to it showing what it's downloading? Like
+ * loading the sprites, music etc."), in order; the bar moves through them (`loadTown`). "pictures": every picture painted, the
+ * sidekicks' sheets downloaded (`TOWN_FEEL.loadPaintShare` of the bar); "building": the pictures put on the GPU for good. (The music
+ * is no step since Nov 14: it comes after the first frame.)
+ */
+const LOAD_STEPS = { pictures: "Loading the town's pictures…", building: "Building the town…" } as const;
+type LoadStep = keyof typeof LOAD_STEPS;
+
 const ARROW_KEYS: readonly Dir[] = ["up", "left", "down", "right"];
 const ARROW_CHEVRON: Readonly<Record<Dir, string>> = { up: "M2.8 7.6 6 4.4l3.2 3.2", down: "M2.8 4.4 6 7.6l3.2-3.2", left: "M7.6 2.8 4.4 6l3.2 3.2", right: "M4.4 2.8 7.6 6 4.4 9.2" };
 /** A press on an on-screen arrow holds its direction until it's let go (the pointer is captured, so a slide off it still ends it). */
@@ -1098,8 +1110,8 @@ function startTown(
   stand: Stand | null = null,
   /** A boss's challenge called off on the way to its door (a tap elsewhere walked you away). */
   onChallengeOff: () => void = () => {},
-  /** The loading screen's progress (0 to 1; `music`: its "Loading music…" step), then null once the town is loaded (`loadTown`). */
-  onLoading: (share: number | null, music?: boolean) => void = () => {},
+  /** The loading screen's progress (0 to 1) and the step it's on, then null once the town is loaded (`loadTown`). */
+  onLoading: (share: number | null, step?: LoadStep) => void = () => {},
   /** The street town can't run here (no WebGL 2), or didn't load again after its reload (gl-fail.ts): the town's box says so. */
   onFail: (why: TownBroken) => void = () => {},
 ) {
@@ -2330,7 +2342,7 @@ function startTown(
   const hookPaint = () => {
     if (!testSwitchesAllowed()) return null;
     const p = painter as Painter & { uploads?: number; resets?: number; stats?: () => unknown };
-    return { backend: painter.kind, drawCalls: painter.drawCalls, lost: painter.lost, uploads: p.uploads ?? 0, resets: p.resets ?? 0, atlas: p.stats?.() ?? null, loading, loadMs, loadPaintMs, loadMusicMs };
+    return { backend: painter.kind, drawCalls: painter.drawCalls, lost: painter.lost, uploads: p.uploads ?? 0, resets: p.resets ?? 0, atlas: p.stats?.() ?? null, loading, loadMs, loadPaintMs };
   };
   /** (Tests, the stills) What a tap at (x, y) in the box would do now: its key ("home:alfil", "sq:c,r", …), where you'd walk, its card's kind. */
   const hookPick = (x: number, y: number) => {
@@ -2371,40 +2383,31 @@ function startTown(
    * as they need (paint-gl.ts `keep`, `kept`), a slice a frame (`f.loadSliceMs`) so the bar moves: painting its first share
    * (`f.loadPaintShare`), uploading the rest. The frames, and so the town's clock, start once it's done. Today's town (Canvas 2D) has
    * nothing to upload: it starts at once.
-   * The bosses' music (Eric, Nov 12: "loading music in the loading bar"): every theme fetched (not decoded: music.ts `preloadMusic`)
-   * from the start, beside the painting (the network beside the processor). Music wanted, the town takes the bar up to
-   * 1 - MUSIC.townShare and "Loading music…" the rest: what hasn't landed once the town is built, waited for at most MUSIC.townWaitMs
-   * (a slow network never holds the town long; the rest lands in the background, and a theme not in yet is fetched as it's needed).
+   * The bosses' music never holds it up (Eric, Nov 14: "christ it's taking forever"; 44 MB since that day's stereo 192 kbps, fetched
+   * beside the painting, took the network from the town's own files, then "Loading music…" waited up to 3 s more): every theme is
+   * fetched (not decoded: music.ts `preloadMusic`) in the background once the town has drawn its first frame, MUSIC.townPreloadAfterMs
+   * after it, one piece at a time. A theme not in yet is fetched as its battle or room needs it, as before.
    */
   const loadTown = async () => {
     const t0 = performance.now();
     const keep = (src: CanvasImageSource) => painter.keep?.(src);
     const tick = () => new Promise<void>((go) => requestAnimationFrame(() => go()));
-    const town = musicWanted() ? 1 - MUSIC.townShare : 1;
-    let musicShare = 0;
-    let musicIn = false;
-    void preloadMusic((s) => (musicShare = s)).then(() => (musicIn = true));
     // (Whatever goes wrong here, the town opens: what wasn't made is made as it shows, as before.)
     try {
       for (let share = 0; share < 1 && alive; ) {
         share = r.warm(f.loadSliceMs, keep);
-        onLoading(share * f.loadPaintShare * town);
+        onLoading(share * f.loadPaintShare, "pictures");
         await tick();
       }
       loadPaintMs = performance.now() - t0;
       for (let share = 0; share < 1 && alive; ) {
         share = painter.kept?.(f.loadSliceMs) ?? 1;
-        onLoading((f.loadPaintShare + (1 - f.loadPaintShare) * share) * town);
+        onLoading(f.loadPaintShare + (1 - f.loadPaintShare) * share, "building");
         if (share < 1) await tick();
       }
     } catch (e) {
       console.warn("town load:", e);
     }
-    const built = performance.now();
-    for (const until = built + MUSIC.townWaitMs; !musicIn && alive && performance.now() < until; await tick()) {
-      onLoading(town + (1 - town) * musicShare, true);
-    }
-    loadMusicMs = performance.now() - built;
     if (!alive) return;
     loadMs = performance.now() - t0;
     loading = false;
@@ -2420,11 +2423,11 @@ function startTown(
     if (lv) lv.at = Math.max(lv.at, performance.now() + f.botLeaveAfterGameMs);
     run();
     draw(performance.now());
+    // (The music after the first frame, in the background: see above.)
+    setTimeout(() => alive && void preloadMusic(), MUSIC.townPreloadAfterMs);
   };
   let loadMs = 0;
   let loadPaintMs = 0;
-  /** How long the town waited on the music once built (the "Loading music…" step). */
-  let loadMusicMs = 0;
   // (The street town failed as it started (its painter is Canvas 2D then): the loading card stays up until the page reloads, or the
   // message has replaced it. No frames ever run on a 2D painter.)
   if (loading) void loadTown();

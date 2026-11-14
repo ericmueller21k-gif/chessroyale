@@ -27,9 +27,11 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
   too, if it's in it), and the old one fades out over `MUSIC.handoffMs` from there, its context kept open that long
   ([decision](../decisions/2026-11-14-music-clean.md)). MP3 only, **stereo at a constant 192 kbps**
   (Nov 14, Eric: "fuck the filter and the compression"; mono 64 kbps Nov 12-14; about 3 MB a theme, 44 MB decoded for two minutes:
-  [decision](../decisions/2026-11-14-music-full-quality.md)). **Fetched during the town's
-  loading bar** (Nov 12, `preloadMusic`: every theme, fetched only, kept by the service worker; its last step "Loading music…",
-  `MUSIC.townShare`, waits at most `MUSIC.townWaitMs`, 3 s, once the town is built), never at app start, not precached; **decoded** when
+  [decision](../decisions/2026-11-14-music-full-quality.md)). **Fetched in the
+  background after the town's first frame** (Nov 12, `preloadMusic`: every theme, fetched only, one piece at a time, `MUSIC.townPreloadAfterMs`
+  after the first frame since Nov 14, never under the town's loading screen; kept by the service worker in `brc-music`, a cache every version
+  shares, each piece answered only while its contents' hash is the build's: a deploy fetches again only the songs it changed:
+  [decision](../decisions/2026-11-14-town-load-fast.md)), never at app start, not precached; **decoded** when
   the battle is picked (or its room or splash needs it), one theme at a time (`forgetTheme` after); late, it starts when it arrives.
   [Decision](../decisions/2026-11-12-music-mono-preload.md). **Music** in Settings → Sound and
   the match's options (on by default, per device, `brc.music`; greyed while Sound is off, which silences it too): off, or the page
