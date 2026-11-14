@@ -25,8 +25,8 @@ const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
 const easeOut = (u: number) => 1 - (1 - clamp01(u)) ** 3;
 /**
  * The light canvases' pixels per CSS pixel: their light is all soft, stretched sprites, so a third is plenty (Nov 14 review: at a
- * phone's 3, the slowed phone's frames went to 100 ms; their cost is their area, the rays up out of the book the most). The small,
- * sharp things (the beam's motes, his eyes' glow) have their own small canvas round him at the screen's own pixels (SHARP_BOX).
+ * phone's 3, the slowed phone's frames went to 100 ms; their cost is their area, the rays up out of the book the most). The beam's
+ * motes, small and sharp, have their own small canvas round him at the screen's own pixels (SHARP_BOX).
  */
 const LIGHT_DPR = 1 / 3;
 
@@ -141,8 +141,8 @@ function canvasesOn(s: Light, t: number, eyes: boolean) {
   if (s.white >= 1) return { back: false, front: false, sharp: false };
   return {
     back: s.pages > 0 || s.rays > 0 || s.shaft > 0 || s.slam > 0,
-    front: s.shaft > 0 || s.grow > 0 || s.radiate > 0 || s.down > 0 || s.slam > 0,
-    sharp: s.shaft > 0 || (eyes && t >= T.burstAt && t < T.whiteFull),
+    front: s.shaft > 0 || (eyes && t >= T.burstAt && t < T.whiteFull) || s.grow > 0 || s.radiate > 0 || s.down > 0 || s.slam > 0,
+    sharp: s.shaft > 0,
   };
 }
 /** Behind him: the pool on the board, the rays along it and up out of the book, the shaft. */
@@ -205,25 +205,11 @@ function drawBack(g: CanvasRenderingContext2D, s: Light, t: number, bx: number, 
   }
   g.restore();
 }
-/**
- * The sharp canvas's box round the book's middle, in squares (`k`): wide enough for the beam at its widest, as tall as its motes
- * rise (his head well inside it).
- */
+/** The motes' canvas's box round the book's middle, in squares (`k`): wide enough for the beam at its widest, as tall as they rise. */
 const SHARP_BOX = { left: -1.5, right: 1.5, top: -6, bottom: 0.2 } as const;
-/** The small, sharp light (on its own canvas, SHARP_BOX; `bx`, `by`: the book's middle, `eyes`: his, in its coordinates). */
-function drawSharp(g: CanvasRenderingContext2D, s: Light, t: number, bx: number, by: number, bw: number, eyes: readonly { x: number; y: number }[]) {
+/** The beam's motes, small and sharp (on their own canvas, SHARP_BOX; `bx`, `by`: the book's middle in its coordinates). */
+function drawSharp(g: CanvasRenderingContext2D, s: Light, t: number, bx: number, by: number, bw: number) {
   const k = bw / 8;
-  // His eyes, white and glowing, from the moment the light takes him.
-  if (eyes.length && t >= PHASE_CHANGE.burstAt && t < PHASE_CHANGE.whiteFull) {
-    const L = light();
-    g.imageSmoothingEnabled = true;
-    const e = Math.min(1, (t - PHASE_CHANGE.burstAt) / 200) * (0.85 + 0.15 * Math.sin(t / 70));
-    for (const p of eyes) {
-      const r = k * (0.22 + 0.1 * s.grow);
-      g.globalAlpha = e;
-      g.drawImage(L.glow, p.x - r, p.y - r, r * 2, r * 2);
-    }
-  }
   if (s.shaft <= 0) return;
   // The motes rising in the beam.
   g.fillStyle = "#fff6cf";
@@ -237,10 +223,10 @@ function drawSharp(g: CanvasRenderingContext2D, s: Light, t: number, bx: number,
   g.globalAlpha = 1;
 }
 /**
- * Over him: the bright core of the beam; the glow engulfing him; the light radiating out over the whole screen; the light dying
- * back into the center; the slam's flash. (The white-out itself: a layer of its own; the motes and his eyes: drawSharp.)
+ * Over him: the bright core of the beam; his white eyes' glow; the glow engulfing him; the light radiating out over the whole
+ * screen; the light dying back into the center; the slam's flash. (The white-out itself: a layer of its own; the motes: drawSharp.)
  */
-function drawFront(g: CanvasRenderingContext2D, s: Light, t: number, bx: number, by: number, bw: number, W: number, H: number, mid: { x: number; y: number }) {
+function drawFront(g: CanvasRenderingContext2D, s: Light, t: number, bx: number, by: number, bw: number, W: number, H: number, mid: { x: number; y: number }, eyes: readonly { x: number; y: number }[]) {
   const L = light();
   const k = bw / 8;
   g.save();
@@ -249,6 +235,15 @@ function drawFront(g: CanvasRenderingContext2D, s: Light, t: number, bx: number,
   if (s.shaft > 0) {
     const tall = k * 5.8 * s.shaft + (by + H * 0.3) * s.shoot;
     streak(g, L.shaft, bx, by, bx, by - tall, k * 1.1 * (1 + 1.8 * s.grow), 0, Math.min(1, 0.38 * s.shaft * (0.9 + 0.1 * Math.sin(t / 90)) * (1 + 1.4 * s.grow)));
+  }
+  // His eyes, white and glowing, from the moment the light takes him.
+  if (eyes.length && t >= PHASE_CHANGE.burstAt && t < PHASE_CHANGE.whiteFull) {
+    const e = Math.min(1, (t - PHASE_CHANGE.burstAt) / 200) * (0.85 + 0.15 * Math.sin(t / 70));
+    for (const p of eyes) {
+      const r = k * (0.22 + 0.1 * s.grow);
+      g.globalAlpha = e;
+      g.drawImage(L.glow, p.x - r, p.y - r, r * 2, r * 2);
+    }
   }
   // Engulfing him: a glow round him that grows till he's lost in it.
   if (s.grow > 0) {
@@ -344,8 +339,8 @@ export function RecluseTransform({ at, t, rect, computer, sceneStand }: { at: nu
       g.setTransform(dpr, 0, 0, dpr, 0, 0);
       g.clearRect(0, 0, w, h);
       if (f === "b") drawBack(g, s, t, bx, by, bw, H);
-      else if (f === "f") drawFront(g, s, t, bx, by, bw, W, H, mid);
-      else drawSharp(g, s, t, bx - sx, by - sy, bw, eyes.map((p) => ({ x: p.x - sx, y: p.y - sy })));
+      else if (f === "f") drawFront(g, s, t, bx, by, bw, W, H, mid, eyes);
+      else drawSharp(g, s, t, bx - sx, by - sy, bw);
     }
   });
   const px = (x: number) => `${x * 100}%`;
