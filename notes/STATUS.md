@@ -1082,3 +1082,8 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 14 03:30: main 6c8657e full run: red only on a retry-pass of fairplay:65 (Eric's ban guard; 3rd time seen: PR #695, now
   main). Flaky round 3 FIRST item: fairplay:65 (the snapshot shows the guest home instead of the landing after cookies+storage
   cleared: find why; game-side fix only, guard checks unchanged).
+- Nov 14 03:45: #703 MERGED + live. Main b0fbd8a red: town-street:227 (Eric's guard, the tap-as-run on CI) failed both tries.
+  Transform helper ARCHIVED to free a slot (mockup on stills/recluse-transform-book + lab code on claude/recluse-transform-book;
+  on Eric's go, a fresh helper builds it from there: brief recluse-transform-book.md, step "On go"). Flaky round 3 started
+  (briefs/flaky-round3.md). Running Opus: night room + flaky round 3. Queue: standings "out" bug -> transform build (on go) ->
+  visual QA.
