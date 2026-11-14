@@ -16,6 +16,11 @@ the light growing until it whites out the screen, the change unseen, the light d
   (Round 3's first, brighter suit was replaced before Eric saw it; its files are gone from this branch, its commit is
   in the branch's history.)
 
+## In the game (the build, Nov 14)
+
+From the real fight (Boss alone, `scripts/frames-recluse-cutscene.mjs ... only=change`): `build-phone-reveal-visor-down.png`,
+`build-phone-visor-up-his-line.png`, `build-computer-reveal-visor-down.png`, `build-computer-visor-up-his-line.png`.
+
 ## His eyes (face mockup, Nov 14, after round 3b)
 
 Eric: "right now he looks too much like a kid in a Halloween costume… I think blue is the way to go." With the visor up his eyes
