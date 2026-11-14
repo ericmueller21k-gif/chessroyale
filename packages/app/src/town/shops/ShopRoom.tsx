@@ -76,6 +76,7 @@ import { drawZzz } from "../zzz.ts";
 import { roomLight, skyNow, type RoomLight } from "../sky.ts";
 import { CLAW_PLAY, clawPose, newPose as newClawPose } from "../../claw/view.ts";
 import { closeClawMachine, openClawMachine } from "../../claw/index.ts";
+import { rideMoving } from "../../ride-sound.ts";
 
 /** A room's art, as its file exports it. */
 export interface RoomArt {
@@ -4135,6 +4136,8 @@ function startRoom(
     // (Ginger's elves: one in your way and you wait, then go on or round.)
     stepYouElves();
     you.update(now);
+    // (Your ride's moving sound inside too, as in the town: ride-sound.ts.)
+    if (you.moving()) rideMoving(riding()?.id);
     stepIntro(now);
     stepCrew(dt * 1000, now);
     stepElves(dt * 1000);

@@ -67,6 +67,7 @@ import { StreetZoom, parkSide } from "./zoom-steps.ts";
 import { PAWN_HEAD, PAWN_PX, Renderer, pawnImage, type Hit, type YouArt } from "./render.ts";
 import { dropRiders, leaveRider, ridersHeld, rideArt, shareRider, type Rider, type RiderPawn } from "./rides.ts";
 import { rideSpeed } from "../components/rides/scale.ts";
+import { rideMoving, rideSoundState, warmRideSound } from "../ride-sound.ts";
 import { HIDDEN_ROOM, MUSIC, mountOf, secondColor, shownLook, sideOfPawn } from "@chessroyale/core";
 import { painter2d, type Backend, type Painter } from "./paint.ts";
 import { painterGL } from "./paint-gl.ts";
@@ -1583,7 +1584,11 @@ function startTown(
     if (key !== youKey) cv.dataset.you = youKey = key;
     const sit = seated(town.you) ? "1" : "0";
     if (cv.dataset.sit !== sit) cv.dataset.sit = sit;
-    if (!ready) cv.dataset.ready = String(+(ready = true));
+    if (!ready) {
+      cv.dataset.ready = String(+(ready = true));
+      // (Your ride's moving sound fetched and decoded once the town shows, never in its loading: ride-sound.ts.)
+      warmRideSound(r.youSoon?.id);
+    }
   };
 
   const frame = (now: number) => {
@@ -1609,6 +1614,8 @@ function startTown(
     if (press.hold(performance.now())) startRun(performance.now());
     keysWalk();
     tick(town, now);
+    // (Your ride's moving sound: only "you moved, on this ride" here; ride-sound.ts does the rest off the frame.)
+    if (town.you.walker.moving()) rideMoving(r.youRider?.id);
     // A bot's card: whether a table is free for you both, to grey its Play (checked only while one is open: no search).
     if (card?.kind === "person" && town.people[card.i]!.bot) {
       const full = !anyTableFree(town, town.people[card.i]!);
@@ -2301,7 +2308,7 @@ function startTown(
     const h = town.you.walker.here();
     const rd = r.youRider;
     return {
-      you: { ride: rd?.id ?? null, color: rd?.color ?? null, scale: rd?.scale ?? null, ready: !!rd?.ready, coming: r.youSoon?.coming ? r.youSoon.id : null, ...r.youRide, box: r.drawnBox(you), at: [h.c, h.r], stepMs: town.you.walker.stepMs, marks: r.marksShown() },
+      you: { ride: rd?.id ?? null, color: rd?.color ?? null, scale: rd?.scale ?? null, ready: !!rd?.ready, coming: r.youSoon?.coming ? r.youSoon.id : null, ...r.youRide, box: r.drawnBox(you), at: [h.c, h.r], stepMs: town.you.walker.stepMs, marks: r.marksShown(), sound: rideSoundState() },
       others: [...r.riders].map(([id, x]) => ({ id, ride: x.id, color: x.color, scale: x.scale, ready: x.ready, box: r.drawnBox(town.people.findIndex((p) => p.id === id)), stepMs: town.people.find((p) => p.id === id)?.walker.stepMs ?? null })),
       // (Sets of rider frames held, shared by riders who look the same.)
       held: ridersHeld(),
