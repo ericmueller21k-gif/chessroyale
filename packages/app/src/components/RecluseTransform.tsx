@@ -38,6 +38,8 @@ const beatsOf = (T: typeof PHASE_CHANGE): LightBeats => {
 let OPEN_MS: number | undefined;
 /** His animations standing on the same spot after the reveal (his box stays put over them). */
 const STANDING = new Set(["revealed", "flipUp", "flipDown", "crouch"]);
+/** His words' box stands this far over the top of his frame (styles.css, `.rc-say-at > .rc-say`'s bottom). */
+const SAY_GAP = 12;
 /** His figure at `t` (ms into the phase change): which animation, since when (ms into it), where his feet are (shares of the board). */
 export function changeFigAt(t: number, computer: boolean): { anim: string; then?: string; since: number; feet: { x: number; y: number } } | null {
   const T = PHASE_CHANGE;
@@ -120,6 +122,25 @@ export function RecluseTransform({ at, t, rect, computer, sceneStand }: { at: nu
     else drawLight(frame, T, back.current, front.current);
   });
 
+  // (His words over his head never straddle the bar's bottom edge, half in the bar and half on the board (Nov 14: 21 px on a computer,
+  // 44 on a phone, over the board's top rank): a box that would is moved wholly into the bar above him, which is empty while he's on
+  // the board (a phone's), or, too tall for it, wholly onto the board under it. Read each frame, from where he stands now.)
+  const sayAt = useRef<HTMLSpanElement>(null);
+  useLayoutEffect(() => {
+    const a = sayAt.current;
+    if (!a) return;
+    a.style.translate = "";
+    const box = a.querySelector<HTMLElement>(".rc-say");
+    const bar = document.querySelector(".boss-bar")?.getBoundingClientRect();
+    if (!box || !bar || !bar.height) return;
+    const h = box.offsetHeight;
+    const bottom = a.getBoundingClientRect().top - SAY_GAP;
+    const top = bottom - h;
+    if (!(top < bar.bottom + 4 && bottom > bar.bottom - 4)) return;
+    const dy = h <= bar.height - 8 ? bar.bottom - 4 - bottom : bar.bottom + 4 - top;
+    a.style.translate = `0 ${Math.round(dy)}px`;
+  });
+
   const px = (x: number) => `${x * 100}%`;
   const figStyle = (feet: { x: number; y: number }) => ({ left: px(feet.x - (CHANGE_FIG * RECLUSE.foot[0]) / RECLUSE.w), top: `${(feet.y - (CHANGE_FIG * RECLUSE.foot[1]) / RECLUSE.w) * bw}px`, width: px(CHANGE_FIG), aspectRatio: `${RECLUSE.w} / ${RECLUSE.h}` });
   const lens = t < T.whiteFull ? 1 : 0;
@@ -153,7 +174,7 @@ export function RecluseTransform({ at, t, rect, computer, sceneStand }: { at: nu
             {/* His words over his head (his voice's bubble), mounted again with each of his animations so a box moved into view is
                 placed again where he stands now; one mount while he stands in place (his first line runs from the visor up
                 through the crouch, and a box mounted again in its fade would vanish at once). */}
-            <span class="rc-say-at">
+            <span class="rc-say-at" ref={sayAt}>
               <VoiceBubble key={STANDING.has(fig.anim) ? "stand" : fig.anim} voice={bossVoice} class="bc-bubble rc-say" />
             </span>
           </span>
