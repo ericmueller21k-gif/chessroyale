@@ -7622,6 +7622,9 @@ button.history-label {
   margin: 4px 0 0;
   font-family: "Press Start 2P", ui-monospace, monospace;
   font-size: 12px;
+  /* (Its own line height, so its box is the same whichever font draws it: the pixel font arrives after the first paint (swap), and the
+     fallback's taller line moved everything under it 2 to 5 px when it came. Nov 13, crate-banner:44.) */
+  line-height: 1;
   letter-spacing: 0.04em;
 }
 .ff-button {
