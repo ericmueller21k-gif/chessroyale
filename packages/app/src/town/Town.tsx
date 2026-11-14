@@ -634,11 +634,13 @@ export function TownScreen({
     ctl.current = t;
     // Away (Eric, Nov 7; afk.ts, here-net.ts): the "zzz" over your pawn (the town's and a shop's), out to home after too long, and the
     // beats that put you (and your "zzz") in everyone else's town. A boss's challenge (from the fight to the battle) and the claw
-    // machine hold the clock: they aren't idle presence. So does the loading screen (Nov 13: everyone's town has one now).
+    // machine hold the clock: they aren't idle presence. The loading screen (Nov 13: everyone's town has one now) holds the idle clock
+    // only: in the background as it loads still counts (Nov 14, afk.ts `setLoading`).
     const stopAway = watchAway({
       town: t.town,
       shop: () => shopIn.current,
-      busy: () => (!loaded && !broken) || flow.current !== "town" || summoning.current || !!shopCtl.current?.busy?.(),
+      busy: () => flow.current !== "town" || summoning.current || !!shopCtl.current?.busy?.(),
+      loading: () => !loaded && !broken,
       onState: (st) => void (t.town.you.zzz = st === "zzz"),
       onOut: () => awayOut.current(),
       onOthers: t.others,

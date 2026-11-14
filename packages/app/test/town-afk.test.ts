@@ -65,6 +65,24 @@ describe("the town's away rule (Eric, Nov 7; on #542: zzz after 1 minute, out af
     expect(c.state(9060 * S)).toBe("zzz");
   });
 
+  it("the loading screen holds the idle clock (no zzz, never out for idling) but not the background's (Nov 14)", () => {
+    const c = new AwayClock(0);
+    c.setLoading(true, 0);
+    expect(c.state(5000 * S)).toBe("here");
+    expect(c.idleMs(5000 * S)).toBe(0);
+    // Loaded: the idle clock starts from then.
+    c.setLoading(false, 5000 * S);
+    expect(c.state(5059 * S)).toBe("here");
+    expect(c.state(5060 * S)).toBe("zzz");
+    // Put away as it loads (a phone in the background runs no frames, so it stays loading): out at the background's limit, the moment
+    // the page is back, as any other page.
+    const d = new AwayClock(0, { zzzMs: 3600 * S, bootMs: 3600 * S, hiddenBootMs: 4 * S });
+    d.setLoading(true, 0);
+    d.hidden(true, 1 * S);
+    expect(d.state(4.9 * S)).toBe("here");
+    expect(d.state(5 * S)).toBe("out");
+  });
+
   it("off (the test switch ?townafk=off): always here", () => {
     const c = new AwayClock(0, null);
     c.hidden(true, 0);
