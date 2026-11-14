@@ -1045,3 +1045,7 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   (reverses his Nov 12 "mono 64 is fine"), a longer build-up for song 2 (the music chat), a kid->man conversation (new content?).
 - Nov 14 00:31: town-leave DONE -> PR #694 (CI). Music helper session_01JuCWRsAD5VCZQP4Gd1BFCT (high) on claude/music-clean.
   Running Opus: flaky + music; Haiku: desktop side column. Queue: bubble (fight + cutscene), night room.
+- Nov 14 00:45: Eric playtest (four boards): music restarts in phase 3 (sent to the music helper: check recluseMusic theme flips);
+  layout must stay identical in every phase (pawns/chat gone in phase 2; uneven gaps) -> briefs/recluse-boards-same-frame.md (after
+  desktop-side-column merges); transformation redo: the book's light, no King absorb -> briefs/recluse-transform-book.md (mockup).
+  QUEUE: bubble -> same-frame -> transform mockup -> night room.
