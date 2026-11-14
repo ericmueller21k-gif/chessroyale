@@ -25,8 +25,9 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
   rebuilds one after the window was away 2 s+, the device changed, or it died) **takes it over with no break** (Nov 14): once the new
   one's clock runs (at most `MUSIC.handoffWaitMs`), it starts there at the place the old one is heard at (`carriedStarts`; its intro
   too, if it's in it), and the old one fades out over `MUSIC.handoffMs` from there, its context kept open that long
-  ([decision](../decisions/2026-11-14-music-clean.md)). MP3 only, **mono at 64 kbps**
-  (Nov 12, Eric: "Mono 64 sounds... it's totally fine"; about 1 MB a theme, 23 MB decoded for two minutes). **Fetched during the town's
+  ([decision](../decisions/2026-11-14-music-clean.md)). MP3 only, **stereo at a constant 192 kbps**
+  (Nov 14, Eric: "fuck the filter and the compression"; mono 64 kbps Nov 12-14; about 3 MB a theme, 44 MB decoded for two minutes:
+  [decision](../decisions/2026-11-14-music-full-quality.md)). **Fetched during the town's
   loading bar** (Nov 12, `preloadMusic`: every theme, fetched only, kept by the service worker; its last step "Loading music…",
   `MUSIC.townShare`, waits at most `MUSIC.townWaitMs`, 3 s, once the town is built), never at app start, not precached; **decoded** when
   the battle is picked (or its room or splash needs it), one theme at a time (`forgetTheme` after); late, it starts when it arrives.

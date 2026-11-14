@@ -8,7 +8,8 @@ music. Made in code by `scripts/reel/music/` on branch `claude/trailer-v2` (no s
 
 1. Take the boss's pieces from the music handoff (`boss-music/` on branch `stills/trailer-v2`, rebuilt by
    `python3 scripts/reel/music/handoff.py <folder>` on `claude/trailer-v2`): **the `.mp3` files only** (they decode
-   everywhere, iOS Safari included; mono at 64 kbps since Nov 12, the handoff's default: never re-encode an MP3, which shifts the
+   everywhere, iOS Safari included; stereo at a constant 192 kbps since Nov 14, Eric: "fuck the filter and the compression", rendered with
+   `handoff.py --stereo --kbps 192` (and `phases_v.py --stereo --kbps 192` for the Hidden Boss's); mono 64 kbps Nov 12-14: never re-encode an MP3, which shifts the
    audio and moves the loop points: render it again from its song), e.g. `bigboy-loop.mp3`, or `hollow-intro.mp3` and `hollow-loop.mp3`.
 2. Put them in this folder.
 3. Copy the boss's entry from the handoff's `themes.json` into `themes.json` here, under `themes`, keyed by the boss's id
