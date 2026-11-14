@@ -30,7 +30,11 @@ class FakeSource {
   loopEnd = 0;
   started: [number, number | undefined] | null = null;
   stoppedAt: number | null = null;
-  connect() {}
+  /** The gain it plays into (one gain per copy of a theme playing). */
+  to: unknown = null;
+  connect(g: unknown) {
+    this.to = g;
+  }
   start(at: number, offset?: number) {
     this.started = [at, offset];
   }
@@ -804,6 +808,21 @@ describe("a new audio context takes the music over with no break (Eric, Nov 14: 
     expect(next.sources).toHaveLength(0);
   });
 
+  it("the battle takes the splash's music over while the new one opens: it is carried too, the old one stopped (it was left there, Nov 14)", async () => {
+    ctx.currentTime = 20;
+    await splashMusic("grex");
+    expect(ctx.sources).toHaveLength(2);
+    ctx.currentTime += 3;
+    wall += 3000;
+    const { next } = rebuild();
+    bossMusic({ key: ++key, boss: "grex", live: false });
+    splashDone();
+    await runs(next);
+    expect(next.sources.length).toBeGreaterThan(0);
+    for (const s of ctx.sources) expect(s.stoppedAt).not.toBeNull();
+    expect(musicNow()?.boss).toBe("grex");
+  });
+
   it("the new one's clock never starts: the music is started on it after handoffWaitMs all the same", async () => {
     await playFor(40);
     const { next } = rebuild();
@@ -812,5 +831,96 @@ describe("a new audio context takes the music over with no break (Eric, Nov 14: 
     wall += MUSIC.handoffWaitMs;
     await wait(40);
     expect(next.sources).toHaveLength(1);
+  });
+});
+
+describe("never two sources of one theme sounding past the handover (Nov 14)", () => {
+  /** The copies of a theme (by its pieces' files) sounding at `t` on `c`: each its own gain, started by then and not yet stopped. */
+  function copies(c: ReturnType<typeof fakeContext>, pieces: string[], t: number) {
+    const gains = new Set<unknown>();
+    for (const s of c.sources) {
+      const url = (s.buffer as { url?: string } | null)?.url ?? "";
+      if (pieces.some((p) => url === `/music/${p}.mp3`) && s.started && s.started[0] <= t && (s.stoppedAt === null || s.stoppedAt > t)) gains.add(s.to);
+    }
+    return gains.size;
+  }
+  /** Just past the handover after a copy starting at `now` (its start delay, then the old one's handoffMs). */
+  const past = (now: number) => now + MUSIC.startDelayS + MUSIC.handoffMs / 1000 + 0.01;
+  const ZEBRA = ["zebra-intro", "zebra-loop"];
+  const GREX = ["grex-intro", "grex-loop"];
+  beforeEach(() => {
+    ctx.sources = [];
+    ctx.gains = [];
+    sound.muted = false;
+    sound.hidden = false;
+    setMusicOn(true);
+  });
+  afterEach(() => {
+    roomMusic(null);
+    splashDone();
+    bossMusic(null);
+  });
+
+  it("a room left and walked straight back into: the copy fading out stops by the handover, one copy after", async () => {
+    ctx.currentTime = 200;
+    roomMusic("zebra");
+    await settle();
+    ctx.currentTime = 230;
+    roomMusic(null);
+    ctx.currentTime = 230.4;
+    roomMusic("zebra");
+    await settle();
+    expect(copies(ctx, ZEBRA, 230.4 + MUSIC.startDelayS)).toBe(2);
+    expect(copies(ctx, ZEBRA, past(230.4))).toBe(1);
+    // (The one left is the new one, from its intro.)
+    expect(roomMusicNow()?.boss).toBe("zebra");
+  });
+
+  it("a rematch of the same boss as the last one's result fades: one copy past the handover", async () => {
+    ctx.currentTime = 300;
+    bossMusic({ key: "first", boss: "grex", live: true });
+    await settle();
+    ctx.currentTime = 360;
+    bossMusic(null);
+    ctx.currentTime = 360.5;
+    bossMusic({ key: "rematch", boss: "grex", live: true });
+    await settle();
+    expect(copies(ctx, GREX, past(360.5))).toBe(1);
+  });
+
+  it("the Hidden Boss challenged from his room: his room's theme fading out stops by the handover as his fight's copy starts", async () => {
+    const HOUSE = ["recluse-house-loop"];
+    ctx.currentTime = 400;
+    roomMusic(RECLUSE_MUSIC.child);
+    await settle();
+    ctx.currentTime = 420;
+    await splashMusic("recluse");
+    ctx.currentTime = 420.6;
+    bossMusic({ key: "hidden", boss: "recluse", live: true, theme: RECLUSE_MUSIC.child });
+    await settle();
+    expect(copies(ctx, HOUSE, past(420.6))).toBe(1);
+  });
+
+  it("a splash called off and the same boss challenged again: one copy past the handover", async () => {
+    ctx.currentTime = 500;
+    await splashMusic("grex");
+    ctx.currentTime = 503;
+    splashDone();
+    ctx.currentTime = 503.3;
+    await splashMusic("grex");
+    expect(copies(ctx, GREX, past(503.3))).toBe(1);
+  });
+
+  it("a copy whose fade ends before the handover would is left to end on its own (never held longer)", async () => {
+    ctx.currentTime = 600;
+    roomMusic("zebra");
+    await settle();
+    const first = [...ctx.sources];
+    ctx.currentTime = 630;
+    roomMusic(null);
+    ctx.currentTime = 630 + MUSIC.endFadeMs / 1000 - 0.1;
+    roomMusic("zebra");
+    await settle();
+    for (const s of first) expect(s.stoppedAt).toBe(630 + MUSIC.endFadeMs / 1000);
   });
 });

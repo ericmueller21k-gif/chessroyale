@@ -20,12 +20,14 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
   "START!" done) until it's decided (`boss.result`; then a 1.5 s fade, `MUSIC.endFadeMs`, and nothing on the result screen); solo,
   raids, online and the Crowd's boss final alike, one check in `App.tsx` (`musicBattle` → `bossMusic`). The intro once at t0, the
   loop from t0 + `introSeconds`, from `pad`, looping between `pad` and `pad + loopSeconds` (`musicPlan`), Web Audio only, on its own
-  gain at `MUSIC.volume` (0.25: about 7 dB under the boss sounds), **straight to the speakers** (`musicBus`: at the master's level,
+  gain at `MUSIC.volume` (0.4, Nov 14: about 3 dB under a move's or the clock's tick, 5 under a capture, measured at the speakers;
+  [decision](../decisions/2026-11-14-music-level.md)), **straight to the speakers** (`musicBus`: at the master's level,
   not through the game sounds' 6 kHz low-pass; Nov 14, Eric: "it sounds much lower quality"). **A new audio context** (sound.ts
   rebuilds one after the window was away 2 s+, the device changed, or it died) **takes it over with no break** (Nov 14): once the new
   one's clock runs (at most `MUSIC.handoffWaitMs`), it starts there at the place the old one is heard at (`carriedStarts`; its intro
   too, if it's in it), and the old one fades out over `MUSIC.handoffMs` from there, its context kept open that long
-  ([decision](../decisions/2026-11-14-music-clean.md)). MP3 only, **stereo at a constant 192 kbps**
+  ([decision](../decisions/2026-11-14-music-clean.md)). **Never two copies of one theme** past `MUSIC.handoffMs`: one still fading out at
+  its end (a room left, a result, a splash gone) is cut to that as a new copy starts (`cutEnding`; Nov 14). MP3 only, **stereo at a constant 192 kbps**
   (Nov 14, Eric: "fuck the filter and the compression"; mono 64 kbps Nov 12-14; about 3 MB a theme, 44 MB decoded for two minutes:
   [decision](../decisions/2026-11-14-music-full-quality.md)). **Fetched during the town's
   loading bar** (Nov 12, `preloadMusic`: every theme, fetched only, kept by the service worker; its last step "Loading music…",

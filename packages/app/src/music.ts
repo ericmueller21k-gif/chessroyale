@@ -252,6 +252,24 @@ export function stopPlaying(p: Playing, ms: number, at?: number) {
 }
 
 // ---- The Music switch (Settings → Sound, and the match's Options): on unless switched off, remembered on the device. ----
+/**
+ * What is fading out at its end (a battle's result, a room left, a splash gone: MUSIC.endFadeMs), by its theme, and when that fade
+ * ends (its context's clock). A new copy of the same theme starting meanwhile (a room walked back into, a rematch, the Hidden Boss's
+ * room into his fight) cuts it short to MUSIC.handoffMs: never two copies of one theme sounding past that (Nov 14).
+ */
+let ending: { theme: string; p: Playing; until: number }[] = [];
+/** `p` (playing `theme`) fades out over MUSIC.endFadeMs and stops. */
+function endPlaying(p: Playing, theme: string) {
+  stopPlaying(p, MUSIC.endFadeMs);
+  ending = ending.filter((e) => e.p !== p && e.p.ctx.currentTime < e.until);
+  ending.push({ theme, p, until: p.ctx.currentTime + MUSIC.endFadeMs / 1000 });
+}
+/** A new copy of `theme` is starting: one still fading out at its end stops within MUSIC.handoffMs instead. */
+function cutEnding(theme: string) {
+  for (const e of ending) if (e.theme === theme && e.p.ctx.currentTime + MUSIC.handoffMs / 1000 < e.until) stopPlaying(e.p, MUSIC.handoffMs);
+  ending = ending.filter((e) => e.theme !== theme && e.p.ctx.currentTime < e.until);
+}
+
 const MUSIC_KEY = "brc.music";
 const switchListeners = new Set<() => void>();
 let on = (() => {
@@ -475,6 +493,7 @@ function maybeStart() {
     const sw = switchPlan(got.themes, theme, now, !!from, dropAt, !got.intro);
     if (!sw) return;
     try {
+      cutEnding(theme);
       playing = { ...startPlan(bus.ctx, bus.out, sw.plan, got.intro, got.loop, level()), key: b.key, boss: b.boss, theme };
       log(`music:start:${theme}${sw.plan.intro ? "" : ":loop"}`);
       // (Where its loop lands on Date.now()'s clock, for the tests: the Hidden Boss's drop on his boards' split.)
@@ -516,7 +535,7 @@ function endBattle() {
   if (p && p.theme !== was) setTimeout(() => forgetTheme(p.theme), MUSIC.endFadeMs + 250);
   if (!p) return;
   log(`music:end:${p.boss}`);
-  stopPlaying(p, MUSIC.endFadeMs);
+  endPlaying(p, p.theme);
 }
 
 /**
@@ -579,6 +598,7 @@ function maybeStartRoom() {
     const plan = musicPlan(got.themes, r, bus.ctx.currentTime + MUSIC.startDelayS, !got.intro);
     if (!plan) return;
     try {
+      cutEnding(r);
       roomPlaying = { ...startPlan(bus.ctx, bus.out, plan, got.intro, got.loop, level()), boss: r };
       log(`music:room:${r}${plan.intro ? "" : ":loop"}`);
     } catch {
@@ -597,7 +617,7 @@ function endRoom() {
   if (was) setTimeout(() => forgetTheme(was), MUSIC.endFadeMs + 250);
   if (!p) return;
   log(`music:roomEnd:${p.boss}`);
-  stopPlaying(p, MUSIC.endFadeMs);
+  endPlaying(p, p.boss);
 }
 
 // ---- A challenge from the town (Eric, Nov 11): the theme starts the moment the boss's full-screen splash starts, and the battle
@@ -630,6 +650,7 @@ export function splashMusic(boss: string): Promise<void> {
     const plan = musicPlan(got.themes, boss, bus.ctx.currentTime + MUSIC.startDelayS, !got.intro);
     if (!plan) return;
     try {
+      cutEnding(boss);
       const p = startPlan(bus.ctx, bus.out, plan, got.intro, got.loop, level());
       // (Late, the battle already picked: it's the battle's now.)
       if (battle && themeOf(battle) === boss) playing = { ...p, key: battle.key, boss: battle.boss, theme: boss };
@@ -648,7 +669,7 @@ export function splashDone() {
   carried = null;
   if (!p) return;
   log(`music:splashEnd:${p.boss}`);
-  stopPlaying(p, MUSIC.endFadeMs);
+  endPlaying(p, p.boss);
   setTimeout(() => forgetTheme(p.boss), MUSIC.endFadeMs + 250);
 }
 
@@ -696,11 +717,14 @@ onAudioRebuilt((old) => {
   if (!all.length) return 0;
   const bus = musicBus();
   if (!bus) return 0;
+  // (Whatever plays then and is still on an older context: one that ended meanwhile is gone, one switched to started on the new one,
+  // and one a battle took over from its splash meanwhile is carried too (Nov 14: it was left on the old one, to be closed silent).
+  // A newer context made since carries it itself.)
   const go = () => {
-    // (Each still the one playing: one that ended, or was switched, meanwhile is left as it was.)
-    if (playing && all.includes(playing)) playing = handOver(playing, bus);
-    if (roomPlaying && all.includes(roomPlaying)) roomPlaying = handOver(roomPlaying, bus);
-    if (carried && all.includes(carried)) carried = handOver(carried, bus);
+    if (musicBus()?.ctx !== bus.ctx) return;
+    if (playing) playing = handOver(playing, bus);
+    if (roomPlaying) roomPlaying = handOver(roomPlaying, bus);
+    if (carried) carried = handOver(carried, bus);
   };
   whenRunning(bus.ctx, go);
   // (Kept open for the wait, the start and the fade; a context that isn't running isn't sounding: closed at once.)
