@@ -80,4 +80,20 @@ export const mixLights = (w: SkyWeights): number => LOOKS.reduce((k, l) => k + w
 /** How much of dawn's mist shows (extra haze over the far ground). */
 export const mixMist = (w: SkyWeights): number => LOOKS.reduce((m, l) => m + w[l] * look(l).mist, 0);
 
+/**
+ * The looks' weights now, as the town reads them: `?sky=` where it holds one look, else the device's clock (the town's own clock, read
+ * the same way: Town.tsx, chat.ts `townTone`).
+ */
+export function skyNow(now: Date = new Date(), search: string = typeof location === "undefined" ? "" : location.search): SkyWeights {
+  return skyOverride(new URLSearchParams(search).get("sky")) ?? skyWeights(now.getHours() * 60 + now.getMinutes() + now.getSeconds() / 60);
+}
+
+/**
+ * The light in a room with a window on the street (the Hidden Boss's walk-up, Nov 14: Eric, "it's always light in that room"): one of
+ * three pre-drawn looks, picked from the town's weights as the room loads (never per frame). Dawn and dusk share the warm low light.
+ * Night once it's half night (as the chat's tone flips), else the warm light once dawn and dusk together outweigh the day.
+ */
+export type RoomLight = "day" | "dusk" | "night";
+export const roomLight = (w: SkyWeights): RoomLight => (w.night >= 0.5 ? "night" : w.dawn + w.dusk > w.day ? "dusk" : "day");
+
 export const sameWeights = (a: SkyWeights, b: SkyWeights): boolean => LOOKS.every((l) => Math.abs(a[l] - b[l]) < 1e-3);

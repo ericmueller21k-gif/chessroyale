@@ -73,6 +73,7 @@ import { backGl, type BackGl, type XY } from "./back-gl.ts";
 import { nextFrame, roomSliceMs } from "./load-slice.ts";
 import { CAB_H, cabinetOf, drawCabinet, newHits } from "./claw-cabinet.ts";
 import { drawZzz } from "../zzz.ts";
+import { roomLight, skyNow, type RoomLight } from "../sky.ts";
 import { CLAW_PLAY, clawPose, newPose as newClawPose } from "../../claw/view.ts";
 import { closeClawMachine, openClawMachine } from "../../claw/index.ts";
 
@@ -134,6 +135,8 @@ export interface RoomArt {
   standing?: readonly Sq[];
   /** A dark wash over the whole room, its lights added over it (Rolling Dough's dim back room: SHOP_FEEL.zebra.dim). */
   dim?: number;
+  /** The wash's color, "r,g,b" (none: Rolling Dough's near black; the walk-up at night: a deep blue, at dusk a warm dark: Nov 14). */
+  dimRGB?: string;
   /**
    * Where the camera looks while it's at the town's zoomed-in camera (the default), in place of following you: a small room seen whole
    * (Rolling Dough's back room: the art's SHOP_ZEBRA_BACK_CAM from the table's middle, so Don Dough, his crew and you are all on a
@@ -163,8 +166,11 @@ interface CrewPlaces {
   palletAt: readonly [number, number];
   shelf: { readonly col: number; readonly row: number; readonly lift: number };
 }
-/** Each room's art by its key (`roomKey`: its home's id, or "<id>-back" for a home's back room), loaded only when you go in. */
-const ART: Partial<Record<string, () => Promise<RoomArt>>> = {
+/**
+ * Each room's art by its key (`roomKey`: its home's id, or "<id>-back" for a home's back room), loaded only when you go in. A room with a
+ * window on the street (the walk-up's, Nov 14) takes the light of the town's time of day as it loads (`LIT_ROOMS`).
+ */
+const ART: Partial<Record<string, (light: RoomLight) => Promise<RoomArt>>> = {
   tiger: () => import("./babur-art.ts").then((m) => ({ layout: m.SHOP_BABUR_LAYOUT, pieces: m.SHOP_BABUR_PIECES, crateAt: m.SHOP_BABUR_CRATE_AT, lights: m.SHOP_BABUR_HOOP_LIGHTS, pools: m.SHOP_BABUR_HOOP_POOLS })),
   gardener: () => import("./puddles-art.ts").then((m) => ({ layout: m.SHOP_PUDDLES_LAYOUT, pieces: m.SHOP_PUDDLES_PIECES, crateAt: m.SHOP_PUDDLES_CRATE_AT, lights: [], pools: [] })),
   alfil: () => import("./alfil-art.ts").then((m) => ({ layout: m.SHOP_ALFIL_LAYOUT, pieces: m.SHOP_ALFIL_PIECES, crateAt: m.SHOP_ALFIL_CRATE_AT, lights: m.SHOP_ALFIL_LIGHTS, pools: m.SHOP_ALFIL_POOLS })),
@@ -208,18 +214,22 @@ const ART: Partial<Record<string, () => Promise<RoomArt>>> = {
   // the door; and its back room, its own room through the door at the back left: Don Dough and his crew at the table, dim.)
   // (The Hidden Boss's walk-up, Nov 13: the hall and the landing, small box rooms of 7 x 7, each seen whole; and the top floor, his room
   // (9 x 9), its side walls drawn by its scene as one surface each (shops/recluse-scene.ts, the room's `fx` from the town).)
-  recluse: () =>
-    import("./recluse-stairs-art.ts").then((m) => ({ n: m.RECLUSE_HALL_N, layout: m.RECLUSE_HALL_LAYOUT, pieces: m.RECLUSE_STAIRS_PIECES, crateAt: [0, 0] as const, lights: m.RECLUSE_HALL_LIGHTS, pools: m.RECLUSE_HALL_POOLS, outside: "#8d8a82", fixCam: m.RECLUSE_HALL_CAM, seeThru: ["entrance", "hem"] })),
-  "recluse-landing": () =>
-    import("./recluse-stairs-art.ts").then((m) => ({ n: m.RECLUSE_HALL_N, layout: m.RECLUSE_LANDING_LAYOUT, pieces: m.RECLUSE_STAIRS_PIECES, crateAt: [0, 0] as const, lights: m.RECLUSE_LANDING_LIGHTS, pools: m.RECLUSE_LANDING_POOLS, outside: "#140d0a", fixCam: m.RECLUSE_HALL_CAM, seeThru: ["stairs-down", "hem"] })),
-  "recluse-top": () =>
+  recluse: (light) =>
+    import("./recluse-stairs-art.ts").then((m) => {
+      const l = m.recluseStairsLit(light);
+      return { n: m.RECLUSE_HALL_N, layout: m.RECLUSE_HALL_LAYOUT, pieces: l.pieces, crateAt: [0, 0] as const, lights: l.hall, pools: m.RECLUSE_HALL_POOLS, dim: l.dim, dimRGB: l.dimRGB, outside: "#8d8a82", fixCam: m.RECLUSE_HALL_CAM, seeThru: ["entrance", "hem"] };
+    }),
+  "recluse-landing": (light) =>
+    import("./recluse-stairs-art.ts").then((m) => {
+      const l = m.recluseStairsLit(light);
+      return { n: m.RECLUSE_HALL_N, layout: m.RECLUSE_LANDING_LAYOUT, pieces: l.pieces, crateAt: [0, 0] as const, lights: l.landing, pools: m.RECLUSE_LANDING_POOLS, dim: l.dim, dimRGB: l.dimRGB, outside: "#140d0a", fixCam: m.RECLUSE_HALL_CAM, seeThru: ["stairs-down", "hem"] };
+    }),
+  "recluse-top": (light) =>
     import("./recluse-art.ts").then((m) => ({
       n: m.SHOP_RECLUSE_N,
       layout: m.SHOP_RECLUSE_LAYOUT,
-      pieces: m.SHOP_RECLUSE_PIECES,
+      ...m.recluseLit(light),
       crateAt: [0, 0] as const,
-      lights: m.SHOP_RECLUSE_LIGHTS,
-      pools: m.SHOP_RECLUSE_POOLS,
       upright: ["bed"],
       standing: m.SHOP_RECLUSE_STANDING,
       outside: "#2a1d14",
@@ -360,8 +370,13 @@ const picture = (url: string, what: string) =>
 const loading = new Map<string, Promise<LoadedRoom>>();
 /** Loads a home's room (its art's chunk, every piece's frames drawn, the kid's sheet), once: its front, or its back room (`part`). */
 export function loadRoom(home: HomeId, part: RoomPart = "front"): Promise<LoadedRoom> {
-  return loadRoomWith(roomKey(home, part), roomDef(home, part)!, ART[roomKey(home, part)]!);
+  const key = roomKey(home, part);
+  // (A room that follows the time of day is kept once for each light it's been seen in.)
+  const light = LIT_ROOMS.has(key) ? roomLight(skyNow()) : "day";
+  return loadRoomWith(LIT_ROOMS.has(key) ? `${key}@${light}` : key, roomDef(home, part)!, () => ART[key]!(light));
 }
+/** The rooms whose light follows the town's time of day as they load (sky.ts `roomLight`): the walk-up's three (Nov 14). */
+const LIT_ROOMS: ReadonlySet<string> = new Set(["recluse", "recluse-landing", "recluse-top"]);
 /**
  * Loads a room from its def and its art's loader, once by `key`: a home's room (`loadRoom`), or a room no home opens yet (the Hidden
  * Boss's child's room, Nov 12: a mockup, shops/recluse-preview.tsx, reachable only on the dev server).
@@ -3977,7 +3992,7 @@ function startRoom(
     }
     while (k < figN) drawFig(figK[k++]!, now, rc);
     if (art.dim) {
-      g.fillStyle = `rgba(10,8,18,${art.dim})`;
+      g.fillStyle = `rgba(${art.dimRGB ?? "10,8,18"},${art.dim})`;
       g.fillRect(0, 0, W, H);
       drawGlows(now);
     }
