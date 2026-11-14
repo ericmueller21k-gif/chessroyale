@@ -3,6 +3,7 @@ import { Chess } from "chess.js";
 import { BOSS_POWERS, RECLUSE_ONLINE, RECLUSE_PHASE2 } from "@chessroyale/core";
 import { BOARD_SEL, test, watchFor, watchSpans, bossAloneFromHome } from "./helpers.ts";
 import { RECLUSE_LINES } from "../packages/app/src/characters/recluse-lines.ts";
+import { RECLUSE_PALETTE } from "../packages/app/src/characters/recluse.ts";
 import { pacedLine } from "../packages/app/src/paced-line.ts";
 
 /**
@@ -761,6 +762,29 @@ test("phase 2 (?phase=2): four boards, each its own Chess960 start; Stockfish 27
   await expect(page.locator(".gk-command")).toHaveCount(0);
   // His suit and helmet where he stands, from his transformation on (Eric, Nov 14).
   await expect(page.locator(`${figure()}[data-suit] .boss-char-sprite`)).toBeVisible();
+  // (The picture too, not only the attribute (#707's review, m4): his canvas has the suit's navy and panels, and none of his shirt's
+  // white, recluse.ts's palette.)
+  const hex = (keys: string) => [...keys].map((k) => RECLUSE_PALETTE[k]!);
+  const drawn = await page.evaluate(
+    ({ sel, suit, shirt }) => {
+      const cv = document.querySelector<HTMLCanvasElement>(sel)!;
+      const d = cv.getContext("2d")!.getImageData(0, 0, cv.width, cv.height).data;
+      const rgb = (h: string) => parseInt(h.slice(1, 7), 16);
+      const [S, W] = [new Set(suit.map(rgb)), new Set(shirt.map(rgb))];
+      let inSuit = 0;
+      let inShirt = 0;
+      for (let i = 0; i < d.length; i += 4) {
+        if (d[i + 3]! < 255) continue;
+        const c = (d[i]! << 16) | (d[i + 1]! << 8) | d[i + 2]!;
+        if (S.has(c)) inSuit++;
+        if (W.has(c)) inShirt++;
+      }
+      return { inSuit, inShirt };
+    },
+    { sel: `${figure()}[data-suit] .boss-char-sprite`, suit: hex("nuvzRSPI"), shirt: hex("st") },
+  );
+  expect(drawn.inSuit, "the suit's pixels").toBeGreaterThan(300);
+  expect(drawn.inShirt, "the shirt's pixels").toBe(0);
   if (test.info().project.name !== "phone") {
     // A computer: each board's tag (name and clock) in the row above it, never over its back rank (Chess960's is random),
     // inside the square of four; and the scoreboard has no Bank column (each clock is its board's, on its tag).
@@ -790,6 +814,8 @@ test("phase 2 (?phase=2): four boards, each its own Chess960 start; Stockfish 27
   const moves = page.locator(test.info().project.name === "phone" ? ".bp .mv-list .mv-row" : ".mv-side .mv-list .mv-row");
   await expect(moves.first()).toHaveAttribute("aria-label", new RegExp(`^1\\. You: pawn to ${pawn.to}`));
   await expect(moves).toHaveCount(2);
+  // His row's face is his face now, in his suit, as the bar's (not the plain portrait in his shirt).
+  await expect(moves.nth(1).locator(".mv-who img")).toHaveAttribute("data-face", /:true$/);
   // A phone's small boards: whose each is, by name, cut short to the board's width, the clock whole (#7).
   if (test.info().project.name === "phone") {
     const tags = await page.evaluate(() => [...document.querySelectorAll(".rc-mini")].map((m) => { const t = m.querySelector(".rc-tag")!.getBoundingClientRect(); const r = m.getBoundingClientRect(); return { name: m.querySelector(".rc-tag-name")?.textContent?.trim() ?? "", clock: m.querySelector(".rc-tag-clock")!.textContent, inside: t.left >= r.left - 0.5 && t.right <= r.right + 0.5 }; }));

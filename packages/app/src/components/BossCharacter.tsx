@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef } from "preact/hooks";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "preact/hooks";
 import { bossBeat, type Beat, type BeatResult, type Stage } from "../characters/boss-beats.ts";
 import { BOSS_KITS, artOf, bossKit, bossKitOf, poweredKit, type BossKit } from "../characters/kits.ts";
 import { growingRun, resetGrowing } from "./RecluseChild.ts";
@@ -439,6 +439,65 @@ export function BossTag({ boss, live = true }: { boss: Pick<BossView, "name" | "
  */
 export const faceBust = (kit: BossKit, live: boolean) => (live && kit.barFace && kit.bar) || null;
 
+/** His bust's look now (BossFace's `live`: the loop his figure rests in, his suit), for a kit with a `barFace`; else null. */
+function liveLook(kit: BossKit, now: number): { anim: string; on: boolean; id: string } | null {
+  const bust = faceBust(kit, true);
+  if (!bust) return null;
+  const loop = figureLoop();
+  const anim = loop && bust.anims[loop] ? loop : kit.portrait.anim;
+  const on = suitOn(kit, now);
+  return { anim, on, id: `${anim}:${on}` };
+}
+/** Draws that look's bust into `g` (the bar's face, cut to `barFace`). */
+function drawLook(g: CanvasRenderingContext2D, kit: BossKit, look: { anim: string; on: boolean }) {
+  const bust = kit.bar!;
+  const f = kit.barFace!;
+  const p = kit.portrait;
+  const drawn = bust.anims[look.anim]!.frames[look.anim === p.anim ? p.frame : 0]!;
+  g.putImageData(frameImage(bust, look.on ? suited(drawn) : drawn), -f.x, -f.y, f.x, f.y, f.w, f.h);
+}
+
+/** Each look's bust as an image address, made once (`ch.id:anim:suit`). */
+const lookUrls = new Map<string, string>();
+function liveFaceNow(kit: BossKit): { url: string; id: string } | null {
+  const look = liveLook(kit, Date.now());
+  if (!look || typeof document === "undefined") return null;
+  const key = `${kit.ch.id}:${look.id}`;
+  let url = lookUrls.get(key);
+  if (!url) {
+    const cv = document.createElement("canvas");
+    cv.width = kit.barFace!.w;
+    cv.height = kit.barFace!.h;
+    const g = cv.getContext("2d");
+    if (!g) return null;
+    drawLook(g, kit, look);
+    url = cv.toDataURL();
+    lookUrls.set(key, url);
+  }
+  return { url, id: look.id };
+}
+/**
+ * The boss's face as the bar draws it now (BossFace `live`), as an image address for the Moves list's rows (one image each, the same
+ * address, and one loop for the whole list: never a canvas or a loop per row). Null for a boss whose look doesn't change in a battle:
+ * the rows keep `bossPortraitUrl`.
+ */
+export function useLiveFace(boss: Pick<BossView, "name" | "icon"> & { form?: BossView["form"] }): { url: string; id: string } | null {
+  const kit = bossKitOf(boss);
+  const [face, setFace] = useState(() => (kit ? liveFaceNow(kit) : null));
+  useLayoutEffect(() => {
+    if (!kit || !faceBust(kit, true)) return void setFace(null);
+    let raf = 0;
+    const tick = () => {
+      const now = liveFaceNow(kit);
+      setFace((o) => (o?.url === now?.url ? o : now));
+      raf = requestAnimationFrame(tick);
+    };
+    tick();
+    return () => cancelAnimationFrame(raf);
+  }, [kit]);
+  return face;
+}
+
 export function BossFace({ boss, class: cls = "", label, live = false }: { boss: Pick<BossView, "name" | "icon"> & { form?: BossView["form"] }; class?: string; /** Its name for a screen reader (the boss's own unless given; "": none, its button names it). */ label?: string; /** Inside a battle (its bar, its lines): his look as it is now, for a boss whose look changes in it (BossKit.barFace). Elsewhere his portrait: the battle's state (his age, his suit) is the last battle's until the next begins (#712's review). */ live?: boolean }) {
   // (In a form of its own, that form's face: the Hidden Boss's child.)
   const kit = bossKitOf(boss);
@@ -455,20 +514,14 @@ export function BossFace({ boss, class: cls = "", label, live = false }: { boss:
     }
     // (A look that changes in the battle (the Hidden Boss's age, his suit): the bust as the phone's bar draws it, the loop his figure rests
     // in and his suit, read each frame and drawn again when either changes. Eric's computer showed the 9-year-old at 20, Nov 14.)
-    const f = kit.barFace;
     let raf = 0;
     let last = "";
     const draw = () => {
-      const now = Date.now();
-      const loop = figureLoop();
-      const anim = loop && bust.anims[loop] ? loop : p.anim;
-      const on = suitOn(kit, now);
-      const id = `${anim}:${on}`;
-      if (id !== last) {
-        last = id;
-        const drawn = bust.anims[anim]!.frames[anim === p.anim ? p.frame : 0]!;
-        g.putImageData(frameImage(bust, on ? suited(drawn) : drawn), -f.x, -f.y, f.x, f.y, f.w, f.h);
-        cv.current?.setAttribute("data-face", id);
+      const look = liveLook(kit, Date.now())!;
+      if (look.id !== last) {
+        last = look.id;
+        drawLook(g, kit, look);
+        cv.current?.setAttribute("data-face", look.id);
       }
       raf = requestAnimationFrame(draw);
     };

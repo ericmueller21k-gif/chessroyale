@@ -7,7 +7,7 @@ import { crossedOut } from "./Folio.tsx";
 import { battleStartPly, moverOf, rowNumber, newPlyCache, noteTurns, pieceOn, plyRows, timeShown, turnBook, turnMs, type Mover, type PieceType, type PlyCache, type PlyRow } from "../move-list.ts";
 import { camoHidden, seenFen } from "../camo.ts";
 import { pawnLook } from "../looks.ts";
-import { BossFace, bossPortraitUrl } from "./BossCharacter.tsx";
+import { BossFace, bossPortraitUrl, useLiveFace } from "./BossCharacter.tsx";
 import { godKingPortraitUrl } from "./GodKing.tsx";
 import { Avatar } from "./Items.tsx";
 import { TowerFit } from "./MiniTower.tsx";
@@ -94,10 +94,11 @@ const Pc = ({ color, type }: { color: "w" | "b"; type: PieceType }) => (
 );
 
 /** Who moved: a small picture. */
-function Who({ mover, boss, alone }: { mover: Mover; boss: BossView; alone: boolean }) {
+function Who({ mover, boss, alone, face }: { mover: Mover; boss: BossView; alone: boolean; face: LiveFace }) {
   if (mover === "boss") {
-    const url = bossPortraitUrl(boss.name);
-    return <span class="mv-who">{url ? <img src={url} alt="" /> : <BossFace boss={boss} label="" />}</span>;
+    // (His face as the bar draws it now, where his look changes in the battle (the Hidden Boss's suit): the list matches the bar.)
+    const url = face?.url ?? bossPortraitUrl(boss.name);
+    return <span class="mv-who">{url ? <img src={url} alt="" data-face={face?.id} /> : <BossFace boss={boss} label="" />}</span>;
   }
   if (mover === "king") {
     const url = godKingPortraitUrl(boss.crowdSide);
@@ -119,7 +120,8 @@ function Who({ mover, boss, alone }: { mover: Mover; boss: BossView; alone: bool
 
 const WHO_WORD: Record<Mover, string> = { boss: "Boss", crowd: "Crowd", king: "God King", opening: "Opening" };
 
-type RowProps = { s: Shown; boss: BossView; alone: boolean; hush: boolean; struck: boolean };
+type LiveFace = ReturnType<typeof useLiveFace>;
+type RowProps = { s: Shown; boss: BossView; alone: boolean; hush: boolean; struck: boolean; face: LiveFace };
 /** (Drawn again only when what it shows changes: its PlyRow is the cache's, the same object from draw to draw.) */
 const sameRow = (a: RowProps, b: RowProps) =>
   a.s.row === b.s.row &&
@@ -132,10 +134,11 @@ const sameRow = (a: RowProps, b: RowProps) =>
   a.hush === b.hush &&
   a.struck === b.struck &&
   a.alone === b.alone &&
+  (a.s.mover !== "boss" || a.face?.url === b.face?.url) &&
   a.boss.name === b.boss.name &&
   a.boss.crowdSide === b.boss.crowdSide;
 
-const MoveRow = memo(function MoveRow({ s, boss, alone, hush, struck }: RowProps) {
+const MoveRow = memo(function MoveRow({ s, boss, alone, hush, struck, face }: RowProps) {
   const { row } = s;
   const other = row.color === "w" ? "b" : "w";
   const who = s.mover === "crowd" && alone ? "You" : WHO_WORD[s.mover];
@@ -144,7 +147,7 @@ const MoveRow = memo(function MoveRow({ s, boss, alone, hush, struck }: RowProps
     : `${rowNumber(row)} ${who}: ${row.castle ?? `${PIECE[s.piece]} to ${row.to}`}${s.captured ? `, takes ${PIECE[s.captured]}` : ""}${s.ms !== null ? `, ${timeShown(s.ms)}` : ""}${struck ? ", crossed out" : ""}`;
   return (
     <li class={`mv-row mv-${s.mover}${struck ? " mv-struck" : ""}`} aria-label={words}>
-      <Who mover={s.mover} boss={boss} alone={alone} />
+      <Who mover={s.mover} boss={boss} alone={alone} face={face} />
       <span class="mv-no">{rowNumber(row)}</span>
       {hush ? (
         <span class="mv-sq">…</span>
@@ -177,6 +180,7 @@ export function MoveList({ match, hushLast = false, scroll = true, onOpen }: { m
   const stuck = useRef(true);
   const data = boss ? shownRows(match, boss) : null;
   const n = data?.rows.length ?? 0;
+  const face = useLiveFace(boss ?? { name: "", icon: "" });
   // Kept at the newest row, unless the reader scrolled up.
   useLayoutEffect(() => {
     const el = box.current;
@@ -214,7 +218,7 @@ export function MoveList({ match, hushLast = false, scroll = true, onOpen }: { m
             </li>
           )}
           {data.rows.map((s, i) => (
-            <MoveRow key={s.row.ply} s={s} boss={who} alone={alone} hush={hushLast && i === data.rows.length - 1 && s.mover === "boss"} struck={struck.has(s.row.ply)} />
+            <MoveRow key={s.row.ply} s={s} boss={who} alone={alone} hush={hushLast && i === data.rows.length - 1 && s.mover === "boss"} struck={struck.has(s.row.ply)} face={face} />
           ))}
           {!data.rows.length && <li class="mv-empty">No moves yet.</li>}
         </ol>
