@@ -3,7 +3,7 @@ import { RECLUSE_CUTSCENE as C } from "@chessroyale/core";
 import { RECLUSE_CUTSCENE_LINES } from "../src/characters/recluse-lines.ts";
 import { CUTSCENE_SPOTS, RECLUSE_CUTSCENE } from "../src/characters/recluse-ages.ts";
 import { renderFrame } from "../src/characters/sprite.ts";
-import { boxAt, cutBox, cutReadMs, cutTyped, cutsceneTimeline, fitCutscene } from "../src/recluse-cutscene.ts";
+import { boxAt, cutBox, cutReadMs, cutTyped, cutsceneTimeline, fitCutscene, sceneStandAt } from "../src/recluse-cutscene.ts";
 
 // The Hidden Boss's cutscene (Nov 12; in his fight since Nov 13): Eric's 17 lines, typed a sentence at a time, each box up long
 // enough to read.
@@ -41,6 +41,21 @@ describe("the Hidden Boss's cutscene", () => {
       expect(f.timeline.standAt - f.timeline.poofAt).toBe(arrival.poofMs + arrival.dropMs + arrival.landMs);
       expect(f.c.typeMs).toBeLessThan(C.typeMs);
     }
+  });
+
+  it("his transformation carries the loop of the two on from the scene as fitted to its hold, a test's short one too (#707's review, m5)", () => {
+    const L = RECLUSE_CUTSCENE_LINES;
+    // (Its own hold: the full scene's stand, its length before the phase change.)
+    expect(sceneStandAt(L, arrival, { at: 1000, until: 1000 + C.holdMs }, 1000 + C.holdMs)).toBe(tl.standAt - tl.endAt);
+    // (A test's 6 s hold: the fitted scene's stand, not the full one's (which would start the loop 100 s back, a jump in it).)
+    const fit = fitCutscene(L, arrival, 6000).timeline;
+    expect(sceneStandAt(L, arrival, { at: 1000, until: 7000 }, 7000)).toBe(fit.standAt - 6000);
+    expect(sceneStandAt(L, arrival, { at: 1000, until: 7000 }, 7000)).toBeGreaterThan(-6000);
+    // (Solo's timer a little late: still the scene's own times.)
+    expect(sceneStandAt(L, arrival, { at: 1000, until: 7000 }, 7040)).toBe(fit.standAt - 6040);
+    // (No scene led into it (a device joined at the phase change, a link straight to it), or an old one: the full scene ending now.)
+    expect(sceneStandAt(L, arrival, null, 7000)).toBe(tl.standAt - tl.endAt);
+    expect(sceneStandAt(L, arrival, { at: 1000, until: 7000 }, 60_000)).toBe(tl.standAt - tl.endAt);
   });
 
   it("has Eric's 18 lines (Nov 14: the kid's two points, then \"Why don't you show us?\"), line 15 two sentences, and never names him", () => {
