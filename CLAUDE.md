@@ -121,6 +121,9 @@ spelling in names too; older names (e.g. `colour`) stay until touched.
   - **Pre-launch only.** `main` deploys to Eric alone (Zero Trust), so a slip costs a playtest, not players. At
     launch every logic change goes back to the full lane per PR, and PRs go back to the full suite.
 - Classic (8 boards) will be reworked (Eric, Oct 5, 2026): don't invest in it until he decides the new design.
+- **Commit messages name no model (Nov 13).** End a commit with the `Claude-Session:` line only: no `Co-Authored-By:` line
+  naming a Claude model, even when the session's attribution note suggests one (this file takes precedence). Twice on Nov 13 it
+  slipped in and needed a force-push to remove.
 - Merge PRs with a **merge commit**, not squash: the working branch then stays part of `main`'s history, so the next
   push is a plain fast-forward (squash merges left the branch diverged, needing a force-push). After merging, bring
   the branch up to date with `git pull origin main` before the next change.
