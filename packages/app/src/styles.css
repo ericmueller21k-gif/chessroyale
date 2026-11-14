@@ -2427,40 +2427,6 @@ button.history-label {
   opacity: 0.12;
   transition: opacity 0.4s;
 }
-/* Exactly on its square: eighths of the board's own size (--board-size), at any size, zoom or display scale. Square
-   corners and the glow inside, so nothing of it reads as wider than the square. */
-.square-ring {
-  position: absolute;
-  left: calc(var(--board-size, 100%) * var(--sq-x, 0) / 8);
-  top: calc(var(--board-size, 100%) * var(--sq-y, 0) / 8);
-  width: calc(var(--board-size, 100%) / 8);
-  height: calc(var(--board-size, 100%) / 8);
-  box-sizing: border-box;
-  border: 4px solid #2fd27a;
-  border-radius: 2px;
-  box-shadow: inset 0 0 10px rgba(47, 210, 122, 0.65);
-  pointer-events: none;
-  z-index: 3;
-  animation: ring 500ms ease-out;
-}
-@keyframes ring {
-  from {
-    transform: scale(1.4);
-    opacity: 0;
-  }
-}
-/* Eric's look test (Nov 14, main.tsx): ?ring=off, no ring; ?ring=fade, it fades in at its size, no zoom. */
-:root[data-ring="off"] .square-ring {
-  display: none;
-}
-:root[data-ring="fade"] .square-ring {
-  animation-name: ring-fade;
-}
-@keyframes ring-fade {
-  from {
-    opacity: 0;
-  }
-}
 .selecting-label {
   position: absolute;
   left: 50%;

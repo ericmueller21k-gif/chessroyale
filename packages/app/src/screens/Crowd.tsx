@@ -14,7 +14,6 @@ import { ChatSection, LOCKED_PHONE, UnderBoard, useMedia } from "../components/Q
 import { HistoryNav, type useHistoryView } from "../components/HistoryNav.tsx";
 import { PowerUps } from "../components/PowerUpButton.tsx";
 import { BossPanel, besideBoard, useBossLayout } from "../components/MovePanel.tsx";
-import { SquareRing } from "../components/ShadeMoves.tsx";
 import { CrowdGhosts, type GhostPick } from "../components/CrowdGhosts.tsx";
 import { KingCommand, KingSummon, kingSquare } from "../components/GodKing.tsx";
 import { LastStand, clearSquare, lastStandBoard } from "../components/LastStand.tsx";
@@ -605,7 +604,6 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
               chosen={landed ? mine.result.playedMove : null}
             />
           )}
-          {played && !alone && !stand && <SquareRing square={mine.result.playedMove.slice(2, 4)} orientation={orientation} />}
           {boardClock}
           {godKing && t >= godKing.startAt - start && <KingSummon {...godKing} />}
           {command && t >= command.startAt - start && <KingCommand {...command} />}
