@@ -1,5 +1,5 @@
 import { expect, type Browser, type Page } from "@playwright/test";
-import { asAdmin, asSignedIn, named, pickMode, test } from "./helpers.ts";
+import { asAdmin, asSignedIn, named, pickMode, tapInTown, test } from "./helpers.ts";
 
 /**
  * The computer's right column and its typed global chat (Eric's approved mockup, Nov 7: docs/decisions/2026-11-07-typed-chat-column.md).
@@ -223,13 +223,8 @@ async function goIntoCircus(p: Page) {
   }
   await expect.poll(() => homeAt(p, "tiger")).not.toBeNull();
   const card = p.getByRole("dialog", { name: "Babur's Circus", exact: true });
-  await expect(async () => {
-    if (await card.isVisible()) return;
-    if (await p.getByRole("dialog").isVisible()) await p.keyboard.press("Escape");
-    const at = (await homeAt(p, "tiger"))!;
-    await p.mouse.click(at.x, at.y);
-    await expect(card).toBeVisible({ timeout: 1500 });
-  }).toPass({ timeout: 20_000 });
+  // (The tap on the frame its point came from: `tapInTown`, Nov 14.)
+  await tapInTown(p, "home", "tiger", card);
   await card.getByRole("button", { name: "Go in" }).click();
   await expect(room(p)).toHaveAttribute("data-ready", "1", { timeout: 30_000 });
 }

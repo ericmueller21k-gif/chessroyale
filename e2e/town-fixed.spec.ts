@@ -1,6 +1,6 @@
 import { mkdirSync } from "node:fs";
 import { expect, type Page } from "@playwright/test";
-import { asAdmin, test, lookDrag } from "./helpers.ts";
+import { asAdmin, test, lookDrag, townTap } from "./helpers.ts";
 
 /**
  * The street town, round 5 (Nov 5; brief-town-fixed-cam.md): one fixed view. The camera faces north whatever you press (Eric: "There
@@ -145,13 +145,12 @@ test(`one fixed view: the arrows walk all four ways and the camera never turns; 
   await expect.poll(() => page.evaluate(() => (window as unknown as { __townBossBack: (id: string) => boolean }).__townBossBack("timber")), { timeout: 30_000 }).toBe(true);
   await walkTo(page, [5, 29]);
   // (A tap on its door square, or the next of its squares drawn clear; up to three tries, as someone passing can take the tap.)
-  const cv = (await canvas(page).boundingBox())!;
   for (let tries = 0; tries < 3 && (await cam(page)).strip !== "timber"; tries++) {
     if (await page.getByRole("dialog").isVisible()) await page.keyboard.press("Escape");
-    let xy: { x: number; y: number } | null = null;
-    for (const sq of [[5, 31], [6, 31], [4, 31]] as const) if ((xy = await page.evaluate((s) => (window as unknown as W).__townAt("tap-square", s), sq))) break;
-    expect(xy, "a square of the strip drawn").not.toBeNull();
-    await page.mouse.click(cv.x + xy!.x, cv.y + xy!.y);
+    // (The tap on the frame its point came from: `townTap`, Nov 14.)
+    let tapped = false;
+    for (const sq of [[5, 31], [6, 31], [4, 31]] as const) if ((tapped = await townTap(page, "tap-square", sq))) break;
+    expect(tapped, "a square of the strip drawn").toBe(true);
     await page.waitForTimeout(300);
     await expect.poll(async () => (await me(page)).moving, { timeout: 15_000 }).toBe(false);
   }
@@ -286,10 +285,8 @@ test(`looking round: a drag turns the camera about your pawn, which doesn't move
   const here = await you(page);
   // (The square back the way you came: walked through a moment ago, so it's street, not a lamp or a home's front.)
   const sq = [here[0], here[1] + 1] as const;
-  const xy = await page.evaluate((s) => (window as unknown as W).__townAt("tap-square", s), sq);
-  expect(xy, `${sq} drawn in the turned view`).not.toBeNull();
-  const cv = (await canvas(page).boundingBox())!;
-  await page.mouse.click(cv.x + xy!.x, cv.y + xy!.y);
+  // (The tap on the frame its point came from: `townTap`, Nov 14.)
+  expect(await townTap(page, "tap-square", sq), `${sq} drawn in the turned view`).toBe(true);
   await expect.poll(async () => (await you(page)).join(","), { timeout: 15_000 }).toBe(sq.join(","));
   // (The tap locked west in: the base heading, the camera where it was.)
   await expect.poll(async () => mod((await cam(page)).headingBase), { timeout: 3000 }).toBe(270);

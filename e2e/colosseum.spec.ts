@@ -1,5 +1,5 @@
 import { expect, type Page } from "@playwright/test";
-import { test, townReady } from "./helpers.ts";
+import { test, townReady, townTap } from "./helpers.ts";
 
 /**
  * Inside the Colosseum, the first look (Oct 30; docs/areas/colosseum.md): the town's Colosseum card links in, the arena draws
@@ -49,8 +49,8 @@ test("the Colosseum's first look: the card's link in, the arena drawn, Change se
   await townReady(page);
   const gate = (await page.evaluate(() => (window as unknown as { __townAt: (k: string) => { x: number; y: number } | null }).__townAt("coliseum")))!;
   expect(gate, "the Colosseum is drawn at the start").not.toBeNull();
-  const cv = (await page.locator("canvas.town-canvas").boundingBox())!;
-  await page.mouse.click(cv.x + gate.x, cv.y + gate.y);
+  // (The tap on the frame its point came from: `townTap`, Nov 14.)
+  expect(await townTap(page, "coliseum", "coliseum"), "the Colosseum's gate tapped").toBe(true);
   const card = page.getByRole("dialog", { name: "The Colosseum", exact: true });
   await expect(card.getByRole("button", { name: "Raids with people" })).toBeDisabled();
   const look = card.getByRole("link", { name: "Look inside (preview)" });

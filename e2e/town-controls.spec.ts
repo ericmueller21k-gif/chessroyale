@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { mkdirSync, rmSync } from "node:fs";
 import { devices, expect, type Page } from "@playwright/test";
-import { asAdmin, test, lookDrag, quickTap } from "./helpers.ts";
+import { asAdmin, test, lookDrag, townTap } from "./helpers.ts";
 
 /**
  * The street town's controls and minimap (Nov 5; brief-street-controls-map.md, docs/decisions/2026-11-05-street-controls-map.md):
@@ -161,10 +161,8 @@ async function drag(page: Page, share: number) {
 }
 /** Taps square `sq` where it's drawn (a quick tap: a walk). */
 async function tapSquare(page: Page, sq: readonly [number, number]) {
-  const xy = await page.evaluate((s) => (window as unknown as W).__townAt("tap-square", s), sq);
-  expect(xy, `${sq} drawn`).not.toBeNull();
-  const cv = (await canvas(page).boundingBox())!;
-  await quickTap(page, cv.x + xy!.x, cv.y + xy!.y);
+  // (The tap on the frame its point came from: `townTap`, Nov 14.)
+  expect(await townTap(page, "tap-square", sq), `${sq} drawn`).toBe(true);
 }
 async function arrowStep(page: Page, key: string) {
   const from = await you(page);

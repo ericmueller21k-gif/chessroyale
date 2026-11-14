@@ -1,5 +1,5 @@
 import { expect, type Page } from "@playwright/test";
-import { test } from "./helpers.ts";
+import { test, townTap } from "./helpers.ts";
 import { BOTS } from "../packages/app/src/town/world.ts";
 import { wrapF } from "../packages/app/src/town/camera.ts";
 import { TOWN_FEEL } from "../packages/app/src/town/feel.ts";
@@ -219,13 +219,12 @@ test("tags fade as you walk away from a figure (not a pop), are gone past the ra
   await page.waitForTimeout(400);
   const gone = await read(page);
   expect(gone.tags.find((t) => t.text === name), "past the radius: no tag").toBeUndefined();
-  const at = await page.evaluate((id) => (window as unknown as Hooks).__townAt("bot", id), i);
-  if (!at) {
+  // (The tap on the frame its point came from, the first frame it's drawn and clear: `townTap`, Nov 14. Not drawn: nothing to tap.)
+  if (!(await townTap(page, "bot", i, 0, 0))) {
     // (The sidekick is off the screen from here, so there is nothing to tap: the card's case is covered by the unit tests of the rule.)
     test.info().annotations.push({ type: "note", description: "the sidekick was off the screen: the open-card case wasn't tapped" });
     return;
   }
-  await page.mouse.click(cv.x + at.x, cv.y + at.y);
   await expect(page.getByRole("dialog", { name: `${name}`, exact: true })).toBeVisible();
   const shown = await read(page);
   const opened = shown.tags.find((t) => t.text === name);

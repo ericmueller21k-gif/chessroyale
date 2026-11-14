@@ -42,6 +42,7 @@ export class AwayClock {
   private lastInput: number;
   private hiddenAt: number | null = null;
   private busy = false;
+  private loading = false;
 
   /** `limits` null: the rule is off (always "here"). */
   constructor(
@@ -68,9 +69,20 @@ export class AwayClock {
     this.busy = on;
   }
 
-  /** How long since your last input (0 while busy): each beat sends it. */
+  /**
+   * The town's loading screen is up (true) or gone. Nothing can be tapped under it, so it holds the idle clock (no zzz, never out for
+   * idling; it starts again from when it goes), but not the background's: a page put away as the town loads is out after the limit
+   * like any other (Nov 14: it was held as a challenge is, and the hidden time was dropped as the page came back still loading; a phone
+   * in the background runs no frames, so its loading waits for it).
+   */
+  setLoading(on: boolean, now: number): void {
+    if (this.loading !== on) this.lastInput = Math.max(this.lastInput, now);
+    this.loading = on;
+  }
+
+  /** How long since your last input (0 while busy or loading): each beat sends it. */
   idleMs(now: number): number {
-    return this.busy ? 0 : Math.max(0, now - this.lastInput);
+    return this.busy || this.loading ? 0 : Math.max(0, now - this.lastInput);
   }
 
   /** Here, away (the zzz), or out (boot). */
@@ -78,6 +90,7 @@ export class AwayClock {
     const L = this.limits;
     if (!L || this.busy) return "here";
     if (this.hiddenAt !== null && now - this.hiddenAt >= L.hiddenBootMs) return "out";
+    if (this.loading) return "here";
     const idle = now - this.lastInput;
     if (idle >= L.bootMs) return "out";
     return idle >= L.zzzMs ? "zzz" : "here";

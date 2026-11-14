@@ -131,12 +131,14 @@ export function awayLimits(): AwayLimits | null {
 /**
  * The town's away rule and its beats, until the returned function is called. `onState`: here or the "zzz" (yours to draw); `onOut`:
  * you were away too long (once; the town leaves for home). `busy`: a challenge or the claw machine has you. `shop`: the room you're
- * in (null: the town square). `onOthers`: the server's answer was put in the town (who left: a card open on them closes).
+ * in (null: the town square). `loading`: the town's loading screen is up (holds the idle clock, not the background's: afk.ts
+ * `setLoading`). `onOthers`: the server's answer was put in the town (who left: a card open on them closes).
  */
 export function watchAway(o: {
   town: Town;
   shop: () => string | null;
   busy: () => boolean;
+  loading?: () => boolean;
   onState: (s: AwayState) => void;
   onOut: () => void;
   onOthers?: (gone: Person[], dressed: Person[]) => void;
@@ -197,6 +199,7 @@ export function watchAway(o: {
     if (done) return;
     const now = Date.now();
     clock.setBusy(o.busy(), now);
+    clock.setLoading(o.loading?.() ?? false, now);
     if (o.town.you.walker.moving()) clock.act(now);
     const s = clock.state(now);
     if (s === "out") return out();

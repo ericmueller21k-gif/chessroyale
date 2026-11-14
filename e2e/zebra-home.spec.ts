@@ -1,5 +1,5 @@
 import { expect, type Page } from "@playwright/test";
-import { asAdmin, test, townReady } from "./helpers.ts";
+import { asAdmin, tapInTown, test, townReady } from "./helpers.ts";
 import { ZEBRA_BACK_LINES, ZEBRA_OUTSIDE_LINES } from "../packages/app/src/town/shops/zebra-lines.ts";
 
 /**
@@ -116,13 +116,8 @@ test("Rolling Dough: in, the guards watch you, the counter zebra's line, through
   }
   // The guard out front (Eric, Nov 11), where the other homes' bosses stand: his card, Talk, "the boss is inside" (a line at random).
   const guard = page.getByRole("dialog", { name: "Bakery guard", exact: true });
-  await expect(async () => {
-    if (await guard.isVisible()) return;
-    const at = await homeAt(page, "boss");
-    expect(at, "the guard out front on screen").not.toBeNull();
-    await page.mouse.click(at!.x, at!.y);
-    await expect(guard).toBeVisible({ timeout: 1500 });
-  }).toPass({ timeout: 20_000 });
+  // (The tap on the frame its point came from: `tapInTown`, Nov 14.)
+  await tapInTown(page, "boss", "zebra", guard);
   await expect(guard.getByRole("button")).toHaveText(["Talk"]);
   const box0 = (await guard.boundingBox())!;
   await guard.getByRole("button", { name: "Talk" }).click();
@@ -135,13 +130,7 @@ test("Rolling Dough: in, the guards watch you, the counter zebra's line, through
   await page.keyboard.press("Escape");
   await expect(guard).toBeHidden();
   const card = page.getByRole("dialog", { name: "Rolling Dough", exact: true });
-  await expect(async () => {
-    if (await card.isVisible()) return;
-    const at = await homeAt(page);
-    expect(at).not.toBeNull();
-    await page.mouse.click(at!.x, at!.y);
-    await expect(card).toBeVisible({ timeout: 1500 });
-  }).toPass({ timeout: 20_000 });
+  await tapInTown(page, "home", "zebra", card);
   await expect(card.getByRole("button")).toHaveText(["Go in"]);
   await card.getByRole("button", { name: "Go in" }).click();
   await expect(room(page)).toHaveAttribute("data-ready", "1", { timeout: 20_000 });
@@ -295,13 +284,7 @@ test("Rolling Dough: Challenge plays the beat (the crew aim at you, following yo
   await page.evaluate(() => (window as unknown as Hooks).__townGlide?.("zebra"));
   await expect.poll(() => homeAt(page), { message: "the bakery comes into view" }).not.toBeNull();
   const card = page.getByRole("dialog", { name: "Rolling Dough", exact: true });
-  await expect(async () => {
-    if (await card.isVisible()) return;
-    const at = await homeAt(page);
-    expect(at).not.toBeNull();
-    await page.mouse.click(at!.x, at!.y);
-    await expect(card).toBeVisible({ timeout: 1500 });
-  }).toPass({ timeout: 20_000 });
+  await tapInTown(page, "home", "zebra", card);
   await card.getByRole("button", { name: "Go in" }).click();
   await expect(room(page)).toHaveAttribute("data-ready", "1", { timeout: 20_000 });
   await goThrough(page, "Go in", "back");

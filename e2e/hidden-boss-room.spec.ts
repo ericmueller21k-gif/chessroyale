@@ -2,7 +2,7 @@ import { mkdirSync } from "node:fs";
 import { devices, expect, type Page } from "@playwright/test";
 import { HIDDEN_ROOM } from "@chessroyale/core";
 import { legalMoves } from "@chessroyale/chess";
-import { asServerAdmin, asSignedIn, submitMove, test } from "./helpers.ts";
+import { asServerAdmin, asSignedIn, submitMove, tapInTown, test } from "./helpers.ts";
 
 /**
  * The Hidden Boss's room challenge (Eric, Nov 12 and 13; docs/areas/town-square.md, "His room's challenge"): up his walk-up to the top
@@ -88,13 +88,8 @@ async function toLanding(page: Page, townroom: string) {
   await expect.poll(homeAt, { message: "the walk-up comes into view", timeout: 20_000 }).not.toBeNull();
   await page.waitForTimeout(1200);
   const card = page.getByRole("dialog", { name: "The Walk-up", exact: true });
-  await expect(async () => {
-    if (await card.isVisible()) return;
-    const at = await homeAt();
-    expect(at).not.toBeNull();
-    await page.mouse.click(at!.x, at!.y);
-    await expect(card).toBeVisible({ timeout: 1500 });
-  }).toPass({ timeout: 20_000 });
+  // (The tap on the frame its point came from: `tapInTown`, Nov 14.)
+  await tapInTown(page, "home", "recluse", card);
   await card.getByRole("button", { name: "Go in" }).click();
   await expect(room(page)).toHaveAttribute("data-ready", "1", { timeout: 20_000 });
   await climb(page, "landing", "Go up");

@@ -21328,7 +21328,15 @@ button.sq-tiny {
   aspect-ratio: 1;
   transform: translateY(-50%);
   filter: drop-shadow(0 0 0.7px #04361a) drop-shadow(0 0 0.7px #04361a) drop-shadow(0 0 5px rgba(64, 255, 120, 0.95));
-  animation: ac-appear 160ms ease-out;
+  animation: ac-sil-appear 160ms ease-out;
+}
+/* (Its own, keeping its centering: `ac-appear`'s scale replaced the translate while it grew, so it showed half a square low and slid
+   up into place, and a tap read from it then landed on the square below. Nov 14, autochess:259.) */
+@keyframes ac-sil-appear {
+  from {
+    transform: translateY(-50%) scale(0.4);
+    opacity: 0;
+  }
 }
 .ac-sil-shape {
   display: block;
