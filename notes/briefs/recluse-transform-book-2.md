@@ -41,3 +41,21 @@ repeated, up to 3 hours) for the director's `.go` (it will contain "round2" and 
 too, if any: list them), keep the boss kit and the split-on-the-drop test green; watch it frame by frame with real taps
 (`npm run frames:boss`); one still per platform of the reveal; `.pr-body.md` (what changed, player-visible, checks old -> new);
 `.done`. No PRs, no CI waits, no model names in commits (end commits with the Claude-Session line only).
+
+## Round 3 (Eric, Nov 14, after round 2's visor): a full suit and helmet instead of the visor
+Eric: "give him a full exoskeleton-style futuristic armor… don't make it look like war… more like computer networking, that sort of
+wiring… a matching full-head helmet that is part of it. When he transforms, the full front visor flips up, and that's when he says
+something, and then he flips it back down, covering his face again… red and kind of blue, some yellow… not a thick bodysuit: fairly
+fit to his body… what I wanted to avoid was him fusing with a computer… he's just in a futuristic full body suit."
+- Keep round 2's sequence (book, white eyes, relaxed arms, the light, the white-out, the reveal as the light dies down); the reveal
+  now shows him in the suit and helmet, visor down. The visor flips UP to show his face for his line ("Computation without
+  creativity is nothing. Now I have both."), then flips back DOWN, and stays down for phase 2 (the bust in the bar shows the helmet).
+- The suit: fitted, sleek, circuit-board / network-wiring lines (thin glowing traces, nodes, cable runs), not battle plating, not
+  weapons, not a machine fused into him. Mostly deep red and blue with yellow accents/traces.
+- **Original design (required):** it must not read as any famous armored hero. Red-and-gold plate armor with a flip-up faceplate
+  is Iron Man's look: avoid gold plating, a chest reactor circle, the faceplate's eye slits/mouth shape, and that silhouette. Lean
+  on blue as a main color, circuit-trace patterning, a single smooth visor (not eye slits), and his own hair/face shape. Say in the
+  README how it stays distinct.
+- Phase 2: his figure, the bar's bust and the four boards' figure all wear it. Visor flip as a short animation (a few frames).
+Mockup round 3 as before (GIFs, stills incl. a suit close-up front/side, the visor up and down), `.mockup` "round 3", wait for `.go`
+containing "round3".
