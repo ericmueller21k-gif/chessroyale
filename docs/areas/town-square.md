@@ -1215,7 +1215,7 @@ uploading 0.2); slowed 4x: about 21 s. 10 kept pages, 12 in all (192 MB). After 
 `art2d`): uploading a GPU canvas waits for the GPU. Hooks: `__townPaint()`'s `loading`, `loadMs`, `loadPaintMs`, `atlas`. Tests:
 `packages/app/test/town-atlas.test.ts`, `e2e/town-street.spec.ts` ("the town's loading screen…").
 **Its music step (Nov 12; [decision](../decisions/2026-11-12-music-mono-preload.md)):** from the bar's start every boss theme is fetched
-beside the painting (`music.ts` `preloadMusic`: fetched, never decoded); with Music on the town takes the bar to 85% and "Loading music…"
+beside the painting (`music.ts` `preloadMusic`: fetched, never decoded; about 44 MB since Nov 14's stereo 192 kbps, about a minute at 6 Mbps, most of it behind the open town); with Music on the town takes the bar to 85% and "Loading music…"
 the rest (`MUSIC.townShare`), only for what hasn't landed once the town is built, at most `MUSIC.townWaitMs` (3 s; then the town opens and
 the rest lands behind it). Music or Sound off: nothing fetched, no step. Hook: `__townPaint()`'s `loadMusicMs`. Test: `e2e/town-street.spec.ts`
 ("the town's loading fetches every boss theme once").

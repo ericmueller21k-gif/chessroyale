@@ -97,7 +97,7 @@ const THEMES = {
     zebra: { intro: "zebra-intro", loop: "zebra-loop", introSeconds: 4, loopSeconds: 100 },
     // (The Hidden Boss's, as the handoff has them, Nov 13.)
     "recluse-house": { intro: null, loop: "recluse-house-loop", introSeconds: 0, loopSeconds: 60 },
-    "recluse-phase2": { intro: "recluse-phase2-intro", loop: "recluse-phase2-loop", introSeconds: 58.869625, loopSeconds: 89.275563 },
+    "recluse-phase2": { intro: "recluse-phase2-intro", loop: "recluse-phase2-loop", introSeconds: 118.887167, loopSeconds: 89.275563 },
     "recluse-beaten": { intro: "recluse-beaten-intro", loop: "recluse-house-loop", introSeconds: 1.815, loopSeconds: 60 },
     "recluse-phase3": { intro: "recluse-phase3-intro", loop: "recluse-phase3-loop", introSeconds: 19.29325, loopSeconds: 88.371021 },
   },
