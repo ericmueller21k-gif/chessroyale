@@ -1113,3 +1113,6 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 14 08:00: transform build done -> #707 (CI 82d4b2e7). Boss-lane review: session_01JuCWRv1WnTZR5bs8yfkb8q -> review/707.
   Music HQ helper (#tbd) adding the long recluse-phase2 intro in stereo 192 (watcher bnv3aw9q1). Running Opus: music HQ + review.
   After #707: visual QA, flaky round 4.
+- Nov 14 09:25: music: Eric's cached file sounds fine; the songs' session proved the file exact; cause most likely LEVEL (music at
+  -13 dB). briefs/music-level.md queued (next free slot; town-load helper refused the add-on, staying on its brief: it already
+  moved the music fetch after the first frame + per-file hash-checked brc-music cache).
