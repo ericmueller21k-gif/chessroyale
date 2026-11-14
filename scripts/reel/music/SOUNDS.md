@@ -190,3 +190,13 @@ new answering phrase) so the minute isn't thirty seconds twice, and the place's 
 Into a drop (Nov 12, Ginger's): more of the build's own sound right before it ("a little more like ice crack"), then
 "a little bit of ... pause with ... quiet, like jingling", "and then all of a sudden like the big ice shatter, and
 then it jumps back into it": a hush of a bar, one big hit from the boss's world with room to be heard, then the drop.
+
+## The town's theme (Nov 14, song_ad.py): sent, no verdict yet
+
+Eric: "make a theme, a town theme ... about 3 minutes ... the goal is it's a song where people literally are like, I
+want to turn this song on while I'm in the chess town because it's so good." From a write-up of a style (another
+game's playground tune, a 1920s bandstand stroll), used as above: its pace, swing, no drum kit, warm voices handing
+the tune on, nothing shrill, several places in one walk; none of its chords, key or tune. Two changes for his ear: an
+ocarina where it has a horn, and the soft piano and music box in the quiet part. It is far darker than the boss themes
+by design (4 to 8 kHz about 14 dB lower): if he calls it muffled, raise the mix's low-pass and the brush first.
+Sent with a 45-second clip of a second main tune (`python3 song_ad.py out.wav b`): the tune decides this one.
