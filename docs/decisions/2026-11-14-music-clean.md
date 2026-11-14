@@ -25,3 +25,7 @@ stopped for a second, and then it was almost like it restarted at a different pa
   only when the list of devices changes, not when the same device switches mode or another app takes it. The context's `error`
   event is only in newer Chrome. We have no report showing that either signal would have caught Nov 3, so removing the trigger has
   no reason that holds. Its cost was the audible cut, and that's gone now: a rebuild of a healthy context is a silent handover.
+- **The phase-3 theme "restarting" on the four boards** (Eric, Nov 14: "it's restarted twice and it's only been like a minute"). The
+  theme doesn't flip: through the four boards, solo and online, only `simul` phases are set, and `recluseMusic` names
+  `recluse-phase3` for each until every board is decided. A unit test and e2e `music:` lines prove it (one start at the split,
+  none after until the result). The rebuild was the only restart path, and it's fixed above.

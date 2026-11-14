@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MUSIC, MUSIC_SWITCH, RECLUSE_MUSIC } from "@chessroyale/core";
+import type { Phase } from "../src/game.ts";
 
 // The audio graph, faked: what was started where, and every move of the music's gain.
 type Call = [string, ...number[]];
@@ -628,6 +629,36 @@ describe("the Hidden Boss: a theme for each point of his fight, switched mid-fig
       } finally {
         vi.useRealTimers();
       }
+    });
+
+    it("the four boards (Eric, Nov 14: \"this music keeps restarting on the third phase\"): every state they pass through names the same theme, so it starts once at the split and plays on until the result", async () => {
+      // (Each state as solo.ts and recluse-online.ts set them: the phase change, the countdown (set twice: once more after the boards'
+      // first frame), the clocks, then boards decided one by one, his ultimate; phase 1 beaten (`result`) or joined at phase 2.)
+      const split = Date.now() + 20_000;
+      const states: [Phase, boolean][] = [
+        [{ kind: "phaseChange", at: split - 17_435, splitAt: split }, false],
+        [{ kind: "simul", at: split + 9_000 }, false],
+        [{ kind: "simul", at: split + 9_120 }, false],
+        [{ kind: "simul", at: split + 9_120 }, false],
+        [{ kind: "simul", at: split + 9_120 }, false],
+      ];
+      for (const result of [true, false]) {
+        const themes = states.map(([p, decided]) => recluseMusic(p, result, decided));
+        expect(themes.slice(1).every((t) => t?.theme === H.transform && t.dropAt === undefined)).toBe(true);
+        expect(themes[0]).toEqual({ theme: H.transform, dropAt: split });
+      }
+      // Through the player: one start (its intro, then the loop on the split), nothing more until the result.
+      for (const [p, decided] of states) {
+        const r = recluseMusic(p, true, decided)!;
+        bossMusic({ key, boss: "recluse", live: true, ...r });
+        await settle();
+      }
+      expect(ctx.sources).toHaveLength(2);
+      expect(musicTheme()).toBe(H.transform);
+      // (Every board decided: the result's fade, as any boss's.)
+      expect(recluseMusic({ kind: "simul", at: split + 9_120 }, true, true)).toBeNull();
+      bossMusic(null);
+      expect(musicTheme()).toBeNull();
     });
 
     it("the result while a switch's fade waits (his beaten theme till the transformation): both stop", async () => {
