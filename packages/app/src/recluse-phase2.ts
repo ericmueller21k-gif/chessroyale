@@ -47,10 +47,12 @@ export const PHASE_CHANGE = lazyTable(() => {
   const a = RECLUSE.anims;
   const len = (n: string) => animLength(a[n]!);
   const pace = RECLUSE_PHASE2.change;
-  const T = pace.transform;
+  // (The beats are settings from the transformation theme's start, `musicAtMs` in: here, from the phase change's.)
+  const { musicAtMs, introMs, riseMs, leapMs, line2AfterMs, ...beats } = pace.transform;
+  const T = { musicAtMs, introMs, riseMs, leapMs, line2AfterMs, ...Object.fromEntries(Object.entries(beats).map(([k, v]) => [k, v + musicAtMs])) } as typeof pace.transform;
   // (His fall before it: a setting since Nov 13, as the lobby server times it too.)
   const fallMs = pace.fallMs;
-  const crackAt = T.introMs;
+  const crackAt = musicAtMs + introMs;
   const upAt = crackAt - T.leapMs;
   const crouchAt = upAt - 200;
   // (His two lines, each typed sentence by sentence at the cutscene's pace: the first while the visor is up, gone as it comes

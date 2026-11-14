@@ -2051,7 +2051,7 @@ export const RECLUSE_CUTSCENE = {
  * (four boards, about 40 moves each); each searches about a third of one re-check's nodes.
  */
 export const RECLUSE_ONLINE = {
-  changeMs: 23_400,
+  changeMs: 23_700,
   groupNodes: 120_000,
   botLoss: 0.06,
   askMs: 6000,
@@ -2120,9 +2120,10 @@ export const RECLUSE_PHASE2 = {
    */
   change: {
     /**
-     * His transformation (Eric, Nov 14; docs/decisions/2026-11-14-recluse-transformation.md), ms from its start, which is the moment
-     * the book at his feet opens, 400 ms after his cutscene's last box is gone (so `introMs` after it, the music's drop, the board
-     * cracks): the light takes him on the music's slam (`burstAt`: his eyes go white) and lifts him on its build (`riseAt`, for
+     * His transformation (Eric, Nov 14; docs/decisions/2026-11-14-recluse-transformation.md). The phase change starts as the book at
+     * his feet opens, 400 ms after his cutscene's last box is gone; the transformation theme's intro starts `musicAtMs` into it (so a
+     * device a moment late to the phase change still plays the whole intro, its drop on the split), and every beat here is ms from
+     * the intro's start (`introMs` after it, the music's drop, the board cracks): the light takes him on the music's slam (`burstAt`: his eyes go white) and lifts him on its build (`riseAt`, for
      * `riseMs`); it grows, shoots up off the screen (`shootAt`), radiates in every direction (`radiateAt`), whites out the screen
      * (`whiteAt` to `whiteFull`; unseen, the suit), holds, and dies back into the center (`downAt` to `revealAt`); the visor flips
      * up (`flipUpAt`) for his first line (`line1At`) and back down (`flipDownAt`); he leaps on the music's breath, a second before
@@ -2130,6 +2131,7 @@ export const RECLUSE_PHASE2 = {
      * `introMs` is `recluse-phase3`'s introSeconds (public/music/themes.json; a test keeps them equal).
      */
     transform: {
+      musicAtMs: 300,
       introMs: 17_435,
       burstAt: 2640,
       riseAt: 3040,

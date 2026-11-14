@@ -54,7 +54,9 @@ describe("the phase change", () => {
     const order = [0, C.burstAt, C.riseAt, C.riseAt + C.riseMs, C.shootAt, C.radiateAt, C.whiteAt, C.whiteFull, C.downAt, C.revealAt, C.flipUpAt, C.line1At, C.flipDownAt, C.crouchAt, C.upAt, C.crackAt, C.partAt, C.growAt, C.growAt + C.growMs, C.pickupAt, C.catchAt, C.backAt, C.homeAt, C.bannerAt, C.total];
     expect([...order].sort((a, b) => a - b)).toEqual(order);
     // (Every beat a setting.)
-    for (const [k, v] of Object.entries(RECLUSE_PHASE2.change.transform)) expect((C as unknown as Record<string, number>)[k], k).toBe(v);
+    // (Every beat a setting, from the transformation theme's start, `musicAtMs` into the phase change.)
+    const S = RECLUSE_PHASE2.change.transform;
+    for (const [k, v] of Object.entries(S)) expect((C as unknown as Record<string, number>)[k], k).toBe(["musicAtMs", "introMs", "riseMs", "leapMs", "line2AfterMs"].includes(k) ? v : v + S.musicAtMs);
     // (The pieces fly to their Chess960 squares as the book comes back to him, and land before "PHASE 2".)
     expect(C.shuffleAt).toBeGreaterThanOrEqual(C.pickupAt);
     expect(C.shuffleAt + C.shuffleMs).toBeLessThanOrEqual(C.bannerAt);
@@ -68,10 +70,12 @@ describe("the phase change", () => {
   it("the board cracks on the transformation theme's drop (its intro's length, themes.json), the light taking him on its slam and lifting him on its build; he leaps on its breath, a second before", () => {
     const C = PHASE_CHANGE;
     const themes = JSON.parse(readFileSync(new URL("../public/music/themes.json", import.meta.url), "utf8"));
-    expect(C.crackAt).toBe(Math.round(themes.themes["recluse-phase3"].introSeconds * 1000));
+    // (Its intro starts a moment into the phase change, so a device a little late to it still plays the whole intro.)
+    expect(C.musicAtMs).toBeGreaterThanOrEqual(200);
+    expect(C.crackAt - C.musicAtMs).toBe(Math.round(themes.themes["recluse-phase3"].introSeconds * 1000));
     expect(C.crackAt - C.upAt).toBe(1000);
     // (The music's marks: the slam 2.64 s in, the build 3.04 s, the breath a second before the drop.)
-    expect([C.burstAt, C.riseAt]).toEqual([2640, 3040]);
+    expect([C.burstAt - C.musicAtMs, C.riseAt - C.musicAtMs]).toEqual([2640, 3040]);
   });
 
   it("his two lines (Eric, Nov 13 and 14), typed at the cutscene's pace: the first with his visor up, typed out and readable before it comes down; the second after the landing, typed out by \"PHASE 2\" and gone before the clocks", () => {

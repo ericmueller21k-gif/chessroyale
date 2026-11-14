@@ -492,7 +492,8 @@ test("beaten in phase 1 (?win=1): he collapses and mumbles, his cutscene, then t
     chantLine: { selector: ".rc-say", text: /^Computation without creativity is nothing\. Now I have both\.$/ },
     chantLineB: { selector: ".rc-say .speech-line > span:first-child", text: /Now I have both\.$/ },
     chantLine2: { selector: ".rc-say", text: /^Prepare yourself\. This is the ultimate test of your skill\.$/ },
-    chantLine2B: { selector: ".rc-say .speech-line > span:first-child", text: /This is the ultimate test of your skill\.$/ },
+    // (Its last words typed as he's home again: in his place's bubble by then, his words where he is.)
+    chantLine2B: { selector: ".bc-bubble .speech-line > span:first-child", text: /This is the ultimate test of your skill\.$/ },
     crack: { selector: ".rc-crack canvas" },
     split: { selector: ".rc-split.rc-q3" },
     pickup: { selector: '.rc-tf-fig[data-anim="pickup"] canvas' },
@@ -514,8 +515,8 @@ test("beaten in phase 1 (?win=1): he collapses and mumbles, his cutscene, then t
     visorDown: { selector: '.rc-tf-fig[data-anim="flipDown"]' },
     jump: { selector: '.rc-tf-fig[data-anim="air"]' },
     // (His second line over his head, and its second sentence as it starts to type: its first letter typed.)
-    chant2: { selector: ".rc-say", text: /^Prepare yourself\./ },
-    chant2b: { selector: ".rc-say .speech-line > span:first-child", text: /^Prepare yourself\.\s*\S/ },
+    chant2: { selector: ".bc-bubble", text: /^Prepare yourself\./ },
+    chant2b: { selector: ".bc-bubble .speech-line > span:first-child", text: /^Prepare yourself\.\s*\S/ },
     crack: { selector: ".rc-crack canvas" },
     banner: { selector: ".fight-banner", text: /PHASE 2/ },
     c5: count(5),
@@ -604,13 +605,15 @@ test("beaten in phase 1 (?win=1): he collapses and mumbles, his cutscene, then t
   for (const k of [...order, "chant2", "chant2b", "ready"] as const) expect(s[k], k).not.toBeNull();
   const first = (k: keyof typeof s) => s[k]!.first;
   for (let i = 1; i < order.length; i++) expect(first(order[i]!), `${order[i - 1]} then ${order[i]}`).toBeGreaterThan(first(order[i - 1]!));
-  const near = (k: keyof typeof s, at: number) => expect(Math.abs(first(k) - first("open") - at), k).toBeLessThanOrEqual(400);
+  // (Each beat a setting from the music's start, `musicAtMs` into the phase change.)
+  const near = (k: keyof typeof s, at: number) => expect(Math.abs(first(k) - first("open") - T.musicAtMs - at), k).toBeLessThanOrEqual(400);
   near("taken", T.burstAt);
   near("white", T.whiteFull);
   near("revealed", T.revealAt);
   near("visorUp", T.flipUpAt);
   near("visorDown", T.flipDownAt);
   near("crack", T.introMs);
+  // (The theme from its intro: the phase change's start was never too late for it.)
   expect(first("crack") - first("jump")).toBeGreaterThanOrEqual(T.leapMs - 300);
   // (His first line gone as the visor comes down.)
   expect(s.line1!.last).toBeLessThanOrEqual(first("visorDown") + 100);
