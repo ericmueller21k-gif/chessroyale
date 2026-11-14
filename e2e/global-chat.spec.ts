@@ -69,8 +69,9 @@ test("chat is off by default; turning it on shows the notice once (Not now keeps
   await notice.getByRole("button", { name: "Turn on chat" }).click();
   await expect(field(ann)).toBeEnabled();
   await expect(field(ann)).toHaveAttribute("placeholder", "Send a message");
-  // Kept with the account (the server's), not only on this device.
-  expect(((await (await ann.request.get("/api/me")).json()) as { chatOn: boolean }).chatOn).toBe(true);
+  // Kept with the account (the server's), not only on this device. (The switch shows on at once and its save follows: read the server
+  // until the save has landed, not the moment after the tap, Nov 13.)
+  await expect.poll(async () => ((await (await ann.request.get("/api/me")).json()) as { chatOn: boolean }).chatOn, { message: "the server keeps chat on" }).toBe(true);
   await ann.reload();
   await expect(field(ann)).toBeEnabled();
   // Off from the gear; on again with no notice (it showed once).

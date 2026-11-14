@@ -125,7 +125,9 @@ test("computer: a real match running shows in the live window as Live (no Bot ma
   // (The switch back is the window's: a route takes the real match off the live line on cue.)
   let hide = false;
   await page.route((u) => u.pathname === "/api/live", async (route) => {
-    const res = await route.fetch();
+    // (The route's fetch is Node's, not the browser's: a kept-alive connection the local server had closed came back ECONNRESET, where
+    // the browser would have sent the request again on a new one, as it does for the app. So does this, once. Main run 43478703204.)
+    const res = await route.fetch().catch(() => route.fetch());
     const body = await res.json();
     await route.fulfill({ response: res, json: hide ? { ...body, featured: null } : body });
   });

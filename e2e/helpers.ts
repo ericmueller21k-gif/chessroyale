@@ -711,3 +711,25 @@ export async function tapInTown(page: Page, kind: TownThing, id: string | number
   }
   return card;
 }
+
+/**
+ * Waits until `read()` gives the same value (compared as JSON) for `ms` in a row, and returns it: for anything still moving when a test
+ * looks (a camera's glide, a zoom, a layout after a resize or a font arriving), so the test measures or taps where the thing is, not
+ * where it was a frame ago. Read about every 50 ms; fails after `timeout` if it never holds still. (Nov 13, "fix the cause": one helper
+ * in place of fixed `waitForTimeout`s and one-off loops; docs/decisions/2026-11-14-flaky-causes.md.)
+ */
+export async function settled<T>(page: Page, read: () => Promise<T>, ms = 300, timeout = 20_000): Promise<T> {
+  const until = Date.now() + timeout;
+  let last = JSON.stringify(await read());
+  let since = Date.now();
+  for (;;) {
+    await page.waitForTimeout(50);
+    const now = await read();
+    const key = JSON.stringify(now);
+    if (key !== last) {
+      last = key;
+      since = Date.now();
+    } else if (Date.now() - since >= ms) return now;
+    if (Date.now() > until) throw new Error(`settled: still changing after ${timeout} ms (last: ${key.slice(0, 200)})`);
+  }
+}

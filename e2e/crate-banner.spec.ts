@@ -45,6 +45,9 @@ test("crates: the gambling warning's red ring is always at the top of the crate 
   await named(page, "Warned");
   await page.goto("/shop?crates");
   await expect(page.locator(".series-crate-row")).toHaveCount(2);
+  // (The page's fonts in: what's measured here is the message box's effect, not a font arriving. Nov 13: the pixel font's swap moved the
+  // rows under the crates' title 5 px between the two looks; that title now keeps one line height, and the fonts are preloaded.)
+  await page.evaluate(() => document.fonts.ready.then(() => undefined));
   const ring = page.getByRole("button", { name: "Gambling warning" });
   const message = page.getByRole("dialog", { name: "Gambling warning" });
   const sideways = () => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);

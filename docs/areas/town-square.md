@@ -709,7 +709,8 @@ and [2026-11-02-bigger-showpieces.md](../decisions/2026-11-02-bigger-showpieces.
   `fadeMs`), the room's code and art load (only now: `shops/ShopRoom.tsx` and each room's art are chunks of their own), the town waits
   (`pause`: no frames, nothing moves, its chips put away) and the room fades in from black. **Going out** ("Go out", or the back button,
   which inside a shop means out, not home): the room fades to black and the town zooms back out from the door, you where you stood.
-  A Back or Go out tapped while the room still fades in waits for it, then goes out (`outNext`, Nov 12: it was lost).
+  A Back or Go out tapped while the room still fades in waits for it, then goes out (`outNext`, Nov 12: it was lost); a way through to
+  another room (the stairs' Go up, a back door) tapped then waits the same way and goes through (`passNext`, Nov 13).
   **The area banner (Nov 11, Eric's mockup):** as the black lifts on a room you walked into through its door (the town's, or Rolling
   Dough's door between rooms; never one you arrive in by a challenge), its name across a soft dark band a third down the room's view:
   the boss's name and 's in gold in the pixel font ("DON DOUGH'S"; Rolling Dough's back room "BACK ROOM"; a room with no boss nothing),
