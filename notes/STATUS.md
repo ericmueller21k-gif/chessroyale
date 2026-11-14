@@ -1089,3 +1089,6 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   visual QA.
 - Nov 14 04:05: night room done -> #704 (CI 52de274c). Brief ready: briefs/recluse-phase2-standings.md (xhigh: start ALONE when
   flaky round 3 finishes). Running Opus: flaky round 3 only.
+- Nov 14 04:25: Eric's notes on the transform mockup -> round 2 brief (briefs/recluse-transform-book-2.md): relaxed arms, white
+  eyes, light engulfs him and whites out the screen, change unseen, NEW final look = an original robotic visor with flowing matrix
+  text (no cyborg), reveal as the light dies down, then the creativity line; fix: big board visible behind the four during the split.
