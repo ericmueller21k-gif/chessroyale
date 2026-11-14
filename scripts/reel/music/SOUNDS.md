@@ -231,3 +231,10 @@ background thing ... this part, we just want to focus on the piano ... if it nee
 what I'm expecting". His own material is his to give: it is played note for note, and song_ad.py's docstring says
 which notes are his and what was decided in fitting it (the song's 129 not the write-up's 98, no swing for its twenty
 bars, where two runs sit, its place in the middle with the cafe moved after the lifted tune). The song is 3:36 now.
+Of that solo, heard: he liked the lyrical bars (a leap, a call, a turn in threes, long notes, both hands plain) and
+turned down every fast run: "the basic climbs up and down ... are just not hitting for me ... we need to do something
+instead of these constant climbs up and down, these quick whatever they're called." A run of 16ths up or down a scale
+or a chord has now missed in every song it was tried in (the Wrangler notes above say the same): don't write them.
+The other notes he passed on agree, and add: at most three 16ths the same way, leaps and dotted rhythms and notes
+tied over the barline so the right hand floats over the left, ornaments (a flick, a neighbor note) for interest, and a
+repeat that develops, not a copy. Two rewrites of those bars sent side by side (`take` "a" and "g").

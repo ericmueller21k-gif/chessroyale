@@ -42,8 +42,22 @@ beautiful solo piano work that's in the middle of this song. And you can still k
 that rings throughout the whole song in it. But then this part, we just want to focus on the piano ... if it needs to
 be longer to fit it in, that's what I'm expecting anyway." He sent a write-up of it: his left hand's two four-bar
 patterns, tidied to even 8ths (C major 9th, then his F sharp and D sharp over a C), and a right-hand solo written
-over them for him. Both hands are played here note for note as written (`LEFT_A`, `LEFT_B`, `RIGHT_1`, `RIGHT_2`): they
-are his to give, and nothing in them is this file's writing or any other song's. The calls made in fitting it in:
+over them for him. They are his to give. The left hand is played note for note as written (`LEFT_A`, `LEFT_B`); so are
+the right hand's first five bars and its last (`RIGHT_1`, `BAR_5`, `BAR_8`). Its bars 6 and 7 as written were runs of
+16ths, a climb and a fall, and he turned those down once he heard them: "I really like it up until 19 seconds, and
+then it just falls apart ... the basic climbs up and down ... are just not hitting for me ... maybe kind of keeping
+it in the space of the first ... we need to do something instead of these constant climbs up and down, these quick
+whatever they're called" (he liked the sour F sharp, the last bar "with both hands there", and bars 3 and 4 the second
+time). So those two bars, and the second time's bar 2 (the same kind of run), are rewritten, in two takes he asked
+for side by side (`take`):
+  "a"  this file's own: bar 6 answers in bar 3's rhythm and climbs back to the F sharp in 8ths, bar 7 turns on the D
+       sharp as bar 4 turns on the E and walks down to bar 8; the second time is the same, an octave doubled.
+  "g"  to the rules his other set of notes gives (no ladder of 16ths; leaps of fourths, fifths and sixths; dotted
+       8ths and notes tied over the barline; a flick or a neighbor note for ornament; the second time not a copy,
+       building in octaves): bar 6 leaps up to an F sharp held over the barline while the left hand turns to the D
+       sharp under it; the second time climbs on to a high B in octaves before it settles. The notes are this
+       file's; the rules are the notes'.
+The calls made in fitting it in:
   - It plays at the song's 129 beats a minute, not the write-up's 98: the backdrop he asked to keep is the song's.
   - For its twenty bars nothing swings (the song's off 8ths are late; his 8ths and 16ths are even): the brush plays
     even 8ths and the bass one soft note a bar, and the chords and wood block wait.
@@ -52,15 +66,14 @@ are his to give, and nothing in them is this file's writing or any other song's.
     doubled an octave under and strings far off under the F sharp bars (the write-up's "octaves ... a subtle pad").
     The write-up's own three-minute plan (a piece of its own, with a long opening and a cadenza) is not used: his
     words were a solo in the middle of this song.
-  - Two places where its lengths don't add up to a bar: bar 2's run of 16ths starts on the bar's first beat (its
-    "tied" E is left ringing), so the run ends on the two notes it lands on, on the third beat; and bar 7's ten 16ths
-    start after a beat and a half, so the D sharp falls with the left hand's and the last note leads into bar 8.
+  - Bar 2's lengths as written don't add up to a bar: its run of 16ths starts on the bar's first beat (its "tied" E
+    is left ringing), so the run ends on the two notes it lands on, on the third beat.
 The idea from the game: a walk round the town. The bass walks down a step a bar under a D that never moves (G, F
 sharp, F, E, E flat, D: the E flat bar is the chord borrowed from the minor, the walk's one wistful step); the tune is
 handed from voice to voice as the walk passes the square, the gazebo and the cafe; and near the end the pawn reaches
 the far side and is promoted: the tune a minor third up, everyone together. A wood block's knock is a piece set down.
 G major; 116 bars of four at 129 beats a minute: 215.8 s.
-  python3 song_ad.py <out.wav>
+  python3 song_ad.py <out.wav> [the piano solo's take: a or g]
 
   bars   1-4    0:00  the stroll starts: the bass, the chords, a brush
   bars   5-12   0:07  the square: the tune on the clarinet
@@ -147,25 +160,35 @@ TALK_A = "-:8 | G4:.5 B4:.5 E5:1.5 D5:.5 B4:1 | D5:1 B4:.5 G4:.5 F4:1 D4:1 | -:8
 eighths = lambda text: " | ".join(" ".join(name + ":.5" for name in bar.split()) for bar in text.split(" | "))
 LEFT_A = eighths("C2 G2 D3 E3 G3 E3 D3 G2 | C2 G2 E3 F3 G3 F3 E3 G2 | A2 E3 B3 C4 E4 C4 B3 E3 | F2 C3 G3 A3 E4 C4 A3 G3")
 LEFT_B = eighths("C3 F#3 A3 B3 D4 B3 A3 F#3 | C3 F#3 A3 B3 E4 D4 B3 A3 | C3 D#3 A3 B3 C4 B3 A3 D#3 | B2 E3 G3 A3 B3 A3 G3 E3")
-# The right hand over each: a flick into a leap, a run down the scale onto two notes, a call, a turn in threes; then
-# the F sharp's falling line, a climb of 16ths to a ringing F sharp, a fall of 16ths through the D sharp, and an
-# arpeggio up and out. `_UNDER`: the note it asks for under two of the long ones.
-RIGHT_1 = ("D5:.125 E5:.875 B5:1 G5:.5 A5:.5 E6:1 | D6:.25 C6:.25 B5:.25 A5:.25 G5:.25 F5:.25 E5:.25 D5:.25 E5:2 | "
-           "-:.5 E5:.5 A5:.5 B5:.5 C6:1.5 D6:.5 | E6:1/3 F6:1/3 E6:1/3 B5:1 G5:2")
-RIGHT_2 = ("F#6:1.5 E6:.5 D6:.5 B5:.5 A5:1 | F#5:.25 A5:.25 B5:.25 D6:.25 E6:.25 F#6:.25 A6:.25 B6:.25 F#6:2 | "
-           "-:1.5 G6:.25 F#6:.25 E6:.25 D#6:.25 C6:.25 B5:.25 A5:.25 F#5:.25 D#5:.25 B4:.25 | E5:2 E5:.5 G5:.5 B5:.5 E6:.5")
-RIGHT_1_UNDER, RIGHT_2_UNDER = "-:6 G4:2 | -:8", "-:12 | C5:2 -:2"
+# The right hand, bars 1 to 4 as written: a flick into a leap, a run down the scale onto two notes, a call, a turn in
+# threes. Bar 5 (the F sharp's falling line) and bar 8 (two notes, then an arpeggio up and out) as written too.
+CALL = "-:.5 E5:.5 A5:.5 B5:.5 C6:1.5 D6:.5 | E6:1/3 F6:1/3 E6:1/3 B5:1 G5:2"
+RIGHT_1 = "D5:.125 E5:.875 B5:1 G5:.5 A5:.5 E6:1 | D6:.25 C6:.25 B5:.25 A5:.25 G5:.25 F5:.25 E5:.25 D5:.25 E5:2 | " + CALL
+BAR_5, BAR_8 = "F#6:1.5 E6:.5 D6:.5 B5:.5 A5:1", "E5:2 E5:.5 G5:.5 B5:.5 E6:.5"
+# Rewritten (see the docstring), per take: the first time's bars 6 and 7; the second time's bars 1 and 2 (bar 1 as
+# written; in "g" its last note is held over the barline) and its bars 6 and 7.
+TAKES = {
+    "a": ("-:.5 B5:.5 D6:.5 E6:.5 F#6:1.5 E6:.5 | D#6:1/3 E6:1/3 D#6:1/3 B5:1 A5:1 F#5:1",
+          "D5:.125 E5:.875 B5:1 G5:.5 A5:.5 E6:1 | D6:1 B5:.5 G5:.5 E5:2",
+          "-:.5 B5:.5 D6:.5 E6:.5 F#6:1.5 E6:.5 | D#6:1/3 E6:1/3 D#6:1/3 B5:1 A5:1 F#5:1"),
+    "g": ("E5:.75 B5:.75 G5:.5 F#6:3 | B5:.75 E6:.125 D#6:.625 A5:.5 C6:.5 F#5:.5",
+          "D5:.125 E5:.875 B5:1 G5:.5 A5:.5 E6:1.75 | G5:.75 C6:.5 E5:2",
+          "E5:.75 B5:.75 G5:.5 F#6:1 A6:1 | B6:1.5 F#6:.5 A6:.5 E6:.125 D#6:.875 B5:.5"),
+}
+RIGHT_1_UNDER, RIGHT_2_UNDER = "-:6 G4:2 | -:8", "-:12 | C5:2 -:2"  # the note asked for under two of the long ones
 SOLO_PAD = "A3 D4 F#4 | A3 D4 F#4 | A3 C4 D#4 | G3 B3 E4"  # strings under the black-key bars the second time: notes his left hand plays there
 # The stroll's last bars: the tune's first hop on the piano, far off.
 LAST = "-:4 | G4:.5 B4:.5 -:.5 D5:.5 E5:2 | -:8"
 for _line, _beats in ((TUNE, 32), (UNDER, 32), (BESIDE, 32), (HOME, 4), (HOME_BESIDE, 4), (SLOW, 32), (CAFE_1, 32), (CAFE_2, 32), (BELL, 32), (TALK_C, 32), (TALK_A, 32), (LAST, 16),
-                      (LEFT_A, 16), (LEFT_B, 16), (RIGHT_1, 16), (RIGHT_2, 16), (RIGHT_1_UNDER, 16), (RIGHT_2_UNDER, 16)):
+                      (LEFT_A, 16), (LEFT_B, 16), (RIGHT_1, 16), (CALL, 8), (BAR_5, 4), (BAR_8, 4), (RIGHT_1_UNDER, 16), (RIGHT_2_UNDER, 16),
+                      *((line, 8) for take in TAKES.values() for line in take)):
     assert beats(_line) == _beats, (_line[:30], beats(_line))
 
 
-def render(window=None) -> np.ndarray:
-    """The song as heard (stereo, at the mix's own level). `window`: (from beat, to beat), to make only that passage
-    (a sample, to compare voices on)."""
+def render(take: str = "a", window=None) -> np.ndarray:
+    """The song as heard (stereo, at the mix's own level). `take`: which rewrite of the piano solo's bars 6 and 7
+    ("a" or "g": the docstring). `window`: (from beat, to beat), to make only that passage (a sample, to compare
+    voices on)."""
     x = Ride(RIDE, BEATS, None, os=2, seed=233, tape_secs=TAPE)
     x.window = window
     put, at = x.put, x.at
@@ -440,10 +463,12 @@ def render(window=None) -> np.ndarray:
         else:
             grand(first, some(LEFT_A, 0, 2), 0.047, -0.15, up=12), grand(first + 8, some(LEFT_A, 2, 4), 0.047, -0.15)
         grand(first + 16, LEFT_B, 0.047, -0.15)
-        for off, line, under in ((0, RIGHT_1, RIGHT_1_UNDER), (16, RIGHT_2, RIGHT_2_UNDER)):
+        mid, opening, mid2 = TAKES[take]
+        lines = (f"{opening} | {CALL}", f"{BAR_5} | {mid2} | {BAR_8}") if again else (RIGHT_1, f"{BAR_5} | {mid} | {BAR_8}")
+        for off, line, under in ((0, lines[0], RIGHT_1_UNDER), (16, lines[1], RIGHT_2_UNDER)):
             grand(first + off, line, 0.1, 0.15, bus="solo"), grand(first + off, under, 0.07, 0.1, bus="solo")
-            if again:
-                grand(first + off, line, 0.05, 0.1, up=-12, slow=True, bus="solo")
+            if again:  # the octave under: in "g" its second half is a little louder (the build in octaves)
+                grand(first + off, line, 0.06 if take == "g" and off else 0.05, 0.1, up=-12, slow=True, bus="solo")
     for i, names in enumerate(SOLO_PAD.split(" | ")):
         at(s0 + 64 + 4 * i, 4)
         for j, name in enumerate(names.split()):
@@ -487,9 +512,9 @@ def render(window=None) -> np.ndarray:
     return x.play(x.mixdown(levels, lowpass=8000, room=0.26, room_s=1.6))
 
 
-def main(out: str) -> None:
-    write_wav(out, render())
+def main(out: str, take: str = "a") -> None:
+    write_wav(out, render(take))
 
 
 if __name__ == "__main__":
-    main(sys.argv[1])
+    main(*sys.argv[1:3])
