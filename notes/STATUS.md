@@ -1143,3 +1143,7 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   helper session_01JuCWRrcU7Qm3pRuQssFV1J (xhigh, ALONE, claude/recluse-phase2-standings; brief incl. QA #12), watcher b05uf7u6t.
   Follow-ups: MovePanel boss rows plain portrait in phase 2; QA #11 nits; flaky leftovers (alfil:247, town-chat:1367/1370,
   fairplay:65, shop:238, town-afk:116, town-street:155, specs still using __townAt+click).
+- Nov 14 13:55: #712 MERGED fa03a8cf, LIVE 13:32. Main full run RED: hidden-boss-room:116 [desktop] both tries, #712's new checks
+  (235: GK line "Careful. My strength feels faint…" over .under-board in the party layout; 321: Moves panel no rows after the 🏆 wins
+  all four). Standings helper was already reproducing it; handed it briefs/fix-main-712.md to fix in its branch (separate commits,
+  own PR section). Next merge = that PR, which turns main green.
