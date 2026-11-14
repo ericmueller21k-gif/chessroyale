@@ -325,7 +325,7 @@ function Tag({ b, v, now, big }: { b: SimulBoardView; v: SimulView; now: number;
   const low = running && left < (v.ultAt !== null ? 2_000 : 15_000);
   return (
     <span class={`rc-tag${b.you ? " you" : ""}${running ? " running" : ""}${low ? " low" : ""}`}>
-      <span class="rc-tag-name">{b.name} </span>
+      <span class="rc-tag-name">{b.name}</span>{" "}
       <span class="rc-tag-clock">{clockShown(left)}</span>
     </span>
   );
