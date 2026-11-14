@@ -8,6 +8,12 @@ import { StreakFire } from "./StreakFire.tsx";
 
 /** Points with their sign, to `dp` decimals (Crowd 50 v 50's are kept to 2: scoreDp). */
 const signed = (x: number, dp: number) => (x >= 0 ? "+" : "") + x.toFixed(dp);
+/**
+ * A phase 2 board decided, on its player's row (Standing.board): the word, or on the small rows (a phone's panel, its names
+ * already short) a mark with the word as its title. While the board is on, nothing: the row is in, as any player still playing.
+ */
+const BOARD_WORD = { won: "Won", lost: "Lost", drawn: "Drawn" } as const;
+const BOARD_MARK = { won: "✓", lost: "✕", drawn: "½" } as const;
 /** A row moving more places than this fades in at its new place rather than sliding there. */
 const JUMP_ROWS = 4;
 
@@ -157,6 +163,12 @@ export function RaceTower({
                 {r.practice && (
                   <span class="t-practice" title="Practice mode (unlimited power-ups)">
                     💡
+                  </span>
+                )}
+                {/* (The Hidden Boss's phase 2: their board's result once it ends, after the name; the name gives way, never this.) */}
+                {r.board && r.board !== "playing" && (
+                  <span class={`t-board ${r.board}`} title={BOARD_WORD[r.board]}>
+                    {mini ? BOARD_MARK[r.board] : BOARD_WORD[r.board]}
                   </span>
                 )}
               </span>

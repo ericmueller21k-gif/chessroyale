@@ -36,7 +36,9 @@ export function exitNote(m: Pick<GameView, "serverPaced" | "seatToBot" | "boss" 
   // your board on, from the phase change on.)
   if (online && m.simul && kind === "resign") return "You'll leave this match and it counts as a loss. A bot plays your board on.";
   if (!online && m.simul?.playing) return kind === "resign" ? "Your board is lost. The other boards play on, but all four must be won." : "The battle ends here, and the boss wins it.";
-  const out = !!m.standings().find((s) => s.isYou)?.out;
+  // (Online, every phase 2 board decided: everyone's result stands, the results on their way. The scoreboard shows its board
+  // players still in until then: phase2Standings.)
+  const out = !!m.standings().find((s) => s.isYou)?.out || (online && !!m.simul?.decided);
   if (kind === "leave") {
     if (out) return online ? "You're already out, so your result stands. You'll go home." : "You're already out, so your result stands. You'll see it now.";
     if (!online) return exitTo === "town" ? "You'll go back to the town square. Nothing goes on your record." : "You'll go home. Nothing goes on your record.";

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { DEFAULT_SETTINGS, HIDDEN_ROOM, LEAVING, RECLUSE_CHILD, RECLUSE_CUTSCENE, RECLUSE_FORMS, RECLUSE_ONLINE, RECLUSE_PHASE2, childRating, hiddenRoomSettings, levelForMaia, maiaTopRating, modeSettings, mulberry32, recluseChildFirst, recluseNextForm, type FairMove, type Settings } from "@chessroyale/core";
-import { START_FEN, applyMove, bankLeft, legalMoves, type BoardScore, type MatchRunner, type MoveScore, type ServerMessage } from "@chessroyale/chess";
+import { START_FEN, applyMove, bankLeft, legalMoves, phase2Standings, type BoardScore, type MatchRunner, type MoveScore, type ServerMessage } from "@chessroyale/chess";
 import { LobbyCore, newLobbyRecord, type PartyLobby } from "../src/lobby.ts";
 import { mateFirst, phase2NoResult, phase2NoResultFor, phase2Unvouched, pick, quickMove, withMates, type Phase2SearchRequest } from "../src/bosses/recluse.ts";
 import { lobbyOptions } from "../src/lobby-options.ts";
@@ -476,6 +476,40 @@ describe("the admins' ultimate trigger in phase 2 (as solo's)", () => {
     expect(F.p2().state.ultAt).toBe(F.now);
     expect(F.last("p1", "phase2")!.p2.ultAt).toBe(F.now);
     expect(F.core.ultimateTrigger("p1", true)).toBe(false);
+  });
+});
+
+describe("the scoreboard through his fall and phase 2 (Eric's playtest, Nov 14: every row \"out\", a phone's Players tab empty)", () => {
+  it("phase 1's end places everyone (what the server sends reads out, and stays the results' truth); with his boards the four show in, each board's state as it ends, a leaver out; the results as before", () => {
+    const F = roomFight(2, 2, { engine: true });
+    F.beatAdult();
+    const fall = F.last("p1", "boss")!;
+    expect(fall.toPhase2).toBe(true);
+    // (The cause: his battle over, the runner places everyone, so its standings read "out" for the four who fought him.)
+    expect(fall.standings.map((s) => [s.out, s.placement])).toEqual([1, 2, 3, 4].map((n) => [true, n]));
+    // What the screens show from his fall (its word on who takes the boards): the four in, playing, with phase 1's points.
+    const atFall = phase2Standings(fall.standings, fall.phase2Boards!.map((player) => ({ player })));
+    expect(atFall.map((s) => [s.out, s.board])).toEqual(fall.standings.map(() => [false, "playing"]));
+    expect(atFall.map((s) => [s.id, s.points])).toEqual(fall.standings.map((s) => [s.id, s.points]));
+    F.toBoards();
+    expect(phase2Standings(fall.standings, F.last("p1", "phase2")!.p2.boards).every((s) => !s.out && s.board === "playing")).toBe(true);
+    // p2 resigns (a bot plays their board on, under its own id): out. Then the admin's 🏆 wins every board.
+    const placementOfP2 = fall.standings.find((s) => s.id === "p2")!.placement;
+    F.core.message("p2", { t: "resign" });
+    expect(F.core.winFormTrigger("p1", true)).toBe(true);
+    for (const s of F.searches.splice(0)) F.answer(s);
+    F.answerAsks();
+    F.advance(RECLUSE_PHASE2.botMoveMs[1] + 100);
+    expect(F.p2().done).toMatchObject({ beaten: true, won: 4 });
+    // (A device holds the fall's standings: phase 2's messages carry none.)
+    const shown = phase2Standings(fall.standings, F.last("p1", "phase2")!.p2.boards);
+    expect(shown.filter((s) => !s.out).map((s) => [s.id, s.board])).toEqual(fall.standings.filter((s) => s.id !== "p2").map((s) => [s.id, "won"]));
+    expect(shown.find((s) => s.id === "p2")).toMatchObject({ out: true, placement: placementOfP2 });
+    // The results: everyone placed as phase 1's end placed them; the standings they carry, as before.
+    F.advance(F.p2().done!.until - F.now);
+    const res = F.last("p1", "results")!;
+    expect(res.placements).toEqual(Object.fromEntries(fall.standings.map((s) => [s.id, s.placement])));
+    expect(res.standings.map((s) => [s.id, s.out, s.placement, s.points])).toEqual(fall.standings.map((s) => [s.id, true, s.placement, s.points]));
   });
 });
 

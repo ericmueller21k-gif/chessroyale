@@ -1,4 +1,4 @@
-import { toSan, type BoardRound, type Base, type BoardSlot, type Capture, type LivePick, type NetBoss, type NetFinal, type NetLightsOut, type NetStanding, type NetVote } from "@chessroyale/chess";
+import { toSan, type BoardRound, type Base, type BoardSlot, type Capture, type LivePick, type NetBoss, type NetFinal, type NetLightsOut, type NetStanding, type NetVote, type Phase2Seat } from "@chessroyale/chess";
 import { brilliance, type MaterialSlip } from "@chessroyale/core";
 import { roundsInStage, type Augment, type Settings } from "@chessroyale/core";
 import type { MatchChat } from "./chat.ts";
@@ -31,8 +31,11 @@ export interface BoardView {
   captures?: Capture[];
 }
 
-/** One row of the live leaderboard. */
-export type Standing = NetStanding & { isYou: boolean };
+/**
+ * One row of the live leaderboard. `board`: the Hidden Boss's phase 2, from his fall until the results, a player on one of his
+ * boards: still in, and how their board stands (phase2Standings).
+ */
+export type Standing = NetStanding & { isYou: boolean; board?: Phase2Seat };
 
 /** A power-up's suggestion: one of the engine's top moves and the mover's expected score after it. */
 export interface Hint {

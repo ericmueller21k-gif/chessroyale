@@ -17,6 +17,8 @@ import {
   phase2Numbers,
   phase2Outcome,
   phase2Resign,
+  phase2Seat,
+  phase2Standings,
   phase2Timeouts,
   phase2Ult,
   phase2WinAll,
@@ -24,6 +26,7 @@ import {
   phase2ToMove,
   recentMoves,
   startPhase2,
+  type NetStanding,
   type Phase2State,
   type UciTransport,
 } from "../src/index.ts";
@@ -324,5 +327,46 @@ describe("testing (admins, Nov 13): \"Win this form\" in phase 2 wins every boar
     expect(phase2Outcome(won)).toMatchObject({ decided: true, won: 3 });
     expect(phase2Outcome(phase2WinAll(start(), T0))).toMatchObject({ decided: true, beaten: true });
     expect(phase2WinAll(won, T0)).toBe(won);
+  });
+});
+
+describe("the scoreboard from his fall until the results (Eric's playtest, Nov 14: every row read \"out\", a phone's Players tab empty)", () => {
+  // (Phase 1's end placed everyone (core finishBoss): the four who fought him 1 to 4, out, beside those knocked out before.)
+  const row = (id: string, placement: number, points: number): NetStanding => ({ id, name: id, points, stageScore: points, avg: 0, bankMs: 60_000, avgThinkMs: 0, rating: null, powerUps: 0, powerUpsUsed: 0, practice: false, isBot: id.startsWith("bot"), out: true, placement });
+  const placed = [row("bot2", 1, 3.5), row("you", 2, 2.25), row("bot1", 3, 1), row("bot3", 4, -0.5), row("cut1", 5, 0), row("cut2", 6, -1)];
+
+  it("those on his boards are in, playing, with phase 1's points, first in the order they stood; everyone else as they were; the placements untouched", () => {
+    const shown = phase2Standings(placed, start().boards);
+    expect(shown.map((s) => [s.id, s.out, s.board])).toEqual([
+      ["bot2", false, "playing"],
+      ["you", false, "playing"],
+      ["bot1", false, "playing"],
+      ["bot3", false, "playing"],
+      ["cut1", true, undefined],
+      ["cut2", true, undefined],
+    ]);
+    // (Points, placements and every other number as phase 1 left them: what's stored and rewarded comes from those.)
+    expect(shown.map(({ out: _o, board: _b, ...r }) => r)).toEqual(placed.map(({ out: _o, ...r }) => r));
+    expect(placed.every((r) => r.out)).toBe(true);
+    // (Before the boards are set up, his fall's word on who takes them: all playing.)
+    expect(phase2Standings(placed, PLAYERS.map((player) => ({ player }))).filter((s) => !s.out)).toHaveLength(4);
+  });
+
+  it("each board's state as it ends: won, lost, drawn; someone who left (their board a bot's under a new id) shows out; a fresh bot has no row", () => {
+    const edits: Partial<Phase2State["boards"][number]>[] = [{ result: { winner: "crowd", how: "mate" } }, { result: { winner: "boss", how: "time" } }, { result: { winner: "draw", how: "stalemate" } }, { player: "rb9" }];
+    const st = withBoards(start(), (id) => edits[id]!);
+    const shown = phase2Standings(placed, st.boards);
+    // (Boards 0 to 3: you won, bot1 lost, bot2 drew, bot3 left (a bot plays it). The rows keep phase 1's order.)
+    expect(shown.map((s) => [s.id, s.out, s.board ?? null])).toEqual([
+      ["bot2", false, "drawn"],
+      ["you", false, "won"],
+      ["bot1", false, "lost"],
+      ["bot3", true, null],
+      ["cut1", true, null],
+      ["cut2", true, null],
+    ]);
+    expect(shown.find((s) => s.id === "bot3")!.placement).toBe(4);
+    expect(shown.some((s) => s.id === "rb9")).toBe(false);
+    expect([null, { winner: "crowd", how: "resign" }, { winner: "boss", how: "resign" }, { winner: "draw", how: "draw" }].map((r) => phase2Seat(r as never))).toEqual(["playing", "won", "lost", "drawn"]);
   });
 });

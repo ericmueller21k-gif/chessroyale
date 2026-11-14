@@ -1,6 +1,6 @@
 import { RECLUSE_CHILD, RECLUSE_CUTSCENE, RECLUSE_PHASE2, BOSS_ALONE_SCORING, bossClockSettings, BOSS_BRAIN, BOSS_POWERS, DEFAULT_SETTINGS, MATCHMAKING, type ItemLook, type MatchmakingType, botVotes, castPregameVote, clockAfterVote, closePregameVote, cutSeconds, pregameVotes, voteResultMs, type Augment, type BossBrain, type PlayerState, type Settings } from "@chessroyale/core";
 import { GUARD_WORDS, MatchRunner, START_FEN, baseAt, ShowdownScout, brainLine as brainWords, boardSlots, type HumanUciEngine, netBoard, type LobbyPlayer, type LivePick, toSan, type BoardSlot, type BoardState, type NetFinal, type Opening, type RoundReport, type UciEngine } from "@chessroyale/chess";
-import { bulletClock, crowdRace, phase2Numbers, phase2ToMove, botRoster, bossIntroTimeline, bossThinkMs, landedEarlyMs, fullMoonMs, folioTurnMs, popOffMs, zebraTurnMs, bossTurnShowMs, judgeTaps, bossRules, kingHelpBlocked, kingMoveMs, kingStrikeMs, lightsDeadline, lightsOutTimeline, lightsRoundEnd, lastStandMs, powerMomentMs, rushKeep, rushMovesLeft, rushSquares, rushTimeline } from "@chessroyale/chess";
+import { bulletClock, crowdRace, phase2Numbers, phase2Standings, phase2ToMove, botRoster, bossIntroTimeline, bossThinkMs, landedEarlyMs, fullMoonMs, folioTurnMs, popOffMs, zebraTurnMs, bossTurnShowMs, judgeTaps, bossRules, kingHelpBlocked, kingMoveMs, kingStrikeMs, lightsDeadline, lightsOutTimeline, lightsRoundEnd, lastStandMs, powerMomentMs, rushKeep, rushMovesLeft, rushSquares, rushTimeline } from "@chessroyale/chess";
 import type { BossView, BoardView, DarkNote, ExitKind, FinalView, GameView, Hint, LightsView, MoveRecord, RushView, Phase, SimulView, Standing, VoteView } from "./game.ts";
 import { PHASE2_ULT_ANIMS, PHASE_CHANGE, Phase2Game, phase2Follows, phase2Mates, phaseChangeRun } from "./recluse-phase2.ts";
 import { RECLUSE_LINES } from "./characters/recluse-lines.ts";
@@ -194,7 +194,12 @@ export class SoloMatch implements GameView {
     return id === HUMAN;
   }
   standings(): Standing[] {
-    return this.runner.leaderboard().map((s) => ({ ...s, isYou: s.id === HUMAN }));
+    const rows = this.runner.leaderboard();
+    // (The Hidden Boss's phase 2 players still in from his fall until the results: phase2Standings. Phase 1's end placed everyone,
+    // and that stays the truth for the result.)
+    const k = this.phase.kind;
+    const boards = k === "phaseChange" || k === "simul" ? this.phase2?.state.boards : k === "boss" && this.phase.toPhase2 ? this.phase2Seats.map((player) => ({ player })) : null;
+    return (boards ? phase2Standings(rows, boards) : rows).map((s) => ({ ...s, isYou: s.id === HUMAN }));
   }
   slots(): BoardSlot[] {
     return this.runner ? boardSlots(this.runner.boards, this.runner.state.boards) : [];
@@ -1202,6 +1207,8 @@ export class SoloMatch implements GameView {
     this.timer = setTimeout(() => this.startSimul(), PHASE_CHANGE.total);
   }
   private phase2Names = new Map<string, string>();
+  /** His fall, phase 2 to follow: who takes his boards (the scoreboard's, until the boards are set up: `standings`). */
+  private phase2Seats: string[] = [];
 
   /**
    * Phase 2's boards, set: a countdown on every one first (PHASE_CHANGE.countdownMs; Eric, Oct 17: "you're going to be so
@@ -1376,6 +1383,8 @@ export class SoloMatch implements GameView {
         // phase change and phase 2 (Boss alone, a solo Crowd's final), or the result screen, where he goes on mumbling.
         // Before his phase change the fall is short, and his words are cleared as he falls, so his mumbling carries on.)
         const phase2 = this.phase2Due();
+        // (Who takes his boards, for the scoreboard through his fall and cutscene: you, then those phase2Mates keeps.)
+        this.phase2Seats = phase2 ? [HUMAN, ...mates.slice(0, RECLUSE_PHASE2.boards - 1).map((m) => m.id)] : [];
         const fallMs = this.runner.boss?.result !== "crowd" ? undefined : phase2 ? PHASE_CHANGE.fallMs : bossRules(this.runner.boss)?.fallMs;
         if (fallMs) {
           if (phase2) bossVoice.reset();
