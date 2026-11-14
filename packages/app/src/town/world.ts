@@ -1089,16 +1089,17 @@ const RINGS = 6;
 /**
  * Where `w` should end up to stand at `at` (`beside`: next to it), one pawn a square: `at` itself if it's free (and not
  * `beside`), else the nearest free square around it, ring by ring (the 8 squares touching it, then the 16 round those,
- * ...), and in a ring the one `w` reaches in fewest steps. Null if there's none (or no way there).
+ * ...), and in a ring the one `w` reaches in fewest steps. Null if there's none (or no way there). `ok`: only the squares at these
+ * offsets from `at` (the test hook's call: off the camera's line through you).
  */
-export function spotNear(t: Town, w: Walker, at: Sq, beside: boolean): Sq | null {
+export function spotNear(t: Town, w: Walker, at: Sq, beside: boolean, ok?: (dc: number, dr: number) => boolean): Sq | null {
   const d = stepsFrom(w.here());
   for (let k = beside ? 1 : 0; k <= RINGS; k++) {
     let best: Sq | null = null;
     let bestD = Infinity;
     for (let dr = -k; dr <= k; dr++)
       for (let dc = -k; dc <= k; dc++) {
-        if (Math.max(Math.abs(dc), Math.abs(dr)) !== k) continue;
+        if (Math.max(Math.abs(dc), Math.abs(dr)) !== k || (ok && !ok(dc, dr))) continue;
         const c = colI(at.c + dc);
         const r = rowI(at.r + dr);
         if (c < 0 || r < 0) continue;
