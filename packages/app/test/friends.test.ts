@@ -89,7 +89,10 @@ describe("friends in the app", () => {
         target = { kind: "crowd", code: "LOBBY" };
         return target;
       },
-      join: (kind, code) => joined.push(`${kind}:${code}`),
+      join: (kind, code, taken) => {
+        joined.push(`${kind}:${code}`);
+        taken();
+      },
     });
     expect(inviteMode()).toBe("new");
     // Refused: no game is made for it.
@@ -114,6 +117,28 @@ describe("friends in the app", () => {
     expect(joined).toEqual(["crowd:ABCDE"]);
     await vi.waitFor(() => expect(posted).toEqual([{ path: "/api/friends/dismiss", body: { id: "f1" } }]));
     expect(inviteToast()).toBeNull();
+  });
+
+  it("in Chess Town, Stay at 'Leave Chess Town?' (Eric, Nov 13): an invite's Join keeps the invite; a Challenge makes nothing and sends nothing", async () => {
+    const asked: string[] = [];
+    setInviteHost({
+      target: () => null,
+      canCreate: () => true,
+      create: async () => "stayed",
+      // (The town's question, answered Stay: the host never goes, so never calls taken.)
+      join: (kind, code) => void asked.push(`${kind}:${code}`),
+    });
+    refuseInvites = false;
+    posted.length = 0;
+    expect(await invitePlayer("f2")).toBeNull();
+    expect(posted.map((p) => p.body)).toEqual([{ id: "f2", check: true }]);
+    posted.length = 0;
+    const inv = openInvites()[0]!;
+    joinInvite(inv);
+    expect(asked).toEqual([`${inv.kind}:${inv.code}`]);
+    await new Promise((ok) => setTimeout(ok, 20));
+    expect(posted).toEqual([]);
+    expect(openInvites().map((i) => i.from)).toContain(inv.from);
   });
 });
 

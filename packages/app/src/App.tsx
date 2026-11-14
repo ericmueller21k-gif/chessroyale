@@ -1,6 +1,6 @@
 import type { ComponentChildren } from "preact";
 import { useEffect, useLayoutEffect, useReducer, useRef, useState } from "preact/hooks";
-import { type Activity, type MatchmakingType, CROWD_MISSES, RECLUSE_MUSIC, recluseChildFirst, SQUADS, botLevelMean, POWER_IDS, WEAK_BOTS, bossDef, bossIdFromLink, CROWD_KNOCKOUTS, RAID_SETTINGS, bossPartySettings, hiddenRoomSettings, HIDDEN_ROOM, raidBossElo, DEFAULT_SETTINGS, DRAW_RULES, QUICK_PACE, bestMoveOf, definedOnly, matchFeats, modeSettings, pausedLine, speedOption, startOption, type DrawRule, type FinalFormat, type ModeChoiceId, type Settings } from "@chessroyale/core";
+import { type Activity, type InviteKind, type MatchmakingType, CROWD_MISSES, RECLUSE_MUSIC, recluseChildFirst, SQUADS, botLevelMean, POWER_IDS, WEAK_BOTS, bossDef, bossIdFromLink, CROWD_KNOCKOUTS, RAID_SETTINGS, bossPartySettings, hiddenRoomSettings, HIDDEN_ROOM, raidBossElo, DEFAULT_SETTINGS, DRAW_RULES, QUICK_PACE, bestMoveOf, definedOnly, matchFeats, modeSettings, pausedLine, speedOption, startOption, type DrawRule, type FinalFormat, type ModeChoiceId, type Settings } from "@chessroyale/core";
 import { bossInUrl, bossTierFromUrl, chosenBoss, chosenHomeMode, chosenMode, lobbyModeOf, prefetchBossAlone, raidInUrl, rememberBossPick } from "./screens/Home.tsx";
 import { lastBoss } from "./boss-history.ts";
 import { unlockAudio } from "./components/Countdown.tsx";
@@ -736,6 +736,8 @@ export function App() {
 
   /** The game with a town bot on now: its seat to come back to (null: none). */
   const townGame = useRef<string | null>(null);
+  /** The town's own step in the history (below). */
+  const TOWN_STEP = { townStep: true };
   /** The town's back gesture: the next popstate is ours to skip (a bot game's history.back, backToTown below). */
   const townSkip = useRef(false);
   /** The town as it renders this time (read by the back gesture, which runs outside a render): shown, and where it goes. */
@@ -818,9 +820,11 @@ export function App() {
       // The phone's or the browser's back in Chess Town (not at a table's game): it has gone back already, so Stay puts the
       // town's address back and Leave goes home (the front door, as the town's back button does).
       if (!townGame.current && townLive.current.show) {
-        setTownAsk({ dest: TOWN_BACK_TO, go: () => townLive.current.home(), stay: () => void history.pushState(null, "", "/town") });
+        setTownAsk({ dest: TOWN_BACK_TO, go: () => townLive.current.home(), stay: () => void history.pushState(TOWN_STEP, "", location.href) });
         return;
       }
+      // (The town's own step's leftover, the town since left some other way (the side menu, a game): its address goes, nothing else.)
+      if (!townGame.current && location.pathname === "/town" && !townLive.current.show) return void history.replaceState(null, "", "/");
       backToTownRef.current(true);
     };
     addEventListener("popstate", onPop);
@@ -833,8 +837,18 @@ export function App() {
   // In the town, its address without the seat (it's been read).
   useEffect(() => {
     if (!showTown || duel || !new URLSearchParams(location.search).has("at")) return;
-    history.replaceState(null, "", `/town${searchWithoutSeat()}`);
+    history.replaceState(history.state, "", `/town${searchWithoutSeat()}`);
   }, [showTown, duel]);
+  /**
+   * The town's own step in the history (Eric, Nov 13: "There should always be 'are you sure you want to exit' if you're in the town"):
+   * the town opens in place (replaceState), so the phone's or browser's back had no step of ours to take and left the site with no
+   * question, from the street or a building. One step pushed as the town shows (none if this one is already ours: a reload, back from a
+   * table's game): back takes it, and the popstate above asks.
+   */
+  useEffect(() => {
+    if (!showTown || match || duel || (history.state as { townStep?: boolean } | null)?.townStep) return;
+    history.pushState(TOWN_STEP, "", location.href);
+  }, [showTown, match, duel]);
   /**
    * A link: /1v1/CODE goes back into that game; /1v1 queues once your account has loaded (the queue needs it). A
    * reload during a search carries on with it (`savedDuelQueue`: its ticket and its wait): on the stage from /1v1, else
@@ -1640,6 +1654,7 @@ export function App() {
   );
   // Friends (friends.ts): what an invite can point at (a private lobby still waiting, your party), making one at the
   // front door in the home screen's mode, and joining someone's. Set every render, so it sees this render's state.
+  const inTown = townLive.current.show;
   setInviteHost({
     target: () => {
       if (match instanceof NetMatch && !match.auto && match.phase.kind === "lobby" && !match.gone)
@@ -1648,6 +1663,8 @@ export function App() {
     },
     canCreate: () => !match && !squads,
     create: async () => {
+      // (In Chess Town it asks first, as every way out does: Eric, Nov 13. A profile's Challenge over the town makes a game.)
+      if (inTown && !(await new Promise<boolean>((ok) => setTownAsk({ dest: "your game", go: () => ok(true), stay: () => ok(false) })))) return "stayed";
       // (The Boss raid screen: a raid. 1 v 1 has no lobbies: 50 v 50's.)
       const picked = chosenHomeMode() ?? "crowd";
       const mode = raidOpen ? "raid" : picked === "squads" ? "squads" : lobbyModeOf(picked);
@@ -1665,18 +1682,27 @@ export function App() {
       void joinParty(r.code);
       return { kind: "squads", code: r.code };
     },
-    join: (kind, code) => {
-      goHome();
-      if (kind === "squads") return void joinParty(code);
-      // (An invite can outlive its lobby's start: ask first, so a stale one never costs you your party.)
-      void lobbyStatus(code).then((s) => {
-        // (No answer, offline: carry on as if it's open, as lobbyStatus's other callers do.)
-        if (s && (!s.open || s.phase !== "waiting")) return setSquadsNote("That lobby has started or closed.");
-        if (party) closeParty();
-        joinLobby(code);
-      });
+    // (The invite toast's Join, over the town on a computer: "Leave Chess Town?" first, as every way out (Eric, Nov 13).)
+    join: (kind, code, taken) => {
+      const go = () => {
+        taken();
+        joinNow(kind, code);
+      };
+      if (inTown) askLeave("their game", go);
+      else go();
     },
   });
+  function joinNow(kind: InviteKind, code: string) {
+    goHome();
+    if (kind === "squads") return void joinParty(code);
+    // (An invite can outlive its lobby's start: ask first, so a stale one never costs you your party.)
+    void lobbyStatus(code).then((s) => {
+      // (No answer, offline: carry on as if it's open, as lobbyStatus's other callers do.)
+      if (s && (!s.open || s.phase !== "waiting")) return setSquadsNote("That lobby has started or closed.");
+      if (party) closeParty();
+      joinLobby(code);
+    });
+  }
   // In a match (not its lobby or results): the live line says so, for friends' lists.
   setLiveBusy((!!match && !["loading", "lobby", "results"].includes(match.phase.kind)) || (!!squads && !squadsWaiting(squads.lobby)) || (!!duel && !duel.snapshot().end));
   // What you're doing, for friends' lists (the friends page's "In Chess Town", Eric, Nov 11): a match's mode, a queue or lobby

@@ -92,7 +92,8 @@ export function InviteButton({
       onClick={() => {
         setBusy(true);
         invitePlayer(uid)
-          .then(() => {
+          .then((t) => {
+            if (!t) return;
             setDone(true);
             onNote(`Invited. The invite lasts ${FRIENDS.inviteMinutes} minutes.`);
             timer.current = setTimeout(() => setDone(false), FRIENDS.reinviteMs);

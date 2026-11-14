@@ -1,13 +1,15 @@
 import { mkdirSync } from "node:fs";
-import { expect, type Page } from "@playwright/test";
-import { asSignedIn, tapInTown, test } from "./helpers.ts";
+import { expect, type Browser, type Page } from "@playwright/test";
+import { asSignedIn, named, tapInTown, test } from "./helpers.ts";
 
 /**
  * "Leave Chess Town?" (Eric: "a little pop-up that just says you are about to leave Chess Town, click yes and no … you should always
  * have a confirm if you're going back out to a different menu or you're trying to exit"; town/LeaveTown.tsx). Leaving the town for
  * another screen asks first: Stay (the default, Escape too) changes nothing, Leave goes where you asked. Asked: a computer's side
  * menu, the town's back button, the phone's or browser's back gesture (and a guest's chat sign-up). Not asked: a room's back (the
- * square), a boss's challenge into its battle, the AFK drop. `LEAVE_STILLS=<folder>` (outside the repo) saves the dialog's stills.
+ * square), a boss's challenge into its battle, the AFK drop. Since Nov 13 (Eric: "even if you're in a building … There should always be
+ * 'are you sure you want to exit' if you're in the town"): from inside a building too, and the back gesture with no step of the app's
+ * own before the town (the town has its own), and an invite's Join. `LEAVE_STILLS=<folder>` (outside the repo) saves the dialog's stills.
  */
 test.use({ actionTimeout: 15_000 });
 
@@ -91,16 +93,14 @@ test("the town's back button asks 'Leave Chess Town?' first: Stay keeps you on y
 
 test("the phone's back gesture asks too: Stay puts the town back as it was, Leave goes home", async ({ page }) => {
   const square = await openTown(page);
-  // (The app's own address, one step on: the back gesture takes it back to the town.)
-  await page.evaluate(() => history.pushState(null, "", "/town?sky=day&townafk=off&step=2"));
+  // (The town opened first in this tab, nothing of the app's before it: back takes the town's own step, Nov 13. It left the site before.)
   await page.goBack();
   await expect(leaveDialog(page)).toBeVisible();
   await expect(leaveDialog(page).locator(".fd-sub")).toHaveText("You'll head back to Play.");
   await still(page, "back-gesture");
   await leaveDialog(page).getByRole("button", { name: "Stay" }).click();
   await expectStayed(page, square);
-  // The gesture again, and Leave: the front door.
-  await page.evaluate(() => history.pushState(null, "", "/town?sky=day&townafk=off&step=3"));
+  // The gesture again (Stay put the town's step back), and Leave: the front door.
   await page.goBack();
   await leaveDialog(page).getByRole("button", { name: "Leave", exact: true }).click();
   await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
@@ -129,13 +129,17 @@ test("a computer's side menu asks first: 'You'll head back to the Shop.'; Stay k
 test("inside a room: the back button goes out to the square with no question; the back gesture asks, Stay stays in the room", async ({ page }) => {
   await openTown(page);
   await goInBabur(page);
-  await page.evaluate(() => history.pushState(null, "", "/town?sky=day&townafk=off&step=2"));
-  await page.goBack();
-  await expect(leaveDialog(page)).toBeVisible();
-  await still(page, "room-back-gesture");
-  await leaveDialog(page).getByRole("button", { name: "Stay" }).click();
-  await expect(leaveDialog(page)).toHaveCount(0);
-  await expect(room(page)).toHaveAttribute("data-ready", "1");
+  // (The real history, nothing of the test's own: the town's step, Nov 13. Twice: Stay puts the step back.)
+  for (const n of [1, 2]) {
+    await page.goBack();
+    await expect(leaveDialog(page)).toBeVisible();
+    await expect(leaveDialog(page).locator(".fd-sub")).toHaveText("You'll head back to Play.");
+    if (n === 1) await still(page, "room-back-gesture");
+    await leaveDialog(page).getByRole("button", { name: "Stay" }).click();
+    await expect(leaveDialog(page)).toHaveCount(0);
+    await expect(room(page)).toHaveAttribute("data-ready", "1");
+    expect(new URL(page.url()).pathname).toBe("/town");
+  }
   // The room's own back (a computer's: its door's Go out, no bar since Nov 7): out to the square, and no question.
   if (test.info().project.name === "phone") await page.getByRole("button", { name: "Back", exact: true }).click();
   else
@@ -150,17 +154,19 @@ test("inside a room: the back button goes out to the square with no question; th
   await expect(page.getByRole("heading", { name: "Town square" })).toBeVisible();
   if (test.info().project.name !== "phone") return;
   // Back tapped the moment the room is drawn, as it still fades in: the tap waits for the room, then out (Nov 12: it was lost, and
-  // you stayed in the room).
+  // you stayed in the room). (The page notes the room drawn: it's up for about 0.6 s, which fell between two of toHaveCount's polls
+  // on a slow runner, and the check then waited 20 s for a room long gone: the town-leave:148 flake, Nov 13.)
   await page.evaluate(() => {
     new MutationObserver((_, ob) => {
       if (document.querySelector("canvas.town-shop-canvas")?.getAttribute("data-ready") !== "1") return;
       ob.disconnect();
+      (window as unknown as { __roomDrawn?: boolean }).__roomDrawn = true;
       document.querySelector<HTMLButtonElement>("button.town-back")!.click();
     }).observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ["data-ready"] });
   });
   const card = await openCard(page, "home", "Babur's Circus", "tiger");
   await card.getByRole("button", { name: "Go in" }).click();
-  await expect(room(page)).toHaveCount(1, { timeout: 20_000 });
+  await expect.poll(() => page.evaluate(() => !!(window as unknown as { __roomDrawn?: boolean }).__roomDrawn), { timeout: 20_000 }).toBe(true);
   await expect(room(page)).toHaveCount(0, { timeout: 10_000 });
   await expect(leaveDialog(page)).toHaveCount(0);
 });
@@ -177,6 +183,50 @@ test("a computer's side menu inside a room asks too; Leave goes to the front doo
   await menu.getByRole("button", { name: "Play", exact: true }).click();
   await leaveDialog(page).getByRole("button", { name: "Leave", exact: true }).click();
   await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
+  await expect(room(page)).toHaveCount(0);
+});
+
+/** A signed-in player in a context of their own (as e2e/friends.spec.ts): their page and id. */
+async function player(browser: Browser, name: string): Promise<{ page: Page; id: string }> {
+  const page = await (await browser.newContext({ ...test.info().project.use })).newPage();
+  await named(page, name);
+  await page.goto("/?nolanding");
+  await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
+  const id = await page.evaluate(() => fetch("/api/me").then((r) => r.json()).then((p) => p.user.id as string));
+  return { page, id };
+}
+
+test("inside a room, an invite's Join asks first (Eric, Nov 13): Stay keeps you in the room and the invite; Leave joins their game", async ({ browser }) => {
+  onlyComputer();
+  test.setTimeout(3 * 60_000);
+  const ann = await player(browser, "Ann Town");
+  const bo = await player(browser, "Bo Town");
+  const page = bo.page;
+  await page.addInitScript(() => {
+    document.addEventListener("DOMContentLoaded", () => {
+      const s = document.createElement("style");
+      s.textContent = ".town-chat,.town-chat *{pointer-events:none!important}";
+      document.head.append(s);
+    });
+  });
+  await openTown(page);
+  await goInBabur(page);
+  // Ann challenges Bo from his profile: a lobby of hers, and his toast, over the room.
+  await ann.page.goto(`/profile/${bo.id}?nolanding`);
+  await ann.page.getByRole("button", { name: "Challenge" }).click();
+  await expect(ann.page.getByRole("heading", { name: /^Lobby [A-Z2-9]{5}$/ })).toBeVisible({ timeout: 20_000 });
+  const toast = page.locator(".fr-toast");
+  await expect(toast).toContainText("Ann Town invited you", { timeout: 25_000 });
+  await toast.getByRole("button", { name: "Join" }).click();
+  await expect(leaveDialog(page).locator(".fd-sub")).toHaveText("You'll head back to their game.");
+  await still(page, "room-invite");
+  await leaveDialog(page).getByRole("button", { name: "Stay" }).click();
+  await expect(leaveDialog(page)).toHaveCount(0);
+  await expect(room(page)).toHaveAttribute("data-ready", "1");
+  await expect(toast).toBeVisible();
+  await toast.getByRole("button", { name: "Join" }).click();
+  await leaveDialog(page).getByRole("button", { name: "Leave", exact: true }).click();
+  await expect(page.getByRole("heading", { name: /^Lobby [A-Z2-9]{5}$/ })).toBeVisible({ timeout: 20_000 });
   await expect(room(page)).toHaveCount(0);
 });
 

@@ -247,10 +247,11 @@ export interface InviteHost {
   target(): InviteTarget | null;
   /** Whether a game can be made to invite into (at the front door, not in a match). */
   canCreate(): boolean;
-  /** Makes one in the home screen's mode (a private lobby, or with Squads picked a party) and goes there. */
-  create(): Promise<InviteTarget | null>;
-  /** Joins an invite's lobby or party. */
-  join(kind: InviteKind, code: string): void;
+  /** Makes one in the home screen's mode (a private lobby, or with Squads picked a party) and goes there. "stayed": you were in
+   * Chess Town and chose Stay at "Leave Chess Town?", so nothing is made. */
+  create(): Promise<InviteTarget | null | "stayed">;
+  /** Joins an invite's lobby or party; `taken` once it goes (in Chess Town only after "Leave": Stay keeps the invite). */
+  join(kind: InviteKind, code: string, taken: () => void): void;
 }
 let host: InviteHost | null = null;
 export function setInviteHost(h: InviteHost | null) {
@@ -264,14 +265,16 @@ export function inviteMode(): "game" | "new" | null {
   return host.canCreate() ? "new" : null;
 }
 
-/** Invites a player to your game, making one first at the front door. */
-export async function invitePlayer(uid: string): Promise<InviteTarget> {
+/** Invites a player to your game, making one first at the front door. Null: you stayed in Chess Town, and nothing was sent. */
+export async function invitePlayer(uid: string): Promise<InviteTarget | null> {
   if (!host) throw new Error("Invites aren't available here.");
   let t = host.target();
   if (!t && host.canCreate()) {
     // (Whether they'd take it, before making a lobby or party for them.)
     await act("invite", { id: uid, check: true });
-    t = await host.create();
+    const made = await host.create();
+    if (made === "stayed") return null;
+    t = made;
   }
   if (!t) throw new Error("Finish your match first, then invite them.");
   await act("invite", { id: uid, kind: t.kind, code: t.code });
@@ -280,9 +283,10 @@ export async function invitePlayer(uid: string): Promise<InviteTarget> {
 
 /** Joins an invite (its lobby or party), and takes it off your list. */
 export function joinInvite(inv: InviteEntry) {
-  hideToast();
-  void dismissInvite(inv).catch(() => undefined);
-  host?.join(inv.kind, inv.code);
+  host?.join(inv.kind, inv.code, () => {
+    hideToast();
+    void dismissInvite(inv).catch(() => undefined);
+  });
 }
 
 // ---------------- For screens ----------------
