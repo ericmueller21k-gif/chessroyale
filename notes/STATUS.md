@@ -1181,3 +1181,7 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   (3f98685a), CI watcher bdm5n8hqg. Run 43625203937's first-try traces (artifacts, 7 days) -> flaky round 6.
 - Nov 14 19:10: #717 trace revert MERGED 77a15f0e (its PR run: green, 0 retries). Main run watcher running. Ride sounds helper running.
 - Nov 14 19:10: ride sounds -> #718 (7667147b, CI watcher bebehldx3); settings RIDE_SOUND (level 0.3, holdMs 120, dozer fadeOut 700, pogo 350). No helpers. Main run (77a15f0e) watcher bbhhlr0fp.
+- Nov 14 19:20: main 77a15f0e (#717 revert) still RED: 3 retry-passes (town-street:174, fairplay:65, town.spec:966) -> the trace flag
+  wasn't the main cause (my call was wrong; told Eric). Flaky round 6 helper started (high, claude/flaky-round6, brief flaky-round6.md:
+  look for a shared cause after #715's townTap, use run 43625203937's first-try traces). Consider restoring retain-on-first-failure
+  once main is green (Eric approved it). #718 ride sounds CI running (watcher bebehldx3).
