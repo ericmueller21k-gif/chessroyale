@@ -1035,3 +1035,6 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   loop seamless; cause = audio context rebuilt after window switch restarted the loop from its start -> #691 loopPlace resumes in
   place. (c) desktop chat box layout ("slop"): Haiku helper session_01JuCWRtzeue2mWZ6TQB9Ni7 on claude/desktop-side-column.
   Running: 2 Opus (flaky, town-leave) + 1 Haiku. Queued: night room.
+- Nov 14 00:20: QUEUE for the next free Opus slots, in order: (1) briefs/recluse-bubble-grows.md (his bubble keeps the 9-year-old's
+  size after he grows: covers his face; Eric playtest), (2) briefs/confirm-flash-fade.md (mockup GIF first, helper waits for `.go`
+  with Eric's answer), (3) briefs/recluse-room-night.md.
