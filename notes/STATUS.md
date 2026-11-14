@@ -1075,3 +1075,7 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   Flaky round 3 list: shop:238 (?fps going out read 4 vs >4 on CI; recurring: fix the cause), town-street:528, town-chat:1367, town-chat:1054, preloads vs maintenance banner, town-street:226 tap.
 - Nov 14 03:00: #699 ring off, #701 bubble + grow-up exchanges, #702 Eric's cutscene lines: all MERGED (main 6c8657e). Watching
   deploy + main's full run. Running: same-frame (session_01JuCWRswvB1cpPP2PTyBeWU), transform (waits for Eric's go).
+- Nov 14 03:20: same-frame done -> #703 (CI f721b3a7): phase 1's frame through phase 2, four boards with even gaps, party column
+  (moves, chat, God King + 2x2 team), #700's exclusion dropped. Night-room helper started: session_01JuCWRvEPBw8VTUtLuTFiRr.
+  Running Opus: transform (waiting for Eric's go) + night room. Queue: standings "out" bug in phase 2 (xhigh, core/server) ->
+  visual QA (after transform) -> flaky round 3.
