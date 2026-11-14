@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { RECLUSE_CUTSCENE as C } from "@chessroyale/core";
 import { RECLUSE_CUTSCENE_LINES } from "../src/characters/recluse-lines.ts";
-import { RECLUSE_CUTSCENE } from "../src/characters/recluse-ages.ts";
+import { CUTSCENE_SPOTS, RECLUSE_CUTSCENE } from "../src/characters/recluse-ages.ts";
+import { renderFrame } from "../src/characters/sprite.ts";
 import { boxAt, cutBox, cutReadMs, cutTyped, cutsceneTimeline, fitCutscene } from "../src/recluse-cutscene.ts";
 import { RECLUSE } from "../src/characters/recluse.ts";
 import { PHASE_CHANGE, absorbPaced } from "../src/recluse-phase2.ts";
@@ -40,16 +41,17 @@ describe("the Hidden Boss's cutscene", () => {
       expect(f.timeline.endAt).toBeLessThanOrEqual(hold);
       expect(f.timeline.endAt).toBeGreaterThan(hold * 0.9);
       // (Every line still shown, in order, the child's frames as they are.)
-      expect(f.timeline.boxes).toHaveLength(17);
+      expect(f.timeline.boxes).toHaveLength(18);
       expect(f.timeline.standAt - f.timeline.poofAt).toBe(arrival.poofMs + arrival.dropMs + arrival.landMs);
       expect(f.c.typeMs).toBeLessThan(C.typeMs);
     }
   });
 
-  it("has Eric's 17 lines, line 15 two sentences, and never names him", () => {
-    expect(RECLUSE_CUTSCENE_LINES).toHaveLength(17);
-    expect(RECLUSE_CUTSCENE_LINES[14]).toEqual({ who: "kid", say: ["Everyone has the same computers.", "So the best player is still the best."] });
-    expect(RECLUSE_CUTSCENE_LINES.map((l) => l.who).join(" ")).toBe("kid man kid man kid man kid man kid man kid man kid man kid man kid");
+  it("has Eric's 18 lines (Nov 14: the kid's two points, then \"Why don't you show us?\"), line 15 two sentences, and never names him", () => {
+    expect(RECLUSE_CUTSCENE_LINES).toHaveLength(18);
+    expect(RECLUSE_CUTSCENE_LINES[14]).toEqual({ who: "kid", say: ["Everyone has the same computers.", "So the only thing that separates anyone is creativity."] });
+    expect(RECLUSE_CUTSCENE_LINES[15]).toEqual({ who: "kid", say: ["They just made the game deeper.", "The computers never changed who the best player was."] });
+    expect(RECLUSE_CUTSCENE_LINES.map((l) => l.who).join(" ")).toBe("kid man kid man kid man kid man kid man kid man kid man kid kid man kid");
     // (A line of two sentences is two entries; one sentence, however long, is one: it types all at once.)
     for (const l of RECLUSE_CUTSCENE_LINES) for (const s of l.say) expect(s.slice(0, -1)).not.toMatch(/[.?!] /);
   });
@@ -67,11 +69,11 @@ describe("the Hidden Boss's cutscene", () => {
     expect(b.starts[1]).toBe(firstDone + C.sentencePauseMs);
     expect(cutTyped(line, b, b.starts[1]!)).toBe(first + 2);
     expect(cutTyped(line, b, b.typed)).toBe(b.text.length);
-    expect(b.text).toBe("Everyone has the same computers. So the best player is still the best.");
+    expect(b.text).toBe("Everyone has the same computers. So the only thing that separates anyone is creativity.");
   });
 
   it("shows one box at a time, in order, each fully readable for its time once typed", () => {
-    expect(tl.boxes).toHaveLength(17);
+    expect(tl.boxes).toHaveLength(18);
     tl.boxes.forEach((b, i) => {
       expect(b.until - C.boxFadeMs - b.typed).toBe(cutReadMs(b.text));
       expect(cutReadMs(b.text)).toBeGreaterThanOrEqual(C.readMs);
@@ -95,6 +97,24 @@ describe("the Hidden Boss's cutscene", () => {
   it("has the cues its one-shots play on", () => {
     const cue = (a: string) => RECLUSE_CUTSCENE.anims[a]!.frames[0]!.cue;
     expect([cue("poof"), cue("drop"), cue("land"), cue("fade")]).toEqual(["poof", "drop", "land", "fade"]);
+  });
+
+  // Eric, Nov 14: the man's words sat over his face, his spot 38 rows low (the scene's headroom). Each box stands just above the top
+  // of its speaker's drawing in the conversation (his own half of the scene, its motes left out), at its tallest frame.
+  it("puts each speaker's box at the top of his drawing in the conversation (CUTSCENE_SPOTS)", () => {
+    const ch = RECLUSE_CUTSCENE;
+    const mid = Math.round((CUTSCENE_SPOTS.man.x + CUTSCENE_SPOTS.kid.x) / 2);
+    const topIn = (x0: number, x1: number) =>
+      Math.min(
+        ...["together", "kidTalk", "manTalk"].flatMap((a) =>
+          ch.anims[a]!.frames.map((f) => {
+            const r = renderFrame(ch, { ...f, specks: [] });
+            for (let y = 0; y < r.h; y++) for (let x = x0; x < x1; x++) if (r.data[(y * r.w + x) * 4 + 3]! > 0) return y;
+            return r.h;
+          }),
+        ),
+      );
+    expect({ man: CUTSCENE_SPOTS.man.head, kid: CUTSCENE_SPOTS.kid.head }).toEqual({ man: topIn(0, mid), kid: topIn(mid, ch.w) });
   });
 });
 

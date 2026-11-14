@@ -343,7 +343,7 @@ test("a player in Boss alone never sees Engine move", async ({ page }) => {
 });
 
 /** Your phase 2 board: big on a phone, at the bottom left of the four on a computer. */
-const myBoard = (page: Page) => page.locator(".rc-simul .rc-q2 .hb-board, .rc-simul .board-row > .board-wrap:not(.rc-stage) .hb-board").first();
+const myBoard = (page: Page) => page.locator(".rc-simul .rc-q2 .hb-board, .rc-simul .rc-big .hb-board").first();
 const simulNow = (p: Page) => p.evaluate(() => (window as any).match?.simul ?? null);
 /**
  * When the app first put each of these in the page (performance.now, from a MutationObserver: the moment it happens, not
@@ -501,11 +501,12 @@ test("beaten in phase 1 (?win=1): he collapses and mumbles, then the phase chang
     drop: { selector: '.rc-fig[data-anim="drop"] canvas' },
     chant: { selector: '.rc-fig[data-anim="chantRaise"] canvas' },
     light: { selector: ".rc-light" },
-    // (A phone's bar bubble, two rows: a sentence at a time, each its own page; Nov 13.)
-    chantLine: { selector: ".bc-bubble", text: /^Computation without creativity is nothing\.$/ },
-    chantLineB: { selector: ".bc-bubble", text: /^Now I have both\.$/ },
-    chantLine2: { selector: ".bc-bubble", text: /^Prepare yourself\.$/ },
-    chantLine2B: { selector: ".bc-bubble", text: /^This is the ultimate test of your skill\.$/ },
+    // (Over his head on the board while he's there, a phone too (Eric, Nov 14): the whole line, its sentences typed in turn; the
+    // typed part (the box's first span) shows each sentence typed out.)
+    chantLine: { selector: ".rc-say", text: /^Computation without creativity is nothing\. Now I have both\.$/ },
+    chantLineB: { selector: ".rc-say .speech-line > span:first-child", text: /Now I have both\.$/ },
+    chantLine2: { selector: ".rc-say", text: /^Prepare yourself\. This is the ultimate test of your skill\.$/ },
+    chantLine2B: { selector: ".rc-say .speech-line > span:first-child", text: /This is the ultimate test of your skill\.$/ },
     crack: { selector: ".rc-crack canvas" },
     split: { selector: ".rc-split.rc-q3" },
     pickup: { selector: '.rc-fig[data-anim="pickup"] canvas' },
@@ -528,9 +529,9 @@ test("beaten in phase 1 (?win=1): he collapses and mumbles, then the phase chang
     note: { selector: ".boss-dock-status", text: /The God King's power is his!/ },
     rage: { selector: `${figure()}[data-anim="rage"]` },
     chant: { selector: '.rc-fig[data-anim="chantRaise"], .rc-fig[data-anim="chant"]' },
-    // (His second chant line's first page, and its second sentence's page as it starts to type.)
-    chant2: { selector: ".bc-bubble", text: /^Prepare yourself\.$/ },
-    chant2b: { selector: ".bc-bubble", text: /^This is the ultimate test of your skill\.$/ },
+    // (His second chant line over his head, and its second sentence as it starts to type: its first letter typed.)
+    chant2: { selector: ".rc-say", text: /^Prepare yourself\./ },
+    chant2b: { selector: ".rc-say .speech-line > span:first-child", text: /^Prepare yourself\.\s*\S/ },
     crack: { selector: ".rc-crack canvas" },
     banner: { selector: ".fight-banner", text: /PHASE 2/ },
     c5: count(5),
@@ -686,9 +687,11 @@ test("beaten in phase 1 (?win=1): he collapses and mumbles, then the phase chang
   await expect(page.locator(".boss-bar .rage-meter")).toHaveCount(0);
   // (Freestyle is in the dock's line, where the line above the board said it: Eric, Oct 24.)
   await expect(page.locator(".boss-dock-status .dock-line").first()).toHaveText(/· Freestyle$/);
-  // Phase 2: the God King gone (nothing to tap), the boss's look on where he stands.
-  await expect(page.locator(".gk-unit.gone")).toHaveCount(1);
-  await expect(page.getByRole("button", { name: /God King/ })).toHaveCount(0);
+  // Phase 2: the God King in his place, greyed, nothing to tap (Eric, Nov 14: "you can't use him anymore"), the boss's look on
+  // where he stands.
+  await expect(page.locator(".gk-unit.benched")).toHaveCount(1);
+  await expect(page.getByRole("button", { name: /God King/ })).toHaveCount(1);
+  await expect(page.getByRole("button", { name: "God King: can't be called in phase 2" })).toBeDisabled();
   await expect(page.locator(`${figure()} .bc-engine.on`)).toHaveCSS("visibility", "visible");
   // (Back in his place, seen again.)
   await expect(page.locator(".rc-away")).toHaveCount(0);
@@ -713,7 +716,7 @@ test("beaten in phase 1 (?win=1): he collapses and mumbles, then the phase chang
   expect(errors).toEqual([]);
 });
 
-test("phase 2 (?phase=2): four boards, each its own Chess960 start; Stockfish 2750 answers your move; Engine move on your board; no God King (absorbed), the boss's half-engine look on", { tag: "@phone-only" }, async ({ page }) => {
+test("phase 2 (?phase=2): four boards, each its own Chess960 start; Stockfish 2750 answers your move; Engine move on your board; the God King greyed in his place, never called, the boss's half-engine look on", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(5 * 60_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
@@ -729,11 +732,12 @@ test("phase 2 (?phase=2): four boards, each its own Chess960 start; Stockfish 27
     expect(b.fen).toMatch(/ w [A-H]{2}[a-h]{2} - 0 1$/);
     expect(b.bases).toEqual([{ ply: 0, fen: b.fen }]);
   }
-  // The God King is gone (the boss absorbed him in the phase change): his place in the dock empty, nothing to tap, and
-  // not a word from him all through phase 2.
+  // The God King stays in his place, greyed (Eric, Nov 14: "the king will still be with you, but you can't use him anymore"):
+  // his button off, and not a word from him all through phase 2.
   const king = await watchFor(page, { bubble: { selector: ".gk-bubble" }, figure: { selector: ".boss-dock .god-king" } });
-  await expect(page.locator(".gk-unit.gone")).toHaveCount(1);
-  await expect(page.getByRole("button", { name: /God King/ })).toHaveCount(0);
+  await expect(page.locator(".gk-unit.benched")).toHaveCount(1);
+  await expect(page.getByRole("button", { name: /God King/ })).toHaveCount(1);
+  await expect(page.getByRole("button", { name: "God King: can't be called in phase 2" })).toBeDisabled();
   await expect(page.locator(".gk-command")).toHaveCount(0);
   // His look: one eye cold blue, the circuit lines, over his figure where it stands (on screen, on his head).
   const eng = page.locator(`${figure()} .bc-engine.on`);
@@ -777,8 +781,8 @@ test("phase 2 (?phase=2): four boards, each its own Chess960 start; Stockfish 27
   await expect.poll(async () => (await simulNow(page)).boards[0].history.length, { timeout: 30_000 }).toBeGreaterThanOrEqual(3);
   // The bots play their boards meanwhile.
   await expect.poll(async () => (await simulNow(page)).boards.slice(1).every((b: { history: string[] }) => b.history.length >= 2), { timeout: 30_000 }).toBe(true);
-  expect(await king.seen()).toEqual({ bubble: false, figure: false });
-  await expect(page.getByRole("button", { name: /God King/ })).toHaveCount(0);
+  expect(await king.seen()).toEqual({ bubble: false, figure: true });
+  await expect(page.getByRole("button", { name: "God King: can't be called in phase 2" })).toBeDisabled();
   expect(errors).toEqual([]);
 });
 
@@ -858,7 +862,7 @@ test("the admins' Win this form (Nov 13, Eric's timing test): pressed, your next
     kid: { selector: '.cs-fig .sprite-anim, .cs-fig canvas' },
     hidden: { selector: "body.cs-on" },
     first: { selector: '.cs-say[data-line="1"]', text: /^Why are you on the floor\?$/ },
-    last: { selector: '.cs-say[data-line="17"]', text: /^I'm not sure\. The only one who can prove it is right next to me\.$/ },
+    last: { selector: '.cs-say[data-line="18"]', text: /^Why don't you show us\?$/ },
   });
   await play(page, mv);
   await expect.poll(() => page.evaluate(() => !!(window as any).match.phase.fall), { timeout: 30_000 }).toBe(true);
@@ -937,6 +941,35 @@ test("his child form first (Nov 13): the kid, his level a step up every 4 moves 
   await expect(page.locator(".boss-bar .boss-level")).toHaveAttribute("data-level", "unknown");
   await expect(win).toBeEnabled();
   expect(errors).toEqual([]);
+});
+
+test("his words stand above his head at every age beside the board (Eric, Nov 14: grown to 20, they sat over his face)", async ({ page }) => {
+  test.skip(test.info().project.name === "phone", "a computer: on a phone his words are in his bar");
+  test.setTimeout(3 * 60_000);
+  await meetHim(page, "laststand=0&clock=60&form=child");
+  await yourMove(page);
+  // (The top of his drawing on the screen, from his canvas, and his words' bottom.)
+  const gap = () =>
+    page.evaluate(() => {
+      const fig = document.querySelector<HTMLElement>(".boss-char.place-side")!;
+      const cv = fig.querySelector("canvas")!;
+      const px = cv.getContext("2d")!.getImageData(0, 0, cv.width, cv.height).data;
+      let top = cv.height;
+      for (let y = 0; y < cv.height && top === cv.height; y++) for (let x = 0; x < cv.width; x++) if (px[(y * cv.width + x) * 4 + 3]! > 0) top = y;
+      const r = cv.getBoundingClientRect();
+      const bubble = fig.querySelector(".bc-bubble")!.getBoundingClientRect();
+      return Math.round(r.top + (top / cv.height) * r.height - bubble.bottom);
+    });
+  // The child, 13, 20 and the man: his words over his head at each (the age's loop, set by the test switch's hook).
+  for (const loop of ["idle", "age1", "age2", "age3"]) {
+    await page.evaluate((loop) => {
+      (window as any).bossFigure(loop);
+      (window as any).sayBoss("That one's mine now.");
+    }, loop);
+    await expect(page.locator(figure())).toHaveAttribute("data-anim", loop);
+    await expect(page.locator(`${figure()} .bc-bubble`)).toHaveAttribute("aria-label", "That one's mine now.");
+    await expect.poll(gap, { message: loop }).toBeGreaterThan(0);
+  }
 });
 
 test("a loss (?win=1&phase=2): you resign your board, the bots win theirs: defeated, 3 of 4 won", { tag: "@phone-only" }, async ({ page }) => {

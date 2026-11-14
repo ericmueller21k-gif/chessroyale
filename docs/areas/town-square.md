@@ -709,7 +709,8 @@ and [2026-11-02-bigger-showpieces.md](../decisions/2026-11-02-bigger-showpieces.
   `fadeMs`), the room's code and art load (only now: `shops/ShopRoom.tsx` and each room's art are chunks of their own), the town waits
   (`pause`: no frames, nothing moves, its chips put away) and the room fades in from black. **Going out** ("Go out", or the back button,
   which inside a shop means out, not home): the room fades to black and the town zooms back out from the door, you where you stood.
-  A Back or Go out tapped while the room still fades in waits for it, then goes out (`outNext`, Nov 12: it was lost).
+  A Back or Go out tapped while the room still fades in waits for it, then goes out (`outNext`, Nov 12: it was lost); a way through to
+  another room (the stairs' Go up, a back door) tapped then waits the same way and goes through (`passNext`, Nov 13).
   **The area banner (Nov 11, Eric's mockup):** as the black lifts on a room you walked into through its door (the town's, or Rolling
   Dough's door between rooms; never one you arrive in by a challenge), its name across a soft dark band a third down the room's view:
   the boss's name and 's in gold in the pixel font ("DON DOUGH'S"; Rolling Dough's back room "BACK ROOM"; a room with no boss nothing),
@@ -805,6 +806,15 @@ exception: about 7 squares from Ginger's igloo (`town-camera.test.ts`).
 - **The flats' doors** are talk pieces with `locked` lines: a tap walks you to that door's own spot (`talkNear`), and its card
   ("Apartment door") says a short line in turn, with OK. His room: a tap on his board walks you round to its front; his card ("Hidden
   Boss") has the room's own challenge (below: **His room's challenge**).
+- **By the time of day (Nov 14, Eric: "it's always light in that room... the outside shining should be like a moon at night"):** the
+  three rooms take the town's light as they load (sky.ts `skyNow`, `roomLight`: the same weights and `?sky=` as the street, no second clock;
+  dawn and dusk share one warm look; night from half night). `ShopRoom.tsx` keeps each walk-up room once per light (`LIT_ROOMS`, key
+  `<room>@<light>`); a change while you're inside shows the next time a room loads. His room (`recluse-art.ts` `recluseLit`): day as drawn;
+  dusk an orange-pink sky over the roofline, a window lit across the street, the floor panes longer and warmer, a light warm wash; night a
+  dark blue sky with the moon and stars, two windows lit across the street, the panes pale moonlight, a gentle blue wash (RoomArt `dim`
+  and the new `dimRGB`, the lights over it). The hall's street door and the landing's window darken the same way (`recluse-stairs-art.ts`
+  `recluseStairsLit`), the sconces still lit. Only the window and floor tiles are drawn again, once per light; nothing per frame. The
+  summoning's light draws over it as before. The dev preview takes `?sky=` too. Test: `test/recluse-building.test.ts` ("by the time of day").
 - **Music:** `recluse-house` (themes.json) plays in his room only (`ShopDef.music`; `roomTheme`); the hall and the landing have none.
   It loads as you go in at the street door (`homeTheme`).
 - **Banners:** the hall "Hidden Boss's / The Walk-up", the landing "Second floor", his room "Top floor".

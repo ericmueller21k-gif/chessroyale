@@ -45,8 +45,12 @@ const daysBack = (n: number) => {
   return d.getTime();
 };
 
-/** The 1 v 1 games in the mockup's list, as the server's RankedSummary.recent carries them (core's RankedRecentGame: `points`, not RP). */
-export const MOCKUP_RANKED_GAMES = [
+/**
+ * The 1 v 1 games in the mockup's list, as the server's RankedSummary.recent carries them (core's RankedRecentGame: `points`, not RP).
+ * Their times from when the test asks, not when the worker loaded this file: a shard runs a file minutes after loading it, and a
+ * midnight in between made "Yesterday" two days back ("Nov 12"; main, Nov 13).
+ */
+export const mockupRankedGames = () => [
   { opponent: { id: "g43", name: "Guest 43", look: { head: { def: "wizard-hat", color: "red", blemish: 10, seed: 1 } } }, result: "win", points: 18, at: hoursAgo(2) },
   { opponent: { id: "woolly", name: "Woolly", look: { head: { def: "party-hat", color: "cobalt", blemish: 30, seed: 2 } } }, result: "loss", points: -14, at: yesterday(20) },
   { opponent: { id: "g21", name: "Guest 21", look: {} }, result: "win", points: 22, at: yesterday(10) },
@@ -75,7 +79,7 @@ export function demoProfile(over: Record<string, unknown> = {}) {
       draws: 0,
       peak: rankAt("paragon", 4, 10),
       streak: 3,
-      recent: MOCKUP_RANKED_GAMES,
+      recent: mockupRankedGames(),
     },
     crowd: { games: 12, wins: 3, avgPlace: 21.4, best: 1, cutsSurvivedPct: 80, brilliant: 4 },
     boss: { raids: 6, bossesBeaten: 2, strikesSurvived: 9, lastStands: 1, survivedPct: 50, brilliant: 2 },

@@ -66,7 +66,7 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
 - **Where bosses are met:** the boss raid (up to 50 people, online; or a Solo raid with 49 bots), the Crowd 50 v 50's
   boss final (the top 4, always against the Hidden Boss since Oct 14), and solo's "Boss alone" (one of the Boss raid
   screen's choices, or `/bosses`; [hub.md](hub.md); you pick every move
-  against a boss you choose on the Boss Battle screen's tiles (the Boss raid screen's since Oct 26, Eric; "Solo Boss Mode" until Oct 29), at a difficulty from Very easy to Very hard, `BOSS_DIFFICULTY`; its **START** begins the battle at once). **Boss alone's clock** (Eric, Oct 30, replacing his Oct 21 untimed one): 10 + 10 (`BOSS_CLOCK`, `bossClockSettings`, on with `RAID_SETTINGS.bossAloneClock`): a 10-minute bank, 10 s added as each move begins, no cap on one move, the boss untimed; the dock's clock shows the bank with a "+10" as each move begins, and an empty bank loses on time (`bossClock`: the runner's `bossOutOfTime`, the move not played, "won on time"). A Solo raid keeps the raid's clock, a test link's `?clock=` turns it off, and the Hidden Boss's Bullet replaces it when it comes; docs/decisions/2026-10-30-boss-battle-clock.md. **Boss Battle's live party** (up to 3; docs/decisions/2026-10-30-boss-party.md; server only so far): a private raid lobby made by the party's START (`boss-party.ts`): only its members, everyone picking every move with the others' picks live (`tally` to all) and changeable until the last pick, the draw rule "party" (`partyMove`: a majority, else the engine's best pick or one of two within 30 cp at random), one team clock (`setTeamBank`), any member's God King call acting for the team (`kingAnyCall`), the AFK kick a minute after a turn's first pick (`partyKickable`), never ranked, and no boss strikes (`bossNoStrikes`, Eric, Oct 31; Boss alone has none either). **On the stage** (`BossSelect`'s `party`, `components/BossParty.tsx`, `PartyClient` with kind "boss"): the invite circles open "Invite friends" (the party made the first time; `/boss/party/CODE` joins it), members on the back platforms with the leader's crown and a ready member's check, the member menu (View profile; the leader's Promote and Kick), the leader's START once all are ready and a member's READY, the line under it; START takes everyone into the battle. **In the battle** (`Play.tsx`'s party arrows, `BossDock`'s `PartyMates`, `NetMatch`'s party submit and `partyKick`): every pick an arrow in its owner's seat color (orange, blue, pink), yours changeable until the last pick; "Your pick is in. 2/3 picked" and the team clock; the team's pawns on discs of their colors with a check or "…" (a phone: under your pawn and the God King; a computer: stacked by the board's corner, he in his place, you above him, them above you), and a Kick for whoever may kick, grey for the first minute. Tests: `e2e/boss-party.spec.ts`. The Hidden Boss
+  against a boss you choose on the Boss Battle screen's tiles (the Boss raid screen's since Oct 26, Eric; "Solo Boss Mode" until Oct 29), at a difficulty from Very easy to Very hard, `BOSS_DIFFICULTY`; its **START** begins the battle at once). **Boss alone's clock** (Eric, Oct 30, replacing his Oct 21 untimed one): 10 + 10 (`BOSS_CLOCK`, `bossClockSettings`, on with `RAID_SETTINGS.bossAloneClock`): a 10-minute bank, 10 s added as each move begins, no cap on one move, the boss untimed; the dock's clock shows the bank with a "+10" as each move begins, and an empty bank loses on time (`bossClock`: the runner's `bossOutOfTime`, the move not played, "won on time"). A Solo raid keeps the raid's clock, a test link's `?clock=` turns it off, and the Hidden Boss's Bullet replaces it when it comes; docs/decisions/2026-10-30-boss-battle-clock.md. **Boss Battle's live party** (up to 3; docs/decisions/2026-10-30-boss-party.md; server only so far): a private raid lobby made by the party's START (`boss-party.ts`): only its members, everyone picking every move with the others' picks live (`tally` to all) and changeable until the last pick, the draw rule "party" (`partyMove`: a majority, else the engine's best pick or one of two within 30 cp at random), one team clock (`setTeamBank`), any member's God King call acting for the team (`kingAnyCall`), the AFK kick a minute after a turn's first pick (`partyKickable`), never ranked, and no boss strikes (`bossNoStrikes`, Eric, Oct 31; Boss alone has none either). **On the stage** (`BossSelect`'s `party`, `components/BossParty.tsx`, `PartyClient` with kind "boss"): the invite circles open "Invite friends" (the party made the first time; `/boss/party/CODE` joins it), members on the back platforms with the leader's crown and a ready member's check, the member menu (View profile; the leader's Promote and Kick), the leader's START once all are ready and a member's READY, the line under it; START takes everyone into the battle. **In the battle** (`Play.tsx`'s party arrows, `BossDock`'s `PartyMates`, `NetMatch`'s party submit and `partyKick`): every pick an arrow in its owner's seat color (orange, blue, pink), yours changeable until the last pick; "Your pick is in. 2/3 picked" and the team clock; the team's pawns on discs of their colors with a check or "…" (a phone: under your pawn and the God King; a computer, Nov 14: in the column under the Moves panel and the chat, the God King in his place on the board's bottom line and the team in a 2 x 2 right of him, you at its bottom left, the chat stopping above them, the same in every phase), and a Kick for whoever may kick, grey for the first minute. Tests: `e2e/boss-party.spec.ts`. The Hidden Boss
   (below) is met by everyone in the Crowd's boss final, solo and online, and otherwise only by an admin, in Boss alone
   from the `/bosses` picker (his tile on the select screen is dark and locked for everyone).
 - **The Boss raid screen's character select** (Eric, Oct 16; now the Boss Battle screen's, Oct 26; Oct 29: your stage and a party's two invite circles, VS, a smaller "?" box, the five-level difficulty and START, docs/decisions/2026-10-29-boss-battle-look.md; docs/decisions/2026-10-16-boss-character-select.md;
@@ -189,13 +189,19 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
   `childRating` (1800, +100 every 4 moves on the board, to Maia's top 2500, the man's), Stockfish at `levelForMaia` of it while Maia
   loads; his level from that rating (`formStep` in the view), popping at each step (BossLevel). His figure: `RECLUSE_CHILD_KIT`
   (`bossKitOf`) draws `RECLUSE_GROWING` (recluse-ages.ts: each age's idle and the growing steps), stepped by a figure run from
-  `formStep` (components/RecluseChild.ts, once each); the kid's lines `RECLUSE_CHILD_LINES`. Beaten: nobody placed
-  (finishBossBattle), his line, he grows up into the man (`growUpAt`, `fallMs`), then the runner's `nextBossForm`: a new match
+  `formStep` (components/RecluseChild.ts, once each); the kid's lines `RECLUSE_CHILD_LINES`. **His words beside the board stand on the
+  drawing shown now** (Eric, Nov 14: grown to 20 they sat over his face, placed for the child): the kit's `heads` (`GROWING_HEADS`, each
+  animation's tallest frame over his feet, measured from the art by `recluse-child.test.ts`) sets `--bc-head` as his animation changes
+  (`.bc-heads` in styles.css); a step up counts the age he grows into from its first frame, so a line said as he grows is already above
+  the new size. A phone's words are in his bar, as every boss's. Beaten: nobody placed
+  (finishBossBattle), the kid's line, he grows up into the man (`growUpAt`, `fallMs`, 7.5 s since Nov 14), and the man answers as he's
+  grown (Eric, Nov 14: "there was no conversation"; `RECLUSE_GROWUP_EXCHANGES`, five pairs, one a fight by `growUpExchange`: the
+  battle's start and its seeded level offset, the same on every device; the kid's half is his `defeat` line, the kit's `lineOf`), then the runner's `nextBossForm`: a new match
   against his adult form (solo `nextForm`: his entrance again). **Online** (his room's fight, the Crowd's final): the lobby's fall path
   (his rules' `fallMs`), then `nextRound` calls `nextBossForm` and plays the adult form's intro; each move request carries the child's
   rating (`childRatingNow`) and strength (`bossEloNow`) to the host and its checker alike; `NetMatch` resets his beats, words, banners
   and its 🏆 as the form goes. Tests: `chess/test/recluse-child.test.ts`, `app/test/recluse-child.test.ts`, server
-  `recluse-online.test.ts` ("his child form online"), `e2e/recluse.spec.ts` ("his child form first"), `e2e/hidden-boss-room.spec.ts`.
+  `recluse-online.test.ts` ("his child form online"), `e2e/recluse.spec.ts` ("his child form first"; "his words stand above his head at every age", a computer, with the test switches' `bossFigure(loop)` hook), `e2e/hidden-boss-room.spec.ts`.
 - **Win this form** (admins only, Boss alone, the Hidden Boss only, Nov 13; his child form too: for Eric's timing test of his music and phase
   change): a 🏆 after the 🐟 (a computer: in the title line). Pressed, your next move beats his adult form by the end a mate takes
   (the runner's `bossForceWin`: `stageComplete`, then `finishBossBattle`'s "crowd"; his fall, phase change and music follow as for
@@ -339,12 +345,13 @@ below):
 - **His cutscene** (Eric, Nov 12; in the fight since Nov 13, solo and online; [decision](../decisions/2026-11-13-recluse-cutscene-wired.md)):
   after his fall, before the phase change, about 104 s (`RECLUSE_CUTSCENE.holdMs`; a unit test keeps it the timeline's length):
   everything dims but a soft round spotlight on the board's middle; he kneels in it while the ghost of him as a child poofs in above
-  the board, drops, lands, his knees buckling; Eric's 17 lines, each its own typed box by its speaker (a line of two sentences typed
+  the board, drops, lands, his knees buckling; Eric's 18 lines, each its own typed box by its speaker (a line of two sentences typed
   one, a second's pause, the next; `RECLUSE_CUTSCENE_LINES`); the child fades; the man alone a moment; the light lifts (`outMs`) and
   the phase change carries on, him on his knees in his place, quiet (`kneel`, `phaseChangeRun`'s `before`), until he seizes the God
   King's power. Solo: from the fall's end (`SoloMatch.cutscene`), the phase change as it ends; online from the server's
   `recluseCutscene`, everyone at once. Drawn by App over the fall's screen (`components/RecluseCutscene.tsx`, `recluse-cutscene.ts`'s
-  timeline, the figure `recluse-cutscene` in `recluse-ages.ts`); meanwhile his figure in its place is hidden (`body.cs-on`) and both
+  timeline, the figure `recluse-cutscene` in `recluse-ages.ts`; each box over its speaker's head, `CUTSCENE_SPOTS`, measured from the
+  frames by `recluse-cutscene.test.ts`: the man's was 38 rows low until Nov 14, his words over his face); meanwhile his figure in its place is hidden (`body.cs-on`) and both
   voices are quiet (`Voice.hush`). Music: his beaten theme on through it (`recluseMusic`: the fall with `toPhase2`). No skip, the 🏆
   included. A test's shorter hold plays it sped up to fit (`fitCutscene`; solo `?cutscene=SECONDS`, a test server's
   `CUTSCENE_HOLD_MS`, the e2e's 12 s). Tests: `app/test/recluse-cutscene.test.ts`, `e2e/recluse.spec.ts` ("Win this form").
@@ -370,7 +377,8 @@ below):
     seize), and the God King fades up and away in light (`gkLeave`); he holds his fist, its last frame (a one-shot given
     a time in a figure run holds its last frame), the dock saying "The God King's power is his!". Sounds: `gkHyuah`, `recluseDrain`, `gkLastGrunt2`, `recluseSpark`, `gkLeave`.
   - **Then**, where he stands, he gets up in a rage (`rage`, both drawings); then the board draws his whole figure (a
-    phone too; `.rc-fig`, his place empty meanwhile: `.rc-away`) for his leap onto the middle (`leap`: a thud, dust, the
+    phone too; `.rc-fig`, his place empty meanwhile: `.rc-away`; his words over his head there, `.rc-say`, his place's box and a phone's bar
+    bubble hidden meanwhile: Eric, Nov 14, they floated by his empty place) for his leap onto the middle (`leap`: a thud, dust, the
     board jolts), the book brandished and thrown down open at his feet (`drop`), his chant over it (`chantRaise`,
     `chant`: arms raised, his hair lifting into phase 2's) as light pours up out of it (CSS only: `.rc-light`, a pulsing
     cone behind him, and `.rc-glow` on the pages; only opacity and transform move) and **Eric's two lines** (Nov 13,
@@ -417,19 +425,29 @@ below):
   each frame by a transform, `placeEngine`, from the head part's place in the frame, `headOf`; the kit's `engine`;
   styles `.bc-engine`, opacity and transform animations only). It ignites only as it comes (`fresh`); a new battle
   clears it (`resetBeats`).
-- **The God King is gone in phase 2** (absorbed): his place in the dock stays, empty (`king="gone"`, so the dock doesn't
-  move), no button, no charges, and not a word from him (his phase 2 lines are gone; a board's result is on the board's
-  own tag, and his word on it is the boss's).
+- **The same frame in every phase** (Eric, Nov 14: "the board split only replaces the single board";
+  [decision](../decisions/2026-11-14-recluse-same-frame.md)): the phase change and phase 2 draw phase 1's whole boss screen:
+  a computer's boss bar at the top (no title line; "Phase 2" where it said the move) and its tools, his figure or bust, the
+  Moves panel and the chat (`besideBoard`; a phone's panel left of the God King, `BossPanel`), your pawn and your team's
+  (`PartyMates` keeps the placed "out" team from phase 1's end on, `match.simul`), the God King. Only the board's square
+  changes: the four boards inside it (`FOUR` in `Recluse2.tsx`). Test: `e2e/hidden-boss-room.spec.ts` (the square, the Moves
+  panel, chat, pawns and God King within 2 px of the man's fight; the four boards' gaps equal).
+- **The God King in phase 2** (Eric, Nov 14: "the king will still be with you, but you can't use him anymore"): in his place,
+  greyed (`king="benched"`, `.gk-unit.benched`: grayscale, half opacity), his button disabled ("God King: can't be called in
+  phase 2"), and not a word from him (his phase 2 lines are gone; a board's result is on the board's own tag, and his word
+  on it is the boss's). The phase change still absorbs him (`absorbKing`; another job removes that).
 - **Phase 2** (rules `packages/chess/src/bosses/recluse-phase2.ts`; driver `Phase2Game`; screen `SimulScreen`): four
   boards, each its own Chess960 start (`phase2Numbers`, from the battle's seed, all different), each a BoardState from
   a base at ply 0 (`phase2Board`). The players are White; you play board 0, bots the other three. His brain is
   Stockfish only (`phase2Brain`, `phase2BossMove`: `RECLUSE_PHASE2.elo` 2750, `nodes`, `moveMs` 900 a move), one engine
   serving the boards in turn (`phase2Next`: yours first). Each player's bank `bankSeconds` (120 s), no increment; he
   has no clock. Yours is the dock's clock, at the box's right (Oct 15). Each board's tag (`Tag`): on a computer, the
-  player's name and clock in a row of its own above each board, off its back rank (the four boards a little smaller for
-  it, `DESK` in `Recluse2.tsx`: 44.5% of the square each, a 4.6% row above; the phase change ends them there too; the
-  "slow move" note at the row's right); on a phone, each small board's clock just above it, off its pieces,
-  and the big board none when it's yours (the player's name on one you watch). The scoreboard has no Bank column from
+  player's name and clock in the gap above each board, off its back rank (`FOUR.desk` in `Recluse2.tsx`: 43.5% of the square
+  each, the gaps between them and to the square's edges equal, 4.3%; each board's squares centered in its slot; the phase
+  change ends them there too; the "slow move" note at the row's right); on a phone, inside the same square
+  (`FOUR.phone`), the other three small in a row at its top (26% each, equal gaps), each one's clock just above it, off its
+  pieces, and yours big under them (65%, centered, the slow marks at its right), with no tag when it's yours (the player's
+  name on one you watch; tap a small one to watch it big). The scoreboard has no Bank column from
   the phase change on (`RaceTower`'s `bank`): each clock is its board's. A board ends by mate, a draw, time
   (`phase2Flags`) or resigning (`phase2Resign`); the others play on;
   the battle ends when every board is decided, won only with all four won (`phase2Outcome`). Then his reaction

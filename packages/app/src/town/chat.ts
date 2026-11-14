@@ -19,7 +19,7 @@
  * server's, TOWN_CHAT. docs/decisions/2026-10-28-town-chat-typing.md.
  */
 import { TOWN_CHAT } from "@chessroyale/core";
-import { skyOverride, skyTone, skyWeights, type SkyTone } from "./sky.ts";
+import { skyNow, skyTone, type SkyTone } from "./sky.ts";
 import { HOMES, type HomeId } from "./world.ts";
 
 /** Every number of the chat, in one place (the CSS reads none of them: the component hands it the fade times). */
@@ -120,8 +120,7 @@ export function tooSoonText(waitMs: number): string {
  * Read about once a minute by the screen (never per frame), which changes one attribute only when the tone flips.
  */
 export function townTone(now: Date = new Date(), search: string = typeof location === "undefined" ? "" : location.search): SkyTone {
-  const w = skyOverride(new URLSearchParams(search).get("sky")) ?? skyWeights(now.getHours() * 60 + now.getMinutes() + now.getSeconds() / 60);
-  return skyTone(w);
+  return skyTone(skyNow(now, search));
 }
 
 /** The time of day as the log shows it: hours and minutes, 12-hour, no am/pm ("9:41", "12:05"). */

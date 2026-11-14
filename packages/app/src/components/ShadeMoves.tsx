@@ -89,11 +89,5 @@ export function ShadeMoves({
   );
 }
 
-/**
- * A green ring around a square (where the chosen move landed). Placed and sized in eighths of the board's own size
- * (--board-size), not of the wrap, so it sits exactly on the square at any size, zoom or display scale.
- */
-export function SquareRing({ square, orientation }: { square: string; orientation: "white" | "black" }) {
-  const p = at(square, orientation, useContext(BoardTurn));
-  return <div class="square-ring" style={{ "--sq-x": String(p.left / 12.5), "--sq-y": String(p.top / 12.5) }} aria-hidden="true" />;
-}
+// (The green ring round the played move's square is gone: Eric, Nov 14, "Ring off, no question about it". The piece's three green
+// blinks and the move itself say it.)
