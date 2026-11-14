@@ -11,9 +11,12 @@ out) and hid the party's pawns during his fall and cutscene (the dock kept them 
 **Fix (what's shown only).** `phase2Standings` (packages/chess, recluse-phase2.ts, shared): from his fall (phase 2 to follow) until the
 results, each board's player is in (`out: false`) with their board's state (`board`: playing, won, lost, drawn), first, in the order
 they stood; everyone else as they were. NetMatch and SoloMatch `standings()` apply it (who's on the boards: the phase 2 view, or his
-fall's word before it). RaceTower shows the state after the name ("PLAYING", "WON" in green, "LOST" in red, "DRAWN").
+fall's word before it). RaceTower shows a board's result after the name once it ends: "WON" (green), "LOST" (red), "DRAWN"; on
+the small rows of a phone's panel, a mark (✓, ✕, ½) with the word as its title (the sheet a tap opens has the words).
 
 Calls made:
+- **No word while a board is on.** The row is in, with its points, as any player still playing; "PLAYING" on every row cut a
+  phone panel's names to one letter (its name column is about 57 px) and a computer's to a few.
 - **Placements stay phase 1's, untouched.** Results, XP, rank and everything stored read them; the server sends the same standings
   as before (the results' included). No server code changed.
 - **Points: phase 1's, as they stood.** Phase 2's boards are won or lost; no move scores points.

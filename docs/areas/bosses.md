@@ -345,9 +345,9 @@ below):
 - **The scoreboard through phase 2** (Nov 14, Eric's playtest; [decision](../decisions/2026-11-14-recluse-phase2-standings.md)): his
   battle's end places everyone still in (core `finishBoss`), and those placements stay the results' truth, untouched. From his fall
   (phase 2 to follow) until the results, what the screens show (NetMatch and SoloMatch `standings()`, through `phase2Standings` in
-  recluse-phase2.ts) has each board's player in, first, with phase 1's points and their board's state after the name (RaceTower's
-  `t-board`: Playing, Won, Lost, Drawn); everyone else as they were, someone who left a board out. A computer's table and a phone's
-  Players tab list the four. Tests: `chess/test/recluse-phase2.test.ts`, `server/test/recluse-online.test.ts`, `app/test/recluse-online.test.ts`,
+  recluse-phase2.ts) has each board's player in, first, with phase 1's points, and once their board ends its result after the name
+  (RaceTower's `t-board`: Won, Lost, Drawn; a phone panel's small rows ✓, ✕, ½); everyone else as they were, someone who left a
+  board out. A computer's table lists the four; a phone's Players tab the rows its box fits (three on an iPhone 13), its sheet all four. Tests: `chess/test/recluse-phase2.test.ts`, `server/test/recluse-online.test.ts`, `app/test/recluse-online.test.ts`,
   `app/test/recluse-phase2.test.ts` ("the scoreboard"), `e2e/hidden-boss-room.spec.ts`.
 - **His cutscene** (Eric, Nov 12; in the fight since Nov 13, solo and online; [decision](../decisions/2026-11-13-recluse-cutscene-wired.md)):
   after his fall, before the phase change, about 104 s (`RECLUSE_CUTSCENE.holdMs`; a unit test keeps it the timeline's length):
