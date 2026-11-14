@@ -11,8 +11,13 @@ speed over a third of a second, and sinks as it stops; a bouncing ride starts on
 town's step is 90 ms (eleven squares a second), far too quick to sound once a step, so a loop has its own pace.
 Made soft, as the game's sounds are (they pass a 6 kHz low-pass there: the samples here have had the same), and with
 their character between 150 Hz and 2 kHz, where a phone's speaker has it.
-These are sketches to choose from: five for Sawyer's Dozer, three for Boingo's Pogo.
-  python3 rides.py <out folder>   (writes each as <name>.wav: moving, a stop, moving again; and <name>-loop.wav: the loop alone)
+The sketches to choose from: five for Sawyer's Dozer, three for Boingo's Pogo. His picks (Nov 14): for the dozer,
+"I like the diesel chug slightly better" (than the rumble and squeak, his first); for the pogo, "the first one ...
+just the regular boing". These two go to the game first ("we want to kind of test this on two of them here, and then
+we'll kind of go more. I want to move around with it and see how it feels"); and stopping: "when you stop moving, it
+doesn't just like instantly stop ... it kind of fades over like a second or whatever ... we'll have to test it".
+  python3 rides.py <out folder>          (the sketches: each as <name>.wav, moving, a stop, moving again; and <name>-loop.wav)
+  python3 rides.py --game <out folder>   (the chosen loops for the game: <ride id>.wav and rides.json; see `handoff`)
 """
 import sys
 import wave
@@ -210,6 +215,37 @@ def save(path, x):
         w.writeframes((np.clip(x, -1, 1) * 32767).astype("<i2").tobytes())
 
 
+# The loops chosen for the game, by the ride's id (crates.ts): the sketch, whether it is an engine, and how long its
+# fade is as the pawn stops, to start from (seconds: Eric's "like a second or whatever", to be tried in the town).
+CHOSEN = {"sawyer-dozer": (dozer_chug, True, 0.7), "boingo-pogo": (pogo_boing, False, 0.35)}
+GAME_SR = 24000  # the loops have nothing over 6 kHz, so half the samples carry all of them
+GAME_PAD = 0.1  # seconds of the loop's end before it and of its start after it: the loop is played between them
+
+
+def handoff(out):
+    """The chosen loops as the game takes them: mono WAV at 24 kHz (a WAV has no silence added at its ends, so it
+    can loop), each with `pad` seconds of itself on either side so that a decoder's change of sample rate has real
+    sound to work from at both ends of the loop; and rides.json: for each ride, its file, where its loop is, and how
+    to start and stop it."""
+    import json
+
+    rides = {}
+    for ride, (make, engine, fade) in CHOSEN.items():
+        loop = finished(make())
+        half = np.fft.irfft(np.fft.rfft(loop)[: len(loop) // 4 + 1], len(loop) // 2) * 0.5  # the same loop at 24 kHz, still a ring
+        pad = int(GAME_PAD * GAME_SR)
+        with wave.open(f"{out}/{ride}.wav", "wb") as w:
+            w.setnchannels(1), w.setsampwidth(2), w.setframerate(GAME_SR)
+            w.writeframes((np.clip(np.concatenate([half[-pad:], half, half[:pad]]), -1, 1) * 32767).astype("<i2").tobytes())
+        rides[ride] = {"file": f"{ride}.wav", "loopStart": GAME_PAD, "loopEnd": round(GAME_PAD + len(half) / GAME_SR, 6), "engine": engine,
+                       "fadeInMs": 60, "fadeOutMs": int(fade * 1000), "rmsDb": round(float(20 * np.log10(np.sqrt(np.mean(half**2)))), 1),
+                       "peakDb": round(float(20 * np.log10(np.abs(half).max())), 1)}
+        print(ride, rides[ride])
+    with open(f"{out}/rides.json", "w") as f:
+        json.dump({"note": "Play <file> looping between loopStart and loopEnd (seconds), starting at loopStart. See README.md.", "rides": rides}, f, indent=2)
+        f.write("\n")
+
+
 def main(out):
     for name, make, engine in SKETCHES:
         loop = finished(make())
@@ -221,4 +257,4 @@ def main(out):
 
 
 if __name__ == "__main__":
-    main(sys.argv[1])
+    handoff(sys.argv[2]) if sys.argv[1] == "--game" else main(sys.argv[1])
