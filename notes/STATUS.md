@@ -1222,3 +1222,4 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 15 04:15: shine -> #727 (a0ac88b1, CI watcher bw52mi93m): region clip id clashed with the rider cut's '-seat' (pogo, rodeo bull); regionClip namespace. Running: #726 (stale-tab) CI bsw1i1zrf. No helpers.
 - Nov 15 04:30: #726 stale-tab MERGED 957fe2e0 (PR CI green; fairplay:65 desktop retry-pass, the known 'guest home after cookies cleared' flake). #727 merged main -> 3478b364, CI rerunning (town-rides hashes pass locally). Watchers running.
 - Nov 15 04:55: #727 shine MERGED e939a08d (PR CI green, 0 retries). Main run watcher on e939a08d (covers #726 too). No helpers, no open PRs.
+- Nov 15 05:10: main e939a08d (#726+#727) LIVE; run RED: hidden-boss-room:111 [phone] retry-pass at the 🏆 armed check (bots won all boards first). Fix by me -> PR (claude/room-trophy-race, c005cc13): armed OR decided.
