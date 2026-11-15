@@ -3652,6 +3652,8 @@ export const RIDE_SOUND = {
   engine: { startRate: 0.8, upMs: 300, stopRate: 0.88 },
   rides: {
     "sawyer-dozer": { kind: "loop", engine: true, fadeInMs: 60, fadeOutMs: 700, rate: 1 },
+    /** Puddles's Mower: a putter (Eric, Nov 15: "the putter, the second one's good"), an engine as the dozer is. */
+    "puddles-mower": { kind: "loop", engine: true, fadeInMs: 60, fadeOutMs: 700, rate: 1 },
     /** Its loop's 4 boings (its "little tune": low, mid, low, high), cut as in the sample Eric picked (Nov 15: "Yeah, I like A"). */
     "boingo-pogo": { kind: "steps", level: 0.3, boings: [0, 0.245, 0.49, 0.735], lengthS: 0.245, on: "takeoff" },
   } as Readonly<Record<string, RideLoopSound | RideStepSound>>,
