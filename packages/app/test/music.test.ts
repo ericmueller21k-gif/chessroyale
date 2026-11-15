@@ -75,8 +75,8 @@ const forgot: string[] = [];
 // (Decoded buffers kept as sound.ts keeps them, until forgotten: `fetched` lists the misses, each a real fetch and decode.)
 const bufs = new Map<string, { url: string; duration: number }>();
 const fetched: string[] = [];
-/** (Set: an intro's decode waits for it.) */
-const gate = { intro: null as Promise<void> | null };
+/** (Set: an intro's decode waits for it; `solo`: a town solo's.) */
+const gate = { intro: null as Promise<void> | null, solo: null as Promise<void> | null };
 /** Pieces whose next decode fails (once). */
 const loadFails = new Set<string>();
 const sound = vi.hoisted(() => ({ muted: false, hidden: false, muteListeners: [] as (() => void)[] }));
@@ -91,6 +91,7 @@ vi.mock("../src/sound.ts", () => ({
     const duration = url.endsWith("-intro.mp3") ? 8 : url.includes("town-loop") ? 179.604646 : url.includes("town-solo") ? 41.209313 : 120;
     if (!bufs.has(url)) (fetched.push(url), bufs.set(url, { url, duration }));
     const buf = bufs.get(url)!;
+    if (gate.solo && url.includes("town-solo")) return gate.solo.then(() => buf);
     return gate.intro && url.endsWith("-intro.mp3") ? gate.intro.then(() => buf) : Promise.resolve(buf);
   },
   forgetAudioFile: (url: string) => void (forgot.push(url), bufs.delete(url)),
@@ -134,7 +135,7 @@ vi.stubGlobal("fetch", (url: string) => {
   return Promise.resolve({ ok: true, json: () => Promise.resolve(THEMES) });
 });
 
-const { bossMusic, loopPlace, musicFiles, musicLevel, musicNow, musicPlan, musicTheme, musicWanted, preloadMusic, recluseMusic, roomMusic, roomMusicLoad, roomMusicNow, setMusicOn, splashDone, splashMusic, switchPlan, heardNow, townFiles, townMusic, townMusicNow, townSoloAt, townSoloOf } = await import(
+const { bossMusic, loopPlace, musicFiles, musicLevel, musicNow, musicPlan, musicTheme, musicWanted, preloadMusic, recluseMusic, roomMusic, roomMusicLoad, roomMusicNow, setMusicOn, splashDone, splashMusic, switchPlan, heardNow, townFiles, townDecodedNow, townMusic, townMusicNow, townSoloAt, townSoloOf } = await import(
   "../src/music.ts"
 );
 const settle = () => new Promise((r) => setTimeout(r, 0));
@@ -1019,9 +1020,10 @@ describe("the town's own theme, with its two piano solos slotted in (Eric, Nov 1
     expect(townFiles(THEMES)).toEqual(["/music/town-loop.mp3", "/music/town-solo-a.mp3", "/music/town-solo-b.mp3"]);
   });
 
-  it("the theme loops as a boss loop does: from the pad, between pad and pad + loopSeconds, at MUSIC.volume; then its solos are decoded", async () => {
+  it("the theme loops as a boss loop does: from the pad, between pad and pad + loopSeconds, at MUSIC.volume; only the theme decoded", async () => {
     const t0 = await open(10);
-    expect(fetched).toEqual(["/music/town-loop.mp3", "/music/town-solo-a.mp3", "/music/town-solo-b.mp3"]);
+    expect(fetched).toEqual(["/music/town-loop.mp3"]);
+    expect(townDecodedNow()).toEqual(["town-loop"]);
     const [theme] = ctx.sources;
     expect(ctx.sources).toHaveLength(1);
     expect(bufOf(theme!)).toBe("/music/town-loop.mp3");
@@ -1155,8 +1157,9 @@ describe("the town's own theme, with its two piano solos slotted in (Eric, Nov 1
     expect(again).toHaveLength(1);
     expect(again[0]!.started).toEqual([soloAt + 60 + MUSIC.startDelayS, PAD]);
     expect(townMusicNow()).toEqual({ level: MUSIC.volume });
-    // (Its solos weren't fetched again.)
-    expect(fetched.filter((u) => u.includes("town"))).toHaveLength(3);
+    // (Its theme wasn't decoded again: kept while the town is open. The solo, faded out with the town's music, was let go.)
+    expect(fetched.filter((u) => u.includes("town-loop"))).toHaveLength(1);
+    expect(townDecodedNow()).toEqual(["town-loop"]);
     const t1 = soloAt + 60 + MUSIC.startDelayS;
     await at(t1 + 3 * L - TOWN_MUSIC.aheadS + 1);
     expect(bufOf(ctx.sources.at(-2)!)).toBe("/music/town-solo-b.mp3");
@@ -1225,7 +1228,9 @@ describe("the town's own theme, with its two piano solos slotted in (Eric, Nov 1
     townMusic(false);
     expect(townMusicNow()).toBeNull();
     await vi.advanceTimersByTimeAsync(MUSIC.endFadeMs + 300);
-    expect(forgot.sort()).toEqual(["/music/town-loop.mp3", "/music/town-solo-a.mp3", "/music/town-solo-b.mp3"]);
+    // (Solo a still rang out; b's turn wasn't near, so it was never decoded.)
+    expect(forgot.sort()).toEqual(["/music/town-loop.mp3", "/music/town-solo-a.mp3"]);
+    expect(townDecodedNow()).toEqual([]);
     const t1 = await open(2000);
     await at(t1 + 3 * L - TOWN_MUSIC.aheadS + 1);
     expect(bufOf(ctx.sources.at(-2)!)).toBe("/music/town-solo-a.mp3");
@@ -1252,11 +1257,117 @@ describe("the town's own theme, with its two piano solos slotted in (Eric, Nov 1
     expect(ctx.sources).toHaveLength(1);
   });
 
-  it("the town's loading: preloadMusic waits for the theme and its solos, then fetches only the bosses' (each piece once)", async () => {
+  it("the town's loading: preloadMusic waits for the theme (decoded to play), then fetches the solos' bytes and the bosses' (each piece once), decoding none", async () => {
     preFetched.length = 0;
     await open(10);
     await preloadMusic();
-    expect(files.filter((u) => u.includes("town"))).toEqual(TOWN_FILES);
-    expect(preFetched.filter((u) => u.includes("town")), "the town's, decoded by its player, not fetched again").toEqual([]);
+    expect(files.filter((u) => u.includes("town")), "decoded: the theme alone").toEqual([TOWN_FILES[0]]);
+    // (The solos' bytes: fetched once a visit, into the cache, by the loading bar's test above; the theme, decoded by its player, not again.)
+    expect(preFetched, "the theme not fetched again").not.toContain(TOWN_FILES[0]);
+  });
+
+  describe("in memory (Nov 15: the theme ~69 MB, each solo ~16 MB, beside the town's WebGL on a phone): the theme, and at most one solo", () => {
+    it("no solo decoded until its turn nears (TOWN_MUSIC.aheadS + decodeS before it); then only that one, put on the clock aheadS before", async () => {
+      expect(TOWN_MUSIC.decodeS).toBeGreaterThan(0);
+      const t0 = await open(10);
+      const soloAt = t0 + 3 * L;
+      await at(soloAt - TOWN_MUSIC.aheadS - TOWN_MUSIC.decodeS - 5);
+      expect(files.filter((u) => u.includes("town-solo"))).toEqual([]);
+      expect(townDecodedNow()).toEqual(["town-loop"]);
+      await at(soloAt - TOWN_MUSIC.aheadS - TOWN_MUSIC.decodeS + 1);
+      expect(files.filter((u) => u.includes("town-solo"))).toEqual(["/music/town-solo-a.mp3"]);
+      expect(townDecodedNow().sort()).toEqual(["town-loop", "town-solo-a"]);
+      // (Decoded, not on the clock yet.)
+      expect(ctx.sources).toHaveLength(1);
+      await at(soloAt - TOWN_MUSIC.aheadS + 1);
+      expect(named("town-solo-a")[0]!.started).toEqual([soloAt, 0]);
+      expect(files.filter((u) => u.includes("town-solo")), "decoded once").toEqual(["/music/town-solo-a.mp3"]);
+    });
+
+    it("once a solo has rung out its decoded audio is let go (no reference kept), and decoded again only at its next turn, from the cache", async () => {
+      const t0 = await open(10);
+      const soloAt = t0 + 3 * L;
+      await at(soloAt - TOWN_MUSIC.aheadS + 1);
+      const end = soloAt + 41.209313;
+      await at(end - 1);
+      expect(townDecodedNow(), "still ringing out").toContain("town-solo-a");
+      expect(forgot).toEqual([]);
+      await at(end + 1);
+      expect(forgot).toEqual(["/music/town-solo-a.mp3"]);
+      expect(townDecodedNow()).toEqual(["town-loop"]);
+      expect(bufs.has("/music/town-solo-a.mp3"), "sound.ts's copy let go too").toBe(false);
+      // (Its turn again (b, then a): decoded anew, a after b has been let go.)
+      const run1 = soloAt + S;
+      await at(run1 + 3 * L - TOWN_MUSIC.aheadS + 1);
+      expect(bufOf(ctx.sources.at(-2)!)).toBe("/music/town-solo-b.mp3");
+      const run2 = run1 + 3 * L + S;
+      await at(run2 + 3 * L - TOWN_MUSIC.aheadS + 1);
+      expect(bufOf(ctx.sources.at(-2)!)).toBe("/music/town-solo-a.mp3");
+      expect(files.filter((u) => u.includes("town-solo"))).toEqual(["/music/town-solo-a.mp3", "/music/town-solo-b.mp3", "/music/town-solo-a.mp3"]);
+    });
+
+    it("never more than the theme and one solo decoded, through a, b, a and a room in between", async () => {
+      const t0 = await open(10);
+      let most = 0;
+      const look = () => {
+        most = Math.max(most, townDecodedNow().length);
+        expect(townDecodedNow().filter((n) => n.includes("solo")).length).toBeLessThanOrEqual(1);
+        expect([...bufs.keys()].filter((u) => u.includes("town-solo")).length).toBeLessThanOrEqual(1);
+      };
+      const until = t0 + 3 * (3 * L + S) + 60;
+      for (let t = t0; t < until; t += 15) {
+        await at(t);
+        look();
+        if (Math.abs(t - (t0 + 3 * L + S + 200)) < 8) {
+          roomMusic("zebra");
+          await vi.advanceTimersByTimeAsync(MUSIC.endFadeMs + 300);
+          look();
+          roomMusic(null);
+          await vi.advanceTimersByTimeAsync(0);
+        }
+      }
+      expect(most, "a solo was held at some point").toBe(2);
+    });
+
+    it("a decode that lands late (past the solo's moment): the theme plays one more pass, the solo, kept, at that pass's end", async () => {
+      let land!: () => void;
+      gate.solo = new Promise((r) => (land = r));
+      try {
+        const t0 = await open(10);
+        const soloAt = t0 + 3 * L;
+        await at(soloAt - TOWN_MUSIC.aheadS + 1);
+        // (Still decoding: nothing on the clock, the theme looping on.)
+        expect(named("town-solo-a")).toHaveLength(0);
+        expect(ctx.sources[0]!.stoppedAt).toBeNull();
+        ctx.currentTime = soloAt + 1;
+        land();
+        await vi.advanceTimersByTimeAsync(0);
+        expect(named("town-solo-a"), "too late for this pass's end").toHaveLength(0);
+        expect(ctx.sources[0]!.stoppedAt).toBeNull();
+        await at(t0 + 4 * L - TOWN_MUSIC.aheadS + 1);
+        expect(named("town-solo-a")[0]!.started).toEqual([t0 + 4 * L, 0]);
+        expect(ctx.sources[0]!.stoppedAt).toBe(t0 + 4 * L);
+        expect(files.filter((u) => u.includes("town-solo")), "decoded once, kept for its pass").toEqual(["/music/town-solo-a.mp3"]);
+      } finally {
+        gate.solo = null;
+      }
+    });
+
+    it("a decode that lands in time (after aheadS, before the solo): it's put on the clock as it lands", async () => {
+      let land!: () => void;
+      gate.solo = new Promise((r) => (land = r));
+      try {
+        const t0 = await open(10);
+        const soloAt = t0 + 3 * L;
+        await at(soloAt - TOWN_MUSIC.aheadS + 1);
+        ctx.currentTime = soloAt - 30;
+        land();
+        await vi.advanceTimersByTimeAsync(0);
+        expect(named("town-solo-a")[0]!.started).toEqual([soloAt, 0]);
+        expect(ctx.sources[0]!.stoppedAt).toBe(soloAt);
+      } finally {
+        gate.solo = null;
+      }
+    });
   });
 });

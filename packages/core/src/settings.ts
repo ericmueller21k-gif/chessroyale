@@ -4509,8 +4509,11 @@ export const MUSIC = { volume: 0.4, fadeMs: 300, endFadeMs: 1500, startDelayS: 0
  * - `order`: the solos by their `id` in themes.json, taking turns (a, b, a, …). Empty: the theme alone.
  * - `aheadS`: how long before a solo it is put on the audio clock, with the theme's return after it (s). The joins are on the clock,
  *   never a timer; this is only how early the timer that schedules them runs (a hidden tab's timers can be a minute late).
+ * - `decodeS`: how much earlier than `aheadS` a solo is decoded (s). Only the theme stays decoded while the town plays; a solo is
+ *   decoded as its turn nears and let go once it has rung out (Nov 15: about 69 MB for the theme, 16 MB a solo, beside the town's
+ *   WebGL on a phone), so at most the theme and one solo are in memory. Not decoded by the time it goes on the clock: one more pass.
  */
-export const TOWN_MUSIC: { readonly passesPerSolo: number; readonly order: readonly string[]; readonly aheadS: number } = { passesPerSolo: 3, order: ["a", "b"], aheadS: 120 };
+export const TOWN_MUSIC: { readonly passesPerSolo: number; readonly order: readonly string[]; readonly aheadS: number; readonly decodeS: number } = { passesPerSolo: 3, order: ["a", "b"], aheadS: 120, decodeS: 30 };
 
 /**
  * The Hidden Boss's music (Nov 13; docs/decisions/2026-11-13-hidden-boss-music.md; the handoff's README, "The Hidden Boss"): one
