@@ -1,3 +1,14 @@
+# Chandy, round 2c: Dodge's clones on the edges, teleports, full-length blasts (Nov 16)
+
+| File | What |
+| --- | --- |
+| `phone-dodge-edges.png` | Round 1 on the blank board: the row clones on a5 and h4, the column clones on e8 and f8, dashed aim lines the whole rank or file, the 3 x 3 clear; votes on d3 (yours) and e3. |
+| `phone-dodge-teleport.png` | Round 3, a teleport: the e8 clone blinks out (its afterimage fading on e8) and reappears on f8; "TELEPORT!"; the safe square moved. |
+| `phone-dodge-round3.gif` | Round 3, 3 s: three teleports (0.8, 1.4, 1.8 s), the safe square moving f3, f4, e4, e5, the votes following, LOCKED, the four blasts pop the whole ranks and files, DODGED 3/3. |
+| `phone-dodge-blast.png` | The blast: four full-length beams, your king on the one square they miss. |
+
+---
+
 # Chandy, round 2b: Dodge's opening and vote (Nov 15)
 
 | File | What |

@@ -1,4 +1,9 @@
-# Chandy: the design (round 2b, Nov 15)
+# Chandy: the design (round 2c, Nov 16)
+
+Round 2c (Eric): the clones stand on the board's edges, teleport mid-round, and blast whole ranks and files: D3 below. Everything
+else from round 2b stands.
+
+# Round 2b (Nov 15)
 
 Round 2b (Eric): Dodge's opening and its vote: D1-D2 and D6-D7 below, the rest of round 2 stands as answered (the locks L1-L6 as
 recommended, the queen lock from his side only with its pre-check).
@@ -107,9 +112,26 @@ to the safe square, LOCKED, fire, DODGED). (The mockup's real clock kept ticking
     back with it).
   - **D1c. The board's zoom:** **A (recommended): none**: the whole blank board stays in its place (a square is the usual size to tap),
     only the scope moves. Nothing changes size or place.
-- **D3. The aim, readable in 3 s on a phone:** **A (recommended): always 2 rows and 2 columns, no diagonals.** Four dashed lines, one per
-  clone: rows from the left or right (aiming level), columns from above (aiming down). The safe square is where the unlit row meets the
-  unlit column: quick to read. B: from round 2, one decoy diagonal that misses S (harder to read, still fair).
+- ✅ **D3 (Eric, round 2c): the clones on the board's edges, teleporting, full-length blasts.**
+  - **Where they stand:** a row's clone on the a- or h-file square of that rank (aiming level, inward), a column's on rank 8 at that
+    file (aiming down: his side, never rank 1, where the HUD sits). Always on the board. Drawn at half an art pixel to a CSS pixel, a
+    clone is about one square tall and his rifle reaches about two squares in, so on a phone (a 45 px square) he covers the a/h-file
+    square and the b/g one beside it, never the 3 x 3 (d3-f5): `phone-dodge-edges.png`.
+  - **The aim:** always exactly 2 rows and 2 columns missing exactly one safe square (no diagonals): dashed lines the whole rank or
+    file, edge to edge.
+  - **The teleport:** a clone blinks out (a white flash), leaves its red-green afterimage fading on its old square (about half a
+    second), and reappears on the edge square of the other free line of its kind (a row-shooter to the free rank, a column-shooter to the
+    free file), so after every teleport it's still 2 rows + 2 columns and the safe square has moved one step. "TELEPORT!" shows where the
+    round's name was. Round 1: 1 teleport, round 2: 2, round 3: 3: `phone-dodge-teleport.png`, `phone-dodge-round3.gif`.
+  - **D3a. The timing (A, recommended): keep 3 s every round; the teleports at 1.2 s (round 1), 0.9 and 1.6 s (round 2), 0.8, 1.4 and
+    1.8 s (round 3): the last always 1.2 s before the vote closes** (a reaction and a tap take about 0.5 to 0.7 s on a phone, plus the
+    300 ms grace online: tight but fair, "be very quick on the last one"). B: 3.5 s for round 3, the last teleport at 2.3 s (the same
+    1.2 s left, a little more time to read the first two).
+  - **D3b. Votes and teleports:** a vote made before a teleport stays where it was tapped; players re-tap to change (the counts move:
+    the GIF).
+  - **D3c. The blast (A, recommended):** when the vote closes (LOCKED), your king steps to the winning square, then all four beams fire at
+    once: a big pop the whole rank or file, edge to edge (thicker and brighter for a moment, then the beam), about half a second; then
+    "DODGED n/3" or "HIT! YOU LOSE": `phone-dodge-blast.png`.
 - **D4. The safe square:** **A (recommended): from the seed, never the same as the round before; the middle allowed** (sometimes staying
   put is right).
 - **D5. Does a beam ever cross the king's own square if he stays?** Yes, whenever the safe square isn't the middle: standing still is
