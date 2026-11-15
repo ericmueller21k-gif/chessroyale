@@ -1,4 +1,9 @@
-# Chandy: the design (round 2, Nov 15)
+# Chandy: the design (round 2b, Nov 15)
+
+Round 2b (Eric): Dodge's opening and its vote: D1-D2 and D6-D7 below, the rest of round 2 stands as answered (the locks L1-L6 as
+recommended, the queen lock from his side only with its pre-check).
+
+# Round 2
 
 Round 2 first (Eric's answers, then the new questions, each with my **recommended answer first**, answerable in a line: "L3: A"); round
 1's questions follow, the answered ones marked ✅. Still open from round 1 (my recommendations stand unless Eric says otherwise): Q2-Q5,
@@ -92,13 +97,16 @@ The stills: `phone-dodge-aim.png` (round 1: four clones, the dashed aim lines, 2
 stayed in the middle: "HIT! YOU LOSE"), `phone-dodge.gif` (one round, about 5 s: zoom in, the clones blink in, the 3 s, your king steps
 to the safe square, LOCKED, fire, DODGED). (The mockup's real clock kept ticking in the dock; in the game it holds.)
 
-- **D1. The real board or its own little arena?** **A (recommended): its own 3 x 3 arena, laid over the real board zoomed onto your
-  king.** Always 9 squares (on the rim too: the stills' king is on e1, so the arena's bottom row is past the board's edge), nothing on
-  them blocks you, no chess rules (no "moving into check"), and the real board isn't changed: when it's over, your king is back on his
-  square and the game goes on. B: the real squares (fewer than 9 at the rim, your own pieces in the way, legality questions).
-- **D2. "Seamlessly":** **A (recommended):** the board zooms onto your king in a quarter of a second (1.4x, the king in the middle) and
-  dims; the arena's red frame appears; the clones blink in one by one (about a tenth of a second each); after round 3 it zooms back. No
-  other screen, nothing moves out of its place. (In the build: the board is drawn untransformed once the zoom ends, per the lessons.)
+- ✅ **D1-D2 (Eric, round 2b): how it starts.** He targets your king: a **scope-in** (everything but a circle round your king greys,
+  blurs and darkens; a cyan scope ring round him); while he's in focus your king **slides to the center** (e4 here); the scope opens on a
+  **blank board**: every other piece gone, your king in the middle with all 9 squares round him (the 3 x 3 framed in red). After round 3
+  the board comes back exactly as it was, your king on his own square. `phone-dodge-scope-in.png`, `phone-dodge-2b.gif`.
+  - **D1a. Where "the center" is:** **A (recommended): e4 for White, e5 for Black** (the 3 x 3 d3-f5 is then whole on the board and
+    near the middle; the 8 x 8 board has no single middle square). B: d4 / d5.
+  - **D1b. The board's last-move marks and check mark:** **A (recommended): gone with the pieces** (a truly blank board; they come
+    back with it).
+  - **D1c. The board's zoom:** **A (recommended): none**: the whole blank board stays in its place (a square is the usual size to tap),
+    only the scope moves. Nothing changes size or place.
 - **D3. The aim, readable in 3 s on a phone:** **A (recommended): always 2 rows and 2 columns, no diagonals.** Four dashed lines, one per
   clone: rows from the left or right (aiming level), columns from above (aiming down). The safe square is where the unlit row meets the
   unlit column: quick to read. B: from round 2, one decoy diagonal that misses S (harder to read, still fair).
@@ -106,12 +114,17 @@ to the safe square, LOCKED, fire, DODGED). (The mockup's real clock kept ticking
   put is right).
 - **D5. Does a beam ever cross the king's own square if he stays?** Yes, whenever the safe square isn't the middle: standing still is
   a hit then (the hit still).
-- **D6. The 3 s online:** **A (recommended):** the server starts each round; each device counts its 3 s from when it saw the round
-  begin; a tap moves your king at once on your screen and sends the square (you can change it until the end); the server takes the
-  last square it got by the end plus 300 ms for lag, and sends the result, the same for everyone. Solo: on the device.
-- **D7. A boss raid with many players:** **A (recommended): the crowd's king goes where most players put him** (the popular vote, like
-  a move; no pick counts as staying put); one hit loses the battle for everyone. B: each player dodges alone and the battle is lost only
-  if more than half are hit.
+- ✅ **D6-D7 (Eric, round 2b): the vote.** The crowd votes on the king's square with 3 s to pick; the most popular square is played
+  (ties: the crowd's usual tie-break); **nobody votes: a random square** from the seed (alone, you are the crowd: no tap, a random
+  square); one hit loses the battle for the whole crowd; the server closes the vote at 3 s plus the lag grace. `phone-dodge-vote.png`
+  (6 votes on f3, yours ringed in gold), `phone-dodge-nobody-voted.png`.
+  - **D6a. The lag grace:** **A (recommended): 300 ms** after the 3 s, server time; each device's bar runs from when it saw the round
+    start, so nobody's 3 s is short. B: 500 ms.
+  - **D6b. The counts:** the crowd's move vote already shows its counts on screen; **A (recommended): the same here: a count on each
+    voted square, your own pick ringed in gold**, changeable until the 3 s end.
+  - **D6c. Your king while the vote runs:** **A (recommended): he stays in the middle until the vote closes**, then steps to the winning
+    square (LOCKED), then the beams fire: one result for everyone.
+  - **D6d. Nobody voted and the random square is safe or not:** **A: pure chance** (1 in 9 to survive the round), as you said.
 - **D8. "Only if your queen is alive":** **A (recommended): dropped**: he always targets your king.
 - **D9. How often:** **A (recommended):** the rage meter is on his bar from the start, dimmed ("Rage: unlocks at 5 upgrades"); after the
   5th upgrade it fills as every boss's; full: the "RAGE!" warning, then Dodge as your turn begins (the clock held); after it, it fills

@@ -1,3 +1,17 @@
+# Chandy, round 2b: Dodge's opening and vote (Nov 15)
+
+| File | What |
+| --- | --- |
+| `phone-dodge-2b.gif` | About 7 s: he targets your king (the scope-in: the rest greys, blurs and darkens, a cyan scope ring), your king slides to the center (e4), the scope opens on a blank board, the clones blink in, one round with the vote (counts on the voted squares, yours ringed in gold), LOCKED, the beams fire, DODGED. |
+| `phone-dodge-scope-in.png` | The scope-in on your king, before his slide. |
+| `phone-dodge-vote.png` | The vote on the blank board: 1.4 s left, 6 votes on f3 (yours), 2 on e3, 1 on d5; the safe square not marked. |
+| `phone-dodge-nobody-voted.png` | Nobody voted: the king on a random square (d5), "NOBODY VOTED: RANDOM". |
+
+The blank board is the mockup's own 64 squares in the board's colors over the real ones (the real board keeps its pieces underneath).
+Round 2's Dodge stills (`phone-dodge-aim/dodged/hit.png`, `phone-dodge.gif`) show the old zoomed arena: replaced by these.
+
+---
+
 # Chandy, round 2: the mockup (Nov 15)
 
 Eric's round-1 answers are in; the design is in **DESIGN.md** (round 2 first: the locks, the queen lock's one rule, his ultimate Dodge).
