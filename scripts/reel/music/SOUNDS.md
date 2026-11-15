@@ -267,3 +267,10 @@ run the song; a yawn where the roar should be; his hoops are the drop). Boingo's
 a dying ride, a steam-organ whistle): this one is in four, steady, darker, and its lead is low.
 To watch in his answer: the two pops and the yawn stop the band for a beat (he disliked the band frozen mid-verse in
 Ginger's first go; these are at the ends of sections), and the chords a tritone apart under his tune.
+His answer: the write-up was his own design, made with another assistant, and he had meant it to be followed, not
+taken as a style: "can you just give me another version where you actually copy the one I sent? I'm not sure which one
+I'll go with ... actually use what I gave you and do one more." song_af.py is that: its key, chord loop, six patches,
+six sections and named notes as written (2:00, its 64 bars); only what it leaves open is written here. song_ae.py
+stays as the other candidate. For next time: when he sends a write-up, ask of it one thing before building: is it a
+description of someone else's track (then the style only), or his own plan (then as written). A plan that says
+"architect and generate an original track" and names no source is his own.
