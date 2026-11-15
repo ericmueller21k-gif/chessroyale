@@ -1209,3 +1209,4 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 15 01:55: #722 town music MERGED d7fedf13 (PR CI green, 0 retries). Deploy + main run watcher running. Pending Eric: pogo sample A/B.
 - Nov 15 01:50: Eric picked pogo sample A -> helper session_01JuCWRtqHMFZ3LxqZEQ7T19 (high, claude/pogo-boings, briefs/pogo-boings.md; sample in notes/ref). Check-in 02:32.
 - Nov 15 02:05: pogo boings -> #723 (e986e264, CI watcher b7qc1hqt5): a boing per step at take-off (drawn hop is already one per square), 4 in turn, one-shots; dozer unchanged. No helpers.
+- Nov 15 02:40: #723 pogo boings MERGED 018bd310 (PR CI green, 0 retries); main d7fedf13 (#722) was green. Eric: town music not heard -> checked live: d7fedf13 serves the town files and a fresh phone browser fetches town-loop first; told him to reopen the tab (service worker keeps the old build), Music on, tap once.
