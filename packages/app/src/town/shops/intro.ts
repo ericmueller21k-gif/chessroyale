@@ -35,6 +35,7 @@ import { startSplatter } from "./smudgy-splatter.ts";
 import { timelineBeats, type IntroData } from "./timeline.ts";
 import { FOLIO_MOVES, FOLIO_PLANE, folioAnims, type FolioMove, type FolioPlane } from "./challenge.ts";
 import { BLITZ_MOVES, CHALLENGE_FEEL, CREW_MOVES, blitzAnims, type BlitzMove, DARK_MOVES, ROPE_MOVES, crewAnims, type CrewMove, boardSquare, darkAnims, drainAt, drawnTop, frameAt, introBeats, introOf, ropeAnims, stormEdge, wipeAt, type BossIntro, type DarkMove, type IntroAnims, type IntroBeat, type IntroLayout, type RopeMove } from "./challenge.ts";
+import { chunk } from "../../stale.ts";
 
 /**
  * A boss's intro art, as its file exports it: an intro as data (its file's IntroData), or one still on its own state machine (its art,
@@ -78,22 +79,22 @@ interface IceMods {
   elves: typeof import("./ginger-elves-art.ts");
 }
 const ART: Partial<Record<HomeId, () => Promise<IntroArt>>> = {
-  hollow: () => import("./hollow-intro-art.ts").then((m) => ({ dark: m })),
+  hollow: () => chunk(import("./hollow-intro-art.ts")).then((m) => ({ dark: m })),
   // (Wrangler's: his moves, the lasso's loop, the bale (his table: the barn's board stand), the buckets, his wipe; one chunk.)
-  pig: () => import("./pig-intro-art.ts").then((m) => ({ rope: m, table: m.INTRO_PIG_TABLE, palette: m.INTRO_PIG_TABLE_PALETTE, storm: m.INTRO_PIG_STORM, front: m.INTRO_PIG_FRONT })),
+  pig: () => chunk(import("./pig-intro-art.ts")).then((m) => ({ rope: m, table: m.INTRO_PIG_TABLE, palette: m.INTRO_PIG_TABLE_PALETTE, storm: m.INTRO_PIG_STORM, front: m.INTRO_PIG_FRONT })),
   // (Jefferson's: his moves, the crate-stack table (the warehouse's board stand without its slab and board), your lift, his wipe; one
   // chunk. His crew are the room's: their baked sheets.)
-  grex: () => import("./grex-intro-art.ts").then((m) => ({ crew: m, table: m.INTRO_GREX_TABLE, palette: m.INTRO_GREX_TABLE_PALETTE, storm: m.INTRO_GREX_STORM, front: m.INTRO_GREX_FRONT })),
+  grex: () => chunk(import("./grex-intro-art.ts")).then((m) => ({ crew: m, table: m.INTRO_GREX_TABLE, palette: m.INTRO_GREX_TABLE_PALETTE, storm: m.INTRO_GREX_STORM, front: m.INTRO_GREX_FRONT })),
   // (Ginger's: his moves, the blast, the icicle (his table), the crack and the puff, the light, the board and its two carriers, his
   // blizzard; the room's own elves keep working.)
   // (Dash's: his moves, the shoe-box table and stools, his dust trail, the pieces' pop, his clock rush; one chunk.)
-  dash: () => import("./blitz-intro-art.ts").then((m) => ({ dash: m, table: m.INTRO_BLITZ_TABLE, palette: m.INTRO_BLITZ_TABLE_PALETTE, storm: m.INTRO_BLITZ_STORM, front: m.INTRO_BLITZ_FRONT })),
+  dash: () => chunk(import("./blitz-intro-art.ts")).then((m) => ({ dash: m, table: m.INTRO_BLITZ_TABLE, palette: m.INTRO_BLITZ_TABLE_PALETTE, storm: m.INTRO_BLITZ_STORM, front: m.INTRO_BLITZ_FRONT })),
   // (Folio's: its moves, the sheets folding into the stools and the table, the plane, the board unfolding; one chunk with its paper
   // kit. The table's slab is its folded table's top (paper), the board the park table's ink, as the art's board is.)
   folio: () =>
-    Promise.all([import("./folio-intro-art.ts"), import("../../characters/folio-intro.ts")]).then(([props, moves]) => ({ folio: { props, moves }, table: props.INTRO_FOLIO_TABLE, palette: FOLIO_TABLE_PALETTE })),
+    Promise.all([chunk(import("./folio-intro-art.ts")), chunk(import("../../characters/folio-intro.ts"))]).then(([props, moves]) => ({ folio: { props, moves }, table: props.INTRO_FOLIO_TABLE, palette: FOLIO_TABLE_PALETTE })),
   gingerbread: () =>
-    Promise.all([import("./ginger-intro-art.ts"), import("../../characters/ginger-intro.ts"), import("./ginger-elves-art.ts")]).then(([props, moves, elves]) => ({
+    Promise.all([chunk(import("./ginger-intro-art.ts")), chunk(import("../../characters/ginger-intro.ts")), chunk(import("./ginger-elves-art.ts"))]).then(([props, moves, elves]) => ({
       ice: { props, moves, elves },
       table: props.INTRO_GINGER_TABLE,
       palette: props.INTRO_GINGER_TABLE_PALETTE,

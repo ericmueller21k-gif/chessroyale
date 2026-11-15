@@ -5,6 +5,7 @@ import { account, onAccountChange } from "../account.ts";
 import { FrontFrame, type FrontNav } from "../components/FrontMenu.tsx";
 import { useMedia } from "../components/QuickChat.tsx";
 import type { Stand } from "./world.ts";
+import { chunk } from "../stale.ts";
 
 export type { Stand };
 
@@ -78,7 +79,7 @@ export function TownPage({ nav, ...props }: Props & { nav: FrontNav }) {
     // (No module when its chunk was gone after a deploy: the page is loading again, stale.ts.) The town shows once your pawn is ready on
     // its ride (Eric, Nov 10: "your rider doesnt appear for a few seconds"), or after a moment (TOWN_FEEL.youWaitMs) without it.
     const load = () =>
-      void import("./Town.tsx").then((m) => {
+      void chunk(import("./Town.tsx")).then((m) => {
         if (!live || !m) return;
         const you = m.readyYou();
         release = you.done;

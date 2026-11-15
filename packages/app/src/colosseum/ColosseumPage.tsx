@@ -1,5 +1,6 @@
 import type { FunctionComponent } from "preact";
 import { useEffect, useState } from "preact/hooks";
+import { chunk } from "../stale.ts";
 
 type Screen = FunctionComponent<{ onExit: () => void }>;
 
@@ -13,7 +14,7 @@ export function ColosseumPage({ onExit }: { onExit: () => void }) {
   useEffect(() => {
     let live = true;
     // (No module when its chunk was gone after a deploy: the page is loading again, stale.ts.)
-    void import("./Colosseum.tsx").then((m) => live && m && setScreen(() => m.ColosseumScreen));
+    void chunk(import("./Colosseum.tsx")).then((m) => live && m && setScreen(() => m.ColosseumScreen));
     return () => void (live = false);
   }, []);
   return Screen ? <Screen onExit={onExit} /> : <div class="screen col-screen" />;

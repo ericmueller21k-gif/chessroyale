@@ -2499,6 +2499,13 @@ export function clockAfterVote(clock: number, votes: readonly Augment[], s: Pick
 }
 
 /**
+ * The app's files on the device (the service worker, packages/app/sw-template.js; Nov 15): each version's files stay while a tab runs
+ * that version, so a tab left open across a deploy still opens its rooms. A tab that doesn't say which version it runs (asleep in the
+ * background) keeps the newest `keepVersions` versions (this one included) until it does or closes.
+ */
+export const APP_CACHE = { keepVersions: 3 } as const;
+
+/**
  * The front door (home, queue, profiles): the live line's timing and the queue's show. (A rating's own names, RATING_RANKS
  * "Novice … Transcendent", were retired on Oct 28, 2026: the rank shown everywhere is ranked 1 v 1's tier, RANKED_1V1.)
  * See DECISIONS.md, "The front door".
