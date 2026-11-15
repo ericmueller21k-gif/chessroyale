@@ -1,7 +1,7 @@
 import { useLayoutEffect } from "preact/hooks";
 import { BOSS_POWERS } from "@chessroyale/core";
 import { RECLUSE_FX, bulletIncrementAt, kingHelpBlocked } from "@chessroyale/chess";
-import { RECLUSE, RECLUSE_BUST, suited } from "../characters/recluse.ts";
+import { RECLUSE, RECLUSE_BUST, coated } from "../characters/recluse.ts";
 import { RECLUSE_CUTSCENE } from "../characters/recluse-ages.ts";
 import { RECLUSE_CHANGE, RECLUSE_CHANGE_BOOK, RECLUSE_CHANGE_KID } from "../characters/recluse-transform.ts";
 import { lazyTable, type Character } from "../characters/sprite.ts";
@@ -108,7 +108,7 @@ let warmed: "w" | "b" | null = null;
 /**
  * His phase change's frames drawn ahead, a slice each animation frame, from when his battle shows (it comes only once he's beaten,
  * minutes later), so none stalls a slow phone the first time it shows (.claude/LESSONS.md: "A stall the first time an effect
- * shows"): his cutscene's first frames, his transformation's (the man, the child, the book), then his suit where he stands (the
+ * shows"): his cutscene's first frames, his transformation's (the man, the child, the book), then his final form where he stands (the
  * bust's and the figure's phase 2 idle and ultimate; the figure's results, beaten or laughing); and its sounds, made ahead in the
  * sound worker. (Into BossEffect's frame cache, the one BossCharacter draws from too.)
  */
@@ -116,10 +116,12 @@ export function prewarmRecluse(side: "w" | "b"): void {
   if (warmed === side) return;
   warmed = side;
   const frames = (ch: Character, names: readonly string[]) => names.flatMap((n) => ch.anims[n]?.frames ?? []);
+  // (In his final form: each frame numbered within its own animation, as BossCharacter numbers it (it turns his helix).)
+  const worn = (ch: Character, names: readonly string[]) => names.flatMap((n) => (ch.anims[n]?.frames ?? []).map((f, i) => coated(f, i)));
   // (His cutscene's first frames: the man alone in the light, the child's poof, drop and landing.)
   const SCENE = ["idle", "poof", "drop", "land"];
   const CHANGE = Object.keys(RECLUSE_CHANGE.anims);
-  // (In his suit where he stands: phase 2's idle and ultimate; on the results, beaten (and slumped) or laughing.)
+  // (In his final form where he stands: phase 2's idle and ultimate; on the results, beaten (and slumped) or laughing.)
   const SUITED = ["idle2", ...PHASE2_ULT_ANIMS];
   const SUITED_RESULTS = ["collapse", "collapseLoop", "laugh"];
   // One after another, in the order they show, so only one slice of drawing ahead is ever at work in a frame.
@@ -127,7 +129,7 @@ export function prewarmRecluse(side: "w" | "b"): void {
     prewarmSprite(RECLUSE_CHANGE, frames(RECLUSE_CHANGE, CHANGE), undefined, () =>
       prewarmSprite(RECLUSE_CHANGE_KID, frames(RECLUSE_CHANGE_KID, ["together"]), undefined, () =>
         prewarmSprite(RECLUSE_CHANGE_BOOK, frames(RECLUSE_CHANGE_BOOK, ["glow"]), undefined, () =>
-          prewarmSprite(RECLUSE_BUST, frames(RECLUSE_BUST, SUITED).map(suited), undefined, () => prewarmSprite(RECLUSE, frames(RECLUSE, [...SUITED, ...SUITED_RESULTS]).map(suited))),
+          prewarmSprite(RECLUSE_BUST, worn(RECLUSE_BUST, SUITED), undefined, () => prewarmSprite(RECLUSE, worn(RECLUSE, [...SUITED, ...SUITED_RESULTS]))),
         ),
       ),
     ),

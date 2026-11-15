@@ -2,8 +2,8 @@
  * The Hidden Boss's sounds, synthesized (no files, no licenses): the red book's pages fluttering as it opens, the book
  * slammed shut (a dull thump with a slap of paper), a soft rustle of cloth as he moves it or himself, his laugh as breath
  * through the nose (no real voice: a few huffs), a low swell under his stare, and for his phase change a thump as he
- * lands on the board and the light pouring out of the book (a soft chord swelling over the hum), his visor's light as he's
- * revealed in his suit (a few sparks and a cold tone rising) and the arcs that split the board (a soft crackle, never a buzz),
+ * lands on the board and the light pouring out of the book (a soft chord swelling over the hum), his light as he's
+ * revealed in his final form (a few sparks and a cold tone rising) and the arcs that split the board (a soft crackle, never a buzz),
  * and phase 2's slow move (two soft
  * notes falling). Each is a pure function of the sample rate (its noise is seeded), so a test can measure
  * it: every one stays quieter than a piece's move (peak and loudness). Made ahead in the sound worker (warmSounds).
@@ -91,7 +91,7 @@ const SOUNDS: Record<RecluseSound, (rate: number) => Float32Array> = {
     const pluck = (age: number, decay: number) => (age < 0 ? 0 : Math.min(1, age / 0.01) * Math.exp(-age / decay));
     return render(rate, 0.42, (t) => pluck(t, 0.06) * d(t) + pluck(t - 0.13, 0.09) * a(t));
   },
-  // His visor's light as he's revealed in his suit (0.6 s): three quick soft sparks, and a cold tone sweeping up and dying
+  // His light as he's revealed in his final form (0.6 s): three quick soft sparks, and a cold tone sweeping up and dying
   // away (its octave over it, faint).
   spark: (rate) => {
     const fizz = bandpass(rate, () => 3600, 1.4, lowpass(rate, 6500, noise(641)));

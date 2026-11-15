@@ -75,30 +75,13 @@ export const RECLUSE_PALETTE: Record<string, string> = {
   "8": "#fff3b8", // the spell's glow (and the glint in his eyes): pale, gold, ember
   "9": "#ffc44a",
   "0": "#ff7a3c",
-  // The suit (MOCKUP round 3b, Nov 14): a matte near-black navy, dark to light; slim charcoal panels, dark to light; the
-  // gloves and boots; the glowing traces, red and cool blue, and their tiny yellow nodes; the visor's glass.
-  n: "#090c17",
-  u: "#111829",
-  v: "#1b2540",
-  z: "#2b3a5c",
-  R: "#121319",
-  S: "#1d1f29",
-  P: "#2a2d39",
-  I: "#3d4152",
-  Z: "#05070d",
-  f: "#d83a4c",
-  g: "#ff8a95",
-  i: "#ffd84a",
-  p: "#070a14",
-  "#": "#131d36",
-  "=": "#5ab4e6",
-  // His glowing eyes (MOCKUP, Nov 14): the core, the glow, the glow on his skin.
+  // His glowing eyes (Nov 14): the core, the glow, the glow on his skin.
   "!": "#f2fdff",
   "+": "#38b6ff",
   "(": "#38b6ff99",
   ")": "#38b6ff33",
   "[": "#7fd2ffcc",
-  // His final form (MOCKUP round 4, Nov 15): the black trench coat, dark to light, its blue lining, the lining in shadow; the
+  // His final form (round 4, Nov 15): the black trench coat, dark to light, its blue lining, the lining in shadow; the
   // aura's light on his hair; the aura, outer and inner; its bolts, core and glow; the binary helix's glyphs, front to back.
   "<": "#08080c",
   ">": "#121219",
@@ -118,8 +101,6 @@ export const RECLUSE_PALETTE: Record<string, string> = {
 type Pt = readonly [number, number];
 const SHIRT = "qrst";
 const NAVY = "NMLl";
-const SUIT_PANEL = "RSPI";
-const SUIT_BLUE = "nuvz";
 const COAT = "<>>{}";
 
 const ramp = (r: string, l: number) => r[Math.max(0, Math.min(r.length - 1, Math.floor(l * r.length)))]!;
@@ -227,7 +208,7 @@ const EYES: Record<Eyes, { l: readonly string[]; r?: readonly string[] }> = {
   glare: { l: ["bbbb", "wxxw", "wxxw", "cbbc"] },
   // Possessed (the light taking him, his transformation, Eric, Nov 14): wide open, totally white, no iris.
   possessed: { l: ["wwww", "wwww", "wwww", "bwwb"] },
-  // Glowing (the suit, visor up: Eric, Nov 14, "his eyes glow bright electric blue"): a bright core in the glow's color, a
+  // Glowing (his final form: Eric, Nov 14, "his eyes glow bright electric blue"): a bright core in the glow's color, a
   // soft glow round each and a thin line of light down each cheek (`eyeGlow`, see-through, over the face).
   glow: { l: ["b++b", "+!!+", "+!!+", "b++b"] },
 };
@@ -402,7 +383,7 @@ function boxOf(pts: readonly Pt[], pad: number): { x0: number; y0: number; w: nu
  * front of the book he clutches). `full`: a fuller forearm, for his free arm hanging in full view (the book arm's
  * forearm is mostly behind the book or across it).
  */
-function paintArm(sh: Pt, el: Pt, wr: Pt, fore: boolean, full = false, suit = false, coat = false): Part {
+function paintArm(sh: Pt, el: Pt, wr: Pt, fore: boolean, full = false, coat = false): Part {
   const cuff = 0.36;
   const b = boxOf([sh, el, wr], 6);
   const cv = canvas(b.w, b.h);
@@ -425,11 +406,9 @@ function paintArm(sh: Pt, el: Pt, wr: Pt, fore: boolean, full = false, suit = fa
         cv[y]![x] = s === lo && lo.t > 0.8 && lo.t < 0.9 ? "<" : ramp(COAT, l - (s === up ? 0.08 : 0));
         continue;
       }
-      // (The suit: a charcoal panel over the upper arm, a dark seam each end of the cuff where his sleeve was rolled, the
-      // forearm dark navy.)
-      if (s === lo && !inCuff) cv[y]![x] = ramp(suit ? "nuv" : "bcd", l);
-      else if (s === lo) cv[y]![x] = lo.t > cuff - 0.1 || lo.t < 0.06 ? (suit ? "Z" : "q") : ramp(suit ? "nuv" : "rst", l + 0.1);
-      else cv[y]![x] = ramp(suit ? SUIT_PANEL : SHIRT, l - 0.12);
+      if (s === lo && !inCuff) cv[y]![x] = ramp("bcd", l);
+      else if (s === lo) cv[y]![x] = lo.t > cuff - 0.1 || lo.t < 0.06 ? "q" : ramp("rst", l + 0.1);
+      else cv[y]![x] = ramp(SHIRT, l - 0.12);
     }
   return { grid: toGrid(cv) };
 }
@@ -588,147 +567,7 @@ function armPart(sh: Pt, el: Pt, wr: Pt, fore = false, full = false): { name: st
   return { name, at };
 }
 
-// ---- The suit (a MOCKUP, round 3b, Eric and the director, Nov 14: "a full exoskeleton-style futuristic armor… don't make it
-// look like war… more like computer networking, that sort of wiring… a matching full-head helmet… the full front visor flips
-// up… fairly fit to his body"; darker, its own look). Fitted, a matte near-black navy with slim charcoal panels, thin glowing
-// traces in red and cool blue, tiny yellow nodes; an angular helmet of its own, one smooth visor over his whole face that
-// flips up into the dome. Every part has its suit version, the same size and place (`suitName`), so any pose wears it by its
-// part names (`suitFrame`).
-
-export type Visor = "down" | "mid" | "up";
-const GLOVE: Record<string, string> = { a: "Z", b: "Z", c: "n", d: "u", e: "v" };
-const BOOT: Record<string, string> = { D: "Z", E: "n", F: "u", G: "=" };
 const toCanvas = (p: Part): Canvas => p.grid.map((r) => [...r]);
-const remap = (p: Part, map: Record<string, string>): Part => ({ ...p, grid: p.grid.map((r) => [...r].map((c) => map[c] ?? c).join("")) });
-/** Thin traces (lines in `line`, their ends a tiny node in `node`) on a canvas whose top-left is drawing (x0, y0), only over its drawn pixels. */
-function traces(cv: Canvas, x0: number, y0: number, paths: readonly (readonly Pt[])[], line = "f", node = "i"): void {
-  const on = (x: number, y: number) => {
-    const k = cv[y - y0]?.[x - x0];
-    return k !== undefined && k !== "." && k !== "k";
-  };
-  const put = (x: number, y: number, k: string) => on(x, y) && (cv[y - y0]![x - x0] = k);
-  for (const path of paths) {
-    for (let i = 1; i < path.length; i++) {
-      const [ax, ay] = path[i - 1]!;
-      const [bx, by] = path[i]!;
-      const n = Math.max(Math.abs(bx - ax), Math.abs(by - ay)) || 1;
-      for (let t = 0; t <= n; t++) put(Math.round(ax + ((bx - ax) * t) / n), Math.round(ay + ((by - ay) * t) / n), line);
-    }
-    const end = path[path.length - 1]!;
-    if (node) put(Math.round(end[0]), Math.round(end[1]), node);
-  }
-}
-/** The suit's torso: dark navy down the middle, slim charcoal panels at his sides and shoulders split by seams, a high collar;
- * the circuit: a cool-blue spine down the middle, red runs branching to his sides, a tiny node at each end. */
-function suitTorso(): Part {
-  const X0 = 30;
-  const Y0 = 26;
-  const cv = toCanvas(torso());
-  const NECK: Record<string, string> = { a: "n", b: "u", c: "u", d: "v", e: "v", E: "Z", D: "Z", O: "n", Y: "=", y: "i" };
-  cv.forEach((row, y) =>
-    row.forEach((k, x) => {
-      const X = x + X0;
-      const Y = y + Y0;
-      const i = SHIRT.indexOf(k);
-      if (i >= 0) {
-        const half = Y < 36 ? 4.5 : 8.6 - (Y - 36) * 0.07;
-        const d = Math.abs(X + 0.5 - 46) - half;
-        // (A seam where the side panels meet the middle, and across them every 9 rows: segmented.)
-        row[x] = d > 0 && d < 1 ? "Z" : d > 0 ? (Y % 9 === 0 ? "Z" : SUIT_PANEL[i]!) : SUIT_BLUE[Math.min(2, i)]!;
-      } else if (NECK[k]) row[x] = NECK[k]!;
-    }),
-  );
-  traces(cv, X0, Y0, [[[46, 37], [46, 69]]], "=");
-  traces(cv, X0, Y0, [
-    [[46, 42], [43, 45], [43, 51], [40, 54]],
-    [[46, 47], [49, 50], [49, 57], [52, 60]],
-    [[46, 60], [42, 64]],
-    [[46, 54], [50, 54]],
-  ]);
-  stamp(cv, X0, Y0, ["i"], 46, 36);
-  return { grid: toGrid(cv) };
-}
-/** The suit's legs: dark navy, a thin red glowing line down the outside of each, a cool-blue trace down the front to a tiny
- * node at the knee, a seam across each knee. */
-function suitLegs(stance: Stance): Part {
-  const { part, at } = legsOf(stance);
-  const cv = toCanvas(remap(part, { N: "n", M: "u", L: "v", l: "u" }));
-  const dy = STANCE_DROP[stance];
-  const legsPts = STANCE_LEGS[stance];
-  // Circuit runs, not stripes: down the front of each thigh to a node above the knee (cool blue); down the outside of each
-  // thigh, jogging in to a node (red); down each shin, jogging out to a node (red).
-  legsPts.forEach((leg, i) => {
-    const s1 = i ? -1 : 1;
-    const [hx, hy] = leg[0]!;
-    const [kx, ky] = leg[1]!;
-    const mid = (u: number): Pt => [hx + (kx - hx) * u, hy + (ky - hy) * u];
-    traces(cv, at[0], at[1], [[[hx + s1 * 1.4, hy + 7], [kx + s1 * 1.4, ky - 3]]], "=");
-    const m = mid(0.35);
-    const m2 = mid(0.7);
-    traces(cv, at[0], at[1], [[[m[0] - s1 * 3.4, m[1]], [m2[0] - s1 * 3.4, m2[1]], [m2[0] - s1 * 1.6, m2[1] + 2]]]);
-    if (leg[2]) {
-      const [ax, ay] = leg[2]!;
-      traces(cv, at[0], at[1], [[[kx - s1 * 0.5, ky + 4], [kx + (ax - kx) * 0.45 - s1 * 0.5, ky + (ay - ky) * 0.45], [kx + (ax - kx) * 0.45 - s1 * 2.5, ky + (ay - ky) * 0.45 + 2]]]);
-    }
-  });
-  if (stance !== "kneel")
-    for (const leg of legsPts) {
-      const [kx, ky] = leg[1]!;
-      traces(cv, at[0], at[1], [[[kx - 3, ky + 2], [kx + 3, ky + 2]]], "Z", "");
-    }
-  return { grid: toGrid(cv) };
-}
-/** Facing his head part's own pixels (25 x 35): the helmet's shell (angular, faceted, his long head's proportions), the face
- * opening, the visor. */
-const SHELL = inPoly([[8.4, 1.2], [16.6, 1.2], [21.6, 4.6], [24.2, 11.5], [24.2, 19.5], [22.4, 27.5], [16.8, 34.8], [8.2, 34.8], [2.6, 27.5], [0.8, 19.5], [0.8, 11.5], [3.4, 4.6]]);
-const OPENING = inPoly([[6.6, 13.6], [18.4, 13.6], [20.8, 16.6], [20.6, 21], [19.2, 27.5], [15.4, 33.8], [9.6, 33.8], [5.8, 27.5], [4.4, 21], [4.2, 16.6]]);
-/** The visor's glass down over his face: near black with a cool-blue tint low down, one long highlight, its rim lit. */
-function glass(x: number, y: number): string {
-  if (!OPENING(x, y + 1) || !OPENING(x - 1, y) || !OPENING(x + 1, y)) return "#";
-  const d = x - 7 + (y - 15) * 0.45;
-  if (d >= 0 && d < 1.2 && y < 24) return "=";
-  if (d >= 1.6 && d < 2.4 && y < 21) return "#";
-  return y < 17 ? "Z" : y > 29 || x < 7 ? "#" : "p";
-}
-/** His head in the helmet (`visor`: down over his face, on its way up, up in the dome): the face drawn as ever, inside. */
-function helmet(face: Face, dark: boolean, visor: Visor): Part {
-  const cv = toCanvas(head(face, 0, dark));
-  for (let y = 0; y < cv.length; y++)
-    for (let x = 0; x < 25; x++) {
-      if (!SHELL(x, y)) {
-        cv[y]![x] = ".";
-        continue;
-      }
-      if (OPENING(x, y)) {
-        if ("HhjJ".includes(cv[y]![x]!)) cv[y]![x] = "n";
-        continue;
-      }
-      // Facets: the crown's top plate lit, the side plates darker, the right side darkest (lit from the top left).
-      const top = y < 6 + Math.abs(x + 0.5 - 12.5) * -0.2 && Math.abs(x + 0.5 - 12.5) < 5;
-      const side = x + 0.5 < 5 + (y > 12 ? 0 : (12 - y) * 0.35) ? "L" : x + 0.5 > 20 - (y > 12 ? 0 : (12 - y) * 0.35) ? "R" : "M";
-      cv[y]![x] = top ? "z" : side === "L" ? "v" : side === "R" ? "n" : y < 13 ? "v" : "u";
-    }
-  // The seams between the plates and round the opening; a red run down each side jogging in to a node; a short cool-blue run
-  // over the brow; one tiny node at his temple.
-  traces(cv, 0, 0, [[[8, 2], [6, 7], [4, 12]], [[16, 2], [19, 7], [20, 12]], [[7, 6], [18, 6]]], "Z", "");
-  for (let y = 0; y < cv.length; y++)
-    for (let x = 0; x < 25; x++) if (SHELL(x, y) && !OPENING(x, y) && (OPENING(x + 1, y) || OPENING(x - 1, y) || OPENING(x, y + 1) || OPENING(x, y - 1))) cv[y]![x] = "Z";
-  traces(cv, 0, 0, [[[2, 12], [2, 18], [4, 20]], [[23, 14], [23, 21], [21, 23]]], "f", "");
-  traces(cv, 0, 0, [[[9, 8], [12, 8], [14, 10], [16, 10]]], "=", "");
-  stamp(cv, 0, 0, ["i"], 22, 11);
-  if (visor === "down") {
-    for (let y = 0; y < cv.length; y++) for (let x = 0; x < 25; x++) if (OPENING(x, y)) cv[y]![x] = glass(x, y);
-  } else {
-    // On its way up: the glass tilted back, its lower half gone over the brow; or up, a band of it across the dome.
-    const [top, bottom] = visor === "mid" ? [7, 19] : [3, 9];
-    for (let y = top; y <= bottom; y++)
-      for (let x = 0; x < 25; x++) {
-        if (!SHELL(x, y) || Math.abs(x + 0.5 - 12.5) > 9.8 - (y < top + 2 ? (top + 2 - y) * 1.6 : 0)) continue;
-        cv[y]![x] = y === bottom ? "=" : y === top ? "#" : x - 5 + (y - top) * 0.6 > 0 && x - 5 + (y - top) * 0.6 < 1.2 ? "=" : y < top + 2 ? "Z" : "p";
-      }
-  }
-  return { grid: toGrid(cv) };
-}
 /** The glow over his glowing eyes (no outline, see-through, on his head part's own pixels): soft round each eye, a thin line of
  * light down each cheek from under it. */
 function eyeGlow(): Part {
@@ -743,53 +582,13 @@ function eyeGlow(): Part {
   return { grid: toGrid(cv), outline: false };
 }
 
-/** A part's suit version (null: not worn with it, the tie), made the first time it's asked for. */
-export function suitName(name: string, visor: Visor = "down"): string | null {
-  if (name.startsWith("tie:")) return null;
-  if (name.startsWith("head:")) {
-    const [, f, , dark] = name.split(":");
-    const [eyes, brows, mouth] = f!.split(".") as [Eyes, Brows, Mouth];
-    return add(`helmet:${visor}:${f}${dark ? ":dark" : ""}`, () => helmet({ eyes, brows, mouth }, !!dark, visor));
-  }
-  if (name.startsWith("arm")) {
-    const [kind, pts] = name.split(":");
-    const q = pts!.split(";").map((p) => p.split(",").map(Number) as unknown as Pt) as [Pt, Pt, Pt];
-    return add(`suit:${name}`, () => paintArm(q[0], q[1], q[2], kind!.includes("fore"), kind!.includes("full"), true));
-  }
-  if (name === "torso") return add("suit:torso", suitTorso);
-  if (name.startsWith("legs:")) return add(`suit:${name}`, () => suitLegs(name.slice(5) as Stance));
-  if (name === "shoe" || name === "heels") return add(`suit:${name}`, () => remap(PARTS[name]!, BOOT));
-  if (name.startsWith("fist:") || name.startsWith("hand:") || name === "clutch") return add(`suit:${name}`, () => remap(PARTS[name]!, GLOVE));
-  return name;
-}
-/** A frame of him in the suit (the visor as given). */
-export const suitFrame = (f: Frame, visor: Visor = "down"): Frame => ({
-  ...f,
-  layers: f.layers.flatMap((l) => {
-    const n = suitName(l.part, visor);
-    if (!n) return [];
-    // (His glowing eyes' glow over his face, when it shows.)
-    if (visor !== "down" && l.part.startsWith("head:glow.")) return [{ ...l, part: n }, { ...l, part: add("eyeGlow", eyeGlow) }];
-    return [{ ...l, part: n }];
-  }),
-});
-/** A frame of his in the suit, the visor down, made once (where he stands: BossCharacter draws it every time the frame shows). */
-const SUITED = new WeakMap<Frame, Frame>();
-export function suited(f: Frame, i = 0): Frame {
-  // (MOCKUP round 4: his final form wherever the suit showed.)
-  if (ROUND4) return coated(f, i);
-  let s = SUITED.get(f);
-  if (!s) SUITED.set(f, (s = suitFrame(f)));
-  return s;
-}
-const ROUND4 = true;
-
-// ---- His final form (a MOCKUP, round 4, Eric, Nov 15: "a black trench coat ... no more helmet ... his hair is just like always
-// radiating up and flowing ... an aura field around him ... bolts ... a pattern of ones and zeros ... spiraling around him in a
-// double helix"). His face as ever with the glowing blue eyes; a long black trench coat of his own cut, open over his white shirt
-// and blue tie; his hair always rising; round him a glow field with small bolts flicking in it and two strands of tiny 1s and 0s
-// turning round him (in front of him drawn over him, behind him under him). Like the suit, worn by part names (`coatFrame`), plus
-// layers of its own placed from his body; each frame's place in its loop (`i`) turns the helix and sways the coat.
+// ---- His final form (round 4, Eric, Nov 15, in place of round 3b's suit and helmet: "a black trench coat ... no more helmet ...
+// his hair is just like always radiating up and flowing ... an aura field around him ... bolts ... a pattern of ones and zeros ...
+// spiraling around him in a double helix"; round 4b: "all his hair should be moving"). His face as ever with the glowing blue eyes;
+// a long black trench coat of his own cut, open over his white shirt and blue tie; his own brown hair always rising, in fine strands,
+// every one moving; round him a glow field with small bolts flicking in it and two strands of tiny 1s and 0s turning round him (in
+// front of him drawn over him, behind him under him). Worn by part names (`coatFrame`), plus layers of its own placed from his body;
+// each frame's place in its loop (`i`) turns the helix, flows the hair and sways the coat.
 
 /** The coat's open front: half its width either side of his middle (x 46), down his chest. */
 const opening = (y: number) => (y < 34 ? 3 : 3 + Math.min(2.6, (y - 34) * 0.16));
@@ -1024,7 +823,7 @@ function coatName(name: string): string | null {
   if (name.startsWith("arm")) {
     const [kind, pts] = name.split(":");
     const q = pts!.split(";").map((p) => p.split(",").map(Number) as unknown as Pt) as [Pt, Pt, Pt];
-    return add(`coat:${name}`, () => paintArm(q[0], q[1], q[2], kind!.includes("fore"), kind!.includes("full"), false, true));
+    return add(`coat:${name}`, () => paintArm(q[0], q[1], q[2], kind!.includes("fore"), kind!.includes("full"), true));
   }
   if (name === "torso") return add("coat:torso", coatTorso);
   return name;
@@ -1061,7 +860,10 @@ export function coatFrame(f: Frame, i = 0): Frame {
   const sparks: Speck[] = bolts(i).map(([x, y, k]) => [fx + x, fy + y, k]);
   return { ...f, layers, specks: [...(f.specks ?? []), ...sparks] };
 }
-/** A frame of his in his final form, made once (`i`: its place in its loop, the first time it's asked for). */
+/**
+ * A frame of his in his final form, made once (`i`: its place in its loop, the first time it's asked for): where he stands
+ * BossCharacter draws it every time the frame shows, from his transformation's white-out on (`setSuitAt`).
+ */
 const COATED = new WeakMap<Frame, Frame>();
 export function coated(f: Frame, i = 0): Frame {
   let s = COATED.get(f);
@@ -1694,7 +1496,7 @@ export const RECLUSE_HEADS: Readonly<Record<string, number>> = {
 export const RECLUSE_PORTRAIT = { x: OX + HEAD_AT[0] - 2, y: OY - 1, w: 29, h: 36 } as const;
 /**
  * The same face in his bust's pixels (RECLUSE_BUST's window; each age's bust in recluse-ages.ts has its own window on its own head, so
- * the same one fits all): a portrait taken from the bust as it's drawn now, his age and his suit (BossKit.barFace, Nov 14).
+ * the same one fits all): a portrait taken from the bust as it's drawn now, his age and his final form (BossKit.barFace, Nov 14).
  */
 export const RECLUSE_BUST_PORTRAIT = { x: RECLUSE_PORTRAIT.x - OX - BUST.x0, y: RECLUSE_PORTRAIT.y - OY - BUST.y0, w: RECLUSE_PORTRAIT.w, h: RECLUSE_PORTRAIT.h } as const;
 
