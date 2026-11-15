@@ -1,0 +1,28 @@
+{
+  "pad": 0.5,
+  "note": "Loop <loop> between pad and pad + loopSeconds. To play a solo: when a pass of the loop ends, start the solo's file there instead of the next pass; `seconds` after the solo started, start the loop again from its top (offset pad) and let the solo's file play out over it.",
+  "source": "scripts/reel/music/song_ad.py",
+  "theme": {
+    "loop": "town-loop",
+    "loopSeconds": 178.604646,
+    "bpm": 129.0,
+    "lufs": -16.0,
+    "peakDb": -2.3
+  },
+  "solos": [
+    {
+      "id": "a",
+      "file": "town-solo-a",
+      "seconds": 37.209313,
+      "fileSeconds": 41.209313,
+      "peakDb": -3.2
+    },
+    {
+      "id": "b",
+      "file": "town-solo-b",
+      "seconds": 37.209313,
+      "fileSeconds": 41.209313,
+      "peakDb": -4.2
+    }
+  ]
+}
