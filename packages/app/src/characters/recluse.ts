@@ -879,11 +879,13 @@ function coatSkirt(stance: Stance, sway: number): Part {
  * His head in his final form (round 4, Eric, Nov 15: "more strands of hair, more lines in between, so it's more free flowing";
  * blue tried and dropped, "the brown is better"): his face as ever (the glowing eyes, phase 2's shadows) and his own brown hair always rising, one part
  * with one outline (so no line runs across it): a mass of fine strands swept up from his crown, wider at its foot, each strand its
- * own shade and length so its top is a fringe of fine ends, the whole rippling as the draft runs up it (`flow`, 0 to 2); lit from
+ * own shade and length so its top is a fringe of fine ends, every strand flowing all the time as the draft runs up it (`flow`, a step of `HAIR_FLOWS`); lit from
  * the top left, its ends and outer edges caught by the aura's light. His head part's pixels with 6 more columns each side and 12
  * more rows on top (37 x 47; `RISE_AT`).
  */
 const HAIR_RAMP = "HhhjjJJ";
+/** The steps of his hair's loop (one a frame: about 0.8 s at his idle's pace). */
+const HAIR_FLOWS = 6;
 function risenHead(face: Face, dark: boolean, flow: number): Part {
   const DX = 6;
   const DY = 12;
@@ -893,15 +895,18 @@ function risenHead(face: Face, dark: boolean, flow: number): Part {
   const base = toCanvas(head(face, 0, dark, true));
   const cv = canvas(25 + 2 * DX, 35 + DY);
   base.forEach((row, y) => row.forEach((k, x) => (cv[y + DY]![x + DX] = k)));
+  // (Every strand moving all the time (round 4b, Eric, Nov 15: "all his hair should be moving"): a wave running up the whole mass
+  // from the roots, each strand swaying on its own a little out of step with its neighbors, its tip flicking longer and shorter,
+  // so it ripples like a flame; `flow` is the step of its loop, `HAIR_FLOWS` a cycle.)
+  const ph = (flow / HAIR_FLOWS) * 2 * Math.PI;
   const at = (cx: number, cy: number) => {
     const up = LIFT + 3 - (cy - DY + 0.5);
-    const rise = Math.min(1, Math.max(0, up) / 12);
-    const x0 = cx - DX + 0.5 - C - 1.7 * Math.sin(up * 0.33 - flow * 2.1) * rise;
+    const rise = 0.35 + 0.65 * Math.min(1, Math.max(0, up) / 12);
+    const x0 = cx - DX + 0.5 - C - 1.6 * Math.sin(up * 0.3 - ph) * rise;
     const n = Math.floor(x0 / STRAND);
-    // (Each strand curls a little on its own as well.)
-    const x = x0 - 0.7 * Math.sin(up * 0.55 + n * 1.9 - flow * 2.1) * rise;
+    const x = x0 - 1.3 * Math.sin(up * 0.5 + n * 1.9 - ph) * rise;
     const i = Math.floor(x / STRAND);
-    const e = 16 * (1 - (x / 14.5) ** 2) + 4.5 * hash(i) - 1.5;
+    const e = 14.5 * (1 - (x / 14.5) ** 2) + 4 * hash(i) - 1.5 + 1.6 * Math.sin(ph + i * 1.7);
     return { ok: up > -8 && up < e, x, up, i, top: e - up };
   };
   for (let cy = 0; cy < cv.length; cy++)
@@ -1033,7 +1038,7 @@ export function coatFrame(f: Frame, i = 0): Frame {
   const [fx, fy] = legsL ? [legsL.x - 28, legsL.y - 66] : [torsoL.x - 30, torsoL.y - 26];
   const sway = [0, 1, 0, -1][Math.floor(i / 3) % 4]!;
   const step = i % 12;
-  const flow = Math.floor(i / 2) % 3;
+  const flow = i % HAIR_FLOWS;
   const at = (part: string, x: number, y: number): Layer => ({ part, x: fx + x, y: fy + y });
   const layers: Layer[] = [at(add(`coatAura:${i % 3}`, () => aura(i % 3)), AURA.x0, AURA.y0), at(add(`coatHelix:back:${step}`, () => helix(false, step)), HELIX.x0, HELIX.y0)];
   for (const l of f.layers) {
@@ -1068,7 +1073,7 @@ export function coated(f: Frame, i = 0): Frame {
 
 /** Where his drawing space sits on the frame: room above for the hair in the wind and the spell's glow. */
 const OX = -14;
-const OY = 14;
+const OY = 19;
 const W = 64;
 const H = OY + GROUND + 4;
 
