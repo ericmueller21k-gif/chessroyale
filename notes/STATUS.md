@@ -1208,3 +1208,4 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 15 01:40: Eric: pogo all wrong: no loop/fade; a boing per square (each step, 90 ms), on the landing frame, from the first press, overlapping OK; sample first. Sent pogo-sample-A-tune (4 pitches cycling) and -B-same (one boing) built from boingo-pogo.wav's boings (scratchpad/pogo). Waiting on his pick before building. #722 town music CI running (ba06o6ixr).
 - Nov 15 01:55: #722 town music MERGED d7fedf13 (PR CI green, 0 retries). Deploy + main run watcher running. Pending Eric: pogo sample A/B.
 - Nov 15 01:50: Eric picked pogo sample A -> helper session_01JuCWRtqHMFZ3LxqZEQ7T19 (high, claude/pogo-boings, briefs/pogo-boings.md; sample in notes/ref). Check-in 02:32.
+- Nov 15 02:05: pogo boings -> #723 (e986e264, CI watcher b7qc1hqt5): a boing per step at take-off (drawn hop is already one per square), 4 in turn, one-shots; dozer unchanged. No helpers.
