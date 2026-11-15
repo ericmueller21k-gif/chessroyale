@@ -112,6 +112,13 @@ before the rows are laid (`street.ts lotHere`), so each row fills the place with
   street town reloads once (`/town`, the same query); failing again within 2 minutes of that (`RETRY_WINDOW_MS`, the time kept in
   the tab's session storage), the town's box shows the loading card's look with "The town didn't load. Please retry." and a
   **Retry** button, nothing else (`.town-broken`). No WebGL 2 at all: "Chess Town can't run on this device.", no button, no reload.
+- **A deploy while the town is open** (Nov 15, [decision](../decisions/2026-11-15-stale-tab.md)): its rooms' and intros' code comes
+  from the tab's own version's files, which the service worker keeps while the tab is open ([ops.md](ops.md), "A deploy and the tabs
+  already open"). Where it can't (no worker yet), `stale.ts` loads the page again and the town comes back where you were: your square
+  and facing (for a challenge, where you stood as you called it), and the room or challenge your tap was opening opens again
+  (`setPlace` / `takePlace`, session storage, read once; Town.tsx `townPlaceBack`). A room-to-room door or Don Dough's own challenge
+  comes back as the home's front room. Every `import(...).then((m) => m.x)` goes through `chunk()` (stale.ts): while the page reloads
+  it stops quietly instead of throwing.
   A standing rule (docs/rules/eric.md, "The town never shows an old version"). Each page reports once with its reason (`retry` for
   the page that gives up), nothing else shown (the health view counts them: docs/areas/ops.md, "Health"). The canvas says which backend
   (`data-backend`). Tests: `test/town-gl-fail.test.ts`, `e2e/town-street.spec.ts` ("context lost"), `e2e/problems.spec.ts`

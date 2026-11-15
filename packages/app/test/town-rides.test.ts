@@ -92,7 +92,7 @@ describe("the rides", () => {
       const lines = text.split("\n").filter((l) => drawing.test(l) && /\bimport\b/.test(l));
       if (f.endsWith("components/rides/load.ts")) {
         expect(lines.length).toBe(RIDE_IDS.length);
-        for (const l of lines) expect(l, l).toMatch(/\(\) => import\("\.\/[a-z-]+\.tsx"\)/);
+        for (const l of lines) expect(l, l).toMatch(/\(\) => chunk\(import\("\.\/[a-z-]+\.tsx"\)\)/);
       } else expect(lines, f).toEqual([]);
     }
     expect(rideDrawing("riding-chirp")).toBe(RIDES["riding-chirp"]);

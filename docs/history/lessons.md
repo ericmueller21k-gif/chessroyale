@@ -1043,3 +1043,15 @@ missed the scene's 38 rows of headroom; the phase change draws him somewhere his
 the board his words go over his figure. An e2e check measures the bubble's bottom against his head at each age.
 docs/decisions/2026-11-14-recluse-bubble-grows.md.
 
+
+## A deploy that took an open tab's files (Nov 15, 2026)
+
+**What happened:** Eric, on a computer, came back to a tab open from before a deploy and challenged Wrangler: the page loaded again,
+the town at its center, his challenge gone.
+
+**Why:** the new version's service worker deleted every older version's cache as it took over, and the deploy had taken those files off
+the server. The tab had its code nowhere. The "a deploy landed" e2e ran with the service worker blocked (it got in the way of the
+route that refused the file), so it only ever tested the reload, never what the worker does to an open tab.
+
+**The fix:** each version's files stay while a tab runs that version; the fallback reload comes back where you were, with the
+challenge or room opening. docs/decisions/2026-11-15-stale-tab.md.

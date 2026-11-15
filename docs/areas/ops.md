@@ -14,6 +14,16 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
   branches): only `check` (typecheck and unit tests, `.github/workflows/check.yml`: since Nov 6 `unit` and `chess`, packages/chess's tests,
   run side by side and `check` is green when both are) and the e2e run decide whether a PR
   is green. Merge with a merge commit, then confirm the deploy live.
+- **A deploy and the tabs already open** (Nov 15, [decision](../decisions/2026-11-15-stale-tab.md)): a deploy takes the old
+  version's files off the server, so an open tab lives on what the service worker keeps (`packages/app/sw-template.js`). Each
+  version's cache stays while a tab runs it: the new worker asks each tab for its entry script (`install.ts`, `answerWorker`) and
+  keeps every version holding one; a tab that doesn't answer (asleep in the background, or older than this) keeps the newest
+  `APP_CACHE.keepVersions` (3, settings.ts). The rest go as the new worker takes over and each time a page loads (`brc-loaded`).
+  A file under `/assets/` is answered from any kept version (its name is its contents'), any other file from this version only.
+  Not covered: a picture changed by the deploy and not shown yet (pictures aren't precached), and a page no worker answers (a first
+  visit before it's ready): `stale.ts` reloads it once a minute at most, back where it was (the town's square and facing, and the
+  room or challenge your tap was opening). Tests: `sw-versions.test.ts`, `stale.test.ts`, town.spec's two "a deploy landed" describes
+  (the e2e server's `/api/e2e/sw.js`, `e2e-sql.ts`, serves the next deploy's worker).
 - **CI e2e** (Oct 15, DECISIONS.md "e2e on GitHub Actions for every PR"; fast PR checks since Oct 18,
   `docs/decisions/2026-10-18-faster-pipeline.md`, a trial): `.github/workflows/e2e.yml`, on GitHub's standard runners
   (free: the repository is public).
