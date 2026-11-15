@@ -30,7 +30,7 @@ import { codeInPath, guardEntries, handleProblems, pruneProblems, serverError } 
 import { handleOpsAdmin } from "./ops-admin.ts";
 import { checkAlerts, type AlertEnv } from "./alerts.ts";
 import { pruneChatMod } from "./chat-mod.ts";
-import { e2eSql, type E2eSqlEnv } from "./e2e-sql.ts";
+import { e2eSql, e2eWorker, type E2eSqlEnv } from "./e2e-sql.ts";
 import type { AccessEnv } from "./access.ts";
 import { SERVER_RECHECK_NODES, serverScoreAt, warmEngine, type EngineEnv } from "./engine.ts";
 import { takeEngineCall } from "./engine-calls.ts";
@@ -199,8 +199,9 @@ async function handle(request: Request, rawEnv: Env, ctx: ExecutionContext): Pro
 
 async function route(request: Request, rawEnv: Env, url: URL, waitUntil: WaitUntil): Promise<Response> {
   // POST /api/e2e/sql: the e2e tests' writes to the local database, on its one writer (e2e-sql.ts; the e2e's local server only).
+  // (And GET /api/e2e/sw.js: the next deploy's service worker, for a test of a tab left open across a deploy.)
   if (rawEnv.E2E_SQL) {
-    const res = await e2eSql(request, url, rawEnv);
+    const res = (await e2eSql(request, url, rawEnv)) ?? (await e2eWorker(url, rawEnv));
     if (res) return res;
   }
   // GET /api/status → { paused, banner }: the kill switches that are off and the maintenance banner (kill-switches.ts).

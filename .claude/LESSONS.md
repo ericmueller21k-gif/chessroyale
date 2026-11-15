@@ -218,6 +218,11 @@ Tests check *what* ends up on the screen, not *how it gets there*, nor how long 
     each way it ends, including "nobody is there any more".
   - Test the stale case: the old link, the tab reopened later, the app back from the background.
   - A refused WebSocket says nothing about why: ask the server (an ordinary request) before retrying.
+- **A deploy that took an open tab's files** (Nov 15, [story](../docs/history/lessons.md#a-deploy-that-took-an-open-tabs-files-nov-15-2026)):
+  - A deploy reaches tabs already open: what they load later comes from what the service worker kept. Never delete a version's
+    files while a tab may still run it (`sw-template.js`, `prune`).
+  - A test of the stale case runs the way players do, the service worker in charge (town.spec, "a deploy landed, the service worker
+    in charge"): a test that blocks the worker only tests the fallback.
 
 ## Tests
 

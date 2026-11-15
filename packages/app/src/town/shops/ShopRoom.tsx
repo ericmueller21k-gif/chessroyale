@@ -77,6 +77,7 @@ import { roomLight, skyNow, type RoomLight } from "../sky.ts";
 import { CLAW_PLAY, clawPose, newPose as newClawPose } from "../../claw/view.ts";
 import { closeClawMachine, openClawMachine } from "../../claw/index.ts";
 import { rideMoving, rideStep } from "../../ride-sound.ts";
+import { chunk } from "../../stale.ts";
 
 /** A room's art, as its file exports it. */
 export interface RoomArt {
@@ -172,22 +173,22 @@ interface CrewPlaces {
  * window on the street (the walk-up's, Nov 14) takes the light of the town's time of day as it loads (`LIT_ROOMS`).
  */
 const ART: Partial<Record<string, (light: RoomLight) => Promise<RoomArt>>> = {
-  tiger: () => import("./babur-art.ts").then((m) => ({ layout: m.SHOP_BABUR_LAYOUT, pieces: m.SHOP_BABUR_PIECES, crateAt: m.SHOP_BABUR_CRATE_AT, lights: m.SHOP_BABUR_HOOP_LIGHTS, pools: m.SHOP_BABUR_HOOP_POOLS })),
-  gardener: () => import("./puddles-art.ts").then((m) => ({ layout: m.SHOP_PUDDLES_LAYOUT, pieces: m.SHOP_PUDDLES_PIECES, crateAt: m.SHOP_PUDDLES_CRATE_AT, lights: [], pools: [] })),
-  alfil: () => import("./alfil-art.ts").then((m) => ({ layout: m.SHOP_ALFIL_LAYOUT, pieces: m.SHOP_ALFIL_PIECES, crateAt: m.SHOP_ALFIL_CRATE_AT, lights: m.SHOP_ALFIL_LIGHTS, pools: m.SHOP_ALFIL_POOLS })),
-  bigboy: () => import("./bigboy-art.ts").then((m) => ({ layout: m.SHOP_BIGBOY_LAYOUT, pieces: m.SHOP_BIGBOY_PIECES, crateAt: m.SHOP_BIGBOY_CRATE_AT, lights: m.SHOP_BIGBOY_LIGHTS, pools: m.SHOP_BIGBOY_POOLS, upright: ["airplane"], marks: m.SHOP_BIGBOY_MARKS })),
+  tiger: () => chunk(import("./babur-art.ts")).then((m) => ({ layout: m.SHOP_BABUR_LAYOUT, pieces: m.SHOP_BABUR_PIECES, crateAt: m.SHOP_BABUR_CRATE_AT, lights: m.SHOP_BABUR_HOOP_LIGHTS, pools: m.SHOP_BABUR_HOOP_POOLS })),
+  gardener: () => chunk(import("./puddles-art.ts")).then((m) => ({ layout: m.SHOP_PUDDLES_LAYOUT, pieces: m.SHOP_PUDDLES_PIECES, crateAt: m.SHOP_PUDDLES_CRATE_AT, lights: [], pools: [] })),
+  alfil: () => chunk(import("./alfil-art.ts")).then((m) => ({ layout: m.SHOP_ALFIL_LAYOUT, pieces: m.SHOP_ALFIL_PIECES, crateAt: m.SHOP_ALFIL_CRATE_AT, lights: m.SHOP_ALFIL_LIGHTS, pools: m.SHOP_ALFIL_POOLS })),
+  bigboy: () => chunk(import("./bigboy-art.ts")).then((m) => ({ layout: m.SHOP_BIGBOY_LAYOUT, pieces: m.SHOP_BIGBOY_PIECES, crateAt: m.SHOP_BIGBOY_CRATE_AT, lights: m.SHOP_BIGBOY_LIGHTS, pools: m.SHOP_BIGBOY_POOLS, upright: ["airplane"], marks: m.SHOP_BIGBOY_MARKS })),
   // (The giant king being carved, 4 x 2 squares, stands up whole at its foot.)
-  timber: () => import("./timber-art.ts").then((m) => ({ layout: m.SHOP_TIMBER_LAYOUT, pieces: m.SHOP_TIMBER_PIECES, crateAt: m.SHOP_TIMBER_CRATE_AT, lights: m.SHOP_TIMBER_LIGHTS, pools: m.SHOP_TIMBER_POOLS, upright: ["showpiece"], marks: m.SHOP_TIMBER_MARKS })),
+  timber: () => chunk(import("./timber-art.ts")).then((m) => ({ layout: m.SHOP_TIMBER_LAYOUT, pieces: m.SHOP_TIMBER_PIECES, crateAt: m.SHOP_TIMBER_CRATE_AT, lights: m.SHOP_TIMBER_LIGHTS, pools: m.SHOP_TIMBER_POOLS, upright: ["showpiece"], marks: m.SHOP_TIMBER_MARKS })),
   // (The halfpipe, 4 x 2 squares, its skateboard rolling by itself: deep, so it stands up whole at its foot.)
-  dash: () => import("./blitz-art.ts").then((m) => ({ layout: m.SHOP_BLITZ_LAYOUT, pieces: m.SHOP_BLITZ_PIECES, crateAt: m.SHOP_BLITZ_CRATE_AT, lights: m.SHOP_BLITZ_LIGHTS, pools: m.SHOP_BLITZ_POOLS, upright: ["showpiece"], marks: m.SHOP_BLITZ_MARKS })),
+  dash: () => chunk(import("./blitz-art.ts")).then((m) => ({ layout: m.SHOP_BLITZ_LAYOUT, pieces: m.SHOP_BLITZ_PIECES, crateAt: m.SHOP_BLITZ_CRATE_AT, lights: m.SHOP_BLITZ_LIGHTS, pools: m.SHOP_BLITZ_POOLS, upright: ["showpiece"], marks: m.SHOP_BLITZ_MARKS })),
   // (A cave, not a box: walkable only on its floor's shape. The tree of presents, 3 x 2 squares, stands up whole at its foot.)
-  hollow: () => import("./hollow-art.ts").then((m) => ({ layout: m.SHOP_HOLLOW_LAYOUT, pieces: m.SHOP_HOLLOW_PIECES, crateAt: m.SHOP_HOLLOW_CRATE_AT, lights: m.SHOP_HOLLOW_LIGHTS, pools: m.SHOP_HOLLOW_POOLS, upright: ["showpiece"], marks: m.SHOP_HOLLOW_MARKS, floor: m.SHOP_HOLLOW_FLOOR })),
+  hollow: () => chunk(import("./hollow-art.ts")).then((m) => ({ layout: m.SHOP_HOLLOW_LAYOUT, pieces: m.SHOP_HOLLOW_PIECES, crateAt: m.SHOP_HOLLOW_CRATE_AT, lights: m.SHOP_HOLLOW_LIGHTS, pools: m.SHOP_HOLLOW_POOLS, upright: ["showpiece"], marks: m.SHOP_HOLLOW_MARKS, floor: m.SHOP_HOLLOW_FLOOR })),
   // (A box barn. Its two pens of knights, 3 x 2 squares each, stand up whole at their foot; his red mat and your denim one are its marks.)
-  pig: () => import("./pig-art.ts").then((m) => ({ layout: m.SHOP_PIG_LAYOUT, pieces: m.SHOP_PIG_PIECES, crateAt: m.SHOP_PIG_CRATE_AT, lights: m.SHOP_PIG_LIGHTS, pools: m.SHOP_PIG_POOLS, upright: ["pen", "pen-b"], marks: m.SHOP_PIG_MARKS, stand: m.SHOP_PIG_BOARD_AT })),
+  pig: () => chunk(import("./pig-art.ts")).then((m) => ({ layout: m.SHOP_PIG_LAYOUT, pieces: m.SHOP_PIG_PIECES, crateAt: m.SHOP_PIG_CRATE_AT, lights: m.SHOP_PIG_LIGHTS, pools: m.SHOP_PIG_POOLS, upright: ["pen", "pen-b"], marks: m.SHOP_PIG_MARKS, stand: m.SHOP_PIG_BOARD_AT })),
   // (A warehouse with a floor's shape (16 x 16, racking all round), as Hollow's cave; no counter: the crate stands on the floor by the
   // dealer. The board on its crates in the battle spot, its foot on the marks' line; the crew and their machines.)
   grex: () =>
-    import("./grex-art.ts").then((m) => ({
+    chunk(import("./grex-art.ts")).then((m) => ({
       layout: m.SHOP_GREX_LAYOUT,
       pieces: m.SHOP_GREX_PIECES,
       crateAt: [0, 0] as const,
@@ -203,12 +204,12 @@ const ART: Partial<Record<string, (light: RoomLight) => Promise<RoomArt>>> = {
   // sun and lie on the paper as color, not light.)
   // (Smudgy's studio, Nov 6: a box room, the drop cloth its battle spot (its `circle-` tiles), the painters each `t0` into one loop.)
   smudgy: () =>
-    import("./smudgy-art.ts").then((m) => ({ layout: m.SHOP_SMUDGY_LAYOUT, pieces: m.SHOP_SMUDGY_PIECES, crateAt: m.SHOP_SMUDGY_CRATE_AT, lights: m.SHOP_SMUDGY_LIGHTS, pools: m.SHOP_SMUDGY_POOLS, marks: m.SHOP_SMUDGY_MARKS })),
+    chunk(import("./smudgy-art.ts")).then((m) => ({ layout: m.SHOP_SMUDGY_LAYOUT, pieces: m.SHOP_SMUDGY_PIECES, crateAt: m.SHOP_SMUDGY_CRATE_AT, lights: m.SHOP_SMUDGY_LIGHTS, pools: m.SHOP_SMUDGY_POOLS, marks: m.SHOP_SMUDGY_MARKS })),
   folio: () =>
-    import("./folio-art.ts").then((m) => ({ layout: m.SHOP_FOLIO_LAYOUT, pieces: m.SHOP_FOLIO_PIECES, crateAt: m.SHOP_FOLIO_CRATE_AT, lights: m.SHOP_FOLIO_LIGHTS, pools: m.SHOP_FOLIO_POOLS, marks: m.SHOP_FOLIO_MARKS, poolBlend: "multiply" as const })),
+    chunk(import("./folio-art.ts")).then((m) => ({ layout: m.SHOP_FOLIO_LAYOUT, pieces: m.SHOP_FOLIO_PIECES, crateAt: m.SHOP_FOLIO_CRATE_AT, lights: m.SHOP_FOLIO_LIGHTS, pools: m.SHOP_FOLIO_POOLS, marks: m.SHOP_FOLIO_MARKS, poolBlend: "multiply" as const })),
   // (Boingo's Funhouse, Nov 6: an arcade, a box room of 24 x 24; the play structure stands up whole at its foot.)
   clown: () =>
-    import("./boingo-art.ts").then((m) => ({ n: m.SHOP_BOINGO_N, layout: m.SHOP_BOINGO_LAYOUT, pieces: m.SHOP_BOINGO_PIECES, crateAt: m.SHOP_BOINGO_CRATE_AT, lights: m.SHOP_BOINGO_LIGHTS, pools: m.SHOP_BOINGO_POOLS, upright: ["play", "claw"], marks: m.SHOP_BOINGO_MARKS, claw: { at: m.SHOP_BOINGO_CLAW_AT, spot: m.SHOP_BOINGO_CLAW_SPOT }, sign: { piece: "price-sign", face: m.SIGN_FACE, lines: m.SIGN_LINES() } })),
+    chunk(import("./boingo-art.ts")).then((m) => ({ n: m.SHOP_BOINGO_N, layout: m.SHOP_BOINGO_LAYOUT, pieces: m.SHOP_BOINGO_PIECES, crateAt: m.SHOP_BOINGO_CRATE_AT, lights: m.SHOP_BOINGO_LIGHTS, pools: m.SHOP_BOINGO_POOLS, upright: ["play", "claw"], marks: m.SHOP_BOINGO_MARKS, claw: { at: m.SHOP_BOINGO_CLAW_AT, spot: m.SHOP_BOINGO_CLAW_SPOT }, sign: { piece: "price-sign", face: m.SIGN_FACE, lines: m.SIGN_LINES() } })),
   // (An igloo with a round floor's shape, as Hollow's cave, but not a cave; its catwalk and staircases, a second walking level; the
   // elves at work.)
   // (Rolling Dough, Nov 11: the front room, a floor's shape as Hollow's (16 x 12: the back room is behind its back wall), the guards by
@@ -216,17 +217,17 @@ const ART: Partial<Record<string, (light: RoomLight) => Promise<RoomArt>>> = {
   // (The Hidden Boss's walk-up, Nov 13: the hall and the landing, small box rooms of 7 x 7, each seen whole; and the top floor, his room
   // (9 x 9), its side walls drawn by its scene as one surface each (shops/recluse-scene.ts, the room's `fx` from the town).)
   recluse: (light) =>
-    import("./recluse-stairs-art.ts").then((m) => {
+    chunk(import("./recluse-stairs-art.ts")).then((m) => {
       const l = m.recluseStairsLit(light);
       return { n: m.RECLUSE_HALL_N, layout: m.RECLUSE_HALL_LAYOUT, pieces: l.pieces, crateAt: [0, 0] as const, lights: l.hall, pools: m.RECLUSE_HALL_POOLS, dim: l.dim, dimRGB: l.dimRGB, outside: "#8d8a82", fixCam: m.RECLUSE_HALL_CAM, seeThru: ["entrance", "hem"] };
     }),
   "recluse-landing": (light) =>
-    import("./recluse-stairs-art.ts").then((m) => {
+    chunk(import("./recluse-stairs-art.ts")).then((m) => {
       const l = m.recluseStairsLit(light);
       return { n: m.RECLUSE_HALL_N, layout: m.RECLUSE_LANDING_LAYOUT, pieces: l.pieces, crateAt: [0, 0] as const, lights: l.landing, pools: m.RECLUSE_LANDING_POOLS, dim: l.dim, dimRGB: l.dimRGB, outside: "#140d0a", fixCam: m.RECLUSE_HALL_CAM, seeThru: ["stairs-down", "hem"] };
     }),
   "recluse-top": (light) =>
-    import("./recluse-art.ts").then((m) => ({
+    chunk(import("./recluse-art.ts")).then((m) => ({
       n: m.SHOP_RECLUSE_N,
       layout: m.SHOP_RECLUSE_LAYOUT,
       ...m.recluseLit(light),
@@ -238,7 +239,7 @@ const ART: Partial<Record<string, (light: RoomLight) => Promise<RoomArt>>> = {
       seeThru: ["entrance", "hem"],
     })),
   zebra: () =>
-    Promise.all([import("./zebra-art.ts"), import("./zebra-crew.ts")]).then(([m, c]) => ({
+    Promise.all([chunk(import("./zebra-art.ts")), chunk(import("./zebra-crew.ts"))]).then(([m, c]) => ({
       layout: m.SHOP_ZEBRA_LAYOUT,
       pieces: m.SHOP_ZEBRA_PIECES,
       crateAt: m.SHOP_ZEBRA_CRATE_AT,
@@ -261,7 +262,7 @@ const ART: Partial<Record<string, (light: RoomLight) => Promise<RoomArt>>> = {
       // distracting ... disable that for now". The sounds stay in zebra-sounds.ts for a later, gentler pass.)
     })),
   "zebra-back": () =>
-    Promise.all([import("./zebra-art.ts"), import("./zebra-crew.ts"), import("./zebra-don.ts")]).then(([m, c, d]) => {
+    Promise.all([chunk(import("./zebra-art.ts")), chunk(import("./zebra-crew.ts")), chunk(import("./zebra-don.ts"))]).then(([m, c, d]) => {
       // (The crew's chatter and challenge beat (`aimAt`: aiming at you), and the walk-out: zebra-scene.ts WalkOut.)
       const CREW = ["sitListen", "sitTalk", "sitArgue", "sitPuff", "standUp", "draw", "aim", "aimAt", "lower", "puff", "walk", "carry"];
       return {
@@ -291,7 +292,7 @@ const ART: Partial<Record<string, (light: RoomLight) => Promise<RoomArt>>> = {
       };
     }),
   gingerbread: () =>
-    Promise.all([import("./ginger-art.ts"), import("./ginger-elves-art.ts")]).then(([m, e]) => ({
+    Promise.all([chunk(import("./ginger-art.ts")), chunk(import("./ginger-elves-art.ts"))]).then(([m, e]) => ({
       layout: m.SHOP_GINGER_LAYOUT,
       pieces: m.SHOP_GINGER_PIECES,
       crateAt: m.SHOP_GINGER_CRATE_AT,

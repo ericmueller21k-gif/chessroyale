@@ -31,3 +31,24 @@ export async function e2eSql(request: Request, url: URL, env: E2eSqlEnv): Promis
   const results = await env.DB.batch(statements.map((s) => env.DB!.prepare(s)));
   return Response.json({ rows: results.at(-1)?.results ?? [] });
 }
+
+/**
+ * `GET /api/e2e/sw.js?key=…&version=brc-…` (Nov 15): the app's service worker as the next deploy's would be, for town.spec's "a deploy
+ * landed, the service worker in charge": its version `version`, none of this version's files under /assets/ (a new version's have new
+ * names), and the server without this version's code (its network refuses every script and style under /assets/; a picture keeps its
+ * name, so its place on the server, until it changes). The test registers it in /sw.js's
+ * place, as an update would. (The browser fetches a worker's script itself, past the tests' routes and without their headers: so the
+ * key is in the query.) The same locks as the SQL route: only the e2e's local server, only with its key.
+ */
+export async function e2eWorker(url: URL, env: E2eSqlEnv & { ASSETS?: Fetcher }): Promise<Response | null> {
+  if (url.pathname !== "/api/e2e/sw.js" || !env.ASSETS || !e2eSqlAllowed(env.E2E_SQL, url.searchParams.get("key"))) return null;
+  const version = url.searchParams.get("version") ?? "";
+  if (!/^brc-[0-9a-f]{12}$/.test(version)) return Response.json({ message: "No version" }, { status: 400 });
+  const sw = await (await env.ASSETS.fetch(new URL("/sw.js", url))).text();
+  const files = (JSON.parse(/const FILES = (\[.*?\]);/s.exec(sw)?.[1] ?? "[]") as string[]).filter((f) => !f.startsWith("/assets/"));
+  const gone =
+    "const NET = fetch;\n" +
+    'self.fetch = (r, o) => (/^\\/assets\\/.*\\.(js|css)$/.test(new URL(typeof r === "string" ? r : r.url, location.href).pathname) ? Promise.resolve(new Response("", { status: 404 })) : NET(r, o));\n';
+  const body = gone + sw.replace(/const VERSION = "[^"]*";/, `const VERSION = "${version}";`).replace(/const FILES = \[.*?\];/s, `const FILES = ${JSON.stringify(files)};`);
+  return new Response(body, { headers: { "content-type": "text/javascript; charset=utf-8", "service-worker-allowed": "/", "cache-control": "no-store" } });
+}

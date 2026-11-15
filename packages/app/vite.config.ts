@@ -6,6 +6,7 @@ import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { defineConfig, type Plugin } from "vite";
 import preact from "@preact/preset-vite";
+import { APP_CACHE } from "../core/src/settings.ts";
 
 const require = createRequire(import.meta.url);
 /** This config's own folder (packages/app): its files resolve from here, whichever folder Vite was started from. */
@@ -117,6 +118,7 @@ function serviceWorker(): Plugin {
         .replace("__VERSION__", `brc-${hash.digest("hex").slice(0, 12)}`)
         .replace("__HASHES__", JSON.stringify(hashes))
         .replace("__MUSIC_HASHES__", JSON.stringify(musicHashes))
+        .replace("__KEEP_VERSIONS__", String(APP_CACHE.keepVersions))
         .replace("__MAIA__", `brc-maia-${maia.digest("hex").slice(0, 12)}`)
         .replace("__FILES__", JSON.stringify(files));
       writeFileSync(join(outDir, "sw.js"), sw);
