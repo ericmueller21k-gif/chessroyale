@@ -20,8 +20,14 @@
  * Switching mid-fight (the Hidden Boss, Nov 13: docs/decisions/2026-11-13-hidden-boss-music.md): a battle names the theme it wants
  * now (`MusicBattle.theme`, a key in themes.json; its boss's by default), and a new one takes over by MUSIC_SWITCH's fades
  * (`switchPlan`); one whose loop must start at a given moment (`dropAt`: his boards' split) starts its intro that long before it.
+ *
+ * The town's own (Eric, Nov 14-15; docs/decisions/2026-11-15-town-music.md): `townMusic`. Its theme (themes.json's `town`) loops in the
+ * street town and in buildings with no theme of their own; after every TOWN_MUSIC.passesPerSolo passes a piano solo plays instead of
+ * the next pass, and the theme comes back from its top `seconds` after the solo started, the solo ringing out over it. Every join is on
+ * the audio clock. A room's theme, a challenge's splash or a battle takes over; leaving a room hands back to the theme, from its top.
+ * In memory: the theme while the town is open, and at most one solo, decoded as its turn nears and let go once it has rung out.
  */
-import { MUSIC, MUSIC_SWITCH, RECLUSE_MUSIC } from "@chessroyale/core";
+import { MUSIC, MUSIC_SWITCH, RECLUSE_MUSIC, TOWN_MUSIC } from "@chessroyale/core";
 import type { Phase } from "./game.ts";
 import { forgetAudioFile, isMuted, isPageHidden, loadAudioFile, musicBus, onAudioRebuilt, onMuteChange } from "./sound.ts";
 
@@ -35,6 +41,20 @@ export interface MusicTheme {
 export interface MusicThemes {
   pad: number;
   themes: Record<string, MusicTheme | undefined>;
+  /** The town's theme and its solos (Nov 15). */
+  town?: TownTheme;
+}
+/** A piano solo for the town's theme: its file, and how long after it starts the theme comes back (s; the file rings out past it). */
+export interface TownSolo {
+  id: string;
+  file: string;
+  seconds: number;
+}
+/** The town's theme as themes.json lists it: its loop (`pad` as every theme's), and its solos. */
+export interface TownTheme {
+  loop: string;
+  loopSeconds: number;
+  solos?: TownSolo[];
 }
 
 /** What starts when, on the audio clock (s). */
@@ -141,6 +161,8 @@ export interface Playing {
   plan?: MusicPlan;
   intro?: AudioBuffer | null;
   loop?: AudioBuffer;
+  /** A source already set to stop by then (the town's theme at a solo): never let ring past it by a later stop (`stopPlaying`). */
+  ends?: Map<AudioBufferSourceNode, number>;
 }
 
 /** A loop's timing on Date.now()'s clock: when it starts (from `offset`), and its loop points (s into its file). */
@@ -241,7 +263,7 @@ export function stopPlaying(p: Playing, ms: number, at?: number) {
   }
   for (const s of p.sources) {
     try {
-      s.stop(from + ms / 1000);
+      s.stop(Math.min(from + ms / 1000, p.ends?.get(s) ?? Infinity));
     } catch {
       // Already stopped, or its context closed.
     }
@@ -305,13 +327,15 @@ export function onMusicChange(fn: () => void): () => void {
 const log = (line: string) => (globalThis as { __soundLog?: string[] }).__soundLog?.push(line);
 
 let themesFile: Promise<MusicThemes | null> | null = null;
+/** themes.json once it's in. */
+let themesNow: MusicThemes | null = null;
 function loadThemes(): Promise<MusicThemes | null> {
   if (!themesFile) {
     const p = fetch("/music/themes.json")
       .then((r) => (r.ok ? (r.json() as Promise<MusicThemes>) : null))
       .catch(() => null)
       // (A failure is asked again next time.)
-      .then((t) => (t ? t : ((themesFile = null), null)));
+      .then((t) => (t ? (themesNow = t) : ((themesFile = null), null)));
     themesFile = p;
   }
   return themesFile;
@@ -326,6 +350,13 @@ export function musicFiles(themes: MusicThemes, skip: readonly string[] = []): s
     if (th.loop) urls.add(musicUrl(th.loop));
   }
   return [...urls];
+}
+
+/** The town's pieces, as served: its theme, then its solos in TOWN_MUSIC.order. */
+export function townFiles(themes: MusicThemes): string[] {
+  const t = themes.town;
+  if (!t?.loop) return [];
+  return [t.loop, ...TOWN_MUSIC.order.map((id) => t.solos?.find((s) => s.id === id)?.file)].filter((f): f is string => !!f).map(musicUrl);
 }
 
 /** The pieces the town's loading (or a fight's `ahead`) has fetched, or is fetching, this visit. */
@@ -346,7 +377,10 @@ export async function preloadMusic(onShare: (share: number) => void = () => {}):
   if (!wanted()) return;
   const themes = await loadThemes();
   if (!themes || !wanted()) return;
-  await fetchPieces(musicFiles(themes, NOT_IN_TOWN), onShare);
+  // (The town's own first, Nov 15: its theme, decoded by its player to play now, then its solos' bytes (each decoded as its turn
+  // nears); the bosses' after.)
+  if (townLoading) await townLoading;
+  await fetchPieces([...townFiles(themes), ...musicFiles(themes, NOT_IN_TOWN)], onShare);
 }
 
 /**
@@ -450,6 +484,7 @@ export function bossMusic(b: MusicBattle | null) {
     if (b.next && wanted()) void loadTheme(b.next);
   }
   maybeStart();
+  townCheck();
 }
 
 /**
@@ -592,6 +627,8 @@ export function roomMusic(boss: string | null) {
   endRoom();
   room = boss;
   maybeStartRoom();
+  // (A room with a theme of its own takes over from the town's; out of it, the town's comes back.)
+  townCheck();
 }
 
 function maybeStartRoom() {
@@ -634,6 +671,8 @@ function endRoom() {
 /** The splash's music, until the battle takes it over (bossMusic). */
 let carried: (Playing & { boss: string }) | null = null;
 let splashTok = 0;
+/** A challenge's splash is on (splashMusic until splashDone). */
+let splashing = false;
 
 /**
  * The challenge's splash starts: `boss`'s theme starts now (its intro, then the loop), or as soon as it's decoded (the promise
@@ -642,6 +681,9 @@ let splashTok = 0;
  */
 export function splashMusic(boss: string): Promise<void> {
   const tok = ++splashTok;
+  // (The town's theme gives way to the challenge's, ready or not.)
+  splashing = true;
+  townCheck();
   if (roomPlaying?.boss === boss) {
     carried = roomPlaying;
     roomPlaying = null;
@@ -673,20 +715,352 @@ export function splashMusic(boss: string): Promise<void> {
 /** The splash is gone: its music, if no battle took it over (a challenge that didn't start), fades out and stops. */
 export function splashDone() {
   splashTok++;
+  splashing = false;
   const p = carried;
   carried = null;
-  if (!p) return;
-  log(`music:splashEnd:${p.boss}`);
-  endPlaying(p, p.boss);
-  setTimeout(() => forgetTheme(p.boss), MUSIC.endFadeMs + 250);
+  if (p) {
+    log(`music:splashEnd:${p.boss}`);
+    endPlaying(p, p.boss);
+    setTimeout(() => forgetTheme(p.boss), MUSIC.endFadeMs + 250);
+  }
+  // (A challenge called off, the town still open: its theme again.)
+  townCheck();
 }
+
+// ---- The town's own music (Eric, Nov 14-15: "a song where people literally are like, I want to turn this song on while I'm in the
+// chess town"; "a 3 min theme, and 2 short piano inserts"; docs/decisions/2026-11-15-town-music.md). Town.tsx opens it once the town has
+// drawn its first frame (`townMusic(true)`, MUSIC.townPreloadAfterMs after it, with the bosses' fetching) and closes it as the town goes.
+// It plays while the town is open and nothing else is: a room with a theme of its own, a challenge's splash or a battle takes over (it
+// fades out over MUSIC.endFadeMs as a room's does), and it comes back from its top once they're gone. ----
+/** Its key among what's fading out (`ending`): one copy past the handover, as any theme. */
+const TOWN_KEY = "\u0000town";
+
+/**
+ * One run of the town's theme: from its top at `at` (its context's clock, s) for `passes` passes, then the solo whose turn is `turn`
+ * (TOWN_MUSIC.order's, round and round) instead of the next pass.
+ */
+export interface TownRun {
+  at: number;
+  passes: number;
+  turn: number;
+}
+/** The solo whose turn is `turn` (TOWN_MUSIC.order, round and round), or null: none (no order, or no such solo in themes.json). */
+export function townSoloOf(town: TownTheme, turn: number): TownSolo | null {
+  const order = TOWN_MUSIC.order;
+  if (!order.length) return null;
+  const id = order[turn % order.length];
+  return town.solos?.find((s) => s.id === id && s.file && s.seconds > 0) ?? null;
+}
+/** When a run's solo starts: the end of its last pass (its context's clock, s). */
+export const townSoloAt = (town: TownTheme, run: TownRun) => run.at + run.passes * town.loopSeconds;
+/** A run's passes before its solo: TOWN_MUSIC.passesPerSolo, at least one. */
+const passesPerSolo = () => Math.max(1, Math.floor(TOWN_MUSIC.passesPerSolo) || 1);
+
+/** A piece on the clock: its source, from `offset` into its file at `at`, the theme looping, until `end` (s; Infinity: not set). */
+interface TownPiece {
+  src: AudioBufferSourceNode;
+  buf: AudioBuffer;
+  at: number;
+  offset: number;
+  loop: boolean;
+  end: number;
+}
+interface TownPlaying extends Playing {
+  town: TownTheme;
+  pad: number;
+  theme: AudioBuffer;
+  pieces: TownPiece[];
+  /** The run playing now (or next, the solo before it put on the clock), and its theme's piece. */
+  run: TownRun;
+  runPiece: TownPiece;
+  /** The last solo put on the clock: when it starts and its turn (stopped before it's heard, it's still next). */
+  solo: { at: number; turn: number } | null;
+  /** When it started, on its clock and on Date.now()'s: to carry it onto a new context (`handOverTown`). */
+  anchor: { at: number; wallAt: number };
+  timer?: ReturnType<typeof setTimeout>;
+}
+
+/** The town is open (`townMusic`). */
+let townOpen = false;
+let townPlaying: TownPlaying | null = null;
+let townStarting = false;
+/** Its theme didn't load (or there is none): not asked again until the town opens again (townCheck runs on every App render). */
+let townFailed = false;
+/** The solo whose turn is next: taking turns while the town is open, from the first again as it opens. */
+let townTurn = 0;
+/**
+ * The town's decoded pieces (by name): its theme, kept while the town is open, and at most one solo, decoded as its turn nears and let
+ * go once it has rung out (`townTick`, `releaseSolos`; Nov 15: the theme ~69 MB, a solo ~16 MB, beside the town's WebGL on a phone).
+ */
+const townBufs = new Map<string, AudioBuffer>();
+/** The solo being decoded now, if one is (its file). */
+let soloDecoding: string | null = null;
+/** The town's theme loading (preloadMusic waits for it: the solos' and the bosses' bytes after, fetched, not decoded). */
+let townLoading: Promise<unknown> | null = null;
+
+/**
+ * The town opens (`true`: its first frame drawn) or closes (`false`: it's gone, or the Hidden Boss's summoning has begun). Open, its
+ * theme is fetched and decoded and starts, unless something else is playing; closed, it fades out (MUSIC.endFadeMs) and its pieces
+ * are let go, and the solos' turns start again from the first.
+ */
+export function townMusic(open: boolean) {
+  if (open === townOpen) return;
+  townOpen = open;
+  townFailed = false;
+  if (open) return townCheck();
+  endTown();
+  townTurn = 0;
+  setTimeout(() => {
+    if (townOpen) return;
+    for (const name of townBufs.keys()) forgetAudioFile(musicUrl(name));
+    townBufs.clear();
+  }, MUSIC.endFadeMs + 250);
+}
+
+/** For the tests: the town's pieces decoded now (their names). */
+export const townDecodedNow = () => [...townBufs.keys()];
+
+/** A room with a theme of its own (one themes.json has; a room whose theme is missing plays the town's). */
+const ownRoom = () => room !== null && (!themesNow || !!themesNow.themes[room]);
+const townWanted = () => townOpen && !battle && !splashing && !ownRoom();
+
+/** What's going on changed: the town's theme ends if something else takes over, or starts if it's its turn again. */
+function townCheck() {
+  if (!townWanted()) return endTown();
+  maybeStartTown();
+}
+
+function maybeStartTown() {
+  if (!townWanted() || townPlaying || townStarting || townFailed || !wanted()) return;
+  townStarting = true;
+  const loads = loadTown().then((town) => {
+    townStarting = false;
+    if (!town) return void (townFailed = townOpen);
+    const theme = townBufs.get(town.loop);
+    const bus = musicBus();
+    if (theme && bus && townWanted() && !townPlaying && wanted()) startTown(bus, town, theme);
+  });
+  townLoading = loads.catch(() => {});
+}
+
+/** The town's theme fetched and decoded (once a visit); null: none in themes.json, or it didn't load. */
+async function loadTown(): Promise<TownTheme | null> {
+  const themes = await loadThemes();
+  const town = themes?.town;
+  if (!town?.loop || !(town.loopSeconds > 0) || !townOpen) return null;
+  if (!townBufs.has(town.loop) && !(await loadPiece(town.loop))) return null;
+  return town;
+}
+/**
+ * A solo decoded as its turn nears (`townTick`), unless one is being decoded or another solo is still held (ringing out): at most the
+ * theme and one solo in memory. Once in, the town's music looks again: put on the clock if it's still in time, else one more pass. A
+ * decode that fails is one more pass too, and is tried again as that pass's end nears.
+ */
+function decodeSolo(town: TownTheme, file: string) {
+  if (soloDecoding || [...townBufs.keys()].some((k) => k !== town.loop && k !== file)) return;
+  soloDecoding = file;
+  void loadPiece(file).then((ok) => {
+    soloDecoding = null;
+    const tp = townPlaying;
+    if (!tp) return releaseSolos();
+    if (!ok && townSoloOf(tp.town, tp.run.turn)?.file === file) tp.run = { ...tp.run, passes: tp.run.passes + 1 };
+    townTick(tp);
+  });
+}
+/**
+ * Each solo's decoded audio let go unless it's still needed: sounding (or on the clock), or the one whose turn is near (within
+ * TOWN_MUSIC.aheadS + decodeS). The town's music not playing: every solo. Its bytes stay in the service worker's cache.
+ */
+function releaseSolos() {
+  const tp = townPlaying;
+  const now = tp?.ctx.currentTime ?? 0;
+  const next = tp && townSoloOf(tp.town, tp.run.turn);
+  const near = tp && next && townSoloAt(tp.town, tp.run) - now <= TOWN_MUSIC.aheadS + TOWN_MUSIC.decodeS ? next.file : null;
+  const theme = tp?.town.loop ?? themesNow?.town?.loop;
+  for (const [name, buf] of townBufs) {
+    if (name === theme || name === near || name === soloDecoding || tp?.pieces.some((p) => p.buf === buf)) continue;
+    townBufs.delete(name);
+    forgetAudioFile(musicUrl(name));
+    log(`music:town:forget:${name}`);
+  }
+}
+/** One of the town's pieces into townBufs (the town still open); false if it didn't load. */
+async function loadPiece(name: string): Promise<boolean> {
+  const url = musicUrl(name);
+  // (preloadMusic doesn't fetch it again.)
+  preloaded.add(url);
+  log(`music:town:load:${name}`);
+  const buf = await loadAudioFile(url);
+  if (!buf) {
+    preloaded.delete(url);
+    return false;
+  }
+  if (townOpen) townBufs.set(name, buf);
+  else forgetAudioFile(url);
+  return townOpen;
+}
+
+function startTown(bus: { ctx: MusicContext; out: AudioNode }, town: TownTheme, theme: AudioBuffer) {
+  const pad = Math.max(0, themesNow?.pad || 0);
+  const at = bus.ctx.currentTime + MUSIC.startDelayS;
+  let tp: TownPlaying;
+  try {
+    cutEnding(TOWN_KEY);
+    const gain = bus.ctx.createGain();
+    gain.gain.value = level();
+    gain.connect(bus.out);
+    const run = { at, passes: passesPerSolo(), turn: townTurn };
+    tp = { ctx: bus.ctx, gain, sources: [], ends: new Map(), town, pad, theme, pieces: [], run, runPiece: null!, solo: null, anchor: { at, wallAt: Date.now() + (at - bus.ctx.currentTime) * 1000 } };
+    tp.runPiece = addPiece(tp, theme, at, pad, true);
+  } catch {
+    return; // Ignore audio errors: the town goes on in silence.
+  }
+  townPlaying = tp;
+  log("music:town:start");
+  townTick(tp);
+}
+
+/** A piece started on `tp`'s context at `at`, `offset` into its file (the theme looping between pad and pad + loopSeconds). */
+function addPiece(tp: TownPlaying, buf: AudioBuffer, at: number, offset: number, loop: boolean): TownPiece {
+  const src = tp.ctx.createBufferSource();
+  src.buffer = buf;
+  if (loop) {
+    src.loop = true;
+    src.loopStart = tp.pad;
+    src.loopEnd = tp.pad + tp.town.loopSeconds;
+  }
+  src.connect(tp.gain);
+  src.start(at, offset);
+  const piece = { src, buf, at, offset, loop, end: loop ? Infinity : at + Math.max(0, buf.duration - offset) };
+  tp.pieces.push(piece);
+  tp.sources.push(src);
+  if (piece.end < Infinity) tp.ends!.set(src, piece.end);
+  return piece;
+}
+/** A piece set to stop at `at`. */
+function endPiece(tp: TownPlaying, p: TownPiece, at: number) {
+  p.src.stop(at);
+  p.end = at;
+  tp.ends!.set(p.src, at);
+}
+
+/**
+ * Decodes the next solo once it's TOWN_MUSIC.aheadS + decodeS away, and puts it on the clock once it's aheadS away: the theme's pass
+ * stops exactly as it starts, and the theme starts again from its top `seconds` later (the solo's file ringing out over it). A solo
+ * still decoding then waits for its decode (which looks again as it lands); one not decoded, or too late to join on time (a hidden
+ * tab's timer): the theme plays one more pass and its solo comes at that pass's end. A solo that has rung out is let go. Then the
+ * timer for the next of these.
+ */
+function townTick(tp: TownPlaying) {
+  if (townPlaying !== tp) return;
+  clearTimeout(tp.timer);
+  const now = tp.ctx.currentTime;
+  // (What's over is let go.)
+  tp.pieces = tp.pieces.filter((p) => p.end > now);
+  tp.sources = tp.pieces.map((p) => p.src);
+  for (const p of tp.ends!.keys()) if (!tp.sources.includes(p)) tp.ends!.delete(p);
+  releaseSolos();
+  for (;;) {
+    const solo = townSoloOf(tp.town, tp.run.turn);
+    // (No solos: the theme loops on.)
+    if (!solo) return;
+    const at = townSoloAt(tp.town, tp.run);
+    if (at - now > TOWN_MUSIC.aheadS + TOWN_MUSIC.decodeS) break;
+    const buf = townBufs.get(solo.file);
+    if (!buf) decodeSolo(tp.town, solo.file);
+    if (at - now > TOWN_MUSIC.aheadS) break;
+    // (Still decoding, in time yet: its decode looks again as it lands.)
+    if (!buf && soloDecoding === solo.file && at >= now + MUSIC.startDelayS) break;
+    if (!buf || at < now + MUSIC.startDelayS) {
+      tp.run = { ...tp.run, passes: tp.run.passes + 1 };
+      continue;
+    }
+    try {
+      endPiece(tp, tp.runPiece, at);
+      addPiece(tp, buf, at, 0, false);
+      const back = at + solo.seconds;
+      tp.runPiece = addPiece(tp, tp.theme, back, tp.pad, true);
+      tp.solo = { at, turn: tp.run.turn };
+      tp.run = { at: back, passes: passesPerSolo(), turn: tp.run.turn + 1 };
+      townTurn = tp.run.turn;
+      log(`music:town:solo:${solo.id}`);
+    } catch {
+      return; // Its context closed: a new one carries it on (handOverTown).
+    }
+  }
+  // (The next of: the next solo's decode, its going on the clock, a solo's end (let go then).)
+  const at = townSoloAt(tp.town, tp.run);
+  const wake = [at - TOWN_MUSIC.aheadS - TOWN_MUSIC.decodeS, at - TOWN_MUSIC.aheadS, ...tp.pieces.filter((p) => !p.loop).map((p) => p.end)].filter((t) => t > now);
+  if (wake.length) tp.timer = setTimeout(() => townTick(tp), Math.max(1000, (Math.min(...wake) - now) * 1000));
+}
+
+/** The town's theme fades out (MUSIC.endFadeMs) and stops, its solo too; next time it starts from its top. */
+function endTown() {
+  const tp = townPlaying;
+  if (!tp) return;
+  townPlaying = null;
+  clearTimeout(tp.timer);
+  // (A solo put on the clock but not yet heard: still its turn next.)
+  if (tp.solo && tp.ctx.currentTime < tp.solo.at) townTurn = tp.solo.turn;
+  log("music:town:end");
+  endPlaying(tp, TOWN_KEY);
+  // (Its solo let go once faded out, unless the town's music has started again and still needs it.)
+  setTimeout(releaseSolos, MUSIC.endFadeMs + 250);
+}
+
+/**
+ * The town's music carried onto a new audio context (`onAudioRebuilt`, as `handOver`): every piece still to sound starts on the new
+ * clock at its own moment, or now as far into its file as it has got, its stop kept; the old one fades out over MUSIC.handoffMs.
+ */
+function handOverTown(tp: TownPlaying, bus: { ctx: MusicContext; out: AudioNode }) {
+  if (bus.ctx === tp.ctx) return;
+  const { d, from } = clockShift(tp.ctx, bus.ctx, tp.anchor.at, tp.anchor.wallAt);
+  let next: TownPlaying;
+  try {
+    const gain = bus.ctx.createGain();
+    gain.gain.value = level();
+    gain.connect(bus.out);
+    next = {
+      ...tp,
+      ctx: bus.ctx,
+      gain,
+      sources: [],
+      ends: new Map(),
+      pieces: [],
+      run: { ...tp.run, at: tp.run.at + d },
+      solo: tp.solo && { ...tp.solo, at: tp.solo.at + d },
+      anchor: { at: tp.anchor.at + d, wallAt: tp.anchor.wallAt },
+      timer: undefined,
+    };
+    for (const p of tp.pieces) {
+      const at = p.at + d;
+      const end = p.end + d;
+      if (end <= from) continue;
+      const start = Math.max(at, from);
+      const into = p.loop ? (loopAfter({ offset: p.offset, loopStart: tp.pad, loopEnd: tp.pad + tp.town.loopSeconds }, start - at) ?? p.offset) : p.offset + (start - at);
+      const q = addPiece(next, p.buf, start, into, p.loop);
+      if (end < Infinity) endPiece(next, q, end);
+      if (p === tp.runPiece) next.runPiece = q;
+    }
+  } catch {
+    return; // Ignore audio errors: the old one plays on while its context does.
+  }
+  clearTimeout(tp.timer);
+  log(`music:town:handover:${next.sources.length}`);
+  stopPlaying(tp, MUSIC.handoffMs, tp.ctx.currentTime + (from - bus.ctx.currentTime));
+  townPlaying = next;
+  townTick(next);
+}
+
+/** For the tests: the town's theme playing (its gain's target), or null. */
+export const townMusicNow = () => (townPlaying ? { level: level() } : null);
 
 /** The switches or the page changed: fade to the level they make now (the loop keeps its place), or start if it hadn't. */
 function relevel() {
   const l = level();
   // (A switch's fading theme: Music off or the page hidden ends it now.)
   if (!l) stopLeaving(MUSIC.fadeMs);
-  for (const p of [playing, roomPlaying, carried]) {
+  for (const p of [playing, roomPlaying, carried, townPlaying]) {
     if (!p) continue;
     log(`music:level:${l}`);
     try {
@@ -698,6 +1072,7 @@ function relevel() {
   // (A battle's theme that changed while Music was off: switched to now.)
   maybeStart();
   if (!roomPlaying) maybeStartRoom();
+  townCheck();
 }
 
 /** For the tests and the sound report: the boss whose battle music is playing, and its gain's target. */
@@ -721,7 +1096,7 @@ if (typeof document !== "undefined") document.addEventListener("visibilitychange
 onAudioRebuilt((old) => {
   // (A switch's fading theme: its fade ends on the old one.)
   stopLeaving(MUSIC.fadeMs);
-  const all = [playing, roomPlaying, carried].filter((q): q is NonNullable<typeof q> => !!q);
+  const all = [playing, roomPlaying, carried, townPlaying].filter((q): q is NonNullable<typeof q> => !!q);
   if (!all.length) return 0;
   const bus = musicBus();
   if (!bus) return 0;
@@ -733,6 +1108,7 @@ onAudioRebuilt((old) => {
     if (playing) playing = handOver(playing, bus);
     if (roomPlaying) roomPlaying = handOver(roomPlaying, bus);
     if (carried) carried = handOver(carried, bus);
+    if (townPlaying) handOverTown(townPlaying, bus);
   };
   whenRunning(bus.ctx, go);
   // (Kept open for the wait, the start and the fade; a context that isn't running isn't sounding: closed at once.)
@@ -751,18 +1127,26 @@ function whenRunning(c: MusicContext, fn: () => void) {
   check();
 }
 
+/**
+ * The new context's clock less the old's for the same moment heard (`d`), and when music can start on the new one (`from`). `at` (the
+ * old clock) is when `wallAt` (Date.now()'s) was: the old clock at the moment `from` is heard is its own while it keeps time with the
+ * wall clock, else the wall clock's.
+ */
+function clockShift(old: MusicContext, next: MusicContext, at: number, wallAt: number): { d: number; from: number } {
+  const perf = performance.now();
+  const from = next.currentTime + MUSIC.startDelayS;
+  const lead = from - heardNow(next, perf);
+  const oldHeard = heardNow(old, perf);
+  const byWall = (Date.now() - wallAt) / 1000;
+  const keepsTime = (old.state === undefined || old.state === "running") && Math.abs(oldHeard - at - byWall) < 0.5;
+  return { d: from - ((keepsTime ? oldHeard : at + byWall) + lead), from };
+}
+
 /** `q` carried onto the new context (`bus`) as described above, the old one faded out from there; `q` itself if it can't be. */
 function handOver<P extends Playing>(q: P, bus: { ctx: MusicContext; out: AudioNode }): P {
   const { plan, loop, place } = q;
   if (!plan || !loop || !place || bus.ctx === q.ctx) return q;
-  const perf = performance.now();
-  const from = bus.ctx.currentTime + MUSIC.startDelayS;
-  // (The old clock at the moment `from` is heard: its own while it keeps time with the wall clock, else the wall clock's.)
-  const lead = from - heardNow(bus.ctx, perf);
-  const oldHeard = heardNow(q.ctx, perf);
-  const byWall = (Date.now() - place.wallAt) / 1000;
-  const keepsTime = (q.ctx.state === undefined || q.ctx.state === "running") && Math.abs(oldHeard - plan.loop.at - byWall) < 0.5;
-  const d = from - ((keepsTime ? oldHeard : plan.loop.at + byWall) + lead);
+  const { d, from } = clockShift(q.ctx, bus.ctx, plan.loop.at, place.wallAt);
   const moved: MusicPlan = { intro: plan.intro && { ...plan.intro, at: plan.intro.at + d }, loop: { ...plan.loop, at: plan.loop.at + d } };
   let next: Playing;
   try {

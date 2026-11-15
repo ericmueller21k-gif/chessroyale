@@ -365,7 +365,8 @@ test("Rolling Dough: Challenge plays the beat (the crew aim at you, following yo
   await shot(page, "challenge-battle");
   // His theme (Eric, Nov 11): started as you walked in, carried through his splash into the battle: no restart, fetched once.
   const musicLog = await page.evaluate(() => (window as unknown as { __soundLog: string[] }).__soundLog.filter((l) => l.startsWith("music:")));
-  expect(musicLog.filter((l) => !l.startsWith("music:level") && !l.startsWith("music:load"))).toEqual(["music:room:zebra", "music:splash:zebra:room", "music:carry:zebra"]);
+  // (Not the town's own theme's, Nov 15: it gives way as the room's starts.)
+  expect(musicLog.filter((l) => !l.startsWith("music:level") && !l.startsWith("music:load") && !l.startsWith("music:town:"))).toEqual(["music:room:zebra", "music:splash:zebra:room", "music:carry:zebra"]);
   // (Each piece twice: the town's loading fetched it (Nov 12), then its room's decode read it back from the cache.)
   expect(themeGets.sort()).toEqual(["/music/zebra-intro.mp3", "/music/zebra-intro.mp3", "/music/zebra-loop.mp3", "/music/zebra-loop.mp3"]);
   const zb = await page.evaluate(() => (window as unknown as { __zb: { crew: boolean; storm: boolean; wipe: boolean; outOn: boolean; kept: number[]; carried: string[]; faded: string[]; frontFirst: Record<string, number>; steps: string[]; lines: string[] } }).__zb);
