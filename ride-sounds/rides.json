@@ -31,6 +31,17 @@
       "fadeOutMs": 700,
       "rmsDb": -20.0,
       "peakDb": -6.3
+    },
+    "ginger-sled": {
+      "file": "ginger-sled.wav",
+      "sampleRate": 48000,
+      "loopStart": 0.1,
+      "loopEnd": 1.1,
+      "engine": false,
+      "fadeInMs": 60,
+      "fadeOutMs": 300,
+      "rmsDb": -30.2,
+      "peakDb": -10.4
     }
   }
 }

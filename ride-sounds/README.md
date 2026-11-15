@@ -10,6 +10,7 @@ and then we'll kind of go more. I want to move around with it and see how it fee
 | Sawyer's Dozer (`sawyer-dozer`) | `sawyer-dozer.wav` | a diesel's chug: twelve firings a second, its exhaust, the tracks ticking |
 | Boingo's Pogo (`boingo-pogo`) | `boingo-pogo.wav` | a spring's boing on every bounce, four a second, a little tune in their pitches |
 | Puddles's Mower (`puddles-mower`) | `puddles-mower.wav` | a ride-on mower's putter: sixteen hollow pops a second, strong and weak, the blades' whine and swish under the deck |
+| Candy Cane Sled (`ginger-sled`) | `ginger-sled.wav` | jingle bells, shaken: three shakes a second, each a knock on three bells and the pellets rattling on |
 
 Made in code by `scripts/reel/music/rides.py --game <folder>` on `claude/trailer-v2` (no samples). `rides.json` has each
 ride's numbers.
@@ -52,7 +53,19 @@ Eric asked for the next rides' sounds ("The mower, I think, is pretty self-expla
 1.1 s, -20 dB RMS), and it is an engine like the dozer: `{ kind: "loop", engine: true, fadeInMs: 60, fadeOutMs: 700,
 rate: 1 }` is where I'd start. He hasn't heard it in the town yet.
 
-The Candy Cane Sled's jingle bells are still with him (a second go, after a first that missed). When they come they
-will differ in one way: the file will be at 48 kHz with its highs raised, because most of a jingle bell is above 8 kHz
-and the game's 6 kHz low-pass would take it off; it still plays through the same path as the others, nothing to wire
-differently, as long as the loop's file is decoded at whatever rate it has.
+## Nov 15: the Candy Cane Sled
+
+Eric: "like a literal jingle bell when you shake it." My first go missed ("nails on a chalkboard"); he sent a recording
+of real ones, and this is built from what that shows a jingle bell is (not from the recording itself: no samples).
+Of the second go: "Bells are good to go yes."
+
+It differs from the other loops in two ways, both because four fifths of a jingle bell is above 8 kHz:
+- **The file is 48 kHz** (mono WAV, 16 bit, 1.2 s, 115 KB): the same shape, a loop of exactly 1 s between 0.1 and
+  1.1 s. It has not been low-passed.
+- **It must play round the game's 6 kHz low-pass** (`soften` in sound.ts), as agreed with the director: through it,
+  most of the bell is gone. The file's highs are not raised, so it must not go through the low-pass either way.
+
+Not an engine. Where I'd start: `{ kind: "loop", engine: false, fadeInMs: 60, fadeOutMs: 300, rate: 1 }`, at
+`RIDE_SOUND.level` like the rest. Its level is in the file: -30.2 dB RMS, peak -10.4 dB, about 6 LU under the engines
+by loudness, because a steady bright sound reads louder than its level and this one is on for as long as you move. If
+he wants it louder in the town, a per-ride level is the knob (the file has 10 dB of room).
