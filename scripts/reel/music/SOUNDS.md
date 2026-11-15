@@ -243,3 +243,8 @@ falling hook (C, B, G, B, A) that comes back; no sharps anywhere. The notes on w
 what was written for him are the lesson: "harmonic and rhythmic restraint": a hook that recurs, spaced-out phrases,
 notes of the key, and no D sharp or F sharp colour under a plain tune. The solo is now his phrases over white-key
 chords (song_ad.py's docstring says whose each bar is).
+Nov 15: "I like both my first version and this one" (read as the rewrite sent as "1-mine", and his own melodies):
+the theme goes back to its 2:59 without a solo, and the two solos are pieces of their own that the game plays between
+two passes of the theme now and then ("say every 10 min ... only 3 files, a 3 min theme, and 2 short piano inserts").
+town.py builds the three files; handed over in `town-music/` on the stills branch with how to play them. A long theme
+can carry extra parts this way without growing: a piece that starts where a pass ends and hands back to the top.

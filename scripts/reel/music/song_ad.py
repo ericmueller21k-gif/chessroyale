@@ -33,76 +33,80 @@ chord, an 8th ahead of the swing, on the synth's music box, which has an overton
 bell whose overtones are the note's own harmonics, a written line that answers the guitar, swung with the rest).
 Earlier (0:40, the ocarina): "staticky ... some artifact embedded in every time it plays a note": the breath in the
 synth's ocarina; the town's ocarina and flute are the bare tones.
-So the song is that sample (the stroll's four bars, the tune on the clarinet, the tune on the flute) three times,
-a little different each time, with other places between: the gazebo, a piano solo, a conversation, the tune a minor
-third up, and the cafe before it comes home.
-The piano solo in the middle is Eric's own piece (Nov 14): "I tried to come up with my own piano solo ... I basically
-recorded it with my piano here ... you're going to just transcribe exactly what it tells you to do ... a nice little
-beautiful solo piano work that's in the middle of this song. And you can still keep that like quiet background thing
-that rings throughout the whole song in it. But then this part, we just want to focus on the piano ... if it needs to
-be longer to fit it in, that's what I'm expecting anyway." It took three goes, each from notes of his.
-First a write-up of what he had played: his left hand's rolling patterns, tidied to even 8ths, and a right-hand solo
-written over them for him. Heard, he liked its lyrical bars and turned down its runs: "I really like it up until 19
-seconds, and then it just falls apart ... the basic climbs up and down ... are just not hitting for me ... we need to
-do something instead of these constant climbs up and down, these quick whatever they're called." Two rewrites of
-those bars followed ("Those are good"), and then: "I just went to the piano again and tried a couple more things that
-I want to get ... Can you make another version with my changes?", with the notes he had played: all on the white
-keys, in quarters and 8ths, round one falling hook (C, B, G, B, A). So now:
-  - His, as given: the left hand's first pattern (`LEFT_A`); the hook (`HOOK`) and the four phrases he played
-    (`RIGHT_2`, `RIGHT_4`: the leap to a high D and the hook; the drop to E and its two small cells; the valley down
-    to D and the climb to C, with its turn on A and G; the hook to close). The notes give their pitches in order,
-    not their lengths: the rhythms are set here, the hook the same each time.
-  - From the first write-up, kept because he liked them: the right hand's first bar (a flick into a leap) and its
-    bars 3 and 4 (a call, a turn in threes).
-  - This file's: the second time's bar 2 (from the rewrite he called good), and the left hand under his phrases. The
-    first write-up had black keys there (an F sharp, then a D sharp, over a C); his phrases have F and D natural, and
-    his notes ask for the harmony under them to move to "A minor / F major / D minor / E minor" so that nothing is
-    sour. It is D minor, F, E minor, A minor, a bar each, rolled in his own left hand's shape (the F and A minor
-    bars are his own from `LEFT_A`); his phrases close on the A.
-The calls made in fitting it in:
-  - It plays at the song's 129 beats a minute, not the write-up's 98: the backdrop he asked to keep is the song's.
-  - For its twenty bars nothing swings (the song's off 8ths are late; his 8ths are even): the brush plays even 8ths
-    and the bass one soft note a bar, and the chords and wood block wait.
-  - Its shape: his first pattern once by the left hand alone; then eight bars with the right hand (the first two
-    bars' left hand an octave up, as the write-up asks of a repeat); then eight more, the first four's longer notes
-    and the last hook doubled an octave under, strings far off under the last four. The write-up's own three-minute
-    plan (a piece of its own, with a long opening and a cadenza) is not used: his words were a solo in the middle of
-    this song.
+So the theme is that sample (the stroll's four bars, the tune on the clarinet, the tune on the flute) three times,
+a little different each time, with other places between: the gazebo, the cafe, a conversation, and the tune a minor
+third up before it comes home.
 The idea from the game: a walk round the town. The bass walks down a step a bar under a D that never moves (G, F
 sharp, F, E, E flat, D: the E flat bar is the chord borrowed from the minor, the walk's one wistful step); the tune is
 handed from voice to voice as the walk passes the square, the gazebo and the cafe; and near the end the pawn reaches
 the far side and is promoted: the tune a minor third up, everyone together. A wood block's knock is a piece set down.
-G major; 116 bars of four at 129 beats a minute: 215.8 s.
-  python3 song_ad.py <out.wav>
 
-  bars   1-4    0:00  the stroll starts: the bass, the chords, a brush
-  bars   5-12   0:07  the square: the tune on the clarinet
-  bars  13-20   0:22  again on the flute, lightly, the clarinet's long notes far under it
-  bars  21-28   0:37  the gazebo: a slow tune on the ocarina over the piano's rolling chords, the bass walking
-  bars  29-44   0:52  the square again: the clarinet with the flute beside it, then the flute's turn
-  bars  45-64   1:22  Eric's piano solo: the left hand alone (four bars), the solo over it (1:29), the black-key bars
-                      (1:37), and all of it again, fuller (1:44); only the brush and a soft bass under it
-  bars  65-72   1:59  a conversation: the clarinet and the flute trade two bars each
-  bars  73-80   2:14  promoted: the tune a minor third up, everyone
-  bars  81-96   2:29  the cafe, in E minor, the stroll going on under it: short phrases on the vibraphone and the soft
-                      piano together over a guitar, then on the guitar, a small bell answering
-  bars  97-112  2:59  home: the clarinet's turn and the flute's once more, the brush thinning out
-  bars 113-116  3:28  the stroll alone again, for the way round
+The piano solos (`SOLOS`). Eric wanted a piano solo of his own in it (Nov 14): "I tried to come up with my own piano
+solo ... I basically recorded it with my piano here ... a nice little beautiful solo piano work that's in the middle of
+this song. And you can still keep that like quiet background thing that rings throughout the whole song in it. But
+then this part, we just want to focus on the piano." It went through four goes, each from notes of his, and two are
+kept. Then (Nov 15): "I like both my first version and this one, is there any way to ... have them alternate playing
+say every 10 min in the town, and the main theme stays the original we composed without the piano solo, but we add
+these 2 files and they ... can seamlessly work into the main theme every few play throughs? ... then it's only 3
+files, a 3 min theme, and 2 short piano inserts." So the theme is as it was before the solo, and each solo is a piece
+of its own, twenty bars, made to be played between the theme's end and its start: it begins on the C the theme's
+last D7 can fall to, with what the theme's last bars leave ringing over its start, and it ends on a chord that steps
+to the theme's G, its own last notes ringing on over the theme's first bars (town.py makes the game's files).
+  "a"  (read as his "first version": the one sent to him as "1-mine".) From his first write-up: his left hand's two
+       rolling patterns, tidied to even 8ths (C major 9th, then his F sharp and D sharp over a C), played as written;
+       and the right-hand solo written over them for him, its first five bars and its last as written. Its bars 6 and
+       7 were runs of 16ths, a climb and a fall, which he turned down ("the basic climbs up and down ... are just not
+       hitting for me ... maybe kind of keeping it in the space of the first"): those two bars, and the second time's
+       bar 2, are this file's, in the manner of the bars he liked ("Those are good").
+  "b"  From what he then played himself ("I just went to the piano again and tried a couple more things"): all white
+       keys, quarters and 8ths, round one falling hook (C, B, G, B, A). His: the left hand's first pattern, the hook
+       and the four phrases (the leap to a high D and the hook; the drop to E and its two small cells; the valley down
+       to D and the climb to C, with its turn on A and G; the hook to close). His notes give the pitches in order, not
+       their lengths: the rhythms are set here, the hook the same each time. Kept from the first write-up because he
+       liked them: the right hand's first bar and its bars 3 and 4. This file's: the second time's bar 2, and the left
+       hand under his phrases (his notes ask for "A minor / F major / D minor / E minor" there, so nothing is sour: D
+       minor, F, E minor, A minor, rolled in his own left hand's shape).
+The calls made in both:
+  - They play at the theme's 129 beats a minute, not the write-up's 98, so a solo sits in the theme's time.
+  - Nothing swings in them (the theme's off 8ths are late; his 8ths are even): the brush plays even 8ths and the bass
+    one soft note a bar; no chords, no wood block.
+  - The shape: his first pattern once by the left hand alone; eight bars with the right hand (the first two bars'
+    left hand an octave up, as the write-up asks of a repeat); eight more, some of the right hand doubled an octave
+    under and strings far off under the last four. The write-up's own three-minute plan is not used.
+  - In "a", bar 2's lengths as written don't add up to a bar: its run starts on the first beat (its "tied" E left
+    ringing), so it ends on the two notes it lands on, on the third beat.
+
+G major; the theme 96 bars of four at 129 beats a minute, 178.6 s, a loop; a solo 20 bars, 37.2 s.
+  python3 song_ad.py <out.wav> [a solo, a or b: the solo and what rings after it; without, the theme]
+
+  bars  1-4    0:00  the stroll starts: the bass, the chords, a brush
+  bars  5-12   0:07  the square: the tune on the clarinet
+  bars 13-20   0:22  again on the flute, lightly, the clarinet's long notes far under it
+  bars 21-28   0:37  the gazebo: a slow tune on the ocarina over the piano's rolling chords, the bass walking
+  bars 29-44   0:52  the square again: the clarinet with the flute beside it, then the flute's turn
+  bars 45-60   1:22  the cafe, in E minor, the stroll going on under it: short phrases on the vibraphone and the soft
+                     piano together over a guitar, then on the guitar, a small bell answering
+  bars 61-68   1:52  a conversation: the clarinet and the flute trade two bars each
+  bars 69-76   2:07  promoted: the tune a minor third up, everyone
+  bars 77-92   2:21  home: the clarinet's turn and the flute's once more, the brush thinning out
+  bars 93-96   2:51  the stroll alone again, for the way round (or into a solo)
+  a solo:      0:00  the left hand alone; 0:07 the right hand; 0:15 its second four bars; 0:22 and 0:30 again, fuller
 """
 import sys
 
 import numpy as np
 
 from song_r import beats, notes
-from synth import Ride, n, write_wav
+from synth import SR, Ride, n, write_wav
 
-BARS = 116
+BARS = 96  # the theme
 BEATS = 4 * BARS
 BPM = 129.0  # Eric's, by ear
-TAPE = BEATS * 60 / BPM  # 215.8 s
+TAPE = BEATS * 60 / BPM  # 178.6 s
 SWING = 0.08  # an off 8th is this much of a beat late
 bar0 = lambda bar: 4 * (bar - 1)  # the beat a bar (from 1) starts at
-RIDE = [(0, BEATS, BPM, BPM, 1.0, 1.0, 0.0)]
+SOLO_BARS = 20
+LEAD_IN, RING = 4, 4  # a solo's own tape: the theme's last four bars before it (for what they leave ringing), four empty bars after
 
 # A bar's chord (two with a comma: half a bar each); "/X": the bass's note. "+3" after it: a minor third up.
 WALK = "G D/F# G7/F Cadd9/E Cmadd9/Eb G/D A9 D7"  # the tune's eight bars: the bass steps down under the D
@@ -111,9 +115,7 @@ GAZEBO = "Cmaj7 Bm7 Am7 D7/F# Cmaj7 Bm7,E7 Am7 D7"
 CAFE = "Em9 Em/D Cmaj7 B7 Em9 Em/D C#m7b5 D7sus4,D7  Em9 Em/D Cmaj7 B7 Em9 A9 Am7/D D7"
 TALK = "G B7 Em G7/D C A7/C# D7sus4 D7,F7"
 LIFTED = " ".join(c + "+3" for c in WALK.split()[:7]) + " F7,D7"  # its last bar is the way home
-SOLO = 45  # the bar Eric's piano solo starts at: twenty bars
-SOLO_BASS = "C C Am F  C C Am F  Dm F Em Am  C C Am F  Dm F Em Am"  # the bass's notes only: its chords are in its left hand
-CHORDS = f"{VAMP}  {WALK} {WALK}  {GAZEBO}  {WALK} {WALK}  {SOLO_BASS}  {TALK}  {LIFTED}  {CAFE}  {WALK} {WALK}  {VAMP}".split()
+CHORDS = f"{VAMP}  {WALK} {WALK}  {GAZEBO}  {WALK} {WALK}  {CAFE}  {TALK}  {LIFTED}  {WALK} {WALK}  {VAMP}".split()
 assert len(CHORDS) == BARS, len(CHORDS)
 KINDS = {"": (0, 4, 7), "6": (0, 4, 7, 9), "maj7": (0, 4, 7, 11), "7": (0, 4, 7, 10), "9": (0, 4, 7, 10, 14), "add9": (0, 4, 7, 14), "m": (0, 3, 7),
          "m7": (0, 3, 7, 10), "m9": (0, 3, 7, 10, 14), "madd9": (0, 3, 7, 14), "m7b5": (0, 3, 6, 10), "7sus4": (0, 5, 7, 10)}
@@ -155,35 +157,57 @@ BELL = "-:3 B5:.5 G5:.5 | E5:1 -:3 | -:1 E5:.5 G5:.5 B5:1 -:1 | -:3 B5:.5 F#5:.5
 # The conversation: the clarinet's two bars, the flute's two, twice.
 TALK_C = "D5:.5 B4:.5 G4:1 A4:.5 B4:.5 D5:1 | D#5:1.5 B4:.5 F#4:1 A4:1 | -:8 | E5:1 C5:.5 G4:.5 E4:1 G4:1 | A4:.5 C#5:.5 E5:1.5 C#5:.5 A4:1 | -:8"
 TALK_A = "-:8 | G4:.5 B4:.5 E5:1.5 D5:.5 B4:1 | D5:1 B4:.5 G4:.5 F4:1 D4:1 | -:8 | G4:1 A4:1 C5:1 D5:1 | D5:.5 C5:.5 A4:1 C5:1 Eb5:1"
-# Eric's piano solo (the docstring says whose each part is). The left hand, a bar of 8ths each: his first pattern
-# (C major 9th, then A minor and F), and the four bars under his own phrases (D minor, F, E minor, A minor).
+# ---- the piano solos (the docstring says whose each part is) ----
 eighths = lambda text: " | ".join(" ".join(name + ":.5" for name in bar.split()) for bar in text.split(" | "))
+# The left hand, a bar of 8ths each. His first pattern (C major 9th, then A minor and F); his second, with its black
+# keys (F sharp, then D sharp, over a C); and the four bars under the phrases he played (D minor, F, E minor, A minor).
 LEFT_A = eighths("C2 G2 D3 E3 G3 E3 D3 G2 | C2 G2 E3 F3 G3 F3 E3 G2 | A2 E3 B3 C4 E4 C4 B3 E3 | F2 C3 G3 A3 E4 C4 A3 G3")
-LEFT_B = eighths("D2 A2 E3 F3 A3 F3 E3 A2 | F2 C3 G3 A3 E4 C4 A3 G3 | E2 B2 G3 A3 B3 A3 G3 B2 | A2 E3 B3 C4 E4 C4 B3 E3")
-# The right hand. His hook; the first write-up's opening bar (up to its last note) and its bars 3 and 4.
-HOOK = "C6:1 B5:1 G5:.5 B5:.5 A5:1"
+LEFT_BLACK = eighths("C3 F#3 A3 B3 D4 B3 A3 F#3 | C3 F#3 A3 B3 E4 D4 B3 A3 | C3 D#3 A3 B3 C4 B3 A3 D#3 | B2 E3 G3 A3 B3 A3 G3 E3")
+LEFT_WHITE = eighths("D2 A2 E3 F3 A3 F3 E3 A2 | F2 C3 G3 A3 E4 C4 A3 G3 | E2 B2 G3 A3 B3 A3 G3 B2 | A2 E3 B3 C4 E4 C4 B3 E3")
+# The right hand. The first write-up's opening bar (a flick into a leap; `OPEN` is all but its last note), its run
+# down the scale onto two notes, and its bars 3 and 4 (a call, a turn in threes).
 OPEN = "D5:.125 E5:.875 B5:1 G5:.5 A5:.5"
+RUN = "D6:.25 C6:.25 B5:.25 A5:.25 G5:.25 F5:.25 E5:.25 D5:.25 E5:2"
 CALL = "-:.5 E5:.5 A5:.5 B5:.5 C6:1.5 D6:.5 | E6:1/3 F6:1/3 E6:1/3 B5:1 G5:2"
-# The first eight bars: the opening, his hook, the call and turn; then his first phrases: up to a high D and the
-# hook, then the drop to E and its two cells, closing on A.
-RIGHT_1 = f"{OPEN} E6:1 | {HOOK} | {CALL}"
-RIGHT_2 = f"C6:1 B5:.5 F5:.5 D6:1.5 C6:.5 | {HOOK} | C6:1 B5:.5 E5:1 E5:.5 B5:.5 A5:.5 | E5:.5 B5:.5 G5:1 A5:2"
-# The second eight: the opening held over the barline into three falling notes (and a G under the last), the call and
-# turn; then his other phrases: the valley down to D, the climb to C, a breath, his turn on A and G, and the hook.
-RIGHT_3, RIGHT_3_UNDER = f"{OPEN} E6:1.75 | G5:.75 C6:.5 E5:2 | {CALL}", "-:6 G4:2 | -:8"
-RIGHT_4 = f"C6:1 B5:.5 G5:.5 A5:.5 F5:.5 D5:1 | E5:.5 D5:.5 F5:.5 G5:.5 C5:2 | -:2 A5:.5 G5:.5 A5:.5 G5:.5 | {HOOK}"
-SOLO_PAD = "A3 D4 F4 | A3 C4 F4 | G3 B3 E4 | A3 C4 E4"  # strings under the second time's last four bars: their chords
+LAND = "-:6 G4:2 | -:8"  # the G under the note a second bar lands on
+# "a": the write-up's bar 5 (the F sharp's falling line) and bar 8 (two notes, then an arpeggio up and out), with this
+# file's two bars between: an answer in bar 3's rhythm back up to the F sharp, a turn on the D sharp and a walk down.
+BLACK = "F#6:1.5 E6:.5 D6:.5 B5:.5 A5:1 | -:.5 B5:.5 D6:.5 E6:.5 F#6:1.5 E6:.5 | D#6:1/3 E6:1/3 D#6:1/3 B5:1 A5:1 F#5:1 | E5:2 E5:.5 G5:.5 B5:.5 E6:.5"
+# "b": his hook, and his phrases: up to a high D and the hook, the drop to E and its two cells closing on A; then the
+# valley down to D, the climb to C, a breath, his turn on A and G, and the hook.
+HOOK = "C6:1 B5:1 G5:.5 B5:.5 A5:1"
+PLAYED_1 = f"C6:1 B5:.5 F5:.5 D6:1.5 C6:.5 | {HOOK} | C6:1 B5:.5 E5:1 E5:.5 B5:.5 A5:.5 | E5:.5 B5:.5 G5:1 A5:2"
+PLAYED_2 = f"C6:1 B5:.5 G5:.5 A5:.5 F5:.5 D5:1 | E5:.5 D5:.5 F5:.5 G5:.5 C5:2 | -:2 A5:.5 G5:.5 A5:.5 G5:.5 | {HOOK}"
+# A solo: the bass's notes (a chord's name a bar: only its root is used); the left hand's second pattern; the right
+# hand's four lines of four bars; `under`: (beats in, a line under the right hand); `doubled`: (beats in, a line played
+# again an octave under, softly; True: its quick notes left out); `strings`: far off under the last four bars.
+SOLOS = {
+    "a": dict(bass="C C Am F  C C Am F  C C C Em/B  C C Am F  C C C Em/B", left=LEFT_BLACK,
+              right=(f"{OPEN} E6:1 | {RUN} | {CALL}", BLACK, f"{OPEN} E6:1 | D6:1 B5:.5 G5:.5 E5:2 | {CALL}", BLACK),
+              under=((0, LAND), (16, "-:12 | C5:2 -:2"), (32, LAND), (48, "-:12 | C5:2 -:2")),
+              doubled=((32, f"{OPEN} E6:1 | D6:1 B5:.5 G5:.5 E5:2 | {CALL}", True), (48, BLACK, True)),
+              strings="A3 D4 F#4 | A3 D4 F#4 | A3 C4 D#4 | G3 B3 E4"),
+    "b": dict(bass="C C Am F  C C Am F  Dm F Em Am  C C Am F  Dm F Em Am", left=LEFT_WHITE,
+              right=(f"{OPEN} E6:1 | {HOOK} | {CALL}", PLAYED_1, f"{OPEN} E6:1.75 | G5:.75 C6:.5 E5:2 | {CALL}", PLAYED_2),
+              under=((32, LAND),),
+              doubled=((32, f"{OPEN} E6:1.75 | G5:.75 C6:.5 E5:2 | {CALL}", True), (60, HOOK, False)),
+              strings="A3 D4 F4 | A3 C4 F4 | G3 B3 E4 | A3 C4 E4"),
+}
 # The stroll's last bars: the tune's first hop on the piano, far off.
 LAST = "-:4 | G4:.5 B4:.5 -:.5 D5:.5 E5:2 | -:8"
 for _line, _beats in ((TUNE, 32), (UNDER, 32), (BESIDE, 32), (HOME, 4), (HOME_BESIDE, 4), (SLOW, 32), (CAFE_1, 32), (CAFE_2, 32), (BELL, 32), (TALK_C, 32), (TALK_A, 32), (LAST, 16),
-                      (LEFT_A, 16), (LEFT_B, 16), (HOOK, 4), (RIGHT_1, 16), (RIGHT_2, 16), (RIGHT_3, 16), (RIGHT_3_UNDER, 16), (RIGHT_4, 16)):
+                      (LEFT_A, 16), (LEFT_BLACK, 16), (LEFT_WHITE, 16), (HOOK, 4),
+                      *((line, 16) for solo in SOLOS.values() for line in solo["right"])):
     assert beats(_line) == _beats, (_line[:30], beats(_line))
 
 
-def render(window=None) -> np.ndarray:
-    """The song as heard (stereo, at the mix's own level). `window`: (from beat, to beat), to make only that passage
-    (a sample, to compare voices on)."""
-    x = Ride(RIDE, BEATS, None, os=2, seed=233, tape_secs=TAPE)
+def render(solo=None, window=None) -> np.ndarray:
+    """The theme as heard (stereo, at the mix's own level): a loop. Or, with `solo` ("a" or "b"), that solo's own tape:
+    the theme's last four bars, the solo's twenty, and four empty bars for what rings on (`piece` cuts the solo out).
+    `window`: (from beat, to beat), to make only that passage (a sample, to compare voices on)."""
+    chords = CHORDS if solo is None else f"{VAMP}  {SOLOS[solo]['bass']}  G G G G".split()
+    bars = len(chords)
+    x = Ride([(0, 4 * bars, BPM, BPM, 1.0, 1.0, 0.0)], 4 * bars, None, os=2, seed=233, tape_secs=4 * bars * 60 / BPM)
     x.window = window
     put, at = x.put, x.at
     rng = np.random.default_rng(89)
@@ -226,10 +250,7 @@ def render(window=None) -> np.ndarray:
 
     def halves(bar):
         """The bar's chords: one for the whole bar, or one for each half."""
-        names = CHORDS[(bar - 1) % BARS].split(",")
-        if "+" in CHORDS[(bar - 1) % BARS] and len(names) == 1:
-            return [chord(names[0])]
-        return [chord(nm) for nm in names]
+        return [chord(name) for name in chords[(bar - 1) % bars].split(",")]
 
     of = lambda bar, beat=0.0: halves(bar)[-1 if beat >= 2 else 0]
 
@@ -281,10 +302,10 @@ def render(window=None) -> np.ndarray:
         t = np.arange(k) / sr
         put("wood", b, (np.sin(tau * 760 * t) + 0.5 * np.sin(tau * 1180 * t) + 0.3 * murk(k, 2500) * np.exp(-t / 0.002)) * np.exp(-t / 0.014) * np.minimum(1, t / 0.0006) * tail(k) * vol, pan)
 
-    def stroll(bar, vol=1.0, chick="keys", brushes=True, wood=True, low=1.0):
+    def stroll(bar, vol=1.0, chick="keys", brushes=True, wood=True, low=1.0, lead=True):
         """A bar of the stroll: the bass on 1 and 3 (the bar's note, then another of the chord's a fourth or so over
-        it) and a step towards the next bar's just before it; the chord, soft, on 2 and 4; a brush on the 8ths; the
-        wood block on 4."""
+        it) and, with `lead`, a step towards the next bar's just before it; the chord, soft, on 2 and 4; a brush on the
+        8ths; the wood block on 4."""
         b = bar0(bar)
         for half, (root, between) in enumerate(halves(bar) if len(halves(bar)) == 2 else [of(bar)] * 2):
             other = (between(root + 5, root + 8) or between(root + 3, root + 4) or [root])[0]
@@ -297,7 +318,7 @@ def render(window=None) -> np.ndarray:
             elif chick == "both":
                 puff(b + 2 * half + 1, ms, 0.03 * vol), strum(b + 2 * half + 1, ms, 0.065 * vol)
         root, nxt = of(bar, 2)[0], of(bar + 1)[0]
-        if nxt != root:
+        if lead and nxt != root:
             bass(b + 3 + sway(0.5), nxt + (1 if nxt < root else -1), 0.4, 0.3 * vol * low)
         if brushes:
             for i in range(8):
@@ -407,10 +428,6 @@ def render(window=None) -> np.ndarray:
             ph = tau * x.hz(m) * t
             put("bell", b, np.sin(ph + np.exp(-t / 0.25) * np.sin(3 * ph)) * np.exp(-t / 0.5) * np.minimum(1, t / 0.002) * tail(k, 0.2) * vol, pan)
 
-    # Bars 1-4: the stroll starts. The bass and the chords; the brush from the third bar.
-    for bar in range(1, 5):
-        stroll(bar, 0.9, brushes=bar >= 3, wood=bar >= 3)
-
     def sample(first, beside=0.0, glow=False, thin=False):
         """Sixteen bars, the ones Eric kept ("I love everything about that sample, so you can keep that on rough
         repeat"): two notes in and the tune on the clarinet; then on the flute, lightly, the clarinet's long
@@ -427,72 +444,87 @@ def render(window=None) -> np.ndarray:
             flute(bar0(first), BESIDE, beside)
         flute(bar0(first + 8) - 1, PICKUP, 0.9), flute(bar0(first + 8), TUNE), clarinet(bar0(first + 8), UNDER, 0.28)
 
-    # Bars 5-20: the square: the sample as he heard it.
-    sample(5)
+    def way_round(first):
+        """The theme's last four bars: the stroll alone, the tune's first hop on the piano, far off. Its last bar has
+        no step in the bass towards what comes next: that is the theme's G or a solo's C."""
+        for bar in range(first, first + 4):
+            stroll(bar, 0.85, brushes=False, wood=False, lead=bar < first + 3)
+        piano(bar0(first), LAST, 0.08)
 
-    # Bars 21-28: the gazebo. The ocarina's slow tune; the soft piano rolls the chords; the bass walks; strings, far off; no wood block.
-    for bar in range(21, 29):
-        walking(bar, 0.95), rolled(bar, 0.045), pad(bar, 0.018)
-        for i in range(8):
-            brush(bar0(bar) + sway(i * 0.5), 0.014 if i % 2 == 0 else 0.009)  # as loud as in the stroll: the shake never drops
-    ocarina(bar0(21), SLOW)
+    def piano_solo(first, solo):
+        """Twenty bars of piano (the docstring has Eric's words, whose each part is and the calls made). Under it only
+        the brush, in even 8ths, and one soft bass note a bar. The left hand's first pattern alone; then eight bars
+        with the right hand, twice: the second time some of it is doubled an octave under, and strings sit far off
+        under the last four bars."""
+        s0 = bar0(first)
+        for bar in range(first, first + SOLO_BARS):
+            root = of(bar)[0]
+            bass(bar0(bar), root - 12 if root > 45 else root, 2.5, 0.22)
+            for i in range(8):
+                brush(bar0(bar) + i * 0.5, 0.012 if i % 2 == 0 else 0.008)
+        grand(s0, LEFT_A, 0.047, -0.15)
+        grand(s0 + 16, some(LEFT_A, 0, 2), 0.047, -0.15, up=12), grand(s0 + 24, some(LEFT_A, 2, 4), 0.047, -0.15), grand(s0 + 48, LEFT_A, 0.047, -0.15)
+        grand(s0 + 32, solo["left"], 0.047, -0.15), grand(s0 + 64, solo["left"], 0.047, -0.15)
+        for i, line in enumerate(solo["right"]):
+            grand(s0 + 16 + 16 * i, line, 0.1, 0.15, bus="solo")
+        for off, line in solo["under"]:
+            grand(s0 + 16 + off, line, 0.07, 0.1, bus="solo")
+        for off, line, slow in solo["doubled"]:
+            grand(s0 + 16 + off, line, 0.05, 0.1, up=-12, slow=slow, bus="solo")
+        for i, names in enumerate(solo["strings"].split(" | ")):
+            at(s0 + 64 + 4 * i, 4)
+            for j, name in enumerate(names.split()):
+                put("pad", s0 + 64 + 4 * i, x.strings(n(name), 4, 0.014, attack=0.4, release=0.5), -0.4 + 0.4 * j)
 
-    # Bars 29-44: the square again: this time the flute plays beside the clarinet before its own turn.
-    sample(29, beside=0.6)
+    if solo:
+        way_round(1), piano_solo(LEAD_IN + 1, SOLOS[solo])
+    else:
+        # Bars 1-4: the stroll starts. The bass and the chords; the brush from the third bar.
+        for bar in range(1, 5):
+            stroll(bar, 0.9, brushes=bar >= 3, wood=bar >= 3)
 
-    # Bars 45-64: Eric's piano solo (the docstring has his words, whose each part is and the calls made). Under it
-    # only the brush, in even 8ths, and one soft bass note a bar. His first pattern by the left hand alone; then
-    # eight bars with the right hand, twice: the second time the first four bars' longer notes and the last hook are
-    # doubled an octave under, and strings sit far off under the last four.
-    s0 = bar0(SOLO)
-    for bar in range(SOLO, SOLO + 20):
-        root = of(bar)[0]
-        bass(bar0(bar), root - 12 if root > 45 else root, 2.5, 0.22)
-        for i in range(8):
-            brush(bar0(bar) + i * 0.5, 0.012 if i % 2 == 0 else 0.008)
-    grand(s0, LEFT_A, 0.047, -0.15)
-    grand(s0 + 16, some(LEFT_A, 0, 2), 0.047, -0.15, up=12), grand(s0 + 24, some(LEFT_A, 2, 4), 0.047, -0.15), grand(s0 + 48, LEFT_A, 0.047, -0.15)
-    grand(s0 + 32, LEFT_B, 0.047, -0.15), grand(s0 + 64, LEFT_B, 0.047, -0.15)
-    for first, line in ((s0 + 16, RIGHT_1), (s0 + 32, RIGHT_2), (s0 + 48, RIGHT_3), (s0 + 64, RIGHT_4)):
-        grand(first, line, 0.1, 0.15, bus="solo")
-    grand(s0 + 48, RIGHT_3_UNDER, 0.07, 0.1, bus="solo")
-    grand(s0 + 48, RIGHT_3, 0.05, 0.1, up=-12, slow=True, bus="solo"), grand(s0 + 76, HOOK, 0.05, 0.1, up=-12, bus="solo")
-    for i, names in enumerate(SOLO_PAD.split(" | ")):
-        at(s0 + 64 + 4 * i, 4)
-        for j, name in enumerate(names.split()):
-            put("pad", s0 + 64 + 4 * i, x.strings(n(name), 4, 0.014, attack=0.4, release=0.5), -0.4 + 0.4 * j)
+        # Bars 5-20: the square: the sample as he heard it.
+        sample(5)
 
-    # Bars 65-72: a conversation: the clarinet's two bars, the flute's two, twice, over the stroll.
-    for bar in range(65, 73):
-        stroll(bar, 0.9, "keys", wood=bar % 2 == 0)
-    clarinet(bar0(65), TALK_C), flute(bar0(65), TALK_A)
+        # Bars 21-28: the gazebo. The ocarina's slow tune; the soft piano rolls the chords; the bass walks; strings, far off; no wood block.
+        for bar in range(21, 29):
+            walking(bar, 0.95), rolled(bar, 0.045), pad(bar, 0.018)
+            for i in range(8):
+                brush(bar0(bar) + sway(i * 0.5), 0.014 if i % 2 == 0 else 0.009)  # as loud as in the stroll: the shake never drops
+        ocarina(bar0(21), SLOW)
 
-    # Bars 73-80: promoted: the tune a minor third up; the clarinet has it, the flute beside it, the ocarina
-    # over its one long note; strings; the fullest the song gets, and still easy.
-    for bar in range(73, 81):
-        stroll(bar, 1.08, "both"), pad(bar, 0.02)
-    clarinet(bar0(73), seven(TUNE), 1.05, up=3), clarinet(bar0(80), HOME, 1.05)
-    flute(bar0(73), seven(BESIDE), 0.7, up=3), flute(bar0(80), HOME_BESIDE, 0.7)
-    ocarina(bar0(73), "-:20 | -:1.5 F5:2.5 | -:8", 0.045)
+        # Bars 29-44: the square again: this time the flute plays beside the clarinet before its own turn.
+        sample(29, beside=0.6)
 
-    # Bars 81-96: the cafe, in E minor. The stroll goes on under it, a little softer (Eric: the backdrop "that rings
-    # throughout" stays in the whole song). The vibraphone has the short phrases, the soft piano with it and well
-    # under it, over the guitar's picking; then the guitar has them over the piano's chords, the bell answering.
-    for bar in range(81, 97):
-        stroll(bar, 0.85, "keys")
-        if bar < 89:
-            picked(bar, 0.06)
-        else:
-            rolled(bar, 0.02)
-    vibes(bar0(81), CAFE_1, 1.6), piano(bar0(81), CAFE_1, 0.045)
-    guitar(bar0(89), CAFE_2, 0.2), bell(bar0(89), BELL)
+        # Bars 45-60: the cafe, in E minor. The stroll goes on under it, a little softer (Eric: the backdrop "that
+        # rings throughout" stays in the whole song). The vibraphone has the short phrases, the soft piano with it and
+        # well under it, over the guitar's picking; then the guitar has them over the piano's chords, the bell answering.
+        for bar in range(45, 61):
+            stroll(bar, 0.85, "keys")
+            if bar < 53:
+                picked(bar, 0.06)
+            else:
+                rolled(bar, 0.02)
+        vibes(bar0(45), CAFE_1, 1.6), piano(bar0(45), CAFE_1, 0.045)
+        guitar(bar0(53), CAFE_2, 0.2), bell(bar0(53), BELL)
 
-    # Bars 97-112: home: the sample once more, strings far off under the clarinet, the wood block and the brush
-    # dropping out at the end. Bars 113-116: the stroll alone again; the tune's first hop on the piano, far off.
-    sample(97, glow=True, thin=True)
-    for bar in range(113, 117):
-        stroll(bar, 0.85, brushes=False, wood=False)
-    piano(bar0(113), LAST, 0.08)
+        # Bars 61-68: a conversation: the clarinet's two bars, the flute's two, twice, over the stroll.
+        for bar in range(61, 69):
+            stroll(bar, 0.9, "keys", wood=bar % 2 == 0)
+        clarinet(bar0(61), TALK_C), flute(bar0(61), TALK_A)
+
+        # Bars 69-76: promoted: the tune a minor third up; the clarinet has it, the flute beside it, the ocarina
+        # over its one long note; strings; the fullest the song gets, and still easy.
+        for bar in range(69, 77):
+            stroll(bar, 1.08, "both"), pad(bar, 0.02)
+        clarinet(bar0(69), seven(TUNE), 1.05, up=3), clarinet(bar0(76), HOME, 1.05)
+        flute(bar0(69), seven(BESIDE), 0.7, up=3), flute(bar0(76), HOME_BESIDE, 0.7)
+        ocarina(bar0(69), "-:20 | -:1.5 F5:2.5 | -:8", 0.045)
+
+        # Bars 77-92: home: the sample once more, strings far off under the clarinet, the wood block and the brush
+        # dropping out at the end. Bars 93-96: the stroll alone again.
+        sample(77, glow=True, thin=True)
+        way_round(93)
 
     x.beat_s = 60 / BPM
     x.echo("clarinet", 1.5, 0.1, 0.04), x.echo("flute", 1.5, 0.1, 0.04), x.echo("bell", 1.0, 0.3, 0.15), x.echo("guitar", 1.5, 0.1, 0.04), x.echo("solo", 0.75, 0.1, 0.04)
@@ -500,9 +532,15 @@ def render(window=None) -> np.ndarray:
     return x.play(x.mixdown(levels, lowpass=8000, room=0.26, room_s=1.6))
 
 
-def main(out: str) -> None:
-    write_wav(out, render())
+def piece(solo: str) -> np.ndarray:
+    """A solo as the piece played between the theme's end and its start: its twenty bars, with what the theme's last
+    bars leave ringing over its start, and then what it leaves ringing itself (four bars' worth: `RING`)."""
+    return render(solo)[:, int(round(LEAD_IN * 4 * 60 / BPM * SR)):]
+
+
+def main(out: str, solo: str = "") -> None:
+    write_wav(out, piece(solo) if solo else render())
 
 
 if __name__ == "__main__":
-    main(sys.argv[1])
+    main(*sys.argv[1:3])
