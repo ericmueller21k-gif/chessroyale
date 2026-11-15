@@ -17,13 +17,24 @@ just the regular boing". These two go to the game first ("we want to kind of tes
 we'll kind of go more. I want to move around with it and see how it feels"); and stopping: "when you stop moving, it
 doesn't just like instantly stop ... it kind of fades over like a second or whatever ... we'll have to test it".
 Next (Nov 15), two more rides: "The candy cane sled ... like a literal jingle bell when you shake it. You know how that
-sounds. That's what it should sound like ... And the mower. The mower, I think, is pretty self-explanatory." Two
-sketches each. (The game plays every loop between 0.1 s and 1.1 s of its file, so a loop is exactly one second.) A
-bell's ring is all between 2 and 6 kHz, where the ear is keenest, and it is on for as long as the pawn moves: the
-sled's sketches are made 6 dB under the others (the brush under the town's piano solos was the lesson: a steady bright
-part reads far louder than its level).
+sounds. That's what it should sound like ... And the mower. The mower, I think, is pretty self-explanatory." (The game
+plays every loop between 0.1 s and 1.1 s of its file, so a loop is exactly one second.)
+The mower: of two, "the putter, the second one's good" (`mower_ride`).
+The sled: the first two goes (a bell built from six partials between 2.7 and 9.5 kHz, the lowest the strongest, knocked
+evenly eight times a second) "sound nothing like jingle bells ... like, you know, nails on a chalkboard", and he sent a
+recording of real ones ("some royalty free ... you can just try to mirror it exactly"). The recording is not used and
+not kept here: what was taken from it is what a jingle bell is, measured: where its ringing pitches are and how strong
+(`BELLS`: three bells; four fifths of the sound is above 8 kHz, and the partials up there are as strong as the lowest),
+how fast a ring dies (20 dB in 100 to 160 ms), and how it is shaken (a shake every 0.3 s, a knock on every bell and
+then the pellets rattling on, about sixteen knocks a second, never evenly). `sled_bells` is built from those numbers;
+its loop's spectrum is within 2 dB of the recording's in every band that matters.
+The game softens its sounds with a low-pass at 6 kHz (sound.ts), which would take off most of a jingle bell. So the
+sled's loop is `bright`: it is not low-passed here, its file is at 48 kHz, and its highs are raised in the file by what
+the game's filter will take off (up to BRIGHT_DB), so in the town it is heard as made. And it is made quieter than the
+engines: at their level it reads louder than they do, and it is on for as long as the pawn moves (the brush under the
+town's piano solos was the lesson).
   python3 rides.py <out folder> [name ...]   (the sketches, or those whose names start so: each as <name>.wav, moving, a stop, moving again; and <name>-loop.wav)
-  python3 rides.py --game <out folder>   (the chosen loops for the game: <ride id>.wav and rides.json; see `handoff`)
+  python3 rides.py --game <out folder> [ride id ...]   (the chosen loops for the game, or those named: <ride id>.wav and rides.json; see `handoff`)
 """
 import sys
 import wave
@@ -188,39 +199,38 @@ def pogo_twang():
     return strikes(n, [(i / 4, 1.0 if i % 2 == 0 else 0.8) for i in range(4)], spring) + 0.35 * strikes(n, [(i / 4, 1.0) for i in range(4)], landing())
 
 
-# ---- The Candy Cane Sled (Ginger's): two ----
-def jingle(f, seed):
-    """One knock of a jingle bell's pellet: a ring of partials that are not one note's harmonics, each a close pair (the
-    bell's slit splits them, so it shimmers), the high ones dying first; and the pellet's tick."""
-    k = int(0.3 * SR)
-    t = secs(k)
-    rng = np.random.default_rng(seed)
-    ring = np.zeros(k)
-    for ratio, loud, dies in ((1.0, 1.0, 0.085), (1.47, 0.8, 0.07), (1.93, 0.6, 0.055), (2.41, 0.5, 0.045), (2.86, 0.35, 0.035), (3.52, 0.25, 0.028)):
-        for split in (-0.004, 0.004):
-            ring += loud * np.sin(TAU * f * ratio * (1 + split) * t + rng.uniform(0, TAU)) * np.exp(-t / dies)
-    return (ring / 2 + 0.8 * colored(k, 3000, 9000, seed) * np.exp(-t / 0.0015)) * np.minimum(1, t / 0.0003)
+# ---- The Candy Cane Sled (Ginger's) ----
+# Three jingle bells: each one's ringing pitches (Hz) and how strongly each rings (dB under the strongest), as measured
+# on a recording of real ones (the docstring). Most of a jingle bell is above 8 kHz.
+BELLS = (
+    ((2373, 0), (4875, -8), (5684, -6), (9814, -2), (10424, -3), (15416, -2), (16934, -6)),
+    ((2496, -3), (4723, -12), (5830, -5), (9932, -6), (10641, -3), (11004, -7), (15527, -6), (17250, -6)),
+    ((2180, -10), (4365, -21), (8273, -11), (8525, -7), (8689, -7), (9545, -9), (9668, -8), (14244, -13), (15047, -10), (15229, -8), (16512, -11)),
+)
 
 
-def sled_bell():
-    """One jingle bell, shaken: eight knocks a second, there and back (strong, weak), the pellet bouncing once or twice after each."""
-    rng = np.random.default_rng(21)
-    hits = []
-    for i in range(8):
-        at, loud = i / 8 + rng.uniform(-0.004, 0.004), (1.0 if i % 2 == 0 else 0.6) * rng.uniform(0.85, 1.0)
-        hits += [(at, loud), (at + rng.uniform(0.018, 0.026), 0.45 * loud), (at + rng.uniform(0.042, 0.055), 0.22 * loud)]
-    return strikes(SR, hits, jingle(2700, 1))
+def sled_bells():
+    """Jingle bells, shaken: three shakes a second, each a knock on every bell and then the pellets rattling on, softer,
+    until the next (measured: a shake every 0.3 s, about sixteen knocks a second, each ring 20 dB down in 100 to 160 ms)."""
+    n = SR
+    rng = np.random.default_rng(31)
+    out = np.zeros(n)
+    k = int(0.45 * SR)
+    t, idx = secs(k), np.arange(k)
 
+    def knock(at, loud, bell):
+        w = np.zeros(k)
+        for f, db in bell:
+            dies = 0.045 if f < 3500 else 0.067 if f < 7000 else 0.07 if f < 12000 else 0.045
+            w += 10 ** ((db + rng.uniform(-3, 3)) / 20) / np.sqrt(dies / 0.045) * np.sin(TAU * f * t + rng.uniform(0, TAU)) * np.exp(-t / dies)
+        out[(int(at * SR) + idx) % n] += loud * w * np.minimum(1, t / 0.0002)
 
-def sled_sleigh():
-    """A strap of five sleigh bells: four shakes a second, each bell knocking a little apart from the others, and a softer shake back between."""
-    rng = np.random.default_rng(22)
-    out = np.zeros(SR)
-    for j, f in enumerate((2250, 2600, 2950, 3400, 3850)):
-        hits = []
-        for i in range(4):
-            hits += [(i / 4 + rng.uniform(0, 0.028), rng.uniform(0.6, 1.0)), (i / 4 + 0.125 + rng.uniform(0, 0.035), rng.uniform(0.25, 0.55))]
-        out += strikes(SR, hits, jingle(f, 30 + j))
+    for shake in range(3):
+        at, strength = shake / 3 + rng.uniform(-0.008, 0.008), (1.0, 0.8, 0.9)[shake]
+        for bell in BELLS:
+            knock(at + rng.uniform(0, 0.03), strength * rng.uniform(0.7, 1.0), bell)
+            for _ in range(rng.integers(2, 4)):
+                knock(at + rng.uniform(0.05, 0.3), strength * rng.uniform(0.05, 0.2), bell)
     return out
 
 
@@ -254,20 +264,41 @@ def mower_ride():
     return putter + 0.1 * whine + 0.12 * swish
 
 
-# A sketch: its name, what makes its loop, whether it is an engine, and (if not 1) its level beside the others'.
+# A sketch: its name, what makes its loop, whether it is an engine, and (if not 1 and False) its level beside the
+# others' and whether it is bright (`finished`).
 SKETCHES = [("dozer-1-diesel-chug", dozer_chug, True), ("dozer-2-rumble-and-squeak", dozer_rumble, True), ("dozer-3-putt-putt", dozer_putt, True),
             ("dozer-4-heavy-growl", dozer_heavy, True), ("dozer-5-toy-motor", dozer_toy, True),
             ("pogo-1-boing", pogo_boing, False), ("pogo-2-chip-hop", pogo_chip, False), ("pogo-3-steel-spring", pogo_twang, False),
-            ("sled-1-one-jingle-bell", sled_bell, False, 0.5), ("sled-2-sleigh-bells", sled_sleigh, False, 0.5),
+            ("sled-jingle-bells", sled_bells, False, 0.31, True),
             ("mower-1-small-engine", mower_push, True), ("mower-2-ride-on-putter", mower_ride, True)]
 LEVEL = 0.1  # every loop's loudness (RMS), after the game's low-pass
 
 
-def finished(loop, level=1.0):
-    """A loop as the game would have it: through its 6 kHz low-pass, at the common level (times `level`). Its deepest
-    part (under about 120 Hz) is thinned first: a phone's speaker has none of it, and the music's bass lives there."""
-    loop = highpass(lowpass(loop, 6000), 120)
+BRIGHT_DB = 10.0  # how far a bright loop's highs are raised in its file against the game's low-pass: all of it up to 10 kHz (more, and the sled's file clips)
+
+
+def soften(n):
+    """The game's own softening of its sounds (sound.ts: a Web Audio low-pass at 6 kHz, its Q 1 dB), as the gain at
+    each frequency of an n-point transform at 48 kHz."""
+    w = TAU * 6000 / SR
+    a, b0 = np.sin(w) / (2 * 10 ** (1 / 20)), (1 - np.cos(w)) / 2
+    z = np.exp(-1j * TAU * np.fft.rfftfreq(n, 1 / SR) / SR)
+    return np.abs(b0 * (1 + z) ** 2 / ((1 + a) - 2 * np.cos(w) * z + (1 - a) * z * z))
+
+
+def finished(loop, level=1.0, bright=False):
+    """A loop as it is heard in the game, at the common level (times `level`). Its deepest part (under about 120 Hz)
+    is thinned: a phone's speaker has none of it, and the music's bass lives there. It goes through the game's 6 kHz
+    low-pass; a `bright` loop keeps what `for_game` can put back of what that takes off."""
+    loop = highpass(loop, 120)
+    loop = np.fft.irfft(np.fft.rfft(loop) * np.minimum(1, soften(len(loop)) * 10 ** (BRIGHT_DB / 20)), len(loop)) if bright else lowpass(loop, 6000)
     return loop / np.sqrt(np.mean(loop**2)) * LEVEL * level
+
+
+def for_game(heard):
+    """A bright loop's file: its highs raised by what the game's low-pass takes off, so that through it the loop is
+    heard as `finished` made it."""
+    return np.fft.irfft(np.fft.rfft(heard) / np.maximum(soften(len(heard)), 1e-3), len(heard))
 
 
 def moving(loop, length, engine):
@@ -290,31 +321,40 @@ def save(path, x):
         w.writeframes((np.clip(x, -1, 1) * 32767).astype("<i2").tobytes())
 
 
-# The loops chosen for the game, by the ride's id (crates.ts): the sketch, whether it is an engine, and how long its
-# fade is as the pawn stops, to start from (seconds: Eric's "like a second or whatever", to be tried in the town).
-CHOSEN = {"sawyer-dozer": (dozer_chug, True, 0.7), "boingo-pogo": (pogo_boing, False, 0.35)}
-GAME_SR = 24000  # the loops have nothing over 6 kHz, so half the samples carry all of them
+# The loops chosen for the game, by the ride's id (crates.ts): the sketch, whether it is an engine, how long its fade
+# is as the pawn stops, to start from (seconds: Eric's "like a second or whatever", to be tried in the town), and for
+# one that is not an engine at the common level and softened, its level and whether it is bright.
+CHOSEN = {"sawyer-dozer": (dozer_chug, True, 0.7), "boingo-pogo": (pogo_boing, False, 0.35), "puddles-mower": (mower_ride, True, 0.7)}
+GAME_SR = 24000  # the loops have nothing over 6 kHz, so half the samples carry all of them (a bright loop keeps all 48000)
 GAME_PAD = 0.1  # seconds of the loop's end before it and of its start after it: the loop is played between them
 
 
-def handoff(out):
-    """The chosen loops as the game takes them: mono WAV at 24 kHz (a WAV has no silence added at its ends, so it
-    can loop), each with `pad` seconds of itself on either side so that a decoder's change of sample rate has real
-    sound to work from at both ends of the loop; and rides.json: for each ride, its file, where its loop is, and how
-    to start and stop it."""
+def handoff(out, *only):
+    """The chosen loops (or those named) as the game takes them: mono WAV (a WAV has no silence added at its ends, so
+    it can loop), at 24 kHz, or 48 kHz for a bright one, each with `pad` seconds of itself on either side so that a
+    decoder's change of sample rate has real sound to work from at both ends of the loop; and rides.json: for each
+    ride, its file, where its loop is, and how to start and stop it."""
     import json
+    import os
 
-    rides = {}
-    for ride, (make, engine, fade) in CHOSEN.items():
-        loop = finished(make())
-        half = np.fft.irfft(np.fft.rfft(loop)[: len(loop) // 4 + 1], len(loop) // 2) * 0.5  # the same loop at 24 kHz, still a ring
-        pad = int(GAME_PAD * GAME_SR)
+    rides = json.load(open(f"{out}/rides.json"))["rides"] if only and os.path.exists(f"{out}/rides.json") else {}
+    for ride, (make, engine, fade, *more) in CHOSEN.items():
+        if only and ride not in only:
+            continue
+        bright = len(more) > 1 and more[1]
+        loop = finished(make(), *more)
+        heard = loop
+        if bright:
+            loop, rate = for_game(loop), SR
+        else:
+            loop, rate = np.fft.irfft(np.fft.rfft(loop)[: len(loop) // 4 + 1], len(loop) // 2) * 0.5, GAME_SR  # the same loop at 24 kHz, still a ring
+        pad = int(GAME_PAD * rate)
         with wave.open(f"{out}/{ride}.wav", "wb") as w:
-            w.setnchannels(1), w.setsampwidth(2), w.setframerate(GAME_SR)
-            w.writeframes((np.clip(np.concatenate([half[-pad:], half, half[:pad]]), -1, 1) * 32767).astype("<i2").tobytes())
-        rides[ride] = {"file": f"{ride}.wav", "loopStart": GAME_PAD, "loopEnd": round(GAME_PAD + len(half) / GAME_SR, 6), "engine": engine,
-                       "fadeInMs": 60, "fadeOutMs": int(fade * 1000), "rmsDb": round(float(20 * np.log10(np.sqrt(np.mean(half**2)))), 1),
-                       "peakDb": round(float(20 * np.log10(np.abs(half).max())), 1)}
+            w.setnchannels(1), w.setsampwidth(2), w.setframerate(rate)
+            w.writeframes((np.clip(np.concatenate([loop[-pad:], loop, loop[:pad]]), -1, 1) * 32767).astype("<i2").tobytes())
+        rides[ride] = {"file": f"{ride}.wav", "sampleRate": rate, "loopStart": GAME_PAD, "loopEnd": round(GAME_PAD + len(loop) / rate, 6), "engine": engine,
+                       "fadeInMs": 60, "fadeOutMs": int(fade * 1000), "rmsDb": round(float(20 * np.log10(np.sqrt(np.mean(heard**2)))), 1),
+                       "peakDb": round(float(20 * np.log10(np.abs(loop).max())), 1)}
         print(ride, rides[ride])
     with open(f"{out}/rides.json", "w") as f:
         json.dump({"note": "Play <file> looping between loopStart and loopEnd (seconds), starting at loopStart. See README.md.", "rides": rides}, f, indent=2)
@@ -325,7 +365,7 @@ def main(out, *only):
     for name, make, engine, *level in SKETCHES:
         if only and not name.startswith(only):
             continue
-        loop = finished(make(), *level)
+        loop = finished(make(), *level)  # as heard in the game
         save(f"{out}/{name}-loop.wav", loop)
         demo = np.concatenate([moving(loop, 1.75, engine), np.zeros(int(0.5 * SR)), moving(loop, 2.5, engine), np.zeros(int(0.2 * SR))])
         save(f"{out}/{name}.wav", demo)
@@ -334,4 +374,4 @@ def main(out, *only):
 
 
 if __name__ == "__main__":
-    handoff(sys.argv[2]) if sys.argv[1] == "--game" else main(*sys.argv[1:])
+    handoff(*sys.argv[2:]) if sys.argv[1] == "--game" else main(*sys.argv[1:])
