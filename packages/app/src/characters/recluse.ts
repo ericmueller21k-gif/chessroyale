@@ -106,7 +106,12 @@ export const RECLUSE_PALETTE: Record<string, string> = {
   "}": "#363849",
   "~": "#1f4aa8",
   "-": "#0d1a3a",
-  "^": "#8fd4ff",
+  "^": "#c8eeff",
+  // His hair in his final form (Eric, Nov 15: "blue"), dark to light.
+  $: "#0d2466",
+  _: "#1b48a8",
+  "`": "#2f78dd",
+  ",": "#6cb8ff",
   "&": "#5cc6ff7a",
   "%": "#40aaff48",
   "'": "#40aaff24",
@@ -876,38 +881,48 @@ function coatSkirt(stance: Stance, sway: number): Part {
   return { grid: toGrid(cv) };
 }
 /**
- * His head in his final form: his face as ever (the glowing eyes, phase 2's shadows) and his hair always rising, one part with one
- * outline (so no line runs across his hair): a mass swept up from his crown, wider at its foot, its top in a few rounded locks, the
- * whole of it rippling as the draft runs up it (`flow`, 0 to 2); the swept hair on top of his head turned up into it; dark lines
- * between the locks; his own brown, lit from the top left; the aura's light along its outer edges. His head part's pixels with 6
- * more columns each side and 12 more rows on top (37 x 47; `RISE_AT`).
+ * His head in his final form (round 4, Eric, Nov 15: "his hair blue ... more strands of hair, more lines in between, so it's more
+ * free flowing"): his face as ever (the glowing eyes, phase 2's shadows) and his hair, now electric blue, always rising, one part
+ * with one outline (so no line runs across it): a mass of fine strands swept up from his crown, wider at its foot, each strand its
+ * own shade and length so its top is a fringe of fine ends, the whole rippling as the draft runs up it (`flow`, 0 to 2); lit from
+ * the top left, its ends and outer edges caught by the aura's light. His head part's pixels with 6 more columns each side and 12
+ * more rows on top (37 x 47; `RISE_AT`).
  */
+const HAIR_BLUE: Record<string, string> = { H: "$", h: "_", j: "`", J: "," };
+const HAIR_RAMP = "$__``,,";
 function risenHead(face: Face, dark: boolean, flow: number): Part {
   const DX = 6;
   const DY = 12;
   const C = 12.5;
-  const LOCK = 5.2;
+  const STRAND = 2.4;
+  const hash = (n: number) => ((Math.sin(n * 91.345 + 7.1) * 43758.5453) % 1 + 1) % 1;
   const base = toCanvas(head(face, 0, dark, true));
   const cv = canvas(25 + 2 * DX, 35 + DY);
-  base.forEach((row, y) => row.forEach((k, x) => (cv[y + DY]![x + DX] = k)));
-  const inside = (cx: number, cy: number) => {
-    const hx = cx - DX + 0.5;
+  // (His own hair round his face turned blue with it.)
+  base.forEach((row, y) => row.forEach((k, x) => (cv[y + DY]![x + DX] = HAIR_BLUE[k] ?? k)));
+  const at = (cx: number, cy: number) => {
     const up = LIFT + 3 - (cy - DY + 0.5);
-    const shift = 1.7 * Math.sin(up * 0.33 - flow * 2.1) * Math.min(1, Math.max(0, up) / 12);
-    const x = hx - shift - C;
-    const e = 17.5 * (1 - (x / 14.5) ** 2) + 3.2 * Math.cos((Math.PI * x) / LOCK) ** 2 - 1.6;
-    return { ok: up > -3 && up < e, x, up, top: e - up };
+    const rise = Math.min(1, Math.max(0, up) / 12);
+    const x0 = cx - DX + 0.5 - C - 1.7 * Math.sin(up * 0.33 - flow * 2.1) * rise;
+    const n = Math.floor(x0 / STRAND);
+    // (Each strand curls a little on its own as well.)
+    const x = x0 - 0.7 * Math.sin(up * 0.55 + n * 1.9 - flow * 2.1) * rise;
+    const i = Math.floor(x / STRAND);
+    const e = 16 * (1 - (x / 14.5) ** 2) + 4.5 * hash(i) - 1.5;
+    return { ok: up > -8 && up < e, x, up, i, top: e - up };
   };
   for (let cy = 0; cy < cv.length; cy++)
     for (let cx = 0; cx < cv[0]!.length; cx++) {
-      const p = inside(cx, cy);
+      const p = at(cx, cy);
       const k0 = cv[cy]![cx]!;
       // (Over his own hair's top rows, and wherever his head part was empty; never over his face.)
-      if (!p.ok || !(k0 === "." || (cy - DY < LIFT + 7 && "HhjJB".includes(k0)))) continue;
-      const u = p.x / LOCK - Math.round(p.x / LOCK); // -0.5 .. 0.5 across a lock
-      const edge = !inside(cx - 1, cy).ok || !inside(cx + 1, cy).ok;
-      cv[cy]![cx] =
-        edge && Math.abs(p.x) > 9 && p.up > 6 ? "^" : p.top < 1.6 && u < 0.3 ? "J" : Math.abs(u) > 0.42 && p.up > 1 ? "H" : u < -0.12 ? (p.up > 8 ? "J" : "j") : u > 0.22 ? "h" : "j";
+      if (!p.ok || !((k0 === "." && p.up > -3) || (cy - DY < LIFT + 11 && "$_`,".includes(k0)))) continue;
+      // Light from the top left across the mass, each strand a shade of its own (so lines run between them), lighter towards
+      // its end; the ends and the outer edges in the aura's light.
+      const edge = !at(cx - 1, cy).ok || !at(cx + 1, cy).ok || cv[cy]![cx - 1] === "." || cv[cy]![cx + 1] === ".";
+      const u = p.x / STRAND - p.i; // 0 .. 1 across a strand
+      const l = 0.5 - p.x / 30 + (hash(p.i * 3 + 1) - 0.5) * 0.4 + Math.min(0.2, p.up / 60) + (u > 0.35 && u < 0.7 ? 0.18 : 0);
+      cv[cy]![cx] = p.top < 1 || (edge && p.up > 5 && Math.abs(p.x) > 8) ? "^" : u < 0.34 && p.up > -1 ? "$" : ramp(HAIR_RAMP, l);
     }
   return { grid: toGrid(cv) };
 }
