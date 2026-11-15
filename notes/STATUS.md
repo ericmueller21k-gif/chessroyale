@@ -1250,3 +1250,4 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 15 18:10: #733 Babur theme MERGED e47619c7; deploy + main run watcher. (#732's main run still running too.)
 - Nov 15 18:15: main full run on 30898935 (#732) GREEN, no retries.
 - Nov 15 18:35: #733 Babur LIVE (e47619c7). Main run RED: town-street:294 [phone] failed both tries: expect.poll(marked) read mid-reload threw (poll doesn't retry throws). Fix (test only, guard test) -> PR claude/town-reload-read (899ecd3e), CI running; asked Eric's OK.
+- Nov 15 18:55: #734 CI GREEN; held for Eric's OK (guard test). Main is red until it merges (town-street:294).
