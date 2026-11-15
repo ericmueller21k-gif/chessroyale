@@ -480,9 +480,10 @@ test("the town's loading screen (Eric, Nov 11: \"loads it all in at once and the
 // (Its own service worker blocked: page.route sees only what the page fetches itself, never what a worker answers.)
 test.describe(() => {
   test.use({ serviceWorkers: "block" });
-  test("the town's first frame doesn't wait for the music (Eric, Nov 14: \"christ it's taking forever\"); then every boss theme is fetched once, one piece at a time, none decoded, but the Hidden Boss's (fetched as his fight starts); Music off fetches none", { tag: "@phone-only" }, async ({ page }) => {
+  test("the town's first frame doesn't wait for the music (Eric, Nov 14: \"christ it's taking forever\"); then the town's own theme, played in the street (Nov 15), its solos, then every boss theme fetched once, one piece at a time, none decoded, but the Hidden Boss's (fetched as his fight starts); Music off fetches none", { tag: "@phone-only" }, async ({ page }) => {
     const dir = "packages/app/public/music";
-    const themes = JSON.parse(readFileSync(`${dir}/themes.json`, "utf8")) as { themes: Record<string, { intro: string | null; loop: string }> };
+    const themes = JSON.parse(readFileSync(`${dir}/themes.json`, "utf8")) as { themes: Record<string, { intro: string | null; loop: string }>; town: { loop: string; solos: { file: string }[] } };
+    const town = [themes.town.loop, ...themes.town.solos.map((s) => s.file)].map((n) => `/music/${n}.mp3`);
     const hidden: string[] = Object.values(RECLUSE_MUSIC);
     const names = Object.entries(themes.themes)
       .filter(([k]) => !hidden.includes(k))
@@ -508,15 +509,20 @@ test.describe(() => {
     await asAdmin(page);
     await page.goto("/town?sky=day");
     await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
-    // Then, in the background, one piece at a time: the first held, no second asked for meanwhile.
+    // Then, in the background, one piece at a time: the first held (the town's theme), no second asked for meanwhile.
     await expect.poll(() => held.length, { timeout: 15_000 }).toBe(1);
     await page.waitForTimeout(1000);
     expect(held.length, "one piece at a time").toBe(1);
+    expect(new URL(held[0]!.request().url()).pathname, "the town's theme first").toBe(town[0]);
     release = true;
     for (const r of held.splice(0)) await r.continue();
-    await expect.poll(() => gets.length, { timeout: 30_000 }).toBe(names.length);
+    // The town's theme plays in the street once decoded (Nov 15).
+    const townLog = () => page.evaluate(() => (window as unknown as { __soundLog: string[] }).__soundLog.filter((l) => l.startsWith("music:town:")));
+    await expect.poll(townLog, { timeout: 30_000 }).toContain("music:town:start");
+    await expect.poll(() => gets.length, { timeout: 30_000 }).toBe(town.length + names.length);
     await page.waitForTimeout(1000);
-    expect(gets.sort(), "each theme's pieces, once").toEqual(names.map((n) => `/music/${n}.mp3`).sort());
+    expect(gets.slice(0, town.length), "the town's theme, then its solos, before any boss's").toEqual(town);
+    expect(gets.sort(), "each piece, once").toEqual([...town, ...names.map((n) => `/music/${n}.mp3`)].sort());
     const decoded = await page.evaluate(() => (window as unknown as { __decoded: number[] }).__decoded);
     expect(decoded.filter((b) => sizes.includes(b)), "no theme decoded").toEqual([]);
     const log = await page.evaluate(() => (window as unknown as { __soundLog: string[] }).__soundLog);

@@ -687,9 +687,9 @@
         "e2e/piece-sounds.spec.ts"
       ]
     },
-    "boss music (Nov 11): each boss's theme from the battle's start to its result, the Music switch": {
+    "boss music (Nov 11): each boss's theme from the battle's start to its result, the Music switch; the town's own theme (Nov 15)": {
       "paths": ["packages/app/src/music.ts", "packages/app/public/music/**"],
-      "specs": ["e2e/grex.spec.ts", "e2e/match-menu.spec.ts"]
+      "specs": ["e2e/grex.spec.ts", "e2e/match-menu.spec.ts", "e2e/town-street.spec.ts", "e2e/zebra-home.spec.ts"]
     },
     "ride sounds (Nov 14): your ride's moving loop in the town and its rooms": {
       "paths": ["packages/app/src/ride-sound.ts", "packages/app/public/sounds/rides/**"],
