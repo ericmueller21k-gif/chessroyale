@@ -472,7 +472,7 @@ before the rows are laid (`street.ts lotHere`), so each row fills the place with
   page at K, to try sizes; read once as the page opens (`test-switches.ts`).
   **Its moving sound** (Nov 14, Eric: "one continuous sound"; [2026-11-14-ride-sounds.md](../decisions/2026-11-14-ride-sounds.md)): a
   ride listed in `RIDE_SOUND.rides` (its file `/sounds/rides/<id>.wav`) sounds as your own pawn moves on it, in the town and a shop's
-  room; standing, nothing; any other ride silent; on the game's sounds (the Sound switch, a hidden page). Sawyer's Dozer and Puddles's Mower (Nov 15) (`kind: "loop"`)
+  room; standing, nothing; any other ride silent; on the game's sounds (the Sound switch, a hidden page). Sawyer's Dozer, Puddles's Mower and the Candy Cane Sled's bells (Nov 15; `bright`: round the 6 kHz softening, `gameBus(true)`) (`kind: "loop"`)
   loop: it counts as moving until `holdMs` (120) after your last step, fades in over `fadeInMs` and out over `fadeOutMs` (700), coming
   up to speed and sinking a little as it fades; moving again mid-fade brings it back from where it is. The frame loops only say "you
   moved, on this ride" (`rideMoving`); a timer off the frame sees you stop. Your ride's file is fetched after the town's first frame.

@@ -148,7 +148,7 @@ export function rideStep(id: string | null | undefined, at: number, stepMs: numb
 
 function start(id: string, s: RideLoopSound) {
   if (isMuted() || isPageHidden()) return;
-  const bus = gameBus();
+  const bus = gameBus(s.bright);
   if (!bus || bus.ctx.state !== "running") return;
   const buf = buffers.get(id);
   if (!buf) return warmRideSound(id);
