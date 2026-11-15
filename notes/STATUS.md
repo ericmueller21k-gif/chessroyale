@@ -1,3 +1,4 @@
+- Nov 15 ~20:30 UTC: final-form helper had idled before the .go; woke it; built (28dabc9). Moved its docs/ stills to stills/recluse-final-look/built. PR #735 (6ade2e3) open, CI watched. Chandy design helper session_01JuCWRsWD6rfcLq4HEgzZGe running (watcher on .mockup). #734 waits Eric OK.
 - Nov 15 ~19:00 UTC: Eric: new boss Chandy (special-ops alligator, energy sniper, lock-on passive, 5 rifle upgrades each unlocking a random move, ult TBD). Design helper (characters, Opus high; brief chandy-design-r1.md; claude/boss-chandy, stills/boss-chandy) beside the final-form helper. Mockup + DESIGN.md questions, no rules code. #734 waits for Eric OK.
 - Nov 13 ~06:30 UTC: main full run on 0429629 (#672) GREEN, no flakes (43371241300).
 - Nov 13 06:45 UTC: room challenge done -> PR #673 (full-e2e label). Reviewer session_01JuCWRv5TAH8JGMXyvbXRrq (xhigh) -> review/hidden-challenge. Next after merge: phase change + four boards online.
