@@ -1,19 +1,22 @@
-chandy redo: round 2c (Eric, Nov 16, on Dodge's round). Everything else in 2b stands.
+chandy build art (Eric, Nov 16: "I like how you have it done. That's fine." with one change below). Round 2c stands.
 
-ERIC'S WORDS (condensed): the gators should stand at the EDGES of the board (on the board still, on its outer squares, further back
-from the king, not next to the 3x3). They do an AFTERIMAGE-style TELEPORT: in round 1, one of them teleports mid-round and changes
-where it stands (so its line moves); in round 2, two of them; in the final round, three ("so you have to be very quick on the last
-one"). And the blast covers the WHOLE row or column across the board: a big pop.
+ERIC'S CHANGE: during Dodge's vote, NO dashed aim lines. "That's like the whole point. You actually have to look and see which ones
+he's pointing at." The players read each gator's line from where he stands (the edge square of his rank or file) and his aim pose.
+After the vote LOCKS, the lines may flash a few times, then the beams fire as drawn now. Make the aim readable without lines: the
+rifle's muzzle glow pointing down its line is fine, a line is not. Also keep the clones visible while they fire (in the 2c blast
+still they vanish under the beams).
 
-WHAT TO DESIGN AND MOCK UP
-- The clones on the board's edge squares: a row-shooter on the a- or h-file at that rank, a column-shooter on rank 1 or 8 at that
-  file (they stand on top of the board, never off it). Say how they fit on a phone without covering the king's 9 squares.
-- The teleport: the clone blinks out leaving a red-green afterimage that fades, and reappears on another edge square aiming at a new
-  line. After every teleport the aim is still exactly 2 rows + 2 columns missing exactly one safe square, so the safe square changes.
-  Pick the timing so it stays fair inside 3 s (or recommend a longer window for rounds 2 and 3 if 3 s isn't enough to react to the
-  last teleport: e.g. the last teleport no later than ~1.2 s before the close). Votes made before a teleport stay where they were
-  tapped; players re-tap to change.
-- The fire: each beam a big pop across the whole rank or file, edge to edge (the full 8 squares), then the hit or the dodge.
-- Mock up: a still of the clones on the edges; a GIF of round 3 (three teleports, the vote counts moving, the full-length blasts);
-  a still of the blast. About 4 images. Update D2/D3 in DESIGN.md with the numbers.
-Then .mockup "chandy round 2c" and wait for a .go containing "chandy" (the next one should be "chandy build").
+BUILD THE ART (this job; the rules come in a separate job afterwards, so be exact in the notes for it):
+- Pull main first. Chandy's sprite kit in the game's format (`characters/chandy.ts` and his sounds' cue list), unwired from rules:
+  idle, point, unsling/aim/fire, the 6 rifle stages on his back and in his hands, the bar's bust and the select tile; the clones'
+  palette (`CHANDY_CLONE_PALETTE`) and clone poses (level, down, teleport blink, afterimage fade).
+- The board art on the shared board-effects canvas: the crosshair (with the turns-left pips), scatter sparks, the beam cover, the
+  bubble shield, dizzy stars, the queen-lock aim and shot with the shatter; Dodge's scope-in, slide, blank board, clones, the
+  post-lock line flash and the blasts.
+- The upgrade window (the `.gk-command` look) as a component, fed by a stage number.
+- An admin-only preview to show it all in the real app (as other bosses' previews), not in the production menus.
+- Tests the boss lane asks for art: his kit's frames (sizes, feet, no clipping), the clone palette, and `npm run frames:character`
+  on phone and computer. One still per platform at the end. `.pr-body.md` (what changed, player-visible: nothing until the rules
+  job wires him, checks old -> new), a short decision note in docs/decisions/ (Chandy's design, pointing at stills/boss-chandy's
+  DESIGN.md as the rules job's spec), docs/areas/bosses.md touched only where art lives. Then `.done`. No PRs, no CI waits, no images
+  under docs/, no model names in commits.
