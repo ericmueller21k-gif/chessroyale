@@ -27,7 +27,7 @@ not kept here: what was taken from it is what a jingle bell is, measured: where 
 (`BELLS`: three bells; four fifths of the sound is above 8 kHz, and the partials up there are as strong as the lowest),
 how fast a ring dies (20 dB in 100 to 160 ms), and how it is shaken (a shake every 0.3 s, a knock on every bell and
 then the pellets rattling on, about sixteen knocks a second, never evenly). `sled_bells` is built from those numbers;
-its loop's spectrum is within 2 dB of the recording's in every band that matters.
+its loop's spectrum is within 2 dB of the recording's in every band that matters. "Bells are good to go yes."
 The game softens its sounds with a low-pass at 6 kHz (sound.ts), which would take off most of a jingle bell. So the
 sled's loop is `bright`: it is not low-passed here, its file is at 48 kHz, and the game plays it round its low-pass
 (the director's side, agreed Nov 15: raising the highs in the file to make up for the filter works only up to 10 kHz
@@ -305,7 +305,8 @@ def save(path, x):
 # The loops chosen for the game, by the ride's id (crates.ts): the sketch, whether it is an engine, how long its fade
 # is as the pawn stops, to start from (seconds: Eric's "like a second or whatever", to be tried in the town), and for
 # one that is not an engine at the common level and softened, its level and whether it is bright.
-CHOSEN = {"sawyer-dozer": (dozer_chug, True, 0.7), "boingo-pogo": (pogo_boing, False, 0.35), "puddles-mower": (mower_ride, True, 0.7)}
+CHOSEN = {"sawyer-dozer": (dozer_chug, True, 0.7), "boingo-pogo": (pogo_boing, False, 0.35), "puddles-mower": (mower_ride, True, 0.7),
+          "ginger-sled": (sled_bells, False, 0.3, 0.31, True)}
 GAME_SR = 24000  # the loops have nothing over 6 kHz, so half the samples carry all of them (a bright loop keeps all 48000)
 GAME_PAD = 0.1  # seconds of the loop's end before it and of its start after it: the loop is played between them
 
