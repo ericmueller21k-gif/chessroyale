@@ -36,6 +36,8 @@ import { CASTLE_SOUND, MOVE_SOUNDS, CAPTURE_SOUNDS, defaultPieceSound, onPieceSo
 
 let ctx: AudioContext | null = null;
 let master: GainNode | null = null;
+/** The game's sounds without the softening (a ride's bells, `gameBus(true)`): the master's level, straight to the speakers. */
+let bright: GainNode | null = null;
 /**
  * The boss music's own way to the speakers (music.ts, `musicBus`): at the master's level, but straight to them, not through the
  * low-pass (Eric, Nov 14: "it sounds much lower quality... we can't compromise on these songs").
@@ -131,6 +133,9 @@ function ensureContext() {
   soften.frequency.value = 6000;
   master.connect(soften).connect(ctx.destination);
   out = soften;
+  bright = ctx.createGain();
+  bright.gain.value = MASTER_LEVEL;
+  bright.connect(ctx.destination);
 }
 
 let loading = false;
@@ -270,6 +275,7 @@ function rebuildAudio() {
   ctx = null;
   master = null;
   musicOut = null;
+  bright = null;
   const close = () => {
     try {
       void old?.close().catch(() => undefined);
@@ -405,10 +411,12 @@ export function musicBus(): { ctx: AudioContext; out: GainNode } | null {
 }
 /**
  * The game's sounds' way out (the master: the Sound switch's sounds, through the soft low-pass), for a sound that runs on rather than
- * plays once (a ride's moving loop, ride-sound.ts: it checks the switch and the page itself). Null until the audio graph is made.
+ * plays once (a ride's moving loop, ride-sound.ts: it checks the switch and the page itself). `unsoftened`: the same level round the
+ * 6 kHz low-pass, for a sound whose highs are the point (a ride's bells). Null until the audio graph is made.
  */
-export function gameBus(): { ctx: AudioContext; out: GainNode } | null {
-  return ctx && master ? { ctx, out: master } : null;
+export function gameBus(unsoftened = false): { ctx: AudioContext; out: GainNode } | null {
+  const out = unsoftened ? bright : master;
+  return ctx && out ? { ctx, out } : null;
 }
 /** A recorded file fetched and decoded once a visit (by its path; a failure is tried again next time). Null without audio. */
 export function loadAudioFile(url: string): Promise<AudioBuffer | null> {

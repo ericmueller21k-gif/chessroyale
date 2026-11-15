@@ -3652,12 +3652,18 @@ export const RIDE_SOUND = {
   engine: { startRate: 0.8, upMs: 300, stopRate: 0.88 },
   rides: {
     "sawyer-dozer": { kind: "loop", engine: true, fadeInMs: 60, fadeOutMs: 700, rate: 1 },
+    /** Puddles's Mower: a putter (Eric, Nov 15: "the putter, the second one's good"), an engine as the dozer is. */
+    "puddles-mower": { kind: "loop", engine: true, fadeInMs: 60, fadeOutMs: 700, rate: 1 },
+    /** The Candy Cane Sled's jingle bells (Eric, Nov 15: "Bells are good to go yes"): four fifths of a jingle bell is above 8 kHz,
+     *  so it plays round the softening (`bright`), from a 48 kHz file. */
+    "ginger-sled": { kind: "loop", engine: false, fadeInMs: 60, fadeOutMs: 300, rate: 1, bright: true },
     /** Its loop's 4 boings (its "little tune": low, mid, low, high), cut as in the sample Eric picked (Nov 15: "Yeah, I like A"). */
     "boingo-pogo": { kind: "steps", level: 0.3, boings: [0, 0.245, 0.49, 0.735], lengthS: 0.245, on: "takeoff" },
   } as Readonly<Record<string, RideLoopSound | RideStepSound>>,
 } as const;
 /** A ride whose sound loops while it moves (RIDE_SOUND). */
-export type RideLoopSound = { readonly kind: "loop"; readonly engine: boolean; readonly fadeInMs: number; readonly fadeOutMs: number; readonly rate: number };
+/** `bright`: played round the game sounds' 6 kHz softening (sound.ts `gameBus(true)`), for a sound whose highs are the point (a bell). */
+export type RideLoopSound = { readonly kind: "loop"; readonly engine: boolean; readonly fadeInMs: number; readonly fadeOutMs: number; readonly rate: number; readonly bright?: boolean };
 /** A ride with a one-shot on every step (RIDE_SOUND). */
 export type RideStepSound = { readonly kind: "steps"; readonly level: number; readonly boings: readonly number[]; readonly lengthS: number; readonly on: "takeoff" | "landing" };
 

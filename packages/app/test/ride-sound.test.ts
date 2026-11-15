@@ -54,6 +54,8 @@ class FakeGain {
   disconnect() {}
 }
 const OUT = { out: true };
+/** The unsoftened output (`gameBus(true)`): a bright ride's. */
+const BRIGHT = { bright: true };
 const ctx = {
   /** The audio's clock (s): 10 s ahead of the page's (the fake timers' Date.now, ms), moving with it. */
   get currentTime() {
@@ -77,7 +79,7 @@ const sound = vi.hoisted(() => ({ muted: false, hidden: false, mute: [] as (() =
 vi.mock("../src/sound.ts", () => ({
   isMuted: () => sound.muted,
   isPageHidden: () => sound.hidden,
-  gameBus: () => ({ ctx, out: OUT }),
+  gameBus: (unsoftened?: boolean) => ({ ctx, out: unsoftened ? BRIGHT : OUT }),
   loadAudioFile: (url: string) => (sound.asked.push(url), Promise.resolve({ url })),
   onMuteChange: (fn: () => void) => (sound.mute.push(fn), () => undefined),
   onAudioRebuilt: (fn: () => void) => (sound.rebuilt.push(fn), () => undefined),
@@ -107,6 +109,7 @@ beforeEach(async () => {
   vi.useRealTimers();
   warmRideSound("sawyer-dozer");
   warmRideSound("boingo-pogo");
+  warmRideSound("ginger-sled");
   await settle();
   vi.useFakeTimers({ now: 0 });
   rideSoundForTests(() => Date.now());
@@ -122,7 +125,7 @@ afterEach(() => {
 describe("a ride's moving sound", () => {
   it("each listed ride's loop is fetched once, from /sounds/rides/<id>.wav; a ride with no entry never is", () => {
     warmRideSound("riding-chirp");
-    expect(sound.asked).toEqual(["/sounds/rides/sawyer-dozer.wav", "/sounds/rides/boingo-pogo.wav"]);
+    expect(sound.asked).toEqual(["/sounds/rides/sawyer-dozer.wav", "/sounds/rides/boingo-pogo.wav", "/sounds/rides/ginger-sled.wav"]);
   });
 
   it("starts on the first moving frame: one source looping between 0.1 and 1.1 s, from 0.1; fades in over fadeInMs; an engine from startRate up to 1 over upMs", () => {
@@ -227,6 +230,14 @@ describe("a ride's moving sound", () => {
     expect(rideSoundState()).toMatchObject({ ride: null, live: 0, boings: 0 });
   });
 
+  it("the sled's bells play round the softening (bright: gameBus(true)); the dozer's engine through it", () => {
+    move("ginger-sled", 100);
+    expect(playing()).toHaveLength(1);
+    expect(ctx.gains.at(-1)!.to).toBe(BRIGHT);
+    pass(2000);
+    move("sawyer-dozer", 100);
+    expect(ctx.gains.at(-1)!.to).toBe(OUT);
+  });
   it("a frame loop that halts mid-walk (the town closing, a hidden tab): it fades out all the same", () => {
     move("sawyer-dozer", 200);
     pass(RIDE_SOUND.holdMs + DOZER.fadeOutMs + 100);
