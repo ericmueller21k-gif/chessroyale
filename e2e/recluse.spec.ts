@@ -17,7 +17,7 @@ import { pacedLine } from "../packages/app/src/paced-line.ts";
  *   bullet clock (the whole bullet bank on the move, the dock's time left, no increment for 3 moves); then he adds time
  *   per move (his line, "+2 s a move from now on" across the board, "Bullet 1+2" in the dock, +2 s a move made in time);
  * - beaten (?win=1: you mate in one): he collapses and mumbles on the board, then (Boss alone) his phase change (it
- *   is his transformation by the book's light, Nov 14: his eyes white, the white-out, his suit, the visor up for his line, the
+ *   is his transformation by the book's light, Nov 14: his eyes white, the white-out, his final form (Nov 15), his first line, the
  *   split on the music's drop; the God King greyed in his place) and phase 2's four boards, then a 5-4-3-2-1 on every board
  *   before any clock runs (each from RECLUSE_PHASE2.change).
  */
@@ -451,7 +451,7 @@ test("his chatter all through phase 1 (Eric, Oct 15: he went quiet after move 10
   expect(errors).toEqual([]);
 });
 
-test("beaten in phase 1 (?win=1): he collapses and mumbles, his cutscene, then the phase change (his transformation by the book's light: his eyes white, lifted in it, the white-out, revealed in his suit, the visor up for his line and down, the leap, the split on the drop, the book back, the leap home, the shuffle; the God King greyed in his place throughout), a countdown on four boards, then their clocks; all four won: Victory!", { tag: "@phone-only" }, async ({ page }) => {
+test("beaten in phase 1 (?win=1): he collapses and mumbles, his cutscene, then the phase change (his transformation by the book's light: his eyes white, lifted in it, the white-out, revealed in his final form, his first line, the leap, the split on the drop, the book back, the leap home, the shuffle; the God King greyed in his place throughout), a countdown on four boards, then their clocks; all four won: Victory!", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(5 * 60_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
@@ -475,8 +475,8 @@ test("beaten in phase 1 (?win=1): he collapses and mumbles, his cutscene, then t
   });
   const change = await watchFor(page, {
     // His transformation over the board (Eric, Nov 14), carrying on from his cutscene: the book opening at his feet in the lens, the
-    // child beside him, the light taking him and lifting him, the screen whiting out, him revealed in the suit, the visor up for his
-    // line and down, the leap; his place empty meanwhile; the God King greyed in his place and silent.
+    // child beside him, the light taking him and lifting him, the screen whiting out, him revealed in his final form (Nov 15: the
+    // coat, no helmet), his line, the leap; his place empty meanwhile; the God King greyed in his place and silent.
     open: { selector: '.rc-tf-fig[data-anim="open"] canvas' },
     lens: { selector: ".rc-transform .cs-dim" },
     kid: { selector: ".rc-tf-kid canvas" },
@@ -486,8 +486,6 @@ test("beaten in phase 1 (?win=1): he collapses and mumbles, his cutscene, then t
     light: { selector: ".rc-transform .rc-light-cv" },
     white: { selector: '.rc-stage[data-step="white"]' },
     revealed: { selector: '.rc-tf-fig[data-anim="revealed"]' },
-    visorUp: { selector: '.rc-tf-fig[data-anim="flipUp"]' },
-    visorDown: { selector: '.rc-tf-fig[data-anim="flipDown"]' },
     jump: { selector: '.rc-tf-fig[data-anim="air"]' },
     land: { selector: '.rc-tf-fig[data-anim="land"]' },
     away: { selector: ".rc-away" },
@@ -517,9 +515,7 @@ test("beaten in phase 1 (?win=1): he collapses and mumbles, his cutscene, then t
     taken: { selector: '.rc-tf-fig[data-anim="burst"]' },
     white: { selector: '.rc-stage[data-step="white"]' },
     revealed: { selector: '.rc-stage[data-step="revealed"]' },
-    visorUp: { selector: '.rc-tf-fig[data-anim="flipUp"]' },
     line1: { selector: ".rc-say", text: /^Computation without creativity/ },
-    visorDown: { selector: '.rc-tf-fig[data-anim="flipDown"]' },
     jump: { selector: '.rc-tf-fig[data-anim="air"]' },
     // (His second line over his head, and its second sentence as it starts to type: its first letter typed.)
     chant2: { selector: ".bc-bubble", text: /^Prepare yourself\./ },
@@ -624,11 +620,11 @@ test("beaten in phase 1 (?win=1): he collapses and mumbles, his cutscene, then t
   expect(Date.now() - at).toBeLessThan(20_000 + ADDED_MS);
   expect(await phase(page)).toBe("simul");
   // The beats in order, at their times (Nov 14): the book opening as the phase change starts, the light taking him on the music's
-  // slam, the white-out, the reveal, the visor up for his first line and down after it, the leap on the music's breath, the crack
+  // slam, the white-out, the reveal, his first line as he stands, the leap on the music's breath, the crack
   // on its drop; then "PHASE 2" and 5, 4, 3, 2, 1, a second each; then the clocks.
   const s = await pace.spans();
   const c = await clocks.spans();
-  const order = ["open", "taken", "white", "revealed", "visorUp", "line1", "visorDown", "jump", "crack", "banner", "c5", "c4", "c3", "c2", "c1"] as const;
+  const order = ["open", "taken", "white", "revealed", "line1", "jump", "crack", "banner", "c5", "c4", "c3", "c2", "c1"] as const;
   for (const k of [...order, "chant2", "chant2b", "ready"] as const) expect(s[k], k).not.toBeNull();
   const first = (k: keyof typeof s) => s[k]!.first;
   for (let i = 1; i < order.length; i++) expect(first(order[i]!), `${order[i - 1]} then ${order[i]}`).toBeGreaterThan(first(order[i - 1]!));
@@ -637,13 +633,12 @@ test("beaten in phase 1 (?win=1): he collapses and mumbles, his cutscene, then t
   near("taken", T.burstAt);
   near("white", T.whiteFull);
   near("revealed", T.revealAt);
-  near("visorUp", T.flipUpAt);
-  near("visorDown", T.flipDownAt);
+  near("line1", T.line1At);
   near("crack", T.introMs);
   // (The theme from its intro: the phase change's start was never too late for it.)
   expect(first("crack") - first("jump")).toBeGreaterThanOrEqual(T.leapMs - 300);
-  // (His first line held after the visor comes down, through the crouch (Nov 14 review, M2), gone as he leaps.)
-  expect(s.line1!.last).toBeGreaterThan(first("visorDown"));
+  // (His first line held through the crouch (Nov 14 review, M2), gone as he leaps.)
+  expect(s.line1!.last).toBeGreaterThan(first("jump") - 400);
   expect(s.line1!.last).toBeLessThanOrEqual(first("jump") + 100);
   // His second line after the landing: "Prepare yourself.", a second's pause, then its second sentence.
   expect(first("chant2") - first("crack")).toBeGreaterThanOrEqual(T.line2AfterMs - 300);
@@ -673,8 +668,6 @@ test("beaten in phase 1 (?win=1): he collapses and mumbles, his cutscene, then t
     light: true,
     white: true,
     revealed: true,
-    visorUp: true,
-    visorDown: true,
     jump: true,
     land: true,
     away: true,
@@ -706,8 +699,8 @@ test("beaten in phase 1 (?win=1): he collapses and mumbles, his cutscene, then t
   await expect(page.locator(".boss-bar .rage-meter")).toHaveCount(0);
   // (Freestyle is in the dock's line, where the line above the board said it: Eric, Oct 24.)
   await expect(page.locator(".boss-dock-status .dock-line").first()).toHaveText(/· Freestyle$/);
-  // Phase 2: the God King in his place, greyed, nothing to tap (Eric, Nov 14: "you can't use him anymore"), the boss in his suit
-  // where he stands.
+  // Phase 2: the God King in his place, greyed, nothing to tap (Eric, Nov 14: "you can't use him anymore"), the boss in his final
+  // form where he stands.
   await expect(page.locator(".gk-unit.benched")).toHaveCount(1);
   await expect(page.getByRole("button", { name: /God King/ })).toHaveCount(1);
   await expect(page.getByRole("button", { name: "God King: can't be called in phase 2" })).toBeDisabled();
@@ -760,31 +753,30 @@ test("phase 2 (?phase=2): four boards, each its own Chess960 start; Stockfish 27
   await expect(page.getByRole("button", { name: /God King/ })).toHaveCount(1);
   await expect(page.getByRole("button", { name: "God King: can't be called in phase 2" })).toBeDisabled();
   await expect(page.locator(".gk-command")).toHaveCount(0);
-  // His suit and helmet where he stands, from his transformation on (Eric, Nov 14).
+  // His final form where he stands, from his transformation on (Eric, Nov 15; the attribute's name is round 3b's suit).
   await expect(page.locator(`${figure()}[data-suit] .boss-char-sprite`)).toBeVisible();
-  // (The picture too, not only the attribute (#707's review, m4): his canvas has the suit's navy and panels, and none of his shirt's
-  // white, recluse.ts's palette.)
+  // (The picture too, not only the attribute (#707's review, m4): his canvas has the black coat's pixels (recluse.ts's palette; the
+  // bust shows about 440, the whole figure about 1,260), and the aura's see-through glow round him.)
   const hex = (keys: string) => [...keys].map((k) => RECLUSE_PALETTE[k]!);
   const drawn = await page.evaluate(
-    ({ sel, suit, shirt }) => {
+    ({ sel, coat }) => {
       const cv = document.querySelector<HTMLCanvasElement>(sel)!;
       const d = cv.getContext("2d")!.getImageData(0, 0, cv.width, cv.height).data;
       const rgb = (h: string) => parseInt(h.slice(1, 7), 16);
-      const [S, W] = [new Set(suit.map(rgb)), new Set(shirt.map(rgb))];
-      let inSuit = 0;
-      let inShirt = 0;
+      const C = new Set(coat.map(rgb));
+      let inCoat = 0;
+      let glow = 0;
       for (let i = 0; i < d.length; i += 4) {
+        if (d[i + 3]! > 0 && d[i + 3]! < 255) glow++;
         if (d[i + 3]! < 255) continue;
-        const c = (d[i]! << 16) | (d[i + 1]! << 8) | d[i + 2]!;
-        if (S.has(c)) inSuit++;
-        if (W.has(c)) inShirt++;
+        if (C.has((d[i]! << 16) | (d[i + 1]! << 8) | d[i + 2]!)) inCoat++;
       }
-      return { inSuit, inShirt };
+      return { inCoat, glow };
     },
-    { sel: `${figure()}[data-suit] .boss-char-sprite`, suit: hex("nuvzRSPI"), shirt: hex("st") },
+    { sel: `${figure()}[data-suit] .boss-char-sprite`, coat: hex("<>{}") },
   );
-  expect(drawn.inSuit, "the suit's pixels").toBeGreaterThan(300);
-  expect(drawn.inShirt, "the shirt's pixels").toBe(0);
+  expect(drawn.inCoat, "the coat's pixels").toBeGreaterThan(300);
+  expect(drawn.glow, "the aura's pixels").toBeGreaterThan(300);
   if (test.info().project.name !== "phone") {
     // A computer: each board's tag (name and clock) in the row above it, never over its back rank (Chess960's is random),
     // inside the square of four; and the scoreboard has no Bank column (each clock is its board's, on its tag).
@@ -814,7 +806,7 @@ test("phase 2 (?phase=2): four boards, each its own Chess960 start; Stockfish 27
   const moves = page.locator(test.info().project.name === "phone" ? ".bp .mv-list .mv-row" : ".mv-side .mv-list .mv-row");
   await expect(moves.first()).toHaveAttribute("aria-label", new RegExp(`^1\\. You: pawn to ${pawn.to}`));
   await expect(moves).toHaveCount(2);
-  // His row's face is his face now, in his suit, as the bar's (not the plain portrait in his shirt).
+  // His row's face is his face now, in his final form, as the bar's (not the plain portrait in his shirt).
   await expect(moves.nth(1).locator(".mv-who img")).toHaveAttribute("data-face", /:true$/);
   // A phone's small boards: whose each is, by name, cut short to the board's width, the clock whole (#7).
   if (test.info().project.name === "phone") {
