@@ -1235,3 +1235,4 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 15 07:30: bubble fix -> #730 (67ef2343), CI watcher b1wofs8ue; helper archived. Asked Eric: keep the Hidden Boss's ~3.5 px bubble bob (words on his current pose's head) or pin it?
 - Nov 15 07:35: Eric: Hidden Boss bubble may follow his head (keep). Final form r4 'looks good', wants to see the hair moving first: sent hair-closeup.gif (cropped idle). .go waits on his OK. Note: hair tips touch the GIF's top edge: check the canvas doesn't clip them on go.
 - Nov 15 07:40: Eric: 'all his hair should be moving' -> .go 'round4 redo' on claude/recluse-final-look (every strand moving, no clipped tips; hair close-up GIF). Watcher for .mockup 'round 4b'.
+- Nov 15 07:58: r4b (all hair moving, canvas +5 px up) sent to Eric: hair-closeup.gif + idle.gif. On his go: .go 'round4b' on claude/recluse-final-look.
