@@ -606,7 +606,141 @@ async function setup() {
        <div style="font-size:9px;color:${st.random ? "#f2c14e" : "#ffe0e6"}">${line3}</div>`,
     );
   };
+  // ---- Dodge, round 2c: the clones on the board's edge squares (rows from the a- or h-file, columns from rank 8), teleporting
+  // mid-round (afterimages), each blast the whole rank or file.
+  const dodge3 = (st) => {
+    document.querySelectorAll("#mk .mk-dodge").forEach((e) => e.remove());
+    const boardEl = document.querySelector(".board");
+    const b = boardEl.getBoundingClientRect();
+    const s = b.width / 8;
+    const kEl = document.querySelector(".board piece.white.king");
+    const bg = kEl ? getComputedStyle(kEl).backgroundImage : "";
+    for (const pc of document.querySelectorAll(".board piece"))
+      pc.style.visibility = "hidden";
+    const center = (name) => ({
+      x: b.left + (name.charCodeAt(0) - 97 + 0.5) * s,
+      y: b.top + (8 - Number(name[1]) + 0.5) * s,
+    });
+    const el = (css, html = "") => {
+      const d = document.createElement("div");
+      d.className = "mk-dodge";
+      d.style.cssText = `position:absolute;${css}`;
+      d.innerHTML = html;
+      layer.append(d);
+      return d;
+    };
+    for (let i = 0; i < 64; i++) {
+      const f = i % 8;
+      const r = Math.floor(i / 8);
+      el(
+        `left:${b.left + f * s}px;top:${b.top + r * s}px;width:${s}px;height:${s}px;background:var(${(f + r) % 2 ? "--sq-dark" : "--sq-light"});z-index:1`,
+      );
+    }
+    const A = center("e4");
+    el(
+      `left:${A.x - 1.5 * s - 3}px;top:${A.y - 1.5 * s - 3}px;width:${3 * s}px;height:${3 * s}px;border:3px solid #ff3f5e;border-radius:4px;box-shadow:0 0 12px #ff3f5e80;z-index:2`,
+    );
+    const kp = center(st.king ?? "e4");
+    const king = el(
+      `left:${kp.x - s / 2}px;top:${kp.y - s / 2}px;width:${s}px;height:${s}px;background:${bg} center/100% no-repeat;z-index:6`,
+    );
+    if (st.result === "hit")
+      king.style.filter =
+        "drop-shadow(0 0 4px #fff) drop-shadow(0 0 10px #ff3f5e)";
+    // A clone on an edge square: a row's on the a- or h-file at that rank (aiming level, inward), a column's on rank 8 (aiming down).
+    const rankOf = (r) => 4 - r; // arena row -1 is rank 5
+    const fileOf = (c) => String.fromCharCode(101 + c); // arena column -1 is the d-file
+    const clone = (ln, opacity, flash) => {
+      const pose = ln.row !== undefined ? "level" : "down";
+      const cc = canvasOf(ch.CHANDY_CLONE, pose, 0);
+      const m = ch.cloneMuzzle(pose);
+      const k = 0.5;
+      let x0;
+      let y0;
+      let flip = false;
+      if (ln.row !== undefined) {
+        const q = center(`${ln.side === "h" ? "h" : "a"}${rankOf(ln.row)}`);
+        // (Feet on the square's floor: the muzzle sits about mid-square.)
+        y0 = q.y + s / 2 - 2 - ch.CHANDY_FOOT[1] * k;
+        if (ln.side === "h")
+          ((x0 = q.x + s / 2 - (cc.width - ch.CHANDY_FOOT[0]) * k - 30),
+            (flip = true));
+        else x0 = q.x - s / 2 - ch.CHANDY_FOOT[0] * k + 30;
+      } else {
+        const q = center(`${fileOf(ln.col)}8`);
+        x0 = q.x - m[0] * k;
+        y0 = q.y + s / 2 - 2 - ch.CHANDY_FOOT[1] * k;
+      }
+      cc.style.cssText = `position:absolute;image-rendering:pixelated;left:${x0}px;top:${y0}px;width:${cc.width * k}px;height:${cc.height * k}px;${flip ? "transform:scaleX(-1);" : ""}z-index:5;opacity:${opacity};${flash ? "filter:brightness(2.2) drop-shadow(0 0 6px #fff);" : ""}`;
+      cc.classList.add("mk-dodge");
+      layer.append(cc);
+    };
+    const lines = [
+      ...(st.rows ?? []).map(([row, side]) => ({ row, side })),
+      ...(st.cols ?? []).map((col) => ({ col })),
+    ];
+    // Afterimages where a clone just left: the same figure, fading.
+    for (const g of st.ghosts ?? []) clone(g, g.opacity ?? 0.35, false);
+    lines.forEach((ln) =>
+      clone(
+        ln,
+        ln.row !== undefined
+          ? st.blink?.row === ln.row
+            ? 0.6
+            : 1
+          : st.blink?.col === ln.col
+            ? 0.6
+            : 1,
+        (ln.row !== undefined && st.blink?.row === ln.row) ||
+          (ln.col !== undefined && st.blink?.col === ln.col),
+      ),
+    );
+    // The lines: dashed while aiming; the blast a big pop the whole rank or file, edge to edge.
+    if (st.lines) {
+      const blast = st.lines === "beam";
+      const thick = blast ? (st.pop ? 1.7 : 1.3) : 1;
+      for (const ln of lines)
+        for (let i = 0; i < 8; i++) {
+          const c2 = canvasOf(
+            fx.LINE_TILE,
+            blast ? "beam" : "aimPink",
+            blast ? (st.beamFrame ?? 0) : 0,
+          );
+          const q =
+            ln.row !== undefined
+              ? center(`${String.fromCharCode(97 + i)}${rankOf(ln.row)}`)
+              : center(`${fileOf(ln.col)}${8 - i}`);
+          c2.style.cssText = `position:absolute;image-rendering:pixelated;left:${q.x - s / 2}px;top:${q.y - (s * thick) / 2}px;width:${s}px;height:${s * thick}px;${ln.col !== undefined ? "transform:rotate(90deg);" : ""}z-index:${blast ? 7 : 4};${st.pop ? "filter:brightness(1.6);" : ""}`;
+          c2.classList.add("mk-dodge");
+          layer.append(c2);
+        }
+    }
+    for (const [q, n] of Object.entries(st.votes ?? {})) {
+      const c = center(q);
+      el(
+        `left:${c.x + s / 2 - 22}px;top:${c.y - s / 2 + 2}px;min-width:18px;padding:1px 3px;border-radius:8px;background:#0b0b1a;color:#fff;font:700 10px system-ui;text-align:center;border:1px solid #f2c14e;z-index:9`,
+        String(n),
+      );
+    }
+    if (st.mine) {
+      const c = center(st.mine);
+      el(
+        `left:${c.x - s / 2 + 2}px;top:${c.y - s / 2 + 2}px;width:${s - 4}px;height:${s - 4}px;border:3px solid #f2c14e;border-radius:4px;box-sizing:border-box;z-index:9`,
+      );
+    }
+    // The HUD on ranks 1-2 (under the 3 x 3; the beams pass over it when they fire).
+    const t = st.t ?? 3;
+    el(
+      `left:${A.x - 150}px;top:${A.y + 1.5 * s + 8}px;width:300px;box-sizing:border-box;padding:6px 0 7px;display:grid;gap:5px;justify-items:center;font-family:"Press Start 2P",monospace;color:#fff;text-shadow:2px 2px 0 #0b0b1a;background:rgba(11,11,26,.88);border-radius:8px;z-index:${st.result ? 9 : 6}`,
+      st.result
+        ? `<div style="padding:4px 8px;font-size:13px;color:${st.result === "hit" ? "#ff3f5e" : "#f2c14e"}">${st.result === "hit" ? "HIT! YOU LOSE" : `DODGED ${st.round ?? 1}/3`}</div>`
+        : `<div style="font-size:11px">${st.tele ? `<span style="color:#f2c14e">${st.tele}</span>` : `DODGE! <span style="color:#ff8fa3">ROUND ${st.round ?? 1}/3</span>`}</div>
+       <div style="width:220px;height:10px;border:2px solid #fff;border-radius:3px;background:#0b0b1a;overflow:hidden"><div style="height:100%;width:${(t / 3) * 100}%;background:${t > 1 ? "#ff3f5e" : "#ffe0e6"}"></div></div>
+       <div style="font-size:9px;color:#ffe0e6">${st.locked ? "LOCKED" : `VOTE: TAP A SQUARE  ${t.toFixed(1)} s`}</div>`,
+    );
+  };
   window.__mk = {
+    dodge3,
     dodge2,
     dodge,
     ch,
@@ -1326,6 +1460,237 @@ const SCENES = {
       m.dock("Nobody voted: a random square.");
     });
     await shot(p, "dodge-nobody-voted");
+  },
+  async dodge3Edges(p) {
+    await p.evaluate(() => {
+      const m = window.__mk;
+      m.barAt(5, 1);
+      m.figureAt(m.ch.CHANDY_FIRE, "fire", 2);
+      // Round 1: rows -1 and 0 (ranks 5 and 4), columns 0 and 1 (e and f): the safe square is d3.
+      m.dodge3({
+        rows: [
+          [-1, "a"],
+          [0, "h"],
+        ],
+        cols: [0, 1],
+        lines: "aim",
+        t: 2.4,
+        round: 1,
+        votes: { d3: 2, e3: 1 },
+        mine: "d3",
+      });
+      m.dock("Dodge! Vote for a square.");
+    });
+    await shot(p, "dodge-edges");
+  },
+  async dodge3Blast(p) {
+    await p.evaluate(() => {
+      const m = window.__mk;
+      m.barAt(5, 1);
+      m.figureAt(m.ch.CHANDY_FIRE, "fire", 3);
+      m.dodge3({
+        rows: [
+          [-1, "a"],
+          [1, "h"],
+        ],
+        cols: [-1, 1],
+        lines: "beam",
+        pop: true,
+        t: 0,
+        locked: true,
+        round: 3,
+        king: "e4",
+        result: "dodged",
+      });
+      m.dock("Dodged all 3!");
+    });
+    await shot(p, "dodge-blast");
+  },
+  async dodge3Gif(p) {
+    // Round 3, 3 s: three teleports (at 0.8, 1.4 and 1.8 s: the last 1.2 s before the vote closes), the safe square moving each time,
+    // the votes following; LOCKED; the full-length blasts pop; DODGED 3/3.
+    const dir = join(out, "gif-dodge3");
+    rmSync(dir, { recursive: true, force: true });
+    mkdirSync(dir, { recursive: true });
+    await p.evaluate(() => {
+      const m = window.__mk;
+      m.barAt(5, 1);
+      m.figureAt(m.ch.CHANDY_FIRE, "fire", 2);
+      m.dock("Dodge! Round 3: be quick.");
+    });
+    // The aim's states: [rows, cols, safe square]. Each teleport moves one clone to the free line of its kind.
+    const A0 = {
+      rows: [
+        [-1, "a"],
+        [0, "h"],
+      ],
+      cols: [-1, 0],
+    }; // safe f3
+    const A1 = {
+      rows: [
+        [-1, "a"],
+        [1, "h"],
+      ],
+      cols: [-1, 0],
+    }; // the h-file clone jumps from rank 4 to rank 3: safe f4
+    const A2 = {
+      rows: [
+        [-1, "a"],
+        [1, "h"],
+      ],
+      cols: [-1, 1],
+    }; // the e8 clone jumps to f8: safe e4
+    const A3 = {
+      rows: [
+        [0, "a"],
+        [1, "h"],
+      ],
+      cols: [-1, 1],
+    }; // the a-file clone jumps from rank 5 to rank 4: safe e5
+    const steps = [];
+    const at = (t, st) =>
+      steps.push([250, { round: 3, lines: "aim", t, ...st }]);
+    at(3, { ...A0 });
+    at(2.75, { ...A0, votes: { f3: 1 } });
+    at(2.5, { ...A0, votes: { f3: 3, e3: 1 }, mine: "f3" });
+    at(2.25, { ...A0, votes: { f3: 4, e3: 1 }, mine: "f3" });
+    steps.push([
+      120,
+      {
+        round: 3,
+        t: 2.2,
+        ...A1,
+        lines: "aim",
+        blink: { row: 1 },
+        ghosts: [{ row: 0, side: "h", opacity: 0.45 }],
+        votes: { f3: 4, e3: 1 },
+        mine: "f3",
+        tele: "TELEPORT!",
+      },
+    ]);
+    at(2.0, {
+      ...A1,
+      ghosts: [{ row: 0, side: "h", opacity: 0.2 }],
+      votes: { f3: 4, e3: 1 },
+      mine: "f3",
+    });
+    at(1.75, { ...A1, votes: { f3: 2, f4: 3 }, mine: "f4" });
+    steps.push([
+      120,
+      {
+        round: 3,
+        t: 1.6,
+        ...A2,
+        lines: "aim",
+        blink: { col: 1 },
+        ghosts: [{ col: 0, opacity: 0.45 }],
+        votes: { f3: 2, f4: 3 },
+        mine: "f4",
+        tele: "TELEPORT!",
+      },
+    ]);
+    at(1.4, {
+      ...A2,
+      ghosts: [{ col: 0, opacity: 0.2 }],
+      votes: { f3: 1, f4: 2, e4: 2 },
+      mine: "e4",
+    });
+    steps.push([
+      120,
+      {
+        round: 3,
+        t: 1.2,
+        ...A3,
+        lines: "aim",
+        blink: { row: 0 },
+        ghosts: [{ row: -1, side: "a", opacity: 0.45 }],
+        votes: { f4: 2, e4: 3 },
+        mine: "e4",
+        tele: "TELEPORT!",
+      },
+    ]);
+    at(1.0, {
+      ...A3,
+      ghosts: [{ row: -1, side: "a", opacity: 0.2 }],
+      votes: { f4: 1, e4: 2, e5: 3 },
+      mine: "e5",
+    });
+    at(0.75, { ...A3, votes: { e4: 2, e5: 5 }, mine: "e5" });
+    at(0.5, { ...A3, votes: { e4: 2, e5: 6 }, mine: "e5" });
+    at(0.25, { ...A3, votes: { e4: 2, e5: 7 }, mine: "e5" });
+    steps.push([
+      350,
+      {
+        round: 3,
+        t: 0,
+        locked: true,
+        ...A3,
+        lines: "aim",
+        king: "e5",
+        votes: { e4: 2, e5: 7 },
+      },
+    ]);
+    steps.push([
+      90,
+      {
+        round: 3,
+        t: 0,
+        locked: true,
+        ...A3,
+        lines: "beam",
+        pop: true,
+        king: "e5",
+      },
+    ]);
+    for (let i = 0; i < 5; i++)
+      steps.push([
+        70,
+        {
+          round: 3,
+          t: 0,
+          locked: true,
+          ...A3,
+          lines: "beam",
+          beamFrame: i % 2,
+          king: "e5",
+        },
+      ]);
+    steps.push([
+      1300,
+      {
+        round: 3,
+        t: 0,
+        locked: true,
+        ...A3,
+        lines: "beam",
+        king: "e5",
+        result: "dodged",
+      },
+    ]);
+    let i = 0;
+    for (const [ms, st] of steps) {
+      await p.evaluate((st) => window.__mk.dodge3(st), st);
+      for (let k = 0; k < Math.round(ms / 40); k++)
+        await p.screenshot({
+          path: join(dir, `${String(i++).padStart(4, "0")}.png`),
+        });
+      if (st.tele && st.blink?.col === 1)
+        await p.screenshot({ path: join(out, `${device}-dodge-teleport.png`) });
+    }
+    execFileSync("ffmpeg", [
+      "-y",
+      "-loglevel",
+      "error",
+      "-framerate",
+      "25",
+      "-i",
+      join(dir, "%04d.png"),
+      "-vf",
+      "scale=390:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=160[p];[b][p]paletteuse",
+      join(out, `${device}-dodge-round3.gif`),
+    ]);
+    rmSync(dir, { recursive: true, force: true });
+    console.log("gif dodge-round3");
   },
   async queenWarn(p) {
     await p.evaluate(() => {
