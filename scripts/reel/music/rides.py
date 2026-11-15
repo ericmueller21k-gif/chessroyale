@@ -16,7 +16,13 @@ The sketches to choose from: five for Sawyer's Dozer, three for Boingo's Pogo. H
 just the regular boing". These two go to the game first ("we want to kind of test this on two of them here, and then
 we'll kind of go more. I want to move around with it and see how it feels"); and stopping: "when you stop moving, it
 doesn't just like instantly stop ... it kind of fades over like a second or whatever ... we'll have to test it".
-  python3 rides.py <out folder>          (the sketches: each as <name>.wav, moving, a stop, moving again; and <name>-loop.wav)
+Next (Nov 15), two more rides: "The candy cane sled ... like a literal jingle bell when you shake it. You know how that
+sounds. That's what it should sound like ... And the mower. The mower, I think, is pretty self-explanatory." Two
+sketches each. (The game plays every loop between 0.1 s and 1.1 s of its file, so a loop is exactly one second.) A
+bell's ring is all between 2 and 6 kHz, where the ear is keenest, and it is on for as long as the pawn moves: the
+sled's sketches are made 6 dB under the others (the brush under the town's piano solos was the lesson: a steady bright
+part reads far louder than its level).
+  python3 rides.py <out folder> [name ...]   (the sketches, or those whose names start so: each as <name>.wav, moving, a stop, moving again; and <name>-loop.wav)
   python3 rides.py --game <out folder>   (the chosen loops for the game: <ride id>.wav and rides.json; see `handoff`)
 """
 import sys
@@ -182,17 +188,86 @@ def pogo_twang():
     return strikes(n, [(i / 4, 1.0 if i % 2 == 0 else 0.8) for i in range(4)], spring) + 0.35 * strikes(n, [(i / 4, 1.0) for i in range(4)], landing())
 
 
+# ---- The Candy Cane Sled (Ginger's): two ----
+def jingle(f, seed):
+    """One knock of a jingle bell's pellet: a ring of partials that are not one note's harmonics, each a close pair (the
+    bell's slit splits them, so it shimmers), the high ones dying first; and the pellet's tick."""
+    k = int(0.3 * SR)
+    t = secs(k)
+    rng = np.random.default_rng(seed)
+    ring = np.zeros(k)
+    for ratio, loud, dies in ((1.0, 1.0, 0.085), (1.47, 0.8, 0.07), (1.93, 0.6, 0.055), (2.41, 0.5, 0.045), (2.86, 0.35, 0.035), (3.52, 0.25, 0.028)):
+        for split in (-0.004, 0.004):
+            ring += loud * np.sin(TAU * f * ratio * (1 + split) * t + rng.uniform(0, TAU)) * np.exp(-t / dies)
+    return (ring / 2 + 0.8 * colored(k, 3000, 9000, seed) * np.exp(-t / 0.0015)) * np.minimum(1, t / 0.0003)
+
+
+def sled_bell():
+    """One jingle bell, shaken: eight knocks a second, there and back (strong, weak), the pellet bouncing once or twice after each."""
+    rng = np.random.default_rng(21)
+    hits = []
+    for i in range(8):
+        at, loud = i / 8 + rng.uniform(-0.004, 0.004), (1.0 if i % 2 == 0 else 0.6) * rng.uniform(0.85, 1.0)
+        hits += [(at, loud), (at + rng.uniform(0.018, 0.026), 0.45 * loud), (at + rng.uniform(0.042, 0.055), 0.22 * loud)]
+    return strikes(SR, hits, jingle(2700, 1))
+
+
+def sled_sleigh():
+    """A strap of five sleigh bells: four shakes a second, each bell knocking a little apart from the others, and a softer shake back between."""
+    rng = np.random.default_rng(22)
+    out = np.zeros(SR)
+    for j, f in enumerate((2250, 2600, 2950, 3400, 3850)):
+        hits = []
+        for i in range(4):
+            hits += [(i / 4 + rng.uniform(0, 0.028), rng.uniform(0.6, 1.0)), (i / 4 + 0.125 + rng.uniform(0, 0.035), rng.uniform(0.25, 0.55))]
+        out += strikes(SR, hits, jingle(f, 30 + j))
+    return out
+
+
+# ---- Puddles's Mower: two ----
+def mower_push():
+    """A small four-stroke mower: twenty-four firings a second, strong and weak by turns, a raspy buzz in each; the blade's whirr; the deck's rattle."""
+    n = SR
+    t = secs(n)
+    fire = strikes(n, [(i / 24, 1.0 if i % 2 == 0 else 0.72) for i in range(24)], burst(0.08, 0.014))
+    buzz = np.tanh(2.5 * waves(TAU * 96 * t, 0.3, 3000, 96) * (0.25 + 0.75 * fire / fire.max()))
+    whirr = colored(n, 500, 2600, 11) * (0.65 + 0.35 * np.sin(TAU * 48 * t))
+    tick = (np.sin(TAU * 2100 * secs(1500)) + 0.5 * np.sin(TAU * 3300 * secs(1500))) * burst(1500 / SR, 0.004)
+    rattle = strikes(n, [(i / 8 + 0.02, 0.5 + 0.5 * abs(np.sin(1.7 * i))) for i in range(8)], tick)
+    return highpass(buzz + 0.28 * whirr + 0.06 * rattle, 80)
+
+
+def mower_ride():
+    """A ride-on mower: a slower, hollower putter, sixteen pops a second, strong and weak, and the blades' steady whine and swish under the deck."""
+    n = SR
+    k = int(0.1 * SR)
+    t = secs(k)
+
+    def pop(pitch):
+        tone = np.sin(TAU * np.cumsum(pitch * (120 + 110 * np.exp(-t / 0.01))) / SR) * np.exp(-t / 0.028)
+        return (tone + 0.5 * colored(k, 350, 800, 12) * np.exp(-t / 0.01)) * np.minimum(1, t / 0.001)
+
+    putter = strikes(n, [(i / 8, 1.0) for i in range(8)], pop(1.0)) + strikes(n, [(i / 8 + 1 / 16, 0.65) for i in range(8)], pop(1.1))
+    T = secs(n)
+    whine = (np.sin(TAU * 310 * T) + 0.4 * np.sin(TAU * 620 * T)) * (0.8 + 0.2 * np.sin(TAU * 16 * T))
+    swish = colored(n, 900, 3000, 13) * (0.5 + 0.5 * np.sin(TAU * 8 * T)) ** 2
+    return putter + 0.1 * whine + 0.12 * swish
+
+
+# A sketch: its name, what makes its loop, whether it is an engine, and (if not 1) its level beside the others'.
 SKETCHES = [("dozer-1-diesel-chug", dozer_chug, True), ("dozer-2-rumble-and-squeak", dozer_rumble, True), ("dozer-3-putt-putt", dozer_putt, True),
             ("dozer-4-heavy-growl", dozer_heavy, True), ("dozer-5-toy-motor", dozer_toy, True),
-            ("pogo-1-boing", pogo_boing, False), ("pogo-2-chip-hop", pogo_chip, False), ("pogo-3-steel-spring", pogo_twang, False)]
+            ("pogo-1-boing", pogo_boing, False), ("pogo-2-chip-hop", pogo_chip, False), ("pogo-3-steel-spring", pogo_twang, False),
+            ("sled-1-one-jingle-bell", sled_bell, False, 0.5), ("sled-2-sleigh-bells", sled_sleigh, False, 0.5),
+            ("mower-1-small-engine", mower_push, True), ("mower-2-ride-on-putter", mower_ride, True)]
 LEVEL = 0.1  # every loop's loudness (RMS), after the game's low-pass
 
 
-def finished(loop):
-    """A loop as the game would have it: through its 6 kHz low-pass, at the common level. Its deepest part (under
-    about 120 Hz) is thinned first: a phone's speaker has none of it, and the music's bass lives there."""
+def finished(loop, level=1.0):
+    """A loop as the game would have it: through its 6 kHz low-pass, at the common level (times `level`). Its deepest
+    part (under about 120 Hz) is thinned first: a phone's speaker has none of it, and the music's bass lives there."""
     loop = highpass(lowpass(loop, 6000), 120)
-    return loop / np.sqrt(np.mean(loop**2)) * LEVEL
+    return loop / np.sqrt(np.mean(loop**2)) * LEVEL * level
 
 
 def moving(loop, length, engine):
@@ -246,9 +321,11 @@ def handoff(out):
         f.write("\n")
 
 
-def main(out):
-    for name, make, engine in SKETCHES:
-        loop = finished(make())
+def main(out, *only):
+    for name, make, engine, *level in SKETCHES:
+        if only and not name.startswith(only):
+            continue
+        loop = finished(make(), *level)
         save(f"{out}/{name}-loop.wav", loop)
         demo = np.concatenate([moving(loop, 1.75, engine), np.zeros(int(0.5 * SR)), moving(loop, 2.5, engine), np.zeros(int(0.2 * SR))])
         save(f"{out}/{name}.wav", demo)
@@ -257,4 +334,4 @@ def main(out):
 
 
 if __name__ == "__main__":
-    handoff(sys.argv[2]) if sys.argv[1] == "--game" else main(sys.argv[1])
+    handoff(sys.argv[2]) if sys.argv[1] == "--game" else main(*sys.argv[1:])
