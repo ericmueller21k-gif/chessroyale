@@ -460,7 +460,154 @@ async function setup() {
       );
     }
   };
+  // ---- Dodge, round 2b: the scope-in on your king, his slide to the center, the blank board; the round on the real squares with the vote.
+  const dodge2 = (st) => {
+    document.querySelectorAll("#mk .mk-dodge").forEach((e) => e.remove());
+    const wrapEl = document.querySelector(".board-wrap");
+    const boardEl = document.querySelector(".board");
+    const b = boardEl.getBoundingClientRect();
+    const s = b.width / 8;
+    const ps = pieces();
+    const ksq = Object.keys(ps).find((q) => ps[q] === "K");
+    const kEl = document.querySelector(".board piece.white.king");
+    const bg = kEl ? getComputedStyle(kEl).backgroundImage : "";
+    const center = (name) => ({
+      x: b.left + (name.charCodeAt(0) - 97 + 0.5) * s,
+      y: b.top + (8 - Number(name[1]) + 0.5) * s,
+    });
+    const el = (css, html = "") => {
+      const d = document.createElement("div");
+      d.className = "mk-dodge";
+      d.style.cssText = `position:absolute;${css}`;
+      d.innerHTML = html;
+      layer.append(d);
+      return d;
+    };
+    // The board's own pieces: all there before the board goes blank; after, none (your king is drawn by the mockup).
+    for (const pc of document.querySelectorAll(".board piece"))
+      pc.style.visibility = st.blank || pc === kEl ? "hidden" : "";
+    // Your king: from his square sliding to e4 (`slide` 0..1), then on the square you pick.
+    const from = center(ksq);
+    const to = center("e4");
+    const kp = st.king
+      ? center(st.king)
+      : {
+          x: from.x + (to.x - from.x) * (st.slide ?? 0),
+          y: from.y + (to.y - from.y) * (st.slide ?? 0),
+        };
+    // The blank board: the mockup redraws its 64 squares over the real ones (no pieces, no last-move marks); its letters stay.
+    if (st.blank)
+      for (let i = 0; i < 64; i++) {
+        const f = i % 8;
+        const r = Math.floor(i / 8);
+        el(
+          `left:${b.left + f * s}px;top:${b.top + r * s}px;width:${s}px;height:${s}px;background:var(${(f + r) % 2 ? "--sq-dark" : "--sq-light"});z-index:1`,
+        );
+      }
+    // The 3 x 3 round e4, its red frame (on the blank board only).
+    const A = center("e4");
+    if (st.blank && st.arena !== false)
+      el(
+        `left:${A.x - 1.5 * s - 3}px;top:${A.y - 1.5 * s - 3}px;width:${3 * s}px;height:${3 * s}px;border:3px solid #ff3f5e;border-radius:4px;box-shadow:0 0 12px #ff3f5e80;z-index:2`,
+      );
+    const king = el(
+      `left:${kp.x - s / 2}px;top:${kp.y - s / 2}px;width:${s}px;height:${s}px;background:${bg} center/100% no-repeat;z-index:6`,
+    );
+    if (st.result === "hit")
+      king.style.filter =
+        "drop-shadow(0 0 4px #fff) drop-shadow(0 0 10px #ff3f5e)";
+    // The scope: everything but a circle round your king greyed, blurred and darkened; a cyan scope ring round the circle.
+    if (st.hole != null) {
+      const R = st.hole;
+      const op = st.scope ?? 1;
+      const w = wrapEl.getBoundingClientRect();
+      const fx0 = kp.x - w.left;
+      const fy0 = kp.y - w.top;
+      el(
+        `left:${w.left}px;top:${w.top}px;width:${w.width}px;height:${w.height}px;opacity:${op};backdrop-filter:grayscale(1) blur(2.5px) brightness(.35);-webkit-mask:radial-gradient(circle at ${fx0}px ${fy0}px,transparent ${R}px,#000 ${R + 2}px);mask:radial-gradient(circle at ${fx0}px ${fy0}px,transparent ${R}px,#000 ${R + 2}px);z-index:7`,
+      );
+      el(
+        `left:${kp.x - R}px;top:${kp.y - R}px;width:${2 * R}px;height:${2 * R}px;border-radius:50%;border:3px solid #58e6ff;box-shadow:0 0 10px #58e6ff;opacity:${op};z-index:8`,
+        `<i style="position:absolute;left:50%;top:-10px;width:3px;height:18px;margin-left:-1.5px;background:#58e6ff"></i><i style="position:absolute;left:50%;bottom:-10px;width:3px;height:18px;margin-left:-1.5px;background:#58e6ff"></i><i style="position:absolute;top:50%;left:-10px;height:3px;width:18px;margin-top:-1.5px;background:#58e6ff"></i><i style="position:absolute;top:50%;right:-10px;height:3px;width:18px;margin-top:-1.5px;background:#58e6ff"></i>`,
+      );
+    }
+    if (!st.blank || !st.safe) return;
+    // The lines and the clones, as round 2, on the real squares.
+    const [sc, sr] = st.safe;
+    const rows = [-1, 0, 1].filter((r) => r !== sr);
+    const cols = [-1, 0, 1].filter((c) => c !== sc);
+    const lines = [
+      ...rows.map((r, i) => ({ row: r, side: i === 0 ? -1 : 1 })),
+      ...cols.map((c) => ({ col: c })),
+    ];
+    const tile = (anim, i, x, y, rot) => {
+      const c2 = canvasOf(fx.LINE_TILE, anim, i);
+      c2.style.cssText = `position:absolute;image-rendering:pixelated;left:${x - s / 2}px;top:${y - s / 2}px;width:${s}px;height:${s}px;${rot ? "transform:rotate(90deg);" : ""}z-index:4`;
+      c2.classList.add("mk-dodge");
+      layer.append(c2);
+    };
+    lines.forEach((ln, n) => {
+      if (n >= (st.clones ?? 4)) return;
+      const pose = ln.row !== undefined ? "level" : "down";
+      const cc = canvasOf(ch.CHANDY_CLONE, pose, 0);
+      const m = ch.cloneMuzzle(pose);
+      const k = 0.5;
+      let x0;
+      let y0;
+      let flip = false;
+      if (ln.row !== undefined) {
+        if (ln.side < 0) x0 = A.x - 1.5 * s - 4 - m[0] * k;
+        else ((x0 = A.x + 1.5 * s + 4 - (cc.width - m[0]) * k), (flip = true));
+        y0 = A.y + ln.row * s - m[1] * k;
+      } else {
+        x0 = A.x + ln.col * s - m[0] * k;
+        y0 = A.y - 1.5 * s - 4 - m[1] * k;
+      }
+      cc.style.cssText = `position:absolute;image-rendering:pixelated;left:${x0}px;top:${y0}px;width:${cc.width * k}px;height:${cc.height * k}px;${flip ? "transform:scaleX(-1);" : ""}z-index:5;opacity:${st.ghost?.[n] ?? 1}`;
+      cc.classList.add("mk-dodge");
+      layer.append(cc);
+      if (!st.lines) return;
+      const anim = st.lines === "beam" ? "beam" : "aimPink";
+      const fi = st.lines === "beam" ? (st.beamFrame ?? 0) : 0;
+      if (ln.row !== undefined)
+        for (let dc = -1; dc <= 1; dc++)
+          tile(anim, fi, A.x + dc * s, A.y + ln.row * s, false);
+      else
+        for (let dr = -1; dr <= 1; dr++)
+          tile(anim, fi, A.x + ln.col * s, A.y + dr * s, true);
+    });
+    // The vote: each square's count (as the crowd's vote shows its counts), your own pick ringed in gold.
+    for (const [q, n] of Object.entries(st.votes ?? {})) {
+      const c = center(q);
+      el(
+        `left:${c.x + s / 2 - 22}px;top:${c.y - s / 2 + 2}px;min-width:18px;padding:1px 3px;border-radius:8px;background:#0b0b1a;color:#fff;font:700 10px system-ui;text-align:center;border:1px solid #f2c14e;z-index:9`,
+        String(n),
+      );
+    }
+    if (st.mine) {
+      const c = center(st.mine);
+      el(
+        `left:${c.x - s / 2 + 2}px;top:${c.y - s / 2 + 2}px;width:${s - 4}px;height:${s - 4}px;border:3px solid #f2c14e;border-radius:4px;box-sizing:border-box;z-index:9`,
+      );
+    }
+    // The HUD under the 3 x 3: the round, the vote's 3 s bar, its seconds or the result.
+    const t = st.t ?? 3;
+    const line3 = st.random
+      ? "NOBODY VOTED: RANDOM"
+      : st.locked
+        ? "LOCKED"
+        : `VOTE: TAP A SQUARE  ${t.toFixed(1)} s`;
+    el(
+      `left:${A.x - 150}px;top:${A.y + 1.5 * s + 6}px;width:300px;box-sizing:border-box;padding:6px 0 7px;display:grid;gap:5px;justify-items:center;font-family:"Press Start 2P",monospace;color:#fff;text-shadow:2px 2px 0 #0b0b1a;background:rgba(11,11,26,.88);border-radius:8px;z-index:9`,
+      st.result
+        ? `<div style="padding:6px 10px;background:#0b0b1a;border:2px solid ${st.result === "hit" ? "#ff3f5e" : "#f2c14e"};border-radius:6px;font-size:13px;color:${st.result === "hit" ? "#ff3f5e" : "#f2c14e"}">${st.result === "hit" ? "HIT! YOU LOSE" : `DODGED ${st.round ?? 1}/3`}</div>`
+        : `<div style="font-size:11px">DODGE! <span style="color:#ff8fa3">ROUND ${st.round ?? 1}/3</span></div>
+       <div style="width:220px;height:10px;border:2px solid #fff;border-radius:3px;background:#0b0b1a;overflow:hidden"><div style="height:100%;width:${(t / 3) * 100}%;background:${t > 1 ? "#ff3f5e" : "#ffe0e6"}"></div></div>
+       <div style="font-size:9px;color:${st.random ? "#f2c14e" : "#ffe0e6"}">${line3}</div>`,
+    );
+  };
   window.__mk = {
+    dodge2,
     dodge,
     ch,
     fx,
@@ -1019,6 +1166,166 @@ const SCENES = {
       );
     });
     await shot(p, "queen-lock-shot");
+  },
+  async dodge2Gif(p) {
+    // About 7 s: the scope-in on your king, his slide to the center, the scope opens on a blank board, one round with the vote.
+    const dir = join(out, "gif-dodge2");
+    rmSync(dir, { recursive: true, force: true });
+    mkdirSync(dir, { recursive: true });
+    await p.evaluate(() => {
+      const m = window.__mk;
+      m.barAt(5, 1);
+      m.figureAt(m.ch.CHANDY_FIRE, "fire", 2);
+      m.dock("Dodge! He's targeting your king.");
+    });
+    const safe = [1, 1];
+    const steps = [[400, {}]];
+    for (const R of [200, 140, 90, 50, 34]) steps.push([90, { hole: R }]);
+    steps.push([300, { hole: 34 }]);
+    for (let i = 1; i <= 6; i++) steps.push([80, { hole: 34, slide: i / 6 }]);
+    steps.push([200, { hole: 34, slide: 1 }]);
+    for (const [R, op, blank] of [
+      [60, 0.8, true],
+      [120, 0.55, true],
+      [220, 0.3, true],
+    ])
+      steps.push([90, { hole: R, scope: op, slide: 1, blank }]);
+    steps.push([300, { slide: 1, blank: true }]);
+    for (let n = 1; n <= 4; n++)
+      steps.push([
+        110,
+        {
+          blank: true,
+          slide: 1,
+          safe,
+          clones: n,
+          ghost: [1, 1, 1, 1].map((g, i) => (i === n - 1 ? 0.5 : 1)),
+        },
+      ]);
+    const votes = [
+      {},
+      { f3: 1 },
+      { f3: 1, e3: 2 },
+      { f3: 3, e3: 2 },
+      { f3: 4, e3: 2, d5: 1 },
+      { f3: 6, e3: 2, d5: 1 },
+    ];
+    let v = 0;
+    for (let t = 3; t > 0.01; t -= 0.25) {
+      if (t < 2.6 && v < votes.length - 1 && Math.round(t * 4) % 2 === 0) v++;
+      steps.push([
+        250,
+        {
+          blank: true,
+          slide: 1,
+          safe,
+          lines: "aim",
+          t,
+          votes: votes[v],
+          mine: t < 2.2 ? "f3" : undefined,
+        },
+      ]);
+    }
+    steps.push([
+      350,
+      {
+        blank: true,
+        king: "f3",
+        safe,
+        lines: "aim",
+        t: 0,
+        locked: true,
+        votes: votes[5],
+        mine: "f3",
+      },
+    ]);
+    for (let i = 0; i < 6; i++)
+      steps.push([
+        70,
+        {
+          blank: true,
+          king: "f3",
+          safe,
+          lines: "beam",
+          beamFrame: i % 2,
+          t: 0,
+          locked: true,
+        },
+      ]);
+    steps.push([
+      1200,
+      {
+        blank: true,
+        king: "f3",
+        safe,
+        lines: "beam",
+        t: 0,
+        locked: true,
+        result: "dodged",
+      },
+    ]);
+    let i = 0;
+    for (const [ms, st] of steps) {
+      await p.evaluate((st) => window.__mk.dodge2({ round: 1, ...st }), st);
+      for (let k = 0; k < Math.round(ms / 40); k++)
+        await p.screenshot({
+          path: join(dir, `${String(i++).padStart(4, "0")}.png`),
+        });
+      if (ms === 300 && st.hole === 34 && !st.slide)
+        await p.screenshot({ path: join(out, `${device}-dodge-scope-in.png`) });
+    }
+    execFileSync("ffmpeg", [
+      "-y",
+      "-loglevel",
+      "error",
+      "-framerate",
+      "25",
+      "-i",
+      join(dir, "%04d.png"),
+      "-vf",
+      "scale=390:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=160[p];[b][p]paletteuse",
+      join(out, `${device}-dodge-2b.gif`),
+    ]);
+    rmSync(dir, { recursive: true, force: true });
+    console.log("gif dodge-2b");
+  },
+  async dodge2Vote(p) {
+    await p.evaluate(() => {
+      const m = window.__mk;
+      m.barAt(5, 1);
+      m.figureAt(m.ch.CHANDY_FIRE, "fire", 2);
+      m.dodge2({
+        blank: true,
+        slide: 1,
+        safe: [1, 1],
+        lines: "aim",
+        t: 1.4,
+        round: 1,
+        votes: { f3: 6, e3: 2, d5: 1 },
+        mine: "f3",
+      });
+      m.dock("Dodge! Vote for a square.");
+    });
+    await shot(p, "dodge-vote");
+  },
+  async dodge2Random(p) {
+    await p.evaluate(() => {
+      const m = window.__mk;
+      m.barAt(5, 1);
+      m.figureAt(m.ch.CHANDY_FIRE, "fire", 2);
+      m.dodge2({
+        blank: true,
+        king: "d5",
+        safe: [-1, -1],
+        lines: "aim",
+        t: 0,
+        locked: true,
+        random: true,
+        round: 2,
+      });
+      m.dock("Nobody voted: a random square.");
+    });
+    await shot(p, "dodge-nobody-voted");
   },
   async queenWarn(p) {
     await p.evaluate(() => {
