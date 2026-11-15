@@ -262,6 +262,38 @@ test("rides (Oct 31): the locker's Ride tab wears one; the preview's pawns ride 
   expect(await boxes()).toEqual(before);
 });
 
+test("a shiny ride's shine stays inside its own shapes (Eric, Nov 15: the pogo's slid across the preview as a rectangle): every shine's clip is its own region's, and no two clips on the page share an id with different shapes", async ({ page }) => {
+  await named(page, "Shiny");
+  await page.goto("/shop");
+  // (Purity 98%: shiny. Boingo's Pogo has a region named "seat", the name that gave the rider cut's id; a shiny crown rides on it.)
+  const [pogo, crown] = await giveItems(page, [
+    { def: "boingo-pogo", color: "red", blemish: 2 },
+    { def: "fire-ice-crown", color: "opal", blemish: 2 },
+  ]);
+  await wearItem(page, "ride", pogo!);
+  await wearItem(page, "head", crown!);
+  await page.reload();
+  await page.getByRole("tab", { name: "Locker" }).click();
+  await page.getByRole("tab", { name: "Ride", exact: true }).click();
+  await expect(page.locator('.locker-preview .avatar.riding[data-ride="boingo-pogo"][data-drawn="1"]')).toHaveCount(1);
+  await expect(page.locator(".locker-grid .item-art[data-drawn=\"1\"]").first()).toBeVisible();
+  const clips = await page.evaluate(() => {
+    // A shine's clip group is its Region's: the clipPath drawn beside it is the one its `url(#…)` must find on the page.
+    const shines = [...document.querySelectorAll(".item-shine")].map((s) => {
+      const g = s.parentElement!;
+      const id = g.getAttribute("clip-path")!.match(/^url\(#(.+)\)$/)![1]!;
+      return { id, own: document.getElementById(id) === g.parentElement!.querySelector(":scope > clipPath") };
+    });
+    const shapes = new Map<string, Set<string>>();
+    for (const c of document.querySelectorAll("clipPath")) shapes.set(c.id, (shapes.get(c.id) ?? new Set()).add(c.innerHTML));
+    return { shines, clashes: [...shapes].filter(([, s]) => s.size > 1).map(([id]) => id) };
+  });
+  // (The preview's pogo and crown, and the Ride tab's pogo tile: each region of each.)
+  expect(clips.shines.length).toBeGreaterThan(5);
+  expect(clips.shines.filter((s) => !s.own).map((s) => s.id), "shines whose clip is another shape's").toEqual([]);
+  expect(clips.clashes, "clip ids drawn with two different shapes").toEqual([]);
+});
+
 test("rides on home (Nov 1): the big pawn and your ring ride Riding Chirp, its idle playing, in the same boxes (nothing grows or moves); off again, the pawn alone", async ({ page }) => {
   await named(page, "Rider");
   await page.goto("/");

@@ -2,7 +2,7 @@
 // trail mark): only the import lines changed, its green cord taken out of every view (Eric, Nov 1) and the `!`s the app's stricter typecheck asks for (noUncheckedIndexedAccess).
 // The art's kit there (scripts/boss-art/item-kit.tsx) is a copy of ../item-paint.tsx and ./kit.ts. Notes: docs/areas/shop.md, "Rides".
 import type { RiderDraft, RiderProps, RiderPose, RiderViewDraft, TrailProps } from "./kit.ts";
-import { Region, LINE, lw, lighten } from "../item-paint.tsx";
+import { Region, LINE, lw, lighten, regionClip } from "../item-paint.tsx";
 
 /* Hollow's Bulb: a fat vintage Christmas bulb lying on its side, floating. (Its green cord taken out of every view, Eric, Nov 1: "we don't really need that".) */
 
@@ -90,7 +90,7 @@ function Front({ p, p2, anim, f }: RiderProps) {
       <path d="M 12.5 61 L 21.5 61" fill="none" stroke={SILVER_L} stroke-linecap="round" {...lw(2)} />
       <Region p={p} name="glass" d={[GLASS]} />
       {/* the glow inside, over the glass (its clip) */}
-      <g clip-path={`url(#${p.id}-glass)`}>
+      <g clip-path={`url(#${regionClip(p, "glass")})`}>
         <ellipse cx={68} cy={67} rx={r * 1.4} ry={r} fill={`url(#${gid})`} />
         <path d="M 30 63 L 54 64 M 30 71 L 54 70" fill="none" stroke="#3a3a40" stroke-opacity="0.5" {...lw(1.2)} />
         <path d="M 54 64 Q 57 61 59 64 Q 61 67 63 64 Q 65 61 67 64 Q 69 67 71 64 L 54 70"
@@ -161,7 +161,7 @@ function FrontViewFront({ p, p2, anim, f }: RiderProps) {
     <g>
       <GlowDefs p2={p2} k={k} gid={gid} />
       <Region p={p} name="glass" d={[END_GLASS]} />
-      <g clip-path={`url(#${p.id}-glass)`}>
+      <g clip-path={`url(#${regionClip(p, "glass")})`}>
         <ellipse cx={50} cy={68} rx={r * 1.15} ry={r} fill={`url(#${gid})`} />
         <path d="M 30 58 Q 50 46 70 58" fill="none" stroke="#1d1d1f" stroke-opacity="0.16" stroke-linecap="round" {...lw(1.6)} />
         <path d="M 45.5 67 L 48 55 M 54.5 67 L 52 55" fill="none" stroke="#3a3a40" stroke-opacity="0.5" {...lw(1.2)} />
@@ -184,7 +184,7 @@ function BackViewFront({ p, p2, anim, f }: RiderProps) {
     <g>
       <GlowDefs p2={p2} k={k} gid={gid} />
       <Region p={p} name="glass" d={[END_GLASS]} />
-      <g clip-path={`url(#${p.id}-glass)`}>
+      <g clip-path={`url(#${regionClip(p, "glass")})`}>
         <ellipse cx={50} cy={66} rx={r * 1.15} ry={r} fill={`url(#${gid})`} />
         <circle cx={50} cy={68} r={15} fill="none" stroke={lighten(p2.hex, 0.55)} stroke-opacity={0.25 + 0.5 * k} {...lw(3)} />
       </g>

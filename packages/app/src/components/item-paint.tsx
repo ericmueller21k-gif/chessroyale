@@ -111,11 +111,19 @@ export const lw = (n: number) => ({ style: `stroke-width: calc(var(--sw, 1) * ${
 export const LINE = { stroke: "#1d1d1f", "stroke-linejoin": "round" as const, "stroke-linecap": "round" as const, ...lw(3) };
 
 /**
+ * The id of a Region's clip (its own shapes). Region clips have their own `-clip-` namespace, so a region's name can never
+ * give an id that another id made from the paint's own id already has (its gradients `-g`, `-f`, `-s`, a ride's rider cut `-seat`,
+ * a drawing's own clips and gradients). With `${p.id}-${name}`, Boingo's Pogo's "seat" region got the rider cut's id, and its
+ * shine slid across the locker preview as a whole rectangle (Eric, Nov 15).
+ */
+export const regionClip = (p: Paint, name: string) => `${p.id}-clip-${name}`;
+
+/**
  * A painted region: its paths filled with the item's color, the blemish blotches (clipped to the region), an
  * optional overlay (stripes), the shine when shiny, then the outline (`line` wide: thinner for small parts).
  */
 export function Region({ p, d, name, fill, over, outline = true, line = 3 }: { p: Paint; d: string[]; name: string; fill?: string; over?: ComponentChildren; outline?: boolean; line?: number }) {
-  const clip = `${p.id}-${name}`;
+  const clip = regionClip(p, name);
   const blotches = p.finish.blemish > 0 ? blotchPath(p.finish.seed + name.length * 7919, p.finish.blemish, d, p.box) : "";
   return (
     <g>
