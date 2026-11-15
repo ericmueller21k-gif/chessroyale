@@ -1214,3 +1214,4 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 15 03:05: lobby-chat:28 fix -> #724 (bbb5522b, CI watcher b3p2pdesb): the test reads the full lobby in one in-page frame (1.8 s before the votes); reproduced 4/5 at CPU 4x, fixed 5/5. Follow-up: front-door:141-142, matchmaking:141 same race.
 - Nov 15 03:25: #724 CI caught 'box is not defined' (lobby-chat:269, the helper removed box()); fixed by me (0f805600), CI watcher bdum6jsms. CAUSE: npm run typecheck doesn't cover e2e/ (no e2e tsconfig), so e2e type errors only show in CI 25 min later. Next job: add e2e to typecheck (fix what it finds).
 - Nov 15 03:45: #724 MERGED 07626574; main run watcher running. Next: e2e typecheck job (briefs/e2e-typecheck.md).
+- Nov 15 03:30: e2e typecheck -> #725 (7f7ba8aa, CI watcher bg5pentww): e2e/tsconfig.json in npm run typecheck, 89 errors fixed (no ts-ignore), a real bug in tiger.spec's fallback (from.w). +12 s typecheck.
