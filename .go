@@ -1,7 +1,8 @@
-round3 GO (Eric, Nov 14): "blue eyes, go".
-Build round 3b in the game: the darker suit and its own helmet, the visor flipping up for his line ("Computation without creativity is
-nothing. Now I have both.") and back down, the BLUE eyes from eyes-blue-vs-yellow.png (bright electric-blue cores, a soft glow, a thin
-glowing line down each cheek) whenever his face shows (visor up; the white-out's possessed white eyes before it stay as in round 2),
-everything else as round 2 (book, relaxed arms, the light to a full white-out, the change unseen, the reveal as it dies down, the
-jump, the split on the drop with no big board behind it, no God King absorption). Pull main first (it has #703 same frame, #701
-bubbles, #702 lines; #706 standings is in CI). Then the "On go" steps of the brief.
+round4 redo (Eric, Nov 15): the look is good ("boss looks good"); one note, then show it again before building.
+"all his hair should be moving": today the mass ripples a little and the strands curl a bit, which reads as nearly still.
+Make every strand visibly move, all the time: the whole hair flowing upward in the aura's draft, every strand swaying and its tip
+flicking, each a little out of step with its neighbors so it ripples like a flame, from the roots at his crown to the tips.
+Keep his brown, the fine strands with darker lines between, the shape. Also check his canvas leaves room above the tallest tip
+(in the idle GIF the tips touch the top edge: don't clip them).
+Show: a close-up GIF of his head and hair (8x, the idle loop) plus the full idle GIF again. Push them to stills/recluse-final-look,
+write .mockup "round 4b", and wait for a .go containing "round4b" (and any notes).
