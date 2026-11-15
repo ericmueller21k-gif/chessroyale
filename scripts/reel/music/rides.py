@@ -29,10 +29,10 @@ how fast a ring dies (20 dB in 100 to 160 ms), and how it is shaken (a shake eve
 then the pellets rattling on, about sixteen knocks a second, never evenly). `sled_bells` is built from those numbers;
 its loop's spectrum is within 2 dB of the recording's in every band that matters.
 The game softens its sounds with a low-pass at 6 kHz (sound.ts), which would take off most of a jingle bell. So the
-sled's loop is `bright`: it is not low-passed here, its file is at 48 kHz, and its highs are raised in the file by what
-the game's filter will take off (up to BRIGHT_DB), so in the town it is heard as made. And it is made quieter than the
-engines: at their level it reads louder than they do, and it is on for as long as the pawn moves (the brush under the
-town's piano solos was the lesson).
+sled's loop is `bright`: it is not low-passed here, its file is at 48 kHz, and the game plays it round its low-pass
+(the director's side, agreed Nov 15: raising the highs in the file to make up for the filter works only up to 10 kHz
+before the file clips). And it is made quieter than the engines: at their level it reads louder than they do, and it
+is on for as long as the pawn moves (the brush under the town's piano solos was the lesson).
   python3 rides.py <out folder> [name ...]   (the sketches, or those whose names start so: each as <name>.wav, moving, a stop, moving again; and <name>-loop.wav)
   python3 rides.py --game <out folder> [ride id ...]   (the chosen loops for the game, or those named: <ride id>.wav and rides.json; see `handoff`)
 """
@@ -265,7 +265,7 @@ def mower_ride():
 
 
 # A sketch: its name, what makes its loop, whether it is an engine, and (if not 1 and False) its level beside the
-# others' and whether it is bright (`finished`).
+# others' and whether it is bright (`finished`: not low-passed).
 SKETCHES = [("dozer-1-diesel-chug", dozer_chug, True), ("dozer-2-rumble-and-squeak", dozer_rumble, True), ("dozer-3-putt-putt", dozer_putt, True),
             ("dozer-4-heavy-growl", dozer_heavy, True), ("dozer-5-toy-motor", dozer_toy, True),
             ("pogo-1-boing", pogo_boing, False), ("pogo-2-chip-hop", pogo_chip, False), ("pogo-3-steel-spring", pogo_twang, False),
@@ -274,31 +274,12 @@ SKETCHES = [("dozer-1-diesel-chug", dozer_chug, True), ("dozer-2-rumble-and-sque
 LEVEL = 0.1  # every loop's loudness (RMS), after the game's low-pass
 
 
-BRIGHT_DB = 10.0  # how far a bright loop's highs are raised in its file against the game's low-pass: all of it up to 10 kHz (more, and the sled's file clips)
-
-
-def soften(n):
-    """The game's own softening of its sounds (sound.ts: a Web Audio low-pass at 6 kHz, its Q 1 dB), as the gain at
-    each frequency of an n-point transform at 48 kHz."""
-    w = TAU * 6000 / SR
-    a, b0 = np.sin(w) / (2 * 10 ** (1 / 20)), (1 - np.cos(w)) / 2
-    z = np.exp(-1j * TAU * np.fft.rfftfreq(n, 1 / SR) / SR)
-    return np.abs(b0 * (1 + z) ** 2 / ((1 + a) - 2 * np.cos(w) * z + (1 - a) * z * z))
-
-
 def finished(loop, level=1.0, bright=False):
     """A loop as it is heard in the game, at the common level (times `level`). Its deepest part (under about 120 Hz)
     is thinned: a phone's speaker has none of it, and the music's bass lives there. It goes through the game's 6 kHz
-    low-pass; a `bright` loop keeps what `for_game` can put back of what that takes off."""
-    loop = highpass(loop, 120)
-    loop = np.fft.irfft(np.fft.rfft(loop) * np.minimum(1, soften(len(loop)) * 10 ** (BRIGHT_DB / 20)), len(loop)) if bright else lowpass(loop, 6000)
+    low-pass, but for a `bright` loop, which the game plays round it."""
+    loop = highpass(loop, 120) if bright else highpass(lowpass(loop, 6000), 120)
     return loop / np.sqrt(np.mean(loop**2)) * LEVEL * level
-
-
-def for_game(heard):
-    """A bright loop's file: its highs raised by what the game's low-pass takes off, so that through it the loop is
-    heard as `finished` made it."""
-    return np.fft.irfft(np.fft.rfft(heard) / np.maximum(soften(len(heard)), 1e-3), len(heard))
 
 
 def moving(loop, length, engine):
@@ -345,7 +326,7 @@ def handoff(out, *only):
         loop = finished(make(), *more)
         heard = loop
         if bright:
-            loop, rate = for_game(loop), SR
+            rate = SR
         else:
             loop, rate = np.fft.irfft(np.fft.rfft(loop)[: len(loop) // 4 + 1], len(loop) // 2) * 0.5, GAME_SR  # the same loop at 24 kHz, still a ring
         pad = int(GAME_PAD * rate)
