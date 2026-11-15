@@ -107,11 +107,10 @@ export const RECLUSE_PALETTE: Record<string, string> = {
   "~": "#1f4aa8",
   "-": "#0d1a3a",
   "^": "#8fd4ff",
-  "&": "#4cb8ff66",
-  "%": "#2f9dff3c",
-  "'": "#2f9dff1e",
+  "&": "#5cc6ff7a",
+  "%": "#40aaff48",
+  "'": "#40aaff24",
   "*": "#f4fdff",
-  "|": "#7fd6ff",
   "?": "#3ea2f0",
   ";": "#2a6fc0b0",
 };
@@ -876,48 +875,39 @@ function coatSkirt(stance: Stance, sway: number): Part {
   for (let Y = top + 1; Y < top + 11; Y++) stamp(cv, X0, Y0, [Y === top + 10 ? ".{" : "{}"], 55 + Math.round(swing(sway, (Y - top) / 40)), Y);
   return { grid: toGrid(cv) };
 }
-/** His hair always rising (behind his head part, which draws its roots): locks flowing up from his crown, fanning out a little,
- * waving as they go (`flow`, 0 to 2); his own brown, their ends caught by the aura's light. On his head part's own pixels moved
- * up 12 and left 6 (37 x 28). */
-const HAIR_ROOTS: readonly (readonly [number, number, number])[] = [
-  // (x, y in head pixels, length)
-  [1, 9, 11], [4, 5, 14], [7, 3, 16], [10, 2, 17], [13, 2, 16], [16, 3, 17], [19, 5, 14], [22, 8, 12],
-];
-function risenHair(flow: number): Part {
-  const W2 = 37;
-  const H2 = 28;
-  const cv = canvas(W2, H2);
+/**
+ * His head in his final form: his face as ever (the glowing eyes, phase 2's shadows) and his hair always rising, one part with one
+ * outline (so no line runs across his hair): a mass swept up from his crown, wider at its foot, its top in a few rounded locks, the
+ * whole of it rippling as the draft runs up it (`flow`, 0 to 2); the swept hair on top of his head turned up into it; dark lines
+ * between the locks; his own brown, lit from the top left; the aura's light along its outer edges. His head part's pixels with 6
+ * more columns each side and 12 more rows on top (37 x 47; `RISE_AT`).
+ */
+function risenHead(face: Face, dark: boolean, flow: number): Part {
   const DX = 6;
   const DY = 12;
-  const best = Array.from({ length: H2 }, () => Array.from({ length: W2 }, () => ({ d: 9, t: 0, side: 0, n: -1 })));
-  HAIR_ROOTS.forEach(([rx, ry, len], n) => {
-    // (Swept up from all round his head: the sides lean out and curl up, the crown straight up.)
-    const lean = (rx - 12) * 0.035;
-    const pts: Pt[] = [];
-    for (let s = 0; s <= 12; s++) {
-      const t = s / 12;
-      // (A slow S down each lock, travelling up it as `flow` turns; neighbours out of step, so the mass ripples.)
-      const wave = Math.sin(t * 3.4 - flow * 2.1 + n * 0.9) * 1.8 * t;
-      pts.push([rx + DX + 0.5 + Math.sin(lean) * len * t + wave, ry + LIFT + DY + 0.5 - Math.cos(lean) * len * t]);
-    }
-    for (let y = 0; y < H2; y++)
-      for (let x = 0; x < W2; x++)
-        for (let i = 1; i < pts.length; i++) {
-          const q = nearest([x + 0.5, y + 0.5], pts[i - 1]!, pts[i]!);
-          const t = (i - 1 + q.t) / (pts.length - 1);
-          const r = 3.3 - t * 2.3;
-          const b = best[y]![x]!;
-          if (q.d <= r && q.d - r < b.d) best[y]![x] = { d: q.d - r, t, side: q.nx / r, n };
-        }
-  });
-  for (let y = 0; y < H2; y++)
-    for (let x = 0; x < W2; x++) {
-      const b = best[y]![x]!;
-      if (b.n < 0) continue;
-      // Lit from the top left, a dark parting between locks; the outer locks' outer edges and the ends catch the aura's light.
-      // (Where one lock meets the next: a dark line between them, so the mass reads as strands.)
-      const parting = [best[y]![x + 1], best[y - 1]?.[x]].some((o) => o && o.n >= 0 && o.n !== b.n && b.side > 0);
-      cv[y]![x] = b.t > 0.9 && b.n % 2 ? "^" : parting ? "H" : b.side > 0.5 ? "h" : b.side < -0.25 ? (b.t > 0.45 ? "J" : "j") : b.t > 0.6 ? "j" : "h";
+  const C = 12.5;
+  const LOCK = 5.2;
+  const base = toCanvas(head(face, 0, dark, true));
+  const cv = canvas(25 + 2 * DX, 35 + DY);
+  base.forEach((row, y) => row.forEach((k, x) => (cv[y + DY]![x + DX] = k)));
+  const inside = (cx: number, cy: number) => {
+    const hx = cx - DX + 0.5;
+    const up = LIFT + 3 - (cy - DY + 0.5);
+    const shift = 1.7 * Math.sin(up * 0.33 - flow * 2.1) * Math.min(1, Math.max(0, up) / 12);
+    const x = hx - shift - C;
+    const e = 17.5 * (1 - (x / 14.5) ** 2) + 3.2 * Math.cos((Math.PI * x) / LOCK) ** 2 - 1.6;
+    return { ok: up > -3 && up < e, x, up, top: e - up };
+  };
+  for (let cy = 0; cy < cv.length; cy++)
+    for (let cx = 0; cx < cv[0]!.length; cx++) {
+      const p = inside(cx, cy);
+      const k0 = cv[cy]![cx]!;
+      // (Over his own hair's top rows, and wherever his head part was empty; never over his face.)
+      if (!p.ok || !(k0 === "." || (cy - DY < LIFT + 7 && "HhjJB".includes(k0)))) continue;
+      const u = p.x / LOCK - Math.round(p.x / LOCK); // -0.5 .. 0.5 across a lock
+      const edge = !inside(cx - 1, cy).ok || !inside(cx + 1, cy).ok;
+      cv[cy]![cx] =
+        edge && Math.abs(p.x) > 9 && p.up > 6 ? "^" : p.top < 1.6 && u < 0.3 ? "J" : Math.abs(u) > 0.42 && p.up > 1 ? "H" : u < -0.12 ? (p.up > 8 ? "J" : "j") : u > 0.22 ? "h" : "j";
     }
   return { grid: toGrid(cv) };
 }
@@ -953,8 +943,8 @@ function bolts(i: number): [number, number, string][] {
     let y = -2 + h(i * 3 + b * 17) * 110;
     // (A jagged run down and out: two steps out, one back, its ends dimmer; a branch off its middle.)
     for (let s = 0; s < 10; s++) {
-      out.push([Math.round(x), Math.round(y), s === 0 || s === 9 ? "|" : "*"]);
-      if (s === 4) out.push([Math.round(x) + side, Math.round(y) + 1, "|"], [Math.round(x) + 2 * side, Math.round(y) + 1, "|"]);
+      out.push([Math.round(x), Math.round(y), s === 0 || s === 9 ? "+" : "*"], [Math.round(x) - side, Math.round(y), "+"]);
+      if (s === 4) out.push([Math.round(x) + side, Math.round(y) + 1, "+"], [Math.round(x) + 2 * side, Math.round(y) + 2, "+"]);
       x += (s % 3 === 2 ? -1 : 1) * side;
       y += 1;
     }
@@ -978,14 +968,15 @@ function helix(front: boolean, step: number): Part {
       const R = 19 * (0.72 + 0.28 * Math.sin(Math.PI * u));
       const th = (Y / 44) * 2 * Math.PI + strand * Math.PI + (step / 12) * 2 * Math.PI;
       const z = Math.cos(th);
-      if (front !== z > 0 || (front && Math.abs(R * Math.sin(th)) < 12)) continue;
+      // (Not across his face and chest, where it would only clutter him.)
+      if (front !== z > 0 || (front && Math.abs(R * Math.sin(th)) < 13)) continue;
       const x = Math.round(46 + R * Math.sin(th)) - HELIX.x0;
       const y = Math.round(Y) - HELIX.y0;
       if (cv[y]?.[x] !== undefined) cv[y]![x] = ";";
     }
   for (let strand = 0; strand < 2; strand++)
-    for (let slot = 0; slot < 15; slot++) {
-      const Y = foot - slot * ((foot - top) / 14);
+    for (let slot = 0; slot < 20; slot++) {
+      const Y = foot - slot * ((foot - top) / 19);
       const u = (Y - top) / (foot - top);
       const R = 19 * (0.72 + 0.28 * Math.sin(Math.PI * u));
       const th = (Y / 44) * 2 * Math.PI + strand * Math.PI + (step / 12) * 2 * Math.PI;
@@ -993,7 +984,8 @@ function helix(front: boolean, step: number): Part {
       if (front !== z > 0) continue;
       const X = 46 + R * Math.sin(th);
       if (front && Y < 28 && Math.abs(X - 46) < 9) continue;
-      const k = z > 0.4 ? "*" : z > 0 ? "|" : z > -0.5 ? "?" : ";";
+      // (The nearest white, over his coat; the rest of the near side electric blue, so they read on a light board too; the far side dimmer.)
+      const k = z > 0.85 ? "*" : z > 0 ? "+" : z > -0.5 ? "?" : ";";
       const g = GLYPH[h(slot * 3 + strand * 41 + Math.floor((step + slot) / 6) * 7) < 0.5 ? "0" : "1"];
       g.forEach((row, dy) =>
         [...row].forEach((c, dx) => {
@@ -1007,14 +999,15 @@ function helix(front: boolean, step: number): Part {
   return { grid: toGrid(cv), outline: false };
 }
 const RISE_AT: Pt = [-6, -12];
+/** His head part's final-form version for a frame (`flow`: his hair's ripple), placed `RISE_AT` from where his head was. */
+function coatHead(name: string, flow: number): string {
+  const [, f, , dark] = name.split(":");
+  const [eyes0, brows, mouth] = f!.split(".") as [Eyes, Brows, Mouth];
+  const eyes: Eyes = eyes0 === "shut" ? "shut" : "glow";
+  return add(`coathead:${eyes}.${brows}.${mouth}${dark ? ":dark" : ""}:${flow}`, () => risenHead({ eyes, brows, mouth }, !!dark, flow));
+}
 /** A part's coat version (null: not worn with it), made the first time it's asked for. */
 function coatName(name: string): string | null {
-  if (name.startsWith("head:")) {
-    const [, f, , dark] = name.split(":");
-    const [eyes0, brows, mouth] = f!.split(".") as [Eyes, Brows, Mouth];
-    const eyes: Eyes = eyes0 === "shut" ? "shut" : "glow";
-    return add(`coathead:${eyes}.${brows}.${mouth}${dark ? ":dark" : ""}`, () => head({ eyes, brows, mouth }, 0, !!dark, true));
-  }
   if (name.startsWith("arm")) {
     const [kind, pts] = name.split(":");
     const q = pts!.split(";").map((p) => p.split(",").map(Number) as unknown as Pt) as [Pt, Pt, Pt];
@@ -1044,8 +1037,9 @@ export function coatFrame(f: Frame, i = 0): Frame {
       continue;
     }
     if (l.part.startsWith("head:")) {
-      layers.push({ ...l, part: add(`risenHair:${flow}`, () => risenHair(flow)), x: l.x + RISE_AT[0], y: l.y + RISE_AT[1] }, { ...l, part: n });
-      if (!n.includes(":shut")) layers.push({ ...l, part: add("eyeGlow", eyeGlow) });
+      const h = coatHead(l.part, flow);
+      layers.push({ ...l, part: h, x: l.x + RISE_AT[0], y: l.y + RISE_AT[1] });
+      if (!h.startsWith("coathead:shut")) layers.push({ ...l, part: add("eyeGlow", eyeGlow) });
       continue;
     }
     layers.push({ ...l, part: n });
