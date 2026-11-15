@@ -198,7 +198,7 @@ test("home: your pawn hops on a phone and a computer alike, 4 s after home shows
   // Three hops of 1.8 s each: on, off, on, off, on, off, the next one 30 s after the one before.
   expect(normal.during, `${test.info().project.name}: the hop's animation runs`).toBe("fd-hop");
   expect(normal.log.map((e) => e[1])).toEqual([1, 0, 1, 0, 1, 0]);
-  const [firstOn, firstOff, secondOn, , thirdOn] = normal.log.map((e) => e[0]);
+  const [firstOn, firstOff, secondOn, , thirdOn] = normal.log.map((e) => e[0]) as [number, number, number, number, number, number];
   // (The first hop 4 s after the pawn first shows. The pawn is seen by a DOM observer, and under the fake clock that reading can
   // land a fraction of a second off from when the hop's timer starts: a quarter second either side. The gaps between hops are exact.)
   expect(firstOn - normal.heroAt, "the first hop, 4 s after home shows").toBeGreaterThanOrEqual(3750);

@@ -808,8 +808,9 @@ test("quests (Nov 9, phase 3; real quests set by ?quests=): the Quests entry ope
     const overlaps: string[] = [];
     for (let i = 0; i < items.length; i++)
       for (let j = i + 1; j < items.length; j++) {
-        const a = items[i].r, b = items[j].r;
-        if (a.left < b.right - 0.5 && b.left < a.right - 0.5 && a.top < b.bottom - 0.5 && b.top < a.bottom - 0.5) overlaps.push(`${items[i].name} / ${items[j].name}`);
+        const p = items[i]!, q = items[j]!;
+        const a = p.r, b = q.r;
+        if (a.left < b.right - 0.5 && b.left < a.right - 0.5 && a.top < b.bottom - 0.5 && b.top < a.bottom - 0.5) overlaps.push(`${p.name} / ${q.name}`);
       }
     const cut = [...top.querySelectorAll(":scope > .fd-logo, .fd-top-end *")].filter((e) => e.scrollWidth > e.clientWidth + 1 && getComputedStyle(e).overflow !== "visible").map((e) => e.className);
     const edge = Math.max(...items.map((i) => i.r.right)) - innerWidth;
