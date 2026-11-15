@@ -3,6 +3,7 @@ import type { RiderDraft } from "./kit.ts";
 import { hunchessBase } from "@chessroyale/core";
 import { RIDE_CELLS, type RideCells } from "../../town/ride-cells.ts";
 import { hunchessDraft } from "./hunchess.tsx";
+import { chunk } from "../../stale.ts";
 
 /**
  * Each ride's drawing in its own chunk, loaded only when a ride is drawn (Nov 1, docs/decisions/2026-11-01-rides-lazy.md): worn by
@@ -15,25 +16,25 @@ import { hunchessDraft } from "./hunchess.tsx";
 
 /** Every ride's drawing, by its item id (crates.ts), each a chunk of its own. A new ride: its drawing in this folder, and a line here. */
 const DRAWINGS: Readonly<Record<string, () => Promise<RiderDraft>>> = {
-  "riding-chirp": () => import("./riding-chirp.tsx").then((m) => m.RidingChirp),
-  "moon-ride": () => import("./moon-ride.tsx").then((m) => m.moonRide),
-  "hollow-bulb": () => import("./hollow-bulb.tsx").then((m) => m.hollowBulb),
-  "smudgy-brush": () => import("./smudgy-brush.tsx").then((m) => m.smudgyBrush),
-  "alfil-howdah": () => import("./alfil-howdah.tsx").then((m) => m.AlfilHowdah),
-  "balloon-pup": () => import("./balloon-pup.tsx").then((m) => m.balloonPup),
-  "bigboy-buggy": () => import("./bigboy-buggy.tsx").then((m) => m.BigBoyBuggy),
-  "boingo-pogo": () => import("./boingo-pogo.tsx").then((m) => m.boingoPogo),
-  "folio-crane": () => import("./folio-crane.tsx").then((m) => m.folioCrane),
-  "ginger-sled": () => import("./ginger-sled.tsx").then((m) => m.gingerSled),
-  "jefferson-giraffe": () => import("./jefferson-giraffe.tsx").then((m) => m.rider),
-  "puddles-mower": () => import("./puddles-mower.tsx").then((m) => m.puddlesMower),
-  "sawyer-dozer": () => import("./sawyer-dozer.tsx").then((m) => m.sawyerDozer),
-  "rodeo-bull": () => import("./rodeo-bull.tsx").then((m) => m.rodeoBull),
-  "cheetah-shoes": () => import("./cheetah-shoes.tsx").then((m) => m.cheetahShoes),
-  "log-roller": () => import("./log-roller.tsx").then((m) => m.logRoller),
-  "pen-pony": () => import("./pen-pony.tsx").then((m) => m.penPony),
+  "riding-chirp": () => chunk(import("./riding-chirp.tsx")).then((m) => m.RidingChirp),
+  "moon-ride": () => chunk(import("./moon-ride.tsx")).then((m) => m.moonRide),
+  "hollow-bulb": () => chunk(import("./hollow-bulb.tsx")).then((m) => m.hollowBulb),
+  "smudgy-brush": () => chunk(import("./smudgy-brush.tsx")).then((m) => m.smudgyBrush),
+  "alfil-howdah": () => chunk(import("./alfil-howdah.tsx")).then((m) => m.AlfilHowdah),
+  "balloon-pup": () => chunk(import("./balloon-pup.tsx")).then((m) => m.balloonPup),
+  "bigboy-buggy": () => chunk(import("./bigboy-buggy.tsx")).then((m) => m.BigBoyBuggy),
+  "boingo-pogo": () => chunk(import("./boingo-pogo.tsx")).then((m) => m.boingoPogo),
+  "folio-crane": () => chunk(import("./folio-crane.tsx")).then((m) => m.folioCrane),
+  "ginger-sled": () => chunk(import("./ginger-sled.tsx")).then((m) => m.gingerSled),
+  "jefferson-giraffe": () => chunk(import("./jefferson-giraffe.tsx")).then((m) => m.rider),
+  "puddles-mower": () => chunk(import("./puddles-mower.tsx")).then((m) => m.puddlesMower),
+  "sawyer-dozer": () => chunk(import("./sawyer-dozer.tsx")).then((m) => m.sawyerDozer),
+  "rodeo-bull": () => chunk(import("./rodeo-bull.tsx")).then((m) => m.rodeoBull),
+  "cheetah-shoes": () => chunk(import("./cheetah-shoes.tsx")).then((m) => m.cheetahShoes),
+  "log-roller": () => chunk(import("./log-roller.tsx")).then((m) => m.logRoller),
+  "pen-pony": () => chunk(import("./pen-pony.tsx")).then((m) => m.penPony),
   // (An outfit, Nov 10: drawn with the rides' kit, the pawn's head in its face hole.)
-  "banana-suit": () => import("./banana-suit.tsx").then((m) => m.bananaSuit),
+  "banana-suit": () => chunk(import("./banana-suit.tsx")).then((m) => m.bananaSuit),
 };
 
 /** Every ride's item id. */

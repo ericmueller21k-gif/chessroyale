@@ -34,6 +34,7 @@ import { floorEngine, type FloorEngine } from "./floor-engine.ts";
 import { FLOOR, FloorMatch, clockText, evalText, resultText, thinkMs, viewersText, type FloorState } from "./match.ts";
 import still from "./still.jpg";
 import "./colosseum.css";
+import { chunk } from "../stale.ts";
 
 /** Ambient crowd noise (ambient.ts: Eric's arena ambience, streamed): Normal, Low or Off, remembered on this device; Normal by default. */
 const AMBIENT_KEY = "colosseum-ambient";
@@ -252,7 +253,7 @@ export function ColosseumScreen({ onExit }: { onExit: () => void }) {
       {
         move: async (fen, rating, ms) => {
           if (engine) return engine.move(fen, rating, ms);
-          const { legalMoves } = await import("@chessroyale/chess");
+          const { legalMoves } = await chunk(import("@chessroyale/chess"));
           const all = legalMoves(fen);
           return all[Math.floor(Math.random() * all.length)]!;
         },

@@ -87,6 +87,7 @@ import { dressedPawn, lookKey, offFace, offRide } from "./you-look.ts";
 import type { ItemLook } from "@chessroyale/core";
 import type { BotGameAsk } from "./TownPage.tsx";
 import "./town.css";
+import { chunk, setPlace, takePlace } from "../stale.ts";
 
 const CHIPS = TOWN_FEEL.maxChips;
 
@@ -112,6 +113,20 @@ export interface Card {
 }
 
 type Ctl = ReturnType<typeof startTown>;
+
+/** Where you were in the town as the page had to load again (stale.ts, a deploy's missing files), and the room or challenge opening. */
+interface TownPlace {
+  stand: Stand;
+  open: { home: HomeId; challenge: boolean } | null;
+}
+/** That place, the first time the town opens after that reload (null any other time, or for anything that doesn't read as one). */
+function townPlaceBack(): TownPlace | null {
+  const v = takePlace()?.town as Partial<TownPlace> | undefined;
+  const st = v?.stand;
+  if (!st || !Number.isInteger(st.c) || !Number.isInteger(st.r) || (st.facing !== 1 && st.facing !== -1) || ![0, 1, 2].includes(st.view)) return null;
+  const open = v.open && typeof v.open.home === "string" && HOMES.some((h) => h.id === v.open!.home) ? { home: v.open.home, challenge: v.open.challenge === true } : null;
+  return { stand: { c: st.c, r: st.r, facing: st.facing, view: st.view }, open };
+}
 
 /**
  * Each `.town-fit` row of a card at its stylesheet size, or smaller until its words fit the row (Eric, Oct 29: a long name
@@ -217,6 +232,11 @@ export function TownScreen({
   const fade = useRef<HTMLDivElement>(null);
   /** Going in or out: taps wait, and another way in or out isn't started. */
   const doorBusy = useRef(false);
+  /**
+   * The home a door is opening now (its "Go in", a boss's challenge, the door between two rooms), kept with where you stand should the
+   * page have to load again for it (stale.ts: a deploy took its files): it comes back with that room or challenge opening.
+   */
+  const opening = useRef<{ home: HomeId; challenge: boolean } | null>(null);
   /** The back button (or Go out) tapped while the room was still fading in: out as soon as it has (Nov 12: the tap was lost). */
   const outNext = useRef(false);
   /**
@@ -290,7 +310,7 @@ export function TownScreen({
     id !== "recluse"
       ? null
       : part === "top"
-        ? import("./shops/recluse-scene.ts").then((m) => {
+        ? chunk(import("./shops/recluse-scene.ts")).then((m) => {
             const me = account().profile?.user.id ?? "you";
             const sc = m.recluseScene(Date.now() - performance.now(), true, {
               live: true,
@@ -303,7 +323,7 @@ export function TownScreen({
             recluse.current = sc;
             return sc.fx;
           })
-        : import("./shops/recluse-stairs-scene.ts").then((m) => m.RECLUSE_STAIRS_FX);
+        : chunk(import("./shops/recluse-stairs-scene.ts")).then((m) => m.RECLUSE_STAIRS_FX);
   /**
    * You stand at a shop's door (its "Go in"): the town zooms in on the door (`x`, `y` in the box) and fades to black; the room opens.
    * A boss's challenge (`challenge`) goes in the same way, the boss beside you, with its intro's art loading too; the room plays it.
@@ -311,6 +331,7 @@ export function TownScreen({
   const goIn = async (id: HomeId, x: number, y: number, challenge = false) => {
     if (doorBusy.current) return;
     doorBusy.current = true;
+    opening.current = { home: id, challenge };
     outNext.current = false;
     passNext.current = null;
     doorPhase(RF.goIn);
@@ -324,10 +345,10 @@ export function TownScreen({
     // (A challenge's too: its splash starts the theme, Eric, Nov 11; loaded now it's ready by then.)
     roomMusicLoad(homeTheme(id));
     // (Its code and art load now, while the town zooms: nothing of a shop loads while you walk round the town.)
-    const load = import("./shops/ShopRoom.tsx").then((m) => m.loadRoom(id).then((room) => ({ room, View: m.ShopRoom })));
+    const load = chunk(import("./shops/ShopRoom.tsx")).then((m) => m.loadRoom(id).then((room) => ({ room, View: m.ShopRoom })));
     const scene = roomFxOf(id, "front");
     // (A challenge's intro art too: loaded only now, as you go in to fight.)
-    const intro = challenge ? import("./shops/intro.ts").then(async (m) => ({ m, intro: await m.loadIntro(id)! })) : null;
+    const intro = challenge ? chunk(import("./shops/intro.ts")).then(async (m) => ({ m, intro: await m.loadIntro(id)! })) : null;
     const cv = townCanvas();
     if (cv) {
       cv.style.transformOrigin = `${x.toFixed(1)}px ${y.toFixed(1)}px`;
@@ -414,9 +435,10 @@ export function TownScreen({
       }
     }
     byDoor.current = true;
+    opening.current = { home: at.room.def.home, challenge: false };
     doorPhase(RF.goIn);
     // (The back door's creak is off with the bakery's other room sounds: Eric, Nov 11.)
-    const load = import("./shops/ShopRoom.tsx").then((m) => m.loadRoom(at.room.def.home, to));
+    const load = chunk(import("./shops/ShopRoom.tsx")).then((m) => m.loadRoom(at.room.def.home, to));
     const scene = roomFxOf(at.room.def.home, to);
     fadeTo(1, F.fadeMs);
     await later(F.fadeMs);
@@ -443,14 +465,16 @@ export function TownScreen({
     if (doorBusy.current || !at || flow.current !== "town") return;
     const id = at.room.def.home;
     doorBusy.current = true;
+    // (Back after a reload, his room opens: his Challenge is a tap away there again.)
+    opening.current = { home: id, challenge: false };
     outNext.current = false;
     byDoor.current = false;
     step("fight");
     step("atDoor");
     const F = SHOP_FEEL;
     // (Eric, Nov 11: "The main room is still where you fight": his intro plays in the front room, you both coming out of the back door.)
-    const intro = import("./shops/intro.ts").then(async (m) => ({ m, intro: (await m.loadIntro(id))! }));
-    const front = import("./shops/ShopRoom.tsx").then((m) => m.loadRoom(id, "front"));
+    const intro = chunk(import("./shops/intro.ts")).then(async (m) => ({ m, intro: (await m.loadIntro(id))! }));
+    const front = chunk(import("./shops/ShopRoom.tsx")).then((m) => m.loadRoom(id, "front"));
     doorPhase(RF.goIn);
     fadeTo(1, F.fadeMs);
     await later(F.fadeMs);
@@ -597,6 +621,8 @@ export function TownScreen({
 
   // (A layout effect: the world's first frame is drawn before the screen first shows.)
   useLayoutEffect(() => {
+    /** Back after a reload for a deploy's missing files (stale.ts): where you were and what was opening. */
+    const back = townPlaceBack();
     /** The town is drawn (its loading screen gone): until then the away clock holds, as under a challenge. */
     let loaded = false;
     /** The town failed (its message shows instead): the away clock runs again, so a player who can't play is dropped as idle, never held present. */
@@ -616,10 +642,13 @@ export function TownScreen({
     const t = startTown(box.current!, canvas.current!, chips.current, cardEl.current!, live.current!, setZoomedOut, setCard, seatOf(seat), (s, face) => {
       const b = TOWN_BOTS[s.bot]!;
       onPlayBot?.({ seat: seatText(s), name: botLabel(b), rating: b.rating, look: isSprite(b.look) ? null : b.look.wear, face });
-    }, (id, x, y, challenge) => void goIn(id, x, y, challenge), stand, () => step("cancel"), (share, step) => {
+    }, (id, x, y, challenge) => void goIn(id, x, y, challenge), stand ?? back?.stand ?? null, () => step("cancel"), (share, step) => {
       if (share === null) {
         loaded = true;
         startGuest();
+        // (Back after that reload: the room or challenge your tap was opening opens, as the tap would, once the town is drawn.)
+        const i = back?.open ? HOMES.findIndex((h) => h.id === back.open!.home) : -1;
+        if (i >= 0) requestAnimationFrame(() => (back!.open!.challenge ? fight(i) : ctl.current?.goIn(i)));
         return setLoading(false);
       }
       if (step) setLoadStep(step);
@@ -634,6 +663,13 @@ export function TownScreen({
       setBroken(why);
     });
     ctl.current = t;
+    // Should the page have to load again (stale.ts): where you stand (for a challenge, where you stood as you called it, so it's called
+    // again from there) and the room or challenge opening now, or the room you're in.
+    setPlace(() => {
+      const open = doorBusy.current ? opening.current : insideNow.current ? { home: insideNow.current.room.def.home, challenge: false } : null;
+      const at = (open?.challenge ? t.challengeStand() : null) ?? t.standNow();
+      return { town: { stand: at, open } satisfies TownPlace };
+    });
     // Away (Eric, Nov 7; afk.ts, here-net.ts): the "zzz" over your pawn (the town's and a shop's), out to home after too long, and the
     // beats that put you (and your "zzz") in everyone else's town. A boss's challenge (from the fight to the battle) and the claw
     // machine hold the clock: they aren't idle presence. The loading screen (Nov 13: everyone's town has one now) holds the idle clock
@@ -649,6 +685,7 @@ export function TownScreen({
     });
     return () => {
       gone.current = true;
+      setPlace(null);
       stopGuest();
       stopAway();
       t.stop();
@@ -2557,6 +2594,8 @@ function startTown(
     },
     /** Where you stood as you challenged a boss (null: no challenge). */
     challengeStand: () => challengeStand,
+    /** Where you stand now (the square you're on or stepping onto, the way you face). */
+    standNow: () => standOf(town.you.walker),
     /** A challenge started inside a home (Don Dough's): you come back to where you stand in the town now, at its door. */
     standHere: () => void (challengeStand = standOf(town.you.walker)),
     endChallenge,

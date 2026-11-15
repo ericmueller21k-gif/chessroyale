@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import { bossDef, tokenBossName } from "@chessroyale/core";
 import { renderFrame, type Character } from "../characters/sprite.ts";
+import { chunk } from "../stale.ts";
 
 /**
  * A boss's token (Nov 2, shops round 2): its picture from claude/boss-art (components/tokens/, one chunk loaded the first time a
@@ -10,7 +11,7 @@ import { renderFrame, type Character } from "../characters/sprite.ts";
  */
 let art: Readonly<Record<string, Character>> | null = null;
 let loading: Promise<void> | null = null;
-const loadArt = () => (loading ??= import("./tokens/index.ts").then((m) => void (art = m.TOKEN_ART)).catch(() => void (loading = null)));
+const loadArt = () => (loading ??= chunk(import("./tokens/index.ts")).then((m) => void (art = m.TOKEN_ART)).catch(() => void (loading = null)));
 
 const reduced = () => typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
 

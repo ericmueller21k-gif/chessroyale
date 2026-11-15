@@ -4,13 +4,15 @@
  * small panel at the bottom (ClawMachine.tsx, its own chunk, loaded on that first tap: nothing of it loads with the app). One at a
  * time: a second call while it's open does nothing. Leaving the room closes it (`closeClawMachine`).
  */
+import { chunk } from "../stale.ts";
+
 let open = false;
 let closer: (() => void) | null = null;
 
 export function openClawMachine(): void {
   if (open) return;
   open = true;
-  void import("./ClawMachine.tsx")
+  void chunk(import("./ClawMachine.tsx"))
     .then((m) => {
       if (!open) return;
       closer = m.mountClawMachine(() => {

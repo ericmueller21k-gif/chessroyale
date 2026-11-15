@@ -24,6 +24,7 @@ import { prefetchMaia, startMaia } from "./maia.ts";
 import { MaiaGate, type GateEnd } from "./maia-gate.ts";
 import { testParams, timingOnDevice } from "./test-switches.ts";
 import { gardenClock, setGardenSource } from "./garden-clock.ts";
+import { chunk } from "./stale.ts";
 
 export const HUMAN = "you";
 /** In the final, how long each move is shown before the next turn. */
@@ -38,7 +39,7 @@ const BOSS_KILL_MS = 3800;
 let library: readonly Opening[] | null = null;
 let libraryLoad: Promise<readonly Opening[]> | null = null;
 export function loadOpenings(): Promise<readonly Opening[]> {
-  libraryLoad ??= import("@chessroyale/chess/data/openings.json").then(
+  libraryLoad ??= chunk(import("@chessroyale/chess/data/openings.json")).then(
     (m) => (library = m.default as unknown as Opening[]),
     (e) => {
       // (A failed fetch is tried again next time.)
