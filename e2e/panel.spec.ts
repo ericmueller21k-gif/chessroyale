@@ -158,11 +158,11 @@ test("the panel under the board is never empty: every tap, every remembered layo
   // the scoreboard after a reload, open or folded as the fold says. (The layout setting is the split's; the tab has none.)
   for (const layout of ["split", "board", "chat"]) {
     for (const fold of ["1", "0"]) {
-      await p.evaluate(([l, f]) => {
+      await p.evaluate(([l, f]: [string, string]) => {
         for (const k of Object.keys(localStorage)) if (/^brc\.(underBoard|miniTower)/.test(k)) localStorage.removeItem(k);
         localStorage.setItem("brc.underBoard", l);
         localStorage.setItem("brc.miniTower", f);
-      }, [layout, fold]);
+      }, [layout, fold] as [string, string]);
       await reload();
       const want = { layout: "board", open: fold === "1" || layout !== "split" } as { layout: "board"; open: boolean };
       await expectShowing(p, want, `older build: ${layout}, ${fold === "1" ? "open" : "folded"}`);

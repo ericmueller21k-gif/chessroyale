@@ -117,7 +117,7 @@ const cam = (p: Page) => p.evaluate(() => { const c = (window as any).__townCam(
  */
 async function swipe(p: Page, x: number, y: number, dy: number) {
   const cdp = await p.context().newCDPSession(p);
-  const touch = (type: string, at: number | null) => cdp.send("Input.dispatchTouchEvent", { type, touchPoints: at === null ? [] : [{ x, y: at }] });
+  const touch = (type: "touchStart" | "touchMove" | "touchEnd", at: number | null) => cdp.send("Input.dispatchTouchEvent", { type, touchPoints: at === null ? [] : [{ x, y: at }] });
   await touch("touchStart", y);
   for (let i = 1; i <= 10; i++) {
     await touch("touchMove", y + (dy * i) / 10);

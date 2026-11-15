@@ -313,8 +313,8 @@ test("nothing below the screen's bottom edge at the phone sizes with their brows
     [393, 659],
     [428, 746],
     [360, 560],
-  ]) {
-    await page.setViewportSize({ width: w!, height: h! });
+  ] as [number, number][]) {
+    await page.setViewportSize({ width: w, height: h });
     await page.waitForTimeout(300);
     const out = await page.evaluate(() => {
       const h = innerHeight;

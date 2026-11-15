@@ -79,8 +79,10 @@ async function watch(page: Page) {
     requestAnimationFrame(look);
   });
 }
-const seen = (page: Page) => page.evaluate(() => (window as any).__fo as { kinds: string[]; banners: string[]; lines: string[]; docks: string[]; marks: Record<string, string>[]; rev: { back: string; board: string; over: string }[] });
-const marks = (page: Page) => page.evaluate(() => ({ ...(document.querySelector<HTMLElement>(".fo-marks")?.dataset ?? {}) }) as Record<string, string>);
+/** The marks watcher's data attributes (Folio.tsx's .fo-marks: every one always set, "" when empty). */
+type Marks = Record<"draft" | "folded" | "crease" | "pencil" | "under" | "over", string>;
+const seen = (page: Page) => page.evaluate(() => (window as any).__fo as { kinds: string[]; banners: string[]; lines: string[]; docks: string[]; marks: Marks[]; rev: { back: string; board: string; over: string }[] });
+const marks = (page: Page) => page.evaluate(() => ({ ...(document.querySelector<HTMLElement>(".fo-marks")?.dataset ?? {}) }) as Marks);
 
 /** A position's pieces as the watcher writes them ("e4wpawn"), sorted. */
 function piecesOf(fen: string): string {

@@ -24,7 +24,7 @@ const canvas = (p: Page) => p.locator("canvas.town-canvas");
 const you = async (p: Page) => (await canvas(p).getAttribute("data-you"))!.split(",").map(Number) as [number, number];
 type Fig = { name: string; x0: number; y0: number; x1: number; y1: number; fy: number; alpha: number };
 type Box = { id: string; kind: string; facing: string; front: boolean; x: number; y: number; foot: number[] | null };
-type Cam = { heading: number; headingTo: number; headingBase: number; look: number; strip: string | null; figures: Fig[]; boxes: Box[] };
+type Cam = { heading: number; headingTo: number; headingBase: number; look: number; snapped: number | null; strip: string | null; figures: Fig[]; boxes: Box[] };
 type Me = { c: number; r: number; facing: number; view: number; moving: boolean; way: [number, number] };
 type W = {
   __townWalk: (s: readonly [number, number]) => boolean;

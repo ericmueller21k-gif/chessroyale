@@ -145,7 +145,7 @@ test("Squads (a test lobby): Resign leaves the lobby, a bot plays your seat, and
   const code: string = await page.evaluate(() => (window as any).squads.code);
   const squad: string = await page.evaluate(() => {
     const s = (window as any).squads;
-    return ["Rooks", "Knights", "Bishops", "Queens", "Kings", "Pawns", "Towers", "Crowns"][s.mySquad.id];
+    return ["Rooks", "Knights", "Bishops", "Queens", "Kings", "Pawns", "Towers", "Crowns"][s.mySquad.id]!;
   });
   // In a match: the board's screen.
   await expect(page.locator(".sq-game")).toBeVisible({ timeout: 30_000 });

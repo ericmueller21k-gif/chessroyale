@@ -1307,7 +1307,7 @@ test("the phase banners on the board: ACTION PHASE as buying begins, the big 3-2
   expect(Math.abs(box.y + box.height / 2 - (board.y + board.height / 2)), "in the middle").toBeLessThan(board.height * 0.14);
   const style = await action.evaluate((el) => {
     const s = getComputedStyle(el);
-    return { blur: s.backdropFilter || s.webkitBackdropFilter, radius: parseFloat(s.borderTopLeftRadius), bg: s.backgroundColor, fontSize: parseFloat(s.fontSize), board: el.closest(".board-wrap")!.getBoundingClientRect().width };
+    return { blur: s.backdropFilter || (s as CSSStyleDeclaration & { webkitBackdropFilter?: string }).webkitBackdropFilter, radius: parseFloat(s.borderTopLeftRadius), bg: s.backgroundColor, fontSize: parseFloat(s.fontSize), board: el.closest(".board-wrap")!.getBoundingClientRect().width };
   });
   expect(style.blur).toContain("blur");
   expect(style.radius).toBeGreaterThan(8);

@@ -13,7 +13,8 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
   The "Workers Builds: chessroyale" check fails instantly on PR branches (Cloudflare's preview build for non-production
   branches): only `check` (typecheck and unit tests, `.github/workflows/check.yml`: since Nov 6 `unit` and `chess`, packages/chess's tests,
   run side by side and `check` is green when both are) and the e2e run decide whether a PR
-  is green. Merge with a merge commit, then confirm the deploy live.
+  is green. The typecheck covers the e2e specs too (`e2e/tsconfig.json`, Nov 15): a spec's missing name or wrong field fails `check`
+  in minutes, not the e2e run half an hour later. Merge with a merge commit, then confirm the deploy live.
 - **A deploy and the tabs already open** (Nov 15, [decision](../decisions/2026-11-15-stale-tab.md)): a deploy takes the old
   version's files off the server, so an open tab lives on what the service worker keeps (`packages/app/sw-template.js`). Each
   version's cache stays while a tab runs it: the new worker asks each tab for its entry script (`install.ts`, `answerWorker`) and

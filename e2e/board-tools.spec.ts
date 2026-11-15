@@ -287,7 +287,7 @@ test("a phone: haptics: a tap picking up a piece ticks, a move ticks; a held pre
   await white.evaluate(() => {
     const w = window as unknown as { __buzz: unknown[] };
     w.__buzz = [];
-    navigator.vibrate = (p: VibratePattern) => (w.__buzz.push(p), true);
+    navigator.vibrate = (p: VibratePattern | Iterable<number>) => (w.__buzz.push(p), true);
   });
   const buzzes = () => white.evaluate(() => (window as unknown as { __buzz: unknown[] }).__buzz);
   const { select: S, move: M } = HAPTICS.patterns;
