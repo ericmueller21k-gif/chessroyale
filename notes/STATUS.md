@@ -1227,3 +1227,4 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 15 05:20: #728 (room trophy race) MERGED eb334c43; deploy + main full run watcher b3s50b7t5. Sled bells (1bf323b6) added to #729 (4beedbbf): new unsoftened output, sound.ts gameBus(true), RIDE_SOUND `bright`. PR CI watcher bi31tuj6u. Next: merge #729 when green; tell Eric the mower and sled are live.
 - Nov 15 05:25: PARKED per Eric: Alfil's elephant as a real one-step-any-way piece, via Fairy-Stockfish if ever ("no question"), only while an elephant lives. notes/briefs/idea-alfil-real-elephant.md. Start only on his word.
 - Nov 15 05:35: #728 main full run GREEN (eb334c43). #729 MERGED 27a7fe6d, LIVE (mower + sled). Main run watcher b0uwjgpu7.
+- Nov 15 05:55: main full run on 27a7fe6d GREEN. Queue empty: waiting on Eric's next ask.
