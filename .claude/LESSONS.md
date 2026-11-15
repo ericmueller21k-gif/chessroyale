@@ -375,4 +375,10 @@ Tests check *what* ends up on the screen, not *how it gets there*, nor how long 
   - A speech bubble stands on the drawing shown now: a figure whose height or place changes (grows, leaps onto the board) carries its
     heights from the art (measured in a unit test), never one number per character, and a check measures the bubble against his head.
 
+- **A cleared browser marked again by its own open tab** (Nov 15, [story](../docs/history/lessons.md#a-cleared-browser-marked-again-by-its-own-open-tab-nov-15-2026)):
+  - "A fresh browser" in a test is a new context (`browser.newContext({ ...test.info().project.use })`), never the open tab's
+    cookies and storage cleared: that tab's requests already on their way answer after the clear and set them again.
+  - A failure that only passes on CI's retry may be hidden by the retry's trace (it slows the page): repeat it locally with
+    `--trace off`, and log requests in the test instead.
+
 - **The FAQ follows the rules** (Oct 11): a PR that changes a rule, a number's meaning or a boss updates its words in `packages/app/src/faq/content.ts` in the same PR; numbers there come from the settings objects, never typed in.
