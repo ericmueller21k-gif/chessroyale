@@ -175,3 +175,21 @@ describe("a deploy while a tab is open: the new worker takes over", () => {
     expect(await store.match("/assets/Gone-x.js")).toBeUndefined();
   });
 });
+
+describe("the page's side: it says which version it runs", () => {
+  it("answers the worker's ask with its entry script's path, on the ask's port (and starts the worker's messages)", async () => {
+    vi.stubGlobal("location", { href: `${ORIGIN}/town` });
+    const { answerWorker, entryScript } = await import("../src/install.ts");
+    const doc = { querySelector: (sel: string) => (sel.includes("/assets/") ? { src: `${ORIGIN}/assets/index-abc.js` } : null) } as unknown as Document;
+    expect(entryScript(doc)).toBe("/assets/index-abc.js");
+    let listener: ((e: unknown) => void) | null = null;
+    let started = 0;
+    answerWorker({ addEventListener: (_: string, fn: (e: unknown) => void) => void (listener = fn), startMessages: () => void started++ } as never, () => entryScript(doc));
+    expect(started).toBe(1);
+    const replies: unknown[] = [];
+    listener!({ data: { type: "brc-entry?" }, ports: [{ postMessage: (v: unknown) => replies.push(v) }] });
+    listener!({ data: { type: "something else" }, ports: [{ postMessage: (v: unknown) => replies.push(v) }] });
+    expect(replies).toEqual(["/assets/index-abc.js"]);
+    vi.unstubAllGlobals();
+  });
+});
