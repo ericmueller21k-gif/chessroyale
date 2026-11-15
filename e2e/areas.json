@@ -42,6 +42,7 @@
     "packages/server/src/e2e-sql.ts",
     "packages/*/package.json",
     "tsconfig.base.json",
+    "e2e/tsconfig.json",
     "packages/*/tsconfig.json",
     "playwright.config.ts",
     "e2e/dev-proxy-retry.mjs",
