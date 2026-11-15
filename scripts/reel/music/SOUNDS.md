@@ -238,3 +238,8 @@ or a chord has now missed in every song it was tried in (the Wrangler notes abov
 The other notes he passed on agree, and add: at most three 16ths the same way, leaps and dotted rhythms and notes
 tied over the barline so the right hand floats over the left, ornaments (a flick, a neighbor note) for interest, and a
 repeat that develops, not a copy. Two rewrites of those bars sent side by side (`take` "a" and "g").
+"Those are good", and then he played more himself and sent the notes: all white keys, quarters and 8ths, round one
+falling hook (C, B, G, B, A) that comes back; no sharps anywhere. The notes on why his own playing sat better than
+what was written for him are the lesson: "harmonic and rhythmic restraint": a hook that recurs, spaced-out phrases,
+notes of the key, and no D sharp or F sharp colour under a plain tune. The solo is now his phrases over white-key
+chords (song_ad.py's docstring says whose each bar is).

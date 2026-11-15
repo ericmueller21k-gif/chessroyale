@@ -40,40 +40,40 @@ The piano solo in the middle is Eric's own piece (Nov 14): "I tried to come up w
 recorded it with my piano here ... you're going to just transcribe exactly what it tells you to do ... a nice little
 beautiful solo piano work that's in the middle of this song. And you can still keep that like quiet background thing
 that rings throughout the whole song in it. But then this part, we just want to focus on the piano ... if it needs to
-be longer to fit it in, that's what I'm expecting anyway." He sent a write-up of it: his left hand's two four-bar
-patterns, tidied to even 8ths (C major 9th, then his F sharp and D sharp over a C), and a right-hand solo written
-over them for him. They are his to give. The left hand is played note for note as written (`LEFT_A`, `LEFT_B`); so are
-the right hand's first five bars and its last (`RIGHT_1`, `BAR_5`, `BAR_8`). Its bars 6 and 7 as written were runs of
-16ths, a climb and a fall, and he turned those down once he heard them: "I really like it up until 19 seconds, and
-then it just falls apart ... the basic climbs up and down ... are just not hitting for me ... maybe kind of keeping
-it in the space of the first ... we need to do something instead of these constant climbs up and down, these quick
-whatever they're called" (he liked the sour F sharp, the last bar "with both hands there", and bars 3 and 4 the second
-time). So those two bars, and the second time's bar 2 (the same kind of run), are rewritten, in two takes he asked
-for side by side (`take`):
-  "a"  this file's own: bar 6 answers in bar 3's rhythm and climbs back to the F sharp in 8ths, bar 7 turns on the D
-       sharp as bar 4 turns on the E and walks down to bar 8; the second time is the same, an octave doubled.
-  "g"  to the rules his other set of notes gives (no ladder of 16ths; leaps of fourths, fifths and sixths; dotted
-       8ths and notes tied over the barline; a flick or a neighbor note for ornament; the second time not a copy,
-       building in octaves): bar 6 leaps up to an F sharp held over the barline while the left hand turns to the D
-       sharp under it; the second time climbs on to a high B in octaves before it settles. The notes are this
-       file's; the rules are the notes'.
+be longer to fit it in, that's what I'm expecting anyway." It took three goes, each from notes of his.
+First a write-up of what he had played: his left hand's rolling patterns, tidied to even 8ths, and a right-hand solo
+written over them for him. Heard, he liked its lyrical bars and turned down its runs: "I really like it up until 19
+seconds, and then it just falls apart ... the basic climbs up and down ... are just not hitting for me ... we need to
+do something instead of these constant climbs up and down, these quick whatever they're called." Two rewrites of
+those bars followed ("Those are good"), and then: "I just went to the piano again and tried a couple more things that
+I want to get ... Can you make another version with my changes?", with the notes he had played: all on the white
+keys, in quarters and 8ths, round one falling hook (C, B, G, B, A). So now:
+  - His, as given: the left hand's first pattern (`LEFT_A`); the hook (`HOOK`) and the four phrases he played
+    (`RIGHT_2`, `RIGHT_4`: the leap to a high D and the hook; the drop to E and its two small cells; the valley down
+    to D and the climb to C, with its turn on A and G; the hook to close). The notes give their pitches in order,
+    not their lengths: the rhythms are set here, the hook the same each time.
+  - From the first write-up, kept because he liked them: the right hand's first bar (a flick into a leap) and its
+    bars 3 and 4 (a call, a turn in threes).
+  - This file's: the second time's bar 2 (from the rewrite he called good), and the left hand under his phrases. The
+    first write-up had black keys there (an F sharp, then a D sharp, over a C); his phrases have F and D natural, and
+    his notes ask for the harmony under them to move to "A minor / F major / D minor / E minor" so that nothing is
+    sour. It is D minor, F, E minor, A minor, a bar each, rolled in his own left hand's shape (the F and A minor
+    bars are his own from `LEFT_A`); his phrases close on the A.
 The calls made in fitting it in:
   - It plays at the song's 129 beats a minute, not the write-up's 98: the backdrop he asked to keep is the song's.
-  - For its twenty bars nothing swings (the song's off 8ths are late; his 8ths and 16ths are even): the brush plays
-    even 8ths and the bass one soft note a bar, and the chords and wood block wait.
-  - Its shape: his first pattern once by the left hand alone; then both patterns with the solo over them (the first
-    two bars' left hand an octave up, as the write-up asks of a repeat); then both again, the solo's longer notes
-    doubled an octave under and strings far off under the F sharp bars (the write-up's "octaves ... a subtle pad").
-    The write-up's own three-minute plan (a piece of its own, with a long opening and a cadenza) is not used: his
-    words were a solo in the middle of this song.
-  - Bar 2's lengths as written don't add up to a bar: its run of 16ths starts on the bar's first beat (its "tied" E
-    is left ringing), so the run ends on the two notes it lands on, on the third beat.
+  - For its twenty bars nothing swings (the song's off 8ths are late; his 8ths are even): the brush plays even 8ths
+    and the bass one soft note a bar, and the chords and wood block wait.
+  - Its shape: his first pattern once by the left hand alone; then eight bars with the right hand (the first two
+    bars' left hand an octave up, as the write-up asks of a repeat); then eight more, the first four's longer notes
+    and the last hook doubled an octave under, strings far off under the last four. The write-up's own three-minute
+    plan (a piece of its own, with a long opening and a cadenza) is not used: his words were a solo in the middle of
+    this song.
 The idea from the game: a walk round the town. The bass walks down a step a bar under a D that never moves (G, F
 sharp, F, E, E flat, D: the E flat bar is the chord borrowed from the minor, the walk's one wistful step); the tune is
 handed from voice to voice as the walk passes the square, the gazebo and the cafe; and near the end the pawn reaches
 the far side and is promoted: the tune a minor third up, everyone together. A wood block's knock is a piece set down.
 G major; 116 bars of four at 129 beats a minute: 215.8 s.
-  python3 song_ad.py <out.wav> [the piano solo's take: a or g]
+  python3 song_ad.py <out.wav>
 
   bars   1-4    0:00  the stroll starts: the bass, the chords, a brush
   bars   5-12   0:07  the square: the tune on the clarinet
@@ -112,7 +112,7 @@ CAFE = "Em9 Em/D Cmaj7 B7 Em9 Em/D C#m7b5 D7sus4,D7  Em9 Em/D Cmaj7 B7 Em9 A9 Am
 TALK = "G B7 Em G7/D C A7/C# D7sus4 D7,F7"
 LIFTED = " ".join(c + "+3" for c in WALK.split()[:7]) + " F7,D7"  # its last bar is the way home
 SOLO = 45  # the bar Eric's piano solo starts at: twenty bars
-SOLO_BASS = "C C Am F  C C Am F  C C C Em/B  C C Am F  C C C Em/B"  # the bass's notes only: its chords are in its left hand
+SOLO_BASS = "C C Am F  C C Am F  Dm F Em Am  C C Am F  Dm F Em Am"  # the bass's notes only: its chords are in its left hand
 CHORDS = f"{VAMP}  {WALK} {WALK}  {GAZEBO}  {WALK} {WALK}  {SOLO_BASS}  {TALK}  {LIFTED}  {CAFE}  {WALK} {WALK}  {VAMP}".split()
 assert len(CHORDS) == BARS, len(CHORDS)
 KINDS = {"": (0, 4, 7), "6": (0, 4, 7, 9), "maj7": (0, 4, 7, 11), "7": (0, 4, 7, 10), "9": (0, 4, 7, 10, 14), "add9": (0, 4, 7, 14), "m": (0, 3, 7),
@@ -155,40 +155,34 @@ BELL = "-:3 B5:.5 G5:.5 | E5:1 -:3 | -:1 E5:.5 G5:.5 B5:1 -:1 | -:3 B5:.5 F#5:.5
 # The conversation: the clarinet's two bars, the flute's two, twice.
 TALK_C = "D5:.5 B4:.5 G4:1 A4:.5 B4:.5 D5:1 | D#5:1.5 B4:.5 F#4:1 A4:1 | -:8 | E5:1 C5:.5 G4:.5 E4:1 G4:1 | A4:.5 C#5:.5 E5:1.5 C#5:.5 A4:1 | -:8"
 TALK_A = "-:8 | G4:.5 B4:.5 E5:1.5 D5:.5 B4:1 | D5:1 B4:.5 G4:.5 F4:1 D4:1 | -:8 | G4:1 A4:1 C5:1 D5:1 | D5:.5 C5:.5 A4:1 C5:1 Eb5:1"
-# Eric's piano solo, as his write-up gives it. The left hand's two patterns, a bar of 8ths each: the C major 9th's
-# four bars, and the four with his black keys (F sharp, then D sharp) over a C.
+# Eric's piano solo (the docstring says whose each part is). The left hand, a bar of 8ths each: his first pattern
+# (C major 9th, then A minor and F), and the four bars under his own phrases (D minor, F, E minor, A minor).
 eighths = lambda text: " | ".join(" ".join(name + ":.5" for name in bar.split()) for bar in text.split(" | "))
 LEFT_A = eighths("C2 G2 D3 E3 G3 E3 D3 G2 | C2 G2 E3 F3 G3 F3 E3 G2 | A2 E3 B3 C4 E4 C4 B3 E3 | F2 C3 G3 A3 E4 C4 A3 G3")
-LEFT_B = eighths("C3 F#3 A3 B3 D4 B3 A3 F#3 | C3 F#3 A3 B3 E4 D4 B3 A3 | C3 D#3 A3 B3 C4 B3 A3 D#3 | B2 E3 G3 A3 B3 A3 G3 E3")
-# The right hand, bars 1 to 4 as written: a flick into a leap, a run down the scale onto two notes, a call, a turn in
-# threes. Bar 5 (the F sharp's falling line) and bar 8 (two notes, then an arpeggio up and out) as written too.
+LEFT_B = eighths("D2 A2 E3 F3 A3 F3 E3 A2 | F2 C3 G3 A3 E4 C4 A3 G3 | E2 B2 G3 A3 B3 A3 G3 B2 | A2 E3 B3 C4 E4 C4 B3 E3")
+# The right hand. His hook; the first write-up's opening bar (up to its last note) and its bars 3 and 4.
+HOOK = "C6:1 B5:1 G5:.5 B5:.5 A5:1"
+OPEN = "D5:.125 E5:.875 B5:1 G5:.5 A5:.5"
 CALL = "-:.5 E5:.5 A5:.5 B5:.5 C6:1.5 D6:.5 | E6:1/3 F6:1/3 E6:1/3 B5:1 G5:2"
-RIGHT_1 = "D5:.125 E5:.875 B5:1 G5:.5 A5:.5 E6:1 | D6:.25 C6:.25 B5:.25 A5:.25 G5:.25 F5:.25 E5:.25 D5:.25 E5:2 | " + CALL
-BAR_5, BAR_8 = "F#6:1.5 E6:.5 D6:.5 B5:.5 A5:1", "E5:2 E5:.5 G5:.5 B5:.5 E6:.5"
-# Rewritten (see the docstring), per take: the first time's bars 6 and 7; the second time's bars 1 and 2 (bar 1 as
-# written; in "g" its last note is held over the barline) and its bars 6 and 7.
-TAKES = {
-    "a": ("-:.5 B5:.5 D6:.5 E6:.5 F#6:1.5 E6:.5 | D#6:1/3 E6:1/3 D#6:1/3 B5:1 A5:1 F#5:1",
-          "D5:.125 E5:.875 B5:1 G5:.5 A5:.5 E6:1 | D6:1 B5:.5 G5:.5 E5:2",
-          "-:.5 B5:.5 D6:.5 E6:.5 F#6:1.5 E6:.5 | D#6:1/3 E6:1/3 D#6:1/3 B5:1 A5:1 F#5:1"),
-    "g": ("E5:.75 B5:.75 G5:.5 F#6:3 | B5:.75 E6:.125 D#6:.625 A5:.5 C6:.5 F#5:.5",
-          "D5:.125 E5:.875 B5:1 G5:.5 A5:.5 E6:1.75 | G5:.75 C6:.5 E5:2",
-          "E5:.75 B5:.75 G5:.5 F#6:1 A6:1 | B6:1.5 F#6:.5 A6:.5 E6:.125 D#6:.875 B5:.5"),
-}
-RIGHT_1_UNDER, RIGHT_2_UNDER = "-:6 G4:2 | -:8", "-:12 | C5:2 -:2"  # the note asked for under two of the long ones
-SOLO_PAD = "A3 D4 F#4 | A3 D4 F#4 | A3 C4 D#4 | G3 B3 E4"  # strings under the black-key bars the second time: notes his left hand plays there
+# The first eight bars: the opening, his hook, the call and turn; then his first phrases: up to a high D and the
+# hook, then the drop to E and its two cells, closing on A.
+RIGHT_1 = f"{OPEN} E6:1 | {HOOK} | {CALL}"
+RIGHT_2 = f"C6:1 B5:.5 F5:.5 D6:1.5 C6:.5 | {HOOK} | C6:1 B5:.5 E5:1 E5:.5 B5:.5 A5:.5 | E5:.5 B5:.5 G5:1 A5:2"
+# The second eight: the opening held over the barline into three falling notes (and a G under the last), the call and
+# turn; then his other phrases: the valley down to D, the climb to C, a breath, his turn on A and G, and the hook.
+RIGHT_3, RIGHT_3_UNDER = f"{OPEN} E6:1.75 | G5:.75 C6:.5 E5:2 | {CALL}", "-:6 G4:2 | -:8"
+RIGHT_4 = f"C6:1 B5:.5 G5:.5 A5:.5 F5:.5 D5:1 | E5:.5 D5:.5 F5:.5 G5:.5 C5:2 | -:2 A5:.5 G5:.5 A5:.5 G5:.5 | {HOOK}"
+SOLO_PAD = "A3 D4 F4 | A3 C4 F4 | G3 B3 E4 | A3 C4 E4"  # strings under the second time's last four bars: their chords
 # The stroll's last bars: the tune's first hop on the piano, far off.
 LAST = "-:4 | G4:.5 B4:.5 -:.5 D5:.5 E5:2 | -:8"
 for _line, _beats in ((TUNE, 32), (UNDER, 32), (BESIDE, 32), (HOME, 4), (HOME_BESIDE, 4), (SLOW, 32), (CAFE_1, 32), (CAFE_2, 32), (BELL, 32), (TALK_C, 32), (TALK_A, 32), (LAST, 16),
-                      (LEFT_A, 16), (LEFT_B, 16), (RIGHT_1, 16), (CALL, 8), (BAR_5, 4), (BAR_8, 4), (RIGHT_1_UNDER, 16), (RIGHT_2_UNDER, 16),
-                      *((line, 8) for take in TAKES.values() for line in take)):
+                      (LEFT_A, 16), (LEFT_B, 16), (HOOK, 4), (RIGHT_1, 16), (RIGHT_2, 16), (RIGHT_3, 16), (RIGHT_3_UNDER, 16), (RIGHT_4, 16)):
     assert beats(_line) == _beats, (_line[:30], beats(_line))
 
 
-def render(take: str = "a", window=None) -> np.ndarray:
-    """The song as heard (stereo, at the mix's own level). `take`: which rewrite of the piano solo's bars 6 and 7
-    ("a" or "g": the docstring). `window`: (from beat, to beat), to make only that passage (a sample, to compare
-    voices on)."""
+def render(window=None) -> np.ndarray:
+    """The song as heard (stereo, at the mix's own level). `window`: (from beat, to beat), to make only that passage
+    (a sample, to compare voices on)."""
     x = Ride(RIDE, BEATS, None, os=2, seed=233, tape_secs=TAPE)
     x.window = window
     put, at = x.put, x.at
@@ -446,10 +440,10 @@ def render(take: str = "a", window=None) -> np.ndarray:
     # Bars 29-44: the square again: this time the flute plays beside the clarinet before its own turn.
     sample(29, beside=0.6)
 
-    # Bars 45-64: Eric's piano solo (the docstring has his words and the calls made). Under it only the brush, in
-    # even 8ths, and one soft bass note a bar. His first pattern by the left hand alone; then twice through both
-    # patterns with the right hand's solo: the second time its longer notes are doubled an octave under, and strings
-    # sit far off under the black-key bars.
+    # Bars 45-64: Eric's piano solo (the docstring has his words, whose each part is and the calls made). Under it
+    # only the brush, in even 8ths, and one soft bass note a bar. His first pattern by the left hand alone; then
+    # eight bars with the right hand, twice: the second time the first four bars' longer notes and the last hook are
+    # doubled an octave under, and strings sit far off under the last four.
     s0 = bar0(SOLO)
     for bar in range(SOLO, SOLO + 20):
         root = of(bar)[0]
@@ -457,18 +451,12 @@ def render(take: str = "a", window=None) -> np.ndarray:
         for i in range(8):
             brush(bar0(bar) + i * 0.5, 0.012 if i % 2 == 0 else 0.008)
     grand(s0, LEFT_A, 0.047, -0.15)
-    for again, first in enumerate((s0 + 16, s0 + 48)):
-        if again:
-            grand(first, LEFT_A, 0.047, -0.15)
-        else:
-            grand(first, some(LEFT_A, 0, 2), 0.047, -0.15, up=12), grand(first + 8, some(LEFT_A, 2, 4), 0.047, -0.15)
-        grand(first + 16, LEFT_B, 0.047, -0.15)
-        mid, opening, mid2 = TAKES[take]
-        lines = (f"{opening} | {CALL}", f"{BAR_5} | {mid2} | {BAR_8}") if again else (RIGHT_1, f"{BAR_5} | {mid} | {BAR_8}")
-        for off, line, under in ((0, lines[0], RIGHT_1_UNDER), (16, lines[1], RIGHT_2_UNDER)):
-            grand(first + off, line, 0.1, 0.15, bus="solo"), grand(first + off, under, 0.07, 0.1, bus="solo")
-            if again:  # the octave under: in "g" its second half is a little louder (the build in octaves)
-                grand(first + off, line, 0.06 if take == "g" and off else 0.05, 0.1, up=-12, slow=True, bus="solo")
+    grand(s0 + 16, some(LEFT_A, 0, 2), 0.047, -0.15, up=12), grand(s0 + 24, some(LEFT_A, 2, 4), 0.047, -0.15), grand(s0 + 48, LEFT_A, 0.047, -0.15)
+    grand(s0 + 32, LEFT_B, 0.047, -0.15), grand(s0 + 64, LEFT_B, 0.047, -0.15)
+    for first, line in ((s0 + 16, RIGHT_1), (s0 + 32, RIGHT_2), (s0 + 48, RIGHT_3), (s0 + 64, RIGHT_4)):
+        grand(first, line, 0.1, 0.15, bus="solo")
+    grand(s0 + 48, RIGHT_3_UNDER, 0.07, 0.1, bus="solo")
+    grand(s0 + 48, RIGHT_3, 0.05, 0.1, up=-12, slow=True, bus="solo"), grand(s0 + 76, HOOK, 0.05, 0.1, up=-12, bus="solo")
     for i, names in enumerate(SOLO_PAD.split(" | ")):
         at(s0 + 64 + 4 * i, 4)
         for j, name in enumerate(names.split()):
@@ -512,9 +500,9 @@ def render(take: str = "a", window=None) -> np.ndarray:
     return x.play(x.mixdown(levels, lowpass=8000, room=0.26, room_s=1.6))
 
 
-def main(out: str, take: str = "a") -> None:
-    write_wav(out, render(take))
+def main(out: str) -> None:
+    write_wav(out, render())
 
 
 if __name__ == "__main__":
-    main(*sys.argv[1:3])
+    main(sys.argv[1])
