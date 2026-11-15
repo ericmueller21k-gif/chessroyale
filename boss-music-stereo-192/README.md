@@ -12,3 +12,12 @@ build made before that change, only `recluse-phase2-intro` and its `themes.json`
 
 The other bosses' themes are not in this folder: `python3 scripts/reel/music/handoff.py --stereo --kbps 192 <folder>`
 builds them.
+
+## Nov 15: Babur's theme (`tiger`)
+
+`tiger-loop.mp3` / `.ogg` (stereo, 192 kbps), and its entry in this folder's `themes.json`: one loop of 120.0 s, no
+intro piece (`introSeconds` 0), pad 0.5 as the others, -16.7 LUFS, peak -1.1 dBFS. Built by
+`python3 handoff.py --stereo --kbps 192 <folder> tiger` from `scripts/reel/music/song_af.py` on `claude/trailer-v2`.
+It is Eric's own plan for the song (written with another assistant), built as written; he heard it and said "that's so
+good ... I like the second one". The loop point is clean on the built file (the climax falls into the quiet opening,
+as his plan has it).
