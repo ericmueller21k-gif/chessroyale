@@ -15,9 +15,11 @@ builds them.
 
 ## Nov 15: Babur's theme (`tiger`)
 
-`tiger-loop.mp3` / `.ogg` (stereo, 192 kbps), and its entry in this folder's `themes.json`: one loop of 120.0 s, no
-intro piece (`introSeconds` 0), pad 0.5 as the others, -16.7 LUFS, peak -1.1 dBFS. Built by
+`tiger-loop.mp3` / `.ogg` (stereo, 192 kbps), and its entry in this folder's `themes.json`: one loop of **165.0 s**, no
+intro piece (`introSeconds` 0), pad 0.5 as the others, -16.8 LUFS, peak -1.1 dBFS. Built by
 `python3 handoff.py --stereo --kbps 192 <folder> tiger` from `scripts/reel/music/song_af.py` on `claude/trailer-v2`.
-It is Eric's own plan for the song (written with another assistant), built as written; he heard it and said "that's so
-good ... I like the second one". The loop point is clean on the built file (the climax falls into the quiet opening,
-as his plan has it).
+It is Eric's own plan for the song (written with another assistant), built as written; he heard it at two minutes and
+said "that's so good ... I like the second one", then asked for it longer ("2 minutes and 30 seconds or 2 minutes and
+45 seconds just plays. It's less repetitive"): this is the 2:45 one, the same sections with two of them longer. It
+replaces the 120.0 s file of commit 43f2700f (same name: `loopSeconds` is what changed). The loop point is clean on
+the built file (the climax falls into the quiet opening, as his plan has it).
