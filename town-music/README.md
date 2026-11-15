@@ -31,9 +31,14 @@ The pieces fit together the way a boss theme's intro and loop do, with the order
 - Both joins want the same sample-accurate scheduling the intro-to-loop join has (Web Audio start times), not a
   timer: a solo's first note and the theme's first beat after it are on the beat.
 
-I put the game's own files together this way and checked both joins: no step at either, and the level runs straight
-through (theme into solo -22.1 dB to -21.9 dB over the second either side; solo back into theme about 2 dB down, which
-is the theme's quiet opening).
+I put the game's own files together this way and checked both joins: nothing is cut and there is no step that isn't
+a note starting. The level rises about 3 dB as the piano comes in and falls about 3 dB back into the theme's quiet
+opening.
+
+Nov 15, after Eric heard them: the solos have no brush now ("that shaking thing ... completely drowns out every other
+thing going on ... for even the solo, just get rid of it completely") and the piano's left hand, the bass and the
+strings are a little louder; he heard a clip and said "perfect". Same file names, lengths and numbers as before, so
+nothing in the wiring changes: only the two solo files (and town.json's peaks) differ.
 
 ## When to play a solo (Eric's words, then a proposal)
 
