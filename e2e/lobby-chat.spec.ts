@@ -1,4 +1,4 @@
-import { expect, type Page } from "@playwright/test";
+import { expect, type Locator, type Page } from "@playwright/test";
 import { asSignedIn, createLobbyFromHome, named, pickMode, soloFromHome, test } from "./helpers.ts";
 
 /**
@@ -10,6 +10,12 @@ import { asSignedIn, createLobbyFromHome, named, pickMode, soloFromHome, test } 
 const phase = (p: Page) => p.evaluate(() => (window as any).match?.phase.kind ?? "none").catch(() => "none");
 type Box = { x: number; y: number; width: number; height: number };
 type QueueBoxes = { count: Box; seats: Box; cancel: Box; chat: Box };
+/** Where a locator is on the page (scroll included), for the private lobby's chat and Start (the queue's pieces are measured in-page). */
+const box = async (l: Locator): Promise<Box> => {
+  const b = (await l.boundingBox())!;
+  const scrollY = await l.page().evaluate(() => window.scrollY);
+  return { x: Math.round(b.x), y: Math.round(b.y + scrollY), width: Math.round(b.width), height: Math.round(b.height) };
+};
 const overlaps = (a: Box, b: Box) => a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
 /**
  * Put on the page before it opens: `queueBoxes()`, where the queue's own pieces are (the lobby chat must cover none of
