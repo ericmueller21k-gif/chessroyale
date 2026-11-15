@@ -1244,3 +1244,4 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 15 09:35: fairplay:65 fix -> #732 (779f8c44), CI running. GUARD TEST (Eric's ban rule): setup only; asked Eric's OK before merge. Helper archived.
 - Nov 15 10:05: #732 CI GREEN (no flaky). Held for Eric's OK (guard test). Final form r4b waits on his go.
 - Nov 15 17:40: Babur's theme (music helper, 43f2700f; Eric approved) -> PR claude/babur-theme (ddac7725), CI running. Smudgy is the last boss with no theme. Still held: #732 (Eric's OK, guard test), final form r4b (Eric's go).
+- Nov 15 17:50: Eric: final form 4b "looks correct now" -> .go round4b written; build watcher running. Eric on bans: wrap it up; a banned account can't get in, and cheaters making new accounts is fine. #732 merged (his "wrap it up" taken as the OK; setup only). DROPPED per Eric: the ban-gate stray-guest race job (ban holds; not worth the time). No more ban/fair-play work unless he asks.
