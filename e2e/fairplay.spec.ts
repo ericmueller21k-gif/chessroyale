@@ -129,24 +129,27 @@ test("a ban means you can't sign in (Eric, Nov 13): a tab open drops to the ban 
   await onlyTheBan(page);
   expect(await localSql(page, "SELECT COUNT(*) AS n FROM sessions WHERE user_id = ?", id)).toEqual([{ n: 0 }]);
 
-  // A fresh browser (cookies and storage cleared): signing in to the banned account shows only the ban line, and makes no session.
-  await page.context().clearCookies();
-  await page.evaluate(() => localStorage.clear());
-  await emailSignIn(page, email, "424242");
-  await onlyTheBan(page);
-  expect(await localSql(page, "SELECT COUNT(*) AS n FROM sessions WHERE user_id = ?", id)).toEqual([{ n: 0 }]);
-  await page.unrouteAll();
-  await page.goto("/town");
-  await onlyTheBan(page);
+  // A fresh browser (no cookies, no storage, no tab left open on the ban screen): signing in to the banned account shows only the
+  // ban line, and makes no session. A browser of its own, not this one cleared: the tab still open here has requests on their way,
+  // and an answer to one sent before a clear lands after it and marks the browser again, as it should (main's retry-passes, Nov 15:
+  // docs/decisions/2026-11-15-fairplay-fresh-browser.md).
+  await page.close();
+  const fresh = await (await browser.newContext({ ...test.info().project.use })).newPage();
+  await emailSignIn(fresh, email, "424242");
+  await onlyTheBan(fresh);
+  expect(await localSql(fresh, "SELECT COUNT(*) AS n FROM sessions WHERE user_id = ?", id)).toEqual([{ n: 0 }]);
+  await fresh.unrouteAll();
+  await fresh.goto("/town");
+  await onlyTheBan(fresh);
 
   // Lifted (an appeal by email, answered by a person): the next load is the game again, and the account signs in as before.
   expect(await (await decide("clear")).json()).toMatchObject({ ok: true, status: "cleared" });
   await adminCtx.close();
-  await page.reload();
-  await expect(page.locator(".ban-screen")).toHaveCount(0);
-  await emailSignIn(page, email, "535353");
-  await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
-  expect(((await (await page.request.get("/api/me")).json()) as { user: { id: string } }).user.id).toBe(id);
+  await fresh.reload();
+  await expect(fresh.locator(".ban-screen")).toHaveCount(0);
+  await emailSignIn(fresh, email, "535353");
+  await expect(fresh.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
+  expect(((await (await fresh.request.get("/api/me")).json()) as { user: { id: string } }).user.id).toBe(id);
 });
 
 test("the reviewer's API lists a reported player's case with its evidence", { tag: "@phone-only" }, async ({ page, browser }) => {
