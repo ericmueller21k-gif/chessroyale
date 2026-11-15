@@ -1234,12 +1234,13 @@ keeps the music in a cache of its own across deploys (`brc-music`, `MUSIC_HASHES
 Test: `e2e/town-street.spec.ts` ("the town's first frame doesn't wait for the music": every piece held unanswered, the first frame drawn, then
 one piece at a time).
 **The town's own theme (Nov 15; [decision](../decisions/2026-11-15-town-music.md)):** at the same moment, `townMusic(true)` (music.ts):
-its theme (themes.json's `town`, `town-loop.mp3`, 2:59) is fetched first and plays once decoded, then its two piano solos, then the
-bosses'. It loops in the street and in buildings with no theme of their own; after every `TOWN_MUSIC.passesPerSolo` (3) passes a solo
+its theme (themes.json's `town`, `town-loop.mp3`, 2:59) is fetched first and plays once decoded, then its two piano solos' bytes, then the
+bosses' (fetched only). In memory: the theme while the town is open (~69 MB decoded), and at most one solo (~16 MB), decoded
+`TOWN_MUSIC.aheadS + decodeS` (150 s) before it plays and let go once it has rung out; not decoded in time, one more pass. It loops in the street and in buildings with no theme of their own; after every `TOWN_MUSIC.passesPerSolo` (3) passes a solo
 (`TOWN_MUSIC.order`: a, b, a…) plays instead of the next pass, the theme back from its top as it ends (about every 9.5 min), all joins
 on the audio clock. A boss's room, a challenge's splash or a battle takes over; out of the room it comes back from its top. The town
 closing (Town.tsx's cleanup, the Hidden Boss's summoning) ends it and lets its pieces go. Tests: `packages/app/test/music.test.ts`
-("the town's own theme"), the e2e above (the theme first, its source started in the street).
+("the town's own theme", its "in memory" block), the e2e above (the theme first, its source started in the street).
 
 **Painting ahead (Nov 11):** each frame `planBoxes` paints, nearest first, the pictures of the boxes in reach: always the faced quarter's roofs and the sides' and backs' pictures (and shaded steps), mid-turn the next quarter's roofs (`boxBakeMs`, 1.5 ms); standing still, also the fronts' shaded frames and the other quarters' roofs (`boxBakeStillMs`, 4 ms, while the view is at rest). Before, a first look round painted hundreds of them as they showed. [Decision](../decisions/2026-11-11-town-frame-report.md). (Since the loading screen, it finds nothing left to paint.)
 
