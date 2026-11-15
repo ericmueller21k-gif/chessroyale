@@ -247,7 +247,8 @@ reward give, `rewardCrate`), `BOSS_TOKENS` and
 - e2e: `e2e/welcome-crate.spec.ts` (the Welcome Crate end to end, Nov 6); `e2e/shop.spec.ts` (round 2: an admin's grants and both buys, the counts following; a counted Boss alone battle's token box,
   its start pushed back in the local database by `backdateSoloBattle`), `e2e/icon-editor.spec.ts`, `crate-banner.spec.ts`, `profile.spec.ts` (an admin's locker too; rides: the locker's Ride tab, the preview
   riding in boxes that don't move, the profile's pawn riding and Wearing; `giveItems` in `e2e/helpers.ts` gives items no crate holds,
-  straight in the local database).
+  straight in the local database; Nov 15, "a shiny ride's shine stays inside its own shapes": a shiny pogo and crown worn, every
+  shine's clip is its own Region's and no two clips on the page share an id with different shapes).
 - The Fischer Random banner (`.fischer-stage` in styles.css): its band slants but the words stay level, so its padding
   must clear the words' ends (about 0.06 of their width); `crate-banner.spec.ts` measures that every frame.
 - The fitting sheet: `npm run preview:items -- <scratch>/sheet.png items=<id>[,<id>]` (read the PNG; keep it out of
@@ -257,6 +258,9 @@ reward give, `rewardCrate`), `BOSS_TOKENS` and
 ## Rules for this area (from `.claude/LESSONS.md`)
 
 - Wherever an item is named, show the item (`ItemArt`, `Avatar`), never a swatch, emoji or icon in its place.
+- A Region's clip id is `regionClip(p, name)` (`<paint id>-clip-<name>`, item-paint.tsx), its own namespace: any other id a drawing
+  makes from `p.id` (a gradient, a mask, a clip of its own) never starts `-clip-`. Refer to a Region's clip only through `regionClip`
+  (Nov 15: the pogo's "seat" region shared the rider cut's `-seat` id, and its shine slid across the preview as a rectangle).
 - When a number describes a drawing (a purity), measure the drawing against the number over many cases, then test it.
 - A packed pixel value compared with a typed array's is made unsigned (`>>> 0`) first; a flood fill has a bound it
   can't pass; test a tool many times in a row on its own result.
