@@ -20,6 +20,17 @@
       "fadeOutMs": 350,
       "rmsDb": -20.0,
       "peakDb": -7.1
+    },
+    "puddles-mower": {
+      "file": "puddles-mower.wav",
+      "sampleRate": 24000,
+      "loopStart": 0.1,
+      "loopEnd": 1.1,
+      "engine": true,
+      "fadeInMs": 60,
+      "fadeOutMs": 700,
+      "rmsDb": -20.0,
+      "peakDb": -6.3
     }
   }
 }

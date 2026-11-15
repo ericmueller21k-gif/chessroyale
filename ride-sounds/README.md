@@ -9,6 +9,7 @@ and then we'll kind of go more. I want to move around with it and see how it fee
 |---|---|---|
 | Sawyer's Dozer (`sawyer-dozer`) | `sawyer-dozer.wav` | a diesel's chug: twelve firings a second, its exhaust, the tracks ticking |
 | Boingo's Pogo (`boingo-pogo`) | `boingo-pogo.wav` | a spring's boing on every bounce, four a second, a little tune in their pitches |
+| Puddles's Mower (`puddles-mower`) | `puddles-mower.wav` | a ride-on mower's putter: sixteen hollow pops a second, strong and weak, the blades' whine and swish under the deck |
 
 Made in code by `scripts/reel/music/rides.py --game <folder>` on `claude/trailer-v2` (no samples). `rides.json` has each
 ride's numbers.
@@ -43,3 +44,15 @@ Sound switch, the page hidden), not with the music.
   loop again from silence.
 - A ride with no entry in `rides.json` stays silent, as now. The other rides' loops will come in this same shape once he
   is happy with how these two feel.
+
+## Nov 15: Puddles's Mower
+
+Eric asked for the next rides' sounds ("The mower, I think, is pretty self-explanatory") and picked this one of two:
+"the putter, the second one's good". Same form as the dozer's (mono WAV, 24 kHz, a loop of exactly 1 s between 0.1 and
+1.1 s, -20 dB RMS), and it is an engine like the dozer: `{ kind: "loop", engine: true, fadeInMs: 60, fadeOutMs: 700,
+rate: 1 }` is where I'd start. He hasn't heard it in the town yet.
+
+The Candy Cane Sled's jingle bells are still with him (a second go, after a first that missed). When they come they
+will differ in one way: the file will be at 48 kHz with its highs raised, because most of a jingle bell is above 8 kHz
+and the game's 6 kHz low-pass would take it off; it still plays through the same path as the others, nothing to wire
+differently, as long as the loop's file is decoded at whatever rate it has.
