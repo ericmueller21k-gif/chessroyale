@@ -72,7 +72,7 @@ async function tapSquare(page: Page, sq: string) {
 /** Your Relay move, tap, tap: the first quiet legal move, else (only captures legal, run 42849806128) the first non-promotion. */
 async function move(page: Page, fen: string) {
   const legal = new Chess(fen).moves({ verbose: true }).filter((m) => !m.promotion);
-  const mv = legal.find((m) => !m.captured) ?? legal[0];
+  const mv = legal.find((m) => !m.captured) ?? legal[0]!;
   await tapSquare(page, mv.from);
   await tapSquare(page, mv.to);
   await expect.poll(async () => (await seen(page)).mine, { timeout: 5_000 }).toBe(mv.from + mv.to);
@@ -139,7 +139,7 @@ test("Relay: the replay button steps off, the last 2, all; your move on a board,
   expect(await mode(page)).toBe("off");
   await expect(button(page).locator(".rp-trail")).toHaveCount(0);
   await still(page, "button-off");
-  const spin = () => button(page).locator(".rp-trail-spin").evaluate((g) => [parseFloat(getComputedStyle(g).animationDuration), g.querySelectorAll("circle").length]);
+  const spin = () => button(page).locator(".rp-trail-spin").evaluate((g): [number, number] => [parseFloat(getComputedStyle(g).animationDuration), g.querySelectorAll("circle").length]);
   await button(page).click();
   expect(await mode(page)).toBe("two");
   const two = await spin();

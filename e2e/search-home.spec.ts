@@ -54,7 +54,7 @@ async function logAlerts(page: Page) {
   await page.addInitScript(() => {
     (window as unknown as { __soundLog: string[] }).__soundLog = [];
     (window as unknown as { __buzz: unknown[] }).__buzz = [];
-    navigator.vibrate = (p: VibratePattern) => ((window as unknown as { __buzz: unknown[] }).__buzz.push(p), true);
+    navigator.vibrate = (p: VibratePattern | Iterable<number>) => ((window as unknown as { __buzz: unknown[] }).__buzz.push(p), true);
   });
 }
 

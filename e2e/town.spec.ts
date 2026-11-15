@@ -861,7 +861,8 @@ test("the bots' turns: ten out; one walks home and fades out at its door, gone; 
   // Watch every frame from now: what the one going home and the one coming out do.
   await page.evaluate(() => {
     const w = window as unknown as { __townBots: () => Bot[]; __townTurns: (ms: number) => void; __rot: { going: string | null; fadedAt: string | null; trip: string | null; gone: boolean; came: string | null; cameAt: string | null; fadedIn: boolean; out: number[] } };
-    const r = (w.__rot = { going: null, fadedAt: null, trip: null, gone: false, came: null, cameAt: null, fadedIn: false, out: [] });
+    w.__rot = { going: null, fadedAt: null, trip: null, gone: false, came: null, cameAt: null, fadedIn: false, out: [] };
+    const r = w.__rot;
     const was = new Map(w.__townBots().map((b) => [b.name, b.home]));
     const look = () => {
       const all = w.__townBots();

@@ -54,7 +54,7 @@ async function markQuestsSeen(context: import("@playwright/test").BrowserContext
 }
 let questsSeenDefault = true;
 
-export const test = base.extend<{ closeOwnContexts: void; tutorialSeen: boolean; seenWalkthrough: void; questsSeen: boolean; questsSeenForTest: void; seenQuests: void }>({
+export const test = base.extend<{ closeOwnContexts: void; tutorialSeen: boolean; seenDefaultForTest: void; seenWalkthrough: void; questsSeen: boolean; questsSeenForTest: void; seenQuests: void }>({
   tutorialSeen: [true, { option: true }],
   // Sets the default for this test's contexts, then puts it back.
   seenDefaultForTest: [

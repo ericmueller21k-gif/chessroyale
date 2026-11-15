@@ -119,7 +119,7 @@ test("an opponent found while you browse: a sound and a buzz, straight to the st
   await a.addInitScript(() => {
     (window as unknown as { __soundLog: string[] }).__soundLog = [];
     (window as unknown as { __buzz: unknown[] }).__buzz = [];
-    navigator.vibrate = (p: VibratePattern) => ((window as unknown as { __buzz: unknown[] }).__buzz.push(p), true);
+    navigator.vibrate = (p: VibratePattern | Iterable<number>) => ((window as unknown as { __buzz: unknown[] }).__buzz.push(p), true);
   });
   await a.goto(`/1v1?nolanding&pool=${pool}`);
   await expect(a.locator(".dv-search")).toBeVisible();
@@ -186,7 +186,7 @@ test("a reload while queued carries on with the search: on the stage from /1v1, 
   await a.addInitScript(() => {
     localStorage.setItem("brc.muted", "1");
     (window as unknown as { __buzz: unknown[] }).__buzz = [];
-    navigator.vibrate = (p: VibratePattern) => ((window as unknown as { __buzz: unknown[] }).__buzz.push(p), true);
+    navigator.vibrate = (p: VibratePattern | Iterable<number>) => ((window as unknown as { __buzz: unknown[] }).__buzz.push(p), true);
   });
   await a.goto(`/1v1?nolanding&pool=${pool}`);
   await expect(a.locator(".dv-search")).toBeVisible();

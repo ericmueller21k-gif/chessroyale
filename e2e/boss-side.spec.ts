@@ -179,7 +179,7 @@ test("Hollow's darkness on a computer: he casts where he stands, by the board's 
     await submitMove(page, mv.from + mv.to, fen);
     await expect.poll(() => page.evaluate(() => (window as any).__cast.some((f: { dark: boolean; anim: string }) => f.dark && f.anim === "darkCast")), { timeout: 30_000, message: `${w}: his cast` }).toBe(true);
     await expect.poll(() => page.evaluate(() => (window as any).__cast.at(-1).dark), { timeout: 10_000 }).toBe(false);
-    const seen = (await page.evaluate(() => (window as any).__cast)) as { dark: boolean; anim: string; fig: number[]; box: number[]; shown: boolean; words: number[] | null; caster: number[] | null; menu: number[] | null }[];
+    const seen = (await page.evaluate(() => (window as any).__cast)) as { dark: boolean; anim: string; fig: number[]; box: [number, number, number, number]; shown: boolean; words: [number, number, number, number] | null; caster: number[] | null; menu: [number, number, number, number] | null }[];
     const dark = seen.filter((f) => f.dark);
     expect(dark.length, `${w}: the cover's frames`).toBeGreaterThan(10);
     for (const f of dark) {

@@ -34,7 +34,7 @@ test("only piece sounds, clock ticks and the reveal reel play, and muting silenc
   const queue = all.findIndex((l) => !l.startsWith("pop"));
   expect(all.slice(0, queue).every((l) => /^pop(Soft)?:/.test(l))).toBe(true);
   const log = all.slice(queue);
-  const names = log.map((l) => l.split(":")[0]);
+  const names = log.map((l) => l.split(":")[0]!);
   expect(names).toContain("tick");
   expect(names.some((n) => n === "move" || n === "capture")).toBe(true);
   // Besides the reveal reel and its winner, nothing else makes a sound: no jingles for the power-up or the round start.
