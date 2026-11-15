@@ -8,31 +8,66 @@ import { asSignedIn, createLobbyFromHome, named, pickMode, soloFromHome, test } 
  */
 
 const phase = (p: Page) => p.evaluate(() => (window as any).match?.phase.kind ?? "none").catch(() => "none");
-/** Where it is on the page (a phone's chat is under Cancel, a scroll away on a short screen: scrolling moves nothing). */
-const box = async (l: Locator) => {
+type Box = { x: number; y: number; width: number; height: number };
+type QueueBoxes = { count: Box; seats: Box; cancel: Box; chat: Box };
+/** Where a locator is on the page (scroll included), for the private lobby's chat and Start (the queue's pieces are measured in-page). */
+const box = async (l: Locator): Promise<Box> => {
   const b = (await l.boundingBox())!;
   const scrollY = await l.page().evaluate(() => window.scrollY);
   return { x: Math.round(b.x), y: Math.round(b.y + scrollY), width: Math.round(b.width), height: Math.round(b.height) };
 };
-type Box = Awaited<ReturnType<typeof box>>;
 const overlaps = (a: Box, b: Box) => a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
-/** The queue's own pieces, where they are (the lobby chat must cover none of them, and move none of them). */
-const queueBoxes = async (p: Page) => ({
-  count: await box(p.locator(".fd-queue-count")),
-  seats: await box(p.locator(".fd-seats")),
-  cancel: await box(p.locator(".fd-cancel")),
-  chat: await box(p.locator(".lchat")),
-});
+/**
+ * Put on the page before it opens: `queueBoxes()`, where the queue's own pieces are (the lobby chat must cover none of
+ * them, and move none of them), measured inside the page in one go (a phone's chat is under Cancel, a scroll away on a
+ * short screen: scrolling moves nothing); and `watchFill()`, which watches the queue every frame until the lobby moves
+ * on. The full lobby shows only FRONT_DOOR.fillShowMs (1.8 s) before the votes, and the bots' hello comes within it:
+ * checks from the test, a round trip each, landed after the votes had begun on a slow runner (main and two PRs, Nov 15:
+ * the phase already "vote", the hello's queue gone, a box gone). From inside the page it's what the player sees: the
+ * first frame with every seat filled and a bot's hello showing, and the queue then; or the lobby moving on first.
+ */
+const QUEUE_WATCH = () => {
+  const w = window as any;
+  const box = (sel: string): Box => {
+    const e = document.querySelector(sel);
+    if (!e) throw new Error(`${sel} isn't on the page`);
+    const b = e.getBoundingClientRect();
+    return { x: Math.round(b.x), y: Math.round(b.y + window.scrollY), width: Math.round(b.width), height: Math.round(b.height) };
+  };
+  w.queueBoxes = (): QueueBoxes => ({ count: box(".fd-queue-count"), seats: box(".fd-seats"), cancel: box(".fd-cancel"), chat: box(".lchat") });
+  w.watchFill = () => {
+    w.filled = new Promise((done) => {
+      const tick = () => {
+        const phase = w.match?.phase.kind ?? "none";
+        const full = document.querySelector(".fd-count-n")?.textContent === "100";
+        const hello = [...document.querySelectorAll('.qchat-lobby .qline[data-from^="bot"]')].some((e) => e.checkVisibility());
+        if (phase !== "lobby") return done({ phase, full, hello });
+        if (!full || !hello) return requestAnimationFrame(tick);
+        try {
+          done({ phase, full, hello, boxes: w.queueBoxes() });
+        } catch (e) {
+          done({ phase, full, hello, error: String(e) });
+        }
+      };
+      tick();
+    });
+  };
+};
+const queueBoxes = (p: Page): Promise<QueueBoxes> => p.evaluate(() => (window as any).queueBoxes());
 const run = Date.now().toString(36).slice(-5);
 
 test("two players in a Default queue chat before the match starts: each sees the other's lines, the bots say hello, and the lines carry into the match", { tag: "@phone-only" }, async ({ browser }) => {
   test.setTimeout(3 * 60_000);
   const opts = test.info().project.use;
-  const pool = `lchat-${test.info().project.name[0]}${run}`;
+  // (The repeat's number too: `--repeat-each` runs share `run`, and two repeats in one queue saw 3 or 4 players.)
+  const pool = `lchat-${test.info().project.name[0]}${run}${test.info().repeatEachIndex}`;
   const ann = await (await browser.newContext({ ...opts })).newPage();
   const bo = await (await browser.newContext({ ...opts })).newPage();
   await named(ann, "Ann Lobby");
   await named(bo, "Bo Lobby");
+  // (CPU_THROTTLE=4: both pages on a slowed CPU, to prove a race on a slow runner. Not set in CI.)
+  if (process.env.CPU_THROTTLE) for (const p of [ann, bo]) await (await p.context().newCDPSession(p)).send("Emulation.setCPUThrottlingRate", { rate: Number(process.env.CPU_THROTTLE) });
+  await ann.addInitScript(QUEUE_WATCH);
   for (const p of [ann, bo]) await p.goto(`/?debug&pool=${pool}`);
   // Both PLAY at once: the same queue (8 s locally before the bots fill in).
   for (const p of [ann, bo]) await pickMode(p);
@@ -43,6 +78,9 @@ test("two players in a Default queue chat before the match starts: each sees the
     await expect(p.locator(".qchat-lobby .qhead-title")).toHaveText("Lobby");
     await expect.poll(() => p.evaluate(() => (window as any).match.chat.enabled)).toBe(true);
   }
+  // From here the page watches for the bots filling the lobby (8 s after the first PLAY on the e2e's server).
+  expect(await phase(ann)).toBe("lobby");
+  await ann.evaluate(() => (window as any).watchFill());
   const before = await queueBoxes(ann);
   // Never over the count, the grid or Cancel.
   for (const k of ["count", "seats", "cancel"] as const) expect(overlaps(before.chat, before[k])).toBe(false);
@@ -70,13 +108,12 @@ test("two players in a Default queue chat before the match starts: each sees the
   expect(after).toEqual(before);
 
   // Time's up: the bots fill the seats and one or two say hello in the lobby, before the votes begin.
-  await expect(ann.locator(".fd-count-n")).toHaveText("100", { timeout: 20_000 });
-  const botLine = ann.locator('.qchat-lobby .qline[data-from^="bot"]');
-  await expect(botLine.first()).toBeVisible({ timeout: 3_000 });
-  expect(await phase(ann)).toBe("lobby");
+  // (The page saw it: every seat filled and a bot's hello showing while the lobby still showed, never the votes first.)
+  const seen = await ann.evaluate(() => Promise.race([(window as any).filled, new Promise((r) => setTimeout(() => r({ timedOut: true }), 30_000))]));
+  expect(seen).toMatchObject({ phase: "lobby", full: true, hello: true, boxes: expect.anything() });
   // (The queue's own lines change as the bots fill in: "Unranked" appears and moves what's under it. The chat covers
   // nothing; on a phone it keeps its size, on a computer it gives up the room the new line takes in its column.)
-  const filled = await queueBoxes(ann);
+  const filled = (seen as { boxes: QueueBoxes }).boxes;
   if (test.info().project.name === "phone") expect([filled.chat.width, filled.chat.height]).toEqual([before.chat.width, before.chat.height]);
   else expect(filled.chat.height).toBeGreaterThanOrEqual(120);
   for (const k of ["count", "seats", "cancel"] as const) expect(overlaps(filled.chat, filled[k])).toBe(false);

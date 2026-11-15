@@ -326,6 +326,11 @@ Tests check *what* ends up on the screen, not *how it gets there*, nor how long 
     layout effect as it appears too.
   - A test that holds something the game times from its first frame (the bot across, 4 s) holds it from the page as that frame is drawn
     (an init script on the ready attribute), not after the test's own poll sees it.
+- **The lobby chat spec's 1.8 s** (Nov 15, `docs/decisions/2026-11-15-flaky-lobby-chat.md`):
+  - A moment the server times (the full lobby, 1.8 s before the votes) is checked from inside the page, in one frame: everything the
+    check needs (the count, the line, the phase, the boxes) read together by a per-frame watcher put on the page before the moment
+    begins. `watchFor` says only that each thing showed, not that they showed together. Never a string of round trips after it starts.
+  - A spec run with `--repeat-each` gives each repeat its own queue pool (`test.info().repeatEachIndex`): repeats share module state.
 
 ## Eric's rules hold
 
