@@ -351,7 +351,7 @@ function Character({ boss, stage, place }: { boss: BossView; stage: Stage; place
       if (id !== last) {
         last = id;
         const drawn = kit.ch.anims[s.anim]!.frames[s.frame]!;
-        const frame = suitNow ? suited(drawn) : drawn;
+        const frame = suitNow ? suited(drawn, s.frame) : drawn;
         g?.putImageData(frameImage(kit.ch, frame, look), 0, 0);
         box.current?.setAttribute("data-anim", s.anim);
         box.current?.toggleAttribute("data-suit", suitNow);
