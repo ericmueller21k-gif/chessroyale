@@ -14830,8 +14830,11 @@ img.qicon {
     width: calc(48px * var(--bc-scale));
     height: calc(60px * var(--bc-scale));
   }
+  /* (No wider than his room: from his box's right edge, where it opens, to the side menu's, less a margin (`--side-room`, set with his size
+     and place: BossCharacter.tsx fitSides). A long line wraps in it, and the box keeps its size and place for its whole life: Eric, Nov 15.) */
   .boss-char.place-side .bc-bubble {
     bottom: calc(100% + 17px * var(--bc-scale));
+    max-width: min(220px, var(--side-room, 220px));
   }
   .screen.game > .boss-dock:not(.dk-party) > .gk-unit {
     width: calc(120px * var(--king-k, 1));

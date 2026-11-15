@@ -1,3 +1,4 @@
+import { xpDayStart } from "@chessroyale/core";
 import { expect, type Page } from "@playwright/test";
 import { asServerAdmin, bossAloneFromHome, giveCrates, submitMove, test } from "./helpers.ts";
 
@@ -41,8 +42,18 @@ async function wonGame(page: Page, xp: number, moves: number | null = null) {
 const locker = async (page: Page) =>
   ((await (await page.request.get("/api/locker")).json()) as { seriesCrates: Record<string, number>; keys: number; bossPicks: number; bossCrates: Record<string, number> });
 
+/**
+ * The test's games share one XP day: it turns at XP.dayStartUtcHour UTC (08:00), and a test begun just before then saw its second
+ * game paid the next day's reward (main's run, Nov 15, 07:58 UTC). Within `minutes` of the turn, wait for it to pass first.
+ */
+async function oneXpDay(minutes: number) {
+  const left = xpDayStart(Date.now()) + 24 * 3_600_000 - Date.now();
+  if (left < minutes * 60_000) await new Promise((r) => setTimeout(r, left + 5_000));
+}
+
 test("the daily reward: the day's first counted game of 15 moves says \"Daily reward +200\" in the XP box, and its toast \"+1 Winter Crate\"; the next game doesn't", async ({ page }) => {
-  test.setTimeout(4 * 60_000);
+  test.setTimeout(9 * 60_000);
+  await oneXpDay(5);
   await wonGame(page, 0, 20);
   const box = page.getByTestId("xp-box");
   await expect(box.locator(".xp-parts")).toHaveText("Win +50 · Daily reward +200");

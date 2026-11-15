@@ -616,16 +616,22 @@ export function BossSide({ match }: { match: GameView }) {
 /** Where the figures beside the board are sized (styles.css reads `--side-s` and `--king-k` there): a computer from 1100 px wide. */
 const SIDES = "(min-width: 1100px) and (min-height: 600px)";
 /**
- * The figures' sizes and places on this screen for the room beside its board (sideSizes), set on the screen: `--side-s` (the boss's size),
- * `--side-d` (his box's middle, px left of his anchor), `--king-k` (the God King's and your pawn's size) and `--first-d` (the middle of the
- * first figure right of the board, px right of the dock's edge). Removed where they don't apply (a phone, 900 to 1099 px).
+ * The figures' sizes and places on this screen for the room beside its board (sideSizes): `--side-s` (the boss's size), `--side-d` (his
+ * box's middle, px left of his anchor), `--side-room` (the room his words open into, from his box's right edge to the side menu's), `--king-k`
+ * (the God King's and your pawn's size) and `--first-d` (the middle of the first figure right of the board, px right of the dock's edge).
+ * Removed where they don't apply (a phone, 900 to 1099 px).
+ * Set on the arena around the screen, which stays as the battle's screens take turns (yours, his), not on the screen: each new screen
+ * draws its figures and their words already at their size and place. (Eric, Nov 15: set on each new screen, by its own layout effect,
+ * they came after the words' box had fitted itself, at the default size and place; then the figure moved and the box went under the
+ * menu.)
  */
 function fitSides(side: HTMLElement | null, name: string) {
   const screen = side?.closest<HTMLElement>(".screen");
   if (!side || !screen) return;
-  const vars = ["--side-s", "--side-d", "--side-lift", "--king-k", "--first-d", "--king-room"];
+  const vars = ["--side-s", "--side-d", "--side-lift", "--side-room", "--king-k", "--first-d", "--king-room"];
+  const at = (screen.closest<HTMLElement>(".arena") ?? screen).style;
   if (!matchMedia(SIDES).matches) {
-    for (const v of vars) screen.style.removeProperty(v);
+    for (const v of vars) at.removeProperty(v);
     return;
   }
   const rect = (e: Element | null | undefined) => {
@@ -641,7 +647,7 @@ function fitSides(side: HTMLElement | null, name: string) {
   const reach = kit ? SIDE_REACH[kit.ch.id] : undefined;
   if (!wrap || !box || !cv || !kit || !reach) return;
   const sx = cv.width / kit.ch.w;
-  const now = (v: string, d: number) => parseFloat(screen.style.getPropertyValue(v)) || d;
+  const now = (v: string, d: number) => parseFloat(at.getPropertyValue(v)) || d;
   const s = now("--side-s", 2);
   const k = now("--king-k", 1);
   const anchor = side.getBoundingClientRect().left;
@@ -687,29 +693,35 @@ function fitSides(side: HTMLElement | null, name: string) {
     undefined,
     kit.ch.id,
   );
-  screen.style.setProperty("--side-s", String(place.s));
-  screen.style.setProperty("--king-k", String(place.k));
+  at.setProperty("--side-s", String(place.s));
+  at.setProperty("--king-k", String(place.k));
   if (place.bossMid === null) {
-    screen.style.removeProperty("--side-d");
-    screen.style.removeProperty("--side-lift");
+    at.removeProperty("--side-d");
+    at.removeProperty("--side-lift");
+    at.removeProperty("--side-room");
   } else {
-    screen.style.setProperty("--side-d", `${Math.round((anchor - place.bossMid) * 10) / 10}px`);
+    at.setProperty("--side-d", `${Math.round((anchor - place.bossMid) * 10) / 10}px`);
+    // His words open left from his box's right edge (styles.css, `.place-side .bc-bubble`): as wide as the room from there to the side
+    // menu's edge (or his column's), less the margin, so a long line wraps inside it and the box never needs moving into view.
+    const menu = rect(document.querySelector(".gm-frame > .fd-side"));
+    const from = Math.max(space?.left ?? screen.getBoundingClientRect().left, menu && menu.right < innerWidth / 2 ? menu.right : 0);
+    at.setProperty("--side-room", `${Math.floor(place.bossMid + 24 * place.s - from - SIDE_FEEL.margin)}px`);
     // Over the board's edge, the few pixels his drawing has under his feet (SIDE_REACH's down) would lie over the dock's row under the
     // board: he stands that much higher there.
     const row = rect(dock?.querySelector(":scope > .boss-dock-main"));
     const overRow = place.bossMid + (cv.left + (kit.ch.foot[0] + reach[2]) * sx - (box.left + box.width / 2)) * (place.s / s) > (row?.left ?? Infinity);
     const under = reach[3] * place.s;
     const lift = row && overRow ? Math.max(0, Math.ceil(wrap.bottom + under - row.top + 1)) : 0;
-    screen.style.setProperty("--side-lift", `${lift}px`);
+    at.setProperty("--side-lift", `${lift}px`);
   }
   const edge = dock?.getBoundingClientRect().right;
   if (place.firstMid === null || edge === undefined) {
-    screen.style.removeProperty("--first-d");
-    screen.style.removeProperty("--king-room");
+    at.removeProperty("--first-d");
+    at.removeProperty("--king-room");
     return;
   }
-  screen.style.setProperty("--first-d", `${Math.round((place.firstMid - edge) * 10) / 10}px`);
+  at.setProperty("--first-d", `${Math.round((place.firstMid - edge) * 10) / 10}px`);
   // (The room his words and his menu open into: from his box's left edge (and their 4 px in) to the window's, less the margin.)
   const kingLeft = place.firstMid + (pawn ? 60 : -60) * place.k;
-  screen.style.setProperty("--king-room", `${Math.floor(screen.getBoundingClientRect().right - SIDE_FEEL.margin - kingLeft - 4)}px`);
+  at.setProperty("--king-room", `${Math.floor(screen.getBoundingClientRect().right - SIDE_FEEL.margin - kingLeft - 4)}px`);
 }

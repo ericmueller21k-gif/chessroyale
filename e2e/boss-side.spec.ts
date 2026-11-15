@@ -228,3 +228,62 @@ test("the God King's words stay whole inside the game screen (Eric, Nov 13)", as
     expect(r.left, `${w}: words within the screen's left edge`).toBeGreaterThanOrEqual(r.screenLeft - 0.5);
   }
 });
+
+/**
+ * Eric (Nov 15, Don Dough on a 1611 × 843 computer): "his chat boxes enlarge and move off screen after he says stuff… they are fine
+ * for a moment, then they aren't". Each turn draws a new screen (yours, then his), and with it his figure and his words' box, which
+ * fitted itself before that screen had set his size and place: so the box came back larger and further left, under the side menu. A
+ * line's box keeps its size and place for its whole life, across the screens it outlives, and is whole on screen, right of the menu:
+ * his longest line, every frame from its first to its last, through your move and his.
+ */
+test("Eric's rule (Nov 15): a boss's words beside the board keep their size and place for the line's whole life, on screen, right of the menu", async ({ page }) => {
+  test.skip(test.info().project.name !== "desktop", "the boss stands beside the board on a computer only");
+  test.setTimeout(180_000);
+  const kit = BOSS_KITS["Don Dough"]!;
+  const text = [...Object.values(kit.lines).flatMap((v) => [...(v ?? [])]), ...(kit.fall ?? [])].reduce((a, b) => (b.length > a.length ? b : a));
+  await asAdmin(page);
+  await page.addInitScript(() => localStorage.setItem("brc.evalBar", "0"));
+  for (const [w, h] of [[1611, 843], [1280, 800]] as const) {
+    await page.setViewportSize({ width: w, height: h });
+    await page.goto(`/?debug&pace=quick&clock=60&laststand=0&brain=stockfish&boss=zebra`);
+    await bossAloneFromHome(page, "Don Dough");
+    await expect.poll(() => page.evaluate(() => (window as any).match?.phase.kind ?? "none"), { timeout: 60_000 }).toBe("play");
+    // (Past his opening words: the line below is the only one up.)
+    await expect.poll(() => page.locator(".place-side .bc-bubble").count(), { timeout: 15_000 }).toBe(0);
+    // Every frame while the line is up: its box (the entrance's pop-in, `fresh`, moves it a few px: left out), the menu's, the window's,
+    // and which screen draws it.
+    await page.evaluate((text) => {
+      const w = window as any;
+      w.__said = [];
+      const ids = new WeakMap<Element, number>();
+      let n = 0;
+      const look = () => {
+        const e = [...document.querySelectorAll(".place-side .bc-bubble")].find((x) => x.getAttribute("aria-label") === text);
+        const s = document.querySelector(".screen");
+        if (s && !ids.has(s)) ids.set(s, ++n);
+        if (e && !e.classList.contains("fresh")) {
+          const b = e.getBoundingClientRect();
+          w.__said.push({ box: [b.left, b.top, b.right, b.bottom].map((v) => Math.round(v * 2) / 2), menu: document.querySelector(".gm-frame > .fd-side")?.getBoundingClientRect().right ?? 0, win: innerWidth, screen: ids.get(s!) });
+        }
+        if (w.__said.length < 2000) requestAnimationFrame(look);
+      };
+      requestAnimationFrame(look);
+      w.sayBoss(text);
+    }, text);
+    await expect.poll(() => page.evaluate(() => (window as any).__said.length)).toBeGreaterThan(2);
+    // Your move: his screen, then yours again, while the line is still up.
+    const fen = await page.evaluate(() => (window as any).match.phase.board.fen as string);
+    const mv = new Chess(fen).moves({ verbose: true }).find((m) => m.piece === "p" && !m.captured)!;
+    await submitMove(page, mv.from + mv.to, fen);
+    await expect.poll(() => page.evaluate((text) => [...document.querySelectorAll(".place-side .bc-bubble")].some((x) => x.getAttribute("aria-label") === text), text), { timeout: 20_000 }).toBe(false);
+    const seen = (await page.evaluate(() => (window as any).__said)) as { box: number[]; menu: number; win: number; screen: number }[];
+    expect(new Set(seen.map((f) => f.screen)).size, `${w}: the line outlived its screen`).toBeGreaterThan(1);
+    const first = seen[0]!;
+    for (const f of seen) {
+      expect(f.box, `${w}: the box at its first frame and on screen ${f.screen}`).toEqual(first.box);
+      expect(f.box[0], `${w}: right of the menu (${f.menu})`).toBeGreaterThanOrEqual(f.menu);
+      expect(f.box[1], `${w}: under the window's top`).toBeGreaterThanOrEqual(0);
+      expect(f.box[2], `${w}: inside the window's right`).toBeLessThanOrEqual(f.win);
+    }
+  }
+});
