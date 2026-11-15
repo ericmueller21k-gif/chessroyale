@@ -1,20 +1,19 @@
-chandy redo: round 2b (Eric, Nov 15, sent while you drew round 2; two messages may also be waiting in your session). Round 2 is good:
-the full-length rifle, the clones, the locks (L1-L6 as recommended), and the queen lock (his side only, with the pre-check) all stand.
-Only Dodge's opening and its vote change:
+chandy redo: round 2c (Eric, Nov 16, on Dodge's round). Everything else in 2b stands.
 
-DODGE, HOW IT STARTS (replaces D1 and D2):
-- He targets your king: a SCOPE-IN, where everything round the king blurs, greys or blacks out, so only the king is in focus.
-- While it's in focus, the king slides to the CENTER of the board.
-- The scope unfocuses: every other piece has gone. The board is BLANK except your king in the center, so he always has all 9 squares
-  (no arena past the board's edge, no pieces in the way).
-- Exactly one of the 9 is safe (Eric asked "or two if the math doesn't work with diagonals": it works with one; diagonals only where
-  they miss the safe square). Survive all 3 rounds and the board comes back exactly as it was, with your king on his own square.
+ERIC'S WORDS (condensed): the gators should stand at the EDGES of the board (on the board still, on its outer squares, further back
+from the king, not next to the 3x3). They do an AFTERIMAGE-style TELEPORT: in round 1, one of them teleports mid-round and changes
+where it stands (so its line moves); in round 2, two of them; in the final round, three ("so you have to be very quick on the last
+one"). And the blast covers the WHOLE row or column across the board: a big pop.
 
-THE VOTE (replaces D7, and D6's lag part):
-- The crowd votes on the king's square with 3 s to pick; the most popular square is played; ties use the crowd's usual tie-break.
-- If nobody votes, the square is RANDOM (from the seed), not "stay put". Alone, you are the crowd: no tap means a random square.
-- Everyone shares the result: one hit loses the battle for the whole crowd. The server closes the vote at 3 s plus your lag grace.
-
-MOCKUP: a short GIF of the scope-in, slide and blank board, then one Dodge round on the blank board with the vote (tap a square, the
-counts if the crowd vote screen shows them today); a still of the "nobody voted: random" moment. About 4 images. Update D1, D2, D6 and
-D7 in DESIGN.md. Then .mockup "chandy round 2b" and wait for a .go containing "chandy" (the next one will be "chandy build").
+WHAT TO DESIGN AND MOCK UP
+- The clones on the board's edge squares: a row-shooter on the a- or h-file at that rank, a column-shooter on rank 1 or 8 at that
+  file (they stand on top of the board, never off it). Say how they fit on a phone without covering the king's 9 squares.
+- The teleport: the clone blinks out leaving a red-green afterimage that fades, and reappears on another edge square aiming at a new
+  line. After every teleport the aim is still exactly 2 rows + 2 columns missing exactly one safe square, so the safe square changes.
+  Pick the timing so it stays fair inside 3 s (or recommend a longer window for rounds 2 and 3 if 3 s isn't enough to react to the
+  last teleport: e.g. the last teleport no later than ~1.2 s before the close). Votes made before a teleport stay where they were
+  tapped; players re-tap to change.
+- The fire: each beam a big pop across the whole rank or file, edge to edge (the full 8 squares), then the hit or the dodge.
+- Mock up: a still of the clones on the edges; a GIF of round 3 (three teleports, the vote counts moving, the full-length blasts);
+  a still of the blast. About 4 images. Update D2/D3 in DESIGN.md with the numbers.
+Then .mockup "chandy round 2c" and wait for a .go containing "chandy" (the next one should be "chandy build").
