@@ -226,14 +226,14 @@
         "file": "town-solo-a",
         "seconds": 37.209313,
         "fileSeconds": 41.209313,
-        "peakDb": -3.2
+        "peakDb": -1.5
       },
       {
         "id": "b",
         "file": "town-solo-b",
         "seconds": 37.209313,
         "fileSeconds": 41.209313,
-        "peakDb": -4.2
+        "peakDb": -2.5
       }
     ]
   }
