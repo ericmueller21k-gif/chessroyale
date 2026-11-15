@@ -52,6 +52,8 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
   takes it over (`bossMusic`) with no restart at "START!". From the boss menu: started after the intro, as before. Same player, gain,
   switches and fades throughout. Tests: `music.test.ts` ("a boss's room"), `e2e/zebra-home.spec.ts` (Don's theme carried through).
   docs/decisions/2026-11-11-area-banner-room-music.md.
+  **The town's own theme (Nov 15):** a boss's room theme, splash or battle takes over from it, and leaving the room hands back to it
+  (from its top); docs/areas/town-square.md ("The town's own theme"), [decision](../decisions/2026-11-15-town-music.md).
   **The Hidden Boss's four themes, switched mid-fight (Nov 13; [decision](../decisions/2026-11-13-hidden-boss-music.md)):** a battle
   names the theme it wants now (`MusicBattle.theme`, a themes.json key) and music.ts switches by `MUSIC_SWITCH` (`switchPlan`; a single
   theme still plays by `musicPlan`/`startPlan`). Which when: `recluseMusic` (App.tsx's `musicBattle`), keys in `RECLUSE_MUSIC`: his
