@@ -1,4 +1,30 @@
-# Chandy, round 1: the mockup (Nov 15)
+# Chandy, round 2: the mockup (Nov 15)
+
+Eric's round-1 answers are in; the design is in **DESIGN.md** (round 2 first: the locks, the queen lock's one rule, his ultimate Dodge).
+The stills are drawn the same way as round 1 (a real battle on a phone, 390 × 844, Chandy drawn over it by the game's own renderer;
+`scripts/chandy-mockup/stills.mjs`).
+
+## New this round
+
+| File | What |
+| --- | --- |
+| `chandy-r2-1-full-length-rifle.png` | The rifle at his full length on his back: 78 px at the base (his height), 112 fully upgraded; at 3x and at phone size. |
+| `chandy-idle.gif` | The idle GIF in its true colors (round 1's GIF gave each frame its own palette: that scrambled it). |
+| `chandy-r2-2-clones.png` | The scrambled red-green palette kept as his afterimage clones' look (`CHANDY_CLONE_PALETTE`), at rest, aiming level and aiming down. |
+| `phone-dodge-aim.png` | Dodge, round 1: the board zoomed onto your king, the 3 × 3 arena in its red frame, four clones, the dashed aim lines (2 rows, 2 columns), the 3 s bar at 2.2 s. The safe square isn't marked (it's the top-right one). |
+| `phone-dodge-dodged.png` | The beams fire; your king on the safe square: "DODGED 1/3". |
+| `phone-dodge-hit.png` | Round 3: your king stayed in the middle: hit, "HIT! YOU LOSE". |
+| `phone-dodge.gif` | One round, about 5 s: zoom in, the clones blink in, the 3 s counting down, your king steps to the safe square, LOCKED, the beams fire, DODGED. |
+| `phone-queen-lock-aim.png`, `phone-queen-lock-shot.png` | The queen lock's rule: the aim line down her file before your move; she steps behind a pawn (d1 to e2, behind e4) and the pawn takes the shot. |
+| `phone-lock-on.png`, `phone-upgrade.png`, `phone-upgrade.gif` | Round 1's lock-on and upgrade redone with the full-length rifle (in the bar's room and the window, 2.5x). |
+
+Round 1's other stills (the five moves, the firing pose, the board art, the tile) are unchanged: their bar's rifle is round 1's shorter
+one. The base battle under the mockup is Chub & Chirp's, so their leapfrog sometimes leaves a black pawn deep in your half: that's theirs,
+not Chandy's. In the Dodge stills the dock's real clock kept running; in the game it holds.
+
+---
+
+# Round 1 (Nov 15)
 
 A special ops alligator with an energy sniper rifle. **Mockup only: nothing is wired into the game.** The art is code in the sprite
 kit's format on branch `claude/boss-chandy` (`packages/app/src/characters/chandy.ts`, `characters/effects/chandy.ts`); the board stills

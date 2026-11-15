@@ -1,4 +1,131 @@
-# Chandy: the design questions (round 1, Nov 15)
+# Chandy: the design (round 2, Nov 15)
+
+Round 2 first (Eric's answers, then the new questions, each with my **recommended answer first**, answerable in a line: "L3: A"); round
+1's questions follow, the answered ones marked ✅. Still open from round 1 (my recommendations stand unless Eric says otherwise): Q2-Q5,
+Q7, Q9-Q10, Q12-Q17, Q19-Q27, Q36-Q38.
+
+## Answered by Eric (done)
+
+- ✅ **Upgrades:** only taking a **locked** piece upgrades the rifle; the locks are built so he's fully upgraded in nearly every battle
+  (below, L1 to L6).
+- ✅ **Never the queen** for a lock.
+- ✅ **Which move:** random among the unlocked, **except a newly unlocked move is always the next one used.**
+- ✅ **Beam:** covered squares are walls (Big Boy's rule: nothing lands on them or slides through; a knight jumps).
+- ✅ **The upgrade pause:** 2 s, everything paused (the clock held for everyone).
+- ✅ **The rifle:** his full length on his back (`chandy-r2-1-full-length-rifle.png`: 78 px at the base, his height; 112 fully upgraded).
+- ✅ **The red-green look:** the idle GIF's colors are fixed (`chandy-idle.gif`), and the scrambled palette is kept on purpose as his
+  clones' look: `CHANDY_CLONE_PALETTE` in `chandy.ts` (a named look, `CHANDY.looks.clone`, its rim purple), measured key by key from
+  round 1's GIF (`chandy-r2-2-clones.png`).
+- ✅ **His ultimate:** Dodge (below, D1 to D12).
+
+## The locks: built so he's fully upgraded nearly every battle
+
+**The rule as I'd build it:**
+
+1. **The first lock teaches it.** From his 3rd move, the first time one of his moves takes one of your pieces (not the king, not the
+   queen) and that capture is within his margin (L3) of his best move, he locks that piece *as his turn begins*: the crosshair snaps on,
+   he points (half a second), then he takes it. Upgrade 1, the 2 s window, and you've learned what the crosshair means.
+2. **Then he hunts.** At the end of his turn he locks your most capturable piece (L2). It stays locked until he takes it, or for
+   **3 of his turns** without a capture (you got it to safety); then he switches to a more gettable piece.
+3. **Up to 2 locks at once, staggered:** a second lock comes once the first is 2 of his turns old, each living at most 5 of his turns.
+4. **Each capture of a locked piece:** an upgrade (up to 5); the move it unlocks is random, and it's the next one his meter uses.
+
+**The new questions:**
+
+- **L1. The numbers** (all in the settings file): first lock from his 3rd move; a lock hunts for 3 of his turns, lives at most 5; at most
+  2 locks, the second 2 turns after the first. **A (recommended): these**, then the sim tunes them so 5 upgrades come in at least 9
+  battles in 10 (target: the fifth by about move 35 of 40). B: tell me other numbers.
+- **L2. "Very capturable":** **A (recommended), ranked:** (1) a piece he can take now for free (undefended, or attacked by something worth
+  less); (2) a piece under-defended (more attackers than defenders); (3) a pinned or trapped piece he can attack next move (it has
+  fewer than 2 safe squares). Ties: the more valuable, then the seed. A cheap rule on the board, the same on every device, no engine work.
+- **L3. How hard the engine is steered:** to make 5 upgrades nearly certain, harder than round 1's tie-break. **A (recommended):** each
+  of his moves, the engine's top 5 moves at his strength (one search with 5 lines, on the host's device, as Moo's beam already asks
+  for lines); **if one takes a locked piece and is within 1.5 pawns of his best, he plays it** (taking material is usually also the
+  engine's own choice, so the margin is rarely spent); **if one attacks a locked piece or adds an attacker, within 0.5 pawns, he plays
+  that.** Otherwise his usual move. B: margins 1.0 and 0.3 (fewer upgrades, a little stronger chess).
+- **L4. His strength:** the steering costs him a little (he sometimes plays a worse move to grab or chase), and five moves plus an
+  ultimate add a lot. **A (recommended):** the sim sets his strength offset so the crowd's score lands inside the pack, as every boss
+  (one run at one setting, per the boss lane).
+- **L5. If the sim says fewer than 9 in 10:** **A (recommended): raise L3's margins** before changing the rule. B: a rescue rule: from
+  move 30, any capture he makes upgrades (breaks "only locked", so only if you say).
+- **L6. Two crosshairs on screen:** **A (recommended): both the same look, each with a small pip under it counting its turns left (3,
+  2, 1)**, so you can see which one he's about to drop. B: no countdown.
+
+## Queen lock: one simple rule (Eric: "at worst you lose your queen, and only if you don't act")
+
+**The rule (A, recommended):** he spends his turn aiming at your queen: the crosshair on her and a dashed cyan line straight down her
+file from his side (`phone-queen-lock-aim.png`; the dock: "Queen lock: he fires at her next."). **Your move is free** (any move). Then
+he fires **straight down the file she stands on now**: the first of your pieces between her and his edge shatters (`phone-queen-lock-shot.png`:
+she stepped to e2, behind the e4 pawn; "Queen lock: a pawn took it."); nothing in the way, she falls. His own pieces don't stop it; your
+king in the way stops it harmlessly.
+
+**He only uses it when you can save her cheaply:** before he picks Queen lock, he checks you have a move that leaves a pawn, knight or
+bishop between her and his edge (one is there already, she can step behind one, or one can step in front of her). If not, the meter
+picks another unlocked move. Never when you're in check, never with no queen (a promoted queen counts).
+
+- **Q1. One direction (from his side only), or also from the left or right?** **A (recommended): his side only.** The check above
+  already guarantees a cheap save, and one direction is one thing to read; the line is drawn before you move, so you see the danger.
+  B: his side by default, but when her file can't be blocked he fires along her rank from the left or right instead (the line drawn on
+  her rank from that side): more saves, one more thing to read.
+- **Q2. You may block instead of moving her?** **A (recommended): yes**, since your move is free (your words: "or a move that puts one
+  of those in front of her").
+- **Q3. Fair for him?** You always lose one piece (usually a pawn if you play it right); he gave up a move (worth about a third of a
+  pawn). About two-thirds of a pawn for him each time, about what his other moves cost you. **A (recommended): fine as is.** B: he also
+  keeps his move (harsher).
+- **Q4. A rook or a queen's own guard as the blocker:** **A (recommended): any of your pieces in the way shatters** (you chose it; the
+  check only promises a cheap save exists). B: only pawns, knights and bishops shatter; anything bigger stops it harmlessly.
+- **Q5. When he fires:** **A (recommended): at the start of his next turn, then he plays his move.**
+
+## Dodge: his ultimate
+
+**As I read it:** his rage meter unlocks after his 5th upgrade. Full: the game pauses where it is; the view moves so your king is in the
+middle with the 8 squares round him; Chandy copies himself round them (the red-green afterimage clones) and aims beams so that exactly
+one of the 9 squares is safe; you have 3 s to put your king there; the placement locks; the beams fire. 3 rounds. Hit once: you lose
+the battle. Survive all 3: nothing happens.
+
+**Always solvable (the director's check, confirmed):** pick the safe square S; beam the two rows that miss S and the two columns that
+miss S. The two rows cover the 6 squares outside S's row; the two columns cover the other 2 squares of S's row. S is in neither, so it's
+the only square left: exactly one safe square, every time, wherever S is (the middle included).
+
+The stills: `phone-dodge-aim.png` (round 1: four clones, the dashed aim lines, 2.2 s left, the safe square not marked),
+`phone-dodge-dodged.png` (the beams fire, your king on the safe square: "DODGED 1/3"), `phone-dodge-hit.png` (round 3: your king
+stayed in the middle: "HIT! YOU LOSE"), `phone-dodge.gif` (one round, about 5 s: zoom in, the clones blink in, the 3 s, your king steps
+to the safe square, LOCKED, fire, DODGED). (The mockup's real clock kept ticking in the dock; in the game it holds.)
+
+- **D1. The real board or its own little arena?** **A (recommended): its own 3 x 3 arena, laid over the real board zoomed onto your
+  king.** Always 9 squares (on the rim too: the stills' king is on e1, so the arena's bottom row is past the board's edge), nothing on
+  them blocks you, no chess rules (no "moving into check"), and the real board isn't changed: when it's over, your king is back on his
+  square and the game goes on. B: the real squares (fewer than 9 at the rim, your own pieces in the way, legality questions).
+- **D2. "Seamlessly":** **A (recommended):** the board zooms onto your king in a quarter of a second (1.4x, the king in the middle) and
+  dims; the arena's red frame appears; the clones blink in one by one (about a tenth of a second each); after round 3 it zooms back. No
+  other screen, nothing moves out of its place. (In the build: the board is drawn untransformed once the zoom ends, per the lessons.)
+- **D3. The aim, readable in 3 s on a phone:** **A (recommended): always 2 rows and 2 columns, no diagonals.** Four dashed lines, one per
+  clone: rows from the left or right (aiming level), columns from above (aiming down). The safe square is where the unlit row meets the
+  unlit column: quick to read. B: from round 2, one decoy diagonal that misses S (harder to read, still fair).
+- **D4. The safe square:** **A (recommended): from the seed, never the same as the round before; the middle allowed** (sometimes staying
+  put is right).
+- **D5. Does a beam ever cross the king's own square if he stays?** Yes, whenever the safe square isn't the middle: standing still is
+  a hit then (the hit still).
+- **D6. The 3 s online:** **A (recommended):** the server starts each round; each device counts its 3 s from when it saw the round
+  begin; a tap moves your king at once on your screen and sends the square (you can change it until the end); the server takes the
+  last square it got by the end plus 300 ms for lag, and sends the result, the same for everyone. Solo: on the device.
+- **D7. A boss raid with many players:** **A (recommended): the crowd's king goes where most players put him** (the popular vote, like
+  a move; no pick counts as staying put); one hit loses the battle for everyone. B: each player dodges alone and the battle is lost only
+  if more than half are hit.
+- **D8. "Only if your queen is alive":** **A (recommended): dropped**: he always targets your king.
+- **D9. How often:** **A (recommended):** the rage meter is on his bar from the start, dimmed ("Rage: unlocks at 5 upgrades"); after the
+  5th upgrade it fills as every boss's; full: the "RAGE!" warning, then Dodge as your turn begins (the clock held); after it, it fills
+  again; **at most 2 a battle**. B: once a battle.
+- **D10. The God King:** a hit isn't a checkmate. **A (recommended): no Last Stand against Dodge** (it's a game of its own, and always
+  winnable). B: an unused Last Stand saves you once.
+- **D11. Picking a square:** **A (recommended): tap a square of the arena** (one tap; tap another to change; no dragging), on a phone
+  and a computer.
+- **D12. "Nothing hidden, nothing shifts":** the rage meter is there from the first move (dimmed until it applies); Dodge pauses
+  everything, draws over the board in its own place, and puts it all back exactly; its HUD (the round, the 3 s bar) sits under the
+  arena in the board's own space. I read it as fitting.
+
+---
+# Round 1 (Nov 15): the first questions (answered ones marked ✅)
 
 How I read each of Eric's rules, then every question or problem with my **recommended answer first**. Each one can be
 answered in a line ("Q4: A" or "Q4: your words"). I checked each against the ground rules of every power
@@ -17,7 +144,7 @@ touches doesn't count for fair play; a move a power refuses says why in the dock
 A lock lasts a random 4 to 6 of his moves, then he locks another piece. He picks a piece he could plausibly capture in the next few
 turns, never the king, and his engine leans toward going after it.
 
-- **Q1. Can the queen be locked?** Your words were "it wouldn't be the king or the queen".
+- ✅ **Q1 (Eric: never the queen).** Can the queen be locked? Your words were "it wouldn't be the king or the queen".
   **A (recommended): never the queen** (she has her own move, Queen lock). B: the queen too, but rarely (last choice).
 - **Q2. How "capturable in the next few turns" is judged.**
   **A (recommended): a cheap rule on the board, no engine work:** your pieces (not king, not queen) ranked by (1) attacked by him
@@ -44,14 +171,14 @@ turns, never the king, and his engine leans toward going after it.
 window, front and center over the board, the new part attaches, "UPGRADE!". Each upgrade unlocks one of his five moves, in a
 random order.
 
-- **Q6. What upgrades the rifle?** You said both. **A (recommended): any capture he makes** (simple, everyone can see it coming; a
+- ✅ **Q6 (Eric: only taking a locked piece; the locks are built so he's fully upgraded nearly every battle: round 2, L1 to L6).** What upgrades the rifle? You said both. **A (recommended): any capture he makes** (simple, everyone can see it coming; a
   boss takes roughly 6 to 10 pieces in a 40-move battle, so he's usually fully upgraded by the late middlegame). B: only taking the
   locked piece (then the lock really matters, but most battles would end with 1 to 3 upgrades and he'd rarely see his last moves).
   C: any capture, and taking the locked piece also fills his move meter at once (a reward for the lock, a little more code).
 - **Q7. The order of the attachments.** The look and the moves are separate: **A (recommended): the rifle's parts always come in the
   same order** (longer barrel, big scope, bipod and stock, energy cell, emitter: a clear growth), **the move each one unlocks is
   random** from the seed. The window says which move: "New move unlocked: Shields".
-- **Q8. The pause.** **A (recommended): about 2 s** (the window steps in, the part slides on and snaps, "UPGRADE!" holds, the window
+- ✅ **Q8 (Eric: 2 s, everything paused).** The pause. **A (recommended): about 2 s** (the window steps in, the part slides on and snaps, "UPGRADE!" holds, the window
   steps out: the GIF's 1.9 s), **the clock holds** for everyone, as every power's moment does. It happens up to 5 times a
   battle, so I kept it short. B: 1 s (just the snap and the word).
 - **Q9. Captures after the fifth.** **A (recommended): no window** (nothing new to show); his bar shows 5 of 5.
@@ -64,7 +191,7 @@ random order.
 
 - **Q10. How fast it fills.** **A (recommended): full every 6 of the crowd's moves** (about 5 or 6 moves in a battle, once it starts),
   tuned by the sim. B: every 4 (busier, harder). A number in the settings file either way.
-- **Q11. Which move fires when it's full.** **A (recommended): random among the unlocked ones** (your "random, so he's not
+- ✅ **Q11 (Eric: random among the unlocked, except a newly unlocked move is always the next one used).** Which move fires when it's full. **A (recommended): random among the unlocked ones** (your "random, so he's not
   overpowered"), never the same one twice in a row when he has two or more. B: always the newest unlocked.
 - **Q12. Before his first capture** ("Nothing hidden, nothing shifts"). **A (recommended): the bar is there from the start, greyed
   with a lock**, and fills once he's taken a piece (the mockup's lock-on still shows it lit; the queen-lock stills full).
@@ -90,7 +217,7 @@ and you can't see what's under the beam.
 
 - **Q17. Do covered pieces still block lines, defend and give check?** **A (recommended): yes, always** (the board's chess doesn't
   change; only what you may move and what you see). The judge and the engines see the real board.
-- **Q18. Can you move onto or through a covered square?** **A (recommended): no: covered squares are walls for your turn** (Big Boy's
+- ✅ **Q18 (Eric: walls, Big Boy's rule).** Can you move onto or through a covered square? **A (recommended): no: covered squares are walls for your turn** (Big Boy's
   toy-block rule: nothing lands on or slides through; a knight jumps over), so you can't blunder into something you can't see.
   B: you may move onto them blind, Hollow's way (a wrong guess costs, his taunt). B is more code and harsher.
 - **Q19. Is it only your pieces that can't move, or his too?** It only lasts your one turn, so his pieces don't matter: **the cover
@@ -125,7 +252,7 @@ and you can't see what's under the beam.
   of the crescent. The refusal line: "That piece is dizzy."
 - **Q27. Which three?** **A (recommended): at random among your pieces with a move** (your words: "they're random"), as Moo's shipped beam.
 
-## 8. Queen lock
+## 8. Queen lock (round 1; replaced by round 2, Q1 to Q5)
 
 **As I read it:** he spends his whole turn locking your queen; you must move your queen; then he fires a piercing round at her: the
 first of your pieces in its way shatters and the round stops; nothing in the way, your queen dies.
@@ -150,7 +277,7 @@ first of your pieces in its way shatters and the round stops; nothing in the way
 
 ## 9. His ultimate (later)
 
-- **Q35. Room for it now.** **A (recommended): the rage meter is on his bar from the start, dimmed with "Rage: unlocks at 5 upgrades"
+- ✅ **Q35 (Eric designed it: Dodge, round 2).** Room for it now. **A (recommended): the rage meter is on his bar from the start, dimmed with "Rage: unlocks at 5 upgrades"
   until the rifle is full**, then it fills as every boss's; nothing to design yet. B: no rage meter until then (that would break
   "Nothing hidden, nothing shifts": the bar's row would appear later).
 
