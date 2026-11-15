@@ -3640,9 +3640,11 @@ export const RIDE_SOUND = {
   holdMs: 120,
   engine: { startRate: 0.8, upMs: 300, stopRate: 0.88 },
   rides: {
-    "sawyer-dozer": { engine: true, fadeInMs: 60, fadeOutMs: 700 },
-    "boingo-pogo": { engine: false, fadeInMs: 60, fadeOutMs: 350 },
-  } as Readonly<Record<string, { readonly engine: boolean; readonly fadeInMs: number; readonly fadeOutMs: number }>>,
+    "sawyer-dozer": { engine: true, fadeInMs: 60, fadeOutMs: 700, rate: 1 },
+    /** `rate`: the loop's speed (and pitch) while moving. The pogo's 4 boings a second lagged the pawn's pace (Eric, Nov 15: "pogo
+     *  needs to be sped up to match the speed you move around"): 1.5 is 6 a second (about 7 semitones up). */
+    "boingo-pogo": { engine: false, fadeInMs: 60, fadeOutMs: 350, rate: 1.5 },
+  } as Readonly<Record<string, { readonly engine: boolean; readonly fadeInMs: number; readonly fadeOutMs: number; readonly rate: number }>>,
 } as const;
 
 /**
