@@ -1179,6 +1179,20 @@ describe("the town's own theme, with its two piano solos slotted in (Eric, Nov 1
     expect(bufOf(ctx.sources.at(-2)!)).toBe("/music/town-solo-a.mp3");
   });
 
+  it("its theme fails to load: nothing plays, and it isn't asked for again until the town opens again", async () => {
+    loadFails.add("/music/town-loop.mp3");
+    await open(10);
+    expect(ctx.sources).toHaveLength(0);
+    roomMusic(null);
+    bossMusic(null);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(files.filter((u) => u.includes("town-loop"))).toHaveLength(1);
+    townMusic(false);
+    await open(20);
+    expect(ctx.sources).toHaveLength(1);
+    expect(ctx.sources[0]!.started).toEqual([20 + MUSIC.startDelayS, PAD]);
+  });
+
   it("a room with no theme of its own (a shop): the town's plays on, untouched", async () => {
     await open(10);
     roomMusic("bakery");

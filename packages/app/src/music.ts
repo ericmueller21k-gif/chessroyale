@@ -782,6 +782,8 @@ interface TownPlaying extends Playing {
 let townOpen = false;
 let townPlaying: TownPlaying | null = null;
 let townStarting = false;
+/** Its theme didn't load (or there is none): not asked again until the town opens again (townCheck runs on every App render). */
+let townFailed = false;
 /** The solo whose turn is next: taking turns while the town is open, from the first again as it opens. */
 let townTurn = 0;
 /** The town's decoded pieces (by name), kept while the town is open. */
@@ -797,6 +799,7 @@ let townLoading: Promise<unknown> | null = null;
 export function townMusic(open: boolean) {
   if (open === townOpen) return;
   townOpen = open;
+  townFailed = false;
   if (open) return townCheck();
   endTown();
   townTurn = 0;
@@ -818,11 +821,11 @@ function townCheck() {
 }
 
 function maybeStartTown() {
-  if (!townWanted() || townPlaying || townStarting || !wanted()) return;
+  if (!townWanted() || townPlaying || townStarting || townFailed || !wanted()) return;
   townStarting = true;
   const loads = loadTown().then((town) => {
     townStarting = false;
-    if (!town) return;
+    if (!town) return void (townFailed = townOpen);
     const theme = townBufs.get(town.loop);
     const bus = musicBus();
     if (theme && bus && townWanted() && !townPlaying && wanted()) startTown(bus, town, theme);
