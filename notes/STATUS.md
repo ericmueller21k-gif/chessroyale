@@ -1232,3 +1232,4 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 15 06:12: final-form r4 helper session_01JuCWRs1sHMrWnyr8PNKsjF (Opus high) on claude/recluse-final-look; .mockup watcher running. Show Eric the stills, then .go with his notes.
 - Nov 15 06:40: Eric: boss bubble on a computer grows and slides off screen after a moment (Don Dough, screenshot stills/boss-bubble-offscreen). Brief briefs/boss-bubble-offscreen.md (Opus high).
 - Nov 15 06:58: final form r4 mockup in (stills/recluse-final-look); sent Eric 5 images. Waiting on his notes -> .go round4 (or redo) on claude/recluse-final-look. Bubble helper session_01JuCWRuBwpBM4DVSyBVm3e6 running (watcher b6od2kclv).
+- Nov 15 07:30: bubble fix -> #730 (67ef2343), CI watcher b1wofs8ue; helper archived. Asked Eric: keep the Hidden Boss's ~3.5 px bubble bob (words on his current pose's head) or pin it?
