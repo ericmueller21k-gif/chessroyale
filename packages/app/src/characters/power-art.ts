@@ -304,6 +304,7 @@
  * (sparkFly, candleShot, fireballFall's fall) with a CSS transform, never by redrawing.
  */
 import type { SoundName } from "../sound.ts";
+import { CHANDY_SOUNDS } from "./chandy.ts";
 import { EFFECT_SPRITES, TOY_LETTER_NAMES, type ToyLetter } from "./effects.ts";
 import type { Anim, Character } from "./sprite.ts";
 
@@ -636,6 +637,19 @@ export const EFFECTS: Record<EffectName, Effect> = {
   creasePencil: { ch: EFFECT_SPRITES.creasePencil, covers: "square", loop: "E", sounds: {} },
   inkStrike: { ch: EFFECT_SPRITES.inkStrike, covers: "square", start: "strike", loop: "struck", sounds: { strike: "folioScratch" } },
   inkHit: { ch: EFFECT_SPRITES.inkHit, covers: "square", start: "hitHL", sounds: {} },
+  // Chandy's (effects/chandy.ts): placeholder sounds until his own pack (chandy.ts CHANDY_SOUNDS, CHANDY_CUES). The beam's squares pick
+  // their loop by name (row, col, cross); Dodge's lines play `flash`, then `blast`.
+  chandyCrosshair: { ch: EFFECT_SPRITES.chandyCrosshair, covers: "square", start: "lock", loop: "held3", stages: [{ loop: "held3" }, { loop: "held2" }, { loop: "held1" }], end: "drop", sounds: CHANDY_SOUNDS },
+  chandyScatter: { ch: EFFECT_SPRITES.chandyScatter, covers: "square", start: "land", loop: "held", end: "fade", sounds: CHANDY_SOUNDS },
+  chandyScatterBurst: { ch: EFFECT_SPRITES.chandyScatterBurst, covers: "square", start: "burst", sounds: CHANDY_SOUNDS },
+  chandyBeam: { ch: EFFECT_SPRITES.chandyBeam, covers: "square", start: "rowIn", loop: "row", end: "rowOut", sounds: CHANDY_SOUNDS },
+  chandyShield: { ch: EFFECT_SPRITES.chandyShield, covers: "square", start: "up", loop: "held", end: "pop", sounds: CHANDY_SOUNDS },
+  chandyDizzy: { ch: EFFECT_SPRITES.chandyDizzy, covers: "square", start: "hit", loop: "dizzy", end: "clear", sounds: CHANDY_SOUNDS },
+  chandyQueenAim: { ch: EFFECT_SPRITES.chandyQueenAim, covers: "square", start: "on", loop: "aim", end: "fade", sounds: CHANDY_SOUNDS },
+  chandyRound: { ch: EFFECT_SPRITES.chandyRound, covers: "square", loop: "fly", end: "trail", sounds: CHANDY_SOUNDS },
+  chandyShatter: { ch: EFFECT_SPRITES.chandyShatter, covers: "square", start: "shatter", sounds: CHANDY_SOUNDS },
+  chandyDodgeRow: { ch: EFFECT_SPRITES.chandyDodgeRow, covers: "square", start: "flash", end: "blast", sounds: CHANDY_SOUNDS },
+  chandyDodgeCol: { ch: EFFECT_SPRITES.chandyDodgeCol, covers: "square", start: "flash", end: "blast", sounds: CHANDY_SOUNDS },
 };
 
 // ---------------- Big Boy's toy block, for the board ----------------

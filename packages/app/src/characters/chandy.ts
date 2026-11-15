@@ -1,31 +1,24 @@
 /**
- * Chandy, the special ops alligator (Eric's idea, Nov 15; mockup round 1, unwired: nothing in the game draws him yet).
+ * Chandy, the special ops alligator (Eric's idea, Nov 15; his design approved Nov 16, "I like how you have it done": branch
+ * stills/boss-chandy, DESIGN.md; docs/decisions/2026-11-16-chandy-art.md). The art only: his rules come in their own job.
  *
- * An ordinary green alligator standing upright on two feet like our other standing animals (Timber, Don Dough), not muscly: a
- * slim body with a soft cream belly in scale bands, short bowed legs, a long ridged tail lying on the ground behind him, and the
- * broad, rounded alligator snout (a U, not a croc's V) with its upper teeth showing. Special ops by his kit, not his build: black
- * war paint (two slashes under his eye, a band across his snout), a sniper's eye strap (olive webbing round his head, a small
- * scope lens over his near eye that glows the rifle's cyan), an olive sling across his chest, and on his back, slung diagonally,
- * his energy sniper rifle (its muzzle up over his back shoulder): about his full length, longer with each upgrade
- * (`RIFLE_STAGES`, 0 to 5 attachments). No bullets: its energy is cyan.
+ * An ordinary green alligator standing upright on two feet like our other standing animals (Timber, Don Dough), not muscly: a slim
+ * body with a soft cream belly in scale bands, short bowed legs, a long ridged tail lying on the ground behind him, and the broad,
+ * rounded alligator snout (a U, not a croc's V) with its upper teeth showing. Special ops by his kit, not his build: black war paint
+ * (three slashes on his cheek), a sniper's eye strap (olive webbing round his head, a small scope lens over his near eye that glows
+ * the rifle's cyan), an olive sling across his chest, a belt and pouch, and on his back, slung along it from his hip to over his head,
+ * his energy sniper rifle: his full length (78 px), 112 px with all five attachments (`RIFLE_STAGES`). No bullets: its energy is cyan.
  *
- * Drawn three-quarters on, facing our right (toward the board, as Don Dough), light from the top left, in a 100 x 112 frame,
- * his feet at [46, 106], about 72 px from his feet to the top of his eye ridge (Timber's and Don Dough's height).
+ * Drawn three-quarters on, facing our right (toward the board), light from the top left, in a 174 x 122 frame (its right 56 px are the
+ * room the rifle needs held out level), his feet at [58, 116], about 72 px from his feet to the top of his eye ridge.
  *
  * Rigging (`ChandyPose`): every part is painted per pose from numbers and cached (the zebra rig's way): the breath (`bob`), the
  * tail (`sway`), the near arm (`armN`: shoulder to elbow to hand), the far arm (`armF`), the rifle (`gun`: slung, or held at an
  * angle), the rifle's stage, the eye's lens glow (`lens`), the far eye (`eye`), the jaw (`jaw`).
  */
-import {
-  lazyAnimsTogether,
-  type Anim,
-  type Character,
-  type Frame,
-  type Layer,
-  type Part,
-  type Speck,
-} from "./sprite.ts";
+import { lazyAnimsTogether, type Anim, type Character, type Frame, type Layer, type Part, type Speck } from "./sprite.ts";
 import type { Sprite } from "./sprite-kit.ts";
+import type { SoundName } from "../sound.ts";
 
 const lazyAnim = lazyAnimsTogether();
 
@@ -111,16 +104,15 @@ export const CHANDY_CLONE_HALO = "#7c37ff";
 /** The figure is painted from x 0 and shifted OX px right in its frame (room for the rifle's muzzle over his back shoulder). */
 const OX = 12;
 /** And OY px down (room for the full-length rifle's muzzle over his head). */
-const OY = 10;
+const OY = 14;
 const W = 118;
-const H = 122;
+const H = 126;
 const GROUND = 106;
 export const CHANDY_FOOT: Pt = [46 + OX, GROUND + OY];
 
 // ---- Painting helpers (the zebra rig's, by the same rules: whole pixels, one key a pixel, lit from the top left).
 
-const cvs = (w = W, h = H): Cv =>
-  Array.from({ length: h }, () => Array<string>(w).fill("."));
+const cvs = (w = W, h = H): Cv => Array.from({ length: h }, () => Array<string>(w).fill("."));
 const put = (c: Cv, x: number, y: number, k: string) => {
   x = Math.round(x);
   y = Math.round(y);
@@ -153,19 +145,11 @@ function crop(c: Cv, outline = true): { part: Part; at: Pt } | null {
     at: [x0, y0],
   };
 }
-function seg(
-  px: number,
-  py: number,
-  a: Pt,
-  b: Pt,
-): { d: number; t: number; nx: number; ny: number } {
+function seg(px: number, py: number, a: Pt, b: Pt): { d: number; t: number; nx: number; ny: number } {
   const vx = b[0] - a[0];
   const vy = b[1] - a[1];
   const L2 = vx * vx + vy * vy || 1;
-  const t = Math.max(
-    0,
-    Math.min(1, ((px - a[0]) * vx + (py - a[1]) * vy) / L2),
-  );
+  const t = Math.max(0, Math.min(1, ((px - a[0]) * vx + (py - a[1]) * vy) / L2));
   const qx = a[0] + vx * t;
   const qy = a[1] + vy * t;
   const d = Math.hypot(px - qx, py - qy);
@@ -178,18 +162,10 @@ function limb(
   r0: number,
   r1: number,
   ramp: string,
-  keep?: (
-    x: number,
-    y: number,
-    along: number,
-    d: number,
-    r: number,
-  ) => string | null,
+  keep?: (x: number, y: number, along: number, d: number, r: number) => string | null,
 ): void {
   const n = pts.length - 1;
-  const lens = pts
-    .slice(1)
-    .map((p, i) => Math.hypot(p[0] - pts[i]![0], p[1] - pts[i]![1]));
+  const lens = pts.slice(1).map((p, i) => Math.hypot(p[0] - pts[i]![0], p[1] - pts[i]![1]));
   const total = lens.reduce((a, b) => a + b, 0) || 1;
   const x0 = Math.floor(Math.min(...pts.map((p) => p[0])) - 8);
   const x1 = Math.ceil(Math.max(...pts.map((p) => p[0])) + 8);
@@ -207,14 +183,7 @@ function limb(
       const r = r0 + (r1 - r0) * (along / total);
       if (best.d > r) continue;
       const lit = litOf(best.nx, best.ny) * (best.d / Math.max(0.6, r));
-      let k =
-        lit > 0.45
-          ? ramp[3]!
-          : lit > 0.05
-            ? ramp[2]!
-            : lit < -0.45
-              ? ramp[0]!
-              : ramp[1]!;
+      let k = lit > 0.45 ? ramp[3]! : lit > 0.05 ? ramp[2]! : lit < -0.45 ? ramp[0]! : ramp[1]!;
       if (keep) k = keep(x, y, along, best.d, r) ?? k;
       put(c, x, y, k);
     }
@@ -241,28 +210,15 @@ function inPoly(pts: readonly Pt[], x: number, y: number): boolean {
   for (let i = 0; i < pts.length; i++) {
     const [x0, y0] = pts[i]!;
     const [x1, y1] = pts[(i + 1) % pts.length]!;
-    if (y0 <= y !== y1 <= y && x < x0 + ((y - y0) / (y1 - y0)) * (x1 - x0))
-      inside = !inside;
+    if (y0 <= y !== y1 <= y && x < x0 + ((y - y0) / (y1 - y0)) * (x1 - x0)) inside = !inside;
   }
   return inside;
 }
-function polyFill(
-  c: Cv,
-  pts: readonly Pt[],
-  fn: (x: number, y: number) => string | null,
-): void {
+function polyFill(c: Cv, pts: readonly Pt[], fn: (x: number, y: number) => string | null): void {
   const xs = pts.map((p) => p[0]);
   const ys = pts.map((p) => p[1]);
-  for (
-    let y = Math.floor(Math.min(...ys));
-    y <= Math.ceil(Math.max(...ys));
-    y++
-  )
-    for (
-      let x = Math.floor(Math.min(...xs));
-      x <= Math.ceil(Math.max(...xs));
-      x++
-    ) {
+  for (let y = Math.floor(Math.min(...ys)); y <= Math.ceil(Math.max(...ys)); y++)
+    for (let x = Math.floor(Math.min(...xs)); x <= Math.ceil(Math.max(...xs)); x++) {
       if (!inPoly(pts, x + 0.5, y + 0.5)) continue;
       const k = fn(x, y);
       if (k) put(c, x, y, k);
@@ -271,15 +227,7 @@ function polyFill(
 /** The green skin's shade at a point of a round part (nx, ny in -1..1). */
 const skinAt = (nx: number, ny: number) => {
   const l = litOf(nx, ny);
-  return l > 0.62
-    ? "v"
-    : l > 0.3
-      ? "e"
-      : l > -0.05
-        ? "d"
-        : l > -0.5
-          ? "c"
-          : "b";
+  return l > 0.62 ? "v" : l > 0.3 ? "e" : l > -0.05 ? "d" : l > -0.5 ? "c" : "b";
 };
 
 // ---- The rifle: shapes along its length (u, from the butt) and across it (v, + its top: the scope's side), drawn at any angle.
@@ -287,14 +235,7 @@ const skinAt = (nx: number, ny: number) => {
 /** How many attachments it has: 0 the base rifle, 5 fully upgraded. */
 export type RifleStage = 0 | 1 | 2 | 3 | 4 | 5;
 /** The attachments in the order they come (Eric: "a longer barrel, and so on"; the order is my call: DESIGN.md). */
-export const RIFLE_STAGES = [
-  "Base",
-  "Long barrel",
-  "Big scope",
-  "Bipod and stock",
-  "Energy cell",
-  "Emitter",
-] as const;
+export const RIFLE_STAGES = ["Base", "Long barrel", "Big scope", "Bipod and stock", "Energy cell", "Emitter"] as const;
 
 type Shape =
   | { poly: readonly Pt[]; ramp?: string; key?: string; hole?: boolean }
@@ -308,13 +249,11 @@ type Shape =
 
 const GUN = "GHIJj";
 const OD = "LMNn";
-const R = (
-  u0: number,
-  u1: number,
-  v0: number,
-  v1: number,
-  more: Omit<Extract<Shape, { rect: unknown }>, "rect"> = {},
-): Shape => ({ rect: [u0, u1, v0, v1], ramp: GUN, ...more });
+const R = (u0: number, u1: number, v0: number, v1: number, more: Omit<Extract<Shape, { rect: unknown }>, "rect"> = {}): Shape => ({
+  rect: [u0, u1, v0, v1],
+  ramp: GUN,
+  ...more,
+});
 
 /** The rifle's shapes at a stage, back to front, and its length (butt to muzzle). */
 export function rifleShapes(stage: RifleStage): {
@@ -355,26 +294,18 @@ export function rifleShapes(stage: RifleStage): {
   // The receiver, its rail, and its energy line (brighter once the cell is on).
   s.push(R(14, 36.5, -3.6, 3.6));
   s.push({ rect: [15, 35, 3.6, 4.6], ramp: "IJJj" });
-  for (let u = 16; u < 35; u += 2.5)
-    s.push({ rect: [u, u + 0.9, 3.6, 4.6], key: "H" });
+  for (let u = 16; u < 35; u += 2.5) s.push({ rect: [u, u + 0.9, 3.6, 4.6], key: "H" });
   s.push({ rect: [16, 34, -0.7, 0.7], key: stage >= 4 ? "O" : "F" });
-  if (stage >= 4)
-    for (let u = 17; u < 34; u += 3)
-      s.push({ rect: [u, u + 1, -0.7, 0.7], key: "Q" });
+  if (stage >= 4) for (let u = 17; u < 34; u += 3) s.push({ rect: [u, u + 1, -0.7, 0.7], key: "Q" });
   // A small window for the energy at the base (the cell replaces it).
-  if (stage < 4)
-    s.push(
-      { rect: [27, 32, -6, -3.4], ramp: "HIIJ" },
-      { rect: [28, 31, -5.2, -3.8], key: "F" },
-    );
+  if (stage < 4) s.push({ rect: [27, 32, -6, -3.4], ramp: "HIIJ" }, { rect: [28, 31, -5.2, -3.8], key: "F" });
   // The barrel: short at 0; at 1 longer, with a vented shroud and a brake.
   const end = long ? 74 : 60;
   s.push(R(36, end, -1.7, 1.7));
   if (long) {
     s.push(R(36, 58, -3.3, 3.3));
     s.push({ rect: [36, 58, 3.3, 4.2], ramp: "IJJj" });
-    for (const u of [39, 43, 47, 51, 55])
-      s.push({ rect: [u, u + 1.6, -1.6, 1.6], key: stage >= 4 ? "O" : "F" });
+    for (const u of [39, 43, 47, 51, 55]) s.push({ rect: [u, u + 1.6, -1.6, 1.6], key: stage >= 4 ? "O" : "F" });
     if (stage < 5)
       s.push(R(69.5, 74, -2.6, 2.6, { ramp: "GHIJ" }), {
         rect: [71.5, 72.5, -2.6, 2.6],
@@ -386,10 +317,7 @@ export function rifleShapes(stage: RifleStage): {
   }
   // 2: the big scope, on two mounts, its lens at the front.
   if (stage >= 2) {
-    s.push(
-      R(20, 22, 3.6, 5.8, { ramp: "GHHI" }),
-      R(30, 32, 3.6, 5.8, { ramp: "GHHI" }),
-    );
+    s.push(R(20, 22, 3.6, 5.8, { ramp: "GHHI" }), R(30, 32, 3.6, 5.8, { ramp: "GHHI" }));
     s.push(R(16.5, 36, 5.6, 9.4));
     s.push({
       poly: [
@@ -404,10 +332,7 @@ export function rifleShapes(stage: RifleStage): {
     });
     s.push(R(13.5, 17, 5, 10, { ramp: "GHHI" }));
     s.push(R(25, 27.5, 9.2, 11, { ramp: "GHIJ" }));
-    s.push(
-      { rect: [40.2, 41.2, 5, 10], key: "O" },
-      { rect: [40.2, 41.2, 8.6, 10], key: "Q" },
-    );
+    s.push({ rect: [40.2, 41.2, 5, 10], key: "O" }, { rect: [40.2, 41.2, 8.6, 10], key: "Q" });
   }
   // 3: the bipod, its two legs down and forward under the barrel (a V), and the stock's cheek rest and spike (above).
   if (stage >= 3) {
@@ -430,21 +355,14 @@ export function rifleShapes(stage: RifleStage): {
       ],
       ramp: "HIJj",
     });
-    s.push(
-      R(56.6, 61, -14.6, -12.8, { ramp: "GGHI" }),
-      R(52, 56, -14.6, -12.8, { ramp: "GGHI" }),
-    );
+    s.push(R(56.6, 61, -14.6, -12.8, { ramp: "GGHI" }), R(52, 56, -14.6, -12.8, { ramp: "GGHI" }));
   }
   // 4: the energy cell, under the receiver ahead of the grip, glowing, its cable to the shroud.
   if (stage >= 4) {
     s.push({ rect: [26, 38, -12, -3.4], ramp: "qFFO" });
-    for (const u of [29.5, 33])
-      s.push({ rect: [u, u + 1, -12, -3.4], key: "q" });
+    for (const u of [29.5, 33]) s.push({ rect: [u, u + 1, -12, -3.4], key: "q" });
     s.push({ rect: [27, 37, -6.6, -5.4], key: "Q" });
-    s.push(
-      R(25.4, 27, -12.6, -3.2, { ramp: "GHIJ" }),
-      R(37, 38.6, -12.6, -3.2, { ramp: "GHIJ" }),
-    );
+    s.push(R(25.4, 27, -12.6, -3.2, { ramp: "GHIJ" }), R(37, 38.6, -12.6, -3.2, { ramp: "GHIJ" }));
     s.push({
       poly: [
         [38.6, -8],
@@ -510,12 +428,7 @@ export function rifleShapes(stage: RifleStage): {
  */
 export const RIFLE_LEN_K = 1.3;
 
-export function paintRifle(
-  c: Cv,
-  butt: Pt,
-  deg: number,
-  stage: RifleStage,
-): Pt {
+export function paintRifle(c: Cv, butt: Pt, deg: number, stage: RifleStage): Pt {
   const { shapes, len } = rifleShapes(stage);
   const rad = (deg * Math.PI) / 180;
   const ux = Math.cos(rad);
@@ -526,16 +439,8 @@ export function paintRifle(
   const sRaw = vx * LX + vy * LY;
   const sl = Math.sign(sRaw || 1) * Math.max(0.55, Math.abs(sRaw));
   const reach = len * RIFLE_LEN_K + 14;
-  for (
-    let y = Math.floor(butt[1] - reach);
-    y <= Math.ceil(butt[1] + reach);
-    y++
-  )
-    for (
-      let x = Math.floor(butt[0] - reach);
-      x <= Math.ceil(butt[0] + reach);
-      x++
-    ) {
+  for (let y = Math.floor(butt[1] - reach); y <= Math.ceil(butt[1] + reach); y++)
+    for (let x = Math.floor(butt[0] - reach); x <= Math.ceil(butt[0] + reach); x++) {
       const dx = x + 0.5 - butt[0];
       const dy = y + 0.5 - butt[1];
       const u = (dx * ux + dy * uy) / RIFLE_LEN_K;
@@ -586,9 +491,7 @@ export interface ChandyPose {
   /** The near hand: a fist (holding), open, or pointing (one claw out). */
   handN?: "fist" | "point" | "open";
   /** The rifle: slung on his back (a pixel offset as he pulls it), or held: its butt from his near shoulder, and its angle. */
-  gun?:
-    | { slung: true; dx?: number; dy?: number }
-    | { at: Pt; deg: number; front: boolean };
+  gun?: { slung: true; dx?: number; dy?: number } | { at: Pt; deg: number; front: boolean };
   /** The scope lens's glow: 0 dim, 1 lit, 2 flaring. */
   lens?: 0 | 1 | 2;
   eye?: Eye;
@@ -638,13 +541,7 @@ export const ARMS = {
 
 export const CHANDY_PARTS: Record<string, Part> = {};
 const CACHE = new Map<string, { name: string; at: Pt } | null>();
-function part(
-  key: string,
-  paint: (c: Cv) => void,
-  outline = true,
-  w = W + 40,
-  h = H,
-): { name: string; at: Pt } | null {
+function part(key: string, paint: (c: Cv) => void, outline = true, w = W + 40, h = H): { name: string; at: Pt } | null {
   if (CACHE.has(key)) return CACHE.get(key)!;
   const c = cvs(w, h);
   paint(c);
@@ -673,10 +570,7 @@ function shadowPart(): { name: string; at: Pt } | null {
 }
 
 /** The tail: thick at his hips, lying along the ground to our left, its ridge of scutes along the top. */
-function tailPart(
-  sway: number,
-  crouch: number,
-): { name: string; at: Pt } | null {
+function tailPart(sway: number, crouch: number): { name: string; at: Pt } | null {
   const s = Math.round(sway * 2) / 2;
   return part(`tail:${s}:${crouch}`, (c) => {
     const pts: Pt[] = [
@@ -688,17 +582,12 @@ function tailPart(
     ];
     limb(c, pts, 7, 1.4, "bcde", (x, y, along, d, r) => {
       // The belly side of the tail, toward the ground: cream.
-      return y > 101 && along < 34 && d > r * 0.35
-        ? y > 103
-          ? "g"
-          : null
-        : null;
+      return y > 101 && along < 34 && d > r * 0.35 ? (y > 103 ? "g" : null) : null;
     });
     // The ridge: two rows of little scutes, notched along the top edge.
     for (let x = 4; x <= 38; x++) {
       let top = -1;
-      for (let y = 0; y < H; y++)
-        if (get(c, x, y) !== ".") ((top = y), (y = H));
+      for (let y = 0; y < H; y++) if (get(c, x, y) !== ".") ((top = y), (y = H));
       if (top < 0) continue;
       if (mod(x, 3) === 0) (put(c, x, top - 1, "c"), put(c, x, top, "b"));
       else if (mod(x, 3) === 1) put(c, x, top, "e");
@@ -708,123 +597,70 @@ function tailPart(
 }
 
 /** A leg: a thick gator thigh, a short shin, a long foot with claws pointing our right. */
-function legPart(
-  hip: Pt,
-  knee: Pt,
-  ankle: Pt,
-  near: boolean,
-): { name: string; at: Pt } | null {
-  return part(
-    `leg:${near ? "n" : "f"}:${[hip, knee, ankle].map(r2).join(";")}`,
-    (c) => {
-      limb(c, [hip, knee, ankle], 5.2, 3.2, near ? "bcde" : "abcd");
-      // The foot: a flat wedge forward, three pale claws.
-      const fx = ankle[0];
-      const fy = GROUND;
-      polyFill(
-        c,
-        [
-          [fx - 4, fy - 4.5],
-          [fx + 3, fy - 4.5],
-          [fx + 9, fy - 2],
-          [fx + 9.5, fy],
-          [fx - 4.5, fy],
-        ],
-        (x, y) =>
-          y < fy - 3
-            ? near
-              ? "d"
-              : "c"
-            : y < fy - 1
-              ? near
-                ? "c"
-                : "b"
-              : near
-                ? "b"
-                : "a",
-      );
-      for (const [dx, dy] of [
-        [9, -1],
-        [10, 0],
-        [7, 0],
-      ] as const)
-        put(c, fx + dx, fy + dy - 0, "w");
-      put(c, fx + 10, fy - 1, "W");
-    },
-  );
+function legPart(hip: Pt, knee: Pt, ankle: Pt, near: boolean): { name: string; at: Pt } | null {
+  return part(`leg:${near ? "n" : "f"}:${[hip, knee, ankle].map(r2).join(";")}`, (c) => {
+    limb(c, [hip, knee, ankle], 5.2, 3.2, near ? "bcde" : "abcd");
+    // The foot: a flat wedge forward, three pale claws.
+    const fx = ankle[0];
+    const fy = GROUND;
+    polyFill(
+      c,
+      [
+        [fx - 4, fy - 4.5],
+        [fx + 3, fy - 4.5],
+        [fx + 9, fy - 2],
+        [fx + 9.5, fy],
+        [fx - 4.5, fy],
+      ],
+      (x, y) => (y < fy - 3 ? (near ? "d" : "c") : y < fy - 1 ? (near ? "c" : "b") : near ? "b" : "a"),
+    );
+    for (const [dx, dy] of [
+      [9, -1],
+      [10, 0],
+      [7, 0],
+    ] as const)
+      put(c, fx + dx, fy + dy - 0, "w");
+    put(c, fx + 10, fy - 1, "W");
+  });
 }
 
 /** An arm: a slim tube, a small hand with claws (a fist on the sling, open, or one claw pointing). */
-function armPart(
-  sh: Pt,
-  elbow: Pt,
-  hand: Pt,
-  near: boolean,
-  kind: "fist" | "point" | "open",
-): { name: string; at: Pt } | null {
-  return part(
-    `arm:${near ? "n" : "f"}:${kind}:${[sh, elbow, hand].map(r2).join(";")}`,
-    (c) => {
-      limb(c, [sh, elbow, hand], 3.3, 2.5, near ? "bcde" : "abcd");
-      const ux = hand[0] - elbow[0];
-      const uy = hand[1] - elbow[1];
-      const L = Math.hypot(ux, uy) || 1;
-      const dx = ux / L;
-      const dy = uy / L;
-      ellipseFill(c, hand[0] + dx, hand[1] + dy, 2.6, 2.4, (_, __, nx, ny) =>
-        skinAt(nx, ny),
-      );
-      if (kind === "point") {
-        // One long claw out (the pointing finger), the rest curled.
-        for (let i = 2; i <= 6; i++)
-          put(
-            c,
-            hand[0] + dx * (2 + i),
-            hand[1] + dy * (2 + i),
-            i < 5 ? "d" : "e",
-          );
-        put(c, hand[0] + dx * 9, hand[1] + dy * 9, "w");
-        put(c, hand[0] + dx * 2 + 1, hand[1] + dy * 2 + 2, "w");
-      } else if (kind === "open") {
-        for (const a of [-0.6, 0, 0.6])
-          put(
-            c,
-            hand[0] + dx * 3.5 + Math.cos(a) * 0 - dy * a * 2.5,
-            hand[1] + dy * 3.5 + dx * a * 2.5,
-            "w",
-          );
-      } else {
-        put(c, hand[0] + dx * 3, hand[1] + dy * 3 + 1, "w");
-        put(c, hand[0] + dx * 3 + 1, hand[1] + dy * 3 - 1, "w");
-      }
-    },
-  );
+function armPart(sh: Pt, elbow: Pt, hand: Pt, near: boolean, kind: "fist" | "point" | "open"): { name: string; at: Pt } | null {
+  return part(`arm:${near ? "n" : "f"}:${kind}:${[sh, elbow, hand].map(r2).join(";")}`, (c) => {
+    limb(c, [sh, elbow, hand], 3.3, 2.5, near ? "bcde" : "abcd");
+    const ux = hand[0] - elbow[0];
+    const uy = hand[1] - elbow[1];
+    const L = Math.hypot(ux, uy) || 1;
+    const dx = ux / L;
+    const dy = uy / L;
+    ellipseFill(c, hand[0] + dx, hand[1] + dy, 2.6, 2.4, (_, __, nx, ny) => skinAt(nx, ny));
+    if (kind === "point") {
+      // One long claw out (the pointing finger), the rest curled.
+      for (let i = 2; i <= 6; i++) put(c, hand[0] + dx * (2 + i), hand[1] + dy * (2 + i), i < 5 ? "d" : "e");
+      put(c, hand[0] + dx * 9, hand[1] + dy * 9, "w");
+      put(c, hand[0] + dx * 2 + 1, hand[1] + dy * 2 + 2, "w");
+    } else if (kind === "open") {
+      for (const a of [-0.6, 0, 0.6]) put(c, hand[0] + dx * 3.5 + Math.cos(a) * 0 - dy * a * 2.5, hand[1] + dy * 3.5 + dx * a * 2.5, "w");
+    } else {
+      put(c, hand[0] + dx * 3, hand[1] + dy * 3 + 1, "w");
+      put(c, hand[0] + dx * 3 + 1, hand[1] + dy * 3 - 1, "w");
+    }
+  });
 }
 
 /** The torso and neck, one part: the belly plate in scale bands, the sling across the chest, the belt and its pouch. */
-function bodyPart(
-  bob: number,
-  crouch: number,
-): { name: string; at: Pt } | null {
+function bodyPart(bob: number, crouch: number): { name: string; at: Pt } | null {
   return part(`body:${bob}:${crouch}`, (c) => {
     const dy = bob;
     const tcx = 45;
     const tcy = 76 + dy;
     const inTorso = (x: number, y: number) => {
-      const a =
-        ((x + 0.5 - tcx) / 12.5) ** 2 + ((y + 0.5 - tcy) / 17) ** 2 <= 1;
-      const hips =
-        ((x + 0.5 - 45) / 13.5) ** 2 + ((y + 0.5 - (87 + crouch)) / 8) ** 2 <=
-        1;
-      const neck =
-        ((x + 0.5 - NECK[0]) / 9) ** 2 +
-          ((y + 0.5 - (NECK[1] + dy)) / 7.5) ** 2 <=
-        1;
+      const a = ((x + 0.5 - tcx) / 12.5) ** 2 + ((y + 0.5 - tcy) / 17) ** 2 <= 1;
+      const hips = ((x + 0.5 - 45) / 13.5) ** 2 + ((y + 0.5 - (87 + crouch)) / 8) ** 2 <= 1;
+      const neck = ((x + 0.5 - NECK[0]) / 9) ** 2 + ((y + 0.5 - (NECK[1] + dy)) / 7.5) ** 2 <= 1;
       return a || hips || neck;
     };
-    const inBelly = (x: number, y: number) =>
-      ((x + 0.5 - 49.5) / 8.4) ** 2 + ((y + 0.5 - (76 + dy)) / 15.5) ** 2 <=
-        1 && y < 92 + crouch;
+    const inBelly = (x: number, y: number) => ((x + 0.5 - 49.5) / 8.4) ** 2 + ((y + 0.5 - (76 + dy)) / 15.5) ** 2 <= 1 && y < 92 + crouch;
     for (let y = 40; y < H; y++)
       for (let x = 20; x < 75; x++) {
         if (!inTorso(x, y)) continue;
@@ -836,25 +672,19 @@ function bodyPart(
           const band = mod(y - dy, 3) === 0;
           const lit = litOf(nx, ny);
           k = band ? "g" : lit > 0.25 ? "i" : "h";
-          if (!band && x === 50 && mod(Math.floor((y - dy) / 3), 2) === 0)
-            k = "g";
+          if (!band && x === 50 && mod(Math.floor((y - dy) / 3), 2) === 0) k = "g";
           if (x >= 56) k = band ? "f" : "g";
         }
         put(c, x, y, k);
       }
     // The throat under the jaw: cream.
-    ellipseFill(c, 52, 57 + dy, 5, 4, (x, y) =>
-      inTorso(x, y) ? (mod(y - dy, 3) === 0 ? "g" : "h") : null,
-    );
+    ellipseFill(c, 52, 57 + dy, 5, 4, (x, y) => (inTorso(x, y) ? (mod(y - dy, 3) === 0 ? "g" : "h") : null));
     // Scutes down the back of the neck and shoulders: little bumps on our left edge.
     for (const yy of [53, 57, 61]) {
       const y = yy + dy;
       let left = -1;
       for (let x = 20; x < 75; x++) if (inTorso(x, y)) ((left = x), (x = 99));
-      if (left > 0)
-        (put(c, left - 1, y, "c"),
-          put(c, left - 1, y - 1, "d"),
-          put(c, left, y, "b"));
+      if (left > 0) (put(c, left - 1, y, "c"), put(c, left - 1, y - 1, "d"), put(c, left, y, "b"));
     }
     // The sling: olive webbing from his back shoulder down across his chest to his front hip, a steel buckle on it.
     const a: Pt = [34, 60 + dy];
@@ -864,41 +694,17 @@ function bodyPart(
         if (!inTorso(x, y)) continue;
         const s = seg(x + 0.5, y + 0.5, a, b);
         if (s.d > 1.9) continue;
-        const side =
-          (x + 0.5 - (a[0] + (b[0] - a[0]) * s.t)) * -0.72 +
-          (y + 0.5 - (a[1] + (b[1] - a[1]) * s.t)) * 0.69;
+        const side = (x + 0.5 - (a[0] + (b[0] - a[0]) * s.t)) * -0.72 + (y + 0.5 - (a[1] + (b[1] - a[1]) * s.t)) * 0.69;
         put(c, x, y, side < -0.9 ? "n" : side > 0.9 ? "L" : "M");
       }
     for (let j = -1; j <= 1; j++)
-      for (let i = -1; i <= 1; i++)
-        put(
-          c,
-          46 + i,
-          73 + dy + j,
-          i === 0 && j === 0 ? "H" : j < 0 || i < 0 ? "J" : "I",
-        );
+      for (let i = -1; i <= 1; i++) put(c, 46 + i, 73 + dy + j, i === 0 && j === 0 ? "H" : j < 0 || i < 0 ? "J" : "I");
     // The belt (his hips don't breathe): olive, a steel buckle, a pouch on the front hip.
     for (let x = 30; x < 62; x++)
-      for (let y = 89 + crouch; y <= 91 + crouch; y++)
-        if (inTorso(x, y)) put(c, x, y, y === 89 + crouch ? "N" : "M");
-    for (let i = 0; i < 3; i++)
-      put(c, 47 + i, 90 + crouch, i === 1 ? "H" : "J");
+      for (let y = 89 + crouch; y <= 91 + crouch; y++) if (inTorso(x, y)) put(c, x, y, y === 89 + crouch ? "N" : "M");
+    for (let i = 0; i < 3; i++) put(c, 47 + i, 90 + crouch, i === 1 ? "H" : "J");
     for (let y = 88 + crouch; y <= 95 + crouch; y++)
-      for (let x = 53; x <= 59; x++)
-        put(
-          c,
-          x,
-          y,
-          y <= 89 + crouch
-            ? "n"
-            : y === 90 + crouch
-              ? "L"
-              : x === 53
-                ? "N"
-                : x === 59
-                  ? "L"
-                  : "M",
-        );
+      for (let x = 53; x <= 59; x++) put(c, x, y, y <= 89 + crouch ? "n" : y === 90 + crouch ? "L" : x === 53 ? "N" : x === 59 ? "L" : "M");
     put(c, 56, 89 + crouch, "J");
   });
 }
@@ -907,12 +713,7 @@ function bodyPart(
  * The head: the broad alligator skull and snout in profile toward our right, the jaw, the teeth, the eye ridges, the war paint,
  * the eye strap and its scope lens over the near eye, the far eye peeking over the skull.
  */
-function headPart(
-  at: Pt,
-  eye: Eye,
-  jaw: number,
-  lens: 0 | 1 | 2,
-): { name: string; at: Pt } | null {
+function headPart(at: Pt, eye: Eye, jaw: number, lens: 0 | 1 | 2): { name: string; at: Pt } | null {
   return part(`head:${r2(at)}:${eye}:${jaw}:${lens}`, (c) => {
     const [ox, oy] = at;
     const X = (x: number) => x + ox;
@@ -930,13 +731,7 @@ function headPart(
     ];
     polyFill(c, jawPts, (x, y) => {
       const fromBottom = Y(52.6 + (jw * (x - X(45))) / 37) - y;
-      return fromBottom < -1.5
-        ? "h"
-        : fromBottom < -0.2
-          ? "g"
-          : x > X(70)
-            ? "c"
-            : "b";
+      return fromBottom < -1.5 ? "h" : fromBottom < -0.2 ? "g" : x > X(70) ? "c" : "b";
     });
     if (jw > 0) {
       // The open mouth: dark inside, between the jaws.
@@ -952,9 +747,7 @@ function headPart(
       );
     }
     // The far eye ridge, behind the skull.
-    ellipseFill(c, X(49), Y(36.8), 3.4, 2.6, (_, __, nx, ny) =>
-      litOf(nx, ny) > 0.3 ? "d" : "c",
-    );
+    ellipseFill(c, X(49), Y(36.8), 3.4, 2.6, (_, __, nx, ny) => (litOf(nx, ny) > 0.3 ? "d" : "c"));
     // The skull.
     ellipseFill(c, X(49), Y(45), 11, 9, (_, __, nx, ny) => skinAt(nx, ny));
     // The upper snout: broad and flat, its tip rounded (an alligator's U), lit along its top.
@@ -975,17 +768,12 @@ function headPart(
       return d < 1 ? "v" : d < 2.2 ? "e" : d < 5 ? "d" : d < 7 ? "c" : "b";
     });
     // The nostril bump at the tip, and the nostril.
-    ellipseFill(c, X(82.6), Y(40.9), 2.6, 1.6, (_, __, nx, ny) =>
-      litOf(nx, ny) > 0.2 ? "v" : "e",
-    );
+    ellipseFill(c, X(82.6), Y(40.9), 2.6, 1.6, (_, __, nx, ny) => (litOf(nx, ny) > 0.2 ? "v" : "e"));
     put(c, X(83), Y(40.8), "a");
     // Little bumps along the snout's top (the skin's texture), lit.
-    for (const x of [58, 63, 68, 73, 77])
-      put(c, X(x), Y(40 + ((x - 53) / 33) * 2), "d");
+    for (const x of [58, 63, 68, 73, 77]) put(c, X(x), Y(40 + ((x - 53) / 33) * 2), "d");
     // The near eye ridge, high on the skull.
-    ellipseFill(c, X(55.5), Y(37.6), 4.4, 3.2, (_, __, nx, ny) =>
-      skinAt(nx, ny * 1.1),
-    );
+    ellipseFill(c, X(55.5), Y(37.6), 4.4, 3.2, (_, __, nx, ny) => skinAt(nx, ny * 1.1));
     // Scutes on the back of the head.
     for (const [x, y] of [
       [38, 44],
@@ -997,16 +785,10 @@ function headPart(
     for (const x0 of [50, 54, 58])
       for (let i = 0; i <= 4; i++) {
         put(c, X(x0 + i * 0.6), Y(46.6 - i), "p");
-        put(
-          c,
-          X(x0 + i * 0.6 + 1),
-          Y(46.6 - i),
-          i === 0 || i === 4 ? "P" : "p",
-        );
+        put(c, X(x0 + i * 0.6 + 1), Y(46.6 - i), i === 0 || i === 4 ? "P" : "p");
       }
     // The mouth's line: along under the snout, curling up at its back corner (the gator's grin).
-    for (let x = 55; x <= 84; x++)
-      put(c, X(x), Y(48.6 + ((x - 55) / 29) * -0.6 + (x > 83 ? -0.6 : 0)), "m");
+    for (let x = 55; x <= 84; x++) put(c, X(x), Y(48.6 + ((x - 55) / 29) * -0.6 + (x > 83 ? -0.6 : 0)), "m");
     put(c, X(54), Y(48), "m");
     put(c, X(53), Y(47), "m");
     put(c, X(52), Y(47), "m");
@@ -1015,8 +797,7 @@ function headPart(
       put(c, X(x), Y(49.2 + jw * 0.1), "w");
       if (x === 64 || x === 76) put(c, X(x), Y(50.2 + jw * 0.1), "W");
     }
-    if (jw > 0)
-      for (let x = 60; x <= 80; x += 4) put(c, X(x), Y(48.3 + jw), "w");
+    if (jw > 0) for (let x = 60; x <= 80; x += 4) put(c, X(x), Y(48.3 + jw), "w");
     // The eye strap: olive webbing from the back of his head to the lens.
     for (let x = 37; x <= 53; x++) {
       const yc = 42.6 - ((x - 37) / 16) * 4.4;
@@ -1029,8 +810,7 @@ function headPart(
     const ly = 37.6;
     ellipseFill(c, X(lx), Y(ly), 3.4, 3.4, (_, __, nx, ny) => {
       const r = Math.hypot(nx, ny);
-      if (r > 0.62)
-        return litOf(nx, ny) > 0.2 ? "j" : litOf(nx, ny) > -0.3 ? "J" : "I";
+      if (r > 0.62) return litOf(nx, ny) > 0.2 ? "j" : litOf(nx, ny) > -0.3 ? "J" : "I";
       if (lens === 0) return r < 0.25 ? "F" : "q";
       return r < 0.3 ? (lens === 2 ? "Q" : "O") : "F";
     });
@@ -1046,8 +826,7 @@ function headPart(
     // The far eye, peeking over the skull: a yellow iris, a slit pupil (shut: a line).
     const ex = 48.5;
     const ey = 35.8;
-    if (eye === "blink")
-      for (let i = -1; i <= 1; i++) put(c, X(ex + i), Y(ey + 0.5), "a");
+    if (eye === "blink") for (let i = -1; i <= 1; i++) put(c, X(ex + i), Y(ey + 0.5), "a");
     else {
       put(c, X(ex - 1), Y(ey), "Y");
       put(c, X(ex), Y(ey), "x");
@@ -1061,11 +840,7 @@ function headPart(
   });
 }
 
-function riflePart(
-  stage: RifleStage,
-  butt: Pt,
-  deg: number,
-): { name: string; at: Pt; muzzle: Pt } | null {
+function riflePart(stage: RifleStage, butt: Pt, deg: number): { name: string; at: Pt; muzzle: Pt } | null {
   let muzzle: Pt = [0, 0];
   const p = part(
     `rifle:${stage}:${r2(butt)}:${Math.round(deg)}`,
@@ -1094,29 +869,18 @@ export interface Built {
   lens: Pt;
   hand: Pt;
 }
-const add = (o: { x: number; y: number }, s: readonly [number, number]): Pt => [
-  o.x + s[0],
-  o.y + s[1],
-];
+const add = (o: { x: number; y: number }, s: readonly [number, number]): Pt => [o.x + s[0], o.y + s[1]];
 void add;
 
 export function build(stage: RifleStage, p: ChandyPose): Built {
   const bob = p.bob ?? 0;
   const crouch = p.crouch ?? 0;
   const layers: Layer[] = [];
-  const push = (b: { name: string; at: Pt } | null) =>
-    b && layers.push({ part: b.name, x: b.at[0], y: b.at[1] });
+  const push = (b: { name: string; at: Pt } | null) => b && layers.push({ part: b.name, x: b.at[0], y: b.at[1] });
   push(shadowPart());
   push(tailPart(p.sway ?? 0, crouch));
   // The far leg, then the rifle on his back and the far arm, then the body, the near leg, the head and the near arm.
-  push(
-    legPart(
-      [40, 89 + crouch],
-      [37 - crouch * 0.5, 97 + crouch * 0.5],
-      [39, 101],
-      false,
-    ),
-  );
+  push(legPart([40, 89 + crouch], [37 - crouch * 0.5, 97 + crouch * 0.5], [39, 101], false));
   const gun = p.gun ?? { slung: true };
   const sDx = "slung" in gun ? (gun.dx ?? 0) : 0;
   const sDy = "slung" in gun ? (gun.dy ?? 0) : 0;
@@ -1138,39 +902,16 @@ export function build(stage: RifleStage, p: ChandyPose): Built {
     }
   }
   const aF = p.armF ?? ARMS.hang;
-  push(
-    armPart(
-      shF,
-      [shF[0] + aF[0][0], shF[1] + aF[0][1]],
-      [shF[0] + aF[1][0], shF[1] + aF[1][1]],
-      false,
-      "fist",
-    ),
-  );
+  push(armPart(shF, [shF[0] + aF[0][0], shF[1] + aF[0][1]], [shF[0] + aF[1][0], shF[1] + aF[1][1]], false, "fist"));
   push(bodyPart(bob, crouch));
-  push(
-    legPart(
-      [51, 89 + crouch],
-      [56 + crouch * 0.5, 97 + crouch * 0.5],
-      [53, 101],
-      true,
-    ),
-  );
+  push(legPart([51, 89 + crouch], [56 + crouch * 0.5, 97 + crouch * 0.5], [53, 101], true));
   const hd = p.head ?? [0, 0];
   const headAt: Pt = [hd[0], bob + hd[1]];
   push(headPart(headAt, p.eye ?? "open", p.jaw ?? 0, p.lens ?? 1));
   if (front) push(front);
   const aN = p.armN ?? ARMS.sling;
   const hand: Pt = [shN[0] + aN[1][0], shN[1] + aN[1][1]];
-  push(
-    armPart(
-      shN,
-      [shN[0] + aN[0][0], shN[1] + aN[0][1]],
-      hand,
-      true,
-      p.handN ?? "fist",
-    ),
-  );
+  push(armPart(shN, [shN[0] + aN[0][0], shN[1] + aN[0][1]], hand, true, p.handN ?? "fist"));
   for (const l of layers) ((l.x += OX), (l.y += OY));
   return {
     layers,
@@ -1226,29 +967,25 @@ export function burst([x, y]: Pt, t: number): Speck[] {
     for (let i = -r; i <= r; i++) {
       const d = Math.hypot(i, j);
       if (d > r + 0.3) continue;
-      out.push([
-        Math.round(x + i + 2),
-        Math.round(y + j),
-        d < r * 0.4 ? "Q" : d < r * 0.75 ? "O" : "F",
-      ]);
+      out.push([Math.round(x + i + 2), Math.round(y + j), d < r * 0.4 ? "Q" : d < r * 0.75 ? "O" : "F"]);
     }
-  if (t < 0.5)
-    for (let i = r + 1; i < r + 9; i++)
-      out.push([Math.round(x + i + 2), Math.round(y), i < r + 5 ? "Q" : "O"]);
+  if (t < 0.5) for (let i = r + 1; i < r + 9; i++) out.push([Math.round(x + i + 2), Math.round(y), i < r + 5 ? "Q" : "O"]);
   for (const [dx, dy] of [
     [1, -1],
     [1, 1],
     [-1, -1],
     [-1, 1],
   ] as const)
-    for (let i = r; i < r + (t < 0.5 ? 3 : 2); i++)
-      out.push([Math.round(x + 2 + dx * i), Math.round(y + dy * i), "O"]);
+    for (let i = r; i < r + (t < 0.5 ? 3 : 2); i++) out.push([Math.round(x + 2 + dx * i), Math.round(y + dy * i), "O"]);
   return out;
 }
 
-// ---- The animations (round 1: idle, the point at a locked piece, the firing pose).
+// ---- The animations. Every one of them comes at each rifle stage: `<name>` is the base rifle, `<name>_s1` to `<name>_s5` the rifle
+// with 1 to 5 attachments (the rules job picks the name from his upgrades: `chandyAnim`).
 
-const STAGE_SHOWN: RifleStage = 0;
+export const STAGES = [0, 1, 2, 3, 4, 5] as const satisfies readonly RifleStage[];
+/** An animation's name at a rifle stage (`idle`, `idle_s3`). */
+export const chandyAnim = (name: string, stage: RifleStage): string => (stage === 0 ? name : `${name}_s${stage}`);
 
 /** His rest: hand on the sling, the rifle on his back, the lens lit. */
 export const REST: ChandyPose = {
@@ -1259,127 +996,106 @@ export const REST: ChandyPose = {
   eye: "open",
 };
 
-/** Idle: breathing (his upper body up a pixel and back), the tail swaying along the ground, a blink, the lens's glint. */
+/** Idle: breathing (his upper body up a pixel and back), the tail swaying along the ground, the lens's glint, a blink. */
 function idleOf(stage: RifleStage): Anim {
   return {
     loop: true,
     frames: [
       frame(stage, 520, { ...REST, sway: 0 }),
       frame(stage, 360, { ...REST, sway: 0.5, bob: -1 }),
-      frame(
-        stage,
-        520,
-        { ...REST, sway: 1, bob: -1 },
-        { specks: (b) => flare([b.lens[0] - 1, b.lens[1] - 1], 2) },
-      ),
+      frame(stage, 520, { ...REST, sway: 1, bob: -1 }, { specks: (b) => flare([b.lens[0] - 1, b.lens[1] - 1], 2) }),
       frame(stage, 380, { ...REST, sway: 0.5, eye: "blink" }),
     ],
   };
 }
-const idle = lazyAnim(() => idleOf(STAGE_SHOWN));
 
-/** The lock-on: he points at the piece, the lens flares (it ends pointing; a raise, then the point). */
-const point = lazyAnim(() => ({
-  loop: false,
-  frames: [
-    frame(STAGE_SHOWN, 120, {
-      ...REST,
-      armN: ARMS.pointHalf,
-      handN: "open",
-      eye: "narrow",
-    }),
-    frame(
-      STAGE_SHOWN,
-      160,
-      {
+/** The lock-on: a raise, the point (the lens flares: "lock"), held, then pointing down and forward (a phone's board is below his bar). */
+function pointOf(stage: RifleStage): Anim {
+  const P: ChandyPose = { ...REST, handN: "point", eye: "narrow" };
+  return {
+    loop: false,
+    frames: [
+      frame(stage, 120, {
         ...REST,
-        armN: ARMS.point,
-        handN: "point",
+        armN: ARMS.pointHalf,
+        handN: "open",
         eye: "narrow",
-        lens: 2,
-        head: [1, 0],
-      },
-      { cue: "lock", specks: (b) => flare([b.lens[0] - 1, b.lens[1] - 1], 3) },
-    ),
-    frame(STAGE_SHOWN, 700, {
-      ...REST,
-      armN: ARMS.point,
-      handN: "point",
-      eye: "narrow",
-      lens: 1,
-      head: [1, 0],
-    }),
-    frame(STAGE_SHOWN, 700, {
-      ...REST,
-      armN: ARMS.pointDown,
-      handN: "point",
-      eye: "narrow",
-      lens: 1,
-      head: [1, 1],
-    }),
-  ],
-}));
+      }),
+      frame(
+        stage,
+        160,
+        { ...P, armN: ARMS.point, lens: 2, head: [1, 0] },
+        {
+          cue: "lock",
+          specks: (b) => flare([b.lens[0] - 1, b.lens[1] - 1], 3),
+        },
+      ),
+      frame(stage, 500, { ...P, armN: ARMS.point, lens: 1, head: [1, 0] }),
+      frame(stage, 700, { ...P, armN: ARMS.pointDown, lens: 1, head: [1, 1] }),
+    ],
+  };
+}
 
 /** The firing pose: he reaches back for the rifle, swings it round, aims it level at the board, fires. */
-export const FIRE_POSES: Record<"grab" | "swing" | "aim" | "fire", ChandyPose> =
-  {
-    grab: {
-      ...REST,
-      armN: [
-        [-6, -6],
-        [-17, -7],
-      ],
-      handN: "fist",
-      gun: { slung: true, dx: 1, dy: -2 },
-      eye: "narrow",
-      lens: 1,
-    },
-    swing: {
-      ...REST,
-      armN: [
-        [2, 8],
-        [-2, 6],
-      ],
-      armF: [
-        [6, 4],
-        [15, -2],
-      ],
-      gun: { at: [-14, 0], deg: -40, front: true },
-      eye: "narrow",
-      lens: 1,
-      bob: 1,
-      crouch: 1,
-    },
-    aim: {
-      ...REST,
-      armN: [
-        [5, 7],
-        [13, -1],
-      ],
-      armF: ARMS.hang,
-      gun: { at: [-19, -7], deg: 0, front: true },
-      eye: "narrow",
-      lens: 2,
-      bob: 1,
-      crouch: 2,
-      head: [1, -1],
-    },
-    fire: {
-      ...REST,
-      armN: [
-        [4, 7],
-        [11, -1],
-      ],
-      armF: ARMS.hang,
-      gun: { at: [-21, -7], deg: -3, front: true },
-      eye: "narrow",
-      lens: 2,
-      bob: 1,
-      crouch: 2,
-      head: [0, -1],
-      jaw: 2,
-    },
-  };
+export const FIRE_POSES: Record<"grab" | "swing" | "aim" | "fire", ChandyPose> = {
+  grab: {
+    ...REST,
+    armN: [
+      [-6, -6],
+      [-17, -7],
+    ],
+    handN: "fist",
+    gun: { slung: true, dx: 1, dy: -2 },
+    eye: "narrow",
+    lens: 1,
+  },
+  swing: {
+    ...REST,
+    armN: [
+      [2, 8],
+      [-2, 6],
+    ],
+    armF: [
+      [6, 4],
+      [15, -2],
+    ],
+    gun: { at: [-14, 0], deg: -30, front: true },
+    eye: "narrow",
+    lens: 1,
+    bob: 1,
+    crouch: 1,
+  },
+  aim: {
+    ...REST,
+    armN: [
+      [5, 7],
+      [13, -1],
+    ],
+    armF: ARMS.hang,
+    gun: { at: [-19, -7], deg: 0, front: true },
+    eye: "narrow",
+    lens: 2,
+    bob: 1,
+    crouch: 2,
+    head: [1, -1],
+  },
+  fire: {
+    ...REST,
+    armN: [
+      [4, 7],
+      [11, -1],
+    ],
+    armF: ARMS.hang,
+    gun: { at: [-21, -7], deg: -3, front: true },
+    eye: "narrow",
+    lens: 2,
+    bob: 1,
+    crouch: 2,
+    head: [0, -1],
+    jaw: 2,
+  },
+};
+/** Unsling, aim, fire, hold: every one of his moves fires this (its cues: "unsling", "aim", "fire"). */
 function fireOf(stage: RifleStage): Anim {
   return {
     loop: false,
@@ -1400,80 +1116,60 @@ function fireOf(stage: RifleStage): Anim {
     ],
   };
 }
-const fire = lazyAnim(() => fireOf(STAGE_SHOWN));
+/** Held aiming (a loop: the rifle level in his hands, the lens lit), between shots or while a power plays out. */
+const aimOf = (stage: RifleStage): Anim => ({
+  loop: true,
+  frames: [frame(stage, 1000, FIRE_POSES.aim)],
+});
+/** Back on his back: the swing reversed. */
+function stowOf(stage: RifleStage): Anim {
+  return {
+    loop: false,
+    frames: [frame(stage, 120, FIRE_POSES.swing, { cue: "stow" }), frame(stage, 120, FIRE_POSES.grab), frame(stage, 200, REST)],
+  };
+}
 
+const MAKERS: Record<string, (stage: RifleStage) => Anim> = {
+  idle: idleOf,
+  point: pointOf,
+  fire: fireOf,
+  aim: aimOf,
+  stow: stowOf,
+};
+
+/** The room the rifle needs held out level, fully upgraded: his frame is this much wider on our right (Dash's way). */
+export const FIRE_ROOM = 56;
+
+/**
+ * Chandy: his figure for the board, the boss bar, the select tile and the results. Facing our right as drawn. Every animation at every
+ * rifle stage (`chandyAnim`), made on first use.
+ */
 export const CHANDY: Character = {
   id: "chandy",
   name: "Chandy",
-  w: W,
+  w: W + FIRE_ROOM,
   h: H,
   foot: CHANDY_FOOT,
   palette: CHANDY_PALETTE,
   halo: "#26341f",
   looks: { clone: CHANDY_CLONE_PALETTE },
   parts: CHANDY_PARTS,
-  anims: { idle, point },
-};
-
-/** The firing pose needs room for the rifle held out level: the same figure in a frame `FIRE_ROOM` px wider on our right. */
-export const FIRE_ROOM = 56;
-export const CHANDY_FIRE: Character = {
-  ...CHANDY,
-  id: "chandy-fire",
-  name: "Chandy (firing)",
-  w: W + FIRE_ROOM,
-  anims: {
-    idle: lazyAnim(() => ({
-      loop: true,
-      frames: [frame(STAGE_SHOWN, 1000, REST)],
-    })),
-    fire,
-  },
-};
-
-/** Chandy at each rifle stage, standing (for the sheets: his rifle on his back at 0 to 5 attachments). */
-export const CHANDY_STAGES: Character = {
-  ...CHANDY,
-  id: "chandy-stages",
-  name: "Chandy (rifle stages)",
   anims: Object.fromEntries(
-    ([0, 1, 2, 3, 4, 5] as const).map((s) => [
-      `stage${s}`,
-      lazyAnim(() => ({ loop: true, frames: [frame(s, 1000, REST)] })),
-    ]),
-  ),
-};
-/** His firing pose at each stage (the aim). */
-export const CHANDY_AIMS: Character = {
-  ...CHANDY_FIRE,
-  id: "chandy-aims",
-  anims: Object.fromEntries(
-    ([0, 1, 2, 3, 4, 5] as const).map((s) => [
-      `aim${s}`,
-      lazyAnim(() => ({
-        loop: true,
-        frames: [frame(s, 1000, FIRE_POSES.aim)],
-      })),
-    ]),
+    STAGES.flatMap((st) => Object.entries(MAKERS).map(([name, make]) => [chandyAnim(name, st), lazyAnim(() => make(st))])),
   ),
 };
 
-/** The rifle alone, level, at each stage (the upgrade window shows it): 100 x 30, its butt at [8, 15]. */
+/** The rifle alone, level, at each stage (the upgrade window shows it): `stage0` to `stage5`, its butt at [6, 16]. */
 export const RIFLE_W = 132;
-export const RIFLE_H = 30;
+export const RIFLE_H = 34;
 const rifleOnly = (stage: RifleStage): Frame => {
-  const r = part(
-    `solo-rifle:${stage}`,
-    (c) => void paintRifle(c, [6, 15], 0, stage),
-    true,
-    RIFLE_W,
-    RIFLE_H,
-  );
+  const r = part(`solo-rifle:${stage}`, (c) => void paintRifle(c, [6, 16], 0, stage), true, RIFLE_W, RIFLE_H);
   return {
     ms: 1000,
     layers: r ? [{ part: r.name, x: r.at[0], y: r.at[1] }] : [],
   };
 };
+/** The rifle alone at each stage (`stage0` to `stage5`), level: the upgrade window's (components/ChandyUpgrade.tsx). */
 export const CHANDY_RIFLE: Character = {
   id: "chandy-rifle",
   name: "Chandy's rifle",
@@ -1482,15 +1178,13 @@ export const CHANDY_RIFLE: Character = {
   foot: [50, 28],
   palette: CHANDY_PALETTE,
   parts: CHANDY_PARTS,
-  anims: Object.fromEntries(
-    ([0, 1, 2, 3, 4, 5] as const).map((s) => [
-      `stage${s}`,
-      lazyAnim(() => ({ loop: true, frames: [rifleOnly(s)] })),
-    ]),
-  ),
+  anims: Object.fromEntries(STAGES.map((s) => [`stage${s}`, lazyAnim(() => ({ loop: true, frames: [rifleOnly(s)] }))])),
 };
 
-/** The clones' poses for Dodge: aiming level (a row's beam) and straight down (a column's: he stands over its top end). */
+// ---- His afterimage clones (Dodge): the clone look, the rifle fully upgraded; aiming level (from an a- or h-file square, along a rank)
+// or straight down (from a rank-8 square, down a file); a teleport's blink out, its appearing, and the afterimage it leaves, fading.
+
+/** The clones' poses for Dodge: aiming level (a rank's) and straight down (a file's: he stands on its top square). */
 export const CLONE_POSES: Record<"level" | "down", ChandyPose> = {
   level: FIRE_POSES.aim,
   down: {
@@ -1503,43 +1197,140 @@ export const CLONE_POSES: Record<"level" | "down", ChandyPose> = {
     head: [1, 1],
   },
 };
-/** His afterimage clones (Dodge): the clone palette, the rifle fully upgraded, in a frame with room for the rifle aimed level or down. */
+const CLONE_PAL: Record<string, string> = {
+  ...CHANDY_PALETTE,
+  ...CHANDY_CLONE_PALETTE,
+};
+/** The clone's palette at `a` (0..1) of its strength: an afterimage fading. */
+const faded = (a: number): Record<string, string> =>
+  Object.fromEntries(
+    Object.entries(CLONE_PAL).map(([k, c]) => [
+      k,
+      `${c.slice(0, 7)}${Math.round(a * 255)
+        .toString(16)
+        .padStart(2, "0")}`,
+    ]),
+  );
+/** Every key white: a teleport's flash. */
+const WHITE: Record<string, string> = Object.fromEntries(
+  Object.keys(CLONE_PAL)
+    .filter((k) => k !== "k" && k !== "z")
+    .map((k) => [k, "#ffffff"]),
+);
+function cloneAnims(pose: "level" | "down"): Record<string, Anim> {
+  const P = CLONE_POSES[pose];
+  const cap = pose === "level" ? "Level" : "Down";
+  return {
+    [pose]: lazyAnim(() => ({ loop: true, frames: [frame(5, 1000, P)] })),
+    // Blink out: a white flash, then gone (its afterimage is `fade…`, left where it stood).
+    [`blink${cap}`]: lazyAnim(() => ({
+      loop: false,
+      frames: [frame(5, 50, P, { pal: WHITE, cue: "teleport" }), { ms: 40, layers: [] }],
+    })),
+    // Appear on the new square: a flash, then himself.
+    [`appear${cap}`]: lazyAnim(() => ({
+      loop: false,
+      frames: [frame(5, 50, P, { pal: WHITE, cue: "appear" }), frame(5, 60, P, { pal: faded(0.6) }), frame(5, 80, P)],
+    })),
+    // The afterimage: fading out over about half a second, then gone.
+    [`fade${cap}`]: lazyAnim(() => ({
+      loop: false,
+      frames: [
+        frame(5, 120, P, { pal: faded(0.55), cue: "fade" }),
+        frame(5, 140, P, { pal: faded(0.35) }),
+        frame(5, 160, P, { pal: faded(0.15) }),
+        { ms: 40, layers: [] },
+      ],
+    })),
+  };
+}
+/** His afterimage clones (Dodge), in a frame with room for the rifle level or pointing down. */
 export const CHANDY_CLONE: Character = {
   ...CHANDY,
   id: "chandy-clone",
   name: "Chandy's afterimage",
   w: W + FIRE_ROOM,
   h: H + 112,
-  palette: { ...CHANDY_PALETTE, ...CHANDY_CLONE_PALETTE },
+  palette: CLONE_PAL,
   halo: CHANDY_CLONE_HALO,
+  looks: undefined,
   anims: {
     idle: lazyAnim(() => ({ loop: true, frames: [frame(5, 1000, REST)] })),
-    level: lazyAnim(() => ({
-      loop: true,
-      frames: [frame(5, 1000, CLONE_POSES.level)],
-    })),
-    down: lazyAnim(() => ({
-      loop: true,
-      frames: [frame(5, 1000, CLONE_POSES.down)],
-    })),
-    fireLevel: lazyAnim(() => ({
-      loop: true,
-      frames: [
-        frame(5, 1000, FIRE_POSES.fire, { specks: (b) => burst(b.muzzle, 0) }),
-      ],
-    })),
+    ...cloneAnims("level"),
+    ...cloneAnims("down"),
   },
 };
-/** Where a clone's muzzle is in its frame, by pose (for the beams' starting points). */
-export const cloneMuzzle = (pose: "level" | "down"): Pt =>
-  build(5, CLONE_POSES[pose]).muzzle;
+/** Where a clone's muzzle is in its frame, by pose (the line he aims along starts there). */
+export const cloneMuzzle = (pose: "level" | "down"): Pt => build(5, CLONE_POSES[pose]).muzzle;
+
+/**
+ * His sound cues and what each should sound like (the sound pack comes with the rules job; `sounds` in his kit maps each to a sound).
+ * Figure: lock, unsling, aim, fire, stow. Clones: teleport, appear, fade. Board art (effects/chandy.ts): lock, unlock, spark, fizz,
+ * scatter, beam, beamOff, shield, pop, zap, clear, aim, aimOff, whoosh, shatter, flash, blast.
+ */
+export const CHANDY_CUES: Readonly<Record<string, string>> = {
+  lock: "a scope's lock-on chirp, two rising beeps",
+  unlock: "one falling beep",
+  unsling: "a strap's slide and a rifle's clack",
+  aim: "a short energy whine winding up",
+  fire: "an energy rifle's crack: a zap with a low thump, no gunpowder",
+  stow: "the clack back onto the sling",
+  teleport: "a quick reverse whoosh",
+  appear: "a pop in",
+  fade: "a soft fizz",
+  spark: "a spark landing",
+  fizz: "static dying away",
+  scatter: "a burst, crackling",
+  beam: "a beam's hum switching on",
+  beamOff: "the hum winding down",
+  shield: "a bubble's shimmer",
+  pop: "a bubble popping",
+  zap: "three quick zaps",
+  clear: "a little chime: the dizziness gone",
+  aimOff: "the aim's hum off",
+  whoosh: "a round's whoosh",
+  shatter: "glass-like shatter, no gore",
+  flash: "three alarm blips",
+  blast: "a big energy pop",
+  upgrade: "the window: a part clicking on, a rising chord",
+};
+
+/**
+ * His cues' sounds until his own pack comes (placeholders from other bosses' packs, the nearest in feel; CHANDY_CUES says what each
+ * should be). The figure's and the clones' cues and his board art's (power-art.ts EFFECTS uses the same map).
+ */
+export const CHANDY_SOUNDS: Record<string, SoundName> = {
+  lock: "dashTick",
+  unlock: "hollowTick",
+  unsling: "pigDraw",
+  aim: "mooHum",
+  fire: "mooZap",
+  stow: "bigboyClack",
+  teleport: "dashWhoosh",
+  appear: "hopperPop",
+  fade: "hollowFizz",
+  spark: "grexSparkle",
+  fizz: "grexFizz",
+  scatter: "gingerBurst",
+  beam: "mooBeam",
+  beamOff: "mooFizz",
+  shield: "mooShimmer",
+  pop: "hopperPop",
+  zap: "mooZap",
+  clear: "gardenerChime",
+  aimOff: "hollowTick",
+  whoosh: "gingerWhoosh",
+  shatter: "sawyerCrack",
+  flash: "dashTick",
+  blast: "gingerBlast",
+};
 
 /** The part of him a portrait shows (his head, lens and war paint, the rifle's barrel over his shoulder), in frame px. */
-export const CHANDY_PORTRAIT = { x: 42, y: 36, w: 58, h: 36 } as const;
+export const CHANDY_PORTRAIT = { x: 42, y: 40, w: 58, h: 36 } as const;
 
 /** His select tile's framing (boss-select.ts SELECT_FRAMING): his neck, the frame's px across the tile, how far down the neck sits. */
 export const CHANDY_SELECT_FRAMING = {
-  neck: [62, 68],
+  neck: [62, 72],
   span: 60,
   at: 0.56,
 } as const;
@@ -1552,10 +1343,7 @@ export const CHANDY_SPRITE: Sprite = {
     feet: CHANDY_FOOT,
     head: [56 + OX, 44 + OY],
     hands: {
-      sling: [
-        SHOULDER_N[0] + ARMS.sling[1][0] + OX,
-        SHOULDER_N[1] + ARMS.sling[1][1] + OY,
-      ],
+      sling: [SHOULDER_N[0] + ARMS.sling[1][0] + OX, SHOULDER_N[1] + ARMS.sling[1][1] + OY],
     },
   },
   ramps: {
@@ -1566,6 +1354,6 @@ export const CHANDY_SPRITE: Sprite = {
     energy: "qFOQ",
     iris: "yY",
   },
-  frames: { idle: "idle", attack: "point" },
+  frames: { idle: "idle", attack: "fire" },
   unlined: "zQOFq",
 };

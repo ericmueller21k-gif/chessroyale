@@ -35,6 +35,7 @@ import { BOSS_BEAVER_ATTACK as TIMBER_ATTACK } from "./timber.ts";
 import { TIMBER_CHANCE, TIMBER_LINES } from "./timber-lines.ts";
 import { BOSS_ZEBRA as ZEBRA, BOSS_ZEBRA_PORTRAIT } from "./zebra.ts";
 import { ZEBRA_ATTACK } from "./zebra-figure.ts";
+import { CHANDY, CHANDY_PORTRAIT, CHANDY_SOUNDS, CHANDY_SPRITE } from "./chandy.ts";
 import { ZEBRA_CHANCE, ZEBRA_LINES } from "./zebra-lines.ts";
 import { DASH_ATTACK, DASH_FIGURE as DASH } from "./dash-figure.ts";
 import { DASH_CHANCE, DASH_LINES } from "./dash-lines.ts";
@@ -1091,6 +1092,25 @@ export const BOSS_KITS: Record<string, BossKit> = {
     suit: true,
     // (His words above his head as it's drawn now, beside the board: kneeling as he mumbles, beaten.)
     heads: RECLUSE_HEADS,
+  },
+};
+
+/**
+ * Kits drawn ahead of their boss (Nov 16): a boss's art, complete as a kit, before his rules put him in the roster. Not in BOSS_KITS
+ * (that's the roster's: its tests walk every playable boss), so nothing in the game plays one; the art's previews do
+ * (`npm run frames:character -- <dir> Boingo both kit=Chandy`, `chandy-preview.html`). The rules job moves a kit into BOSS_KITS.
+ */
+export const ART_KITS: Readonly<Record<string, BossKit>> = {
+  // Chandy (docs/decisions/2026-11-16-chandy-art.md): every moment at the base rifle (his rules pick the stage's name, chandy.ts
+  // chandyAnim); he points at what he's locked, every shot a fire. His sounds are placeholders from other packs until his own.
+  Chandy: {
+    ch: CHANDY,
+    sprite: CHANDY_SPRITE,
+    anims: { entrance: "point", thinking: "idle", move: "point", capture: "fire", strike: "fire", power: "fire", ultimateWarn: "aim", ultimate: "fire", hurt: "stow", check: "fire", smug: "aim", rattled: "stow", victory: "fire", defeat: "stow" },
+    sounds: CHANDY_SOUNDS,
+    lines: {},
+    chance: {},
+    portrait: { ...CHANDY_PORTRAIT, anim: "idle", frame: 0 },
   },
 };
 
