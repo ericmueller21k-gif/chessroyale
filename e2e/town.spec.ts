@@ -192,6 +192,67 @@ test("a deploy landed while the page was open: the town square's files are gone,
   expect(loads, "the page loaded again, once").toBe(2);
   expect(await colors(page), "the world is drawn, not blank").toBeGreaterThan(40);
 });
+
+// (Nov 15, the fallback: a page no service worker answers.) Eric's tap: a challenge whose room's code is gone.
+test("a deploy landed and a challenge's room code is gone: the page loads again, once, and the challenge goes on (Babur's Circus opens)", { tag: "@phone-only" }, async ({ page }) => {
+  test.setTimeout(180_000);
+  let asked = 0;
+  await page.route(/\/assets\/ShopRoom-[^/]*\.js$/, (route) => (asked++ === 0 ? route.fulfill({ status: 404, body: "" }) : route.continue()));
+  let loads = 0;
+  page.on("request", (r) => r.isNavigationRequest() && r.frame() === page.mainFrame() && loads++);
+  const errors = watchErrors(page);
+  await page.goto("/town");
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
+  const card = await tapInTown(page, "boss", "tiger", page.getByRole("dialog", { name: "Babur", exact: true }));
+  await card.getByRole("button", { name: "Challenge alone" }).click();
+  await page.getByRole("dialog", { name: "Challenge Babur?" }).getByRole("button", { name: "Fight" }).click();
+  await expect.poll(() => loads, { message: "the page loaded again", timeout: 30_000 }).toBe(2);
+  await expect(page.locator("canvas.town-shop-canvas")).toHaveAttribute("data-room", "tiger", { timeout: 40_000 });
+  await expect(page.getByRole("heading", { name: "Babur's Circus" })).toBeVisible();
+  expect(loads, "once").toBe(2);
+  // (No "reading 'loadRoom'" of undefined as the page went: the import that got nothing just stopped. The refused file's own 404 is the browser's.)
+  expect(errors.filter((e) => !e.includes("404"))).toEqual([]);
+});});
+
+test.describe("a deploy landed, the service worker in charge", () => {
+  test.use({ serviceWorkers: "allow" });
+  // (Eric, Nov 15: a tab left open across a deploy, "challenged Wrangler the Pig ... And then it reloaded the town and put me back in
+  // the center". The new version's worker deleted the old version's files as it took over, and the server had them no more.)
+  test("an old tab after a deploy (a new worker in charge, the old files gone from the server): a challenge opens its room from the tab's own version, no reload", { tag: "@phone-only" }, async ({ page }) => {
+    test.setTimeout(180_000);
+    let loads = 0;
+    page.on("request", (r) => r.isNavigationRequest() && r.frame() === page.mainFrame() && loads++);
+    await page.goto("/town");
+    await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
+    // (The worker is in charge once it has every file of this version: it takes over only after its precache.)
+    await expect.poll(() => page.evaluate(() => !!navigator.serviceWorker.controller), { timeout: 60_000 }).toBe(true);
+    const sw = await (await page.request.get("/sw.js")).text();
+    const version = /const VERSION = "([^"]+)"/.exec(sw)![1]!;
+    // The deploy: the next version's worker (the e2e server's /api/e2e/sw.js: its files' names under /assets/ all new, none of this
+    // version's, and its network refusing this version's scripts and styles there, gone from the server), in /sw.js's place, as an update.
+    // (Not a route: the browser fetches a worker's script itself, past them.)
+    const next = version.endsWith("f") ? "brc-eeeeeeeeeeee" : "brc-ffffffffffff";
+    const url = `/api/e2e/sw.js?key=${process.env.E2E_SQL_KEY ?? ""}&version=${next}`;
+    expect((await page.request.get(url)).headers()["content-type"], "the next worker is on the server").toContain("javascript");
+    await page.evaluate((u) => void navigator.serviceWorker.register(u, { scope: "/" }), url);
+    const refused: string[] = [];
+    page.on("response", (r) => r.status() === 404 && refused.push(new URL(r.url()).pathname));
+    // The new worker takes over and keeps the old version's files: this tab runs it.
+    const now = () =>
+      page.evaluate(async () => {
+        const sw = navigator.serviceWorker.controller;
+        return { next: !!sw?.scriptURL.includes("/api/e2e/sw.js") && sw.state === "activated", caches: await caches.keys() };
+      });
+    await expect.poll(now, { timeout: 60_000 }).toEqual({ next: true, caches: expect.arrayContaining([version, next]) });
+    // Babur's challenge: his room's code and his intro's art, chunks of the tab's version, from its version's cache.
+    const card = await tapInTown(page, "boss", "tiger", page.getByRole("dialog", { name: "Babur", exact: true }));
+    await card.getByRole("button", { name: "Challenge alone" }).click();
+    await page.getByRole("dialog", { name: "Challenge Babur?" }).getByRole("button", { name: "Fight" }).click();
+    await expect(page.locator("canvas.town-shop-canvas")).toHaveAttribute("data-room", "tiger", { timeout: 30_000 });
+    await expect(page.getByRole("heading", { name: "Babur's Circus" })).toBeVisible();
+    expect(loads, "the page never loaded again").toBe(1);
+    expect(refused, "nothing it asked for was missing").toEqual([]);
+  });
 });
 
 test("the sky by the time of day: ?sky=day and ?sky=night draw different skies (a day's top is light blue, a night's deep navy)", { tag: "@phone-only" }, async ({ page }) => {

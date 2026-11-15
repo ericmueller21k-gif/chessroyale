@@ -1287,9 +1287,14 @@ const idleMs = (id: string, c: RideCells): number[] => {
   return ms;
 };
 
-/** A ride's idle, frame by frame on its own times (still under reduced motion): one timer per riding avatar on the screen. */
+/**
+ * A ride's idle, frame by frame on its own times (still under reduced motion): one timer per riding avatar on the screen. The frame
+ * is kept with the ride's times it counts: an avatar that changes ride (another player's in the same place, a ride put on) starts at
+ * the new ride's first frame. (Until Nov 15 it kept the old ride's frame for a render, past the new ride's last on one with fewer: the
+ * Safari error "undefined is not an object (evaluating '[d,f,p,m]')", RideLayers' seat of a frame it doesn't have.)
+ */
 function useIdleFrame(ms: readonly number[]): number {
-  const [f, setF] = useState(0);
+  const [at, setAt] = useState({ ms, f: 0 });
   useEffect(() => {
     if (ms.length < 2 || window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
     let i = 0;
@@ -1297,14 +1302,14 @@ function useIdleFrame(ms: readonly number[]): number {
     const next = () => {
       t = setTimeout(() => {
         i = (i + 1) % ms.length;
-        setF(i);
+        setAt({ ms, f: i });
         next();
       }, ms[i]);
     };
     next();
     return () => clearTimeout(t);
   }, [ms]);
-  return f;
+  return at.ms === ms ? at.f : 0;
 }
 
 /**
