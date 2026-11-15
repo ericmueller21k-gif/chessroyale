@@ -269,7 +269,7 @@ test(`locking a new view: a drag let go near east snaps there; a tap locks it in
   await expect.poll(async () => (await cam(page)).base, { timeout: 3000 }).toBe(90);
   await settle(page);
   expect(await you(page), "walked to the square tapped").toEqual([here[0] + 2, here[1] - 1]);
-  expect([...new Set((await headings(page)).map(([h]) => Math.round(h)))], "the camera stayed east").toEqual([90]);
+  expect([...new Set((await headings(page)).map(([h]) => Math.round(h!)))], "the camera stayed east").toEqual([90]);
   c = await cam(page);
   expect([c.heading, c.headingBase, c.look, c.snapped]).toEqual([90, 90, 0, null]);
   // The arrows follow it: up is east now, left north; and they never change it.

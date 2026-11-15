@@ -23,7 +23,7 @@ const GOLD2 = at(2, 2, 10);
  * switches as a player's app is told (this server has TEST_SWITCHES on, which lets everyone use them; a game's `pool=`,
  * which keeps tests apart, needs them).
  */
-async function player(browser: Browser, name: string, rank: RankView | null, { admin = () => false, path = "/?nolanding", asPlayer = false } = {}): Promise<Page> {
+async function player(browser: Browser, name: string, rank: RankView | null, { admin = (): boolean => false, path = "/?nolanding", asPlayer = false } = {}): Promise<Page> {
   const page = await (await browser.newContext({ ...test.info().project.use })).newPage();
   await named(page, name);
   if (asPlayer) await switchesOff(page);

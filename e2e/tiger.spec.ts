@@ -645,7 +645,7 @@ test("Babur's pump on a computer at 1280 × 800, 1440 × 900, 1920 × 1080 and 1
     expect(fly.length, `${at}: the flight`).toBeGreaterThan(3);
     // (The fly sprite's knot is at 16, 22 of its 32; the pump's release knot at 11, 21 of its 34 wide frame.)
     const knot = (f: (typeof fly)[number]) => ({ x: f.fly.x + (16 / 32) * f.fly.w, y: f.fly.y + (22 / 32) * f.fly.h });
-    const from = fly[0]!.pump ?? pump;
+    const from = fly[0]!.pump ?? { x: pump.x, y: pump.y, w: pump.width };
     const s = from.w / 34;
     const release = { x: from.x + 11 * s, y: from.y + 21 * s };
     const end = knot(fly.at(-1)!);

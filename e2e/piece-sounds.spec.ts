@@ -170,7 +170,7 @@ test("piece sounds: the classics and their variations are credited to PyChess (G
 
 test("piece sounds: every option decodes, starts on its hit and is as loud as the classic", async ({ page }) => {
   await page.goto("/settings");
-  const paths = [...MOVE_SOUNDS, ...CAPTURE_SOUNDS].map((o) => o.file);
+  const paths: string[] = [...MOVE_SOUNDS, ...CAPTURE_SOUNDS].map((o) => o.file);
   expect(paths).toHaveLength(18);
   paths.push(CASTLE_SOUND);
   // Decoded by the browser (an mp3's padding included) and heard as a phone plays it in the game (high-passed at

@@ -13,7 +13,8 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
   The "Workers Builds: chessroyale" check fails instantly on PR branches (Cloudflare's preview build for non-production
   branches): only `check` (typecheck and unit tests, `.github/workflows/check.yml`: since Nov 6 `unit` and `chess`, packages/chess's tests,
   run side by side and `check` is green when both are) and the e2e run decide whether a PR
-  is green. Merge with a merge commit, then confirm the deploy live.
+  is green. The typecheck covers the e2e specs too (`e2e/tsconfig.json`, Nov 15): a spec's missing name or wrong field fails `check`
+  in minutes, not the e2e run half an hour later. Merge with a merge commit, then confirm the deploy live.
 - **CI e2e** (Oct 15, DECISIONS.md "e2e on GitHub Actions for every PR"; fast PR checks since Oct 18,
   `docs/decisions/2026-10-18-faster-pipeline.md`, a trial): `.github/workflows/e2e.yml`, on GitHub's standard runners
   (free: the repository is public).

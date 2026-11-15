@@ -71,7 +71,7 @@ test("a ban means you can't sign in (Eric, Nov 13): a tab open drops to the ban 
   // Signed in (an email on the account, its holder old enough), home open in this tab.
   await asSignedIn(page, "banny");
   await localSql(page, "UPDATE users SET age_ok_at = 1 WHERE id = ?", id);
-  const [{ email }] = await localSql<{ email: string }>(page, "SELECT email FROM users WHERE id = ?", id);
+  const { email } = (await localSql<{ email: string }>(page, "SELECT email FROM users WHERE id = ?", id))[0]!;
   await page.reload();
   await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
 

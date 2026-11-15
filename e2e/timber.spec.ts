@@ -4,6 +4,9 @@ import { BOSS_POWERS } from "@chessroyale/core";
 import { BOARD_SEL, asAdmin, bossAloneFromHome, openBossRaid, submitMove, test } from "./helpers.ts";
 import { SIDE_FEEL } from "../packages/app/src/characters/side-size.ts";
 
+/** A box on screen: left, top, right, bottom. */
+type Box = [number, number, number, number];
+
 /**
  * Timber, the beaver builder (docs/decisions/2026-11-01-timber.md), in the game for admins first (BOSS_ADMIN_FIRST): his tile
  * only on an admin's Boss raid screen; Boss alone with the test switches: the workshop strip in the boss bar (five pieces, their
@@ -170,7 +173,7 @@ test.describe("Timber", () => {
         const el = document.querySelector(s);
         if (!el) return null;
         const r = el.getBoundingClientRect();
-        return [Math.round(r.left), Math.round(r.top), Math.round(r.right), Math.round(r.bottom)];
+        return [Math.round(r.left), Math.round(r.top), Math.round(r.right), Math.round(r.bottom)] as Box;
       }, sel);
     for (const size of [{ width: 1280, height: 800 }, { width: 1440, height: 900 }]) {
       await page.setViewportSize(size);
@@ -229,8 +232,8 @@ test.describe("Timber", () => {
       await page.locator(".ult-test").click();
       await playOne(page);
       await yourMove(page);
-      const geo = await page.evaluate(() => (window as any).__geo as { rest: number[][]; cast: number[][]; anims: string[] });
-      const hit = (a: number[], b: number[] | null) => !!b && a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3];
+      const geo = await page.evaluate(() => (window as any).__geo as { rest: Box[]; cast: Box[]; anims: string[] });
+      const hit = (a: Box, b: Box | null) => !!b && a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3];
       expect(geo.rest.length).toBeGreaterThan(0);
       // (Eric's Nov 4 rule: over the board's left edge by at most SIDE_FEEL.over of its side, over the side menu is fine (it lets
       // every tap through), never cut off by the window, never over the bar.)

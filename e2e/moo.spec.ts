@@ -76,7 +76,7 @@ async function record(page: Page) {
       if (!c) return null;
       const d = c.getContext("2d")!.getImageData(0, 0, c.width, c.height).data;
       let n = 0;
-      for (let i = 0; i < d.length; i += 4) if (d[i] === 251 && d[i + 1] === 229 && d[i + 2] === 60 && d[i + 3] > 0) n++;
+      for (let i = 0; i < d.length; i += 4) if (d[i] === 251 && d[i + 1] === 229 && d[i + 2] === 60 && d[i + 3]! > 0) n++;
       return n;
     };
     const look = () => {
