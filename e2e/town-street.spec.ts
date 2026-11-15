@@ -525,6 +525,9 @@ test.describe(() => {
     expect(gets.sort(), "each piece, once").toEqual([...town, ...names.map((n) => `/music/${n}.mp3`)].sort());
     const decoded = await page.evaluate(() => (window as unknown as { __decoded: number[] }).__decoded);
     expect(decoded.filter((b) => sizes.includes(b)), "no theme decoded").toEqual([]);
+    // (The town's solos: fetched, not decoded till a solo's turn nears, minutes away; Nov 15, memory on phones.)
+    const soloSizes = town.slice(1).map((u) => statSync(`${dir}/${u.slice("/music/".length)}`).size);
+    expect(decoded.filter((b) => soloSizes.includes(b)), "no solo decoded").toEqual([]);
     const log = await page.evaluate(() => (window as unknown as { __soundLog: string[] }).__soundLog);
     expect(log.filter((l) => l.startsWith("music:load")), "no theme loaded to play").toEqual([]);
     // Music off (Settings → Sound): none fetched.
