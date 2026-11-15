@@ -67,7 +67,7 @@ import { StreetZoom, parkSide } from "./zoom-steps.ts";
 import { PAWN_HEAD, PAWN_PX, Renderer, pawnImage, type Hit, type YouArt } from "./render.ts";
 import { dropRiders, leaveRider, ridersHeld, rideArt, shareRider, type Rider, type RiderPawn } from "./rides.ts";
 import { rideSpeed } from "../components/rides/scale.ts";
-import { rideMoving, rideSoundState, warmRideSound } from "../ride-sound.ts";
+import { rideMoving, rideSoundState, rideStep, warmRideSound } from "../ride-sound.ts";
 import { HIDDEN_ROOM, MUSIC, mountOf, secondColor, shownLook, sideOfPawn } from "@chessroyale/core";
 import { painter2d, type Backend, type Painter } from "./paint.ts";
 import { painterGL } from "./paint-gl.ts";
@@ -1197,6 +1197,8 @@ function startTown(
   /** The world itself (the loader below names its share of the bar `town`). */
   const world = town;
   const r = new Renderer(painter, town, HOMES);
+  // (Your ride's boings, a step at a time: told by your walker as each step begins, inside the frame loop's tick: ride-sound.ts.)
+  town.you.walker.onStep = (t0, ms) => rideStep(r.youRider?.id, t0, ms);
   // The arrow keys (arrows.ts): hold one and you walk that way, on squares you can stand on and nobody's (the walker's own check).
   // (The street town's turning camera, Nov 5, round 3: the keys go through its heading, so up is always up the screen.)
   const turned = { dc: 0, dr: 0 };

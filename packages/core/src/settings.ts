@@ -3626,26 +3626,33 @@ export const RIDES = {
  * A ride's moving sound (Eric, Nov 14: "when you move around ... it sounds like ... a little bulldozer moving ... one continuous sound";
  * "when you stop moving, it doesn't just like instantly stop ... it kind of fades over like a second or whatever ... I guess we'll have
  * to test it"; docs/decisions/2026-11-14-ride-sounds.md). Your own pawn's ride only, only while it moves, and only a ride listed in
- * `rides` (its loop is `/sounds/rides/<id>.wav`); standing, nothing. On the game's sounds (the Sound switch, a hidden page). App:
- * `ride-sound.ts`.
- * - `level`: its gain on the game's sounds (each loop is -20 dB RMS, so well under a move's knock).
- * - `holdMs`: it counts as moving until this long after your last step (a step is 90 ms), so a turn or a tap between steps never
- *   stops it.
- * - `engine`: a ride with `engine: true` (the dozer) starts at `startRate` and comes up to speed (1) over `upMs`; as it fades out it
- *   sinks to `stopRate`. Moving again mid-fade, it comes back up from where it is, at the same pace.
- * - `rides[id]`: `fadeInMs` as it starts, `fadeOutMs` as it stops.
+ * `rides` (its file is `/sounds/rides/<id>.wav`); standing, nothing. On the game's sounds (the Sound switch, a hidden page). App:
+ * `ride-sound.ts`. A ride's `kind`:
+ * - `loop` (the dozer): one loop while you move (its file: one loop of exactly 1 s with 0.1 s of itself either side), `fadeInMs` as it
+ *   starts, `fadeOutMs` as it stops, at `rate` (its speed and pitch). `level`: its gain on the game's sounds (each loop is -20 dB RMS,
+ *   so well under a move's knock). `holdMs`: it counts as moving until this long after your last step (a step is 90 ms), so a turn or
+ *   a tap between steps never stops it. `engine`: a ride with `engine: true` starts at `startRate` and comes up to speed over `upMs`;
+ *   as it fades out it sinks to `stopRate`. Moving again mid-fade, it comes back up from where it is, at the same pace.
+ * - `steps` (the pogo; Eric, Nov 15: "get rid of the fade in and fade out ... every time ... you go from one square to the next, it
+ *   should be a boing ... they're going to overlap each other, but that's fine"; docs/decisions/2026-11-15-pogo-boings.md): a one-shot
+ *   on every square you step, at `level`, the next of its file's boings each time (`boings`: where each starts in the file, s; each
+ *   `lengthS` long), its own source, so they overlap. `on`: the hop's moment it lands on, `takeoff` (the first drawn frame off the
+ *   ground) or `landing` (the first one back on it), read from the ride's move frames (ride-cells.ts), played once a step.
  */
 export const RIDE_SOUND = {
   level: 0.3,
   holdMs: 120,
   engine: { startRate: 0.8, upMs: 300, stopRate: 0.88 },
   rides: {
-    "sawyer-dozer": { engine: true, fadeInMs: 60, fadeOutMs: 700, rate: 1 },
-    /** `rate`: the loop's speed (and pitch) while moving. The pogo's 4 boings a second lagged the pawn's pace (Eric, Nov 15: "pogo
-     *  needs to be sped up to match the speed you move around"): 1.5 is 6 a second (about 7 semitones up). */
-    "boingo-pogo": { engine: false, fadeInMs: 60, fadeOutMs: 350, rate: 1.5 },
-  } as Readonly<Record<string, { readonly engine: boolean; readonly fadeInMs: number; readonly fadeOutMs: number; readonly rate: number }>>,
+    "sawyer-dozer": { kind: "loop", engine: true, fadeInMs: 60, fadeOutMs: 700, rate: 1 },
+    /** Its loop's 4 boings (its "little tune": low, mid, low, high), cut as in the sample Eric picked (Nov 15: "Yeah, I like A"). */
+    "boingo-pogo": { kind: "steps", level: 0.3, boings: [0, 0.245, 0.49, 0.735], lengthS: 0.245, on: "takeoff" },
+  } as Readonly<Record<string, RideLoopSound | RideStepSound>>,
 } as const;
+/** A ride whose sound loops while it moves (RIDE_SOUND). */
+export type RideLoopSound = { readonly kind: "loop"; readonly engine: boolean; readonly fadeInMs: number; readonly fadeOutMs: number; readonly rate: number };
+/** A ride with a one-shot on every step (RIDE_SOUND). */
+export type RideStepSound = { readonly kind: "steps"; readonly level: number; readonly boings: readonly number[]; readonly lengthS: number; readonly on: "takeoff" | "landing" };
 
 /**
  * Outfits (Eric, Nov 10; docs/decisions/2026-11-10-outfit-slot.md): an outfit hides every other worn item. `eyewear`: face items

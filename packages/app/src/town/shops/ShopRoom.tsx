@@ -76,7 +76,7 @@ import { drawZzz } from "../zzz.ts";
 import { roomLight, skyNow, type RoomLight } from "../sky.ts";
 import { CLAW_PLAY, clawPose, newPose as newClawPose } from "../../claw/view.ts";
 import { closeClawMachine, openClawMachine } from "../../claw/index.ts";
-import { rideMoving } from "../../ride-sound.ts";
+import { rideMoving, rideStep } from "../../ride-sound.ts";
 
 /** A room's art, as its file exports it. */
 export interface RoomArt {
@@ -790,6 +790,8 @@ function startRoom(
     const rd = youRider();
     return rd?.ready ? rd : null;
   };
+  // (Your ride's boings inside too, a step at a time, as in the town: ride-sound.ts.)
+  you.onStep = (t0, ms) => rideStep(riding()?.id, t0, ms);
   // ---- A boss's challenge (shops/challenge.ts): the boss comes in beside you and you each walk to your start mark on the battle
   // circle, side by side, at the challenge's pace; each settles onto its mark's middle; facing each other, the intro plays.
   const C = CHALLENGE_FEEL;

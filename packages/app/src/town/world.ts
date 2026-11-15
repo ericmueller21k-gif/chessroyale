@@ -679,6 +679,11 @@ export class Walker {
   run(next: ((fc: number, fr: number) => Sq | null) | null): void {
     this.runner = next;
   }
+  /**
+   * Told as each step begins (when, on the frame clock, and how long it takes), from `update`, so inside the frame loop that moves it
+   * and never on a frame without a step: your ride's boings (ride-sound.ts `rideStep`).
+   */
+  onStep: ((t0: number, stepMs: number) => void) | null = null;
   update(now: number): void {
     for (let g = 0; g < 64; g++) {
       if (this.step) {
@@ -710,6 +715,7 @@ export class Walker {
       if (n) this.queue.push(n);
     }
     this.step = { fc: this.c, fr: this.r, to, dc, dr, t0, first, last: this.queue.length === 0 };
+    this.onStep?.(t0, this.stepMs);
   }
   /** Its pose at `now`, into `out`. */
   pose(now: number, out: Pose): Pose {
