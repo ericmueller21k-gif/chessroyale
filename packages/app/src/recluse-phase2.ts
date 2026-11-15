@@ -36,14 +36,14 @@ import {
  * - on the music's slam the light bursts out and takes him: his head goes back, his eyes go totally white (`burstAt`);
  * - on its build a shaft of it lifts him off his knees, his arms hanging at his sides (`riseAt`), and it grows faster and faster:
  *   it engulfs him, shoots up off the screen (`shootAt`), radiates in every direction (`radiateAt`) and whites out the whole
- *   screen (`whiteAt` to `whiteFull`); unseen in the white he's set down in his suit and helmet, and the child and the lens go;
- * - the light dies back into the center (`downAt`) and shows him (`revealAt`); his visor flips up (`flipUpAt`), his eyes glowing,
- *   for his first line (`chantLines[0]`, over his head) and back down (`flipDownAt`);
+ *   screen (`whiteAt` to `whiteFull`); unseen in the white he's set down in his final form, and the child and the lens go;
+ * - the light dies back into the center (`downAt`) and shows him (`revealAt`), his eyes glowing; his first line
+ *   (`chantLines[0]`, over his head);
  * - he crouches and leaps on the music's breath (`upAt`), and lands as it drops: the board cracks under him (`crackAt`, the
  *   music's drop: `introMs`), the big board gone from that frame on; blue arcs strike from his hands at his sides (`arcAt` to
  *   `arcEnd`); the quarters part and grow into four boards as the light dies; his second line (`chantLines[1]`);
  * - the book snaps shut and flies up into his hands while every board's pieces fly to their Chess960 squares; he leaps back to his
- *   place, in phase 2's idle (in the suit) from then on;
+ *   place, in phase 2's idle (in his final form) from then on;
  * - "PHASE 2"; then phase 2's boards, still, with a big 5, 4, 3, 2, 1 on every one (`countdownMs`), and the clocks start.
  * The God King stays in his place, greyed, throughout (Eric, Nov 14).
  */
@@ -59,8 +59,8 @@ export const PHASE_CHANGE = lazyTable(() => {
   const crackAt = musicAtMs + introMs;
   const upAt = crackAt - T.leapMs;
   const crouchAt = upAt - 200;
-  // (His two lines, each typed sentence by sentence at the cutscene's pace: the first, a little faster, once the visor is up, its
-  // box held through the visor coming down and the crouch, gone as he leaps; the second as the board splits.)
+  // (His two lines, each typed sentence by sentence at the cutscene's pace: the first, a little faster, as he stands revealed, its
+  // box held through the crouch, gone as he leaps; the second as the board splits.)
   const cl = pace.chantLines;
   const first = pacedLine(RECLUSE_LINES.chantSay[0]!, { ...cl, typeMs: cl.firstTypeMs });
   const chantLines = [
@@ -117,7 +117,7 @@ export const PHASE_CHANGE = lazyTable(() => {
 
 /**
  * His figure where he stands through the phase change (BossCharacter's figure run, from `at`, the change's start): his place
- * stands empty while the board draws him (`rc-away`), and once he's back he rests in phase 2's idle, in the suit.
+ * stands empty while the board draws him (`rc-away`), and once he's back he rests in phase 2's idle, in his final form.
  */
 export function phaseChangeRun(at: number) {
   return { since: at, anims: [], loop: "idle2" } as const;

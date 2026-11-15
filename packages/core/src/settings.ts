@@ -2125,8 +2125,8 @@ export const RECLUSE_PHASE2 = {
      * device a moment late to the phase change still plays the whole intro, its drop on the split), and every beat here is ms from
      * the intro's start (`introMs` after it, the music's drop, the board cracks): the light takes him on the music's slam (`burstAt`: his eyes go white) and lifts him on its build (`riseAt`, for
      * `riseMs`); it grows, shoots up off the screen (`shootAt`), radiates in every direction (`radiateAt`), whites out the screen
-     * (`whiteAt` to `whiteFull`; unseen, the suit), holds, and dies back into the center (`downAt` to `revealAt`); the visor flips
-     * up (`flipUpAt`) for his first line (`line1At`) and back down (`flipDownAt`); he leaps on the music's breath, a second before
+     * (`whiteAt` to `whiteFull`; unseen, his final form), holds, and dies back into the center (`downAt` to `revealAt`), his face
+     * showing; his first line (`line1At`); he leaps on the music's breath, a second before
      * the drop (`leapMs` of hang time), and lands as the board cracks; his second line `line2AfterMs` after the crack.
      * `introMs` is `recluse-phase3`'s introSeconds (public/music/themes.json; a test keeps them equal).
      */
@@ -2142,9 +2142,7 @@ export const RECLUSE_PHASE2 = {
       whiteFull: 8000,
       downAt: 8700,
       revealAt: 10_000,
-      flipUpAt: 10_300,
       line1At: 10_600,
-      flipDownAt: 15_750,
       leapMs: 1000,
       line2AfterMs: 800,
     },
@@ -2153,7 +2151,7 @@ export const RECLUSE_PHASE2 = {
      * a character every `typeMs`, `sentencePauseMs` between a line's two sentences, then fully readable `readMs` plus
      * `perCharMs` a character (at most `maxReadMs`), its fade `fadeMs`. Their times: `transform`'s `line1At` and `line2AfterMs`.
      * The first line types faster (`firstTypeMs` a character, Nov 14 review): the music fixes its window (the reveal to the leap),
-     * and its box stays up after the visor comes down, through the crouch, until he leaps, so it's readable whole about 2.8 s.
+     * and its box stays up through the crouch until he leaps, so it's readable whole about 2.8 s.
      */
     chantLines: { typeMs: 45, firstTypeMs: 30, sentencePauseMs: 1000, readMs: 1700, perCharMs: 40, maxReadMs: 5500, fadeMs: 260 },
     /** The boards split and set: a big 5, 4, 3, 2, 1 on every board before phase 2's clocks run (s). */

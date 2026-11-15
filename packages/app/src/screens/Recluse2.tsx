@@ -191,7 +191,7 @@ const CUE_LATE_MS = 500;
  * child and him from the start to his leap home (his place stands empty meanwhile: `rc-away`, his words over his head there); the
  * board's square here: the four quarters (together the whole board until they part; the big board is never drawn behind them), the
  * crack and the blue arcs from his hands as he lands on the music's drop, the shuffle, "PHASE 2". The God King stays in his place,
- * greyed. His suit shows where he stands from the white-out on (solo.ts and recluse-online.ts: setSuitAt).
+ * greyed. His final form shows where he stands from the white-out on (solo.ts and recluse-online.ts: setSuitAt).
  */
 export function PhaseChangeScreen({ match, at }: { match: GameView; at: number }) {
   const v = match.simul;
@@ -203,7 +203,7 @@ export function PhaseChangeScreen({ match, at }: { match: GameView; at: number }
   // (Each at its moment only: a device that joins or reloads later doesn't play it as it comes in. Nov 14 review, m3.)
   cue(t >= C.revealAt && t < C.revealAt + CUE_LATE_MS, "reveal", () => play("recluseSpark"));
   cue(t >= C.arcAt && t < C.arcAt + CUE_LATE_MS, "arcs", () => play("recluseArc"));
-  // His two lines (Eric, Nov 13 and 14), each typed at its own pace at its time (`chantLines`): the first with his visor up, the
+  // His two lines (Eric, Nov 13 and 14), each typed at its own pace at its time (`chantLines`): the first as he stands revealed, the
   // second as the board splits.
   const chantLine = C.chantLines.filter((l) => t >= l.at).length;
   useLayoutEffect(() => {

@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { DEFAULT_SETTINGS, RAID_SETTINGS, RECLUSE_PHASE2, bossBannerMs, finishBoss } from "@chessroyale/core";
 import { PHASE2_WIN_FEN, applyMove, chess960Fen, fenAtPly, legalMoves, phase2Numbers, type MoveScore } from "@chessroyale/chess";
 import { ARC_LIFE, ARC_STRIKES, PHASE_CHANGE, Phase2Game, arcPoints, boardSteps, phase2Follows, phase2Headline, phase2Mates, phaseChangeRun, smoothPath } from "../src/recluse-phase2.ts";
-import { RECLUSE, RECLUSE_BUST, suited } from "../src/characters/recluse.ts";
+import { RECLUSE, RECLUSE_BUST, coated } from "../src/characters/recluse.ts";
 import { CHANGE_HANDS, RECLUSE_CHANGE, RECLUSE_CHANGE_BOOK } from "../src/characters/recluse-transform.ts";
 import { CRITICAL, NORMAL, Voice, bossVoice } from "../src/speech.tsx";
 import { pacedLine, pacedPage, pacedTyped } from "../src/paced-line.ts";
@@ -45,13 +45,13 @@ describe("when phase 2 follows, and who plays it beside you", () => {
 });
 
 describe("the phase change", () => {
-  it("is about 23 s from his cutscene's end to the end of \"PHASE 2\" (Eric, Nov 14: his transformation by the book's light), its beats in order: the book, the light taking him, the rise, the light growing, the white-out, the reveal, the visor up and down, the leap, the crack, the split, the book back, the leap home", () => {
+  it("is about 23 s from his cutscene's end to the end of \"PHASE 2\" (Eric, Nov 14: his transformation by the book's light), its beats in order: the book, the light taking him, the rise, the light growing, the white-out, the reveal, his first line, the leap, the crack, the split, the book back, the leap home", () => {
     const C = PHASE_CHANGE;
     expect(C.fallMs).toBeGreaterThanOrEqual(1500);
     expect(C.fallMs).toBeLessThanOrEqual(2000);
     expect(C.total).toBeGreaterThanOrEqual(20_000);
     expect(C.total).toBeLessThanOrEqual(26_000);
-    const order = [0, C.burstAt, C.riseAt, C.riseAt + C.riseMs, C.shootAt, C.radiateAt, C.whiteAt, C.whiteFull, C.downAt, C.revealAt, C.flipUpAt, C.line1At, C.flipDownAt, C.crouchAt, C.upAt, C.crackAt, C.partAt, C.growAt, C.growAt + C.growMs, C.pickupAt, C.catchAt, C.backAt, C.homeAt, C.bannerAt, C.total];
+    const order = [0, C.burstAt, C.riseAt, C.riseAt + C.riseMs, C.shootAt, C.radiateAt, C.whiteAt, C.whiteFull, C.downAt, C.revealAt, C.line1At, C.crouchAt, C.upAt, C.crackAt, C.partAt, C.growAt, C.growAt + C.growMs, C.pickupAt, C.catchAt, C.backAt, C.homeAt, C.bannerAt, C.total];
     expect([...order].sort((a, b) => a - b)).toEqual(order);
     // (Every beat a setting.)
     // (Every beat a setting, from the transformation theme's start, `musicAtMs` into the phase change.)
@@ -78,12 +78,12 @@ describe("the phase change", () => {
     expect([C.burstAt - C.musicAtMs, C.riseAt - C.musicAtMs]).toEqual([2640, 3040]);
   });
 
-  it("his two lines (Eric, Nov 13 and 14), typed at the cutscene's pace: the first (a little faster) from his visor up, readable whole 2.8 s, gone as he leaps; the second after the landing, typed out by \"PHASE 2\" and gone before the clocks", () => {
+  it("his two lines (Eric, Nov 13 and 14), typed at the cutscene's pace: the first (a little faster) as he stands revealed, readable whole 2.8 s, gone as he leaps; the second after the landing, typed out by \"PHASE 2\" and gone before the clocks", () => {
     const C = PHASE_CHANGE;
     const L = RECLUSE_PHASE2.change.chantLines;
     // (The cutscene mockup's numbers: 45 ms a character, a second between sentences, readable 1.7 s plus 40 ms a character.)
     expect([L.typeMs, L.sentencePauseMs, L.readMs, L.perCharMs]).toEqual([45, 1000, 1700, 40]);
-    // (The first line, 30 ms a character: its window is the music's, from the visor up to the leap.)
+    // (The first line, 30 ms a character: its window is the music's, from the reveal to the leap.)
     expect(L.firstTypeMs).toBe(30);
     expect(RECLUSE_LINES.chantSay).toEqual([
       ["Computation without creativity is nothing.", "Now I have both."],
@@ -91,11 +91,11 @@ describe("the phase change", () => {
     ]);
     expect(C.chantLines.map((l) => l.line.text)).toEqual(["Computation without creativity is nothing. Now I have both.", "Prepare yourself. This is the ultimate test of your skill."]);
     const [a, b] = C.chantLines;
-    // The first: once the visor is up, typed at 30 ms a character, typed out before the visor comes down, then held (through the
-    // visor down and the crouch) till he leaps: readable whole 2.8 s, not the 1.2 s it had (Nov 14 review, M2), and gone as he leaps.
-    expect(a!.at).toBeGreaterThan(C.flipUpAt);
+    // The first: once he's revealed, typed at 30 ms a character, typed out well before he crouches, then held (through the crouch)
+    // till he leaps: readable whole 2.8 s, not the 1.2 s it had (Nov 14 review, M2), and gone as he leaps.
+    expect(a!.at).toBeGreaterThan(C.revealAt);
     expect(a!.line.typeMs).toBe(30);
-    expect(a!.at + a!.line.typedMs).toBeLessThan(C.flipDownAt);
+    expect(a!.at + a!.line.typedMs).toBeLessThan(C.crouchAt);
     expect(a!.at + a!.line.holdMs).toBe(C.upAt);
     const readable = a!.line.holdMs - a!.line.typedMs - L.fadeMs;
     expect(readable).toBeGreaterThanOrEqual(2800);
@@ -160,32 +160,34 @@ describe("the phase change", () => {
     expect(smoothPath(pts)).toMatch(/^M40 18( Q[\d. -]+){15} L50 90$/);
   });
 
-  it("his figure (Eric, Nov 14): his arms at his sides the whole time; his eyes white as the light takes him; in the suit and helmet from the reveal, the visor up only for his line, his eyes glowing then; one book on screen", () => {
+  it("his figure (Eric, Nov 14): his arms at his sides the whole time; his eyes white as the light takes him; in his final form from the reveal (Nov 15: no helmet, his face showing, his eyes glowing blue, his hair risen); one book on screen", () => {
     const ch = RECLUSE_CHANGE;
-    const heads = (a: string) => ch.anims[a]!.frames.map((f) => f.layers.find((l) => l.part.startsWith("head:") || l.part.startsWith("helmet:"))!.part);
+    const heads = (a: string) => ch.anims[a]!.frames.map((f) => f.layers.find((l) => l.part.startsWith("head:") || l.part.startsWith("coathead:"))!.part);
     const books = (a: string) => ch.anims[a]!.frames.map((f) => f.layers.filter((l) => l.part.startsWith("book:")).length);
     for (const a of Object.keys(ch.anims)) {
       // (Never a raised hand: no open palm, no fist up.)
       for (const f of ch.anims[a]!.frames) expect(f.layers.some((l) => l.part.endsWith("hand:palm")), a).toBe(false);
     }
     for (const a of ["burst", "rise", "beam"]) for (const h of heads(a)) expect(h, a).toMatch(/^head:possessed\./);
-    // (Before the white-out, him as he was; from the reveal, the suit: helmet heads, no tie.)
-    for (const a of ["together", "open", "glowing", "burst", "rise", "beam"]) for (const f of ch.anims[a]!.frames) expect(f.layers.some((l) => l.part.startsWith("suit:") || l.part.startsWith("helmet:")), a).toBe(false);
+    // (Before the white-out, him as he was; from the reveal, his final form: his risen head, his eyes glowing (or a blink), the coat
+    // over his shirt and tie, the aura and the helix. No visor to flip: his face shows the whole time.)
+    for (const a of ["together", "open", "glowing", "burst", "rise", "beam"]) for (const f of ch.anims[a]!.frames) expect(f.layers.some((l) => /^(coat|eyeGlow)/.test(l.part)), a).toBe(false);
     for (const a of ["revealed", "crouch", "air", "land", "landed", "pickup", "leap2"]) {
-      for (const h of heads(a)) expect(h, a).toMatch(/^helmet:down:/);
-      for (const f of ch.anims[a]!.frames) expect(f.layers.some((l) => l.part.startsWith("tie:")), a).toBe(false);
+      for (const h of heads(a)) expect(h, a).toMatch(/^coathead:(glow|shut)\./);
+      for (const f of ch.anims[a]!.frames) {
+        expect(f.layers.some((l) => l.part === "coat:torso"), a).toBe(true);
+        expect(f.layers[0]!.part, a).toMatch(/^coatAura:/);
+        if (f.layers.some((l) => l.part.startsWith("coathead:glow."))) expect(f.layers.some((l) => l.part === "eyeGlow"), a).toBe(true);
+      }
     }
-    expect(heads("flipUp")).toEqual([expect.stringMatching(/^helmet:mid:/), expect.stringMatching(/^helmet:up:/)]);
-    for (const h of heads("faceOpen")) expect(h).toMatch(/^helmet:up:glow\./);
-    for (const f of ch.anims.faceOpen!.frames) expect(f.layers.some((l) => l.part === "eyeGlow")).toBe(true);
-    expect(heads("flipDown").at(-1)).toMatch(/^helmet:down:/);
+    for (const a of ["flipUp", "faceOpen", "flipDown"]) expect(ch.anims[a], a).toBeUndefined();
     // One book: in his frames as it opens and while he kneels; drawn apart while he rises, hovers and jumps; his again from the pickup.
     for (const a of ["open", "glowing", "burst"]) expect(books(a), a).toEqual(books(a).map(() => 1));
-    for (const a of ["rise", "beam", "revealed", "flipUp", "faceOpen", "flipDown", "crouch", "air", "land", "landed"]) expect(books(a), a).toEqual(books(a).map(() => 0));
+    for (const a of ["rise", "beam", "revealed", "crouch", "air", "land", "landed"]) expect(books(a), a).toEqual(books(a).map(() => 0));
     for (const f of RECLUSE_CHANGE_BOOK.anims.glow!.frames) expect(f.layers.filter((l) => l.part.startsWith("book:"))).toHaveLength(1);
     expect(books("pickup")).toEqual(books("pickup").map(() => 1));
-    // (Where he stands in phase 2 too: the suit on his idle, the bust's as well.)
-    for (const c of [RECLUSE, RECLUSE_BUST]) expect(suited(c.anims.idle2!.frames[0]!).layers.some((l) => l.part.startsWith("helmet:down:")), c.id).toBe(true);
+    // (Where he stands in phase 2 too: his final form on his idle, the bust's as well.)
+    for (const c of [RECLUSE, RECLUSE_BUST]) expect(coated(c.anims.idle2!.frames[0]!, 0).layers.some((l) => l.part.startsWith("coathead:")), c.id).toBe(true);
   });
 });
 

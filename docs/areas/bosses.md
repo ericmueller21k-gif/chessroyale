@@ -368,10 +368,10 @@ below):
 - **What the visual check of his fight fixed** (Nov 14; [decision](../decisions/2026-11-14-recluse-qa-fixes.md)): a fitted bar box
   (SpeechBox's `balanced`) measures only once it can be laid out (a ResizeObserver as it first shows), never keeping a width taken
   while hidden; the cutscene's tail goes in and out from its box's own `fresh` / `leaving` (`.cs-say + .cs-tail`); a computer's bar
-  face is his bust as drawn now (BossKit `barFace`: his age's loop, his suit); the man's words stand on `RECLUSE_HEADS` (beaten, his
+  face is his bust as drawn now (BossKit `barFace`: his age's loop, his final form); the man's words stand on `RECLUSE_HEADS` (beaten, his
   kneel); in the party layout the God King's box sits above the team, at 8 px and as wide as the team reaches (252 px: every line he has in two rows, none into the chat; [main red after #712](../decisions/2026-11-14-fix-main-712.md); on a phone, under the panel's switch, up to 248 px into the screen's margin, rows as tight, so no line reaches a teammate at 320 to 430 px wide: [the phone's party](../decisions/2026-11-14-gk-words-phone-party.md)), the chat stopping 200 px over the board's
   foot; phase 2's Moves panel lists your own board; a phone's small boards name their player; the white-out's dying disc starts whole on
-  a tall phone; his words over his helmet never straddle the bar's edge (moved into the bar, or onto the board); the split ends where
+  a tall phone; his words over his head never straddle the bar's edge (moved into the bar, or onto the board); the split ends where
   phase 2 draws each board (`playedBox`). Checks in `e2e/recluse.spec.ts` and `e2e/hidden-boss-room.spec.ts`.
 - **The small follow-ups** (Nov 14; [decision](../decisions/2026-11-14-recluse-polish.md)): a device late for the transformation's
   intro starts it where it is (`switchPlan`); his transformation picks up the cutscene's loop of the two from the scene as fitted to its
@@ -409,27 +409,27 @@ below):
     knees, **his arms hanging relaxed at his sides the whole time** (never raised), his hair pushed back, and he hovers in it while the
     light grows faster and faster: it engulfs him, **shoots up off the screen** (5.6 s), **radiates over the whole screen** (6.3 s),
     and **whites the screen out** (7.3 to 8 s);
-  - **unseen in the white** he's set down in his suit and helmet (`setSuitAt`), the child and the lens gone; the white **dies back
-    into the center** (8.7 to 10 s) and shows him, the visor down (`recluseSpark`);
-  - **the visor flips up** (10.3 s; a frame on its way), his face with **his eyes glowing blue**, for his first line over his head
-    ("Computation without creativity is nothing. / Now I have both.", 10.6 s, typed a little faster, 30 ms a character, by about
-    13.3; the visor **flips back down** at 15.75 s, and the line stays up through the crouch, gone as he leaps: readable whole 2.8 s);
+  - **unseen in the white** he's set down in his final form (`setSuitAt`), the child and the lens gone; the white **dies back
+    into the center** (8.7 to 10 s) and shows him, his face showing, **his eyes glowing blue** (`recluseSpark`);
+  - he says his first line as he stands, over his head ("Computation without creativity is nothing. / Now I have both.", 10.6 s,
+    typed a little faster, 30 ms a character, by about 13.3; the line stays up through the crouch, gone as he leaps: readable whole
+    2.8 s; Nov 15: no visor to flip any more, the same moment as before);
   - he crouches and **leaps on the music's breath**, hangs a second, and **lands on its drop** (17.435 s after the intro starts): the
     board cracks under him (Sawyer's board-saw gap), **the big board never drawn behind the quarters** (they're the whole board until
     they part), blue arcs strike the cracks from his hands at his sides (`Arcs`, `ARC_STRIKES`, `CHANGE_HANDS`: two big ones as it
     cracks and as it parts; `recluseArc`), the quarters part and grow into four boards as the light dies; his second line 0.8 s after
     the landing ("Prepare yourself. / This is the ultimate test of your skill.", over his head, ending in his place's bubble once he's
     home); the book snaps shut into his hands (`pickup`) while the pieces fly to their Chess960 squares; he leaps home (`leap2`),
-    `idle2` in the suit from then on; "PHASE 2". The dock: "The book's light takes him!", "He's transformed!", "One board becomes
+    `idle2` in his final form from then on; "PHASE 2". The dock: "The book's light takes him!", "He's transformed!", "One board becomes
     four…", then the clock line. **The God King stays in his place, greyed** (`king="benched"`), silent, throughout.
   Its lines (`RECLUSE_LINES.chantSay`, Eric's, Nov 13) type at the cutscene's pace (`chantLines`: 45 ms a character, 1 s between
   sentences, readable 1.7 s plus 40 ms a character; the first line `firstTypeMs`, 30 ms; `paced-line.ts`, `sayPaced`; a phone's bar shows a sentence at a time,
-  `pacedPage`). His frames, the child's, the book's and his suit where he stands (idle, ultimate, results) are drawn ahead from his
+  `pacedPage`). His frames, the child's, the book's and his final form where he stands (idle, ultimate, results) are drawn ahead from his
   battle's start (`prewarmRecluse`, into BossEffect's frame cache, the one his place draws from). The reveal's spark and the arcs'
   crackle play only within 0.5 s of their moment (a device joining later doesn't play them). Online the server times it by `RECLUSE_ONLINE.changeMs` (the screens' `PHASE_CHANGE.total`) and holds the
   cutscene `RECLUSE_CUTSCENE.holdMs` (its timeline's length); nothing else in the protocol changed. Tests:
-  `app/test/recluse-phase2.test.ts` (its beats, the music's marks, the lines' times, his figure: no raised hand, white eyes, the
-  suit, the visor), `recluse.test.ts` (the suit on every frame), `recluse-cutscene.test.ts`, `recluse-online.test.ts`,
+  `app/test/recluse-phase2.test.ts` (its beats, the music's marks, the lines' times, his figure: no raised hand, white eyes, his
+  final form from the reveal), `recluse.test.ts` (the final form on every frame, all his hair moving, nothing cut off), `recluse-cutscene.test.ts`, `recluse-online.test.ts`,
   `e2e/recluse.spec.ts` ("beaten in phase 1": its beats in order and at their times, the split's first frame on the drop).
   - **Then the countdown** (Oct 17): phase 2's screen (`SimulScreen`, the boards where you'll play them: a phone's big
     board and three small ones) with no clock running and no move possible: the round's countdown (`CenterCount`) on
@@ -449,14 +449,23 @@ below):
   "No added time." (two lines: one was cut off at 360 px). The God King says nothing from the phase change on. Phase 2's end: "The boss wins." (the bar says how many were won) or "All
   four boards won!". "5 SECONDS!" is its name alone; the dock says "5 s a move, or a random one", and his `ult2` lines
   never name the seconds (placeholders; the number is a setting).
-- **His suit and helmet** (Eric, Nov 14, mockup rounds 3, 3b and the eyes; replacing his half-engine eye): from his transformation's
-  white-out to the end of the battle (the result screen too), on every drawing of him where he stands (the bust, his figure by the
-  board, his figure on the board): a fitted suit, matte near-black navy with slim charcoal panels, thin glowing circuit runs in red
-  and cool blue ending in tiny yellow nodes; an angular helmet of its own with one smooth near-black visor over his whole face. Not
-  an overlay: every part of his drawing has its suit version, the same size and place (`suitName`, `suitFrame`, `suited` in
-  `characters/recluse.ts`), so any pose wears it by its part names; BossCharacter draws `suited(frame)` from `setSuitAt`'s time (the
-  kit's `suit`; `data-suit` on his place). The visor's three ways (`down`, `mid`, `up`); with it up his eyes glow electric blue,
-  a thin line of light down each cheek (`glow` eyes and a see-through `eyeGlow` layer). A new battle clears it (`resetBeats`).
+- **His final form** (Eric, Nov 15, mockup rounds 4 and 4b, in place of Nov 14's suit and helmet;
+  [decision](../decisions/2026-11-15-recluse-final-form.md)): from his transformation's white-out to the end of the battle (the
+  result screen too), on every drawing of him where he stands (the bust, his figure by the board, his figure on the board): his face
+  as ever with **his eyes glowing blue** (a bright core, a soft glow, a thin line of light down each cheek: `glow` eyes and the
+  see-through `eyeGlow` layer; a blink shuts them); **his own brown hair always rising**, fine strands with darker lines between,
+  every strand moving every frame (a wave up the mass, each strand swaying out of step, its tip flicking; `risenHead`, six steps a
+  cycle, one a frame); a **long black trench coat** of his own cut, open over his white shirt, blue tie and belt (notched lapels, the
+  collar up, shoulder straps, buttons, its belt's end hanging, cuff straps, a blue lining at the hem), its tails swaying; round him a
+  see-through **blue aura** rippling like a flame, small **bolts** flicking near its edge, and a **binary double helix**: two strands
+  of tiny 1s and 0s turning round him (a turn every 12 frames; the near side over him, white or electric blue, the far side under
+  him, dimmer; never over his face). Kept his own: no sunglasses, blue digits on a helix (no falling green code), not spiky golden
+  hair, a trench over his own shirt and tie. Not an overlay: his frames' parts swapped for the final form's plus its own layers,
+  placed from his legs (or torso, the bust) (`coatFrame`, `coated(frame, i)` in `characters/recluse.ts`; `i` is the frame's place in
+  its animation, so the helix, hair and coat loop with it); BossCharacter draws `coated(frame, s.frame)` from `setSuitAt`'s time (the
+  kit's `suit`, `data-suit` on his place: names kept from the suit). Each frame is drawn once ahead and cached, so nothing is added per
+  frame on screen. His canvas is 5 px taller than before (151, feet unchanged) so his tallest hair never touches its top; the ages and
+  the cutscene take it from his (`RECLUSE.foot`). A new battle clears it (`resetBeats`).
 - **The same frame in every phase** (Eric, Nov 14: "the board split only replaces the single board";
   [decision](../decisions/2026-11-14-recluse-same-frame.md)): the phase change and phase 2 draw phase 1's whole boss screen:
   a computer's boss bar at the top (no title line; "Phase 2" where it said the move) and its tools, his figure or bust, the
