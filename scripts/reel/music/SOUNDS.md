@@ -248,3 +248,9 @@ the theme goes back to its 2:59 without a solo, and the two solos are pieces of 
 two passes of the theme now and then ("say every 10 min ... only 3 files, a 3 min theme, and 2 short piano inserts").
 town.py builds the three files; handed over in `town-music/` on the stills branch with how to play them. A long theme
 can carry extra parts this way without growing: a piece that starts where a pass ends and hands back to the top.
+The brush under the solos (kept at first because he had asked for the theme's backdrop "the whole song"): "even
+though it stays the same loudness as it always does, it completely drowns out every other thing going on ... just get
+rid of it completely and then bring it back when it's done", and the quiet parts up ("I hear several other things ...
+I'd like to hear more of"). Done; "perfect". The rule: a steady noise part is judged against what plays over it, not by
+its own level: under a band it is a backdrop, under a lone piano it is the loudest thing there. A rule he gave for
+one part ("keep the backdrop") is not a rule for a part he hadn't heard yet.
