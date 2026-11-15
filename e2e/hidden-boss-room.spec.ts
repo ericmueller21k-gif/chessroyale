@@ -324,7 +324,11 @@ test("his room (Eric, Nov 12 and 13): Challenge is 1 of 4; leaving asks; an admi
   if (desk) await expect(yourRow).toHaveAttribute("aria-label", /^1\. You: /);
   await expect(trophy).toBeEnabled({ timeout: 10_000 });
   await trophy.click();
-  await expect(page.getByRole("button", { name: "Your next move wins this form (testing)" })).toBeDisabled();
+  // (Armed, until the bots' next moves win the boards: on a quick runner that can be before this look, and the button goes with
+  // the fight. So: armed, or already decided. The 🏆 is an admins' testing tool, Nov 15.)
+  await expect
+    .poll(async () => (await simulNow())?.decided || (await page.getByRole("button", { name: "Your next move wins this form (testing)" }).isDisabled({ timeout: 250 }).catch(() => false)), { message: "the 🏆 armed (or every board already won)" })
+    .toBe(true);
   await expect.poll(async () => (await simulNow())?.decided ?? false, { message: "every board won", timeout: 30_000 }).toBe(true);
   expect((await simulNow()).won).toBe(4);
   // (And still, once every board is won.)
