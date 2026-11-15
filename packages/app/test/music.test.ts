@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { MUSIC, MUSIC_SWITCH, RECLUSE_MUSIC } from "@chessroyale/core";
+import { MUSIC, MUSIC_SWITCH, RECLUSE_MUSIC, TOWN_MUSIC } from "@chessroyale/core";
 import type { Phase } from "../src/game.ts";
 
 // The audio graph, faked: what was started where, and every move of the music's gain.
@@ -77,6 +77,8 @@ const bufs = new Map<string, { url: string; duration: number }>();
 const fetched: string[] = [];
 /** (Set: an intro's decode waits for it.) */
 const gate = { intro: null as Promise<void> | null };
+/** Pieces whose next decode fails (once). */
+const loadFails = new Set<string>();
 const sound = vi.hoisted(() => ({ muted: false, hidden: false, muteListeners: [] as (() => void)[] }));
 vi.mock("../src/sound.ts", () => ({
   isMuted: () => sound.muted,
@@ -84,7 +86,10 @@ vi.mock("../src/sound.ts", () => ({
   musicBus: () => ({ ctx: busCtx, out: {} }),
   loadAudioFile: (url: string) => {
     files.push(url);
-    if (!bufs.has(url)) (fetched.push(url), bufs.set(url, { url, duration: url.endsWith("-intro.mp3") ? 8 : 120 }));
+    if (loadFails.delete(url)) return Promise.resolve(null);
+    // (The town's pieces at their own lengths: the theme's loop and its pads, a solo and its ring-out.)
+    const duration = url.endsWith("-intro.mp3") ? 8 : url.includes("town-loop") ? 179.604646 : url.includes("town-solo") ? 41.209313 : 120;
+    if (!bufs.has(url)) (fetched.push(url), bufs.set(url, { url, duration }));
     const buf = bufs.get(url)!;
     return gate.intro && url.endsWith("-intro.mp3") ? gate.intro.then(() => buf) : Promise.resolve(buf);
   },
@@ -105,6 +110,15 @@ const THEMES = {
     "recluse-beaten": { intro: "recluse-beaten-intro", loop: "recluse-house-loop", introSeconds: 1.815, loopSeconds: 60 },
     "recluse-phase3": { intro: "recluse-phase3-intro", loop: "recluse-phase3-loop", introSeconds: 19.29325, loopSeconds: 88.371021 },
   },
+  // (The town's, as the handoff has it, Nov 15.)
+  town: {
+    loop: "town-loop",
+    loopSeconds: 178.604646,
+    solos: [
+      { id: "a", file: "town-solo-a", seconds: 37.209313 },
+      { id: "b", file: "town-solo-b", seconds: 37.209313 },
+    ],
+  },
 };
 let themesAsked = 0;
 /** The pieces fetched by the town's loading (preloadMusic: fetched, not decoded), and the ones to fail once. */
@@ -120,7 +134,7 @@ vi.stubGlobal("fetch", (url: string) => {
   return Promise.resolve({ ok: true, json: () => Promise.resolve(THEMES) });
 });
 
-const { bossMusic, loopPlace, musicFiles, musicLevel, musicNow, musicPlan, musicTheme, musicWanted, preloadMusic, recluseMusic, roomMusic, roomMusicLoad, roomMusicNow, setMusicOn, splashDone, splashMusic, switchPlan, heardNow } = await import(
+const { bossMusic, loopPlace, musicFiles, musicLevel, musicNow, musicPlan, musicTheme, musicWanted, preloadMusic, recluseMusic, roomMusic, roomMusicLoad, roomMusicNow, setMusicOn, splashDone, splashMusic, switchPlan, heardNow, townFiles, townMusic, townMusicNow, townSoloAt, townSoloOf } = await import(
   "../src/music.ts"
 );
 const settle = () => new Promise((r) => setTimeout(r, 0));
@@ -158,6 +172,7 @@ describe("the plan from themes.json", () => {
 
 describe("the town's loading bar (Nov 12: every theme fetched, none decoded)", () => {
   const ALL = ["/music/grex-intro.mp3", "/music/grex-loop.mp3", "/music/bigboy-loop.mp3", "/music/zebra-intro.mp3", "/music/zebra-loop.mp3"];
+  const TOWN = ["/music/town-loop.mp3", "/music/town-solo-a.mp3", "/music/town-solo-b.mp3"];
   beforeEach(() => {
     preFetched.length = 0;
     files.length = 0;
@@ -184,9 +199,11 @@ describe("the town's loading bar (Nov 12: every theme fetched, none decoded)", (
     failOnce.add("/music/bigboy-loop.mp3");
     const shares: number[] = [];
     await preloadMusic((s) => shares.push(s));
-    expect(preFetched.sort()).toEqual([...ALL].sort());
+    // (The town's own first, Nov 15: its theme, then its solos in their order; the bosses' after.)
+    expect(preFetched.slice(0, 3)).toEqual(TOWN);
+    expect(preFetched.sort()).toEqual([...TOWN, ...ALL].sort());
     expect(files, "nothing decoded").toEqual([]);
-    expect(shares).toEqual([0.2, 0.4, 0.6, 0.8, 1]);
+    expect(shares).toEqual([1, 2, 3, 4, 5, 6, 7, 8].map((n) => n / 8));
     preFetched.length = 0;
     await preloadMusic();
     expect(preFetched).toEqual(["/music/bigboy-loop.mp3"]);
@@ -951,5 +968,281 @@ describe("never two sources of one theme sounding past the handover (Nov 14)", (
     roomMusic("zebra");
     await settle();
     for (const s of first) expect(s.stoppedAt).toBe(630 + MUSIC.endFadeMs / 1000);
+  });
+});
+
+describe("the town's own theme, with its two piano solos slotted in (Eric, Nov 14-15)", () => {
+  const L = 178.604646;
+  const S = 37.209313;
+  const PAD = 0.5;
+  const town = THEMES.town;
+  const TOWN_FILES = ["/music/town-loop.mp3", "/music/town-solo-a.mp3", "/music/town-solo-b.mp3"];
+  /** The town opened at `t` (its first frame's music): the theme decoded and started, then its solos decoded. */
+  async function open(t = 10) {
+    ctx.currentTime = t;
+    townMusic(true);
+    await vi.advanceTimersByTimeAsync(0);
+    return t + MUSIC.startDelayS;
+  }
+  /** The audio clock at `t`, and the timers run (the tick that puts a solo on the clock, TOWN_MUSIC.aheadS before it: a run's length away). */
+  async function at(t: number) {
+    ctx.currentTime = t;
+    await vi.advanceTimersByTimeAsync(20 * 60_000);
+  }
+  const bufOf = (s: FakeSource) => (s.buffer as { url: string }).url;
+  const named = (name: string) => ctx.sources.filter((s) => bufOf(s) === `/music/${name}.mp3`);
+  beforeEach(() => {
+    vi.useFakeTimers();
+    ctx.sources = [];
+    ctx.gains = [];
+    files.length = 0;
+    fetched.length = 0;
+    forgot.length = 0;
+    bufs.clear();
+    sound.muted = false;
+    sound.hidden = false;
+    setMusicOn(true);
+  });
+  afterEach(async () => {
+    townMusic(false);
+    roomMusic(null);
+    splashDone();
+    bossMusic(null);
+    await vi.advanceTimersByTimeAsync(MUSIC.endFadeMs + 300);
+    vi.useRealTimers();
+  });
+
+  it("the solos by their turn: a, b, a… (TOWN_MUSIC.order); each after passesPerSolo passes; the town's pieces, theme first", () => {
+    expect(TOWN_MUSIC.passesPerSolo).toBe(3);
+    expect([0, 1, 2, 3].map((n) => townSoloOf(town, n)?.id)).toEqual(["a", "b", "a", "b"]);
+    expect(townSoloAt(town, { at: 10, passes: 3, turn: 0 })).toBeCloseTo(10 + 3 * L, 9);
+    expect(townFiles(THEMES)).toEqual(["/music/town-loop.mp3", "/music/town-solo-a.mp3", "/music/town-solo-b.mp3"]);
+  });
+
+  it("the theme loops as a boss loop does: from the pad, between pad and pad + loopSeconds, at MUSIC.volume; then its solos are decoded", async () => {
+    const t0 = await open(10);
+    expect(fetched).toEqual(["/music/town-loop.mp3", "/music/town-solo-a.mp3", "/music/town-solo-b.mp3"]);
+    const [theme] = ctx.sources;
+    expect(ctx.sources).toHaveLength(1);
+    expect(bufOf(theme!)).toBe("/music/town-loop.mp3");
+    expect(theme!.started).toEqual([t0, PAD]);
+    expect([theme!.loop, theme!.loopStart, theme!.loopEnd]).toEqual([true, PAD, PAD + L]);
+    expect(theme!.stoppedAt).toBeNull();
+    expect(ctx.gains[0]!.gain.value).toBe(MUSIC.volume);
+    expect(townMusicNow()).toEqual({ level: MUSIC.volume });
+  });
+
+  it("after 3 passes the solo starts exactly at the pass's end, the theme stopping there; the theme comes back exactly `seconds` later from its top, the solo ringing out over it", async () => {
+    const t0 = await open(10);
+    const soloAt = t0 + 3 * L;
+    // (Not yet: the solo goes on the clock TOWN_MUSIC.aheadS before it.)
+    await at(soloAt - TOWN_MUSIC.aheadS - 5);
+    expect(ctx.sources).toHaveLength(1);
+    await at(soloAt - TOWN_MUSIC.aheadS + 1);
+    const [first, solo, back] = ctx.sources;
+    expect(ctx.sources).toHaveLength(3);
+    expect(first!.stoppedAt).toBe(soloAt);
+    expect(bufOf(solo!)).toBe("/music/town-solo-a.mp3");
+    expect(solo!.started).toEqual([soloAt, 0]);
+    expect(solo!.loop).toBe(false);
+    // (Never stopped: its file plays to its end, 4 s past the theme's return.)
+    expect(solo!.stoppedAt).toBeNull();
+    expect(bufOf(back!)).toBe("/music/town-loop.mp3");
+    expect(back!.started).toEqual([soloAt + S, PAD]);
+    expect([back!.loop, back!.loopStart, back!.loopEnd]).toEqual([true, PAD, PAD + L]);
+    expect(back!.stoppedAt).toBeNull();
+    // All on one gain (the solo at the theme's level: the files are mastered alike).
+    expect(new Set(ctx.sources.map((s) => s.to)).size).toBe(1);
+  });
+
+  it("the solos take turns, a, b, a, each after 3 more passes of the theme", async () => {
+    let run = await open(10);
+    const solos: [string, number][] = [];
+    for (let k = 0; k < 3; k++) {
+      const soloAt = run + 3 * L;
+      await at(soloAt - TOWN_MUSIC.aheadS + 1);
+      const s = ctx.sources.at(-2)!;
+      solos.push([bufOf(s), s.started![0]]);
+      expect(s.started![0]).toBeCloseTo(soloAt, 9);
+      run = soloAt + S;
+      expect(ctx.sources.at(-1)!.started![0]).toBeCloseTo(run, 9);
+    }
+    expect(solos.map(([u]) => u)).toEqual(["/music/town-solo-a.mp3", "/music/town-solo-b.mp3", "/music/town-solo-a.mp3"]);
+    // (Nothing put on the clock twice.)
+    expect(ctx.sources).toHaveLength(1 + 3 * 2);
+  });
+
+  it("a solo not decoded in time: the theme plays one more pass (no break), the solo at that pass's end", async () => {
+    loadFails.add("/music/town-solo-a.mp3");
+    const t0 = await open(10);
+    await at(t0 + 3 * L - TOWN_MUSIC.aheadS + 1);
+    expect(named("town-solo-a")).toHaveLength(0);
+    expect(ctx.sources[0]!.stoppedAt, "the theme loops on").toBeNull();
+    // (Asked for again by that tick: in for the next pass's end.)
+    await at(t0 + 4 * L - TOWN_MUSIC.aheadS + 1);
+    const [solo] = named("town-solo-a");
+    expect(solo!.started).toEqual([t0 + 4 * L, 0]);
+    expect(ctx.sources[0]!.stoppedAt).toBe(t0 + 4 * L);
+    expect(ctx.sources.at(-1)!.started).toEqual([t0 + 4 * L + S, PAD]);
+  });
+
+  it("a new audio context mid-solo: the solo picks up where it is heard, the theme's return at its own moment; the old one fades out", async () => {
+    const t0 = await open(10);
+    // (The wall clock as the audio clock read 10.)
+    const w0 = Date.now();
+    const soloAt = t0 + 3 * L;
+    await at(soloAt - TOWN_MUSIC.aheadS + 1);
+    const old = [...ctx.sources];
+    // (10 s into the solo, on the old clock and on the wall alike.)
+    ctx.currentTime = soloAt + 10;
+    ctx.state = "running";
+    vi.setSystemTime(w0 + (soloAt + 10 - 10) * 1000);
+    const next = fakeContext(0);
+    next.state = "suspended";
+    busCtx = next;
+    try {
+      const keep = rebuilt[0]!(ctx);
+      expect(keep).toBeGreaterThanOrEqual(MUSIC.handoffWaitMs + MUSIC.handoffMs);
+      next.state = "running";
+      next.currentTime = 0.5;
+      ctx.currentTime += 0.5;
+      vi.setSystemTime(Date.now() + 500);
+      await vi.advanceTimersByTimeAsync(20);
+      const from = 0.5 + MUSIC.startDelayS;
+      const [solo, back] = next.sources;
+      expect(next.sources).toHaveLength(2);
+      expect(bufOf(solo!)).toBe("/music/town-solo-a.mp3");
+      expect(solo!.started![0]).toBeCloseTo(from, 6);
+      expect(solo!.started![1]).toBeCloseTo(10.5 + MUSIC.startDelayS, 6);
+      // (The theme's return: `seconds` after the solo started, as heard; from its top, looping.)
+      expect(bufOf(back!)).toBe("/music/town-loop.mp3");
+      expect(back!.started![0]).toBeCloseTo(from + S - (10.5 + MUSIC.startDelayS), 6);
+      expect(back!.started![1]).toBe(PAD);
+      expect([back!.loop, back!.loopStart, back!.loopEnd]).toEqual([true, PAD, PAD + L]);
+      // The old one: everything stopped by the handover's fade.
+      const handAt = soloAt + 10.5 + MUSIC.startDelayS;
+      for (const s of old) expect(s.stoppedAt!).toBeLessThanOrEqual(handAt + MUSIC.handoffMs / 1000 + 1e-9);
+      expect(townMusicNow()).toEqual({ level: MUSIC.volume });
+    } finally {
+      townMusic(false);
+      busCtx = ctx;
+      ctx.state = undefined;
+    }
+  });
+
+  it("stopped mid-solo (a room with its own theme): the solo is the music, faded out with it; out of the room, the theme from its top, and the next solo is b", async () => {
+    const t0 = await open(10);
+    const soloAt = t0 + 3 * L;
+    await at(soloAt - TOWN_MUSIC.aheadS + 1);
+    const [, solo, back] = ctx.sources;
+    ctx.currentTime = soloAt + 10;
+    roomMusic("zebra");
+    const out = soloAt + 10 + MUSIC.endFadeMs / 1000;
+    expect(ctx.gains[0]!.gain.lastRamp).toEqual([0, out]);
+    expect(solo!.stoppedAt).toBe(out);
+    // (The theme's return was to come after the fade: it never sounds.)
+    expect(back!.stoppedAt).toBe(out);
+    expect(back!.stoppedAt!).toBeLessThan(back!.started![0]);
+    expect(townMusicNow()).toBeNull();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(roomMusicNow()?.boss).toBe("zebra");
+    // Out of the room: the theme from its top, now.
+    ctx.currentTime = soloAt + 60;
+    const n = ctx.sources.length;
+    roomMusic(null);
+    await vi.advanceTimersByTimeAsync(0);
+    const again = ctx.sources.slice(n).filter((s) => bufOf(s) === "/music/town-loop.mp3");
+    expect(again).toHaveLength(1);
+    expect(again[0]!.started).toEqual([soloAt + 60 + MUSIC.startDelayS, PAD]);
+    expect(townMusicNow()).toEqual({ level: MUSIC.volume });
+    // (Its solos weren't fetched again.)
+    expect(fetched.filter((u) => u.includes("town"))).toHaveLength(3);
+    const t1 = soloAt + 60 + MUSIC.startDelayS;
+    await at(t1 + 3 * L - TOWN_MUSIC.aheadS + 1);
+    expect(bufOf(ctx.sources.at(-2)!)).toBe("/music/town-solo-b.mp3");
+  });
+
+  it("stopped as a solo was due (put on the clock, not yet heard): the last pass stops by its end, never past it, and that solo is still next", async () => {
+    const t0 = await open(10);
+    const soloAt = t0 + 3 * L;
+    await at(soloAt - TOWN_MUSIC.aheadS + 1);
+    const [first, solo] = ctx.sources;
+    // (0.5 s before the solo: the fade's 1.5 s would run past the pass's end.)
+    ctx.currentTime = soloAt - 0.5;
+    roomMusic("zebra");
+    expect(first!.stoppedAt).toBe(soloAt);
+    expect(solo!.stoppedAt).toBeCloseTo(soloAt - 0.5 + MUSIC.endFadeMs / 1000, 9);
+    roomMusic(null);
+    await vi.advanceTimersByTimeAsync(0);
+    const t1 = ctx.sources.at(-1)!.started![0];
+    await at(t1 + 3 * L - TOWN_MUSIC.aheadS + 1);
+    expect(bufOf(ctx.sources.at(-2)!)).toBe("/music/town-solo-a.mp3");
+  });
+
+  it("a room with no theme of its own (a shop): the town's plays on, untouched", async () => {
+    await open(10);
+    roomMusic("bakery");
+    await vi.advanceTimersByTimeAsync(0);
+    expect(ctx.sources).toHaveLength(1);
+    expect(ctx.sources[0]!.stoppedAt).toBeNull();
+    expect(townMusicNow()).not.toBeNull();
+  });
+
+  it("a challenge's splash takes over at once; called off (no battle), the town's comes back from its top; a battle: none", async () => {
+    await open(10);
+    ctx.currentTime = 50;
+    void splashMusic("grex");
+    expect(ctx.sources[0]!.stoppedAt).toBe(50 + MUSIC.endFadeMs / 1000);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(townMusicNow()).toBeNull();
+    ctx.currentTime = 60;
+    splashDone();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(townMusicNow()).not.toBeNull();
+    expect(ctx.sources.at(-1)!.started).toEqual([60 + MUSIC.startDelayS, PAD]);
+    bossMusic({ key: "town-battle", boss: "grex", live: false });
+    expect(townMusicNow()).toBeNull();
+  });
+
+  it("the town closes: it fades out and its pieces are let go; open again, the solos' turns start from a", async () => {
+    const t0 = await open(10);
+    await at(t0 + 3 * L - TOWN_MUSIC.aheadS + 1);
+    ctx.currentTime = t0 + 3 * L + S + 5;
+    townMusic(false);
+    expect(townMusicNow()).toBeNull();
+    await vi.advanceTimersByTimeAsync(MUSIC.endFadeMs + 300);
+    expect(forgot.sort()).toEqual(["/music/town-loop.mp3", "/music/town-solo-a.mp3", "/music/town-solo-b.mp3"]);
+    const t1 = await open(2000);
+    await at(t1 + 3 * L - TOWN_MUSIC.aheadS + 1);
+    expect(bufOf(ctx.sources.at(-2)!)).toBe("/music/town-solo-a.mp3");
+  });
+
+  it("Music off (or Sound off): nothing fetched, nothing plays; on again, the theme starts; off while it plays, it fades to nothing and keeps its place", async () => {
+    setMusicOn(false);
+    await open(10);
+    sound.muted = true;
+    setMusicOn(true);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(fetched).toEqual([]);
+    expect(ctx.sources).toHaveLength(0);
+    sound.muted = false;
+    sound.muteListeners.forEach((l) => l());
+    await vi.advanceTimersByTimeAsync(0);
+    expect(ctx.sources).toHaveLength(1);
+    ctx.currentTime = 30;
+    setMusicOn(false);
+    expect(ctx.gains[0]!.gain.lastRamp).toEqual([0, 30 + MUSIC.fadeMs / 1000]);
+    expect(ctx.sources[0]!.stoppedAt).toBeNull();
+    setMusicOn(true);
+    expect(ctx.gains[0]!.gain.lastRamp).toEqual([MUSIC.volume, 30 + MUSIC.fadeMs / 1000]);
+    expect(ctx.sources).toHaveLength(1);
+  });
+
+  it("the town's loading: preloadMusic waits for the theme and its solos, then fetches only the bosses' (each piece once)", async () => {
+    preFetched.length = 0;
+    await open(10);
+    await preloadMusic();
+    expect(files.filter((u) => u.includes("town"))).toEqual(TOWN_FILES);
+    expect(preFetched.filter((u) => u.includes("town")), "the town's, decoded by its player, not fetched again").toEqual([]);
   });
 });
