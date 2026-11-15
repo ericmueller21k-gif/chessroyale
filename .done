@@ -1,1 +1,1 @@
-flaky-fairplay-65: fixed in the test (fresh browser = new context); 20/20 phone and desktop; ban-gate race left in .findings.md for the director; guard test edit needs Eric's OK
+flaky-fairplay-65: fixed in the test (fresh browser = new context, old tab closed); --trace off 20/20 phone and desktop (before 1/20 each); ban-gate race written up in the decision note; guard test edit needs Eric's OK
