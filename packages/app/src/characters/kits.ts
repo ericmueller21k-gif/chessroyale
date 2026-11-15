@@ -124,8 +124,8 @@ export interface BossKit extends BeatLines {
   /** The part of a frame a portrait shows, and from which animation and frame. */
   portrait: { x: number; y: number; w: number; h: number; anim: string; frame: number };
   /**
-   * A figure whose look changes in the battle (the Hidden Boss: his age, his suit): its portrait is this part of its bar's bust (`bar`)
-   * as the bust is drawn now (the loop his figure rests in, his suit), so a computer's face follows him as a phone's bust does
+   * A figure whose look changes in the battle (the Hidden Boss: his age, his final form): its portrait is this part of its bar's bust (`bar`)
+   * as the bust is drawn now (the loop his figure rests in, his final form), so a computer's face follows him as a phone's bust does
    * (BossFace, Nov 14). Undefined: `portrait`, one picture.
    */
   barFace?: { x: number; y: number; w: number; h: number };
@@ -172,8 +172,8 @@ export interface BossKit extends BeatLines {
   /** A figure that now and then changes how it rests (Moo hugs the moon, then sits on it): see characters/stance.ts. */
   rest?: Stance;
   /**
-   * Wears a suit from a moment on (the Hidden Boss, from his transformation: BossCharacter's `setSuitAt`): the same frames, their
-   * parts swapped for the suit's (recluse.ts, `suited`).
+   * Changes its look from a moment on (the Hidden Boss's final form, from his transformation: BossCharacter's `setSuitAt`; the name
+   * is round 3b's suit): the same frames, their parts swapped for the final form's (recluse.ts, `coated`).
    */
   suit?: boolean;
   /**
@@ -1083,11 +1083,11 @@ export const BOSS_KITS: Record<string, BossKit> = {
     // (His real "Best by test.", word for word: only when he's White and the battle's game opened 1.e4.)
     lineOf: (beat, boss) => (beat === "entrance" && boss.crowdSide === "b" && boss.board.history[0] === "e2e4" ? RECLUSE_LINES.introE4 : undefined),
     portrait: { ...RECLUSE_PORTRAIT, anim: "idle", frame: 0 },
-    // (A computer's face: his bust's, as it's drawn now, so it wears his suit in phase 2.)
+    // (A computer's face: his bust's, as it's drawn now, so it wears his final form in phase 2.)
     barFace: RECLUSE_BUST_PORTRAIT,
     // (The bust is 50 px wide: the wider box on a phone, as Sawyer's and Wrangler's.)
     wide: true,
-    // (Phase 2: his suit and helmet, from his transformation on.)
+    // (Phase 2: his final form, from his transformation on.)
     suit: true,
     // (His words above his head as it's drawn now, beside the board: kneeling as he mumbles, beaten.)
     heads: RECLUSE_HEADS,

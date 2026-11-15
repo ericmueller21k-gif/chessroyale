@@ -531,9 +531,10 @@ function armPart(a: Age, sh: Pt, el: Pt, wr: Pt): { name: string; at: Pt } {
 
 // ---- Poses.
 
-/** The same frame as today's sprite: room above his head, his middle on x 46, the ground at y 128. */
+/** The same frame as today's sprite: room above his head (his, from his feet: his final form's hair, Nov 15), his middle on x 46,
+ * the ground at y 128. */
 const OX = -14;
-const OY = 14;
+const OY = RECLUSE.foot[1] - 128;
 const W = 64;
 const H = OY + 128 + 4;
 const HEAD_X = 34;

@@ -1159,7 +1159,7 @@ export class SoloMatch implements GameView {
 
   /**
    * His phase change (PHASE_CHANGE, about 23 s; not skippable, like a boss's intro): his transformation by the book's light,
-   * carrying on from his cutscene (the white-out, his suit, his visor up for his line), his leap and the split on the music's drop,
+   * carrying on from his cutscene (the white-out, his final form, his first line), his leap and the split on the music's drop,
    * the book back in his hands, the shuffle, his leap back. The God King stays in his place, greyed (he says nothing in phase 2,
    * and can't be called). Phase 2's boards are set up now (each its own Chess960 start, from the battle's seed), so the
    * shuffle shows where they go; their clocks start after it, and a countdown on them (startSimul). `fromFall`: after phase 1's fall, whose mumbling carries
@@ -1199,7 +1199,7 @@ export class SoloMatch implements GameView {
     // (The slow move's sound made ahead, off the page, before play begins.)
     warmSounds(["recluseSlow", "recluseSpark", "recluseArc"]);
     // Where he stands: empty while the board draws him (from the start, as in his cutscene), and once he's back he rests in
-    // phase 2's idle. His suit from the white-out on, for the rest of the fight.
+    // phase 2's idle. His final form from the white-out on, for the rest of the fight.
     setFigureRun(phaseChangeRun(at));
     setSuitAt(at + PHASE_CHANGE.whiteFull);
     // (The board cracks into four at `splitAt`: his music's drop is put there, music.ts.)

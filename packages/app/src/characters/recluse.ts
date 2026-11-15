@@ -75,36 +75,33 @@ export const RECLUSE_PALETTE: Record<string, string> = {
   "8": "#fff3b8", // the spell's glow (and the glint in his eyes): pale, gold, ember
   "9": "#ffc44a",
   "0": "#ff7a3c",
-  // The suit (MOCKUP round 3b, Nov 14): a matte near-black navy, dark to light; slim charcoal panels, dark to light; the
-  // gloves and boots; the glowing traces, red and cool blue, and their tiny yellow nodes; the visor's glass.
-  n: "#090c17",
-  u: "#111829",
-  v: "#1b2540",
-  z: "#2b3a5c",
-  R: "#121319",
-  S: "#1d1f29",
-  P: "#2a2d39",
-  I: "#3d4152",
-  Z: "#05070d",
-  f: "#d83a4c",
-  g: "#ff8a95",
-  i: "#ffd84a",
-  p: "#070a14",
-  "#": "#131d36",
-  "=": "#5ab4e6",
-  // His glowing eyes (MOCKUP, Nov 14): the core, the glow, the glow on his skin.
+  // His glowing eyes (Nov 14): the core, the glow, the glow on his skin.
   "!": "#f2fdff",
   "+": "#38b6ff",
   "(": "#38b6ff99",
   ")": "#38b6ff33",
   "[": "#7fd2ffcc",
+  // His final form (round 4, Nov 15): the black trench coat, dark to light, its blue lining, the lining in shadow; the
+  // aura's light on his hair; the aura, outer and inner; its bolts, core and glow; the binary helix's glyphs, front to back.
+  "<": "#08080c",
+  ">": "#121219",
+  "{": "#1e1f29",
+  "}": "#363849",
+  "~": "#1f4aa8",
+  "-": "#0d1a3a",
+  "^": "#8fd4ff",
+  "&": "#5cc6ff7a",
+  "%": "#40aaff48",
+  "'": "#40aaff24",
+  "*": "#f4fdff",
+  "?": "#3ea2f0",
+  ";": "#2a6fc0b0",
 };
 
 type Pt = readonly [number, number];
 const SHIRT = "qrst";
 const NAVY = "NMLl";
-const SUIT_PANEL = "RSPI";
-const SUIT_BLUE = "nuvz";
+const COAT = "<>>{}";
 
 const ramp = (r: string, l: number) => r[Math.max(0, Math.min(r.length - 1, Math.floor(l * r.length)))]!;
 /** Fills every pixel of `cv` (its top-left at drawing-space (x0, y0)) inside `inside` with `key(x, y)`, in drawing space. */
@@ -211,7 +208,7 @@ const EYES: Record<Eyes, { l: readonly string[]; r?: readonly string[] }> = {
   glare: { l: ["bbbb", "wxxw", "wxxw", "cbbc"] },
   // Possessed (the light taking him, his transformation, Eric, Nov 14): wide open, totally white, no iris.
   possessed: { l: ["wwww", "wwww", "wwww", "bwwb"] },
-  // Glowing (the suit, visor up: Eric, Nov 14, "his eyes glow bright electric blue"): a bright core in the glow's color, a
+  // Glowing (his final form: Eric, Nov 14, "his eyes glow bright electric blue"): a bright core in the glow's color, a
   // soft glow round each and a thin line of light down each cheek (`eyeGlow`, see-through, over the face).
   glow: { l: ["b++b", "+!!+", "+!!+", "b++b"] },
 };
@@ -260,14 +257,17 @@ const WIND: Record<1 | 2 | 3, readonly string[]> = {
 };
 
 /** A head: a face, the hair in the wind or not, and phase 2's deeper shadows and the glint in his eyes. */
-function head(face: Face, wind: Wind, dark: boolean): Part {
+function head(face: Face, wind: Wind, dark: boolean, rise = false): Part {
   const cv: Canvas = [...Array.from({ length: LIFT }, () => ".".repeat(25)), ...HEAD_BASE].map((r) => [...r]);
   const put = (rows: readonly string[], x: number, y: number) => stamp(cv, 0, -LIFT, rows, x, y);
   // The nose: long and straight, its bridge lit, its shade down our right; the tip and the nostrils.
   put(["c", "d", "e", "e", "d", "d", "d", "d"], 12, 12);
   put(["c", "b", "b", "b", "b", "b", "b", "b"], 13, 12);
   put([".deb.", "bdddb", ".bab."], 10, 20);
-  if (wind) {
+  if (rise) {
+    // (His final form: the loose lock lifted off his brow; the rest rises behind his head, `risenHair`.)
+    put(["..j", ".hJ"], 9, 6);
+  } else if (wind) {
     put(WIND[wind], 0, -LIFT);
     put(["h", "j"], wind === 2 ? 0 : 24, 6);
     put(["..j", ".hJ"], 9, 6);
@@ -383,7 +383,7 @@ function boxOf(pts: readonly Pt[], pad: number): { x0: number; y0: number; w: nu
  * front of the book he clutches). `full`: a fuller forearm, for his free arm hanging in full view (the book arm's
  * forearm is mostly behind the book or across it).
  */
-function paintArm(sh: Pt, el: Pt, wr: Pt, fore: boolean, full = false, suit = false): Part {
+function paintArm(sh: Pt, el: Pt, wr: Pt, fore: boolean, full = false, coat = false): Part {
   const cuff = 0.36;
   const b = boxOf([sh, el, wr], 6);
   const cv = canvas(b.w, b.h);
@@ -394,18 +394,21 @@ function paintArm(sh: Pt, el: Pt, wr: Pt, fore: boolean, full = false, suit = fa
       const lo = nearest(p, el, wr);
       const rUp = 3.5 - up.t * 0.5;
       const inCuff = lo.t < cuff;
-      const rLo = inCuff ? 3.7 - lo.t * 0.6 : full ? 2.8 - lo.t * 0.4 : 2.2 - lo.t * 0.3;
+      const rLo = coat ? 3.5 - lo.t * 0.6 : inCuff ? 3.7 - lo.t * 0.6 : full ? 2.8 - lo.t * 0.4 : 2.2 - lo.t * 0.3;
       const inUp = !fore && up.d <= rUp;
       const inLo = lo.d <= rLo;
       if (!inUp && !inLo) continue;
       const s = inLo && (!inUp || lo.d - rLo < up.d - rUp) ? lo : up;
       const rr = s === lo ? rLo : rUp;
       const l = 0.6 - 0.5 * (s.nx / rr) - 0.4 * (s.ny / rr);
-      // (The suit: a charcoal panel over the upper arm, a dark seam each end of the cuff where his sleeve was rolled, the
-      // forearm dark navy.)
-      if (s === lo && !inCuff) cv[y]![x] = ramp(suit ? "nuv" : "bcd", l);
-      else if (s === lo) cv[y]![x] = lo.t > cuff - 0.1 || lo.t < 0.06 ? (suit ? "Z" : "q") : ramp(suit ? "nuv" : "rst", l + 0.1);
-      else cv[y]![x] = ramp(suit ? SUIT_PANEL : SHIRT, l - 0.12);
+      // (The coat: its sleeve down to the wrist, a strap round the cuff.)
+      if (coat) {
+        cv[y]![x] = s === lo && lo.t > 0.8 && lo.t < 0.9 ? "<" : ramp(COAT, l - (s === up ? 0.08 : 0));
+        continue;
+      }
+      if (s === lo && !inCuff) cv[y]![x] = ramp("bcd", l);
+      else if (s === lo) cv[y]![x] = lo.t > cuff - 0.1 || lo.t < 0.06 ? "q" : ramp("rst", l + 0.1);
+      else cv[y]![x] = ramp(SHIRT, l - 0.12);
     }
   return { grid: toGrid(cv) };
 }
@@ -564,147 +567,7 @@ function armPart(sh: Pt, el: Pt, wr: Pt, fore = false, full = false): { name: st
   return { name, at };
 }
 
-// ---- The suit (a MOCKUP, round 3b, Eric and the director, Nov 14: "a full exoskeleton-style futuristic armor… don't make it
-// look like war… more like computer networking, that sort of wiring… a matching full-head helmet… the full front visor flips
-// up… fairly fit to his body"; darker, its own look). Fitted, a matte near-black navy with slim charcoal panels, thin glowing
-// traces in red and cool blue, tiny yellow nodes; an angular helmet of its own, one smooth visor over his whole face that
-// flips up into the dome. Every part has its suit version, the same size and place (`suitName`), so any pose wears it by its
-// part names (`suitFrame`).
-
-export type Visor = "down" | "mid" | "up";
-const GLOVE: Record<string, string> = { a: "Z", b: "Z", c: "n", d: "u", e: "v" };
-const BOOT: Record<string, string> = { D: "Z", E: "n", F: "u", G: "=" };
 const toCanvas = (p: Part): Canvas => p.grid.map((r) => [...r]);
-const remap = (p: Part, map: Record<string, string>): Part => ({ ...p, grid: p.grid.map((r) => [...r].map((c) => map[c] ?? c).join("")) });
-/** Thin traces (lines in `line`, their ends a tiny node in `node`) on a canvas whose top-left is drawing (x0, y0), only over its drawn pixels. */
-function traces(cv: Canvas, x0: number, y0: number, paths: readonly (readonly Pt[])[], line = "f", node = "i"): void {
-  const on = (x: number, y: number) => {
-    const k = cv[y - y0]?.[x - x0];
-    return k !== undefined && k !== "." && k !== "k";
-  };
-  const put = (x: number, y: number, k: string) => on(x, y) && (cv[y - y0]![x - x0] = k);
-  for (const path of paths) {
-    for (let i = 1; i < path.length; i++) {
-      const [ax, ay] = path[i - 1]!;
-      const [bx, by] = path[i]!;
-      const n = Math.max(Math.abs(bx - ax), Math.abs(by - ay)) || 1;
-      for (let t = 0; t <= n; t++) put(Math.round(ax + ((bx - ax) * t) / n), Math.round(ay + ((by - ay) * t) / n), line);
-    }
-    const end = path[path.length - 1]!;
-    if (node) put(Math.round(end[0]), Math.round(end[1]), node);
-  }
-}
-/** The suit's torso: dark navy down the middle, slim charcoal panels at his sides and shoulders split by seams, a high collar;
- * the circuit: a cool-blue spine down the middle, red runs branching to his sides, a tiny node at each end. */
-function suitTorso(): Part {
-  const X0 = 30;
-  const Y0 = 26;
-  const cv = toCanvas(torso());
-  const NECK: Record<string, string> = { a: "n", b: "u", c: "u", d: "v", e: "v", E: "Z", D: "Z", O: "n", Y: "=", y: "i" };
-  cv.forEach((row, y) =>
-    row.forEach((k, x) => {
-      const X = x + X0;
-      const Y = y + Y0;
-      const i = SHIRT.indexOf(k);
-      if (i >= 0) {
-        const half = Y < 36 ? 4.5 : 8.6 - (Y - 36) * 0.07;
-        const d = Math.abs(X + 0.5 - 46) - half;
-        // (A seam where the side panels meet the middle, and across them every 9 rows: segmented.)
-        row[x] = d > 0 && d < 1 ? "Z" : d > 0 ? (Y % 9 === 0 ? "Z" : SUIT_PANEL[i]!) : SUIT_BLUE[Math.min(2, i)]!;
-      } else if (NECK[k]) row[x] = NECK[k]!;
-    }),
-  );
-  traces(cv, X0, Y0, [[[46, 37], [46, 69]]], "=");
-  traces(cv, X0, Y0, [
-    [[46, 42], [43, 45], [43, 51], [40, 54]],
-    [[46, 47], [49, 50], [49, 57], [52, 60]],
-    [[46, 60], [42, 64]],
-    [[46, 54], [50, 54]],
-  ]);
-  stamp(cv, X0, Y0, ["i"], 46, 36);
-  return { grid: toGrid(cv) };
-}
-/** The suit's legs: dark navy, a thin red glowing line down the outside of each, a cool-blue trace down the front to a tiny
- * node at the knee, a seam across each knee. */
-function suitLegs(stance: Stance): Part {
-  const { part, at } = legsOf(stance);
-  const cv = toCanvas(remap(part, { N: "n", M: "u", L: "v", l: "u" }));
-  const dy = STANCE_DROP[stance];
-  const legsPts = STANCE_LEGS[stance];
-  // Circuit runs, not stripes: down the front of each thigh to a node above the knee (cool blue); down the outside of each
-  // thigh, jogging in to a node (red); down each shin, jogging out to a node (red).
-  legsPts.forEach((leg, i) => {
-    const s1 = i ? -1 : 1;
-    const [hx, hy] = leg[0]!;
-    const [kx, ky] = leg[1]!;
-    const mid = (u: number): Pt => [hx + (kx - hx) * u, hy + (ky - hy) * u];
-    traces(cv, at[0], at[1], [[[hx + s1 * 1.4, hy + 7], [kx + s1 * 1.4, ky - 3]]], "=");
-    const m = mid(0.35);
-    const m2 = mid(0.7);
-    traces(cv, at[0], at[1], [[[m[0] - s1 * 3.4, m[1]], [m2[0] - s1 * 3.4, m2[1]], [m2[0] - s1 * 1.6, m2[1] + 2]]]);
-    if (leg[2]) {
-      const [ax, ay] = leg[2]!;
-      traces(cv, at[0], at[1], [[[kx - s1 * 0.5, ky + 4], [kx + (ax - kx) * 0.45 - s1 * 0.5, ky + (ay - ky) * 0.45], [kx + (ax - kx) * 0.45 - s1 * 2.5, ky + (ay - ky) * 0.45 + 2]]]);
-    }
-  });
-  if (stance !== "kneel")
-    for (const leg of legsPts) {
-      const [kx, ky] = leg[1]!;
-      traces(cv, at[0], at[1], [[[kx - 3, ky + 2], [kx + 3, ky + 2]]], "Z", "");
-    }
-  return { grid: toGrid(cv) };
-}
-/** Facing his head part's own pixels (25 x 35): the helmet's shell (angular, faceted, his long head's proportions), the face
- * opening, the visor. */
-const SHELL = inPoly([[8.4, 1.2], [16.6, 1.2], [21.6, 4.6], [24.2, 11.5], [24.2, 19.5], [22.4, 27.5], [16.8, 34.8], [8.2, 34.8], [2.6, 27.5], [0.8, 19.5], [0.8, 11.5], [3.4, 4.6]]);
-const OPENING = inPoly([[6.6, 13.6], [18.4, 13.6], [20.8, 16.6], [20.6, 21], [19.2, 27.5], [15.4, 33.8], [9.6, 33.8], [5.8, 27.5], [4.4, 21], [4.2, 16.6]]);
-/** The visor's glass down over his face: near black with a cool-blue tint low down, one long highlight, its rim lit. */
-function glass(x: number, y: number): string {
-  if (!OPENING(x, y + 1) || !OPENING(x - 1, y) || !OPENING(x + 1, y)) return "#";
-  const d = x - 7 + (y - 15) * 0.45;
-  if (d >= 0 && d < 1.2 && y < 24) return "=";
-  if (d >= 1.6 && d < 2.4 && y < 21) return "#";
-  return y < 17 ? "Z" : y > 29 || x < 7 ? "#" : "p";
-}
-/** His head in the helmet (`visor`: down over his face, on its way up, up in the dome): the face drawn as ever, inside. */
-function helmet(face: Face, dark: boolean, visor: Visor): Part {
-  const cv = toCanvas(head(face, 0, dark));
-  for (let y = 0; y < cv.length; y++)
-    for (let x = 0; x < 25; x++) {
-      if (!SHELL(x, y)) {
-        cv[y]![x] = ".";
-        continue;
-      }
-      if (OPENING(x, y)) {
-        if ("HhjJ".includes(cv[y]![x]!)) cv[y]![x] = "n";
-        continue;
-      }
-      // Facets: the crown's top plate lit, the side plates darker, the right side darkest (lit from the top left).
-      const top = y < 6 + Math.abs(x + 0.5 - 12.5) * -0.2 && Math.abs(x + 0.5 - 12.5) < 5;
-      const side = x + 0.5 < 5 + (y > 12 ? 0 : (12 - y) * 0.35) ? "L" : x + 0.5 > 20 - (y > 12 ? 0 : (12 - y) * 0.35) ? "R" : "M";
-      cv[y]![x] = top ? "z" : side === "L" ? "v" : side === "R" ? "n" : y < 13 ? "v" : "u";
-    }
-  // The seams between the plates and round the opening; a red run down each side jogging in to a node; a short cool-blue run
-  // over the brow; one tiny node at his temple.
-  traces(cv, 0, 0, [[[8, 2], [6, 7], [4, 12]], [[16, 2], [19, 7], [20, 12]], [[7, 6], [18, 6]]], "Z", "");
-  for (let y = 0; y < cv.length; y++)
-    for (let x = 0; x < 25; x++) if (SHELL(x, y) && !OPENING(x, y) && (OPENING(x + 1, y) || OPENING(x - 1, y) || OPENING(x, y + 1) || OPENING(x, y - 1))) cv[y]![x] = "Z";
-  traces(cv, 0, 0, [[[2, 12], [2, 18], [4, 20]], [[23, 14], [23, 21], [21, 23]]], "f", "");
-  traces(cv, 0, 0, [[[9, 8], [12, 8], [14, 10], [16, 10]]], "=", "");
-  stamp(cv, 0, 0, ["i"], 22, 11);
-  if (visor === "down") {
-    for (let y = 0; y < cv.length; y++) for (let x = 0; x < 25; x++) if (OPENING(x, y)) cv[y]![x] = glass(x, y);
-  } else {
-    // On its way up: the glass tilted back, its lower half gone over the brow; or up, a band of it across the dome.
-    const [top, bottom] = visor === "mid" ? [7, 19] : [3, 9];
-    for (let y = top; y <= bottom; y++)
-      for (let x = 0; x < 25; x++) {
-        if (!SHELL(x, y) || Math.abs(x + 0.5 - 12.5) > 9.8 - (y < top + 2 ? (top + 2 - y) * 1.6 : 0)) continue;
-        cv[y]![x] = y === bottom ? "=" : y === top ? "#" : x - 5 + (y - top) * 0.6 > 0 && x - 5 + (y - top) * 0.6 < 1.2 ? "=" : y < top + 2 ? "Z" : "p";
-      }
-  }
-  return { grid: toGrid(cv) };
-}
 /** The glow over his glowing eyes (no outline, see-through, on his head part's own pixels): soft round each eye, a thin line of
  * light down each cheek from under it. */
 function eyeGlow(): Part {
@@ -719,41 +582,292 @@ function eyeGlow(): Part {
   return { grid: toGrid(cv), outline: false };
 }
 
-/** A part's suit version (null: not worn with it, the tie), made the first time it's asked for. */
-export function suitName(name: string, visor: Visor = "down"): string | null {
-  if (name.startsWith("tie:")) return null;
-  if (name.startsWith("head:")) {
-    const [, f, , dark] = name.split(":");
-    const [eyes, brows, mouth] = f!.split(".") as [Eyes, Brows, Mouth];
-    return add(`helmet:${visor}:${f}${dark ? ":dark" : ""}`, () => helmet({ eyes, brows, mouth }, !!dark, visor));
+// ---- His final form (round 4, Eric, Nov 15, in place of round 3b's suit and helmet: "a black trench coat ... no more helmet ...
+// his hair is just like always radiating up and flowing ... an aura field around him ... bolts ... a pattern of ones and zeros ...
+// spiraling around him in a double helix"; round 4b: "all his hair should be moving"). His face as ever with the glowing blue eyes;
+// a long black trench coat of his own cut, open over his white shirt and blue tie; his own brown hair always rising, in fine strands,
+// every one moving; round him a glow field with small bolts flicking in it and two strands of tiny 1s and 0s turning round him (in
+// front of him drawn over him, behind him under him). Worn by part names (`coatFrame`), plus layers of its own placed from his body;
+// each frame's place in its loop (`i`) turns the helix, flows the hair and sways the coat.
+
+/** The coat's open front: half its width either side of his middle (x 46), down his chest. */
+const opening = (y: number) => (y < 34 ? 3 : 3 + Math.min(2.6, (y - 34) * 0.16));
+/** The torso in the coat: the coat over his shoulders and down his sides, open in front over the shirt, the tie and the belt;
+ * wide lapels with a notch, the collar turned up round his neck, a strap on each shoulder, buttons down each front, its belt. */
+function coatTorso(): Part {
+  const X0 = 30;
+  const Y0 = 26;
+  const cv = toCanvas(torso());
+  cv.forEach((row, y) =>
+    row.forEach((k, x) => {
+      if (k === ".") return;
+      const X = x + X0 + 0.5;
+      const Y = y + Y0;
+      const d = Math.abs(X - 46) - opening(Y);
+      const shirt = SHIRT.indexOf(k);
+      if (d < 0 || (shirt < 0 && "abcde".includes(k))) return;
+      const left = X < 46;
+      // (The lapels, folded back from the opening down to the break at y 50; the notch at y 38.)
+      const lapel = Y >= 31 && Y < 50 && d < 4 - (Y - 31) * 0.21 && Y !== 38;
+      if (lapel) row[x] = d < 1 ? "<" : left ? "}" : "{";
+      else if (Y >= 69 && Y <= 71) row[x] = Y === 69 ? (left ? "}" : "{") : Y === 71 ? "<" : ">";
+      else row[x] = ramp(COAT, shirt >= 0 ? shirt / 4 + 0.1 : 0.3);
+    }),
+  );
+  // The collar turned up round his neck; a strap across each shoulder; three buttons down each front.
+  stamp(cv, X0, Y0, [".<", "<}", "<}", "<}", "<{", ".<"], 39, 27);
+  stamp(cv, X0, Y0, ["<.", "{<", "{<", "{<", "{<", "<."], 51, 27);
+  stamp(cv, X0, Y0, ["}}}}}<"], 34, 34);
+  stamp(cv, X0, Y0, ["<{{{{{"], 52, 34);
+  for (const y of [53, 59, 65]) stamp(cv, X0, Y0, ["}"], 38, y), stamp(cv, X0, Y0, ["{"], 53, y);
+  return { grid: toGrid(cv) };
+}
+/** The coat's waist and hem for a stance (drawing space), and how far its tails swing (`sway`, -1 to 1) at a depth `t` (0 waist, 1 hem). */
+const coatSpan = (stance: Stance) => {
+  const dy = STANCE_DROP[stance];
+  return { top: 70 + dy, hem: Math.min(113 + dy, 125) };
+};
+const swing = (sway: number, t: number) => sway * 2.2 * t * t;
+/** One front panel's edges at depth `t` (left: our left). */
+const panel = (left: boolean, t: number, sway: number): [number, number] => {
+  const s = swing(sway, t);
+  return left ? [34 - 4.6 * t + s, 41 - 2 * t + s] : [51 + 2 * t + s, 58 + 4.6 * t + s];
+};
+/** The coat behind his legs: its lining in shadow, seen between them and under the hems of the fronts. */
+function coatBack(stance: Stance, sway: number): Part {
+  const X0 = 28;
+  const Y0 = 66;
+  const cv = canvas(38, 62);
+  const { top, hem } = coatSpan(stance);
+  for (let Y = top + 6; Y < hem - 1; Y++) {
+    const t = (Y - top) / (hem - top);
+    const [l] = panel(true, t, sway);
+    const [, r] = panel(false, t, sway);
+    for (let X = Math.ceil(l) + 1; X < r - 1; X++) stamp(cv, X0, Y0, [Y > hem - 4 ? "~" : "-"], X, Y);
   }
+  return { grid: toGrid(cv), outline: false };
+}
+/** The coat's skirt for a stance: its two fronts from the waist to below his knees, open between them, its tails swinging; a
+ * crease down each, the front edges lit, the blue lining showing at the hems' inside corners; one end of its belt hanging. */
+function coatSkirt(stance: Stance, sway: number): Part {
+  const X0 = 28;
+  const Y0 = 66;
+  const cv = canvas(38, 62);
+  const { top, hem } = coatSpan(stance);
+  for (let Y = top; Y <= hem; Y++) {
+    const t = (Y - top) / (hem - top);
+    for (const left of [true, false]) {
+      const [a, b] = panel(left, t, sway);
+      // (The hem a pixel lower at the outside corner.)
+      if (Y === hem && left ? false : Y === hem && !left) continue;
+      for (let X = Math.round(a); X <= Math.round(b); X++) {
+        const u = (X - a) / Math.max(1, b - a); // 0 at its left edge, 1 at its right
+        const edge = left ? X === Math.round(b) : X === Math.round(a);
+        const crease = Math.abs(u - (left ? 0.4 : 0.6)) < 0.08 && t > 0.15;
+        const lining = edge && t > 0.78;
+        const k = lining ? "~" : edge ? (left ? "}" : "{") : crease ? "<" : Y >= hem - 1 ? "<" : ramp(COAT, (left ? 0.75 - u * 0.4 : 0.45 - u * 0.35) - t * 0.1);
+        stamp(cv, X0, Y0, [k], X, Y);
+      }
+    }
+  }
+  // The belt's end hanging from its loop on his left side (our right), swinging a little with the tails.
+  for (let Y = top + 1; Y < top + 11; Y++) stamp(cv, X0, Y0, [Y === top + 10 ? ".{" : "{}"], 55 + Math.round(swing(sway, (Y - top) / 40)), Y);
+  return { grid: toGrid(cv) };
+}
+/**
+ * His head in his final form (round 4, Eric, Nov 15: "more strands of hair, more lines in between, so it's more free flowing";
+ * blue tried and dropped, "the brown is better"): his face as ever (the glowing eyes, phase 2's shadows) and his own brown hair always rising, one part
+ * with one outline (so no line runs across it): a mass of fine strands swept up from his crown, wider at its foot, each strand its
+ * own shade and length so its top is a fringe of fine ends, every strand flowing all the time as the draft runs up it (`flow`, a step of `HAIR_FLOWS`); lit from
+ * the top left, its ends and outer edges caught by the aura's light. His head part's pixels with 6 more columns each side and 12
+ * more rows on top (37 x 47; `RISE_AT`).
+ */
+const HAIR_RAMP = "HhhjjJJ";
+/** The steps of his hair's loop (one a frame: about 0.8 s at his idle's pace). */
+const HAIR_FLOWS = 6;
+function risenHead(face: Face, dark: boolean, flow: number): Part {
+  const DX = 6;
+  const DY = 12;
+  const C = 12.5;
+  const STRAND = 2.4;
+  const hash = (n: number) => ((Math.sin(n * 91.345 + 7.1) * 43758.5453) % 1 + 1) % 1;
+  const base = toCanvas(head(face, 0, dark, true));
+  const cv = canvas(25 + 2 * DX, 35 + DY);
+  base.forEach((row, y) => row.forEach((k, x) => (cv[y + DY]![x + DX] = k)));
+  // (Every strand moving all the time (round 4b, Eric, Nov 15: "all his hair should be moving"): a wave running up the whole mass
+  // from the roots, each strand swaying on its own a little out of step with its neighbors, its tip flicking longer and shorter,
+  // so it ripples like a flame; `flow` is the step of its loop, `HAIR_FLOWS` a cycle.)
+  const ph = (flow / HAIR_FLOWS) * 2 * Math.PI;
+  const at = (cx: number, cy: number) => {
+    const up = LIFT + 3 - (cy - DY + 0.5);
+    const rise = 0.35 + 0.65 * Math.min(1, Math.max(0, up) / 12);
+    const x0 = cx - DX + 0.5 - C - 1.6 * Math.sin(up * 0.3 - ph) * rise;
+    const n = Math.floor(x0 / STRAND);
+    const x = x0 - 1.3 * Math.sin(up * 0.5 + n * 1.9 - ph) * rise;
+    const i = Math.floor(x / STRAND);
+    const e = 14.5 * (1 - (x / 14.5) ** 2) + 4 * hash(i) - 1.5 + 1.6 * Math.sin(ph + i * 1.7);
+    return { ok: up > -8 && up < e, x, up, i, top: e - up };
+  };
+  for (let cy = 0; cy < cv.length; cy++)
+    for (let cx = 0; cx < cv[0]!.length; cx++) {
+      const p = at(cx, cy);
+      const k0 = cv[cy]![cx]!;
+      // (Over his own hair's top rows, and wherever his head part was empty; never over his face.)
+      if (!p.ok || !((k0 === "." && p.up > -3) || (cy - DY < LIFT + 11 && "HhjJ".includes(k0)))) continue;
+      // Light from the top left across the mass, each strand a shade of its own (so lines run between them), lighter towards
+      // its end; the ends and the outer edges in the aura's light.
+      const edge = !at(cx - 1, cy).ok || !at(cx + 1, cy).ok || cv[cy]![cx - 1] === "." || cv[cy]![cx + 1] === ".";
+      const u = p.x / STRAND - p.i; // 0 .. 1 across a strand
+      const l = 0.5 - p.x / 30 + (hash(p.i * 3 + 1) - 0.5) * 0.4 + Math.min(0.2, p.up / 60) + (u > 0.35 && u < 0.7 ? 0.18 : 0);
+      cv[cy]![cx] = edge && p.up > 5 && Math.abs(p.x) > 8 ? "^" : p.top < 1 ? "J" : u < 0.34 && p.up > -1 ? "H" : ramp(HAIR_RAMP, l);
+    }
+  return { grid: toGrid(cv) };
+}
+/** The aura: a glow field round his whole figure (drawing space x 20 to 71, y -14 to 127), brighter near him, its edge rippling
+ * up like a flame's (`v`, 0 to 2, flickers). No outline. */
+const AURA = { x0: 20, y0: -14, w: 52, h: 142 } as const;
+function aura(v: number): Part {
+  const cv = canvas(AURA.w, AURA.h);
+  for (let y = 0; y < AURA.h; y++) {
+    const Y = y + AURA.y0;
+    // Its half-width down him: narrow over his hair, widest round his shoulders and arms, in to his feet.
+    const base = Y < 8 ? 9 + (Y + 14) * 0.45 : Y < 40 ? 19 + (Y - 8) * 0.12 : Y < 86 ? 23 : 23 - (Y - 86) * 0.22;
+    for (let x = 0; x < AURA.w; x++) {
+      const X = x + AURA.x0 + 0.5;
+      const w = base + 1.6 * Math.sin(Y * 0.28 + v * 2.1 + (X < 46 ? 0 : 1.9)) + (Y < 2 ? 2.4 * Math.max(0, Math.sin(X * 0.9 + v * 2)) : 0);
+      const d = Math.abs(X - 46) / w;
+      if (Y < -13 + Math.abs(X - 46) * 0.25) continue;
+      if (d < 0.55) cv[y]![x] = "&";
+      else if (d < 0.82) cv[y]![x] = "%";
+      else if (d < 1) cv[y]![x] = "'";
+    }
+  }
+  return { grid: toGrid(cv), outline: false };
+}
+/** Small bolts flicking in the aura (frame `i` of a loop): a few short zigzags near its edge, on some frames. Drawing space. */
+function bolts(i: number): [number, number, string][] {
+  const out: [number, number, string][] = [];
+  const h = (n: number) => ((Math.sin(n * 12.9898) * 43758.5453) % 1 + 1) % 1;
+  for (let b = 0; b < 2; b++) {
+    if (h(i * 7 + b * 3) < 0.45) continue;
+    const side = h(i * 11 + b) < 0.5 ? -1 : 1;
+    let x = 46 + side * (15 + h(i * 5 + b) * 6);
+    let y = -2 + h(i * 3 + b * 17) * 110;
+    // (A jagged run down and out: two steps out, one back, its ends dimmer; a branch off its middle.)
+    for (let s = 0; s < 10; s++) {
+      out.push([Math.round(x), Math.round(y), s === 0 || s === 9 ? "+" : "*"], [Math.round(x) - side, Math.round(y), "+"]);
+      if (s === 4) out.push([Math.round(x) + side, Math.round(y) + 1, "+"], [Math.round(x) + 2 * side, Math.round(y) + 2, "+"]);
+      x += (s % 3 === 2 ? -1 : 1) * side;
+      y += 1;
+    }
+  }
+  return out;
+}
+/** The binary double helix: tiny 1s and 0s on two strands turning round him (frame `i` of a loop: twelve steps a turn), drawing
+ * space x 22 to 70, y -14 to 127. `front`: the glyphs on the near side (over him), else the far side (under him). The glyphs
+ * flip between 1 and 0 now and then; one passing in front of his face is left out. No outline. */
+const GLYPH: Record<"0" | "1", readonly string[]> = { "0": [".#.", "#.#", "#.#", ".#."], "1": [".#", "##", ".#", ".#"] };
+const HELIX = { x0: 22, y0: -14, w: 48, h: 142 } as const;
+function helix(front: boolean, step: number): Part {
+  const cv = canvas(HELIX.w, HELIX.h);
+  const h = (n: number) => ((Math.sin(n * 78.233) * 43758.5453) % 1 + 1) % 1;
+  const top = -8;
+  const foot = 122;
+  // The strands themselves, faint, every other pixel down them between the glyphs: so the two spirals read.
+  for (let strand = 0; strand < 2; strand++)
+    for (let Y = top; Y <= foot; Y += 2) {
+      const u = (Y - top) / (foot - top);
+      const R = 19 * (0.72 + 0.28 * Math.sin(Math.PI * u));
+      const th = (Y / 44) * 2 * Math.PI + strand * Math.PI + (step / 12) * 2 * Math.PI;
+      const z = Math.cos(th);
+      // (Not across his face and chest, where it would only clutter him.)
+      if (front !== z > 0 || (front && Math.abs(R * Math.sin(th)) < 13)) continue;
+      const x = Math.round(46 + R * Math.sin(th)) - HELIX.x0;
+      const y = Math.round(Y) - HELIX.y0;
+      if (cv[y]?.[x] !== undefined) cv[y]![x] = ";";
+    }
+  for (let strand = 0; strand < 2; strand++)
+    for (let slot = 0; slot < 20; slot++) {
+      const Y = foot - slot * ((foot - top) / 19);
+      const u = (Y - top) / (foot - top);
+      const R = 19 * (0.72 + 0.28 * Math.sin(Math.PI * u));
+      const th = (Y / 44) * 2 * Math.PI + strand * Math.PI + (step / 12) * 2 * Math.PI;
+      const z = Math.cos(th);
+      if (front !== z > 0) continue;
+      const X = 46 + R * Math.sin(th);
+      if (front && Y < 28 && Math.abs(X - 46) < 9) continue;
+      // (The nearest white, over his coat; the rest of the near side electric blue, so they read on a light board too; the far side dimmer.)
+      const k = z > 0.85 ? "*" : z > 0 ? "+" : z > -0.5 ? "?" : ";";
+      const g = GLYPH[h(slot * 3 + strand * 41 + Math.floor((step + slot) / 6) * 7) < 0.5 ? "0" : "1"];
+      g.forEach((row, dy) =>
+        [...row].forEach((c, dx) => {
+          if (c !== "#") return;
+          const x = Math.round(X - 1) + dx - HELIX.x0;
+          const y = Math.round(Y - 2) + dy - HELIX.y0;
+          if (cv[y]?.[x] !== undefined) cv[y]![x] = k;
+        }),
+      );
+    }
+  return { grid: toGrid(cv), outline: false };
+}
+const RISE_AT: Pt = [-6, -12];
+/** His head part's final-form version for a frame (`flow`: his hair's ripple), placed `RISE_AT` from where his head was. */
+function coatHead(name: string, flow: number): string {
+  const [, f, , dark] = name.split(":");
+  const [eyes0, brows, mouth] = f!.split(".") as [Eyes, Brows, Mouth];
+  const eyes: Eyes = eyes0 === "shut" ? "shut" : "glow";
+  return add(`coathead:${eyes}.${brows}.${mouth}${dark ? ":dark" : ""}:${flow}`, () => risenHead({ eyes, brows, mouth }, !!dark, flow));
+}
+/** A part's coat version (null: not worn with it), made the first time it's asked for. */
+function coatName(name: string): string | null {
   if (name.startsWith("arm")) {
     const [kind, pts] = name.split(":");
     const q = pts!.split(";").map((p) => p.split(",").map(Number) as unknown as Pt) as [Pt, Pt, Pt];
-    return add(`suit:${name}`, () => paintArm(q[0], q[1], q[2], kind!.includes("fore"), kind!.includes("full"), true));
+    return add(`coat:${name}`, () => paintArm(q[0], q[1], q[2], kind!.includes("fore"), kind!.includes("full"), true));
   }
-  if (name === "torso") return add("suit:torso", suitTorso);
-  if (name.startsWith("legs:")) return add(`suit:${name}`, () => suitLegs(name.slice(5) as Stance));
-  if (name === "shoe" || name === "heels") return add(`suit:${name}`, () => remap(PARTS[name]!, BOOT));
-  if (name.startsWith("fist:") || name.startsWith("hand:") || name === "clutch") return add(`suit:${name}`, () => remap(PARTS[name]!, GLOVE));
+  if (name === "torso") return add("coat:torso", coatTorso);
   return name;
 }
-/** A frame of him in the suit (the visor as given). */
-export const suitFrame = (f: Frame, visor: Visor = "down"): Frame => ({
-  ...f,
-  layers: f.layers.flatMap((l) => {
-    const n = suitName(l.part, visor);
-    if (!n) return [];
-    // (His glowing eyes' glow over his face, when it shows.)
-    if (visor !== "down" && l.part.startsWith("head:glow.")) return [{ ...l, part: n }, { ...l, part: add("eyeGlow", eyeGlow) }];
-    return [{ ...l, part: n }];
-  }),
-});
-/** A frame of his in the suit, the visor down, made once (where he stands: BossCharacter draws it every time the frame shows). */
-const SUITED = new WeakMap<Frame, Frame>();
-export function suited(f: Frame): Frame {
-  let s = SUITED.get(f);
-  if (!s) SUITED.set(f, (s = suitFrame(f)));
+/** A frame of him in his final form; `i`: its place in its loop (the helix's turn, the coat's sway, the hair's flow, the bolts). */
+export function coatFrame(f: Frame, i = 0): Frame {
+  const legsL = f.layers.find((l) => l.part.startsWith("legs:"));
+  const torsoL = f.layers.find((l) => l.part === "torso");
+  if (!torsoL) return f;
+  // (Drawing space to this frame: from his legs where they're drawn (they never shake or breathe), else his torso (the bust).)
+  const [fx, fy] = legsL ? [legsL.x - 28, legsL.y - 66] : [torsoL.x - 30, torsoL.y - 26];
+  const sway = [0, 1, 0, -1][Math.floor(i / 3) % 4]!;
+  const step = i % 12;
+  const flow = i % HAIR_FLOWS;
+  const at = (part: string, x: number, y: number): Layer => ({ part, x: fx + x, y: fy + y });
+  const layers: Layer[] = [at(add(`coatAura:${i % 3}`, () => aura(i % 3)), AURA.x0, AURA.y0), at(add(`coatHelix:back:${step}`, () => helix(false, step)), HELIX.x0, HELIX.y0)];
+  for (const l of f.layers) {
+    const n = coatName(l.part);
+    if (!n) continue;
+    if (l.part.startsWith("legs:")) {
+      const stance = l.part.slice(5) as Stance;
+      layers.push({ ...l, part: add(`coatBack:${stance}:${sway}`, () => coatBack(stance, sway)) }, l, { ...l, part: add(`coatSkirt:${stance}:${sway}`, () => coatSkirt(stance, sway)) });
+      continue;
+    }
+    if (l.part.startsWith("head:")) {
+      const h = coatHead(l.part, flow);
+      layers.push({ ...l, part: h, x: l.x + RISE_AT[0], y: l.y + RISE_AT[1] });
+      if (!h.startsWith("coathead:shut")) layers.push({ ...l, part: add("eyeGlow", eyeGlow) });
+      continue;
+    }
+    layers.push({ ...l, part: n });
+  }
+  layers.push(at(add(`coatHelix:front:${step}`, () => helix(true, step)), HELIX.x0, HELIX.y0));
+  const sparks: Speck[] = bolts(i).map(([x, y, k]) => [fx + x, fy + y, k]);
+  return { ...f, layers, specks: [...(f.specks ?? []), ...sparks] };
+}
+/**
+ * A frame of his in his final form, made once (`i`: its place in its loop, the first time it's asked for): where he stands
+ * BossCharacter draws it every time the frame shows, from his transformation's white-out on (`setSuitAt`).
+ */
+const COATED = new WeakMap<Frame, Frame>();
+export function coated(f: Frame, i = 0): Frame {
+  let s = COATED.get(f);
+  if (!s) COATED.set(f, (s = coatFrame(f, i)));
   return s;
 }
 
@@ -761,7 +875,7 @@ export function suited(f: Frame): Frame {
 
 /** Where his drawing space sits on the frame: room above for the hair in the wind and the spell's glow. */
 const OX = -14;
-const OY = 14;
+const OY = 19;
 const W = 64;
 const H = OY + GROUND + 4;
 
@@ -1382,7 +1496,7 @@ export const RECLUSE_HEADS: Readonly<Record<string, number>> = {
 export const RECLUSE_PORTRAIT = { x: OX + HEAD_AT[0] - 2, y: OY - 1, w: 29, h: 36 } as const;
 /**
  * The same face in his bust's pixels (RECLUSE_BUST's window; each age's bust in recluse-ages.ts has its own window on its own head, so
- * the same one fits all): a portrait taken from the bust as it's drawn now, his age and his suit (BossKit.barFace, Nov 14).
+ * the same one fits all): a portrait taken from the bust as it's drawn now, his age and his final form (BossKit.barFace, Nov 14).
  */
 export const RECLUSE_BUST_PORTRAIT = { x: RECLUSE_PORTRAIT.x - OX - BUST.x0, y: RECLUSE_PORTRAIT.y - OY - BUST.y0, w: RECLUSE_PORTRAIT.w, h: RECLUSE_PORTRAIT.h } as const;
 

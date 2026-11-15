@@ -4,14 +4,14 @@
  * PHASE_CHANGE in recluse-phase2.ts).
  * - `RECLUSE_CHANGE`: the man in his own drawing (RECLUSE's size, so the board's leap and his place work as ever): kneeling as the
  *   cutscene left him, the book at his feet opening, the light taking him (his eyes white), lifted in it, his arms hanging relaxed
- *   at his sides the whole time, hovering; then, after the white-out, in the suit and helmet (recluse.ts, `suitFrame`), the visor
- *   flipping up for his line (his eyes glowing blue) and back down, the jump, the landing on the drop, the book back in his hands
- *   and the leap home.
+ *   at his sides the whole time, hovering; then, after the white-out, in his final form (recluse.ts, `coatFrame`: the black trench
+ *   coat, his hair rising, the aura, its bolts, the binary helix; his eyes glowing blue), saying his first line as he stands, the
+ *   jump, the landing on the drop, the book back in his hands and the leap home.
  * - `RECLUSE_CHANGE_BOOK`: the open book glowing on the board while he stands, hovers and jumps (his frames leave it out).
  * - `RECLUSE_CHANGE_KID`: the ghost of him as a child, beside him until the white-out (the cutscene's drawing without the man).
  * Where they stand: as the cutscene drew them (its man's size, its ground), shares of the board's width.
  */
-import { RECLUSE, recluseLayers, suitFrame, type ReclusePose, type Visor } from "./recluse.ts";
+import { RECLUSE, coatFrame, recluseLayers, type ReclusePose } from "./recluse.ts";
 import { RECLUSE_CUTSCENE } from "./recluse-ages.ts";
 import { lazyAnim, type Character, type Frame, type Layer } from "./sprite.ts";
 
@@ -41,10 +41,10 @@ const onGround = (book: "flat" | "half" | "read", at: readonly [number, number] 
 const kneelP = (eyes: string, extra: Partial<ReclusePose> = {}): ReclusePose => ({ stance: "kneel", dip: 4, face: { eyes, brows: "up", mouth: "tight" }, ...extra }) as ReclusePose;
 const TAKEN = { eyes: "possessed", brows: "up", mouth: "tight" } as const;
 const wind3 = (i: number) => ((i % 3) + 1) as 1 | 2 | 3;
-/** Phase 2 standing in the suit: his stance, his arms at his sides; `extra` over it. (The helmet hides his hair: no wind.) */
+/** Phase 2 standing in his final form: his stance, his arms at his sides; `extra` over it. (His hair is the final form's own.) */
 const P2 = (i: number, extra: Partial<ReclusePose> = {}): ReclusePose => ({ phase: 2, stance: "wide", tie: i % 2 ? 1 : 0, face: { eyes: "hard", brows: "stern", mouth: "stern" }, hold: onGround("read", OPEN_AT, SIDE_ARMS), ...extra }) as ReclusePose;
-/** A frame in the suit, its visor as given; the book left on the board (drawn apart). */
-const S = (f: Frame, visor: Visor = "down") => suitFrame(noBook(f), visor);
+/** A frame in his final form (`i`: its place in its loop); the book left on the board (drawn apart). */
+const S = (f: Frame, i = 0) => coatFrame(noBook(f), i);
 
 export const RECLUSE_CHANGE: Character = {
   ...RECLUSE,
@@ -79,15 +79,11 @@ export const RECLUSE_CHANGE: Character = {
     })),
     // In the beam: hovering, his head back, his eyes white, his arms drifting a little off his sides, his hair streaming.
     beam: lazyAnim(() => ({ loop: true, frames: Array.from({ length: 6 }, (_, i) => noBook(fr(110, { stance: "stand", air: true, wind: wind3(i), headDy: -1, breath: i % 3 === 1 ? 1 : 0, tie: i % 2 ? 1 : -1, face: { ...TAKEN, mouth: i % 6 < 3 ? "tight" : "grit" }, hold: onGround("read", OPEN_AT, i % 6 < 3 ? SIDE_ARMS : SIDE_ARMS_OUT) } as ReclusePose, i))) })),
-    // Revealed: in the suit and helmet, the visor down, standing, his arms at his sides.
-    revealed: lazyAnim(() => ({ loop: true, frames: Array.from({ length: 6 }, (_, i) => S(fr(120, P2(i, { breath: i >= 3 ? 1 : 0 })))) })),
-    // The visor flips up into the dome (a frame on its way): his face, his eyes glowing blue, for his line; then back down.
-    flipUp: lazyAnim(() => ({ loop: false, frames: [S(fr(90, P2(0)), "mid"), S(fr(90, P2(1)), "up")] })),
-    faceOpen: lazyAnim(() => ({ loop: true, frames: Array.from({ length: 6 }, (_, i) => S(fr(130, P2(i, { breath: i >= 3 ? 1 : 0, face: { eyes: "glow", brows: "stern", mouth: "stern" } })), "up")) })),
-    flipDown: lazyAnim(() => ({ loop: false, frames: [S(fr(90, P2(0, { face: { eyes: "glow", brows: "stern", mouth: "stern" } })), "mid"), S(fr(90, P2(1)), "down")] })),
+    // Revealed: in his final form, standing, his arms at his sides, his eyes glowing; his first line said as he stands.
+    revealed: lazyAnim(() => ({ loop: true, frames: Array.from({ length: 12 }, (_, i) => S(fr(120, P2(i, { breath: i % 6 >= 3 ? 1 : 0 })), i)) })),
     // The jump: crouched over the book, then up, and down on the drop; his arms stay at his sides.
     crouch: lazyAnim(() => ({ loop: false, frames: [S(fr(200, P2(1, { stance: "bend", dip: 1, hold: onGround("read", OPEN_AT, SIDE_ARMS_OUT) })))] })),
-    air: lazyAnim(() => ({ loop: true, frames: [0, 1, 2].map((w) => S(fr(120, P2(w, { air: true, stance: "bend", tie: 1, headDy: -1 })))) })),
+    air: lazyAnim(() => ({ loop: true, frames: [0, 1, 2].map((w) => S(fr(120, P2(w, { air: true, stance: "bend", tie: 1, headDy: -1 })), w * 4)) })),
     land: lazyAnim(() => ({
       loop: false,
       frames: [
@@ -96,10 +92,10 @@ export const RECLUSE_CHANGE: Character = {
       ],
     })),
     // Landed, the arcs striking out from his hands at his sides.
-    landed: lazyAnim(() => ({ loop: true, frames: Array.from({ length: 6 }, (_, i) => S(fr(110, P2(i, { hold: onGround("read", OPEN_AT, SIDE_ARMS_OUT) }), i))) })),
-    // (The rest as before, in the suit: the book snapping shut into his hands, his leap home.)
-    pickup: lazyAnim(() => ({ loop: A.pickup!.loop, frames: A.pickup!.frames.map((f) => suitFrame(f)) })),
-    leap2: lazyAnim(() => ({ loop: A.leap2!.loop, frames: A.leap2!.frames.map((f) => suitFrame(f)) })),
+    landed: lazyAnim(() => ({ loop: true, frames: Array.from({ length: 12 }, (_, i) => S(fr(110, P2(i, { hold: onGround("read", OPEN_AT, SIDE_ARMS_OUT) }), i), i)) })),
+    // (The rest as before, in his final form: the book snapping shut into his hands, his leap home.)
+    pickup: lazyAnim(() => ({ loop: A.pickup!.loop, frames: A.pickup!.frames.map((f, i) => coatFrame(f, i)) })),
+    leap2: lazyAnim(() => ({ loop: A.leap2!.loop, frames: A.leap2!.frames.map((f, i) => coatFrame(f, i)) })),
   },
 };
 export const RECLUSE_CHANGE_BOOK: Character = { ...RECLUSE, id: "recluse-change-book", name: "Hidden Boss's book (transformation)", anims: { glow: lazyAnim(() => ({ loop: true, frames: chantF().map(bookOnly) })) } };

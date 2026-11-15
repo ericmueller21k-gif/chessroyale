@@ -320,7 +320,13 @@ test("the street town's WebGL context lost: nothing drawn until it's back, then 
     });
   // (A mark on this page: gone once the page has loaded again.)
   const mark = () => page.evaluate(() => void ((window as unknown as { __mark?: number }).__mark = 1));
-  const marked = () => page.evaluate(() => (window as unknown as { __mark?: number }).__mark === 1);
+  // (Read while the page may be loading again: a read the reload cuts off is the old page gone, so its mark too. Main's run, Nov 15:
+  // the poll's read landed mid-reload, threw "Execution context was destroyed", and expect.poll doesn't retry a throw.)
+  const marked = () =>
+    page.evaluate(() => (window as unknown as { __mark?: number }).__mark === 1).catch((e: Error) => {
+      if (/Execution context was destroyed|navigation/.test(e.message)) return false;
+      throw e;
+    });
   await mark();
   for (let i = 0; i < 2; i++) {
     await lose(true);

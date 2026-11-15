@@ -27,7 +27,7 @@ import { prewarmTiger } from "./Tiger.tsx";
 import { resetTiger } from "../tiger-show.ts";
 import { prewarmFolio } from "./Folio.tsx";
 import { prewarmRecluse } from "./Recluse.tsx";
-import { suited } from "../characters/recluse.ts";
+import { coated } from "../characters/recluse.ts";
 import { CRITICAL, LOW, NORMAL, VoiceBubble, bossVoice, holdMs, type Priority } from "../speech.tsx";
 import { mateAttack, prewarmKingAttack } from "./KingAttack.tsx";
 import { lightsId, syncLights } from "../characters/lights.ts";
@@ -91,15 +91,16 @@ export function setFigureRun(run: FigureRun | null) {
 }
 
 /**
- * The Hidden Boss's suit and helmet (Eric, Nov 14): from `at` (his transformation's white-out) to the end of the battle, worn on
- * every drawing of him where he stands (his frames' parts swapped for the suit's: recluse.ts, `suited`). Cleared by a new battle
+ * The Hidden Boss's final form (Eric, Nov 15: the black trench coat, his hair rising, the aura and the binary helix; the name
+ * `suit` is round 3b's): from `at` (his transformation's white-out) to the end of the battle, worn on every drawing of him where he
+ * stands (his frames' parts swapped for the final form's, plus its own layers: recluse.ts, `coated`). Cleared by a new battle
  * (resetBeats).
  */
 const suit: { at: number | null } = { at: null };
 export function setSuitAt(at: number | null) {
   suit.at = at;
 }
-/** Whether a kit that wears a suit (BossKit.suit) has it on at `now`. */
+/** Whether a kit that changes its look (BossKit.suit: the Hidden Boss's final form) has it on at `now`. */
 const suitOn = (kit: BossKit, now: number) => !!kit.suit && suit.at !== null && now >= suit.at;
 /** The loop the figure rests in now, when a figure run is set (phase 2's `idle2`), else null. */
 export const figureLoop = (): string | null => figure.run?.loop ?? null;
@@ -338,7 +339,7 @@ function Character({ boss, stage, place }: { boss: BossView; stage: Stage; place
         if (rest) s = rest;
       }
       const look = lookRef.current();
-      // (The Hidden Boss in his suit from his transformation on: the same frames, worn.)
+      // (The Hidden Boss in his final form from his transformation on: the same frames, worn; each frame's number turns his helix.)
       const suitNow = suitOn(kit, now);
       const id = `${s.anim}:${s.frame}:${look}:${lightsId()}:${suitNow ? "suit" : ""}`;
       if (kit.heads) {
@@ -351,7 +352,7 @@ function Character({ boss, stage, place }: { boss: BossView; stage: Stage; place
       if (id !== last) {
         last = id;
         const drawn = kit.ch.anims[s.anim]!.frames[s.frame]!;
-        const frame = suitNow ? suited(drawn) : drawn;
+        const frame = suitNow ? coated(drawn, s.frame) : drawn;
         g?.putImageData(frameImage(kit.ch, frame, look), 0, 0);
         box.current?.setAttribute("data-anim", s.anim);
         box.current?.toggleAttribute("data-suit", suitNow);
@@ -433,13 +434,13 @@ export function BossTag({ boss, live = true }: { boss: Pick<BossView, "name" | "
 }
 
 /**
- * The drawing a boss's small face follows as he looks now (his phone's bar's bust: his age, his suit), or null for his portrait, drawn
+ * The drawing a boss's small face follows as he looks now (his phone's bar's bust: his age, his final form), or null for his portrait, drawn
  * once. Only `live` (inside a battle): his look is module state (`suit`, `figure`) that only the next battle clears, so a face on a menu
- * after a fight that reached phase 2 showed his helmet, each with its own frame loop (#712's review).
+ * after a fight that reached phase 2 showed his final form, each with its own frame loop (#712's review).
  */
 export const faceBust = (kit: BossKit, live: boolean) => (live && kit.barFace && kit.bar) || null;
 
-/** His bust's look now (BossFace's `live`: the loop his figure rests in, his suit), for a kit with a `barFace`; else null. */
+/** His bust's look now (BossFace's `live`: the loop his figure rests in, his final form), for a kit with a `barFace`; else null. */
 function liveLook(kit: BossKit, now: number): { anim: string; on: boolean; id: string } | null {
   const bust = faceBust(kit, true);
   if (!bust) return null;
@@ -453,8 +454,9 @@ function drawLook(g: CanvasRenderingContext2D, kit: BossKit, look: { anim: strin
   const bust = kit.bar!;
   const f = kit.barFace!;
   const p = kit.portrait;
-  const drawn = bust.anims[look.anim]!.frames[look.anim === p.anim ? p.frame : 0]!;
-  g.putImageData(frameImage(bust, look.on ? suited(drawn) : drawn), -f.x, -f.y, f.x, f.y, f.w, f.h);
+  const i = look.anim === p.anim ? p.frame : 0;
+  const drawn = bust.anims[look.anim]!.frames[i]!;
+  g.putImageData(frameImage(bust, look.on ? coated(drawn, i) : drawn), -f.x, -f.y, f.x, f.y, f.w, f.h);
 }
 
 /** Each look's bust as an image address, made once (`ch.id:anim:suit`). */
@@ -512,8 +514,8 @@ export function BossFace({ boss, class: cls = "", label, live = false }: { boss:
       g.putImageData(frameImage(art, art.anims[p.anim]!.frames[p.frame]!), -p.x, -p.y, p.x, p.y, p.w, p.h);
       return;
     }
-    // (A look that changes in the battle (the Hidden Boss's age, his suit): the bust as the phone's bar draws it, the loop his figure rests
-    // in and his suit, read each frame and drawn again when either changes. Eric's computer showed the 9-year-old at 20, Nov 14.)
+    // (A look that changes in the battle (the Hidden Boss's age, his final form): the bust as the phone's bar draws it, the loop his figure rests
+    // in and his final form, read each frame and drawn again when either changes. Eric's computer showed the 9-year-old at 20, Nov 14.)
     let raf = 0;
     let last = "";
     const draw = () => {

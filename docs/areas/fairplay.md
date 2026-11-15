@@ -156,6 +156,9 @@ Lane: `fairplay`. The reviewer's brief: `docs/fairplay-reviewer.md`. The numbers
 
 ## Rules for this area
 
+- A test's "fresh browser" after a ban is a new context, not the banned tab's data cleared: that tab's late ban answers mark
+  it again (Nov 15, [2026-11-15-fairplay-fresh-browser.md](../decisions/2026-11-15-fairplay-fresh-browser.md)).
+
 - Measure false bans before switching anything on: simulate every threshold change (catch rates per cheater type
   within 1, 2 and 5 matches; false flags and bans per 1,000 honest players at every strength).
 - Borderline cases go to review (a person), not a ban. A false ban of an honest player is the worst outcome.
