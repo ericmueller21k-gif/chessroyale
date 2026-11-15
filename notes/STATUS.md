@@ -1239,3 +1239,4 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 15 08:00: #730 bubble fix MERGED 2b34ee0a (PR run green; fairplay:65 retry-pass, known). Deploy + main run watcher running.
 - Nov 15 08:20: #730 LIVE (2b34ee0a). Main run RED: xp-rewards:44 [desktop] retry-pass = the XP day turned (08:00 UTC) between its two games. Fix -> #731 (test waits out the turn), CI watcher running.
 - Nov 15 08:40: #731 MERGED b6582a7f; main full run watcher running (lists flaky).
+- Nov 15 09:05: main run on b6582a7f RED: fairplay:65 [phone] retry-pass (the 'fresh browser' sign-in heading missing; recurring since Nov 14). Brief briefs/flaky-fairplay-65.md (Opus high, fairplay; stop before ban/sign-in code).
