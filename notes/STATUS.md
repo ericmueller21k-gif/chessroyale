@@ -1248,3 +1248,4 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 15 17:55: Babur theme now 165 s (b5888835) -> #733 head 78410278, CI rerunning. Eric: new themes 2:30-2:45 from now on (music helper won't lengthen old ones unless asked).
 - Nov 15 18:00: PARKED per Eric: Hidden Boss music fades at the board split, silent countdown, epic drop starts on the countdown's 0. notes/briefs/idea-recluse-drop-on-zero.md. After 4b ships, on his word.
 - Nov 15 18:10: #733 Babur theme MERGED e47619c7; deploy + main run watcher. (#732's main run still running too.)
+- Nov 15 18:15: main full run on 30898935 (#732) GREEN, no retries.
