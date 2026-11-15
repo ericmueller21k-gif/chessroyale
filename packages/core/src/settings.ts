@@ -4502,6 +4502,17 @@ export const BOARD: { readonly checkHighlight: boolean } = { checkHighlight: fal
 export const MUSIC = { volume: 0.4, fadeMs: 300, endFadeMs: 1500, startDelayS: 0.05, splashHoldMs: 2000, townPreloadAfterMs: 2000, handoffMs: 300, handoffWaitMs: 1000 } as const;
 
 /**
+ * Chess Town's own music (Eric, Nov 14-15: "a song where people literally are like, I want to turn this song on while I'm in the chess
+ * town"; docs/decisions/2026-11-15-town-music.md; music.ts `townMusic`): the theme (themes.json's `town`) loops in the street town and
+ * in buildings with no music of their own, and after every `passesPerSolo` passes one of its piano solos plays instead of the next
+ * pass, the theme coming back from its top as the solo ends (Eric: "every few play throughs"; 3 passes and a solo are about 9.5 min).
+ * - `order`: the solos by their `id` in themes.json, taking turns (a, b, a, …). Empty: the theme alone.
+ * - `aheadS`: how long before a solo it is put on the audio clock, with the theme's return after it (s). The joins are on the clock,
+ *   never a timer; this is only how early the timer that schedules them runs (a hidden tab's timers can be a minute late).
+ */
+export const TOWN_MUSIC: { readonly passesPerSolo: number; readonly order: readonly string[]; readonly aheadS: number } = { passesPerSolo: 3, order: ["a", "b"], aheadS: 120 };
+
+/**
  * The Hidden Boss's music (Nov 13; docs/decisions/2026-11-13-hidden-boss-music.md; the handoff's README, "The Hidden Boss"): one
  * theme for each point of his fight, by its key in themes.json, switched mid-fight (music.ts, `switchPlan`).
  * - `child`: his room and the fight with the child. Not played yet (the child form isn't built): App.tsx's `recluseTheme` is the hook.

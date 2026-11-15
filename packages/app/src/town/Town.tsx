@@ -43,7 +43,7 @@ import { openProfile } from "../profile-nav.ts";
 import { account, myPawnColor, onAccountChange, playerName } from "../account.ts";
 import { TOWN_ASKED, testSwitchesAllowed } from "../test-switches.ts";
 import { play, warmSounds } from "../sound.ts";
-import { preloadMusic, roomMusic, roomMusicLoad, splashDone, splashMusic } from "../music.ts";
+import { preloadMusic, roomMusic, roomMusicLoad, splashDone, splashMusic, townMusic } from "../music.ts";
 import { AreaBanner, areaBannerOf, type AreaBannerText } from "./AreaBanner.tsx";
 import { SELECT_SOUND, TOWN_SOUNDS, townSound } from "../characters/boss-select.ts";
 import { N, colI, newPt, proj, rel, rowI, wrapFX, wrapFY, wrapI } from "./camera.ts";
@@ -543,7 +543,8 @@ export function TownScreen({
     setNote(null);
     setAsking(false);
     shopCtl.current?.close?.();
-    // (The room goes quiet: its music stops at the freeze.)
+    // (The room goes quiet: its music stops at the freeze, and the town's doesn't take over: the fight is coming.)
+    townMusic(false);
     roomMusic(null);
     recluse.current?.summon(performance.now());
     await later(HIDDEN_ROOM_FEEL.summon.end);
@@ -651,6 +652,7 @@ export function TownScreen({
       stopGuest();
       stopAway();
       t.stop();
+      townMusic(false);
       roomMusic(null);
     };
   }, []);
@@ -2408,7 +2410,8 @@ function startTown(
    * The bosses' music never holds it up (Eric, Nov 14: "christ it's taking forever"; 44 MB since that day's stereo 192 kbps, fetched
    * beside the painting, took the network from the town's own files, then "Loading music…" waited up to 3 s more): every theme is
    * fetched (not decoded: music.ts `preloadMusic`) in the background once the town has drawn its first frame, MUSIC.townPreloadAfterMs
-   * after it, one piece at a time. A theme not in yet is fetched as its battle or room needs it, as before.
+   * after it, one piece at a time. A theme not in yet is fetched as its battle or room needs it, as before. The town's own theme comes
+   * first (Nov 15, music.ts `townMusic`): decoded and played as soon as it's in, then its two solos, then the bosses'.
    */
   const loadTown = async () => {
     const t0 = performance.now();
@@ -2445,8 +2448,13 @@ function startTown(
     if (lv) lv.at = Math.max(lv.at, performance.now() + f.botLeaveAfterGameMs);
     run();
     draw(performance.now());
-    // (The music after the first frame, in the background: see above.)
-    setTimeout(() => alive && void preloadMusic(), MUSIC.townPreloadAfterMs);
+    // (The music after the first frame, in the background: see above. The town's own theme first, Nov 15: it starts once it's decoded,
+    // its solos and the bosses' themes fetched after it.)
+    setTimeout(() => {
+      if (!alive) return;
+      townMusic(true);
+      void preloadMusic();
+    }, MUSIC.townPreloadAfterMs);
   };
   let loadMs = 0;
   let loadPaintMs = 0;

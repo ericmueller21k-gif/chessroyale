@@ -211,5 +211,30 @@
       "lufs": -16.0,
       "peakDb": -1.4
     }
+  },
+  "town": {
+    "note": "The town's theme (Nov 15, town-music/ on stills/trailer-v2): loop <loop> between pad and pad + loopSeconds. After TOWN_MUSIC.passesPerSolo passes, at a pass's end start a solo's file instead of the next pass; `seconds` after it started, the loop again from its top (offset pad), the solo's file ringing out over it.",
+    "source": "scripts/reel/music/song_ad.py",
+    "loop": "town-loop",
+    "loopSeconds": 178.604646,
+    "bpm": 129.0,
+    "lufs": -16.0,
+    "peakDb": -2.3,
+    "solos": [
+      {
+        "id": "a",
+        "file": "town-solo-a",
+        "seconds": 37.209313,
+        "fileSeconds": 41.209313,
+        "peakDb": -3.2
+      },
+      {
+        "id": "b",
+        "file": "town-solo-b",
+        "seconds": 37.209313,
+        "fileSeconds": 41.209313,
+        "peakDb": -4.2
+      }
+    ]
   }
 }
