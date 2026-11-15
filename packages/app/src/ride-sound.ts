@@ -265,6 +265,7 @@ export function rideSoundState() {
   return {
     boings,
     boingsLive,
+    decoded: [...buffers.keys()],
     ride: v?.id ?? null,
     up: !!v?.up,
     live,

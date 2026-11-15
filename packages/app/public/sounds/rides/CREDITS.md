@@ -7,4 +7,4 @@ Mono WAV, 24 kHz, 16 bit, 1.2 s: one loop of exactly 1 s with 0.1 s of itself ei
 | File | Ride | What it is |
 |---|---|---|
 | sawyer-dozer.wav | Sawyer's Dozer | a diesel's chug: twelve firings a second, its exhaust, the tracks ticking |
-| boingo-pogo.wav | Boingo's Pogo | a spring's boing on every bounce, four a second, a little tune in their pitches |
+| boingo-pogo.wav | Boingo's Pogo | not a loop since Nov 15: its loop's 4 boings (low, mid, low, high) as one-shots back to back, 0.245 s each (cut from 2 ms before each boing's start, a 6 ms fade at its end), 0.98 s; one plays on each square you step (`RIDE_SOUND`'s `boings`) |

@@ -464,17 +464,19 @@ before the rows are laid (`street.ts lotHere`), so each row fills the place with
   size; the item's own tile keeps 1). **`?rideScale=K`** (0.5 to 1.25), a test switch (admins on the live site): every ride on that
   page at K, to try sizes; read once as the page opens (`test-switches.ts`).
   **Its moving sound** (Nov 14, Eric: "one continuous sound"; [2026-11-14-ride-sounds.md](../decisions/2026-11-14-ride-sounds.md)): a
-  ride listed in `RIDE_SOUND.rides` (Sawyer's Dozer and Boingo's Pogo so far; its loop `/sounds/rides/<id>.wav`) plays its loop while
-  your own pawn moves on it, in the town and a shop's room; standing, nothing; any other ride silent. It counts as moving until `holdMs`
-  (120) after your last step, so it never stops between steps; it fades in over `fadeInMs`, out over `fadeOutMs` (the dozer 700, the pogo
-  350), at its own speed `rate` (the pogo 1.5: 6 boings a second, Eric Nov 15), an engine (the dozer) coming up to that speed as it
-  starts and sinking a little as it fades; moving again mid-fade brings it back from
-  where it is. On the game's sounds (the Sound switch, a hidden page). The frame loops only say "you moved, on this ride" on moving frames
-  (`rideMoving`); a timer off the frame sees you stop (`ride-sound.ts`). Your ride's loop is fetched after the town's first frame.
+  ride listed in `RIDE_SOUND.rides` (its file `/sounds/rides/<id>.wav`) sounds as your own pawn moves on it, in the town and a shop's
+  room; standing, nothing; any other ride silent; on the game's sounds (the Sound switch, a hidden page). Sawyer's Dozer (`kind: "loop"`)
+  loops: it counts as moving until `holdMs` (120) after your last step, fades in over `fadeInMs` and out over `fadeOutMs` (700), coming
+  up to speed and sinking a little as it fades; moving again mid-fade brings it back from where it is. The frame loops only say "you
+  moved, on this ride" (`rideMoving`); a timer off the frame sees you stop. Your ride's file is fetched after the town's first frame.
+  Boingo's Pogo (`kind: "steps"`; Nov 15, Eric: "from one square to the next, it should be a boing";
+  [2026-11-15-pogo-boings.md](../decisions/2026-11-15-pogo-boings.md)): no loop, no fade; each step your walker begins (its `onStep`,
+  `rideStep`) plays the next of its 4 boings (low, mid, low, high) as its own one-shot, so they overlap, on the audio clock at the hop's
+  take-off (`on`; the ride's move frames play once a step: take-off 22.5 ms into a 90 ms step). A tap (2 squares) is 2 boings.
   Tests: `test/ride-sound.test.ts`; `e2e/town.spec.ts`, "rides (Oct 31; …)", its end.
   Test hook: `__townRide()` (yours: its ride, color and size, ready, the
   animation, frame and view the last frame drew, which way it faced, your box, foot and head on screen, your step's time, your trail's
-  marks and droplets showing, its moving sound (`sound`: its ride, coming up or fading, the sources alive, its loop); every other rider's, with its step's time; and the sets of frames held); `__townAt("square", [c, r])` says where a square is on screen; `__townPlayer(…, wear)` dresses the
+  marks and droplets showing, its moving sound (`sound`: its ride, coming up or fading, the sources alive, its loop; the boings started and playing); every other rider's, with its step's time; and the sets of frames held); `__townAt("square", [c, r])` says where a square is on screen; `__townPlayer(…, wear)` dresses the
   test player (a ride too).
 - **The bots and playing them** (Oct 27, Eric: "a few bots… with different skill level… if you tap them you can invite
   them to a game and then you both run over to the chessboard"; `docs/decisions/2026-10-27-town-bots.md`). **Twenty bots

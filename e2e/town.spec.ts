@@ -1304,6 +1304,8 @@ interface RideSeen {
     at: [number, number];
     stepMs: number;
     marks: { side: number; back: number; front: number; drops: number };
+    /** ride-sound.ts `rideSoundState`. */
+    sound: { ride: string | null; up: boolean; live: number; loop: unknown[] | null; level: number; rate: number; boings: number; boingsLive: number; decoded: string[] };
   };
   others: { id: string; ride: string; color: string; ready: boolean; box: { y0: number; y1: number; fy: number; hy: number } | null; stepMs: number | null }[];
 }
@@ -1331,10 +1333,11 @@ test("rides (Oct 31; Nov 1, every boss's): your pawn sits on its ride, the ride'
   // (Your profile: "View profile" on your card on a phone, the side menu's Profile on a computer.)
   await expect(page.getByRole("button", { name: "View profile", exact: true }).or(page.getByRole("navigation", { name: "Menu" }).getByRole("button", { name: "Profile" })).filter({ visible: true }).first()).toBeVisible();
   // (No crate holds a ride yet: given straight, as only admins have them.)
-  const [chirp, shoes, dozer] = await giveItems(page, [
+  const [chirp, shoes, dozer, pogo] = await giveItems(page, [
     { def: "riding-chirp", color: "cobalt", blemish: 40 },
     { def: "cheetah-shoes", color: "red", blemish: 0 },
     { def: "sawyer-dozer", color: "gold", blemish: 0 },
+    { def: "boingo-pogo", color: "gold", blemish: 0 },
   ]);
   await wearItem(page, "ride", chirp!);
   // Nothing is fetched for a ride but its drawing (Nov 1: its frames are drawn from it, no sheets; Nov 1, rides lazy: each ride's
@@ -1587,6 +1590,26 @@ test("rides (Oct 31; Nov 1, every boss's): your pawn sits on its ride, the ride'
   expect(said.filter((l) => l === "ride:start" || l === "ride:end"), "one start, one end").toEqual(["ride:start", "ride:end"]);
   for (let i = 1; i < said.length - 2; i++) if (said[i] === "ride:fade") expect(said[i + 1], "a dip comes straight back").toBe("ride:back");
   expect(log.at(-1)![1] - log.at(-2)![1], "let go only once the fade is done (700 ms)").toBeGreaterThanOrEqual(700);
+  // Boingo's Pogo (Nov 15, Eric: "every time ... you go from one square to the next, it should be a boing"): no loop, a boing a
+  // square, its own source each, the 4 in turn. (Counted by step events, so CI's few frames in a walk still give every square's.)
+  await wearItem(page, "ride", pogo!);
+  await page.goto("/town?sky=day");
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
+  await expect.poll(async () => (await rideNow(page)).you.ready, { message: "your pogo's frames are ready", timeout: 30_000 }).toBe(true);
+  expect((await rideNow(page)).you.ride).toBe("boingo-pogo");
+  await logRides();
+  await page.keyboard.press("Shift");
+  await ride([24, 25]);
+  await expect.poll(async () => (await rideNow(page)).you.sound.decoded, { message: "the pogo's boings decoded", timeout: 5_000 }).toContain("boingo-pogo");
+  await page.evaluate(() => ((window as unknown as { __rideLog: unknown[] }).__rideLog.length = 0));
+  const b0 = (await rideNow(page)).you.sound.boings;
+  await ride([24, 29]);
+  const boings = (await rideLog()).map(([l]) => l);
+  expect(boings, "a boing a square, the 4 in turn (4 squares)").toHaveLength(4);
+  const n0 = Number(boings[0]!.split(":").at(-1));
+  expect(boings).toEqual([0, 1, 2, 3].map((i) => `ride:boing:boingo-pogo:${(n0 + i) % 4}`));
+  expect((await rideNow(page)).you.sound).toMatchObject({ boings: b0 + 4, ride: null, live: 0 });
+  await expect.poll(async () => (await rideNow(page)).you.sound.boingsLive, { message: "standing: every boing played out", timeout: 2_000 }).toBe(0);
   expect(fetched).toEqual([]);
   expect(errors).toEqual([]);
 });
