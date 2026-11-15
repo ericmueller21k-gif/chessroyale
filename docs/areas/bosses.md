@@ -652,7 +652,11 @@ below):
   A move that brings a power's moment says nothing of its own (the moment's line is the boss's word that turn). Lights
   out's round prompt keeps its own box above the board for the whole round (and the dock). Each speaker's box keeps
   itself current (`VoiceBubble`: it listens to its voice and draws every frame while a line types and fades), so
-  nothing around it has to be drawn again for it. On a phone the boss's box is inside the boss bar (BossBar,
+  nothing around it has to be drawn again for it. **On a computer** the boss's box opens left from his figure's right edge, over his
+  head, no wider than the room from there to the side menu less 8 px (`--side-room`, set with his size and place; at most 220 px): a
+  long line wraps in it, at the speech font's 9 px, and the box keeps its size and place for the line's whole life, through every
+  screen the line outlives (yours, his). (Eric, Nov 15: Don Dough's box was right at first, then grew and slid under the menu as the
+  next screen drew it; guard: `e2e/boss-side.spec.ts`, "Eric's rule (Nov 15)"; docs/decisions/2026-11-15-boss-words-keep-their-place.md.) On a phone the boss's box is inside the boss bar (BossBar,
   `.bc-bar-bubble`; Oct 24, docs/decisions/2026-10-24-boss-bar-same.md): from the name column's left edge to the bar's right
   padding, under the status (its grid row 2, so never over the status), one row when short, else two balanced rows when two
   hold it at the room's width, else three, never more (`SpeechBox`'s `balanced`, `bubbleFit` in `speech.tsx`); its speech font,
@@ -915,7 +919,9 @@ below):
   beside the corner). Each stands a 12 px gap off the board where its room allows and comes over the board's outer edge, by at most
   `SIDE_FEEL.over` (0.05) of its side, where it doesn't; the boss is drawn over the board there (`.boss-side` z 6). The reach of each
   drawing at rest and where each beat ends is `SIDE_REACH` / `KING_REACH` (measured by a test). BossSide sets `--side-s`, `--side-d`,
-  `--king-k`, `--first-d` and `--king-room` (the God King's words and menu fit it) on the screen; the God King's frame past the window's
+  `--side-room` (the boss's words fit it), `--king-k`, `--first-d` and `--king-room` (the God King's words and menu fit it) on the
+  arena around the screen, which stays as the battle's screens take turns, so each new screen draws its figures and words in place
+  from its first frame (Nov 15; they were on the screen, set after its words had fitted themselves); the God King's frame past the window's
   edge is clipped (`.gm-main`), never scrolled to. The mirror (your pawn's middle as far from the board as the boss's) gave way to this:
   each side by its own room. A party's battle keeps 2 and its places. The board, a phone and 900 to 1099 px are unchanged.
   Decision: [2026-11-04-bigger-side-figures.md](../decisions/2026-11-04-bigger-side-figures.md).

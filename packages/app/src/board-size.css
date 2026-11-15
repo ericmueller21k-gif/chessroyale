@@ -112,7 +112,7 @@
   /* His words (Nov 1): his text box is no wider than his column, so its left edge stays in the window (boss alone's column is
      196 px now; Babur's 220 px fits his). */
   .arena .boss-side .bc-bubble {
-    max-width: min(220px, var(--ts-w, 196px));
+    max-width: min(220px, var(--ts-w, 196px), var(--side-room, 220px));
   }
   /* The God King's words beside your pawn (Boss alone): they open right of him, and the room there is the column's width less
      98 px (the board's share of the window is what's left: a bigger board pushes him right). They wrap to fit it, up to 250 px;
