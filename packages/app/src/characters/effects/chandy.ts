@@ -531,6 +531,93 @@ export const SHATTER: Character = {
   },
 };
 
+// ---- Aim lines and Dodge's beams: one square's length of a line running left to right (turned for a column or a diagonal).
+
+const CLONE_FX: Record<string, string> = {
+  O: "#ff3f5e",
+  F: "#c4243f",
+  Q: "#ffe0e6",
+  q: "#7c37ff",
+};
+function aimTile(): Cv {
+  const c = cv();
+  // A thin dashed line through the middle, a dark edge each side so it reads on light and dark squares.
+  for (let x = 0; x < S; x++) {
+    const on = x % 8 < 5;
+    if (!on) continue;
+    put(c, x, 15, "O");
+    put(c, x, 16, "O");
+    put(c, x, 14, "q");
+    put(c, x, 17, "q");
+  }
+  return c;
+}
+function beamLine(phase: number): Cv {
+  const c = cv();
+  for (let y = 7; y < 25; y++)
+    for (let x = 0; x < S; x++) {
+      const d = Math.abs(y + 0.5 - 16);
+      const wob = Math.sin((x + phase * 5) * 0.6) * 0.8;
+      if (d > 8 + wob) continue;
+      put(
+        c,
+        x,
+        y,
+        d < 2.2 ? "Q" : d < 4.6 + wob * 0.5 ? "O" : d < 7 ? "F" : "q",
+      );
+    }
+  return c;
+}
+const lineParts: Record<string, Part> = {
+  ...one("aim", aimTile()),
+  ...one("beam0", beamLine(0)),
+  ...one("beam1", beamLine(1)),
+};
+/**
+ * A line across one square: `aim` (a dashed warning line: the queen lock's in his cyan, Dodge's in the clones' pink) and `beam` (Dodge's
+ * beam firing, in the clones' colors). Laid square by square along a rank, a file (turned a quarter) or a diagonal.
+ */
+export const LINE_TILE: Character = {
+  id: "chandy-line",
+  name: "Chandy's aim line and Dodge's beam",
+  w: S,
+  h: S,
+  foot: [16, 31],
+  palette: CHANDY_FX_PALETTE,
+  parts: lineParts,
+  anims: {
+    aimCyan: lazyAnim(() => ({
+      loop: true,
+      frames: [
+        at("aim", 400),
+        {
+          ms: 400,
+          layers: [{ part: "aim", x: 0, y: 0 }],
+          pal: { O: "#e4ffff" },
+        },
+      ],
+    })),
+    aimPink: lazyAnim(() => ({
+      loop: true,
+      frames: [
+        { ms: 300, layers: [{ part: "aim", x: 0, y: 0 }], pal: CLONE_FX },
+        {
+          ms: 300,
+          layers: [{ part: "aim", x: 0, y: 0 }],
+          pal: { ...CLONE_FX, O: "#ffe0e6" },
+        },
+      ],
+    })),
+    beam: lazyAnim(() => ({
+      loop: true,
+      frames: [
+        { ms: 60, layers: [{ part: "beam0", x: 0, y: 0 }], pal: CLONE_FX },
+        { ms: 60, layers: [{ part: "beam1", x: 0, y: 0 }], pal: CLONE_FX },
+      ],
+    })),
+  },
+};
+
 /** Every one of Chandy's board sprites (for the preview and the mockup). */
 export const CHANDY_FX = {
   CROSSHAIR,

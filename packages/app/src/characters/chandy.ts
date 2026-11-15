@@ -68,12 +68,54 @@ export const CHANDY_PALETTE: Record<string, string> = {
   z: "#0d0e12", // ground shadow
 };
 
+/**
+ * The clone look (Eric, round 2: "that cool picture of him in all those colors... I like that"): the palette a GIF encoder scrambled
+ * his round-1 idle into (hot pink and red skin, neon green, a purple rim), measured from that GIF key by key and kept on purpose for his
+ * ultimate's afterimage clones. A look over his palette (`CHANDY.looks.clone`), its rim (the halo) purple.
+ */
+export const CHANDY_CLONE_PALETTE: Record<string, string> = {
+  a: "#2916ff",
+  b: "#26341f",
+  c: "#ff3f5e",
+  d: "#2bff56",
+  e: "#ff2c43",
+  v: "#20ff76",
+  f: "#f3eed8",
+  g: "#994aff",
+  h: "#9cba68",
+  i: "#57ff2a",
+  p: "#13151a",
+  P: "#1a16ff",
+  x: "#ff9f9a",
+  y: "#16ff66",
+  Y: "#6340ff",
+  w: "#ff129c",
+  W: "#ff1d2c",
+  m: "#ff414b",
+  L: "#8aff45",
+  M: "#c290ff",
+  N: "#8a865a",
+  n: "#442aff",
+  G: "#13151a",
+  H: "#0c0d11",
+  I: "#ff6976",
+  J: "#64ffc9",
+  j: "#c3ff3d",
+  F: "#272e36",
+  O: "#e6dfb2",
+  Q: "#ffa1ae",
+  z: "#ff9f9a",
+};
+export const CHANDY_CLONE_HALO = "#7c37ff";
+
 /** The figure is painted from x 0 and shifted OX px right in its frame (room for the rifle's muzzle over his back shoulder). */
-const OX = 6;
-const W = 106;
-const H = 112;
+const OX = 12;
+/** And OY px down (room for the full-length rifle's muzzle over his head). */
+const OY = 10;
+const W = 118;
+const H = 122;
 const GROUND = 106;
-export const CHANDY_FOOT: Pt = [46 + OX, GROUND];
+export const CHANDY_FOOT: Pt = [46 + OX, GROUND + OY];
 
 // ---- Painting helpers (the zebra rig's, by the same rules: whole pixels, one key a pixel, lit from the top left).
 
@@ -462,6 +504,12 @@ export function rifleShapes(stage: RifleStage): {
  * Paints the rifle with its butt at `butt`, pointing `deg` (screen degrees: 0 right, -90 up). Its top (the scope's side) is to
  * the left of the way it points (up when it points right). Returns its muzzle.
  */
+/**
+ * The rifle's shapes are laid out in base units along its length; it's drawn this many times longer (Eric, round 2: "his full length":
+ * 78 px at the base, 112 fully upgraded), its thickness unchanged.
+ */
+export const RIFLE_LEN_K = 1.3;
+
 export function paintRifle(
   c: Cv,
   butt: Pt,
@@ -477,7 +525,7 @@ export function paintRifle(
   // How much a shape's top faces the light (never quite flat, so a part always reads round).
   const sRaw = vx * LX + vy * LY;
   const sl = Math.sign(sRaw || 1) * Math.max(0.55, Math.abs(sRaw));
-  const reach = len + 14;
+  const reach = len * RIFLE_LEN_K + 14;
   for (
     let y = Math.floor(butt[1] - reach);
     y <= Math.ceil(butt[1] + reach);
@@ -490,7 +538,7 @@ export function paintRifle(
     ) {
       const dx = x + 0.5 - butt[0];
       const dy = y + 0.5 - butt[1];
-      const u = dx * ux + dy * uy;
+      const u = (dx * ux + dy * uy) / RIFLE_LEN_K;
       const v = dx * vx + dy * vy;
       let k: string | null = null;
       for (const sh of shapes) {
@@ -518,7 +566,7 @@ export function paintRifle(
       if (k && k !== ".") put(c, x, y, k);
       else if (k === ".") put(c, x, y, ".");
     }
-  return [butt[0] + ux * len, butt[1] + uy * len];
+  return [butt[0] + ux * len * RIFLE_LEN_K, butt[1] + uy * len * RIFLE_LEN_K];
 }
 
 // ---- The pose.
@@ -554,11 +602,12 @@ export interface ChandyPose {
 const SHOULDER_N: Pt = [55, 64];
 const SHOULDER_F: Pt = [35, 65];
 const NECK: Pt = [48, 58];
-/** Where the slung rifle leaves his back at the shoulder, and the way it points (up and to our left, over his back). */
-const SLING_EXIT: Pt = [34, 62];
-const SLING_DEG = -121;
-/** How far back from the shoulder the slung rifle's butt is (hidden in his back). */
-const SLING_BACK = 20;
+/**
+ * The slung rifle (round 2: his full length): its butt down by his hip over his tail, running up along his back, its muzzle over his
+ * head (up and a little to our left).
+ */
+const SLUNG_BUTT: Pt = [37, 100];
+const SLING_DEG = -110;
 export const ARMS = {
   /** His hand on the sling at his chest (the soldier's rest). */
   sling: [
@@ -1071,11 +1120,7 @@ export function build(stage: RifleStage, p: ChandyPose): Built {
   const gun = p.gun ?? { slung: true };
   const sDx = "slung" in gun ? (gun.dx ?? 0) : 0;
   const sDy = "slung" in gun ? (gun.dy ?? 0) : 0;
-  const rad = (SLING_DEG * Math.PI) / 180;
-  const slungButt: Pt = [
-    SLING_EXIT[0] - Math.cos(rad) * SLING_BACK + sDx,
-    SLING_EXIT[1] - Math.sin(rad) * SLING_BACK + bob + sDy,
-  ];
+  const slungButt: Pt = [SLUNG_BUTT[0] + sDx, SLUNG_BUTT[1] + bob + sDy];
   let muzzle: Pt = [0, 0];
   const shN: Pt = [SHOULDER_N[0], SHOULDER_N[1] + bob];
   const shF: Pt = [SHOULDER_F[0], SHOULDER_F[1] + bob];
@@ -1126,12 +1171,12 @@ export function build(stage: RifleStage, p: ChandyPose): Built {
       p.handN ?? "fist",
     ),
   );
-  for (const l of layers) l.x += OX;
+  for (const l of layers) ((l.x += OX), (l.y += OY));
   return {
     layers,
-    muzzle: [muzzle[0] + OX, muzzle[1]],
-    lens: [56.5 + headAt[0] + OX, 37.6 + headAt[1]],
-    hand: [hand[0] + OX, hand[1]],
+    muzzle: [muzzle[0] + OX, muzzle[1] + OY],
+    lens: [56.5 + headAt[0] + OX, 37.6 + headAt[1] + OY],
+    hand: [hand[0] + OX, hand[1] + OY],
   };
 }
 
@@ -1365,12 +1410,13 @@ export const CHANDY: Character = {
   foot: CHANDY_FOOT,
   palette: CHANDY_PALETTE,
   halo: "#26341f",
+  looks: { clone: CHANDY_CLONE_PALETTE },
   parts: CHANDY_PARTS,
   anims: { idle, point },
 };
 
 /** The firing pose needs room for the rifle held out level: the same figure in a frame `FIRE_ROOM` px wider on our right. */
-export const FIRE_ROOM = 44;
+export const FIRE_ROOM = 56;
 export const CHANDY_FIRE: Character = {
   ...CHANDY,
   id: "chandy-fire",
@@ -1413,12 +1459,12 @@ export const CHANDY_AIMS: Character = {
 };
 
 /** The rifle alone, level, at each stage (the upgrade window shows it): 100 x 30, its butt at [8, 15]. */
-export const RIFLE_W = 100;
+export const RIFLE_W = 132;
 export const RIFLE_H = 30;
 const rifleOnly = (stage: RifleStage): Frame => {
   const r = part(
     `solo-rifle:${stage}`,
-    (c) => void paintRifle(c, [8, 15], 0, stage),
+    (c) => void paintRifle(c, [6, 15], 0, stage),
     true,
     RIFLE_W,
     RIFLE_H,
@@ -1444,12 +1490,56 @@ export const CHANDY_RIFLE: Character = {
   ),
 };
 
+/** The clones' poses for Dodge: aiming level (a row's beam) and straight down (a column's: he stands over its top end). */
+export const CLONE_POSES: Record<"level" | "down", ChandyPose> = {
+  level: FIRE_POSES.aim,
+  down: {
+    ...FIRE_POSES.aim,
+    armN: [
+      [3, 8],
+      [2, 13],
+    ],
+    gun: { at: [-2, -10], deg: 90, front: true },
+    head: [1, 1],
+  },
+};
+/** His afterimage clones (Dodge): the clone palette, the rifle fully upgraded, in a frame with room for the rifle aimed level or down. */
+export const CHANDY_CLONE: Character = {
+  ...CHANDY,
+  id: "chandy-clone",
+  name: "Chandy's afterimage",
+  w: W + FIRE_ROOM,
+  h: H + 112,
+  palette: { ...CHANDY_PALETTE, ...CHANDY_CLONE_PALETTE },
+  halo: CHANDY_CLONE_HALO,
+  anims: {
+    idle: lazyAnim(() => ({ loop: true, frames: [frame(5, 1000, REST)] })),
+    level: lazyAnim(() => ({
+      loop: true,
+      frames: [frame(5, 1000, CLONE_POSES.level)],
+    })),
+    down: lazyAnim(() => ({
+      loop: true,
+      frames: [frame(5, 1000, CLONE_POSES.down)],
+    })),
+    fireLevel: lazyAnim(() => ({
+      loop: true,
+      frames: [
+        frame(5, 1000, FIRE_POSES.fire, { specks: (b) => burst(b.muzzle, 0) }),
+      ],
+    })),
+  },
+};
+/** Where a clone's muzzle is in its frame, by pose (for the beams' starting points). */
+export const cloneMuzzle = (pose: "level" | "down"): Pt =>
+  build(5, CLONE_POSES[pose]).muzzle;
+
 /** The part of him a portrait shows (his head, lens and war paint, the rifle's barrel over his shoulder), in frame px. */
-export const CHANDY_PORTRAIT = { x: 36, y: 26, w: 58, h: 36 } as const;
+export const CHANDY_PORTRAIT = { x: 42, y: 36, w: 58, h: 36 } as const;
 
 /** His select tile's framing (boss-select.ts SELECT_FRAMING): his neck, the frame's px across the tile, how far down the neck sits. */
 export const CHANDY_SELECT_FRAMING = {
-  neck: [56, 58],
+  neck: [62, 68],
   span: 60,
   at: 0.56,
 } as const;
@@ -1460,11 +1550,11 @@ export const CHANDY_SPRITE: Sprite = {
   facing: "right",
   anchors: {
     feet: CHANDY_FOOT,
-    head: [56 + OX, 44],
+    head: [56 + OX, 44 + OY],
     hands: {
       sling: [
         SHOULDER_N[0] + ARMS.sling[1][0] + OX,
-        SHOULDER_N[1] + ARMS.sling[1][1],
+        SHOULDER_N[1] + ARMS.sling[1][1] + OY,
       ],
     },
   },

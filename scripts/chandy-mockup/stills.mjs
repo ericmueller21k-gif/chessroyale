@@ -231,7 +231,7 @@ async function setup() {
       e.style.visibility = "hidden";
     if (prop) {
       const c = canvasOf(ch.CHANDY_RIFLE, `stage${stage}`, 0);
-      const s = device === "desktop" ? 1 : 1.5;
+      const s = device === "desktop" ? 1 : 1.25;
       bar.push(place(c, prop.right - c.width * s - 2, prop.top + 2, s));
       const pips = document.createElement("div");
       pips.className = "mk-pips";
@@ -329,7 +329,139 @@ async function setup() {
     dockWant = text;
     keep();
   };
+  // ---- Dodge (his ultimate): the board zoomed onto your king, a 3 x 3 arena of its own round him, the clones, the lines, the timer.
+  const Z = 1.4;
+  const dodge = (st) => {
+    document.querySelectorAll("#mk .mk-dodge").forEach((e) => e.remove());
+    const wrapEl = document.querySelector(".board-wrap");
+    const boardEl = document.querySelector(".board");
+    const ps = pieces();
+    const ksq = Object.keys(ps).find((q) => ps[q] === "K");
+    const kf = ksq.charCodeAt(0) - 97;
+    const kr = Number(ksq[1]);
+    const z = st.zoom ?? Z;
+    // (Measure the board untransformed.)
+    boardEl.style.transform = "";
+    const w = wrapEl.getBoundingClientRect();
+    const b = boardEl.getBoundingClientRect();
+    const sqz = b.width / 8;
+    const kx = (kf + 0.5) * sqz + (b.left - w.left);
+    const ky = (8 - kr + 0.5) * sqz + (b.top - w.top);
+    wrapEl.style.overflow = "hidden";
+    boardEl.style.transformOrigin = "0 0";
+    const f = (z - 1) / (Z - 1);
+    boardEl.style.transform = `translate(${(w.width / 2 - kx * Z) * f}px, ${(w.height / 2 - ky * Z) * f}px) scale(${z})`;
+    if (z < Z) return;
+    const C = { x: w.left + w.width / 2, y: w.top + w.height / 2 };
+    const cell = sqz * Z;
+    const el = (cls, css, html = "") => {
+      const d = document.createElement("div");
+      d.className = `mk-dodge ${cls}`;
+      d.style.cssText = `position:absolute;${css}`;
+      d.innerHTML = html;
+      layer.append(d);
+      return d;
+    };
+    // Dim the board round the arena.
+    el(
+      "",
+      `left:${w.left}px;top:${w.top}px;width:${w.width}px;height:${w.height}px;background:rgba(10,8,20,.45)`,
+    );
+    // The arena: its own 9 squares in the board's colors (whether or not the board has them: your king on its edge here).
+    for (let dr = -1; dr <= 1; dr++)
+      for (let dc = -1; dc <= 1; dc++) {
+        const light = (kf + dc + (kr - dr)) % 2 === 1;
+        el(
+          "",
+          `left:${C.x + (dc - 0.5) * cell}px;top:${C.y + (dr - 0.5) * cell}px;width:${cell}px;height:${cell}px;background:${light ? "#efdcb5" : "#c4ad8b"};box-shadow:inset 0 0 0 1px rgba(0,0,0,.18)`,
+        );
+      }
+    el(
+      "",
+      `left:${C.x - 1.5 * cell - 3}px;top:${C.y - 1.5 * cell - 3}px;width:${3 * cell}px;height:${3 * cell}px;border:3px solid #ff3f5e;border-radius:4px;box-shadow:0 0 12px #ff3f5e80`,
+    );
+    // Your king: the board's own piece, on the square you've picked (hidden on the board under the arena).
+    const kEl = document.querySelector(".board piece.white.king");
+    if (kEl) kEl.style.visibility = "hidden";
+    const bg = kEl ? getComputedStyle(kEl).backgroundImage : "";
+    const [kc, krr] = st.king ?? [0, 0];
+    const king = el(
+      "",
+      `left:${C.x + (kc - 0.5) * cell}px;top:${C.y + (krr - 0.5) * cell}px;width:${cell}px;height:${cell}px;background:${bg} center/88% no-repeat;z-index:3`,
+    );
+    if (st.result === "hit")
+      ((king.style.filter =
+        "drop-shadow(0 0 4px #fff) drop-shadow(0 0 10px #ff3f5e) drop-shadow(0 0 3px #ff3f5e)"),
+        (king.style.zIndex = "7"));
+    // The lines: the two rows and the two columns that miss the safe square.
+    const [sc, sr] = st.safe;
+    const rows = [-1, 0, 1].filter((r) => r !== sr);
+    const cols = [-1, 0, 1].filter((c2) => c2 !== sc);
+    const tile = (anim, i, x, y, rot) => {
+      const c2 = canvasOf(fx.LINE_TILE, anim, i);
+      c2.style.cssText = `position:absolute;image-rendering:pixelated;left:${x - cell / 2}px;top:${y - cell / 2}px;width:${cell}px;height:${cell}px;${rot ? "transform:rotate(90deg);" : ""}z-index:4`;
+      c2.classList.add("mk-dodge");
+      layer.append(c2);
+    };
+    const clones = st.clones ?? 4;
+    const lines = [
+      ...rows.map((r, i) => ({ row: r, side: i === 0 ? -1 : 1 })),
+      ...cols.map((c2) => ({ col: c2 })),
+    ];
+    lines.forEach((ln, n) => {
+      if (n >= clones) return;
+      // Its clone: rows from the left or the right, aiming level; columns from above, aiming down.
+      const pose = ln.row !== undefined ? "level" : "down";
+      const cc = canvasOf(ch.CHANDY_CLONE, pose, 0);
+      const m = ch.cloneMuzzle(pose);
+      const k = 0.5;
+      let x0;
+      let y0;
+      let flip = false;
+      if (ln.row !== undefined) {
+        if (ln.side < 0) x0 = C.x - 1.5 * cell - 6 - m[0] * k;
+        else
+          ((x0 = C.x + 1.5 * cell + 6 - (cc.width - m[0]) * k), (flip = true));
+        y0 = C.y + ln.row * cell - m[1] * k;
+      } else {
+        x0 = C.x + ln.col * cell - m[0] * k;
+        y0 = C.y - 1.5 * cell - 6 - m[1] * k;
+      }
+      cc.style.cssText = `position:absolute;image-rendering:pixelated;left:${x0}px;top:${y0}px;width:${cc.width * k}px;height:${cc.height * k}px;${flip ? "transform:scaleX(-1);" : ""}z-index:5;opacity:${st.ghost?.[n] ?? 1}`;
+      cc.classList.add("mk-dodge");
+      layer.append(cc);
+      if (!st.lines) return;
+      const anim = st.lines === "beam" ? "beam" : "aimPink";
+      const fi = st.lines === "beam" ? (st.beamFrame ?? 0) : 0;
+      if (ln.row !== undefined)
+        for (let dc = -1; dc <= 1; dc++)
+          tile(anim, fi, C.x + dc * cell, C.y + ln.row * cell, false);
+      else
+        for (let dr = -1; dr <= 1; dr++)
+          tile(anim, fi, C.x + ln.col * cell, C.y + dr * cell, true);
+    });
+    // The HUD under the arena: the round, the 3 s timer as a draining bar and its seconds.
+    const t = st.t ?? 3;
+    el(
+      "",
+      `left:${C.x - 120}px;top:${C.y + 1.5 * cell + 10}px;width:240px;display:grid;gap:5px;justify-items:center;font-family:"Press Start 2P",monospace;color:#fff;text-shadow:2px 2px 0 #0b0b1a;z-index:6`,
+      `<div style="font-size:11px">DODGE! <span style="color:#ff8fa3">ROUND ${st.round ?? 1}/3</span></div>
+       <div style="width:220px;height:10px;border:2px solid #fff;border-radius:3px;background:#0b0b1a;overflow:hidden"><div style="height:100%;width:${(t / 3) * 100}%;background:${t > 1 ? "#ff3f5e" : "#ffe0e6"}"></div></div>
+       <div style="font-size:9px;color:#ffe0e6">${st.locked ? "LOCKED" : `${t.toFixed(1)} s`}</div>`,
+    );
+    if (st.result) {
+      // The result where the round's line was, big, on a dark pill under the arena.
+      const big =
+        st.result === "hit" ? "HIT! YOU LOSE" : `DODGED ${st.round ?? 1}/3`;
+      el(
+        "",
+        `left:${C.x - 150}px;top:${C.y + 1.5 * cell + 6}px;width:300px;padding:6px 0;text-align:center;background:#0b0b1a;border:2px solid ${st.result === "hit" ? "#ff3f5e" : "#f2c14e"};border-radius:6px;font:400 14px "Press Start 2P",monospace;color:${st.result === "hit" ? "#ff3f5e" : "#f2c14e"};text-shadow:2px 2px 0 #000;z-index:9`,
+        big,
+      );
+    }
+  };
   window.__mk = {
+    dodge,
     ch,
     fx,
     sp,
@@ -390,8 +522,8 @@ const SCENES = {
       const w = document.createElement("div");
       w.className = "mk-win";
       const c = m.canvasOf(m.ch.CHANDY_RIFLE, "stage2", 0);
-      c.style.width = `${c.width * 3}px`;
-      c.style.height = `${c.height * 3}px`;
+      c.style.width = `${c.width * 2.5}px`;
+      c.style.height = `${c.height * 2.5}px`;
       w.innerHTML = `<h2>UPGRADE!</h2><div class="mk-art"></div><div class="mk-l">BIG SCOPE  2/5</div><div class="mk-n">New move unlocked: Shields</div>`;
       w.querySelector(".mk-art").append(c);
       m.layer.append(w);
@@ -444,8 +576,8 @@ const SCENES = {
         const w = document.createElement("div");
         w.className = "mk-win";
         const c = m.canvasOf(m.ch.CHANDY_RIFLE, `stage${stage}`, 0);
-        c.style.width = `${c.width * 3}px`;
-        c.style.height = `${c.height * 3}px`;
+        c.style.width = `${c.width * 2.5}px`;
+        c.style.height = `${c.height * 2.5}px`;
         const title = ["snap", "flash", "new", "new2", "out0", "out1"].includes(
           step,
         )
@@ -469,7 +601,7 @@ const SCENES = {
           for (let j = 0; j < g2.data.length; j += 4)
             if (g1.data[j + 3] && j / 4 / s2.width > 11) g2.data[j + 3] = 0;
           s2.getContext("2d").putImageData(g2, 0, 0);
-          s2.style.cssText = `position:absolute;left:0;top:${step === "slide0" ? -30 : -10}px;width:${s2.width * 3}px;height:${s2.height * 3}px;image-rendering:pixelated`;
+          s2.style.cssText = `position:absolute;left:0;top:${step === "slide0" ? -25 : -8}px;width:${s2.width * 2.5}px;height:${s2.height * 2.5}px;image-rendering:pixelated`;
           art.append(s2);
         }
         if (step === "flash") {
@@ -661,6 +793,232 @@ const SCENES = {
       );
     });
     await shot(p, "move-queen");
+  },
+  async dodgeAim(p) {
+    await p.evaluate(() => {
+      const m = window.__mk;
+      m.barAt(5, 1);
+      m.figureAt(m.ch.CHANDY_FIRE, "fire", 2);
+      m.dodge({ safe: [1, -1], king: [0, 0], lines: "aim", t: 2.2, round: 1 });
+      m.dock("Dodge! Find the one safe square.");
+    });
+    await shot(p, "dodge-aim");
+  },
+  async dodgeDodged(p) {
+    await p.evaluate(() => {
+      const m = window.__mk;
+      m.barAt(5, 1);
+      m.figureAt(m.ch.CHANDY_FIRE, "fire", 4);
+      m.dodge({
+        safe: [1, -1],
+        king: [1, -1],
+        lines: "beam",
+        t: 0,
+        locked: true,
+        round: 1,
+        result: "dodged",
+      });
+      m.dock("Dodged! Round 2 of 3 next.");
+    });
+    await shot(p, "dodge-dodged");
+  },
+  async dodgeHit(p) {
+    await p.evaluate(() => {
+      const m = window.__mk;
+      m.barAt(5, 1);
+      m.figureAt(m.ch.CHANDY_FIRE, "fire", 3);
+      m.dodge({
+        safe: [-1, 1],
+        king: [0, 0],
+        lines: "beam",
+        beamFrame: 1,
+        t: 0,
+        locked: true,
+        round: 3,
+        result: "hit",
+      });
+      m.dock("Hit! Chandy wins the battle.");
+    });
+    await shot(p, "dodge-hit");
+  },
+  async dodgeGif(p) {
+    // One round, about 5 s: the zoom onto your king, the clones blink in round the arena, the aim lines, the 3 s, your king steps to
+    // the safe square, LOCKED, the beams fire, DODGED.
+    const dir = join(out, "gif-dodge");
+    rmSync(dir, { recursive: true, force: true });
+    mkdirSync(dir, { recursive: true });
+    await p.evaluate(() => {
+      const m = window.__mk;
+      m.barAt(5, 1);
+      m.figureAt(m.ch.CHANDY_FIRE, "fire", 2);
+      m.dock("Dodge! Find the one safe square.");
+    });
+    const safe = [-1, 0];
+    const steps = [
+      [120, { zoom: 1.13 }],
+      [120, { zoom: 1.27 }],
+      [160, { safe, clones: 0 }],
+      [120, { safe, clones: 1, ghost: [0.5] }],
+      [120, { safe, clones: 2, ghost: [1, 0.5] }],
+      [120, { safe, clones: 3, ghost: [1, 1, 0.5] }],
+      [120, { safe, clones: 4, ghost: [1, 1, 1, 0.5] }],
+    ];
+    for (let t = 3; t > 0.01; t -= 0.25)
+      steps.push([
+        250,
+        { safe, lines: "aim", t, king: t < 1.6 ? safe : [0, 0] },
+      ]);
+    steps.push([300, { safe, lines: "aim", t: 0, locked: true, king: safe }]);
+    for (let i = 0; i < 6; i++)
+      steps.push([
+        70,
+        {
+          safe,
+          lines: "beam",
+          beamFrame: i % 2,
+          t: 0,
+          locked: true,
+          king: safe,
+        },
+      ]);
+    steps.push([
+      1100,
+      { safe, lines: "beam", t: 0, locked: true, king: safe, result: "dodged" },
+    ]);
+    let i = 0;
+    for (const [ms, st] of steps) {
+      await p.evaluate((st) => window.__mk.dodge({ round: 1, ...st }), st);
+      for (let k = 0; k < Math.round(ms / 40); k++)
+        await p.screenshot({
+          path: join(dir, `${String(i++).padStart(4, "0")}.png`),
+        });
+    }
+    execFileSync("ffmpeg", [
+      "-y",
+      "-loglevel",
+      "error",
+      "-framerate",
+      "25",
+      "-i",
+      join(dir, "%04d.png"),
+      "-vf",
+      "scale=390:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=160[p];[b][p]paletteuse",
+      join(out, `${device}-dodge.gif`),
+    ]);
+    rmSync(dir, { recursive: true, force: true });
+    console.log("gif dodge");
+  },
+  async queenAim(p) {
+    await p.evaluate(() => {
+      const m = window.__mk;
+      m.barAt(5, 1);
+      m.figureAt(m.ch.CHANDY, "point", 3);
+      const ps = m.pieces();
+      const q = Object.keys(ps).find((s) => ps[s] === "Q") ?? "d1";
+      m.onSquare(m.fx.CROSSHAIR, "held", 1, q);
+      // The aim: a dashed line from his edge straight down her file to her.
+      for (let r = 8; r > Number(q[1]); r--)
+        m.onSquare(
+          m.fx.LINE_TILE,
+          "aimCyan",
+          0,
+          `${q[0]}${r}`,
+        ).style.transform = "rotate(90deg)";
+      m.dock("Queen lock: he fires at her next.");
+    });
+    await shot(p, "queen-lock-aim");
+  },
+  async queenShot(p) {
+    // Your answer: the queen steps behind a pawn (here d1 to e2, behind the e4 pawn), then he fires down her new file.
+    const b = await p.evaluate(() =>
+      (({ left, top, width }) => ({ left, top, width }))(
+        document.querySelector(".board").getBoundingClientRect(),
+      ),
+    );
+    const tap = async (s) => {
+      const q = b.width / 8;
+      await p.mouse.click(
+        b.left + (s.charCodeAt(0) - 97 + 0.5) * q,
+        b.top + (8 - Number(s[1]) + 0.5) * q,
+      );
+    };
+    const before = await p.evaluate(() => window.__mk.fen());
+    // Her answer: a queen move (a slide along a clear line) to a square with one of your pawns in front of her on its file.
+    const pick = await p.evaluate(() => {
+      const ps = window.__mk.pieces();
+      const q = Object.keys(ps).find((s) => ps[s] === "Q");
+      const F = (s) => s.charCodeAt(0) - 97;
+      const name = (f, r) => `${String.fromCharCode(97 + f)}${r}`;
+      const out = [];
+      for (const [df, dr] of [
+        [1, 0],
+        [-1, 0],
+        [0, 1],
+        [1, 1],
+        [-1, 1],
+        [1, -1],
+        [-1, -1],
+        [0, -1],
+      ])
+        for (let k = 1; k < 8; k++) {
+          const f = F(q) + df * k;
+          const r = Number(q[1]) + dr * k;
+          if (f < 0 || f > 7 || r < 1 || r > 8 || ps[name(f, r)]) break;
+          if (f === F(q)) continue;
+          let first = null;
+          for (let rr = r + 1; rr <= 8 && !first; rr++)
+            if (ps[name(f, rr)]) first = ps[name(f, rr)];
+          if (first === "P") out.push(name(f, r));
+        }
+      return [q, out[0]];
+    });
+    console.log("queen answer", pick);
+    if (pick[1]) {
+      await tap(pick[0]);
+      await p.waitForTimeout(200);
+      await tap(pick[1]);
+      await p.waitForTimeout(700);
+    }
+    const t0 = Date.now();
+    while (
+      Date.now() - t0 < 60000 &&
+      !(await p.evaluate(
+        () =>
+          /Your move/.test(document.body.innerText) &&
+          !window.match?.phase?.thinking,
+      ))
+    )
+      await p.waitForTimeout(300);
+    await p.waitForTimeout(600);
+    await p.evaluate(() => {
+      const m = window.__mk;
+      m.barAt(5, 1);
+      m.figureAt(m.ch.CHANDY_FIRE, "fire", 3);
+      const ps = m.pieces();
+      const q = Object.keys(ps).find((s) => ps[s] === "Q");
+      const f = q[0];
+      let blocker = null;
+      for (let r = Number(q[1]) + 1; r <= 8 && !blocker; r++)
+        if (ps[`${f}${r}`] && /[A-Z]/.test(ps[`${f}${r}`]))
+          blocker = `${f}${r}`;
+      m.onSquare(m.fx.CROSSHAIR, "held", 1, q);
+      const top = blocker ? Number(blocker[1]) : Number(q[1]);
+      for (let r = 8; r > top; r--)
+        m.onSquare(m.fx.PIERCING_ROUND, "trail", 0, `${f}${r}`);
+      m.onSquare(
+        m.fx.PIERCING_ROUND,
+        "fly",
+        0,
+        `${f}${top + 1}`,
+      ).style.transform = "rotate(90deg)";
+      if (blocker) m.onSquare(m.fx.SHATTER, "shatter", 1, blocker, 1.6);
+      m.dock(
+        blocker
+          ? `Queen lock: a ${{ P: "pawn", N: "knight", B: "bishop", R: "rook" }[ps[blocker]] ?? "piece"} took it.`
+          : "Queen lock: your queen falls.",
+      );
+    });
+    await shot(p, "queen-lock-shot");
   },
   async queenWarn(p) {
     await p.evaluate(() => {
