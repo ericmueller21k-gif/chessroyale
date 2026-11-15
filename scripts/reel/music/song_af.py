@@ -4,7 +4,7 @@ a "seamless 2-minute looping 16-bit FM chiptune track"); song_ae.py took its sty
 motifs, as for a write-up of someone else's track. He then said: "I came up with this one ... can you just give me
 another version where you actually copy the one I sent? I'm not sure which one I'll go with ... actually use what I
 gave you and do one more." It is his to give, so this one is the write-up, part for part:
-  - 128 beats a minute, four in a bar, 64 bars: 120.0 s.
+  - 128 beats a minute, four in a bar. (Its 64 bars, 120.0 s, at first; 88 bars now: below.)
   - C Hungarian minor (C D Eb F# G Ab B), leaning on the F#, the Ab and the B.
   - Its chord loop, a chord a bar: Cm, Cm (with the F# as a neighbor), Abmaj7#11, G7b9, Fm7, D#dim7, G7sus4, G7#5.
   - Its six patches: an FM bell (the modulator 3.5 times the carrier, no attack, 250 ms); a ghost whistle (a high
@@ -17,16 +17,25 @@ gave you and do one more." It is his to give, so this one is the write-up, part 
     falling diminished chord into bar 1.
 What it leaves to whoever builds it is written here, inside its rules, and is original (none of it is any song's or
 any game's): the calliope's tune, the bell's slow tune, the pluck's riff, the chase's figures and the bass's groove.
+Of the two minutes of it ("that's so good ... I like the second one"), then: "I'm kind of changing the rule. I feel
+like 2 minutes and 30 seconds or 2 minutes and 45 seconds just plays. It's less repetitive ... make this one longer,
+just sticking to, you know." So it is 88 bars, 165.0 s, made longer out of its own sections and nothing new: the
+breakdown is twice as long (the whistle and the bell's three notes come in over the riff's second time), and the
+calliope's groove comes back after the chase, before the high wire (first with the xylophone on its tune an octave
+up, then with the pluck's riff under it).
 It asks for things SOUNDS.md says he has turned down before (runs of 16ths up and down, a biting reed lead, a trill):
 they are in, as asked. song_ae.py is the version without them.
   python3 song_af.py <out.wav>
 
   bars  1-8    0:00  the haunted music box: a heartbeat; the bell's three notes; the whistle; then the bell's 16ths climbing
   bars  9-24   0:15  the manic calliope groove: the kit, the bouncing bass, the calliope's tune (twice)
-  bars 25-32   0:45  the breakdown: the dry kit, a deep bass, the acid-drop pluck's off-beat riff
-  bars 33-44   1:00  the gothic organ and the bell: the organ's four chords under the beat, the bell's slow tune
-  bars 45-56   1:22  the chase: the calliope and a xylophone trading runs up the chord and down by half steps
-  bars 57-64   1:45  the high wire: the bass and kit hammering G7b9; the climb, the trill, the cascade down into bar 1
+  bars 25-40   0:45  the breakdown: the dry kit, a deep bass, the acid-drop pluck's off-beat riff; its second time
+                     (1:00) the whistle glides over it and the bell's three notes answer
+  bars 41-52   1:15  the gothic organ and the bell: the organ's four chords under the beat, the bell's slow tune
+  bars 53-64   1:37  the chase: the calliope and a xylophone trading runs up the chord and down by half steps
+  bars 65-80   2:00  the calliope's groove again: its tune with the xylophone an octave over it, then with the
+                     pluck's riff under it
+  bars 81-88   2:30  the high wire: the bass and kit hammering G7b9; the climb, the trill, the cascade down into bar 1
 """
 import sys
 
@@ -35,9 +44,9 @@ import numpy as np
 from song_r import beats, notes
 from synth import Ride, n, write_wav
 
-BPM, BARS = 128, 64
+BPM, BARS = 128, 88
 BEATS = 4 * BARS
-TAPE = BEATS * 60 / BPM  # 120.0 s
+TAPE = BEATS * 60 / BPM  # 165.0 s
 bar0 = lambda bar: 4 * (bar - 1)  # the beat a bar (from 1) starts at
 RIDE = [(0, BEATS, BPM, BPM, 1.0, 1.0, 0.0)]
 
@@ -54,7 +63,8 @@ TENT = {
     "Ab": ("Ab2", "C4 Eb4 Ab4 C5", ""), "Fm": ("F2", "C4 F4 Ab4 C5", ""), "G7": ("G2", "B3 D4 F4 G4", ""),
 }
 LOOP = "Cm Cm Abmaj7#11 G7b9 Fm7 D#dim7 G7sus4 G7#5"
-CHORDS = (f"Cm Cm Cm Cm Cdim Cdim Cdim Cdim  {LOOP} {LOOP}  {LOOP}  Cm Ab Fm G7 Cm Ab Fm G7 Cm Ab Fm G7  {LOOP} Cm Cm Abmaj7#11 G7b9  " + "G7b9 " * 8).split()
+CHORDS = (f"Cm Cm Cm Cm Cdim Cdim Cdim Cdim  {LOOP} {LOOP}  {LOOP} {LOOP}  Cm Ab Fm G7 Cm Ab Fm G7 Cm Ab Fm G7  {LOOP} Cm Cm Abmaj7#11 G7b9  "
+          f"{LOOP} {LOOP}  " + "G7b9 " * 8).split()
 assert len(CHORDS) == BARS, len(CHORDS)
 # The bass's groove: the 16th, half steps over the bar's root, a note or a pop (octaves and fifths, off the beat).
 GROOVE = ((0, 0, "n"), (2, 12, "p"), (3, 0, "n"), (6, 7, "p"), (8, 0, "n"), (10, 12, "p"), (11, 0, "n"), (14, 7, "p"))
@@ -270,9 +280,10 @@ def render(window=None) -> np.ndarray:
         beat(bar, 1.0, sixteenths=bar >= 17, opens=bar % 4 == 0), groove(bar)
     calliope(bar0(9), TUNE), calliope(bar0(17), TUNE)
 
-    # Section 3, bars 25-32: the breakdown. No calliope, no chords: the dry kit, a deep bass note a bar, and the
-    # acid-drop pluck's off-beat riff.
-    for bar in range(25, 33):
+    # Section 3, bars 25-40: the breakdown. No calliope, no chords: the dry kit, a deep bass note a bar, and the
+    # acid-drop pluck's off-beat riff, twice through the loop. The second time the ghost whistle glides over it (from
+    # its B5 and C6 on down and back up) and the bell's three notes answer once.
+    for bar in range(25, 41):
         b = bar0(bar)
         beat(bar, 0.9)
         low = of(bar)[0]
@@ -282,25 +293,29 @@ def render(window=None) -> np.ndarray:
         ph = tau * np.cumsum(x.hz(low) * 2 ** (12 * np.exp(-t / 0.012) / 12)) / sr
         put("sub", b, (np.tanh(2.0 * np.sin(ph)) / np.tanh(2.0) + 0.3 * np.sin(2 * ph)) * np.exp(-t / 0.5) * tail(k, 0.02) * 0.36)
         pluck(b + 3.5, low + 12, 0.22, "p", 0.36)
-    for b, d, m in notes(bar0(25), RIFF):
-        drop(float(b), m)
+    for first in (25, 33):
+        for b, d, m in notes(bar0(first), RIFF):
+            drop(float(b), m)
+    ghost(bar0(33), [("B5", 4), ("C6", 4), ("Eb6", 4), ("D6", 4), ("C6", 4), ("A5", 4), ("G5", 4), ("B5", 3)], 0.032)
+    for b, d, m in notes(bar0(34), MOTIF.split(" | ")[0]):
+        bell(b, m + 12, 0.1, 0.3, 1.0)
 
-    # Section 4, bars 33-44: the gothic organ and the bell. The organ holds Cm, Ab, Fm, G7 under the beat and the
+    # Section 4, bars 41-52: the gothic organ and the bell. The organ holds Cm, Ab, Fm, G7 under the beat and the
     # bass; the bell's slow tune in the fifth octave.
-    for bar in range(33, 45):
+    for bar in range(41, 53):
         beat(bar, 0.85), groove(bar, 0.9), pipes(bar, 0.018)
-    for b, d, m in notes(bar0(33), SLOW):
+    for b, d, m in notes(bar0(41), SLOW):
         bell(b, m, 0.13, 0.2, max(1.0, float(d)))
 
-    # Section 5, bars 45-56: the chase. No organ. The calliope and the xylophone trade 16ths: one runs up the bar's
+    # Section 5, bars 53-64: the chase. No organ. The calliope and the xylophone trade 16ths: one runs up the bar's
     # chord (two beats), the other down by half steps from where it stopped (two beats), turn about; in the last
     # four bars they share one line, a note each.
-    for bar in range(45, 57):
+    for bar in range(53, 65):
         b = bar0(bar)
         beat(bar, 1.0, sixteenths=True), groove(bar)
         run = of(bar)[2]
         down = [run[-1] - 1 - i for i in range(8)]
-        if bar >= 53:
+        if bar >= 61:
             for i, m in enumerate(run + down):
                 piped(b + i / 4, m) if i % 2 == 0 else xylo(b + i / 4, m)
         else:
@@ -308,13 +323,23 @@ def render(window=None) -> np.ndarray:
             for i in range(8):
                 first(b + i / 4, run[i]), second(b + 2 + i / 4, down[i])
 
-    # Section 6, bars 57-64: the high wire. The bass and the kit hammer G7b9 (8ths, then 16ths; a kick on every beat
+    # Bars 65-80: the calliope's groove again, before the high wire (the longer song's: the docstring). Its tune with
+    # the xylophone on the same notes an octave up; then with the pluck's riff under it.
+    for bar in range(65, 81):
+        beat(bar, 1.0, sixteenths=True, opens=bar % 4 == 0), groove(bar)
+    calliope(bar0(65), TUNE), calliope(bar0(73), TUNE)
+    for b, d, m in notes(bar0(65), TUNE):
+        xylo(float(b), m + 12, 0.085)
+    for b, d, m in notes(bar0(73), RIFF):
+        drop(float(b), m, 0.1)
+
+    # Section 6, bars 81-88: the high wire. The bass and the kit hammer G7b9 (8ths, then 16ths; a kick on every beat
     # at the end). The calliope climbs into the sixth octave, trills B5 and C6 in 32nds for three bars, and falls down
     # the diminished chord in overlapping fours to the B under bar 1's C; the whistle climbs beside it and comes down.
-    for bar in range(57, 65):
+    for bar in range(81, 89):
         b = bar0(bar)
         low = of(bar)[0]
-        late = bar >= 61
+        late = bar >= 85
         for i in range(16 if late else 8):
             step = i / 4 if late else i / 2
             pluck(b + step, low + (12 if i % 2 else 0), 0.2, "p" if i % 2 else "n", 0.3 if late else 0.36)
@@ -323,17 +348,17 @@ def render(window=None) -> np.ndarray:
         kick(b + 1.5, 0.4), snare(b + 1, 0.26), snare(b + 3, 0.26)
         for i in range(16):
             hat(b + i / 4, 0.03 if i % 4 == 0 else 0.018 if i % 2 == 0 else 0.009)
-        if bar == 64:
+        if bar == 88:
             for i in range(16):
                 snare(b + i / 4, 0.05 + 0.01 * i, ghost=True)
-    calliope(bar0(57), RISE)
+    calliope(bar0(81), RISE)
     for i in range(96):
-        piped(bar0(59) + i / 8, n("B5") if i % 2 == 0 else n("C6"), 0.08 + 0.025 * (i % 8 == 0) + 0.02 * i / 95, d=0.11)
+        piped(bar0(83) + i / 8, n("B5") if i % 2 == 0 else n("C6"), 0.08 + 0.025 * (i % 8 == 0) + 0.02 * i / 95, d=0.11)
     fall = [n(c) for c in FALL]
     for beat_ in range(12):
         for i in range(4):
-            piped(bar0(62) + beat_ + i / 4, fall[beat_ + i], 0.115)
-    ghost(bar0(57), [("G5", 4), ("B5", 4), ("C6", 4), ("Eb6", 4), ("F#6", 4), ("F6", 4), ("D6", 4), ("B5", 3)], 0.035)
+            piped(bar0(86) + beat_ + i / 4, fall[beat_ + i], 0.115)
+    ghost(bar0(81), [("G5", 4), ("B5", 4), ("C6", 4), ("Eb6", 4), ("F#6", 4), ("F6", 4), ("D6", 4), ("B5", 3)], 0.035)
 
     # A hall for the bell, the whistle and the organ; a little for the calliope, the pluck and the xylophone; none for
     # the kit or the bass.

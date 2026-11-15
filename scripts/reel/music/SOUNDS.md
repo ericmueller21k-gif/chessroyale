@@ -274,3 +274,9 @@ six sections and named notes as written (2:00, its 64 bars); only what it leaves
 stays as the other candidate. For next time: when he sends a write-up, ask of it one thing before building: is it a
 description of someone else's track (then the style only), or his own plan (then as written). A plan that says
 "architect and generate an original track" and names no source is his own.
+Of song_af.py: "Yeah, that's so good ... I like the second one. I like what you came up with." Babur's theme, in the
+game. And a new rule for every theme's length, his words (Nov 15): "I'm kind of changing the rule. I feel like 2
+minutes and 30 seconds or 2 minutes and 45 seconds just plays. It's less repetitive." So a theme is 2:30 to 2:45
+from now on, not two minutes or more; a shorter plan is made longer out of its own sections (Babur's: its breakdown
+twice as long with a second layer, its main groove back before the end with a voice added), never with new material
+he didn't ask for.
