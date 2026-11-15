@@ -68,11 +68,17 @@ to the theme's G, its own last notes ringing on over the theme's first bars (tow
        minor, F, E minor, A minor, rolled in his own left hand's shape).
 The calls made in both:
   - They play at the theme's 129 beats a minute, not the write-up's 98, so a solo sits in the theme's time.
-  - Nothing swings in them (the theme's off 8ths are late; his 8ths are even): the brush plays even 8ths and the bass
-    one soft note a bar; no chords, no wood block.
+  - Nothing swings in them (the theme's off 8ths are late; his 8ths are even). Under the piano there is only one bass
+    note a bar: no chords, no wood block, and no brush. They had the brush at first, as he had asked for the theme's
+    backdrop to stay, and heard in the game's form it was all he could hear (Nov 15): "that shaking thing ... even
+    though it stays the same loudness as it always does, it completely drowns out every other thing going on ... for
+    even the solo, just get rid of it completely and then bring it back when it's done ... I hear several other
+    things being in the background that I'd like to hear more of ... the right hand on the piano is fine": the brush
+    is out of the solos (the theme brings it back), and the left hand, the bass, the notes under and doubling the
+    right hand and the strings are each 2 to 4 dB up.
   - The shape: his first pattern once by the left hand alone; eight bars with the right hand (the first two bars'
     left hand an octave up, as the write-up asks of a repeat); eight more, some of the right hand doubled an octave
-    under and strings far off under the last four. The write-up's own three-minute plan is not used.
+    under and strings under the last four. The write-up's own three-minute plan is not used.
   - In "a", bar 2's lengths as written don't add up to a bar: its run starts on the first beat (its "tied" E left
     ringing), so it ends on the two notes it lands on, on the third beat.
 
@@ -453,28 +459,27 @@ def render(solo=None, window=None) -> np.ndarray:
 
     def piano_solo(first, solo):
         """Twenty bars of piano (the docstring has Eric's words, whose each part is and the calls made). Under it only
-        the brush, in even 8ths, and one soft bass note a bar. The left hand's first pattern alone; then eight bars
-        with the right hand, twice: the second time some of it is doubled an octave under, and strings sit far off
-        under the last four bars."""
+        one bass note a bar: no brush (it had one, in even 8ths, as loud as the theme's; with so little else playing
+        it was all he heard: the docstring). The left hand's first pattern alone; then eight bars with the right
+        hand, twice: the second time some of it is doubled an octave under, and strings sit under the last four
+        bars."""
         s0 = bar0(first)
         for bar in range(first, first + SOLO_BARS):
             root = of(bar)[0]
-            bass(bar0(bar), root - 12 if root > 45 else root, 2.5, 0.22)
-            for i in range(8):
-                brush(bar0(bar) + i * 0.5, 0.012 if i % 2 == 0 else 0.008)
-        grand(s0, LEFT_A, 0.047, -0.15)
-        grand(s0 + 16, some(LEFT_A, 0, 2), 0.047, -0.15, up=12), grand(s0 + 24, some(LEFT_A, 2, 4), 0.047, -0.15), grand(s0 + 48, LEFT_A, 0.047, -0.15)
-        grand(s0 + 32, solo["left"], 0.047, -0.15), grand(s0 + 64, solo["left"], 0.047, -0.15)
+            bass(bar0(bar), root - 12 if root > 45 else root, 2.5, 0.3)
+        grand(s0, LEFT_A, 0.066, -0.15)
+        grand(s0 + 16, some(LEFT_A, 0, 2), 0.066, -0.15, up=12), grand(s0 + 24, some(LEFT_A, 2, 4), 0.066, -0.15), grand(s0 + 48, LEFT_A, 0.066, -0.15)
+        grand(s0 + 32, solo["left"], 0.066, -0.15), grand(s0 + 64, solo["left"], 0.066, -0.15)
         for i, line in enumerate(solo["right"]):
             grand(s0 + 16 + 16 * i, line, 0.1, 0.15, bus="solo")
         for off, line in solo["under"]:
-            grand(s0 + 16 + off, line, 0.07, 0.1, bus="solo")
+            grand(s0 + 16 + off, line, 0.085, 0.1, bus="solo")
         for off, line, slow in solo["doubled"]:
-            grand(s0 + 16 + off, line, 0.05, 0.1, up=-12, slow=slow, bus="solo")
+            grand(s0 + 16 + off, line, 0.065, 0.1, up=-12, slow=slow, bus="solo")
         for i, names in enumerate(solo["strings"].split(" | ")):
             at(s0 + 64 + 4 * i, 4)
             for j, name in enumerate(names.split()):
-                put("pad", s0 + 64 + 4 * i, x.strings(n(name), 4, 0.014, attack=0.4, release=0.5), -0.4 + 0.4 * j)
+                put("pad", s0 + 64 + 4 * i, x.strings(n(name), 4, 0.022, attack=0.4, release=0.5), -0.4 + 0.4 * j)
 
     if solo:
         way_round(1), piano_solo(LEAD_IN + 1, SOLOS[solo])
