@@ -254,3 +254,16 @@ rid of it completely and then bring it back when it's done", and the quiet parts
 I'd like to hear more of"). Done; "perfect". The rule: a steady noise part is judged against what plays over it, not by
 its own level: under a band it is a backdrop, under a lone piano it is the loudest thing there. A rule he gave for
 one part ("keep the backdrop") is not a rule for a part he hadn't heard yet.
+
+## Babur's theme (Nov 15, song_ae.py): sent, no verdict yet
+
+From a write-up Eric sent as "the construction idea for the Tiger Babur circus" (a style: "Dark Gothic Carnival /
+Unhinged Mechanical Funhouse" at 128, a minor scale with a raised fourth, a bell, a ghost whistle, a calliope, an FM
+bass, a pipe organ; six kinds of sections). Used: those means. Not used: its key, its chord loop, its motifs. Changed
+for his ear: no runs of 16ths (the bell says three notes more and more often; the chase trades a four-note cell), the
+"acid pluck" is his balloon's squeak, the whistle is a few long notes. Built by the recipe above: the boss first (a
+bored tiger: the gritty lead an octave down with a purr in it; his balloon's four pump strokes and its landing or pop
+run the song; a yawn where the roar should be; his hoops are the drop). Boingo's is the other circus theme (a waltz on
+a dying ride, a steam-organ whistle): this one is in four, steady, darker, and its lead is low.
+To watch in his answer: the two pops and the yawn stop the band for a beat (he disliked the band frozen mid-verse in
+Ginger's first go; these are at the ends of sections), and the chords a tritone apart under his tune.

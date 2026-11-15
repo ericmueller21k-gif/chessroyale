@@ -8,7 +8,7 @@ out=${1:-$here/../../../reports/trailer}
 mkdir -p "$out"
 tmp=$(mktemp -d)
 cd "$here"
-for t in A:track_a B:track_b C:song_c D:song_d E:song_e F:song_f G:song_g H:song_h I:song_i J:song_j K:song_k L:song_l M:song_m N:song_n O:song_o P:song_p Q:song_q R:song_r S:song_s T:song_t U:song_u V:song_v W:song_w X:song_x Y:song_y Z:song_z AA:song_aa AB:song_ab AC:song_ac AD:song_ad; do
+for t in A:track_a B:track_b C:song_c D:song_d E:song_e F:song_f G:song_g H:song_h I:song_i J:song_j K:song_k L:song_l M:song_m N:song_n O:song_o P:song_p Q:song_q R:song_r S:song_s T:song_t U:song_u V:song_v W:song_w X:song_x Y:song_y Z:song_z AA:song_aa AB:song_ab AC:song_ac AD:song_ad AE:song_ae; do
   python3 "${t##*:}.py" "$tmp/raw.wav"
   python3 master.py "$tmp/raw.wav" "$out/track-${t%%:*}.wav"
   ffmpeg -hide_banner -v error -y -i "$out/track-${t%%:*}.wav" -c:a libvorbis -q:a 6 "$out/track-${t%%:*}.ogg"
