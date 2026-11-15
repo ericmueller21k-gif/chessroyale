@@ -1,5 +1,21 @@
 # The Hidden Boss's final form, round 4 (MOCKUP, Nov 15)
 
+## Round 4b (Nov 15): all his hair moving
+
+Eric: "all his hair should be moving". New: `hair-closeup.gif` (his head and hair, 8x, the idle loop) and `idle.gif` again.
+
+- **Every strand moves, every frame:** a wave runs up the whole mass from the roots at his crown (the roots sway a little, the ends
+  most), each strand also sways on its own a little out of step with its neighbors, and each strand's tip flicks longer and
+  shorter, out of step too, so the top ripples like a flame. Six steps a cycle, one a frame (about 0.8 s at his idle's pace; it was
+  three steps changing every other frame, a small ripple). Still his brown, the fine strands with darker lines between, the shape.
+- **Room above the tips:** his canvas is 5 px taller upward (his feet, width and placement unchanged; the transformation's figures
+  follow his height already). Measured over every phase-2 frame: at least 4 clear rows above the tallest tip at rest, 2 in his
+  laugh (head thrown back), 3 in the transformation's leaps: nothing clipped.
+- **On go, from the taller canvas:** the measured sizes in `recluse-child.test.ts` (the growing figure's heights and the adult's
+  frame, 146 to 151) and `recluse-cutscene.test.ts` (the man's box spot, 78 to 83) follow it; and the phone bar's bust (its own
+  window) still reaches the bar's top edge, so its window and the bar's shift for him move up with it.
+- The other stills below are round 4's (the hair then moved less and was a little taller); nothing else changed.
+
 Eric, after playing round 3b: no more suit or helmet. His face as it is with the glowing blue eyes (Nov 14), a black trench coat,
 his hair always rising and flowing, an aura field round him with bolts in it, and 1s and 0s spiraling round him in a double helix.
 Mid-round notes from Eric: the hair "looks like dreadlocks, should have more strands... more lines in between", then blue hair
@@ -13,7 +29,8 @@ way the suit was (by part names, plus its own layers), so for this mockup it sim
 
 | File | What |
 |---|---|
-| `idle.gif` | Phase 2's idle (4.7 s loop, 4x): the aura flickering, bolts flicking, the helix turning (one turn every 12 frames, about 1.6 s), his hair rippling, the coat's tails swaying |
+| `idle.gif` | Phase 2's idle (4.7 s loop, 4x; round 4b): the aura flickering, bolts flicking, the helix turning (one turn every 12 frames, about 1.6 s), all his hair flowing, the coat's tails swaying |
+| `hair-closeup.gif` | Round 4b: his head and hair up close (8x), the idle loop |
 | `closeup-front.png` | His head and chest up close (8x) |
 | `whole-figure-dark-light.png` | The whole figure (4x): holding the book on a dark ground and on the light board's color, then the reveal pose (arms at his sides) on both |
 | `phone-reveal-first-frame.png`, `computer-reveal-first-frame.png` | The reveal after the white-out, on the board (the spark at his chest is the existing reveal spark) |
