@@ -1249,3 +1249,4 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 15 18:00: PARKED per Eric: Hidden Boss music fades at the board split, silent countdown, epic drop starts on the countdown's 0. notes/briefs/idea-recluse-drop-on-zero.md. After 4b ships, on his word.
 - Nov 15 18:10: #733 Babur theme MERGED e47619c7; deploy + main run watcher. (#732's main run still running too.)
 - Nov 15 18:15: main full run on 30898935 (#732) GREEN, no retries.
+- Nov 15 18:35: #733 Babur LIVE (e47619c7). Main run RED: town-street:294 [phone] failed both tries: expect.poll(marked) read mid-reload threw (poll doesn't retry throws). Fix (test only, guard test) -> PR claude/town-reload-read (899ecd3e), CI running; asked Eric's OK.
