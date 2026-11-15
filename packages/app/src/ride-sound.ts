@@ -91,7 +91,7 @@ function start(id: string, s: (typeof RIDE_SOUND.rides)[string]) {
     src.loop = true;
     src.loopStart = RIDE_LOOP.start;
     src.loopEnd = RIDE_LOOP.end;
-    const r0 = s.engine ? e.startRate : 1;
+    const r0 = s.engine ? e.startRate * s.rate : s.rate;
     src.playbackRate.value = r0;
     const gain = ctx.createGain();
     gain.gain.value = 0;
@@ -104,8 +104,8 @@ function start(id: string, s: (typeof RIDE_SOUND.rides)[string]) {
   clearTimeout(v.endTimer);
   v.up = true;
   rampTo(v.gain.gain, v.level, RIDE_SOUND.level, s.fadeInMs, now);
-  // (Up to speed at the same pace from wherever it is: the whole `upMs` from `startRate`, less from nearer 1.)
-  if (s.engine) rampTo(v.src.playbackRate, v.rate, 1, (e.upMs * (1 - valueAt(v.rate, now))) / (1 - e.startRate), now);
+  // (Up to its speed (`rate`) at the same pace from wherever it is: the whole `upMs` from `startRate`, less from nearer its speed.)
+  if (s.engine) rampTo(v.src.playbackRate, v.rate, s.rate, (e.upMs * (s.rate - valueAt(v.rate, now))) / (s.rate * (1 - e.startRate)), now);
   watch();
 }
 
@@ -126,7 +126,7 @@ function fadeOut(v: Voice) {
   const now = v.ctx.currentTime;
   v.up = false;
   rampTo(v.gain.gain, v.level, 0, s.fadeOutMs, now);
-  if (s.engine) rampTo(v.src.playbackRate, v.rate, RIDE_SOUND.engine.stopRate, s.fadeOutMs, now);
+  if (s.engine) rampTo(v.src.playbackRate, v.rate, RIDE_SOUND.engine.stopRate * s.rate, s.fadeOutMs, now);
   log(`ride:fade:${v.id}`);
   clearTimeout(v.endTimer);
   v.endTimer = setTimeout(() => !v.up && letGo(v), s.fadeOutMs + 50);
