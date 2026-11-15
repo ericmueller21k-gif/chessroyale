@@ -8,6 +8,6 @@ for f in .pr-body.md .review-fixes.md .done; do git cat-file -e HEAD:$f 2>/dev/n
 git commit -qm "Drop the PR body file
 
 Claude-Session: https://claude.ai/code/session_01JuCWRuPpvjpkJLcU3sM3cR"
-git merge -q --no-edit origin/main 2>&1 | tail -3
+if ! git merge -q --no-edit origin/main >/dev/null 2>&1; then echo "MERGE CONFLICT with main (nothing pushed past the body drop): $(git diff --name-only --diff-filter=U | tr '\n' ' ')"; git merge --abort; git push -q origin "$b"; cd /home/user/chessroyale && git worktree remove --force "$w"; exit 2; fi
 git push -q origin "$b" && git rev-parse HEAD
 cd /home/user/chessroyale && git worktree remove --force "$w"
