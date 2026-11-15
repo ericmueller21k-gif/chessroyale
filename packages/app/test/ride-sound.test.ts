@@ -128,10 +128,10 @@ describe("a ride's moving sound", () => {
     expect(rideSoundState()).toMatchObject({ ride: "sawyer-dozer", up: true, live: 1, level: RIDE_SOUND.level, rate: 1 });
   });
 
-  it("the pogo starts at its own speed (no ramp of its rate)", () => {
+  it("the pogo starts at its own speed, RIDE_SOUND's `rate` (no ramp of its rate)", () => {
     rideMoving("boingo-pogo");
     const [src] = playing();
-    expect(src!.playbackRate.value).toBe(1);
+    expect(src!.playbackRate.value).toBe(RIDE_SOUND.rides["boingo-pogo"]!.rate);
     expect(src!.playbackRate.calls).toEqual([]);
   });
 

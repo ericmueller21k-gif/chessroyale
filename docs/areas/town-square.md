@@ -467,7 +467,8 @@ before the rows are laid (`street.ts lotHere`), so each row fills the place with
   ride listed in `RIDE_SOUND.rides` (Sawyer's Dozer and Boingo's Pogo so far; its loop `/sounds/rides/<id>.wav`) plays its loop while
   your own pawn moves on it, in the town and a shop's room; standing, nothing; any other ride silent. It counts as moving until `holdMs`
   (120) after your last step, so it never stops between steps; it fades in over `fadeInMs`, out over `fadeOutMs` (the dozer 700, the pogo
-  350), an engine (the dozer) coming up to speed as it starts and sinking a little as it fades; moving again mid-fade brings it back from
+  350), at its own speed `rate` (the pogo 1.5: 6 boings a second, Eric Nov 15), an engine (the dozer) coming up to that speed as it
+  starts and sinking a little as it fades; moving again mid-fade brings it back from
   where it is. On the game's sounds (the Sound switch, a hidden page). The frame loops only say "you moved, on this ride" on moving frames
   (`rideMoving`); a timer off the frame sees you stop (`ride-sound.ts`). Your ride's loop is fetched after the town's first frame.
   Tests: `test/ride-sound.test.ts`; `e2e/town.spec.ts`, "rides (Oct 31; …)", its end.
