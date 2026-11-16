@@ -21,8 +21,9 @@ const me = async (p: Page) => (await hereOf(p)).find((h) => h.you)!;
 
 /** The town, open as a signed-in player (other players are signed-in players'), in this test's room, the away numbers as given. */
 async function openIn(page: Page, room: string, afk: string, before?: () => Promise<unknown>) {
-  await page.goto("/town?sky=day&townafk=off");
-  await townReady(page);
+  // (The account made and signed in before the town opens, by the page's own first /api/me (helpers.ts pageAccountId): until Nov 16 the
+  // town opened first as a guest's, a whole town load for nothing. `before` fetches from the page: home first, no town.)
+  if (before) await page.goto("/");
   const id = await asSignedIn(page, "afk");
   // (Before the town has a beat of theirs: what they wear is read once a minute.)
   await before?.();
@@ -125,7 +126,10 @@ test("in the background for the limit: the server drops your pawn for another pl
   await setHidden(page, true);
   // (Her hidden beat went as she hid; from now on her page runs nothing.)
   await page.waitForTimeout(500);
-  await page.clock.pauseAt(await page.evaluate(() => Date.now() + 100));
+  // (Paused 1 s on from her page's time as read: the read and the pause are two round trips, and on a busy runner they took over 100 ms,
+  // the margin until Nov 16, so the pause fell in her past: "Cannot fast-forward to the past", main's run 43743117092, desktop. Her page
+  // runs that second's timers at once as it pauses, still well inside the 4 s.)
+  await page.clock.pauseAt(await page.evaluate(() => Date.now() + 1000));
   // The server drops her pawn by itself after 4 s in the background.
   await expect.poll(async () => (await them(bo, annId))?.here, { timeout: 15_000, message: "the server drops Ann for Bo" }).toBe(false);
   // Ann still shows the town (nothing ran) until she's back.

@@ -239,13 +239,18 @@ test("?fps in a room (Nov 11, Eric's iPhone: frozen at 42-44 inside, 2-4 going o
   await page.goto("/town?sky=day&fps");
   await townReady(page);
   await goIn(page, "gardener", "Puddles' Botanical Garden");
-  type Seen = { __pill: string[]; __shopStill?: () => { drawn: number; made: number } | null };
-  // Every reading the pill is given from here (before: none inside a room, its town reading stood still).
+  type Seen = { __pill: string[]; __pillAt: number[]; __pillSince: number; __shopStill?: () => { drawn: number; made: number } | null };
+  // Every reading the pill is given from here (before: none inside a room, its town reading stood still), and when it came.
   await page.evaluate(() => {
     const el = document.querySelector(".town-fps")!;
     const w = window as unknown as Seen;
     w.__pill = [];
-    new MutationObserver(() => w.__pill.push(el.textContent ?? "")).observe(el, { childList: true, characterData: true, subtree: true });
+    w.__pillAt = [];
+    w.__pillSince = performance.now();
+    new MutationObserver(() => {
+      w.__pill.push(el.textContent ?? "");
+      w.__pillAt.push(performance.now());
+    }).observe(el, { childList: true, characterData: true, subtree: true });
   });
   await page.waitForTimeout(2500);
   const inside = await page.evaluate(() => [...(window as unknown as Seen).__pill]);
@@ -256,15 +261,27 @@ test("?fps in a room (Nov 11, Eric's iPhone: frozen at 42-44 inside, 2-4 going o
   expect(still!.drawn, "drawn from the copy while you stand").toBeGreaterThan(30);
   // Out: every reading is the frames of its last second (before: the frames before you went in over the whole visit, "1 fps").
   const room = Number.parseInt(inside[inside.length - 1]!);
-  await page.evaluate(() => ((window as unknown as Seen).__pill.length = 0));
+  // (How long the readings have been watched inside when Back is tapped: the visit a wrong reading out would span, at the least.)
+  const { inMs, from } = await page.evaluate(() => {
+    const w = window as unknown as Seen;
+    return { inMs: performance.now() - w.__pillSince, from: w.__pill.length };
+  });
   await page.getByRole("button", { name: "Back", exact: true }).click();
   await expect(page.locator("canvas.town-shop-canvas")).toHaveCount(0);
   await page.waitForTimeout(1500);
-  const out = await page.evaluate(() => [...(window as unknown as Seen).__pill]);
+  const { all, at } = await page.evaluate(() => {
+    const w = window as unknown as Seen;
+    return { all: [...w.__pill], at: [...w.__pillAt] };
+  });
+  const out = all.slice(from);
   expect(out.length).toBeGreaterThanOrEqual(2);
-  // (Nov 13: 5 or more, was room / 5 against the old town. Back in the street town, on the tests' software WebGL, the first second out reads about
-  // 7 to 12 against 60 inside; a reading spanning the whole visit read 1 to 4, so 5 tells them apart.)
-  expect(Math.min(...out.map((x) => Number.parseInt(x))), `going out, against ${room} fps inside: ${out.join(" | ")}`).toBeGreaterThan(4);
+  // A reading is the frames since the reading before the last one (FpsCount: about a second, its two halves), so its window is the time
+  // back to the update two before it. Spanning the visit, it would reach back past all the readings inside.
+  // (Until Nov 16 a floor of 5 fps going out: a reading spanning the visit read 1 to 4 on the tests' software WebGL, but CI's street town
+  // sometimes draws 4 frames a second itself, "4 fps · 223.3 ms" on main's run 43743117092, and the floor failed a right reading.)
+  const spans = out.map((_, i) => Math.round(at[from + i]! - at[from + i - 2]!));
+  for (const ms of spans) expect(ms, `going out, against ${room} fps inside: ${out.join(" | ")}; each reading's window (ms): ${spans.join(", ")}; inside ${Math.round(inMs)} ms`).toBeLessThan(inMs);
+  for (const x of out) expect(Number.parseInt(x), `going out: ${out.join(" | ")}`).toBeGreaterThan(0);
 });
 
 test("a room's report records while walking, and walking lays no floor triangles (Nov 11, Eric: inside it's \"just like capped\"; ?report \"is pausing when I run into the building\"): the pill counts on inside; WebGL draws the back, the same picture as the 2D way's", { tag: "@phone-only" }, async ({ page }) => {

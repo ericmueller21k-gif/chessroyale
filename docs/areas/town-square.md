@@ -1331,7 +1331,11 @@ noted wherever a slice changed one.
   `townTapPoint` reads the point, taps, and lets them go, so a figure walking about (Big Boy by his crib, a bot) can't move off it
   first. `__townAt`'s points keep 2 px of room on their target (`clearAt`): a point on the edge of what's clear became your pawn once the
   tap was rounded to a whole pixel. A tap on a town figure or place from a spec goes through `townTap` or `tapInTown`, never its own
-  `__townAt` and click ([2026-11-14-flaky-round4.md](../decisions/2026-11-14-flaky-round4.md)).
+  `__townAt` and click ([2026-11-14-flaky-round4.md](../decisions/2026-11-14-flaky-round4.md)). Since Nov 16 its first try at a target
+  with a glide to fall back on gives up after 6 drawn frames without a tap point (it was 3 s, mostly spent on homes off the screen), and
+  a signed-in spec signs in before the town first opens, not after a guest's load
+  ([2026-11-16-town-tap-speed.md](../decisions/2026-11-16-town-tap-speed.md)). On the tests' software WebGL a town load takes 5 to 9 s
+  and every round trip to a page with a town waits on its frames: open a town only where the test needs it.
 - `e2e/shop.spec.ts` (Nov 2, inside a shop; phone and computer): Babur's card's "Go in", inside zoomed out (+ and − switch to Close and back), a tap
   on the Shopkeeper walks you up and its card's Talk opens "Babur's Boss Crate" (the price line, Balloon Pup, what you have, both buys
   greyed with nothing to pay), the header saying "Babur's Circus", then the view dragged back to the door, "Go out" and you're outside
