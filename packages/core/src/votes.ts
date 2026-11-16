@@ -1,6 +1,6 @@
 import type { Rng } from "./rng.ts";
 import { BOSS_ROSTER, crowdFinalBoss, type BossDef } from "./boss.ts";
-import { CROWD_KNOCKOUTS, CROWD_START, crowdFinalists, type Settings } from "./settings.ts";
+import { CROWD_KNOCKOUTS, CROWD_PICK, CROWD_START, crowdFinalists, type Settings } from "./settings.ts";
 
 /**
  * Crowd 50 v 50's pre-game votes. Before the first move, everyone (both teams) votes by dragging their own pawn into
@@ -139,6 +139,27 @@ function openingVote(): PregameVote {
 
 /** The 50 v 50's votes, in the order they're held: how it ends, how it starts, then the clock (Eric, Oct 24). */
 export const PREGAME_VOTES: readonly PregameVote[] = [formatVote(), openingVote(), speedVote()];
+
+/**
+ * "How are moves picked?" (the 50 v 50 rework, Eric, Nov 16; CROWD_PICK): Strong on the left, Majority in the middle, Chaos
+ * on the right, from the most careful to the wildest. Nobody votes: Strong, by its id. Each patch sets `crowdPick`; the
+ * numbers in the words come from CROWD_PICK.
+ */
+function pickVote(): PregameVote {
+  const top = CROWD_PICK.strongTop;
+  const options: VoteOption[] = [
+    { id: "strong", label: "Strong", blurb: `The best of your team's top ${top} picks is played`, patch: { crowdPick: "strong" } },
+    { id: "majority", label: "Majority", blurb: "Your team's most-picked move is played", patch: { crowdPick: "majority" } },
+    { id: "chaos", label: "Chaos", blurb: "Any move your team picked, all equally likely", patch: { crowdPick: "chaos" } },
+  ];
+  return { id: "pick", title: "How are moves picked?", defaultOption: optionIndex(options, "strong"), options };
+}
+
+/**
+ * The 50 v 50's votes since the rework (with `crowdCuts`, CROWD_REWORK): how moves are picked (in the place of how it ends:
+ * there are no endings), how it starts, then the clock. The start and clock votes are the same as PREGAME_VOTES'.
+ */
+export const CROWD_VOTES: readonly PregameVote[] = [pickVote(), openingVote(), speedVote()];
 
 /**
  * A start by its id (a test URL's ?start=normal|random|freestyle), as the vote's option sets it; an id we don't know
@@ -349,6 +370,9 @@ export function botVotes(rng: Rng, ids: readonly string[], options: number, wind
   });
 }
 
-/** The vote that runs before the game in these settings (none outside Crowd 50 v 50 or with augments off). */
-export const pregameVotes = (s: Pick<Settings, "mode" | "crowdTeams" | "augments">): readonly PregameVote[] =>
-  s.mode === "crowd" && s.crowdTeams && s.augments ? PREGAME_VOTES : [];
+/**
+ * The votes that run before the game in these settings: the rework's (CROWD_VOTES) when the 50 v 50 has `crowdCuts`, else
+ * PREGAME_VOTES; none outside Crowd 50 v 50 or with augments off.
+ */
+export const pregameVotes = (s: Pick<Settings, "mode" | "crowdTeams" | "augments"> & Partial<Pick<Settings, "crowdCuts">>): readonly PregameVote[] =>
+  s.mode === "crowd" && s.crowdTeams && s.augments ? (s.crowdCuts?.length ? CROWD_VOTES : PREGAME_VOTES) : [];
