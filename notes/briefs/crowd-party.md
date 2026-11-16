@@ -35,6 +35,13 @@ friends, and then there's like a start or like a find match button."
   ranked as Squads' parties); list anything new as a call in the decision note. Kill switch: the existing friends/party pauses apply.
 - Phone and computer. Nothing shifts: the screen keeps its layout between idle and searching.
 
+## Added by Eric (Nov 16, sent to the helper too)
+- **The invite notice:** a small top-right box "<Name> invited you" with Accept / Decline (not full screen; never over a board in a
+  match). Reuse today's invite notice if one exists.
+- **Do Not Disturb** in your profile (beside "display offline" and the invite setting): no invites, friend requests or messages
+  reach you; senders get the quiet "no one" refusal. Stored data -> full lane.
+- **Streamer mode:** one line in ROADMAP.md only.
+
 ## Mockup first
 Stills (phone and computer) of the idle party screen with 7 "+" seats, the friends sheet open from a "+", an invited seat, a joined
 friend, and the leader's Find match vs a member's greyed one. About 6 images to `stills/crowd-party` with a README; `.mockup` (content
