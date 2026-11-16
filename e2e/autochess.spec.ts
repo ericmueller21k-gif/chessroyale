@@ -660,11 +660,13 @@ for (const i of [0, 1]) expect(light(look.you[i]!.bg), "yours lighter than their
   expect(theirs.y + theirs.height).toBeLessThanOrEqual(frame.y);
   // The name and the level by each pawn; the numbers in thin bars (phone: beside the pawn; computer: under it).
   await expect(page.locator(".ac-who .ac-name")).toHaveText("Bot");
-  await expect(botLevel(page)).toHaveText("Lv 4");
+  // The bot's level and XP, read in one moment: on seed 9 it buys XP 0.5 s into the step (Lv 4, 2/4 → Lv 5, 2/8), and this test can
+  // reach here on either side of that on a slow runner (main, Nov 16: "Lv 5" against "Lv 4").
+  const bot = () => page.evaluate(() => `${document.querySelector(".ac-who .ac-lv")?.textContent} ${document.querySelector(".ac-xp-bot b")?.textContent}`);
+  await expect.poll(bot).toMatch(/^Lv 4 2\/4$|^Lv 5 2\/8$/);
   await expect(page.locator(".ac-hp-you b")).toHaveText("24");
   await expect(page.locator(".ac-hp-bot b")).toHaveText("24");
   await expect(page.locator(".ac-xp-you b")).toHaveText("2/4");
-  await expect(page.locator(".ac-xp-bot b")).toHaveText("2/4");
   await expectLevel(page, 4, "2/4");
   for (const sel of [".ac-me", ".ac-opp"]) {
     const bars = await page.locator(`${sel} .ac-bar i`).evaluateAll((els) => els.map((e) => e.getBoundingClientRect().height));
