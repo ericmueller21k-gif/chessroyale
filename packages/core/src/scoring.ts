@@ -342,10 +342,12 @@ export function scoreGroup(
   const off = new Map(picked.map((p) => [p.move!, allowance?.(p.move!) ?? { points: 0 }]));
   const counted = (m: string) => Math.max(0, losses[m]! - off.get(m)!.points);
   const cs = context ? settings.crowdScoring : undefined;
-  // (Crowd 50 v 50: a losing pick many made counts less: the shared-blunder relief.)
+  // (Crowd 50 v 50: a losing pick many made counts less: the shared-blunder relief; not with fewer than sharedMinPicks real
+  // picks, 4 or fewer, where a lone pick isn't a crowd's shared blunder.)
   const count = new Map<string, number>();
   for (const p of picked) count.set(p.move!, (count.get(p.move!) ?? 0) + 1);
-  const scored = (m: string) => (cs ? counted(m) * sharedFactor(cs, counted(m), count.get(m)!, picked.length) : counted(m));
+  const relief = !!cs && (cs.sharedMinPicks === undefined || picked.length >= cs.sharedMinPicks);
+  const scored = (m: string) => (cs ? counted(m) * (relief ? sharedFactor(cs, counted(m), count.get(m)!, picked.length) : 1) : counted(m));
   const averageLoss = picked.length ? picked.reduce((s, p) => s + scored(p.move!), 0) / picked.length : null;
   const cap = cs ? capFor(cs, context!.stage, context!.move) : null;
   // (A move that plays itself, the group giving away less than streakMinAverage on average by raw loss (a decided game,

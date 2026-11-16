@@ -4,7 +4,7 @@ import { boingoDecor } from "../components/Boingo.tsx";
 import { applyMove, inCheck, pieceAt, sideToMove } from "@chessroyale/chess";
 import { seenFen, seenSan } from "../camo.ts";
 import { blunderWords, capitalised, crowdMoveCues, type KingCue } from "../godKing.ts";
-import { brilliance, crowdTopOdds, type Augment } from "@chessroyale/core";
+import { brilliance, crowdPickOdds, crowdTopOdds, type Augment } from "@chessroyale/core";
 import { Board } from "../components/Board.tsx";
 import { seatKey } from "../board/yours.ts";
 import { TimerBar, useFrameNow } from "../components/Countdown.tsx";
@@ -416,11 +416,14 @@ export function CrowdReveal({ match, mine, board, until }: { match: GameView; mi
                       <strong>Crowd plays {seenSan(fen, mine.result.playedMove)}</strong>{" "}
                       <span class="muted">
                         · {picks.filter((p) => p.move === mine.result.playedMove).length}/{voters}
-                        {/* 50 v 50: drawn from the three most picked, so its chance when it wasn't a sure thing. */}
+                        {/* 50 v 50: drawn by the pick vote's mode (the rework's crowdPick, from the judge's losses as the scores; before it,
+                            from the three most picked), so its chance when it wasn't a sure thing. */}
                         {(() => {
-                          if (match.boss || match.settings.crowdPlayedFromTop <= 1 || mine.result.drawRule !== "popular") return "";
+                          const pick = match.settings.crowdPick;
+                          if (match.boss || (!pick && match.settings.crowdPlayedFromTop <= 1) || mine.result.drawRule !== "popular") return "";
                           const moves = mine.result.players.flatMap((p) => (p.move ? [p.move] : []));
-                          const odds = crowdTopOdds(moves, match.settings.crowdPlayedFromTop)[mine.result.playedMove];
+                          const losses = Object.fromEntries(mine.result.players.flatMap((p) => (p.move && p.loss !== null ? [[p.move, p.loss] as const] : [])));
+                          const odds = (pick ? crowdPickOdds(pick, moves, losses) : crowdTopOdds(moves, match.settings.crowdPlayedFromTop))[mine.result.playedMove];
                           return odds !== undefined && odds < 1 ? ` · ${Math.round(odds * 100)}% chance` : "";
                         })()}
                       </span>

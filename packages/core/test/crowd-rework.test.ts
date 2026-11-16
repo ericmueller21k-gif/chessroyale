@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   CROWD_CUTS,
+  CROWD_PRE_REWORK,
   CROWD_REWORK,
   CROWD_SCORING,
   CROWD_SETTINGS,
@@ -34,8 +35,8 @@ import {
 } from "../src/index.ts";
 
 // The 50 v 50 rework in core (Eric, Nov 16; notes/designs/crowd-rework.md, step C1; docs/decisions/2026-11-16-crowd-rework-core.md):
-// the pick modes, the cuts to a 1 v 1, the soft reset, the move limit, the places, the winner and the best player. Off in
-// today's 50 v 50 until C2 spreads CROWD_REWORK into CROWD_SETTINGS.
+// the pick modes, the cuts to a 1 v 1, the soft reset, the move limit, the places, the winner and the best player. Every
+// 50 v 50's since C2 spread CROWD_REWORK into CROWD_SETTINGS (the runner's side: packages/chess/test/crowd.test.ts).
 const REWORK: Settings = { ...DEFAULT_SETTINGS, ...CROWD_SETTINGS, ...CROWD_REWORK };
 
 /** Picks as the draw sees them: one entry per pick. */
@@ -185,12 +186,20 @@ describe("the cuts, equal from each side, down to a 1 v 1 (CROWD_CUTS)", () => {
     expect(cutPlan(state, standings(state, () => 0.5, REWORK), REWORK).out).toEqual([]);
   });
 
-  it("today's 50 v 50 is untouched until C2: no rework settings, its endings as before", () => {
+  it("every 50 v 50 has the rework since C2 (CROWD_SETTINGS); the 50 v 50 before it only with CROWD_PRE_REWORK (the old endings' tests)", () => {
     const today: Settings = { ...DEFAULT_SETTINGS, ...CROWD_SETTINGS };
-    expect(today.crowdCuts).toBeUndefined();
-    expect(today.crowdPick).toBeUndefined();
-    expect(today.crowdCarry).toBeUndefined();
-    expect(roundsInStage(today, 0)).toBe(20);
+    expect(today).toMatchObject(CROWD_REWORK);
+    expect(today.crowdCuts).toBe(CROWD_CUTS);
+    expect(today.crowdPick).toBe("strong");
+    expect(today.crowdCarry).toBe(0.5);
+    expect(today.crowdMoveLimit).toBe(60);
+    expect(today.knockoutsPerStage).toEqual(crowdCutKnockouts(CROWD_CUTS));
+    expect(roundsInStage(today, 0)).toBe(28);
+    const before: Settings = { ...today, ...CROWD_PRE_REWORK };
+    expect(before.crowdCuts).toBeUndefined();
+    expect(before.crowdPick).toBeUndefined();
+    expect(before.crowdCarry).toBeUndefined();
+    expect(roundsInStage(before, 0)).toBe(20);
     // Raids never take it, even once CROWD_SETTINGS has it.
     const raid: Settings = { ...DEFAULT_SETTINGS, ...CROWD_SETTINGS, ...CROWD_REWORK, ...RAID_SETTINGS };
     for (const k of ["crowdPick", "crowdCuts", "crowdCarry", "crowdMoveLimit", "crowdLimitWin"] as const) expect(raid[k]).toBeUndefined();
@@ -215,8 +224,8 @@ describe("the soft reset: each survivor keeps 50% at a cut (crowdCarry)", () => 
     }
     // 1.25 keeps 0.63 (2 decimals), as the screens show it.
     expect(end.state.players.find((p) => p.alive && p.stageScore === 0.63)).toBeTruthy();
-    // Without crowdCarry (today's), scores carry whole.
-    const today: Settings = { ...DEFAULT_SETTINGS, ...CROWD_SETTINGS, knockoutsPerStage: crowdCutKnockouts(CROWD_CUTS) };
+    // Without crowdCarry (the 50 v 50 before the rework), scores carry whole.
+    const today: Settings = { ...REWORK, crowdCarry: undefined };
     for (const p of endStage(state, mulberry32(1), [0], today).state.players.filter((x) => x.alive)) expect(p.stageScore).toBe(scores(Number(p.id.slice(1))));
   });
 
@@ -243,19 +252,30 @@ describe("rounds of 2 and 1 a side", () => {
     const plain = scoreGroup(group, ev, mulberry32(1), { ...REWORK, crowdScoring: undefined }, "popular");
     expect(plain.players[0]!.roundScore).toBeCloseTo(3, 9);
     expect(plain.players[1]!.roundScore).toBeCloseTo(-3, 9);
-    // 50 v 50's scoring at that stage: one pick of two is half the group, so the shared-blunder relief (sharedShare 25%)
-    // counts the 6 as 3 (any lone pick at 4 or fewer a side is "shared"); then the cap (8, the ratio curve): 1.5 / (1 + 1.5/8).
+    // 50 v 50's scoring at that stage: no shared-blunder relief with 4 or fewer picks (the director's call in C2,
+    // sharedMinPicks 5: a lone pick of two isn't a crowd's shared blunder); then the cap (8, the ratio curve): 3 / (1 + 3/8).
     const crowd = scoreGroup(group, ev, mulberry32(1), REWORK, "popular", undefined, scoring);
     expect(CROWD_SCORING.sharedShare).toBe(0.25);
+    expect(CROWD_SCORING.sharedMinPicks).toBe(5);
     expect(CROWD_SCORING.capCurve).toBe("ratio");
-    expect(crowd.players.map((p) => p.roundScore)).toEqual([1.26, -1.26]);
-    // Without the relief it would be 3 / (1 + 3/8).
-    const unshared = scoreGroup(group, ev, mulberry32(1), { ...REWORK, crowdScoring: { ...CROWD_SCORING, sharedShare: 1, sharedMin: 99 } }, "popular", undefined, scoring);
-    expect(unshared.players.map((p) => p.roundScore)).toEqual([2.18, -2.18]);
+    expect(crowd.players.map((p) => p.roundScore)).toEqual([2.18, -2.18]);
+    // With the relief at any size (C1's numbers), one pick of two counted as shared: the 6 as 3, then 1.5 / (1 + 1.5/8).
+    const shared = scoreGroup(group, ev, mulberry32(1), { ...REWORK, crowdScoring: { ...CROWD_SCORING, sharedMinPicks: undefined } }, "popular", undefined, scoring);
+    expect(shared.players.map((p) => p.roundScore)).toEqual([1.26, -1.26]);
     expect(crowd.drawOdds).toEqual({ e2e4: 1 });
     // A 1-1 split within 3 points: either, at equal odds (Majority: any 1-1 split is a tie).
     expect(scoreGroup(group, judged({ e2e4: 0, a2a3: 2 }), mulberry32(1), REWORK, "popular").drawOdds).toEqual({ e2e4: 0.5, a2a3: 0.5 });
     expect(scoreGroup(group, ev, mulberry32(1), { ...REWORK, crowdPick: "majority" }, "popular").drawOdds).toEqual({ a2a3: 0.5, e2e4: 0.5 });
+  });
+
+  it("the shared-blunder relief from 5 real picks (sharedMinPicks): 2 of 5 on a blunder count it less; 2 of 4 count it whole; misses don't add", () => {
+    const ev = judged({ e2e4: 0, a2a3: 10 });
+    const group = (moves: readonly (string | null)[]) => moves.map((move, i) => ({ playerId: `p${i}`, move }));
+    const loss = (r: ReturnType<typeof scoreGroup>) => r.players.find((p) => p.move === "a2a3")!.shared ?? 10;
+    // 2 of 5 is 40% of the picks: counted times 1 - 0.4.
+    expect(loss(scoreGroup(group(["e2e4", "e2e4", "e2e4", "a2a3", "a2a3"]), ev, mulberry32(1), REWORK, "popular", undefined, scoring))).toBeCloseTo(6, 9);
+    expect(loss(scoreGroup(group(["e2e4", "e2e4", "a2a3", "a2a3"]), ev, mulberry32(1), REWORK, "popular", undefined, scoring))).toBe(10);
+    expect(loss(scoreGroup(group(["e2e4", "e2e4", "a2a3", "a2a3", null, null]), ev, mulberry32(1), REWORK, "popular", undefined, scoring))).toBe(10);
   });
 
   it("1 a side: the round score is always 0, and their pick is played in every mode, a blunder too", () => {

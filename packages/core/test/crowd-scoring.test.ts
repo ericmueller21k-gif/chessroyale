@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   CROWD_SCORING,
+  CROWD_PRE_REWORK,
   CROWD_SETTINGS,
   DEFAULT_SETTINGS,
   applyRound,
@@ -271,7 +272,8 @@ describe("the bubble grace at the cut", () => {
     const state = createMatch(rows.map((_, i) => ({ id: `p${i}`, name: `P${i}`, isBot: true })), [0], settings);
     return { ...state, stage: 1, players: state.players.map((p, i): PlayerState => ({ ...p, stageScore: rows[i]!.s, colour: rows[i]!.c, lossesByStage: [[], []] })) };
   }
-  const K: Settings = { ...S, knockoutsPerStage: [2, 2, 2, 2] };
+  // (The cuts before the rework, by knockouts, until C4 retires them: the rework's cuts by keep, cut-ties.test.ts.)
+  const K: Settings = { ...S, ...CROWD_PRE_REWORK, knockoutsPerStage: [2, 2, 2, 2] };
 
   it("players within cutGrace of the last one through go through; what that leaves carries", () => {
     const g = CS.cutGrace;
@@ -288,7 +290,7 @@ describe("the bubble grace at the cut", () => {
 
   it("not at the last cut before the ending, and not without crowdScoring", () => {
     const g = CS.cutGrace;
-    const last: Settings = { ...S, knockoutsPerStage: [2, 2] };
+    const last: Settings = { ...S, ...CROWD_PRE_REWORK, knockoutsPerStage: [2, 2] };
     const state = teams([3, 2, 1, round2(1 - g / 2)], [3, 2, 1, 0], last);
     expect(cutPlan(state, standings(state, mulberry32(1), last), last).out).toContain("p3");
     const none: Settings = { ...K, crowdScoring: undefined };

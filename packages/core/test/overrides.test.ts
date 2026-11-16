@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CROWD_STAGE_ROUNDS, DEFAULT_SETTINGS, RAID_SETTINGS, definedOnly, modeSettings, roundsInStage } from "../src/index.ts";
+import { CROWD_PRE_REWORK, CROWD_STAGE_ROUNDS, DEFAULT_SETTINGS, RAID_SETTINGS, definedOnly, modeSettings, roundsInStage } from "../src/index.ts";
 
 describe("mode settings with playtest overrides", () => {
   it("an unset override leaves the mode's own value (Crowd keeps its stages, CROWD_STAGE_ROUNDS, a 20 s clock, no opening)", () => {
@@ -12,7 +12,11 @@ describe("mode settings with playtest overrides", () => {
   });
   it("the rounds in a stage (Nov 1): the Crowd's own list, its last entry covering later stages; emptied (a test's ?rounds=) or unset, the first stage's then roundsPerStage", () => {
     const crowd = { ...DEFAULT_SETTINGS, ...modeSettings("crowd") };
-    expect([0, 1, 2, 3, 4, 5, 6, 7, 8].map((i) => roundsInStage(crowd, i))).toEqual([20, 10, 8, 8, 6, 6, 6, 4, 4]);
+    // The rework's (C2, Nov 16): cuts after moves 14, 18, 22, 26, 30, 33, 39 and 42, then the 1 v 1 to move 60 (crowdStageRounds).
+    expect([0, 1, 2, 3, 4, 5, 6, 7, 8].map((i) => roundsInStage(crowd, i))).toEqual([28, 8, 8, 8, 8, 6, 12, 6, 36]);
+    // Before the rework (CROWD_PRE_REWORK, until C4): the list.
+    const before = { ...crowd, ...CROWD_PRE_REWORK };
+    expect([0, 1, 2, 3, 4, 5, 6, 7, 8].map((i) => roundsInStage(before, i))).toEqual([20, 10, 8, 8, 6, 6, 6, 4, 4]);
     // Cuts after moves 10, 15, 19, 23, 26, 29 (the team final), 32 (the boss final) and 34 (the duel).
     expect(CROWD_STAGE_ROUNDS.map((_, i) => CROWD_STAGE_ROUNDS.slice(0, i + 1).reduce((a, b) => a + b, 0) / 2)).toEqual([10, 15, 19, 23, 26, 29, 32, 34]);
     const rounds = { ...crowd, stageRounds: [], firstStageRounds: 2, roundsPerStage: 2 };

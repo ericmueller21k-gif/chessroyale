@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   CROWD_BOTS,
   CROWD_PICK,
-  CROWD_REWORK,
+  CROWD_PRE_REWORK,
   CROWD_SETTINGS,
   DEFAULT_SETTINGS,
   botChoose,
@@ -93,6 +93,8 @@ describe("the team's played move (crowdPlayedFromTop)", () => {
   });
 
   it("50 v 50 draws by those odds from the turn's random source; elsewhere the most popular is played", () => {
+    // (The draw before the rework, until C4 retires it: 50 v 50 plays its pick vote's mode since Nov 16, the next check.)
+    const CROWD: Settings = { ...DEFAULT_SETTINGS, ...CROWD_SETTINGS, ...CROWD_PRE_REWORK };
     const moves = picks({ a: 30, b: 15, c: 5, d: 4 });
     const seen = new Map<string, number>();
     for (let seed = 1; seed <= 4000; seed++) {
@@ -107,9 +109,9 @@ describe("the team's played move (crowdPlayedFromTop)", () => {
     for (let seed = 1; seed <= 50; seed++) expect(drawMove(moves, {}, "popular", mulberry32(seed), DEFAULT_SETTINGS)).toBe("a");
   });
 
-  it("the rework's Strong (off until C2) over a team of bots: at Eric's castle it castles; in a quiet opening, the best of the top 3 or one as good", () => {
-    const rework: Settings = { ...CROWD, ...CROWD_REWORK };
-    expect(CROWD.crowdPick).toBeUndefined();
+  it("the rework's Strong (50 v 50's since C2) over a team of bots: at Eric's castle it castles; in a quiet opening, the best of the top 3 or one as good", () => {
+    const rework: Settings = CROWD;
+    expect(CROWD.crowdPick).toBe("strong");
     const lossOf = (c: readonly Candidate[]) => Object.fromEntries(c.map((x) => [x.move, x.loss]));
     const list = (counts: Map<string, number>) => [...counts].flatMap(([m, n]) => Array<string>(n).fill(m));
     for (let seed = 1; seed <= 40; seed++) {

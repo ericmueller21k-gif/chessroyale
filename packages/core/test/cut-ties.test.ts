@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  CROWD_PRE_REWORK,
   CROWD_REWORK,
   CROWD_SETTINGS,
   DEFAULT_SETTINGS,
@@ -121,7 +122,8 @@ describe("ties at a cut line go through", () => {
 });
 
 describe("Crowd 50 v 50: each team's cut", () => {
-  const C: Settings = { ...DEFAULT_SETTINGS, ...CROWD_SETTINGS, knockoutsPerStage: [4, 4, 2] };
+  // (The 50 v 50 before the rework, by knockouts, until C4 retires it: the rework's cuts by keep are below.)
+  const C: Settings = { ...DEFAULT_SETTINGS, ...CROWD_SETTINGS, ...CROWD_PRE_REWORK, knockoutsPerStage: [4, 4, 2] };
 
   it("ties survive within a team, the shortfall is owed by that team's later cuts, and the ending is still reached exactly", () => {
     // 12 players, 6 a side. White: a 3-way tie at the line keeps everyone; Black: two clearly lowest go.
@@ -244,7 +246,7 @@ describe("the boss's strikes", () => {
 
 describe("the team final's steps", () => {
   it("an exact tie on the match goes to less raw loss, not a coin flip", () => {
-    const S: Settings = { ...DEFAULT_SETTINGS, ...CROWD_SETTINGS, teamFinalSizes: [2, 1] };
+    const S: Settings = { ...DEFAULT_SETTINGS, ...CROWD_SETTINGS, ...CROWD_PRE_REWORK, teamFinalSizes: [2, 1] };
     let state = createMatch(["a", "b", "c", "d"].map((id) => ({ id, name: id, isBot: true })), [0], S);
     // Same counted average (matchLoss), different raw: a and c gave away more before the allowance.
     const raw: Record<string, number> = { a: 9, b: 3, c: 7, d: 1 };
@@ -260,7 +262,7 @@ describe("the team final's steps", () => {
 
 describe("rounds feed the cut", () => {
   it("players with the same counted losses every move tie exactly", () => {
-    const S: Settings = { ...DEFAULT_SETTINGS, ...CROWD_SETTINGS, crowdTeams: false, knockoutsPerStage: [2, 2] };
+    const S: Settings = { ...DEFAULT_SETTINGS, ...CROWD_SETTINGS, ...CROWD_PRE_REWORK, crowdTeams: false, knockoutsPerStage: [2, 2] };
     let state = createMatch(Array.from({ length: 6 }, (_, i) => ({ id: `p${i}`, name: `P${i}`, isBot: true })), [0], S);
     const group = new Map([[0, state.players.map((p) => p.id)]]);
     for (let r = 0; r < 10; r++) {
