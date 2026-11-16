@@ -15,6 +15,13 @@ look like a pond where that space is."
 - Through gaps in the canopy, the buildings behind the lot show (a blue window at the top middle, row houses with windows behind
   the right cypress, a grey roof slab).
 
+## It's at night (Eric: "Maybe it's just in the dark time")
+`notes/briefs/assets/chandy-swamp-front-night.png` (round 2's night still): **six lit windows in a 3 x 2 grid glow over the swamp's
+middle and over its trees**, as if a building stood there. By day the same grid shows faintly as darker squares in the middle panel.
+Find the cause first and say it in the PR: a look-alike front or a row building still laid on the lot behind the swamp (its lights
+drawn on the light layer, which goes over everything with "lighter"), the box's own window lights, or something else. Fix the cause
+(nothing on the swamp's lot lights a window), then the look below.
+
 ## What to do
 - From the street the lot reads as **a pond**: open water going back into the lot (a water surface that recedes, reflections, lily
   pads, reeds at its edges), low brush and distant cypress trunks at its far side, the trees' crowns over it. No flat panel, no
