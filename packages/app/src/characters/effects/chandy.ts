@@ -475,10 +475,10 @@ const cut = (all: readonly Speck[], dx: number, dy: number): Speck[] =>
     .filter(([x, y]) => x >= (dx + 1) * S && x < (dx + 2) * S && y >= (dy + 1) * S && y < (dy + 2) * S)
     .map(([x, y, k]): Speck => [x - (dx + 1) * S, y - (dy + 1) * S, k])
     .filter(([x, y]) => x >= 0 && y >= 0 && x <= S - 1 && y <= S - 1);
-/** A block `w` x `h` of `k` with a dark edge (reads on the beam and on the board). */
-const chip = (x: number, y: number, w: number, h: number, k: string): Speck[] => {
+/** A block `w` x `h` of `k` with an edge of `e` (reads on the beam and on the board). */
+const chip = (x: number, y: number, w: number, h: number, k: string, e = "k"): Speck[] => {
   const out: Speck[] = [];
-  for (let j = -1; j <= h; j++) for (let i = -1; i <= w; i++) out.push([x + i, y + j, i < 0 || j < 0 || i >= w || j >= h ? "k" : k]);
+  for (let j = -1; j <= h; j++) for (let i = -1; i <= w; i++) out.push([x + i, y + j, i < 0 || j < 0 || i >= w || j >= h ? e : k]);
   return out;
 };
 /**
@@ -499,7 +499,7 @@ function killSpecks(i: number, n: number): Speck[] {
     const life = (i * 0.37 + rnd(k, 3)) % 1;
     const x = Math.round(40 + rnd(k, 9) * 16 + Math.sin(life * 6 + k) * 3);
     const y = Math.round(54 - life * 46);
-    out.push(...chip(x, y, k % 3 ? 1 : 2, 1, k % 2 ? "w" : "J"));
+    out.push(...chip(x, y, k % 3 ? 1 : 2, k % 3 ? 1 : 2, "w", k % 2 ? "F" : "O"));
   }
   return out;
 }
@@ -540,7 +540,7 @@ const dodgeKing: Record<string, () => Anim> = {
       (): Anim => ({
         loop: false,
         frames: [
-          ...Array.from({ length: KILL_STEPS }, (_, i): Frame => ({ ms: KILL_STEP_MS, layers: [], specks: cut(killSpecks(i, KILL_STEPS), 0, dy), ...(i % 4 === 0 && dy === 0 ? { cue: i === 0 ? "crack" : "crackle" } : {}) })),
+          ...Array.from({ length: KILL_STEPS }, (_, i): Frame => ({ ms: KILL_STEP_MS, layers: [], specks: cut(killSpecks(i, KILL_STEPS), 0, dy), pal: RED_FX, ...(i % 4 === 0 && dy === 0 ? { cue: i === 0 ? "crack" : "crackle" } : {}) })),
           EMPTY(),
         ],
       }),
