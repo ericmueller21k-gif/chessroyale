@@ -27509,6 +27509,7 @@ body.cs-on .mm-scrim {
     overflow: hidden;
     text-overflow: ellipsis;
   }
+}
 /* Dodge's hits on your king (Eric, Nov 16): the first leaves a crack through him for the rest of Dodge (c1) after a short flicker; the
    second is the kill: the beams keep hitting him (the board canvas's sparks and particles under him), his cracks spread (c2, c3), he
    flickers and fades away, gone as he shatters (BOSS_POWERS.chandy.dodgeKillMs: 5 s). */
