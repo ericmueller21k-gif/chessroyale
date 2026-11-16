@@ -400,13 +400,16 @@
       ],
       "specs": ["e2e/zebra.spec.ts", "e2e/boss-smoke.spec.ts", "e2e/king-attack.spec.ts"]
     },
-    "Chandy (his art drawn ahead of his rules, Nov 16; nothing plays him yet: docs/ideas/chandy-wiring.md)": {
+    "Chandy (chandy)": {
       "paths": [
+        "packages/chess/src/bosses/chandy.ts",
+        "packages/server/src/bosses/chandy.ts",
         "packages/app/src/characters/chandy*.ts",
         "packages/app/src/characters/effects/chandy.ts",
-        "packages/app/src/components/Chandy*.tsx"
+        "packages/app/src/components/Chandy*.tsx",
+        "packages/app/public/music/chandy-loop.mp3"
       ],
-      "specs": ["e2e/boss-smoke.spec.ts"]
+      "specs": ["e2e/chandy.spec.ts", "e2e/boss-smoke.spec.ts", "e2e/boss-side.spec.ts"]
     },
     "Timber (timber)": {
       "paths": [

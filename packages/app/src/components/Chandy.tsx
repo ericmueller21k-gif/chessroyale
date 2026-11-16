@@ -323,3 +323,13 @@ export function dodgeFen(boss: BossView, fen: string): string {
   parts[0] = rows.map((row) => row.join("").replace(/\.+/g, (x) => String(x.length))).join("/");
   return parts.join(" ");
 }
+
+/** The dock's words while Dodge runs (in the slot the Scramble Rush uses): what to do now, and what's at stake. */
+export function dodgeDock(boss: BossView, run: DodgeRun, now: number): { line: string; sub: string } {
+  const v = dodgeView(boss, run, now);
+  if (!v) return { line: "", sub: "" };
+  if (v.phase === "vote") return { line: "Vote where your king stands", sub: "One square is safe. One hit and the battle is his." };
+  if (v.phase === "result") return v.result === "hit" ? { line: "Hit!", sub: "The battle is his." } : { line: `Dodged ${v.round} of 3`, sub: v.round < 3 ? "Next round." : "The board comes back." };
+  if (v.phase === "locked" || v.phase === "blast") return { line: "Locked", sub: v.placed ? `Your king on ${v.placed}.` : "Counting the votes." };
+  return { line: "Dodge!", sub: "One square is safe. Watch his clones." };
+}

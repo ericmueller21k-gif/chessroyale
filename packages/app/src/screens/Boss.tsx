@@ -33,7 +33,7 @@ import { BossPanel, besideBoard, useBossLayout } from "../components/MovePanel.t
 import type { BossView, DodgeRun, GameView, LightsView, RushView } from "../game.ts";
 import { LightsDock, LightsOutLayer, lightsStatus } from "../components/LightsOut.tsx";
 import { RushLayer, rushBoard, rushDock } from "../components/DashRush.tsx";
-import { DodgeLayer, chandyTurnMoments, dodgeFen } from "../components/Chandy.tsx";
+import { DodgeLayer, chandyTurnMoments, dodgeDock, dodgeFen } from "../components/Chandy.tsx";
 import { seenKey, useStillKey } from "../hooks.ts";
 import { Hud } from "./Hud.tsx";
 import { BossDock, Dots } from "../components/BossDock.tsx";
@@ -421,7 +421,7 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
   const zebra = bounceShown || splitShown || pig || alfil || hopper || smudgy || gardener || revised || timber ? null : zebraFen(boss, moments, now, fenShown);
   // (Dash's Scramble Rush: his sweep, your placements, then the position as it was: the game's never changed.)
   const boardFen = dodge ? dodgeFen(boss, fenShown) : rush ? rushBoard(boss, rush, now) : (bounceShown ?? splitShown ?? pig?.fen ?? alfil ?? hopper ?? smudgy?.fen ?? gardener?.fen ?? revised?.fen ?? timber?.fen ?? zebra?.fen ?? fenShown);
-  const rushLines = rush ? rushDock(boss, rush, now) : null;
+  const rushLines = rush ? rushDock(boss, rush, now) : dodge ? dodgeDock(boss, dodge, now) : null;
   const evalFen = bounceShown && bounceShown !== boss.board.fen ? (boss.powers?.bounce?.before ?? fenShown) : (pig?.evalFen ?? fenShown);
   const jolt = bounceJolt(bounce && now >= bounce.at ? bounce : null, now) ?? boardSawJolt(moment, now) ?? alfilJolt(moment, now);
   // (One or two pieces by name; more, how many: the dock's line stays one line.)
