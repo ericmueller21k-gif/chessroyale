@@ -930,7 +930,8 @@ export function startStorm(intro: LoadedIntro): Storm {
    * sweeping across (stormEdge, over the height); going out it drains back down the same way.
    */
   const drawRise = (t: number, i: number) => {
-    const e = phase === "in" ? stormEdge("in", t, F.stormInMs, H, fh) : phase === "covered" ? H : H - stormEdge("out", t, F.stormOutMs, H, fh) + fh;
+    const e = phase === "in" ? stormEdge("in", t, F.stormInMs, H, fh) : phase === "covered" ? H : H + fh - stormEdge("out", t, F.stormOutMs, H + fh, fh);
+    // (Going out it drains until its waterline is below the screen too: the mirror of the way in, nothing left on the last frame.)
     const top = Math.round(H - e);
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
     g.clearRect(0, 0, W, H);

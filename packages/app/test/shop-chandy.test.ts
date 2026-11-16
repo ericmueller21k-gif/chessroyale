@@ -36,6 +36,8 @@ describe("Chandy's Swamp: the front and its plot (Nov 16)", () => {
   it("its arrival title says its name once (no \"CHANDY'S\" over \"CHANDY'S SWAMP\"); Rolling Dough keeps its owner's line", () => {
     expect(areaBannerOf({ boss: "Chandy" }, "Chandy's Swamp")).toEqual({ sub: null, title: "CHANDY'S SWAMP" });
     expect(areaBannerOf({ boss: "Don Dough" }, "Rolling Dough")).toEqual({ sub: "DON DOUGH'S", title: "ROLLING DOUGH" });
+    // (Either possessive is the same name: no "PUDDLES'S" over "PUDDLES' BOTANICAL GARDEN".)
+    expect(areaBannerOf({ boss: "Puddles" }, "Puddles' Botanical Garden")).toEqual({ sub: null, title: "PUDDLES' BOTANICAL GARDEN" });
   });
 });
 

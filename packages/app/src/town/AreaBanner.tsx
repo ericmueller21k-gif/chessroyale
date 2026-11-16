@@ -19,7 +19,10 @@ export function areaBannerOf(def: { boss?: string | null; part?: "back" | "landi
   // (The walk-up's floors, Nov 13: "Second floor", "Top floor" over its name; its hall, as every home's front, its boss's.)
   // (Not the boss's name again over a name that starts with it, Nov 16: "CHANDY'S" over "CHANDY'S SWAMP".)
   const own = def.boss ? `${def.boss}'s` : null;
-  const sub = def.part === "back" ? "Back room" : def.part === "landing" ? "Second floor" : def.part === "top" ? "Top floor" : own && !homeName.toLowerCase().startsWith(own.toLowerCase()) ? own : null;
+  // (Either possessive counts as the same name: "Puddles' Botanical Garden" under the boss "Puddles".)
+  const lead = homeName.toLowerCase();
+  const repeats = !!def.boss && (lead.startsWith(`${def.boss}'s`.toLowerCase()) || lead.startsWith(`${def.boss}'`.toLowerCase()));
+  const sub = def.part === "back" ? "Back room" : def.part === "landing" ? "Second floor" : def.part === "top" ? "Top floor" : own && !repeats ? own : null;
   return { sub: sub && sub.toUpperCase(), title: homeName.toUpperCase() };
 }
 

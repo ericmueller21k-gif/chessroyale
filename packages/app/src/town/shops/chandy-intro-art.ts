@@ -7,7 +7,7 @@
  *
  * - `INTRO_CHANDY_POST`: the board's stand, a squat mossy cypress post with a plank cap the board's slab rests on (the game lays the real
  *   board on it). Taller than the platform: it starts rising first. `idle` dry; `stream` (loops) water running off it in sheets and drips.
- * - `INTRO_CHANDY_PLATFORM`: the hidden platform, old planks on cross beams, moss along its edges and weed hanging off them, five
+ * - `INTRO_CHANDY_PLATFORM`: the hidden platform, old planks on cross beams, moss along its edges and weed hanging off them, eight
  *   squares across (the marks and the post on it), seen from the front and a little above. `stream`: water pouring off its edges.
  * - `INTRO_CHANDY_CRATE`: a milk crate, faded and mossy, the stool: `blue` (his) and `orange` (yours).
  * - `INTRO_CHANDY_STORM` and `_FRONT`: his wipe, simple (Eric: "swamp themed … not crazy"): the swamp's water rising over the screen

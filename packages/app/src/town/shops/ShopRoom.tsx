@@ -2692,7 +2692,8 @@ function startRoom(
     const head = Math.min(a?.top ?? 1, (pad + PAWN_HEAD) / kk);
     const lift = (pose.hop * f.youHop + hopLift("you")) * pt.k;
     // (In the water, no shadow: its ripple instead.)
-    if (!wade || castLift("you") >= 0.02) shadows(pt.x, pt.y, pt.k, h / kk);
+    // (Lifted onto Chandy's platform, the shadow rides up with you: on the deck, not the water.)
+    if (!wade || castLift("you") >= 0.02) shadows(pt.x, pt.y - castLift("you") * pt.k, pt.k, h / kk);
     const y0 = pt.y - fy * h - lift;
     const footX = pt.x;
     const footY = pt.y;
@@ -2753,7 +2754,8 @@ function startRoom(
     // (A boss drawn facing front, Big Boy, swings as his figure stands: never mirrored, his shirt reading.)
     const flip = artFacing(ci!.boss.ch.id) === "front" ? false : (face < 0) !== a.facesLeft;
     bossMirrored = flip;
-    const y0 = pt.y - a.ch.foot[1] * k;
+    // (On a lifted platform (Chandy's), his swing stays on the deck.)
+    const y0 = pt.y - a.ch.foot[1] * k - castLift("boss") * pt.k;
     g.save();
     // (Mirrored about its feet: they stay where they are.)
     g.translate(fx, 0);
@@ -3235,7 +3237,7 @@ function startRoom(
     const w = (h * b.ch.w) / b.ch.h;
     const x0 = pt.x - (b.ch.foot[0] / b.ch.w) * w;
     const y0 = pt.y - (b.ch.foot[1] / b.ch.h) * h - hopLift("boss") * pt.k;
-    if (!wade || castLift("boss") >= 0.02) drawShadows(pt.x, pt.y, w);
+    if (!wade || castLift("boss") >= 0.02) drawShadows(pt.x, pt.y - castLift("boss") * pt.k, w);
     const [bfx, bfy, bfk] = [pt.x, pt.y, pt.k];
     const bWading = castLift("boss") < 0.02 && wadeIn(bfy, bfk);
     g.save();
