@@ -1,4 +1,0 @@
-chandy-pond: done. Branch claude/chandy-pond; stills on stills/chandy-pond (11 images); PR title and body in .pr-body.md.
-Cause of the lit windows: the light layer's cut list held 128 lights a frame (a night street has ~260), and South Street's row stood
-inside the swamp's box, its rear walls' lit windows among the dropped lights. Both fixed (render.ts markLit grows; street.ts OPEN_HOMES).
-Lane: targeted. No guard test changed. Local: typecheck, the touched unit tests.
