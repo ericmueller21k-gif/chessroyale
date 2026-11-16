@@ -1,3 +1,4 @@
+- Nov 17 ~00:05 UTC: #760 C1 MERGED (4bb44cf); main run watched; C2 helper told to merge main. C2 running (xhigh, alone).
 - Nov 16 ~23:30 UTC: C1 DONE -> #760 (2c4e0c3; off until C2; helper archived). C2 helper (xhigh, alone) from the C1 branch. Director call: no shared-blunder relief at <=4 a side. Queued after C2: hash-cascade fix, chess boss rules off first load.
 - Nov 16 ~23:10 UTC: #759 bundle split LIVE (3d827b0); main full run GREEN, no retries. Eric asked about move 60: director recommends no cap (chess rules + clocks); told C1 to make crowdMoveLimit optional (0 = none), value 60 until Eric says. C1 running.
 - Nov 16 ~22:45 UTC: main after #757/#758 GREEN, no retries; #757 LIVE. #759 bundle split MERGED (3d827b0); deploy + main run watched. C1 helper running (xhigh, alone).
