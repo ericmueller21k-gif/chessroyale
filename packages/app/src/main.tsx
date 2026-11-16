@@ -18,7 +18,7 @@ import { watchTheme } from "./theme.ts";
 import { applyBoardColors } from "./prefs.ts";
 import { mountOf, setBannerPlusSource, shownLook } from "@chessroyale/core";
 import { bannerPlusAsked } from "./test-switches.ts";
-import { account, onAccountChange } from "./account.ts";
+import { account, loadAccount, onAccountChange } from "./account.ts";
 import { isAdmin } from "./boss-brain.ts";
 import { loadRide } from "./components/rides/load.ts";
 import "./styles.css";
@@ -100,6 +100,8 @@ if (location.pathname === "/chandy") {
     void import("./dev/chandy-preview.tsx");
   };
   const off = onAccountChange(open);
+  // (The account loads in <App>, which this page never renders: ask for it here.)
+  void loadAccount();
   open();
 } else render(<Root />, document.getElementById("app")!);
 

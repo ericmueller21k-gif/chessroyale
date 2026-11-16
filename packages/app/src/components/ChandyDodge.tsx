@@ -26,7 +26,7 @@ export type DodgePhase = "scope" | "slide" | "open" | "vote" | "locked" | "blast
 export type DodgeLine = { rank: number; side: "left" | "right"; since?: number } | { file: string; since?: number };
 export interface DodgeView {
   phase: DodgePhase;
-  /** When the phase began (Date.now() time; online, the server's, as every moment). */
+  /** When the phase began, in this device's time (online: `local(serverTime)`, as every moment), never a raw server time. */
   since: number;
   /** The crowd's side: its king's color, and the board's way up. */
   side: "white" | "black";
@@ -36,7 +36,7 @@ export interface DodgeView {
   placed?: string;
   /** The clones now, and the afterimages of those that just teleported (each fading from its `since`). */
   lines: readonly DodgeLine[];
-  ghosts?: readonly DodgeLine[];
+  ghosts?: readonly (DodgeLine & { since: number })[];
   /** The vote: each square's count, your own pick, and when it closes. */
   votes?: Readonly<Record<string, number>>;
   mine?: string;
@@ -97,7 +97,7 @@ function CloneLayer({ view }: { view: DodgeView }) {
           const cap = pose === "level" ? "Level" : "Down";
           items.push(line.since !== undefined ? { line, anim: `appear${cap}`, then: pose, since: line.since } : { line, anim: pose, since: 0 });
         }
-        for (const line of v.ghosts ?? []) items.push({ line, anim: "rank" in line ? "fadeLevel" : "fadeDown", since: line.since ?? now });
+        for (const line of v.ghosts ?? []) items.push({ line, anim: "rank" in line ? "fadeLevel" : "fadeDown", since: line.since });
       }
       const frames = items.map((it) => ({ it, s: spriteFrameAt(CHANDY_CLONE, it.anim, it.then, now, it.since) }));
       const key = frames.map(({ s }) => `${s.anim}:${s.frame}`).join(";") + `|${v.side}|${JSON.stringify(v.lines)}`;
@@ -182,7 +182,7 @@ export function ChandyDodge({ view }: { view: DodgeView }) {
           );
         })}
       {blank && (
-        <div class="cd-hud" style={{ top: sqs(cr + 1.5) }}>
+        <div class="cd-hud" style={{ top: sqs(cr + 2) }}>
           {v.phase === "result" ? (
             <div class={`cd-result${v.result === "hit" ? " cd-lost" : ""}`}>{v.result === "hit" ? "HIT! YOU LOSE" : `DODGED ${v.round}/3`}</div>
           ) : (
