@@ -449,7 +449,7 @@ export interface HomeNotice {
   onDismiss: () => void;
 }
 
-function Notice({ notice }: { notice: HomeNotice }) {
+export function Notice({ notice }: { notice: HomeNotice }) {
   return (
     <div class="fd-notice" role="status">
       <svg class="fd-notice-flag" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">

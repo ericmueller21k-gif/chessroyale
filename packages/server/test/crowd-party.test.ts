@@ -145,7 +145,7 @@ describe("50 v 50's party: friends only, by invite", () => {
     expect(P.inbox.get(bo)?.at(-1)).toMatchObject({ t: "party", party: { leaderId: bo } });
   });
 
-  it("L5: the leader's Cancel takes its ticket out of the matchmaker's line; a search with nobody here stops, and so does one everyone left", () => {
+  it("L5, N5: the leader's Cancel takes its ticket out of the matchmaker's line; a search with nobody here stops (and says so when they're back), and so does one everyone left", () => {
     const P = party();
     const ann = member(P.join("u-ann"));
     P.core.invited("u-ann", "u-bo", "Bo", P.now() + 600_000);
@@ -156,6 +156,7 @@ describe("50 v 50's party: friends only, by invite", () => {
     P.core.message(ann, { t: "cancel" });
     expect(P.core.takeDropTickets()).toEqual(["t1"]);
     expect(P.core.takeDropTickets()).toEqual([]);
+    expect(P.view().stopped, "a Cancel is no away stop").toBeUndefined();
     // Searching again, then nobody connected: it asks on until CROWD_PARTY.awayStopMs, then stops (its ticket dropped).
     P.core.message(ann, { t: "queue" });
     P.core.answered(P.core.takeQueue()!.pass, { busy: true, ticket: "t2", position: 3, waitSeconds: 9, retryMs: 3000, message: "busy" });
@@ -167,10 +168,13 @@ describe("50 v 50's party: friends only, by invite", () => {
     expect(P.core.takeQueue()).toBeNull();
     expect(P.view().state).toBe("open");
     expect(P.core.takeDropTickets()).toEqual(["t2"]);
-    // Everyone leaving: at once.
+    // N5: back, the party says why the search stopped, until the next Find match.
     expect(member(P.join("u-ann"))).toBe(ann);
+    expect(P.view().stopped).toBe("away");
+    // Everyone leaving: at once.
     P.core.message(ann, { t: "queue" });
     expect(P.view().state).toBe("queueing");
+    expect(P.view().stopped).toBeUndefined();
     P.core.message(ann, { t: "leave" });
     expect(P.view().state).toBe("open");
   });

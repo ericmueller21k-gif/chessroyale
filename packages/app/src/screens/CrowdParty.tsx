@@ -4,6 +4,10 @@ import type { MatchChat } from "../chat.ts";
 import type { PartyClient } from "../squads.ts";
 import { InviteSheet } from "../components/Friends.tsx";
 import { QueueScreen, type PartySlot, type QueueParty, type QueueView } from "./Queue.tsx";
+import { Notice } from "./Home.tsx";
+
+/** The party's last search stopped because everyone was away (the server's CROWD_PARTY.awayStopMs): a pop-up on top, with its X (N5). */
+export const AWAY_STOP_LINE = "The search stopped: everyone was away.";
 
 /**
  * 50 v 50's party (Eric, Nov 16; docs/decisions/2026-11-16-crowd-party.md): the queue screen in party mode, from the party's own
@@ -63,6 +67,13 @@ export function CrowdPartyScreen({
   const leader = p?.members.find((m) => m.id === p.leaderId);
   const searching = !!lobby;
   const asking = !searching && p?.state === "queueing";
+  // (Why the last search stopped, when everyone was away: on top of the screen, pushing nothing (eric.md), until its X or the next
+  // Find match.)
+  const awayStop = !searching && !asking && p?.stopped === "away";
+  const [stopGone, setStopGone] = useState(false);
+  useEffect(() => {
+    if (!awayStop) setStopGone(false);
+  }, [awayStop]);
   const party: QueueParty = {
     slots,
     leaderName: client.isLeader ? "You" : (leader?.name ?? "the leader"),
@@ -79,6 +90,7 @@ export function CrowdPartyScreen({
   return (
     <>
       <QueueScreen match={lobby ?? idle} onCancel={onLeave} chat={searching && chat} party={party} />
+      {awayStop && !stopGone && <Notice notice={{ text: AWAY_STOP_LINE, onDismiss: () => setStopGone(true) }} />}
       {sheet && !searching && !asking && <InviteSheet onClose={() => setSheet(false)} party={{ inParty, invited, full: inParty.size + invited.size >= CROWD_PARTY_MAX }} />}
     </>
   );

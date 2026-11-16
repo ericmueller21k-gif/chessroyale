@@ -70,7 +70,8 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
     **Solo queue** (the public queue), **Party** (Nov 16, [decision](../decisions/2026-11-16-crowd-party.md): PLAY opens your party's queue screen, idle: your seat,
     up to 7 friends' (`CROWD_PARTY_MAX` = 8), "+" opens your friends sheet, "…" an invite out; the leader's Find match queues all
     into the public matchmaking on one team; members see "Waiting for <leader>" greyed; back and Leave leave; "Party matches aren't
-    ranked" greyed under the row; the screen stays through the fill; a reload goes back to it and its lobby; `screens/CrowdParty.tsx`) and **Bots** (you and 99 bots in your
+    ranked" greyed under the row; the screen stays through the fill; a reload goes back to it and its lobby; a search stopped with everyone
+    away says so on top (`.fd-notice`, its X); `screens/CrowdParty.tsx`) and **Bots** (you and 99 bots in your
     browser: PLAY opens **the Bot level box**, [2026-11-09-home-modes-bot-level.md](../decisions/2026-11-09-home-modes-bot-level.md):
     My level, Very easy … Very hard, Random, each with its average; OK greyed until a pick, remembered on the device, `BOT_LEVELS`;
     `components/BotLevelBox.tsx`), each a title and a sub line, three equal buttons in the 44 px row (Bots off has no button since

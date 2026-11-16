@@ -500,6 +500,8 @@ export interface NetParty {
    */
   kind?: "crowd";
   invited?: { uid: string; name: string; expiresAt: number }[];
+  /** A 50 v 50 party whose last search stopped because everyone was away (CROWD_PARTY.awayStopMs); gone at the next Find match. */
+  stopped?: "away";
 }
 
 export type PartyClientMessage =

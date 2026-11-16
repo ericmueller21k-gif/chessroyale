@@ -380,15 +380,21 @@ test("50 v 50 Party reloads (the fix round of #747, M2) and the leader leaving m
   await expect(waiting).toBeDisabled();
   await expect(ann.page.locator(".fd-seat.friend")).toHaveCount(1);
 
-  // (a) Bo's app is placed but reloads before it gets into the lobby (its check on the lobby held, then the page reloaded): back in
-  // the party, then in its lobby with Ann, in the party's group.
+  // (a) Bo's app is placed, but its check on the lobby comes back stale ("playing", as if it had begun), so it stays out. He reloads
+  // more than 20 s after the placing (older than a hold): his app asks again, finds the lobby still waiting, and he's in with Ann, in
+  // the party's group. A placing is joined by its lobby's state, never by its age (the delta review's test gap).
   const status = /\/api\/lobby\/[A-Z2-9]{5}$/;
-  await bo.page.route(status, () => undefined);
+  let asked = 0;
+  await bo.page.route(status, (r) => (asked++, r.fulfill({ json: { open: true, phase: "playing" } })));
   await ann.page.getByRole("button", { name: "Find match" }).click();
   await expect.poll(() => lobbyOf(ann.page)).toBeTruthy();
+  const placedAt = Date.now();
+  await expect.poll(() => asked).toBeGreaterThan(0);
   await expect(bo.page.locator(".fd-queue-mode")).toHaveText("Crowd · 50 v 50 · Party");
   expect(await lobbyOf(bo.page)).toBeUndefined();
   await bo.page.unroute(status);
+  // (Time passing is the point: the placing older than its 20 s hold. This party's lobby fills 45 s after it opened.)
+  await bo.page.waitForTimeout(Math.max(0, placedAt + 21_000 - Date.now()));
   await bo.page.reload();
   const lobby = await sameLobby(ann.page, bo.page);
   await expect(bo.page.locator(".fd-queue-mode")).toHaveText("Crowd · 50 v 50 · Party");
@@ -414,4 +420,48 @@ test("50 v 50 Party reloads (the fix round of #747, M2) and the leader leaving m
   await bo.page.getByRole("button", { name: "Cancel" }).click();
   await expect(bo.page.getByRole("button", { name: "Find match" })).toBeEnabled();
   await expect.poll(() => lobbyOf(bo.page)).toBeUndefined();
+});
+
+test("50 v 50 Party: a search stopped because everyone was away says so on the party's screen, on top, pushing nothing (the delta review's N5)", async ({ browser }) => {
+  test.setTimeout(2 * 60_000);
+  const q = `pas-${test.info().project.name[0]}${Date.now().toString(36).slice(-5)}`;
+  const ann = await player(browser, "Ann Away");
+  // (The server's word that the last search stopped with everyone away (CROWD_PARTY.awayStopMs, its unit test): added to the party's
+  // own messages once `stopped` is set, as everyone coming back finds it. A real one needs the matchmaker busy for 20 s.)
+  let stopped = false;
+  await ann.page.routeWebSocket(/\/api\/crowd\/party\/[A-Z2-9]{5}\/ws/, (ws) => {
+    const server = ws.connectToServer();
+    ws.onMessage((m) => server.send(m));
+    server.onMessage((m) => {
+      const msg = typeof m === "string" ? JSON.parse(m) : null;
+      ws.send(stopped && msg?.t === "party" ? JSON.stringify({ ...msg, party: { ...msg.party, stopped: "away" } }) : m);
+    });
+  });
+  await ann.page.goto(`/?nolanding&debug&pool=${q}`);
+  await pickMode(ann.page, "50 v 50");
+  await ann.page.getByRole("radiogroup", { name: "Matchmaking" }).getByRole("radio", { name: /^Party/ }).click();
+  await ann.page.getByRole("button", { name: "PLAY", exact: true }).click();
+  const find = ann.page.getByRole("button", { name: "Find match" });
+  await expect(find).toBeEnabled();
+  const note = ann.page.locator(".fd-notice");
+  await expect(note).toHaveCount(0);
+  const fixed = [find, ann.page.locator(".fd-queue-count"), ann.page.locator(".fd-seats")];
+  const boxes = async () => (await Promise.all(fixed.map((l) => l.boundingBox()))).flatMap((b) => [b!.x, b!.y, b!.width, b!.height]);
+  const before = await boxes();
+  /** Every box where it was (to 1 px). */
+  const same = async () => (await boxes()).forEach((v, i) => expect(Math.abs(v - before[i]!), `box value ${i}`).toBeLessThanOrEqual(1));
+  // Back from being away (a reload): the line on top, everything where it was; its X takes it away, and nothing moves.
+  stopped = true;
+  await ann.page.reload();
+  await expect(note).toHaveText(/The search stopped: everyone was away\./);
+  await expect(find).toBeEnabled();
+  const onTop = await note.evaluate((n) => {
+    const r = n.getBoundingClientRect();
+    return n.contains(document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2));
+  });
+  expect(onTop, "on top").toBe(true);
+  await same();
+  await note.getByRole("button", { name: "Dismiss" }).click();
+  await expect(note).toHaveCount(0);
+  await same();
 });

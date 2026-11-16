@@ -95,6 +95,8 @@ export interface PartyRecord {
   invited?: { uid: string; name: string; from: string; expiresAt: number }[];
   /** A 50 v 50 party's search stopped (its leader's Cancel, or nobody left in it) with a matchmaker's ticket: out of its line (L5). */
   dropTickets?: string[];
+  /** A 50 v 50 party's last search stopped because everyone was away (`awayStopMs`): its screen says so until the next Find match (N5). */
+  awayStopped?: true;
   /** Kicked: their tokens and accounts, never back in. */
   kicked?: string[];
   kickedUsers?: string[];
@@ -191,6 +193,7 @@ export class PartyCore {
       state: this.r.state,
       ...(placed ? { placed } : {}),
       ...(this.r.state === "queueing" && this.r.busy ? { busy: { ...this.r.busy } } : {}),
+      ...(crowd && this.r.awayStopped && this.r.state === "open" ? { stopped: "away" as const } : {}),
     };
   }
 
@@ -230,6 +233,7 @@ export class PartyCore {
     const now = this.io.now();
     if (!this.r.members.every((m) => !m.connected && now - (m.goneAt ?? 0) >= CROWD_PARTY.awayStopMs)) return false;
     this.stopSearch();
+    this.r.awayStopped = true;
     return true;
   }
 
@@ -550,6 +554,7 @@ export class PartyCore {
     const size = this.r.kind === "crowd" ? this.r.members.length : this.r.members.filter((m) => m.connected).length;
     if (size < 1) return;
     if (this.r.kind === "crowd") this.r.invited = [];
+    delete this.r.awayStopped;
     this.r.state = "queueing";
     delete this.r.placed;
     delete this.r.busy;
