@@ -1,5 +1,5 @@
 import { expect, type Browser, type Page } from "@playwright/test";
-import { named, test } from "./helpers.ts";
+import { named, pickMode, test } from "./helpers.ts";
 
 /**
  * Friends and invites (docs/decisions/2026-10-15-friends-and-invites.md; the friends page, docs/decisions/2026-11-11-friends-page.md),
@@ -96,11 +96,11 @@ test("two players: a request accepted, online in each other's list, the invites 
   const heading = ann.page.getByRole("heading", { name: /^Lobby [A-Z2-9]{5}$/ });
   await expect(heading).toBeVisible();
   const code = (await heading.textContent())!.slice("Lobby ".length);
-  // Bo's home: the toast, within seconds. Join puts him in her lobby.
+  // Bo's home: the notice at the top right (Eric, Nov 16), within seconds. Accept puts him in her lobby.
   const toast = bo.page.locator(".fr-toast");
   await expect(toast).toContainText("Ann Friend invited you to a Crowd lobby", NEWS);
   await shot(bo.page, "invite-toast");
-  await toast.getByRole("button", { name: "Join" }).click();
+  await toast.getByRole("button", { name: "Accept" }).click();
   await expect(bo.page.getByRole("heading", { name: `Lobby ${code}` })).toBeVisible();
   await expect(ann.page.locator(".lobby-players")).toContainText("Bo Friend");
   // (Joined: the invite is off his list.)
@@ -203,4 +203,87 @@ test("the friends page (Eric, Nov 11): home's Friends opens a page, not a pop-up
   // Private lobby: Play with friends' sheet (make a lobby or join by its code).
   await lobby.click();
   await expect(page.getByRole("dialog", { name: "Play with friends" }).getByRole("button", { name: "Get friend code" })).toBeVisible();
+});
+
+/** Two players made friends through the API (a request and its answer), each on their own page. */
+async function befriend(a: { page: Page; id: string }, b: { page: Page; id: string }) {
+  const post = (p: Page, action: string, body: object) =>
+    p.evaluate(([action, body]) => fetch(`/api/friends/${action}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }).then((r) => r.status), [action, body] as const);
+  expect(await post(a.page, "request", { id: b.id })).toBe(200);
+  expect(await post(b.page, "answer", { id: a.id, accept: true })).toBe(200);
+}
+
+/** PARTY_SHOTS=<dir>: the 50 v 50 party's stills for Eric. */
+async function partyShot(page: Page, name: string) {
+  const dir = process.env.PARTY_SHOTS;
+  if (dir) await page.screenshot({ path: `${dir}/${isComputer() ? "computer" : "phone"}-${name}.png` });
+}
+
+test("50 v 50 Party (Eric, Nov 16): seven + seats; a + opens the friends sheet; the invited seat waits; the notice's Accept brings the friend in; the leader's Find match puts both in one lobby, on one team", async ({ browser }) => {
+  test.setTimeout(3 * 60_000);
+  const q = `party-${test.info().project.name[0]}${Date.now().toString(36).slice(-5)}`;
+  const ann = await player(browser, "Ann Party");
+  const bo = await player(browser, "Bo Party");
+  await befriend(ann, bo);
+  for (const p of [ann.page, bo.page]) await p.goto(`/?nolanding&debug&pool=${q}`);
+
+  // Ann: 50 v 50, Party, PLAY: the queue screen, idle: her seat, seven "+", the party's count, her Find match beside Leave.
+  await pickMode(ann.page, "50 v 50");
+  await ann.page.getByRole("radiogroup", { name: "Matchmaking" }).getByRole("radio", { name: /^Party/ }).click();
+  await ann.page.getByRole("button", { name: "PLAY", exact: true }).click();
+  await expect(ann.page.locator(".fd-queue-mode")).toHaveText("Crowd · 50 v 50 · Party");
+  await expect(ann.page.locator(".fd-seat.party-open")).toHaveCount(7);
+  await expect(ann.page.locator(".fd-queue-count")).toHaveText("1 / 8");
+  await expect(ann.page.getByRole("button", { name: "Find match" })).toBeEnabled();
+  await partyShot(ann.page, "1-alone");
+
+  // A "+": her friends sheet (no codes, no links); Invite. Bo's seat waits ("…"), named under the grid.
+  await ann.page.locator(".fd-seat.party-open").first().click();
+  const sheet = ann.page.getByRole("dialog", { name: "Invite friends" });
+  await expect(sheet).toContainText("Up to 7 friends queue with you, all on your team.");
+  await partyShot(ann.page, "2-sheet");
+  await sheet.locator(".fr-row", { hasText: "Bo Party" }).getByRole("button", { name: "Invite" }).click();
+  await expect(sheet.locator(".fr-row", { hasText: "Bo Party" }).getByRole("button", { name: "Invited" })).toBeDisabled();
+  await ann.page.keyboard.press("Escape");
+  await expect(ann.page.locator(".fd-seat.party-invited")).toHaveCount(1);
+  await expect(ann.page.locator(".fd-seat.party-open")).toHaveCount(6);
+  await expect(ann.page.locator(".fd-you-line")).toContainText("Bo Party invited");
+  await partyShot(ann.page, "3-invited");
+
+  // Bo's home: the notice at the top right, "Ann Party invited you", Accept and Decline; it sits on top and pushes nothing.
+  const toast = bo.page.locator(".fr-toast");
+  await expect(toast).toContainText("Ann Party invited you", NEWS);
+  await expect(toast).toContainText("to their 50 v 50 party");
+  const box = (await toast.boundingBox())!;
+  const vw = bo.page.viewportSize()!.width;
+  expect(vw - (box.x + box.width)).toBeLessThan(24);
+  expect(box.y).toBeLessThan(40);
+  await expect(toast.getByRole("button", { name: "Decline" })).toBeVisible();
+  await partyShot(bo.page, "4-notice");
+  await toast.getByRole("button", { name: "Accept" }).click();
+
+  // Bo is in: his screen is the party's, Find match greyed with whose it is; Ann's has him in a seat.
+  await expect(bo.page.locator(".fd-queue-mode")).toHaveText("Crowd · 50 v 50 · Party");
+  await expect(bo.page.getByRole("button", { name: "Waiting for Ann Party" })).toBeDisabled();
+  await expect(ann.page.locator(".fd-queue-count")).toHaveText("2 / 8");
+  await expect(ann.page.locator(".fd-seat.friend")).toHaveCount(1);
+  await expect(ann.page.locator(".fd-seat.party-invited")).toHaveCount(0);
+  await expect(ann.page.locator(".fd-seat.party-open")).toHaveCount(6);
+  // (In: the invite is off his list.)
+  await expect.poll(() => bo.page.evaluate(() => fetch("/api/friends").then((r) => r.json()).then((a) => a.state.invites.length))).toBe(0);
+  await partyShot(ann.page, "5-joined");
+  await partyShot(bo.page, "6-member");
+
+  // Ann's Find match: both in one 50 v 50 lobby, the party's seats first; then the match, both on one team.
+  await ann.page.getByRole("button", { name: "Find match" }).click();
+  const code = (p: Page) => p.evaluate(() => (window as any).match?.code as string | undefined).catch(() => undefined);
+  await expect.poll(() => code(ann.page)).toBeTruthy();
+  await expect.poll(() => code(bo.page)).toBe(await code(ann.page));
+  await expect(ann.page.getByRole("button", { name: "Cancel" })).toBeVisible();
+  await partyShot(ann.page, "7-searching");
+  const phase = (p: Page) => p.evaluate(() => (window as any).match?.phase.kind ?? "none").catch(() => "none");
+  for (const p of [ann.page, bo.page]) await expect.poll(() => phase(p), { timeout: 30_000 }).toBe("vote");
+  const teams = await ann.page.evaluate((ids) => ids.map((uid) => (window as any).match.standingsList.find((s: any) => s.uid === uid)?.team), [ann.id, bo.id]);
+  expect(teams[0]).toMatch(/^[wb]$/);
+  expect(teams[1]).toBe(teams[0]);
 });

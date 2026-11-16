@@ -20,22 +20,23 @@ const path = (p: Page) => new URL(p.url()).pathname;
 const run = Date.now().toString(36).slice(-5);
 const pool = (name: string) => `${name}-${test.info().project.name[0]}${run}`;
 
-test("home (Nov 9): Solo queue, Party and Bots, each a title and a sub line; the line above PLAY says what each does; Party greyed (soon); Bots asks the bot level and starts", async ({ page }) => {
+test("home (Nov 9): Solo queue, Party and Bots, each a title and a sub line; the line above PLAY says what each does; Party is its own pick, never kept; Bots asks the bot level and starts", async ({ page }) => {
   await named(page, "Typer");
   await page.goto("/?debug");
   await pickMode(page, "50 v 50");
   const types = page.getByRole("radiogroup", { name: "Matchmaking" });
   await expect(types.getByRole("radio")).toHaveCount(3);
-  await expect(types.getByRole("radio")).toHaveText(["Solo queuejoin a lobby", "PartySoon", "Bots99 bots, now"]);
+  await expect(types.getByRole("radio")).toHaveText(["Solo queuejoin a lobby", "Partyup to 7 friends", "Bots99 bots, now"]);
   await expect(types.getByRole("radio", { name: /^Solo queue/ })).toHaveAttribute("aria-checked", "true");
   // Solo queue: bots after the server's fill time (8 s on the test server), said by the line above PLAY.
   await expect(page.locator(".fd-hint")).toHaveText(/^(Starts within 8 s; bots fill any empty seats|Usually about \d+ s to find a match)$/);
   await expect(page.getByRole("button", { name: "About matchmaking" })).toHaveCount(0);
-  // Party (queueing together into the public matchmaking, Eric, Nov 9): greyed until it's built; a tap does nothing.
-  await expect(types.getByRole("radio", { name: /^Party/ })).toBeDisabled();
-  await types.getByRole("radio", { name: /^Party/ }).click({ force: true });
-  await expect(types.getByRole("radio", { name: /^Solo queue/ })).toHaveAttribute("aria-checked", "true");
+  // Party (Eric, Nov 9 and 16: you and up to 7 friends into the public matchmaking): its line, and nothing opens until PLAY.
+  await types.getByRole("radio", { name: /^Party/ }).click();
+  await expect(types.getByRole("radio", { name: /^Party/ })).toHaveAttribute("aria-checked", "true");
+  await expect(page.locator(".fd-hint")).toHaveText("Queue with up to 7 friends");
   await expect(page.getByRole("dialog")).toHaveCount(0);
+  await types.getByRole("radio", { name: /^Solo queue/ }).click();
   // Remembered on this device (the way of being matched; the mode is picked again after a reload, Eric, Oct 18).
   await types.getByRole("radio", { name: /^Bots/ }).click();
   await page.reload();
