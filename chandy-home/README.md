@@ -61,3 +61,7 @@ Here is what the game does so nothing standing on the platform can be hidden:
 - `03`: the front at night.
 - `04`: wading.
 - `07`: the frog.
+
+## Build (Nov 16)
+
+- `14-rise-phone-build.gif`: the built rise on a phone, his water now rising from the screen's foot (Eric's call W) and draining back down.
