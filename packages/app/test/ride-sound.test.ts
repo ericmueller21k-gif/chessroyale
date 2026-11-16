@@ -33,6 +33,7 @@ class FakeSource {
   playbackRate = new FakeParam();
   started: [number, number | undefined, number | undefined] | null = null;
   stopped = false;
+  stopAt: number | undefined;
   onended: (() => void) | null = null;
   connect(g: FakeGain) {
     return g;
@@ -40,8 +41,9 @@ class FakeSource {
   start(at: number, offset?: number, duration?: number) {
     this.started = [at, offset, duration];
   }
-  stop() {
+  stop(at?: number) {
     this.stopped = true;
+    this.stopAt = at;
   }
   disconnect() {}
 }
@@ -85,7 +87,7 @@ vi.mock("../src/sound.ts", () => ({
   onAudioRebuilt: (fn: () => void) => (sound.rebuilt.push(fn), () => undefined),
 }));
 
-const { rideMoving, rideStep, rideHop, rideSoundState, rideSoundForTests, warmRideSound, RIDE_LOOP } = await import("../src/ride-sound.ts");
+const { rideMoving, rideStep, rideHop, rideSoundState, rideSoundForTests, warmRideSound, RIDE_LOOP, DECLICK_S } = await import("../src/ride-sound.ts");
 const { Walker } = await import("../src/town/world.ts");
 const { RIDE_CELLS } = await import("../src/town/ride-cells.ts");
 const { TOWN_FEEL } = await import("../src/town/feel.ts");
@@ -93,7 +95,6 @@ const settle = () => new Promise((r) => setTimeout(r, 0));
 
 const DOZER = RIDE_SOUND.rides["sawyer-dozer"] as RideLoopSound;
 const POGO = RIDE_SOUND.rides["boingo-pogo"] as RideStepSound;
-const E = RIDE_SOUND.engine;
 /** Time passing: the page's clock, the audio's and the timers together. */
 const pass = (d: number) => vi.advanceTimersByTime(d);
 /** Moving for `d` ms: a frame every 16 ms says so. */
@@ -128,15 +129,19 @@ describe("a ride's moving sound", () => {
     expect(sound.asked).toEqual(["/sounds/rides/sawyer-dozer.wav", "/sounds/rides/boingo-pogo.wav", "/sounds/rides/ginger-sled.wav"]);
   });
 
-  it("starts on the first moving frame: one source looping between 0.1 and 1.1 s, from 0.1; fades in over fadeInMs; an engine from startRate up to 1 over upMs", () => {
+  it("a hard start on the first moving frame: one source looping between 0.1 and 1.1 s, from 0.1, at full speed; full level in DECLICK_S", () => {
     rideMoving("sawyer-dozer");
     const [src] = playing();
     expect(playing()).toHaveLength(1);
     expect([src!.loop, src!.loopStart, src!.loopEnd, src!.started![1]]).toEqual([true, RIDE_LOOP.start, RIDE_LOOP.end, 0.1]);
-    expect(src!.playbackRate.value).toBe(E.startRate);
-    expect(src!.playbackRate.lastRamp![0]).toBe(1);
-    expect(src!.playbackRate.lastRamp![1]).toBeCloseTo(10 + E.upMs / 1000, 6);
-    expect(rideSoundState()).toMatchObject({ ride: "sawyer-dozer", up: true, live: 1, level: RIDE_SOUND.level, rate: 1 });
+    expect(src!.started![0]).toBe(ctx.currentTime);
+    expect([src!.playbackRate.value, src!.playbackRate.calls]).toEqual([DOZER.rate, []]);
+    expect(ctx.gains[0]!.gain.calls).toEqual([
+      ["set", 0, 10],
+      ["ramp", RIDE_SOUND.level, 10 + DECLICK_S],
+    ]);
+    expect(DECLICK_S).toBeLessThanOrEqual(0.03);
+    expect(rideSoundState()).toMatchObject({ ride: "sawyer-dozer", live: 1, level: RIDE_SOUND.level, rate: DOZER.rate });
   });
 
   it("a ride with no entry, or on foot, stays silent", () => {
@@ -145,66 +150,49 @@ describe("a ride's moving sound", () => {
     expect(ctx.sources).toEqual([]);
   });
 
-  it("held through a 100 ms gap between steps: the same source, never faded, never a second one", () => {
+  it("held through a 100 ms gap between steps: the same source, never stopped, never a second one", () => {
     move("sawyer-dozer", 200);
     pass(100);
     move("sawyer-dozer", 200);
     expect(ctx.sources).toHaveLength(1);
-    expect(rideSoundState().up).toBe(true);
+    expect(ctx.sources[0]!.stopped).toBe(false);
+    expect(ctx.gains[0]!.gain.calls).toHaveLength(2);
+    expect(rideSoundState()).toMatchObject({ ride: "sawyer-dozer", live: 1 });
   });
 
-  it("stops holdMs after the last step: fades out over fadeOutMs, an engine sinking to stopRate; let go once silent", () => {
+  it("a hard stop holdMs after the last step: down from full level in DECLICK_S and stopped then, at full speed to the end", () => {
     move("sawyer-dozer", 400);
     const [src] = ctx.sources;
+    const g = ctx.gains[0]!.gain;
     pass(RIDE_SOUND.holdMs - 20);
-    expect(rideSoundState().up).toBe(true);
+    expect(rideSoundState()).toMatchObject({ ride: "sawyer-dozer", live: 1 });
+    expect(src!.stopped).toBe(false);
     pass(40);
-    expect(rideSoundState()).toMatchObject({ up: false, level: 0, rate: E.stopRate });
-    const fadeAt = ctx.currentTime;
-    const g = src!.playbackRate.lastRamp!;
-    expect(g[0]).toBe(E.stopRate);
-    expect(g[1]).toBeGreaterThan(fadeAt - 0.03 + DOZER.fadeOutMs / 1000 - 0.03);
-    expect(src!.stopped).toBe(false);
-    pass(DOZER.fadeOutMs + 60);
+    expect(rideSoundState()).toMatchObject({ ride: null, live: 0, level: 0 });
     expect(src!.stopped).toBe(true);
-    expect(rideSoundState()).toMatchObject({ ride: null, live: 0 });
+    // (From full level where it stopped, holdMs after the last moving frame at 384 ms, to 0 DECLICK_S later.)
+    const t = 10 + (384 + RIDE_SOUND.holdMs) / 1000;
+    expect(g.calls.slice(2)).toEqual([
+      ["cancel", t],
+      ["set", RIDE_SOUND.level, t],
+      ["ramp", 0, t + DECLICK_S],
+    ]);
+    expect(src!.stopAt).toBe(t + DECLICK_S);
+    expect(src!.playbackRate.calls).toEqual([]);
+    expect(vi.getTimerCount()).toBe(0);
   });
 
-  it("moving again mid-fade: the same source comes back up from where it is (level and speed), never from silence", () => {
-    move("sawyer-dozer", 1000); // (well up to speed)
-    pass(RIDE_SOUND.holdMs + 10);
-    const [src] = ctx.sources;
-    // Halfway through the fade.
-    pass(DOZER.fadeOutMs / 2);
-    rideMoving("sawyer-dozer");
-    expect(ctx.sources).toHaveLength(1);
-    expect(src!.stopped).toBe(false);
-    expect(rideSoundState()).toMatchObject({ up: true, live: 1, level: RIDE_SOUND.level, rate: 1 });
-    // Its speed picked up from about halfway between 1 and stopRate, and back to 1 in the matching share of upMs.
-    const from = src!.playbackRate.lastFrom as number;
-    expect(from).toBeGreaterThan(E.stopRate + 0.01);
-    expect(from).toBeLessThan(1 - 0.01);
-    const [to, at] = src!.playbackRate.lastRamp!;
-    expect(to).toBe(1);
-    expect((at as number) - ctx.currentTime).toBeCloseTo(((1 - from) / (1 - E.startRate)) * (E.upMs / 1000), 6);
-    // And it doesn't let go when the old fade would have ended.
-    move("sawyer-dozer", DOZER.fadeOutMs);
-    expect(src!.stopped).toBe(false);
-    expect(ctx.sources).toHaveLength(1);
-  });
-
-  it("the gain comes back up from where the fade had it (about half way), not from 0, over fadeInMs", () => {
+  it("moving again once stopped: a new source, at full level and speed from its first frame (no comeback from a fade)", () => {
     move("sawyer-dozer", 300);
     pass(RIDE_SOUND.holdMs + 10);
-    const g = ctx.gains[0]!.gain;
-    expect(g.lastRamp![0]).toBe(0);
-    pass(DOZER.fadeOutMs / 2);
+    pass(100);
     rideMoving("sawyer-dozer");
-    expect(g.lastFrom).toBeGreaterThan(RIDE_SOUND.level * 0.4);
-    expect(g.lastFrom).toBeLessThan(RIDE_SOUND.level * 0.65);
-    expect(g.lastRamp![0]).toBe(RIDE_SOUND.level);
-    expect((g.lastRamp![1] as number) - ctx.currentTime).toBeCloseTo(DOZER.fadeInMs / 1000, 6);
-    expect(ctx.sources).toHaveLength(1);
+    expect(ctx.sources).toHaveLength(2);
+    expect(ctx.sources[0]!.stopped).toBe(true);
+    expect(playing()).toEqual([ctx.sources[1]]);
+    expect(ctx.sources[1]!.playbackRate.value).toBe(DOZER.rate);
+    expect(ctx.gains[1]!.gain.lastRamp).toEqual([RIDE_SOUND.level, ctx.currentTime + DECLICK_S]);
+    expect(rideSoundState()).toMatchObject({ ride: "sawyer-dozer", live: 1 });
   });
 
   it("the Sound switch off or the page hidden: out at once and let go; nothing starts again while it stays so", () => {
@@ -221,11 +209,11 @@ describe("a ride's moving sound", () => {
     expect(rideSoundState().live).toBe(1);
   });
 
-  it("the pogo's moving frames never start a loop (it plays by steps: below); off the dozer onto it, the dozer's loop fades as standing", () => {
+  it("the pogo's moving frames never start a loop (it plays by steps: below); off the dozer onto it, the dozer's loop stops as standing", () => {
     move("boingo-pogo", 300);
     expect(ctx.sources).toEqual([]);
     move("sawyer-dozer", 100);
-    move("boingo-pogo", RIDE_SOUND.holdMs + DOZER.fadeOutMs + 100);
+    move("boingo-pogo", RIDE_SOUND.holdMs + 100);
     expect(ctx.sources).toHaveLength(1);
     expect(rideSoundState()).toMatchObject({ ride: null, live: 0, boings: 0 });
   });
@@ -234,13 +222,15 @@ describe("a ride's moving sound", () => {
     move("ginger-sled", 100);
     expect(playing()).toHaveLength(1);
     expect(ctx.gains.at(-1)!.to).toBe(BRIGHT);
-    pass(2000);
     move("sawyer-dozer", 100);
     expect(ctx.gains.at(-1)!.to).toBe(OUT);
+    // (Straight from one to the other: the sled's stops as the dozer's starts.)
+    expect(playing()).toHaveLength(1);
+    expect(rideSoundState()).toMatchObject({ ride: "sawyer-dozer", live: 1 });
   });
-  it("a frame loop that halts mid-walk (the town closing, a hidden tab): it fades out all the same", () => {
+  it("a frame loop that halts mid-walk (the town closing, a hidden tab): it stops all the same", () => {
     move("sawyer-dozer", 200);
-    pass(RIDE_SOUND.holdMs + DOZER.fadeOutMs + 100);
+    pass(RIDE_SOUND.holdMs + 20);
     expect(rideSoundState()).toMatchObject({ ride: null, live: 0 });
   });
 });
@@ -353,7 +343,7 @@ describe("the pogo's boings: one a step, on the hop (Eric, Nov 15: \"from one sq
     move("sawyer-dozer", 100);
     const loop = ctx.sources.filter((s) => s.loop);
     expect(loop).toHaveLength(1);
-    expect([loop[0]!.loopStart, loop[0]!.loopEnd, loop[0]!.playbackRate.value]).toEqual([RIDE_LOOP.start, RIDE_LOOP.end, E.startRate]);
+    expect([loop[0]!.loopStart, loop[0]!.loopEnd, loop[0]!.playbackRate.value]).toEqual([RIDE_LOOP.start, RIDE_LOOP.end, DOZER.rate]);
     expect(rideSoundState()).toMatchObject({ ride: "sawyer-dozer", live: 1, boings: 2 });
   });
 });
