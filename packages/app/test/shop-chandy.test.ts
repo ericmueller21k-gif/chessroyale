@@ -62,6 +62,12 @@ describe("Chandy's Swamp: the front and its plot (Nov 16)", () => {
     expect(areaBannerOf({ boss: "Don Dough" }, "Rolling Dough")).toEqual({ sub: "DON DOUGH'S", title: "ROLLING DOUGH" });
     // (Either possessive is the same name: no "PUDDLES'S" over "PUDDLES' BOTANICAL GARDEN".)
     expect(areaBannerOf({ boss: "Puddles" }, "Puddles' Botanical Garden")).toEqual({ sub: null, title: "PUDDLES' BOTANICAL GARDEN" });
+    // (Eric, Nov 16: the plain name too, never twice.)
+    expect(areaBannerOf({ boss: "Ginger" }, "Ginger Igloo")).toEqual({ sub: null, title: "GINGER IGLOO" });
+    expect(areaBannerOf({ boss: "Hollow" }, "Hollow Peak")).toEqual({ sub: null, title: "HOLLOW PEAK" });
+    expect(areaBannerOf({ boss: "Moo & Moon" }, "Moo & Moon Meadow")).toEqual({ sub: null, title: "MOO & MOON MEADOW" });
+    // (A name that only begins with the same letters keeps its owner line.)
+    expect(areaBannerOf({ boss: "Dash" }, "Dashboard Diner")).toEqual({ sub: "DASH'S", title: "DASHBOARD DINER" });
   });
 });
 
