@@ -8,9 +8,11 @@ music. Made in code by `scripts/reel/music/` on branch `claude/trailer-v2` (no s
 
 1. Take the boss's pieces from the music handoff (`boss-music/` on branch `stills/trailer-v2`, rebuilt by
    `python3 scripts/reel/music/handoff.py <folder>` on `claude/trailer-v2`): **the `.mp3` files only** (they decode
-   everywhere, iOS Safari included; stereo at a constant 192 kbps since Nov 14, Eric: "fuck the filter and the compression", rendered with
-   `handoff.py --stereo --kbps 192` (and `phases_v.py --stereo --kbps 192` for the Hidden Boss's); mono 64 kbps Nov 12-14: never re-encode an MP3, which shifts the
-   audio and moves the loop points: render it again from its song), e.g. `bigboy-loop.mp3`, or `hollow-intro.mp3` and `hollow-loop.mp3`.
+   everywhere, iOS Safari included; stereo at a constant 128 kbps since Nov 16, Eric: "128 is fine for the game", rendered with
+   `handoff.py --stereo --kbps 128` (and `phases_v.py --stereo --kbps 128` for the Hidden Boss's); 192 kbps Nov 14-16 (tag `music-192k`), mono 64 kbps
+   Nov 12-14. Render it from its song; if an MP3 must be re-encoded (as on Nov 16), use `ffmpeg -i old.mp3 -c:a libmp3lame -b:a 128k -ar 48000 -ac 2`
+   and check, per file, that it decodes to the same length and lines up with the old at offset 0, at `pad` and `pad + loopSeconds`:
+   docs/decisions/2026-11-16-music-128k.md), e.g. `bigboy-loop.mp3`, or `hollow-intro.mp3` and `hollow-loop.mp3`.
 2. Put them in this folder.
 3. Copy the boss's entry from the handoff's `themes.json` into `themes.json` here, under `themes`, keyed by the boss's id
    (`grex`, `bigboy`, `hollow`…): `intro` (a name, or `null` for a loop-only song), `loop`, `introSeconds`,
@@ -29,7 +31,7 @@ boards split at the transformation's start + `recluse-phase3`'s `introSeconds`: 
 ## The town's theme (Nov 15)
 
 `town-loop` (the theme, one seamless loop) and `town-solo-a`, `town-solo-b` (piano solos: `seconds` of music, then 4 s ringing out), from
-`town-music/` on branch `stills/trailer-v2` (made by `scripts/reel/music/town.py --stereo --kbps 192` on `claude/trailer-v2`), the `.mp3`
+`town-music/` on branch `stills/trailer-v2` (made by `scripts/reel/music/town.py --stereo --kbps 128` on `claude/trailer-v2`), the `.mp3`
 files only. Their numbers are `themes.json`'s `town` entry (`loop`, `loopSeconds`, each solo's `id`, `file`, `seconds`; `pad` as every
 theme's), copied from the handoff's `town.json`. How often and in what order the solos play: `TOWN_MUSIC` in settings.ts. A rebuilt piece:
 replace its file and its numbers; no code change (`src/music.ts`, `townMusic`).
