@@ -21,6 +21,14 @@ origin/review/chandy-rules:review.md`. The spec: `git show origin/stills/boss-ch
      at 3, in settings), then the usual warning, then Dodge as a crowd turn begins. Nothing else fills or drains it. The bar stays
      dimmed until the 5th upgrade ("Nothing hidden, nothing shifts").
    - Update DESIGN-facing docs (bosses.md his row, the decision note) and the settings comment.
+5b. **Eric's last-chance Dodge (Nov 16): "if we can calculate that it's a guaranteed mate in one [for the crowd], and he doesn't have
+   all of his upgrades or he hasn't ulted, then he still fires his ult anyway ... because we want that to be something players
+   experience and don't try to circumvent."** As a crowd turn begins, if he hasn't used Dodge this battle and the crowd has a move that
+   mates him (a legal move giving checkmate: chess.js on the position, every legal crowd move tried; within the crowd's allowed moves
+   that turn), Dodge fires now, whatever his upgrades or rage, with its usual warning and scope-in. The board comes back after it and
+   the crowd may still play the mate. It counts as his one Dodge. Same solo and online (the server decides). A rule test for it (a
+   mate-in-one position with 0 upgrades fires Dodge once; a second mate-in-one later doesn't), and an e2e check if cheap (a test
+   switch position with a mate in one).
 6. **One sim run** at the shipped settings (boss lane: one run, one setting): report the share of battles with Dodge (aim: at least
    85%), the 5-upgrade share, the crowd's score; update `reports/chandy-sim.md`. L2 (bots always find the safe square) stays as is:
    note it for Eric.
