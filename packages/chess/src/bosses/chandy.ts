@@ -22,7 +22,7 @@
  *
  * **The move meter** (from the first upgrade): one of your moves a notch, full at chandy.meterEvery. Full as his turn begins, he
  * picks a move: the newest unlock first, else random among the unlocked (the queen lock only when it can come). The queen lock is
- * his whole turn, at once (the pass guard may make it wait a turn); the others land as your next turn begins, after his move:
+ * his whole turn, at once (the pass guard may refuse it: the meter picks another unlocked move, none: it empties); the others land as your next turn begins, after his move:
  * - **Scatter shot** (`scatterShot`): a spot with at least four empty squares round it; four of them blocked through your turn and
  *   his move after it, as Boingo's pies (nobody lands on one; a slide passes through), the ones taking away the most of your moves.
  * - **Beam** (`beam`): a rank and a file, never your king's, the pair holding the most of your pieces; for your turn its squares
@@ -942,7 +942,8 @@ export const chandyBattle = {
     const before = move ? fenBeforeLast(boardOf(b)) : null;
     let c: ChandyState = { ...p.chandy };
     if (move && before) {
-      c.locks = locksAfter(before, move, c.locks);
+      // (A locked pawn that promotes to a queen is unlocked at once: never the queen, L1.)
+      c.locks = locksAfter(before, move, c.locks).filter((l) => l.piece !== "q");
       if (c.aim) {
         const followed = locksAfter(before, move, [{ square: c.aim.square, piece: "q", at: 0 }])[0];
         c.aim = followed?.piece === "q" ? { ...c.aim, square: followed.square } : null;
@@ -1050,8 +1051,8 @@ export const chandyBattle = {
   },
 
   /**
-   * The queen lock's aim (his whole turn): `answer` PASS_WAIT (the host's pass guard) waits a turn, the meter still full, and he plays
-   * his move; anything else aims: the turn passes to the crowd (a base), the aim on her square, the meter spent, and the crowd's turn
+   * The queen lock's aim (his whole turn): `answer` PASS_WAIT (the host's pass guard): no aim, the meter's pick another unlocked move
+   * (none: the meter empties), and he plays his move; anything else aims: the turn passes to the crowd (a base), the aim on her square, the meter spent, and the crowd's turn
    * set up as after his move (its moment, the aim's). Returns her square; null: none was due, or it waits.
    */
   applyQueenLock(b: Battle, answer: string | null = null): string | null {
@@ -1060,7 +1061,12 @@ export const chandyBattle = {
     const p = boss.powers!;
     const c = chandyOf(p);
     if (answer === PASS_WAIT) {
-      setChandy(b, (x) => ({ ...x, passWait: boss.crowdMoves }));
+      // (The meter picks another unlocked move instead, landing as your next turn begins; none: it empties. The queen lock can come
+      // back on a later fill. The review of #739, M1: the design's own "else the meter picks another unlocked move".)
+      setChandy(b, (x) => {
+        const other = meterPick(x, p.seed, ["queenlock"]);
+        return { ...x, passWait: boss.crowdMoves, due: other, ...(other ? {} : { meter: 0 }) };
+      });
       return null;
     }
     const board = boardOf(b);

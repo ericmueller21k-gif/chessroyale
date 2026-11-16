@@ -3,6 +3,7 @@ import { BOSS_ADMIN_FIRST, BOSS_POWERS, BOSS_ROSTER, CHANDY_MOVES, adminFirst, i
 import {
   CHANDY_FX,
   MatchRunner,
+  PASS_WAIT,
   POWER_FX,
   beamAllows,
   botDodgeVote,
@@ -145,7 +146,7 @@ describe("the locks (L1-L6)", () => {
     expect(lockEnds("4k3/8/5n2/8/8/8/8/4K3 w - - 0 1", "w", { moves: 5 }, l)).toBe(true);
   });
 
-  it("follows its piece through a move, castling's rook too; one taken is gone; a pawn that queens is dropped later (its letter changes)", () => {
+  it("follows its piece through a move, castling's rook too; one taken is gone; a pawn that promotes takes its new letter", () => {
     const fen = "r3k3/8/8/8/8/8/8/4K2R w K - 0 1";
     expect(locksAfter(fen, "e1g1", [{ square: "h1", piece: "r", at: 0 }])).toEqual([{ square: "f1", piece: "r", at: 0 }]);
     expect(locksAfter("4k3/8/8/3N4/8/8/8/4K3 w - - 0 1", "d5f6", [{ square: "d5", piece: "n", at: 0 }])).toEqual([{ square: "f6", piece: "n", at: 0 }]);
@@ -153,6 +154,21 @@ describe("the locks (L1-L6)", () => {
     const queened = locksAfter("4k3/P7/8/8/8/8/8/4K3 w - - 0 1", "a7a8q", [{ square: "a7", piece: "p", at: 0 }]);
     expect(queened).toEqual([{ square: "a8", piece: "q", at: 0 }]);
     expect(lockEnds("Q3k3/8/8/8/8/8/8/4K3 b - - 0 1", "w", { moves: 1 }, queened[0]!)).toBe(true);
+  });
+
+  it("a locked pawn that promotes to a queen is unlocked at once: never the queen, nor steered at (the review's L1)", async () => {
+    const r = battle(3);
+    // (Your locked pawn on a7, a rook's pawn on b6 locked too; you queen the a-pawn.)
+    onPosition(r, "8/P6k/1P6/8/8/8/8/4K3 w - - 0 1", "w", { locks: [{ square: "a7", piece: "p", at: 0 }, { square: "b6", piece: "p", at: 0 }], taught: true });
+    await crowdMove(r, () => "a7a8q");
+    expect(r.bossToMove()).toBe(true);
+    expect(cOf(r).locks).toEqual([{ square: "b6", piece: "p", at: 0 }]);
+    expect(r.bossLocks()).toEqual(["b6"]);
+    // (Under-promoted: the lock follows it, its new letter.)
+    const r2 = battle(3);
+    onPosition(r2, "8/P6k/8/8/8/8/8/4K3 w - - 0 1", "w", { locks: [{ square: "a7", piece: "p", at: 0 }], taught: true });
+    await crowdMove(r2, () => "a7a8n");
+    expect(cOf(r2).locks).toEqual([{ square: "a8", piece: "n", at: 0 }]);
   });
 });
 
@@ -342,6 +358,31 @@ describe("the queen lock", () => {
     expect(cOf(r).shot).toMatchObject({ square: "d2", piece: "p" });
     expect(pieceAt(fenOf(r), "d2")).toBeNull();
     expect(chandyTurnMs(r.boss)).toBeGreaterThan(0);
+  });
+});
+
+describe("the queen lock's pass guard (the review's M1)", () => {
+  it("refused (passing would lose real material): the meter picks another unlocked move, which lands as your turn begins; none: it empties", async () => {
+    const r = battle(8);
+    await crowdMove(r);
+    onPosition(r, "4k3/pppp4/8/8/8/8/3P4/3QK2R b - - 0 1", "w", { upgrades: 2, unlocked: ["queenlock", "rapidfire"], fresh: "queenlock", due: "queenlock", meter: S.meterEvery });
+    expect(r.queenLockDue()).toBe(true);
+    expect(r.applyQueenLock(PASS_WAIT)).toBeNull();
+    expect(cOf(r).due).toBe("rapidfire");
+    expect(r.queenLockDue()).toBe(false);
+    expect(r.bossToMove()).toBe(true);
+    await r.playBoss();
+    expect(r.boss!.powers!.events.some((e) => e.kind === "rapidFire")).toBe(true);
+    expect(cOf(r).due ?? null).toBeNull();
+    expect(cOf(r).meter).toBe(0);
+    // (The queen lock alone unlocked: the meter empties, the queen lock can come on a later fill.)
+    const r2 = battle(8);
+    await crowdMove(r2);
+    onPosition(r2, "4k3/pppp4/8/8/8/8/3P4/3QK2R b - - 0 1", "w", { upgrades: 1, unlocked: ["queenlock"], fresh: "queenlock", due: "queenlock", meter: S.meterEvery });
+    expect(r2.applyQueenLock(PASS_WAIT)).toBeNull();
+    expect(cOf(r2).due ?? null).toBeNull();
+    expect(cOf(r2).meter).toBe(0);
+    expect(r2.queenLockDue()).toBe(false);
   });
 });
 
