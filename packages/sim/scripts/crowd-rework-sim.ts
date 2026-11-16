@@ -9,7 +9,7 @@
  * - a soft reset: at each cut a survivor keeps `carry` of their score.
  * Bots of known strength (BOT_LOBBY's temperatures, Crowd's lean: botPickSpread, the game's own code) pick on their
  * team's turns from the judge's top 8 lines (Stockfish 19 lite, `NODES` a position). Each match writes one line to
- * reports/crowd-rework/<mode>-<lobby>-<carry>.jsonl; `summary` reads them all, applies the RP rule (Glicko expected vs
+ * reports/crowd-rework/<mode>-<lobby>.jsonl (kept gzipped on the design branch); `summary` reads them all, applies the RP rule (Glicko expected vs
  * actual, with each tie band) and writes reports/crowd-rework.md.
  *
  *   npx tsx packages/sim/scripts/crowd-rework-sim.ts play <strong|majority|chaos> <strong|mixed|weak> [matches] [seed]
@@ -17,6 +17,7 @@
  */
 import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { gunzipSync } from "node:zlib";
 import { Chess } from "chess.js";
 import { BOT_LOBBY, CROWD_BOTS, DEFAULT_SETTINGS, botLean, botPickSpread, botSkillForRating, mulberry32, openingAllowance, shuffle, type Rng } from "@chessroyale/core";
 import { createNodeEngine } from "@chessroyale/chess/node";
@@ -241,9 +242,10 @@ const seatHash = (seed: number, i: number) => mulberry32(seed * 1_000 + i)();
 /**
  * How a seat's losses are read: `game` as the bots played; `norandom` with the bots' 2% random moves counted as no loss (no
  * real player hands over a move to chance); `wider` scaled by rating, 2^((1150 − r) / 600) (×1.7 at 700, ×0.4 at 1900), as if
- * players' strength showed about four times as much as the bots' compressed spread (a sensitivity check, not a model).
+ * players' strength showed about four times as much as the bots' compressed spread (a sensitivity check, not a model); `engine`
+ * as `game`, but seat 0 (White) gives nothing away on any move: Eric's engine-best player (Nov 1).
  */
-export type Reading = "game" | "norandom" | "wider";
+export type Reading = "game" | "norandom" | "wider" | "engine";
 
 export function replay(row: MatchRow, cuts: Cuts, carry: number, reading: Reading = "game"): Replay {
   const n = row.ratings.length;
@@ -266,7 +268,7 @@ export function replay(row: MatchRow, cuts: Cuts, carry: number, reading: Readin
     const ins = ls.map((_, i) => i).filter((i) => alive[base + i]);
     const rnd0 = new Set(row.random[p]);
     const lossAt = (i: number) =>
-      reading === "norandom" && rnd0.has(i) ? 0 : reading === "wider" ? (ls[i]! / 10) * 2 ** ((1150 - row.ratings[base + i]!) / 600) : ls[i]! / 10;
+      reading === "engine" && base + i === 0 ? 0 : reading === "norandom" && rnd0.has(i) ? 0 : reading === "wider" ? (ls[i]! / 10) * 2 ** ((1150 - row.ratings[base + i]!) / 600) : ls[i]! / 10;
     const c = ins.map((i) => Math.max(0, lossAt(i) - allow));
     const avg = c.reduce((a, b) => a + b, 0) / c.length;
     const rnd = new Set(row.random[p]);
@@ -381,9 +383,11 @@ function bestOf(rp: Replay): Placed | null {
 
 function rowsAll(): MatchRow[] {
   if (!existsSync(OUT)) return [];
-  return readdirSync(OUT)
-    .filter((f) => f.endsWith(".jsonl"))
-    .flatMap((f) => readFileSync(OUT + f, "utf8").trim().split("\n").filter(Boolean).map((l) => JSON.parse(l) as MatchRow));
+  // (Plain .jsonl as written; the design branch keeps them gzipped: .jsonl.gz, read when no plain copy is beside it.)
+  const files = readdirSync(OUT);
+  return files
+    .filter((f) => f.endsWith(".jsonl") || (f.endsWith(".jsonl.gz") && !files.includes(f.slice(0, -3))))
+    .flatMap((f) => (f.endsWith(".gz") ? gunzipSync(readFileSync(OUT + f)).toString("utf8") : readFileSync(OUT + f, "utf8")).trim().split("\n").filter(Boolean).map((l) => JSON.parse(l) as MatchRow));
 }
 
 /** The recommended rule (the report's sections 3-5 use it). */
@@ -534,6 +538,15 @@ function summary() {
         const st = cutStats(rs.map((r) => replay(r, SCHEDULES[REC.schedule]!, c, reading)), l);
         out.push(`| ${l} | ${reading} | ${pct(c)} | ${st.rho.toFixed(2)} | ${pct(st.in5)} | ${pct(st.won)} / ${pct(st.top3)} | ${st.above} |`);
       }
+  {
+    const eng = rows.map((r) => replay(r, SCHEDULES[REC.schedule]!, REC.carry, "engine").players[0]!);
+    out.push(
+      "",
+      `**An engine-best player** (one White seat that never gives anything away; Eric, Nov 1: it "should finish 1st or 2nd"), schedule ${REC.schedule},`,
+      `carry ${pct(REC.carry)}, all lobbies and modes: still in at the end ${pct(eng.filter((p) => p.cutAt === null).length / eng.length)}, 1st or 2nd ${pct(eng.filter((p) => p.place <= 2).length / eng.length)}, median place ${q(eng.map((p) => p.place), 0.5)}`,
+      "(its game result is the live one, so a 1 v 1 it would have won may read as a draw).",
+    );
+  }
   // Per-move loss by rating: how far apart the bots' play really is.
   out.push("", "What a move gives away, by rating (all seats, all moves, counted after the allowance; the spread a cut has to see through):", "", "| Rating | Moves | Mean counted loss a move | Its sd | Moves giving 25+ |", "| --- | --- | --- | --- | --- |");
   for (const [lo, hi] of [[600, 800], [900, 1100], [1200, 1400], [1500, 1700], [1800, 2000], [2100, 2200]] as const) {
