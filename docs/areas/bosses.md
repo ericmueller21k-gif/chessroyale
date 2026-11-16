@@ -957,6 +957,11 @@ top part is left and the review right. Decision: `docs/decisions/2026-11-02-boss
   nor its thaw), Boingo's pie splat (`boingoPie`, 40 ms); and QUEEN SLAIN! as its banner comes (`queenSlain`, 40/60/40,
   Boss.tsx, once per banner). Settings → Sound, "Vibration" turns them off. A new moment is a line in `HAPTICS.cues`.
 
+- **Chandy, drawn ahead of his rules** (Nov 16; docs/decisions/2026-11-16-chandy-art.md; his design: `DESIGN.md` on branch
+  `stills/boss-chandy`): his figure, clones and board art are in (`characters/chandy.ts`, `characters/effects/chandy.ts`, the
+  `chandy…` EFFECTS), his kit in `ART_KITS` (kits.ts: not the roster's), the upgrade window and Dodge as components
+  (`ChandyUpgrade.tsx`, `ChandyDodge.tsx`), an admins' preview at `/chandy`. Nothing plays him yet: `docs/ideas/chandy-wiring.md`.
+
 ## Where the code is
 
 Each boss lives in its own files, one per layer, on a shared base. The shared files only put them together.
