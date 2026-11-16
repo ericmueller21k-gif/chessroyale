@@ -2,14 +2,13 @@ import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import { BOSS_DIFFICULTY, hiddenBosses, menuBosses, type BossDef, type BossDifficultyId, type ItemLook } from "@chessroyale/core";
 import { isAdmin } from "../boss-brain.ts";
 import { DressedPawn } from "./FrontDoor.tsx";
-import { artOf, bossKit } from "../characters/kits.ts";
-import { frameKeys, type Character } from "../characters/sprite.ts";
-import { rowSizes, SELECT_SOUND, SELECT_TINT, selectLine, STAGE_PAWN, STAGE_PAWN_FIGURE, STAGE_RISE, TILE_GAP, TILE_RATIO, TILES_PER_ROW } from "../characters/boss-select.ts";
+import { rowSizes, SELECT_SOUND, SELECT_TINT, selectLine, STAGE_RISE, TILE_GAP, TILE_RATIO, TILES_PER_ROW } from "../characters/boss-select.ts";
 import { isPaused, useServerStatus } from "../status.ts";
 import { playOnTap, warmSounds } from "../sound.ts";
 import { NORMAL, Voice, VoiceBubble } from "../speech.tsx";
-import { BossArt, BossFace } from "./BossCharacter.tsx";
-import { SpriteAnim } from "./BossEffect.tsx";
+import { BossArt, BossPortrait } from "./BossPortrait.tsx";
+import { game } from "../lazy-game.ts";
+import { portraitName } from "../characters/portraits.ts";
 import { useMedia } from "./QuickChat.tsx";
 
 /**
@@ -32,6 +31,10 @@ import { useMedia } from "./QuickChat.tsx";
  * nothing drops. docs/decisions/2026-10-16-boss-character-select.md.
  */
 
+/** The picked boss on the stage, in his idle (BossStage.tsx, in the match's chunk); nothing until it's here (the spot keeps its size). */
+const StageFigure = game.screen("BossStageFigure", null);
+const hasPortrait = (name: string) => !!portraitName({ name });
+
 /** The select's own voice (the battle's is `bossVoice`): one line at a time, each tap's replacing the last. */
 const selectVoice = new Voice();
 /** The last line said by each boss here (no line twice running; the Hidden Boss's two in turn). */
@@ -45,49 +48,6 @@ const lastLine = new Map<string, string>();
 export function selectBosses(admin = isAdmin()): { bosses: BossDef[]; hidden: BossDef[] } {
   const on = (b: BossDef) => !isPaused(`boss:${b.id}`);
   return { bosses: menuBosses({ admin, raid: true }).filter(on), hidden: hiddenBosses().filter(on) };
-}
-
-/**
- * Where a boss stands on the stage, in % of the stage's width (cqi): one size of pixel for every boss, its foot on the
- * platform's middle. Its figure aims at STAGE_PAWN pawns tall (Nov 12; Nov 11 it was STAGE_SCALE times the old size: the
- * tuning knob is in characters/boss-select.ts), and never taller than the room above its feet: its head stays on the
- * stage (a tall one, the giraffe or the Hidden Boss, is held to that room, not cut off). Worked out once a character, from
- * its idle's first frame (the rows it draws in).
- */
-const PX = 0.8;
-/** The old cap (before Nov 11): a figure's head-to-feet height, in cqi. Never drawn smaller than that old size. */
-const TALLEST = 56;
-const FOOT_AT = 50;
-/**
- * Where a boss's feet stand, in its own pixels, for one whose frame's `foot` point isn't between its feet (Eric, Oct 25:
- * Big Boy stood off to one side of the platform). Big Boy's feet span x 33 to 66 in his idle; his `foot` is x 44.
- */
-const STAGE_FOOT_X: Readonly<Record<string, number>> = { bigboy: 49.5 };
-/**
- * The room above a boss's feet on the stage, in cqi: its feet sit 12% up from the bottom of the spot (.bs-spot), a spot is 124:96,
- * so the feet are 88% of the spot's height down. The speech bubble sits above the spot now (Nov 12, Eric: "never over the
- * head"), so the whole height is the room, less a sliver for the head's outline.
- */
-const STAGE_ROOM = (1 - 0.12) * ((100 * 96) / 124) - 1;
-const placed = new Map<string, { left: number; width: number }>();
-function placeOnStage(ch: Character, idle: string, rise: boolean): { left: number; width: number } {
-  const key = `${ch.id}:${rise}`;
-  let p = placed.get(key);
-  if (!p) {
-    const rows = frameKeys(ch, ch.anims[idle]!.frames[0]!);
-    const top = Math.max(0, rows.findIndex((r) => r.some((k) => k !== null)));
-    // (Never wider than the stage: a wide one, Wrangler's lasso out to one side, slides over to stay whole.)
-    const tall = Math.max(1, ch.foot[1] - top);
-    // (Bigger, never smaller than before: the old size is the floor, the aim is about two pawns tall (STAGE_PAWN), the room above the feet the cap.)
-    const before = Math.min(PX, TALLEST / tall, 100 / ch.w);
-    // (Nov 12: aimed at about two pawns tall, capped by the room above its feet, plus the band the bubble rises into when `rise`.)
-    const room = STAGE_ROOM + (rise ? STAGE_RISE : 0);
-    const px = Math.max(before, Math.min((STAGE_PAWN * STAGE_PAWN_FIGURE) / tall, room / tall, 100 / ch.w));
-    const width = ch.w * px;
-    const footX = STAGE_FOOT_X[ch.id] ?? ch.foot[0];
-    placed.set(key, (p = { left: Math.max(0, Math.min(100 - width, FOOT_AT - footX * px)), width }));
-  }
-  return p;
 }
 
 /** The "?" tile's value, and the stage's when a random boss is picked. */
@@ -232,9 +192,7 @@ export function BossSelect({
     const next = BOSS_DIFFICULTY[at + by];
     if (next) onDifficulty(next.id);
   };
-  const kit = def ? bossKit(def.name) : null;
   const rise = roomy && (twoRows || rowSizes(bosses.length + hidden.length + 1, TILES_PER_ROW).length <= 3);
-  const idle = kit ? (kit.anims.idle ?? "idle") : null;
   const tile = (id: string, label: string, body: preact.ComponentChildren, cls = "", tint?: string) => (
     <button type="button" role="radio" key={id || "random"} aria-checked={value === id} aria-label={label} class={`bs-tile${cls}${value === id ? " on" : ""}`} data-boss={hiddenIds.has(id) ? "hidden" : id || "random"} onClick={() => tap(id)}>
       <span class={`bs-tile-in${tint ? " bs-tinted" : ""}`} style={tint ? { "--bs-tint": tint } : undefined}>
@@ -321,8 +279,9 @@ export function BossSelect({
               <span class="dv-st-plat" aria-hidden="true" />
               {/* (Its own key each tap: the drop plays again, from the top.) */}
               <span class="dv-st-pawn bs-fig" key={drop.n}>
-                {kit && idle ? (
-                  <SpriteAnim ch={artOf(kit)} anim={idle} since={drop.at} still={still} class="bs-sprite" style={(({ left, width }) => ({ left: `${left}cqi`, width: `${width}cqi` }))(placeOnStage(artOf(kit), idle, rise))} />
+                {def && hasPortrait(def.name) ? (
+                  // (His figure's code comes with the match's (BossStage.tsx), loaded as the raid screen opens: the spot keeps its size meanwhile.)
+                  <StageFigure name={def.name} since={drop.at} still={still} rise={rise} />
                 ) : (
                   <span class="bs-q bs-q-big" aria-hidden="true">
                     ?
@@ -403,11 +362,11 @@ export function BossCardFace({ everyMs, fadeMs }: { everyMs: number; fadeMs: num
     <span class="rd-face-stack" data-boss={cur.id} style={{ "--rd-fade": `${fadeMs}ms` }}>
       {fading && at(fading.n).id !== cur.id && (
         <span class="rd-face-one" key={`${fading.n}`}>
-          <BossFace boss={at(fading.n)} />
+          <BossPortrait boss={at(fading.n)} />
         </span>
       )}
       <span class={`rd-face-one${fading ? " rd-face-in" : ""}`} key={`${n}`}>
-        <BossFace boss={cur} />
+        <BossPortrait boss={cur} />
       </span>
     </span>
   );

@@ -15,8 +15,8 @@ import { BossCardFace, BossSelect, RANDOM, selectBosses } from "../components/Bo
 import { BossInviteSheet } from "../components/BossParty.tsx";
 import type { PartyClient } from "../squads.ts";
 import { openProfile } from "../profile-nav.ts";
-import { BossFace, bossAnims, portraitAnims } from "../components/BossCharacter.tsx";
-import { prewarmAnims } from "../components/BossEffect.tsx";
+import { BossPortrait } from "../components/BossPortrait.tsx";
+import { game } from "../lazy-game.ts";
 import { UserIcon } from "../components/PixelIcon.tsx";
 import { useMedia } from "../components/QuickChat.tsx";
 import { LiveWindow } from "../components/LiveWindow.tsx";
@@ -231,7 +231,7 @@ export function BossMenu({
                 onClick={() => onPick(b.id)}
               >
                 <span class="br-icon" aria-hidden="true">
-                  <BossFace boss={b} />
+                  <BossPortrait boss={b} />
                 </span>
                 <span class="br-main">
                   <strong>{b.name.replace(/^The /, "")}</strong>
@@ -706,18 +706,23 @@ export function HomeScreen({
       setDifficulty(pv.boss.difficulty);
     } else if (pv.boss.id !== pick || pv.boss.difficulty !== difficulty) bp!.choose(pick, difficulty);
   }, [inParty, leading, pv?.boss?.id, pv?.boss?.difficulty]);
-  // The bosses' art is made the first time it's shown (sprite.ts lazyAnim): their tiles' and faces' made here in quiet slices,
-  // a moment after home shows, so the Boss Battle screen opens without building them; and there, the picked boss's moves. Not
-  // while a game is starting (the Bot level box, the queue: home fills in place): one face can take a slow phone most of a
-  // second, and the queue waited on it (Nov 10 flakes, docs/decisions/2026-11-10-flaky-batch-7.md).
+  // The bosses' tiles and faces draw from the first load's portraits (BossPortrait.tsx: nothing to make). Their figures, powers and the
+  // match's screens are the match's chunk (lazy-game.ts, Nov 16: the bundle split), fetched a moment after home shows (where the tiles'
+  // faces were made until then), so the Boss Battle screen's stage and a match don't wait for it; and there, the picked boss's moves
+  // made in quiet slices. Not while a game is starting (the Bot level box, the queue: home fills in place; App fetches it then anyway).
   const starting = botBox || (queue !== undefined && queue !== null);
   useEffect(() => {
     if (starting) return;
-    let stop = () => {};
-    const t = setTimeout(() => (stop = prewarmAnims(portraitAnims())), 1500);
-    return () => (clearTimeout(t), stop());
+    const t = setTimeout(() => void game.preload(), 1500);
+    return () => clearTimeout(t);
   }, [starting]);
-  useEffect(() => (raid ? prewarmAnims(bossAnims(bossDef(pick)?.name)) : undefined), [raid, pick]);
+  useEffect(() => {
+    if (!raid) return;
+    let stop = () => {};
+    let live = true;
+    void game.preload().then((m) => void (live && m && (stop = m.prewarmBoss(bossDef(pick)?.name))));
+    return () => ((live = false), stop());
+  }, [raid, pick]);
   // (Not while Solo and Boss alone rest: the hidden /bosses lands here too, and the Boss raid screen says why.)
   const bossAlone = () => (rest("solo") ? undefined : bossInUrl() ? onSolo("raid") : setBossMenu("solo"));
   // Boss Battle's START: Maia's files fetched ahead as the old Boss alone menu did when it opened, then the battle.

@@ -60,10 +60,10 @@ import { noteSoloBattle } from "./boss-tokens.ts";
 import { noteSoloGame, settleSoloXp, soloGameId, soloTestGame } from "./xp.ts";
 import { isPaused, pausedBosses } from "./status.ts";
 import { kingSay, type KingCue } from "./godKing.ts";
+import { game } from "./lazy-game.ts";
 
 // Off the first load (Nov 10, phone load: home starts fast), each its own chunk: a match's screens (preloaded when play is
 // near), solo play with its runner and the boss rules, the FAQ, the legal pages and Auto chess (loaded on entry).
-const game = lazyGroup(() => import("./screens/game-screens.ts"));
 const FinalScreen = game.screen("FinalScreen");
 const LobbyScreen = game.screen("LobbyScreen");
 const OpeningGrid = game.screen("OpeningGrid");

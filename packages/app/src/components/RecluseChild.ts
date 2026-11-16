@@ -15,7 +15,7 @@ import { GROWING_LOOPS, RECLUSE_GROWING, growAnim, growUpAnim } from "../charact
 import { RECLUSE_CHILD_LINES, RECLUSE_GROWUP_EXCHANGES } from "../characters/recluse-lines.ts";
 import type { BossView } from "../game.ts";
 import { CRITICAL, LOW, NORMAL, bossVoice } from "../speech.tsx";
-import type { FigureRun } from "./BossCharacter.tsx";
+import type { FigureRun } from "./boss-figure.ts";
 
 /** His age at a step of his ramp (0 the child, 1 about 13, 2 about 20, 3 his adult look). */
 export const ageAtStep = (step: number): number => childAge(childRating(step * RECLUSE_CHILD.everyPlies));

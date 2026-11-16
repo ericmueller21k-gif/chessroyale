@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "preact/ho
 import type { ComponentChildren } from "preact";
 import { pawnColorOf, rankView, sideOfPawn } from "@chessroyale/core";
 import { BackButton, DressedPawn } from "../components/FrontDoor.tsx";
-import { BossArt } from "../components/BossCharacter.tsx";
+import { BossArt } from "../components/BossPortrait.tsx";
 import { InviteButton, useProfileActions } from "../components/Friends.tsx";
 import { ItemArt } from "../components/Items.tsx";
 import { Recent, ReportSheet, WearingRows } from "../components/ProfileParts.tsx";
