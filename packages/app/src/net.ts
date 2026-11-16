@@ -59,6 +59,9 @@ import {
   lightsOutTimeline,
   rushKeep,
   rushMovesLeft,
+  dodgeArena,
+  dodgeOver,
+  dodgeTimeline,
   rushSquares,
   rushTimeline,
   brainLine as brainWords,
@@ -76,7 +79,7 @@ import {
   kingHelpBlocked,
   phase2Standings,
 } from "@chessroyale/chess";
-import type { BossView, BoardView, DarkNote, ExitKind, FinalView, GameView, Hint, LightsView, MoveRecord, Phase, RushView, SimulView, Standing, VoteView } from "./game.ts";
+import type { BossView, BoardView, DarkNote, ExitKind, FinalView, GameView, Hint, LightsView, MoveRecord, Phase, RushView, DodgeRun, SimulView, Standing, VoteView } from "./game.ts";
 import { hintsFrom, whiteExpected } from "./hints.ts";
 import { account } from "./account.ts";
 import { crumb } from "./problems.ts";
@@ -849,13 +852,20 @@ export class NetMatch implements GameView {
         this.lights = null;
         // (Dash's Scramble Rush: its beats on this device's clock, your placements kept through the server's verdict.)
         this.rush = m.rush ? { key: m.rush.key, at: this.local(m.rush.at), ...(this.rush?.key === m.rush.key ? { places: this.rush.places, moved: this.rush.moved } : { places: {}, moved: {} }) } : null;
+        // (Chandy's Dodge: its beats on this device's clock; your vote kept for the round it was made in.)
+        this.dodge = m.dodge ? { key: m.dodge.key, at: this.local(m.dodge.at), round: m.dodge.round, votes: { ...m.dodge.votes }, ...(this.dodge?.key === m.dodge.key && this.dodge.round === m.dodge.round && this.dodge.mine ? { mine: this.dodge.mine } : {}) } : null;
         // (`fall`: beaten, the Hidden Boss collapses on the board until the results come, or (`toPhase2`) his phase change: his words are
         // cleared as he falls, so his mumbling carries on into it, as solo's.)
         if (m.fall && m.toPhase2) {
           bossVoice.reset();
           this.phase2Boards = m.phase2Boards ?? [];
         }
-        return this.setPhase({ kind: "boss", boss, until: m.until ? this.local(m.until) : 0, thinking: m.thinking, intro: m.intro, ...(m.fall ? { fall: true } : {}), ...(m.fall && m.toPhase2 ? { toPhase2: true } : {}), ...(this.rush ? { rush: { ...this.rush, places: { ...this.rush.places }, moved: { ...this.rush.moved } } } : {}) });
+        return this.setPhase({ kind: "boss", boss, until: m.until ? this.local(m.until) : 0, thinking: m.thinking, intro: m.intro, ...(m.fall ? { fall: true } : {}), ...(m.fall && m.toPhase2 ? { toPhase2: true } : {}), ...(this.rush ? { rush: { ...this.rush, places: { ...this.rush.places }, moved: { ...this.rush.moved } } } : {}), ...(this.dodge ? { dodge: { ...this.dodge, votes: { ...this.dodge.votes } } } : {}) });
+      case "dodgeVotes":
+        // Dodge: the round's counts moved (anyone's vote).
+        if (!this.dodge || this.dodge.key !== m.key || this.dodge.round !== m.round || this.phase.kind !== "boss" || !this.boss) return;
+        this.dodge = { ...this.dodge, votes: { ...m.votes } };
+        return this.setPhase({ ...this.phase, dodge: { ...this.dodge, votes: { ...this.dodge.votes } } });
       case "darkTry": {
         if (m.key !== this.key || this.phase.kind !== "play") return;
         if (m.ok) {
@@ -912,7 +922,7 @@ export class NetMatch implements GameView {
         if (m.water) return void this.hostPick(m.key, async (engines) => (await waterAnswer(engines, m.fen, m.water!, !!m.waterAny)).answer);
         // (Chub & Chirp's Carrot Patch cast spends his whole turn: only the pass guard to ask.)
         if (m.pass) return void this.hostPick(m.key, (engines) => castAnswer(engines, m.fen));
-        return void this.hostBoss(m.key, m.fen, m.elo, m.nodes, m.best ? "best" : m.stumble ? "stumble" : m.stagger ? "stagger" : "elo", m.allowed ?? null, !!m.funhouse, m.brain, m.seed !== undefined ? { seed: m.seed, ...(m.pull ? { pull: m.pull } : {}), ...(m.drag ? { drag: true as const } : {}), ...(m.showdown ? { showdown: m.showdown } : {}) } : null, m.land ?? null, m.race ?? null, m.beam ?? null, m.balloon ?? null, m.hoops ?? null, m.crease ?? null, typeof m.draw === "number" ? m.draw : null, !!m.check, !!m.share);
+        return void this.hostBoss(m.key, m.fen, m.elo, m.nodes, m.best ? "best" : m.stumble ? "stumble" : m.stagger ? "stagger" : "elo", m.allowed ?? null, !!m.funhouse, m.brain, m.seed !== undefined ? { seed: m.seed, ...(m.pull ? { pull: m.pull } : {}), ...(m.drag ? { drag: true as const } : {}), ...(m.showdown ? { showdown: m.showdown } : {}) } : null, m.land ?? null, m.race ?? null, m.beam ?? null, m.balloon ?? null, m.hoops ?? null, m.crease ?? null, typeof m.draw === "number" ? m.draw : null, !!m.check, !!m.share, m.lock ?? null);
       case "recluseCutscene":
         return this.phase2.onCutscene(m.at, m.until);
       case "phase2":
@@ -1038,7 +1048,7 @@ export class NetMatch implements GameView {
    * position after the move goes with it (creaseAnswer). `check` (BOSS_CHECK): this device checks the host's move, so a phone
    * doesn't download Maia for it. `share`: the bridge band's share, drawn by the lobby (Stockfish's move, no brain).
    */
-  private async hostBoss(key: string, fen: string, elo: number, nodes: number, kind: BossMoveKind, allowed: string[] | null = null, funhouse = false, brain?: NetBossBrain, asks: BossAsks | null = null, land: SlamPiece[] | null = null, race: CarrotRace | null = null, beam: number | null = null, balloon: BalloonAsk | null = null, hoops: HoopsAsk | null = null, crease: CreaseAsk | null = null, draw: number | null = null, check = false, share = false) {
+  private async hostBoss(key: string, fen: string, elo: number, nodes: number, kind: BossMoveKind, allowed: string[] | null = null, funhouse = false, brain?: NetBossBrain, asks: BossAsks | null = null, land: SlamPiece[] | null = null, race: CarrotRace | null = null, beam: number | null = null, balloon: BalloonAsk | null = null, hoops: HoopsAsk | null = null, crease: CreaseAsk | null = null, draw: number | null = null, check = false, share = false, lock: string[] | null = null) {
     try {
       const engines = await this.engines();
       const [engine] = engines;
@@ -1054,7 +1064,8 @@ export class NetMatch implements GameView {
       const ahead = land?.length && !funhouse ? slamAhead(land) : null;
       // (Chub & Chirp's Carrot Patch: his race brain on this device's engine, with the race the server sent.)
       const look = race && !funhouse ? { race, looks: BOSS_POWERS.carrotLooks, nodes: BOSS_POWERS.carrotNodes } : null;
-      const ordinary = () => bossMoveFrom(engine!, fen, elo, nodes, kind, rng, this.settings.kingStrikeLoss, bossGuardFrom(this.settings), allowed, maia, ahead, look, !!draw);
+      // (Chandy's locks: his ordinary move steered toward them, as the server asked.)
+      const ordinary = () => bossMoveFrom(engine!, fen, elo, nodes, kind, rng, this.settings.kingStrikeLoss, bossGuardFrom(this.settings), allowed, maia, ahead, look, !!draw, lock);
       if (asks && !funhouse) {
         // Wrangler's turn: his long pull (his first move) or his move, then his drag or his showdown's line-up after it,
         // on this device's engines (the scout's line-ups first). The server checks them against his rules.
@@ -1442,6 +1453,24 @@ export class NetMatch implements GameView {
     r.moved = kept.moved;
     this.send({ t: "rushPlace", key: r.key, places: kept.places });
     this.setPhase({ kind: "boss", boss: this.boss, until: 0, rush: { ...r, places: { ...kept.places }, moved: { ...kept.moved } } });
+  }
+
+  /** Chandy's Dodge: the server's as last heard, and your vote in the round on (the server counts it; a later tap replaces it). */
+  private dodge: DodgeRun | null = null;
+  dodgeVote(square: string) {
+    const d = this.dodge;
+    const full = this.boss?.powers?.chandy?.dodge;
+    if (!d || !full || dodgeOver(full) || this.phase.kind !== "boss" || !this.phase.dodge || d.mine === square || !dodgeArena(full.center).includes(square)) return;
+    const r = dodgeTimeline().rounds[d.round];
+    const t = Date.now() - d.at;
+    if (!r || t < r.voteAt - 300 || t > r.voteEnd) return;
+    // (Your vote shows at once; the server's counts follow.)
+    const votes = { ...d.votes };
+    if (d.mine) votes[d.mine] = Math.max(0, (votes[d.mine] ?? 1) - 1);
+    votes[square] = (votes[square] ?? 0) + 1;
+    this.dodge = { ...d, votes, mine: square };
+    this.send({ t: "dodgeVote", key: d.key, round: d.round, square });
+    this.setPhase({ ...this.phase, dodge: { ...this.dodge, votes: { ...votes } } });
   }
 
   submit(move: string | null, premove = false) {
