@@ -40,6 +40,19 @@ export function queuePool(): string | null {
   return testParams().get("pool") ?? POOL_ASKED;
 }
 
+/** `?partyfill=SECONDS` (a test switch, read as `pool` is): a new 50 v 50 party's lobbies fill that long after they open (e2e reloads). */
+const PARTY_FILL_ASKED = (() => {
+  try {
+    return new URLSearchParams(globalThis.location?.search ?? "").get("partyfill");
+  } catch {
+    return null;
+  }
+})();
+export function partyFill(): string | null {
+  if (!testSwitchesAllowed()) return null;
+  return testParams().get("partyfill") ?? PARTY_FILL_ASKED;
+}
+
 /**
  * Two switches for trying lengths on a phone (Eric, Oct 24: "have a URL where I can change the URL and make it say 1/2 a
  * second longer or 1 second longer or 3/4 of a second longer, and then I can go test all three of them"), in seconds:

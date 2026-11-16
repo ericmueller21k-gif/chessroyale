@@ -1,6 +1,6 @@
 import { Component } from "preact";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
-import { CROWD_PARTY_MAX, FRONT_DOOR, MATCHMAKING, isRankedMatch, rankedMinHumans, type ItemLook, type MatchmakingType, type Settings } from "@chessroyale/core";
+import { CROWD_PARTY, CROWD_PARTY_MAX, FRONT_DOOR, MATCHMAKING, isRankedMatch, rankedMinHumans, type ItemLook, type MatchmakingType, type Settings } from "@chessroyale/core";
 import type { LobbyPlayer } from "@chessroyale/chess";
 import { BackButton, DressedPawn, FdButton } from "../components/FrontDoor.tsx";
 import { MuteButton } from "../components/MuteButton.tsx";
@@ -315,25 +315,29 @@ export function QueueScreen({
   const modeName = raid ? "Boss Battle" : match.settings.mode === "classic" ? `Classic · ${size} players` : "Crowd · 50 v 50";
   const exit = useQueueExit(onCancel, onAway, filled);
   // A party's row, in Cancel's place: Leave, and the leader's Find match (Cancel once searching; greyed once the lobby has
-  // filled) or a member's greyed "Waiting for <leader>" (never hidden).
+  // filled) or a member's greyed "Waiting for <leader>" (never hidden). Under it, greyed, that party matches aren't ranked
+  // (CROWD_PARTY.ranked: the fix round of #747, M3), on every one of its screens, so nothing moves.
   const partyRow = party && (
-    <div class="fd-party-row">
-      <FdButton class="fd-party-leave" onClick={party.onLeave}>
-        Leave
-      </FdButton>
-      {!party.leading ? (
-        <FdButton class="fd-party-go" disabled>
-          Waiting for {party.leaderName}
+    <div class="fd-party-actions">
+      <div class="fd-party-row">
+        <FdButton class="fd-party-leave" onClick={party.onLeave}>
+          Leave
         </FdButton>
-      ) : idle ? (
-        <FdButton primary class="fd-party-go" onClick={party.onFind}>
-          Find match
-        </FdButton>
-      ) : (
-        <FdButton class="fd-party-go" disabled={filled} onClick={party.onCancel}>
-          Cancel
-        </FdButton>
-      )}
+        {!party.leading ? (
+          <FdButton class="fd-party-go" disabled>
+            Waiting for {party.leaderName}
+          </FdButton>
+        ) : idle ? (
+          <FdButton primary class="fd-party-go" onClick={party.onFind}>
+            Find match
+          </FdButton>
+        ) : (
+          <FdButton class="fd-party-go" disabled={filled} onClick={party.onCancel}>
+            Cancel
+          </FdButton>
+        )}
+      </div>
+      {!CROWD_PARTY.ranked && <div class="fd-party-note">Party matches aren't ranked</div>}
     </div>
   );
   return (

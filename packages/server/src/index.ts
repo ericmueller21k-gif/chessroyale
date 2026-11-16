@@ -321,7 +321,10 @@ async function route(request: Request, rawEnv: Env, url: URL, waitUntil: WaitUnt
       if (isPaused(rawEnv, "friends")) return pausedResponse("friends");
       const may = await mayPlay(request, env, waitUntil);
       if (may instanceof Response) return may;
-      const fill = Math.max(3, Math.min(600, Number(env.MATCH_FILL_SECONDS ?? 60) || 60));
+      // (`?fill=SECONDS`, a test switch: this party's lobbies fill that long after they open, so a test can reload inside one.)
+      const asked = Number(url.searchParams.get("fill"));
+      const seconds = asked > 0 && (await testSwitches(request, env, waitUntil)) ? asked : Number(env.MATCH_FILL_SECONDS ?? 60) || 60;
+      const fill = Math.max(3, Math.min(600, seconds));
       const region = regionOf(request.cf as { continent?: unknown } | undefined);
       const pool = await testPool(request, env, url, waitUntil);
       const [name, pooled] = [queueName("crowd", "default", pool, region), queueName("crowd", "default", pool, region, true)];

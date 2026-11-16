@@ -27458,6 +27458,14 @@ body.cs-on .mm-scrim {
     min-width: 84px;
   }
 }
+.fd-party-note {
+  margin-top: 6px;
+  font-size: 13px;
+  line-height: 16px;
+  font-weight: 600;
+  color: var(--fd-sub);
+  text-align: center;
+}
 .fd-you-line {
   display: none;
 }
@@ -27484,7 +27492,7 @@ body.cs-on .mm-scrim {
    * the column and Leave and Find match sit side by side under it, the grid giving up their row's height.)
    */
   .fd-root.framed .fd-home .fd-queue.party {
-    --q-grid: min(100%, calc(var(--app-h) - 370px));
+    --q-grid: min(100%, calc(var(--app-h) - 392px));
     grid-template-areas:
       "head head"
       "info info"
@@ -27493,8 +27501,10 @@ body.cs-on .mm-scrim {
       "you you"
       "cancel cancel";
   }
-  .fd-root.framed .fd-home .fd-queue .fd-party-row {
+  .fd-root.framed .fd-home .fd-queue .fd-party-actions {
     grid-area: cancel;
+  }
+  .fd-root.framed .fd-home .fd-queue .fd-party-row {
     min-height: 52px;
   }
   .fd-root.framed .fd-home .fd-queue .fd-party-row .fd-btn {

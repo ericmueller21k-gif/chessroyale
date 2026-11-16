@@ -41,7 +41,7 @@ import { leaveLegal, legalPageOf, type LegalPage } from "./screens/legal-page.ts
 import { useMedia } from "./components/QuickChat.tsx";
 import { LobbyChat } from "./components/LobbyChat.tsx";
 import { queuedSquads } from "./move-replay.ts";
-import { PartyClient, SquadsClient, createParty, currentParty, currentSquads, forgetSquads, partyStatus, squadsQueue, squadsSeat, squadsStatus, squadsTestLobby } from "./squads.ts";
+import { PartyClient, SquadsClient, createParty, crowdPartyScreen, crowdPassFor, currentParty, currentSquads, forgetSquads, markCrowdPartyScreen, partyStatus, rememberCrowdPass, squadsQueue, squadsSeat, squadsStatus, squadsTestLobby } from "./squads.ts";
 import { squadsExit, squadsWaiting } from "./screens/squads-exit.ts";
 import { lazyGroup } from "./lazy.tsx";
 import { dropShell, markHome } from "./shell.ts";
@@ -313,6 +313,12 @@ function screenOf(match: AnyMatch | null, page: string): string {
   return moment ? `boss ${moment}` : "boss";
 }
 
+/** A 50 v 50 party's client for `code` (not connected yet); its placings go to `placed` (App's, set as it renders). */
+function newCrowdClient(code: string, placed: { readonly current: (p: PartyClient, lobby: string, pass: string) => void }): PartyClient {
+  const p: PartyClient = new PartyClient(code.toUpperCase(), (lobby, pass) => placed.current(p, lobby, pass), "crowd");
+  return p;
+}
+
 export function App() {
   const [match, setMatch] = useState<AnyMatch | null>(null);
   const savedResult = useRef<AnyMatch | null>(null);
@@ -387,10 +393,15 @@ export function App() {
    * 50 v 50's party (Nov 16; docs/decisions/2026-11-16-crowd-party.md): its socket while its screen or its lobby's queue is up
    * (closed as the match begins; home's Party then opens it again), and the pass of the lobby it placed you in.
    */
-  const [crowdParty, setCrowdParty] = useState<PartyClient | null>(null);
+  /** What a 50 v 50 party's placing does (set further down): a ref, so a client made before that still finds it. */
+  const crowdPlaced = useRef<(p: PartyClient, lobby: string, pass: string) => void>(() => undefined);
+  // (A reload with its screen up, or its lobby's queue: back to it, quietly; connected once the page is up. The fix round of #747, M2.)
+  const [crowdParty, setCrowdParty] = useState<PartyClient | null>(() => ((code) => (code ? newCrowdClient(code, crowdPlaced) : null))(crowdPartyScreen()));
   const crowdPass = useRef<string | null>(null);
-  /** A party tried again quietly (home's Party): turned away, a new one is made, with no note. */
-  const quietParty = useRef<PartyClient | null>(null);
+  /** A party tried again quietly (home's Party, or a reload): turned away, a new one is made, with no note. */
+  const quietParty = useRef<PartyClient | null>(crowdParty);
+  /** The 50 v 50 party closed for its match (its lobby filled): its screen stays through the fill and loading, then goes (M4). */
+  const crowdHeld = useRef<PartyClient | null>(null);
   const [squadsNote, setSquadsNote] = useState<string | null>(() => (squadsLinkCode && !squadsRejoin ? "That match has ended." : null));
   // Home's notes from ranked's leave rules this tab has dismissed (by their words and dodge: a new dodge's note shows again).
   const [leavesDismissed, setLeavesDismissed] = useState<ReadonlySet<string>>(() => new Set());
@@ -1162,14 +1173,7 @@ export function App() {
   const joinCrowdParty = async (code: string, inside?: (ok: boolean) => void, quiet = false): Promise<void> => {
     const open = await partyStatus(code, "crowd");
     if (open === false) return inside?.(false);
-    const p: PartyClient = new PartyClient(
-      code.toUpperCase(),
-      (lobby, pass) => {
-        crowdPass.current = pass;
-        joinLobby(lobby, { queue: "crowd", crowdPass: pass });
-      },
-      "crowd",
-    );
+    const p = newCrowdClient(code, crowdPlaced);
     if (quiet) quietParty.current = p;
     if (inside) {
       const off = p.subscribe(() => {
@@ -1199,6 +1203,26 @@ export function App() {
     if ("error" in r) return setError(r.error);
     await joinCrowdParty(r.code);
   };
+  /**
+   * The party placed you (the leader's Find match found a lobby): into it with the party's pass, while it still waits and this device
+   * has no seat there yet (in it already, or a reload whose lobby rejoins by itself: nothing). Its socket stays open: the leader's
+   * Cancel brings everyone back. Never by the placing's age: a reload on the way still gets in (M2).
+   */
+  crowdPlaced.current = (p, lobby, pass) => {
+    const here = onScreen.current;
+    if (hasSeat(lobby) || (here instanceof NetMatch && here.code === lobby.toUpperCase())) return;
+    void lobbyStatus(lobby).then((s) => {
+      // (No answer: as if it waits, as lobbyStatus's other callers do.)
+      if (s && !(s.open && s.phase === "waiting")) return;
+      if (p.done || p.party?.state !== "placed" || p.party.placed?.pass !== pass) return;
+      rememberCrowdPass(lobby, pass);
+      joinLobby(lobby, { queue: "crowd", crowdPass: pass });
+    });
+  };
+  // (A reload with the party's screen up: its client, made with the page, connects now.)
+  useEffect(() => {
+    if (crowdParty && crowdParty === quietParty.current && !crowdParty.memberId && !crowdParty.done) crowdParty.connect();
+  }, []);
   /** Leave the party for good (its lobby too, if you're in its queue). */
   const leaveCrowdParty = () => {
     crowdParty?.leave();
@@ -1207,16 +1231,20 @@ export function App() {
     if (match instanceof NetMatch && match.partyPass && (match.phase.kind === "lobby" || match.phase.kind === "loading")) leave();
   };
   // 50 v 50's party: its changes redraw; turned away (a lapsed invite, the party gone): home with why; the leader's Cancel while
-  // its lobby still fills: out of the lobby, back to the party; the lobby filled (the match begins): the party's socket closes.
+  // its lobby still fills: out of the lobby, back to the party; the lobby filled (the match begins): the party's socket closes, and
+  // its screen stays until the match's own (nothing shifts at the fill: M4). Its code is kept while its screen is up, for a reload.
   useEffect(() => crowdParty?.subscribe(() => rerender(undefined)), [crowdParty]);
   useEffect(() => {
-    if (!crowdParty) return;
+    if (!crowdParty) return markCrowdPartyScreen(null);
+    const inLobby = match instanceof NetMatch && !!match.partyPass && match.partyPass === crowdPass.current;
     if (crowdParty.done) {
+      markCrowdPartyScreen(null);
+      if (crowdParty === crowdHeld.current && inLobby && inQueue(match)) return;
       if (crowdParty.error && crowdParty !== quietParty.current) setError(crowdParty.error);
       setCrowdParty(null);
       return;
     }
-    const inLobby = match instanceof NetMatch && !!match.partyPass && match.partyPass === crowdPass.current;
+    markCrowdPartyScreen(crowdParty.code);
     if (!inLobby) return;
     const gathering = (match.phase.kind === "lobby" || match.phase.kind === "loading") && !match.filledAt;
     const placed = crowdParty.party?.placed;
@@ -1224,8 +1252,9 @@ export function App() {
       crowdPass.current = null;
       leave();
     } else if (!gathering) {
+      crowdHeld.current = crowdParty;
       crowdParty.close();
-      setCrowdParty(null);
+      markCrowdPartyScreen(null);
     }
   });
   // (An invite link, or back on the Boss Battle screen after its battle: into the party, once.)
@@ -1380,8 +1409,13 @@ export function App() {
       m.auto = true;
       m.hiddenRoom = !!opts.party.hidden;
     }
-    // (A 50 v 50 party's lobby: its seats held under the party's pass, so everyone in it plays on one team.)
-    if (opts.crowdPass) m.partyPass = opts.crowdPass;
+    // (A 50 v 50 party's lobby: its seats held under the party's pass, so everyone in it plays on one team. A reload there: the pass
+    // it was joined with, so it's still the party's: M2.)
+    const crowd = opts.party ? null : (opts.crowdPass ?? crowdPassFor(code));
+    if (crowd) {
+      m.partyPass = crowd;
+      crowdPass.current = crowd;
+    }
     // The queue shows at once (not "Connecting…"); the lobby confirms it.
     if (queue) m.auto = true;
     // A code typed into Join that leads nowhere is "Can't join", not the note.
@@ -2238,7 +2272,7 @@ export function App() {
     );
   }
   // 50 v 50's party, idle or asking for a lobby: its queue screen (the frame first, as the queue's).
-  if (!match && crowdParty) return <>{home(<CrowdPartyScreen client={crowdParty} onLeave={leaveCrowdParty} />)}</>;
+  if (!match && crowdParty && !crowdParty.done) return <>{home(<CrowdPartyScreen client={crowdParty} onLeave={leaveCrowdParty} />)}</>;
   // (Always a fragment with the frame first, in the queue or not, so the frame is kept from one to the other.)
   if (!match && inLine)
     return (
