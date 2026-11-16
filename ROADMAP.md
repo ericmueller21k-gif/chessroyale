@@ -149,6 +149,7 @@ Eric: "too big a change for now". Recorded so they aren't lost; nothing gets bui
   itself isn't built. Notes: [docs/ideas/boss-series-crate.md](docs/ideas/boss-series-crate.md).
 - **Bosses think out loud** (Eric, Oct 24): engine-based lines in each boss's voice, and call-outs on the player's move.
   Notes: [docs/ideas/bosses-think-out-loud.md](docs/ideas/bosses-think-out-loud.md).
+- **Streamer mode** (Eric, Nov 16; later): one switch for streaming (names and invites hidden on screen, Do Not Disturb on).
 - **Emoji packs** (Eric, Nov 2; not now): an API art job makes our own emoji packs; then the default emoji are deleted everywhere (the
   pre-game votes' went first, Nov 2: docs/decisions/2026-11-02-nov2-fixes-b.md). **Pack 1:** chess piece emoji, free. **Pack 2:** chess
   reactions (a blunder's "oops", "nice move", and the like).

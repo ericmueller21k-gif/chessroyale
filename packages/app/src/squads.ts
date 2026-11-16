@@ -1,4 +1,4 @@
-import { LEAVING, SQUADS, type BossDifficultyId, type ItemLook, type MercItem } from "@chessroyale/core";
+import { CAPACITY, LEAVING, SQUADS, type BossDifficultyId, type ItemLook, type MercItem } from "@chessroyale/core";
 import { toSan, type MoveScore } from "@chessroyale/chess";
 import {
   SQUADS_PROTOCOL,
@@ -1023,10 +1023,17 @@ const LIFTED: Record<BlockLift, string> = { impossible: "that move isn't possibl
 
 // ---------------- Parties ----------------
 
-/** A party's kind: Squads', or Boss Battle's (docs/decisions/2026-10-30-boss-party.md; /api/boss/party). */
-export type PartyKind = "squads" | "boss";
-const partyKey = (code: string, kind: PartyKind = "squads") => `brc.${kind === "boss" ? "bossparty" : "party"}.${code.toUpperCase()}`;
-const partyCurrentKey = (kind: PartyKind) => (kind === "boss" ? "brc.bossparty.current" : "brc.party.current");
+/** A 50 v 50 party's placing older than the lobby's hold on its seats is one this member missed: not joined. */
+const CROWD_PLACED_FRESH_MS = CAPACITY.queue.reservationMs;
+
+/**
+ * A party's kind: Squads', Boss Battle's (docs/decisions/2026-10-30-boss-party.md; /api/boss/party) or 50 v 50's (Nov 16,
+ * docs/decisions/2026-11-16-crowd-party.md; /api/crowd/party: friends in by invite only).
+ */
+export type PartyKind = "squads" | "boss" | "crowd";
+const partyStoreName = (kind: PartyKind) => (kind === "boss" ? "bossparty" : kind === "crowd" ? "crowdparty" : "party");
+const partyKey = (code: string, kind: PartyKind = "squads") => `brc.${partyStoreName(kind)}.${code.toUpperCase()}`;
+const partyCurrentKey = (kind: PartyKind) => `brc.${partyStoreName(kind)}.current`;
 /** The party this device was last in (after a lobby, "Back to your party" reopens it). */
 export const currentParty = (kind: PartyKind = "squads") => {
   const c = stored(partyCurrentKey(kind));
@@ -1048,7 +1055,7 @@ export async function partyStatus(code: string, kind: PartyKind = "squads"): Pro
 /** POST /api/squads/party (or Boss Battle's): a new party's code. */
 export async function createParty(kind: PartyKind = "squads"): Promise<{ code: string } | { error: string } | { banned: true }> {
   // (?pool=NAME: a queue of its own, a test switch.)
-  const pool = kind === "squads" ? queuePool() : null;
+  const pool = kind !== "boss" ? queuePool() : null;
   try {
     const res = await fetch(`/api/${kind}/party${pool ? `?pool=${encodeURIComponent(pool)}` : ""}`, { method: "POST" });
     const body = (await res.json().catch(() => ({}))) as { code?: string; message?: string; banned?: boolean };
@@ -1062,7 +1069,8 @@ export async function createParty(kind: PartyKind = "squads"): Promise<{ code: s
 /**
  * A party on this device: up to 4 friends under a code (the invite link is /squads/party/CODE). The leader queues;
  * when the party is placed, `onPlaced` gets the lobby and its pass (once per placing, even across reloads), and the
- * socket closes: everyone plays the lobby, and comes back to the party afterwards ("Back to your party").
+ * socket closes: everyone plays the lobby, and comes back to the party afterwards ("Back to your party"). A 50 v 50 party's
+ * socket stays open in its lobby's queue (the leader's Cancel brings everyone back): the app closes it as the match begins.
  */
 export class PartyClient {
   party: NetParty | null = null;
@@ -1070,6 +1078,8 @@ export class PartyClient {
   error: string | null = null;
   /** Closed: left, or the party's gone. */
   done = false;
+  /** The server's clock less this device's (ms), from the last message: a 50 v 50 party's invites lapse by the server's time. */
+  skew = 0;
   private ws: WebSocket | null = null;
   private retry = 0;
   private retryTimer: ReturnType<typeof setTimeout> | null = null;
@@ -1112,7 +1122,7 @@ export class PartyClient {
     ws.onopen = () => {
       opened = true;
       this.retry = 0;
-      this.send({ t: "hello", v: SQUADS_PROTOCOL, token: stored(partyKey(this.code, this.kind)) ?? undefined, name: playerName(), device: device(), ...(this.kind === "boss" ? { look: account().profile?.locker?.look ?? {} } : {}) });
+      this.send({ t: "hello", v: SQUADS_PROTOCOL, token: stored(partyKey(this.code, this.kind)) ?? undefined, name: playerName(), device: device(), ...(this.kind !== "squads" ? { look: account().profile?.locker?.look ?? {} } : {}) });
     };
     ws.onmessage = (e) => this.onMessage(JSON.parse(e.data as string) as PartyServerMessage);
     ws.onclose = () => {
@@ -1136,6 +1146,7 @@ export class PartyClient {
   }
 
   private onMessage(msg: PartyServerMessage) {
+    if (typeof msg.now === "number") this.skew = msg.now - Date.now();
     switch (msg.t) {
       case "welcome":
         this.memberId = msg.memberId;
@@ -1148,8 +1159,10 @@ export class PartyClient {
         // Placed (a lobby with seats for everyone): join it, once per placing (a reload doesn't join an old one).
         if (msg.party.state === "placed" && p && String(p.at) !== stored(`${partyKey(this.code, this.kind)}.placed`)) {
           store(`${partyKey(this.code, this.kind)}.placed`, String(p.at));
-          this.close();
-          this.onPlaced(p.lobby, p.pass, this.me?.seat ?? 0);
+          // (A 50 v 50 party: only a placing made just now, so a member back after the match never walks into an old lobby.)
+          const fresh = this.kind !== "crowd" || Math.abs(msg.now - p.at) < CROWD_PLACED_FRESH_MS;
+          if (this.kind !== "crowd") this.close();
+          if (fresh) this.onPlaced(p.lobby, p.pass, this.me?.seat ?? 0);
         }
         break;
       }
@@ -1157,8 +1170,8 @@ export class PartyClient {
         if (msg.banned) showBanNotice();
         this.error = msg.message;
         if (msg.ended || msg.banned || !this.memberId) this.close();
-        // (Kicked: this device forgets the party.)
-        if (msg.ended) this.forget();
+        // (Kicked: this device forgets the party. So does one turned away from a 50 v 50 party: its next Party makes a new one.)
+        if (msg.ended || (this.kind === "crowd" && !this.memberId)) this.forget();
         break;
       case "closed":
         this.error = "That party has closed.";

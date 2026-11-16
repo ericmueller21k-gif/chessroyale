@@ -46,7 +46,7 @@ import { squadsExit, squadsWaiting } from "./screens/squads-exit.ts";
 import { lazyGroup } from "./lazy.tsx";
 import { dropShell, markHome } from "./shell.ts";
 import { PartySheet } from "./screens/SquadsParty.tsx";
-import { CrowdPartyMock, crowdPartyMockAsked } from "./dev/crowd-party-mock.tsx";
+import { CrowdPartyScreen } from "./screens/CrowdParty.tsx";
 import { BotDuel, DuelQueue, NetDuel, savedDuelQueue, setRanked1v1Starter, startRanked1v1, type DuelSession } from "./duel.ts";
 import { confirmLeaveSearch, keepInQueue, saveAwayLobby, savedAwayLobby, searchFoundAlert, searchSlots, setAwaySearch, type AwaySearch } from "./search.ts";
 import { chosenBotLevel } from "./components/BotLevelBox.tsx";
@@ -383,6 +383,12 @@ export function App() {
   /** Boss Battle's party (docs/decisions/2026-10-30-boss-party.md): its socket on the Boss Battle screen, and a note. */
   const [bossParty, setBossParty] = useState<PartyClient | null>(null);
   const [bossPartyError, setBossPartyError] = useState<string | null>(null);
+  /**
+   * 50 v 50's party (Nov 16; docs/decisions/2026-11-16-crowd-party.md): its socket while its screen or its lobby's queue is up
+   * (closed as the match begins; home's Party then opens it again), and the pass of the lobby it placed you in.
+   */
+  const [crowdParty, setCrowdParty] = useState<PartyClient | null>(null);
+  const crowdPass = useRef<string | null>(null);
   const [squadsNote, setSquadsNote] = useState<string | null>(() => (squadsLinkCode && !squadsRejoin ? "That match has ended." : null));
   // Home's notes from ranked's leave rules this tab has dismissed (by their words and dodge: a new dodge's note shows again).
   const [leavesDismissed, setLeavesDismissed] = useState<ReadonlySet<string>>(() => new Set());
@@ -1146,6 +1152,82 @@ export function App() {
     bossParty?.leave();
     setBossParty(null);
   };
+  /**
+   * 50 v 50's party: into it (`code`), its screen up. Placed (the leader's Find match found a lobby): everyone joins that lobby with
+   * the party's pass, the party's socket still open (the leader's Cancel brings them back). `inside`: once you're in or turned away.
+   */
+  const joinCrowdParty = async (code: string, inside?: () => void): Promise<boolean> => {
+    const open = await partyStatus(code, "crowd");
+    if (open === false) {
+      inside?.();
+      return false;
+    }
+    const p: PartyClient = new PartyClient(
+      code.toUpperCase(),
+      (lobby, pass) => {
+        crowdPass.current = pass;
+        joinLobby(lobby, { queue: "crowd", crowdPass: pass });
+      },
+      "crowd",
+    );
+    if (inside) {
+      const off = p.subscribe(() => {
+        if (!p.memberId && !p.done) return;
+        off();
+        inside();
+      });
+    }
+    setCrowdParty((old) => {
+      if (old && old.code !== p.code) old.leave();
+      else old?.close();
+      return p;
+    });
+    p.connect();
+    return true;
+  };
+  /** Home's Party, then PLAY: your party again if it's still open, else a new one (you its first member and leader). */
+  const openCrowdParty = async () => {
+    unlockAudio();
+    setError(null);
+    if (crowdParty && !crowdParty.done) return;
+    const code = currentParty("crowd");
+    if (code && (await joinCrowdParty(code))) return;
+    setLoading(true);
+    const r = await createParty("crowd");
+    setLoading(false);
+    if ("banned" in r) return showBanNotice();
+    if ("error" in r) return setError(r.error);
+    await joinCrowdParty(r.code);
+  };
+  /** Leave the party for good (its lobby too, if you're in its queue). */
+  const leaveCrowdParty = () => {
+    crowdParty?.leave();
+    setCrowdParty(null);
+    crowdPass.current = null;
+    if (match instanceof NetMatch && match.partyPass && (match.phase.kind === "lobby" || match.phase.kind === "loading")) leave();
+  };
+  // 50 v 50's party: its changes redraw; turned away (a lapsed invite, the party gone): home with why; the leader's Cancel while
+  // its lobby still fills: out of the lobby, back to the party; the lobby filled (the match begins): the party's socket closes.
+  useEffect(() => crowdParty?.subscribe(() => rerender(undefined)), [crowdParty]);
+  useEffect(() => {
+    if (!crowdParty) return;
+    if (crowdParty.done) {
+      if (crowdParty.error) setError(crowdParty.error);
+      setCrowdParty(null);
+      return;
+    }
+    const inLobby = match instanceof NetMatch && !!match.partyPass && match.partyPass === crowdPass.current;
+    if (!inLobby) return;
+    const gathering = (match.phase.kind === "lobby" || match.phase.kind === "loading") && !match.filledAt;
+    const placed = crowdParty.party?.placed;
+    if (gathering && crowdParty.party && (crowdParty.party.state !== "placed" || placed?.pass !== crowdPass.current)) {
+      crowdPass.current = null;
+      leave();
+    } else if (!gathering) {
+      crowdParty.close();
+      setCrowdParty(null);
+    }
+  });
   // (An invite link, or back on the Boss Battle screen after its battle: into the party, once.)
   useEffect(() => {
     if (bossPartyLinkCode) void joinBossParty(bossPartyLinkCode);
@@ -1272,7 +1354,7 @@ export function App() {
    * Into a lobby by code. A queue lobby (PLAY) brings the queue's own settings (the server's, remembered with the
    * code for a reload); a lobby you made, the mode you made it in.
    */
-  const joinLobby = (code: string, opts: { queue?: "crowd" | "raid"; mode?: ModeChoiceId; typed?: boolean; resume?: boolean; away?: number; party?: { pass: string; seat: number; boss: string; difficulty: string; hidden?: boolean } } = {}) => {
+  const joinLobby = (code: string, opts: { queue?: "crowd" | "raid"; mode?: ModeChoiceId; typed?: boolean; resume?: boolean; away?: number; party?: { pass: string; seat: number; boss: string; difficulty: string; hidden?: boolean }; crowdPass?: string } = {}) => {
     const key = `brc.queue.${code.toUpperCase()}`;
     let queue = opts.queue;
     try {
@@ -1298,6 +1380,8 @@ export function App() {
       m.auto = true;
       m.hiddenRoom = !!opts.party.hidden;
     }
+    // (A 50 v 50 party's lobby: its seats held under the party's pass, so everyone in it plays on one team.)
+    if (opts.crowdPass) m.partyPass = opts.crowdPass;
     // The queue shows at once (not "Connecting…"); the lobby confirms it.
     if (queue) m.auto = true;
     // A code typed into Join that leads nowhere is "Can't join", not the note.
@@ -1660,6 +1744,8 @@ export function App() {
     target: () => {
       if (match instanceof NetMatch && !match.auto && match.phase.kind === "lobby" && !match.gone)
         return { kind: match.settings.raid ? "raid" : match.settings.mode === "crowd" ? "crowd" : "classic", code: match.code };
+      // (50 v 50's party, on its screen and not searching: its "+" seats invite into it.)
+      if (!match && crowdParty?.memberId && !crowdParty.done && crowdParty.party?.state !== "queueing") return { kind: "crowdparty", code: crowdParty.code };
       return party ? { kind: "squads", code: party.code } : null;
     },
     canCreate: () => !match && !squads,
@@ -1686,6 +1772,12 @@ export function App() {
     // (The invite toast's Join, over the town on a computer: "Leave Chess Town?" first, as every way out (Eric, Nov 13).)
     join: (kind, code, taken) => {
       const go = () => {
+        // (A 50 v 50 party's invite is the only way in: it goes once you're in, never before.)
+        if (kind === "crowdparty") {
+          goHome();
+          if (party) closeParty();
+          return void joinCrowdParty(code, taken);
+        }
         taken();
         joinNow(kind, code);
       };
@@ -1696,6 +1788,7 @@ export function App() {
   function joinNow(kind: InviteKind, code: string) {
     goHome();
     if (kind === "squads") return void joinParty(code);
+    if (kind === "crowdparty") return void joinCrowdParty(code);
     // (An invite can outlive its lobby's start: ask first, so a stale one never costs you your party.)
     void lobbyStatus(code).then((s) => {
       // (No answer, offline: carry on as if it's open, as lobbyStatus's other callers do.)
@@ -1722,7 +1815,7 @@ export function App() {
         ? squadsWaiting(squads.lobby)
           ? "queue"
           : "squads"
-        : duelQueue || inLine
+        : duelQueue || inLine || crowdParty
           ? "queue"
           : showTown
             ? "town"
@@ -2133,6 +2226,7 @@ export function App() {
         onJoinLobby={(code) => leavingSearchFirst(() => joinLobby(code, { typed: code !== inviteCode }))}
         onSquads={() => leavingSearchFirst(() => void squadsPlay())}
         onParty={openParty}
+        onCrowdParty={() => leavingSearchFirst(() => void openCrowdParty())}
         onFriends={nav.friendsList}
         onSignIn={() => chooseGuest(false)}
         onProfile={() => openProfile({ you: true, name: account().profile?.user.name ?? "" })}
@@ -2143,9 +2237,8 @@ export function App() {
     </FrontFrame>
     );
   }
-  // (The 50 v 50 party's mockup, a test switch: the queue screen in party mode with fake data.)
-  const partyMock = !match ? crowdPartyMockAsked() : null;
-  if (partyMock) return <>{home(<CrowdPartyMock step={partyMock} />)}</>;
+  // 50 v 50's party, idle or asking for a lobby: its queue screen (the frame first, as the queue's).
+  if (!match && crowdParty) return <>{home(<CrowdPartyScreen client={crowdParty} onLeave={leaveCrowdParty} />)}</>;
   // (Always a fragment with the frame first, in the queue or not, so the frame is kept from one to the other.)
   if (!match && inLine)
     return (
@@ -2197,6 +2290,14 @@ export function App() {
   if (inQueue(match)) {
     const q = match as NetMatch | SoloMatch;
     const letBots = match instanceof NetMatch ? () => void letBotsFill() : undefined;
+    // (A 50 v 50 party's lobby: the party's screen, searching, its seats filled first.)
+    if (crowdParty && match instanceof NetMatch && match.partyPass && match.partyPass === crowdPass.current)
+      return (
+        <>
+          {home(<CrowdPartyScreen client={crowdParty} lobby={match} onLeave={leaveCrowdParty} chat={!computer} />, computer ? <LobbyChat match={match} /> : undefined, computer)}
+          {overlay}
+        </>
+      );
     // (The lobby's chat: a phone's is in the queue screen, under Cancel; a computer's under your card, beside the lobby.)
     return (
       <>
