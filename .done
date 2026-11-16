@@ -1,8 +1,0 @@
-recluse-hearts: done (branch claude/recluse-hearts; PR title and body in .pr-body.md; stills on stills/recluse-hearts).
-- Lane: boss lane. The one quick review pass by a fresh helper is still to run (not started here: one Opus at a time).
-- Local e2e (phone): the bullet test, 10 + 10 (+10 on top), both hearts tests, "beaten in phase 1" pass; @perf phase 2 passes, the
-  last slash and fade at 14% dropped frames against 15% (4x-slowed headless phone).
-- Local Playwright needed PLAYWRIGHT_BROWSERS_PATH pointing chromium_headless_shell-1194 at /opt/pw-browsers/chromium (the repo's
-  1.56.1 wants build 1194; the machine has 1243). CI is unaffected.
-- For Eric: 8 hearts (one setting; he also said 10); "TOO SLOW" and his heart lines are placeholders.
-- .pr-body.md and .done are committed on the branch for you to read: drop them before merging.
