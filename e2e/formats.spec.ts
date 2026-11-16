@@ -1,9 +1,5 @@
 import { expect, type Page } from "@playwright/test";
-import { crowdFinalBoss } from "@chessroyale/core";
 import { BOARD_SEL, engineTop, named, soloFromHome, submitMove, test, bossAloneFromHome, pickMode } from "./helpers.ts";
-
-/** The boss final's boss (Eric, Oct 14: always the Hidden Boss), by his roster name. */
-const finalBoss = crowdFinalBoss()!;
 
 /** page.evaluate that shrugs off a dropped execution context (seen under heavy load while the page carries on). */
 async function safely<T>(f: () => Promise<T>, fallback: T): Promise<T> {
@@ -46,25 +42,25 @@ async function playToResults(page: Page, seen: Set<string>, minutes: number) {
   }
 }
 
-test("pre-game votes: the cards vote too; the winners set the ending and the clock", async ({ page }) => {
+test("pre-game votes: the cards vote too; the winners set how moves are picked (the rework's first vote, C2) and the clock", async ({ page }) => {
   test.setTimeout(3 * 60_000);
   test.skip(test.info().project.name !== "phone", "one run is enough");
   await page.goto("/?debug&mode=crowd&augments=1");
   await soloFromHome(page);
   await expect(page.locator(".vote-screen")).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByRole("heading", { name: "How does it end?" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "How are moves picked?" })).toBeVisible();
   await expect(page.locator(".vote-zone")).toHaveCount(3);
-  // Vote 1: tap the middle card (the boss final: the Hidden Boss). (Dragging your pawn is in votes.spec.ts.)
-  await page.getByRole("radio", { name: new RegExp(finalBoss.name) }).click();
+  // Vote 1: tap the middle card (Majority). (Dragging your pawn is in votes.spec.ts.)
+  await page.getByRole("radio", { name: /Majority/ }).click();
   await expect.poll(() => page.evaluate(() => (window as any).match.myVote)).toBe(1);
-  await expect(page.locator(".vote-card.on")).toContainText(finalBoss.name);
+  await expect(page.locator(".vote-card.on")).toContainText("Majority");
   // Your pawn walks into that zone.
   await expect(page.locator(".vote-me.in")).toBeVisible();
   // Votes come in live; then the result.
   await expect.poll(async () => Number(await page.locator(".vote-zone-count").nth(1).textContent())).toBeGreaterThan(1);
   await expect(page.locator(".vote-banner")).toBeVisible({ timeout: 15_000 });
-  const format = await page.evaluate(() => (window as any).match.settings.finalFormat);
-  expect(["team", "boss", "duel"]).toContain(format);
+  const pick = await page.evaluate(() => (window as any).match.settings.crowdPick);
+  expect(["strong", "majority", "chaos"]).toContain(pick);
   // Vote 2, how it starts (e2e/opening-vote.spec.ts); then vote 3: tap the Bullet card.
   await expect(page.getByRole("heading", { name: "How does it start?" })).toBeVisible({ timeout: 10_000 });
   await expect(page.getByRole("heading", { name: "How fast?" })).toBeVisible({ timeout: 20_000 });

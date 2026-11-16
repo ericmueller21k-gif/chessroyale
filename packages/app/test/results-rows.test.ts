@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { CROWD_KNOCKOUTS, CROWD_SETTINGS, DEFAULT_SETTINGS, RAID_SETTINGS, type Settings } from "@chessroyale/core";
+import { CROWD_CUTS, CROWD_KNOCKOUTS, CROWD_PRE_REWORK, CROWD_SETTINGS, DEFAULT_SETTINGS, RAID_SETTINGS, type Settings } from "@chessroyale/core";
 import { lossRows } from "../src/game.ts";
 
 /** The results table names what was played (the audit, Oct 15: a boss battle's row read "Duel"). */
 describe("the results table's rows", () => {
-  const crowd = (patch: Partial<Settings> = {}): Settings => ({ ...DEFAULT_SETTINGS, ...CROWD_SETTINGS, ...patch });
+  // (The 50 v 50 before the rework, with its endings, until C4; the rework's own row is the 1 v 1, below.)
+  const crowd = (patch: Partial<Settings> = {}): Settings => ({ ...DEFAULT_SETTINGS, ...CROWD_SETTINGS, ...CROWD_PRE_REWORK, ...patch });
   it("a raid or Boss alone: one row, the boss battle", () => {
     const settings = { ...DEFAULT_SETTINGS, ...RAID_SETTINGS };
     expect(lossRows({ settings, lossesByStage: [[2, 4]] })).toEqual([{ label: "Boss battle", avg: 3 }]);
@@ -19,6 +20,10 @@ describe("the results table's rows", () => {
     ]);
     expect(lossRows({ settings: crowd({ finalFormat: "duel", knockoutsPerStage: CROWD_KNOCKOUTS.duel }), lossesByStage: [...CROWD_KNOCKOUTS.duel.map(() => [1]), [3]] }).map((r) => r.label)).toEqual(["Knockouts", "Duel"]);
     expect(lossRows({ settings: crowd(), lossesByStage: [...CROWD_KNOCKOUTS.team.map(() => [1]), [3]] }).map((r) => r.label)).toEqual(["Knockouts", "Team final"]);
+  });
+  it("the 50 v 50 rework (C2): the cuts as one row, then the 1 v 1", () => {
+    const rework = { ...DEFAULT_SETTINGS, ...CROWD_SETTINGS };
+    expect(lossRows({ settings: rework, lossesByStage: [...CROWD_CUTS.map(() => [1]), [3]] }).map((r) => r.label)).toEqual(["Knockouts", "1 v 1"]);
   });
   it("out before the final: the knockouts only; no moves in a part, no row", () => {
     expect(lossRows({ settings: crowd(), lossesByStage: [[1], [3], []] })).toEqual([{ label: "Knockouts", avg: 2 }]);
