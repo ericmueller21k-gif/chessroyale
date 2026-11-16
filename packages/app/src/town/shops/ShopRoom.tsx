@@ -73,7 +73,7 @@ import { backGl, type BackGl, type XY } from "./back-gl.ts";
 import { nextFrame, roomSliceMs } from "./load-slice.ts";
 import { CAB_H, cabinetOf, drawCabinet, newHits } from "./claw-cabinet.ts";
 import { drawZzz } from "../zzz.ts";
-import { roomLight, skyNow, type RoomLight } from "../sky.ts";
+import { LOOKS, SKY_STOPS, look, roomLight, skyNow, type RoomLight } from "../sky.ts";
 import { CLAW_PLAY, clawPose, newPose as newClawPose } from "../../claw/view.ts";
 import { closeClawMachine, openClawMachine } from "../../claw/index.ts";
 import { rideMoving, rideStep } from "../../ride-sound.ts";
@@ -149,6 +149,11 @@ export interface RoomArt {
   cueSounds?: Readonly<Record<string, SoundName>>;
   /** The ground past its low front wall (none: the bright day; Rolling Dough's back room: the dark planks of the hall beyond). */
   outside?: string;
+  /**
+   * A floor of shallow water (Chandy's Swamp, Nov 16): who walks in it is hidden below its surface, `depth` of the room's pixels (37 a
+   * square) up from their feet, a ripple round them there, and a few drops of spray kick up as they go (`line` and `spray` its colors).
+   */
+  wade?: { readonly depth: number; readonly line: string; readonly spray: string };
 }
 /** Ginger's elves, as his art has them (shops/ginger-art.ts, shops/ginger-elves-art.ts). */
 interface ElvesArt {
@@ -226,6 +231,10 @@ const ART: Partial<Record<string, (light: RoomLight) => Promise<RoomArt>>> = {
       const l = m.recluseStairsLit(light);
       return { n: m.RECLUSE_HALL_N, layout: m.RECLUSE_LANDING_LAYOUT, pieces: l.pieces, crateAt: [0, 0] as const, lights: l.landing, pools: m.RECLUSE_LANDING_POOLS, dim: l.dim, dimRGB: l.dimRGB, outside: "#140d0a", fixCam: m.RECLUSE_HALL_CAM, seeThru: ["stairs-down", "hem"] };
     }),
+  // (Chandy's Swamp, Nov 16: no building, the town's sky overhead; its light follows the time of day as it loads. The battle spot is
+  // hidden under the water: its marks are the art's, never drawn.)
+  chandy: (light) =>
+    chunk(import("./chandy-art.ts")).then((m) => ({ n: m.SHOP_CHANDY_N, layout: m.SHOP_CHANDY_LAYOUT, ...m.chandyLit(light), crateAt: m.SHOP_CHANDY_CRATE_AT, marks: m.SHOP_CHANDY_MARKS, outside: "#3d3220", wade: m.SHOP_CHANDY_WADE })),
   "recluse-top": (light) =>
     chunk(import("./recluse-art.ts")).then((m) => ({
       n: m.SHOP_RECLUSE_N,
@@ -377,8 +386,8 @@ export function loadRoom(home: HomeId, part: RoomPart = "front"): Promise<Loaded
   const light = LIT_ROOMS.has(key) ? roomLight(skyNow()) : "day";
   return loadRoomWith(LIT_ROOMS.has(key) ? `${key}@${light}` : key, roomDef(home, part)!, () => ART[key]!(light));
 }
-/** The rooms whose light follows the town's time of day as they load (sky.ts `roomLight`): the walk-up's three (Nov 14). */
-const LIT_ROOMS: ReadonlySet<string> = new Set(["recluse", "recluse-landing", "recluse-top"]);
+/** The rooms whose light follows the town's time of day as they load (sky.ts `roomLight`): the walk-up's three (Nov 14), Chandy's Swamp (Nov 16). */
+const LIT_ROOMS: ReadonlySet<string> = new Set(["recluse", "recluse-landing", "recluse-top", "chandy"]);
 /**
  * Loads a room from its def and its art's loader, once by `key`: a home's room (`loadRoom`), or a room no home opens yet (the Hidden
  * Boss's child's room, Nov 12: a mockup, shops/recluse-preview.tsx, reachable only on the dev server).
@@ -1344,6 +1353,31 @@ function startRoom(
       }
       return;
     }
+    if (def.roof === "sky") {
+      // No roof (Chandy's Swamp, Nov 16): the town's own sky at its time of day as the room drew it (sky.ts skyNow), its gradient from
+      // the top of the box to the horizon at the walls' tops; at night a few stars.
+      const w = skyNow();
+      const g = rg.createLinearGradient(0, 0, 0, H * 0.5);
+      SKY_STOPS.forEach((at, i) => {
+        const c = [0, 0, 0];
+        for (const l of LOOKS) for (let k = 0; k < 3; k++) c[k]! += look(l).sky[i]![k]! * w[l];
+        g.addColorStop(at, `rgb(${c[0]! | 0},${c[1]! | 0},${c[2]! | 0})`);
+      });
+      rg.fillStyle = g;
+      rg.fillRect(0, 0, W, H * 0.5);
+      // (Under the horizon, behind the trees, only ever seen past the front at the screen's foot: the bank's mud, as the ground outside.)
+      rg.fillStyle = art.outside ?? "#3d3220";
+      rg.fillRect(0, H * 0.5, W, H * 0.5);
+      if (w.night > 0.3) {
+        rg.fillStyle = `rgba(255,255,240,${(w.night * 0.8).toFixed(2)})`;
+        for (let i = 0; i < 60; i++) {
+          const sx = ((i * 7919) % 997) / 997;
+          const sy = ((i * 104729) % 991) / 991;
+          rg.fillRect(Math.round(sx * W), Math.round(sy * H * 0.42), i % 7 ? 1 : 2, i % 7 ? 1 : 2);
+        }
+      }
+      return;
+    }
     if (def.roof === "studio") {
       // A studio's ceiling (Smudgy's): dark beams over a deep teal-gray plaster, a long skylight's pale glow over the room's middle.
       const sky = rg.createLinearGradient(0, 0, 0, H * 0.5);
@@ -1779,6 +1813,90 @@ function startRoom(
   const youHead = { x: 0, y: 0, on: false };
   /** Your figure's box this frame and your row (a cave's see-through pieces: drawUp), drawn before anything nearer than you. */
   const youFig = { x0: 0, y0: 0, x1: 0, y1: 0, z: 0, on: false };
+  // ---- Wading (Chandy's Swamp, Nov 16: art.wade): a figure in the water is drawn clipped at the surface, a ripple round it there, and
+  // a few drops of spray kick up behind it as it goes (a fixed pool of drops on this one canvas, drawn as the figures are: no loop).
+  const wade = art.wade ?? null;
+  /** Each drop: where it left the water (room squares), its sideways and upward speed (room px a second), when; t < 0: free. */
+  const drops = Array.from({ length: 24 }, () => ({ c: 0, r: 0, vx: 0, vz: 0, t: -1 }));
+  let dropAt = 0;
+  /** Where each figure last kicked up spray (room squares), by who. */
+  const lastSplash: Record<string, { c: number; r: number }> = {};
+  const DROP_G = 520;
+  /** A figure in the water at (c, r) now: spray once it's gone a third of a square since its last. */
+  const splashFrom = (who: string, c: number, r: number, now: number) => {
+    const l = (lastSplash[who] ??= { c, r });
+    if (Math.hypot(c - l.c, r - l.r) < 0.34) return;
+    l.c = c;
+    l.r = r;
+    for (let i = 0; i < 5; i++) {
+      const d = drops[dropAt]!;
+      dropAt = (dropAt + 1) % drops.length;
+      const s = Math.sin(now * 0.37 + i * 2.1);
+      Object.assign(d, { c: c + s * 0.12, r: r + 0.02, vx: s * 46, vz: 95 + 30 * Math.cos(now * 0.53 + i), t: now });
+    }
+    const ring = rings[ringAt]!;
+    ringAt = (ringAt + 1) % rings.length;
+    Object.assign(ring, { c, r, t: now });
+  };
+  /** The rings each step leaves on the water, widening and fading (400 ms). */
+  const rings = Array.from({ length: 6 }, () => ({ c: 0, r: 0, t: -1 }));
+  let ringAt = 0;
+  /** The spray in the air now (each drop a square of the room's 2 px, falling back to the water). */
+  const drawSpray = (now: number) => {
+    if (!wade) return;
+    g.strokeStyle = wade.line;
+    for (const o of rings) {
+      if (o.t < 0) continue;
+      const s = (now - o.t) / 400;
+      if (s > 1) {
+        o.t = -1;
+        continue;
+      }
+      if (!P(o.c, o.r)) continue;
+      const rw = (8 + 16 * s) * (pt.k / SQ);
+      g.globalAlpha = 1 - s;
+      g.lineWidth = Math.max(1, (1.4 * pt.k) / SQ);
+      g.beginPath();
+      g.ellipse(pt.x, pt.y - (wade.depth * pt.k) / SQ, rw, rw * 0.3, 0, 0, Math.PI * 2);
+      g.stroke();
+    }
+    g.globalAlpha = 1;
+    g.fillStyle = wade.spray;
+    for (const d of drops) {
+      if (d.t < 0) continue;
+      const s = (now - d.t) / 1000;
+      const z = d.vz * s - (DROP_G * s * s) / 2;
+      if (z < 0 || s > 1) {
+        d.t = -1;
+        continue;
+      }
+      if (!P(d.c, d.r)) continue;
+      const u = pt.k / SQ;
+      const sz = Math.max(2, Math.round(3 * u));
+      g.fillRect(Math.round(pt.x + d.vx * s * u), Math.round(pt.y - (z + wade.depth) * u), sz, sz);
+    }
+  };
+  /** Clips what's drawn next to above the water's surface over feet at screen y (`k` px a square there); `unwade` puts it back. */
+  const wadeIn = (y: number, k: number): boolean => {
+    if (!wade) return false;
+    g.save();
+    g.beginPath();
+    g.rect(-1e5, -1e5, 2e5, y - (wade.depth * k) / SQ + 1e5);
+    g.clip();
+    return true;
+  };
+  /** Ends the clip and draws the ripple round the figure at its surface (`w` the figure's width on the screen). */
+  const unwade = (x: number, y: number, k: number, w: number, now: number) => {
+    if (!wade) return;
+    g.restore();
+    const sy = y - (wade.depth * k) / SQ;
+    const rw = w * (0.32 + 0.03 * Math.sin(now / 260));
+    g.strokeStyle = wade.line;
+    g.lineWidth = Math.max(1, (1.6 * k) / SQ);
+    g.beginPath();
+    g.ellipse(x, sy, rw, rw * 0.22, 0, 0, Math.PI * 2);
+    g.stroke();
+  };
   const dest = { c: 0, r: 0, on: false };
   const pose = { x: 0, y: 0, hop: 0, tilt: 0, step: false, t: 0 };
   const sheet = loaded.kid.sheet;
@@ -2571,8 +2689,13 @@ function startRoom(
     const fy = (pad + PAWN_FOOT) / kk;
     const head = Math.min(a?.top ?? 1, (pad + PAWN_HEAD) / kk);
     const lift = (pose.hop * f.youHop + hopLift("you")) * pt.k;
-    shadows(pt.x, pt.y, pt.k, h / kk);
+    // (In the water, no shadow: its ripple instead.)
+    if (!wade) shadows(pt.x, pt.y, pt.k, h / kk);
     const y0 = pt.y - fy * h - lift;
+    const footX = pt.x;
+    const footY = pt.y;
+    const footK = pt.k;
+    const wading = wadeIn(footY, footK);
     g.save();
     g.translate(pt.x, pt.y);
     if (pose.tilt) g.rotate((pose.tilt * f.hobbleTilt * Math.PI) / 180);
@@ -2596,7 +2719,12 @@ function startRoom(
     }
     g.restore();
     g.imageSmoothingEnabled = false;
-    Object.assign(youHead, { x: pt.x, y: y0 + head * h - 2, on: true });
+    if (wading) {
+      unwade(footX, footY, footK, h / kk, now);
+      splashFrom("you", pose.x + youOx(now), pose.y + youOy(now), now);
+      drawSpray(now);
+    }
+    Object.assign(youHead, { x: footX, y: y0 + head * h - 2, on: true });
   };
   /** The boss (in a challenge): its town sprite, its idle playing, at the town's size, its shadows as the town draws a boss's. */
   const bossHead = { x: 0, y: 0, on: false, px: 0 };
@@ -3098,7 +3226,9 @@ function startRoom(
     const w = (h * b.ch.w) / b.ch.h;
     const x0 = pt.x - (b.ch.foot[0] / b.ch.w) * w;
     const y0 = pt.y - (b.ch.foot[1] / b.ch.h) * h - hopLift("boss") * pt.k;
-    drawShadows(pt.x, pt.y, w);
+    if (!wade) drawShadows(pt.x, pt.y, w);
+    const [bfx, bfy, bfk] = [pt.x, pt.y, pt.k];
+    const bWading = wadeIn(bfy, bfk);
     g.save();
     // (Turned to face `facing`, by the way its art faces: its sprite's (sprite-kit.ts, sprites.ts: Smudgy's left); a boss not on the
     // kit yet as its attack's art faces, as its kit says (Babur's and Puddles' left), or one without one as its intro says (Dash's left).)
@@ -3117,7 +3247,11 @@ function startRoom(
     g.drawImage(img, x0, y0, w, h);
     g.restore();
     g.imageSmoothingEnabled = false;
-    Object.assign(bossHead, { x: pt.x, y: y0 + h * b.head, on: true, px: h });
+    if (bWading) {
+      unwade(bfx, bfy, bfk, w * 0.6, now);
+      splashFrom("boss", bossPose.x + bossOx(now), bossPose.y + bossOy(now), now);
+    }
+    Object.assign(bossHead, { x: bfx, y: y0 + h * b.head, on: true, px: h });
     Object.assign(hisFoot, { x: pt.x, y: pt.y, k: h / b.ch.h, on: true });
   };
   /**
