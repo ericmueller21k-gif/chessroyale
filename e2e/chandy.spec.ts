@@ -8,7 +8,9 @@ import { asAdmin, openBossRaid, submitMove, test } from "./helpers.ts";
  * on an admin's Boss raid screen; Boss alone with the test switches: each of his meter's five moves shows (its event, its banner, his
  * layer over the board), the queen lock's aim and then its shot; a lock's crosshair and, when he takes the locked piece, the upgrade
  * window; and Dodge (`&power=dodge`): the scope-in, a round's vote (your tap counted on the square, ringed), DODGED, then a hit that
- * ends the battle.
+ * ends the battle. Dodge's last chance (`&win=1`: your mate in one from the start): it comes at once with no upgrades, and after three
+ * dodged rounds your mate wins. (At a battle's first turn no warning shows, as no first turn's moments do: the intro has the screen.
+ * Its words, "Now: Dodge", are chandy-wired.test.ts's.)
  */
 const S = BOSS_POWERS.chandy;
 const phase = (p: Page) => p.evaluate(() => (window as any).match?.phase?.kind ?? "none").catch(() => "none");
@@ -193,6 +195,38 @@ test.describe("Chandy", () => {
     expect(s.dodge.slice(0, 4)).toEqual(["cd-p-scope", "cd-p-slide", "cd-p-open", "cd-p-vote"]);
     expect(s.kinds).toContain("dodgeWin");
     expect(s.words).toContain("TELEPORT!");
+    expect(errors).toEqual([]);
+  });
+
+  test("Dodge's last chance: your mate in one brings it at once with no upgrades; the board comes back and your mate wins", { tag: "@phone-only" }, async ({ page }) => {
+    test.setTimeout(180_000);
+    const errors: string[] = [];
+    page.on("pageerror", (e) => errors.push(e.message));
+    await asAdmin(page);
+    // (?win=1: the battle starts with your mate in one, Qxf7, his rifle bare.)
+    await page.goto(`/?debug&pace=quick&laststand=0&brain=stockfish&boss=chandy&win=1&mode=raid`);
+    await openBossRaid(page);
+    await watch(page);
+    await page.getByRole("main").getByRole("button", { name: /^Boss alone/ }).click();
+    await expect.poll(() => page.evaluate(() => !!(window as any).match?.phase?.dodge), { timeout: 60_000 }).toBe(true);
+    const c = await page.evaluate(() => (window as any).match.boss.powers.chandy);
+    expect(c.upgrades).toBe(0);
+    const fen = await page.evaluate(() => (window as any).match.phase.boss.board.fen as string);
+    // Each round: the round's safe square (the state knows it solo) tapped as its vote opens (a tap stays where it's made).
+    for (let k = 0; k < S.dodgeRounds; k++) {
+      await expect(page.locator(".cd-root.cd-p-vote")).toBeVisible({ timeout: 15_000 });
+      await page.getByRole("button", { name: new RegExp(`^Vote ${c.dodge.rounds[k].safe}`) }).click();
+      await expect(page.locator(".cd-result")).toHaveText(`DODGED ${k + 1}/${S.dodgeRounds}`, { timeout: 10_000 });
+    }
+    // The board as it was: your mate.
+    await yourMove(page);
+    expect(await page.evaluate(() => (window as any).match.phase.board.fen as string)).toBe(fen);
+    await submitMove(page, "h5f7", fen);
+    await expect.poll(() => phase(page), { timeout: 60_000 }).toBe("results");
+    const s = await seen(page);
+    expect(s.kinds).toEqual(expect.arrayContaining(["warn", "dodge"]));
+    expect(s.dodge.slice(0, 4)).toEqual(["cd-p-scope", "cd-p-slide", "cd-p-open", "cd-p-vote"]);
+    expect(await page.evaluate(() => (window as any).match.boss.result)).toBe("crowd");
     expect(errors).toEqual([]);
   });
 });

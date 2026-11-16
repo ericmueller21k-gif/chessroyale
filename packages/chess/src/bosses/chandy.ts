@@ -809,8 +809,9 @@ export const CHANDY: BossRules = {
   // Dodge: his meter full (dodgeMeter) or the test switch, the warning as this turn begins, Dodge as the next does; the admins'
   // trigger, straight to it; the last chance (mateOpen), now, its warning with it. Once a battle.
   ultimate(next, t) {
-    const c = next.chandy;
-    if (!c || (next.ults ?? 0) >= dodgeMax(t.s)) return false;
+    // (A fresh state where the battle set none up: the ?win=1 and ?mate=1 switches skip his set-up.)
+    const c = chandyOf(next);
+    if ((next.ults ?? 0) >= dodgeMax(t.s)) return false;
     // (Warned as an earlier turn began: it comes now.)
     if (!t.ultNext && next.warnAt === undefined) {
       const last = mateOpen(next, t);

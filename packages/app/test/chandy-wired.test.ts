@@ -1,6 +1,7 @@
 // Chandy wired (his rules, Nov 16; docs/decisions/2026-11-16-chandy-rules.md): his moments' lengths against his art, his board layer
 // (the crosshairs and their pips, the beam's cover, the queen lock's line), the Dodge view through its timeline (the scope, the vote
-// with its teleports, the result), his kit at each rifle stage, and the dock's words for a move his powers refuse.
+// with its teleports, the result), his kit at each rifle stage, the dock's words for a move his powers refuse, and the warning's
+// words when the last chance brings Dodge at once.
 import { describe, expect, it } from "vitest";
 import { BOSS_POWERS } from "@chessroyale/core";
 import { CHANDY_FIRE_AT, CHANDY_FX, dodgeRounds, dodgeTimeline, safeSquares, linesAfter } from "@chessroyale/chess";
@@ -8,6 +9,8 @@ import { BOSS_KITS, stagedKit } from "../src/characters/kits.ts";
 import { EFFECTS, animLength } from "../src/characters/power-art.ts";
 import { CHANDY } from "../src/characters/chandy.ts";
 import { chandyItems, dodgeFen, dodgeView } from "../src/components/Chandy.tsx";
+import { WARN } from "../src/components/BossPowers.tsx";
+import type { MomentProps } from "../src/components/PowerParts.tsx";
 import { refusedLine } from "../src/refused.ts";
 import type { BossView } from "../src/game.ts";
 
@@ -130,5 +133,19 @@ describe("his kit and his words", () => {
     expect(refusedLine(boss({ scatter: { squares: ["d3"] } }), fen, "d2d3")).toBe("Scatter shot blocks that square.");
     expect(refusedLine(boss({ dizzy: ["a1"] }), fen, "a1a5")).toBe("That piece is dizzy.");
     expect(refusedLine(boss({ shields: { squares: ["d5"] } }), "4k3/8/8/3p4/8/8/8/3QK3 w - - 0 1", "d1d5")).toBe("A shield guards that piece.");
+  });
+});
+
+describe("Dodge's warning", () => {
+  it("says when it comes: next turn as usual; now when it comes this very turn (the last chance, Eric, Nov 16)", () => {
+    const said: string[] = [];
+    const warn = (ultAt: number | null) => {
+      const boss = { ...bossWith(EMPTY), powers: { turn: 5, events: [], ultAt, chandy: EMPTY } } as unknown as BossView;
+      const props = { boss, moment: { kind: "warn", key: "k:warn", at: 0, ms: 1700 }, now: 0, t: 0, orientation: "white", side: "w", kit: null, banner: (text: string, sub?: string) => (said.push(`${text} ${sub}`), null), cast: () => null, anim: () => null } as unknown as MomentProps;
+      WARN.view(props);
+    };
+    warn(null);
+    warn(5);
+    expect(said).toEqual(["RAGE! Next turn: Dodge", "RAGE! Now: Dodge"]);
   });
 });

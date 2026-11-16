@@ -61,8 +61,11 @@ export const WARN: MomentUi = {
   kit: "ultimateWarn",
   view: (p: MomentProps) => {
     const ui = bossUi(p.boss);
+    // (Warned as it comes, this very turn: "Now". Chandy's last chance: your mate in one brings his Dodge at once.)
+    const pw = p.boss.powers;
+    const now = !!pw && pw.ultAt !== null && pw.ultAt === pw.turn;
     // (A boss whose moments all play where it stands, Dash: its warning too, never at the board's corner.)
-    return rageWarn(p, ui?.ultimate.name ?? "its ultimate", ui?.ultimate.when, !!ui?.inPlace);
+    return rageWarn(p, ui?.ultimate.name ?? "its ultimate", now ? "Now" : ui?.ultimate.when, !!ui?.inPlace);
   },
 };
 
