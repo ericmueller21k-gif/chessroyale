@@ -389,6 +389,8 @@ export function App() {
    */
   const [crowdParty, setCrowdParty] = useState<PartyClient | null>(null);
   const crowdPass = useRef<string | null>(null);
+  /** A party tried again quietly (home's Party): turned away, a new one is made, with no note. */
+  const quietParty = useRef<PartyClient | null>(null);
   const [squadsNote, setSquadsNote] = useState<string | null>(() => (squadsLinkCode && !squadsRejoin ? "That match has ended." : null));
   // Home's notes from ranked's leave rules this tab has dismissed (by their words and dodge: a new dodge's note shows again).
   const [leavesDismissed, setLeavesDismissed] = useState<ReadonlySet<string>>(() => new Set());
@@ -1154,14 +1156,12 @@ export function App() {
   };
   /**
    * 50 v 50's party: into it (`code`), its screen up. Placed (the leader's Find match found a lobby): everyone joins that lobby with
-   * the party's pass, the party's socket still open (the leader's Cancel brings them back). `inside`: once you're in or turned away.
+   * the party's pass, the party's socket still open (the leader's Cancel brings them back). `inside`: told once whether you got in
+   * (false: turned away, or the party is gone). `quiet`: a refusal shows no note (home's Party, trying your party again).
    */
-  const joinCrowdParty = async (code: string, inside?: () => void): Promise<boolean> => {
+  const joinCrowdParty = async (code: string, inside?: (ok: boolean) => void, quiet = false): Promise<void> => {
     const open = await partyStatus(code, "crowd");
-    if (open === false) {
-      inside?.();
-      return false;
-    }
+    if (open === false) return inside?.(false);
     const p: PartyClient = new PartyClient(
       code.toUpperCase(),
       (lobby, pass) => {
@@ -1170,11 +1170,12 @@ export function App() {
       },
       "crowd",
     );
+    if (quiet) quietParty.current = p;
     if (inside) {
       const off = p.subscribe(() => {
         if (!p.memberId && !p.done) return;
         off();
-        inside();
+        inside(!!p.memberId);
       });
     }
     setCrowdParty((old) => {
@@ -1183,15 +1184,14 @@ export function App() {
       return p;
     });
     p.connect();
-    return true;
   };
-  /** Home's Party, then PLAY: your party again if it's still open, else a new one (you its first member and leader). */
+  /** Home's Party, then PLAY: your party again if it's still open and you're in it, else a new one (you its first member and leader). */
   const openCrowdParty = async () => {
     unlockAudio();
     setError(null);
     if (crowdParty && !crowdParty.done) return;
     const code = currentParty("crowd");
-    if (code && (await joinCrowdParty(code))) return;
+    if (code && (await new Promise<boolean>((ok) => void joinCrowdParty(code, ok, true)))) return;
     setLoading(true);
     const r = await createParty("crowd");
     setLoading(false);
@@ -1212,7 +1212,7 @@ export function App() {
   useEffect(() => {
     if (!crowdParty) return;
     if (crowdParty.done) {
-      if (crowdParty.error) setError(crowdParty.error);
+      if (crowdParty.error && crowdParty !== quietParty.current) setError(crowdParty.error);
       setCrowdParty(null);
       return;
     }
@@ -1776,7 +1776,7 @@ export function App() {
         if (kind === "crowdparty") {
           goHome();
           if (party) closeParty();
-          return void joinCrowdParty(code, taken);
+          return void joinCrowdParty(code, () => taken());
         }
         taken();
         joinNow(kind, code);

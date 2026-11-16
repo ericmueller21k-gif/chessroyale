@@ -213,10 +213,12 @@ async function befriend(a: { page: Page; id: string }, b: { page: Page; id: stri
   expect(await post(b.page, "answer", { id: a.id, accept: true })).toBe(200);
 }
 
-/** PARTY_SHOTS=<dir>: the 50 v 50 party's stills for Eric. */
+/** PARTY_SHOTS=<dir>: the 50 v 50 party's stills for Eric (dark, as the mockup's). */
 async function partyShot(page: Page, name: string) {
   const dir = process.env.PARTY_SHOTS;
-  if (dir) await page.screenshot({ path: `${dir}/${isComputer() ? "computer" : "phone"}-${name}.png` });
+  if (!dir) return;
+  await page.emulateMedia({ colorScheme: "dark" });
+  await page.screenshot({ path: `${dir}/${isComputer() ? "computer" : "phone"}-${name}.png` });
 }
 
 test("50 v 50 Party (Eric, Nov 16): seven + seats; a + opens the friends sheet; the invited seat waits; the notice's Accept brings the friend in; the leader's Find match puts both in one lobby, on one team", async ({ browser }) => {
@@ -258,6 +260,8 @@ test("50 v 50 Party (Eric, Nov 16): seven + seats; a + opens the friends sheet; 
   const vw = bo.page.viewportSize()!.width;
   expect(vw - (box.x + box.width)).toBeLessThan(24);
   expect(box.y).toBeLessThan(40);
+  // (On top: what's at its middle is the notice itself, never the page under it.)
+  expect(await bo.page.evaluate(([x, y]) => !!document.elementFromPoint(x, y)?.closest(".fr-toast"), [box.x + box.width / 2, box.y + box.height / 2] as const)).toBe(true);
   await expect(toast.getByRole("button", { name: "Decline" })).toBeVisible();
   await partyShot(bo.page, "4-notice");
   await toast.getByRole("button", { name: "Accept" }).click();

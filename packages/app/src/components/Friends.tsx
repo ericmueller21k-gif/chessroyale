@@ -182,8 +182,7 @@ export function InviteToast() {
   return (
     <div class="fr-toast" role="status" aria-label={`${inv.name} invited you`}>
       <div class="fr-toast-text">
-        <strong>{inv.name} invited you</strong>
-        <span>to {inviteWhat(inv.kind)}</span>
+        <strong>{inv.name} invited you</strong> <span>to {inviteWhat(inv.kind)}</span>
       </div>
       <div class="fr-toast-actions">
         <FdButton class="small" onClick={() => void dismissInvite(inv).catch(hideToast)}>
