@@ -14,6 +14,7 @@
  */
 import {
   BOT_LEVELS,
+  CROWD_PARTY,
   CROWD_PARTY_MAX,
   BOSS_BRAIN,
   BOSS_CLOCK,
@@ -269,7 +270,7 @@ function modes(src: FaqSources): FaqSection {
 - **How it starts**, voted on before move 1: ${startLabel("normal")}, the usual starting position; ${startLabel("random")}, a real, balanced opening already ${n(randomMoves, "move")} in for each side, so the game picks up at move ${randomMoves + 1}; or ${startLabel("freestyle")}: the pieces on the back row start shuffled, the same for both sides and different every game. To castle in Freestyle, move your king onto its rook: the king lands on the g- or c-file with the rook beside it, as usual. Nobody voting means ${SV.options[SV.defaultOption]?.label}. Both teams play from that start; a boss final is played from the usual starting position.
 - **The clock is a chess time control**, voted on before move 1: ${timeControls.slice(0, -1).join(", ")} or ${timeControls.at(-1)}. Nobody voting means ${V.options[V.defaultOption]?.label}. Your minutes last the whole game, and each of your moves adds its seconds as it starts; the time you take comes out of your bank, so what a quick move doesn't use is saved for later, as on a chess clock. No move can go past its cap, because your whole team picks together; with an empty bank you still get the added seconds. Your bank is beside the board's clock and in the scoreboard's Bank column. A group Boss Battle is ${namedClock(R)}.
 - **${n(C.powerUpsAtStart, "power-up")}** each: a power-up shows the engine's top 3 moves for that turn.
-- How you play, under the modes on the home screen: **Solo queue** puts you in a lobby, with bots filling empty seats after a short wait; **Party** opens your party's queue screen: tap a **+** to invite up to ${CROWD_PARTY_MAX - 1} friends from your friends list, then the party's leader taps **Find match** and you all join the same matchmaking, together on one team (which side is drawn at random); **Bots** is you and ${C.lobbySize - 1} bots, at once, at the level you pick: ${BOT_LEVELS.filter((l) => l.mean !== null).map((l) => `${l.label} (about ${l.mean})`).join(", ")}, My level (about your rating) or Random (every bot's rating random). A level is the bots' average: each bot is a few hundred points either side of it.
+- How you play, under the modes on the home screen: **Solo queue** puts you in a lobby, with bots filling empty seats after a short wait; **Party** opens your party's queue screen: tap a **+** to invite up to ${CROWD_PARTY_MAX - 1} friends from your friends list, then the party's leader taps **Find match** and you all join the same matchmaking, together on one team (which side is drawn at random)${CROWD_PARTY.ranked ? "" : "; a match with a party of 2 or more in it isn't ranked (XP as usual)"}; **Bots** is you and ${C.lobbySize - 1} bots, at once, at the level you pick: ${BOT_LEVELS.filter((l) => l.mean !== null).map((l) => `${l.label} (about ${l.mean})`).join(", ")}, My level (about your rating) or Random (every bot's rating random). A level is the bots' average: each bot is a few hundred points either side of it.
 - **Bots are a lobby of players.** Each bot has its own rating, the same every match (most between 800 and 1500, a few above or below), and picks from the engine's moves about as loosely as a player of that rating would.
 
 ### Boss Battle {#mode-boss}
@@ -564,7 +565,7 @@ A move is **brilliant** when it separated the field: among at least ${B.minPicke
 
 ### Your rating {#rating}
 
-Your rating comes from your moves, not from wins: from the average number of points your moves give away, matched against how many Stockfish gives away at each of its own strength settings (so it's on Stockfish's rating scale). It shows after ${n(src.ratingMinMoves, "move")}, starts near ${src.priorRating} and firms up as your moves come in. A match counts toward your ranking only when at least ${pct(src.rankedShare, 0)} of its seats are real players; solo games and practice mode never count. Your ranking changes only in a match with at least ${rankedMinHumans(src.crowd.lobbySize, src.rankedShare)} real players (${rankedMinHumans(src.raid.lobbySize, src.rankedShare)} in a group Boss Battle). Solo games never change it.
+Your rating comes from your moves, not from wins: from the average number of points your moves give away, matched against how many Stockfish gives away at each of its own strength settings (so it's on Stockfish's rating scale). It shows after ${n(src.ratingMinMoves, "move")}, starts near ${src.priorRating} and firms up as your moves come in. A match counts toward your ranking only when at least ${pct(src.rankedShare, 0)} of its seats are real players; solo games and practice mode never count${CROWD_PARTY.ranked ? "" : ", nor does a 50 v 50 with a party of friends in it"}. Your ranking changes only in a match with at least ${rankedMinHumans(src.crowd.lobbySize, src.rankedShare)} real players (${rankedMinHumans(src.raid.lobbySize, src.rankedShare)} in a group Boss Battle). Solo games never change it.
 `,
   };
 }
