@@ -1,3 +1,4 @@
+- Nov 16 ~22:20 UTC: bundle split DONE -> #759 (b8fd09c; main chunk 707->446 kB gzip, home 1.69->1.21 s Fast 4G; helper archived). Next steps it found: hash cascade (one-word change renames 71/86 files: import map or stable shared chunk) and chess boss rules 189 kB via the index. CI watched (whole suite).
 - Nov 16 ~22:10 UTC: #757 town solos MERGED (ca23187). Deploy + main run (covers #757 + #758) watched. bundle-split running.
 - Nov 16 ~22:00 UTC: #758 docs trim MERGED (cb3dee6; docs/CI only, no main e2e concern). #757 CI running. bundle-split running.
 - Nov 16 ~21:45 UTC: docs trim DONE -> #758 (b39a8f2; Haiku archived; 4 notes 177-200 words, design text on bosses.md/fairplay.md). CI watched on #757, #758. bundle-split (high) running.
