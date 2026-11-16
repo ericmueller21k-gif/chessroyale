@@ -1034,6 +1034,11 @@ export type SoundName =
   | "mooZap"
   | "mooShimmer"
   | "mooFizz"
+  // Chandy's Dodge (Eric, Nov 16): placeholders from other packs until his own (a proton laser for the beams: Eric's mock-up).
+  | "chandyBeam"
+  | "chandyCrack"
+  | "chandyCrackle"
+  | "chandyShatter"
   // Puddles, the hippo gardener (a raid boss): synthesized, see characters/gardener-sounds.ts.
   | "gardenerGrunt"
   | "gardenerBellow"
@@ -1435,6 +1440,10 @@ const SOUNDS: Record<SoundName, (t: number) => void> = {
   mooZap: mooBoss("zap"),
   mooShimmer: mooBoss("shimmer"),
   mooFizz: mooBoss("fizz"),
+  chandyBeam: mooBoss("beam"),
+  chandyCrack: sawyer("crack"),
+  chandyCrackle: ginger("crackle"),
+  chandyShatter: hollow("smash"),
   gardenerGrunt: gardenerBoss("grunt"),
   gardenerBellow: gardenerBoss("bellow"),
   gardenerCheer: gardenerBoss("cheer"),
@@ -1761,6 +1770,10 @@ const MAKE: Partial<Record<SoundName, readonly BossSound[]>> = {
   mooZap: [["moo", "zap"]],
   mooShimmer: [["moo", "shimmer"]],
   mooFizz: [["moo", "fizz"]],
+  chandyBeam: [["moo", "beam"]],
+  chandyCrack: [["sawyer", "crack"]],
+  chandyCrackle: [["ginger", "crackle"]],
+  chandyShatter: [["hollow", "smash"]],
   gardenerGrunt: [["gardener", "grunt"]],
   gardenerBellow: [["gardener", "bellow"]],
   gardenerCheer: [["gardener", "cheer"]],

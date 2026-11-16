@@ -1861,8 +1861,8 @@ export const BOSS_POWERS = {
   doughQueenFree: true,
   /**
    * Chandy (bosses/chandy.ts; Eric's design, Nov 15-16: DESIGN.md on branch stills/boss-chandy; docs/decisions/2026-11-16-chandy-rules.md).
-   * - **The locks** (L1-L6): the first comes as one of his turns begins, from his `firstLockMove`-th move, on a piece of yours he can
-   *   take now without losing material (never your king or queen); then at the end of each of his turns he locks your most capturable
+   * - **The locks** (L1-L6): none before his first capture; on that move the crosshair locks onto the piece he takes (his engine's own
+   *   move; any piece but the king) right before it shows, an upgrade; then at the end of each of his turns he locks your most capturable
    *   piece, `maxLocks` at most, a second once the first is `secondAfter` of his turns old. A lock hunts for `huntTurns` of his turns,
    *   and lives on to `liveTurns` while the piece is still gettable. His engine is steered within the margins (L3): of its top
    *   `lockLines` moves, one taking a locked piece within `takeMargin` pawns of his best is played; else one attacking a locked piece
@@ -1870,20 +1870,24 @@ export const BOSS_POWERS = {
    * - **The rifle:** each locked piece he takes is an upgrade (`upgradesMax`), each unlocking one of his five moves at random; the
    *   upgrade window holds everything `upgradeMs` (Eric: 2 s).
    * - **The move meter:** from the first upgrade, full every `meterEvery` of your moves; it fires a random unlocked move (a new unlock
-   *   first). Scatter shot blocks `scatterSquares` squares round a spot (a pick of the top `looks`, as every pick of his below);
+   *   first). `fireOnUnlock` (Eric, Nov 16; false turns it off): a new unlock fires on his turn after its upgrade window whatever the
+   *   meter says, and the meter starts over (a queen lock that can't come then waits for the meter). Scatter shot blocks `scatterSquares` squares round a spot (a pick of the top `looks`, as every pick of his below);
    *   shields cover `shieldCount` of his pieces; rapid fire stuns `rapidCount` of yours.
    * - **Dodge** (his ultimate, once a battle: maxUltimates.chandy; Eric, Nov 16: "He only ults once per game, no matter what"; "It
    *   should fire after he gets all 5 upgrades ... it should be ulting most games"): his rage meter is dimmed until the rifle is whole,
    *   then fills over `dodgeAfterMoves` of your moves (nothing else fills or drains it); full, the usual warning, then Dodge as your
    *   next turn begins. **Last chance** (Eric, Nov 16): as your turn begins, if he hasn't used it and you have a move that mates him,
-   *   Dodge comes now, whatever his rifle or meter (the warning with it); you may still play the mate after. `dodgeRounds` rounds, each
-   *   a `dodgeVoteMs` vote (and the server's `dodgeGraceMs` for lag), the clones teleporting at `dodgeTeleports`' times into each round's
-   *   vote (the last always 1.2 s before it closes: a unit test), the beats between them (`dodgeScopeMs` … `dodgeResultMs`). A bot
-   *   finds the safe square with `dodgeBotHit`'s chance.
+   *   Dodge comes now, whatever his rifle or meter (the warning with it); you may still play the mate after. First the warning volley
+   *   (Eric, Nov 16: "an additional shot first that you can't move"): the clones fire once on lines that miss your king, no vote, then
+   *   "Dodge the next one!" (`dodgeVolleyMs` in all, the clones aiming `dodgeAimMs` first). Then `dodgeRounds` rounds, each a
+   *   `dodgeVoteMs` vote (and the server's `dodgeGraceMs` for lag), the clones teleporting at `dodgeTeleports`' times into each round's
+   *   vote (the last always 1.2 s before it closes: a unit test); LOCKED (`dodgeLockedMs`), then the beams travel from the clones'
+   *   muzzles across the board (`dodgeTravelMs` each, `dodgeStaggerMs` apart) and hold (`dodgeHoldMs`) before the next round.
+   *   `dodgeHits` hits lose: the first cracks your king and play goes on; the second, the beams keep hitting him (`dodgeKillMs`), he
+   *   shatters (`dodgeShatterMs`), then the result. A bot finds the safe square with `dodgeBotHit`'s chance.
    * The sim's (reports/chandy-sim.md).
    */
   chandy: {
-    firstLockMove: 3,
     maxLocks: 2,
     secondAfter: 2,
     huntTurns: 3,
@@ -1894,20 +1898,27 @@ export const BOSS_POWERS = {
     upgradesMax: 5,
     upgradeMs: 2000,
     meterEvery: 6,
+    fireOnUnlock: true as boolean,
     looks: 3,
     scatterSquares: 4,
     shieldCount: 2,
     rapidCount: 3,
     dodgeRounds: 3,
+    dodgeHits: 2,
     dodgeVoteMs: 3000,
     dodgeGraceMs: 300,
     dodgeTeleports: [[1200], [900, 1600], [800, 1400, 1800]] as readonly (readonly number[])[],
     dodgeScopeMs: 600,
     dodgeSlideMs: 600,
+    dodgeVolleyMs: 3600,
+    dodgeAimMs: 400,
     dodgeOpenMs: 400,
-    dodgeLockedMs: 700,
-    dodgeBlastMs: 700,
-    dodgeResultMs: 1200,
+    dodgeLockedMs: 600,
+    dodgeTravelMs: 500,
+    dodgeStaggerMs: 150,
+    dodgeHoldMs: 2500,
+    dodgeKillMs: 5000,
+    dodgeShatterMs: 1000,
     dodgeBotHit: 0.6,
     dodgeAfterMoves: 3,
   },

@@ -7,6 +7,7 @@ import {
   POWER_FX,
   beamAllows,
   botDodgeVote,
+  capturedSquare,
   chandyTurnMs,
   chooseBeam,
   chooseRapid,
@@ -15,11 +16,12 @@ import {
   crowdAllowed,
   dodgeArena,
   dodgeCenter,
+  dodgeEndAt,
   dodgeRounds,
   dodgeSeen,
   dodgeTally,
   dodgeTimeline,
-  firstLockPick,
+  dodgeVolley,
   heldIn,
   kingAttacked,
   legalMoves,
@@ -41,6 +43,7 @@ import {
   safeSquares,
   stopReason,
   steerPick,
+  testCapture,
   strikeRage,
   triggerUltimate,
   unlockPick,
@@ -89,8 +92,9 @@ describe("Chandy's sheet", () => {
     expect(isPlayable(def)).toBe(false);
     expect(menuBosses({ admin: false, raid: true }).some((d) => d.id === "chandy")).toBe(false);
     expect(menuBosses({ admin: true, raid: false }).some((d) => d.id === "chandy")).toBe(true);
-    // (L1: first lock from his 3rd move; a lock hunts 3 of his turns, lives at most 5; at most 2, the second 2 turns after the first.)
-    expect([S.firstLockMove, S.huntTurns, S.liveTurns, S.maxLocks, S.secondAfter]).toEqual([3, 3, 5, 2, 2]);
+    // (L1: no lock before his first capture; a lock hunts 3 of his turns, lives at most 5; at most 2, the second 2 turns after the
+    // first. A new unlock fires at once: Eric, Nov 16.)
+    expect([S.huntTurns, S.liveTurns, S.maxLocks, S.secondAfter, S.fireOnUnlock]).toEqual([3, 5, 2, 2, true]);
     // (L3's margins, raised by L5 after the sim (1.5 and 0.5 gave 5 upgrades in 28 battles of 32: reports/chandy-sim.md); the 2 s
     // upgrade window; the meter every 6 of your moves; five upgrades; Dodge once a battle, his rage full 3 of your moves after the
     // fifth (Eric, Nov 16: "He only ults once per game, no matter what").)
@@ -131,12 +135,91 @@ describe("the locks (L1-L6)", () => {
     expect(order.indexOf("c2")).toBeLessThan(order.indexOf("a2"));
   });
 
-  it("his first lock, as his turn begins: a piece he can take without losing material, never the queen", () => {
-    // (Black to move, his knight on f6 takes your free knight on d5; your queen on e4 hangs to it too: never her.)
-    const fen = "4k3/4p3/5n2/3N4/4Q3/8/8/4K3 b - - 0 1";
-    expect(firstLockPick(fen, "w", 9)).toBe("d5");
-    // (Your knight on d5 defended by a pawn on e4 and only his rook can take it: a loss by the exchange check, no lock.)
-    expect(firstLockPick("3rk3/8/8/3N4/4P3/8/8/4K3 b - - 0 1", "w", 9)).toBeNull();
+  it("no lock before his first capture (Eric, Nov 16): his moves until then lock nothing, and his first capture is locked and upgrades", async () => {
+    const r = battle(11);
+    let firstAt = -1;
+    for (let i = 0; i < 40 && firstAt < 0; i++) {
+      if (!r.bossToMove()) {
+        await crowdMove(r);
+        continue;
+      }
+      const before = fenOf(r);
+      expect(cOf(r).locks).toEqual([]);
+      expect(r.bossLocks()).toBeNull();
+      expect(r.boss!.powers!.events.some((e) => e.kind === "lockOn")).toBe(false);
+      const marks: string[] = [];
+      const move = await r.playBoss(undefined, async () => {
+        // (The moment, before his move shows: the lock on the piece, still on the board.)
+        for (const e of r.boss!.powers!.events) if (e.kind === "lockOn" && e.first) marks.push(e.square!);
+        expect(cOf(r).locks.map((l) => l.square)).toEqual(marks);
+        expect(fenOf(r)).toBe(before);
+      });
+      const sq = capturedSquare(before, move);
+      const taken = sq ? pieceAt(before, sq) : null;
+      if (taken && taken.color === r.boss!.crowdSide) {
+        firstAt = i;
+        expect(marks).toEqual([sq]);
+        expect(cOf(r).taught).toBe(true);
+        expect(cOf(r).upgrades).toBe(1);
+      } else {
+        expect(marks).toEqual([]);
+        expect(cOf(r).upgrades).toBe(0);
+        expect(cOf(r).taught).toBeUndefined();
+      }
+    }
+    expect(firstAt).toBeGreaterThanOrEqual(0);
+  });
+
+  it("his first capture: the crosshair locks onto the piece right before he takes it (never steered), then upgrade 1; your queen too", async () => {
+    for (const [fen, move, square, piece] of [
+      // (Black to move, his knight on f6 takes your knight on d5.)
+      ["4k3/8/5n2/3N4/8/8/8/R3K3 b - - 0 1", "f6d5", "d5", "n"],
+      // (His first capture is your queen on d5: it still counts as the teaching lock and the upgrade.)
+      ["4k3/8/5n2/3Q4/8/8/8/R3K3 b - - 0 1", "f6d5", "d5", "q"],
+    ] as const) {
+      const r = battle(3);
+      await crowdMove(r);
+      onPosition(r, fen, "w");
+      // (No lock to steer toward: that move is his engine's own.)
+      expect(r.bossLocks()).toBeNull();
+      // (A quiet move marks nothing.)
+      expect(r.bossMoveMoment("e8d8")).toBe(0);
+      expect(r.bossMoveMoment(move)).toBe(CHANDY_FX.lockOn);
+      expect(cOf(r).locks).toEqual([{ square, piece, at: 0 }]);
+      expect(r.boss!.powers!.events.filter((e) => e.kind === "lockOn")).toEqual([{ kind: "lockOn", turn: r.boss!.powers!.turn, square, first: true }]);
+      expect(r.bossLocks()).toBeNull();
+      // (Marked once: the server asks again as it plays the held move.)
+      expect(r.bossMoveMoment(move)).toBe(0);
+      expect(pieceAt(fenOf(r), square)?.type).toBe(piece);
+      r.applyBossMove(move);
+      const c = cOf(r);
+      expect([c.taught, c.upgrades, c.locks.filter((l) => l.square === square)]).toEqual([true, 1, []]);
+      expect(r.boss!.powers!.events.find((e) => e.kind === "upgrade")).toMatchObject({ stage: 1, unlock: c.unlocked[0] });
+    }
+  });
+
+  it("his first capture counts where nothing marked it (the sims), and a mark on a piece his move didn't take goes", async () => {
+    const r = battle(3);
+    await crowdMove(r);
+    onPosition(r, "4k3/8/5n2/3N4/8/8/8/R3K3 b - - 0 1", "w");
+    r.applyBossMove("f6d5");
+    expect([cOf(r).taught, cOf(r).upgrades]).toEqual([true, 1]);
+    // (Marked on d5, but the move played took the a1 rook: that's his first capture, and the mark goes.)
+    const r2 = battle(3);
+    await crowdMove(r2);
+    onPosition(r2, "r3k3/8/5n2/3N4/8/8/8/R3K3 b - - 0 1", "w");
+    expect(r2.bossMoveMoment("f6d5")).toBe(CHANDY_FX.lockOn);
+    r2.applyBossMove("a8a1");
+    // (The mark, from before his move, is gone; a lock now is his first hunt's, from after it.)
+    expect([cOf(r2).taught, cOf(r2).upgrades, cOf(r2).locks.filter((l) => l.at === 0)]).toEqual([true, 1, []]);
+  });
+
+  it("the test switch's capture (?power=lockon): a capture that nets him no loss, the most netting first; null: none", () => {
+    // (Black to move: his knight takes your free knight on d5 (3) rather than your defended pawn.)
+    expect(testCapture("4k3/8/5n2/3N4/4Q3/8/8/4K3 b - - 0 1", "w", 9)).toBe("f6e4");
+    expect(testCapture("4k3/8/5n2/3N4/8/8/8/4K3 b - - 0 1", "w", 9)).toBe("f6d5");
+    // (Your knight on d5 defended by a pawn on e4 and only his rook can take it: a loss by the exchange check.)
+    expect(testCapture("3rk3/8/8/3N4/4P3/8/8/4K3 b - - 0 1", "w", 9)).toBeNull();
   });
 
   it("a lock's pips count its turns left (3, 2, 1) and it ends: piece gone, past 5, or past 3 and safe", () => {
@@ -239,6 +322,44 @@ describe("the rifle and the move meter", () => {
     onPosition(r2, "4k3/8/5n2/3N4/8/8/8/R3K3 b - - 0 1", "w", { locks: [{ square: "a1", piece: "r", at: 0 }], taught: true });
     r2.applyBossMove("f6d5");
     expect(cOf(r2).upgrades).toBe(0);
+  });
+
+  it("a new unlock fires on his turn after its upgrade window, whatever his meter says; then the meter starts over (fireOnUnlock)", async () => {
+    const r = battle(3);
+    await crowdMove(r);
+    // (Four moves unlocked, the meter empty: taking your locked knight unlocks the fifth, rapid fire.)
+    onPosition(r, "4k3/8/5n2/3N4/8/8/8/R3K3 b - - 0 1", "w", { upgrades: 4, unlocked: ["scatter", "beam", "shields", "queenlock"], meter: 0, locks: [{ square: "d5", piece: "n", at: 0 }], taught: true });
+    r.applyBossMove("f6d5");
+    expect(cOf(r).upgrade).toMatchObject({ stage: 5, unlock: "rapidfire" });
+    // (Your move after the window: his meter full, the unlock picked; it lands as your next turn begins, after his move.)
+    await crowdMove(r);
+    expect([cOf(r).due, cOf(r).meter]).toEqual(["rapidfire", S.meterEvery]);
+    await r.playBoss();
+    expect(r.boss!.powers!.events.some((e) => e.kind === "rapidFire")).toBe(true);
+    expect([cOf(r).due ?? null, cOf(r).meter]).toEqual([null, 0]);
+  });
+
+  it("a new queen lock that can't come then waits for the meter; fireOnUnlock off, the meter as before", async () => {
+    // (No queen of yours: the queen lock can't come; the meter takes its notch and nothing is due.)
+    const r = battle(3);
+    await crowdMove(r);
+    onPosition(r, "4k3/8/5n2/3N4/8/8/8/R3K3 b - - 0 1", "w", { upgrades: 4, unlocked: ["scatter", "beam", "shields", "rapidfire"], meter: 0, locks: [{ square: "d5", piece: "n", at: 0 }], taught: true });
+    r.applyBossMove("f6d5");
+    expect(cOf(r).upgrade).toMatchObject({ unlock: "queenlock" });
+    await crowdMove(r);
+    expect([cOf(r).due ?? null, cOf(r).meter]).toEqual([null, 1]);
+    const set = BOSS_POWERS.chandy as { fireOnUnlock: boolean };
+    set.fireOnUnlock = false;
+    try {
+      const r2 = battle(3);
+      await crowdMove(r2);
+      onPosition(r2, "4k3/8/5n2/3N4/8/8/8/R3K3 b - - 0 1", "w", { upgrades: 4, unlocked: ["scatter", "beam", "shields", "queenlock"], meter: 0, locks: [{ square: "d5", piece: "n", at: 0 }], taught: true });
+      r2.applyBossMove("f6d5");
+      await crowdMove(r2);
+      expect([cOf(r2).due ?? null, cOf(r2).meter]).toEqual([null, 1]);
+    } finally {
+      set.fireOnUnlock = true;
+    }
   });
 
   it("fills a notch a move of yours from the first upgrade, and full, his move lands as your next turn begins", async () => {
@@ -449,6 +570,34 @@ describe("Dodge (D1-D12)", () => {
     });
     expect(tl.rounds[2]!.voteEnd - tl.rounds[2]!.teleports.at(-1)!).toBe(1200);
     expect(S.dodgeTeleports).toEqual([[1200], [900, 1600], [800, 1400, 1800]]);
+    // (Eric, Nov 16: the warning volley first, after the scope-in and the slide; each round's beams travel, then hold 2 to 3 s
+    // before the next opens; two hits lose, the second's kill about 5 s.)
+    expect(tl.volley.at).toBe(S.dodgeScopeMs + S.dodgeSlideMs);
+    expect(tl.volley.landAt).toBeLessThan(tl.volley.end);
+    expect(tl.rounds[0]!.openAt).toBe(tl.volley.end);
+    for (const r of tl.rounds) {
+      expect(r.hitAt - r.blastAt).toBe(3 * S.dodgeStaggerMs + S.dodgeTravelMs);
+      expect(r.end - r.hitAt).toBeGreaterThanOrEqual(2000);
+      expect(r.end - r.hitAt).toBeLessThanOrEqual(3000);
+    }
+    expect([S.dodgeHits, S.dodgeKillMs]).toEqual([2, 5000]);
+    // (The whole of it: about 28 s survived, at most about 32 s when the second hit comes in the last round.)
+    expect(tl.total).toBe(28050);
+    const rounds = dodgeRounds("e4", 1, 1);
+    expect(dodgeEndAt({ rounds, results: [] as never[] })).toBe(tl.rounds[0]!.end);
+    const hit = { placed: "a1", hit: true, votes: {} };
+    const ok = { placed: "a1", hit: false, votes: {} };
+    expect(dodgeEndAt({ rounds, results: [hit, ok, hit] })).toBe(tl.rounds[2]!.hitAt + S.dodgeKillMs + S.dodgeShatterMs);
+    expect(dodgeEndAt({ rounds, results: [hit, ok, hit] })).toBe(31550);
+  });
+
+  it("the warning volley's lines miss your king: the center is the only square of the 3 x 3 they leave", () => {
+    for (const center of ["e4", "e5"])
+      for (let seed = 0; seed < 20; seed++) {
+        const v = dodgeVolley(center, seed, 1);
+        expect(v.length).toBe(4);
+        expect(safeSquares(center, v)).toEqual([center]);
+      }
   });
 
   it("tallies the vote: the most votes; a tie drawn among the tied; nobody votes, a square from the seed", () => {
@@ -487,8 +636,8 @@ describe("Dodge (D1-D12)", () => {
     expect(late.rounds[0]!.teleports.length).toBe(1);
   });
 
-  it("comes as your turn begins once the rifle is whole (the test switch): three dodged rounds and your turn; a hit and the battle is his", async () => {
-    for (const hit of [false, true]) {
+  it("comes as your turn begins once the rifle is whole (the test switch): three dodged rounds and your turn; one hit cracks your king and play goes on; the second and the battle is his", async () => {
+    for (const hits of [[], [1], [0, 2]] as number[][]) {
       const r = battle(21, "dodge");
       for (let i = 0; i < 6 && !r.dodgeDue(); i++) {
         if (r.bossToMove()) await r.playBoss();
@@ -498,17 +647,22 @@ describe("Dodge (D1-D12)", () => {
       const before = fenOf(r);
       const d = cOf(r).dodge!;
       expect(d.king).toBe(r.boss!.crowdSide === "w" ? "e1" : d.king);
+      expect(safeSquares(d.center, d.volley!)).toEqual([d.center]);
       for (let k = 0; k < 3 && r.dodgeDue(); k++) {
         const safe = cOf(r).dodge!.rounds[k]!.safe;
         const wrong = dodgeArena(d.center).find((sq) => sq !== safe)!;
-        const res = r.finishDodgeRound({ h0: hit && k === 1 ? wrong : safe })!;
-        expect(res.hit).toBe(hit && k === 1);
+        const res = r.finishDodgeRound({ h0: hits.includes(k) ? wrong : safe })!;
+        expect(res.hit).toBe(hits.includes(k));
+        // (One hit: no win yet.)
+        if (hits.includes(k) && hits.indexOf(k) === 0) expect(r.boss!.powers!.events.some((e) => e.kind === "dodgeWin")).toBe(false);
       }
+      const won = hits.length >= S.dodgeHits;
       expect(fenOf(r)).toBe(before);
       expect(r.dodgeDue()).toBe(false);
-      expect(r.stageComplete()).toBe(hit);
-      if (hit) {
+      expect(r.stageComplete()).toBe(won);
+      if (won) {
         expect(r.boss!.powers!.events.some((e) => e.kind === "dodgeWin")).toBe(true);
+        expect(cOf(r).dodge!.results.length).toBe(3);
         expect(r.finishBossBattle()).toBe("boss");
       } else expect(cOf(r).dodge!.results.length).toBe(3);
     }

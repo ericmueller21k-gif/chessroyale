@@ -1,6 +1,6 @@
 import { RECLUSE_CHILD, RECLUSE_CUTSCENE, RECLUSE_PHASE2, BOSS_ALONE_SCORING, bossClockSettings, BOSS_BRAIN, BOSS_POWERS, DEFAULT_SETTINGS, MATCHMAKING, type ItemLook, type MatchmakingType, botVotes, castPregameVote, clockAfterVote, closePregameVote, cutSeconds, pregameVotes, voteResultMs, type Augment, type BossBrain, type PlayerState, type Settings } from "@chessroyale/core";
 import { GUARD_WORDS, MatchRunner, START_FEN, baseAt, ShowdownScout, brainLine as brainWords, boardSlots, type HumanUciEngine, netBoard, type LobbyPlayer, type LivePick, toSan, type BoardSlot, type BoardState, type NetFinal, type Opening, type RoundReport, type UciEngine } from "@chessroyale/chess";
-import { type Phase2Board, bulletClock, crowdRace, phase2Numbers, phase2Standings, phase2ToMove, botRoster, bossIntroTimeline, bossThinkMs, landedEarlyMs, fullMoonMs, folioTurnMs, popOffMs, zebraTurnMs, chandyTurnMs, dodgeTimeline, dodgeArena, dodgeOver, bossTurnShowMs, judgeTaps, bossRules, kingHelpBlocked, kingMoveMs, kingStrikeMs, lightsDeadline, lightsOutTimeline, lightsRoundEnd, lastStandMs, powerMomentMs, rushKeep, rushMovesLeft, rushSquares, rushTimeline } from "@chessroyale/chess";
+import { type Phase2Board, bulletClock, crowdRace, phase2Numbers, phase2Standings, phase2ToMove, botRoster, bossIntroTimeline, bossThinkMs, landedEarlyMs, fullMoonMs, folioTurnMs, popOffMs, zebraTurnMs, chandyTurnMs, dodgeTimeline, dodgeArena, dodgeEndAt, dodgeOver, bossTurnShowMs, judgeTaps, bossRules, kingHelpBlocked, kingMoveMs, kingStrikeMs, lightsDeadline, lightsOutTimeline, lightsRoundEnd, lastStandMs, powerMomentMs, rushKeep, rushMovesLeft, rushSquares, rushTimeline } from "@chessroyale/chess";
 import type { BossView, BoardView, DarkNote, ExitKind, FinalView, GameView, Hint, LightsView, MoveRecord, RushView, Phase, SimulView, Standing, VoteView } from "./game.ts";
 import { PHASE_CHANGE, Phase2Game, cueSlash, phase2Follows, phase2Mates, phaseChangeRun } from "./recluse-phase2.ts";
 import { RECLUSE_LINES } from "./characters/recluse-lines.ts";
@@ -806,7 +806,7 @@ export class SoloMatch implements GameView {
   /** Dodge on (your turn waits for it): its key, when it began, the round on and your vote in it. */
   private dodge: { key: string; at: number; round: number; mine?: string } | null = null;
 
-  /** As your turn begins: the scope-in, then three rounds of the vote, each closed here as the server closes them online. */
+  /** As your turn begins: the scope-in, the warning volley, then three rounds of the vote, each closed here as the server closes them online. */
   private dodgeTurn() {
     if (this.timer) clearTimeout(this.timer);
     const at = Date.now();
@@ -823,7 +823,7 @@ export class SoloMatch implements GameView {
     const full = this.runner.state.boss?.powers?.chandy?.dodge;
     const tl = dodgeTimeline();
     if (this.timer) clearTimeout(this.timer);
-    const due = !full || dodgeOver(full) ? d.at + tl.rounds[Math.max(0, (full?.results.length ?? 1) - 1)]!.end : d.at + tl.rounds[full.results.length]!.closeAt;
+    const due = !full || dodgeOver(full) ? d.at + (full ? dodgeEndAt(full) : tl.rounds[0]!.end) : d.at + tl.rounds[full.results.length]!.closeAt;
     this.timer = setTimeout(() => this.dodgeStep(), Math.max(0, due - Date.now()));
   }
   /** A round closes (your vote, or a square from the seed; in a Solo raid the bots' too), or (over) on with the battle. */
@@ -1032,7 +1032,16 @@ export class SoloMatch implements GameView {
     const burnt = !!snap.powers?.burnt?.some((b) => b.turn === snap.crowdMoves && (b.piece || b.fizzled));
     const landed = landedEarlyMs(snap) + fullMoonMs(snap) + folioTurnMs(snap) + popOffMs(snap) + zebraTurnMs(snap) + chandyTurnMs(snap);
     const minThink = bossThinkMs(snap, burnt, landed) - (this.alone && !burnt && !landed ? Date.now() - this.movedAt : 0);
-    await Promise.all([this.runner.playBoss(this.engines[0]), new Promise((r) => setTimeout(r, Math.max(0, minThink)))]);
+    const thinkEnd = Date.now() + Math.max(0, minThink);
+    // (Chandy's first capture: once the thinking's moments are done, the crosshair locks onto the piece he's about to take, then his
+    // move shows; as the server holds the host's move.)
+    const beforeShow = async (ms: number) => {
+      await new Promise((r) => setTimeout(r, Math.max(0, thinkEnd - Date.now())));
+      if (this.stopped) return;
+      this.set({ kind: "boss", boss: this.bossSnapshot(), until: 0, thinking: true });
+      await new Promise((r) => setTimeout(r, ms));
+    };
+    await Promise.all([this.runner.playBoss(this.engines[0], beforeShow), new Promise((r) => setTimeout(r, Math.max(0, minThink)))]);
     if (this.stopped) return;
     // As the turn passes to you, any power that comes with it (a freeze, a pie, the warning, the blizzard) plays out
     // before your clock starts.

@@ -7,8 +7,8 @@ import { asAdmin, openBossRaid, submitMove, test } from "./helpers.ts";
  * Chandy (his rules, Nov 16; docs/decisions/2026-11-16-chandy-rules.md), in the game for admins first (BOSS_ADMIN_FIRST): his tile only
  * on an admin's Boss raid screen; Boss alone with the test switches: each of his meter's five moves shows (its event, its banner, his
  * layer over the board), the queen lock's aim and then its shot; a lock's crosshair and, when he takes the locked piece, the upgrade
- * window; and Dodge (`&power=dodge`): the scope-in, a round's vote (your tap counted on the square, ringed), DODGED, then a hit that
- * ends the battle. Dodge's last chance (`&win=1`: your mate in one from the start): it comes at once with no upgrades, and after three
+ * window; and Dodge (`&power=dodge`): the scope-in, the warning volley, a round's vote (your tap counted on the square, ringed),
+ * DODGED, a hit that cracks your king, then the second that ends the battle. Dodge's last chance (`&win=1`: your mate in one from the start): it comes at once with no upgrades, and after three
  * dodged rounds your mate wins. (At a battle's first turn no warning shows, as no first turn's moments do: the intro has the screen.
  * Its words, "Now: Dodge", are chandy-wired.test.ts's.)
  */
@@ -41,10 +41,14 @@ async function playOne(page: Page, pick?: (legal: { uci: string; piece: string; 
 async function watch(page: Page) {
   await page.evaluate(() => {
     const w = window as any;
-    w.__ch = { kinds: [] as string[], banners: [] as string[], layer: 0, upgrade: [] as string[], dodge: [] as string[], words: [] as string[] };
+    w.__ch = { kinds: [] as string[], banners: [] as string[], layer: 0, upgrade: [] as string[], dodge: [] as string[], words: [] as string[], first: [] as { square: string; fen: string; thinking: boolean }[] };
     const look = () => {
       const r = w.__ch;
       for (const e of w.match?.boss?.powers?.events ?? []) if (!r.kinds.includes(e.kind)) r.kinds.push(e.kind);
+      // (His first lock: the position on screen the frame it's first seen, his move not shown yet.)
+      const ph = w.match?.phase;
+      for (const e of ph?.boss?.powers?.events ?? [])
+        if (e.kind === "lockOn" && e.first && !r.first.some((f: { square: string }) => f.square === e.square)) r.first.push({ square: e.square, fen: ph.boss.board.fen, thinking: !!ph.thinking });
       for (const b of document.querySelectorAll(".fight-banner")) {
         const t = (b.textContent ?? "").replace(/\s+/g, " ").trim();
         if (t && !r.banners.includes(t)) r.banners.push(t);
@@ -64,7 +68,7 @@ async function watch(page: Page) {
     requestAnimationFrame(look);
   });
 }
-const seen = (page: Page) => page.evaluate(() => (window as any).__ch as { kinds: string[]; banners: string[]; layer: number; upgrade: string[]; dodge: string[]; words: string[] });
+const seen = (page: Page) => page.evaluate(() => (window as any).__ch as { kinds: string[]; banners: string[]; layer: number; upgrade: string[]; dodge: string[]; words: string[]; first: { square: string; fen: string; thinking: boolean }[] });
 
 async function battle(page: Page, power: string) {
   await asAdmin(page);
@@ -141,12 +145,12 @@ test.describe("Chandy", () => {
     expect(errors).toEqual([]);
   });
 
-  test("a lock on a piece he can take: the crosshair, then he takes it and the upgrade window shows (1 of 5) with its new move", { tag: "@phone-only" }, async ({ page }) => {
+  test("his first capture: the crosshair locks onto your piece before he takes it, then the upgrade window shows (1 of 5) with its new move", { tag: "@phone-only" }, async ({ page }) => {
     test.setTimeout(180_000);
     const errors: string[] = [];
     page.on("pageerror", (e) => errors.push(e.message));
     await battle(page, "lockon");
-    // (Each of your moves leaves a piece he can take for free, so his first lock sits on it and his engine is steered to take it.)
+    // (Each of your moves leaves a piece he can take for free; the switch has him take one as soon as he can: his first capture.)
     const hang = (legal: { uci: string; piece: string; to: string; captured?: string }[], fen: string) => {
       const c = new Chess(fen);
       return legal.find((m) => m.piece !== "k" && m.piece !== "q" && !m.captured && c.isAttacked(m.to as never, "b") && !(() => {
@@ -160,13 +164,17 @@ test.describe("Chandy", () => {
     expect(s.kinds).toContain("lockOn");
     expect(s.kinds).toContain("upgrade");
     expect(s.upgrade[0]).toMatch(/1 of 5/);
+    // (The lock came while he still thought, your piece still on its square: then he took it.)
+    expect(s.first.length).toBe(1);
+    expect(s.first[0]!.thinking).toBe(true);
+    expect(new Chess(s.first[0]!.fen).get(s.first[0]!.square as never)).toMatchObject({ color: "w" });
     const c = await page.evaluate(() => (window as any).match.boss.powers.chandy);
     expect(c.upgrades).toBeGreaterThanOrEqual(1);
     await expect(page.locator(".ch-pips > i.on")).toHaveCount(c.upgrades);
     expect(errors).toEqual([]);
   });
 
-  test("Dodge: the scope-in, a round's vote (your tap counted, ringed), DODGED; then a hit, and the battle is his", { tag: "@phone-only" }, async ({ page }) => {
+  test("Dodge: the scope-in, the warning volley, a round's vote (your tap counted, ringed), DODGED; a hit cracks your king and play goes on; the second hit, and the battle is his", { tag: "@phone-only" }, async ({ page }) => {
     test.setTimeout(180_000);
     const errors: string[] = [];
     page.on("pageerror", (e) => errors.push(e.message));
@@ -176,6 +184,8 @@ test.describe("Chandy", () => {
     await playOne(page);
     await expect.poll(() => page.evaluate(() => !!(window as any).match.phase.dodge), { timeout: 30_000 }).toBe(true);
     const d = await page.evaluate(() => (window as any).match.boss.powers.chandy.dodge);
+    // The warning volley first (no vote): "DODGE THE NEXT ONE!".
+    await expect(page.locator(".cd-result.cd-warned")).toHaveText("DODGE THE NEXT ONE!", { timeout: 10_000 });
     // Round 1: wait for the vote, tap the square safe once its teleport is done (the state knows it solo), see it counted.
     await expect(page.locator(".cd-root.cd-p-vote")).toBeVisible({ timeout: 10_000 });
     await page.waitForTimeout(S.dodgeTeleports[0]!.at(-1)! + 150);
@@ -183,18 +193,27 @@ test.describe("Chandy", () => {
     await page.getByRole("button", { name: new RegExp(`^Vote ${safe1}`) }).click();
     await expect(page.locator(".cd-pick.cd-mine .cd-count")).toHaveText("1");
     await expect(page.locator(".cd-result")).toHaveText("DODGED 1/3", { timeout: 10_000 });
-    // Round 2: a square that isn't safe: HIT! YOU LOSE, and the battle ends (the result screen).
+    // Round 2: a square that isn't safe: a hit, your king cracked, and play goes on.
+    const wrong = (safe: string) => ["d3", "e3", "f3", "d4", "e4", "f4", "d5", "e5", "f5"].find((sq) => sq !== safe)!;
     await expect(page.locator(".cd-root.cd-p-vote")).toBeVisible({ timeout: 10_000 });
-    const safe2 = d.rounds[1].safe as string;
-    const wrong = ["d3", "e3", "f3", "d4", "e4", "f4", "d5", "e5", "f5"].find((sq) => sq !== safe2)!;
     await page.waitForTimeout(S.dodgeTeleports[1]!.at(-1)! + 150);
-    await page.getByRole("button", { name: new RegExp(`^Vote ${wrong}`) }).click();
+    await page.getByRole("button", { name: new RegExp(`^Vote ${wrong(d.rounds[1].safe)}`) }).click();
+    await expect(page.locator(".cd-result")).toHaveText("HIT! KING CRACKED", { timeout: 10_000 });
+    await expect(page.locator(".cd-king.cd-cracked")).toHaveCount(1);
+    // Round 3: still cracked; a second hit: HIT! YOU LOSE, and the battle ends (the result screen).
+    await expect(page.locator(".cd-root.cd-p-vote")).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator(".cd-king.cd-cracked")).toHaveCount(1);
+    expect(await phase(page)).toBe("boss");
+    await page.waitForTimeout(S.dodgeTeleports[2]!.at(-1)! + 150);
+    await page.getByRole("button", { name: new RegExp(`^Vote ${wrong(d.rounds[2].safe)}`) }).click();
     await expect(page.locator(".cd-result")).toHaveText("HIT! YOU LOSE", { timeout: 10_000 });
+    await expect(page.locator(".cd-root.cd-p-kill")).toBeVisible();
     await expect.poll(() => phase(page), { timeout: 30_000 }).toBe("results");
     const s = await seen(page);
-    expect(s.dodge.slice(0, 4)).toEqual(["cd-p-scope", "cd-p-slide", "cd-p-open", "cd-p-vote"]);
+    expect(s.dodge.slice(0, 5)).toEqual(["cd-p-scope", "cd-p-slide", "cd-p-volley", "cd-p-open", "cd-p-vote"]);
+    expect(s.dodge).toContain("cd-p-kill");
     expect(s.kinds).toContain("dodgeWin");
-    expect(s.words).toContain("TELEPORT!");
+    expect(s.words).toEqual(expect.arrayContaining(["TELEPORT!", "DODGE THE NEXT ONE!", "HIT! KING CRACKED", "HIT! YOU LOSE"]));
     expect(errors).toEqual([]);
   });
 
@@ -225,7 +244,7 @@ test.describe("Chandy", () => {
     await expect.poll(() => phase(page), { timeout: 60_000 }).toBe("results");
     const s = await seen(page);
     expect(s.kinds).toEqual(expect.arrayContaining(["warn", "dodge"]));
-    expect(s.dodge.slice(0, 4)).toEqual(["cd-p-scope", "cd-p-slide", "cd-p-open", "cd-p-vote"]);
+    expect(s.dodge.slice(0, 5)).toEqual(["cd-p-scope", "cd-p-slide", "cd-p-volley", "cd-p-open", "cd-p-vote"]);
     expect(await page.evaluate(() => (window as any).match.boss.result)).toBe("crowd");
     expect(errors).toEqual([]);
   });

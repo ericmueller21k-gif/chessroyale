@@ -1293,6 +1293,10 @@ export const CHANDY_CUES: Readonly<Record<string, string>> = {
   flash: "three alarm blips",
   blast: "a big energy pop",
   upgrade: "the window: a part clicking on, a rising chord",
+  laser: "Dodge's beams: a proton laser firing and holding (Eric's mock-up to come: the sound chandyBeam)",
+  crack: "a Dodge hit on your king: a sharp crack (chandyCrack)",
+  crackle: "the kill: a crackling energy loop, a beat every half second (chandyCrackle)",
+  kingShatter: "your king shattering: glass-like, no gore (chandyShatter)",
 };
 
 /**
@@ -1324,6 +1328,12 @@ export const CHANDY_SOUNDS: Record<string, SoundName> = {
   flash: "hollowTick",
   blast: "gingerBlast",
 };
+
+/**
+ * Dodge's beams and hits (Eric, Nov 16): their own sounds by name (sound.ts: placeholders until Eric's: a proton laser for the beams),
+ * over his other cues. The flash keeps his.
+ */
+export const CHANDY_DODGE_SOUNDS: Record<string, SoundName> = { ...CHANDY_SOUNDS, laser: "chandyBeam", crack: "chandyCrack", crackle: "chandyCrackle", kingShatter: "chandyShatter" };
 
 /** The part of him a portrait shows (his head, lens and war paint, the rifle's barrel over his shoulder), in frame px. */
 export const CHANDY_PORTRAIT = { x: 42, y: 40, w: 58, h: 36 } as const;

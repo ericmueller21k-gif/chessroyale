@@ -1035,14 +1035,16 @@ export interface DodgeResult {
 
 /**
  * Chandy's Dodge (his ultimate), once it has come: the crowd turn it came (`at`: crowdMoves as that turn began; the crowd's turn
- * waits for it), which of the battle's (1 or 2), the crowd's king's square and the center he slides to, its three rounds, and each
- * round's result as it closes. Over after the third round, or at the first hit (the battle his).
+ * waits for it), which of the battle's (1 or 2), the crowd's king's square and the center he slides to, the warning volley's lines
+ * (they miss the king: no vote), its three rounds, and each round's result as it closes. Over after the third round, or at the
+ * second hit (chandy.dodgeHits: the battle his); the first hit cracks the king and play goes on.
  */
 export interface ChandyDodge {
   at: number;
   n: number;
   king: string;
   center: string;
+  volley?: DodgeLine[];
   rounds: DodgeRound[];
   results: DodgeResult[];
 }

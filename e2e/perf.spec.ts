@@ -316,7 +316,7 @@ test("Sawyer on a slow phone: the split, the board saw and his first saw cut sta
   }
 });
 
-test("Chandy on a slow phone: his beam's cover and Dodge's scope-in (the blur under a moving mask) stay within budget, the first time they show", { tag: "@perf" }, async ({ page }) => {
+test("Chandy on a slow phone: his beam's cover, Dodge's scope-in (the blur under a moving mask) and warning volley, its beams with a hit's crack, and the kill stay within budget, the first time they show", { tag: "@perf" }, async ({ page }) => {
   test.skip(test.info().project.name !== "phone", "one run is enough (the phone, slowed)");
   test.setTimeout(5 * 60_000);
   await page.addInitScript(instrument);
@@ -349,13 +349,25 @@ test("Chandy on a slow phone: his beam's cover and Dodge's scope-in (the blur un
   const beam = await through(() => phase(page).then((p) => p === "play"));
   expect(await page.evaluate(() => (window as any).match.boss.powers.chandy.beam?.squares.length)).toBe(15);
   // Dodge (?power=dodge: the warning as your second turn begins, Dodge as your third does): from his move to the vote, the scope-in,
-  // the slide and the blank board opening.
+  // the slide, the warning volley's beams and the blank board opening.
   await battle("dodge");
   await move();
   await move();
   const scope = await through(() => page.evaluate(() => !!document.querySelector(".cd-root.cd-p-vote")));
-  console.log(`Chandy (slowed phone): beam ${f(beam)}; Dodge's scope-in ${f(scope)}`);
-  for (const [what, s] of [["beam", beam], ["Dodge's scope-in", scope]] as const) {
+  // A wrong square in round 1 (the beams travel, hold, your king cracks) and round 2 (the kill, his shatter, the result).
+  const wrongVote = () =>
+    page.evaluate(() => {
+      const m = (window as any).match;
+      const d = m.boss.powers.chandy.dodge;
+      const safe = d.rounds[m.phase.dodge.round].safe as string;
+      m.dodgeVote(["d3", "e3", "f3", "d4", "e4", "f4", "d5", "e5", "f5"].find((sq) => sq !== safe));
+    });
+  await wrongVote();
+  const beams = await through(() => page.evaluate(() => (window as any).match.phase.dodge?.round === 1 && !!document.querySelector(".cd-root.cd-p-vote")));
+  await wrongVote();
+  const kill = await through(() => phase(page).then((p) => p === "results"));
+  console.log(`Chandy (slowed phone): beam ${f(beam)}; Dodge's scope-in ${f(scope)}; its beams and crack ${f(beams)}; the kill ${f(kill)}`);
+  for (const [what, s] of [["beam", beam], ["Dodge's scope-in", scope], ["Dodge's beams", beams], ["Dodge's kill", kill]] as const) {
     expect(s.p95, `${what}: 95th percentile frame (ms)`).toBeLessThan(50);
     expect(s.slow, `${what}: share of dropped frames`).toBeLessThan(0.15);
   }

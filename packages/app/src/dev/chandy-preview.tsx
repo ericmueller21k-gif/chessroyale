@@ -65,7 +65,7 @@ function powerItems(p: Power, since: number): BoardItem[] {
 function dodgeAt(t: number, t0: number, pick: string | undefined, onPick: (s: string) => void): DodgeView {
   const L = (rank: number, side: "left" | "right", since?: number): DodgeLine => ({ rank, side, since });
   const F = (file: string, since?: number): DodgeLine => ({ file, since });
-  const base = { side: "white" as const, king: "e1", center: "e4", round: 3 as const, onPick, mine: pick };
+  const base = { side: "white" as const, king: "e1", center: "e4", round: 3 as const, onPick, mine: pick, hits: 0 };
   if (t < 600) return { ...base, phase: "scope", since: t0, lines: [] };
   if (t < 1200) return { ...base, phase: "slide", since: t0 + 600, lines: [] };
   if (t < 1600) return { ...base, phase: "open", since: t0 + 1200, lines: [] };
@@ -86,8 +86,9 @@ function dodgeAt(t: number, t0: number, pick: string | undefined, onPick: (s: st
   const placed = pick ?? "e5";
   const hit = placed !== "e5";
   if (t < 1600 + 3000 + 700) return { ...base, phase: "locked", since: v0 + 3000, lines, placed };
-  if (t < 1600 + 3000 + 700 + 700) return { ...base, phase: "blast", since: v0 + 3700, lines, placed, result: hit ? "hit" : undefined };
-  return { ...base, phase: "result", since: v0 + 4400, lines, placed, result: hit ? "hit" : "dodged" };
+  const beams = { at: v0 + 3700, fadeAt: v0 + 3700 + 950 + 2500 - 180 };
+  if (t < 1600 + 3000 + 700 + 950) return { ...base, phase: "blast", since: v0 + 3700, lines, placed, beams };
+  return { ...base, phase: "result", since: v0 + 4650, lines, placed, beams, result: hit ? "hit" : "dodged", ...(hit ? { hits: 1, cracked: v0 + 4650 } : {}) };
 }
 
 const CSS = `

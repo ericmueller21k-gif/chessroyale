@@ -3,12 +3,15 @@
 Chandy (id `chandy`; docs/decisions/2026-11-16-chandy-rules.md; Eric's design: `DESIGN.md` on branch `stills/boss-chandy`). From
 the game so far. **Lock-on:** crosshairs on your most capturable pieces, his engine steered to take them; each one taken is an
 upgrade (5), each unlocking a move his meter fires every 6 crowd moves. **Dodge** (once a battle; his rage full 3 crowd moves after
-the fifth upgrade, or at once when the crowd can mate him): 3 rounds of a 3 s vote while clones teleport; one hit ends the battle.
+the fifth upgrade, or at once when the crowd can mate him): a warning volley, then 3 rounds of a 3 s vote while clones teleport; the
+second hit ends the battle (one hit until run D).
 
 The aims (the brief, L1, L4, L5): his crowd score inside the pack; 5 upgrades in at least 9 battles in 10, the fifth by about move
 35; if fewer, raise L3's steering margins before changing the rule. Run C's (Nov 16): Dodge in at least 85% of battles.
 
-**Shipped (run C, 32 battles; Nov 16, Eric's Dodge change, docs/decisions/2026-11-16-chandy-dodge-once.md): Dodge once a battle,
+**Run D (Nov 16, round 2, docs/decisions/2026-11-16-chandy-first-lock.md): his first capture locked and upgrade 1; a new unlock fires
+at once; Dodge's warning volley and two hits: 5 upgrades in 29 battles of 32, the fifth at move 26; Dodge in 25 of 32; the crowd
+scores 0.02 (± 0.02).** Before it, **shipped (run C, 32 battles; Nov 16, Eric's Dodge change, docs/decisions/2026-11-16-chandy-dodge-once.md): Dodge once a battle,
 his rage full `dodgeAfterMoves` 3 of your moves after the fifth upgrade, the last chance; offset −250, `takeMargin` 2, `chaseMargin`
 0.75, `lockLines` 5, the lock numbers as designed, `meterEvery` 6: Dodge in 25 battles of 32 (78%; the aim was 85%), the crowd
 scores 0.09 (± 0.05) in 44 moves; 5 upgrades in 28 battles of 32 (88%), the fifth at move 31 (median).** In the pack: Don Dough
@@ -25,9 +28,21 @@ waiting) and its shot, and each Dodge, `last` marking a last chance's (`reports/
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
 | A | 1.5 / 0.5 (the design) | 32 | 0 / 6 / 26 | 0.09 (± 0.03) | 45 | 28 (88%) | 30 | 7 | 21.0 | 5.4 | 9 (12) | 11 (0) |
 | B | 2 / 0.75 | 32 | 2 / 4 / 26 | 0.12 (± 0.05) | 47 | 30 (94%) | 30.5 | 7 | 21.6 | 5.8 | 11 (39) | 14 (0) |
-| **C** (Dodge once, 3 moves after the fifth; the pass guard's M1) | **2 / 0.75** | 32 | 2 / 2 / 28 | **0.09** (± 0.05) | 44 | **28 (88%)** | 31 | 7 | 20.8 | 5.5 | 7 (7) | **25 (0)** |
+| C (Dodge once, 3 moves after the fifth; the pass guard's M1) | 2 / 0.75 | 32 | 2 / 2 / 28 | 0.09 (± 0.05) | 44 | 28 (88%) | 31 | 7 | 20.8 | 5.5 | 7 (7) | 25 (0) |
+| **D** (Nov 16, round 2: his first capture is his first lock; a new unlock fires at once; Dodge's two hits) | **2 / 0.75** | 32 | 0 / 1 / 31 | **0.02** (± 0.02) | 43 | **29 (91%)** | **26** | 7 | 18.5 | **7.7** | 19 (14) | **25 (0)** |
 
 ## What it says
+
+- **Run D (Nov 16, Eric's round 2; `reports/boss-sim/raid-chandyD.jsonl`, seeds 11 to 14 as before):** every battle's first lock was
+  his first capture (32 of 32, at crowd move 7, median), and each was upgrade 1. **5 upgrades: 29 battles of 32 (91%, was 88%), the
+  fifth sooner (move 26, was 31).** A new unlock firing at once adds about two moves a battle (7.7, was 5.5), the queen lock most
+  (19 aimed, was 7). **Dodge: 25 battles of 32 (78%, unchanged)**, 4 crowd moves after the fifth upgrade as before. The crowd's score
+  fell to 0.02 (± 0.02; 0 wins, 1 draw), now under the pack's lowest (Don Dough 0.05): within two standard errors of run C's 0.09,
+  but the extra moves point the same way. Worth watching in real play; `fireOnUnlock` false turns it off.
+- **Dodge's two hits:** a crowd of bots still never gets hit (the plurality of 60% voters is the safe square), so the sim can't
+  measure it. Alone, finding the safe square 60% of the time (the bots' rate), one hit lost 78% of Dodges (1 − 0.6³); two hits
+  lose 35% (3 × 0.4² × 0.6 + 0.4³). At 80% a round: 49% before, 10% now. Dodge lasts about 28 s survived (was 20 s), 31.6 s at
+  most when the second hit comes in the last round.
 
 - **Run C (Dodge once, 3 moves after the fifth upgrade):** Dodge in 25 battles of 32 (78%), always 4 crowd moves after the fifth
   upgrade (3 to fill, the warning's turn), at crowd move 35 (median; run B's came at 48, in 13 battles). Every battle whose rifle

@@ -308,8 +308,9 @@ export const zebraTurnMs = (boss: { powers?: { events?: readonly { kind: string;
   powerMomentMs((boss?.powers?.events ?? []).filter((e): e is { kind: "doughRise" | "doughSquash" | "goldPlate" } => e.kind === "goldPlate" || ((e.kind === "doughRise" || e.kind === "doughSquash") && e.by === "crowd")));
 
 /**
- * Chandy's moments at the start of his turn (as the crowd's move just played landed: his first lock, the queen lock's shot): they
- * play while he thinks, so his thinking lasts at least as long (the ms; 0: none).
+ * Chandy's moments while he thinks (the queen lock's shot as his turn begins; his first lock, on the piece his first capture takes,
+ * marked as that move is about to show: the server holds the move for it, bossMoveMoment): his thinking lasts at least as long (the
+ * ms; 0: none).
  */
 export const chandyTurnMs = (boss: { powers?: { events?: readonly { kind: string; first?: boolean }[] } | null } | null | undefined): number =>
   powerMomentMs((boss?.powers?.events ?? []).filter((e): e is { kind: "lockOn" | "queenShot" } => e.kind === "queenShot" || (e.kind === "lockOn" && !!e.first)));
