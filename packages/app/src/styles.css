@@ -19425,34 +19425,14 @@ button.sq-tiny {
   will-change: transform, clip-path;
 }
 /* Phase 2's boards, each in its slot of the square, as the phase change leaves them (Recluse2.tsx's FOUR: the place and size
-   inline; a computer's tags in the gap above each board, off its back rank). */
+   inline). */
 .rc-stage > .rc-played {
   inset: auto;
 }
-/* Each board's squares placed in its slot so the gaps match (Eric, Nov 14): the squares are a whole multiple of 8 device pixels,
-   a hair smaller than the slot (the rest, d). Centered on a phone (d/2); a computer's 2x2 moves its left and top boards 2d/3 in
-   and its right and bottom ones d/3, so the gap between them and to the square's edges is the same. The whole wrap moves: its
-   overlays with it. */
+/* Each board's squares centered in its slot (Eric, Nov 14): the squares are a whole multiple of 8 device pixels, a hair smaller
+   than the slot. The whole wrap moves: its overlays with it. */
 .rc-stage > .rc-played > .board-wrap {
-  --rc-ox: 1.5;
-  --rc-oy: 1.5;
-  translate: calc((100% - var(--board-size)) * var(--rc-ox) / 3) calc((100% - var(--board-size)) * var(--rc-oy) / 3);
-}
-.rc-desk .rc-played.rc-q0 > .board-wrap,
-.rc-desk .rc-played.rc-q2 > .board-wrap {
-  --rc-ox: 2;
-}
-.rc-desk .rc-played.rc-q1 > .board-wrap,
-.rc-desk .rc-played.rc-q3 > .board-wrap {
-  --rc-ox: 1;
-}
-.rc-desk .rc-played.rc-q0 > .board-wrap,
-.rc-desk .rc-played.rc-q1 > .board-wrap {
-  --rc-oy: 2;
-}
-.rc-desk .rc-played.rc-q2 > .board-wrap,
-.rc-desk .rc-played.rc-q3 > .board-wrap {
-  --rc-oy: 1;
+  translate: calc((100% - var(--board-size)) / 2) calc((100% - var(--board-size)) / 2);
 }
 /* The crack lines: Sawyer's board-saw gap down the middle, and the same turned across. */
 .rc-crack {
@@ -19578,8 +19558,8 @@ button.sq-tiny {
 .rc-tag.low .rc-tag-clock {
   color: #ff7a7a;
 }
-/* A computer's four boards: the tag in the gap above each (FOUR in Recluse2.tsx), at its left, off its back rank; its
-   text in the board's own width (cqw), so it fits the row at any size. The slow-move note likewise, at its right. */
+/* The big board's tag (the name of a board you watch) in the gap above it, at its left, off its back rank; its text in the board's
+   own width (cqw), so it fits at any size. The slow-move note likewise, at its right. */
 .rc-played .rc-tag {
   top: auto;
   bottom: calc(100% + 1px);
@@ -19616,6 +19596,12 @@ button.sq-tiny {
 .rc-mini .rc-tag-clock {
   flex: none;
 }
+/* (A computer's small boards are bigger than a phone's: their tags a little bigger too, in the tag row's height, 3.5% of the
+   square: about a tenth of the board's own width.) */
+.rc-desk .rc-mini .rc-tag {
+  font-size: min(13px, 10.5cqw);
+  line-height: 1.3;
+}
 /* A decided board: its result across its middle. */
 .rc-result {
   position: absolute;
@@ -19641,7 +19627,7 @@ button.sq-tiny {
 .rc-result.lost {
   color: #ff8a8a;
 }
-/* A phone: the other three boards small in a row above yours, inside the square (FOUR); tap one to watch it big. */
+/* The other three boards small in a row above yours, inside the square (FOUR); tap one to watch it big. */
 /* Each board keeps its own layers (pieces, tags, results) to itself, so nothing on it shows through his words: his
    bubble sits over every board, whatever their own stacking (Eric, Oct 14: a long line was cut off by the boards). */
 .rc-mini,

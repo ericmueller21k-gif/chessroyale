@@ -48,7 +48,7 @@ export interface ShopDef {
   /** Where you stand to talk (room.ts Room.talkAt: Don Dough's, the foot of his table); none: within talking range of `keeper`. */
   talkAt?: readonly Sq[];
   /** The Shopkeeper: the boss's kid (its sheet's name in town/sidekicks/), drawn at `at` (a square, fractions allowed). */
-  kid: "babur" | "puddles" | "alfil" | "bigboy" | "timber" | "blitz" | "hollowdog" | "rooster" | "dealer" | "elf" | "folioturtle" | "smudgykeeper" | "funkeeper" | "zebrakeeper";
+  kid: "babur" | "puddles" | "alfil" | "bigboy" | "timber" | "blitz" | "hollowdog" | "rooster" | "dealer" | "elf" | "folioturtle" | "smudgykeeper" | "funkeeper" | "zebrakeeper" | "swampkeeper";
   at: readonly [number, number];
   /**
    * Drawn at the art's own size, this many of the room's pixels (37 a square) from its feet to the top of its idle, rather than the
@@ -76,7 +76,7 @@ export interface ShopDef {
    * night-purple ceiling hung with strings of bulbs, a bakery's warm ceiling of light beams, or its back room's dark rafters (drawn by
    * the game, not the art: as the mockup did).
    */
-  roof: "tent" | "glass" | "stone" | "nursery" | "lodge" | "store" | "cave" | "barn" | "warehouse" | "igloo" | "paper" | "studio" | "arcade" | "bakery" | "backroom";
+  roof: "tent" | "glass" | "stone" | "nursery" | "lodge" | "store" | "cave" | "barn" | "warehouse" | "igloo" | "paper" | "studio" | "arcade" | "bakery" | "backroom" | "sky";
   /**
    * The chat log's text over the room (Eric, Nov 2: "white, or black, depending on darkness of background in the shop"): "night" for
    * a dark room (white words on a dark tint: Babur's tent), "day" for a light one (dark words on a light tint: Puddles' greenhouse),
@@ -135,6 +135,10 @@ export const SHOPS: Readonly<Partial<Record<HomeId, ShopDef>>> = {
   // baker's cap behind the counter, left of the register, facing into the room (the art's SHOP_ZEBRA_KEEPER), drawn at his art's size
   // (73 px). He has no name: "Shopkeeper". No crate yet (his items come later): Talk has him say one of his lines. A bright bakery:
   // the day tone. Its back room is BACK_ROOMS'.
+  // Chandy's Swamp (Nov 16; an admin's town only while he's in the game for admins first): the old bullfrog in his bucket hat behind
+  // the middle of the stand on stilts at the back, drawn at his art's size (40 px). He has no name: "Shopkeeper". No roof but the
+  // town's sky (`sky`); a swamp under the open sky: the day tone. His crate isn't sold yet (core has no Boss Crate of Chandy's: the item-builder's), so Talk has him say a line, as Rolling Dough's.
+  chandy: { home: "chandy", boss: "Chandy", crate: null, says: ["Crates come in on the next boat. Gators don't rush.", "Watch your step. Some of these logs bite.", "Chandy? He's out there. You won't see him till he wants you to."], kid: "swampkeeper", at: [9.5, 2.3], tall: 40, keeper: [{ c: 9, r: 2 }, { c: 10, r: 2 }], prizes: [], roof: "sky", chatTone: "day" },
   zebra: { home: "zebra", boss: "Don Dough", crate: null, says: ZEBRA_BACK_LINES, kid: "zebrakeeper", at: [12.5, 7.3], tall: 73, flip: true, keeper: [{ c: 12, r: 7 }, { c: 13, r: 7 }], prizes: [], roof: "bakery", chatTone: "day" },
 };
 

@@ -1914,6 +1914,8 @@ export const BOSS_POWERS = {
 // (Nov 13: "recluse", the Hidden Boss, was here for a day, so his walk-up was an admin's only; Eric, Nov 13: "It doesn't need to be admin
 // only... the site is behind Cloudflare": out again, his building, rooms and challenge for everyone signed in. His Boss Battle tile
 // stays locked: he's `adminOnly` in the roster, met only from his room and the Crowd's final.)
+// (Nov 16: "chandy": his home, Chandy's Swamp, came first, in an admin's town only, as Timber's and Dash's did; then his rules
+// (docs/decisions/2026-11-16-chandy-rules.md): in the roster now, an admin's in every mode until Eric says go.)
 export const BOSS_ADMIN_FIRST: readonly string[] = ["timber", "dash", "zebra", "chandy"];
 
 /**
