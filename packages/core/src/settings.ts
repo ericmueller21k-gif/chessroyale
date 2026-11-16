@@ -1159,12 +1159,13 @@ export const BOSS_POWERS = {
    * Then he adds time per move (Eric, Oct 14, after playing it again: "1 min too short, needs to be 1+1 or even 1+2... a
    * few moves, say 3, with 1+0, then he says a comment about it and suggests adding time per move"): the crowd plays the
    * bullet clock's first bulletPlainMoves moves on the bank alone (1+0); as the next crowd turn begins he says so (his
-   * line, then "+2 s a move from now on" across the board), and from then on each move made in time adds
-   * bulletIncrementSeconds to that player's bank (1+2: the more forgiving of Eric's two, as 1:00 alone felt too short).
+   * line, then "+10 s a move from now on" across the board), and from then on each move made in time adds
+   * bulletIncrementSeconds to that player's bank: 1+10 (Eric, Nov 16, after playtesting: "instead of 2 seconds, it should go up
+   * to 10 seconds per move ... we're essentially nerfing him ... because he's too powerful right now"; it was 1+2).
    * No cap on the bank: it grows by at most this a move, over at most bossMaxMoves moves. Estimates, not sim-tested.
    */
   bulletPlainMoves: 3,
-  bulletIncrementSeconds: 2,
+  bulletIncrementSeconds: 10,
   /** The meter glows from this full (0-1) as it nears its ultimate. */
   rageGlowFrom: 0.75,
   /**

@@ -201,6 +201,53 @@ export function smoothPath(pts: readonly Pt[]): string {
   return `${d} L${f(last[0])} ${f(last[1])}`;
 }
 
+/** How a cut heart looks `t` ms after its cut (slashLook): its blade's glint, the blade's stroke, the two halves, the board's grey. */
+export interface SlashLook {
+  /** The glint of his blade drawn back past the heart's top-right corner, in fractions of the heart; null once it has gone through. */
+  glint: { x: number; y: number; o: number; s: number } | null;
+  /** The stroke across the heart (its length 0 to 1, from the top-right corner down to the bottom-left; its opacity), or null. */
+  blade: { len: number; o: number } | null;
+  /** The two halves (the upper left's, the lower right's): their shift (fractions of the heart), turn (degrees) and opacity. */
+  a: { x: number; y: number; r: number; o: number };
+  b: { x: number; y: number; r: number; o: number };
+  /** Done: the slot shows the empty heart alone. */
+  done: boolean;
+  /** A board lost to it (its last heart): how grey it is (0 to 1), and its word's opacity ("TOO SLOW"). */
+  grey: number;
+  word: number;
+}
+
+const easeIn = (x: number) => x * x * x;
+const easeOut = (x: number) => 1 - (1 - x) ** 3;
+const unit = (x: number) => Math.max(0, Math.min(1, x));
+
+/**
+ * A heart cut, `t` ms after its cut began (Eric, Nov 16: "a slash with a wind-up (slow) then a fast follow-through across the heart,
+ * the heart cut in half, both halves sliding apart and fading"; no flash): for `windMs` his blade's glint draws back past the heart's
+ * top-right corner, slowly and then faster; it goes through in `bladeMs`, the stroke fading after; the halves slide apart along the
+ * cut and fade until `ms`. A board whose last heart it was greys from the cut over `greyMs` ("wasted"), its word fading in as it
+ * does. Pure: the screen draws it from the time since the cut, so a board drawn again mid-cut carries on from where it was.
+ */
+export function slashLook(t: number, s: { windMs: number; ms: number; greyMs: number } = RECLUSE_PHASE2.slash): SlashLook {
+  const bladeMs = 90;
+  const wind = unit(t / s.windMs);
+  const after = t - s.windMs;
+  const glint = t < s.windMs ? { x: 0.7 + 0.35 * easeIn(wind), y: -0.15 - 0.35 * easeIn(wind), o: unit(wind * 2.5), s: 0.5 + 0.5 * wind } : null;
+  const blade = after >= 0 && after < bladeMs + 260 ? { len: easeOut(unit(after / bladeMs)), o: 1 - unit((after - bladeMs) / 260) } : null;
+  const apart = easeOut(unit(after / (s.ms - s.windMs)));
+  const fade = unit((after - 120) / (s.ms - s.windMs - 120));
+  const grey = unit(after / s.greyMs);
+  return {
+    glint,
+    blade,
+    a: { x: -0.32 * apart, y: -0.26 * apart, r: -16 * apart, o: 1 - fade },
+    b: { x: 0.3 * apart, y: 0.3 * apart, r: 14 * apart, o: 1 - fade },
+    done: t >= s.ms,
+    grey: grey * grey * (3 - 2 * grey),
+    word: unit((after - 0.35 * s.greyMs) / 600),
+  };
+}
+
 /**
  * His line as one of your hearts is cut (`left`: how many you have left after it; Eric, Nov 16: harder as they run out): a taunt
  * while 3 or more are left, in turn from your first; at 2 and 1 the harder ones; the last (`pick`: which of its lines), as your

@@ -26,13 +26,14 @@ export const RECLUSE_LINES = {
   bullet: ["Stop calculating. Just play!", "Stop staring. Pure chess. Move!", "All that thinking, no idea. Hurry!"],
   /**
    * A few moves into the bullet clock, he adds time per move (Eric, Oct 14): grudging, too fast even for real chess. One,
-   * picked by the battle (placeholders: ours, not his words; the clock that adds time per move was his own invention, so
-   * a line may hint at it, never as a quote). The number is on the board, not in the line (it's a setting).
+   * picked by the battle (placeholders: ours, not his words). Eric, Nov 16: "It just says time per move. Make it say something that
+   * makes more sense"; each whole in his bubble on a phone (two short rows), naming the seconds in words (a test keeps them the
+   * setting's, BOSS_POWERS.bulletIncrementSeconds).
    */
   bulletPlus: [
-    "Too fast, even for real chess. Fine. A little time on every move.",
-    "This is a lottery, not chess. Time per move, then. My own idea, you know.",
-    "Bah. Nobody plays real chess this fast. I'll add time to every move.",
+    "This is a lottery, not chess. Fine: ten seconds a move.",
+    "Too fast, even for real chess. Take ten seconds a move.",
+    "Nobody plays real chess this fast. Ten seconds a move.",
   ],
   /** The God King's help tried, and blocked (he slams the book shut): one, in turn. */
   mock: [

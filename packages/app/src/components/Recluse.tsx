@@ -23,7 +23,7 @@ import { hash, type BossUi, type KitMoment, type MomentProps } from "./PowerPart
  *   his hair in the wind, laughing; holds the spell; slams it shut. His line as it begins; "BULLET!" as the book falls
  *   open. From then on the dock says "Bullet" with the time left in your bank on every move (Play.tsx).
  * - **He adds time per move** (Eric, Oct 14), a few moves into it (`bulletPlus`): his line as he consults the book, then
- *   "+2 s a move from now on" across the board's middle until your clock starts; the dock's "Bullet 1+2" from then on.
+ *   "+10 s a move from now on" across the board's middle until your clock starts; the dock's "Bullet 1+10" from then on.
  * - **The God King's help blocked** (his passive): tapping the God King's move or strike, the help doesn't come but the
  *   charge is spent as if it had (SoloMatch.callKing; online NetMatch.callKing, the lobby spending it); he slams the book
  *   shut and mocks it, and the God King says his help won't take hold (on the device that tried: the others see the
@@ -48,7 +48,7 @@ export const bulletOn = (boss: Pick<BossView, "powers" | "result"> | null | unde
 export const bulletIncrementOn = (boss: Pick<BossView, "powers" | "result"> | null | undefined): number =>
   bulletOn(boss) ? bulletIncrementAt(boss!.powers!.turn, boss!.powers!.ultAt) : 0;
 
-/** The bullet clock as a chess time control: "1+2" (the bank in minutes, plus the increment), once he has added one. */
+/** The bullet clock as a chess time control: "1+10" (the bank in minutes, plus the increment), once he has added one. */
 export const bulletControl = (inc: number): string => `${Math.round((BOSS_POWERS.bulletBankSeconds / 60) * 100) / 100}+${inc}`;
 
 /** The God King's help doesn't work against this boss (the Hidden Boss's passive). */

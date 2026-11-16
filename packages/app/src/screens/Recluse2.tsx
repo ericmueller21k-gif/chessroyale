@@ -1,7 +1,7 @@
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "preact/hooks";
 import { createPortal, memo } from "preact/compat";
 import { RECLUSE_PHASE2 } from "@chessroyale/core";
-import { moveLeft } from "@chessroyale/chess";
+import { bankLeft } from "@chessroyale/chess";
 import { CHANGE_HANDS } from "../characters/recluse-transform.ts";
 import { RecluseTransform } from "../components/RecluseTransform.tsx";
 import { recluseSceneStand, useRect } from "../components/RecluseCutscene.tsx";
@@ -21,7 +21,8 @@ import { BossPanel, STRIP_LAYOUT, besideBoard, useBossLayout } from "../componen
 import { UnderBoard, useMedia } from "../components/QuickChat.tsx";
 import type { GameView, SimulBoardView, SimulView } from "../game.ts";
 import type { ComponentChildren } from "preact";
-import { ARC_LIFE, ARC_REDRAW, ARC_STRIKES, PHASE_CHANGE, phase2UltBannerMs, arcPoints, smoothPath, type ArcStrike } from "../recluse-phase2.ts";
+import { ARC_LIFE, ARC_REDRAW, ARC_STRIKES, PHASE_CHANGE, arcPoints, smoothPath, type ArcStrike } from "../recluse-phase2.ts";
+import { Hearts, TOO_SLOW_WORD, wastedLook } from "../components/RecluseHearts.tsx";
 import { CRITICAL, NORMAL, VoiceBubble, bossVoice } from "../speech.tsx";
 import { Hud } from "./Hud.tsx";
 import { useStillKey } from "../hooks.ts";
@@ -46,8 +47,8 @@ const QUARTER_BOARD = [1, 2, 0, 3] as const;
 type Slot = { x: number; y: number; s: number };
 /**
  * The square's rows, as fractions of it: a `tag` row at the top for the small boards' names and clocks, the three small boards
- * (`mini` each, equal gaps across), and the big board (`big`) at the square's bottom, centered (the slow-move marks in the room at
- * its right), the rest the gap between the rows (a watched board's name in it).
+ * (`mini` each, equal gaps across), and the big board (`big`) at the square's bottom, centered (its hearts in the room at its
+ * right), the rest the gap between the rows (a watched board's name in it).
  */
 type Rows = { tag: number; mini: number; big: number };
 /** A phone's. */
@@ -298,6 +299,7 @@ export function PhaseChangeScreen({ match, at }: { match: GameView; at: number }
 const RESULT_WORD = (b: SimulBoardView) => {
   const r = b.result!;
   if (r.winner === "draw") return "Draw";
+  if (r.how === "slow") return "Too slow";
   const how = r.how === "time" ? " on time" : r.how === "resign" ? ": resigned" : "";
   return r.winner === "crowd" ? "Won" : `Lost${how}`;
 };
@@ -309,11 +311,11 @@ const RESULT_WORD = (b: SimulBoardView) => {
  */
 function Tag({ b, v, now, big }: { b: SimulBoardView; v: SimulView; now: number; big?: boolean }) {
   if (big) return b.you ? null : <span class="rc-tag">{b.name}</span>;
-  // (His ultimate: the move's own few seconds, not the bank. Paused online (his move late): where it stood as the pause began.)
+  // (Paused online (his move late): where it stood as the pause began.)
   const paused = v.paused ?? null;
-  const left = moveLeft(v, b, paused ?? now);
+  const left = bankLeft(b, paused ?? now);
   const running = v.playing && b.toMove === "crowd" && paused === null;
-  const low = running && left < (v.ultAt !== null ? 2_000 : 15_000);
+  const low = running && left < 15_000;
   return (
     <span class={`rc-tag${b.you ? " you" : ""}${running ? " running" : ""}${low ? " low" : ""}`}>
       <span class="rc-tag-name">{b.name}</span>{" "}
@@ -328,68 +330,33 @@ export const NO_RESULT_WORD = "No result";
 /** The dock's words (and the results screen's) when the fight ended with no result: his move never came from the engine server. */
 export const NO_RESULT_LINE = "No result: the Hidden Boss couldn't connect.";
 
-function Outcome({ b, v }: { b: SimulBoardView; v: SimulView }) {
+function Outcome({ b, v, now }: { b: SimulBoardView; v: SimulView; now: number }) {
   if (!b.result) return v.noResult ? <span class="rc-result">{NO_RESULT_WORD}</span> : v.paused != null ? <span class="rc-result">{PAUSED_WORD}</span> : null;
+  // (Lost to its last heart: its word over the board as it greys, "wasted" style; Eric, Nov 16.)
+  const w = wastedLook(b, now);
+  if (w) return <span class="rc-wasted-word" style={{ opacity: w.word }}>{TOO_SLOW_WORD}</span>;
   return <span class={`rc-result ${b.result.winner === "crowd" ? "won" : b.result.winner === "boss" ? "lost" : "draw"}`}>{RESULT_WORD(b)}</span>;
 }
 
-/** How long a slow move's board flashes its marks and shows its note (ms). */
-const SLOW_NOTE_MS = 1800;
-/** A pixel X (5 x 5) in a 7 x 7 cell. */
-const X_PIXELS = [[1, 1], [5, 1], [2, 2], [4, 2], [3, 3], [2, 4], [4, 4], [1, 5], [5, 5]] as const;
-
-/**
- * The team's slow moves (Eric, Oct 14): a slot each up to his ultimate (RECLUSE_PHASE2.slowMovesForUlt), a red pixel X
- * for each slow move so far, the rest dim; in a column by the right edge of your board only (Eric, Oct 14: the count is the
- * team's, the same on every board, so once is enough), as Jefferson's candle shots stand beside his: by the big board (yours,
- * or the one you're watching). They flash at every slow move, whoever's.
- */
-function SlowMarks({ n, flash }: { n: number; flash: boolean }) {
-  const of = RECLUSE_PHASE2.slowMovesForUlt;
-  const cells = Array.from({ length: of }, (_, i) => {
-    return (
-      <g key={i} transform={`translate(0 ${i * 8})`}>
-        <rect width="7" height="7" class="rc-slow-cell" />
-        {i < n ? X_PIXELS.map(([px, py]) => <rect key={`${px}${py}`} x={px} y={py} width="1" height="1" class="rc-slow-x" />) : <rect x="2" y="2" width="3" height="3" class="rc-slow-empty" />}
-      </g>
-    );
-  });
-  return (
-    <span class={`rc-slow col${flash ? " flash" : ""}`} role="img" aria-label={`Slow moves: ${n} of ${of}`} data-slow={n}>
-      <span class="rc-slow-label" aria-hidden="true">
-        slow
-      </span>
-      <svg viewBox={`0 0 7 ${of * 8 - 1}`} shape-rendering="crispEdges" aria-hidden="true">
-        {cells}
-      </svg>
-    </span>
-  );
-}
-
-/**
- * One phase 2 board: yours takes moves on your turn. `marks`: the team's slow moves beside it (one board shows them).
- * `big`: the big board.
- */
-function SimulBoard({ match, v, b, now, small, big, marks: withMarks, count, children }: { match: GameView; v: SimulView; b: SimulBoardView; now: number; small?: boolean; big?: boolean; marks?: boolean; count?: number | null; children?: ComponentChildren }) {
+/** One phase 2 board: yours takes moves on your turn, its hearts at its right. `big`: the big board. */
+function SimulBoard({ match, v, b, now, small, big, count, children }: { match: GameView; v: SimulView; b: SimulBoardView; now: number; small?: boolean; big?: boolean; count?: number | null; children?: ComponentChildren }) {
   const mine = b.you && v.playing && b.toMove === "crowd" && v.paused == null && !v.decided;
-  const recent = !!v.lastSlow && now - v.lastSlow.at < SLOW_NOTE_MS;
-  // (The note marks the board the slow move was on; the marks flash at any slow move.)
-  const flash = recent && v.lastSlow!.board === b.id;
-  const n = Math.min(v.slow, RECLUSE_PHASE2.slowMovesForUlt);
-  // (The same element while its count and flash stand: the screen draws every frame, the marks only when they change.)
-  const marks = useMemo(() => <SlowMarks n={n} flash={recent} />, [n, recent]);
   return (
     <Board fen={b.fen} orientation="white" lastMove={b.lastMove} interactive={mine} onMove={(m) => match.simulMove?.(b.id, m)} small={small} silent={!b.you}>
       <Tag b={b} v={v} now={now} big={big} />
-      <Outcome b={b} v={v} />
-      {v.playing && withMarks && marks}
-      {/* (Which board the last slow move was on: a small note over its top-right corner, for a moment.) */}
-      {flash && <span class="rc-slow-note">slow move</span>}
+      <Outcome b={b} v={v} now={now} />
+      <Hearts b={b} now={now} />
       {/* (Before the clocks run: the countdown, big on every board; "Get ready" over yours.) */}
       {count != null && count > 0 && <CenterCount label={b.you ? "Get ready" : null} n={count} />}
       {children}
     </Board>
   );
+}
+
+/** A board lost to its last heart greys out (its cell's --rc-grey, 0 to 1: styles.css .rc-wasted), or nothing. */
+function wastedStyle(b: SimulBoardView, now: number): { cls: string; style: Record<string, number> } {
+  const w = wastedLook(b, now);
+  return w ? { cls: " rc-wasted", style: { "--rc-grey": Math.round(w.grey * 1000) / 1000 } } : { cls: "", style: {} };
 }
 
 /** His phase 2: four boards at once. */
@@ -422,16 +389,11 @@ export function SimulScreen({ match }: { match: GameView }) {
   // (Online a Crowd final's watcher has no board: none is "yours".)
   // (Paused online, his move late: nobody's turn runs; ended with no result: none.)
   const yourTurn = v.playing && mine.you && mine.toMove === "crowd" && v.paused == null && !v.decided;
-  // His ultimate as it comes: "5 SECONDS!" over the boards.
-  // (On every board at once; nobody waits for it: the 5 s start now.)
-  const ultOn = v.ultAt !== null && now - v.ultAt < phase2UltBannerMs();
-  // (Its name alone: what it means, "5 s a move, or a random one", is the dock's.)
-  const ultBanner = ultOn && <FightBanner text={`${RECLUSE_PHASE2.ultMoveSeconds} SECONDS!`} tone="boss" sound="bannerStart" ms={phase2UltBannerMs()} />;
 
   // Your board's clock in the dock (DockClock): running on your move, holding (undefined) while he answers, none (null)
   // once your board is decided or before the clocks start.
   const run: DockClockRun | null | undefined =
-    mine.result || !v.playing || !mine.you || v.noResult ? null : yourTurn && mine.turnAt !== null ? { startsAt: mine.turnAt, deadline: mine.turnAt + (v.ultAt !== null ? RECLUSE_PHASE2.ultMoveSeconds * 1000 : mine.bankMs) } : undefined;
+    mine.result || !v.playing || !mine.you || v.noResult ? null : yourTurn && mine.turnAt !== null ? { startsAt: mine.turnAt, deadline: mine.turnAt + mine.bankMs } : undefined;
   // (How many are won: the boss bar's right side.)
   const status = v.noResult
     ? NO_RESULT_LINE
@@ -450,8 +412,7 @@ export function SimulScreen({ match }: { match: GameView }) {
         ? "Your move"
         : "The boss is thinking…";
   return (
-    // (The small boards' "5 s!" as his ultimate comes, from the setting: styles.css, .rc-ult .rc-mini.)
-    <div class={`screen game boss-screen rc-simul ${computer ? "rc-desk" : "rc-phone"}${ultOn ? " rc-ult" : ""}`} style={{ "--rc-ult-note": `"${RECLUSE_PHASE2.ultMoveSeconds} s!"` }}>
+    <div class={`screen game boss-screen rc-simul ${computer ? "rc-desk" : "rc-phone"}`}>
       {hud}
       <div class="board-area">
         <div class="board-row">
@@ -460,15 +421,22 @@ export function SimulScreen({ match }: { match: GameView }) {
           {evalBarOn() && <div class="eval-bar rc-evalgap" aria-hidden="true" />}
           {/* (The four boards inside phase 1's one board's square: FOUR.) */}
           <div class="board-wrap rc-stage">
-            <div key={`big${big.id}`} class="rc-cell rc-played rc-big" style={slotStyle(slots[0]!)}>
-              <SimulBoard match={match} v={v} b={big} now={now} big marks count={count} />
-            </div>
-            {others.map((b, i) => (
-              <button type="button" key={b.id} class={`rc-cell rc-played rc-mini${b.you ? " you" : ""}`} style={slotStyle(slots[i + 1]!)} aria-label={b.you ? "Back to your board" : `Watch ${b.name}'s board`} onClick={() => setWatch(b.id)}>
-                <SimulBoard match={match} v={v} b={b} now={now} small count={count} />
-              </button>
-            ))}
-            {ultBanner}
+            {(() => {
+              const w = wastedStyle(big, now);
+              return (
+                <div key={`big${big.id}`} class={`rc-cell rc-played rc-big${w.cls}`} style={{ ...slotStyle(slots[0]!), ...w.style }}>
+                  <SimulBoard match={match} v={v} b={big} now={now} big count={count} />
+                </div>
+              );
+            })()}
+            {others.map((b, i) => {
+              const w = wastedStyle(b, now);
+              return (
+                <button type="button" key={b.id} class={`rc-cell rc-played rc-mini${b.you ? " you" : ""}${w.cls}`} style={{ ...slotStyle(slots[i + 1]!), ...w.style }} aria-label={b.you ? "Back to your board" : `Watch ${b.name}'s board`} onClick={() => setWatch(b.id)}>
+                  <SimulBoard match={match} v={v} b={b} now={now} small count={count} />
+                </button>
+              );
+            })}
           </div>
         </div>
       </div>
@@ -477,7 +445,7 @@ export function SimulScreen({ match }: { match: GameView }) {
         still={still}
         secs={run ? Math.ceil(clockLeft(run, now) / 1000) : null}
         status={status}
-        line={big.id !== mine.id ? "back" : mine.result ? "" : !v.playing && !v.decided ? "ready" : v.ultAt !== null ? "ult" : ""}
+        line={big.id !== mine.id ? "back" : mine.result || v.decided ? "" : !v.playing ? "ready" : "hearts"}
         onBack={back}
         runFrom={run ? run.startsAt : null}
         runTo={run ? run.deadline : null}
@@ -509,7 +477,7 @@ const SimulDock = memo(function SimulDock({
   still: string;
   secs: number | null;
   status: string;
-  line: "back" | "ult" | "ready" | "";
+  line: "back" | "hearts" | "ready" | "";
   onBack: () => void;
   runFrom: number | null;
   runTo: number | null;
@@ -523,8 +491,8 @@ const SimulDock = memo(function SimulDock({
       // (The God King stays in his place, his powers greyed: he can't be called in phase 2. Eric, Nov 14.)
       king="benched"
       panel={panel}
-      // Your board's clock at the box's right: its bank (from his ultimate, the few seconds a move) running on your move,
-      // holding while he answers; none once your board is decided or before the clocks start.
+      // Your board's clock at the box's right: its bank running on your move, holding while he answers; none once your board is
+      // decided or before the clocks start.
       clock={runFrom !== null && runTo !== null ? { startsAt: runFrom, deadline: runTo } : held ? undefined : null}
       status={
         <>
@@ -540,12 +508,12 @@ const SimulDock = memo(function SimulDock({
               </button>
             ) : line === "ready" ? (
               "No added time."
-            ) : line === "ult" ? (
-              // (His ultimate: a few seconds a move, then a random one is played for you; the seconds are your clock.)
-              `${RECLUSE_PHASE2.ultMoveSeconds} s a move, or a random one`
+            ) : line === "hearts" ? (
+              // (Your move's rule while your board plays, in plain words (Eric, Nov 16): the hearts at its right; the number told is the
+              // setting's, never the allowance the server judges with.)
+              `Over ${RECLUSE_PHASE2.slowMoveSeconds} s on a move costs a heart`
             ) : (
-              // (Your board decided, or the slow moves themselves: the marks beside every board; your time: the clock at
-              // the box's right.)
+              // (Your board decided: its own tag says how; your time: the clock at the box's right.)
               ""
             )}
           </span>
