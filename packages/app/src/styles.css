@@ -9641,6 +9641,16 @@ button.fd-logo {
  * under the live line, and "See your result" if you played it. Phones: the button gets its own line.
  */
 .fd-notice {
+  /* A pop-up (Eric, Nov 16: "these style pop-ups always just sit on top of everything else ... They shouldn't ever push
+     anything around"): floating over the screen, centered under the page header, so it takes no space in the flow.
+     Above the page (50), under the sheets (59 and up). On a computer it centers over the middle column. */
+  position: fixed;
+  z-index: 50;
+  top: calc(env(safe-area-inset-top) + 72px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(480px, calc(100vw - 32px));
+  box-sizing: border-box;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -9649,6 +9659,7 @@ button.fd-logo {
   border: 1px solid var(--fd-line);
   border-radius: 14px;
   padding: 6px 6px 6px 14px;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.25);
 }
 .fd-notice-flag {
   flex: none;
@@ -12774,10 +12785,14 @@ button.fd-seat {
     max-width: none;
     container: rd-page / inline-size;
   }
-  .fd-root.framed .rd-page > :is(.fd-page-head, .fd-notice, .bs-select, .rd-options, .rd-about, .fd-rest, .fd-hint, .fd-error) {
+  .fd-root.framed .rd-page > :is(.fd-page-head, .bs-select, .rd-options, .rd-about, .fd-rest, .fd-hint, .fd-error) {
     width: 100%;
     max-width: 496px;
     margin-inline: auto;
+  }
+  /* A computer's pop-up centers over the middle column (between the side menu and the rail), not the window. */
+  .fd-root.framed .fd-notice {
+    left: calc(50% + (var(--fd-menu) - var(--fd-rail)) / 2);
   }
   /* Two rows when the page's width (the column less its padding) is 660 px or more: cards of 90 px or more, the 17 tiles of
      an admin's two rows of nine and eight at 1280 px wide. Narrower keeps six a row (Nov 12). Each row of cards is one

@@ -22,6 +22,14 @@ removed (old → new) and says whether any of them guards a rule here.
     again. But there may be some use cases…"
   - Decisions: [2026-10-18-home-steady-layout.md](../decisions/2026-10-18-home-steady-layout.md),
     [2026-10-25-home-panel-back.md](../decisions/2026-10-25-home-panel-back.md).
+- **Pop-up notices sit on top of the screen and never push anything** (Eric, Nov 16: "Look at how it pushed everything down.
+  We should make these style pop-ups always just sit on top of everything else ... They shouldn't ever push anything around on
+  the screen"). A note or a closed-party message floats over the screen under the page header (`.fd-notice`, fixed), and what's
+  under it keeps its box, showing or dismissed.
+  - Guard: `e2e/lobby-close.spec.ts`, "a pop-up note floats over the screen and pushes nothing: home (PLAY) and Boss Battle (a
+    closed party: its first tile, its first way to play)", phone and computer: the boxes are equal to 1 px with the note showing and
+    after its X, and the note is on top (the element at its middle is inside it).
+  - Decision: [2026-11-16-notices-on-top.md](../decisions/2026-11-16-notices-on-top.md).
 - **No platform named means both.** When Eric doesn't say "phone" or "computer", a change is for both. When unsure, ask.
   (Eric, Oct 25.)
 - **Simple beats flashy** (Eric, Oct 14): the least code, the least lag on a phone, the fewest ways to break.
