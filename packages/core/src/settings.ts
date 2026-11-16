@@ -1890,7 +1890,8 @@ export const BOSS_POWERS = {
    * - **Dodge** (his ultimate, once a battle: maxUltimates.chandy; Eric, Nov 16: "He only ults once per game, no matter what"; "It
    *   should fire after he gets all 5 upgrades ... it should be ulting most games"): his rage meter is dimmed until the rifle is whole,
    *   then fills over `dodgeAfterMoves` of your moves (nothing else fills or drains it); full, the usual warning, then Dodge as your
-   *   next turn begins. **Last chance** (Eric, Nov 16): as your turn begins, if he hasn't used it and you have a move that mates him,
+   *   next turn begins. Eric, Nov 16: 1 (was 3): "It should come a turn later, he should say something about preparing yourself, and
+   *   then after you move it begins." **Last chance** (Eric, Nov 16): as your turn begins, if he hasn't used it and you have a move that mates him,
    *   Dodge comes now, whatever his rifle or meter (the warning with it); you may still play the mate after. First the warning volley
    *   (Eric, Nov 16: "an additional shot first that you can't move"): the clones fire once on lines that miss your king, no vote, then
    *   "Dodge the next one!" (`dodgeVolleyMs` in all, the clones aiming `dodgeAimMs` first). Then `dodgeRounds` rounds, each a
@@ -1934,7 +1935,7 @@ export const BOSS_POWERS = {
     dodgeKillMs: 5000,
     dodgeShatterMs: 1000,
     dodgeBotHit: 0.6,
-    dodgeAfterMoves: 3,
+    dodgeAfterMoves: 1,
   },
 } as const;
 

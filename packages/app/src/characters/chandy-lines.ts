@@ -21,7 +21,7 @@ export const CHANDY_LINES: Partial<Record<Beat, readonly string[]>> = {
   rattled: ["Stay calm. Stay calm.", "Who taught you to hide like that?"],
   power: ["Upgrade online.", "Try this one.", "New toy."],
   powerHit: ["Locked.", "Got you marked."],
-  ultimateWarn: ["Let's see you dodge."],
+  ultimateWarn: ["Prepare yourself. You're in my sights."],
   ultimate: ["Dodge this."],
   victory: ["Never miss. Never.", "Target eliminated."],
   defeat: ["You moved too fast…", "Out of ammo."],

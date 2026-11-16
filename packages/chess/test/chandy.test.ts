@@ -99,7 +99,7 @@ describe("Chandy's sheet", () => {
     // upgrade window; the meter every 6 of your moves; five upgrades; Dodge once a battle, his rage full 3 of your moves after the
     // fifth (Eric, Nov 16: "He only ults once per game, no matter what").)
     expect([S.takeMargin, S.chaseMargin, S.lockLines]).toEqual([2, 0.75, 5]);
-    expect([S.upgradeMs, S.meterEvery, S.upgradesMax, BOSS_POWERS.maxUltimates.chandy, S.dodgeAfterMoves]).toEqual([2000, 6, 5, 1, 3]);
+    expect([S.upgradeMs, S.meterEvery, S.upgradesMax, BOSS_POWERS.maxUltimates.chandy, S.dodgeAfterMoves]).toEqual([2000, 6, 5, 1, 1]);
     // (D6a: a 3 s vote and 300 ms of lag grace.)
     expect([S.dodgeVoteMs, S.dodgeGraceMs, S.dodgeRounds]).toEqual([3000, 300, 3]);
     for (const k of Object.keys(CHANDY_FX) as (keyof typeof CHANDY_FX)[]) expect(POWER_FX[k]).toBe(CHANDY_FX[k]);
