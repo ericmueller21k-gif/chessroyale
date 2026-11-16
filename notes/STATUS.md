@@ -1,3 +1,4 @@
+- Nov 16 ~08:15 UTC: #743 banner live (617abfc); main full run GREEN 23/23.
 - Nov 16 ~07:55 UTC: hearts DONE -> PR #744 (aad5062; 8 hearts, 6.5 s hidden, slash, TOO SLOW, +10, +N layer, book line gone). Hearts helper archived; reviewer session_01JuCWRtEv8iLiGgbB84baYg (high) -> review/recluse-hearts; CI watched. Sent Eric 4 stills. Next xhigh after the review: Chandy round 2 (chandy-first-lock.md), then party build.
 - Nov 16 ~07:45 UTC: #741 + #742 live (031613e). Main full run RED by retry-pass only: chat.spec.ts:80 [desktop] (quick chat picks: a tapped move not picked in 5 s, line 283; first sighting; unrelated) -> flaky list with hopper:212, dash:241 (T1 helper after the queue). #743 banner MERGED (617abfc); deploy + run watched.
 - Nov 16 ~07:05 UTC: #742 notices on top MERGED (261635e), #741 rides wade MERGED (031613e). Watching deploy + main full run on 031613e (covers both). Eric: Chandy fires a new unlock at once (fireOnUnlock) added to chandy-first-lock.md.
