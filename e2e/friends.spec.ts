@@ -237,13 +237,14 @@ test("50 v 50 Party (Eric, Nov 16): seven + seats; a + opens the friends sheet; 
   await expect(ann.page.locator(".fd-seat.party-open")).toHaveCount(7);
   await expect(ann.page.locator(".fd-queue-count")).toHaveText("1 / 8");
   await expect(ann.page.getByRole("button", { name: "Find match" })).toBeEnabled();
-  await expect(ann.page.locator(".fd-party-note")).toHaveText("Party matches aren't ranked");
+  // (Party matches are ranked, Eric, Nov 16: no line saying otherwise.)
+  await expect(ann.page.locator(".fd-party-note")).toHaveCount(0);
   await partyShot(ann.page, "1-alone");
-  // (A laptop's window, 1280 × 600: Leave, Find match and the line under them still inside it, the grid giving way. The fix round of #747.)
+  // (A laptop's window, 1280 × 600: Leave and Find match, the party's last row, still inside it, the grid giving way. The fix round of #747.)
   if (isComputer()) {
     const size = ann.page.viewportSize()!;
     await ann.page.setViewportSize({ width: 1280, height: 600 });
-    await expect.poll(() => ann.page.evaluate(() => Math.round(document.querySelector(".fd-party-note")!.getBoundingClientRect().bottom))).toBeLessThanOrEqual(600);
+    await expect.poll(() => ann.page.evaluate(() => Math.round(document.querySelector(".fd-party-actions")!.getBoundingClientRect().bottom))).toBeLessThanOrEqual(600);
     await expect(ann.page.getByRole("button", { name: "Find match" })).toBeInViewport({ ratio: 1 });
     await ann.page.setViewportSize(size);
   }
