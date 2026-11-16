@@ -283,6 +283,20 @@ describe("each player's own hearts (Eric, Nov 16): a slow move cuts one; out of 
     expect(phase2NextDue(phase2WinAll(st, T0 + 1))).toBeNull();
   });
 
+  it("only the boards `judged` says (people's) are in the automatic cut: a bot's move arriving late keeps its heart, its bank charged as it ran; phase2Slash cuts a bot's slow think (the review of #744, M1)", () => {
+    const st = start([518, 1, 2, 3]);
+    const people = (player: string) => player === PLAYERS[0];
+    const clocked = phase2Clock(st, T0 + 20_000, people);
+    expect(clocked.boards.map((b) => b.hearts)).toEqual([7, 8, 8, 8]);
+    expect(phase2NextDue(clocked, people)).toBe(T0 + 600_000);
+    expect(phase2NextDue(st, people)).toBe(T0 + JUDGE);
+    expect(phase2NextDue(withBoards(st, (id) => (id === 0 ? { turnAt: null } : {})), people)).toBe(T0 + 600_000);
+    const late = phase2Move(st, 1, [...legalMoves(st.boards[1]!.board.fen)].sort()[0]!, T0 + 12_000, people);
+    expect(late.boards[1]).toMatchObject({ hearts: 8, slashed: false, slashAt: null, bankMs: 600_000 - 12_000, result: null });
+    expect(late.boards[1]!.board.history).toHaveLength(1);
+    expect(phase2Slash(st, 2, T0 + 7000).boards[2]).toMatchObject({ hearts: 7, slashAt: T0 + 7000, result: null });
+  });
+
   it("testing (the admins' trigger): a heart cut now on that board, on its player's move only", () => {
     const st = start([518, 1, 2, 3]);
     const cut = phase2Slash(st, 0, T0 + 1000);

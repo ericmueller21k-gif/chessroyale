@@ -333,15 +333,47 @@ describe("phase 2's four boards on this device", () => {
     g.stop();
   });
 
-  it("the bots' slow moves cost their own hearts the same way (botSlowMs past the allowance; rng 0.04: every bot move a slow one), and they play on", async () => {
+  /** The bots' engine answering only after `ms` (the engine it shares with him queued behind his searches, a slow phone). */
+  const lateBots = (ms: number) => {
+    const first = (fen: string) => [...legalMoves(fen)].sort()[0]!;
+    return { playAtElo: (fen: string) => new Promise<string>((r) => setTimeout(() => r(first(fen)), ms)), topMoves: () => Promise.resolve([]) };
+  };
+
+  it("a bot's move is judged by the think it rolled, never by when its engine answers (the review of #744, M1): an answer at 7 s after a usual think costs no heart", async () => {
+    expect(RECLUSE_PHASE2.botMoveMs[1]).toBeLessThan(slowJudgeMs());
+    const slashes: string[] = [];
+    const { g } = make({ bots: lateBots(7000), onSlash: (b) => slashes.push(`${b.id}:${b.hearts}`) });
+    g.start();
+    await vi.advanceTimersByTimeAsync(7200);
+    for (const id of [1, 2, 3]) {
+      expect(g.board(id)).toMatchObject({ hearts: 8, slashAt: null, result: null });
+      expect(g.board(id)!.board.history.length).toBeGreaterThanOrEqual(1);
+    }
+    // (Yours is judged by the clock as ever.)
+    expect(g.board(0)!.hearts).toBe(7);
+    expect(slashes).toEqual(["0:7"]);
+    g.stop();
+  });
+
+  it("the bots' slow thinks cost their own hearts as each think ends, the move in or not (botSlowMs past the allowance; rng 0.04: every bot move a slow one), and they play on", async () => {
     expect(RECLUSE_PHASE2.botSlowMs[0]).toBeGreaterThan(slowJudgeMs());
     const slashes: string[] = [];
-    const { g } = make({ onSlash: (b) => slashes.push(`${b.id}:${b.hearts}`), rng: () => 0.04 });
+    // (The think: botSlowMs at rng 0.04. Their engine answers at 9 s, after it.)
+    const think = RECLUSE_PHASE2.botSlowMs[0] + 0.04 * (RECLUSE_PHASE2.botSlowMs[1] - RECLUSE_PHASE2.botSlowMs[0]);
+    const { g } = make({ bots: lateBots(9000), onSlash: (b) => slashes.push(`${b.id}:${b.hearts}`), rng: () => 0.04 });
+    const t0 = Date.now();
     g.start();
-    await vi.advanceTimersByTimeAsync(RECLUSE_PHASE2.botSlowMs[1] + 500);
+    await vi.advanceTimersByTimeAsync(think - 10);
+    for (const id of [1, 2, 3]) expect(g.board(id)!.hearts).toBe(8);
+    await vi.advanceTimersByTimeAsync(20);
+    for (const id of [1, 2, 3]) {
+      expect(g.board(id)).toMatchObject({ hearts: 7, slashAt: t0 + think, result: null });
+      expect(g.board(id)!.board.history).toHaveLength(0);
+      expect(slashes).toContain(`${id}:7`);
+    }
+    await vi.advanceTimersByTimeAsync(9000 - think + 100);
     for (const id of [1, 2, 3]) {
       expect(g.board(id)!.hearts).toBe(7);
-      expect(slashes).toContain(`${id}:7`);
       expect(g.board(id)!.board.history.length).toBeGreaterThanOrEqual(1);
     }
     g.stop();
