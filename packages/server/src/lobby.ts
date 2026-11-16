@@ -1006,12 +1006,14 @@ export class LobbyCore {
   }
 
   /**
-   * A 50 v 50 party's pass held here with a seat still free in its group: the matchmaker sent its members here, so a member on the
-   * other side of fair play's engine pool (one pooled member takes the whole party to the pool's queue) is let in (H1).
+   * A 50 v 50 party's pass held here with a seat still free in its group, while its hold lasts: the matchmaker sent its members here,
+   * so a member on the other side of fair play's engine pool (one pooled member takes the whole party to the pool's queue) is let in
+   * (H1). Once the hold ends the door is shut (N4: a pooled friend who joined the party after its Find match can't take a late
+   * member's seat in a clean lobby).
    */
   crowdPassOpen(pass: unknown): boolean {
     const p = this.crowdPartyOf(pass);
-    return !!p && p.ids.length < p.size;
+    return !!p && p.ids.length < p.size && p.until > this.io.now();
   }
 
   /** When the last hold for a 50 v 50 party's members on their way ends (0: none): the fill never comes before it. */
@@ -1320,7 +1322,7 @@ export class LobbyCore {
   }
 
   private netLeft(l: LeftHuman): NetLeft {
-    return { how: l.how, result: l.result ? { placement: l.result.placement, players: l.result.players, ranked: l.result.ranked } : null };
+    return { how: l.how, result: l.result ? { placement: l.result.placement, players: l.result.players, ranked: l.result.ranked, ...(!l.result.ranked && this.partied(l.id) ? { partied: true as const } : {}) } : null };
   }
 
   /**
@@ -4388,19 +4390,25 @@ export class LobbyCore {
    * unranked for those who stay, nor for the one who left. Only someone who left before move 1 doesn't count.
    */
   /**
-   * Whether `h`'s result counts for ranking: the match's (ranked), not practicing, and not resting on a Hidden Boss's phase 2 whose
-   * moves of his stood on one device's word (phase2Unvouched: the players of its boards only).
+   * Whether `h`'s result counts for ranking: the match's (ranked), not practicing, not resting on a Hidden Boss's phase 2 whose
+   * moves of his stood on one device's word (phase2Unvouched: the players of its boards only), and not a 50 v 50 party's member.
    */
   private rankedFor(h: { id: string; practice?: boolean }): boolean {
-    return this.ranked() && !h.practice && !phase2Unvouched(this.r, h.id);
+    return this.ranked() && !h.practice && !phase2Unvouched(this.r, h.id) && !this.partied(h.id);
+  }
+
+  /**
+   * `id` played in a 50 v 50 party of 2 or more friends: their own result isn't ranked unless CROWD_PARTY.ranked (the fix rounds of
+   * #747, M3 and N2: the director's call until Eric decides). The singles beside them stay ranked: a single's rating comes from their
+   * own moves, and the risk (friends relaying one player's moves) is in the party's own ratings.
+   */
+  private partied(id: string): boolean {
+    return !CROWD_PARTY.ranked && Object.values(this.r.crowdParties ?? {}).some((p) => p.ids.length >= 2 && p.ids.includes(id));
   }
 
   ranked(): boolean {
     // (A Boss Battle party is a private team: never ranked. Nor a match where one device's word stood alone: unvouched.)
     if (this.r.party || this.r.unvouched) return false;
-    // (A 50 v 50 with a party of 2 or more friends in it, one bloc on one side: not ranked unless CROWD_PARTY.ranked. The fix round
-    // of #747, M3: the director's call until Eric decides.)
-    if (!CROWD_PARTY.ranked && Object.values(this.r.crowdParties ?? {}).some((p) => p.ids.length >= 2)) return false;
     const players = this.runner?.state.players ?? [];
     const played = this.r.humans.length + (this.r.left ?? []).filter((l) => l.how !== "early").length;
     return isRankedMatch(played, Math.max(this.settings.lobbySize, players.length));
@@ -4505,7 +4513,9 @@ export class LobbyCore {
     // its players', nothing counts for or against them.)
     const lone = { ...msg, ranked: false, unvouched: true as const };
     const board = { ...msg, ranked: false, noResult: "board" as const };
-    for (const h of this.r.humans) this.send(h.id, recluseNoResultFor(this.r, h.id) ? board : phase2Unvouched(this.r, h.id) ? lone : msg);
+    // (A 50 v 50 party's members: theirs isn't ranked, and their results say it's for the party: N2.)
+    const partied = { ...msg, ranked: false, partied: true as const };
+    for (const h of this.r.humans) this.send(h.id, recluseNoResultFor(this.r, h.id) ? board : phase2Unvouched(this.r, h.id) ? lone : this.partied(h.id) ? partied : msg);
     this.botChat({ kind: "end" });
     const js = this.r.judges;
     if (js?.stats.jobs) console.log(`judges in ${this.r.code}: ${JSON.stringify(js.stats)}`);

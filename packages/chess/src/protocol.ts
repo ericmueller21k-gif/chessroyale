@@ -710,7 +710,8 @@ export type LeftHow = "resigned" | "away" | "early" | "out" | "kicked" | "afk";
  */
 export interface NetLeft {
   how: LeftHow;
-  result: { placement: number; players: number; ranked: boolean } | null;
+  /** `partied`: they played in a 50 v 50 party of 2 or more friends, so theirs isn't ranked (CROWD_PARTY.ranked). */
+  result: { placement: number; players: number; ranked: boolean; partied?: true } | null;
 }
 
 /** A battle on the Maia brain, as the lobby tells the host's device (bossBrainFor's plan). */
@@ -1108,6 +1109,8 @@ export type ServerMessage = { now: number } & (
       ranked?: boolean;
       /** Something in it stood on one device's word alone (LobbyRecord.unvouched): it pays as a solo game, and the results say so. */
       unvouched?: true;
+      /** You played in a 50 v 50 party of 2 or more friends: yours isn't ranked (CROWD_PARTY.ranked), and the results say why. */
+      partied?: true;
       /** The Hidden Boss's phase 2 decided it: how many of its boards were won (all of them beat him). */
       simul?: { won: number; of: number };
       /**

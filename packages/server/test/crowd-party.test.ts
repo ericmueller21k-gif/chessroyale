@@ -85,7 +85,7 @@ describe("50 v 50's party: friends only, by invite", () => {
     expect(P.view().members).toHaveLength(CROWD_PARTY_MAX);
   });
 
-  it("only the leader's Find match queues it (everyone connected, one ticket); invites still out are dropped; nobody joins mid-search", () => {
+  it("only the leader's Find match queues it (every member, one ticket); invites still out are dropped; nobody joins mid-search", () => {
     const P = party();
     const ann = member(P.join("u-ann"));
     P.core.invited("u-ann", "u-bo", "Bo", P.now() + 600_000);
@@ -326,6 +326,37 @@ describe("50 v 50's party in the lobby", () => {
     expect(side(a[0]!)).not.toBe(side(b[0]!));
   });
 
+  it("N1: Find match holds a seat for every member, an away one too: back after the hold, they still join the party's group and its team", () => {
+    const P = party();
+    const ann = member(P.join("u-ann"));
+    P.core.invited("u-ann", "u-bo", "Bo", P.now() + 600_000);
+    const bo = member(P.join("u-bo"));
+    // (Bo's phone sleeps, or he's mid-reload, as Ann taps Find match.)
+    P.core.disconnect(bo);
+    P.core.message(ann, { t: "queue" });
+    const want = P.core.takeQueue()!;
+    expect(want.size).toBe(2);
+    const L = setup({ ...crowd(), lobbySize: 10 });
+    L.core.setAuto(L.now + 60_000);
+    expect(L.core.reserveParty(want.size, want.pass, 20_000)).toBe(true);
+    const join = (name: string, pass?: string) => {
+      const r = L.core.connect(undefined, name, "phone", false, null, undefined, `u-${name}`, null, null, false, pass ? { pass } : {});
+      if (!r.ok) throw new Error(r.message);
+      return r.playerId;
+    };
+    const a = join("Ann", want.pass);
+    // (Singles beside them.)
+    for (const n of ["Cy", "Di", "Ed"]) join(n);
+    // Bo is back after the hold has run out (his app walks him in with the pass): the party's group still has his seat.
+    L.advance(25_000);
+    const b = join("Bo", want.pass);
+    expect(L.core.record.crowdParties![want.pass]!.ids).toEqual([a, b]);
+    L.advance(60_000);
+    const players = L.core.save().runner!.state.players;
+    const side = (id: string) => players.find((p) => p.id === id)!.colour;
+    expect(side(b)).toBe(side(a));
+  });
+
   it("H2: a lobby filling within a party's hold doesn't take it; a lobby made for it holds them until its fill; the fill never comes sooner", () => {
     const L = setup({ ...crowd(), lobbySize: 10 });
     L.core.setAuto(L.now + 15_000);
@@ -340,7 +371,7 @@ describe("50 v 50's party in the lobby", () => {
     expect(M.core.record.auto!.fillAt).toBe(M.now + 20_000);
   });
 
-  it("H1: a party's pass, held here with room, lets its member past the engine pool's door; a full group's, or another's, doesn't", () => {
+  it("H1, N4: a party's pass, held here with room and in its hold, lets its member past the engine pool's door; a full group's, another's, or one whose hold ran out doesn't", () => {
     const L = setup({ ...crowd(), lobbySize: 10 });
     L.core.setAuto(L.now + 60_000);
     expect(L.core.reserveParty(1, "pp", 20_000)).toBe(true);
@@ -353,23 +384,56 @@ describe("50 v 50's party in the lobby", () => {
     expect(L.core.crowdPassOpen("pp")).toBe(false);
     // (A pass the app made up never breaks the door: only the lobby's own keys.)
     expect(L.core.connect(undefined, "Bo", "phone", false, null, undefined, "u-bo", null, null, false, { pass: "constructor" }).ok).toBe(true);
+    // N4: once its hold has run out, a pass with a seat still free no longer opens the door (a friend who joined the party after its
+    // Find match can't take a late member's seat in a clean lobby).
+    expect(L.core.reserveParty(2, "late", 20_000)).toBe(true);
+    expect(L.core.crowdPassOpen("late")).toBe(true);
+    L.advance(20_000);
+    expect(L.core.crowdPassOpen("late")).toBe(false);
   });
 
-  it(`M3: a match with a party of 2 or more friends in it isn't ranked (CROWD_PARTY.ranked: ${CROWD_PARTY.ranked}); a party of one is a single`, () => {
+  it(`M3, N2: the singles stay ranked; only a party of 2 or more's members aren't (CROWD_PARTY.ranked: ${CROWD_PARTY.ranked}), and their results say it's the party; a party of one is a single`, () => {
     const lobby = (party: number) => {
       const L = setup({ ...crowd(), lobbySize: 10 });
       L.core.setAuto(L.now + 60_000);
       expect(L.core.reserveParty(Math.max(1, party), "pp", 20_000)).toBe(true);
-      for (let i = 0; i < 4; i++) {
+      const ids = [0, 1, 2, 3].map((i) => {
         const r = L.core.connect(undefined, `P${i}`, "phone", false, null, undefined, `u-${i}`, null, null, false, i < party ? { pass: "pp" } : {});
         if (!r.ok) throw new Error(r.message);
-      }
-      L.advance(60_000);
-      return L.core.ranked();
+        return r.playerId;
+      });
+      // (Into its first round. Then a member and a single leave (their results as they go), and the match ends for the other two (its
+      // results), as review-fable-b3's m5 ends one: playing a 50 v 50 out takes far too long here.)
+      for (let i = 0; i < 200 && !L.core.record.round; i++) L.advance(Math.max(1, (L.core.nextAlarm ?? L.now + 1000) - L.now));
+      expect(L.core.record.round).toBeTruthy();
+      L.core.message(ids[0]!, { t: "resign" });
+      L.core.message(ids[2]!, { t: "resign" });
+      (L.core as unknown as { finishMatch(): void }).finishMatch();
+      // (Mid-match nobody has a place yet: the two still here get one, as the match's end gives everyone.)
+      for (const id of [ids[1]!, ids[3]!]) L.core.record.placements[id] ??= 1;
+      // (Each player's own result, and what they were told: the results, or the note as they left.)
+      const rows = [...L.core.takeLeftResults(), ...L.core.humanResults()];
+      const told = (id: string) => {
+        const m = [...(L.inbox.get(id) ?? [])].reverse().find((x) => x.t === "results" || x.t === "resigned");
+        return m?.t === "results" ? { ranked: m.ranked, partied: m.partied } : m?.t === "resigned" ? { ranked: m.result?.ranked, partied: m.result?.partied } : null;
+      };
+      return { ranked: L.core.ranked(), mine: ids.map((id) => rows.find((r) => r.playerId === id)!.ranked), told: ids.map(told) };
     };
-    expect(lobby(0)).toBe(true);
-    expect(lobby(1)).toBe(true);
-    expect(lobby(2)).toBe(CROWD_PARTY.ranked);
+    const party = CROWD_PARTY.ranked ? {} : { partied: true };
+    const two = lobby(2);
+    expect(two.ranked, "the match counts").toBe(true);
+    expect(two.mine).toEqual([CROWD_PARTY.ranked, CROWD_PARTY.ranked, true, true]);
+    expect(two.told).toEqual([
+      { ranked: CROWD_PARTY.ranked, ...party },
+      { ranked: CROWD_PARTY.ranked, ...party },
+      { ranked: true, partied: undefined },
+      { ranked: true, partied: undefined },
+    ]);
+    for (const n of [0, 1]) {
+      const l = lobby(n);
+      expect(l.mine).toEqual([true, true, true, true]);
+      expect(l.told.every((t) => t?.ranked === true && t.partied === undefined)).toBe(true);
+    }
   });
 });
 

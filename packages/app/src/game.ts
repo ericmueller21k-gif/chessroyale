@@ -443,6 +443,8 @@ export interface GameView {
   readonly ranked?: boolean | null;
   /** Online: something in the match stood on one device's word alone, so it pays as a solo game (the results say so). */
   readonly unvouched?: boolean;
+  /** Online: you played in a 50 v 50 party of 2 or more friends, so yours isn't ranked (the results say so). */
+  readonly partied?: boolean;
   /** What leaving means now (null: nothing to leave: the results, or still connecting). */
   readonly exit: ExitKind | null;
   /** Leaving goes straight home, with no results screen (before move 1; online, once you're out). */

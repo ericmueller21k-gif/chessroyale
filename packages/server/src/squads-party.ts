@@ -541,11 +541,13 @@ export class PartyCore {
 
   /**
    * The leader queues everyone connected: seats for them all under a new pass (again after a lobby: a new one). A 50 v 50 party's
-   * invites still out are dropped (they'd find the party gone; the Durable Object deletes them).
+   * invites still out are dropped (they'd find the party gone; the Durable Object deletes them). A 50 v 50 party holds a seat for
+   * every member, away or not (N1: an away member back later walks in with the pass and plays on the party's team; a hold nobody
+   * uses lapses with the reservation, CAPACITY.queue.reservationMs).
    */
   private startQueue(id: string) {
     if (id !== this.leaderNow() || this.r.state === "queueing") return;
-    const size = this.r.members.filter((m) => m.connected).length;
+    const size = this.r.kind === "crowd" ? this.r.members.length : this.r.members.filter((m) => m.connected).length;
     if (size < 1) return;
     if (this.r.kind === "crowd") this.r.invited = [];
     this.r.state = "queueing";
