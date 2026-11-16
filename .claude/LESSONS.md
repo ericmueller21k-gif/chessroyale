@@ -337,6 +337,12 @@ Tests check *what* ends up on the screen, not *how it gets there*, nor how long 
     begins. `watchFor` says only that each thing showed, not that they showed together. Never a string of round trips after it starts.
   - A spec run with `--repeat-each` gives each repeat its own queue pool (`test.info().repeatEachIndex`): repeats share module state.
 
+- **The town specs' time** (Nov 16, `docs/decisions/2026-11-16-town-tap-speed.md`):
+  - A margin between something read from the page and an action sent after it (a clock's pause, a hold) is bigger than the round trips
+    between them on a busy runner (0.2 to 0.7 s beside a WebGL town), or both go to the browser together (CDP).
+  - A wait that has another way through (a glide) gives up as soon as it can tell, counted in frames, not after a fixed time.
+  - A town load costs 5 to 9 s on software WebGL: a spec opens the town once it needs it, signed in first.
+
 ## Eric's rules hold
 
 - **An options panel that disappeared** (Oct 25, [story](../docs/history/lessons.md#an-options-panel-that-disappeared-oct-25-2026)):
