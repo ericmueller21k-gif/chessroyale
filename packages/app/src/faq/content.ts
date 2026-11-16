@@ -914,7 +914,7 @@ Your time is the clock at the right of the box under the board: alone or in a pa
   chandy: (p, b) => {
     const c = p.chandy;
     return `
-Plays from the game so far. A sniper chameleon with a rifle that grows. ${b.offset < 0 ? `His powers are why he plays ${Math.abs(b.offset)} under the usual strength.` : b.offset > 0 ? `He plays ${b.offset} over the usual strength.` : "He plays at the usual strength."}
+Plays from the game so far. A special-ops alligator with an energy rifle that grows. ${b.offset < 0 ? `His powers are why he plays ${Math.abs(b.offset)} under the usual strength.` : b.offset > 0 ? `He plays ${b.offset} over the usual strength.` : "He plays at the usual strength."}
 
 - **Lock-on** (passive): from his move ${num(c.firstLockMove)} on, the first time he can take one of your pieces without losing material, he puts his crosshair on it and takes it. After that, at the end of his turns he locks your most capturable piece (never your king or queen), up to ${n(c.maxLocks, "lock")} at once, and he leans toward taking locked pieces: a capture of one he plays if it's within ${num(c.takeMargin)} pawns of his best move, a move that attacks one if it's within ${num(c.chaseMargin)}. The pips under a crosshair count the turns it has left: get the piece to safety for ${n(c.huntTurns, "of his turns", "of his turns")} and he moves on.
 - **Upgrades:** each locked piece he takes adds a part to his rifle (${num(c.upgradesMax)} in all) and unlocks one of his five moves at random. The game pauses ${n(c.upgradeMs / 1000, "second")} to show it.

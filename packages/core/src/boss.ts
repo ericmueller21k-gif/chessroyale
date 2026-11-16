@@ -259,7 +259,7 @@ export const BOSS_ROSTER: readonly BossDef[] = [
   // the battle. His offset and numbers from the raid sim (reports/zebra-sim.md). Admins first: BOSS_ADMIN_FIRST in settings.ts (the
   // test links `?boss=zebra`, `&power=dough`, `&power=goldplate`).
   { id: "zebra", name: "Don Dough", icon: "🦓", kit: "Don Dough", offset: -250, powers: { passive: "dough", ultimate: "goldplate" } },
-  // Chandy, a sniper chameleon whose rifle grows (Eric's design, Nov 15-16; his rules: bosses/chandy.ts; docs/decisions/2026-11-16-chandy-rules.md):
+  // Chandy, a special-ops alligator whose energy rifle grows (Eric's design, Nov 15-16; his rules: bosses/chandy.ts; docs/decisions/2026-11-16-chandy-rules.md):
   // Lock-on, a crosshair on one or two of your pieces his engine leans toward, each taken an upgrade of his rifle (five), each
   // upgrade unlocking one of his five moves (scatter shot, beam, shields, rapid fire, queen lock) that his move meter fires every
   // six of your moves; and Dodge, his rage meter's ultimate once the rifle is whole: your king on a blank board, three rounds of a

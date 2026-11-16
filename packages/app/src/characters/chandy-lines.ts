@@ -1,6 +1,6 @@
 /**
  * Chandy's lines (Nov 16; docs/decisions/2026-11-16-chandy-rules.md): **placeholders for Eric**, short, in a calm sniper's voice (a
- * chameleon who waits, watches and never misses). His banners' words are in components/Chandy.tsx (CHANDY_WORDS), placeholders too.
+ * special-ops alligator who waits, watches and never misses). His banners' words are in components/Chandy.tsx (CHANDY_WORDS), placeholders too.
  *
  * - `entrance`: his challenge as the battle begins; `power`: a move of his meter's (scatter shot, beam, shields, rapid fire, the
  *   queen lock), said as he fires; `powerHit`: a lock snapping on (said now and then).

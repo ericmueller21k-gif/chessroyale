@@ -1,5 +1,5 @@
 /**
- * Chandy, the sniper chameleon whose rifle grows (BOSS_ROSTER "chandy"; Eric's design, Nov 15-16: DESIGN.md on branch
+ * Chandy, the special-ops alligator whose energy rifle grows (BOSS_ROSTER "chandy"; Eric's design, Nov 15-16: DESIGN.md on branch
  * stills/boss-chandy, rounds 1, 2, 2b and 2c; docs/decisions/2026-11-16-chandy-rules.md). He starts from the game so far, as most
  * bosses do. Every pick below comes from the battle's seed and the position, the same on the server, solo and every screen.
  *
