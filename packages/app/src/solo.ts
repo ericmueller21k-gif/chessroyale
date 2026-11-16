@@ -1032,7 +1032,16 @@ export class SoloMatch implements GameView {
     const burnt = !!snap.powers?.burnt?.some((b) => b.turn === snap.crowdMoves && (b.piece || b.fizzled));
     const landed = landedEarlyMs(snap) + fullMoonMs(snap) + folioTurnMs(snap) + popOffMs(snap) + zebraTurnMs(snap) + chandyTurnMs(snap);
     const minThink = bossThinkMs(snap, burnt, landed) - (this.alone && !burnt && !landed ? Date.now() - this.movedAt : 0);
-    await Promise.all([this.runner.playBoss(this.engines[0]), new Promise((r) => setTimeout(r, Math.max(0, minThink)))]);
+    const thinkEnd = Date.now() + Math.max(0, minThink);
+    // (Chandy's first capture: once the thinking's moments are done, the crosshair locks onto the piece he's about to take, then his
+    // move shows; as the server holds the host's move.)
+    const beforeShow = async (ms: number) => {
+      await new Promise((r) => setTimeout(r, Math.max(0, thinkEnd - Date.now())));
+      if (this.stopped) return;
+      this.set({ kind: "boss", boss: this.bossSnapshot(), until: 0, thinking: true });
+      await new Promise((r) => setTimeout(r, ms));
+    };
+    await Promise.all([this.runner.playBoss(this.engines[0], beforeShow), new Promise((r) => setTimeout(r, Math.max(0, minThink)))]);
     if (this.stopped) return;
     // As the turn passes to you, any power that comes with it (a freeze, a pie, the warning, the blizzard) plays out
     // before your clock starts.

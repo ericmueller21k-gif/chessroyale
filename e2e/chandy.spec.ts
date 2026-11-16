@@ -41,10 +41,14 @@ async function playOne(page: Page, pick?: (legal: { uci: string; piece: string; 
 async function watch(page: Page) {
   await page.evaluate(() => {
     const w = window as any;
-    w.__ch = { kinds: [] as string[], banners: [] as string[], layer: 0, upgrade: [] as string[], dodge: [] as string[], words: [] as string[] };
+    w.__ch = { kinds: [] as string[], banners: [] as string[], layer: 0, upgrade: [] as string[], dodge: [] as string[], words: [] as string[], first: [] as { square: string; fen: string; thinking: boolean }[] };
     const look = () => {
       const r = w.__ch;
       for (const e of w.match?.boss?.powers?.events ?? []) if (!r.kinds.includes(e.kind)) r.kinds.push(e.kind);
+      // (His first lock: the position on screen the frame it's first seen, his move not shown yet.)
+      const ph = w.match?.phase;
+      for (const e of ph?.boss?.powers?.events ?? [])
+        if (e.kind === "lockOn" && e.first && !r.first.some((f: { square: string }) => f.square === e.square)) r.first.push({ square: e.square, fen: ph.boss.board.fen, thinking: !!ph.thinking });
       for (const b of document.querySelectorAll(".fight-banner")) {
         const t = (b.textContent ?? "").replace(/\s+/g, " ").trim();
         if (t && !r.banners.includes(t)) r.banners.push(t);
@@ -64,7 +68,7 @@ async function watch(page: Page) {
     requestAnimationFrame(look);
   });
 }
-const seen = (page: Page) => page.evaluate(() => (window as any).__ch as { kinds: string[]; banners: string[]; layer: number; upgrade: string[]; dodge: string[]; words: string[] });
+const seen = (page: Page) => page.evaluate(() => (window as any).__ch as { kinds: string[]; banners: string[]; layer: number; upgrade: string[]; dodge: string[]; words: string[]; first: { square: string; fen: string; thinking: boolean }[] });
 
 async function battle(page: Page, power: string) {
   await asAdmin(page);
@@ -141,12 +145,12 @@ test.describe("Chandy", () => {
     expect(errors).toEqual([]);
   });
 
-  test("a lock on a piece he can take: the crosshair, then he takes it and the upgrade window shows (1 of 5) with its new move", { tag: "@phone-only" }, async ({ page }) => {
+  test("his first capture: the crosshair locks onto your piece before he takes it, then the upgrade window shows (1 of 5) with its new move", { tag: "@phone-only" }, async ({ page }) => {
     test.setTimeout(180_000);
     const errors: string[] = [];
     page.on("pageerror", (e) => errors.push(e.message));
     await battle(page, "lockon");
-    // (Each of your moves leaves a piece he can take for free, so his first lock sits on it and his engine is steered to take it.)
+    // (Each of your moves leaves a piece he can take for free; the switch has him take one as soon as he can: his first capture.)
     const hang = (legal: { uci: string; piece: string; to: string; captured?: string }[], fen: string) => {
       const c = new Chess(fen);
       return legal.find((m) => m.piece !== "k" && m.piece !== "q" && !m.captured && c.isAttacked(m.to as never, "b") && !(() => {
@@ -160,6 +164,10 @@ test.describe("Chandy", () => {
     expect(s.kinds).toContain("lockOn");
     expect(s.kinds).toContain("upgrade");
     expect(s.upgrade[0]).toMatch(/1 of 5/);
+    // (The lock came while he still thought, your piece still on its square: then he took it.)
+    expect(s.first.length).toBe(1);
+    expect(s.first[0]!.thinking).toBe(true);
+    expect(new Chess(s.first[0]!.fen).get(s.first[0]!.square as never)).toMatchObject({ color: "w" });
     const c = await page.evaluate(() => (window as any).match.boss.powers.chandy);
     expect(c.upgrades).toBeGreaterThanOrEqual(1);
     await expect(page.locator(".ch-pips > i.on")).toHaveCount(c.upgrades);

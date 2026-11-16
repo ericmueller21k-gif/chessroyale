@@ -1860,8 +1860,8 @@ export const BOSS_POWERS = {
   doughQueenFree: true,
   /**
    * Chandy (bosses/chandy.ts; Eric's design, Nov 15-16: DESIGN.md on branch stills/boss-chandy; docs/decisions/2026-11-16-chandy-rules.md).
-   * - **The locks** (L1-L6): the first comes as one of his turns begins, from his `firstLockMove`-th move, on a piece of yours he can
-   *   take now without losing material (never your king or queen); then at the end of each of his turns he locks your most capturable
+   * - **The locks** (L1-L6): none before his first capture; on that move the crosshair locks onto the piece he takes (his engine's own
+   *   move; any piece but the king) right before it shows, an upgrade; then at the end of each of his turns he locks your most capturable
    *   piece, `maxLocks` at most, a second once the first is `secondAfter` of his turns old. A lock hunts for `huntTurns` of his turns,
    *   and lives on to `liveTurns` while the piece is still gettable. His engine is steered within the margins (L3): of its top
    *   `lockLines` moves, one taking a locked piece within `takeMargin` pawns of his best is played; else one attacking a locked piece
@@ -1869,7 +1869,8 @@ export const BOSS_POWERS = {
    * - **The rifle:** each locked piece he takes is an upgrade (`upgradesMax`), each unlocking one of his five moves at random; the
    *   upgrade window holds everything `upgradeMs` (Eric: 2 s).
    * - **The move meter:** from the first upgrade, full every `meterEvery` of your moves; it fires a random unlocked move (a new unlock
-   *   first). Scatter shot blocks `scatterSquares` squares round a spot (a pick of the top `looks`, as every pick of his below);
+   *   first). `fireOnUnlock` (Eric, Nov 16; false turns it off): a new unlock fires on his turn after its upgrade window whatever the
+   *   meter says, and the meter starts over (a queen lock that can't come then waits for the meter). Scatter shot blocks `scatterSquares` squares round a spot (a pick of the top `looks`, as every pick of his below);
    *   shields cover `shieldCount` of his pieces; rapid fire stuns `rapidCount` of yours.
    * - **Dodge** (his ultimate, once a battle: maxUltimates.chandy; Eric, Nov 16: "He only ults once per game, no matter what"; "It
    *   should fire after he gets all 5 upgrades ... it should be ulting most games"): his rage meter is dimmed until the rifle is whole,
@@ -1882,7 +1883,6 @@ export const BOSS_POWERS = {
    * The sim's (reports/chandy-sim.md).
    */
   chandy: {
-    firstLockMove: 3,
     maxLocks: 2,
     secondAfter: 2,
     huntTurns: 3,
@@ -1893,6 +1893,7 @@ export const BOSS_POWERS = {
     upgradesMax: 5,
     upgradeMs: 2000,
     meterEvery: 6,
+    fireOnUnlock: true as boolean,
     looks: 3,
     scatterSquares: 4,
     shieldCount: 2,

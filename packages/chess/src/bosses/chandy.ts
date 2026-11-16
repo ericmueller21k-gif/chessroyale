@@ -4,9 +4,10 @@
  * bosses do. Every pick below comes from the battle's seed and the position, the same on the server, solo and every screen.
  *
  * **Lock-on** (his passive, L1-L6):
- * - **The first lock teaches it:** as one of his turns begins, from his chandy.firstLockMove-th move, the first time he can take a
- *   piece of yours (never the king or queen) without losing material by the exchange check (exchangeNet), he locks it (the
- *   crosshair, his point: `lockOn` with `first`, played while he thinks) and his engine is steered to take it (below).
+ * - **His first capture teaches it** (Eric, Nov 16: "the first piece of the game that he captures is always marked first"): no lock
+ *   comes before it. On the move where he first takes one of your pieces (his engine's own move, never steered; any piece but the
+ *   king, your queen too), the crosshair locks onto that piece right before he takes it (`lockOn` with `first`, while he still
+ *   thinks: firstLock, called with his move before it shows), he points, then the capture lands: upgrade 1.
  * - **Then he hunts:** at the end of each of his turns he locks your most capturable piece (lockOrder: free to take, then
  *   under-defended, then pinned or trapped with a move of his that attacks it; ties the more valuable, then the seed; nothing fits:
  *   the least defended), at most chandy.maxLocks, a second once the first is chandy.secondAfter of his turns old. A lock hunts for
@@ -19,6 +20,8 @@
  * - **Upgrades:** only taking a locked piece upgrades the rifle (to chandy.upgradesMax); each unlocks one of his five moves at
  *   random (the rifle's parts come in a fixed order: the art's), shown in the upgrade window as your turn begins (`upgrade`, 2 s,
  *   the clock held). After the fifth: no window.
+ * - **A new unlock fires at once** (chandy.fireOnUnlock; Eric, Nov 16): on his turn after its upgrade window, whatever his meter
+ *   says (it starts over from empty once the move fires); a queen lock that can't come then (queenLockOk) waits for the meter.
  *
  * **The move meter** (from the first upgrade): one of your moves a notch, full at chandy.meterEvery. Full as his turn begins, he
  * picks a move: the newest unlock first, else random among the unlocked (the queen lock only when it can come). The queen lock is
@@ -48,8 +51,8 @@
  * votes; ties and nobody voting: from the seed); the beams fire; on the safe square, DODGED; anywhere else the battle is his
  * (`dodgeWin`; the God King's Last Stand doesn't apply). The board comes back as it was: Dodge never changes the position.
  *
- * Test switches (solo): `?power=lockon` (the first lock from his first move on a piece he can take, from his third on your most
- * capturable if none is free), `?power=dodge` (all five upgrades at the start, the
+ * Test switches (solo): `?power=lockon` (until his first capture, his move takes a piece of yours whenever one nets him no loss:
+ * testCapture), `?power=dodge` (all five upgrades at the start, the
  * warning as the second turn begins), `?power=scatter|beam|shields|rapidfire|queenlock` (that move unlocked from the start, his
  * meter full after every move of yours).
  */
@@ -248,23 +251,22 @@ export function lockOrder(fen: string, crowd: Side, seed: number, n: number, ski
 }
 
 /**
- * His first lock, as his turn begins (`fen`: him to move): a piece of yours he can take now without losing material by the exchange
- * check (never the king or queen), the capture netting most, then the more valuable, then the seed; null: none.
+ * The test switch's capture (`?power=lockon`; `fen`: him to move): until his first capture, a capture of a piece of yours (never
+ * the king) that nets him no loss by the exchange check, the one netting most, then the more valuable, then the seed; null: none.
  */
-export function firstLockPick(fen: string, crowd: Side, seed: number): string | null {
+export function testCapture(fen: string, crowd: Side, seed: number, allowed: readonly string[] | null = null): string | null {
   if (sideToMove(fen) !== other(crowd)) return null;
-  const best = new Map<string, number>();
-  for (const m of legalMoves(fen)) {
+  const ranked: { m: string; net: number; value: number; roll: number }[] = [];
+  for (const m of allowed ?? legalMoves(fen)) {
     const sq = capturedSquare(fen, m);
     const victim = sq ? pieceAt(fen, sq) : null;
-    if (!sq || !victim || victim.type === "k" || victim.type === "q") continue;
+    if (!sq || !victim || victim.color !== crowd || victim.type === "k") continue;
     const net = exchangeNet(fen, m);
     if (net === null || net < 0) continue;
-    best.set(sq, Math.max(best.get(sq) ?? -1, net));
+    ranked.push({ m, net, value: VALUE[victim.type]!, roll: powerRoll(seed, "test-capture", m) });
   }
-  const ranked = [...best].map(([sq, net]) => ({ sq, net, value: VALUE[pieceAt(fen, sq)!.type]!, roll: powerRoll(seed, "first-lock", sq) }));
-  ranked.sort((a, b) => b.net - a.net || b.value - a.value || a.roll - b.roll || (a.sq < b.sq ? -1 : 1));
-  return ranked[0]?.sq ?? null;
+  ranked.sort((a, b) => b.net - a.net || b.value - a.value || a.roll - b.roll || (a.m < b.m ? -1 : 1));
+  return ranked[0]?.m ?? null;
 }
 
 /** A lock's age (his moves since it came). */
@@ -1006,26 +1008,47 @@ export const chandyBattle = {
         c.locks = c.locks.filter((l) => l.square !== shot.square);
       }
     }
-    // The meter: one of your moves a notch, from the first upgrade (a move's test switch: full at once); full, his move.
-    if (c.upgrades > 0 && !c.due) c.meter = moveTest(b.settings.bossPowerTest) ? s.meterEvery : Math.min(s.meterEvery, c.meter + 1);
     const now = boardOf(b).fen;
-    if (c.upgrades > 0 && c.meter >= s.meterEvery && (!c.due || c.due === "queenlock")) c.due = meterPick(c, p.seed, queenLockOk(now, crowd, p.seed, c.used) ? [] : ["queenlock"]);
-    // His first lock (L1): from his firstLockMove-th move, on a piece he can take now (the test switch: from his first; from his
-    // firstLockMove-th on your most capturable piece when none is free, so a lock always comes).
-    const test = b.settings.bossPowerTest === "lockon";
-    const firstAt = test ? 1 : s.firstLockMove;
-    if (!c.taught && c.moves + 1 >= firstAt && !c.locks.length) {
-      const sq = firstLockPick(now, crowd, p.seed) ?? (test && c.moves + 1 >= s.firstLockMove ? (lockOrder(now, crowd, p.seed, c.moves)[0] ?? null) : null);
-      const piece = sq ? pieceAt(now, sq) : null;
-      if (sq && piece) {
-        c = { ...c, taught: true, locks: [{ square: sq, piece: piece.type, at: c.moves }] };
-        events.push({ kind: "lockOn", turn: p.turn, square: sq, first: true });
-      }
+    // A new unlock fires at once (fireOnUnlock): your move after its upgrade window has the meter full and the unlock picked, whatever
+    // the meter said; a queen lock that can't come now waits for the meter, as ever.
+    const unlock = s.fireOnUnlock && c.upgrade?.unlock && c.upgrade.turn === boss.crowdMoves ? c.upgrade.unlock : null;
+    if (unlock && (unlock !== "queenlock" || queenLockOk(now, crowd, p.seed, c.used))) {
+      c.meter = s.meterEvery;
+      c.due = unlock;
+    } else {
+      // The meter: one of your moves a notch, from the first upgrade (a move's test switch: full at once); full, his move.
+      if (c.upgrades > 0 && !c.due) c.meter = moveTest(b.settings.bossPowerTest) ? s.meterEvery : Math.min(s.meterEvery, c.meter + 1);
+      if (c.upgrades > 0 && c.meter >= s.meterEvery && (!c.due || c.due === "queenlock")) c.due = meterPick(c, p.seed, queenLockOk(now, crowd, p.seed, c.used) ? [] : ["queenlock"]);
     }
     setChandy(b, () => c, events);
   },
 
-  /** After his move (the crowd to move): a locked piece he took is an upgrade (and its unlock); his locks follow; his move counts. */
+  /**
+   * His first capture, as his move is about to show (`move`: the move he plays; him to move): the crosshair locks onto the piece it
+   * takes (never the king; your queen too), his point (`lockOn` with `first`, this crowd turn's moment while he still thinks), and
+   * the move shows after it (the server holds it, solo waits: CHANDY_FX.lockOn). Returns the square; null: not his first capture,
+   * or it's marked already.
+   */
+  firstLock(b: Battle, move: string): string | null {
+    const boss = b.state.boss;
+    const p = boss?.powers;
+    const c = p?.chandy;
+    if (!boss || !p || !c || boss.id !== "chandy" || boss.result || c.taught || c.locks.length || !b.bossToMove() || b.finalGameOver()) return null;
+    const fen = boardOf(b).fen;
+    // (The runner checks it against his allowed moves first: bossMoveMoment.)
+    if (!legalMoves(fen).includes(move)) return null;
+    const sq = capturedSquare(fen, move);
+    const piece = sq ? pieceAt(fen, sq) : null;
+    if (!sq || !piece || piece.color !== boss.crowdSide || piece.type === "k") return null;
+    setChandy(b, (x) => ({ ...x, locks: [{ square: sq, piece: piece.type, at: x.moves }] }), [{ kind: "lockOn", turn: p.turn, square: sq, first: true }]);
+    return sq;
+  },
+
+  /**
+   * After his move (the crowd to move): a locked piece he took is an upgrade (and its unlock), and so is his first capture of a piece
+   * of yours (the first lock: firstLock marked it as the move showed; where nothing did, it counts all the same); his locks follow;
+   * his move counts.
+   */
   afterHisMove(b: Battle, move: string): void {
     const boss = b.state.boss;
     const p = boss?.powers;
@@ -1035,7 +1058,12 @@ export const chandyBattle = {
     let c: ChandyState = { ...p.chandy, moves: p.chandy.moves + 1 };
     if (before) {
       const taken = capturedSquare(before, move);
-      const hit = taken ? c.locks.some((l) => l.square === taken) : false;
+      const victim = taken ? pieceAt(before, taken) : null;
+      const first = !c.taught && !!victim && victim.color === boss.crowdSide && victim.type !== "k";
+      // (Before his first capture the only lock is its own mark: one on a piece his move didn't take goes.)
+      if (!c.taught) c.locks = c.locks.filter((l) => l.square === taken);
+      if (first) c.taught = true;
+      const hit = first || (taken ? c.locks.some((l) => l.square === taken) : false);
       c.locks = locksAfter(before, move, c.locks);
       if (hit && c.upgrades < s.upgradesMax) {
         const unlock = unlockPick(c.unlocked, p.seed, c.upgrades);
@@ -1124,14 +1152,20 @@ export const chandyBattle = {
     return queen;
   },
 
-  /** His locks now (the steering's squares: the boss request's `lock`), or null: none, or not his move. */
+  /** His hunting locks now (the steering's squares: the boss request's `lock`), or null: none, or not his move. Never before his first capture: that move is his engine's own. */
   steer(b: Battle): string[] | null {
     const boss = b.state.boss;
     const c = boss?.powers?.chandy;
-    if (!boss || !c || boss.id !== "chandy" || !c.locks.length || !b.bossToMove()) return null;
+    if (!boss || !c || boss.id !== "chandy" || !c.taught || !c.locks.length || !b.bossToMove()) return null;
     return c.locks.map((l) => l.square);
+  },
+
+  /** The test switch's move (`?power=lockon`, solo): until his first capture, a capture whenever one nets him no loss (testCapture); else null. */
+  testMove(b: Battle, allowed: readonly string[] | null): string | null {
+    const boss = b.state.boss;
+    const c = boss?.powers?.chandy;
+    if (!boss || !c || boss.id !== "chandy" || c.taught || b.settings.bossPowerTest !== "lockon" || !b.bossToMove()) return null;
+    return testCapture(boardOf(b).fen, boss.crowdSide, boss.powers!.seed, allowed);
   },
 };
 
-/** His moments at the start of his turn, after the crowd's move (his first lock, the queen lock's shot), from a turn's events: his move waits for them. */
-export const chandyTurnEvents = (events: readonly PowerEvent[]): PowerEvent[] => events.filter((e) => e.kind === "queenShot" || (e.kind === "lockOn" && e.first));

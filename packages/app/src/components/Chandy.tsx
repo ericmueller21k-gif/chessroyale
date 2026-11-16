@@ -3,7 +3,7 @@
  * docs/ideas/chandy-wiring.md; docs/decisions/2026-11-16-chandy-rules.md), all from the shared state and each moment's start, so
  * everyone online sees the same thing:
  * - **His locks:** a crosshair on each locked piece of yours, its pips counting the turns it has left (3, 2, 1); a new one snaps on
- *   as he points (`lockOn`; his first, as his turn begins, while he thinks: chandyTurnMoments).
+ *   as he points (`lockOn`; his first, on the piece his first capture takes, before that move shows: chandyTurnMoments).
  * - **The upgrade window** (`upgrade`, 2 s, the clock held): the rifle at its new stage, the part snapping on, "UPGRADE!", the move
  *   it unlocked (ChandyUpgrade), front and center over the board.
  * - **His meter's moves** (each with its banner, your pawn on it, and his shot from the board's corner): scatter shot's burst and
@@ -193,28 +193,33 @@ const MOMENTS: Record<"lockOn" | "upgrade" | "scatterShot" | "beam" | "shields" 
   dodgeWin: { order: 3, kit: "ultimateHit", view: () => null },
 };
 
-/** When this device first saw his moments at the start of each of his turns (they play from then), by battle and turn. */
+/** When this device first saw each of his moments in his turns (they play from then), by battle, turn and moment. */
 const turnSeen = new Map<string, number>();
 
 /**
- * His moments at the start of his turn, after your move (his first lock, the queen lock's shot), from this turn's events, timed
- * from when this device first saw them, one after another; his move waits for them (chandyTurnMs).
+ * His moments in his turn, while he thinks (the queen lock's shot as it begins; his first lock as his first capture is about to show,
+ * with his move known: chandyBattle.firstLock), from this turn's events, each from when this device first saw it and never before the
+ * one ahead of it ends; his move waits for them (chandyTurnMs, and the server's hold of his first capture).
  */
 export function chandyTurnMoments(boss: BossView, now = Date.now()): Moment[] {
   const p = boss.powers;
   if (boss.id !== "chandy" || !p) return [];
   const list = p.events.filter((e) => e.turn === p.turn && (e.kind === "queenShot" || (e.kind === "lockOn" && e.first)));
   if (!list.length) return [];
-  const seenKey = `${boss.id}:${boss.startMove}:${p.turn}`;
-  let at = turnSeen.get(seenKey);
-  if (at === undefined) {
-    turnSeen.set(seenKey, (at = now));
-    if (turnSeen.size > 20) turnSeen.delete(turnSeen.keys().next().value!);
-  }
-  let t = at;
+  const seen = (kind: string) => {
+    const seenKey = `${boss.id}:${boss.startMove}:${p.turn}:${kind}`;
+    let at = turnSeen.get(seenKey);
+    if (at === undefined) {
+      turnSeen.set(seenKey, (at = now));
+      if (turnSeen.size > 20) turnSeen.delete(turnSeen.keys().next().value!);
+    }
+    return at;
+  };
+  let t = 0;
   return [...list]
     .sort((a, b) => MOMENTS[a.kind as keyof typeof MOMENTS].order - MOMENTS[b.kind as keyof typeof MOMENTS].order)
     .map((e) => {
+      t = Math.max(t, seen(e.kind));
       const m: Moment = { kind: e.kind, key: `${boss.id}:${e.kind}:${e.turn}:${e.square ?? ""}`, at: t, ms: CHANDY_FX[e.kind as keyof typeof CHANDY_FX], ...(e.square ? { square: e.square } : {}), ...(e.squares ? { squares: e.squares } : {}), ...(e.fizzled ? { fizzled: e.fizzled } : {}), ...(e.first ? { first: true as const } : {}), ...(e.shape ? { shape: e.shape } : {}) };
       t += m.ms;
       return m;

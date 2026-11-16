@@ -2622,6 +2622,16 @@ export class LobbyCore {
       this.broadcast(this.bossMessage(until));
       return this.setTimer("nextRound", until);
     }
+    // Chandy's first capture: the crosshair locks onto the piece before his move shows (his point, while he still thinks), then the
+    // move, held for the moment as your queen banner holds it (bossMinAt; the same on solo: playBoss's beforeShow).
+    const holdMs = this.runner!.bossMoveMoment(move);
+    if (holdMs) {
+      this.r.bossMinAt = this.io.now() + holdMs;
+      this.r.bossPending = move;
+      this.r.bossPendingExtras = extras;
+      this.broadcast(this.bossMessage(0, { thinking: true }));
+      return this.setTimer("bossPlay", this.r.bossMinAt);
+    }
     // (Wrangler's drag or showdown line-up, Moo's lines for his Moonbeam, the circus tiger's hoops and balloon square,
     // Folio's Crease line: the runner checks each against the rules before it's used.)
     this.runner!.applyBossMove(move, undefined, { drag: extras.drag ?? null, showdown: extras.showdown ?? null, outside: extras.outside ?? null, beam: extras.beam ?? null, balloon: extras.balloon ?? null, hoops: extras.hoops ?? null, crease: extras.crease ?? null });
