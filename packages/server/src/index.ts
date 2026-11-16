@@ -42,9 +42,9 @@ export { EngineServer } from "./engine.ts";
 
 // The Durable Objects' entry points (their fetch, WebSocket handlers, alarm and the methods the Worker calls): an
 // error in one is logged and counted (problems.ts), then thrown on as before.
-guardEntries(Lobby, "Lobby", ["fetch", "webSocketMessage", "webSocketClose", "alarm", "exists", "status", "create", "joinable", "reserve", "release", "hurry"]);
+guardEntries(Lobby, "Lobby", ["fetch", "webSocketMessage", "webSocketClose", "alarm", "exists", "status", "create", "joinable", "reserve", "reserveParty", "release", "hurry"]);
 guardEntries(SquadsLobby, "SquadsLobby", ["fetch", "webSocketMessage", "webSocketClose", "alarm", "exists", "status", "create", "reserve"]);
-guardEntries(SquadsParty, "SquadsParty", ["fetch", "webSocketMessage", "webSocketClose", "alarm", "create", "status"]);
+guardEntries(SquadsParty, "SquadsParty", ["fetch", "webSocketMessage", "webSocketClose", "alarm", "create", "status", "crowdMayInvite", "crowdInvited", "crowdUninvited"]);
 guardEntries(Matchmaker, "Matchmaker", ["next", "duelNext", "cancel"]);
 guardEntries(DuelGame, "DuelGame", ["fetch", "webSocketMessage", "webSocketClose", "alarm", "exists", "status", "create", "abandon"]);
 guardEntries(LiveHub, "LiveHub", ["seen", "arrive", "report", "forget", "liveCounts", "players", "health", "presence", "chatRead", "chatPost", "chatIcon", "alarm"]);
@@ -165,7 +165,7 @@ async function handle(request: Request, rawEnv: Env, ctx: ExecutionContext): Pro
     {
       ip: request.headers.get("cf-connecting-ip"),
       session: readCookie(request, SESSION_COOKIE),
-      play: request.method === "POST" && (url.pathname === "/api/play" || url.pathname === "/api/lobby" || url.pathname === "/api/1v1/play" || /^\/api\/squads\/(play|party|lobby)$/.test(url.pathname) || url.pathname === "/api/boss/party"),
+      play: request.method === "POST" && (url.pathname === "/api/play" || url.pathname === "/api/lobby" || url.pathname === "/api/1v1/play" || /^\/api\/squads\/(play|party|lobby)$/.test(url.pathname) || url.pathname === "/api/boss/party" || url.pathname === "/api/crowd/party"),
       friends: request.method === "POST" && url.pathname.startsWith("/api/friends/"),
       search: request.method === "GET" && url.pathname === "/api/friends/search",
     },
@@ -312,12 +312,30 @@ async function route(request: Request, rawEnv: Env, url: URL, waitUntil: WaitUnt
       const code = await openLobbyCode(async (c) => env.PARTIES.get(env.PARTIES.idFromName(c)).create(c, "", 0, "boss"));
       return code ? json({ code }) : json({ message: "Couldn't make a party. Try again." }, 500);
     }
-    const bp = url.pathname.match(/^\/api\/boss\/party\/([A-Z2-9]{5})(\/ws)?$/i);
+    // 50 v 50's party (Nov 16; docs/decisions/2026-11-16-crowd-party.md): POST /api/crowd/party[?pool=] → { code }: a new party,
+    // its maker the first member. No link: friends get in only by a member's invite (friends-api.ts). GET /api/crowd/party/CODE →
+    // { open, members, state } | 404; …/ws: its WebSocket. Squads' object (PARTIES) with kind "crowd"; its Find match queues as
+    // PLAY's Default does (a pooled member: the engine pool's queue). 50 v 50's kill switch rests it, and so does friends'.
+    if (url.pathname === "/api/crowd/party" && request.method === "POST") {
+      if (isPaused(rawEnv, "crowd")) return pausedResponse("crowd");
+      if (isPaused(rawEnv, "friends")) return pausedResponse("friends");
+      const may = await mayPlay(request, env, waitUntil);
+      if (may instanceof Response) return may;
+      const fill = Math.max(3, Math.min(600, Number(env.MATCH_FILL_SECONDS ?? 60) || 60));
+      const region = regionOf(request.cf as { continent?: unknown } | undefined);
+      const pool = await testPool(request, env, url, waitUntil);
+      const [name, pooled] = [queueName("crowd", "default", pool, region), queueName("crowd", "default", pool, region, true)];
+      const code = await openLobbyCode(async (c) => env.PARTIES.get(env.PARTIES.idFromName(c)).create(c, name, fill * 1000, "crowd", pooled, may.uid));
+      return code ? json({ code }) : json({ message: "Couldn't make a party. Try again." }, 500);
+    }
+    const bp = url.pathname.match(/^\/api\/(boss|crowd)\/party\/([A-Z2-9]{5})(\/ws)?$/i);
     if (bp) {
-      const stub = env.PARTIES.get(env.PARTIES.idFromName(bp[1]!.toUpperCase()));
-      if (bp[2]) return (await stub.status()) ? stub.fetch(request) : json({ message: "We couldn't find that party." }, 404);
-      const status = request.method === "GET" ? await stub.status() : null;
-      return status ? json({ open: true, ...status }) : json({ open: false, message: "That party has closed." }, 404);
+      const stub = env.PARTIES.get(env.PARTIES.idFromName(bp[2]!.toUpperCase()));
+      // (Only a party of the path's own kind: a Boss Battle party's code never opens as a 50 v 50 party's, or the other way.)
+      const status = await stub.status();
+      const mine = status?.kind === bp[1]!.toLowerCase() ? status : null;
+      if (bp[3]) return mine ? stub.fetch(request) : json({ message: "We couldn't find that party." }, 404);
+      return mine && request.method === "GET" ? json({ open: true, ...mine }) : json({ open: false, message: "That party has closed." }, 404);
     }
     // Squads (docs/areas/squads.md, "The server"): its queue, parties and lobbies, and the test lobby.
     const squads = await squadsRoute(request, env, url, waitUntil);
@@ -537,11 +555,11 @@ async function engineCaller(request: Request, env: Env, waitUntil: WaitUntil): P
  * and not banned for fair play (an evasion ban banCheck finds now: the ban answer, ban-gate.ts, as the gate gives a banned session).
  * Else go ahead, with whether the account is in fair play's engine pool (its queues are the pool's own; nothing in the answer says so).
  */
-async function mayPlay(request: Request, env: Env, waitUntil: WaitUntil): Promise<Response | { pooled: boolean }> {
+async function mayPlay(request: Request, env: Env, waitUntil: WaitUntil): Promise<Response | { pooled: boolean; uid?: string }> {
   if (!env.DB) return { pooled: false };
   const me: User | null = await accountOf(request, env, waitUntil);
   if (signInRequired(env) && !isSignedIn(me)) return json({ message: SIGN_IN_TO_PLAY }, 401);
   const ban: { banned: boolean; pooled?: boolean } = await banCheck(d1Sql(env.DB), me, readCookie(request, DEVICE_COOKIE), Date.now()).catch(() => ({ banned: false }));
   if (ban.banned && me) return banAnswer(d1Sql(env.DB), readCookie(request, SESSION_COOKIE), me.id);
-  return { pooled: !!ban.pooled };
+  return { pooled: !!ban.pooled, ...(me ? { uid: me.id } : {}) };
 }

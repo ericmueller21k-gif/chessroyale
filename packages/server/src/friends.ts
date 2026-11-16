@@ -55,10 +55,14 @@ export const FRIENDS_SCHEMA = [
   )`,
 ];
 
-/** Settings kept on the account: who may invite you (NULL: everyone), and hiding when you're online (1). */
+/**
+ * Settings kept on the account: who may invite you (NULL: everyone), hiding when you're online (1), and Do Not Disturb (1: no
+ * invites or friend requests reach you, Eric, Nov 16).
+ */
 export const FRIENDS_COLUMNS = [
   { table: "users", column: "allow_invites", type: "TEXT" },
   { table: "users", column: "hide_online", type: "INTEGER" },
+  { table: "users", column: "dnd", type: "INTEGER" },
 ];
 
 export const FRIEND_TEXT = {
@@ -74,6 +78,7 @@ export const FRIEND_TEXT = {
   noRequest: "That request isn't there any more.",
   maxBlocked: `You've blocked ${FRIENDS.maxBlocked} players, the most you can. Unblock someone first.`,
   notTaking: "This player isn't taking invites right now.",
+  notTakingRequests: "This player isn't taking friend requests right now.",
   reinvite: "You just invited them. Give them a moment.",
   invitesHour: "You've sent a lot of invites. Try again in a while.",
 } as const;
@@ -91,8 +96,9 @@ interface Target {
   email: string | null;
   google_sub: string | null;
   allow_invites: string | null;
+  dnd: number | null;
 }
-const target = (sql: Sql, id: string) => sql.first<Target>("SELECT id, email, google_sub, allow_invites FROM users WHERE id = ?", id);
+const target = (sql: Sql, id: string) => sql.first<Target>("SELECT id, email, google_sub, allow_invites, dnd FROM users WHERE id = ?", id);
 const signedIn = (t: Pick<Target, "email" | "google_sub">) => !!(t.email || t.google_sub);
 
 /**
@@ -134,6 +140,8 @@ export async function sendRequest(sql: Sql, meId: string, toId: string, needSign
   const blockedByThem = await isBlocking(sql, toId, meId);
   if (!blockedByThem && (await sql.first("SELECT 1 AS x FROM friend_requests WHERE from_id = ? AND to_id = ?", toId, meId))) return befriend(sql, meId, toId, now);
   if (await sql.first("SELECT 1 AS x FROM friend_requests WHERE from_id = ? AND to_id = ?", meId, toId)) return { ok: true };
+  // (Do Not Disturb: no request reaches them; the quiet refusal, as an invite's "no one".)
+  if (t.dnd) return fail(FRIEND_TEXT.notTakingRequests, 403);
   if ((await friendCount(sql, meId)) >= FRIENDS.max) return fail(FRIEND_TEXT.maxFriends);
   if ((await countOf(sql, "SELECT COUNT(*) AS n FROM friend_requests WHERE from_id = ?", meId)) >= FRIENDS.maxPendingSent) return fail(FRIEND_TEXT.maxPending);
   if (!(await spend(sql, meId, "request", FRIENDS.requestsPerDay, 86_400_000, now))) return fail(FRIEND_TEXT.requestsToday, 429);
@@ -244,22 +252,27 @@ export async function mayInvite(sql: Sql, meId: string, toId: string, needSignIn
   if (needSignIn && !signedIn(t)) return fail(FRIEND_TEXT.guestInvite);
   if (await isBlocking(sql, meId, toId)) return fail(FRIEND_TEXT.unblockFirst);
   const setting: InviteSetting = isInviteSetting(t.allow_invites) ? t.allow_invites : "everyone";
-  if (setting === "none" || (await isBlocking(sql, toId, meId)) || (setting === "friends" && !(await areFriends(sql, meId, toId)))) return fail(FRIEND_TEXT.notTaking, 403);
+  // (Do Not Disturb refuses as "No one" does: the same words, so it's never found out.)
+  if (setting === "none" || t.dnd || (await isBlocking(sql, toId, meId)) || (setting === "friends" && !(await areFriends(sql, meId, toId)))) return fail(FRIEND_TEXT.notTaking, 403);
   const last = await sql.first<{ at: number }>("SELECT at FROM invites WHERE from_id = ? AND to_id = ?", meId, toId);
   if (last && now - last.at < FRIENDS.reinviteMs) return fail(FRIEND_TEXT.reinvite, 429);
   return { ok: true };
 }
 
-/** An invite to you, dismissed (or used: joining takes it off your list). */
-export async function dismissInvite(sql: Sql, meId: string, fromId: string): Promise<Done> {
-  await sql.run("DELETE FROM invites WHERE from_id = ? AND to_id = ?", fromId, meId);
-  return { ok: true };
+/**
+ * An invite to you, dismissed (or used: joining takes it off your list). What it was for comes back (a 50 v 50 party's seat then
+ * shows "+" again: friends-api.ts).
+ */
+export async function dismissInvite(sql: Sql, meId: string, fromId: string): Promise<Done & { was?: { kind: InviteKind; code: string } }> {
+  const was = await sql.first<{ kind: InviteKind; code: string }>("DELETE FROM invites WHERE from_id = ? AND to_id = ? RETURNING kind, code", fromId, meId);
+  return { ok: true, ...(was ? { was: { kind: was.kind, code: was.code } } : {}) };
 }
 
-/** Your settings: who may invite you, and whether others see when you're online. Unknown values are ignored. */
-export async function setFriendSettings(sql: Sql, meId: string, patch: { invites?: unknown; showOnline?: unknown }): Promise<Done> {
+/** Your settings: who may invite you, whether others see when you're online, and Do Not Disturb. Unknown values are ignored. */
+export async function setFriendSettings(sql: Sql, meId: string, patch: { invites?: unknown; showOnline?: unknown; dnd?: unknown }): Promise<Done> {
   if (isInviteSetting(patch.invites)) await sql.run("UPDATE users SET allow_invites = ? WHERE id = ?", patch.invites === "everyone" ? null : patch.invites, meId);
   if (typeof patch.showOnline === "boolean") await sql.run("UPDATE users SET hide_online = ? WHERE id = ?", patch.showOnline ? null : 1, meId);
+  if (typeof patch.dnd === "boolean") await sql.run("UPDATE users SET dnd = ? WHERE id = ?", patch.dnd ? 1 : null, meId);
   return { ok: true };
 }
 
@@ -273,7 +286,7 @@ export type PresenceOf = (ids: string[]) => Promise<Record<string, Presence> | n
 export async function friendsState(sql: Sql, meId: string, now: number, presenceOf?: PresenceOf): Promise<FriendsState> {
   // (Its reads at once, Nov 10: each D1 read is a round trip; then who's online among the friends.)
   const [me, rows, requests, sent, invites, blocked] = await Promise.all([
-    sql.first<{ allow_invites: string | null; hide_online: number | null }>("SELECT allow_invites, hide_online FROM users WHERE id = ?", meId),
+    sql.first<{ allow_invites: string | null; hide_online: number | null; dnd: number | null }>("SELECT allow_invites, hide_online, dnd FROM users WHERE id = ?", meId),
     sql.all<FriendRow & { name: string; since: number }>(
       "SELECT u.id, u.name, f.since, u.last_seen, u.hide_online FROM friends f JOIN users u ON u.id = f.friend_id WHERE f.user_id = ?",
       meId,
@@ -305,9 +318,10 @@ export async function friendsState(sql: Sql, meId: string, now: number, presence
     friends,
     requests,
     sent,
-    invites: invites.map((i) => ({ from: i.from_id, name: i.name, kind: i.kind, code: i.code, at: i.at, expiresAt: i.expires_at })),
+    // (Do Not Disturb: none reach you, even those sent before you turned it on; they lapse as usual.)
+    invites: me?.dnd ? [] : invites.map((i) => ({ from: i.from_id, name: i.name, kind: i.kind, code: i.code, at: i.at, expiresAt: i.expires_at })),
     blocked,
-    settings: { invites: isInviteSetting(me?.allow_invites) ? me.allow_invites : "everyone", showOnline: !me?.hide_online },
+    settings: { invites: isInviteSetting(me?.allow_invites) ? me.allow_invites : "everyone", showOnline: !me?.hide_online, dnd: !!me?.dnd },
   };
 }
 

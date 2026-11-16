@@ -5,7 +5,7 @@ import { SERVER_LOST_MS, phase2Unvouched, quickMove, recluseLobby, mateFirst, re
 import type { BossLobby } from "./bosses/base.ts";
 import { hearsTyped, typedReads, typedSay, typedSeat, type TypedSeats } from "./typed-chat.ts";
 import { QUICK_CHAT, botChatLines, canSay, canSayToAll, chatCheck, chatSay, chatSent, mulberry32, noChatSent, ownedChatPacks, type BotChatMoment, type ChatSent } from "@chessroyale/core";
-import { FAIRPLAY, type FairMove } from "@chessroyale/core";
+import { FAIRPLAY, packParties, type FairMove } from "@chessroyale/core";
 import { BOSS_BRAIN, BOSS_CHECK, BOSS_PARTY, BOSS_POWERS, HIDDEN_ROOM, RECLUSE_ONLINE, RECLUSE_PHASE2, finishBoss, recluseNextForm, DEFAULT_SETTINGS, JUDGES, isTeamMatch, type JudgeConfig, FRONT_DOOR, LEAVING, LOBBY_LIFE, MATCHMAKING, isRankedMatch, type PlayerState, brilliance, cleanLook, matchFeats, type ItemLook, type MatchFeats, botVotes, castPregameVote, closePregameVote, raidBossElo, bossDef, clockAfterVote, cutSeconds, pregameVotes, voteResultMs, type Augment, type DrawRule, type Settings } from "@chessroyale/core";
 import {
   MatchRunner,
@@ -297,6 +297,11 @@ export interface LiveMatchBoard {
 export interface LobbyRecord {
   code: string;
   createdAt: number;
+  /**
+   * A matchmade 50 v 50's parties (Nov 16, docs/decisions/2026-11-16-crowd-party.md), by their pass: the seats held for them
+   * (`size`, until `until`: then any not taken go back to everyone), and who of them has joined. Each plays on one team.
+   */
+  crowdParties?: Record<string, { size: number; ids: string[]; until: number }>;
   /** (`phase2`: the Hidden Boss's phase change and four boards online, from the cutscene's hold on: `recluse2`.) */
   phase: "lobby" | "opening" | "vote" | "play" | "scoring" | "reveal" | "stageBreak" | "final" | "boss" | "phase2" | "results";
   humans: Human[];
@@ -959,9 +964,38 @@ export class LobbyCore {
     this.broadcast(this.lobbyMessage(), false);
   }
 
-  /** Matchmaking: seats still free for new players (0 once it no longer takes players). */
+  /** Matchmaking: seats still free for new players (0 once it no longer takes players), less those held for parties on their way. */
   seatsLeft(): number {
-    return this.joinable() ? this.settings.lobbySize - this.r.humans.length : 0;
+    return this.joinable() ? Math.max(0, this.settings.lobbySize - this.r.humans.length - this.partyHeld()) : 0;
+  }
+
+  /** Seats held for 50 v 50 parties' members still on their way (until their hold runs out). */
+  private partyHeld(): number {
+    const now = this.io.now();
+    return Object.values(this.r.crowdParties ?? {}).reduce((n, p) => n + (p.until > now ? Math.max(0, p.size - p.ids.length) : 0), 0);
+  }
+
+  /**
+   * Matchmaking: a 50 v 50 party's seats, all `size` of them, held `ms` under its `pass` (its members join with it), or none:
+   * `singles` seats are held for players on their way already, and every party here must still fit whole on one team
+   * (packParties, with half the seats a side). True: held (asked again for the same pass: as it was).
+   */
+  reserveParty(size: number, pass: string, ms: number, singles = 0): boolean {
+    if (!pass || !(size >= 1) || this.r.party || !isTeamMatch(this.settings)) return false;
+    if (this.r.crowdParties?.[pass]) return true;
+    if (size > this.seatsLeft() - singles) return false;
+    const now = this.io.now();
+    // (A party's seats on its team: those held while the hold lasts, then those who came.)
+    const sizes = [...Object.values(this.r.crowdParties ?? {}).map((p) => (p.until > now ? Math.max(p.size, p.ids.length) : p.ids.length)), size];
+    const half = Math.floor(this.settings.lobbySize / 2);
+    if (!packParties(sizes, half, this.settings.lobbySize - half, () => 0.5)) return false;
+    this.r.crowdParties = { ...(this.r.crowdParties ?? {}), [pass]: { size, ids: [], until: now + ms } };
+    return true;
+  }
+
+  /** Whether this player came in as a 50 v 50 party's member (their seat was held, not one of the anonymous ones). */
+  inCrowdParty(playerId: string): boolean {
+    return Object.values(this.r.crowdParties ?? {}).some((p) => p.ids.includes(playerId));
   }
 
   private standings(): NetStanding[] {
@@ -1089,6 +1123,9 @@ export class LobbyCore {
       pl.seats[id] = seat;
       pl.members = { ...(pl.members ?? {}), [id]: admit.member };
     }
+    // A 50 v 50 party's member: in its group (they'll play on one team), while it has room for them.
+    const crowd = typeof party.pass === "string" && !pl ? this.r.crowdParties?.[party.pass] : undefined;
+    if (crowd && crowd.ids.length < crowd.size) crowd.ids.push(id);
     if (!this.r.hostId) this.r.hostId = id;
     delete this.r.emptiedAt;
     this.send(id, { t: "welcome", playerId: id, token: newToken, code: this.r.code }, false);
@@ -1708,6 +1745,8 @@ export class LobbyCore {
       library: this.library,
       entrants: [...this.r.humans.map((h) => ({ id: h.id, name: h.name, isBot: false, practice: !!h.practice })), ...bots],
       clock: () => this.io.now(),
+      // (A 50 v 50's parties: each on one team, those still here.)
+      ...(this.r.crowdParties ? { together: Object.values(this.r.crowdParties).map((p) => p.ids.filter((id) => this.human(id))) } : {}),
     });
     const now = this.io.now();
     if (this.r.auto) {

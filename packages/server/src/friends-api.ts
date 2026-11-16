@@ -1,4 +1,4 @@
-import { isGameCode, isInviteKind, pausedLine, type InviteKind } from "@chessroyale/core";
+import { FRIENDS, isGameCode, isInviteKind, pausedLine, type InviteKind } from "@chessroyale/core";
 import { d1Sql, ensureSchema } from "./accounts.ts";
 import { DEVICE_COOKIE, SESSION_COOKIE, accountOf, isSignedIn, readCookie, signInRequired, type AccountEnv, type WaitUntil } from "./api.ts";
 import { cachedUserId } from "./presence.ts";
@@ -54,9 +54,10 @@ const isId = (v: unknown): v is string => typeof v === "string" && /^[A-Za-z0-9_
  *   fields only; banned, test accounts and, where signing in is set up, guests left out). Its own rate limit (CAPACITY.rateLimits.search).
  * POST /api/friends/ACTION with JSON, each answering with the list as it is after it (or { message } and a status):
  *   request {id} · answer {id, accept} · cancel {id} · remove {id} · block {id} · unblock {id}
- *   invite {id, kind, code}: to your private lobby (kind: its mode) or Squads party ("squads"), still open;
+ *   invite {id, kind, code}: to your private lobby (kind: its mode) or Squads party ("squads"), still open, or your 50 v 50 party
+ *     ("crowdparty": a member only, while it has room and isn't searching; its seat shows "…" until they answer);
  *     invite {id, check: true}: only whether they'd take one (asked before making a lobby or party for it)
- *   dismiss {id}: an invite to you (by who sent it) · settings {invites?, showOnline?}
+ *   dismiss {id}: an invite to you (by who sent it; a 50 v 50 party's seat shows "+" again) · settings {invites?, showOnline?, dnd?}
  * Signed-in accounts only where signing in is set up; requests and invites not while banned. Rate limits: a burst
  * limit per account (limits.ts, CAPACITY.rateLimits.friends) and the daily and hourly caps (friends.ts, FRIENDS).
  */
@@ -117,9 +118,13 @@ export async function handleFriendsApi(request: Request, env: FriendsEnv, waitUn
     case "unblock":
       done = await unblock(sql, me.id, id);
       break;
-    case "dismiss":
-      done = await dismissInvite(sql, me.id, id);
+    case "dismiss": {
+      const out = await dismissInvite(sql, me.id, id);
+      // (A 50 v 50 party's: its seat is a "+" again. A member already, who joined with it: nothing changes.)
+      if (out.was?.kind === "crowdparty" && env.PARTIES) waitUntil(env.PARTIES.get(env.PARTIES.idFromName(out.was.code)).crowdUninvited(me.id).catch(() => undefined));
+      done = out;
       break;
+    }
     case "invite": {
       const { kind, code } = body;
       if (await banned()) return banAnswer(sql, readCookie(request, SESSION_COOKIE), me.id);
@@ -129,6 +134,18 @@ export async function handleFriendsApi(request: Request, env: FriendsEnv, waitUn
         break;
       }
       if (!isInviteKind(kind) || !isGameCode(code)) return json({ message: "Bad request" }, 400);
+      // A 50 v 50 party (Nov 16): friends only, by a member, while it has a seat for them; their seat shows "…" once it's sent.
+      if (kind === "crowdparty") {
+        const party = env.PARTIES?.get(env.PARTIES.idFromName(code));
+        const may = party ? await party.crowdMayInvite(me.id, id).catch(() => ({ ok: false as const, message: GAME_GONE })) : { ok: true as const };
+        if (!may.ok) return json({ message: may.message }, 409);
+        done = await sendInvite(sql, me.id, id, kind, code, needSignIn, now);
+        if (done.ok && party) {
+          const name = (await sql.first<{ name: string }>("SELECT name FROM users WHERE id = ?", id).catch(() => null))?.name ?? "Friend";
+          await party.crowdInvited(me.id, id, name, now + FRIENDS.inviteMinutes * 60_000).catch(() => undefined);
+        }
+        break;
+      }
       // Only to a private lobby still waiting for players, or a party still open (who's in it isn't checked: a code is
       // already an invite anyone can share). What it's for comes from the lobby itself, never the app.
       const target = await inviteTarget(env, kind, code);

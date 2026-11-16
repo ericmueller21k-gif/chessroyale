@@ -6,6 +6,7 @@ import {
   applyRound,
   startBanks,
   assignColours,
+  assignTeams,
   assignGroups,
   botChoose,
   botLeanFor,
@@ -274,6 +275,8 @@ export class MatchRunner {
        * online, the page's visible time solo. Without one, a stand-in (Battle.now).
        */
       clock?: () => number;
+      /** A 50 v 50's parties (each the entrant ids of one): each plays the match on one team (core's assignTeams). */
+      together?: readonly (readonly string[])[];
     },
   ) {
     this.top = new TopMovesCache(opts.settings.botCandidateMoves);
@@ -300,8 +303,12 @@ export class MatchRunner {
       this.usedFamilies.add(o.family);
     });
     this.state = createMatch(opts.entrants, openings.map((_, i) => i), opts.settings);
-    // Crowd 50 v 50: a random half play White all match, the rest Black.
-    this.state = assignColours(this.state, opts.rng, isTeamMatch(this.settings) ? Math.floor(this.alive().length / 2) : this.whiteSeats());
+    // Crowd 50 v 50: a random half play White all match, the rest Black (each party whole on one side).
+    const teams = isTeamMatch(this.settings);
+    this.state =
+      teams && opts.together?.length
+        ? assignTeams(this.state, opts.rng, Math.floor(this.alive().length / 2), opts.together)
+        : assignColours(this.state, opts.rng, teams ? Math.floor(this.alive().length / 2) : this.whiteSeats());
     if (this.settings.raid) this.startRaid();
     // (A start set before the match, the ?start= test switch: Random opening is the openings above; Freestyle here.)
     else this.setUpStart();

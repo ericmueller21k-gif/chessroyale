@@ -712,8 +712,8 @@ export function botLevelMean(id: BotLevelId, yourRating: number | null): number 
 }
 
 /**
- * A 50 v 50 party's people (Eric, Nov 9: queue together into the public 50 v 50 matchmaking, "like Fortnite squads", sides random, ranked):
- * you and up to 7 friends. Not built yet (a later job's matchmaker piece): home shows Party greyed. Unused until then.
+ * A 50 v 50 party's people (Eric, Nov 9 and 16: queue together into the public 50 v 50 matchmaking, on one team, the side drawn at
+ * random): you and up to 7 friends, invited from your friends list (docs/decisions/2026-11-16-crowd-party.md).
  */
 export const CROWD_PARTY_MAX = 8;
 

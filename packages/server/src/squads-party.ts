@@ -1,4 +1,4 @@
-import { BOSS_DIFFICULTY, BOSS_PARTY, SQUADS, SQUADS_LOBBY, cleanLook, type BossDifficultyId, type ItemLook } from "@chessroyale/core";
+import { BOSS_DIFFICULTY, BOSS_PARTY, CROWD_PARTY_MAX, SQUADS, SQUADS_LOBBY, cleanLook, type BossDifficultyId, type ItemLook } from "@chessroyale/core";
 import type { LobbyCloseReason } from "@chessroyale/chess";
 import { seatName } from "./text-filter.ts";
 import { SQUADS_PROTOCOL, type NetParty, type PartyClientMessage, type PartyServerMessage } from "@chessroyale/chess/squads";
@@ -57,6 +57,16 @@ export interface BossStart {
 /** Said to someone kicked from a Boss Battle party, at the stage or in its battle. */
 export const KICKED = "You were removed from the party.";
 
+/** A 50 v 50 party's refusals (docs/decisions/2026-11-16-crowd-party.md): it's friends only, by invite. */
+export const CROWD_PARTY_LINES = {
+  invitedOnly: "That invite has lapsed. Ask them to invite you again.",
+  searching: "Your friends are already looking for a match. Ask them to cancel and invite you again.",
+  full: "This party is full.",
+  notMember: "Join the party first, then invite friends.",
+  noRoom: "Your party is full.",
+  inParty: "They're already in your party.",
+} as const;
+
 export interface PartyRecord {
   v: 1;
   code: string;
@@ -75,8 +85,14 @@ export interface PartyRecord {
    * A Boss Battle party (docs/decisions/2026-10-30-boss-party.md): up to BOSS_PARTY.max, the leader's boss and
    * difficulty, the tokens of anyone kicked (never back in), and START's battle while the Durable Object makes it.
    */
-  kind?: "boss";
+  kind?: "boss" | "crowd";
   boss?: { id: string; difficulty: BossDifficultyId };
+  /**
+   * A 50 v 50 party (Nov 16): the account that made it (the first in), and its open invites (each friend's account, name, who
+   * invited them and when it lapses): only those accounts get in.
+   */
+  owner?: string;
+  invited?: { uid: string; name: string; from: string; expiresAt: number }[];
   /** Kicked: their tokens and accounts, never back in. */
   kicked?: string[];
   kickedUsers?: string[];
@@ -90,8 +106,18 @@ export interface PartyRecord {
   revokes?: string[];
 }
 
-export function newPartyRecord(code: string, now: number, kind?: "boss"): PartyRecord {
-  return { v: 1, code, createdAt: now, members: [], leaderId: null, counter: 0, state: "open", activeAt: now, ...(kind ? { kind, boss: { id: "", difficulty: "normal" } } : {}) };
+export function newPartyRecord(code: string, now: number, kind?: "boss" | "crowd", owner?: string): PartyRecord {
+  return {
+    v: 1,
+    code,
+    createdAt: now,
+    members: [],
+    leaderId: null,
+    counter: 0,
+    state: "open",
+    activeAt: now,
+    ...(kind === "boss" ? { kind, boss: { id: "", difficulty: "normal" as const } } : kind === "crowd" ? { kind, invited: [], ...(owner ? { owner } : {}) } : {}),
+  };
 }
 
 /** When a party closes: with nobody connected, SQUADS_LOBBY.partyIdleMinutes after anyone last did anything. */
@@ -125,13 +151,23 @@ export class PartyCore {
   }
 
   private get max(): number {
-    return this.r.kind === "boss" ? BOSS_PARTY.max : SQUADS.partyMax;
+    return this.r.kind === "boss" ? BOSS_PARTY.max : this.r.kind === "crowd" ? CROWD_PARTY_MAX : SQUADS.partyMax;
+  }
+
+  /** A 50 v 50 party's open invites (lapsed ones dropped). */
+  private openInvites(): NonNullable<PartyRecord["invited"]> {
+    const now = this.io.now();
+    const open = (this.r.invited ?? []).filter((i) => i.expiresAt > now);
+    if (this.r.invited && open.length !== this.r.invited.length) this.r.invited = open;
+    return open;
   }
 
   /** The party as `forId` sees it (a Boss Battle party's battle pass is each member's own). */
   view(forId?: string): NetParty {
     const boss = this.r.kind === "boss";
+    const crowd = this.r.kind === "crowd";
     const placed = this.r.placed ? (boss ? { ...this.r.placed, pass: (forId && this.r.passes?.[forId]) || "" } : { ...this.r.placed }) : null;
+    const look = (m: PartyMember) => (m.look && Object.keys(m.look).length ? { look: m.look } : {});
     return {
       code: this.r.code,
       leaderId: this.leaderNow(),
@@ -139,10 +175,12 @@ export class PartyCore {
         id: m.id,
         name: m.name,
         connected: m.connected,
-        ...(boss ? { seat: m.seat ?? 0, ready: !!m.ready, ...(m.look && Object.keys(m.look).length ? { look: m.look } : {}), ...(m.bot ? { bot: true as const } : {}), ...(m.userId ? { uid: m.userId } : {}) } : {}),
+        ...(boss ? { seat: m.seat ?? 0, ready: !!m.ready, ...look(m), ...(m.bot ? { bot: true as const } : {}), ...(m.userId ? { uid: m.userId } : {}) } : {}),
+        ...(crowd ? { ...look(m), ...(m.userId ? { uid: m.userId } : {}) } : {}),
       })),
       max: this.max,
       ...(boss && this.r.boss ? { boss: { ...this.r.boss } } : {}),
+      ...(crowd ? { kind: "crowd" as const, invited: this.openInvites().map(({ uid, name, expiresAt }) => ({ uid, name, expiresAt })) } : {}),
       state: this.r.state,
       ...(placed ? { placed } : {}),
       ...(this.r.state === "queueing" && this.r.busy ? { busy: { ...this.r.busy } } : {}),
@@ -169,16 +207,25 @@ export class PartyCore {
     if (opts.v !== SQUADS_PROTOCOL) return { ok: false, message: "Update the app to play Squads (reload the page)." };
     // (Kicked: neither that seat's token nor that account ever comes back in, with a token or without.)
     if ((token && this.r.kicked?.includes(token)) || (opts.userId && this.r.kickedUsers?.includes(opts.userId))) return { ok: false, message: KICKED };
-    const existing = token ? this.r.members.find((m) => m.token === token) : undefined;
+    const crowd = this.r.kind === "crowd";
+    // (A 50 v 50 party: one seat per account, as a lobby's; another tab or device of a member takes over their seat.)
+    const existing = crowd && opts.userId ? this.r.members.find((m) => m.userId === opts.userId) : token ? this.r.members.find((m) => m.token === token) : undefined;
     if (existing) {
       existing.connected = true;
       delete existing.goneAt;
-      if (this.r.kind === "boss" && opts.look !== undefined) existing.look = cleanLook(opts.look);
+      if ((this.r.kind === "boss" || crowd) && opts.look !== undefined) existing.look = cleanLook(opts.look);
       this.io.send(existing.id, { t: "welcome", v: SQUADS_PROTOCOL, memberId: existing.id, token: existing.token, code: this.r.code });
       this.broadcast();
       return { ok: true, memberId: existing.id };
     }
     if (this.r.members.length >= this.max) return { ok: false, message: "This party is full." };
+    // A 50 v 50 party: friends only (Eric, Nov 16): its maker first, then only an account a member invited (no codes, no links).
+    if (crowd) {
+      if (this.r.state === "queueing") return { ok: false, message: CROWD_PARTY_LINES.searching };
+      const first = this.r.counter === 0 && (!this.r.owner || this.r.owner === opts.userId);
+      if (!opts.userId || (!first && !this.openInvites().some((i) => i.uid === opts.userId))) return { ok: false, message: CROWD_PARTY_LINES.invitedOnly };
+      this.r.invited = this.openInvites().filter((i) => i.uid !== opts.userId);
+    }
     const id = `m${++this.r.counter}`;
     const name = seatName(opts.name, `Player ${this.r.members.length + 1}`);
     const member: PartyMember = {
@@ -188,7 +235,7 @@ export class PartyCore {
       connected: true,
       device: opts.device === "phone" ? "phone" : "computer",
       joinedAt: now,
-      ...(this.r.kind === "boss" ? { seat: this.freeSeat(), look: cleanLook(opts.look) } : {}),
+      ...(this.r.kind === "boss" ? { seat: this.freeSeat(), look: cleanLook(opts.look) } : crowd ? { look: cleanLook(opts.look) } : {}),
       ...(opts.userId ? { userId: opts.userId } : {}),
     };
     this.r.members.push(member);
@@ -196,6 +243,36 @@ export class PartyCore {
     this.io.send(id, { t: "welcome", v: SQUADS_PROTOCOL, memberId: id, token: member.token, code: this.r.code });
     this.broadcast();
     return { ok: true, memberId: id };
+  }
+
+  /**
+   * A 50 v 50 party: `from` (a member's account) invites the friend `to` (the friends API sends the invite itself, after this
+   * says yes, then calls invited()). Not while it's looking for a match; only while there's a seat for them (members and open
+   * invites count); asking again for someone invited already is fine.
+   */
+  mayInvite(from: string, to: string): { ok: true } | { ok: false; message: string } {
+    if (this.r.kind !== "crowd") return { ok: false, message: CROWD_PARTY_LINES.notMember };
+    if (!this.r.members.some((m) => m.userId === from)) return { ok: false, message: CROWD_PARTY_LINES.notMember };
+    if (this.r.members.some((m) => m.userId === to)) return { ok: false, message: CROWD_PARTY_LINES.inParty };
+    if (this.r.state === "queueing") return { ok: false, message: "Cancel the search first, then invite them." };
+    const open = this.openInvites();
+    if (!open.some((i) => i.uid === to) && this.r.members.length + open.length >= this.max) return { ok: false, message: CROWD_PARTY_LINES.noRoom };
+    return { ok: true };
+  }
+
+  /** The invite went out: their seat shows "…" until they come, decline or it lapses (`expiresAt`, as the invite's). */
+  invited(from: string, to: string, name: string, expiresAt: number) {
+    if (this.r.kind !== "crowd" || !this.mayInvite(from, to).ok) return;
+    this.r.activeAt = this.io.now();
+    this.r.invited = [...this.openInvites().filter((i) => i.uid !== to), { uid: to, name: seatName(name, "Friend"), from, expiresAt }];
+    this.broadcast();
+  }
+
+  /** Declined (or dismissed): their seat is a "+" again. A member already: nothing. */
+  uninvited(to: string) {
+    if (this.r.kind !== "crowd" || !this.r.invited?.some((i) => i.uid === to)) return;
+    this.r.invited = this.r.invited.filter((i) => i.uid !== to);
+    this.broadcast();
   }
 
   /** A (re)connected member's welcome and the party, again (sent before their socket could be found). */
@@ -406,11 +483,15 @@ export class PartyCore {
     this.broadcast();
   }
 
-  /** The leader queues everyone connected: seats for them all under a new pass (again after a lobby: a new one). */
+  /**
+   * The leader queues everyone connected: seats for them all under a new pass (again after a lobby: a new one). A 50 v 50 party's
+   * invites still out are dropped (they'd find the party gone; the Durable Object deletes them).
+   */
   private startQueue(id: string) {
     if (id !== this.leaderNow() || this.r.state === "queueing") return;
     const size = this.r.members.filter((m) => m.connected).length;
     if (size < 1) return;
+    if (this.r.kind === "crowd") this.r.invited = [];
     this.r.state = "queueing";
     delete this.r.placed;
     delete this.r.busy;

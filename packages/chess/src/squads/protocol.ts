@@ -470,7 +470,7 @@ export interface NetPartyMember {
   look?: ItemLook;
   ready?: boolean;
   bot?: true;
-  /** Their account (View profile). */
+  /** Their account (View profile; a 50 v 50 party's friends sheet shows them "In party"). */
   uid?: string;
 }
 
@@ -493,6 +493,13 @@ export interface NetParty {
    * everyone sees; any change un-readies everyone. `placed` is the battle (a lobby), joined with `pass` and your seat.
    */
   boss?: { id: string; difficulty: BossDifficultyId };
+  /**
+   * A 50 v 50 party (Nov 16, docs/decisions/2026-11-16-crowd-party.md): "crowd". Up to CROWD_PARTY_MAX friends, in only by an invite
+   * from a member (`invited`: still open, each a seat showing "…" until they come or it lapses at `expiresAt`, server time). The
+   * leader's Find match queues everyone connected into the public 50 v 50 matchmaking, on one team; `placed` is that lobby.
+   */
+  kind?: "crowd";
+  invited?: { uid: string; name: string; expiresAt: number }[];
 }
 
 export type PartyClientMessage =

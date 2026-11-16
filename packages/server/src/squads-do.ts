@@ -1,5 +1,5 @@
 import { DurableObject } from "cloudflare:workers";
-import { SQUADS, SQUADS_LOBBY, pausedLine } from "@chessroyale/core";
+import { SQUADS, SQUADS_LOBBY, modeSettings, pausedLine } from "@chessroyale/core";
 import type { LobbyCloseReason, Opening } from "@chessroyale/chess";
 import type { PartyClientMessage, PlayerBadge, SquadsClientMessage } from "@chessroyale/chess/squads";
 import openings from "@chessroyale/chess/data/openings.json";
@@ -479,18 +479,40 @@ export class SquadsParty extends DurableObject<Env> {
   /**
    * A new party under this code (false: the code is in use), queueing on `queueName` (lobbies fill after `fillMs`), or on
    * `poolName` when a member is in fair play's engine pool (read from their accounts as it queues). A Boss Battle party (`kind`
-   * "boss", boss-party.ts) has no queue: its START makes the battle.
+   * "boss", boss-party.ts) has no queue: its START makes the battle. A 50 v 50 party ("crowd", Nov 16) queues into the public
+   * 50 v 50 matchmaking; `owner` (its maker's account) is the only one in without an invite.
    */
-  async create(code: string, queueName: string, fillMs: number, kind?: "boss", poolName?: string): Promise<boolean> {
+  async create(code: string, queueName: string, fillMs: number, kind?: "boss" | "crowd", poolName?: string, owner?: string): Promise<boolean> {
     if (this.record && !(await this.closeIfDue())) return false;
-    this.record = { ...newPartyRecord(code, Date.now(), kind), queueName, fillMs, ...(poolName ? { poolName } : {}) };
+    this.record = { ...newPartyRecord(code, Date.now(), kind, owner), queueName, fillMs, ...(poolName ? { poolName } : {}) };
     await this.persist(this.core());
     return true;
   }
 
-  async status(): Promise<{ members: number; state: PartyRecord["state"] } | null> {
+  async status(): Promise<{ members: number; state: PartyRecord["state"]; kind?: "boss" | "crowd" } | null> {
     if (!this.record || (await this.closeIfDue())) return null;
-    return { members: this.record.members.length, state: this.record.state };
+    return { members: this.record.members.length, state: this.record.state, ...(this.record.kind ? { kind: this.record.kind } : {}) };
+  }
+
+  /**
+   * A 50 v 50 party's invites (friends-api.ts): whether member `from` may invite `to` now (asked before the invite is stored), that
+   * it went out (their seat shows "…"), and that they declined it. CROWD_PARTY_LINES are the refusals.
+   */
+  async crowdMayInvite(from: string, to: string): Promise<{ ok: true } | { ok: false; message: string }> {
+    if (!this.record || (await this.closeIfDue())) return { ok: false, message: "That party has closed." };
+    return this.core().mayInvite(from, to);
+  }
+  async crowdInvited(from: string, to: string, name: string, expiresAt: number): Promise<void> {
+    if (!this.record || (await this.closeIfDue())) return;
+    const core = this.core();
+    core.invited(from, to, name, expiresAt);
+    await this.persist(core);
+  }
+  async crowdUninvited(to: string): Promise<void> {
+    if (!this.record || (await this.closeIfDue())) return;
+    const core = this.core();
+    core.uninvited(to);
+    await this.persist(core);
   }
 
   async fetch(request: Request): Promise<Response> {
@@ -536,9 +558,12 @@ export class SquadsParty extends DurableObject<Env> {
     }
     const memberId = attached.playerId;
     if (!memberId) return;
+    const was = this.record.state;
     core.message(memberId, msg, { test: !!attached.test });
     if (msg.t === "leave") ws.close(4001, "Left the party");
     await this.persist(core, msg.t === "leave" ? ws : undefined);
+    // (A 50 v 50 party's Find match drops its invites still out: off the friends' lists too.)
+    if (this.record?.kind === "crowd" && was !== "queueing" && this.record.state === "queueing") this.ctx.waitUntil(this.dropInvites());
     if (this.record.kind === "boss") {
       await this.revokeInBattle();
       return this.makeBattle();
@@ -613,6 +638,14 @@ export class SquadsParty extends DurableObject<Env> {
     await this.persist(this.core());
   }
 
+  /** A 50 v 50 party's invites in the database (its Find match dropped them). Best effort: they lapse anyway. */
+  private async dropInvites() {
+    if (!this.env.DB || !this.record) return;
+    await d1Sql(this.env.DB)
+      .run("DELETE FROM invites WHERE kind = 'crowdparty' AND code = ?", this.record.code)
+      .catch(() => undefined);
+  }
+
   /** In line: ask the Squads matchmaker for seats for the party (its answer: a lobby, or busy and when to ask again). */
   private async askMatchmaker() {
     if (this.asking || !this.record) return;
@@ -628,12 +661,17 @@ export class SquadsParty extends DurableObject<Env> {
       if (!this.record) return;
       const queue = pooled ? this.record.poolName! : this.record.queueName;
       // Squads resting (a kill switch): the party waits in line with its line, asking again each minute, and goes in
-      // once it's back.
-      const answer = isPaused(this.env, "squads")
-        ? { busy: true as const, ticket: want.ticket ?? "", position: 0, waitSeconds: 60, retryMs: 60_000, message: pausedLine("squads") }
-        : await this.env.MATCHMAKER.get(this.env.MATCHMAKER.idFromName(queue))
-            .next({}, this.record.fillMs, { squads: true, ...(pooled ? { engine: true } : {}) }, want.ticket, { size: want.size, pass: want.pass })
-            .catch(() => null);
+      // once it's back. (A 50 v 50 party: 50 v 50's kill switch, the same way.)
+      const part = this.record.kind === "crowd" ? "crowd" : "squads";
+      const mm = this.env.MATCHMAKER.get(this.env.MATCHMAKER.idFromName(queue));
+      const info = { size: want.size, pass: want.pass };
+      // (A 50 v 50 party asks exactly as PLAY does, /api/play's Default: the same lobbies, the party's seats held whole under its pass.)
+      const answer = isPaused(this.env, part)
+        ? { busy: true as const, ticket: want.ticket ?? "", position: 0, waitSeconds: 60, retryMs: 60_000, message: pausedLine(part) }
+        : await (part === "crowd"
+            ? mm.next(JSON.parse(JSON.stringify(modeSettings("crowd", { augments: true }))), this.record.fillMs, { botsOff: false, crowdWaitsForFull: true, ...(pooled ? { engine: true } : {}) }, want.ticket, info)
+            : mm.next({}, this.record.fillMs, { squads: true, ...(pooled ? { engine: true } : {}) }, want.ticket, info)
+          ).catch(() => null);
       if (!this.record) return;
       const core = this.core();
       core.answered(want.pass, answer);
