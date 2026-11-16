@@ -463,6 +463,25 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
         return median * Math.exp(spread * Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v));
       };
       const dash = { pickSec, rushSec: patch.rushSec ?? 2.2, bankMs: BOSS_CLOCK.bankSeconds * 1000, minBankMs: BOSS_CLOCK.bankSeconds * 1000, slaps: 0, stolenMs: 0, scrambles: 0, scrambled: 0, flags: 0, scrambleFlags: 0, slapSeen: -1 };
+      // (Chandy: each lock (after which crowd move, its square), each upgrade (after which crowd move), the moves his meter fired,
+      // each queen lock aimed (or the turn it waited) and its shot, and each Dodge's rounds.)
+      const chandy = { locks: [] as { at: number; square: string }[], upgrades: [] as number[], fired: [] as { at: number; move: string }[], aims: [] as number[], aimWaits: [] as number[], shots: [] as { at: number; piece: string | null }[], dodges: [] as { at: number; rounds: number; hit: boolean; random: number }[] };
+      const chandySeen = new Set<string>();
+      const CHANDY_FIRED: Record<string, string> = { scatterShot: "scatter", beam: "beam", shields: "shields", rapidFire: "rapidfire", queenAim: "queenlock" };
+      const chandyLook = () => {
+        const p = runner.boss?.powers;
+        const c = p?.chandy;
+        if (!p || !c) return;
+        while (chandy.upgrades.length < c.upgrades) chandy.upgrades.push(runner.boss!.crowdMoves);
+        for (const e of p.events) {
+          const key = `${e.kind}@${e.turn}@${e.square ?? ""}`;
+          if (chandySeen.has(key)) continue;
+          chandySeen.add(key);
+          if (e.kind === "lockOn") chandy.locks.push({ at: e.turn, square: e.square ?? "" });
+          else if (CHANDY_FIRED[e.kind]) chandy.fired.push({ at: e.turn, move: CHANDY_FIRED[e.kind]! });
+          else if (e.kind === "queenShot") chandy.shots.push({ at: e.turn, piece: (e as { shape?: string }).shape ?? null });
+        }
+      };
       // (Timber: every drop and every Gnaw, and his bonus scraps.)
       const timber = { drops: [] as { at: number; piece: string; square: string }[], gnaws: [] as { at: number; square: string | null }[], bonus: 0 };
       const timberLook = () => {
@@ -521,11 +540,19 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
       };
       const t0 = Date.now();
       while (!runner.isOver()) {
+        if (bossId === "chandy") chandyLook();
         if (runner.stageComplete()) {
           result = runner.finishBossBattle();
           break;
         }
         if (runner.bossToMove()) {
+          if (bossId === "chandy" && runner.queenLockDue()) {
+            // (Chandy's queen lock: his whole turn, unless the pass guard has it wait: then his move.)
+            const at = runner.boss!.crowdMoves;
+            await runner.playQueenLock(engines).catch(() => runner.applyQueenLock(null));
+            (runner.bossToMove() ? chandy.aimWaits : chandy.aims).push(at);
+            chandyLook();
+          }
           if (runner.lightsOutDue()) {
             ults.push({ kind: "lightsout", turn: runner.boss!.crowdMoves });
             runner.startLightsOut();
@@ -660,6 +687,7 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
             const ultsBefore = runner.boss!.powers?.ults ?? 0;
             const tw = Date.now();
             await runner.playBoss(engines[0]);
+            if (bossId === "chandy") chandyLook();
             if (bossId === "timber") timberLook();
             if (bossId === "dash") {
               const slap = runner.boss!.powers?.dash?.slap;
@@ -700,6 +728,15 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
           const done = runner.boss!.powers?.carrots;
           if (castAt !== null && done && (done.spin || done.over === "won")) break;
           look();
+          continue;
+        }
+        // (Chandy's Dodge, as the crowd's turn begins: the bots' votes, round by round; a hit ends the battle.)
+        if (runner.dodgeDue()) {
+          const d0 = runner.boss!.powers!.chandy!.dodge!;
+          ults.push({ kind: "dodge", turn: runner.boss!.crowdMoves });
+          while (runner.dodgeDue()) runner.finishDodgeRound({});
+          const d = runner.boss!.powers!.chandy!.dodge!;
+          chandy.dodges.push({ at: d0.at, rounds: d.results.length, hit: d.results.some((r) => r.hit), random: d.results.filter((r) => r.random).length });
           continue;
         }
         if (runner.extraMoveDue()) {
@@ -777,6 +814,7 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
           if (patch.darkMiss && bossId === "hollow" && (await hollowDark())) continue;
           await runner.score(new Map());
         }
+        if (bossId === "chandy") chandyLook();
         if (tusksBefore && runner.boss!.powers?.fusion?.why === "taken" && runner.boss!.powers.fusion.at === runner.boss!.crowdMoves) alfil.taken++;
         if (runner.boss!.powers?.landed?.early && runner.boss!.powers.landed.at === runner.boss!.crowdMoves) alfil.early++;
         if (runner.bossKillDue()) runner.bossKill();
@@ -806,7 +844,7 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
           }
         : null;
       if (zs) for (const g of zs.gilds) ults.push({ kind: "goldPlate", turn: g.at });
-      const row = { boss: bossId, tag, seed, game: g, strikes: struck, tier: b.tier, elo: b.elo, result: result ?? b.result ?? null, moves: b.crowdMoves, ults: ults.length, ultTurns: ults.map((u) => u.turn), kinds: [...new Set(ults.map((u) => u.kind))], secs: Math.round((Date.now() - t0) / 1000), ...(bossId === "alfil" ? { alfil } : {}), ...(bossId === "hopper" ? { hopper, carrots } : {}), ...(bossId === "smudgy" ? { camo: camoRow, ...smudgy } : {}), ...(bossId === "moo" ? { moo } : {}), ...(bossId === "gardener" ? { garden } : {}), ...(bossId === "tiger" ? { tiger: { ...tiger, placed: b.powers?.balloon?.placed ?? 0 } } : {}), ...(bossId === "folio" ? { folio: folioRow } : {}), ...(bossId === "timber" ? { timber: { ...timber, scraps: b.powers?.workshop?.n ?? 0, pickSec } } : {}), ...(bossId === "dash" ? { dash: { ...dash, slapSeen: undefined } } : {}), ...(bossId === "zebra" ? { zebra: zebraRow } : {}), ...(bossId === "hollow" ? { alone: !!patch.alone, bulbs: !!patch.alone && patch.bulbs !== false, difficulty: patch.difficulty ?? 0, darkMiss: patch.darkMiss ?? 0, hollow } : {}) };
+      const row = { boss: bossId, tag, seed, game: g, strikes: struck, tier: b.tier, elo: b.elo, result: result ?? b.result ?? null, moves: b.crowdMoves, ults: ults.length, ultTurns: ults.map((u) => u.turn), kinds: [...new Set(ults.map((u) => u.kind))], secs: Math.round((Date.now() - t0) / 1000), ...(bossId === "alfil" ? { alfil } : {}), ...(bossId === "hopper" ? { hopper, carrots } : {}), ...(bossId === "smudgy" ? { camo: camoRow, ...smudgy } : {}), ...(bossId === "moo" ? { moo } : {}), ...(bossId === "gardener" ? { garden } : {}), ...(bossId === "tiger" ? { tiger: { ...tiger, placed: b.powers?.balloon?.placed ?? 0 } } : {}), ...(bossId === "folio" ? { folio: folioRow } : {}), ...(bossId === "timber" ? { timber: { ...timber, scraps: b.powers?.workshop?.n ?? 0, pickSec } } : {}), ...(bossId === "dash" ? { dash: { ...dash, slapSeen: undefined } } : {}), ...(bossId === "zebra" ? { zebra: zebraRow } : {}), ...(bossId === "chandy" ? { chandy: { ...chandy, fifthAt: chandy.upgrades[BOSS_POWERS.chandy.upgradesMax - 1] ?? null, unlocked: b.powers?.chandy?.unlocked ?? [] } } : {}), ...(bossId === "hollow" ? { alone: !!patch.alone, bulbs: !!patch.alone && patch.bulbs !== false, difficulty: patch.difficulty ?? 0, darkMiss: patch.darkMiss ?? 0, hollow } : {}) };
       appendFileSync(root + `reports/boss-sim/raid-${tag}.jsonl`, JSON.stringify(row) + "\n");
       console.log(JSON.stringify(row));
     }
