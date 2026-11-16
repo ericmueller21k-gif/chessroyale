@@ -1103,6 +1103,10 @@ export const BOSS_KITS: Record<string, BossKit> = {
   // locked pieces taken, 0-5: `stageOf`, each animation's `_sN` twin); he points at what he locks, every shot a fire. His sounds are
   // placeholders from other packs until his own (CHANDY_CUES); his lines are placeholders for Eric.
   Chandy: {
+    // (His phone bar's fit: npx tsx scripts/bar-fit.ts.)
+    barScale: 0.76,
+    barShift: 12,
+    barName: 53,
     ch: CHANDY,
     sprite: CHANDY_SPRITE,
     anims: { entrance: "point", thinking: "idle", move: "point", capture: "fire", strike: "fire", power: "fire", powerHit: "point", ultimateWarn: "aim", ultimate: "fire", ultimateHit: "fire", hurt: "stow", check: "fire", smug: "aim", rattled: "stow", victory: "fire", defeat: "stow" },
@@ -1197,7 +1201,11 @@ export function stagedKit(kit: BossKit, stage: number): BossKit {
   if (!k) {
     const twin = (name: string) => (kit.ch.anims[`${name}_s${stage}`] ? `${name}_s${stage}` : name);
     const anims: Partial<Record<Beat, string>> = { ...kit.anims };
-    for (const b of BEAT_NAMES) anims[b] = twin(kit.anims[b] ?? b);
+    // (Only the moments it draws: those it names, and those its character has under the moment's own name.)
+    for (const b of BEAT_NAMES) {
+      const a = kit.anims[b] ?? (kit.ch.anims[b] ? b : undefined);
+      if (a) anims[b] = twin(a);
+    }
     const loops: Partial<Record<Loop, string>> = { ...kit.loops };
     for (const l of LOOP_NAMES) loops[l] = twin(kit.loops?.[l] ?? l);
     byStage.set(stage, (k = { ...kit, anims, loops }));

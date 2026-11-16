@@ -1300,13 +1300,13 @@ export const CHANDY_CUES: Readonly<Record<string, string>> = {
  * should be). The figure's and the clones' cues and his board art's (power-art.ts EFFECTS uses the same map).
  */
 export const CHANDY_SOUNDS: Record<string, SoundName> = {
-  lock: "dashTick",
+  lock: "hollowTick",
   unlock: "hollowTick",
   unsling: "pigDraw",
   aim: "mooHum",
   fire: "mooZap",
   stow: "bigboyClack",
-  teleport: "dashWhoosh",
+  teleport: "gingerWhoosh",
   appear: "hopperPop",
   fade: "hollowFizz",
   spark: "grexSparkle",
@@ -1321,7 +1321,7 @@ export const CHANDY_SOUNDS: Record<string, SoundName> = {
   aimOff: "hollowTick",
   whoosh: "gingerWhoosh",
   shatter: "sawyerCrack",
-  flash: "dashTick",
+  flash: "hollowTick",
   blast: "gingerBlast",
 };
 
