@@ -17,7 +17,10 @@
 import { CHANDY_FIRE_AT, CHANDY_FX, dodgeTimeline, linesAfter, type ChandyView } from "@chessroyale/chess";
 import type { ChandyMove, DodgeLine } from "@chessroyale/core";
 import type { BossView, DodgeRun } from "../game.ts";
-import { BoardEffects, type BoardItem } from "./BossEffect.tsx";
+import { BoardEffects, onEachFrame, prewarm, prewarmAnims, prewarmSprite, type BoardItem } from "./BossEffect.tsx";
+import { CHANDY, CHANDY_CLONE, CHANDY_RIFLE } from "../characters/chandy.ts";
+import { spriteCanvas } from "../characters/sprite-kit.ts";
+import { EFFECTS, type EffectName } from "../characters/power-art.ts";
 import { ChandyDodge, type DodgeView } from "./ChandyDodge.tsx";
 import { ChandyUpgrade } from "./ChandyUpgrade.tsx";
 import type { BoardLayerProps, BossUi, Moment, MomentProps, MomentUi } from "./PowerParts.tsx";
@@ -332,4 +335,44 @@ export function dodgeDock(boss: BossView, run: DodgeRun, now: number): { line: s
   if (v.phase === "result") return v.result === "hit" ? { line: "Hit!", sub: "The battle is his." } : { line: `Dodged ${v.round} of 3`, sub: v.round < 3 ? "Next round." : "The board comes back." };
   if (v.phase === "locked" || v.phase === "blast") return { line: "Locked", sub: v.placed ? `Your king on ${v.placed}.` : "Counting the votes." };
   return { line: "Dodge!", sub: "One square is safe. Watch his clones." };
+}
+
+// ---------------- Made ahead ----------------
+
+let warmed = false;
+/** Draws `frames` of a sprite-kit character to its canvases (as the clones' layer and the upgrade window draw them), a slice a frame. */
+function warmCanvases(ch: typeof CHANDY_CLONE, done?: () => void): void {
+  const frames = Object.entries(ch.anims).flatMap(([name, a]) => a.frames.map((_, i) => [name, i] as const));
+  let i = 0;
+  let stop = () => {};
+  stop = onEachFrame(() => {
+    const t0 = performance.now();
+    do {
+      const f = frames[i++];
+      if (f) spriteCanvas(ch, f[0], f[1]);
+    } while (i < frames.length && performance.now() - t0 < 4);
+    if (i >= frames.length) {
+      stop();
+      done?.();
+    }
+  });
+}
+
+/**
+ * His art made ahead, in quiet slices from the battle's start (BossCharacter's warm-up; .claude/LESSONS.md, "A stall the first time an
+ * effect shows"): Dodge's clones were made as its vote opened, a 3.9 s stall on a slowed phone that swallowed the whole vote (Nov 16).
+ * Then the rifle's stages (the upgrade window), his figure at each stage, and his board art.
+ */
+export function prewarmChandy(): void {
+  if (warmed) return;
+  warmed = true;
+  prewarmAnims([...Object.values(CHANDY_CLONE.anims), ...Object.values(CHANDY_RIFLE.anims)], () =>
+    warmCanvases(CHANDY_CLONE, () =>
+      warmCanvases(CHANDY_RIFLE, () => {
+        const staged = Object.entries(CHANDY.anims).filter(([name]) => /_s\d$/.test(name));
+        prewarmSprite(CHANDY, staged.flatMap(([, a]) => a.frames));
+        for (const fx of Object.keys(EFFECTS).filter((k) => k.startsWith("chandy")) as EffectName[]) prewarm(fx, Object.entries(EFFECTS[fx].ch.anims).flatMap(([a, an]) => an.frames.map((_, i) => [a, i] as const)));
+      }),
+    ),
+  );
 }

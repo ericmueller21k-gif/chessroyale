@@ -46,7 +46,8 @@
  * votes; ties and nobody voting: from the seed); the beams fire; on the safe square, DODGED; anywhere else the battle is his
  * (`dodgeWin`; the God King's Last Stand doesn't apply). The board comes back as it was: Dodge never changes the position.
  *
- * Test switches (solo): `?power=lockon` (the first lock from his first move, on your most capturable piece if none is free), `?power=dodge` (all five upgrades at the start, the
+ * Test switches (solo): `?power=lockon` (the first lock from his first move on a piece he can take, from his third on your most
+ * capturable if none is free), `?power=dodge` (all five upgrades at the start, the
  * warning as the second turn begins), `?power=scatter|beam|shields|rapidfire|queenlock` (that move unlocked from the start, his
  * meter full after every move of yours).
  */
@@ -965,12 +966,12 @@ export const chandyBattle = {
     if (c.upgrades > 0 && !c.due) c.meter = moveTest(b.settings.bossPowerTest) ? s.meterEvery : Math.min(s.meterEvery, c.meter + 1);
     const now = boardOf(b).fen;
     if (c.upgrades > 0 && c.meter >= s.meterEvery && (!c.due || c.due === "queenlock")) c.due = meterPick(c, p.seed, queenLockOk(now, crowd, p.seed, c.used) ? [] : ["queenlock"]);
-    // His first lock (L1): from his firstLockMove-th move, on a piece he can take now (the test switch: from his first, and on your
-    // most capturable piece when none is free).
+    // His first lock (L1): from his firstLockMove-th move, on a piece he can take now (the test switch: from his first; from his
+    // firstLockMove-th on your most capturable piece when none is free, so a lock always comes).
     const test = b.settings.bossPowerTest === "lockon";
     const firstAt = test ? 1 : s.firstLockMove;
     if (!c.taught && c.moves + 1 >= firstAt && !c.locks.length) {
-      const sq = firstLockPick(now, crowd, p.seed) ?? (test ? (lockOrder(now, crowd, p.seed, c.moves)[0] ?? null) : null);
+      const sq = firstLockPick(now, crowd, p.seed) ?? (test && c.moves + 1 >= s.firstLockMove ? (lockOrder(now, crowd, p.seed, c.moves)[0] ?? null) : null);
       const piece = sq ? pieceAt(now, sq) : null;
       if (sq && piece) {
         c = { ...c, taught: true, locks: [{ square: sq, piece: piece.type, at: c.moves }] };

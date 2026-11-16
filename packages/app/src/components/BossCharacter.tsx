@@ -22,6 +22,7 @@ import { prewarmAlfil } from "./Alfil.tsx";
 import { prewarmHopper } from "./Hopper.tsx";
 import { prewarmSmudgy } from "./Smudgy.tsx";
 import { prewarmMoo } from "./Moo.tsx";
+import { prewarmChandy } from "./Chandy.tsx";
 import { prewarmGardener, resetGarden } from "./Gardener.tsx";
 import { prewarmTiger } from "./Tiger.tsx";
 import { resetTiger } from "../tiger-show.ts";
@@ -293,6 +294,8 @@ function Character({ boss, stage, place }: { boss: BossView; stage: Stage; place
       if (kit.ch.id === "folio") prewarmFolio();
       // (The Hidden Boss's phase change: his rage, his leap onto the board, the book thrown down, the chant.)
       if (kit.ch.id === "recluse") prewarmRecluse(boss.crowdSide);
+      // (Chandy's Dodge clones, the rifle's stages, his figure at each, his board art.)
+      if (kit.ch.id === "chandy") prewarmChandy();
       // (Its attack on a king too: the God King's Last Stand, or its mate.)
       prewarmKingAttack(kit.ch.name);
     });

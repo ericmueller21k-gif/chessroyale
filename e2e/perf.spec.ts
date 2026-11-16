@@ -316,6 +316,51 @@ test("Sawyer on a slow phone: the split, the board saw and his first saw cut sta
   }
 });
 
+test("Chandy on a slow phone: his beam's cover and Dodge's scope-in (the blur under a moving mask) stay within budget, the first time they show", { tag: "@perf" }, async ({ page }) => {
+  test.skip(test.info().project.name !== "phone", "one run is enough (the phone, slowed)");
+  test.setTimeout(5 * 60_000);
+  await page.addInitScript(instrument);
+  await asAdmin(page);
+  const cdp = await page.context().newCDPSession(page);
+  const through = async (until: () => Promise<boolean>, ms = 60_000) => {
+    await page.evaluate(() => ((window as any).__perf.frames = []));
+    await expect.poll(until, { timeout: ms }).toBe(true);
+    return frameStats(((await page.evaluate(() => (window as any).__perf.frames.splice(0))) as [number][]).map((f) => f[0]));
+  };
+  const move = async () => {
+    await expect.poll(() => phase(page), { timeout: 60_000 }).toBe("play");
+    const { fen, allowed } = await page.evaluate(() => ({ fen: (window as any).match.phase.board.fen as string, allowed: ((window as any).match.boss?.powers?.allowed ?? null) as string[] | null }));
+    const legal = new Chess(fen).moves({ verbose: true }).filter((m) => !m.captured && !m.promotion && (!allowed || allowed.includes(m.from + m.to)));
+    await page.evaluate((uci) => (window as any).match.submit(uci), legal[0]!.from + legal[0]!.to);
+    await expect.poll(() => phase(page), { timeout: 20_000 }).not.toBe("play");
+  };
+  // (Admins first: his battle from the Boss raid screen's Boss alone, as e2e/chandy.spec.ts.)
+  const battle = async (power: string) => {
+    await cdp.send("Emulation.setCPUThrottlingRate", { rate: 1 });
+    await page.goto(`/?debug&nolanding&clock=60&laststand=0&brain=stockfish&boss=chandy&power=${power}&mode=raid`);
+    await expect(page.getByRole("main").getByRole("button", { name: /^Boss alone/ })).toBeVisible({ timeout: 30_000 });
+    await page.getByRole("main").getByRole("button", { name: /^Boss alone/ }).click();
+    await expect.poll(() => phase(page), { timeout: 60_000 }).toBe("play");
+    await cdp.send("Emulation.setCPUThrottlingRate", { rate: 4 });
+  };
+  // The beam (?power=beam: it lands as your second turn begins): his move, the banner, his shot, the cover over 15 squares.
+  await battle("beam");
+  await move();
+  const beam = await through(() => phase(page).then((p) => p === "play"));
+  expect(await page.evaluate(() => (window as any).match.boss.powers.chandy.beam?.squares.length)).toBe(15);
+  // Dodge (?power=dodge: the warning as your second turn begins, Dodge as your third does): from his move to the vote, the scope-in,
+  // the slide and the blank board opening.
+  await battle("dodge");
+  await move();
+  await move();
+  const scope = await through(() => page.evaluate(() => !!document.querySelector(".cd-root.cd-p-vote")));
+  console.log(`Chandy (slowed phone): beam ${f(beam)}; Dodge's scope-in ${f(scope)}`);
+  for (const [what, s] of [["beam", beam], ["Dodge's scope-in", scope]] as const) {
+    expect(s.p95, `${what}: 95th percentile frame (ms)`).toBeLessThan(50);
+    expect(s.slow, `${what}: share of dropped frames`).toBeLessThan(0.15);
+  }
+});
+
 test("the Hidden Boss's phase 2 on a slow phone: the phase change and four boards in play stay within budget", { tag: "@perf" }, async ({ page }) => {
   test.skip(test.info().project.name !== "phone", "one run is enough (the phone, slowed)");
   test.setTimeout(4 * 60_000);
