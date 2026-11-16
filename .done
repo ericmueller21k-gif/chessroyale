@@ -1,9 +1,0 @@
-crowd-party-followup: done (branch claude/crowd-party-followup).
-- 1. leave(): drops the id from its crowdParties group (lobby.ts); new unit test, red without the fix.
-- 2. L1: cancel after the Find match, stopped undefined; red without squads-party.ts's delete this.r.awayStopped.
-- 3. L2: partyfill 45 -> 70; the M2 test passed on phone (and the main Party test, which cancels and finds again, too).
-- 4. Nit: CROWD_PARTY.ranked comment.
-- Area page updated (matchmaking.md). No decision note: no new call made, the review's fix as written.
-- Locally the project's pinned Playwright browser (1194) isn't in this container; I ran with a throwaway config pointing at
-  /opt/pw-browsers/chromium (not committed).
-- Drop .pr-body.md and .done before merging.
