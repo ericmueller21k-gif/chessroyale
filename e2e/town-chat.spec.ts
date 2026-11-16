@@ -2,7 +2,7 @@ import { devices, expect, request as apiRequest, type Browser, type Page, type R
 import { CHAT, tooSoonText } from "../packages/app/src/town/chat.ts";
 import { NAME_COLORS } from "../packages/app/src/town/names.ts";
 import { TOWN_CHAT } from "@chessroyale/core";
-import { asServerAdmin, asSignedIn, test } from "./helpers.ts";
+import { asServerAdmin, asSignedIn, test, townLetGo } from "./helpers.ts";
 
 /**
  * The town square's chat log (Oct 28; docs/areas/town-square.md, "The chat log"), on a phone and a computer. v2 (Eric, Oct 28): one
@@ -132,10 +132,19 @@ const scrollOf = (p: Page) => p.locator(".tc-log").evaluate((el) => ({ top: el.s
 /**
  * The town, open, with the bosses' and kids' own chatter stopped (it speaks every 20 to 45 s: a test looks at its own lines). By day
  * unless told (`sky`: the town's own `?sky=` override: day, dawn, dusk or night).
+ * The other players' towns in this browser (Bo's, a guest's) are held while it loads, then let go: every page here shares one software
+ * GPU, and two towns drawing every frame starve a third's loading uploads (Nov 16, #747's red: the guest's town took 20 to 26 s on a
+ * quiet machine, on main as on the branch, and over 40 s on CI beside another worker's town; held, 6 s).
  */
 async function open(page: Page, query = "", sky = "day") {
-  await page.goto(`/town?sky=${sky}&townroom=${room}${query}`);
-  await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
+  const others = (page.context().browser()?.contexts() ?? []).flatMap((c) => c.pages()).filter((p) => p !== page && !p.isClosed());
+  await Promise.all(others.map((p) => p.evaluate(() => (window as any).__townHold?.(true)).catch(() => undefined)));
+  try {
+    await page.goto(`/town?sky=${sky}&townroom=${room}${query}`);
+    await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
+  } finally {
+    await Promise.all(others.map(townLetGo));
+  }
   await page.waitForFunction(() => typeof (window as any).__townSay === "function");
   await page.evaluate(() => (window as any).__townChatter(false));
 }
