@@ -415,7 +415,7 @@ test("the minimap: on by default at the top right, your dot moving with you and 
       return false;
     }).length,
   );
-  expect(drawn, "every portrait drawn").toBe(18);
+  expect(drawn, "every portrait drawn").toBe(PLAN_HOME_COUNT);
   await expect(page.locator(".tm-big [data-icon=park]")).toHaveCount(1);
   await expect(page.locator(".tm-big [data-icon=colosseum]")).toHaveCount(1);
   await expect(page.locator(".tm-big .tm-you")).toHaveCount(1);
