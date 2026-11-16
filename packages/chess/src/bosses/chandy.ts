@@ -356,12 +356,16 @@ export function steerPick(fen: string, pick: string, top: readonly MoveScore[], 
 
 // ---------------- The move meter ----------------
 
-/** The move the full meter fires (`skip`: moves that can't come now): the newest unlock first, else random among the unlocked. */
-export function meterPick(c: Pick<ChandyState, "unlocked" | "fresh" | "used">, seed: number, skip: readonly ChandyMove[] = []): ChandyMove | null {
+/**
+ * The move the full meter fires (`skip`: moves that can't come now): the newest unlock first, else random among the unlocked, never
+ * the one he fired last while another can come (Eric, Nov 16: "Despite 2 weapon unlocks he just did this move twice in a row").
+ */
+export function meterPick(c: Pick<ChandyState, "unlocked" | "fresh" | "used" | "last">, seed: number, skip: readonly ChandyMove[] = []): ChandyMove | null {
   const open = c.unlocked.filter((m) => !skip.includes(m));
   if (!open.length) return null;
   if (c.fresh && open.includes(c.fresh)) return c.fresh;
-  return open[Math.floor(powerRoll(seed, "meter", c.used) * open.length)]!;
+  const fresh = open.length > 1 && c.last ? open.filter((m) => m !== c.last) : open;
+  return fresh[Math.floor(powerRoll(seed, "meter", c.used) * fresh.length)]!;
 }
 
 /** The move an upgrade unlocks: random among those still locked (from the seed and the upgrade's number); none once all five are. */
@@ -803,7 +807,7 @@ function landMove(c: ChandyState, t: TurnContext): ChandyState {
   for (const m of tries) {
     const done = (x: Partial<ChandyState>, e: PowerEvent): ChandyState => {
       t.events.push(e);
-      return { ...c, ...x, due: null, meter: 0, used: n + 1, fresh: c.fresh === m ? null : c.fresh };
+      return { ...c, ...x, due: null, meter: 0, used: n + 1, last: m, fresh: c.fresh === m ? null : c.fresh };
     };
     if (m === "scatter") {
       const pick = chooseScatter(t.fen, t.crowd, t.seed, n, s);
@@ -1185,7 +1189,7 @@ export const chandyBattle = {
     setBoard(b, passed);
     b.boards.set(b.state.boards[0]!, { ...boardOf(b), expected: 1 - board.expected, lastMove: null });
     b.bossLast = null;
-    setChandy(b, (x) => ({ ...x, moves: x.moves + 1, aim: { square: queen, turn: turnOf(boss) }, due: null, meter: 0, used: x.used + 1, fresh: x.fresh === "queenlock" ? null : x.fresh }));
+    setChandy(b, (x) => ({ ...x, moves: x.moves + 1, aim: { square: queen, turn: turnOf(boss) }, due: null, meter: 0, used: x.used + 1, last: "queenlock", fresh: x.fresh === "queenlock" ? null : x.fresh }));
     b.bossPassed();
     return queen;
   },
