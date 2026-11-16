@@ -19,3 +19,18 @@ iPhone 13 and a 1280 × 800 computer.
 Calls to check: names live in the line under the grid (a phone's seats are 33 px, too small for a name); the count is the party's
 ("3 / 8") until the search, then the lobby's; any member may invite; the header's back is Leave too. Measured: fits 320 × 568 to
 1920 × 1080 with no sideways scroll; on a computer no page scroll from 1280 × 600 up.
+
+# Build (Nov 16): the real thing, from the e2e flow (`PARTY_SHOTS=<dir>`, friends.spec.ts "50 v 50 Party"), dark
+
+Two signed-in friends through the real server: Ann makes the party, invites Bo from a "+", Bo accepts the notice, Ann's Find match
+puts both in one lobby, and the match starts with both on one team. iPhone 13 and a 1280 × 800 computer, in `build/`.
+
+| Still | What it shows |
+| --- | --- |
+| *-1-alone.png | Party made: Ann's seat, seven "+", "1 / 8", Leave and Find match. |
+| *-2-sheet.png | A "+" tapped: her friends sheet, "Up to 7 friends queue with you, all on your team.", Invite. |
+| *-3-invited.png | Bo invited: his seat waits ("…"), "Bo Party invited" under the grid. |
+| *-4-notice.png | Bo's home: the notice at the top right, "Ann Party invited you / to their 50 v 50 party", Decline and Accept. |
+| *-5-joined.png | Bo in: Ann sees "2 / 8", his pawn dashed gold, six "+" left. |
+| *-6-member.png | Bo's view: "Waiting for Ann Party" greyed; members may invite too ("+" live). |
+| *-7-searching.png | Find match: the lobby, the party's seats first, "2 / 100", the leader's Cancel. |
