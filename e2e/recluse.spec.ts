@@ -1073,18 +1073,19 @@ test("a loss (?win=1&phase=2): you resign your board, the bots win theirs: defea
   expect(errors).toEqual([]);
 });
 
-/** Every board's heart column against its board (the page's boxes): its hearts, their boxes, and every board's box. */
+/** Every board's heart column against its board's squares (the page's boxes): its hearts, their boxes, and every board's squares. */
 const heartBoxes = (page: Page) =>
   page.evaluate(() => {
     const box = (e: Element) => {
       const r = e.getBoundingClientRect();
       return { l: r.left, t: r.top, r: r.right, b: r.bottom };
     };
-    const boards = [...document.querySelectorAll(".rc-stage .rc-played .board")].map(box);
+    // (The squares as drawn: a whole multiple of 8 device pixels, a hair inside the wrap's .board.)
+    const boards = [...document.querySelectorAll(".rc-stage .rc-played .board .hb-container")].map(box);
     const cols = [...document.querySelectorAll(".rc-stage .rc-hearts")].map((c) => ({
       hearts: c.getAttribute("data-hearts"),
       col: box(c),
-      board: box(c.closest(".board-wrap")!.querySelector(":scope > .board")!),
+      board: box(c.closest(".board-wrap")!.querySelector(":scope > .board .hb-container")!),
       each: [...c.querySelectorAll(".rc-heart")].map(box),
     }));
     return { boards, cols, stage: box(document.querySelector(".rc-stage")!) };

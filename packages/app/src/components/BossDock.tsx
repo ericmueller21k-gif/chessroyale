@@ -502,11 +502,18 @@ function ClockPlus({ inc, since, anchor }: { inc: number; since: number; anchor:
   const ref = useRef<HTMLSpanElement>(null);
   const [delay] = useState(() => Math.min(0, since - Date.now()));
   useLayoutEffect(() => {
-    const el = ref.current;
-    const r = anchor.current?.getBoundingClientRect();
-    if (!el || !r) return;
-    el.style.setProperty("--px", `${r.right}px`);
-    el.style.setProperty("--py", `${r.top}px`);
+    const place = () => {
+      const el = ref.current;
+      const r = anchor.current?.getBoundingClientRect();
+      if (!el || !r) return;
+      el.style.setProperty("--px", `${r.right}px`);
+      el.style.setProperty("--py", `${r.top}px`);
+    };
+    // (Once the dock has lined its row up with the board, before the paint: its own layout effect, a parent's, runs after this one, so
+    // a screen drawn anew as the move begins had it 12 px off. And again a frame later, should the board settle then.)
+    queueMicrotask(place);
+    const raf = requestAnimationFrame(place);
+    return () => cancelAnimationFrame(raf);
   }, []);
   if (typeof document === "undefined") return null;
   return createPortal(
