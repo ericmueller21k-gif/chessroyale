@@ -263,7 +263,7 @@ const FAR: readonly Shelf[] = (() => {
   const rows = [12, 22, 32, 42, 52, 62, 71];
   rows.forEach((y, r) => {
     const step = 15 - r;
-    for (let x = 26 + ((r * 7) % step); x < 122; x += step) {
+    for (let x = 8 + ((r * 7) % step); x < 138; x += step) {
       const j = grain(x, r, 83);
       out.push({ x: x + Math.round((j - 0.5) * 5), y: y + Math.round((grain(r, x, 85) - 0.5) * 4), rx: 8 + Math.round(j * 5) - (r > 4 ? 1 : 0), ry: 4 + (r < 3 ? 1 : 0) });
     }
@@ -274,9 +274,12 @@ const FAR: readonly Shelf[] = (() => {
 const canopyTop = (x: number) => 9 + Math.round(5 * Math.abs(Math.sin(x * 0.11 + 0.6)) + 3 * grain(x >> 2, 9, 87));
 /** Its underside, over the trunks and the brush. */
 const canopyBottom = (x: number) => 76 + Math.round(2.5 * Math.sin(x * 0.27) + 2 * grain(x >> 2, 10, 89));
-const farTrees = paint(24, 6, 96, 90, (x, y) => {
+/** How far out to the picture's sides the wood goes (behind the near crowns, closing the gaps between their shelves), ragged. */
+const woodL = (y: number) => 6 + Math.round(1.5 * Math.sin(y * 0.23) + grain(y >> 2, 11, 93) * 2);
+const woodR = (y: number) => W - 6 - Math.round(1.5 * Math.sin(y * 0.19 + 2) + grain(y >> 2, 12, 95) * 2);
+const farTrees = paint(4, 6, W - 8, 90, (x, y) => {
   const bank = farY(x) + OY;
-  if (y > bank || y < canopyTop(x)) return null;
+  if (y > bank || y < canopyTop(x) || x < woodL(y) || x >= woodR(y)) return null;
   const trunk = FAR_TRUNKS.find((t) => Math.abs(x + 0.5 - t - Math.sin(y * 0.09 + t) * 0.8) < (y > bank - 8 ? 2.2 : 1.4));
   if (y > canopyBottom(x)) {
     // Under the canopy: the trunks, pale in the haze, lit on the left; the shade of the wood between them.
