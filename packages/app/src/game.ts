@@ -274,7 +274,10 @@ export interface SimulBoardView {
   bankMs: number;
   turnAt: number | null;
   toMove: "crowd" | "boss" | null;
-  result: { winner: "crowd" | "boss" | "draw"; how: "mate" | "time" | "resign" | "stalemate" | "draw" } | null;
+  result: { winner: "crowd" | "boss" | "draw"; how: "mate" | "time" | "resign" | "stalemate" | "draw" | "slow" } | null;
+  /** The player's hearts left (RECLUSE_PHASE2.hearts at the start), and when the last was cut (this device's time), or null. */
+  hearts: number;
+  slashAt: number | null;
 }
 
 /** The Hidden Boss's phase 2 as the screens see it: the four boards, and where the battle stands. */
@@ -291,12 +294,6 @@ export interface SimulView {
   /** Every board is decided (his reaction holds the boards, then the result). */
   decided: boolean;
   beaten: boolean;
-  /** Slow moves so far, the team's (the RECLUSE_PHASE2.slowMovesForUlt-th brings his ultimate). */
-  slow: number;
-  /** The last slow move: on which board (id) and when, or null. */
-  lastSlow: { board: number; at: number } | null;
-  /** When his ultimate came (then every move has ultMoveSeconds, no bank), or null. */
-  ultAt: number | null;
   /**
    * Online: every clock paused since then (this device's time): his move is late from the engine server. Every board shows "He's
    * thinking…", takes no move, and its clock shows where it stood. Missing or null: not paused (solo never is).

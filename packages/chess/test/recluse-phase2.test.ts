@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { BOSS_BRAIN, RECLUSE_PHASE2, bossBannerMs } from "@chessroyale/core";
+import { BOSS_BRAIN, RECLUSE_PHASE2 } from "@chessroyale/core";
 import {
   PHASE2_WIN_FEN,
   UciEngine,
@@ -11,19 +11,20 @@ import {
   legalMoves,
   phase2BossMove,
   phase2Brain,
-  phase2Flags,
+  phase2Clock,
   phase2Move,
   phase2Next,
+  phase2NextDue,
   phase2Numbers,
   phase2Outcome,
   phase2Resign,
   phase2Seat,
+  phase2Slash,
   phase2Standings,
-  phase2Timeouts,
-  phase2Ult,
   phase2WinAll,
-  moveLeft,
   phase2ToMove,
+  slashDue,
+  slowJudgeMs,
   recentMoves,
   startPhase2,
   type NetStanding,
@@ -96,7 +97,7 @@ describe("the Hidden Boss's phase 2: four boards, each its own Chess960 start", 
     // King on g1, its rook on h1, f1 clear: castling short puts the king on g1 and the rook on f1.
     const ready = "bbqnnrkr/pppppppp/8/8/8/8/PPPPPPPP/BBQNN1KR w Hhf - 0 1";
     const b0 = start().boards[0]!;
-    const st: Phase2State = { slow: 0, ultAt: null, boards: [{ ...b0, board: { ...b0.board, fen: ready, bases: [{ ply: 0, fen: ready }] } }] };
+    const st: Phase2State = { boards: [{ ...b0, board: { ...b0.board, fen: ready, bases: [{ ply: 0, fen: ready }] } }] };
     expect(legalMoves(ready)).toContain("g1h1");
     const after = phase2Move(st, 0, "g1h1", T0 + 500);
     expect(after.boards[0]!.board.fen.split(" ")[0]).toBe("bbqnnrkr/pppppppp/8/8/8/8/PPPPPPPP/BBQNNRK1");
@@ -122,16 +123,16 @@ describe("the Hidden Boss's phase 2: four boards, each its own Chess960 start", 
     expect(bankLeft(st.boards[1]!, T0 + 10_000)).toBe(RECLUSE_PHASE2.bankSeconds * 1000 - 10_000);
   });
 
-  it("out of time loses that board: a late move isn't played, and the flag check catches a bank run out", () => {
+  it("out of time loses that board: a late move isn't played, and the clock's check catches a bank run out", () => {
     const bank = RECLUSE_PHASE2.bankSeconds * 1000;
     let st = start([518, 1, 2, 3]);
     const late = phase2Move(st, 0, "e2e4", T0 + bank + 1);
     expect(late.boards[0]!.result).toEqual({ winner: "boss", how: "time" });
     expect(late.boards[0]!.board.history).toEqual([]);
-    expect(phase2Flags(st, T0 + bank - 1)).toBe(st);
+    expect(phase2Clock(st, T0 + bank - 1).boards.every((b) => b.result === null)).toBe(true);
     // Board 0 moves in time; the others run out together.
     st = phase2Move(st, 0, "e2e4", T0 + 1000);
-    const flagged = phase2Flags(st, T0 + bank);
+    const flagged = phase2Clock(st, T0 + bank);
     expect(flagged.boards.map((b) => b.result?.how ?? null)).toEqual([null, "time", "time", "time"]);
     expect(phase2Outcome(flagged)).toMatchObject({ won: 0, lost: 3, decided: false, beaten: false });
   });
@@ -187,82 +188,124 @@ describe("the Hidden Boss's phase 2: four boards, each its own Chess960 start", 
   });
 });
 
-describe("his phase 2 ultimate: slow moves, then a few seconds a move, a random move when they run out", () => {
-  const SLOW = RECLUSE_PHASE2.slowMoveSeconds * 1000;
-  /** Board 0 moves, then he answers at once: one move each, the player's taking `ms`. */
-  const round = (st: Phase2State, id: number, ms: number, at: number): { st: Phase2State; at: number } => {
+describe("each player's own hearts (Eric, Nov 16): a slow move cuts one; out of hearts, that board is lost", () => {
+  const JUDGE = slowJudgeMs();
+  /** Eight quiet moves a side from the normal setup (number 518), so nothing ends the board early. */
+  const OURS = ["e2e4", "g1f3", "f1c4", "d2d3", "b1c3", "h2h3", "a2a3", "b2b4"];
+  const HIS = ["e7e5", "b8c6", "f8c5", "d7d6", "g8f6", "h7h6", "a7a6", "c5b6"];
+  /** A board's move by its player `ms` into their turn, then his answer at once (on board 518, the scripted ones). */
+  const round = (st: Phase2State, id: number, ms: number): Phase2State => {
     const b = st.boards[id]!;
-    const t = (b.turnAt ?? at) + ms;
-    let next = phase2Move(st, id, [...legalMoves(b.board.fen)].sort()[0]!, t);
-    next = phase2Move(next, id, [...legalMoves(next.boards[id]!.board.fen)].sort()[0]!, t);
-    return { st: next, at: t };
+    const t = b.turnAt! + ms;
+    const k = b.board.history.length / 2;
+    const ours = b.number === 518 ? OURS[k]! : [...legalMoves(b.board.fen)].sort()[0]!;
+    const next = phase2Move(st, id, ours, t);
+    if (next.boards[id]!.result) return next;
+    return phase2Move(next, id, b.number === 518 ? HIS[k]! : [...legalMoves(next.boards[id]!.board.fen)].sort()[0]!, t);
   };
 
-  it("counts a move longer than slowMoveSeconds (anyone's, any board) as slow; a quick one doesn't count", () => {
+  it("every player's clock is 10 minutes with no increment, and 8 hearts each; a move is slow past 5 s, judged at 6.5 s (the hidden allowance for lag)", () => {
+    expect(RECLUSE_PHASE2.bankSeconds).toBe(600);
+    expect(RECLUSE_PHASE2.hearts).toBe(8);
+    expect(RECLUSE_PHASE2.slowMoveSeconds).toBe(5);
+    expect(JUDGE).toBe(6500);
+    const st = start([518, 1, 2, 3]);
+    for (const b of st.boards) expect(b).toMatchObject({ bankMs: 600_000, hearts: 8, slashed: false, slashAt: null });
+    // (A move in time adds nothing to the bank.)
+    expect(round(st, 0, 1000).boards[0]!.bankMs).toBe(599_000);
+  });
+
+  it("a move by 6.5 s keeps its hearts; one at 6.5 s (5 s told plus the allowance) or later has one of that player's cut, and only theirs", () => {
+    const st = start([518, 1, 2, 3]);
+    expect(round(st, 0, JUDGE - 1).boards[0]!.hearts).toBe(8);
+    const slow = round(st, 2, JUDGE);
+    expect(slow.boards.map((b) => b.hearts)).toEqual([8, 8, 7, 8]);
+    expect(slow.boards[2]!.slashAt).toBe(T0 + JUDGE);
+    // (The move itself is played: a slow move isn't a lost one.)
+    expect(slow.boards[2]!.board.history).toHaveLength(2);
+  });
+
+  it("the cut comes as the move turns slow (the clock's check, at that moment, however late it's noticed), once a move; then they may take as long as they need: nothing is played for them", () => {
+    const st = start([518, 1, 2, 3]);
+    expect(phase2Clock(st, T0 + JUDGE - 1)).toBe(st);
+    const cut = phase2Clock(st, T0 + 20_000);
+    for (const b of cut.boards) expect(b).toMatchObject({ hearts: 7, slashed: true, slashAt: T0 + JUDGE, turnAt: T0, result: null });
+    for (const b of cut.boards) expect(b.board.history).toEqual([]);
+    // (No second cut on the same move, however long it takes.)
+    expect(phase2Clock(cut, T0 + 90_000)).toBe(cut);
+    // Their move a minute and a half in: played, their clock charged, still 7 hearts.
+    const moved = phase2Move(cut, 0, "e2e4", T0 + 90_000);
+    expect(moved.boards[0]).toMatchObject({ hearts: 7, bankMs: 600_000 - 90_000, turnAt: null, result: null });
+    // His answer starts a new move to judge.
+    const next = phase2Move(moved, 0, "e7e5", T0 + 91_000);
+    expect(next.boards[0]).toMatchObject({ slashed: false, turnAt: T0 + 91_000 });
+    expect(slashDue(next.boards[0]!)).toBe(T0 + 91_000 + JUDGE);
+    expect(phase2Clock(next, T0 + 91_000 + JUDGE).boards[0]!.hearts).toBe(6);
+  });
+
+  it("a move that arrives late has its heart cut first, at the moment it turned slow, then is played", () => {
+    const st = start([518, 1, 2, 3]);
+    const late = phase2Move(st, 1, [...legalMoves(st.boards[1]!.board.fen)].sort()[0]!, T0 + 12_000);
+    expect(late.boards[1]).toMatchObject({ hearts: 7, slashAt: T0 + JUDGE, turnAt: null, result: null });
+    expect(late.boards[1]!.board.history).toHaveLength(1);
+  });
+
+  it("the 8th slow move loses that board (\"slow\"): its move isn't played, its clock stops; the other boards play on", () => {
     let st = start([518, 1, 2, 3]);
-    let r = round(st, 0, SLOW, T0);
-    expect(r.st.slow).toBe(0);
-    r = round(r.st, 0, SLOW + 1, r.at);
-    expect(r.st.slow).toBe(1);
-    st = phase2Move(r.st, 2, [...legalMoves(r.st.boards[2]!.board.fen)].sort()[0]!, T0 + 60_000);
-    expect(st.slow).toBe(2);
+    for (let i = 0; i < 7; i++) st = round(st, 0, JUDGE + 100);
+    expect(st.boards[0]!.hearts).toBe(1);
+    expect(st.boards[0]!.result).toBeNull();
+    const ply = st.boards[0]!.board.history.length;
+    const at = st.boards[0]!.turnAt!;
+    const lost = round(st, 0, JUDGE + 100);
+    expect(lost.boards[0]).toMatchObject({ hearts: 0, slashAt: at + JUDGE, turnAt: null, result: { winner: "boss", how: "slow" } });
+    expect(lost.boards[0]!.board.history).toHaveLength(ply);
+    expect(lost.boards[0]!.bankMs).toBe(st.boards[0]!.bankMs - JUDGE);
+    expect(lost.boards.slice(1).every((b) => b.result === null && b.hearts === 8)).toBe(true);
+    expect(phase2Outcome(lost)).toMatchObject({ lost: 1, decided: false });
+    // (By the clock alone, the same: the last heart cut as the move turns slow.)
+    expect(phase2Clock(st, at + JUDGE).boards[0]!.result).toEqual({ winner: "boss", how: "slow" });
+    expect(phase2Seat(lost.boards[0]!.result)).toBe("lost");
   });
 
-  it("fires on the team's slowMovesForUlt-th slow move (10 of 10): from then on, no slow moves count and no flag falls", () => {
-    expect(RECLUSE_PHASE2.slowMovesForUlt).toBe(10);
-    let st = start([518, 1, 2, 3]);
-    let at = T0;
-    // (The team's: one slow move after another, around the four boards.)
-    for (let i = 0; i < RECLUSE_PHASE2.slowMovesForUlt - 1; i++) ({ st, at } = round(st, i % 4, SLOW + 100, at));
-    expect(st.slow).toBe(RECLUSE_PHASE2.slowMovesForUlt - 1);
-    expect(st.ultAt).toBeNull();
-    ({ st, at } = round(st, 1, SLOW + 100, at));
-    expect(st.slow).toBe(RECLUSE_PHASE2.slowMovesForUlt);
-    expect(st.ultAt).not.toBeNull();
-    const ultAt = st.ultAt!;
-    // Every player whose move it is starts their few seconds as it comes, from when its banner goes (Oct 24; all but
-    // board 1's, whose move it was).
-    for (const b of st.boards.filter((x) => x.id !== 1)) expect(b.turnAt).toBe(ultAt + bossBannerMs());
-    ({ st } = round(st, 0, SLOW + 100, at));
-    expect(st.slow).toBe(RECLUSE_PHASE2.slowMovesForUlt);
-    expect(phase2Flags(st, ultAt + 10 * 60_000)).toBe(st);
+  it("a bank that runs out before the move turns slow loses on time, no heart cut", () => {
+    const st = withBoards(start([518, 1, 2, 3]), (id) => (id === 0 ? { bankMs: 3000 } : {}));
+    const out = phase2Clock(st, T0 + 7000);
+    expect(out.boards[0]).toMatchObject({ hearts: 8, result: { winner: "boss", how: "time" } });
+    expect(phase2NextDue(st)).toBe(T0 + 3000);
   });
 
-  it("gives anyone mid-move a fresh, full ultMoveSeconds as its banner goes, however long they'd thought (nobody paused)", () => {
-    const st0 = start([518, 1, 2, 3]);
-    // (Board 1's player has thought for 4.9 s, board 2's for a minute: both get the whole 5 s from the ultimate.)
-    const st = { ...st0, boards: st0.boards.map((b) => (b.id === 1 ? { ...b, turnAt: T0 - 4900 } : b.id === 2 ? { ...b, turnAt: T0 - 60_000 } : b)) };
-    const ult = phase2Ult(st, T0);
-    // ("5 SECONDS!" over the boards first, a boss banner's length: the few seconds start as it goes, Oct 24.)
-    const from = T0 + bossBannerMs();
-    for (const b of ult.boards) expect(moveLeft(ult, b, T0)).toBe(RECLUSE_PHASE2.ultMoveSeconds * 1000);
-    for (const b of ult.boards) expect(moveLeft(ult, b, from)).toBe(RECLUSE_PHASE2.ultMoveSeconds * 1000);
-    expect(moveLeft(ult, ult.boards[1]!, from + 4000)).toBe(RECLUSE_PHASE2.ultMoveSeconds * 1000 - 4000);
-    expect(phase2Timeouts(ult, from + RECLUSE_PHASE2.ultMoveSeconds * 1000 - 1, () => 0)).toBe(ult);
-    expect(phase2Timeouts(ult, from + RECLUSE_PHASE2.ultMoveSeconds * 1000, () => 0).boards.every((b) => b.board.history.length === 1)).toBe(true);
+  it("the next moment the clocks need looking at: the first move turning slow or bank running out; none while nobody's clock runs", () => {
+    const st = start([518, 1, 2, 3]);
+    expect(phase2NextDue(st)).toBe(T0 + JUDGE);
+    const cut = phase2Clock(st, T0 + JUDGE);
+    expect(phase2NextDue(cut)).toBe(T0 + 600_000);
+    expect(phase2NextDue(phase2WinAll(st, T0 + 1))).toBeNull();
   });
 
-  it("then each move has ultMoveSeconds, no bank; out of them, a random legal move is played for that player (never a loss)", () => {
-    const st = phase2Ult(start([518, 1, 2, 3]), T0 + 1000);
-    expect(phase2Ult(st, T0 + 2000)).toBe(st);
-    const b = st.boards[0]!;
-    // (From as its banner goes.)
-    const from = T0 + 1000 + bossBannerMs();
-    expect(moveLeft(st, b, from + 2000)).toBe(RECLUSE_PHASE2.ultMoveSeconds * 1000 - 2000);
-    expect(phase2Timeouts(st, from + RECLUSE_PHASE2.ultMoveSeconds * 1000 - 1, () => 0)).toBe(st);
-    const out = phase2Timeouts(st, from + RECLUSE_PHASE2.ultMoveSeconds * 1000, () => 0.5);
-    for (const x of out.boards) {
-      expect(x.result).toBeNull();
-      expect(x.board.history).toHaveLength(1);
-      expect(legalMoves(x.board.fen === b.board.fen ? b.board.fen : st.boards[x.id]!.board.fen)).toContain(x.board.history[0]);
-      expect(phase2ToMove(x)).toBe("boss");
-    }
-    // (The rng picks it: the same rng, the same move.)
-    const legal = legalMoves(b.board.fen);
-    expect(out.boards[0]!.board.history[0]).toBe(legal[Math.floor(0.5 * legal.length)]);
-    // A move made in time is played as usual; the bank isn't touched.
-    const mine = phase2Move(st, 0, "e2e4", T0 + 3000);
-    expect(mine.boards[0]!.bankMs).toBe(b.bankMs);
+  it("only the boards `judged` says (people's) are in the automatic cut: a bot's move arriving late keeps its heart, its bank charged as it ran; phase2Slash cuts a bot's slow think (the review of #744, M1)", () => {
+    const st = start([518, 1, 2, 3]);
+    const people = (player: string) => player === PLAYERS[0];
+    const clocked = phase2Clock(st, T0 + 20_000, people);
+    expect(clocked.boards.map((b) => b.hearts)).toEqual([7, 8, 8, 8]);
+    expect(phase2NextDue(clocked, people)).toBe(T0 + 600_000);
+    expect(phase2NextDue(st, people)).toBe(T0 + JUDGE);
+    expect(phase2NextDue(withBoards(st, (id) => (id === 0 ? { turnAt: null } : {})), people)).toBe(T0 + 600_000);
+    const late = phase2Move(st, 1, [...legalMoves(st.boards[1]!.board.fen)].sort()[0]!, T0 + 12_000, people);
+    expect(late.boards[1]).toMatchObject({ hearts: 8, slashed: false, slashAt: null, bankMs: 600_000 - 12_000, result: null });
+    expect(late.boards[1]!.board.history).toHaveLength(1);
+    expect(phase2Slash(st, 2, T0 + 7000).boards[2]).toMatchObject({ hearts: 7, slashAt: T0 + 7000, result: null });
+  });
+
+  it("testing (the admins' trigger): a heart cut now on that board, on its player's move only", () => {
+    const st = start([518, 1, 2, 3]);
+    const cut = phase2Slash(st, 0, T0 + 1000);
+    expect(cut.boards.map((b) => b.hearts)).toEqual([7, 8, 8, 8]);
+    expect(cut.boards[0]!.slashAt).toBe(T0 + 1000);
+    // (Its move is slashed: the same move isn't cut again when it turns slow.)
+    expect(phase2Clock(cut, T0 + 20_000).boards[0]!.hearts).toBe(7);
+    const his = phase2Move(st, 0, "e2e4", T0 + 1000);
+    expect(phase2Slash(his, 0, T0 + 1500)).toBe(his);
   });
 });
 

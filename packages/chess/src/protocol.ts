@@ -1135,6 +1135,9 @@ export interface NetPhase2Board {
   bankMs: number;
   turnAt: number | null;
   result: Phase2Result | null;
+  /** The player's hearts left, and when the last was cut (server time; the slash, and a board lost to it its fade), or null. */
+  hearts: number;
+  slashAt: number | null;
 }
 
 /**
@@ -1150,10 +1153,6 @@ export interface NetPhase2 {
   /** Phase 1's last position, the one his phase change splits. */
   from: string;
   boards: NetPhase2Board[];
-  /** The team's slow moves so far, the last one (which board, when), and when his ultimate came (null: not yet). */
-  slow: number;
-  lastSlow: { board: number; at: number } | null;
-  ultAt: number | null;
   /**
    * Every clock paused since then (server time): his move is late from the engine server (RECLUSE_ONLINE.pauseMs). Every board shows
    * "He's thinking…" and takes no move; the clocks run on from where they stood once it's in. Missing: not paused.

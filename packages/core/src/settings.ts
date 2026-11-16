@@ -1159,12 +1159,13 @@ export const BOSS_POWERS = {
    * Then he adds time per move (Eric, Oct 14, after playing it again: "1 min too short, needs to be 1+1 or even 1+2... a
    * few moves, say 3, with 1+0, then he says a comment about it and suggests adding time per move"): the crowd plays the
    * bullet clock's first bulletPlainMoves moves on the bank alone (1+0); as the next crowd turn begins he says so (his
-   * line, then "+2 s a move from now on" across the board), and from then on each move made in time adds
-   * bulletIncrementSeconds to that player's bank (1+2: the more forgiving of Eric's two, as 1:00 alone felt too short).
+   * line, then "+10 s a move from now on" across the board), and from then on each move made in time adds
+   * bulletIncrementSeconds to that player's bank: 1+10 (Eric, Nov 16, after playtesting: "instead of 2 seconds, it should go up
+   * to 10 seconds per move ... we're essentially nerfing him ... because he's too powerful right now"; it was 1+2).
    * No cap on the bank: it grows by at most this a move, over at most bossMaxMoves moves. Estimates, not sim-tested.
    */
   bulletPlainMoves: 3,
-  bulletIncrementSeconds: 2,
+  bulletIncrementSeconds: 10,
   /** The meter glows from this full (0-1) as it nears its ultimate. */
   rageGlowFrom: 0.75,
   /**
@@ -2146,23 +2147,26 @@ export const RECLUSE_PHASE2 = {
    */
   moveMs: 900,
   /**
-   * Each player's bank on each board (s): ultra-fast bullet, no increment, nothing adds time; out of time loses that
-   * board. His own moves take no time from it (he has no clock, as in phase 1). An estimate (2:00 a board): not yet
-   * sim-tested.
+   * Each player's bank on each board (s), no increment, nothing adds time; out of time loses that board (Eric, Nov 16: 10 minutes,
+   * was 2:00). His own moves take no time from it (he has no clock, as in phase 1).
    */
-  bankSeconds: 120,
+  bankSeconds: 600,
   /**
-   * His ultimate (Eric, Oct 14): a move that takes longer than `slowMoveSeconds` (anyone's, on any board, before it
-   * comes) is a slow move: he says so (one of his lines about playing faster), counted once for the team as the move
-   * is made (the X marks beside every board). The team's `slowMovesForUlt`-th slow move brings his ultimate (Eric, Oct
-   * 14, after playtesting: at 10 of 10; it was the 6th, then the 5th): from then on every move on every board has
-   * `ultMoveSeconds`, no bank, everyone's few seconds starting fresh as it comes; when they run out, a random legal
-   * move is played for that player (never a loss on time). Before it, the bank above applies. Estimates, not yet
-   * sim-tested: with a 2:00 bank (about 3 s a move over a game) slow moves will be common.
+   * Each player's hearts (Eric, Nov 16: "everyone actually needs their own"; "Let's just call it 8", a column of 8 at each board's
+   * right; he also said 10: one number here). A move that takes longer than `slowMoveSeconds` (what players are told) has one of
+   * that player's hearts cut as it turns slow, judged with `slowAllowMs` more for lag, never shown or said (the server's clock
+   * online: a move slow at 6.5 s from when the board became theirs). After the cut they may take as long as they need on that move
+   * (their clock runs; nothing is played for them). The last heart cut, their board is lost; the others play on.
    */
   slowMoveSeconds: 5,
-  slowMovesForUlt: 10,
-  ultMoveSeconds: 5,
+  slowAllowMs: 1500,
+  hearts: 8,
+  /**
+   * A heart cut on screen (ms from the cut, Eric, Nov 16): his blade drawn back, slow (`windMs`), then a fast follow-through across
+   * the heart, its halves sliding apart and fading (`ms` in all; the sound's swish at `windMs`: recluse-sounds.ts SLASH_CUT_S). No
+   * flash (Eric: photosensitivity). A board whose last heart it was then fades to grey over `greyMs`, "TOO SLOW" over it.
+   */
+  slash: { windMs: 520, ms: 1400, greyMs: 2600 },
   /**
    * The bots on the other boards (Boss alone's, or a solo Crowd's finalists beside you): Stockfish at this strength, this
    * many nodes, within `botMoveMs`.
@@ -2172,11 +2176,12 @@ export const RECLUSE_PHASE2 = {
   /** A bot's thinking per move (ms, its own clock running): a random time in this range, as a bullet player's. */
   botMoveMs: [900, 2600] as readonly [number, number],
   /**
-   * Now and then (this share of its moves, before his ultimate) a bot thinks longer, `botSlowMs` (past
-   * `slowMoveSeconds`), so his slow-move count and his ultimate come in Boss alone too, not only from you.
+   * Now and then (this share of its moves) a bot thinks longer, `botSlowMs` (past `slowMoveSeconds` and its allowance), and loses a
+   * heart as you would: a few a board, all of them hardly ever (Nov 16: at 5% a 40-move board loses about 2, a 60-move one 3; all 8
+   * about 1 in 1,400 and 1 in 100).
    */
-  botSlowChance: 0.12,
-  botSlowMs: [5400, 7000] as readonly [number, number],
+  botSlowChance: 0.05,
+  botSlowMs: [7000, 9000] as readonly [number, number],
   /** Once every board is decided: how long his reaction holds the boards before the result screen (ms). */
   endMs: 3200,
   /**

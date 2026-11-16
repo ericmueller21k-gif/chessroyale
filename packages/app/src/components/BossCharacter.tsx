@@ -222,10 +222,14 @@ export const hasCharacter = (match: GameView) => !!bossKit(match.boss?.name);
 
 export function BossCharacter({ match, place }: { match: GameView; place: "bar" | "side" | "results" }) {
   const boss = match.boss;
-  return boss && bossKitOf(boss) ? <Character boss={boss} stage={bossStage(match.phase, boss)} place={place} /> : null;
+  // (Beaten with his phase change next (the Hidden Boss's `toPhase2`): his cutscene comes 1.8 s in and hushes him, so his fall's mumbling
+  // only ever flashed its first line in his bar before it: none then (Eric, Nov 16: "get rid of that line").)
+  const p = match.phase;
+  const mute = p.kind === "boss" && !!p.fall && !!p.toPhase2;
+  return boss && bossKitOf(boss) ? <Character boss={boss} stage={bossStage(match.phase, boss)} place={place} muteFall={mute} /> : null;
 }
 
-function Character({ boss, stage, place }: { boss: BossView; stage: Stage; place: "bar" | "side" | "results" }) {
+function Character({ boss, stage, place, muteFall }: { boss: BossView; stage: Stage; place: "bar" | "side" | "results"; muteFall?: boolean }) {
   // (A form of its own: the Hidden Boss's child, his growing figure; his age followed by a figure run, RecluseChild.ts.)
   const full = bossKitOf(boss);
   useLayoutEffect(() => {
@@ -394,7 +398,7 @@ function Character({ boss, stage, place }: { boss: BossView; stage: Stage; place
   // Beaten: its fall lines (the Hidden Boss's mumbling), one after another once its defeat's animation is over, each
   // as the last one goes; carried on by whichever screen draws it next (the result screen), from the same moment.
   const fallAt = useMemo(() => {
-    if (!kit?.fall?.length || beat?.anim !== "defeat" || figure.run) return null;
+    if (!kit?.fall?.length || beat?.anim !== "defeat" || figure.run || muteFall) return null;
     const shot = kit.ch.anims[kit.anims.defeat ?? "defeat"];
     let t = since + (shot && !shot.loop ? length(shot) : 0);
     return kit.fall.map((text) => {
@@ -402,7 +406,7 @@ function Character({ boss, stage, place }: { boss: BossView; stage: Stage; place
       t += holdMs(text) + 150;
       return { text, at };
     });
-  }, [kit, beat?.key, since]);
+  }, [kit, beat?.key, since, muteFall]);
   useEffect(() => {
     if (!fallAt) return;
     const timers = fallAt.map(({ text, at }, i) => setTimeout(() => bossVoice.say(text, `${boss.id}:${boss.startMove}:fall:${i}`, NORMAL), Math.max(0, at - Date.now())));

@@ -559,13 +559,18 @@ describe("the FAQ on the Crowd's boss final (Eric, Oct 14: always the Hidden Bos
     expect(t).toContain(`against Stockfish at ${RECLUSE_PHASE2.elo}`);
     expect(t).toContain(`A ${RECLUSE_PHASE2.change.countdownSeconds}-second countdown on every board, then`);
     expect(t).toContain("his second phase follows, online and in a Solo game");
+    // (Phase 2's hearts, Eric, Nov 16: each player's own, 10 minutes a board; the allowance for lag is never written.)
+    expect(t).toContain(`then 10 minutes a board with no added time`);
+    expect(t).toContain(`Each of you has ${RECLUSE_PHASE2.hearts} hearts of your own: a move that takes longer than ${RECLUSE_PHASE2.slowMoveSeconds} s costs one`);
+    expect(t).not.toMatch(/6\.5|slowAllow|allowance/);
     // "Still to come" lists only bosses without their art and powers.
     expect(t).toMatch(/Still to come/);
     expect(t.slice(t.indexOf("Still to come"))).not.toContain(him.name);
-    const moved = section("boss-powers", { ...FAQ_DEFAULTS, powers: { ...BOSS_POWERS, bulletTurn: 9 }, phase2: { ...RECLUSE_PHASE2, slowMovesForUlt: 6, change: { ...RECLUSE_PHASE2.change, countdownSeconds: 3 } } });
+    const moved = section("boss-powers", { ...FAQ_DEFAULTS, powers: { ...BOSS_POWERS, bulletTurn: 9 }, phase2: { ...RECLUSE_PHASE2, hearts: 10, change: { ...RECLUSE_PHASE2.change, countdownSeconds: 3 } } });
     expect(moved).toContain("full as turn 9 begins");
     expect(moved).toContain("A 3-second countdown on every board");
-    expect(moved).toContain("the team's 6th brings his last power");
+    expect(moved).toContain("Each of you has 10 hearts of your own");
+    expect(moved).toContain("whoever loses all 10 loses their board");
   });
 
   it("his strength and brain are fixed (the Crowd's battle no longer follows the finalists' ratings), the boy's climbing first (Nov 13); the God King can't help against the man", () => {

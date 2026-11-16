@@ -400,7 +400,7 @@ export function PlayScreen({
                   <span class="muted barred-note">✕ {seenSan(board.fen, barred)}</span>
                 ) : bulletOn(match.boss) ? (
                   // (The Hidden Boss's bullet clock, on every move to the end; once he has added time per move, the time
-                  // control too: "Bullet 1+2". What's left in your bank is the dock's clock, at the box's right.)
+                  // control too: "Bullet 1+10". What's left in your bank is the dock's clock, at the box's right.)
                   <span class="bullet-note">
                     <strong>Bullet{bulletIncrementOn(match.boss) ? `\u00a0${bulletControl(bulletIncrementOn(match.boss))}` : ""}</strong>
                   </span>

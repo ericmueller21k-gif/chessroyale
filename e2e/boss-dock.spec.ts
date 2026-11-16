@@ -437,10 +437,47 @@ test("Boss alone on Boss Battle's 10 + 10 (Eric, Oct 30): the clock from the fir
   });
   expect(first).toBe(610_000);
   await expect(page.locator(".boss-dock-status .dk-clock.running .dk-time")).toHaveText(/^10:(10|0\d)$/);
+  // (The "+10" on top of everything, Eric, Nov 16: the status box clipped it. Read as it's drawn, the frame after it goes in: at its
+  // middle the page's topmost element is the "+10" itself (made tappable for the look: elementFromPoint skips what takes no taps), and
+  // it stands whole in the window, just over the clock's number, its right edge on the number's.)
+  await page.evaluate(() => {
+    const w = window as any;
+    w.__plusTop = null;
+    const obs = new MutationObserver(() => {
+      const el = document.querySelector<HTMLElement>("body > .dk-plus");
+      if (!el || w.__plusTop) return;
+      obs.disconnect();
+      requestAnimationFrame(() => {
+        el.style.pointerEvents = "auto";
+        const r = el.getBoundingClientRect();
+        const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+        const t = document.querySelector(".dk-clock .dk-time")!.getBoundingClientRect();
+        el.style.pointerEvents = "";
+        // (Not over a sheet or menu that's open, as the resign confirm is (the review of #744, m4): one like it laid over the page, then gone.)
+        const sheet = Object.assign(document.createElement("div"), { className: "mm-confirm" });
+        sheet.setAttribute("role", "alertdialog");
+        sheet.setAttribute("aria-modal", "true");
+        document.body.append(sheet);
+        const underSheet = getComputedStyle(el).visibility;
+        sheet.remove();
+        w.__plusTop = { on: !!hit && (hit === el || el.contains(hit)), text: el.textContent, underSheet, after: getComputedStyle(el).visibility, left: r.left, top: r.top, right: r.right, bottom: r.bottom, timeTop: t.top, timeRight: t.right, vw: innerWidth };
+      });
+    });
+    obs.observe(document.body, { childList: true });
+  });
   await quietMove(page);
   // His reply, then your next move: the bank less what you used, plus 10 s, and the "+10" rising over it.
-  const plus = page.locator(".boss-dock-status .dk-clock.running .dk-plus");
+  const plus = page.locator("body > .dk-plus");
   await expect(plus).toHaveText("+10", { timeout: 60_000 });
+  await expect.poll(() => page.evaluate(() => (window as any).__plusTop), { timeout: 5_000 }).not.toBeNull();
+  const top = await page.evaluate(() => (window as any).__plusTop);
+  expect(top).toMatchObject({ on: true, text: "+10", underSheet: "hidden", after: "visible" });
+  expect(top.top).toBeGreaterThanOrEqual(0);
+  expect(top.left).toBeGreaterThanOrEqual(0);
+  expect(top.right).toBeLessThanOrEqual(top.vw);
+  // (Its rise starts 6 px low and small, so within a few pixels of where it settles: over the number, at its right.)
+  expect(top.bottom).toBeLessThanOrEqual(top.timeTop + 8);
+  expect(Math.abs(top.right - top.timeRight)).toBeLessThanOrEqual(8);
   const next = await page.evaluate(() => {
     const p = (window as any).match.phase;
     return p.deadline - p.startsAt;

@@ -26,14 +26,11 @@ export const RECLUSE_LINES = {
   bullet: ["Stop calculating. Just play!", "Stop staring. Pure chess. Move!", "All that thinking, no idea. Hurry!"],
   /**
    * A few moves into the bullet clock, he adds time per move (Eric, Oct 14): grudging, too fast even for real chess. One,
-   * picked by the battle (placeholders: ours, not his words; the clock that adds time per move was his own invention, so
-   * a line may hint at it, never as a quote). The number is on the board, not in the line (it's a setting).
+   * picked by the battle (placeholders: ours, not his words). Eric, Nov 16: "It just says time per move. Make it say something that
+   * makes more sense"; each whole in his bubble on any phone (two rows at 320 px: boss-bar-lines.test.ts), naming the seconds in words
+   * (a test keeps them the setting's, BOSS_POWERS.bulletIncrementSeconds).
    */
-  bulletPlus: [
-    "Too fast, even for real chess. Fine. A little time on every move.",
-    "This is a lottery, not chess. Time per move, then. My own idea, you know.",
-    "Bah. Nobody plays real chess this fast. I'll add time to every move.",
-  ],
+  bulletPlus: ["Lottery, not chess. Ten seconds a move.", "Too fast for chess. Ten seconds a move.", "Bah. Fine: ten seconds a move."],
   /** The God King's help tried, and blocked (he slams the book shut): one, in turn. */
   mock: [
     // QUOTE (A6): Peter Kihss in the New York Times, Jul 4, 1972, p. 14 (Winter, C.N. 5830).
@@ -73,8 +70,16 @@ export const RECLUSE_LINES = {
   boardWon: ["One down. Who's next?", "Too slow. The clock doesn't wait."],
   /** He loses a board (placeholders). */
   boardLost: ["Hm. A lucky one.", "That board was nothing. Watch the others.", "So one of you can play."],
-  /** A slow move (more than slowMoveSeconds, anyone's), before his ultimate: one, in turn (placeholders). */
-  slow: ["Still thinking? Move!", "You think too hard. Play!", "The clock is ticking. So am I.", "Stop staring. Make a move!", "Faster! This isn't correspondence chess."],
+  /**
+   * A heart of yours cut (Eric, Nov 16: your move past RECLUSE_PHASE2.slowMoveSeconds), on your screen only, cutting in on whatever
+   * he's saying; harder as your hearts run out (recluse-phase2.ts slashLine): `taunt` while 3 or more are left, in turn; `hard` at 2
+   * left, then 1; `last` (one of them) as the last goes and your board with it. PLACEHOLDERS, ours, for Eric.
+   */
+  slash: {
+    taunt: ["Too slow.", "Faster, or lose.", "Not so easy without your engine?", "Tick, tock. That's another one.", "Thinking again? I'll take that.", "Is that how you play? Slowly?"],
+    hard: ["Two hearts left. Can you count that fast?", "One heart left. Make it count."],
+    last: ["Your last heart. This board is mine.", "No hearts left. Sit down. You're done."],
+  },
   /**
    * His chatter (recluse-talk.ts; Eric, Oct 14 and 15): about every 15 s of play (RECLUSE_TALK), all through phase 1 and
    * phase 2, about the team against him (his games analyzed, collusion, Curaçao), in three stages as the fight goes on:
@@ -148,12 +153,6 @@ export const RECLUSE_LINES = {
     "Go on, call your God King. Oh, that's right.",
     "Every line, every move. I see them all now.",
   ],
-  /**
-   * His phase 2 ultimate as it comes: a few seconds a move from now on (placeholders). Never the seconds: the banner
-   * names it from the setting (RECLUSE_PHASE2.ultMoveSeconds) and the dock says what it means, as `bulletPlus`'s number
-   * is the board's.
-   */
-  ult2: ["That's enough! No more thinking, all of you!", "Enough thinking! Move, or I move for you!"],
   /** Beaten on all four boards (placeholders; his "super saiyan" transformation comes later). */
   beaten2: ["Impossible... all four...", "Four boards... and not one book among them..."],
 } as const;
