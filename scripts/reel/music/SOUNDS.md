@@ -293,7 +293,7 @@ is: the handoff needs the boss's id.
 `chandy` (he is not in the roster yet: the id is a guess the director can rename). Two of his own plans built as
 written have now passed first go (Babur's, this): when he gives a plan, build the plan.
 
-## A new theme for Folio (Nov 16, song_ah.py): passed on
+## A new theme for Folio (Nov 16, song_ah.py): passed on, then back with his piano
 
 "This is the write-up for Folio. Again, about 2 minutes, 45 seconds ... And stick to what I'm sending you." His own
 plan ("Breezy 90s Japanese City-Pop / High-Altitude Smooth Synth-Jazz": 102 beats a minute, 16ths swung 58%, G major,
@@ -302,7 +302,19 @@ as written. Its 20 bars are 47 seconds, so it is played three times with a littl
 twice the third time (68 bars, 2:40). Folio already has song_o.py in the game: which one stays is his call.
 
 Eric's verdict, Nov 16: "I didn't care for this one, actually. It's not what you did, but let's try this again." The
-style, not the build: song_ah.py stays as a record, and isn't used.
+style, not the build.
+
+Then, the same day, he played over it and came back to it: "C6 c6 b5 a5 g5 F5+A5 e5+g5 x2(quick), repeat but then
+after g5 it's g5+b5 then f5+a5 x2(quick). Add this piano roll and a little around this idea to the first folio
+iteration the 1:16/1:17 seems to be a natural time to quiet the song and add this layer on top? You'll need to adjust
+somethings I'm sure". So it is a candidate again, with his piano:
+- 1:15 is the second bridge, which starts on Cmaj7 (his first notes fit it). That bridge is his piano's now, in place
+  of the whistle's line, and quieter: no brush, soft kick and rim, the bass's roots, the pad.
+- His notes as given, on the soft piano. He gave no rhythm: quarter notes, the thirds 8ths, the last left to ring.
+  A clip with the thirds as 16ths went with it, for him to say which is how he played it.
+- His notes are C major's (F natural), so the chords under his four bars are Cmaj7, Fmaj9, Am9, G9 in place of the
+  plan's. Four bars of mine follow in his shape and end on his thirds with F sharp, back to G.
+- Sent as v2. No verdict yet; which of the three (this, song_ai.py, song_o.py) is Folio's is his call.
 
 ## Folio's arcade theme (Nov 16, song_ai.py): sent, no verdict yet
 
