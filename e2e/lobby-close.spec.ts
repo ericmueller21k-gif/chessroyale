@@ -133,7 +133,7 @@ test("a code typed into Join that leads nowhere: \"Can't join\", not an endless 
 /**
  * Pop-up notices sit on top and push nothing (Eric, Nov 16: "They shouldn't ever push anything around on the screen").
  * With a note showing, a fixed thing on the screen keeps its box (to 1 px); dismissed, it still does; and the note is on
- * top (the element at its middle is inside it). Home: PLAY. Boss Battle (a party that closed): the first boss tile and START.
+ * top (the element at its middle is inside it). Home: PLAY. Boss Battle (a party that closed): the first boss tile and the first way to play.
  */
 const box = async (loc: Locator) => {
   const b = await loc.boundingBox();
@@ -155,7 +155,7 @@ async function expectOnTop(page: Page, note: Locator) {
   await expect(note).toBeVisible();
 }
 
-test("a pop-up note floats over the screen and pushes nothing: home (PLAY) and Boss Battle (a closed party: the first tile, START)", async ({ page }) => {
+test("a pop-up note floats over the screen and pushes nothing: home (PLAY) and Boss Battle (a closed party: its first tile, its first way to play)", async ({ page }) => {
   test.setTimeout(3 * 60_000);
   // Home with no note: where PLAY is.
   await page.goto("/?debug");
@@ -172,20 +172,21 @@ test("a pop-up note floats over the screen and pushes nothing: home (PLAY) and B
   await expectSameBox(play, playAt);
 
   // Boss Battle with no note: the first tile and START.
+  // (The raid screen, the same one a closed party's link opens: its first tile and its first way to play.)
   await page.goto("/?debug&mode=raid");
   const tile = page.locator(".bs-tile").first();
-  const start = page.locator(".bs-start").first();
-  await expect(start).toBeVisible();
+  const play1 = page.locator(".rd-options button").first();
+  await expect(play1).toBeVisible();
   const tileAt = await box(tile);
-  const startAt = await box(start);
-  // Its party has closed: the note floats over it, and the tile and START keep their boxes.
+  const playOptAt = await box(play1);
+  // Its party has closed: the note floats over it, and the tile and the first way to play keep their boxes.
   await page.goto("/boss/party/ZZZZZ?debug&mode=raid");
   await expect(note(page)).toContainText("That party has closed.", { timeout: 20_000 });
   await expectOnTop(page, note(page));
   await expectSameBox(tile, tileAt);
-  await expectSameBox(start, startAt);
+  await expectSameBox(play1, playOptAt);
   await note(page).getByRole("button", { name: "Dismiss" }).click();
   await expect(note(page)).toHaveCount(0);
   await expectSameBox(tile, tileAt);
-  await expectSameBox(start, startAt);
+  await expectSameBox(play1, playOptAt);
 });

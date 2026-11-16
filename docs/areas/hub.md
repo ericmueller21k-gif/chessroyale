@@ -90,7 +90,7 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
     off with its line, as the other modes. Ranked's leave rules (L1, Nov 9; [ranked.md](ranked.md), "Leaving early"): a
     lockout greys 1 v 1's PLAY with its countdown in the line ("You left early: 1 v 1 opens in 4:32", one line from 320 px;
     `LeavesLine`, the only part drawn each second), PLAY back by itself as it ends; the delayed queue's line ("3 leaves in your
-    last 20: +2 min queue") leaves PLAY on. Home's note slot (the `fd-notice` at its top, dismissable for the tab) says "You left
+    last 20: +2 min queue") leaves PLAY on. Home's note slot (the `fd-notice`, a pop-up fixed under the header that pushes nothing, dismissable for the tab; Eric, Nov 16) says "You left
     before the game started: −5 RP" after a dodge, or "Finish ranked games to clear your leaves." from 5 marks; another notice (a match
     that ended) goes first.
   - **Searching while you browse** (Eric, Nov 10; [2026-11-10-search-on-home.md](../decisions/2026-11-10-search-on-home.md); `search.ts`, Home's `SearchRow`):
