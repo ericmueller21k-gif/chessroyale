@@ -135,6 +135,7 @@
     "packages/app/hidden-room-preview.html",
     "packages/app/items-preview.html",
     "packages/app/rides-measure.html",
+    "packages/app/chandy-preview.html",
     "packages/app/src/dev/**",
     "packages/maia-worker/LICENSE",
     "packages/maia-worker/licenses/**",
@@ -398,6 +399,14 @@
         "packages/app/src/board/pieces/zebra/*.svg"
       ],
       "specs": ["e2e/zebra.spec.ts", "e2e/boss-smoke.spec.ts", "e2e/king-attack.spec.ts"]
+    },
+    "Chandy (his art drawn ahead of his rules, Nov 16; nothing plays him yet: docs/ideas/chandy-wiring.md)": {
+      "paths": [
+        "packages/app/src/characters/chandy*.ts",
+        "packages/app/src/characters/effects/chandy.ts",
+        "packages/app/src/components/Chandy*.tsx"
+      ],
+      "specs": ["e2e/boss-smoke.spec.ts"]
     },
     "Timber (timber)": {
       "paths": [

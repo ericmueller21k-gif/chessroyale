@@ -28,7 +28,7 @@ function tick() {
   for (const t of ticks) t();
   if (ticks.size) loopId = requestAnimationFrame(tick);
 }
-function onEachFrame(fn: () => void): () => void {
+export function onEachFrame(fn: () => void): () => void {
   ticks.add(fn);
   if (!loopId) loopId = requestAnimationFrame(tick);
   return () => {
