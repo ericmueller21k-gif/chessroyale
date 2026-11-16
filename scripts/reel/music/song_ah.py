@@ -17,51 +17,53 @@ Its 20 bars are 47 seconds, and he wants about 2:45 (SOUNDS.md: a shorter plan i
 sections). So the plan is played three times, a little more in it each time, and the third time has the theme twice:
   1  as written: the vamp; the theme; the bridge, its line on the bell-Rhodes
   2  the vamp with the whistle's small turns in its gaps; the theme; the bridge (its line on the whistle, until
-     Eric's line took this bridge: below)
-  3  the vamp; the theme with the bell-Rhodes sparkling over it; the theme again, a second whistle a third or a sixth
-     under the first; the bridge, both lines
+     Eric's piano took this bridge's place: below)
+  3  the vamp; the theme with the bell-Rhodes sparkling over it and a second whistle a third or a sixth under the
+     first (it was the theme twice, until the piano); the bridge, both lines
 68 bars, 160.0 s.
 What the plan leaves to whoever builds it is written here, inside its rules, and is original (none of it is any
 song's or any game's): the whistle's theme (long notes held over the barline, small turns of 16ths on the five-note
 scale), the bridge's line, the bell-Rhodes's rhythm, the bass's line and the kit's pattern.
 (Folio has a theme in the game already, song_o.py. This is for Eric to choose between.)
 
-Eric's line (Nov 16, the same day; he had passed on the song, then played over it): "the 1:16/1:17 seems to be a
+Eric's piano (Nov 16, the same day; he had passed on the song, then played over it): "the 1:16/1:17 seems to be a
 natural time to quiet the song and add this layer on top? You'll need to adjust somethings I'm sure". 1:15 is where
-the second bridge starts, so that bridge (bars 33-40) is his now, in place of the whistle's line. He wrote the notes
-out first and I put them on a piano; then he sent a recording of himself playing it ("this was how I meant it to be
-played. I think I wrote it wrong. This would just be the first part. Just, like, use this as the starting point and
-then do the solo ... instead of, like, a piano ... something, like, high-pitch instrument sounding ... a flute, maybe
-... on the last note I played here, there was a slight pause that was not on purpose. It should be playing a bit
-faster than what it's being played here, like to fit the song"). The recording stays out of the repo; what it holds:
-  - Thirds, all of it: C6+E6 three times, B5+D6, A5+C6, G5+B5, and B5+D6 twice. His to give, played as given.
-  - Its rhythm, measured: 0.28 s, 0.27, 0.31, then 0.65, 0.66, then 0.48 and 0.30. On the song's grid (an 8th is
-    0.29 s) that is three 8ths, two quarters, and two 8ths into the last, which is "a bit faster" than he played.
-    The 0.48 is the pause he didn't mean: an 8th.
-  - Where it sits against the bar he didn't say: it starts on the bridge's first beat, on the C chord its first
-    notes are the root and third of, so its long notes push ahead of the beat as the bell-Rhodes's chords do.
-  - Two flutes, with no breath in them (SOUNDS.md). `up` plays them that many half steps higher (12: piccolos), for
-    him to compare.
-  - "Then do the solo" is mine, in his shape: a flute alone over the next two bars; his three C+E again over the A
-    minor chord, this time turning up to E6+G6; and thirds down to D6+F#6, which leads home to G.
-  - "Adjust": his last B5+D6 lands on the plan's Cm6, which fights it, so the C major chord stays two beats longer
-    there (Cmaj7, then F9). The rest of this bridge's chords are the plan's, and so are the other two bridges.
-  - "Quiet the song": no brush there (a steady noise drowns a sparse solo: SOUNDS.md), the kick and the rim softer,
-    the bass down to a root and a fifth, the bell-Rhodes once a chord and soft, the reed pad. The theme's last note
-    before it ends at the barline, so it isn't a step under the flutes' first.
-  python3 song_ah.py <out.wav> [up]
+the second bridge was; it is his piano's place now. It took three goes to get to what he meant: his notes written
+out, on a piano; then a recording of him playing them, which I set on two flutes with a solo after ("It wasn't
+correct; also go back to piano actually"); then his own plan for it (made with another assistant, and his to give),
+which this is:
+  - The left hand, his "low rolling theme": eight bars of steady 8th notes, every pitch as he wrote it ("DO NOT alter
+    these pitches or replace them with block chords"): four bars on the white keys (C, G, D, E; then E, F; the same an
+    octave up; a turn down through F, E, D), then F sharp in the roll (two bars), D sharp (one), and E again. A warm
+    felt piano. It plays its eight bars alone first ("so the listener hears my low rolling theme clearly first"),
+    then again under the right hand.
+  - The right hand, in octaves 5 and 6, "crystalline": his motif (E6, D6, A5, G5, D6) is the opening hook, not his
+    test notes played back ("Do NOT copy the choppy 4-second clip verbatim"), and the solo grows from it in 16th-note
+    runs, grace notes and arpeggios that follow the left hand: white keys; the hook a step up with F sharp; a run on
+    the D sharp bar's chord (B7 flat 9: the harmonic minor's sound); home on E. The solo past the hook is mine, and
+    original (none of it is any song's or any game's). The town's lesson holds (16ths that only climb and fall
+    "miss"): its runs turn, and step down in threes and fours, with held notes between.
+  - His plan says 96 beats a minute; inside this song it goes at the song's 102 ("it should be playing a bit faster
+    ... to fit the song"). The 16ths here are even, not swung: nothing swung plays under them.
+  - "Quiet the song": the band stops for it. The left hand alone, eight bars; under the solo a soft kick on 1 and a
+    rim on 2 and 4; the snare's fill brings the band back. The left hand's last four notes walk down to G, which is
+    where the vamp starts. The theme's last note before it ends at the barline.
+  - The piano is sixteen bars where the bridge was eight, so the third time round has the theme once, not twice,
+    with the bell-Rhodes's sparkle and the second whistle both: 68 bars still.
+  python3 song_ah.py <out.wav>
 
   bars  1-4    0:00  the vamp: the bell-Rhodes, the bass, the kit
   bars  5-12   0:09  the whistle's theme
   bars 13-20   0:28  the bridge: a rim and a brush, the reed pad, the bell-Rhodes's line
   bars 21-24   0:47  the vamp, the whistle's turns in its gaps
   bars 25-32   0:56  the theme
-  bars 33-40   1:15  the bridge, quieter: Eric's line on two flutes, and the flutes' solo
-  bars 41-44   1:34  the vamp
-  bars 45-52   1:44  the theme, the bell-Rhodes sparkling over it
-  bars 53-60   2:02  the theme, two whistles
+  bars 33-40   1:15  Eric's piano: the left hand's rolling theme, alone
+  bars 41-48   1:34  the left hand again, the right hand's solo over it; the snare's fill
+  bars 49-52   1:53  the vamp
+  bars 53-60   2:02  the theme, the bell-Rhodes sparkling over it, two whistles
   bars 61-68   2:21  the bridge, both lines; the snare's fill, and bar 1
 """
+import re
 import sys
 
 import numpy as np
@@ -88,11 +90,10 @@ SKY = {
 VAMP = "Gmaj9 | Cmaj7/G | Gmaj9 | C/D"
 CYCLE = "Gmaj7:2 F#m7b5:1 B7b9:1 | Em9:2 Dm7:1 G7:1 | Cmaj7:2 Bm7:1 Em7:1 | Am9:2 C/D:2"
 BRIDGE = "Cmaj7 | Cm6:2 F9:2 | Bm7 | E7sus4:2 E7:2 | Am9:2 Bm7:2 | Cmaj7:2 C#dim7:2 | D13sus4 | D7b9"
-# The second bridge, under Eric's line: the plan's chords, but its second bar stays on Cmaj7 two beats (for Cm6).
-HIS_BRIDGE = "Cmaj7 | Cmaj7:2 F9:2 | Bm7 | E7sus4:2 E7:2 | Am9:2 Bm7:2 | Cmaj7:2 C#dim7:2 | D13sus4 | D7b9"
 ONCE = f"{VAMP} | {CYCLE} | {CYCLE} | {BRIDGE}"
+PIANO_BARS = 16  # Eric's piano, where the second bridge was (C here only so the bass steps up into it)
 PLAN = [[(c.partition(":")[0], float(c.partition(":")[2] or 4)) for c in bar.split()]
-        for bar in f"{ONCE} | {VAMP} | {CYCLE} | {CYCLE} | {HIS_BRIDGE} | {VAMP} | {CYCLE} | {CYCLE} | {CYCLE} | {CYCLE} | {BRIDGE}".split(" | ")]
+        for bar in f"{ONCE} | {VAMP} | {CYCLE} | {CYCLE} | {' | '.join(['Cmaj7'] * PIANO_BARS)} | {VAMP} | {CYCLE} | {CYCLE} | {BRIDGE}".split(" | ")]
 assert len(PLAN) == BARS and all(sum(d for _, d in bar) == 4 for bar in PLAN), len(PLAN)
 
 # ---- the lines. Lengths in beats; .25 is a 16th; a note may cross a barline. ----
@@ -111,20 +112,31 @@ THEME_UNDER = (
 LINE = "-:1 E5:1 G5:1 B5:1 | A5:1.5 G5:.5 Eb5:2 | D5:1.5 F#5:.5 A5:1 B5:1 | A5:2 G#5:2 | E5:.5 G5:.5 B5:1 A5:.5 B5:.5 D6:1 | E6:1.5 D6:.5 C#6:1 Bb5:1 | A5:.5 G5:.5 E5:1 G5:2 | F#5:1.5 Eb5:.5 D5:2"
 # The whistle's turns in the vamp's gaps (the second time).
 TURNS = "-:4 | -:2.5 D5:.25 E5:.25 G5:.5 E5:.5 | -:4 | -:2 B5:.25 A5:.25 G5:.5 E5:.5 D5:.5"
-# Eric's line (bars 33-34, from his recording), and the flutes' solo after it (mine). "X+Y" is two notes together.
-HIS = "C6+E6:.5 C6+E6:.5 C6+E6:.5 B5+D6:1 A5+C6:1 G5+B5:.5 | B5+D6:.5 B5+D6:1.5 "
-SOLO = (
-    "-:.5 A5:.5 C6:.5 Eb6:.5 | D6:1.5 E6:.25 F#6:.25 A6:1 F#6:1 | E6:1.5 D6:.5 B5:.5 G#5:.5 B5:.5 D6:.5 | "
-    "C6+E6:.5 C6+E6:.5 C6+E6:.5 B5+D6:1 D6+F#6:1 B5+D6:.5 | E6+G6:.5 E6+G6:1.5 G6:.5 E6:.5 C#6:.5 Bb5:.5 | "
-    "B5+D6:1.5 A5+C6:.5 G5+B5:1 A5+C6:1 | A5+C6:.5 F#5+A5:.5 A5+C6:.5 D6+F#6:2.5"
+# Eric's left hand: eight bars of eight 8ths, as he wrote them.
+LEFT = (
+    "C2 G2 D3 E3 C2 G2 D3 E3", "C2 G2 E3 F3 C2 G2 E3 F3", "C3 G3 D4 E4 C3 G3 D4 E4", "C3 G3 E4 G4 F4 E4 D4 G3",
+    "C3 F#3 A3 B3 C3 F#3 A3 B3", "C3 F#3 A3 B3 D4 C4 B3 A3", "C3 D#3 A3 B3 C4 B3 A3 D#3", "C3 E3 A3 B3 C4 B3 A3 G3",
 )
-for _line, _beats in ((THEME, 33), (THEME_UNDER, 33), (LINE, 32), (TURNS, 16), ((HIS + SOLO).replace("+", ""), 32)):
+# The right hand's solo over its second time round, a bar a line. "X>Y" is a grace note X into Y (two: a rolled chord).
+# His motif opens it (E6 D6 A5 G5, and D6 into the next bar); the rest is mine.
+RIGHT = (
+    "E6:1.5 D6:.5 A5:1 G5:1 | "
+    "D6:1.5 E6:.25 D6:.25 C6:.25 A5:.25 G5:.25 A5:.25 C6:.25 E6:.25 G6:.5 | "
+    "F6>E6:1 D6:.5 A5:.5 G5:.5 A5:.25 C6:.25 D6:.5 E6:.5 | "
+    "G6:.25 E6:.25 C6:.25 E6:.25 F6:.25 D6:.25 B5:.25 D6:.25 E6:.25 C6:.25 A5:.25 C6:.25 D6:.25 B5:.25 G5:.25 B5:.25 | "
+    "G6>F#6:1.5 E6:.5 B5:1 A5:1 | "
+    "E6:1 F#6:.25 G6:.25 A6:.25 F#6:.25 D6:.25 E6:.25 F#6:.25 D6:.25 B5:.25 C6:.25 D6:.25 B5:.25 | "
+    "B6:.75 A6:.25 F#6:.25 D#6:.25 C6:.25 B5:.25 A5:.25 B5:.25 C6:.25 D#6:.25 F#6:.5 D#6:.5 | "
+    "D#6>E6:1 C6:.5 B5:.5 A5:.5 G5:.5 G5>B5>D6:1"
+)
+assert all(len(bar.split()) == 8 for bar in LEFT)
+for _line, _beats in ((THEME, 33), (THEME_UNDER, 33), (LINE, 32), (TURNS, 16), (re.sub(r"\S+>", "", RIGHT), 32)):
     assert beats(_line) == _beats, (_line[:30], beats(_line))
 
 
-def render(window=None, up=0) -> np.ndarray:
+def render(window=None) -> np.ndarray:
     """The song as heard (stereo, at the mix's own level). `window`: (from beat, to beat), to make only that passage
-    (a sample, to compare voices on). `up`: the flutes play this many half steps higher (12: piccolos)."""
+    (a sample, to compare voices on)."""
     x = Ride(RIDE, BEATS, None, os=2, seed=257, tape_secs=TAPE)
     x.window = window
     put, at = x.put, x.at
@@ -338,36 +350,63 @@ def render(window=None, up=0) -> np.ndarray:
         if on_whistle:
             whistle(bar0(first), LINE, 0.85)
 
-    def flutes(start, text, vol=1.0):
-        """Eric's line and its solo: two flutes with no breath in them. "X+Y" is the two together (the higher on the
-        first flute); a single note is the first alone. Each note is tongued (an 8th or less is cut a little short);
-        a vibrato on a note of a beat or more."""
-        harm = [1, 0.2, 0.05] if up >= 12 else list(x.FLUTE)
+    def left(bar, steps, vol=1.0):
+        """A bar of Eric's left hand: eight 8ths on the warm felt piano, each ringing into the next few; the first
+        and the fifth a little firmer."""
+        for i, name in enumerate(steps.split()):
+            w = x.struck("felt", n(name))
+            put("piano", bar0(bar) + i / 2, w * np.exp(-np.arange(len(w)) / sr / 0.9) * 0.25 * vol * (1.0 if i % 4 == 0 else 0.85), -0.15)
+
+    made = {}
+
+    def crystal(m):
+        """A note of the high piano, crystalline: three strings a hair apart, overtones up to 9 kHz that die sooner
+        the higher they are, the hammer's tick. Its loudest point 1; kept once made."""
+        if m not in made:
+            k = int(2.2 * sr)
+            t = np.arange(k) / sr
+            f0 = x.hz(m)
+            h = np.arange(1, max(2, int(9000 / f0) + 1))
+            w = np.zeros(k)
+            for off in (-1.5, 0.3, 1.6):
+                ph = np.outer(h * np.sqrt(1 + 0.0006 * h * h), tau * f0 * 2 ** (off / 1200) * t) + h[:, None]
+                w += ((1 / h**1.35)[:, None] * np.sin(ph) * np.exp(-np.outer(1 + 0.6 * h, t) / (0.9 * (262 / f0) ** 0.35))).sum(axis=0)
+            w = w * np.minimum(1, t / 0.002) + 0.25 * hiss(k, 9000, 0.5) * np.exp(-t / 0.004)
+            made[m] = w / np.abs(w).max() * tail(k, 0.2)
+        return made[m]
+
+    def right(start, text, vol=1.0):
+        """The right hand: the high piano. A long note is played full, a 16th lighter (the one on the beat a little
+        less so); a grace note is soft and just ahead of its note."""
         t = float(start)
         for tok in text.replace("|", " ").split():
             names, _, d = tok.partition(":")
             d = float(d)
-            if names != "-":
-                b = sway(t)
-                at(b, d)
-                for j, m in enumerate(sorted((n(c) for c in names.split("+")), reverse=True)):
-                    more = dict(vib=0.005 if d >= 1 else 0.0, vib_hz=5.2, attack=0.02, release=0.04)
-                    put("flute", b, x.tone(m + up, d * (0.82 if d <= 0.5 else 0.94), harm, 0.1 * vol * (0.8 if j else 1.0) * (0.7 if up >= 12 else 1.0), **more), -0.15 if j else 0.2)
+            *graces, main = names.split(">")
+            for j, g in enumerate(graces):
+                put("piano", t - 0.085 * (len(graces) - j), crystal(n(g)) * 0.3 * vol * 0.55, 0.25)
+            touch = 1.0 if d >= 1 else 0.9 if d >= 0.5 else 0.84 if abs(t - round(t)) < 1e-6 else 0.72
+            put("piano", t, crystal(n(main)) * 0.3 * vol * touch, 0.25)
             t += d
 
-    def his_bridge(first):
-        """Eight bars, the song quieter under Eric's line and the flutes' solo: the kick and the rim soft, no brush;
-        the bass's roots; the bell-Rhodes once a chord; the reed pad; the last bar's fill."""
-        for bar in range(first, first + 8):
-            pocket(bar, 0.75, soft=True, fill=bar == first + 7, brushes=False), walk(bar, 0.8, light=True), comp(bar, 0.6, sparse=True)
-            for start, d, low, ms in spans(bar):
-                reeds(bar0(bar) + start, ms, d)
-        flutes(bar0(first), HIS + SOLO)
+    def interlude(first):
+        """Sixteen bars, the band silent: Eric's left hand alone, its eight bars; then again with the right hand's
+        solo over it, a soft kick on 1 and a rim on 2 and 4 under them; the last bar's fill."""
+        for j in range(PIANO_BARS):
+            b = bar0(first + j)
+            left(first + j, LEFT[j % 8])
+            if j >= 8:
+                kick(b, 0.2), rim(b + 1, 0.06)
+                if j < PIANO_BARS - 1:
+                    rim(b + 3, 0.06)
+        for i in range(8, 16):
+            snare(bar0(first + PIANO_BARS - 1) + i / 4, 0.07 + 0.018 * (i - 8), ghost=i % 2 == 1)
+        right(bar0(first + 8), RIGHT)
 
-    # The plan, three times (the docstring); the second bridge is Eric's line's.
+    # The plan, three times (the docstring); Eric's piano where the second bridge was.
     vamp(1), theme(5), bridge(13, on_keys=True)
-    vamp(21, turns=True), theme(25, again=True), his_bridge(33)
-    vamp(41), theme(45, sparkle=True, again=True), theme(53, two=True), bridge(61, on_keys=True, on_whistle=True)
+    vamp(21, turns=True), theme(25, again=True), interlude(33)
+    vamp(49), theme(53, sparkle=True, two=True), bridge(61, on_keys=True, on_whistle=True)
 
     # A hall for the bell-Rhodes, the whistle and the pad; none for the kit or the bass.
     def room(name, secs=1.6, wet=0.3):
@@ -382,16 +421,16 @@ def render(window=None, up=0) -> np.ndarray:
         x.buses[name] = bus + wet * np.fft.irfft(np.fft.rfft(bus, axis=1) * np.fft.rfft(ir, axis=1) / (1 + (f / 4500) ** 2) * (f > 150), n=size, axis=1)
 
     x.beat_s = 60 / BPM
-    x.echo("whistle", 0.75, 0.16, 0.07), x.echo("whistle2", 0.75, 0.16, 0.07), x.echo("keys", 0.75, 0.12, 0.05), x.echo("flute", 0.75, 0.12, 0.05)
-    for name, secs, wet in (("keys", 1.8, 0.3), ("whistle", 1.8, 0.3), ("whistle2", 1.8, 0.3), ("pad", 2.2, 0.4), ("flute", 1.8, 0.3)):
+    x.echo("whistle", 0.75, 0.16, 0.07), x.echo("whistle2", 0.75, 0.16, 0.07), x.echo("keys", 0.75, 0.12, 0.05)
+    for name, secs, wet in (("keys", 1.8, 0.3), ("whistle", 1.8, 0.3), ("whistle2", 1.8, 0.3), ("pad", 2.2, 0.4), ("piano", 1.8, 0.25)):
         room(name, secs, wet)
-    levels = {"whistle": 1.0, "whistle2": 1.0, "flute": 1.0, "keys": 2.0, "pad": 1.6, "bass": 0.55, "kick": 0.95, "snare": 2.1, "hats": 5.0}
+    levels = {"whistle": 1.0, "whistle2": 1.0, "piano": 1.0, "keys": 2.0, "pad": 1.6, "bass": 0.55, "kick": 0.95, "snare": 2.1, "hats": 5.0}
     return x.play(x.mixdown(levels, lowpass=9000, room=0.05))
 
 
-def main(out: str, up: str = "0") -> None:
-    write_wav(out, render(up=int(up)))
+def main(out: str) -> None:
+    write_wav(out, render())
 
 
 if __name__ == "__main__":
-    main(*sys.argv[1:])
+    main(sys.argv[1])

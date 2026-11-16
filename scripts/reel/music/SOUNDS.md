@@ -324,7 +324,19 @@ somethings I'm sure". So it is a candidate again, with his piano:
 - A played recording says more than written notes: measure its onsets and each note's level over time, and ask
   nothing he has already shown. (Its file stays in the scratch folder: never in the repo.)
 - Sent as two 30-second clips: the flutes where he played it, and piccolos an octave up ("a bit higher than this").
-  No verdict yet; which of the three (this, song_ai.py, song_o.py) is Folio's is his call.
+  His verdict: "It wasn't correct; also go back to piano actually." With it came his own plan for the piano (made
+  with another assistant, his to give): a left hand, eight bars of steady 8ths with every pitch written out ("DO NOT
+  alter these pitches or replace them with block chords"), alone first, then a right-hand solo in octaves 5 and 6
+  that opens with his motif (E6, D6, A5, G5, D6) and grows into 16th runs, grace notes and arpeggios.
+- So v4: sixteen bars of piano where the second bridge was, the band silent. His left hand as written, on the felt
+  piano; the right hand on a brighter piano made for it (the felt one is nearly a sine that high). The plan says 96
+  beats a minute; in the song it goes at the song's 102. The third time round has the theme once now: 68 bars still.
+- A lesson: a short clip of someone's test notes is a sketch of an idea, not the part. I played his back exactly,
+  twice (written, then recorded), and neither was what he meant; what he wanted was his motif as the opening of
+  something written. Ask what the notes are for before setting them.
+- His plan asks for 16th-note runs, which the town's solos taught us "miss" when they only climb and fall. These
+  turn and step down in threes and fours, with held notes between. If he says they miss again, that is why.
+- Sent as one clip (0:46). No verdict yet; which of the three (this, song_ai.py, song_o.py) is Folio's is his call.
 
 ## Folio's arcade theme (Nov 16, song_ai.py): sent, no verdict yet
 
