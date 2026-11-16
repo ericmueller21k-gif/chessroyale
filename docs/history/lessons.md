@@ -1071,3 +1071,16 @@ locally, 1 in 20 untraced on each project.
 failure), run 20 times per project without a trace.
 
 **The fix:** the fresh browser is its own context, the open tab closed first. docs/decisions/2026-11-15-fairplay-fresh-browser.md.
+
+## Windows lit over Chandy's Swamp (Nov 16, 2026)
+
+**What happened:** the night after Chandy's Swamp went live, Eric saw six lit windows in a grid glowing over the swamp's water and its
+trees, as if a building stood there.
+
+**Why:** two things together. South Street's row backs onto Meadow Street's, and the swamp's lot and box run back over it, so that
+row's fronts stood inside the swamp, their rear walls' windows behind its trees. Those windows should still have been hidden: the
+light layer cuts each light where something is drawn in front of it. But it kept the boxes of only 128 lights a frame and silently
+dropped the rest, and a night street draws about 260. The rows' rear walls are drawn late, near the camera, so theirs were dropped,
+and nothing could cut them. Every solid building hid the bug: there's rarely anything in front of a lit window but a passer-by.
+
+**The fix:** the list grows; an open home leaves the row behind it open. docs/decisions/2026-11-16-chandy-pond.md.
