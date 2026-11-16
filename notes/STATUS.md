@@ -1,3 +1,4 @@
+- Nov 16 ~09:30 UTC: #744 hearts LIVE (4ce16dc); main full run GREEN 23/23. Chandy round 2 running.
 - Nov 16 ~08:40 UTC: hearts fix round DONE (43407b0; M1 bots by rolled think, M2 old fights 8 hearts, m3, m4); #744 CI re-running; merge when green (no re-review). Chandy round 2 started (xhigh, alone; brief chandy-first-lock.md; claude/chandy-first-lock). Party build after it.
 - Nov 16 ~08:20 UTC: #744 first CI GREEN; review (review/recluse-hearts): M1 bot hearts cut by engine lag (unwinnable), M2 old stored fights NaN hearts, m3 results "too slow", m4 +N over sheets (director: hide under sheets), m5 stale tab note. Fix round session started (xhigh, alone) on claude/recluse-hearts. Reviewer archived. Then Chandy round 2, then party.
 - Nov 16 ~08:15 UTC: #743 banner live (617abfc); main full run GREEN 23/23.
