@@ -2153,7 +2153,7 @@ export const RECLUSE_PHASE2 = {
   /**
    * A heart cut on screen (ms from the cut, Eric, Nov 16): his blade drawn back, slow (`windMs`), then a fast follow-through across
    * the heart, its halves sliding apart and fading (`ms` in all; the sound's swish at `windMs`: recluse-sounds.ts SLASH_CUT_S). No
-   * flash (Eric: photosensitivity). A board whose last heart it was fades to grey from the cut over `greyMs`, "TOO SLOW" over it.
+   * flash (Eric: photosensitivity). A board whose last heart it was then fades to grey over `greyMs`, "TOO SLOW" over it.
    */
   slash: { windMs: 520, ms: 1400, greyMs: 2600 },
   /**

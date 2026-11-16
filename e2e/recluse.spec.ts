@@ -1188,7 +1188,7 @@ test("out of hearts (?phase=2, the admins' \"Lose a heart (testing)\"): your boa
   await expect(page.locator(".rc-big .rc-heart.full")).toHaveCount(0);
   await expect(page.locator(".boss-dock-status")).toContainText("Your board: too slow. The others play on.");
   // The fade to grey, slow (greyMs), then held: the board's squares and pieces grey, the word clean and white over them.
-  await page.waitForTimeout(RECLUSE_PHASE2.slash.windMs + RECLUSE_PHASE2.slash.greyMs + 300);
+  await page.waitForTimeout(RECLUSE_PHASE2.slash.ms + RECLUSE_PHASE2.slash.greyMs + 300);
   const look = await page.evaluate(() => {
     const board = document.querySelector(".rc-big.rc-wasted > .board-wrap > .board");
     const word = document.querySelector<HTMLElement>(".rc-big .rc-wasted-word");

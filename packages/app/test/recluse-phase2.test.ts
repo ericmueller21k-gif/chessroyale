@@ -537,13 +537,12 @@ describe("his slash as he cuts a heart, and his line (Eric, Nov 16)", () => {
     }
   });
 
-  it("a board lost to its last heart greys from the cut over greyMs (a slow fade), its word coming in as it does", () => {
-    expect(slashLook(S.windMs).grey).toBe(0);
-    expect(slashLook(S.windMs + S.greyMs / 2).grey).toBeCloseTo(0.5, 5);
-    expect(slashLook(S.windMs + S.greyMs).grey).toBe(1);
+  it("a board lost to its last heart greys out slowly by CSS the compositor runs (never a filter set from script each frame), once the cut is over, its word coming in as it does", () => {
+    const css = readFileSync(new URL("../src/styles.css", import.meta.url), "utf8");
+    expect(css).toMatch(/\.rc-wasted > \.board-wrap > \.board \{\s*will-change: filter;\s*animation: rc-grey var\(--rc-grey-ms, 2600ms\) ease-in-out var\(--rc-grey-d, 0ms\) both;\s*\}/);
+    expect(css).toMatch(/@keyframes rc-grey \{\s*from \{\s*filter: grayscale\(0\) brightness\(1\);\s*\}\s*to \{\s*filter: grayscale\(1\) brightness\(0\.7\);/);
+    expect(css).toMatch(/\.rc-wasted \.rc-wasted-word \{\s*animation: rc-wasted-word 600ms ease-out calc\(var\(--rc-grey-d, 0ms\) \+ 0\.35 \* var\(--rc-grey-ms, 2600ms\)\) both;/);
     expect(S.greyMs).toBeGreaterThanOrEqual(2000);
-    expect(slashLook(S.windMs + 0.3 * S.greyMs).word).toBe(0);
-    expect(slashLook(S.windMs + S.greyMs).word).toBe(1);
   });
 
   it("the sound's swish lands on the cut (recluse-sounds.ts SLASH_CUT_S)", () => {

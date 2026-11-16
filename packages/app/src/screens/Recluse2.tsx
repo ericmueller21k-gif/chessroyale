@@ -22,7 +22,7 @@ import { UnderBoard, useMedia } from "../components/QuickChat.tsx";
 import type { GameView, SimulBoardView, SimulView } from "../game.ts";
 import type { ComponentChildren } from "preact";
 import { ARC_LIFE, ARC_REDRAW, ARC_STRIKES, PHASE_CHANGE, arcPoints, smoothPath, type ArcStrike } from "../recluse-phase2.ts";
-import { Hearts, TOO_SLOW_WORD, wastedLook } from "../components/RecluseHearts.tsx";
+import { Hearts, TOO_SLOW_WORD, lostToHearts } from "../components/RecluseHearts.tsx";
 import { CRITICAL, NORMAL, VoiceBubble, bossVoice } from "../speech.tsx";
 import { Hud } from "./Hud.tsx";
 import { useStillKey } from "../hooks.ts";
@@ -330,11 +330,10 @@ export const NO_RESULT_WORD = "No result";
 /** The dock's words (and the results screen's) when the fight ended with no result: his move never came from the engine server. */
 export const NO_RESULT_LINE = "No result: the Hidden Boss couldn't connect.";
 
-function Outcome({ b, v, now }: { b: SimulBoardView; v: SimulView; now: number }) {
+function Outcome({ b, v }: { b: SimulBoardView; v: SimulView }) {
   if (!b.result) return v.noResult ? <span class="rc-result">{NO_RESULT_WORD}</span> : v.paused != null ? <span class="rc-result">{PAUSED_WORD}</span> : null;
-  // (Lost to its last heart: its word over the board as it greys, "wasted" style; Eric, Nov 16.)
-  const w = wastedLook(b, now);
-  if (w) return <span class="rc-wasted-word" style={{ opacity: w.word }}>{TOO_SLOW_WORD}</span>;
+  // (Lost to its last heart: its word over the board as it greys, "wasted" style, timed by its cell: Eric, Nov 16.)
+  if (lostToHearts(b)) return <span class="rc-wasted-word">{TOO_SLOW_WORD}</span>;
   return <span class={`rc-result ${b.result.winner === "crowd" ? "won" : b.result.winner === "boss" ? "lost" : "draw"}`}>{RESULT_WORD(b)}</span>;
 }
 
@@ -344,7 +343,7 @@ function SimulBoard({ match, v, b, now, small, big, count, children }: { match: 
   return (
     <Board fen={b.fen} orientation="white" lastMove={b.lastMove} interactive={mine} onMove={(m) => match.simulMove?.(b.id, m)} small={small} silent={!b.you}>
       <Tag b={b} v={v} now={now} big={big} />
-      <Outcome b={b} v={v} now={now} />
+      <Outcome b={b} v={v} />
       <Hearts b={b} now={now} />
       {/* (Before the clocks run: the countdown, big on every board; "Get ready" over yours.) */}
       {count != null && count > 0 && <CenterCount label={b.you ? "Get ready" : null} n={count} />}
@@ -353,10 +352,29 @@ function SimulBoard({ match, v, b, now, small, big, count, children }: { match: 
   );
 }
 
-/** A board lost to its last heart greys out (its cell's --rc-grey, 0 to 1: styles.css .rc-wasted), or nothing. */
-function wastedStyle(b: SimulBoardView, now: number): { cls: string; style: Record<string, number> } {
-  const w = wastedLook(b, now);
-  return w ? { cls: " rc-wasted", style: { "--rc-grey": Math.round(w.grey * 1000) / 1000 } } : { cls: "", style: {} };
+/**
+ * A board's cell in the square, in its slot: the big one (a box), or a small one (a button: watch it). A board lost to its last heart
+ * greys out slowly with its word over it ("wasted": styles.css .rc-wasted, a CSS animation the compositor runs, Nov 16's perf run),
+ * once its last heart's cut is over (the slash, then the fade: their work never in the same frames): its delay set as the class first applies, so a cell drawn anew mid-fade (a board watched big)
+ * carries on from where it is rather than fading again.
+ */
+function Cell({ b, slot, mini, onWatch, children }: { b: SimulBoardView; slot: Slot; mini?: boolean; onWatch?: () => void; children: ComponentChildren }) {
+  const lost = lostToHearts(b);
+  const first = useRef<number | null>(null);
+  if (!lost) first.current = null;
+  else first.current ??= Date.now();
+  const S = RECLUSE_PHASE2.slash;
+  const style = { ...slotStyle(slot), ...(lost ? { "--rc-grey-d": `${b.slashAt! + S.ms - first.current!}ms`, "--rc-grey-ms": `${S.greyMs}ms` } : {}) };
+  const cls = `rc-cell rc-played ${mini ? `rc-mini${b.you ? " you" : ""}` : "rc-big"}${lost ? " rc-wasted" : ""}`;
+  return mini ? (
+    <button type="button" class={cls} style={style} aria-label={b.you ? "Back to your board" : `Watch ${b.name}'s board`} onClick={onWatch}>
+      {children}
+    </button>
+  ) : (
+    <div class={cls} style={style}>
+      {children}
+    </div>
+  );
 }
 
 /** His phase 2: four boards at once. */
@@ -421,22 +439,14 @@ export function SimulScreen({ match }: { match: GameView }) {
           {evalBarOn() && <div class="eval-bar rc-evalgap" aria-hidden="true" />}
           {/* (The four boards inside phase 1's one board's square: FOUR.) */}
           <div class="board-wrap rc-stage">
-            {(() => {
-              const w = wastedStyle(big, now);
-              return (
-                <div key={`big${big.id}`} class={`rc-cell rc-played rc-big${w.cls}`} style={{ ...slotStyle(slots[0]!), ...w.style }}>
-                  <SimulBoard match={match} v={v} b={big} now={now} big count={count} />
-                </div>
-              );
-            })()}
-            {others.map((b, i) => {
-              const w = wastedStyle(b, now);
-              return (
-                <button type="button" key={b.id} class={`rc-cell rc-played rc-mini${b.you ? " you" : ""}${w.cls}`} style={{ ...slotStyle(slots[i + 1]!), ...w.style }} aria-label={b.you ? "Back to your board" : `Watch ${b.name}'s board`} onClick={() => setWatch(b.id)}>
-                  <SimulBoard match={match} v={v} b={b} now={now} small count={count} />
-                </button>
-              );
-            })}
+            <Cell key={`big${big.id}`} b={big} slot={slots[0]!}>
+              <SimulBoard match={match} v={v} b={big} now={now} big count={count} />
+            </Cell>
+            {others.map((b, i) => (
+              <Cell key={b.id} b={b} slot={slots[i + 1]!} mini onWatch={() => setWatch(b.id)}>
+                <SimulBoard match={match} v={v} b={b} now={now} small count={count} />
+              </Cell>
+            ))}
           </div>
         </div>
       </div>

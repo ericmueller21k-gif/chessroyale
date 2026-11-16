@@ -19749,10 +19749,29 @@ button.sq-tiny {
     display: none;
   }
 }
-/* A board lost to its last heart (Eric, Nov 16: "wasted" style): it fades to grey, slowly (--rc-grey, 0 to 1, from the screen each
-   frame of the fade), and a clean word lies over it, "TOO SLOW". */
+/* A board lost to its last heart (Eric, Nov 16: "wasted" style): it fades to grey, slowly, and a clean word comes in over it, "TOO
+   SLOW". CSS animations the compositor runs (a filter changed from script each frame repainted the board: 42% of a slowed phone's
+   frames dropped); their delay, from the end of the last heart's cut, is the cell's (--rc-grey-d: Recluse2.tsx's Cell), so a cell drawn
+   anew carries on where it was. */
 .rc-wasted > .board-wrap > .board {
-  filter: grayscale(var(--rc-grey, 0)) brightness(calc(1 - 0.3 * var(--rc-grey, 0)));
+  will-change: filter;
+  animation: rc-grey var(--rc-grey-ms, 2600ms) ease-in-out var(--rc-grey-d, 0ms) both;
+}
+@keyframes rc-grey {
+  from {
+    filter: grayscale(0) brightness(1);
+  }
+  to {
+    filter: grayscale(1) brightness(0.7);
+  }
+}
+.rc-wasted .rc-wasted-word {
+  animation: rc-wasted-word 600ms ease-out calc(var(--rc-grey-d, 0ms) + 0.35 * var(--rc-grey-ms, 2600ms)) both;
+}
+@keyframes rc-wasted-word {
+  from {
+    opacity: 0;
+  }
 }
 .rc-wasted-word {
   position: absolute;

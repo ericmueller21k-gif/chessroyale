@@ -77,12 +77,8 @@ export function Hearts({ b, now }: { b: Pick<SimulBoardView, "hearts" | "slashAt
   );
 }
 
-/** A board lost to its last heart: how grey it is now, and its word's opacity (slashLook), or null: not that kind of loss. */
-export function wastedLook(b: Pick<SimulBoardView, "result" | "slashAt">, now: number): { grey: number; word: number } | null {
-  if (b.result?.how !== "slow" || b.slashAt === null) return null;
-  const l = slashLook(Math.max(0, now - b.slashAt));
-  return { grey: l.grey, word: l.word };
-}
+/** A board lost to its last heart (it greys out, "TOO SLOW" over it: Recluse2.tsx's Cell, styles.css .rc-wasted). */
+export const lostToHearts = (b: Pick<SimulBoardView, "result" | "slashAt">): boolean => b.result?.how === "slow" && b.slashAt !== null;
 
 /** The word over a board lost to its last heart (Eric, Nov 16: a "wasted" style fade to grey, a clean word over it). */
 export const TOO_SLOW_WORD = "TOO SLOW";

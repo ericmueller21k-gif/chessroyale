@@ -212,9 +212,6 @@ export interface SlashLook {
   b: { x: number; y: number; r: number; o: number };
   /** Done: the slot shows the empty heart alone. */
   done: boolean;
-  /** A board lost to it (its last heart): how grey it is (0 to 1), and its word's opacity ("TOO SLOW"). */
-  grey: number;
-  word: number;
 }
 
 const easeIn = (x: number) => x * x * x;
@@ -225,10 +222,10 @@ const unit = (x: number) => Math.max(0, Math.min(1, x));
  * A heart cut, `t` ms after its cut began (Eric, Nov 16: "a slash with a wind-up (slow) then a fast follow-through across the heart,
  * the heart cut in half, both halves sliding apart and fading"; no flash): for `windMs` his blade's glint draws back past the heart's
  * top-right corner, slowly and then faster; it goes through in `bladeMs`, the stroke fading after; the halves slide apart along the
- * cut and fade until `ms`. A board whose last heart it was greys from the cut over `greyMs` ("wasted"), its word fading in as it
- * does. Pure: the screen draws it from the time since the cut, so a board drawn again mid-cut carries on from where it was.
+ * cut and fade until `ms`. Pure: the screen draws it from the time since the cut, so a board drawn again mid-cut carries on from where
+ * it was. (A board whose last heart it was greys out by CSS: Recluse2.tsx's Cell.)
  */
-export function slashLook(t: number, s: { windMs: number; ms: number; greyMs: number } = RECLUSE_PHASE2.slash): SlashLook {
+export function slashLook(t: number, s: { windMs: number; ms: number } = RECLUSE_PHASE2.slash): SlashLook {
   const bladeMs = 90;
   const wind = unit(t / s.windMs);
   const after = t - s.windMs;
@@ -236,15 +233,12 @@ export function slashLook(t: number, s: { windMs: number; ms: number; greyMs: nu
   const blade = after >= 0 && after < bladeMs + 260 ? { len: easeOut(unit(after / bladeMs)), o: 1 - unit((after - bladeMs) / 260) } : null;
   const apart = easeOut(unit(after / (s.ms - s.windMs)));
   const fade = unit((after - 120) / (s.ms - s.windMs - 120));
-  const grey = unit(after / s.greyMs);
   return {
     glint,
     blade,
     a: { x: -0.32 * apart, y: -0.26 * apart, r: -16 * apart, o: 1 - fade },
     b: { x: 0.3 * apart, y: 0.3 * apart, r: 14 * apart, o: 1 - fade },
     done: t >= s.ms,
-    grey: grey * grey * (3 - 2 * grey),
-    word: unit((after - 0.35 * s.greyMs) / 600),
   };
 }
 
