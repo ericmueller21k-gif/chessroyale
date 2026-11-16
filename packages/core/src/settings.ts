@@ -30,6 +30,20 @@ export type ModeChoiceId = GameMode | "raid";
 export type FinalFormat = "team" | "boss" | "duel";
 
 /**
+ * How a Crowd 50 v 50 team's move is picked since the rework (the vote "How are moves picked?", Eric, Nov 16; CROWD_PICK):
+ * - strong: the judge's best of the team's 3 most-picked moves, or one as good (within 3% expected score), drawn
+ * - majority: the most-picked move (a tie drawn among the tied)
+ * - chaos: any move the team picked, each equally likely
+ */
+export type CrowdPick = "strong" | "majority" | "chaos";
+
+/** One 50 v 50 cut since the rework (CROWD_CUTS): after Black's move `after` (the game's move number), `keep` a side stay in. */
+export interface CrowdCut {
+  after: number;
+  keep: number;
+}
+
+/**
  * How a Crowd 50 v 50's game starts (the pre-game vote "How does it start?", Eric, Oct 24): the usual starting position,
  * a balanced named opening `CROWD_START.randomOpeningMoves` moves in, or Freestyle (FIDE's name for Chess960: the back-row
  * pieces shuffled, a seeded start, never the usual one).
@@ -359,6 +373,25 @@ export interface Settings {
    * it (CrowdMisses). 1: only a unanimous pick is sure.
    */
   crowdSureShare: number;
+  /**
+   * Crowd 50 v 50 since the rework (Eric, Nov 16; CROWD_REWORK): how a team's move is picked, set by the vote "How are moves
+   * picked?" (votes.ts; nobody votes: Strong). With the "popular" draw rule it takes the place of `crowdPlayedFromTop` and
+   * `crowdSureShare` (CrowdPick, CROWD_PICK). Unset: as before.
+   */
+  crowdPick?: CrowdPick;
+  /**
+   * Crowd 50 v 50 since the rework (CROWD_REWORK): one game played to its end, with equal cuts from each side down to a 1 v 1
+   * (CROWD_CUTS: after which move, how many a side are kept). Set, it decides each stage's length (roundsInStage: by the game's
+   * move number, to the move limit after the last cut) and each cut's size (cutPlan), and the match never enters a final
+   * (isFinal). `knockoutsPerStage` goes with it (crowdCutKnockouts). Unset: the endings as before.
+   */
+  crowdCuts?: readonly CrowdCut[];
+  /** With `crowdCuts`: the share of their score each survivor keeps at a cut (the soft reset; 2 decimals). Unset: all of it. */
+  crowdCarry?: number;
+  /** With `crowdCuts`: the game ends after Black's move this-many (crowdLimitReached), and the judge's verdict decides. */
+  crowdMoveLimit?: number;
+  /** At the move limit: the side at this expected score or more wins (crowdLimitVerdict); neither: a draw. */
+  crowdLimitWin?: number;
   /** Opening moves per side played on each board before the first round (0-10, a lobby setting). Boards where Black starts get one ply more. */
   openingMoves: number;
   /**
@@ -814,9 +847,34 @@ export const MAX_OPENING_MOVES = 10;
 /** Plies of opening on a board where White starts (Black-start boards get one more). */
 export const openingPlies = (s: Pick<Settings, "openingMoves">) => 2 * Math.max(0, Math.min(MAX_OPENING_MOVES, Math.round(s.openingMoves)));
 
-/** Rounds in a knockout stage: `stageRounds`' entry when the mode has a list, else the longer first one, then `roundsPerStage`. */
-export const roundsInStage = (s: Pick<Settings, "roundsPerStage" | "firstStageRounds" | "stageRounds">, stage: number) =>
-  s.stageRounds?.length ? s.stageRounds[Math.min(stage, s.stageRounds.length - 1)]! : stage === 0 ? s.firstStageRounds : s.roundsPerStage;
+/**
+ * Rounds (plies) in a knockout stage: with `crowdCuts` (the 50 v 50 rework), the plies to its cut's move (crowdStageRounds),
+ * unless a test's `?rounds=` emptied `stageRounds`; else `stageRounds`' entry when the mode has a list; else the longer
+ * first one, then `roundsPerStage`.
+ */
+export const roundsInStage = (
+  s: Pick<Settings, "roundsPerStage" | "firstStageRounds" | "stageRounds"> & Partial<Pick<Settings, "crowdCuts" | "crowdMoveLimit" | "openingMoves">>,
+  stage: number,
+) =>
+  s.crowdCuts?.length && s.stageRounds?.length !== 0
+    ? crowdStageRounds(s, stage)
+    : s.stageRounds?.length
+      ? s.stageRounds[Math.min(stage, s.stageRounds.length - 1)]!
+      : stage === 0
+        ? s.firstStageRounds
+        : s.roundsPerStage;
+
+/**
+ * The plies of a stage under `crowdCuts`, counted by the game's own move number (the board's: "Move 14"), the same in every
+ * start: from move 1, or the move after a Random opening's `openingMoves`, to Black's move `after` of the stage's cut; after
+ * the last cut, the 1 v 1 to the move limit (`crowdMoveLimit`; none: it plays to the end). At least one ply.
+ */
+export function crowdStageRounds(s: Partial<Pick<Settings, "crowdCuts" | "crowdMoveLimit" | "openingMoves">>, stage: number): number {
+  const cuts = s.crowdCuts ?? [];
+  const from = stage <= 0 || !cuts.length ? (s.openingMoves ?? 0) : cuts[Math.min(stage, cuts.length) - 1]!.after;
+  const to = stage < cuts.length ? cuts[stage]!.after : (s.crowdMoveLimit ?? Infinity);
+  return Math.max(1, 2 * (to - from));
+}
 
 /**
  * The opening allowance (Eric, Oct 15, 2026; docs/decisions/2026-10-15-opening-allowance-and-ties.md): early in a game a
@@ -966,6 +1024,68 @@ export function crowdFinalists(format: FinalFormat, knockouts: Readonly<Record<F
 }
 
 /**
+ * The 50 v 50 rework's pick modes (Settings.crowdPick; Eric, Nov 16; notes/designs/crowd-rework.md, rule 1; measured in
+ * reports/crowd-rework.md). Only the team's real picks count, never a miss's pick made for it (CROWD_MISSES); nobody on the
+ * team picked: one of the engine's top `CROWD_MISSES.defaultFromTop` (the runner, as before).
+ * - **strong** (nobody votes: this): the team's `strongTop` most-picked moves (a tie for the last place goes to the
+ *   better-scored); the judge's best of them is played, or, when others are within `strongClose` expected score of it (0.03:
+ *   about 30 centipawns), one of those close ones and it, drawn at equal odds;
+ * - **majority**: the most-picked move, a tie drawn among the tied;
+ * - **chaos**: one of the distinct moves the team picked, each equally likely, however many picked it (Eric's default for his
+ *   question 2: "totally random").
+ * The 1 v 1 needs no rule: one player's pick is the only move.
+ */
+export const CROWD_PICK: { strongTop: number; strongClose: number } = { strongTop: 3, strongClose: 0.03 };
+
+/**
+ * The 50 v 50 rework's cuts (Eric, Nov 16; the design's schedule C): equal from each side, each side's players ranked by their
+ * score (already relative to their own team), after Black's move `after` by the game's move number, leaving `keep` a side:
+ * 50 v 50 for moves 1-14, then 34, 23, 15 and 10 a side for 4 moves each, 6 for 3 (31-33), 4 for 6 (34-39: Eric, "the top 4
+ * a side play longer"), 2 for 3 (40-42), and from move 43 the 1 v 1 to the move limit. Ties at the line go through and what
+ * that leaves over is owed by the cuts to come, spread evenly; the last cut is exact (cutPlan). The first cut after 14: the
+ * opening allowance is gone by then (OPENING_ALLOWANCE.goneBy).
+ */
+export const CROWD_CUTS: readonly CrowdCut[] = [
+  { after: 14, keep: 34 },
+  { after: 18, keep: 23 },
+  { after: 22, keep: 15 },
+  { after: 26, keep: 10 },
+  { after: 30, keep: 6 },
+  { after: 33, keep: 4 },
+  { after: 39, keep: 2 },
+  { after: 42, keep: 1 },
+];
+
+/** Each cut's knockouts, both sides together (Settings.knockoutsPerStage), from a cut schedule and the lobby's size. */
+export function crowdCutKnockouts(cuts: readonly CrowdCut[], lobbySize = CROWD_SETTINGS.lobbySize ?? DEFAULT_SETTINGS.lobbySize): number[] {
+  return cuts.map((c, i) => 2 * Math.max(0, (i ? cuts[i - 1]!.keep : lobbySize / 2) - c.keep));
+}
+
+/**
+ * The 50 v 50 rework in core (Eric, Nov 16: "the 50v50 rework. We're doing away with the hidden boss on that for now";
+ * notes/designs/crowd-rework.md; docs/decisions/2026-11-16-crowd-rework-core.md). Off until step C2 spreads it into
+ * CROWD_SETTINGS (with the runner, the server and the protocol); raids never take it (RAID_SETTINGS). One game played to its
+ * end: mate, a draw by the rules, or the move limit, after Black's move `crowdMoveLimit`, where the judge's verdict decides
+ * (a side at `crowdLimitWin` expected score or more wins; else a draw: Eric's default for his question 1). No team final,
+ * boss final or duel. The cuts (CROWD_CUTS) take the same number from each side down to a 1 v 1; at each cut a survivor
+ * keeps `crowdCarry` of their score. Strong is the pick when nobody votes (and with the votes off).
+ */
+export const CROWD_REWORK: Partial<Settings> = {
+  crowdPick: "strong",
+  crowdCuts: CROWD_CUTS,
+  knockoutsPerStage: crowdCutKnockouts(CROWD_CUTS),
+  crowdCarry: 0.5,
+  crowdMoveLimit: 60,
+  crowdLimitWin: 0.75,
+};
+
+/**
+ * The 50 v 50 rework's best player (bestPlayer; the design's rule 5): the fewest counted points given away a move over the
+ * match (matchLoss), among those who survived at least `cutsShare` of the cuts made (half: rounded up).
+ */
+export const CROWD_BEST = { cutsShare: 0.5 } as const;
+
+/**
  * Boss raid: everyone (up to 50, no bots) picks the crowd's moves together
  * against a boss, from the starting position (Eric, Oct 21: the runner's
  * startRaid). The boss strikes down to half the group; the King has 3 charges.
@@ -981,6 +1101,12 @@ export const RAID_SETTINGS: Partial<Settings> = {
   crowdBots: undefined,
   // (A raid keeps its misses as before: 50 v 50's CROWD_MISSES are off.)
   crowdMisses: undefined,
+  // (Nor does it take the 50 v 50 rework, once CROWD_SETTINGS has it: a raid has no cuts, no move limit and plays the most popular pick.)
+  crowdPick: undefined,
+  crowdCuts: undefined,
+  crowdCarry: undefined,
+  crowdMoveLimit: undefined,
+  crowdLimitWin: undefined,
   augments: false,
   lobbySize: 50,
   groupSize: 50,

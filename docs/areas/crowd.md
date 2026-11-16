@@ -261,6 +261,16 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
     bot sits in). Already out: their place is recorded with everyone's at the end. The match stays ranked as it was.
   - **Away:** gone longer than `LEAVING.awayMs` (120 s) is resigning (`sweepAway`); in 50 v 50 so is the 4th miss in a game (the AFK rule, above); a move locks once everyone still
     here has moved (`roundDone`). Nobody left: the match ends at once and the lobby closes (`wrapUpIfEmpty`).
+- **The 50 v 50 rework (Eric, Nov 16; `notes/designs/crowd-rework.md` on `design/crowd-rework`): its rules are in core, off until
+  step C2** spreads `CROWD_REWORK` into `CROWD_SETTINGS` (docs/decisions/2026-11-16-crowd-rework-core.md). One game to its end (mate,
+  a draw, or after Black's move 60 the judge's verdict: 75%+ wins); no endings. The vote "How are moves picked?" (`CROWD_VOTES`,
+  held where `crowdCuts` is set) replaces "How does it end?": **Strong** (the judge's best of the team's 3 most-picked, or one within
+  3% of it, drawn; nobody votes), **Majority**, **Chaos** (`crowdPickOdds`). Cuts by the game's move number (`CROWD_CUTS`: after 14,
+  18, 22, 26, 30, 33, 39, 42, leaving 34, 23, 15, 10, 6, 4, 2, 1 a side; `crowdStageRounds`), counted from each cut's keep with
+  today's tie rules; then the 1 v 1, an ordinary stage. Survivors keep 50% at each cut (`crowdCarry`, 2 decimals). The end's places
+  (`finishGame`): those still in first, the winning side's then the losing side's (a draw: together), by score; each cut's below.
+  `crowdPodium`: the winner (1st of a won game) and `bestPlayer` (fewest counted points a move among those who survived half the cuts
+  made, never one who left).
 - **Classic** (64 players, 8 boards, rotating) still runs but is frozen: Eric will rework it; don't invest in it.
 
 ## Where the code is
@@ -283,6 +293,7 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
 
 ## Settings
 
+The rework's (off until C2): `CROWD_REWORK`, `CROWD_CUTS`, `CROWD_PICK`, `CROWD_BEST`.
 `OPENING_ALLOWANCE` (points, flatThrough, goneBy, materialPawns), `CROWD_MISSES` (the AFK rule), `crowdSureShare`, `CROWD_SCORING` (the cap and its stages and curve, the piece bar, the shared-blunder relief, streaks, rare finds, a miss, the bubble grace), `RAID_SCORING` (50 v 50's, the cap by crowd move, streaks on live moves only, no bubble), `BOSS_ALONE_SCORING`, `CROWD_START` (the start vote's random opening length), `LEAVING` (the away time, the seat's bot, the app's wait for an answer), `DEFAULT_SETTINGS`, `CROWD_SETTINGS`, `RAID_SETTINGS`, `CROWD_KNOCKOUTS` (and `crowdFinalists`), `QUICK_PACE`
 (the `?pace=quick` test switch, per mode; players always play the mode's own pace), the clock (`timeBankSeconds`, `timeIncrementSeconds`, `moveClockSeconds`;
 `moveClockSteps` for a rising clock, unused today), the vote keys (`voteSeconds`, `voteBotSkip`, …), `teamFinal*`. The
@@ -297,6 +308,9 @@ time controls themselves are in the vote data (`PREGAME_VOTES` in `votes.ts`).
   agree), `runner.test.ts` (Classic's boards with ties kept in), `packages/app/test/faq.test.ts`. Sims:
   `packages/sim/scripts/opening-allowance.ts` (the calibration, `reports/opening-allowance.md`) and
   `allowance-sim.ts` (before/after Crowd matches, `reports/allowance-sim.md`).
+- The rework (off until C2): unit `packages/core/test/crowd-rework.test.ts` (each pick mode, the schedule to the 1 v 1, the carry,
+  rounds of 2 and 1 a side, the places, best player, the move limit), `votes.test.ts` (the pick vote), `cut-ties.test.ts` (cuts by
+  keep: ties, what's owed, a short side), `crowd-bot-spread.test.ts` (Strong over bots' picks).
 - 50 v 50's bots and played move: unit `packages/core/test/crowd-bot-spread.test.ts` (a team at lobby ratings never all
   picks one move, Eric's castle included; the plurality moves between good lines; the top-3 odds and ties; the draw),
   `packages/chess/test/judge.test.ts` (the lean from the seed alone), `packages/server/test/lobby.test.ts` (the live

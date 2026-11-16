@@ -1,5 +1,5 @@
 import type { Rng } from "./rng.ts";
-import { BOSS_PARTY, DEFAULT_SETTINGS, OPENING_ALLOWANCE, cpFromExpected, type CrowdScoring, type CrowdStart, type DrawRule, type Settings } from "./settings.ts";
+import { BOSS_PARTY, CROWD_PICK, DEFAULT_SETTINGS, OPENING_ALLOWANCE, cpFromExpected, type CrowdPick, type CrowdScoring, type CrowdStart, type DrawRule, type Settings } from "./settings.ts";
 
 /**
  * Scoring from buildspec.md. Expected scores are from the mover's side, 0 to 1
@@ -170,6 +170,34 @@ export function crowdTopOdds(moves: readonly string[], top: number, sure = 1): R
   return Object.fromEntries(kept.map(([m, n]) => [m, n / total]));
 }
 
+/**
+ * The 50 v 50 rework's played move (Settings.crowdPick, the vote "How are moves picked?"; CROWD_PICK): each move's chance, in
+ * the order one draw goes through them. `moves` are the team's real picks (one entry per pick: a miss's pick made for it is
+ * never among them); `losses` the judge's points given away by each (moveLosses: 1 point = 0.01 expected score), so 3%
+ * expected score is 3 points.
+ * - strong: the `strongTop` most-picked (a tie for the last place: the better-scored, then by name), then the best of them
+ *   and any within `strongClose` of it, equal odds (best first);
+ * - majority: the most-picked, equal odds among the tied (by name);
+ * - chaos: every distinct move picked, equal odds (by name).
+ * No picks: nothing (the runner plays one of the engine's top moves).
+ */
+export function crowdPickOdds(mode: CrowdPick, moves: readonly string[], losses: Readonly<Record<string, number>>, pick: { strongTop: number; strongClose: number } = CROWD_PICK): Record<string, number> {
+  const counts = new Map<string, number>();
+  for (const m of moves) counts.set(m, (counts.get(m) ?? 0) + 1);
+  const byName = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
+  const loss = (m: string) => losses[m] ?? 0;
+  let kept = [...counts.keys()].sort(byName);
+  if (mode === "majority") {
+    const top = Math.max(0, ...counts.values());
+    kept = kept.filter((m) => counts.get(m) === top);
+  } else if (mode === "strong") {
+    const top = [...kept].sort((a, b) => counts.get(b)! - counts.get(a)! || loss(a) - loss(b) || byName(a, b)).slice(0, Math.max(1, pick.strongTop));
+    const best = Math.min(...top.map(loss));
+    kept = top.filter((m) => loss(m) - best <= 100 * pick.strongClose + 1e-9).sort((a, b) => loss(a) - loss(b) || byName(a, b));
+  }
+  return Object.fromEntries(kept.map((m) => [m, 1 / kept.length]));
+}
+
 /** Picks the move that continues the board, from the moves picked (one entry per pick) and their losses. */
 export function drawMove(
   moves: readonly string[],
@@ -182,6 +210,13 @@ export function drawMove(
   const among = (xs: readonly string[]) => xs[Math.floor(rng() * xs.length)]!;
   const distinct = [...new Set(moves)];
   if (rule === "party") return partyMove(moves, losses, rng, expected);
+  if (rule === "popular" && settings.crowdPick) {
+    // (The 50 v 50 rework: one draw over its mode's odds, in their order.)
+    const odds = Object.entries(crowdPickOdds(settings.crowdPick, moves, losses));
+    let r = rng();
+    for (const [m, p] of odds) if ((r -= p) < 0) return m;
+    return odds[odds.length - 1]![0];
+  }
   if (rule === "popular" && settings.crowdPlayedFromTop > 1) {
     // (One draw, over the odds in their order: most picked first, ties by move.)
     const odds = Object.entries(crowdTopOdds(moves, settings.crowdPlayedFromTop, settings.crowdSureShare));
@@ -367,7 +402,20 @@ export function scoreGroup(
         evaluation.expectedAfter,
       )
     : evaluation.bestMove;
-  const odds = rule === "popular" && settings.crowdPlayedFromTop > 1 ? crowdTopOdds(picked.map((p) => p.move!), settings.crowdPlayedFromTop, settings.crowdSureShare) : drawOdds(picks);
+  const odds =
+    rule === "popular" && settings.crowdPick
+      ? crowdPickOdds(
+          settings.crowdPick,
+          picked.map((p) => p.move!),
+          losses,
+        )
+      : rule === "popular" && settings.crowdPlayedFromTop > 1
+        ? crowdTopOdds(
+            picked.map((p) => p.move!),
+            settings.crowdPlayedFromTop,
+            settings.crowdSureShare,
+          )
+        : drawOdds(picks);
   return { players, averageLoss, playedMove, drawRule: rule, drawOdds: odds };
 }
 
