@@ -36,6 +36,7 @@ const PALETTE: Record<string, string> = {
   V: "#4b7d5d",
   g: "#9fd0b0",
   G: "#d6f0e0",
+  "9": "#5f8c76", // the open sky caught on the far water, through the gap in the trees
   q: "#6f9a30", // duckweed
   l: "#2f6c2a", // lily pads: shade, mid, light; the flower's petals, its blush, its heart
   L: "#4c9a3a",
@@ -75,30 +76,59 @@ const CX = 72;
 const OY = 50;
 const FOOT = 114;
 
-// ---- The water: from the far bank's brush (about 80) to the near bank (about 108), seen from the front and a little above. Darker
-// toward the front, a sheen under the open sky in the middle, duckweed scattered over it.
+// ---- The pond (Eric, Nov 16: "it should actually look like a pond where that space is"): open water from the near bank (about 107)
+// back to the far bank (about 44), seen from the front and a little above, so it recedes: dark and see-through near, paler far off
+// where it catches the open sky between the trees, its ripple lines closer together and shorter the further back they lie; the far
+// bank's brush and trunks reflected under it, broken by the ripples.
 
 /** The near bank's line, a little irregular. */
 const nearY = (x: number) => 107 + Math.round(1.6 * Math.sin(x * 0.21) + grain(x >> 2, 0, 3) * 1.6);
-/** The far bank's line (behind it the brush and the back trees). */
-const farY = (x: number) => 78 + Math.round(2 * Math.sin(x * 0.13 + 1) + grain(x >> 3, 1, 5) * 2);
-const water = paint(0, 72, W, 42, (x, y) => {
-  if (y < farY(x) || y > nearY(x)) return null;
-  const depth = (y - farY(x)) / Math.max(1, nearY(x) - farY(x));
-  const sky = 1 - Math.abs(x - CX) / 70;
-  if (grain(x, y, 7) > 0.93 && depth > 0.15) return "q";
-  // The sheen: long thin streaks along the water, brightest in the open middle.
-  if ((y + Math.floor(x / 23)) % 6 === 0 && grain(x >> 2, y, 11) > 0.55 - sky * 0.25) return sky > 0.45 ? "V" : "v";
-  const l = 0.75 - depth * 0.55 + sky * 0.2 + (grain(x, y, 13) - 0.5) * 0.15;
-  return l > 0.62 ? "v" : l > 0.42 ? "W" : "w";
+/** The far bank's line (behind it the brush and the far trees). */
+const farY = (x: number) => 44 + Math.round(1.5 * Math.sin(x * 0.13 + 1) + grain(x >> 3, 1, 5) * 1.5);
+/** How far back a point on the water lies (0 at the near bank, 1 at the far one), through the view's perspective. */
+const away = (x: number, y: number) => {
+  const n = nearY(x);
+  const f = farY(x);
+  // (Rows of water shrink toward the far bank: a row's distance grows as 1 / its height over the horizon, 30 px over the far bank.)
+  const H0 = f - 30;
+  const d = (Y: number) => 1 / Math.max(1, Y - H0);
+  return Math.min(1, Math.max(0, (d(y + 0.5) - d(n)) / (d(f) - d(n))));
+};
+/** The far bank's brush's top over its bank, at x (also what the water mirrors under the bank). */
+const brushTop = (x: number) => farY(x) + 1 - 6 - 5 * Math.abs(Math.sin(x * 0.19)) - 3 * grain(x >> 3, 2, 23);
+const water = paint(0, 30, W, 84, (x, y) => {
+  const f = farY(x);
+  if (y < f || y > nearY(x)) return null;
+  const t = away(x, y);
+  // How much open sky the water shows here: most in the middle, between the crowns, and more the further back (a low angle).
+  const sky = Math.max(0, 1 - Math.abs(x - CX) / 44) * (0.35 + 0.65 * t);
+  // The far bank mirrored, a few pixels under it: its brush dark, broken where a ripple crosses.
+  const m = 2 * f - y;
+  if (y - f < 9 && m < f && m >= brushTop(x + Math.round(Math.sin(y * 1.7)))) return (y + (x >> 2)) % 3 === 0 ? "W" : "w";
+  // Its tone: dark near, paler far off and in the middle (the sky); a ripple line is a step lighter than the water round it.
+  const tones = ["w", "W", "v", "V", "9"] as const;
+  const l = 0.12 + t * 0.42 + sky * 0.42 + (grain(x >> 3, y >> 1, 13) - 0.5) * 0.08;
+  let k = l > 0.78 ? 4 : l > 0.56 ? 3 : l > 0.4 ? 2 : l > 0.24 ? 1 : 0;
+  // Ripple lines: a row every so far back (closer together far off), its dashes longer near.
+  const rowAt = t * 10;
+  if (Math.abs(rowAt - Math.round(rowAt)) < 0.06 + 0.1 * t) {
+    const dash = 4 + Math.round((1 - t) * 10);
+    if ((x + Math.round(rowAt) * 11) % (dash * 2 + 4) < dash) k = Math.min(4, k + 1);
+  }
+  // Duckweed: along the banks and round the trees, not out on the open water.
+  const edge = Math.max(Math.abs(x - CX) / 72, 1 - t * 4);
+  if (grain(x, y, 7) > 1.02 - 0.12 * edge * edge) return "q";
+  return tones[k]!;
 }, false);
-/** The glints: a few bright dashes that drift along the sheen (frame `i` of four). */
+/** The glints: a few bright dashes that drift along the ripples (frame `i` of four), shorter far off. */
 const glints = (i: number) =>
-  paint(20, 80, 104, 26, (x, y) => {
-    if (y < farY(x) + 2 || y > nearY(x) - 2) return null;
+  paint(16, 46, 112, 60, (x, y) => {
+    if (y < farY(x) + 3 || y > nearY(x) - 2) return null;
+    const t = away(x, y);
+    const len = t > 0.6 ? 1 : 3;
     const u = (x + i * 3) % 29;
-    const row = (y * 7 + Math.floor((x + i * 3) / 29) * 5) % 9;
-    if (row === 0 && u < 3) return u === 1 ? "G" : "g";
+    const row = (y * 7 + Math.floor((x + i * 3) / 29) * 5) % 11;
+    if (row === 0 && u < len && Math.abs(x - CX) < 40) return u === 1 || len === 1 ? "G" : "g";
     return null;
   }, false);
 
@@ -113,12 +143,12 @@ const bank = paint(0, 100, W, 16, (x, y) => {
 
 // ---- The far bank's brush: low rounded bushes along the back of the water, between the two trees.
 
-const brush = paint(30, 60, 86, 24, (x, y) => {
+const brush = paint(18, 28, 108, 20, (x, y) => {
   const base = farY(x) + 1;
-  const top = base - 8 - 6 * Math.abs(Math.sin(x * 0.17)) - 4 * grain(x >> 3, 2, 23);
+  const top = brushTop(x);
   if (y > base || y < top) return null;
-  const l = 0.55 - (y - top) / (base - top) * 0.5 + (grain(x, y, 29) - 0.5) * 0.4 - (x - 30) * 0.002;
-  return l > 0.5 ? "d" : l > 0.25 ? "c" : l > 0.05 ? "b" : "a";
+  const l = 0.6 - ((y - top) / (base - top)) * 0.55 + (grain(x, y, 29) - 0.5) * 0.4 - (x - 18) * 0.002;
+  return l > 0.55 ? "d" : l > 0.3 ? "c" : l > 0.08 ? "b" : "a";
 });
 
 // ---- The bald cypresses: a flared trunk standing in the water, the bark in ropy ridges, and its crown in flat shelves of feathery
@@ -223,40 +253,50 @@ const MOSS_R = [
   [112, 86, 12],
 ] as const;
 /**
- * The far trees across the water (the plot's back, ringed as its sides are): a line of cypress crowns and their trunks, paler in the
- * haze, standing on the far bank behind the brush, a little lower than the near two so the lot reads deep.
+ * The far side of the pond (the plot's back, ringed as its sides are): a wood of cypresses, paler in the haze, their thin trunks standing
+ * on the far bank behind the brush and their crowns meeting overhead in a canopy that closes the lot off between the near two trees, so
+ * nothing of the street behind shows through (Eric, Nov 16). Its shelves lit from the top left, deep shade in the gaps between them.
  */
-const FAR: readonly (Shelf & { t: number })[] = [
-  { x: 48, y: 40, rx: 12, ry: 6, t: 48 },
-  { x: 44, y: 54, rx: 15, ry: 6, t: 48 },
-  { x: 50, y: 68, rx: 11, ry: 5, t: 48 },
-  { x: 74, y: 30, rx: 13, ry: 6, t: 74 },
-  { x: 70, y: 46, rx: 16, ry: 7, t: 74 },
-  { x: 78, y: 60, rx: 13, ry: 5, t: 74 },
-  { x: 98, y: 44, rx: 11, ry: 6, t: 97 },
-  { x: 94, y: 58, rx: 14, ry: 6, t: 97 },
-  { x: 62, y: 80, rx: 12, ry: 5, t: 62 },
-  { x: 88, y: 76, rx: 11, ry: 5, t: 88 },
-];
-const farTrees = paint(26, 20, 92, 110, (x, y) => {
-  const bank = farY(x) + OY - 4;
-  if (y > bank) return null;
-  let top: (typeof FAR)[number] | null = null;
-  for (const s of FAR) {
-    const dx = (x + 0.5 - s.x) / s.rx;
-    const dy = (y + 0.5 - s.y) / s.ry;
-    if (dx * dx + dy * dy - 0.2 * (grain(x >> 1, y >> 1, 77) - 0.5) <= 1 && (!top || s.y > top.y)) top = s;
+const FAR_TRUNKS = [34, 47, 58, 71, 84, 96, 109] as const;
+const FAR: readonly Shelf[] = (() => {
+  const out: Shelf[] = [];
+  const rows = [12, 22, 32, 42, 52, 62, 71];
+  rows.forEach((y, r) => {
+    const step = 15 - r;
+    for (let x = 26 + ((r * 7) % step); x < 122; x += step) {
+      const j = grain(x, r, 83);
+      out.push({ x: x + Math.round((j - 0.5) * 5), y: y + Math.round((grain(r, x, 85) - 0.5) * 4), rx: 8 + Math.round(j * 5) - (r > 4 ? 1 : 0), ry: 4 + (r < 3 ? 1 : 0) });
+    }
+  });
+  return out;
+})();
+/** The canopy's top edge (picture px, over x): ragged, highest in the middle, under the near crowns' tops. */
+const canopyTop = (x: number) => 9 + Math.round(5 * Math.abs(Math.sin(x * 0.11 + 0.6)) + 3 * grain(x >> 2, 9, 87));
+/** Its underside, over the trunks and the brush. */
+const canopyBottom = (x: number) => 76 + Math.round(2.5 * Math.sin(x * 0.27) + 2 * grain(x >> 2, 10, 89));
+const farTrees = paint(24, 6, 96, 90, (x, y) => {
+  const bank = farY(x) + OY;
+  if (y > bank || y < canopyTop(x)) return null;
+  const trunk = FAR_TRUNKS.find((t) => Math.abs(x + 0.5 - t - Math.sin(y * 0.09 + t) * 0.8) < (y > bank - 8 ? 2.2 : 1.4));
+  if (y > canopyBottom(x)) {
+    // Under the canopy: the trunks, pale in the haze, lit on the left; the shade of the wood between them.
+    if (trunk !== undefined) return x + 0.5 < trunk ? "7" : "6";
+    return grain(x >> 1, y >> 1, 81) > 0.85 ? "6" : "5";
+  }
+  let top: Shelf | null = null;
+  for (const sh of FAR) {
+    const dx = (x + 0.5 - sh.x) / sh.rx;
+    const dy = (y + 0.5 - sh.y) / sh.ry;
+    if (dx * dx + dy * dy - 0.25 * (grain(x >> 1, y >> 1, 77) - 0.5) <= 1 && (!top || sh.y > top.y)) top = sh;
   }
   if (top) {
+    if (grain(x, y, 91) > 0.93) return "5";
     const l = 0.62 - ((y + 0.5 - top.y) / top.ry) * 0.5 - ((x + 0.5 - top.x) / top.rx) * 0.2 + (grain(x, y, 75) - 0.5) * 0.3;
-    return l > 0.6 ? "7" : l > 0.25 ? "6" : "5";
+    return l > 0.66 ? "7" : l > 0.28 ? "6" : "5";
   }
-  // Behind them, the deep haze of the woods further back (nothing of the street shows through the swamp).
-  const haze = 44 + 6 * Math.sin(x * 0.2) + 4 * grain(x >> 2, 5, 79);
-  if (y >= haze && !FAR.some((s) => Math.abs(x + 0.5 - s.t) < (y > bank - 10 ? 2.4 : 1.6))) return grain(x >> 1, y >> 1, 81) > 0.8 ? "6" : "5";
-  // Their trunks, thin and pale, down to the far bank.
-  if (FAR.some((s) => Math.abs(x + 0.5 - s.t) < (y > bank - 10 ? 2.4 : 1.6)) && y > 40) return x + 0.5 < FAR.find((s) => Math.abs(x + 0.5 - s.t) < 2.5)!.t ? "6" : "5";
-  return null;
+  // Between the shelves, the canopy's deep shade (a trunk showing through it here and there).
+  if (trunk !== undefined && y > 40) return "6";
+  return grain(x >> 1, y >> 1, 79) > 0.8 ? "6" : "w";
 });
 const mossFrames = [0, 1, 0, -1].map((s) => [moss(MOSS_L, s), moss(MOSS_R, s)] as const);
 
@@ -270,18 +310,20 @@ const knee = (cx: number, foot: number, h: number) =>
     if (Math.abs(X) > half + 0.2) return null;
     return X < -half * 0.3 ? "U" : X < half * 0.4 ? "u" : "T";
   });
-const knees = [knee(66, 100, 7), knee(72, 103, 5), knee(54, 90, 5), knee(80, 86, 4)];
+// (Smaller the further back they stand: the pond's depth reads from them.)
+const knees = [knee(66, 100, 7), knee(72, 103, 5), knee(50, 82, 4), knee(80, 64, 3), knee(42, 58, 2)];
 const pad = (cx: number, cy: number, rx: number, flower = false) =>
   paint(cx - rx - 1, cy - 4, 2 * rx + 3, 7, (x, y) => {
     const dx = (x + 0.5 - cx) / rx;
-    const dy = (y + 0.5 - cy) / (rx * 0.42);
+    // (Flatter far off, seen at a lower angle.)
+    const dy = (y + 0.5 - cy) / Math.max(0.9, rx * (0.2 + 0.25 * (1 - away(cx, cy))));
     if (flower && Math.abs(x + 0.5 - cx) < 2.2 && y < cy - 0.5 && y >= cy - 3) return y === cy - 3 ? (x === cx ? "f" : null) : x === cx && y === cy - 1 ? "y" : Math.abs(x + 0.5 - cx) < 1.5 ? "f" : "F";
     if (dx * dx + dy * dy > 1) return null;
     // Its notch, a wedge cut toward the viewer's right.
     if (dx > 0.15 && Math.abs(dy) < dx * 0.35) return null;
     return dx + dy < -0.5 ? "h" : dx + dy < 0.4 ? "L" : "l";
   });
-const pads = [pad(76, 96, 7, true), pad(62, 104, 6), pad(48, 86, 5), pad(70, 88, 4), pad(116, 92, 5), pad(40, 98, 4)];
+const pads = [pad(76, 97, 7, true), pad(60, 104, 6), pad(44, 86, 5), pad(66, 78, 4), pad(112, 92, 5), pad(36, 100, 4), pad(54, 66, 3), pad(88, 58, 2), pad(104, 70, 3), pad(30, 62, 2), pad(76, 52, 2)];
 /** A clump of cattails and reeds: blades fanning from `foot`, a few with a brown head. */
 function cattails(cx: number, foot: number, h: number, n: number, seed: number) {
   const blades = Array.from({ length: n }, (_, i) => ({ lean: (i / Math.max(1, n - 1) - 0.5) * 0.7 + (grain(i, seed, 51) - 0.5) * 0.3, len: h * (0.65 + grain(i, seed, 53) * 0.35), head: grain(i, seed, 57) > 0.55 }));
@@ -296,7 +338,9 @@ function cattails(cx: number, foot: number, h: number, n: number, seed: number) 
     return null;
   }, false);
 }
-const reeds = [cattails(70, 112, 18, 5, 1), cattails(140, 112, 18, 5, 3), cattails(84, 84, 12, 4, 4), cattails(120, 110, 14, 4, 5), cattails(60, 82, 10, 3, 6)];
+const reeds = [cattails(70, 112, 18, 5, 1), cattails(140, 112, 18, 5, 3), cattails(120, 110, 14, 4, 5), cattails(6, 84, 14, 4, 6), cattails(138, 80, 12, 4, 4)];
+/** The far bank's reeds, small with the distance, standing in front of its brush. */
+const farReeds = [cattails(30, 47, 8, 3, 7), cattails(62, 46, 7, 3, 8), cattails(116, 47, 8, 3, 9), cattails(94, 46, 6, 3, 10)];
 
 // ---- The boardwalk: old planks on posts running in from the sidewalk across the water (the way in), a lantern on its near post.
 
@@ -360,6 +404,7 @@ const back = [add("shadow", shadow), add("farTrees", farTrees), add("brush", bru
 const TALL: ReadonlySet<string> = new Set(["farTrees", "trunkL", "trunkR", "crownL", "crownR", ...[0, 1, 2, 3].flatMap((i) => [`mossL${i}`, `mossR${i}`])]);
 const glintNames = [0, 1, 2, 3].map((i) => add(`glint${i}`, glints(i)));
 const mid = [
+  ...farReeds.map((p, i) => add(`farReeds${i}`, p)),
   ...knees.map((p, i) => add(`knee${i}`, p)),
   ...pads.map((p, i) => add(`pad${i}`, p)),
   add("bank", bank),
