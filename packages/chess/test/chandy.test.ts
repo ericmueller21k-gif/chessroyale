@@ -84,8 +84,9 @@ describe("Chandy's sheet", () => {
     expect(menuBosses({ admin: true, raid: false }).some((d) => d.id === "chandy")).toBe(true);
     // (L1: first lock from his 3rd move; a lock hunts 3 of his turns, lives at most 5; at most 2, the second 2 turns after the first.)
     expect([S.firstLockMove, S.huntTurns, S.liveTurns, S.maxLocks, S.secondAfter]).toEqual([3, 3, 5, 2, 2]);
-    // (L3's margins; the 2 s upgrade window; the meter every 6 of your moves; five upgrades; Dodge at most twice.)
-    expect([S.takeMargin, S.chaseMargin, S.lockLines]).toEqual([1.5, 0.5, 5]);
+    // (L3's margins, raised by L5 after the sim (1.5 and 0.5 gave 5 upgrades in 28 battles of 32: reports/chandy-sim.md); the 2 s
+    // upgrade window; the meter every 6 of your moves; five upgrades; Dodge at most twice.)
+    expect([S.takeMargin, S.chaseMargin, S.lockLines]).toEqual([2, 0.75, 5]);
     expect([S.upgradeMs, S.meterEvery, S.upgradesMax, BOSS_POWERS.maxUltimates.chandy]).toEqual([2000, 6, 5, 2]);
     // (D6a: a 3 s vote and 300 ms of lag grace.)
     expect([S.dodgeVoteMs, S.dodgeGraceMs, S.dodgeRounds]).toEqual([3000, 300, 3]);
@@ -163,7 +164,7 @@ describe("the steering (L3)", () => {
     { move: "f6d5", expected: take },
     { move: "f6g4", expected: 0.55 },
   ];
-  it("takes a locked piece within 1.5 pawns of his best, never further", () => {
+  it("takes a locked piece within 2 pawns of his best, never further", () => {
     // (0.35 against 0.6: about 1.1 pawns on the log-odds scale.)
     expect(steerPick(fen, "e8d7", top(0.35), ["d5"])).toBe("f6d5");
     // (0.15: about 2.3 pawns: his own pick.)
@@ -171,7 +172,7 @@ describe("the steering (L3)", () => {
     // (No lock: his pick.)
     expect(steerPick(fen, "e8d7", top(0.35), [])).toBe("e8d7");
   });
-  it("else chases within half a pawn: a move adding an attacker on a locked piece; his own pick when it does", () => {
+  it("else chases within three quarters of a pawn: a move adding an attacker on a locked piece; his own pick when it does", () => {
     // (Your knight on d4 locked; his king e8, his knight b8: Nc6 attacks d4.)
     const f = "1n2k3/8/8/8/3N4/8/8/4K3 b - - 0 1";
     const lines: MoveScore[] = [
@@ -180,7 +181,7 @@ describe("the steering (L3)", () => {
       { move: "b8a6", expected: 0.59 },
     ];
     expect(steerPick(f, "e8d7", lines, ["d4"])).toBe("b8c6");
-    // (Too far: 0.3 against 0.6 is more than half a pawn.)
+    // (Too far: 0.3 against 0.6 is more than three quarters of a pawn.)
     expect(steerPick(f, "e8d7", [lines[0]!, { move: "b8c6", expected: 0.3 }], ["d4"])).toBe("e8d7");
   });
 });
