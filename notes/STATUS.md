@@ -1,3 +1,4 @@
+- Nov 16 ~14:50 UTC: main full run after #749 (42415c7) GREEN, no retry-passes. Waiting on T1 helper.
 - Nov 16 ~14:30 UTC: #749 MERGED (42415c7; test-only). Main run watched. T1 helper running.
 - Nov 16 ~14:05 UTC: #748 LIVE (06c6914). Main run RED by retry-pass: autochess.spec:607 [phone] (bot "Lv 5" vs "Lv 4": the bot buys XP 0.5 s into the quick step; test race). Fixed forward: #749 (1ada3c6, light lane, test-only), CI watched.
 - Nov 16 ~13:45 UTC: #748 MERGED (06c6914; CI green). Deploy + main run watched. T1 helper running.
