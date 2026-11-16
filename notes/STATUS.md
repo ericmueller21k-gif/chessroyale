@@ -1,3 +1,4 @@
+- Nov 16 ~21:25 UTC: Eric OK: T4 (CI warning 250->200 words, PR body >60 lines; director pushed claude/docs-length 0d1d92d) + Haiku moves 4 long notes text to area pages; L6 bundle split (Opus high, claude/bundle-split). Running: town-solos (high), bundle-split (high), docs Haiku.
 - Nov 16 ~21:05 UTC: music helper session (Eric-started) relayed: town piano solos never heard (first due 8:56, count restarts each time the town music starts). Eric wants ~33% early (within 1:30), always one before ~5 min. Cause checked. Helper (Opus high) claude/town-solos (brief town-solos.md).
 - Nov 16 ~20:10 UTC: #755 + #756 LIVE (fe57a9b); main full run GREEN, no retry-passes. No helpers. Waiting on Eric for the 50 v 50 rework go + Hidden Boss + 3 questions.
 - Nov 16 ~19:45 UTC: #756 ride sounds MERGED (fe57a9b). Deploy + main run (covers #755 + #756) watched. No helpers running. Waiting on Eric: rework go + Hidden Boss question + 3 questions.
