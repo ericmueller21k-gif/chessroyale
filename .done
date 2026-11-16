@@ -1,0 +1,1 @@
+hint-two-moves: done. The cause was a start in check (the Caro-Kann's 5.Nxf6+ at 9 plies, 2 legal moves), not the engine. The spec now expects min(3, legal moves). See .pr-body.md.
