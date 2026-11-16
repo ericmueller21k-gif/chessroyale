@@ -12,6 +12,7 @@ import { HUMAN, loadOpenings, SoloMatch } from "../src/solo.ts";
 import { KING_LINES, kingLine, kingSay, resetKingSpeech } from "../src/godKing.ts";
 import { KING_VS_RECLUSE, RECLUSE_LINES } from "../src/characters/recluse-lines.ts";
 import { animLength } from "../src/characters/power-art.ts";
+import { boardEndWords } from "../src/components/Breakdown.tsx";
 
 // (The opening library is its own chunk, loaded on first use: solo.ts.)
 beforeAll(() => loadOpenings());
@@ -461,6 +462,14 @@ describe("phase 2 without the God King's help (Eric, Nov 14: greyed in his place
     m.finishPhase2();
     expect(m.phase).toMatchObject({ kind: "results", placement: 1, bossResult: "crowd", simul: { won: 4, of: 4 }, simulBoard: { id: 0, you: true, history: [mv], bases: [{ ply: 0, fen }], result: { winner: "crowd", how: "mate" } } });
     m.stop?.();
+  });
+
+  it("the result's review says how your board ended, as its tag does: a board lost to its hearts is \"too slow\" (the review of #744, m3)", () => {
+    expect(boardEndWords({ winner: "boss", how: "slow" })).toBe("Your board is lost: too slow.");
+    expect(boardEndWords({ winner: "boss", how: "time" })).toBe("Your board is lost on time.");
+    expect(boardEndWords({ winner: "boss", how: "resign" })).toBe("Your board is lost: you resigned.");
+    expect(boardEndWords({ winner: "boss", how: "mate" })).toBe("Your board is lost.");
+    expect(boardEndWords({ winner: "crowd", how: "mate" })).toBe("Your board is won.");
   });
 
   it("a phase 2 board, move by move, for the result's review: its Chess960 start, then each move's position and SAN (as fenAtPly), in one pass", () => {
