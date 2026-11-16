@@ -125,6 +125,16 @@ describe("Dodge on screen", () => {
     expect(dodgeView(done, { ...run, round: 1, votes: {}, mine: undefined }, run.at + tl.rounds[1]!.voteAt + 10)).toMatchObject({ phase: "vote", round: 2 });
   });
 
+  it("the art keeps the timeline's beats: the kill as long as dodgeKillMs, the shatter inside dodgeShatterMs, a beam's start under its travel step", () => {
+    const S = BOSS_POWERS.chandy;
+    const king = EFFECTS.chandyDodgeKing.ch.anims;
+    // (The kill's steps, then its empty last frame.)
+    expect(animLength(king.kill!) - king.kill!.frames.at(-1)!.ms).toBe(S.dodgeKillMs);
+    expect(animLength(king.killUp!)).toBe(animLength(king.kill!));
+    for (const a of ["shatter00", "shatter11", "shatter22"]) expect(animLength(king[a]!)).toBeLessThanOrEqual(S.dodgeShatterMs);
+    expect(animLength(EFFECTS.chandyDodgeRow.ch.anims.travel!)).toBeLessThanOrEqual(S.dodgeTravelMs);
+  });
+
   it("takes your king off the board under it (Dodge draws its own)", () => {
     const boss = bossWith({ ...EMPTY, dodge: d }, [], "4k3/8/8/8/8/8/8/6K1 w - - 0 1");
     expect(dodgeFen(boss, "4k3/8/8/8/8/8/8/6K1 w - - 0 1")).toBe("4k3/8/8/8/8/8/8/8 w - - 0 1");

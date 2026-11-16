@@ -366,7 +366,7 @@ export function dodgeDock(boss: BossView, run: DodgeRun, now: number): { line: s
   const stake = left <= 1 ? "One more hit and the battle is his." : `${left === 2 ? "Two" : left} hits and the battle is his.`;
   if (v.phase === "vote") return { line: "Vote where your king stands", sub: `One square is safe. ${stake}` };
   if (v.phase === "kill") return { line: "Hit!", sub: "The battle is his." };
-  if (v.phase === "result") return v.result === "hit" ? { line: "Hit! Your king is cracked", sub: stake } : { line: `Dodged ${v.round} of 3`, sub: v.round < 3 ? "Next round." : "The board comes back." };
+  if (v.phase === "result") return v.result === "hit" ? { line: "King cracked!", sub: stake } : { line: `Dodged ${v.round} of 3`, sub: v.round < 3 ? "Next round." : "The board comes back." };
   if (v.phase === "locked" || v.phase === "blast") return { line: "Locked", sub: v.placed ? `Your king on ${v.placed}.` : "Counting the votes." };
   if (v.phase === "volley") return v.warned ? { line: "Dodge the next one!", sub: `Vote where your king stands. ${stake}` } : { line: "Dodge!", sub: "A warning shot. Watch his clones." };
   if (v.phase === "open" && v.round === 1) return { line: "Dodge the next one!", sub: `One square is safe. ${stake}` };

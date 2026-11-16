@@ -469,73 +469,96 @@ const rnd = (a: number, b: number) => {
   const h = Math.sin(a * 127.1 + b * 311.7) * 43758.5453;
   return h - Math.floor(h);
 };
-/** The kill at step `i` of `n`: sparks on his edges where the beams strike, and his particles rising off him (more as it goes). */
+/** Specks laid out over the 3 x 3 squares round your king (96 px, his square in the middle), cut to one of them (`dx`, `dy`: -1 to 1, on the screen). */
+const cut = (all: readonly Speck[], dx: number, dy: number): Speck[] =>
+  all
+    .filter(([x, y]) => x >= (dx + 1) * S && x < (dx + 2) * S && y >= (dy + 1) * S && y < (dy + 2) * S)
+    .map(([x, y, k]): Speck => [x - (dx + 1) * S, y - (dy + 1) * S, k])
+    .filter(([x, y]) => x >= 0 && y >= 0 && x <= S - 1 && y <= S - 1);
+/** A block `w` x `h` of `k` with a dark edge (reads on the beam and on the board). */
+const chip = (x: number, y: number, w: number, h: number, k: string): Speck[] => {
+  const out: Speck[] = [];
+  for (let j = -1; j <= h; j++) for (let i = -1; i <= w; i++) out.push([x + i, y + j, i < 0 || j < 0 || i >= w || j >= h ? "k" : k]);
+  return out;
+};
+/**
+ * The kill at step `i` of `n` (96 px space): white-hot sparks where the beams strike his edges, and his particles drifting up off him
+ * into the square above, more and more of them.
+ */
 function killSpecks(i: number, n: number): Speck[] {
   const out: Speck[] = [];
-  const sparks = 6;
-  for (let k = 0; k < sparks; k++) {
+  for (let k = 0; k < 7; k++) {
     const a = rnd(i, k) * Math.PI * 2;
-    const r = 7 + rnd(k, i) * 5;
-    const x = Math.round(16 + Math.cos(a) * r);
-    const y = Math.round(17 + Math.sin(a) * r * 0.9);
-    out.push([x, y, k % 3 ? "O" : "Q"], [x + (k % 2 ? 1 : -1), y, "F"]);
+    const r = 8 + rnd(k, i) * 6;
+    const x = Math.round(48 + Math.cos(a) * r);
+    const y = Math.round(50 + Math.sin(a) * r * 0.9);
+    out.push([x, y, "w"], [x + 1, y, "Y"], [x, y - 1, "Y"]);
   }
-  const motes = 4 + Math.round((i / n) * 14);
+  const motes = 3 + Math.round((i / n) * 12);
   for (let k = 0; k < motes; k++) {
-    const x = Math.round(9 + rnd(i * 3 + 1, k) * 14);
-    const rise = ((i * 2 + k * 5) % 12) + rnd(k, 7) * 2;
-    const y = Math.round(24 - rise * 1.6);
-    out.push([x, y, k % 3 === 0 ? "w" : k % 3 === 1 ? "J" : "G"]);
+    const life = (i * 0.37 + rnd(k, 3)) % 1;
+    const x = Math.round(40 + rnd(k, 9) * 16 + Math.sin(life * 6 + k) * 3);
+    const y = Math.round(54 - life * 46);
+    out.push(...chip(x, y, k % 3 ? 1 : 2, 1, k % 2 ? "w" : "J"));
   }
-  return out.filter(([x, y]) => x >= 1 && y >= 1 && x <= S - 2 && y <= S - 2);
+  return out;
 }
-/** The king's shards at `t` (0-1): flying out in every direction, tumbling and falling. */
+/** His shards at `t` (0-1, 96 px space): out in every direction from his square, tumbling, falling. */
 const kingShards = (t: number): Speck[] => {
   const out: Speck[] = [];
-  for (let i = 0; i < 22; i++) {
-    const a = (i / 22) * Math.PI * 2 + rnd(i, 3) * 0.4;
-    const r = 3 + t * (12 + rnd(i, 5) * 4);
-    const x = Math.round(16 + Math.cos(a) * r);
-    const y = Math.round(16 + Math.sin(a) * r * 0.85 + t * t * 5);
-    const k = i % 4 === 0 ? "w" : i % 4 === 1 ? "J" : i % 4 === 2 ? "G" : "O";
-    out.push([x, y, k], [x + 1, y, k === "w" ? "J" : "G"]);
-    if (i % 3 === 0) out.push([x, y + 1, "G"]);
+  for (let i = 0; i < 24; i++) {
+    const a = (i / 24) * Math.PI * 2 + rnd(i, 3) * 0.3;
+    const r = 4 + t * (26 + rnd(i, 5) * 16);
+    const x = Math.round(48 + Math.cos(a) * r);
+    const y = Math.round(48 + Math.sin(a) * r * 0.9 + t * t * 14);
+    const big = i % 3 === 0;
+    out.push(...chip(x, y, big ? 3 : 2, big ? 2 : (i + Math.round(t * 4)) % 2 ? 2 : 1, i % 4 === 0 ? "J" : "w"));
   }
-  return out.filter(([x, y]) => x >= 1 && y >= 1 && x <= S - 2 && y <= S - 2);
+  return out;
 };
 /** The kill's steps (ms each): BOSS_POWERS.chandy.dodgeKillMs over them (an app test keeps the two the same). */
 export const KILL_STEP_MS = 125;
-/** Dodge's hits on your king, on his square (`crack`, `kill`, `shatter`). */
-export const DODGE_KING = fx("chandy-dodge-king", "Dodge's hits on your king", {
+const KILL_STEPS = 40;
+const SHATTER_STEPS = [0.12, 0.25, 0.38, 0.5, 0.62, 0.74, 0.86, 1];
+/** The shatter's squares, their anims' names: `shatter` plus dx and dy + 1 (11: his own). */
+export const shatterAnim = (dx: number, dy: number) => `shatter${dx + 1}${dy + 1}`;
+const dodgeKing: Record<string, () => Anim> = {
   crack: () => ({
     loop: false,
     frames: [
       { ms: 60, layers: [], specks: burstSpecks(9), pal: RED_FX, cue: "crack" },
-      { ms: 80, layers: [], specks: [...burstSpecks(4), ...killSpecks(0, 4)], pal: RED_FX },
-      { ms: 110, layers: [], specks: killSpecks(1, 4), pal: RED_FX },
-      { ms: 130, layers: [], specks: killSpecks(2, 4).filter((_, i) => i % 2 === 0), pal: RED_FX },
+      { ms: 80, layers: [], specks: [...burstSpecks(4), ...cut(killSpecks(0, 4), 0, 0)], pal: RED_FX },
+      { ms: 110, layers: [], specks: cut(killSpecks(1, 4), 0, 0), pal: RED_FX },
+      { ms: 130, layers: [], specks: cut(killSpecks(2, 4), 0, 0).filter((_, i) => i % 2 === 0), pal: RED_FX },
       EMPTY(),
     ],
   }),
-  kill: () => {
-    const n = 40;
-    return {
+  // The kill on his square, and his particles drifting into the square above (`killUp`).
+  ...Object.fromEntries(
+    ([["kill", 0], ["killUp", -1]] as const).map(([name, dy]) => [
+      name,
+      (): Anim => ({
+        loop: false,
+        frames: [
+          ...Array.from({ length: KILL_STEPS }, (_, i): Frame => ({ ms: KILL_STEP_MS, layers: [], specks: cut(killSpecks(i, KILL_STEPS), 0, dy), ...(i % 4 === 0 && dy === 0 ? { cue: i === 0 ? "crack" : "crackle" } : {}) })),
+          EMPTY(),
+        ],
+      }),
+    ]),
+  ),
+};
+for (let dy = -1; dy <= 1; dy++)
+  for (let dx = -1; dx <= 1; dx++)
+    dodgeKing[shatterAnim(dx, dy)] = () => ({
       loop: false,
       frames: [
-        ...Array.from({ length: n }, (_, i): Frame => ({ ms: KILL_STEP_MS, layers: [], specks: killSpecks(i, n), pal: RED_FX, ...(i % 4 === 0 ? { cue: i === 0 ? "crack" : "crackle" } : {}) })),
+        ...(dx === 0 && dy === 0 ? [{ ms: 70, layers: [], specks: burstSpecks(12), pal: { ...RED_FX, O: "#ffffff", F: "#ffd6d0" }, cue: "kingShatter" } as Frame] : [EMPTY(70)]),
+        ...SHATTER_STEPS.map((t): Frame => ({ ms: 100, layers: [], specks: cut(kingShards(t), dx, dy) })),
         EMPTY(),
       ],
-    };
-  },
-  shatter: () => ({
-    loop: false,
-    frames: [
-      { ms: 70, layers: [], specks: burstSpecks(12), pal: { ...RED_FX, O: "#ffffff", F: "#ffd6d0" }, cue: "kingShatter" },
-      ...[0.15, 0.3, 0.45, 0.6, 0.75, 0.9, 1].map((t): Frame => ({ ms: 100, layers: [], specks: kingShards(t) })),
-      EMPTY(),
-    ],
-  }),
-});
+    });
+/** Dodge's hits on your king, on his square and round it (`crack`, `kill`, `killUp`, `shatter` 00 to 22). */
+export const DODGE_KING = fx("chandy-dodge-king", "Dodge's hits on your king", dodgeKing);
 
 /** Every one of Chandy's board sprites (registered in effects.ts EFFECT_SPRITES; played as power-art.ts EFFECTS). */
 export const CHANDY_FX = {

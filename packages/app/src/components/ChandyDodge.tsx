@@ -25,6 +25,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import { BOSS_POWERS } from "@chessroyale/core";
 import { CHANDY_CLONE, CHANDY_FOOT, cloneMuzzle } from "../characters/chandy.ts";
+import { shatterAnim } from "../characters/effects/chandy.ts";
 import { spriteCanvas } from "../characters/sprite-kit.ts";
 import { BoardEffects, onEachFrame, spriteFrameAt, type BoardItem } from "./BossEffect.tsx";
 
@@ -185,7 +186,22 @@ export function ChandyDodge({ view }: { view: DodgeView }) {
     );
     // Your king hit: the first hit's impact; the losing hit's kill, then his shatter.
     if (v.placed && v.phase === "result" && v.result === "hit" && v.cracked !== undefined) items.push({ square: v.placed, name: "chandyDodgeKing", anim: "crack", since: v.cracked });
-    if (v.placed && v.killAt !== undefined) items.push(now < v.killAt + kill ? { square: v.placed, name: "chandyDodgeKing", anim: "kill", since: v.killAt } : { square: v.placed, name: "chandyDodgeKing", anim: "shatter", since: v.killAt + kill });
+    if (v.placed && v.killAt !== undefined) {
+      // (His particles drift into the square above his; his shards fly into the eight round him.)
+      const [pc, pr] = cell(v.placed, v.side);
+      const round = (dx: number, dy: number) => (pc + dx >= 0 && pc + dx < 8 && pr + dy >= 0 && pr + dy < 8 ? sqAt(pc + dx, pr + dy, v.side) : null);
+      if (now < v.killAt + kill)
+        for (const [anim, dy] of [["kill", 0], ["killUp", -1]] as const) {
+          const square = round(0, dy);
+          if (square) items.push({ square, name: "chandyDodgeKing", anim, since: v.killAt, quiet: dy !== 0 });
+        }
+      else
+        for (let dy = -1; dy <= 1; dy++)
+          for (let dx = -1; dx <= 1; dx++) {
+            const square = round(dx, dy);
+            if (square) items.push({ square, name: "chandyDodgeKing", anim: shatterAnim(dx, dy), since: v.killAt + kill, quiet: dx !== 0 || dy !== 0 });
+          }
+    }
   }
   const nine: string[] = [];
   for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) nine.push(sqAt(cc + dc, cr + dr, v.side));

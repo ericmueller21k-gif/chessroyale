@@ -651,7 +651,7 @@ export const EFFECTS: Record<EffectName, Effect> = {
   chandyShatter: { ch: EFFECT_SPRITES.chandyShatter, covers: "square", start: "shatter", sounds: CHANDY_SOUNDS },
   chandyDodgeRow: { ch: EFFECT_SPRITES.chandyDodgeRow, covers: "square", start: "travel", loop: "hold", end: "fade", sounds: CHANDY_DODGE_SOUNDS },
   chandyDodgeCol: { ch: EFFECT_SPRITES.chandyDodgeCol, covers: "square", start: "travel", loop: "hold", end: "fade", sounds: CHANDY_DODGE_SOUNDS },
-  chandyDodgeKing: { ch: EFFECT_SPRITES.chandyDodgeKing, covers: "square", start: "crack", end: "shatter", sounds: CHANDY_DODGE_SOUNDS },
+  chandyDodgeKing: { ch: EFFECT_SPRITES.chandyDodgeKing, covers: "square", start: "crack", end: "shatter11", sounds: CHANDY_DODGE_SOUNDS },
 };
 
 // ---------------- Big Boy's toy block, for the board ----------------
