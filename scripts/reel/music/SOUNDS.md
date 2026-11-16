@@ -292,3 +292,11 @@ is: the handoff needs the boss's id.
 "It's the new one, Chandy, that's being built right now, and it sounds great. Nothing to fix." Handed over as
 `chandy` (he is not in the roster yet: the id is a guess the director can rename). Two of his own plans built as
 written have now passed first go (Babur's, this): when he gives a plan, build the plan.
+
+## A new theme for Folio (Nov 16, song_ah.py): sent, no verdict yet
+
+"This is the write-up for Folio. Again, about 2 minutes, 45 seconds ... And stick to what I'm sending you." His own
+plan ("Breezy 90s Japanese City-Pop / High-Altitude Smooth Synth-Jazz": 102 beats a minute, 16ths swung 58%, G major,
+a bell-Rhodes, a square-wave whistle over a flute, a fingered FM bass, a reed pad; a vamp, a theme, a bridge), built
+as written. Its 20 bars are 47 seconds, so it is played three times with a little more in it each time, the theme
+twice the third time (68 bars, 2:40). Folio already has song_o.py in the game: which one stays is his call.
