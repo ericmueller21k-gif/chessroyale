@@ -267,7 +267,7 @@ test("his room (Eric, Nov 12 and 13): Challenge is 1 of 4; leaving asks; an admi
   await expect.poll(async () => ((await simulNow())?.boards ?? []).slice(1).filter((b: { history: string[] }) => b.history.length > 0).length, { message: "the bots move", timeout: 30_000 }).toBeGreaterThan(0);
   await still(page, "four-boards");
   // Everything around the board where it was against the man, within 2 px: the square, the Moves panel and chat, the pawns, the
-  // God King (Eric, Nov 14). And the four boards inside the square, square, the gaps between them and to its edges equal.
+  // God King (Eric, Nov 14). And the four boards inside the square.
   const fourFrame = await frameBoxes(page);
   expect(manFrame[".mv-side"]!.length + manFrame[".bp"]!.length, "the Moves panel").toBe(1);
   expect(manFrame[".you-pawn"], "your pawn").toHaveLength(1);
@@ -276,15 +276,16 @@ test("his room (Eric, Nov 12 and 13): Challenge is 1 of 4; leaving asks; an admi
     expect(fourFrame[sel], `${sel}: as many`).toHaveLength(boxes.length);
     boxes.forEach((b, i) => b.forEach((n, k) => expect(Math.abs(fourFrame[sel]![i]![k]! - n), `${sel} ${i} [${k}]: ${b} -> ${fourFrame[sel]![i]}`).toBeLessThanOrEqual(2)));
   }
-  if (test.info().project.name === "desktop") {
-    const gaps = await page.evaluate(() => {
-      const sq = document.querySelector(".rc-simul .rc-stage")!.getBoundingClientRect();
-      const [tl, tr, bl] = [".rc-q0", ".rc-q1", ".rc-q2"].map((q) => document.querySelector(`.rc-simul ${q} .hb-board`)!.getBoundingClientRect());
-      return { square: [tl!.width - tl!.height], gaps: [tl!.left - sq.left, tr!.left - tl!.right, sq.right - tr!.right, tl!.top - sq.top, bl!.top - tl!.bottom, sq.bottom - bl!.bottom] };
-    });
-    expect(Math.abs(gaps.square[0]!), "each board square").toBeLessThanOrEqual(1);
-    for (const g of gaps.gaps) expect(Math.abs(g - gaps.gaps[0]!), `the gaps ${gaps.gaps.map(Math.round)}`).toBeLessThanOrEqual(2);
-  }
+  // (Your board big at the square's bottom, the other three in a row above it, on a computer too since Nov 16: the gaps across equal.)
+  const gaps = await page.evaluate(() => {
+    const sq = document.querySelector(".rc-simul .rc-stage")!.getBoundingClientRect();
+    const big = document.querySelector(".rc-simul .rc-big .hb-board")!.getBoundingClientRect();
+    const [a, b, c] = [...document.querySelectorAll(".rc-simul .rc-mini .hb-board")].map((m) => m.getBoundingClientRect());
+    return { square: [big.width - big.height, a!.width - a!.height], above: Math.max(a!.bottom, b!.bottom, c!.bottom) - big.top, gaps: [a!.left - sq.left, b!.left - a!.right, c!.left - b!.right, sq.right - c!.right] };
+  });
+  for (const d of gaps.square) expect(Math.abs(d), "each board square").toBeLessThanOrEqual(1);
+  expect(gaps.above, "the small boards above yours").toBeLessThanOrEqual(0);
+  for (const g of gaps.gaps) expect(Math.abs(g - gaps.gaps[0]!), `the gaps ${gaps.gaps.map(Math.round)}`).toBeLessThanOrEqual(2);
   // The scoreboard in phase 2 (Eric's playtest, Nov 14: every row read "out", a phone's Players tab empty): the four on his boards
   // are in, never "out": a computer's table beside the board; a phone's Players tab (the rows its box fits, as in phase 1), and
   // the four in full when it's tapped open. (Each board's result shows on its row as it ends: below.)
@@ -311,7 +312,7 @@ test("his room (Eric, Nov 12 and 13): Challenge is 1 of 4; leaving asks; an admi
   const mine = (await simulNow()).boards[0] as { fen: string; toMove: string | null; history: string[] };
   expect(mine.toMove).toBe("crowd");
   const move = legalMoves(mine.fen).find((m) => m.startsWith("b") || m.startsWith("g")) ?? legalMoves(mine.fen)[0]!;
-  const board = page.locator(".rc-simul .rc-q2 .hb-board, .rc-simul .rc-big .hb-board").first();
+  const board = page.locator(".rc-simul .rc-big .hb-board");
   const box = (await board.boundingBox())!;
   for (const sq of [move.slice(0, 2), move.slice(2, 4)]) {
     const f = sq.charCodeAt(0) - 97;

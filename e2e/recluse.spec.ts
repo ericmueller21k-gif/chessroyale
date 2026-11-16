@@ -337,8 +337,8 @@ test("a player in Boss alone never sees Engine move", async ({ page }) => {
   await expect(page.getByRole("button", { name: "Engine move" })).toHaveCount(0);
 });
 
-/** Your phase 2 board: big on a phone, at the bottom left of the four on a computer. */
-const myBoard = (page: Page) => page.locator(".rc-simul .rc-q2 .hb-board, .rc-simul .rc-big .hb-board").first();
+/** Your phase 2 board: the big one, under the other three (a computer too since Nov 16). */
+const myBoard = (page: Page) => page.locator(".rc-simul .rc-big .hb-board");
 const simulNow = (p: Page) => p.evaluate(() => (window as any).match?.simul ?? null);
 /**
  * When the app first put each of these in the page (performance.now, from a MutationObserver: the moment it happens, not
@@ -711,8 +711,7 @@ test("beaten in phase 1 (?win=1): he collapses and mumbles, his cutscene, then t
   expect(v.boards).toHaveLength(4);
   // (Every board from a base at ply 0 with its start: here the test switch's mate in one, written as Chess960.)
   for (const b of v.boards) expect(b.bases).toEqual([{ ply: 0, fen: "r1bqkb1r/pppp1ppp/2n2n2/4p2Q/2B1P3/8/PPPP1PPP/RNB1K1NR w HAha - 4 4" }]);
-  if (test.info().project.name === "phone") await expect(page.locator(".rc-mini")).toHaveCount(3);
-  else await expect(page.locator(".rc-played .hb-board")).toHaveCount(4);
+  await expect(page.locator(".rc-mini")).toHaveCount(3);
   // Your Qxf7 mates on your board; the bots mate on theirs: every board won.
   await simulPlay(page, "h5f7");
   await expect.poll(() => phase(page), { timeout: 30_000 }).toBe("results");
@@ -1102,14 +1101,13 @@ test("phase 2's ultimate (the admins' trigger): \"5 SECONDS!\", his line and spe
   expect(errors).toEqual([]);
 });
 
-test("phase 2's slow moves (?phase=2): each marks a red X for the team in one column beside your board (a phone's big board), the slow board gets a note, a soft sound; the 10th brings his ultimate on every board", async ({ page }) => {
+test("phase 2's slow moves (?phase=2): each marks a red X for the team in one column beside your board (the big board), the slow board gets a note, a soft sound; the 10th brings his ultimate on every board", async ({ page }) => {
   test.setTimeout(5 * 60_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   await meetHim(page, "phase=2");
   await expect.poll(async () => (await simulNow(page))?.playing ?? false, { timeout: 60_000 + ADDED_MS }).toBe(true);
   await page.evaluate(() => ((window as any).__soundLog = []));
-  const phone = test.info().project.name === "phone";
   // Ten slots, all empty, once: a column beside your board (Eric, Oct 14: the count is the team's, so once is enough).
   await expect(page.locator(".rc-slow")).toHaveCount(1);
   await expect(page.locator(".rc-slow.col")).toHaveCount(1);
@@ -1158,13 +1156,63 @@ test("phase 2's slow moves (?phase=2): each marks a red X for the team in one co
   expect(v.slow).toBe(10);
   expect(marked).toBeGreaterThan(0);
   await expect(page.locator('.rc-slow[data-slow="10"]')).toHaveCount(1);
-  // Ten red X's, the slow board noted, a soft sound each time, and the banner on every board (a phone's small ones too).
+  // Ten red X's, the slow board noted, a soft sound each time, and the banner on every board (the small ones too).
   await expect(page.locator('.rc-slow[data-slow="10"]').first().locator(".rc-slow-x")).toHaveCount(10 * 9);
-  await expect.poll(() => seen.seen(), { timeout: 10_000 }).toEqual({ flash: true, note: true, banner: true, minis: phone });
+  await expect.poll(() => seen.seen(), { timeout: 10_000 }).toEqual({ flash: true, note: true, banner: true, minis: true });
   expect(((await page.evaluate(() => (window as any).__soundLog)) as string[]).filter((x) => x.startsWith("recluseSlow")).length).toBeGreaterThanOrEqual(1);
   // (His transformation's theme, started at the split, plays on through a minute and more of the four boards, the slow moves and his
   // ultimate: never started again nor ended (Eric, Nov 14: "this music keeps restarting on the third phase").)
   const music = ((await page.evaluate(() => (window as any).__soundLog)) as string[]).filter((x) => /^music:(start|out|end):/.test(x));
   expect(music, "no restart through phase 2").toEqual([]);
   expect(errors).toEqual([]);
+});
+
+test("phase 2 on a computer (Eric, Nov 16: \"replicate how it is on mobile\"): your board big where phase 1's stood, three quarters of its size, its foot and middle kept; the other three small in a row above it, inside the window, nothing overlapping; tap one to watch it, Back to my board", async ({ page }) => {
+  test.skip(test.info().project.name === "phone", "a computer's layout (a phone's: the phase 2 tests above)");
+  test.setTimeout(3 * 60_000);
+  await meetHim(page, "phase=2");
+  await expect.poll(() => phase(page), { timeout: 60_000 + ADDED_MS }).toBe("simul");
+  for (const [width, height] of [[1280, 800], [1440, 900], [1611, 843], [1920, 1080], [1280, 600]] as const) {
+    await page.setViewportSize({ width, height });
+    await page.waitForTimeout(400);
+    const at = `${width} x ${height}`;
+    const lay = await page.evaluate(() => {
+      const box = (e: Element | null) => {
+        const r = e!.getBoundingClientRect();
+        return { l: r.left, t: r.top, r: r.right, b: r.bottom, w: r.width };
+      };
+      return {
+        // (The square: phase 1's board's box, which the phase change and phase 2 keep: hidden-boss-room.spec.ts.)
+        square: box(document.querySelector(".rc-simul .rc-stage")),
+        bar: box(document.querySelector(".boss-bar")),
+        big: box(document.querySelector(".rc-big .hb-board")),
+        minis: [...document.querySelectorAll(".rc-mini")].map((m) => ({ board: box(m.querySelector(".hb-board")), tag: box(m.querySelector(".rc-tag")) })),
+      };
+    });
+    const { square, big, minis } = lay;
+    // Your board: three quarters of phase 1's (FOUR.desk, its squares a whole multiple of 8 device pixels), its foot and middle there.
+    expect(Math.abs(big.w - 0.755 * square.w), `${at}: your board ${big.w} in ${square.w}`).toBeLessThanOrEqual(8);
+    expect(Math.abs((big.l + big.r) / 2 - (square.l + square.r) / 2), `${at}: your board's middle`).toBeLessThanOrEqual(1);
+    expect(square.b - big.b, `${at}: your board's foot`).toBeGreaterThanOrEqual(0);
+    expect(square.b - big.b, `${at}: your board's foot`).toBeLessThanOrEqual(5);
+    // The other three: in a row above it, each whole in the window with its tag, under the boss bar, none overlapping.
+    expect(minis, at).toHaveLength(3);
+    for (const [i, m] of minis.entries()) {
+      for (const b of [m.board, m.tag]) expect(b.l >= 0 && b.t >= lay.bar.b && b.r <= width && b.b <= big.t, `${at}: small board ${i} ${JSON.stringify(b)}`).toBe(true);
+      expect(m.tag.b, `${at}: small board ${i}'s tag over it`).toBeLessThanOrEqual(m.board.t);
+      if (i) expect(m.board.l, `${at}: small boards ${i - 1} and ${i}`).toBeGreaterThanOrEqual(Math.max(minis[i - 1]!.board.r, minis[i - 1]!.tag.r));
+      if (i) expect(m.tag.l, `${at}: tags ${i - 1} and ${i}`).toBeGreaterThanOrEqual(minis[i - 1]!.tag.r);
+    }
+  }
+  // Tap a small one: it's the big one, "Back to my board" in the dock brings yours back.
+  const watched = (await simulNow(page)).boards[1].name as string;
+  await page.getByRole("button", { name: `Watch ${watched}'s board` }).click();
+  await expect(page.locator(".rc-big .rc-tag")).toHaveText(watched);
+  // (Its name in the gap over it, clear of the row above.)
+  const clear = await page.evaluate(() => document.querySelector(".rc-big .rc-tag")!.getBoundingClientRect().top - Math.max(...[...document.querySelectorAll(".rc-mini .hb-board")].map((m) => m.getBoundingClientRect().bottom)));
+  expect(clear, "the watched board's name under the small boards").toBeGreaterThanOrEqual(0);
+  await expect(page.getByRole("button", { name: "Back to your board" })).toBeVisible();
+  await page.getByRole("button", { name: "Back to my board" }).click();
+  await expect(page.locator(".rc-big .rc-tag")).toHaveCount(0);
+  await expect(page.locator(".rc-mini.you")).toHaveCount(0);
 });
