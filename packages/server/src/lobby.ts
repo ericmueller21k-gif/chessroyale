@@ -22,6 +22,7 @@ import {
   zebraTurnMs,
   chandyTurnMs,
   dodgeSeen,
+  dodgeOver,
   popOffMs,
   folioTurnMs,
   landsAfterHisMove,
@@ -1906,13 +1907,18 @@ export class LobbyCore {
     return { t: "boss", boss: this.bossViewSent(opts.justKilled ?? null), standings: this.standings(), until, ...(opts.thinking ? { thinking: true } : {}), ...(opts.fall ? { fall: true } : {}), ...(opts.rush ? { rush: opts.rush } : {}), ...(opts.dodge ? { dodge: opts.dodge } : {}) };
   }
 
-  /** The boss's view as it's sent: during Chandy's Dodge, only what has been seen of it so far (dodgeSeen: the teleports in their time). */
+  /**
+   * The boss's view as every message sends it (the boss's, a round's, a reveal's): Chandy's Dodge, until it's over, only as far as it
+   * has been seen (dodgeSeen: no safe square before its vote closes, each teleport in its time). Dodge is set up as his move applies
+   * and plays from the next round on (startDodge): until then nothing of it has been seen. (Each message is stored as sent, so a
+   * device back from a reload, `last`, gets no more than everyone had then.)
+   */
   private bossViewSent(justKilled: string | null = null): NetBoss {
     const view = this.runner!.bossView(justKilled)!;
     const d = view.powers?.chandy?.dodge;
+    if (!d || dodgeOver(d)) return view;
     const l = this.r.dodge;
-    if (!d || !l) return view;
-    return { ...view, powers: { ...view.powers!, chandy: { ...view.powers!.chandy!, dodge: dodgeSeen(d, this.io.now() - l.at) } } };
+    return { ...view, powers: { ...view.powers!, chandy: { ...view.powers!.chandy!, dodge: dodgeSeen(d, l ? this.io.now() - l.at : -1) } } };
   }
 
   /** The boss's turn: everyone sees it thinking while the host's engine plays its move. */
@@ -2870,7 +2876,7 @@ export class LobbyCore {
     const alive = new Set(runner.alive().map((p) => p.id));
     const inRound = new Set(playing.map((h) => h.id));
     const crowd = this.settings.mode === "crowd";
-    const bossNow = runner.boss ? runner.bossView()! : undefined;
+    const bossNow = runner.boss ? this.bossViewSent() : undefined;
     for (const h of this.r.humans) {
       // Crowd 50 v 50: the team not picking still gets the board, to watch the vote come in.
       const watching = crowd && !final && alive.has(h.id) && !inRound.has(h.id);
@@ -3305,7 +3311,7 @@ export class LobbyCore {
     // The God King's Last Stand plays out in the reveal (the next move's clock starts after it: nobody loses time).
     const stand = report.boards.some((b) => b.lastStand);
     const until = this.io.now() + (this.settings.revealSeconds + this.settings.drawnMoveSeconds) * 1000 + (kingActs ? kingMoveMs(this.settings) : 0) + (stand ? lastStandMs() : 0);
-    const bossNow = runner.boss ? runner.bossView()! : undefined;
+    const bossNow = runner.boss ? this.bossViewSent() : undefined;
     const st = this.standings();
     const cutoff = this.cutoff();
     const slots = this.slots();
