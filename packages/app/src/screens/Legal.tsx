@@ -321,8 +321,8 @@ function Privacy() {
         title="Friends"
         what={
           <p>
-            Your friends, friend requests waiting for an answer, the players you block, your settings for who may invite you and
-            whether others see when you're online, game invites to you, and counts that limit how many requests and invites you send.
+            Your friends, friend requests waiting for an answer, the players you block, your settings for who may invite you,
+            whether others see when you're online and Do Not Disturb, game invites to you, and counts that limit how many requests and invites you send.
           </p>
         }
         why="so you can add friends and invite players to your games, and keep away from players you block."
