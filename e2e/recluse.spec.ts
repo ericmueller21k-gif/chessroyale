@@ -1153,7 +1153,8 @@ test("phase 2's hearts (?phase=2; Eric, Nov 16): a column of 8 at every board's 
   // (The wind-up slow, the stroke fast: the glint up for most of windMs, the stroke across and gone within about 400 ms.)
   expect(Math.max(...frames.glint) - Math.min(...frames.glint)).toBeGreaterThan(RECLUSE_PHASE2.slash.windMs * 0.6);
   expect(Math.max(...frames.blade) - Math.min(...frames.blade)).toBeLessThan(450);
-  expect(await page.locator(".rc-hcut").count()).toBe(0);
+  // (Gone once its time is up: waited for, not read at one instant after a fixed sleep, which a busy runner can beat by a frame.)
+  await expect(page.locator(".rc-hcut")).toHaveCount(0, { timeout: 5_000 });
   expect(await said.seen()).toEqual({ line: true, word: false });
   expect(((await page.evaluate(() => (window as any).__soundLog)) as string[]).filter((x) => x.startsWith("recluseSlash"))).toHaveLength(1);
   // As long as you need: 5 s more, no move played for you, no second heart on the same move, your clock running.
