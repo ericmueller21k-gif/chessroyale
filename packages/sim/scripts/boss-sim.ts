@@ -465,7 +465,7 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
       const dash = { pickSec, rushSec: patch.rushSec ?? 2.2, bankMs: BOSS_CLOCK.bankSeconds * 1000, minBankMs: BOSS_CLOCK.bankSeconds * 1000, slaps: 0, stolenMs: 0, scrambles: 0, scrambled: 0, flags: 0, scrambleFlags: 0, slapSeen: -1 };
       // (Chandy: each lock (after which crowd move, its square), each upgrade (after which crowd move), the moves his meter fired,
       // each queen lock aimed (or the turn it waited) and its shot, and each Dodge's rounds.)
-      const chandy = { locks: [] as { at: number; square: string }[], upgrades: [] as number[], fired: [] as { at: number; move: string }[], aims: [] as number[], aimWaits: [] as number[], shots: [] as { at: number; piece: string | null }[], dodges: [] as { at: number; rounds: number; hit: boolean; random: number }[] };
+      const chandy = { locks: [] as { at: number; square: string }[], upgrades: [] as number[], fired: [] as { at: number; move: string }[], aims: [] as number[], aimWaits: [] as number[], shots: [] as { at: number; piece: string | null }[], dodges: [] as { at: number; rounds: number; hit: boolean; random: number; last: boolean; upgrades: number }[] };
       const chandySeen = new Set<string>();
       const CHANDY_FIRED: Record<string, string> = { scatterShot: "scatter", beam: "beam", shields: "shields", rapidFire: "rapidfire", queenAim: "queenlock" };
       const chandyLook = () => {
@@ -732,11 +732,13 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
         }
         // (Chandy's Dodge, as the crowd's turn begins: the bots' votes, round by round; a hit ends the battle.)
         if (runner.dodgeDue()) {
-          const d0 = runner.boss!.powers!.chandy!.dodge!;
+          const p0 = runner.boss!.powers!;
+          const d0 = p0.chandy!.dodge!;
           ults.push({ kind: "dodge", turn: runner.boss!.crowdMoves });
           while (runner.dodgeDue()) runner.finishDodgeRound({});
           const d = runner.boss!.powers!.chandy!.dodge!;
-          chandy.dodges.push({ at: d0.at, rounds: d.results.length, hit: d.results.some((r) => r.hit), random: d.results.filter((r) => r.random).length });
+          // (`last`: the last chance, the crowd's mate in one, warned and come on one turn.)
+          chandy.dodges.push({ at: d0.at, rounds: d.results.length, hit: d.results.some((r) => r.hit), random: d.results.filter((r) => r.random).length, last: p0.warnAt === p0.ultAt, upgrades: p0.chandy!.upgrades });
           continue;
         }
         if (runner.extraMoveDue()) {
