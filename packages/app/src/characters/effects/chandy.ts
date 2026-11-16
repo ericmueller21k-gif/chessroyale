@@ -266,30 +266,19 @@ export const SHIELD = fx("chandy-shield", "Chandy's bubble shield", {
 
 // ---- Rapid fire: a hit (a little cyan splash), then dizzy stars circling over the piece's head (Moo & Moon's stun rule).
 
-const star = (x: number, y: number, k = "y", l = "Y"): Speck[] => [
-  [x, y, l],
-  [x - 1, y, l],
-  [x + 1, y, l],
-  [x, y - 1, l],
-  [x, y + 1, k],
-  [x - 2, y, k],
-  [x + 2, y, k],
-  [x - 3, y, k],
-  [x + 3, y, k],
-  [x, y - 2, k],
-  [x, y - 3, "w"],
-  [x - 1, y + 2, k],
-  [x + 1, y + 2, k],
-  [x - 2, y + 3, k],
-  [x + 2, y + 3, k],
-  [x - 1, y + 1, k],
-  [x + 1, y + 1, k],
-];
+/** A star 9 px across: a bright middle, gold arms, a white tip at the top. */
+const star = (x: number, y: number, k = "y", l = "Y"): Speck[] => {
+  const out: Speck[] = [];
+  for (let d = -4; d <= 4; d++) out.push([x + d, y, Math.abs(d) < 2 ? l : k]);
+  for (let d = -4; d <= 3; d++) out.push([x, y + d, d === -4 ? "w" : Math.abs(d) < 2 ? l : k]);
+  for (const [dx, dy] of [[-1, -1], [1, -1], [-1, 1], [1, 1], [-2, 2], [2, 2], [-3, 3], [3, 3]] as const) out.push([x + dx, y + dy, Math.abs(dx) < 2 ? l : k]);
+  return out;
+};
 const dizzy = (t: number): Speck[] =>
   [0, 1, 2]
     .flatMap((i) => {
       const a = t * 0.9 + (i * Math.PI * 2) / 3;
-      return star(Math.round(16 + Math.cos(a) * 10), Math.round(6 + Math.sin(a) * 3), "y", Math.sin(a) > 0 ? "w" : "Y");
+      return star(Math.round(16 + Math.cos(a) * 10), Math.round(7 + Math.sin(a) * 2), "y", Math.sin(a) > 0 ? "w" : "Y");
     })
     .filter(([x, y]) => x >= 1 && y >= 1 && x <= S - 2 && y <= S - 2);
 const hitSpecks = (step: number): Speck[] =>

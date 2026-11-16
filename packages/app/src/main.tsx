@@ -19,6 +19,7 @@ import { applyBoardColors } from "./prefs.ts";
 import { mountOf, setBannerPlusSource, shownLook } from "@chessroyale/core";
 import { bannerPlusAsked } from "./test-switches.ts";
 import { account, onAccountChange } from "./account.ts";
+import { isAdmin } from "./boss-brain.ts";
 import { loadRide } from "./components/rides/load.ts";
 import "./styles.css";
 // (A computer's board as big as the window's height: after styles.css, whose computer sizes it takes over.)
@@ -89,7 +90,18 @@ function Root() {
     </ErrorBoundary>
   );
 }
-render(<Root />, document.getElementById("app")!);
+// Chandy's art preview (Nov 16; admins only, in no menu: dev/chandy-preview.tsx), at /chandy: loaded once the account says admin.
+if (location.pathname === "/chandy") {
+  const app = document.getElementById("app")!;
+  app.textContent = "Admins only.";
+  const open = () => {
+    if (!isAdmin()) return;
+    off();
+    void import("./dev/chandy-preview.tsx");
+  };
+  const off = onAccountChange(open);
+  open();
+} else render(<Root />, document.getElementById("app")!);
 
 // Your own worn ride's drawing (its own chunk, rides/load.ts), asked for after the first paint and again whenever your look
 // changes (once a ride: it's kept), so your pawn on home, in your ring and in the town rarely waits for it (Nov 1, rides lazy).
