@@ -1,7 +1,10 @@
 import { execFileSync } from "node:child_process";
-import { mkdirSync, rmSync } from "node:fs";
+import { mkdirSync, readFileSync, rmSync } from "node:fs";
 import { devices, expect, type Page } from "@playwright/test";
 import { asAdmin, test, lookDrag, townTap } from "./helpers.ts";
+
+/** Every home in the street plan: an admin's town (this spec's) shows them all, so the minimap's portraits follow the plan, not a number to edit per new home. */
+const PLAN_HOME_COUNT = (JSON.parse(readFileSync(new URL("../packages/app/src/town/street-plan.json", import.meta.url), "utf8")) as { lots: { kind: string }[] }).lots.filter((l) => l.kind === "home").length;
 
 /**
  * The street town's controls and minimap (Nov 5; brief-street-controls-map.md, docs/decisions/2026-11-05-street-controls-map.md):
@@ -400,9 +403,9 @@ test("the minimap: on by default at the top right, your dot moving with you and 
   expect(Math.abs(bb.x + bb.width / 2 - (tb.x + tb.width / 2)), "in the middle across").toBeLessThan(2);
   expect(Math.abs(bb.y + bb.height / 2 - (tb.y + tb.height / 2)), "in the middle down").toBeLessThan(2);
   const faces = page.locator(".tm-face");
-  await expect(faces).toHaveCount(18);
+  await expect(faces).toHaveCount(PLAN_HOME_COUNT);
   const ids = await faces.evaluateAll((els) => els.map((e) => (e as HTMLElement).dataset.home));
-  expect(new Set(ids).size).toBe(18);
+  expect(new Set(ids).size).toBe(PLAN_HOME_COUNT);
   // (Each portrait drawn: some of its pixels not blank.)
   const drawn = await faces.evaluateAll((els) =>
     els.filter((e) => {
