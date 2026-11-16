@@ -74,10 +74,10 @@ function dodgeAt(t: number, t0: number, pick: string | undefined, onPick: (s: st
   const now = t0 + t;
   // The safe square moves f3, f4, e4, e5 as the h-file clone, the e8 clone and the a-file clone teleport.
   let lines: DodgeLine[] = [L(5, "left"), L(4, "right"), F("d"), F("e")];
-  const ghosts: DodgeLine[] = [];
-  if (now >= tp[0]!) (lines = [L(5, "left"), L(3, "right", tp[0]), F("d"), F("e")]), ghosts.push(L(4, "right", tp[0]));
-  if (now >= tp[1]!) (lines = [L(5, "left"), L(3, "right"), F("d"), F("f", tp[1])]), ghosts.push(F("e", tp[1]));
-  if (now >= tp[2]!) (lines = [L(4, "left", tp[2]), L(3, "right"), F("d"), F("f")]), ghosts.push(L(5, "left", tp[2]));
+  const ghosts: (DodgeLine & { since: number })[] = [];
+  if (now >= tp[0]!) (lines = [L(5, "left"), L(3, "right", tp[0]), F("d"), F("e")]), ghosts.push({ ...L(4, "right"), since: tp[0]! });
+  if (now >= tp[1]!) (lines = [L(5, "left"), L(3, "right"), F("d"), F("f", tp[1])]), ghosts.push({ ...F("e"), since: tp[1]! });
+  if (now >= tp[2]!) (lines = [L(4, "left", tp[2]), L(3, "right"), F("d"), F("f")]), ghosts.push({ ...L(5, "left"), since: tp[2]! });
   const recent = ghosts.filter((g) => now - (g.since ?? 0) < 700);
   const teleport = tp.some((s) => now >= s && now - s < 400);
   const votes: Record<string, number> = now < tp[0]! ? { f3: 3 } : now < tp[1]! ? { f3: 1, f4: 3 } : now < tp[2]! ? { f4: 1, e4: 3 } : { e4: 1, e5: 4 };

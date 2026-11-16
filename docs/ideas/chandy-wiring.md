@@ -50,3 +50,12 @@ about half a second). `cloneMuzzle(pose)` gives where each pose's line starts.
 
 Admins: `/chandy` in the app (or `npm run dev`, then `/chandy-preview.html`). `npm run frames:character -- <dir> Boingo both
 kit=Chandy` plays him in a battle.
+
+## From the art review (Nov 16)
+- **Time:** solo and online pass both components the same view, built from the shared match state; neither keeps game state. Every
+  `since` / `endsAt` is this device's time (online: `local(serverTime)`, `net.ts`), never a raw server time, so a fast or slow clock
+  never shortens or stretches the 3 s vote.
+- **The teleport schedules are tunables:** rounds 1 to 3 (1.2 s; 0.9 and 1.6 s; 0.8, 1.4 and 1.8 s) go in `settings.ts`, with a unit
+  test that the last teleport is always 1.2 s before the vote closes. Today only the preview holds round 3's.
+- **Frame cost:** the scope-in animates a `backdrop-filter` blur under a moving mask for about 0.9 s over the whole board. Run `@perf`
+  on the scope and slide; if they drop frames on a phone, swap the blur for a plain dark radial gradient.
