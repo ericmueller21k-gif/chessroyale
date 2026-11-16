@@ -5642,6 +5642,12 @@ button.history-label {
   pointer-events: none;
   animation: dk-plus 1.6s ease-out forwards;
 }
+/* Not over a sheet or menu that's open (a modal: the resign confirm, the Moves/Players/Chat sheet; the options menu's layer): the review
+   of #744, m4; Eric's "above everything" was about the status box clipping it. (The rotate lock is always in the page, shown only on a
+   phone held sideways.) Hidden, not removed, so its rise runs on unseen and never starts again. */
+body:has([aria-modal="true"]:not(#rotate-lock), .mm-scrim) > .dk-plus {
+  visibility: hidden;
+}
 .dk-clock.plus > .dk-time {
   animation: dk-tick 0.7s ease-out;
 }
