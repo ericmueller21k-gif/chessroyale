@@ -14,8 +14,9 @@ import { standAt, timelineAt, timelineBeats, timelineCues } from "../src/town/sh
 import { CHANDY_TOWN } from "../src/characters/chandy-figure.ts";
 import { TOWN_FEEL } from "../src/town/feel.ts";
 import { areaBannerOf } from "../src/town/AreaBanner.tsx";
-import { HOUSE_CHANDY, HOUSE_CHANDY_DOOR } from "../src/town/houses/chandy.ts";
-import { HOME_SPECS } from "../src/town/home-boxes.ts";
+import { HOUSE_CHANDY, HOUSE_CHANDY_DOOR, HOUSE_CHANDY_LIGHTS } from "../src/town/houses/chandy.ts";
+import { HOME_SPECS, homeBox } from "../src/town/home-boxes.ts";
+import { frameKeys } from "../src/characters/sprite.ts";
 
 const S = CHALLENGE_FEEL.swamp;
 const tl = CHANDY_INTRO.timeline;
@@ -32,6 +33,29 @@ describe("Chandy's Swamp: the front and its plot (Nov 16)", () => {
     // (Its box: leafy walls round it under the cypresses' crowns, the water low inside.)
     expect(HOME_SPECS.chandy.side?.mat).toBe("foliage");
     expect(HOME_SPECS.chandy.roof.every((f) => f.tex === "water")).toBe(true);
+  });
+  // (Round 3, Eric: "there's windows, which there shouldn't be windows. … it should actually look like a pond where that space is".)
+  const keys = frameKeys(HOUSE_CHANDY, HOUSE_CHANDY.anims.idle!.frames[0]!);
+  it("from the street it's a pond: open water takes the middle, going back to a far bank half way up the picture", () => {
+    const water = new Set(["w", "W", "v", "V", "9", "q", "g", "G"]);
+    for (const x of [50, 60, 72]) {
+      const col = keys.map((row) => row[x]);
+      const n = col.filter((k) => k && water.has(k)).length;
+      expect(n, `water down column ${x}`).toBeGreaterThanOrEqual(40);
+      // (Its far edge: the first water from the top, about 94 of 170.)
+      expect(col.findIndex((k) => k && water.has(k)), `the far bank over column ${x}`).toBeLessThan(100);
+    }
+  });
+  it("nothing behind it shows through: the wood behind the near crowns closes every gap, from under the canopy's ragged top to the foot", () => {
+    for (let x = 8; x < HOUSE_CHANDY.w - 8; x++) {
+      expect(keys.findIndex((row) => row[x]), `column ${x}'s top`).toBeLessThanOrEqual(16);
+      for (let y = 16; y < HOUSE_CHANDY.foot[1]; y++) expect(keys[y]![x], `${x}, ${y}`).toBeTruthy();
+    }
+  });
+  it("nothing of it lights a window: the lantern and three fireflies at dusk and night; its leafy walls none", () => {
+    expect(HOUSE_CHANDY_LIGHTS.map((l) => l.keys)).toEqual(["JK", "8", "8", "8"]);
+    const b = homeBox("chandy");
+    for (const side of [b.left, b.right, b.back]) expect(side!.lights).toEqual([]);
   });
   it("its arrival title says its name once (no \"CHANDY'S\" over \"CHANDY'S SWAMP\"); Rolling Dough keeps its owner's line", () => {
     expect(areaBannerOf({ boss: "Chandy" }, "Chandy's Swamp")).toEqual({ sub: null, title: "CHANDY'S SWAMP" });

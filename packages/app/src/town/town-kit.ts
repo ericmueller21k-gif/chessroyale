@@ -102,9 +102,41 @@ export const MAT: Record<Mat, (x: number, y: number) => string> = {
   gingerbread: (x, y) => (grain(x, y, 12) > 0.94 ? "a" : grain(x, y, 13) > 0.95 ? "c" : "b"),
   turf: (x, y) => (grain(x, y, 14) > 0.8 ? "a" : grain(x, y, 15) > 0.85 ? "c" : "b"),
   rock: (x, y) => (grain(x >> 2, y >> 2, 16) > 0.82 ? "c" : grain(x, y, 17) > 0.9 ? "a" : "b"),
-  // (Chandy's Swamp, Nov 16: the cypresses and brush ringing it, seen from the side: leafy clumps, lit at their tops.)
-  foliage: (x, y) => (grain(x >> 2, (y + 2 * Math.sin(x * 0.3)) / 3 | 0, 44) > 0.7 ? "c" : grain(x, y, 45) > 0.86 ? "a" : (y + (x >> 3)) % 9 < 2 ? "a" : "b"),
+  // (Chandy's Swamp, Nov 16: the cypresses and brush ringing it, seen from the side: leafy clumps, each lit at its top left, the lower
+  // over the higher, deep shade between; no rows or squares (Eric: "there shouldn't be windows").)
+  foliage: (x, y) => leafClumps(x, y),
 };
+/** Leaf clumps over a wall: a staggered, jittered field of rounded clumps (each about 11 by 8 px), keyed a b c and r (sunlit). */
+function leafClumps(x: number, y: number): string {
+  const CW = 11;
+  const CH = 7;
+  const row = Math.floor(y / CH);
+  let best = -1;
+  let shade = 0;
+  for (let dr = -1; dr <= 1; dr++) {
+    const r = row + dr;
+    const off = (r & 1) * (CW >> 1) + Math.round(grain(r, 0, 46) * 4);
+    const col = Math.floor((x - off) / CW);
+    for (let dc = -1; dc <= 1; dc++) {
+      const c = col + dc;
+      const cx = c * CW + off + CW / 2 + (grain(c, r, 47) - 0.5) * 4;
+      const cy = r * CH + CH / 2 + (grain(c, r, 48) - 0.5) * 3;
+      const rx = 6.5 + grain(c, r, 49) * 2.5;
+      const ry = 4.8 + grain(c, r, 50) * 1.6;
+      const dx = (x + 0.5 - cx) / rx;
+      const dy = (y + 0.5 - cy) / ry;
+      const d = dx * dx + dy * dy - 0.3 * (grain(x >> 1, y >> 1, 51) - 0.5);
+      // (The lowest clump over a pixel is in front.)
+      if (d <= 1 && cy > best) {
+        best = cy;
+        shade = 0.62 - dy * 0.5 - dx * 0.2 + (grain(x, y, 52) - 0.5) * 0.3;
+      }
+    }
+  }
+  if (best < 0) return "a";
+  if (grain(x, y, 53) > 0.92) return "a";
+  return shade > 1.02 ? "r" : shade > 0.68 ? "c" : shade > 0.3 ? "b" : "a";
+}
 
 /** A sash window: a trim frame, glass lit top-left, a glint, mullions, a sill (and shutters in `shut`). */
 export function windowAt(x: number, y: number, w: number, h: number, out: Piece[], lights: LightSpot[], o: { cross?: boolean; shut?: string; arch?: boolean; strength?: number } = {}) {
@@ -201,7 +233,10 @@ export function sideArt(id: string, pal: Record<string, string>, spec: SideSpec,
   const lights: LightSpot[] = [];
   const top = 0;
   const f = MAT[spec.mat];
-  P.push(box(0, top, L, H, (i, j) => (spec.plinth && j >= H - spec.plinth ? (i % 10 === 0 || j === H - spec.plinth ? "X" : "x") : f(frontAtRight ? L - 1 - i : i, j)), false));
+  // (A leafy wall's top is ragged, the clumps' tops against the sky, and it has no ink edges: it's no building.)
+  const leafy = spec.mat === "foliage";
+  const ragged = (i: number) => Math.max(0, Math.round(3 + 1.8 * Math.sin(i * 0.37) + 1.4 * Math.sin(i * 0.91 + 1) + 1.5 * grain(i >> 1, 0, 54)));
+  P.push(box(0, top, L, H, (i, j) => (leafy && j < ragged(i) ? null : spec.plinth && j >= H - spec.plinth ? (i % 10 === 0 || j === H - spec.plinth ? "X" : "x") : f(frontAtRight ? L - 1 - i : i, j)), false));
   for (const y of spec.trim ?? []) if (y >= 0 && y < H) P.push(box(0, y, L, 3, (_i, j) => (j < 2 ? "g" : "G"), false));
   const every = spec.every ?? 30;
   for (const r of spec.rows ?? []) {
@@ -214,8 +249,10 @@ export function sideArt(id: string, pal: Record<string, string>, spec: SideSpec,
   }
   if (spec.corner !== false) P.push(box(frontAtRight ? L - 3 : 0, 0, 3, H, (i) => (i === (frontAtRight ? 0 : 2) ? "G" : "g"), false));
   // The ink: the wall's top edge and its back edge.
-  P.push(box(0, 0, L, 1, "k", false));
-  P.push(box(frontAtRight ? 0 : L - 1, 0, 1, H, "k", false));
+  if (!leafy) {
+    P.push(box(0, 0, L, 1, "k", false));
+    P.push(box(frontAtRight ? 0 : L - 1, 0, 1, H, "k", false));
+  }
   return { ch: character(id, L, H + 1, pal, P, [frontAtRight ? L : 0, H]), lights };
 }
 

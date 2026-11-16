@@ -381,4 +381,8 @@ Tests check *what* ends up on the screen, not *how it gets there*, nor how long 
   - A failure that only passes on CI's retry may be hidden by the retry's trace (it slows the page): repeat it locally with
     `--trace off`, and log requests in the test instead.
 
+- **Windows lit over Chandy's Swamp** (Nov 16, [story](../docs/history/lessons.md#windows-lit-over-chandys-swamp-nov-16-2026)):
+  - A frame's bookkeeping never caps silently: a list that's full grows (or fails loudly in tests), never drops what comes after.
+  - A home you can see into (no solid front) is open: nothing of the town may stand inside its box (`street.ts OPEN_HOMES`).
+
 - **The FAQ follows the rules** (Oct 11): a PR that changes a rule, a number's meaning or a boss updates its words in `packages/app/src/faq/content.ts` in the same PR; numbers there come from the settings objects, never typed in.

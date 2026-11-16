@@ -811,8 +811,12 @@ export class Renderer {
   /** Two light layers, used in turn (one is laid on the world while the other is cleared and drawn: no copying). */
   private readonly layers: LightLayer[] = [];
   private layer: LightLayer | null = null;
-  /** This frame's lights' boxes on the screen (x0, y0, x1, y1 each): what's drawn later over one cuts into it. */
-  private readonly litBox = new Float32Array(4 * 128);
+  /**
+   * This frame's lights' boxes on the screen (x0, y0, x1, y1 each): what's drawn later over one cuts into it. It grows when a frame
+   * has more (Nov 16: a fixed 128 dropped the rest, about half a night street's 260 windows, and those shone through whatever stood
+   * in front of them: the row behind Chandy's Swamp lit up its trees).
+   */
+  private litBox = new Float32Array(4 * 512);
   private nLit = 0;
 
   /**
@@ -2252,14 +2256,17 @@ export class Renderer {
   /** Notes a light's box on the screen (what's drawn later over it cuts into it) and its layer's tiles. */
   private markLit(x: number, y: number, w: number, h: number): void {
     const L = this.layer!;
-    if (this.nLit * 4 < this.litBox.length) {
-      const b = this.litBox;
-      const k = this.nLit++ * 4;
-      b[k] = x;
-      b[k + 1] = y;
-      b[k + 2] = x + w;
-      b[k + 3] = y + h;
+    if (this.nLit * 4 >= this.litBox.length) {
+      const more = new Float32Array(this.litBox.length * 2);
+      more.set(this.litBox);
+      this.litBox = more;
     }
+    const b = this.litBox;
+    const k = this.nLit++ * 4;
+    b[k] = x;
+    b[k + 1] = y;
+    b[k + 2] = x + w;
+    b[k + 3] = y + h;
     const T = TOWN_FEEL.lightTilePx;
     const tx1 = Math.min(L.nx - 1, Math.floor((x + w) / T));
     const ty1 = Math.min(L.ny - 1, Math.floor((y + h) / T));

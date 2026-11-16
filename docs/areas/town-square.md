@@ -291,7 +291,7 @@ before the rows are laid (`street.ts lotHere`), so each row fills the place with
   picture's pixels, the palette keys that light up, a color, a strength, a halo for a lantern; `LightSpot` in
   `houses/kit.ts`): its windows, doorways and glass, the Colosseum's gate and a few arches. At dusk (0.7) and night (1)
   (`lightsAt`; they follow the sky's blend, `mixLights`) each light, baked once into a small canvas the first time it's
-  drawn lit, is added into a light layer as the world is drawn far to near (anything drawn in front cuts its shape out),
+  drawn lit, is added into a light layer as the world is drawn far to near (anything drawn in front cuts its shape out; every light this frame, its list growing as needed: a fixed 128 let half a night street's windows shine through, Nov 16),
   and the layer is laid on after the tint with `lighter`, only in the 64 px tiles a light touched. Lights fade and haze
   with their pictures; the tags, names and bubble are drawn after them. Nothing is made or drawn by day.
 
@@ -887,7 +887,10 @@ exception: about 7 squares from Ginger's igloo (`town-camera.test.ts`).
 
 ## Chandy's Swamp (Nov 16; an admin's town only, as Chandy is admins first)
 
-- **Front** (`houses/chandy.ts`, 144 × 170): cypresses as tall as the row houses, a swamp between, its boardwalk the door; Meadow Street 26-29. Its box: `foliage` walls, `water` inside (town-kit.ts).
+- **Front** (`houses/chandy.ts`, 144 × 170): cypresses as tall as the row houses, a pond between going back to a far bank half way up
+  (paler far off, ripples closer together), a wood behind whose canopy closes the lot off, its boardwalk the door; Meadow Street 26-29.
+  Its box: `foliage` walls (leaf clumps, a ragged top, no ink edges), `water` inside (town-kit.ts). It's open (`street.ts
+  OPEN_HOMES`): South Street's row behind leaves its stretch open, as no front may stand inside its box (Nov 16, round 3).
 - **Room** (`shops/chandy-art.ts`): roof `sky` (the town's sky as it loads, `LIT_ROOMS`), water floor, the battle spot hidden as `ring-` water tiles; `RoomArt.wade` hides feet under the surface with a ripple and spray (one canvas, no loop). The frog keeps the stand (`swampkeeper`).
 - **Rise** (`shops/intros/chandy.ts`): the post, then the platform (`Prop.wet`, `flat`) lifting you both through the timeline's `lift` (no wading once lifted), the crates, his point and fire, his `rise` storm (water from the foot). His rules are in (docs/decisions/2026-11-16-chandy-rules.md): Challenge alone plays the rise into his battle. e2e `chandy-home.spec.ts`; unit `shop-chandy.test.ts`.
 
