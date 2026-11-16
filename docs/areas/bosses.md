@@ -158,6 +158,16 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
   thinking…"); once asked, that move is the server's alone (a device's late answer isn't heard). Tried again as phase 2's are; not
   in after `RECLUSE_ONLINE.serverWaitMs`: **no result** for those fighting him (`LobbyRecord.recluse1.none`; the battle a draw),
   everyone else's result standing, counted for the health view. No engine server set up: the quick move, the match unvouched.
+  Why the server after the host's window and not another device's: asking another device cost everyone 15 s more, and two silent
+  devices took turns forever (`pickHost` skips only the current host). Once asked, that move is the server's alone, so a device's
+  late answer isn't heard and the host isn't asked again for it. A mate in one is played first (`mateFirst`, by the rules: the engine
+  server never says `mate`, and in a won position every move scores 1, so the sort alone missed it); the pick skips pickBossMove's
+  head-to-head second look (every move here was scored at one budget). A player who left before the no result keeps their loss as
+  written; fair play keeps every phase 1 move (phase 2's no result drops only phase 2's). His searches never wait on D1's count
+  (`background`), and the daily digest names yesterday's no-result fights as well as today's. Phase 1's other moves stay on devices:
+  moving them to the server needs Maia on the engine server (it runs Stockfish only) or Stockfish for his adult form online, a design
+  call for Eric and the director. Other bosses are unchanged (another device, then a random move): a follow-up if Eric wants the same
+  for every boss.
   Tests: server `recluse-online.test.ts` ("his phase 1 move when no device answers"), `crowd-hidden-boss.test.ts` ("no result in
   phase 1"), chess `boss-brain.test.ts` (`bossMoveFromScores`).
 - **The brain (Oct 12: every boss on Maia; DECISIONS.md, "Every boss on Maia"):** every boss plays its normal moves
@@ -328,7 +338,9 @@ below):
   (m3). His count on his row never holds his search up (the delta review of #683, m1: counted beside it). His move not in after `pauseMs` (3 s): **every board's clock pauses**
   (`recluse2.paused`, the view's `paused`): every board says "He's thinking…" and takes no move, nothing flags or times out, the
   admins' ultimate waits; once it's in, every running clock goes on from where it stood (`hold`: turn starts and bots' thinking moved
-  on by the pause; a board handed to a bot during a pause thinks from its end, m1). Not in after `serverWaitMs` (60 s): **no
+  on by the pause; a board handed to a bot during a pause thinks from its end, m1). The 3 s is not his first millisecond: his answer usually takes about a
+  second (an estimate: five groups of 120,000 nodes at about 0.8 million a second), and pausing all four boards at every one of his
+  moves would stop the game. Each pause's length and each of his searches' times are logged, to tune the setting from the server's logs. Not in after `serverWaitMs` (60 s): **no
   result** (`done.noResult`; "No result: the Hidden Boss couldn't connect."), counted for the health view (`<day>:recluse-none`).
   **For phase 2's board players only** (`phase2NoResultFor`: `recluse2.names`, as `phase2Unvouched`; the review of #683, M3): their
   results say "Nothing counts for or against you." (`noResult: "board"`, `bossResult` "draw" for the duo, not ranked;
@@ -350,6 +362,10 @@ below):
   at once and kept over the server's word until it has it or refuses it, sent again on a reconnect), `NetMatch`'s `simul`,
   `simulMove`, `bossNote`, `phase2Ahead` (his themes fetched ahead). Tests: `server/test/recluse-online.test.ts`,
   `crowd-hidden-boss.test.ts`, `engine-server.test.ts`, `app/test/recluse-online.test.ts`, `e2e/hidden-boss-room.spec.ts`.
+- **Not done (Nov 13, phase 2):** XP's move count online is phase 1's picks only; a reload in the middle of his room's fight doesn't
+  know it's the room's (no 🏆 after it). A third engine instance for him (`max_instances` 2 → 3) is Eric's spend, asked for only once the
+  logs show other lobbies' searches delaying him. A mate in one is found with the position read once (`matingMoves`: 0.3 to 3.5 ms;
+  a replay per move took 4.5 to 19.5 ms, measured).
 - **The scoreboard through phase 2** (Nov 14, Eric's playtest; [decision](../decisions/2026-11-14-recluse-phase2-standings.md)): his
   battle's end places everyone still in (core `finishBoss`), and those placements stay the results' truth, untouched. From his fall
   (phase 2 to follow) until the results, what the screens show (NetMatch and SoloMatch `standings()`, through `phase2Standings` in
