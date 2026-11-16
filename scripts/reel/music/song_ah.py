@@ -37,12 +37,18 @@ which this is:
     octave up; a turn down through F, E, D), then F sharp in the roll (two bars), D sharp (one), and E again. A warm
     felt piano. It plays its eight bars alone first ("so the listener hears my low rolling theme clearly first"),
     then again under the right hand.
-  - The right hand, in octaves 5 and 6, "crystalline": his motif (E6, D6, A5, G5, D6) is the opening hook, not his
-    test notes played back ("Do NOT copy the choppy 4-second clip verbatim"), and the solo grows from it in 16th-note
-    runs, grace notes and arpeggios that follow the left hand: white keys; the hook a step up with F sharp; a run on
-    the D sharp bar's chord (B7 flat 9: the harmonic minor's sound); home on E. The solo past the hook is mine, and
-    original (none of it is any song's or any game's). The town's lesson holds (16ths that only climb and fall
-    "miss"): its runs turn, and step down in threes and fours, with held notes between.
+  - The right hand, in octaves 5 and 6, "crystalline". Its hook is his, and the plan's first account of it was
+    wrong (five single notes; "Gemini fucked up, it didn't even listen to my note I sent it, now it's corrected").
+    Corrected, and played as given: eight hits, each two notes together: C6+E6 three times, "a fast, snappy staccato
+    burst" (three 16ths, a pickup); B5+D6 on the beat, held a dotted quarter; A5+C6 a quarter; G5+B5 a quarter; then
+    G5+D6 twice, "a quick double-strike": an 8th, and a whole note left to ring ("Do NOT flatten these into even
+    quarter/eighth notes"). The last two are B5+D6 on his recording, as I measure it (the G of the hit before still
+    ringing under the first): `heard` plays them so, for him to choose by ear.
+  - The solo after the hook is mine, and original (none of it is any song's or any game's), and follows the left
+    hand: the hook's shape a third higher; a bar of 16ths stepping down in broken thirds; a line with F sharp and a
+    grace note; 16ths again; a run on the D sharp bar's chord (B7 flat 9: the harmonic minor's sound); home on E, and
+    the hook's last four hits to close, the double-strike ringing into the vamp. The town's lesson holds (16ths that
+    only climb and fall "miss"): its runs turn, and step down in threes and fours, with held notes between.
   - His plan says 96 beats a minute; inside this song it goes at the song's 102 ("it should be playing a bit faster
     ... to fit the song"). The 16ths here are even, not swung: nothing swung plays under them.
   - "Quiet the song": the band stops for it. The left hand alone, eight bars; under the solo a soft kick on 1 and a
@@ -50,7 +56,7 @@ which this is:
     where the vamp starts. The theme's last note before it ends at the barline.
   - The piano is sixteen bars where the bridge was eight, so the third time round has the theme once, not twice,
     with the bell-Rhodes's sparkle and the second whistle both: 68 bars still.
-  python3 song_ah.py <out.wav>
+  python3 song_ah.py <out.wav> [heard]
 
   bars  1-4    0:00  the vamp: the bell-Rhodes, the bass, the kit
   bars  5-12   0:09  the whistle's theme
@@ -117,26 +123,26 @@ LEFT = (
     "C2 G2 D3 E3 C2 G2 D3 E3", "C2 G2 E3 F3 C2 G2 E3 F3", "C3 G3 D4 E4 C3 G3 D4 E4", "C3 G3 E4 G4 F4 E4 D4 G3",
     "C3 F#3 A3 B3 C3 F#3 A3 B3", "C3 F#3 A3 B3 D4 C4 B3 A3", "C3 D#3 A3 B3 C4 B3 A3 D#3", "C3 E3 A3 B3 C4 B3 A3 G3",
 )
-# The right hand's solo over its second time round, a bar a line. "X>Y" is a grace note X into Y (two: a rolled chord).
-# His motif opens it (E6 D6 A5 G5, and D6 into the next bar); the rest is mine.
+# The right hand over its second time round, from three 16ths before it. "X+Y" is two notes together; "!" staccato;
+# "X>Y" a grace note X into Y. His hook (the pickup and the first two bars, as he gave it); the rest is mine.
 RIGHT = (
-    "E6:1.5 D6:.5 A5:1 G5:1 | "
-    "D6:1.5 E6:.25 D6:.25 C6:.25 A5:.25 G5:.25 A5:.25 C6:.25 E6:.25 G6:.5 | "
-    "F6>E6:1 D6:.5 A5:.5 G5:.5 A5:.25 C6:.25 D6:.5 E6:.5 | "
+    "C6+E6!:.25 C6+E6!:.25 C6+E6!:.25 | B5+D6:1.5 A5+C6:1 G5+B5:1 G5+D6:.5 | G5+D6:3.25 "
+    "E6+G6!:.25 E6+G6!:.25 E6+G6!:.25 | D6+F6:1.5 C6+E6:1 B5+D6:1 E6:.25 F6:.25 | "
     "G6:.25 E6:.25 C6:.25 E6:.25 F6:.25 D6:.25 B5:.25 D6:.25 E6:.25 C6:.25 A5:.25 C6:.25 D6:.25 B5:.25 G5:.25 B5:.25 | "
     "G6>F#6:1.5 E6:.5 B5:1 A5:1 | "
     "E6:1 F#6:.25 G6:.25 A6:.25 F#6:.25 D6:.25 E6:.25 F#6:.25 D6:.25 B5:.25 C6:.25 D6:.25 B5:.25 | "
     "B6:.75 A6:.25 F#6:.25 D#6:.25 C6:.25 B5:.25 A5:.25 B5:.25 C6:.25 D#6:.25 F#6:.5 D#6:.5 | "
-    "D#6>E6:1 C6:.5 B5:.5 A5:.5 G5:.5 G5>B5>D6:1"
+    "D#6>E6:1 A5+C6:1 G5+B5:1 G5+D6:.5 G5+D6:.5"
 )
 assert all(len(bar.split()) == 8 for bar in LEFT)
-for _line, _beats in ((THEME, 33), (THEME_UNDER, 33), (LINE, 32), (TURNS, 16), (re.sub(r"\S+>", "", RIGHT), 32)):
+for _line, _beats in ((THEME, 33), (THEME_UNDER, 33), (LINE, 32), (TURNS, 16), (re.sub(r"[^ :]+:", "X:", RIGHT), 32.75)):
     assert beats(_line) == _beats, (_line[:30], beats(_line))
 
 
-def render(window=None) -> np.ndarray:
+def render(window=None, heard=False) -> np.ndarray:
     """The song as heard (stereo, at the mix's own level). `window`: (from beat, to beat), to make only that passage
-    (a sample, to compare voices on)."""
+    (a sample, to compare voices on). `heard`: the hook's double-strike is B5+D6, as on Eric's recording, not the
+    G5+D6 he wrote."""
     x = Ride(RIDE, BEATS, None, os=2, seed=257, tape_secs=TAPE)
     x.window = window
     put, at = x.put, x.at
@@ -376,17 +382,27 @@ def render(window=None) -> np.ndarray:
         return made[m]
 
     def right(start, text, vol=1.0):
-        """The right hand: the high piano. A long note is played full, a 16th lighter (the one on the beat a little
-        less so); a grace note is soft and just ahead of its note."""
+        """The right hand: the high piano. A note of two beats or more rings out; a shorter one is let go just after
+        the next begins (played smoothly, not pedaled into a blur); a staccato one is snapped off. A long note is
+        played full, a 16th lighter (the one on the beat a little less so); a grace note is soft and just ahead of
+        its note."""
         t = float(start)
         for tok in text.replace("|", " ").split():
             names, _, d = tok.partition(":")
             d = float(d)
-            *graces, main = names.split(">")
+            short = names.endswith("!")
+            *graces, main = names.rstrip("!").split(">")
             for j, g in enumerate(graces):
                 put("piano", t - 0.085 * (len(graces) - j), crystal(n(g)) * 0.3 * vol * 0.55, 0.25)
-            touch = 1.0 if d >= 1 else 0.9 if d >= 0.5 else 0.84 if abs(t - round(t)) < 1e-6 else 0.72
-            put("piano", t, crystal(n(main)) * 0.3 * vol * touch, 0.25)
+            pair = main.split("+")
+            touch = 0.82 if short else 1.0 if d >= 1 else 0.9 if d >= 0.5 else 0.84 if abs(t - round(t)) < 1e-6 else 0.72
+            for name in pair:
+                w = crystal(n(name))
+                if short or d < 2:
+                    fade = int((0.04 if short else 0.15) * sr)
+                    k = min(len(w), int((0.1 if short else (d + 0.35) * 60 / BPM) * sr) + fade)
+                    w = w[:k] * np.minimum(1, (k - np.arange(k)) / fade)
+                put("piano", t, w * 0.3 * vol * touch * (0.85 if len(pair) > 1 else 1.0), 0.25)
             t += d
 
     def interlude(first):
@@ -401,7 +417,7 @@ def render(window=None) -> np.ndarray:
                     rim(b + 3, 0.06)
         for i in range(8, 16):
             snare(bar0(first + PIANO_BARS - 1) + i / 4, 0.07 + 0.018 * (i - 8), ghost=i % 2 == 1)
-        right(bar0(first + 8), RIGHT)
+        right(bar0(first + 8) - 0.75, RIGHT.replace("G5+D6", "B5+D6") if heard else RIGHT)
 
     # The plan, three times (the docstring); Eric's piano where the second bridge was.
     vamp(1), theme(5), bridge(13, on_keys=True)
@@ -428,9 +444,9 @@ def render(window=None) -> np.ndarray:
     return x.play(x.mixdown(levels, lowpass=9000, room=0.05))
 
 
-def main(out: str) -> None:
-    write_wav(out, render())
+def main(out: str, heard: str = "") -> None:
+    write_wav(out, render(heard=bool(heard)))
 
 
 if __name__ == "__main__":
-    main(sys.argv[1])
+    main(*sys.argv[1:])

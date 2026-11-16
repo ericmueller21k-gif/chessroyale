@@ -336,7 +336,15 @@ somethings I'm sure". So it is a candidate again, with his piano:
   something written. Ask what the notes are for before setting them.
 - His plan asks for 16th-note runs, which the town's solos taught us "miss" when they only climb and fall. These
   turn and step down in threes and fours, with held notes between. If he says they miss again, that is why.
-- Sent as one clip (0:46). No verdict yet; which of the three (this, song_ai.py, song_o.py) is Folio's is his call.
+- Sent as one clip (0:46). His answer: the plan's account of his hook was wrong ("Gemini fucked up, it didn't even
+  listen to my note I sent it, now it's corrected"), and the corrected one: eight hits, each two notes together
+  (C6+E6 three times, B5+D6, A5+C6, G5+B5, G5+D6 twice), with their rhythm ("Do NOT flatten these into even
+  quarter/eighth notes"): a snappy staccato burst of three 16ths as a pickup; a dotted quarter; two quarters; a quick
+  double-strike, the second left to ring. That is the hook now, as given, opening the right hand's solo and closing it.
+- His recording and the corrected plan agree on six hits. On the last two the recording has B5+D6 (the G of the hit
+  before still ringing under the first, and gone by the second); the plan says G5+D6. Both were sent, 30 seconds
+  each, for his ear to settle. When a write-up and the recording it describes disagree, say so and send both.
+- No verdict yet; which of the three (this, song_ai.py, song_o.py) is Folio's is his call.
 
 ## Folio's arcade theme (Nov 16, song_ai.py): sent, no verdict yet
 
