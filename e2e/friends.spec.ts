@@ -237,7 +237,8 @@ test("50 v 50 Party (Eric, Nov 16): seven + seats; a + opens the friends sheet; 
   await expect(ann.page.locator(".fd-seat.party-open")).toHaveCount(7);
   await expect(ann.page.locator(".fd-queue-count")).toHaveText("1 / 8");
   await expect(ann.page.getByRole("button", { name: "Find match" })).toBeEnabled();
-  await expect(ann.page.locator(".fd-party-note")).toHaveText("Party matches aren't ranked");
+  // (Party matches are ranked, Eric, Nov 16: no line saying otherwise.)
+  await expect(ann.page.locator(".fd-party-note")).toHaveCount(0);
   await partyShot(ann.page, "1-alone");
   // (A laptop's window, 1280 × 600: Leave, Find match and the line under them still inside it, the grid giving way. The fix round of #747.)
   if (isComputer()) {

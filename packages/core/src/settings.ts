@@ -719,14 +719,14 @@ export const CROWD_PARTY_MAX = 8;
 
 /**
  * A 50 v 50 party's play (the fix round of PR #747, docs/decisions/2026-11-16-crowd-party-fixes.md):
- * - `ranked`: whether a 50 v 50 party's members (a party of 2 or more friends who played together) get a ranked result. It applies to
- *   them only: the singles in the same match stay ranked. The director's call until Eric decides (his Nov 9 rule assumed friends
- *   "won't even be on the same side"): no. XP as usual; the party's screen says so in one line.
+ * - `ranked`: whether a 50 v 50 party's members (a party of 2 or more friends who played together) get a ranked result (the singles
+ *   in the same match always do). Eric, Nov 16: yes, "It's always ranked. There is no unranked unless it's a private lobby."
+ *   Off: their results and the party's screen say why, in one line each.
  * - `leadHoldMs`: how long a leader who dropped (a reload, the app in the background) keeps the lead before it passes on.
  * - `awayStopMs`: a search with nobody in the party connected for this long stops (its ticket is canceled).
  */
 export const CROWD_PARTY: { ranked: boolean; leadHoldMs: number; awayStopMs: number } = {
-  ranked: false,
+  ranked: true,
   leadHoldMs: 20_000,
   awayStopMs: 20_000,
 };
