@@ -1,3 +1,4 @@
+- Nov 16 ~19:40 UTC: crowd rework design + sim DONE (design/crowd-rework: notes/designs/crowd-rework.md, reports/crowd-rework.md, mockups podium + cut). Recommend Strong default, schedule C (4v4 moves 34-39, 1v1 43-60), carry 50%, tie band 1, verdict at 60. Big finding: cuts mostly luck with bots (rank corr 0.1-0.32). Hidden Boss is only met as the 50v50 boss final, which goes: asked Eric. Build C1-C5 waits on his OK + 4 questions. Helper archived.
 - Nov 16 ~19:25 UTC: #755 Chandy no-repeat MERGED (57cdcee). #756 CI running; merge next, then one main run covers both.
 - Nov 16 ~19:15 UTC: ride sounds hard start/stop DONE -> #756 (e41a7c8; helper archived). CI watched on #755 and #756. Rework design helper still running.
 - Nov 16 ~19:00 UTC: #754 music LIVE (02560e4), main GREEN. Eric: Chandy fired beam twice in a row with 2 unlocks -> #755 (bed5cd8, meterPick skips ChandyState.last), CI watched. Running: rework design (high), ride-sound-hard (high).
