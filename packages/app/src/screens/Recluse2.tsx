@@ -455,7 +455,7 @@ export function SimulScreen({ match }: { match: GameView }) {
         still={still}
         secs={run ? Math.ceil(clockLeft(run, now) / 1000) : null}
         status={status}
-        line={big.id !== mine.id ? "back" : mine.result || v.decided ? "" : !v.playing ? "ready" : "hearts"}
+        line={big.id !== mine.id ? "back" : !v.playing && !v.decided ? "ready" : ""}
         onBack={back}
         runFrom={run ? run.startsAt : null}
         runTo={run ? run.deadline : null}
@@ -487,7 +487,7 @@ const SimulDock = memo(function SimulDock({
   still: string;
   secs: number | null;
   status: string;
-  line: "back" | "hearts" | "ready" | "";
+  line: "back" | "ready" | "";
   onBack: () => void;
   runFrom: number | null;
   runTo: number | null;
@@ -518,12 +518,9 @@ const SimulDock = memo(function SimulDock({
               </button>
             ) : line === "ready" ? (
               "No added time."
-            ) : line === "hearts" ? (
-              // (Your move's rule while your board plays, in plain words (Eric, Nov 16): the hearts at its right; the number told is the
-              // setting's, never the allowance the server judges with.)
-              `Over ${RECLUSE_PHASE2.slowMoveSeconds} s on a move costs a heart`
             ) : (
-              // (Your board decided: its own tag says how; your time: the clock at the box's right.)
+              // (In play: your hearts at your board's right, his word as one goes; your time: the clock at the box's right. A phone's
+              // one-line dock cut a rule written here, Nov 16.)
               ""
             )}
           </span>

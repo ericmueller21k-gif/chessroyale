@@ -1163,7 +1163,6 @@ test("phase 2's hearts (?phase=2; Eric, Nov 16): a column of 8 at every board's 
   expect(later.hearts).toBe(RECLUSE_PHASE2.hearts - 1);
   expect(later.result).toBeNull();
   await expect(page.locator(".boss-dock-status .dk-clock.running")).toHaveCount(1);
-  await expect(page.locator(".boss-dock-status")).toContainText(`Over ${RECLUSE_PHASE2.slowMoveSeconds} s on a move costs a heart`);
   expect(errors).toEqual([]);
 });
 

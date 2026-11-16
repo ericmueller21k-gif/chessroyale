@@ -19714,13 +19714,18 @@ button.sq-tiny {
 .rc-hhalf.b {
   clip-path: polygon(100% 0, 100% 100%, 0 100%);
 }
+/* His blade drawn back: a short bright sliver along the cut's line, outlined so it shows on the light page too. */
 .rc-hglint {
   position: absolute;
-  width: 46%;
-  height: 46%;
+  width: 72%;
+  height: max(2px, 11%);
   translate: -50% -50%;
-  border-radius: 50%;
-  background: radial-gradient(circle, #fff 0 16%, rgba(205, 238, 255, 0.75) 30%, rgba(205, 238, 255, 0) 64%);
+  rotate: -45deg;
+  border-radius: 1px;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.2), #fff 45%, #fff);
+  box-shadow:
+    0 0 0 1px rgba(30, 24, 48, 0.6),
+    0 0 3px rgba(190, 236, 255, 0.9);
 }
 .rc-hblade {
   position: absolute;
@@ -19736,7 +19741,9 @@ button.sq-tiny {
   height: 100%;
   border-radius: 1px;
   background: linear-gradient(90deg, rgba(255, 255, 255, 0), #fff 35%, #fff);
-  box-shadow: 0 0 2px rgba(190, 236, 255, 0.9);
+  box-shadow:
+    0 0 0 1px rgba(30, 24, 48, 0.5),
+    0 0 2px rgba(190, 236, 255, 0.9);
   transform-origin: 100% 50%;
 }
 @media (prefers-reduced-motion: reduce) {

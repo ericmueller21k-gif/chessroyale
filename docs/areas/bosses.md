@@ -448,8 +448,7 @@ below):
   outside phase 2, so it's tested against null); the dock never says what his or the God King's bubble or the banner
   says: no sub-line under the dock's line, and as "PHASE 2" "Win all four boards" shows, "10:00 on your clock" over
   "No added time." (two lines: one was cut off at 360 px). The God King says nothing from the phase change on. Phase 2's end: "The boss wins." (the bar says how many were won) or "All
-  four boards won!". In play the dock's second line is the hearts' rule ("Over 5 s on a move costs a heart", the setting's
-  number, never the allowance).
+  four boards won!". In play the dock's second line is empty (your hearts are at your board's right).
 - **His final form** (Eric, Nov 15, mockup rounds 4 and 4b, in place of Nov 14's suit and helmet;
   [decision](../decisions/2026-11-15-recluse-final-form.md)): from his transformation's white-out to the end of the battle (the
   result screen too), on every drawing of him where he stands (the bust, his figure by the board, his figure on the board): his face
