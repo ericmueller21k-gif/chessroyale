@@ -50,8 +50,8 @@ describe("inside: the swamp (Nov 16)", () => {
     expect(def.crate).toBeNull();
     expect(def.says?.length).toBeGreaterThan(0);
     expect(roomDef("chandy")).toBe(def);
-    // (His rules aren't in: no challenge from inside.)
-    expect(canChallengeInside("chandy")).toBe(false);
+    // (His rules are in (docs/decisions/2026-11-16-chandy-rules.md): the challenge from inside too.)
+    expect(canChallengeInside("chandy")).toBe(true);
   });
   it("every square has its floor tile baked in (water), the battle spot's hidden under it as ring tiles of the same water", () => {
     const tiles = new Map(SHOP_CHANDY_LAYOUT.filter((p) => isFloor(p.name)).map((p) => [`${p.col},${p.row}`, p.name]));
