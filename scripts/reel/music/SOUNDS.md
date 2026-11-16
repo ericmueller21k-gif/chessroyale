@@ -280,3 +280,12 @@ minutes and 30 seconds or 2 minutes and 45 seconds just plays. It's less repetit
 from now on, not two minutes or more; a shorter plan is made longer out of its own sections (Babur's: its breakdown
 twice as long with a second layer, its main groove back before the end with a voice added), never with new material
 he didn't ask for.
+
+## A new boss's theme (Nov 16, song_ag.py): sent, no verdict yet
+
+"New boss we're working on. Here's the instructions for the song. Same thing, 2 minutes, 30 seconds, 2 minutes, 45
+seconds. And again, [as] his last one, stick to the script." His own plan again ("High-Speed Cyberspace Breakbeat &
+Jazz-Fusion": 154 beats a minute, a breakbeat, a 16th bass bouncing the octave, a saw lead, a drawbar organ's solo, a
+bell, three key centers), built as written. Its 64 bars are 1:40 at that pace, so it is played through and then goes
+round its own sections once more, shorter and fuller, before it loops (100 bars, 2:36). He has not said which boss it
+is: the handoff needs the boss's id.
