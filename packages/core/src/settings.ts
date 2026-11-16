@@ -1095,8 +1095,9 @@ export const CROWD_SETTINGS: Partial<Settings> = {
 
 /**
  * The 50 v 50 as it was before the rework (the top-3 draw with its sure share, CROWD_STAGE_ROUNDS' cuts to an ending, scores
- * carried whole, the relief at any size), put over CROWD_SETTINGS: for the old endings' unit tests and sims only, until step
- * C4 retires them with their code. Never for players: no lobby, test switch or queue sets it.
+ * carried whole, the relief at any size), put over CROWD_SETTINGS: for the old endings' unit tests and sims, until step C4
+ * retires them with their code, and the FAQ's words until step C3 rewrites them for the rework. No lobby, test switch or queue
+ * sets it: no match is played with it.
  */
 export const CROWD_PRE_REWORK: Partial<Settings> = {
   crowdPick: undefined,

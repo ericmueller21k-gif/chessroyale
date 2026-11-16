@@ -33,6 +33,7 @@ import {
   BRILLIANT,
   CRATES,
   CROWD_KNOCKOUTS,
+  CROWD_PRE_REWORK,
   CROWD_SETTINGS,
   DEFAULT_SETTINGS,
   ENGINE_MIN_ELO,
@@ -151,7 +152,9 @@ export interface FaqSources {
 
 export const FAQ_DEFAULTS: FaqSources = {
   settings: DEFAULT_SETTINGS,
-  crowd: { ...DEFAULT_SETTINGS, ...CROWD_SETTINGS },
+  // (The 50 v 50 as it was before the rework (CROWD_PRE_REWORK) until step C3 rewrites its sections for the rework: one coherent
+  // description, not the old endings' words over the rework's cut moves. docs/decisions/2026-11-16-crowd-rework-runner.md.)
+  crowd: { ...DEFAULT_SETTINGS, ...CROWD_SETTINGS, ...CROWD_PRE_REWORK },
   raid: { ...DEFAULT_SETTINGS, ...RAID_SETTINGS },
   crowdKnockouts: CROWD_KNOCKOUTS,
   powers: BOSS_POWERS,

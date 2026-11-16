@@ -2,7 +2,7 @@ import { LookAways } from "./lookaway.ts";
 import { engineSpeed, ownEngine } from "./engine.ts";
 import { lastBoss } from "./boss-history.ts";
 import { showBanNotice } from "./components/FairPlay.tsx";
-import { BOSS_BRAIN, BOSS_POWERS, DEFAULT_SETTINGS, HIDDEN_ROOM, LEAVING, PREGAME_VOTES, mulberry32, type MatchmakingType, botChoose, botLeanFor, botThinkMs as thinkMs, castPregameVote, type Augment, type ItemLook, type Settings, type SlamPiece } from "@chessroyale/core";
+import { BOSS_BRAIN, BOSS_POWERS, DEFAULT_SETTINGS, HIDDEN_ROOM, LEAVING, heldVotes, mulberry32, type MatchmakingType, botChoose, botLeanFor, botThinkMs as thinkMs, castPregameVote, type Augment, type ItemLook, type Settings, type SlamPiece } from "@chessroyale/core";
 import {
   legalMoves,
   toSan,
@@ -827,7 +827,7 @@ export class NetMatch implements GameView {
         // The vote's result sets the rest of the match, as on the server (how it ends: what the last cut leads to, the
         // leaderboard's cut line; the clock). The crowd voted for the boss final: Maia's files ahead, on a device that may
         // play him with it.
-        const won = v.result !== null ? PREGAME_VOTES[v.index]?.options[v.result] : undefined;
+        const won = v.result !== null ? heldVotes(v, this.settings)[v.index]?.options[v.result] : undefined;
         if (won) this.settings = { ...this.settings, ...won.patch };
         if (won?.patch.finalFormat === "boss") this.maiaAhead();
         this.voteState = { ...v, startsAt: this.local(v.startsAt), until: this.local(v.until), votes: v.votes.map((x) => ({ ...x, at: this.local(x.at) })), ...(v.nextAt ? { nextAt: this.local(v.nextAt) } : {}) };

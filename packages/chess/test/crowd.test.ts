@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BOSS_TIERS, CROWD_MISSES, crowdTopOdds, bossDef, crowdFinalBoss, crowdFinalists, fixedLevel, isPlayable, maiaTopRating, CROWD_KNOCKOUTS, DEFAULT_SETTINGS, roundsInStage, RAID_SETTINGS, raidBossElo, bossElo, bossStartPly, bossInfo, botVotes, clockAfterVote, modeSettings, mulberry32, tallyVotes, voteZoneAt, PREGAME_VOTES, type Settings } from "@chessroyale/core";
+import { BOSS_TIERS, CROWD_CUTS, CROWD_MISSES, CROWD_PRE_REWORK, pregameVotes, crowdPickOdds, crowdTopOdds, bossDef, crowdFinalBoss, crowdFinalists, fixedLevel, isPlayable, maiaTopRating, CROWD_KNOCKOUTS, DEFAULT_SETTINGS, roundsInStage, RAID_SETTINGS, raidBossElo, bossElo, bossStartPly, bossInfo, botVotes, clockAfterVote, modeSettings, mulberry32, tallyVotes, voteZoneAt, PREGAME_VOTES, type Settings } from "@chessroyale/core";
 import { bossIntroTimeline, bossShowMs, legalMoves, MatchRunner, moveNumber, START_FEN, sanLineToUci, type EngineLike, type Opening } from "../src/index.ts";
 
 const hash = (s: string) => {
@@ -62,9 +62,11 @@ async function playKnockouts(settings: Settings, seed: number) {
 
 describe("Crowd mode", () => {
   const base: Settings = { ...DEFAULT_SETTINGS, ...modeSettings("crowd") };
+  // (The 50 v 50 before the rework, for its endings' tests until C4 retires them: every 50 v 50 has the rework since C2, below.)
+  const preRework: Settings = { ...base, ...CROWD_PRE_REWORK };
 
   it("50 v 50 team final: down to 8, then 4v4 alternating, 3v3, 2v2 to the end", async () => {
-    const settings: Settings = { ...base, finalMaxTurns: 70 };
+    const settings: Settings = { ...preRework, finalMaxTurns: 70 };
     // (Seed 5: Nov 4's sure majority, crowdSureShare, changed every seed's game; seed 1's now keeps 4 over at a cut.)
     const { runner, sizes, plies } = await playKnockouts(settings, 5);
     // The plan's sizes, but for the bubble grace (CROWD_SCORING.cutGrace, Oct 24): a cut can keep a player or two in
@@ -113,7 +115,7 @@ describe("Crowd mode", () => {
   });
 
   it("leaving (LEAVING): a seat handed to a bot keeps its team, score and turns in the final under a new id; one that goes out takes the last place still open, and every place is still given once", async () => {
-    const settings: Settings = { ...base, finalMaxTurns: 30 };
+    const settings: Settings = { ...preRework, finalMaxTurns: 30 };
     const runner = new MatchRunner({
       settings,
       rng: mulberry32(3),
@@ -188,7 +190,8 @@ describe("Crowd mode", () => {
       expect(me.roundScore).toBe(Math.min(...real.map((p) => p.roundScore - (p.brilliantBonus ?? 0))));
       // It never counts in the tally: the odds are the real picks' alone (and with them, the played move).
       expect(real).toHaveLength(ids.length - 1);
-      expect(b.result.drawOdds).toEqual(crowdTopOdds(real.map((p) => p.move!), base.crowdPlayedFromTop, base.crowdSureShare));
+      // (Since the rework, C2: the pick vote's mode, Strong by default, over the real picks and the judge's losses for them.)
+      expect(b.result.drawOdds).toEqual(crowdPickOdds(base.crowdPick!, real.map((p) => p.move!), Object.fromEntries(real.map((p) => [p.move!, p.loss!]))));
       // The 4th removes you (the lobby and SoloMatch take you out); the first three never.
       expect(report.away ?? []).toEqual(misses > CROWD_MISSES.allowed ? ["b0"] : []);
     }
@@ -221,7 +224,7 @@ describe("Crowd mode", () => {
   });
 
   it("50 v 50 duel: the best of each side play 1v1; the game's winner places first", async () => {
-    const settings: Settings = { ...base, finalFormat: "duel", knockoutsPerStage: CROWD_KNOCKOUTS.duel, finalMaxTurns: 40 };
+    const settings: Settings = { ...preRework, finalFormat: "duel", knockoutsPerStage: CROWD_KNOCKOUTS.duel, finalMaxTurns: 40 };
     const { runner, sizes } = await playKnockouts(settings, 3);
     expect(sizes.at(-1)).toBe(2);
     const f = runner.final!;
@@ -241,7 +244,7 @@ describe("Crowd mode", () => {
 
   it("50 v 50 boss final: always the Hidden Boss (whatever boss was picked), the top 4 against him, from the starting position, at his fixed strength and brain", async () => {
     // (A boss picked or met last makes no difference: Eric, Oct 14, "that mode is always just versus [him]".)
-    const settings: Settings = { ...base, finalFormat: "boss", knockoutsPerStage: CROWD_KNOCKOUTS.boss, bossMaxMoves: 20, bossId: "bigboy", bossAvoid: "recluse" };
+    const settings: Settings = { ...preRework, finalFormat: "boss", knockoutsPerStage: CROWD_KNOCKOUTS.boss, bossMaxMoves: 20, bossId: "bigboy", bossAvoid: "recluse" };
     // (A seed whose cuts take exactly the plan, nobody kept in by the bubble grace: 58 since Nov 4's sure majority,
     // crowdSureShare, changed every seed's game; 4 was until then.)
     const { runner, sizes, plies } = await playKnockouts(settings, 58);
@@ -283,7 +286,7 @@ describe("Crowd mode", () => {
 
   it("50 v 50 boss final: the four play the battle out against him; the God King's help never comes, nobody is struck, and everyone is placed", async () => {
     // (At his adult form, as `?form=adult`: the God King's help works against the child he starts as, Nov 13.)
-    const settings: Settings = { ...base, finalFormat: "boss", knockoutsPerStage: CROWD_KNOCKOUTS.boss, bossMaxMoves: 9, recluseChild: false };
+    const settings: Settings = { ...preRework, finalFormat: "boss", knockoutsPerStage: CROWD_KNOCKOUTS.boss, bossMaxMoves: 9, recluseChild: false };
     const { runner } = await playKnockouts(settings, 4);
     const boss = runner.boss!;
     expect(boss.id).toBe("recluse");
@@ -476,7 +479,7 @@ describe("Crowd mode", () => {
   });
 
   it("the clock vote's time control: every bank starts at its bank (only before move 1), every move's cap is its own, bots think within it", async () => {
-    const settings: Settings = { ...base, finalFormat: "boss", knockoutsPerStage: CROWD_KNOCKOUTS.boss, bossMaxMoves: 4 };
+    const settings: Settings = { ...preRework, finalFormat: "boss", knockoutsPerStage: CROWD_KNOCKOUTS.boss, bossMaxMoves: 4 };
     const runner = new MatchRunner({
       settings,
       rng: mulberry32(11),
@@ -527,7 +530,7 @@ describe("Crowd mode", () => {
       { fromMove: 16, seconds: 25 },
       { fromMove: 21, seconds: 30 },
     ];
-    const settings: Settings = { ...base, finalFormat: "boss", knockoutsPerStage: CROWD_KNOCKOUTS.boss, bossMaxMoves: 4, moveClockSteps: rising };
+    const settings: Settings = { ...preRework, finalFormat: "boss", knockoutsPerStage: CROWD_KNOCKOUTS.boss, bossMaxMoves: 4, moveClockSteps: rising };
     const runner = new MatchRunner({
       settings,
       rng: mulberry32(11),
@@ -584,5 +587,156 @@ describe("Crowd mode", () => {
     expect(clockAfterVote(20, [], base)).toBe(20);
     expect(clockAfterVote(40, ["more"], base)).toBe(40);
     expect(clockAfterVote(10, ["less"], base)).toBe(10);
+  });
+});
+
+// The 50 v 50 rework in the runner (C2, Nov 16; docs/decisions/2026-11-16-crowd-rework-runner.md; core's rules:
+// packages/core/test/crowd-rework.test.ts): one game played to its end, equal cuts down to a 1 v 1, no endings.
+describe("the 50 v 50 rework (C2): one game to its end, cuts to a 1 v 1, no endings", () => {
+  const rework: Settings = { ...DEFAULT_SETTINGS, ...modeSettings("crowd") };
+  const crowdOf = (n: number, people = 0) => Array.from({ length: n }, (_, i) => ({ id: `b${i}`, name: `B${i}`, isBot: i >= people, skill: 1 + (i % 20) }));
+  const side = (runner: MatchRunner, c: "w" | "b") => runner.alive().filter((p) => p.colour === c).length;
+  /** An engine that rates one move in each of these positions far above the rest (by the position's moves so far). */
+  const scripted = (line: readonly string[]): EngineLike => {
+    const want = (fen: string, move: string) => {
+      const ply = 2 * (moveNumber(fen) - 1) + (fen.split(" ")[1] === "b" ? 1 : 0);
+      return line[ply] === move;
+    };
+    const score = (fen: string, move: string) => (want(fen, move) ? 0.95 : 0.2 + 0.1 * hash(fen + move));
+    return {
+      async topMoves(fen, n) {
+        return legalMoves(fen)
+          .map((move) => ({ move, expected: score(fen, move) }))
+          .sort((a, b) => b.expected - a.expected)
+          .slice(0, n);
+      },
+      async scoreMoves(fen, moves) {
+        return moves.map((move) => ({ move, expected: score(fen, move) }));
+      },
+    };
+  };
+  /** Plays the match out as the lobby and solo do: a game over first (it cuts nobody), then the stage's cut. */
+  async function playOut(runner: MatchRunner, each?: (report: Awaited<ReturnType<MatchRunner["score"]>>) => void) {
+    const cuts: { move: number; w: number; b: number }[] = [];
+    while (!runner.isOver()) {
+      expect(runner.isFinal()).toBe(false);
+      expect(runner.boss).toBeNull();
+      expect(runner.final).toBeNull();
+      if (runner.endGameIfOver()) break;
+      runner.deal();
+      const report = await runner.score(new Map());
+      each?.(report);
+      if (runner.endGameIfOver()) break;
+      if (runner.stageComplete()) {
+        runner.endStage();
+        cuts.push({ move: moveNumber(runner.boards.get(runner.state.boards[0]!)!.fen), w: side(runner, "w"), b: side(runner, "b") });
+      }
+    }
+    return cuts;
+  }
+
+  it("is every 50 v 50's: Strong, the cuts after moves 14 to 42, the carry, the move limit; the votes are how moves are picked, how it starts, how fast", () => {
+    expect(rework).toMatchObject({ crowdPick: "strong", crowdCuts: CROWD_CUTS, crowdCarry: 0.5, crowdMoveLimit: 60, crowdLimitWin: 0.75 });
+    expect(pregameVotes(rework).map((v) => v.id)).toEqual(["pick", "start", "speed"]);
+  });
+
+  it("plays to move 60 with no final: equal cuts to 34, 23, 15, 10, 6, 4, 2 and 1 a side; the 1 v 1's pick is played; the judge's verdict; everyone placed once; the podium", async () => {
+    const runner = new MatchRunner({ settings: rework, rng: mulberry32(2), engines: [fake], library, entrants: crowdOf(100) });
+    let oneVOne = 0;
+    const cuts = await playOut(runner, (report) => {
+      const r = report.boards[0]!.result;
+      if (runner.state.stage < CROWD_CUTS.length) return;
+      // The 1 v 1: an ordinary stage, one player a side, whose pick is played.
+      expect(r.players).toHaveLength(1);
+      expect(r.playedMove).toBe(r.players[0]!.move);
+      oneVOne++;
+    });
+    const board = runner.boards.get(runner.state.boards[0]!)!;
+    // Cut after Black's move `after` (the next move's number is after + 1); each side kept to its keep, but for the bubble
+    // grace's few (cutCarry), which the cuts after take; the last cut is exact.
+    expect(cuts.map((c) => c.move)).toEqual(CROWD_CUTS.map((c) => c.after + 1));
+    cuts.forEach((c, i) => {
+      for (const n of [c.w, c.b]) expect(n - CROWD_CUTS[i]!.keep).toBeGreaterThanOrEqual(0);
+      for (const n of [c.w, c.b]) expect(n - CROWD_CUTS[i]!.keep).toBeLessThanOrEqual(3);
+    });
+    expect(cuts.at(-1)).toMatchObject({ w: 1, b: 1 });
+    // This seed's game reaches the move limit: the 1 v 1 plays moves 43 to 60, and Black's 60th ends it.
+    expect(moveNumber(board.fen)).toBe(61);
+    expect(oneVOne).toBe(2 * (60 - 42));
+    expect(runner.isOver()).toBe(true);
+    expect(runner.state.players.map((p) => p.placement).sort((a, b) => a! - b!)).toEqual(Array.from({ length: 100 }, (_, i) => i + 1));
+    // The judge's verdict: a side at 75% or more by the board's (agreed) numbers, else a draw.
+    const toMove = board.fen.split(" ")[1] as "w" | "b";
+    const winner = board.expected >= 0.75 ? toMove : 1 - board.expected >= 0.75 ? (toMove === "w" ? "b" : "w") : null;
+    expect(runner.gameWinner()).toBe(winner);
+    const first = runner.state.players.find((p) => p.placement === 1)!;
+    const second = runner.state.players.find((p) => p.placement === 2)!;
+    // The two of the 1 v 1 take 1st and 2nd: the winner first (drawn: the better score).
+    expect(new Set([first.colour, second.colour])).toEqual(new Set(["w", "b"]));
+    if (winner) expect(first.colour).toBe(winner);
+    const res = runner.crowdResults()!;
+    expect(res.podium.winner).toBe(winner ? first.id : undefined);
+    expect(res.podium.best).toBeTruthy();
+    // Each player's "out at move" (a cut's; null: still in at the end) and points a move.
+    for (const p of runner.state.players) {
+      const row = res.players[p.id]!;
+      expect(row.outAtMove).toBe(p.placement! <= 2 ? null : CROWD_CUTS[p.outInStage!]!.after);
+      expect(row.perMove).toBeGreaterThanOrEqual(0);
+    }
+  }, 60_000);
+
+  it("a game over by the rules ends the match at once, and on a cut's move cuts nobody: Black mates on move 2 (a test's 4-ply stage), Black's 50 place first", async () => {
+    const settings: Settings = { ...rework, stageRounds: [], firstStageRounds: 4, roundsPerStage: 4 };
+    // 1.f3 e5 2.g4 Qh4#: the engine rates each of these far above the rest, so Strong plays them.
+    const runner = new MatchRunner({ settings, rng: mulberry32(1), engines: [scripted(["f2f3", "e7e5", "g2g4", "d8h4"])], library, entrants: crowdOf(100) });
+    const cuts = await playOut(runner);
+    const board = runner.boards.get(runner.state.boards[0]!)!;
+    expect(board.history).toEqual(["f2f3", "e7e5", "g2g4", "d8h4"]);
+    // The stage's 4th ply was its cut's: nobody cut, the stage never ended.
+    expect(cuts).toEqual([]);
+    expect(runner.state.stage).toBe(0);
+    expect(runner.isOver()).toBe(true);
+    expect(runner.gameWinner()).toBe("b");
+    const place = (c: "w" | "b") => runner.state.players.filter((p) => p.colour === c).map((p) => p.placement!).sort((a, b) => a - b);
+    expect(place("b")).toEqual(Array.from({ length: 50 }, (_, i) => i + 1));
+    expect(place("w")).toEqual(Array.from({ length: 50 }, (_, i) => i + 51));
+    expect(runner.crowdResults()!.podium.winner).toBe(runner.state.players.find((p) => p.placement === 1)!.id);
+    // (Nothing more is dealt: the board isn't replaced, as a game over before the endings once was.)
+    expect(runner.crowdGameEnd()).toBeNull();
+  });
+
+  it("who left: a person who resigns is out at the move they left, a seat a bot took plays on; neither is ever the best player", async () => {
+    // A short game for the test: a cut every 2 plies (8 cuts, the 1 v 1 from move 9), the limit at move 10.
+    const settings: Settings = { ...rework, stageRounds: [], firstStageRounds: 2, roundsPerStage: 2, crowdMoveLimit: 10 };
+    // b0 a person, who picks the judge's best every turn (so they survive the cuts), the rest bots.
+    const runner = new MatchRunner({ settings, rng: mulberry32(7), engines: [fake], library, entrants: crowdOf(100, 1) });
+    // Through the 3rd cut (move 6), as the lobby plays it; then b0 resigns (nobody takes the seat) and b1's seat goes to a bot.
+    while (runner.state.stage < 3) {
+      const groups = runner.deal();
+      const fen = runner.boards.get(runner.state.boards[0]!)!.fen;
+      const best = (await fake.topMoves(fen, 1))[0]!.move;
+      const ids = [...groups.values()].flat();
+      await runner.score(new Map(ids.includes("b0") ? [["b0", { move: best, thinkMs: 1000 }]] : []));
+      if (runner.stageComplete()) runner.endStage();
+    }
+    // (b1, a bot, may have been cut by now: only those still in leave.)
+    const leaving = ["b0", "b1"].filter((id) => runner.player(id).alive);
+    const at = moveNumber(runner.boards.get(runner.state.boards[0]!)!.fen);
+    if (leaving.includes("b0")) runner.retire("b0");
+    if (leaving.includes("b1")) runner.handOver("b1", { id: "rb1", name: "Relief Rita", skill: 4 });
+    const left = [...(leaving.includes("b0") ? ["b0"] : []), ...(leaving.includes("b1") ? ["rb1"] : [])];
+    expect(left.length).toBeGreaterThan(0);
+    for (const id of left) expect(runner.player(id).leftAt).toBe(at);
+    // Their play made perfect, so either would be the best player if leaving didn't bar them.
+    runner.state = {
+      ...runner.state,
+      players: runner.state.players.map((p) => (left.includes(p.id) ? { ...p, lossesByStage: p.lossesByStage.map((l) => l.map(() => 0)), countedLossSum: 0, rawLossSum: 0, misses: 0 } : p)),
+    };
+    await playOut(runner);
+    expect(runner.state.players.map((p) => p.placement).sort((a, b) => a! - b!)).toEqual(Array.from({ length: 100 }, (_, i) => i + 1));
+    const res = runner.crowdResults()!;
+    expect(left).not.toContain(res.podium.best);
+    expect(res.podium.best).toBeTruthy();
+    if (left.includes("b0")) expect(res.players["b0"]!.outAtMove).toBe(at);
   });
 });

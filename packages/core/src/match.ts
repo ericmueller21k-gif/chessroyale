@@ -70,6 +70,12 @@ export interface PlayerState {
   placement: number | null;
   /** Moves missed over the match (each counts as finalMissLoss in matchLoss). */
   misses?: number;
+  /**
+   * The 50 v 50 rework: a person left this seat for good mid-match (resigned, gone too long, removed for being away), after
+   * this move of the game (the board's move number). Out then, or, a bot having taken the seat, the bot plays on under it.
+   * Either way the seat is never the best player (bestPlayer's `left`): its record isn't one player's whole match.
+   */
+  leftAt?: number;
   /** Crowd 50 v 50 (CrowdScoring): strong moves in a row now, and the streak bonus earned over the match. */
   streak?: number;
   streakPoints?: number;
@@ -689,8 +695,12 @@ export const isTeamMatch = (settings: Pick<Settings, "mode" | "crowdTeams">) => 
 export const isFinal = (state: MatchState, settings: Settings = DEFAULT_SETTINGS) =>
   !settings.crowdCuts?.length && state.stage >= settings.knockoutsPerStage.length;
 
+/**
+ * The stage's rounds are played: its cut is due. Never in the 50 v 50 rework's 1 v 1, after its last cut (`crowdCuts`): it plays
+ * to the game's end (the runner's endGameIfOver), with no more cuts or breaks, whatever a test's `?rounds=` makes its length.
+ */
 export const stageComplete = (state: MatchState, settings: Settings = DEFAULT_SETTINGS) =>
-  state.round >= roundsInStage(settings, state.stage);
+  !(settings.crowdCuts?.length && state.stage >= settings.crowdCuts.length) && state.round >= roundsInStage(settings, state.stage);
 
 /** Turn order: a[0], b[0], a[1], b[1], ... */
 export function interleave(a: readonly string[], b: readonly string[]): string[] {

@@ -376,3 +376,13 @@ export function botVotes(rng: Rng, ids: readonly string[], options: number, wind
  */
 export const pregameVotes = (s: Pick<Settings, "mode" | "crowdTeams" | "augments"> & Partial<Pick<Settings, "crowdCuts">>): readonly PregameVote[] =>
   s.mode === "crowd" && s.crowdTeams && s.augments ? (s.crowdCuts?.length ? CROWD_VOTES : PREGAME_VOTES) : [];
+
+/**
+ * The votes a vote message is one of (NetVote: its place `index` and, from the server since the rework, its `id`): the list whose
+ * vote at that place has that id, so an app and a lobby made before or after the rework agree on what's held; with no id (an older
+ * server, solo before C2), these settings' votes (pregameVotes). The vote itself is `heldVotes(v, s)[v.index]`.
+ */
+export function heldVotes(v: { index: number; id?: string }, s: Pick<Settings, "mode" | "crowdTeams" | "augments"> & Partial<Pick<Settings, "crowdCuts">>): readonly PregameVote[] {
+  for (const list of [CROWD_VOTES, PREGAME_VOTES]) if (v.id !== undefined && list[v.index]?.id === v.id) return list;
+  return pregameVotes(s);
+}

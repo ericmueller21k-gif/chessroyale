@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_SETTINGS, FAIRPLAY, RAID_SETTINGS, modeSettings, mulberry32 } from "@chessroyale/core";
+import { CROWD_PRE_REWORK, DEFAULT_SETTINGS, FAIRPLAY, RAID_SETTINGS, modeSettings, mulberry32 } from "@chessroyale/core";
 import { applyMove, legalMoves, sanLineToUci, type BoardScore, type Opening, type ServerMessage } from "@chessroyale/chess";
 import { LobbyCore, newLobbyRecord } from "../src/lobby.ts";
 
@@ -339,7 +339,8 @@ function finalLobby() {
     { now: () => now, send: (id, msg) => inbox.set(id, [...(inbox.get(id) ?? []), { ...msg, now } as ServerMessage]) },
     library,
     mulberry32(3),
-    { ...DEFAULT_SETTINGS, ...modeSettings("crowd", { augments: false }), finalFormat: "duel", knockoutsPerStage: [2, 2], stageRounds: [], firstStageRounds: 1, roundsPerStage: 1, boardIntroSeconds: 0 },
+    // (The 50 v 50 before the rework, its duel: the rework has no final. C4 retires this with it.)
+    { ...DEFAULT_SETTINGS, ...modeSettings("crowd", { augments: false }), ...CROWD_PRE_REWORK, finalFormat: "duel", knockoutsPerStage: [2, 2], stageRounds: [], firstStageRounds: 1, roundsPerStage: 1, boardIntroSeconds: 0 },
   );
   const last = <T extends ServerMessage["t"]>(id: string, t: T) =>
     [...(inbox.get(id) ?? [])].reverse().find((m) => m.t === t) as Extract<ServerMessage, { t: T }> | undefined;

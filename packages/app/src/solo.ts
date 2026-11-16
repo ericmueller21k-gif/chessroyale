@@ -454,6 +454,7 @@ export class SoloMatch implements GameView {
     this.voteState = {
       key: `vote-${index}`,
       index,
+      id: votes[index]!.id,
       count: votes.length,
       startsAt: now,
       until: now + ms,
@@ -1413,6 +1414,8 @@ export class SoloMatch implements GameView {
 
   private nextRound() {
     if (this.runner.isOver()) return this.finish();
+    // (The 50 v 50 rework: its one game over (by the rules or the move limit) ends the match for everyone still in.)
+    if (this.runner.endGameIfOver()) return this.finish();
     if (!this.you.alive) return void this.simulateRest();
     if (this.runner.boss) {
       // (Testing, ?phase=2: the Hidden Boss's phase 2 at once, from the phase change.)
@@ -1606,6 +1609,8 @@ export class SoloMatch implements GameView {
 
   private afterReveal() {
     if (this.runner.boss) return this.afterBossRound();
+    // (The 50 v 50 rework: a game over on any move ends the match, before a cut due on that move: it cuts nobody.)
+    if (this.runner.endGameIfOver()) return this.finish();
     if (!this.runner.stageComplete()) return this.nextRound();
     const stage = this.runner.state.stage;
     const before = this.standings();
@@ -1747,9 +1752,12 @@ export class SoloMatch implements GameView {
         if (this.runner.bossKillDue()) this.runner.bossKill();
         continue;
       }
+      // (The 50 v 50 rework: its game over ends the match, ahead of any cut.)
+      if (this.runner.endGameIfOver()) break;
       this.runner.deal();
       await this.runner.score(new Map());
       if (this.stopped) return;
+      if (this.runner.endGameIfOver()) break;
       if (this.runner.final) this.runner.afterFinalTurn();
       if (this.runner.stageComplete()) {
         if (this.runner.isFinal() && this.runner.final) this.runner.finishFinal();

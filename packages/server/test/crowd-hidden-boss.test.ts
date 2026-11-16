@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BOSS_POWERS, CROWD_KNOCKOUTS, DEFAULT_SETTINGS, RECLUSE_CHILD, RECLUSE_PHASE2, bossDef, childRating, crowdFinalists, fixedLevel, levelForMaia, maiaTopRating, modeSettings, mulberry32, type Settings } from "@chessroyale/core";
+import { BOSS_POWERS, CROWD_KNOCKOUTS, CROWD_PRE_REWORK, DEFAULT_SETTINGS, RECLUSE_CHILD, RECLUSE_PHASE2, bossDef, childRating, crowdFinalists, fixedLevel, levelForMaia, maiaTopRating, modeSettings, mulberry32, type Settings } from "@chessroyale/core";
 import { legalMoves, sanLineToUci, type BoardScore, type Opening, type ServerMessage } from "@chessroyale/chess";
 import { LobbyCore, newLobbyRecord, type LobbyIO } from "../src/lobby.ts";
 
@@ -47,6 +47,8 @@ function crowdFinal(patch: Partial<Settings> = {}, seed = 7, o: { worst?: string
     {
       ...DEFAULT_SETTINGS,
       ...modeSettings("crowd", { augments: false }),
+      // (The 50 v 50 before the rework: the rework (C2, Nov 16) never meets him, his code kept unreached; C4 retires these.)
+      ...CROWD_PRE_REWORK,
       finalFormat: "boss",
       knockoutsPerStage: CROWD_KNOCKOUTS.boss,
       // (Two rounds a stage: with one, the team that hasn't moved yet is all tied at the first cut.)
