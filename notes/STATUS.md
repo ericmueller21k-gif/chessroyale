@@ -1,3 +1,4 @@
+- Nov 16 ~14:30 UTC: #749 MERGED (42415c7; test-only). Main run watched. T1 helper running.
 - Nov 16 ~14:05 UTC: #748 LIVE (06c6914). Main run RED by retry-pass: autochess.spec:607 [phone] (bot "Lv 5" vs "Lv 4": the bot buys XP 0.5 s into the quick step; test race). Fixed forward: #749 (1ada3c6, light lane, test-only), CI watched.
 - Nov 16 ~13:45 UTC: #748 MERGED (06c6914; CI green). Deploy + main run watched. T1 helper running.
 - Nov 16 ~13:30 UTC: #747 LIVE (8f04c89, 3 min); main full run GREEN, no retry-passes. town-chat [phone] 17.2 min (audit 703 s): sent to the T1 helper to check the open() hold.
