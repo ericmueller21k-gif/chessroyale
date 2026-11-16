@@ -509,20 +509,14 @@ export function UltimateTest({ match, icon = false }: { match: GameView; icon?: 
   // (A press is for the next ultimate only: once it has come, the button is ready again.)
   const key = boss ? `${boss.id}:${boss.startMove}:${boss.board.generation}:${p?.ults ?? 0}` : "";
   const [pressed, setPressed] = useState("");
-  // (The Hidden Boss's phase 2: his own ultimate, the few seconds a move.)
+  // (The Hidden Boss's phase 2 has no ultimate since Nov 16: the trigger cuts one of your hearts, the slash on demand; greyed off your
+  // move.)
   const simul = match.simul;
   if (BOSS_POWERS.ultimateTestButton && account().profile?.admin && simul) {
     if (!simul.playing || simul.decided) return null;
-    return (
-      <TestButton
-        cls="ult-test"
-        icon={icon}
-        glyph="⚡"
-        label={simul.ultAt !== null ? "Ultimate under way (testing)" : "Trigger ultimate (testing)"}
-        disabled={simul.ultAt !== null}
-        onClick={() => match.triggerUltimate()}
-      />
-    );
+    const mine = simul.boards.find((b) => b.you);
+    const can = !!mine && !mine.result && mine.toMove === "crowd" && mine.turnAt !== null && simul.paused == null;
+    return <TestButton cls="ult-test" icon={icon} glyph="⚡" label="Lose a heart (testing)" disabled={!can} onClick={() => match.triggerUltimate()} />;
   }
   if (!BOSS_POWERS.ultimateTestButton || !account().profile?.admin || !boss || !p || boss.result || match.bossNote != null || (bossRules(boss)?.ultimateOnce && p.ults) || (p.ults ?? 0) >= (bossRules(boss)?.ultimateMax ?? Infinity)) return null;
   // (Hollow's Lights out: the full meter has it on its way until the test has begun.)

@@ -35,13 +35,13 @@ import {
   legalMoves,
   matingMoves,
   matingMoves960,
-  phase2Flags,
+  phase2Clock,
   phase2Move,
+  phase2NextDue,
   phase2Numbers,
   phase2Outcome,
-  phase2Timeouts,
+  phase2Slash,
   phase2ToMove,
-  phase2Ult,
   phase2WinAll,
   startPhase2,
   type BossMoveKind,
@@ -134,7 +134,6 @@ export interface Recluse2Record {
   told?: true;
   /** The clocks have started (at `clocksAt`). */
   playing?: true;
-  lastSlow: { board: number; at: number } | null;
   /** Work per board (by board id). */
   work: Record<string, Work>;
   /** A bot's move is played no sooner than this (its thinking), by board id. */
@@ -212,7 +211,6 @@ export function begin(lobby: Phase2Lobby, o: { players: readonly { id: string; n
     state: startPhase2({ players: players.map((x) => x.id), numbers: phase2Numbers(o.seed), now: clocksAt, win: o.win }),
     names: Object.fromEntries(players.map((x) => [x.id, x.name])),
     fairFrom: Object.fromEntries(players.map((x) => [x.id, lobby.r.fair?.[x.id]?.length ?? 0])),
-    lastSlow: null,
     work: {},
     botAt: {},
     fair: {},
@@ -245,10 +243,9 @@ export function view(p: Recluse2Record): NetPhase2 {
       bankMs: b.bankMs,
       turnAt: p.playing ? b.turnAt : null,
       result: b.result,
+      hearts: b.hearts,
+      slashAt: b.slashAt,
     })),
-    slow: p.state.slow,
-    lastSlow: p.lastSlow,
-    ultAt: p.state.ultAt,
     ...(p.paused !== undefined ? { paused: p.paused } : {}),
     ...(p.done ? { done: p.done } : {}),
     ...(p.winNext ? { winNext: true as const } : {}),
@@ -258,8 +255,8 @@ export function view(p: Recluse2Record): NetPhase2 {
 const tell = (lobby: Phase2Lobby, p: Recluse2Record) => lobby.broadcast({ t: "phase2", p2: view(p) });
 
 /**
- * Phase 2's timer: the cutscene and the phase change told as the fall ends; the clocks started; flags and his ultimate's random
- * moves (not while paused); his search tried again, or late (every clock paused), or never in (no result); a bot's device that never
+ * Phase 2's timer: the cutscene and the phase change told as the fall ends; the clocks started; hearts cut on slow moves and flags
+ * (not while paused); his search tried again, or late (every clock paused), or never in (no result); a bot's device that never
  * answered (the quick move); moves due; the results once every board is decided and shown.
  */
 export function step(lobby: Phase2Lobby) {
@@ -278,7 +275,7 @@ export function step(lobby: Phase2Lobby) {
   }
   startClocks(lobby, p);
   if (p.playing) {
-    if (p.paused === undefined) apply(lobby, p, phase2Timeouts(phase2Flags(p.state, now), now, () => lobby.rng()), "clock");
+    if (p.paused === undefined) apply(lobby, p, phase2Clock(p.state, now), "clock");
     for (const w of Object.values(p.work)) {
       if (w.move) continue;
       if (w.who === "boss") {
@@ -336,12 +333,9 @@ function arm(lobby: Phase2Lobby) {
   else if (p.done) times.push(p.done.until);
   else if (!p.playing) times.push(p.clocksAt);
   else {
-    const ult = p.state.ultAt !== null;
-    // (Paused: no clock runs out meanwhile; their times are moved on by the pause as it ends.)
-    for (const b of p.paused === undefined ? p.state.boards : []) {
-      if (b.result || b.turnAt === null || phase2ToMove(b) !== "crowd") continue;
-      times.push(b.turnAt + (ult ? RECLUSE_PHASE2.ultMoveSeconds * 1000 : b.bankMs));
-    }
+    // (A move turning slow, a bank running out. Paused: none meanwhile; their times are moved on by the pause as it ends.)
+    const due = p.paused === undefined ? phase2NextDue(p.state) : null;
+    if (due !== null) times.push(due);
     for (const [id, w] of Object.entries(p.work)) {
       // (A move in: played when due, but never while paused: nothing is played then, and it's played as the pause ends.)
       if (w.move) {
@@ -356,17 +350,13 @@ function arm(lobby: Phase2Lobby) {
 }
 
 /**
- * The state moves on (a move, a flag, a timeout, the admins' win): the last slow move noted, work for positions gone dropped, his
+ * The state moves on (a move, a heart cut, a flag, the admins' win): work for positions gone dropped, his
  * next moves and the bots' asked, every board decided noted (`done`), and everyone told. Nothing changed: nothing happens.
  */
 function apply(lobby: Phase2Lobby, p: Recluse2Record, next: Phase2State, _why: string): boolean {
   const before = p.state;
   if (next === before) return false;
   const now = lobby.now();
-  if (next.slow > before.slow) {
-    const on = next.boards.find((b, i) => b.board.history.length > before.boards[i]!.board.history.length);
-    if (on) p.lastSlow = { board: on.id, at: now };
-  }
   p.state = next;
   for (const [id, w] of Object.entries(p.work)) {
     const b = boardOf(p, id);
@@ -391,10 +381,10 @@ function queue(lobby: Phase2Lobby, p: Recluse2Record, b: Phase2Board) {
   if (!who || p.work[b.id]) return;
   if (who === "crowd") {
     if (lobby.person(b.player)) return;
-    // (A bot thinks a bullet player's while, now and then longer before his ultimate, so his slow-move count comes from them too.
+    // (A bot thinks a bullet player's while, now and then past a slow move's time, and loses a heart as a person would.
     // Paused (a board handed to a bot meanwhile): from the pause's start, so `hold` moves it on to the pause's end plus its while,
     // never the pause charged to its clock on top: the review of #683, m1.)
-    const slow = p.state.ultAt === null && lobby.rng() < RECLUSE_PHASE2.botSlowChance;
+    const slow = lobby.rng() < RECLUSE_PHASE2.botSlowChance;
     const [lo, hi] = slow ? RECLUSE_PHASE2.botSlowMs : RECLUSE_PHASE2.botMoveMs;
     p.botAt[b.id] = (p.paused ?? lobby.now()) + lo + lobby.rng() * (hi - lo);
   }
@@ -652,11 +642,15 @@ export function winForm(lobby: Phase2Lobby): boolean {
   return true;
 }
 
-/** Testing (the admins' ultimate trigger, as solo's): his phase 2 ultimate now, once the clocks run (not while they're paused). */
-export function ult(lobby: Phase2Lobby): boolean {
+/**
+ * Testing (the admins' ultimate trigger in phase 2, as solo's; he has no ultimate there since Nov 16): a heart of the admin's own
+ * board cut now, on their move, once the clocks run (not while they're paused): the slash on demand.
+ */
+export function ult(lobby: Phase2Lobby, playerId: string): boolean {
   const p = lobby.r.recluse2;
-  if (!p || !p.playing || p.done || p.paused !== undefined || p.state.ultAt !== null) return false;
-  apply(lobby, p, phase2Ult(p.state, lobby.now()), "ult");
+  const b = p?.state.boards.find((x) => x.player === playerId);
+  if (!p || !b || !p.playing || p.done || p.paused !== undefined) return false;
+  if (!apply(lobby, p, phase2Slash(p.state, b.id, lobby.now()), "slash")) return false;
   arm(lobby);
   return true;
 }

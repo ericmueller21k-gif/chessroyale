@@ -2,8 +2,13 @@
  * The Hidden Boss's phase 2 (Eric, Oct 14): beaten on one board, he revives, the board splits into four, and he plays
  * all four at once in Chess960, each board from its own start position (Eric: "Every player gets a different one that
  * avoids everybody just discussing the same move"). The players are White on every board; he plays Black. Every board
- * must be won to beat him: a board lost (mate, time, resign) is lost and the others play on; a draw is not a win. The
- * battle ends when every board is decided.
+ * must be won to beat him: a board lost (mate, time, resign, or its player's hearts all cut) is lost and the others play on; a draw
+ * is not a win. The battle ends when every board is decided.
+ *
+ * Each player's own hearts (Eric, Nov 16, in place of the team's slow-move count and his "5 SECONDS!"): a move slower than
+ * slowJudgeMs (5 s as players are told, judged with a hidden allowance for lag) has one of that player's hearts cut as it turns
+ * slow; they may then take as long as they need on it (their clock running, nothing played for them). The last one cut, that board
+ * is lost.
  *
  * Pure rules, no clock of their own (`now` is passed in) and no engine: the app drives them (packages/app/src/
  * recluse-phase2.ts; today an admin's fight in Boss alone, on this device). His brain here is Stockfish only, at a
@@ -12,7 +17,7 @@
  * Each board is a BoardState from a base at ply 0 holding its start FEN (`bases: [{ ply: 0, fen }]`), so fenAtPly,
  * boardEnd and replays work as for any board (DECISIONS.md, "Chess960's rules").
  */
-import { RECLUSE_PHASE2, bossBannerMs, mulberry32 } from "@chessroyale/core";
+import { RECLUSE_PHASE2, mulberry32 } from "@chessroyale/core";
 import { BOSS_OPENING, boardEnd, playOnBoard, type BoardState } from "../boards.ts";
 import { chess960Fen } from "../chess960.ts";
 import { legalMoves, sideToMove } from "../rules.ts";
@@ -20,10 +25,10 @@ import { powerRoll } from "./base.ts";
 
 export type Phase2Settings = typeof RECLUSE_PHASE2;
 
-/** How a board ended: who won it (the players, "crowd"; him, "boss"; or a draw) and how. */
+/** How a board ended: who won it (the players, "crowd"; him, "boss"; or a draw) and how ("slow": its player's hearts all cut). */
 export interface Phase2Result {
   winner: "crowd" | "boss" | "draw";
-  how: "mate" | "time" | "resign" | "stalemate" | "draw";
+  how: "mate" | "time" | "resign" | "stalemate" | "draw" | "slow";
 }
 
 export interface Phase2Board {
@@ -39,17 +44,16 @@ export interface Phase2Board {
   /** When the player's current turn began (their clock running), or null: it's his move, or the board is decided. */
   turnAt: number | null;
   result: Phase2Result | null;
+  /** The player's hearts left (RECLUSE_PHASE2.hearts at the start): a slow move cuts one; none left, the board is lost. */
+  hearts: number;
+  /** This turn's move has been slow already (its heart is cut): no second cut on the same move. */
+  slashed: boolean;
+  /** When the last heart was cut (the screens' slash, and a board lost to it its fade to grey), or null. */
+  slashAt: number | null;
 }
 
 export interface Phase2State {
   boards: Phase2Board[];
-  /** Slow moves so far (anyone's, any board, longer than slowMoveSeconds), until his ultimate comes. */
-  slow: number;
-  /**
-   * When his ultimate came (null: not yet): from then on every move has ultMoveSeconds, no bank; out of time, a random
-   * legal move is played for that player (phase2Timeouts).
-   */
-  ultAt: number | null;
 }
 
 /** The players' side on every board: White (they move first, as the crowd does in Boss alone); he's Black. */
@@ -93,15 +97,13 @@ export function phase2Board(id: number, fen: string): BoardState {
  * Phase 2 begins at `now`: a board a player (`players[i]` on board i), each from its own start position (`numbers`), or
  * every board from the test position (`win`). Every player's clock starts at once (they're White).
  */
-export function startPhase2(opts: { players: readonly string[]; numbers: readonly number[]; now: number; win?: boolean; s?: Pick<Phase2Settings, "bankSeconds"> }): Phase2State {
+export function startPhase2(opts: { players: readonly string[]; numbers: readonly number[]; now: number; win?: boolean; s?: Pick<Phase2Settings, "bankSeconds" | "hearts"> }): Phase2State {
   const s = opts.s ?? RECLUSE_PHASE2;
   return {
-    slow: 0,
-    ultAt: null,
     boards: opts.players.map((player, id) => {
       const number = opts.win ? -1 : opts.numbers[id]!;
       const board = phase2Board(id, opts.win ? PHASE2_WIN_FEN : chess960Fen(number));
-      return { id, player, number, board, bankMs: s.bankSeconds * 1000, turnAt: opts.now, result: null };
+      return { id, player, number, board, bankMs: s.bankSeconds * 1000, turnAt: opts.now, result: null, hearts: s.hearts, slashed: false, slashAt: null };
     }),
   };
 }
@@ -127,71 +129,92 @@ function resultAfter(board: BoardState): Phase2Result | null {
 
 const replace = (st: Phase2State, b: Phase2Board): Phase2State => ({ ...st, boards: st.boards.map((x) => (x.id === b.id ? b : x)) });
 
-type UltSettings = Pick<Phase2Settings, "slowMoveSeconds" | "slowMovesForUlt" | "ultMoveSeconds">;
+type SlowSettings = Pick<Phase2Settings, "slowMoveSeconds" | "slowAllowMs">;
 
-/** The time left for the player's move on a board at `now` (ms): their bank, or once his ultimate has come, the move's own few seconds. */
-export function moveLeft(st: Pick<Phase2State, "ultAt">, b: Pick<Phase2Board, "bankMs" | "turnAt">, now: number, s: Pick<UltSettings, "ultMoveSeconds"> = RECLUSE_PHASE2): number {
-  if (st.ultAt === null) return bankLeft(b, now);
-  return b.turnAt === null ? s.ultMoveSeconds * 1000 : Math.max(0, s.ultMoveSeconds * 1000 - Math.max(0, now - b.turnAt));
+/**
+ * How long a move may take before it's slow (ms from when the board became the player's): the `slowMoveSeconds` players are told,
+ * plus `slowAllowMs` of allowance for lag that's never shown (Eric, Nov 16: judged by the server, about 6.5 s).
+ */
+export const slowJudgeMs = (s: SlowSettings = RECLUSE_PHASE2): number => s.slowMoveSeconds * 1000 + s.slowAllowMs;
+
+/** When the player's move on a board turns slow (its heart is cut), or null: not their move, or already cut this turn. */
+export function slashDue(b: Pick<Phase2Board, "board" | "result" | "turnAt" | "slashed">, s: SlowSettings = RECLUSE_PHASE2): number | null {
+  if (b.slashed || b.turnAt === null || phase2ToMove(b) !== "crowd") return null;
+  return b.turnAt + slowJudgeMs(s);
 }
 
 /**
- * His ultimate comes at `now` (the team's slowMovesForUlt-th slow move, or the admins' trigger): every player whose
- * move it is starts their few seconds afresh, however long they'd thought, as its banner ("5 SECONDS!", a boss banner's
- * length: bossBannerMs) leaves the boards (Oct 24: a longer banner never eats into them). Unchanged (the same object)
- * once it has come.
+ * One of the player's hearts cut at `at` (their move slow, or the admins' test): their move goes on, as long as they need on it
+ * (their clock running, nothing played for them); the last one cut, the board is lost (`how: "slow"`), the clock stopped.
  */
-export function phase2Ult(st: Phase2State, now: number): Phase2State {
-  if (st.ultAt !== null) return st;
-  const from = now + bossBannerMs();
-  return { ...st, ultAt: now, boards: st.boards.map((b) => (!b.result && b.turnAt !== null ? { ...b, turnAt: from } : b)) };
+function cut(b: Phase2Board, at: number): Phase2Board {
+  const hearts = Math.max(0, b.hearts - 1);
+  if (hearts > 0) return { ...b, hearts, slashed: true, slashAt: at };
+  return { ...b, hearts, slashed: true, slashAt: at, bankMs: bankLeft(b, at), turnAt: null, result: { winner: "boss", how: "slow" } };
 }
 
 /**
- * A move on a board at `now`, by whoever's move it is there: the player's (their clock stops; out of time, the board is
- * lost and the move isn't played) or his (the player's clock starts). Unchanged (the same object) if the board is
- * decided or the move isn't legal there.
+ * A board's move turned slow by `now`: its heart cut at the moment it turned (`slashDue`), not when it was noticed, so a timer's
+ * lateness never moves it. Not if the bank ran out first (that board is lost on time: phase2Clock). Unchanged (the same object) if not.
  */
-export function phase2Move(st: Phase2State, boardId: number, move: string, now: number, s: UltSettings = RECLUSE_PHASE2): Phase2State {
-  const b = st.boards.find((x) => x.id === boardId);
-  const who = b ? phase2ToMove(b) : null;
-  if (!b || !who || !legalMoves(b.board.fen).includes(move)) return st;
+function slashBoard(b: Phase2Board, now: number, s: SlowSettings): Phase2Board {
+  const at = slashDue(b, s);
+  if (at === null || now < at || bankLeft(b, at) <= 0) return b;
+  return cut(b, at);
+}
+
+/**
+ * A move on a board at `now`, by whoever's move it is there: the player's (their clock stops; a move past slowJudgeMs has its heart
+ * cut first, if it wasn't yet; out of hearts or out of time, the board is lost and the move isn't played) or his (the player's clock
+ * starts, a new move to judge). Unchanged (the same object) if the board is decided or the move isn't legal there.
+ */
+export function phase2Move(st: Phase2State, boardId: number, move: string, now: number, s: SlowSettings = RECLUSE_PHASE2): Phase2State {
+  const b0 = st.boards.find((x) => x.id === boardId);
+  const who = b0 ? phase2ToMove(b0) : null;
+  if (!b0 || !who || !legalMoves(b0.board.fen).includes(move)) return st;
   if (who === "crowd") {
-    const board = playOnBoard(b.board, move, 0.5);
-    // (His ultimate: the bank is gone; the move's few seconds are checked by phase2Timeouts. No slow moves count now.)
-    if (st.ultAt !== null) return replace(st, { ...b, board, turnAt: null, result: resultAfter(board) });
+    const b = slashBoard(b0, now, s);
+    if (b.result) return replace(st, b);
     const left = bankLeft(b, now);
     if (left <= 0) return replace(st, { ...b, bankMs: 0, turnAt: null, result: { winner: "boss", how: "time" } });
-    const next = replace(st, { ...b, board, bankMs: left, turnAt: null, result: resultAfter(board) });
-    // A slow move (longer than slowMoveSeconds): one more for the team; the slowMovesForUlt-th brings his ultimate.
-    if (b.turnAt === null || now - b.turnAt <= s.slowMoveSeconds * 1000) return next;
-    const slow = next.slow + 1;
-    return slow >= s.slowMovesForUlt ? phase2Ult({ ...next, slow }, now) : { ...next, slow };
+    const board = playOnBoard(b.board, move, 0.5);
+    return replace(st, { ...b, board, bankMs: left, turnAt: null, result: resultAfter(board) });
   }
-  const board = playOnBoard(b.board, move, 0.5);
+  const board = playOnBoard(b0.board, move, 0.5);
   const result = resultAfter(board);
-  return replace(st, { ...b, board, turnAt: result ? null : now, result });
-}
-
-/** Every board whose player is out of time at `now` is lost on time. Unchanged (the same object) if none is. */
-export function phase2Flags(st: Phase2State, now: number): Phase2State {
-  // (Once his ultimate has come no flag falls: a move out of time is played at random instead, phase2Timeouts.)
-  if (st.ultAt !== null) return st;
-  if (!st.boards.some((b) => !b.result && b.turnAt !== null && bankLeft(b, now) <= 0)) return st;
-  return { ...st, boards: st.boards.map((b) => (!b.result && b.turnAt !== null && bankLeft(b, now) <= 0 ? { ...b, bankMs: 0, turnAt: null, result: { winner: "boss", how: "time" } } : b)) };
+  return replace(st, { ...b0, board, turnAt: result ? null : now, slashed: false, result });
 }
 
 /**
- * Once his ultimate has come: every player out of their few seconds at `now` has a random legal move played for them
- * (`rng` picks it, as Squads plays a missed move: never a loss on time). Unchanged (the same object) if nobody is.
+ * The clocks at `now`: every move turned slow has its heart cut (phase2Move's rule, at the moment it turned), and every board whose
+ * player is out of time is lost on time. Unchanged (the same object) if nothing is due.
  */
-export function phase2Timeouts(st: Phase2State, now: number, rng: () => number, s: UltSettings = RECLUSE_PHASE2): Phase2State {
-  if (st.ultAt === null) return st;
-  let next = st;
+export function phase2Clock(st: Phase2State, now: number, s: SlowSettings = RECLUSE_PHASE2): Phase2State {
+  const boards = st.boards.map((b) => {
+    const c = slashBoard(b, now, s);
+    if (c.result || c.turnAt === null || bankLeft(c, now) > 0) return c;
+    return { ...c, bankMs: 0, turnAt: null, result: { winner: "boss" as const, how: "time" as const } };
+  });
+  return boards.every((b, i) => b === st.boards[i]) ? st : { ...st, boards };
+}
+
+/**
+ * Testing (the admins' trigger in phase 2): a heart of the player's on that board cut now, on their move, whatever its time (the
+ * slash on demand). Unchanged unless it's their move on a live board.
+ */
+export function phase2Slash(st: Phase2State, boardId: number, now: number): Phase2State {
+  const b = st.boards.find((x) => x.id === boardId);
+  if (!b || b.turnAt === null || phase2ToMove(b) !== "crowd") return st;
+  return replace(st, cut(b, now));
+}
+
+/** The next moment a board's clock needs looking at after `now` (a move turning slow, a bank running out), or null: none running. */
+export function phase2NextDue(st: Phase2State, s: SlowSettings = RECLUSE_PHASE2): number | null {
+  let next: number | null = null;
   for (const b of st.boards) {
-    if (phase2ToMove(b) !== "crowd" || b.turnAt === null || now - b.turnAt < s.ultMoveSeconds * 1000) continue;
-    const legal = legalMoves(b.board.fen);
-    next = phase2Move(next, b.id, legal[Math.min(legal.length - 1, Math.floor(rng() * legal.length))]!, now, s);
+    if (b.result || b.turnAt === null || phase2ToMove(b) !== "crowd") continue;
+    const slash = slashDue(b, s);
+    for (const t of [b.turnAt + b.bankMs, slash]) if (t !== null && (next === null || t < next)) next = t;
   }
   return next;
 }

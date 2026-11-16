@@ -1,8 +1,8 @@
 import { RECLUSE_CHILD, RECLUSE_CUTSCENE, RECLUSE_PHASE2, BOSS_ALONE_SCORING, bossClockSettings, BOSS_BRAIN, BOSS_POWERS, DEFAULT_SETTINGS, MATCHMAKING, type ItemLook, type MatchmakingType, botVotes, castPregameVote, clockAfterVote, closePregameVote, cutSeconds, pregameVotes, voteResultMs, type Augment, type BossBrain, type PlayerState, type Settings } from "@chessroyale/core";
 import { GUARD_WORDS, MatchRunner, START_FEN, baseAt, ShowdownScout, brainLine as brainWords, boardSlots, type HumanUciEngine, netBoard, type LobbyPlayer, type LivePick, toSan, type BoardSlot, type BoardState, type NetFinal, type Opening, type RoundReport, type UciEngine } from "@chessroyale/chess";
-import { bulletClock, crowdRace, phase2Numbers, phase2Standings, phase2ToMove, botRoster, bossIntroTimeline, bossThinkMs, landedEarlyMs, fullMoonMs, folioTurnMs, popOffMs, zebraTurnMs, chandyTurnMs, dodgeTimeline, dodgeArena, dodgeOver, bossTurnShowMs, judgeTaps, bossRules, kingHelpBlocked, kingMoveMs, kingStrikeMs, lightsDeadline, lightsOutTimeline, lightsRoundEnd, lastStandMs, powerMomentMs, rushKeep, rushMovesLeft, rushSquares, rushTimeline } from "@chessroyale/chess";
+import { type Phase2Board, bulletClock, crowdRace, phase2Numbers, phase2Standings, phase2ToMove, botRoster, bossIntroTimeline, bossThinkMs, landedEarlyMs, fullMoonMs, folioTurnMs, popOffMs, zebraTurnMs, chandyTurnMs, dodgeTimeline, dodgeArena, dodgeOver, bossTurnShowMs, judgeTaps, bossRules, kingHelpBlocked, kingMoveMs, kingStrikeMs, lightsDeadline, lightsOutTimeline, lightsRoundEnd, lastStandMs, powerMomentMs, rushKeep, rushMovesLeft, rushSquares, rushTimeline } from "@chessroyale/chess";
 import type { BossView, BoardView, DarkNote, ExitKind, FinalView, GameView, Hint, LightsView, MoveRecord, RushView, Phase, SimulView, Standing, VoteView } from "./game.ts";
-import { PHASE2_ULT_ANIMS, PHASE_CHANGE, Phase2Game, phase2Follows, phase2Mates, phaseChangeRun } from "./recluse-phase2.ts";
+import { PHASE_CHANGE, Phase2Game, cueSlash, phase2Follows, phase2Mates, phaseChangeRun } from "./recluse-phase2.ts";
 import { RECLUSE_LINES } from "./characters/recluse-lines.ts";
 import { playInPlace, resetBeats, setSuitAt, setFigureRun } from "./components/BossCharacter.tsx";
 import { resetBattleBanners } from "./battle-banners.ts";
@@ -994,8 +994,8 @@ export class SoloMatch implements GameView {
   /** Testing (admins): the boss's ultimate as the next crowd turn begins. */
   triggerUltimate() {
     if (!BOSS_POWERS.ultimateTestButton || !account().profile?.admin) return;
-    // (The Hidden Boss's phase 2: his ultimate now.)
-    if (this.phase.kind === "simul") return void (this.phase2Playing && this.phase2?.ult());
+    // (The Hidden Boss's phase 2 has no ultimate since Nov 16: the trigger cuts one of your hearts now, the slash on demand.)
+    if (this.phase.kind === "simul") return void (this.phase2Playing && this.phase2?.slash());
     if (this.runner.triggerUltimate()) this.emit();
   }
   get boss(): BossView | null {
@@ -1259,13 +1259,11 @@ export class SoloMatch implements GameView {
       rng: this.rng,
       onChange: () => this.emit(),
       onResult: (b) => this.phase2Result(b.result!.winner),
-      onSlow: (id, ult) => this.phase2Slow(id, ult),
-      onUlt: () => this.phase2Ult(),
+      onSlash: (b) => this.phase2Slash(b),
       onDone: () => this.phase2Done(),
     });
-    this.lastSlow = null;
-    // (The slow move's sound made ahead, off the page, before play begins.)
-    warmSounds(["recluseSlow", "recluseSpark", "recluseArc"]);
+    // (The slash's sound made ahead, off the page, before play begins.)
+    warmSounds(["recluseSlash", "recluseSpark", "recluseArc"]);
     // Where he stands: empty while the board draws him (from the start, as in his cutscene), and once he's back he rests in
     // phase 2's idle. His final form from the white-out on, for the rest of the fight.
     setFigureRun(phaseChangeRun(at));
@@ -1306,30 +1304,12 @@ export class SoloMatch implements GameView {
     bossVoice.say(lines[Math.floor(this.rng() * lines.length)]!, "recluse:phase2", NORMAL);
   }
 
-  private phase2Lines = { won: 0, lost: 0, slow: 0 };
+  private phase2Lines = { won: 0, lost: 0 };
 
-  /**
-   * A slow move (the team's count, the X marks beside every board): a soft sound, and his word on it if nothing else is
-   * being said (one bubble: it waits a little, then lapses).
-   */
-  private phase2Slow(boardId: number, ult: boolean) {
-    // (Soft and low: two notes falling. The board it was on flashes its marks, and the dock names it, for a moment.)
-    play("recluseSlow");
-    this.lastSlow = { board: boardId, at: Date.now() };
-    // (The one that brings his ultimate: his ultimate's line instead.)
-    if (ult) return;
-    const lines = RECLUSE_LINES.slow;
-    bossVoice.say(lines[this.phase2Lines.slow++ % lines.length]!, `recluse:p2:slow:${this.phase2Lines.slow}`, LOW);
-  }
-  /** The last slow move: on which board, and when (its marks flash, the dock names it). */
-  private lastSlow: { board: number; at: number } | null = null;
-
-  /** His ultimate: his line, the spellbook where he stands; from now on a few seconds a move on every board. */
-  private phase2Ult() {
-    const at = Date.now();
-    playInPlace(`recluse:ult2:${at}`, PHASE2_ULT_ANIMS, at);
-    const lines = RECLUSE_LINES.ult2;
-    bossVoice.say(lines[Math.floor(this.rng() * lines.length)]!, `recluse:p2:ult:${at}`, CRITICAL);
+  /** A heart cut (Eric, Nov 16): yours, the slash's sound and his line; a bot's, the slash on its board alone (Recluse2.tsx). */
+  private phase2Slash(b: Phase2Board) {
+    // (Which last line from the moment it came, not the match's random source: drawing from it would move everything drawn after.)
+    if (b.player === HUMAN) cueSlash(b.hearts, `solo:${b.slashAt}`, b.slashAt ?? 0);
   }
   /** A board decided: his word on it (a draw: nothing). The board's own tag says won or lost; the God King says nothing. */
   private phase2Result(winner: "crowd" | "boss" | "draw") {
@@ -1394,9 +1374,6 @@ export class SoloMatch implements GameView {
       from: this.phase2From,
       playing: this.phase2Playing,
       ...o,
-      slow: g.state.slow,
-      lastSlow: this.lastSlow,
-      ultAt: g.state.ultAt,
       boards: g.state.boards.map((b) => ({
         id: b.id,
         you: b.player === HUMAN,
@@ -1410,6 +1387,8 @@ export class SoloMatch implements GameView {
         turnAt: this.phase2Playing ? b.turnAt : null,
         toMove: this.phase2Playing ? phase2ToMove(b) : null,
         result: b.result,
+        hearts: b.hearts,
+        slashAt: b.slashAt,
       })),
     };
     this.simulCache = { state: g.state, playing: this.phase2Playing, view };

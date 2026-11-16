@@ -6,7 +6,6 @@ import { RECLUSE_CUTSCENE } from "../characters/recluse-ages.ts";
 import { RECLUSE_CHANGE, RECLUSE_CHANGE_BOOK, RECLUSE_CHANGE_KID } from "../characters/recluse-transform.ts";
 import { lazyTable, type Character } from "../characters/sprite.ts";
 import { RECLUSE_LINES } from "../characters/recluse-lines.ts";
-import { PHASE2_ULT_ANIMS } from "../recluse-phase2.ts";
 import { animLength, cueAt } from "../characters/power-art.ts";
 import type { BossView } from "../game.ts";
 import { kingSay } from "../godKing.ts";
@@ -121,8 +120,9 @@ export function prewarmRecluse(side: "w" | "b"): void {
   // (His cutscene's first frames: the man alone in the light, the child's poof, drop and landing.)
   const SCENE = ["idle", "poof", "drop", "land"];
   const CHANGE = Object.keys(RECLUSE_CHANGE.anims);
-  // (In his final form where he stands: phase 2's idle and ultimate; on the results, beaten (and slumped) or laughing.)
-  const SUITED = ["idle2", ...PHASE2_ULT_ANIMS];
+  // (In his final form where he stands: phase 2's idle and the spellbook as he's beaten on all four; on the results, beaten (and
+  // slumped) or laughing.)
+  const SUITED = ["idle2", "spellbook2", "spellLoop2", "spellClose2"];
   const SUITED_RESULTS = ["collapse", "collapseLoop", "laugh"];
   // One after another, in the order they show, so only one slice of drawing ahead is ever at work in a frame.
   prewarmSprite(RECLUSE_CUTSCENE, frames(RECLUSE_CUTSCENE, SCENE), undefined, () =>
