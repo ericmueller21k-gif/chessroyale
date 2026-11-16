@@ -16,7 +16,8 @@ High-Altitude Smooth Synth-Jazz", and it is his to give, so this is the plan, pa
 Its 20 bars are 47 seconds, and he wants about 2:45 (SOUNDS.md: a shorter plan is made longer out of its own
 sections). So the plan is played three times, a little more in it each time, and the third time has the theme twice:
   1  as written: the vamp; the theme; the bridge, its line on the bell-Rhodes
-  2  the vamp with the whistle's small turns in its gaps; the theme; the bridge, its line on the whistle
+  2  the vamp with the whistle's small turns in its gaps; the theme; the bridge (its line on the whistle, until
+     Eric's piano took this bridge: below)
   3  the vamp; the theme with the bell-Rhodes sparkling over it; the theme again, a second whistle a third or a sixth
      under the first; the bridge, both lines
 68 bars, 160.0 s.
@@ -24,14 +25,31 @@ What the plan leaves to whoever builds it is written here, inside its rules, and
 song's or any game's): the whistle's theme (long notes held over the barline, small turns of 16ths on the five-note
 scale), the bridge's line, the bell-Rhodes's rhythm, the bass's line and the kit's pattern.
 (Folio has a theme in the game already, song_o.py. This is for Eric to choose between.)
-  python3 song_ah.py <out.wav>
+
+Eric's piano (Nov 16, the same day; he had passed on the song, then played over it): "C6 c6 b5 a5 g5 F5+A5 e5+g5
+x2(quick), repeat but then after g5 it's g5+b5 then f5+a5 x2(quick). Add this piano roll and a little around this
+idea to the first folio iteration the 1:16/1:17 seems to be a natural time to quiet the song and add this layer on
+top? You'll need to adjust somethings I'm sure". 1:15 is where the second bridge starts, on Cmaj7, which his first
+notes fit. So the second bridge (bars 33-40) is his piano's now, in place of the whistle's line:
+  - His notes are his to give and are played as given, on a soft piano: C6 C6 B5 A5 G5 and the two thirds, twice;
+    the same again, ending on G5+B5 and F5+A5. He gave no rhythm: the five notes are quarter notes, the thirds 8ths,
+    the last one left to ring (two bars a phrase). `quick` makes the thirds 16ths instead, for him to compare.
+  - "A little around this idea" is mine, four bars in his shape (two notes the same, a step down, a third's rocking):
+    it starts a third higher, and its last thirds are his with F sharp, which is the way home to G.
+  - "Adjust": his notes are C major's (F natural), so under his four bars the bridge's chords are Cmaj7, Fmaj9, Am9,
+    G9 (each holds every note he plays over it), in place of the plan's Cmaj7, Cm6 to F9, Bm7, E7sus4 to E7. The last
+    four bars keep the plan's chords. The first and third bridges are as the plan has them.
+  - "Quiet the song": no brush there (a steady noise drowns a sparse piano: SOUNDS.md), the kick and the rim softer,
+    the bass down to a root and a fifth, the bell-Rhodes once a chord and soft, the reed pad. The theme's last note
+    before it ends at the barline, so it isn't a step over the piano's first.
+  python3 song_ah.py <out.wav> [quick]
 
   bars  1-4    0:00  the vamp: the bell-Rhodes, the bass, the kit
   bars  5-12   0:09  the whistle's theme
   bars 13-20   0:28  the bridge: a rim and a brush, the reed pad, the bell-Rhodes's line
   bars 21-24   0:47  the vamp, the whistle's turns in its gaps
   bars 25-32   0:56  the theme
-  bars 33-40   1:15  the bridge, the whistle's line
+  bars 33-40   1:15  the bridge, quieter: Eric's piano
   bars 41-44   1:34  the vamp
   bars 45-52   1:44  the theme, the bell-Rhodes sparkling over it
   bars 53-60   2:02  the theme, two whistles
@@ -58,13 +76,17 @@ SKY = {
     "Dm7": ("D2", "F3 A3 C4 D4"), "G7": ("G2", "F3 B3 D4 G4"), "Cmaj7": ("C2", "G3 B3 C4 E4"), "Bm7": ("B2", "A3 B3 D4 F#4"),
     "Em7": ("E2", "G3 B3 D4 E4"), "Am9": ("A2", "G3 B3 C4 E4"), "Cm6": ("C2", "G3 A3 C4 Eb4"), "F9": ("F2", "G3 A3 C4 Eb4"),
     "E7sus4": ("E2", "A3 B3 D4 E4"), "E7": ("E2", "G#3 B3 D4 E4"), "C#dim7": ("C#2", "G3 Bb3 C#4 E4"), "D7b9": ("D2", "C4 Eb4 F#4 A4"),
+    "Fmaj9": ("F2", "A3 C4 E4 G4"), "G9": ("G2", "F3 A3 B3 D4"),
 }
 # A bar's chords, each with its beats (4 if alone).
 VAMP = "Gmaj9 | Cmaj7/G | Gmaj9 | C/D"
 CYCLE = "Gmaj7:2 F#m7b5:1 B7b9:1 | Em9:2 Dm7:1 G7:1 | Cmaj7:2 Bm7:1 Em7:1 | Am9:2 C/D:2"
 BRIDGE = "Cmaj7 | Cm6:2 F9:2 | Bm7 | E7sus4:2 E7:2 | Am9:2 Bm7:2 | Cmaj7:2 C#dim7:2 | D13sus4 | D7b9"
+# The second bridge, under Eric's piano: his four bars' chords are the ones his notes are in; the rest is the plan's.
+HIS_BRIDGE = "Cmaj7 | Fmaj9 | Am9 | G9 | Am9:2 Bm7:2 | Cmaj7:2 C#dim7:2 | D13sus4 | D7b9"
 ONCE = f"{VAMP} | {CYCLE} | {CYCLE} | {BRIDGE}"
-PLAN = [[(c.partition(":")[0], float(c.partition(":")[2] or 4)) for c in bar.split()] for bar in f"{ONCE} | {ONCE} | {VAMP} | {CYCLE} | {CYCLE} | {CYCLE} | {CYCLE} | {BRIDGE}".split(" | ")]
+PLAN = [[(c.partition(":")[0], float(c.partition(":")[2] or 4)) for c in bar.split()]
+        for bar in f"{ONCE} | {VAMP} | {CYCLE} | {CYCLE} | {HIS_BRIDGE} | {VAMP} | {CYCLE} | {CYCLE} | {CYCLE} | {CYCLE} | {BRIDGE}".split(" | ")]
 assert len(PLAN) == BARS and all(sum(d for _, d in bar) == 4 for bar in PLAN), len(PLAN)
 
 # ---- the lines. Lengths in beats; .25 is a 16th; a note may cross a barline. ----
@@ -83,13 +105,18 @@ THEME_UNDER = (
 LINE = "-:1 E5:1 G5:1 B5:1 | A5:1.5 G5:.5 Eb5:2 | D5:1.5 F#5:.5 A5:1 B5:1 | A5:2 G#5:2 | E5:.5 G5:.5 B5:1 A5:.5 B5:.5 D6:1 | E6:1.5 D6:.5 C#6:1 Bb5:1 | A5:.5 G5:.5 E5:1 G5:2 | F#5:1.5 Eb5:.5 D5:2"
 # The whistle's turns in the vamp's gaps (the second time).
 TURNS = "-:4 | -:2.5 D5:.25 E5:.25 G5:.5 E5:.5 | -:4 | -:2 B5:.25 A5:.25 G5:.5 E5:.5 D5:.5"
-for _line, _beats in ((THEME, 33), (THEME_UNDER, 33), (LINE, 32), (TURNS, 16)):
+# Eric's piano: his two phrases (bars 33-36), then four bars of mine around them. "X+Y" is two notes together.
+HIS = "C6:1 C6:1 B5:1 A5:1 | G5:1 F5+A5:{q} E5+G5:{q} F5+A5:{q} E5+G5:{h} | C6:1 C6:1 B5:1 A5:1 | G5:1 G5+B5:{q} F5+A5:{q} G5+B5:{q} F5+A5:{h} | "
+AROUND = "E6:1 E6:1 D6:1 B5:1 | C6:1 A5+C6:.5 G5+B5:.5 G5+Bb5:.5 E5+G5:1.5 | D6:1 D6:1 C6:1 B5:1 | A5:1 G5+B5:{q} F#5+A5:{q} G5+B5:{q} F#5+A5:{h}"
+PIANO = (HIS + AROUND).format(q=".5", h="1.5")
+PIANO_QUICK = (HIS + AROUND).format(q=".25", h="2.25")  # the thirds as 16ths
+for _line, _beats in ((THEME, 33), (THEME_UNDER, 33), (LINE, 32), (TURNS, 16), (PIANO.replace("+", ""), 32), (PIANO_QUICK.replace("+", ""), 32)):
     assert beats(_line) == _beats, (_line[:30], beats(_line))
 
 
-def render(window=None) -> np.ndarray:
+def render(window=None, quick=False) -> np.ndarray:
     """The song as heard (stereo, at the mix's own level). `window`: (from beat, to beat), to make only that passage
-    (a sample, to compare voices on)."""
+    (a sample, to compare voices on). `quick`: the piano's thirds are 16ths, not 8ths."""
     x = Ride(RIDE, BEATS, None, os=2, seed=257, tape_secs=TAPE)
     x.window = window
     put, at = x.put, x.at
@@ -163,9 +190,9 @@ def render(window=None) -> np.ndarray:
         t = np.arange(k) / sr
         put("hats", b, hiss(k, 12000, 0.85) * np.exp(-t / (0.055 if open_ else 0.009)) * tail(k, 0.004) * vol, pan)
 
-    def pocket(bar, vol=1.0, soft=False, fill=False):
+    def pocket(bar, vol=1.0, soft=False, fill=False, brushes=True):
         """The kit's bar: the kick on 1, just before 3 and on the "and" of 3; the snare on 2 and 4 (`soft`: a rim there,
-        a brush on the 16ths, no open hat); hats in swung 16ths, one open on the "and" of 4. `fill`: the snare's 16ths
+        a brush on the 16ths unless `brushes` is off, no open hat); hats in swung 16ths, one open on the "and" of 4. `fill`: the snare's 16ths
         through the bar's second half, growing: the fill that is the pickup into the next bar."""
         b = bar0(bar)
         for i, loud in ((0, 1.0), (7, 0.6), (10, 0.85)):
@@ -175,6 +202,8 @@ def render(window=None) -> np.ndarray:
             if not (fill and beat == 3):
                 rim(b + beat, 0.1 * vol) if soft else snare(b + beat, 0.2 * vol)
         for i in range(16):
+            if soft and not brushes:
+                continue
             if soft:
                 brush(b + sw(i), (0.013 if i % 4 == 0 else 0.009 if i % 2 == 0 else 0.006) * vol)
             else:
@@ -232,13 +261,19 @@ def render(window=None) -> np.ndarray:
         for j, m in enumerate(ms):
             put("pad", b, x.tone(m, length * 0.98, list(REEDS), vol, attack=0.2, release=0.3, trem=0.05, trem_hz=4.0), (-0.45, -0.15, 0.15, 0.45)[j % 4])
 
-    def walk(bar, vol=1.0):
+    def walk(bar, vol=1.0, light=False):
         """The bass's bar: each chord's root, its fifth and octave if there is room, and a half step up into the next
-        root on the last 16th before it (two half steps of it before a new bar)."""
+        root on the last 16th before it (two half steps of it before a new bar). `light`: the root, held, and (a
+        whole bar's chord) its fifth; no steps."""
         b = bar0(bar)
         here = spans(bar)
         for j, (start, d, low, _) in enumerate(here):
             nxt = here[j + 1][2] if j + 1 < len(here) else first_root(bar + 1)
+            if light:
+                finger(b + start, low, min(d, 2.2) * 0.9, 0.4 * vol)
+                if d >= 4:
+                    finger(b + 2.5, low + 7, 0.9, 0.3 * vol)
+                continue
             if d >= 4:
                 finger(b, low, 1.2, 0.4 * vol), finger(b + 1.5, low + 7, 0.45, 0.32 * vol), finger(b + 2, low + 12, 0.7, 0.34 * vol), finger(b + sw(11), low + 7, 0.4, 0.3 * vol)
                 if nxt != low:
@@ -295,9 +330,32 @@ def render(window=None) -> np.ndarray:
         if on_whistle:
             whistle(bar0(first), LINE, 0.85)
 
-    # The plan, three times (the docstring).
+    def piano(start, text, vol=1.0):
+        """Eric's piano: the soft piano, each note ringing on a second or so as under the pedal; a single note of a
+        beat or more has the octave under it, softly; two notes together are each a little softer."""
+        t = float(start)
+        for tok in text.replace("|", " ").split():
+            names, _, d = tok.partition(":")
+            d = float(d)
+            ms = [n(c) for c in names.split("+")] if names != "-" else []
+            for j, m in enumerate(ms):
+                for up, a in ((0, 1.0), (-12, 0.3)) if len(ms) == 1 and d >= 1 else ((0, 0.8 if len(ms) > 1 else 0.9),):
+                    w = x.struck("felt", m + up)
+                    put("piano", sway(t), w * np.exp(-np.arange(len(w)) / sr / 1.2) * 0.5 * vol * a, 0.12 + 0.12 * j)
+            t += d
+
+    def his_bridge(first):
+        """Eight bars, the song quieter under Eric's piano: the kick and the rim soft, no brush; the bass's roots; the
+        bell-Rhodes once a chord; the reed pad; the last bar's fill."""
+        for bar in range(first, first + 8):
+            pocket(bar, 0.75, soft=True, fill=bar == first + 7, brushes=False), walk(bar, 0.8, light=True), comp(bar, 0.6, sparse=True)
+            for start, d, low, ms in spans(bar):
+                reeds(bar0(bar) + start, ms, d)
+        piano(bar0(first), PIANO_QUICK if quick else PIANO)
+
+    # The plan, three times (the docstring); the second bridge is Eric's piano's.
     vamp(1), theme(5), bridge(13, on_keys=True)
-    vamp(21, turns=True), theme(25), bridge(33, on_whistle=True)
+    vamp(21, turns=True), theme(25, again=True), his_bridge(33)
     vamp(41), theme(45, sparkle=True, again=True), theme(53, two=True), bridge(61, on_keys=True, on_whistle=True)
 
     # A hall for the bell-Rhodes, the whistle and the pad; none for the kit or the bass.
@@ -314,15 +372,15 @@ def render(window=None) -> np.ndarray:
 
     x.beat_s = 60 / BPM
     x.echo("whistle", 0.75, 0.16, 0.07), x.echo("whistle2", 0.75, 0.16, 0.07), x.echo("keys", 0.75, 0.12, 0.05)
-    for name, secs, wet in (("keys", 1.8, 0.3), ("whistle", 1.8, 0.3), ("whistle2", 1.8, 0.3), ("pad", 2.2, 0.4)):
+    for name, secs, wet in (("keys", 1.8, 0.3), ("whistle", 1.8, 0.3), ("whistle2", 1.8, 0.3), ("pad", 2.2, 0.4), ("piano", 1.8, 0.25)):
         room(name, secs, wet)
-    levels = {"whistle": 1.0, "whistle2": 1.0, "keys": 2.0, "pad": 1.6, "bass": 0.55, "kick": 0.95, "snare": 2.1, "hats": 5.0}
+    levels = {"whistle": 1.0, "whistle2": 1.0, "piano": 0.56, "keys": 2.0, "pad": 1.6, "bass": 0.55, "kick": 0.95, "snare": 2.1, "hats": 5.0}
     return x.play(x.mixdown(levels, lowpass=9000, room=0.05))
 
 
-def main(out: str) -> None:
-    write_wav(out, render())
+def main(out: str, quick: str = "") -> None:
+    write_wav(out, render(quick=bool(quick)))
 
 
 if __name__ == "__main__":
-    main(sys.argv[1])
+    main(*sys.argv[1:])
