@@ -1,3 +1,4 @@
+- Nov 16 ~15:30 UTC: Eric answered: party ALWAYS ranked (only private lobbies unranked; thinks Squads counts for its mode: Squads is unranked today, asked) -> #750 (CROWD_PARTY.ranked true). Chandy Dodge a turn later + "prepare yourself" line -> #752 (dodgeAfterMoves 1). 8 hearts fine. Music: sent Eric sawyer-loop 192k vs 128k (music-test/ in the main checkout, untracked, not for commit); he asked how it helps for all audio. T1 DONE -> #751 (helper archived). CI watched on #750, #751, #752.
 - Nov 16 ~14:50 UTC: main full run after #749 (42415c7) GREEN, no retry-passes. Waiting on T1 helper.
 - Nov 16 ~14:30 UTC: #749 MERGED (42415c7; test-only). Main run watched. T1 helper running.
 - Nov 16 ~14:05 UTC: #748 LIVE (06c6914). Main run RED by retry-pass: autochess.spec:607 [phone] (bot "Lv 5" vs "Lv 4": the bot buys XP 0.5 s into the quick step; test race). Fixed forward: #749 (1ada3c6, light lane, test-only), CI watched.
