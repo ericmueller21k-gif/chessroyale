@@ -1,3 +1,4 @@
+- Nov 16 ~22:45 UTC: main after #757/#758 GREEN, no retries; #757 LIVE. #759 bundle split MERGED (3d827b0); deploy + main run watched. C1 helper running (xhigh, alone).
 - Nov 16 ~22:30 UTC: Eric GO on the 50 v 50 rework; Hidden Boss out of 50 v 50 for now (code kept, unreached). Defaults: verdict at 60, Chaos equal, winners first. C1 helper (Opus xhigh, alone) claude/crowd-rework-c1. Queued after: hash-cascade fix (stable file names), chess boss rules off first load. #759 CI + main run after #757 watched.
 - Nov 16 ~22:20 UTC: bundle split DONE -> #759 (b8fd09c; main chunk 707->446 kB gzip, home 1.69->1.21 s Fast 4G; helper archived). Next steps it found: hash cascade (one-word change renames 71/86 files: import map or stable shared chunk) and chess boss rules 189 kB via the index. CI watched (whole suite).
 - Nov 16 ~22:10 UTC: #757 town solos MERGED (ca23187). Deploy + main run (covers #757 + #758) watched. bundle-split running.
