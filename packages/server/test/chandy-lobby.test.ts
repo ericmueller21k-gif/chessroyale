@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_SETTINGS, RAID_SETTINGS, mulberry32, type ChandyDodge, type Settings } from "@chessroyale/core";
-import { dodgeTimeline, legalMoves, sanLineToUci, type BoardScore, type MatchRunner, type Opening, type ServerMessage } from "@chessroyale/chess";
+import { CHANDY_FX, dodgeTimeline, legalMoves, sanLineToUci, type BoardScore, type MatchRunner, type Opening, type ServerMessage } from "@chessroyale/chess";
 import { LobbyCore, newLobbyRecord } from "../src/lobby.ts";
 
 /**
@@ -73,7 +73,7 @@ function chandyLobby(test: string) {
   };
   advance(1000);
   advance(60_000);
-  return { core, log, advance, runner, hisTurn, crowdPlays, now: () => now };
+  return { core, log, advance, runner, hisTurn, crowdPlays, last, drop, now: () => now };
 }
 
 /** A message's Dodge (the boss's, a round's or a reveal's view of it), or null. */
@@ -146,5 +146,41 @@ describe("Chandy online: Dodge's answers go out in their time", () => {
       });
     }
     expect(checked).toBeGreaterThan(5);
+  });
+});
+
+describe("Chandy online: his first capture", () => {
+  it("the host's move, then the lock moment while he still thinks (the board as it was), then the move shows: upgrade 1", () => {
+    const L = chandyLobby("");
+    L.crowdPlays();
+    for (let i = 0; i < 20 && !L.last("p1", "bossRequest"); i++) L.advance(500);
+    const req = L.last("p1", "bossRequest")!;
+    expect(req).toBeTruthy();
+    L.drop("p1", "bossRequest");
+    // (The position set by hand as his move is asked: his knight on f6 can take your knight on d5, his first capture.)
+    const r = L.runner();
+    const id = r.state.boards[0]!;
+    const board = r.boards.get(id)!;
+    const fen = "4k3/8/5n2/3N4/8/8/8/R3K3 b - - 0 1";
+    r.boards.set(id, { ...board, fen, bases: [...(board.bases ?? []).filter((x) => x.ply !== board.history.length), { ply: board.history.length, fen }] });
+    const before = L.log.length;
+    L.core.message("p1", { t: "bossMove", key: req.key, move: "f6d5" });
+    // (Held: a thinking message with the lock on d5 and its moment, the board unchanged.)
+    const held = L.log.slice(before).filter((x) => x.id === "p1" && x.msg.t === "boss").map((x) => x.msg as Extract<Msg, { t: "boss" }>);
+    expect(held.length).toBe(1);
+    expect(held[0]!.thinking).toBe(true);
+    expect(held[0]!.boss.board.fen).toBe(fen);
+    expect(held[0]!.boss.powers?.chandy?.locks.map((l) => l.square)).toEqual(["d5"]);
+    expect(held[0]!.boss.powers?.events.filter((e) => e.kind === "lockOn")).toEqual([{ kind: "lockOn", turn: held[0]!.boss.powers!.turn, square: "d5", first: true }]);
+    // (Not before the moment's end.)
+    L.advance(CHANDY_FX.lockOn - 100);
+    expect(r.boards.get(id)!.fen).toBe(fen);
+    L.advance(200);
+    expect(r.boards.get(id)!.fen).not.toBe(fen);
+    const c = r.boss!.powers!.chandy!;
+    expect([c.taught, c.upgrades]).toEqual([true, 1]);
+    const shown = L.log.slice(before).filter((x) => x.id === "p1" && x.msg.t === "boss").map((x) => x.msg as Extract<Msg, { t: "boss" }>).at(-1)!;
+    expect(shown.thinking).toBeFalsy();
+    expect(shown.boss.powers?.events.some((e) => e.kind === "upgrade")).toBe(true);
   });
 });

@@ -3,7 +3,7 @@
  * docs/ideas/chandy-wiring.md; docs/decisions/2026-11-16-chandy-rules.md), all from the shared state and each moment's start, so
  * everyone online sees the same thing:
  * - **His locks:** a crosshair on each locked piece of yours, its pips counting the turns it has left (3, 2, 1); a new one snaps on
- *   as he points (`lockOn`; his first, as his turn begins, while he thinks: chandyTurnMoments).
+ *   as he points (`lockOn`; his first, on the piece his first capture takes, before that move shows: chandyTurnMoments).
  * - **The upgrade window** (`upgrade`, 2 s, the clock held): the rifle at its new stage, the part snapping on, "UPGRADE!", the move
  *   it unlocked (ChandyUpgrade), front and center over the board.
  * - **His meter's moves** (each with its banner, your pawn on it, and his shot from the board's corner): scatter shot's burst and
@@ -12,10 +12,11 @@
  *   next turn (the round down the file, the piece in its way shattered).
  * - **His bar:** the rifle's pips (n of 5) and the move meter, greyed until his first upgrade (nothing hidden, nothing shifts); his
  *   rage meter dimmed until the fifth ("Rage: unlocks at 5 upgrades").
- * - **Dodge** (as your turn begins): ChandyDodge over the board, built from the shared state and the battle's clock (dodgeView).
+ * - **Dodge** (as your turn begins): ChandyDodge over the board, built from the shared state and the battle's clock (dodgeView): the
+ *   scope-in, the warning volley, three rounds of vote and beams; the first hit cracks your king, the second is the kill.
  */
 import { CHANDY_FIRE_AT, CHANDY_FX, dodgeTimeline, linesAfter, type ChandyView } from "@chessroyale/chess";
-import type { ChandyMove, DodgeLine } from "@chessroyale/core";
+import { BOSS_POWERS, type ChandyMove, type DodgeLine } from "@chessroyale/core";
 import type { BossView, DodgeRun } from "../game.ts";
 import { BoardEffects, onEachFrame, prewarm, prewarmAnims, prewarmSprite, type BoardItem } from "./BossEffect.tsx";
 import { CHANDY, CHANDY_CLONE, CHANDY_RIFLE } from "../characters/chandy.ts";
@@ -193,28 +194,33 @@ const MOMENTS: Record<"lockOn" | "upgrade" | "scatterShot" | "beam" | "shields" 
   dodgeWin: { order: 3, kit: "ultimateHit", view: () => null },
 };
 
-/** When this device first saw his moments at the start of each of his turns (they play from then), by battle and turn. */
+/** When this device first saw each of his moments in his turns (they play from then), by battle, turn and moment. */
 const turnSeen = new Map<string, number>();
 
 /**
- * His moments at the start of his turn, after your move (his first lock, the queen lock's shot), from this turn's events, timed
- * from when this device first saw them, one after another; his move waits for them (chandyTurnMs).
+ * His moments in his turn, while he thinks (the queen lock's shot as it begins; his first lock as his first capture is about to show,
+ * with his move known: chandyBattle.firstLock), from this turn's events, each from when this device first saw it and never before the
+ * one ahead of it ends; his move waits for them (chandyTurnMs, and the server's hold of his first capture).
  */
 export function chandyTurnMoments(boss: BossView, now = Date.now()): Moment[] {
   const p = boss.powers;
   if (boss.id !== "chandy" || !p) return [];
   const list = p.events.filter((e) => e.turn === p.turn && (e.kind === "queenShot" || (e.kind === "lockOn" && e.first)));
   if (!list.length) return [];
-  const seenKey = `${boss.id}:${boss.startMove}:${p.turn}`;
-  let at = turnSeen.get(seenKey);
-  if (at === undefined) {
-    turnSeen.set(seenKey, (at = now));
-    if (turnSeen.size > 20) turnSeen.delete(turnSeen.keys().next().value!);
-  }
-  let t = at;
+  const seen = (kind: string) => {
+    const seenKey = `${boss.id}:${boss.startMove}:${p.turn}:${kind}`;
+    let at = turnSeen.get(seenKey);
+    if (at === undefined) {
+      turnSeen.set(seenKey, (at = now));
+      if (turnSeen.size > 20) turnSeen.delete(turnSeen.keys().next().value!);
+    }
+    return at;
+  };
+  let t = 0;
   return [...list]
     .sort((a, b) => MOMENTS[a.kind as keyof typeof MOMENTS].order - MOMENTS[b.kind as keyof typeof MOMENTS].order)
     .map((e) => {
+      t = Math.max(t, seen(e.kind));
       const m: Moment = { kind: e.kind, key: `${boss.id}:${e.kind}:${e.turn}:${e.square ?? ""}`, at: t, ms: CHANDY_FX[e.kind as keyof typeof CHANDY_FX], ...(e.square ? { square: e.square } : {}), ...(e.squares ? { squares: e.squares } : {}), ...(e.fizzled ? { fizzled: e.fizzled } : {}), ...(e.first ? { first: true as const } : {}), ...(e.shape ? { shape: e.shape } : {}) };
       t += m.ms;
       return m;
@@ -260,28 +266,54 @@ const shownLine = (l: DodgeLine, side: "white" | "black", since?: number): Dodge
 /** How long a teleport's afterimage and "TELEPORT!" show (ms). */
 const GHOST_MS = 500;
 
+/** How long the beams take to fade at their end (ms; the art's `fade`). */
+const BEAM_FADE_MS = 180;
+
 /**
  * Dodge's view at `now` (this device's time), from the shared state (the boss's `chandy.dodge`: online, what's been seen of it) and
- * the run (when it began, the round voted on, its counts, your vote). The phases follow dodgeTimeline from the run's start.
+ * the run (when it began, the round voted on, its counts, your vote). The phases follow dodgeTimeline from the run's start: the
+ * scope-in, the slide, the warning volley, then each round (its beams traveling and held; a hit that loses: the kill).
  */
 export function dodgeView(boss: BossView, run: DodgeRun, now: number, onPick?: (square: string) => void): DodgeView | null {
   const d = chandyOf(boss)?.dodge;
   if (!d) return null;
+  const S = BOSS_POWERS.chandy;
   const side = boss.crowdSide === "w" ? "white" : "black";
   const tl = dodgeTimeline();
   const t = now - run.at;
-  const base = { side, king: d.king, center: d.center } as const;
+  const base = { side, king: d.king, center: d.center, hits: 0 } as const;
   if (t < tl.slideAt) return { ...base, phase: "scope", since: run.at, lines: [], round: 1 };
-  if (t < tl.rounds[0]!.voteAt - 400) return { ...base, phase: "slide", since: run.at + tl.slideAt, lines: [], round: 1 };
-  // The round on: the last one with a result whose end hasn't passed, else the one being voted on.
-  let k = Math.min(d.rounds.length - 1, d.results.length);
-  for (let i = 0; i < d.results.length; i++) if (t < tl.rounds[i]!.end) {
-    k = i;
-    break;
+  if (t < tl.volley.at) return { ...base, phase: "slide", since: run.at + tl.slideAt, lines: [], round: 1 };
+  // The warning volley: the clones on lines that miss your king fire once; no vote.
+  if (t < tl.volley.end) {
+    const lines = (d.volley ?? []).map((l) => shownLine(l, side, run.at + tl.volley.at));
+    return { ...base, phase: "volley", since: run.at + tl.volley.at, lines, round: 1, beams: { at: run.at + tl.volley.fireAt, fadeAt: run.at + tl.volley.end - BEAM_FADE_MS }, ...(t >= tl.volley.landAt ? { warned: true } : {}) };
   }
+  // The hit that loses (its round shows the kill until dodgeEndAt), and the round on: the last one with a result whose end hasn't
+  // passed, else the one being voted on.
+  let hits = 0;
+  const losing = d.results.findIndex((r) => r.hit && ++hits >= S.dodgeHits);
+  const endOf = (i: number) => (i === losing ? tl.rounds[i]!.hitAt + tl.killMs : tl.rounds[i]!.end);
+  let k = Math.min(d.rounds.length - 1, d.results.length);
+  let running = false;
+  for (let i = 0; i < d.results.length; i++)
+    if (t < endOf(i)) {
+      k = i;
+      running = true;
+      break;
+    }
+  // (Dodge decided, its last round's end past: keep that round (the kill, or the last result) on screen until the results come,
+  // never the next round's clones and "Locked" after a kill in round 2: the review of #745.)
+  if (!running && (losing >= 0 || d.results.length >= d.rounds.length)) k = losing >= 0 ? losing : d.results.length - 1;
   const r = tl.rounds[k]!;
   const round = d.rounds[k]!;
   const result = d.results[k];
+  const landed = !!result && t >= r.hitAt;
+  // (Your king's crack: the first hit, once it has landed; the hits shown so far.)
+  const first = d.results.findIndex((x) => x.hit);
+  const crackAt = first >= 0 && first !== losing && (k > first || (k === first && landed)) ? run.at + tl.rounds[first]!.hitAt : undefined;
+  const shownHits = d.results.slice(0, k).filter((x) => x.hit).length + (landed && result.hit ? 1 : 0);
+  const kept = { ...base, hits: shownHits, ...(crackAt !== undefined ? { cracked: crackAt } : {}) };
   const roundNo = (k + 1) as 1 | 2 | 3;
   const seen = round.teleports.filter((_, j) => t >= (r.teleports[j] ?? Infinity));
   const linesNow = linesAfter(round, seen.length);
@@ -296,16 +328,19 @@ export function dodgeView(boss: BossView, run: DodgeRun, now: number, onPick?: (
     return [{ ...shownLine(was, side), since: left }];
   });
   const teleport = seen.some((_, j) => t >= r.teleports[j]! && t < r.teleports[j]! + GHOST_MS);
-  if (t < r.voteAt) return { ...base, phase: "open", since: run.at + r.openAt, lines: [], round: roundNo };
+  if (t < r.voteAt) return { ...kept, phase: "open", since: run.at + r.openAt, lines: [], round: roundNo };
   if (!result) {
-    if (t < r.voteEnd) return { ...base, phase: "vote", since: run.at + r.voteAt, lines, ghosts, votes: run.round === k ? run.votes : {}, ...(run.round === k && run.mine ? { mine: run.mine } : {}), endsAt: run.at + r.voteEnd, round: roundNo, teleport, ...(onPick ? { onPick } : {}) };
+    if (t < r.voteEnd) return { ...kept, phase: "vote", since: run.at + r.voteAt, lines, ghosts, votes: run.round === k ? run.votes : {}, ...(run.round === k && run.mine ? { mine: run.mine } : {}), endsAt: run.at + r.voteEnd, round: roundNo, teleport, ...(onPick ? { onPick } : {}) };
     // (Closed: the result is on its way.)
-    return { ...base, phase: "locked", since: run.at + r.voteEnd, lines, round: roundNo };
+    return { ...kept, phase: "locked", since: run.at + r.voteEnd, lines, round: roundNo };
   }
   const placed = result.placed;
-  if (t < r.blastAt) return { ...base, phase: "locked", since: run.at + r.closeAt, lines, placed, round: roundNo };
-  if (t < r.resultAt) return { ...base, phase: "blast", since: run.at + r.blastAt, lines, placed, round: roundNo, ...(result.hit ? { result: "hit" as const } : {}) };
-  return { ...base, phase: "result", since: run.at + r.resultAt, lines, placed, round: roundNo, result: result.hit ? "hit" : "dodged" };
+  if (t < r.blastAt) return { ...kept, phase: "locked", since: run.at + r.closeAt, lines, placed, round: roundNo };
+  const killAt = run.at + r.hitAt;
+  const beams = { at: run.at + r.blastAt, fadeAt: k === losing ? killAt + S.dodgeKillMs - BEAM_FADE_MS : run.at + r.end - BEAM_FADE_MS };
+  if (!landed) return { ...kept, phase: "blast", since: run.at + r.blastAt, lines, placed, round: roundNo, beams };
+  if (k === losing) return { ...kept, phase: "kill", since: killAt, lines, placed, round: roundNo, beams, result: "hit", killAt };
+  return { ...kept, phase: "result", since: killAt, lines, placed, round: roundNo, beams, result: result.hit ? "hit" : "dodged" };
 }
 
 /** Dodge over the board while it runs (the board under it shows the position, its king taken off: dodgeFen). */
@@ -331,9 +366,16 @@ export function dodgeFen(boss: BossView, fen: string): string {
 export function dodgeDock(boss: BossView, run: DodgeRun, now: number): { line: string; sub: string } {
   const v = dodgeView(boss, run, now);
   if (!v) return { line: "", sub: "" };
-  if (v.phase === "vote") return { line: "Vote where your king stands", sub: "One square is safe. One hit and the battle is his." };
-  if (v.phase === "result") return v.result === "hit" ? { line: "Hit!", sub: "The battle is his." } : { line: `Dodged ${v.round} of 3`, sub: v.round < 3 ? "Next round." : "The board comes back." };
+  const S = BOSS_POWERS.chandy;
+  const left = S.dodgeHits - v.hits;
+  const stake = left <= 1 ? "One more hit and the battle is his." : `${left === 2 ? "Two" : left} hits and the battle is his.`;
+  if (v.phase === "vote") return { line: "Vote where your king stands", sub: `One square is safe. ${stake}` };
+  if (v.phase === "kill") return { line: "Hit!", sub: "The battle is his." };
+  // (A first hit in the last round: Dodge is over, the board comes back; no "one more hit".)
+  if (v.phase === "result") return v.result === "hit" ? { line: "King cracked!", sub: v.round < 3 ? stake : "The board comes back." } : { line: `Dodged ${v.round} of 3`, sub: v.round < 3 ? "Next round." : "The board comes back." };
   if (v.phase === "locked" || v.phase === "blast") return { line: "Locked", sub: v.placed ? `Your king on ${v.placed}.` : "Counting the votes." };
+  if (v.phase === "volley") return v.warned ? { line: "Dodge the next one!", sub: `Vote where your king stands. ${stake}` } : { line: "Dodge!", sub: "A warning shot. Watch his clones." };
+  if (v.phase === "open" && v.round === 1) return { line: "Dodge the next one!", sub: `One square is safe. ${stake}` };
   return { line: "Dodge!", sub: "One square is safe. Watch his clones." };
 }
 

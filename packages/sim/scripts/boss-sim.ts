@@ -465,7 +465,7 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
       const dash = { pickSec, rushSec: patch.rushSec ?? 2.2, bankMs: BOSS_CLOCK.bankSeconds * 1000, minBankMs: BOSS_CLOCK.bankSeconds * 1000, slaps: 0, stolenMs: 0, scrambles: 0, scrambled: 0, flags: 0, scrambleFlags: 0, slapSeen: -1 };
       // (Chandy: each lock (after which crowd move, its square), each upgrade (after which crowd move), the moves his meter fired,
       // each queen lock aimed (or the turn it waited) and its shot, and each Dodge's rounds.)
-      const chandy = { locks: [] as { at: number; square: string }[], upgrades: [] as number[], fired: [] as { at: number; move: string }[], aims: [] as number[], aimWaits: [] as number[], shots: [] as { at: number; piece: string | null }[], dodges: [] as { at: number; rounds: number; hit: boolean; random: number; last: boolean; upgrades: number }[] };
+      const chandy = { locks: [] as { at: number; square: string; first?: true }[], upgrades: [] as number[], fired: [] as { at: number; move: string }[], aims: [] as number[], aimWaits: [] as number[], shots: [] as { at: number; piece: string | null }[], dodges: [] as { at: number; rounds: number; hit: boolean; hits: number; won: boolean; random: number; last: boolean; upgrades: number }[] };
       const chandySeen = new Set<string>();
       const CHANDY_FIRED: Record<string, string> = { scatterShot: "scatter", beam: "beam", shields: "shields", rapidFire: "rapidfire", queenAim: "queenlock" };
       const chandyLook = () => {
@@ -477,7 +477,7 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
           const key = `${e.kind}@${e.turn}@${e.square ?? ""}`;
           if (chandySeen.has(key)) continue;
           chandySeen.add(key);
-          if (e.kind === "lockOn") chandy.locks.push({ at: e.turn, square: e.square ?? "" });
+          if (e.kind === "lockOn") chandy.locks.push({ at: e.turn, square: e.square ?? "", ...(e.first ? { first: true as const } : {}) });
           else if (CHANDY_FIRED[e.kind]) chandy.fired.push({ at: e.turn, move: CHANDY_FIRED[e.kind]! });
           else if (e.kind === "queenShot") chandy.shots.push({ at: e.turn, piece: (e as { shape?: string }).shape ?? null });
         }
@@ -686,7 +686,8 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
             const hoopsAsked = bossId === "tiger" && !!runner.hoopsAsk();
             const ultsBefore = runner.boss!.powers?.ults ?? 0;
             const tw = Date.now();
-            await runner.playBoss(engines[0]);
+            // (Chandy's first capture: its lock is marked as his move is about to show, so it's looked at then, as solo shows it.)
+            await runner.playBoss(engines[0], bossId === "chandy" ? async () => chandyLook() : undefined);
             if (bossId === "chandy") chandyLook();
             if (bossId === "timber") timberLook();
             if (bossId === "dash") {
@@ -730,7 +731,7 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
           look();
           continue;
         }
-        // (Chandy's Dodge, as the crowd's turn begins: the bots' votes, round by round; a hit ends the battle.)
+        // (Chandy's Dodge, as the crowd's turn begins: the bots' votes, round by round; the second hit ends the battle.)
         if (runner.dodgeDue()) {
           const p0 = runner.boss!.powers!;
           const d0 = p0.chandy!.dodge!;
@@ -738,7 +739,8 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
           while (runner.dodgeDue()) runner.finishDodgeRound({});
           const d = runner.boss!.powers!.chandy!.dodge!;
           // (`last`: the last chance, the crowd's mate in one, warned and come on one turn.)
-          chandy.dodges.push({ at: d0.at, rounds: d.results.length, hit: d.results.some((r) => r.hit), random: d.results.filter((r) => r.random).length, last: p0.warnAt === p0.ultAt, upgrades: p0.chandy!.upgrades });
+          const hits = d.results.filter((r) => r.hit).length;
+          chandy.dodges.push({ at: d0.at, rounds: d.results.length, hit: hits > 0, hits, won: hits >= BOSS_POWERS.chandy.dodgeHits, random: d.results.filter((r) => r.random).length, last: p0.warnAt === p0.ultAt, upgrades: p0.chandy!.upgrades });
           continue;
         }
         if (runner.extraMoveDue()) {

@@ -209,7 +209,8 @@ async function solo(start: MatchRunner): Promise<Trace> {
       // (Chandy's queen lock: aimed, as online where the host's answer to the pass guard is a move, never "wait".)
       if (r.bossToMove() && r.queenLockDue()) r.applyQueenLock(null);
       seen();
-      if (r.bossToMove()) await r.playBoss(engines[0]);
+      // (A moment with his move known, before it shows, as solo shows it: Chandy's first lock.)
+      if (r.bossToMove()) await r.playBoss(engines[0], async () => seen());
       continue;
     }
     // (Chandy's Dodge: everyone votes the safe square, as online.)
@@ -263,4 +264,14 @@ describe("the boss kit: solo and online agree", () => {
       expect(local.result).toBe(net.result);
     }, 60_000);
   }
+
+  it("chandy, no switch: his first capture's lock (the host's move, then the lock moment, then the move) is the same solo and online", async () => {
+    const { trace: net, start } = await online("chandy", "");
+    const local = await solo(start);
+    const firsts = [...net.events].filter((e) => e.includes('"kind":"lockOn"') && e.includes('"first":true'));
+    expect(firsts.length).toBe(1);
+    expect(local.turns).toEqual(net.turns);
+    expect({ onlyOnline: [...net.events].filter((e) => !local.events.has(e)), onlySolo: [...local.events].filter((e) => !net.events.has(e)) }).toEqual({ onlyOnline: [], onlySolo: [] });
+    expect(local.result).toBe(net.result);
+  }, 60_000);
 });

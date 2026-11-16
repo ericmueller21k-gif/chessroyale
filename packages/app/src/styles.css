@@ -27509,4 +27509,88 @@ body.cs-on .mm-scrim {
     overflow: hidden;
     text-overflow: ellipsis;
   }
+/* Dodge's hits on your king (Eric, Nov 16): the first leaves a crack through him for the rest of Dodge (c1) after a short flicker; the
+   second is the kill: the beams keep hitting him (the board canvas's sparks and particles under him), his cracks spread (c2, c3), he
+   flickers and fades away, gone as he shatters (BOSS_POWERS.chandy.dodgeKillMs: 5 s). */
+.cd-crack {
+  position: absolute;
+  inset: 0;
+  background: no-repeat center / 100% 100%;
+  opacity: 0;
+  pointer-events: none;
+}
+.cd-crack.c1 {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpolyline points='16,5 14,10 17,14 13,19 15,24 13,28' fill='none' stroke='%231a0008' stroke-width='1.7' stroke-linejoin='miter' shape-rendering='crispEdges'/%3E%3Cpolyline points='16,5 14,10 17,14 13,19 15,24 13,28' fill='none' stroke='%23ffe1dc' stroke-width='0.7' transform='translate(0.9 0)' shape-rendering='crispEdges'/%3E%3C/svg%3E");
+}
+.cd-crack.c2 {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpolyline points='17,14 21,16 24,15' fill='none' stroke='%231a0008' stroke-width='1.7' stroke-linejoin='miter' shape-rendering='crispEdges'/%3E%3Cpolyline points='17,14 21,16 24,15' fill='none' stroke='%23ffe1dc' stroke-width='0.7' transform='translate(0.9 0)' shape-rendering='crispEdges'/%3E%3Cpolyline points='13,19 9,21 7,24' fill='none' stroke='%231a0008' stroke-width='1.7' stroke-linejoin='miter' shape-rendering='crispEdges'/%3E%3Cpolyline points='13,19 9,21 7,24' fill='none' stroke='%23ffe1dc' stroke-width='0.7' transform='translate(0.9 0)' shape-rendering='crispEdges'/%3E%3Cpolyline points='14,10 10,9' fill='none' stroke='%231a0008' stroke-width='1.7' stroke-linejoin='miter' shape-rendering='crispEdges'/%3E%3Cpolyline points='14,10 10,9' fill='none' stroke='%23ffe1dc' stroke-width='0.7' transform='translate(0.9 0)' shape-rendering='crispEdges'/%3E%3C/svg%3E");
+}
+.cd-crack.c3 {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpolyline points='15,24 19,26 22,29' fill='none' stroke='%231a0008' stroke-width='1.7' stroke-linejoin='miter' shape-rendering='crispEdges'/%3E%3Cpolyline points='15,24 19,26 22,29' fill='none' stroke='%23ffe1dc' stroke-width='0.7' transform='translate(0.9 0)' shape-rendering='crispEdges'/%3E%3Cpolyline points='21,16 22,21 25,23' fill='none' stroke='%231a0008' stroke-width='1.7' stroke-linejoin='miter' shape-rendering='crispEdges'/%3E%3Cpolyline points='21,16 22,21 25,23' fill='none' stroke='%23ffe1dc' stroke-width='0.7' transform='translate(0.9 0)' shape-rendering='crispEdges'/%3E%3Cpolyline points='16,5 19,8 22,7' fill='none' stroke='%231a0008' stroke-width='1.7' stroke-linejoin='miter' shape-rendering='crispEdges'/%3E%3Cpolyline points='16,5 19,8 22,7' fill='none' stroke='%23ffe1dc' stroke-width='0.7' transform='translate(0.9 0)' shape-rendering='crispEdges'/%3E%3Cpolyline points='9,21 10,26' fill='none' stroke='%231a0008' stroke-width='1.7' stroke-linejoin='miter' shape-rendering='crispEdges'/%3E%3Cpolyline points='9,21 10,26' fill='none' stroke='%23ffe1dc' stroke-width='0.7' transform='translate(0.9 0)' shape-rendering='crispEdges'/%3E%3Cpolyline points='10,9 8,13' fill='none' stroke='%231a0008' stroke-width='1.7' stroke-linejoin='miter' shape-rendering='crispEdges'/%3E%3Cpolyline points='10,9 8,13' fill='none' stroke='%23ffe1dc' stroke-width='0.7' transform='translate(0.9 0)' shape-rendering='crispEdges'/%3E%3C/svg%3E");
+}
+.cd-cracked .cd-crack.c1 {
+  opacity: 1;
+}
+.cd-p-result.cd-root .cd-cracked piece {
+  animation: cd-flicker 700ms steps(1) both;
+  animation-delay: var(--cd-ago, 0ms);
+}
+@keyframes cd-flicker {
+  0%, 20%, 40%, 60% { opacity: 0.35; }
+  10%, 30%, 50%, 100% { opacity: 1; }
+}
+.cd-dying .cd-crack.c1 {
+  opacity: 1;
+}
+.cd-dying .cd-crack.c2 {
+  animation: cd-crack-in 5000ms steps(1) both;
+  animation-delay: var(--cd-ago, 0ms);
+}
+.cd-dying .cd-crack.c3 {
+  animation: cd-crack-in2 5000ms steps(1) both;
+  animation-delay: var(--cd-ago, 0ms);
+}
+@keyframes cd-crack-in {
+  0%, 24% { opacity: 0; }
+  25%, 100% { opacity: 1; }
+}
+@keyframes cd-crack-in2 {
+  0%, 54% { opacity: 0; }
+  55%, 100% { opacity: 1; }
+}
+.cd-dying piece {
+  animation: cd-dissolve 5000ms linear both;
+  animation-delay: var(--cd-ago, 0ms);
+}
+@keyframes cd-dissolve {
+  0% { opacity: 1; }
+  30% { opacity: 0.9; }
+  32% { opacity: 0.4; }
+  34% { opacity: 0.9; }
+  58% { opacity: 0.7; }
+  60% { opacity: 0.25; }
+  63% { opacity: 0.7; }
+  80% { opacity: 0.45; }
+  82% { opacity: 0.1; }
+  85% { opacity: 0.4; }
+  99.9% { opacity: 0.25; }
+  100% { opacity: 0; }
+}
+.cd-result.cd-warned {
+  color: #ff8fa3;
+  font-size: 11px;
+}
+.cd-hits {
+  display: flex;
+  gap: 5px;
+}
+.cd-hits i {
+  width: 10px;
+  height: 10px;
+  box-sizing: border-box;
+  border: 2px solid #ff3f5e;
+  border-radius: 2px;
+}
+.cd-hits i.on {
+  background: #ff3f5e;
 }

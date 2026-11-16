@@ -110,6 +110,7 @@ import {
   hollowBattle,
   blackedOut,
   chandyBattle,
+  CHANDY_FX,
   dodgeWon,
   type DarkTryResult,
   moveLoss,
@@ -1341,13 +1342,15 @@ export class MatchRunner {
    * The boss's move from an engine (at its strength), played on the board. Wrangler's turn also works out his long pull,
    * drag or showdown on this device's engines (pigTurn), as the host does online.
    */
-  async playBoss(engine: EngineLike = this.opts.engines[0]!): Promise<string> {
+  async playBoss(engine: EngineLike = this.opts.engines[0]!, beforeShow?: (ms: number) => Promise<void>): Promise<string> {
     const fen = this.boards.get(this.state.boards[0]!)!.fen;
     const kind = this.bossMoveKind();
     // (Test switch: a mate in one whenever there is one.)
     const mate = this.settings.bossMateTest ? (this.bossAllowed() ?? legalMoves(fen)).find((m) => gameEnd(applyMove(fen, m), []) === "checkmate") : undefined;
     // (Test switch ?paint=1: Smudgy's hidden rook steps like a pawn, whose name the e2e reads.)
     const paint = this.settings.bossPaintTest ? smudgyBattle.paintStep(this.battle, this.bossAllowed() ?? legalMoves(fen)) : undefined;
+    // (Test switch ?power=lockon: Chandy takes a piece as soon as he can, so his first lock comes early.)
+    const grab = chandyBattle.testMove(this.battle, this.bossAllowed()) ?? undefined;
     // (The Hidden Boss's child: Maia at his rating now, and Stockfish at the strength that rating stands for while Maia isn't there.)
     const child = this.childRatingNow();
     const brain = this.humanBrain && child !== null ? { ...this.humanBrain, rating: child } : this.humanBrain;
@@ -1363,6 +1366,7 @@ export class MatchRunner {
     const ordinary = async () =>
       mate ??
       paint ??
+      grab ??
       (await bossMoveFrom(engine, fen, elo, this.settings.bossNodes, kind, this.opts.rng, this.settings.kingStrikeLoss, bossGuardFrom(this.settings), this.bossAllowed(), brain ? { ...brain, onNote: (n) => (this.brainNote = n) } : undefined, ahead, race, false, this.bossLocks()));
     const asks = this.bossAsks();
     if (asks) {
@@ -1382,6 +1386,9 @@ export class MatchRunner {
     const move = await ordinary();
     const end = balloon || hoops ? await this.tigerTurnEnd(fen, move, hoops, balloon, engine) : {};
     const line = crease ? await creasePick(this.opts.engines.length ? this.opts.engines : [engine], applyMove(fen, move), crease).catch(() => null) : null;
+    // (A moment that plays with his move known, before it shows: Chandy's first lock. Solo shows it and waits; the sims don't.)
+    const holdMs = this.bossMoveMoment(move);
+    if (holdMs && beforeShow) await beforeShow(holdMs);
     this.applyBossMove(move, kind === "stagger", { ...(beam ? { beam: await beamLines(engine, fen, move, beam) } : {}), ...end, ...(crease ? { crease: line?.line ?? null, creaseLoss: line?.loss ?? null } : {}) });
     return move;
   }
@@ -1578,6 +1585,17 @@ export class MatchRunner {
   /** Chandy's locked squares for his move now (the boss request's `lock`: his engine steered toward them), or null. */
   bossLocks(): string[] | null {
     return chandyBattle.steer(this.battle);
+  }
+
+  /**
+   * A moment of the boss's that plays with his move known, before it shows (Chandy's first capture: the crosshair locks onto the piece
+   * he's about to take, chandyBattle.firstLock): marks it and returns how long it holds the screen (ms) before the move may show; 0:
+   * none. The server holds the host's move that long; solo's playBoss waits (its `beforeShow`).
+   */
+  bossMoveMoment(move: string): number {
+    const fen = this.boards.get(this.state.boards[0]!)!.fen;
+    if (!(this.bossAllowed() ?? legalMoves(fen)).includes(move)) return 0;
+    return chandyBattle.firstLock(this.battle, move) ? CHANDY_FX.lockOn : 0;
   }
 
   /** Boingo's funhouse: he plays the crowd's move this turn (the funhouse's first, once), before the crowd picks. */
