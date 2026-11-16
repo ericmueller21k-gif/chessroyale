@@ -1,0 +1,1086 @@
+# History: lessons learned the hard way
+
+Every lesson in full, moved here word for word from `.claude/LESSONS.md` on Oct 10, 2026 (the housekeeping pass): what
+Eric saw, the cause, how it was found, the fix and the rule. `.claude/LESSONS.md` keeps the rules, each linking here;
+the area pages in `docs/areas/` carry the ones for their area.
+
+## A move that snaps back (Oct 6, 2026)
+
+**Eric saw:** in a solo boss raid, you move a piece, it animates there, then jumps back to where it was. About 1.5 s
+later it moves again. It feels like the app froze.
+
+**The cause:**
+- In Crowd mode your pick is only a vote, so the play screen puts the piece back and shows your pick as a ghost.
+  The reveal then counts the votes and moves the winning piece.
+- A solo boss raid is Crowd mode with a crowd of one. Your pick *is* the move, so the snap-back, the ghost and the
+  second move were all noise.
+- It was old behavior (since the crowd ghosts), not the Last Stand work, which only made it more noticeable.
+- Every test passed throughout: tests check *what* ends up on the board, not *how it gets there*.
+
+**How it was found:**
+- `npm run frames:boss -- <dir>` (`scripts/frames-boss-move.mjs`) plays one move the way a player does (two taps), and
+  saves a frame every time the pieces or the phase change.
+- The timeline showed the piece on its new square, then back on the old one with a ghost, then on the new one again.
+- Running the same script on the commit before the suspected change (`git checkout <sha>`, run, check out the branch
+  again) showed the same frames. So the bug was older, and the fix belonged wherever the behavior came from.
+
+**The fix:**
+- A crowd of one keeps your move on the board (`Play.tsx`: crowd mode only when more than one is picking).
+- Its reveal starts with the move already played (`Crowd.tsx`: `alone`).
+- Crowds of more than one are unchanged.
+
+**The rule:**
+- Before calling any change to a board, a move or an animation done, watch it frame by frame, with real taps on a
+  phone-sized screen. Use `npm run frames:boss`, or a script like it for other modes.
+- Look for any piece that moves twice, jumps back or flickers.
+- Do this for the most common path (one plain move), not only for the new feature: a feature can be perfect and
+  the plain move next to it still broken.
+
+## Purity that didn't match the item (Oct 6, 2026)
+
+**Eric saw:** a Legendary (then called Exalted) Gift-Wrap Tube at 41.4% purity was almost fully blotched. It should have been about 59%.
+
+**The cause:**
+- The blotch pattern was cut so the right share of the *whole 100 × 100 square* was blotched. An item got whatever
+  share of the pattern it happened to sit on.
+- Wide items averaged out. Thin or small ones swung wildly: the tube from 11% to 100%, a beard from 0% to 100%.
+- Every test passed, and the fitting sheet looked fine: it shows one pattern per purity, and one pattern can be lucky.
+
+**How it was found:** a script drew each item's blotches for 120 patterns, filled them on a canvas, and counted the
+pixels inside the item. That turned "looks off" into numbers, before and after the fix.
+
+**The rule:** when a number on screen describes a drawing (a purity, a meter, a share), measure the drawing against
+the number over many cases, not one preview. Then add a test that does the same.
+
+## Colored squares instead of the item (Oct 6, 2026)
+
+**Eric saw:** the profile's Wearing list showed a plain colored square beside each item, "not the item itself".
+
+**The cause:** the mockup drew a color swatch there, and it was built exactly as drawn. On a real profile, a swatch
+next to an item's name reads as a missing picture. Every test passed: none looked at what stood in for the item.
+
+**The fix:** each row draws the item with the crates' `ItemArt` (the same drawing as the locker and the reveal), and
+`e2e/profile.spec.ts` checks the row holds an item drawing.
+
+**The rule:** wherever an item is named on screen, show the item, drawn by `ItemArt` or `Avatar`, never a stand-in
+(a swatch, an emoji, an icon). When a mockup uses a placeholder for real art, build it with the real art.
+
+## A white flash between moves (Oct 6, 2026)
+
+**Eric saw:** in a solo boss raid on his phone, going frame by frame after a move, the screen flashed white here and
+there, "in between" things happening.
+
+**The cause:**
+- Every phase of a match (play, scoring, reveal, boss, watching) is its own screen component, so each phase change
+  mounts a new screen, and with it a new board.
+- Every `.screen` faded in from 40% opacity over 160 ms: two or three times a move, the whole screen washed out
+  toward the page background, which is near-white in light mode (a dark blink in dark mode).
+- The board (chessground) was built in a `useEffect`, which Preact runs after the browser paints. So each new
+  screen's first frame had no board at all, only the background where it should be.
+- It hit every mode (boss, Crowd, Classic). Every test passed: tests check what's on screen, not every frame of how it
+  gets there.
+
+**How it was found:** `npm run frames:flash -- <dir> [moves] [light|dark] [boss|crowd|classic]`
+(`scripts/frames-flash.mjs`) records every frame the browser paints (Chrome's screencast) while playing moves on an
+iPhone-sized screen, measures each frame's brightness, and flags jumps. Before the fix: at every phase change, about
+50 ms with 70% of the screen near-white in light mode. After: none.
+
+**The fix:** no fade on a match's screens (`.screen.game` and the cut, break, spectate, grid and results screens), and
+the board is built and kept in step in layout effects, before the paint.
+
+**The rule:**
+- Anything imperative that draws what a player sees on a screen's first frame (chessground, a canvas, measured
+  sizes) goes in `useLayoutEffect`, not `useEffect`.
+- No opacity entrance on screens that replace each other during play.
+- Check a change to screens or transitions with `npm run frames:flash` in light **and** dark mode: a blink that's
+  invisible in one scheme is glaring in the other.
+
+## Two flaky solo tests: leftover pages, the test's own thinking, the engine's first line (Oct 6, 2026)
+
+**Seen:** "strong play survives…" and "missing every move…" (`e2e/solo.spec.ts`) sometimes failed in a full
+`npm run e2e` and passed when run alone, on `main` too.
+
+**The cause:**
+- Tests that open their own browser context (a second player: `browser.newContext()`) never closed it, and Playwright
+  doesn't until the worker exits. A page left in a live match keeps playing it, and a host's page runs its engines every
+  round. By the time the solo tests ran, the desktop worker had five such pages (from "Play now", "home → queue → match"
+  and the queue test). The stages before the final took 224 s instead of 75 s.
+- So strong play ran out of its 240 s. The match's own pacing is already about 200 s of that (the final's 15 bot turns
+  are 7 s each).
+- Strong play asked the engine for its move after the clock had started, so the lookup counted as the player's
+  thinking time: up to 10 s on the busy worker. Late cuts are often exact ties (several players find the best move),
+  broken by less thinking time, and bots think 3–20 s. In one run, strong play kept its place at the stage 6 cut only
+  because it thought less than 7.3 s.
+- "Missing every move" looked for the results 200 times (about 50 s). Once you're out, the rest of the match is played
+  out at the engines' speed, which took 33 s of that: 3 s spare.
+- Both tests tapped through the reveal 3.6 s in, only about 100 ms after it starts taking taps. A late frame would cost
+  a 3.7 s retry.
+- Found after the first fix, in one run of five: strong play played the engine's first line, but the judge rates a pick
+  by its line's score, and the first line isn't always the highest. When the node budget runs out partway through a
+  depth, the lines not yet searched again keep the last depth's score: in 2% of balanced positions a later line scores
+  higher (by up to 5 points). Four bots played that line (Qg4, rated best), strong play the first (Qf6, −1.0, while
+  the reveal said "Best was Qf6"), and it fell at the last cut.
+
+**How it was found:**
+- The failing test's trace listed five other live pages, with the earlier tests' URLs (`pool=formats`,
+  `pool=profile`), still drawing a match throughout.
+- Logging in the tests over full runs: time per phase, the engine lookup, the player's thinking time, and everyone tied
+  with you at each cut.
+- The first line: the failing run's trace showed the reveal's picks and losses. Then 720 top-8 searches of match-like
+  positions (library openings plus a few good moves) counted how often the first line isn't the highest.
+- Tried and dropped: Playwright's fake clock (`page.clock`), to stop the player's clock during the lookup. On a busy
+  page it runs up to 40% slower than real time (8 s behind after a minute), which stretched the whole match.
+
+**The fix (tests only; no game code changed):**
+- `e2e/helpers.ts` exports a `test` that closes every context a test opened, pass or fail. The files that open contexts
+  use it.
+- Strong play has the next stage's boards searched during the reveal and the stage break (no clock runs; the break waits
+  for your tap). The round reuses those searches to score with, so the move is known when the clock starts.
+- Strong play plays the highest-scoring line of that search, and taps the piece again if the board wasn't taking moves
+  yet. Both tests tap through the reveal when it says "Tap to continue".
+- "Missing every move" waits for the results to a deadline, not a count of looks.
+
+**The rule:**
+- A test that opens a context uses `test` from `e2e/helpers.ts`. A page left open keeps playing.
+- The player's clock is part of what's tested: do the test's own work (engine lookups) before the clock starts, not on
+  it.
+- Wait for what the screen says (a prompt, a phase), with a deadline for slow machines. Not a fixed pause, not a count of
+  looks.
+- When a test passes alone and fails in the full suite, look at what else is running in that worker (the trace lists
+  every live context).
+- "The engine's best move" is the line with the highest score, not the first line.
+
+## Cut names that lost their chips, and a top bar too wide for phones (Oct 7, 2026)
+
+**Seen** (by the quick-chat build): on the Crowd cut screen, the last row of knocked-out names was cut in half. On
+narrow phones, the sound button sat over the top bar's "CUT".
+
+**The cause:**
+- When names became tappable (`PlayerName`), its `.player-name` style replaced the cut screen's `.cut-name` chips:
+  it comes later in `styles.css` with the same specificity. The names became 16 px plain text in a 120 px box with
+  `overflow: hidden`, which hid the last row's bottom half and the "+N".
+- The top bar's items never shrink. On most phones they're wider than the bar once scores have a few digits, so the
+  line ran under the sound button and off the screen.
+- Every test passed: the names were all in the page, just not all visible, and the tests' phone (390 px) had small
+  scores.
+
+**How it was found:** a script played a solo Crowd match on 360 and 375 px phones, light and dark, with the longest
+real bot names and the widest scores. It measured each name's box against the list's, the bar's `scrollWidth`
+against its width, and the cut pill against the sound button. Then `e2e/crowd.spec.ts` did the same.
+
+**The rule:**
+- When a screen adopts a shared component, check its own styles still apply: computed styles, not only the markup.
+- Check anything kept to one line on a phone at 360 px with its widest real content (long names, six-character
+  scores). Measure it; don't only look at a screenshot at the test phone's size.
+- A fixed-height box with `overflow: hidden` hides what doesn't fit, and no test fails. Show whole items and count
+  the rest instead.
+
+## An empty box under the board (Oct 7, 2026)
+
+**Eric saw:** on his iPhone, the scoreboard under the board was a tall black box with nothing in it, about two thirds
+of the screen wide.
+
+**The cause:**
+- Two buttons each kept half of the view: the layout (side by side, or one panel full width) and the fold. Folding,
+  then making the scoreboard full width, left "full width, folded".
+- That layout's class was the bare word `board`, so the chessboard's `.board { width: 100%; height: 100% }` applied
+  to the panel. Open, its flex sizing hid that. Folded, the panel took the screen's full height, with only the
+  folded header inside.
+- Every test passed: none folded the panel and then changed its layout, and none looked for an empty box.
+
+**How it was found:** a script loaded an online match on an emulated iPhone with each saved combination and measured
+the panel (height, rows, chat). Then it listed every CSS rule matching the empty panel, and `.board` was among them.
+
+**The rule:**
+- Give state classes a prefix (`ub-board`, not `board`). A plain word can already be another component's rule.
+- One state per view, changed only by named actions, not one setting per button. When a control makes something
+  bigger, it shows its content.
+- For a panel with several controls, test every button from every state, with a reload after each, and assert the
+  panel is never an empty box (`e2e/panel.spec.ts`).
+
+## A vote board that jumped, and zones that pulsed green (Oct 7, 2026)
+
+**Seen** (by the vote overhaul, before it shipped):
+- The board moved when the game began. On a phone the vote's board was 20 px wider and 8 px lower than the game's: the
+  vote had its own big heading and no eval bar beside the board. On a computer the game has the leaderboard down the
+  side and the vote didn't. It had been so since the votes were built, and every test passed.
+- With your pawn picked up, the three zones were meant to pulse blue. They showed vivid green.
+
+**The cause:**
+- Each screen built its own frame around the board, so the board's box depended on what was above and beside it.
+- Chrome animates between a `color-mix(in srgb, X 80%, transparent)` color and a plain one through values far out
+  of range (its computed border read `oklab(1 129 245 / 1)`), drawn as bright green.
+
+**How it was found:** a script measured the board's box (and the rows above it) on the vote and on the game's first
+screen, at 360 and 390 px and on a computer; then `npm run frames:vote` recorded every frame with a real finger, and
+the frame of the tap showed the green.
+
+**The rule:**
+- When one screen hands a board to the next, give both the same frame (top line, the line above the board, the eval
+  bar's slot, the sidebar) and measure the board's box on both, on a phone and a computer. Don't trust a screenshot.
+- Don't transition or animate between colors made with `color-mix(…, transparent)`. Switch them, or fade a layer's
+  opacity, or animate a shadow.
+- Also caught (by `e2e/crowd.spec.ts`, "the board never moves", on the computer only): the move's clock added to the
+  line above the board ("⏱ 10 s") made that line 1 px taller on your move, so the board moved. The emoji's font is
+  taller than the text's, and the line's height was `normal` (a phone's is fixed). An emoji or symbol in a line
+  above the board gets `line-height: 1`.
+
+## A lobby that never closed (Oct 7, 2026)
+
+**Eric saw:** he opened the app hours after a match and got its results screen again, at the lobby's old address.
+
+**The cause:**
+- Every lobby's Durable Object kept its record for ever: nothing ended its life after the results, so its address
+  reconnected and replayed them.
+- A lobby that's gone refuses the WebSocket, and the app treated a refusal like a dropped connection: retry, for ever.
+  A typed unknown code sat on "Connecting…".
+- Every test passed: they all followed a match to its results and stopped there. None asked what happens after, to
+  the lobby, its code or an old link.
+
+**How it was found:** reading what the Durable Object does after `phase === "results"` (nothing), and opening an
+unknown code: the socket's 404 never reaches the page.
+
+**The rule:**
+- Anything the server starts (a lobby, a queue, a session) has an end, written down with its numbers, and a test for
+  each way it ends, including "nobody is there any more".
+- Test the stale case: the old link, the tab reopened later, the app back from the background.
+- A refused WebSocket says nothing about why: ask the server (an ordinary request) before retrying.
+
+## Tests that leaned on a lucky seed, and names that looked short (Oct 7, 2026)
+
+**Seen** (by the vote tweaks, before they shipped):
+- Eight quick-chat lobby tests failed when the bot name list grew from 68 to 140. Nothing about chat had changed.
+- Six of the new bot names, all 16 characters or fewer, were cut short with "…" on a 360 px phone's scoreboard.
+
+**The cause:**
+- The tests' lobby is seeded (`mulberry32(7)`), and the chat helper needed two people on one team and one on the
+  other. Teams are a random draw. Shuffling a longer name list takes more draws from the same random source, so
+  seed 7 then put all three on one team. The tests had depended on what one seed happened to give, not on the rules.
+- Characters aren't widths: in the column's bold 12 px, "Woodpusher Woody" (16 characters) is 120 px and "Pawn Island
+  Isla" (also 16) is 94 px.
+
+**How it was found:** the failing helper read `team(undefined)`: no one was alone on a team. For the names, a script
+read the scoreboard's name column (103 px at 360 px) and measured every name in its own font with a canvas.
+
+**The rule:**
+- A test that needs a particular random outcome looks for a seed that gives it (and says what it needs), rather than
+  trusting that a fixed seed always will. Anything new that draws from the match's random source moves everything
+  drawn after it.
+- Check text that must fit by measuring it in the real font and box, with some room for other fonts (an iPhone's runs
+  wider than headless Chrome's), not by counting characters.
+
+## One lucky pass taken for a cause (Oct 8, 2026)
+
+**Seen** (by the capacity work, before it shipped): `e2e/panel.spec.ts` failed on the phone three times out of four
+on the capacity branch and passed on main: after about 15 reloads of a match screen, the chat panel under the board
+read too short (16-24 px, the test wants more than 30).
+
+**The wrong turn:** the branch had just added a per-account rate limit (300 a minute), the failure came late in the
+test, after many reloads, and with the limit raised the test passed once. That looked like proof, and the limit
+went up. The next run failed again with the higher limit.
+
+**The cause:** the test's steps don't wait for the round. Its reload step accepts the reveal and scoring phases, and
+in a reveal the move tallies sit above the panel (about 90 px on a phone), so the chat feed shrinks. Whether a check
+lands in a reveal depends on where the first round's deadline falls during the walk: luck. Main came close too
+(scoring at tap 15, a smaller row, so it passed).
+
+**How it was found:** a copy of the test logged, at every step on both branches, the phase, the seconds left in the
+round, and the top and height of the board, the panel and the chat's parts. The panel moved down 93 px exactly when
+the phase was the reveal.
+
+**The fix:** the panel test measures only while a move is being chosen (play or watching), waiting for it.
+
+**The rule:**
+- One passing run doesn't confirm a cause. Before changing anything for a suspected cause, log what the test sees at
+  each step on both branches (the phase, times, boxes) and find the step where they differ.
+- A test that measures a layout waits for the phase it means to measure; a phase change in the middle is a different
+  screen.
+
+## A top bar that only fit a new player (Oct 8, 2026)
+
+**Seen** (by the light/dark switch, before it shipped): adding the sun to the phone's home top bar, a measurement at
+320-430 px with bigger balances showed the bar already ran off a 320 px phone at 1,250 coins (and off a 390 px one
+at 12,345 once the sun was in). Every test passed: every test account has 0 coins.
+
+**The cause:** the bar's items never shrink, and the coin pill grows with the balance. Tests and screenshots only ever
+saw "0 coins", the narrowest the pill gets.
+
+**How it was found:** a script set the pill to 0, 1,250, 9,999, 12,345, 123,456 and 999,999 coins at 320, 360, 375,
+390 and 430 px and measured each item's box against the bar and the page's `scrollWidth`.
+
+**The rule:**
+- A number on screen that grows (coins, ratings, counts, scores) is tested at its widest realistic value, not the
+  value a fresh test account has. Fake the server's answer in the test (`page.route`) if that's the only way to get it.
+- When something new joins a row of fixed-size items, measure the row at 320 px with that widest content first.
+
+## A board that vanished after it flipped (Oct 8, 2026)
+
+**Seen** (by the boss powers, before they shipped): Boingo's funhouse flips the board. Built as a 3D card flip (the
+board turned edge-on, its orientation swapped, then back), every square and piece vanished after the flip and stayed
+gone. Every test passed: the orientation, the fen and the moves were all right.
+
+**The cause:** chessground measures its board (`getBoundingClientRect`) when it redraws, and an orientation change
+redraws it. Edge-on, the board measured nearly 0 px wide, so it drew everything at nearly no size, and nothing
+measured it again (it only does on a resize).
+
+**How it was found:** `npm run frames:powers` saved every painted frame of the moment: the board was fine up to the
+swap and empty from then on.
+
+**The fix:** the board spins a half turn in its own plane (the pieces upside down for a moment), and the orientation
+swaps once the spin has ended, with nothing transformed.
+
+**The rule:** never change what chessground draws (its orientation, its size) while a transform is on it or an
+ancestor. Animate it, then change it once the transform is gone, and watch the frames after the change too.
+
+## Lag that grows with the match (Oct 9, 2026)
+
+**Eric saw:** in a solo boss battle against Ginger, on his phone and his computer, the game started smooth and got
+steadily worse: dragging a piece dropped frames after about 5 moves, worse at 10, unplayable by move 13-15. Ginger's
+blizzard was glitchy too.
+
+**What grew:** the work done on every redraw, not the page. DOM nodes, running animations, rAF callbacks per frame,
+timers and the heap all stayed flat; only frame times climbed.
+- The screens read the boss battle (`match.boss`) many times per redraw. The play screen redraws five times a second
+  and reads it about 20 times; the top bar, the boss bar, the dock and the boss read it too, and the boss screen
+  redraws every frame.
+- In a solo battle `match.boss` looked like a field but was a getter that rebuilt the whole view on every read
+  (`runner.bossView()`). Each build replayed the whole game with chess.js twice (the board's "last few moves" view
+  worked out the position before them from move 0) and generated the legal moves for the powers. So every redraw cost
+  a little more with each move.
+- The boss's turn had the same thing: the boss screen replayed the whole game on every frame (`lastMoveTookQueen`), and
+  the match flow did it again in `gameEnd` several times a round.
+- The blizzard added its own cost: its pixel frames are drawn the first time they show (each part's outline redone
+  for every frame, each pixel's color parsed from text), and the ice over every piece built a chess.js game per
+  square on every redraw (`pieceAt`).
+- Checking the other modes found the same kind of cost in Crowd. From move 4 (once ratings show), the standings
+  re-sorted the rating curve 51 times per player, for 100 players, on every redraw: drag p95 went from 17 ms to 150-180
+  ms on the slowed phone.
+- No test saw it: tests play a few moves and check what's on the screen, never how long a frame takes at move 20.
+
+**How it was found:** `npm run perf:boss` (`scripts/perf-boss.mjs`) plays a whole battle with real drags, on a computer
+and on a phone with its CPU slowed 4x (CDP), and after every move records frame times (sitting, dragging, the boss's
+turn) with DOM nodes, animations, rAF callbacks, timers, listeners, heap and audio nodes. Everything was flat except
+frame times, so the cost per frame was growing. A CPU profile at move 8 (`PERF_PROFILE=8`: an unminified build)
+put most of the time in chess.js under `get boss` → `bossView` → `netBoard`. A profile of the boss's turn
+(`PERF_PROFILE_BOSS=1`) found `lastMoveTookQueen` → `fenAfter`, and the blizzard's showed the sprite drawing and
+`pieceAt`.
+
+**The numbers** (frames while dragging a piece, p95 and share dropped; a dropped frame is one over 20 ms):
+
+| Move | Computer, before | Computer, after | Phone (4x slower), before | Phone (4x slower), after |
+| ---: | --- | --- | --- | --- |
+| 5 | 67 ms, 13% | 17 ms, 0% | 367 ms, 70% | 17 ms, 0% |
+| 15 | 150 ms, 24% | 17 ms, 0% | 717 ms, 61% | 17 ms, 1% |
+| 25 | 217 ms, 73% | 17 ms, 0% | 1,100 ms, 67% | 17 ms, 0% |
+
+The boss's turn at move 25 went from every frame dropped (p95 200 ms on the computer, 400-1,100 ms on the phone) to
+17 ms with 0-1% dropped. With the view and replays fixed, Ginger's blizzard on the slowed phone still had p95 50 ms
+(9% dropped); the sprite and `pieceAt` changes brought it to 17 ms (4%).
+
+**The fix:**
+- `bossView` keeps its last view, keyed by everything it is built from, so a kept view is always the one a fresh
+  build would give.
+- `fenAfter` and `gameEnd` remember their answers; a line a move or two on from a known one carries on from it.
+  `pieceAt` reads a position once.
+- Sprite frames work out each part's outline once per way it's drawn and each color once per frame. Every frame of
+  every character and effect is byte for byte the same.
+- The rating curve's sorted points and the prior's loss are worked out once per curve.
+
+**The guard:**
+- `packages/chess/test/long-match.test.ts` plays a 40-plus move battle. Reading the boss view again must do no
+  chess.js work, and a new move only a handful of steps.
+- `e2e/perf.spec.ts` (phone, CPU slowed 4x) plays four moves, checking that DOM nodes, animations, rAF callbacks and
+  timers don't grow. It then makes the game 120 plies long and checks frames while sitting, dragging and through the
+  boss's turn: p95 under 50 ms and under 15% dropped.
+
+**The rule:**
+- Anything a screen reads while rendering must be cheap and must not depend on how long the match is. A getter that
+  looks like a field gets read dozens of times a frame, so it must never rebuild anything.
+- Never replay a game from move 0 per redraw, per read or per round. Use the board's FEN or the remembered `fenAfter`.
+- Before calling a change to a board, the boss or an animation done, run `npm run perf:boss -- <dir> gingerbread phone
+  25`. Frame times late in the match must match the early ones. The same script runs `clown`, `crowd` and `online` (an
+  online raid on a local server).
+
+## A ring a few pixels off its square (Oct 9, 2026)
+
+**Eric saw:** on his computer, the green ring on the crowd's move sat a little low and to the side of its square.
+
+**The cause:** chessground draws the squares in a box it rounds down to a whole multiple of 8 device pixels, up to
+8 px smaller than the board's wrap. The ring was placed in % of the wrap, so the error grew toward the board's far
+side: 1-4 px on most squares, more at a fractional display scale (Eric's is 125%). At the tests' sizes the gap was
+small or zero, and no test compared an overlay with the square under it.
+
+**How it was found:** a script measured the ring's box against chessground's `square.last-move` box and the wrap
+against `cg-container`, at several widths and display scales (1, 1.1, 1.25, 1.5, 3).
+
+**The rule:**
+- Anything drawn over the squares sizes and places itself in eighths of chessground's board (`--cg-size`, from the
+  `---cg-width` chessground writes on the wrap), never in % of the wrap.
+- Check an overlay against the square it marks, within 1 px, at a size where the rounding gap is widest (wrap width
+  times the display scale just under a multiple of 8), not only at the test phone's size.
+
+## A dozen sprites, a dozen loops (Oct 9, 2026)
+
+**Found before it shipped:** G-REX's fire can put a dozen burning tiles on the board at once, with fireballs and
+rockets on top. Mounted as one `<BossEffect>` each, a storm of 22 sprites on a phone slowed 4x dropped 25-33% of frames,
+against 7-11% on the plain board. Each sprite ran its own animation-frame loop and redrew its own canvas: 30
+callbacks a frame instead of 5.
+
+**The fix:** every effect sprite shares one animation-frame loop (`onEachFrame` in `BossEffect.tsx`), and
+`<BoardEffects>` draws many square effects on one canvas over the board, redrawing only the squares whose frame
+changed. The same storm then measured like the plain board.
+
+**The rule:** an effect that can appear many times at once goes on a shared canvas, not a canvas each; never start a
+loop per sprite. Measure the worst case at once on a slowed phone (`npm run frames:character -- <dir> Boingo phone
+kit="G-REX" fxperf`), not one effect at a time.
+
+## A move only legal after a burn (Oct 9, 2026)
+
+**Seen** (by G-REX's fire, before it shipped): watching a G-REX battle frame by frame, the page threw "Invalid move
+d8d1" on every redraw a few moves after a pawn burnt on d4. Every unit test passed.
+
+**The cause:** the fire destroys a piece between moves, so the board's history is no longer a game you can replay from
+the starting position: the boss's queen went d8-d1 down a file the burnt pawn had blocked. The boss's reactions
+(`boss-beats.ts`) replayed the history from move 0 to find the position a move or two back, and chess.js refused the
+queen's move. The tests replayed short histories that never had a move made possible by a burn.
+
+**How it was found:** `npm run frames:powers -- <dir> grex` logs page errors; the error repeated on every frame from
+the queen's move on.
+
+**The fix:** a board keeps a base where its position changed (`BoardState.bases`), and every replay plays from the
+latest base at or before the ply it wants (`fenAtPly`, `gameEndWith`, `recentMoves`, the history arrows, a newcomer's
+replay, the boss's reactions). `packages/app/test/fire-replays.test.ts` replays a game whose last move is only legal
+after a burn.
+
+**The rule:** anything that changes the position outside a move must leave a base, and nothing may replay a board's
+history from move 0 directly: use `fenAtPly(history, ply, bases)`. When adding such a power, grep for `fenAfter(` and
+`.history` and check each.
+
+## A navigation that never happened (Oct 9, 2026)
+
+**Seen:** `e2e/grex.spec.ts:53` (G-REX's barrage) failed now and then, on the phone and the computer, and passed on a
+rerun. Most often: "page.evaluate: Execution context was destroyed, most likely because of a navigation", in the
+test's `play()`, in the middle of the barrage. The same message had hit `boss-powers.spec.ts` (Ginger) and
+`crowd.spec.ts` once each. Twice more, the check for a piece burning failed (not found; once, two found).
+
+**The cause:** two races in the test, none in the game.
+- Nothing navigated. Each of those tests awaited the engine's search inside `page.evaluate`
+  (`await m.runner.topMovesFor(fen)`), holding a `Runtime.callFunctionOn` open for seconds while the page was busy.
+  Playwright reports any protocol failure of that call (anything but a JavaScript exception or a closed page) as
+  "Execution context was destroyed, most likely because of a navigation" (`rewriteError` in its
+  `crExecutionContext.js`), and the call can fail that way without a navigation: an evaluate whose awaited promise is
+  dropped and collected gives the very same message (checked with a two-line script).
+- A piece burning shows for 1.5 s as the boss's turn begins. The test looked for it after its own wait for the turn to
+  change (`expect.poll` steps up to a second apart), so under load it could look too late; and when two tiles burnt
+  at once, its locator matched both (Playwright's strict mode).
+
+**How it was found:** a copy of the test that set an id on `window` before the app loaded (`addInitScript`) and, on the
+failure, read it back with the URL, then started the same search again and polled for it; it also logged every engine
+call and every `until` listener with times. On a failure the id and URL were unchanged (no navigation), the fresh
+search answered at once, and every search the page had started had finished (the failure came as the awaited one
+resolved). The burn was caught by running the test six times with four workers (one strict-mode failure).
+
+**The fix:** `engineTop(page)` in `e2e/helpers.ts` starts the search in the page, keeps its answer on `window` and
+polls for it, so no evaluate is held open while the engine thinks. `watchFor(page, …)` puts a MutationObserver in the
+page before the move, so a burn that shows for a moment is never missed, and the test reads what burnt from the shared
+state (`powers.burnt`) before expecting it on screen.
+
+**The rule:**
+- Never await long app work (an engine search, a server round trip) inside `page.evaluate`. Start it in the page, keep
+  the answer on `window`, and poll for it from the test. ("Execution context was destroyed" without a navigation is
+  this; it hit Ginger's test again in the full run while this was being fixed, so `boss-powers.spec.ts` uses
+  `engineTop` too.) `crowd.spec.ts`, `formats.spec.ts` and `boss-character.spec.ts` still await `topMovesFor` inside
+  an evaluate (two of them inside a 12 s race, which only narrows it): move them to `engineTop` when they're next
+  touched.
+- Something on screen for a moment is checked by watching for it from before it can appear, not by looking for it
+  after a wait for something else.
+
+## A stall the first time an effect shows (Oct 9, 2026)
+
+**Seen** (by Hollow's art, before it shipped): his Lights out on a phone slowed 4x froze for 480-530 ms as the first
+bulb smashed, and dropped 7-11% of frames for the next few seconds. Every frame after that was smooth, and every test
+passed: tests and previews see an effect's frames, not the first time they're made.
+
+**The cause:** everything is made the first time it's needed, in the frame that needs it.
+- The smash's synthesized sound took 150 ms to make on a computer (16 little glass bells, each running its oscillators
+  for the whole sound), so about 500 ms on the slowed phone, at the cue.
+- At the last smash the night's 32 tile variants all showed for the first time in one frame, and each new frame of the
+  night's loop made 32 more.
+- Earlier, his art painted every part of every frame when the app loaded: about 350 ms more on every start.
+
+**How it was found:** `npm run frames:wip -- <dir> Hollow lightsout phone 21 perf` measures frames a second at a time
+through the moment (e2e/perf-probe.js); the stall sat in the second the first smash landed. Timing each piece in Node
+(the sound, a frame's first render, the night's tiles) named them.
+
+**The fix:** parts are painted when first shown (`lazyParts`); the night is drawn ahead, a slice a frame (`prewarm`,
+from when he drops in); the glass sounds are closed-form (30 ms) and a boss's sounds are made in idle moments once his
+character shows (`warmSounds`). Lights out then measured like the plain board.
+
+**The rule:**
+- Measure a new effect's first showing on a slowed phone, not only its steady state: a second at a time, from the
+  moment it starts.
+- Anything that shows many new frames at once (a board of tiles) is drawn ahead, a slice a frame. A sound made in code
+  is made before its cue, and costs no more than about 30 ms on a computer.
+- Nothing a boss needs only in its battle is made when the app loads.
+
+## A move that went silent, a card that said "undefined", a prompt gone too soon (Oct 10, 2026)
+
+**Eric saw** (playing Hollow on his phone): "undefined" twice on Hollow's card in the boss menu; a new sound instead of
+the knock when he moved a piece; and Lights out's "Find my …" typed out and gone before he could read it, off the top
+of the screen.
+
+**The cause:**
+- The menu's power words were a plain `Record<string, string>`: a new power without words compiled, and read
+  "undefined". Every other table of power words was typed by the power, and caught it.
+- The board knocked for a move in a plain effect, which runs after the next paint. Alone against a boss, a move the
+  judge scores at once (its search done while you thought) swaps the play screen for the boss screen before that paint:
+  the effect never ran, the new board started after your move, and the first sound was the boss's reply. Every test
+  passed: none listened, and the tests move fast, before the engine's search is done, so their moves took the slow path.
+- The prompt was only in his speech box: 2.8 s, a third of the board wide, growing upward from above the board.
+
+**How it was found:** a script logged every `play()` (`window.__soundLog`) and every phase change, to the millisecond,
+over moves with a 4 s think on a phone slowed 4x: "scoring" lasted 30-50 ms and no knock came. For the prompt, a script
+sampled its box every 100 ms through whole tests at 320-430 px wide (short and tall) and on computers, against the
+screen and the boss bar.
+
+**The rule:**
+- A table keyed by a closed set (powers, events, beats) is typed by that set (`Record<PowerId, …>`), so a new member
+  without an entry doesn't compile.
+- Anything a player hears or sees *as* something changes (a sound, a first frame) goes in a layout effect, and must not
+  depend on a screen surviving to its next paint: screens can be replaced within a frame.
+- Test the realistic pace too: a test that moves at once takes a different path from a player who thinks.
+- Text a player must read to play (a prompt, a target) stays on screen for as long as it applies, in a place that's in
+  view on every screen. A speech bubble is extra, never the only copy. Measure it through the whole moment, not in one
+  screenshot.
+
+## A paint bucket that ran out of memory (Oct 10, 2026)
+
+**Eric saw** (on his computer): in the profile's icon builder, a few clicks of the fill froze the page, then Chrome's
+"Aw, Snap! Out of Memory".
+
+**The cause:** a color built with bitwise operators (`0xff << 24 | …`) is a *signed* number; the same value read
+back from a `Uint32Array` is unsigned. So the fill's "already that color, stop" check never matched, and filling an
+area with the color it already had (any second click on it) re-queued every pixel forever. Every test passed: the one
+test of the fill clicked once, on a blank canvas.
+
+**How it was found:** `e2e/icon-editor.spec.ts` (50 fills in a row on a computer) hung on the second fill on `main`;
+then two lines of Node showed `new Uint32Array([v])[0] !== v` for an opaque color.
+
+**The rule:**
+- A pixel or packed value compared with what a typed array holds is made unsigned (`>>> 0`) first.
+- A loop that ends only when a check says "done" (a flood fill, a search) also has a bound it can't pass: a visited
+  set, each item queued once.
+- Test a tool the way it gets used: many times in a row, on its own result, not once on a fresh state.
+
+## Lines that went with their screen (Oct 10, 2026)
+
+**Eric saw** (Ginger, Boss alone): when she froze his queen, her text box appeared and disappeared almost at once.
+
+**The cause:** every speech box lived inside something shorter-lived than the line. Her text box beside her showed a
+line for 3.4 s only while the battle stayed at the same beat, and alone the boss's move shows for 0.45 s; a power's
+moment also hid her figure, with the box inside it (`visibility: hidden` on `.boss-char`). Her power lines lived in
+the dock for the moment's own length (2.3 s, mostly under its banner); lines drawn over the board lived as long as
+their moment; the God King's line was a flat 3.8 s and any critical cue replaced it at once; Lights out's verdict was
+cut when its screen ended. PR #124 had fixed one of these boxes (Hollow's prompt) on its own. No test looked at how
+long a line stayed up: the tests checked that a box appeared.
+
+**How it was found:** a probe logged every speech box's time on screen, every frame, through a Boss alone game: the
+freeze line 2.3 s in the dock, nothing in her text box, the God King's opening line 3.6 s however long it was. Then
+each box's owner was traced back to the screen or moment that removed it.
+
+**The rule:**
+- A line a character says goes into that speaker's voice (`speech.tsx`), never into a box a screen or a moment owns.
+  How long it stays comes from the one rule (its length), not from how long the screen lasts. A new line waits its
+  turn; only a critical one cuts in.
+- Test a line's whole time on screen, every frame, from before it can appear (`e2e/boss-speech.spec.ts`), at the pace
+  the mode really has (Boss alone's 0.45 s boss move is a different path from a raid's 1.8 s).
+- Nothing hides a text box to make it fit, and hiding a figure mustn't hide the words beside it: check what else sits
+  inside an element you hide.
+
+## Coordinates a column off (Oct 11, 2026)
+
+**Eric saw** (a Squads screenshot, a Relay board flipped for Black on a 390 px phone): the file letters ran "H … B"
+from the second column, with nothing under the first and "A" outside the board on the right, and the rank numbers
+sat on the top edge of each row rather than inside their squares.
+
+**The cause:** the app never styled chessground's coordinates. Chessground's own CSS places them for a page that sets
+them outside the board: files 24 px to the right across the board's full width (on a 300 px board, each letter landed
+in the next column, the last one off the board), ranks 20 px up with each nudged down a little (on the lines between
+rows). Every big board in every mode had it, either way up, from the first build. No test looked at the labels: they
+are text over the board, and every test measured the squares and the pieces.
+
+**How it was found:** each label's text box (a range over its text) measured against the square it names, on a boss
+board (White's way up) and the Squads board (Black's): every file one column along, every rank across two rows.
+
+**The rule:**
+- Anything a library draws on our screens (coordinates, a ghost, a highlight) gets a look against what it marks, with
+  our own CSS, either way up: a library's defaults are made for its own page.
+- Board coordinates sit inside their edge squares; a test measures each label against the square it names, both ways
+  up, on a phone and a computer (`expectCoordsInSquares` in `e2e/helpers.ts`).
+
+## A rage meter drawn at a fifth of its color (Oct 11, 2026)
+
+**Found while** watching the rage meter frame by frame for repeat ultimates (PR "rage meters"): its bar was a dull
+brown at every fill, and as it emptied the change was hard to see. True-color screenshots of the meter alone showed
+the same, so it wasn't the screencast's compression.
+
+**The cause:** the boss bar's threat skulls are `<i>` elements, dimmed by `.boss-threat i { opacity: 0.22 }` (the
+skulls not lit). The rage meter sits inside the same `.boss-threat` box, and its bar is an `<i>` too: the rule caught
+it, so the meter has been drawn at 22% opacity since it was built. No test looked at its color, only at its width and
+classes.
+
+**The rule:**
+- A rule on a bare element under a box (`.box i`) also styles every component nested in that box. Style children by a
+  child selector or a class of their own (`.boss-threat > i`), and check the computed style of what sits inside.
+- When a number on screen is drawn (a meter, a bar), look at it in true color, alone and enlarged, not only in a
+  frame of the whole screen.
+
+## A melt the test blinked through (Oct 12, 2026)
+
+**Seen:** after Ginger's three-turn Blizzard (PR #160), `e2e/boss-powers.spec.ts` "the gingerbread man (Freeze)…"
+failed now and then, on main (2 of 6 runs) and more often on another branch that touched no boss code (5 of 6): the
+first thaw's banner showed, then `.pw-ice.melting` "never appeared". It looked like it might depend on the seed, so
+the question was whether the thaw rule misbehaved in some games.
+
+**The cause:** the test, not the game. A thaw's melt is on screen for about 0.67 s, 1.3 s into its 2.2 s moment
+(`THAW.meltAt`, `MELT_MS`). The test waited for the banner, then for the melting ice with `toBeVisible({ timeout:
+5_000 })`. That looks at once, then 0.1, 0.25, 0.5 and 1 s apart, so its looks fall about 0, 0.1, 0.35, 0.85 and
+1.85 s after it starts. When the banner was caught between about 0.1 and 0.45 s after it appeared, the look at 0.85 s
+came before the melt and the one at 1.85 s after it. When the banner is caught depends on how the earlier waits line
+up with the boss's thinking, which moves a little with anything else on the branch, not on the seed. PR #160 broke a
+rule that was already written ("A navigation that never happened": watch for something brief from before it can
+appear).
+
+**How it was found:** a copy of the test logged, every frame from before the boss's move, the melting and cracked
+blocks, the banner and the phase, next to the times of the test's own check. In 8 runs the melt showed every time, as
+many blocks as the thaw named, from 1.32 s into it (666 ms long where the log ran to its end); the one failure had
+started its check 247 ms after the banner, and its looks at 0.85 and 1.85 s fell either side of the melt. A sweep of
+3,200 blizzards in the rules (random play, and a boss that takes a crowd piece whenever it can) found every later turn
+thawing what it should: never nothing on the second, everything on the last.
+
+**The fix:** the test watches for melting ice from before the boss's move (`watchSquares`, a MutationObserver, as
+`watchFor` does) and checks that exactly the squares the thaw names melted, for both thaws (THAWING! and THAWED!). A
+control run that looked only 2.5 s after each banner, with nothing melting on screen any more, still passed. Nothing
+in the game changed.
+
+**The rule:**
+- A longer timeout doesn't make `toBeVisible` a watch: anything on screen for less than about a second can fall
+  between two of its looks. Watch for it from before it can appear.
+- Before blaming the game for a test that fails now and then, log every frame of the moment in the page and the test's
+  own times next to it: where the two don't overlap is the answer.
+
+## A queen won for free (Oct 13, 2026)
+
+**What Eric saw:** Wrangler's SHOWDOWN! lined up three pairs, Eric took Wrangler's queen in the forced duel, and
+Wrangler didn't take back: he took a different piece, so Eric won a queen for free. The admins' debug line said "Maia
+600 · no guard".
+
+**The cause:** two parts that were each right on their own. The showdown's search picks a line-up by reading each
+position after a duel with the engine's best reply (usually taking back), so a line-up "leaves him a little ahead" only
+if he plays that reply. But his next move came from his brain, like any other: on Maia at 600 with no guard (or a slip, on
+Stockfish), which can miss it. The tests checked the line-up, the forced duel and the brain separately, and the e2e
+stopped at the duel; nothing played the move after it.
+
+**The fix:** a power's follow-up that its engine search scored is played by the engine at full strength
+(`BossRules.bestReply`: the runner's "best" kind, the server's `bossRequest.best`), never the brain, a slip or a
+stumble. Unit tests on Maia at 600 with every move a slip (solo and online) fail without it; the e2e plays the duel and
+checks his reply is exactly the engine's best. That e2e also showed the engine's best reply isn't always the take-back
+(another capture can come first), so a power's scored line can need more than one move of his.
+
+**The rule:**
+- When a power's engine search scores an outcome that depends on the boss's next move, that move is the engine's
+  (`bestReply`), and a test plays the move after the power, on the weakest brain the boss can have.
+
+## A showdown that never came (Oct 13, 2026)
+
+**What Eric saw:** he played Wrangler for 30 turns and his SHOWDOWN! never fired. Every try (mostly the admins'
+"Trigger ultimate" button) ended in "Not yet...".
+
+**The cause:** three things. The search at his turn ran in rounds (scan until three promising line-ups, confirm them,
+go again), and each round started its seeded generator from the beginning, so after the first three promising line-ups
+it only ever re-scanned the same ones: the rest of its budget was spent on repeats. The line-ups were the rarer kind
+(queens in the middle: 14% fit the goal, as low as 6% in some positions). And the tests checked the search on a fake
+engine where the first line-ups qualified, and the e2e used the test switch in a position where one was found at once;
+nothing measured how often it fired in real games.
+
+**The fix:** one run of the generator a size, carried on round after round (the Wrangler rage test went from 15 s to
+1 s); rook, bishop and knight line-ups anywhere; his own meter and no warning or "Not yet..." (Eric's calls); and a sim
+that plays real battles with his scout and his turn's search (`packages/sim/scripts/showdown-sim.ts`): a showdown in
+every one of 21 battles on a phone's budget.
+
+**The rule:**
+- A search in rounds carries its source on from round to round; one that starts it again re-scans the same candidates.
+  Test that a later round sees new candidates.
+- A power that fires only when a search finds something is measured in real battles (a sim through the match runner,
+  on a phone's budget) before it ships: how often it fires, and how long after it may. A fixed position doesn't show it.
+
+## A move scored twice, another not at all (Oct 14, 2026)
+
+**What was seen:** while building the Chess960 rules, a helper asked the engine server (run locally at 20k nodes) to
+score two moves, one of them castling, and got the same move back twice, the castling move missing.
+
+**The cause:** our reader of Stockfish's output kept the last exact line for each MultiPV slot and skipped bound lines.
+Stockfish re-sorts its lines as it deepens, and a search cut off partway through a line prints that slot as a bound, so
+the slot's last exact line came from the depth before and could name the move that now sat in the other slot. It
+happened in about one in five of the judge's top-8 searches. It had been seen twice before and patched where it
+showed: `scoreMoves` re-scored a missing move another way (milestone 1), and Squads' `cleanTop` kept a duplicated
+move's first line. Neither covered re-checks, the engine server or the top-8 search, and nobody asked why.
+
+**The fix:** `searchLines` reads each slot's last exact line as before, unless that lists a move twice; then each move
+once, with its own latest exact line, the moves from the last line printed for each slot (bound lines included). A
+search with no move twice reads exactly as before.
+
+**The rule:**
+- When an engine's answer looks impossible (a move twice, a move missing), find out why before patching around it, and
+  measure how often it happens across many positions: a fallback where it showed hides it everywhere else.
+- Read Stockfish's MultiPV output by move, not by slot: a slot's last exact line may name another move.
+
+## A countdown that seemed to fire early (Oct 15, 2026)
+
+**What Eric saw:** against the Hidden Boss, under his bullet clock (1+2), "just the big one popped up for a second",
+the 3-2-1's big number alone, "and I definitely had more time because I would have seen the 3-2-1 whole countdown".
+He was spamming Engine move and played on: at move 20 the dock said "Bullet 1+2 · 0:20 left".
+
+**The cause:** no misfire. The bullet clock's first three moves add nothing (60 s, 1+0). Think through them and the
+first 1+2 turn starts with about 0 s plus the 2 s, inside the countdown, so its first frame shows one big number with
+no build-up. Then the instant Engine move takes it away. Each instant move after that banks about 1.9 s, which is
+where his 0:20 at move 20 came from. Nothing on screen had said his time was that low. It was small, muted, after the
+words, gone between moves, and rounded down ("0:02 left") while the big number is rounded up ("3"). A unit test
+spamming Engine move at every moment of the bullet clock, and five browser runs (instant and slow answers, a slowed CPU,
+every `.cc-num` watched), never showed the count with time in the bank.
+
+**The fix:** your clock always in the dock, bold at the status box's right, holding between your moves, red in its last
+10 s, in the same rounding as the big 3-2-1, with a "+2" as the increment lands (`DockClock`). The countdown's logic
+didn't change. `packages/app/test/boss-clock.test.ts` plays Eric's path.
+
+**The rule:**
+- A clock the player plays against is on screen all the time, in one place, readable at a glance, in the same rounding
+  as any countdown drawn over the board. Never only inside a line of text that changes with the moment.
+- Before hunting a "fired early" bug, work out the player's own time on the path they really played (the bank, the
+  increment, how fast they moved) and check it against what they saw last; then test that path.
+
+## A queen banner that came back after the ult (Oct 16, 2026)
+
+**What Eric saw:** against Big Boy, "he used his ult and idk what happened but the queen slayed banner appeared for
+like 1 second very fast".
+
+**The cause:** QUEEN SLAIN! was drawn whenever the boss screen showed the boss thinking and the board's last move had
+taken a queen (`lastMoveTookQueen`). Big Boy's Big Bounce comes at the start of his turn, between your move and his, so
+his turn thinks twice on the same last move: once while his bounce is picked, once for his move. Take his queen with
+the move before his bounce and the banner played in the first thinking, then again in the second, after the bounce,
+cut off by his move (in Boss alone his move comes as soon as his engine answers: about a second). Online, the lobby
+held his move after the bounce for the banner again, while the bounce itself didn't wait for it. The same check, which
+never asked whose move it was, would also have shown "QUEEN SLAIN! You take Hollow's queen" when Hollow took yours and
+thought again for his extra move. Reproduced in the browser by placing his queen where a pawn takes it before the
+bounce turn: the banner showed for 3 s, the bounce played, then the banner again.
+
+**The fix:** one check for the screen, the solo game's wait and the lobby's (`queenSlain` in `boss-timing.ts`): the
+crowd's capture of the boss's queen, only in the thinking straight after it (not once the bounce has played this
+turn). The bounce now waits for the banner online as it did solo.
+
+**The rule:**
+- A banner for something that happened (a capture, a power) is keyed to that event happening, never to a state that
+  stays true afterwards: a power that pauses the turn shows the same state again.
+- When a turn has more than one screen of the same kind (a thinking before a power and one after it), check everything
+  drawn from that state on each of them.
+
+## A menu glued to a laptop's taskbar, and two numbers for one boss (Oct 17, 2026)
+
+**What Eric saw:** Chrome maximized on a Windows laptop, the Boss raid screen, Sawyer, then Boss alone: its menu "sitting
+at the bottom… there's no way I can drag it… literally attached to the bottom of the screen", its row cut off at the
+taskbar. In the same photo the stage said "💀 Rating 1350" and the menu's row for Sawyer "1600 ≈ your level".
+
+**The cause:** the menu sat in the middle only on windows at least 700 px tall; a maximized laptop browser has about
+550 to 650 px, so it got the phone's sheet, flush with the window's foot, where the taskbar is. The tests measured
+the computer at 1280×800, over that line. The stage worked out the boss's strength with no difficulty; the menu added
+the difficulty: two formulas for one number, each tested alone.
+
+**The fix:** from 600 px wide the menu is a dialog in the middle with room all round, at any height, scrolling inside
+(the in-game leaderboard sheet too); one function for Boss alone's strength, used by the stage and the menu, the stage
+following the menu's difficulty. docs/decisions/2026-10-17-boss-sheet-fit.md.
+
+**The rule:**
+- Test a computer's screens at a laptop's maximized window too (1280×600 and 1366×768), not only a tall test window:
+  a sheet on a computer sits in the middle with room all round, never on the window's edge.
+- A number shown in two places comes from one function, and a test reads both on the same screen (and the battle's own).
+
+## A saw the boss crossed (Oct 17, 2026)
+
+**What Eric saw:** Boss alone against Sawyer, the board saw up: "I tried to take, it's like it glitched, and he just
+played his queen through the cut in the board and captured my piece." One move back in the history, the cut wasn't
+drawn: "the engine clearly didn't see it was there."
+
+**The cause:** no rule was broken. His knight's check from f6 left the boss one legal move, Qd8xf6, across the saw,
+and a power never blocks the only way out of check: the limit lifted for that move, as the ground rules say. The move
+before, Eric's Qg7xb7 (a queen for free) crossed the saw and was refused: the piece went straight back, with nothing
+said. And the history view draws no power's marks on past moves, so the saw seemed never to have been there. Every
+brain path was audited and tested (Stockfish, the slips, the strike, Maia with and without its guards, every
+fallback): each already picked from the moves the powers allow.
+
+**The fix:** the dock says why a move of yours is refused ("The board saw blocks that move."), and on your turn when
+the boss's only move went through a power ("His only move: across the saw."). The boss's pick and the
+move played are checked once more and a wrong one is logged.
+
+**The rule:**
+- A limit that refuses a move, or lifts for one, says so on screen in the words of the power: a piece that only goes
+  back, or a boss crossing his own saw, reads as a glitch.
+- Before fixing "the boss broke the rule", rebuild the position from the screenshot and list its legal moves: the
+  rule's own exceptions (the only move, the only way out of check) come first.
+
+## A board that shrank as the boss fell (Oct 18, 2026)
+
+**What Eric saw:** on his phone, beating the Hidden Boss with `?win=1`: "the board shrinks right after … putting him in
+checkmate", and stays smaller through his rant until the boards split. He thought the slower phase change (#269) did it.
+
+**The cause:** a phone's board is sized by the window's height less a budget for the rest of the screen: 330 px, or
+255 px when the scoreboard is minimized (`:has(.mini-tower.closed)`). Phase 1's screens have the scoreboard; the phase
+change's screen has none, so the minimized rule stopped matching as it began and the board fell back to the smaller
+budget (390 × 600: 314 to 270 px). It was there before #269, which only made it last twice as long. No test saw it:
+the phone tests run at 390 × 664, where the board is sized by the width, with the scoreboard open.
+
+**The fix:** the phase change says whether phase 1's scoreboard was minimized (`rc-folded`) and the same rule applies.
+A test measures the board every frame from the mate to the split, on a short phone window with the scoreboard
+minimized. docs/decisions/2026-10-18-phase-change-board-size.md.
+
+**The rule:**
+- A rule that sizes the board from something on the screen (`:has(...)`) must hold on every screen that hands the board
+  on: when the next screen lacks that thing, it carries the state itself.
+- Measure a board handed between screens with each setting that changes its size (the scoreboard minimized), in a
+  window short enough that the height sizes it.
+
+## A drag that outlived its step (Oct 21, 2026)
+
+**What Eric saw:** in Auto chess, "I dropped my queen in and then it froze. So it looked like I had two queens". A white queen
+stood on g1 through the whole fight and the result, never moving; the real one played on from d6. He also dragged a glowing
+offer on the board toward the sell spot and "it just sold a piece that didn't exist".
+
+**The cause:** a piece being dragged is drawn twice: the real piece stays on the board and a ghost follows the pointer. The
+adjust step (5 s) can end under a finger still moving its piece, and the step's end cleared the press but not the drag, so the
+ghost stayed where the finger was through the fight, the result and into the next round (where "Drop to sell for N" lit over the
+shop with nothing dragged). The buy step's ends had been covered one by one; the next step's weren't. Separately, a sale paid
+`sellValue(board[square]!)` without checking a piece was there (a second sale of a piece already sold paid `NaN`), and a finger's
+drag from a shop card was cancelled by the browser (no `touch-action`), which no test saw because every drag test used a mouse
+or the board's own layer. No test held a drag through anything.
+
+**The fix:** one `cancelGesture()` for a press, its capture, the ghost and the selection, run at every step's end, the lock, the
+round turning, a window blur, a cancelled pointer and a lost capture; a sale checks the piece is there and is the kind the hold
+says; silhouettes on the board are tap only. Tests hold a drag through each moment. docs/decisions/2026-10-21-autochess-drag-fixes.md.
+
+**The rule:**
+- State that follows a pointer (a press, a drag, a ghost, a selection) ends in one function that every step change, lock and
+  pointer event calls, not in each handler that thought of it.
+- An action on a "hold" re-checks what it points at now (the piece is there, of that kind) before it pays or changes anything.
+- A drag test holds the drag through every moment that can cut it off, and checks the ghost is gone within a moment of each, with
+  nothing bought, held or sold; and a gesture tested with a mouse is tested with a finger too (`touch-action`).
+
+## An options panel that disappeared (Oct 25, 2026)
+
+**What Eric saw:** home on a computer and on a phone showed the RANKED row and PLAY with nothing between them; the Default /
+Bots off / Solo row only appeared after he tapped a mode, and the page moved when it did. "I feel like I've said this 100
+times, the menu buttons should never be like invisible… we had it working before… something should have caught this."
+
+**The cause:** on Oct 24 Eric asked to drop the "Tap a mode above to play" message and its white space. The director's brief
+for that tidy-up went further than he asked: "when no mode is picked, the panel isn't there at all… it may move." That
+reversed his Oct 18 rule (home keeps still; one panel, one height, options greyed or explained). The same brief told the
+helper to update the home specs to "no panel when no mode is picked", so the tests that guarded the Oct 18 rule were rewritten
+to guard the opposite, and the director merged it (#339) without checking the brief against the earlier decision.
+
+**The fix:** the panel is back in its place with nothing selected and its options greyed until a mode is picked; picking a
+mode moves nothing (docs/decisions/2026-10-25-home-panel-back.md). Eric's standing rules now live in `docs/rules/eric.md`,
+each with the test that guards it.
+
+**The rule:**
+- A brief lists the standing rules of the area it touches (`docs/rules/eric.md`, the area's decisions) and keeps them. When
+  Eric's new words seem to clash with one, ask him; never read a clash into them.
+- A test that guards one of Eric's rules changes only with his OK. A brief never says "update the specs to the new
+  behavior" for one, and every PR lists the test checks it changed or removed.
+
+## A scoreboard that rebuilt itself every phase (Nov 1, 2026)
+
+**What Eric saw:** in a 50 v 50 on his iPhone, the scoreboard's box under the board "flashing… being rebuilt in a weird
+way", a problem seen before.
+
+**The cause:** each phase of a turn (your pick, the counting, the reveal, the other team's turn) is a screen of its own,
+and each built the box under the board anew. The new scoreboard measured its room in a `useEffect`, after its first
+paint, so its first frame showed 3 rows, then all of them, and the rows' area grew over half a second (its height
+transition): the rows wiped in from the top, two or three times a turn. The checks measured the box's place and size,
+which never changed, so none failed.
+
+**How it was found:** a per-frame sampler (the box element, its rows) and the painted frames across turns and a cut at
+390 × 750: 5 box elements in 2 turns and a cut, rows 3 → 9 after each.
+
+**The fix:** one box element for the match (`KeptBox`), and `MiniTower` measuring in a layout effect from its last room.
+docs/decisions/2026-11-01-crowd-steady-box.md.
+
+## A defeat that never came (Nov 9, 2026)
+
+**What happened:** main's full run on 729e639 went red on `e2e/boss-result.spec.ts:44` (phone, both tries): after
+`?mate=1` and START, `.results h1` never came. It had passed before, and it passed locally. Only CSS had changed.
+
+**Why:** START with no boss picked plays a random one. `?mate=1` (`bossMateTest`) has the boss play a mate in one from
+1.f3 e5 2.g4, but only among the moves his rules allow, and only on his ordinary move: Wrangler's first move is always
+his long pull (`pigTurn` plays the pull before the mate is looked at) and Sawyer's first move must be a pawn's (his
+split). Both played 2…d5 and the battle went on. 2 bosses of 14: about one run in seven per try, so it came and went.
+
+**How it was found:** the defeat path run once per playable boss (`?boss=<id>`): 12 passed, Wrangler and Sawyer
+failed. `?win=1` passed for all 14.
+
+**The fix:** the spec names Hollow (as `king-attack` and `shop` already do), and the switch's comment in settings.ts
+says which bosses it can't mate at once. docs/decisions/2026-11-09-boss-result-red.md.
+
+## Uploads that waited for the GPU, and an atlas that never gave room back (Nov 11, 2026)
+
+**What Eric saw:** `/town?report` on his iPhone 14 Plus. Warm: 4,353 uploads and 12 atlas resets in 28 s, most of the frame "Outside
+our code". Cold: frames up to 259 ms while turning, painting and uploading.
+
+**The cause:** two things. (1) The town's 2D pictures (tags, signs, the bubble, text) were canvases the browser drew on the GPU.
+Uploading one to WebGL first waits for the GPU to finish what it's drawing: 30 to 120 ms an upload, headless. (2) The atlas only got
+room back by starting a whole page again. A picture the sweep let go, or one that changed size, kept its old room, so the 6 pages
+filled and reset over and over, and everything on them was uploaded again.
+
+**How it was found:** each upload timed by where it came from, headless, once the loading screen had taken painting out of the
+picture.
+
+**The fix:** the town's pictures are painted and uploaded once, on a loading screen, onto an atlas sized for them. Only 2 spare pages
+start again. The town's 2D pictures are made in memory (`art2d`). docs/decisions/2026-11-11-town-loading.md.
+
+
+## A report that looked paused in every room (Nov 11, 2026)
+
+**What Eric saw:** `/town?report` on his iPhone "is pausing when I run into the building, so I don't know how to capture it", the day
+#638 made the report record rooms.
+
+**The cause:** the rooms' frames were recorded, but the pill's "● Recording N s" was set in the town's frame loop, which stops while
+you're in a room. Inside, the pill stood still. #638's tests checked the recorded frames and the `?fps` pill, not the report's pill.
+
+**The fix:** the recorder tells the pill each new second (`FrameRec.onSec`), whichever loop records. The e2e check walks in a room and
+reads the pill's texts. docs/decisions/2026-11-11-room-smooth.md.
+
+
+## Floor tiles that stood up (Nov 11, 2026)
+
+**What Eric saw:** in Rolling Dough's back room, on his iPhone, the table and its board ghosted, and dark squares on the floor as he
+walked round it; "the same in the main bakery".
+
+**The cause:** the back room's tiles were named `bfloor-` and `rug-`, and the room bakes only names starting `floor-` into its floor.
+Every tile stood up as a piece each frame, and went see-through over you, as a cave's rock does. The see-through rule reached the
+whole room (and the table) because the room has a floor's shape. The room's unit tests checked walls and paths, not that its floor
+was a floor; the stills at rest looked right.
+
+**The fix:** the tiles renamed; a room lists what may go see-through (`seeThru`). A unit test: every square has a floor tile baked
+in; an e2e check walks round the table: no tile stands, nothing but the door and near wall see-through.
+docs/decisions/2026-11-11-room-smooth.md.
+
+## Escapes lost as a pop-up opened (Nov 11, 2026)
+
+**What happened:** main's full run went red on retry-only passes in `town-chat.spec.ts:1410` (a player's own line menu stayed open
+after Escape) and `shop.spec.ts:1480` (the "Buying opens soon" pop-up stayed open after Escape, many runs), and on
+`squads-play.spec.ts:304`, the very test written for this in October.
+
+**Why:** the town chat's line menu and the shop's pop-up added their Escape listener in a `useEffect`, which Preact runs after a paint
+(up to about 100 ms later, more on a busy phone or CI): an Escape pressed as they opened was lost. The party sheet had been fixed for
+this on Oct 16, but its test's watcher fired on any `[role="dialog"]`, and `index.html` always holds one (the hidden "Turn your phone
+upright"), so it could send its Escape before the sheet existed.
+
+**How it was found:** the CI snapshots (the pop-up still open, the sheet still open with nothing else on screen), then an Escape sent
+from a MutationObserver the moment each pop-up is in the page: the menu and the pop-up stayed open on the old build, every time.
+
+**The fix:** layout effects for both listeners; each spec presses Escape at the pop-up's first frame; the party sheet's watcher waits
+for `.sq-party`. docs/decisions/2026-11-11-flaky-batch.md (it lists eight more pop-ups with the same `useEffect`).
+
+## Hollow's dark at Babur's mate (Nov 11, 2026)
+
+**What Eric saw:** "when Babur mated me it showed the dark matter Hollow uses on the tile."
+
+**Why:** the mate on your king was built for Hollow first (Oct 10): the king toppled into his dark (`darkItem`) and flashed his
+violet at each lash, both drawn in the shared `KingAttack.tsx`. When every boss got an attack, those stayed there, so every boss's
+mate ended on Hollow's dark square. The tests checked Hollow's mate only. The same sweep found Dash's swipes showing Jefferson's
+fireball pops (`popItem`).
+
+**The fix:** the dark and the violet are Hollow's kit's (`mateMark`, `glow`); Dash got his own claw marks (`clawHit`); a test walks
+every boss's kit. docs/decisions/2026-11-11-mate-effects-iphone-vibration.md.
+
+## A level that popped twice a move, and a Back tap that was lost (Nov 12, 2026)
+
+**What happened:** main's full run went red on retry-only passes in `boss-bar.spec.ts:204` (the level badge's animation read as `""`
+mid-Full-Moon) and `town-leave.spec.ts:148` (still inside Babur's Circus 20 s after the room's Back was tapped).
+
+**Why:** the match's screens are separate components, one per phase, so the boss bar and its level badge are put in the page anew at
+every phase: twice a move. The lifted badge's gold pop (560 ms) replayed at each one, about nine times in one Full Moon, and the test's
+read could land on a badge just replaced. In the town, `goOut` returned at once while the door was busy, and the door stays busy until
+the room's warm-up frames and its 260 ms fade are done (up to about 1.3 s after it's drawn): a Back tapped then did nothing.
+
+**How it was found:** a MutationObserver logging each `.boss-level` put in the page (with the phase), and one tapping Back the moment the
+room's canvas is drawn: the pop replayed at every phase, and the room stayed, on the old build every time.
+
+**The fix:** the badge carries on its animation from when the lift or slash began (`levelSince`, a negative `animation-delay`); the town
+keeps a Back tapped as the room fades in and goes out once it has (`outNext`). Each spec has the check that failed on the old build.
+docs/decisions/2026-11-11-flaky-batch.md, "Batch 4".
+
+## A plip that never played on a busy page (Nov 12, 2026)
+
+**What happened:** main's run went red on a retry-only pass in `gardener.spec.ts:229`: four plips for the opening's five seeds.
+
+**Why:** a sprite plays a frame's sound as it draws that frame, and a frame a slow tick jumps past still plays (Oct, Wrangler's tug), but
+only from the second drawing on. A seed's plop is put in the page by a timer at its landing; on a busy page the timer came over 55 ms
+late, the plop's first drawing was already past its first frame (the one with the plip), and the sound never played.
+
+**How it was found:** the page's CPU slowed 4x through CDP (`Emulation.setCPUThrottlingRate`): four plips in 5 of 6 runs.
+
+**The fix:** the first drawing plays the cues the one-shot passed over since it began, up to `LATE_CUE_MS` (1 s) late. A unit test.
+docs/decisions/2026-11-12-flaky-batch-5.md.
+
+## His words over his face as he grew (Nov 14, 2026)
+
+**What happened:** Eric, playing the Hidden Boss's child form on a computer: grown to 20, his line sat over his face, the tail at his
+chin. The cutscene's man and the phase change (his line by his empty place, far from him on the board) the same day.
+
+**Why:** a bubble's place was a number set once per drawing (CSS per character id; the cutscene's hand-typed head spots; the side
+box's place), never checked against the drawing shown. His child form is one drawing whose height changes by age; the cutscene's spot
+missed the scene's 38 rows of headroom; the phase change draws him somewhere his box isn't. Every test said a line showed, none where.
+
+**The fix:** the heights come from the art (a kit's `heads`, the cutscene's spots), each equal to the measured frames in a unit test; on
+the board his words go over his figure. An e2e check measures the bubble's bottom against his head at each age.
+docs/decisions/2026-11-14-recluse-bubble-grows.md.
+
+
+## A deploy that took an open tab's files (Nov 15, 2026)
+
+**What happened:** Eric, on a computer, came back to a tab open from before a deploy and challenged Wrangler: the page loaded again,
+the town at its center, his challenge gone.
+
+**Why:** the new version's service worker deleted every older version's cache as it took over, and the deploy had taken those files off
+the server. The tab had its code nowhere. The "a deploy landed" e2e ran with the service worker blocked (it got in the way of the
+route that refused the file), so it only ever tested the reload, never what the worker does to an open tab.
+
+**The fix:** each version's files stay while a tab runs that version; the fallback reload comes back where you were, with the
+challenge or room opening. docs/decisions/2026-11-15-stale-tab.md.
+
+## A cleared browser marked again by its own open tab (Nov 15, 2026)
+
+**What happened:** the ban e2e ("a ban means you can't sign in") passed only on its retry on main and PRs from Nov 14: after "a fresh
+browser (cookies and storage cleared)", `/` showed the ban screen, or a guest home, instead of the sign-in.
+
+**Why:** the test cleared the cookies and storage of the tab still open on the ban screen, about 50 ms after it drew. That tab still
+had requests on their way, and the answer to one sent before the clear (the ban answer, which marks the browser and writes
+`brc.banned`) landed after it. The server was right: the request came from the banned browser. A fresh browser has no old tab. CI's
+retry records a trace, which slowed the page enough that the answers were always in before the clear: 0 failures in 40 traced runs
+locally, 1 in 20 untraced on each project.
+
+**How it was found:** a request log in the test (every request and answer with its cookies, the test's steps, the storage at the
+failure), run 20 times per project without a trace.
+
+**The fix:** the fresh browser is its own context, the open tab closed first. docs/decisions/2026-11-15-fairplay-fresh-browser.md.
+
+## Windows lit over Chandy's Swamp (Nov 16, 2026)
+
+**What happened:** the night after Chandy's Swamp went live, Eric saw six lit windows in a grid glowing over the swamp's water and its
+trees, as if a building stood there.
+
+**Why:** two things together. South Street's row backs onto Meadow Street's, and the swamp's lot and box run back over it, so that
+row's fronts stood inside the swamp, their rear walls' windows behind its trees. Those windows should still have been hidden: the
+light layer cuts each light where something is drawn in front of it. But it kept the boxes of only 128 lights a frame and silently
+dropped the rest, and a night street draws about 260. The rows' rear walls are drawn late, near the camera, so theirs were dropped,
+and nothing could cut them. Every solid building hid the bug: there's rarely anything in front of a lit window but a passer-by.
+
+**The fix:** the list grows; an open home leaves the row behind it open. docs/decisions/2026-11-16-chandy-pond.md.

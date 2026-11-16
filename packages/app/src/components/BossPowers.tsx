@@ -1,0 +1,323 @@
+import type { ComponentChildren } from "preact";
+import { useContext, useLayoutEffect, useRef } from "preact/hooks";
+import { BoardTurn, type QuarterTurn } from "../board-view.ts";
+import { BOSS_BANNER, BOSS_POWERS, bossBannerMs, type PowerEventKind } from "@chessroyale/core";
+import { KING_ATTACK, bannerLeadMs, bossRules, mateMoments, powerFxMs, powerMomentMs } from "@chessroyale/chess";
+import { bossKit, poweredKit, type BossKit } from "../characters/kits.ts";
+import { cueAt } from "../characters/power-art.ts";
+import type { BossView } from "../game.ts";
+import { BOINGO_UI, angleView } from "./Boingo.tsx";
+import { BIGBOY_UI } from "./BigBoy.tsx";
+import { GINGER_UI } from "./Ginger.tsx";
+import { GREX_UI } from "./Grex.tsx";
+import { HOLLOW_UI } from "./Hollow.tsx";
+import { SAWYER_UI } from "./Sawyer.tsx";
+import { PIG_UI } from "./Pig.tsx";
+import { RECLUSE_UI } from "./Recluse.tsx";
+import { ALFIL_UI } from "./Alfil.tsx";
+import { HOPPER_UI } from "./Hopper.tsx";
+import { SMUDGY_UI } from "./Smudgy.tsx";
+import { MOO_UI } from "./Moo.tsx";
+import { GARDENER_UI } from "./Gardener.tsx";
+import { TIGER_UI } from "./Tiger.tsx";
+import { FOLIO_UI } from "./Folio.tsx";
+import { TIMBER_UI } from "./Timber.tsx";
+import { DASH_UI } from "./Dash.tsx";
+import { ZEBRA_UI } from "./Zebra.tsx";
+import { Cast, PowerBanner, kitLine, momentKey, rageWarn, ragePct, type BossUi, type Moment, type MomentProps, type MomentUi } from "./PowerParts.tsx";
+import { CRITICAL, NORMAL, bossVoice, type Priority } from "../speech.tsx";
+import { useFrameNow } from "./Countdown.tsx";
+
+/**
+ * Boss powers on screen: what every player sees, from the battle's shared state (NetBoss.powers), so online everyone
+ * sees the same ice, the same pie and the same moment at the same time. Each boss's own beats, moments and board layer
+ * are in its file (Ginger.tsx, Boingo.tsx, Grex.tsx, Hollow.tsx, BigBoy.tsx, Sawyer.tsx, Pig.tsx, on the shapes in PowerParts.tsx); this
+ * puts them together:
+ *
+ * - The board layer (PowerBoard): the boss's own layer (ice, the pie, fire, the dark, a toy block), drawn over the
+ *   pieces, never taking a tap.
+ * - The moments (momentsOf / PowerMoment): as the turn passes to the crowd, after the boss's move shows, each power
+ *   that came with it plays in turn, in the God King's banner style (the boss on the left, the moment in the middle,
+ *   the God King on the right), with its board effect. The crowd's clock starts after them.
+ * - The rage meter (RageMeter) in the boss bar: it fills over the battle (faster as the boss loses material or the
+ *   crowd gets ahead), glows as it nears full, flashes for the one-turn warning, and is gone once the ultimate is spent.
+ */
+
+// Each boss's file, for the screens.
+export { FREEZE, BLIZZARD, THAW, MELT_MS, prewarmGinger, thawLine, thawOver } from "./Ginger.tsx";
+export { PIE, FUNHOUSE, FUNHOUSE_LINES, SPIN, angleView, funhouseFlipAt, funhouseLine, funhouseView, spinOf } from "./Boingo.tsx";
+export { BURN, CANDLE, CandlePips, FIREBALL, FireBurn, SPARK, candleShotPath, candleShotTimes, fireCountdown, fireballLandAt, shadowItems, shadowsAt } from "./Grex.tsx";
+export { DARK, DarkCost, HOLLOW_CASTER, hollowCastFrom } from "./Hollow.tsx";
+export { PowerBanner, type Moment } from "./PowerParts.tsx";
+
+/** Every boss with powers on screen, by its BOSS_ROSTER id. */
+const BOSS_UI: ReadonlyMap<string, BossUi> = new Map(([GINGER_UI, BOINGO_UI, GREX_UI, HOLLOW_UI, BIGBOY_UI, SAWYER_UI, PIG_UI, RECLUSE_UI, ALFIL_UI, HOPPER_UI, SMUDGY_UI, MOO_UI, GARDENER_UI, TIGER_UI, FOLIO_UI, TIMBER_UI, DASH_UI, ZEBRA_UI] as BossUi[]).map((u) => [u.id, u]));
+const bossUi = (boss: Pick<BossView, "id"> | null | undefined): BossUi | null => (boss?.id ? (BOSS_UI.get(boss.id) ?? null) : null);
+
+/** The rage warning, the same for every boss: the meter full, its ultimate coming. */
+export const WARN: MomentUi = {
+  order: 1,
+  kit: "ultimateWarn",
+  view: (p: MomentProps) => {
+    const ui = bossUi(p.boss);
+    // (A boss whose moments all play where it stands, Dash: its warning too, never at the board's corner.)
+    return rageWarn(p, ui?.ultimate.name ?? "its ultimate", ui?.ultimate.when, !!ui?.inPlace);
+  },
+};
+
+/** Every kind of power moment, from the bosses' files: a power without one doesn't compile. */
+const MOMENT_UI: Record<PowerEventKind, MomentUi> = {
+  warn: WARN,
+  ...GINGER_UI.moments,
+  ...BOINGO_UI.moments,
+  ...GREX_UI.moments,
+  ...HOLLOW_UI.moments,
+  ...BIGBOY_UI.moments,
+  ...SAWYER_UI.moments,
+  ...PIG_UI.moments,
+  ...RECLUSE_UI.moments,
+  ...ALFIL_UI.moments,
+  ...HOPPER_UI.moments,
+  ...SMUDGY_UI.moments,
+  ...MOO_UI.moments,
+  ...GARDENER_UI.moments,
+  ...TIGER_UI.moments,
+  ...FOLIO_UI.moments,
+  ...TIMBER_UI.moments,
+  ...DASH_UI.moments,
+  ...ZEBRA_UI.moments,
+};
+
+/** The moments that play on a screen of their own, in the order they're looked for. */
+const OWN = (Object.keys(MOMENT_UI) as PowerEventKind[]).filter((k) => MOMENT_UI[k].own);
+
+/**
+ * The moments a boss screen plays, ending at `until` (the screen's end: the crowd's clock starts then), one after
+ * another. The funhouse has a screen of its own (after the move he plays for the crowd); so do Hollow's extra move and
+ * Big Boy's Big Bounce; the rest come after the boss's move, as the turn passes to the crowd. A moment whose banner
+ * shows longer than its beats give it (Oct 24: every banner a boss banner's whole length) starts its own clock (`at`)
+ * that much later (`lead`, bannerLeadMs), its banner up meanwhile: everything it does comes after.
+ */
+export function momentsOf(boss: BossView, until: number): Moment[] {
+  const p = boss.powers;
+  if (!p || !until || !p.events.length) return [];
+  const only = OWN.find((k) => MOMENT_UI[k].own!(boss)) ?? null;
+  // (A moment this app doesn't know, from a newer server, is passed over rather than read: Oct 17, Alfil's.)
+  const list = p.events.filter((e) => MOMENT_UI[e.kind] && (only ? e.kind === only : !MOMENT_UI[e.kind].own)).sort((a, b) => MOMENT_UI[a.kind].order - MOMENT_UI[b.kind].order);
+  let t = until - powerMomentMs(list);
+  return list.map((e) => {
+    // (Chub & Chirp's carrots: one pulled by each side in one turn, two moments.)
+    const lead = bannerLeadMs(e.kind);
+    const m: Moment = { kind: e.kind, key: momentKey(boss.id, e), at: t + lead, ms: powerFxMs(e) - lead, ...(lead ? { lead } : {}), ...(e.square ? { square: e.square } : {}), ...(e.squares ? { squares: e.squares } : {}), ...(e.fizzled ? { fizzled: e.fizzled } : {}), ...(e.first ? { first: true as const } : {}), ...(e.size ? { size: e.size } : {}), ...(e.pick !== undefined ? { pick: e.pick } : {}), ...(e.ult ? { ult: true as const } : {}), ...(e.by ? { by: e.by } : {}), ...(e.tier !== undefined ? { tier: e.tier } : {}), ...(e.prize ? { prize: e.prize } : {}), ...(e.growth ? { growth: e.growth } : {}), ...(e.kind === "clockFit" && e.count ? { count: e.count } : {}), ...(e.shape ? { shape: e.shape } : {}), ...(e.opening ? { opening: e.opening } : {}) };
+    t += lead + m.ms;
+    return m;
+  });
+}
+
+/**
+ * At the boss's mate (its attack on the crowd's king to come): the moments that still play, ending as the screen's last
+ * KING_ATTACK.mateHoldMs begins (the attack from KING_ATTACK.mateAt into it): only Chub & Chirp's fifth carrot's, the
+ * pull and his win (mateMoments); none for any other mate.
+ */
+export const mateMomentsOf = (boss: BossView, until: number): Moment[] => (mateMoments(boss.powers?.events).length ? momentsOf(boss, until - KING_ATTACK.mateHoldMs) : []);
+
+/** The dock's line for the boss's turn when it brought no move to show (BossUi.noMove: Alfil's fusion); null otherwise. */
+export const noMoveLine = (boss: BossView): string | null => bossUi(boss)?.noMove?.(boss) ?? null;
+
+/** The moment playing at `now`, if any (its banner's hold before its own clock, `lead`, included). */
+export const momentAt = (moments: readonly Moment[], now: number) => moments.find((m) => now >= m.at - (m.lead ?? 0) && now < m.at + m.ms) ?? null;
+
+/**
+ * The board as the crowd sees it: from its own side, or (in Boingo's funhouse) turned: upside down (the other side's
+ * orientation), or a quarter turn either way (Board's `turn`). Older servers send only `flipped`.
+ */
+export function crowdView(boss: Pick<BossView, "powers"> | null | undefined, side: "w" | "b"): { orientation: "white" | "black"; turn: QuarterTurn } {
+  const p = boss?.powers;
+  return angleView(p?.angle ?? (p?.flipped ? 180 : 0), side);
+}
+
+
+// ---------------- The board layer ----------------
+
+/** When a square's ice, pie or fire appears during a moment (ms, wall clock); 0: it's simply there. */
+function appearAt(square: string, moments: readonly Moment[], orientation: "white" | "black"): number {
+  for (const m of moments) {
+    const t = MOMENT_UI[m.kind].appearAt?.(m, square, orientation);
+    if (t !== undefined) return t;
+  }
+  return 0;
+}
+
+/** The boss's powers over the board (its own layer: BossUi.board), under any banner; never takes a tap. */
+export function PowerBoard({ boss, orientation, moments = [], now = Date.now(), fen }: { boss: BossView; orientation: "white" | "black"; moments?: readonly Moment[]; now?: number; fen?: string }) {
+  const p = boss.powers;
+  if (!p) return null;
+  const board = fen ?? boss.board.fen;
+  const turn = useContext(BoardTurn);
+  const layer = bossUi(boss)?.board?.({ boss, p, board, orientation, turn, moments, now, appearAt: (square) => appearAt(square, moments, orientation) }) ?? null;
+  return (
+    <>
+      {layer?.under}
+      <div class="power-board" aria-hidden="true">
+        {layer?.over}
+      </div>
+    </>
+  );
+}
+
+/**
+ * The boss's own piece in the boss bar, from the boss screen's moments ending at `until`: its passive's bar under the rage
+ * meter (`bar`: Hollow's bulbs, Puddles' Seeds), its ultimate's piece beside the rage meter (`ult`: Moo's moon) or its prop
+ * in the free room at the right (`prop`; none yet). Through the boss's turn on its screen it draws itself every frame (the
+ * strip relights as his darkness lands): the header around it draws only now and then (useStillKey).
+ */
+export function BossBarExtra({ boss, until = 0, part = "bar" }: { boss: BossView; until?: number; part?: "bar" | "ult" | "prop" }) {
+  const ui = bossUi(boss);
+  const draw = part === "ult" ? ui?.ultBar : part === "prop" ? ui?.barProp : ui?.bar;
+  useFrameNow(!!draw && !!until);
+  return draw?.({ boss, moments: () => momentsOf(boss, until) }) ?? null;
+}
+
+// ---------------- The moments ----------------
+
+/** The boss's line for a power's moment (its kit's), the same on every screen; null without one. */
+export function powerLine(kit: BossKit | null, m: Pick<Moment, "kind" | "key" | "first" | "pick" | "ult" | "by" | "tier" | "shape" | "opening">): string | null {
+  const ui = MOMENT_UI[m.kind];
+  return ui.line ? ui.line(kit, m) : kitLine(kit, ui.kit, m.key);
+}
+
+/**
+ * What a power's moment means for you, for the dock, where no banner says it; null otherwise (the dock keeps the turn's
+ * own line). The banner names the power; the boss's bubble is his character.
+ */
+export function dockLine(m: Pick<Moment, "kind" | "squares" | "fizzled">): string | null {
+  return MOMENT_UI[m.kind].dock?.(m) ?? null;
+}
+
+/** When the boss says a moment's line (ms into it). */
+export const momentLineAt = (m: Pick<Moment, "kind">): number => MOMENT_UI[m.kind].lineAt ?? 0;
+
+/** How much a moment's line matters: an ultimate's cuts in on another line; a passive's or the warning's waits its turn. */
+export function momentPriority(m: Pick<Moment, "kind" | "first">): Priority {
+  const ui = MOMENT_UI[m.kind];
+  return ui.priority?.(m) ?? (ui.kit === "ultimate" ? CRITICAL : NORMAL);
+}
+
+/**
+ * Every power moment's line, said into the boss's voice as the moment reaches it (each kind's `lineAt`): its text box
+ * shows it for its time and in turn (speech.tsx), through the rest of the boss's turn and into the crowd's, on every
+ * screen. The one place a boss's power lines are said, so a new boss's are too.
+ */
+export function useMomentSpeech(boss: BossView, moments: readonly Moment[], now: number) {
+  const due = moments.filter((m) => now >= m.at + momentLineAt(m));
+  const last = due.at(-1)?.key;
+  useLayoutEffect(() => {
+    // (Each moment's line once: the voice ignores a moment said again.)
+    // (Its time runs from when this device says it, as a boss's animations do: a busy frame never eats into it.)
+    // (A long line comes in parts that each fit the bar's two rows, "\n" between them (Don Dough's): said one after another.)
+    for (const m of due) (powerLine(bossKit(boss.name), m) ?? "").split("\n").forEach((part, i) => bossVoice.say(part, `${boss.id}:${boss.startMove}:${m.key}${i ? `:${i}` : ""}`, momentPriority(m)));
+  }, [last]);
+}
+
+/** The boss's animation for a power's moment, from its kit (e.g. freezeCast, pieThrow, check, blizzard, funhouse). */
+const kitAnim = (kit: BossKit | null, kind: PowerEventKind) => {
+  const name = kit?.anims[MOMENT_UI[kind].kit];
+  return name && kit!.ch.anims[name] ? name : null;
+};
+
+/**
+ * The moment playing now, over the board: its banner (boss left, moment middle, God King right), the boss stepping up
+ * to the board's corner to cast (its kit's moment, timed so its hit lands on the effect), and its effect (each kind's
+ * view, from its boss's file). The ice and the pie themselves are the board layer's (PowerBoard), timed to land with
+ * the effect.
+ */
+export function PowerMoment({ boss, moment, now: wall, orientation, side }: { boss: BossView; moment: Moment | null; now: number; orientation: "white" | "black"; side: "w" | "b" }) {
+  if (!moment) return null;
+  // (Its banner's hold, `lead`, before its own clock: the moment drawn as at its start, its banner up.)
+  const now = Math.max(wall, moment.at);
+  const t = now - moment.at;
+  const shown = bossBannerMs();
+  // (Moo's Full Moon: his moments' animations are powered while it lasts.)
+  const plain = bossKit(boss.name);
+  const kit = plain?.powered?.on(boss, now, "bossMove") ? poweredKit(plain) : plain;
+  // Every banner a boss banner's whole length (Oct 24): one from the moment's start from its hold (`lead`) to the end of
+  // its window in the moment's beats (POWER_BANNERS in boss-timing.ts: bannerLeadMs makes up the rest); one later in it
+  // (BULLET!, DRAW!) in place, the moment longer by whatever passes its end (bannerWaitMs).
+  const banner = (text: string, sub?: string, tone = "", until = Infinity, from = 0) => {
+    const ms = Math.min(BOSS_BANNER.ms, until - from);
+    const on = from === 0 ? wall >= moment.at - (moment.lead ?? 0) && t < ms : t >= from && t < from + shown;
+    return on ? <PowerBanner key={moment.key} boss={boss} side={side} text={text} sub={sub} tone={tone} ms={shown} /> : null;
+  };
+  /** The boss casting (by the board's top-left corner on a phone, where it stands on a computer: Cast), its animation's `hit` cue landing at `hitAt` (ms into the moment). */
+  const cast = (hit: string, hitAt: number) => {
+    const anim = kitAnim(kit, moment.kind);
+    if (!anim) return null;
+    const a = kit!.ch.anims[anim]!;
+    const since = moment.at + hitAt - (cueAt(a, hit) ?? 0);
+    return <Cast boss={boss.name} anim={anim} since={since} now={now} runKey={`${moment.key}:cast`} class={`pm-by-${kit!.ch.id}`} />;
+  };
+  return MOMENT_UI[moment.kind].view({ boss, moment, now, t, orientation, side, kit, banner, cast, anim: () => kitAnim(kit, moment.kind) });
+}
+
+// ---------------- The rage meter ----------------
+
+/**
+ * The boss bar's rage meter: it fills over the battle (faster as the boss loses material, the crowd gets ahead on the
+ * judged eval or the God King strikes the boss), glows as it nears full, flashes for the one-turn warning, is full on
+ * the ultimate's turn, then empties and stays empty (dimmed, paused) while the ultimate's effect runs, and fills again
+ * for the next one (Eric, Oct 11: several a battle). A boss capped at a few a battle that keeps its meter shown (Timber: two,
+ * Nov 2) has it empty and dimmed after the last, for the rest of the battle.
+ */
+export function RageMeter({ boss }: { boss: BossView }): ComponentChildren {
+  const p = boss.powers;
+  const bar = useRef<HTMLElement>(null);
+  const show = !!p && p.rage !== null && !boss.result;
+  // (Warned, it's full: the test switch can bring the ultimate before the meter is. Older servers: null once spent.)
+  const paused = !!p?.paused;
+  // (Spent: the last ultimate a battle allows has come and the meter stays, empty and dimmed: Timber's after his second Gnaw.)
+  const rules = bossRules(boss);
+  const spent = paused && !!rules?.spentMeterShown && (p?.ults ?? 0) >= (rules?.ultimateMax ?? Infinity);
+  const now = !!p && p.ultAt !== null && !paused;
+  const pct = ragePct(boss) ?? 0;
+  // The meter only drops when an ultimate empties it: from what this device last showed, it holds a moment (the screen
+  // it drops on is a busy first frame: a slide would be half over before it's seen), then slides down on the page's
+  // own clock, carried on by whichever screen draws it next, however soon the next turn comes (a screen change or a
+  // slow first frame mustn't make it jump).
+  const key = `${boss.id}:${boss.startMove}`;
+  const t = performance.now();
+  const last = show ? meterShown.get(key) : undefined;
+  let drain = last?.drain && t - last.drain.start < RAGE_DRAIN.ms ? last.drain : null;
+  if (!drain && last && pct < last.pct - 1) drain = { from: last.pct, start: t + RAGE_DRAIN.holdMs };
+  if (show) {
+    meterShown.set(key, { pct, drain });
+    if (meterShown.size > 20) meterShown.delete(meterShown.keys().next().value!);
+  }
+  useLayoutEffect(() => {
+    const el = bar.current;
+    if (!el || !drain || typeof el.animate !== "function") return;
+    const a = el.animate([{ width: `${drain.from}%` }, { width: `${pct}%` }], { duration: RAGE_DRAIN.ms, easing: "ease-in-out", fill: "both" });
+    a.startTime = drain.start;
+    return () => a.cancel();
+  }, [drain?.start, pct, show]);
+  if (!show) return null;
+  const glow = pct >= BOSS_POWERS.rageGlowFrom * 100;
+  return (
+    <span
+      class={`rage-meter${glow ? " glow" : ""}${p!.warned ? " warned" : ""}${now ? " now" : ""}${paused ? " paused" : ""}`}
+      role="meter"
+      aria-label={spent ? "Rage: no more ultimates this battle" : paused ? "Rage: empty while the ultimate lasts" : `Rage ${pct}%`}
+      aria-valuenow={pct}
+      aria-valuemin={0}
+      aria-valuemax={100}
+      title={spent ? "Rage: no more ultimates this battle" : paused ? "Rage: empty until the boss's ultimate is over" : "Rage: when it's full, the boss's ultimate is coming"}
+    >
+      {/* (No width transition while it slides down: a transition would override the slide.) */}
+      <i ref={bar} style={drain ? { width: `${pct}%`, transition: "none" } : { width: `${pct}%` }} />
+    </span>
+  );
+}
+
+/** As an ultimate comes, the meter stays where it was for `holdMs` from its first showing, then empties over `ms`. */
+export const RAGE_DRAIN = { holdMs: 400, ms: 900 } as const;
+/** What each battle's meter last showed on this device, and its slide down while one runs (from `start`, page time). */
+const meterShown = new Map<string, { pct: number; drain: { from: number; start: number } | null }>();

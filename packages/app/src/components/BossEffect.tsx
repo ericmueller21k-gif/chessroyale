@@ -1,0 +1,342 @@
+import { useLayoutEffect, useRef } from "preact/hooks";
+import { bossKit } from "../characters/kits.ts";
+import { SQUARE } from "../characters/effects.ts";
+import { EFFECTS, animLength, type EffectName } from "../characters/power-art.ts";
+import { renderFrame, type Anim, type Character, type Frame } from "../characters/sprite.ts";
+import { play, type SoundName } from "../sound.ts";
+import { cueHaptic } from "../haptics.ts";
+
+/**
+ * A boss power's pixel art on screen: an effect sprite on the board (the ice over a frozen piece, a pie, the
+ * blizzard; characters/effects.ts) or a boss's power moment played somewhere other than his usual spot (Boingo's
+ * funhouse, on the board). The canvas fills its box (size the box to the square, or the board), never takes a tap,
+ * and plays the art's sounds from its frames' cues, once each, through the mute switch.
+ *
+ * `since` is when the animation started (Date.now() time; online, from the shared state, so everyone is on the same
+ * frame). A one-shot plays once and then hands over to `then` (a loop, run by the clock), or holds its last frame.
+ *
+ * Kept cheap however many play at once (.claude/LESSONS.md, "Lag that grows with the match"): every sprite on the page
+ * shares one animation-frame loop, each frame's pixels are made once, and a canvas is only redrawn when its frame
+ * changes. For many square effects at once (a dozen burning tiles), <BoardEffects> draws them all on one canvas.
+ */
+
+/** One animation-frame loop for every sprite on the page (a dozen effects cost one callback a frame, not a dozen). */
+const ticks = new Set<() => void>();
+let loopId = 0;
+function tick() {
+  loopId = 0;
+  for (const t of ticks) t();
+  if (ticks.size) loopId = requestAnimationFrame(tick);
+}
+export function onEachFrame(fn: () => void): () => void {
+  ticks.add(fn);
+  if (!loopId) loopId = requestAnimationFrame(tick);
+  return () => {
+    ticks.delete(fn);
+    if (!ticks.size && loopId) {
+      cancelAnimationFrame(loopId);
+      loopId = 0;
+    }
+  };
+}
+
+/** What shows at `now`: `anim` once from `since`, then `then` by the clock (or `anim`'s last frame held). */
+export function spriteFrameAt(ch: Character, anim: string, then: string | undefined, now: number, since: number): { anim: string; frame: number; tag: string } {
+  const a = ch.anims[anim];
+  if (!a) throw new Error(`${ch.id}: no animation "${anim}"`);
+  const at = (frames: readonly Frame[], t: number) => {
+    let acc = 0;
+    for (let i = 0; i < frames.length; i++) if (t < (acc += frames[i]!.ms)) return i;
+    return frames.length - 1;
+  };
+  const len = animLength(a);
+  if (a.loop) {
+    const cycle = Math.floor(Math.max(0, now - since) / len);
+    return { anim, frame: at(a.frames, now - since - cycle * len), tag: `${anim}:${since}:${cycle}` };
+  }
+  const loop = then ? ch.anims[then] : undefined;
+  if (now - since < len || !loop) return { anim, frame: at(a.frames, Math.max(0, now - since)), tag: `${anim}:${since}` };
+  const total = animLength(loop);
+  const cycle = Math.floor(now / total);
+  return { anim: then!, frame: at(loop.frames, now - cycle * total), tag: `${then}:${cycle}` };
+}
+
+/**
+ * Each frame's pixels, made once per look (Hollow's bulbs out) and per recolor from the battle (Hollow's lights:
+ * `ch.swap`); a new battle's lights replace the last one's.
+ */
+const images = new WeakMap<Frame, Map<string, ImageData>>();
+export function frameImage(ch: Character, frame: Frame, look = ""): ImageData {
+  const swap = ch.swap?.() ?? null;
+  let byLook = images.get(frame);
+  if (!byLook) images.set(frame, (byLook = new Map()));
+  const key = `${swap?.id ?? ""}|${look}`;
+  let img = byLook.get(key);
+  if (!img) {
+    const r = renderFrame(ch, frame, { look: look || undefined, swap });
+    img = new ImageData(new Uint8ClampedArray(r.data), r.w, r.h);
+    if (swap) for (const k of [...byLook.keys()]) if (!k.startsWith("|") && !k.startsWith(`${swap.id}|`)) byLook.delete(k);
+    byLook.set(key, img);
+  }
+  return img;
+}
+/** A frame as a little canvas of its own (made once, and again for a new battle's lights), for drawImage. */
+const canvases = new WeakMap<Frame, { id: string; canvas: HTMLCanvasElement }>();
+function frameCanvas(ch: Character, frame: Frame): HTMLCanvasElement {
+  const id = ch.swap?.()?.id ?? "";
+  let c = canvases.get(frame);
+  if (!c || c.id !== id) {
+    const canvas = document.createElement("canvas");
+    canvas.width = ch.w;
+    canvas.height = ch.h;
+    canvas.getContext("2d")?.putImageData(frameImage(ch, frame), 0, 0);
+    canvases.set(frame, (c = { id, canvas }));
+  }
+  return c.canvas;
+}
+/**
+ * Draws an effect's frames ahead of time, a slice each animation frame on the shared loop (about 4 ms of work a frame),
+ * so a big effect's first showing doesn't stall: Hollow's night has 256 tiles, and its last smash would otherwise draw
+ * 32 of them in one frame. `frames` in the order they'll be needed ([animation, frame index]). Returns a cancel.
+ */
+export function prewarm(name: EffectName, frames: readonly (readonly [string, number])[]): () => void {
+  const ch = EFFECTS[name].ch;
+  let i = 0;
+  let stop = () => {};
+  stop = onEachFrame(() => {
+    const t0 = performance.now();
+    do {
+      const f = frames[i] && ch.anims[frames[i]![0]]?.frames[frames[i]![1]];
+      if (f) frameCanvas(ch, f);
+      i++;
+    } while (i < frames.length && performance.now() - t0 < 4);
+    if (i >= frames.length) stop();
+  });
+  return () => stop();
+}
+
+/**
+ * Characters' animations made ahead (their frames' poses, made the first time they're read: sprite.ts lazyAnim): about 4 ms
+ * of work at a time with a pause between (one big move can take longer: frames still draw between them), then `done`. So a
+ * boss's battle builds his moves while it loads, not in one stall the first time one shows. Returns a cancel.
+ */
+export function prewarmAnims(anims: readonly Anim[], done?: () => void): () => void {
+  let i = 0;
+  let timer = 0;
+  const slice = () => {
+    const t0 = performance.now();
+    do void anims[i++]?.frames;
+    while (i < anims.length && performance.now() - t0 < 4);
+    if (i < anims.length) timer = window.setTimeout(slice, 50);
+    else done?.();
+  };
+  timer = window.setTimeout(slice, 50);
+  return () => clearTimeout(timer);
+}
+
+/**
+ * A character's frames drawn ahead the same way (a boss's power moment played away from his spot, which SpriteAnim
+ * draws: Big Boy's bounce), in the given look. Returns a cancel.
+ */
+export function prewarmSprite(ch: Character, frames: readonly Frame[], look?: string, done?: () => void): () => void {
+  let i = 0;
+  let stop = () => {};
+  stop = onEachFrame(() => {
+    const t0 = performance.now();
+    do {
+      const f = frames[i];
+      if (f) frameImage(ch, f, look);
+      i++;
+    } while (i < frames.length && performance.now() - t0 < 4);
+    if (i >= frames.length) {
+      stop();
+      // (What's to be drawn ahead next, so that one slice a frame is ever at work: the Hidden Boss's.)
+      done?.();
+    }
+  });
+  return () => stop();
+}
+
+/** Sounds already played (a frame shown twice, or a new screen, never plays one twice). */
+const played = new Set<string>();
+
+export interface SpriteAnimProps {
+  ch: Character;
+  anim: string;
+  since: number;
+  then?: string;
+  /** Frame cues to sounds. */
+  sounds?: Record<string, SoundName>;
+  /** Tells apart two of the same effect at once (two frozen pieces): the square, say. */
+  id?: string;
+  class?: string;
+  style?: Record<string, string | number>;
+  /** One of the character's looks (Hollow's bulbs: `bulbs0` to `bulbs3`). */
+  look?: string;
+  /** Told each frame as it's drawn (the Hidden Boss's transformation: his eyes' glow follows his head). Read when the animation starts. */
+  onFrame?: (frame: Frame) => void;
+  /** Drawn once, at its first frame, and never again (reduced motion: a still). */
+  still?: boolean;
+}
+
+/** A frame of a sprite's animation as shown (spriteFrameAt): which animation, which frame, and its run's tag. */
+export type Shown = { anim: string; frame: number; tag: string };
+
+/**
+ * The frames whose sounds are due now `s` shows, `prev` having shown last (null: the first drawn): `s`, after any passed
+ * over since in the same run, or in the one-shot `anim` before its loop took over. A slow frame on a busy phone jumps
+ * past a short one (Wrangler's 60 ms "tug"), and its sound would never play. Their sounds come a moment late instead.
+ */
+export function framesSince(ch: Character, anim: string, prev: Shown | null, s: Shown, first?: { now: number; since: number }): Shown[] {
+  const out: Shown[] = [];
+  if (prev && prev.tag === s.tag) for (let i = prev.frame + 1; i < s.frame; i++) out.push({ anim: s.anim, frame: i, tag: s.tag });
+  else if (prev && prev.anim === anim && s.anim !== anim) for (let i = prev.frame + 1; i < ch.anims[anim]!.frames.length; i++) out.push({ anim, frame: i, tag: prev.tag });
+  else if (!prev && first && !ch.anims[anim]!.loop) {
+    // The first drawing, after the one-shot began (`first`: now, its start): the frames it passed over meanwhile, those at most
+    // LATE_CUE_MS ago. (A seed's plop drawn 100 ms late on a busy page skipped its 55 ms first frame, and its plip with it.)
+    const tag = `${anim}:${first.since}`;
+    let t = first.since;
+    for (const [i, f] of ch.anims[anim]!.frames.entries()) {
+      if (s.tag === tag && i >= s.frame) break;
+      if (t >= first.now - LATE_CUE_MS) out.push({ anim, frame: i, tag });
+      t += f.ms;
+    }
+  }
+  out.push(s);
+  return out;
+}
+/**
+ * How late a cue's sound may come when the sprite is first drawn after its frame (a busy page): later than this (a reload, a screen
+ * opened mid-animation) it isn't played. A copy drawn again (the match's screens are rebuilt every phase) never plays a cue twice: each
+ * is played once, by its tag.
+ */
+export const LATE_CUE_MS = 1_000;
+
+export function SpriteAnim({ ch, anim, since, then, sounds = {}, id = "", class: cls = "", style, look, onFrame, still = false }: SpriteAnimProps) {
+  const cv = useRef<HTMLCanvasElement>(null);
+  // Drawn before the paint (no empty first frame), then on every animation frame that changes the picture.
+  useLayoutEffect(() => {
+    const g = cv.current?.getContext("2d");
+    if (!g) return;
+    let last = "";
+    // The run and frame drawn last: a frame skipped since (a slow frame on a busy phone jumps past a 60 ms one) still
+    // plays its sound, a moment late rather than never (framesSince).
+    let prev: Shown | null = null;
+    const draw = () => {
+      const now = Date.now();
+      const s = spriteFrameAt(ch, anim, then, now, since);
+      const shown = `${s.anim}:${s.frame}`;
+      // (Drawn again for a new battle's lights too.)
+      const key = `${shown}:${ch.swap?.()?.id ?? ""}`;
+      if (key !== last) {
+        last = key;
+        const frame = ch.anims[s.anim]!.frames[s.frame]!;
+        g.clearRect(0, 0, ch.w, ch.h);
+        g.putImageData(frameImage(ch, frame, look), 0, 0);
+        onFrame?.(frame);
+        cv.current?.setAttribute("data-frame", shown);
+        for (const f of framesSince(ch, anim, prev, s, prev ? undefined : { now, since })) {
+          const fr = ch.anims[f.anim]!.frames[f.frame]!;
+          const sound = fr.cue ? sounds[fr.cue] : undefined;
+          const tag = `${ch.id}:${id}:${f.tag}:${f.frame}`;
+          if (sound && !played.has(tag)) {
+            played.add(tag);
+            play(sound);
+            cueHaptic(ch.id, f.anim, fr.cue!);
+          }
+        }
+        prev = s;
+      }
+    };
+    draw();
+    return still ? undefined : onEachFrame(draw);
+  }, [ch, anim, then, since, id, look, still]);
+  return <canvas ref={cv} class={`fx-sprite ${cls}`} width={ch.w} height={ch.h} aria-hidden="true" style={style} data-fx={ch.id} />;
+}
+
+/** An effect sprite (power-art.ts EFFECTS) playing `anim` (default: its start, else its loop), then `then`. */
+export function BossEffect({ name, anim, since, then, id, class: cls, style, quiet = false }: { name: EffectName; anim?: string; since: number; then?: string; id?: string; class?: string; style?: Record<string, string | number>; /** Plays none of its cues' sounds (the boss's own cue at the same instant is the sound). */ quiet?: boolean }) {
+  const fx = EFFECTS[name];
+  const a = anim ?? fx.start ?? fx.loop!;
+  return <SpriteAnim ch={fx.ch} anim={a} since={since} then={then ?? (a === fx.start ? fx.loop : undefined)} sounds={quiet ? {} : fx.sounds} id={id} class={cls} style={style} />;
+}
+
+/**
+ * A boss's own animation (a power moment) somewhere other than his usual spot: Boingo's funhouse on the board. Marked `boss-moment`:
+ * while a moment draws him elsewhere, his figure where he stands hides (styles.css).
+ */
+export function BossMoment({ boss, anim, since, then, class: cls, style, look }: { boss: string; anim: string; since: number; then?: string; class?: string; style?: Record<string, string | number>; look?: string }) {
+  const kit = bossKit(boss);
+  if (!kit) return null;
+  return <SpriteAnim ch={kit.ch} anim={anim} since={since} then={then} sounds={kit.sounds} id="moment" class={`boss-moment${cls ? ` ${cls}` : ""}`} style={style} look={look} />;
+}
+
+/** One effect on a square of the board, for <BoardEffects>. */
+export interface BoardItem {
+  /** The square, "e4". */
+  square: string;
+  name: EffectName;
+  /** Default: its start, else its loop. */
+  anim?: string;
+  /** Default: its loop, after its start. */
+  then?: string;
+  since: number;
+  /** No sounds (a dozen tiles catching at once: one sound is enough). */
+  quiet?: boolean;
+}
+
+/**
+ * Many square effects at once on one canvas over the whole board (a dozen fire tiles, a piece burning on one, a
+ * fireball landing): one canvas, one shared loop, and only the squares whose frame changed are redrawn. Size its box
+ * to the board. Items on the same square draw in order (a piece's burn over its tile). Sounds from the frames' cues,
+ * once each, through the mute switch.
+ */
+export function BoardEffects({ items, orientation, class: cls = "", style }: { items: readonly BoardItem[]; orientation: "white" | "black"; class?: string; style?: Record<string, string | number> }) {
+  const cv = useRef<HTMLCanvasElement>(null);
+  const live = useRef(items);
+  live.current = items;
+  useLayoutEffect(() => {
+    const g = cv.current?.getContext("2d");
+    if (!g) return;
+    g.imageSmoothingEnabled = false;
+    g.clearRect(0, 0, 8 * SQUARE, 8 * SQUARE);
+    // What each square shows now (the frames drawn there), so an unchanged square is left alone.
+    const shown = new Map<string, string>();
+    const draw = () => {
+      const now = Date.now();
+      const want = new Map<string, { key: string; frames: { ch: Character; frame: Frame; sound?: SoundName; anim: string; tag: string }[] }>();
+      for (const it of live.current) {
+        const fx = EFFECTS[it.name];
+        const a = it.anim ?? fx.start ?? fx.loop!;
+        const s = spriteFrameAt(fx.ch, a, it.then ?? (a === fx.start ? fx.loop : undefined), now, it.since);
+        const frame = fx.ch.anims[s.anim]!.frames[s.frame]!;
+        const w = want.get(it.square) ?? { key: "", frames: [] };
+        w.key += `${it.name}:${s.anim}:${s.frame};`;
+        w.frames.push({ ch: fx.ch, frame, sound: frame.cue && !it.quiet ? fx.sounds[frame.cue] : undefined, anim: s.anim, tag: `${fx.ch.id}:${it.square}:${s.tag}:${s.frame}` });
+        want.set(it.square, w);
+      }
+      for (const sq of new Set([...shown.keys(), ...want.keys()])) {
+        const w = want.get(sq);
+        if ((w?.key ?? "") === (shown.get(sq) ?? "")) continue;
+        const f = sq.charCodeAt(0) - 97;
+        const r = Number(sq[1]) - 1;
+        const x = (orientation === "white" ? f : 7 - f) * SQUARE;
+        const y = (orientation === "white" ? 7 - r : r) * SQUARE;
+        g.clearRect(x, y, SQUARE, SQUARE);
+        for (const fr of w?.frames ?? []) {
+          g.drawImage(frameCanvas(fr.ch, fr.frame), x, y);
+          if (fr.sound && !played.has(fr.tag)) {
+            played.add(fr.tag);
+            play(fr.sound);
+            cueHaptic(fr.ch.id, fr.anim, fr.frame.cue!);
+          }
+        }
+        if (w) shown.set(sq, w.key);
+        else shown.delete(sq);
+      }
+    };
+    draw();
+    return onEachFrame(draw);
+  }, [orientation]);
+  return <canvas ref={cv} class={`fx-sprite fx-board ${cls}`} width={8 * SQUARE} height={8 * SQUARE} aria-hidden="true" style={style} data-fx="board" />;
+}

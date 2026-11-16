@@ -1,0 +1,111 @@
+# Matchmaking, lobbies and ranked
+
+Lanes: `hub` (joining and filling a lobby, the queue screen), `ranked` (the matching rules and the rating math),
+`ops` (the matchmaker's plumbing under load: [ops.md](ops.md)).
+
+## How it works today
+
+- **"Play now" is the queue.** POST `/api/play` hands the press to the matchmaker (a Durable Object), which answers
+  with a lobby code, or "Servers are busy, you're in line: about N s" with a ticket to ask again with.
+- **One queue per mode and type** (`queueName`): crowd-default, crowd-botsoff, raid-default, raid-botsoff; each with an engine pool's
+  own (`.engine`) for accounts fair play pooled, set from the account on every ask (1 v 1 and Squads too; a party with a pooled member
+  queues there), never by the browser; its lobbies seat no newcomer from the other side ([fairplay.md](fairplay.md)). The three
+  matchmaking types, picked on the home screen under the mode and remembered per device:
+  - **Default:** real players; bots fill the empty seats once the lobby has waited `MATCH_FILL_SECONDS` (60 s; 8 s in
+    the e2e suite). Bots pop into the seats over `FRONT_DOOR.fillShowMs`.
+  - **Bots off:** real players only. A 50 v 50 waits until it's full; a raid starts at 50, or after the minute with at
+    least `MATCHMAKING.raidBotsOffMinPlayers` (10). A seat whose person has been gone `botsOffSeatHoldMs` is freed.
+    "Switch to Default" moves you to Default's queue with your wait counting (bots no sooner than `switchMinWaitMs`).
+  - **Solo:** you and bots, at once, played in your browser (it never touches the matchmaker or the live counts). The
+    queue screen fills first (`soloFillMs`, `soloHoldMs`).
+- **The queue as pure logic** (`queue.ts`): a PLAY press is a ticket held in memory; tickets are seated in batches
+  (one seat reservation per lobby per batch); admission is limited per second and by `maxPlayers` on the servers
+  (`CAPACITY.queue`, `CAPACITY.overload`). `MatchRules.group` splits a batch into groups that must not share a lobby
+  (where ranked's skill bands will go); the default keeps everyone together in the order they pressed.
+- **A seating that fails** (a lobby or game that couldn't be opened, or any call in it that threw: `create`, `reserve`,
+  storage; docs/decisions/2026-10-17-seating-throw-puts-back.md): `form()` catches it in one place, logs it
+  (`Matchmaker.form`, counted as `mm.seatThrew` when it threw, `mm.createFailed` when a create answered no), and stops
+  the batch. Everyone in the batch still being seated goes back to the front of the line in order (`putBack` leaves
+  anyone placed already in their seat: no one is seated twice), so their asks keep waiting in line; the next batch
+  tries again after `CAPACITY.queue.formEveryMs` (1 s), or at the next ask. Anything else that escapes a batch waits
+  the same second, so a failure that persists never spins. A ticket still marked as being seated a minute after its
+  batch began is forgotten (`SEATING_KEEP_MS`, a backstop no seating reaches today).
+- **Lobbies.** One Durable Object per lobby, under a 5-character code with no look-alikes (`codes.ts`; a code is never
+  reused while its lobby exists). "Play with friends" makes a private lobby (invite link `/lobby/CODE`); a private raid
+  stays people-only. Seats survive reloads (a seat token on the device). One seat per account (a guest's too): a second
+  tab or device takes over that seat, as a reconnect does; a token from another account is refused. The host (a connected computer before a
+  phone) or the many judges score each round (see [engine.md](engine.md)).
+- **Stepping out of a lobby** (Nov 10, [2026-11-10-search-on-home.md](../decisions/2026-11-10-search-on-home.md)): 50 v 50's and Squads'
+  queue lobbies have Exit and "Keep me in the queue" (checked unless unchecked on the device) where Cancel was. Checked, you browse
+  with the seat held by the app's connection (home's rows, the bar elsewhere; a reload keeps it: `hunchess.awaySearch`); the lobby
+  filling takes you in, with the found alert. Unchecked, Exit leaves as Cancel did. Raid, party and Solo queues keep Cancel.
+- **A lobby's life** (`LOBBY_LIFE`): results stay up `lobbyResultsKeepMinutes` (15), then it closes; a lobby that
+  never starts closes after `lobbyIdleMinutes`, an abandoned one after `lobbyAbandonedMinutes` (now only a safety net).
+  Closing tells anyone still connected, records results on profiles, drops it from the live line and deletes its
+  storage (freeing the code). An old link or a reopened tab asks `/api/lobby/CODE` before retrying the socket.
+- **Leaving a match** (Oct 13; `LEAVING`; DECISIONS.md, "Resign: leaving a match in every mode"; the screens:
+  [crowd.md](crowd.md)). "resign" from the app, or gone longer than `LEAVING.awayMs` (120 s; an older app is handled
+  this way), takes someone out of the match: mid-match a loss in the last place still open, recorded at once; before
+  move 1 nothing recorded; a bot in the seat where the lobby fills seats with bots (`botsFill`; with Bots off and in a
+  private raid only a final's seat or the last of a side, `botTakes`). The device forgets the seat; coming back with
+  its token is told how they left (`error` with `left`). **When nobody is left** the match ends at once and the lobby
+  closes (`wrapUpIfEmpty`, results `keepMs` 0), so its code stops working; a **private lobby nobody started** closes
+  when its last person presses Leave (`emptiedAt`). The match's ranked status counts everyone who played
+  (`ranked()`), so leaving never makes it unranked.
+- **Squads** (`docs/areas/squads.md`, "The server"; no menu entry until its screens): its own queue (`squads-default`,
+  the same matchmaker object) whose tickets are parties (up to 4, under a code and invite link, the leader queuing) or
+  single players, each seated whole in a Squads lobby that still fits it; the lobby fills with bots after
+  `MATCH_FILL_SECONDS`, like Crowd's Default. Routes under `/api/squads/`.
+- **The boss of a raid** is matched to the people only (bots don't count toward its strength), by the ratings stored
+  on their accounts (`users.rating`, which the lobby's object reads as each joins: never a number the app sends; none
+  yet, or no account: the 1500 prior; docs/decisions/2026-10-16-server-side-rating.md), avoiding the boss most of its
+  players met last (each sends theirs on joining).
+- **Ranked 1 v 1** ([ranked.md](ranked.md)): its own queue (`ranked1v1-default`, the same matchmaker object) of
+  single players paired by the hidden rating (`PAIR_BY_RATING`, core's `pairUp`: the range widens with the wait and
+  the ratings' deviations), each pair a game object of its own (`DuelGame`). Its own rank and tiers; routes under
+  `/api/1v1/`. Ranked's leave rules (L1, Nov 9; [ranked.md](ranked.md), "Leaving early"): a locked-out player's first ask is
+  refused with when; one in the delayed queue gets a ticket with `notBefore` that `PAIR_BY_RATING` won't pair before (it
+  keeps its place in line; the answers say `delayMs`).
+- **Ranking today** (other modes) is the rating on your profile (its rank, chart and "Top N%"). A match
+  counts for ranking only if at least `RANKING.rankedMinHumanShare` (30%) of its seats are real players
+  (`isRankedMatch`; 30 of a 50 v 50's 100, 15 of a raid's 50). Solo and practice never count (only `online = 1`
+  results do, whatever their `ranked`). Stored as
+  `results.ranked`. The draft for ranked proper (Weng–Lin ratings, rank points, seasons, ranked queues) is in
+  `docs/history/matchmaking-and-lobbies.md` and waits for Eric and for trustworthy scoring.
+
+## Where the code is
+
+| What | Where |
+| --- | --- |
+| PLAY and its answers, the matchmaker object | `packages/server/src/matchmaker.ts` |
+| The queue (pure): tickets, batches, admission, matching rules | `packages/server/src/queue.ts` |
+| Lobby codes | `packages/server/src/codes.ts` |
+| Squads: parties, the Squads lobby and its queue | `packages/server/src/squads-party.ts`, `squads-lobby.ts`, `squads-do.ts`; `matchmaker.ts` (`seatSquads`) |
+| Joining, filling, the lobby's life, results | `packages/server/src/lobby.ts` (pure), `lobby-do.ts` (Durable Object), routes in `index.ts` |
+| The rating estimate and its curve | `packages/core/src/rating.ts`, `rating-curve.ts` (the rating's own rank names, `RATING_RANKS`, were retired on Oct 28, 2026: the rank shown is 1 v 1's) |
+| App side: the queue screen, connecting | `packages/app/src/screens/Queue.tsx`, `Lobby.tsx`, `net.ts` |
+
+## Settings
+
+`MATCHMAKING`, `MATCHMAKING_TYPES`, `RANKING`, `LOBBY_LIFE`, `LEAVING`, `FRONT_DOOR.fillShowMs`, `CAPACITY.queue` and
+`CAPACITY.overload`; the Worker variable `MATCH_FILL_SECONDS` (`wrangler.jsonc`).
+
+## Tests and tools
+
+- Unit: `packages/server/test/matchmaker.test.ts` (with `duel-queue.test.ts` and `squads-queue.test.ts`: a seating
+  that throws after some are placed, those keep their seats and the rest are seated next; a throw outside a seating
+  waits formEveryMs), `lobby-types.test.ts`, `lobby-life.test.ts`, `lobby.test.ts`,
+  `resign.test.ts` (leaving: seats to bots, the loss, the last one out closing the lobby and its code, the away rule),
+  `lobby-do-rating.test.ts` (a raid's boss from the stored ratings, whatever an app claims),
+  `packages/core/test/rating.test.ts`, `profile.test.ts`.
+- e2e: `e2e/matchmaking.spec.ts`, `lobby-close.spec.ts`, `multiplayer.spec.ts`, `busy.spec.ts`, `front-door.spec.ts`,
+  `resign.spec.ts`.
+- Frames: `npm run frames:matchmaking`, `frames:queue`, `frames:close`.
+- Rating curve: `npx tsx packages/sim/scripts/calibrate-rating.ts` (`reports/rating-calibration.md`).
+
+## Rules for this area (from `.claude/LESSONS.md`)
+
+- Anything the server starts (a lobby, a queue, a session) has an end, written down with its numbers, and a test for
+  each way it ends, including "nobody is there any more". Test the stale case: the old link, the tab reopened later.
+- A refused WebSocket says nothing about why: ask the server (an ordinary request) before retrying.
+- Only real players move ratings; ratings are computed on the server from its own record, never from a browser.

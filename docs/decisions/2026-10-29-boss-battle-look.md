@@ -1,0 +1,9 @@
+# Boss Battle: the new look (Oct 29, 2026)
+
+Eric, from his mockup: "this is the boss solo mode [being] redesigned … it's going to be called boss battle." Area: [bosses.md](../areas/bosses.md). Part 1 is the look; the live party (up to 3) is part 2.
+
+- **Name:** "Solo Boss Mode" is "Boss Battle" (header, home card "Any boss, up to 3", the computer's side menu, the town's confirm "You'll fight [boss] in Boss Battle."; the director's wording, no "alone").
+- **Stage:** your pawn in front, two smaller platforms behind you each with a dashed invite circle (part 1: shown but a tap does nothing, named "Invite a friend (coming soon)"), plain gray "VS", the "?" box smaller (0.82 wide, half as tall as a boss tile). The "Invite" line under "?" was a mistake in the picture: removed. Sizes measured from the picture.
+- **Difficulty:** five levels on the stage (arrows stop at the ends and grey out; the picked dot is larger, dot and name in its color). Ids stay (`easy`, `normal`, `hard`, `hardest`) with `very-easy` added first; `normal` shows as "Medium" and `hardest` as "Very hard"; the default is still `normal`. Maia in even steps to its ceiling for every boss: 700, 1150, 1600, 2050, 2500 (Eric: "Very hard" at the strongest Maia we have); `elo` -500, -300, 0, 250, 500. Colors checked at 3:1 for the name on the page: Easy (#179a45) and Medium (#c2670a) are darker in the light theme; Hard (#ef4444) and Very hard (#c22222) lighter in the dark theme.
+- **START** (was the Boss alone button on this screen) goes straight into the battle with the picked boss at the screen's difficulty, fetching Maia's files ahead as the old confirm menu did. That menu (your rating, the boss's level and "+N vs you", skulls, powers) is no longer on this path; the full `?mode=raid` screen and `/bosses` keep it.
+- **Also, Boss alone's pawn** (Eric): its idle bob is 1 px (was 2 phone, 3 computer), and on a phone its art stands 6 px lower (`--feet`).

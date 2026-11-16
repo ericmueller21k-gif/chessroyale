@@ -1,0 +1,112 @@
+import { useEffect, useState } from "preact/hooks";
+import type { RiderDraft } from "./kit.ts";
+import { hunchessBase } from "@chessroyale/core";
+import { RIDE_CELLS, type RideCells } from "../../town/ride-cells.ts";
+import { hunchessDraft } from "./hunchess.tsx";
+import { chunk } from "../../stale.ts";
+
+/**
+ * Each ride's drawing in its own chunk, loaded only when a ride is drawn (Nov 1, docs/decisions/2026-11-01-rides-lazy.md): worn by
+ * you or someone in view in the town, or shown in the locker, the profiles or on home. Until #442 drew rides from their drawings
+ * they were in the main bundle, 55 KB gzip on every player's first load though only admins can wear one. What every box needs
+ * before a drawing arrives (each view's cell, its frames' seats and times, the tile's box) is in the main bundle, measured ahead
+ * (town/ride-cells.ts), so nothing moves when it comes: the pawn sits where it will ride and the ride appears under it.
+ * Your own worn ride's drawing is asked for as the app starts, after its first paint (main.tsx), so your pawn rarely waits.
+ */
+
+/** Every ride's drawing, by its item id (crates.ts), each a chunk of its own. A new ride: its drawing in this folder, and a line here. */
+const DRAWINGS: Readonly<Record<string, () => Promise<RiderDraft>>> = {
+  "riding-chirp": () => chunk(import("./riding-chirp.tsx")).then((m) => m.RidingChirp),
+  "moon-ride": () => chunk(import("./moon-ride.tsx")).then((m) => m.moonRide),
+  "hollow-bulb": () => chunk(import("./hollow-bulb.tsx")).then((m) => m.hollowBulb),
+  "smudgy-brush": () => chunk(import("./smudgy-brush.tsx")).then((m) => m.smudgyBrush),
+  "alfil-howdah": () => chunk(import("./alfil-howdah.tsx")).then((m) => m.AlfilHowdah),
+  "balloon-pup": () => chunk(import("./balloon-pup.tsx")).then((m) => m.balloonPup),
+  "bigboy-buggy": () => chunk(import("./bigboy-buggy.tsx")).then((m) => m.BigBoyBuggy),
+  "boingo-pogo": () => chunk(import("./boingo-pogo.tsx")).then((m) => m.boingoPogo),
+  "folio-crane": () => chunk(import("./folio-crane.tsx")).then((m) => m.folioCrane),
+  "ginger-sled": () => chunk(import("./ginger-sled.tsx")).then((m) => m.gingerSled),
+  "jefferson-giraffe": () => chunk(import("./jefferson-giraffe.tsx")).then((m) => m.rider),
+  "puddles-mower": () => chunk(import("./puddles-mower.tsx")).then((m) => m.puddlesMower),
+  "sawyer-dozer": () => chunk(import("./sawyer-dozer.tsx")).then((m) => m.sawyerDozer),
+  "rodeo-bull": () => chunk(import("./rodeo-bull.tsx")).then((m) => m.rodeoBull),
+  "cheetah-shoes": () => chunk(import("./cheetah-shoes.tsx")).then((m) => m.cheetahShoes),
+  "log-roller": () => chunk(import("./log-roller.tsx")).then((m) => m.logRoller),
+  "pen-pony": () => chunk(import("./pen-pony.tsx")).then((m) => m.penPony),
+  // (An outfit, Nov 10: drawn with the rides' kit, the pawn's head in its face hole.)
+  "banana-suit": () => chunk(import("./banana-suit.tsx")).then((m) => m.bananaSuit),
+};
+
+/** Every ride's item id. */
+export const RIDE_IDS: readonly string[] = Object.keys(DRAWINGS);
+
+/**
+ * The ride whose drawing an item is: a ride's own id, or (a HunChess colorway, Nov 6: "balloon-pup-hunchess") the ride it's made
+ * from. Its cells, size and drawing are that ride's; only the colorway's drawing is remapped (hunchess.tsx).
+ */
+export const rideBase = (def: string | undefined): string | undefined => (def ? (hunchessBase(def) ?? def) : undefined);
+
+/** A ride's measured numbers (ride-cells.ts), or undefined for any other item (a HunChess colorway: its ride's). */
+export const rideCells = (def: string | undefined): RideCells | undefined => {
+  const base = rideBase(def);
+  return base && Object.hasOwn(RIDE_CELLS, base) ? RIDE_CELLS[base] : undefined;
+};
+
+const drawn = new Map<string, RiderDraft>();
+const coming = new Map<string, Promise<RiderDraft | undefined>>();
+
+/** A ride's drawing if it has loaded (undefined: not yet, or not a ride). */
+export const rideDrawing = (def: string | undefined): RiderDraft | undefined => (def ? drawn.get(def) : undefined);
+
+/**
+ * A ride's drawing, loading it if it hasn't (once: everyone asking shares the one load). Undefined for any other item, or if
+ * its chunk didn't come (then the next ask tries again).
+ */
+export function loadRide(def: string | undefined): Promise<RiderDraft | undefined> {
+  // (A HunChess colorway: its ride's drawing, remapped once it has come; kept under the colorway's own id.)
+  const base = rideBase(def);
+  if (def && base !== def && base) {
+    const d = drawn.get(def);
+    if (d) return Promise.resolve(d);
+    return loadRide(base).then((x) => {
+      if (!x) return undefined;
+      const c = drawn.get(def) ?? hunchessDraft(x, base);
+      drawn.set(def, c);
+      return c;
+    });
+  }
+  if (!def || !Object.hasOwn(DRAWINGS, def)) return Promise.resolve(undefined);
+  const d = drawn.get(def);
+  if (d) return Promise.resolve(d);
+  let p = coming.get(def);
+  if (!p) {
+    p = DRAWINGS[def]!().then(
+      (x) => {
+        drawn.set(def, x);
+        coming.delete(def);
+        return x;
+      },
+      () => {
+        coming.delete(def);
+        return undefined;
+      },
+    );
+    coming.set(def, p);
+  }
+  return p;
+}
+
+/** A ride's drawing for a component: undefined until it has loaded (asked for as the component shows), then drawn again with it. */
+export function useRide(def: string | undefined): RiderDraft | undefined {
+  const d = rideDrawing(def);
+  const [, redraw] = useState(0);
+  useEffect(() => {
+    if (d || !def) return;
+    let live = true;
+    void loadRide(def).then((x) => live && x && redraw((n) => n + 1));
+    return () => {
+      live = false;
+    };
+  }, [def, d]);
+  return d;
+}

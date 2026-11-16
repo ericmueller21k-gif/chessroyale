@@ -1,0 +1,59 @@
+// Frame-by-frame check of one move in a solo boss raid, the way a player makes it (two taps on the board).
+//   npm run frames:boss -- <out-dir> [boss name, default "Boingo"] [width: a phone under 800 px, else a computer; default an iPhone 13]
+// Starts the app's dev server, picks a boss, taps a knight or bishop move, then saves a PNG every time the board's
+// pieces or the phase change for 12 s, and prints a timeline (ms, phase, piece count, frame). Read the frames: a piece
+// that jumps back, flickers or moves twice shows up as an extra frame. See .claude/LESSONS.md.
+import { resolve } from "node:path";
+import { chromium, devices } from "@playwright/test";
+import { createServer } from "vite";
+import { Chess } from "chess.js";
+
+const [outArg = ".", bossName = "Boingo", widthArg] = process.argv.slice(2);
+const out = resolve(outArg);
+const server = await createServer({ root: "packages/app", configFile: "packages/app/vite.config.ts", server: { port: 5197 }, logLevel: "error" });
+await server.listen();
+const url = server.resolvedUrls.local[0];
+const b = await chromium.launch();
+const w = Number(widthArg);
+const p = await b.newPage(w ? { viewport: { width: w, height: w < 800 ? 760 : 800 }, deviceScaleFactor: w < 800 ? 2 : 1, isMobile: w < 800, hasTouch: w < 800 } : { ...devices["iPhone 13"] });
+p.on("pageerror", (e) => console.log("pageerror", e.message));
+// (The first-time walkthrough seen, as every e2e test's context: tutorial.ts's TUTORIAL_SEEN_KEY.)
+await p.addInitScript(() => localStorage.setItem("hunchess.tutorial.dismissed", "1"));
+// (The hidden /bosses: the solo boss picker at once, every boss by name.)
+await p.goto(url + "bosses?debug&clock=30&nolanding");
+await p.getByRole("dialog", { name: "Choose your boss" }).getByRole("button", { name: new RegExp(bossName) }).click();
+for (let i = 0; i < 200; i++) {
+  if ((await p.evaluate(() => window.match?.phase.kind)) === "play") break;
+  await p.waitForTimeout(250);
+}
+await p.waitForTimeout(1500);
+const fen = await p.evaluate(() => window.match.phase.board.fen);
+const c = new Chess(fen);
+const all = c.moves({ verbose: true });
+const mv = all.find((m) => m.piece === "n" || m.piece === "b") ?? all[0];
+console.log("fen", fen, "move", mv.from + mv.to);
+const box = await p.locator(".hb-board").first().boundingBox();
+const sq = (s) => ({ x: box.x + (s.charCodeAt(0) - 97 + 0.5) * (box.width / 8), y: box.y + (8 - Number(s[1]) + 0.5) * (box.height / 8) });
+const snap = () =>
+  p.evaluate(() => {
+    const ps = [...document.querySelectorAll(".hb-board piece")].map((e) => `${e.className}@${e.style.transform}`).sort().join("|");
+    return { k: window.match?.phase.kind, ps };
+  });
+await p.mouse.click(sq(mv.from).x, sq(mv.from).y);
+await p.mouse.click(sq(mv.to).x, sq(mv.to).y);
+const t0 = Date.now();
+let last = null;
+let n = 0;
+while (Date.now() - t0 < 12000) {
+  const s = await snap();
+  const key = s.k + s.ps;
+  if (key !== last) {
+    await p.screenshot({ path: `${out}/f${String(n).padStart(2, "0")}.png`, clip: { x: box.x - 30, y: box.y - 30, width: box.width + 60, height: box.height + 130 } });
+    console.log(`${Date.now() - t0}ms phase=${s.k} pieces=${s.ps.split("|").length} f${n}`);
+    n++;
+    last = key;
+  }
+  await p.waitForTimeout(40);
+}
+await b.close();
+await server.close();

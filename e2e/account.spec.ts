@@ -1,0 +1,53 @@
+import { expect } from "@playwright/test";
+import { test } from "./helpers.ts";
+import { soloFromHome } from "./helpers.ts";
+
+test("a guest profile: icon and name stick, a solo match goes on it", async ({ page }) => {
+  test.setTimeout(4 * 60_000);
+  test.skip(test.info().project.name !== "phone", "one run is enough");
+  await page.goto("/");
+  const config = await page.evaluate(() => fetch("/api/auth/config").then((r) => r.json()));
+  expect(config.accounts).toBe(true);
+  // A guest account is made on the first visit.
+  // (Your profile: "View profile" on your card on a phone, the side menu's Profile on a computer.)
+  const chip = page.getByRole("button", { name: "View profile", exact: true }).or(page.getByRole("navigation", { name: "Menu" }).getByRole("button", { name: "Profile" })).filter({ visible: true }).first();
+  await expect(chip).toBeVisible();
+  // (Home's line under your name: your 1 v 1 rank; a new account hasn't played one. Oct 28.)
+  await expect(page.locator(".fd-hero-sub")).toHaveText("Unranked");
+  await chip.click();
+  // Your profile: Edit name & icon. Draw an icon: fill the canvas with a color, add a stroke, save.
+  await expect(page.locator(".fd-card")).toContainText("No rating yet");
+  await page.getByRole("button", { name: "Edit name & icon" }).click();
+  await page.getByRole("button", { name: "Edit your icon" }).click();
+  const canvas = page.getByLabel("Your icon, 48 by 48 pixels");
+  await page.getByRole("button", { name: "Fill" }).click();
+  await page.getByRole("radio").nth(3).click();
+  await canvas.click({ position: { x: 5, y: 5 } });
+  await page.getByRole("button", { name: "Pencil" }).click();
+  await page.getByRole("radio").nth(6).click();
+  await canvas.click({ position: { x: 40, y: 40 } });
+  await page.getByRole("button", { name: "Save icon" }).click();
+  await expect(page.locator(".profile-icon img")).toHaveAttribute("src", /^data:image\/png;base64,/);
+  await expect
+    .poll(() => page.evaluate(() => fetch("/api/me").then((r) => r.json()).then((p) => String(p.user.icon).slice(0, 22))))
+    .toBe("data:image/png;base64,");
+  const nameBox = page.getByLabel("Your name");
+  await nameBox.fill("Hunter");
+  await page.getByRole("button", { name: "Save name" }).click();
+  await expect(page.getByRole("heading", { name: "Hunter" })).toBeVisible();
+  await expect.poll(() => page.evaluate(() => fetch("/api/me").then((r) => r.json()).then((p) => p.user.name))).toBe("Hunter");
+  // Without Google or Resend secrets, no sign-in buttons are offered.
+  await expect(page.locator(".signin")).toHaveCount(0);
+  await page.getByRole("button", { name: "Back", exact: true }).click();
+  // It's still there after a reload (the session cookie).
+  await page.reload();
+  await expect(page.locator(".fd-hero-name")).toHaveText("Hunter");
+  // A quick solo match (missing every move) lands on the profile. (The final as short as crowd.spec.ts's, finalTurns=12: else it's
+  // played out to mate or 160 turns, each scored by the engine, about 2 a second: over a minute after up to six stages at the clock.)
+  await page.goto("/?debug&pace=quick&mode=crowd&rounds=1&augments=0&finalTurns=12");
+  await soloFromHome(page);
+  await expect.poll(() => page.evaluate(() => (window as any).match?.phase.kind), { timeout: 3 * 60_000 }).toBe("results");
+  await expect
+    .poll(() => page.evaluate(() => fetch("/api/me").then((r) => r.json()).then((p) => p.stats.crowd.matches)), { timeout: 10_000 })
+    .toBe(1);
+});

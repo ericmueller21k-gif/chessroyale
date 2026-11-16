@@ -1,0 +1,155 @@
+import { useEffect, useRef, useState } from "preact/hooks";
+import { tooYoung } from "../account.ts";
+import { SignIn } from "../components/SignIn.tsx";
+import { MuteButton } from "../components/MuteButton.tsx";
+import { CROWD_SETTINGS, DEFAULT_SETTINGS, bossInText, crowdFinalBoss, crowdFinalists, roundsInStage } from "@chessroyale/core";
+
+/** The Crowd's numbers, from its settings: its seats, the first cut, the team final's sizes. */
+const CROWD = { ...DEFAULT_SETTINGS, ...CROWD_SETTINGS };
+const versus = (n: number) => `${n}v${n}`;
+/** The boss final's boss, by name ("the Hidden Boss"), or any boss. */
+const FINAL_BOSS = crowdFinalBoss() ? bossInText(crowdFinalBoss()!.name) : "a boss";
+
+const FAQ: [string, string][] = [
+  [
+    "Why do I need an account to play online?",
+    `Every online match is real people against real people, and accounts keep it that way. A ban sticks, your stats and rating mean something, and it's much harder to drop into a match with an engine open in another tab. Guests can still play the whole game against ${CROWD.lobbySize - 1} bots.`,
+  ],
+  [
+    "How does 50 v 50 work?",
+    `${CROWD.lobbySize} players, one game of chess from the first move. You're on White or Black for the whole game. Every turn your team of ${CROWD.lobbySize / 2} picks a move, and one of its three most popular picks is played: the more picks, the likelier. Stockfish scores every pick, so you score by choosing well, even when the crowd goes the other way. After move ${roundsInStage(CROWD, 0) / 2} the lowest scorers start going out, a cut every few moves. Before the game, everyone votes on how it ends: a team final (${versus(CROWD.teamFinalSizes[0]!)} down to ${versus(CROWD.teamFinalSizes.at(-1)!)}), a boss final where the top ${crowdFinalists("boss")} take on ${FINAL_BOSS}, or a duel between the best of each side.`,
+  ],
+  ["Is it free?", "Yes. Coins and cosmetics will be earned by playing, never bought, and they never change the game."],
+  [
+    "How do you deal with cheating?",
+    "Accounts are the first step. Every move is also scored by the engine, so a player who matches it move after move stands out. Automatic checks that flag those players are being built next.",
+  ],
+  ["What do you do with my email?", "Signing in, and an email if a fair-play decision is made about your account. No newsletters, and we never sell it or share it for advertising. See the privacy policy."],
+  ["Can I play on my phone?", "It's made for phones. Add it to your home screen and it opens like an app."],
+];
+
+/** Where the computer's reel and layout start (styles.css' `.landing` at 1024 px and up). */
+const WIDE_REEL = "(min-width: 1024px)";
+const wideNow = () => typeof matchMedia === "function" && matchMedia(WIDE_REEL).matches;
+
+/**
+ * The demo reel (Nov 11): 50 v 50, the town and a boss, ranked 1 v 1 and the ranks, the Hidden Boss, 25 s on a loop
+ * (scripts/reel/record-reel.ts, scripts/encode-demo.sh). Two cuts of it: a phone's portrait one and a computer's 16:9 one (Eric:
+ * "a wide rectangle on the computer… like a cinema"); only the one for this window's width loads, chosen as the page first draws so
+ * its box is the right shape from the start. Muted is set on the element itself, as phones only autoplay muted video.
+ */
+function DemoVideo() {
+  const [wide, setWide] = useState(wideNow);
+  useEffect(() => {
+    const mq = matchMedia(WIDE_REEL);
+    const on = () => setWide(mq.matches);
+    mq.addEventListener("change", on);
+    return () => mq.removeEventListener("change", on);
+  }, []);
+  const ref = useRef<HTMLVideoElement>(null);
+  useEffect(() => {
+    const v = ref.current;
+    if (!v) return;
+    v.muted = true;
+    v.setAttribute("muted", "");
+    void v.play().catch(() => undefined);
+  }, [wide]);
+  const name = wide ? "hunchess-reel-wide" : "hunchess-reel";
+  return (
+    <video
+      key={name}
+      ref={ref}
+      class={wide ? "demo-video wide" : "demo-video"}
+      poster={`/media/${name}.jpg`}
+      autoplay
+      muted
+      loop
+      playsInline
+      preload="auto"
+      aria-label="A short reel: a 50 v 50 match, the town and a boss battle, a ranked 1 v 1 and its ranks, and the Hidden Boss"
+    >
+      <source src={`/media/${name}.mp4`} type="video/mp4" />
+      {/* (WebM too, for browsers without H.264, e.g. open-source Chromium; neither is precached: vite.config.ts.) */}
+      <source src={`/media/${name}.webm`} type="video/webm" />
+    </video>
+  );
+}
+
+/** The front door: what the game looks like, signing in to play online, or playing bots as a guest. */
+export function LandingScreen({
+  google,
+  email,
+  joinCode,
+  notice,
+  failed,
+  onGuest,
+}: {
+  google: boolean;
+  email: boolean;
+  joinCode?: string;
+  /** An old link's lobby has closed ("That match has ended."). */
+  notice?: string;
+  failed?: boolean;
+  onGuest: () => void;
+}) {
+  return (
+    <div class="screen landing">
+      {/* Two panes on a computer (Eric, Nov 11): the title and the reel stay put on the left, the sign-in and the questions scroll on the
+          right. Below 1024 px both wrappers are display: contents, so a phone's column is as before. */}
+      <div class="landing-stage">
+        <header class="landing-head">
+          <h1 class="logo">
+            <span class="logo-crown" aria-hidden="true">
+              ♚
+            </span>
+            HunChess
+            <MuteButton />
+          </h1>
+          <p class="landing-tag">
+            <strong>{CROWD.lobbySize} players. One board.</strong> Pick the best move for your team of {CROWD.lobbySize / 2}. The crowd plays it.
+          </p>
+        </header>
+        <figure class="demo-frame">
+          <DemoVideo />
+          <figcaption class="muted small">A look inside HunChess</figcaption>
+        </figure>
+      </div>
+      <div class="landing-side">
+        <div class="landing-actions">
+          {notice && (
+            <p class="landing-notice" role="status">
+              {notice}
+            </p>
+          )}
+          <section class="signin landing-signin">
+            {/* (Sign in first, then Sign up below it (Eric, Nov 12); the box's heading follows: "Sign in to play online", "Sign up to
+                join lobby ABCDE". A device that answered the age question "too young": "Online play needs an account", no sign-in,
+                the guest button below.) */}
+            <SignIn google={google} email={email} next={joinCode ? `/lobby/${joinCode}` : "/"} failed={failed} title={joinCode ? `join lobby ${joinCode}` : "play online"} />
+          </section>
+          {!tooYoung() && (
+            <div class="or-line" aria-hidden="true">
+              <span>or</span>
+            </div>
+          )}
+          <button type="button" class="btn btn-secondary btn-wide" onClick={onGuest}>
+            Play vs {CROWD.lobbySize - 1} bots as a guest
+          </button>
+          <p class="muted small landing-note">Guests play solo against bots. Online matches need an account.</p>
+        </div>
+        <section class="faq">
+          <h2>Questions</h2>
+          {FAQ.map(([q, a]) => (
+            <details key={q}>
+              <summary>{q}</summary>
+              <p>{a}</p>
+            </details>
+          ))}
+        </section>
+        <footer class="landing-foot muted small">
+          <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a> · <a href="/copyright">Copyright</a>
+        </footer>
+      </div>
+    </div>
+  );
+}

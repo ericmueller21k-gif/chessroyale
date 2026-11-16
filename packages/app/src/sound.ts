@@ -1,0 +1,2056 @@
+/**
+ * Game sounds: pieces use recorded knocks: the move and capture sounds the player picked in Settings (piece-sounds.ts;
+ * all wood; the defaults are the classic PyChess knocks, GPL-3.0, as is castling's); every timer uses one clean clock tick; the reveal's
+ * "selecting move" reel has a roulette-style arpeggio and three tones for the
+ * winner (all synthesised with Web Audio, placeholders until real samples). Browsers
+ * only allow audio after a tap, so call unlockAudio() from one. The mute
+ * choice is remembered on the device.
+ */
+
+import { QUICK_CHAT } from "@chessroyale/core";
+import { autochessSound, type AutochessSound } from "./autochess/sounds.ts";
+import { clownSound, type ClownSound } from "./characters/clown-sounds.ts";
+import { gingerSound, type GingerSound } from "./characters/gingerbread-sounds.ts";
+import { WHISTLES, grexSound, whistlePick, type GrexSound } from "./characters/grex-sounds.ts";
+import { hollowSound, type HollowSound } from "./characters/hollow-sounds.ts";
+import { bigBoySound, type BigBoySound } from "./characters/bigboy-sounds.ts";
+import { sawyerSound, type SawyerSound } from "./characters/sawyer-sounds.ts";
+import { pigSound, type PigSound } from "./characters/pig-sounds.ts";
+import { recluseSound, type RecluseSound } from "./characters/recluse-sounds.ts";
+import { alfilSound, type AlfilSound } from "./characters/alfil-sounds.ts";
+import { hopperSound, type HopperSound } from "./characters/hopper-sounds.ts";
+import { smudgySound, type SmudgySound } from "./characters/smudgy-sounds.ts";
+import { mooSound, type MooSound } from "./characters/moo-sounds.ts";
+import { gardenerSound, type GardenerSound } from "./characters/gardener-sounds.ts";
+import { tigerSound, type TigerSound } from "./characters/tiger-sounds.ts";
+import { folioSound, type FolioSound } from "./characters/folio-sounds.ts";
+import { timberSound, type TimberSound } from "./characters/timber-sounds.ts";
+import { dashSound, type DashSound } from "./characters/dash-sounds.ts";
+import { zebraSound, type ZebraSound } from "./characters/zebra-sounds.ts";
+import { clawSound, type ClawSound } from "./claw/sounds.ts";
+import { godKingSound } from "./characters/god-king-sounds.ts";
+import { captureWorkerError } from "./problems.ts";
+import { makeBossSound, type BossSound } from "./characters/boss-sounds.ts";
+import { soundCache } from "./characters/synth.ts";
+import { CASTLE_SOUND, MOVE_SOUNDS, CAPTURE_SOUNDS, defaultPieceSound, onPieceSoundChange, pieceSound, pieceSoundOption, type PieceSoundKind } from "./piece-sounds.ts";
+
+let ctx: AudioContext | null = null;
+let master: GainNode | null = null;
+/** The game's sounds without the softening (a ride's bells, `gameBus(true)`): the master's level, straight to the speakers. */
+let bright: GainNode | null = null;
+/**
+ * The boss music's own way to the speakers (music.ts, `musicBus`): at the master's level, but straight to them, not through the
+ * low-pass (Eric, Nov 14: "it sounds much lower quality... we can't compromise on these songs").
+ */
+let musicOut: GainNode | null = null;
+/** The master's level (and the music's, beside it). */
+const MASTER_LEVEL = 0.9;
+/** The last node before the speakers (the soft low-pass): the sound report listens here. */
+let out: AudioNode | null = null;
+/** Audio contexts made this visit (the sound report). */
+let made = 0;
+const samples = new Map<string, AudioBuffer>();
+/** Every recorded file, fetched and decoded once, by its path (the piece sounds share them with SAMPLE_FILES). */
+const files = new Map<string, Promise<AudioBuffer | null>>();
+const decoded = new Map<string, AudioBuffer>();
+function loadFile(url: string): Promise<AudioBuffer | null> {
+  let p = files.get(url);
+  if (!p) {
+    p = fetch(url)
+      .then((r) => r.arrayBuffer())
+      .then((b) => ctx!.decodeAudioData(b))
+      .then((buf) => (decoded.set(url, buf), buf))
+      .catch(() => (files.delete(url), null));
+    files.set(url, p);
+  }
+  return p;
+}
+const MUTE_KEY = "brc.muted";
+let muted = (() => {
+  try {
+    return localStorage.getItem(MUTE_KEY) === "1";
+  } catch {
+    return false;
+  }
+})();
+const listeners = new Set<() => void>();
+
+const SAMPLE_FILES = {
+  // The default move and capture sounds (the classic knocks: the judge's gavel is made from them) and castling's.
+  move: MOVE_SOUNDS[0].file,
+  capture: CAPTURE_SOUNDS[0].file,
+  castle: CASTLE_SOUND,
+  // The God King (boss battle): CC0 retro cuts, see public/sounds/god-king/CREDITS.md.
+  gkSummon: "/sounds/god-king/summon.mp3",
+  gkAppear: "/sounds/god-king/appear.mp3",
+  gkHyuah: "/sounds/god-king/hyuah.mp3",
+  gkBolt: "/sounds/god-king/bolt.mp3",
+  gkHit: "/sounds/god-king/hit.mp3",
+  gkLeave: "/sounds/god-king/leave.mp3",
+  gkSlash: "/sounds/god-king/slash.mp3",
+  gkCutIn: "/sounds/god-king/cutin.mp3",
+  // His Last Stand (same packs, see the credits).
+  gkWarn: "/sounds/god-king/warn.mp3",
+  gkLastLeap: "/sounds/god-king/last-leap.mp3",
+  gkLastCrash: "/sounds/god-king/last-crash.mp3",
+  gkLastSlashes: "/sounds/god-king/last-slashes.mp3",
+  gkLastGrunt1: "/sounds/god-king/last-grunt1.mp3",
+  gkLastGrunt2: "/sounds/god-king/last-grunt2.mp3",
+  gkLastGroan: "/sounds/god-king/last-groan.mp3",
+  bannerStart: "/sounds/banner/start.mp3",
+  queenGasp: "/sounds/banner/queen-gasp.mp3",
+  menuOpen: "/sounds/menu/open.mp3",
+  menuClose: "/sounds/menu/close.mp3",
+  menuSelect: "/sounds/menu/select.mp3",
+} as const;
+
+/**
+ * G-REX's Roman candle whistle is synthesised (characters/grex-sounds.ts: three variants, a little pitch either way,
+ * now and then a crackle). To use a recorded whistle instead, put the file in public/sounds/grex/ (credit it in
+ * CREDITS.md) and set its path here, e.g. "/sounds/grex/whistle.mp3": every shot then plays it, with the same pitch
+ * spread and crackles, at GREX_WHISTLE_FILE_LEVEL (trim it so the whole volley stays under a move's loudness).
+ */
+const GREX_WHISTLE_FILE: string | null = null;
+const GREX_WHISTLE_FILE_LEVEL = 0.15;
+
+/** The audio graph, made once (prepareAudio, while the page is idle; failing that, on the first tap). */
+function ensureContext() {
+  if (ctx) return;
+  const c = (ctx = new AudioContext());
+  made++;
+  note(`made #${made}: ${c.sampleRate} Hz, ${c.state}`);
+  c.addEventListener?.("statechange", () => note(`#${made} ${c.state}`));
+  // (Chrome: the audio device failed under it. It may still say "running", its clock moving, and play nothing.)
+  c.addEventListener?.("error", () => markStale("context error"));
+  master = ctx.createGain();
+  master.gain.value = MASTER_LEVEL;
+  musicOut = ctx.createGain();
+  musicOut.gain.value = MASTER_LEVEL;
+  musicOut.connect(ctx.destination);
+  // A gentle low-pass keeps the game's sounds soft on phone speakers (not the music: `musicOut`).
+  const soften = ctx.createBiquadFilter();
+  soften.type = "lowpass";
+  soften.frequency.value = 6000;
+  master.connect(soften).connect(ctx.destination);
+  out = soften;
+  bright = ctx.createGain();
+  bright.gain.value = MASTER_LEVEL;
+  bright.connect(ctx.destination);
+}
+
+let loading = false;
+/** Fetches and decodes the recorded samples: once, after the first tap's frame (none of it holds up that tap). */
+function loadSamples() {
+  if (loading) return;
+  loading = true;
+  const go = () => {
+    for (const [name, url] of Object.entries({ ...SAMPLE_FILES, ...(GREX_WHISTLE_FILE ? { grexWhistleFile: GREX_WHISTLE_FILE } : {}) })) {
+      void loadFile(url).then((buf) => buf && samples.set(name, buf));
+    }
+    // Only the picked move and capture sounds (the others load when previewed), and a new pick as it's made.
+    void loadFile(pieceSound("move").file);
+    void loadFile(pieceSound("capture").file);
+    onPieceSoundChange(() => {
+      void loadFile(pieceSound("move").file);
+      void loadFile(pieceSound("capture").file);
+    });
+  };
+  // (After the next paint: the tap's own work, a piece picked up or a button pressed, shows first.)
+  if (typeof requestAnimationFrame === "function") requestAnimationFrame(() => setTimeout(go, 0));
+  else setTimeout(go, 0);
+}
+
+/**
+ * Makes the audio graph while the page is idle, before any tap, so the first tap of a visit only has to switch sound
+ * on: making it cost 45-210 ms (a slowed phone) inside the first tap, the first move's own frame waited for it. The
+ * graph starts suspended; nothing is fetched or played until a tap (unlockAudio).
+ */
+export function prepareAudio() {
+  // (The page coming back from another app or a locked phone: see `audioReturned`.)
+  if (typeof document !== "undefined") {
+    document.addEventListener("visibilitychange", audioReturned);
+    addEventListener("pageshow", audioReturned);
+    addEventListener("focus", audioReturned);
+    addEventListener("blur", audioLeft);
+    (globalThis as { navigator?: { mediaDevices?: EventTarget } }).navigator?.mediaDevices?.addEventListener?.("devicechange", () => markStale("devices changed"));
+  }
+  const make = () => {
+    try {
+      ensureContext();
+    } catch {
+      // No audio on this device: the game works silently.
+    }
+  };
+  const idle = (globalThis as { requestIdleCallback?: (f: () => void, o?: { timeout: number }) => number }).requestIdleCallback;
+  if (idle) idle(make, { timeout: 2000 });
+  else setTimeout(make, 1000);
+}
+
+/** Call from a tap so browsers allow sound later. Also loads the recorded samples (after the tap's frame). */
+export function unlockAudio() {
+  try {
+    ensureContext();
+    void ctx!.resume().catch(() => undefined);
+    loadSamples();
+  } catch {
+    // No audio on this device: the game works silently.
+  }
+}
+
+// ---- Coming back to the page (Eric, Nov 3, on his iPhone: "whenever I switch away and come back" the sound was gone) ----
+/**
+ * iOS suspends or "interrupts" the audio context while the page is hidden (another app, the phone locked), and coming back it
+ * doesn't always recover: resume() can wait for ever, the context can be closed, or it can say "running" with its clock stopped.
+ * So when the page comes back (visibilitychange to visible, pageshow, focus) it tries resume() at once (some browsers allow it
+ * then), and the first tap or key after that (`wakeAudio`; iOS only starts sound inside one) checks the context: running with its
+ * clock moving, all is well; anything else, a new context and master chain are made inside that tap (the old one closed), the
+ * boss sounds made for it again (`warmSounds`' cache is by sample rate; the recorded files' decoded buffers serve any context),
+ * `onAudioRebuilt` listeners hear of it (the Colosseum's streamed ambience), and that tap's own sound plays as it wakes.
+ * Nothing waits to play on the way back: a sound asked for while the page is hidden is dropped (`play`).
+ */
+let back: { at: number; t: number } | null = null;
+/** Until then (ms), a sound plays on a new context waking inside its tap (suspended, its resume asked for): the tap's own sound. */
+let wakingUntil = 0;
+const WAKE_MS = 400;
+/** A context that says "running" this long (s) after coming back but whose clock moved less than a quarter of that is dead. */
+const STALL_CHECK_S = 0.25;
+const nowMs = () => (typeof performance !== "undefined" ? performance.now() : Date.now());
+const pageHidden = () => typeof document !== "undefined" && document.visibilityState === "hidden";
+/** Every boss sound `warmSounds` has made, to make again for a new context. */
+const warmed = new Set<SoundName>();
+/**
+ * A listener hears the old context (null: none) and may return how long (ms) it still needs it: the music, still sounding on it,
+ * fades out there once the new one has taken over (music.ts). The old one is closed after the longest of those, else at once.
+ */
+type RebuiltListener = (old: AudioContext | null) => number | void;
+const rebuiltListeners = new Set<RebuiltListener>();
+/** Calls `fn` whenever the audio context is replaced (`mediaGain`'s elements then need a new element). */
+export function onAudioRebuilt(fn: RebuiltListener): () => void {
+  rebuiltListeners.add(fn);
+  return () => rebuiltListeners.delete(fn);
+}
+
+// ---- The computer's sound changing under the page (Eric, Nov 3, Chrome on his computer: the bosses' sounds played; he moved and
+// resized the window, clicked over to another app and back, and every click after was silent, no reload). Chrome can keep a context
+// "running", its clock moving, after the audio device under it changed (headphones, another app opening the microphone and the
+// headset switching mode, the output picked again): nothing the clock checks above can see, and nothing comes out. So a device change
+// (`devicechange`), the context's own error, or the window coming back after losing focus for `AWAY_REBUILD_MS` with the page on
+// screen (an app switch on a computer; a phone going to another app hides the page instead, checked above) marks it stale, and the
+// next tap makes a new one: cheap (the boss sounds are cached by sample rate, the files' decoded buffers serve any context). ----
+/** The next tap makes a new context (`wakeAudio`), whatever the old one says. */
+let stale = false;
+const markStale = (why: string) => {
+  note(`stale? ${why}${ctx && loading ? "" : " (sound not on yet)"}`);
+  if (ctx && loading) stale = true;
+};
+/** When the window lost focus with the page on screen (ms), or -1. */
+let leftAt = -1;
+const AWAY_REBUILD_MS = 2000;
+/** The window lost focus (`blur`). */
+export function audioLeft() {
+  note("window lost focus");
+  if (leftAt < 0) leftAt = nowMs();
+}
+
+/** The page shows again (visibilitychange, pageshow, focus): resume() now if it isn't running; the next tap checks it. */
+export function audioReturned() {
+  const c = ctx;
+  note(pageHidden() ? "page hidden" : `page back (${c?.state ?? "no sound yet"})`);
+  if (pageHidden()) {
+    // (Hidden: the checks below run when it shows again; a blur before it doesn't count.)
+    leftAt = -1;
+    return;
+  }
+  if (leftAt >= 0 && nowMs() - leftAt >= AWAY_REBUILD_MS) markStale(`away ${((nowMs() - leftAt) / 1000).toFixed(1)} s`);
+  leftAt = -1;
+  // (Before sound was ever switched on, the first tap does that as usual.)
+  if (!c || !loading) return;
+  back = { at: nowMs(), t: c.state === "running" ? c.currentTime : -1 };
+  if (c.state !== "running" && c.state !== "closed") void c.resume().catch(() => undefined);
+}
+
+/** A new audio context in place of a dead one, inside a tap (`wakeAudio`). */
+function rebuildAudio() {
+  const old = ctx;
+  ctx = null;
+  master = null;
+  musicOut = null;
+  bright = null;
+  const close = () => {
+    try {
+      void old?.close().catch(() => undefined);
+    } catch {
+      // Already closed.
+    }
+  };
+  try {
+    ensureContext();
+  } catch {
+    close();
+    return; // No audio now: the game works silently.
+  }
+  wakingUntil = nowMs() + WAKE_MS;
+  warmSounds([...warmed]);
+  let keep = 0;
+  rebuiltListeners.forEach((l) => {
+    try {
+      keep = Math.max(keep, Number(l(old)) || 0);
+    } catch {
+      // (One listener's trouble doesn't stop the others.)
+    }
+  });
+  // (Kept a moment for a listener still using it, at most REBUILD_GAP_MS: never more than two contexts at once.)
+  if (keep > 0) setTimeout(close, Math.min(keep, REBUILD_GAP_MS));
+  else close();
+}
+
+// ---- Dying while the page stays (Eric, Nov 3, Safari on his iPhone, no switching away: he tapped Timber in the town, who
+// chittered, closed his card, tapped Alfil: silence, and the fight after had none either; the sound "never came back"). iOS can
+// stop the audio with the page on screen (its media process restarting, memory, another sound taking over): the context says
+// "interrupted" or "suspended" and a tap's resume() waits for ever, or it says "running" with its clock stopped. Only coming
+// back to the page was checked; now every tap is. ----
+/** The last tap that found the context running: when (ms, the tap's own time stamp) and its clock then (s). Null: not since made. */
+let seen: { at: number; t: number } | null = null;
+/**
+ * The clock check judges taps this far apart (s): closer, too soon to tell; further apart is judged by the page coming back
+ * instead. Times are the taps' own event time stamps (the device's clock; a test's fake clock doesn't move them).
+ */
+const SEEN_MIN_S = 1;
+const SEEN_MAX_S = 60;
+/** At most one rebuild this often (ms) while the page stays: iOS mid phone call interrupts each new one too. */
+const REBUILD_GAP_MS = 2000;
+let rebuiltAt = -Infinity;
+
+/** `rebuildAudio` from a tap; what the old context's clock said is forgotten. */
+function rebuildInTap() {
+  rebuiltAt = nowMs();
+  seen = null;
+  stale = false;
+  note("rebuilt in a tap");
+  rebuildAudio();
+  (globalThis as { __soundLog?: string[] }).__soundLog?.push("audio:rebuilt");
+}
+
+/**
+ * Every tap and key (main.tsx, before the page's own handlers see it): switches sound on (`unlockAudio`) until it's on, and checks
+ * that sound that was on still is: on the first tap after the page came back (`audioReturned`), and on every tap while it stays
+ * (`checkStillOn`). Dead, a new context is made inside that tap, and the tap's own sound plays on it.
+ */
+export function wakeAudio(e?: Event) {
+  const b = back;
+  const c = ctx;
+  const tapAt = e && e.timeStamp > 0 ? e.timeStamp : nowMs();
+  if (stale && c && !pageHidden() && nowMs() - rebuiltAt >= REBUILD_GAP_MS) {
+    stale = false;
+    back = null;
+    rebuildInTap();
+  } else if (b && c) {
+    const waited = (nowMs() - b.at) / 1000;
+    if (c.state !== "running") {
+      back = null;
+      rebuildInTap();
+    } else if (b.t < 0 || waited >= STALL_CHECK_S) {
+      // Running: resumed on the way back (fine), or running all along: its clock must have moved meanwhile.
+      back = null;
+      if (b.t >= 0 && c.currentTime - b.t < waited / 4) rebuildInTap();
+      else seen = { at: tapAt, t: c.currentTime };
+    }
+    // (Running, and too soon to tell whether its clock moves: the next tap checks.)
+  } else if (c && loading && !pageHidden()) checkStillOn(c, tapAt);
+  if (!audioUnlocked()) unlockAudio();
+}
+
+/** A tap while the page stayed: a context seen running that isn't now, or whose clock stood still since, is made again. */
+function checkStillOn(c: AudioContext, tapAt: number) {
+  const s = seen;
+  if (c.state === "running") {
+    const apart = s ? (tapAt - s.at) / 1000 : 0;
+    if (s && apart >= SEEN_MIN_S && apart <= SEEN_MAX_S && c.currentTime - s.t < apart / 4 && nowMs() - rebuiltAt >= REBUILD_GAP_MS) {
+      rebuildInTap();
+      return;
+    }
+    if (!s || apart >= SEEN_MIN_S) seen = { at: tapAt, t: c.currentTime };
+    return;
+  }
+  // Not running. Never seen running (sound isn't on yet: the tap switches it on below), or a new one waking inside its tap: wait.
+  if (!s || nowMs() < wakingUntil || nowMs() - rebuiltAt < REBUILD_GAP_MS) return;
+  rebuildInTap();
+}
+
+/** Sound is on and its samples are loading or loaded: a tap has nothing more to do. */
+export const audioUnlocked = () => loading && ctx?.state === "running";
+
+export const isMuted = () => muted;
+/** Sound is on (the audio context is running). */
+export const audioRunning = () => ctx?.state === "running";
+export function setMuted(m: boolean) {
+  muted = m;
+  try {
+    localStorage.setItem(MUTE_KEY, m ? "1" : "0");
+  } catch {
+    // Not important.
+  }
+  listeners.forEach((l) => l());
+}
+export function onMuteChange(fn: () => void): () => void {
+  listeners.add(fn);
+  return () => listeners.delete(fn);
+}
+
+/**
+ * The boss music's way out (music.ts): the audio context and the music's own gain to the speakers (`musicOut`: the master's level,
+ * no low-pass), made if it hasn't been (suspended until a tap, as ever). Null without audio.
+ */
+export function musicBus(): { ctx: AudioContext; out: GainNode } | null {
+  try {
+    ensureContext();
+  } catch {
+    return null;
+  }
+  return ctx && musicOut ? { ctx, out: musicOut } : null;
+}
+/**
+ * The game's sounds' way out (the master: the Sound switch's sounds, through the soft low-pass), for a sound that runs on rather than
+ * plays once (a ride's moving loop, ride-sound.ts: it checks the switch and the page itself). `unsoftened`: the same level round the
+ * 6 kHz low-pass, for a sound whose highs are the point (a ride's bells). Null until the audio graph is made.
+ */
+export function gameBus(unsoftened = false): { ctx: AudioContext; out: GainNode } | null {
+  const out = unsoftened ? bright : master;
+  return ctx && out ? { ctx, out } : null;
+}
+/** A recorded file fetched and decoded once a visit (by its path; a failure is tried again next time). Null without audio. */
+export function loadAudioFile(url: string): Promise<AudioBuffer | null> {
+  return musicBus() ? loadFile(url) : Promise.resolve(null);
+}
+/** The page is hidden (another app, a locked phone, another tab). */
+export const isPageHidden = () => pageHidden();
+/**
+ * Lets a recorded file's decoded audio go (a boss theme after its battle: about 45 MB decoded for two minutes, and the
+ * phone has the town's pictures to keep). Fetched again it comes from the service worker's cache and is decoded anew.
+ */
+export function forgetAudioFile(url: string) {
+  files.delete(url);
+  decoded.delete(url);
+}
+
+/** The Colosseum's cheer (a queen taken): loaded by `warmFile` when the Colosseum opens. */
+export const COLOSSEUM_CHEER = "/sounds/colosseum/cheer.mp3";
+/** Fetches and decodes a recorded file a screen will play (`fileSample`), if sound has been made ready. */
+export function warmFile(url: string) {
+  if (ctx) void loadFile(url);
+}
+/** A file loaded by `warmFile`; still loading, it plays as soon as it's in (or never, if it failed). */
+function fileSample(url: string, at: number, level = 1) {
+  const buf = decoded.get(url);
+  if (buf) return startBuffer(buf, at, level, 1);
+  void loadFile(url).then((b) => b && ctx && !muted && startBuffer(b, Math.max(at, ctx.currentTime), level, 1));
+}
+
+/**
+ * A media element (the Colosseum's streamed ambience) played through the game's sound: its own gain into the master
+ * (the same 6 kHz softening as every sound), so it can fade (iOS ignores an element's `volume`). Made once an element;
+ * null without audio. The element plays silently until the context runs (the first tap wakes it).
+ */
+const mediaGains = new WeakMap<HTMLMediaElement, GainNode>();
+export function mediaGain(el: HTMLMediaElement): { ctx: AudioContext; gain: GainNode } | null {
+  try {
+    ensureContext();
+  } catch {
+    return null;
+  }
+  if (!ctx || !master) return null;
+  let g = mediaGains.get(el);
+  if (!g) {
+    g = ctx.createGain();
+    g.gain.value = 0;
+    ctx.createMediaElementSource(el).connect(g).connect(master);
+    mediaGains.set(el, g);
+  }
+  return { ctx, gain: g };
+}
+
+function sample(name: keyof typeof SAMPLE_FILES, at: number, level = 1, rate = 1) {
+  const buf = samples.get(name);
+  if (buf) startBuffer(buf, at, level, rate);
+}
+/**
+ * The picked move or capture sound. Until it has loaded (or if it can't), today's wooden knock: a move is never
+ * silent because of a pick.
+ */
+function pieceSample(kind: PieceSoundKind, at: number, level = 1, rate = 1) {
+  const buf = decoded.get(pieceSound(kind).file) ?? decoded.get(defaultPieceSound(kind).file);
+  if (buf) startBuffer(buf, at, level, rate);
+}
+/** Castling: the classic king-and-rook knock with the default move sound; with another, the picked move sound twice. */
+function castleSample(at: number) {
+  if (pieceSound("move").id === defaultPieceSound("move").id || !decoded.has(pieceSound("move").file)) return sample("castle", at);
+  pieceSample("move", at);
+  pieceSample("move", at + 0.11, 0.8);
+}
+function startBuffer(buf: AudioBuffer, at: number, level: number, rate: number) {
+  const src = ctx!.createBufferSource();
+  src.buffer = buf;
+  src.playbackRate.value = rate;
+  const g = ctx!.createGain();
+  g.gain.value = level;
+  src.connect(g).connect(master!);
+  src.start(at);
+}
+
+/**
+ * Plays one of the piece sounds in Settings' pickers (its ▶, or as it's picked), loading it first if it hasn't been.
+ * A tap asked for it, so it plays even with the game's sound switched off. Tests read `preview:<kind>:<id>` in the log.
+ */
+export function previewPieceSound(kind: PieceSoundKind, id: string): void {
+  const option = pieceSoundOption(kind, id);
+  (globalThis as { __soundLog?: string[] }).__soundLog?.push(`preview:${kind}:${option.id}`);
+  unlockAudio();
+  const c = ctx;
+  if (!c || !master) return;
+  void loadFile(option.file).then(async (buf) => {
+    if (!buf || ctx !== c) return;
+    await c.resume().catch(() => undefined);
+    startBuffer(buf, c.currentTime + 0.005, 1, 1);
+  });
+}
+
+/** Plays synthesised samples (a boss character's sounds, see characters/), at `rate` (a little higher or lower). */
+/** Synthesized sounds already checked for samples that aren't numbers (`buffer`). */
+const checked = new WeakSet<Float32Array>();
+/**
+ * A sound made by code (the bosses', the God King's, Auto chess's), started now. Each one's samples are checked once and any that
+ * isn't a number is made 0: one NaN sample reaching the soft low-pass every sound goes through (`ensureContext`) breaks that filter
+ * for good, and every sound after is silent while the context still says "running" (Timber's chitter at 48 kHz, Nov 3; Chrome:
+ * "BiquadFilterNode: state is bad").
+ */
+function buffer(data: Float32Array, at: number, rate = 1) {
+  if (!checked.has(data)) {
+    for (let i = 0; i < data.length; i++) if (!Number.isFinite(data[i]!)) data[i] = 0;
+    checked.add(data);
+  }
+  const c = ctx!;
+  const buf = c.createBuffer(1, data.length, c.sampleRate);
+  buf.getChannelData(0).set(data);
+  const src = c.createBufferSource();
+  src.buffer = buf;
+  src.playbackRate.value = rate;
+  src.connect(master!);
+  src.start(at);
+}
+const autochess = (name: AutochessSound) => (t: number) => buffer(autochessSound(name, ctx!.sampleRate), t);
+const clown = (name: ClownSound) => (t: number) => buffer(clownSound(name, ctx!.sampleRate), t);
+const ginger = (name: GingerSound) => (t: number) => buffer(gingerSound(name, ctx!.sampleRate), t);
+const grex = (name: GrexSound) => (t: number) => buffer(grexSound(name, ctx!.sampleRate), t);
+const hollow = (name: HollowSound) => (t: number) => buffer(hollowSound(name, ctx!.sampleRate), t);
+const bigBoy = (name: BigBoySound) => (t: number) => buffer(bigBoySound(name, ctx!.sampleRate), t);
+const sawyer = (name: SawyerSound) => (t: number) => buffer(sawyerSound(name, ctx!.sampleRate), t);
+const pig = (name: PigSound) => (t: number) => buffer(pigSound(name, ctx!.sampleRate), t);
+const recluse = (name: RecluseSound) => (t: number) => buffer(recluseSound(name, ctx!.sampleRate), t);
+const alfil = (name: AlfilSound) => (t: number) => buffer(alfilSound(name, ctx!.sampleRate), t);
+const hopper = (name: HopperSound) => (t: number) => buffer(hopperSound(name, ctx!.sampleRate), t);
+const smudgy = (name: SmudgySound) => (t: number) => buffer(smudgySound(name, ctx!.sampleRate), t);
+const mooBoss = (name: MooSound) => (t: number) => buffer(mooSound(name, ctx!.sampleRate), t);
+const gardenerBoss = (name: GardenerSound) => (t: number) => buffer(gardenerSound(name, ctx!.sampleRate), t);
+const tigerBoss = (name: TigerSound) => (t: number) => buffer(tigerSound(name, ctx!.sampleRate), t);
+const folioBoss = (name: FolioSound) => (t: number) => buffer(folioSound(name, ctx!.sampleRate), t);
+const timberBoss = (name: TimberSound) => (t: number) => buffer(timberSound(name, ctx!.sampleRate), t);
+const clawPlay = (name: ClawSound) => (t: number) => buffer(clawSound(name, ctx!.sampleRate), t);
+const dashBoss = (name: DashSound) => (t: number) => buffer(dashSound(name, ctx!.sampleRate), t);
+const zebraBoss = (name: ZebraSound) => (t: number) => buffer(zebraSound(name, ctx!.sampleRate), t);
+const zebraRoom = (name: ZebraSound) => (t: number) => buffer(zebraSound(name, ctx!.sampleRate), t);
+/** Timber's build sound picks one of these each time (Eric, Nov 2: "interchangeable between the tap, the whack, and the knock"). */
+export const TIMBER_BUILD = ["timberTap", "timberWhack", "timberKnock"] as const satisfies readonly SoundName[];
+/** The God King tapped with no charges left: his soft "can't" (god-king-sounds.ts). */
+const kingCant = (t: number) => buffer(godKingSound("cant", ctx!.sampleRate), t);
+/** One of the Roman candle's shots: a whistle (one of three, its pitch a little either way), now and then a crackle at its top. */
+function grexWhistle(t: number) {
+  const w = whistlePick(Math.random(), Math.random(), Math.random());
+  const file = samples.get("grexWhistleFile");
+  if (file) {
+    const src = ctx!.createBufferSource();
+    src.buffer = file;
+    src.playbackRate.value = w.rate;
+    const g = ctx!.createGain();
+    g.gain.value = GREX_WHISTLE_FILE_LEVEL;
+    src.connect(g).connect(master!);
+    src.start(t);
+  } else buffer(grexSound(w.name, ctx!.sampleRate), t, w.rate);
+  if (w.crackleAt !== null) buffer(grexSound("sparkle", ctx!.sampleRate), t + (file ? file.duration / w.rate : w.crackleAt), w.rate);
+}
+
+/** A clean clock tick: a very short burst of noise through a narrow band, like a watch's escapement. */
+function clockTick(at: number, level = 0.5) {
+  const c = ctx!;
+  const len = 0.03;
+  const buf = c.createBuffer(1, Math.ceil(c.sampleRate * len), c.sampleRate);
+  const data = buf.getChannelData(0);
+  for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / data.length, 6);
+  const src = c.createBufferSource();
+  src.buffer = buf;
+  const band = c.createBiquadFilter();
+  band.type = "bandpass";
+  band.frequency.value = 3200;
+  band.Q.value = 6;
+  const g = c.createGain();
+  g.gain.value = level * 4;
+  src.connect(band).connect(g).connect(master!);
+  src.start(at);
+}
+
+/**
+ * Squads' sudden-death sting: two low notes falling a fourth ("dun-dun"), a muted brassy buzz through a low-pass, with a
+ * soft thump under the first. Short, clear, quieter than a move, and nothing like a chime (no bright bell partials).
+ */
+function sqSting(at: number) {
+  const c = ctx!;
+  const note = (t: number, f: number, len: number, level: number) => {
+    const o = c.createOscillator();
+    o.type = "sawtooth";
+    o.frequency.setValueAtTime(f, t);
+    const lp = c.createBiquadFilter();
+    lp.type = "lowpass";
+    lp.frequency.setValueAtTime(1500, t);
+    lp.frequency.exponentialRampToValueAtTime(500, t + len);
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(level, t + 0.012);
+    g.gain.setValueAtTime(level, t + len * 0.45);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + len);
+    o.connect(lp).connect(g).connect(master!);
+    o.start(t);
+    o.stop(t + len + 0.02);
+  };
+  note(at, 220, 0.16, 0.09);
+  note(at + 0.17, 165, 0.32, 0.1);
+  tap(at, 160, 0.12);
+}
+
+/**
+ * How loud a sound is (its peak and RMS over where it sounds), rendered offline as it would play: for checking that a
+ * sound stays quieter than a move (e2e/squads-play.spec.ts, through ?debug). A sample must have loaded (unlockAudio).
+ */
+export async function measureSound(name: SoundName, seconds = 1): Promise<{ peak: number; rms: number }> {
+  const real = { ctx, master };
+  const off = new OfflineAudioContext(1, Math.ceil(44100 * seconds), 44100);
+  const g = off.createGain();
+  g.gain.value = 0.9;
+  g.connect(off.destination);
+  ctx = off as unknown as AudioContext;
+  master = g;
+  try {
+    SOUNDS[name](0.005);
+  } finally {
+    ctx = real.ctx;
+    master = real.master;
+  }
+  const data = (await off.startRendering()).getChannelData(0);
+  let peak = 0;
+  let sum = 0;
+  let n = 0;
+  for (const x of data) {
+    const a = Math.abs(x);
+    peak = Math.max(peak, a);
+    if (a > 1e-3) {
+      sum += x * x;
+      n++;
+    }
+  }
+  return { peak, rms: n ? Math.sqrt(sum / n) : 0 };
+}
+
+/** One struck note built from partials: [frequency multiple, level, decay seconds]. */
+function strike(at: number, freq: number, partials: readonly (readonly [number, number, number])[], level: number, opts: { glide?: number; type?: OscillatorType } = {}) {
+  const c = ctx!;
+  for (const [mult, amp, decay] of partials) {
+    const o = c.createOscillator();
+    o.type = opts.type ?? "sine";
+    // A struck pan or bar starts a hair sharp and settles: a touch of warmth.
+    o.frequency.setValueAtTime(freq * mult * (1 + (opts.glide ?? 0)), at);
+    o.frequency.exponentialRampToValueAtTime(freq * mult, at + 0.04);
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.0001, at);
+    g.gain.exponentialRampToValueAtTime(level * amp, at + 0.004);
+    g.gain.exponentialRampToValueAtTime(0.0001, at + decay);
+    o.connect(g).connect(master!);
+    o.start(at);
+    o.stop(at + decay + 0.02);
+  }
+}
+
+/** A short soft noise tap (the stick hitting), band-passed around `freq`. */
+function tap(at: number, freq: number, level: number) {
+  const c = ctx!;
+  const len = 0.015;
+  const buf = c.createBuffer(1, Math.ceil(c.sampleRate * len), c.sampleRate);
+  const data = buf.getChannelData(0);
+  for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / data.length) ** 3;
+  const src = c.createBufferSource();
+  src.buffer = buf;
+  const band = c.createBiquadFilter();
+  band.type = "bandpass";
+  band.frequency.value = freq;
+  band.Q.value = 2;
+  const g = c.createGain();
+  g.gain.value = level;
+  src.connect(band).connect(g).connect(master!);
+  src.start(at);
+}
+
+/**
+ * A soft, short "pop": a sine that drops in pitch fast (like a bubble), with a tiny tap on top. Its pitch wanders a
+ * little so a run of them doesn't sound mechanical.
+ */
+function bubblePop(at: number, level: number) {
+  const c = ctx!;
+  const f = 520 + Math.random() * 160;
+  const o = c.createOscillator();
+  o.type = "sine";
+  o.frequency.setValueAtTime(f, at);
+  o.frequency.exponentialRampToValueAtTime(f * 0.42, at + 0.07);
+  const g = c.createGain();
+  g.gain.setValueAtTime(0.0001, at);
+  g.gain.exponentialRampToValueAtTime(0.32 * level, at + 0.004);
+  g.gain.exponentialRampToValueAtTime(0.0001, at + 0.09);
+  o.connect(g).connect(master!);
+  o.start(at);
+  o.stop(at + 0.11);
+  tap(at, 1800, 0.05 * level);
+}
+
+/**
+ * Voices for the reveal's "selecting move" roulette (Settings → Sound, "Reveal sound"). Each plays one note; the
+ * roulette climbs a major arpeggio from `base` (C, E, G, C), and the winner is three of the same note.
+ */
+export const REEL_VOICES = {
+  pan: {
+    label: "Steel pan",
+    blurb: "Warm (the default)",
+    base: 523.25, // C5
+    note: (t: number, f: number, l = 1) => {
+      strike(t, f, [[1, 1, 0.5], [2, 0.45, 0.32], [3, 0.18, 0.18], [4.02, 0.08, 0.1]], 0.16 * l, { glide: 0.012 });
+      tap(t, 2400, 0.08 * l);
+    },
+  },
+  kalimba: {
+    label: "Kalimba",
+    blurb: "A soft pluck",
+    base: 523.25,
+    note: (t: number, f: number, l = 1) => strike(t, f, [[1, 1, 0.45], [5.4, 0.12, 0.05], [2, 0.12, 0.2]], 0.17 * l),
+  },
+  marimba: {
+    label: "Marimba",
+    blurb: "Wooden",
+    base: 523.25,
+    note: (t: number, f: number, l = 1) => strike(t, f, [[1, 1, 0.38], [4, 0.14, 0.07], [10, 0.03, 0.02]], 0.18 * l),
+  },
+  glock: {
+    label: "Glockenspiel",
+    blurb: "A bright bell",
+    base: 1046.5, // C6
+    note: (t: number, f: number, l = 1) => strike(t, f, [[1, 1, 0.6], [2.76, 0.3, 0.25], [5.4, 0.12, 0.1]], 0.1 * l),
+  },
+  musicbox: {
+    label: "Music box",
+    blurb: "Tinkly",
+    base: 1046.5,
+    note: (t: number, f: number, l = 1) => strike(t, f, [[1, 1, 0.8], [3, 0.15, 0.3], [4.2, 0.05, 0.08]], 0.09 * l),
+  },
+  chip: {
+    label: "8-bit blip",
+    blurb: "Like an old video game",
+    base: 1046.5,
+    note: (t: number, f: number, l = 1) => strike(t, f, [[1, 1, 0.07], [2, 0.8, 0.05]], 0.05 * l, { type: "square" }),
+  },
+} as const;
+export type ReelVoice = keyof typeof REEL_VOICES;
+const VOICE_KEY = "brc.reelVoice";
+let reelVoice: ReelVoice = (() => {
+  try {
+    const v = localStorage.getItem(VOICE_KEY);
+    return v && v in REEL_VOICES ? (v as ReelVoice) : "pan";
+  } catch {
+    return "pan";
+  }
+})();
+export const getReelVoice = () => reelVoice;
+export function setReelVoice(v: ReelVoice) {
+  reelVoice = v;
+  try {
+    localStorage.setItem(VOICE_KEY, v);
+  } catch {
+    // Not important.
+  }
+}
+
+/** A whole roulette in a voice, to hear it in Settings: the slowing steps, then the winner's three tones. */
+export function previewReel(voice: ReelVoice) {
+  unlockAudio();
+  // About 1.9 s over 11 steps, each a little longer than the last, as the reveal's reel slows.
+  const raw = Array.from({ length: 11 }, (_, i) => Math.pow(1.22, i));
+  const scale = 1900 / raw.reduce((a, b) => a + b, 0);
+  let at = 0;
+  let last = 0;
+  for (const d of raw) {
+    last = at;
+    setTimeout(() => play("reel", voice), at);
+    at += d * scale;
+  }
+  setTimeout(() => play("select", voice), last + 450);
+}
+
+const ARPEGGIO = [1, 1.26, 1.5, 2]; // C E G C
+let rouletteStep = 0;
+
+export type SoundName =
+  | "move"
+  | "capture"
+  | "castle"
+  | "tick"
+  | "reel"
+  | "select"
+  | "ripple"
+  | "gkSummon"
+  | "gkAppear"
+  | "gkHyuah"
+  | "gkBolt"
+  | "gkHit"
+  | "gkLeave"
+  | "gkSlash"
+  | "gkCutIn"
+  | "gkWarn"
+  | "gkLastLeap"
+  | "gkLastCrash"
+  | "gkLastSlashes"
+  | "gkLastGrunt1"
+  | "gkLastGrunt2"
+  | "gkLastGroan"
+  | "bannerStart"
+  | "queenGasp"
+  | "menuOpen"
+  | "menuClose"
+  | "menuSelect"
+  | "gavel"
+  | "pop"
+  | "popSoft"
+  // Auto chess (the demo), synthesized: see autochess/sounds.ts. A piece sold (a coin cascade), a reroll, a piece placed, one held
+  // on the bench, XP bought, a level up, a lock in, one of their pieces revealed, a pawn cashing in during the fight, and a piece gaining
+  // its second star (acStar2) or its third (acStar3).
+  | "sell"
+  | "acReroll"
+  | "acPlace"
+  | "acHold"
+  | "acXp"
+  | "acLevel"
+  | "acLock"
+  | "acReveal"
+  | "acCash"
+  | "acStar2"
+  | "acStar3"
+  | "chat"
+  // Boingo the Clown (a raid boss): synthesised, see characters/clown-sounds.ts.
+  | "clownBoing"
+  | "clownHonk"
+  | "clownSqueak"
+  | "clownSlideUp"
+  | "clownSlideDown"
+  | "clownLaugh"
+  | "clownSplat"
+  | "clownFlip"
+  // Ginger (a raid boss, the Freeze boss): synthesised, see characters/gingerbread-sounds.ts.
+  | "gingerCrunch"
+  | "gingerJingle"
+  | "gingerCrackle"
+  | "gingerWind"
+  // (His challenge intro's, Nov 5.)
+  | "gingerCharge"
+  | "gingerBlast"
+  | "gingerBurst"
+  | "gingerWhoosh"
+  | "gingerStab"
+  | "gingerStep"
+  | "gingerHeave"
+  | "gingerClack"
+  | "gingerCast"
+  | "gingerSparkle"
+  | "gingerThump"
+  | "gingerGust"
+  // G-REX (a raid boss, the Fire boss): synthesised, see characters/grex-sounds.ts.
+  | "grexCrackle"
+  | "grexWhoosh"
+  | "grexFizz"
+  | "grexPoof"
+  | "grexPop"
+  | "grexSparkle"
+  | "grexRoar"
+  | "grexSmack"
+  | "grexWhistle"
+  // (His challenge intro in his warehouse, Nov 4: his holler, a hoof's clop, the dozer's snort, your lift's hiss and clunk, the crates'
+  // creak and soft creak, the wipe's rocket, little pop and soft bang.)
+  | "grexShout"
+  | "grexStep"
+  | "grexSnort"
+  | "grexHiss"
+  | "grexClunk"
+  | "grexCreak"
+  | "grexCreakSoft"
+  | "grexRocket"
+  | "grexPopSoft"
+  | "grexBang"
+  // Hollow (a raid boss, the Darkness boss): synthesised, see characters/hollow-sounds.ts.
+  | "hollowHum"
+  | "hollowCast"
+  | "hollowWhisper"
+  | "hollowPop"
+  | "hollowSmash"
+  | "hollowTick"
+  | "hollowFound"
+  | "hollowMiss"
+  | "hollowRelight"
+  | "hollowClink"
+  | "hollowLash"
+  | "hollowGutter"
+  | "hollowSnuff"
+  | "hollowDrain"
+  | "hollowTink"
+  | "hollowStar"
+  | "hollowSip"
+  | "hollowPawn"
+  | "hollowBlackout"
+  | "hollowFizz"
+  | "hollowForced"
+  | "hollowSettle"
+  // (His intro's swell and his full ball's deep hum: his cast and hum, played slower and so lower.)
+  | "hollowSwell"
+  | "hollowDeep"
+  // Big Boy (a raid boss, the baby): synthesised, see characters/bigboy-sounds.ts.
+  | "bigboyGiggle"
+  | "bigboySlurp"
+  | "bigboyWail"
+  | "bigboyBoing"
+  | "bigboyCrash"
+  | "bigboyNom"
+  | "bigboyToss"
+  | "bigboyClack"
+  | "bigboySwish"
+  | "bigboyBonk"
+  | "bigboyStomp"
+  | "bigboyPoof"
+  // Sawyer (a raid boss, the raccoon with a saw): synthesised, see characters/sawyer-sounds.ts.
+  | "sawyerRev"
+  | "sawyerSwing"
+  | "sawyerCut"
+  | "sawyerCrack"
+  | "sawyerTape"
+  | "sawyerBigSaw"
+  | "sawyerHop"
+  | "sawyerRejoin"
+  // Wrangler (a raid boss, the cowboy pig): synthesised, see characters/pig-sounds.ts.
+  | "pigWhirl"
+  | "pigThrow"
+  | "pigCatch"
+  | "pigTug"
+  | "pigTip"
+  | "pigLaugh"
+  | "pigSnort"
+  | "pigStomp"
+  | "pigWindup"
+  | "pigHop"
+  | "pigDraw"
+  | "pigYank"
+  // (His challenge intro, Nov 4: the bale's scrape, a bucket's clatter, the wipe's spurs and cap pop.)
+  | "pigSlide"
+  | "pigClatter"
+  | "pigJingle"
+  | "pigPop"
+  // The Hidden Boss (admins only, for now): synthesised, see characters/recluse-sounds.ts.
+  | "recluseFlip"
+  | "recluseShut"
+  | "recluseRustle"
+  | "recluseHuff"
+  | "recluseHum"
+  | "recluseThump"
+  | "recluseGlow"
+  | "recluseSlow"
+  | "recluseSpark"
+  | "recluseArc"
+  // Alfil (a raid boss, the woolly mammoth): synthesised, see characters/alfil-sounds.ts.
+  | "alfilTrumpet"
+  | "alfilLeap"
+  | "alfilThud"
+  | "alfilCrunch"
+  | "alfilWhoosh"
+  | "alfilSnort"
+  | "alfilRumble"
+  | "alfilStomp"
+  | "alfilClatter"
+  | "alfilOof"
+  | "alfilLand"
+  | "alfilGlow"
+  | "alfilJab"
+  | "alfilThump"
+  // Chub & Chirp (a raid boss, a rabbit riding a grasshopper): synthesized, see characters/hopper-sounds.ts.
+  | "hopperChirp"
+  | "hopperThump"
+  | "hopperSqueak"
+  | "hopperOof"
+  | "hopperFlop"
+  | "hopperCheer"
+  | "hopperSigh"
+  | "hopperToss"
+  | "hopperBonk"
+  | "hopperHop"
+  | "hopperLand"
+  | "hopperThunk"
+  | "hopperPop"
+  | "hopperTick"
+  | "hopperStop"
+  // Smudgy (a raid boss, a chameleon painter): synthesized, see characters/smudgy-sounds.ts.
+  | "smudgySplash"
+  | "smudgyDrip"
+  | "smudgySwish"
+  | "smudgyGiggle"
+  | "smudgyDab"
+  | "smudgyThump"
+  | "smudgyOof"
+  | "smudgyWhoosh"
+  | "smudgyFlop"
+  | "smudgySplat"
+  | "smudgySwipe"
+  // Moo & Moon (a raid boss, a cow and his friend the Moon): synthesized, see characters/moo-sounds.ts.
+  | "mooSoft"
+  | "mooHappy"
+  | "mooBig"
+  | "mooSleepy"
+  | "mooThump"
+  | "mooOof"
+  | "mooFlop"
+  | "mooSlip"
+  | "mooPlop"
+  | "mooHum"
+  | "mooCharge"
+  | "mooSwell"
+  | "mooFlare"
+  | "mooBeam"
+  | "mooZap"
+  | "mooShimmer"
+  | "mooFizz"
+  // Puddles, the hippo gardener (a raid boss): synthesized, see characters/gardener-sounds.ts.
+  | "gardenerGrunt"
+  | "gardenerBellow"
+  | "gardenerCheer"
+  | "gardenerHello"
+  | "gardenerThump"
+  | "gardenerOof"
+  | "gardenerFlop"
+  | "gardenerWhoosh"
+  | "gardenerToss"
+  | "gardenerPlip"
+  | "gardenerTug"
+  | "gardenerSpray"
+  | "gardenerSwell"
+  | "gardenerDrips"
+  | "gardenerSnap"
+  | "gardenerGulp"
+  | "gardenerPop"
+  | "gardenerChime"
+  | "gardenerWilt"
+  | "gardenerSigh"
+  | "gardenerJet"
+  | "gardenerSpurt"
+  | "gardenerRustle"
+  // Babur, the circus tiger (a raid boss): synthesized, see characters/tiger-sounds.ts.
+  | "tigerPump"
+  | "tigerSqueak"
+  | "tigerPop"
+  | "tigerWhoosh"
+  | "tigerPoof"
+  | "tigerThump"
+  | "tigerSpring"
+  | "tigerRustle"
+  | "tigerYawn"
+  | "tigerGrowl"
+  | "tigerHuff"
+  | "tigerFlame"
+  | "tigerBonk"
+  | "tigerCheer"
+  | "tigerWhoop"
+  | "tigerWince"
+  | "tigerHello"
+  // Folio, the paper crane (a raid boss): synthesized, see characters/folio-sounds.ts (its voice for its lines too).
+  | "folioRustle"
+  | "folioFold"
+  | "folioUnfold"
+  | "folioFlap"
+  | "folioScratch"
+  | "folioDab"
+  | "folioPage"
+  | "folioCrumple"
+  | "folioGlint"
+  | "folioHello"
+  | "folioVoice"
+  | "folioMurmur"
+  | "folioHum"
+  // (Its sanctuary's intro, Nov 5: a folded piece set standing, the plane gliding in, the board landing, the crumple and the open.)
+  | "folioSet"
+  | "folioGlide"
+  | "folioLand"
+  | "folioBall"
+  | "folioOpen"
+  // Timber, the beaver builder (a raid boss): synthesized, all wood, see characters/timber-sounds.ts.
+  | "timberGnaw"
+  | "timberChomp"
+  | "timberClack"
+  | "timberKnock"
+  | "timberPat"
+  | "timberTap"
+  | "timberWhack"
+  | "timberSaw"
+  | "timberThump"
+  | "timberClatter"
+  | "timberSlap"
+  | "timberSwoosh"
+  | "timberSlide"
+  | "timberChitter"
+  | "timberOof"
+  | "timberHup"
+  | "timberBurp"
+  // (His build: a tap, a whack or a knock, one at random each time: Eric, Nov 2.)
+  | "timberBuild"
+  // Dash, the cheetah (a raid boss): synthesized, sneakers and a chess clock, see characters/dash-sounds.ts.
+  | "dashZip"
+  | "dashSqueak"
+  | "dashClick"
+  | "dashTick"
+  | "dashTicktock"
+  | "dashSnap"
+  | "dashWhoosh"
+  | "dashSlam"
+  | "dashSteal"
+  | "dashWhirr"
+  | "dashFlag"
+  | "dashYeah"
+  | "dashOof"
+  | "dashYawn"
+  | "dashSlump"
+  | "dashHello"
+  | "dashDing"
+  | "dashChomp"
+  // Rolling Dough, Don Dough's bakery (Nov 11): its room sounds, synthesized and quiet, see characters/zebra-sounds.ts.
+  | "zebraDoor"
+  | "zebraThump"
+  | "zebraClick"
+  | "zebraMurmur"
+  | "dashStep"
+  // (His intro's, Nov 5: the shoe boxes landing, his jacket dusted off.)
+  | "dashThud"
+  | "dashBrush"
+  // Don Dough, the zebra kingpin (a raid boss): synthesized, a bread rifle and a bakery, see characters/zebra-sounds.ts.
+  | "zebraPop"
+  | "zebraVolley"
+  | "zebraLaugh"
+  | "zebraChuckle"
+  | "zebraDraw"
+  | "zebraCock"
+  | "zebraRelax"
+  | "zebraTsk"
+  | "zebraTap"
+  | "zebraThud"
+  | "zebraTip"
+  | "zebraHm"
+  | "zebraOof"
+  | "zebraSnap"
+  | "zebraLob"
+  | "zebraPlop"
+  | "zebraRoll"
+  | "zebraDing"
+  | "zebraRise"
+  | "zebraOvenPop"
+  | "zebraSquash"
+  | "zebraStir"
+  | "zebraGild"
+  | "zebraWhoosh"
+  | "zebraTumble"
+  | "zebraShine"
+  | "zebraKiss"
+  | "zebraClink"
+  | "kingCant"
+  // Squads: a short tick in the last seconds of your free time, and the sting as a squad enters sudden death.
+  | "sqTick"
+  | "sqSting"
+  | "colosseumCheer"
+  // Boingo's claw machine (Nov 6): synthesized, see claw/sounds.ts. The coin in the slot, the claw's whir, its grab, a prize's thud.
+  | "clawCoin"
+  | "clawWhir"
+  | "clawGrab"
+  | "clawThud"
+  // Quest progress on home (Nov 10; questSound below).
+  | "questTick"
+  | "questDone";
+
+const SOUNDS: Record<SoundName, (t: number) => void> = {
+  move: (t) => pieceSample("move", t),
+  capture: (t) => pieceSample("capture", t),
+  castle: castleSample,
+  tick: (t) => clockTick(t),
+  // One step of the "selecting move" reel: the next note up the arpeggio, with a quick grace note above.
+  reel: (t) => {
+    const v = REEL_VOICES[reelVoice];
+    const f = v.base * ARPEGGIO[rouletteStep++ % ARPEGGIO.length]!;
+    v.note(t, f);
+    v.note(t + 0.035, f * 1.5, 0.45);
+  },
+  // The winner: three of the same note, in time with its three blinks.
+  select: (t) => {
+    rouletteStep = 0;
+    const v = REEL_VOICES[reelVoice];
+    for (let i = 0; i < 3; i++) v.note(t + i * 0.2, v.base * 1.5, 1.2);
+  },
+  gkSummon: (t) => sample("gkSummon", t, 0.7),
+  gkAppear: (t) => sample("gkAppear", t, 0.7),
+  gkHyuah: (t) => sample("gkHyuah", t, 0.9),
+  gkBolt: (t) => sample("gkBolt", t, 0.8),
+  gkHit: (t) => sample("gkHit", t, 0.8),
+  gkSlash: (t) => sample("gkSlash", t, 0.85),
+  gkCutIn: (t) => sample("gkCutIn", t, 0.85),
+  gkWarn: (t) => sample("gkWarn", t, 0.85),
+  gkLastLeap: (t) => sample("gkLastLeap", t, 0.8),
+  gkLastCrash: (t) => sample("gkLastCrash", t, 0.95),
+  gkLastSlashes: (t) => sample("gkLastSlashes", t, 0.7),
+  gkLastGrunt1: (t) => sample("gkLastGrunt1", t, 0.9),
+  gkLastGrunt2: (t) => sample("gkLastGrunt2", t, 0.9),
+  gkLastGroan: (t) => sample("gkLastGroan", t, 0.95),
+  bannerStart: (t) => sample("bannerStart", t, 0.9),
+  // A woman's short gasp, quieter than a move. Unused for now (Eric, Oct 11: the queen banners are silent; it sounded wrong).
+  queenGasp: (t) => sample("queenGasp", t, 0.9),
+  menuOpen: (t) => sample("menuOpen", t, 0.7),
+  menuClose: (t) => sample("menuClose", t, 0.7),
+  menuSelect: (t) => sample("menuSelect", t, 0.8),
+  // The Colosseum's crowd cheering a queen taken (sounds/colosseum/CREDITS.md): fetched when the Colosseum opens, not
+  // with the samples every screen loads.
+  colosseumCheer: (t) => fileSample(COLOSSEUM_CHEER, t, 0.9),
+  clawCoin: clawPlay("coin"),
+  clawWhir: clawPlay("whir"),
+  clawGrab: clawPlay("grab"),
+  clawThud: clawPlay("thud"),
+  gkLeave: (t) => sample("gkLeave", t, 0.6),
+  // The judge's gavel at a cut: two heavy wooden knocks (the classic capture and move sounds, pitched down to about
+  // half, whatever the pick: as it was before Oct 12, the classics being the defaults again).
+  gavel: (t) => {
+    for (const [dt, level] of [[0, 1], [0.26, 0.85]] as const) {
+      sample("capture", t + dt, level, 0.55);
+      sample("move", t + dt, level * 0.8, 0.45);
+    }
+  },
+  // The queue: a pawn pops into its seat (a short soft "pop"), and a bot's, quieter.
+  pop: (t) => bubblePop(t, 1),
+  popSoft: (t) => bubblePop(t, 0.45),
+  // (Placeholders until Eric's pack: a small bell note per count, and the auto chess level-up's arpeggio and chord. QUEST_SOUND_FILES.)
+  questTick: (t) => (QUEST_SOUND_FILES.tick ? fileSample(QUEST_SOUND_FILES.tick, t) : strike(t, 1568, [[1, 1, 0.09], [2, 0.3, 0.05]], 0.1)),
+  questDone: (t) => (QUEST_SOUND_FILES.done ? fileSample(QUEST_SOUND_FILES.done, t) : autochess("level")(t)),
+  sell: autochess("sell"),
+  acReroll: autochess("reroll"),
+  acPlace: autochess("place"),
+  acHold: autochess("hold"),
+  acXp: autochess("xp"),
+  acLevel: autochess("level"),
+  acLock: autochess("lock"),
+  acReveal: autochess("reveal"),
+  acCash: autochess("cash"),
+  acStar2: autochess("star2"),
+  acStar3: autochess("star3"),
+  // Quick chat: a team message arrives. A soft, short tick, well under a move's knock.
+  chat: (t) => {
+    clockTick(t, 0.5 * QUICK_CHAT.tickLevel);
+    tap(t + 0.012, 2600, 0.2 * QUICK_CHAT.tickLevel);
+  },
+  clownBoing: clown("boing"),
+  clownHonk: clown("honk"),
+  clownSqueak: clown("squeak"),
+  clownSlideUp: clown("slideUp"),
+  clownSlideDown: clown("slideDown"),
+  clownLaugh: clown("laugh"),
+  clownSplat: clown("splat"),
+  clownFlip: clown("flip"),
+  gingerCrunch: ginger("crunch"),
+  gingerJingle: ginger("jingle"),
+  gingerCrackle: ginger("crackle"),
+  gingerWind: ginger("wind"),
+  gingerCharge: ginger("charge"),
+  gingerBlast: ginger("blast"),
+  gingerBurst: ginger("burst"),
+  gingerWhoosh: ginger("whoosh"),
+  gingerStab: ginger("stab"),
+  // (The elves' steps a little random in pitch, as Jefferson's crew's clops.)
+  gingerStep: (t) => buffer(gingerSound("step", ctx!.sampleRate), t, 0.9 + 0.2 * Math.random()),
+  gingerHeave: ginger("heave"),
+  gingerClack: ginger("clack"),
+  gingerCast: ginger("cast"),
+  gingerSparkle: ginger("sparkle"),
+  gingerThump: ginger("thump"),
+  gingerGust: ginger("gust"),
+  grexCrackle: grex("crackle"),
+  grexWhoosh: grex("whoosh"),
+  grexFizz: grex("fizz"),
+  grexPoof: grex("poof"),
+  grexPop: grex("pop"),
+  grexSparkle: grex("sparkle"),
+  grexRoar: grex("roar"),
+  grexSmack: grex("smack"),
+  grexWhistle,
+  grexShout: grex("shout"),
+  // (Seven giraffes walking at once: each clop a little higher or lower.)
+  grexStep: (t) => buffer(grexSound("step", ctx!.sampleRate), t, 0.9 + 0.2 * Math.random()),
+  grexSnort: grex("snort"),
+  grexHiss: grex("hiss"),
+  grexClunk: grex("clunk"),
+  grexCreak: grex("creak"),
+  grexCreakSoft: grex("creakSoft"),
+  grexRocket: grex("rocket"),
+  grexPopSoft: grex("popSoft"),
+  grexBang: grex("bang"),
+  hollowHum: hollow("hum"),
+  hollowCast: hollow("cast"),
+  hollowWhisper: hollow("whisper"),
+  hollowPop: hollow("pop"),
+  hollowSmash: hollow("smash"),
+  hollowTick: hollow("tick"),
+  hollowFound: hollow("found"),
+  hollowMiss: hollow("miss"),
+  hollowRelight: hollow("relight"),
+  hollowClink: hollow("clink"),
+  hollowLash: hollow("lash"),
+  hollowGutter: hollow("gutter"),
+  hollowSnuff: hollow("snuff"),
+  hollowDrain: hollow("drain"),
+  hollowTink: hollow("tink"),
+  hollowStar: hollow("star"),
+  hollowSip: hollow("sip"),
+  hollowPawn: hollow("pawn"),
+  hollowBlackout: hollow("blackout"),
+  hollowFizz: hollow("fizz"),
+  hollowForced: hollow("forced"),
+  hollowSettle: hollow("settle"),
+  hollowSwell: (t) => buffer(hollowSound("cast", ctx!.sampleRate), t, 0.7),
+  hollowDeep: (t) => buffer(hollowSound("hum", ctx!.sampleRate), t, 0.75),
+  bigboyGiggle: bigBoy("giggle"),
+  bigboySlurp: bigBoy("slurp"),
+  bigboyWail: bigBoy("wail"),
+  bigboyBoing: bigBoy("boing"),
+  bigboyCrash: bigBoy("crash"),
+  bigboyNom: bigBoy("nom"),
+  bigboyToss: bigBoy("toss"),
+  bigboyClack: bigBoy("clack"),
+  bigboySwish: bigBoy("swish"),
+  bigboyBonk: bigBoy("bonk"),
+  bigboyStomp: bigBoy("stomp"),
+  bigboyPoof: bigBoy("poof"),
+  sawyerRev: sawyer("rev"),
+  sawyerSwing: sawyer("swing"),
+  sawyerCut: sawyer("cut"),
+  sawyerCrack: sawyer("crack"),
+  sawyerTape: sawyer("tape"),
+  sawyerBigSaw: sawyer("bigsaw"),
+  sawyerHop: sawyer("hop"),
+  sawyerRejoin: sawyer("rejoin"),
+  pigWhirl: pig("whirl"),
+  pigThrow: pig("throw"),
+  pigCatch: pig("catch"),
+  pigTug: pig("tug"),
+  pigTip: pig("tip"),
+  pigLaugh: pig("laugh"),
+  pigSnort: pig("snort"),
+  pigStomp: pig("stomp"),
+  pigWindup: pig("windup"),
+  pigHop: pig("hop"),
+  pigDraw: pig("draw"),
+  pigYank: pig("yank"),
+  pigSlide: pig("slide"),
+  pigClatter: pig("clatter"),
+  pigJingle: pig("jingle"),
+  pigPop: pig("pop"),
+  recluseFlip: recluse("flip"),
+  recluseShut: recluse("shut"),
+  recluseRustle: recluse("rustle"),
+  recluseHuff: recluse("huff"),
+  recluseHum: recluse("hum"),
+  recluseThump: recluse("thump"),
+  recluseGlow: recluse("glow"),
+  recluseSlow: recluse("slow"),
+  recluseSpark: recluse("spark"),
+  recluseArc: recluse("arc"),
+  alfilTrumpet: alfil("trumpet"),
+  alfilLeap: alfil("leap"),
+  alfilThud: alfil("thud"),
+  alfilCrunch: alfil("crunch"),
+  alfilWhoosh: alfil("whoosh"),
+  alfilSnort: alfil("snort"),
+  alfilRumble: alfil("rumble"),
+  alfilStomp: alfil("stomp"),
+  alfilClatter: alfil("clatter"),
+  alfilOof: alfil("oof"),
+  alfilLand: alfil("land"),
+  alfilGlow: alfil("glow"),
+  alfilJab: alfil("jab"),
+  alfilThump: alfil("thump"),
+  hopperChirp: hopper("chirp"),
+  hopperThump: hopper("thump"),
+  hopperSqueak: hopper("squeak"),
+  hopperOof: hopper("oof"),
+  hopperFlop: hopper("flop"),
+  hopperCheer: hopper("cheer"),
+  hopperSigh: hopper("sigh"),
+  hopperToss: hopper("toss"),
+  hopperBonk: hopper("bonk"),
+  hopperHop: hopper("hop"),
+  hopperLand: hopper("land"),
+  hopperThunk: hopper("thunk"),
+  hopperPop: hopper("pop"),
+  hopperTick: hopper("tick"),
+  hopperStop: hopper("stop"),
+  smudgySplash: smudgy("splash"),
+  smudgyDrip: smudgy("drip"),
+  smudgySwish: smudgy("swish"),
+  smudgyGiggle: smudgy("giggle"),
+  smudgyDab: smudgy("dab"),
+  smudgyThump: smudgy("thump"),
+  smudgyOof: smudgy("oof"),
+  smudgyWhoosh: smudgy("whoosh"),
+  smudgyFlop: smudgy("flop"),
+  smudgySplat: smudgy("splat"),
+  smudgySwipe: smudgy("swipe"),
+  mooSoft: mooBoss("mooSoft"),
+  mooHappy: mooBoss("mooHappy"),
+  mooBig: mooBoss("mooBig"),
+  mooSleepy: mooBoss("mooSleepy"),
+  mooThump: mooBoss("thump"),
+  mooOof: mooBoss("oof"),
+  mooFlop: mooBoss("flop"),
+  mooSlip: mooBoss("slip"),
+  mooPlop: mooBoss("plop"),
+  mooHum: mooBoss("hum"),
+  mooCharge: mooBoss("charge"),
+  mooSwell: mooBoss("swell"),
+  mooFlare: mooBoss("flare"),
+  mooBeam: mooBoss("beam"),
+  mooZap: mooBoss("zap"),
+  mooShimmer: mooBoss("shimmer"),
+  mooFizz: mooBoss("fizz"),
+  gardenerGrunt: gardenerBoss("grunt"),
+  gardenerBellow: gardenerBoss("bellow"),
+  gardenerCheer: gardenerBoss("cheer"),
+  gardenerHello: gardenerBoss("hello"),
+  gardenerThump: gardenerBoss("thump"),
+  gardenerOof: gardenerBoss("oof"),
+  gardenerFlop: gardenerBoss("flop"),
+  gardenerWhoosh: gardenerBoss("whoosh"),
+  gardenerToss: gardenerBoss("toss"),
+  gardenerPlip: gardenerBoss("plip"),
+  gardenerTug: gardenerBoss("tug"),
+  gardenerSpray: gardenerBoss("spray"),
+  gardenerSwell: gardenerBoss("swell"),
+  gardenerDrips: gardenerBoss("drips"),
+  gardenerSnap: gardenerBoss("snap"),
+  gardenerGulp: gardenerBoss("gulp"),
+  gardenerPop: gardenerBoss("pop"),
+  gardenerChime: gardenerBoss("chime"),
+  gardenerWilt: gardenerBoss("wilt"),
+  gardenerSigh: gardenerBoss("sigh"),
+  gardenerJet: gardenerBoss("jet"),
+  gardenerSpurt: gardenerBoss("spurt"),
+  gardenerRustle: gardenerBoss("rustle"),
+  tigerPump: tigerBoss("pump"),
+  tigerSqueak: tigerBoss("squeak"),
+  tigerPop: tigerBoss("pop"),
+  tigerWhoosh: tigerBoss("whoosh"),
+  tigerPoof: tigerBoss("poof"),
+  tigerThump: tigerBoss("thump"),
+  tigerSpring: tigerBoss("spring"),
+  tigerRustle: tigerBoss("rustle"),
+  tigerYawn: tigerBoss("yawn"),
+  tigerGrowl: tigerBoss("growl"),
+  tigerHuff: tigerBoss("huff"),
+  tigerFlame: tigerBoss("flame"),
+  tigerBonk: tigerBoss("bonk"),
+  tigerCheer: tigerBoss("cheer"),
+  tigerWhoop: tigerBoss("whoop"),
+  tigerWince: tigerBoss("wince"),
+  tigerHello: tigerBoss("hello"),
+  folioRustle: folioBoss("rustle"),
+  folioFold: folioBoss("fold"),
+  folioUnfold: folioBoss("unfold"),
+  folioFlap: folioBoss("flap"),
+  folioScratch: folioBoss("scratch"),
+  folioDab: folioBoss("dab"),
+  folioPage: folioBoss("page"),
+  folioCrumple: folioBoss("crumple"),
+  folioGlint: folioBoss("glint"),
+  folioHello: folioBoss("hello"),
+  folioVoice: folioBoss("voice"),
+  folioMurmur: folioBoss("murmur"),
+  folioHum: folioBoss("hum"),
+  folioSet: folioBoss("set"),
+  folioGlide: folioBoss("glide"),
+  folioLand: folioBoss("land"),
+  folioBall: folioBoss("ball"),
+  folioOpen: folioBoss("open"),
+  timberGnaw: timberBoss("gnaw"),
+  timberChomp: timberBoss("chomp"),
+  timberClack: timberBoss("clack"),
+  timberKnock: timberBoss("knock"),
+  timberPat: timberBoss("pat"),
+  timberTap: timberBoss("tap"),
+  timberWhack: timberBoss("whack"),
+  timberSaw: timberBoss("saw"),
+  timberThump: timberBoss("thump"),
+  timberClatter: timberBoss("clatter"),
+  timberSlap: timberBoss("slap"),
+  timberSwoosh: timberBoss("swoosh"),
+  timberSlide: timberBoss("slide"),
+  timberChitter: timberBoss("chitter"),
+  timberOof: timberBoss("oof"),
+  timberHup: timberBoss("hup"),
+  timberBurp: timberBoss("burp"),
+  timberBuild: (t: number) => SOUNDS[TIMBER_BUILD[Math.floor(Math.random() * TIMBER_BUILD.length)]!](t),
+  dashZip: dashBoss("zip"),
+  dashSqueak: dashBoss("squeak"),
+  dashClick: dashBoss("click"),
+  dashTick: dashBoss("tick"),
+  dashTicktock: dashBoss("ticktock"),
+  dashSnap: dashBoss("snap"),
+  dashWhoosh: dashBoss("whoosh"),
+  dashSlam: dashBoss("slam"),
+  dashSteal: dashBoss("steal"),
+  dashWhirr: dashBoss("whirr"),
+  dashFlag: dashBoss("flag"),
+  dashYeah: dashBoss("yeah"),
+  dashOof: dashBoss("oof"),
+  dashYawn: dashBoss("yawn"),
+  dashSlump: dashBoss("slump"),
+  dashHello: dashBoss("hello"),
+  dashDing: dashBoss("ding"),
+  dashChomp: dashBoss("chomp"),
+  zebraDoor: zebraRoom("door"),
+  zebraThump: zebraRoom("thump"),
+  zebraClick: zebraRoom("click"),
+  zebraMurmur: zebraRoom("murmur"),
+  dashStep: dashBoss("step"),
+  dashThud: dashBoss("thud"),
+  dashBrush: dashBoss("brush"),
+  zebraPop: zebraBoss("pop"),
+  zebraVolley: zebraBoss("volley"),
+  zebraLaugh: zebraBoss("laugh"),
+  zebraChuckle: zebraBoss("chuckle"),
+  zebraDraw: zebraBoss("draw"),
+  zebraCock: zebraBoss("cock"),
+  zebraRelax: zebraBoss("relax"),
+  zebraTsk: zebraBoss("tsk"),
+  zebraTap: zebraBoss("tap"),
+  zebraThud: zebraBoss("thud"),
+  zebraTip: zebraBoss("tip"),
+  zebraHm: zebraBoss("hm"),
+  zebraOof: zebraBoss("oof"),
+  zebraSnap: zebraBoss("snap"),
+  zebraLob: zebraBoss("lob"),
+  zebraPlop: zebraBoss("plop"),
+  zebraRoll: zebraBoss("roll"),
+  zebraDing: zebraBoss("ding"),
+  zebraRise: zebraBoss("rise"),
+  zebraOvenPop: zebraBoss("ovenPop"),
+  zebraSquash: zebraBoss("squash"),
+  zebraStir: zebraBoss("stir"),
+  zebraGild: zebraBoss("gild"),
+  zebraWhoosh: zebraBoss("whoosh"),
+  zebraTumble: zebraBoss("tumble"),
+  zebraShine: zebraBoss("shine"),
+  zebraKiss: zebraBoss("kiss"),
+  zebraClink: zebraBoss("clink"),
+  kingCant,
+  sqTick: (t) => clockTick(t, 0.22),
+  sqSting,
+  // Every board's move landing after a round: a quick ripple of soft knocks (the picked move sound), one per board.
+  ripple: (t) => {
+    for (let i = 0; i < 8; i++) pieceSample("move", t + i * 0.045, 0.22 + 0.04 * (i % 3), 1.25 + 0.05 * (i % 4));
+  },
+};
+
+/**
+ * Synthesised sounds that can be made ahead (warmSounds), by name: Boingo's, Ginger's, Jefferson's (his three candle
+ * whistles and the crackle took about 180 ms to make the first time a shot went up, on a computer: Oct 14), Hollow's
+ * (his smash took 150 ms on a computer), Big Boy's, Sawyer's, Wrangler's, Alfil's, Chub & Chirp's. Each a list of its module and name (a few for one cue).
+ */
+const MAKE: Partial<Record<SoundName, readonly BossSound[]>> = {
+  sell: [["autochess", "sell"]],
+  acReroll: [["autochess", "reroll"]],
+  acPlace: [["autochess", "place"]],
+  acHold: [["autochess", "hold"]],
+  acXp: [["autochess", "xp"]],
+  questDone: [["autochess", "level"]],
+  acLevel: [["autochess", "level"]],
+  acLock: [["autochess", "lock"]],
+  acReveal: [["autochess", "reveal"]],
+  acCash: [["autochess", "cash"]],
+  acStar2: [["autochess", "star2"]],
+  acStar3: [["autochess", "star3"]],
+  clownBoing: [["clown", "boing"]],
+  clownHonk: [["clown", "honk"]],
+  clownSqueak: [["clown", "squeak"]],
+  clownSlideUp: [["clown", "slideUp"]],
+  clownSlideDown: [["clown", "slideDown"]],
+  clownLaugh: [["clown", "laugh"]],
+  clownSplat: [["clown", "splat"]],
+  clownFlip: [["clown", "flip"]],
+  gingerCrunch: [["ginger", "crunch"]],
+  gingerJingle: [["ginger", "jingle"]],
+  gingerCrackle: [["ginger", "crackle"]],
+  gingerWind: [["ginger", "wind"]],
+  gingerCharge: [["ginger", "charge"]],
+  gingerBlast: [["ginger", "blast"]],
+  gingerBurst: [["ginger", "burst"]],
+  gingerWhoosh: [["ginger", "whoosh"]],
+  gingerStab: [["ginger", "stab"]],
+  gingerStep: [["ginger", "step"]],
+  gingerHeave: [["ginger", "heave"]],
+  gingerClack: [["ginger", "clack"]],
+  gingerCast: [["ginger", "cast"]],
+  gingerSparkle: [["ginger", "sparkle"]],
+  gingerThump: [["ginger", "thump"]],
+  gingerGust: [["ginger", "gust"]],
+  grexCrackle: [["grex", "crackle"]],
+  grexWhoosh: [["grex", "whoosh"]],
+  grexFizz: [["grex", "fizz"]],
+  grexPoof: [["grex", "poof"]],
+  grexPop: [["grex", "pop"]],
+  grexSparkle: [["grex", "sparkle"]],
+  grexRoar: [["grex", "roar"]],
+  grexSmack: [["grex", "smack"]],
+  grexWhistle: [...WHISTLES, "sparkle" as const].map((w): BossSound => ["grex", w]),
+  grexShout: [["grex", "shout"]],
+  grexStep: [["grex", "step"]],
+  grexSnort: [["grex", "snort"]],
+  grexHiss: [["grex", "hiss"]],
+  grexClunk: [["grex", "clunk"]],
+  grexCreak: [["grex", "creak"]],
+  grexCreakSoft: [["grex", "creakSoft"]],
+  grexRocket: [["grex", "rocket"]],
+  grexPopSoft: [["grex", "popSoft"]],
+  grexBang: [["grex", "bang"]],
+  hollowHum: [["hollow", "hum"]],
+  hollowCast: [["hollow", "cast"]],
+  hollowWhisper: [["hollow", "whisper"]],
+  hollowPop: [["hollow", "pop"]],
+  hollowSmash: [["hollow", "smash"]],
+  hollowTick: [["hollow", "tick"]],
+  hollowFound: [["hollow", "found"]],
+  hollowMiss: [["hollow", "miss"]],
+  hollowRelight: [["hollow", "relight"]],
+  hollowClink: [["hollow", "clink"]],
+  hollowLash: [["hollow", "lash"]],
+  hollowGutter: [["hollow", "gutter"]],
+  hollowSnuff: [["hollow", "snuff"]],
+  hollowDrain: [["hollow", "drain"]],
+  hollowTink: [["hollow", "tink"]],
+  hollowStar: [["hollow", "star"]],
+  hollowSip: [["hollow", "sip"]],
+  hollowPawn: [["hollow", "pawn"]],
+  hollowBlackout: [["hollow", "blackout"]],
+  hollowFizz: [["hollow", "fizz"]],
+  hollowForced: [["hollow", "forced"]],
+  hollowSettle: [["hollow", "settle"]],
+  hollowSwell: [["hollow", "cast"]],
+  hollowDeep: [["hollow", "hum"]],
+  bigboyGiggle: [["bigBoy", "giggle"]],
+  bigboySlurp: [["bigBoy", "slurp"]],
+  bigboyWail: [["bigBoy", "wail"]],
+  bigboyBoing: [["bigBoy", "boing"]],
+  bigboyCrash: [["bigBoy", "crash"]],
+  bigboyNom: [["bigBoy", "nom"]],
+  bigboyToss: [["bigBoy", "toss"]],
+  bigboyClack: [["bigBoy", "clack"]],
+  bigboySwish: [["bigBoy", "swish"]],
+  bigboyBonk: [["bigBoy", "bonk"]],
+  bigboyStomp: [["bigBoy", "stomp"]],
+  bigboyPoof: [["bigBoy", "poof"]],
+  sawyerRev: [["sawyer", "rev"]],
+  sawyerSwing: [["sawyer", "swing"]],
+  sawyerCut: [["sawyer", "cut"]],
+  sawyerCrack: [["sawyer", "crack"]],
+  sawyerTape: [["sawyer", "tape"]],
+  sawyerBigSaw: [["sawyer", "bigsaw"]],
+  sawyerHop: [["sawyer", "hop"]],
+  sawyerRejoin: [["sawyer", "rejoin"]],
+  pigWhirl: [["pig", "whirl"]],
+  pigThrow: [["pig", "throw"]],
+  pigCatch: [["pig", "catch"]],
+  pigTug: [["pig", "tug"]],
+  pigTip: [["pig", "tip"]],
+  pigLaugh: [["pig", "laugh"]],
+  pigSnort: [["pig", "snort"]],
+  pigStomp: [["pig", "stomp"]],
+  pigWindup: [["pig", "windup"]],
+  pigHop: [["pig", "hop"]],
+  pigDraw: [["pig", "draw"]],
+  pigYank: [["pig", "yank"]],
+  pigSlide: [["pig", "slide"]],
+  pigClatter: [["pig", "clatter"]],
+  pigJingle: [["pig", "jingle"]],
+  pigPop: [["pig", "pop"]],
+  recluseFlip: [["recluse", "flip"]],
+  recluseShut: [["recluse", "shut"]],
+  recluseRustle: [["recluse", "rustle"]],
+  recluseHuff: [["recluse", "huff"]],
+  recluseHum: [["recluse", "hum"]],
+  recluseThump: [["recluse", "thump"]],
+  recluseGlow: [["recluse", "glow"]],
+  recluseSlow: [["recluse", "slow"]],
+  recluseSpark: [["recluse", "spark"]],
+  recluseArc: [["recluse", "arc"]],
+  alfilTrumpet: [["alfil", "trumpet"]],
+  alfilLeap: [["alfil", "leap"]],
+  alfilThud: [["alfil", "thud"]],
+  alfilCrunch: [["alfil", "crunch"]],
+  alfilWhoosh: [["alfil", "whoosh"]],
+  alfilSnort: [["alfil", "snort"]],
+  alfilRumble: [["alfil", "rumble"]],
+  alfilStomp: [["alfil", "stomp"]],
+  alfilClatter: [["alfil", "clatter"]],
+  alfilOof: [["alfil", "oof"]],
+  alfilLand: [["alfil", "land"]],
+  alfilGlow: [["alfil", "glow"]],
+  alfilJab: [["alfil", "jab"]],
+  alfilThump: [["alfil", "thump"]],
+  hopperChirp: [["hopper", "chirp"]],
+  hopperThump: [["hopper", "thump"]],
+  hopperSqueak: [["hopper", "squeak"]],
+  hopperOof: [["hopper", "oof"]],
+  hopperFlop: [["hopper", "flop"]],
+  hopperCheer: [["hopper", "cheer"]],
+  hopperSigh: [["hopper", "sigh"]],
+  hopperToss: [["hopper", "toss"]],
+  hopperBonk: [["hopper", "bonk"]],
+  hopperHop: [["hopper", "hop"]],
+  hopperLand: [["hopper", "land"]],
+  hopperThunk: [["hopper", "thunk"]],
+  hopperPop: [["hopper", "pop"]],
+  hopperTick: [["hopper", "tick"]],
+  hopperStop: [["hopper", "stop"]],
+  smudgySplash: [["smudgy", "splash"]],
+  smudgyDrip: [["smudgy", "drip"]],
+  smudgySwish: [["smudgy", "swish"]],
+  smudgyGiggle: [["smudgy", "giggle"]],
+  smudgyDab: [["smudgy", "dab"]],
+  smudgyThump: [["smudgy", "thump"]],
+  smudgyOof: [["smudgy", "oof"]],
+  smudgyWhoosh: [["smudgy", "whoosh"]],
+  smudgyFlop: [["smudgy", "flop"]],
+  smudgySplat: [["smudgy", "splat"]],
+  smudgySwipe: [["smudgy", "swipe"]],
+  mooSoft: [["moo", "mooSoft"]],
+  mooHappy: [["moo", "mooHappy"]],
+  mooBig: [["moo", "mooBig"]],
+  mooSleepy: [["moo", "mooSleepy"]],
+  mooThump: [["moo", "thump"]],
+  mooOof: [["moo", "oof"]],
+  mooFlop: [["moo", "flop"]],
+  mooSlip: [["moo", "slip"]],
+  mooPlop: [["moo", "plop"]],
+  mooHum: [["moo", "hum"]],
+  mooCharge: [["moo", "charge"]],
+  mooSwell: [["moo", "swell"]],
+  mooFlare: [["moo", "flare"]],
+  mooBeam: [["moo", "beam"]],
+  mooZap: [["moo", "zap"]],
+  mooShimmer: [["moo", "shimmer"]],
+  mooFizz: [["moo", "fizz"]],
+  gardenerGrunt: [["gardener", "grunt"]],
+  gardenerBellow: [["gardener", "bellow"]],
+  gardenerCheer: [["gardener", "cheer"]],
+  gardenerHello: [["gardener", "hello"]],
+  gardenerThump: [["gardener", "thump"]],
+  gardenerOof: [["gardener", "oof"]],
+  gardenerFlop: [["gardener", "flop"]],
+  gardenerWhoosh: [["gardener", "whoosh"]],
+  gardenerToss: [["gardener", "toss"]],
+  gardenerPlip: [["gardener", "plip"]],
+  gardenerTug: [["gardener", "tug"]],
+  gardenerSpray: [["gardener", "spray"]],
+  gardenerSwell: [["gardener", "swell"]],
+  gardenerDrips: [["gardener", "drips"]],
+  gardenerSnap: [["gardener", "snap"]],
+  gardenerGulp: [["gardener", "gulp"]],
+  gardenerPop: [["gardener", "pop"]],
+  gardenerChime: [["gardener", "chime"]],
+  gardenerWilt: [["gardener", "wilt"]],
+  gardenerSigh: [["gardener", "sigh"]],
+  gardenerJet: [["gardener", "jet"]],
+  gardenerSpurt: [["gardener", "spurt"]],
+  gardenerRustle: [["gardener", "rustle"]],
+  tigerPump: [["tiger", "pump"]],
+  tigerSqueak: [["tiger", "squeak"]],
+  tigerPop: [["tiger", "pop"]],
+  tigerWhoosh: [["tiger", "whoosh"]],
+  tigerPoof: [["tiger", "poof"]],
+  tigerThump: [["tiger", "thump"]],
+  tigerSpring: [["tiger", "spring"]],
+  tigerRustle: [["tiger", "rustle"]],
+  tigerYawn: [["tiger", "yawn"]],
+  tigerGrowl: [["tiger", "growl"]],
+  tigerHuff: [["tiger", "huff"]],
+  tigerFlame: [["tiger", "flame"]],
+  tigerBonk: [["tiger", "bonk"]],
+  tigerCheer: [["tiger", "cheer"]],
+  tigerWhoop: [["tiger", "whoop"]],
+  tigerWince: [["tiger", "wince"]],
+  tigerHello: [["tiger", "hello"]],
+  folioRustle: [["folio", "rustle"]],
+  folioFold: [["folio", "fold"]],
+  folioUnfold: [["folio", "unfold"]],
+  folioFlap: [["folio", "flap"]],
+  folioScratch: [["folio", "scratch"]],
+  folioDab: [["folio", "dab"]],
+  folioPage: [["folio", "page"]],
+  folioCrumple: [["folio", "crumple"]],
+  folioGlint: [["folio", "glint"]],
+  folioHello: [["folio", "hello"]],
+  folioVoice: [["folio", "voice"]],
+  folioMurmur: [["folio", "murmur"]],
+  folioHum: [["folio", "hum"]],
+  folioSet: [["folio", "set"]],
+  folioGlide: [["folio", "glide"]],
+  folioLand: [["folio", "land"]],
+  folioBall: [["folio", "ball"]],
+  folioOpen: [["folio", "open"]],
+  timberGnaw: [["timber", "gnaw"]],
+  timberChomp: [["timber", "chomp"]],
+  timberClack: [["timber", "clack"]],
+  timberKnock: [["timber", "knock"]],
+  timberPat: [["timber", "pat"]],
+  timberTap: [["timber", "tap"]],
+  timberWhack: [["timber", "whack"]],
+  timberSaw: [["timber", "saw"]],
+  timberThump: [["timber", "thump"]],
+  timberClatter: [["timber", "clatter"]],
+  timberSlap: [["timber", "slap"]],
+  timberSwoosh: [["timber", "swoosh"]],
+  timberSlide: [["timber", "slide"]],
+  timberChitter: [["timber", "chitter"]],
+  timberOof: [["timber", "oof"]],
+  timberHup: [["timber", "hup"]],
+  timberBurp: [["timber", "burp"]],
+  timberBuild: [["timber", "tap"], ["timber", "whack"], ["timber", "knock"]],
+  dashZip: [["dash", "zip"]],
+  dashSqueak: [["dash", "squeak"]],
+  dashClick: [["dash", "click"]],
+  dashTick: [["dash", "tick"]],
+  dashTicktock: [["dash", "ticktock"]],
+  dashSnap: [["dash", "snap"]],
+  dashWhoosh: [["dash", "whoosh"]],
+  dashSlam: [["dash", "slam"]],
+  dashSteal: [["dash", "steal"]],
+  dashWhirr: [["dash", "whirr"]],
+  dashFlag: [["dash", "flag"]],
+  dashYeah: [["dash", "yeah"]],
+  dashOof: [["dash", "oof"]],
+  dashYawn: [["dash", "yawn"]],
+  dashSlump: [["dash", "slump"]],
+  dashHello: [["dash", "hello"]],
+  dashDing: [["dash", "ding"]],
+  dashChomp: [["dash", "chomp"]],
+  zebraDoor: [["zebra", "door"]],
+  zebraThump: [["zebra", "thump"]],
+  zebraClick: [["zebra", "click"]],
+  zebraMurmur: [["zebra", "murmur"]],
+  dashStep: [["dash", "step"]],
+  dashThud: [["dash", "thud"]],
+  dashBrush: [["dash", "brush"]],
+  zebraPop: [["zebra", "pop"]],
+  zebraVolley: [["zebra", "volley"]],
+  zebraLaugh: [["zebra", "laugh"]],
+  zebraChuckle: [["zebra", "chuckle"]],
+  zebraDraw: [["zebra", "draw"]],
+  zebraCock: [["zebra", "cock"]],
+  zebraRelax: [["zebra", "relax"]],
+  zebraTsk: [["zebra", "tsk"]],
+  zebraWhoosh: [["zebra", "whoosh"]],
+  zebraTumble: [["zebra", "tumble"]],
+  zebraTap: [["zebra", "tap"]],
+  zebraThud: [["zebra", "thud"]],
+  zebraTip: [["zebra", "tip"]],
+  zebraHm: [["zebra", "hm"]],
+  zebraOof: [["zebra", "oof"]],
+  zebraSnap: [["zebra", "snap"]],
+  zebraLob: [["zebra", "lob"]],
+  zebraPlop: [["zebra", "plop"]],
+  zebraRoll: [["zebra", "roll"]],
+  zebraDing: [["zebra", "ding"]],
+  zebraRise: [["zebra", "rise"]],
+  zebraOvenPop: [["zebra", "ovenPop"]],
+  zebraSquash: [["zebra", "squash"]],
+  zebraStir: [["zebra", "stir"]],
+  zebraGild: [["zebra", "gild"]],
+  zebraShine: [["zebra", "shine"]],
+  zebraKiss: [["zebra", "kiss"]],
+  zebraClink: [["zebra", "clink"]],
+  kingCant: [["godKing", "cant"]],
+  clawCoin: [["claw", "coin"]],
+  clawWhir: [["claw", "whir"]],
+  clawGrab: [["claw", "grab"]],
+  clawThud: [["claw", "thud"]],
+};
+/** The sound worker (sound-worker.ts), started with the first warmSounds; null where there's none (or it failed). */
+let worker: Worker | null | undefined;
+/** Sounds sent to the worker and not back yet: made in idle moments instead if it fails. */
+const pending = new Set<string>();
+const cached = ([module, name]: BossSound, rate: number) => soundCache(module).has(`${name}@${rate}`);
+
+function soundWorker(): Worker | null {
+  if (worker !== undefined) return worker;
+  try {
+    worker = new Worker(new URL("./sound-worker.ts", import.meta.url), { type: "module" });
+    worker.onmessage = (e: MessageEvent<{ sound: BossSound; rate: number; data: Float32Array | null }>) => {
+      const { sound, rate, data } = e.data;
+      pending.delete(JSON.stringify([sound, rate]));
+      if (data && !cached(sound, rate)) soundCache(sound[0]).set(`${sound[1]}@${rate}`, data);
+    };
+    // (Handled: its sounds are made in idle moments instead. Like the engines' workers', its error stays here, never
+    // a page error of its own, and is reported once: problems.ts.)
+    worker.onerror = (e) => {
+      e.preventDefault();
+      captureWorkerError("sound", e);
+      worker?.terminate();
+      worker = null;
+      const left = [...pending].map((k) => JSON.parse(k) as [BossSound, number]);
+      pending.clear();
+      for (const [sound, rate] of left) makeIdle(sound, rate);
+    };
+  } catch {
+    worker = null;
+  }
+  return worker;
+}
+
+/** Without the worker: one sound per idle moment (each still one task, as long as it takes to make). */
+const idleQueue: [BossSound, number][] = [];
+function makeIdle(sound: BossSound, rate: number) {
+  const idle = (fn: () => void) => (typeof requestIdleCallback === "function" ? requestIdleCallback(fn, { timeout: 3000 }) : setTimeout(fn, 60));
+  const next = () => {
+    const job = idleQueue.shift();
+    if (!job) return;
+    if (!cached(...job)) makeBossSound(...job);
+    if (idleQueue.length) idle(next);
+  };
+  idleQueue.push([sound, rate]);
+  if (idleQueue.length === 1) idle(next);
+}
+
+/**
+ * Makes a boss's synthesized sounds ahead of time, so the first time one plays (a bulb smashed in the middle of his
+ * ultimate) a slow phone doesn't stall making it. They're made in the sound worker, off the page's thread: one can take
+ * 50 to 180 ms on a slowed phone, a dropped frame or ten if it were made on the page during the intro (Big Boy's, Oct 14).
+ * Without a worker, one per idle moment. Needs the audio context (for its sample rate): a no-op before the first tap.
+ */
+export function warmSounds(names: readonly SoundName[]): void {
+  if (!ctx) return;
+  for (const n of names) warmed.add(n);
+  const rate = ctx.sampleRate;
+  const todo = [...new Set(names)].flatMap((n) => MAKE[n] ?? []).filter((s) => !cached(s, rate) && !pending.has(JSON.stringify([s, rate])));
+  const w = soundWorker();
+  for (const sound of todo) {
+    if (!w) {
+      makeIdle(sound, rate);
+      continue;
+    }
+    pending.add(JSON.stringify([sound, rate]));
+    w.postMessage({ sound, rate });
+  }
+}
+
+/**
+ * Plays a sound a tap asked for (the Boss raid screen's boss stepping on), through the mute switch. On a visit's first
+ * tap the audio is still waking (its `resume` takes a moment), so the sound plays as soon as it's up rather than never.
+ */
+export function playOnTap(name: SoundName) {
+  unlockAudio();
+  const c = ctx;
+  if (!c || c.state === "running") return play(name);
+  void c
+    .resume()
+    .catch(() => undefined)
+    .then(() => ctx === c && play(name));
+}
+
+/**
+ * Quest progress's sounds (Eric, Nov 10: "some sort of satisfying animation or sound. I've actually got a sound pack that I'm working
+ * on"): "tick" as a moved quest's count goes up on home, "done" as one finishes. Everything plays them through here, by name: the
+ * pack drops in by setting its files below (e.g. "/sounds/quests/done.mp3"); null plays the placeholder made in code.
+ */
+export type QuestSound = "tick" | "done";
+const QUEST_SOUND_FILES: Record<QuestSound, string | null> = { tick: null, done: null };
+export const questSound = (s: QuestSound) => play(s === "tick" ? "questTick" : "questDone");
+/** Made ahead (the done sound's placeholder, in the sound worker), as the overlay opens to show progress. */
+export const warmQuestSounds = () => warmSounds(["questDone"]);
+
+/** Plays a sound; `voice` previews a roulette voice without choosing it (Settings → Sound, "Reveal sound"). */
+export function play(name: SoundName, voice?: ReelVoice) {
+  // Tests read this log (set window.__soundLog = [] to start one).
+  (globalThis as { __soundLog?: string[] }).__soundLog?.push(`${name}:${ctx?.state ?? "none"}${muted ? ":muted" : ""}`);
+  note(`play ${name}: ${ctx?.state ?? "none"}${ctx ? ` t=${ctx.currentTime.toFixed(2)}` : ""}${muted ? " muted" : ""}${pageHidden() ? " hidden" : ""}`);
+  if (muted || !ctx || !master || pageHidden()) return;
+  // (Running; or a new context waking inside the tap that made it: the sound starts as it wakes.)
+  if (ctx.state !== "running" && !(ctx.state === "suspended" && nowMs() < wakingUntil)) return;
+  const chosen = reelVoice;
+  if (voice) reelVoice = voice;
+  try {
+    SOUNDS[name](ctx.currentTime + 0.005);
+  } catch {
+    // Ignore audio errors.
+  } finally {
+    reelVoice = chosen;
+  }
+}
+
+// ---- The sound report (Eric, Nov 3: on his computer the sound died after fast clicks on the bosses, and a test browser can't make
+// it happen). Admins, Settings → Testing: what the sound did lately (contexts made, their states, the page going and coming back,
+// each sound asked for), the device's numbers, and a test tick measured at the last node before the speakers: a loud number there
+// with nothing heard means the device stopped; zero or "not numbers" means the sound inside the game broke. Kept in memory only. ----
+const NOTES_MAX = 400;
+const notes: string[] = [];
+function note(line: string) {
+  notes.push(`${(nowMs() / 1000).toFixed(2)} ${line}`);
+  if (notes.length > NOTES_MAX) notes.splice(0, notes.length - NOTES_MAX);
+}
+
+/** The sound report: plays a tick, measures it at the speakers' input for 0.4 s, and returns everything as text. */
+export async function soundReport(): Promise<string> {
+  const c = ctx;
+  let heard = "no sound on";
+  if (c && out && c.state === "running") {
+    const an = c.createAnalyser();
+    an.fftSize = 2048;
+    out.connect(an);
+    const buf = new Float32Array(an.fftSize);
+    let peak = 0;
+    let bad = 0;
+    play("tick");
+    for (let i = 0; i < 20; i++) {
+      await new Promise((ok) => setTimeout(ok, 20));
+      an.getFloatTimeDomainData(buf);
+      for (const v of buf) {
+        if (!Number.isFinite(v)) bad++;
+        else peak = Math.max(peak, Math.abs(v));
+      }
+    }
+    out.disconnect(an);
+    heard = `peak ${peak.toFixed(3)}${bad ? `, ${bad} not numbers` : ""}`;
+  } else if (c) heard = `not running (${c.state})`;
+  const n = (globalThis as { navigator?: { userAgent?: string } }).navigator;
+  const lat = c as (AudioContext & { outputLatency?: number; sinkId?: unknown }) | null;
+  return [
+    `HunChess sound report, ${new Date().toISOString()}`,
+    `browser: ${n?.userAgent ?? "?"}`,
+    `sound: ${c ? `#${made} ${c.state}, t=${c.currentTime.toFixed(2)}, ${c.sampleRate} Hz, latency ${c.baseLatency ?? "?"}/${lat?.outputLatency ?? "?"}, sink ${JSON.stringify(lat?.sinkId ?? "")}` : "none"}; muted ${muted}; switched on ${loading}; stale ${stale}`,
+    `test tick: ${heard}`,
+    `page: ${pageHidden() ? "hidden" : "shown"}, ${(nowMs() / 1000).toFixed(2)} s in`,
+    "",
+    ...notes,
+  ].join("\n");
+}
