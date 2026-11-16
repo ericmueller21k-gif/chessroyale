@@ -1,4 +1,5 @@
-"""Song AG (Eric, Nov 16): a new boss's theme, a loop of 2:36. "New boss we're working on. Here's the instructions for
+"""Song AG (Eric, Nov 16): Chandy's theme, a loop of 2:36 ("It's the new one, Chandy, that's being built right now, and
+it sounds great. Nothing to fix."). His brief: "New boss we're working on. Here's the instructions for
 the song. Same thing, 2 minutes, 30 seconds, 2 minutes, 45 seconds. And again, [as] his last one, stick to the script
 that I'm giving you here to actually create it." The script is his own plan (made with another assistant, as Babur's
 was: song_af.py), "High-Speed Cyberspace Breakbeat & Jazz-Fusion", and it is his to give, so this is the plan, part
