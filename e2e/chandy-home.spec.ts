@@ -1,5 +1,5 @@
 import { expect, type Page } from "@playwright/test";
-import { asAdmin, tapInTown, test, townReady } from "./helpers.ts";
+import { asAdmin, giveItems, tapInTown, test, townReady, wearItem } from "./helpers.ts";
 
 /**
  * Chandy's Swamp (Nov 16; docs/areas/town-square.md, "Chandy's Swamp"), on a phone and a computer, as an admin (Chandy is in the game for
@@ -37,6 +37,26 @@ test("Chandy's Swamp: his Challenge open (his rules are in); in by the boardwalk
   // (Its arrival title: its name once, not "CHANDY'S" over it.)
   await expect(page.locator(".area-banner .area-banner-title")).toHaveText("CHANDY'S SWAMP");
   await expect(page.locator(".area-banner .area-banner-sub")).toHaveCount(0);
+});
+
+// (Eric, Nov 16: "when you're on a ride ... it doesn't show the splashing in the swamp ... make it a fixed kind of depth for all of them".)
+test("on a ride, you wade in the swamp too: the ride cut at the water, its ripple and spray as on foot", { tag: "@phone-only" }, async ({ page }) => {
+  test.setTimeout(150_000);
+  await asAdmin(page);
+  await page.goto("/");
+  await expect(page.getByRole("button", { name: "View profile", exact: true }).or(page.getByRole("navigation", { name: "Menu" }).getByRole("button", { name: "Profile" })).filter({ visible: true }).first()).toBeVisible();
+  // (No crate holds a ride yet: given straight, as only admins have them.)
+  const [chirp] = await giveItems(page, [{ def: "riding-chirp", color: "cobalt", blemish: 0 }]);
+  await wearItem(page, "ride", chirp!);
+  await page.goto("/town?sky=day");
+  await townReady(page);
+  const home = page.getByRole("dialog", { name: "Chandy's Swamp", exact: true });
+  await tapInTown(page, "home", "chandy", home);
+  await home.getByRole("button", { name: "Go in" }).click();
+  await expect(room(page)).toHaveAttribute("data-ready", "1", { timeout: 30_000 });
+  const ride = () => page.evaluate(() => (window as unknown as { __shopRide?: () => { ride: string | null; wading: boolean } | null }).__shopRide?.() ?? null);
+  await expect.poll(async () => (await ride())?.ride, { timeout: 30_000 }).toBe("riding-chirp");
+  await expect.poll(async () => (await ride())?.wading).toBe(true);
 });
 
 test("his rise: the post first, the platform lifting you both, the crates on it, his water rising over the screen @phone-only", async ({ page }) => {

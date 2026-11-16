@@ -962,7 +962,7 @@ function startRoom(
   };
 
   /** The test hook's view of your ride (as the town's `youRide`): its animation and frame drawn last, its side, its view. */
-  const seen = { ride: null as string | null, anim: "" as "" | "idle" | "move", frame: -1, facing: 1, view: 0 };
+  const seen = { ride: null as string | null, anim: "" as "" | "idle" | "move", frame: -1, facing: 1, view: 0, wading: false };
 
   // ---- The floor, baked once: every tile (turned as the layout says) into one picture of the whole room, n x n squares.
   const floor = document.createElement("canvas");
@@ -2639,6 +2639,11 @@ function startRoom(
     const grow = 1 / (1 + up * f.shadowLiftShrink);
     const fade = Math.max(0, 1 - up * f.shadowLiftFade);
     const soft = rd.shadow;
+    // (Chandy's Swamp, Nov 16, Eric: "just make it a fixed kind of depth for all of them": every ride wades as you do on foot, cut at
+    // the water's one depth, its ripple and spray the same; no shadow in the water. Lifted onto his platform: dry.)
+    const inWater = !!wade && castLift("you") < 0.02;
+    seen.wading = inWater;
+    if (!inWater) {
     g.fillStyle = SHADOW;
     g.globalAlpha = f.shadowAlpha * (0.5 + 0.5 * fade);
     g.beginPath();
@@ -2649,6 +2654,8 @@ function startRoom(
     g.ellipse(pt.x, pt.y, pt.k * f.contactShadowW * 1.45 * Math.min(soft, 1.2) * grow, pt.k * f.contactShadowDepth * grow, 0, 0, Math.PI * 2);
     g.fill();
     g.globalAlpha = 1;
+    }
+    const wading = inWater && wadeIn(pt.y, pt.k);
     g.save();
     if (flip < 0) {
       g.translate(pt.x, 0);
@@ -2660,6 +2667,11 @@ function startRoom(
     g.drawImage(img, x0, y0, w, h);
     g.restore();
     g.imageSmoothingEnabled = false;
+    if (wading) {
+      unwade(pt.x, pt.y, pt.k, w * 0.6, now);
+      splashFrom("you", pose.x + youOx(now), pose.y + youOy(now), now);
+      drawSpray(now);
+    }
     // (The tag over its top standing: it doesn't jump with the hop.)
     Object.assign(youHead, { x: pt.x, y: y0 + lift * pt.k + rv.top * h - 2, on: true });
   };
@@ -2700,6 +2712,7 @@ function startRoom(
     const footK = pt.k;
     // (Lifted out of the water (Chandy's platform): no waterline, no ripple.)
     const wading = castLift("you") < 0.02 && wadeIn(footY, footK);
+    seen.wading = wading;
     g.save();
     g.translate(pt.x, pt.y);
     if (pose.tilt) g.rotate((pose.tilt * f.hobbleTilt * Math.PI) / 180);
