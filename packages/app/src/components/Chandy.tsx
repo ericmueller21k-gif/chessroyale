@@ -295,11 +295,16 @@ export function dodgeView(boss: BossView, run: DodgeRun, now: number, onPick?: (
   const losing = d.results.findIndex((r) => r.hit && ++hits >= S.dodgeHits);
   const endOf = (i: number) => (i === losing ? tl.rounds[i]!.hitAt + tl.killMs : tl.rounds[i]!.end);
   let k = Math.min(d.rounds.length - 1, d.results.length);
+  let running = false;
   for (let i = 0; i < d.results.length; i++)
     if (t < endOf(i)) {
       k = i;
+      running = true;
       break;
     }
+  // (Dodge decided, its last round's end past: keep that round (the kill, or the last result) on screen until the results come,
+  // never the next round's clones and "Locked" after a kill in round 2: the review of #745.)
+  if (!running && (losing >= 0 || d.results.length >= d.rounds.length)) k = losing >= 0 ? losing : d.results.length - 1;
   const r = tl.rounds[k]!;
   const round = d.rounds[k]!;
   const result = d.results[k];
@@ -366,7 +371,8 @@ export function dodgeDock(boss: BossView, run: DodgeRun, now: number): { line: s
   const stake = left <= 1 ? "One more hit and the battle is his." : `${left === 2 ? "Two" : left} hits and the battle is his.`;
   if (v.phase === "vote") return { line: "Vote where your king stands", sub: `One square is safe. ${stake}` };
   if (v.phase === "kill") return { line: "Hit!", sub: "The battle is his." };
-  if (v.phase === "result") return v.result === "hit" ? { line: "King cracked!", sub: stake } : { line: `Dodged ${v.round} of 3`, sub: v.round < 3 ? "Next round." : "The board comes back." };
+  // (A first hit in the last round: Dodge is over, the board comes back; no "one more hit".)
+  if (v.phase === "result") return v.result === "hit" ? { line: "King cracked!", sub: v.round < 3 ? stake : "The board comes back." } : { line: `Dodged ${v.round} of 3`, sub: v.round < 3 ? "Next round." : "The board comes back." };
   if (v.phase === "locked" || v.phase === "blast") return { line: "Locked", sub: v.placed ? `Your king on ${v.placed}.` : "Counting the votes." };
   if (v.phase === "volley") return v.warned ? { line: "Dodge the next one!", sub: `Vote where your king stands. ${stake}` } : { line: "Dodge!", sub: "A warning shot. Watch his clones." };
   if (v.phase === "open" && v.round === 1) return { line: "Dodge the next one!", sub: `One square is safe. ${stake}` };
