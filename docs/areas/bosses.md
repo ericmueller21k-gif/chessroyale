@@ -28,7 +28,7 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
   too, if it's in it), and the old one fades out over `MUSIC.handoffMs` from there, its context kept open that long
   ([decision](../decisions/2026-11-14-music-clean.md)). **Never two copies of one theme** past `MUSIC.handoffMs`: one still fading out at
   its end (a room left, a result, a splash gone) is cut to that as a new copy starts (`cutEnding`; Nov 14). MP3 only, **stereo at a constant 128 kbps**
-  (Nov 16, Eric: "128 is fine for the game"; 192 kbps Nov 14-16, tag `music-192k`, [decision](../decisions/2026-11-14-music-full-quality.md);
+  (Nov 16, Eric: "128 is fine for the game"; 192 kbps Nov 14-16, main at b3bd995, [decision](../decisions/2026-11-14-music-full-quality.md);
   mono 64 kbps Nov 12-14; about 2 MB a theme, 45 MB in all: [decision](../decisions/2026-11-16-music-128k.md)). **Fetched in the
   background after the town's first frame** (Nov 12, `preloadMusic`: every theme, fetched only, one piece at a time, `MUSIC.townPreloadAfterMs`
   after the first frame since Nov 14, never under the town's loading screen; kept by the service worker in `brc-music`, a cache every version
