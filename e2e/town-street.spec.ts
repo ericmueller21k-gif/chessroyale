@@ -531,9 +531,13 @@ test.describe(() => {
     expect(gets.sort(), "each piece, once").toEqual([...town, ...names.map((n) => `/music/${n}.mp3`)].sort());
     const decoded = await page.evaluate(() => (window as unknown as { __decoded: number[] }).__decoded);
     expect(decoded.filter((b) => sizes.includes(b)), "no theme decoded").toEqual([]);
-    // (The town's solos: fetched, not decoded till a solo's turn nears, minutes away; Nov 15, memory on phones.)
+    // (The town's solos: fetched, not decoded till a solo's turn nears; Nov 15, memory on phones. Since Nov 16 a third of the starts are
+    // partway in, the first solo (a) under 70 s away: that one, and only it, decoded at once.)
     const soloSizes = town.slice(1).map((u) => statSync(`${dir}/${u.slice("/music/".length)}`).size);
-    expect(decoded.filter((b) => soloSizes.includes(b)), "no solo decoded").toEqual([]);
+    const early = (await townLog()).some((l) => l.startsWith("music:town:entry:"));
+    const solosDecoded = async () => (await page.evaluate(() => (window as unknown as { __decoded: number[] }).__decoded)).filter((b) => soloSizes.includes(b));
+    if (early) await expect.poll(solosDecoded, { timeout: 15_000, message: "only the first solo decoded" }).toEqual([soloSizes[0]]);
+    else expect(decoded.filter((b) => soloSizes.includes(b)), "no solo decoded").toEqual([]);
     const log = await page.evaluate(() => (window as unknown as { __soundLog: string[] }).__soundLog);
     expect(log.filter((l) => l.startsWith("music:load")), "no theme loaded to play").toEqual([]);
     // Music off (Settings → Sound): none fetched.

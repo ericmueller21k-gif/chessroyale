@@ -235,7 +235,7 @@
     }
   },
   "town": {
-    "note": "The town's theme (Nov 15, town-music/ on stills/trailer-v2): loop <loop> between pad and pad + loopSeconds. After TOWN_MUSIC.passesPerSolo passes, at a pass's end start a solo's file instead of the next pass; `seconds` after it started, the loop again from its top (offset pad), the solo's file ringing out over it.",
+    "note": "The town's theme (Nov 15, town-music/ on stills/trailer-v2): loop <loop> between pad and pad + loopSeconds. After a pass (TOWN_MUSIC: when, Nov 16), at a pass's end start a solo's file instead of the next pass; `seconds` after it started, the loop again from its top (offset pad), the solo's file ringing out over it.",
     "source": "scripts/reel/music/song_ad.py",
     "loop": "town-loop",
     "loopSeconds": 178.604646,
