@@ -9,19 +9,26 @@
  *   edge, aiming down). No lines (Eric, Nov 16: "you actually have to look and see which ones he's pointing at"). A clone that
  *   teleports blinks out leaving its afterimage (`ghosts`) and appears on its new square. Your taps vote (`onPick`); the counts show on
  *   the squares, yours ringed in gold; the 3 s bar runs to `endsAt`.
+ * - `volley` (the warning volley, Eric, Nov 16): the clones appear on lines that miss your king and fire once (no vote); then "DODGE
+ *   THE NEXT ONE!".
  * - `locked`: your king on the winning square (`placed`); each clone's line flashes three times, the whole rank or file.
- * - `blast`: the blasts, a big pop edge to edge (power-art.ts EFFECTS chandyDodgeRow / chandyDodgeCol, on the shared board canvas).
- * - `result`: "DODGED n/3" or "HIT! YOU LOSE".
+ * - `blast`: the beams (`beams`): each leaves its clone's muzzle and travels across the board, a little after the one before, a square
+ *   at a time (power-art.ts EFFECTS chandyDodgeRow / chandyDodgeCol, on the shared board canvas), then holds, steady, until it fades.
+ * - `result`: "DODGED n/3", or the first hit: "HIT! KING CRACKED" (his crack stays for the rest of Dodge: `cracked`).
+ * - `kill` (the hit that loses): the beams keep hitting your king; the cracks spread, he flickers and dissipates in particles, then
+ *   shatters into shards (chandyDodgeKing); "HIT! YOU LOSE".
  *
  * The clones are drawn on one canvas of their own (90 px a square: half a CSS pixel an art pixel on a phone's 45 px square, crisp at
- * any size), one shared frame loop; the lines on the board's effects canvas. Nothing here takes a tap but the vote's squares.
+ * any size), one shared frame loop; the lines, beams and hits on the board's effects canvas, under your king (he stands in the beams;
+ * his crack is drawn on him). Nothing here takes a tap but the vote's squares.
  */
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
+import { BOSS_POWERS } from "@chessroyale/core";
 import { CHANDY_CLONE, CHANDY_FOOT, cloneMuzzle } from "../characters/chandy.ts";
 import { spriteCanvas } from "../characters/sprite-kit.ts";
 import { BoardEffects, onEachFrame, spriteFrameAt, type BoardItem } from "./BossEffect.tsx";
 
-export type DodgePhase = "scope" | "slide" | "open" | "vote" | "locked" | "blast" | "result";
+export type DodgePhase = "scope" | "slide" | "volley" | "open" | "vote" | "locked" | "blast" | "result" | "kill";
 /** A clone's line, on the screen: a rank's clone on its `left` or `right` edge square, a file's on the top edge (his side). */
 export type DodgeLine = { rank: number; side: "left" | "right"; since?: number } | { file: string; since?: number };
 export interface DodgeView {
@@ -46,6 +53,14 @@ export interface DodgeView {
   teleport?: boolean;
   result?: "dodged" | "hit";
   onPick?: (square: string) => void;
+  /** The beams: when the first leaves its clone and when they fade (this device's time); the clones' lines are `lines`. */
+  beams?: { at: number; fadeAt: number };
+  /** The warning volley has landed: "DODGE THE NEXT ONE!". */
+  warned?: boolean;
+  /** Hits so far (shown); your king's crack, from the first hit's landing (this device's time); the kill's start (the losing hit). */
+  hits: number;
+  cracked?: number;
+  killAt?: number;
 }
 
 const FILES = "abcdefgh";
@@ -56,6 +71,15 @@ const cell = (sq: string, side: "white" | "black"): [number, number] => {
   return side === "white" ? [f, 7 - r] : [7 - f, r];
 };
 const sqAt = (c: number, r: number, side: "white" | "black") => (side === "white" ? `${FILES[c]}${8 - r}` : `${FILES[7 - c]}${r + 1}`);
+/** A clone's line, square by square from his muzzle: a rank's from his edge (left or right on the screen), a file's from the top (his side). */
+function lineSquares(line: DodgeLine, side: "white" | "black"): string[] {
+  const out: string[] = [];
+  for (let i = 0; i < 8; i++) {
+    if ("rank" in line) out.push(sqAt(line.side === "left" ? i : 7 - i, cell(`a${line.rank}`, side)[1], side));
+    else out.push(sqAt(cell(`${line.file}1`, side)[0], i, side));
+  }
+  return out;
+}
 /** n squares as a CSS length. */
 const sqs = (n: number) => `calc(var(--board-size) * ${n / 8})`;
 /** The clones' canvas: 90 px a square, one square of room above the board (a top-edge clone's head) and on each side. */
@@ -89,7 +113,7 @@ function CloneLayer({ view }: { view: DodgeView }) {
     const draw = () => {
       const v = live.current;
       const now = Date.now();
-      const show = v.phase === "vote" || v.phase === "locked" || v.phase === "blast" || v.phase === "result";
+      const show = v.phase === "volley" || v.phase === "vote" || v.phase === "locked" || v.phase === "blast" || v.phase === "result" || v.phase === "kill";
       const items: { line: DodgeLine; anim: string; then?: string; since: number }[] = [];
       if (show) {
         for (const line of v.lines) {
@@ -144,14 +168,25 @@ export function ChandyDodge({ view }: { view: DodgeView }) {
   const [kc, kr] = cell(v.king, v.side);
   const [cc, cr] = cell(v.center, v.side);
   const at = v.phase === "scope" ? [kc, kr] : v.phase === "slide" || v.phase === "open" || v.phase === "vote" || !v.placed ? [cc, cr] : cell(v.placed, v.side);
-  // The lines once the vote locks: each clone's whole rank or file, flashing, then the blast (the board's effects canvas).
+  // The lines once the vote locks: each clone's whole rank or file, flashing; then the beams, each from its clone's muzzle across the
+  // board, held, then fading (the board's effects canvas).
   const items: BoardItem[] = [];
-  if (v.phase === "locked" || v.phase === "blast")
-    for (const line of v.lines)
-      for (let i = 0; i < 8; i++) {
-        const square = "rank" in line ? sqAt(i, cell(`a${line.rank}`, v.side)[1], v.side) : sqAt(cell(`${line.file}1`, v.side)[0], i, v.side);
-        items.push({ square, name: "rank" in line ? "chandyDodgeRow" : "chandyDodgeCol", anim: v.phase === "locked" ? "flash" : "blast", since: v.since, quiet: i > 0 });
-      }
+  if (v.phase === "locked") for (const line of v.lines) lineSquares(line, v.side).forEach((square, i) => items.push({ square, name: "rank" in line ? "chandyDodgeRow" : "chandyDodgeCol", anim: "flash", since: v.since, quiet: i > 0 }));
+  if (v.beams && now >= v.beams.at) {
+    const { dodgeTravelMs: travel, dodgeStaggerMs: stagger, dodgeKillMs: kill } = BOSS_POWERS.chandy;
+    const fading = now >= v.beams.fadeAt;
+    v.lines.forEach((line, j) =>
+      lineSquares(line, v.side).forEach((square, i) => {
+        const since = v.beams!.at + j * stagger + (i * travel) / 8;
+        if (now < since) return;
+        const name = "rank" in line ? "chandyDodgeRow" : "chandyDodgeCol";
+        items.push(fading ? { square, name, anim: "fade", since: v.beams!.fadeAt, quiet: true } : { square, name, anim: "travel", then: "hold", since, quiet: i > 0 });
+      }),
+    );
+    // Your king hit: the first hit's impact; the losing hit's kill, then his shatter.
+    if (v.placed && v.phase === "result" && v.result === "hit" && v.cracked !== undefined) items.push({ square: v.placed, name: "chandyDodgeKing", anim: "crack", since: v.cracked });
+    if (v.placed && v.killAt !== undefined) items.push(now < v.killAt + kill ? { square: v.placed, name: "chandyDodgeKing", anim: "kill", since: v.killAt } : { square: v.placed, name: "chandyDodgeKing", anim: "shatter", since: v.killAt + kill });
+  }
   const nine: string[] = [];
   for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) nine.push(sqAt(cc + dc, cr + dr, v.side));
   const left = v.endsAt ? Math.max(0, v.endsAt - now) / 1000 : 3;
@@ -168,8 +203,16 @@ export function ChandyDodge({ view }: { view: DodgeView }) {
       )}
       <BoardEffects items={items} orientation={v.side} class="cd-lines" />
       <CloneLayer view={v} />
-      <div class={`hb-pieces cd-king${v.result === "hit" ? " cd-hit" : ""}`} aria-hidden="true" style={{ "--cd-x": `${at[0]}`, "--cd-y": `${at[1]}` }}>
-        <piece class={`${v.side} king`} />
+      <div class={`hb-pieces cd-king${v.result === "hit" ? " cd-hit" : ""}${v.cracked !== undefined ? " cd-cracked" : ""}${v.phase === "kill" ? " cd-dying" : ""}`} aria-hidden="true" style={{ "--cd-x": `${at[0]}`, "--cd-y": `${at[1]}` }}>
+        <piece class={`${v.side} king`}>
+          {(v.cracked !== undefined || v.phase === "kill") && (
+            <>
+              <i class="cd-crack c1" />
+              <i class="cd-crack c2" />
+              <i class="cd-crack c3" />
+            </>
+          )}
+        </piece>
       </div>
       {v.phase === "vote" &&
         nine.map((sq) => {
@@ -183,15 +226,22 @@ export function ChandyDodge({ view }: { view: DodgeView }) {
         })}
       {blank && (
         <div class="cd-hud" style={{ top: sqs(cr + 2) }}>
-          {v.phase === "result" ? (
-            <div class={`cd-result${v.result === "hit" ? " cd-lost" : ""}`}>{v.result === "hit" ? "HIT! YOU LOSE" : `DODGED ${v.round}/3`}</div>
+          {v.phase === "result" || v.phase === "kill" ? (
+            <div class={`cd-result${v.result === "hit" ? " cd-lost" : ""}`}>{v.phase === "kill" ? "HIT! YOU LOSE" : v.result === "hit" ? "HIT! KING CRACKED" : `DODGED ${v.round}/3`}</div>
+          ) : v.phase === "volley" && v.warned ? (
+            <div class="cd-result cd-warned">DODGE THE NEXT ONE!</div>
           ) : (
             <>
-              <div class="cd-round">{v.teleport ? <span class="cd-tele">TELEPORT!</span> : <>DODGE! <span>ROUND {v.round}/3</span></>}</div>
+              <div class="cd-round">{v.teleport ? <span class="cd-tele">TELEPORT!</span> : v.phase === "volley" ? <>DODGE! <span>WARNING SHOT</span></> : <>DODGE! <span>ROUND {v.round}/3</span></>}</div>
               <div class="cd-bar">
                 <i style={{ width: `${v.phase === "vote" ? (left / 3) * 100 : v.phase === "open" ? 100 : 0}%` }} />
               </div>
-              <div class="cd-say">{v.phase === "vote" ? `VOTE: TAP A SQUARE ${left.toFixed(1)} s` : v.phase === "open" ? "GET READY" : "LOCKED"}</div>
+              <div class="cd-say">{v.phase === "vote" ? `VOTE: TAP A SQUARE ${left.toFixed(1)} s` : v.phase === "open" ? "GET READY" : v.phase === "volley" ? "WATCH HIS CLONES" : "LOCKED"}</div>
+              <div class="cd-hits" aria-label={`Hits ${v.hits} of ${BOSS_POWERS.chandy.dodgeHits}`}>
+                {Array.from({ length: BOSS_POWERS.chandy.dodgeHits }, (_, i) => (
+                  <i key={i} class={i < v.hits ? "on" : ""} />
+                ))}
+              </div>
             </>
           )}
         </div>

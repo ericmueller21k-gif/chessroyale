@@ -77,6 +77,12 @@ describe("Dodge on screen", () => {
     const at = (ms: number) => dodgeView(boss, run, run.at + ms)!;
     expect(at(10).phase).toBe("scope");
     expect(at(tl.slideAt + 10).phase).toBe("slide");
+    // (The warning volley: its clones on lines that miss your king, the beams, then "Dodge the next one!".)
+    const volley = at(tl.volley.at + 10);
+    expect(volley).toMatchObject({ phase: "volley", hits: 0 });
+    expect(volley.warned).toBeUndefined();
+    expect(volley.beams?.at).toBe(run.at + tl.volley.fireAt);
+    expect(at(tl.volley.landAt + 10).warned).toBe(true);
     expect(at(tl.rounds[0]!.voteAt - 100).phase).toBe("open");
     const v = at(tl.rounds[0]!.voteAt + 50);
     expect(v.phase).toBe("vote");
@@ -94,15 +100,27 @@ describe("Dodge on screen", () => {
     expect(t.lines.length).toBe(4);
   });
 
-  it("locks, blasts and shows the round's result once the server's tally is in; a hit says HIT", () => {
+  it("locks, sends the beams and shows the round's result once the server's tally is in; a first hit cracks your king, the second is the kill", () => {
     const placed = d.rounds[0]!.safe;
     const done = bossWith({ ...EMPTY, dodge: { ...d, results: [{ placed, hit: false, votes: { [placed]: 1 } }] } });
-    expect(dodgeView(done, run, run.at + tl.rounds[0]!.closeAt + 10)).toMatchObject({ phase: "locked", placed });
-    expect(dodgeView(done, run, run.at + tl.rounds[0]!.blastAt + 10)).toMatchObject({ phase: "blast", placed });
-    expect(dodgeView(done, run, run.at + tl.rounds[0]!.resultAt + 10)).toMatchObject({ phase: "result", result: "dodged", round: 1 });
+    const r0 = tl.rounds[0]!;
+    expect(dodgeView(done, run, run.at + r0.closeAt + 10)).toMatchObject({ phase: "locked", placed });
+    expect(dodgeView(done, run, run.at + r0.blastAt + 10)).toMatchObject({ phase: "blast", placed, beams: { at: run.at + r0.blastAt } });
+    expect(dodgeView(done, run, run.at + r0.hitAt + 10)).toMatchObject({ phase: "result", result: "dodged", round: 1, hits: 0 });
+    // (The beams held through the result, until just before the next round.)
+    expect(dodgeView(done, run, run.at + r0.end - 10)!.beams!.fadeAt).toBeLessThan(run.at + r0.end);
     const wrong = safeSquares("e4", []).find((sq) => sq !== placed)!;
-    const hit = bossWith({ ...EMPTY, dodge: { ...d, results: [{ placed: wrong, hit: true, votes: {} }] } });
-    expect(dodgeView(hit, run, run.at + tl.rounds[0]!.resultAt + 10)).toMatchObject({ phase: "result", result: "hit" });
+    const hit = { placed: wrong, hit: true, votes: {} };
+    const once = bossWith({ ...EMPTY, dodge: { ...d, results: [hit] } });
+    expect(dodgeView(once, run, run.at + r0.blastAt + 10)!.cracked).toBeUndefined();
+    expect(dodgeView(once, run, run.at + r0.hitAt + 10)).toMatchObject({ phase: "result", result: "hit", hits: 1, cracked: run.at + r0.hitAt });
+    // (Cracked for the rest of Dodge: the next round's vote too.)
+    expect(dodgeView(once, { ...run, round: 1, votes: {}, mine: undefined }, run.at + tl.rounds[1]!.voteAt + 10)).toMatchObject({ phase: "vote", round: 2, hits: 1, cracked: run.at + r0.hitAt });
+    const r1 = tl.rounds[1]!;
+    const twice = bossWith({ ...EMPTY, dodge: { ...d, results: [hit, { ...hit, placed: wrong }] } });
+    expect(dodgeView(twice, run, run.at + r1.hitAt + 10)).toMatchObject({ phase: "kill", result: "hit", hits: 2, killAt: run.at + r1.hitAt });
+    // (The kill holds the screen past the round's usual end, to the shatter and the result.)
+    expect(dodgeView(twice, run, run.at + r1.hitAt + tl.killMs - 10)!.phase).toBe("kill");
     // (The next round opens after the first's result.)
     expect(dodgeView(done, { ...run, round: 1, votes: {}, mine: undefined }, run.at + tl.rounds[1]!.voteAt + 10)).toMatchObject({ phase: "vote", round: 2 });
   });

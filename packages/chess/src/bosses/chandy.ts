@@ -45,11 +45,13 @@
  * fifth upgrade, then fills over chandy.dodgeAfterMoves of your moves (nothing else fills or drains it); full, the usual warning, then
  * as your next turn begins Dodge (the crowd's turn waits for it: dodgeDue). **Last chance:** as your turn begins, if he hasn't used
  * it and you have a move that mates him (mateOpen), Dodge comes now, its warning with it, whatever his rifle or meter; the board
- * comes back after it and you may still play the mate. Three rounds on a blank board, your king in the middle of the 3 x 3 round e4 (White) or e5 (Black):
- * four clones, two on rank lines and two on file lines, leave exactly one square safe (dodgeRounds); they teleport
- * chandy.dodgeTeleports' times into the vote, each one shifting the safe square a step. The crowd votes the king's square (the most
- * votes; ties and nobody voting: from the seed); the beams fire; on the safe square, DODGED; anywhere else the battle is his
- * (`dodgeWin`; the God King's Last Stand doesn't apply). The board comes back as it was: Dodge never changes the position.
+ * comes back after it and you may still play the mate. On a blank board, your king in the middle of the 3 x 3 round e4 (White) or e5
+ * (Black): first the warning volley (Eric, Nov 16): the clones fire once on lines that miss your king (dodgeVolley), no vote, then
+ * "Dodge the next one!". Then three rounds: four clones, two on rank lines and two on file lines, leave exactly one square safe
+ * (dodgeRounds); they teleport chandy.dodgeTeleports' times into the vote, each one shifting the safe square a step. The crowd votes
+ * the king's square (the most votes; ties and nobody voting: from the seed); the beams travel from the clones and hold; on the safe
+ * square, DODGED; anywhere else a hit. chandy.dodgeHits hits lose (`dodgeWin`; the God King's Last Stand doesn't apply): the first
+ * cracks your king and play goes on, the second ends the battle. The board comes back as it was: Dodge never changes the position.
  *
  * Test switches (solo): `?power=lockon` (until his first capture, his move takes a piece of yours whenever one nets him no loss:
  * testCapture), `?power=dodge` (all five upgrades at the start, the
@@ -648,25 +650,54 @@ export function dodgeRounds(center: string, seed: number, n: number, s: ChandySe
 }
 
 /**
+ * The warning volley's lines (Eric, Nov 16: "an additional shot first that you can't move"): the arena's two ranks and two files that
+ * miss the center, where your king stands (a rank's clone on the a- or h-file from the seed): every beam misses him.
+ */
+export function dodgeVolley(center: string, seed: number, n: number): DodgeLine[] {
+  const f = fileIx(center);
+  const r = rankIx(center);
+  return [
+    ...[-1, 1].map((d, i): DodgeLine => ({ rank: r + d + 1, side: powerRoll(seed, "dodge-volley", n, i) < 0.5 ? "left" : "right" })),
+    ...[-1, 1].map((d): DodgeLine => ({ file: FILES[f + d]! })),
+  ];
+}
+
+/**
  * Dodge's beats (ms from its start; the server, solo and every screen alike; nobody's clock runs): the scope-in on your king, his
- * slide to the center (`slideAt`), the blank board opening; then each round: "get ready" (`openAt`), its vote (`voteAt` to
- * `voteEnd`, the teleports at their times), the server's lag grace (`closeAt`: the votes counted), LOCKED (your king on the winning
- * square, the lines flashing), the blast (`blastAt`), the result (`resultAt`) until `end`.
+ * slide to the center (`slideAt`); the warning volley (`volley`: the clones appear at `at`, the beams fire at `fireAt` and have all
+ * landed by `landAt`, "Dodge the next one!", until `end`); then each round: "get ready" (`openAt`), its vote (`voteAt` to `voteEnd`,
+ * the teleports at their times), the server's lag grace (`closeAt`: the votes counted), LOCKED (your king on the winning square, the
+ * lines flashing), the beams (`blastAt`: each from its clone's muzzle across the board, dodgeStaggerMs apart, dodgeTravelMs each),
+ * the hit or DODGED as the last lands (`hitAt`), the beams held until `end` (dodgeHoldMs). A hit that loses: the kill from `hitAt`
+ * for `killMs` (the beams on your king, then his shatter), then the result (dodgeEndAt).
  */
 export function dodgeTimeline(s: ChandySettings = BOSS_POWERS.chandy) {
-  const rounds: { openAt: number; voteAt: number; teleports: number[]; voteEnd: number; closeAt: number; blastAt: number; resultAt: number; end: number }[] = [];
-  let openAt = s.dodgeScopeMs + s.dodgeSlideMs;
+  const travel = 3 * s.dodgeStaggerMs + s.dodgeTravelMs;
+  const vAt = s.dodgeScopeMs + s.dodgeSlideMs;
+  const volley = { at: vAt, fireAt: vAt + s.dodgeAimMs, landAt: vAt + s.dodgeAimMs + travel, end: vAt + s.dodgeVolleyMs };
+  const rounds: { openAt: number; voteAt: number; teleports: number[]; voteEnd: number; closeAt: number; blastAt: number; hitAt: number; end: number }[] = [];
+  let openAt = volley.end;
   for (let k = 0; k < s.dodgeRounds; k++) {
     const voteAt = openAt + s.dodgeOpenMs;
     const voteEnd = voteAt + s.dodgeVoteMs;
     const closeAt = voteEnd + s.dodgeGraceMs;
     const blastAt = closeAt + s.dodgeLockedMs;
-    const resultAt = blastAt + s.dodgeBlastMs;
-    const end = resultAt + s.dodgeResultMs;
-    rounds.push({ openAt, voteAt, teleports: (s.dodgeTeleports[k] ?? []).map((ms) => voteAt + ms), voteEnd, closeAt, blastAt, resultAt, end });
+    const hitAt = blastAt + travel;
+    const end = hitAt + s.dodgeHoldMs;
+    rounds.push({ openAt, voteAt, teleports: (s.dodgeTeleports[k] ?? []).map((ms) => voteAt + ms), voteEnd, closeAt, blastAt, hitAt, end });
     openAt = end;
   }
-  return { slideAt: s.dodgeScopeMs, rounds, total: rounds.at(-1)?.end ?? 0 };
+  return { slideAt: s.dodgeScopeMs, volley, rounds, killMs: s.dodgeKillMs + s.dodgeShatterMs, total: rounds.at(-1)?.end ?? 0 };
+}
+
+/** A Dodge's hits so far. */
+export const dodgeHits = (d: Pick<ChandyDodge, "results">): number => d.results.filter((r) => r.hit).length;
+
+/** When a Dodge is done (ms from its start, `d` over): the kill's end after a losing hit, else the last round's end. */
+export function dodgeEndAt(d: Pick<ChandyDodge, "rounds" | "results">, s: ChandySettings = BOSS_POWERS.chandy): number {
+  const tl = dodgeTimeline(s);
+  const k = Math.max(0, d.results.length - 1);
+  return dodgeHits(d) >= s.dodgeHits ? tl.rounds[k]!.hitAt + tl.killMs : tl.rounds[k]!.end;
 }
 
 /**
@@ -692,11 +723,14 @@ export function botDodgeVote(d: Pick<ChandyDodge, "center" | "n" | "rounds">, k:
   return arena[Math.floor(powerRoll(seed, "dodge-bot-sq", d.n, k, botId) * arena.length)]!;
 }
 
-/** Dodge is over: every round played, or a hit. */
-export const dodgeOver = (d: Pick<ChandyDodge, "rounds" | "results"> | null | undefined): boolean => !!d && (d.results.length >= d.rounds.length || d.results.some((r) => r.hit));
+/** Dodge is over: every round played, or the hits that lose (chandy.dodgeHits). */
+export const dodgeOver = (d: Pick<ChandyDodge, "rounds" | "results"> | null | undefined, s: Pick<ChandySettings, "dodgeHits"> = BOSS_POWERS.chandy): boolean => !!d && (d.results.length >= d.rounds.length || dodgeHits(d) >= s.dodgeHits);
 
-/** A Dodge hit ended the battle: his. */
-export const dodgeWon = (boss: Pick<BossState, "powers"> | null | undefined): boolean => !!boss?.powers?.chandy?.dodge?.results.some((r) => r.hit);
+/** Dodge's hits ended the battle: his. */
+export const dodgeWon = (boss: Pick<BossState, "powers"> | null | undefined, s: Pick<ChandySettings, "dodgeHits"> = BOSS_POWERS.chandy): boolean => {
+  const d = boss?.powers?.chandy?.dodge;
+  return !!d && dodgeHits(d) >= s.dodgeHits;
+};
 
 /**
  * What a screen may see of a Dodge `elapsed` ms into it (online, the server sends this; D3: the teleports are the surprise): each
@@ -706,6 +740,7 @@ export function dodgeSeen(d: ChandyDodge, elapsed: number, s: ChandySettings = B
   const tl = dodgeTimeline(s);
   return {
     ...d,
+    ...(d.volley ? { volley: d.volley.map((l) => ({ ...l })) } : {}),
     rounds: d.rounds.map((r, k) => {
       const t = tl.rounds[k]!;
       const done = k < d.results.length;
@@ -825,7 +860,7 @@ export const CHANDY: BossRules = {
     next.ultAt = t.turn;
     const center = dodgeCenter(t.crowd);
     const n = (next.ults ?? 0) + 1;
-    next.chandy = { ...c, dodge: { at: t.turn - 1, n, king: kingOf(t.fen, t.crowd) ?? center, center, rounds: dodgeRounds(center, t.seed, n, t.s.chandy), results: [] } };
+    next.chandy = { ...c, dodge: { at: t.turn - 1, n, king: kingOf(t.fen, t.crowd) ?? center, center, volley: dodgeVolley(center, t.seed, n), rounds: dodgeRounds(center, t.seed, n, t.s.chandy), results: [] } };
     t.events.push({ kind: "dodge", turn: t.turn });
     return true;
   },
@@ -966,7 +1001,7 @@ export function chandyView(p: BossPowerState, s: ChandySettings = BOSS_POWERS.ch
     aim: c.aim?.square ?? null,
     shot: c.shot ? { ...c.shot } : null,
     // (The whole of it: online the server sends only what has been seen of it, dodgeSeen.)
-    dodge: c.dodge ? { ...c.dodge, rounds: c.dodge.rounds.map((r) => ({ lines: r.lines.map((l) => ({ ...l })), teleports: r.teleports.map((x) => ({ ...x, to: { ...x.to } })), safe: r.safe })), results: c.dodge.results.map((r) => ({ ...r, votes: { ...r.votes } })) } : null,
+    dodge: c.dodge ? { ...c.dodge, ...(c.dodge.volley ? { volley: c.dodge.volley.map((l) => ({ ...l })) } : {}), rounds: c.dodge.rounds.map((r) => ({ lines: r.lines.map((l) => ({ ...l })), teleports: r.teleports.map((x) => ({ ...x, to: { ...x.to } })), safe: r.safe })), results: c.dodge.results.map((r) => ({ ...r, votes: { ...r.votes } })) } : null,
   };
 }
 
@@ -1084,7 +1119,8 @@ export const chandyBattle = {
 
   /**
    * Dodge's round on closes (`votes`: each person's square, by player id; the bots' from the seed; only those still in vote): the
-   * square played and whether it's a hit (dodgeTally). A hit: the battle is his (`dodgeWin`). Returns the result; null: none due.
+   * square played and whether it's a hit (dodgeTally). The hit that makes chandy.dodgeHits: the battle is his (`dodgeWin`); the
+   * first only cracks the king. Returns the result; null: none due.
    */
   finishDodgeRound(b: Battle, votes: Readonly<Record<string, unknown>>): DodgeResult | null {
     const boss = b.state.boss;
@@ -1098,7 +1134,9 @@ export const chandyBattle = {
       else if (votes[pl.id] !== undefined) all[pl.id] = votes[pl.id];
     }
     const result = dodgeTally(d, k, all, p.seed);
-    setChandy(b, (c) => ({ ...c, dodge: { ...d, results: [...d.results, result] } }), result.hit ? [{ kind: "dodgeWin", turn: p.turn, square: result.placed }] : []);
+    const results = [...d.results, result];
+    const won = result.hit && dodgeHits({ results }) >= BOSS_POWERS.chandy.dodgeHits;
+    setChandy(b, (c) => ({ ...c, dodge: { ...d, results } }), won ? [{ kind: "dodgeWin", turn: p.turn, square: result.placed }] : []);
     return result;
   },
 

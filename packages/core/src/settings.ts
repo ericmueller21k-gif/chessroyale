@@ -1876,10 +1876,14 @@ export const BOSS_POWERS = {
    *   should fire after he gets all 5 upgrades ... it should be ulting most games"): his rage meter is dimmed until the rifle is whole,
    *   then fills over `dodgeAfterMoves` of your moves (nothing else fills or drains it); full, the usual warning, then Dodge as your
    *   next turn begins. **Last chance** (Eric, Nov 16): as your turn begins, if he hasn't used it and you have a move that mates him,
-   *   Dodge comes now, whatever his rifle or meter (the warning with it); you may still play the mate after. `dodgeRounds` rounds, each
-   *   a `dodgeVoteMs` vote (and the server's `dodgeGraceMs` for lag), the clones teleporting at `dodgeTeleports`' times into each round's
-   *   vote (the last always 1.2 s before it closes: a unit test), the beats between them (`dodgeScopeMs` … `dodgeResultMs`). A bot
-   *   finds the safe square with `dodgeBotHit`'s chance.
+   *   Dodge comes now, whatever his rifle or meter (the warning with it); you may still play the mate after. First the warning volley
+   *   (Eric, Nov 16: "an additional shot first that you can't move"): the clones fire once on lines that miss your king, no vote, then
+   *   "Dodge the next one!" (`dodgeVolleyMs` in all, the clones aiming `dodgeAimMs` first). Then `dodgeRounds` rounds, each a
+   *   `dodgeVoteMs` vote (and the server's `dodgeGraceMs` for lag), the clones teleporting at `dodgeTeleports`' times into each round's
+   *   vote (the last always 1.2 s before it closes: a unit test); LOCKED (`dodgeLockedMs`), then the beams travel from the clones'
+   *   muzzles across the board (`dodgeTravelMs` each, `dodgeStaggerMs` apart) and hold (`dodgeHoldMs`) before the next round.
+   *   `dodgeHits` hits lose: the first cracks your king and play goes on; the second, the beams keep hitting him (`dodgeKillMs`), he
+   *   shatters (`dodgeShatterMs`), then the result. A bot finds the safe square with `dodgeBotHit`'s chance.
    * The sim's (reports/chandy-sim.md).
    */
   chandy: {
@@ -1899,15 +1903,21 @@ export const BOSS_POWERS = {
     shieldCount: 2,
     rapidCount: 3,
     dodgeRounds: 3,
+    dodgeHits: 2,
     dodgeVoteMs: 3000,
     dodgeGraceMs: 300,
     dodgeTeleports: [[1200], [900, 1600], [800, 1400, 1800]] as readonly (readonly number[])[],
     dodgeScopeMs: 600,
     dodgeSlideMs: 600,
+    dodgeVolleyMs: 3600,
+    dodgeAimMs: 400,
     dodgeOpenMs: 400,
-    dodgeLockedMs: 700,
-    dodgeBlastMs: 700,
-    dodgeResultMs: 1200,
+    dodgeLockedMs: 600,
+    dodgeTravelMs: 500,
+    dodgeStaggerMs: 150,
+    dodgeHoldMs: 2500,
+    dodgeKillMs: 5000,
+    dodgeShatterMs: 1000,
     dodgeBotHit: 0.6,
     dodgeAfterMoves: 3,
   },

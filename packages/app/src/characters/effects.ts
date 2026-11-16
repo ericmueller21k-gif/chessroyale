@@ -119,4 +119,5 @@ export const EFFECT_SPRITES = {
   chandyShatter: CHANDY_FX.SHATTER,
   chandyDodgeRow: CHANDY_FX.DODGE_ROW,
   chandyDodgeCol: CHANDY_FX.DODGE_COL,
+  chandyDodgeKing: CHANDY_FX.DODGE_KING,
 } as const satisfies Record<string, Character>;

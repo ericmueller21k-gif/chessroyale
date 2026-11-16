@@ -4,7 +4,7 @@
 // gingerbread.test.ts ("the effect sprites").
 import { describe, expect, it } from "vitest";
 import { ART_KITS, BOSS_KITS } from "../src/characters/kits.ts";
-import { CHANDY, CHANDY_CLONE, CHANDY_CLONE_HALO, CHANDY_CLONE_PALETTE, CHANDY_CUES, CHANDY_FOOT, CHANDY_PORTRAIT, CHANDY_RIFLE, CHANDY_SOUNDS, RIFLE_STAGES, STAGES, chandyAnim, cloneMuzzle } from "../src/characters/chandy.ts";
+import { CHANDY, CHANDY_CLONE, CHANDY_CLONE_HALO, CHANDY_CLONE_PALETTE, CHANDY_CUES, CHANDY_DODGE_SOUNDS, CHANDY_FOOT, CHANDY_PORTRAIT, CHANDY_RIFLE, CHANDY_SOUNDS, RIFLE_STAGES, STAGES, chandyAnim, cloneMuzzle } from "../src/characters/chandy.ts";
 import { EFFECTS } from "../src/characters/power-art.ts";
 import { frameKeys, renderFrame, type Character } from "../src/characters/sprite.ts";
 import type { Beat } from "../src/characters/boss-beats.ts";
@@ -73,8 +73,10 @@ describe("Chandy's art", () => {
     for (const b of beats) expect(kit.ch.anims[kit.anims[b] ?? b], b).toBeTruthy();
     for (const ch of [CHANDY, CHANDY_CLONE]) for (const a of Object.values(ch.anims)) for (const f of a.frames) if (f.cue) expect(kit.sounds[f.cue], f.cue).toBeTruthy();
     for (const fx of Object.entries(EFFECTS).filter(([k]) => k.startsWith("chandy")))
-      for (const a of Object.values(fx[1].ch.anims)) for (const f of a.frames) if (f.cue) expect(CHANDY_SOUNDS[f.cue], `${fx[0]}: ${f.cue}`).toBeTruthy();
-    for (const cue of Object.keys(CHANDY_SOUNDS)) expect(CHANDY_CUES[cue], cue).toBeTruthy();
+      for (const a of Object.values(fx[1].ch.anims)) for (const f of a.frames) if (f.cue) expect(fx[1].sounds[f.cue], `${fx[0]}: ${f.cue}`).toBeTruthy();
+    for (const cue of Object.keys(CHANDY_DODGE_SOUNDS)) expect(CHANDY_CUES[cue], cue).toBeTruthy();
+    // (Dodge's own sounds by name, for Eric's: the beams' laser, the crack, the kill's crackle, the shatter.)
+    expect([CHANDY_DODGE_SOUNDS.laser, CHANDY_DODGE_SOUNDS.crack, CHANDY_DODGE_SOUNDS.crackle, CHANDY_DODGE_SOUNDS.kingShatter]).toEqual(["chandyBeam", "chandyCrack", "chandyCrackle", "chandyShatter"]);
     const P = CHANDY_PORTRAIT;
     expect(P.x >= 0 && P.y >= 0 && P.x + P.w <= CHANDY.w && P.y + P.h <= CHANDY.h).toBe(true);
   });

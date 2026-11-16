@@ -3,11 +3,11 @@
  * begins (nobody's clock running), round by round. Each person sends their vote for the king's square as they tap ("dodgeVote"; a
  * later tap replaces it), and everyone sees the counts move ("dodgeVotes"). The teleports go out as they come (the view is
  * dodgeSeen: nothing shows before its time), and each round closes at its vote's end plus the lag grace (chandy.dodgeGraceMs): the
- * runner tallies it with the bots' votes (finishDodgeRound), everyone sees the result; a hit ends the battle, his. After the last
- * round (or the hit) and its result, on with the match. The game's board never changes.
+ * runner tallies it with the bots' votes (finishDodgeRound), everyone sees the result; the second hit ends the battle, his. After the
+ * last round's held beams (or the losing hit's kill: dodgeEndAt), on with the match. The game's board never changes.
  */
 import { BOSS_POWERS } from "@chessroyale/core";
-import { dodgeArena, dodgeOver, dodgeTimeline, type NetDodge } from "@chessroyale/chess";
+import { dodgeArena, dodgeEndAt, dodgeOver, dodgeTimeline, type NetDodge } from "@chessroyale/chess";
 import type { BossLobby } from "./base.ts";
 
 const dodgeOf = (lobby: BossLobby) => lobby.runner?.boss?.powers?.chandy?.dodge ?? null;
@@ -20,12 +20,12 @@ function net(lobby: BossLobby): NetDodge {
   return { key: l.key, at: l.at, round: l.round, votes: counts };
 }
 
-/** When the next step is due: the round on's next teleport (it goes out to everyone), its close, or (over) the last result's end. */
+/** When the next step is due: the round on's next teleport (it goes out to everyone), its close, or (over) its end (dodgeEndAt). */
 function arm(lobby: BossLobby) {
   const l = lobby.r.dodge!;
   const d = dodgeOf(lobby);
   const tl = dodgeTimeline();
-  if (!d || dodgeOver(d)) return lobby.setTimer("dodge", l.at + tl.rounds[Math.max(0, (d?.results.length ?? 1) - 1)]!.end);
+  if (!d || dodgeOver(d)) return lobby.setTimer("dodge", l.at + (d ? dodgeEndAt(d) : tl.rounds[0]!.end));
   const r = tl.rounds[d.results.length]!;
   const t = lobby.now() - l.at;
   const next = r.teleports.find((x) => x > t) ?? r.closeAt;
@@ -50,7 +50,7 @@ function dodgeStep(lobby: BossLobby) {
   const tl = dodgeTimeline();
   const t = lobby.now() - l.at;
   if (dodgeOver(d)) {
-    if (t < tl.rounds[d.results.length - 1]!.end) return arm(lobby);
+    if (t < dodgeEndAt(d)) return arm(lobby);
     lobby.r.dodge = undefined;
     return lobby.nextRound();
   }

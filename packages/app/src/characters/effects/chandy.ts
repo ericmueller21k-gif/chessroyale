@@ -399,25 +399,33 @@ export const SHATTER = fx("chandy-shatter", "A piece shattered by the piercing r
 });
 
 // ---- Dodge: no lines while the vote runs (Eric, Nov 16: you read his aim from where he stands); once it locks, each clone's line
-// flashes three times, then the blast, a big pop the whole rank or file, edge to edge. In his clones' pink.
+// flashes three times (his clones' pink). Then his beams (Eric, Nov 16: "they should actually start moving from where his sprites are,
+// and then they blast through ... and then they linger there ... Ours are red"): each square of a clone's line lights in turn from his
+// muzzle (`travel`: a white-hot head), holds as a thick, steady red beam (`hold`: a slow shimmer down its core and a crackling edge),
+// and fades (`fade`). An original energy beam, ours: a core, a glow, a crackling dark edge.
 
-function beamLine(phase: number, pop: boolean): Cv {
+/** Dodge's beams: red, white-hot at the core. */
+const RED_FX: Record<string, string> = { Q: "#fff1ee", O: "#ff2b2b", F: "#c2001b", q: "#4f000e" };
+
+/** A square of a beam along a rank (a quarter turn for a file): its core, glow and edge, `phase` moving the shimmer; `head`: wider, hotter. */
+function redBeam(phase: number, head: boolean): Cv {
   const c = cv();
-  const r = pop ? 13 : 8;
+  const r = head ? 13 : 11;
   for (let y = 0; y < S; y++)
     for (let x = 0; x < S; x++) {
       const d = Math.abs(y + 0.5 - 16);
-      const wob = Math.sin((x + phase * 5) * 0.6) * 0.8;
+      const wob = Math.sin((x + phase * 4) * 0.7) * 0.9 + Math.sin((x * 3 + phase * 7) * 0.5) * 0.4;
       if (d > r + wob) continue;
-      put(c, x, y, d < (pop ? 5 : 2.2) ? "Q" : d < (pop ? 9 : 4.6) + wob * 0.5 ? "O" : d < r - 1 ? "F" : "q");
+      put(c, x, y, d < (head ? 5 : 3) + (head ? 0 : wob * 0.3) ? "Q" : d < (head ? 9 : 7.5) + wob * 0.5 ? "O" : d < r - 1.2 + wob * 0.5 ? "F" : "q");
     }
   return c;
 }
-one("blast0", () => beamLine(0, false));
-one("blast1", () => beamLine(1, false));
-one("pop", () => beamLine(0, true));
+one("rb0", () => redBeam(0, false));
+one("rb1", () => redBeam(1, false));
+one("rb2", () => redBeam(2, false));
+one("rhead", () => redBeam(0, true));
 const lineAnims = (rot?: 1): Record<string, () => Anim> => ({
-  /** The flash after the vote locks: the line blinks three times (dashed), then it's gone (the blast comes). */
+  /** The flash after the vote locks: the line blinks three times (dashed), then it's gone (the beam comes). */
   flash: () => ({
     loop: false,
     frames: [0, 1, 2].flatMap((i): Frame[] => [
@@ -425,22 +433,109 @@ const lineAnims = (rot?: 1): Record<string, () => Anim> => ({
       EMPTY(90),
     ]),
   }),
-  /** The blast: the pop (thick, white-hot), then the beam crackling, then gone. */
-  blast: () => ({
+  /** The beam reaching this square: its white-hot head (the line's first square fires his laser), then the beam. */
+  travel: () => ({
     loop: false,
     frames: [
-      { ms: 90, layers: [L("pop", rot)], pal: { ...CLONE_FX, O: "#ffe0e6" }, cue: "blast" },
-      { ms: 70, layers: [L("pop", rot)], pal: CLONE_FX },
-      ...[0, 1, 0, 1, 0].map((i): Frame => ({ ms: 70, layers: [L(`blast${i}`, rot)], pal: CLONE_FX })),
-      { ms: 60, layers: [L("blast1", rot)], pal: { ...CLONE_FX, O: "#c4243f", Q: "#ff3f5e" } },
+      { ms: 45, layers: [L("rhead", rot)], pal: { ...RED_FX, O: "#ffd6d0", F: "#ff2b2b" }, cue: "laser" },
+      { ms: 60, layers: [L("rhead", rot)], pal: RED_FX },
+    ],
+  }),
+  /** The beam held, steady: a slow shimmer. */
+  hold: () => ({ loop: true, frames: [0, 1, 2].map((i): Frame => ({ ms: 90, layers: [L(`rb${i}`, rot)], pal: RED_FX })) }),
+  /** The beam going: dimmer, thinner, gone. */
+  fade: () => ({
+    loop: false,
+    frames: [
+      { ms: 90, layers: [L("rb1", rot)], pal: { ...RED_FX, Q: "#ff8a80", O: "#c2001b", F: "#7a0012" } },
+      { ms: 90, layers: [L("rb2", rot)], pal: { Q: "#c2001b", O: "#7a0012", F: "#4f000e80", q: "#4f000e40" } },
       EMPTY(),
     ],
   }),
 });
-/** One square of a Dodge line along a rank (`flash`, `blast`). */
+/** One square of a Dodge line along a rank (`flash`, then the beam: `travel`, `hold`, `fade`). */
 export const DODGE_ROW = fx("chandy-dodge-row", "Dodge's line along a rank", lineAnims());
 /** One square of a Dodge line along a file (the same, turned a quarter). */
 export const DODGE_COL = fx("chandy-dodge-col", "Dodge's line along a file", lineAnims(1));
+
+// ---- Dodge's hits on your king (Eric, Nov 16: "if you get hit once, your king put like a little crack through it ... if it gets hit
+// again ... keep the beams going for a few seconds on your king as it slowly particle dissipates away ... and then shards of your king go
+// in all directions"). Under the king (it stands in the beams): the first hit's impact (`crack`: the crack itself is drawn on the king,
+// ChandyDodge); the kill (`kill`: sparks where the beams strike him and his particles drifting off, a crackle every half second, more
+// and more of them); his shatter (`shatter`: shards in every direction). No gore: light, sparks and pieces of a chess piece.
+
+/** A pseudo-random number 0-1 from two integers (the same every time). */
+const rnd = (a: number, b: number) => {
+  const h = Math.sin(a * 127.1 + b * 311.7) * 43758.5453;
+  return h - Math.floor(h);
+};
+/** The kill at step `i` of `n`: sparks on his edges where the beams strike, and his particles rising off him (more as it goes). */
+function killSpecks(i: number, n: number): Speck[] {
+  const out: Speck[] = [];
+  const sparks = 6;
+  for (let k = 0; k < sparks; k++) {
+    const a = rnd(i, k) * Math.PI * 2;
+    const r = 7 + rnd(k, i) * 5;
+    const x = Math.round(16 + Math.cos(a) * r);
+    const y = Math.round(17 + Math.sin(a) * r * 0.9);
+    out.push([x, y, k % 3 ? "O" : "Q"], [x + (k % 2 ? 1 : -1), y, "F"]);
+  }
+  const motes = 4 + Math.round((i / n) * 14);
+  for (let k = 0; k < motes; k++) {
+    const x = Math.round(9 + rnd(i * 3 + 1, k) * 14);
+    const rise = ((i * 2 + k * 5) % 12) + rnd(k, 7) * 2;
+    const y = Math.round(24 - rise * 1.6);
+    out.push([x, y, k % 3 === 0 ? "w" : k % 3 === 1 ? "J" : "G"]);
+  }
+  return out.filter(([x, y]) => x >= 1 && y >= 1 && x <= S - 2 && y <= S - 2);
+}
+/** The king's shards at `t` (0-1): flying out in every direction, tumbling and falling. */
+const kingShards = (t: number): Speck[] => {
+  const out: Speck[] = [];
+  for (let i = 0; i < 22; i++) {
+    const a = (i / 22) * Math.PI * 2 + rnd(i, 3) * 0.4;
+    const r = 3 + t * (12 + rnd(i, 5) * 4);
+    const x = Math.round(16 + Math.cos(a) * r);
+    const y = Math.round(16 + Math.sin(a) * r * 0.85 + t * t * 5);
+    const k = i % 4 === 0 ? "w" : i % 4 === 1 ? "J" : i % 4 === 2 ? "G" : "O";
+    out.push([x, y, k], [x + 1, y, k === "w" ? "J" : "G"]);
+    if (i % 3 === 0) out.push([x, y + 1, "G"]);
+  }
+  return out.filter(([x, y]) => x >= 1 && y >= 1 && x <= S - 2 && y <= S - 2);
+};
+/** The kill's steps (ms each): BOSS_POWERS.chandy.dodgeKillMs over them (an app test keeps the two the same). */
+export const KILL_STEP_MS = 125;
+/** Dodge's hits on your king, on his square (`crack`, `kill`, `shatter`). */
+export const DODGE_KING = fx("chandy-dodge-king", "Dodge's hits on your king", {
+  crack: () => ({
+    loop: false,
+    frames: [
+      { ms: 60, layers: [], specks: burstSpecks(9), pal: RED_FX, cue: "crack" },
+      { ms: 80, layers: [], specks: [...burstSpecks(4), ...killSpecks(0, 4)], pal: RED_FX },
+      { ms: 110, layers: [], specks: killSpecks(1, 4), pal: RED_FX },
+      { ms: 130, layers: [], specks: killSpecks(2, 4).filter((_, i) => i % 2 === 0), pal: RED_FX },
+      EMPTY(),
+    ],
+  }),
+  kill: () => {
+    const n = 40;
+    return {
+      loop: false,
+      frames: [
+        ...Array.from({ length: n }, (_, i): Frame => ({ ms: KILL_STEP_MS, layers: [], specks: killSpecks(i, n), pal: RED_FX, ...(i % 4 === 0 ? { cue: i === 0 ? "crack" : "crackle" } : {}) })),
+        EMPTY(),
+      ],
+    };
+  },
+  shatter: () => ({
+    loop: false,
+    frames: [
+      { ms: 70, layers: [], specks: burstSpecks(12), pal: { ...RED_FX, O: "#ffffff", F: "#ffd6d0" }, cue: "kingShatter" },
+      ...[0.15, 0.3, 0.45, 0.6, 0.75, 0.9, 1].map((t): Frame => ({ ms: 100, layers: [], specks: kingShards(t) })),
+      EMPTY(),
+    ],
+  }),
+});
 
 /** Every one of Chandy's board sprites (registered in effects.ts EFFECT_SPRITES; played as power-art.ts EFFECTS). */
 export const CHANDY_FX = {
@@ -455,4 +550,5 @@ export const CHANDY_FX = {
   SHATTER,
   DODGE_ROW,
   DODGE_COL,
+  DODGE_KING,
 } as const;

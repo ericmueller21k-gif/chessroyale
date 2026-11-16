@@ -16,10 +16,12 @@ import {
   crowdAllowed,
   dodgeArena,
   dodgeCenter,
+  dodgeEndAt,
   dodgeRounds,
   dodgeSeen,
   dodgeTally,
   dodgeTimeline,
+  dodgeVolley,
   heldIn,
   kingAttacked,
   legalMoves,
@@ -568,6 +570,34 @@ describe("Dodge (D1-D12)", () => {
     });
     expect(tl.rounds[2]!.voteEnd - tl.rounds[2]!.teleports.at(-1)!).toBe(1200);
     expect(S.dodgeTeleports).toEqual([[1200], [900, 1600], [800, 1400, 1800]]);
+    // (Eric, Nov 16: the warning volley first, after the scope-in and the slide; each round's beams travel, then hold 2 to 3 s
+    // before the next opens; two hits lose, the second's kill about 5 s.)
+    expect(tl.volley.at).toBe(S.dodgeScopeMs + S.dodgeSlideMs);
+    expect(tl.volley.landAt).toBeLessThan(tl.volley.end);
+    expect(tl.rounds[0]!.openAt).toBe(tl.volley.end);
+    for (const r of tl.rounds) {
+      expect(r.hitAt - r.blastAt).toBe(3 * S.dodgeStaggerMs + S.dodgeTravelMs);
+      expect(r.end - r.hitAt).toBeGreaterThanOrEqual(2000);
+      expect(r.end - r.hitAt).toBeLessThanOrEqual(3000);
+    }
+    expect([S.dodgeHits, S.dodgeKillMs]).toEqual([2, 5000]);
+    // (The whole of it: about 28 s survived, at most about 32 s when the second hit comes in the last round.)
+    expect(tl.total).toBe(28050);
+    const rounds = dodgeRounds("e4", 1, 1);
+    expect(dodgeEndAt({ rounds, results: [] as never[] })).toBe(tl.rounds[0]!.end);
+    const hit = { placed: "a1", hit: true, votes: {} };
+    const ok = { placed: "a1", hit: false, votes: {} };
+    expect(dodgeEndAt({ rounds, results: [hit, ok, hit] })).toBe(tl.rounds[2]!.hitAt + S.dodgeKillMs + S.dodgeShatterMs);
+    expect(dodgeEndAt({ rounds, results: [hit, ok, hit] })).toBe(31550);
+  });
+
+  it("the warning volley's lines miss your king: the center is the only square of the 3 x 3 they leave", () => {
+    for (const center of ["e4", "e5"])
+      for (let seed = 0; seed < 20; seed++) {
+        const v = dodgeVolley(center, seed, 1);
+        expect(v.length).toBe(4);
+        expect(safeSquares(center, v)).toEqual([center]);
+      }
   });
 
   it("tallies the vote: the most votes; a tie drawn among the tied; nobody votes, a square from the seed", () => {
@@ -606,8 +636,8 @@ describe("Dodge (D1-D12)", () => {
     expect(late.rounds[0]!.teleports.length).toBe(1);
   });
 
-  it("comes as your turn begins once the rifle is whole (the test switch): three dodged rounds and your turn; a hit and the battle is his", async () => {
-    for (const hit of [false, true]) {
+  it("comes as your turn begins once the rifle is whole (the test switch): three dodged rounds and your turn; one hit cracks your king and play goes on; the second and the battle is his", async () => {
+    for (const hits of [[], [1], [0, 2]] as number[][]) {
       const r = battle(21, "dodge");
       for (let i = 0; i < 6 && !r.dodgeDue(); i++) {
         if (r.bossToMove()) await r.playBoss();
@@ -617,17 +647,22 @@ describe("Dodge (D1-D12)", () => {
       const before = fenOf(r);
       const d = cOf(r).dodge!;
       expect(d.king).toBe(r.boss!.crowdSide === "w" ? "e1" : d.king);
+      expect(safeSquares(d.center, d.volley!)).toEqual([d.center]);
       for (let k = 0; k < 3 && r.dodgeDue(); k++) {
         const safe = cOf(r).dodge!.rounds[k]!.safe;
         const wrong = dodgeArena(d.center).find((sq) => sq !== safe)!;
-        const res = r.finishDodgeRound({ h0: hit && k === 1 ? wrong : safe })!;
-        expect(res.hit).toBe(hit && k === 1);
+        const res = r.finishDodgeRound({ h0: hits.includes(k) ? wrong : safe })!;
+        expect(res.hit).toBe(hits.includes(k));
+        // (One hit: no win yet.)
+        if (hits.includes(k) && hits.indexOf(k) === 0) expect(r.boss!.powers!.events.some((e) => e.kind === "dodgeWin")).toBe(false);
       }
+      const won = hits.length >= S.dodgeHits;
       expect(fenOf(r)).toBe(before);
       expect(r.dodgeDue()).toBe(false);
-      expect(r.stageComplete()).toBe(hit);
-      if (hit) {
+      expect(r.stageComplete()).toBe(won);
+      if (won) {
         expect(r.boss!.powers!.events.some((e) => e.kind === "dodgeWin")).toBe(true);
+        expect(cOf(r).dodge!.results.length).toBe(3);
         expect(r.finishBossBattle()).toBe("boss");
       } else expect(cOf(r).dodge!.results.length).toBe(3);
     }
