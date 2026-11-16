@@ -482,13 +482,11 @@ below):
   a base at ply 0 (`phase2Board`). The players are White; you play board 0, bots the other three. His brain is
   Stockfish only (`phase2Brain`, `phase2BossMove`: `RECLUSE_PHASE2.elo` 2750, `nodes`, `moveMs` 900 a move), one engine
   serving the boards in turn (`phase2Next`: yours first). Each player's bank `bankSeconds` (120 s), no increment; he
-  has no clock. Yours is the dock's clock, at the box's right (Oct 15). Each board's tag (`Tag`): on a computer, the
-  player's name and clock in the gap above each board, off its back rank (`FOUR.desk` in `Recluse2.tsx`: 43.5% of the square
-  each, the gaps between them and to the square's edges equal, 4.3%; each board's squares centered in its slot; the phase
-  change ends them there too; the "slow move" note at the row's right); on a phone, inside the same square
-  (`FOUR.phone`), the other three small in a row at its top (26% each, equal gaps), each one's clock just above it, off its
-  pieces, and yours big under them (65%, centered, the slow marks at its right), with no tag when it's yours (the player's
-  name on one you watch; tap a small one to watch it big). The scoreboard has no Bank column from
+  has no clock. Yours is the dock's clock, at the box's right (Oct 15). Each board's tag (`Tag`): inside the square (`FOUR` in
+  `Recluse2.tsx`), on a phone and (Eric, Nov 16) a computer alike, the other three small in a row at its top (a phone's 26% each, a
+  computer's 18%; equal gaps), each one's name and clock just above it, off its pieces, and yours big under them at the square's
+  foot (a phone's 65%, a computer's 75.5%; centered, the slow marks at its right), with no tag when it's yours (the player's
+  name on one you watch; tap a small one to watch it big). Each board's squares centered in its slot; the phase change ends them there. The scoreboard has no Bank column from
   the phase change on (`RaceTower`'s `bank`): each clock is its board's. A board ends by mate, a draw, time
   (`phase2Flags`) or resigning (`phase2Resign`); the others play on;
   the battle ends when every board is decided, won only with all four won (`phase2Outcome`). Then his reaction
@@ -520,9 +518,11 @@ below):
   turn: "Fun, isn't it?"). Phase 1's are about you and the God King (an engine at your side) against him; lines about
   the boards are phase 2's. His rivals' last names are fine; never their country or its people; nothing says Korchnoi
   threw games; each QUOTE in one phase only.
-- **Layouts:** a phone: the other three boards small above yours (tap one to watch it; "Back to my board"); a computer:
-  the four as a 2x2 in the board's square, each at its corner, as the phase change leaves them. Each board keeps its
-  own layers to itself (`isolation`), so his bubble sits over all of them (Eric, Oct 14: a long line was covered).
+- **Layouts:** a phone and a computer alike (Eric, Nov 16: "replicate how it is on mobile"): the other three boards small above
+  yours (tap one to watch it; "Back to my board"), the split growing the quarters straight into those slots. A computer's board is
+  three quarters of phase 1's, its foot and middle kept (the three need the room above it: 448 of 600 px at 1280 x 800, 568 of 760
+  at 1440 x 900, 536 of 720 at 1611 x 843, 712 of 952 at 1920 x 1080; [decision](../decisions/2026-11-16-recluse-p2-desktop-layout.md)).
+  Each board keeps its own layers to itself (`isolation`), so his bubble sits over all of them (Eric, Oct 14: a long line was covered).
 - **Test switches:** `?win=1` (phase 1 a mate in one; in phase 2 every board starts from a mate in one, written as
   Chess960, and the bots take it, so your Qxf7 wins it all), `?phase=2` (straight to the phase change, no phase 1);
   together, a loss is one resign away.
