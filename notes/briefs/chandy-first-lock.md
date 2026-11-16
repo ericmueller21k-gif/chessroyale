@@ -25,6 +25,12 @@ never took the first one: Eric sees marks before any capture, and a first captur
 - Remove `firstLockMove` and the steering of the first lock if dead. Re-run the sim once (one setting): the 5-upgrade and Dodge
   shares will move; report them in `reports/chandy-sim.md`.
 
+## A new unlock fires at once (Eric, Nov 16: "When he does get a new unlock, he should use it right away, regardless of where his
+current meter is for his next move ... if we need to, we can revert that later.")
+- Each upgrade's unlocked move fires on his next turn (after the upgrade window), whatever his meter says; the meter then starts over
+  from empty. One setting (`fireOnUnlock`, true) so it can be turned off. The queen lock's pre-check still applies (if she can't be
+  saved cheaply, it waits for its turn as today). Rule tests; the sim's numbers updated.
+
 ## Dodge, reworked (Eric, Nov 16, after playing it)
 Eric: "it should start out and his guys fire. They fire first ... and intentionally avoid the king. So there's an additional shot first
 that you can't move or anything. And then ... it says a message ... dodge ... that way it's teaching you what you need to do ... you
