@@ -1,7 +1,7 @@
 # 50 v 50 rework: the pick vote, equal cuts to a 1 v 1, a soft reset, the podium, RP (design, Nov 16, 2026)
 
 Design only (director's lane, brief `notes/briefs/crowd-rework-design.md`); read against main at b6582a7. Sim:
-`packages/sim/scripts/crowd-rework-sim.ts` → `reports/crowd-rework.md` (this branch). Mockup: `notes/mockups/crowd-podium.png`.
+`packages/sim/scripts/crowd-rework-sim.ts` → `reports/crowd-rework.md` (this branch). Mockups: `notes/mockups/crowd-podium.png`, `crowd-cut.png`.
 Feeds the rank engine of `design/mode-ranks` (`notes/designs/mode-ranks.md`).
 
 ## 1. The rules
@@ -16,11 +16,18 @@ Feeds the rank engine of `design/mode-ranks` (`notes/designs/mode-ranks.md`).
 2. **One game, played to its end:** mate, stalemate or a draw by the rules, or the **move limit**: after Black's 60th move the
    judge's verdict decides (one side at 75% expected score or more wins, as today's finals adjudicate; otherwise a draw; question 1).
    No team final, Hidden Boss final or duel. A game that ends early ends the match for everyone still in.
-3. **Cuts, equal from each side:** after moves **14, 18, 22, 26, 30, 33, 36 and 39** each side keeps **34, 23, 15, 10, 6, 4, 2, 1**.
+3. **Cuts, equal from each side,** after moves **14, 18, 22, 26, 30, 33, 39 and 42**. The stages, from 50 v 50 down (Eric, Nov 16:
+   the top 4 a side play longer, the moves taken from the 1 v 1):
+
+   | Stage | 50 v 50 | 34 v 34 | 23 v 23 | 15 v 15 | 10 v 10 | 6 v 6 | **4 v 4** | 2 v 2 | **1 v 1** |
+   | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+   | Moves | 1-14 | 15-18 | 19-22 | 23-26 | 27-30 | 31-33 | **34-39** | 40-42 | **43-60** |
+   | How many | 14 | 4 | 4 | 4 | 4 | 3 | **6** | 3 | **up to 18** |
+
    Each side's players are ranked by their round score, which is already relative to their own team (team average − yours,
    today's `scoreGroup`); today's tie rules stay (ties at the line go through and the places owed carry to later cuts; the last
    cut is exact: raw loss, then time, then a coin). The first cut is at 14 because the opening allowance is gone by then (section 2).
-   **From move 40 the 1 v 1:** each side's last player picks alone and their pick is played (the pick mode no longer matters).
+   **From move 43 the 1 v 1:** each side's last player picks alone and their pick is played (the pick mode no longer matters).
 4. **Soft reset:** at each cut, each survivor keeps **50%** of their score; the round's play adds to it.
 5. **Places:** those still in at the end first: the winning side's, then the losing side's (a draw: together), each by score; then
    each cut's players from the last cut back, both sides together, by their score at that cut. In the 1 v 1 the winner is 1st;
@@ -34,6 +41,13 @@ Feeds the rank engine of `design/mode-ranks` (`notes/designs/mode-ranks.md`).
 7. **RP** (mode-ranks M1's engine): your actual vs Glicko-expected result against each real player outside your party, from the
    places; a pair split by a cut whose relative scores at that cut were within **1 point** (the **tie band**) counts as a draw.
    RP = 40 × (S − E) + catch-up, as 1 v 1.
+8. **Spectating after a cut** (Eric, Nov 16: "make sure there's a spectate option; I'm sure late game players wanna spectate who
+   barely lost to see how it ends"). **Today** (`Crowd.tsx`'s cut screen, crowd.md "Resigning and leaving"): a cut player stays on the
+   match screen to the results, with the verdict, "Why was I cut?", team chat and a plain "Leave the match" button (your place
+   stands); nothing names watching as a choice. **New:** the cut screen's foot holds two buttons side by side, always both: **Spectate**
+   (watch to the podium: the live board, who's left a side and the scores, the scoreboard as now; Leave stays in ⚙) and **Leave the
+   match**. Above them, a fixed box: who's still in a side and the stages to come (`notes/mockups/crowd-cut.png`). Nothing hidden,
+   nothing shifts: the buttons keep their place every cut; not tapping either is spectating.
 
 ## 2. What the sim says (`reports/crowd-rework.md`, 360 games)
 
@@ -61,7 +75,7 @@ is replayed on the same games.
   4-move round rarely tells them apart. The 2% random move isn't the cause (taking it out: 0.36). If players' strength shows about
   four times as much (the `wider` reading), rank correlation is 0.5-0.8 and a 1800+ finishes above a 900- 97% of the time (73% now).
   **An engine-best player still survives to the end 100% of the time and finishes 1st or 2nd 98%** (Eric's Nov 1 bar holds).
-- **Winner and best player:** the best player is the winner in 40-55% of decided games, on the podium in 68-77%, median place 2:
+- **Winner and best player:** the best player is the winner in 35-55% of decided games, on the podium in 68-73%, median place 2:
   both titles earn their place on the screen.
 - **RP** (40 × (S − E), Glicko on the true ratings): per match the probes' 10th-90th run about −30 to +29. Eric's three cases hold
   in sign and size: a 1900 in a weak lobby can gain little (90th percentile −0.8 with the bots, +0.2 `wider`); a 1200 in a strong lobby
@@ -70,7 +84,11 @@ is replayed on the same games.
   then narrows (risk 2). **Tie band 1 point:** the gap at the line is 0.15 (median), so 1 point turns 5-11% of pairs split by a cut
   into draws and trims the tails by about 1 RP; 2 and 4 points draw 9-27% for little more.
 
-**Recommended:** Strong as the default pick; schedule B (cuts after 14, 18, 22, 26, 30, 33, 36, 39; 1 v 1 from 40); carry 50%;
+- **Eric's longer 4 v 4 (schedule C) costs nothing:** C sorts as B does (rank correlation 0.32 / 0.10 / 0.15, the same RP). 96% of
+  games reach the 4 v 4 and play all 6 of its moves; 89% reach the 1 v 1, which plays a median 18 of its 18 (10th percentile 6).
+  (The live games cut by B, so under C moves 40-42 were played by one bot a side: the played moves stay the live ones.)
+
+**Recommended:** Strong as the default pick; schedule C (the table in rule 3; 4 v 4 for 6 moves, 1 v 1 from 43); carry 50%;
 tie band 1 point; the judge's verdict at move 60. Settled by real matches, not the sim: how much players' strength really shows
 per move (the `wider` question). Measure it from the first weeks of real 50 v 50 results (rank correlation of MMR and place).
 
@@ -89,7 +107,7 @@ per move (the `wider` question). Measure it from the first weeks of real 50 v 50
   `outAtMove`, `perMove`. Optional fields only: old apps ignore them.
 - **server `lobby.ts`:** the vote's patch, the move-limit end, places written in the new order (no schema change); the 50 v 50 boss-final
   path (the Hidden Boss's child, man and phase 2 online) is no longer reached (see question 3).
-- **app:** `Vote.tsx` cards come from the data; the top bar's countdown ("Move 31 · cut in 2", "1 v 1 from move 40"); one banner at
+- **app:** `Vote.tsx` cards come from the data; the top bar's countdown ("Move 31 · cut in 2", "1 v 1 from move 43"); one banner at
   the 1 v 1; `Results.tsx` the podium, the best-player line and the chart (fixed heights); the FAQ.
 
 **Build steps** (one `xhigh` helper at a time):
@@ -98,7 +116,7 @@ per move (the `wider` question). Measure it from the first weeks of real 50 v 50
 | --- | --- | --- |
 | C1 | core: the pick vote and modes, the cut schedule, carry, move limit, places, best player; unit tests (`votes`, `cut-ties`, `crowd-bot-spread`, a new `crowd-rework.test.ts`) | targeted, xhigh |
 | C2 | runner + server + protocol: no endings in 50 v 50, the limit, the 1 v 1 stage, results' optional fields; `crowd.test`, `lobby.test`, `resign.test` | targeted (optional protocol fields), xhigh |
-| C3 | screens: vote cards, top bar, the 1 v 1 banner, the podium results and chart (from this mockup), FAQ; e2e `crowd.spec`, `formats.spec`, `votes.spec`, a podium check at 320 / 390 / 1280 | targeted, high |
+| C3 | screens: vote cards, top bar, the 1 v 1 banner, the cut screen's Spectate / Leave, the podium results and chart (these mockups), FAQ; e2e `crowd.spec`, `formats.spec`, `votes.spec`, a podium check at 320 / 390 / 1280 | targeted, high |
 | C4 | retire the 50 v 50 endings: `crowd-hidden.spec`, the endings' unit tests, dead settings; `e2e/areas.json` | targeted, medium |
 | C5 | RP: mode-ranks M1-M3 with these places and the tie band | ranked, **full lane**, xhigh |
 

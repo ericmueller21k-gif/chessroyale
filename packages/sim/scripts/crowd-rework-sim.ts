@@ -35,6 +35,11 @@ export const SCHEDULES: Record<string, Cuts> = {
   A: [10, 14, 18, 22, 26, 30, 34, 38].map((after, i) => ({ after, keep: [34, 23, 15, 10, 6, 4, 2, 1][i]! })),
   /** B: the first cut after move 14 (the opening allowance is gone by then); the 1 v 1 from move 40. */
   B: [14, 18, 22, 26, 30, 33, 36, 39].map((after, i) => ({ after, keep: [34, 23, 15, 10, 6, 4, 2, 1][i]! })),
+  /**
+   * C: B with the 4 v 4 (the last 8) playing 6 moves instead of 3, taken from the 1 v 1 (Eric, Nov 16: "the top 4 on each side
+   * should be able to play a bit longer ... grab a few moves from the 1v1"): 4 v 4 moves 34-39, 2 v 2 40-42, the 1 v 1 from 43.
+   */
+  C: [14, 18, 22, 26, 30, 33, 39, 42].map((after, i) => ({ after, keep: [34, 23, 15, 10, 6, 4, 2, 1][i]! })),
 };
 /** What the live games use (who is still in picks the played move); the report replays every schedule and carry on them. */
 const LIVE = { cuts: SCHEDULES.B!, carry: 0.5 };
@@ -391,7 +396,7 @@ function rowsAll(): MatchRow[] {
 }
 
 /** The recommended rule (the report's sections 3-5 use it). */
-const REC = { schedule: "B", carry: 0.5, band: 1 };
+const REC = { schedule: "C", carry: 0.5, band: 1 };
 
 function cutStats(rps: Replay[], lobby: Lobby) {
   const rho = mean(rps.map((r) => -spearman(r.players.map((p) => p.r), r.players.map((p) => p.place))));
@@ -459,7 +464,9 @@ function summary() {
     "the played move). Every seat's loss on every one of its team's moves is kept, cut or not, so each schedule, carry and tie band",
     "below is **replayed on the same games** (paired; the played moves stay the live ones). A round score is the team's average",
     "counted loss less yours (counted: after the opening allowance), summed over the round; 50 v 50's soft cap, streaks, rare finds",
-    "and shared relief are left out. Cuts leave 34, 23, 15, 10, 6, 4, 2, 1 a side; " + `**A**: after moves ${sched("A")}; **B**: after ${sched("B")}.`,
+    "and shared relief are left out. Cuts leave 34, 23, 15, 10, 6, 4, 2, 1 a side; " + `**A**: after moves ${sched("A")}; **B**: after ${sched("B")};`,
+    `**C** (the 4 v 4 three moves longer, the 1 v 1 three shorter): after ${sched("C")}. The live games cut by B, so under C a 2 v 2's`,
+    "moves 40-42 were played by one bot a side (the played moves stay the live ones).",
     `A game still going after move ${MOVE_LIMIT} is a draw. Strong's \"close\": within ${STRONG_CLOSE} expected score of the best of the top 3.`,
     "",
     `Matches: ${rows.length} (${modes.map((m) => `${m} ${rows.filter((r) => r.mode === m).length}`).join(", ")}). Median ${q(rows.map((r) => r.secs), 0.5)} s a match on one core.`,
@@ -490,6 +497,19 @@ function summary() {
       `**At the move limit, the judge's verdict** (${lim.length} games that reached it, from the second batch, which recorded it): one side at`,
       `75%+ expected score in ${pct(clear(0.25))}, 90%+ in ${pct(clear(0.4))}; within 60-40 in ${pct(lim.filter((r) => Math.abs(r.limitWhite! - 0.5) < 0.1).length / lim.length)}.`,
     );
+  }
+  out.push("", "**How long the late stages last** (moves actually played in each, all live games; a game over sooner plays fewer):", "", "| Schedule | Stages (moves each, 50 v 50 down) | Reach the 4 v 4 | 4 v 4 moves (median) | Reach the 1 v 1 | 1 v 1 moves (median, 10th-90th) |", "| --- | --- | --- | --- | --- | --- |");
+  for (const k of ["B", "C"]) {
+    const cs = SCHEDULES[k]!;
+    const lens = cs.map((c, i) => c.after - (i ? cs[i - 1]!.after : 0));
+    const stages = `${lens.join(", ")}, then the 1 v 1 to move ${MOVE_LIMIT} (${MOVE_LIMIT - cs[cs.length - 1]!.after})`;
+    const fourFrom = cs[5]!.after; // the 4 v 4 plays after the cut to 4
+    const fourTo = cs[6]!.after;
+    const oneFrom = cs[7]!.after;
+    const moves = rows.map((r) => Math.ceil(r.plies / 2));
+    const four = moves.filter((m) => m > fourFrom);
+    const one = moves.filter((m) => m > oneFrom);
+    out.push(`| ${k} | ${stages} | ${pct(four.length / moves.length)} | ${q(four.map((m) => Math.min(m, fourTo) - fourFrom), 0.5)} of ${fourTo - fourFrom} | ${pct(one.length / moves.length)} | ${q(one.map((m) => m - oneFrom), 0.5)} (${q(one.map((m) => m - oneFrom), 0.1)}-${q(one.map((m) => m - oneFrom), 0.9)}) of ${MOVE_LIMIT - oneFrom} |`);
   }
   out.push(
     "",

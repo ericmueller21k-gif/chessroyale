@@ -1,0 +1,45 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+@font-face{font-family:Archivo;src:url(/home/user/chessroyale/packages/app/public/fonts/archivo.woff2)}
+@font-face{font-family:"Archivo Black";src:url(/home/user/chessroyale/packages/app/public/fonts/archivo-black.woff2)}
+:root{--bg:#16181d;--surface:#20232a;--surface-2:#2a2e37;--text:#eef0f4;--muted:#9aa2b1;--line:#343946;--accent:#f4b740;--good:#4cc38a;--bad:#ff6b6b}
+*{box-sizing:border-box;margin:0}
+body{background:var(--bg);color:var(--text);font-family:Archivo,-apple-system,sans-serif;width:390px;height:844px;overflow:hidden;display:flex;flex-direction:column}
+.top{height:44px;display:flex;align-items:center;justify-content:space-between;padding:0 14px;border-bottom:1px solid var(--line);font-size:14px;color:var(--muted)}
+.top b{color:var(--text)}
+.gear{width:28px;height:28px;border-radius:8px;background:var(--surface-2);display:grid;place-items:center}
+.verdict{text-align:center;padding:14px 14px 4px}
+.verdict h1{font-family:"Archivo Black";font-size:22px}
+.verdict p{color:var(--muted);font-size:13.5px;margin-top:3px}
+.grid{margin:10px auto 0;display:grid;grid-template-columns:repeat(10,26px);gap:5px;width:max-content}
+.c{width:26px;height:26px;border-radius:6px;background:var(--surface-2);display:grid;place-items:center}
+.c i{width:10px;height:10px;border-radius:50%;background:#c9ced8;display:block}
+.c.o{opacity:.28}.c.o i{background:#777}
+.c.me{outline:2px solid var(--accent)}.c.me i{background:var(--accent)}
+.why{margin:12px 14px 0;height:40px;border-radius:10px;background:var(--surface);border:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 12px;font-size:13.5px}
+.why span{color:var(--muted)}
+.next{margin:10px 14px 0;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 12px;font-size:13px;color:var(--muted);line-height:1.45}
+.next b{color:var(--text)}
+.left{display:flex;gap:6px;margin-top:6px}
+.left div{flex:1;background:var(--surface-2);border-radius:8px;padding:6px 8px;font-size:12.5px;color:var(--text)}
+.left div small{color:var(--muted);display:block}
+.spacer{flex:1}
+.btns{display:flex;gap:10px;padding:10px 14px 8px}
+.btn{flex:1;height:52px;border-radius:12px;display:grid;place-items:center;font-weight:700;font-size:16px;text-align:center;line-height:1.1}
+.btn small{display:block;font-weight:400;font-size:11.5px;opacity:.75}
+.btn.a{background:var(--accent);color:#1a1406}.btn.s{background:var(--surface-2)}
+.foot{text-align:center;color:var(--muted);font-size:12px;padding:0 14px 18px;height:34px}
+</style></head><body>
+<div class="top"><span><b>50 v 50</b> · Move 33 · 4 v 4 next</span><span class="gear">⚙</span></div>
+<div class="verdict"><h1>You're out: 9th of 100</h1><p>Cut at move 33 · 0.18 behind the last one through</p></div>
+<div class="grid" id="g"></div>
+<div class="why"><b>Why was I cut?</b><span>Breakdown ›</span></div>
+<div class="next"><b>Still in: 4 a side.</b> The 4 v 4 plays moves 34-39, then 2 v 2, then the 1 v 1 from move 43.
+ <div class="left"><div>White<small>Rook_Raider, Lena M., castle.queen, pawnstar_77</small></div><div>Black<small>Nadia K., Bishop Bob, mateinfour, Theo_P</small></div></div></div>
+<div class="spacer"></div>
+<div class="btns"><div class="btn a">Spectate<small>watch to the podium</small></div><div class="btn s">Leave the match<small>your place stands</small></div></div>
+<div class="foot">Spectating: the live board, who's left and the scores. Leave any time from ⚙.</div>
+<script>
+const g=document.getElementById('g');for(let i=0;i<100;i++){const d=document.createElement('div');d.className='c'+(i===27?' me o':([3,11,27,40,52,64,71,88].includes(i)?'':' o'));if(i===27)d.className='c me';const k=document.createElement('i');d.appendChild(k);g.appendChild(d);}
+</script>
+</body></html>
