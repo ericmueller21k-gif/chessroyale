@@ -293,10 +293,32 @@ is: the handoff needs the boss's id.
 `chandy` (he is not in the roster yet: the id is a guess the director can rename). Two of his own plans built as
 written have now passed first go (Babur's, this): when he gives a plan, build the plan.
 
-## A new theme for Folio (Nov 16, song_ah.py): sent, no verdict yet
+## A new theme for Folio (Nov 16, song_ah.py): passed on
 
 "This is the write-up for Folio. Again, about 2 minutes, 45 seconds ... And stick to what I'm sending you." His own
 plan ("Breezy 90s Japanese City-Pop / High-Altitude Smooth Synth-Jazz": 102 beats a minute, 16ths swung 58%, G major,
 a bell-Rhodes, a square-wave whistle over a flute, a fingered FM bass, a reed pad; a vamp, a theme, a bridge), built
 as written. Its 20 bars are 47 seconds, so it is played three times with a little more in it each time, the theme
 twice the third time (68 bars, 2:40). Folio already has song_o.py in the game: which one stays is his call.
+
+Eric's verdict, Nov 16: "I didn't care for this one, actually. It's not what you did, but let's try this again." The
+style, not the build: song_ah.py stays as a record, and isn't used.
+
+## Folio's arcade theme (Nov 16, song_ai.py): sent, no verdict yet
+
+"And now I've given you clear exactly how I want it, right? Like, very specific. The only thing is, you make sure it's
+the proper length that we've been doing." His own plan again ("Fast-Paced 90s Arcade Action-Funk & Synth-Brass Rock":
+160 beats a minute, C minor, an FM brass lead, an FM slap bass, an "orchestra hit", a square wave in harmony), this
+time with every note written out: the bass lines, the brass's chords, the tunes, the hits. Built note for note.
+- Its 36 bars are 54 seconds ("looped twice" in the plan, 1:48), so it is played three times: 108 bars, 2:42. The
+  notes are the same each time; only what the plan offers a choice of changes (the square wave a third under the
+  tune, then a sixth, then both; the brass's hits doubled in octaves, then fourths, then both; a second brass an
+  octave under the climax the third time; the drum fills).
+- Written here, where the plan gives chords but no notes: the square wave's harmony and arpeggios, the bass under
+  the call and response and the climax, the fills. The calls made where the plan reads two ways are in the song's
+  docstring.
+- A lesson from building it: two detuned copies of a voice that start at random phases can cancel for the whole of
+  a short note (an 8th at this pace is shorter than half their beat). The brass is three players that start together.
+- Measured: -16.0 LUFS, peak -1.3 dBFS; the lead about -21 to -22 dB, the bass -21.6, the kick -21; its sections
+  within 2 dB of each other; its spectrum within about 1 dB of Chandy's below 1 kHz, 1 to 2 dB under it above.
+- Not handed over yet: on his OK it replaces song_o.py as Folio's theme, or not, as he says.
