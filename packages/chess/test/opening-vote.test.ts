@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { CROWD_KNOCKOUTS, CROWD_START, DEFAULT_SETTINGS, PREGAME_VOTES, crowdFinalBoss, modeSettings, mulberry32, type Settings } from "@chessroyale/core";
+import { CROWD_KNOCKOUTS, CROWD_PRE_REWORK, CROWD_START, DEFAULT_SETTINGS, PREGAME_VOTES, crowdFinalBoss, modeSettings, mulberry32, type Settings } from "@chessroyale/core";
 import {
   CHESS960_STANDARD_INDEX,
   FREESTYLE_OPENING,
@@ -223,6 +223,8 @@ describe("a Freestyle game in the runner: bots move, the judge scores, castling 
 });
 
 describe("the finals after a Freestyle game", () => {
+  // (The 50 v 50 before the rework, CROWD_PRE_REWORK: the rework (C2) has no finals; C4 retires these with them.)
+  const preRework: Settings = { ...crowd, ...CROWD_PRE_REWORK };
   /** Plays a Freestyle 50 v 50 (votes as patches) through every cut to its final. */
   async function toFinal(settings: Settings, seed: number) {
     const r = runner(seed, { settings });
@@ -237,7 +239,7 @@ describe("the finals after a Freestyle game", () => {
   }
 
   it("the boss final is played from the usual starting position: the Hidden Boss, and any boss standing in for him", async () => {
-    const boss: Settings = { ...crowd, finalFormat: "boss", knockoutsPerStage: CROWD_KNOCKOUTS.boss, bossMaxMoves: 20 };
+    const boss: Settings = { ...preRework, finalFormat: "boss", knockoutsPerStage: CROWD_KNOCKOUTS.boss, bossMaxMoves: 20 };
     for (const settings of [boss, { ...boss, bossesOff: [crowdFinalBoss()!.id] }]) {
       const { r, start } = await toFinal(settings, 8);
       expect(isChess960Fen(start)).toBe(true);
@@ -248,7 +250,7 @@ describe("the finals after a Freestyle game", () => {
   });
 
   it("the team final plays on, on the game's own board from its Freestyle start", async () => {
-    const { r, start } = await toFinal({ ...crowd, finalMaxTurns: 70 }, 9);
+    const { r, start } = await toFinal({ ...preRework, finalMaxTurns: 70 }, 9);
     expect(r.final!.format).toBe("team");
     const b = r.boards.get(r.state.boards[0]!)!;
     expect(baseAt(0, b.bases).fen).toBe(start);
