@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { RECLUSE_PHASE2, type PowerEventKind } from "@chessroyale/core";
+import type { PowerEventKind } from "@chessroyale/core";
 import { dockLine } from "../src/components/BossPowers.tsx";
 import { SPIN_LINES } from "../src/components/Boingo.tsx";
 import { GINGER_LINES } from "../src/characters/gingerbread.ts";
@@ -44,9 +44,8 @@ describe("a power's words: banner, dock and bubble each say their own", () => {
     expect(has(BIGBOY_LINES.ultimateWarn, /bounce/i)).toEqual([]);
     // (Eric's "Big boy BOUNCE!" stays: his line, Oct 10.)
     expect(BIGBOY_LINES.ultimate).toContain("Big boy BOUNCE!");
-    // The Hidden Boss's phase 2 ultimate: the banner says the seconds (from the setting), the dock what they mean.
-    for (const l of RECLUSE_LINES.ult2) expect(l).not.toMatch(/\d|seconds|five/i);
-    expect(RECLUSE_PHASE2.ultMoveSeconds).toBeGreaterThan(0);
+    // (The Hidden Boss's phase 2 has no ultimate since Nov 16: his lines as he cuts a heart never name it, nor its allowance for lag.)
+    for (const l of Object.values(RECLUSE_LINES.slash).flat()) expect(l).not.toMatch(/\d|seconds|heart cut|allowance/i);
   });
 });
 

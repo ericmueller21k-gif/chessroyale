@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { RECLUSE_TALK, SPEECH } from "@chessroyale/core";
 import { Chatter, TALK_TICK_MS, talkStage, talkWhen, type TalkPhase } from "../src/recluse-talk.ts";
 import { RECLUSE_LINES } from "../src/characters/recluse-lines.ts";
-import { CHATTER, CRITICAL, LOW, NORMAL, Voice, holdMs, typeMs } from "../src/speech.tsx";
+import { CHATTER, CRITICAL, INTERRUPT, LOW, NORMAL, Voice, holdMs, typeMs } from "../src/speech.tsx";
 import type { GameView } from "../src/game.ts";
 
 // The Hidden Boss's chatter (recluse-talk.ts): one line about every 15 s of play in both phases, by the clock, in three
@@ -41,7 +41,8 @@ function play(phase: TalkPhase, stretches: Stretch[], rng: () => number) {
       held.push([t, t + holdMs(s.line.text)]);
       // (His chatter never holds another line back for long: with nothing up the line starts at once; over his chatter,
       // once the chatter has typed out and been readable for SPEECH.minReadMs, the rule for every line, Oct 24.)
-      if (!before) expect(voice.line(t)?.text).toBe(s.line.text);
+      // (His line as he cuts your heart cuts in on anything at once: Eric, Nov 16, INTERRUPT.)
+      if (!before || s.line.priority === INTERRUPT) expect(voice.line(t)?.text).toBe(s.line.text);
       else if (before.priority === CHATTER) expect(voice.line(t)?.text).toBe(t >= before.firm ? s.line.text : before.text);
     }
     const end = t + s.ms;
@@ -107,12 +108,12 @@ function phase1(rng: () => number): Stretch[] {
   return out;
 }
 
-/** Phase 2 down to one board: a move every 10 to 20 s for ten minutes, a slow-move line now and then, boards ending. */
+/** Phase 2 down to one board: a move every 10 to 20 s for ten minutes, a heart cut now and then (his line cuts in at once), boards ending. */
 function phase2(rng: () => number): Stretch[] {
   const out: Stretch[] = [];
   for (let t = 0, i = 0; t < 600_000; i++) {
     const ms = 10_000 + rng() * 10_000;
-    const line = i === 3 || i === 9 ? { text: RECLUSE_LINES.boardWon[0], priority: CRITICAL } : rng() < 0.15 ? { text: RECLUSE_LINES.slow[0], priority: LOW } : undefined;
+    const line = i === 3 || i === 9 ? { text: RECLUSE_LINES.boardWon[0], priority: CRITICAL } : rng() < 0.15 ? { text: RECLUSE_LINES.slash.taunt[0], priority: INTERRUPT } : undefined;
     out.push({ ms, talk: true, line: line as Stretch["line"] });
     t += ms;
   }
@@ -170,7 +171,7 @@ describe("his chatter", () => {
       const { said, quiet } = play(2, phase2(rng), rng);
       expect(quiet, `seed ${seed}`).toBeLessThanOrEqual(everyMs + jitterMs + 2000);
       const g = gaps(said.map((s) => s.at));
-      // (A slow-move or board line up when one is due holds it a few seconds at most: one line's time.)
+      // (A heart's or a board's line up when one is due holds it a few seconds at most: one line's time.)
       expect(Math.max(...g), `seed ${seed}: ${g.map(sec)}`).toBeLessThanOrEqual(everyMs + jitterMs + 7000);
       expect(said.length).toBeGreaterThanOrEqual(600_000 / (everyMs + jitterMs + 3000));
       said.forEach((s, i) => {

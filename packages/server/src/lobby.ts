@@ -724,6 +724,8 @@ export class LobbyCore {
     // lobby was made with (one made before a boss was rested, by code, picked for a raid, or a queue's filling lobby).
     if (settings.bossesOff) this.settings = { ...this.settings, bossesOff: settings.bossesOff };
     if (record.moveClock) this.settings = { ...this.settings, moveClockSeconds: record.moveClock, moveClockSteps: [] };
+    // (The Hidden Boss's phase 2 stored by an older server, a deploy mid-fight: what it didn't store filled in. The review of #744, M2.)
+    if (record.recluse2) recluseLobby.upgrade(record.recluse2);
     if (record.runner) {
       // (The clock for powers that run in real time, the hippo gardener's seeds: the server's.)
       this.runner = MatchRunner.restore(record.runner, { settings: this.settings, rng, engines: [], library, clock: () => this.io.now() });
@@ -1520,8 +1522,8 @@ export class LobbyCore {
    */
   ultimateTrigger(playerId: string, admin: boolean): boolean {
     if (!admin || !BOSS_POWERS.ultimateTestButton || !this.human(playerId) || !this.runner?.boss || this.r.phase === "results") return false;
-    // (The Hidden Boss's phase 2: his "5 SECONDS!" now, as solo's trigger brings it.)
-    const ok = this.r.recluse2 ? recluseLobby.ult(this.phase2Lobby) : this.runner.triggerUltimate();
+    // (The Hidden Boss's phase 2: a heart of the admin's own board cut now, as solo's trigger does.)
+    const ok = this.r.recluse2 ? recluseLobby.ult(this.phase2Lobby, playerId) : this.runner.triggerUltimate();
     if (ok) console.log(`test trigger: ${playerId} brings the ultimate in ${this.r.code}`);
     // (A test control touched the battle: no XP for anyone in it, "No XP: test game." Review m3, Nov 9.)
     if (ok) this.r.overrides = { ...this.r.overrides, tested: true };

@@ -361,7 +361,7 @@ test("Chandy on a slow phone: his beam's cover and Dodge's scope-in (the blur un
   }
 });
 
-test("the Hidden Boss's phase 2 on a slow phone: the phase change and four boards in play stay within budget", { tag: "@perf" }, async ({ page }) => {
+test("the Hidden Boss's phase 2 on a slow phone: the phase change, four boards in play, his slashes and a board's fade to grey stay within budget", { tag: "@perf" }, async ({ page }) => {
   test.skip(test.info().project.name !== "phone", "one run is enough (the phone, slowed)");
   test.setTimeout(4 * 60_000);
   await page.addInitScript(instrument);
@@ -391,13 +391,30 @@ test("the Hidden Boss's phase 2 on a slow phone: the phase change and four board
   const P = RECLUSE_PHASE2.change;
   await expect.poll(() => page.evaluate(() => !!(window as any).match.simul?.playing), { timeout: 30_000 + P.transform.introMs + 6000 + 15_000 + P.countdownSeconds * 1000 }).toBe(true);
   const change = frameStats((await page.evaluate(() => (window as any).__perf.frames.splice(0))).map((f: [number, number]) => f[0]));
-  // Four boards in play: the bots and he move on theirs (you don't), for eight seconds.
-  await page.waitForTimeout(8000);
+  // Four boards in play: the bots and he move on theirs (you don't), for eight and a half seconds: your move turns slow at 6.5 s, its
+  // heart's slash in it (Nov 16).
+  await page.waitForTimeout(8500);
   const play = frameStats((await page.evaluate(() => (window as any).__perf.frames.splice(0))).map((f: [number, number]) => f[0]));
   const moves = await page.evaluate(() => (window as any).match.simul.boards.reduce((n: number, b: { history: string[] }) => n + b.history.length, 0));
-  console.log(`phase 2 on a 4x-slowed phone: the phase change ${f(change)}; four boards in play ${f(play)}, ${moves} moves`);
+  expect(await page.evaluate(() => (window as any).match.simul.boards[0].hearts), "the slash came in that stretch").toBe(RECLUSE_PHASE2.hearts - 1);
+  // Your last heart: the rest cut first (the admins' trigger), then the last, measured: its slash, his line and your board's slow fade
+  // to grey under "TOO SLOW".
+  const btn = page.getByRole("button", { name: "Lose a heart (testing)" });
+  const hearts = () => page.evaluate(() => (window as any).match.simul.boards[0].hearts as number);
+  while ((await hearts()) > 1) {
+    const n = await hearts();
+    await btn.click();
+    await expect.poll(hearts).toBe(n - 1);
+  }
+  await page.waitForTimeout(RECLUSE_PHASE2.slash.ms + 500);
+  await page.evaluate(() => ((window as any).__perf.frames = []));
+  await btn.click();
+  await page.waitForTimeout(RECLUSE_PHASE2.slash.ms + RECLUSE_PHASE2.slash.greyMs + 200);
+  expect(await page.evaluate(() => (window as any).match.simul.boards[0].result?.how)).toBe("slow");
+  const slash = frameStats((await page.evaluate(() => (window as any).__perf.frames.splice(0))).map((f: [number, number]) => f[0]));
+  console.log(`phase 2 on a 4x-slowed phone: the phase change ${f(change)}; four boards in play ${f(play)}, ${moves} moves; the last heart's slash and the fade ${f(slash)}`);
   expect(moves, "moves played on the bots' boards meanwhile").toBeGreaterThan(4);
-  for (const [what, s] of [["the phase change", change], ["four boards in play", play]] as const) {
+  for (const [what, s] of [["the phase change", change], ["four boards in play, a slash", play], ["the last heart's slash and the fade to grey", slash]] as const) {
     expect(s.p95, `${what}: 95th percentile frame (ms)`).toBeLessThan(50);
     expect(s.slow, `${what}: share of dropped frames`).toBeLessThan(0.15);
   }

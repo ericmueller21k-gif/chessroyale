@@ -1,22 +1,23 @@
-import { BOSS_BANNER, RECLUSE_PHASE2, bannerPlusMs, bossBannerMs } from "@chessroyale/core";
+import { BOSS_BANNER, RECLUSE_PHASE2, bannerPlusMs } from "@chessroyale/core";
 import { RECLUSE } from "./characters/recluse.ts";
 import { animLength, cueAt } from "./characters/power-art.ts";
 import { lazyTable } from "./characters/sprite.ts";
 import { RECLUSE_LINES } from "./characters/recluse-lines.ts";
 import { pacedLine } from "./paced-line.ts";
+import { play } from "./sound.ts";
+import { INTERRUPT, bossVoice } from "./speech.tsx";
 import {
   applyMove,
   baseAt,
   legalMoves,
   phase2BossMove,
-  phase2Flags,
+  phase2Clock,
   phase2Move,
   phase2Next,
   phase2Outcome,
   phase2Resign,
-  phase2Timeouts,
+  phase2Slash,
   phase2ToMove,
-  phase2Ult,
   phase2WinAll,
   startPhase2,
   toSan,
@@ -24,6 +25,7 @@ import {
   type MoveScore,
   type Phase2Board,
   type Phase2Engine,
+  type Phase2Judged,
   type Phase2State,
 } from "@chessroyale/chess";
 
@@ -200,14 +202,67 @@ export function smoothPath(pts: readonly Pt[]): string {
   return `${d} L${f(last[0])} ${f(last[1])}`;
 }
 
-/** His ultimate where he stands (playInPlace): the spellbook opened, held, slammed shut. */
-export const PHASE2_ULT_ANIMS = ["spellbook2", "spellLoop2", "spellClose2"] as const;
+/** How a cut heart looks `t` ms after its cut (slashLook): its blade's glint, the blade's stroke, the two halves, the board's grey. */
+export interface SlashLook {
+  /** The glint of his blade drawn back past the heart's top-right corner, in fractions of the heart; null once it has gone through. */
+  glint: { x: number; y: number; o: number; s: number } | null;
+  /** The stroke across the heart (its length 0 to 1, from the top-right corner down to the bottom-left; its opacity), or null. */
+  blade: { len: number; o: number } | null;
+  /** The two halves (the upper left's, the lower right's): their shift (fractions of the heart), turn (degrees) and opacity. */
+  a: { x: number; y: number; r: number; o: number };
+  b: { x: number; y: number; r: number; o: number };
+  /** Done: the slot shows the empty heart alone. */
+  done: boolean;
+}
+
+const easeIn = (x: number) => x * x * x;
+const easeOut = (x: number) => 1 - (1 - x) ** 3;
+const unit = (x: number) => Math.max(0, Math.min(1, x));
+
 /**
- * "5 SECONDS!" shows this long as his ultimate comes (ms): a boss's banner (bossBannerMs: BOSS_BANNER.ms, 1.5 s since
- * Eric's Oct 16 "a second shorter again", and since Oct 24 the banners' extra). Everyone's few seconds start as it goes
- * (phase2Ult), so it never eats into them.
+ * A heart cut, `t` ms after its cut began (Eric, Nov 16: "a slash with a wind-up (slow) then a fast follow-through across the heart,
+ * the heart cut in half, both halves sliding apart and fading"; no flash): for `windMs` his blade's glint draws back past the heart's
+ * top-right corner, slowly and then faster; it goes through in `bladeMs`, the stroke fading after; the halves slide apart along the
+ * cut and fade until `ms`. Pure: the screen draws it from the time since the cut, so a board drawn again mid-cut carries on from where
+ * it was. (A board whose last heart it was greys out by CSS: Recluse2.tsx's Cell.)
  */
-export const phase2UltBannerMs = (): number => bossBannerMs();
+export function slashLook(t: number, s: { windMs: number; ms: number } = RECLUSE_PHASE2.slash): SlashLook {
+  const bladeMs = 90;
+  const wind = unit(t / s.windMs);
+  const after = t - s.windMs;
+  const glint = t < s.windMs ? { x: 0.7 + 0.35 * easeIn(wind), y: -0.15 - 0.35 * easeIn(wind), o: unit(wind * 2.5), s: 0.5 + 0.5 * wind } : null;
+  const blade = after >= 0 && after < bladeMs + 260 ? { len: easeOut(unit(after / bladeMs)), o: 1 - unit((after - bladeMs) / 260) } : null;
+  const apart = easeOut(unit(after / (s.ms - s.windMs)));
+  const fade = unit((after - 120) / (s.ms - s.windMs - 120));
+  return {
+    glint,
+    blade,
+    a: { x: -0.32 * apart, y: -0.26 * apart, r: -16 * apart, o: 1 - fade },
+    b: { x: 0.3 * apart, y: 0.3 * apart, r: 14 * apart, o: 1 - fade },
+    done: t >= s.ms,
+  };
+}
+
+/**
+ * His line as one of your hearts is cut (`left`: how many you have left after it; Eric, Nov 16: harder as they run out): a taunt
+ * while 3 or more are left, in turn from your first; at 2 and 1 the harder ones; the last (`pick`: which of its lines), as your
+ * board goes with it.
+ */
+export function slashLine(left: number, pick = 0): string {
+  const L = RECLUSE_LINES.slash;
+  if (left <= 0) return L.last[Math.abs(pick) % L.last.length]!;
+  if (left <= 2) return L.hard[(2 - left) % L.hard.length]!;
+  return L.taunt[Math.max(0, RECLUSE_PHASE2.hearts - 1 - left) % L.taunt.length]!;
+}
+
+/**
+ * A heart of yours cut (solo's and online's): the slash's sound and his line, on your screen only (a bot's heart has the slash on its
+ * board alone), cutting in on whatever he's saying (INTERRUPT; Eric, Nov 16). `key`: the fight's.
+ */
+export function cueSlash(left: number, key: string, pick = 0) {
+  play("recluseSlash");
+  bossVoice.say(slashLine(left, pick), `recluse:p2:slash:${key}:${left}`, INTERRUPT);
+}
 
 /**
  * Whether his phase 2 follows phase 1 won, on this device (solo): alone (Boss alone), or in a solo Crowd's boss final
@@ -280,8 +335,10 @@ export interface Phase2BotEngine extends Phase2Engine {
  * The Hidden Boss's phase 2 on this device (Boss alone; its rules: packages/chess/src/bosses/recluse-phase2.ts): four
  * boards at once, you on board 0, bots on the rest. One engine plays him on every board in turn (`boss`: your board
  * first when it's waiting, then the board that has waited longest); the bots think on their own clocks (`bots`; the same
- * engine when the device has one only). Every clock is checked five times a second; a board ends by mate, a draw, time
- * or resigning; the battle ends when every board is decided (`onDone`).
+ * engine when the device has one only). Every clock is checked five times a second; a board ends by mate, a draw, time,
+ * resigning or its hearts all cut; the battle ends when every board is decided (`onDone`). Only your moves are judged by the clock
+ * (`judged`): a bot's heart is cut by the slow think it rolled, as that think ends, never because its engine answered late (the
+ * engine it shares with him queues behind his searches: the review of #744, M1).
  */
 export class Phase2Game {
   state: Phase2State;
@@ -295,6 +352,8 @@ export class Phase2Game {
   lastMs: number | null = null;
   /** His moves so far, on all the boards. */
   bossMoves = 0;
+  /** Whose moves the clock judges: yours (Phase2Judged). */
+  private readonly judged: Phase2Judged = (player) => player === this.opts.human;
 
   constructor(
     private readonly opts: {
@@ -309,12 +368,8 @@ export class Phase2Game {
       onChange: () => void;
       /** A board has just been decided (its result is set). */
       onResult: (b: Phase2Board) => void;
-      /**
-       * A slow move (anyone's) before his ultimate: on which board, and whether it was the one that brought his ultimate;
-       * then his ultimate as it comes.
-       */
-      onSlow?: (boardId: number, ult: boolean) => void;
-      onUlt?: () => void;
+      /** A heart cut on a board (its player's move turned slow, or the admins' test): the board as it is now (hearts left, lost). */
+      onSlash?: (b: Phase2Board) => void;
       /** His move played on a board: how many he has made so far on all of them. */
       onBossMove?: (moves: number) => void;
       onDone: () => void;
@@ -327,11 +382,8 @@ export class Phase2Game {
   start() {
     this.state = startPhase2({ players: this.opts.players, numbers: this.opts.numbers, now: Date.now(), win: this.opts.win });
     for (const b of this.state.boards) if (b.player !== this.opts.human) this.botTurn(b.id);
-    // (Before his ultimate a bank that runs out loses the board; after it, a move out of time is played at random.)
-    this.tick = setInterval(() => {
-      const now = Date.now();
-      this.update(phase2Timeouts(phase2Flags(this.state, now), now, this.opts.rng ?? Math.random));
-    }, 200);
+    // (A move turning slow has its heart cut, as the server's timer does online; a bank that runs out loses the board.)
+    this.tick = setInterval(() => this.update(phase2Clock(this.state, Date.now(), this.judged)), 200);
     this.opts.onChange();
   }
 
@@ -356,7 +408,7 @@ export class Phase2Game {
     const b = this.board(boardId);
     if (!b || b.player !== this.opts.human || phase2ToMove(b) !== "crowd") return;
     const before = this.state;
-    this.update(phase2Move(this.state, boardId, move, Date.now()));
+    this.update(phase2Move(this.state, boardId, move, Date.now(), this.judged));
     if (this.winNext && this.state !== before) {
       this.winNext = false;
       this.update(phase2WinAll(this.state, Date.now()));
@@ -366,9 +418,10 @@ export class Phase2Game {
   /** Testing (admins, "Win this form"): your next move here wins every board still on. */
   winNext = false;
 
-  /** Testing (admins): his ultimate now. */
-  ult() {
-    this.update(phase2Ult(this.state, Date.now()));
+  /** Testing (admins, the ultimate trigger in phase 2): a heart of yours cut now, on your move. */
+  slash() {
+    const mine = this.state.boards.find((b) => b.player === this.opts.human);
+    if (mine) this.update(phase2Slash(this.state, mine.id, Date.now()));
   }
 
   /** You resign your board: it's lost; the others play on. */
@@ -380,16 +433,10 @@ export class Phase2Game {
     if (this.stopped || next === this.state) return;
     const before = this.state;
     this.state = next;
-    const ult = next.ultAt !== null && before.ultAt === null;
-    if (next.slow > before.slow) {
-      // (One move at a time changes the state: the board whose history grew.)
-      const slowOn = next.boards.find((b, i) => b.board.history.length > before.boards[i]!.board.history.length);
-      if (slowOn) this.opts.onSlow?.(slowOn.id, ult);
-    }
-    if (ult) this.opts.onUlt?.();
     for (const b of next.boards) {
       const was = before.boards.find((x) => x.id === b.id)!;
       if (was === b) continue;
+      if (b.hearts < was.hearts) this.opts.onSlash?.(b);
       if (b.result && !was.result) this.opts.onResult(b);
       const who = phase2ToMove(b);
       if (who === "boss" && !this.waiting.includes(b.id)) this.waiting.push(b.id);
@@ -423,21 +470,25 @@ export class Phase2Game {
         if (this.stopped) return;
         if (this.board(id)?.board.fen === fen) {
           const before = this.state;
-          this.update(phase2Move(this.state, id, move, Date.now()));
+          this.update(phase2Move(this.state, id, move, Date.now(), this.judged));
           if (this.state !== before && !this.stopped) this.opts.onBossMove?.(++this.bossMoves);
         }
         this.pump();
       });
   }
 
-  /** A bot's move: it thinks a bullet player's while (its clock running), then plays. Late, its board is lost on time. */
+  /**
+   * A bot's move: it thinks a bullet player's while (its clock running), then plays. Late, its board is lost on time. A slow think
+   * costs it a heart as that think ends (`thinkEnds`), whenever its engine answers; a usual one never does, however late the answer.
+   */
   private botTurn(id: number) {
     const fen = this.board(id)!.board.fen;
     const rng = this.opts.rng ?? Math.random;
-    // (Now and then a slow one before his ultimate, so his count comes from the bots too.)
-    const slow = this.state.ultAt === null && !this.opts.win && rng() < RECLUSE_PHASE2.botSlowChance;
+    // (Now and then a slow one: it loses a heart as yours would.)
+    const slow = !this.opts.win && rng() < RECLUSE_PHASE2.botSlowChance;
     const [lo, hi] = slow ? RECLUSE_PHASE2.botSlowMs : RECLUSE_PHASE2.botMoveMs;
     const think = lo + rng() * (hi - lo);
+    const thinkEnds = Date.now() + think;
     const engine = this.opts.bots;
     const search = this.opts.win
       ? engine.topMoves(fen, 1).then((t) => t[0]?.move ?? legalMoves(fen)[0]!)
@@ -446,13 +497,15 @@ export class Phase2Game {
     const wait = new Promise<void>((r) => {
       const t = setTimeout(() => {
         this.timers.delete(t);
+        // (Its slow think over: the heart cut at the moment it ended, even if the timer ran late.)
+        if (slow && this.board(id)?.board.fen === fen) this.update(phase2Slash(this.state, id, thinkEnds));
         r();
       }, this.opts.win ? 300 : think);
       this.timers.add(t);
     });
     void Promise.all([search.catch(() => legalMoves(fen)[0]!), wait]).then(([move]) => {
       if (this.stopped || this.board(id)?.board.fen !== fen) return;
-      this.update(phase2Move(this.state, id, move, Date.now()));
+      this.update(phase2Move(this.state, id, move, Date.now(), this.judged));
     });
   }
 }

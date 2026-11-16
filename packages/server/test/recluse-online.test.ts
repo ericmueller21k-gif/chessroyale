@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { DEFAULT_SETTINGS, HIDDEN_ROOM, LEAVING, RECLUSE_CHILD, RECLUSE_CUTSCENE, RECLUSE_FORMS, RECLUSE_ONLINE, RECLUSE_PHASE2, childRating, hiddenRoomSettings, levelForMaia, maiaTopRating, modeSettings, mulberry32, recluseChildFirst, recluseNextForm, type FairMove, type Settings } from "@chessroyale/core";
-import { START_FEN, applyMove, bankLeft, legalMoves, phase2Standings, type BoardScore, type MatchRunner, type MoveScore, type ServerMessage } from "@chessroyale/chess";
+import { START_FEN, applyMove, bankLeft, legalMoves, phase2Standings, slowJudgeMs, type BoardScore, type MatchRunner, type MoveScore, type Phase2Board, type ServerMessage } from "@chessroyale/chess";
 import { LobbyCore, newLobbyRecord, type PartyLobby } from "../src/lobby.ts";
 import { mateFirst, phase2NoResult, phase2NoResultFor, phase2Unvouched, pick, quickMove, withMates, type Phase2SearchRequest } from "../src/bosses/recluse.ts";
 import { lobbyOptions } from "../src/lobby-options.ts";
@@ -465,17 +465,156 @@ describe("the admin's Win this form in every form online (server-checked)", () =
   });
 });
 
-describe("the admins' ultimate trigger in phase 2 (as solo's)", () => {
-  it("brings his \"5 SECONDS!\" once the clocks run: every move then has its few seconds", () => {
+describe("the admins' ultimate trigger in phase 2 (as solo's): he has none there since Nov 16, so it cuts one of your hearts", () => {
+  it("once the clocks run, on your own move: a heart of yours cut now, told to everyone; refused for a player, and before the clocks", () => {
     const F = roomFight(1, 3, { engine: true });
     F.beatAdult();
     expect(F.core.ultimateTrigger("p1", true)).toBe(false);
     F.toBoards();
     expect(F.core.ultimateTrigger("p1", false)).toBe(false);
     expect(F.core.ultimateTrigger("p1", true)).toBe(true);
-    expect(F.p2().state.ultAt).toBe(F.now);
-    expect(F.last("p1", "phase2")!.p2.ultAt).toBe(F.now);
-    expect(F.core.ultimateTrigger("p1", true)).toBe(false);
+    expect(F.boardOf("p1")).toMatchObject({ hearts: RECLUSE_PHASE2.hearts - 1, slashAt: F.now });
+    expect(F.last("p1", "phase2")!.p2.boards.find((b) => b.player === "p1")).toMatchObject({ hearts: RECLUSE_PHASE2.hearts - 1, slashAt: F.now });
+    expect(F.p2().state.boards.filter((b) => b.player !== "p1").every((b) => b.hearts === RECLUSE_PHASE2.hearts)).toBe(true);
+  });
+});
+
+describe("each player's own hearts online (Eric, Nov 16): the server judges a move slow at 6.5 s from when the board was theirs", () => {
+  it("a move at 6.4 s keeps its heart; one not made by 6.5 s has its player's heart cut by the server's timer as it turns slow, told to everyone; then nothing is played for them, however long they take", () => {
+    const F = roomFight(2, 2, { auto: true });
+    F.beatAdult();
+    F.toBoards();
+    const key = F.p2().key;
+    const t0 = F.boardOf("p1").turnAt!;
+    expect(slowJudgeMs()).toBe(6500);
+    F.advance(t0 + 6400 - F.now);
+    const mine = F.boardOf("p1");
+    F.core.message("p1", { t: "phase2Move", key, board: mine.id, move: legalMoves(mine.board.fen)[0]!, ply: 0 });
+    expect(F.boardOf("p1").hearts).toBe(8);
+    expect(F.boardOf("p2").hearts).toBe(8);
+    F.advance(t0 + 6500 - F.now);
+    expect(F.boardOf("p2")).toMatchObject({ hearts: 7, slashAt: t0 + 6500, slashed: true, result: null });
+    for (const id of ["p1", "p2"]) expect(F.last(id, "phase2")!.p2.boards.find((b) => b.player === "p2")).toMatchObject({ hearts: 7, slashAt: t0 + 6500 });
+    // (A minute more: no move played for them, no second cut on the same move; their clock ran.)
+    F.advance(60_000);
+    const theirs = F.boardOf("p2");
+    expect(theirs.board.history).toHaveLength(0);
+    expect(theirs.hearts).toBe(7);
+    F.core.message("p2", { t: "phase2Move", key, board: theirs.id, move: legalMoves(theirs.board.fen)[0]!, ply: 0 });
+    expect(F.boardOf("p2").board.history.length).toBeGreaterThanOrEqual(1);
+    expect(F.boardOf("p2").hearts).toBe(7);
+    expect(F.boardOf("p2").bankMs).toBe(RECLUSE_PHASE2.bankSeconds * 1000 - (F.now - t0));
+  });
+
+  it("the last heart cut loses that board (\"slow\"), its clock stopped; the others play on", () => {
+    const F = roomFight(2, 2, { auto: true });
+    F.beatAdult();
+    F.toBoards();
+    F.p2().state = { ...F.p2().state, boards: F.p2().state.boards.map((b) => (b.player === "p2" ? { ...b, hearts: 1 } : b)) };
+    const t0 = F.boardOf("p2").turnAt!;
+    F.advance(t0 + 6500 - F.now);
+    expect(F.boardOf("p2")).toMatchObject({ hearts: 0, turnAt: null, result: { winner: "boss", how: "slow" } });
+    expect(F.last("p1", "phase2")!.p2.boards.find((b) => b.player === "p2")!.result).toEqual({ winner: "boss", how: "slow" });
+    expect(F.p2().done).toBeUndefined();
+    expect(F.p2().state.boards.filter((b) => b.player !== "p2").every((b) => b.result === null)).toBe(true);
+    // (Their move now: refused, the board is decided.)
+    const theirs = F.boardOf("p2");
+    F.core.message("p2", { t: "phase2Move", key: F.p2().key, board: theirs.id, move: legalMoves(theirs.board.fen)[0]!, ply: 0 });
+    expect(F.last("p2", "phase2")!.refused).toBe(true);
+  });
+
+  it("a bot's move is judged by the think it rolled, never by when it arrives (the review of #744, M1): the host's device silent, the engine server's answer at 7 s costs no heart", () => {
+    expect(RECLUSE_PHASE2.botMoveMs[1]).toBeLessThan(slowJudgeMs());
+    expect(RECLUSE_ONLINE.askMs + 1000).toBeGreaterThan(slowJudgeMs());
+    const F = roomFight(1, 3, { engine: true });
+    F.beatAdult();
+    F.toBoards();
+    const bots = F.p2().state.boards.filter((b) => b.player !== "p1");
+    const t0 = bots[0]!.turnAt!;
+    // (Every bot rolled a usual think this move. The host's device never answers: each bot's move goes to the engine server at askMs.)
+    for (const b of bots) {
+      delete F.p2().work[b.id]!.slow;
+      F.p2().botAt[b.id] = t0 + RECLUSE_PHASE2.botMoveMs[1];
+    }
+    F.advance(t0 + 7000 - F.now);
+    for (const b of bots) expect(F.p2().work[b.id]).toMatchObject({ via: "server" });
+    for (const q of F.searches.splice(0)) F.answer(q);
+    for (const b of bots) {
+      expect(F.p2().state.boards.find((x) => x.id === b.id)).toMatchObject({ hearts: 8, slashed: false, slashAt: null, result: null });
+      expect(F.p2().state.boards.find((x) => x.id === b.id)!.board.history.length).toBeGreaterThanOrEqual(1);
+      expect(F.last("p1", "phase2")!.p2.boards.find((x) => x.id === b.id)!.hearts).toBe(8);
+    }
+    // (Yours is judged by the clock as ever: cut at 6.5 s.)
+    expect(F.boardOf("p1")).toMatchObject({ hearts: 7, slashAt: t0 + slowJudgeMs() });
+  });
+
+  it("a bot's slow think (botSlowChance; botSlowMs past the allowance, its usual time never) costs its heart as that think ends, its move in or not; then it plays on", () => {
+    expect(RECLUSE_PHASE2.botSlowMs[0]).toBeGreaterThan(slowJudgeMs());
+    expect(RECLUSE_PHASE2.botSlowChance).toBeGreaterThan(0);
+    expect(RECLUSE_PHASE2.botSlowChance).toBeLessThanOrEqual(0.06);
+    const F = roomFight(1, 3, { engine: true });
+    F.beatAdult();
+    F.toBoards();
+    const [a, b] = F.p2().state.boards.filter((x) => x.player !== "p1");
+    const t0 = a!.turnAt!;
+    const ends = t0 + RECLUSE_PHASE2.botSlowMs[0];
+    // (Both rolled the slow think this move: `a`'s device answers at once, `b`'s never does, its engine server's answer coming at 9 s.)
+    for (const x of [a!, b!]) {
+      F.p2().work[x.id]!.slow = true;
+      F.p2().botAt[x.id] = ends;
+    }
+    expect(F.answerAsks(a!.board.fen)).toBe(1);
+    const board = (id: number) => F.p2().state.boards.find((x) => x.id === id)!;
+    F.advance(ends - 10 - F.now);
+    for (const x of [a!, b!]) expect(board(x.id)).toMatchObject({ hearts: 8, slashAt: null });
+    expect(board(a!.id).board.history).toHaveLength(0);
+    F.advance(10);
+    for (const x of [a!, b!]) expect(board(x.id)).toMatchObject({ hearts: 7, slashAt: ends, result: null });
+    expect(F.last("p1", "phase2")!.p2.boards.find((x) => x.id === b!.id)).toMatchObject({ hearts: 7, slashAt: ends });
+    expect(board(a!.id).board.history).toHaveLength(1);
+    expect(board(b!.id).board.history).toHaveLength(0);
+    F.advance(t0 + 9000 - F.now);
+    for (const q of F.searches.splice(0)) if (q.fen === b!.board.fen) F.answer(q);
+    expect(board(b!.id).board.history).toHaveLength(1);
+    expect(board(b!.id).hearts).toBe(7);
+  });
+
+  it("a bot's slow think that ends on its last heart loses its board (\"slow\") as it ends; its move, coming later, isn't played", () => {
+    const F = roomFight(1, 3, { engine: true });
+    F.beatAdult();
+    F.toBoards();
+    const bot = F.p2().state.boards.find((x) => x.player !== "p1")!;
+    F.p2().state = { ...F.p2().state, boards: F.p2().state.boards.map((x) => (x.id === bot.id ? { ...x, hearts: 1 } : x)) };
+    const ends = bot.turnAt! + RECLUSE_PHASE2.botSlowMs[0];
+    F.p2().work[bot.id]!.slow = true;
+    F.p2().botAt[bot.id] = ends;
+    F.advance(ends - F.now);
+    expect(F.p2().state.boards.find((x) => x.id === bot.id)).toMatchObject({ hearts: 0, turnAt: null, slashAt: ends, result: { winner: "boss", how: "slow" } });
+    expect(F.p2().work[bot.id]).toBeUndefined();
+    expect(F.answerAsks(bot.board.fen)).toBe(1);
+    expect(F.p2().state.boards.find((x) => x.id === bot.id)!.board.history).toHaveLength(0);
+  });
+});
+
+describe("a fight stored by an older server, before the hearts (a deploy mid-fight: the review of #744, M2)", () => {
+  it("loads with every board's 8 hearts, nothing cut; a slow move then cuts one, told to everyone (never NaN, which lost the board)", () => {
+    const F = roomFight(2, 2, { auto: true });
+    F.beatAdult();
+    F.toBoards();
+    // (As an older server stored it: no hearts, slashed or slashAt on its boards. The Durable Object builds the lobby over its record
+    // for every event, as here.)
+    const rec = F.core.record;
+    for (const b of rec.recluse2!.state.boards as Partial<Phase2Board>[]) {
+      delete b.hearts;
+      delete b.slashed;
+      delete b.slashAt;
+    }
+    new LobbyCore(rec, { now: () => F.now, send: () => undefined }, library);
+    for (const b of rec.recluse2!.state.boards) expect(b).toMatchObject({ hearts: RECLUSE_PHASE2.hearts, slashed: false, slashAt: null });
+    const t0 = F.boardOf("p2").turnAt!;
+    F.advance(t0 + slowJudgeMs() - F.now);
+    expect(F.boardOf("p2")).toMatchObject({ hearts: 7, slashAt: t0 + slowJudgeMs(), result: null });
+    expect(F.last("p1", "phase2")!.p2.boards.find((b) => b.player === "p2")!.hearts).toBe(7);
   });
 });
 
@@ -875,6 +1014,34 @@ describe("his moves from the engine server only (Eric, Nov 13: \"we can't have h
     expect(bankLeft(F.boardOf("p2"), F.now)).toBe(left);
     F.core.message("p2", { t: "phase2Move", key: F.p2().key, board: theirs.id, move: legalMoves(theirs.board.fen)[0]!, ply: 0 });
     expect(F.boardOf("p2").board.history).toHaveLength(1);
+  });
+
+  it("hearts and the pause: no heart is cut while every clock stands still; the time paused never counts toward a slow move", () => {
+    const F = roomFight(2, 2, { engine: true });
+    F.beatAdult();
+    const { tries } = hisReply(F);
+    F.advance(RECLUSE_ONLINE.pauseMs + 10);
+    const pausedAt = F.p2().paused!;
+    expect(pausedAt).toBeDefined();
+    const ran = pausedAt - F.boardOf("p2").turnAt!;
+    expect(ran).toBeLessThan(slowJudgeMs());
+    F.advance(30_000);
+    expect(F.boardOf("p2").hearts).toBe(8);
+    F.answer(tries().at(-1)!);
+    expect(F.p2().paused).toBeUndefined();
+    // (Their move turns slow at 6.5 s of their clock running, the pause left out. His moves answered as they're asked from here, so
+    // no other pause comes.)
+    const run = (ms: number) => {
+      for (let t = 0; t < ms; t += 250) {
+        for (const q of F.searches.splice(0)) F.answer(q);
+        F.advance(Math.min(250, ms - t));
+      }
+    };
+    run(slowJudgeMs() - ran - 10);
+    expect(F.p2().paused).toBeUndefined();
+    expect(F.boardOf("p2").hearts).toBe(8);
+    run(20);
+    expect(F.boardOf("p2").hearts).toBe(7);
   });
 
   it("no answer in serverWaitMs: the fight ends with no result; nothing counts for its board players (not ranked, no XP or result row), phase 2's fair-play moves dropped, those before it kept and written; counted for the health view", async () => {

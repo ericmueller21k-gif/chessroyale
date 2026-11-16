@@ -5625,17 +5625,30 @@ button.history-label {
     font-size: 15px;
   }
 }
-/* The bullet clock's increment as your move begins: "+2" rises over the number, which flashes green as it goes up. */
+/* A clock's increment as your move begins (Boss Battle's 10 + 10, his bullet clock's): "+10" rises over the number, which flashes
+   green as it goes up. On the page's top layer (Eric, Nov 16: the status box clipped it; BossDock.tsx ClockPlus): fixed, its right
+   edge on the number's, just above it, over everything, taking no taps. */
 .dk-plus {
-  position: absolute;
-  right: 0;
-  bottom: calc(100% + 1px);
+  position: fixed;
+  left: var(--px, -100px);
+  top: var(--py, -100px);
+  z-index: 2147483000;
+  translate: -100% calc(-100% - 1px);
   font-size: 12px;
   font-weight: 800;
+  line-height: 1;
   color: var(--good);
+  white-space: nowrap;
+  pointer-events: none;
   animation: dk-plus 1.6s ease-out forwards;
 }
-.dk-clock:has(> .dk-plus) > .dk-time {
+/* Not over a sheet or menu that's open (a modal: the resign confirm, the Moves/Players/Chat sheet; the options menu's layer): the review
+   of #744, m4; Eric's "above everything" was about the status box clipping it. (The rotate lock is always in the page, shown only on a
+   phone held sideways.) Hidden, not removed, so its rise runs on unseen and never starts again. */
+body:has([aria-modal="true"]:not(#rotate-lock), .mm-scrim) > .dk-plus {
+  visibility: hidden;
+}
+.dk-clock.plus > .dk-time {
   animation: dk-tick 0.7s ease-out;
 }
 @keyframes dk-plus {
@@ -19574,19 +19587,12 @@ button.sq-tiny {
   color: #ff7a7a;
 }
 /* The big board's tag (the name of a board you watch) in the gap above it, at its left, off its back rank; its text in the board's
-   own width (cqw), so it fits at any size. The slow-move note likewise, at its right. */
+   own width (cqw), so it fits at any size. */
 .rc-played .rc-tag {
   top: auto;
   bottom: calc(100% + 1px);
   left: 0;
   font-size: min(12px, 5.9cqw);
-  line-height: 1.3;
-}
-.rc-played .rc-slow-note {
-  top: auto;
-  bottom: calc(100% + 1px);
-  right: calc(100% - var(--board-size, 100%));
-  font-size: min(11px, 5.4cqw);
   line-height: 1.3;
 }
 /* A phone's small boards: the name and clock just above each, off its pieces (Eric, Oct 15), in the room over the row; the name cut
@@ -19664,102 +19670,151 @@ button.sq-tiny {
     animation: none;
   }
 }
-/* His ultimate, on a phone's small boards too: "5 s!" across each as the banner shows over yours (the seconds from the
-   setting: --rc-ult-note, set by the screen). */
-.rc-ult .rc-mini::after {
-  content: var(--rc-ult-note, "5 s!");
+/* Each board's hearts (Eric, Nov 16; RecluseHearts.tsx): a column at its right, each heart one of its squares tall (a small board's at
+   its own size), in the gutter beside it, never over it. Classic pixel hearts; a cut one leaves its empty slot, so the column keeps
+   its size. */
+.rc-hearts {
+  --rc-heart: calc(var(--board-size, 100%) / max(8, var(--rc-hearts, 8)));
   position: absolute;
-  inset: 0;
-  z-index: 10;
-  display: grid;
-  place-items: center;
-  border-radius: 2px;
-  background: rgba(59, 7, 100, 0.55);
-  color: #fee2e2;
-  font: italic 900 22px/1 "Arial Black", "Helvetica Neue", Impact, system-ui, sans-serif;
-  text-shadow: 2px 2px 0 #1a0a00;
-  pointer-events: none;
-}
-/* The team's slow moves beside your board (SlowMarks; on a phone, the big board): ten slots, a red pixel X each, the rest
-   dim. A column by the board's right edge, in the gutter beside it (never over it), as Jefferson's candle shots stand.
-   They flash at every slow move. */
-.rc-slow {
-  position: absolute;
+  top: 0;
+  left: calc(var(--board-size, 100%) + max(2px, var(--board-size, 100%) * 0.012));
   z-index: 9;
   display: flex;
-  align-items: center;
-  gap: 2px;
-  pointer-events: none;
-}
-.rc-slow svg {
-  display: block;
-  image-rendering: pixelated;
-}
-.rc-slow-cell {
-  fill: rgba(16, 12, 22, 0.8);
-}
-.rc-slow-empty {
-  fill: rgba(255, 255, 255, 0.22);
-}
-.rc-slow-x {
-  fill: #ff4646;
-}
-.rc-slow-label {
-  font-size: 8px;
-  font-weight: 800;
-  line-height: 1;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--muted);
-}
-.rc-slow.col {
-  left: calc(var(--board-size, 100%) + 4px);
-  top: calc(var(--board-size, 100%) / 2);
-  translate: 0 -50%;
   flex-direction: column;
-}
-.rc-slow.col svg {
-  width: min(12px, calc(var(--board-size, 100%) * 0.055));
-}
-.rc-slow.col .rc-slow-label {
-  writing-mode: vertical-rl;
-  rotate: 180deg;
-}
-.rc-slow.flash svg {
-  animation: rc-slow-flash 600ms ease-out 3;
-}
-.rc-slow.flash .rc-slow-label {
-  color: #e11d48;
-}
-/* The board the last slow move was on: a small red note over its top-right corner, for a moment. */
-.rc-slow-note {
-  position: absolute;
-  top: 3px;
-  right: calc(100% - var(--board-size, 100%) + 3px);
-  z-index: 9;
-  padding: 1px 6px;
-  border-radius: 4px;
-  background: rgba(127, 29, 29, 0.9);
-  color: #fff;
-  font-size: 11px;
-  font-weight: 800;
-  line-height: 1.4;
-  white-space: nowrap;
+  width: var(--rc-heart);
+  height: calc(var(--rc-heart) * var(--rc-hearts, 8));
   pointer-events: none;
 }
-.rc-mini .rc-slow-note {
-  top: 1px;
-  right: 1px;
-  padding: 0 3px;
-  font-size: 9px;
+.rc-heart {
+  position: relative;
+  flex: 1 1 0;
+  min-height: 0;
 }
-@keyframes rc-slow-flash {
+.rc-heart svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.rc-h-o {
+  fill: #2b0710;
+}
+.rc-h-r {
+  fill: #ec2b45;
+}
+.rc-h-d {
+  fill: #a5122a;
+}
+.rc-h-h {
+  fill: #ffd6dc;
+}
+.rc-h-rim {
+  fill: rgba(255, 205, 214, 0.38);
+}
+.rc-h-hole {
+  fill: rgba(255, 255, 255, 0.06);
+}
+:root[data-theme="light"] .rc-h-rim {
+  fill: rgba(43, 7, 16, 0.42);
+}
+:root[data-theme="light"] .rc-h-hole {
+  fill: rgba(43, 7, 16, 0.08);
+}
+/* A heart being cut, over its (now empty) slot: its two halves along the line from its top-right corner, his blade's glint drawn
+   back past that corner, then the stroke across; placed each frame from the time since the cut (slashLook). No flash. */
+.rc-hcut {
+  position: absolute;
+  inset: 0;
+}
+.rc-hhalf {
+  position: absolute;
+  inset: 0;
+}
+.rc-hhalf.a {
+  clip-path: polygon(0 0, 100% 0, 0 100%);
+}
+.rc-hhalf.b {
+  clip-path: polygon(100% 0, 100% 100%, 0 100%);
+}
+/* His blade drawn back: a short bright sliver along the cut's line, outlined so it shows on the light page too. */
+.rc-hglint {
+  position: absolute;
+  width: 72%;
+  height: max(2px, 11%);
+  translate: -50% -50%;
+  rotate: -45deg;
+  border-radius: 1px;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.2), #fff 45%, #fff);
+  box-shadow:
+    0 0 0 1px rgba(30, 24, 48, 0.6),
+    0 0 3px rgba(190, 236, 255, 0.9);
+}
+.rc-hblade {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 150%;
+  height: max(2px, 9%);
+  translate: -50% -50%;
+  rotate: -45deg;
+}
+.rc-hblade > i {
+  display: block;
+  height: 100%;
+  border-radius: 1px;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0), #fff 35%, #fff);
+  box-shadow:
+    0 0 0 1px rgba(30, 24, 48, 0.5),
+    0 0 2px rgba(190, 236, 255, 0.9);
+  transform-origin: 100% 50%;
+}
+@media (prefers-reduced-motion: reduce) {
+  .rc-hhalf {
+    translate: none !important;
+    rotate: none !important;
+  }
+  .rc-hglint,
+  .rc-hblade {
+    display: none;
+  }
+}
+/* A board lost to its last heart (Eric, Nov 16: "wasted" style): it fades to grey, slowly, and a clean word comes in over it, "TOO
+   SLOW". CSS animations the compositor runs (a filter changed from script each frame repainted the board: 42% of a slowed phone's
+   frames dropped); their delay, from the end of the last heart's cut, is the cell's (--rc-grey-d: Recluse2.tsx's Cell), so a cell drawn
+   anew carries on where it was. */
+.rc-wasted > .board-wrap > .board {
+  will-change: filter;
+  animation: rc-grey var(--rc-grey-ms, 2600ms) ease-in-out var(--rc-grey-d, 0ms) both;
+}
+@keyframes rc-grey {
   from {
-    filter: drop-shadow(0 0 3px #ff4646);
+    filter: grayscale(0) brightness(1);
   }
   to {
-    filter: none;
+    filter: grayscale(1) brightness(0.7);
   }
+}
+.rc-wasted .rc-wasted-word {
+  animation: rc-wasted-word 600ms ease-out calc(var(--rc-grey-d, 0ms) + 0.35 * var(--rc-grey-ms, 2600ms)) both;
+}
+@keyframes rc-wasted-word {
+  from {
+    opacity: 0;
+  }
+}
+.rc-wasted-word {
+  position: absolute;
+  top: calc(var(--board-size, 100%) / 2);
+  left: calc(var(--board-size, 100%) / 2);
+  z-index: 10;
+  translate: -50% -50%;
+  color: #fff;
+  font: 900 min(30px, calc(var(--board-size, 100%) * 0.12)) / 1 system-ui, -apple-system, "Segoe UI", sans-serif;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+  text-shadow:
+    0 1px 0 rgba(0, 0, 0, 0.55),
+    0 0 6px rgba(0, 0, 0, 0.6);
+  pointer-events: none;
 }
 .rc-mini.you {
   border-color: #ffd451;

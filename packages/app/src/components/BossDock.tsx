@@ -1,6 +1,6 @@
 import type { ComponentChildren } from "preact";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "preact/hooks";
-import { memo } from "preact/compat";
+import { createPortal, memo } from "preact/compat";
 import { BOSS_PARTY, BOSS_POWERS, type ItemLook } from "@chessroyale/core";
 import { PARTY_COLORS } from "../board/logic.ts";
 import { bossRules } from "@chessroyale/chess";
@@ -450,15 +450,15 @@ export const clockLeft = (run: DockClockRun, now: number): number =>
 /** Where each match's dock clock stopped: it holds there between your moves, whichever screen shows it. */
 const held = new WeakMap<object, { run: DockClockRun | null; ms: number | null }>();
 
-/** How long the "+2" of the bullet clock's increment shows beside the clock as your move begins (ms). */
+/** How long the "+10" of a clock's increment shows beside the clock as your move begins (ms). */
 export const DOCK_PLUS_MS = 1600;
 
 /**
  * Your clock, bold at the status box's right, the same on every boss battle screen (Eric, Oct 15: "never disappears or
  * jumps between moves"): on your move, counting down (red from TICK_FROM_SECONDS); otherwise, dimmed, what you had
  * left when your move went in. On a clock with an increment (Boss Battle's 10 + 10, the Hidden Boss's bullet clock once
- * he adds one), a move begins with it added, and a brief "+10" (or "+2") beside the number says so. It re-renders itself, once each time the second shown changes;
- * the screen around it doesn't.
+ * he adds one), a move begins with it added, and a brief "+10" over the number says so (ClockPlus: on the page's top layer). It
+ * re-renders itself, once each time the second shown changes; the screen around it doesn't.
  */
 export function DockClock({ match, boss, run }: { match: GameView; boss: GameView["boss"]; run?: DockClockRun }) {
   let h = held.get(match);
@@ -470,6 +470,7 @@ export function DockClock({ match, boss, run }: { match: GameView; boss: GameVie
   if (!run && h.run) h.run = null;
   h.ms = ms;
   const [, setShown] = useState(0);
+  const timeRef = useRef<HTMLSpanElement>(null);
   useEffect(() => {
     if (!run) return;
     const t = setInterval(() => setShown(Math.ceil(clockLeft(run, Date.now()) / 1000)), 200);
@@ -482,16 +483,44 @@ export function DockClock({ match, boss, run }: { match: GameView; boss: GameVie
   const plus = inc > 0 && now - run!.startsAt < DOCK_PLUS_MS;
   const low = !!run && Math.ceil(ms / 1000) <= TICK_FROM_SECONDS;
   return (
-    <span class={`dk-clock${run ? " running" : " held"}${low ? " low" : ""}`} role="timer" aria-label={`Your clock: ${clockShown(ms)}`}>
-      {plus && (
-        <span class="dk-plus" key={run!.startsAt} aria-hidden="true">
-          +{inc}
-        </span>
-      )}
-      <span class="dk-time" aria-hidden="true">
+    <span class={`dk-clock${run ? " running" : " held"}${low ? " low" : ""}${plus ? " plus" : ""}`} role="timer" aria-label={`Your clock: ${clockShown(ms)}`}>
+      <span ref={timeRef} class="dk-time" aria-hidden="true">
         {clockShown(ms)}
       </span>
+      {plus && <ClockPlus key={run!.startsAt} inc={inc} since={run!.startsAt} anchor={timeRef} />}
     </span>
+  );
+}
+
+/**
+ * The increment's "+10" rising over your clock as a move begins (Eric, Nov 16: "layered properly so that plus 10 is actually layered
+ * above everything else"; the status box clipped it): on the page's top layer (a portal, fixed, over the dock, the panels and the
+ * boards), placed once from the clock's number as it shows, then CSS. Its time from the move's start, so a dock drawn again mid-way
+ * (the screens are rebuilt at a phase change) carries on where it was rather than rising twice.
+ */
+function ClockPlus({ inc, since, anchor }: { inc: number; since: number; anchor: { current: HTMLElement | null } }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  const [delay] = useState(() => Math.min(0, since - Date.now()));
+  useLayoutEffect(() => {
+    const place = () => {
+      const el = ref.current;
+      const r = anchor.current?.getBoundingClientRect();
+      if (!el || !r) return;
+      el.style.setProperty("--px", `${r.right}px`);
+      el.style.setProperty("--py", `${r.top}px`);
+    };
+    // (Once the dock has lined its row up with the board, before the paint: its own layout effect, a parent's, runs after this one, so
+    // a screen drawn anew as the move begins had it 12 px off. And again a frame later, should the board settle then.)
+    queueMicrotask(place);
+    const raf = requestAnimationFrame(place);
+    return () => cancelAnimationFrame(raf);
+  }, []);
+  if (typeof document === "undefined") return null;
+  return createPortal(
+    <span ref={ref} class="dk-plus" aria-hidden="true" style={{ animationDelay: `${delay}ms` }}>
+      +{inc}
+    </span>,
+    document.body,
   );
 }
 
@@ -509,20 +538,14 @@ export function UltimateTest({ match, icon = false }: { match: GameView; icon?: 
   // (A press is for the next ultimate only: once it has come, the button is ready again.)
   const key = boss ? `${boss.id}:${boss.startMove}:${boss.board.generation}:${p?.ults ?? 0}` : "";
   const [pressed, setPressed] = useState("");
-  // (The Hidden Boss's phase 2: his own ultimate, the few seconds a move.)
+  // (The Hidden Boss's phase 2 has no ultimate since Nov 16: the trigger cuts one of your hearts, the slash on demand; greyed off your
+  // move.)
   const simul = match.simul;
   if (BOSS_POWERS.ultimateTestButton && account().profile?.admin && simul) {
     if (!simul.playing || simul.decided) return null;
-    return (
-      <TestButton
-        cls="ult-test"
-        icon={icon}
-        glyph="⚡"
-        label={simul.ultAt !== null ? "Ultimate under way (testing)" : "Trigger ultimate (testing)"}
-        disabled={simul.ultAt !== null}
-        onClick={() => match.triggerUltimate()}
-      />
-    );
+    const mine = simul.boards.find((b) => b.you);
+    const can = !!mine && !mine.result && mine.toMove === "crowd" && mine.turnAt !== null && simul.paused == null;
+    return <TestButton cls="ult-test" icon={icon} glyph="⚡" label="Lose a heart (testing)" disabled={!can} onClick={() => match.triggerUltimate()} />;
   }
   if (!BOSS_POWERS.ultimateTestButton || !account().profile?.admin || !boss || !p || boss.result || match.bossNote != null || (bossRules(boss)?.ultimateOnce && p.ults) || (p.ults ?? 0) >= (bossRules(boss)?.ultimateMax ?? Infinity)) return null;
   // (Hollow's Lights out: the full meter has it on its way until the test has begun.)
