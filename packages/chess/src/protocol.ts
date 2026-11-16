@@ -13,6 +13,7 @@ import type { CreaseAsk, FolioView } from "./bosses/folio.ts";
 import type { WorkshopView } from "./bosses/timber.ts";
 import type { DashView } from "./bosses/dash.ts";
 import type { ZebraView } from "./bosses/zebra.ts";
+import type { ChandyView } from "./bosses/chandy.ts";
 import type { Phase2Result } from "./bosses/recluse-phase2.ts";
 import type { MoveScore } from "./uci.ts";
 /**
@@ -469,6 +470,8 @@ export interface NetBossPowers {
    * last Gold Plate, and his opening comment.
    */
   zebra?: ZebraView | null;
+  /** Chandy: his locks (each with its turns left), the rifle's upgrades and unlocked moves, his move meter, this turn's effects, the queen lock's aim and shot, Dodge (online, what has been seen of it: dodgeSeen). */
+  chandy?: ChandyView | null;
   /**
    * The circus tiger (missing for other bosses and from older servers; an older app ignores them): the balloon on his
    * nozzle (`balloon`: its shape as everyone sees it, a fake queen's "q"; its color; when it went on and when it's fully

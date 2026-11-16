@@ -108,6 +108,8 @@ import {
   shownAngle,
   hollowBattle,
   blackedOut,
+  chandyBattle,
+  dodgeWon,
   type DarkTryResult,
   moveLoss,
   pigBattle,
@@ -150,7 +152,7 @@ import {
   type ShowdownScout,
   type CarrotRace,
 } from "./boss-powers.ts";
-import type { BossPowerSettings, BounceResult, CarrotPatch, LeapfrogHop, LightsOutTest, RepaintResult, WaterResult } from "@chessroyale/core";
+import type { BossPowerSettings, BounceResult, CarrotPatch, DodgeResult, LeapfrogHop, LightsOutTest, RepaintResult, WaterResult } from "@chessroyale/core";
 import { MATE_TEST_MOVES, TopMovesCache, WIN_TEST_MOVES, bossGuardFrom, bossMoveFrom, netBoard, raceGuard, recheckCloseCalls, repliesFrom, type BossAhead, type BossMoveKind, type BossRace, type EngineLike, type LandingCheck, type RaceCheck } from "./runner-tools.ts";
 // (The judge's re-check, the boss's guards and move, the boards' wire form: their own file, runner-tools.ts, so a page that
 // needs only those, home, doesn't load the runner. Nov 10, phone load.)
@@ -1271,7 +1273,7 @@ export class MatchRunner {
   }
 
   stageComplete(): boolean {
-    if (this.state.boss) return this.finalGameOver() || this.state.boss.crowdMoves >= this.settings.bossMaxMoves || this.bossOutOfTime() || carrotBattle.won(this.state.boss) || blackedOut(this.state.boss) || (this.bossForceWin && this.bossToMove());
+    if (this.state.boss) return this.finalGameOver() || this.state.boss.crowdMoves >= this.settings.bossMaxMoves || this.bossOutOfTime() || carrotBattle.won(this.state.boss) || blackedOut(this.state.boss) || dodgeWon(this.state.boss) || (this.bossForceWin && this.bossToMove());
     if (this.state.final) return finalComplete(this.state, this.settings) || this.finalGameOver();
     return stageComplete(this.state, this.settings);
   }
@@ -1354,7 +1356,7 @@ export class MatchRunner {
     const ordinary = async () =>
       mate ??
       paint ??
-      (await bossMoveFrom(engine, fen, elo, this.settings.bossNodes, kind, this.opts.rng, this.settings.kingStrikeLoss, bossGuardFrom(this.settings), this.bossAllowed(), brain ? { ...brain, onNote: (n) => (this.brainNote = n) } : undefined, ahead, race));
+      (await bossMoveFrom(engine, fen, elo, this.settings.bossNodes, kind, this.opts.rng, this.settings.kingStrikeLoss, bossGuardFrom(this.settings), this.bossAllowed(), brain ? { ...brain, onNote: (n) => (this.brainNote = n) } : undefined, ahead, race, false, this.bossLocks()));
     const asks = this.bossAsks();
     if (asks) {
       // (His long pull, drag or showdown on every engine of this device; his ordinary move on `engine`, as ever.)
@@ -1536,6 +1538,39 @@ export class MatchRunner {
    */
   finishRush(places: Readonly<Record<string, Readonly<Record<string, unknown>>>>, only?: string): { correct: Record<string, number>; mean: number; held: boolean } {
     return dashBattle.finishRush(this.battle, places, only);
+  }
+
+  /** Chandy's Dodge is due: it came as this crowd turn began, and the turn waits for it, round by round (chandyBattle.dodgeDue). */
+  dodgeDue(): boolean {
+    return chandyBattle.dodgeDue(this.battle);
+  }
+
+  /**
+   * Dodge's round on closes: each person's square (by player id; the bots' from the seed), the square played and whether a line hit
+   * the king (chandyBattle.finishDodgeRound): a hit ends the battle, his. Null: no round was due.
+   */
+  finishDodgeRound(votes: Readonly<Record<string, unknown>>): DodgeResult | null {
+    return chandyBattle.finishDodgeRound(this.battle, votes);
+  }
+
+  /** Chandy's queen lock is due at the start of his turn: his whole turn spent aiming (chandyBattle.queenLockDue). */
+  queenLockDue(): boolean {
+    return chandyBattle.queenLockDue(this.battle);
+  }
+
+  /** The queen lock from this device's engines (solo, the sims: the pass guard); her square, or null: none, or it waits. */
+  async playQueenLock(engines: readonly EngineLike[] = this.opts.engines): Promise<string | null> {
+    return chandyBattle.playQueenLock(this.battle, engines);
+  }
+
+  /** The queen lock's aim (the host's pass guard: PASS_WAIT waits a turn, anything else aims); her square, or null. */
+  applyQueenLock(answer: string | null = null): string | null {
+    return chandyBattle.applyQueenLock(this.battle, answer);
+  }
+
+  /** Chandy's locked squares for his move now (the boss request's `lock`: his engine steered toward them), or null. */
+  bossLocks(): string[] | null {
+    return chandyBattle.steer(this.battle);
   }
 
   /** Boingo's funhouse: he plays the crowd's move this turn (the funhouse's first, once), before the crowd picks. */
@@ -1855,8 +1890,8 @@ export class MatchRunner {
     const b = this.state.boss!;
     const timeout = this.bossOutOfTime() && !this.finalGameOver();
     const winner = this.gameWinner();
-    // (Hollow's last bulb out, Boss alone: his, whatever the board says.)
-    const result = this.bossForceWin ? "crowd" : timeout || this.bossCarrotWin || blackedOut(b) ? "boss" : winner === null ? "draw" : winner === b.crowdSide ? "crowd" : "boss";
+    // (Hollow's last bulb out, Boss alone, and a Dodge hit: his, whatever the board says.)
+    const result = this.bossForceWin ? "crowd" : timeout || this.bossCarrotWin || blackedOut(b) || dodgeWon(b) ? "boss" : winner === null ? "draw" : winner === b.crowdSide ? "crowd" : "boss";
     // (The Hidden Boss's child beaten: the fight goes on, a new match against his adult form (nextBossForm). Nobody is placed.)
     if (b.form === "child" && result === "crowd") {
       this.state = { ...this.state, boss: { ...b, result } };

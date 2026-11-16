@@ -22,9 +22,10 @@ import { FOLIO } from "./folio.ts";
 import { TIMBER } from "./timber.ts";
 import { DASH } from "./dash.ts";
 import { ZEBRA } from "./zebra.ts";
+import { CHANDY } from "./chandy.ts";
 
 /** Every boss with powers, by its BOSS_ROSTER id. */
-const BOSS_RULES: ReadonlyMap<string, BossRules> = new Map([GINGER, BOINGO, GREX, HOLLOW, BIGBOY, SAWYER, PIG, RECLUSE, ALFIL, HOPPER, SMUDGY, MOO, GARDENER, TIGER, FOLIO, TIMBER, DASH, ZEBRA].map((r) => [r.id, r]));
+const BOSS_RULES: ReadonlyMap<string, BossRules> = new Map([GINGER, BOINGO, GREX, HOLLOW, BIGBOY, SAWYER, PIG, RECLUSE, ALFIL, HOPPER, SMUDGY, MOO, GARDENER, TIGER, FOLIO, TIMBER, DASH, ZEBRA, CHANDY].map((r) => [r.id, r]));
 
 /** A boss's rules (null: a boss without powers); in a form of its own, that form's (the Hidden Boss's child: RECLUSE_CHILD_RULES). */
 export const bossRules = (boss: (Pick<BossState, "id"> & { form?: BossState["form"] }) | null | undefined): BossRules | null =>

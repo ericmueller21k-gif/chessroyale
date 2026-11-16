@@ -572,11 +572,13 @@ export function warnThenUnleash(next: BossPowerState, t: TurnContext): boolean {
 export type BossLastMove = { move: string; san: string; staggered?: boolean; captured?: string; through?: StopReason };
 
 /** The power fields `BossRules.stopReason` reads: the same in the match's state and in the screens' view. */
-export type StopFields = Partial<Pick<BossPowerState, "cut" | "boardSaw" | "pies" | "block" | "crease">> & {
+export type StopFields = Partial<Pick<BossPowerState, "cut" | "boardSaw" | "pies" | "block" | "crease" | "turn">> & {
   camo?: { square: string | null } | null;
   garden?: { plants: readonly { square: string }[] } | null;
   hoops?: { blocks: readonly string[] } | null;
   zebra?: { his?: Side; lumps: readonly { square: string }[]; gold: readonly string[] } | null;
+  /** Chandy's effects (the match's state carries each one's crowd turn; the screens' view only this turn's). */
+  chandy?: { scatter?: { squares: readonly string[]; turn?: number } | null; beam?: { squares: readonly string[]; turn?: number } | null; shields?: { squares: readonly string[]; turn?: number } | null } | null;
 };
 
 /**
