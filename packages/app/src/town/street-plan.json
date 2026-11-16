@@ -945,6 +945,36 @@
     "y0": 30.7,
     "y1": 31.85
    }
+  },
+  {
+   "kind": "home",
+   "id": "chandy",
+   "v": 0,
+   "c0": 27,
+   "r0": 8,
+   "w": 4,
+   "d": 3,
+   "facing": "S",
+   "street": "meadow-st",
+   "side": false,
+   "art": "homeBox(\"chandy\")",
+   "name": "Chandy's Swamp",
+   "inset": 0.45,
+   "depth": 2.3,
+   "door": {
+    "c": 29,
+    "r": 7
+   },
+   "rest": {
+    "c": 27,
+    "r": 7
+   },
+   "wander": {
+    "x0": 26.7,
+    "x1": 30.3,
+    "y0": 6.7,
+    "y1": 7.85
+   }
   }
  ],
  "park": {

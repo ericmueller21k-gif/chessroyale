@@ -29,16 +29,19 @@
  *   recluse    The Walk-up                  red-brown brick, three rows of arched windows down each side (it's a corner building:
  *                                           its east side faces Seam Avenue), a flat tar roof behind its cornice, a water tank on
  *                                           its bulkhead (Nov 13, the Hidden Boss's)
+ *   chandy     Chandy's Swamp               no building: cypresses and brush ringing it (leafy walls on its sides and back, their
+ *                                           crowns on top) and the swamp's water filling its middle (Nov 16)
  */
 import type { Character } from "../characters/sprite.ts";
 import type { LightSpot } from "./houses/kit.ts";
 import { HOUSES } from "./houses/index.ts";
+import { HOUSE_CHANDY_DOOR } from "./houses/chandy.ts";
 import {
   BASE, blockF, domeRoof, flatRoof, gableRoof, hipRoof, hipWideRoof, quadF, sideArt, SQ, vaultRoof,
   type Face, type SideSpec, type TownBox,
 } from "./town-kit.ts";
 
-export type HomeId = "tiger" | "gingerbread" | "grex" | "hollow" | "moo" | "clown" | "bigboy" | "sawyer" | "pig" | "smudgy" | "hopper" | "gardener" | "alfil" | "folio" | "timber" | "blitz" | "zebra" | "recluse";
+export type HomeId = "tiger" | "gingerbread" | "grex" | "hollow" | "moo" | "clown" | "bigboy" | "sawyer" | "pig" | "smudgy" | "hopper" | "gardener" | "alfil" | "folio" | "timber" | "blitz" | "zebra" | "recluse" | "chandy";
 
 /** A home's box: its sides (null: its roof runs to the ground there), roof, palette, and where its door is on its front. */
 interface HomeSpec {
@@ -174,6 +177,20 @@ export const HOME_SPECS: Record<HomeId, HomeSpec> = {
     side: { mat: "brick", rows: [{ y: 33, h: 25, arch: true }, { y: 77, h: 25, arch: true }, { y: 121, h: 25, arch: true }], every: 28, trim: [0, 18, 154], plinth: 49 },
     roof: [...flatRoof(8, 136, 208), ...blockF(96, 122, 0.25, 0.6, 208, 222, "clay", "tar"), ...blockF(100, 118, 0.3, 0.55, 222, 236, "plank", "plank")],
     pal: { ...ramp("#6e4a3c", "#93412f", "#a8523b"), g: "#87684f", G: "#5d4636" },
+  },
+  // (Chandy's Swamp, Nov 16: no building. Its sides and back are the trees and brush ringing it, as tall as the street's homes (96 px),
+  // their crowns along the top; inside, the water, low (6 px over the sidewalk). Its door is its boardwalk (houses/chandy.ts).)
+  chandy: {
+    body: [4, 140], eave: [96, 96], door: HOUSE_CHANDY_DOOR,
+    side: { mat: "foliage", corner: false },
+    back: { h: 96, side: { mat: "foliage", corner: false } },
+    roof: [
+      ...flatRoof(4, 140, 6, "water").map((f) => ({ ...f, rim: false })),
+      ...blockF(4, 34, 0, 1, 92, 100, "hedge"),
+      ...blockF(110, 140, 0, 1, 92, 100, "hedge"),
+      ...blockF(34, 110, 0.72, 1, 92, 100, "hedge"),
+    ],
+    pal: { ...ramp("#1f3d1f", "#2f5a2a", "#4f8a3c"), ...roofRamp("#1d3a2c", "#284c37", "#4b7d5d"), r: "#7aae4c", s: "#4f8a3c", S: "#2f5a2a" },
   },
   hollow: {
     body: [28, 124], eave: null, door: 81, taper: 0.55,

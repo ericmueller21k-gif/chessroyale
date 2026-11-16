@@ -68,7 +68,7 @@ import { PAWN_HEAD, PAWN_PX, Renderer, pawnImage, type Hit, type YouArt } from "
 import { dropRiders, leaveRider, ridersHeld, rideArt, shareRider, type Rider, type RiderPawn } from "./rides.ts";
 import { rideSpeed } from "../components/rides/scale.ts";
 import { rideMoving, rideSoundState, rideStep, warmRideSound } from "../ride-sound.ts";
-import { HIDDEN_ROOM, MUSIC, mountOf, secondColor, shownLook, sideOfPawn } from "@chessroyale/core";
+import { BOSS_ROSTER, HIDDEN_ROOM, MUSIC, adminPlayable, mountOf, secondColor, shownLook, sideOfPawn } from "@chessroyale/core";
 import { painter2d, type Backend, type Painter } from "./paint.ts";
 import { painterGL } from "./paint-gl.ts";
 import { reportTownFallback } from "../problems.ts";
@@ -145,6 +145,9 @@ function fitRows(card: HTMLElement): void {
     }
   }
 }
+
+/** A town boss you can challenge: his rules are in (core's roster, with his character and powers). Chandy's home came first (Nov 16). */
+const bossReady = (id: string): boolean => BOSS_ROSTER.some((b) => b.id === id && adminPlayable(b));
 
 export function TownScreen({
   onBack,
@@ -844,9 +847,11 @@ export function TownScreen({
               <>
                 <h2>{home.boss}</h2>
                 {card.line && <p class="town-card-text town-card-line">{card.line}</p>}
-                <button type="button" class="town-btn primary" onClick={() => ctl.current?.confirm()}>
+                {/* (A boss whose rules aren't in yet, Chandy's on Nov 16: Challenge alone greyed, "Coming soon": nothing hidden.) */}
+                <button type="button" class="town-btn primary" disabled={!bossReady(home.id)} onClick={() => ctl.current?.confirm()}>
                   Challenge alone
                 </button>
+                {!bossReady(home.id) && <div class="town-soon">Coming soon</div>}
               </>
             )}
             {/* A home with its inside built (Nov 2: Babur's and Puddles'): its name and "Go in", centered, nothing else (Eric, Nov 2: "chop

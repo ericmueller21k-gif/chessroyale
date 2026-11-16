@@ -173,7 +173,7 @@ export const tableAt = (c: number, r: number): Table | null => TABLES.find((t) =
 /** Your square when the page opens: the street town's start (its plan's). */
 export const START: Sq = STREET_START;
 
-export type HomeId = "tiger" | "gingerbread" | "grex" | "hollow" | "moo" | "clown" | "bigboy" | "sawyer" | "pig" | "smudgy" | "hopper" | "gardener" | "alfil" | "folio" | "timber" | "dash" | "zebra" | "recluse";
+export type HomeId = "tiger" | "gingerbread" | "grex" | "hollow" | "moo" | "clown" | "bigboy" | "sawyer" | "pig" | "smudgy" | "hopper" | "gardener" | "alfil" | "folio" | "timber" | "dash" | "zebra" | "recluse" | "chandy";
 /**
  * The homes whose boss isn't out in the town: Rolling Dough (Nov 11, Eric's design: Don Dough is the kingpin "in the back room (not
  * out in the town)"; you meet him in his bakery's back room). They're last in ALL_HOMES, so the town's bosses keep the homes' order.
@@ -298,6 +298,10 @@ export const ALL_HOMES: readonly Home[] = (
     // In an admin's town only while he's in the game for admins first (core's BOSS_ADMIN_FIRST; his Boss Battle tile stays locked:
     // adminOnly). His name is core's one string. docs/decisions/2026-11-13-hidden-boss-building.md.)
     { id: "recluse", boss: RECLUSE_NAME, name: "The Walk-up", color: "#8a3b2a", cx: 45, cy: 7 },
+    // (Nov 16: Chandy's Swamp, the special ops alligator's: no building, cypresses ringing a swamp. The street town: its lot on Meadow
+    // Street between Wrangler's Stall and Moo & Moon Meadow (street-plan.json). He roams out front as any boss. Its ring his green. In an
+    // admin's town only while he's in the game for admins first (core's BOSS_ADMIN_FIRST). docs/decisions/2026-11-16-chandy-home.md.)
+    { id: "chandy", boss: "Chandy", name: "Chandy's Swamp", color: "#4f8a3c", cx: 28, cy: 9 },
   ] satisfies Omit<Home, "half" | "foot" | "hw" | "hd" | "door" | "entry" | "rest" | "wander">[]
 ).map(streetHome);
 /**

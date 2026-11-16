@@ -1867,7 +1867,9 @@ export const BOSS_POWERS = {
 // (Nov 13: "recluse", the Hidden Boss, was here for a day, so his walk-up was an admin's only; Eric, Nov 13: "It doesn't need to be admin
 // only... the site is behind Cloudflare": out again, his building, rooms and challenge for everyone signed in. His Boss Battle tile
 // stays locked: he's `adminOnly` in the roster, met only from his room and the Crowd's final.)
-export const BOSS_ADMIN_FIRST: readonly string[] = ["timber", "dash", "zebra"];
+// (Nov 16: "chandy", ahead of his rules: his home, Chandy's Swamp, is in an admin's town only, as Timber's and Dash's were first. Not in
+// the roster yet (his rules are the next job): adminFirst checks the id alone.)
+export const BOSS_ADMIN_FIRST: readonly string[] = ["timber", "dash", "zebra", "chandy"];
 
 /**
  * How Sawyer's split pawn looks (packages/app/src/components/Sawyer.tsx). Looks only: the rules, the engine and the

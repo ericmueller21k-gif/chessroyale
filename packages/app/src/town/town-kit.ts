@@ -83,7 +83,7 @@ export function paletteOf(cw: Colourway): Record<string, string> {
 
 // ---- The materials: one texture each, keyed a/b/c (dark, mid, light of the wall), so a colourway's palette tints it.
 // The fronts paint their walls with the same functions, so a side carries the front's material round the corner exactly.
-export type Mat = "brick" | "siding" | "plaster" | "stone" | "log" | "plank" | "glass" | "ice" | "canvas" | "paper" | "gingerbread" | "turf" | "slat" | "rock" | "sandstone" | "stripe";
+export type Mat = "brick" | "siding" | "plaster" | "stone" | "log" | "plank" | "glass" | "ice" | "canvas" | "paper" | "gingerbread" | "turf" | "slat" | "rock" | "sandstone" | "stripe" | "foliage";
 /** A material's key at (x, y) on a wall (px; y from the wall's top). */
 export const MAT: Record<Mat, (x: number, y: number) => string> = {
   brick: (x, y) => (y % 5 === 4 ? "a" : (x + (Math.floor(y / 5) % 2) * 4) % 8 === 0 ? "a" : grain(x >> 3, (y / 5) | 0, 3) > 0.85 ? "c" : "b"),
@@ -102,6 +102,8 @@ export const MAT: Record<Mat, (x: number, y: number) => string> = {
   gingerbread: (x, y) => (grain(x, y, 12) > 0.94 ? "a" : grain(x, y, 13) > 0.95 ? "c" : "b"),
   turf: (x, y) => (grain(x, y, 14) > 0.8 ? "a" : grain(x, y, 15) > 0.85 ? "c" : "b"),
   rock: (x, y) => (grain(x >> 2, y >> 2, 16) > 0.82 ? "c" : grain(x, y, 17) > 0.9 ? "a" : "b"),
+  // (Chandy's Swamp, Nov 16: the cypresses and brush ringing it, seen from the side: leafy clumps, lit at their tops.)
+  foliage: (x, y) => (grain(x >> 2, (y + 2 * Math.sin(x * 0.3)) / 3 | 0, 44) > 0.7 ? "c" : grain(x, y, 45) > 0.86 ? "a" : (y + (x >> 3)) % 9 < 2 ? "a" : "b"),
 };
 
 /** A sash window: a trim frame, glass lit top-left, a glint, mullions, a sill (and shutters in `shut`). */
@@ -218,7 +220,7 @@ export function sideArt(id: string, pal: Record<string, string>, spec: SideSpec,
 }
 
 // ---- Roof tiles: 37 x 37 top-down textures (rows run along the tile's x), keyed in the roof's ramp (d e f) or a material's.
-export type RoofTex = "wall" | "wallstone" | "wallplain" | "crumb" | "shingle" | "slate" | "clay" | "tar" | "glass" | "canvas" | "turf" | "hedge" | "sand" | "icing" | "paper" | "plank" | "crystal" | "quilt" | "grass" | "metal" | "thatch" | "seats" | "podium";
+export type RoofTex = "wall" | "wallstone" | "wallplain" | "crumb" | "shingle" | "slate" | "clay" | "tar" | "glass" | "canvas" | "turf" | "hedge" | "sand" | "icing" | "paper" | "plank" | "crystal" | "quilt" | "grass" | "metal" | "thatch" | "seats" | "podium" | "water";
 export const ROOF_TILES: Record<RoofTex, (x: number, y: number) => string> = {
   wall: (x, y) => MAT.brick(x, y),
   wallstone: (x, y) => MAT.stone(x, y),
@@ -249,6 +251,8 @@ export const ROOF_TILES: Record<RoofTex, (x: number, y: number) => string> = {
     if (s % 3 === 1 && x % 37 >= 15 && x % 37 < 22 && d > 0) return d === 1 ? "X" : "x";
     return d === 0 ? "5" : d === 1 ? "1" : d < 4 ? "2" : "3";
   },
+  // (Chandy's Swamp, Nov 16: the swamp's water from above, in the roof's ramp (d dark, e mid, f a sheen): long streaks of sheen, ripples.)
+  water: (x, y) => ((y % 7 === 0 && grain(x >> 3, y, 46) > 0.55) || grain(x, y, 47) > 0.97 ? "f" : grain(x >> 1, y >> 1, 48) > 0.62 ? "e" : "d"),
   podium: (x, y) => ((Math.floor((x * 5) / 37) + Math.floor((y * 5) / 37)) % 2 ? "L" : "D"),
 };
 /** A roof tile as a Character (37 x 37, no outline) in a palette: what the box renderer textures a face with. */
