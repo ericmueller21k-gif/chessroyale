@@ -355,8 +355,8 @@ test("50 v 50 Party reloads (the fix round of #747, M2) and the leader leaving m
   const ann = await player(browser, "Ann Lead");
   const bo = await player(browser, "Bo Member");
   await befriend(ann, bo);
-  // (`partyfill`: this party's lobbies fill 45 s after they open, so a member can reload inside one: production's wait is 60 s.)
-  for (const p of [ann.page, bo.page]) await p.goto(`/?nolanding&debug&pool=${q}&partyfill=45`);
+  // (`partyfill`: this party's lobbies fill 70 s after they open, so (b) still has room after (a)'s 21 s wait: production's is 60 s.)
+  for (const p of [ann.page, bo.page]) await p.goto(`/?nolanding&debug&pool=${q}&partyfill=70`);
   await pickMode(ann.page, "50 v 50");
   await ann.page.getByRole("radiogroup", { name: "Matchmaking" }).getByRole("radio", { name: /^Party/ }).click();
   await ann.page.getByRole("button", { name: "PLAY", exact: true }).click();
