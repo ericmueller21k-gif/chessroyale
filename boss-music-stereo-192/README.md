@@ -23,3 +23,13 @@ said "that's so good ... I like the second one", then asked for it longer ("2 mi
 45 seconds just plays. It's less repetitive"): this is the 2:45 one, the same sections with two of them longer. It
 replaces the 120.0 s file of commit 43f2700f (same name: `loopSeconds` is what changed). The loop point is clean on
 the built file (the climax falls into the quiet opening, as his plan has it).
+
+## Nov 16: Chandy's theme (`chandy`)
+
+`chandy-loop.mp3` / `.ogg` (stereo, 192 kbps), and its entry in this folder's `themes.json`: one loop of 155.844146 s
+(2:36), no intro piece (`introSeconds` 0), pad 0.5 as the others, bpm 154, -16.8 LUFS, peak -1.1 dBFS. Built by
+`python3 handoff.py --stereo --kbps 192 <folder> chandy` from `scripts/reel/music/song_ag.py` on `claude/trailer-v2`.
+Eric's own plan for the song (a fast breakbeat with a saw lead and an organ solo), built as written; on hearing it: "It's
+the new one, Chandy, that's being built right now, and it sounds great. Nothing to fix." The loop point is clean on the
+built file. Chandy is not in the roster yet, so `chandy` is my guess at his id: rename the entry and the files if his
+roster id is different.
