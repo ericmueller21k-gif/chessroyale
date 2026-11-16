@@ -182,6 +182,18 @@ export interface RushView {
   moved: Record<string, number>;
 }
 
+/**
+ * Chandy's Dodge on this device's clock (online: `local` of the server's start): its key, when it began, the round being voted on, its
+ * counts so far, and your own vote in it. The clones, the teleports as they come and each round's result are in the boss's view.
+ */
+export interface DodgeRun {
+  key: string;
+  at: number;
+  round: number;
+  votes: Record<string, number>;
+  mine?: string;
+}
+
 /** The reveal: your group's picks and scores (same shape the server sends). */
 export type GroupReveal = Pick<BoardRound, "fenBefore" | "bestMove" | "playerIds" | "king" | "kingCalls" | "lastStand"> & {
   result: Pick<BoardRound["result"], "players" | "playedMove" | "drawRule" | "brilliant">;
@@ -229,7 +241,7 @@ export type Phase =
    * the loading step before the intro, while the boss's Maia brain loads (maia-gate.ts): the intro's first frame, held;
    * `afterLoading`: the intro that follows it. `toPhase2` (with `fall`): the Hidden Boss beaten, his phase change next (solo).
    */
-  | { kind: "boss"; boss: BossView; until: number; thinking?: boolean; intro?: boolean; loading?: boolean; afterLoading?: boolean; lights?: LightsView; rush?: RushView; fall?: boolean; toPhase2?: boolean }
+  | { kind: "boss"; boss: BossView; until: number; thinking?: boolean; intro?: boolean; loading?: boolean; afterLoading?: boolean; lights?: LightsView; rush?: RushView; dodge?: DodgeRun; fall?: boolean; toPhase2?: boolean }
   /**
    * The Hidden Boss's phase change (`at`: when it began; PHASE_CHANGE in recluse-phase2.ts): the book's slam, the board
    * split into four, his revive, the Chess960 shuffle; `splitAt`: when the board cracks into four, Date.now()'s clock, where his
@@ -426,6 +438,8 @@ export interface GameView {
   lightsTap(square: string): void;
   /** Dash's Scramble Rush: you put the swept piece that stood on `from` (before his sweep) on `to`, while its countdown is on. */
   rushPlace(from: string, to: string): void;
+  /** Chandy's Dodge: your vote for the king's square in the round on (a later tap replaces it). */
+  dodgeVote(square: string): void;
   /** Quick chat (online matches only; see `enabled`). */
   readonly chat?: MatchChat;
   /** It counts for your ranking (at least 30% real players; never solo). Null or missing: not known (yet). */

@@ -26902,6 +26902,64 @@ body.cs-on .mm-scrim {
 /* ---- Chandy (art, Nov 16; docs/decisions/2026-11-16-chandy-art.md; his rules job places these): his upgrade window
    (components/ChandyUpgrade.tsx: the God King's command-window look, front and center over the board, 2 s) and Dodge
    (components/ChandyDodge.tsx: laid over the board's box, in eighths of --board-size). */
+/* Chandy's row under his rage meter (components/Chandy.tsx, ChandyBar): his rifle's five pips and his move meter, the rage meter's width
+   on a phone, greyed until his first upgrade (nothing hidden, nothing shifts). */
+.ch-bar {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  width: 44px;
+  height: 6px;
+}
+.ch-bar.ch-off {
+  opacity: 0.4;
+}
+.ch-pips {
+  display: flex;
+  gap: 1px;
+  flex: none;
+}
+.ch-pips > i {
+  display: block;
+  width: 3px;
+  height: 6px;
+  border-radius: 1px;
+  background: rgba(0, 0, 0, 0.45);
+  box-shadow: inset 0 0 0 1px rgba(88, 230, 255, 0.45);
+}
+.ch-pips > i.on {
+  background: #58e6ff;
+}
+.ch-meter {
+  position: relative;
+  flex: 1;
+  height: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 3px;
+  box-sizing: border-box;
+  background: rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+}
+.ch-meter > i {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: linear-gradient(90deg, #129cc3, #58e6ff);
+  transition: width 600ms ease-out;
+}
+@media (min-width: 900px) and (min-height: 600px) {
+  .boss-bar .ch-bar {
+    width: 88px;
+    height: 10px;
+    gap: 4px;
+  }
+  .boss-bar .ch-pips > i {
+    width: 6px;
+    height: 10px;
+  }
+  .boss-bar .ch-meter {
+    height: 10px;
+  }
+}
 .ch-upgrade {
   position: absolute;
   left: 50%;

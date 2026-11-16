@@ -1141,7 +1141,7 @@ export const BOSS_POWERS = {
    * the raid sim (reports/folio-sim.md). Dash 1 (Nov 3): about 1.9 Time Scrambles a battle of 46 moves in the
    * raid sim with the player's clock, the crowd 0.15 (reports/dash-sim.md).
    */
-  rageSpeed: { gingerbread: 1.2, clown: 1.8, grex: 1.2, hollow: 1, bigboy: 1, sawyer: 1.3, alfil: 1.2, smudgy: 1, moo: 1, gardener: 1.2, tiger: 1.3, folio: 1.3, timber: 0.7, dash: 1, zebra: 1 } as Readonly<Record<string, number>>,
+  rageSpeed: { gingerbread: 1.2, clown: 1.8, grex: 1.2, hollow: 1, bigboy: 1, sawyer: 1.3, alfil: 1.2, smudgy: 1, moo: 1, gardener: 1.2, tiger: 1.3, folio: 1.3, timber: 0.7, dash: 1, zebra: 1, chandy: 1 } as Readonly<Record<string, number>>,
   /**
    * The Hidden Boss's ultimate, the bullet clock (Eric, Oct 14: "Meter builds starting turn 1, about 7 turns in he says
    * something about how you're thinking too much and to just play pure chess etc, true to him, then for the rest of phase 1
@@ -1749,9 +1749,10 @@ export const BOSS_POWERS = {
    * Nov 2: "make it so this beaver only ults up to 2 times a game. After 2 times, his meter just stops charging. Otherwise, it's
    * too strong."): after his second his meter stays empty and dimmed for the rest of the battle, and the admins' trigger is gone.
    * (Smudgy's Repaint keeps its own cap, repaintMax.) docs/decisions/2026-11-02-nov2-fixes.md. Dash's Time Scramble at most twice
-   * (Eric, Nov 6: "about twice a game"; his Scramble Rush is his once-a-battle power besides).
+   * (Eric, Nov 6: "about twice a game"; his Scramble Rush is his once-a-battle power besides). Chandy's Dodge once (Eric, Nov 16:
+   * "He only ults once per game, no matter what").
    */
-  maxUltimates: { timber: 2, dash: 2, zebra: 2 } as Readonly<Record<string, number>>,
+  maxUltimates: { timber: 2, dash: 2, zebra: 2, chandy: 1 } as Readonly<Record<string, number>>,
   /**
    * Dash's Clock Slap (his passive; Eric's design, Nov 1; bosses/dash.ts; docs/decisions/2026-11-03-dash.md): each capture of
    * his steals time from your clock. On a time bank (Boss alone and a Boss Battle party: BOSS_CLOCK's 10 + 10, the team's one
@@ -1857,6 +1858,58 @@ export const BOSS_POWERS = {
   doughLeadMax: 2,
   /** A queen's lump (rare: doughOdds) comes whatever the lead (Eric: "on occasion, he may throw out a queen"). */
   doughQueenFree: true,
+  /**
+   * Chandy (bosses/chandy.ts; Eric's design, Nov 15-16: DESIGN.md on branch stills/boss-chandy; docs/decisions/2026-11-16-chandy-rules.md).
+   * - **The locks** (L1-L6): the first comes as one of his turns begins, from his `firstLockMove`-th move, on a piece of yours he can
+   *   take now without losing material (never your king or queen); then at the end of each of his turns he locks your most capturable
+   *   piece, `maxLocks` at most, a second once the first is `secondAfter` of his turns old. A lock hunts for `huntTurns` of his turns,
+   *   and lives on to `liveTurns` while the piece is still gettable. His engine is steered within the margins (L3): of its top
+   *   `lockLines` moves, one taking a locked piece within `takeMargin` pawns of his best is played; else one attacking a locked piece
+   *   (or adding an attacker) within `chaseMargin`.
+   * - **The rifle:** each locked piece he takes is an upgrade (`upgradesMax`), each unlocking one of his five moves at random; the
+   *   upgrade window holds everything `upgradeMs` (Eric: 2 s).
+   * - **The move meter:** from the first upgrade, full every `meterEvery` of your moves; it fires a random unlocked move (a new unlock
+   *   first). Scatter shot blocks `scatterSquares` squares round a spot (a pick of the top `looks`, as every pick of his below);
+   *   shields cover `shieldCount` of his pieces; rapid fire stuns `rapidCount` of yours.
+   * - **Dodge** (his ultimate, once a battle: maxUltimates.chandy; Eric, Nov 16: "He only ults once per game, no matter what"; "It
+   *   should fire after he gets all 5 upgrades ... it should be ulting most games"): his rage meter is dimmed until the rifle is whole,
+   *   then fills over `dodgeAfterMoves` of your moves (nothing else fills or drains it); full, the usual warning, then Dodge as your
+   *   next turn begins. **Last chance** (Eric, Nov 16): as your turn begins, if he hasn't used it and you have a move that mates him,
+   *   Dodge comes now, whatever his rifle or meter (the warning with it); you may still play the mate after. `dodgeRounds` rounds, each
+   *   a `dodgeVoteMs` vote (and the server's `dodgeGraceMs` for lag), the clones teleporting at `dodgeTeleports`' times into each round's
+   *   vote (the last always 1.2 s before it closes: a unit test), the beats between them (`dodgeScopeMs` … `dodgeResultMs`). A bot
+   *   finds the safe square with `dodgeBotHit`'s chance.
+   * The sim's (reports/chandy-sim.md).
+   */
+  chandy: {
+    firstLockMove: 3,
+    maxLocks: 2,
+    secondAfter: 2,
+    huntTurns: 3,
+    liveTurns: 5,
+    lockLines: 5,
+    takeMargin: 2,
+    chaseMargin: 0.75,
+    upgradesMax: 5,
+    upgradeMs: 2000,
+    meterEvery: 6,
+    looks: 3,
+    scatterSquares: 4,
+    shieldCount: 2,
+    rapidCount: 3,
+    dodgeRounds: 3,
+    dodgeVoteMs: 3000,
+    dodgeGraceMs: 300,
+    dodgeTeleports: [[1200], [900, 1600], [800, 1400, 1800]] as readonly (readonly number[])[],
+    dodgeScopeMs: 600,
+    dodgeSlideMs: 600,
+    dodgeOpenMs: 400,
+    dodgeLockedMs: 700,
+    dodgeBlastMs: 700,
+    dodgeResultMs: 1200,
+    dodgeBotHit: 0.6,
+    dodgeAfterMoves: 3,
+  },
 } as const;
 
 /**
@@ -1867,8 +1920,8 @@ export const BOSS_POWERS = {
 // (Nov 13: "recluse", the Hidden Boss, was here for a day, so his walk-up was an admin's only; Eric, Nov 13: "It doesn't need to be admin
 // only... the site is behind Cloudflare": out again, his building, rooms and challenge for everyone signed in. His Boss Battle tile
 // stays locked: he's `adminOnly` in the roster, met only from his room and the Crowd's final.)
-// (Nov 16: "chandy", ahead of his rules: his home, Chandy's Swamp, is in an admin's town only, as Timber's and Dash's were first. Not in
-// the roster yet (his rules are the next job): adminFirst checks the id alone.)
+// (Nov 16: "chandy": his home, Chandy's Swamp, came first, in an admin's town only, as Timber's and Dash's did; then his rules
+// (docs/decisions/2026-11-16-chandy-rules.md): in the roster now, an admin's in every mode until Eric says go.)
 export const BOSS_ADMIN_FIRST: readonly string[] = ["timber", "dash", "zebra", "chandy"];
 
 /**

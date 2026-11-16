@@ -3,7 +3,7 @@
  * boss's server-side moments live in its own file and the lobby only routes to them.
  */
 import type { Settings } from "@chessroyale/core";
-import type { MatchRunner, NetRush, NetStanding } from "@chessroyale/chess";
+import type { MatchRunner, NetDodge, NetRush, NetStanding } from "@chessroyale/chess";
 import type { Human, LobbyRecord, Outgoing, Timer } from "../lobby.ts";
 
 export interface BossLobby {
@@ -19,7 +19,7 @@ export interface BossLobby {
   /** On with the match: the next step of the boss's turn, or the crowd's turn. */
   nextRound(): void;
   /** The boss's screen to everyone (`rush`: Dash's Scramble Rush on). */
-  broadcastBoss(until: number, opts?: { rush?: NetRush }): void;
+  broadcastBoss(until: number, opts?: { rush?: NetRush; dodge?: NetDodge }): void;
   /** A crowd turn in progress (a pick sent another way, as Hollow's dark sends a move attempt). */
   doneThisRound(playerId: string): boolean;
   thinkTime(round: NonNullable<LobbyRecord["round"]>, upTo: number): number;

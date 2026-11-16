@@ -1,7 +1,7 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { afterEach, describe, expect, it } from "vitest";
 import { BOSS_BANNER, BANNER_PLUS_MS, DEFAULT_SETTINGS, SQUADS, bannerPlusMs, bossBannerMs, setBannerPlusSource, voteResultMs, type PowerEventKind } from "@chessroyale/core";
-import { ALFIL_BEATS, BLOCK, BOARD_SAW, BOSS_INTRO, BOUNCE, HOOPS_BEATS, HOPPER_BEATS, KING_COMMAND, KING_SUMMON, LAST_STAND, LIGHTS_OUT, POWER_BANNERS, POWER_FX, PULL, RECLUSE_FX, SAW_CUT, SHOWDOWN, SPLIT, START_FEN, bannerLeadMs, bannerWaitMs, bossIntroTimeline, bossShowMs, bossThinkMs, kingStrikeMs, lastStandMs, lightsOutTimeline, powerFxMs, powerMomentMs } from "@chessroyale/chess";
+import { CHANDY_FIRE_AT, ALFIL_BEATS, BLOCK, BOARD_SAW, BOSS_INTRO, BOUNCE, HOOPS_BEATS, HOPPER_BEATS, KING_COMMAND, KING_SUMMON, LAST_STAND, LIGHTS_OUT, POWER_BANNERS, POWER_FX, PULL, RECLUSE_FX, SAW_CUT, SHOWDOWN, SPLIT, START_FEN, bannerLeadMs, bannerWaitMs, bossIntroTimeline, bossShowMs, bossThinkMs, kingStrikeMs, lastStandMs, lightsOutTimeline, powerFxMs, powerMomentMs } from "@chessroyale/chess";
 import { WARN, PowerBanner, PowerMoment, momentAt, momentsOf } from "../src/components/BossPowers.tsx";
 import { HOPPER_UI } from "../src/components/Hopper.tsx";
 import { SMUDGY_UI } from "../src/components/Smudgy.tsx";
@@ -12,6 +12,7 @@ import { FOLIO_BEATS, FOLIO_UI } from "../src/components/Folio.tsx";
 import { TIMBER_UI } from "../src/components/Timber.tsx";
 import { DASH_UI } from "../src/components/Dash.tsx";
 import { ZEBRA_BEATS, ZEBRA_UI } from "../src/components/Zebra.tsx";
+import { CHANDY_UI } from "../src/components/Chandy.tsx";
 import { BIGBOY_UI } from "../src/components/BigBoy.tsx";
 import { BOINGO_UI, FUNHOUSE, PIE, SPIN, funhouseFlipAt } from "../src/components/Boingo.tsx";
 import { BLIZZARD, FREEZE, GINGER_UI, THAW } from "../src/components/Ginger.tsx";
@@ -39,7 +40,7 @@ const css = readFileSync(new URL("../src/styles.css", import.meta.url), "utf8");
 
 /** Every power moment's view, by kind (the rage warning and each boss's). */
 const VIEWS: Partial<Record<PowerEventKind, { ui: MomentUi; boss: string; name: string }>> = {};
-for (const [ui, name] of [[GINGER_UI, "Ginger"], [BOINGO_UI, "Boingo"], [GREX_UI, "Jefferson"], [HOLLOW_UI, "Hollow"], [BIGBOY_UI, "Big Boy"], [SAWYER_UI, "Sawyer"], [PIG_UI, "Wrangler"], [RECLUSE_UI, "Hidden Boss"], [ALFIL_UI, "Alfil"], [HOPPER_UI, "Chub & Chirp"], [SMUDGY_UI, "Smudgy"], [MOO_UI, "Moo & Moon"], [GARDENER_UI, "Puddles"], [TIGER_UI, "Babur"], [FOLIO_UI, "Folio"], [TIMBER_UI, "Timber"], [DASH_UI, "Dash"], [ZEBRA_UI, "Don Dough"]] as const) {
+for (const [ui, name] of [[GINGER_UI, "Ginger"], [BOINGO_UI, "Boingo"], [GREX_UI, "Jefferson"], [HOLLOW_UI, "Hollow"], [BIGBOY_UI, "Big Boy"], [SAWYER_UI, "Sawyer"], [PIG_UI, "Wrangler"], [RECLUSE_UI, "Hidden Boss"], [ALFIL_UI, "Alfil"], [HOPPER_UI, "Chub & Chirp"], [SMUDGY_UI, "Smudgy"], [MOO_UI, "Moo & Moon"], [GARDENER_UI, "Puddles"], [TIGER_UI, "Babur"], [FOLIO_UI, "Folio"], [TIMBER_UI, "Timber"], [DASH_UI, "Dash"], [ZEBRA_UI, "Don Dough"], [CHANDY_UI, "Chandy"]] as const) {
   for (const [kind, m] of Object.entries(ui.moments)) VIEWS[kind as PowerEventKind] = { ui: m as MomentUi, boss: ui.id, name };
 }
 VIEWS.warn = { ui: WARN, boss: "bigboy", name: "Big Boy" };
@@ -97,6 +98,12 @@ const POWER_AT: Partial<Record<PowerEventKind, number>> = {
   revision: FOLIO_BEATS.revision.strikeAt[0],
   // (Don Dough's Gold Plate: his first stroke gilds the piece.)
   goldPlate: ZEBRA_BEATS.gold.gildAt,
+  // (Chandy's meter's moves: his shot.)
+  scatterShot: CHANDY_FIRE_AT,
+  beam: CHANDY_FIRE_AT,
+  shields: CHANDY_FIRE_AT,
+  rapidFire: CHANDY_FIRE_AT,
+  queenAim: CHANDY_FIRE_AT,
 };
 
 /** Each power's banner on screen on Oct 15, ms (its window, at most the 2.5 s it slid off by then). */

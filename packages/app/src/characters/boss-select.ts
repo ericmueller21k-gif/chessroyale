@@ -8,6 +8,7 @@
  * decision file); an approved set replaces a boss's list here, in one edit.
  */
 import type { SoundName } from "../sound.ts";
+import { CHANDY_SELECT_FRAMING } from "./chandy.ts";
 
 /** Each boss's sound as it steps onto the stage, by its roster id. */
 export const SELECT_SOUND: Readonly<Record<string, SoundName>> = {
@@ -45,6 +46,8 @@ export const SELECT_SOUND: Readonly<Record<string, SoundName>> = {
   dash: "dashHello",
   // His bread rifle's little pop, then his belly laugh.
   zebra: "zebraPop",
+  // Chandy: his rifle's zap (a placeholder from Moo's pack until his own: chandy.ts CHANDY_CUES).
+  chandy: "mooZap",
   // The Hidden Boss: his low, ominous hum (the stare).
   recluse: "recluseHum",
 };
@@ -90,6 +93,8 @@ export const SELECT_LINES: Readonly<Record<string, readonly string[]>> = {
   timber: ["Hard hats on. We're building today.", "Measure twice, checkmate once.", "Got wood? I've got plenty."],
   dash: ["Yo yo yo! Dash in the building, cuz!", "Sup, cuz. Ready to get cooked?", "Bet. Let's run it, broski."],
   zebra: ["Nothing here but a bakery.", "You want a game? Sit down, kid.", "Pop! Ha! Relax, it's just a roll."],
+  // Chandy (placeholders for Eric, Nov 16): his select and challenge lines.
+  chandy: ["You're already in my sights.", "Hold still. This won't take long.", "One shot. That's all I need."],
   // The Hidden Boss (Eric's own first line; never named on screen): the two in turn.
   recluse: ["Team up on me. It wouldn't be the first time anyone did that.", "You're not ready to fight me yet."],
 };
@@ -191,6 +196,8 @@ export const SELECT_FRAMING: Readonly<Record<string, Framing>> = {
   dash: { neck: [36, 44], span: 54, at: 0.5 },
   // (His fedora and the white of his face in the tile, his round belly and the planks' end below it.)
   zebra: { neck: [40, 56], span: 58, at: 0.5 },
+  // (His head, lens and war paint in the tile, the slung rifle over his shoulder: the art's framing, chandy.ts.)
+  chandy: CHANDY_SELECT_FRAMING,
   recluse: { neck: [33, 47], span: 61, at: 0.5 },
 };
 
@@ -223,6 +230,8 @@ export const SELECT_TINT: Readonly<Record<string, string>> = {
   dash: "#5a3f8e",
   // (A bakery pink, across from his white fur and dark stripes; his vest's maroon stays clear of it.)
   zebra: "#d9667a",
+  // (A deep berry, across the wheel from his green and away from his rifle's cyan.)
+  chandy: "#8a3a52",
 };
 
 /**
@@ -248,5 +257,7 @@ export const GOODBYE_LINES: Readonly<Record<string, string>> = {
   timber: "That was fun! Come back anytime, the sawdust is fresh.",
   dash: "That was fun, bro. Come back anytime. No cap.",
   zebra: "Good game, kid. Come back for fresh bread anytime.",
+  // (A placeholder for Eric, Nov 16.)
+  chandy: "Good game. I'll keep you in my sights.",
   recluse: "Good game. Come back and bring a better opening.",
 };

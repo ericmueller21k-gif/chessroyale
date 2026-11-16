@@ -71,6 +71,7 @@ export * from "./bosses/folio.ts";
 export * from "./bosses/timber.ts";
 export * from "./bosses/dash.ts";
 export * from "./bosses/zebra.ts";
+export * from "./bosses/chandy.ts";
 export * from "./bosses/index.ts";
 
 /** A battle's powers as it starts (nothing has happened yet; the first turn is set up by prepareTurn). */
@@ -284,12 +285,15 @@ export function rageOf(boss: BossState | null | undefined, s: RageRates = BOSS_P
 
 /**
  * The meter is held empty: an ultimate came and its effect still runs, or (spentMeterShown: Timber's) the last a battle allows
- * has come (the screens show it paused).
+ * has come (the screens show it paused). A meter of its own (Wrangler's) is never paused, unless it's kept on the bar once spent
+ * (spentMeterShown: Chandy's after his one Dodge).
  */
 export const ragePaused = (boss: BossState | null | undefined): boolean => {
   const p = boss?.powers;
   const rules = bossRules(boss);
-  return !!p && p.ultAt !== undefined && turnOf(boss!) > p.ultAt && !rules?.meter && (!ultimateSpent(boss) || !!rules?.spentMeterShown);
+  if (!p || p.ultAt === undefined || turnOf(boss!) <= p.ultAt) return false;
+  if (rules?.meter) return !!rules.spentMeterShown && ultimateSpent(boss);
+  return !ultimateSpent(boss) || !!rules?.spentMeterShown;
 };
 
 // ---------------- The judge plays by the same rules ----------------

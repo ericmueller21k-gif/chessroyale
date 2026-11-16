@@ -3,8 +3,8 @@ import { asAdmin, tapInTown, test, townReady } from "./helpers.ts";
 
 /**
  * Chandy's Swamp (Nov 16; docs/areas/town-square.md, "Chandy's Swamp"), on a phone and a computer, as an admin (Chandy is in the game for
- * admins first, his rules still to come): his card out front, its Challenge alone greyed with "Coming soon" (nothing hidden); in through
- * the boardwalk to the swamp under the town's sky. Then his rise, played to its wipe by the test switch `introPreview` (no battle yet):
+ * admins first): his card out front, its Challenge alone open since his rules landed (docs/decisions/2026-11-16-chandy-rules.md); in
+ * through the boardwalk to the swamp under the town's sky. Then his rise, played to its wipe by the test switch `introPreview`:
  * the board's post rises first, the platform lifts you both, the crates land, his entrance, his water rising over the screen. Every step
  * and height is recorded in the page, a frame at a time, from before it starts (`__shopIntro`'s `swamp`).
  * Test hooks: the room's canvas (`data-room`, `data-ready`), `__shopIntro()`.
@@ -21,13 +21,13 @@ async function chandyCard(page: Page) {
   return card;
 }
 
-test("Chandy's Swamp: his Challenge greyed until his rules land; in by the boardwalk to the swamp under the sky", async ({ page }) => {
+test("Chandy's Swamp: his Challenge open (his rules are in); in by the boardwalk to the swamp under the sky", async ({ page }) => {
   await asAdmin(page);
   await page.goto("/town?sky=day");
   await townReady(page);
   const card = await chandyCard(page);
-  await expect(card.getByRole("button", { name: "Challenge alone" })).toBeDisabled();
-  await expect(card.getByText("Coming soon")).toBeVisible();
+  await expect(card.getByRole("button", { name: "Challenge alone" })).toBeEnabled();
+  await expect(card.getByText("Coming soon")).toHaveCount(0);
   await page.keyboard.press("Escape");
   const home = page.getByRole("dialog", { name: "Chandy's Swamp", exact: true });
   await tapInTown(page, "home", "chandy", home);

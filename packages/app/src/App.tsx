@@ -2338,7 +2338,7 @@ export function App() {
       // (The loading step, then the intro on a screen of its own: the intro's timeline starts as it mounts.)
       return (
         <>
-          <BossScreen key={p.loading ? "boss-loading" : "boss"} match={match} boss={p.boss} until={p.until} thinking={p.thinking} intro={p.intro} loading={p.loading} afterLoading={p.afterLoading} lights={p.lights} rush={p.rush} fall={p.fall} />
+          <BossScreen key={p.loading ? "boss-loading" : "boss"} match={match} boss={p.boss} until={p.until} thinking={p.thinking} intro={p.intro} loading={p.loading} afterLoading={p.afterLoading} lights={p.lights} rush={p.rush} dodge={p.dodge} fall={p.fall} />
           {/* (The Hidden Boss beaten, his phase change next: his cutscene over his fall's screen, from its moment: solo's, or the server's.) */}
           {p.fall && p.toPhase2 && match.cutscene && <RecluseCutscene key={match.cutscene.at} at={match.cutscene.at} until={match.cutscene.until} />}
         </>

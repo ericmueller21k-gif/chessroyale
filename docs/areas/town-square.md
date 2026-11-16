@@ -885,14 +885,14 @@ exception: about 7 squares from Ginger's igloo (`town-camera.test.ts`).
   Hidden Boss's walk-up": the door, up two flights, his card,
   back down; `STILLS=<dir>` writes the stills).
 
-## Chandy's Swamp (Nov 16; an admin's town only until his rules land)
+## Chandy's Swamp (Nov 16; an admin's town only, as Chandy is admins first)
 
 - **Front** (`houses/chandy.ts`, 144 × 170): cypresses as tall as the row houses, a pond between going back to a far bank half way up
   (paler far off, ripples closer together), a wood behind whose canopy closes the lot off, its boardwalk the door; Meadow Street 26-29.
   Its box: `foliage` walls (leaf clumps, a ragged top, no ink edges), `water` inside (town-kit.ts). It's open (`street.ts
   OPEN_HOMES`): South Street's row behind leaves its stretch open, as no front may stand inside its box (Nov 16, round 3).
 - **Room** (`shops/chandy-art.ts`): roof `sky` (the town's sky as it loads, `LIT_ROOMS`), water floor, the battle spot hidden as `ring-` water tiles; `RoomArt.wade` hides feet under the surface with a ripple and spray (one canvas, no loop). The frog keeps the stand (`swampkeeper`).
-- **Rise** (`shops/intros/chandy.ts`): the post, then the platform (`Prop.wet`, `flat`) lifting you both through the timeline's `lift` (no wading once lifted), the crates, his point and fire, his `rise` storm (water from the foot). `?introPreview` plays it to the wipe while his rules aren't in; his card's Challenge alone is greyed "Coming soon". e2e `chandy-home.spec.ts`; unit `shop-chandy.test.ts`.
+- **Rise** (`shops/intros/chandy.ts`): the post, then the platform (`Prop.wet`, `flat`) lifting you both through the timeline's `lift` (no wading once lifted), the crates, his point and fire, his `rise` storm (water from the foot). His rules are in (docs/decisions/2026-11-16-chandy-rules.md): Challenge alone plays the rise into his battle. e2e `chandy-home.spec.ts`; unit `shop-chandy.test.ts`.
 
 ## Challenging a boss (Nov 2: Pokémon-gym style)
 

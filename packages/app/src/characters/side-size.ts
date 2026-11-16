@@ -35,6 +35,12 @@ export const SIDE_FEEL = {
    * him, overlapping him a little (components/Tiger.tsx `sidePump`; docs/decisions/2026-10-24-babur-desktop-pump.md, Nov 7).
    */
   lean: ["tiger"] as readonly string[],
+  /**
+   * A boss wider at rest than the one size allows for (Chandy's slung rifle, Nov 16: 100 sprite px against the others' 87 at most): left
+   * out of SIDE_WIDEST, so every boss keeps today's size; drawn at the same size, his far side lies over the menu beside the empty column
+   * where it must, never past the window's edge (Eric's rule, Nov 4: "over the board or a menu is fine").
+   */
+  overMenu: ["chandy"] as readonly string[],
   /** The God King and your pawn: the bosses' size over 2, at most this (15% under Nov 4's 2), the same in every fight. */
   kingMax: 1.7,
   /** The share of the room right of the board they fill at most (Nov 7: 15% smaller than they were, "so then the king fits"). */
@@ -76,7 +82,16 @@ export const SIDE_REACH: Readonly<Record<string, readonly [left: number, up: num
   dash: [39, 95, 28, 2],
   zebra: [33, 96, 51, 2],
   recluse: [30, 135, 30, 2],
+  // (Chandy at rest: his frames with the rifle held level, aiming and firing, lie over the board: OVER_BOARD.)
+  chandy: [57, 117, 43, 3],
 };
+
+/**
+ * Animations whose drawing lies over the board on a computer, left out of a boss's SIDE_REACH (his room is his rest's): Chandy's level
+ * rifle, aiming and firing (Nov 16), at every stage. Over the board is fine (Eric's rule, Nov 4); the e2e guard still checks every frame
+ * whole in the window.
+ */
+export const OVER_BOARD: Readonly<Record<string, RegExp>> = { chandy: /^(aim|fire)(_s\d)?$/ };
 /** The God King's the same (characters/god-king.ts: his frame 108 × 104, his feet at 64, 99), measured by the same test. */
 export const KING_REACH = [38, 98, 34, 3] as const;
 
@@ -113,7 +128,7 @@ export type SideRoom = {
 export type SidePlace = { s: number; k: number; bossMid: number | null; firstMid: number | null };
 
 /** The widest and the tallest any boss's drawing reaches (SIDE_REACH): what the one size must fit (sprite px). */
-export const SIDE_WIDEST = Math.max(...Object.values(SIDE_REACH).map(([l, , r]) => l + r));
+export const SIDE_WIDEST = Math.max(...Object.entries(SIDE_REACH).filter(([id]) => !SIDE_FEEL.overMenu.includes(id)).map(([, [l, , r]]) => l + r));
 export const SIDE_TALLEST = Math.max(...Object.values(SIDE_REACH).map(([, u]) => u));
 
 export function sideSizes(r: SideRoom, feel: typeof SIDE_FEEL = SIDE_FEEL, boss = ""): SidePlace {
@@ -129,7 +144,8 @@ export function sideSizes(r: SideRoom, feel: typeof SIDE_FEEL = SIDE_FEEL, boss 
   const up = (r.boardBottom - r.bossTop) / r.s;
   // The one size: what the widest and the tallest boss would fit in this room (his own reach swapped for theirs), whoever stands here.
   const reach = SIDE_REACH[boss];
-  const wider = reach ? Math.max(0, SIDE_WIDEST - reach[0] - reach[2]) : 0;
+  // (A boss wider than the one size allows for, Chandy: the one size as everyone's; his far side over the menu where it must.)
+  const wider = reach ? (feel.overMenu.includes(boss) ? SIDE_WIDEST - reach[0] - reach[2] : Math.max(0, SIDE_WIDEST - reach[0] - reach[2])) : 0;
   const taller = reach ? Math.max(0, SIDE_TALLEST - reach[1]) : 0;
   const fitLeft = (r.boardLeft + over - r.leftLimit - feel.margin) / (lc + rc + wider);
   const fitUp = up > 0 ? (r.boardBottom - feel.margin) / (up + taller) : Infinity;
