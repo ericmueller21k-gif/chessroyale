@@ -1065,6 +1065,12 @@ for his character and moments, and `e2e/<boss>.spec.ts` for what his powers show
 never at import (`test/lazy-boss-art.test.ts` fails otherwise). Frames sharing a rounded-pose cache or a counter: `lazyAnimsTogether()`.
 The battle warms his moves and effects in slices (`prewarmAnims`, `BossEffect.tsx`) before his own prewarm; home warms the tiles' portraits, never while a game starts (the Bot level box, the queue).
 
+**His portrait for the first load** (Nov 16; [2026-11-16-bundle-split.md](../decisions/2026-11-16-bundle-split.md)): home, the boss select's
+tiles, the menus, quests and profiles draw his portrait from `characters/portraits.gen.ts`, not his kit. After adding a kit or changing his
+drawing or `portrait`, run `npx tsx packages/app/scripts/portraits.ts` (`test/portraits.test.ts` fails until then). His drawings, effects and
+powers' screens load with the match's screens (`lazy-game.ts`); nothing on the first load (`main.tsx`'s imports: Home, net, sound, speech)
+imports his drawing's file: a name it needs goes in a small file of its own (as `moo-icons.ts`, `tiger-names.ts`).
+
 **Admins first** (Nov 1, Timber): a new boss can go in for admins before players. His id in `BOSS_ADMIN_FIRST` (settings.ts)
 keeps him out of `isPlayable` (no random pick, no player's select or menu, no raid lobby's pick) while `adminFirst`/`menuBosses`
 put him on an admin's select and Boss alone; the kit and the smoke test still check him. Taking the id out puts him live.
