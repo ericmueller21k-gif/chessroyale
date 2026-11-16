@@ -1,3 +1,4 @@
+- Nov 16 ~22:00 UTC: #758 docs trim MERGED (cb3dee6; docs/CI only, no main e2e concern). #757 CI running. bundle-split running.
 - Nov 16 ~21:45 UTC: docs trim DONE -> #758 (b39a8f2; Haiku archived; 4 notes 177-200 words, design text on bosses.md/fairplay.md). CI watched on #757, #758. bundle-split (high) running.
 - Nov 16 ~21:35 UTC: town solos DONE -> #757 (6360591; helper archived; ?townsolo admin switch). CI watched. Running: bundle-split (high), docs Haiku.
 - Nov 16 ~21:25 UTC: Eric OK: T4 (CI warning 250->200 words, PR body >60 lines; director pushed claude/docs-length 0d1d92d) + Haiku moves 4 long notes text to area pages; L6 bundle split (Opus high, claude/bundle-split). Running: town-solos (high), bundle-split (high), docs Haiku.
