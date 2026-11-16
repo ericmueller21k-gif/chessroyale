@@ -648,6 +648,10 @@
       "paths": ["e2e/zebra-home.spec.ts", "packages/app/src/town/shops/zebra-*.ts", "packages/app/src/town/shops/bakery-kit.ts", "packages/app/src/town/shops/intros/zebra.ts", "packages/app/src/town/houses/zebra.ts", "packages/app/src/characters/zebra-sounds.ts", "packages/app/src/characters/sidekicks/zebrakeeper.ts"],
       "specs": ["e2e/zebra-home.spec.ts"]
     },
+    "Chandy's Swamp (Nov 16: the swamp on Meadow Street, its room under the sky, wading, the frog's stand, his rise and rising wipe)": {
+      "paths": ["e2e/chandy-home.spec.ts", "packages/app/src/town/shops/chandy-*.ts", "packages/app/src/town/shops/intros/chandy.ts", "packages/app/src/town/houses/chandy.ts", "packages/app/src/characters/sidekicks/swampkeeper.ts"],
+      "specs": ["e2e/chandy-home.spec.ts"]
+    },
     "the Hidden Boss's walk-up (Nov 13: the building in the town, the hall, the landing and his room, the stairs between them)": {
       "paths": ["packages/app/src/town/houses/recluse.ts", "packages/app/src/town/shops/recluse-*.ts"],
       "specs": ["e2e/town-street.spec.ts", "e2e/hidden-boss-room.spec.ts"]

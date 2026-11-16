@@ -365,6 +365,15 @@ export const BOSS_INTROS: Readonly<Partial<Record<HomeId, BossIntro>>> = {
   // boss is in the game, from his card there (shops.ts canChallengeInside); his line the art's battle start. You both walk out of the
   // back door to where you stand (`seated`: no hop back) while his goons carry the table, chairs and board out (zebra-scene.ts
   // SetupScene). His camera centered on the table so the five watching behind it show.)
+  // (Nov 16: his own, the board on its post and the platform rising out of his swamp: shops/intros/chandy.ts. His line a placeholder until
+  // his lines come with his rules; his sounds placeholders from other packs, as his art's are.)
+  chandy: {
+    name: "Chandy",
+    line: "Stand still. The water does the rest.",
+    layout: "across",
+    custom: true,
+    cues: { rise: "gardenerDrips", crate: "zebraPlop", storm: "smudgySplash" },
+  },
   zebra: {
     name: "Don Dough",
     line: ZEBRA_BATTLE_START.don,
@@ -458,6 +467,12 @@ export const CHALLENGE_FEEL = {
   hopUp: 0.3,
   /** The park table's stools: this far (squares) from the table's middle (park.ts PARK_TABLE: three squares across). */
   stoolOff: 1,
+  /**
+   * Chandy's swamp (Nov 16, shops/intros/chandy.ts): the post rising alone (`postMs`, from `postFrom` squares under its place to the
+   * sunken deck), the platform rising (`platformMs`) from `deckDown` squares under the water to `deckUp` over it, a beat to settle, the
+   * crates dropping on from `crateDrop` squares over the deck (`cratesMs`).
+   */
+  swamp: { postMs: 1800, postFrom: -2.2, deckDown: -0.3, deckUp: 0.6, platformMs: 1700, settleMs: 300, cratesMs: 520, crateDrop: 1.6 },
   /** A circle whose middle has a piece standing in it (Babur's ring, its pedestal): the table stands this many squares south of it. */
   clearOff: 1.5,
   /**

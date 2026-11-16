@@ -289,6 +289,13 @@ export interface Prop {
   over?: true;
   /** ("board") Its slab rests on the art under it (Big Boy's blocks): lifted until its front is TABLE_BOARD.top over the table's foot. */
   rest?: true;
+  /**
+   * It rises out of water (Chandy's swamp, Nov 16): nothing of it shows under the water's surface, the floor at its place, this many of
+   * its pixels south of its foot (its front edge's foot: the platform's).
+   */
+  wet?: number;
+  /** (With `wet`) A flat thing (Chandy's platform's deck): while it's under the surface (`lift` under 0) it shows faint, as through the water. */
+  flat?: true;
 }
 /** A boss's own intro, as data (shops/intros/<boss>.ts), and what the room needs to draw it. */
 export interface IntroData {
@@ -305,7 +312,7 @@ export interface IntroData {
   table?: Character;
   palette?: Readonly<Record<string, string>>;
   /** Its storm (the transition: its tile and its front), or `splatter` (Smudgy's); none: the default flash and wipe. */
-  storm?: { readonly tile: Character; readonly front: Character };
+  storm?: { readonly tile: Character; readonly front: Character; /** It rises from the screen's foot (Chandy's water, Nov 16), not across. */ readonly rise?: true };
   splatter?: true;
   /** It swings no God King attack (its transition is its own). */
   noAttack?: true;
