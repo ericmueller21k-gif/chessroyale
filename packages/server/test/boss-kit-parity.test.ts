@@ -23,6 +23,7 @@ import {
   hoopsAnswer,
   creaseAnswer,
   applyMove,
+  dodgeTimeline,
   slamFrom,
   type BoardScore,
   type EngineLike,
@@ -135,6 +136,13 @@ async function online(bossId: string, test: string): Promise<{ trace: Trace; sta
     let acted = false;
     for (const m of msgs) {
       if (m.t === "boss") for (const e of m.boss.powers?.events ?? []) trace.events.add(eventKey(e));
+      // (Chandy's Dodge: both vote the safe square (the lobby's own state: the view hides it) once the round's vote is open.)
+      const dodge = m.t === "boss" ? m.dodge : undefined;
+      const full = runner.boss?.powers?.chandy?.dodge;
+      if (dodge && full && full.results.length === dodge.round && dodge.round < full.rounds.length) {
+        now = Math.max(now, dodge.at + dodgeTimeline().rounds[dodge.round]!.voteAt);
+        for (const id of ["p1", "p2"]) core.message(id, { t: "dodgeVote", key: dodge.key, round: dodge.round, square: full.rounds[dodge.round]!.safe });
+      }
       if (m.t === "results") trace.result = m.bossResult ?? "none";
       if (m.t === "scoreRequest") {
         const boards = await Promise.all(m.jobs.map((j) => hostScore(engine, runner.settings, j)));
@@ -204,8 +212,12 @@ async function solo(start: MatchRunner): Promise<Trace> {
       if (r.bossToMove()) await r.playBoss(engines[0]);
       continue;
     }
-    // (Chandy's Dodge: nobody votes, as online with no one tapping.)
-    while (r.dodgeDue()) r.finishDodgeRound({});
+    // (Chandy's Dodge: everyone votes the safe square, as online.)
+    while (r.dodgeDue()) {
+      const d = r.boss!.powers!.chandy!.dodge!;
+      const safe = d.rounds[d.results.length]!.safe;
+      r.finishDodgeRound(Object.fromEntries(r.alive().map((p) => [p.id, safe])));
+    }
     seen();
     if (r.stageComplete()) continue;
     // (Dash's Scramble Rush: nobody's placements, as online.)

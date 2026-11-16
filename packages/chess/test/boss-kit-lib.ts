@@ -574,9 +574,11 @@ export async function runBattle(k: KitBattle, sf: StockfishMoves | null): Promis
       continue;
     }
     if (r.dodgeDue()) {
-      // (Chandy's Dodge: nobody votes, so a square from the seed each round; the board never changes.)
+      // (Chandy's Dodge: the crowd votes the safe square, so the battle goes on for the invariants (a hit ends it: chandy.test.ts);
+      // the board never changes.)
       const before = r.boards.get(r.state.boards[0]!)!.fen;
-      r.finishDodgeRound({});
+      const d = r.boss!.powers!.chandy!.dodge!;
+      r.finishDodgeRound({ [r.alive()[0]!.id]: d.rounds[d.results.length]!.safe });
       note("dodge");
       if (r.boards.get(r.state.boards[0]!)!.fen !== before) c.failures.push(`${where}: Dodge changed the board`);
       continue;
