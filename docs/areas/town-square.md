@@ -473,9 +473,11 @@ before the rows are laid (`street.ts lotHere`), so each row fills the place with
   **Its moving sound** (Nov 14, Eric: "one continuous sound"; [2026-11-14-ride-sounds.md](../decisions/2026-11-14-ride-sounds.md)): a
   ride listed in `RIDE_SOUND.rides` (its file `/sounds/rides/<id>.wav`) sounds as your own pawn moves on it, in the town and a shop's
   room; standing, nothing; any other ride silent; on the game's sounds (the Sound switch, a hidden page). Sawyer's Dozer, Puddles's Mower and the Candy Cane Sled's bells (Nov 15; `bright`: round the 6 kHz softening, `gameBus(true)`) (`kind: "loop"`)
-  loop: it counts as moving until `holdMs` (120) after your last step, fades in over `fadeInMs` and out over `fadeOutMs` (700), coming
-  up to speed and sinking a little as it fades; moving again mid-fade brings it back from where it is. The frame loops only say "you
-  moved, on this ride" (`rideMoving`); a timer off the frame sees you stop. Your ride's file is fetched after the town's first frame.
+  loop: a hard start and stop, no fades (Nov 16, Eric: "it should be a hard start and stop ... Like boingo";
+  [2026-11-16-ride-sound-hard.md](../decisions/2026-11-16-ride-sound-hard.md)): full level and speed on your first moving frame; it
+  counts as moving until `holdMs` (120) after your last moving frame, then stops. Each end takes 30 ms (`DECLICK_S`, the Sound
+  switch's too), as a bare cut mid-wave clicks. The frame loops only say "you moved, on this ride" (`rideMoving`); a timer off the
+  frame sees you stop. Your ride's file is fetched after the town's first frame.
   Boingo's Pogo (`kind: "steps"`; Nov 15, Eric: "from one square to the next, it should be a boing";
   [2026-11-15-pogo-boings.md](../decisions/2026-11-15-pogo-boings.md)): no loop, no fade; each step your walker begins (its `onStep`,
   `rideStep`) plays the next of its 4 boings (low, mid, low, high) as its own one-shot, so they overlap, on the audio clock at the hop's
