@@ -87,7 +87,7 @@ export type Done = { ok: true; notify?: string[] } | { ok: false; message: strin
 const fail = (message: string, status = 400): Done => ({ ok: false, message, status });
 
 const isBlocking = async (sql: Sql, who: string, whom: string) => !!(await sql.first("SELECT 1 AS x FROM blocks WHERE user_id = ? AND blocked_id = ?", who, whom));
-const areFriends = async (sql: Sql, a: string, b: string) => !!(await sql.first("SELECT 1 AS x FROM friends WHERE user_id = ? AND friend_id = ?", a, b));
+export const areFriends = async (sql: Sql, a: string, b: string) => !!(await sql.first("SELECT 1 AS x FROM friends WHERE user_id = ? AND friend_id = ?", a, b));
 const countOf = async (sql: Sql, q: string, ...p: unknown[]) => (await sql.first<{ n: number }>(q, ...p))?.n ?? 0;
 const friendCount = (sql: Sql, id: string) => countOf(sql, "SELECT COUNT(*) AS n FROM friends WHERE user_id = ?", id);
 
@@ -201,7 +201,10 @@ export async function removeFriend(sql: Sql, meId: string, otherId: string): Pro
  * reach you (kept unseen), their invites are refused as "not taking invites" (the same words as your invite setting),
  * and the app hides their chat lines.
  */
-export async function block(sql: Sql, meId: string, otherId: string, now: number): Promise<Done> {
+/** Invites into a 50 v 50 party that went (`to`, the party's code): its seat for them may be a "+" again (friends-api.ts). */
+export type CrowdInvitesGone = { crowd?: { to: string; code: string }[] };
+
+export async function block(sql: Sql, meId: string, otherId: string, now: number): Promise<Done & CrowdInvitesGone> {
   if (otherId === meId) return fail(FRIEND_TEXT.self);
   if (!(await target(sql, otherId))) return fail(FRIEND_TEXT.noPlayer, 404);
   if (await isBlocking(sql, meId, otherId)) return { ok: true };
@@ -210,8 +213,29 @@ export async function block(sql: Sql, meId: string, otherId: string, now: number
   await sql.run("INSERT OR IGNORE INTO blocks (user_id, blocked_id, at) VALUES (?, ?, ?)", meId, otherId, now);
   await removeFriend(sql, meId, otherId);
   await sql.run("DELETE FROM friend_requests WHERE (from_id = ? AND to_id = ?) OR (from_id = ? AND to_id = ?)", meId, otherId, otherId, meId);
-  await sql.run("DELETE FROM invites WHERE (from_id = ? AND to_id = ?) OR (from_id = ? AND to_id = ?)", meId, otherId, otherId, meId);
-  return { ok: true };
+  const gone = await sql.all<{ to_id: string; kind: InviteKind; code: string }>(
+    "DELETE FROM invites WHERE (from_id = ? AND to_id = ?) OR (from_id = ? AND to_id = ?) RETURNING to_id, kind, code",
+    meId,
+    otherId,
+    otherId,
+    meId,
+  );
+  const crowd = gone.filter((g) => g.kind === "crowdparty").map((g) => ({ to: g.to_id, code: g.code }));
+  return { ok: true, ...(crowd.length ? { crowd } : {}) };
+}
+
+/**
+ * Whether an open invite into the 50 v 50 party `code` waits for `toId` (from any member: two may have invited them; the fix round of
+ * #747, L3). `admits`: and it still lets them in, their Do Not Disturb off (a block deletes the invite itself: L2).
+ */
+export async function crowdInviteOpen(sql: Sql, toId: string, code: string, now: number, admits = false): Promise<boolean> {
+  const row = await sql.first<{ dnd: number | null }>(
+    "SELECT u.dnd FROM invites i JOIN users u ON u.id = i.to_id WHERE i.to_id = ? AND i.kind = 'crowdparty' AND i.code = ? AND i.expires_at > ? LIMIT 1",
+    toId,
+    code,
+    now,
+  );
+  return !!row && !(admits && row.dnd);
 }
 
 export async function unblock(sql: Sql, meId: string, otherId: string): Promise<Done> {
@@ -316,7 +340,8 @@ export async function friendsState(sql: Sql, meId: string, now: number, presence
     .sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name, "en", { sensitivity: "base" }));
   return {
     friends,
-    requests,
+    // (Do Not Disturb: no friend request reaches you either, even those sent before; they wait, as requests do, for it to end.)
+    requests: me?.dnd ? [] : requests,
     sent,
     // (Do Not Disturb: none reach you, even those sent before you turned it on; they lapse as usual.)
     invites: me?.dnd ? [] : invites.map((i) => ({ from: i.from_id, name: i.name, kind: i.kind, code: i.code, at: i.at, expiresAt: i.expires_at })),

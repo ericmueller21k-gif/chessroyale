@@ -1,4 +1,4 @@
-import { BOSS_DIFFICULTY, BOSS_PARTY, CROWD_PARTY_MAX, SQUADS, SQUADS_LOBBY, cleanLook, type BossDifficultyId, type ItemLook } from "@chessroyale/core";
+import { BOSS_DIFFICULTY, BOSS_PARTY, CROWD_PARTY, CROWD_PARTY_MAX, SQUADS, SQUADS_LOBBY, cleanLook, type BossDifficultyId, type ItemLook } from "@chessroyale/core";
 import type { LobbyCloseReason } from "@chessroyale/chess";
 import { seatName } from "./text-filter.ts";
 import { SQUADS_PROTOCOL, type NetParty, type PartyClientMessage, type PartyServerMessage } from "@chessroyale/chess/squads";
@@ -93,6 +93,8 @@ export interface PartyRecord {
    */
   owner?: string;
   invited?: { uid: string; name: string; from: string; expiresAt: number }[];
+  /** A 50 v 50 party's search stopped (its leader's Cancel, or nobody left in it) with a matchmaker's ticket: out of its line (L5). */
+  dropTickets?: string[];
   /** Kicked: their tokens and accounts, never back in. */
   kicked?: string[];
   kickedUsers?: string[];
@@ -104,6 +106,11 @@ export interface PartyRecord {
   placedStart?: number;
   /** Members kicked after START, for the Durable Object to revoke in the battle (takeRevokes). */
   revokes?: string[];
+}
+
+/** A 50 v 50 party: whether `userId` would come in by an invite (not a member yet, nor its maker coming in first). */
+export function needsCrowdInvite(r: PartyRecord, userId: string): boolean {
+  return r.kind === "crowd" && !r.members.some((m) => m.userId === userId) && !(r.counter === 0 && (!r.owner || r.owner === userId));
 }
 
 export function newPartyRecord(code: string, now: number, kind?: "boss" | "crowd", owner?: string): PartyRecord {
@@ -192,13 +199,63 @@ export class PartyCore {
     for (const m of this.r.members) if (m.connected) this.io.send(m.id, shared ?? { t: "party", party: this.view(m.id) });
   }
 
-  /** The leader: the first to join who's still here (connected), else the first who is (never a bot). */
+  /**
+   * The leader: the first to join who's still here (connected), else the first who is (never a bot). A 50 v 50 party's leader who
+   * dropped (a reload) keeps the lead CROWD_PARTY.leadHoldMs first (the fix round of #747, M2).
+   */
   leaderNow(): string | null {
     const lead = this.r.members.find((m) => m.id === this.r.leaderId);
     if (lead?.connected) return lead.id;
+    if (lead && this.leadHeldUntil() !== null) return lead.id;
     const next = this.r.members.find((m) => m.connected && !m.bot);
     if (next) this.r.leaderId = next.id;
     return this.r.leaderId;
+  }
+
+  /** A 50 v 50 party's leader away (dropped, not left): until when they keep the lead; null when they don't (or aren't away). */
+  private leadHeldUntil(): number | null {
+    if (this.r.kind !== "crowd") return null;
+    const lead = this.r.members.find((m) => m.id === this.r.leaderId);
+    if (!lead || lead.connected || lead.goneAt === undefined) return null;
+    const until = lead.goneAt + CROWD_PARTY.leadHoldMs;
+    return until > this.io.now() ? until : null;
+  }
+
+  /**
+   * A 50 v 50 party's search with nobody in it connected for CROWD_PARTY.awayStopMs (everyone gone or left): it stops, its ticket
+   * out of the matchmaker's line, so it never holds seats for nobody (L5).
+   */
+  private stopIfDeserted(): boolean {
+    if (this.r.kind !== "crowd" || this.r.state !== "queueing") return false;
+    const now = this.io.now();
+    if (!this.r.members.every((m) => !m.connected && now - (m.goneAt ?? 0) >= CROWD_PARTY.awayStopMs)) return false;
+    this.stopSearch();
+    return true;
+  }
+
+  /** Back to idle: no search, no placing (a 50 v 50 party's ticket still in line: dropped, `takeDropTickets`). */
+  private stopSearch() {
+    const ticket = this.r.kind === "crowd" && this.r.state === "queueing" ? this.r.queue?.ticket : null;
+    if (ticket) this.r.dropTickets = [...(this.r.dropTickets ?? []), ticket];
+    delete this.r.queue;
+    delete this.r.busy;
+    delete this.r.placed;
+    this.r.state = "open";
+  }
+
+  /** A 50 v 50 party's tickets to take out of the matchmaker's line (the Durable Object cancels them in both queues). */
+  takeDropTickets(): string[] {
+    const t = this.r.dropTickets ?? [];
+    delete this.r.dropTickets;
+    return t;
+  }
+
+  /** The alarm: a 50 v 50 party's lead passed on once its away leader's hold ends; a deserted search stopped. */
+  tick() {
+    if (this.r.kind !== "crowd") return;
+    const was = this.r.leaderId;
+    const stopped = this.stopIfDeserted();
+    if (this.leaderNow() !== was || stopped) this.broadcast();
   }
 
   connect(token: string | undefined, opts: { name?: string; device?: "phone" | "computer"; v?: number; look?: unknown; userId?: string }): { ok: true; memberId: string } | { ok: false; message: string } {
@@ -309,14 +366,13 @@ export class PartyCore {
         return this.startQueue(id);
       case "cancel":
         if (id !== this.leaderNow()) return;
-        delete this.r.queue;
-        delete this.r.busy;
-        delete this.r.placed;
-        this.r.state = "open";
+        this.stopSearch();
         return this.broadcast();
       case "leave": {
         this.r.members = this.r.members.filter((m) => m.id !== id);
         if (this.r.leaderId === id) this.r.leaderId = this.r.members[0]?.id ?? null;
+        // (A 50 v 50 party's last one here leaving: its search stops.)
+        this.stopIfDeserted();
         return this.broadcast();
       }
       case "hello":
@@ -506,13 +562,19 @@ export class PartyCore {
   takeQueue(): { ticket: string | null; size: number; pass: string } | null {
     const q = this.r.queue;
     if (this.r.state !== "queueing" || !q || q.retryAt > this.io.now()) return null;
+    // (A 50 v 50 party with nobody connected a while: no more asking.)
+    if (this.stopIfDeserted()) {
+      this.broadcast();
+      return null;
+    }
     q.retryAt = this.io.now() + PARTY_ASK_MS;
     return { ticket: q.ticket, size: q.size, pass: q.pass };
   }
 
-  /** When to ask again (the Durable Object's alarm). */
+  /** When to ask again (the Durable Object's alarm), or when a 50 v 50 party's away leader's hold on the lead ends. */
   get nextAlarm(): number | null {
-    return this.r.state === "queueing" && this.r.queue ? this.r.queue.retryAt : null;
+    const times = [this.r.state === "queueing" && this.r.queue ? this.r.queue.retryAt : null, this.leadHeldUntil()].filter((t): t is number => t !== null);
+    return times.length ? Math.min(...times) : null;
   }
 
   /** The matchmaker's answer for the pass asked with: placed (everyone is told the lobby), or busy (ask again). */

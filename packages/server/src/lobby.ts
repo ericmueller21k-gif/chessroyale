@@ -5,7 +5,7 @@ import { SERVER_LOST_MS, phase2Unvouched, quickMove, recluseLobby, mateFirst, re
 import type { BossLobby } from "./bosses/base.ts";
 import { hearsTyped, typedReads, typedSay, typedSeat, type TypedSeats } from "./typed-chat.ts";
 import { QUICK_CHAT, botChatLines, canSay, canSayToAll, chatCheck, chatSay, chatSent, mulberry32, noChatSent, ownedChatPacks, type BotChatMoment, type ChatSent } from "@chessroyale/core";
-import { FAIRPLAY, packParties, type FairMove } from "@chessroyale/core";
+import { CROWD_PARTY, FAIRPLAY, packParties, type FairMove } from "@chessroyale/core";
 import { BOSS_BRAIN, BOSS_CHECK, BOSS_PARTY, BOSS_POWERS, HIDDEN_ROOM, RECLUSE_ONLINE, RECLUSE_PHASE2, finishBoss, recluseNextForm, DEFAULT_SETTINGS, JUDGES, isTeamMatch, type JudgeConfig, FRONT_DOOR, LEAVING, LOBBY_LIFE, MATCHMAKING, isRankedMatch, type PlayerState, brilliance, cleanLook, matchFeats, type ItemLook, type MatchFeats, botVotes, castPregameVote, closePregameVote, raidBossElo, bossDef, clockAfterVote, cutSeconds, pregameVotes, voteResultMs, type Augment, type DrawRule, type Settings } from "@chessroyale/core";
 import {
   MatchRunner,
@@ -957,7 +957,8 @@ export class LobbyCore {
   hurry(at: number) {
     const a = this.r.auto;
     if (!a || a.botsOff || a.filledAt || a.fillAt === null || this.r.phase !== "lobby") return;
-    const fillAt = Math.max(this.io.now() + MATCHMAKING.switchMinWaitMs, Math.min(a.fillAt, at));
+    // (Never before a 50 v 50 party's members on their way have had their hold: H2.)
+    const fillAt = Math.max(this.io.now() + MATCHMAKING.switchMinWaitMs, Math.min(a.fillAt, at), this.partyHoldEnd());
     if (fillAt >= a.fillAt) return;
     a.fillAt = fillAt;
     this.setTimer("autoStart", fillAt);
@@ -976,21 +977,46 @@ export class LobbyCore {
   }
 
   /**
-   * Matchmaking: a 50 v 50 party's seats, all `size` of them, held `ms` under its `pass` (its members join with it), or none:
-   * `singles` seats are held for players on their way already, and every party here must still fit whole on one team
-   * (packParties, with half the seats a side). True: held (asked again for the same pass: as it was).
+   * Matchmaking: a 50 v 50 party's seats, all `size` of them, held `ms` under its `pass` (its members join with it), or none.
+   * `singles` seats are held for players on their way already. Every party here must still fit whole on one team (packParties,
+   * half the seats a side), each counted at its full size: a member arriving after the hold still joins its group (the fix round
+   * of #747, L1). A lobby already filling (not `fresh`) takes a party only while its hold ends before the fill (H2: else bots take
+   * the seats of members still on their way); a `fresh` lobby, made for this party, holds them until its fill at most. True: held
+   * (asked again for the same pass: as it was).
    */
-  reserveParty(size: number, pass: string, ms: number, singles = 0): boolean {
+  reserveParty(size: number, pass: string, ms: number, singles = 0, fresh = false): boolean {
     if (!pass || !(size >= 1) || this.r.party || !isTeamMatch(this.settings)) return false;
-    if (this.r.crowdParties?.[pass]) return true;
+    if (this.crowdPartyOf(pass)) return true;
     if (size > this.seatsLeft() - singles) return false;
     const now = this.io.now();
-    // (A party's seats on its team: those held while the hold lasts, then those who came.)
-    const sizes = [...Object.values(this.r.crowdParties ?? {}).map((p) => (p.until > now ? Math.max(p.size, p.ids.length) : p.ids.length)), size];
+    const fillAt = this.r.auto?.fillAt ?? null;
+    if (fillAt !== null && !fresh && fillAt - now < ms) return false;
+    const sizes = [...Object.values(this.r.crowdParties ?? {}).map((p) => p.size), size];
     const half = Math.floor(this.settings.lobbySize / 2);
     if (!packParties(sizes, half, this.settings.lobbySize - half, () => 0.5)) return false;
-    this.r.crowdParties = { ...(this.r.crowdParties ?? {}), [pass]: { size, ids: [], until: now + ms } };
+    const hold = fillAt !== null && fresh ? Math.max(0, Math.min(ms, fillAt - now)) : ms;
+    this.r.crowdParties = { ...(this.r.crowdParties ?? {}), [pass]: { size, ids: [], until: now + hold } };
     return true;
+  }
+
+  /** The 50 v 50 party held here under this pass, if any (its own key only: a pass is the app's word). */
+  private crowdPartyOf(pass: unknown): NonNullable<LobbyRecord["crowdParties"]>[string] | undefined {
+    const all = this.r.crowdParties;
+    return typeof pass === "string" && all && Object.hasOwn(all, pass) ? all[pass] : undefined;
+  }
+
+  /**
+   * A 50 v 50 party's pass held here with a seat still free in its group: the matchmaker sent its members here, so a member on the
+   * other side of fair play's engine pool (one pooled member takes the whole party to the pool's queue) is let in (H1).
+   */
+  crowdPassOpen(pass: unknown): boolean {
+    const p = this.crowdPartyOf(pass);
+    return !!p && p.ids.length < p.size;
+  }
+
+  /** When the last hold for a 50 v 50 party's members on their way ends (0: none): the fill never comes before it. */
+  private partyHoldEnd(): number {
+    return Math.max(0, ...Object.values(this.r.crowdParties ?? {}).map((p) => (p.ids.length < p.size ? p.until : 0)));
   }
 
   /** Whether this player came in as a 50 v 50 party's member (their seat was held, not one of the anonymous ones). */
@@ -1124,7 +1150,7 @@ export class LobbyCore {
       pl.members = { ...(pl.members ?? {}), [id]: admit.member };
     }
     // A 50 v 50 party's member: in its group (they'll play on one team), while it has room for them.
-    const crowd = typeof party.pass === "string" && !pl ? this.r.crowdParties?.[party.pass] : undefined;
+    const crowd = !pl ? this.crowdPartyOf(party.pass) : undefined;
     if (crowd && crowd.ids.length < crowd.size) crowd.ids.push(id);
     if (!this.r.hostId) this.r.hostId = id;
     delete this.r.emptiedAt;
@@ -4372,6 +4398,9 @@ export class LobbyCore {
   ranked(): boolean {
     // (A Boss Battle party is a private team: never ranked. Nor a match where one device's word stood alone: unvouched.)
     if (this.r.party || this.r.unvouched) return false;
+    // (A 50 v 50 with a party of 2 or more friends in it, one bloc on one side: not ranked unless CROWD_PARTY.ranked. The fix round
+    // of #747, M3: the director's call until Eric decides.)
+    if (!CROWD_PARTY.ranked && Object.values(this.r.crowdParties ?? {}).some((p) => p.ids.length >= 2)) return false;
     const players = this.runner?.state.players ?? [];
     const played = this.r.humans.length + (this.r.left ?? []).filter((l) => l.how !== "early").length;
     return isRankedMatch(played, Math.max(this.settings.lobbySize, players.length));

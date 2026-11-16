@@ -4,7 +4,8 @@ import type { LobbyCloseReason, Opening } from "@chessroyale/chess";
 import type { PartyClientMessage, PlayerBadge, SquadsClientMessage } from "@chessroyale/chess/squads";
 import openings from "@chessroyale/chess/data/openings.json";
 import { SQUADS_STARTED, SquadsCore, newSquadsRecord, squadsClosing, squadsLiveKey, squadsLiveSummary, type LiveMatch, type SquadsRecord, type SquadsReward, type SquadsServerRequest } from "./squads-lobby.ts";
-import { PartyCore, newPartyRecord, partyClosing, type PartyRecord } from "./squads-party.ts";
+import { CROWD_PARTY_LINES, PartyCore, needsCrowdInvite, newPartyRecord, partyClosing, type PartyRecord } from "./squads-party.ts";
+import { crowdInviteOpen } from "./friends.ts";
 import { bossPartyOverrides, partyLobby } from "./boss-party.ts";
 import { openLobbyCode } from "./codes.ts";
 import { DEVICE_COOKIE, SIGN_IN_TO_PLAY, accountOf, isSignedIn, readCookie, signInRequired, withSecrets } from "./api.ts";
@@ -536,7 +537,6 @@ export class SquadsParty extends DurableObject<Env> {
     }
     if (!msg || typeof msg !== "object" || typeof msg.t !== "string") return;
     const attached = (ws.deserializeAttachment() as Attached | null) ?? {};
-    const core = this.core();
     if (msg.t === "hello") {
       const refuse = (message: string, extra: Record<string, unknown> = {}) => {
         ws.send(JSON.stringify({ t: "error", message, ...extra, now: Date.now() }));
@@ -544,8 +544,18 @@ export class SquadsParty extends DurableObject<Env> {
       };
       if (attached.guest) return refuse(SIGN_IN_TO_PLAY);
       if (attached.banned) return refuse(BANNED_MESSAGE, { banned: true });
+      const crowd = this.record.kind === "crowd";
+      // A 50 v 50 party's newcomer: the invite that lets them in must still stand in the database (a block, the invite declined
+      // with no other left, or their Do Not Disturb takes it back: the fix round of #747, L2). A failed read: the party's own list.
+      if (crowd && attached.userId && this.env.DB && needsCrowdInvite(this.record, attached.userId)) {
+        const open = await crowdInviteOpen(d1Sql(this.env.DB), attached.userId, this.record.code, Date.now(), true).catch(() => true);
+        if (!this.record) return;
+        if (!open) return refuse(CROWD_PARTY_LINES.invitedOnly);
+      }
+      const core = this.core();
       const token = typeof msg.token === "string" ? msg.token : undefined;
-      const known = token ? this.record.members.find((m) => m.token === token) : undefined;
+      // (A 50 v 50 party's seat is the account's, never a token a shared device kept for someone else: L4.)
+      const known = token && !crowd ? this.record.members.find((m) => m.token === token) : undefined;
       if (known) ws.serializeAttachment({ ...attached, playerId: known.id });
       const result = core.connect(token, { name: attached.name ?? (typeof msg.name === "string" ? msg.name : undefined), device: msg.device === "phone" ? "phone" : "computer", v: msg.v, look: msg.look, ...(attached.userId ? { userId: attached.userId } : {}) });
       if (!result.ok) return refuse(result.message);
@@ -559,6 +569,7 @@ export class SquadsParty extends DurableObject<Env> {
     const memberId = attached.playerId;
     if (!memberId) return;
     const was = this.record.state;
+    const core = this.core();
     core.message(memberId, msg, { test: !!attached.test });
     if (msg.t === "leave") ws.close(4001, "Left the party");
     await this.persist(core, msg.t === "leave" ? ws : undefined);
@@ -569,6 +580,7 @@ export class SquadsParty extends DurableObject<Env> {
       return this.makeBattle();
     }
     await this.askMatchmaker();
+    await this.cancelTickets();
   }
 
   /**
@@ -634,8 +646,24 @@ export class SquadsParty extends DurableObject<Env> {
 
   async alarm() {
     if (!this.record || (await this.closeIfDue())) return;
+    // (A 50 v 50 party: its away leader's hold on the lead ends; a search with nobody here stops.)
+    const core = this.core();
+    core.tick();
+    await this.persist(core);
     await this.askMatchmaker();
     await this.persist(this.core());
+    await this.cancelTickets();
+  }
+
+  /** A 50 v 50 party's search stopped with a ticket in the matchmaker's line: canceled there, in both queues (L5). */
+  private async cancelTickets() {
+    if (!this.record) return;
+    const core = this.core();
+    const tickets = core.takeDropTickets();
+    if (!tickets.length) return;
+    await this.persist(core);
+    const queues = [this.record.queueName, this.record.poolName].filter((q): q is string => !!q);
+    for (const t of tickets) for (const q of queues) await this.env.MATCHMAKER.get(this.env.MATCHMAKER.idFromName(q)).cancel(t).catch(() => undefined);
   }
 
   /** A 50 v 50 party's invites in the database (its Find match dropped them). Best effort: they lapse anyway. */

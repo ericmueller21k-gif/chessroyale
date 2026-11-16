@@ -348,14 +348,15 @@ async function route(request: Request, rawEnv: Env, url: URL, waitUntil: WaitUnt
     const st = url.pathname.match(/^\/api\/lobby\/([A-Z2-9]{5})$/i);
     if (st && request.method === "GET") {
       const code = st[1]!.toUpperCase();
-      const status = await env.LOBBIES.get(env.LOBBIES.idFromName(code)).status();
+      // (`?parties`, where the test switches are on: each 50 v 50 party's group, by account: the e2e reads one team from it.)
+      const status = await env.LOBBIES.get(env.LOBBIES.idFromName(code)).status(env.TEST_SWITCHES === "1" && url.searchParams.has("parties"));
       let result = null;
       if ((!status || status.phase === "over") && env.DB) {
         const me = await accountOf(request, env, waitUntil).catch(() => null);
         if (me) result = await lobbyResult(d1Sql(env.DB), me.id, code).catch(() => null);
       }
       if (!status) return json({ open: false, message: MATCH_ENDED, ...(result ? { result } : {}) }, 404);
-      return json({ open: true, phase: status.phase, ...(result ? { result } : {}) });
+      return json({ open: true, phase: status.phase, ...(result ? { result } : {}), ...(status.parties ? { parties: status.parties } : {}) });
     }
     // GET /api/lobby/CODE/ws → WebSocket to that lobby's Durable Object
     const m = url.pathname.match(/^\/api\/lobby\/([A-Z2-9]{5})\/ws$/i);
