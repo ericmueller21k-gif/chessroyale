@@ -128,7 +128,7 @@ removed (old → new) and says whether any of them guards a rule here.
   you're trying to exit"; Nov 13: "even if you're in a building … There should always be 'are you sure you want to exit' if you're in the
   town").** Every way out of the town asks "Leave Chess Town?" with Stay (the default, Escape) and Leave, on the street and inside any
   building alike: the side menu, the town's back button, the phone's or browser's back gesture (the town keeps a step of its own in the
-  history, so back never leaves the site unasked), an invite's Join, a profile's Challenge, the chat's sign-in. Stay changes nothing.
+  history, so back never leaves the site unasked), an invite's Accept (its Join until Nov 16), a profile's Challenge, the chat's sign-in. Stay changes nothing.
   Stepping out of a building onto the street (still the town), boss challenges, the AFK drop and forced exits don't ask.
   - Guard: `e2e/town-leave.spec.ts`, "the town's back button asks…", "the phone's back gesture asks too…", "a computer's side menu
     asks first…", "inside a room…", "a computer's side menu inside a room…", "inside a room, an invite's Join asks first…", "a boss's
