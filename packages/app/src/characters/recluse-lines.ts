@@ -27,14 +27,10 @@ export const RECLUSE_LINES = {
   /**
    * A few moves into the bullet clock, he adds time per move (Eric, Oct 14): grudging, too fast even for real chess. One,
    * picked by the battle (placeholders: ours, not his words). Eric, Nov 16: "It just says time per move. Make it say something that
-   * makes more sense"; each whole in his bubble on a phone (two short rows), naming the seconds in words (a test keeps them the
-   * setting's, BOSS_POWERS.bulletIncrementSeconds).
+   * makes more sense"; each whole in his bubble on any phone (two rows at 320 px: boss-bar-lines.test.ts), naming the seconds in words
+   * (a test keeps them the setting's, BOSS_POWERS.bulletIncrementSeconds).
    */
-  bulletPlus: [
-    "This is a lottery, not chess. Fine: ten seconds a move.",
-    "Too fast, even for real chess. Take ten seconds a move.",
-    "Nobody plays real chess this fast. Ten seconds a move.",
-  ],
+  bulletPlus: ["Lottery, not chess. Ten seconds a move.", "Too fast for chess. Ten seconds a move.", "Bah. Fine: ten seconds a move."],
   /** The God King's help tried, and blocked (he slams the book shut): one, in turn. */
   mock: [
     // QUOTE (A6): Peter Kihss in the New York Times, Jul 4, 1972, p. 14 (Winter, C.N. 5830).

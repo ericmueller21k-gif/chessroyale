@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { BOSS_ROSTER } from "@chessroyale/core";
 import { BOSS_KITS } from "../src/characters/kits.ts";
+import { RECLUSE_LINES } from "../src/characters/recluse-lines.ts";
 
 /**
  * Every boss's line fits the boss bar's bubble in two rows at 320 px (Eric and the coordinator, Nov 6: the bar stays 99 px, the
@@ -50,5 +51,10 @@ describe("the boss bar's lines fit two rows at 320 px", () => {
   it("every boss line is two rows or fewer", () => {
     const long = barLines().filter((l) => rowsOf(l.text) > 2);
     expect(long.map((l) => `${l.boss}: "${l.text}" (${rowsOf(l.text)} rows)`)).toEqual([]);
+  });
+
+  it("the Hidden Boss's moments' lines too: his time a move added (Eric, Nov 16: \"This is a lottery, not chess. Time per move, then. My own…\" was cut off) and his lines as he cuts a heart", () => {
+    const lines = [...RECLUSE_LINES.bulletPlus, ...Object.values(RECLUSE_LINES.slash).flat()];
+    expect(lines.filter((l) => rowsOf(l) > 2)).toEqual([]);
   });
 });

@@ -94,13 +94,12 @@ describe("then he adds time per move (Eric, Oct 14)", () => {
     expect(powerLine(kit, { kind: "bulletPlus", key: "recluse:bulletPlus:10" }), "the same for everyone").toBe(line);
     expect(RECLUSE_LINES.bulletPlus.length).toBeGreaterThanOrEqual(2);
     // (Eric, Nov 16: "It just says time per move. Make it say something that makes more sense": each names the seconds in words, the
-    // setting's (1+10), and is short enough for his bubble on a phone (two short rows: the e2e measures it), never cut off.)
+    // setting's (1+10), and fits his bubble on any phone, never cut off: boss-bar-lines.test.ts.)
     const WORDS: Record<number, string> = { 5: "five", 10: "ten", 15: "fifteen" };
     expect(BOSS_POWERS.bulletIncrementSeconds).toBe(10);
     for (const l of RECLUSE_LINES.bulletPlus) {
       expect(l.toLowerCase()).toContain(`${WORDS[BOSS_POWERS.bulletIncrementSeconds]} seconds a move`);
       expect(l).not.toMatch(/\d/);
-      expect(l.length).toBeLessThanOrEqual(56);
       expect(l).not.toMatch(/Time per move, then|My own/);
     }
     expect(momentPriority({ kind: "bulletPlus" })).toBe(CRITICAL);
