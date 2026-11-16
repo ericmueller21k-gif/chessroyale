@@ -9,3 +9,5 @@
 - "Winner" = the player with the highest rating even if they lost.
 - RP: factor both where you finished and your engine score; 100 strong players and an early cut shouldn't cost much; survived long but
   blundered; standing within your elimination round (ahead of the other 9: lose fewer).
+- (later) The top 4 on each side (the last 8) play a bit longer: a few moves taken from the 1v1's share go to the 4 v 4.
+- (later) A cut player gets a Spectate option to watch how it ends (late cuts especially).
