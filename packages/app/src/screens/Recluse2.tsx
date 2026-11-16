@@ -35,8 +35,8 @@ import { evalBarOn, underBoardView } from "../prefs.ts";
  * panel left of the God King), your pawn and your team's, and the God King in his place. Only the board's square changes:
  * one board, then the four boards inside that same square (FOUR).
  *
- * A computer plays the four as a 2x2, the gaps between them and to the square's edges all equal, each board's tag in the gap
- * above it. A phone: your board big at the square's bottom, the other three small in a row above it (tap one to watch it big).
+ * A computer and a phone alike (Eric, Nov 16: "replicate how it is on mobile"): your board big at the square's bottom, the other
+ * three small in a row above it (tap one to watch it big; "Back to my board"). A computer's in its own proportions (DESK).
  */
 
 /** Which board each quarter of the square holds (top left, top right, bottom left, bottom right): yours at bottom left. */
@@ -44,33 +44,27 @@ const QUARTER_BOARD = [1, 2, 0, 3] as const;
 
 /** Where a board sits in the square: its left and top and its size, as fractions of the square. */
 type Slot = { x: number; y: number; s: number };
-/** A computer's four boards: each `cell` of the square, the gap between them and to the edges the same (DESK_GAP). */
-const DESK_CELL = 0.435;
-const DESK_GAP = (1 - 2 * DESK_CELL) / 3;
 /**
- * A phone's: the three small boards in a row at the square's top (`mini` of it each, equal gaps across, a `tag` row above them
- * for their clocks), yours big under them at the square's bottom, centered (the slow-move marks in the room at its right).
+ * The square's rows, as fractions of it: a `tag` row at the top for the small boards' names and clocks, the three small boards
+ * (`mini` each, equal gaps across), and the big board (`big`) at the square's bottom, centered (the slow-move marks in the room at
+ * its right), the rest the gap between the rows (a watched board's name in it).
  */
-const PHONE = { tag: 0.06, mini: 0.26, big: 0.65 } as const;
-const PHONE_GAP = (1 - 3 * PHONE.mini) / 4;
+type Rows = { tag: number; mini: number; big: number };
+/** A phone's. */
+const PHONE: Rows = { tag: 0.06, mini: 0.26, big: 0.65 };
 /**
- * The slots: a computer's by quarter (top left, top right, bottom left, bottom right); a phone's, the big one first, then the
- * three small ones from the left. (A computer's top boards: their tag in the gap above them, as the bottom ones'.)
+ * A computer's (Eric, Nov 16): the big board as big as the room for the three above it allows, so it stands three quarters of
+ * phase 1's board, its bottom edge and middle where that board's were (the dock under it); the small ones at least a phone's.
  */
-export const FOUR = {
-  desk: [
-    { x: DESK_GAP, y: DESK_GAP, s: DESK_CELL },
-    { x: 1 - DESK_GAP - DESK_CELL, y: DESK_GAP, s: DESK_CELL },
-    { x: DESK_GAP, y: 1 - DESK_GAP - DESK_CELL, s: DESK_CELL },
-    { x: 1 - DESK_GAP - DESK_CELL, y: 1 - DESK_GAP - DESK_CELL, s: DESK_CELL },
-  ],
-  phone: [
-    { x: (1 - PHONE.big) / 2, y: 1 - PHONE.big, s: PHONE.big },
-    ...[0, 1, 2].map((i) => ({ x: PHONE_GAP + i * (PHONE.mini + PHONE_GAP), y: PHONE.tag, s: PHONE.mini })),
-  ],
-} as const satisfies Record<string, readonly Slot[]>;
-/** A phone's slot for each quarter at the split's end: yours (bottom left) big, the others small in quarter order. */
-const PHONE_SLOT_OF_QUARTER = [1, 2, 0, 3] as const;
+const DESK: Rows = { tag: 0.035, mini: 0.18, big: 0.755 };
+/** The slots: the big one first, then the three small ones from the left. */
+function rows(r: Rows): Slot[] {
+  const gap = (1 - 3 * r.mini) / 4;
+  return [{ x: (1 - r.big) / 2, y: 1 - r.big, s: r.big }, ...[0, 1, 2].map((i) => ({ x: gap + i * (r.mini + gap), y: r.tag, s: r.mini }))];
+}
+export const FOUR = { desk: rows(DESK), phone: rows(PHONE) } as const satisfies Record<string, readonly Slot[]>;
+/** The slot for each quarter at the split's end: yours (bottom left) big, the others small in quarter order. */
+const SLOT_OF_QUARTER = [1, 2, 0, 3] as const;
 const slotStyle = (b: Slot) => ({ left: `${b.x * 100}%`, top: `${b.y * 100}%`, width: `${b.s * 100}%`, height: `${b.s * 100}%` });
 
 const ease = (x: number) => (x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x));
@@ -88,7 +82,7 @@ function quarterStyle(q: number, t: number, desk: boolean, width: number): Recor
   const part = ease((t - C.partAt) / (C.growAt - C.partAt));
   const grow = ease((t - C.growAt) / C.growMs);
   const gap = (1 - grow) * part * 3;
-  const slot = desk ? q : PHONE_SLOT_OF_QUARTER[q]!;
+  const slot = SLOT_OF_QUARTER[q]!;
   // (It ends exactly where phase 2 draws that board, its squares and their place in the slot (`playedBox`), so nothing snaps as play
   // starts: Nov 14, the four boards were 3 to 6 px smaller in play than at the split's end.)
   const to = playedBox(desk, slot, width);
@@ -104,21 +98,19 @@ function quarterStyle(q: number, t: number, desk: boolean, width: number): Recor
 
 /**
  * Where phase 2 draws a slot's board in a square `width` px across, for the phase change's quarters (each the board drawn whole in
- * that square, moved and scaled): its place as fractions of the square, its size as one of the whole board's. Its squares a whole multiple of 8 device pixels (board/logic.ts `boardSize`) in the slot's box (a phone's
- * small boards inside their button's 2 px border), placed in it as styles.css's `.rc-played > .board-wrap` translate does (a
- * computer's left and top boards 2/3 of the rest in, its right and bottom ones 1/3; a phone's centered). Unmeasured (width 0): the
- * slot itself.
+ * that square, moved and scaled): its place as fractions of the square, its size as one of the whole board's. Its squares a whole multiple of 8 device pixels (board/logic.ts `boardSize`) in the slot's box (the
+ * small boards inside their button's 2 px border), centered in it as styles.css's `.rc-played > .board-wrap` translate does.
+ * Unmeasured (width 0): the slot itself.
  */
 function playedBox(desk: boolean, slot: number, width: number): Slot {
   const to = desk ? FOUR.desk[slot]! : FOUR.phone[slot]!;
   if (!(width > 0)) return to;
   const dpr = devicePixelRatio || 1;
   const whole = boardSize(width, dpr);
-  const border = !desk && slot > 0 ? 2 : 0;
+  const border = slot > 0 ? 2 : 0;
   const inner = to.s * width - 2 * border;
   const b = boardSize(inner, dpr);
-  const [ox, oy] = desk ? [slot % 2 ? 1 : 2, slot >= 2 ? 1 : 2] : [1.5, 1.5];
-  return { x: (to.x * width + border + ((inner - b) * ox) / 3) / width, y: (to.y * width + border + ((inner - b) * oy) / 3) / width, s: b / whole };
+  return { x: (to.x * width + border + (inner - b) / 2) / width, y: (to.y * width + border + (inner - b) / 2) / width, s: b / whole };
 }
 
 /** Sounds and lines of the phase change already started (by its start time and name): each once, as its beat comes. */
@@ -311,9 +303,9 @@ const RESULT_WORD = (b: SimulBoardView) => {
 };
 
 /**
- * A board's tag: who plays it and their clock. A computer's four boards: in the row above each (DESK), off its back rank;
- * a phone's small boards, just above each, off their pieces (Eric, Oct 15), the name cut short to fit (Nov 14: with the clock alone
- * a player couldn't tell whose board was whose). A phone's big board: none on yours (your clock is the dock's), the player's name on one you're watching.
+ * A board's tag: who plays it and their clock. The small boards: just above each, off their pieces (Eric, Oct 15), the name cut
+ * short to fit (Nov 14: with the clock alone a player couldn't tell whose board was whose). The big board: none on yours (your clock
+ * is the dock's), the player's name on one you're watching.
  */
 function Tag({ b, v, now, big }: { b: SimulBoardView; v: SimulView; now: number; big?: boolean }) {
   if (big) return b.you ? null : <span class="rc-tag">{b.name}</span>;
@@ -349,8 +341,8 @@ const X_PIXELS = [[1, 1], [5, 1], [2, 2], [4, 2], [3, 3], [2, 4], [4, 4], [1, 5]
 /**
  * The team's slow moves (Eric, Oct 14): a slot each up to his ultimate (RECLUSE_PHASE2.slowMovesForUlt), a red pixel X
  * for each slow move so far, the rest dim; in a column by the right edge of your board only (Eric, Oct 14: the count is the
- * team's, the same on every board, so once is enough), as Jefferson's candle shots stand beside his. On a phone, by the
- * big board (yours, or the one you're watching). They flash at every slow move, whoever's.
+ * team's, the same on every board, so once is enough), as Jefferson's candle shots stand beside his: by the big board (yours,
+ * or the one you're watching). They flash at every slow move, whoever's.
  */
 function SlowMarks({ n, flash }: { n: number; flash: boolean }) {
   const of = RECLUSE_PHASE2.slowMovesForUlt;
@@ -376,7 +368,7 @@ function SlowMarks({ n, flash }: { n: number; flash: boolean }) {
 
 /**
  * One phase 2 board: yours takes moves on your turn. `marks`: the team's slow moves beside it (one board shows them).
- * `big`: a phone's big board.
+ * `big`: the big board.
  */
 function SimulBoard({ match, v, b, now, small, big, marks: withMarks, count, children }: { match: GameView; v: SimulView; b: SimulBoardView; now: number; small?: boolean; big?: boolean; marks?: boolean; count?: number | null; children?: ComponentChildren }) {
   const mine = b.you && v.playing && b.toMove === "crowd" && v.paused == null && !v.decided;
@@ -426,6 +418,7 @@ export function SimulScreen({ match }: { match: GameView }) {
   const mine = v.boards[0]!;
   const big = v.boards.find((b) => b.id === watch) ?? mine;
   const others = v.boards.filter((b) => b.id !== big.id);
+  const slots = FOUR[computer ? "desk" : "phone"];
   // (Online a Crowd final's watcher has no board: none is "yours".)
   // (Paused online, his move late: nobody's turn runs; ended with no result: none.)
   const yourTurn = v.playing && mine.you && mine.toMove === "crowd" && v.paused == null && !v.decided;
@@ -467,24 +460,14 @@ export function SimulScreen({ match }: { match: GameView }) {
           {evalBarOn() && <div class="eval-bar rc-evalgap" aria-hidden="true" />}
           {/* (The four boards inside phase 1's one board's square: FOUR.) */}
           <div class="board-wrap rc-stage">
-            {computer ? (
-              QUARTER_BOARD.map((id, q) => (
-                <div key={q} class={`rc-cell rc-q${q} rc-played`} style={slotStyle(FOUR.desk[q]!)}>
-                  <SimulBoard match={match} v={v} b={v.boards[id]!} now={now} marks={v.boards[id]!.you} count={count} />
-                </div>
-              ))
-            ) : (
-              <>
-                <div key={`big${big.id}`} class="rc-cell rc-played rc-big" style={slotStyle(FOUR.phone[0])}>
-                  <SimulBoard match={match} v={v} b={big} now={now} big marks count={count} />
-                </div>
-                {others.map((b, i) => (
-                  <button type="button" key={b.id} class={`rc-cell rc-played rc-mini${b.you ? " you" : ""}`} style={slotStyle(FOUR.phone[i + 1]!)} aria-label={b.you ? "Back to your board" : `Watch ${b.name}'s board`} onClick={() => setWatch(b.id)}>
-                    <SimulBoard match={match} v={v} b={b} now={now} small count={count} />
-                  </button>
-                ))}
-              </>
-            )}
+            <div key={`big${big.id}`} class="rc-cell rc-played rc-big" style={slotStyle(slots[0]!)}>
+              <SimulBoard match={match} v={v} b={big} now={now} big marks count={count} />
+            </div>
+            {others.map((b, i) => (
+              <button type="button" key={b.id} class={`rc-cell rc-played rc-mini${b.you ? " you" : ""}`} style={slotStyle(slots[i + 1]!)} aria-label={b.you ? "Back to your board" : `Watch ${b.name}'s board`} onClick={() => setWatch(b.id)}>
+                <SimulBoard match={match} v={v} b={b} now={now} small count={count} />
+              </button>
+            ))}
             {ultBanner}
           </div>
         </div>
@@ -494,7 +477,7 @@ export function SimulScreen({ match }: { match: GameView }) {
         still={still}
         secs={run ? Math.ceil(clockLeft(run, now) / 1000) : null}
         status={status}
-        line={!computer && big.id !== mine.id ? "back" : mine.result ? "" : !v.playing && !v.decided ? "ready" : v.ultAt !== null ? "ult" : ""}
+        line={big.id !== mine.id ? "back" : mine.result ? "" : !v.playing && !v.decided ? "ready" : v.ultAt !== null ? "ult" : ""}
         onBack={back}
         runFrom={run ? run.startsAt : null}
         runTo={run ? run.deadline : null}
