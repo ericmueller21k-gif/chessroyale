@@ -1257,9 +1257,12 @@ one piece at a time).
 **The town's own theme (Nov 15; [decision](../decisions/2026-11-15-town-music.md)):** at the same moment, `townMusic(true)` (music.ts):
 its theme (themes.json's `town`, `town-loop.mp3`, 2:59) is fetched first and plays once decoded, then its two piano solos' bytes, then the
 bosses' (fetched only). In memory: the theme while the town is open (~69 MB decoded), and at most one solo (~16 MB), decoded
-`TOWN_MUSIC.aheadS + decodeS` (150 s) before it plays and let go once it has rung out; not decoded in time, one more pass. It loops in the street and in buildings with no theme of their own; after every `TOWN_MUSIC.passesPerSolo` (3) passes a solo
-(`TOWN_MUSIC.order`: a, b, a…) plays instead of the next pass, the theme back from its top as it ends (about every 9.5 min), all joins
-on the audio clock. A boss's room, a challenge's splash or a battle takes over; out of the room it comes back from its top. The town
+`TOWN_MUSIC.aheadS + decodeS` (150 s) before it plays and let go once it has rung out; not decoded in time, one more pass. It loops in the street and in buildings with no theme of their own; now and then a solo
+(`TOWN_MUSIC.order`: a, b, a…) plays instead of the next pass, the theme back from its top as it ends, all joins on the audio clock.
+**When (Nov 16; [decision](../decisions/2026-11-16-town-solos.md)):** rolled each time it starts: with `earlyChance` (0.33) it starts
+partway in at one of `earlyEntries` (bar 77 or bar 61, fading in over `earlyFadeS`), its first solo 0:37 or 1:07 in (decoded at once);
+otherwise from its top, the first solo `firstPasses` (1) pass in, at 2:59. After each solo, 1 or 2 passes at random (`passesAfterSolo`).
+The `?townsolo` test switch makes every start the early one at bar 77 (log `music:town:entry:<s>`, then `music:town:solo:<id>`). A boss's room, a challenge's splash or a battle takes over; out of the room it comes back from its top. The town
 closing (Town.tsx's cleanup, the Hidden Boss's summoning) ends it and lets its pieces go. Tests: `packages/app/test/music.test.ts`
 ("the town's own theme", its "in memory" block), the e2e above (the theme first, its source started in the street).
 

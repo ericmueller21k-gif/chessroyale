@@ -2509,7 +2509,8 @@ function startTown(
     // its solos and the bosses' themes fetched after it.)
     setTimeout(() => {
       if (!alive) return;
-      townMusic(true);
+      // (`?townsolo`, a test switch: its first solo 37 s in, every time it starts; Nov 16.)
+      townMusic(true, testParams().has("townsolo"));
       void preloadMusic();
     }, MUSIC.townPreloadAfterMs);
   };

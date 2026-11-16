@@ -135,7 +135,7 @@ vi.stubGlobal("fetch", (url: string) => {
   return Promise.resolve({ ok: true, json: () => Promise.resolve(THEMES) });
 });
 
-const { bossMusic, loopPlace, musicFiles, musicLevel, musicNow, musicPlan, musicTheme, musicWanted, preloadMusic, recluseMusic, roomMusic, roomMusicLoad, roomMusicNow, setMusicOn, splashDone, splashMusic, switchPlan, heardNow, townFiles, townDecodedNow, townMusic, townMusicNow, townSoloAt, townSoloOf } = await import(
+const { bossMusic, loopPlace, musicFiles, musicLevel, musicNow, musicPlan, musicTheme, musicWanted, preloadMusic, recluseMusic, roomMusic, roomMusicLoad, roomMusicNow, setMusicOn, splashDone, splashMusic, switchPlan, heardNow, townFiles, townDecodedNow, townEntry, townFirstRun, townMusic, townMusicNow, townSoloAt, townSoloOf } = await import(
   "../src/music.ts"
 );
 const settle = () => new Promise((r) => setTimeout(r, 0));
@@ -992,6 +992,7 @@ describe("the town's own theme, with its two piano solos slotted in (Eric, Nov 1
   }
   const bufOf = (s: FakeSource) => (s.buffer as { url: string }).url;
   const named = (name: string) => ctx.sources.filter((s) => bufOf(s) === `/music/${name}.mp3`);
+  let random: ReturnType<typeof vi.spyOn<Math, "random">>;
   beforeEach(() => {
     vi.useFakeTimers();
     ctx.sources = [];
@@ -1003,6 +1004,8 @@ describe("the town's own theme, with its two piano solos slotted in (Eric, Nov 1
     sound.muted = false;
     sound.hidden = false;
     setMusicOn(true);
+    // (The rolls pinned unless a test sets its own: from the theme's top, its first solo 1 pass in; 2 passes after each solo.)
+    random = vi.spyOn(Math, "random").mockReturnValue(0.99);
   });
   afterEach(async () => {
     townMusic(false);
@@ -1010,14 +1013,144 @@ describe("the town's own theme, with its two piano solos slotted in (Eric, Nov 1
     splashDone();
     bossMusic(null);
     await vi.advanceTimersByTimeAsync(MUSIC.endFadeMs + 300);
+    random.mockRestore();
     vi.useRealTimers();
   });
 
-  it("the solos by their turn: a, b, a… (TOWN_MUSIC.order); each after passesPerSolo passes; the town's pieces, theme first", () => {
-    expect(TOWN_MUSIC.passesPerSolo).toBe(3);
+  it("the solos by their turn: a, b, a… (TOWN_MUSIC.order); the first 1 pass in (from the top), then 1 or 2 passes after each; the town's pieces, theme first", () => {
+    expect(TOWN_MUSIC.firstPasses).toBe(1);
+    expect(TOWN_MUSIC.passesAfterSolo).toEqual([1, 2]);
     expect([0, 1, 2, 3].map((n) => townSoloOf(town, n)?.id)).toEqual(["a", "b", "a", "b"]);
     expect(townSoloAt(town, { at: 10, passes: 3, turn: 0 })).toBeCloseTo(10 + 3 * L, 9);
     expect(townFiles(THEMES)).toEqual(["/music/town-loop.mp3", "/music/town-solo-a.mp3", "/music/town-solo-b.mp3"]);
+  });
+
+  // Eric, Nov 16: "it fires the solos sometimes in the first minute 30 or sometimes later, not every time early maybe like 33% of the time,
+  // but it should always play a solo before 5 minutes or so of looping."
+  describe("when the first solo comes (Nov 16): a third of the time within about a minute, else 1 pass in; always within 3 minutes", () => {
+    const [E77, E61] = TOWN_MUSIC.earlyEntries as [number, number];
+
+    it("the roll: under earlyChance, partway in at one of its bar lines at random; else from the top; forced, the first", () => {
+      expect(TOWN_MUSIC.earlyChance).toBe(0.33);
+      // (Bar lines: a bar is 240/129 s; bar 77 and bar 61.)
+      expect(E77).toBeCloseTo((76 * 240) / 129, 5);
+      expect(E61).toBeCloseTo((60 * 240) / 129, 5);
+      const rolls = (...r: number[]) => () => r.shift()!;
+      expect(townEntry(town, false, rolls(0.32, 0.1))).toBe(E77);
+      expect(townEntry(town, false, rolls(0, 0.9))).toBe(E61);
+      expect(townEntry(town, false, rolls(0.33))).toBe(0);
+      expect(townEntry(town, false, rolls(0.99))).toBe(0);
+      expect(townEntry(town, true, rolls(0.99))).toBe(E77);
+      // Over many starts (a seeded roll), about a third early, both entries met.
+      let seed = 7;
+      const lcg = () => ((seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648);
+      let early = 0;
+      const seen = new Set<number>();
+      for (let k = 0; k < 3000; k++) {
+        const e = townEntry(town, false, lcg);
+        if (e) (early++, seen.add(e));
+      }
+      expect(early / 3000).toBeGreaterThan(0.28);
+      expect(early / 3000).toBeLessThan(0.38);
+      expect([...seen].sort()).toEqual([E61, E77].sort());
+    });
+
+    it("the first solo's moment: 0:37 or 1:07 in early, 2:59 from the top; always within 3 minutes (Eric: before about 5)", () => {
+      const first = (entry: number) => townSoloAt(town, townFirstRun(100, entry, 0)) - 100;
+      expect(first(E77)).toBeCloseTo(37.209297, 3);
+      expect(first(E61)).toBeCloseTo(66.976739, 3);
+      expect(first(0)).toBeCloseTo(L, 9);
+      for (const e of [0, E77, E61]) expect(first(e)).toBeLessThan(180);
+      // (Every entry's solo comes inside the window it's decoded in, at once.)
+      for (const e of [E77, E61]) expect(first(e)).toBeLessThan(TOWN_MUSIC.aheadS + TOWN_MUSIC.decodeS);
+    });
+
+    it("early: the theme starts partway in on the clock, fading in over earlyFadeS; its solo decoded at once and put on the clock at that pass's end", async () => {
+      random.mockReturnValueOnce(0.1).mockReturnValueOnce(0.1);
+      const t0 = await open(10);
+      const [theme, solo, back] = ctx.sources;
+      expect(bufOf(theme!)).toBe("/music/town-loop.mp3");
+      expect(theme!.started).toEqual([t0, PAD + E77]);
+      expect([theme!.loop, theme!.loopStart, theme!.loopEnd]).toEqual([true, PAD, PAD + L]);
+      expect(ctx.gains[0]!.gain.calls.find((c) => c[0] === "set")).toEqual(["set", 0, t0]);
+      expect(ctx.gains[0]!.gain.lastRamp).toEqual([MUSIC.volume, t0 + TOWN_MUSIC.earlyFadeS]);
+      expect(files.filter((u) => u.includes("town-solo"))).toEqual(["/music/town-solo-a.mp3"]);
+      const soloAt = t0 + L - E77;
+      expect(theme!.stoppedAt).toBeCloseTo(soloAt, 9);
+      expect(bufOf(solo!)).toBe("/music/town-solo-a.mp3");
+      expect(solo!.started![0]).toBeCloseTo(soloAt, 9);
+      expect(bufOf(back!)).toBe("/music/town-loop.mp3");
+      expect(back!.started![0]).toBeCloseTo(soloAt + S, 9);
+      expect(back!.started![1]).toBe(PAD);
+      // (Then b after 1 or 2 passes, as rolled: 2 here.)
+      await at(soloAt + S + 2 * L - TOWN_MUSIC.aheadS + 1);
+      expect(bufOf(ctx.sources.at(-2)!)).toBe("/music/town-solo-b.mp3");
+      expect(ctx.sources.at(-2)!.started![0]).toBeCloseTo(soloAt + S + 2 * L, 9);
+    });
+
+    it("early, its decode landing past the solo's moment: one more pass, the solo at its end", async () => {
+      let land!: () => void;
+      gate.solo = new Promise((r) => (land = r));
+      try {
+        random.mockReturnValueOnce(0.1).mockReturnValueOnce(0.9);
+        const t0 = await open(10);
+        expect(ctx.sources[0]!.started).toEqual([t0, PAD + E61]);
+        const soloAt = t0 + L - E61;
+        // (Still decoding as its moment passes: the theme loops on.)
+        ctx.currentTime = soloAt + 1;
+        await vi.advanceTimersByTimeAsync(5000);
+        expect(named("town-solo-a")).toHaveLength(0);
+        land();
+        await vi.advanceTimersByTimeAsync(0);
+        expect(named("town-solo-a"), "too late for this pass's end").toHaveLength(0);
+        expect(ctx.sources[0]!.stoppedAt).toBeNull();
+        await at(soloAt + L - TOWN_MUSIC.aheadS + 1);
+        expect(named("town-solo-a")[0]!.started![0]).toBeCloseTo(soloAt + L, 9);
+        expect(ctx.sources[0]!.stoppedAt).toBeCloseTo(soloAt + L, 9);
+      } finally {
+        gate.solo = null;
+      }
+    });
+
+    it("early, its decode landing in time: put on the clock as it lands", async () => {
+      let land!: () => void;
+      gate.solo = new Promise((r) => (land = r));
+      try {
+        random.mockReturnValueOnce(0.1).mockReturnValueOnce(0.1);
+        const t0 = await open(10);
+        const soloAt = t0 + L - E77;
+        ctx.currentTime = soloAt - 20;
+        await vi.advanceTimersByTimeAsync(3000);
+        land();
+        await vi.advanceTimersByTimeAsync(0);
+        expect(named("town-solo-a")[0]!.started![0]).toBeCloseTo(soloAt, 9);
+      } finally {
+        gate.solo = null;
+      }
+    });
+
+    it("the ?townsolo test switch (townMusic's second argument): every start partway in at bar 77, its solo 37 s in, whatever the roll", async () => {
+      ctx.currentTime = 10;
+      townMusic(true, true);
+      await vi.advanceTimersByTimeAsync(0);
+      const t0 = 10 + MUSIC.startDelayS;
+      expect(ctx.sources[0]!.started).toEqual([t0, PAD + E77]);
+      expect(named("town-solo-a")[0]!.started![0]).toBeCloseTo(t0 + L - E77, 9);
+      // (Out of a room and back: again.)
+      ctx.currentTime = 100;
+      roomMusic("zebra");
+      await vi.advanceTimersByTimeAsync(0);
+      roomMusic(null);
+      await vi.advanceTimersByTimeAsync(0);
+      const again = ctx.sources.find((s) => bufOf(s) === "/music/town-loop.mp3" && s.started![0] === 100 + MUSIC.startDelayS);
+      expect(again!.started).toEqual([100 + MUSIC.startDelayS, PAD + E77]);
+      expect(named("town-solo-b")[0]!.started![0]).toBeCloseTo(100 + MUSIC.startDelayS + L - E77, 9);
+      // (Closed and opened without it: rolled again, from the top here.)
+      townMusic(false);
+      await vi.advanceTimersByTimeAsync(MUSIC.endFadeMs + 300);
+      await open(500);
+      expect(ctx.sources.at(-1)!.started).toEqual([500 + MUSIC.startDelayS, PAD]);
+    });
   });
 
   it("the theme loops as a boss loop does: from the pad, between pad and pad + loopSeconds, at MUSIC.volume; only the theme decoded", async () => {
@@ -1034,9 +1167,9 @@ describe("the town's own theme, with its two piano solos slotted in (Eric, Nov 1
     expect(townMusicNow()).toEqual({ level: MUSIC.volume });
   });
 
-  it("after 3 passes the solo starts exactly at the pass's end, the theme stopping there; the theme comes back exactly `seconds` later from its top, the solo ringing out over it", async () => {
+  it("after 1 pass the solo starts exactly at the pass's end, the theme stopping there; the theme comes back exactly `seconds` later from its top, the solo ringing out over it", async () => {
     const t0 = await open(10);
-    const soloAt = t0 + 3 * L;
+    const soloAt = t0 + L;
     // (Not yet: the solo goes on the clock TOWN_MUSIC.aheadS before it.)
     await at(soloAt - TOWN_MUSIC.aheadS - 5);
     expect(ctx.sources).toHaveLength(1);
@@ -1057,11 +1190,14 @@ describe("the town's own theme, with its two piano solos slotted in (Eric, Nov 1
     expect(new Set(ctx.sources.map((s) => s.to)).size).toBe(1);
   });
 
-  it("the solos take turns, a, b, a, each after 3 more passes of the theme", async () => {
+  it("the solos take turns, a, b, a: the first after 1 pass, then after 1 or 2 more as rolled", async () => {
     let run = await open(10);
     const solos: [string, number][] = [];
+    // (Rolled as each solo goes on the clock: after a, 1 pass (low); after b, 2 (high).)
+    const rolls = [0.2, 0.99, 0.99];
     for (let k = 0; k < 3; k++) {
-      const soloAt = run + 3 * L;
+      random.mockReturnValue(rolls[k]!);
+      const soloAt = run + (k === 2 ? 2 : 1) * L;
       await at(soloAt - TOWN_MUSIC.aheadS + 1);
       const s = ctx.sources.at(-2)!;
       solos.push([bufOf(s), s.started![0]]);
@@ -1077,22 +1213,22 @@ describe("the town's own theme, with its two piano solos slotted in (Eric, Nov 1
   it("a solo not decoded in time: the theme plays one more pass (no break), the solo at that pass's end", async () => {
     loadFails.add("/music/town-solo-a.mp3");
     const t0 = await open(10);
-    await at(t0 + 3 * L - TOWN_MUSIC.aheadS + 1);
+    await at(t0 + L - TOWN_MUSIC.aheadS + 1);
     expect(named("town-solo-a")).toHaveLength(0);
     expect(ctx.sources[0]!.stoppedAt, "the theme loops on").toBeNull();
     // (Asked for again by that tick: in for the next pass's end.)
-    await at(t0 + 4 * L - TOWN_MUSIC.aheadS + 1);
+    await at(t0 + 2 * L - TOWN_MUSIC.aheadS + 1);
     const [solo] = named("town-solo-a");
-    expect(solo!.started).toEqual([t0 + 4 * L, 0]);
-    expect(ctx.sources[0]!.stoppedAt).toBe(t0 + 4 * L);
-    expect(ctx.sources.at(-1)!.started).toEqual([t0 + 4 * L + S, PAD]);
+    expect(solo!.started).toEqual([t0 + 2 * L, 0]);
+    expect(ctx.sources[0]!.stoppedAt).toBe(t0 + 2 * L);
+    expect(ctx.sources.at(-1)!.started).toEqual([t0 + 2 * L + S, PAD]);
   });
 
   it("a new audio context mid-solo: the solo picks up where it is heard, the theme's return at its own moment; the old one fades out", async () => {
     const t0 = await open(10);
     // (The wall clock as the audio clock read 10.)
     const w0 = Date.now();
-    const soloAt = t0 + 3 * L;
+    const soloAt = t0 + L;
     await at(soloAt - TOWN_MUSIC.aheadS + 1);
     const old = [...ctx.sources];
     // (10 s into the solo, on the old clock and on the wall alike.)
@@ -1134,7 +1270,7 @@ describe("the town's own theme, with its two piano solos slotted in (Eric, Nov 1
 
   it("stopped mid-solo (a room with its own theme): the solo is the music, faded out with it; out of the room, the theme from its top, and the next solo is b", async () => {
     const t0 = await open(10);
-    const soloAt = t0 + 3 * L;
+    const soloAt = t0 + L;
     await at(soloAt - TOWN_MUSIC.aheadS + 1);
     const [, solo, back] = ctx.sources;
     ctx.currentTime = soloAt + 10;
@@ -1161,13 +1297,13 @@ describe("the town's own theme, with its two piano solos slotted in (Eric, Nov 1
     expect(fetched.filter((u) => u.includes("town-loop"))).toHaveLength(1);
     expect(townDecodedNow()).toEqual(["town-loop"]);
     const t1 = soloAt + 60 + MUSIC.startDelayS;
-    await at(t1 + 3 * L - TOWN_MUSIC.aheadS + 1);
+    await at(t1 + L - TOWN_MUSIC.aheadS + 1);
     expect(bufOf(ctx.sources.at(-2)!)).toBe("/music/town-solo-b.mp3");
   });
 
   it("stopped as a solo was due (put on the clock, not yet heard): the last pass stops by its end, never past it, and that solo is still next", async () => {
     const t0 = await open(10);
-    const soloAt = t0 + 3 * L;
+    const soloAt = t0 + L;
     await at(soloAt - TOWN_MUSIC.aheadS + 1);
     const [first, solo] = ctx.sources;
     // (0.5 s before the solo: the fade's 1.5 s would run past the pass's end.)
@@ -1178,7 +1314,7 @@ describe("the town's own theme, with its two piano solos slotted in (Eric, Nov 1
     roomMusic(null);
     await vi.advanceTimersByTimeAsync(0);
     const t1 = ctx.sources.at(-1)!.started![0];
-    await at(t1 + 3 * L - TOWN_MUSIC.aheadS + 1);
+    await at(t1 + L - TOWN_MUSIC.aheadS + 1);
     expect(bufOf(ctx.sources.at(-2)!)).toBe("/music/town-solo-a.mp3");
   });
 
@@ -1223,8 +1359,8 @@ describe("the town's own theme, with its two piano solos slotted in (Eric, Nov 1
 
   it("the town closes: it fades out and its pieces are let go; open again, the solos' turns start from a", async () => {
     const t0 = await open(10);
-    await at(t0 + 3 * L - TOWN_MUSIC.aheadS + 1);
-    ctx.currentTime = t0 + 3 * L + S + 5;
+    await at(t0 + L - TOWN_MUSIC.aheadS + 1);
+    ctx.currentTime = t0 + L + S + 5;
     townMusic(false);
     expect(townMusicNow()).toBeNull();
     await vi.advanceTimersByTimeAsync(MUSIC.endFadeMs + 300);
@@ -1232,7 +1368,7 @@ describe("the town's own theme, with its two piano solos slotted in (Eric, Nov 1
     expect(forgot.sort()).toEqual(["/music/town-loop.mp3", "/music/town-solo-a.mp3"]);
     expect(townDecodedNow()).toEqual([]);
     const t1 = await open(2000);
-    await at(t1 + 3 * L - TOWN_MUSIC.aheadS + 1);
+    await at(t1 + L - TOWN_MUSIC.aheadS + 1);
     expect(bufOf(ctx.sources.at(-2)!)).toBe("/music/town-solo-a.mp3");
   });
 
@@ -1270,7 +1406,7 @@ describe("the town's own theme, with its two piano solos slotted in (Eric, Nov 1
     it("no solo decoded until its turn nears (TOWN_MUSIC.aheadS + decodeS before it); then only that one, put on the clock aheadS before", async () => {
       expect(TOWN_MUSIC.decodeS).toBeGreaterThan(0);
       const t0 = await open(10);
-      const soloAt = t0 + 3 * L;
+      const soloAt = t0 + L;
       await at(soloAt - TOWN_MUSIC.aheadS - TOWN_MUSIC.decodeS - 5);
       expect(files.filter((u) => u.includes("town-solo"))).toEqual([]);
       expect(townDecodedNow()).toEqual(["town-loop"]);
@@ -1286,7 +1422,7 @@ describe("the town's own theme, with its two piano solos slotted in (Eric, Nov 1
 
     it("once a solo has rung out its decoded audio is let go (no reference kept), and decoded again only at its next turn, from the cache", async () => {
       const t0 = await open(10);
-      const soloAt = t0 + 3 * L;
+      const soloAt = t0 + L;
       await at(soloAt - TOWN_MUSIC.aheadS + 1);
       const end = soloAt + 41.209313;
       await at(end - 1);
@@ -1298,10 +1434,10 @@ describe("the town's own theme, with its two piano solos slotted in (Eric, Nov 1
       expect(bufs.has("/music/town-solo-a.mp3"), "sound.ts's copy let go too").toBe(false);
       // (Its turn again (b, then a): decoded anew, a after b has been let go.)
       const run1 = soloAt + S;
-      await at(run1 + 3 * L - TOWN_MUSIC.aheadS + 1);
+      await at(run1 + 2 * L - TOWN_MUSIC.aheadS + 1);
       expect(bufOf(ctx.sources.at(-2)!)).toBe("/music/town-solo-b.mp3");
-      const run2 = run1 + 3 * L + S;
-      await at(run2 + 3 * L - TOWN_MUSIC.aheadS + 1);
+      const run2 = run1 + 2 * L + S;
+      await at(run2 + 2 * L - TOWN_MUSIC.aheadS + 1);
       expect(bufOf(ctx.sources.at(-2)!)).toBe("/music/town-solo-a.mp3");
       expect(files.filter((u) => u.includes("town-solo"))).toEqual(["/music/town-solo-a.mp3", "/music/town-solo-b.mp3", "/music/town-solo-a.mp3"]);
     });
@@ -1314,11 +1450,11 @@ describe("the town's own theme, with its two piano solos slotted in (Eric, Nov 1
         expect(townDecodedNow().filter((n) => n.includes("solo")).length).toBeLessThanOrEqual(1);
         expect([...bufs.keys()].filter((u) => u.includes("town-solo")).length).toBeLessThanOrEqual(1);
       };
-      const until = t0 + 3 * (3 * L + S) + 60;
+      const until = t0 + L + S + 2 * (2 * L + S) + 60;
       for (let t = t0; t < until; t += 15) {
         await at(t);
         look();
-        if (Math.abs(t - (t0 + 3 * L + S + 200)) < 8) {
+        if (Math.abs(t - (t0 + L + S + 200)) < 8) {
           roomMusic("zebra");
           await vi.advanceTimersByTimeAsync(MUSIC.endFadeMs + 300);
           look();
@@ -1334,7 +1470,7 @@ describe("the town's own theme, with its two piano solos slotted in (Eric, Nov 1
       gate.solo = new Promise((r) => (land = r));
       try {
         const t0 = await open(10);
-        const soloAt = t0 + 3 * L;
+        const soloAt = t0 + L;
         await at(soloAt - TOWN_MUSIC.aheadS + 1);
         // (Still decoding: nothing on the clock, the theme looping on.)
         expect(named("town-solo-a")).toHaveLength(0);
@@ -1344,9 +1480,9 @@ describe("the town's own theme, with its two piano solos slotted in (Eric, Nov 1
         await vi.advanceTimersByTimeAsync(0);
         expect(named("town-solo-a"), "too late for this pass's end").toHaveLength(0);
         expect(ctx.sources[0]!.stoppedAt).toBeNull();
-        await at(t0 + 4 * L - TOWN_MUSIC.aheadS + 1);
-        expect(named("town-solo-a")[0]!.started).toEqual([t0 + 4 * L, 0]);
-        expect(ctx.sources[0]!.stoppedAt).toBe(t0 + 4 * L);
+        await at(t0 + 2 * L - TOWN_MUSIC.aheadS + 1);
+        expect(named("town-solo-a")[0]!.started).toEqual([t0 + 2 * L, 0]);
+        expect(ctx.sources[0]!.stoppedAt).toBe(t0 + 2 * L);
         expect(files.filter((u) => u.includes("town-solo")), "decoded once, kept for its pass").toEqual(["/music/town-solo-a.mp3"]);
       } finally {
         gate.solo = null;
@@ -1358,7 +1494,7 @@ describe("the town's own theme, with its two piano solos slotted in (Eric, Nov 1
       gate.solo = new Promise((r) => (land = r));
       try {
         const t0 = await open(10);
-        const soloAt = t0 + 3 * L;
+        const soloAt = t0 + L;
         await at(soloAt - TOWN_MUSIC.aheadS + 1);
         ctx.currentTime = soloAt - 30;
         land();
