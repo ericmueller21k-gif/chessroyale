@@ -1,0 +1,76 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+@font-face{font-family:Archivo;src:url(/home/user/chessroyale/packages/app/public/fonts/archivo.woff2)}
+@font-face{font-family:"Archivo Black";src:url(/home/user/chessroyale/packages/app/public/fonts/archivo-black.woff2)}
+:root{--bg:#16181d;--surface:#20232a;--surface-2:#2a2e37;--text:#eef0f4;--muted:#9aa2b1;--line:#343946;--accent:#f4b740;--good:#4cc38a;--bad:#ff6b6b;
+--gold:#f4b740;--silver:#c3cad6;--bronze:#d08a52}
+*{box-sizing:border-box;margin:0}
+body{background:var(--bg);color:var(--text);font-family:Archivo,-apple-system,sans-serif;width:390px;height:844px;overflow:hidden;display:flex;flex-direction:column}
+.top{height:44px;display:flex;align-items:center;justify-content:space-between;padding:0 14px;border-bottom:1px solid var(--line);font-size:14px;color:var(--muted)}
+.top b{color:var(--text);font-weight:600}
+.gear{width:28px;height:28px;border-radius:8px;background:var(--surface-2);display:grid;place-items:center;font-size:16px}
+.head{text-align:center;padding:10px 14px 0}
+.head h1{font-family:"Archivo Black";font-size:21px;letter-spacing:.2px}
+.head p{font-size:13px;color:var(--muted);margin-top:2px}
+.podium{height:226px;display:flex;align-items:flex-end;justify-content:center;gap:6px;padding:0 14px;margin-top:6px}
+.spot{width:112px;display:flex;flex-direction:column;align-items:center}
+.tag{height:20px;font-size:11px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;padding:3px 8px;border-radius:10px;margin-bottom:4px}
+.tag.win{background:var(--gold);color:#1a1406}
+.tag.best{background:#3b82f6;color:#fff}
+.tag.none{visibility:hidden}
+.pawn{width:46px;height:58px}
+.name{font-size:13px;font-weight:600;margin-top:4px;max-width:108px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sub{font-size:11px;color:var(--muted);height:15px}
+.ped{width:100%;border-radius:8px 8px 0 0;display:flex;justify-content:center;padding-top:6px;font-family:"Archivo Black";font-size:24px;color:rgba(0,0,0,.55);margin-top:4px}
+.p1 .ped{height:78px;background:linear-gradient(#f7c95e,#d99a1e)}
+.p2 .ped{height:56px;background:linear-gradient(#dfe4ec,#a9b2c0)}
+.p3 .ped{height:40px;background:linear-gradient(#e2a06c,#b36a33)}
+.you{margin:10px 14px 0;background:var(--surface);border:1px solid var(--line);border-radius:12px;height:62px;display:flex;align-items:center;padding:0 12px;gap:10px}
+.you .place{font-family:"Archivo Black";font-size:20px;width:58px}
+.you .mid{flex:1;font-size:12.5px;color:var(--muted);line-height:1.35}
+.you .mid b{color:var(--text)}
+.rp{font-family:"Archivo Black";font-size:17px;color:var(--good);text-align:right;line-height:1.1}
+.rp small{display:block;font-family:Archivo;font-size:11px;color:var(--muted);font-weight:400}
+.chart{margin:10px 14px 0;background:var(--surface);border:1px solid var(--line);border-radius:12px;flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden}
+.chart h2{font-size:12px;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);padding:9px 12px 6px;display:flex;justify-content:space-between}
+.row{display:grid;grid-template-columns:34px 18px 1fr 62px 58px;align-items:center;height:30px;padding:0 12px;font-size:13px;border-top:1px solid var(--line)}
+.row.h{font-size:11px;color:var(--muted);height:24px;border-top:none}
+.row .n{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:6px}
+.row .r{text-align:right;font-variant-numeric:tabular-nums}
+.row.me{background:rgba(244,183,64,.14)}
+.dot{width:11px;height:11px;border-radius:50%;border:1.5px solid #8b93a3}
+.dot.w{background:#f2f2f2}.dot.b{background:#111}
+.star{color:#5b9bff}
+.btns{display:flex;gap:10px;padding:10px 14px 18px}
+.btn{flex:1;height:50px;border-radius:12px;display:grid;place-items:center;font-weight:700;font-size:16px}
+.btn.a{background:var(--accent);color:#1a1406}.btn.s{background:var(--surface-2)}
+</style></head><body>
+<div class="top"><span><b>50 v 50</b> · Strong picks · Blitz</span><span class="gear">⚙</span></div>
+<div class="head"><h1>White wins by checkmate</h1><p>Move 47 · 1 v 1 from move 39</p></div>
+<div class="podium">
+ <div class="spot p2"><span class="tag best">Best player</span>
+  <svg class="pawn" viewBox="0 0 46 58"><g fill="#111" stroke="#8b93a3" stroke-width="2"><circle cx="23" cy="12" r="9"/><path d="M15 24h16l-3 4 5 18H13l5-18z"/><rect x="7" y="46" width="32" height="9" rx="3"/></g></svg>
+  <div class="name">Nadia K.</div><div class="sub">0.71 a move ★</div><div class="ped">2</div></div>
+ <div class="spot p1"><span class="tag win">Winner</span>
+  <svg class="pawn" viewBox="0 0 46 58"><g fill="#f2f2f2" stroke="#8b93a3" stroke-width="2"><circle cx="23" cy="12" r="9"/><path d="M15 24h16l-3 4 5 18H13l5-18z"/><rect x="7" y="46" width="32" height="9" rx="3"/></g></svg>
+  <div class="name">Rook_Raider</div><div class="sub">0.94 a move</div><div class="ped">1</div></div>
+ <div class="spot p3"><span class="tag none">-</span>
+  <svg class="pawn" viewBox="0 0 46 58"><g fill="#f2f2f2" stroke="#8b93a3" stroke-width="2"><circle cx="23" cy="12" r="9"/><path d="M15 24h16l-3 4 5 18H13l5-18z"/><rect x="7" y="46" width="32" height="9" rx="3"/></g></svg>
+  <div class="name">castle.queen</div><div class="sub">1.10 a move</div><div class="ped">3</div></div>
+</div>
+<div class="you"><div class="place">14th</div><div class="mid"><b>You</b> · out at move 30<br>1.62 a move · expected 31st</div><div class="rp">+11 RP<small>Gold 2 · 58/80</small></div></div>
+<div class="chart"><h2><span>All 100</span><span>Out at · a move</span></h2>
+ <div class="row h"><span>#</span><span></span><span>Player</span><span class="r">Out at</span><span class="r">Lost</span></div>
+ <div class="row"><span>1</span><span class="dot w"></span><span class="n">Rook_Raider</span><span class="r">End</span><span class="r">0.94</span></div>
+ <div class="row"><span>2</span><span class="dot b"></span><span class="n">Nadia K. <span class="star">★</span></span><span class="r">End</span><span class="r">0.71</span></div>
+ <div class="row"><span>3</span><span class="dot w"></span><span class="n">castle.queen</span><span class="r">38</span><span class="r">1.10</span></div>
+ <div class="row"><span>4</span><span class="dot b"></span><span class="n">Bishop Bob</span><span class="r">38</span><span class="r">1.24</span></div>
+ <div class="row"><span>5</span><span class="dot b"></span><span class="n">mateinfour</span><span class="r">34</span><span class="r">1.05</span></div>
+ <div class="row"><span>6</span><span class="dot w"></span><span class="n">pawnstar_77</span><span class="r">34</span><span class="r">1.31</span></div>
+ <div class="row"><span>7</span><span class="dot w"></span><span class="n">Lena M.</span><span class="r">30</span><span class="r">1.18</span></div>
+ <div class="row"><span>8</span><span class="dot b"></span><span class="n">grumpyknight</span><span class="r">30</span><span class="r">1.46</span></div>
+ <div style="flex:1"></div>
+ <div class="row me"><span>14</span><span class="dot w"></span><span class="n">You</span><span class="r">30</span><span class="r">1.62</span></div>
+</div>
+<div class="btns"><div class="btn s">Home</div><div class="btn a">Play again</div></div>
+</body></html>
