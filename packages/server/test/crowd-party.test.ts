@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CROWD_PARTY_MAX, modeSettings, type Settings } from "@chessroyale/core";
+import { CROWD_PARTY, CROWD_PARTY_MAX, modeSettings, type Settings } from "@chessroyale/core";
 import { SQUADS_PROTOCOL, type PartyServerMessage } from "@chessroyale/chess/squads";
 import { CROWD_PARTY_LINES, PartyCore, newPartyRecord } from "../src/squads-party.ts";
 import { Matchmaker, type PlayAnswer } from "../src/matchmaker.ts";
@@ -7,7 +7,9 @@ import { LobbyCore, newLobbyRecord } from "../src/lobby.ts";
 import { library, setup } from "./lobby-fixture.ts";
 import { memoryDb } from "./memory-db.ts";
 import { createGuest, ensureSchema } from "../src/accounts.ts";
-import { dismissInvite, friendsState, mayInvite, sendInvite, sendRequest, setFriendSettings, FRIEND_TEXT } from "../src/friends.ts";
+import { answerRequest, block, crowdInviteOpen, dismissInvite, friendsState, mayInvite, sendInvite, sendRequest, setFriendSettings, FRIEND_TEXT } from "../src/friends.ts";
+import { handleFriendsApi } from "../src/friends-api.ts";
+import { createSession } from "../src/accounts.ts";
 
 /**
  * 50 v 50's party (Nov 16; docs/decisions/2026-11-16-crowd-party.md): friends only, by a member's invite; up to CROWD_PARTY_MAX;
@@ -26,7 +28,7 @@ function party() {
   });
   const join = (uid: string, name = uid) => core.connect(undefined, { name, v: SQUADS_PROTOCOL, userId: uid });
   const view = () => core.view();
-  return { core, join, view, tick: (ms: number) => (now += ms), now: () => now };
+  return { core, join, view, inbox, tick: (ms: number) => (now += ms), now: () => now };
 }
 
 const member = (r: ReturnType<PartyCore["connect"]>) => {
@@ -116,6 +118,62 @@ describe("50 v 50's party: friends only, by invite", () => {
     expect(P.view().members.map((m) => m.uid)).toEqual(["u-bo"]);
     expect(P.core.mayInvite("u-bo", "u-ann")).toEqual({ ok: true });
   });
+
+  it("M2 (c): a leader who drops (a reload) keeps the lead a while; back in time, still the leader; gone longer, it passes on", () => {
+    const P = party();
+    const ann = member(P.join("u-ann"));
+    P.core.invited("u-ann", "u-bo", "Bo", P.now() + 600_000);
+    const bo = member(P.join("u-bo"));
+    P.core.disconnect(ann);
+    expect(P.view().leaderId).toBe(ann);
+    // (The alarm comes when the hold ends, to pass the lead on then.)
+    expect(P.core.nextAlarm).toBe(P.now() + CROWD_PARTY.leadHoldMs);
+    P.core.message(bo, { t: "queue" });
+    expect(P.core.record.state).toBe("open");
+    P.tick(CROWD_PARTY.leadHoldMs - 1000);
+    P.core.tick();
+    expect(P.view().leaderId).toBe(ann);
+    expect(member(P.join("u-ann"))).toBe(ann);
+    expect(P.view().leaderId).toBe(ann);
+    expect(P.core.nextAlarm).toBeNull();
+    // Gone past the hold: Bo leads, and everyone is told so by the alarm.
+    P.core.disconnect(ann);
+    P.tick(CROWD_PARTY.leadHoldMs);
+    P.inbox.clear();
+    P.core.tick();
+    expect(P.view().leaderId).toBe(bo);
+    expect(P.inbox.get(bo)?.at(-1)).toMatchObject({ t: "party", party: { leaderId: bo } });
+  });
+
+  it("L5: the leader's Cancel takes its ticket out of the matchmaker's line; a search with nobody here stops, and so does one everyone left", () => {
+    const P = party();
+    const ann = member(P.join("u-ann"));
+    P.core.invited("u-ann", "u-bo", "Bo", P.now() + 600_000);
+    const bo = member(P.join("u-bo"));
+    P.core.message(ann, { t: "queue" });
+    const pass = P.core.takeQueue()!.pass;
+    P.core.answered(pass, { busy: true, ticket: "t1", position: 3, waitSeconds: 9, retryMs: 3000, message: "busy" });
+    P.core.message(ann, { t: "cancel" });
+    expect(P.core.takeDropTickets()).toEqual(["t1"]);
+    expect(P.core.takeDropTickets()).toEqual([]);
+    // Searching again, then nobody connected: it asks on until CROWD_PARTY.awayStopMs, then stops (its ticket dropped).
+    P.core.message(ann, { t: "queue" });
+    P.core.answered(P.core.takeQueue()!.pass, { busy: true, ticket: "t2", position: 3, waitSeconds: 9, retryMs: 3000, message: "busy" });
+    P.core.disconnect(ann);
+    P.core.disconnect(bo);
+    P.tick(3000);
+    expect(P.core.takeQueue()).not.toBeNull();
+    P.tick(CROWD_PARTY.awayStopMs);
+    expect(P.core.takeQueue()).toBeNull();
+    expect(P.view().state).toBe("open");
+    expect(P.core.takeDropTickets()).toEqual(["t2"]);
+    // Everyone leaving: at once.
+    expect(member(P.join("u-ann"))).toBe(ann);
+    P.core.message(ann, { t: "queue" });
+    expect(P.view().state).toBe("queueing");
+    P.core.message(ann, { t: "leave" });
+    expect(P.view().state).toBe("open");
+  });
 });
 
 // ---------------- The matchmaker and the lobby ----------------
@@ -134,7 +192,7 @@ function lobbies(size = 100) {
         core.setAuto(auto.fillAt, !!auto.botsOff);
         const l = { core, singles: 0 };
         open.set(c, l);
-        if (auto.party) return core.reserveParty(auto.party.size, auto.party.pass, 20_000) ? true : 0;
+        if (auto.party) return core.reserveParty(auto.party.size, auto.party.pass, 20_000, 0, true) ? true : 0;
         const give = Math.min(auto.reserve ?? 0, core.seatsLeft());
         l.singles += give;
         return auto.reserve ? give : true;
@@ -167,7 +225,7 @@ function matchmaker(ns: unknown) {
   return new TestMatchmaker(ctx as unknown as DurableObjectState, { LOBBIES: ns } as never);
 }
 const codeOf = (a: PlayAnswer) => ("code" in a ? a.code : null);
-const play = (mm: Matchmaker, info?: { size: number; pass: string }) => mm.next({}, 60_000, { crowdWaitsForFull: true }, null, info);
+const play = (mm: Matchmaker, info?: { size: number; pass: string }, fillMs = 60_000) => mm.next({}, fillMs, { crowdWaitsForFull: true }, null, info);
 
 describe("50 v 50's party in the matchmaker", () => {
   it("a party is one ticket, seated whole beside the single players, its seats held under its pass", async () => {
@@ -191,6 +249,18 @@ describe("50 v 50's party in the matchmaker", () => {
     const c = await play(mm, { size: 2, pass: "c" });
     expect(codeOf(c)).not.toBe(codeOf(a));
     expect(L.open.get(codeOf(c)!)!.core.record.crowdParties?.c?.size).toBe(2);
+  });
+
+  it("H2: a lobby filling sooner than a party's hold isn't the party's: a new one is (and holds them until its own fill)", async () => {
+    const L = lobbies();
+    const mm = matchmaker(L.ns);
+    // (A lobby filling in 15 s, less than the 20 s a party's members have to arrive.)
+    const first = codeOf(await play(mm, undefined, 15_000))!;
+    const party = codeOf(await play(mm, { size: 3, pass: "pp" }, 15_000))!;
+    expect(party).not.toBe(first);
+    expect(L.open.get(first)!.core.record.crowdParties).toBeUndefined();
+    const held = L.open.get(party)!.core.record;
+    expect(held.crowdParties?.pp?.until).toBe(held.auto!.fillAt);
   });
 });
 
@@ -217,7 +287,7 @@ describe("50 v 50's party in the lobby", () => {
     expect(players.filter((p) => p.colour === "w")).toHaveLength(5);
   });
 
-  it("a hold that runs out frees its seats; a second party only while every party still fits whole on a team", () => {
+  it("a hold that runs out frees its seats; a second party only while every party, at its full size, still fits whole on a team", () => {
     const L = setup({ ...crowd(), lobbySize: 10 });
     L.core.setAuto(L.now + 60_000);
     expect(L.core.reserveParty(4, "a", 5_000)).toBe(true);
@@ -225,9 +295,81 @@ describe("50 v 50's party in the lobby", () => {
     expect(L.core.reserveParty(2, "c", 5_000)).toBe(false);
     expect(L.core.seatsLeft()).toBe(2);
     L.advance(5_000);
-    // (Nobody came: their seats are everyone's again, and the parties count as who came: none.)
+    // (Nobody came yet: their seats are everyone's again. L1: a party still counts at its full size, as its members on their way
+    // join it whenever they come, so a third party still doesn't fit whole on a side.)
     expect(L.core.seatsLeft()).toBe(10);
-    expect(L.core.reserveParty(2, "c", 5_000)).toBe(true);
+    expect(L.core.reserveParty(2, "c", 5_000)).toBe(false);
+  });
+
+  it("L1: a member arriving after the hold still joins the party's group, and the start puts every party whole on one side", () => {
+    const L = setup({ ...crowd(), lobbySize: 10 });
+    L.core.setAuto(L.now + 60_000);
+    expect(L.core.reserveParty(4, "a", 5_000)).toBe(true);
+    expect(L.core.reserveParty(4, "b", 5_000)).toBe(true);
+    const join = (name: string, pass: string) => {
+      const r = L.core.connect(undefined, name, "phone", false, null, undefined, `u-${name}`, null, null, false, { pass });
+      if (!r.ok) throw new Error(r.message);
+      return r.playerId;
+    };
+    const a = ["A1", "A2"].map((n) => join(n, "a"));
+    const b = ["B1", "B2", "B3"].map((n) => join(n, "b"));
+    L.advance(10_000);
+    a.push(join("A3", "a"), join("A4", "a"));
+    b.push(join("B4", "b"));
+    expect(L.core.record.crowdParties!.a!.ids).toEqual(a);
+    expect(L.core.record.crowdParties!.b!.ids).toEqual(b);
+    L.advance(60_000);
+    const players = L.core.save().runner!.state.players;
+    const side = (id: string) => players.find((p) => p.id === id)!.colour;
+    expect(new Set(a.map(side)).size).toBe(1);
+    expect(new Set(b.map(side)).size).toBe(1);
+    expect(side(a[0]!)).not.toBe(side(b[0]!));
+  });
+
+  it("H2: a lobby filling within a party's hold doesn't take it; a lobby made for it holds them until its fill; the fill never comes sooner", () => {
+    const L = setup({ ...crowd(), lobbySize: 10 });
+    L.core.setAuto(L.now + 15_000);
+    expect(L.core.reserveParty(3, "pp", 20_000)).toBe(false);
+    expect(L.core.reserveParty(3, "pp", 20_000, 0, true)).toBe(true);
+    expect(L.core.record.crowdParties!.pp!.until).toBe(L.now + 15_000);
+    // (Someone who already waited joins: bots fill sooner, but not before the party's members have had their hold.)
+    const M = setup({ ...crowd(), lobbySize: 10 });
+    M.core.setAuto(M.now + 60_000);
+    expect(M.core.reserveParty(3, "pp", 20_000)).toBe(true);
+    M.core.hurry(M.now);
+    expect(M.core.record.auto!.fillAt).toBe(M.now + 20_000);
+  });
+
+  it("H1: a party's pass, held here with room, lets its member past the engine pool's door; a full group's, or another's, doesn't", () => {
+    const L = setup({ ...crowd(), lobbySize: 10 });
+    L.core.setAuto(L.now + 60_000);
+    expect(L.core.reserveParty(1, "pp", 20_000)).toBe(true);
+    expect(L.core.crowdPassOpen("pp")).toBe(true);
+    expect(L.core.crowdPassOpen("nope")).toBe(false);
+    expect(L.core.crowdPassOpen("__proto__")).toBe(false);
+    expect(L.core.crowdPassOpen(undefined)).toBe(false);
+    const r = L.core.connect(undefined, "Ann", "phone", false, null, undefined, "u-ann", null, null, false, { pass: "pp" });
+    expect(r.ok).toBe(true);
+    expect(L.core.crowdPassOpen("pp")).toBe(false);
+    // (A pass the app made up never breaks the door: only the lobby's own keys.)
+    expect(L.core.connect(undefined, "Bo", "phone", false, null, undefined, "u-bo", null, null, false, { pass: "constructor" }).ok).toBe(true);
+  });
+
+  it(`M3: a match with a party of 2 or more friends in it isn't ranked (CROWD_PARTY.ranked: ${CROWD_PARTY.ranked}); a party of one is a single`, () => {
+    const lobby = (party: number) => {
+      const L = setup({ ...crowd(), lobbySize: 10 });
+      L.core.setAuto(L.now + 60_000);
+      expect(L.core.reserveParty(Math.max(1, party), "pp", 20_000)).toBe(true);
+      for (let i = 0; i < 4; i++) {
+        const r = L.core.connect(undefined, `P${i}`, "phone", false, null, undefined, `u-${i}`, null, null, false, i < party ? { pass: "pp" } : {});
+        if (!r.ok) throw new Error(r.message);
+      }
+      L.advance(60_000);
+      return L.core.ranked();
+    };
+    expect(lobby(0)).toBe(true);
+    expect(lobby(1)).toBe(true);
+    expect(lobby(2)).toBe(CROWD_PARTY.ranked);
   });
 });
 
@@ -255,10 +397,99 @@ describe("Do Not Disturb (Eric, Nov 16)", () => {
     expect(await sendRequest(sql, a, b, false, now)).toMatchObject({ ok: true });
   });
 
+  it("nit: earlier friend requests are hidden too, until it ends", async () => {
+    const { sql, now, a, b } = await db();
+    expect(await sendRequest(sql, a, b, false, now)).toMatchObject({ ok: true });
+    await setFriendSettings(sql, b, { dnd: true });
+    expect((await friendsState(sql, b, now)).requests).toEqual([]);
+    await setFriendSettings(sql, b, { dnd: false });
+    expect((await friendsState(sql, b, now)).requests.map((r) => r.id)).toEqual([a]);
+  });
+
   it("dismissing a 50 v 50 party's invite says what it was for (its seat is a + again)", async () => {
     const { sql, now, a, b } = await db();
     expect(await sendInvite(sql, a, b, "crowdparty", "PRTY2", false, now)).toMatchObject({ ok: true });
     expect(await dismissInvite(sql, b, a)).toEqual({ ok: true, was: { kind: "crowdparty", code: "PRTY2" } });
     expect(await dismissInvite(sql, b, a)).toEqual({ ok: true });
+  });
+});
+
+// ---------------- The friends API: friends only, and the seats invites hold ----------------
+
+describe("50 v 50 party invites through the friends API", () => {
+  async function world() {
+    const { sql, d1 } = memoryDb();
+    await ensureSchema(sql);
+    const now = Date.now();
+    const users = await Promise.all(["Ann", "Bo", "Cy"].map(async (n) => (await createGuest(sql, now - 60_000, n)).user.id));
+    const tokens = await Promise.all(users.map((u) => createSession(sql, u, now)));
+    const uninvited: [string, string][] = [];
+    const parties = {
+      idFromName: (c: string) => c,
+      get: (c: string) => ({
+        crowdMayInvite: async () => ({ ok: true }),
+        crowdInvited: async () => undefined,
+        crowdUninvited: async (to: string) => void uninvited.push([c, to]),
+      }),
+    };
+    const env = { DB: d1, PARTIES: parties };
+    const call = async (who: number, action: string, body: object) => {
+      const bg: Promise<unknown>[] = [];
+      const res = (await handleFriendsApi(
+        new Request(`https://hunchess.com/api/friends/${action}`, { method: "POST", headers: { cookie: `hc_session=${tokens[who]}` }, body: JSON.stringify(body) }),
+        env as never,
+        (p) => void bg.push(p),
+      ))!;
+      await Promise.all(bg);
+      return { status: res.status, body: (await res.json()) as { message?: string } };
+    };
+    const befriend = async (x: number, y: number) => {
+      await sendRequest(sql, users[x]!, users[y]!, false, now);
+      await answerRequest(sql, users[y]!, users[x]!, true, now);
+    };
+    return { sql, now, users, call, befriend, uninvited };
+  }
+
+  it("M1: only to a friend: anyone else by account is refused on the server, whatever the app offers", async () => {
+    const W = await world();
+    const [, bo] = W.users;
+    expect(await W.call(0, "invite", { id: bo, kind: "crowdparty", code: "PRTY2" })).toEqual({ status: 403, body: { message: FRIEND_TEXT.notTaking } });
+    await W.befriend(0, 1);
+    expect((await W.call(0, "invite", { id: bo, kind: "crowdparty", code: "PRTY2" })).status).toBe(200);
+  });
+
+  it("L3: two members invite Bo; he declines one: his seat waits on the other. Declining both, or a block, makes it a + again", async () => {
+    const W = await world();
+    const [ann, bo, cy] = W.users as [string, string, string];
+    await W.befriend(0, 1);
+    await W.befriend(2, 1);
+    expect((await W.call(0, "invite", { id: bo, kind: "crowdparty", code: "PRTY2" })).status).toBe(200);
+    expect((await W.call(2, "invite", { id: bo, kind: "crowdparty", code: "PRTY2" })).status).toBe(200);
+    expect((await W.call(1, "dismiss", { id: ann })).status).toBe(200);
+    expect(W.uninvited).toEqual([]);
+    expect(await crowdInviteOpen(W.sql, bo, "PRTY2", W.now)).toBe(true);
+    expect((await W.call(1, "dismiss", { id: cy })).status).toBe(200);
+    expect(W.uninvited).toEqual([["PRTY2", bo]]);
+    // A block takes the invite between them back, and the seat with it.
+    W.uninvited.length = 0;
+    expect((await W.call(0, "invite", { id: bo, kind: "crowdparty", code: "PRTY3" })).status).toBe(200);
+    expect((await W.call(1, "block", { id: ann })).status).toBe(200);
+    expect(W.uninvited).toEqual([["PRTY3", bo]]);
+  });
+
+  it("L2: the invite lets them in only while it stands: a block deletes it; their Do Not Disturb holds it back", async () => {
+    const W = await world();
+    const [ann, bo] = W.users as [string, string, string];
+    await W.befriend(0, 1);
+    expect(await sendInvite(W.sql, ann, bo, "crowdparty", "PRTY2", false, W.now)).toMatchObject({ ok: true });
+    expect(await crowdInviteOpen(W.sql, bo, "PRTY2", W.now, true)).toBe(true);
+    expect(await crowdInviteOpen(W.sql, bo, "OTHER", W.now, true)).toBe(false);
+    await setFriendSettings(W.sql, bo, { dnd: true });
+    expect(await crowdInviteOpen(W.sql, bo, "PRTY2", W.now, true)).toBe(false);
+    // (Its seat still waits: nobody learns of Do Not Disturb from a seat turning back into a +.)
+    expect(await crowdInviteOpen(W.sql, bo, "PRTY2", W.now)).toBe(true);
+    await setFriendSettings(W.sql, bo, { dnd: false });
+    expect(await block(W.sql, bo, ann, W.now)).toEqual({ ok: true, crowd: [{ to: bo, code: "PRTY2" }] });
+    expect(await crowdInviteOpen(W.sql, bo, "PRTY2", W.now, true)).toBe(false);
   });
 });
