@@ -41,7 +41,7 @@ Lane: `fairplay`. The reviewer's brief: `docs/fairplay-reviewer.md`. The numbers
   results count again), **closed** (a watch with nothing new for `FAIRPLAY.evidenceDays`).
 - **A ban means you can't sign in** (Eric, Nov 13; [2026-11-13-ban-blocks-sign-in.md](../decisions/2026-11-13-ban-blocks-sign-in.md)):
   - **Signing in** to a banned account (an emailed code, Google, a test account's script) is refused once the identity is proven
-    (`signInBan`): the ban answer, no session made, an emailed code spent. So is ban evasion: an account whose identities a banned
+    (`signInBan`): the ban answer, no session made, an emailed code spent. The check waits for the proven identity (the code right, Google's answer), never the code's sending: refusing earlier would tell anyone who typed an address that its account is banned. It comes before the age question. So is ban evasion: an account whose identities a banned
     account had, or that would take Google's verified email that is a banned account's address (banned by evasion as it signs in);
     an identity new to us that a banned account had (its own new account, banned by evasion, made once the sign-in can finish,
     behind the age question: `evasionAccount`; a person can clear it). A refused sign-in ends whatever session the browser carried.
@@ -50,6 +50,9 @@ Lane: `fairplay`. The reviewer's brief: `docs/fairplay-reviewer.md`. The numbers
     `FAIRPLAY.banCheckMs` (60 s; `ban-cache.ts`), so the live line's and the town's polls need no database read most of the time; a
     ban made on the same instance counts at once (`setCase` forgets its answers). A session that's gone or expired: its token is
     forgotten in presence's cache too, so no route serves the banned account from it.
+  - **Page URLs** are the app's static files, served without the Worker, so the gate enforces on the API (everything the app can do
+    online) and the app draws the ban screen on every URL. Running the Worker for every file would cost a Worker call per file for
+    every player.
   - **The ban answer:** 403 `{banned: true, message}` (core's `BANNED_LINE`: "Your account has been banned. For more information,
     email support@hunchess.com.") with the `x-hc-banned` header, the browser's session ended (whatever account), the browser marked
     (`hc_banned`, the banned account's id). The Worker never takes a mark away over a route's own ban answer.
@@ -123,7 +126,7 @@ Lane: `fairplay`. The reviewer's brief: `docs/fairplay-reviewer.md`. The numbers
   ban, lift, reset the name and icon; admins only: [chat.md](chat.md), "Moderation"), and a box on the list opens any
   player's page by id or profile link.
 - **Emails:** a ban notice (the ban screen's line, with the admin's note if any), a ban lifted ("Sign in again to play online") and a
-  review cleared go to the player's sign-in address through Resend.
+  review cleared go to the player's sign-in address through Resend. An appeal turned down says to email support; neither email says solo stays open.
 
 ## Where the code is
 
@@ -142,7 +145,7 @@ Lane: `fairplay`. The reviewer's brief: `docs/fairplay-reviewer.md`. The numbers
 ## Settings
 
 `FAIRPLAY` in settings.ts; Worker secrets/variables `ADMIN_EMAILS`, `FAIRPLAY_REVIEW_TOKEN`, `RESEND_API_KEY`,
-`EMAIL_FROM`.
+`EMAIL_FROM`. The support address is core's `SUPPORT_EMAIL`, the one source for the ban line, the ban emails and the app's mailto link.
 
 ## Tests
 
