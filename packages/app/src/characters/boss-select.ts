@@ -8,7 +8,6 @@
  * decision file); an approved set replaces a boss's list here, in one edit.
  */
 import type { SoundName } from "../sound.ts";
-import { CHANDY_SELECT_FRAMING } from "./chandy.ts";
 
 /** Each boss's sound as it steps onto the stage, by its roster id. */
 export const SELECT_SOUND: Readonly<Record<string, SoundName>> = {
@@ -196,8 +195,8 @@ export const SELECT_FRAMING: Readonly<Record<string, Framing>> = {
   dash: { neck: [36, 44], span: 54, at: 0.5 },
   // (His fedora and the white of his face in the tile, his round belly and the planks' end below it.)
   zebra: { neck: [40, 56], span: 58, at: 0.5 },
-  // (His head, lens and war paint in the tile, the slung rifle over his shoulder: the art's framing, chandy.ts.)
-  chandy: CHANDY_SELECT_FRAMING,
+  // (His head, lens and war paint in the tile, the slung rifle over his shoulder.)
+  chandy: { neck: [62, 72], span: 60, at: 0.56 },
   recluse: { neck: [33, 47], span: 61, at: 0.5 },
 };
 

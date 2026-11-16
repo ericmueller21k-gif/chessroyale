@@ -306,7 +306,7 @@
 import type { SoundName } from "../sound.ts";
 import { CHANDY_DODGE_SOUNDS, CHANDY_SOUNDS } from "./chandy.ts";
 import { EFFECT_SPRITES, TOY_LETTER_NAMES, type ToyLetter } from "./effects.ts";
-import type { Anim, Character } from "./sprite.ts";
+import { animLength, cueAt, type Anim, type Character } from "./sprite.ts";
 
 /** The power moments' animation names, every boss's. */
 export const POWER_ANIMS = [
@@ -666,18 +666,8 @@ export function blockItem(square: string, state: "land" | "sit" | "poof", since:
   return { square, name: "toyBlock", anim: `${state}${l}`, since };
 }
 
-/** An animation's length in ms. */
-export const animLength = (a: Anim) => a.frames.reduce((s, f) => s + f.ms, 0);
-
-/** When a cue fires in an animation, in ms from its start (the start of its first frame with that cue), or null. */
-export function cueAt(a: Anim, cue: string): number | null {
-  let t = 0;
-  for (const f of a.frames) {
-    if (f.cue === cue) return t;
-    t += f.ms;
-  }
-  return null;
-}
+// (animLength and cueAt are sprite.ts's: read without the bosses' effects. Re-exported here for the files that took them from here.)
+export { animLength, cueAt } from "./sprite.ts";
 
 // ---------------- Hollow's dark, for the board ----------------
 

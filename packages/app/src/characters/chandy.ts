@@ -1338,12 +1338,6 @@ export const CHANDY_DODGE_SOUNDS: Record<string, SoundName> = { ...CHANDY_SOUNDS
 /** The part of him a portrait shows (his head, lens and war paint, the rifle's barrel over his shoulder), in frame px. */
 export const CHANDY_PORTRAIT = { x: 42, y: 40, w: 58, h: 36 } as const;
 
-/** His select tile's framing (boss-select.ts SELECT_FRAMING): his neck, the frame's px across the tile, how far down the neck sits. */
-export const CHANDY_SELECT_FRAMING = {
-  neck: [62, 72],
-  span: 60,
-  at: 0.56,
-} as const;
 
 /** Chandy on the sprite kit: facing our right as drawn, his anchors at rest. */
 export const CHANDY_SPRITE: Sprite = {

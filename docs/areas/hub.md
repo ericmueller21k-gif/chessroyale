@@ -7,7 +7,9 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
 - **Loading (Nov 10, [phone load 2](../decisions/2026-11-10-phone-load-2.md)):** `index.html`'s shell (home's markup, only the logo, hero
   panel and PLAY's outline visible; the splash where this device hasn't landed on home: `shell.ts`) shows before the script runs and goes as
   the first real screen draws. The match screens (`screens/game-screens.ts`), solo, FAQ, Legal and Auto chess are chunks (`lazy.tsx`),
-  preloaded when play is near. Pictures are cached on first show, not precached; the demo video is MP4 only. `scripts/measure-load.mjs`.
+  preloaded when play is near; the match's (`lazy-game.ts`, with every boss's drawings, effects and powers since Nov 16's
+  [bundle split](../decisions/2026-11-16-bundle-split.md)) also 1.5 s after home shows. Home's boss faces and the select's tiles are
+  prerendered portraits (`components/BossPortrait.tsx`). Pictures are cached on first show, not precached; the demo video is MP4 only. `scripts/measure-load.mjs`.
   Past `FRONT_DOOR.loadBarAfterMs` (2 s) the shell shows a thin bar and what's loading (under the splash's logo, centered; the shell is always the splash since Eric's Nov 10 call, never home's outline),
   moved by the app's steps (`loadbar.ts`); a script that won't load, or no step for 20 s: "Try again" (a reload).
   [Decision](../decisions/2026-11-10-loading-bar.md); guard: `e2e/home-layout.spec.ts`, "the loading bar".

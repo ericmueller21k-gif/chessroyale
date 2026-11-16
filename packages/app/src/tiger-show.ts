@@ -14,7 +14,7 @@
  */
 import { HOOPS_BEATS, TIGER_ANIM, balloonStage, withoutPiece } from "@chessroyale/chess";
 import type { BalloonShape } from "@chessroyale/core";
-import { BALLOON_COLOR_NAMES, pumpAnim, type BalloonPiece, type Stage } from "./characters/tiger-bar.ts";
+import { BALLOON_COLOR_NAMES, pumpAnim, type BalloonPiece, type Stage } from "./characters/tiger-names.ts";
 
 /** The piece a balloon's shape is (a fake queen is a queen). */
 export const PIECE_OF: Record<BalloonShape, BalloonPiece> = { p: "pawn", n: "knight", b: "bishop", r: "rook", q: "queen" };

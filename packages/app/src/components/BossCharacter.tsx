@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "preact/ho
 import { bossBeat, type Beat, type BeatResult, type Stage } from "../characters/boss-beats.ts";
 import { BOSS_KITS, artOf, bossKit, bossKitOf, liveKit, type BossKit } from "../characters/kits.ts";
 import { growingRun, resetGrowing } from "./RecluseChild.ts";
-import { SELECT_FRAMING } from "../characters/boss-select.ts";
+import { figure, onResetBeats, setFigureRun, suit } from "./boss-figure.ts";
 import { stanceAt } from "../characters/stance.ts";
 import { resetMoo } from "../characters/moo-state.ts";
 import { type Anim, type Character, type Frame } from "../characters/sprite.ts";
@@ -62,45 +62,18 @@ const startOf = (key: string, now = Date.now()) => {
 /** Sounds already played: the phone and computer placements, or a new screen, never play one twice. */
 const played = new Set<string>();
 
-/**
- * A new boss battle (its intro, with the voices' reset): the moments seen and sounds played in the last one are
- * forgotten, so its entrance, and its defeat or victory, play again (their keys repeat from battle to battle).
- */
-export function resetBeats() {
+// A new battle forgets the moments seen and sounds played here, and each power's own state (boss-figure.ts, resetBeats).
+onResetBeats(() => {
   started.clear();
   played.clear();
   inPlace.run = null;
-  figure.run = null;
-  suit.at = null;
   resetMoo();
   resetGarden();
   resetTiger();
   resetGrowing();
-}
+});
+export { resetBeats, setFigureRun, setSuitAt, type FigureRun } from "./boss-figure.ts";
 
-/**
- * What the boss's figure shows instead of its beat, for as long as it's set (the Hidden Boss's phase 2): `before` (a loop)
- * until `since`, then `anims` in turn (a loop given with `ms` plays that long; a one-shot given with `ms` plays once and
- * holds its last frame for the rest), then `loop` for good. Its beat's lines and
- * fall lines are quiet meanwhile (his phase 2 says its own). Runs in place (playInPlace) still play over it. Cleared by a
- * new battle (resetBeats). `talks`: its beat's lines are said as usual meanwhile (the Hidden Boss's child growing up).
- */
-export type FigureRun = { since: number; anims: readonly (string | { readonly anim: string; readonly ms: number })[]; loop: string; before?: string; talks?: boolean };
-const figure: { run: FigureRun | null } = { run: null };
-export function setFigureRun(run: FigureRun | null) {
-  figure.run = run;
-}
-
-/**
- * The Hidden Boss's final form (Eric, Nov 15: the black trench coat, his hair rising, the aura and the binary helix; the name
- * `suit` is round 3b's): from `at` (his transformation's white-out) to the end of the battle, worn on every drawing of him where he
- * stands (his frames' parts swapped for the final form's, plus its own layers: recluse.ts, `coated`). Cleared by a new battle
- * (resetBeats).
- */
-const suit: { at: number | null } = { at: null };
-export function setSuitAt(at: number | null) {
-  suit.at = at;
-}
 /** Whether a kit that changes its look (BossKit.suit: the Hidden Boss's final form) has it on at `now`. */
 const suitOn = (kit: BossKit, now: number) => !!kit.suit && suit.at !== null && now >= suit.at;
 /** The loop the figure rests in now, when a figure run is set (phase 2's `idle2`), else null. */
@@ -575,27 +548,6 @@ export function bossPortraitUrl(name: string): string | null {
   }
   portraitUrls.set(name, url);
   return url;
-}
-
-/**
- * A boss's whole figure for a select tile (docs/decisions/2026-10-23-boss-select-sf.md): its portrait's frame, full size, on a
- * canvas of its own. The stylesheet (`.bs-art`) scales it and puts its neck where `SELECT_FRAMING` says; the tile's slanted
- * shape cuts off what doesn't fit. A boss without a character keeps its emoji.
- */
-export function BossArt({ boss, class: cls = "" }: { boss: { id: string; name: string; icon: string }; class?: string }) {
-  const kit = bossKit(boss.name);
-  const fit = SELECT_FRAMING[boss.id];
-  const cv = useRef<HTMLCanvasElement>(null);
-  useLayoutEffect(() => {
-    if (!kit || !cv.current) return;
-    const p = kit.portrait;
-    const art = artOf(kit);
-    cv.current.getContext("2d")?.putImageData(frameImage(art, art.anims[p.anim]!.frames[p.frame]!), 0, 0);
-  }, [kit]);
-  if (!kit || !fit) return <>{boss.icon}</>;
-  const art = artOf(kit);
-  const style = { "--ax": fit.neck[0], "--ay": fit.neck[1], "--aw": art.w, "--ah": art.h, "--span": fit.span, "--at": fit.at };
-  return <canvas ref={cv} class={`bs-art ${cls}`} width={art.w} height={art.h} aria-hidden="true" style={style} />;
 }
 
 /**

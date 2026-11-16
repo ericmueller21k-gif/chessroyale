@@ -11,7 +11,7 @@ import { applyMove, legalMoves, sideToMove, type ClientMessage, type NetPhase2 }
 import type { Phase, SimulView } from "./game.ts";
 import { PHASE_CHANGE, cueSlash, phaseChangeRun } from "./recluse-phase2.ts";
 import { RECLUSE_LINES } from "./characters/recluse-lines.ts";
-import { setSuitAt, setFigureRun } from "./components/BossCharacter.tsx";
+import { setSuitAt, setFigureRun } from "./components/boss-figure.ts";
 import { warmSounds } from "./sound.ts";
 import { CRITICAL, NORMAL, bossVoice } from "./speech.tsx";
 import { resetKingSpeech } from "./godKing.ts";

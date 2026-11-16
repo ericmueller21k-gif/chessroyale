@@ -15,7 +15,8 @@ export function lazyGroup<M>(load: () => Promise<M>) {
       (m) => (m ? (mod = m) : ((loading = null), null)),
       () => ((loading = null), null),
     ));
-  const screen = <K extends keyof M>(name: K): M[K] => {
+  /** `fallback`: what shows until the chunk is here (the plain screen background; null for a piece inside a screen, its box kept by its own). */
+  const screen = <K extends keyof M>(name: K, fallback: preact.JSX.Element | null = <div class="screen" />): M[K] => {
     function Lazy(props: object) {
       const [, loaded] = useReducer((n: number) => n + 1, 0);
       useEffect(() => {
@@ -24,7 +25,7 @@ export function lazyGroup<M>(load: () => Promise<M>) {
         return () => void (live = false);
       }, []);
       const Screen = mod?.[name] as ComponentType<object> | undefined;
-      return Screen ? <Screen {...props} /> : <div class="screen" />;
+      return Screen ? <Screen {...props} /> : fallback;
     }
     return Lazy as M[K];
   };

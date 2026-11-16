@@ -765,8 +765,8 @@ const WATER_SWEEP: Character = (() => {
     anims: { sweep: { loop: false, frames: sweepFrames }, sheen: { loop: false, frames: [...sheenFrames, { ms: 40, layers: [] }] } },
   };
 })();
-/** The spray's front crosses the board's columns at this pace (ms for the whole board), so the sprout on a column can start as it passes. */
-export const SWEEP_MS = 420;
+// (SWEEP_MS, the spray's pace across the board, is garden-sweep.ts's: the first load's garden reads it without this drawing.)
+export { SWEEP_MS } from "../../garden-sweep.ts";
 
 // ---- His jet landing on a king.
 
