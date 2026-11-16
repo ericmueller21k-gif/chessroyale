@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import type { ComponentChildren } from "preact";
-import { ACTIVITY_LINES, FRIENDS, inviteWhat, type FriendEntry, type InviteEntry } from "@chessroyale/core";
+import { ACTIVITY_LINES, CROWD_PARTY_MAX, FRIENDS, inviteWhat, type FriendEntry, type InviteEntry } from "@chessroyale/core";
 import {
   addFriend,
   answerFriend,
@@ -229,7 +229,11 @@ export function InviteFriends() {
   );
 }
 
-function InviteSheet({ onClose }: { onClose: () => void }) {
+/**
+ * The friends sheet (online first), each with Invite. A 50 v 50 party's (a "+" tapped, Nov 16) says so, and shows a friend already
+ * in the party or invited greyed with what they are, Invite greyed for everyone once the party has no room (never hidden).
+ */
+export function InviteSheet({ onClose, party }: { onClose: () => void; party?: { inParty: ReadonlySet<string>; invited: ReadonlySet<string>; full: boolean } }) {
   const { state } = useFriends(true);
   const [note, setNote] = useState<string | null>(null);
   // (A layout effect, as every pop-up's: an effect waits for a paint, and an Escape pressed as it opened was lost. LESSONS.md, Nov 11.)
@@ -247,11 +251,22 @@ function InviteSheet({ onClose }: { onClose: () => void }) {
             ✕
           </button>
         </div>
-        {state && !state.friends.length && <p class="fd-sub">No friends yet. Tap a player's name, then Add friend. Or share the link.</p>}
+        {party && <p class="fd-sub">Up to {CROWD_PARTY_MAX - 1} friends queue with you, all on your team.</p>}
+        {state && !state.friends.length && <p class="fd-sub">{party ? "No friends yet. Tap a player's name, then Add friend." : "No friends yet. Tap a player's name, then Add friend. Or share the link."}</p>}
         <div class="fr-list">
           {state?.friends.map((f) => (
             <FriendRow key={f.id} f={f}>
-              <InviteButton uid={f.id} onNote={setNote} />
+              {party?.inParty.has(f.id) ? (
+                <FdButton class="small" disabled>
+                  In party
+                </FdButton>
+              ) : party?.invited.has(f.id) ? (
+                <FdButton class="small" disabled>
+                  Invited
+                </FdButton>
+              ) : (
+                <InviteButton uid={f.id} onNote={setNote} {...(party?.full ? { disabled: true, title: "Your party is full" } : {})} />
+              )}
             </FriendRow>
           ))}
         </div>

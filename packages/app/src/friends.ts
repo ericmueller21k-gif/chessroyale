@@ -102,6 +102,11 @@ function takeAnswer(a: FriendsAnswer) {
   emit();
 }
 
+/** The 50 v 50 party mockup's friends (dev/crowd-party-mock.tsx, a test switch): a list as if the server had sent it. */
+export function mockFriendsList(next: FriendsState) {
+  apply(next);
+}
+
 // ---------------- Loading ----------------
 
 let forAccount: string | null = null;

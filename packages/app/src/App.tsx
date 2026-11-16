@@ -46,6 +46,7 @@ import { squadsExit, squadsWaiting } from "./screens/squads-exit.ts";
 import { lazyGroup } from "./lazy.tsx";
 import { dropShell, markHome } from "./shell.ts";
 import { PartySheet } from "./screens/SquadsParty.tsx";
+import { CrowdPartyMock, crowdPartyMockAsked } from "./dev/crowd-party-mock.tsx";
 import { BotDuel, DuelQueue, NetDuel, savedDuelQueue, setRanked1v1Starter, startRanked1v1, type DuelSession } from "./duel.ts";
 import { confirmLeaveSearch, keepInQueue, saveAwayLobby, savedAwayLobby, searchFoundAlert, searchSlots, setAwaySearch, type AwaySearch } from "./search.ts";
 import { chosenBotLevel } from "./components/BotLevelBox.tsx";
@@ -2142,6 +2143,9 @@ export function App() {
     </FrontFrame>
     );
   }
+  // (The 50 v 50 party's mockup, a test switch: the queue screen in party mode with fake data.)
+  const partyMock = !match ? crowdPartyMockAsked() : null;
+  if (partyMock) return <>{home(<CrowdPartyMock step={partyMock} />)}</>;
   // (Always a fragment with the frame first, in the queue or not, so the frame is kept from one to the other.)
   if (!match && inLine)
     return (

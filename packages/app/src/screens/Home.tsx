@@ -65,7 +65,7 @@ function saveMode(mode: ModeChoiceId) {
 
 const MATCHMAKING_KEY = "brc.matchmaking";
 /**
- * How you're matched (home's 50 v 50 options, Nov 9: Solo queue "default", Bots "solo"; Party is greyed until it's built): this device's
+ * How you're matched (home's 50 v 50 options, Nov 9: Solo queue "default", Bots "solo"; Party is its own pick, never stored): this device's
  * choice. "botsoff" (people only) has no button on home since Nov 9; stored (a test's), it still queues people only under Solo queue.
  */
 export function chosenMatchmaking(): MatchmakingType {
@@ -414,12 +414,13 @@ function FriendsSheet({
 /**
  * 50 v 50's options (Eric, Nov 9: "solo queue, party, and then … bots"), left to right, each a title and a short sub line as Squads'
  * (what each does in full is the line above PLAY). Solo queue is the public queue (it was Default), Bots a game in your browser at
- * the level you pick (it was Solo). Party (queueing together into the public matchmaking, up to CROWD_PARTY_MAX, ranked; Eric, Nov 9)
- * shows greyed, "Soon", until its matchmaker piece is built. Bots off is gone from home. docs/decisions/2026-11-09-home-modes-options.md.
+ * the level you pick (it was Solo). Party (Eric, Nov 9 and 16: you and up to CROWD_PARTY_MAX - 1 friends queue together into the
+ * public matchmaking, on one team; PLAY opens your party's queue screen). Bots off is gone from home. docs/decisions/2026-11-09-home-modes-options.md,
+ * 2026-11-16-crowd-party.md.
  */
-const types: { id: "default" | "party" | "solo"; label: string; sub: string; soon?: boolean }[] = [
+const types: { id: "default" | "party" | "solo"; label: string; sub: string }[] = [
   { id: "default", label: "Solo queue", sub: "join a lobby" },
-  { id: "party", label: "Party", sub: "Soon", soon: true },
+  { id: "party", label: "Party", sub: `up to ${CROWD_PARTY_MAX - 1} friends` },
   { id: "solo", label: "Bots", sub: `${CROWD_SIZE - 1} bots, now` },
 ];
 
@@ -530,6 +531,7 @@ export function HomeScreen({
   onRanked1v1,
   onSquads,
   onParty,
+  onCrowdParty,
   onRaid,
   onChessTown,
   onAutoChess,
@@ -583,6 +585,8 @@ export function HomeScreen({
   onSquads: () => void;
   /** Squads' party: make one, or join by code. */
   onParty: () => void;
+  /** 50 v 50's party (Nov 16): its queue screen (made the first time, or yours again). */
+  onCrowdParty?: () => void;
   /** Open (true) or close the Solo Boss Mode screen. */
   onRaid: (open: boolean) => void;
   /** Chess Town's button: the town square, as /town opens it. */
@@ -626,19 +630,23 @@ export function HomeScreen({
       }
     } else saveMode(m);
   };
-  // How you're matched (50 v 50: Solo queue or Bots; Party greyed). Guests (online needs signing in) can only play Bots; Classic online
+  // How you're matched (50 v 50: Solo queue, Party or Bots). Guests (online needs signing in) can only play Bots; Classic online
   // is coming (Bots works). ("botsoff", a test's stored pick, shows as Solo queue and queues people only.)
   const [picked, setPicked] = useState(chosenMatchmaking);
+  // (50 v 50's Party, Nov 16: PLAY opens your party's queue screen. Not remembered: the stored pick stays Solo queue or Bots.)
+  const [crowdParty, setCrowdParty] = useState(false);
   const soloOnly = !!onlineLocked;
   const type = soloOnly ? "solo" : picked;
+  const partyPicked = crowdParty && !soloOnly && mode === "crowd";
   // (The option shown picked: Bots off has no button since Nov 9.)
-  const option = type === "botsoff" ? "default" : type;
+  const option = partyPicked ? "party" : type === "botsoff" ? "default" : type;
   // The Bot level box (PLAY with Bots).
   const [botBox, setBotBox] = useState(false);
   // (Nothing picked yet: the options show greyed, none selected and none tappable: Eric, Oct 25.)
   const pickType = (t: "default" | "party" | "solo") => {
-    // (Party: greyed until it's built.)
-    if (!mode || t === "party" || (soloOnly && t !== "solo")) return;
+    if (!mode || (soloOnly && t !== "solo")) return;
+    setCrowdParty(t === "party");
+    if (t === "party") return;
     setPicked(t);
     saveMatchmaking(t);
   };
@@ -738,6 +746,8 @@ export function HomeScreen({
     if (!mode || resting || lockUntil) return;
     if (mode === "squads") return onlineLocked ? onSignIn() : party ? onParty() : onSquads();
     if (mode === "1v1") return onlineLocked ? onSignIn() : onRanked1v1();
+    // (Party: your party's queue screen, idle until its leader's Find match.)
+    if (partyPicked) return onCrowdParty?.();
     // (Bots: the Bot level box first; its OK starts the game.)
     if (type === "solo") return setBotBox(true);
     if (mode === "crowd") onPlay("crowd", type);
@@ -781,6 +791,8 @@ export function HomeScreen({
         Sign in to play online
       </button>
     </>
+  ) : partyPicked ? (
+    `Queue with up to ${CROWD_PARTY_MAX - 1} friends`
   ) : type === "solo" ? (
     `Start at once with ${bots} bots`
   ) : type === "botsoff" ? (
@@ -1122,7 +1134,7 @@ export function HomeScreen({
       ) : (
         <div class="fd-modes fd-types fd-three" role="radiogroup" aria-label="Matchmaking">
           {types.map((t) => {
-            const off = !!t.soon || (soloOnly && t.id !== "solo");
+            const off = soloOnly && t.id !== "solo";
             const idle = !mode;
             return (
               <button
@@ -1132,7 +1144,7 @@ export function HomeScreen({
                 aria-checked={!idle && option === t.id}
                 aria-disabled={idle || off || undefined}
                 class={`${option === t.id && !idle ? "on" : ""}${off ? " off" : ""}`}
-                title={t.soon ? `Queue with up to ${CROWD_PARTY_MAX - 1} friends (soon)` : off ? "Online: sign in to play" : undefined}
+                title={off ? "Online: sign in to play" : undefined}
                 onClick={() => pickType(t.id)}
               >
                 {t.label}
