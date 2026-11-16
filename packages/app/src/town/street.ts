@@ -93,6 +93,24 @@ export function homesOn(side: RowSide, lots: readonly StreetLot[] = PLAN.lots as
     .map((l) => ({ id: l.id as HomeId, a: alongIn(side, across ? l.c0 : l.r0)!, w: l.w }));
 }
 /**
+ * The homes you see into (Chandy's Swamp, Nov 16: a pond under trees, no building): the row backing onto one leaves its stretch open, as
+ * if the home stood there too. Its lot runs back over that row's squares, so a front laid there would stand inside its box, its rear
+ * wall's windows showing through the trees (Eric: "there's windows, which there shouldn't be windows").
+ */
+const OPEN_HOMES: ReadonlySet<string> = new Set(["chandy"]);
+/** The open homes whose lots run back onto row side `side` from the row facing the other way: each a gap in it, as a home anchors one. */
+function openBehind(side: RowSide, lots: readonly StreetLot[]): RowHome[] {
+  const across = side.facing === "S" || side.facing === "N";
+  const [lo, hi] = [Math.min(side.d0, side.d1), Math.max(side.d0, side.d1)];
+  return lots
+    .filter((l) => l.kind === "home" && OPEN_HOMES.has(l.id) && l.facing !== side.facing && (across ? l.facing === "S" || l.facing === "N" : l.facing === "E" || l.facing === "W"))
+    .filter((l) => {
+      const [d0, d1] = across ? [l.r0, l.r0 + l.d - 1] : [l.c0, l.c0 + l.d - 1];
+      return d0 <= hi && d1 >= lo && alongIn(side, across ? l.c0 : l.r0) !== null;
+    })
+    .map((l) => ({ id: l.id as HomeId, a: alongIn(side, across ? l.c0 : l.r0)! + (l.shift ?? 0), w: l.w }));
+}
+/**
  * The rows (round 4, rows.ts) over the plan: on each row side, the plan's everyday buildings go (its homes stay, anchoring the row) and
  * look-alike fronts fill the row from corner to corner; the ground under a row is a lot's, and the garden things it covers go.
  */
@@ -106,8 +124,11 @@ function withRows(lots: StreetLot[]): StreetLot[] {
   const out = lots.filter((l) => l.kind === "home" || !covered(l)).map((l) => ({ ...l }));
   for (const side of ROW_SIDES) {
     const across = side.facing === "S" || side.facing === "N";
-    for (const p of layRow(side, homesOn(side, out))) {
+    const own = homesOn(side, out);
+    for (const p of layRow(side, [...own, ...openBehind(side, out)])) {
       if (p.kind === "home") {
+        // (An open home's gap in the row behind it: nothing laid, and its own lot keeps its own row's slide.)
+        if (!own.some((h) => h.id === p.home)) continue;
         const lot = out.find((l) => l.kind === "home" && l.id === p.home)!;
         if (p.shift) lot.shift = p.shift;
         continue;
