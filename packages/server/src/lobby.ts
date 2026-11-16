@@ -1209,6 +1209,9 @@ export class LobbyCore {
       this.r.accounts = rest;
     }
     if (this.r.hostId === playerId) this.r.hostId = this.pickHost(playerId);
+    // A 50 v 50 party's member who leaves before the fill is out of its group: a friend left alone plays as a single (ranked,
+    // no party line), and the seat in the group is open again for a return with the pass (held while its hold lasts).
+    for (const p of Object.values(this.r.crowdParties ?? {})) p.ids = p.ids.filter((id) => id !== playerId);
     // A private lobby's last person has gone: it closes now (lobbyClosing), and its code stops working. (Not a party's
     // battle: the others may still be on their way; it starts with whoever comes, or closes when nothing happens.)
     if (!this.r.auto && !this.r.party && !this.r.humans.length) this.r.emptiedAt = this.io.now();

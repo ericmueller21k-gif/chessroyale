@@ -175,6 +175,11 @@ describe("50 v 50's party: friends only, by invite", () => {
     P.core.message(ann, { t: "queue" });
     expect(P.view().state).toBe("queueing");
     expect(P.view().stopped).toBeUndefined();
+    // (L1: the line is gone, not just hidden while searching: a Cancel back to the party doesn't bring it back.)
+    P.core.message(ann, { t: "cancel" });
+    expect(P.view().state).toBe("open");
+    expect(P.view().stopped).toBeUndefined();
+    P.core.message(ann, { t: "queue" });
     P.core.message(ann, { t: "leave" });
     expect(P.view().state).toBe("open");
   });
@@ -438,6 +443,41 @@ describe("50 v 50's party in the lobby", () => {
       expect(l.mine).toEqual([true, true, true, true]);
       expect(l.told.every((t) => t?.ranked === true && t.partied === undefined)).toBe(true);
     }
+  });
+
+  it("a member who taps Leave before the fill is out of the party's group: their seat in it reopens for a return with the pass, and the friend left behind plays as a single (ranked, no party line)", () => {
+    const L = setup({ ...crowd(), lobbySize: 10 });
+    L.core.setAuto(L.now + 60_000);
+    expect(L.core.reserveParty(2, "pp", 20_000)).toBe(true);
+    const join = (name: string, pass?: string) => {
+      const r = L.core.connect(undefined, name, "phone", false, null, undefined, `u-${name}`, null, null, false, pass ? { pass } : {});
+      if (!r.ok) throw new Error(r.message);
+      return r.playerId;
+    };
+    const ann = join("Ann", "pp");
+    const bo = join("Bo", "pp");
+    for (const n of ["Cy", "Di"]) join(n);
+    const free = L.core.seatsLeft();
+    L.core.message(bo, { t: "leave" });
+    expect(L.core.record.crowdParties!.pp!.ids).toEqual([ann]);
+    expect(L.core.inCrowdParty(bo)).toBe(false);
+    // (His seat in the group is held again while the hold lasts, so nobody else takes it, and the pass opens the door for him.)
+    expect(L.core.seatsLeft()).toBe(free);
+    expect(L.core.crowdPassOpen("pp")).toBe(true);
+    // Back with the pass: in the group again, in a new seat.
+    const bo2 = join("Bo", "pp");
+    expect(L.core.record.crowdParties!.pp!.ids).toEqual([ann, bo2]);
+    // He leaves again, for good: Ann plays alone, a single's result (ranked, no "Party matches aren't ranked").
+    L.core.message(bo2, { t: "leave" });
+    for (let i = 0; i < 200 && !L.core.record.round; i++) L.advance(Math.max(1, (L.core.nextAlarm ?? L.now + 1000) - L.now));
+    expect(L.core.record.round).toBeTruthy();
+    (L.core as unknown as { finishMatch(): void }).finishMatch();
+    L.core.record.placements[ann] ??= 1;
+    expect(L.core.ranked()).toBe(true);
+    expect(L.core.humanResults().find((r) => r.playerId === ann)!.ranked).toBe(true);
+    const told = [...(L.inbox.get(ann) ?? [])].reverse().find((m) => m.t === "results");
+    expect(told).toMatchObject({ t: "results", ranked: true });
+    expect(told && "partied" in told ? told.partied : undefined).toBeUndefined();
   });
 });
 
