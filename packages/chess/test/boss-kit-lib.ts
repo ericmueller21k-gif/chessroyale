@@ -56,7 +56,7 @@ export const PROMOTION_OPT_OUT: Readonly<Record<string, string>> = {};
  * The runner's steps the driver plays, by name. A runner method that names a step (`…Due`, `…Step`) and isn't listed
  * here fails the kit (`unknownSteps`): a new kind of step must be played by the driver, never skipped silently.
  */
-export const KNOWN_STEPS = ["lightsOutDue", "bounceDue", "alfilStep", "carrotDue", "repaintDue", "waterDue", "hopDue", "rushDue", "extraMoveDue", "funhouseDue", "darkForcedDue", "bossKillDue"] as const;
+export const KNOWN_STEPS = ["lightsOutDue", "bounceDue", "alfilStep", "carrotDue", "repaintDue", "waterDue", "hopDue", "rushDue", "extraMoveDue", "funhouseDue", "darkForcedDue", "bossKillDue", "dodgeDue", "queenLockDue"] as const;
 
 /** Runner methods that look like steps but aren't in KNOWN_STEPS. */
 export function unknownSteps(): string[] {
@@ -555,6 +555,11 @@ export async function runBattle(k: KitBattle, sf: StockfishMoves | null): Promis
         await c.position(r, "the hop");
         c.promotion(r, crowdLeft, "the hop");
       }
+      if (r.bossToMove() && r.queenLockDue()) {
+        await r.playQueenLock(engines).catch(() => r.applyQueenLock(null));
+        note("queenlock");
+        await c.position(r, "the queen lock's aim");
+      }
       if (r.bossToMove()) {
         const fen = r.boards.get(r.state.boards[0]!)!.fen;
         const allowed = r.bossAllowed();
@@ -566,6 +571,14 @@ export async function runBattle(k: KitBattle, sf: StockfishMoves | null): Promis
         c.endsTooProbe(pre, r, `his move ${move}`);
       }
       seen();
+      continue;
+    }
+    if (r.dodgeDue()) {
+      // (Chandy's Dodge: nobody votes, so a square from the seed each round; the board never changes.)
+      const before = r.boards.get(r.state.boards[0]!)!.fen;
+      r.finishDodgeRound({});
+      note("dodge");
+      if (r.boards.get(r.state.boards[0]!)!.fen !== before) c.failures.push(`${where}: Dodge changed the board`);
       continue;
     }
     if (r.rushDue()) {

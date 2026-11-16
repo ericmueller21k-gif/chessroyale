@@ -1,5 +1,6 @@
 import { hollowLobby } from "./bosses/hollow.ts";
 import { dashLobby } from "./bosses/dash.ts";
+import { chandyLobby } from "./bosses/chandy.ts";
 import { SERVER_LOST_MS, phase2Unvouched, quickMove, recluseLobby, mateFirst, recluseNoResult, recluseNoResultFor, retryDelay, type Phase2Lobby, type Phase2SearchRequest, type Recluse1Ask, type Recluse2Record } from "./bosses/recluse.ts";
 import type { BossLobby } from "./bosses/base.ts";
 import { hearsTyped, typedReads, typedSay, typedSeat, type TypedSeats } from "./typed-chat.ts";
@@ -19,6 +20,8 @@ import {
   landedEarlyMs,
   fullMoonMs,
   zebraTurnMs,
+  chandyTurnMs,
+  dodgeSeen,
   popOffMs,
   folioTurnMs,
   landsAfterHisMove,
@@ -42,6 +45,7 @@ import {
   type NetFinal,
   type NetStanding,
   type NetRush,
+  type NetDodge,
   type Opening,
   type RoundReport,
   type RunnerSnapshot,
@@ -273,6 +277,7 @@ export type Timer =
   | "judgeTick"
   | "lights"
   | "rush"
+  | "dodge"
   | "partyStart"
   | "phase2";
 
@@ -379,7 +384,7 @@ export interface LobbyRecord {
    * "repaint": it picks Smudgy's Repaint pair (his whole turn). "water": it places the hippo gardener's watering (his whole turn).
    * (The circus tiger's hoops come with his move: asked with it, the request's `hoops`.)
    */
-  bossKind?: "elo" | "stumble" | "stagger" | "best" | "funhouse" | "extra" | "bounce" | "tusks" | "fuse" | "slam" | "hop" | "carrots" | "repaint" | "water";
+  bossKind?: "elo" | "stumble" | "stagger" | "best" | "funhouse" | "extra" | "bounce" | "tusks" | "fuse" | "slam" | "hop" | "carrots" | "repaint" | "water" | "queenlock";
   /** Big Boy's Big Bounce, Alfil's fusion and Slam, the hopper's hop: the candidates the host was sent (the answer must be one of them). */
   bounceCandidates?: string[];
   /** The boss's move, held until it has "thought" long enough (your queen banner plays first), and when that is. */
@@ -420,6 +425,8 @@ export interface LobbyRecord {
   lights?: { key: string; at: number; ended: number; endedAt?: number[]; taps: Record<string, string[][]>; tapAt?: Record<string, number[][]> };
   /** Dash's Scramble Rush in progress (the crowd's turn waits; the phase "boss"): when it began, each person's placements, and once judged, its verdict's end. */
   rush?: { key: string; at: number; places: Record<string, Record<string, string>>; moved?: Record<string, Record<string, number>>; judged?: boolean };
+  /** Chandy's Dodge on (bosses/chandy.ts): its key, start, the round being voted on and each person's vote in it. */
+  dodge?: { key: string; at: number; round: number; votes: Record<string, string> };
   /**
    * Matchmade ("Play now"): starts by itself when full or at `fillAt`, bots filling the rest. `filledAt`: the seats
    * were filled then (bots pop in on the queue screen) and the match begins FRONT_DOOR.fillShowMs later; `waitMs`:
@@ -1637,6 +1644,8 @@ export class LobbyCore {
         return hollowLobby.lightsTap(this.bossLobby, playerId, msg.key, msg.round, msg.square);
       case "rushPlace":
         return dashLobby.rushPlace(this.bossLobby, playerId, msg.key, msg.places);
+      case "dodgeVote":
+        return chandyLobby.dodgeVote(this.bossLobby, playerId, msg.key, msg.round, msg.square);
       case "kick":
         return this.partyKick(playerId, msg.playerId);
       case "phase2Move":
@@ -1786,6 +1795,8 @@ export class LobbyCore {
         return hollowLobby.lightsStep(this.bossLobby);
       case "rush":
         return dashLobby.rushStep(this.bossLobby);
+      case "dodge":
+        return chandyLobby.dodgeStep(this.bossLobby);
       case "phase2":
         return recluseLobby.step(this.phase2Lobby);
       case "partyStart":
@@ -1891,8 +1902,17 @@ export class LobbyCore {
 
   // ---------------- Boss battle ----------------
 
-  private bossMessage(until: number, opts: { thinking?: boolean; justKilled?: string | null; fall?: boolean; rush?: NetRush } = {}): Outgoing {
-    return { t: "boss", boss: this.runner!.bossView(opts.justKilled ?? null)!, standings: this.standings(), until, ...(opts.thinking ? { thinking: true } : {}), ...(opts.fall ? { fall: true } : {}), ...(opts.rush ? { rush: opts.rush } : {}) };
+  private bossMessage(until: number, opts: { thinking?: boolean; justKilled?: string | null; fall?: boolean; rush?: NetRush; dodge?: NetDodge } = {}): Outgoing {
+    return { t: "boss", boss: this.bossViewSent(opts.justKilled ?? null), standings: this.standings(), until, ...(opts.thinking ? { thinking: true } : {}), ...(opts.fall ? { fall: true } : {}), ...(opts.rush ? { rush: opts.rush } : {}), ...(opts.dodge ? { dodge: opts.dodge } : {}) };
+  }
+
+  /** The boss's view as it's sent: during Chandy's Dodge, only what has been seen of it so far (dodgeSeen: the teleports in their time). */
+  private bossViewSent(justKilled: string | null = null): NetBoss {
+    const view = this.runner!.bossView(justKilled)!;
+    const d = view.powers?.chandy?.dodge;
+    const l = this.r.dodge;
+    if (!d || !l) return view;
+    return { ...view, powers: { ...view.powers!, chandy: { ...view.powers!.chandy!, dodge: dodgeSeen(d, this.io.now() - l.at) } } };
   }
 
   /** The boss's turn: everyone sees it thinking while the host's engine plays its move. */
@@ -2195,7 +2215,7 @@ export class LobbyCore {
     const burnt = !!b?.powers?.burnt?.some((x) => x.turn === b.crowdMoves && (x.piece || x.fizzled));
     // (Alfil's pieces came down early after your move: their landing plays first too; so does Moo's Full Moon, his
     // transformation at the start of his turn.)
-    const own = landedEarlyMs(b) + fullMoonMs(b) + folioTurnMs(b) + popOffMs(b) + zebraTurnMs(b);
+    const own = landedEarlyMs(b) + fullMoonMs(b) + folioTurnMs(b) + popOffMs(b) + zebraTurnMs(b) + chandyTurnMs(b);
     return queenSlain(view) || burnt || own ? this.io.now() + bossThinkMs(view, burnt, own) : undefined;
   }
 
@@ -2228,7 +2248,7 @@ export class LobbyCore {
     // (A pick among candidate positions, not a move: Big Boy's bounce, Alfil's cast, fusion and Slam, the hopper's hop;
     // and the Carrot Patch's cast, which only asks the pass guard.)
     const kind = this.r.bossKind;
-    const pick = kind === "bounce" || kind === "tusks" || kind === "fuse" || kind === "slam" || kind === "hop" || kind === "carrots" || kind === "repaint" || kind === "water";
+    const pick = kind === "bounce" || kind === "tusks" || kind === "fuse" || kind === "slam" || kind === "hop" || kind === "carrots" || kind === "repaint" || kind === "water" || kind === "queenlock";
     // A power limits the moves: the boss's (a pie), or the crowd's for the move Boingo plays for it.
     const allowed = funhouse ? runner.crowdAllowed() : runner.bossAllowed();
     // (Wrangler's turn: his long pulls, a drag or the showdown to work out too, ordered by a seed of the turn's own.)
@@ -2238,6 +2258,8 @@ export class LobbyCore {
     const land = kind === "elo" || kind === "stumble" || kind === "stagger" || kind === "fuse" ? landsAfterHisMove(runner.state.boss) : null;
     // (Chub & Chirp's Carrot Patch: his ordinary move in the race goes through his race brain, on the host's engine.)
     const race = kind === "elo" ? (runner.bossRace("elo")?.race ?? null) : null;
+    // (Chandy's locks: his ordinary move steered toward them, the same on the host and a checker, as it decides the move.)
+    const lock = kind === "elo" ? runner.bossLocks() : null;
     const own = kind === "elo" || kind === "stumble" || kind === "stagger" || kind === "best";
     const bare = checker && !this.bossExtrasAsked();
     // (Moo's Moonbeam lands after this move: the host lists the crowd's top moves after it.)
@@ -2274,7 +2296,7 @@ export class LobbyCore {
       ...(move ? hoopsAsk(runner) : {}),
       ...(move ? creaseAsk(runner) : {}),
       // (A step that spends his whole turn: the pass guard, on the host's engine. The server never searches.)
-      ...(kind === "fuse" || kind === "carrots" ? { pass: true as const } : {}),
+      ...(kind === "fuse" || kind === "carrots" || kind === "queenlock" ? { pass: true as const } : {}),
       // (`only`: the move that plays, its extras asked of the host (playChecked, N2): that move alone, no long pull, no brain.)
       ...(only ? { allowed: [only] } : allowed && !pick ? { allowed } : {}),
       ...(brain ? { brain } : {}),
@@ -2285,6 +2307,7 @@ export class LobbyCore {
       ...(asks ? { ...(asks.pull && !only ? { pull: asks.pull } : {}), ...(asks.drag && !bare ? { drag: true as const } : {}), ...(asks.showdown && !bare ? { showdown: asks.showdown } : {}), seed: asks.seed } : {}),
       ...(land ? { land: land.map((x) => ({ ...x })) } : {}),
       ...(race ? { race } : {}),
+      ...(lock ? { lock } : {}),
       ...(beam ? { beam } : {}),
       ...(balloon ? { balloon } : {}),
     });
@@ -2381,6 +2404,24 @@ export class LobbyCore {
     this.r.phase = "boss";
     this.r.bossKey = `c-${++this.r.counter}`;
     this.r.bossKind = "carrots";
+    this.r.bossMinAt = this.thinkMinAt();
+    this.broadcast(this.bossMessage(0, { thinking: true }));
+    const host = this.hostNow();
+    this.r.hostId = host;
+    if (host) this.sendBossRequest(host);
+    this.setTimer("bossTimeout", this.io.now() + BOSS_TIMEOUT_MS);
+  }
+
+  /**
+   * Chandy's queen lock (at the start of his turn, his move meter's pick: the runner's queenLockDue): everyone sees him get ready
+   * (thinking) while the host's engine checks the pass guard (the request's `pass`: PASS_WAIT when passing would lose real
+   * material); then the aim, his whole turn; then the crowd's turn, its moments (the aim's first). PASS_WAIT: no aim, he moves.
+   */
+  private requestQueenLock() {
+    this.sealPremoves();
+    this.r.phase = "boss";
+    this.r.bossKey = `q-${++this.r.counter}`;
+    this.r.bossKind = "queenlock";
     this.r.bossMinAt = this.thinkMinAt();
     this.broadcast(this.bossMessage(0, { thinking: true }));
     const host = this.hostNow();
@@ -2507,6 +2548,15 @@ export class LobbyCore {
       this.broadcast(this.bossMessage(until));
       return this.setTimer("nextRound", until);
     }
+    if (this.r.bossKind === "queenlock") {
+      // Chandy's queen lock: his whole turn spent aiming (the crowd's turn begins as after his move: its moments, the aim's). The
+      // host's PASS_WAIT (the pass guard: it waits, and he moves): straight on.
+      this.r.bossKind = undefined;
+      this.runner!.applyQueenLock(move === PASS_WAIT ? PASS_WAIT : null);
+      const until = this.io.now() + (!this.runner!.bossToMove() ? bossTurnShowMs(this.runner!.bossView()) : 0);
+      this.broadcast(this.bossMessage(until));
+      return this.setTimer("nextRound", until);
+    }
     if (this.r.bossKind === "carrots") {
       // Chub & Chirp's cast: his whole turn (the crowd's turn begins as after his move: its moments, the cast's first).
       // None due any more (nothing came of it), or the host's PASS_WAIT (the pass guard: it waits, and he moves):
@@ -2617,7 +2667,7 @@ export class LobbyCore {
     // Nobody can run the engine: the boss plays a random allowed move so the match can go on (in his funhouse, the
     // crowd's: a random allowed one too). His extra move needs the engine to stay small: without one, he skips it.
     const runner = this.runner!;
-    if (this.r.bossKind === "extra" || this.r.bossKind === "bounce" || this.r.bossKind === "tusks" || this.r.bossKind === "fuse" || this.r.bossKind === "slam" || this.r.bossKind === "hop" || this.r.bossKind === "carrots" || this.r.bossKind === "repaint" || this.r.bossKind === "water") return this.playBoss("");
+    if (this.r.bossKind === "extra" || this.r.bossKind === "bounce" || this.r.bossKind === "tusks" || this.r.bossKind === "fuse" || this.r.bossKind === "slam" || this.r.bossKind === "hop" || this.r.bossKind === "carrots" || this.r.bossKind === "repaint" || this.r.bossKind === "water" || this.r.bossKind === "queenlock") return this.playBoss("");
     const legal = (this.r.bossKind === "funhouse" ? runner.crowdAllowed() : runner.bossAllowed()) ?? legalMoves(runner.boards.get(runner.state.boards[0]!)!.fen);
     this.playBoss(legal[Math.floor(this.rng() * legal.length)]!);
   }
@@ -2783,9 +2833,10 @@ export class LobbyCore {
       // (Hollow's Lights out, Big Boy's Big Bounce, Alfil's steps, Chub & Chirp's Carrot Patch cast (his whole turn) and
       // hop, Smudgy's Repaint and the hippo gardener's watering (each his whole turn) come at the start of his turn, before
       // his move. The circus tiger's hoops come after his move, with it: requestBoss.)
-      if (runner.bossToMove()) return runner.lightsOutDue() ? hollowLobby.startLights(this.bossLobby) : runner.bounceDue() ? this.requestBounce() : runner.alfilStep() ? this.requestAlfil() : runner.carrotDue() ? this.requestCarrots() : runner.repaintDue() ? this.requestRepaint() : runner.waterDue() ? this.requestWater() : runner.hopDue() ? this.requestHop() : this.requestBoss();
-      // (Dash's Scramble Rush, as the crowd's turn begins: the turn waits for it.)
+      if (runner.bossToMove()) return runner.lightsOutDue() ? hollowLobby.startLights(this.bossLobby) : runner.bounceDue() ? this.requestBounce() : runner.alfilStep() ? this.requestAlfil() : runner.carrotDue() ? this.requestCarrots() : runner.repaintDue() ? this.requestRepaint() : runner.waterDue() ? this.requestWater() : runner.hopDue() ? this.requestHop() : runner.queenLockDue() ? this.requestQueenLock() : this.requestBoss();
+      // (Dash's Scramble Rush, as the crowd's turn begins: the turn waits for it; Chandy's Dodge too.)
       if (runner.rushDue()) return dashLobby.startRush(this.bossLobby);
+      if (runner.dodgeDue()) return chandyLobby.startDodge(this.bossLobby);
       // (A failed Lights out or Scramble Rush: his extra move, after his own and before the crowd's turn.)
       if (runner.extraMoveDue()) return this.requestExtra();
       // (Boingo's funhouse: his move for the crowd, as its turn begins.)

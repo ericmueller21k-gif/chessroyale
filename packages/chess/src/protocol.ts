@@ -686,7 +686,9 @@ export type ClientMessage =
   /** Hollow's Lights out: this player taps a square in round `round` (0-based). */
   | { t: "lightsTap"; key: string; round: number; square: string }
   /** Dash's Scramble Rush: this player's placements so far (each swept piece's square before the sweep → the square put on). */
-  | { t: "rushPlace"; key: string; places: Record<string, string> };
+  | { t: "rushPlace"; key: string; places: Record<string, string> }
+  /** Chandy's Dodge: this player's vote for the king's square in round `round` (0-based); a later vote replaces it. */
+  | { t: "dodgeVote"; key: string; round: number; square: string };
 
 /** Why a lobby closed (see LOBBY_LIFE in settings.ts). */
 export type LobbyCloseReason = "ended" | "idle" | "abandoned";
@@ -889,6 +891,8 @@ export type ServerMessage = { now: number } & (
       intro?: boolean;
       fall?: boolean;
       rush?: NetRush;
+      /** Chandy's Dodge on the server's clock (the crowd's turn waits for it): see NetDodge. */
+      dodge?: NetDodge;
       /** With `fall`: the Hidden Boss's phase change follows (his phase 2 online), not the results. */
       toPhase2?: true;
       /** With `toPhase2`: who takes his four boards (player ids, board order): for them, leaving from here on is resigning a board. */
@@ -904,6 +908,8 @@ export type ServerMessage = { now: number } & (
   | { t: "lights"; lights: NetLightsOut; boss: NetBoss; standings: NetStanding[] }
   /** Lights out: the crowd's count, to everyone, as anyone's tap changes it (the round's end sends it in `lights`). */
   | { t: "lightsCrowd"; key: string; crowd: NonNullable<NetLightsOut["crowd"]> }
+  /** Chandy's Dodge: the round's vote so far (each square's count), to everyone, as anyone's vote changes it. */
+  | { t: "dodgeVotes"; key: string; round: number; votes: Record<string, number> }
   /** To the host: play the boss's move. */
   | {
       t: "bossRequest";
@@ -1040,6 +1046,11 @@ export type ServerMessage = { now: number } & (
        * the beams then take the crowd's pieces by value (the server's own fallback).
        */
       beam?: number;
+      /**
+       * Chandy's locks (his ordinary move): the locked squares. Play his move through the steering (bossMoveFrom's `locks`: steerPick
+       * on the top moves it searched). An older app ignores it: he plays his move unsteered, nothing breaks.
+       */
+      lock?: string[];
     }
   /**
    * The boss's brain for this battle, to the host as the battle begins (on the Maia brain only): it starts loading
@@ -1164,4 +1175,16 @@ export interface NetPhase2 {
 export interface NetRush {
   key: string;
   at: number;
+}
+
+/**
+ * Chandy's Dodge on the server's clock (the crowd's turn waits for it): its key and when it began (server time; every beat follows
+ * from it: dodgeTimeline), the round being voted on and its counts so far. The clones, the teleports as they come and each round's
+ * result are in the boss's view (`powers.chandy.dodge`: dodgeSeen, so nothing shows before its time).
+ */
+export interface NetDodge {
+  key: string;
+  at: number;
+  round: number;
+  votes: Record<string, number>;
 }

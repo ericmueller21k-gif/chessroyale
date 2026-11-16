@@ -90,7 +90,7 @@ async function hostBoss(engine: EngineLike, s: Settings, m: Extract<Msg, { t: "b
   const kind = m.best ? "best" : m.stumble ? "stumble" : m.stagger ? "stagger" : "elo";
   const ahead = m.land?.length && !m.funhouse ? slamAhead(m.land) : null;
   const look = m.race && !m.funhouse ? { race: m.race, looks: BOSS_POWERS.carrotLooks, nodes: BOSS_POWERS.carrotNodes } : null;
-  const ordinary = () => bossMoveFrom(engine, m.fen, m.elo, m.nodes, kind, Math.random, s.kingStrikeLoss, bossGuardFrom(s), m.allowed ?? null, undefined, ahead, look);
+  const ordinary = () => bossMoveFrom(engine, m.fen, m.elo, m.nodes, kind, Math.random, s.kingStrikeLoss, bossGuardFrom(s), m.allowed ?? null, undefined, ahead, look, false, m.lock ?? null);
   if (m.seed !== undefined && !m.funhouse) {
     const answer = await pigTurn(engines, m.fen, { seed: m.seed, ...(m.pull ? { pull: m.pull } : {}), ...(m.drag ? { drag: true as const } : {}), ...(m.showdown ? { showdown: m.showdown } : {}) }, ordinary);
     return reply(answer.move, { ...(answer.drag !== undefined ? { drag: answer.drag } : {}), ...(answer.showdown !== undefined ? { showdown: answer.showdown } : {}) });
@@ -198,9 +198,16 @@ async function solo(start: MatchRunner): Promise<Trace> {
       seen();
       if (r.bossToMove() && r.hopDue()) await r.playHop(engines).catch(() => r.applyHop(null));
       seen();
+      // (Chandy's queen lock: aimed, as online where the host's answer to the pass guard is a move, never "wait".)
+      if (r.bossToMove() && r.queenLockDue()) r.applyQueenLock(null);
+      seen();
       if (r.bossToMove()) await r.playBoss(engines[0]);
       continue;
     }
+    // (Chandy's Dodge: nobody votes, as online with no one tapping.)
+    while (r.dodgeDue()) r.finishDodgeRound({});
+    seen();
+    if (r.stageComplete()) continue;
     // (Dash's Scramble Rush: nobody's placements, as online.)
     if (r.rushDue()) r.finishRush({});
     if (r.extraMoveDue()) {
