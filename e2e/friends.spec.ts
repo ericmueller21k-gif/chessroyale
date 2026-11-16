@@ -237,7 +237,16 @@ test("50 v 50 Party (Eric, Nov 16): seven + seats; a + opens the friends sheet; 
   await expect(ann.page.locator(".fd-seat.party-open")).toHaveCount(7);
   await expect(ann.page.locator(".fd-queue-count")).toHaveText("1 / 8");
   await expect(ann.page.getByRole("button", { name: "Find match" })).toBeEnabled();
+  await expect(ann.page.locator(".fd-party-note")).toHaveText("Party matches aren't ranked");
   await partyShot(ann.page, "1-alone");
+  // (A laptop's window, 1280 × 600: Leave, Find match and the line under them still inside it, the grid giving way. The fix round of #747.)
+  if (isComputer()) {
+    const size = ann.page.viewportSize()!;
+    await ann.page.setViewportSize({ width: 1280, height: 600 });
+    await expect.poll(() => ann.page.evaluate(() => Math.round(document.querySelector(".fd-party-note")!.getBoundingClientRect().bottom))).toBeLessThanOrEqual(600);
+    await expect(ann.page.getByRole("button", { name: "Find match" })).toBeInViewport({ ratio: 1 });
+    await ann.page.setViewportSize(size);
+  }
 
   // A "+": her friends sheet (no codes, no links); Invite. Bo's seat waits ("…"), named under the grid.
   await ann.page.locator(".fd-seat.party-open").first().click();
@@ -259,7 +268,10 @@ test("50 v 50 Party (Eric, Nov 16): seven + seats; a + opens the friends sheet; 
   const box = (await toast.boundingBox())!;
   const vw = bo.page.viewportSize()!.width;
   expect(vw - (box.x + box.width)).toBeLessThan(24);
-  expect(box.y).toBeLessThan(40);
+  // (A computer: at the very top. A phone: under its top bar, never over its buttons: the fix round of #747.)
+  expect(box.y).toBeLessThan(isComputer() ? 40 : 90);
+  const over = await bo.page.evaluate(([x, y, w, h]) => [...document.querySelectorAll(".fd-top button")].filter((b) => { const r = b.getBoundingClientRect(); return r.width > 0 && r.right > x && r.left < x + w && r.bottom > y && r.top < y + h; }).map((b) => b.getAttribute("aria-label") ?? b.textContent), [box.x, box.y, box.width, box.height] as const);
+  expect(over).toEqual([]);
   // (On top: what's at its middle is the notice itself, never the page under it.)
   expect(await bo.page.evaluate(([x, y]) => !!document.elementFromPoint(x, y)?.closest(".fr-toast"), [box.x + box.width / 2, box.y + box.height / 2] as const)).toBe(true);
   await expect(toast.getByRole("button", { name: "Decline" })).toBeVisible();

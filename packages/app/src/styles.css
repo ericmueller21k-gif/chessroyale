@@ -19936,6 +19936,12 @@ button.sq-tiny {
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
   border: 1px solid var(--fd-line);
 }
+@media (max-width: 1023px) {
+  /* (A phone: under the top bar, as the page's other notices (.fd-notice), so its buttons stay in reach. The fix round of #747.) */
+  .fr-toast {
+    top: calc(env(safe-area-inset-top) + 72px);
+  }
+}
 .fr-toast-text {
   display: flex;
   flex-direction: column;
