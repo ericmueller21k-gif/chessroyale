@@ -490,3 +490,16 @@ export function lazyParts(): { parts: Record<string, Part>; add: (name: string, 
     },
   };
 }
+
+/** An animation's length in ms. */
+export const animLength = (a: Anim) => a.frames.reduce((s, f) => s + f.ms, 0);
+
+/** When a cue fires in an animation, in ms from its start (the start of its first frame with that cue), or null. */
+export function cueAt(a: Anim, cue: string): number | null {
+  let t = 0;
+  for (const f of a.frames) {
+    if (f.cue === cue) return t;
+    t += f.ms;
+  }
+  return null;
+}

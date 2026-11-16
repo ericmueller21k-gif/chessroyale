@@ -1,6 +1,6 @@
 import { BOSS_BANNER, RECLUSE_PHASE2, bannerPlusMs } from "@chessroyale/core";
 import { RECLUSE } from "./characters/recluse.ts";
-import { animLength, cueAt } from "./characters/power-art.ts";
+import { animLength, cueAt } from "./characters/sprite.ts";
 import { lazyTable } from "./characters/sprite.ts";
 import { RECLUSE_LINES } from "./characters/recluse-lines.ts";
 import { pacedLine } from "./paced-line.ts";

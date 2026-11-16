@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, useState } from "preact/hooks";
-import { BossFace } from "./BossCharacter.tsx";
+import { BossPortrait } from "./BossPortrait.tsx";
 import { QUESTS, type QuestIcon, type QuestView } from "@chessroyale/core";
 import { questSound, warmQuestSounds } from "../sound.ts";
 import { KeyArt, WinterCrateArt } from "./Items.tsx";
@@ -87,7 +87,7 @@ export const QuestsBarIcon = () => (
 
 /** The quest's picture, in its tile. */
 function QuestPicture({ icon }: { icon: QuestIcon }) {
-  if (icon.kind === "boss") return <BossFace boss={{ name: icon.boss, icon: "" }} class="qo-boss" label="" />;
+  if (icon.kind === "boss") return <BossPortrait boss={{ name: icon.boss, icon: "" }} class="qo-boss" label="" />;
   if (icon.kind === "squad")
     return (
       <span class="hb-pieces qo-pieces qo-squad" aria-hidden="true">

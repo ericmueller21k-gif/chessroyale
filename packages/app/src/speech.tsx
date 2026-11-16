@@ -34,7 +34,7 @@ import { SPEECH } from "@chessroyale/core";
 import { talkPlusMs, testSwitchesAllowed } from "./test-switches.ts";
 import { useFrameNow } from "./components/Countdown.tsx";
 import { lineLength, plainLine, sliceLine, type LineSeg } from "./speech-icons.ts";
-import { mooIconSprite, type MooIconId } from "./characters/moo.ts";
+import { mooIconSprite, type MooIconId } from "./characters/moo-icons.ts";
 import { renderFrame } from "./characters/sprite.ts";
 import { play, type SoundName } from "./sound.ts";
 import { pacedPage, pacedTyped, type PacedLine } from "./paced-line.ts";

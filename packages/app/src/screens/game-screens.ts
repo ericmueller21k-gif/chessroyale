@@ -15,3 +15,4 @@ export { SpectateScreen } from "./Spectate.tsx";
 export { StageBreakScreen } from "./StageBreak.tsx";
 export { SquadsQueue, SquadsScreen } from "./Squads.tsx";
 export { DuelFront } from "./Duel.tsx";
+export { BossStageFigure, prewarmBoss } from "../components/BossStage.tsx";

@@ -90,7 +90,7 @@ import { moveRecordFrom, type GroupReveal } from "./game.ts";
 import { MatchChat } from "./chat.ts";
 import { isAdmin, maiaAllowed } from "./boss-brain.ts";
 import { resetKingSpeech } from "./godKing.ts";
-import { resetBeats } from "./components/BossCharacter.tsx";
+import { resetBeats } from "./components/boss-figure.ts";
 import { resetBattleBanners } from "./battle-banners.ts";
 import { bossVoice } from "./speech.tsx";
 import { maiaSaved, prefetchMaia, startMaia } from "./maia.ts";

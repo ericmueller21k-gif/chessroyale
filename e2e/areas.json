@@ -52,6 +52,7 @@
     "packages/chess/src/runner.ts",
     "packages/chess/src/runner-tools.ts",
     "packages/app/src/lazy.tsx",
+    "packages/app/src/lazy-game.ts",
     "packages/app/src/shell.ts",
     "packages/app/src/loadbar.ts",
     "packages/app/src/screens/game-screens.ts",
@@ -217,6 +218,10 @@
         "packages/app/src/characters/black-knight.ts",
         "packages/app/src/characters/pawn-golem.ts",
         "packages/app/src/components/BossCharacter.tsx",
+        "packages/app/src/components/boss-figure.ts",
+        "packages/app/src/components/BossPortrait.tsx",
+        "packages/app/src/characters/portraits.ts",
+        "packages/app/src/characters/portraits.gen.ts",
         "packages/app/src/components/BossEffect.tsx",
         "packages/app/src/components/PowerParts.tsx",
         "packages/app/src/components/KingAttack.tsx",
@@ -264,6 +269,7 @@
     "the Boss raid screen (the select)": {
       "paths": [
         "packages/app/src/components/BossSelect.tsx",
+        "packages/app/src/components/BossStage.tsx",
         "packages/app/src/components/BossDifficulty.tsx",
         "packages/app/src/characters/boss-select.ts",
         "packages/app/src/boss-difficulty.ts",
