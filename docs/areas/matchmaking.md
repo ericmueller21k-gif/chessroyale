@@ -52,6 +52,10 @@ Lanes: `hub` (joining and filling a lobby, the queue screen), `ranked` (the matc
   closes (`wrapUpIfEmpty`, results `keepMs` 0), so its code stops working; a **private lobby nobody started** closes
   when its last person presses Leave (`emptiedAt`). The match's ranked status counts everyone who played
   (`ranked()`), so leaving never makes it unranked.
+- **50 v 50's party** (Nov 16, [decision](../decisions/2026-11-16-crowd-party.md)): its object (`SquadsParty`, kind "crowd") asks the
+  crowd queue as PLAY's Default does, one ticket `{ size, pass }` (`seatParty`): all its seats held in one lobby under its pass
+  (`reserveParty`, `CAPACITY.queue.reservationMs`), only while every party there still fits whole on one team (core's `packParties`),
+  else a new lobby; at the start each party plays on one team (`assignTeams`). Tests: `crowd-party.test.ts`, `friends.spec.ts`.
 - **Squads** (`docs/areas/squads.md`, "The server"; no menu entry until its screens): its own queue (`squads-default`,
   the same matchmaker object) whose tickets are parties (up to 4, under a code and invite link, the leader queuing) or
   single players, each seated whole in a Squads lobby that still fits it; the lobby fills with bots after

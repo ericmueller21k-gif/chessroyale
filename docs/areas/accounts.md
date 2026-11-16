@@ -146,7 +146,7 @@ Lane: `hub`. What a profile shows is on [hub.md](hub.md).
   landing page's footer, Settings and the FAQ.
 - **Friends and invites** (Oct 15; [docs/decisions/2026-10-15-friends-and-invites.md](../decisions/2026-10-15-friends-and-invites.md)): signed-in accounts only where signing in is
   set up. Add a friend from their profile (any name opens it); they accept or decline. Invite anyone to your private
-  lobby or Squads party, as their setting allows (everyone, the default; friends only; no one); an invite lasts
+  lobby or Squads party (and a friend, by a member, to your 50 v 50 party: [hub.md](hub.md)), as their setting allows (everyone, the default; friends only; no one); an invite lasts
   `FRIENDS.inviteMinutes`. Block ends a friendship and keeps the other's requests (kept unseen), invites (refused with
   the same words as a setting) and chat lines (hidden in the app) away. "Show when I'm online" off hides online and
   last seen on your profile and in friends' lists, for everyone, and others get only the day of your recent matches. Not while banned (requests and invites). Switched off
@@ -169,10 +169,11 @@ policy's "Friends" entry (`screens/Legal.tsx`) says the same in plain words.
 | `friends` (user_id, friend_id, since) | A friendship, one row per side | Until either removes it, blocks, or deletes their account |
 | `friend_requests` (from_id, to_id, at) | A request waiting for an answer | Until answered or taken back; unanswered, `FRIENDS.requestDays` (30) |
 | `blocks` (user_id, blocked_id, at) | Who you've blocked | Until you unblock (or either account is deleted) |
-| `invites` (from_id, to_id, kind, code, at, expires_at) | An open invite: the lobby's mode or "squads", and its code | `FRIENDS.inviteMinutes` (10), then pruned within 10 minutes; one per pair |
+| `invites` (from_id, to_id, kind, code, at, expires_at) | An open invite: the lobby's mode, "squads" or "crowdparty", and its code | `FRIENDS.inviteMinutes` (10), then pruned within 10 minutes; one per pair |
 | `friend_limits` (user_id, kind, window_start, n) | Requests sent today, invites sent this hour (the caps) | A day |
 | `users.allow_invites` | Who may invite you: NULL everyone, "friends", "none" | With the account |
 | `users.hide_online` | 1: online and last seen hidden from everyone | With the account |
+| `users.dnd` | 1: Do Not Disturb (Nov 16): no invites or friend requests reach you | With the account |
 
 Nothing else is stored: no friend codes, no chat between friends. The friends page's player search (Nov 11) reads names through an
 index on `users.name` (`users_name`, any case: a prefix is a range, never a scan; `searchPlayers` in `friends.ts`), nothing new kept.

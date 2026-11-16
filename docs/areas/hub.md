@@ -67,8 +67,9 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
     "it should never change size";
     [docs/decisions/2026-10-18-home-steady-layout.md](../decisions/2026-10-18-home-steady-layout.md)), holding the
     pick's options or words (Nov 9, [2026-11-09-home-modes-options.md](../decisions/2026-11-09-home-modes-options.md)): 50 v 50's
-    **Solo queue** (the public queue), **Party** (greyed, "Soon": queueing together into the public matchmaking, up to
-    `CROWD_PARTY_MAX` = 8, sides random, ranked, a later job; Eric, Nov 9) and **Bots** (you and 99 bots in your
+    **Solo queue** (the public queue), **Party** (Nov 16, [decision](../decisions/2026-11-16-crowd-party.md): PLAY opens your party's queue screen, idle: your seat,
+    up to 7 friends' (`CROWD_PARTY_MAX` = 8), "+" opens your friends sheet, "…" an invite out; the leader's Find match queues all
+    into the public matchmaking on one team; members see "Waiting for <leader>" greyed; back and Leave leave; `screens/CrowdParty.tsx`) and **Bots** (you and 99 bots in your
     browser: PLAY opens **the Bot level box**, [2026-11-09-home-modes-bot-level.md](../decisions/2026-11-09-home-modes-bot-level.md):
     My level, Very easy … Very hard, Random, each with its average; OK greyed until a pick, remembered on the device, `BOT_LEVELS`;
     `components/BotLevelBox.tsx`), each a title and a sub line, three equal buttons in the 44 px row (Bots off has no button since
@@ -282,9 +283,10 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
     server is asked whether they'd take an invite, then a lobby (or, with Squads picked, a party) is made in the home
     screen's mode and they're invited into it. Not during a match. A lobby and a party have "Invite friends" (a sheet
     of your friends) under their link.
-  - **A new invite** shows as a toast at the top of a front-door page (never over a match or the queue) for
-    `FRIENDS.toastMs`: Join (into the lobby or party; the invite leaves your list) or ✕ (declines it).
-  - **Settings → Friends:** "Invites from" (Everyone, Friends, No one) and "Show when I'm online".
+  - **A new invite** shows in a small box at the top right of a front-door page (never over a match or the queue; Eric, Nov 16), on
+    top, pushing nothing, for `FRIENDS.toastMs`: "<Name> invited you", Accept (into the lobby or party; off your list) or Decline.
+  - **Settings → Friends:** "Invites from" (Everyone, Friends, No one), "Show when I'm online" and **Do Not Disturb** (no invites or
+    friend requests reach you; senders get the "No one" words).
   - **Fresh:** the list loads with your account and again when the live line's `inbox` grows (something new arrived
     for you). While a list is on screen (the phone's line, the computer's panel, the friends list, Invite friends) and
     you have a friend who shows when they're online, who's online in it refreshes every `FRIENDS.refreshMs`
