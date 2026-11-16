@@ -647,9 +647,11 @@ export class SquadsParty extends DurableObject<Env> {
   async alarm() {
     if (!this.record || (await this.closeIfDue())) return;
     // (A 50 v 50 party: its away leader's hold on the lead ends; a search with nobody here stops.)
-    const core = this.core();
-    core.tick();
-    await this.persist(core);
+    if (this.record.kind === "crowd") {
+      const core = this.core();
+      core.tick();
+      await this.persist(core);
+    }
     await this.askMatchmaker();
     await this.persist(this.core());
     await this.cancelTickets();
