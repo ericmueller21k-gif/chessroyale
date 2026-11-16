@@ -58,6 +58,7 @@ const PALETTE: Record<string, string> = {
   K: "#ffb340",
   "-": "#0d0e1280", // the ground shadow: core, rim (see-through)
   "+": "#0d0e1244",
+  "8": "#6f7a2a", // a firefly by day (it glows at dusk and night: HOUSE_CHANDY_LIGHTS)
   "5": "#29473a", // the far trees across the water, in the haze: deep, mid, light
   "6": "#38604a",
   "7": "#527c5e",
@@ -370,7 +371,14 @@ const mid = [
   add("crownR", crownR),
 ];
 const mossNames = mossFrames.map(([l, r], i) => [add(`mossL${i}`, l), add(`mossR${i}`, r)] as const);
-const front = [...reeds.map((p, i) => add(`reeds${i}`, p)), add("postL", postL), add("postR", postR), add("board", board), add("lanternPost", lanternPost), add("lantern", lantern)];
+/** Three fireflies over the water, each two pixels square (ground coordinates). */
+const FIREFLIES: readonly Pt[] = [
+  [66, 68],
+  [82, 62],
+  [46, 64],
+];
+const fireflies = paint(40, 58, 46, 14, (x, y) => (FIREFLIES.some(([fx, fy]) => x >= fx && x < fx + 2 && y >= fy && y < fy + 2) ? "8" : null), false);
+const front = [add("fireflies", fireflies), ...reeds.map((p, i) => add(`reeds${i}`, p)), add("postL", postL), add("postR", postR), add("board", board), add("lanternPost", lanternPost), add("lantern", lantern)];
 const L = (part: string): Layer => ({ part, x: at[part]![0], y: at[part]![1] + (TALL.has(part) ? 0 : OY) });
 
 /** Four frames: the glints drift along the water, the moss sways a pixel either way; the lantern's glass flickers. */
@@ -400,5 +408,5 @@ export const HOUSE_CHANDY_DOOR = Math.round((BW0 + BW1) / 2);
 /** Its lights at dusk and night: the lantern on the boardwalk's post, flickering, a halo round it; and three fireflies over the water. */
 export const HOUSE_CHANDY_LIGHTS: readonly LightSpot[] = [
   { x: LANTERN[0] + 2, y: LANTERN[1] - 8 + OY, w: 4, h: 10, keys: "JK", color: LANTERN_LIGHT, strength: 1, flicker: true, halo: 12 },
-  ...([[62, 74], [80, 66], [44, 70]] as const).map(([x, y]) => ({ x, y: y + OY, w: 1, h: 1, color: "#d8ff7a", strength: 0.7, flicker: true, halo: 5 })),
+  ...FIREFLIES.map(([x, y]) => ({ x, y: y + OY, w: 2, h: 2, keys: "8", color: "#d8ff7a", strength: 0.8, flicker: true, halo: 5 })),
 ];
