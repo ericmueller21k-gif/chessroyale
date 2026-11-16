@@ -1,3 +1,4 @@
+- Nov 16 ~18:30 UTC: #754 music 128k MERGED (02560e4). Deploy + main run watched. Rework design helper session_01JuCWRrqYvX9bvFKQG2Nhsx running.
 - Nov 16 ~18:15 UTC: Eric: RP vs lobby strength (= Glicko expected; director drops margin-weighting for a narrow tie band), podium shows winner + best player (min half the rounds), soft score reset per round. Design+sim helper (Opus high) -> design/crowd-rework (brief crowd-rework-design.md). Mode ranks build waits on it.
 - Nov 16 ~18:05 UTC: music 128k DONE -> #754 (13e0e85; 67.5 -> 45.0 MB, loops checked at offset 0). Tag push refused (403) from sessions: the 192k files are named by main b3bd995 instead. Helper archived. CI watched.
 - Nov 16 ~17:55 UTC: main full run after #753 (b3bd995) GREEN, no retry-passes. Music helper running. Waiting on Eric: 5 redesign questions + lossless masters location.
