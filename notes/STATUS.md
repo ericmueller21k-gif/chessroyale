@@ -1,3 +1,4 @@
+- Nov 16 ~19:00 UTC: #754 music LIVE (02560e4), main GREEN. Eric: Chandy fired beam twice in a row with 2 unlocks -> #755 (bed5cd8, meterPick skips ChandyState.last), CI watched. Running: rework design (high), ride-sound-hard (high).
 - Nov 16 ~18:45 UTC: Eric: ride sounds hard start/stop like Boingo (no fades) -> helper (Opus high) claude/ride-sound-hard. Eric also: 4v4 longer (moves from the 1v1), spectate after a cut -> sent to the rework design helper.
 - Nov 16 ~18:30 UTC: #754 music 128k MERGED (02560e4). Deploy + main run watched. Rework design helper session_01JuCWRrqYvX9bvFKQG2Nhsx running.
 - Nov 16 ~18:15 UTC: Eric: RP vs lobby strength (= Glicko expected; director drops margin-weighting for a narrow tie band), podium shows winner + best player (min half the rounds), soft score reset per round. Design+sim helper (Opus high) -> design/crowd-rework (brief crowd-rework-design.md). Mode ranks build waits on it.
