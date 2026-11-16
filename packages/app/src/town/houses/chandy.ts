@@ -58,11 +58,20 @@ const PALETTE: Record<string, string> = {
   K: "#ffb340",
   "-": "#0d0e1280", // the ground shadow: core, rim (see-through)
   "+": "#0d0e1244",
+  "5": "#29473a", // the far trees across the water, in the haze: deep, mid, light
+  "6": "#38604a",
+  "7": "#527c5e",
 };
 
 const W = 144;
-const H = 120;
+/** The picture: 170 tall, so its cypresses stand as tall as the row houses beside it (Eric: "roughly the same height of the buildings"). */
+const H = 170;
 const CX = 72;
+/**
+ * The ground things (the water, the banks, the boardwalk, the sign) are drawn on a 120-tall ground, `OY` pixels down the picture; the
+ * trees on the whole picture.
+ */
+const OY = 50;
 const FOOT = 114;
 
 // ---- The water: from the far bank's brush (about 80) to the near bank (about 108), seen from the front and a little above. Darker
@@ -173,41 +182,81 @@ function moss(strands: readonly (readonly [number, number, number])[], sway: num
 }
 
 const LEFT: readonly Shelf[] = [
-  { x: 22, y: 12, rx: 18, ry: 8 },
-  { x: 12, y: 24, rx: 13, ry: 7 },
-  { x: 34, y: 26, rx: 16, ry: 7 },
-  { x: 20, y: 38, rx: 19, ry: 7 },
-  { x: 40, y: 44, rx: 11, ry: 5 },
-  { x: 8, y: 48, rx: 9, ry: 5 },
+  { x: 22, y: 14, rx: 20, ry: 9 },
+  { x: 10, y: 30, rx: 14, ry: 8 },
+  { x: 36, y: 34, rx: 17, ry: 8 },
+  { x: 20, y: 52, rx: 21, ry: 9 },
+  { x: 44, y: 64, rx: 13, ry: 6 },
+  { x: 8, y: 72, rx: 10, ry: 6 },
+  { x: 26, y: 84, rx: 16, ry: 6 },
 ];
 const RIGHT: readonly Shelf[] = [
-  { x: 120, y: 10, rx: 19, ry: 8 },
-  { x: 132, y: 22, rx: 12, ry: 7 },
-  { x: 108, y: 24, rx: 15, ry: 7 },
-  { x: 124, y: 36, rx: 19, ry: 7 },
-  { x: 102, y: 42, rx: 11, ry: 5 },
-  { x: 136, y: 50, rx: 8, ry: 5 },
+  { x: 120, y: 12, rx: 21, ry: 9 },
+  { x: 134, y: 28, rx: 12, ry: 8 },
+  { x: 106, y: 32, rx: 16, ry: 8 },
+  { x: 124, y: 50, rx: 21, ry: 9 },
+  { x: 100, y: 64, rx: 12, ry: 6 },
+  { x: 138, y: 70, rx: 8, ry: 6 },
+  { x: 118, y: 82, rx: 16, ry: 6 },
 ];
-const trunkL = trunk(20, 34, 110, 4, 13);
-const trunkR = trunk(123, 32, 109, 4, 12);
-const crownL = crown(0, 2, 54, 54, LEFT, 41);
-const crownR = crown(88, 0, 56, 58, RIGHT, 43);
+const trunkL = trunk(20, 56, 160, 5, 14);
+const trunkR = trunk(123, 54, 159, 5, 13);
+const crownL = crown(0, 2, 62, 94, LEFT, 41);
+const crownR = crown(82, 0, 62, 92, RIGHT, 43);
 const MOSS_L = [
-  [6, 52, 12],
-  [12, 30, 10],
-  [26, 44, 14],
-  [33, 32, 9],
-  [44, 48, 11],
-  [18, 18, 7],
+  [6, 76, 14],
+  [12, 36, 12],
+  [28, 58, 16],
+  [40, 40, 10],
+  [48, 68, 12],
+  [18, 22, 8],
+  [24, 88, 13],
 ] as const;
 const MOSS_R = [
-  [98, 46, 13],
-  [110, 30, 9],
-  [117, 42, 15],
-  [131, 28, 10],
-  [138, 54, 10],
-  [126, 16, 7],
+  [98, 68, 14],
+  [110, 38, 10],
+  [117, 56, 17],
+  [131, 34, 11],
+  [138, 74, 11],
+  [126, 20, 8],
+  [112, 86, 12],
 ] as const;
+/**
+ * The far trees across the water (the plot's back, ringed as its sides are): a line of cypress crowns and their trunks, paler in the
+ * haze, standing on the far bank behind the brush, a little lower than the near two so the lot reads deep.
+ */
+const FAR: readonly (Shelf & { t: number })[] = [
+  { x: 48, y: 40, rx: 12, ry: 6, t: 48 },
+  { x: 44, y: 54, rx: 15, ry: 6, t: 48 },
+  { x: 50, y: 68, rx: 11, ry: 5, t: 48 },
+  { x: 74, y: 30, rx: 13, ry: 6, t: 74 },
+  { x: 70, y: 46, rx: 16, ry: 7, t: 74 },
+  { x: 78, y: 60, rx: 13, ry: 5, t: 74 },
+  { x: 98, y: 44, rx: 11, ry: 6, t: 97 },
+  { x: 94, y: 58, rx: 14, ry: 6, t: 97 },
+  { x: 62, y: 80, rx: 12, ry: 5, t: 62 },
+  { x: 88, y: 76, rx: 11, ry: 5, t: 88 },
+];
+const farTrees = paint(26, 20, 92, 110, (x, y) => {
+  const bank = farY(x) + OY - 4;
+  if (y > bank) return null;
+  let top: (typeof FAR)[number] | null = null;
+  for (const s of FAR) {
+    const dx = (x + 0.5 - s.x) / s.rx;
+    const dy = (y + 0.5 - s.y) / s.ry;
+    if (dx * dx + dy * dy - 0.2 * (grain(x >> 1, y >> 1, 77) - 0.5) <= 1 && (!top || s.y > top.y)) top = s;
+  }
+  if (top) {
+    const l = 0.62 - ((y + 0.5 - top.y) / top.ry) * 0.5 - ((x + 0.5 - top.x) / top.rx) * 0.2 + (grain(x, y, 75) - 0.5) * 0.3;
+    return l > 0.6 ? "7" : l > 0.25 ? "6" : "5";
+  }
+  // Behind them, the deep haze of the woods further back (nothing of the street shows through the swamp).
+  const haze = 44 + 6 * Math.sin(x * 0.2) + 4 * grain(x >> 2, 5, 79);
+  if (y >= haze && !FAR.some((s) => Math.abs(x + 0.5 - s.t) < (y > bank - 10 ? 2.4 : 1.6))) return grain(x >> 1, y >> 1, 81) > 0.8 ? "6" : "5";
+  // Their trunks, thin and pale, down to the far bank.
+  if (FAR.some((s) => Math.abs(x + 0.5 - s.t) < (y > bank - 10 ? 2.4 : 1.6)) && y > 40) return x + 0.5 < FAR.find((s) => Math.abs(x + 0.5 - s.t) < 2.5)!.t ? "6" : "5";
+  return null;
+});
 const mossFrames = [0, 1, 0, -1].map((s) => [moss(MOSS_L, s), moss(MOSS_R, s)] as const);
 
 // ---- In the water: cypress knees (little stumps poking up), lily pads (one in flower), cattails and reeds at the edges.
@@ -305,7 +354,9 @@ const shadow = groundShadow(CX, FOOT - 1, 70, 4);
 const parts: Record<string, Part> = {};
 const at: Record<string, Pt> = {};
 const add = (name: string, p: { part: Part; at: Pt }) => ((parts[name] = p.part), (at[name] = p.at), name);
-const back = [add("shadow", shadow), add("brush", brush), add("water", water)];
+const back = [add("shadow", shadow), add("farTrees", farTrees), add("brush", brush), add("water", water)];
+/** The parts drawn on the whole picture (the rest on the ground, OY down). */
+const TALL: ReadonlySet<string> = new Set(["farTrees", "trunkL", "trunkR", "crownL", "crownR", ...[0, 1, 2, 3].flatMap((i) => [`mossL${i}`, `mossR${i}`])]);
 const glintNames = [0, 1, 2, 3].map((i) => add(`glint${i}`, glints(i)));
 const mid = [
   ...knees.map((p, i) => add(`knee${i}`, p)),
@@ -320,7 +371,7 @@ const mid = [
 ];
 const mossNames = mossFrames.map(([l, r], i) => [add(`mossL${i}`, l), add(`mossR${i}`, r)] as const);
 const front = [...reeds.map((p, i) => add(`reeds${i}`, p)), add("postL", postL), add("postR", postR), add("board", board), add("lanternPost", lanternPost), add("lantern", lantern)];
-const L = (part: string): Layer => ({ part, x: at[part]![0], y: at[part]![1] });
+const L = (part: string): Layer => ({ part, x: at[part]![0], y: at[part]![1] + (TALL.has(part) ? 0 : OY) });
 
 /** Four frames: the glints drift along the water, the moss sways a pixel either way; the lantern's glass flickers. */
 const LANTERN_PAL: readonly Record<string, string>[] = [{}, { J: "#fff3c4", K: "#ffc25a" }, {}, { J: "#ffe08a", K: "#f5a030" }];
@@ -336,18 +387,18 @@ export const HOUSE_CHANDY: Character = {
   name: "Chandy's Swamp",
   w: W,
   h: H,
-  foot: [CX, FOOT],
+  foot: [CX, FOOT + OY],
   palette: PALETTE,
   parts,
   anims: { idle },
 };
 
 /** Where the sign's blank face is (frame pixels), for the game to write "Chandy's Swamp" on. */
-export const HOUSE_CHANDY_SIGN = signFace(BOARD[0], BOARD[1], BWD, BHT);
+export const HOUSE_CHANDY_SIGN = signFace(BOARD[0], BOARD[1] + OY, BWD, BHT);
 /** The boardwalk's middle on the front (px): its door (home-boxes.ts). */
 export const HOUSE_CHANDY_DOOR = Math.round((BW0 + BW1) / 2);
 /** Its lights at dusk and night: the lantern on the boardwalk's post, flickering, a halo round it; and three fireflies over the water. */
 export const HOUSE_CHANDY_LIGHTS: readonly LightSpot[] = [
-  { x: LANTERN[0] + 2, y: LANTERN[1] - 8, w: 4, h: 10, keys: "JK", color: LANTERN_LIGHT, strength: 1, flicker: true, halo: 12 },
-  ...([[62, 74], [80, 66], [44, 70]] as const).map(([x, y]) => ({ x, y, w: 1, h: 1, color: "#d8ff7a", strength: 0.7, flicker: true, halo: 5 })),
+  { x: LANTERN[0] + 2, y: LANTERN[1] - 8 + OY, w: 4, h: 10, keys: "JK", color: LANTERN_LIGHT, strength: 1, flicker: true, halo: 12 },
+  ...([[62, 74], [80, 66], [44, 70]] as const).map(([x, y]) => ({ x, y: y + OY, w: 1, h: 1, color: "#d8ff7a", strength: 0.7, flicker: true, halo: 5 })),
 ];
