@@ -500,7 +500,10 @@ below):
   them); the last cut loses that board (`how: "slow"`). On screen (`components/RecluseHearts.tsx`): a column of pixel hearts at every
   board's right, a square each; his slash (`slashLook`: a slow wind-up, a fast stroke, the halves apart; no flash), `recluseSlash` and his
   line (`slashLine`, harder as they run out; INTERRUPT: cuts in at once) on that player's screen only; a board lost greys out slowly
-  with "TOO SLOW" over it. Bots' slow moves (`botSlowChance` 5%, `botSlowMs` past 6.5 s) cost theirs. The admins' ⚡ cuts one of yours.
+  with "TOO SLOW" over it ("Your board is lost: too slow." in the results). A bot's board is judged by the think it rolled, never when
+  its move arrives (`Phase2Judged`: people only in the automatic cut; engine lag never costs a bot a heart): a slow roll (`botSlowChance`
+  5%, `botSlowMs` past 6.5 s) is cut with `phase2Slash` as that think ends. A fight stored before the hearts loads with 8 each
+  (`recluseLobby.upgrade`). The admins' ⚡ cuts one of yours.
 - **His chatter, both phases** (Eric, Oct 14, then Oct 15: "he stopped saying voice lines after like 10 moves";
   DECISIONS.md, "The Hidden Boss keeps talking"): one line about every 15 s of play by the clock (`RECLUSE_TALK`:
   `everyMs` 15 s, give or take `jitterMs` 3 s), all through phase 1 (from his first "play" turn, the bullet stretch too,
@@ -760,7 +763,8 @@ below):
   counts; running on your move, red in its last 10 s; once your move is in, it holds where it stopped, dimmed, through
   the boss's turn, the reveal and the moments, whichever screen shows it; under an increment (Boss alone's 10 + 10, the bullet clock's once he adds one) a "+10"
   rises over it as each move begins, on the page's top layer (`ClockPlus`: a fixed portal over the dock, the panels and the boards;
-  Eric, Nov 16: the status box clipped it; boss-dock.spec's element-at-point check). None during Lights out's rounds (their prompt and meter take the box: before the
+  Eric, Nov 16: the status box clipped it; boss-dock.spec's element-at-point check), hidden while a modal or the options menu is open
+  (the resign confirm, the Moves/Players/Chat sheet). None during Lights out's rounds (their prompt and meter take the box: before the
   first round, as the night falls, the dock keeps its layout and your held clock, "Remember where his pieces are." and
   "Clocks stopped."), the phase change, or before your first move. Once the crowd's move lands, a reveal's line leads with
   your verdict, in the reveal's words ("Best move · You: e4 (+2.1)", "Best was Qxe7+ · You: e4 (+0.0)"), so a cut on a narrow phone falls
