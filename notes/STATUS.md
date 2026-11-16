@@ -1,3 +1,4 @@
+- Nov 17 ~00:55 UTC: #761 smoke fix MERGED (8721620); main run watched. C2 running; star ride waits on C2.
 - Nov 17 ~00:30 UTC: main after #760 RED by retry-pass: boss-smoke Chandy passive false (no free capture before the deadline) -> fix PR (521f993, SMOKE_FIRST chandy e4 Ba6), CI watched. C2 running.
 - Nov 16 ~23:50 UTC: Eric: forget Fable, stick to Opus for the art runner (its default). Star ride brief updated; starts after C2.
 - Nov 16 ~23:45 UTC: Eric: API credits $200 for the month; art now on Fable 5.2 medium (runner BOSS_ART_MODEL). First job: Moon's Ride redrawn as a rounded 3D star, hovering, sparkler trail, single color shaded. Helper (item-builder, Opus high) brief star-ride.md. C2 running (xhigh): an art session runs beside it (API spend, light on plan).
