@@ -437,7 +437,7 @@ export class Phase2Game {
     for (const b of next.boards) {
       const was = before.boards.find((x) => x.id === b.id)!;
       if (was === b) continue;
-      if (b.slashAt !== was.slashAt && b.slashAt !== null) this.opts.onSlash?.(b);
+      if (b.hearts < was.hearts) this.opts.onSlash?.(b);
       if (b.result && !was.result) this.opts.onResult(b);
       const who = phase2ToMove(b);
       if (who === "boss" && !this.waiting.includes(b.id)) this.waiting.push(b.id);

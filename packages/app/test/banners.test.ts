@@ -25,7 +25,7 @@ import { ALFIL_UI } from "../src/components/Alfil.tsx";
 import { lightsBannerMs } from "../src/components/LightsOut.tsx";
 import { bannerLength } from "../src/components/FightBanner.tsx";
 import type { MomentProps, MomentUi } from "../src/components/PowerParts.tsx";
-import { PHASE_CHANGE, phase2UltBannerMs } from "../src/recluse-phase2.ts";
+import { PHASE_CHANGE } from "../src/recluse-phase2.ts";
 import { bossKit } from "../src/characters/kits.ts";
 import type { BossView } from "../src/game.ts";
 
@@ -188,7 +188,7 @@ describe("a boss's banners a second shorter", () => {
     expect(SPIN.spinAt + SPIN.spinMs).toBeLessThan(POWER_FX.spin);
   });
 
-  it("START!, the queen banners, PHASE 2 and 5 SECONDS!: a boss's (with Oct 24's extra), and what follows each after it", () => {
+  it("START!, the queen banners and PHASE 2: a boss's (with Oct 24's extra), and what follows each after it (his \"5 SECONDS!\" gone since Nov 16)", () => {
     expect(BOSS_INTRO.bannerMs).toBe(bossBannerMs());
     const tl = bossIntroTimeline(4);
     expect(tl.total - tl.bannerAt).toBe(bossBannerMs());
@@ -200,7 +200,6 @@ describe("a boss's banners a second shorter", () => {
     expect(bossThinkMs(took)).toBe(bossBannerMs() + 500);
     expect(PHASE_CHANGE.bannerMs).toBe(1400 + bannerPlusMs());
     expect(PHASE_CHANGE.total).toBe(PHASE_CHANGE.bannerAt + PHASE_CHANGE.bannerMs);
-    expect(phase2UltBannerMs()).toBe(bossBannerMs());
   });
 
   it("the God King's cut-ins, the Last Stand's and the votes' result: their Oct 15 lengths and Oct 24's extra, everything after them later by it", () => {

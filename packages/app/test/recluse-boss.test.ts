@@ -93,10 +93,18 @@ describe("then he adds time per move (Eric, Oct 14)", () => {
     expect(RECLUSE_LINES.bulletPlus).toContain(line);
     expect(powerLine(kit, { kind: "bulletPlus", key: "recluse:bulletPlus:10" }), "the same for everyone").toBe(line);
     expect(RECLUSE_LINES.bulletPlus.length).toBeGreaterThanOrEqual(2);
-    // (The number is the board's text, from the setting, never in his line.)
-    for (const l of RECLUSE_LINES.bulletPlus) expect(l).not.toMatch(/\d/);
+    // (Eric, Nov 16: "It just says time per move. Make it say something that makes more sense": each names the seconds in words, the
+    // setting's (1+10), and is short enough for his bubble on a phone (two short rows: the e2e measures it), never cut off.)
+    const WORDS: Record<number, string> = { 5: "five", 10: "ten", 15: "fifteen" };
+    expect(BOSS_POWERS.bulletIncrementSeconds).toBe(10);
+    for (const l of RECLUSE_LINES.bulletPlus) {
+      expect(l.toLowerCase()).toContain(`${WORDS[BOSS_POWERS.bulletIncrementSeconds]} seconds a move`);
+      expect(l).not.toMatch(/\d/);
+      expect(l.length).toBeLessThanOrEqual(56);
+      expect(l).not.toMatch(/Time per move, then|My own/);
+    }
     expect(momentPriority({ kind: "bulletPlus" })).toBe(CRITICAL);
-    expect(BULLET_PLUS.text()).toBe("+2 s a move from now on");
+    expect(BULLET_PLUS.text()).toBe("+10 s a move from now on");
     // (The board says it: the dock keeps the turn's own line, never the increment a second time.)
     expect(dockLine({ kind: "bulletPlus" })).toBeNull();
     // Within its moment: the consult, and the text up for a couple of seconds before the clock starts.
@@ -106,13 +114,13 @@ describe("then he adds time per move (Eric, Oct 14)", () => {
     expect(RECLUSE_FX.bulletPlus - BULLET_PLUS.textAt).toBeGreaterThanOrEqual(2000);
   });
 
-  it("the dock's time control once it applies (\"Bullet 1+2\"), from bulletPlainMoves turns after the bullet clock came", () => {
+  it("the dock's time control once it applies (\"Bullet 1+10\"), from bulletPlainMoves turns after the bullet clock came", () => {
     expect(BOSS_POWERS.bulletPlainMoves).toBe(3);
     const at = (turn: number, extra: Partial<BossView> = {}) => bulletIncrementOn(view({ powers: { ultimate: "bullet", ultAt: 7, turn }, ...extra } as Partial<BossView>));
-    expect([7, 8, 9, 10, 30].map((t) => at(t))).toEqual([0, 0, 0, 2, 2]);
+    expect([7, 8, 9, 10, 30].map((t) => at(t))).toEqual([0, 0, 0, 10, 10]);
     expect(bulletIncrementOn(view())).toBe(0);
     expect(at(12, { result: "crowd" })).toBe(0);
-    expect(bulletControl(2)).toBe("1+2");
+    expect(bulletControl(10)).toBe("1+10");
   });
 });
 

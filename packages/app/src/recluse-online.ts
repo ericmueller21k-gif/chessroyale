@@ -169,7 +169,7 @@ export class OnlinePhase2 {
     const me = this.m.myId();
     for (const b of p.boards) {
       const was = prev.boards.find((x) => x.id === b.id);
-      if (b.player === me && b.slashAt !== null && was && b.slashAt !== was.slashAt) cueSlash(b.hearts, `${p.key}:${b.id}`, hash(`${p.key}:${b.slashAt}`));
+      if (b.player === me && was && b.hearts < was.hearts) cueSlash(b.hearts, `${p.key}:${b.id}`, hash(`${p.key}:${b.slashAt}`));
     }
     if (!p.done)
       for (const b of p.boards) {
