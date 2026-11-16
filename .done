@@ -1,0 +1,14 @@
+crowd-party build: done (branch claude/crowd-party, main merged in; PR title and body in .pr-body.md; full lane: add `full-e2e`).
+- Server: the 50 v 50 party is SquadsParty kind "crowd" (owner first, then invite-only, 8 with open invites counted, Find match
+  drops invites, leader handover); POST /api/crowd/party; the matchmaker seats a party ticket whole (`seatParty`), the lobby holds
+  its seats under its pass (`reserveParty`) only while every party there fits whole on one team (core `packParties`), and the runner
+  puts each party on one team (`assignTeams`). Invites: kind "crowdparty" via the friends API (party DO says yes, seat shows "…",
+  a decline frees it). Do Not Disturb: `users.dnd` (FRIENDS_COLUMNS migration), requests and invites refused quietly.
+- App: screens/CrowdParty.tsx drives the mockup's QueueScreen from the real party; the leader's Cancel recalls members from the
+  lobby; the party socket closes as the match starts; home's Party reopens yours or quietly makes a new one. Notice top right,
+  Decline / Accept. DND toggle in Settings → Friends (where the other two live; "your profile" read as that).
+- Flag for the director: the town-leave guard test's toast button is renamed Join → Accept (Eric's words); eric.md line 131 still
+  says "an invite's Join".
+- Tests: typecheck clean; unit tests of core, chess, server, app all pass (new crowd-party.test.ts, match.test.ts). Local e2e: the new
+  friends.spec "50 v 50 Party" and every changed test pass, phone and computer (PLAYWRIGHT_BROWSERS_PATH mapped to /opt/pw-browsers).
+- Stills: branch stills/crowd-party, folder build/ (14, README). No CI wait (per the brief). Drop .pr-body.md and .done before merging.
