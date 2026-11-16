@@ -881,7 +881,9 @@ function startRoom(
   const bossOx = (now: number) => (marks ? settle(bossAt, marks.boss.c - marks.bossSq.c, now) + (castOff("boss")?.c ?? back() * (marks.bossClear.c - marks.boss.c)) : 0);
   const bossOy = (now: number) => (marks ? settle(bossAt, marks.boss.r - marks.bossSq.r, now) + (castOff("boss")?.r ?? back() * (marks.bossClear.r - marks.boss.r)) : 0);
   /** How high the hop back lifts you (or the boss) now, in squares. */
-  const hopLift = (who: "you" | "boss") => (introNow?.cast ? (introNow.cast[who]?.hop ?? 0) : (introNow?.hop ?? 0) * C.hopUp);
+  const hopLift = (who: "you" | "boss") => (introNow?.cast ? (introNow.cast[who]?.hop ?? 0) + castLift(who) : (introNow?.hop ?? 0) * C.hopUp);
+  /** How high an intro as data has lifted you or the boss (squares: Chandy's platform, Nov 16); 0 for any other. */
+  const castLift = (who: "you" | "boss") => introNow?.cast?.[who]?.lift ?? 0;
   /**
    * An intro as data: where the boss stands while it plays its own moves (`cast.boss.anim`: Timber's walk to his log, the carry, the
    * gnaw, the dusting off), on the room's floor. Null: its town figure, where the walk in and the intro put it.
@@ -2690,12 +2692,13 @@ function startRoom(
     const head = Math.min(a?.top ?? 1, (pad + PAWN_HEAD) / kk);
     const lift = (pose.hop * f.youHop + hopLift("you")) * pt.k;
     // (In the water, no shadow: its ripple instead.)
-    if (!wade) shadows(pt.x, pt.y, pt.k, h / kk);
+    if (!wade || castLift("you") >= 0.02) shadows(pt.x, pt.y, pt.k, h / kk);
     const y0 = pt.y - fy * h - lift;
     const footX = pt.x;
     const footY = pt.y;
     const footK = pt.k;
-    const wading = wadeIn(footY, footK);
+    // (Lifted out of the water (Chandy's platform): no waterline, no ripple.)
+    const wading = castLift("you") < 0.02 && wadeIn(footY, footK);
     g.save();
     g.translate(pt.x, pt.y);
     if (pose.tilt) g.rotate((pose.tilt * f.hobbleTilt * Math.PI) / 180);
@@ -2772,14 +2775,20 @@ function startRoom(
     const k = (b.squares * pt.k) / b.ch.h;
     const ch = mover.ch;
     const img = mover.frames[mv.anim!]![mv.frame]!;
-    drawShadows(pt.x, pt.y, b.ch.w * k);
+    // (Lifted with what he stands on, or hopping: Chandy's platform, Nov 16.)
+    const up = (mv.hop + mv.lift) * pt.k;
+    if (!wade || up > 0.5) drawShadows(pt.x, pt.y - up, b.ch.w * k);
+    const wading = up <= 0.5 && wadeIn(pt.y, pt.k);
+    const [fx, fy, fk] = [pt.x, pt.y, pt.k];
     g.save();
     g.translate(pt.x, 0);
     if (mv.flip) g.scale(-1, 1);
     g.imageSmoothingEnabled = k < 1.5;
-    g.drawImage(img, -ch.foot[0] * k, pt.y - ch.foot[1] * k, img.width * k, img.height * k);
+    g.drawImage(img, -ch.foot[0] * k, pt.y - up - ch.foot[1] * k, img.width * k, img.height * k);
     g.restore();
     g.imageSmoothingEnabled = false;
+    if (wading) unwade(fx, fy, fk, b.ch.w * k * 0.6, performance.now());
+    pt.y -= up;
     Object.assign(bossHead, { x: pt.x, y: pt.y - (b.ch.foot[1] - b.ch.h * b.head) * k, on: true, px: b.squares * pt.k });
   };
   /**
@@ -3226,9 +3235,9 @@ function startRoom(
     const w = (h * b.ch.w) / b.ch.h;
     const x0 = pt.x - (b.ch.foot[0] / b.ch.w) * w;
     const y0 = pt.y - (b.ch.foot[1] / b.ch.h) * h - hopLift("boss") * pt.k;
-    if (!wade) drawShadows(pt.x, pt.y, w);
+    if (!wade || castLift("boss") >= 0.02) drawShadows(pt.x, pt.y, w);
     const [bfx, bfy, bfk] = [pt.x, pt.y, pt.k];
-    const bWading = wadeIn(bfy, bfk);
+    const bWading = castLift("boss") < 0.02 && wadeIn(bfy, bfk);
     g.save();
     // (Turned to face `facing`, by the way its art faces: its sprite's (sprite-kit.ts, sprites.ts: Smudgy's left); a boss not on the
     // kit yet as its attack's art faces, as its kit says (Babur's and Puddles' left), or one without one as its intro says (Dash's left).)
@@ -3324,12 +3333,20 @@ function startRoom(
         const front = p.rest ? slabFrontY(v, dx, dz) : null;
         const rest = front === null ? 0 : Math.max(0, front - (pt.y - TABLE_BOARD.top * s));
         const up = rest + a.lift * pt.k;
+        const wet = p.wet !== undefined;
+        if (wet) {
+          g.save();
+          g.beginPath();
+          g.rect(-1e5, -1e5, 2e5, pt.y + p.wet! * s + 1e5);
+          g.clip();
+        }
         if (up) {
           g.save();
           g.translate(0, -up);
         }
         paintTable(g, v, dx, dz, T.palette, marks.layout);
         if (up) g.restore();
+        if (wet) g.restore();
         continue;
       }
       if (who === "table") {
@@ -3347,7 +3364,17 @@ function startRoom(
         if (!P(at.c, at.r)) continue;
         const x = pt.x + off[0] * k;
         const y = pt.y + off[1] * k - a.lift * pt.k;
+        // (Rising out of the water, Chandy's: nothing under its surface shows.)
+        if (p.wet !== undefined) {
+          g.save();
+          g.beginPath();
+          g.rect(-1e5, -1e5, 2e5, pt.y + p.wet * k + 1e5);
+          g.clip();
+          // (A deck still under the surface: faint, through the water.)
+          if (p.flat && a.lift < 0) g.globalAlpha = 0.3;
+        }
         g.drawImage(img, x - p.ch.foot[0] * k, y - p.ch.foot[1] * k, img.width * k, img.height * k);
+        if (p.wet !== undefined) g.restore();
       }
     }
   };

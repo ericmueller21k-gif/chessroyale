@@ -121,6 +121,9 @@ const waterAt = (x: number, y: number, s: number): string => {
 const tile = (name: string, fn: (x: number, y: number) => string | null) => def(name, [1, 1], T, T, [18, 18], [[paint(0, 0, T, T, fn, false)]]);
 tile("floor-a", (x, y) => waterAt(x, y, 1));
 tile("floor-b", (x, y) => waterAt(x, y, 2));
+// (The battle spot: the same water, named as a battle circle's tiles so the challenge finds it (challenge.ts marksOf). Nothing shows it.)
+tile("ring-a", (x, y) => waterAt(x, y, 1));
+tile("ring-b", (x, y) => waterAt(x, y, 2));
 tile("floor-weed", (x, y) => {
   const d = Math.hypot((x - 18) / 13, (y - 18) / 9);
   if (d < 1 && grain(x, y, 9) > 0.35 + d * 0.4) return grain(x, y, 10) > 0.6 ? "Q" : "q";
@@ -145,16 +148,16 @@ tile("floor-bloom", (x, y) => lily(19, 17, 10, true)(x, y) ?? waterAt(x, y, 5));
 // Spanish moss hanging, brush and reeds at their feet. Each piece one square wide, WALL_H tall: the back row (row 0) and both sides
 // (columns 0 and 19). Four kinds, so neighbors differ.
 
-const WALL_H = 210;
+const WALL_H = 136;
 /** The crowns' shelves in a tree piece (x, y, half-width, half-height): wider than the piece, so neighbors' run together. */
 const SHELVES: readonly (readonly [number, number, number, number])[] = [
-  [20, 14, 20, 9],
-  [6, 30, 16, 8],
-  [32, 36, 18, 8],
-  [16, 54, 22, 9],
-  [36, 70, 14, 7],
-  [4, 76, 14, 7],
-  [22, 92, 18, 7],
+  [24, 10, 11, 5],
+  [6, 22, 14, 6],
+  [32, 28, 15, 6],
+  [16, 42, 20, 7],
+  [36, 54, 14, 6],
+  [4, 58, 14, 6],
+  [22, 70, 18, 6],
 ];
 const WF = WALL_H - 1;
 function treesPiece(name: string, kind: number) {
@@ -162,7 +165,7 @@ function treesPiece(name: string, kind: number) {
   // Where its trunk stands (or none), its width at the foot.
   const tx = [18, 9, 27, -99][kind]!;
   const tw = [10, 7, 8, 0][kind]!;
-  const crownBot = 96 + (kind % 2) * 12;
+  const crownBot = 74 + (kind % 2) * 6;
   const back = paint(0, 0, T, WALL_H, (x, y) => {
     // The crowns: shelves of feathery green, each a ragged oval lit on its top left, the sky showing over the top one and between.
     let best = -1;
@@ -179,7 +182,7 @@ function treesPiece(name: string, kind: number) {
       const l = 0.62 - bv * 0.55 - bu * 0.2 + (grain(x, y, s + 2) - 0.5) * 0.35;
       return l > 0.95 ? "e" : l > 0.62 ? "d" : l > 0.3 ? "c" : l > 0.05 ? "b" : "a";
     }
-    if (y < 34) return null;
+    if (y < 32) return null;
     if (y < crownBot - 10) return grain(x >> 1, y >> 1, s + 6) > 0.75 ? "6" : "5";
     // Below: the woods further back, in the haze, down to the brush.
     if (y < WF - 22) return grain(x >> 1, y >> 1, s + 2) > 0.8 ? "6" : (y + x) % 11 === 0 ? "7" : "5";
@@ -413,6 +416,10 @@ const WEED = new Set(["6,3", "12,5", "3,13", "17,9", "8,16", "11,17", "15,7"]);
 for (let row = 0; row < N; row++)
   for (let col = 0; col < N; col++) {
     const k = `${col},${row}`;
+    if (col >= 7 && col <= 12 && row >= 9 && row <= 12) {
+      at((col + row) % 2 ? "ring-b" : "ring-a", col, row, false);
+      continue;
+    }
     at(BLOOM.has(k) ? "floor-bloom" : LILY.has(k) ? "floor-lily" : WEED.has(k) ? "floor-weed" : (col + row) % 2 ? "floor-b" : "floor-a", col, row, false);
   }
 const FLOOR_COUNT = LAYOUT.length;
