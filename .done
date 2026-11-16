@@ -1,0 +1,12 @@
+recluse-hearts fix round: done (branch claude/recluse-hearts; PR title and body in .pr-body.md, rewritten with these fixes).
+- M1: a bot's board is never in the automatic cut (`Phase2Judged`, people only: server `people(lobby)`, solo `you`); a slow-rolled
+  think is cut with phase2Slash as it ends (server: `Work.slow` + `cutSlowBots` at botAt, its move in or not; solo: the think timer).
+  A bot's bank still runs on real time (a 7 s lag every move would take about 85 moves to empty 10:00): left as is.
+- M2: `recluseLobby.upgrade` fills hearts/slashed/slashAt as the lobby loads (LobbyCore's constructor: every event).
+- m3: "Your board is lost: too slow." (`boardEndWords`, exported for its test). m5: noted in the PR body.
+- m4: `body:has([aria-modal="true"]:not(#rotate-lock), .mm-scrim) > .dk-plus { visibility: hidden }`. The first try, any
+  `[role=dialog]`, hid the +10 for good: `#rotate-lock` (index.html) is always in the page, role=dialog and aria-modal. The e2e probe
+  caught it; the check now also asserts the +10 is visible with no sheet open.
+- Tests: typecheck clean; 8 phase 2 / lobby / parity files, 202 pass; the new server M1/M2 tests and both solo bot tests fail on
+  the old code. Local e2e boss-dock "10 + 10" passes, phone and desktop (a scratchpad config pointing at /opt/pw-browsers/chromium).
+- No CI wait (per the brief). .pr-body.md and .done are on the branch: drop them before merging.
