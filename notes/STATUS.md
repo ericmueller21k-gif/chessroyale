@@ -1,3 +1,4 @@
+- Nov 16 ~23:50 UTC: Eric: forget Fable, stick to Opus for the art runner (its default). Star ride brief updated; starts after C2.
 - Nov 16 ~23:45 UTC: Eric: API credits $200 for the month; art now on Fable 5.2 medium (runner BOSS_ART_MODEL). First job: Moon's Ride redrawn as a rounded 3D star, hovering, sparkler trail, single color shaded. Helper (item-builder, Opus high) brief star-ride.md. C2 running (xhigh): an art session runs beside it (API spend, light on plan).
 - Nov 17 ~00:05 UTC: #760 C1 MERGED (4bb44cf); main run watched; C2 helper told to merge main. C2 running (xhigh, alone).
 - Nov 16 ~23:30 UTC: C1 DONE -> #760 (2c4e0c3; off until C2; helper archived). C2 helper (xhigh, alone) from the C1 branch. Director call: no shared-blunder relief at <=4 a side. Queued after C2: hash-cascade fix, chess boss rules off first load.

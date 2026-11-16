@@ -1,4 +1,4 @@
-# Moon's Ride redrawn as a rounded star, drawn by the API on Fable 5.2 at medium. item-builder lane. Opus, high
+# Moon's Ride redrawn as a rounded star, drawn by the API (the runner's default: Opus 5.5). item-builder lane. Opus, high
 
 Branch: the art on `claude/boss-art` (the runner: `scripts/boss-art/run.ts`, its README), then the ride into the game on
 `claude/star-ride` from main. Read CLAUDE.md, `.claude/agents/item-builder.md`, `.claude/LESSONS.md`, and on `claude/director-notes`
@@ -20,15 +20,10 @@ rounded star in the game's pixel style; don't copy any game's star vehicle (no r
 star sparks that pop and fade behind it (the rides' existing trail mark system: `--rider-trail`). Standing: hovering, no sparks.
 
 **The API run:**
-1. Add Fable to the runner: `PRICES["claude-fable-5-2"] = { input: 8, output: 40, cacheWrite: 10, cacheRead: 0.2 }` (the Claude API's
-   prices). Fable 5.2 keeps thinking always on (the runner's `thinking: {type: "adaptive"}` is accepted), rejects forced `tool_choice`
-   any/tool (check the runner doesn't send one) and enforces preserved thinking's history check: the runner must pass every assistant
-   turn back unchanged, thinking blocks included (moving `cache_control` is fine; dropping or editing an earlier block isn't). A
-   `stop_reason: "refusal"` already stops the run.
-2. Run with `BOSS_ART_MODEL=claude-fable-5-2 BOSS_ART_EFFORT=medium`, the cap at `BOSS_ART_CAP_USD=20` for the side view, then the views
+1. Run with the runner's defaults (Opus 5.5; Eric, Nov 16: "Forget Fable. Just use the Opus"), the cap at `BOSS_ART_CAP_USD=20` for the side view, then the views
    and the trail runs at their own caps (say each estimate before it runs; the month's budget is $200). Stop and ask (`.question` on your
    branch) before passing $40 in all.
-3. The ride replaces `moon-ride`'s drawing (`packages/app/src/components/rides/moon-ride.tsx`; keep the id so owners keep it). Its name
+2. The ride replaces `moon-ride`'s drawing (`packages/app/src/components/rides/moon-ride.tsx`; keep the id so owners keep it). Its name
    and line: propose a star-fitting name and description in the PR body (keep "Moon's Ride" until Eric picks).
 **Checks:** the item kit's tests for rides, the fitting sheet (`npm run preview:items -- out.png items=moon-ride`), the town ride e2e if
 it covers it; one GIF of it moving (hover + sparks) and stills in two colors, on a `stills/star-ride` branch (never under docs/).
