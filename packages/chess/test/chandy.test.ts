@@ -305,6 +305,17 @@ describe("the rifle and the move meter", () => {
     expect(meterPick({ unlocked: ["queenlock"], fresh: "queenlock", used: 0 }, 5, ["queenlock"])).toBeNull();
   });
 
+  it("never the same move twice in a row while another can come (Eric, Nov 16: beam, then beam again, with two unlocked)", () => {
+    for (let seed = 0; seed < 30; seed++)
+      for (let used = 0; used < 30; used++) {
+        expect(meterPick({ unlocked: ["beam", "shields"], fresh: null, used, last: "beam" }, seed)).toBe("shields");
+        expect(meterPick({ unlocked: ["beam", "shields", "scatter"], fresh: null, used, last: "scatter" }, seed)).not.toBe("scatter");
+        // (The only move left, or the others can't come now: it may repeat.)
+        expect(meterPick({ unlocked: ["beam"], fresh: null, used, last: "beam" }, seed)).toBe("beam");
+        expect(meterPick({ unlocked: ["beam", "queenlock"], fresh: null, used, last: "beam" }, seed, ["queenlock"])).toBe("beam");
+      }
+  });
+
   it("only taking a locked piece upgrades the rifle; the window shows as your turn begins", async () => {
     const r = battle(3);
     await crowdMove(r);

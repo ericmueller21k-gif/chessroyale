@@ -1074,6 +1074,8 @@ export interface ChandyState {
   meter: number;
   due?: ChandyMove | null;
   used: number;
+  /** The move he fired last: the meter picks another while one can come (chandy.ts meterPick). */
+  last?: ChandyMove;
   scatter?: { spot: string; squares: string[]; turn: number } | null;
   beam?: { rank: number; file: string; squares: string[]; turn: number } | null;
   shields?: { squares: string[]; turn: number } | null;
