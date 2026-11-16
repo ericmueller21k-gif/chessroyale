@@ -25,6 +25,7 @@ import {
   type MoveScore,
   type Phase2Board,
   type Phase2Engine,
+  type Phase2Judged,
   type Phase2State,
 } from "@chessroyale/chess";
 
@@ -334,8 +335,10 @@ export interface Phase2BotEngine extends Phase2Engine {
  * The Hidden Boss's phase 2 on this device (Boss alone; its rules: packages/chess/src/bosses/recluse-phase2.ts): four
  * boards at once, you on board 0, bots on the rest. One engine plays him on every board in turn (`boss`: your board
  * first when it's waiting, then the board that has waited longest); the bots think on their own clocks (`bots`; the same
- * engine when the device has one only). Every clock is checked five times a second; a board ends by mate, a draw, time
- * or resigning; the battle ends when every board is decided (`onDone`).
+ * engine when the device has one only). Every clock is checked five times a second; a board ends by mate, a draw, time,
+ * resigning or its hearts all cut; the battle ends when every board is decided (`onDone`). Only your moves are judged by the clock
+ * (`judged`): a bot's heart is cut by the slow think it rolled, as that think ends, never because its engine answered late (the
+ * engine it shares with him queues behind his searches: the review of #744, M1).
  */
 export class Phase2Game {
   state: Phase2State;
@@ -349,6 +352,8 @@ export class Phase2Game {
   lastMs: number | null = null;
   /** His moves so far, on all the boards. */
   bossMoves = 0;
+  /** Whose moves the clock judges: yours (Phase2Judged). */
+  private readonly judged: Phase2Judged = (player) => player === this.opts.human;
 
   constructor(
     private readonly opts: {
@@ -378,7 +383,7 @@ export class Phase2Game {
     this.state = startPhase2({ players: this.opts.players, numbers: this.opts.numbers, now: Date.now(), win: this.opts.win });
     for (const b of this.state.boards) if (b.player !== this.opts.human) this.botTurn(b.id);
     // (A move turning slow has its heart cut, as the server's timer does online; a bank that runs out loses the board.)
-    this.tick = setInterval(() => this.update(phase2Clock(this.state, Date.now())), 200);
+    this.tick = setInterval(() => this.update(phase2Clock(this.state, Date.now(), this.judged)), 200);
     this.opts.onChange();
   }
 
@@ -403,7 +408,7 @@ export class Phase2Game {
     const b = this.board(boardId);
     if (!b || b.player !== this.opts.human || phase2ToMove(b) !== "crowd") return;
     const before = this.state;
-    this.update(phase2Move(this.state, boardId, move, Date.now()));
+    this.update(phase2Move(this.state, boardId, move, Date.now(), this.judged));
     if (this.winNext && this.state !== before) {
       this.winNext = false;
       this.update(phase2WinAll(this.state, Date.now()));
@@ -465,14 +470,17 @@ export class Phase2Game {
         if (this.stopped) return;
         if (this.board(id)?.board.fen === fen) {
           const before = this.state;
-          this.update(phase2Move(this.state, id, move, Date.now()));
+          this.update(phase2Move(this.state, id, move, Date.now(), this.judged));
           if (this.state !== before && !this.stopped) this.opts.onBossMove?.(++this.bossMoves);
         }
         this.pump();
       });
   }
 
-  /** A bot's move: it thinks a bullet player's while (its clock running), then plays. Late, its board is lost on time. */
+  /**
+   * A bot's move: it thinks a bullet player's while (its clock running), then plays. Late, its board is lost on time. A slow think
+   * costs it a heart as that think ends (`thinkEnds`), whenever its engine answers; a usual one never does, however late the answer.
+   */
   private botTurn(id: number) {
     const fen = this.board(id)!.board.fen;
     const rng = this.opts.rng ?? Math.random;
@@ -480,6 +488,7 @@ export class Phase2Game {
     const slow = !this.opts.win && rng() < RECLUSE_PHASE2.botSlowChance;
     const [lo, hi] = slow ? RECLUSE_PHASE2.botSlowMs : RECLUSE_PHASE2.botMoveMs;
     const think = lo + rng() * (hi - lo);
+    const thinkEnds = Date.now() + think;
     const engine = this.opts.bots;
     const search = this.opts.win
       ? engine.topMoves(fen, 1).then((t) => t[0]?.move ?? legalMoves(fen)[0]!)
@@ -488,13 +497,15 @@ export class Phase2Game {
     const wait = new Promise<void>((r) => {
       const t = setTimeout(() => {
         this.timers.delete(t);
+        // (Its slow think over: the heart cut at the moment it ended, even if the timer ran late.)
+        if (slow && this.board(id)?.board.fen === fen) this.update(phase2Slash(this.state, id, thinkEnds));
         r();
       }, this.opts.win ? 300 : think);
       this.timers.add(t);
     });
     void Promise.all([search.catch(() => legalMoves(fen)[0]!), wait]).then(([move]) => {
       if (this.stopped || this.board(id)?.board.fen !== fen) return;
-      this.update(phase2Move(this.state, id, move, Date.now()));
+      this.update(phase2Move(this.state, id, move, Date.now(), this.judged));
     });
   }
 }

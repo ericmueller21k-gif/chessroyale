@@ -724,6 +724,8 @@ export class LobbyCore {
     // lobby was made with (one made before a boss was rested, by code, picked for a raid, or a queue's filling lobby).
     if (settings.bossesOff) this.settings = { ...this.settings, bossesOff: settings.bossesOff };
     if (record.moveClock) this.settings = { ...this.settings, moveClockSeconds: record.moveClock, moveClockSteps: [] };
+    // (The Hidden Boss's phase 2 stored by an older server, a deploy mid-fight: what it didn't store filled in. The review of #744, M2.)
+    if (record.recluse2) recluseLobby.upgrade(record.recluse2);
     if (record.runner) {
       // (The clock for powers that run in real time, the hippo gardener's seeds: the server's.)
       this.runner = MatchRunner.restore(record.runner, { settings: this.settings, rng, engines: [], library, clock: () => this.io.now() });

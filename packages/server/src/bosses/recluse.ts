@@ -48,6 +48,7 @@ import {
   type MoveScore,
   type NetPhase2,
   type Phase2Board,
+  type Phase2Judged,
   type Phase2State,
 } from "@chessroyale/chess";
 import type { LobbyRecord, Outgoing, Timer } from "../lobby.ts";
@@ -68,6 +69,8 @@ interface Work {
   ask?: string;
   /** His: a try came back empty: the next is due then (RECLUSE_ONLINE.retryMs, doubling). */
   retryAt?: number;
+  /** A bot's: the think it rolled is the slow one (RECLUSE_PHASE2.botSlowChance): its heart is cut as that think ends (`botAt`). */
+  slow?: true;
 }
 
 /**
@@ -191,6 +194,26 @@ export interface Phase2Lobby {
 const boardOf = (p: Recluse2Record, id: number | string): Phase2Board | undefined => p.state.boards.find((b) => b.id === Number(id));
 
 /**
+ * Whose moves the server's clock judges: people's. A bot's move comes late for reasons that aren't its think (the host's engine missing
+ * RECLUSE_ONLINE.askMs, the engine server after it), so its heart is cut only by the slow think it rolled, as that think ends
+ * (`cutSlowBots`): the review of #744, M1.
+ */
+const people = (lobby: Phase2Lobby): Phase2Judged => (id) => lobby.person(id);
+
+/**
+ * A fight stored by an older server (a deploy mid-fight, before Nov 16's hearts: its boards have no `hearts`, `slashed` or `slashAt`):
+ * every board's hearts full and nothing cut, so it shows its 8 and a slow move cuts one, never NaN (which lost the board on its first
+ * slow move: the review of #744, M2). Run as the lobby is loaded (LobbyCore), before anything reads it.
+ */
+export function upgrade(p: Recluse2Record) {
+  for (const b of p.state.boards as Partial<Phase2Board>[]) {
+    b.hearts ??= RECLUSE_PHASE2.hearts;
+    b.slashed ??= false;
+    b.slashAt ??= null;
+  }
+}
+
+/**
  * His phase 2 follows his fall: everything timed from now, once (the fall `fallMs`, the cutscene's hold, his phase change, the
  * countdown), the boards set from the battle's seed (`players` in board order: one each). Told to everyone as the fall ends (`step`).
  */
@@ -275,7 +298,7 @@ export function step(lobby: Phase2Lobby) {
   }
   startClocks(lobby, p);
   if (p.playing) {
-    if (p.paused === undefined) apply(lobby, p, phase2Clock(p.state, now), "clock");
+    if (p.paused === undefined) apply(lobby, p, phase2Clock(p.state, now, people(lobby)), "clock");
     for (const w of Object.values(p.work)) {
       if (w.move) continue;
       if (w.who === "boss") {
@@ -334,7 +357,7 @@ function arm(lobby: Phase2Lobby) {
   else if (!p.playing) times.push(p.clocksAt);
   else {
     // (A move turning slow, a bank running out. Paused: none meanwhile; their times are moved on by the pause as it ends.)
-    const due = p.paused === undefined ? phase2NextDue(p.state) : null;
+    const due = p.paused === undefined ? phase2NextDue(p.state, people(lobby)) : null;
     if (due !== null) times.push(due);
     for (const [id, w] of Object.entries(p.work)) {
       // (A move in: played when due, but never while paused: nothing is played then, and it's played as the pause ends.)
@@ -343,7 +366,11 @@ function arm(lobby: Phase2Lobby) {
       } else if (w.who === "boss" && w.since !== undefined) {
         times.push(w.retryAt ?? w.at + SERVER_LOST_MS, w.since + RECLUSE_ONLINE.serverWaitMs);
         if (p.paused === undefined) times.push(w.since + RECLUSE_ONLINE.pauseMs);
-      } else times.push(w.at + (w.via === "device" ? RECLUSE_ONLINE.askMs : SERVER_LOST_MS));
+      } else {
+        times.push(w.at + (w.via === "device" ? RECLUSE_ONLINE.askMs : SERVER_LOST_MS));
+        // (A bot's slow think ends before its move is in: its heart is cut then, whenever the move comes.)
+        if (w.slow && p.paused === undefined) times.push(p.botAt[id] ?? 0);
+      }
     }
   }
   if (times.length) lobby.setTimer("phase2", Math.max(lobby.now(), Math.min(...times)));
@@ -379,16 +406,18 @@ function apply(lobby: Phase2Lobby, p: Recluse2Record, next: Phase2State, _why: s
 function queue(lobby: Phase2Lobby, p: Recluse2Record, b: Phase2Board) {
   const who = phase2ToMove(b);
   if (!who || p.work[b.id]) return;
+  let slow = false;
   if (who === "crowd") {
     if (lobby.person(b.player)) return;
-    // (A bot thinks a bullet player's while, now and then past a slow move's time, and loses a heart as a person would.
-    // Paused (a board handed to a bot meanwhile): from the pause's start, so `hold` moves it on to the pause's end plus its while,
-    // never the pause charged to its clock on top: the review of #683, m1.)
-    const slow = lobby.rng() < RECLUSE_PHASE2.botSlowChance;
+    // (A bot thinks a bullet player's while, now and then past a slow move's time: that think's end costs it a heart, as a person's
+    // slow move would (cutSlowBots), and only that: never when its move arrives. Paused (a board handed to a bot meanwhile): from the
+    // pause's start, so `hold` moves it on to the pause's end plus its while, never the pause charged to its clock on top: the review
+    // of #683, m1.)
+    slow = lobby.rng() < RECLUSE_PHASE2.botSlowChance;
     const [lo, hi] = slow ? RECLUSE_PHASE2.botSlowMs : RECLUSE_PHASE2.botMoveMs;
     p.botAt[b.id] = (p.paused ?? lobby.now()) + lo + lobby.rng() * (hi - lo);
   }
-  const w: Work = { id: `w${++p.seq}`, fen: b.board.fen, who: who === "boss" ? "boss" : "bot", via: "server", at: lobby.now() };
+  const w: Work = { id: `w${++p.seq}`, fen: b.board.fen, who: who === "boss" ? "boss" : "bot", via: "server", at: lobby.now(), ...(slow ? { slow: true as const } : {}) };
   p.work[b.id] = w;
   if (w.who === "bot") return toDevice(lobby, p, w);
   if (!lobby.search) return quick(lobby, p, w);
@@ -519,10 +548,27 @@ export function resend(lobby: Phase2Lobby, back?: string) {
 }
 
 /**
- * Moves worked out and due: his at once, a bot's once it has thought its while; none while paused. The team's under the admins' win
- * wins it all.
+ * A bot's slow think (rolled in `queue`) over: its heart cut at the moment that think ended (`botAt`), whether its move is in or not;
+ * the last one cut, its board is lost. Never while paused (`hold` moves the think's end on by the pause). The review of #744, M1.
+ */
+function cutSlowBots(lobby: Phase2Lobby, p: Recluse2Record) {
+  if (!p.playing || p.done || p.paused !== undefined) return;
+  const now = lobby.now();
+  for (const [id, w] of Object.entries(p.work)) {
+    const at = p.botAt[id];
+    if (p.done || !w.slow || w.who !== "bot" || at === undefined || now < at) continue;
+    w.slow = undefined;
+    const b = boardOf(p, id);
+    if (b && b.board.fen === w.fen) apply(lobby, p, phase2Slash(p.state, b.id, at), "slash");
+  }
+}
+
+/**
+ * Moves worked out and due: his at once, a bot's once it has thought its while (a slow think's heart cut first); none while paused.
+ * The team's under the admins' win wins it all.
  */
 function playReady(lobby: Phase2Lobby, p: Recluse2Record) {
+  cutSlowBots(lobby, p);
   for (let guard = 0; guard < 16 && p.paused === undefined; guard++) {
     const now = lobby.now();
     const due = Object.entries(p.work).find(([id, w]) => w.move && (w.who === "boss" || now >= (p.botAt[id] ?? 0)));
@@ -531,7 +577,7 @@ function playReady(lobby: Phase2Lobby, p: Recluse2Record) {
     delete p.work[id];
     const b = boardOf(p, id);
     if (!b || b.result || b.board.fen !== w.fen) continue;
-    const moved = apply(lobby, p, phase2Move(p.state, b.id, w.move!, now), w.who);
+    const moved = apply(lobby, p, phase2Move(p.state, b.id, w.move!, now, people(lobby)), w.who);
     if (moved && w.who === "bot") winIfArmed(lobby, p);
   }
 }
@@ -560,7 +606,7 @@ export function move(lobby: Phase2Lobby, playerId: string, key: unknown, boardId
   if (!p.playing || p.done || p.paused !== undefined || typeof mv !== "string" || mv.length > 8 || !b || b.player !== playerId || ply !== b.board.history.length || phase2ToMove(b) !== "crowd" || !legalMoves(b.board.fen).includes(mv)) return refuse();
   const now = lobby.now();
   const before = b;
-  if (!apply(lobby, p, phase2Move(p.state, b.id, mv, now), "person")) return refuse();
+  if (!apply(lobby, p, phase2Move(p.state, b.id, mv, now, people(lobby)), "person")) return refuse();
   const after = boardOf(p, b.id)!;
   // (Not in a test fight (the admins' 🏆 or ultimate trigger): no fair-play rows, no engine budget spent on them. The review's m4.)
   if (lobby.search && lobby.fairPlayer(playerId) && !lobby.r.overrides?.tested && after.board.history.length > before.board.history.length) {
@@ -784,4 +830,4 @@ function noteFair(lobby: Phase2Lobby, f: FairAsk, scores: readonly MoveScore[]) 
   r.fairV = (r.fairV ?? 0) + 1;
 }
 
-export const recluseLobby = { begin, step, move, searched, answer, resend, winForm, ult, handOver, onBoard, view };
+export const recluseLobby = { begin, step, move, searched, answer, resend, winForm, ult, handOver, onBoard, view, upgrade };

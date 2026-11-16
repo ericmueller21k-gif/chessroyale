@@ -8,7 +8,7 @@
  * Each player's own hearts (Eric, Nov 16, in place of the team's slow-move count and his "5 SECONDS!"): a move slower than
  * slowJudgeMs (5 s as players are told, judged with a hidden allowance for lag) has one of that player's hearts cut as it turns
  * slow; they may then take as long as they need on it (their clock running, nothing played for them). The last one cut, that board
- * is lost.
+ * is lost. A bot's board is judged by the think it rolled, never by when its move arrives (`Phase2Judged`).
  *
  * Pure rules, no clock of their own (`now` is passed in) and no engine: the app drives them (packages/app/src/
  * recluse-phase2.ts; today an admin's fight in Boss alone, on this device). His brain here is Stockfish only, at a
@@ -132,6 +132,15 @@ const replace = (st: Phase2State, b: Phase2Board): Phase2State => ({ ...st, boar
 type SlowSettings = Pick<Phase2Settings, "slowMoveSeconds" | "slowAllowMs">;
 
 /**
+ * Whose moves the clock judges (a heart cut as a move turns slow), by a board's player: people's. A bot's move can arrive late for
+ * reasons that aren't its think (the host's engine, the engine server, a shared engine's queue), so a bot's board is never in the
+ * automatic cut: its heart is cut only when the think it rolled was the slow one (RECLUSE_PHASE2.botSlowChance), with phase2Slash
+ * as that think ends (the review of #744, M1). Default: every board (the rules' own tests).
+ */
+export type Phase2Judged = (player: string) => boolean;
+const everyone: Phase2Judged = () => true;
+
+/**
  * How long a move may take before it's slow (ms from when the board became the player's): the `slowMoveSeconds` players are told,
  * plus `slowAllowMs` of allowance for lag that's never shown (Eric, Nov 16: judged by the server, about 6.5 s).
  */
@@ -157,23 +166,24 @@ function cut(b: Phase2Board, at: number): Phase2Board {
  * A board's move turned slow by `now`: its heart cut at the moment it turned (`slashDue`), not when it was noticed, so a timer's
  * lateness never moves it. Not if the bank ran out first (that board is lost on time: phase2Clock). Unchanged (the same object) if not.
  */
-function slashBoard(b: Phase2Board, now: number, s: SlowSettings): Phase2Board {
-  const at = slashDue(b, s);
+function slashBoard(b: Phase2Board, now: number, s: SlowSettings, judged: Phase2Judged): Phase2Board {
+  const at = judged(b.player) ? slashDue(b, s) : null;
   if (at === null || now < at || bankLeft(b, at) <= 0) return b;
   return cut(b, at);
 }
 
 /**
  * A move on a board at `now`, by whoever's move it is there: the player's (their clock stops; a move past slowJudgeMs has its heart
- * cut first, if it wasn't yet; out of hearts or out of time, the board is lost and the move isn't played) or his (the player's clock
- * starts, a new move to judge). Unchanged (the same object) if the board is decided or the move isn't legal there.
+ * cut first, if it wasn't yet and `judged` says theirs is; out of hearts or out of time, the board is lost and the move isn't played)
+ * or his (the player's clock starts, a new move to judge). Unchanged (the same object) if the board is decided or the move isn't legal
+ * there.
  */
-export function phase2Move(st: Phase2State, boardId: number, move: string, now: number, s: SlowSettings = RECLUSE_PHASE2): Phase2State {
+export function phase2Move(st: Phase2State, boardId: number, move: string, now: number, judged: Phase2Judged = everyone, s: SlowSettings = RECLUSE_PHASE2): Phase2State {
   const b0 = st.boards.find((x) => x.id === boardId);
   const who = b0 ? phase2ToMove(b0) : null;
   if (!b0 || !who || !legalMoves(b0.board.fen).includes(move)) return st;
   if (who === "crowd") {
-    const b = slashBoard(b0, now, s);
+    const b = slashBoard(b0, now, s, judged);
     if (b.result) return replace(st, b);
     const left = bankLeft(b, now);
     if (left <= 0) return replace(st, { ...b, bankMs: 0, turnAt: null, result: { winner: "boss", how: "time" } });
@@ -186,12 +196,12 @@ export function phase2Move(st: Phase2State, boardId: number, move: string, now: 
 }
 
 /**
- * The clocks at `now`: every move turned slow has its heart cut (phase2Move's rule, at the moment it turned), and every board whose
- * player is out of time is lost on time. Unchanged (the same object) if nothing is due.
+ * The clocks at `now`: every judged move turned slow has its heart cut (phase2Move's rule, at the moment it turned), and every board
+ * whose player is out of time is lost on time. Unchanged (the same object) if nothing is due.
  */
-export function phase2Clock(st: Phase2State, now: number, s: SlowSettings = RECLUSE_PHASE2): Phase2State {
+export function phase2Clock(st: Phase2State, now: number, judged: Phase2Judged = everyone, s: SlowSettings = RECLUSE_PHASE2): Phase2State {
   const boards = st.boards.map((b) => {
-    const c = slashBoard(b, now, s);
+    const c = slashBoard(b, now, s, judged);
     if (c.result || c.turnAt === null || bankLeft(c, now) > 0) return c;
     return { ...c, bankMs: 0, turnAt: null, result: { winner: "boss" as const, how: "time" as const } };
   });
@@ -199,8 +209,8 @@ export function phase2Clock(st: Phase2State, now: number, s: SlowSettings = RECL
 }
 
 /**
- * Testing (the admins' trigger in phase 2): a heart of the player's on that board cut now, on their move, whatever its time (the
- * slash on demand). Unchanged unless it's their move on a live board.
+ * A heart of the player's on that board cut at `now`, on their move, whatever its time: a bot's slow think ending (its rolled think, not
+ * when its move arrives: Phase2Judged), or the admins' trigger (the slash on demand). Unchanged unless it's their move on a live board.
  */
 export function phase2Slash(st: Phase2State, boardId: number, now: number): Phase2State {
   const b = st.boards.find((x) => x.id === boardId);
@@ -208,12 +218,12 @@ export function phase2Slash(st: Phase2State, boardId: number, now: number): Phas
   return replace(st, cut(b, now));
 }
 
-/** The next moment a board's clock needs looking at after `now` (a move turning slow, a bank running out), or null: none running. */
-export function phase2NextDue(st: Phase2State, s: SlowSettings = RECLUSE_PHASE2): number | null {
+/** The next moment a board's clock needs looking at after `now` (a judged move turning slow, a bank running out), or null: none running. */
+export function phase2NextDue(st: Phase2State, judged: Phase2Judged = everyone, s: SlowSettings = RECLUSE_PHASE2): number | null {
   let next: number | null = null;
   for (const b of st.boards) {
     if (b.result || b.turnAt === null || phase2ToMove(b) !== "crowd") continue;
-    const slash = slashDue(b, s);
+    const slash = judged(b.player) ? slashDue(b, s) : null;
     for (const t of [b.turnAt + b.bankMs, slash]) if (t !== null && (next === null || t < next)) next = t;
   }
   return next;
