@@ -3,7 +3,7 @@ import { useContext, useLayoutEffect, useRef } from "preact/hooks";
 import { BoardTurn, type QuarterTurn } from "../board-view.ts";
 import { BOSS_BANNER, BOSS_POWERS, bossBannerMs, type PowerEventKind } from "@chessroyale/core";
 import { KING_ATTACK, bannerLeadMs, bossRules, mateMoments, powerFxMs, powerMomentMs } from "@chessroyale/chess";
-import { bossKit, poweredKit, type BossKit } from "../characters/kits.ts";
+import { bossKit, liveKit, type BossKit } from "../characters/kits.ts";
 import { cueAt } from "../characters/power-art.ts";
 import type { BossView } from "../game.ts";
 import { BOINGO_UI, angleView } from "./Boingo.tsx";
@@ -24,6 +24,7 @@ import { FOLIO_UI } from "./Folio.tsx";
 import { TIMBER_UI } from "./Timber.tsx";
 import { DASH_UI } from "./Dash.tsx";
 import { ZEBRA_UI } from "./Zebra.tsx";
+import { CHANDY_UI } from "./Chandy.tsx";
 import { Cast, PowerBanner, kitLine, momentKey, rageWarn, ragePct, type BossUi, type Moment, type MomentProps, type MomentUi } from "./PowerParts.tsx";
 import { CRITICAL, NORMAL, bossVoice, type Priority } from "../speech.tsx";
 import { useFrameNow } from "./Countdown.tsx";
@@ -51,7 +52,7 @@ export { DARK, DarkCost, HOLLOW_CASTER, hollowCastFrom } from "./Hollow.tsx";
 export { PowerBanner, type Moment } from "./PowerParts.tsx";
 
 /** Every boss with powers on screen, by its BOSS_ROSTER id. */
-const BOSS_UI: ReadonlyMap<string, BossUi> = new Map(([GINGER_UI, BOINGO_UI, GREX_UI, HOLLOW_UI, BIGBOY_UI, SAWYER_UI, PIG_UI, RECLUSE_UI, ALFIL_UI, HOPPER_UI, SMUDGY_UI, MOO_UI, GARDENER_UI, TIGER_UI, FOLIO_UI, TIMBER_UI, DASH_UI, ZEBRA_UI] as BossUi[]).map((u) => [u.id, u]));
+const BOSS_UI: ReadonlyMap<string, BossUi> = new Map(([GINGER_UI, BOINGO_UI, GREX_UI, HOLLOW_UI, BIGBOY_UI, SAWYER_UI, PIG_UI, RECLUSE_UI, ALFIL_UI, HOPPER_UI, SMUDGY_UI, MOO_UI, GARDENER_UI, TIGER_UI, FOLIO_UI, TIMBER_UI, DASH_UI, ZEBRA_UI, CHANDY_UI] as BossUi[]).map((u) => [u.id, u]));
 const bossUi = (boss: Pick<BossView, "id"> | null | undefined): BossUi | null => (boss?.id ? (BOSS_UI.get(boss.id) ?? null) : null);
 
 /** The rage warning, the same for every boss: the meter full, its ultimate coming. */
@@ -86,6 +87,7 @@ const MOMENT_UI: Record<PowerEventKind, MomentUi> = {
   ...TIMBER_UI.moments,
   ...DASH_UI.moments,
   ...ZEBRA_UI.moments,
+  ...CHANDY_UI.moments,
 };
 
 /** The moments that play on a screen of their own, in the order they're looked for. */
@@ -108,7 +110,7 @@ export function momentsOf(boss: BossView, until: number): Moment[] {
   return list.map((e) => {
     // (Chub & Chirp's carrots: one pulled by each side in one turn, two moments.)
     const lead = bannerLeadMs(e.kind);
-    const m: Moment = { kind: e.kind, key: momentKey(boss.id, e), at: t + lead, ms: powerFxMs(e) - lead, ...(lead ? { lead } : {}), ...(e.square ? { square: e.square } : {}), ...(e.squares ? { squares: e.squares } : {}), ...(e.fizzled ? { fizzled: e.fizzled } : {}), ...(e.first ? { first: true as const } : {}), ...(e.size ? { size: e.size } : {}), ...(e.pick !== undefined ? { pick: e.pick } : {}), ...(e.ult ? { ult: true as const } : {}), ...(e.by ? { by: e.by } : {}), ...(e.tier !== undefined ? { tier: e.tier } : {}), ...(e.prize ? { prize: e.prize } : {}), ...(e.growth ? { growth: e.growth } : {}), ...(e.kind === "clockFit" && e.count ? { count: e.count } : {}), ...(e.shape ? { shape: e.shape } : {}), ...(e.opening ? { opening: e.opening } : {}) };
+    const m: Moment = { kind: e.kind, key: momentKey(boss.id, e), at: t + lead, ms: powerFxMs(e) - lead, ...(lead ? { lead } : {}), ...(e.square ? { square: e.square } : {}), ...(e.squares ? { squares: e.squares } : {}), ...(e.fizzled ? { fizzled: e.fizzled } : {}), ...(e.first ? { first: true as const } : {}), ...(e.size ? { size: e.size } : {}), ...(e.pick !== undefined ? { pick: e.pick } : {}), ...(e.ult ? { ult: true as const } : {}), ...(e.by ? { by: e.by } : {}), ...(e.tier !== undefined ? { tier: e.tier } : {}), ...(e.prize ? { prize: e.prize } : {}), ...(e.growth ? { growth: e.growth } : {}), ...(e.kind === "clockFit" && e.count ? { count: e.count } : {}), ...(e.shape ? { shape: e.shape } : {}), ...(e.opening ? { opening: e.opening } : {}), ...(e.stage !== undefined ? { stage: e.stage } : {}), ...(e.unlock ? { unlock: e.unlock } : {}) };
     t += lead + m.ms;
     return m;
   });
@@ -239,7 +241,7 @@ export function PowerMoment({ boss, moment, now: wall, orientation, side }: { bo
   const shown = bossBannerMs();
   // (Moo's Full Moon: his moments' animations are powered while it lasts.)
   const plain = bossKit(boss.name);
-  const kit = plain?.powered?.on(boss, now, "bossMove") ? poweredKit(plain) : plain;
+  const kit = plain ? liveKit(plain, boss, now, "bossMove") : plain;
   // Every banner a boss banner's whole length (Oct 24): one from the moment's start from its hold (`lead`) to the end of
   // its window in the moment's beats (POWER_BANNERS in boss-timing.ts: bannerLeadMs makes up the rest); one later in it
   // (BULLET!, DRAW!) in place, the moment longer by whatever passes its end (bannerWaitMs).
@@ -273,7 +275,9 @@ export function RageMeter({ boss }: { boss: BossView }): ComponentChildren {
   const bar = useRef<HTMLElement>(null);
   const show = !!p && p.rage !== null && !boss.result;
   // (Warned, it's full: the test switch can bring the ultimate before the meter is. Older servers: null once spent.)
-  const paused = !!p?.paused;
+  // (Chandy's: dimmed until his rifle is whole, nothing gathering before: D9.)
+  const locked = !!p?.chandy?.rageLocked;
+  const paused = !!p?.paused || locked;
   // (Spent: the last ultimate a battle allows has come and the meter stays, empty and dimmed: Timber's after his second Gnaw.)
   const rules = bossRules(boss);
   const spent = paused && !!rules?.spentMeterShown && (p?.ults ?? 0) >= (rules?.ultimateMax ?? Infinity);
@@ -305,11 +309,11 @@ export function RageMeter({ boss }: { boss: BossView }): ComponentChildren {
     <span
       class={`rage-meter${glow ? " glow" : ""}${p!.warned ? " warned" : ""}${now ? " now" : ""}${paused ? " paused" : ""}`}
       role="meter"
-      aria-label={spent ? "Rage: no more ultimates this battle" : paused ? "Rage: empty while the ultimate lasts" : `Rage ${pct}%`}
+      aria-label={spent ? "Rage: no more ultimates this battle" : locked ? "Rage: unlocks at 5 upgrades" : paused ? "Rage: empty while the ultimate lasts" : `Rage ${pct}%`}
       aria-valuenow={pct}
       aria-valuemin={0}
       aria-valuemax={100}
-      title={spent ? "Rage: no more ultimates this battle" : paused ? "Rage: empty until the boss's ultimate is over" : "Rage: when it's full, the boss's ultimate is coming"}
+      title={spent ? "Rage: no more ultimates this battle" : locked ? "Rage: unlocks at 5 upgrades" : paused ? "Rage: empty until the boss's ultimate is over" : "Rage: when it's full, the boss's ultimate is coming"}
     >
       {/* (No width transition while it slides down: a transition would override the slide.) */}
       <i ref={bar} style={drain ? { width: `${pct}%`, transition: "none" } : { width: `${pct}%` }} />

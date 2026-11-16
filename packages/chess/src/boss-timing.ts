@@ -18,7 +18,7 @@ import { FOLIO_FX } from "./bosses/folio.ts";
 import { TIMBER_FX } from "./bosses/timber.ts";
 import { DASH_FX } from "./bosses/dash.ts";
 import { ZEBRA_FX } from "./bosses/zebra.ts";
-import { CHANDY_FX } from "./bosses/chandy.ts";
+import { CHANDY_FIRE_AT, CHANDY_FX } from "./bosses/chandy.ts";
 
 /**
  * Boss battle timing shared by the lobby server and the solo game, so a screen
@@ -141,6 +141,13 @@ export const POWER_BANNERS: Partial<Record<keyof typeof POWER_FX, readonly (read
   // (Don Dough's GOLD PLATE!, Nov 11: over his cast's stirring, off the board before his first stroke gilds the piece. His dough has
   // none.)
   goldPlate: [[0, 1500]],
+  // (Chandy's meter's moves, Nov 16: off the board as he fires. His locks, the upgrade window, the queen lock's shot and Dodge have
+  // none.)
+  scatterShot: [[0, CHANDY_FIRE_AT]],
+  beam: [[0, CHANDY_FIRE_AT]],
+  shields: [[0, CHANDY_FIRE_AT]],
+  rapidFire: [[0, CHANDY_FIRE_AT]],
+  queenAim: [[0, CHANDY_FIRE_AT]],
 };
 
 /** How long a moment's own clock holds at its start while its banner shows longer (ms; 0 without one from its start). */

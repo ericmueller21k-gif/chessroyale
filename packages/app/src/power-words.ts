@@ -48,6 +48,13 @@ export const POWER_WORDS: Record<PowerId, string> = {
   split: "saws a pawn in two",
   dough: "drops dough that rises into his pieces, Rising Dough",
   goldplate: "Gold Plate",
+  lockon: "locks on to your pieces, his rifle grows, Lock-on",
+  dodge: "Dodge",
+  scatter: "Scatter Shot",
+  beam: "Beam",
+  shields: "Shields",
+  rapidfire: "Rapid Fire",
+  queenlock: "Queen Lock",
 };
 
 /** A boss's card line for its powers: its passive, then its ultimate; empty for a boss without powers yet. */

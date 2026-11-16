@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "preact/hooks";
 import { bossBeat, type Beat, type BeatResult, type Stage } from "../characters/boss-beats.ts";
-import { BOSS_KITS, artOf, bossKit, bossKitOf, poweredKit, type BossKit } from "../characters/kits.ts";
+import { BOSS_KITS, artOf, bossKit, bossKitOf, liveKit, type BossKit } from "../characters/kits.ts";
 import { growingRun, resetGrowing } from "./RecluseChild.ts";
 import { SELECT_FRAMING } from "../characters/boss-select.ts";
 import { stanceAt } from "../characters/stance.ts";
@@ -320,7 +320,7 @@ function Character({ boss, stage, place }: { boss: BossView; stage: Stage; place
       const now = Date.now();
       // (A run of its own animations in place, over its beat, while one lasts: the Hidden Boss's spellbook, his slam.)
       // (Moo's Full Moon: every animation of his is its powered-up twin while it lasts.)
-      const live = kit.powered?.on(nowRef.current.boss, now, nowRef.current.stage) ? poweredKit(kit) : kit;
+      const live = liveKit(kit, nowRef.current.boss, now, nowRef.current.stage);
       const own = inPlaceShowing(kit.ch, now);
       let s = own ?? figureShowing(kit.ch, now) ?? showing(live, beat, now, since);
       // (A run that moves the figure along a phone's bar: Babur's hop to his pump.)

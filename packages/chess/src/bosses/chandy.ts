@@ -72,6 +72,9 @@ type SteerSettings = Pick<BossPowerSettings, "chandy" | "bouncePawnLogit">;
  * the upgrade window (Eric: 2 s, everything paused); each move's shot and what it leaves; the queen lock's aim, and its shot at the
  * start of his next turn. Dodge plays on a screen of its own (dodgeTimeline), and its hit ends the battle.
  */
+/** When his shot fires in a move's moment (ms): his `fire` animation's cue (the art's: unsling, aim, fire at 520 ms). */
+export const CHANDY_FIRE_AT = 520;
+
 export const CHANDY_FX = {
   lockOn: 900,
   upgrade: BOSS_POWERS.chandy.upgradeMs,
@@ -950,7 +953,7 @@ export const chandyBattle = {
     if (c.aim && c.aim.turn <= boss.crowdMoves) {
       const shot = queenShot(fen, c.aim.square, crowd);
       c.shot = { at: boss.crowdMoves, square: shot.square, piece: shot.piece };
-      events.push({ kind: "queenShot", turn: p.turn, square: shot.square ?? c.aim.square, squares: shot.trail, ...(shot.square ? {} : { fizzled: [c.aim.square] }) });
+      events.push({ kind: "queenShot", turn: p.turn, square: shot.square ?? c.aim.square, squares: shot.trail, ...(shot.square ? { shape: shot.piece as "p" | "n" | "b" | "r" | "q" } : { fizzled: [c.aim.square] }) });
       c.aim = null;
       if (shot.square) {
         setBoard(b, shot.fen);

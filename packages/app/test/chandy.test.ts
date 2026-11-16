@@ -1,5 +1,5 @@
 // Chandy's art (Nov 16; docs/decisions/2026-11-16-chandy-art.md), drawn ahead of his rules: his figure at every rifle stage, his clones,
-// his rifle alone, and his kit (in ART_KITS, not the roster's BOSS_KITS). The same checks characters.test.ts and boss-character.test.ts
+// his rifle alone, and his kit (the roster's, BOSS_KITS, since his rules). The same checks characters.test.ts and boss-character.test.ts
 // make of every boss, plus his own: the stages, the clone look, the clones' muzzles. His board art is walked with every boss's by
 // gingerbread.test.ts ("the effect sprites").
 import { describe, expect, it } from "vitest";
@@ -66,9 +66,9 @@ describe("Chandy's art", () => {
     expect(dx).toBeGreaterThan(0);
   });
 
-  it("is a kit drawn ahead: every moment animated, a sound for every cue, its portrait inside the frame; not in the roster's kits", () => {
-    const kit = ART_KITS.Chandy!;
-    expect(BOSS_KITS.Chandy).toBeUndefined();
+  it("is the roster's kit (his rules, Nov 16): every moment animated, a sound for every cue, its portrait inside the frame; none drawn ahead now", () => {
+    const kit = BOSS_KITS.Chandy!;
+    expect(ART_KITS.Chandy).toBeUndefined();
     const beats: Beat[] = ["entrance", "idle", "thinking", "move", "capture", "hurt", "check", "smug", "rattled", "defeat", "victory", "strike", "power", "ultimateWarn", "ultimate"];
     for (const b of beats) expect(kit.ch.anims[kit.anims[b] ?? b], b).toBeTruthy();
     for (const ch of [CHANDY, CHANDY_CLONE]) for (const a of Object.values(ch.anims)) for (const f of a.frames) if (f.cue) expect(kit.sounds[f.cue], f.cue).toBeTruthy();

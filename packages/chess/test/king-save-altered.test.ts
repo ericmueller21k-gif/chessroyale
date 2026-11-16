@@ -27,6 +27,9 @@ const ZEBRA_FRESH = { lumps: [], drops: 0, next: 99, rises: [], squashes: [], go
 
 type Patch = (fen: string) => Partial<BossPowerState>;
 
+/** Chandy with nothing of his on the board. */
+const CHANDY_FRESH = { moves: 0, locks: [], upgrades: 0, unlocked: [], meter: 0, used: 0 };
+
 /** A battle against `id`, the crowd White to move on `fen` (the game so far when not given), its powers patched. */
 function battle(id: string, patch: Patch = () => ({}), fen?: string) {
   let blunder = "";
@@ -186,6 +189,18 @@ const AUDIT: Record<string, { on: Record<string, Patch>; off: Patch } | { none: 
       "the turn a piece of his rose": () => ({ zebra: { ...ZEBRA_FRESH, drops: 1, rises: [{ at: 0, side: "boss", n: 0, piece: "p", square: "a6" }] } }),
     },
     off: () => ({ zebra: ZEBRA_FRESH }),
+  },
+  // (Chandy's meter's moves limit your turn (the scatter shot's squares, the beam, his shields, rapid fire's dizzy pieces) or aim at
+  // your queen (the queen lock): the save sits those out. His locks limit nothing: they only steer his move.)
+  chandy: {
+    on: {
+      "a scatter shot's squares": (f) => ({ chandy: { ...CHANDY_FRESH, scatter: { spot: "a3", squares: [emptyTarget(f)], turn: 1 } } }),
+      "the beam": () => ({ chandy: { ...CHANDY_FRESH, beam: { rank: 3, file: "b", squares: ["a3", "b3", "c3", "d3", "e3", "f3", "g3", "h3", "b1", "b2", "b4", "b5", "b6", "b7", "b8"], turn: 1 } } }),
+      "his shields": (f) => ({ chandy: { ...CHANDY_FRESH, shields: { squares: hisPawns(f).slice(0, 2), turn: 1 } } }),
+      "rapid fire's dizzy pieces": (f) => ({ chandy: { ...CHANDY_FRESH, dizzy: { squares: [crowdPiece(f)], turn: 1 } } }),
+      "the queen lock's aim": () => ({ chandy: { ...CHANDY_FRESH, aim: { square: "d1", turn: 1 } } }),
+    },
+    off: () => ({ chandy: { ...CHANDY_FRESH, locks: [{ square: "e4", piece: "p", at: 0 }] } }),
   },
 };
 
