@@ -1059,7 +1059,8 @@ export interface ChandyDodge {
  *   pieces), `dizzy` (the crowd's), each for crowd turn `turn`; `aim`: the queen lock's aim, at the crowd's queen, fired at the
  *   start of his turn after crowd turn `turn` (the turn the aim is for); `shot`: its last shot (the crowd move it came after, the square hit; none: it
  *   stopped on the king or found nothing to hit).
- * - `dodge`: his Dodge under way or last played. `passWait`: the crowd move after which the queen lock waited (the pass guard).
+ * - `dodge`: his Dodge under way or played (once a battle). `passWait`: the crowd move after which the queen lock waited (the pass
+ *   guard). `whole`: the crowd turn the rifle came whole.
  */
 export interface ChandyState {
   moves: number;
@@ -1081,6 +1082,8 @@ export interface ChandyState {
   passWait?: number;
   /** His last upgrade (the rifle's stage, the move it unlocked), shown as crowd turn `turn` begins. */
   upgrade?: { turn: number; stage: number; unlock?: ChandyMove } | null;
+  /** The crowd turn his rifle came whole (its fifth upgrade shown): his rage meter fills from then (chandy.dodgeAfterMoves). */
+  whole?: number;
 }
 
 /** The pieces Timber's workshop builds, in its strip's order (WORKSHOP_PIECES). */

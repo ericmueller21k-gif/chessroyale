@@ -1749,9 +1749,10 @@ export const BOSS_POWERS = {
    * Nov 2: "make it so this beaver only ults up to 2 times a game. After 2 times, his meter just stops charging. Otherwise, it's
    * too strong."): after his second his meter stays empty and dimmed for the rest of the battle, and the admins' trigger is gone.
    * (Smudgy's Repaint keeps its own cap, repaintMax.) docs/decisions/2026-11-02-nov2-fixes.md. Dash's Time Scramble at most twice
-   * (Eric, Nov 6: "about twice a game"; his Scramble Rush is his once-a-battle power besides).
+   * (Eric, Nov 6: "about twice a game"; his Scramble Rush is his once-a-battle power besides). Chandy's Dodge once (Eric, Nov 16:
+   * "He only ults once per game, no matter what").
    */
-  maxUltimates: { timber: 2, dash: 2, zebra: 2, chandy: 2 } as Readonly<Record<string, number>>,
+  maxUltimates: { timber: 2, dash: 2, zebra: 2, chandy: 1 } as Readonly<Record<string, number>>,
   /**
    * Dash's Clock Slap (his passive; Eric's design, Nov 1; bosses/dash.ts; docs/decisions/2026-11-03-dash.md): each capture of
    * his steals time from your clock. On a time bank (Boss alone and a Boss Battle party: BOSS_CLOCK's 10 + 10, the team's one
@@ -1870,7 +1871,11 @@ export const BOSS_POWERS = {
    * - **The move meter:** from the first upgrade, full every `meterEvery` of your moves; it fires a random unlocked move (a new unlock
    *   first). Scatter shot blocks `scatterSquares` squares round a spot (a pick of the top `looks`, as every pick of his below);
    *   shields cover `shieldCount` of his pieces; rapid fire stuns `rapidCount` of yours.
-   * - **Dodge** (his ultimate; at most maxUltimates.chandy a battle, its meter dimmed until the rifle is whole): `dodgeRounds` rounds, each
+   * - **Dodge** (his ultimate, once a battle: maxUltimates.chandy; Eric, Nov 16: "He only ults once per game, no matter what"; "It
+   *   should fire after he gets all 5 upgrades ... it should be ulting most games"): his rage meter is dimmed until the rifle is whole,
+   *   then fills over `dodgeAfterMoves` of your moves (nothing else fills or drains it); full, the usual warning, then Dodge as your
+   *   next turn begins. **Last chance** (Eric, Nov 16): as your turn begins, if he hasn't used it and you have a move that mates him,
+   *   Dodge comes now, whatever his rifle or meter (the warning with it); you may still play the mate after. `dodgeRounds` rounds, each
    *   a `dodgeVoteMs` vote (and the server's `dodgeGraceMs` for lag), the clones teleporting at `dodgeTeleports`' times into each round's
    *   vote (the last always 1.2 s before it closes: a unit test), the beats between them (`dodgeScopeMs` … `dodgeResultMs`). A bot
    *   finds the safe square with `dodgeBotHit`'s chance.
@@ -1903,6 +1908,7 @@ export const BOSS_POWERS = {
     dodgeBlastMs: 700,
     dodgeResultMs: 1200,
     dodgeBotHit: 0.6,
+    dodgeAfterMoves: 3,
   },
 } as const;
 

@@ -29,14 +29,20 @@ import {
   lockOrder,
   lockRank,
   locksAfter,
+  mateOpen,
+  matingMoves,
   meterPick,
   pieceAt,
   powerTurn,
   queenLockAim,
   queenShot,
+  rageOf,
+  ragePaused,
   safeSquares,
   stopReason,
   steerPick,
+  strikeRage,
+  triggerUltimate,
   unlockPick,
   type MoveScore,
 } from "../src/index.ts";
@@ -86,9 +92,10 @@ describe("Chandy's sheet", () => {
     // (L1: first lock from his 3rd move; a lock hunts 3 of his turns, lives at most 5; at most 2, the second 2 turns after the first.)
     expect([S.firstLockMove, S.huntTurns, S.liveTurns, S.maxLocks, S.secondAfter]).toEqual([3, 3, 5, 2, 2]);
     // (L3's margins, raised by L5 after the sim (1.5 and 0.5 gave 5 upgrades in 28 battles of 32: reports/chandy-sim.md); the 2 s
-    // upgrade window; the meter every 6 of your moves; five upgrades; Dodge at most twice.)
+    // upgrade window; the meter every 6 of your moves; five upgrades; Dodge once a battle, his rage full 3 of your moves after the
+    // fifth (Eric, Nov 16: "He only ults once per game, no matter what").)
     expect([S.takeMargin, S.chaseMargin, S.lockLines]).toEqual([2, 0.75, 5]);
-    expect([S.upgradeMs, S.meterEvery, S.upgradesMax, BOSS_POWERS.maxUltimates.chandy]).toEqual([2000, 6, 5, 2]);
+    expect([S.upgradeMs, S.meterEvery, S.upgradesMax, BOSS_POWERS.maxUltimates.chandy, S.dodgeAfterMoves]).toEqual([2000, 6, 5, 1, 3]);
     // (D6a: a 3 s vote and 300 ms of lag grace.)
     expect([S.dodgeVoteMs, S.dodgeGraceMs, S.dodgeRounds]).toEqual([3000, 300, 3]);
     for (const k of Object.keys(CHANDY_FX) as (keyof typeof CHANDY_FX)[]) expect(POWER_FX[k]).toBe(CHANDY_FX[k]);
@@ -507,14 +514,152 @@ describe("Dodge (D1-D12)", () => {
     }
   });
 
-  it("before the rifle is whole, his rage meter gathers nothing", async () => {
+  it("before the rifle is whole, his rage meter gathers nothing and stays dimmed: no move, capture or strike fills it", async () => {
     const r = battle(13);
-    for (let i = 0; i < 12; i++) {
+    for (let i = 0; i < 12 && !r.stageComplete(); i++) {
       if (r.bossToMove()) await r.playBoss();
       else await crowdMove(r);
+      // (Not the last chance's Dodge, a mate of yours in one: the rifle's alone.)
+      if (cOf(r).upgrades >= S.upgradesMax || r.boss!.powers!.ults) break;
+      expect(rageOf(r.boss)).toBe(0);
+      expect(r.bossView()!.powers!.chandy!.rageLocked).toBe(true);
+      // (The God King's strike adds nothing to his meter.)
+      expect(rageOf(strikeRage(r.boss!))).toBe(0);
     }
     expect(cOf(r).upgrades).toBeLessThan(5);
     expect(r.boss!.powers!.warnAt).toBeUndefined();
+  });
+
+  it("the fifth upgrade makes the rifle whole as your next turn begins; the fourth doesn't", async () => {
+    for (const before of [3, 4]) {
+      const r = battle(3);
+      await crowdMove(r);
+      onPosition(r, "4k3/8/5n2/3N4/8/8/8/R3K3 b - - 0 1", "w", { upgrades: before, unlocked: CHANDY_MOVES.slice(0, before), locks: [{ square: "d5", piece: "n", at: 0 }], taught: true });
+      const turn = r.boss!.crowdMoves + 1;
+      r.applyBossMove("f6d5");
+      expect(cOf(r).upgrades).toBe(before + 1);
+      expect(cOf(r).whole).toBe(before + 1 === S.upgradesMax ? turn : undefined);
+      expect(r.bossView()!.powers!.chandy!.rageLocked).toBe(before + 1 < S.upgradesMax);
+    }
+  });
+
+  it("from the rifle whole, his meter fills over dodgeAfterMoves of your moves; full, the warning; Dodge as your next turn begins (Eric, Nov 16)", async () => {
+    const r = battle(5);
+    await crowdMove(r);
+    if (r.bossToMove()) await r.playBoss();
+    const whole = r.boss!.powers!.turn;
+    onPosition(r, fenOf(r), r.boss!.crowdSide, { upgrades: 5, unlocked: [...CHANDY_MOVES], whole, meter: 0 });
+    const seen: { turn: number; rage: number | null; warn: boolean; dodge: boolean }[] = [];
+    for (let i = 0; i < 2 * S.dodgeAfterMoves + 4 && !r.dodgeDue(); i++) {
+      if (r.bossToMove()) {
+        await r.playBoss();
+        continue;
+      }
+      const p = r.boss!.powers!;
+      // (No mate in one for you on the way: the last chance isn't what brings it here.)
+      expect(matingMoves(fenOf(r))).toEqual([]);
+      seen.push({ turn: p.turn, rage: rageOf(r.boss), warn: p.events.some((e) => e.kind === "warn"), dodge: p.events.some((e) => e.kind === "dodge") });
+      await crowdMove(r);
+    }
+    expect(r.dodgeDue()).toBe(true);
+    const n = S.dodgeAfterMoves;
+    expect(seen.map((x) => x.turn)).toEqual(Array.from({ length: n + 1 }, (_, k) => whole + k));
+    expect(seen.map((x) => x.rage)).toEqual(Array.from({ length: n + 1 }, (_, k) => Math.min(1, k / n)));
+    expect(seen.map((x) => x.warn)).toEqual(Array.from({ length: n + 1 }, (_, k) => k === n));
+    expect(seen.some((x) => x.dodge)).toBe(false);
+    expect(r.boss!.powers!.turn).toBe(whole + n + 1);
+    expect(r.boss!.powers!.events.some((e) => e.kind === "dodge")).toBe(true);
+    expect(rageOf(r.boss)).toBe(1);
+  });
+
+  it("once a battle: after it, his meter stays empty and dimmed, nothing brings another, the admins' trigger refuses", async () => {
+    const r = battle(21, "dodge");
+    for (let i = 0; i < 6 && !r.dodgeDue(); i++) {
+      if (r.bossToMove()) await r.playBoss();
+      else await crowdMove(r);
+    }
+    expect(r.dodgeDue()).toBe(true);
+    for (let k = 0; k < 3 && r.dodgeDue(); k++) r.finishDodgeRound({ h0: cOf(r).dodge!.rounds[k]!.safe });
+    const at = r.boss!.powers!.ultAt!;
+    // (Its own turn: the meter full; your move.)
+    expect(rageOf(r.boss)).toBe(1);
+    await crowdMove(r);
+    let turns = 0;
+    for (let i = 0; i < 40 && !r.stageComplete(); i++) {
+      if (r.bossToMove()) {
+        await r.playBoss();
+        continue;
+      }
+      expect(r.dodgeDue()).toBe(false);
+      const p = r.boss!.powers!;
+      expect(p.ults).toBe(1);
+      expect(p.ultAt).toBe(at);
+      expect(p.events.some((e) => e.kind === "dodge" || e.kind === "warn")).toBe(false);
+      expect(rageOf(r.boss)).toBe(0);
+      expect(ragePaused(r.boss)).toBe(true);
+      expect(triggerUltimate(r.boss).ok).toBe(false);
+      turns++;
+      await crowdMove(r);
+    }
+    expect(turns).toBeGreaterThan(5);
+  });
+});
+
+describe("Dodge's last chance (Eric, Nov 16)", () => {
+  // (1.e4 e5 2.Bc4 Nc6 3.Qh5, Black to move: after 3...Nf6 White mates with Qxf7.)
+  const BEFORE = "r1bqkbnr/pppp1ppp/2n5/4p2Q/2B1P3/8/PPPP1PPP/RNB1K1NR b KQkq - 3 3";
+
+  it("your mate in one, as your turn begins: Dodge now, whatever his rifle (0 upgrades), its warning with it; the mate is still yours after it", async () => {
+    const r = battle(4);
+    await crowdMove(r);
+    onPosition(r, BEFORE, "w");
+    expect(cOf(r).upgrades).toBe(0);
+    r.applyBossMove("g8f6");
+    const p = r.boss!.powers!;
+    expect(p.events.filter((e) => e.kind === "warn" || e.kind === "dodge").map((e) => e.kind)).toEqual(["warn", "dodge"]);
+    expect(p.ults).toBe(1);
+    expect(r.dodgeDue()).toBe(true);
+    expect(rageOf(r.boss)).toBe(1);
+    expect(r.bossView()!.powers!.chandy!.rageLocked).toBe(false);
+    const fen = fenOf(r);
+    for (let k = 0; k < 3 && r.dodgeDue(); k++) r.finishDodgeRound({ h0: cOf(r).dodge!.rounds[k]!.safe });
+    expect(fenOf(r)).toBe(fen);
+    expect(r.stageComplete()).toBe(false);
+    // (The board as it was: Qxf7 still mates, and it's allowed.)
+    expect(r.crowdAllowed() ?? legalMoves(fen)).toContain("h5f7");
+    await crowdMove(r, () => "h5f7");
+    expect(r.stageComplete()).toBe(true);
+    expect(r.finishBossBattle()).toBe("crowd");
+  });
+
+  it("only once: a second mate in one later brings nothing", async () => {
+    const r = battle(4);
+    await crowdMove(r);
+    onPosition(r, BEFORE, "w");
+    r.applyBossMove("g8f6");
+    for (let k = 0; k < 3 && r.dodgeDue(); k++) r.finishDodgeRound({ h0: cOf(r).dodge!.rounds[k]!.safe });
+    // (You don't mate; later he walks into it again.)
+    await crowdMove(r, () => "b1c3");
+    onPosition(r, BEFORE, "w");
+    r.applyBossMove("g8f6");
+    const p = r.boss!.powers!;
+    expect(matingMoves(fenOf(r))).toContain("h5f7");
+    expect(p.events.some((e) => e.kind === "dodge" || e.kind === "warn")).toBe(false);
+    expect(p.ults).toBe(1);
+    expect(r.dodgeDue()).toBe(false);
+  });
+
+  it("counts only the moves you may play that turn: a mate his limits stop isn't one", () => {
+    const fen = "r1bqkb1r/pppp1ppp/2n2n2/4p2Q/2B1P3/8/PPPP1PPP/RNB1K1NR w KQkq - 4 4";
+    const fresh = { moves: 0, locks: [], upgrades: 0, unlocked: [], meter: 0, used: 0 };
+    expect(mateOpen({ chandy: fresh }, { fen, turn: 4 })).toBe(true);
+    // (His shield on f7 this turn: Qxf7 can't take it.)
+    expect(mateOpen({ chandy: { ...fresh, shields: { squares: ["f7"], turn: 4 } } }, { fen, turn: 4 })).toBe(false);
+    // (A shield of another turn's: the mate is open.)
+    expect(mateOpen({ chandy: { ...fresh, shields: { squares: ["f7"], turn: 3 } } }, { fen, turn: 4 })).toBe(true);
+    // (Your queen held by rapid fire.)
+    expect(mateOpen({ chandy: { ...fresh, dizzy: { squares: ["h5"], turn: 4 } } }, { fen, turn: 4 })).toBe(false);
+    expect(mateOpen({ chandy: fresh }, { fen: "r1bqkb1r/pppp1ppp/2n2n2/4p3/2B1P3/5Q2/PPPP1PPP/RNB1K1NR w KQkq - 4 4", turn: 4 })).toBe(false);
   });
 });
 

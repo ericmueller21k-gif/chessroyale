@@ -38,9 +38,11 @@
  *   hand him a promotion for his next move, fizzles.
  * A power never leaves you without a legal move: the dispatcher lifts the turn's limits if it would.
  *
- * **Dodge** (his ultimate, the rage meter's): dimmed until the fifth upgrade (nothing gathers before), then it fills as every
- * boss's; the usual warning, then as your next turn begins Dodge (the crowd's turn waits for it: dodgeDue), at most
- * maxUltimates.chandy a battle. Three rounds on a blank board, your king in the middle of the 3 x 3 round e4 (White) or e5 (Black):
+ * **Dodge** (his ultimate, once a battle: maxUltimates.chandy; Eric, Nov 16): his rage meter (his own: dodgeMeter) is dimmed until the
+ * fifth upgrade, then fills over chandy.dodgeAfterMoves of your moves (nothing else fills or drains it); full, the usual warning, then
+ * as your next turn begins Dodge (the crowd's turn waits for it: dodgeDue). **Last chance:** as your turn begins, if he hasn't used
+ * it and you have a move that mates him (mateOpen), Dodge comes now, its warning with it, whatever his rifle or meter; the board
+ * comes back after it and you may still play the mate. Three rounds on a blank board, your king in the middle of the 3 x 3 round e4 (White) or e5 (Black):
  * four clones, two on rank lines and two on file lines, leave exactly one square safe (dodgeRounds); they teleport
  * chandy.dodgeTeleports' times into the vote, each one shifting the safe square a step. The crowd votes the king's square (the most
  * votes; ties and nobody voting: from the seed); the beams fire; on the safe square, DODGED; anywhere else the battle is his
@@ -54,10 +56,10 @@
 import { BOSS_POWERS, CHANDY_MOVES, type BossPowerSettings, type BossPowerState, type BossState, type ChandyDodge, type ChandyLock, type ChandyMove, type ChandyState, type DodgeLine, type DodgeResult, type DodgeRound, type PowerEvent } from "@chessroyale/core";
 import { Chess, type Square } from "chess.js";
 import type { BoardState } from "../boards.ts";
-import { applyMove, attackedSquares, exchangeNet, fenAtPly, kingAttacked, legalMoves, pieceAt, sideToMove, withoutPiece } from "../rules.ts";
+import { applyMove, attackedSquares, exchangeNet, fenAtPly, kingAttacked, legalMoves, matingMoves, pieceAt, sideToMove, withoutPiece } from "../rules.ts";
 import type { EngineLike } from "../runner.ts";
 import type { MoveScore } from "../uci.ts";
-import { PASS_WAIT, VALUE, from, heldIn, logit, moveSquares, other, powerRoll, ragePoints, to, turnOf, warnThenUnleash, type Battle, type BossRules, type Side, type StopFields, type TurnContext } from "./base.ts";
+import { PASS_WAIT, VALUE, from, heldIn, logit, moveSquares, other, powerRoll, testSwitch, to, turnOf, type Battle, type BossRules, type Side, type StopFields, type TurnContext } from "./base.ts";
 import { lands } from "./boingo.ts";
 import { passTurn } from "./hollow.ts";
 import { castAnswer } from "./hopper.ts";
@@ -717,11 +719,41 @@ export function dodgeSeen(d: ChandyDodge, elapsed: number, s: ChandySettings = B
 /** His meter's move switches (?power=…): that move unlocked from the start, the meter full after every move of yours. */
 const moveTest = (test: string): ChandyMove | null => ((CHANDY_MOVES as readonly string[]).includes(test) ? (test as ChandyMove) : null);
 
-/** His Dodges a battle at most (BOSS_POWERS.maxUltimates.chandy). */
-const dodgeMax = (s: Pick<BossPowerSettings, "maxUltimates"> = BOSS_POWERS): number => s.maxUltimates?.["chandy"] ?? 2;
+/** His Dodges a battle at most (BOSS_POWERS.maxUltimates.chandy: once). */
+const dodgeMax = (s: Pick<BossPowerSettings, "maxUltimates"> = BOSS_POWERS): number => s.maxUltimates?.["chandy"] ?? 1;
 
 /** The rifle is whole: the rage meter fills from now on (D9). */
 export const rifleWhole = (c: Pick<ChandyState, "upgrades">, s: Pick<ChandySettings, "upgradesMax"> = BOSS_POWERS.chandy): boolean => c.upgrades >= s.upgradesMax;
+
+/**
+ * His rage meter, 0-1, as crowd turn `turn` is picked (BossRules.meter: his own, so the God King's strike and the usual gains add
+ * nothing; Eric, Nov 16): empty until the rifle is whole (`whole`: the crowd turn its fifth upgrade showed), then a notch for each of
+ * your moves, full after chandy.dodgeAfterMoves; full once warned and on Dodge's own turn; empty after it (once a battle).
+ */
+export function dodgeMeter(p: Pick<BossPowerState, "chandy" | "ultAt" | "warnAt">, turn: number, s: Pick<BossPowerSettings, "chandy"> = BOSS_POWERS): number {
+  if (p.ultAt !== undefined) return turn <= p.ultAt ? 1 : 0;
+  if (p.warnAt !== undefined) return 1;
+  const whole = p.chandy?.whole;
+  if (whole === undefined) return 0;
+  const n = s.chandy.dodgeAfterMoves;
+  return n <= 0 ? 1 : Math.max(0, Math.min(1, (turn - whole) / n));
+}
+
+/**
+ * The last chance (Eric, Nov 16: "if we can calculate that it's a guaranteed mate in one ... he still fires his ult anyway"): the
+ * crowd, to move in `t.fen`, has a move that mates him, among its allowed moves as this turn's limits stand (his held pieces and
+ * stops in `next` for crowd turn `t.turn`; limits that would leave no move lift, as the dispatcher's do). Every legal move tried
+ * (chess.js: matingMoves).
+ */
+export function mateOpen(next: Pick<BossPowerState, "chandy">, t: Pick<TurnContext, "fen" | "turn">): boolean {
+  const mates = matingMoves(t.fen);
+  if (!mates.length) return false;
+  const c = next.chandy;
+  const held = [...(on(c?.dizzy, t.turn)?.squares ?? []), ...(on(c?.beam, t.turn)?.squares ?? [])];
+  const f = stopFieldsOf({ chandy: c, turn: t.turn });
+  const ok = (m: string) => !(held.length && heldIn(t.fen, m, held)) && !chandyStop(f, t.fen, m);
+  return mates.some(ok) || !legalMoves(t.fen).some(ok);
+}
 
 /**
  * The move the meter picked lands as the crowd's turn begins (`t.fen`: the crowd to move): it, or (it can't here) another unlocked
@@ -757,6 +789,10 @@ export const CHANDY: BossRules = {
   id: "chandy",
   ultimateMax: BOSS_POWERS.maxUltimates["chandy"],
   spentMeterShown: true,
+  // His own rage meter (Eric, Nov 16): from the fifth upgrade, over dodgeAfterMoves of your moves; nothing else fills or drains it.
+  meter: (p, turn, s) => dodgeMeter(p, turn, s),
+  // (After his last Dodge, as long as the battle: the meter spent, empty and dimmed, and no other comes.)
+  ultimateRunning: (p, turn, s) => (p.ults ?? 0) >= dodgeMax(s) || turn <= (p.ultAt ?? 0),
   wearOff(next, t) {
     const c = next.chandy;
     if (!c) return;
@@ -769,15 +805,21 @@ export const CHANDY: BossRules = {
       dizzy: on(c.dizzy, t.turn),
       locks: c.locks.filter((l) => !lockEnds(t.fen, t.crowd, c, l, t.s.chandy)),
     };
-    // (The rage meter is dimmed until the rifle is whole: nothing gathers before, D9.)
-    if (!rifleWhole(c, t.s.chandy)) next.rageUsed = ragePoints(next, t.s);
   },
+  // Dodge: his meter full (dodgeMeter) or the test switch, the warning as this turn begins, Dodge as the next does; the admins'
+  // trigger, straight to it; the last chance (mateOpen), now, its warning with it. Once a battle.
   ultimate(next, t) {
     const c = next.chandy;
     if (!c || (next.ults ?? 0) >= dodgeMax(t.s)) return false;
-    // (Only once the rifle is whole; the admins' trigger brings it anyway, for testing.)
-    if (!rifleWhole(c, t.s.chandy) && !t.ultNext) return false;
-    if (!warnThenUnleash(next, t)) return false;
+    // (Warned as an earlier turn began: it comes now.)
+    if (!t.ultNext && next.warnAt === undefined) {
+      const last = mateOpen(next, t);
+      if (!last && dodgeMeter(next, t.turn, t.s) < 1 && !testSwitch(t, next)) return false;
+      next.warnAt = t.turn;
+      t.events.push({ kind: "warn", turn: t.turn });
+      if (!last) return false;
+    }
+    next.ultAt = t.turn;
     const center = dodgeCenter(t.crowd);
     const n = (next.ults ?? 0) + 1;
     next.chandy = { ...c, dodge: { at: t.turn - 1, n, king: kingOf(t.fen, t.crowd) ?? center, center, rounds: dodgeRounds(center, t.seed, n, t.s.chandy), results: [] } };
@@ -847,7 +889,7 @@ export const CHANDY: BossRules = {
       return {
         chandy: {
           ...FRESH,
-          ...(test === "dodge" ? { upgrades: s.upgradesMax, unlocked: [...CHANDY_MOVES], taught: true as const } : {}),
+          ...(test === "dodge" ? { upgrades: s.upgradesMax, unlocked: [...CHANDY_MOVES], taught: true as const, whole: 1 } : {}),
           ...(m ? { upgrades: 1, unlocked: [m], fresh: m, meter: s.meterEvery - 1 } : {}),
         },
       };
@@ -891,7 +933,7 @@ export interface ChandyView {
   unlocked: ChandyMove[];
   /** The move meter, 0-1 (null: not started, before the first upgrade). */
   meter: number | null;
-  /** The rage meter is dimmed: the rifle isn't whole yet (D9). */
+  /** The rage meter is dimmed: the rifle isn't whole yet (D9) and Dodge hasn't come (the last chance can bring it before). */
   rageLocked: boolean;
   scatter: { spot: string; squares: string[] } | null;
   beam: { rank: number; file: string; squares: string[] } | null;
@@ -913,7 +955,7 @@ export function chandyView(p: BossPowerState, s: ChandySettings = BOSS_POWERS.ch
     upgrades: c.upgrades,
     unlocked: [...c.unlocked],
     meter: c.upgrades > 0 ? Math.min(1, c.meter / Math.max(1, s.meterEvery)) : null,
-    rageLocked: !rifleWhole(c, s),
+    rageLocked: !rifleWhole(c, s) && !p.ults,
     scatter: scatter ? { spot: scatter.spot, squares: [...scatter.squares] } : null,
     beam: beam ? { rank: beam.rank, file: beam.file, squares: [...beam.squares] } : null,
     shields: shields ? { squares: [...shields.squares] } : null,
@@ -998,7 +1040,7 @@ export const chandyBattle = {
         const unlock = unlockPick(c.unlocked, p.seed, c.upgrades);
         const stage = c.upgrades + 1;
         // (Shown as your next turn begins: everyTurn.)
-        c = { ...c, upgrades: stage, upgrade: { turn: turnOf(boss), stage, ...(unlock ? { unlock } : {}) }, ...(unlock ? { unlocked: [...c.unlocked, unlock], fresh: unlock } : {}) };
+        c = { ...c, upgrades: stage, upgrade: { turn: turnOf(boss), stage, ...(unlock ? { unlock } : {}) }, ...(unlock ? { unlocked: [...c.unlocked, unlock], fresh: unlock } : {}), ...(stage >= s.upgradesMax ? { whole: turnOf(boss) } : {}) };
       }
     }
     setChandy(b, () => c);
