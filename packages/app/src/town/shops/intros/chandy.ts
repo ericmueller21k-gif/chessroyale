@@ -5,8 +5,8 @@
  * under you both, its deck from under the water to `deckUp` squares over it, the post and the board riding up on it and you both lifted
  * with it from the moment its deck reaches your feet (no waterline on you from then). It settles; **the milk crates drop on** at the
  * stools' places (his blue, your orange) and you hop back clear of them; the set stands a beat; **his entrance**: he points, then fires
- * (his own moves, the board figure's, until his God King attack comes with his rules); his attack's beat; **his wipe**: a wall of the swamp's water
- * rolling in over the screen from the side (INTRO_CHANDY_STORM and _FRONT). Every number is CHALLENGE_FEEL.swamp or the art's frames.
+ * (his own moves, the board figure's, until his God King attack comes with his rules); his attack's beat; **his wipe**: the swamp's water rising over
+ * the screen from its foot (INTRO_CHANDY_STORM and _FRONT, the storm's `rise`). Every number is CHALLENGE_FEEL.swamp or the art's frames.
  */
 import { CHANDY } from "../../../characters/chandy.ts";
 import { TABLE_BOARD } from "../../houses/park.ts";
@@ -42,7 +42,7 @@ export const CHANDY_INTRO = defineIntro({
     crateY: { ch: INTRO_CHANDY_CRATE, at: ["youStool"] },
   },
   mover: CHANDY,
-  storm: { tile: INTRO_CHANDY_STORM, front: INTRO_CHANDY_FRONT },
+  storm: { tile: INTRO_CHANDY_STORM, front: INTRO_CHANDY_FRONT, rise: true },
   beats: [
     faceBeat(),
     lineBeat(),

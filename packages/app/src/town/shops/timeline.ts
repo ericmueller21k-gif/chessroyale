@@ -312,7 +312,7 @@ export interface IntroData {
   table?: Character;
   palette?: Readonly<Record<string, string>>;
   /** Its storm (the transition: its tile and its front), or `splatter` (Smudgy's); none: the default flash and wipe. */
-  storm?: { readonly tile: Character; readonly front: Character };
+  storm?: { readonly tile: Character; readonly front: Character; /** It rises from the screen's foot (Chandy's water, Nov 16), not across. */ readonly rise?: true };
   splatter?: true;
   /** It swings no God King attack (its transition is its own). */
   noAttack?: true;

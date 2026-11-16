@@ -10,8 +10,8 @@
  * - `INTRO_CHANDY_PLATFORM`: the hidden platform, old planks on cross beams, moss along its edges and weed hanging off them, five
  *   squares across (the marks and the post on it), seen from the front and a little above. `stream`: water pouring off its edges.
  * - `INTRO_CHANDY_CRATE`: a milk crate, faded and mossy, the stool: `blue` (his) and `orange` (yours).
- * - `INTRO_CHANDY_STORM` and `_FRONT`: his wipe, simple (Eric: "swamp themed … not crazy"): a wall of the swamp's water rolling in over
- *   the screen from the side (as every boss's wipe sweeps), its front a wavy foamy edge, a cattail and a lily pad riding it, bubbles in it.
+ * - `INTRO_CHANDY_STORM` and `_FRONT`: his wipe, simple (Eric: "swamp themed … not crazy"): the swamp's water rising over the screen
+ *   from its foot (the storm's `rise`), its front a wavy waterline, reeds and a lily pad riding it, bubbles in it.
  */
 import type { Character, Frame, Part } from "../../characters/sprite.ts";
 import { grain, paint, type Pt } from "../houses/kit.ts";
@@ -183,7 +183,7 @@ export const INTRO_CHANDY_CRATE: Character = ch("intro-chandy-crate", XW, XH, [X
   orange: [{ ms: 1000, bits: crateBits("o", "O", "P") }],
 });
 
-// ==== The wipe: the swamp's water rolling in (a tile that fills behind its front), bubbles rising in it; 74 px, repeating.
+// ==== The wipe: the swamp's water rising (a tile that fills under its front), bubbles rising in it; 74 px, repeating.
 
 export const INTRO_CHANDY_STORM: Character = ch("intro-chandy-storm", 74, 74, [37, 73], {
   idle: [0, 1, 2, 3].map((i) => ({
@@ -199,27 +199,26 @@ export const INTRO_CHANDY_STORM: Character = ch("intro-chandy-storm", 74, 74, [3
     ],
   })),
 });
-/**
- * The wipe's front: the leading edge of a wall of swamp water rolling in from the side (as every boss's wipe sweeps: round 2), 48 x 74,
- * repeating down the screen: the water on its left carrying on from the tile, a wavy foamy edge, a lily pad and a cattail riding it.
- */
-export const INTRO_CHANDY_FRONT: Character = ch("intro-chandy-front", 48, 74, [24, 73], {
+/** The wipe's front (round 2: rising from the screen's foot, Eric's call): a wavy waterline, reeds and a cattail standing up out of it, a
+ * lily pad riding the crest; under it the water, carrying on into the tile. 74 x 40, repeating across. */
+export const INTRO_CHANDY_FRONT: Character = ch("intro-chandy-front", 74, 40, [37, 39], {
   idle: [0, 1, 2, 3].map((i) => ({
     ms: 110,
     bits: [
-      paint(0, 0, 48, 74, (x, y) => {
-        const wave = 30 + Math.round(5 * Math.sin(((y + i * 5) * 2 * Math.PI) / 74) + 2 * Math.sin(((y - i * 4) * 4 * Math.PI) / 74));
-        // A cattail riding the edge, leaning out ahead of it, and a lily pad on the water just behind.
-        const cy = 20;
-        if (Math.abs(y - (cy + (x - wave) * 0.15)) < 0.8 && x > wave && x < wave + 12) return "h";
-        if (Math.abs(y - (cy + (x - wave) * 0.15)) < 1.3 && x >= wave + 9 && x < wave + 14) return "c";
-        if (x > wave) return null;
-        if (x > wave - 2) return "G";
-        if (x > wave - 5) return "g";
-        const ly = 52;
-        if (Math.hypot((x - (wave - 14)) / 7, (y - ly) / 4) < 1) return x < wave - 14 ? "L" : "l";
-        return x > wave - 8 ? "V" : grain(x >> 2, y >> 2, 45) > 0.7 ? "w" : "W";
-      }, false),
+      paint(0, 0, 74, 40, (x, y) => {
+        const wave = 22 + Math.round(3 * Math.sin((x + i * 4) * 0.17) + 2 * Math.sin((x - i * 3) * 0.31));
+        if (y < wave) {
+          // Reeds and a cattail standing up out of it.
+          const reed = [6, 9, 40, 44, 47].find((rx) => Math.abs(x - rx - (wave - y) * 0.12) < 0.8);
+          if (reed !== undefined && wave - y < (reed % 3 === 0 ? 20 : 14)) return wave - y > 13 && reed === 9 ? "c" : reed % 2 ? "h" : "r";
+          return null;
+        }
+        if (y === wave) return "G";
+        if (y < wave + 3) return "g";
+        // A lily pad riding the crest.
+        if (y < wave + 5 && Math.abs(x - 26 - i) < 7) return x < 26 + i ? "L" : "l";
+        return y < wave + 7 ? "V" : grain(x >> 2, y >> 2, 45) > 0.7 ? "w" : "W";
+      }),
     ],
   })),
 });

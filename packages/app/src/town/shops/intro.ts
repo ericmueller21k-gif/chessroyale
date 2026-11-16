@@ -118,6 +118,8 @@ export interface StormArt {
   fronts: HTMLCanvasElement[];
   backs: HTMLCanvasElement[];
   ms: number[];
+  /** It rises from the screen's foot (its front a waterline over it) and drains back down (Chandy's water, Nov 16), not across. */
+  rise?: boolean;
   cues: { cue: string; at: number }[];
 }
 
@@ -453,7 +455,7 @@ export function loadIntro(home: HomeId): Promise<LoadedIntro> | null {
       dark = buildDark(m);
     }
     // (Its storm: its art's, or its data's.)
-    const st = art?.data ? (art.data.storm ? { storm: art.data.storm.tile, front: art.data.storm.front } : null) : art?.storm ? { storm: art.storm, front: art.front } : null;
+    const st = art?.data ? (art.data.storm ? { storm: art.data.storm.tile, front: art.data.storm.front, rise: !!art.data.storm.rise } : null) : art?.storm ? { storm: art.storm, front: art.front, rise: false } : null;
     if (st) {
       const k = CHALLENGE_FEEL.stormScale;
       const stormFrames = st.storm.anims.idle!.frames;
@@ -469,6 +471,7 @@ export function loadIntro(home: HomeId): Promise<LoadedIntro> | null {
         fronts: st.front.anims.idle!.frames.map((_, i) => scaled(toCanvas(st.front, "idle", i), k)),
         backs: st.front.anims.idle!.frames.map((_, i) => scaled(toCanvas(st.front, "idle", i), k, true)),
         ms: stormFrames.map((f) => Math.max(16, f.ms)),
+        rise: st.rise,
       };
     }
     // The table: the boss's own (Big Boy's blocks, built; Timber's gnawed pedestal, its stumps apart), or the town's park table in its stone
@@ -904,6 +907,7 @@ export function startStorm(intro: LoadedIntro): Storm {
     const u = now % loop;
     let i = 0;
     while (i < ends.length - 1 && u >= ends[i]!) i++;
+    if (art.rise) return drawRise(t, i);
     if (phase === "in") edge = stormEdge("in", t, F.stormInMs, W, fw);
     else if (phase === "covered") edge = W;
     else edge = stormEdge("out", t, F.stormOutMs, W, fw);
@@ -920,6 +924,22 @@ export function startStorm(intro: LoadedIntro): Storm {
     const img = phase === "out" ? art.backs[i]! : art.fronts[i]!;
     const x = phase === "out" ? edge - fw : edge;
     if (phase !== "covered") for (let y = 0; y < H; y += fh) g.drawImage(img, x, y);
+  };
+  /**
+   * A rising storm (Chandy's water): its top comes up from the screen's foot, its front (a waterline) riding it, on the same clock as one
+   * sweeping across (stormEdge, over the height); going out it drains back down the same way.
+   */
+  const drawRise = (t: number, i: number) => {
+    const e = phase === "in" ? stormEdge("in", t, F.stormInMs, H, fh) : phase === "covered" ? H : H - stormEdge("out", t, F.stormOutMs, H, fh) + fh;
+    const top = Math.round(H - e);
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    g.clearRect(0, 0, W, H);
+    g.imageSmoothingEnabled = false;
+    const pat = patterns[i]!;
+    pat.setTransform(new DOMMatrix([1, 0, 0, 1, 0, top]));
+    g.fillStyle = pat;
+    g.fillRect(0, Math.max(0, top), W, H - Math.max(0, top));
+    if (phase !== "covered") for (let x = 0; x < W; x += fw) g.drawImage(art.fronts[i]!, x, top - fh);
   };
   let raf = 0;
   const frame = (now: number) => {
