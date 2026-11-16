@@ -22,8 +22,8 @@
  * (`switchPlan`); one whose loop must start at a given moment (`dropAt`: his boards' split) starts its intro that long before it.
  *
  * The town's own (Eric, Nov 14-15; docs/decisions/2026-11-15-town-music.md): `townMusic`. Its theme (themes.json's `town`) loops in the
- * street town and in buildings with no theme of their own; after every TOWN_MUSIC.passesPerSolo passes a piano solo plays instead of
- * the next pass, and the theme comes back from its top `seconds` after the solo started, the solo ringing out over it. Every join is on
+ * street town and in buildings with no theme of their own; now and then (TOWN_MUSIC: the first within 3 min of its start, a third of the
+ * time within about a minute; then every 1 or 2 passes) a piano solo plays instead of the next pass, and the theme comes back from its top `seconds` after the solo started, the solo ringing out over it. Every join is on
  * the audio clock. A room's theme, a challenge's splash or a battle takes over; leaving a room hands back to the theme, from its top.
  * In memory: the theme while the town is open, and at most one solo, decoded as its turn nears and let go once it has rung out.
  */
@@ -753,8 +753,25 @@ export function townSoloOf(town: TownTheme, turn: number): TownSolo | null {
 }
 /** When a run's solo starts: the end of its last pass (its context's clock, s). */
 export const townSoloAt = (town: TownTheme, run: TownRun) => run.at + run.passes * town.loopSeconds;
-/** A run's passes before its solo: TOWN_MUSIC.passesPerSolo, at least one. */
-const passesPerSolo = () => Math.max(1, Math.floor(TOWN_MUSIC.passesPerSolo) || 1);
+/** A count of passes, at least one. */
+const passes = (n: number | undefined) => Math.max(1, Math.floor(n ?? 1) || 1);
+/** After a solo, the passes before the next: one of TOWN_MUSIC.passesAfterSolo at random (Nov 16: not clockwork). */
+const passesAfterSolo = (rand = Math.random) => passes(TOWN_MUSIC.passesAfterSolo[Math.floor(rand() * TOWN_MUSIC.passesAfterSolo.length)]);
+/**
+ * Where the town's theme starts this time (Eric, Nov 16; docs/decisions/2026-11-16-town-solos.md), in s into its loop: 0, from its top
+ * (its first solo TOWN_MUSIC.firstPasses passes in), or with chance TOWN_MUSIC.earlyChance one of its `earlyEntries` at random (so its
+ * first solo comes at the end of that pass, early). `early`: that roll forced, at the first entry (the `?townsolo` test switch).
+ */
+export function townEntry(town: TownTheme, early = false, rand = Math.random): number {
+  const entries = TOWN_MUSIC.earlyEntries.filter((e) => e > 0 && e < town.loopSeconds);
+  if (!entries.length || !(early || rand() < TOWN_MUSIC.earlyChance)) return 0;
+  return early ? entries[0]! : entries[Math.floor(rand() * entries.length)]!;
+}
+/**
+ * The first run as the town's theme starts at `at` (its context's clock), `entry` s into its loop: from its top, TOWN_MUSIC.firstPasses
+ * passes; partway in, the rest of that pass (the run counted from where its top would have been).
+ */
+export const townFirstRun = (at: number, entry: number, turn: number): TownRun => (entry > 0 ? { at: at - entry, passes: 1, turn } : { at, passes: passes(TOWN_MUSIC.firstPasses), turn });
 
 /** A piece on the clock: its source, from `offset` into its file at `at`, the theme looping, until `end` (s; Infinity: not set). */
 interface TownPiece {
@@ -788,6 +805,8 @@ let townStarting = false;
 let townFailed = false;
 /** The solo whose turn is next: taking turns while the town is open, from the first again as it opens. */
 let townTurn = 0;
+/** The `?townsolo` test switch (Town.tsx): every start of the town's music partway in, its first solo 37 s in. */
+let townSoonForced = false;
 /**
  * The town's decoded pieces (by name): its theme, kept while the town is open, and at most one solo, decoded as its turn nears and let
  * go once it has rung out (`townTick`, `releaseSolos`; Nov 15: the theme ~69 MB, a solo ~16 MB, beside the town's WebGL on a phone).
@@ -801,11 +820,12 @@ let townLoading: Promise<unknown> | null = null;
 /**
  * The town opens (`true`: its first frame drawn) or closes (`false`: it's gone, or the Hidden Boss's summoning has begun). Open, its
  * theme is fetched and decoded and starts, unless something else is playing; closed, it fades out (MUSIC.endFadeMs) and its pieces
- * are let go, and the solos' turns start again from the first.
+ * are let go, and the solos' turns start again from the first. `soloSoon`: the `?townsolo` test switch (TOWN_MUSIC's early start, always).
  */
-export function townMusic(open: boolean) {
+export function townMusic(open: boolean, soloSoon = false) {
   if (open === townOpen) return;
   townOpen = open;
+  townSoonForced = open && soloSoon;
   townFailed = false;
   if (open) return townCheck();
   endTown();
@@ -903,20 +923,25 @@ async function loadPiece(name: string): Promise<boolean> {
 function startTown(bus: { ctx: MusicContext; out: AudioNode }, town: TownTheme, theme: AudioBuffer) {
   const pad = Math.max(0, themesNow?.pad || 0);
   const at = bus.ctx.currentTime + MUSIC.startDelayS;
+  // (Rolled each time it starts, Nov 16: partway in a third of the time, its first solo early.)
+  const entry = townEntry(town, townSoonForced);
   let tp: TownPlaying;
   try {
     cutEnding(TOWN_KEY);
     const gain = bus.ctx.createGain();
-    gain.gain.value = level();
+    gain.gain.value = entry ? 0 : level();
     gain.connect(bus.out);
-    const run = { at, passes: passesPerSolo(), turn: townTurn };
+    const run = townFirstRun(at, entry, townTurn);
     tp = { ctx: bus.ctx, gain, sources: [], ends: new Map(), town, pad, theme, pieces: [], run, runPiece: null!, solo: null, anchor: { at, wallAt: Date.now() + (at - bus.ctx.currentTime) * 1000 } };
-    tp.runPiece = addPiece(tp, theme, at, pad, true);
+    tp.runPiece = addPiece(tp, theme, at, pad + entry, true);
+    // (Partway in, it fades in: the file there holds the ring of the bars before.)
+    if (entry) fadeTo(gain.gain, level(), at, TOWN_MUSIC.earlyFadeS * 1000);
   } catch {
     return; // Ignore audio errors: the town goes on in silence.
   }
   townPlaying = tp;
   log("music:town:start");
+  if (entry) log(`music:town:entry:${entry}`);
   townTick(tp);
 }
 
@@ -981,17 +1006,18 @@ function townTick(tp: TownPlaying) {
       const back = at + solo.seconds;
       tp.runPiece = addPiece(tp, tp.theme, back, tp.pad, true);
       tp.solo = { at, turn: tp.run.turn };
-      tp.run = { at: back, passes: passesPerSolo(), turn: tp.run.turn + 1 };
+      tp.run = { at: back, passes: passesAfterSolo(), turn: tp.run.turn + 1 };
       townTurn = tp.run.turn;
       log(`music:town:solo:${solo.id}`);
     } catch {
       return; // Its context closed: a new one carries it on (handOverTown).
     }
   }
-  // (The next of: the next solo's decode, its going on the clock, a solo's end (let go then).)
+  // (The next of: the next solo's decode, its going on the clock, a solo's end (let go then). None ahead: its solo is near and not on the
+  // clock yet (an early one, decoding or waiting for another solo to be let go): a look again in a second.)
   const at = townSoloAt(tp.town, tp.run);
   const wake = [at - TOWN_MUSIC.aheadS - TOWN_MUSIC.decodeS, at - TOWN_MUSIC.aheadS, ...tp.pieces.filter((p) => !p.loop).map((p) => p.end)].filter((t) => t > now);
-  if (wake.length) tp.timer = setTimeout(() => townTick(tp), Math.max(1000, (Math.min(...wake) - now) * 1000));
+  tp.timer = setTimeout(() => townTick(tp), Math.max(1000, ((wake.length ? Math.min(...wake) : now) - now) * 1000));
 }
 
 /** The town's theme fades out (MUSIC.endFadeMs) and stops, its solo too; next time it starts from its top. */
