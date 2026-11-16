@@ -314,7 +314,17 @@ somethings I'm sure". So it is a candidate again, with his piano:
   A clip with the thirds as 16ths went with it, for him to say which is how he played it.
 - His notes are C major's (F natural), so the chords under his four bars are Cmaj7, Fmaj9, Am9, G9 in place of the
   plan's. Four bars of mine follow in his shape and end on his thirds with F sharp, back to G.
-- Sent as v2. No verdict yet; which of the three (this, song_ai.py, song_o.py) is Folio's is his call.
+- Sent as v2 (the piano). His answer was a recording of himself playing it: "this was how I meant it to be played. I
+  think I wrote it wrong. This would just be the first part ... use this as the starting point and then do the solo
+  ... instead of, like, a piano ... something, like, high-pitch instrument sounding ... a flute, maybe ... on the last
+  note I played here, there was a slight pause that was not on purpose. It should be playing a bit faster".
+- So v3: his line as he played it (all thirds: C6+E6 three times, B5+D6, A5+C6, G5+B5, B5+D6 twice; three 8ths, two
+  quarters, two 8ths into the last, on the song's grid) on two flutes with no breath in them, then a flute solo of
+  mine in its shape. The chords are the plan's again but for two beats (Cmaj7 held where Cm6 was). The piano is gone.
+- A played recording says more than written notes: measure its onsets and each note's level over time, and ask
+  nothing he has already shown. (Its file stays in the scratch folder: never in the repo.)
+- Sent as two 30-second clips: the flutes where he played it, and piccolos an octave up ("a bit higher than this").
+  No verdict yet; which of the three (this, song_ai.py, song_o.py) is Folio's is his call.
 
 ## Folio's arcade theme (Nov 16, song_ai.py): sent, no verdict yet
 
