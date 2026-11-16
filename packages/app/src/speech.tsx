@@ -17,7 +17,8 @@
  * - **Never taken off unread.** Once a line has started, nothing takes it off before it has typed out and been fully
  *   readable for `minReadMs`: a line that would cut in sooner waits for that, then cuts in (still dropped after
  *   `waitMs`). (Oct 24: Babur's thinking line, which had waited its turn behind his balloon's cheer, was up for a
- *   quarter of a second when his hoops' line, critical, cut in.)
+ *   quarter of a second when his hoops' line, critical, cut in.) The one exception, named by Eric (Nov 16): the Hidden Boss's line
+ *   as he cuts one of your hearts in phase 2, "interrupting whatever he's saying" (`INTERRUPT`).
  * - **Never hidden by a fit check.** A box that would run off the screen takes a smaller size, a step at a time, and
  *   past the last step is moved back into view (SpeechBox). Its size is settled once per line, before its first paint.
  *
@@ -43,7 +44,9 @@ export const CHATTER = -1;
 export const LOW = 0;
 export const NORMAL = 1;
 export const CRITICAL = 2;
-export type Priority = typeof CHATTER | typeof LOW | typeof NORMAL | typeof CRITICAL;
+/** Cuts in at once on any line, firm or not (Eric, Nov 16: the Hidden Boss's line as he cuts your heart). */
+export const INTERRUPT = 3;
+export type Priority = typeof CHATTER | typeof LOW | typeof NORMAL | typeof CRITICAL | typeof INTERRUPT;
 
 /**
  * A line on screen: its words, its moment (`key`), when it started and when it's gone (its fade included), and the
@@ -111,7 +114,7 @@ export class Voice {
     if (this.said.size > 400) this.said.delete(this.said.values().next().value!);
     this.advance(at);
     const cur = this.now;
-    if (!cur || at >= cur.until || (cutsIn(priority, cur) && at >= cur.firm)) this.start({ text, key, priority, saidAt: at, hold, paced }, at);
+    if (!cur || at >= cur.until || (cutsIn(priority, cur) && (at >= cur.firm || priority === INTERRUPT))) this.start({ text, key, priority, saidAt: at, hold, paced }, at);
     else {
       this.queue.push({ text, key, priority, saidAt: at, hold, paced });
       // Highest priority first; in the order said within one.
@@ -200,14 +203,17 @@ export class Voice {
     // (Stale ones are dropped.)
     if (this.queue.length) this.queue = this.queue.filter((w) => now - w.saidAt <= SPEECH.waitMs);
     const w = this.queue[0];
-    if (!w || (this.now && !(cutsIn(w.priority, this.now) && now >= this.now.firm))) return;
+    if (!w || (this.now && !(cutsIn(w.priority, this.now) && (now >= this.now.firm || w.priority === INTERRUPT)))) return;
     this.queue.shift();
     this.start(w, Math.max(now, w.saidAt));
   }
 }
 
-/** Whether a line cuts in on the one up (once that one is firm): a critical one on any but a critical one, any on chatter. */
-const cutsIn = (priority: Priority, cur: Spoken) => (priority === CRITICAL && cur.priority < CRITICAL) || (cur.priority === CHATTER && priority > CHATTER);
+/**
+ * Whether a line cuts in on the one up (once that one is firm): a critical one on any but a critical one, any on chatter; an
+ * interrupting one on any, at once.
+ */
+const cutsIn = (priority: Priority, cur: Spoken) => priority === INTERRUPT || (priority === CRITICAL && cur.priority < CRITICAL) || (cur.priority === CHATTER && priority > CHATTER);
 
 /** The boss's voice (one battle at a time on a device): its powers' lines, its reactions, its intro moments. */
 export const bossVoice = new Voice(true);

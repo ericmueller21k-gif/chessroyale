@@ -299,9 +299,9 @@ function measureGrid() {
 /** The tiles' lines on the page, each as many tiles as it holds (top to bottom). */
 // The START form fits its window with no scroll (Eric, Nov 12: "an immutable screen... never scroll"): the grid on top, the stage
 // pushed down, START at the bottom, the speech bubble above the picked boss's head. Guest (sixteen tiles, three rows) and admin
-// (nineteen, a fourth row of one), at iPhone 14 Plus (428 x 746, Eric's baseline) and a small phone (360 x 640).
+// (every admin-first boss too: a fourth row), at iPhone 14 Plus (428 x 746, Eric's baseline) and a small phone (360 x 640).
 for (const admin of [false, true]) {
-  test(`the Boss Battle screen never scrolls, ${admin ? "admin (nineteen tiles, four rows)" : "guest (sixteen tiles, three rows)"}: at 428 x 746 and 360 x 640 the page fits its window, START is on screen, and the picked boss's speech bubble sits above its head (Eric, Nov 12)`, async ({ page }) => {
+  test(`the Boss Battle screen never scrolls, ${admin ? "admin (every tile, four rows)" : "guest (sixteen tiles, three rows)"}: at 428 x 746 and 360 x 640 the page fits its window, START is on screen, and the picked boss's speech bubble sits above its head (Eric, Nov 12)`, async ({ page }) => {
     test.skip(desktop(), "a phone's windows");
     await named(page, "Selector");
     if (admin) await asAdmin(page);
@@ -310,7 +310,8 @@ for (const admin of [false, true]) {
       await page.setViewportSize({ width: w, height: h });
       await page.goto("/");
       await openSoloBoss(page);
-      await expect(page.locator(".bs-tile")).toHaveCount(admin ? 19 : 16);
+      // (Counted from the roster, as the boss rows below are: each new boss is admins-first, so the admin count grows with it.)
+      await expect(page.locator(".bs-tile")).toHaveCount(playableBosses().length + (admin ? adminFirstBosses().length : 0) + 2);
       await tile(page, "Jefferson").click();
       // (After its drop, which squashes it a little wider for a moment.)
       await page.waitForTimeout(500);

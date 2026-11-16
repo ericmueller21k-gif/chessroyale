@@ -82,7 +82,7 @@ describe("the dock's clock and the big 3-2-1 (Eric's playtest, Oct 15: \"just th
     m.dispose();
   }, 60_000);
 
-  it("what Eric saw: the three 1+0 moves empty the bank, so the first 1+2 turn starts inside the count (one big number at once, then the instant Engine move); the dock's clock reads that same number, and each instant move after rebuilds the bank", async () => {
+  it("what Eric saw (at 1+2, Oct 15): the three 1+0 moves empty the bank, then the first turn with the increment (1+10 since Nov 16: it starts above the count, which comes at its end); the dock's clock reads the count's number, and each instant move after rebuilds the bank", async () => {
     const m = hiddenBoss();
     for (let i = 0; i < 120 && m.phase.kind !== "play"; i++) await vi.advanceTimersByTimeAsync(500);
     const yourMove = async () => {
@@ -103,15 +103,19 @@ describe("the dock's clock and the big 3-2-1 (Eric's playtest, Oct 15: \"just th
       await vi.advanceTimersByTimeAsync(19_700);
       await engineMove();
     }
-    // The increment comes ("+2 s a move from now on"): this turn's clock is what was left plus 2 s, 2.9 s.
+    // The increment comes ("+10 s a move from now on"): this turn's clock is what was left plus the increment, 10.9 s.
     await yourMove();
     const p = m.phase as Extract<typeof m.phase, { kind: "play" }>;
-    expect(p.deadline - p.startsAt).toBe(900 + BOSS_POWERS.bulletIncrementSeconds * 1000);
-    // On the turn's very first frame the big count is already showing: a lone "3" (never the 3-2-1 build-up).
-    expect(countdown(p, p.startsAt)).toBe(3);
-    // The dock's clock says the same, in the same rounding ("0:03"; the old dock line floored it: "0:02 left").
-    expect(clockShown(clockLeft(p, p.startsAt))).toBe("0:03");
-    // And it shows the "+2" as this move begins.
+    const INC = BOSS_POWERS.bulletIncrementSeconds * 1000;
+    expect(p.deadline - p.startsAt).toBe(900 + INC);
+    // On the turn's first frame: the big count only if it starts inside it (it did at 1+2: a lone "3", never the 3-2-1 build-up).
+    const first = Math.ceil((900 + INC) / 1000);
+    expect(countdown(p, p.startsAt)).toBe(first <= COUNT_FROM_SECONDS ? first : null);
+    expect(clockShown(clockLeft(p, p.startsAt))).toBe(clockShown(900 + INC));
+    // At its end the count and the dock's clock say the same, in the same rounding ("0:03"; the old dock line floored it: "0:02 left").
+    expect(countdown(p, p.deadline - 2500)).toBe(3);
+    expect(clockShown(clockLeft(p, p.deadline - 2500))).toBe("0:03");
+    // And it shows the "+10" as this move begins.
     expect(Date.now() - p.startsAt).toBeLessThan(DOCK_PLUS_MS);
     // The instant Engine move: the number is gone a moment later, and he didn't lose on time.
     await vi.advanceTimersByTimeAsync(100);
@@ -119,7 +123,7 @@ describe("the dock's clock and the big 3-2-1 (Eric's playtest, Oct 15: \"just th
     expect(m.phase.kind).not.toBe("play");
     await yourMove();
     expect(m.runner.bossTimedOut).toBeFalsy();
-    // Each instant move from here banks nearly the whole 2 s: about +1.9 s a turn (Eric's 0:20 by move 20).
+    // Each instant move from here banks nearly the whole increment.
     const before = bank(m);
     for (let i = 0; i < 5; i++) {
       await vi.advanceTimersByTimeAsync(100);

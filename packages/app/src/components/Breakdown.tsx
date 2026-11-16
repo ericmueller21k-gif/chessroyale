@@ -236,12 +236,12 @@ function useStepKeys(last: number, setAt: (f: (p: number) => number) => void) {
   }, [last]);
 }
 
-/** How your phase 2 board ended, in words (the board's own tag says it the same way: Won, Lost on time, Lost: resigned, Draw). */
-function boardEnd(r: SimulBoardView["result"]): string {
+/** How your phase 2 board ended, in words (the board's own tag says it the same way: Won, Lost on time, Lost: resigned, Too slow, Draw). */
+export function boardEndWords(r: SimulBoardView["result"]): string {
   if (!r) return "";
   if (r.winner === "draw") return "Your board is drawn.";
   if (r.winner === "crowd") return "Your board is won.";
-  return `Your board is lost${r.how === "time" ? " on time" : r.how === "resign" ? ": you resigned" : ""}.`;
+  return `Your board is lost${r.how === "time" ? " on time" : r.how === "resign" ? ": you resigned" : r.how === "slow" ? ": too slow" : ""}.`;
 }
 
 /**
@@ -279,7 +279,7 @@ export function BoardReview({ board }: { board: Pick<SimulBoardView, "history" |
       </div>
       <p class="small bm-text">
         {said}
-        {at === last && board.result ? ` ${boardEnd(board.result)}` : ""}
+        {at === last && board.result ? ` ${boardEndWords(board.result)}` : ""}
       </p>
     </div>
   );

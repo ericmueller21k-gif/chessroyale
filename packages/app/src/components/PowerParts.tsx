@@ -1,7 +1,7 @@
 import { useContext, useLayoutEffect, useRef } from "preact/hooks";
 import { BoardTurn, type QuarterTurn } from "../board-view.ts";
 import type { ComponentChildren, JSX } from "preact";
-import type { PowerEvent, PowerEventKind, WaterGrowth } from "@chessroyale/core";
+import type { ChandyMove, PowerEvent, PowerEventKind, WaterGrowth } from "@chessroyale/core";
 import type { BossKit } from "../characters/kits.ts";
 import type { BossView } from "../game.ts";
 import { BossFace, playInPlace } from "./BossCharacter.tsx";
@@ -54,6 +54,9 @@ export interface Moment {
   shape?: string;
   /** Don Dough's opening comment: the library's name for your opening (none: his fallback). */
   opening?: string;
+  /** Chandy's upgrade: the rifle's stage now, and the move it unlocked. */
+  stage?: number;
+  unlock?: ChandyMove;
 }
 
 /** Which of a boss kit's moments a power's moment is (its animation and lines: characters/power-art.ts). */
@@ -94,7 +97,7 @@ export interface MomentUi {
    * line under its name). Left out: the dock keeps the turn's own line (the boss's move). Never the power's name: the
    * banner names it, and the boss's bubble is his character (DECISIONS.md, "Nothing said twice").
    */
-  dock?: (m: Pick<Moment, "kind" | "squares" | "fizzled">) => string | null;
+  dock?: (m: Pick<Moment, "kind" | "squares" | "fizzled" | "shape">) => string | null;
   /** When what it puts on a square appears there (ms, wall clock); undefined: it puts nothing on that square. */
   appearAt?: (m: Moment, square: string, orientation: "white" | "black") => number | undefined;
   /** It plays on a screen of its own (the funhouse, his extra move, the Big Bounce) when this says so. */

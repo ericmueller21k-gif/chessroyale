@@ -246,8 +246,8 @@ describe("his ultimate, the bullet clock (Eric, Oct 14)", () => {
     expect(RECLUSE_FX.bullet).toBeGreaterThan(4000);
   });
 
-  it("then he adds time per move: 3 moves at 1+0, his moment as the 4th begins, and from then on +2 s a move made in time", async () => {
-    expect(BOSS_POWERS.bulletIncrementSeconds).toBe(2);
+  it("then he adds time per move: 3 moves at 1+0, his moment as the 4th begins, and from then on +10 s a move made in time (Eric, Nov 16: was +2)", async () => {
+    expect(BOSS_POWERS.bulletIncrementSeconds).toBe(10);
     const INC = BOSS_POWERS.bulletIncrementSeconds * 1000;
     const r = alone();
     await untilTurn(r, 7);
@@ -269,7 +269,7 @@ describe("his ultimate, the bullet clock (Eric, Oct 14)", () => {
     let p = r.boss!.powers!;
     expect(p.turn).toBe(10);
     expect(p.events).toEqual([{ kind: "bulletPlus", turn: 10 }]);
-    expect(bulletIncrement(r.boss)).toBe(2);
+    expect(bulletIncrement(r.boss)).toBe(10);
     // (The clock starts after his moment, as after every power's: alone, his move's 0.45 s show and then the moment.)
     expect(RECLUSE_FX.bulletPlus).toBeGreaterThan(2000);
     expect(powerMomentMs(p.events)).toBe(RECLUSE_FX.bulletPlus);
@@ -286,7 +286,7 @@ describe("his ultimate, the bullet clock (Eric, Oct 14)", () => {
       p = r.boss!.powers!;
       // (His moment came once: none since.)
       expect(p.events).toEqual([]);
-      expect(bulletIncrement(r.boss)).toBe(2);
+      expect(bulletIncrement(r.boss)).toBe(10);
     }
     expect(r.player("h0").bankMs).toBe(BANK - 9000 + 3 * INC - 8000);
     // A quick move makes the bank grow, past the bullet bank too: no cap (nothing caps a move below what the bank holds).
@@ -295,7 +295,7 @@ describe("his ultimate, the bullet clock (Eric, Oct 14)", () => {
       await r.score(new Map([["h0", { move: crowdMove(r), thinkMs: 0 }]]));
       await r.playBoss();
     }
-    expect(r.player("h0").bankMs).toBe(BANK - 11_000 + 8 * INC);
+    expect(r.player("h0").bankMs).toBe(BANK - 9000 + 3 * INC - 8000 + 8 * INC);
     expect(r.player("h0").bankMs).toBeGreaterThan(BANK);
     expect(r.allowedMsFor("h0")).toBe(r.player("h0").bankMs + INC);
   });
@@ -303,9 +303,9 @@ describe("his ultimate, the bullet clock (Eric, Oct 14)", () => {
   it("with the increment, running out still loses on time: a move not made in time adds nothing, and empties the bank", async () => {
     const r = alone({ bossPowerTest: "bullet" });
     await untilTurn(r, 2 + BOSS_POWERS.bulletPlainMoves);
-    expect(bulletIncrement(r.boss)).toBe(2);
+    expect(bulletIncrement(r.boss)).toBe(10);
     const allowed = r.allowedMsFor("h0");
-    expect(allowed).toBe(r.player("h0").bankMs + 2000);
+    expect(allowed).toBe(r.player("h0").bankMs + BOSS_POWERS.bulletIncrementSeconds * 1000);
     const ply = r.boards.get(0)!.history.length;
     r.deal();
     await r.score(new Map([["h0", { move: null, thinkMs: allowed }]]));

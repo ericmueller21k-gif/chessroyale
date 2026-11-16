@@ -30,9 +30,10 @@ import { useFrameNow } from "../components/Countdown.tsx";
 import { EvalBar } from "../components/EvalBar.tsx";
 import { UnderBoard } from "../components/QuickChat.tsx";
 import { BossPanel, besideBoard, useBossLayout } from "../components/MovePanel.tsx";
-import type { BossView, GameView, LightsView, RushView } from "../game.ts";
+import type { BossView, DodgeRun, GameView, LightsView, RushView } from "../game.ts";
 import { LightsDock, LightsOutLayer, lightsStatus } from "../components/LightsOut.tsx";
 import { RushLayer, rushBoard, rushDock } from "../components/DashRush.tsx";
+import { DodgeLayer, chandyTurnMoments, dodgeDock, dodgeFen } from "../components/Chandy.tsx";
 import { seenKey, useStillKey } from "../hooks.ts";
 import { Hud } from "./Hud.tsx";
 import { BossDock, Dots } from "../components/BossDock.tsx";
@@ -231,12 +232,13 @@ function ClaimDark({ boss, since, now }: { boss: BossView; since: number; now: n
  * the boss striking down the crowd's worst recent mover, with a flash and the
  * victim's name crossed out.
  */
-export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, loading, afterLoading, lights, rush, fall }: { match: GameView; boss: BossView; until: number; thinking?: boolean; intro?: boolean; loading?: boolean; afterLoading?: boolean; lights?: LightsView; rush?: RushView; fall?: boolean }) {
+export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, loading, afterLoading, lights, rush, dodge, fall }: { match: GameView; boss: BossView; until: number; thinking?: boolean; intro?: boolean; loading?: boolean; afterLoading?: boolean; lights?: LightsView; rush?: RushView; dodge?: DodgeRun; fall?: boolean }) {
   const now = useFrameNow();
   const layout = useBossLayout();
   // (Hollow's Lights out comes before his move, Dash's Scramble Rush after it: as far as the rest of the screen goes, nothing new
   // has moved and no moment plays.)
-  const thinking = thinkingNow || !!lights || !!rush;
+  // (Chandy's Dodge too, as your turn begins: nothing new has moved.)
+  const thinking = thinkingNow || !!lights || !!rush || !!dodge;
   const [mountedAt] = useState(Date.now());
   const victim = boss.justKilled ?? null;
   // The intro: the boss's card over the starting position, the game so far replayed quickly from the start,
@@ -285,7 +287,7 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
   const moments = useMemo(() => {
     if (intro || victim || fall) return [];
     if (mating) return mateMomentsOf(boss, until);
-    if (thinking) return lights || rush ? [] : [earlyLanding(boss), ...yourPulls(boss), ...rookTakenMoment(boss), ...fullMoonMoment(boss), ...folioMoments(boss), ...popOffMoments(boss), ...zebraTurnMoments(boss)].filter((m) => m !== null);
+    if (thinking) return lights || rush || dodge ? [] : [earlyLanding(boss), ...yourPulls(boss), ...rookTakenMoment(boss), ...fullMoonMoment(boss), ...folioMoments(boss), ...popOffMoments(boss), ...zebraTurnMoments(boss), ...chandyTurnMoments(boss)].filter((m) => m !== null);
     return momentsOf(boss, until);
   }, [boss.board.fen, boss.powers?.events.length, until, thinking, intro, victim, mating, fall]);
   // (Moo's daze: he's drawn powered up until its `calm`, noted from the moment's start.)
@@ -418,8 +420,8 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
   // Don Dough's: a piece risen from his dough off its square until the rise's pop.
   const zebra = bounceShown || splitShown || pig || alfil || hopper || smudgy || gardener || revised || timber ? null : zebraFen(boss, moments, now, fenShown);
   // (Dash's Scramble Rush: his sweep, your placements, then the position as it was: the game's never changed.)
-  const boardFen = rush ? rushBoard(boss, rush, now) : (bounceShown ?? splitShown ?? pig?.fen ?? alfil ?? hopper ?? smudgy?.fen ?? gardener?.fen ?? revised?.fen ?? timber?.fen ?? zebra?.fen ?? fenShown);
-  const rushLines = rush ? rushDock(boss, rush, now) : null;
+  const boardFen = dodge ? dodgeFen(boss, fenShown) : rush ? rushBoard(boss, rush, now) : (bounceShown ?? splitShown ?? pig?.fen ?? alfil ?? hopper ?? smudgy?.fen ?? gardener?.fen ?? revised?.fen ?? timber?.fen ?? zebra?.fen ?? fenShown);
+  const rushLines = rush ? rushDock(boss, rush, now) : dodge ? dodgeDock(boss, dodge, now) : null;
   const evalFen = bounceShown && bounceShown !== boss.board.fen ? (boss.powers?.bounce?.before ?? fenShown) : (pig?.evalFen ?? fenShown);
   const jolt = bounceJolt(bounce && now >= bounce.at ? bounce : null, now) ?? boardSawJolt(moment, now) ?? alfilJolt(moment, now);
   // (One or two pieces by name; more, how many: the dock's line stays one line.)
@@ -556,6 +558,7 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
           <Board fen={boardFen} orientation={orientation} turn={view.turn} lastMove={pig?.lastMove ?? revised?.lastMove ?? lastShown} animate={!rush && !bounceShown && !splitStill(split, now) && !pig?.still && !alfil && !hopper && !smudgy?.still} elephants={intro ? undefined : boss.powers?.elephants} gold={intro ? undefined : zebraGold(boss, moments, now)} decor={gardener?.decor ?? (intro ? undefined : boingoDecor(boss, moments, now))} premove={{ key: seatKey(match, boss.board.id, boss.crowdSide), side: boss.crowdSide, watch: !!lights || !!rush || !!loading }}>
             {!intro && <PowerBoard boss={boss} orientation={orientation} moments={moments} now={now} fen={boardFen} />}
             {rush && <RushLayer boss={boss} view={rush} now={now} orientation={orientation} onPlace={(from, to) => match.rushPlace(from, to)} />}
+            {dodge && <DodgeLayer boss={boss} run={dodge} now={now} onPick={(sq) => match.dodgeVote(sq)} />}
             {lights && <LightsOutLayer boss={boss} lights={lights} now={now} orientation={orientation} graceMs={match.settings.lateGraceMs} onTap={(sq) => match.lightsTap(sq)} />}
             {wipPower() && <WipPreview fen={fenShown} orientation={orientation} crowd={boss.crowdSide} />}
             <PowerMoment boss={boss} moment={moment} now={now} orientation={orientation} side={boss.crowdSide} />

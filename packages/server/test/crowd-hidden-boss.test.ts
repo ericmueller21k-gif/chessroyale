@@ -204,8 +204,11 @@ describe("the Crowd's boss final online: always the Hidden Boss (Eric, Oct 14)",
   });
 
   it("his bullet clock online (?power=bullet: from turn 2): each person's deadline is their bank, the bullet bank, with no cap; everyone out of time, he wins on time (the results say so)", () => {
-    // (Nobody picks, on purpose: 50 v 50's AFK rule off, CrowdMisses, as the ?afk=0 switch; it would remove them at the 4th miss.)
-    const L = crowdFinal({ bossPowerTest: "bullet", crowdMisses: null });
+    // (Nobody picks, on purpose: 50 v 50's AFK rule off, CrowdMisses, as the ?afk=0 switch; it would remove them at the 4th miss. The
+    // bots think a little longer than the increment a move, so their banks run down too: at 1+10 (Nov 16) their usual few seconds a
+    // move never would.)
+    const inc = BOSS_POWERS.bulletIncrementSeconds;
+    const L = crowdFinal({ bossPowerTest: "bullet", crowdMisses: null, botThinkSeconds: [inc + 2, inc + 3] });
     let deadline: number | null = null;
     let plus: { allowed: number; bank: number } | null = null;
     for (let i = 0; i < 6000 && L.core.record.phase !== "results"; i++) {
@@ -216,7 +219,7 @@ describe("the Crowd's boss final online: always the Hidden Boss (Eric, Oct 14)",
       if (L.core.record.phase === "play" && round && b.powers?.ultAt !== undefined && id) {
         // The turn it came: every bank was set to the bullet bank; a person's deadline is all of it (no increment yet).
         if (deadline === null && turn === b.powers.ultAt) deadline = round.deadlines[id]! - round.startedAt;
-        // Its first moves played (1+0), each move adds the increment (1+2): the bank and the increment, still no cap.
+        // Its first moves played (1+0), each move adds the increment (1+10): the bank and the increment, still no cap.
         if (plus === null && turn === b.powers.ultAt + BOSS_POWERS.bulletPlainMoves) {
           plus = { allowed: round.deadlines[id]! - round.startedAt, bank: L.core.save().runner!.state.players.find((p) => p.id === id)!.bankMs };
           expect(b.powers.events.some((e) => e.kind === "bulletPlus")).toBe(true);

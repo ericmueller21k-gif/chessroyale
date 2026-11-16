@@ -182,6 +182,18 @@ export interface RushView {
   moved: Record<string, number>;
 }
 
+/**
+ * Chandy's Dodge on this device's clock (online: `local` of the server's start): its key, when it began, the round being voted on, its
+ * counts so far, and your own vote in it. The clones, the teleports as they come and each round's result are in the boss's view.
+ */
+export interface DodgeRun {
+  key: string;
+  at: number;
+  round: number;
+  votes: Record<string, number>;
+  mine?: string;
+}
+
 /** The reveal: your group's picks and scores (same shape the server sends). */
 export type GroupReveal = Pick<BoardRound, "fenBefore" | "bestMove" | "playerIds" | "king" | "kingCalls" | "lastStand"> & {
   result: Pick<BoardRound["result"], "players" | "playedMove" | "drawRule" | "brilliant">;
@@ -229,7 +241,7 @@ export type Phase =
    * the loading step before the intro, while the boss's Maia brain loads (maia-gate.ts): the intro's first frame, held;
    * `afterLoading`: the intro that follows it. `toPhase2` (with `fall`): the Hidden Boss beaten, his phase change next (solo).
    */
-  | { kind: "boss"; boss: BossView; until: number; thinking?: boolean; intro?: boolean; loading?: boolean; afterLoading?: boolean; lights?: LightsView; rush?: RushView; fall?: boolean; toPhase2?: boolean }
+  | { kind: "boss"; boss: BossView; until: number; thinking?: boolean; intro?: boolean; loading?: boolean; afterLoading?: boolean; lights?: LightsView; rush?: RushView; dodge?: DodgeRun; fall?: boolean; toPhase2?: boolean }
   /**
    * The Hidden Boss's phase change (`at`: when it began; PHASE_CHANGE in recluse-phase2.ts): the book's slam, the board
    * split into four, his revive, the Chess960 shuffle; `splitAt`: when the board cracks into four, Date.now()'s clock, where his
@@ -262,7 +274,10 @@ export interface SimulBoardView {
   bankMs: number;
   turnAt: number | null;
   toMove: "crowd" | "boss" | null;
-  result: { winner: "crowd" | "boss" | "draw"; how: "mate" | "time" | "resign" | "stalemate" | "draw" } | null;
+  result: { winner: "crowd" | "boss" | "draw"; how: "mate" | "time" | "resign" | "stalemate" | "draw" | "slow" } | null;
+  /** The player's hearts left (RECLUSE_PHASE2.hearts at the start), and when the last was cut (this device's time), or null. */
+  hearts: number;
+  slashAt: number | null;
 }
 
 /** The Hidden Boss's phase 2 as the screens see it: the four boards, and where the battle stands. */
@@ -279,12 +294,6 @@ export interface SimulView {
   /** Every board is decided (his reaction holds the boards, then the result). */
   decided: boolean;
   beaten: boolean;
-  /** Slow moves so far, the team's (the RECLUSE_PHASE2.slowMovesForUlt-th brings his ultimate). */
-  slow: number;
-  /** The last slow move: on which board (id) and when, or null. */
-  lastSlow: { board: number; at: number } | null;
-  /** When his ultimate came (then every move has ultMoveSeconds, no bank), or null. */
-  ultAt: number | null;
   /**
    * Online: every clock paused since then (this device's time): his move is late from the engine server. Every board shows "He's
    * thinking…", takes no move, and its clock shows where it stood. Missing or null: not paused (solo never is).
@@ -426,6 +435,8 @@ export interface GameView {
   lightsTap(square: string): void;
   /** Dash's Scramble Rush: you put the swept piece that stood on `from` (before his sweep) on `to`, while its countdown is on. */
   rushPlace(from: string, to: string): void;
+  /** Chandy's Dodge: your vote for the king's square in the round on (a later tap replaces it). */
+  dodgeVote(square: string): void;
   /** Quick chat (online matches only; see `enabled`). */
   readonly chat?: MatchChat;
   /** It counts for your ranking (at least 30% real players; never solo). Null or missing: not known (yet). */

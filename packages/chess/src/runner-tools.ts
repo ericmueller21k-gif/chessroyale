@@ -4,7 +4,7 @@ import { recentMoves, type BoardState } from "./boards.ts";
 import { applyMove, gameEnd, legalMoves, sideToMove } from "./rules.ts";
 import type { MoveScore } from "./uci.ts";
 import { humanBrainMove, within, type BrainNote, type HumanEngineLike } from "./boss-brain.ts";
-import { moveLoss, pullsOf, raceAfter, raceAdjust, raceWorth, topEach, type CarrotRace } from "./boss-powers.ts";
+import { moveLoss, pullsOf, raceAfter, raceAdjust, raceWorth, steerPick, topEach, type CarrotRace } from "./boss-powers.ts";
 
 /**
  * The match runner's parts that don't need the runner (runner.ts, which re-exports them): the judge's re-check of close
@@ -420,10 +420,17 @@ export async function bossMoveFrom(
   ahead: BossAhead | null = null,
   race: BossRace | null = null,
   seeded = false,
+  locks: readonly string[] | null = null,
 ): Promise<string> {
   const searched: { top: readonly MoveScore[] } = { top: [] };
   let move = await pickBossMove(engine, fen, elo, nodes, kind, rng, strikeLoss, guard, allowed, brain, searched, seeded);
   const k: BossMoveKind = kind === true ? "stumble" : kind === false ? "elo" : kind;
+  // (Chandy's locks: his ordinary move steered toward them within the margins, from the top moves this search already scored: steerPick.)
+  if (locks?.length && k === "elo" && searched.top.length) {
+    const steered = steerPick(fen, move, searched.top, locks, allowed);
+    if (steered !== move && brain && brain.brain !== "stockfish") brain.onNote?.({ brain: brain.brain, rating: brain.rating, ...(brain.stockfishShare ? { share: brain.stockfishShare } : {}), by: "stockfish", why: "lock" });
+    move = steered;
+  }
   if (race && k === "elo" && searched.top.length) {
     try {
       const check = await raceGuard(engine, fen, move, searched.top, race, guard, allowed);

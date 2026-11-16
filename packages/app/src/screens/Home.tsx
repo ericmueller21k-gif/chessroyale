@@ -675,6 +675,15 @@ export function HomeScreen({
   const inParty = !!pv && !!meId && pv.members.some((m) => m.id === meId) && pv.members.length > 1;
   const leading = inParty && pv!.leaderId === meId;
   const [inviting, setInviting] = useState(false);
+  // A party error ("That party has closed.") is a pop-up: it sits over the screen with an X, and never takes a line
+  // under START (Eric, Nov 16: "They shouldn't ever push anything around on the screen"). Dismissed, it's gone until
+  // the next attempt clears it.
+  const partyErr = !inParty ? (bp?.error ?? bossParty?.error ?? null) : null;
+  const [partyErrGone, setPartyErrGone] = useState(false);
+  useEffect(() => {
+    if (!partyErr) setPartyErrGone(false);
+  }, [partyErr]);
+  const partyNotice: HomeNotice | null = partyErr && !partyErrGone ? { text: partyErr, onDismiss: () => setPartyErrGone(true) } : null;
   const pickTile = (id: string) => {
     setPick(id);
     if (!selectBosses().hidden.some((b) => b.id === id)) rememberBossPick(id);
@@ -964,7 +973,7 @@ export function HomeScreen({
       }
     : undefined;
   const names = (xs: { name: string }[]) => (xs.length > 1 ? `${xs.slice(0, -1).map((x) => x.name).join(", ")} and ${xs.at(-1)!.name}` : (xs[0]?.name ?? ""));
-  const partyLine = !inParty ? (bp?.error ?? bossParty?.error ?? "") : leading ? (waiting.length ? `Waiting for ${names(waiting)} to ready up` : "Everyone's ready.") : `${leaderName} picks the boss and the difficulty.`;
+  const partyLine = !inParty ? "" : leading ? (waiting.length ? `Waiting for ${names(waiting)} to ready up` : "Everyone's ready.") : `${leaderName} picks the boss and the difficulty.`;
   const invite = () => {
     void bossParty?.onInvite().then((ok) => ok && setInviting(true));
   };
@@ -985,7 +994,7 @@ export function HomeScreen({
           <span class="fd-head-spacer" />
         </header>
         {/* (Why you're here: a match that closed while this screen was where you'd come back to, as on home.) */}
-        {notice && <Notice notice={notice} />}
+        {notice ? <Notice notice={notice} /> : partyNotice && <Notice notice={partyNotice} />}
         {/* The character select (Eric, Oct 16): the tiles, the stage; the ways to play under it. */}
         <BossSelect value={pick} difficulty={difficulty} name={name} look={look} onPick={pickTile} onDifficulty={pickDifficulty} onInvite={full || !bossParty ? undefined : invite} party={stage} />
         <div class="rd-options">

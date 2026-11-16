@@ -53,7 +53,7 @@ export interface BrainNote {
    * away too much with the pieces down, swapped for the best of his top moves there); or his race brain did (Chub &
    * Chirp's Carrot Patch: a move better for the race, raceGuard).
    */
-  why?: "not ready" | "failed" | "no answer" | "guard" | "none allowed" | "share" | "strike" | "power" | "replaced" | "landing" | "race";
+  why?: "not ready" | "failed" | "no answer" | "guard" | "none allowed" | "share" | "strike" | "power" | "replaced" | "landing" | "race" | "lock";
 }
 
 /** Within a guard: never more than maxLoss points, nor more than maxLogitLoss log-odds (a couple of points is always fine). */
@@ -166,6 +166,7 @@ export function brainLine(n: BrainNote): string {
     replaced: "pick replaced (not allowed)",
     landing: "landing guard → Stockfish",
     race: "race brain → Stockfish",
+    lock: "lock-on → Stockfish",
   };
   return `${head} · ${why[n.why ?? "no answer"]}${ms}`;
 }

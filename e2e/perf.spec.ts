@@ -316,7 +316,52 @@ test("Sawyer on a slow phone: the split, the board saw and his first saw cut sta
   }
 });
 
-test("the Hidden Boss's phase 2 on a slow phone: the phase change and four boards in play stay within budget", { tag: "@perf" }, async ({ page }) => {
+test("Chandy on a slow phone: his beam's cover and Dodge's scope-in (the blur under a moving mask) stay within budget, the first time they show", { tag: "@perf" }, async ({ page }) => {
+  test.skip(test.info().project.name !== "phone", "one run is enough (the phone, slowed)");
+  test.setTimeout(5 * 60_000);
+  await page.addInitScript(instrument);
+  await asAdmin(page);
+  const cdp = await page.context().newCDPSession(page);
+  const through = async (until: () => Promise<boolean>, ms = 60_000) => {
+    await page.evaluate(() => ((window as any).__perf.frames = []));
+    await expect.poll(until, { timeout: ms }).toBe(true);
+    return frameStats(((await page.evaluate(() => (window as any).__perf.frames.splice(0))) as [number][]).map((f) => f[0]));
+  };
+  const move = async () => {
+    await expect.poll(() => phase(page), { timeout: 60_000 }).toBe("play");
+    const { fen, allowed } = await page.evaluate(() => ({ fen: (window as any).match.phase.board.fen as string, allowed: ((window as any).match.boss?.powers?.allowed ?? null) as string[] | null }));
+    const legal = new Chess(fen).moves({ verbose: true }).filter((m) => !m.captured && !m.promotion && (!allowed || allowed.includes(m.from + m.to)));
+    await page.evaluate((uci) => (window as any).match.submit(uci), legal[0]!.from + legal[0]!.to);
+    await expect.poll(() => phase(page), { timeout: 20_000 }).not.toBe("play");
+  };
+  // (Admins first: his battle from the Boss raid screen's Boss alone, as e2e/chandy.spec.ts.)
+  const battle = async (power: string) => {
+    await cdp.send("Emulation.setCPUThrottlingRate", { rate: 1 });
+    await page.goto(`/?debug&nolanding&clock=60&laststand=0&brain=stockfish&boss=chandy&power=${power}&mode=raid`);
+    await expect(page.getByRole("main").getByRole("button", { name: /^Boss alone/ })).toBeVisible({ timeout: 30_000 });
+    await page.getByRole("main").getByRole("button", { name: /^Boss alone/ }).click();
+    await expect.poll(() => phase(page), { timeout: 60_000 }).toBe("play");
+    await cdp.send("Emulation.setCPUThrottlingRate", { rate: 4 });
+  };
+  // The beam (?power=beam: it lands as your second turn begins): his move, the banner, his shot, the cover over 15 squares.
+  await battle("beam");
+  await move();
+  const beam = await through(() => phase(page).then((p) => p === "play"));
+  expect(await page.evaluate(() => (window as any).match.boss.powers.chandy.beam?.squares.length)).toBe(15);
+  // Dodge (?power=dodge: the warning as your second turn begins, Dodge as your third does): from his move to the vote, the scope-in,
+  // the slide and the blank board opening.
+  await battle("dodge");
+  await move();
+  await move();
+  const scope = await through(() => page.evaluate(() => !!document.querySelector(".cd-root.cd-p-vote")));
+  console.log(`Chandy (slowed phone): beam ${f(beam)}; Dodge's scope-in ${f(scope)}`);
+  for (const [what, s] of [["beam", beam], ["Dodge's scope-in", scope]] as const) {
+    expect(s.p95, `${what}: 95th percentile frame (ms)`).toBeLessThan(50);
+    expect(s.slow, `${what}: share of dropped frames`).toBeLessThan(0.15);
+  }
+});
+
+test("the Hidden Boss's phase 2 on a slow phone: the phase change, four boards in play, his slashes and a board's fade to grey stay within budget", { tag: "@perf" }, async ({ page }) => {
   test.skip(test.info().project.name !== "phone", "one run is enough (the phone, slowed)");
   test.setTimeout(4 * 60_000);
   await page.addInitScript(instrument);
@@ -346,13 +391,30 @@ test("the Hidden Boss's phase 2 on a slow phone: the phase change and four board
   const P = RECLUSE_PHASE2.change;
   await expect.poll(() => page.evaluate(() => !!(window as any).match.simul?.playing), { timeout: 30_000 + P.transform.introMs + 6000 + 15_000 + P.countdownSeconds * 1000 }).toBe(true);
   const change = frameStats((await page.evaluate(() => (window as any).__perf.frames.splice(0))).map((f: [number, number]) => f[0]));
-  // Four boards in play: the bots and he move on theirs (you don't), for eight seconds.
-  await page.waitForTimeout(8000);
+  // Four boards in play: the bots and he move on theirs (you don't), for eight and a half seconds: your move turns slow at 6.5 s, its
+  // heart's slash in it (Nov 16).
+  await page.waitForTimeout(8500);
   const play = frameStats((await page.evaluate(() => (window as any).__perf.frames.splice(0))).map((f: [number, number]) => f[0]));
   const moves = await page.evaluate(() => (window as any).match.simul.boards.reduce((n: number, b: { history: string[] }) => n + b.history.length, 0));
-  console.log(`phase 2 on a 4x-slowed phone: the phase change ${f(change)}; four boards in play ${f(play)}, ${moves} moves`);
+  expect(await page.evaluate(() => (window as any).match.simul.boards[0].hearts), "the slash came in that stretch").toBe(RECLUSE_PHASE2.hearts - 1);
+  // Your last heart: the rest cut first (the admins' trigger), then the last, measured: its slash, his line and your board's slow fade
+  // to grey under "TOO SLOW".
+  const btn = page.getByRole("button", { name: "Lose a heart (testing)" });
+  const hearts = () => page.evaluate(() => (window as any).match.simul.boards[0].hearts as number);
+  while ((await hearts()) > 1) {
+    const n = await hearts();
+    await btn.click();
+    await expect.poll(hearts).toBe(n - 1);
+  }
+  await page.waitForTimeout(RECLUSE_PHASE2.slash.ms + 500);
+  await page.evaluate(() => ((window as any).__perf.frames = []));
+  await btn.click();
+  await page.waitForTimeout(RECLUSE_PHASE2.slash.ms + RECLUSE_PHASE2.slash.greyMs + 200);
+  expect(await page.evaluate(() => (window as any).match.simul.boards[0].result?.how)).toBe("slow");
+  const slash = frameStats((await page.evaluate(() => (window as any).__perf.frames.splice(0))).map((f: [number, number]) => f[0]));
+  console.log(`phase 2 on a 4x-slowed phone: the phase change ${f(change)}; four boards in play ${f(play)}, ${moves} moves; the last heart's slash and the fade ${f(slash)}`);
   expect(moves, "moves played on the bots' boards meanwhile").toBeGreaterThan(4);
-  for (const [what, s] of [["the phase change", change], ["four boards in play", play]] as const) {
+  for (const [what, s] of [["the phase change", change], ["four boards in play, a slash", play], ["the last heart's slash and the fade to grey", slash]] as const) {
     expect(s.p95, `${what}: 95th percentile frame (ms)`).toBeLessThan(50);
     expect(s.slow, `${what}: share of dropped frames`).toBeLessThan(0.15);
   }
