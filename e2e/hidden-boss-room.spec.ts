@@ -276,16 +276,19 @@ test("his room (Eric, Nov 12 and 13): Challenge is 1 of 4; leaving asks; an admi
     expect(fourFrame[sel], `${sel}: as many`).toHaveLength(boxes.length);
     boxes.forEach((b, i) => b.forEach((n, k) => expect(Math.abs(fourFrame[sel]![i]![k]! - n), `${sel} ${i} [${k}]: ${b} -> ${fourFrame[sel]![i]}`).toBeLessThanOrEqual(2)));
   }
-  // (Your board big at the square's bottom, the other three in a row above it, on a computer too since Nov 16: the gaps across equal.)
+  // (Your board big at the square's bottom, the other three in a row above it, on a computer too since Nov 16, spaced evenly across:
+  // measured by their middles, as each board's squares are a whole multiple of 8 device pixels centered in its slot.)
   const gaps = await page.evaluate(() => {
     const sq = document.querySelector(".rc-simul .rc-stage")!.getBoundingClientRect();
     const big = document.querySelector(".rc-simul .rc-big .hb-board")!.getBoundingClientRect();
     const [a, b, c] = [...document.querySelectorAll(".rc-simul .rc-mini .hb-board")].map((m) => m.getBoundingClientRect());
-    return { square: [big.width - big.height, a!.width - a!.height], above: Math.max(a!.bottom, b!.bottom, c!.bottom) - big.top, gaps: [a!.left - sq.left, b!.left - a!.right, c!.left - b!.right, sq.right - c!.right] };
+    return { square: [big.width - big.height, a!.width - a!.height], above: Math.max(a!.bottom, b!.bottom, c!.bottom) - big.top, gaps: [a!.left + a!.width / 2 - sq.left, b!.left + b!.width / 2 - (a!.left + a!.width / 2), c!.left + c!.width / 2 - (b!.left + b!.width / 2), sq.right - (c!.left + c!.width / 2)] };
   });
   for (const d of gaps.square) expect(Math.abs(d), "each board square").toBeLessThanOrEqual(1);
   expect(gaps.above, "the small boards above yours").toBeLessThanOrEqual(0);
-  for (const g of gaps.gaps) expect(Math.abs(g - gaps.gaps[0]!), `the gaps ${gaps.gaps.map(Math.round)}`).toBeLessThanOrEqual(2);
+  // (Middle to middle the same; the outer ones as far from the square's edges as each other.)
+  expect(Math.abs(gaps.gaps[1]! - gaps.gaps[2]!), `the middles ${gaps.gaps.map(Math.round)}`).toBeLessThanOrEqual(2);
+  expect(Math.abs(gaps.gaps[0]! - gaps.gaps[3]!), `the middles ${gaps.gaps.map(Math.round)}`).toBeLessThanOrEqual(2);
   // The scoreboard in phase 2 (Eric's playtest, Nov 14: every row read "out", a phone's Players tab empty): the four on his boards
   // are in, never "out": a computer's table beside the board; a phone's Players tab (the rows its box fits, as in phase 1), and
   // the four in full when it's tapped open. (Each board's result shows on its row as it ends: below.)
