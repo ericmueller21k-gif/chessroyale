@@ -278,16 +278,128 @@ test("50 v 50 Party (Eric, Nov 16): seven + seats; a + opens the friends sheet; 
   await partyShot(ann.page, "5-joined");
   await partyShot(bo.page, "6-member");
 
-  // Ann's Find match: both in one 50 v 50 lobby, the party's seats first; then the match, both on one team.
+  // Ann's Find match: both in one 50 v 50 lobby, the party's seats first. Her Cancel brings both back to idle, out of it (M5).
   await ann.page.getByRole("button", { name: "Find match" }).click();
-  const code = (p: Page) => p.evaluate(() => (window as any).match?.code as string | undefined).catch(() => undefined);
-  await expect.poll(() => code(ann.page)).toBeTruthy();
-  await expect.poll(() => code(bo.page)).toBe(await code(ann.page));
-  await expect(ann.page.getByRole("button", { name: "Cancel" })).toBeVisible();
+  await sameLobby(ann.page, bo.page);
+  await expect(ann.page.getByRole("button", { name: "Cancel" })).toBeEnabled();
   await partyShot(ann.page, "7-searching");
-  const phase = (p: Page) => p.evaluate(() => (window as any).match?.phase.kind ?? "none").catch(() => "none");
-  for (const p of [ann.page, bo.page]) await expect.poll(() => phase(p), { timeout: 30_000 }).toBe("vote");
+  await ann.page.getByRole("button", { name: "Cancel" }).click();
+  for (const p of [ann.page, bo.page]) await expect.poll(() => lobbyOf(p)).toBeUndefined();
+  await expect(ann.page.getByRole("button", { name: "Find match" })).toBeEnabled();
+  await expect(bo.page.getByRole("button", { name: "Waiting for Ann Party" })).toBeDisabled();
+  await expect(bo.page.locator(".fd-queue-mode")).toHaveText("Crowd · 50 v 50 · Party");
+
+  // Find match again: the lobby's party group is the two of them (the server's own, through its test hook), so they play on one
+  // team every time, not by chance. Through the fill and loading the party's screen stays, its Cancel greyed (M4: nothing shifts).
+  await ann.page.getByRole("button", { name: "Find match" }).click();
+  const lobby = await sameLobby(ann.page, bo.page);
+  await expect.poll(() => partyGroups(ann.page, lobby)).toEqual([[ann.id, bo.id].sort()]);
+  await watchFill(ann.page);
+  for (const p of [ann.page, bo.page]) await expect.poll(() => phaseOf(p), { timeout: 30_000 }).toBe("vote");
+  const frames = await ann.page.evaluate(() => (window as any).__fillFrames as { title: string | null; go: string | null }[]);
+  expect(frames.length).toBeGreaterThan(0);
+  expect(new Set(frames.map((f) => `${f.title} · ${f.go}`))).toEqual(new Set(["Crowd · 50 v 50 · Party · Cancel:off"]));
   const teams = await ann.page.evaluate((ids) => ids.map((uid) => (window as any).match.standingsList.find((s: any) => s.uid === uid)?.team), [ann.id, bo.id]);
   expect(teams[0]).toMatch(/^[wb]$/);
   expect(teams[1]).toBe(teams[0]);
+});
+
+/** The lobby a page is in (window.match's code, while that match is still open: the debug hook keeps the last one), if any. */
+const lobbyOf = (p: Page) => p.evaluate(() => ((m) => (m && !m.closed ? (m.code as string) : undefined))((window as any).match)).catch(() => undefined);
+const phaseOf = (p: Page) => p.evaluate(() => (window as any).match?.phase.kind ?? "none").catch(() => "none");
+/** Both pages in one lobby: its code. */
+async function sameLobby(a: Page, b: Page): Promise<string> {
+  await expect.poll(() => lobbyOf(a)).toBeTruthy();
+  const code = (await lobbyOf(a))!;
+  await expect.poll(() => lobbyOf(b)).toBe(code);
+  return code;
+}
+/** The lobby's 50 v 50 party groups, each by its members' accounts (sorted): GET /api/lobby/CODE?parties, a test hook. */
+const partyGroups = (p: Page, code: string) =>
+  p.evaluate((c) => fetch(`/api/lobby/${c}?parties`).then((r) => r.json()).then((b) => ((b.parties ?? []) as string[][]).map((g) => [...g].sort())), code);
+/**
+ * Every frame from the lobby filling until the match leaves the queue: the title and the leader's button (`__fillFrames`), put on
+ * the page before the fill, so the fill's first frame is caught (LESSONS: a moment the server times is watched from inside the page).
+ */
+const watchFill = (p: Page) =>
+  p.evaluate(() => {
+    const w = window as any;
+    w.__fillFrames = [];
+    const tick = () => {
+      const m = w.match;
+      const queued = !!m && (m.phase.kind === "lobby" || m.phase.kind === "loading");
+      if (queued && m.filledAt) {
+        const go = document.querySelector<HTMLButtonElement>(".fd-party-go");
+        w.__fillFrames.push({ title: document.querySelector(".fd-queue-mode")?.textContent ?? null, go: go ? `${go.textContent}:${go.disabled ? "off" : "on"}` : null });
+      }
+      if (!m || queued) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  });
+
+test("50 v 50 Party reloads (the fix round of #747, M2) and the leader leaving mid-search: back in the party and its lobby; the leader keeps the lead; the leader's Cancel recalls a reloaded member; Leave hands the lead on", async ({ browser }) => {
+  test.setTimeout(4 * 60_000);
+  const q = `prl-${test.info().project.name[0]}${Date.now().toString(36).slice(-5)}`;
+  const ann = await player(browser, "Ann Lead");
+  const bo = await player(browser, "Bo Member");
+  await befriend(ann, bo);
+  // (`partyfill`: this party's lobbies fill 45 s after they open, so a member can reload inside one: production's wait is 60 s.)
+  for (const p of [ann.page, bo.page]) await p.goto(`/?nolanding&debug&pool=${q}&partyfill=45`);
+  await pickMode(ann.page, "50 v 50");
+  await ann.page.getByRole("radiogroup", { name: "Matchmaking" }).getByRole("radio", { name: /^Party/ }).click();
+  await ann.page.getByRole("button", { name: "PLAY", exact: true }).click();
+  await expect(ann.page.getByRole("button", { name: "Find match" })).toBeEnabled();
+  // (Bo invited as the friends sheet does it, through the API; he's in from his notice's Accept.)
+  const party = await ann.page.evaluate(() => localStorage.getItem("brc.crowdparty.current"));
+  const invite = await ann.page.evaluate(
+    ([id, code]) => fetch("/api/friends/invite", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ id, kind: "crowdparty", code }) }).then((r) => r.status),
+    [bo.id, party] as const,
+  );
+  expect(invite).toBe(200);
+  await expect(bo.page.locator(".fr-toast")).toContainText("Ann Lead invited you", NEWS);
+  await bo.page.locator(".fr-toast").getByRole("button", { name: "Accept" }).click();
+  const waiting = bo.page.getByRole("button", { name: "Waiting for Ann Lead" });
+  await expect(waiting).toBeDisabled();
+
+  // (c) Ann reloads: back on her party's screen, still its leader; Bo still waits for her.
+  await ann.page.reload();
+  await expect(ann.page.locator(".fd-queue-mode")).toHaveText("Crowd · 50 v 50 · Party");
+  await expect(ann.page.getByRole("button", { name: "Find match" })).toBeEnabled();
+  await expect(waiting).toBeDisabled();
+  await expect(ann.page.locator(".fd-seat.friend")).toHaveCount(1);
+
+  // (a) Bo's app is placed but reloads before it gets into the lobby (its check on the lobby held, then the page reloaded): back in
+  // the party, then in its lobby with Ann, in the party's group.
+  const status = /\/api\/lobby\/[A-Z2-9]{5}$/;
+  await bo.page.route(status, () => undefined);
+  await ann.page.getByRole("button", { name: "Find match" }).click();
+  await expect.poll(() => lobbyOf(ann.page)).toBeTruthy();
+  await expect(bo.page.locator(".fd-queue-mode")).toHaveText("Crowd · 50 v 50 · Party");
+  expect(await lobbyOf(bo.page)).toBeUndefined();
+  await bo.page.unroute(status);
+  await bo.page.reload();
+  const lobby = await sameLobby(ann.page, bo.page);
+  await expect(bo.page.locator(".fd-queue-mode")).toHaveText("Crowd · 50 v 50 · Party");
+  await expect.poll(() => partyGroups(ann.page, lobby)).toEqual([[ann.id, bo.id].sort()]);
+
+  // (b) Bo reloads inside the lobby: back on the party's screen there; Ann's Cancel brings him back to idle, out of the lobby.
+  await bo.page.reload();
+  await expect.poll(() => lobbyOf(bo.page)).toBe(lobby);
+  await expect(bo.page.locator(".fd-queue-mode")).toHaveText("Crowd · 50 v 50 · Party");
+  await expect(waiting).toBeDisabled();
+  await ann.page.getByRole("button", { name: "Cancel" }).click();
+  for (const p of [ann.page, bo.page]) await expect.poll(() => lobbyOf(p)).toBeUndefined();
+  await expect(waiting).toBeDisabled();
+  await expect(bo.page.locator(".fd-queue-mode")).toHaveText("Crowd · 50 v 50 · Party");
+
+  // The leader leaving mid-search: Bo leads, the search goes on (his Cancel), and Ann is home.
+  await ann.page.getByRole("button", { name: "Find match" }).click();
+  const again = await sameLobby(ann.page, bo.page);
+  await ann.page.getByRole("button", { name: "Leave", exact: true }).click();
+  await expect(ann.page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
+  await expect(bo.page.getByRole("button", { name: "Cancel" })).toBeEnabled();
+  expect(await lobbyOf(bo.page)).toBe(again);
+  await bo.page.getByRole("button", { name: "Cancel" }).click();
+  await expect(bo.page.getByRole("button", { name: "Find match" })).toBeEnabled();
+  await expect.poll(() => lobbyOf(bo.page)).toBeUndefined();
 });

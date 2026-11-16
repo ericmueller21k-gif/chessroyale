@@ -54,7 +54,7 @@ import { clockShown } from "./clock-text.ts";
 import { measureSound } from "./sound.ts";
 import { bossMusic, recluseMusic, type MusicBattle } from "./music.ts";
 import { noteWhere } from "./problems.ts";
-import { queuePool, testParams } from "./test-switches.ts";
+import { debugSwitch, queuePool, testParams } from "./test-switches.ts";
 import { evalBarOn, practiceOn } from "./prefs.ts";
 import { noteSoloBattle } from "./boss-tokens.ts";
 import { noteSoloGame, settleSoloXp, soloGameId, soloTestGame } from "./xp.ts";
@@ -1063,7 +1063,7 @@ export function App() {
 
   // ?debug (a test switch): the match, the Squads clients and the 1 v 1 game on `window`, for tests and the console. (Each render, so
   // they're there once your account says you may, and a match joined before that, from a link, is too.)
-  const debug = testParams().has("debug");
+  const debug = debugSwitch();
   // (__kingSay: a God King line on cue, for the layout checks; the roll always lands.)
   if (debug) Object.assign(window as unknown as Record<string, unknown>, { squads, party, duel, __measureSound: measureSound, __kingSay: (cue: KingCue, key: string) => kingSay(cue, key, Date.now(), () => 0), ...(match ? { match } : {}) });
 
@@ -1339,7 +1339,7 @@ export function App() {
     // (Asked for once: home after this match doesn't open the boss menu again.)
     setHomeIntent(null);
     setMatch(m);
-    if (testParams().has("debug")) (window as unknown as { match: GameView }).match = m;
+    if (debugSwitch()) (window as unknown as { match: GameView }).match = m;
   };
 
   /**
