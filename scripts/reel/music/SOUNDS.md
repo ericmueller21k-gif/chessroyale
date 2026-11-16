@@ -364,3 +364,16 @@ time with every note written out: the bass lines, the brass's chords, the tunes,
 - Measured: -16.0 LUFS, peak -1.3 dBFS; the lead about -21 to -22 dB, the bass -21.6, the kick -21; its sections
   within 2 dB of each other; its spectrum within about 1 dB of Chandy's below 1 kHz, 1 to 2 dB under it above.
 - Not handed over yet: on his OK it replaces song_o.py as Folio's theme, or not, as he says.
+
+## The town's solos weren't heard (Nov 16): the cause, passed to the director
+
+Eric: "the piano solos are not firing in the town, I heard 3 individual piano keys played randomly 2 times in 8
+minutes, not one solo ... fires the solos sometimes in the first minute 30 or sometimes later, not every time early
+maybe like 33% of the time, but it should always play a solo before 5 minutes or so of looping".
+- Not a failure to fire, as the code reads: the game plays a solo after three full passes (`TOWN_MUSIC.passesPerSolo`),
+  8:56 after the theme starts, and counts from zero again each time the town's music restarts. Eight minutes is short.
+- The three piano keys are the theme's own: the far-off piano in its last four bars (`LAST` in song_ad.py), about
+  2:53 into each pass.
+- A solo joins only at a pass's end, so "early" means entering the theme late. Its clean entry points: bar 77
+  (141.395349 s in: 37 s of theme, then the solo) and bar 61 (111.627907 s in: 67 s of theme). Sent to the director
+  with the rest; no new audio needed unless those entries sound rough with a fade-in.
