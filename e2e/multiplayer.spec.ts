@@ -1,4 +1,5 @@
 import { devices, expect, type Page } from "@playwright/test";
+import { legalMoves } from "@chessroyale/chess";
 import { createLobbyFromHome, joinFromInvite, named, submitMove, test } from "./helpers.ts";
 
 const phase = (p: Page) => p.evaluate(() => (window as any).match?.phase.kind ?? "none");
@@ -52,10 +53,15 @@ test("two players in a lobby with 30 bots play a whole match; a reload rejoins t
       const k = await phase(p);
       if (k === "results") done.add(name);
       else if (k === "play" && name === "guest" && !usedPowerUp) {
-        // Use a power-up once: the engine's top 3 show up, and the guest plays the first.
+        // Use a power-up once: the engine's top 3 show up, and the guest plays the first. (Every legal move when there
+        // are fewer: a board can start in check with two replies, the Caro-Kann's 5.Nxf6+, about 1 run in 170.)
         usedPowerUp = true;
-        await p.evaluate(() => (window as any).match.usePowerUp());
-        await expect(p.locator(".hints li")).toHaveCount(3, { timeout: 15_000 });
+        const fen = await p.evaluate(() => {
+          const m = (window as any).match;
+          m.usePowerUp();
+          return m.phase.board.fen as string;
+        });
+        await expect(p.locator(".hints li")).toHaveCount(Math.min(3, legalMoves(fen).length), { timeout: 15_000 });
         await p.evaluate(() => (window as any).match.submit((window as any).match.hint[0].move));
       } else if (k === "play") await playBest(p);
       else if (k === "reveal" && name === "guest" && !reloaded) {
