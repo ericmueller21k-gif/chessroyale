@@ -613,6 +613,7 @@
     "the queue and lobbies": {
       "paths": [
         "packages/app/src/screens/Queue.tsx",
+        "packages/app/src/screens/CrowdParty.tsx",
         "packages/app/src/screens/Lobby.tsx",
         "packages/app/src/components/LobbyChat.tsx",
         "packages/server/src/matchmaker.ts",
@@ -625,7 +626,8 @@
         "e2e/matchmaking.spec.ts",
         "e2e/multiplayer.spec.ts",
         "e2e/ranked-1v1.spec.ts",
-        "e2e/squads.spec.ts", "e2e/search-home.spec.ts"
+        "e2e/squads.spec.ts", "e2e/search-home.spec.ts",
+        "e2e/friends.spec.ts"
       ]
     },
     "live counts and the live window": {

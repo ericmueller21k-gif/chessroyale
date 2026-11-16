@@ -219,14 +219,14 @@ test("inside a room, an invite's Join asks first (Eric, Nov 13): Stay keeps you 
   await expect(ann.page.getByRole("heading", { name: /^Lobby [A-Z2-9]{5}$/ })).toBeVisible({ timeout: 20_000 });
   const toast = page.locator(".fr-toast");
   await expect(toast).toContainText("Ann Town invited you", { timeout: 25_000 });
-  await toast.getByRole("button", { name: "Join" }).click();
+  await toast.getByRole("button", { name: "Accept" }).click();
   await expect(leaveDialog(page).locator(".fd-sub")).toHaveText("You'll head back to their game.");
   await still(page, "room-invite");
   await leaveDialog(page).getByRole("button", { name: "Stay" }).click();
   await expect(leaveDialog(page)).toHaveCount(0);
   await expect(room(page)).toHaveAttribute("data-ready", "1");
   await expect(toast).toBeVisible();
-  await toast.getByRole("button", { name: "Join" }).click();
+  await toast.getByRole("button", { name: "Accept" }).click();
   await leaveDialog(page).getByRole("button", { name: "Leave", exact: true }).click();
   await expect(page.getByRole("heading", { name: /^Lobby [A-Z2-9]{5}$/ })).toBeVisible({ timeout: 20_000 });
   await expect(room(page)).toHaveCount(0);

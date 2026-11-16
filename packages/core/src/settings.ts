@@ -712,10 +712,23 @@ export function botLevelMean(id: BotLevelId, yourRating: number | null): number 
 }
 
 /**
- * A 50 v 50 party's people (Eric, Nov 9: queue together into the public 50 v 50 matchmaking, "like Fortnite squads", sides random, ranked):
- * you and up to 7 friends. Not built yet (a later job's matchmaker piece): home shows Party greyed. Unused until then.
+ * A 50 v 50 party's people (Eric, Nov 9 and 16: queue together into the public 50 v 50 matchmaking, on one team, the side drawn at
+ * random): you and up to 7 friends, invited from your friends list (docs/decisions/2026-11-16-crowd-party.md).
  */
 export const CROWD_PARTY_MAX = 8;
+
+/**
+ * A 50 v 50 party's play (the fix round of PR #747, docs/decisions/2026-11-16-crowd-party-fixes.md):
+ * - `ranked`: whether a 50 v 50 with a party of 2 or more friends in it counts for ranking. The director's call until Eric decides
+ *   (his Nov 9 rule assumed friends "won't even be on the same side"): no. XP as usual; the party's screen says so in one line.
+ * - `leadHoldMs`: how long a leader who dropped (a reload, the app in the background) keeps the lead before it passes on.
+ * - `awayStopMs`: a search with nobody in the party connected for this long stops (its ticket is canceled).
+ */
+export const CROWD_PARTY: { ranked: boolean; leadHoldMs: number; awayStopMs: number } = {
+  ranked: false,
+  leadHoldMs: 20_000,
+  awayStopMs: 20_000,
+};
 
 /** 32-bit FNV-1a of a string (a bot's name: its fixed rating). */
 function nameHash(name: string): number {

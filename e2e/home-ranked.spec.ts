@@ -475,7 +475,7 @@ test("home, said once (Eric, Oct 28): no ⓘ; the three options are titles only 
     const group = page.getByRole("radiogroup", { name: "Matchmaking" });
     // Since Nov 9 a title and a short sub line each (Solo queue, Party, Bots), side by side, equal, whole, tappable, and filling the
     // row: the group is as wide as the RANKED row, with the buttons' margins even on both sides.
-    await expect(group.getByRole("radio"), `${at}: the three options`).toHaveText(["Solo queuejoin a lobby", "PartySoon", "Bots99 bots, now"]);
+    await expect(group.getByRole("radio"), `${at}: the three options`).toHaveText(["Solo queuejoin a lobby", "Partyup to 7 friends", "Bots99 bots, now"]);
     for (const r of await group.getByRole("radio").all()) expect(await r.evaluate((e) => e.scrollWidth - e.clientWidth), `${at}: each option whole`).toBeLessThanOrEqual(0);
     const g = (await group.boundingBox())!;
     const ranked = await rect(".fd-ranked");
@@ -503,14 +503,13 @@ test("home, said once (Eric, Oct 28): no ⓘ; the three options are titles only 
     const says: [RegExp, RegExp | string][] = [
       [/^Solo queue/, /^(Starts within \d+ s; bots fill any empty seats|Usually about \d+ s to find a match)$/],
       [/^Bots/, "Start at once with 99 bots"],
+      [/^Party/, "Queue with up to 7 friends"],
     ];
     for (const [pick, line] of says) {
       await group.getByRole("radio", { name: pick }).click();
       await expect(page.locator(".fd-hint"), `${at}: ${pick}`).toHaveText(line);
       await oneLine(String(pick));
     }
-    // (50 v 50's Party: greyed, "Soon", until its matchmaker piece is built; Eric, Nov 9.)
-    await expect(group.getByRole("radio", { name: /^Party/ }), `${at}: Party greyed`).toBeDisabled();
     await group.getByRole("radio", { name: /^Solo queue/ }).click();
     await page.getByRole("radio", { name: /^Squads/ }).click();
     await page.getByRole("radiogroup", { name: "Squads" }).getByRole("radio", { name: /^Party/ }).click();

@@ -331,6 +331,72 @@ export function assignColours(state: MatchState, rng: Rng, whites: number | null
   };
 }
 
+/**
+ * Sides for a 50 v 50's parties (docs/decisions/2026-11-16-crowd-party.md): each party whole on one side, with at most `whites`
+ * players on White and `blacks` on Black among them. A side per party (in `sizes`' order), drawn at random among the ways that fit,
+ * or null when none does. Subset sums over at most 100 seats: tiny.
+ */
+export function packParties(sizes: readonly number[], whites: number, blacks: number, rng: Rng): Side[] | null {
+  const total = sizes.reduce((a, b) => a + b, 0);
+  if (total > whites + blacks || sizes.some((s) => s < 0)) return null;
+  // (A random order, so which parties land together on White is drawn; then the White total, drawn among those that fit.)
+  const order = shuffle(rng, sizes.map((_, i) => i));
+  // can[k][s]: the first k parties of `order` can put exactly s players on White.
+  const can: boolean[][] = [Array.from({ length: whites + 1 }, (_, s) => s === 0)];
+  order.forEach((i, k) => {
+    const prev = can[k]!;
+    can.push(prev.map((ok, s) => ok || (s >= sizes[i]! && prev[s - sizes[i]!]!)));
+  });
+  const fits = can[order.length]!.flatMap((ok, s) => (ok && total - s <= blacks ? [s] : []));
+  if (!fits.length) return null;
+  let s = fits[Math.floor(rng() * fits.length)]!;
+  const sides: Side[] = sizes.map(() => "b");
+  for (let k = order.length; k > 0; k--) {
+    const i = order[k - 1]!;
+    // (Taken on White when the sum couldn't be made without it.)
+    if (!can[k - 1]![s]) {
+      sides[i] = "w";
+      s -= sizes[i]!;
+    }
+  }
+  return sides;
+}
+
+/**
+ * A 50 v 50's sides with parties (`together`: the players of each party, by id): `whites` players on White, each party whole on
+ * one side (packParties), everyone else drawn at random into the seats left. Parties that can't all fit whole (never, as the lobby
+ * takes a party only while they do): the usual draw, assignColours.
+ */
+export function assignTeams(state: MatchState, rng: Rng, whites: number, together: readonly (readonly string[])[]): MatchState {
+  const alive = alivePlayers(state);
+  const ids = new Set(alive.map((p) => p.id));
+  // (Each player in one party at most, and only those still in the match.)
+  const seen = new Set<string>();
+  const parties: string[][] = [];
+  for (const g of together) {
+    const party = g.filter((id) => ids.has(id) && !seen.has(id));
+    party.forEach((id) => seen.add(id));
+    if (party.length) parties.push(party);
+  }
+  const sides = packParties(
+    parties.map((g) => g.length),
+    whites,
+    alive.length - whites,
+    rng,
+  );
+  if (!sides) return assignColours(state, rng, whites);
+  const white = new Set(parties.flatMap((g, i) => (sides[i] === "w" ? g : [])));
+  const rest = shuffle(
+    rng,
+    alive.filter((p) => !seen.has(p.id)),
+  );
+  for (const p of rest.slice(0, Math.max(0, whites - white.size))) white.add(p.id);
+  return {
+    ...state,
+    players: state.players.map((p) => (p.alive ? { ...p, colour: white.has(p.id) ? "w" : "b" } : p)),
+  };
+}
+
 export interface RoundPlayerOutcome {
   playerId: string;
   roundScore: number;

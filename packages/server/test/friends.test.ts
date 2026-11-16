@@ -191,7 +191,7 @@ describe("invites", () => {
     expect((await state(sql, b)).invites).toEqual([]);
     // Friends only: Cy (not a friend) is refused, Ann (a friend) isn't. No one: nobody.
     await setFriendSettings(sql, b, { invites: "friends" });
-    expect((await state(sql, b)).settings).toEqual({ invites: "friends", showOnline: true });
+    expect((await state(sql, b)).settings).toEqual({ invites: "friends", showOnline: true, dnd: false });
     expect(await sendInvite(sql, c, b, "crowd", "LOBBY", false, T0 + 60_000)).toMatchObject({ ok: false, message: FRIEND_TEXT.notTaking });
     await sendRequest(sql, a, b, false, T0);
     await answerRequest(sql, b, a, true, T0);
@@ -347,7 +347,7 @@ describe("the friends API", () => {
     expect((await call(env, a.token, "/api/friends/invite", { id: b.id, kind: "crowd", code: "ABCDE" })).status).toBe(200);
     expect((await call(env, b.token, "/api/friends")).body.state.invites.map((i: { code: string }) => i.code)).toEqual(["ABCDE"]);
     const set = await call(env, b.token, "/api/friends/settings", { invites: "none", showOnline: false });
-    expect(set.body.state.settings).toEqual({ invites: "none", showOnline: false });
+    expect(set.body.state.settings).toEqual({ invites: "none", showOnline: false, dnd: false });
     expect((await call(env, a.token, "/api/friends/invite", { id: b.id, kind: "crowd", code: "ABCDE" })).body.message).toBe(FRIEND_TEXT.notTaking);
     expect((await call(env, a.token, "/api/friends/invite", { id: b.id, check: true })).status).toBe(403);
     // Signing in set up: a guest gets { signIn } and can't act.

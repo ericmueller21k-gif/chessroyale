@@ -209,7 +209,7 @@ export const cancelFriendRequest = (id: string) => act("cancel", { id });
 export const removeFriend = (id: string) => act("remove", { id });
 export const blockPlayer = (id: string) => act("block", { id });
 export const unblockPlayer = (id: string) => act("unblock", { id });
-export const saveFriendSettings = (patch: { invites?: FriendsState["settings"]["invites"]; showOnline?: boolean }) => act("settings", patch);
+export const saveFriendSettings = (patch: { invites?: FriendsState["settings"]["invites"]; showOnline?: boolean; dnd?: boolean }) => act("settings", patch);
 /** Declines an invite to you: off your list (and the toast). */
 export function dismissInvite(inv: InviteEntry) {
   if (toast && inviteKey(toast) === inviteKey(inv)) hideToast();

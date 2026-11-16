@@ -6,6 +6,7 @@ import {
   allowedMs,
   assignColours,
   assignGroups,
+  assignTeams,
   botChoose,
   botPick,
   createMatch,
@@ -16,6 +17,7 @@ import {
   isFinal,
   keepBoards,
   mulberry32,
+  packParties,
   stagePlan,
   standingPoints,
   standings,
@@ -286,6 +288,43 @@ describe("colors per stage", () => {
       expect(ids).toHaveLength(8);
       for (const id of ids) expect(state.players.find((p) => p.id === id)!.colour).toBe(sides.get(b));
     }
+  });
+});
+
+describe("a 50 v 50's parties (Nov 16): each whole on one team", () => {
+  const hundred = Array.from({ length: 100 }, (_, i) => ({ id: `p${i}`, name: `P${i}`, isBot: i > 20, skill: 5 }));
+  const sideOf = (s: MatchState, id: string) => s.players.find((p) => p.id === id)!.colour;
+
+  it("packs parties whole into the sides, or says they can't be", () => {
+    for (let seed = 1; seed <= 30; seed++) {
+      const sizes = [8, 8, 8, 8, 8, 8, 7, 7, 3, 1];
+      const sides = packParties(sizes, 50, 50, mulberry32(seed))!;
+      const on = (side: "w" | "b") => sizes.reduce((n, s, i) => n + (sides[i] === side ? s : 0), 0);
+      expect(on("w")).toBeLessThanOrEqual(50);
+      expect(on("b")).toBeLessThanOrEqual(50);
+    }
+    // Twelve 8s fill 48 a side: a party of 3 fits whole on neither.
+    expect(packParties([...Array(12).fill(8), 3], 50, 50, mulberry32(1))).toBeNull();
+    expect(packParties([51], 50, 50, mulberry32(1))).toBeNull();
+    // The side is drawn: a lone party lands on each over a few seeds.
+    const seen = new Set(Array.from({ length: 20 }, (_, i) => packParties([8], 50, 50, mulberry32(i + 1))![0]));
+    expect(seen).toEqual(new Set(["w", "b"]));
+  });
+
+  it("puts each party on one team, half and half, everyone else drawn", () => {
+    const together = [["p0", "p1", "p2", "p3", "p4", "p5", "p6", "p7"], ["p8", "p9"], ["p10", "p30", "p31"]];
+    for (let seed = 1; seed <= 10; seed++) {
+      const state = assignTeams(createMatch(hundred, [0]), mulberry32(seed), 50, together);
+      expect(state.players.filter((p) => p.colour === "w")).toHaveLength(50);
+      expect(state.players.filter((p) => p.colour === "b")).toHaveLength(50);
+      for (const g of together) expect(new Set(g.map((id) => sideOf(state, id))).size).toBe(1);
+    }
+  });
+
+  it("ignores ids no longer in the match and anyone listed twice", () => {
+    const state = assignTeams(createMatch(hundred.slice(0, 10), [0]), mulberry32(3), 5, [["p0", "p1", "gone"], ["p1", "p2"]]);
+    expect(state.players.filter((p) => p.colour === "w")).toHaveLength(5);
+    expect(sideOf(state, "p0")).toBe(sideOf(state, "p1"));
   });
 });
 

@@ -263,6 +263,8 @@ export class NetMatch implements GameView {
   ranked: boolean | null = null;
   /** Something in it stood on one device's word alone: it pays as a solo game (from the results). */
   unvouched = false;
+  /** You played in a 50 v 50 party of 2 or more friends: yours isn't ranked (from the results). */
+  partied = false;
   /** How you were matched (the queue screen's wording). */
   get queueType(): MatchmakingType {
     return this.botsOff ? "botsoff" : "default";
@@ -436,6 +438,7 @@ export class NetMatch implements GameView {
       return this.emit();
     }
     this.ranked = m.result.ranked;
+    this.partied = !!m.result.partied;
     this.placement = m.result.placement;
     this.leftPlayers = m.result.players;
     // (Crowd 50 v 50's removal for being away is a resign of the server's: the same results, its own words.)
@@ -964,6 +967,7 @@ export class NetMatch implements GameView {
         if (m.standings) this.standingsList = m.standings;
         if (m.ranked !== undefined) this.ranked = m.ranked;
         this.unvouched = !!m.unvouched;
+        this.partied = !!m.partied;
         return this.showResults(m);
     }
   }
