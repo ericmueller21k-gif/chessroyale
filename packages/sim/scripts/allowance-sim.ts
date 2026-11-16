@@ -12,7 +12,7 @@
  * simply to still cut players playing poor, and not punish players not playing precise engine lines or slight
  * variations in the opening 10-14 moves."
  */
-import { CROWD_KNOCKOUTS, CROWD_STAGE_ROUNDS, DEFAULT_SETTINGS, botSkillSpread, modeSettings, mulberry32, shuffle, type FinalFormat, type Settings } from "@chessroyale/core";
+import { CROWD_PRE_REWORK, CROWD_KNOCKOUTS, CROWD_STAGE_ROUNDS, DEFAULT_SETTINGS, botSkillSpread, modeSettings, mulberry32, shuffle, type FinalFormat, type Settings } from "@chessroyale/core";
 import * as chess from "@chessroyale/chess";
 import { MatchRunner, type Opening } from "@chessroyale/chess";
 import { createNodeEngine } from "@chessroyale/chess/node";
@@ -49,7 +49,7 @@ interface MatchRec {
 
 async function run(label: string, matches: number, engineCount: number, nodes: number, format: FinalFormat) {
   const library = JSON.parse(readFileSync(root + "packages/chess/data/openings.json", "utf8")) as Opening[];
-  const settings: Settings = { ...DEFAULT_SETTINGS, ...modeSettings("crowd"), finalFormat: format, knockoutsPerStage: CROWD_KNOCKOUTS[format], engineNodes: nodes };
+  const settings: Settings = { ...DEFAULT_SETTINGS, ...modeSettings("crowd"), ...CROWD_PRE_REWORK, finalFormat: format, knockoutsPerStage: CROWD_KNOCKOUTS[format], engineNodes: nodes };
   mkdirSync(dir, { recursive: true });
   const file = `${dir}${label}.jsonl`;
   writeFileSync(file, "");

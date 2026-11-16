@@ -16,7 +16,7 @@
  */
 import { appendFileSync, mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { DEFAULT_SETTINGS, bestOf, botChoose, botSkillSpread, modeSettings, mulberry32, shuffle, type Settings } from "@chessroyale/core";
+import { CROWD_PRE_REWORK, DEFAULT_SETTINGS, bestOf, botChoose, botSkillSpread, modeSettings, mulberry32, shuffle, type Settings } from "@chessroyale/core";
 import { applyMove, gameEnd, HumanUciEngine, legalMoves, materialSlips, START_FEN } from "@chessroyale/chess";
 import { createNodeEngine } from "@chessroyale/chess/node";
 import type { MatchRow, Ply } from "./crowd-scoring-sim.ts";
@@ -35,7 +35,7 @@ const JUDGE_NODES = 150_000;
  * any scoring, so the later cuts would only measure ties. (The game itself plays on; the report says so.)
  */
 const DECIDED = 0.05;
-const base: Settings = { ...DEFAULT_SETTINGS, ...modeSettings("crowd") };
+const base: Settings = { ...DEFAULT_SETTINGS, ...modeSettings("crowd"), ...CROWD_PRE_REWORK };
 
 async function trace(kind: "maia" | "bots", matches: number, seed: number) {
   mkdirSync(OUT, { recursive: true });

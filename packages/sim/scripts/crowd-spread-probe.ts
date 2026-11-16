@@ -14,7 +14,7 @@
  */
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { CROWD_BOTS, CROWD_START, DEFAULT_SETTINGS, botRatingOf, botSkillSpread, modeSettings, mulberry32, shuffle, type CrowdBotSpread, type Settings } from "@chessroyale/core";
+import { CROWD_PRE_REWORK, CROWD_BOTS, CROWD_START, DEFAULT_SETTINGS, botRatingOf, botSkillSpread, modeSettings, mulberry32, shuffle, type CrowdBotSpread, type Settings } from "@chessroyale/core";
 import { MatchRunner, botRoster, type Opening } from "@chessroyale/chess";
 import { createNodeEngine } from "@chessroyale/chess/node";
 
@@ -37,7 +37,7 @@ interface Turn {
 async function game(seed: number, plies: number, start: string, kind: string, spread: CrowdBotSpread, engine: Awaited<ReturnType<typeof createNodeEngine>>) {
   const settings: Settings = {
     ...DEFAULT_SETTINGS,
-    ...modeSettings("crowd"),
+    ...modeSettings("crowd"), ...CROWD_PRE_REWORK,
     engineNodes: 100_000,
     crowdStart: start as Settings["crowdStart"],
     ...(start === "random" ? { openingMoves: CROWD_START.randomOpeningMoves } : {}),

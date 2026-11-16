@@ -16,7 +16,7 @@
  */
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { BOT_LOBBY, DEFAULT_SETTINGS, botRatingForSkill, botSkillSpread, estimateRating, matchLoss, modeSettings, mulberry32, rawLossTotal, shuffle, type Settings } from "@chessroyale/core";
+import { CROWD_PRE_REWORK, BOT_LOBBY, DEFAULT_SETTINGS, botRatingForSkill, botSkillSpread, estimateRating, matchLoss, modeSettings, mulberry32, rawLossTotal, shuffle, type Settings } from "@chessroyale/core";
 import { MatchRunner, botRoster, type Entrant, type Opening } from "@chessroyale/chess";
 import { createNodeEngine } from "@chessroyale/chess/node";
 
@@ -44,7 +44,7 @@ async function run(kind: string, matches: number, seed0: number, help: string, t
   if (!["before", "tuned", "probe"].includes(kind)) throw new Error(`bots: before | tuned | probe, not ${kind}`);
   mkdirSync(OUT, { recursive: true });
   const engines = await Promise.all(Array.from({ length: 3 }, () => createNodeEngine({ nodes: 100_000, hashMb: 16 })));
-  const settings: Settings = { ...DEFAULT_SETTINGS, ...modeSettings("crowd"), engineNodes: 100_000 };
+  const settings: Settings = { ...DEFAULT_SETTINGS, ...modeSettings("crowd"), ...CROWD_PRE_REWORK, engineNodes: 100_000 };
   const own = help === "own" ? await createNodeEngine({ nodes: 100_000, hashMb: 16 }) : null;
   for (let m = 0; m < matches; m++) {
     const seed = seed0 + m;

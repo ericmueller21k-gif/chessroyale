@@ -8,7 +8,7 @@
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { gunzipSync } from "node:zlib";
 import { fileURLToPath } from "node:url";
-import {
+import { CROWD_PRE_REWORK,
   CROWD_SCORING,
   DEFAULT_SETTINGS,
   applyRound,
@@ -34,7 +34,7 @@ import { spearman } from "../src/stats.ts";
 
 const root = fileURLToPath(new URL("../../../", import.meta.url));
 const OUT = root + "reports/crowd-scoring/";
-const base: Settings = { ...DEFAULT_SETTINGS, ...modeSettings("crowd") };
+const base: Settings = { ...DEFAULT_SETTINGS, ...modeSettings("crowd"), ...CROWD_PRE_REWORK };
 
 /** One recorded ply: the position, the judge's numbers and every pick of the side to move (in player order). */
 export interface Ply {

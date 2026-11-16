@@ -8,7 +8,7 @@
  * Results: reports/crowd-sim.md (the starts: docs/decisions/2026-10-24-opening-vote.md; the cuts:
  * docs/decisions/2026-11-01-crowd-cuts.md).
  */
-import { CROWD_KNOCKOUTS, DEFAULT_SETTINGS, PREGAME_VOTES, botSkillSpread, modeSettings, mulberry32, shuffle, type FinalFormat, type Settings } from "@chessroyale/core";
+import { CROWD_PRE_REWORK, CROWD_KNOCKOUTS, DEFAULT_SETTINGS, PREGAME_VOTES, botSkillSpread, modeSettings, mulberry32, shuffle, type FinalFormat, type Settings } from "@chessroyale/core";
 import { MatchRunner, baseAt, isChess960Fen, type Opening } from "@chessroyale/chess";
 import { createNodeEngine } from "@chessroyale/chess/node";
 import { readFileSync } from "node:fs";
@@ -21,7 +21,7 @@ const startId = args.find((a) => !(a in CROWD_KNOCKOUTS));
 const START = startId ? PREGAME_VOTES.find((v) => v.id === "start")!.options.find((o) => o.id === startId) : undefined;
 if (startId && !START) throw new Error(`No start "${startId}"`);
 const engines = await Promise.all(Array.from({ length: 4 }, () => createNodeEngine({ nodes: 100_000, hashMb: 16 })));
-const settings: Settings = { ...DEFAULT_SETTINGS, ...modeSettings("crowd"), finalFormat: FORMAT, knockoutsPerStage: CROWD_KNOCKOUTS[FORMAT], engineNodes: 100_000 };
+const settings: Settings = { ...DEFAULT_SETTINGS, ...modeSettings("crowd"), ...CROWD_PRE_REWORK, finalFormat: FORMAT, knockoutsPerStage: CROWD_KNOCKOUTS[FORMAT], engineNodes: 100_000 };
 const rhos: number[] = [];
 let bestFinal = 0, top5Final = 0, restarts = 0, plies = 0, finalPlies = 0, finalEndedEarly = 0, decided = 0;
 // Games that ended (and restarted) before the ending, and the plies played before it began.
