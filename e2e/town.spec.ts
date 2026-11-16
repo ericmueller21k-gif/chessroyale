@@ -1367,7 +1367,7 @@ interface RideSeen {
     stepMs: number;
     marks: { side: number; back: number; front: number; drops: number };
     /** ride-sound.ts `rideSoundState`. */
-    sound: { ride: string | null; up: boolean; live: number; loop: unknown[] | null; level: number; rate: number; boings: number; boingsLive: number; decoded: string[] };
+    sound: { ride: string | null; live: number; loop: unknown[] | null; level: number; rate: number; boings: number; boingsLive: number; decoded: string[] };
   };
   others: { id: string; ride: string; color: string; ready: boolean; box: { y0: number; y1: number; fy: number; hy: number } | null; stepMs: number | null }[];
 }
@@ -1578,7 +1578,8 @@ test("rides (Oct 31; Nov 1, every boss's): your pawn sits on its ride, the ride'
   await expect.poll(async () => (await rideNow(page)).you.ready, { message: "your shoes' frames are ready", timeout: 30_000 }).toBe(true);
   expect([(await rideNow(page)).you.ride, (await rideNow(page)).you.stepMs]).toEqual(["cheetah-shoes", 45]);
   // Its moving sound (Nov 14, Eric: "one continuous sound"; RIDE_SOUND): Cheetah Shoes have none, so walking on them is silent; Sawyer's
-  // Dozer plays one looping source from its first step, and standing still it fades out (holdMs, then fadeOutMs) and is let go.
+  // Dozer plays one looping source from its first step, and standing still it stops (holdMs after the last step; a hard stop since
+  // Nov 16, no fade).
   // (Each ride line of the sound log with its time, as the app writes it: ride-sound.ts.)
   const logRides = () =>
     page.evaluate(() => {
@@ -1612,7 +1613,7 @@ test("rides (Oct 31; Nov 1, every boss's): your pawn sits on its ride, the ride'
   // (The first walk may come before the loop is decoded: from here, a walk with it ready.)
   await expect.poll(async () => (await rideNow(page)).you.sound.live, { message: "the first walk's loop let go", timeout: 5_000 }).toBe(0);
   await page.evaluate(() => ((window as unknown as { __rideLog: unknown[] }).__rideLog.length = 0));
-  // Moving: one source, looping 0.1 to 1.1 s, coming up (read as it moves, every 15 ms rather than per frame, so a slow CI frame
+  // Moving: one source, looping 0.1 to 1.1 s (read as it moves, every 15 ms rather than per frame, so a slow CI frame
   // rate (software WebGL: about 4 frames in the walk) still gives enough reads: walking 4 squares takes 360 ms).
   const heard = page.evaluate(
     () =>
@@ -1631,27 +1632,22 @@ test("rides (Oct 31; Nov 1, every boss's): your pawn sits on its ride, the ride'
       }),
   );
   await ride([24, 29]);
-  const during = (await heard) as { ride: string | null; up: boolean; live: number; loop: unknown[] | null }[];
+  const during = (await heard) as { ride: string | null; live: number; loop: unknown[] | null }[];
   // (No count of reads: CI's software WebGL draws only 3 or 4 frames in this walk. What matters: once the loop starts, it plays on
-  // one source for the rest of the walk, never dropping out between steps.)
+  // one source, never two at once. A CI frame longer than RIDE_SOUND.holdMs can stop it for that frame (a phone's never is): then a
+  // read finds none, and the next frame starts it again.)
   expect(during.length, "read while moving").toBeGreaterThan(0);
   expect(Math.max(...during.map((d) => d.live)), "never more than one source").toBe(1);
   const from = during.findIndex((d) => d.live === 1);
   expect(from, "the loop plays as you ride").toBeGreaterThanOrEqual(0);
-  for (const d of during.slice(from)) expect([d.live, d.ride, d.loop]).toEqual([1, "sawyer-dozer", [true, 0.1, 1.1]]);
-  // (Coming up while you ride; a CI frame longer than RIDE_SOUND.holdMs can start the fade for a frame and bring it straight back,
-  // on the same source, so not every read is "up".)
-  expect(during.some((d) => d.up), "coming up as you ride").toBe(true);
-  // Standing still: it fades out (RIDE_SOUND.holdMs after the last step, over the dozer's fadeOutMs) and is let go.
-  await expect.poll(async () => (await rideNow(page)).you.sound, { message: "standing: faded out and let go", timeout: 5_000 }).toMatchObject({ ride: null, live: 0 });
-  const log = await rideLog();
-  // Started once, let go once, after its last fade. (A CI frame longer than holdMs may dip it mid-walk: a fade then "back", on the
-  // same source, never a second start.)
-  const said = log.map(([l]) => l.replace(/:sawyer-dozer$/, ""));
-  expect([said[0], ...said.slice(-2)], "started once, faded, let go").toEqual(["ride:start", "ride:fade", "ride:end"]);
-  expect(said.filter((l) => l === "ride:start" || l === "ride:end"), "one start, one end").toEqual(["ride:start", "ride:end"]);
-  for (let i = 1; i < said.length - 2; i++) if (said[i] === "ride:fade") expect(said[i + 1], "a dip comes straight back").toBe("ride:back");
-  expect(log.at(-1)![1] - log.at(-2)![1], "let go only once the fade is done (700 ms)").toBeGreaterThanOrEqual(700);
+  for (const d of during.slice(from)) expect([[1, "sawyer-dozer", [true, 0.1, 1.1]], [0, null, null]]).toContainEqual([d.live, d.ride, d.loop]);
+  // Standing still: it stops (RIDE_SOUND.holdMs after the last step).
+  await expect.poll(async () => (await rideNow(page)).you.sound, { message: "standing: stopped", timeout: 2_000 }).toMatchObject({ ride: null, live: 0 });
+  const said = (await rideLog()).map(([l]) => l.replace(/:sawyer-dozer$/, ""));
+  // Started, then stopped once you stood: each start its stop (a slow CI frame's stop and start mid-walk come in pairs too).
+  expect(said.length % 2, "each start its stop").toBe(0);
+  said.forEach((l, i) => expect(l, "start, stop, ...").toBe(i % 2 ? "ride:stop" : "ride:start"));
+  expect(said.length, "started as you rode").toBeGreaterThan(0);
   // Boingo's Pogo (Nov 15, Eric: "every time ... you go from one square to the next, it should be a boing"): no loop, a boing a
   // square, its own source each, the 4 in turn. (Counted by step events, so CI's few frames in a walk still give every square's.)
   await wearItem(page, "ride", pogo!);

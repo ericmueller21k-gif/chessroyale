@@ -3719,11 +3719,12 @@ export const RIDES = {
  * to test it"; docs/decisions/2026-11-14-ride-sounds.md). Your own pawn's ride only, only while it moves, and only a ride listed in
  * `rides` (its file is `/sounds/rides/<id>.wav`); standing, nothing. On the game's sounds (the Sound switch, a hidden page). App:
  * `ride-sound.ts`. A ride's `kind`:
- * - `loop` (the dozer): one loop while you move (its file: one loop of exactly 1 s with 0.1 s of itself either side), `fadeInMs` as it
- *   starts, `fadeOutMs` as it stops, at `rate` (its speed and pitch). `level`: its gain on the game's sounds (each loop is -20 dB RMS,
- *   so well under a move's knock). `holdMs`: it counts as moving until this long after your last step (a step is 90 ms), so a turn or
- *   a tap between steps never stops it. `engine`: a ride with `engine: true` starts at `startRate` and comes up to speed over `upMs`;
- *   as it fades out it sinks to `stopRate`. Moving again mid-fade, it comes back up from where it is, at the same pace.
+ * - `loop` (the dozer): one loop while you move (its file: one loop of exactly 1 s with 0.1 s of itself either side), at `rate` (its
+ *   speed and pitch). A hard start and stop (Eric, Nov 16: "forget the fade in and out, it should be a hard start and stop when you
+ *   start moving and stop. Like boingo"; docs/decisions/2026-11-16-ride-sound-hard.md): full level and speed on your first moving
+ *   frame, out once you stop. `level`: its gain on the game's sounds (each loop is -20 dB RMS, so well under a move's knock).
+ *   `holdMs`: it counts as moving until this long after your last moving frame (a step is 90 ms), so a turn or a tap between steps
+ *   never stops it.
  * - `steps` (the pogo; Eric, Nov 15: "get rid of the fade in and fade out ... every time ... you go from one square to the next, it
  *   should be a boing ... they're going to overlap each other, but that's fine"; docs/decisions/2026-11-15-pogo-boings.md): a one-shot
  *   on every square you step, at `level`, the next of its file's boings each time (`boings`: where each starts in the file, s; each
@@ -3733,21 +3734,20 @@ export const RIDES = {
 export const RIDE_SOUND = {
   level: 0.3,
   holdMs: 120,
-  engine: { startRate: 0.8, upMs: 300, stopRate: 0.88 },
   rides: {
-    "sawyer-dozer": { kind: "loop", engine: true, fadeInMs: 60, fadeOutMs: 700, rate: 1 },
-    /** Puddles's Mower: a putter (Eric, Nov 15: "the putter, the second one's good"), an engine as the dozer is. */
-    "puddles-mower": { kind: "loop", engine: true, fadeInMs: 60, fadeOutMs: 700, rate: 1 },
+    "sawyer-dozer": { kind: "loop", rate: 1 },
+    /** Puddles's Mower: a putter (Eric, Nov 15: "the putter, the second one's good"). */
+    "puddles-mower": { kind: "loop", rate: 1 },
     /** The Candy Cane Sled's jingle bells (Eric, Nov 15: "Bells are good to go yes"): four fifths of a jingle bell is above 8 kHz,
      *  so it plays round the softening (`bright`), from a 48 kHz file. */
-    "ginger-sled": { kind: "loop", engine: false, fadeInMs: 60, fadeOutMs: 300, rate: 1, bright: true },
+    "ginger-sled": { kind: "loop", rate: 1, bright: true },
     /** Its loop's 4 boings (its "little tune": low, mid, low, high), cut as in the sample Eric picked (Nov 15: "Yeah, I like A"). */
     "boingo-pogo": { kind: "steps", level: 0.3, boings: [0, 0.245, 0.49, 0.735], lengthS: 0.245, on: "takeoff" },
   } as Readonly<Record<string, RideLoopSound | RideStepSound>>,
 } as const;
 /** A ride whose sound loops while it moves (RIDE_SOUND). */
 /** `bright`: played round the game sounds' 6 kHz softening (sound.ts `gameBus(true)`), for a sound whose highs are the point (a bell). */
-export type RideLoopSound = { readonly kind: "loop"; readonly engine: boolean; readonly fadeInMs: number; readonly fadeOutMs: number; readonly rate: number; readonly bright?: boolean };
+export type RideLoopSound = { readonly kind: "loop"; readonly rate: number; readonly bright?: boolean };
 /** A ride with a one-shot on every step (RIDE_SOUND). */
 export type RideStepSound = { readonly kind: "steps"; readonly level: number; readonly boings: readonly number[]; readonly lengthS: number; readonly on: "takeoff" | "landing" };
 
