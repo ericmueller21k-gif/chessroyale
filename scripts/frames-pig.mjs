@@ -21,7 +21,7 @@ mkdirSync(outDir, { recursive: true });
 const server = await createServer({ root: "packages/app", configFile: "packages/app/vite.config.ts", server: { port: 5198, strictPort: false }, logLevel: "error" });
 await server.listen();
 const url = server.resolvedUrls.local[0];
-const browser = await chromium.launch();
+const browser = await chromium.launch(process.env.PW_CHROMIUM ? { executablePath: process.env.PW_CHROMIUM } : {});
 // (A first visit lets Vite find and bundle the app's dependencies: it reloads the page when it does, which would
 // throw a match back to the home screen.)
 {
@@ -41,6 +41,14 @@ function gif(dir, file, width) {
 
 async function run(name, context) {
   const p = await browser.newPage({ ...context, colorScheme: scheme });
+  // (The first-time walkthrough and the quests overlay would cover home and take the taps: seen, as e2e/helpers.ts sets them.)
+  await p.addInitScript(() => {
+    try {
+      localStorage.setItem("hunchess.tutorial.dismissed", "1");
+      localStorage.setItem("hunchess.quests.seenDay", "9999999999999");
+      localStorage.setItem("hunchess.quests.noPop", "1");
+    } catch {}
+  });
   const errors = [];
   p.on("pageerror", (e) => {
     errors.push(e.message);
@@ -55,9 +63,12 @@ async function run(name, context) {
   await cdp.send("Page.startScreencast", { format: "jpeg", quality: 80, everyNthFrame: 1, ...(name === "phone" ? { maxWidth: 780, maxHeight: 1688 } : {}) });
   await p.goto(`${url}?debug&clock=60&nolanding&boss=pig&power=${power}&laststand=0${sideB ? "&side=b" : ""}`);
   // (Clicked again only if the first tap came before the page was ready: the button is disabled while it loads.)
+  // (Home → Boss Battle → START, as e2e/helpers.ts `bossAloneFromHome`: START skips the old Boss alone menu since Oct 29.)
   for (let i = 0; i < 40 && !(await p.evaluate(() => !!window.match)); i++) {
-    const btn = p.getByRole("main").getByRole("button", { name: "Boss alone" });
-    if (await btn.isEnabled().catch(() => false)) await btn.click().catch(() => undefined);
+    const start = p.getByRole("main").getByRole("button", { name: "START" });
+    const open = p.getByRole("main").getByRole("button", { name: /^Boss Battle/ });
+    if (await start.isEnabled({ timeout: 500 }).catch(() => false)) await start.click({ timeout: 2000 }).catch(() => undefined);
+    else if (await open.isEnabled({ timeout: 500 }).catch(() => false)) await open.click({ timeout: 2000 }).catch(() => undefined);
     await p.waitForTimeout(750);
   }
   const t0 = Date.now();
