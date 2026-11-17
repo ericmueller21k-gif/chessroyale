@@ -39,7 +39,8 @@ round its chorus once more (both leads together), the turnaround, and then the p
 
   bars  1-4    0:00  the band's stabs (Em, D, C, B7), drum breaks between; a run up the B7
   bars  5-12   0:06  the locomotive: the riff over the E pedal
-  bars 13-28   0:18  the verse, twice: the brass, a square wave under it
+  bars 13-28   0:18  the verse, twice: the brass, a square wave under it; the second time (0:30) the riff's low lead
+                     under them with a tune of its own
   bars 29-36   0:41  the pre-chorus: the flute-and-bell's 16ths, climbing to C#7
   bars 37-52   0:53  the chorus (F sharp minor), twice: the second (1:05) an octave up, pads and 16ths under it, and a
                      second synth's own tune over it, the two in thirds for its last five notes
@@ -106,6 +107,14 @@ UNDER_2 = (
     "G4:.5 B4:.5 E5:.5 G5:1 E5:.5 E5:1 | G5:.75 E5:.75 E5:.5 B4:2 | C5:.5 E5:.5 G5:.5 G5:1 G5:.5 E5:1 | G5:.75 E5:.75 E5:.5 C5:1 -:1 | "
     "F#5:.5 G5:.5 B5:.5 C6:1 B5:.5 G5:1 | B5:.75 G5:.75 F#5:.5 D5:1 F#5:.5 G5:.5 | B5:1 F#5:.5 D5:.5 F#5:.5 B5:.5 D6:1 | B5:1.5 B5:.25 G5:.25 E5:.5 D5:.5 B4:1"
 )
+# Under the verse's second time, the riff's low lead again with a tune of its own (Eric, Nov 17: "at like 30 seconds
+# till the different part around 42 seconds add it again but now the deeper tone the song starts with but we don't
+# hear again, but make it quieter than the lead now and make it play another counter melody"): the riff's own notes
+# and push, following the chords; it rests for the band's hits, and its last bar is the riff's seven notes.
+LOW_2 = (
+    "E3:.75 G3:.75 A3:.5 B3:1 A3:.5 G3:.5 | E3:1.5 D3:.5 E3:.5 G3:.5 Bb3:.5 A3:.5 | G3:.75 E3:.75 G3:.5 C4:1 B3:.5 G3:.5 | E3:1.5 G3:.5 A3:.5 B3:.5 -:1 | "
+    "D3:.75 F#3:.75 A3:.5 C4:1 B3:.5 A3:.5 | F#3:1.5 E3:.5 F#3:.5 A3:.5 -:1 | B2:.75 D3:.75 F#3:.5 A3:1 F#3:.5 D3:.5 | E3:1 G3:.5 A3:.5 Bb3:.5 A3:.5 G3:.5 E3:.5"
+)
 # The pre-chorus, a bar a line: 16ths that climb in turns (never a plain ladder: the town's lesson), and an answer.
 RUNS = (
     "C5 E5 G5 E5 G5 B5 C6 B5 G5 B5 E6 C6 E6 G6 E6 C6", "B5:.75 G5:.75 E5:.5 G5:1 -:1",
@@ -144,7 +153,7 @@ RIGHT = (
 # The stabs: where they fall in the bar (16ths), and the fills that take the rest of it (s: snare; h, m, l: toms).
 HITS_A, HITS_B = (0, 3, 6), (0, 3, 6, 9, 12)
 FILLS = ("sshhmmll", "s.sshhml", "hhmmllss", "hmlshmls")
-for _line, _beats in ((RIFF, 8), (RIFF_OUT, 8), (VERSE_1, 32), (UNDER_1, 32), (VERSE_2, 32), (UNDER_2, 32), (CHORUS, 32), (CHORUS_UNDER, 32), (COUNTER, 32),
+for _line, _beats in ((RIFF, 8), (RIFF_OUT, 8), (VERSE_1, 32), (UNDER_1, 32), (VERSE_2, 32), (UNDER_2, 32), (LOW_2, 32), (CHORUS, 32), (CHORUS_UNDER, 32), (COUNTER, 32),
                       (TURN_BRAKES, 15), (TURN_ON, 16), (DREAD, 24), (RIGHT.replace("B4>", "").replace("E6>", "").replace("D6>", "").replace("+", ""), 40)):
     assert beats(_line) == _beats, (_line[:30], beats(_line))
 assert all(len(bar.split()) == 8 for bar in LEFT) and len(LEFT) == 10
@@ -475,8 +484,9 @@ def render(window=None) -> np.ndarray:
                 brass(bar0(first + 2 * j), text, 0.55, 0.2, 12)
         whistle(bar0(first + 6), 6, 0.035, "B4 E5 G5")
 
-    def verse(first, tune, under):
-        """Eight bars: the brass's tune, the square wave under it; the band's two hits ending each phrase."""
+    def verse(first, tune, under, low=None):
+        """Eight bars: the brass's tune, the square wave under it; the band's two hits ending each phrase. `low`: the
+        riff's low lead under them with a tune of its own, quieter than the brass."""
         for j in range(8):
             bar = first + j
             if j % 2 == 1:
@@ -488,6 +498,8 @@ def render(window=None) -> np.ndarray:
                 train(bar)
         crash(bar0(first), 0.05)
         brass(bar0(first), tune), square(bar0(first), under)
+        if low:
+            soar(bar0(first), low, 0.63, -0.2, knee=1100.0)
 
     def pre(first):
         """Eight bars: the flute-and-bell's 16ths and its answers; the guitar's chords held open under them, the kit
@@ -578,7 +590,7 @@ def render(window=None) -> np.ndarray:
         roll(b + 4, 4, 0.06, 0.3)
 
     intro(1), riff(5)
-    verse(13, VERSE_1, UNDER_1), verse(21, VERSE_2, UNDER_2)
+    verse(13, VERSE_1, UNDER_1), verse(21, VERSE_2, UNDER_2, LOW_2)
     pre(29)
     chorus(37), chorus(45, high=True, counter=True)
     turn(53, brakes=True)

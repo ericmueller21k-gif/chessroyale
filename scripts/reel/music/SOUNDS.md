@@ -404,4 +404,9 @@ a style to write in. Its frame is kept (tempo, keys, chords, patches, sections, 
   notes before moving into the next part". 1:05 is the chorus's second time. A second synth (three sawtooths) has its
   own tune there in 8ths, an octave over the lead and moving where the lead holds; for the tune's last five notes it
   takes the lead's rhythm a third above it. The square wave's 16ths are a little softer under it. Sent as v2.
+- His second: "at like 30 seconds till the different part around 42 seconds add it again but now the deeper tone the
+  song starts with but we don't hear again, but make it quieter than the lead now and make it play another counter
+  melody". 0:30 to 0:41 is the verse's second time. The riff's low overdriven lead comes back under it with a tune of
+  its own (the riff's notes and push, following the chords, resting for the band's hits, its last bar the riff
+  itself), about 5 dB under the brass. Sent as v3.
 
