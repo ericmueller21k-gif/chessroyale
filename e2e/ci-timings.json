@@ -28,7 +28,6 @@
   "e2e/chat.spec.ts": { "phone": 0, "desktop": 168 },
   "e2e/colosseum.spec.ts": { "phone": 71, "desktop": 101 },
   "e2e/crate-banner.spec.ts": { "phone": 78, "desktop": 74 },
-  "e2e/crowd-hidden.spec.ts": { "phone": 199, "desktop": 248 },
   "e2e/crowd-scoring.spec.ts": { "phone": 31, "desktop": 32 },
   "e2e/crowd.spec.ts": { "phone": 385, "desktop": 0 },
   "e2e/crowd-play.spec.ts": { "phone": 200, "desktop": 130 },

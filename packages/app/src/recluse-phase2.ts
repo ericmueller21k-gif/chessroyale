@@ -290,7 +290,7 @@ export function phase2Mates(mates: readonly { id: string; name: string }[], boar
  * The result's headline after his phase 2 (QA #12, Nov 14). Where everyone in the match played one of his boards (his room's
  * fight: the four of them), the boards decided it, so the headline is the fight's, as a boss alone's: "Victory!" (every board
  * won) or "Defeated"; the place goes in the line under it ("4th of 4" over "You beat the Hidden Boss on all 4 boards!" read as a
- * loss). A Crowd final's headline stays your place in its crowd, as before (crowd-hidden.spec.ts). Null: the usual headline (no
+ * loss). A Crowd final's headline stays your place in its crowd, as before (unreached since C4). Null: the usual headline (no
  * phase 2, no result, or a crowd beyond the boards). Only what's shown: the placement itself is untouched.
  */
 export function phase2Headline(r: { simul?: { won: number; of: number }; noResult?: string }, totalPlayers: number): "Victory!" | "Defeated" | null {

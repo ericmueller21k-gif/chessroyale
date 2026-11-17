@@ -84,23 +84,6 @@ test("pre-game votes: the cards vote too; the winners set how moves are picked (
   ][result]);
 });
 
-test("team final: the top 8 play 4v4, the weakest on each side go out, everyone is placed", async ({ page }) => {
-  test.setTimeout(10 * 60_000);
-  test.skip(test.info().project.name !== "phone", "one run is enough");
-  await page.goto("/?debug&pace=quick&mode=crowd&format=team&rounds=1&clock=20&finalTurns=30");
-  await soloFromHome(page);
-  const seen = new Set<string>();
-  await playToResults(page, seen, 9);
-  expect(await phase(page)).toBe("results");
-  const f = await page.evaluate(() => (window as any).match.runner.state.final);
-  expect(f.format).toBe("team");
-  // 30 turns: 24 for the 4v4 step, then the first cut (one from each side).
-  expect(f.out.length).toBe(2);
-  const places = await page.evaluate(() => (window as any).match.runner.state.players.map((p: any) => p.placement).sort((a: number, b: number) => a - b));
-  expect(places).toEqual(Array.from({ length: 100 }, (_, i) => i + 1));
-  if (seen.has("final")) await expect(page.locator(".team-result")).toBeVisible();
-});
-
 test("boss raid (solo): you against a boss from the starting position (Eric, Oct 21); the King can strike it", async ({ page }) => {
   test.setTimeout(8 * 60_000);
   test.skip(test.info().project.name !== "phone", "one run is enough");
@@ -350,8 +333,6 @@ test("the God King's Last Stand (solo raid, ?laststand=1): the ?? warning, he ta
   await expect(facts).toContainText("Your chances");
   await expect(page.locator(`.ls-card .mini ${BOARD_SEL.arrowLine}`).first()).toBeAttached();
 });
-
-// (The boss final's two battles, solo and online, are crowd-hidden.spec.ts's: their checks merged there, Nov 2.)
 
 test("Play now: players land in the same lobby, the count climbs, bots fill it and the votes begin", { tag: "@phone-only" }, async ({ browser }) => {
   test.setTimeout(3 * 60_000);
