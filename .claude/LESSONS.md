@@ -62,6 +62,10 @@ Tests check *what* ends up on the screen, not *how it gets there*, nor how long 
 
 ## Measure what's on screen; don't trust a screenshot
 
+- **Lines on the star's seat** (Nov 17, [story](../docs/history/lessons.md#lines-on-the-stars-seat-nov-17-2026)): never draw a
+  masked copy of a drawing in front of a figure to hide part of it: every edge of the copy lands on the figure as a line. Draw the thing
+  once, behind, and clip the figure by a shape whose edge is a line that drawing already has (a ride's `pose.hide`). When a fix moves a
+  seam and Eric sees another, change the structure, not the mask. Check his own look, zoomed 4×, every frame and view.
 - **Purity that didn't match the item** (Oct 6, [story](../docs/history/lessons.md#purity-that-didnt-match-the-item-oct-6-2026)):
   when a number on screen describes a drawing (a purity, a meter, a share), measure the drawing against the number
   over many cases, not one preview. Then add a test that does the same.

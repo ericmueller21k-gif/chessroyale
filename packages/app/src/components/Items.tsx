@@ -3,7 +3,7 @@ import { useEffect, useState } from "preact/hooks";
 import { PAWN_OUTLINE_ON_BLACK, aboveHat, behindPiece, isShiny, secondColor, showsPurity, shownLook, type ItemLook, type ItemSlot } from "@chessroyale/core";
 import { LINE, Region, darken, isLight, lighten, lw, mirror, usePaint as paintIn, type Finish, type Paint } from "./item-paint.tsx";
 
-import type { RiderDraft } from "./rides/kit.ts";
+import { HIDE_ALL, type RiderDraft } from "./rides/kit.ts";
 import { rideCells, useRide } from "./rides/load.ts";
 import type { RideCells } from "../town/ride-cells.ts";
 import { rideScale, scaledAt, scaledSeat, seatAnchor } from "./rides/scale.ts";
@@ -1234,19 +1234,29 @@ export function RideLayers({ id, c, d, finish, side, anim, f, k = 1, children }:
   const a = rideAnchor(c);
   const sized = k === 1 ? undefined : `translate(${a[0]} ${a[1]}) scale(${k}) translate(${-a[0]} ${-a[1]})`;
   const seat = `${p.id}-seat`;
+  // (A ride that hides its rider by a shape of its own, behind its seat's lip, in place of the straight cut: the pose's `hide`.)
+  const hide = d?.pose(anim, f).hide;
   return (
     <g>
       <defs>
         {p.defs}
         {p2.defs}
         <clipPath id={seat}>
-          <rect x="-60" y="-60" width="220" height={60 + cut} />
+          {hide ? <path transform={sized} clip-rule="evenodd" d={`${HIDE_ALL} ${hide}`} /> : <rect x="-60" y="-60" width="220" height={60 + cut} />}
         </clipPath>
       </defs>
       {d ? <g transform={sized}>{d.Back({ p, p2, side, f, anim })}</g> : null}
-      <g class="ride-pawn" transform={`translate(${pawnX} ${pawnY}) rotate(${tilt} 50 88)`}>
-        <g clip-path={d ? `url(#${seat})` : undefined}>{children}</g>
-      </g>
+      {hide ? (
+        <g clip-path={`url(#${seat})`}>
+          <g class="ride-pawn" transform={`translate(${pawnX} ${pawnY}) rotate(${tilt} 50 88)`}>
+            {children}
+          </g>
+        </g>
+      ) : (
+        <g class="ride-pawn" transform={`translate(${pawnX} ${pawnY}) rotate(${tilt} 50 88)`}>
+          <g clip-path={d ? `url(#${seat})` : undefined}>{children}</g>
+        </g>
+      )}
       {d ? <g transform={sized}>{d.Front({ p, p2, side, f, anim })}</g> : null}
     </g>
   );
