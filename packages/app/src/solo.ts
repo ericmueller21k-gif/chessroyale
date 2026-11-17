@@ -1419,7 +1419,8 @@ export class SoloMatch implements GameView {
     if (this.runner.isOver()) return this.finish();
     // (The 50 v 50 rework: its one game over (by the rules or the move limit) ends the match for everyone still in.)
     if (this.runner.endGameIfOver()) return this.finish();
-    // (Out: the rest played out at once; in the 50 v 50 rework you watch it to the podium instead, as online (Spectate, C3).)
+    // (Out: the rest played out at once, your result straight after; in the 50 v 50 rework, once you tap Spectate, you watch it to
+    // the podium instead (C3). Not by default: the bots' game at watch pace can run to move 60, and nothing then needs you.)
     if (!this.you.alive && !this.watchesToEnd()) return void this.simulateRest();
     if (this.runner.boss) {
       // (Testing, ?phase=2: the Hidden Boss's phase 2 at once, from the phase change.)
@@ -1637,9 +1638,9 @@ export class SoloMatch implements GameView {
     });
   }
 
-  /** The 50 v 50 rework (C3): out, you watch the game to its end (the cut screen's Spectate, or the break running out). */
+  /** The 50 v 50 rework (C3): out, you watch the game to its end once you've tapped the cut screen's Spectate. */
   private watchesToEnd(): boolean {
-    return this.settings.mode === "crowd" && !this.settings.raid && !!this.settings.crowdCuts?.length;
+    return this.spectateAsked && this.settings.mode === "crowd" && !this.settings.raid && !!this.settings.crowdCuts?.length;
   }
 
   spectateAsked = false;

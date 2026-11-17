@@ -285,8 +285,9 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
   place and the gap to your team's last one through, "Why was I cut?", a fixed still-in box (each side's count and names, the stages
   to come: `stagesAhead` / `stagesLine`), and at its foot **Spectate** and **Leave the match**, side by side, always both, sticky at the
   bottom, in the same place every cut. Spectating is the watch screen ("you're watching", no premoves): online the server sends a cut
-  player the watching rounds, tallies and reveals (`LobbyCore.spectatorsWatch`); solo plays on before you (`watchesToEnd`), never the
-  fast-forward. Not tapping either spectates once the break ends. The results (`components/Podium.tsx`, mockup `crowd-podium`): the
+  player the watching rounds, tallies and reveals (`LobbyCore.spectatorsWatch`), and not tapping either spectates once the break
+  ends; solo plays on before you once you tap Spectate (`watchesToEnd`), else the rest is played out at once to your result, as
+  before (unit `packages/app/test/solo-cut-out.test.ts`). The results (`components/Podium.tsx`, mockup `crowd-podium`): the
   mode line, how the game ended (`endWords`), the podium (2nd, 1st tallest, 3rd; each player's own dressed pawn, name, points a move;
   "Winner" and "Best player" tags), a fixed best-player line, your row (place, out at move, points a move, RP's spot greyed until
   C5) and the chart of all 100 in a 330 px box that scrolls inside, your row pinned at its foot. Solo the rows' `outAtMove` / `perMove`

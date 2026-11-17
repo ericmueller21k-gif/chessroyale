@@ -11,8 +11,10 @@ FAQ's 50 v 50 section and the landing page's answer, from the rework's settings 
 **Calls made here:**
 - **Spectating is the watch screen** (the live board, the picks coming in, the scoreboard), solo and online: the least new code.
   Online the server now sends a cut player in the rework the team-not-picking's rounds, tallies and reveals (`spectatorsWatch`);
-  before, only boards and standings after each move. Not tapping either button spectates once the break ends; solo, Spectate ends
-  the break now; online it shows "from the next move". Solo no longer fast-forwards the rest in the rework (`watchesToEnd`).
+  before, only boards and standings after each move. Online, not tapping either button spectates once the break ends, and Spectate
+  shows "from the next move". **Solo** watches only once you tap Spectate (it ends the break; `watchesToEnd`); not tapping plays
+  the rest out at once to your result, as before (PR #764's CI: a guest's solo match, missing every move, sat watching the bots'
+  game past account.spec's 3 minutes; nothing in solo should wait on a game you've left).
 - **A narrow phone's top bar** (to 480 px) has about 60 px under "Move 34": "to 34v34" and "1v1 at 43" there (`shortCountdown`;
   "34 v 34 next" was 9 px too wide at 360 px), the full words above.
 - **The out view has no chat box** (it ran under the foot on a phone): chat is the scoreboard's tab while spectating.

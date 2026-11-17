@@ -360,8 +360,9 @@ export interface GameView {
   continueFromBreak(): void;
   /**
    * The 50 v 50 rework's cut screen, out (C3; Eric, Nov 16: "make sure there's a spectate option"): watch to the podium. Solo: the
-   * break ends now and the game plays on before you; online: from the next move (the server's watching rounds). Not tapping it
-   * spectates too, once the break ends. `spectateAsked`: tapped (its button shows it).
+   * break ends now and the game plays on before you (not tapping it: the rest is played out at once, your result straight after);
+   * online: from the next move (the server's watching rounds; not tapping it spectates too, once the break ends). `spectateAsked`:
+   * tapped (its button shows it).
    */
   spectate?(): void;
   readonly spectateAsked?: boolean;
