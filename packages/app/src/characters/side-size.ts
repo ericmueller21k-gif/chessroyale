@@ -79,7 +79,7 @@ export const SIDE_REACH: Readonly<Record<string, readonly [left: number, up: num
   tiger: [31, 89, 31, 2],
   folio: [46, 80, 41, 2],
   timber: [38, 84, 46, 4],
-  dash: [39, 95, 28, 2],
+  dash: [39, 95, 28, 4],
   zebra: [33, 96, 51, 2],
   recluse: [30, 135, 30, 2],
   // (Chandy at rest: his frames with the rifle held level, aiming and firing, lie over the board: OVER_BOARD.)

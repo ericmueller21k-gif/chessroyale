@@ -81,6 +81,20 @@ export const DASH_RUSH_LINES = {
   fail: ["Guess I'll move again. Clearly you weren't paying attention.", "My turn again, bro. Rules are rules.", "Nah, that's not it. I'll take another one, cuz."],
 } as const;
 
+/**
+ * His stall skit (Eric, Nov 17; placeholders for Eric): `slam`, slamming his clock 20 s into your move (a fast-talking cheetah who
+ * hates waiting); `brag`, as his fake second move lands (how slow you are, he can't wait); `jk`, laughing as he takes it back.
+ * One of each a skit, from the battle's start and the move (the same on every screen).
+ */
+export const DASH_STALL_LINES = {
+  slam: ["Bro, I've aged three years. MOVE!", "Cuz, I could've played ten games by now!", "Fam, my fur's going gray over here. Hurry up!"],
+  brag: ["Too slow, broski! I'm just gonna go again.", "You snooze, you lose, fam. My move. Again.", "Can't wait all day, cuz. I'll take your turn."],
+  jk: ["Nahh, jk bro! Put it back, put it back.", "Nahh, I'm playin', fam! Your move.", "Jk, jk! Bro, your FACE though."],
+} as const;
+
+/** His lying-down clock tap (Eric, Nov 17): a bored line as he lies down by your clock (placeholders for Eric). */
+export const DASH_TAP_LINES: readonly string[] = ["Take your time. I'll just lie here.", "Wake me up when you move, bro.", "Comfy down here, cuz. No rush. Kinda rush."];
+
 /** How often each moment speaks: every boss's beats, his slap, his scramble and your flag always. */
 export const DASH_CHANCE: Partial<Record<Beat, number>> = {
   entrance: 1,

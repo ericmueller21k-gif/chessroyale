@@ -925,7 +925,7 @@ export const BOSS_KITS: Record<string, BossKit> = {
   "Dash": {
     artFacesLeft: true,
     barScale: 0.98,
-    barShift: 5,
+    barShift: 6,
     ch: DASH,
     anims: {
       // (His periodic strike on a piece in a raid: his capture's double fist pump.)
@@ -950,6 +950,7 @@ export const BOSS_KITS: Record<string, BossKit> = {
       snap: "dashSnap",
       point: "dashSnap",
       yes: "dashYeah",
+      laugh: "dashLaugh",
       "ta-da": "dashYeah",
       cheer: "dashYeah",
       windup: "dashWhoosh",

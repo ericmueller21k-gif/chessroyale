@@ -1974,6 +1974,7 @@ export const BOSS_POWERS = {
    * a smack with the love line, `loveMs` long. 4.6 s in all: his thinking waits for it, and no one's clock runs meanwhile.
    */
   dashPopOff: { from: 8, to: 20, gap: 6, smacks: 3, hits: 10, hitMs: 70, popMs: 2000, loveMs: 2600 },
+  // (His stall skit and his lying-down clock tap, Nov 17: DASH_STALL and DASH_TAP below BOSS_POWERS.)
   /**
    * Dash's Scramble Rush (Eric, Nov 6; bosses/dash.ts; docs/decisions/2026-11-06-dash-v2.md), once a battle: as a crowd turn
    * begins, from turn `from` on, the first time his rage meter is `atMeter` full (Time Scramble's meter: it comes at full). A
@@ -2146,6 +2147,39 @@ export const HOLLOW_LIGHTS: { readonly colours: readonly { readonly name: string
     { name: "cyan", glass: "#45ecef", shade: "#0f97a3" },
   ],
 };
+
+/**
+ * Dash's stall skit (Eric, Nov 17: "once a game if you take more than 30 seconds to move… he smacks the shit out of the clock for 5
+ * seconds… then at 30 s is when he fake plays… nahh jk bro and he moves his piece back"; docs/decisions/2026-11-17-dash-stall.md).
+ * Once a battle, on a crowd move nobody has finished yet: the slam at slamSeconds of the move's clock (on a bank: Boss alone, a
+ * Boss Battle party) or slamShare of the move's clock (a raid's or a group battle's move clock, 20 s: the director's call, Nov 17),
+ * `slamMs` of hard clock slams; then his fake second move at fakeSeconds or fakeShare, held landMs + bragMs + jkMs + backMs (his
+ * move lands, his brag, "Nahh, jk bro", it slides back). The move's clock stands still through both, for everyone (measured on
+ * the move's own clock, the pauses left out); the board takes no move during the fake move's hold. Not on a move whose clock
+ * can't reach the fake move with marginMs to spare. Until the fake move has come, it stays armed for a later move (the
+ * director's call). `test`: ?power=stall's beats (ms of the move's clock).
+ */
+export const DASH_STALL = {
+  slamSeconds: 20,
+  fakeSeconds: 30,
+  slamShare: 0.5,
+  fakeShare: 0.75,
+  slamMs: 5000,
+  landMs: 450,
+  bragMs: 2100,
+  jkMs: 1600,
+  backMs: 450,
+  marginMs: 2000,
+  test: { slamAt: 1500, fakeAt: 3500 },
+} as const;
+
+/**
+ * Dash's lying-down clock tap (Eric, Nov 17: "once per game he goes down laying down with his chess clock by your clock… and starts
+ * tapping it for a few seconds"): once a battle, as a crowd move begins, from a crowd turn drawn from the battle's seed (`from` to
+ * `to`), the first one with nothing else of his; screen only, `delayMs` after your clock starts, `tapMs` of taps. Your clock keeps
+ * running as ever.
+ */
+export const DASH_TAP = { from: 3, to: 9, delayMs: 900, tapMs: 3000 } as const;
 
 /**
  * The Hidden Boss's phase 2 (Eric, Oct 14; DECISIONS.md, "The Hidden Boss, phase 2"): four boards of Chess960 at once,

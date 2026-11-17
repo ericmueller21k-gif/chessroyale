@@ -27991,3 +27991,24 @@ body.cs-on .mm-scrim {
 .pod-dot.b {
   background: #111;
 }
+
+/* Dash's lying-down clock tap (Eric, Nov 17; DashStall.tsx, DashTap): beside your clock under the board, on the page's top layer,
+   placed once from the clock's time (left, top, size), mirrored when he lies on its left; taking no taps. His figure where he
+   stands is away meanwhile (its place kept). */
+.dash-lie {
+  position: fixed;
+  z-index: 55;
+  pointer-events: none;
+}
+.dash-lie.mirror {
+  transform: scaleX(-1);
+}
+.dash-lie-sprite {
+  display: block;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+}
+body.dash-away .boss-char .boss-char-sprite {
+  visibility: hidden;
+}

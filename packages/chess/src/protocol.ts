@@ -731,6 +731,16 @@ export interface NetBossBrain {
   stockfishShare?: number;
 }
 
+/** Dash's stall skit's beat (the "stall" message; a round's `stall`): the slam, or his fake move `move`, from `at` to `until`. */
+export interface NetStall {
+  beat: "slam" | "fake";
+  at: number;
+  until: number;
+  move?: string;
+  /** The fake move came alone on this move (his slam spent on an earlier one): no slam's pause before it. */
+  alone?: boolean;
+}
+
 export type ServerMessage = { now: number } & (
   | { t: "welcome"; playerId: string; token: string; code: string }
   | {
@@ -791,6 +801,8 @@ export type ServerMessage = { now: number } & (
       increment?: number;
       /** Boss battle: the battle as it stands (the God King's charges, a Last Stand's barred move). */
       boss?: NetBoss;
+      /** Dash's stall skit's beat under way (a reconnect mid-skit; its message: "stall"). Optional: older servers don't send it. */
+      stall?: NetStall;
     }
   /** A human has made their move this round (sent to everyone, for the leaderboard). */
   | { t: "moved"; key: string; playerId: string }
@@ -831,6 +843,12 @@ export type ServerMessage = { now: number } & (
    * player's new deadline, pushed back by that long.
    */
   | { t: "strike"; key: string; calls: number; needed: number; at?: number; until?: number; deadline?: number }
+  /**
+   * Boss battle, Dash's stall skit (Eric, Nov 17; bosses/dash.ts, stallPlan): a beat begins on this move, `at` to `until` (the
+   * slam, or his fake second move `move`, played and taken back): the move clock stands still and `deadline` is this player's
+   * new deadline, pushed back by that long. Sent to everyone in the round, those who have picked too.
+   */
+  | ({ t: "stall"; key: string; deadline: number } & NetStall)
   | {
       t: "reveal";
       key: string;

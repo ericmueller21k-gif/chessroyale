@@ -90,8 +90,8 @@ export interface MomentProps {
 export interface MomentUi {
   /** Its place when several play in one turn (passives first, then the warning, then ultimates). */
   order: number;
-  /** Which of the kit's moments it is. */
-  kit: KitMoment;
+  /** Which of the kit's moments it is. Left out: none (no animation or line of the kit's: Dash's screen-only clock tap). */
+  kit?: KitMoment;
   /**
    * What it means for you, in the dock, only where no banner says it (a moment without a banner, or whose banner has no
    * line under its name). Left out: the dock keeps the turn's own line (the boss's move). Never the power's name: the

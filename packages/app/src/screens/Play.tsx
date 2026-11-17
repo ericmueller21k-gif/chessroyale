@@ -11,7 +11,7 @@ import { EvalBar, knownEval } from "../components/EvalBar.tsx";
 import { kingTurn, turnCues } from "../godKing.ts";
 import { HistoryNav, useHistoryView } from "../components/HistoryNav.tsx";
 import { isCrowdFifty } from "../game.ts";
-import type { BoardView, GameView, StrikeState } from "../game.ts";
+import type { BoardView, GameView, StallState, StrikeState } from "../game.ts";
 import { LOCKED_PHONE, UnderBoard, useMedia } from "../components/QuickChat.tsx";
 import { BossPanel, besideBoard, useBossLayout } from "../components/MovePanel.tsx";
 import { PowerUps } from "../components/PowerUpButton.tsx";
@@ -27,6 +27,7 @@ import { bossKit } from "../characters/kits.ts";
 import { CRITICAL, NORMAL, bossVoice } from "../speech.tsx";
 import { play } from "../sound.ts";
 import { ScrambleCount } from "../components/Dash.tsx";
+import { DashStall, DashTap, frozenWindow, stallBoard, stallHolding, stallOn } from "../components/DashStall.tsx";
 import { duelCount, duelTurn } from "../components/Pig.tsx";
 import { bulletControl, bulletIncrementOn, bulletOn, kingBlocked } from "../components/Recluse.tsx";
 import { WipPreview, wipPower } from "../components/WipPreview.tsx";
@@ -91,6 +92,7 @@ export function PlayScreen({
   clock,
   picked,
   strike,
+  stall,
 }: {
   match: GameView;
   board: BoardView;
@@ -101,6 +103,8 @@ export function PlayScreen({
   clock?: number;
   picked?: string | null;
   strike?: StrikeState;
+  /** Dash's stall skit on this move (DashStall.tsx). */
+  stall?: StallState;
 }) {
   const side = sideToMove(board.fen);
   const waiting = picked !== undefined;
@@ -178,15 +182,20 @@ export function PlayScreen({
     // A Boss Battle party: everyone's pick this turn, live, an arrow in each one's color (yours too).
     ...(partySeats && !waiting && !history.browsing ? (match.livePicks() ?? []).filter((p) => p.at <= now && partySeats[p.playerId] !== undefined).map((p) => ({ move: p.move, brush: partyBrush(partySeats[p.playerId]!) })) : []),
   ];
-  const fen = history.fen ?? moved?.fen ?? shown.fen;
-  const lastMove = history.browsing ? history.lastMove : (moved?.lastMove ?? shown.lastMove);
+  // (Dash's stall skit: his fake second move on the board, until it slides back. DashStall.tsx.)
+  const faked = history.browsing ? null : stallBoard(board.fen, stall, now);
+  const fen = history.fen ?? faked?.fen ?? moved?.fen ?? shown.fen;
+  const lastMove = history.browsing ? history.lastMove : (faked?.lastMove ?? moved?.lastMove ?? shown.lastMove);
+  // (The move's clock stands still through the King's strike and Dash's stall beats: the window it's in, or was last.)
+  const frozen = frozenWindow(strike, stall);
+  const stalling = stallOn(stall, now);
   // Boss battle: the God King striking the boss. The clock stands still and nobody moves until he's gone.
   const striking = !!strike?.at && now < strike.until!;
   // Hollow's dark: the squares covered (their pieces hidden), and how your last attempt into it went.
   const dark = useMemo(() => (match.boss?.powers?.dark ?? []).map((d) => d.square), [match.boss?.powers?.dark?.map((d) => d.square).join()]);
   const note = match.darkNote;
   // (Boss alone, his bulbs: no move of yours while the dark moves for you, nor once the last bulb is out.)
-  const canMove = !waiting && !intro && !shown.replaying && !history.browsing && !striking && !note?.pending && !note?.forced && !note?.blackout;
+  const canMove = !waiting && !intro && !shown.replaying && !history.browsing && !striking && !stallHolding(stall, now) && !note?.pending && !note?.forced && !note?.blackout;
   // His word on each wrong move into the dark (a taunt at random, never the same twice running; Eric, Nov 5), and in Boss
   // alone the dark's move for you and the blackout, each with its sound.
   const strand = match.boss?.powers?.strand;
@@ -292,7 +301,7 @@ export function PlayScreen({
             {note && !note.pending && <DarkCost square={note.move.slice(2, 4)} since={note.at} now={now} orientation={orientation} points={!strand} />}
             {note?.forced && <DarkForced since={note.at} now={now} />}
             {match.boss && wipPower() && <WipPreview fen={fen} orientation={orientation} crowd={match.boss.crowdSide} />}
-            {!waiting && deadline > 0 && <TimerBar startsAt={startsAt} deadline={deadline} total={total} frozen={strike?.at ? { at: strike.at, until: strike.until! } : undefined} />}
+            {!waiting && deadline > 0 && <TimerBar startsAt={startsAt} deadline={deadline} total={total} frozen={frozen} />}
             {/* (Dash's Time Scramble: a scrambled move's big 3-2-1 over the board, taking no taps.) */}
             {match.boss?.id === "dash" && !waiting && deadline > 0 && <ScrambleCount boss={match.boss} startsAt={startsAt} deadline={deadline} />}
             {match.settings.mode === "crowd" && !match.boss && deadline > 0 && <BoardClock match={match} you={you} turn={{ startsAt, deadline, yours: true, done: waiting }} />}
@@ -303,7 +312,9 @@ export function PlayScreen({
                 note={shown.replaying ? (shown.fromStart ? "New board: replaying it from the start" : "Replaying the moves you missed") : null}
               />
             )}
-            {ending && !striking && <CenterCount label="Round end" n={secsLeft} />}
+            {ending && !striking && !stalling && <CenterCount label="Round end" n={secsLeft} />}
+            {match.boss?.id === "dash" && <DashStall boss={match.boss} stall={stall} />}
+            {match.boss?.id === "dash" && <DashTap boss={match.boss} startsAt={waiting ? 0 : startsAt} waiting={waiting} />}
             {godKing && <KingSummon {...godKing} />}
             {command && <KingCommand {...command} />}
             {crowd && waiting && !history.browsing && <LiveGhosts match={match} fen={board.fen} orientation={orientation} />}
@@ -322,16 +333,21 @@ export function PlayScreen({
           command={command ? { mode: "strike", startAt: command.startAt } : undefined}
           nav={{ view: history, total: board.history.length }}
           panel={layout.strip ? <BossPanel match={match} /> : undefined}
-          canCall={!waiting && !intro && !shown.replaying && !striking}
+          canCall={!waiting && !intro && !shown.replaying && !striking && !stallHolding(stall, now)}
           strike={strike}
           // After his Last Stand: the power-ups he left you (the engine's top 3 moves, as in Crowd).
           powerUp={{ enabled: canMove, inUse: hint !== null }}
           // Your clock, at the status box's right: running on your move; once it's in, it holds (DockClock).
-          clock={!waiting && deadline > 0 ? { startsAt, deadline, frozen: strike?.at ? { at: strike.at, until: strike.until! } : undefined } : undefined}
+          clock={!waiting && deadline > 0 ? { startsAt, deadline, frozen } : undefined}
           status={
             striking ? (
               <span>
                 <strong>👑 He strikes the boss!</strong> <span class="muted">Clock stopped.</span>
+              </span>
+            ) : stalling ? (
+              // (Dash's stall skit: the clock stands still for it; DashStall.tsx.)
+              <span>
+                <strong>{stall!.beat === "slam" ? "Hurry up!" : "He moved again?!"}</strong> <span class="muted">Clock stopped.</span>
               </span>
             ) : waiting && alone && picked ? (
               // Alone, your move is simply played: the boss is already thinking about its reply.
