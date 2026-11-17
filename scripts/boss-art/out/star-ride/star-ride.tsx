@@ -1,4 +1,4 @@
-import { Region, LINE, lw, darken, lighten, isLight, type RiderDraft, type RiderProps, type Paint } from "../../item-kit.tsx";
+import { Region, LINE, lw, darken, lighten, isLight, type RiderDraft, type RiderProps, type Paint, type RiderViewDraft } from "../../item-kit.tsx";
 
 // The star lies level in its own plane (X right/forward, Z away from us) and is seen from the town's camera, looking
 // down on it fairly steeply: Z is squashed by K. Its puffy side drops T below the top face.
@@ -232,6 +232,250 @@ function Front({ f, anim }: RiderProps) {
   );
 }
 
+// ---------------------------------------------------------------------------------------------------------------
+// Front and back views: the same star, turned so a point faces the camera (straight down the picture), centered on
+// x 50. In the move it dips toward the way it goes: the plane pitches a few degrees round the pawn's seat, so the face
+// squashes a little more (going away, far side down) or a little less (coming toward us, near side down).
+const VROT = -90;
+const K_AWAY = 0.66; // back view, moving
+const K_TOWARD = 0.745; // front view, moving
+
+const segsFor = (rot: number) => {
+  const vs: V2[] = [];
+  for (let j = 0; j < 10; j++) {
+    const a = (j * Math.PI) / 5 + (rot * Math.PI) / 180;
+    const r = j % 2 ? RI : R;
+    vs.push([r * Math.cos(a), r * Math.sin(a)]);
+  }
+  return vs.map((v, j) => {
+    const e1 = unit(sub(vs[(j + 9) % 10], v));
+    const e2 = unit(sub(vs[(j + 1) % 10], v));
+    const g = Math.acos(e1[0] * e2[0] + e1[1] * e2[1]);
+    const rad = (j % 2 ? RNK : RTK) * R;
+    const d = rad / Math.tan(g / 2);
+    const h = (4 / 3) * Math.tan((Math.PI - g) / 4) * rad;
+    const A = add(v, mul(e1, d));
+    const B = add(v, mul(e2, d));
+    return [A, sub(A, mul(e1, h)), sub(B, mul(e2, h)), B] as V2[];
+  });
+};
+const VSEGS = segsFor(VROT);
+
+function starDV(sc: number, s: number, ox: number, oy: number, k: number, cy: number): string {
+  const pr = (q: V2) => `${n1(50 + ox + (q[0] - ox) * sc)} ${n1(cy + s - (oy + (q[1] - oy) * sc) * k)}`;
+  let d = "";
+  VSEGS.forEach(([A, c1, c2, B], i) => {
+    d += `${i ? " L" : "M"} ${pr(A)} C ${pr(c1)} ${pr(c2)} ${pr(B)}`;
+  });
+  return d + " Z";
+}
+
+interface Geo {
+  k: number;
+  cy: number;
+  tf: number;
+  top: string;
+  sides: string[];
+  dome: { d: string; t: number }[];
+}
+const geoCache = new Map<number, Geo>();
+/** The turned star's paths at squash k, pivoting round the pawn's seat (y BASE) so the pawn stays put. */
+function geo(k: number): Geo {
+  const hit = geoCache.get(k);
+  if (hit) return hit;
+  const cy = BASE - ((BASE - CY) * k) / K;
+  const tf = Math.sqrt(1 - k * k) / Math.sqrt(1 - K * K);
+  const g: Geo = {
+    k,
+    cy,
+    tf,
+    top: starDV(profile(0), 0, 0, 0, k, cy),
+    sides: STEPS.map((s) => starDV(profile(s / T), s * tf, 0, 0, k, cy)),
+    dome: Array.from({ length: 14 }, (_, i) => {
+      const kk = 1 - (i + 1) * 0.055;
+      return { d: starDV(profile(0) * kk, 0, -6, 6, k, cy), t: -0.05 - (i + 1) * 0.022 };
+    }),
+  };
+  geoCache.set(k, g);
+  return g;
+}
+/** A point in the plane at an absolute angle (degrees) and radius, on screen, for the turned star. */
+const atV = (deg: number, r: number, s: number, g: Geo): V2 => {
+  const a = (deg * Math.PI) / 180;
+  return [50 + r * Math.cos(a), g.cy + s - r * Math.sin(a) * g.k];
+};
+
+function StarV({ p, g }: { p: Paint; g: Geo }) {
+  const hex = p.hex;
+  const light = isLight(hex);
+  const nn = parseInt(hex.slice(1), 16);
+  const dark = (0.299 * ((nn >> 16) & 255) + 0.587 * ((nn >> 8) & 255) + 0.114 * (nn & 255)) / 255 < 0.25;
+  const hl = `${p.id}-vstar-hl`;
+  const shade = `${p.id}-vstar-sh`;
+  // the glint where the side's sits in the picture: the back-left, lit from the upper left
+  const [gx, gy] = atV(142, 27, 0, g);
+  return (
+    <g>
+      <defs>
+        <radialGradient id={hl}>
+          <stop offset="0" stop-color="#fff" stop-opacity="0.6" />
+          <stop offset="0.55" stop-color="#fff" stop-opacity="0.22" />
+          <stop offset="1" stop-color="#fff" stop-opacity="0" />
+        </radialGradient>
+        <linearGradient id={shade} x1="1" y1="0" x2="0" y2="0">
+          <stop offset="0" stop-color="#000" stop-opacity="0" />
+          <stop offset="1" stop-color="#000" stop-opacity="0.22" />
+        </linearGradient>
+      </defs>
+      {g.sides.map((d) => (
+        <path key={`o${d}`} d={d} fill="none" {...LINE} {...lw(6)} />
+      ))}
+      <path d={g.top} fill="none" {...LINE} {...lw(6)} />
+      <Region
+        p={p}
+        name="star-side"
+        d={g.sides}
+        outline={false}
+        over={
+          <>
+            {g.sides
+              .map((d, i) => ({ d, u: STEPS[i] / T }))
+              .reverse()
+              .map(({ d, u }) => (
+                <path key={`s${d}`} d={d} fill={tone(hex, (light ? 0.1 : 0.06) + (light ? 0.42 : 0.5) * u ** 1.25)} />
+              ))}
+            <rect x={50 - 60} y={g.cy - 45} width="120" height="100" fill={`url(#${shade})`} />
+          </>
+        }
+      />
+      <Region
+        p={p}
+        name="star-top"
+        d={[g.top]}
+        outline={false}
+        over={
+          <>
+            <path d={g.top} fill={tone(hex, dark ? -0.16 : -0.02)} />
+            {g.dome.map(({ d, t }) => (
+              <path key={`d${d}`} d={d} fill={tone(hex, dark ? t * 1.25 - 0.12 : t)} />
+            ))}
+            <ellipse cx={44} cy={g.cy - 3} rx={30} ry={(16 * g.k) / K} fill={`url(#${hl})`} />
+          </>
+        }
+      />
+      <path d={g.top} fill="none" stroke={darken(hex, 0.55)} stroke-linejoin="round" opacity="0.45" {...lw(1.4)} />
+      <ellipse cx={gx} cy={gy} rx={6} ry={2.2} transform={`rotate(-18 ${n1(gx)} ${n1(gy)})`} fill="#fff" opacity="0.85" />
+      <circle cx={gx + 8} cy={gy - 3.5} r={1.4} fill="#fff" opacity="0.8" />
+    </g>
+  );
+}
+
+/** One spark of the fizz at its age (0 fresh to 2 fading), flying from (ox, oy) along (dx, dy). */
+function fizzSpark(key: number, ox: number, oy: number, dx: number, dy: number, age: number, c: string, r0: number, scale: number) {
+  const dist = 3 + age * 4.5;
+  const r = r0 * scale * (1.1 - age * 0.28);
+  return (
+    <g key={key} opacity={[1, 0.9, 0.55][age]}>
+      <path d={sparkD(ox + dx * dist, oy + dy * dist, r)} fill={c} stroke="#1d1d1f" stroke-linejoin="round" {...lw(1.1)} />
+    </g>
+  );
+}
+
+function viewBack(view: "front" | "back") {
+  return function ViewBack({ p, f, anim }: RiderProps) {
+    const b = bob(anim, f);
+    const g = geo(anim === "move" ? (view === "front" ? K_TOWARD : K_AWAY) : K);
+    const rx = 34 - b * 1.6;
+    const sh = `${p.id}-vstar-shadow`;
+    // front view, moving: the fizz from the two far points, beside the pawn (it may hide some of it)
+    let fizz = null;
+    if (view === "front" && anim === "move") {
+      const tips = [atV(54, VIS - 4, 0, g), atV(126, VIS - 4, 0, g)];
+      fizz = (
+        <>
+          {SPARKS.map((s, i) => {
+            const age = (f - s.born + MOVE_N) % MOVE_N;
+            if (age > 2) return null;
+            const side = i % 2 ? -1 : 1;
+            const [ox, oy] = tips[i % 2];
+            return fizzSpark(i, ox, oy, side * -s.dx * 0.8, -0.5 + s.dy * 0.5, age, s.c, s.r, 2.0);
+          })}
+          {tips.map(([ox, oy], i) => {
+            const hot = f % 2 === i;
+            return (
+              <g key={`h${i}`}>
+                <circle cx={ox} cy={oy} r={hot ? 3.8 : 2.8} fill="#ffe9a0" opacity="0.55" />
+                <circle cx={ox} cy={oy} r={hot ? 2.2 : 1.5} fill="#fffbe6" />
+              </g>
+            );
+          })}
+        </>
+      );
+    }
+    return (
+      <g>
+        <defs>
+          <radialGradient id={sh}>
+            <stop offset="0" stop-color="#1d1d1f" stop-opacity="0.5" />
+            <stop offset="0.6" stop-color="#1d1d1f" stop-opacity="0.32" />
+            <stop offset="1" stop-color="#1d1d1f" stop-opacity="0" />
+          </radialGradient>
+        </defs>
+        <ellipse cx={50} cy={GROUND} rx={rx} ry={4.5 - b * 0.25} fill={`url(#${sh})`} />
+        <g transform={`translate(0 ${n1(-b)})`}>
+          <StarV p={p} g={g} />
+          <ellipse cx={50} cy={BASE - 1} rx={27} ry={4} fill={darken(p.hex, 0.6)} opacity="0.22" />
+          {fizz}
+        </g>
+      </g>
+    );
+  };
+}
+
+/** Back view, moving: the fizz from the point nearest us, small, low in the middle. */
+function BackViewFront({ f, anim }: RiderProps) {
+  if (anim !== "move") return null;
+  const b = bob(anim, f);
+  const g = geo(K_AWAY);
+  const [ox, oy] = atV(-90, VIS - 4, T * 0.4 * g.tf, g);
+  return (
+    <g transform={`translate(0 ${n1(-b)})`}>
+      {SPARKS.map((s, i) => {
+        const age = (f - s.born + MOVE_N) % MOVE_N;
+        if (age > 2) return null;
+        const dy = 0.45 + (0.4 * (-s.dx - 0.55)) / 0.45;
+        return fizzSpark(i, ox, oy, s.dy * 1.1, dy, age, s.c, s.r, 1.9);
+      })}
+      <circle cx={ox} cy={oy} r={f % 2 ? 3.4 : 4.2} fill="#ffe9a0" opacity="0.55" />
+      <circle cx={ox} cy={oy} r={f % 2 ? 1.9 : 2.5} fill="#fffbe6" />
+    </g>
+  );
+}
+
+const viewPose = (anim: "idle" | "move", f: number) => ({
+  dx: 0,
+  dy: 0,
+  pawnX: 0,
+  pawnY: BASE - 88 - bob(anim, f),
+  pawnTilt: 0,
+  cut: 92,
+});
+
+const frontView: RiderViewDraft = {
+  idle: { ms: Array(IDLE_N).fill(170) },
+  move: { ms: Array(MOVE_N).fill(70) },
+  pose: viewPose,
+  Back: viewBack("front"),
+  Front: () => null,
+};
+const backView: RiderViewDraft = {
+  idle: { ms: Array(IDLE_N).fill(170) },
+  move: { ms: Array(MOVE_N).fill(70) },
+  pose: viewPose,
+  Back: viewBack("back"),
+  Front: BackViewFront,
+};
+
 export const starRide: RiderDraft = {
   id: "star-ride",
   name: "Moon's Ride",
@@ -250,4 +494,5 @@ export const starRide: RiderDraft = {
   }),
   Back,
   Front,
+  views: { front: frontView, back: backView },
 };
