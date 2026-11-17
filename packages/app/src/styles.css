@@ -315,6 +315,10 @@ p {
 .hud-stage-text > span {
   white-space: nowrap;
 }
+/* (The 50 v 50's countdown: the full words, or a narrow phone's short ones below.) */
+.hud-stage-text .cd-short {
+  display: none;
+}
 @media (max-width: 480px) {
   .screen .hud-row {
     gap: 6px;
@@ -358,6 +362,12 @@ p {
   }
   .hud-stage-text > .muted {
     font-size: 11px;
+  }
+  .hud-stage-text .cd-long {
+    display: none;
+  }
+  .hud-stage-text .cd-short {
+    display: inline;
   }
   .hud-dot {
     display: none;
@@ -7553,6 +7563,145 @@ body:has([aria-modal="true"]:not(#rotate-lock), .mm-scrim) > .dk-plus {
   width: auto;
   min-height: 0;
   padding: 10px 22px;
+}
+/* The 50 v 50 rework's cut screen, out (C3; mockup crowd-cut): a smaller gavel and grid, then the verdict, why, the still-in box
+   and the foot (Spectate | Leave the match), each in its box from the first frame: the gavel's verdict fades in, nothing moves. */
+.crowd-cut.judge.out .judge-stage,
+.crowd-cut.judge.out .gavel-piece {
+  height: 52px;
+}
+.crowd-cut.judge.out .gavel-piece {
+  width: 52px;
+}
+.crowd-cut.judge.out .pawn-grid {
+  width: min(100%, 300px);
+}
+.cut-outview {
+  /* (A computer's window is wide: the column a phone has, centered.) */
+  width: min(100%, 560px);
+  align-self: center;
+  flex: 1 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  text-align: left;
+}
+.cut-outview > :not(.co-foot) {
+  opacity: 0;
+  transition: opacity 0.35s;
+}
+.cut-outview.on > :not(.co-foot) {
+  opacity: 1;
+}
+.co-title {
+  margin: 0;
+  text-align: center;
+  font-size: 24px;
+  font-weight: 900;
+  line-height: 1.15;
+}
+.co-sub {
+  margin: -6px 0 0;
+  text-align: center;
+  font-size: 14px;
+}
+.co-why {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 46px;
+  padding: 0 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 15px;
+}
+.co-why:disabled {
+  opacity: 0.45;
+}
+.co-still {
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+}
+.co-still-line {
+  margin: 0 0 8px;
+  font-size: 14px;
+  line-height: 1.35;
+  /* Three lines, always: the box keeps its height from cut to cut. */
+  height: calc(3 * 1.35em);
+  overflow: hidden;
+}
+.co-sides {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.co-side {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: 7px 10px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--text) 6%, transparent);
+}
+.co-side-name {
+  font-size: 14px;
+  font-weight: 700;
+}
+.co-names {
+  font-size: 12px;
+  line-height: 1.35;
+  height: calc(2 * 1.35em);
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow-wrap: anywhere;
+}
+/* The foot: at the screen's bottom (on a short phone it stays there as the screen scrolls), the same place every cut. */
+.co-foot {
+  position: sticky;
+  bottom: 0;
+  margin-top: auto;
+  padding: 8px 0 calc(env(safe-area-inset-bottom) + 2px);
+  background: var(--bg);
+}
+.co-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.co-buttons .btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-height: 58px;
+  padding: 6px 8px;
+  white-space: nowrap;
+}
+.co-btn-main {
+  font-size: 17px;
+  font-weight: 800;
+}
+.co-btn-sub {
+  font-size: 12px;
+  font-weight: 500;
+  opacity: 0.85;
+}
+.co-spectate.on {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 45%, transparent);
+}
+.co-note {
+  margin: 6px 0 0;
+  text-align: center;
 }
 .cut-out .cut-name.more {
   text-decoration: none;
@@ -27610,4 +27759,233 @@ body.cs-on .mm-scrim {
 }
 .cd-hits i.on {
   background: #ff3f5e;
+}
+
+/* ---- The 50 v 50 rework's results (C3; mockup crowd-podium): the podium, the best player's line, your row and the chart ----
+   Every box has a fixed size, so nothing moves as names, tags and rows fill in (Eric's rules). */
+.podium {
+  /* (A computer's window is wide: the column a phone has, centered.) */
+  width: min(100%, 560px);
+  align-self: center;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.pod-mode {
+  margin: 0;
+  font-size: 14px;
+}
+.podium .pod-head {
+  margin: 0;
+  /* (Clear of the gear in the corner: "Black wins on the judge's verdict" is the longest.) */
+  padding: 0 34px;
+  font-size: 24px;
+  line-height: 1.15;
+}
+.pod-sub {
+  margin: -6px 0 0;
+  min-height: 1.3em;
+  font-size: 14px;
+}
+.pod-steps {
+  display: grid;
+  grid-template-columns: 1fr 1.1fr 1fr;
+  align-items: end;
+  gap: 8px;
+  margin-top: 4px;
+}
+/* (Every step has the same rows: two tags' room, the pawn, the name, the points, the block; each row its column's width.) */
+.pod-step {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: 42px 60px 22px 18px auto;
+  justify-items: center;
+  align-items: end;
+  min-width: 0;
+}
+/* (One player can be Winner and Best player: the tags stack.) */
+.pod-tags {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  max-width: 100%;
+}
+.pod-tag {
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.pod-tag.win {
+  background: #f4b740;
+  color: #1a1406;
+}
+.pod-tag.best {
+  background: #3b82f6;
+  color: #fff;
+}
+.pod-pawn {
+  width: 56px;
+  height: 56px;
+}
+.pod-pawn svg {
+  width: 100%;
+  height: 100%;
+}
+.pod-name {
+  width: 100%;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+  font-weight: 700;
+}
+.pod-pts {
+  font-size: 12px;
+  white-space: nowrap;
+}
+.pod-block {
+  width: 100%;
+  margin-top: 4px;
+  display: grid;
+  place-items: start center;
+  padding-top: 6px;
+  border-radius: 10px 10px 0 0;
+  font-size: 30px;
+  font-weight: 900;
+  color: rgba(0, 0, 0, 0.45);
+}
+.pod-1 .pod-block {
+  height: 96px;
+  background: linear-gradient(#f6c75a, #d99c1c);
+}
+.pod-2 .pod-block {
+  height: 68px;
+  background: linear-gradient(#dfe3ea, #a9b0bd);
+}
+.pod-3 .pod-block {
+  height: 48px;
+  background: linear-gradient(#e2a06c, #b56f3d);
+}
+.pod-best {
+  margin: 0;
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pod-star {
+  color: #3b82f6;
+}
+.pod-you {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 12px;
+  min-height: 64px;
+  padding: 8px 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  text-align: left;
+}
+.pod-you-place {
+  font-size: 24px;
+  font-weight: 900;
+}
+.pod-you-mid {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  font-size: 14px;
+}
+.pod-you-mid > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pod-rp {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  color: var(--muted);
+  opacity: 0.55;
+}
+.pod-rp strong {
+  font-size: 18px;
+}
+/* The chart of all 100: a fixed box that scrolls inside, the title and columns at its top, your row pinned at its foot. */
+.pod-chart {
+  position: relative;
+  height: 330px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  text-align: left;
+}
+.pod-row {
+  display: grid;
+  grid-template-columns: 34px 16px 1fr 56px 48px;
+  align-items: center;
+  gap: 6px;
+  height: 38px;
+  padding: 0 12px;
+  border-top: 1px solid var(--line);
+  font-size: 14px;
+  background: var(--surface);
+}
+.pod-row.pod-title {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  grid-template-columns: 1fr auto;
+  border-top: 0;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.pod-row.pod-cols {
+  position: sticky;
+  top: 38px;
+  z-index: 2;
+  height: 30px;
+  font-size: 12px;
+}
+.pod-row.you {
+  position: sticky;
+  top: 68px;
+  bottom: 0;
+  z-index: 1;
+  background: color-mix(in srgb, var(--accent) 22%, var(--surface));
+  font-weight: 700;
+}
+.pod-player {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pod-num,
+.pod-right {
+  text-align: right;
+}
+.pod-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 1.5px solid var(--muted);
+}
+.pod-dot.w {
+  background: #f1f1f1;
+}
+.pod-dot.b {
+  background: #111;
 }

@@ -2964,9 +2964,11 @@ export class LobbyCore {
     const inRound = new Set(playing.map((h) => h.id));
     const crowd = this.settings.mode === "crowd";
     const bossNow = runner.boss ? this.bossViewSent() : undefined;
+    // (The 50 v 50 rework, C3: a player cut watches to the podium, the live board as the team not picking sees it: Spectate.)
+    const spectators = this.spectatorsWatch();
     for (const h of this.r.humans) {
       // Crowd 50 v 50: the team not picking still gets the board, to watch the vote come in.
-      const watching = crowd && !final && alive.has(h.id) && !inRound.has(h.id);
+      const watching = crowd && !final && (alive.has(h.id) || spectators) && !inRound.has(h.id);
       const board = inRound.has(h.id) ? runner.boardOf(h.id) : watching ? runner.boards.get(runner.state.boards[0]!)! : null;
       this.send(h.id, {
         t: "round",
@@ -2988,7 +2990,7 @@ export class LobbyCore {
         ...(bossNow ? { boss: bossNow } : {}),
       });
       if (final) this.send(h.id, { t: "final", final: runner.finalView()!, standings: st, slots: this.slots() }, !inRound.has(h.id));
-      else if (!alive.has(h.id)) this.sendSpectate(h.id);
+      else if (!alive.has(h.id) && !watching) this.sendSpectate(h.id);
     }
     if (this.judging()) this.planJudges(key, crowd && !final);
     else if (this.r.hostId) {
@@ -3054,6 +3056,15 @@ export class LobbyCore {
   /** Every board slot, for the strip of tiny boards. */
   private slots() {
     return boardSlots(this.runner!.boards, this.runner!.state.boards);
+  }
+
+  /**
+   * The 50 v 50 rework (C3; the design's rule 8, Eric, Nov 16: "make sure there's a spectate option"): a player cut watches the
+   * game to its end as the team not picking does, the live board, the picks coming in and each reveal, until they leave. Before
+   * it (and in every other mode) a player out got the boards and standings only (sendSpectate).
+   */
+  private spectatorsWatch(): boolean {
+    return this.settings.mode === "crowd" && !this.settings.raid && !!this.settings.crowdCuts?.length;
   }
 
   private sendSpectate(id: string) {
@@ -3227,7 +3238,7 @@ export class LobbyCore {
     for (const h of this.r.humans) {
       const alive = runner.player(h.id)?.alive;
       // (A party sees its teammates' picks as they happen, before picking too: Eric, Oct 30.)
-      if (!alive || (playing.has(h.id) && !this.doneThisRound(h.id) && !this.r.party)) continue;
+      if ((!alive && !this.spectatorsWatch()) || (playing.has(h.id) && !this.doneThisRound(h.id) && !this.r.party)) continue;
       this.send(h.id, { t: "tally", key: round.key, picks }, false);
     }
   }
@@ -3404,7 +3415,8 @@ export class LobbyCore {
     const slots = this.slots();
     for (const h of this.r.humans) {
       // Crowd: everyone still in sees the one board's vote, whether or not their team picked this turn.
-      const mine = report.boards.find((b) => b.playerIds.includes(h.id)) ?? (this.settings.mode === "crowd" && runner.player(h.id).alive ? report.boards[0] : undefined);
+      // (The 50 v 50 rework: those cut too, watching to the podium: spectatorsWatch.)
+      const mine = report.boards.find((b) => b.playerIds.includes(h.id)) ?? (this.settings.mode === "crowd" && (runner.player(h.id).alive || this.spectatorsWatch()) ? report.boards[0] : undefined);
       const score = mine ? byBoard.get(mine.boardId) : undefined;
       this.send(h.id, {
         t: "reveal",

@@ -7,7 +7,7 @@ import { useMedia } from "../components/QuickChat.tsx";
 import { exitFor } from "../match-exit.ts";
 import { clockShown } from "../clock-text.ts";
 import { BoardsStrip } from "../components/TinyBoard.tsx";
-import { bossAlone, isCrowd, myBoardId, towerView, type GameView } from "../game.ts";
+import { bossAlone, cutCountdown, isCrowd, shortCountdown, myBoardId, towerView, type GameView } from "../game.ts";
 import { roundsInStage } from "@chessroyale/core";
 import { BossBar } from "./Boss.tsx";
 
@@ -79,8 +79,8 @@ export function Hud({ match, stripFrozen = false }: { match: GameView; stripFroz
   const moveNo = fen ? Number(fen.split(" ")[5]) || 1 : null;
   // (In moves, as the board counts them: a round is one team's turn, so two make a move. "cut now": this move is the last.)
   const movesLeft = Math.ceil((roundsInStage(match.settings, match.stage) - match.roundsPlayed) / 2);
-  // (The 50 v 50 rework's 1 v 1, after its last cut: no cut to count down to. Its own top bar comes with the screens, C3.)
-  const oneVOne = !!match.settings.crowdCuts?.length && match.stage >= match.settings.crowdCuts.length;
+  // (The 50 v 50 rework: "cut in 2", "4 v 4 next" on a cut's move, "1 v 1 from move 43", then "1 v 1": cutCountdown.)
+  const countdown = cutCountdown(match.settings, match.stage, match.roundsPlayed, moveNo);
   const team = view.teamLabel ? (alive.find((s) => s.isYou)?.team ?? null) : null;
   // A boss battle on a computer with a mouse (Nov 1, Eric: "completely gone from the top"): no title line. The boss's bar
   // is the top of the screen and says the move; the ⚡, the fish and the gear go at the top of the column beside the board
@@ -112,7 +112,17 @@ export function Hud({ match, stripFrozen = false }: { match: GameView; stripFroz
                   <span>{moveNo ? `Move ${moveNo}` : "Crowd"}</span>
                   <span class="muted">
                     <span class="hud-dot"> · </span>
-                    {oneVOne ? "1 v 1" : movesLeft <= 1 ? "cut now" : `cut in ${movesLeft}`}
+                    {countdown ? (
+                      // (A narrow phone's line under "Move 34" has about 60 px: "to 34v34", "1v1 at 43" there; C3.)
+                      <>
+                        <span class="cd-long">{countdown}</span>
+                        <span class="cd-short">{shortCountdown(countdown)}</span>
+                      </>
+                    ) : movesLeft <= 1 ? (
+                      "cut now"
+                    ) : (
+                      `cut in ${movesLeft}`
+                    )}
                   </span>
                 </span>
               </>

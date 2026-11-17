@@ -16,6 +16,7 @@ import { exitFor } from "../match-exit.ts";
 import { TokenBox } from "../components/TokenBox.tsx";
 import { XpResult, useGameXp } from "../components/XpResult.tsx";
 import { NO_RESULT_LINE } from "./Recluse2.tsx";
+import { CrowdPodium } from "../components/Podium.tsx";
 import { phase2Headline } from "../recluse-phase2.ts";
 
 /** An online match where one device's word stood alone (LobbyRecord.unvouched: nobody could check a host's scores or the boss's move). */
@@ -70,6 +71,8 @@ export function ResultsScreen({ match, placement, winner, onAgain, onHome, homeT
   const p2Head = match.phase.kind === "results" && !left ? phase2Headline(match.phase, match.totalPlayers) : null;
   // (And its review: the board you played, not phase 1's moves. None if you watched it, or left your board.)
   const simulBoard = match.phase.kind === "results" ? match.phase.simulBoard : undefined;
+  // (The 50 v 50 rework's podium, once the game is over and you were still with it: not after you left.)
+  const podium = match.phase.kind === "results" && !match.phase.left ? match.phase.podium : undefined;
   const topName = (() => {
     const w = standings.find((s) => s.placement === 1);
     return w ? <PlayerName name={winner} uid={w.uid} bot={w.isBot} /> : winner;
@@ -83,14 +86,16 @@ export function ResultsScreen({ match, placement, winner, onAgain, onHome, homeT
             <MatchMenu exit={exitFor(match)} />
           </div>
         )}
+        {/* (The 50 v 50 rework, C3: the podium in place of the trophy and the title; the rest of the page as before.) */}
+        {podium && <CrowdPodium match={match} titles={podium} gameWinner={gameWinner} />}
         {/* (A boss battle has no trophy and no skull above its title: Eric, Nov 7.) */}
-        {!bossResult && (
+        {!bossResult && !podium && (
           <div class={`trophy${resigned ? " resigned" : ""}`} aria-hidden="true">
             {resigned ? <FlagIcon size={56} /> : placement === 1 ? "🏆" : placement <= 4 ? "🥈" : "♟️"}
           </div>
         )}
         {/* (A boss battle's title: the God King's pixel type, Eric, Nov 7.) */}
-        <h1 class={bossResult ? "boss-title" : undefined}>
+        {!podium && <h1 class={bossResult ? "boss-title" : undefined}>
           {afk ? (
             "Removed for being away"
           ) : resigned ? (
@@ -105,8 +110,8 @@ export function ResultsScreen({ match, placement, winner, onAgain, onHome, homeT
               {ordinal(placement)} of {match.totalPlayers}
             </>
           )}
-        </h1>
-        {left ? (
+        </h1>}
+        {podium ? null : left ? (
           // (Your place when you left; the match went on without you, or, solo, stopped there. Boss alone: the boss's line
           // below says who won.)
           !alone && (

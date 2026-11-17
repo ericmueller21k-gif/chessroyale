@@ -320,6 +320,8 @@ for (const admin of [false, true]) {
       const start = (await page.locator(".bs-start").boundingBox())!;
       expect(start.y, `${at}: START's top in the window`).toBeGreaterThanOrEqual(0);
       expect(start.y + start.height, `${at}: START's foot in the window`).toBeLessThanOrEqual(h);
+      // (The stage's figure comes with the match's screens, loaded as this screen opens since the bundle split, #759: wait for its paint.)
+      await expect.poll(() => figureDrawn(page), { timeout: 15_000, message: `${at}: the boss's figure drawn` }).toBe(true);
       // The boss's head: its visible top, the first row of its figure's paint in the sprite's canvas (its box runs past its frame's empty rows).
       const head = await page.evaluate(() => {
         const el = document.querySelector(".bs-spot:not(.bs-mine) .bs-sprite") as HTMLElement | null;
@@ -352,6 +354,16 @@ const tileAt = (ps: { x: number; y: number }[]) => ps.map((p) => document.elemen
 const TODAY_PAWN = 145;
 const TODAY_BOSS: Record<string, number> = { Jefferson: 178, "Big Boy": 182, Alfil: 180, "Chub & Chirp": 167 };
 /** The boss's painted figure on the stage: its top and foot, from the canvas's own pixels (as the never-scroll test reads its head). */
+/** Whether the picked boss's figure has paint yet (it comes with the match's screens, loaded as the screen opens: #759). */
+const figureDrawn = (p: Page) =>
+  p.evaluate(() => {
+    const el = document.querySelector(".bs-spot:not(.bs-mine) .bs-sprite") as HTMLElement | null;
+    const cv = el && (el.tagName === "CANVAS" ? (el as HTMLCanvasElement) : el.querySelector("canvas"));
+    if (!cv || !cv.width || !cv.height) return false;
+    const d = cv.getContext("2d")!.getImageData(0, 0, cv.width, cv.height).data;
+    for (let i = 3; i < d.length; i += 4) if (d[i]! > 0) return true;
+    return false;
+  });
 const bossPaint = (p: Page) =>
   p.evaluate(() => {
     const el = document.querySelector(".bs-spot:not(.bs-mine) .bs-sprite") as HTMLElement | null;
@@ -388,6 +400,8 @@ test("on a computer the pawn and the picked boss stand bigger on the stage, as t
         await page.waitForTimeout(500);
         const pawn = (await page.locator(".bs-me .fd-pawn-stage").boundingBox())!;
         expect(pawn.height / TODAY_PAWN, `${at}: the pawn's height`).toBeGreaterThanOrEqual(floor);
+        // (Its figure loads with the match's screens: wait for its paint, #759.)
+        await expect.poll(() => figureDrawn(page), { timeout: 15_000, message: `${at}: the boss's figure drawn` }).toBe(true);
         const fig = (await bossPaint(page))!;
         expect((fig.bottom - fig.top) / TODAY_BOSS[boss]!, `${at}: the boss's height`).toBeGreaterThanOrEqual(floor);
         expect(await page.evaluate(() => document.documentElement.scrollHeight - innerHeight), `${at}: no page scroll`).toBeLessThanOrEqual(0);

@@ -72,13 +72,12 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
   knight saddled, the knight your pawn's color, only its blanket the item's color). Their names and lines are the drawings' own. **In no crate yet** (the
   crate comes later): only admins have them, as admin copies (red, emerald second color, 100%: "Admins own one of every item", below).
   **Where the drawings came from:** copied as drawn from `claude/boss-art` (`scripts/boss-art/out/<ride>/<ride>.tsx`; their
-  `summary.md`, `views-summary.md` and `trail-summary.md` there have the artist's notes; Moon's Ride Oct 30, the rest Nov 1) into
+  `summary.md`, `views-summary.md` and `trail-summary.md` there have the artist's notes; Nov 1; Moon's Ride redrawn as a rounded star Nov 17, from `out/star-ride/`, its id kept; the same day its pawn sunk into a hollowed-out seat, cut 70) into
   `components/rides/` (`kit.ts`: the types; `load.ts`: each drawing its own chunk, loaded when a ride is drawn, Nov 1: town-square.md,
   "Rides"); only their import lines changed and the `!`s the app's typecheck asks for, and
-  Hollow's Bulb's green cord was taken out of every view by hand (Eric, Nov 1: "we don't really need that"). Moon's Ride stays as it
-  was (its side only; its redraw is on hold) and the old cat, `hollow-steed`, isn't one. Each is a `Back` and a `Front` with the pawn
+  Hollow's Bulb's green cord was taken out of every view by hand (Eric, Nov 1: "we don't really need that"). The old cat, `hollow-steed`, isn't one. Each is a `Back` and a `Front` with the pawn
   between them, raised onto its seat, maybe tilted and hidden below the seat (`pose`), and two animations: `idle` and `move` (one
-  square of the town's walk): its side; all but Moon's Ride also have `views` (its back, walking up the screen, and its front, walking
+  square of the town's walk): its side; all also have `views` (its back, walking up the screen, and its front, walking
   down) and a `trail` mark (town-square.md, "Rides"). Drawn: the locker's tile (`ItemArt`: the ride with a white pawn on it), the
   locker's preview and the profiles' pawn (`Avatar`'s `ride`: the pawn and its items on its ride's side, its idle playing, fitted into
   the same box, so a box never grows), the profile's Wearing rows (last), the town square (town-square.md, "Rides"), and **home** (Nov 1:

@@ -43,10 +43,10 @@ test("narrow phones: the top bar's numbers stay clear of the options button, and
     });
     expect(bar.spill, `${device}: ${bar.text}`).toBeLessThanOrEqual(0);
     expect(bar.clear, `${device}: the cut pill runs under the options button`).toBeGreaterThanOrEqual(0);
-    expect(bar.labelCut, `${device}: "Move 34 · cut now" is cut short`).toBe(false);
+    expect(bar.labelCut, `${device}: "Move 34 · to 34v34" is cut short`).toBe(false);
     // The countdown is in moves, as the board counts them (Nov 1): with ?rounds=2 a stage is one move, so this one is the
-    // cut's ("cut now"; counting plies, it said "cut in 2").
-    expect(bar.text, device).toContain("cut now");
+    // cut's, which says what it leaves since the 50 v 50 rework (C3; "cut now" before it): "34 v 34 next", on a narrow phone "to 34v34".
+    expect(bar.text, device).toContain("to 34v34");
     // Play to the first cut (up to 30 go out: ties at the line go through) and hold it there. You play the engine's best
     // move, so you go through: nobody's pick scores better than yours, and you start well above your team's line. (A
     // bot's pick, which this copied before, is now and then a random legal move, `botRandomMoveChance`; one put you out,
@@ -153,9 +153,29 @@ test("online, once you're out, a later cut says so (not \"You're through\") and 
       return outAt;
     }, { timeout: 3 * 60_000, intervals: [200] })
     .not.toBeNull();
-  // The cut you went out at.
-  await expect(page.locator(".crowd-cut .out-msg")).toContainText("You're out");
-  await expect(page.getByRole("button", { name: "Why was I cut?" })).toBeVisible();
+  // The cut you went out at (the 50 v 50 rework's cut screen, C3; mockup crowd-cut): your place, the gap to the last one
+  // through, why, who's still in, and at its foot Spectate and Leave the match side by side.
+  await expect(page.locator(".crowd-cut .co-title")).toHaveText(/^You're out: \d+(st|nd|rd|th) of 100$/, { timeout: 5000 });
+  await expect(page.locator(".crowd-cut .co-sub")).toHaveText(/^Cut at move \d+ · \d+\.\d\d behind the last one through$/);
+  await expect(page.getByRole("button", { name: /Why was I cut\?/ })).toBeEnabled();
+  await expect(page.locator(".crowd-cut .co-still")).toContainText("Still in:");
+  const foot = () =>
+    page.evaluate(() => {
+      const r = (sel: string) => {
+        const b = document.querySelector(sel)!.getBoundingClientRect();
+        return { x: Math.round(b.x), y: Math.round(b.y + scrollY), w: Math.round(b.width), h: Math.round(b.height) };
+      };
+      return { spectate: r(".crowd-cut .co-spectate"), leave: r(".crowd-cut .co-leave"), still: r(".crowd-cut .co-still") };
+    });
+  const first = await foot();
+  // Side by side, Spectate on the left, both whole on the screen.
+  expect(first.spectate.y).toBe(first.leave.y);
+  expect(first.spectate.x + first.spectate.w).toBeLessThanOrEqual(first.leave.x);
+  expect(first.leave.x + first.leave.w).toBeLessThanOrEqual(page.viewportSize()!.width);
+  // Not tapping either is spectating: once the break ends, the live board as the team not picking sees it (the server's watching
+  // rounds go to those cut too).
+  await expect.poll(() => phase(page), { timeout: 60_000, intervals: [200] }).toMatch(/^(watching|scoring|reveal)$/);
+  await expect(page.locator(".opening-name")).toContainText("you're watching", { timeout: 30_000 });
   // A later cut that puts players out, watched from the sidelines: a new judgment (the doomed pawns glow before the
   // gavel lands). (Ties at the line go through, so a cut early on, when the opening allowance leaves many level, may put
   // nobody out and strike nothing: docs/decisions/2026-10-15-flaky-e2e-batch.md.)
@@ -167,11 +187,13 @@ test("online, once you're out, a later cut says so (not \"You're through\") and 
     .toBeGreaterThan(outAt!);
   await expect(page.locator(".crowd-cut .grid-pawn.doomed").first()).toBeVisible({ timeout: 1000 });
   await expect(page.locator(".crowd-cut .grid-pawn.cut-now").first()).toBeVisible({ timeout: 5000 });
-  // It says you went out before, not that you're through.
-  await expect(page.locator(".crowd-cut .out-msg")).toHaveText(/^You went out earlier, in \d+(st|nd|rd|th) place\.$/);
+  // It says you went out before, not that you're through; the two buttons are where they were (Eric, Nov 16: always both,
+  // never moving), and the still-in box keeps its size.
+  await expect(page.locator(".crowd-cut .co-sub")).toHaveText(/^You went out earlier · /);
   await expect(page.locator(".crowd-cut .safe-msg")).toHaveCount(0);
   await expect(page.locator(".crowd-cut")).not.toContainText("You're through");
-  await expect(page.getByRole("button", { name: "Why was I cut?" })).toHaveCount(0);
+  const later = await foot();
+  for (const k of ["spectate", "leave", "still"] as const) for (const d of ["x", "y", "w", "h"] as const) expect(Math.abs(later[k][d] - first[k][d]), `${k}.${d}`).toBeLessThanOrEqual(1);
 });
 
 test("50 v 50's AFK rule (Eric, Nov 4): each miss says a move was picked for you (1 of 3), whole on one line at 390 and 320 px, scores your team's lowest and never counts in the vote; the 4th removes you", async ({ page }) => {
@@ -289,4 +311,44 @@ test("Crowd 50 v 50: plays your team's turns, watches the other team's, survives
   // Everyone placed 1-100.
   const places = await page.evaluate(() => (window as any).match.runner.state.players.map((p: any) => p.placement).sort((a: number, b: number) => a - b));
   expect(places).toEqual(Array.from({ length: 100 }, (_, i) => i + 1));
+  // The podium results (the rework, C3; mockup crowd-podium) at 320, 390 and 1280: 2nd left, 1st (tallest) in the middle, 3rd
+  // right, each a dressed pawn with name and points a move; the best player's line on one line; your row; the chart of all 100 in
+  // a fixed box, your row pinned in view at its foot; nothing past the screen's edge.
+  for (const [w, h] of [[320, 568], [390, 844], [1280, 800]] as const) {
+    await page.setViewportSize({ width: w, height: h });
+    // (A frame or two for what lays itself out on a resize; once, at 320, the page was 19 px wide just after it.)
+    await page.waitForTimeout(400);
+    const pod = await page.evaluate(() => {
+      const r = (el: Element | null) => (el ? el.getBoundingClientRect() : null);
+      const steps = [...document.querySelectorAll(".pod-steps .pod-step")].map((s) => ({ cls: s.className, x: r(s)!.x, block: r(s.querySelector(".pod-block"))!.height, pawn: !!s.querySelector(".pod-pawn svg"), name: (s.querySelector(".pod-name") as HTMLElement).innerText, pts: (s.querySelector(".pod-pts") as HTMLElement).innerText, nameClip: s.querySelector(".pod-name")!.scrollWidth > s.querySelector(".pod-name")!.clientWidth + 1 }));
+      const chart = r(document.querySelector(".pod-chart"))!;
+      const you = r(document.querySelector(".pod-chart .pod-row.you"))!;
+      const best = document.querySelector(".pod-best") as HTMLElement;
+      const pageBox = r(document.querySelector(".podium"))!;
+      return { steps, chart: { top: chart.top, bottom: chart.bottom, h: chart.height }, you: { top: you.top, bottom: you.bottom }, rows: document.querySelectorAll(".pod-chart .pod-row:not(.pod-title):not(.pod-cols)").length, bestText: best.innerText, bestH: best.getBoundingClientRect().height, bestLine: parseFloat(getComputedStyle(best).lineHeight) || 20, bestClip: best.scrollWidth > best.clientWidth + 1, spill: document.documentElement.scrollWidth - innerWidth, wide: [...document.querySelectorAll("body *")].filter((e) => {
+        if (e.getBoundingClientRect().right <= innerWidth + 0.5) return false;
+        for (let p = e.parentElement; p && p !== document.body; p = p.parentElement) if (getComputedStyle(p).overflowX !== "visible") return false;
+        return true;
+      }).slice(0, 5).map((e) => `${e.tagName}.${e.className} ${Math.round(e.getBoundingClientRect().right)}`), podRight: pageBox.right, podLeft: pageBox.left, youRow: (document.querySelector(".pod-you") as HTMLElement).innerText };
+    });
+    const at = `${w} px`;
+    expect(pod.steps.map((s) => s.cls.match(/pod-(\d)/)![1]), at).toEqual(["2", "1", "3"]);
+    expect(pod.steps[1]!.block, at).toBeGreaterThan(pod.steps[0]!.block);
+    expect(pod.steps[0]!.block, at).toBeGreaterThan(pod.steps[2]!.block);
+    for (const s of pod.steps) {
+      expect(s.pawn, `${at}: ${s.name}'s pawn`).toBe(true);
+      expect(s.pts, at).toMatch(/^\d+\.\d\d a move$/);
+    }
+    expect(pod.bestText, at).toMatch(/Best player: /);
+    expect(pod.bestH, `${at}: the best player's line is one line`).toBeLessThan(pod.bestLine * 1.6);
+    expect(pod.youRow, at).toMatch(/^\d+(st|nd|rd|th)/);
+    expect(pod.youRow, at).toContain("RP");
+    expect(pod.rows, at).toBe(100);
+    expect(Math.round(pod.chart.h), `${at}: the chart's box`).toBe(330);
+    expect(pod.you.top, `${at}: your row in the chart's view`).toBeGreaterThanOrEqual(pod.chart.top - 0.5);
+    expect(pod.you.bottom, `${at}: your row in the chart's view`).toBeLessThanOrEqual(pod.chart.bottom + 0.5);
+    expect(pod.spill, `${at}: no sideways scroll (${pod.wide.join(", ")})`).toBeLessThanOrEqual(0);
+    expect(pod.podLeft, at).toBeGreaterThanOrEqual(0);
+    expect(pod.podRight, at).toBeLessThanOrEqual(w);
+  }
 });

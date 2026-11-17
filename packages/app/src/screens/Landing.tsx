@@ -2,13 +2,11 @@ import { useEffect, useRef, useState } from "preact/hooks";
 import { tooYoung } from "../account.ts";
 import { SignIn } from "../components/SignIn.tsx";
 import { MuteButton } from "../components/MuteButton.tsx";
-import { CROWD_SETTINGS, DEFAULT_SETTINGS, bossInText, crowdFinalBoss, crowdFinalists, roundsInStage } from "@chessroyale/core";
+import { CROWD_SETTINGS, DEFAULT_SETTINGS } from "@chessroyale/core";
 
-/** The Crowd's numbers, from its settings: its seats, the first cut, the team final's sizes. */
+/** The 50 v 50's numbers, from its settings: its seats, the cuts (the first, and the 1 v 1 after the last), the move limit. */
 const CROWD = { ...DEFAULT_SETTINGS, ...CROWD_SETTINGS };
-const versus = (n: number) => `${n}v${n}`;
-/** The boss final's boss, by name ("the Hidden Boss"), or any boss. */
-const FINAL_BOSS = crowdFinalBoss() ? bossInText(crowdFinalBoss()!.name) : "a boss";
+const CUTS = CROWD.crowdCuts ?? [];
 
 const FAQ: [string, string][] = [
   [
@@ -17,7 +15,7 @@ const FAQ: [string, string][] = [
   ],
   [
     "How does 50 v 50 work?",
-    `${CROWD.lobbySize} players, one game of chess from the first move. You're on White or Black for the whole game. Every turn your team of ${CROWD.lobbySize / 2} picks a move, and one of its three most popular picks is played: the more picks, the likelier. Stockfish scores every pick, so you score by choosing well, even when the crowd goes the other way. After move ${roundsInStage(CROWD, 0) / 2} the lowest scorers start going out, a cut every few moves. Before the game, everyone votes on how it ends: a team final (${versus(CROWD.teamFinalSizes[0]!)} down to ${versus(CROWD.teamFinalSizes.at(-1)!)}), a boss final where the top ${crowdFinalists("boss")} take on ${FINAL_BOSS}, or a duel between the best of each side.`,
+    `${CROWD.lobbySize} players, one game of chess from the first move. You're on White or Black for the whole game. Every turn your team of ${CROWD.lobbySize / 2} picks a move, and before the game everyone votes on how the team's move is picked: Strong (the best of the team's top picks), Majority (the top pick, sometimes the 2nd or 3rd) or Chaos (any pick at all). Stockfish scores every pick, so you score by choosing well, even when the crowd goes the other way. After move ${CUTS[0]?.after ?? 14} the lowest scorers on each side start going out, the same number from each, a cut every few moves, until from move ${(CUTS.at(-1)?.after ?? 42) + 1} it's 1 v 1: each side's last player alone, to the end of the game${CROWD.crowdMoveLimit ? ` (at most ${CROWD.crowdMoveLimit} moves)` : ""}. The best three finish on the podium.`,
   ],
   ["Is it free?", "Yes. Coins and cosmetics will be earned by playing, never bought, and they never change the game."],
   [
