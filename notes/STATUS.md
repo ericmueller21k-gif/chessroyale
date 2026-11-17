@@ -1,3 +1,4 @@
+- Nov 17 15:25 UTC: Eric: slam and fake move each once per game independently (move between them -> fake still comes later at 30 s, alone). Sent to fix helper session_01JuCWRvgADv6G7HGf2yAbbt (option b).
 - Nov 17 15:20 UTC: Eric answered payments (notes/briefs/payments-answers.md). Picks sent back for OK. Payments design helper queued after moo stills.
 - Nov 17 15:08 UTC: review/dash-stall: 6 findings, nothing match-breaking. Fix helper (high) on claude/dash-stall for 1 (spend skit at slam, Eric once/game), 2, 3, 6. Queued: 4 (watchers not told of pause, also King strike) + 5 (lock during hold).
 - Nov 17 15:00 UTC: Dash .done -> #770 (5bfb01d), CI watched. Review helper session_01JuCWRsWyzikoc8e3uktQCx (review/dash-stall). Star seat helper session_01JuCWRuY8zSbRayeaRQ8phN (claude/star-seat-one-layer). Both high; watcher armed. Next when a slot frees: moo-cinematic (stills first), then boss-facing. Payments: waiting on Eric answers.
