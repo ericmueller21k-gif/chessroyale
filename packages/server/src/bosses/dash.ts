@@ -55,8 +55,10 @@ function rushPlace(lobby: BossLobby, playerId: string, key: string, places: unkn
  * His stall skit's next beat, as the move's clock reaches it (the round's "stall" timer; his rules' stallPlan, planned as the round
  * opened): the slam, or his fake second move. While the round is still open (someone still to pick), it begins now: the move clock
  * stands still for its length (every deadline, and every bot still thinking, moves back by that long, as for the King's strike),
- * everyone in the round is told (those who've picked too), and the fake move is recorded (once a battle). A pick that reaches here
- * during the fake move's hold was made before it (the board takes none then) and counts as ever: nobody's pick is lost.
+ * everyone in the round is told (those who've picked too), and the skit is recorded at the slam (once a battle: a move before the
+ * fake move ends it there). A pick that reaches here during the fake move's hold was made before it (the board takes none then)
+ * and counts as ever: nobody's pick is lost. A beat that fires late, with the round's deadline (near) gone, is dropped: the round
+ * locks as it would have, and nobody's clock moves back.
  */
 function stallBeat(lobby: BossLobby) {
   const round = lobby.r.round;
@@ -64,6 +66,10 @@ function stallBeat(lobby: BossLobby) {
   const st = round?.stall;
   if (lobby.r.phase !== "play" || !round || !runner || !st?.next) return;
   const now = lobby.now();
+  if (now >= round.deadline - DASH_STALL.marginMs / 2) {
+    st.next = undefined;
+    return lobby.armRound();
+  }
   const beat = st.next;
   const ms = beat === "slam" ? DASH_STALL.slamMs : stallTimeline().total;
   st[beat] = { at: now, until: now + ms };
@@ -71,7 +77,7 @@ function stallBeat(lobby: BossLobby) {
   round.deadline += ms;
   for (const id of Object.keys(round.deadlines)) round.deadlines[id]! += ms;
   for (const [id, at] of Object.entries(round.botsDoneIn ?? {})) if (round.startedAt + at > now) round.botsDoneIn![id] = at + ms;
-  if (beat === "fake") runner.stalled(st.plan.move);
+  if (beat === "slam") runner.stalled(st.plan.move);
   const shown = { beat, at: now, until: now + ms, ...(beat === "fake" ? { move: st.plan.move } : {}) };
   for (const h of lobby.roundHumans()) {
     const deadline = round.deadlines[h.id] ?? round.deadline;

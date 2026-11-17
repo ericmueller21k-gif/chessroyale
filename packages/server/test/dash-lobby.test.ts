@@ -270,23 +270,14 @@ describe("Dash's stall skit online (Eric, Nov 17)", () => {
     expect(l.runner().boards.get(l.runner().state.boards[0]!)!.fen).toBe(fen);
   });
 
-  it("once a battle: armed until the fake move comes (a move before it leaves it for a later one); never after the King's strike on the same move", () => {
+  it("once a battle: spent at the slam (a move before the fake move ends it there, and it never comes again); a King's strike before the slam leaves it for a later move", () => {
     const l = dashLobby("", ["P1"]);
     l.toRound();
     let round = l.core.save().round!;
     const clock = l.runner().moveClock() * 1000;
+    const pick = () => l.core.message("p1", { t: "pick", key: l.core.save().round!.key, move: (l.runner().crowdAllowed() ?? legalMoves(l.runner().boards.get(l.runner().state.boards[0]!)!.fen))[0]! });
     expect(round.stall?.next).toBe("slam");
-    // The slam comes, then the move goes in before the fake move: it stays armed.
-    until(l, round.startedAt + clock * DASH_STALL.slamShare + 100);
-    expect(stalls(l, "p1").map((m) => m.beat)).toEqual(["slam"]);
-    l.core.message("p1", { t: "pick", key: round.key, move: legalMoves(l.last("p1", "round")!.board!.fen)[0]! });
-    expect(l.hostScores()).toBe(true);
-    expect(l.runner().boss!.powers!.dash!.stall ?? null).toBeNull();
-    // The next move: planned again. The King's strike before the slam: nothing of the skit comes on this move.
-    l.toRound();
-    round = l.core.save().round!;
-    expect(round.stall?.next).toBe("slam");
-    l.inbox.set("p1", []);
+    // The King's strike before the slam: nothing of the skit comes on this move, and it stays armed.
     until(l, round.startedAt + 1000);
     expect(l.runner().boss!.kingCharges).toBeGreaterThan(0);
     l.core.message("p1", { t: "king", key: round.key, strike: true });
@@ -294,5 +285,48 @@ describe("Dash's stall skit online (Eric, Nov 17)", () => {
     expect(l.core.save().round!.stall?.next).toBeUndefined();
     until(l, l.core.save().round!.deadline - 100);
     expect(stalls(l, "p1")).toEqual([]);
+    pick();
+    expect(l.hostScores()).toBe(true);
+    expect(l.runner().boss!.powers!.dash!.stall ?? null).toBeNull();
+    // The next move: planned again. The slam comes and spends it; the move goes in before the fake move, so that never comes.
+    l.toRound();
+    round = l.core.save().round!;
+    expect(round.stall?.next).toBe("slam");
+    l.inbox.set("p1", []);
+    until(l, round.startedAt + clock * DASH_STALL.slamShare + 100);
+    expect(stalls(l, "p1").map((m) => m.beat)).toEqual(["slam"]);
+    const crowdMoves = l.runner().boss!.crowdMoves;
+    expect(l.runner().boss!.powers!.dash!.stall).toEqual({ at: crowdMoves, move: round.stall!.plan.move });
+    pick();
+    expect(l.hostScores()).toBe(true);
+    // Never again: no plan on the moves after, and no slam however long the move takes.
+    for (let n = 0; n < 2; n++) {
+      l.toRound();
+      round = l.core.save().round!;
+      expect(round.stall).toBeUndefined();
+      l.inbox.set("p1", []);
+      until(l, round.deadline - 100);
+      expect(stalls(l, "p1")).toEqual([]);
+      pick();
+      expect(l.hostScores()).toBe(true);
+    }
+  });
+
+  it("a beat whose alarm fires late, with the round's deadline gone: dropped; nobody's deadline moves back and the round locks as it would have", () => {
+    const l = dashLobby("", ["P1"]);
+    l.toRound();
+    const round = l.core.save().round!;
+    expect(round.stall?.next).toBe("slam");
+    const { deadline } = round;
+    l.inbox.set("p1", []);
+    // (A cold Durable Object: the slam's alarm only fires past the deadline.)
+    l.advance(deadline + 400 - l.now());
+    expect(stalls(l, "p1")).toEqual([]);
+    const after = l.core.save().round!;
+    expect(after.deadline).toBe(deadline);
+    expect(after.stall?.next).toBeUndefined();
+    expect(after.stall?.slam).toBeUndefined();
+    expect(l.runner().boss!.powers!.dash!.stall ?? null).toBeNull();
+    expect(l.core.nextAlarm).toBe(deadline + l.settings.lateGraceMs);
   });
 });

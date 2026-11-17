@@ -1145,8 +1145,8 @@ export interface DashState {
   /** His pop-off (once a battle; Eric, Nov 7): his turn `at`, it plays before his move lands, while he thinks. */
   popOff?: { at: number } | null;
   /**
-   * His stall skit (once a battle; Eric, Nov 17; DASH_STALL): its fake move came on the crowd move after crowd move `at` (`move`:
-   * the move he played and took back). Until then it stays armed.
+   * His stall skit (once a battle; Eric, Nov 17; DASH_STALL): its slam came on the crowd move after crowd move `at` (`move`: the
+   * move he plays and takes back if the fake move comes too). Spent at the slam; until then it stays armed.
    */
   stall?: { at: number; move: string } | null;
   /** His lying-down clock tap (once a battle; Eric, Nov 17; DASH_TAP): it came as the crowd move after crowd move `at` began. */

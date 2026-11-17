@@ -1551,7 +1551,7 @@ export class MatchRunner {
   /**
    * Dash's stall skit on the crowd move about to be picked (stallPlan: once a battle, null when not on this move): when its slam and
    * its fake move come on the move's clock (`playerId`'s; the crowd's first by default), and the move he takes back. The round's
-   * timer (solo.ts, the lobby) plays the beats, stops the clock for them and calls `stalled` as the fake move comes.
+   * timer (solo.ts, the lobby) plays the beats, stops the clock for them and calls `stalled` as the slam comes.
    */
   stallPlan(playerId?: string): StallPlan | null {
     const boss = this.state.boss;
@@ -1562,7 +1562,7 @@ export class MatchRunner {
     return stallPlan(boss, board.fen, this.allowedMsFor(id), !!this.settings.bossClock, this.settings.bossPowerTest ?? "");
   }
 
-  /** Dash's stall skit's fake move has come on this crowd move (dashBattle.stalled): once a battle. */
+  /** Dash's stall skit's slam has come on this crowd move (dashBattle.stalled): once a battle, spent at the slam. */
   stalled(move: string): void {
     dashBattle.stalled(this.battle, move);
   }

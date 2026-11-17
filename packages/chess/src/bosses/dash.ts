@@ -570,7 +570,7 @@ export interface DashView {
   rush?: DashRush | null;
   /** His pop-off (Eric, Nov 7): his turn it comes on, so his screen plays it while he thinks. */
   popOff?: { at: number } | null;
-  /** His stall skit's fake move, once it has come (Eric, Nov 17): the crowd move it came on and the move he took back. */
+  /** His stall skit, once its slam has come (Eric, Nov 17; spent there): the crowd move it came on and the move he'd take back. */
   stall?: { at: number; move: string } | null;
   /** His lying-down clock tap, once it has come (Eric, Nov 17): the crowd move it came on. */
   tap?: { at: number } | null;
@@ -638,9 +638,10 @@ export const dashBattle = {
   },
 
   /**
-   * His stall skit's fake move has come (its hold began; stallPlan's): once a battle, on the crowd move being picked now (`move`:
-   * the move he plays and takes back). Nothing on the board or any clock changes here: the screens show it, and the round's
-   * clock stands still for it where it's timed (solo.ts, the lobby).
+   * His stall skit has begun: its slam came (stallPlan's), on the crowd move being picked now (`move`: the move he plays and takes
+   * back if the move's clock reaches his fake move). Once a battle (Eric, Nov 17: "this only fire at once 1 time per game"): the
+   * skit is spent at the slam, so a move made before the fake move ends it there, never to come again. Nothing on the board or
+   * any clock changes here: the screens show it, and the round's clock stands still for it where it's timed (solo.ts, the lobby).
    */
   stalled(b: Battle, move: string): void {
     const boss = b.state.boss;
