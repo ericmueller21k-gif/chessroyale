@@ -607,8 +607,11 @@ export class Walker {
   /** When it claimed the square it will end on (its goal): the order of `go`s, 0 for where it first stood. */
   claim = 0;
   private queue: Sq[] = [];
-  /** The step being taken: from, to, when it began, and whether it eases off from standing and eases into a stop. */
-  private step: { fc: number; fr: number; to: Sq; dc: number; dr: number; t0: number; first: boolean; last: boolean } | null = null;
+  /**
+   * The step being taken: from, to, when it began, whether it eases off from standing and eases into a stop, and from how far through
+   * (`from`, 0 to 1) it eases into that stop. `held`: the square queued after it is the keys' (`run`), kept only while they're held.
+   */
+  private step: { fc: number; fr: number; to: Sq; dc: number; dr: number; t0: number; first: boolean; last: boolean; from: number; held: boolean } | null = null;
   constructor(
     sq: Sq,
     /** How long a step takes (ms): a ride may make it shorter (RIDES.speed: Town.tsx sets it as the look is put on). */
@@ -669,19 +672,25 @@ export class Walker {
   /** Drops the rest of its path: it stops once the step it's on ends (Jefferson's crew in the way, Nov 4). */
   halt(): void {
     this.queue = [];
+    if (this.step) this.step.held = false;
   }
   /** Walk this path (after the step it's on), claiming its last square. */
   go(path: Sq[]): void {
     this.queue = path.slice();
     this.claim = ++claims;
+    if (this.step) this.step.held = false;
   }
   /**
    * Asked (with the square it's beginning from) when a step begins and nothing is queued after it: the square to walk to next, or
    * null to stop after this step (the keys' walk: arrows.ts). Asked before the step's ease is set, so a held key runs on with no stop.
+   * `holding`, asked each frame of that step: false (the key let go before the step ends) drops the square it gave and the step
+   * eases into a stop from there, so a tap walks one square, not two (Eric, Nov 17).
    */
   private runner: ((fc: number, fr: number) => Sq | null) | null = null;
-  run(next: ((fc: number, fr: number) => Sq | null) | null): void {
+  private holding: (() => boolean) | null = null;
+  run(next: ((fc: number, fr: number) => Sq | null) | null, holding: (() => boolean) | null = null): void {
     this.runner = next;
+    this.holding = holding;
   }
   /**
    * Told as each step begins (when, on the frame clock, and how long it takes), from `update`, so inside the frame loop that moves it
@@ -692,6 +701,14 @@ export class Walker {
     for (let g = 0; g < 64; g++) {
       if (this.step) {
         const end = this.step.t0 + this.stepMs;
+        const s = this.step;
+        // (Let go before the step ends: no next square; it eases into a stop from where it is now, at the speed it has.)
+        if (s.held && this.holding && !this.holding()) {
+          this.queue.length = 0;
+          s.held = false;
+          s.last = true;
+          s.from = Math.max(0, Math.min(1, (now - s.t0) / this.stepMs));
+        }
         if (now < end) return;
         this.c = this.step.to.c;
         this.r = this.step.to.r;
@@ -714,11 +731,12 @@ export class Walker {
     if (dc) this.facing = dc < 0 ? -1 : 1;
     if (dc) this.view = 0;
     else if (dr) this.view = screenRow(dr, this.rowsUp) > 0 ? 1 : 2;
+    let held = false;
     if (!this.queue.length && this.runner) {
       const n = this.runner(to.c, to.r);
-      if (n) this.queue.push(n);
+      if (n) (this.queue.push(n), (held = true));
     }
-    this.step = { fc: this.c, fr: this.r, to, dc, dr, t0, first, last: this.queue.length === 0 };
+    this.step = { fc: this.c, fr: this.r, to, dc, dr, t0, first, last: this.queue.length === 0, from: 0, held };
     this.onStep?.(t0, this.stepMs);
   }
   /** Its pose at `now`, into `out`. */
@@ -734,7 +752,7 @@ export class Walker {
       return out;
     }
     const t = Math.max(0, Math.min(1, (now - s.t0) / this.stepMs));
-    const e = this.ease ? ease(t, s.first, s.last, this.ease) : t;
+    const e = this.ease ? ease(t, s.first, s.last, this.ease, s.from) : t;
     out.x = s.fc + s.dc * e;
     out.y = s.fr + s.dr * e;
     out.step = true;
@@ -747,10 +765,16 @@ export class Walker {
 
 /**
  * Where a step has got to at t (0 to 1): even, or eased into a first step from standing and out of a last one by
- * `amount`. The eased curves meet the even steps at the same speed, so a walk never jolts between squares.
+ * `amount`. The eased curves meet the even steps at the same speed, so a walk never jolts between squares. A last step eases out
+ * from `from` (0: the whole step; later: a key let go mid-step, Nov 17): the ease-out is added from there on, starting at nothing
+ * and at no speed, so the place and the speed carry on unbroken, and it ends at the same speed as a whole step's.
  */
-export function ease(t: number, first: boolean, last: boolean, amount: number): number {
-  const e = first && last ? t * t * (3 - 2 * t) : first ? t * t * (2 - t) : last ? t * (1 + t - t * t) : t;
+export function ease(t: number, first: boolean, last: boolean, amount: number, from = 0): number {
+  let e = first ? t * t * (2 - t) : t;
+  if (last && t > from && from < 1) {
+    const u = (t - from) / (1 - from);
+    e += (1 - from) * u * u * (1 - u);
+  }
   return t + amount * (e - t);
 }
 
