@@ -520,7 +520,7 @@ export const TOWN_FEEL = {
    */
   rides: {
     "riding-chirp": { foot: 97, shadow: 1.15 },
-    "moon-ride": { foot: 96, shadow: 0 },
+    "moon-ride": { foot: 99.5, shadow: 0 },
     "hollow-bulb": { foot: 96, shadow: 0 },
     "smudgy-brush": { foot: 94, shadow: 0 },
     "alfil-howdah": { foot: 99.5, shadow: 1.3 },
