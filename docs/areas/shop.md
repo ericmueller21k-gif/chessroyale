@@ -72,7 +72,7 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
   knight saddled, the knight your pawn's color, only its blanket the item's color). Their names and lines are the drawings' own. **In no crate yet** (the
   crate comes later): only admins have them, as admin copies (red, emerald second color, 100%: "Admins own one of every item", below).
   **Where the drawings came from:** copied as drawn from `claude/boss-art` (`scripts/boss-art/out/<ride>/<ride>.tsx`; their
-  `summary.md`, `views-summary.md` and `trail-summary.md` there have the artist's notes; Nov 1; Moon's Ride redrawn as a rounded star Nov 17, from `out/star-ride/`, its id kept; the same day its pawn sunk into a hollowed-out seat, cut 70) into
+  `summary.md`, `views-summary.md` and `trail-summary.md` there have the artist's notes; Nov 1; Moon's Ride redrawn as a rounded star Nov 17, from `out/star-ride/`, its id kept; the same day its pawn sunk into a hollowed-out seat, cut 70, and the edge round the seat curved so nothing beside the pawn is cut straight) into
   `components/rides/` (`kit.ts`: the types; `load.ts`: each drawing its own chunk, loaded when a ride is drawn, Nov 1: town-square.md,
   "Rides"); only their import lines changed and the `!`s the app's typecheck asks for, and
   Hollow's Bulb's green cord was taken out of every view by hand (Eric, Nov 1: "we don't really need that"). The old cat, `hollow-steed`, isn't one. Each is a `Back` and a `Front` with the pawn

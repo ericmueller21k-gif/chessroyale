@@ -167,7 +167,9 @@ before the rows are laid (`street.ts lotHere`), so each row fills the place with
   and walks you next to it.
 - **Arrow keys** (Eric, Nov 4, `town-arrow-keys-v3`; `town/arrows.ts`). Hold an arrow and your character runs that way, square to
   square at a tap's pace, as long as it's held; two held is a diagonal (the axes alternate, one square each); a release stops you after
-  the step in progress; walls, the floor and people stop you as they stop a tap. The on-screen keys (27 px, three across and one up,
+  the step in progress, and **a tap walks one square** (Eric, Nov 17): the next square is asked for as a step begins (so a hold runs
+  on with no stop) but dropped if the key is let go before that step ends, the step easing into its stop from there (`Walker.run`'s
+  `holding`, `ease`'s `from`; `town-arrows.test.ts`, "a tap walks one square"); walls, the floor and people stop you as they stop a tap. The on-screen keys (27 px, three across and one up,
   see-through white with a chevron; held: dark, a pixel lower) and the keyboard (the arrows and WASD, never while typing in a box or
   a chat log) feed the same held directions, and the matching key lights while held. A key's walk stands you up, closes a card and
   calls off a game you were walking to, as a tap does. Inside a shop the keys walk you about the room (not during a challenge's intro).
