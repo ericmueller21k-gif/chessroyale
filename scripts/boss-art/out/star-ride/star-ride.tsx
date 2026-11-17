@@ -495,4 +495,40 @@ export const starRide: RiderDraft = {
   Back,
   Front,
   views: { front: frontView, back: backView },
+  trail: { ms: [160, 150, 150, 140], w: 30, h: 18, Mark: TrailMark },
 };
+
+// The trail: a little cluster of sparks dropped from the fizz, lying flat on the floor (squashed), fading out.
+const T_STARS = [
+  { x: -7, y: -1, r: 6.2, c: "#ffe28a" },
+  { x: 4.5, y: 4, r: 5, c: "#ffffff" },
+  { x: 9, y: -5.5, r: 4.2, c: "#ffd45c" },
+];
+const T_SPECKS = [
+  { x: -12, y: 6.5 },
+  { x: 0, y: -7 },
+  { x: 12.5, y: 5.5 },
+];
+
+function TrailMark({ f, n }: { f: number; n: number }) {
+  if (f >= 3) return null;
+  const m = n % 2 ? -1 : 1;
+  const sc = f === 0 ? 1 : 0.7;
+  return (
+    <g transform="scale(1 0.72)" opacity={[1, 0.85, 0.6][f]}>
+      {T_SPECKS.map((s, i) => (
+        <circle key={`k${i}`} cx={s.x * m} cy={s.y} r={f === 2 ? 2 : 1.7} fill="#ffe9a0" stroke="#1d1d1f" {...lw(0.8)} />
+      ))}
+      {f < 2 &&
+        T_STARS.map((s, i) => (
+          <path key={`s${i}`} d={sparkD(s.x * m, s.y, s.r * sc)} fill={s.c} stroke="#1d1d1f" stroke-linejoin="round" {...lw(1)} />
+        ))}
+      {f === 0 && (
+        <g stroke="#ffffff" stroke-linecap="round" {...lw(1)}>
+          <path d={`M ${-7 * m - 6.5} -1 L ${-7 * m - 3.5} -1 M ${-7 * m - 5} -2.5 L ${-7 * m - 5} 0.5`} />
+          <circle cx={-7 * m} cy={-1} r={1.1} fill="#ffffff" stroke="none" />
+        </g>
+      )}
+    </g>
+  );
+}
