@@ -15,8 +15,8 @@ import { BossCardFace, BossSelect, RANDOM, selectBosses } from "../components/Bo
 import { BossInviteSheet } from "../components/BossParty.tsx";
 import type { PartyClient } from "../squads.ts";
 import { openProfile } from "../profile-nav.ts";
-import { BossFace, bossAnims, portraitAnims } from "../components/BossCharacter.tsx";
-import { prewarmAnims } from "../components/BossEffect.tsx";
+import { BossPortrait } from "../components/BossPortrait.tsx";
+import { game } from "../lazy-game.ts";
 import { UserIcon } from "../components/PixelIcon.tsx";
 import { useMedia } from "../components/QuickChat.tsx";
 import { LiveWindow } from "../components/LiveWindow.tsx";
@@ -65,7 +65,7 @@ function saveMode(mode: ModeChoiceId) {
 
 const MATCHMAKING_KEY = "brc.matchmaking";
 /**
- * How you're matched (home's 50 v 50 options, Nov 9: Solo queue "default", Bots "solo"; Party is greyed until it's built): this device's
+ * How you're matched (home's 50 v 50 options, Nov 9: Solo queue "default", Bots "solo"; Party is its own pick, never stored): this device's
  * choice. "botsoff" (people only) has no button on home since Nov 9; stored (a test's), it still queues people only under Solo queue.
  */
 export function chosenMatchmaking(): MatchmakingType {
@@ -231,7 +231,7 @@ export function BossMenu({
                 onClick={() => onPick(b.id)}
               >
                 <span class="br-icon" aria-hidden="true">
-                  <BossFace boss={b} />
+                  <BossPortrait boss={b} />
                 </span>
                 <span class="br-main">
                   <strong>{b.name.replace(/^The /, "")}</strong>
@@ -414,12 +414,13 @@ function FriendsSheet({
 /**
  * 50 v 50's options (Eric, Nov 9: "solo queue, party, and then … bots"), left to right, each a title and a short sub line as Squads'
  * (what each does in full is the line above PLAY). Solo queue is the public queue (it was Default), Bots a game in your browser at
- * the level you pick (it was Solo). Party (queueing together into the public matchmaking, up to CROWD_PARTY_MAX, ranked; Eric, Nov 9)
- * shows greyed, "Soon", until its matchmaker piece is built. Bots off is gone from home. docs/decisions/2026-11-09-home-modes-options.md.
+ * the level you pick (it was Solo). Party (Eric, Nov 9 and 16: you and up to CROWD_PARTY_MAX - 1 friends queue together into the
+ * public matchmaking, on one team; PLAY opens your party's queue screen). Bots off is gone from home. docs/decisions/2026-11-09-home-modes-options.md,
+ * 2026-11-16-crowd-party.md.
  */
-const types: { id: "default" | "party" | "solo"; label: string; sub: string; soon?: boolean }[] = [
+const types: { id: "default" | "party" | "solo"; label: string; sub: string }[] = [
   { id: "default", label: "Solo queue", sub: "join a lobby" },
-  { id: "party", label: "Party", sub: "Soon", soon: true },
+  { id: "party", label: "Party", sub: `up to ${CROWD_PARTY_MAX - 1} friends` },
   { id: "solo", label: "Bots", sub: `${CROWD_SIZE - 1} bots, now` },
 ];
 
@@ -448,7 +449,7 @@ export interface HomeNotice {
   onDismiss: () => void;
 }
 
-function Notice({ notice }: { notice: HomeNotice }) {
+export function Notice({ notice }: { notice: HomeNotice }) {
   return (
     <div class="fd-notice" role="status">
       <svg class="fd-notice-flag" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
@@ -530,6 +531,7 @@ export function HomeScreen({
   onRanked1v1,
   onSquads,
   onParty,
+  onCrowdParty,
   onRaid,
   onChessTown,
   onAutoChess,
@@ -583,6 +585,8 @@ export function HomeScreen({
   onSquads: () => void;
   /** Squads' party: make one, or join by code. */
   onParty: () => void;
+  /** 50 v 50's party (Nov 16): its queue screen (made the first time, or yours again). */
+  onCrowdParty?: () => void;
   /** Open (true) or close the Solo Boss Mode screen. */
   onRaid: (open: boolean) => void;
   /** Chess Town's button: the town square, as /town opens it. */
@@ -626,19 +630,23 @@ export function HomeScreen({
       }
     } else saveMode(m);
   };
-  // How you're matched (50 v 50: Solo queue or Bots; Party greyed). Guests (online needs signing in) can only play Bots; Classic online
+  // How you're matched (50 v 50: Solo queue, Party or Bots). Guests (online needs signing in) can only play Bots; Classic online
   // is coming (Bots works). ("botsoff", a test's stored pick, shows as Solo queue and queues people only.)
   const [picked, setPicked] = useState(chosenMatchmaking);
+  // (50 v 50's Party, Nov 16: PLAY opens your party's queue screen. Not remembered: the stored pick stays Solo queue or Bots.)
+  const [crowdParty, setCrowdParty] = useState(false);
   const soloOnly = !!onlineLocked;
   const type = soloOnly ? "solo" : picked;
+  const partyPicked = crowdParty && !soloOnly && mode === "crowd";
   // (The option shown picked: Bots off has no button since Nov 9.)
-  const option = type === "botsoff" ? "default" : type;
+  const option = partyPicked ? "party" : type === "botsoff" ? "default" : type;
   // The Bot level box (PLAY with Bots).
   const [botBox, setBotBox] = useState(false);
   // (Nothing picked yet: the options show greyed, none selected and none tappable: Eric, Oct 25.)
   const pickType = (t: "default" | "party" | "solo") => {
-    // (Party: greyed until it's built.)
-    if (!mode || t === "party" || (soloOnly && t !== "solo")) return;
+    if (!mode || (soloOnly && t !== "solo")) return;
+    setCrowdParty(t === "party");
+    if (t === "party") return;
     setPicked(t);
     saveMatchmaking(t);
   };
@@ -667,6 +675,15 @@ export function HomeScreen({
   const inParty = !!pv && !!meId && pv.members.some((m) => m.id === meId) && pv.members.length > 1;
   const leading = inParty && pv!.leaderId === meId;
   const [inviting, setInviting] = useState(false);
+  // A party error ("That party has closed.") is a pop-up: it sits over the screen with an X, and never takes a line
+  // under START (Eric, Nov 16: "They shouldn't ever push anything around on the screen"). Dismissed, it's gone until
+  // the next attempt clears it.
+  const partyErr = !inParty ? (bp?.error ?? bossParty?.error ?? null) : null;
+  const [partyErrGone, setPartyErrGone] = useState(false);
+  useEffect(() => {
+    if (!partyErr) setPartyErrGone(false);
+  }, [partyErr]);
+  const partyNotice: HomeNotice | null = partyErr && !partyErrGone ? { text: partyErr, onDismiss: () => setPartyErrGone(true) } : null;
   const pickTile = (id: string) => {
     setPick(id);
     if (!selectBosses().hidden.some((b) => b.id === id)) rememberBossPick(id);
@@ -689,18 +706,23 @@ export function HomeScreen({
       setDifficulty(pv.boss.difficulty);
     } else if (pv.boss.id !== pick || pv.boss.difficulty !== difficulty) bp!.choose(pick, difficulty);
   }, [inParty, leading, pv?.boss?.id, pv?.boss?.difficulty]);
-  // The bosses' art is made the first time it's shown (sprite.ts lazyAnim): their tiles' and faces' made here in quiet slices,
-  // a moment after home shows, so the Boss Battle screen opens without building them; and there, the picked boss's moves. Not
-  // while a game is starting (the Bot level box, the queue: home fills in place): one face can take a slow phone most of a
-  // second, and the queue waited on it (Nov 10 flakes, docs/decisions/2026-11-10-flaky-batch-7.md).
+  // The bosses' tiles and faces draw from the first load's portraits (BossPortrait.tsx: nothing to make). Their figures, powers and the
+  // match's screens are the match's chunk (lazy-game.ts, Nov 16: the bundle split), fetched a moment after home shows (where the tiles'
+  // faces were made until then), so the Boss Battle screen's stage and a match don't wait for it; and there, the picked boss's moves
+  // made in quiet slices. Not while a game is starting (the Bot level box, the queue: home fills in place; App fetches it then anyway).
   const starting = botBox || (queue !== undefined && queue !== null);
   useEffect(() => {
     if (starting) return;
-    let stop = () => {};
-    const t = setTimeout(() => (stop = prewarmAnims(portraitAnims())), 1500);
-    return () => (clearTimeout(t), stop());
+    const t = setTimeout(() => void game.preload(), 1500);
+    return () => clearTimeout(t);
   }, [starting]);
-  useEffect(() => (raid ? prewarmAnims(bossAnims(bossDef(pick)?.name)) : undefined), [raid, pick]);
+  useEffect(() => {
+    if (!raid) return;
+    let stop = () => {};
+    let live = true;
+    void game.preload().then((m) => void (live && m && (stop = m.prewarmBoss(bossDef(pick)?.name))));
+    return () => ((live = false), stop());
+  }, [raid, pick]);
   // (Not while Solo and Boss alone rest: the hidden /bosses lands here too, and the Boss raid screen says why.)
   const bossAlone = () => (rest("solo") ? undefined : bossInUrl() ? onSolo("raid") : setBossMenu("solo"));
   // Boss Battle's START: Maia's files fetched ahead as the old Boss alone menu did when it opened, then the battle.
@@ -738,6 +760,8 @@ export function HomeScreen({
     if (!mode || resting || lockUntil) return;
     if (mode === "squads") return onlineLocked ? onSignIn() : party ? onParty() : onSquads();
     if (mode === "1v1") return onlineLocked ? onSignIn() : onRanked1v1();
+    // (Party: your party's queue screen, idle until its leader's Find match.)
+    if (partyPicked) return onCrowdParty?.();
     // (Bots: the Bot level box first; its OK starts the game.)
     if (type === "solo") return setBotBox(true);
     if (mode === "crowd") onPlay("crowd", type);
@@ -781,6 +805,8 @@ export function HomeScreen({
         Sign in to play online
       </button>
     </>
+  ) : partyPicked ? (
+    `Queue with up to ${CROWD_PARTY_MAX - 1} friends`
   ) : type === "solo" ? (
     `Start at once with ${bots} bots`
   ) : type === "botsoff" ? (
@@ -952,7 +978,7 @@ export function HomeScreen({
       }
     : undefined;
   const names = (xs: { name: string }[]) => (xs.length > 1 ? `${xs.slice(0, -1).map((x) => x.name).join(", ")} and ${xs.at(-1)!.name}` : (xs[0]?.name ?? ""));
-  const partyLine = !inParty ? (bp?.error ?? bossParty?.error ?? "") : leading ? (waiting.length ? `Waiting for ${names(waiting)} to ready up` : "Everyone's ready.") : `${leaderName} picks the boss and the difficulty.`;
+  const partyLine = !inParty ? "" : leading ? (waiting.length ? `Waiting for ${names(waiting)} to ready up` : "Everyone's ready.") : `${leaderName} picks the boss and the difficulty.`;
   const invite = () => {
     void bossParty?.onInvite().then((ok) => ok && setInviting(true));
   };
@@ -973,7 +999,7 @@ export function HomeScreen({
           <span class="fd-head-spacer" />
         </header>
         {/* (Why you're here: a match that closed while this screen was where you'd come back to, as on home.) */}
-        {notice && <Notice notice={notice} />}
+        {notice ? <Notice notice={notice} /> : partyNotice && <Notice notice={partyNotice} />}
         {/* The character select (Eric, Oct 16): the tiles, the stage; the ways to play under it. */}
         <BossSelect value={pick} difficulty={difficulty} name={name} look={look} onPick={pickTile} onDifficulty={pickDifficulty} onInvite={full || !bossParty ? undefined : invite} party={stage} />
         <div class="rd-options">
@@ -1122,7 +1148,7 @@ export function HomeScreen({
       ) : (
         <div class="fd-modes fd-types fd-three" role="radiogroup" aria-label="Matchmaking">
           {types.map((t) => {
-            const off = !!t.soon || (soloOnly && t.id !== "solo");
+            const off = soloOnly && t.id !== "solo";
             const idle = !mode;
             return (
               <button
@@ -1132,7 +1158,7 @@ export function HomeScreen({
                 aria-checked={!idle && option === t.id}
                 aria-disabled={idle || off || undefined}
                 class={`${option === t.id && !idle ? "on" : ""}${off ? " off" : ""}`}
-                title={t.soon ? `Queue with up to ${CROWD_PARTY_MAX - 1} friends (soon)` : off ? "Online: sign in to play" : undefined}
+                title={off ? "Online: sign in to play" : undefined}
                 onClick={() => pickType(t.id)}
               >
                 {t.label}

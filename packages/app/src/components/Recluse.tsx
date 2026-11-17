@@ -1,12 +1,11 @@
 import { useLayoutEffect } from "preact/hooks";
 import { BOSS_POWERS } from "@chessroyale/core";
 import { RECLUSE_FX, bulletIncrementAt, kingHelpBlocked } from "@chessroyale/chess";
-import { RECLUSE, RECLUSE_BUST, suited } from "../characters/recluse.ts";
+import { RECLUSE, RECLUSE_BUST, coated } from "../characters/recluse.ts";
 import { RECLUSE_CUTSCENE } from "../characters/recluse-ages.ts";
 import { RECLUSE_CHANGE, RECLUSE_CHANGE_BOOK, RECLUSE_CHANGE_KID } from "../characters/recluse-transform.ts";
 import { lazyTable, type Character } from "../characters/sprite.ts";
 import { RECLUSE_LINES } from "../characters/recluse-lines.ts";
-import { PHASE2_ULT_ANIMS } from "../recluse-phase2.ts";
 import { animLength, cueAt } from "../characters/power-art.ts";
 import type { BossView } from "../game.ts";
 import { kingSay } from "../godKing.ts";
@@ -24,7 +23,7 @@ import { hash, type BossUi, type KitMoment, type MomentProps } from "./PowerPart
  *   his hair in the wind, laughing; holds the spell; slams it shut. His line as it begins; "BULLET!" as the book falls
  *   open. From then on the dock says "Bullet" with the time left in your bank on every move (Play.tsx).
  * - **He adds time per move** (Eric, Oct 14), a few moves into it (`bulletPlus`): his line as he consults the book, then
- *   "+2 s a move from now on" across the board's middle until your clock starts; the dock's "Bullet 1+2" from then on.
+ *   "+10 s a move from now on" across the board's middle until your clock starts; the dock's "Bullet 1+10" from then on.
  * - **The God King's help blocked** (his passive): tapping the God King's move or strike, the help doesn't come but the
  *   charge is spent as if it had (SoloMatch.callKing; online NetMatch.callKing, the lobby spending it); he slams the book
  *   shut and mocks it, and the God King says his help won't take hold (on the device that tried: the others see the
@@ -49,7 +48,7 @@ export const bulletOn = (boss: Pick<BossView, "powers" | "result"> | null | unde
 export const bulletIncrementOn = (boss: Pick<BossView, "powers" | "result"> | null | undefined): number =>
   bulletOn(boss) ? bulletIncrementAt(boss!.powers!.turn, boss!.powers!.ultAt) : 0;
 
-/** The bullet clock as a chess time control: "1+2" (the bank in minutes, plus the increment), once he has added one. */
+/** The bullet clock as a chess time control: "1+10" (the bank in minutes, plus the increment), once he has added one. */
 export const bulletControl = (inc: number): string => `${Math.round((BOSS_POWERS.bulletBankSeconds / 60) * 100) / 100}+${inc}`;
 
 /** The God King's help doesn't work against this boss (the Hidden Boss's passive). */
@@ -108,7 +107,7 @@ let warmed: "w" | "b" | null = null;
 /**
  * His phase change's frames drawn ahead, a slice each animation frame, from when his battle shows (it comes only once he's beaten,
  * minutes later), so none stalls a slow phone the first time it shows (.claude/LESSONS.md: "A stall the first time an effect
- * shows"): his cutscene's first frames, his transformation's (the man, the child, the book), then his suit where he stands (the
+ * shows"): his cutscene's first frames, his transformation's (the man, the child, the book), then his final form where he stands (the
  * bust's and the figure's phase 2 idle and ultimate; the figure's results, beaten or laughing); and its sounds, made ahead in the
  * sound worker. (Into BossEffect's frame cache, the one BossCharacter draws from too.)
  */
@@ -116,18 +115,21 @@ export function prewarmRecluse(side: "w" | "b"): void {
   if (warmed === side) return;
   warmed = side;
   const frames = (ch: Character, names: readonly string[]) => names.flatMap((n) => ch.anims[n]?.frames ?? []);
+  // (In his final form: each frame numbered within its own animation, as BossCharacter numbers it (it turns his helix).)
+  const worn = (ch: Character, names: readonly string[]) => names.flatMap((n) => (ch.anims[n]?.frames ?? []).map((f, i) => coated(f, i)));
   // (His cutscene's first frames: the man alone in the light, the child's poof, drop and landing.)
   const SCENE = ["idle", "poof", "drop", "land"];
   const CHANGE = Object.keys(RECLUSE_CHANGE.anims);
-  // (In his suit where he stands: phase 2's idle and ultimate; on the results, beaten (and slumped) or laughing.)
-  const SUITED = ["idle2", ...PHASE2_ULT_ANIMS];
+  // (In his final form where he stands: phase 2's idle and the spellbook as he's beaten on all four; on the results, beaten (and
+  // slumped) or laughing.)
+  const SUITED = ["idle2", "spellbook2", "spellLoop2", "spellClose2"];
   const SUITED_RESULTS = ["collapse", "collapseLoop", "laugh"];
   // One after another, in the order they show, so only one slice of drawing ahead is ever at work in a frame.
   prewarmSprite(RECLUSE_CUTSCENE, frames(RECLUSE_CUTSCENE, SCENE), undefined, () =>
     prewarmSprite(RECLUSE_CHANGE, frames(RECLUSE_CHANGE, CHANGE), undefined, () =>
       prewarmSprite(RECLUSE_CHANGE_KID, frames(RECLUSE_CHANGE_KID, ["together"]), undefined, () =>
         prewarmSprite(RECLUSE_CHANGE_BOOK, frames(RECLUSE_CHANGE_BOOK, ["glow"]), undefined, () =>
-          prewarmSprite(RECLUSE_BUST, frames(RECLUSE_BUST, SUITED).map(suited), undefined, () => prewarmSprite(RECLUSE, frames(RECLUSE, [...SUITED, ...SUITED_RESULTS]).map(suited))),
+          prewarmSprite(RECLUSE_BUST, worn(RECLUSE_BUST, SUITED), undefined, () => prewarmSprite(RECLUSE, worn(RECLUSE, [...SUITED, ...SUITED_RESULTS]))),
         ),
       ),
     ),

@@ -30,6 +30,7 @@ const PASSIVE_EVENTS: Partial<Record<PowerId, PowerEventKind[]>> = {
   scraps: ["build"],
   clockslap: ["slap"],
   dough: ["doughDrop"],
+  lockon: ["lockOn"],
 };
 
 // (A boss in the game for admins first, Timber and Dash, is checked too: the test plays as an admin.)
@@ -45,8 +46,10 @@ const SMOKE_POWER: Partial<Record<string, PowerId>> = { smudgy: "repaint" };
 /**
  * A boss whose passive needs a position the knights' shuffle doesn't give: your first moves instead (then the usual rule).
  * Boingo's pie (Nov 12) needs one of your pieces with both squares diagonally behind it empty: 1.e4 leaves d3 and f3 open.
+ * Chandy's lock-on starts with his first capture (Nov 16), and the knights' shuffle may give him nothing free to take before the
+ * time runs out (main, Nov 16: "passive": false): 1.e4 and 2.Ba6 leave a bishop he takes at once (b7, the b8 knight or the c8 bishop).
  */
-const SMOKE_FIRST: Partial<Record<string, string[]>> = { clown: ["e2e4"] };
+const SMOKE_FIRST: Partial<Record<string, string[]>> = { clown: ["e2e4"], chandy: ["e2e4", "f1a6"] };
 const desktop = () => test.info().project.name === "desktop";
 const phase = (p: Page) => p.evaluate(() => (window as any).match?.phase?.kind ?? "none").catch(() => "none");
 

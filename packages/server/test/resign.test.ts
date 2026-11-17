@@ -145,6 +145,25 @@ describe("resigning online: Crowd 50 v 50 and raids", () => {
     expect(L.core.connect(token, "P2", "phone")).toEqual({ ok: false, message: LEFT_MATCH, ended: true, left: { how: "resigned", result: { placement: 100, players: 100, ranked: false } } });
   });
 
+  it("the 50 v 50 rework (C2): the seat a person left is marked with the move they left at and is never the best player; the match plays to its end for the others", () => {
+    // A short rework game (the first cut after move 3, then one each move, the limit after Black's 8th); p1 never picks, so no
+    // AFK rule here (?afk=0).
+    const L = crowd(2, { stageRounds: [], firstStageRounds: 6, roundsPerStage: 1, crowdMoveLimit: 8, crowdMisses: null });
+    // (A seat left before any move was played isn't marked: the bot plays the whole match.)
+    L.until(() => L.runner().boards[0]!.history.length >= 3);
+    const move = Number(L.runner().boards[0]!.fen.split(" ")[5]);
+    L.core.message("p2", { t: "resign" });
+    const bot = L.runner().state.players.find((p) => p.id.startsWith("rb"))!;
+    expect(bot.leftAt).toBe(move);
+    // Their own result stands where they left (the last place still open), as before the rework.
+    expect(L.last("p2", "resigned")).toMatchObject({ how: "resigned", result: { placement: L.runner().state.players.filter((p) => p.alive).length } });
+    L.until(() => L.core.record.phase === "results");
+    const res = L.last("p1", "results")!;
+    expect(res.podium?.best).toBeTruthy();
+    expect(res.podium!.best).not.toBe(bot.id);
+    expect(Object.values(res.placements).filter((n) => n === 1)).toHaveLength(1);
+  });
+
   it("50 v 50's AFK rule (CrowdMisses, Eric, Nov 4): a miss is shown as a pick made for you (1 of 3), and the 4th miss in the game removes you as leaving the match (\"afk\": a loss, a bot in the seat); someone who picks plays on", () => {
     const L = crowd(2);
     const seen: number[] = [];

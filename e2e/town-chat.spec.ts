@@ -2,7 +2,7 @@ import { devices, expect, request as apiRequest, type Browser, type Page, type R
 import { CHAT, tooSoonText } from "../packages/app/src/town/chat.ts";
 import { NAME_COLORS } from "../packages/app/src/town/names.ts";
 import { TOWN_CHAT } from "@chessroyale/core";
-import { asServerAdmin, asSignedIn, test } from "./helpers.ts";
+import { asServerAdmin, asSignedIn, test, townLetGo } from "./helpers.ts";
 
 /**
  * The town square's chat log (Oct 28; docs/areas/town-square.md, "The chat log"), on a phone and a computer. v2 (Eric, Oct 28): one
@@ -132,21 +132,31 @@ const scrollOf = (p: Page) => p.locator(".tc-log").evaluate((el) => ({ top: el.s
 /**
  * The town, open, with the bosses' and kids' own chatter stopped (it speaks every 20 to 45 s: a test looks at its own lines). By day
  * unless told (`sky`: the town's own `?sky=` override: day, dawn, dusk or night).
+ * The other players' towns in this browser (Bo's, a guest's) are held while it loads, then let go: every page here shares one software
+ * GPU, and two towns drawing every frame starve a third's loading uploads (Nov 16, #747's red: the guest's town took 20 to 26 s on a
+ * quiet machine, on main as on the branch, and over 40 s on CI beside another worker's town; held, 6 s).
  */
 async function open(page: Page, query = "", sky = "day") {
-  await page.goto(`/town?sky=${sky}&townroom=${room}${query}`);
-  await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
+  const others = (page.context().browser()?.contexts() ?? []).flatMap((c) => c.pages()).filter((p) => p !== page && !p.isClosed());
+  await Promise.all(others.map((p) => p.evaluate(() => (window as any).__townHold?.(true)).catch(() => undefined)));
+  try {
+    await page.goto(`/town?sky=${sky}&townroom=${room}${query}`);
+    await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
+  } finally {
+    await Promise.all(others.map(townLetGo));
+  }
   await page.waitForFunction(() => typeof (window as any).__townSay === "function");
   await page.evaluate(() => (window as any).__townChatter(false));
 }
 
 /**
  * The town, open, as a signed-in player (the field and other players' lines are theirs only): the account gets an email in
- * the local database (`asSignedIn`), then the page loads again. `admin`: the chat moderator's address instead
+ * the local database (`asSignedIn`), then the town opens. `admin`: the chat moderator's address instead
  * (playwright.config.ts' ADMIN_EMAILS). Answers the account's id.
+ * (The account is made before the town opens, by the page's own first /api/me: `pageAccountId`. Until Nov 16 the town opened first as
+ * a guest's and again signed in: a whole town load each time, 5 to 6 s on a quiet machine, for nothing.)
  */
 async function openSignedIn(page: Page, admin = false) {
-  await open(page);
   const id = admin ? await asServerAdmin(page, "chat") : await asSignedIn(page, "town");
   await open(page);
   // (Signed in: the typing line is enabled, not greyed. It isn't visible until a tap opens it.)
@@ -1230,10 +1240,19 @@ test("press and hold on the box and drag it anywhere on the map; it stays, is re
   // takes it (a finger scrolls the stream; a mouse drag does nothing), the camera and you stay, typing doesn't open, and the box stays.
   const here = await you(page);
   const free = { x: b0.x + b0.w - 30, y: b0.y + b0.h - 60 };
-  await page.mouse.move(free.x, free.y);
-  await page.mouse.down();
-  await page.mouse.move(free.x + 40, free.y + 120, { steps: 6 });
-  await page.mouse.up();
+  {
+    // (The press and the first move go to the browser together: on a busy machine a round trip between them outlasted the hold, 400 ms,
+    // and the drag became a carry. Nov 16, the desktop's run locally: the box carried to 280, 128.)
+    const cdp = await page.context().newCDPSession(page);
+    const at = (i: number) => ({ x: free.x + (40 * i) / 6, y: free.y + (120 * i) / 6 });
+    const ev = (type: "mousePressed" | "mouseMoved" | "mouseReleased", i: number, buttons: number) =>
+      cdp.send("Input.dispatchMouseEvent", { type, ...at(i), button: type === "mouseMoved" && !buttons ? "none" : "left", buttons, clickCount: type === "mouseMoved" ? 0 : 1 });
+    await ev("mouseMoved", 0, 0);
+    await Promise.all([ev("mousePressed", 0, 1), ev("mouseMoved", 1, 1)]);
+    for (let i = 2; i <= 6; i++) await ev("mouseMoved", i, 1);
+    await ev("mouseReleased", 6, 0);
+    await cdp.detach();
+  }
   expect(await rectOf(page, ".town-chat")).toEqual(b0);
   const cam1 = await page.evaluate(() => (window as any).__townCam().focus as number[]);
   expect(Math.hypot(cam1[0]! - cam0[0]!, cam1[1]! - cam0[1]!), "the camera didn't move: the box took the drag").toBeLessThan(0.05);
@@ -1444,7 +1463,12 @@ test("signing in a page whose own first /api/me answers after the town shows: th
     await new Promise((ok) => setTimeout(ok, 1500));
     return route.fulfill({ response: await api.get("/api/me") });
   });
-  await openSignedIn(page);
+  // (The town first, as a guest's: its first /api/me is the one held. Then the email, and the town again, signed in: openSignedIn's steps
+  // before Nov 16, kept whole here as this race is this test's subject.)
+  await open(page);
+  await asSignedIn(page, "town");
+  await open(page);
+  await expect(page.locator(".tc-form input")).toBeEnabled();
   await api.dispose();
 });
 

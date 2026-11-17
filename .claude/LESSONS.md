@@ -337,6 +337,12 @@ Tests check *what* ends up on the screen, not *how it gets there*, nor how long 
     begins. `watchFor` says only that each thing showed, not that they showed together. Never a string of round trips after it starts.
   - A spec run with `--repeat-each` gives each repeat its own queue pool (`test.info().repeatEachIndex`): repeats share module state.
 
+- **The town specs' time** (Nov 16, `docs/decisions/2026-11-16-town-tap-speed.md`):
+  - A margin between something read from the page and an action sent after it (a clock's pause, a hold) is bigger than the round trips
+    between them on a busy runner (0.2 to 0.7 s beside a WebGL town), or both go to the browser together (CDP).
+  - A wait that has another way through (a glide) gives up as soon as it can tell, counted in frames, not after a fixed time.
+  - A town load costs 5 to 9 s on software WebGL: a spec opens the town once it needs it, signed in first.
+
 ## Eric's rules hold
 
 - **An options panel that disappeared** (Oct 25, [story](../docs/history/lessons.md#an-options-panel-that-disappeared-oct-25-2026)):
@@ -374,5 +380,15 @@ Tests check *what* ends up on the screen, not *how it gets there*, nor how long 
 - **His words over his face as he grew** (Nov 14, [story](../docs/history/lessons.md#his-words-over-his-face-as-he-grew-nov-14-2026)):
   - A speech bubble stands on the drawing shown now: a figure whose height or place changes (grows, leaps onto the board) carries its
     heights from the art (measured in a unit test), never one number per character, and a check measures the bubble against his head.
+
+- **A cleared browser marked again by its own open tab** (Nov 15, [story](../docs/history/lessons.md#a-cleared-browser-marked-again-by-its-own-open-tab-nov-15-2026)):
+  - "A fresh browser" in a test is a new context (`browser.newContext({ ...test.info().project.use })`), never the open tab's
+    cookies and storage cleared: that tab's requests already on their way answer after the clear and set them again.
+  - A failure that only passes on CI's retry may be hidden by the retry's trace (it slows the page): repeat it locally with
+    `--trace off`, and log requests in the test instead.
+
+- **Windows lit over Chandy's Swamp** (Nov 16, [story](../docs/history/lessons.md#windows-lit-over-chandys-swamp-nov-16-2026)):
+  - A frame's bookkeeping never caps silently: a list that's full grows (or fails loudly in tests), never drops what comes after.
+  - A home you can see into (no solid front) is open: nothing of the town may stand inside its box (`street.ts OPEN_HOMES`).
 
 - **The FAQ follows the rules** (Oct 11): a PR that changes a rule, a number's meaning or a boss updates its words in `packages/app/src/faq/content.ts` in the same PR; numbers there come from the settings objects, never typed in.

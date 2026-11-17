@@ -23,6 +23,7 @@ import {
   hoopsAnswer,
   creaseAnswer,
   applyMove,
+  dodgeTimeline,
   slamFrom,
   type BoardScore,
   type EngineLike,
@@ -90,7 +91,7 @@ async function hostBoss(engine: EngineLike, s: Settings, m: Extract<Msg, { t: "b
   const kind = m.best ? "best" : m.stumble ? "stumble" : m.stagger ? "stagger" : "elo";
   const ahead = m.land?.length && !m.funhouse ? slamAhead(m.land) : null;
   const look = m.race && !m.funhouse ? { race: m.race, looks: BOSS_POWERS.carrotLooks, nodes: BOSS_POWERS.carrotNodes } : null;
-  const ordinary = () => bossMoveFrom(engine, m.fen, m.elo, m.nodes, kind, Math.random, s.kingStrikeLoss, bossGuardFrom(s), m.allowed ?? null, undefined, ahead, look);
+  const ordinary = () => bossMoveFrom(engine, m.fen, m.elo, m.nodes, kind, Math.random, s.kingStrikeLoss, bossGuardFrom(s), m.allowed ?? null, undefined, ahead, look, false, m.lock ?? null);
   if (m.seed !== undefined && !m.funhouse) {
     const answer = await pigTurn(engines, m.fen, { seed: m.seed, ...(m.pull ? { pull: m.pull } : {}), ...(m.drag ? { drag: true as const } : {}), ...(m.showdown ? { showdown: m.showdown } : {}) }, ordinary);
     return reply(answer.move, { ...(answer.drag !== undefined ? { drag: answer.drag } : {}), ...(answer.showdown !== undefined ? { showdown: answer.showdown } : {}) });
@@ -135,6 +136,13 @@ async function online(bossId: string, test: string): Promise<{ trace: Trace; sta
     let acted = false;
     for (const m of msgs) {
       if (m.t === "boss") for (const e of m.boss.powers?.events ?? []) trace.events.add(eventKey(e));
+      // (Chandy's Dodge: both vote the safe square (the lobby's own state: the view hides it) once the round's vote is open.)
+      const dodge = m.t === "boss" ? m.dodge : undefined;
+      const full = runner.boss?.powers?.chandy?.dodge;
+      if (dodge && full && full.results.length === dodge.round && dodge.round < full.rounds.length) {
+        now = Math.max(now, dodge.at + dodgeTimeline().rounds[dodge.round]!.voteAt);
+        for (const id of ["p1", "p2"]) core.message(id, { t: "dodgeVote", key: dodge.key, round: dodge.round, square: full.rounds[dodge.round]!.safe });
+      }
       if (m.t === "results") trace.result = m.bossResult ?? "none";
       if (m.t === "scoreRequest") {
         const boards = await Promise.all(m.jobs.map((j) => hostScore(engine, runner.settings, j)));
@@ -198,9 +206,21 @@ async function solo(start: MatchRunner): Promise<Trace> {
       seen();
       if (r.bossToMove() && r.hopDue()) await r.playHop(engines).catch(() => r.applyHop(null));
       seen();
-      if (r.bossToMove()) await r.playBoss(engines[0]);
+      // (Chandy's queen lock: aimed, as online where the host's answer to the pass guard is a move, never "wait".)
+      if (r.bossToMove() && r.queenLockDue()) r.applyQueenLock(null);
+      seen();
+      // (A moment with his move known, before it shows, as solo shows it: Chandy's first lock.)
+      if (r.bossToMove()) await r.playBoss(engines[0], async () => seen());
       continue;
     }
+    // (Chandy's Dodge: everyone votes the safe square, as online.)
+    while (r.dodgeDue()) {
+      const d = r.boss!.powers!.chandy!.dodge!;
+      const safe = d.rounds[d.results.length]!.safe;
+      r.finishDodgeRound(Object.fromEntries(r.alive().map((p) => [p.id, safe])));
+    }
+    seen();
+    if (r.stageComplete()) continue;
     // (Dash's Scramble Rush: nobody's placements, as online.)
     if (r.rushDue()) r.finishRush({});
     if (r.extraMoveDue()) {
@@ -244,4 +264,14 @@ describe("the boss kit: solo and online agree", () => {
       expect(local.result).toBe(net.result);
     }, 60_000);
   }
+
+  it("chandy, no switch: his first capture's lock (the host's move, then the lock moment, then the move) is the same solo and online", async () => {
+    const { trace: net, start } = await online("chandy", "");
+    const local = await solo(start);
+    const firsts = [...net.events].filter((e) => e.includes('"kind":"lockOn"') && e.includes('"first":true'));
+    expect(firsts.length).toBe(1);
+    expect(local.turns).toEqual(net.turns);
+    expect({ onlyOnline: [...net.events].filter((e) => !local.events.has(e)), onlySolo: [...local.events].filter((e) => !net.events.has(e)) }).toEqual({ onlyOnline: [], onlySolo: [] });
+    expect(local.result).toBe(net.result);
+  }, 60_000);
 });

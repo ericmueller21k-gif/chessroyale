@@ -7,7 +7,9 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
 - **Loading (Nov 10, [phone load 2](../decisions/2026-11-10-phone-load-2.md)):** `index.html`'s shell (home's markup, only the logo, hero
   panel and PLAY's outline visible; the splash where this device hasn't landed on home: `shell.ts`) shows before the script runs and goes as
   the first real screen draws. The match screens (`screens/game-screens.ts`), solo, FAQ, Legal and Auto chess are chunks (`lazy.tsx`),
-  preloaded when play is near. Pictures are cached on first show, not precached; the demo video is MP4 only. `scripts/measure-load.mjs`.
+  preloaded when play is near; the match's (`lazy-game.ts`, with every boss's drawings, effects and powers since Nov 16's
+  [bundle split](../decisions/2026-11-16-bundle-split.md)) also 1.5 s after home shows. Home's boss faces and the select's tiles are
+  prerendered portraits (`components/BossPortrait.tsx`). Pictures are cached on first show, not precached; the demo video is MP4 only. `scripts/measure-load.mjs`.
   Past `FRONT_DOOR.loadBarAfterMs` (2 s) the shell shows a thin bar and what's loading (under the splash's logo, centered; the shell is always the splash since Eric's Nov 10 call, never home's outline),
   moved by the app's steps (`loadbar.ts`); a script that won't load, or no step for 20 s: "Try again" (a reload).
   [Decision](../decisions/2026-11-10-loading-bar.md); guard: `e2e/home-layout.spec.ts`, "the loading bar".
@@ -67,8 +69,11 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
     "it should never change size";
     [docs/decisions/2026-10-18-home-steady-layout.md](../decisions/2026-10-18-home-steady-layout.md)), holding the
     pick's options or words (Nov 9, [2026-11-09-home-modes-options.md](../decisions/2026-11-09-home-modes-options.md)): 50 v 50's
-    **Solo queue** (the public queue), **Party** (greyed, "Soon": queueing together into the public matchmaking, up to
-    `CROWD_PARTY_MAX` = 8, sides random, ranked, a later job; Eric, Nov 9) and **Bots** (you and 99 bots in your
+    **Solo queue** (the public queue), **Party** (Nov 16, [decision](../decisions/2026-11-16-crowd-party.md): PLAY opens your party's queue screen, idle: your seat,
+    up to 7 friends' (`CROWD_PARTY_MAX` = 8), "+" opens your friends sheet, "…" an invite out; the leader's Find match queues all
+    into the public matchmaking on one team; members see "Waiting for <leader>" greyed; back and Leave leave; "Party matches aren't
+    ranked" greyed under the row; the screen stays through the fill; a reload goes back to it and its lobby; a search stopped with everyone
+    away says so on top (`.fd-notice`, its X); `screens/CrowdParty.tsx`) and **Bots** (you and 99 bots in your
     browser: PLAY opens **the Bot level box**, [2026-11-09-home-modes-bot-level.md](../decisions/2026-11-09-home-modes-bot-level.md):
     My level, Very easy … Very hard, Random, each with its average; OK greyed until a pick, remembered on the device, `BOT_LEVELS`;
     `components/BotLevelBox.tsx`), each a title and a sub line, three equal buttons in the 44 px row (Bots off has no button since
@@ -90,7 +95,7 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
     off with its line, as the other modes. Ranked's leave rules (L1, Nov 9; [ranked.md](ranked.md), "Leaving early"): a
     lockout greys 1 v 1's PLAY with its countdown in the line ("You left early: 1 v 1 opens in 4:32", one line from 320 px;
     `LeavesLine`, the only part drawn each second), PLAY back by itself as it ends; the delayed queue's line ("3 leaves in your
-    last 20: +2 min queue") leaves PLAY on. Home's note slot (the `fd-notice` at its top, dismissable for the tab) says "You left
+    last 20: +2 min queue") leaves PLAY on. Home's note slot (the `fd-notice`, a pop-up fixed under the header that pushes nothing, dismissable for the tab; Eric, Nov 16) says "You left
     before the game started: −5 RP" after a dodge, or "Finish ranked games to clear your leaves." from 5 marks; another notice (a match
     that ended) goes first.
   - **Searching while you browse** (Eric, Nov 10; [2026-11-10-search-on-home.md](../decisions/2026-11-10-search-on-home.md); `search.ts`, Home's `SearchRow`):
@@ -282,9 +287,11 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
     server is asked whether they'd take an invite, then a lobby (or, with Squads picked, a party) is made in the home
     screen's mode and they're invited into it. Not during a match. A lobby and a party have "Invite friends" (a sheet
     of your friends) under their link.
-  - **A new invite** shows as a toast at the top of a front-door page (never over a match or the queue) for
-    `FRIENDS.toastMs`: Join (into the lobby or party; the invite leaves your list) or ✕ (declines it).
-  - **Settings → Friends:** "Invites from" (Everyone, Friends, No one) and "Show when I'm online".
+  - **A new invite** shows in a small box at the top right of a front-door page (never over a match or the queue; Eric, Nov 16; a
+    phone's under its top bar), on top, pushing nothing, for `FRIENDS.toastMs`: "<Name> invited you", Accept (into the lobby or
+    party; off your list) or Decline.
+  - **Settings → Friends:** "Invites from" (Everyone, Friends, No one), "Show when I'm online" and **Do Not Disturb** (no invites or
+    friend requests reach you, nor show, earlier ones too; senders get the "No one" words).
   - **Fresh:** the list loads with your account and again when the live line's `inbox` grows (something new arrived
     for you). While a list is on screen (the phone's line, the computer's panel, the friends list, Invite friends) and
     you have a friend who shows when they're online, who's online in it refreshes every `FRIENDS.refreshMs`

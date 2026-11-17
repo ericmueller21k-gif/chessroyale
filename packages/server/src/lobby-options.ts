@@ -10,7 +10,7 @@ import type { LobbyRecord } from "./lobby.ts";
  *     admin, or TEST_SWITCHES on: testSwitchesOn in admin.ts); for anyone else they're dropped, silently, so the lobby
  *     is exactly the one made without them.
  */
-export const LOBBY_TEST_SWITCHES = ["rounds", "clock", "finalTurns", "bossMoves", "draw", "power", "format", "speed", "weakbots", "keep", "pace", "augments", "start", "afk", "xpgame", "form"] as const;
+export const LOBBY_TEST_SWITCHES = ["rounds", "clock", "finalTurns", "limit", "bossMoves", "draw", "power", "format", "speed", "weakbots", "keep", "pace", "augments", "start", "afk", "xpgame", "form"] as const;
 
 /** `?boss=` is the creator's pick only in a raid, as a boss's id: a fixed strength (a tier), or a boss in another mode, is a test's. */
 const testBoss = (q: URLSearchParams) => q.has("boss") && (q.get("mode") !== "raid" || BOSS_TIERS.includes(Number(q.get("boss"))));
@@ -66,13 +66,17 @@ export function lobbyOptions(query: URLSearchParams, test: boolean, xpGameOn = f
       stageRounds: n("rounds") ? [] : undefined,
       moveClockSeconds: n("clock"),
       finalMaxTurns: n("finalTurns"),
+      // ?limit=N: the 50 v 50 rework's game ends after Black's move N (crowdMoveLimit, 60), the judge's verdict deciding (tests).
+      crowdMoveLimit: mode === "crowd" && !raid ? n("limit") : undefined,
       bossMaxMoves: n("bossMoves"),
       drawRuleByStage: draw && DRAW_RULES.includes(draw) ? [draw] : undefined,
     }),
-    // ?format=team|boss|duel: skip the pre-game votes and play that ending (for testing).
+    // ?format=team|boss|duel: skip the pre-game votes (for testing). Before the 50 v 50 rework it also played that ending; the
+    // rework has none (CROWD_REWORK's crowdCuts: one game to its end), so there it only skips the votes (Strong plays).
     ...(() => {
       const f = q.get("format") as FinalFormat | null;
-      return mode === "crowd" && f && f in CROWD_KNOCKOUTS ? { finalFormat: f, knockoutsPerStage: CROWD_KNOCKOUTS[f], augments: false } : {};
+      if (mode !== "crowd" || !f || !(f in CROWD_KNOCKOUTS)) return {};
+      return !raid && modeSettings("crowd").crowdCuts?.length ? { augments: false } : { finalFormat: f, knockoutsPerStage: CROWD_KNOCKOUTS[f], augments: false };
     })(),
     // ?speed=bullet|blitz|rapid: that time control (for testing, with ?format=; old ids map over, unknown ones are Blitz).
     ...(mode === "crowd" ? (speedOption(q.get("speed"))?.patch ?? {}) : {}),

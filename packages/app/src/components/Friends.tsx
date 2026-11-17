@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import type { ComponentChildren } from "preact";
-import { ACTIVITY_LINES, FRIENDS, inviteWhat, type FriendEntry, type InviteEntry } from "@chessroyale/core";
+import { ACTIVITY_LINES, CROWD_PARTY_MAX, FRIENDS, inviteWhat, type FriendEntry, type InviteEntry } from "@chessroyale/core";
 import {
   addFriend,
   answerFriend,
@@ -166,7 +166,10 @@ export function FriendsPanel({ onOpen }: { onOpen: () => void }) {
 /** "9 min left". */
 const minutesLeft = (inv: InviteEntry, now = Date.now()) => `${Math.max(1, Math.ceil((inv.expiresAt - now) / 60_000))} min left`;
 
-/** A new invite, for a moment at the top of a front-door page (never over a match): Join or Dismiss. */
+/**
+ * A new invite, for a moment in a small box at the top right of a front-door page (never over a match; Eric, Nov 16): "<Name>
+ * invited you", what to, Accept (join it) or Decline (it's gone from your list; a 50 v 50 party's seat for you is a "+" again).
+ */
 export function InviteToast() {
   useFriends();
   const toast = inviteToast();
@@ -178,15 +181,17 @@ export function InviteToast() {
   if (!inv) return null;
   return (
     <div class="fr-toast" role="status" aria-label={`${inv.name} invited you`}>
-      <span class="fr-toast-text">
-        <strong>{inv.name}</strong> invited you to {inviteWhat(inv.kind)}
-      </span>
-      <FdButton primary class="small" onClick={() => joinInvite(inv)}>
-        Join
-      </FdButton>
-      <button type="button" class="fd-icon-btn fr-toast-x" aria-label="Dismiss the invite" onClick={() => void dismissInvite(inv).catch(hideToast)}>
-        ✕
-      </button>
+      <div class="fr-toast-text">
+        <strong>{inv.name} invited you</strong> <span>to {inviteWhat(inv.kind)}</span>
+      </div>
+      <div class="fr-toast-actions">
+        <FdButton class="small" onClick={() => void dismissInvite(inv).catch(hideToast)}>
+          Decline
+        </FdButton>
+        <FdButton primary class="small" onClick={() => joinInvite(inv)}>
+          Accept
+        </FdButton>
+      </div>
     </div>
   );
 }
@@ -229,7 +234,11 @@ export function InviteFriends() {
   );
 }
 
-function InviteSheet({ onClose }: { onClose: () => void }) {
+/**
+ * The friends sheet (online first), each with Invite. A 50 v 50 party's (a "+" tapped, Nov 16) says so, and shows a friend already
+ * in the party or invited greyed with what they are, Invite greyed for everyone once the party has no room (never hidden).
+ */
+export function InviteSheet({ onClose, party }: { onClose: () => void; party?: { inParty: ReadonlySet<string>; invited: ReadonlySet<string>; full: boolean } }) {
   const { state } = useFriends(true);
   const [note, setNote] = useState<string | null>(null);
   // (A layout effect, as every pop-up's: an effect waits for a paint, and an Escape pressed as it opened was lost. LESSONS.md, Nov 11.)
@@ -247,11 +256,22 @@ function InviteSheet({ onClose }: { onClose: () => void }) {
             ✕
           </button>
         </div>
-        {state && !state.friends.length && <p class="fd-sub">No friends yet. Tap a player's name, then Add friend. Or share the link.</p>}
+        {party && <p class="fd-sub">Up to {CROWD_PARTY_MAX - 1} friends queue with you, all on your team.</p>}
+        {state && !state.friends.length && <p class="fd-sub">{party ? "No friends yet. Tap a player's name, then Add friend." : "No friends yet. Tap a player's name, then Add friend. Or share the link."}</p>}
         <div class="fr-list">
           {state?.friends.map((f) => (
             <FriendRow key={f.id} f={f}>
-              <InviteButton uid={f.id} onNote={setNote} />
+              {party?.inParty.has(f.id) ? (
+                <FdButton class="small" disabled>
+                  In party
+                </FdButton>
+              ) : party?.invited.has(f.id) ? (
+                <FdButton class="small" disabled>
+                  Invited
+                </FdButton>
+              ) : (
+                <InviteButton uid={f.id} onNote={setNote} {...(party?.full ? { disabled: true, title: "Your party is full" } : {})} />
+              )}
             </FriendRow>
           ))}
         </div>
@@ -261,7 +281,7 @@ function InviteSheet({ onClose }: { onClose: () => void }) {
   );
 }
 
-/** Settings → Friends: who may invite you, and whether others see when you're online. */
+/** Settings → Friends: who may invite you, whether others see when you're online, and Do Not Disturb (Eric, Nov 16). */
 export function FriendSettings() {
   const { state, status } = useFriends();
   const [note, setNote] = useState<string | null>(null);
@@ -305,6 +325,13 @@ export function FriendSettings() {
           <span>Your profile and your friends' lists show when you're online or in a match. Off: nobody sees it.</span>
         </span>
         <input type="checkbox" role="switch" checked={s.showOnline} onChange={(e) => save({ showOnline: e.currentTarget.checked })} />
+      </label>
+      <label class="fd-toggle">
+        <span class="fd-toggle-text">
+          <strong>Do Not Disturb</strong>
+          <span>No invites or friend requests reach you. Others are told you aren't taking them right now.</span>
+        </span>
+        <input type="checkbox" role="switch" checked={!!s.dnd} onChange={(e) => save({ dnd: e.currentTarget.checked })} />
       </label>
       {note && <p class="fd-error">{note}</p>}
     </section>

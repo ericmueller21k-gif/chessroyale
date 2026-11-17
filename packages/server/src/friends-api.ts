@@ -1,13 +1,16 @@
-import { isGameCode, isInviteKind, pausedLine, type InviteKind } from "@chessroyale/core";
+import { FRIENDS, isGameCode, isInviteKind, pausedLine, type InviteKind } from "@chessroyale/core";
 import { d1Sql, ensureSchema } from "./accounts.ts";
 import { DEVICE_COOKIE, SESSION_COOKIE, accountOf, isSignedIn, readCookie, signInRequired, type AccountEnv, type WaitUntil } from "./api.ts";
 import { cachedUserId } from "./presence.ts";
 import { banCheck } from "./fairplay.ts";
 import { banAnswer } from "./ban-gate.ts";
 import {
+  FRIEND_TEXT,
   answerRequest,
+  areFriends,
   block,
   cancelRequest,
+  crowdInviteOpen,
   dismissInvite,
   friendsOnline,
   friendsState,
@@ -54,9 +57,10 @@ const isId = (v: unknown): v is string => typeof v === "string" && /^[A-Za-z0-9_
  *   fields only; banned, test accounts and, where signing in is set up, guests left out). Its own rate limit (CAPACITY.rateLimits.search).
  * POST /api/friends/ACTION with JSON, each answering with the list as it is after it (or { message } and a status):
  *   request {id} · answer {id, accept} · cancel {id} · remove {id} · block {id} · unblock {id}
- *   invite {id, kind, code}: to your private lobby (kind: its mode) or Squads party ("squads"), still open;
+ *   invite {id, kind, code}: to your private lobby (kind: its mode) or Squads party ("squads"), still open, or your 50 v 50 party
+ *     ("crowdparty": a member only, while it has room and isn't searching; its seat shows "…" until they answer);
  *     invite {id, check: true}: only whether they'd take one (asked before making a lobby or party for it)
- *   dismiss {id}: an invite to you (by who sent it) · settings {invites?, showOnline?}
+ *   dismiss {id}: an invite to you (by who sent it; a 50 v 50 party's seat shows "+" again) · settings {invites?, showOnline?, dnd?}
  * Signed-in accounts only where signing in is set up; requests and invites not while banned. Rate limits: a burst
  * limit per account (limits.ts, CAPACITY.rateLimits.friends) and the daily and hourly caps (friends.ts, FRIENDS).
  */
@@ -96,6 +100,17 @@ export async function handleFriendsApi(request: Request, env: FriendsEnv, waitUn
   const id = isId(body.id) ? body.id : null;
   if (!id) return json({ message: "Bad request" }, 400);
   const banned = async () => (await banCheck(sql, me, readCookie(request, DEVICE_COOKIE), now).catch(() => ({ banned: false }))).banned;
+  // Invites into a 50 v 50 party that went: each one's seat is a "+" again once no other invite into that party waits for them (two
+  // members may have invited them: the fix round of #747, L3). In the background: a seat that lingers lapses with its invite anyway.
+  const seatsBack = (gone: { to: string; code: string }[]) => {
+    const parties = env.PARTIES;
+    if (!parties || !gone.length) return;
+    waitUntil(
+      (async () => {
+        for (const g of gone) if (!(await crowdInviteOpen(sql, g.to, g.code, now))) await parties.get(parties.idFromName(g.code)).crowdUninvited(g.to);
+      })().catch(() => undefined),
+    );
+  };
   let done: Done;
   switch (action) {
     case "request":
@@ -111,15 +126,23 @@ export async function handleFriendsApi(request: Request, env: FriendsEnv, waitUn
     case "remove":
       done = await removeFriend(sql, me.id, id);
       break;
-    case "block":
-      done = await block(sql, me.id, id, now);
+    case "block": {
+      const out = await block(sql, me.id, id, now);
+      // (Its invites between the two went: a 50 v 50 party's seat for them too. The party's door checks the invite again: L2.)
+      if (out.ok && out.crowd) seatsBack(out.crowd);
+      done = out;
       break;
+    }
     case "unblock":
       done = await unblock(sql, me.id, id);
       break;
-    case "dismiss":
-      done = await dismissInvite(sql, me.id, id);
+    case "dismiss": {
+      const out = await dismissInvite(sql, me.id, id);
+      // (A 50 v 50 party's: its seat is a "+" again, unless another member's invite into it still waits. A member already: nothing.)
+      if (out.was?.kind === "crowdparty") seatsBack([{ to: me.id, code: out.was.code }]);
+      done = out;
       break;
+    }
     case "invite": {
       const { kind, code } = body;
       if (await banned()) return banAnswer(sql, readCookie(request, SESSION_COOKIE), me.id);
@@ -129,11 +152,29 @@ export async function handleFriendsApi(request: Request, env: FriendsEnv, waitUn
         break;
       }
       if (!isInviteKind(kind) || !isGameCode(code)) return json({ message: "Bad request" }, 400);
+      // (One invite from you to them at a time: one into another 50 v 50 party that this replaces goes, and so may its seat for them.)
+      const was = await sql.first<{ code: string }>("SELECT code FROM invites WHERE from_id = ? AND to_id = ? AND kind = 'crowdparty' AND code <> ?", me.id, id, code);
+      // A 50 v 50 party (Nov 16): friends only, by a member, while it has a seat for them; their seat shows "…" once it's sent.
+      if (kind === "crowdparty") {
+        // (Friends only, whatever the app offers: never a stranger by account through the API. The fix round of #747, M1.)
+        if (!(await areFriends(sql, me.id, id))) return json({ message: FRIEND_TEXT.notTaking }, 403);
+        const party = env.PARTIES?.get(env.PARTIES.idFromName(code));
+        const may = party ? await party.crowdMayInvite(me.id, id).catch(() => ({ ok: false as const, message: GAME_GONE })) : { ok: true as const };
+        if (!may.ok) return json({ message: may.message }, 409);
+        done = await sendInvite(sql, me.id, id, kind, code, needSignIn, now);
+        if (done.ok && was) seatsBack([{ to: id, code: was.code }]);
+        if (done.ok && party) {
+          const name = (await sql.first<{ name: string }>("SELECT name FROM users WHERE id = ?", id).catch(() => null))?.name ?? "Friend";
+          await party.crowdInvited(me.id, id, name, now + FRIENDS.inviteMinutes * 60_000).catch(() => undefined);
+        }
+        break;
+      }
       // Only to a private lobby still waiting for players, or a party still open (who's in it isn't checked: a code is
       // already an invite anyone can share). What it's for comes from the lobby itself, never the app.
       const target = await inviteTarget(env, kind, code);
       if (!target) return json({ message: GAME_GONE }, 409);
       done = await sendInvite(sql, me.id, id, target, code, needSignIn, now);
+      if (done.ok && was) seatsBack([{ to: id, code: was.code }]);
       break;
     }
     default:

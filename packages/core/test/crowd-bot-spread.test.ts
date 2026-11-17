@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   CROWD_BOTS,
+  CROWD_PICK,
   CROWD_SETTINGS,
   DEFAULT_SETTINGS,
   botChoose,
@@ -90,7 +91,8 @@ describe("the team's played move (crowdPlayedFromTop)", () => {
     expect(crowdTopOdds(picks({ a: 20, b: 20, c: 5 }), 3)).toEqual({ a: 20 / 45, b: 20 / 45, c: 5 / 45 });
   });
 
-  it("50 v 50 draws by those odds from the turn's random source; elsewhere the most popular is played", () => {
+  it("50 v 50's Majority mode draws by those odds from the turn's random source (Eric, Nov 17); elsewhere the most popular is played", () => {
+    const CROWD: Settings = { ...DEFAULT_SETTINGS, ...CROWD_SETTINGS, crowdPick: "majority" };
     const moves = picks({ a: 30, b: 15, c: 5, d: 4 });
     const seen = new Map<string, number>();
     for (let seed = 1; seed <= 4000; seed++) {
@@ -103,5 +105,21 @@ describe("the team's played move (crowdPlayedFromTop)", () => {
     expect(seen.get("c")! / 4000).toBeCloseTo(0.1, 1);
     expect(drawMove(moves, {}, "popular", mulberry32(1), CROWD)).toBe(drawMove(moves, {}, "popular", mulberry32(1), CROWD));
     for (let seed = 1; seed <= 50; seed++) expect(drawMove(moves, {}, "popular", mulberry32(seed), DEFAULT_SETTINGS)).toBe("a");
+  });
+
+  it("the rework's Strong (50 v 50's since C2) over a team of bots: at Eric's castle it castles; in a quiet opening, the best of the top 3 or one as good", () => {
+    const rework: Settings = CROWD;
+    expect(CROWD.crowdPick).toBe("strong");
+    const lossOf = (c: readonly Candidate[]) => Object.fromEntries(c.map((x) => [x.move, x.loss]));
+    const list = (counts: Map<string, number>) => [...counts].flatMap(([m, n]) => Array<string>(n).fill(m));
+    for (let seed = 1; seed <= 40; seed++) {
+      expect(drawMove(list(teamPicks(CASTLE, seed)), lossOf(CASTLE), "popular", mulberry32(seed), rework)).toBe("e8g8");
+      const quiet = teamPicks(QUIET, seed);
+      const loss = lossOf(QUIET);
+      const top3 = [...quiet].sort((a, b) => b[1] - a[1] || loss[a[0]]! - loss[b[0]]!).slice(0, 3).map(([m]) => m);
+      const m = drawMove(list(quiet), loss, "popular", mulberry32(seed), rework);
+      expect(top3).toContain(m);
+      expect(loss[m]!).toBeLessThanOrEqual(Math.min(...top3.map((x) => loss[x]!)) + 100 * CROWD_PICK.strongClose + 1e-9);
+    }
   });
 });

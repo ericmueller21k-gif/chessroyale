@@ -1055,3 +1055,32 @@ route that refused the file), so it only ever tested the reload, never what the 
 
 **The fix:** each version's files stay while a tab runs that version; the fallback reload comes back where you were, with the
 challenge or room opening. docs/decisions/2026-11-15-stale-tab.md.
+
+## A cleared browser marked again by its own open tab (Nov 15, 2026)
+
+**What happened:** the ban e2e ("a ban means you can't sign in") passed only on its retry on main and PRs from Nov 14: after "a fresh
+browser (cookies and storage cleared)", `/` showed the ban screen, or a guest home, instead of the sign-in.
+
+**Why:** the test cleared the cookies and storage of the tab still open on the ban screen, about 50 ms after it drew. That tab still
+had requests on their way, and the answer to one sent before the clear (the ban answer, which marks the browser and writes
+`brc.banned`) landed after it. The server was right: the request came from the banned browser. A fresh browser has no old tab. CI's
+retry records a trace, which slowed the page enough that the answers were always in before the clear: 0 failures in 40 traced runs
+locally, 1 in 20 untraced on each project.
+
+**How it was found:** a request log in the test (every request and answer with its cookies, the test's steps, the storage at the
+failure), run 20 times per project without a trace.
+
+**The fix:** the fresh browser is its own context, the open tab closed first. docs/decisions/2026-11-15-fairplay-fresh-browser.md.
+
+## Windows lit over Chandy's Swamp (Nov 16, 2026)
+
+**What happened:** the night after Chandy's Swamp went live, Eric saw six lit windows in a grid glowing over the swamp's water and its
+trees, as if a building stood there.
+
+**Why:** two things together. South Street's row backs onto Meadow Street's, and the swamp's lot and box run back over it, so that
+row's fronts stood inside the swamp, their rear walls' windows behind its trees. Those windows should still have been hidden: the
+light layer cuts each light where something is drawn in front of it. But it kept the boxes of only 128 lights a frame and silently
+dropped the rest, and a night street draws about 260. The rows' rear walls are drawn late, near the camera, so theirs were dropped,
+and nothing could cut them. Every solid building hid the bug: there's rarely anything in front of a lit window but a passer-by.
+
+**The fix:** the list grows; an open home leaves the row behind it open. docs/decisions/2026-11-16-chandy-pond.md.

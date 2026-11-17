@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
   CROWD_KNOCKOUTS,
+  CROWD_PICK,
+  CROWD_PRE_REWORK,
+  CROWD_REWORK,
   CROWD_SETTINGS,
+  CROWD_VOTES,
+  RAID_SETTINGS,
+  pregameVotes,
   CROWD_START,
   DEFAULT_SETTINGS,
   crowdFinalBoss,
@@ -87,6 +93,40 @@ describe("how it ends: the boss final is the Hidden Boss's (Eric, Oct 14)", () =
     for (const k of CROWD_KNOCKOUTS.boss) expect(k % 2).toBe(0);
     // A count from other knockouts, or another lobby.
     expect(crowdFinalists("boss", { ...CROWD_KNOCKOUTS, boss: [90] }, 100)).toBe(10);
+  });
+});
+
+describe("how moves are picked (the 50 v 50 rework, Eric, Nov 16): Strong | Majority | Chaos, in the place of how it ends", () => {
+  const rework: Settings = { ...crowd, ...CROWD_REWORK };
+  const pick = CROWD_VOTES[0]!;
+  const join = (playerId: string, option: number) => ({ playerId, option });
+
+  it("held first, then the start and the clock as before; its cards left to right, in a player's words; nobody votes: Strong", () => {
+    expect(CROWD_VOTES.map((v) => [v.id, v.title, v.options.map((o) => o.id), v.options[v.defaultOption]!.id])).toEqual([
+      ["pick", "How are moves picked?", ["strong", "majority", "chaos"], "strong"],
+      ["start", "How does it start?", ["normal", "random", "freestyle"], "normal"],
+      ["speed", "How fast?", ["bullet", "blitz", "rapid"], "blitz"],
+    ]);
+    expect(pick.options.map((o) => [o.label, o.blurb])).toEqual([
+      ["Strong", `The best of your team's top ${CROWD_PICK.strongTop} picks is played`],
+      ["Majority", "Your team's top pick, sometimes 2nd or 3rd"],
+      ["Chaos", "Any move your team picked, all equally likely"],
+    ]);
+    expect(JSON.stringify(pick.options)).not.toMatch(/\p{Extended_Pictographic}/u);
+    const { result } = closePregameVote([], ["ann", "bo"], pick, mulberry32(3), join);
+    expect(pick.options[result]!.id).toBe("strong");
+  });
+
+  it("each patch sets the pick mode only", () => {
+    expect(pick.options.map((o) => o.patch)).toEqual([{ crowdPick: "strong" }, { crowdPick: "majority" }, { crowdPick: "chaos" }]);
+  });
+
+  it("held where the 50 v 50 has the rework's cuts, as every 50 v 50 since C2 (the old one held how it ends); none with the votes off or in a raid", () => {
+    expect(pregameVotes(rework)).toBe(CROWD_VOTES);
+    expect(pregameVotes(crowd)).toBe(CROWD_VOTES);
+    expect(pregameVotes({ ...crowd, ...CROWD_PRE_REWORK })).toBe(PREGAME_VOTES);
+    expect(pregameVotes({ ...rework, augments: false })).toEqual([]);
+    expect(pregameVotes({ ...rework, ...RAID_SETTINGS })).toEqual([]);
   });
 });
 

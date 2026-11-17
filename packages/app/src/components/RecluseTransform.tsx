@@ -37,7 +37,7 @@ const beatsOf = (T: typeof PHASE_CHANGE): LightBeats => {
 };
 let OPEN_MS: number | undefined;
 /** His animations standing on the same spot after the reveal (his box stays put over them). */
-const STANDING = new Set(["revealed", "flipUp", "flipDown", "crouch"]);
+const STANDING = new Set(["revealed", "crouch"]);
 /** His words' box stands this far over the top of his frame (styles.css, `.rc-say-at > .rc-say`'s bottom). */
 const SAY_GAP = 12;
 /** His figure at `t` (ms into the phase change): which animation, since when (ms into it), where his feet are (shares of the board). */
@@ -52,9 +52,7 @@ export function changeFigAt(t: number, computer: boolean): { anim: string; then?
   if (t < T.riseAt + T.riseMs) return { anim: "rise", since: T.riseAt, feet };
   // (Hovering in the beam, a little higher as the light grows; set down unseen in the white.)
   if (t < T.whiteFull) return { anim: "beam", since: T.riseAt + T.riseMs, feet: { x: feet.x, y: feet.y - 0.03 * ease((t - T.riseAt - T.riseMs) / (T.whiteFull - T.riseAt - T.riseMs)) } };
-  if (t < T.flipUpAt) return { anim: "revealed", since: T.whiteFull, feet };
-  if (t < T.flipDownAt) return { anim: "flipUp", then: "faceOpen", since: T.flipUpAt, feet };
-  if (t < T.crouchAt) return { anim: "flipDown", then: "revealed", since: T.flipDownAt, feet };
+  if (t < T.crouchAt) return { anim: "revealed", since: T.whiteFull, feet };
   if (t < T.upAt) return { anim: "crouch", since: T.crouchAt, feet };
   if (t < T.crackAt) {
     const u = (t - T.upAt) / (T.crackAt - T.upAt);
@@ -192,7 +190,7 @@ export function RecluseTransform({ at, t, rect, computer, sceneStand }: { at: nu
               onFrame={(f) => void (headAt.current = headOf(f))}
             />
             {/* His words over his head (his voice's bubble), mounted again with each of his animations so a box moved into view is
-                placed again where he stands now; one mount while he stands in place (his first line runs from the visor up
+                placed again where he stands now; one mount while he stands in place (his first line runs from the reveal
                 through the crouch, and a box mounted again in its fade would vanish at once). */}
             <span class="rc-say-at" ref={sayAt}>
               <VoiceBubble key={STANDING.has(fig.anim) ? "stand" : fig.anim} voice={bossVoice} class="bc-bubble rc-say" />

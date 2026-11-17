@@ -1,6 +1,6 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { KING_REACH, SIDE_FEEL, SIDE_REACH, SIDE_TALLEST, SIDE_WIDEST, sideSizes, type SideRoom } from "../src/characters/side-size.ts";
+import { KING_REACH, OVER_BOARD, SIDE_FEEL, SIDE_REACH, SIDE_TALLEST, SIDE_WIDEST, sideSizes, type SideRoom } from "../src/characters/side-size.ts";
 import { GOD_KING } from "../src/characters/god-king.ts";
 import { BOSS_KITS } from "../src/characters/kits.ts";
 import { BOSS_INTROS, CHALLENGE_FEEL, bubbleSize, drawnTop } from "../src/town/shops/challenge.ts";
@@ -22,13 +22,14 @@ describe("a computer's corner casts", () => {
 });
 
 describe("the figures beside the board on a computer (sideSizes)", () => {
-  const reachOf = (ch: { w: number; h: number; foot: readonly number[]; anims: Record<string, { loop?: boolean; frames: unknown[] }> }) => {
+  const reachOf = (ch: { id?: string; w: number; h: number; foot: readonly number[]; anims: Record<string, { loop?: boolean; frames: unknown[] }> }) => {
     let x0 = Infinity;
     let y0 = Infinity;
     let x1 = -Infinity;
     let y1 = -Infinity;
-    for (const a of Object.values(ch.anims))
-      for (const f of a.loop ? a.frames : a.frames.slice(-1)) {
+    // (Chandy's level rifle lies over the board: OVER_BOARD's animations aren't his room.)
+    for (const [name, a] of Object.entries(ch.anims))
+      for (const f of OVER_BOARD[ch.id ?? ""]?.test(name) ? [] : a.loop ? a.frames : a.frames.slice(-1)) {
         const { w, h, data } = renderFrame(ch as never, f as never);
         for (let y = 0; y < h; y++)
           for (let x = 0; x < w; x++)
@@ -82,7 +83,9 @@ describe("the figures beside the board on a computer (sideSizes)", () => {
         expect(p.s).toBeLessThanOrEqual(SIDE_FEEL.max);
         // His drawing: in his room, under the window's top, and over the board's edge by at most `over`.
         const lc = reach[0]!, rc = reach[2]!;
-        expect(p.bossMid! - lc * p.s, `${id}: in his room`).toBeGreaterThanOrEqual(r.limit + SIDE_FEEL.margin - 0.2);
+        // (Chandy, wider at rest than the one size allows for: over the menu beside the empty column where he must, whole in the window.)
+        if (SIDE_FEEL.overMenu.includes(id)) expect(p.bossMid! - lc * p.s, `${id}: whole in the window`).toBeGreaterThanOrEqual(SIDE_FEEL.margin - 0.2);
+        else expect(p.bossMid! - lc * p.s, `${id}: in his room`).toBeGreaterThanOrEqual(r.limit + SIDE_FEEL.margin - 0.2);
         expect(p.bossMid! + rc * p.s, `${id}: over the board by at most ${over}`).toBeLessThanOrEqual(r.left + over + 0.2);
         expect(r.bottom - reach[1]! * p.s, `${id}: under the window's top`).toBeGreaterThanOrEqual(SIDE_FEEL.margin - 0.2);
         // Your pawn over the board by at most `over`, the God King's drawing inside the window.

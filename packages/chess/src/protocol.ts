@@ -13,6 +13,7 @@ import type { CreaseAsk, FolioView } from "./bosses/folio.ts";
 import type { WorkshopView } from "./bosses/timber.ts";
 import type { DashView } from "./bosses/dash.ts";
 import type { ZebraView } from "./bosses/zebra.ts";
+import type { ChandyView } from "./bosses/chandy.ts";
 import type { Phase2Result } from "./bosses/recluse-phase2.ts";
 import type { MoveScore } from "./uci.ts";
 /**
@@ -97,6 +98,13 @@ export interface NetStanding {
   look?: ItemLook;
   /** A person's account (a tap on their name opens /api/profile/UID). */
   uid?: string;
+  /**
+   * The 50 v 50 rework's results only (MatchRunner.crowdResults): the game's move they went out after (a cut's, or the one they
+   * left at), null while still in at the end; and the counted points they gave away a move over the match (2 decimals), null
+   * with no move. Missing: another message, another mode, or an older server.
+   */
+  outAtMove?: number | null;
+  perMove?: number | null;
 }
 
 export interface NetPick {
@@ -469,6 +477,8 @@ export interface NetBossPowers {
    * last Gold Plate, and his opening comment.
    */
   zebra?: ZebraView | null;
+  /** Chandy: his locks (each with its turns left), the rifle's upgrades and unlocked moves, his move meter, this turn's effects, the queen lock's aim and shot, Dodge (online, what has been seen of it: dodgeSeen). */
+  chandy?: ChandyView | null;
   /**
    * The circus tiger (missing for other bosses and from older servers; an older app ignores them): the balloon on his
    * nozzle (`balloon`: its shape as everyone sees it, a fake queen's "q"; its color; when it went on and when it's fully
@@ -523,8 +533,10 @@ export interface NetLightsOut {
 /** A pre-game vote, for every screen: everyone's votes, each visible from `at` (server time). */
 export interface NetVote {
   key: string;
-  /** Which vote (index into PREGAME_VOTES) and how many there are. */
+  /** Which vote (index into the settings' pregameVotes: CROWD_VOTES since the 50 v 50 rework) and how many there are. */
   index: number;
+  /** The vote's id ("pick", "start", "speed"; "format" before the rework). Missing: an older server (look it up by index). */
+  id?: string;
   count: number;
   startsAt: number;
   until: number;
@@ -683,7 +695,9 @@ export type ClientMessage =
   /** Hollow's Lights out: this player taps a square in round `round` (0-based). */
   | { t: "lightsTap"; key: string; round: number; square: string }
   /** Dash's Scramble Rush: this player's placements so far (each swept piece's square before the sweep → the square put on). */
-  | { t: "rushPlace"; key: string; places: Record<string, string> };
+  | { t: "rushPlace"; key: string; places: Record<string, string> }
+  /** Chandy's Dodge: this player's vote for the king's square in round `round` (0-based); a later vote replaces it. */
+  | { t: "dodgeVote"; key: string; round: number; square: string };
 
 /** Why a lobby closed (see LOBBY_LIFE in settings.ts). */
 export type LobbyCloseReason = "ended" | "idle" | "abandoned";
@@ -705,7 +719,8 @@ export type LeftHow = "resigned" | "away" | "early" | "out" | "kicked" | "afk";
  */
 export interface NetLeft {
   how: LeftHow;
-  result: { placement: number; players: number; ranked: boolean } | null;
+  /** `partied`: they played in a 50 v 50 party of 2 or more friends, so theirs isn't ranked (CROWD_PARTY.ranked). */
+  result: { placement: number; players: number; ranked: boolean; partied?: true } | null;
 }
 
 /** A battle on the Maia brain, as the lobby tells the host's device (bossBrainFor's plan). */
@@ -886,6 +901,8 @@ export type ServerMessage = { now: number } & (
       intro?: boolean;
       fall?: boolean;
       rush?: NetRush;
+      /** Chandy's Dodge on the server's clock (the crowd's turn waits for it): see NetDodge. */
+      dodge?: NetDodge;
       /** With `fall`: the Hidden Boss's phase change follows (his phase 2 online), not the results. */
       toPhase2?: true;
       /** With `toPhase2`: who takes his four boards (player ids, board order): for them, leaving from here on is resigning a board. */
@@ -901,6 +918,8 @@ export type ServerMessage = { now: number } & (
   | { t: "lights"; lights: NetLightsOut; boss: NetBoss; standings: NetStanding[] }
   /** Lights out: the crowd's count, to everyone, as anyone's tap changes it (the round's end sends it in `lights`). */
   | { t: "lightsCrowd"; key: string; crowd: NonNullable<NetLightsOut["crowd"]> }
+  /** Chandy's Dodge: the round's vote so far (each square's count), to everyone, as anyone's vote changes it. */
+  | { t: "dodgeVotes"; key: string; round: number; votes: Record<string, number> }
   /** To the host: play the boss's move. */
   | {
       t: "bossRequest";
@@ -1037,6 +1056,11 @@ export type ServerMessage = { now: number } & (
        * the beams then take the crowd's pieces by value (the server's own fallback).
        */
       beam?: number;
+      /**
+       * Chandy's locks (his ordinary move): the locked squares. Play his move through the steering (bossMoveFrom's `locks`: steerPick
+       * on the top moves it searched). An older app ignores it: he plays his move unsteered, nothing breaks.
+       */
+      lock?: string[];
     }
   /**
    * The boss's brain for this battle, to the host as the battle begins (on the Maia brain only): it starts loading
@@ -1082,8 +1106,17 @@ export type ServerMessage = { now: number } & (
       lossesByStage: Record<string, number[][]>;
       /** The final leaderboard (ratings, time, power-ups), for the results screen. */
       standings: NetStanding[];
-      /** Crowd: who won the game on the board (the side that mated, or the side clearly ahead), null for a draw. */
+      /**
+       * Crowd: who won the game on the board (the side that mated, or the side clearly ahead: the 50 v 50 rework's judge's verdict at
+       * the move limit, 75%), null for a draw.
+       */
       gameWinner?: "w" | "b" | null;
+      /**
+       * The 50 v 50 rework's podium (MatchRunner.crowdResults): the winner, 1st place of a won game (missing: a draw), and the best
+       * player (the fewest counted points a move among those who survived half the cuts; null: nobody qualified). Each row of
+       * `standings` then has `outAtMove` and `perMove`. Missing: not the rework, or an older server.
+       */
+      podium?: { winner?: string; best: string | null };
       /** Boss battle: who won it. */
       bossResult?: "crowd" | "boss" | "draw";
       /** Boss battle: the boss won on time (the Hidden Boss's bullet clock ran out). Missing: not on time, or an older server. */
@@ -1094,6 +1127,8 @@ export type ServerMessage = { now: number } & (
       ranked?: boolean;
       /** Something in it stood on one device's word alone (LobbyRecord.unvouched): it pays as a solo game, and the results say so. */
       unvouched?: true;
+      /** You played in a 50 v 50 party of 2 or more friends: yours isn't ranked (CROWD_PARTY.ranked), and the results say why. */
+      partied?: true;
       /** The Hidden Boss's phase 2 decided it: how many of its boards were won (all of them beat him). */
       simul?: { won: number; of: number };
       /**
@@ -1121,6 +1156,9 @@ export interface NetPhase2Board {
   bankMs: number;
   turnAt: number | null;
   result: Phase2Result | null;
+  /** The player's hearts left, and when the last was cut (server time; the slash, and a board lost to it its fade), or null. */
+  hearts: number;
+  slashAt: number | null;
 }
 
 /**
@@ -1136,10 +1174,6 @@ export interface NetPhase2 {
   /** Phase 1's last position, the one his phase change splits. */
   from: string;
   boards: NetPhase2Board[];
-  /** The team's slow moves so far, the last one (which board, when), and when his ultimate came (null: not yet). */
-  slow: number;
-  lastSlow: { board: number; at: number } | null;
-  ultAt: number | null;
   /**
    * Every clock paused since then (server time): his move is late from the engine server (RECLUSE_ONLINE.pauseMs). Every board shows
    * "He's thinking…" and takes no move; the clocks run on from where they stood once it's in. Missing: not paused.
@@ -1161,4 +1195,16 @@ export interface NetPhase2 {
 export interface NetRush {
   key: string;
   at: number;
+}
+
+/**
+ * Chandy's Dodge on the server's clock (the crowd's turn waits for it): its key and when it began (server time; every beat follows
+ * from it: dodgeTimeline), the round being voted on and its counts so far. The clones, the teleports as they come and each round's
+ * result are in the boss's view (`powers.chandy.dodge`: dodgeSeen, so nothing shows before its time).
+ */
+export interface NetDodge {
+  key: string;
+  at: number;
+  round: number;
+  votes: Record<string, number>;
 }

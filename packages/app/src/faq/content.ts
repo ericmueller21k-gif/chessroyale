@@ -14,6 +14,7 @@
  */
 import {
   BOT_LEVELS,
+  CROWD_PARTY,
   CROWD_PARTY_MAX,
   BOSS_BRAIN,
   BOSS_CLOCK,
@@ -32,6 +33,7 @@ import {
   BRILLIANT,
   CRATES,
   CROWD_KNOCKOUTS,
+  CROWD_PRE_REWORK,
   CROWD_SETTINGS,
   DEFAULT_SETTINGS,
   ENGINE_MIN_ELO,
@@ -150,7 +152,9 @@ export interface FaqSources {
 
 export const FAQ_DEFAULTS: FaqSources = {
   settings: DEFAULT_SETTINGS,
-  crowd: { ...DEFAULT_SETTINGS, ...CROWD_SETTINGS },
+  // (The 50 v 50 as it was before the rework (CROWD_PRE_REWORK) until step C3 rewrites its sections for the rework: one coherent
+  // description, not the old endings' words over the rework's cut moves. docs/decisions/2026-11-16-crowd-rework-runner.md.)
+  crowd: { ...DEFAULT_SETTINGS, ...CROWD_SETTINGS, ...CROWD_PRE_REWORK },
   raid: { ...DEFAULT_SETTINGS, ...RAID_SETTINGS },
   crowdKnockouts: CROWD_KNOCKOUTS,
   powers: BOSS_POWERS,
@@ -269,7 +273,7 @@ function modes(src: FaqSources): FaqSection {
 - **How it starts**, voted on before move 1: ${startLabel("normal")}, the usual starting position; ${startLabel("random")}, a real, balanced opening already ${n(randomMoves, "move")} in for each side, so the game picks up at move ${randomMoves + 1}; or ${startLabel("freestyle")}: the pieces on the back row start shuffled, the same for both sides and different every game. To castle in Freestyle, move your king onto its rook: the king lands on the g- or c-file with the rook beside it, as usual. Nobody voting means ${SV.options[SV.defaultOption]?.label}. Both teams play from that start; a boss final is played from the usual starting position.
 - **The clock is a chess time control**, voted on before move 1: ${timeControls.slice(0, -1).join(", ")} or ${timeControls.at(-1)}. Nobody voting means ${V.options[V.defaultOption]?.label}. Your minutes last the whole game, and each of your moves adds its seconds as it starts; the time you take comes out of your bank, so what a quick move doesn't use is saved for later, as on a chess clock. No move can go past its cap, because your whole team picks together; with an empty bank you still get the added seconds. Your bank is beside the board's clock and in the scoreboard's Bank column. A group Boss Battle is ${namedClock(R)}.
 - **${n(C.powerUpsAtStart, "power-up")}** each: a power-up shows the engine's top 3 moves for that turn.
-- How you play, under the modes on the home screen: **Solo queue** puts you in a lobby, with bots filling empty seats after a short wait; **Party** (coming soon) will queue you with up to ${CROWD_PARTY_MAX - 1} friends into the same matchmaking (sides drawn at random); **Bots** is you and ${C.lobbySize - 1} bots, at once, at the level you pick: ${BOT_LEVELS.filter((l) => l.mean !== null).map((l) => `${l.label} (about ${l.mean})`).join(", ")}, My level (about your rating) or Random (every bot's rating random). A level is the bots' average: each bot is a few hundred points either side of it.
+- How you play, under the modes on the home screen: **Solo queue** puts you in a lobby, with bots filling empty seats after a short wait; **Party** opens your party's queue screen: tap a **+** to invite up to ${CROWD_PARTY_MAX - 1} friends from your friends list, then the party's leader taps **Find match** and you all join the same matchmaking, together on one team (which side is drawn at random)${CROWD_PARTY.ranked ? "" : "; a party of 2 or more plays unranked (XP as usual), and everyone else in the match stays ranked"}; **Bots** is you and ${C.lobbySize - 1} bots, at once, at the level you pick: ${BOT_LEVELS.filter((l) => l.mean !== null).map((l) => `${l.label} (about ${l.mean})`).join(", ")}, My level (about your rating) or Random (every bot's rating random). A level is the bots' average: each bot is a few hundred points either side of it.
 - **Bots are a lobby of players.** Each bot has its own rating, the same every match (most between 800 and 1500, a few above or below), and picks from the engine's moves about as loosely as a player of that rating would.
 
 ### Boss Battle {#mode-boss}
@@ -564,7 +568,7 @@ A move is **brilliant** when it separated the field: among at least ${B.minPicke
 
 ### Your rating {#rating}
 
-Your rating comes from your moves, not from wins: from the average number of points your moves give away, matched against how many Stockfish gives away at each of its own strength settings (so it's on Stockfish's rating scale). It shows after ${n(src.ratingMinMoves, "move")}, starts near ${src.priorRating} and firms up as your moves come in. A match counts toward your ranking only when at least ${pct(src.rankedShare, 0)} of its seats are real players; solo games and practice mode never count. Your ranking changes only in a match with at least ${rankedMinHumans(src.crowd.lobbySize, src.rankedShare)} real players (${rankedMinHumans(src.raid.lobbySize, src.rankedShare)} in a group Boss Battle). Solo games never change it.
+Your rating comes from your moves, not from wins: from the average number of points your moves give away, matched against how many Stockfish gives away at each of its own strength settings (so it's on Stockfish's rating scale). It shows after ${n(src.ratingMinMoves, "move")}, starts near ${src.priorRating} and firms up as your moves come in. A match counts toward your ranking only when at least ${pct(src.rankedShare, 0)} of its seats are real players; solo games and practice mode never count${CROWD_PARTY.ranked ? "" : ", nor does a 50 v 50 you play in a party of friends"}. Your ranking changes only in a match with at least ${rankedMinHumans(src.crowd.lobbySize, src.rankedShare)} real players (${rankedMinHumans(src.raid.lobbySize, src.rankedShare)} in a group Boss Battle). Solo games never change it.
 `,
   };
 }
@@ -910,6 +914,17 @@ Your time is the clock at the right of the box under the board: alone or in a pa
 - **Time Scramble** (ultimate, at most ${n(p.maxUltimates["dash"] ?? 0, "time")} a battle): after the warning, your next ${n(p.scrambleMoves, "move")} get ${n(p.scrambleSeconds, "second")} each, counted down over the board. They still come out of your bank, which still gets its extra seconds.
 - **Scramble Rush** (once a battle, never before move ${num(p.dashScramble.from)}, warned a turn ahead: "Next turn: Scramble Rush"): "1.00" counts down to "0.00" over ${n(p.dashScramble.countdownMs / 1000, "second")} while his copies race across the board, moving ${n(p.dashScramble.pieces, "piece")} of yours and ${num(p.dashScramble.pieces)} of his (never a king). Then you have ${n(p.dashScramble.placeMs / 1000, "second")} to drag or tap them back, each piece at most ${n(p.dashScramble.movesPerPiece, "time")}: a green edge where one is right, a red edge where it isn't. Fewer than ${num(p.dashScramble.needCorrect)} of the ${num(p.dashScramble.pieces * 2)} back (solo, yours alone; online with a crowd, on average) and he plays an extra move at once: the move list shows both of his moves. Either way the board goes back exactly as it was: only the screen showed them moved.
 - **Out of time** against him is never a loss: a move is played for you instead, picked at random from the ${n(p.flagTop, "best move")} (in a group Boss Battle, only if nobody picked in time). Your bank can run down to nothing; each move then has just its extra seconds.`,
+  // (Chandy is in the game for admins first, BOSS_ADMIN_FIRST: his block shows in the FAQ once he's live for everyone.)
+  chandy: (p, b) => {
+    const c = p.chandy;
+    return `
+Plays from the game so far. A special-ops alligator with an energy rifle that grows. ${b.offset < 0 ? `His powers are why he plays ${Math.abs(b.offset)} under the usual strength.` : b.offset > 0 ? `He plays ${b.offset} over the usual strength.` : "He plays at the usual strength."}
+
+- **Lock-on** (passive): nothing is locked until he first takes one of your pieces: on that move his crosshair snaps onto the piece (any but your king, your queen too) just before he takes it, and that capture is his first upgrade. After that, at the end of his turns he locks your most capturable piece (never your king or queen), up to ${n(c.maxLocks, "lock")} at once, and he leans toward taking locked pieces: a capture of one he plays if it's within ${num(c.takeMargin)} pawns of his best move, a move that attacks one if it's within ${num(c.chaseMargin)}. The pips under a crosshair count the turns it has left: get the piece to safety for ${n(c.huntTurns, "of his turns", "of his turns")} and he moves on.
+- **Upgrades:** each locked piece he takes adds a part to his rifle (${num(c.upgradesMax)} in all) and unlocks one of his five moves at random. The game pauses ${n(c.upgradeMs / 1000, "second")} to show it.
+- **His move meter**, from his first upgrade, fills over ${n(c.meterEvery, "of your moves", "of your moves")}; full, he uses one of his unlocked moves (a new one first, else one at random)${c.fireOnUnlock ? ". A move he has just unlocked he uses at once, on his turn after the upgrade, however full the meter (it starts over after; a queen lock that can't come then waits for the meter)" : ""}: **Scatter shot** (${n(c.scatterSquares, "empty square")} around a spot blocked for your turn: nobody lands there, a slide passes through), **Beam** (a rank and a file, never your king's: your pieces in it can't move and nothing lands on or slides through it this turn; what's under it is hidden, but it still blocks, defends and gives check), **Shields** (${n(c.shieldCount, "piece")} of his you attack can't be taken this turn, never one giving check), **Rapid fire** (${n(c.rapidCount, "piece")} of yours can't move this turn), and **Queen lock** (only when a pawn, knight or bishop can get between your queen and his side of the board, and not when skipping his move would cost him real material: then the meter picks another move; he spends his turn aiming down her file; your move is free; then he fires down the file she's on: the first of your pieces from his side shatters, or she does if nothing's in the way; your king stops it). None of them ever leaves you without a legal move.
+- **Dodge** (ultimate, ${(p.maxUltimates["chandy"] ?? 1) === 1 ? "once a battle" : `at most ${n(p.maxUltimates["chandy"] ?? 0, "time")} a battle`}): his rage meter is dimmed until his rifle is whole, then fills over ${n(c.dodgeAfterMoves, "of your moves", "of your moves")}; nothing else fills it. After the warning, as your next turn begins: a blank board, your king in the middle of the 3 x 3 around e4 (White) or e5 (Black). First a warning shot: his clones fire once and miss (no vote). Then ${n(c.dodgeRounds, "round")}, his clones on the board's edges aiming along two ranks and two files, so exactly one square is safe: ${n(c.dodgeVoteMs / 1000, "second")} each to vote where your king stands (the most votes wins; if nobody votes, a random square); the clones teleport mid-round (once, twice, then three times), moving the safe square. Their beams then hold for a few seconds. ${c.dodgeHits === 2 ? "The first hit cracks your king; a second hit and you lose the battle" : `${n(c.dodgeHits, "hit")} and you lose the battle`} (the God King can't save you from it). Survive and the board comes back as it was. **Last chance:** if he hasn't used it and you have a move that checkmates him, it comes at once as your turn begins, whatever his rifle or meter; survive it and the mate is still yours to play.`;
+  },
 };
 
 /**
@@ -928,7 +943,7 @@ Met in the Crowd's boss final, where it's always him, against the top ${n2}, and
 - **First, the child**: he begins as a boy with no powers at all (no No Help, no Bullet: the God King's help works), Maia at ${num(RECLUSE_CHILD.startRating)}, ${num(RECLUSE_CHILD.stepRating)} stronger every ${n(RECLUSE_CHILD.everyPlies, "move")} on the board (yours and his), up to ${num(maiaTopRating())}, the man's own strength. His level climbs with it, and he grows older as it does. Beat him and he grows up: a new game starts from the beginning, against the man below. If the boy wins or it's a draw, the fight is over.
 - **No Help** (passive): the God King's help doesn't work against him: his move, his strike and his Last Stand never come. Calling him spends a charge all the same, and ${bossInText(b.name, false, src.roster)} mocks it. He never strikes anyone down either: all ${n2} of you play to the end.
 - **Bullet** (ultimate): a meter of his own, full as turn ${p.bulletTurn} begins, when it comes with no warning. From then on every bank is ${clock(p.bulletBankSeconds)}, with no cap on a move${increment}. If everyone still in runs out of time, he wins on time.
-- **Beaten:** his second phase follows, online and in a Solo game: he transforms (the God King stays in his place, but can't be called for the rest of the fight), then ${n(P.boards, "board")} of Freestyle chess at once (the back-row pieces shuffled), each from its own start, one for each of you who fought him (bots on any left over; online, a bot plays on for anyone who leaves), against Stockfish at ${num(P.elo)}. A ${num(P.change.countdownSeconds)}-second countdown on every board, then ${clock(P.bankSeconds)} a board with no added time, and a board whose clock runs out is lost; all ${num(P.boards)} must be won. A move slower than ${num(P.slowMoveSeconds)} s counts against the team, and the team's ${ordinal(P.slowMovesForUlt)} brings his last power: from then on ${num(P.ultMoveSeconds)} s a move on every board, and a move out of time is played at random for you.`;
+- **Beaten:** his second phase follows, online and in a Solo game: he transforms (the God King stays in his place, but can't be called for the rest of the fight), then ${n(P.boards, "board")} of Freestyle chess at once (the back-row pieces shuffled), each from its own start, one for each of you who fought him (bots on any left over; online, a bot plays on for anyone who leaves), against Stockfish at ${num(P.elo)}. A ${num(P.change.countdownSeconds)}-second countdown on every board, then ${clock(P.bankSeconds)} a board with no added time, and a board whose clock runs out is lost; all ${num(P.boards)} must be won. Each of you has ${num(P.hearts)} hearts of your own: a move that takes longer than ${num(P.slowMoveSeconds)} s costs one (he cuts it; then take the time you need on that move), and whoever loses all ${num(P.hearts)} loses their board.`;
 }
 
 function bossPowers(src: FaqSources): FaqSection {

@@ -77,7 +77,7 @@ export interface BossInfo {
 }
 
 /** The boss powers there are: a passive (or opening) and an ultimate per boss. */
-export type PowerId = "freeze" | "blizzard" | "pie" | "funhouse" | "sparkler" | "candle" | "dark" | "lightsout" | "blocks" | "bounce" | "cuts" | "boardsaw" | "drag" | "showdown" | "nohelp" | "bullet" | "tusks" | "slam" | "leapfrog" | "carrotpatch" | "camouflage" | "repaint" | "moonbeam" | "fullmoon" | "seeds" | "water" | "balloons" | "hoops" | "draft" | "crease" | "revision" | "scraps" | "gnaw" | "clockslap" | "scramble" | "rush" | "clockfit" | "popoff" | "split" | "dough" | "goldplate";
+export type PowerId = "freeze" | "blizzard" | "pie" | "funhouse" | "sparkler" | "candle" | "dark" | "lightsout" | "blocks" | "bounce" | "cuts" | "boardsaw" | "drag" | "showdown" | "nohelp" | "bullet" | "tusks" | "slam" | "leapfrog" | "carrotpatch" | "camouflage" | "repaint" | "moonbeam" | "fullmoon" | "seeds" | "water" | "balloons" | "hoops" | "draft" | "crease" | "revision" | "scraps" | "gnaw" | "clockslap" | "scramble" | "rush" | "clockfit" | "popoff" | "split" | "dough" | "goldplate" | "lockon" | "dodge" | "scatter" | "beam" | "shields" | "rapidfire" | "queenlock";
 /**
  * Every power, for the test switch (?power=<id>: a boss's ultimate comes early; its passive as usual, but for Wrangler's
  * drag and Alfil's Tusks, which come sooner and more often, the hopper's Leapfrog, whose battle starts with a hop due
@@ -93,9 +93,12 @@ export type PowerId = "freeze" | "blizzard" | "pie" | "funhouse" | "sparkler" | 
  * the first crowd move it may follow (turn 5 on), whatever the evaluation says. Dash's ?power=rush, his once-a-battle Scramble
  * Rush (not on his BOSS_ROSTER line either), comes as the second turn begins. Don Dough's ?power=dough drops his first lump of
  * dough at the end of his first turn (from BALLOON_TEST_MOVES, so it can rise); ?power=goldplate warns as the second turn begins
- * (the gilding at the start of his turn after it).
+ * (the gilding at the start of his turn after it). Chandy's ?power=lockon brings his first lock from his first move (not his third);
+ * ?power=dodge gives him all five upgrades at the start and warns as the second turn begins (Dodge as the third begins); and each of
+ * his five moves has a switch of its own (?power=scatter, beam, shields, rapidfire, queenlock: not on his BOSS_ROSTER line): that
+ * move unlocked from the start and his move meter full from the second turn (bosses/chandy.ts).
  */
-export const POWER_IDS: readonly PowerId[] = ["freeze", "blizzard", "pie", "funhouse", "sparkler", "candle", "dark", "lightsout", "blocks", "bounce", "cuts", "boardsaw", "drag", "showdown", "nohelp", "bullet", "tusks", "slam", "leapfrog", "carrotpatch", "camouflage", "repaint", "moonbeam", "fullmoon", "seeds", "water", "balloons", "hoops", "draft", "crease", "revision", "scraps", "gnaw", "clockslap", "scramble", "rush", "clockfit", "popoff", "split", "dough", "goldplate"];
+export const POWER_IDS: readonly PowerId[] = ["freeze", "blizzard", "pie", "funhouse", "sparkler", "candle", "dark", "lightsout", "blocks", "bounce", "cuts", "boardsaw", "drag", "showdown", "nohelp", "bullet", "tusks", "slam", "leapfrog", "carrotpatch", "camouflage", "repaint", "moonbeam", "fullmoon", "seeds", "water", "balloons", "hoops", "draft", "crease", "revision", "scraps", "gnaw", "clockslap", "scramble", "rush", "clockfit", "popoff", "split", "dough", "goldplate", "lockon", "dodge", "scatter", "beam", "shields", "rapidfire", "queenlock"];
 
 /**
  * A raid boss: the base template every boss fills in. Its powers' rules (which moves are allowed, what happens after
@@ -256,6 +259,13 @@ export const BOSS_ROSTER: readonly BossDef[] = [
   // the battle. His offset and numbers from the raid sim (reports/zebra-sim.md). Admins first: BOSS_ADMIN_FIRST in settings.ts (the
   // test links `?boss=zebra`, `&power=dough`, `&power=goldplate`).
   { id: "zebra", name: "Don Dough", icon: "🦓", kit: "Don Dough", offset: -250, powers: { passive: "dough", ultimate: "goldplate" } },
+  // Chandy, a special-ops alligator whose energy rifle grows (Eric's design, Nov 15-16; his rules: bosses/chandy.ts; docs/decisions/2026-11-16-chandy-rules.md):
+  // Lock-on, a crosshair on one or two of your pieces his engine leans toward, each taken an upgrade of his rifle (five), each
+  // upgrade unlocking one of his five moves (scatter shot, beam, shields, rapid fire, queen lock) that his move meter fires every
+  // six of your moves; and Dodge, his rage meter's ultimate once the rifle is whole: your king on a blank board, three rounds of a
+  // vote on where he stands, one hit and the battle is his. His offset from the raid sim (reports/chandy-sim.md). Admins first:
+  // BOSS_ADMIN_FIRST in settings.ts (the test links `?boss=chandy`, `&power=lockon`, `&power=dodge`, `&power=scatter` …).
+  { id: "chandy", name: "Chandy", icon: "🦎", kit: "Chandy", offset: -250, powers: { passive: "lockon", ultimate: "dodge" } },
   { id: "recluse", name: "Hidden Boss", icon: "📕", kit: "Hidden Boss", offset: 0, powers: { passive: "nohelp", ultimate: "bullet" }, adminOnly: true, crowdFinal: true, the: true, levelUnknown: true },
   { id: "golem", name: "The Pawn Golem", icon: "🗿", kit: null, offset: 0, powers: null },
   { id: "archer", name: "The Bone Archer", icon: "💀", kit: null, offset: 0, powers: null },
@@ -745,6 +755,8 @@ export interface BossPowerState {
   dash?: DashState | null;
   /** Don Dough's powers (Rising Dough's lumps, Gold Plate's gold pieces, his opening comment). */
   zebra?: ZebraState | null;
+  /** Chandy's powers (his locks, the rifle's upgrades, his move meter and the move it fired, Dodge). */
+  chandy?: ChandyState | null;
   /** What happened as this turn began, for the screens' moments (the same for everyone). */
   events: PowerEvent[];
 }
@@ -985,6 +997,99 @@ export interface ZebraState {
   goldTurn?: number;
 }
 
+/** Chandy's five moves (his move meter's), each unlocked by an upgrade of his rifle, in the design's order. */
+export type ChandyMove = "scatter" | "beam" | "shields" | "rapidfire" | "queenlock";
+export const CHANDY_MOVES: readonly ChandyMove[] = ["scatter", "beam", "shields", "rapidfire", "queenlock"];
+
+/** One of Chandy's locks: the crowd's piece under his crosshair (its square now, its letter), and his move count when it came. */
+export interface ChandyLock {
+  square: string;
+  piece: string;
+  /** His moves played when it came (its age is his moves since). */
+  at: number;
+}
+
+/**
+ * A Dodge clone's line (bosses/chandy.ts): a rank's, standing on that rank's a-file (`left`) or h-file (`right`) square from the
+ * crowd's side, aiming along it; or a file's, standing on his edge of that file, aiming down it.
+ */
+export type DodgeLine = { rank: number; side: "left" | "right" } | { file: string };
+
+/** One round of Dodge, as set up from the seed: the four clones as it opens, its teleports in order, and the square safe at the end. */
+export interface DodgeRound {
+  lines: DodgeLine[];
+  /** Each teleport: which clone (an index into `lines`) blinks to which line. */
+  teleports: { clone: number; to: DodgeLine }[];
+  /** The one square of the 3 x 3 no line crosses once every teleport is done. */
+  safe: string;
+}
+
+/** A round of Dodge, decided: the square the crowd's vote put the king on, whether a line hit him, and the vote's counts. */
+export interface DodgeResult {
+  placed: string;
+  hit: boolean;
+  /** Nobody voted: the square came from the seed. */
+  random?: true;
+  votes: Record<string, number>;
+}
+
+/**
+ * Chandy's Dodge (his ultimate), once it has come: the crowd turn it came (`at`: crowdMoves as that turn began; the crowd's turn
+ * waits for it), which of the battle's (1 or 2), the crowd's king's square and the center he slides to, the warning volley's lines
+ * (they miss the king: no vote), its three rounds, and each round's result as it closes. Over after the third round, or at the
+ * second hit (chandy.dodgeHits: the battle his); the first hit cracks the king and play goes on.
+ */
+export interface ChandyDodge {
+  at: number;
+  n: number;
+  king: string;
+  center: string;
+  volley?: DodgeLine[];
+  rounds: DodgeRound[];
+  results: DodgeResult[];
+}
+
+/**
+ * Chandy's powers in a battle (id chandy; Eric, Nov 15-16; the chess package's bosses/chandy.ts).
+ * - `moves`: his moves this battle; `locks`: the crowd's pieces locked now (at most chandy.maxLocks); `taught`: his first lock has
+ *   come (the one that teaches it, as his turn begins).
+ * - `upgrades`: locked pieces taken (0-5), each an upgrade of the rifle; `unlocked`: the moves those upgrades unlocked, in order;
+ *   `fresh`: the newest, the next one his meter uses.
+ * - `meter`: the crowd's moves toward his next move (full at chandy.meterEvery), counting from the first upgrade; `due`: the move
+ *   the full meter picked, landing as the crowd's turn begins (the queen lock: his whole turn, at its start); `used`: moves fired.
+ * - This crowd turn's effects: `scatter` (the shot's spot and its blocked squares), `beam` (a rank and a file), `shields` (his
+ *   pieces), `dizzy` (the crowd's), each for crowd turn `turn`; `aim`: the queen lock's aim, at the crowd's queen, fired at the
+ *   start of his turn after crowd turn `turn` (the turn the aim is for); `shot`: its last shot (the crowd move it came after, the square hit; none: it
+ *   stopped on the king or found nothing to hit).
+ * - `dodge`: his Dodge under way or played (once a battle). `passWait`: the crowd move after which the queen lock waited (the pass
+ *   guard). `whole`: the crowd turn the rifle came whole.
+ */
+export interface ChandyState {
+  moves: number;
+  locks: ChandyLock[];
+  taught?: true;
+  upgrades: number;
+  unlocked: ChandyMove[];
+  fresh?: ChandyMove | null;
+  meter: number;
+  due?: ChandyMove | null;
+  used: number;
+  /** The move he fired last: the meter picks another while one can come (chandy.ts meterPick). */
+  last?: ChandyMove;
+  scatter?: { spot: string; squares: string[]; turn: number } | null;
+  beam?: { rank: number; file: string; squares: string[]; turn: number } | null;
+  shields?: { squares: string[]; turn: number } | null;
+  dizzy?: { squares: string[]; turn: number } | null;
+  aim?: { square: string; turn: number } | null;
+  shot?: { at: number; square: string | null; piece: string | null } | null;
+  dodge?: ChandyDodge | null;
+  passWait?: number;
+  /** His last upgrade (the rifle's stage, the move it unlocked), shown as crowd turn `turn` begins. */
+  upgrade?: { turn: number; stage: number; unlock?: ChandyMove } | null;
+  /** The crowd turn his rifle came whole (its fifth upgrade shown): his rage meter fills from then (chandy.dodgeAfterMoves). */
+  whole?: number;
+}
+
 /** The pieces Timber's workshop builds, in its strip's order (WORKSHOP_PIECES). */
 export type WorkshopPiece = "p" | "n" | "b" | "r" | "q";
 export const WORKSHOP_PIECES: readonly WorkshopPiece[] = ["p", "n", "b", "r", "q"];
@@ -1116,7 +1221,7 @@ export interface SawCut {
  * gardener's plain plant, as a toy block (either side). `hoop`: the circus tiger's burning hoop, either side (nothing crosses its
  * wall, and no check across it). `crease`: Folio's Crease, the crowd's moves only (none across its line; Folio's pieces cross it).
  */
-export type StopReason = "boardsaw" | "cut" | "pie" | "block" | "paint" | "plant" | "hoop" | "crease" | "gold" | "dough";
+export type StopReason = "boardsaw" | "cut" | "pie" | "block" | "paint" | "plant" | "hoop" | "crease" | "gold" | "dough" | "beam" | "scatter" | "shield";
 
 /** Wrangler's long pull: his center pawn's double step (`from` to `via`), lassoed on to `to`, as crowd turn `turn` begins. */
 export interface LongPull {
@@ -1532,7 +1637,21 @@ export type PowerEventKind =
   | "doughRise"
   | "doughSquash"
   | "goldPlate"
-  | "openingTalk";
+  | "openingTalk"
+  // Chandy: a lock (the crosshair on a piece of yours: `square`; `first`: the one as his turn begins), an upgrade of his rifle
+  // (`stage` 1-5, the move it unlocked: `unlock`), his move meter's moves (scatter shot, beam, shields, rapid fire, the queen
+  // lock's aim) and the queen lock's shot at the start of his next turn; Dodge (as the crowd's turn begins: it plays on a screen of
+  // its own) and its hit (the battle his).
+  | "lockOn"
+  | "upgrade"
+  | "scatterShot"
+  | "beam"
+  | "shields"
+  | "rapidFire"
+  | "queenAim"
+  | "queenShot"
+  | "dodge"
+  | "dodgeWin";
 export interface PowerEvent {
   kind: PowerEventKind;
   turn: number;
@@ -1584,6 +1703,9 @@ export interface PowerEvent {
   move?: string;
   /** Don Dough's opening comment: the library's name for your opening (none: his fallback line). */
   opening?: string;
+  /** Chandy's upgrade: the rifle's stage now (1-5), and the move it unlocked (none after all five are). */
+  stage?: number;
+  unlock?: ChandyMove;
 }
 
 /** The settings behind the God King's Last Stand. */

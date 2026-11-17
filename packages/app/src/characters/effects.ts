@@ -26,6 +26,7 @@ import { FLOUR_HIT } from "./effects/zebra.ts";
 import { CLAW_HIT } from "./effects/dash.ts";
 import { ZEBRA_DOUGH } from "./zebra-dough.ts";
 import { GOLD_FX } from "./zebra-gold.ts";
+import { CHANDY_FX } from "./effects/chandy.ts";
 
 // Each boss's effects are drawn in its own file (effects/<boss>.ts); what they share is in effects/common.ts.
 export { BOARD_CELL, SQUARE } from "./effects/common.ts";
@@ -106,4 +107,17 @@ export const EFFECT_SPRITES = {
   creasePencil: CREASE_PENCIL,
   inkStrike: INK_STRIKE,
   inkHit: INK_HIT,
+  // Chandy's (effects/chandy.ts; his rules wire them in their own job).
+  chandyCrosshair: CHANDY_FX.CROSSHAIR,
+  chandyScatter: CHANDY_FX.SCATTER_MARK,
+  chandyScatterBurst: CHANDY_FX.SCATTER_BURST,
+  chandyBeam: CHANDY_FX.BEAM_TILE,
+  chandyShield: CHANDY_FX.SHIELD,
+  chandyDizzy: CHANDY_FX.DIZZY,
+  chandyQueenAim: CHANDY_FX.QUEEN_AIM,
+  chandyRound: CHANDY_FX.PIERCING_ROUND,
+  chandyShatter: CHANDY_FX.SHATTER,
+  chandyDodgeRow: CHANDY_FX.DODGE_ROW,
+  chandyDodgeCol: CHANDY_FX.DODGE_COL,
+  chandyDodgeKing: CHANDY_FX.DODGE_KING,
 } as const satisfies Record<string, Character>;

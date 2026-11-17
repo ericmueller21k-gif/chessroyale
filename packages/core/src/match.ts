@@ -1,7 +1,7 @@
 import type { BossPowerState } from "./boss.ts";
 import { randomInt, shuffle, weightedIndex, type Rng } from "./rng.ts";
-import type { GroupResult } from "./scoring.ts";
-import { DEFAULT_SETTINGS, moveClockAt, roundsInStage, type CrowdBotSpread, type Settings } from "./settings.ts";
+import { round2, type GroupResult } from "./scoring.ts";
+import { CROWD_BEST, DEFAULT_SETTINGS, moveClockAt, roundsInStage, type CrowdBotSpread, type Settings } from "./settings.ts";
 
 /**
  * Match structure from buildspec.md: knockout stages scored on move quality,
@@ -70,6 +70,12 @@ export interface PlayerState {
   placement: number | null;
   /** Moves missed over the match (each counts as finalMissLoss in matchLoss). */
   misses?: number;
+  /**
+   * The 50 v 50 rework: a person left this seat for good mid-match (resigned, gone too long, removed for being away), after
+   * this move of the game (the board's move number). Out then, or, a bot having taken the seat, the bot plays on under it.
+   * Either way the seat is never the best player (bestPlayer's `left`): its record isn't one player's whole match.
+   */
+  leftAt?: number;
   /** Crowd 50 v 50 (CrowdScoring): strong moves in a row now, and the streak bonus earned over the match. */
   streak?: number;
   streakPoints?: number;
@@ -331,6 +337,72 @@ export function assignColours(state: MatchState, rng: Rng, whites: number | null
   };
 }
 
+/**
+ * Sides for a 50 v 50's parties (docs/decisions/2026-11-16-crowd-party.md): each party whole on one side, with at most `whites`
+ * players on White and `blacks` on Black among them. A side per party (in `sizes`' order), drawn at random among the ways that fit,
+ * or null when none does. Subset sums over at most 100 seats: tiny.
+ */
+export function packParties(sizes: readonly number[], whites: number, blacks: number, rng: Rng): Side[] | null {
+  const total = sizes.reduce((a, b) => a + b, 0);
+  if (total > whites + blacks || sizes.some((s) => s < 0)) return null;
+  // (A random order, so which parties land together on White is drawn; then the White total, drawn among those that fit.)
+  const order = shuffle(rng, sizes.map((_, i) => i));
+  // can[k][s]: the first k parties of `order` can put exactly s players on White.
+  const can: boolean[][] = [Array.from({ length: whites + 1 }, (_, s) => s === 0)];
+  order.forEach((i, k) => {
+    const prev = can[k]!;
+    can.push(prev.map((ok, s) => ok || (s >= sizes[i]! && prev[s - sizes[i]!]!)));
+  });
+  const fits = can[order.length]!.flatMap((ok, s) => (ok && total - s <= blacks ? [s] : []));
+  if (!fits.length) return null;
+  let s = fits[Math.floor(rng() * fits.length)]!;
+  const sides: Side[] = sizes.map(() => "b");
+  for (let k = order.length; k > 0; k--) {
+    const i = order[k - 1]!;
+    // (Taken on White when the sum couldn't be made without it.)
+    if (!can[k - 1]![s]) {
+      sides[i] = "w";
+      s -= sizes[i]!;
+    }
+  }
+  return sides;
+}
+
+/**
+ * A 50 v 50's sides with parties (`together`: the players of each party, by id): `whites` players on White, each party whole on
+ * one side (packParties), everyone else drawn at random into the seats left. Parties that can't all fit whole (never, as the lobby
+ * takes a party only while they do): the usual draw, assignColours.
+ */
+export function assignTeams(state: MatchState, rng: Rng, whites: number, together: readonly (readonly string[])[]): MatchState {
+  const alive = alivePlayers(state);
+  const ids = new Set(alive.map((p) => p.id));
+  // (Each player in one party at most, and only those still in the match.)
+  const seen = new Set<string>();
+  const parties: string[][] = [];
+  for (const g of together) {
+    const party = g.filter((id) => ids.has(id) && !seen.has(id));
+    party.forEach((id) => seen.add(id));
+    if (party.length) parties.push(party);
+  }
+  const sides = packParties(
+    parties.map((g) => g.length),
+    whites,
+    alive.length - whites,
+    rng,
+  );
+  if (!sides) return assignColours(state, rng, whites);
+  const white = new Set(parties.flatMap((g, i) => (sides[i] === "w" ? g : [])));
+  const rest = shuffle(
+    rng,
+    alive.filter((p) => !seen.has(p.id)),
+  );
+  for (const p of rest.slice(0, Math.max(0, whites - white.size))) white.add(p.id);
+  return {
+    ...state,
+    players: state.players.map((p) => (p.alive ? { ...p, colour: white.has(p.id) ? "w" : "b" } : p)),
+  };
+}
+
 export interface RoundPlayerOutcome {
   playerId: string;
   roundScore: number;
@@ -491,15 +563,23 @@ export const sameScore = (a: number, b: number) => Math.abs(a - b) < 1e-9;
 /** The cut pool a player is in. */
 const poolOf = (p: Pick<PlayerState, "colour">, teams: boolean): CutPool => (teams ? (p.colour ?? "w") : "all");
 
-/** True when this stage's cut is the last before a fixed-size ending (the final, the boss battle, the duel). */
-export const isLastCut = (state: Pick<MatchState, "stage">, settings: Pick<Settings, "knockoutsPerStage">) =>
-  state.stage >= settings.knockoutsPerStage.length - 1;
+/** The cuts a match has: the 50 v 50 rework's schedule (`crowdCuts`), else one per `knockoutsPerStage` entry. */
+export const cutsInMatch = (settings: Pick<Settings, "knockoutsPerStage"> & Partial<Pick<Settings, "crowdCuts">>) =>
+  settings.crowdCuts?.length ? settings.crowdCuts.length : settings.knockoutsPerStage.length;
+
+/** True when this stage's cut is the last before a fixed-size ending (the final, the boss battle, the duel; the rework's 1 v 1). */
+export const isLastCut = (state: Pick<MatchState, "stage">, settings: Pick<Settings, "knockoutsPerStage"> & Partial<Pick<Settings, "crowdCuts">>) =>
+  state.stage >= cutsInMatch(settings) - 1;
 
 /**
  * Who a stage's cut takes, from `ranked` (best first, as `standings`):
  * - Each pool owes its share of the stage's knockouts (half each in Crowd 50 v 50) plus its part of what earlier cuts
  *   left over (`cutCarry`), spread evenly over the cuts still to come (rounded up), so no one cut takes them all at once
  *   (Eric's bar: a player who goes out should think "yeah, I messed up", not lose to a pile-up of owed places).
+ *   The 50 v 50 rework (`crowdCuts`) counts from each cut's `keep` instead: its share is the last cut's keep less this one's,
+ *   what's left over is whoever is still in above the last cut's keep, and a cut never takes a side below its keep (seats
+ *   left empty by players who left count toward it). With nobody gone that's the same as the knockouts; after the last cut
+ *   (the 1 v 1) nobody is cut.
  * - It takes the bottom of the pool, except that everyone tied exactly with the last player through goes through too:
  *   nobody goes out on thinking time or a coin flip. In Crowd 50 v 50 so does anyone within the bubble grace of that
  *   player (CrowdScoring.cutGrace). What that leaves over is owed by the cuts after it.
@@ -513,13 +593,19 @@ export function cutPlan(state: MatchState, ranked: readonly PlayerState[], setti
   const exact = isLastCut(state, settings);
   const out = new Set<string>();
   const carry: Partial<Record<CutPool, number>> = {};
+  const cuts = settings.crowdCuts?.length ? settings.crowdCuts : null;
+  if (cuts && state.stage >= cuts.length) return { out: [], carry };
   // Cuts left, this one included: what earlier cuts left over is spread evenly over them (all of it at the last).
-  const remaining = Math.max(1, settings.knockoutsPerStage.length - state.stage);
+  const remaining = Math.max(1, cutsInMatch(settings) - state.stage);
   for (const pool of teams ? (["w", "b"] as const) : (["all"] as const)) {
     const members = ranked.filter((p) => poolOf(p, teams) === pool);
-    const carried = state.cutCarry?.[pool] ?? 0;
+    const keep = cuts ? cuts[state.stage]!.keep * (teams ? 1 : 2) : 0;
+    const before = cuts ? (state.stage ? cuts[state.stage - 1]!.keep * (teams ? 1 : 2) : Infinity) : 0;
+    // (The rework: what earlier cuts left over is whoever is in above the last cut's keep; this cut's own share is the rest
+    // down to its keep.)
+    const carried = cuts ? Math.max(0, members.length - before) : (state.cutCarry?.[pool] ?? 0);
     const dueNow = Math.ceil(carried / remaining);
-    const owed = (teams ? Math.floor(k / 2) : k) + dueNow;
+    const owed = cuts ? Math.max(0, members.length - keep) - carried + dueNow : (teams ? Math.floor(k / 2) : k) + dueNow;
     // (At least one stays in every pool.)
     const n = Math.max(0, Math.min(owed, members.length - 1));
     const bottom = members.slice(members.length - n);
@@ -527,7 +613,7 @@ export function cutPlan(state: MatchState, ranked: readonly PlayerState[], setti
     const grace = settings.crowdScoring?.cutGrace ?? 0;
     const going = exact || !line ? bottom : bottom.filter((p) => !sameScore(standingPoints(p, settings), standingPoints(line, settings)) && standingPoints(line, settings) - standingPoints(p, settings) > grace + 1e-9);
     for (const p of going) out.add(p.id);
-    const left = carried - dueNow + (owed - going.length);
+    const left = cuts ? members.length - going.length - keep : carried - dueNow + (owed - going.length);
     if (left > 0) carry[pool] = left;
   }
   return { out: ranked.filter((p) => out.has(p.id)).map((p) => p.id), carry };
@@ -543,7 +629,9 @@ export interface StageEnd {
 
 /**
  * Ends the current stage: the lowest scorers are knocked out and placed (cutPlan: ties at the line go through),
- * scores reset (or carry over), and the board list is shrunk by the caller via `keepBoards`.
+ * scores reset (or carry over: with `crowdCarry`, each survivor keeps that share, to 2 decimals as every 50 v 50 score is;
+ * streaks untouched), and the board list is shrunk by the caller via `keepBoards`. The 50 v 50 rework (`crowdCuts`) never
+ * sets up a final: after its last cut the 1 v 1 is an ordinary stage, one player a side.
  */
 export function endStage(
   state: MatchState,
@@ -563,7 +651,7 @@ export function endStage(
     if (out.has(p.id)) return { ...p, alive: false, outInStage: state.stage, placement: placement.get(p.id)! };
     return {
       ...p,
-      stageScore: settings.scoresBetweenStages === "reset" ? 0 : p.stageScore,
+      stageScore: settings.scoresBetweenStages === "reset" ? 0 : settings.crowdCarry === undefined ? p.stageScore : round2(p.stageScore * settings.crowdCarry),
       stageThinkMs: 0,
       stageRounds: 0,
       powerUps: Math.min(settings.powerUpsMax, p.powerUps + settings.powerUpsPerStage),
@@ -571,7 +659,7 @@ export function endStage(
     };
   });
   const next: MatchState = { stage: state.stage + 1, round: 0, players, boards: [...keepBoards], ...(Object.keys(plan.carry).length ? { cutCarry: plan.carry } : {}) };
-  if (next.stage >= settings.knockoutsPerStage.length) {
+  if (next.stage >= settings.knockoutsPerStage.length && !settings.crowdCuts?.length) {
     // Seeds from this stage's standings: 1 & 4 against 2 & 3, alternating 1, 2, 4, 3.
     const seeds = ranked.filter((p) => !out.has(p.id)).map((p) => p.id);
     const colourOf = new Map(ranked.map((p) => [p.id, p.colour]));
@@ -603,12 +691,16 @@ export function endStage(
 /** Crowd 50 v 50: players keep one color (their team) all match. */
 export const isTeamMatch = (settings: Pick<Settings, "mode" | "crowdTeams">) => settings.mode === "crowd" && settings.crowdTeams;
 
-/** True once the knockout stages are over and the 2v2 final is on. */
+/** True once the knockout stages are over and the 2v2 final is on. Never in the 50 v 50 rework (`crowdCuts`): it has no final. */
 export const isFinal = (state: MatchState, settings: Settings = DEFAULT_SETTINGS) =>
-  state.stage >= settings.knockoutsPerStage.length;
+  !settings.crowdCuts?.length && state.stage >= settings.knockoutsPerStage.length;
 
+/**
+ * The stage's rounds are played: its cut is due. Never in the 50 v 50 rework's 1 v 1, after its last cut (`crowdCuts`): it plays
+ * to the game's end (the runner's endGameIfOver), with no more cuts or breaks, whatever a test's `?rounds=` makes its length.
+ */
 export const stageComplete = (state: MatchState, settings: Settings = DEFAULT_SETTINGS) =>
-  state.round >= roundsInStage(settings, state.stage);
+  !(settings.crowdCuts?.length && state.stage >= settings.crowdCuts.length) && state.round >= roundsInStage(settings, state.stage);
 
 /** Turn order: a[0], b[0], a[1], b[1], ... */
 export function interleave(a: readonly string[], b: readonly string[]): string[] {
@@ -794,6 +886,90 @@ export function finishBoss(state: MatchState, rng: Rng, result: "crowd" | "boss"
     boss: state.boss && { ...state.boss, result },
     players: state.players.map((p) => (p.alive ? { ...p, alive: false, placement: place.get(p.id)!, outInStage: place.get(p.id) === 1 ? null : state.stage } : p)),
   };
+}
+
+// ---- The 50 v 50 rework's end (crowdCuts: one game to its end, cuts to a 1 v 1) ----
+
+/**
+ * The move limit (`crowdMoveLimit`) is reached once Black's move that-many has been played: the position's own move number
+ * (a FEN's fullmove, as the board numbers it) is past it. No limit: never.
+ */
+export const crowdLimitReached = (settings: Pick<Settings, "crowdMoveLimit">, fullmove: number) =>
+  settings.crowdMoveLimit !== undefined && fullmove > settings.crowdMoveLimit;
+
+/**
+ * The judge's verdict at the move limit (Eric's default for his question 1, Nov 16): the side at `crowdLimitWin` expected
+ * score or more wins (75%: 9 in 10 games that reach move 60 are clearly won by then, reports/crowd-rework.md); otherwise a
+ * draw (null). `expected` is the side to move's expected score, as the board keeps it.
+ */
+export function crowdLimitVerdict(expected: number, toMove: Side, settings: Pick<Settings, "crowdLimitWin">): Side | null {
+  const win = settings.crowdLimitWin ?? 1;
+  if (expected >= win - 1e-9) return toMove;
+  if (1 - expected >= win - 1e-9) return toMove === "w" ? "b" : "w";
+  return null;
+}
+
+/**
+ * Ends a 50 v 50 rework game (mate, a draw by the rules, the move limit's verdict, or a game over before the 1 v 1): everyone
+ * still in takes the first places (the design's rule 5), the winning side's first, then the losing side's (`winner` null, a
+ * draw: both sides together), each by their score (to 2 decimals, as the screens show it; Eric's default for his question 4:
+ * the winning side's survivors first); an exact tie goes to fewer counted points given away a move over the match
+ * (matchLoss), then less raw loss, then less thinking time, then a coin. So in the 1 v 1 the winner is 1st and, drawn, the
+ * better whole-match score. Those cut are already placed below them, each cut's below the next's (endStage).
+ */
+export function finishGame(state: MatchState, rng: Rng, winner: Side | null, settings: Settings = DEFAULT_SETTINGS): MatchState {
+  const coin = new Map(state.players.map((p) => [p.id, rng()]));
+  const side = (p: PlayerState) => (winner === null || p.colour === winner ? 0 : 1);
+  const score = (a: PlayerState, b: PlayerState) => {
+    const x = standingPoints(a, settings);
+    const y = standingPoints(b, settings);
+    return sameScore(x, y) ? 0 : y - x;
+  };
+  const ranked = alivePlayers(state).sort(
+    (a, b) =>
+      side(a) - side(b) ||
+      score(a, b) ||
+      matchLoss(a, settings) - matchLoss(b, settings) ||
+      rawLossTotal(a, settings) - rawLossTotal(b, settings) ||
+      scoreThinkMs(a, settings) - scoreThinkMs(b, settings) ||
+      coin.get(a.id)! - coin.get(b.id)!,
+  );
+  const place = new Map(ranked.map((p, i) => [p.id, i + 1]));
+  return {
+    ...state,
+    players: state.players.map((p) => (p.alive ? { ...p, alive: false, placement: place.get(p.id)!, outInStage: place.get(p.id) === 1 ? null : state.stage } : p)),
+  };
+}
+
+/** The cuts a 50 v 50 rework match made (its stage, at most the schedule's length). */
+export const cutsMade = (state: Pick<MatchState, "stage">, settings: Pick<Settings, "knockoutsPerStage"> & Partial<Pick<Settings, "crowdCuts">>) =>
+  Math.min(state.stage, cutsInMatch(settings));
+
+/**
+ * The best player (the design's rule 5): the fewest counted points given away a move over the match (matchLoss: the opening
+ * allowance taken off, a miss counting as finalMissLoss), among those who survived at least `CROWD_BEST.cutsShare` of the
+ * cuts made (rounded up: half), each player counted as surviving the cuts before the stage they went out in. Those who
+ * left the match (`left`: resigned, removed for being away) never are: it's a title for playing, not for leaving. An exact
+ * tie goes to the better place. Null before anyone has moved.
+ */
+export function bestPlayer(state: MatchState, settings: Settings = DEFAULT_SETTINGS, left: ReadonlySet<string> = new Set()): string | null {
+  const made = cutsMade(state, settings);
+  const need = Math.ceil(made * CROWD_BEST.cutsShare - 1e-9);
+  const survived = (p: PlayerState) => (p.alive || p.outInStage === null ? made : Math.min(made, p.outInStage));
+  const loss = (p: PlayerState) => matchLoss(p, settings);
+  const ok = state.players.filter((p) => !left.has(p.id) && survived(p) >= need && Number.isFinite(loss(p)));
+  const place = (p: PlayerState) => p.placement ?? 0;
+  const best = [...ok].sort((a, b) => (sameScore(loss(a), loss(b)) ? 0 : loss(a) - loss(b)) || place(a) - place(b) || (a.id < b.id ? -1 : 1))[0];
+  return best?.id ?? null;
+}
+
+/**
+ * The podium's titles (the design's rules 5 and 6), once everyone is placed: the winner, 1st place of a won game (a drawn
+ * game has none), and the best player (bestPlayer; one player can be both).
+ */
+export function crowdPodium(state: MatchState, winner: Side | null, settings: Settings = DEFAULT_SETTINGS, left: ReadonlySet<string> = new Set()): { winner?: string; best: string | null } {
+  const first = winner === null ? undefined : state.players.find((p) => p.placement === 1);
+  return { ...(first ? { winner: first.id } : {}), best: bestPlayer(state, settings, left) };
 }
 
 // ---- Boards ----

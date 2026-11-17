@@ -1,8 +1,8 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "preact/hooks";
 import { bossBeat, type Beat, type BeatResult, type Stage } from "../characters/boss-beats.ts";
-import { BOSS_KITS, artOf, bossKit, bossKitOf, poweredKit, type BossKit } from "../characters/kits.ts";
+import { BOSS_KITS, artOf, bossKit, bossKitOf, liveKit, type BossKit } from "../characters/kits.ts";
 import { growingRun, resetGrowing } from "./RecluseChild.ts";
-import { SELECT_FRAMING } from "../characters/boss-select.ts";
+import { figure, onResetBeats, setFigureRun, suit } from "./boss-figure.ts";
 import { stanceAt } from "../characters/stance.ts";
 import { resetMoo } from "../characters/moo-state.ts";
 import { type Anim, type Character, type Frame } from "../characters/sprite.ts";
@@ -22,12 +22,13 @@ import { prewarmAlfil } from "./Alfil.tsx";
 import { prewarmHopper } from "./Hopper.tsx";
 import { prewarmSmudgy } from "./Smudgy.tsx";
 import { prewarmMoo } from "./Moo.tsx";
+import { prewarmChandy } from "./Chandy.tsx";
 import { prewarmGardener, resetGarden } from "./Gardener.tsx";
 import { prewarmTiger } from "./Tiger.tsx";
 import { resetTiger } from "../tiger-show.ts";
 import { prewarmFolio } from "./Folio.tsx";
 import { prewarmRecluse } from "./Recluse.tsx";
-import { suited } from "../characters/recluse.ts";
+import { coated } from "../characters/recluse.ts";
 import { CRITICAL, LOW, NORMAL, VoiceBubble, bossVoice, holdMs, type Priority } from "../speech.tsx";
 import { mateAttack, prewarmKingAttack } from "./KingAttack.tsx";
 import { lightsId, syncLights } from "../characters/lights.ts";
@@ -61,45 +62,19 @@ const startOf = (key: string, now = Date.now()) => {
 /** Sounds already played: the phone and computer placements, or a new screen, never play one twice. */
 const played = new Set<string>();
 
-/**
- * A new boss battle (its intro, with the voices' reset): the moments seen and sounds played in the last one are
- * forgotten, so its entrance, and its defeat or victory, play again (their keys repeat from battle to battle).
- */
-export function resetBeats() {
+// A new battle forgets the moments seen and sounds played here, and each power's own state (boss-figure.ts, resetBeats).
+onResetBeats(() => {
   started.clear();
   played.clear();
   inPlace.run = null;
-  figure.run = null;
-  suit.at = null;
   resetMoo();
   resetGarden();
   resetTiger();
   resetGrowing();
-}
+});
+export { resetBeats, setFigureRun, setSuitAt, type FigureRun } from "./boss-figure.ts";
 
-/**
- * What the boss's figure shows instead of its beat, for as long as it's set (the Hidden Boss's phase 2): `before` (a loop)
- * until `since`, then `anims` in turn (a loop given with `ms` plays that long; a one-shot given with `ms` plays once and
- * holds its last frame for the rest), then `loop` for good. Its beat's lines and
- * fall lines are quiet meanwhile (his phase 2 says its own). Runs in place (playInPlace) still play over it. Cleared by a
- * new battle (resetBeats). `talks`: its beat's lines are said as usual meanwhile (the Hidden Boss's child growing up).
- */
-export type FigureRun = { since: number; anims: readonly (string | { readonly anim: string; readonly ms: number })[]; loop: string; before?: string; talks?: boolean };
-const figure: { run: FigureRun | null } = { run: null };
-export function setFigureRun(run: FigureRun | null) {
-  figure.run = run;
-}
-
-/**
- * The Hidden Boss's suit and helmet (Eric, Nov 14): from `at` (his transformation's white-out) to the end of the battle, worn on
- * every drawing of him where he stands (his frames' parts swapped for the suit's: recluse.ts, `suited`). Cleared by a new battle
- * (resetBeats).
- */
-const suit: { at: number | null } = { at: null };
-export function setSuitAt(at: number | null) {
-  suit.at = at;
-}
-/** Whether a kit that wears a suit (BossKit.suit) has it on at `now`. */
+/** Whether a kit that changes its look (BossKit.suit: the Hidden Boss's final form) has it on at `now`. */
 const suitOn = (kit: BossKit, now: number) => !!kit.suit && suit.at !== null && now >= suit.at;
 /** The loop the figure rests in now, when a figure run is set (phase 2's `idle2`), else null. */
 export const figureLoop = (): string | null => figure.run?.loop ?? null;
@@ -220,10 +195,14 @@ export const hasCharacter = (match: GameView) => !!bossKit(match.boss?.name);
 
 export function BossCharacter({ match, place }: { match: GameView; place: "bar" | "side" | "results" }) {
   const boss = match.boss;
-  return boss && bossKitOf(boss) ? <Character boss={boss} stage={bossStage(match.phase, boss)} place={place} /> : null;
+  // (Beaten with his phase change next (the Hidden Boss's `toPhase2`): his cutscene comes 1.8 s in and hushes him, so his fall's mumbling
+  // only ever flashed its first line in his bar before it: none then (Eric, Nov 16: "get rid of that line").)
+  const p = match.phase;
+  const mute = p.kind === "boss" && !!p.fall && !!p.toPhase2;
+  return boss && bossKitOf(boss) ? <Character boss={boss} stage={bossStage(match.phase, boss)} place={place} muteFall={mute} /> : null;
 }
 
-function Character({ boss, stage, place }: { boss: BossView; stage: Stage; place: "bar" | "side" | "results" }) {
+function Character({ boss, stage, place, muteFall }: { boss: BossView; stage: Stage; place: "bar" | "side" | "results"; muteFall?: boolean }) {
   // (A form of its own: the Hidden Boss's child, his growing figure; his age followed by a figure run, RecluseChild.ts.)
   const full = bossKitOf(boss);
   useLayoutEffect(() => {
@@ -292,6 +271,8 @@ function Character({ boss, stage, place }: { boss: BossView; stage: Stage; place
       if (kit.ch.id === "folio") prewarmFolio();
       // (The Hidden Boss's phase change: his rage, his leap onto the board, the book thrown down, the chant.)
       if (kit.ch.id === "recluse") prewarmRecluse(boss.crowdSide);
+      // (Chandy's Dodge clones, the rifle's stages, his figure at each, his board art.)
+      if (kit.ch.id === "chandy") prewarmChandy();
       // (Its attack on a king too: the God King's Last Stand, or its mate.)
       prewarmKingAttack(kit.ch.name);
     });
@@ -319,7 +300,7 @@ function Character({ boss, stage, place }: { boss: BossView; stage: Stage; place
       const now = Date.now();
       // (A run of its own animations in place, over its beat, while one lasts: the Hidden Boss's spellbook, his slam.)
       // (Moo's Full Moon: every animation of his is its powered-up twin while it lasts.)
-      const live = kit.powered?.on(nowRef.current.boss, now, nowRef.current.stage) ? poweredKit(kit) : kit;
+      const live = liveKit(kit, nowRef.current.boss, now, nowRef.current.stage);
       const own = inPlaceShowing(kit.ch, now);
       let s = own ?? figureShowing(kit.ch, now) ?? showing(live, beat, now, since);
       // (A run that moves the figure along a phone's bar: Babur's hop to his pump.)
@@ -338,7 +319,7 @@ function Character({ boss, stage, place }: { boss: BossView; stage: Stage; place
         if (rest) s = rest;
       }
       const look = lookRef.current();
-      // (The Hidden Boss in his suit from his transformation on: the same frames, worn.)
+      // (The Hidden Boss in his final form from his transformation on: the same frames, worn; each frame's number turns his helix.)
       const suitNow = suitOn(kit, now);
       const id = `${s.anim}:${s.frame}:${look}:${lightsId()}:${suitNow ? "suit" : ""}`;
       if (kit.heads) {
@@ -351,7 +332,7 @@ function Character({ boss, stage, place }: { boss: BossView; stage: Stage; place
       if (id !== last) {
         last = id;
         const drawn = kit.ch.anims[s.anim]!.frames[s.frame]!;
-        const frame = suitNow ? suited(drawn) : drawn;
+        const frame = suitNow ? coated(drawn, s.frame) : drawn;
         g?.putImageData(frameImage(kit.ch, frame, look), 0, 0);
         box.current?.setAttribute("data-anim", s.anim);
         box.current?.toggleAttribute("data-suit", suitNow);
@@ -390,7 +371,7 @@ function Character({ boss, stage, place }: { boss: BossView; stage: Stage; place
   // Beaten: its fall lines (the Hidden Boss's mumbling), one after another once its defeat's animation is over, each
   // as the last one goes; carried on by whichever screen draws it next (the result screen), from the same moment.
   const fallAt = useMemo(() => {
-    if (!kit?.fall?.length || beat?.anim !== "defeat" || figure.run) return null;
+    if (!kit?.fall?.length || beat?.anim !== "defeat" || figure.run || muteFall) return null;
     const shot = kit.ch.anims[kit.anims.defeat ?? "defeat"];
     let t = since + (shot && !shot.loop ? length(shot) : 0);
     return kit.fall.map((text) => {
@@ -398,7 +379,7 @@ function Character({ boss, stage, place }: { boss: BossView; stage: Stage; place
       t += holdMs(text) + 150;
       return { text, at };
     });
-  }, [kit, beat?.key, since]);
+  }, [kit, beat?.key, since, muteFall]);
   useEffect(() => {
     if (!fallAt) return;
     const timers = fallAt.map(({ text, at }, i) => setTimeout(() => bossVoice.say(text, `${boss.id}:${boss.startMove}:fall:${i}`, NORMAL), Math.max(0, at - Date.now())));
@@ -433,13 +414,13 @@ export function BossTag({ boss, live = true }: { boss: Pick<BossView, "name" | "
 }
 
 /**
- * The drawing a boss's small face follows as he looks now (his phone's bar's bust: his age, his suit), or null for his portrait, drawn
+ * The drawing a boss's small face follows as he looks now (his phone's bar's bust: his age, his final form), or null for his portrait, drawn
  * once. Only `live` (inside a battle): his look is module state (`suit`, `figure`) that only the next battle clears, so a face on a menu
- * after a fight that reached phase 2 showed his helmet, each with its own frame loop (#712's review).
+ * after a fight that reached phase 2 showed his final form, each with its own frame loop (#712's review).
  */
 export const faceBust = (kit: BossKit, live: boolean) => (live && kit.barFace && kit.bar) || null;
 
-/** His bust's look now (BossFace's `live`: the loop his figure rests in, his suit), for a kit with a `barFace`; else null. */
+/** His bust's look now (BossFace's `live`: the loop his figure rests in, his final form), for a kit with a `barFace`; else null. */
 function liveLook(kit: BossKit, now: number): { anim: string; on: boolean; id: string } | null {
   const bust = faceBust(kit, true);
   if (!bust) return null;
@@ -453,8 +434,9 @@ function drawLook(g: CanvasRenderingContext2D, kit: BossKit, look: { anim: strin
   const bust = kit.bar!;
   const f = kit.barFace!;
   const p = kit.portrait;
-  const drawn = bust.anims[look.anim]!.frames[look.anim === p.anim ? p.frame : 0]!;
-  g.putImageData(frameImage(bust, look.on ? suited(drawn) : drawn), -f.x, -f.y, f.x, f.y, f.w, f.h);
+  const i = look.anim === p.anim ? p.frame : 0;
+  const drawn = bust.anims[look.anim]!.frames[i]!;
+  g.putImageData(frameImage(bust, look.on ? coated(drawn, i) : drawn), -f.x, -f.y, f.x, f.y, f.w, f.h);
 }
 
 /** Each look's bust as an image address, made once (`ch.id:anim:suit`). */
@@ -512,8 +494,8 @@ export function BossFace({ boss, class: cls = "", label, live = false }: { boss:
       g.putImageData(frameImage(art, art.anims[p.anim]!.frames[p.frame]!), -p.x, -p.y, p.x, p.y, p.w, p.h);
       return;
     }
-    // (A look that changes in the battle (the Hidden Boss's age, his suit): the bust as the phone's bar draws it, the loop his figure rests
-    // in and his suit, read each frame and drawn again when either changes. Eric's computer showed the 9-year-old at 20, Nov 14.)
+    // (A look that changes in the battle (the Hidden Boss's age, his final form): the bust as the phone's bar draws it, the loop his figure rests
+    // in and his final form, read each frame and drawn again when either changes. Eric's computer showed the 9-year-old at 20, Nov 14.)
     let raf = 0;
     let last = "";
     const draw = () => {
@@ -566,27 +548,6 @@ export function bossPortraitUrl(name: string): string | null {
   }
   portraitUrls.set(name, url);
   return url;
-}
-
-/**
- * A boss's whole figure for a select tile (docs/decisions/2026-10-23-boss-select-sf.md): its portrait's frame, full size, on a
- * canvas of its own. The stylesheet (`.bs-art`) scales it and puts its neck where `SELECT_FRAMING` says; the tile's slanted
- * shape cuts off what doesn't fit. A boss without a character keeps its emoji.
- */
-export function BossArt({ boss, class: cls = "" }: { boss: { id: string; name: string; icon: string }; class?: string }) {
-  const kit = bossKit(boss.name);
-  const fit = SELECT_FRAMING[boss.id];
-  const cv = useRef<HTMLCanvasElement>(null);
-  useLayoutEffect(() => {
-    if (!kit || !cv.current) return;
-    const p = kit.portrait;
-    const art = artOf(kit);
-    cv.current.getContext("2d")?.putImageData(frameImage(art, art.anims[p.anim]!.frames[p.frame]!), 0, 0);
-  }, [kit]);
-  if (!kit || !fit) return <>{boss.icon}</>;
-  const art = artOf(kit);
-  const style = { "--ax": fit.neck[0], "--ay": fit.neck[1], "--aw": art.w, "--ah": art.h, "--span": fit.span, "--at": fit.at };
-  return <canvas ref={cv} class={`bs-art ${cls}`} width={art.w} height={art.h} aria-hidden="true" style={style} />;
 }
 
 /**

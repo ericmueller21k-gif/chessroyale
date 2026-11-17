@@ -140,15 +140,14 @@ Lane: `god-king`. The bosses' own rules and art are on [bosses.md](bosses.md).
   time, in the sound worker's table); e2e `e2e/recluse.spec.ts` (the sound and the shake, no menu).
 - Against the Hidden Boss: unit `packages/chess/test/recluse.test.ts` (blocked; a try spends its charge, the Last Stand
   nothing), `packages/app/test/recluse-boss.test.ts` (the mocks, his cues, solo's `callKing` spending),
-  `packages/app/test/recluse-phase2.test.ts` (no lines of his in the phase change or phase 2; silent in phase 2), `packages/server/test/crowd-hidden-boss.test.ts` (online: a try is
-  never a turn or a strike, and spends a charge); e2e `e2e/recluse.spec.ts` (the dock's count drops in phase 1; greyed in
-  his place, never to be called, through the phase change and phase 2), `e2e/crowd-hidden.spec.ts` (the Crowd's
-  final, solo and online).
+  `packages/app/test/recluse-phase2.test.ts` (no lines of his in the phase change or phase 2; silent in phase 2); e2e `e2e/recluse.spec.ts` (the dock's count drops in phase 1; greyed in
+  his place, never to be called, through the phase change and phase 2). (The Crowd's final against him: unreached since C2, its tests
+  retired in C4.)
 - On a board a boss has changed: unit `packages/chess/test/king-save-altered.test.ts` (Eric's hoop; every boss's states,
   audited from the roster; a stub boss's new filter); e2e `e2e/king-save-altered.spec.ts` (Babur's hoops).
 - Unit: `packages/chess/test/last-stand.test.ts`, `packages/app/test/god-king.test.ts`,
   `packages/app/test/god-king-sprite.test.ts`, `packages/server/test/lobby.test.ts`.
-- e2e: `e2e/crowd-hidden.spec.ts` (the boss final: tried, he never comes), `e2e/boss-powers.spec.ts`.
+- e2e: `e2e/boss-powers.spec.ts`.
 - Frames in the game: `npm run frames:god-king -- <dir> [w|b] [phone|desktop|both] [summon|laststand|all] [light|dark]`;
   a boss's attack in his Last Stand: `npm run frames:king-attack -- <dir> hollow [phone|desktop|both] laststand`.
 - e2e for a boss's attack in his Last Stand: `e2e/king-attack.spec.ts`. Unit: `packages/app/test/king-attack.test.ts`

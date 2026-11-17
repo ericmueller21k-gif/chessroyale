@@ -1,5 +1,5 @@
 import { DurableObject } from "cloudflare:workers";
-import { CAPACITY, DEFAULT_SETTINGS, MATCHMAKING } from "@chessroyale/core";
+import { CAPACITY, CROWD_PARTY_MAX, DEFAULT_SETTINGS, MATCHMAKING } from "@chessroyale/core";
 import type { LobbyRecord } from "./lobby.ts";
 import { openLobbyCode } from "./codes.ts";
 import type { Env } from "./index.ts";
@@ -232,6 +232,56 @@ export class Matchmaker extends DurableObject<Env> {
   private async seat(key: string, tickets: Ticket[]): Promise<boolean> {
     if (this.lobbyOptions.squads) return this.seatSquads(key, tickets);
     if (this.lobbyOptions.duel) return this.seatDuel(tickets);
+    // A 50 v 50 party's ticket is seated whole (seatParty); the players between parties as before, in the order they pressed.
+    if (!tickets.some(crowdParty)) return this.seatSingles(key, tickets);
+    let run: Ticket[] = [];
+    for (const t of tickets) {
+      if (!crowdParty(t)) {
+        run.push(t);
+        continue;
+      }
+      if (run.length && !(await this.seatSingles(key, run))) return false;
+      run = [];
+      if (!(await this.seatParty(key, t))) return false;
+    }
+    return run.length ? this.seatSingles(key, run) : true;
+  }
+
+  /**
+   * A 50 v 50 party (docs/decisions/2026-11-16-crowd-party.md): all its seats in one lobby under its pass, so its members play on
+   * one team: the filling lobby if they fit there (with every party in it still whole on a team), else a new one. False: not
+   * seated (form puts it back in line).
+   */
+  private async seatParty(key: string, t: Ticket): Promise<boolean> {
+    const party = crowdParty(t)!;
+    const code = this.current.get(key);
+    if (code) {
+      countCall("mm.reserve");
+      if (await this.lobby(code).reserveParty(party.size, party.pass, CAPACITY.queue.reservationMs).catch(() => false)) {
+        this.placeAll([t], code);
+        return true;
+      }
+    }
+    const { overrides, fillMs, botsOff, crowdWaitsForFull, engine } = this.lobbyOptions;
+    countCall("mm.create");
+    const fillAt = botsOff && crowdWaitsForFull ? null : Date.now() + fillMs;
+    const made = { held: false as boolean | number };
+    const fresh = await openLobbyCode(async (c) => {
+      made.held = await this.lobby(c).create(c, overrides, { fillAt, botsOff, party, reserveMs: CAPACITY.queue.reservationMs, ...(engine ? { engine } : {}) });
+      return made.held !== false;
+    });
+    if (!fresh || made.held !== true) {
+      countCall("mm.createFailed");
+      return false;
+    }
+    this.current.set(key, fresh);
+    await this.ctx.storage.put("current", Object.fromEntries(this.current));
+    this.placeAll([t], fresh);
+    return true;
+  }
+
+  /** Single players (a 50 v 50's or a raid's): the seats left in the group's filling lobby first, then new lobbies. */
+  private async seatSingles(key: string, tickets: Ticket[]): Promise<boolean> {
     let rest = tickets;
     const code = this.current.get(key);
     if (code) {
@@ -358,6 +408,13 @@ export class Matchmaker extends DurableObject<Env> {
   private lobby(code: string) {
     return this.env.LOBBIES.get(this.env.LOBBIES.idFromName(code));
   }
+}
+
+/** A 50 v 50 party's ticket (its Durable Object asks with `info` { size, pass }): its seats and pass, else null (one player). */
+function crowdParty(t: Ticket): { size: number; pass: string } | null {
+  const pass = t.info?.pass;
+  if (typeof pass !== "string" || !pass) return null;
+  return { size: Math.max(1, Math.min(CROWD_PARTY_MAX, Math.round(Number(t.info?.size) || 1))), pass };
 }
 
 /** The earliest Bots-off wait among these tickets (players switching to Default), if any. */

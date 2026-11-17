@@ -2,15 +2,17 @@
  * The Hidden Boss's sounds, synthesized (no files, no licenses): the red book's pages fluttering as it opens, the book
  * slammed shut (a dull thump with a slap of paper), a soft rustle of cloth as he moves it or himself, his laugh as breath
  * through the nose (no real voice: a few huffs), a low swell under his stare, and for his phase change a thump as he
- * lands on the board and the light pouring out of the book (a soft chord swelling over the hum), his visor's light as he's
- * revealed in his suit (a few sparks and a cold tone rising) and the arcs that split the board (a soft crackle, never a buzz),
- * and phase 2's slow move (two soft
- * notes falling). Each is a pure function of the sample rate (its noise is seeded), so a test can measure
+ * lands on the board and the light pouring out of the book (a soft chord swelling over the hum), his light as he's
+ * revealed in his final form (a few sparks and a cold tone rising) and the arcs that split the board (a soft crackle, never a buzz),
+ * and phase 2's slash as he cuts one of your hearts (a slow whoosh drawn back, then a fast swish and a ring of steel). Each is a pure function of the sample rate (its noise is seeded), so a test can measure
  * it: every one stays quieter than a piece's move (peak and loudness). Made ahead in the sound worker (warmSounds).
  */
 import { bandpass, lowpass, noise, osc, render, rng, saw, sine, soft, type Voice, soundCache } from "./synth.ts";
 
-export type RecluseSound = "flip" | "shut" | "rustle" | "huff" | "hum" | "thump" | "glow" | "slow" | "spark" | "arc";
+export type RecluseSound = "flip" | "shut" | "rustle" | "huff" | "hum" | "thump" | "glow" | "slash" | "spark" | "arc";
+
+/** When the slash's blade goes through (s from its start): the heart's cut on screen, RECLUSE_PHASE2.slash.windMs (a test keeps them equal). */
+export const SLASH_CUT_S = 0.52;
 
 /** Noise with its highs rolled off: paper, never a hiss. */
 const paper = (rate: number, cut: number, seed: number): Voice => lowpass(rate, cut, noise(seed));
@@ -78,20 +80,24 @@ const SOUNDS: Record<RecluseSound, (rate: number) => Float32Array> = {
       return env * (shimmer * (tones[0]!(t) + 0.8 * tones[1]!(t) + 0.7 * tones[2]!(t)) + 0.8 * (a(t) + b(t)));
     });
   },
-  // A slow move in phase 2 (Eric, Oct 14: never a harsh buzzer): two soft, low notes falling, D to A, each a quick
-  // pluck dying away (a little of its octave, so a phone's speaker carries it), well under a move's loudness.
-  slow: (rate) => {
-    const note = (f: number) => {
-      const o1 = osc(rate, () => f, sine);
-      const o2 = osc(rate, () => 2 * f, sine);
-      return (t: number) => o1(t) + 0.35 * o2(t);
-    };
-    const d = note(293.7);
-    const a = note(220);
-    const pluck = (age: number, decay: number) => (age < 0 ? 0 : Math.min(1, age / 0.01) * Math.exp(-age / decay));
-    return render(rate, 0.42, (t) => pluck(t, 0.06) * d(t) + pluck(t - 0.13, 0.09) * a(t));
+  // A heart cut in phase 2 (Eric, Nov 16; no harsh buzzer): the wind-up, a soft whoosh of air drawn back and rising, slow; then at
+  // SLASH_CUT_S the follow-through, a fast swish falling through the band and a short ring of steel (a few high partials, not
+  // in tune with each other, dying away).
+  slash: (rate) => {
+    const air = paper(rate, 5000, 661);
+    const wind = bandpass(rate, (t) => 500 + 900 * Math.min(1, t / SLASH_CUT_S), 1.2, air);
+    const swish = bandpass(rate, (t) => 4200 * Math.exp(-Math.max(0, t - SLASH_CUT_S) / 0.05) + 700, 1.4, paper(rate, 7000, 667));
+    const ring = [2637, 3510, 4699].map((f) => osc(rate, () => f, sine));
+    return render(rate, 0.95, (t) => {
+      const a = t / SLASH_CUT_S;
+      const up = t < SLASH_CUT_S ? 0.9 * a * a * Math.sin(Math.PI * Math.min(1, a) * 0.5) : 0;
+      const age = t - SLASH_CUT_S;
+      const fast = age >= 0 ? Math.min(1, age / 0.006) * Math.exp(-age / 0.06) : 0;
+      const steel = age >= 0 ? Math.min(1, age / 0.004) * Math.exp(-age / 0.16) : 0;
+      return up * wind(t) + 3 * fast * swish(t) + 0.45 * steel * (ring[0]!(t) + 0.6 * ring[1]!(t) + 0.35 * ring[2]!(t));
+    });
   },
-  // His visor's light as he's revealed in his suit (0.6 s): three quick soft sparks, and a cold tone sweeping up and dying
+  // His light as he's revealed in his final form (0.6 s): three quick soft sparks, and a cold tone sweeping up and dying
   // away (its octave over it, faint).
   spark: (rate) => {
     const fizz = bandpass(rate, () => 3600, 1.4, lowpass(rate, 6500, noise(641)));
@@ -132,7 +138,7 @@ const SOUNDS: Record<RecluseSound, (rate: number) => Float32Array> = {
 };
 
 /** Trims each to sit a little under a move's loudness, as the other bosses' do; a soft ceiling keeps the peaks well under its. */
-const LEVEL: Record<RecluseSound, number> = { flip: 0.11, shut: 0.26, rustle: 0.18, huff: 0.1, hum: 0.09, thump: 0.24, glow: 0.05, slow: 0.12, spark: 0.13, arc: 0.15 };
+const LEVEL: Record<RecluseSound, number> = { flip: 0.11, shut: 0.26, rustle: 0.18, huff: 0.1, hum: 0.09, thump: 0.24, glow: 0.05, slash: 0.14, spark: 0.13, arc: 0.15 };
 
 const cache = soundCache("recluse");
 /** The samples for one of his sounds at a sample rate (made once, then reused). */

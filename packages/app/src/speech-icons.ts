@@ -9,7 +9,7 @@
  * measures a line is unchanged; only what draws it and what reads it aloud knows the tokens. A `{word}` that isn't one of
  * his icons is plain text.
  */
-import { MOO_ICONS, type MooIconId } from "./characters/moo.ts";
+import { MOO_ICONS, type MooIconId } from "./characters/moo-icons.ts";
 
 /** A piece of a line: its words, or one of his icons. */
 export type LineSeg = { text: string; icon?: undefined } | { icon: MooIconId; text?: undefined };

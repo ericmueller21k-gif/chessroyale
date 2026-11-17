@@ -41,11 +41,12 @@ import { leaveLegal, legalPageOf, type LegalPage } from "./screens/legal-page.ts
 import { useMedia } from "./components/QuickChat.tsx";
 import { LobbyChat } from "./components/LobbyChat.tsx";
 import { queuedSquads } from "./move-replay.ts";
-import { PartyClient, SquadsClient, createParty, currentParty, currentSquads, forgetSquads, partyStatus, squadsQueue, squadsSeat, squadsStatus, squadsTestLobby } from "./squads.ts";
+import { PartyClient, SquadsClient, createParty, crowdPartyScreen, crowdPassFor, currentParty, currentSquads, forgetSquads, markCrowdPartyScreen, partyStatus, rememberCrowdPass, squadsQueue, squadsSeat, squadsStatus, squadsTestLobby } from "./squads.ts";
 import { squadsExit, squadsWaiting } from "./screens/squads-exit.ts";
 import { lazyGroup } from "./lazy.tsx";
 import { dropShell, markHome } from "./shell.ts";
 import { PartySheet } from "./screens/SquadsParty.tsx";
+import { CrowdPartyScreen } from "./screens/CrowdParty.tsx";
 import { BotDuel, DuelQueue, NetDuel, savedDuelQueue, setRanked1v1Starter, startRanked1v1, type DuelSession } from "./duel.ts";
 import { confirmLeaveSearch, keepInQueue, saveAwayLobby, savedAwayLobby, searchFoundAlert, searchSlots, setAwaySearch, type AwaySearch } from "./search.ts";
 import { chosenBotLevel } from "./components/BotLevelBox.tsx";
@@ -53,16 +54,16 @@ import { clockShown } from "./clock-text.ts";
 import { measureSound } from "./sound.ts";
 import { bossMusic, recluseMusic, type MusicBattle } from "./music.ts";
 import { noteWhere } from "./problems.ts";
-import { queuePool, testParams } from "./test-switches.ts";
+import { debugSwitch, queuePool, testParams } from "./test-switches.ts";
 import { evalBarOn, practiceOn } from "./prefs.ts";
 import { noteSoloBattle } from "./boss-tokens.ts";
 import { noteSoloGame, settleSoloXp, soloGameId, soloTestGame } from "./xp.ts";
 import { isPaused, pausedBosses } from "./status.ts";
 import { kingSay, type KingCue } from "./godKing.ts";
+import { game } from "./lazy-game.ts";
 
 // Off the first load (Nov 10, phone load: home starts fast), each its own chunk: a match's screens (preloaded when play is
 // near), solo play with its runner and the boss rules, the FAQ, the legal pages and Auto chess (loaded on entry).
-const game = lazyGroup(() => import("./screens/game-screens.ts"));
 const FinalScreen = game.screen("FinalScreen");
 const LobbyScreen = game.screen("LobbyScreen");
 const OpeningGrid = game.screen("OpeningGrid");
@@ -105,9 +106,11 @@ function overridesFromUrl(modeId?: ModeChoiceId, matchBoss = false): Partial<Set
   const crowd = mode === "crowd" || raid;
   // Testing, admins: Boss alone (a raid alone, the boss picked) may meet a boss hidden from players (the Hidden Boss).
   const hidden = raid && !matchBoss && isAdmin();
-  // ?format=team|boss|duel: skip the pre-game votes and play that ending (for testing).
+  // ?format=team|boss|duel: skip the pre-game votes (for testing). Before the 50 v 50 rework it also played that ending; the rework
+  // has none (crowdCuts), so there it only skips the votes (Strong plays), as the lobby's switch (lobby-options.ts).
   const format = q.get("format") as FinalFormat | null;
-  const forced = crowd && format && format in CROWD_KNOCKOUTS ? { finalFormat: format, knockoutsPerStage: CROWD_KNOCKOUTS[format], augments: false } : {};
+  const ending = !raid && modeSettings("crowd").crowdCuts?.length ? {} : { finalFormat: format, knockoutsPerStage: CROWD_KNOCKOUTS[format as FinalFormat] };
+  const forced = crowd && format && format in CROWD_KNOCKOUTS ? { ...ending, augments: false } : {};
   // ?speed=bullet|blitz|rapid: that time control (for testing, with ?format=; old ids map over, unknown ones are Blitz).
   const speed = crowd ? (speedOption(q.get("speed"))?.patch ?? {}) : {};
   // ?start=normal|random|freestyle: that start (for testing, with ?format=, like ?speed=; an unknown id is Normal).
@@ -139,6 +142,8 @@ function overridesFromUrl(modeId?: ModeChoiceId, matchBoss = false): Partial<Set
       stageRounds: n("rounds") ? [] : undefined,
       moveClockSeconds: n("clock"),
       finalMaxTurns: n("finalTurns"),
+      // ?limit=N: the 50 v 50 rework's game ends after Black's move N (crowdMoveLimit, 60), the judge's verdict deciding (tests).
+      crowdMoveLimit: crowd && !raid ? n("limit") : undefined,
       bossMaxMoves: n("bossMoves"),
       drawRuleByStage: draw && DRAW_RULES.includes(draw) ? [draw] : undefined,
     }),
@@ -312,6 +317,12 @@ function screenOf(match: AnyMatch | null, page: string): string {
   return moment ? `boss ${moment}` : "boss";
 }
 
+/** A 50 v 50 party's client for `code` (not connected yet); its placings go to `placed` (App's, set as it renders). */
+function newCrowdClient(code: string, placed: { readonly current: (p: PartyClient, lobby: string, pass: string) => void }): PartyClient {
+  const p: PartyClient = new PartyClient(code.toUpperCase(), (lobby, pass) => placed.current(p, lobby, pass), "crowd");
+  return p;
+}
+
 export function App() {
   const [match, setMatch] = useState<AnyMatch | null>(null);
   const savedResult = useRef<AnyMatch | null>(null);
@@ -382,6 +393,19 @@ export function App() {
   /** Boss Battle's party (docs/decisions/2026-10-30-boss-party.md): its socket on the Boss Battle screen, and a note. */
   const [bossParty, setBossParty] = useState<PartyClient | null>(null);
   const [bossPartyError, setBossPartyError] = useState<string | null>(null);
+  /**
+   * 50 v 50's party (Nov 16; docs/decisions/2026-11-16-crowd-party.md): its socket while its screen or its lobby's queue is up
+   * (closed as the match begins; home's Party then opens it again), and the pass of the lobby it placed you in.
+   */
+  /** What a 50 v 50 party's placing does (set further down): a ref, so a client made before that still finds it. */
+  const crowdPlaced = useRef<(p: PartyClient, lobby: string, pass: string) => void>(() => undefined);
+  // (A reload with its screen up, or its lobby's queue: back to it, quietly; connected once the page is up. The fix round of #747, M2.)
+  const [crowdParty, setCrowdParty] = useState<PartyClient | null>(() => ((code) => (code ? newCrowdClient(code, crowdPlaced) : null))(crowdPartyScreen()));
+  const crowdPass = useRef<string | null>(null);
+  /** A party tried again quietly (home's Party, or a reload): turned away, a new one is made, with no note. */
+  const quietParty = useRef<PartyClient | null>(crowdParty);
+  /** The 50 v 50 party closed for its match (its lobby filled): its screen stays through the fill and loading, then goes (M4). */
+  const crowdHeld = useRef<PartyClient | null>(null);
   const [squadsNote, setSquadsNote] = useState<string | null>(() => (squadsLinkCode && !squadsRejoin ? "That match has ended." : null));
   // Home's notes from ranked's leave rules this tab has dismissed (by their words and dodge: a new dodge's note shows again).
   const [leavesDismissed, setLeavesDismissed] = useState<ReadonlySet<string>>(() => new Set());
@@ -1043,7 +1067,7 @@ export function App() {
 
   // ?debug (a test switch): the match, the Squads clients and the 1 v 1 game on `window`, for tests and the console. (Each render, so
   // they're there once your account says you may, and a match joined before that, from a link, is too.)
-  const debug = testParams().has("debug");
+  const debug = debugSwitch();
   // (__kingSay: a God King line on cue, for the layout checks; the roll always lands.)
   if (debug) Object.assign(window as unknown as Record<string, unknown>, { squads, party, duel, __measureSound: measureSound, __kingSay: (cue: KingCue, key: string) => kingSay(cue, key, Date.now(), () => 0), ...(match ? { match } : {}) });
 
@@ -1145,6 +1169,98 @@ export function App() {
     bossParty?.leave();
     setBossParty(null);
   };
+  /**
+   * 50 v 50's party: into it (`code`), its screen up. Placed (the leader's Find match found a lobby): everyone joins that lobby with
+   * the party's pass, the party's socket still open (the leader's Cancel brings them back). `inside`: told once whether you got in
+   * (false: turned away, or the party is gone). `quiet`: a refusal shows no note (home's Party, trying your party again).
+   */
+  const joinCrowdParty = async (code: string, inside?: (ok: boolean) => void, quiet = false): Promise<void> => {
+    const open = await partyStatus(code, "crowd");
+    if (open === false) return inside?.(false);
+    const p = newCrowdClient(code, crowdPlaced);
+    if (quiet) quietParty.current = p;
+    if (inside) {
+      const off = p.subscribe(() => {
+        if (!p.memberId && !p.done) return;
+        off();
+        inside(!!p.memberId);
+      });
+    }
+    setCrowdParty((old) => {
+      if (old && old.code !== p.code) old.leave();
+      else old?.close();
+      return p;
+    });
+    p.connect();
+  };
+  /** Home's Party, then PLAY: your party again if it's still open and you're in it, else a new one (you its first member and leader). */
+  const openCrowdParty = async () => {
+    unlockAudio();
+    setError(null);
+    if (crowdParty && !crowdParty.done) return;
+    const code = currentParty("crowd");
+    if (code && (await new Promise<boolean>((ok) => void joinCrowdParty(code, ok, true)))) return;
+    setLoading(true);
+    const r = await createParty("crowd");
+    setLoading(false);
+    if ("banned" in r) return showBanNotice();
+    if ("error" in r) return setError(r.error);
+    await joinCrowdParty(r.code);
+  };
+  /**
+   * The party placed you (the leader's Find match found a lobby): into it with the party's pass, while it still waits and this device
+   * has no seat there yet (in it already, or a reload whose lobby rejoins by itself: nothing). Its socket stays open: the leader's
+   * Cancel brings everyone back. Never by the placing's age: a reload on the way still gets in (M2).
+   */
+  crowdPlaced.current = (p, lobby, pass) => {
+    const here = onScreen.current;
+    if (hasSeat(lobby) || (here instanceof NetMatch && here.code === lobby.toUpperCase())) return;
+    void lobbyStatus(lobby).then((s) => {
+      // (No answer: as if it waits, as lobbyStatus's other callers do.)
+      if (s && !(s.open && s.phase === "waiting")) return;
+      if (p.done || p.party?.state !== "placed" || p.party.placed?.pass !== pass) return;
+      rememberCrowdPass(lobby, pass);
+      joinLobby(lobby, { queue: "crowd", crowdPass: pass });
+    });
+  };
+  // (A reload with the party's screen up: its client, made with the page, connects now.)
+  useEffect(() => {
+    if (crowdParty && crowdParty === quietParty.current && !crowdParty.memberId && !crowdParty.done) crowdParty.connect();
+  }, []);
+  /** Leave the party for good (its lobby too, if you're in its queue). */
+  const leaveCrowdParty = () => {
+    crowdParty?.leave();
+    setCrowdParty(null);
+    crowdPass.current = null;
+    if (match instanceof NetMatch && match.partyPass && (match.phase.kind === "lobby" || match.phase.kind === "loading")) leave();
+  };
+  // 50 v 50's party: its changes redraw; turned away (a lapsed invite, the party gone): home with why; the leader's Cancel while
+  // its lobby still fills: out of the lobby, back to the party; the lobby filled (the match begins): the party's socket closes, and
+  // its screen stays until the match's own (nothing shifts at the fill: M4). Its code is kept while its screen is up, for a reload.
+  useEffect(() => crowdParty?.subscribe(() => rerender(undefined)), [crowdParty]);
+  useEffect(() => {
+    if (!crowdParty) return markCrowdPartyScreen(null);
+    const inLobby = match instanceof NetMatch && !!match.partyPass && match.partyPass === crowdPass.current;
+    if (crowdParty.done) {
+      markCrowdPartyScreen(null);
+      if (crowdParty === crowdHeld.current && inLobby && inQueue(match)) return;
+      if (crowdParty.error && crowdParty !== quietParty.current) setError(crowdParty.error);
+      setCrowdParty(null);
+      return;
+    }
+    markCrowdPartyScreen(crowdParty.code);
+    if (!inLobby) return;
+    const gathering = (match.phase.kind === "lobby" || match.phase.kind === "loading") && !match.filledAt;
+    const placed = crowdParty.party?.placed;
+    if (gathering && crowdParty.party && (crowdParty.party.state !== "placed" || placed?.pass !== crowdPass.current)) {
+      crowdPass.current = null;
+      leave();
+    } else if (!gathering) {
+      crowdHeld.current = crowdParty;
+      crowdParty.close();
+      markCrowdPartyScreen(null);
+    }
+  });
   // (An invite link, or back on the Boss Battle screen after its battle: into the party, once.)
   useEffect(() => {
     if (bossPartyLinkCode) void joinBossParty(bossPartyLinkCode);
@@ -1227,7 +1343,7 @@ export function App() {
     // (Asked for once: home after this match doesn't open the boss menu again.)
     setHomeIntent(null);
     setMatch(m);
-    if (testParams().has("debug")) (window as unknown as { match: GameView }).match = m;
+    if (debugSwitch()) (window as unknown as { match: GameView }).match = m;
   };
 
   /**
@@ -1271,7 +1387,7 @@ export function App() {
    * Into a lobby by code. A queue lobby (PLAY) brings the queue's own settings (the server's, remembered with the
    * code for a reload); a lobby you made, the mode you made it in.
    */
-  const joinLobby = (code: string, opts: { queue?: "crowd" | "raid"; mode?: ModeChoiceId; typed?: boolean; resume?: boolean; away?: number; party?: { pass: string; seat: number; boss: string; difficulty: string; hidden?: boolean } } = {}) => {
+  const joinLobby = (code: string, opts: { queue?: "crowd" | "raid"; mode?: ModeChoiceId; typed?: boolean; resume?: boolean; away?: number; party?: { pass: string; seat: number; boss: string; difficulty: string; hidden?: boolean }; crowdPass?: string } = {}) => {
     const key = `brc.queue.${code.toUpperCase()}`;
     let queue = opts.queue;
     try {
@@ -1296,6 +1412,13 @@ export function App() {
       m.partySeat = opts.party.seat;
       m.auto = true;
       m.hiddenRoom = !!opts.party.hidden;
+    }
+    // (A 50 v 50 party's lobby: its seats held under the party's pass, so everyone in it plays on one team. A reload there: the pass
+    // it was joined with, so it's still the party's: M2.)
+    const crowd = opts.party ? null : (opts.crowdPass ?? crowdPassFor(code));
+    if (crowd) {
+      m.partyPass = crowd;
+      crowdPass.current = crowd;
     }
     // The queue shows at once (not "Connecting…"); the lobby confirms it.
     if (queue) m.auto = true;
@@ -1659,6 +1782,8 @@ export function App() {
     target: () => {
       if (match instanceof NetMatch && !match.auto && match.phase.kind === "lobby" && !match.gone)
         return { kind: match.settings.raid ? "raid" : match.settings.mode === "crowd" ? "crowd" : "classic", code: match.code };
+      // (50 v 50's party, on its screen and not searching: its "+" seats invite into it.)
+      if (!match && crowdParty?.memberId && !crowdParty.done && crowdParty.party?.state !== "queueing") return { kind: "crowdparty", code: crowdParty.code };
       return party ? { kind: "squads", code: party.code } : null;
     },
     canCreate: () => !match && !squads,
@@ -1685,6 +1810,12 @@ export function App() {
     // (The invite toast's Join, over the town on a computer: "Leave Chess Town?" first, as every way out (Eric, Nov 13).)
     join: (kind, code, taken) => {
       const go = () => {
+        // (A 50 v 50 party's invite is the only way in: it goes once you're in, never before.)
+        if (kind === "crowdparty") {
+          goHome();
+          if (party) closeParty();
+          return void joinCrowdParty(code, () => taken());
+        }
         taken();
         joinNow(kind, code);
       };
@@ -1695,6 +1826,7 @@ export function App() {
   function joinNow(kind: InviteKind, code: string) {
     goHome();
     if (kind === "squads") return void joinParty(code);
+    if (kind === "crowdparty") return void joinCrowdParty(code);
     // (An invite can outlive its lobby's start: ask first, so a stale one never costs you your party.)
     void lobbyStatus(code).then((s) => {
       // (No answer, offline: carry on as if it's open, as lobbyStatus's other callers do.)
@@ -1721,7 +1853,7 @@ export function App() {
         ? squadsWaiting(squads.lobby)
           ? "queue"
           : "squads"
-        : duelQueue || inLine
+        : duelQueue || inLine || crowdParty
           ? "queue"
           : showTown
             ? "town"
@@ -2132,6 +2264,7 @@ export function App() {
         onJoinLobby={(code) => leavingSearchFirst(() => joinLobby(code, { typed: code !== inviteCode }))}
         onSquads={() => leavingSearchFirst(() => void squadsPlay())}
         onParty={openParty}
+        onCrowdParty={() => leavingSearchFirst(() => void openCrowdParty())}
         onFriends={nav.friendsList}
         onSignIn={() => chooseGuest(false)}
         onProfile={() => openProfile({ you: true, name: account().profile?.user.name ?? "" })}
@@ -2142,6 +2275,8 @@ export function App() {
     </FrontFrame>
     );
   }
+  // 50 v 50's party, idle or asking for a lobby: its queue screen (the frame first, as the queue's).
+  if (!match && crowdParty && !crowdParty.done) return <>{home(<CrowdPartyScreen client={crowdParty} onLeave={leaveCrowdParty} />)}</>;
   // (Always a fragment with the frame first, in the queue or not, so the frame is kept from one to the other.)
   if (!match && inLine)
     return (
@@ -2193,6 +2328,14 @@ export function App() {
   if (inQueue(match)) {
     const q = match as NetMatch | SoloMatch;
     const letBots = match instanceof NetMatch ? () => void letBotsFill() : undefined;
+    // (A 50 v 50 party's lobby: the party's screen, searching, its seats filled first.)
+    if (crowdParty && match instanceof NetMatch && match.partyPass && match.partyPass === crowdPass.current)
+      return (
+        <>
+          {home(<CrowdPartyScreen client={crowdParty} lobby={match} onLeave={leaveCrowdParty} chat={!computer} />, computer ? <LobbyChat match={match} /> : undefined, computer)}
+          {overlay}
+        </>
+      );
     // (The lobby's chat: a phone's is in the queue screen, under Cancel; a computer's under your card, beside the lobby.)
     return (
       <>
@@ -2338,7 +2481,7 @@ export function App() {
       // (The loading step, then the intro on a screen of its own: the intro's timeline starts as it mounts.)
       return (
         <>
-          <BossScreen key={p.loading ? "boss-loading" : "boss"} match={match} boss={p.boss} until={p.until} thinking={p.thinking} intro={p.intro} loading={p.loading} afterLoading={p.afterLoading} lights={p.lights} rush={p.rush} fall={p.fall} />
+          <BossScreen key={p.loading ? "boss-loading" : "boss"} match={match} boss={p.boss} until={p.until} thinking={p.thinking} intro={p.intro} loading={p.loading} afterLoading={p.afterLoading} lights={p.lights} rush={p.rush} dodge={p.dodge} fall={p.fall} />
           {/* (The Hidden Boss beaten, his phase change next: his cutscene over his fall's screen, from its moment: solo's, or the server's.) */}
           {p.fall && p.toPhase2 && match.cutscene && <RecluseCutscene key={match.cutscene.at} at={match.cutscene.at} until={match.cutscene.until} />}
         </>

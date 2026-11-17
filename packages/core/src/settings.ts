@@ -30,6 +30,21 @@ export type ModeChoiceId = GameMode | "raid";
 export type FinalFormat = "team" | "boss" | "duel";
 
 /**
+ * How a Crowd 50 v 50 team's move is picked since the rework (the vote "How are moves picked?", Eric, Nov 16; CROWD_PICK):
+ * - strong: the judge's best of the team's 3 most-picked moves, or one as good (within 3% expected score), drawn
+ * - majority: the old 50 v 50's draw (Eric, Nov 17): the most-picked at 70% of the picks or more, always; else one of the top 3
+ *   by their picks (crowdSureShare, crowdPlayedFromTop, crowdTopOdds)
+ * - chaos: any move the team picked, each equally likely
+ */
+export type CrowdPick = "strong" | "majority" | "chaos";
+
+/** One 50 v 50 cut since the rework (CROWD_CUTS): after Black's move `after` (the game's move number), `keep` a side stay in. */
+export interface CrowdCut {
+  after: number;
+  keep: number;
+}
+
+/**
  * How a Crowd 50 v 50's game starts (the pre-game vote "How does it start?", Eric, Oct 24): the usual starting position,
  * a balanced named opening `CROWD_START.randomOpeningMoves` moves in, or Freestyle (FIDE's name for Chess960: the back-row
  * pieces shuffled, a seeded start, never the usual one).
@@ -359,6 +374,25 @@ export interface Settings {
    * it (CrowdMisses). 1: only a unanimous pick is sure.
    */
   crowdSureShare: number;
+  /**
+   * Crowd 50 v 50 since the rework (Eric, Nov 16; CROWD_REWORK): how a team's move is picked, set by the vote "How are moves
+   * picked?" (votes.ts; nobody votes: Strong). With the "popular" draw rule it takes the place of `crowdPlayedFromTop` and
+   * `crowdSureShare` (CrowdPick, CROWD_PICK). Unset: as before.
+   */
+  crowdPick?: CrowdPick;
+  /**
+   * Crowd 50 v 50 since the rework (CROWD_REWORK): one game played to its end, with equal cuts from each side down to a 1 v 1
+   * (CROWD_CUTS: after which move, how many a side are kept). Set, it decides each stage's length (roundsInStage: by the game's
+   * move number, to the move limit after the last cut) and each cut's size (cutPlan), and the match never enters a final
+   * (isFinal). `knockoutsPerStage` goes with it (crowdCutKnockouts). Unset: the endings as before.
+   */
+  crowdCuts?: readonly CrowdCut[];
+  /** With `crowdCuts`: the share of their score each survivor keeps at a cut (the soft reset; 2 decimals). Unset: all of it. */
+  crowdCarry?: number;
+  /** With `crowdCuts`: the game ends after Black's move this-many (crowdLimitReached), and the judge's verdict decides. */
+  crowdMoveLimit?: number;
+  /** At the move limit: the side at this expected score or more wins (crowdLimitVerdict); neither: a draw. */
+  crowdLimitWin?: number;
   /** Opening moves per side played on each board before the first round (0-10, a lobby setting). Boards where Black starts get one ply more. */
   openingMoves: number;
   /**
@@ -455,6 +489,13 @@ export interface CrowdScoring {
   sharedShare: number;
   sharedK: number;
   sharedFloor: number;
+  /**
+   * The relief only when at least this many on the team picked (real picks: a miss never counts, as the AFK rule's tally):
+   * at 4 or fewer one pick is a quarter of them (`sharedShare`), so a lone pick would count as a crowd's shared blunder. The
+   * director's call for the rework's small sides (4 v 4 to the 1 v 1), Nov 16; docs/decisions/2026-11-16-crowd-rework-runner.md.
+   * Unset: at any size (a raid's crowd).
+   */
+  sharedMinPicks?: number;
   streakStrong: number;
   streakFrom: number;
   streakFromMove: number;
@@ -488,6 +529,7 @@ export const CROWD_SCORING: CrowdScoring = {
   sharedShare: 0.25,
   sharedK: 1,
   sharedFloor: 0.4,
+  sharedMinPicks: 5,
   streakStrong: 2,
   streakFrom: 3,
   streakFromMove: 6,
@@ -514,6 +556,8 @@ export const RAID_SCORING: CrowdScoring = {
   capFromMove: [1, 11, 15, 19],
   streakMinAverage: 1,
   cutGrace: 0,
+  // (A raid's crowd keeps the relief at any size: the 50 v 50's small sides are the reason for sharedMinPicks.)
+  sharedMinPicks: undefined,
 };
 
 /**
@@ -712,10 +756,24 @@ export function botLevelMean(id: BotLevelId, yourRating: number | null): number 
 }
 
 /**
- * A 50 v 50 party's people (Eric, Nov 9: queue together into the public 50 v 50 matchmaking, "like Fortnite squads", sides random, ranked):
- * you and up to 7 friends. Not built yet (a later job's matchmaker piece): home shows Party greyed. Unused until then.
+ * A 50 v 50 party's people (Eric, Nov 9 and 16: queue together into the public 50 v 50 matchmaking, on one team, the side drawn at
+ * random): you and up to 7 friends, invited from your friends list (docs/decisions/2026-11-16-crowd-party.md).
  */
 export const CROWD_PARTY_MAX = 8;
+
+/**
+ * A 50 v 50 party's play (the fix round of PR #747, docs/decisions/2026-11-16-crowd-party-fixes.md):
+ * - `ranked`: whether a 50 v 50 party's members (a party of 2 or more friends who played together) get a ranked result (the singles
+ *   in the same match always do). Eric, Nov 16: yes, "It's always ranked. There is no unranked unless it's a private lobby."
+ *   Off: their results and the party's screen say why, in one line each.
+ * - `leadHoldMs`: how long a leader who dropped (a reload, the app in the background) keeps the lead before it passes on.
+ * - `awayStopMs`: a search with nobody in the party connected for this long stops (its ticket is canceled).
+ */
+export const CROWD_PARTY: { ranked: boolean; leadHoldMs: number; awayStopMs: number } = {
+  ranked: true,
+  leadHoldMs: 20_000,
+  awayStopMs: 20_000,
+};
 
 /** 32-bit FNV-1a of a string (a bot's name: its fixed rating). */
 function nameHash(name: string): number {
@@ -800,9 +858,34 @@ export const MAX_OPENING_MOVES = 10;
 /** Plies of opening on a board where White starts (Black-start boards get one more). */
 export const openingPlies = (s: Pick<Settings, "openingMoves">) => 2 * Math.max(0, Math.min(MAX_OPENING_MOVES, Math.round(s.openingMoves)));
 
-/** Rounds in a knockout stage: `stageRounds`' entry when the mode has a list, else the longer first one, then `roundsPerStage`. */
-export const roundsInStage = (s: Pick<Settings, "roundsPerStage" | "firstStageRounds" | "stageRounds">, stage: number) =>
-  s.stageRounds?.length ? s.stageRounds[Math.min(stage, s.stageRounds.length - 1)]! : stage === 0 ? s.firstStageRounds : s.roundsPerStage;
+/**
+ * Rounds (plies) in a knockout stage: with `crowdCuts` (the 50 v 50 rework), the plies to its cut's move (crowdStageRounds),
+ * unless a test's `?rounds=` emptied `stageRounds`; else `stageRounds`' entry when the mode has a list; else the longer
+ * first one, then `roundsPerStage`.
+ */
+export const roundsInStage = (
+  s: Pick<Settings, "roundsPerStage" | "firstStageRounds" | "stageRounds"> & Partial<Pick<Settings, "crowdCuts" | "crowdMoveLimit" | "openingMoves">>,
+  stage: number,
+) =>
+  s.crowdCuts?.length && s.stageRounds?.length !== 0
+    ? crowdStageRounds(s, stage)
+    : s.stageRounds?.length
+      ? s.stageRounds[Math.min(stage, s.stageRounds.length - 1)]!
+      : stage === 0
+        ? s.firstStageRounds
+        : s.roundsPerStage;
+
+/**
+ * The plies of a stage under `crowdCuts`, counted by the game's own move number (the board's: "Move 14"), the same in every
+ * start: from move 1, or the move after a Random opening's `openingMoves`, to Black's move `after` of the stage's cut; after
+ * the last cut, the 1 v 1 to the move limit (`crowdMoveLimit`; none: it plays to the end). At least one ply.
+ */
+export function crowdStageRounds(s: Partial<Pick<Settings, "crowdCuts" | "crowdMoveLimit" | "openingMoves">>, stage: number): number {
+  const cuts = s.crowdCuts ?? [];
+  const from = stage <= 0 || !cuts.length ? (s.openingMoves ?? 0) : cuts[Math.min(stage, cuts.length) - 1]!.after;
+  const to = stage < cuts.length ? cuts[stage]!.after : (s.crowdMoveLimit ?? Infinity);
+  return Math.max(1, 2 * (to - from));
+}
 
 /**
  * The opening allowance (Eric, Oct 15, 2026; docs/decisions/2026-10-15-opening-allowance-and-ties.md): early in a game a
@@ -901,17 +984,85 @@ export const CROWD_BOTS: CrowdBotSpread = {
 export const CROWD_STAGE_ROUNDS: readonly number[] = [20, 10, 8, 8, 6, 6, 6, 4];
 
 /**
- * Crowd mode: 100 players, 50 v 50, on one board from the starting position; each team picks its side's moves and one
- * of its three most popular picks is played, by their picks (crowdPlayedFromTop). No cuts for the first 10 moves, then a cut every 2 to 5 moves (CROWD_STAGE_ROUNDS, half
- * of each cut from each team) down to the ending the pre-game vote picked (CROWD_KNOCKOUTS). Scores carry over all game.
- * 3 power-ups, none earned.
+ * The 50 v 50 rework's pick modes (Settings.crowdPick; Eric, Nov 16; notes/designs/crowd-rework.md, rule 1; measured in
+ * reports/crowd-rework.md). Only the team's real picks count, never a miss's pick made for it (CROWD_MISSES); nobody on the
+ * team picked: one of the engine's top `CROWD_MISSES.defaultFromTop` (the runner, as before).
+ * - **strong** (nobody votes: this): the team's `strongTop` most-picked moves (a tie for the last place goes to the
+ *   better-scored); the judge's best of them is played, or, when others are within `strongClose` expected score of it (0.03:
+ *   about 30 centipawns), one of those close ones and it, drawn at equal odds;
+ * - **majority** (Eric, Nov 17: "it almost always does the majority but sometimes the 2nd or 3rd option"): the old 50 v 50's
+ *   draw, kept one setting away in case the old way comes back: the most-picked move at `crowdSureShare` (0.7) of the team's real
+ *   picks or more, always; below it, one of the `crowdPlayedFromTop` (3) most-picked by their picks (`crowdTopOdds`);
+ * - **chaos**: one of the distinct moves the team picked, each equally likely, however many picked it (Eric's default for his
+ *   question 2: "totally random").
+ * The 1 v 1 needs no rule: one player's pick is the only move.
+ */
+export const CROWD_PICK: { strongTop: number; strongClose: number } = { strongTop: 3, strongClose: 0.03 };
+
+/**
+ * The 50 v 50 rework's cuts (Eric, Nov 16; the design's schedule C): equal from each side, each side's players ranked by their
+ * score (already relative to their own team), after Black's move `after` by the game's move number, leaving `keep` a side:
+ * 50 v 50 for moves 1-14, then 34, 23, 15 and 10 a side for 4 moves each, 6 for 3 (31-33), 4 for 6 (34-39: Eric, "the top 4
+ * a side play longer"), 2 for 3 (40-42), and from move 43 the 1 v 1 to the move limit. Ties at the line go through and what
+ * that leaves over is owed by the cuts to come, spread evenly; the last cut is exact (cutPlan). The first cut after 14: the
+ * opening allowance is gone by then (OPENING_ALLOWANCE.goneBy).
+ */
+export const CROWD_CUTS: readonly CrowdCut[] = [
+  { after: 14, keep: 34 },
+  { after: 18, keep: 23 },
+  { after: 22, keep: 15 },
+  { after: 26, keep: 10 },
+  { after: 30, keep: 6 },
+  { after: 33, keep: 4 },
+  { after: 39, keep: 2 },
+  { after: 42, keep: 1 },
+];
+
+/** A Crowd 50 v 50's lobby: 100 players, 50 a side (CROWD_SETTINGS.lobbySize). */
+export const CROWD_LOBBY_SIZE = 100;
+
+/** Each cut's knockouts, both sides together (Settings.knockoutsPerStage), from a cut schedule and the lobby's size. */
+export function crowdCutKnockouts(cuts: readonly CrowdCut[], lobbySize = CROWD_LOBBY_SIZE): number[] {
+  return cuts.map((c, i) => 2 * Math.max(0, (i ? cuts[i - 1]!.keep : lobbySize / 2) - c.keep));
+}
+
+/**
+ * The 50 v 50 rework in core (Eric, Nov 16: "the 50v50 rework. We're doing away with the hidden boss on that for now";
+ * notes/designs/crowd-rework.md; docs/decisions/2026-11-16-crowd-rework-core.md). On in CROWD_SETTINGS since step C2 (the
+ * runner, the server and the protocol: docs/decisions/2026-11-16-crowd-rework-runner.md); raids never take it (RAID_SETTINGS). One game played to its
+ * end: mate, a draw by the rules, or the move limit, after Black's move `crowdMoveLimit`, where the judge's verdict decides
+ * (a side at `crowdLimitWin` expected score or more wins; else a draw: Eric's default for his question 1). No team final,
+ * boss final or duel. The cuts (CROWD_CUTS) take the same number from each side down to a 1 v 1; at each cut a survivor
+ * keeps `crowdCarry` of their score. Strong is the pick when nobody votes (and with the votes off).
+ */
+export const CROWD_REWORK: Partial<Settings> = {
+  crowdPick: "strong",
+  crowdCuts: CROWD_CUTS,
+  knockoutsPerStage: crowdCutKnockouts(CROWD_CUTS),
+  crowdCarry: 0.5,
+  crowdMoveLimit: 60,
+  crowdLimitWin: 0.75,
+};
+
+/**
+ * The 50 v 50 rework's best player (bestPlayer; the design's rule 5): the fewest counted points given away a move over the
+ * match (matchLoss), among those who survived at least `cutsShare` of the cuts made (half: rounded up).
+ */
+export const CROWD_BEST = { cutsShare: 0.5 } as const;
+
+/**
+ * Crowd mode: 100 players, 50 v 50, on one board from the starting position; each team picks its side's moves. Since the
+ * rework (Nov 16, CROWD_REWORK, spread in last): the move by the pick vote (Strong when nobody votes), equal cuts from each
+ * side (CROWD_CUTS) down to a 1 v 1, half of each survivor's score carried at a cut, one game played to its end or the move
+ * limit; no endings. (The keys before it, the endings' knockouts and the top-3 draw, are the old 50 v 50's: the rework's
+ * keys take their place; step C4 retires them.) 3 power-ups, none earned.
  */
 export const CROWD_SETTINGS: Partial<Settings> = {
   mode: "crowd",
   // Always team turns (Crowd's "everyone moves" went on Oct 15, 2026); only a raid sets it false.
   crowdTeams: true,
-  lobbySize: 100,
-  groupSize: 100,
+  lobbySize: CROWD_LOBBY_SIZE,
+  groupSize: CROWD_LOBBY_SIZE,
   knockoutsPerStage: CROWD_KNOCKOUTS.team,
   finalFormat: "team",
   stageRounds: CROWD_STAGE_ROUNDS,
@@ -941,6 +1092,24 @@ export const CROWD_SETTINGS: Partial<Settings> = {
   // The cut is a judgment (the gavel and every player's pawn): 10 s, as Eric asked.
   stageBreakSeconds: 10,
   botThinkSeconds: [2, 14],
+  // (The 50 v 50 rework, Nov 16: last, so its cuts' knockouts take the place of the endings'.)
+  ...CROWD_REWORK,
+};
+
+/**
+ * The 50 v 50 as it was before the rework (the top-3 draw with its sure share, CROWD_STAGE_ROUNDS' cuts to an ending, scores
+ * carried whole, the relief at any size), put over CROWD_SETTINGS: for the old endings' unit tests and sims, until step C4
+ * retires them with their code, and the FAQ's words until step C3 rewrites them for the rework. No lobby, test switch or queue
+ * sets it: no match is played with it.
+ */
+export const CROWD_PRE_REWORK: Partial<Settings> = {
+  crowdPick: undefined,
+  crowdCuts: undefined,
+  crowdCarry: undefined,
+  crowdMoveLimit: undefined,
+  crowdLimitWin: undefined,
+  knockoutsPerStage: CROWD_KNOCKOUTS.team,
+  crowdScoring: { ...CROWD_SCORING, sharedMinPicks: undefined },
 };
 
 /**
@@ -950,6 +1119,7 @@ export const CROWD_SETTINGS: Partial<Settings> = {
 export function crowdFinalists(format: FinalFormat, knockouts: Readonly<Record<FinalFormat, readonly number[]>> = CROWD_KNOCKOUTS, lobbySize = CROWD_SETTINGS.lobbySize ?? DEFAULT_SETTINGS.lobbySize): number {
   return lobbySize - knockouts[format].reduce((a, b) => a + b, 0);
 }
+
 
 /**
  * Boss raid: everyone (up to 50, no bots) picks the crowd's moves together
@@ -967,6 +1137,12 @@ export const RAID_SETTINGS: Partial<Settings> = {
   crowdBots: undefined,
   // (A raid keeps its misses as before: 50 v 50's CROWD_MISSES are off.)
   crowdMisses: undefined,
+  // (Nor does it take the 50 v 50 rework, once CROWD_SETTINGS has it: a raid has no cuts, no move limit and plays the most popular pick.)
+  crowdPick: undefined,
+  crowdCuts: undefined,
+  crowdCarry: undefined,
+  crowdMoveLimit: undefined,
+  crowdLimitWin: undefined,
   augments: false,
   lobbySize: 50,
   groupSize: 50,
@@ -1141,7 +1317,7 @@ export const BOSS_POWERS = {
    * the raid sim (reports/folio-sim.md). Dash 1 (Nov 3): about 1.9 Time Scrambles a battle of 46 moves in the
    * raid sim with the player's clock, the crowd 0.15 (reports/dash-sim.md).
    */
-  rageSpeed: { gingerbread: 1.2, clown: 1.8, grex: 1.2, hollow: 1, bigboy: 1, sawyer: 1.3, alfil: 1.2, smudgy: 1, moo: 1, gardener: 1.2, tiger: 1.3, folio: 1.3, timber: 0.7, dash: 1, zebra: 1 } as Readonly<Record<string, number>>,
+  rageSpeed: { gingerbread: 1.2, clown: 1.8, grex: 1.2, hollow: 1, bigboy: 1, sawyer: 1.3, alfil: 1.2, smudgy: 1, moo: 1, gardener: 1.2, tiger: 1.3, folio: 1.3, timber: 0.7, dash: 1, zebra: 1, chandy: 1 } as Readonly<Record<string, number>>,
   /**
    * The Hidden Boss's ultimate, the bullet clock (Eric, Oct 14: "Meter builds starting turn 1, about 7 turns in he says
    * something about how you're thinking too much and to just play pure chess etc, true to him, then for the rest of phase 1
@@ -1159,12 +1335,13 @@ export const BOSS_POWERS = {
    * Then he adds time per move (Eric, Oct 14, after playing it again: "1 min too short, needs to be 1+1 or even 1+2... a
    * few moves, say 3, with 1+0, then he says a comment about it and suggests adding time per move"): the crowd plays the
    * bullet clock's first bulletPlainMoves moves on the bank alone (1+0); as the next crowd turn begins he says so (his
-   * line, then "+2 s a move from now on" across the board), and from then on each move made in time adds
-   * bulletIncrementSeconds to that player's bank (1+2: the more forgiving of Eric's two, as 1:00 alone felt too short).
+   * line, then "+10 s a move from now on" across the board), and from then on each move made in time adds
+   * bulletIncrementSeconds to that player's bank: 1+10 (Eric, Nov 16, after playtesting: "instead of 2 seconds, it should go up
+   * to 10 seconds per move ... we're essentially nerfing him ... because he's too powerful right now"; it was 1+2).
    * No cap on the bank: it grows by at most this a move, over at most bossMaxMoves moves. Estimates, not sim-tested.
    */
   bulletPlainMoves: 3,
-  bulletIncrementSeconds: 2,
+  bulletIncrementSeconds: 10,
   /** The meter glows from this full (0-1) as it nears its ultimate. */
   rageGlowFrom: 0.75,
   /**
@@ -1749,9 +1926,10 @@ export const BOSS_POWERS = {
    * Nov 2: "make it so this beaver only ults up to 2 times a game. After 2 times, his meter just stops charging. Otherwise, it's
    * too strong."): after his second his meter stays empty and dimmed for the rest of the battle, and the admins' trigger is gone.
    * (Smudgy's Repaint keeps its own cap, repaintMax.) docs/decisions/2026-11-02-nov2-fixes.md. Dash's Time Scramble at most twice
-   * (Eric, Nov 6: "about twice a game"; his Scramble Rush is his once-a-battle power besides).
+   * (Eric, Nov 6: "about twice a game"; his Scramble Rush is his once-a-battle power besides). Chandy's Dodge once (Eric, Nov 16:
+   * "He only ults once per game, no matter what").
    */
-  maxUltimates: { timber: 2, dash: 2, zebra: 2 } as Readonly<Record<string, number>>,
+  maxUltimates: { timber: 2, dash: 2, zebra: 2, chandy: 1 } as Readonly<Record<string, number>>,
   /**
    * Dash's Clock Slap (his passive; Eric's design, Nov 1; bosses/dash.ts; docs/decisions/2026-11-03-dash.md): each capture of
    * his steals time from your clock. On a time bank (Boss alone and a Boss Battle party: BOSS_CLOCK's 10 + 10, the team's one
@@ -1857,6 +2035,70 @@ export const BOSS_POWERS = {
   doughLeadMax: 2,
   /** A queen's lump (rare: doughOdds) comes whatever the lead (Eric: "on occasion, he may throw out a queen"). */
   doughQueenFree: true,
+  /**
+   * Chandy (bosses/chandy.ts; Eric's design, Nov 15-16: DESIGN.md on branch stills/boss-chandy; docs/decisions/2026-11-16-chandy-rules.md).
+   * - **The locks** (L1-L6): none before his first capture; on that move the crosshair locks onto the piece he takes (his engine's own
+   *   move; any piece but the king) right before it shows, an upgrade; then at the end of each of his turns he locks your most capturable
+   *   piece, `maxLocks` at most, a second once the first is `secondAfter` of his turns old. A lock hunts for `huntTurns` of his turns,
+   *   and lives on to `liveTurns` while the piece is still gettable. His engine is steered within the margins (L3): of its top
+   *   `lockLines` moves, one taking a locked piece within `takeMargin` pawns of his best is played; else one attacking a locked piece
+   *   (or adding an attacker) within `chaseMargin`.
+   * - **The rifle:** each locked piece he takes is an upgrade (`upgradesMax`), each unlocking one of his five moves at random; the
+   *   upgrade window holds everything `upgradeMs` (Eric: 2 s).
+   * - **The move meter:** from the first upgrade, full every `meterEvery` of your moves; it fires a random unlocked move (a new unlock
+   *   first). `fireOnUnlock` (Eric, Nov 16; false turns it off): a new unlock fires on his turn after its upgrade window whatever the
+   *   meter says, and the meter starts over (a queen lock that can't come then waits for the meter). Scatter shot blocks `scatterSquares` squares round a spot (a pick of the top `looks`, as every pick of his below);
+   *   shields cover `shieldCount` of his pieces; rapid fire stuns `rapidCount` of yours.
+   * - **Dodge** (his ultimate, once a battle: maxUltimates.chandy; Eric, Nov 16: "He only ults once per game, no matter what"; "It
+   *   should fire after he gets all 5 upgrades ... it should be ulting most games"): his rage meter is dimmed until the rifle is whole,
+   *   then fills over `dodgeAfterMoves` of your moves (nothing else fills or drains it); full, the usual warning, then Dodge as your
+   *   next turn begins. Eric, Nov 16: 1 (was 3): "It should come a turn later, he should say something about preparing yourself, and
+   *   then after you move it begins." **Last chance** (Eric, Nov 16): as your turn begins, if he hasn't used it and you have a move that mates him,
+   *   Dodge comes now, whatever his rifle or meter (the warning with it); you may still play the mate after. First the warning volley
+   *   (Eric, Nov 16: "an additional shot first that you can't move"): the clones fire once on lines that miss your king, no vote, then
+   *   "Dodge the next one!" (`dodgeVolleyMs` in all, the clones aiming `dodgeAimMs` first). Then `dodgeRounds` rounds, each a
+   *   `dodgeVoteMs` vote (and the server's `dodgeGraceMs` for lag), the clones teleporting at `dodgeTeleports`' times into each round's
+   *   vote (the last always 1.2 s before it closes: a unit test); LOCKED (`dodgeLockedMs`), then the beams travel from the clones'
+   *   muzzles across the board (`dodgeTravelMs` each, `dodgeStaggerMs` apart) and hold (`dodgeHoldMs`) before the next round.
+   *   `dodgeHits` hits lose: the first cracks your king and play goes on; the second, the beams keep hitting him (`dodgeKillMs`), he
+   *   shatters (`dodgeShatterMs`), then the result. A bot finds the safe square with `dodgeBotHit`'s chance.
+   * The sim's (reports/chandy-sim.md).
+   */
+  chandy: {
+    maxLocks: 2,
+    secondAfter: 2,
+    huntTurns: 3,
+    liveTurns: 5,
+    lockLines: 5,
+    takeMargin: 2,
+    chaseMargin: 0.75,
+    upgradesMax: 5,
+    upgradeMs: 2000,
+    meterEvery: 6,
+    fireOnUnlock: true as boolean,
+    looks: 3,
+    scatterSquares: 4,
+    shieldCount: 2,
+    rapidCount: 3,
+    dodgeRounds: 3,
+    dodgeHits: 2,
+    dodgeVoteMs: 3000,
+    dodgeGraceMs: 300,
+    dodgeTeleports: [[1200], [900, 1600], [800, 1400, 1800]] as readonly (readonly number[])[],
+    dodgeScopeMs: 600,
+    dodgeSlideMs: 600,
+    dodgeVolleyMs: 3600,
+    dodgeAimMs: 400,
+    dodgeOpenMs: 400,
+    dodgeLockedMs: 600,
+    dodgeTravelMs: 500,
+    dodgeStaggerMs: 150,
+    dodgeHoldMs: 2500,
+    dodgeKillMs: 5000,
+    dodgeShatterMs: 1000,
+    dodgeBotHit: 0.6,
+    dodgeAfterMoves: 1,
+  },
 } as const;
 
 /**
@@ -1867,7 +2109,9 @@ export const BOSS_POWERS = {
 // (Nov 13: "recluse", the Hidden Boss, was here for a day, so his walk-up was an admin's only; Eric, Nov 13: "It doesn't need to be admin
 // only... the site is behind Cloudflare": out again, his building, rooms and challenge for everyone signed in. His Boss Battle tile
 // stays locked: he's `adminOnly` in the roster, met only from his room and the Crowd's final.)
-export const BOSS_ADMIN_FIRST: readonly string[] = ["timber", "dash", "zebra"];
+// (Nov 16: "chandy": his home, Chandy's Swamp, came first, in an admin's town only, as Timber's and Dash's did; then his rules
+// (docs/decisions/2026-11-16-chandy-rules.md): in the roster now, an admin's in every mode until Eric says go.)
+export const BOSS_ADMIN_FIRST: readonly string[] = ["timber", "dash", "zebra", "chandy"];
 
 /**
  * How Sawyer's split pawn looks (packages/app/src/components/Sawyer.tsx). Looks only: the rules, the engine and the
@@ -2080,23 +2324,26 @@ export const RECLUSE_PHASE2 = {
    */
   moveMs: 900,
   /**
-   * Each player's bank on each board (s): ultra-fast bullet, no increment, nothing adds time; out of time loses that
-   * board. His own moves take no time from it (he has no clock, as in phase 1). An estimate (2:00 a board): not yet
-   * sim-tested.
+   * Each player's bank on each board (s), no increment, nothing adds time; out of time loses that board (Eric, Nov 16: 10 minutes,
+   * was 2:00). His own moves take no time from it (he has no clock, as in phase 1).
    */
-  bankSeconds: 120,
+  bankSeconds: 600,
   /**
-   * His ultimate (Eric, Oct 14): a move that takes longer than `slowMoveSeconds` (anyone's, on any board, before it
-   * comes) is a slow move: he says so (one of his lines about playing faster), counted once for the team as the move
-   * is made (the X marks beside every board). The team's `slowMovesForUlt`-th slow move brings his ultimate (Eric, Oct
-   * 14, after playtesting: at 10 of 10; it was the 6th, then the 5th): from then on every move on every board has
-   * `ultMoveSeconds`, no bank, everyone's few seconds starting fresh as it comes; when they run out, a random legal
-   * move is played for that player (never a loss on time). Before it, the bank above applies. Estimates, not yet
-   * sim-tested: with a 2:00 bank (about 3 s a move over a game) slow moves will be common.
+   * Each player's hearts (Eric, Nov 16: "everyone actually needs their own"; "Let's just call it 8", a column of 8 at each board's
+   * right; he also said 10: one number here). A move that takes longer than `slowMoveSeconds` (what players are told) has one of
+   * that player's hearts cut as it turns slow, judged with `slowAllowMs` more for lag, never shown or said (the server's clock
+   * online: a move slow at 6.5 s from when the board became theirs). After the cut they may take as long as they need on that move
+   * (their clock runs; nothing is played for them). The last heart cut, their board is lost; the others play on.
    */
   slowMoveSeconds: 5,
-  slowMovesForUlt: 10,
-  ultMoveSeconds: 5,
+  slowAllowMs: 1500,
+  hearts: 8,
+  /**
+   * A heart cut on screen (ms from the cut, Eric, Nov 16): his blade drawn back, slow (`windMs`), then a fast follow-through across
+   * the heart, its halves sliding apart and fading (`ms` in all; the sound's swish at `windMs`: recluse-sounds.ts SLASH_CUT_S). No
+   * flash (Eric: photosensitivity). A board whose last heart it was then fades to grey over `greyMs`, "TOO SLOW" over it.
+   */
+  slash: { windMs: 520, ms: 1400, greyMs: 2600 },
   /**
    * The bots on the other boards (Boss alone's, or a solo Crowd's finalists beside you): Stockfish at this strength, this
    * many nodes, within `botMoveMs`.
@@ -2106,11 +2353,12 @@ export const RECLUSE_PHASE2 = {
   /** A bot's thinking per move (ms, its own clock running): a random time in this range, as a bullet player's. */
   botMoveMs: [900, 2600] as readonly [number, number],
   /**
-   * Now and then (this share of its moves, before his ultimate) a bot thinks longer, `botSlowMs` (past
-   * `slowMoveSeconds`), so his slow-move count and his ultimate come in Boss alone too, not only from you.
+   * Now and then (this share of its moves) a bot thinks longer, `botSlowMs` (past `slowMoveSeconds` and its allowance), and loses a
+   * heart as you would: a few a board, all of them hardly ever (Nov 16: at 5% a 40-move board loses about 2, a 60-move one 3; all 8
+   * about 1 in 1,400 and 1 in 100).
    */
-  botSlowChance: 0.12,
-  botSlowMs: [5400, 7000] as readonly [number, number],
+  botSlowChance: 0.05,
+  botSlowMs: [7000, 9000] as readonly [number, number],
   /** Once every board is decided: how long his reaction holds the boards before the result screen (ms). */
   endMs: 3200,
   /**
@@ -2125,8 +2373,8 @@ export const RECLUSE_PHASE2 = {
      * device a moment late to the phase change still plays the whole intro, its drop on the split), and every beat here is ms from
      * the intro's start (`introMs` after it, the music's drop, the board cracks): the light takes him on the music's slam (`burstAt`: his eyes go white) and lifts him on its build (`riseAt`, for
      * `riseMs`); it grows, shoots up off the screen (`shootAt`), radiates in every direction (`radiateAt`), whites out the screen
-     * (`whiteAt` to `whiteFull`; unseen, the suit), holds, and dies back into the center (`downAt` to `revealAt`); the visor flips
-     * up (`flipUpAt`) for his first line (`line1At`) and back down (`flipDownAt`); he leaps on the music's breath, a second before
+     * (`whiteAt` to `whiteFull`; unseen, his final form), holds, and dies back into the center (`downAt` to `revealAt`), his face
+     * showing; his first line (`line1At`); he leaps on the music's breath, a second before
      * the drop (`leapMs` of hang time), and lands as the board cracks; his second line `line2AfterMs` after the crack.
      * `introMs` is `recluse-phase3`'s introSeconds (public/music/themes.json; a test keeps them equal).
      */
@@ -2142,9 +2390,7 @@ export const RECLUSE_PHASE2 = {
       whiteFull: 8000,
       downAt: 8700,
       revealAt: 10_000,
-      flipUpAt: 10_300,
       line1At: 10_600,
-      flipDownAt: 15_750,
       leapMs: 1000,
       line2AfterMs: 800,
     },
@@ -2153,7 +2399,7 @@ export const RECLUSE_PHASE2 = {
      * a character every `typeMs`, `sentencePauseMs` between a line's two sentences, then fully readable `readMs` plus
      * `perCharMs` a character (at most `maxReadMs`), its fade `fadeMs`. Their times: `transform`'s `line1At` and `line2AfterMs`.
      * The first line types faster (`firstTypeMs` a character, Nov 14 review): the music fixes its window (the reveal to the leap),
-     * and its box stays up after the visor comes down, through the crouch, until he leaps, so it's readable whole about 2.8 s.
+     * and its box stays up through the crouch until he leaps, so it's readable whole about 2.8 s.
      */
     chantLines: { typeMs: 45, firstTypeMs: 30, sentencePauseMs: 1000, readMs: 1700, perCharMs: 40, maxReadMs: 5500, fadeMs: 260 },
     /** The boards split and set: a big 5, 4, 3, 2, 1 on every board before phase 2's clocks run (s). */
@@ -3635,11 +3881,12 @@ export const RIDES = {
  * to test it"; docs/decisions/2026-11-14-ride-sounds.md). Your own pawn's ride only, only while it moves, and only a ride listed in
  * `rides` (its file is `/sounds/rides/<id>.wav`); standing, nothing. On the game's sounds (the Sound switch, a hidden page). App:
  * `ride-sound.ts`. A ride's `kind`:
- * - `loop` (the dozer): one loop while you move (its file: one loop of exactly 1 s with 0.1 s of itself either side), `fadeInMs` as it
- *   starts, `fadeOutMs` as it stops, at `rate` (its speed and pitch). `level`: its gain on the game's sounds (each loop is -20 dB RMS,
- *   so well under a move's knock). `holdMs`: it counts as moving until this long after your last step (a step is 90 ms), so a turn or
- *   a tap between steps never stops it. `engine`: a ride with `engine: true` starts at `startRate` and comes up to speed over `upMs`;
- *   as it fades out it sinks to `stopRate`. Moving again mid-fade, it comes back up from where it is, at the same pace.
+ * - `loop` (the dozer): one loop while you move (its file: one loop of exactly 1 s with 0.1 s of itself either side), at `rate` (its
+ *   speed and pitch). A hard start and stop (Eric, Nov 16: "forget the fade in and out, it should be a hard start and stop when you
+ *   start moving and stop. Like boingo"; docs/decisions/2026-11-16-ride-sound-hard.md): full level and speed on your first moving
+ *   frame, out once you stop. `level`: its gain on the game's sounds (each loop is -20 dB RMS, so well under a move's knock).
+ *   `holdMs`: it counts as moving until this long after your last moving frame (a step is 90 ms), so a turn or a tap between steps
+ *   never stops it.
  * - `steps` (the pogo; Eric, Nov 15: "get rid of the fade in and fade out ... every time ... you go from one square to the next, it
  *   should be a boing ... they're going to overlap each other, but that's fine"; docs/decisions/2026-11-15-pogo-boings.md): a one-shot
  *   on every square you step, at `level`, the next of its file's boings each time (`boings`: where each starts in the file, s; each
@@ -3649,21 +3896,20 @@ export const RIDES = {
 export const RIDE_SOUND = {
   level: 0.3,
   holdMs: 120,
-  engine: { startRate: 0.8, upMs: 300, stopRate: 0.88 },
   rides: {
-    "sawyer-dozer": { kind: "loop", engine: true, fadeInMs: 60, fadeOutMs: 700, rate: 1 },
-    /** Puddles's Mower: a putter (Eric, Nov 15: "the putter, the second one's good"), an engine as the dozer is. */
-    "puddles-mower": { kind: "loop", engine: true, fadeInMs: 60, fadeOutMs: 700, rate: 1 },
+    "sawyer-dozer": { kind: "loop", rate: 1 },
+    /** Puddles's Mower: a putter (Eric, Nov 15: "the putter, the second one's good"). */
+    "puddles-mower": { kind: "loop", rate: 1 },
     /** The Candy Cane Sled's jingle bells (Eric, Nov 15: "Bells are good to go yes"): four fifths of a jingle bell is above 8 kHz,
      *  so it plays round the softening (`bright`), from a 48 kHz file. */
-    "ginger-sled": { kind: "loop", engine: false, fadeInMs: 60, fadeOutMs: 300, rate: 1, bright: true },
+    "ginger-sled": { kind: "loop", rate: 1, bright: true },
     /** Its loop's 4 boings (its "little tune": low, mid, low, high), cut as in the sample Eric picked (Nov 15: "Yeah, I like A"). */
     "boingo-pogo": { kind: "steps", level: 0.3, boings: [0, 0.245, 0.49, 0.735], lengthS: 0.245, on: "takeoff" },
   } as Readonly<Record<string, RideLoopSound | RideStepSound>>,
 } as const;
 /** A ride whose sound loops while it moves (RIDE_SOUND). */
 /** `bright`: played round the game sounds' 6 kHz softening (sound.ts `gameBus(true)`), for a sound whose highs are the point (a bell). */
-export type RideLoopSound = { readonly kind: "loop"; readonly engine: boolean; readonly fadeInMs: number; readonly fadeOutMs: number; readonly rate: number; readonly bright?: boolean };
+export type RideLoopSound = { readonly kind: "loop"; readonly rate: number; readonly bright?: boolean };
 /** A ride with a one-shot on every step (RIDE_SOUND). */
 export type RideStepSound = { readonly kind: "steps"; readonly level: number; readonly boings: readonly number[]; readonly lengthS: number; readonly on: "takeoff" | "landing" };
 
@@ -4526,16 +4772,34 @@ export const MUSIC = { volume: 0.4, fadeMs: 300, endFadeMs: 1500, startDelayS: 0
 /**
  * Chess Town's own music (Eric, Nov 14-15: "a song where people literally are like, I want to turn this song on while I'm in the chess
  * town"; docs/decisions/2026-11-15-town-music.md; music.ts `townMusic`): the theme (themes.json's `town`) loops in the street town and
- * in buildings with no music of their own, and after every `passesPerSolo` passes one of its piano solos plays instead of the next
- * pass, the theme coming back from its top as the solo ends (Eric: "every few play throughs"; 3 passes and a solo are about 9.5 min).
+ * in buildings with no music of their own, and now and then one of its piano solos plays instead of the next pass, the theme coming back
+ * from its top as the solo ends (Eric: "every few play throughs"). When the first solo comes (Eric, Nov 16: "sometimes in the first
+ * minute 30 or sometimes later, not every time early maybe like 33% of the time, but it should always play a solo before 5 minutes or
+ * so"; docs/decisions/2026-11-16-town-solos.md): rolled each time the town's music starts.
+ * - `earlyChance`: the chance the theme starts partway in, so its first solo comes early (0 to 1). Otherwise it starts from its top.
+ * - `earlyEntries`: where it may start, in s into its loop (one of them at random): bar lines, a bar being 240/129 s. Bar 77
+ *   (141.395349 s): the solo 37 s in; bar 61 (111.627907 s): 1:07 in.
+ * - `earlyFadeS`: a partway start fades in over this (s): the file holds the ring of the bars before it, and a hard start would click.
+ * - `firstPasses`: from its top, the passes before the first solo (1: the solo at 2:59).
+ * - `passesAfterSolo`: after a solo, the passes before the next, one of these at random (1 or 2: not clockwork).
  * - `order`: the solos by their `id` in themes.json, taking turns (a, b, a, …). Empty: the theme alone.
  * - `aheadS`: how long before a solo it is put on the audio clock, with the theme's return after it (s). The joins are on the clock,
  *   never a timer; this is only how early the timer that schedules them runs (a hidden tab's timers can be a minute late).
  * - `decodeS`: how much earlier than `aheadS` a solo is decoded (s). Only the theme stays decoded while the town plays; a solo is
  *   decoded as its turn nears and let go once it has rung out (Nov 15: about 69 MB for the theme, 16 MB a solo, beside the town's
- *   WebGL on a phone), so at most the theme and one solo are in memory. Not decoded by the time it goes on the clock: one more pass.
+ *   WebGL on a phone), so at most the theme and one solo are in memory. An early solo is decoded as the music starts. Not decoded by
+ *   the time it's due: one more pass.
  */
-export const TOWN_MUSIC: { readonly passesPerSolo: number; readonly order: readonly string[]; readonly aheadS: number; readonly decodeS: number } = { passesPerSolo: 3, order: ["a", "b"], aheadS: 120, decodeS: 30 };
+export const TOWN_MUSIC: {
+  readonly earlyChance: number;
+  readonly earlyEntries: readonly number[];
+  readonly earlyFadeS: number;
+  readonly firstPasses: number;
+  readonly passesAfterSolo: readonly number[];
+  readonly order: readonly string[];
+  readonly aheadS: number;
+  readonly decodeS: number;
+} = { earlyChance: 0.33, earlyEntries: [141.395349, 111.627907], earlyFadeS: 1, firstPasses: 1, passesAfterSolo: [1, 2], order: ["a", "b"], aheadS: 120, decodeS: 30 };
 
 /**
  * The Hidden Boss's music (Nov 13; docs/decisions/2026-11-13-hidden-boss-music.md; the handoff's README, "The Hidden Boss"): one

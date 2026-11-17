@@ -52,6 +52,17 @@ Lanes: `hub` (joining and filling a lobby, the queue screen), `ranked` (the matc
   closes (`wrapUpIfEmpty`, results `keepMs` 0), so its code stops working; a **private lobby nobody started** closes
   when its last person presses Leave (`emptiedAt`). The match's ranked status counts everyone who played
   (`ranked()`), so leaving never makes it unranked.
+- **50 v 50's party** (Nov 16, [decision](../decisions/2026-11-16-crowd-party.md)): its object (`SquadsParty`, kind "crowd") asks the
+  crowd queue as PLAY's Default does, one ticket `{ size, pass }` (`seatParty`): all its seats held in one lobby under its pass
+  (`reserveParty`, `CAPACITY.queue.reservationMs`), only while every party there, at full size, still fits whole on one team (core's
+  `packParties`) and the hold ends before the fill, else a new lobby (held until its fill); a late member still joins the group, a pooled
+  member's party passes the pool's door by its pass while its hold lasts; at the start each party plays on one team (`assignTeams`). Find
+  match holds a seat for every member, away ones too. A member who leaves the lobby before the fill (Leave, or the party's Cancel) is out
+  of its group (`leave()`): a friend left alone plays as a single (ranked), and the seat reopens for a return with the pass while the hold lasts. A party's match is ranked for everyone, its members too (Eric, Nov 16:
+  "It's always ranked"; `CROWD_PARTY.ranked` true, [party-ranked](../decisions/2026-11-16-party-ranked.md)); with it off, a party of 2+ would
+  play unranked and the singles beside it stay ranked (`rankedFor`; its results say `partied`). A party finding the filling lobby
+  with less than its hold left makes a new lobby, which the queue's singles then join (the old one's last seconds go to bots): accepted, as
+  moving the old fill would shift its countdown under everyone in it. Leader's Cancel or a deserted search (`awayStopMs`, then a line) cancels its ticket. Test switches: `GET /api/lobby/CODE?parties` (its groups), `?partyfill=S` (its lobbies' fill). Tests: `crowd-party.test.ts`, `crowd-party-do.test.ts`, `friends.spec.ts`.
 - **Squads** (`docs/areas/squads.md`, "The server"; no menu entry until its screens): its own queue (`squads-default`,
   the same matchmaker object) whose tickets are parties (up to 4, under a code and invite link, the leader queuing) or
   single players, each seated whole in a Squads lobby that still fits it; the lobby fills with bots after

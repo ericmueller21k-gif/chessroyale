@@ -9,7 +9,7 @@ const { STREET_GROUND, STREET_GROUND_KEY, STREET_LOTS, STREET_PROPS, STREET_STRE
 const { HOMES, PROPS, START, findPath, stepsFrom, walkable } = await import("../src/town/world.ts");
 const { boxPoint, newPlan, planBox, pxOf, streetBoxes } = await import("../src/town/boxes.ts");
 const { STRIPS } = await import("../src/town/strips.ts");
-const { ROW_MIN_W, ROW_SIDES, layRow } = await import("../src/town/rows.ts");
+const { ROW_MIN_W, ROW_SIDES, homeSpan, layRow } = await import("../src/town/rows.ts");
 const { homesOn } = await import("../src/town/street.ts");
 const { OVAL, RING, RING_M } = await import("../src/town/houses/coliseum-ring.ts");
 const { TOWN_FEEL } = await import("../src/town/feel.ts");
@@ -72,7 +72,7 @@ describe("one back line across the whole town", () => {
 
 describe("Upper Street's homes moved south: Meadow Street", () => {
   it("every boss home is in the town, each with its door, strip and rest square, reached from the start", () => {
-    expect(HOMES).toHaveLength(18);
+    expect(HOMES).toHaveLength(19);
     const d = stepsFrom(START);
     for (const h of HOMES) {
       const strip = STRIPS.find((s) => s.home === (h.id === "dash" ? "blitz" : h.id));
@@ -95,6 +95,27 @@ describe("Upper Street's homes moved south: Meadow Street", () => {
       expect(l.r0, id).toBe(meadow.r1 + 2);
       expect(l.door!.r, id).toBe(meadow.r1 + 1);
     }
+  });
+  it("Chandy's Swamp is open (Nov 16): no row front stands inside its box, the row behind leaving its stretch open up to its sides", () => {
+    // (South Street's row backs onto Meadow Street's; the swamp's lot and box run back over it. A front laid there stood inside the
+    // swamp, its rear wall's windows lit through the trees: Eric, "there's windows, which there shouldn't be windows".)
+    const sw = STREET_LOTS.find((o) => o.kind === "home" && o.id === "chandy")!;
+    const front = sw.r0 - 0.5 + sw.inset;
+    // (Its body as its row lays it, a few pixels in from its lot's edges; a neighbor's picture overlaps it by a pixel or two.)
+    const span = homeSpan("chandy", sw.c0 + (sw.shift ?? 0), sw.w, "S");
+    const [x0, x1] = [span[0] + 0.08, span[1] - 0.08];
+    const looks = STREET_LOTS.filter((o) => o.kind === "house" && o.look && o.at);
+    const half = (o: (typeof looks)[number]) => o.look!.w / 2 / 37;
+    const depthOf = (o: (typeof looks)[number]) => (o.facing === "S" ? [o.at!.y, o.at!.y + o.depth] : [o.at!.y - o.depth, o.at!.y]);
+    const inside = looks.filter((o) => {
+      const [d0, d1] = depthOf(o);
+      return o.at!.x + half(o) > x0 && o.at!.x - half(o) < x1 && d1 > front && d0 < front + sw.depth;
+    });
+    expect(inside.map((o) => `${o.street} ${o.facing} ${o.at!.x} ${o.at!.y} w${o.look!.w} px${o.look!.px} d${o.depth}`)).toEqual([]);
+    // (South Street's row closes up to the swamp's sides: a front ends within a fifth of a square of each.)
+    const behind = looks.filter((o) => o.street === "south-st" && o.facing === "N" && Math.abs(o.at!.y - 10.05) < 0.01);
+    expect(Math.min(...behind.map((o) => Math.abs(o.at!.x + half(o) - span[0])))).toBeLessThan(0.2);
+    expect(Math.min(...behind.map((o) => Math.abs(o.at!.x - half(o) - span[1])))).toBeLessThan(0.2);
   });
   it("the start is on the promenade in the park, and the park still the town's middle", () => {
     expect(START).toEqual({ c: 22, r: 25 });
@@ -218,7 +239,7 @@ describe("boss homes are never neighbors, and no look-alike is a sliver (Eric, N
         }
       });
     }
-    expect(homes).toBe(18);
+    expect(homes).toBe(19);
     expect(ROW_MIN_W).toBe(1);
   });
 });

@@ -275,7 +275,7 @@ Built around the rules: the server never decides anything the rules decide (duti
 plays, ties). The calls are in `DECISIONS.md`, "Squads, phase 2".
 
 - **Objects.** One Durable Object per lobby (`SquadsLobby`, binding `SQUADS`) and one per party (`SquadsParty`,
-  `PARTIES`). The lobby's logic is pure (`squads-lobby.ts`, `SquadsCore`); the object stores it (the record under
+  `PARTIES`; also Boss Battle's parties, kind "boss", and 50 v 50's, kind "crowd": [hub.md](hub.md), PLAY). The lobby's logic is pure (`squads-lobby.ts`, `SquadsCore`); the object stores it (the record under
   "lobby", each match under "m:<key>", only those that changed), runs its alarms and talks over hibernating
   WebSockets (`squads-do.ts`).
 - **The queue.** `POST /api/squads/play` (one player) asks the Squads matchmaker (`squads-default`: the same Matchmaker

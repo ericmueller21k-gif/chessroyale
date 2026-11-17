@@ -22,6 +22,14 @@ removed (old → new) and says whether any of them guards a rule here.
     again. But there may be some use cases…"
   - Decisions: [2026-10-18-home-steady-layout.md](../decisions/2026-10-18-home-steady-layout.md),
     [2026-10-25-home-panel-back.md](../decisions/2026-10-25-home-panel-back.md).
+- **Pop-up notices sit on top of the screen and never push anything** (Eric, Nov 16: "Look at how it pushed everything down.
+  We should make these style pop-ups always just sit on top of everything else ... They shouldn't ever push anything around on
+  the screen"). A note or a closed-party message floats over the screen under the page header (`.fd-notice`, fixed), and what's
+  under it keeps its box, showing or dismissed.
+  - Guard: `e2e/lobby-close.spec.ts`, "a pop-up note floats over the screen and pushes nothing: home (PLAY) and Boss Battle (a
+    closed party: its first tile, its first way to play)", phone and computer: the boxes are equal to 1 px with the note showing and
+    after its X, and the note is on top (the element at its middle is inside it).
+  - Decision: [2026-11-16-notices-on-top.md](../decisions/2026-11-16-notices-on-top.md).
 - **No platform named means both.** When Eric doesn't say "phone" or "computer", a change is for both. When unsure, ask.
   (Eric, Oct 25.)
 - **Simple beats flashy** (Eric, Oct 14): the least code, the least lag on a phone, the fewest ways to break.
@@ -53,7 +61,11 @@ removed (old → new) and says whether any of them guards a rule here.
 - **50 v 50: a big majority always wins (Eric, Nov 4: "10 people on white, a 7-2-1 split, the 7 should always win, but a
   6-3-1 could go to the 3").** When the most-picked move has at least `crowdSureShare` (0.7) of the team's real picks, it's
   played, always, a blunder too; below it, the draw from the top 3. A miss's pick made for it never counts in that share.
-  - Guard: `packages/core/test/crowd-afk.test.ts`, "a big majority always wins": "10 on a team, 7-2-1: the 7 always (every seed);
+  **In Majority mode since the rework (Eric's OK, Nov 17: "For the majority mode I wonder if we should still use this, so it
+  almost always does the majority but sometimes the 2nd or 3rd option"):** the 50 v 50's move is the pick vote's (Strong,
+  Majority, Chaos); Majority is this draw and keeps this rule; Strong and Chaos don't follow it. Eric may bring it back for every
+  game, so the draw's code and settings stay one setting away. [2026-11-17-crowd-rework-c4.md](../decisions/2026-11-17-crowd-rework-c4.md).
+  - Guard: `packages/core/test/crowd-afk.test.ts` (on the 50 v 50's settings with `crowdPick: "majority"`), "a big majority always wins": "10 on a team, 7-2-1: the 7 always (every seed);
     85%: always, a blunder too", "6-3-1: the draw as before (60 / 30 / 10), so the 3 sometimes", "the share counts real picks only".
   - Decision: [2026-11-04-crowd-votes-afk.md](../decisions/2026-11-04-crowd-votes-afk.md).
 - **50 v 50: the AFK rule (Eric, Nov 4: "no move at all = default to a random top 5 move, but your penalty is simply you get the
@@ -120,7 +132,7 @@ removed (old → new) and says whether any of them guards a rule here.
   you're trying to exit"; Nov 13: "even if you're in a building … There should always be 'are you sure you want to exit' if you're in the
   town").** Every way out of the town asks "Leave Chess Town?" with Stay (the default, Escape) and Leave, on the street and inside any
   building alike: the side menu, the town's back button, the phone's or browser's back gesture (the town keeps a step of its own in the
-  history, so back never leaves the site unasked), an invite's Join, a profile's Challenge, the chat's sign-in. Stay changes nothing.
+  history, so back never leaves the site unasked), an invite's Accept (its Join until Nov 16), a profile's Challenge, the chat's sign-in. Stay changes nothing.
   Stepping out of a building onto the street (still the town), boss challenges, the AFK drop and forced exits don't ask.
   - Guard: `e2e/town-leave.spec.ts`, "the town's back button asks…", "the phone's back gesture asks too…", "a computer's side menu
     asks first…", "inside a room…", "a computer's side menu inside a room…", "inside a room, an invite's Join asks first…", "a boss's

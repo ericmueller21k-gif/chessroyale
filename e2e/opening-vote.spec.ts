@@ -76,13 +76,13 @@ async function firstMove(page: Page) {
   return { before, played: mine.played };
 }
 
-test("the three votes in order: how it ends, how it starts, how fast; the start's cards and zones left to right; the game begins from the start that won", async ({ page }) => {
+test("the three votes in order: how moves are picked (how it ended before the rework), how it starts, how fast; the start's cards and zones left to right; the game begins from the start that won", async ({ page }) => {
   test.setTimeout(3 * 60_000);
   await page.goto("/?debug&mode=crowd&augments=1");
   await soloFromHome(page);
   await expect(page.locator(".vote-screen")).toBeVisible({ timeout: 30_000 });
   await expect(page.locator(".vote-step")).toHaveText("Vote 1 of 3");
-  await expect(page.getByRole("heading", { name: "How does it end?" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "How are moves picked?" })).toBeVisible();
 
   // Vote 2: how it starts, in a player's words (never Chess960 or Fischer Random), left to right on the cards and the board.
   await expect(page.getByRole("heading", { name: "How does it start?" })).toBeVisible({ timeout: 20_000 });

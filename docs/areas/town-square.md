@@ -291,7 +291,7 @@ before the rows are laid (`street.ts lotHere`), so each row fills the place with
   picture's pixels, the palette keys that light up, a color, a strength, a halo for a lantern; `LightSpot` in
   `houses/kit.ts`): its windows, doorways and glass, the Colosseum's gate and a few arches. At dusk (0.7) and night (1)
   (`lightsAt`; they follow the sky's blend, `mixLights`) each light, baked once into a small canvas the first time it's
-  drawn lit, is added into a light layer as the world is drawn far to near (anything drawn in front cuts its shape out),
+  drawn lit, is added into a light layer as the world is drawn far to near (anything drawn in front cuts its shape out; every light this frame, its list growing as needed: a fixed 128 let half a night street's windows shine through, Nov 16),
   and the layer is laid on after the tint with `lighter`, only in the 64 px tiles a light touched. Lights fade and haze
   with their pictures; the tags, names and bubble are drawn after them. Nothing is made or drawn by day.
 
@@ -473,9 +473,11 @@ before the rows are laid (`street.ts lotHere`), so each row fills the place with
   **Its moving sound** (Nov 14, Eric: "one continuous sound"; [2026-11-14-ride-sounds.md](../decisions/2026-11-14-ride-sounds.md)): a
   ride listed in `RIDE_SOUND.rides` (its file `/sounds/rides/<id>.wav`) sounds as your own pawn moves on it, in the town and a shop's
   room; standing, nothing; any other ride silent; on the game's sounds (the Sound switch, a hidden page). Sawyer's Dozer, Puddles's Mower and the Candy Cane Sled's bells (Nov 15; `bright`: round the 6 kHz softening, `gameBus(true)`) (`kind: "loop"`)
-  loop: it counts as moving until `holdMs` (120) after your last step, fades in over `fadeInMs` and out over `fadeOutMs` (700), coming
-  up to speed and sinking a little as it fades; moving again mid-fade brings it back from where it is. The frame loops only say "you
-  moved, on this ride" (`rideMoving`); a timer off the frame sees you stop. Your ride's file is fetched after the town's first frame.
+  loop: a hard start and stop, no fades (Nov 16, Eric: "it should be a hard start and stop ... Like boingo";
+  [2026-11-16-ride-sound-hard.md](../decisions/2026-11-16-ride-sound-hard.md)): full level and speed on your first moving frame; it
+  counts as moving until `holdMs` (120) after your last moving frame, then stops. Each end takes 30 ms (`DECLICK_S`, the Sound
+  switch's too), as a bare cut mid-wave clicks. The frame loops only say "you moved, on this ride" (`rideMoving`); a timer off the
+  frame sees you stop. Your ride's file is fetched after the town's first frame.
   Boingo's Pogo (`kind: "steps"`; Nov 15, Eric: "from one square to the next, it should be a boing";
   [2026-11-15-pogo-boings.md](../decisions/2026-11-15-pogo-boings.md)): no loop, no fade; each step your walker begins (its `onStep`,
   `rideStep`) plays the next of its 4 boings (low, mid, low, high) as its own one-shot, so they overlap, on the audio clock at the hop's
@@ -735,7 +737,7 @@ and [2026-11-02-bigger-showpieces.md](../decisions/2026-11-02-bigger-showpieces.
   walk-up's top floor is that same climb (Nov 14: kept, it went through to the top again as the top faded in).
   **The area banner (Nov 11, Eric's mockup):** as the black lifts on a room you walked into through its door (the town's, or Rolling
   Dough's door between rooms; never one you arrive in by a challenge), its name across a soft dark band a third down the room's view:
-  the boss's name and 's in gold in the pixel font ("DON DOUGH'S"; Rolling Dough's back room "BACK ROOM"; a room with no boss nothing),
+  the boss's name and 's in gold in the pixel font ("DON DOUGH'S"; Rolling Dough's back room "BACK ROOM"; a room with no boss nothing; never over a name that already starts with the boss's name, "GINGER IGLOO", "HOLLOW PEAK", "CHANDY'S SWAMP": Eric, Nov 16),
   gold rules above and below, the home's name in Archivo Black (`town/AreaBanner.tsx`, `areaBannerOf`, from the homes' and rooms'
   data). Fades in 0.4 s, holds 1.8 s, fades out 0.6 s (`AREA_BANNER`; reduced motion: no fades); taps pass through it; sized from
   the room's view (container units). **Room music:** the boss's theme loads as the door zooms and plays as the room shows; a
@@ -884,6 +886,15 @@ exception: about 7 squares from Ginger's igloo (`town-camera.test.ts`).
   the count at 0 of 4, Challenge 1 of 4, leaving asks, 3 bots join to 4 of 4, the summoning, the fight, the 🏆; a 5th locked out); `town-street.spec.ts` ("the
   Hidden Boss's walk-up": the door, up two flights, his card,
   back down; `STILLS=<dir>` writes the stills).
+
+## Chandy's Swamp (Nov 16; an admin's town only, as Chandy is admins first)
+
+- **Front** (`houses/chandy.ts`, 144 × 170): cypresses as tall as the row houses, a pond between going back to a far bank half way up
+  (paler far off, ripples closer together), a wood behind whose canopy closes the lot off, its boardwalk the door; Meadow Street 26-29.
+  Its box: `foliage` walls (leaf clumps, a ragged top, no ink edges), `water` inside (town-kit.ts). It's open (`street.ts
+  OPEN_HOMES`): South Street's row behind leaves its stretch open, as no front may stand inside its box (Nov 16, round 3).
+- **Room** (`shops/chandy-art.ts`): roof `sky` (the town's sky as it loads, `LIT_ROOMS`), water floor, the battle spot hidden as `ring-` water tiles; `RoomArt.wade` hides feet under the surface with a ripple and spray (one canvas, no loop), on foot and on every ride alike: one fixed depth cuts a ride's foot too (Eric, Nov 16; `__shopRide().wading`). The frog keeps the stand (`swampkeeper`).
+- **Rise** (`shops/intros/chandy.ts`): the post, then the platform (`Prop.wet`, `flat`) lifting you both through the timeline's `lift` (no wading once lifted), the crates, his point and fire, his `rise` storm (water from the foot). His rules are in (docs/decisions/2026-11-16-chandy-rules.md): Challenge alone plays the rise into his battle. e2e `chandy-home.spec.ts`; unit `shop-chandy.test.ts`.
 
 ## Challenging a boss (Nov 2: Pokémon-gym style)
 
@@ -1246,9 +1257,12 @@ one piece at a time).
 **The town's own theme (Nov 15; [decision](../decisions/2026-11-15-town-music.md)):** at the same moment, `townMusic(true)` (music.ts):
 its theme (themes.json's `town`, `town-loop.mp3`, 2:59) is fetched first and plays once decoded, then its two piano solos' bytes, then the
 bosses' (fetched only). In memory: the theme while the town is open (~69 MB decoded), and at most one solo (~16 MB), decoded
-`TOWN_MUSIC.aheadS + decodeS` (150 s) before it plays and let go once it has rung out; not decoded in time, one more pass. It loops in the street and in buildings with no theme of their own; after every `TOWN_MUSIC.passesPerSolo` (3) passes a solo
-(`TOWN_MUSIC.order`: a, b, a…) plays instead of the next pass, the theme back from its top as it ends (about every 9.5 min), all joins
-on the audio clock. A boss's room, a challenge's splash or a battle takes over; out of the room it comes back from its top. The town
+`TOWN_MUSIC.aheadS + decodeS` (150 s) before it plays and let go once it has rung out; not decoded in time, one more pass. It loops in the street and in buildings with no theme of their own; now and then a solo
+(`TOWN_MUSIC.order`: a, b, a…) plays instead of the next pass, the theme back from its top as it ends, all joins on the audio clock.
+**When (Nov 16; [decision](../decisions/2026-11-16-town-solos.md)):** rolled each time it starts: with `earlyChance` (0.33) it starts
+partway in at one of `earlyEntries` (bar 77 or bar 61, fading in over `earlyFadeS`), its first solo 0:37 or 1:07 in (decoded at once);
+otherwise from its top, the first solo `firstPasses` (1) pass in, at 2:59. After each solo, 1 or 2 passes at random (`passesAfterSolo`).
+The `?townsolo` test switch makes every start the early one at bar 77 (log `music:town:entry:<s>`, then `music:town:solo:<id>`). A boss's room, a challenge's splash or a battle takes over; out of the room it comes back from its top. The town
 closing (Town.tsx's cleanup, the Hidden Boss's summoning) ends it and lets its pieces go. Tests: `packages/app/test/music.test.ts`
 ("the town's own theme", its "in memory" block), the e2e above (the theme first, its source started in the street).
 
@@ -1322,7 +1336,11 @@ noted wherever a slice changed one.
   `townTapPoint` reads the point, taps, and lets them go, so a figure walking about (Big Boy by his crib, a bot) can't move off it
   first. `__townAt`'s points keep 2 px of room on their target (`clearAt`): a point on the edge of what's clear became your pawn once the
   tap was rounded to a whole pixel. A tap on a town figure or place from a spec goes through `townTap` or `tapInTown`, never its own
-  `__townAt` and click ([2026-11-14-flaky-round4.md](../decisions/2026-11-14-flaky-round4.md)).
+  `__townAt` and click ([2026-11-14-flaky-round4.md](../decisions/2026-11-14-flaky-round4.md)). Since Nov 16 its first try at a target
+  with a glide to fall back on gives up after 6 drawn frames without a tap point (it was 3 s, mostly spent on homes off the screen), and
+  a signed-in spec signs in before the town first opens, not after a guest's load
+  ([2026-11-16-town-tap-speed.md](../decisions/2026-11-16-town-tap-speed.md)). On the tests' software WebGL a town load takes 5 to 9 s
+  and every round trip to a page with a town waits on its frames: open a town only where the test needs it.
 - `e2e/shop.spec.ts` (Nov 2, inside a shop; phone and computer): Babur's card's "Go in", inside zoomed out (+ and − switch to Close and back), a tap
   on the Shopkeeper walks you up and its card's Talk opens "Babur's Boss Crate" (the price line, Balloon Pup, what you have, both buys
   greyed with nothing to pay), the header saying "Babur's Circus", then the view dragged back to the door, "Go out" and you're outside

@@ -3,7 +3,7 @@ import { BOSS_ROSTER } from "@chessroyale/core";
 import { CHARACTERS } from "../src/characters/index.ts";
 import { EFFECT_SPRITES } from "../src/characters/effects.ts";
 import { BOSS_KITS, bossKit, kitName } from "../src/characters/kits.ts";
-import { RECLUSE, RECLUSE_BOOK, RECLUSE_BUST, suitFrame, suited } from "../src/characters/recluse.ts";
+import { RECLUSE, RECLUSE_BOOK, RECLUSE_BUST, coated } from "../src/characters/recluse.ts";
 import { frameKeys, renderFrame, type Character } from "../src/characters/sprite.ts";
 
 // The Hidden Boss (code id `recluse`): his art. Since phase 1 (Oct 14) he's registered (his kit, his full figure among the
@@ -118,7 +118,7 @@ describe("the Hidden Boss's art", () => {
     expect(Math.max(...bust)).toBeLessThanOrEqual(75);
   });
 
-  it("wears his suit on every frame of either drawing (Eric, Nov 14): each part's suit version is its size, so it sits where the part did; the tie off, the helmet over his head; the visor's three ways", () => {
+  it("wears his final form on every frame of either drawing (Eric, Nov 15): each part where it was (his coat's parts their size), his risen head over his own, his eyes glowing, the aura and helix under him and the helix's near side over him; all his hair moving every frame; nothing cut off at the top", () => {
     const size = (name: string) => {
       const g = RECLUSE.parts[name]!.grid;
       return [Math.max(...g.map((r) => r.length)), g.length];
@@ -126,17 +126,38 @@ describe("the Hidden Boss's art", () => {
     for (const ch of [RECLUSE, RECLUSE_BUST])
       for (const [name, anim] of Object.entries(ch.anims))
         anim.frames.forEach((f, i) => {
-          const s = suited(f);
-          expect(suited(f), "made once").toBe(s);
-          const kept = f.layers.filter((l) => !l.part.startsWith("tie:"));
-          expect(s.layers.map((l) => [l.x, l.y]), `${ch.id} ${name} ${i + 1}`).toEqual(kept.map((l) => [l.x, l.y]));
-          s.layers.forEach((l, j) => expect(size(l.part), `${ch.id} ${name} ${i + 1}: ${l.part}`).toEqual(size(kept[j]!.part)));
-          expect(s.layers.some((l) => l.part.startsWith("head:")), `${ch.id} ${name} ${i + 1}`).toBe(false);
+          const at = `${ch.id} ${name} ${i + 1}`;
+          const c = coated(f, i);
+          expect(coated(f, i), "made once").toBe(c);
+          // (Its own layers first and last: the aura and the helix's far side under him, its near side over him.)
+          expect(c.layers[0]!.part, at).toMatch(/^coatAura:/);
+          expect(c.layers[1]!.part, at).toMatch(/^coatHelix:back:/);
+          expect(c.layers.at(-1)!.part, at).toMatch(/^coatHelix:front:/);
+          const worn = c.layers.slice(2, -1).filter((l) => !/^(coatBack|coatSkirt|eyeGlow)/.test(l.part) && !l.part.startsWith("legs:"));
+          const own = f.layers.filter((l) => !l.part.startsWith("legs:"));
+          expect(worn.length, at).toBe(own.length);
+          worn.forEach((l, j) => {
+            const o = own[j]!;
+            if (o.part.startsWith("head:")) {
+              // (His head: risen, 6 px wider each side and 12 taller, his eyes glowing unless he blinks.)
+              expect(l.part, at).toMatch(o.part.startsWith("head:shut.") ? /^coathead:shut\./ : /^coathead:glow\./);
+              expect([l.x - o.x, l.y - o.y], at).toEqual([-6, -12]);
+            } else {
+              expect([l.x, l.y], `${at}: ${l.part}`).toEqual([o.x, o.y]);
+              expect(size(l.part), `${at}: ${l.part}`).toEqual(size(o.part));
+            }
+          });
+          expect(c.layers.some((l) => l.part.startsWith("head:")), at).toBe(false);
         });
-    for (const v of ["down", "mid", "up"] as const) {
-      const f = suitFrame(RECLUSE.anims.idle2!.frames[0]!, v);
-      expect(f.layers.find((l) => l.part.startsWith("helmet:"))!.part).toMatch(new RegExp(`^helmet:${v}:`));
-    }
+    // All his hair moving (round 4b): a new head every frame of his idle, round the loop and back with no jump; the helix a step a frame.
+    const idle = RECLUSE.anims.idle2!.frames.map((f, i) => coated(f, i));
+    const head = (i: number) => idle[i]!.layers.find((l) => l.part.startsWith("coathead:"))!.part.split(":").at(-1);
+    idle.forEach((_, i) => expect(head((i + 1) % idle.length), `frame ${i + 1}`).not.toBe(head(i)));
+    expect(idle.length % 12, "the helix, the hair and the coat loop with the idle").toBe(0);
+    // Nothing of him cut off at the top: at least 2 clear rows over his tallest hair in every phase 2 animation (the glow aside).
+    const top = (ch: typeof RECLUSE, f: Parameters<typeof coated>[0], i: number) => frameKeys(ch, coated(f, i)).findIndex((r) => r.some((k) => k && !"%&';?*+@".includes(k)));
+    for (const n of ["idle2", "consult2", "stare2", "laugh2", "spellbook2", "spellLoop2", "spellClose2", "slam2"])
+      RECLUSE.anims[n]!.frames.forEach((f, i) => expect(top(RECLUSE, f, i), `${n} ${i + 1}`).toBeGreaterThanOrEqual(2));
   });
 
   it("puts the book effect on one board square", () => {

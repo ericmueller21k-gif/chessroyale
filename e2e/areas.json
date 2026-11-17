@@ -52,6 +52,7 @@
     "packages/chess/src/runner.ts",
     "packages/chess/src/runner-tools.ts",
     "packages/app/src/lazy.tsx",
+    "packages/app/src/lazy-game.ts",
     "packages/app/src/shell.ts",
     "packages/app/src/loadbar.ts",
     "packages/app/src/screens/game-screens.ts",
@@ -135,6 +136,7 @@
     "packages/app/hidden-room-preview.html",
     "packages/app/items-preview.html",
     "packages/app/rides-measure.html",
+    "packages/app/chandy-preview.html",
     "packages/app/src/dev/**",
     "packages/maia-worker/LICENSE",
     "packages/maia-worker/licenses/**",
@@ -184,7 +186,6 @@
         "e2e/boss-powers.spec.ts",
         "e2e/boss-select.spec.ts",
         "e2e/boss-speech.spec.ts",
-        "e2e/crowd-hidden.spec.ts",
         "e2e/formats.spec.ts",
         "e2e/grex.spec.ts",
         "e2e/hollow.spec.ts",
@@ -216,6 +217,10 @@
         "packages/app/src/characters/black-knight.ts",
         "packages/app/src/characters/pawn-golem.ts",
         "packages/app/src/components/BossCharacter.tsx",
+        "packages/app/src/components/boss-figure.ts",
+        "packages/app/src/components/BossPortrait.tsx",
+        "packages/app/src/characters/portraits.ts",
+        "packages/app/src/characters/portraits.gen.ts",
         "packages/app/src/components/BossEffect.tsx",
         "packages/app/src/components/PowerParts.tsx",
         "packages/app/src/components/KingAttack.tsx",
@@ -256,13 +261,13 @@
         "e2e/boss-powers.spec.ts",
         "e2e/boss-side.spec.ts",
         "e2e/side-same-size.spec.ts",
-        "e2e/crowd-hidden.spec.ts",
         "e2e/recluse.spec.ts"
       ]
     },
     "the Boss raid screen (the select)": {
       "paths": [
         "packages/app/src/components/BossSelect.tsx",
+        "packages/app/src/components/BossStage.tsx",
         "packages/app/src/components/BossDifficulty.tsx",
         "packages/app/src/characters/boss-select.ts",
         "packages/app/src/boss-difficulty.ts",
@@ -290,7 +295,6 @@
       "specs": [
         "e2e/boss-powers.spec.ts",
         "e2e/boss-speech.spec.ts",
-        "e2e/crowd-hidden.spec.ts",
         "e2e/formats.spec.ts",
         "e2e/king-attack.spec.ts",
         "e2e/king-save-altered.spec.ts",
@@ -399,6 +403,17 @@
       ],
       "specs": ["e2e/zebra.spec.ts", "e2e/boss-smoke.spec.ts", "e2e/king-attack.spec.ts"]
     },
+    "Chandy (chandy)": {
+      "paths": [
+        "packages/chess/src/bosses/chandy.ts",
+        "packages/server/src/bosses/chandy.ts",
+        "packages/app/src/characters/chandy*.ts",
+        "packages/app/src/characters/effects/chandy.ts",
+        "packages/app/src/components/Chandy*.tsx",
+        "packages/app/public/music/chandy-loop.mp3"
+      ],
+      "specs": ["e2e/chandy.spec.ts", "e2e/boss-smoke.spec.ts", "e2e/boss-side.spec.ts"]
+    },
     "Timber (timber)": {
       "paths": [
         "packages/chess/src/bosses/timber.ts",
@@ -467,6 +482,7 @@
         "packages/app/src/recluse-cutscene.ts",
         "packages/app/src/components/RecluseCutscene.tsx",
         "packages/app/src/components/RecluseTransform.tsx",
+        "packages/app/src/components/RecluseHearts.tsx",
         "packages/app/src/components/recluse-light*.ts",
         "packages/app/src/characters/recluse*.ts",
         "packages/app/src/characters/effects/recluse.ts",
@@ -476,7 +492,7 @@
         "packages/app/src/recluse-online.ts",
         "packages/server/src/bosses/recluse.ts"
       ],
-      "specs": ["e2e/crowd-hidden.spec.ts", "e2e/formats.spec.ts", "e2e/hidden-boss-room.spec.ts", "e2e/recluse.spec.ts"]
+      "specs": ["e2e/formats.spec.ts", "e2e/hidden-boss-room.spec.ts", "e2e/recluse.spec.ts"]
     },
     "Sawyer": {
       "paths": [
@@ -521,7 +537,6 @@
       "specs": [
         "e2e/crowd.spec.ts",
         "e2e/crowd-play.spec.ts",
-        "e2e/crowd-hidden.spec.ts",
         "e2e/crowd-scoring.spec.ts",
         "e2e/match-screen.spec.ts",
         "e2e/opening-vote.spec.ts",
@@ -550,7 +565,7 @@
         "packages/app/src/match-exit.ts",
         "packages/app/src/components/MatchMenu.tsx"
       ],
-      "specs": ["e2e/crowd.spec.ts", "e2e/crowd-play.spec.ts", "e2e/crowd-hidden.spec.ts", "e2e/formats.spec.ts", "e2e/match-menu.spec.ts", "e2e/problems.spec.ts", "e2e/resign.spec.ts", "e2e/boss-review.spec.ts", "e2e/boss-result.spec.ts", "e2e/xp.spec.ts"]
+      "specs": ["e2e/crowd.spec.ts", "e2e/crowd-play.spec.ts", "e2e/formats.spec.ts", "e2e/match-menu.spec.ts", "e2e/problems.spec.ts", "e2e/resign.spec.ts", "e2e/boss-review.spec.ts", "e2e/boss-result.spec.ts", "e2e/xp.spec.ts"]
     },
     "home and the front door": {
       "paths": [
@@ -600,6 +615,7 @@
     "the queue and lobbies": {
       "paths": [
         "packages/app/src/screens/Queue.tsx",
+        "packages/app/src/screens/CrowdParty.tsx",
         "packages/app/src/screens/Lobby.tsx",
         "packages/app/src/components/LobbyChat.tsx",
         "packages/server/src/matchmaker.ts",
@@ -612,7 +628,8 @@
         "e2e/matchmaking.spec.ts",
         "e2e/multiplayer.spec.ts",
         "e2e/ranked-1v1.spec.ts",
-        "e2e/squads.spec.ts", "e2e/search-home.spec.ts"
+        "e2e/squads.spec.ts", "e2e/search-home.spec.ts",
+        "e2e/friends.spec.ts"
       ]
     },
     "live counts and the live window": {
@@ -638,6 +655,10 @@
     "Rolling Dough, Don Dough's bakery (Nov 11: the front room, the back room and the door between them, the guards, the chatter, the talk beat)": {
       "paths": ["e2e/zebra-home.spec.ts", "packages/app/src/town/shops/zebra-*.ts", "packages/app/src/town/shops/bakery-kit.ts", "packages/app/src/town/shops/intros/zebra.ts", "packages/app/src/town/houses/zebra.ts", "packages/app/src/characters/zebra-sounds.ts", "packages/app/src/characters/sidekicks/zebrakeeper.ts"],
       "specs": ["e2e/zebra-home.spec.ts"]
+    },
+    "Chandy's Swamp (Nov 16: the swamp on Meadow Street, its room under the sky, wading, the frog's stand, his rise and rising wipe)": {
+      "paths": ["e2e/chandy-home.spec.ts", "packages/app/src/town/shops/chandy-*.ts", "packages/app/src/town/shops/intros/chandy.ts", "packages/app/src/town/houses/chandy.ts", "packages/app/src/characters/sidekicks/swampkeeper.ts"],
+      "specs": ["e2e/chandy-home.spec.ts"]
     },
     "the Hidden Boss's walk-up (Nov 13: the building in the town, the hall, the landing and his room, the stairs between them)": {
       "paths": ["packages/app/src/town/houses/recluse.ts", "packages/app/src/town/shops/recluse-*.ts"],

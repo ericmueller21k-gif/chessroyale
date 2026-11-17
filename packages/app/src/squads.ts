@@ -27,7 +27,7 @@ import { crumb } from "./problems.ts";
 import { enginePool, engineSpeed } from "./engine.ts";
 import { showBanNotice } from "./components/FairPlay.tsx";
 import { play } from "./sound.ts";
-import { queuePool } from "./test-switches.ts";
+import { partyFill, queuePool } from "./test-switches.ts";
 import { byOfHalf } from "./move-replay.ts";
 import { LOW_BANK_MS, blockName, coinText, dutyOf, itemText, liveBank, movesOfHalf, sideIn, squadName, squadOf, tickSecond, type LocalBoard, type LocalMatch } from "./squads-view.ts";
 
@@ -1023,10 +1023,40 @@ const LIFTED: Record<BlockLift, string> = { impossible: "that move isn't possibl
 
 // ---------------- Parties ----------------
 
-/** A party's kind: Squads', or Boss Battle's (docs/decisions/2026-10-30-boss-party.md; /api/boss/party). */
-export type PartyKind = "squads" | "boss";
-const partyKey = (code: string, kind: PartyKind = "squads") => `brc.${kind === "boss" ? "bossparty" : "party"}.${code.toUpperCase()}`;
-const partyCurrentKey = (kind: PartyKind) => (kind === "boss" ? "brc.bossparty.current" : "brc.party.current");
+/**
+ * A 50 v 50 party's screen (or its lobby's queue) up on this device: its code, so a reload goes back to it (the fix round of #747,
+ * M2). Gone once you leave it or its match begins.
+ */
+const CROWD_SCREEN_KEY = "brc.crowdparty.screen";
+export function crowdPartyScreen(): string | null {
+  const c = stored(CROWD_SCREEN_KEY);
+  return c && /^[A-Z2-9]{5}$/.test(c) ? c : null;
+}
+export function markCrowdPartyScreen(code: string | null) {
+  if (stored(CROWD_SCREEN_KEY) !== code) store(CROWD_SCREEN_KEY, code);
+}
+/** The pass a 50 v 50 party placed you with, and its lobby: a reload into that lobby is the party's again (M2). */
+const CROWD_PASS_KEY = "brc.crowdparty.pass";
+export function crowdPassFor(lobby: string): string | null {
+  try {
+    const v = JSON.parse(stored(CROWD_PASS_KEY) ?? "null") as { lobby?: unknown; pass?: unknown } | null;
+    return v && v.lobby === lobby.toUpperCase() && typeof v.pass === "string" ? v.pass : null;
+  } catch {
+    return null;
+  }
+}
+export function rememberCrowdPass(lobby: string, pass: string) {
+  store(CROWD_PASS_KEY, JSON.stringify({ lobby: lobby.toUpperCase(), pass }));
+}
+
+/**
+ * A party's kind: Squads', Boss Battle's (docs/decisions/2026-10-30-boss-party.md; /api/boss/party) or 50 v 50's (Nov 16,
+ * docs/decisions/2026-11-16-crowd-party.md; /api/crowd/party: friends in by invite only).
+ */
+export type PartyKind = "squads" | "boss" | "crowd";
+const partyStoreName = (kind: PartyKind) => (kind === "boss" ? "bossparty" : kind === "crowd" ? "crowdparty" : "party");
+const partyKey = (code: string, kind: PartyKind = "squads") => `brc.${partyStoreName(kind)}.${code.toUpperCase()}`;
+const partyCurrentKey = (kind: PartyKind) => `brc.${partyStoreName(kind)}.current`;
 /** The party this device was last in (after a lobby, "Back to your party" reopens it). */
 export const currentParty = (kind: PartyKind = "squads") => {
   const c = stored(partyCurrentKey(kind));
@@ -1047,10 +1077,12 @@ export async function partyStatus(code: string, kind: PartyKind = "squads"): Pro
 
 /** POST /api/squads/party (or Boss Battle's): a new party's code. */
 export async function createParty(kind: PartyKind = "squads"): Promise<{ code: string } | { error: string } | { banned: true }> {
-  // (?pool=NAME: a queue of its own, a test switch.)
-  const pool = kind === "squads" ? queuePool() : null;
+  // (?pool=NAME: a queue of its own, a test switch; a 50 v 50 party's ?partyfill=SECONDS too.)
+  const pool = kind !== "boss" ? queuePool() : null;
+  const fill = kind === "crowd" ? partyFill() : null;
+  const query = new URLSearchParams([...(pool ? [["pool", pool]] : []), ...(fill ? [["fill", fill]] : [])]).toString();
   try {
-    const res = await fetch(`/api/${kind}/party${pool ? `?pool=${encodeURIComponent(pool)}` : ""}`, { method: "POST" });
+    const res = await fetch(`/api/${kind}/party${query ? `?${query}` : ""}`, { method: "POST" });
     const body = (await res.json().catch(() => ({}))) as { code?: string; message?: string; banned?: boolean };
     if (body.banned) return { banned: true };
     return body.code ? { code: body.code } : { error: body.message ?? "Couldn't make a party." };
@@ -1062,7 +1094,8 @@ export async function createParty(kind: PartyKind = "squads"): Promise<{ code: s
 /**
  * A party on this device: up to 4 friends under a code (the invite link is /squads/party/CODE). The leader queues;
  * when the party is placed, `onPlaced` gets the lobby and its pass (once per placing, even across reloads), and the
- * socket closes: everyone plays the lobby, and comes back to the party afterwards ("Back to your party").
+ * socket closes: everyone plays the lobby, and comes back to the party afterwards ("Back to your party"). A 50 v 50 party's
+ * socket stays open in its lobby's queue (the leader's Cancel brings everyone back): the app closes it as the match begins.
  */
 export class PartyClient {
   party: NetParty | null = null;
@@ -1070,6 +1103,10 @@ export class PartyClient {
   error: string | null = null;
   /** Closed: left, or the party's gone. */
   done = false;
+  /** The server's clock less this device's (ms), from the last message: a 50 v 50 party's invites lapse by the server's time. */
+  skew = 0;
+  /** A 50 v 50 party's placing handled on this page (its time). */
+  private placedAt: number | null = null;
   private ws: WebSocket | null = null;
   private retry = 0;
   private retryTimer: ReturnType<typeof setTimeout> | null = null;
@@ -1112,7 +1149,7 @@ export class PartyClient {
     ws.onopen = () => {
       opened = true;
       this.retry = 0;
-      this.send({ t: "hello", v: SQUADS_PROTOCOL, token: stored(partyKey(this.code, this.kind)) ?? undefined, name: playerName(), device: device(), ...(this.kind === "boss" ? { look: account().profile?.locker?.look ?? {} } : {}) });
+      this.send({ t: "hello", v: SQUADS_PROTOCOL, token: stored(partyKey(this.code, this.kind)) ?? undefined, name: playerName(), device: device(), ...(this.kind !== "squads" ? { look: account().profile?.locker?.look ?? {} } : {}) });
     };
     ws.onmessage = (e) => this.onMessage(JSON.parse(e.data as string) as PartyServerMessage);
     ws.onclose = () => {
@@ -1136,6 +1173,7 @@ export class PartyClient {
   }
 
   private onMessage(msg: PartyServerMessage) {
+    if (typeof msg.now === "number") this.skew = msg.now - Date.now();
     switch (msg.t) {
       case "welcome":
         this.memberId = msg.memberId;
@@ -1146,7 +1184,15 @@ export class PartyClient {
         this.party = msg.party;
         const p = msg.party.placed;
         // Placed (a lobby with seats for everyone): join it, once per placing (a reload doesn't join an old one).
-        if (msg.party.state === "placed" && p && String(p.at) !== stored(`${partyKey(this.code, this.kind)}.placed`)) {
+        if (msg.party.state === "placed" && p && this.kind === "crowd") {
+          // (A 50 v 50 party: its socket stays open. Each placing once on this page: the app joins only while that lobby still waits
+          // and this device has no seat there yet, so a reload on the way still gets in, and a member back after its match never
+          // walks in. The fix round of #747, M2.)
+          if (this.placedAt !== p.at) {
+            this.placedAt = p.at;
+            this.onPlaced(p.lobby, p.pass, 0);
+          }
+        } else if (msg.party.state === "placed" && p && String(p.at) !== stored(`${partyKey(this.code, this.kind)}.placed`)) {
           store(`${partyKey(this.code, this.kind)}.placed`, String(p.at));
           this.close();
           this.onPlaced(p.lobby, p.pass, this.me?.seat ?? 0);
@@ -1157,8 +1203,8 @@ export class PartyClient {
         if (msg.banned) showBanNotice();
         this.error = msg.message;
         if (msg.ended || msg.banned || !this.memberId) this.close();
-        // (Kicked: this device forgets the party.)
-        if (msg.ended) this.forget();
+        // (Kicked: this device forgets the party. So does one turned away from a 50 v 50 party: its next Party makes a new one.)
+        if (msg.ended || (this.kind === "crowd" && !this.memberId)) this.forget();
         break;
       case "closed":
         this.error = "That party has closed.";

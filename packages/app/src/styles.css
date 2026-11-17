@@ -5625,17 +5625,30 @@ button.history-label {
     font-size: 15px;
   }
 }
-/* The bullet clock's increment as your move begins: "+2" rises over the number, which flashes green as it goes up. */
+/* A clock's increment as your move begins (Boss Battle's 10 + 10, his bullet clock's): "+10" rises over the number, which flashes
+   green as it goes up. On the page's top layer (Eric, Nov 16: the status box clipped it; BossDock.tsx ClockPlus): fixed, its right
+   edge on the number's, just above it, over everything, taking no taps. */
 .dk-plus {
-  position: absolute;
-  right: 0;
-  bottom: calc(100% + 1px);
+  position: fixed;
+  left: var(--px, -100px);
+  top: var(--py, -100px);
+  z-index: 2147483000;
+  translate: -100% calc(-100% - 1px);
   font-size: 12px;
   font-weight: 800;
+  line-height: 1;
   color: var(--good);
+  white-space: nowrap;
+  pointer-events: none;
   animation: dk-plus 1.6s ease-out forwards;
 }
-.dk-clock:has(> .dk-plus) > .dk-time {
+/* Not over a sheet or menu that's open (a modal: the resign confirm, the Moves/Players/Chat sheet; the options menu's layer): the review
+   of #744, m4; Eric's "above everything" was about the status box clipping it. (The rotate lock is always in the page, shown only on a
+   phone held sideways.) Hidden, not removed, so its rise runs on unseen and never starts again. */
+body:has([aria-modal="true"]:not(#rotate-lock), .mm-scrim) > .dk-plus {
+  visibility: hidden;
+}
+.dk-clock.plus > .dk-time {
   animation: dk-tick 0.7s ease-out;
 }
 @keyframes dk-plus {
@@ -9634,6 +9647,16 @@ button.fd-logo {
  * under the live line, and "See your result" if you played it. Phones: the button gets its own line.
  */
 .fd-notice {
+  /* A pop-up (Eric, Nov 16: "these style pop-ups always just sit on top of everything else ... They shouldn't ever push
+     anything around"): floating over the screen, centered under the page header, so it takes no space in the flow.
+     Above the page (50), under the sheets (59 and up). On a computer it centers over the middle column. */
+  position: fixed;
+  z-index: 50;
+  top: calc(env(safe-area-inset-top) + 72px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(480px, calc(100vw - 32px));
+  box-sizing: border-box;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -9642,6 +9665,7 @@ button.fd-logo {
   border: 1px solid var(--fd-line);
   border-radius: 14px;
   padding: 6px 6px 6px 14px;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.25);
 }
 .fd-notice-flag {
   flex: none;
@@ -12767,10 +12791,14 @@ button.fd-seat {
     max-width: none;
     container: rd-page / inline-size;
   }
-  .fd-root.framed .rd-page > :is(.fd-page-head, .fd-notice, .bs-select, .rd-options, .rd-about, .fd-rest, .fd-hint, .fd-error) {
+  .fd-root.framed .rd-page > :is(.fd-page-head, .bs-select, .rd-options, .rd-about, .fd-rest, .fd-hint, .fd-error) {
     width: 100%;
     max-width: 496px;
     margin-inline: auto;
+  }
+  /* A computer's pop-up centers over the middle column (between the side menu and the rail), not the window. */
+  .fd-root.framed .fd-notice {
+    left: calc(50% + (var(--fd-menu) - var(--fd-rail)) / 2);
   }
   /* Two rows when the page's width (the column less its padding) is 660 px or more: cards of 90 px or more, the 17 tiles of
      an admin's two rows of nine and eight at 1280 px wide. Narrower keeps six a row (Nov 12). Each row of cards is one
@@ -19425,34 +19453,14 @@ button.sq-tiny {
   will-change: transform, clip-path;
 }
 /* Phase 2's boards, each in its slot of the square, as the phase change leaves them (Recluse2.tsx's FOUR: the place and size
-   inline; a computer's tags in the gap above each board, off its back rank). */
+   inline). */
 .rc-stage > .rc-played {
   inset: auto;
 }
-/* Each board's squares placed in its slot so the gaps match (Eric, Nov 14): the squares are a whole multiple of 8 device pixels,
-   a hair smaller than the slot (the rest, d). Centered on a phone (d/2); a computer's 2x2 moves its left and top boards 2d/3 in
-   and its right and bottom ones d/3, so the gap between them and to the square's edges is the same. The whole wrap moves: its
-   overlays with it. */
+/* Each board's squares centered in its slot (Eric, Nov 14): the squares are a whole multiple of 8 device pixels, a hair smaller
+   than the slot. The whole wrap moves: its overlays with it. */
 .rc-stage > .rc-played > .board-wrap {
-  --rc-ox: 1.5;
-  --rc-oy: 1.5;
-  translate: calc((100% - var(--board-size)) * var(--rc-ox) / 3) calc((100% - var(--board-size)) * var(--rc-oy) / 3);
-}
-.rc-desk .rc-played.rc-q0 > .board-wrap,
-.rc-desk .rc-played.rc-q2 > .board-wrap {
-  --rc-ox: 2;
-}
-.rc-desk .rc-played.rc-q1 > .board-wrap,
-.rc-desk .rc-played.rc-q3 > .board-wrap {
-  --rc-ox: 1;
-}
-.rc-desk .rc-played.rc-q0 > .board-wrap,
-.rc-desk .rc-played.rc-q1 > .board-wrap {
-  --rc-oy: 2;
-}
-.rc-desk .rc-played.rc-q2 > .board-wrap,
-.rc-desk .rc-played.rc-q3 > .board-wrap {
-  --rc-oy: 1;
+  translate: calc((100% - var(--board-size)) / 2) calc((100% - var(--board-size)) / 2);
 }
 /* The crack lines: Sawyer's board-saw gap down the middle, and the same turned across. */
 .rc-crack {
@@ -19578,20 +19586,13 @@ button.sq-tiny {
 .rc-tag.low .rc-tag-clock {
   color: #ff7a7a;
 }
-/* A computer's four boards: the tag in the gap above each (FOUR in Recluse2.tsx), at its left, off its back rank; its
-   text in the board's own width (cqw), so it fits the row at any size. The slow-move note likewise, at its right. */
+/* The big board's tag (the name of a board you watch) in the gap above it, at its left, off its back rank; its text in the board's
+   own width (cqw), so it fits at any size. */
 .rc-played .rc-tag {
   top: auto;
   bottom: calc(100% + 1px);
   left: 0;
   font-size: min(12px, 5.9cqw);
-  line-height: 1.3;
-}
-.rc-played .rc-slow-note {
-  top: auto;
-  bottom: calc(100% + 1px);
-  right: calc(100% - var(--board-size, 100%));
-  font-size: min(11px, 5.4cqw);
   line-height: 1.3;
 }
 /* A phone's small boards: the name and clock just above each, off its pieces (Eric, Oct 15), in the room over the row; the name cut
@@ -19615,6 +19616,12 @@ button.sq-tiny {
 }
 .rc-mini .rc-tag-clock {
   flex: none;
+}
+/* (A computer's small boards are bigger than a phone's: their tags a little bigger too, in the tag row's height, 3.5% of the
+   square: about a tenth of the board's own width.) */
+.rc-desk .rc-mini .rc-tag {
+  font-size: min(13px, 10.5cqw);
+  line-height: 1.3;
 }
 /* A decided board: its result across its middle. */
 .rc-result {
@@ -19641,7 +19648,7 @@ button.sq-tiny {
 .rc-result.lost {
   color: #ff8a8a;
 }
-/* A phone: the other three boards small in a row above yours, inside the square (FOUR); tap one to watch it big. */
+/* The other three boards small in a row above yours, inside the square (FOUR); tap one to watch it big. */
 /* Each board keeps its own layers (pieces, tags, results) to itself, so nothing on it shows through his words: his
    bubble sits over every board, whatever their own stacking (Eric, Oct 14: a long line was cut off by the boards). */
 .rc-mini,
@@ -19663,102 +19670,151 @@ button.sq-tiny {
     animation: none;
   }
 }
-/* His ultimate, on a phone's small boards too: "5 s!" across each as the banner shows over yours (the seconds from the
-   setting: --rc-ult-note, set by the screen). */
-.rc-ult .rc-mini::after {
-  content: var(--rc-ult-note, "5 s!");
+/* Each board's hearts (Eric, Nov 16; RecluseHearts.tsx): a column at its right, each heart one of its squares tall (a small board's at
+   its own size), in the gutter beside it, never over it. Classic pixel hearts; a cut one leaves its empty slot, so the column keeps
+   its size. */
+.rc-hearts {
+  --rc-heart: calc(var(--board-size, 100%) / max(8, var(--rc-hearts, 8)));
   position: absolute;
-  inset: 0;
-  z-index: 10;
-  display: grid;
-  place-items: center;
-  border-radius: 2px;
-  background: rgba(59, 7, 100, 0.55);
-  color: #fee2e2;
-  font: italic 900 22px/1 "Arial Black", "Helvetica Neue", Impact, system-ui, sans-serif;
-  text-shadow: 2px 2px 0 #1a0a00;
-  pointer-events: none;
-}
-/* The team's slow moves beside your board (SlowMarks; on a phone, the big board): ten slots, a red pixel X each, the rest
-   dim. A column by the board's right edge, in the gutter beside it (never over it), as Jefferson's candle shots stand.
-   They flash at every slow move. */
-.rc-slow {
-  position: absolute;
+  top: 0;
+  left: calc(var(--board-size, 100%) + max(2px, var(--board-size, 100%) * 0.012));
   z-index: 9;
   display: flex;
-  align-items: center;
-  gap: 2px;
-  pointer-events: none;
-}
-.rc-slow svg {
-  display: block;
-  image-rendering: pixelated;
-}
-.rc-slow-cell {
-  fill: rgba(16, 12, 22, 0.8);
-}
-.rc-slow-empty {
-  fill: rgba(255, 255, 255, 0.22);
-}
-.rc-slow-x {
-  fill: #ff4646;
-}
-.rc-slow-label {
-  font-size: 8px;
-  font-weight: 800;
-  line-height: 1;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--muted);
-}
-.rc-slow.col {
-  left: calc(var(--board-size, 100%) + 4px);
-  top: calc(var(--board-size, 100%) / 2);
-  translate: 0 -50%;
   flex-direction: column;
-}
-.rc-slow.col svg {
-  width: min(12px, calc(var(--board-size, 100%) * 0.055));
-}
-.rc-slow.col .rc-slow-label {
-  writing-mode: vertical-rl;
-  rotate: 180deg;
-}
-.rc-slow.flash svg {
-  animation: rc-slow-flash 600ms ease-out 3;
-}
-.rc-slow.flash .rc-slow-label {
-  color: #e11d48;
-}
-/* The board the last slow move was on: a small red note over its top-right corner, for a moment. */
-.rc-slow-note {
-  position: absolute;
-  top: 3px;
-  right: calc(100% - var(--board-size, 100%) + 3px);
-  z-index: 9;
-  padding: 1px 6px;
-  border-radius: 4px;
-  background: rgba(127, 29, 29, 0.9);
-  color: #fff;
-  font-size: 11px;
-  font-weight: 800;
-  line-height: 1.4;
-  white-space: nowrap;
+  width: var(--rc-heart);
+  height: calc(var(--rc-heart) * var(--rc-hearts, 8));
   pointer-events: none;
 }
-.rc-mini .rc-slow-note {
-  top: 1px;
-  right: 1px;
-  padding: 0 3px;
-  font-size: 9px;
+.rc-heart {
+  position: relative;
+  flex: 1 1 0;
+  min-height: 0;
 }
-@keyframes rc-slow-flash {
+.rc-heart svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.rc-h-o {
+  fill: #2b0710;
+}
+.rc-h-r {
+  fill: #ec2b45;
+}
+.rc-h-d {
+  fill: #a5122a;
+}
+.rc-h-h {
+  fill: #ffd6dc;
+}
+.rc-h-rim {
+  fill: rgba(255, 205, 214, 0.38);
+}
+.rc-h-hole {
+  fill: rgba(255, 255, 255, 0.06);
+}
+:root[data-theme="light"] .rc-h-rim {
+  fill: rgba(43, 7, 16, 0.42);
+}
+:root[data-theme="light"] .rc-h-hole {
+  fill: rgba(43, 7, 16, 0.08);
+}
+/* A heart being cut, over its (now empty) slot: its two halves along the line from its top-right corner, his blade's glint drawn
+   back past that corner, then the stroke across; placed each frame from the time since the cut (slashLook). No flash. */
+.rc-hcut {
+  position: absolute;
+  inset: 0;
+}
+.rc-hhalf {
+  position: absolute;
+  inset: 0;
+}
+.rc-hhalf.a {
+  clip-path: polygon(0 0, 100% 0, 0 100%);
+}
+.rc-hhalf.b {
+  clip-path: polygon(100% 0, 100% 100%, 0 100%);
+}
+/* His blade drawn back: a short bright sliver along the cut's line, outlined so it shows on the light page too. */
+.rc-hglint {
+  position: absolute;
+  width: 72%;
+  height: max(2px, 11%);
+  translate: -50% -50%;
+  rotate: -45deg;
+  border-radius: 1px;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.2), #fff 45%, #fff);
+  box-shadow:
+    0 0 0 1px rgba(30, 24, 48, 0.6),
+    0 0 3px rgba(190, 236, 255, 0.9);
+}
+.rc-hblade {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 150%;
+  height: max(2px, 9%);
+  translate: -50% -50%;
+  rotate: -45deg;
+}
+.rc-hblade > i {
+  display: block;
+  height: 100%;
+  border-radius: 1px;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0), #fff 35%, #fff);
+  box-shadow:
+    0 0 0 1px rgba(30, 24, 48, 0.5),
+    0 0 2px rgba(190, 236, 255, 0.9);
+  transform-origin: 100% 50%;
+}
+@media (prefers-reduced-motion: reduce) {
+  .rc-hhalf {
+    translate: none !important;
+    rotate: none !important;
+  }
+  .rc-hglint,
+  .rc-hblade {
+    display: none;
+  }
+}
+/* A board lost to its last heart (Eric, Nov 16: "wasted" style): it fades to grey, slowly, and a clean word comes in over it, "TOO
+   SLOW". CSS animations the compositor runs (a filter changed from script each frame repainted the board: 42% of a slowed phone's
+   frames dropped); their delay, from the end of the last heart's cut, is the cell's (--rc-grey-d: Recluse2.tsx's Cell), so a cell drawn
+   anew carries on where it was. */
+.rc-wasted > .board-wrap > .board {
+  will-change: filter;
+  animation: rc-grey var(--rc-grey-ms, 2600ms) ease-in-out var(--rc-grey-d, 0ms) both;
+}
+@keyframes rc-grey {
   from {
-    filter: drop-shadow(0 0 3px #ff4646);
+    filter: grayscale(0) brightness(1);
   }
   to {
-    filter: none;
+    filter: grayscale(1) brightness(0.7);
   }
+}
+.rc-wasted .rc-wasted-word {
+  animation: rc-wasted-word 600ms ease-out calc(var(--rc-grey-d, 0ms) + 0.35 * var(--rc-grey-ms, 2600ms)) both;
+}
+@keyframes rc-wasted-word {
+  from {
+    opacity: 0;
+  }
+}
+.rc-wasted-word {
+  position: absolute;
+  top: calc(var(--board-size, 100%) / 2);
+  left: calc(var(--board-size, 100%) / 2);
+  z-index: 10;
+  translate: -50% -50%;
+  color: #fff;
+  font: 900 min(30px, calc(var(--board-size, 100%) * 0.12)) / 1 system-ui, -apple-system, "Segoe UI", sans-serif;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+  text-shadow:
+    0 1px 0 rgba(0, 0, 0, 0.55),
+    0 0 6px rgba(0, 0, 0, 0.6);
+  pointer-events: none;
 }
 .rc-mini.you {
   border-color: #ffd451;
@@ -19860,33 +19916,53 @@ button.sq-tiny {
   min-height: 52px;
   padding: 4px 6px 4px 12px;
 }
-/* A new invite, at the top of a front-door page (never over a match). */
+/*
+ * A new invite (Eric, Nov 16): a small box at the top right of a front-door page (never over a match), "<Name> invited you" with
+ * Accept and Decline. Fixed, on top of everything: it pushes nothing (docs/rules/eric.md, pop-up notices).
+ */
 .fr-toast {
   position: fixed;
   z-index: 65;
   top: calc(env(safe-area-inset-top) + 10px);
-  left: 50%;
-  transform: translateX(-50%);
-  width: min(440px, calc(100% - 24px));
+  right: calc(env(safe-area-inset-right) + 12px);
+  width: min(300px, calc(100% - 24px));
   display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: 10px;
-  padding: 8px 8px 8px 14px;
+  padding: 12px;
   border-radius: 16px;
   background: var(--fd-panel-2);
   color: var(--fd-text);
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
   border: 1px solid var(--fd-line);
 }
+@media (max-width: 1023px) {
+  /* (A phone: under the top bar, as the page's other notices (.fd-notice), so its buttons stay in reach. The fix round of #747.) */
+  .fr-toast {
+    top: calc(env(safe-area-inset-top) + 72px);
+  }
+}
 .fr-toast-text {
-  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
   min-width: 0;
   font-size: 14px;
   line-height: 1.3;
 }
-.fr-toast-x {
-  flex: none;
-  background: var(--fd-panel);
+.fr-toast-text strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.fr-toast-text span {
+  color: var(--fd-muted);
+  font-size: 13px;
+}
+.fr-toast-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
 }
 .fr-invite-friends {
   width: 100%;
@@ -26911,4 +26987,627 @@ body.cs-on .mm-scrim {
     max-width: 320px;
     font-size: 12px;
   }
+}
+
+/* ---- Chandy (art, Nov 16; docs/decisions/2026-11-16-chandy-art.md; his rules job places these): his upgrade window
+   (components/ChandyUpgrade.tsx: the God King's command-window look, front and center over the board, 2 s) and Dodge
+   (components/ChandyDodge.tsx: laid over the board's box, in eighths of --board-size). */
+/* Chandy's row under his rage meter (components/Chandy.tsx, ChandyBar): his rifle's five pips and his move meter, the rage meter's width
+   on a phone, greyed until his first upgrade (nothing hidden, nothing shifts). */
+.ch-bar {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  width: 44px;
+  height: 6px;
+}
+.ch-bar.ch-off {
+  opacity: 0.4;
+}
+.ch-pips {
+  display: flex;
+  gap: 1px;
+  flex: none;
+}
+.ch-pips > i {
+  display: block;
+  width: 3px;
+  height: 6px;
+  border-radius: 1px;
+  background: rgba(0, 0, 0, 0.45);
+  box-shadow: inset 0 0 0 1px rgba(88, 230, 255, 0.45);
+}
+.ch-pips > i.on {
+  background: #58e6ff;
+}
+.ch-meter {
+  position: relative;
+  flex: 1;
+  height: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 3px;
+  box-sizing: border-box;
+  background: rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+}
+.ch-meter > i {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: linear-gradient(90deg, #129cc3, #58e6ff);
+  transition: width 600ms ease-out;
+}
+@media (min-width: 900px) and (min-height: 600px) {
+  .boss-bar .ch-bar {
+    width: 88px;
+    height: 10px;
+    gap: 4px;
+  }
+  .boss-bar .ch-pips > i {
+    width: 6px;
+    height: 10px;
+  }
+  .boss-bar .ch-meter {
+    height: 10px;
+  }
+}
+.ch-upgrade {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 30;
+  translate: -50% -50%;
+  width: min(92%, 352px);
+  box-sizing: border-box;
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  padding: 10px 8px 12px;
+  font-family: "Press Start 2P", ui-monospace, monospace;
+  color: #fff;
+  background: linear-gradient(180deg, #2a3cbd 0%, #13207a 55%, #0a1150 100%);
+  border: 3px solid #f4f4f4;
+  border-radius: 6px;
+  box-shadow: 0 0 0 2px #0b0b1a, 4px 6px 0 rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+  animation: ch-up-life 2000ms linear both;
+  animation-delay: var(--ch-ago, 0ms);
+}
+@keyframes ch-up-life {
+  0% { opacity: 0; transform: scaleY(0.35); }
+  4% { opacity: 1; transform: scaleY(0.7); }
+  6%, 92% { opacity: 1; transform: none; }
+  96% { opacity: 1; transform: scaleY(0.7); }
+  100% { opacity: 0; transform: scaleY(0.35); }
+}
+.ch-up-title {
+  font-size: 16px;
+  letter-spacing: 2px;
+  color: #f2c14e;
+  text-shadow: 2px 2px 0 #0b0b1a;
+  animation: ch-up-title 2000ms steps(1, end) both;
+  animation-delay: var(--ch-ago, 0ms);
+}
+@keyframes ch-up-title {
+  0% { visibility: hidden; }
+  26% { visibility: visible; color: #fff; }
+  40%, 100% { visibility: visible; color: #f2c14e; }
+}
+.ch-up-art {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 132 / 34;
+}
+.ch-up-art canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+}
+.ch-up-part {
+  animation: ch-up-slide 2000ms linear both;
+  animation-delay: var(--ch-ago, 0ms);
+}
+@keyframes ch-up-slide {
+  0%, 10% { opacity: 0; transform: translateY(-70%); }
+  12% { opacity: 1; transform: translateY(-70%); }
+  24% { opacity: 1; transform: none; filter: none; }
+  26% { filter: brightness(3); }
+  34%, 100% { opacity: 1; transform: none; filter: none; }
+}
+.ch-up-flash {
+  position: absolute;
+  inset: -10% 25%;
+  border-radius: 50%;
+  background: radial-gradient(#e4ffff, rgba(88, 230, 255, 0.5) 45%, transparent 70%);
+  opacity: 0;
+  animation: ch-up-flash 2000ms linear both;
+  animation-delay: var(--ch-ago, 0ms);
+}
+@keyframes ch-up-flash {
+  0%, 24% { opacity: 0; }
+  27% { opacity: 1; }
+  36%, 100% { opacity: 0; }
+}
+.ch-up-label {
+  font-size: 10px;
+  text-shadow: 2px 2px 0 #0b0b1a;
+}
+.ch-up-note {
+  font-size: 7px;
+  line-height: 1.6;
+  color: #c9d1ff;
+  text-align: center;
+}
+.ch-up-label,
+.ch-up-note {
+  animation: ch-up-title 2000ms steps(1, end) both;
+  animation-delay: var(--ch-ago, 0ms);
+}
+
+.cd-root {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: var(--board-size);
+  height: var(--board-size);
+  z-index: 25;
+  pointer-events: none;
+}
+.cd-blank {
+  position: absolute;
+  inset: 0;
+  background: repeating-conic-gradient(var(--sq-dark) 0 25%, var(--sq-light) 0 50%) 0 0 / calc(var(--board-size) / 4) calc(var(--board-size) / 4);
+}
+.cd-p-open .cd-blank {
+  animation: cd-fade 300ms both;
+  animation-delay: var(--cd-ago, 0ms);
+}
+@keyframes cd-fade {
+  from { opacity: 0; }
+}
+.cd-arena {
+  position: absolute;
+  width: calc(var(--board-size) * 3 / 8);
+  height: calc(var(--board-size) * 3 / 8);
+  box-sizing: border-box;
+  border: 3px solid #ff3f5e;
+  border-radius: 4px;
+  box-shadow: 0 0 12px rgba(255, 63, 94, 0.5);
+}
+/* The scope: the board's box, all but a circle round your king greyed, blurred and darkened; the circle's middle (--cd-mx, --cd-my,
+   registered so they animate) slides with him to the center. */
+@property --cd-hole {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 0px;
+}
+@property --cd-mx {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 0px;
+}
+@property --cd-my {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 0px;
+}
+.cd-aim {
+  --cd-hole: calc(var(--board-size) * 0.09);
+  --cd-mx: calc(var(--board-size) * (var(--cd-kx) + 0.5) / 8);
+  --cd-my: calc(var(--board-size) * (var(--cd-ky) + 0.5) / 8);
+  position: absolute;
+  inset: 0;
+}
+.cd-scope {
+  position: absolute;
+  inset: 0;
+  backdrop-filter: grayscale(1) blur(2.5px) brightness(0.35);
+  -webkit-backdrop-filter: grayscale(1) blur(2.5px) brightness(0.35);
+  -webkit-mask: radial-gradient(circle at var(--cd-mx) var(--cd-my), transparent var(--cd-hole), #000 calc(var(--cd-hole) + 2px));
+  mask: radial-gradient(circle at var(--cd-mx) var(--cd-my), transparent var(--cd-hole), #000 calc(var(--cd-hole) + 2px));
+}
+/* (The hole closes in on him: never an opacity on the scope's parent, which would cut its backdrop filter off from the board.) */
+.cd-p-scope .cd-aim {
+  animation: cd-scope-in 400ms both;
+  animation-delay: var(--cd-ago, 0ms);
+}
+@keyframes cd-scope-in {
+  from {
+    --cd-hole: calc(var(--board-size) * 1.2);
+  }
+}
+.cd-p-slide .cd-aim {
+  animation: cd-scope-slide 480ms both;
+  animation-delay: var(--cd-ago, 0ms);
+}
+@keyframes cd-scope-slide {
+  to {
+    --cd-mx: calc(var(--board-size) * (var(--cd-cx) + 0.5) / 8);
+    --cd-my: calc(var(--board-size) * (var(--cd-cy) + 0.5) / 8);
+  }
+}
+.cd-ring {
+  position: absolute;
+  left: var(--cd-mx);
+  top: var(--cd-my);
+  width: calc(var(--cd-hole) * 2);
+  height: calc(var(--cd-hole) * 2);
+  translate: -50% -50%;
+  border: 3px solid #58e6ff;
+  border-radius: 50%;
+  box-shadow: 0 0 10px #58e6ff;
+}
+.cd-ring::before,
+.cd-ring::after {
+  content: "";
+  position: absolute;
+  background: #58e6ff;
+}
+.cd-ring::before {
+  left: 50%;
+  top: -10px;
+  bottom: -10px;
+  width: 3px;
+  margin-left: -1.5px;
+  -webkit-mask: linear-gradient(#000 0 10px, transparent 10px calc(100% - 10px), #000 calc(100% - 10px));
+  mask: linear-gradient(#000 0 10px, transparent 10px calc(100% - 10px), #000 calc(100% - 10px));
+}
+.cd-ring::after {
+  top: 50%;
+  left: -10px;
+  right: -10px;
+  height: 3px;
+  margin-top: -1.5px;
+  -webkit-mask: linear-gradient(90deg, #000 0 10px, transparent 10px calc(100% - 10px), #000 calc(100% - 10px));
+  mask: linear-gradient(90deg, #000 0 10px, transparent 10px calc(100% - 10px), #000 calc(100% - 10px));
+}
+.cd-p-scope .cd-aim .cd-ring {
+  animation: cd-ring-in 400ms both;
+  animation-delay: var(--cd-ago, 0ms);
+}
+@keyframes cd-ring-in {
+  from { transform: scale(3); opacity: 0; }
+}
+.cd-lines {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+  z-index: 3;
+}
+.cd-clones {
+  position: absolute;
+  left: calc(var(--board-size) / -8);
+  top: calc(var(--board-size) / -8);
+  width: calc(var(--board-size) * 10 / 8);
+  height: calc(var(--board-size) * 10 / 8);
+  image-rendering: pixelated;
+  z-index: 5;
+}
+.hb-pieces.cd-king {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: var(--board-size);
+  height: var(--board-size);
+  z-index: 6;
+}
+.cd-king piece {
+  transform: translate(calc(100% * var(--cd-x)), calc(100% * var(--cd-y)));
+}
+.cd-p-slide .cd-king piece {
+  animation: cd-king-slide 480ms both;
+  animation-delay: var(--cd-ago, 0ms);
+}
+@keyframes cd-king-slide {
+  from { transform: translate(calc(100% * var(--cd-kx)), calc(100% * var(--cd-ky))); }
+}
+.cd-hit piece {
+  filter: drop-shadow(0 0 4px #fff) drop-shadow(0 0 10px #ff3f5e);
+}
+.cd-pick {
+  position: absolute;
+  width: calc(var(--board-size) / 8);
+  height: calc(var(--board-size) / 8);
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: none;
+  pointer-events: auto;
+  z-index: 7;
+  cursor: pointer;
+}
+.cd-pick.cd-mine {
+  box-shadow: inset 0 0 0 3px #f2c14e;
+}
+.cd-count {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  min-width: 18px;
+  padding: 1px 3px;
+  border: 1px solid #f2c14e;
+  border-radius: 8px;
+  background: #0b0b1a;
+  color: #fff;
+  font: 700 10px/1.2 system-ui, sans-serif;
+  text-align: center;
+}
+.cd-hud {
+  position: absolute;
+  left: calc(var(--board-size) * (var(--cd-cx) + 0.5) / 8);
+  translate: -50% 0;
+  width: min(300px, 82%);
+  margin-top: 8px;
+  box-sizing: border-box;
+  padding: 6px 0 7px;
+  display: grid;
+  gap: 5px;
+  justify-items: center;
+  border-radius: 8px;
+  background: rgba(11, 11, 26, 0.88);
+  font-family: "Press Start 2P", ui-monospace, monospace;
+  color: #fff;
+  text-shadow: 2px 2px 0 #0b0b1a;
+  z-index: 8;
+}
+.cd-round {
+  font-size: 11px;
+}
+.cd-round span {
+  color: #ff8fa3;
+}
+.cd-round .cd-tele {
+  color: #f2c14e;
+}
+.cd-bar {
+  width: min(220px, 88%);
+  height: 10px;
+  box-sizing: border-box;
+  border: 2px solid #fff;
+  border-radius: 3px;
+  background: #0b0b1a;
+  overflow: hidden;
+}
+.cd-bar i {
+  display: block;
+  height: 100%;
+  background: #ff3f5e;
+}
+.cd-say {
+  font-size: 9px;
+  color: #ffe0e6;
+}
+.cd-result {
+  padding: 2px 8px;
+  font-size: 13px;
+  color: #f2c14e;
+}
+.cd-result.cd-lost {
+  color: #ff3f5e;
+}
+
+/* -- A 50 v 50 party (Nov 16, docs/decisions/2026-11-16-crowd-party.md): the queue screen, idle, with seats to invite friends into -- */
+.fd-seat.party-open,
+.fd-seat.party-invited {
+  color: var(--fd-gold-text);
+}
+.fd-seat.party-open::before,
+.fd-seat.party-invited::before {
+  content: "";
+  position: absolute;
+  inset: 10%;
+  border-radius: 50%;
+  border: 2px dashed currentColor;
+}
+.fd-seat.party-invited {
+  color: var(--fd-sub);
+}
+.fd-seat.party-open:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+.fd-seat-mark {
+  width: 56%;
+  height: 56%;
+  stroke: currentColor;
+  stroke-width: 3;
+  stroke-linecap: round;
+  fill: currentColor;
+}
+.fd-seat-mark circle {
+  stroke: none;
+}
+.fd-seat.party-open:active:not(:disabled) {
+  transform: scale(0.92);
+}
+/* (Rings inside their seat: side by side, a party's rings would meet across the 3 px gap.) */
+.fd-seats.party .fd-seat.you,
+.fd-seats.party .fd-seat.friend {
+  outline-offset: -1px;
+}
+/* A friend not connected: their pawn faded (they're not queued). */
+.fd-seat.away .fd-pawn {
+  opacity: 0.4;
+}
+/* Leave and Find match in Cancel's place and height (so a phone's chat under it doesn't move). */
+.fd-party-row {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+  min-height: 56px;
+}
+.fd-party-row .fd-btn {
+  min-height: 56px;
+  border-radius: 16px;
+  font-size: 17px;
+  font-weight: 800;
+}
+.fd-party-leave {
+  flex: none;
+  min-width: 110px;
+}
+.fd-party-go {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+@media (max-width: 359px) {
+  .fd-party-row .fd-btn {
+    font-size: 15px;
+  }
+  .fd-party-leave {
+    min-width: 84px;
+  }
+}
+.fd-party-note {
+  margin-top: 6px;
+  font-size: 13px;
+  line-height: 16px;
+  font-weight: 600;
+  color: var(--fd-sub);
+  text-align: center;
+}
+.fd-you-line {
+  display: none;
+}
+@media (max-width: 1023px) {
+  .fd-queue-you.party .fd-you-title {
+    display: none;
+  }
+  .fd-queue-you.party > div {
+    min-width: 0;
+  }
+  .fd-queue-you.party .fd-you-line {
+    display: block;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--fd-sub);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+@media (min-width: 1024px) {
+  /*
+   * (A computer's party: the queue column is about 420 px at 1280, too narrow for your card beside two buttons, so the card spans
+   * the column and Leave and Find match sit side by side under it, the grid giving up their row's height.)
+   */
+  .fd-root.framed .fd-home .fd-queue.party {
+    --q-grid: min(100%, calc(var(--app-h) - 392px));
+    grid-template-areas:
+      "head head"
+      "info info"
+      "bar bar"
+      "seats seats"
+      "you you"
+      "cancel cancel";
+  }
+  .fd-root.framed .fd-home .fd-queue .fd-party-actions {
+    grid-area: cancel;
+  }
+  .fd-root.framed .fd-home .fd-queue .fd-party-row {
+    min-height: 52px;
+  }
+  .fd-root.framed .fd-home .fd-queue .fd-party-row .fd-btn {
+    min-height: 52px;
+  }
+  .fd-root.framed .fd-home .fd-queue .fd-queue-you.party > div {
+    min-width: 0;
+  }
+  .fd-root.framed .fd-home .fd-queue .fd-queue-you.party .fd-you-title,
+  .fd-root.framed .fd-home .fd-queue .fd-queue-you.party .fd-you-sub {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+/* Dodge's hits on your king (Eric, Nov 16): the first leaves a crack through him for the rest of Dodge (c1) after a short flicker; the
+   second is the kill: the beams keep hitting him (the board canvas's sparks and particles under him), his cracks spread (c2, c3), he
+   flickers and fades away, gone as he shatters (BOSS_POWERS.chandy.dodgeKillMs: 5 s). */
+.cd-crack {
+  position: absolute;
+  inset: 0;
+  background: no-repeat center / 100% 100%;
+  opacity: 0;
+  pointer-events: none;
+}
+.cd-crack.c1 {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpolyline points='16,5 14,10 17,14 13,19 15,24 13,28' fill='none' stroke='%231a0008' stroke-width='1.7' stroke-linejoin='miter' shape-rendering='crispEdges'/%3E%3Cpolyline points='16,5 14,10 17,14 13,19 15,24 13,28' fill='none' stroke='%23ffe1dc' stroke-width='0.7' transform='translate(0.9 0)' shape-rendering='crispEdges'/%3E%3C/svg%3E");
+}
+.cd-crack.c2 {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpolyline points='17,14 21,16 24,15' fill='none' stroke='%231a0008' stroke-width='1.7' stroke-linejoin='miter' shape-rendering='crispEdges'/%3E%3Cpolyline points='17,14 21,16 24,15' fill='none' stroke='%23ffe1dc' stroke-width='0.7' transform='translate(0.9 0)' shape-rendering='crispEdges'/%3E%3Cpolyline points='13,19 9,21 7,24' fill='none' stroke='%231a0008' stroke-width='1.7' stroke-linejoin='miter' shape-rendering='crispEdges'/%3E%3Cpolyline points='13,19 9,21 7,24' fill='none' stroke='%23ffe1dc' stroke-width='0.7' transform='translate(0.9 0)' shape-rendering='crispEdges'/%3E%3Cpolyline points='14,10 10,9' fill='none' stroke='%231a0008' stroke-width='1.7' stroke-linejoin='miter' shape-rendering='crispEdges'/%3E%3Cpolyline points='14,10 10,9' fill='none' stroke='%23ffe1dc' stroke-width='0.7' transform='translate(0.9 0)' shape-rendering='crispEdges'/%3E%3C/svg%3E");
+}
+.cd-crack.c3 {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpolyline points='15,24 19,26 22,29' fill='none' stroke='%231a0008' stroke-width='1.7' stroke-linejoin='miter' shape-rendering='crispEdges'/%3E%3Cpolyline points='15,24 19,26 22,29' fill='none' stroke='%23ffe1dc' stroke-width='0.7' transform='translate(0.9 0)' shape-rendering='crispEdges'/%3E%3Cpolyline points='21,16 22,21 25,23' fill='none' stroke='%231a0008' stroke-width='1.7' stroke-linejoin='miter' shape-rendering='crispEdges'/%3E%3Cpolyline points='21,16 22,21 25,23' fill='none' stroke='%23ffe1dc' stroke-width='0.7' transform='translate(0.9 0)' shape-rendering='crispEdges'/%3E%3Cpolyline points='16,5 19,8 22,7' fill='none' stroke='%231a0008' stroke-width='1.7' stroke-linejoin='miter' shape-rendering='crispEdges'/%3E%3Cpolyline points='16,5 19,8 22,7' fill='none' stroke='%23ffe1dc' stroke-width='0.7' transform='translate(0.9 0)' shape-rendering='crispEdges'/%3E%3Cpolyline points='9,21 10,26' fill='none' stroke='%231a0008' stroke-width='1.7' stroke-linejoin='miter' shape-rendering='crispEdges'/%3E%3Cpolyline points='9,21 10,26' fill='none' stroke='%23ffe1dc' stroke-width='0.7' transform='translate(0.9 0)' shape-rendering='crispEdges'/%3E%3Cpolyline points='10,9 8,13' fill='none' stroke='%231a0008' stroke-width='1.7' stroke-linejoin='miter' shape-rendering='crispEdges'/%3E%3Cpolyline points='10,9 8,13' fill='none' stroke='%23ffe1dc' stroke-width='0.7' transform='translate(0.9 0)' shape-rendering='crispEdges'/%3E%3C/svg%3E");
+}
+.cd-cracked .cd-crack.c1 {
+  opacity: 1;
+}
+.cd-p-result.cd-root .cd-cracked piece {
+  animation: cd-flicker 700ms steps(1) both;
+  animation-delay: var(--cd-ago, 0ms);
+}
+@keyframes cd-flicker {
+  0%, 20%, 40%, 60% { opacity: 0.35; }
+  10%, 30%, 50%, 100% { opacity: 1; }
+}
+.cd-dying .cd-crack.c1 {
+  opacity: 1;
+}
+.cd-dying .cd-crack.c2 {
+  animation: cd-crack-in 5000ms steps(1) both;
+  animation-delay: var(--cd-ago, 0ms);
+}
+.cd-dying .cd-crack.c3 {
+  animation: cd-crack-in2 5000ms steps(1) both;
+  animation-delay: var(--cd-ago, 0ms);
+}
+@keyframes cd-crack-in {
+  0%, 24% { opacity: 0; }
+  25%, 100% { opacity: 1; }
+}
+@keyframes cd-crack-in2 {
+  0%, 54% { opacity: 0; }
+  55%, 100% { opacity: 1; }
+}
+.cd-dying piece {
+  animation: cd-dissolve 5000ms linear both;
+  animation-delay: var(--cd-ago, 0ms);
+}
+@keyframes cd-dissolve {
+  0% { opacity: 1; }
+  30% { opacity: 0.9; }
+  32% { opacity: 0.4; }
+  34% { opacity: 0.9; }
+  58% { opacity: 0.7; }
+  60% { opacity: 0.25; }
+  63% { opacity: 0.7; }
+  80% { opacity: 0.45; }
+  82% { opacity: 0.1; }
+  85% { opacity: 0.4; }
+  99.9% { opacity: 0.25; }
+  100% { opacity: 0; }
+}
+.cd-result.cd-warned {
+  color: #ff8fa3;
+  font-size: 11px;
+}
+.cd-hits {
+  display: flex;
+  gap: 5px;
+}
+.cd-hits i {
+  width: 10px;
+  height: 10px;
+  box-sizing: border-box;
+  border: 2px solid #ff3f5e;
+  border-radius: 2px;
+}
+.cd-hits i.on {
+  background: #ff3f5e;
 }

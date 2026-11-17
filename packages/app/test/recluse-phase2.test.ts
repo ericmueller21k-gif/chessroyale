@@ -1,16 +1,18 @@
 import { beforeAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
-import { DEFAULT_SETTINGS, RAID_SETTINGS, RECLUSE_PHASE2, bossBannerMs, finishBoss } from "@chessroyale/core";
-import { PHASE2_WIN_FEN, applyMove, chess960Fen, fenAtPly, legalMoves, phase2Numbers, type MoveScore } from "@chessroyale/chess";
-import { ARC_LIFE, ARC_STRIKES, PHASE_CHANGE, Phase2Game, arcPoints, boardSteps, phase2Follows, phase2Headline, phase2Mates, phaseChangeRun, smoothPath } from "../src/recluse-phase2.ts";
-import { RECLUSE, RECLUSE_BUST, suited } from "../src/characters/recluse.ts";
+import { DEFAULT_SETTINGS, RAID_SETTINGS, RECLUSE_PHASE2, finishBoss } from "@chessroyale/core";
+import { PHASE2_WIN_FEN, applyMove, chess960Fen, fenAtPly, legalMoves, phase2Numbers, slowJudgeMs, type MoveScore } from "@chessroyale/chess";
+import { ARC_LIFE, ARC_STRIKES, PHASE_CHANGE, Phase2Game, arcPoints, boardSteps, phase2Follows, phase2Headline, phase2Mates, phaseChangeRun, slashLine, slashLook, smoothPath } from "../src/recluse-phase2.ts";
+import { SLASH_CUT_S } from "../src/characters/recluse-sounds.ts";
+import { RECLUSE, RECLUSE_BUST, coated } from "../src/characters/recluse.ts";
 import { CHANGE_HANDS, RECLUSE_CHANGE, RECLUSE_CHANGE_BOOK } from "../src/characters/recluse-transform.ts";
-import { CRITICAL, NORMAL, Voice, bossVoice } from "../src/speech.tsx";
+import { CHATTER, CRITICAL, INTERRUPT, NORMAL, Voice, bossVoice } from "../src/speech.tsx";
 import { pacedLine, pacedPage, pacedTyped } from "../src/paced-line.ts";
 import { HUMAN, loadOpenings, SoloMatch } from "../src/solo.ts";
 import { KING_LINES, kingLine, kingSay, resetKingSpeech } from "../src/godKing.ts";
 import { KING_VS_RECLUSE, RECLUSE_LINES } from "../src/characters/recluse-lines.ts";
 import { animLength } from "../src/characters/power-art.ts";
+import { boardEndWords } from "../src/components/Breakdown.tsx";
 
 // (The opening library is its own chunk, loaded on first use: solo.ts.)
 beforeAll(() => loadOpenings());
@@ -45,13 +47,13 @@ describe("when phase 2 follows, and who plays it beside you", () => {
 });
 
 describe("the phase change", () => {
-  it("is about 23 s from his cutscene's end to the end of \"PHASE 2\" (Eric, Nov 14: his transformation by the book's light), its beats in order: the book, the light taking him, the rise, the light growing, the white-out, the reveal, the visor up and down, the leap, the crack, the split, the book back, the leap home", () => {
+  it("is about 23 s from his cutscene's end to the end of \"PHASE 2\" (Eric, Nov 14: his transformation by the book's light), its beats in order: the book, the light taking him, the rise, the light growing, the white-out, the reveal, his first line, the leap, the crack, the split, the book back, the leap home", () => {
     const C = PHASE_CHANGE;
     expect(C.fallMs).toBeGreaterThanOrEqual(1500);
     expect(C.fallMs).toBeLessThanOrEqual(2000);
     expect(C.total).toBeGreaterThanOrEqual(20_000);
     expect(C.total).toBeLessThanOrEqual(26_000);
-    const order = [0, C.burstAt, C.riseAt, C.riseAt + C.riseMs, C.shootAt, C.radiateAt, C.whiteAt, C.whiteFull, C.downAt, C.revealAt, C.flipUpAt, C.line1At, C.flipDownAt, C.crouchAt, C.upAt, C.crackAt, C.partAt, C.growAt, C.growAt + C.growMs, C.pickupAt, C.catchAt, C.backAt, C.homeAt, C.bannerAt, C.total];
+    const order = [0, C.burstAt, C.riseAt, C.riseAt + C.riseMs, C.shootAt, C.radiateAt, C.whiteAt, C.whiteFull, C.downAt, C.revealAt, C.line1At, C.crouchAt, C.upAt, C.crackAt, C.partAt, C.growAt, C.growAt + C.growMs, C.pickupAt, C.catchAt, C.backAt, C.homeAt, C.bannerAt, C.total];
     expect([...order].sort((a, b) => a - b)).toEqual(order);
     // (Every beat a setting.)
     // (Every beat a setting, from the transformation theme's start, `musicAtMs` into the phase change.)
@@ -78,12 +80,12 @@ describe("the phase change", () => {
     expect([C.burstAt - C.musicAtMs, C.riseAt - C.musicAtMs]).toEqual([2640, 3040]);
   });
 
-  it("his two lines (Eric, Nov 13 and 14), typed at the cutscene's pace: the first (a little faster) from his visor up, readable whole 2.8 s, gone as he leaps; the second after the landing, typed out by \"PHASE 2\" and gone before the clocks", () => {
+  it("his two lines (Eric, Nov 13 and 14), typed at the cutscene's pace: the first (a little faster) as he stands revealed, readable whole 2.8 s, gone as he leaps; the second after the landing, typed out by \"PHASE 2\" and gone before the clocks", () => {
     const C = PHASE_CHANGE;
     const L = RECLUSE_PHASE2.change.chantLines;
     // (The cutscene mockup's numbers: 45 ms a character, a second between sentences, readable 1.7 s plus 40 ms a character.)
     expect([L.typeMs, L.sentencePauseMs, L.readMs, L.perCharMs]).toEqual([45, 1000, 1700, 40]);
-    // (The first line, 30 ms a character: its window is the music's, from the visor up to the leap.)
+    // (The first line, 30 ms a character: its window is the music's, from the reveal to the leap.)
     expect(L.firstTypeMs).toBe(30);
     expect(RECLUSE_LINES.chantSay).toEqual([
       ["Computation without creativity is nothing.", "Now I have both."],
@@ -91,11 +93,11 @@ describe("the phase change", () => {
     ]);
     expect(C.chantLines.map((l) => l.line.text)).toEqual(["Computation without creativity is nothing. Now I have both.", "Prepare yourself. This is the ultimate test of your skill."]);
     const [a, b] = C.chantLines;
-    // The first: once the visor is up, typed at 30 ms a character, typed out before the visor comes down, then held (through the
-    // visor down and the crouch) till he leaps: readable whole 2.8 s, not the 1.2 s it had (Nov 14 review, M2), and gone as he leaps.
-    expect(a!.at).toBeGreaterThan(C.flipUpAt);
+    // The first: once he's revealed, typed at 30 ms a character, typed out well before he crouches, then held (through the crouch)
+    // till he leaps: readable whole 2.8 s, not the 1.2 s it had (Nov 14 review, M2), and gone as he leaps.
+    expect(a!.at).toBeGreaterThan(C.revealAt);
     expect(a!.line.typeMs).toBe(30);
-    expect(a!.at + a!.line.typedMs).toBeLessThan(C.flipDownAt);
+    expect(a!.at + a!.line.typedMs).toBeLessThan(C.crouchAt);
     expect(a!.at + a!.line.holdMs).toBe(C.upAt);
     const readable = a!.line.holdMs - a!.line.typedMs - L.fadeMs;
     expect(readable).toBeGreaterThanOrEqual(2800);
@@ -160,32 +162,34 @@ describe("the phase change", () => {
     expect(smoothPath(pts)).toMatch(/^M40 18( Q[\d. -]+){15} L50 90$/);
   });
 
-  it("his figure (Eric, Nov 14): his arms at his sides the whole time; his eyes white as the light takes him; in the suit and helmet from the reveal, the visor up only for his line, his eyes glowing then; one book on screen", () => {
+  it("his figure (Eric, Nov 14): his arms at his sides the whole time; his eyes white as the light takes him; in his final form from the reveal (Nov 15: no helmet, his face showing, his eyes glowing blue, his hair risen); one book on screen", () => {
     const ch = RECLUSE_CHANGE;
-    const heads = (a: string) => ch.anims[a]!.frames.map((f) => f.layers.find((l) => l.part.startsWith("head:") || l.part.startsWith("helmet:"))!.part);
+    const heads = (a: string) => ch.anims[a]!.frames.map((f) => f.layers.find((l) => l.part.startsWith("head:") || l.part.startsWith("coathead:"))!.part);
     const books = (a: string) => ch.anims[a]!.frames.map((f) => f.layers.filter((l) => l.part.startsWith("book:")).length);
     for (const a of Object.keys(ch.anims)) {
       // (Never a raised hand: no open palm, no fist up.)
       for (const f of ch.anims[a]!.frames) expect(f.layers.some((l) => l.part.endsWith("hand:palm")), a).toBe(false);
     }
     for (const a of ["burst", "rise", "beam"]) for (const h of heads(a)) expect(h, a).toMatch(/^head:possessed\./);
-    // (Before the white-out, him as he was; from the reveal, the suit: helmet heads, no tie.)
-    for (const a of ["together", "open", "glowing", "burst", "rise", "beam"]) for (const f of ch.anims[a]!.frames) expect(f.layers.some((l) => l.part.startsWith("suit:") || l.part.startsWith("helmet:")), a).toBe(false);
+    // (Before the white-out, him as he was; from the reveal, his final form: his risen head, his eyes glowing (or a blink), the coat
+    // over his shirt and tie, the aura and the helix. No visor to flip: his face shows the whole time.)
+    for (const a of ["together", "open", "glowing", "burst", "rise", "beam"]) for (const f of ch.anims[a]!.frames) expect(f.layers.some((l) => /^(coat|eyeGlow)/.test(l.part)), a).toBe(false);
     for (const a of ["revealed", "crouch", "air", "land", "landed", "pickup", "leap2"]) {
-      for (const h of heads(a)) expect(h, a).toMatch(/^helmet:down:/);
-      for (const f of ch.anims[a]!.frames) expect(f.layers.some((l) => l.part.startsWith("tie:")), a).toBe(false);
+      for (const h of heads(a)) expect(h, a).toMatch(/^coathead:(glow|shut)\./);
+      for (const f of ch.anims[a]!.frames) {
+        expect(f.layers.some((l) => l.part === "coat:torso"), a).toBe(true);
+        expect(f.layers[0]!.part, a).toMatch(/^coatAura:/);
+        if (f.layers.some((l) => l.part.startsWith("coathead:glow."))) expect(f.layers.some((l) => l.part === "eyeGlow"), a).toBe(true);
+      }
     }
-    expect(heads("flipUp")).toEqual([expect.stringMatching(/^helmet:mid:/), expect.stringMatching(/^helmet:up:/)]);
-    for (const h of heads("faceOpen")) expect(h).toMatch(/^helmet:up:glow\./);
-    for (const f of ch.anims.faceOpen!.frames) expect(f.layers.some((l) => l.part === "eyeGlow")).toBe(true);
-    expect(heads("flipDown").at(-1)).toMatch(/^helmet:down:/);
+    for (const a of ["flipUp", "faceOpen", "flipDown"]) expect(ch.anims[a], a).toBeUndefined();
     // One book: in his frames as it opens and while he kneels; drawn apart while he rises, hovers and jumps; his again from the pickup.
     for (const a of ["open", "glowing", "burst"]) expect(books(a), a).toEqual(books(a).map(() => 1));
-    for (const a of ["rise", "beam", "revealed", "flipUp", "faceOpen", "flipDown", "crouch", "air", "land", "landed"]) expect(books(a), a).toEqual(books(a).map(() => 0));
+    for (const a of ["rise", "beam", "revealed", "crouch", "air", "land", "landed"]) expect(books(a), a).toEqual(books(a).map(() => 0));
     for (const f of RECLUSE_CHANGE_BOOK.anims.glow!.frames) expect(f.layers.filter((l) => l.part.startsWith("book:"))).toHaveLength(1);
     expect(books("pickup")).toEqual(books("pickup").map(() => 1));
-    // (Where he stands in phase 2 too: the suit on his idle, the bust's as well.)
-    for (const c of [RECLUSE, RECLUSE_BUST]) expect(suited(c.anims.idle2!.frames[0]!).layers.some((l) => l.part.startsWith("helmet:down:")), c.id).toBe(true);
+    // (Where he stands in phase 2 too: his final form on his idle, the bust's as well.)
+    for (const c of [RECLUSE, RECLUSE_BUST]) expect(coated(c.anims.idle2!.frames[0]!, 0).layers.some((l) => l.part.startsWith("coathead:")), c.id).toBe(true);
   });
 });
 
@@ -301,38 +305,78 @@ describe("phase 2's four boards on this device", () => {
     g.stop();
   });
 
-  it("his ultimate (the admins' trigger): from then on, out of your few seconds, a random legal move is played for you (no loss)", async () => {
-    const ult = vi.fn();
-    const { g } = make({ onUlt: ult });
+  it("your move past 6.5 s (5 s told, the allowance for lag hidden): one of your hearts cut as it turns slow, then as long as you need (nothing played for you); the admins' trigger cuts one now; your 8th loses your board (\"slow\")", async () => {
+    const slashes: string[] = [];
+    const { g, results } = make({ onSlash: (b) => slashes.push(`${b.id}:${b.hearts}`) });
     g.start();
-    g.ult();
-    expect(ult).toHaveBeenCalledTimes(1);
-    expect(g.state.ultAt).not.toBeNull();
-    // (Its banner first: the few seconds start as it goes, Oct 24.)
-    await vi.advanceTimersByTimeAsync(bossBannerMs() + RECLUSE_PHASE2.ultMoveSeconds * 1000 + 300);
-    expect(g.board(0)!.result).toBeNull();
-    expect(g.board(0)!.board.history.length).toBeGreaterThanOrEqual(1);
-    g.ult();
-    expect(ult).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(slowJudgeMs() - 300);
+    expect(g.board(0)!.hearts).toBe(8);
+    await vi.advanceTimersByTimeAsync(600);
+    expect(g.board(0)).toMatchObject({ hearts: 7, result: null });
+    expect(slashes.filter((x) => x.startsWith("0:"))).toEqual(["0:7"]);
+    // (A minute more: no move played for you, no second cut on the same move.)
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(g.board(0)!.board.history).toHaveLength(0);
+    expect(g.board(0)!.hearts).toBe(7);
+    // The admins' trigger (testing): a heart of yours cut now, each press; the last loses your board.
+    for (let left = 6; left >= 1; left--) {
+      g.slash();
+      expect(g.board(0)!.hearts).toBe(left);
+    }
+    expect(results).not.toContain("0:boss:slow");
+    g.slash();
+    expect(g.board(0)).toMatchObject({ hearts: 0, turnAt: null, result: { winner: "boss", how: "slow" } });
+    expect(results).toContain("0:boss:slow");
+    expect(slashes.filter((x) => x.startsWith("0:"))).toEqual(["0:7", "0:6", "0:5", "0:4", "0:3", "0:2", "0:1", "0:0"]);
+    // (Your move then does nothing.)
+    g.move(0, legalMoves(g.board(0)!.board.fen)[0]!);
+    expect(g.board(0)!.board.history).toHaveLength(0);
     g.stop();
   });
 
-  it("slow moves count for the team, yours and the bots' (now and then a bot thinks past slowMoveSeconds), each on its board; the 10th brings his ultimate", async () => {
-    const slow: [number, boolean][] = [];
-    const ult = vi.fn();
-    // (rng 0.05: every bot's move is a slow one.)
-    const { g } = make({ onSlow: (id, u) => slow.push([id, u]), onUlt: ult, rng: () => 0.05 });
+  /** The bots' engine answering only after `ms` (the engine it shares with him queued behind his searches, a slow phone). */
+  const lateBots = (ms: number) => {
+    const first = (fen: string) => [...legalMoves(fen)].sort()[0]!;
+    return { playAtElo: (fen: string) => new Promise<string>((r) => setTimeout(() => r(first(fen)), ms)), topMoves: () => Promise.resolve([]) };
+  };
+
+  it("a bot's move is judged by the think it rolled, never by when its engine answers (the review of #744, M1): an answer at 7 s after a usual think costs no heart", async () => {
+    expect(RECLUSE_PHASE2.botMoveMs[1]).toBeLessThan(slowJudgeMs());
+    const slashes: string[] = [];
+    const { g } = make({ bots: lateBots(7000), onSlash: (b) => slashes.push(`${b.id}:${b.hearts}`) });
     g.start();
-    await vi.advanceTimersByTimeAsync(RECLUSE_PHASE2.botSlowMs[1] + 500);
-    expect(g.state.slow).toBeGreaterThanOrEqual(3);
-    expect(ult).not.toHaveBeenCalled();
-    await vi.advanceTimersByTimeAsync(4 * RECLUSE_PHASE2.botSlowMs[1]);
-    expect(ult).toHaveBeenCalledTimes(1);
-    expect(g.state.slow).toBe(RECLUSE_PHASE2.slowMovesForUlt);
-    // One call a slow move, naming its board (the bots' here, never yours: you haven't moved); the last one brought it.
-    expect(slow).toHaveLength(RECLUSE_PHASE2.slowMovesForUlt);
-    for (const [id] of slow) expect([1, 2, 3]).toContain(id);
-    expect(slow.map(([, u]) => u)).toEqual([...Array(RECLUSE_PHASE2.slowMovesForUlt - 1).fill(false), true]);
+    await vi.advanceTimersByTimeAsync(7200);
+    for (const id of [1, 2, 3]) {
+      expect(g.board(id)).toMatchObject({ hearts: 8, slashAt: null, result: null });
+      expect(g.board(id)!.board.history.length).toBeGreaterThanOrEqual(1);
+    }
+    // (Yours is judged by the clock as ever.)
+    expect(g.board(0)!.hearts).toBe(7);
+    expect(slashes).toEqual(["0:7"]);
+    g.stop();
+  });
+
+  it("the bots' slow thinks cost their own hearts as each think ends, the move in or not (botSlowMs past the allowance; rng 0.04: every bot move a slow one), and they play on", async () => {
+    expect(RECLUSE_PHASE2.botSlowMs[0]).toBeGreaterThan(slowJudgeMs());
+    const slashes: string[] = [];
+    // (The think: botSlowMs at rng 0.04. Their engine answers at 9 s, after it.)
+    const think = RECLUSE_PHASE2.botSlowMs[0] + 0.04 * (RECLUSE_PHASE2.botSlowMs[1] - RECLUSE_PHASE2.botSlowMs[0]);
+    const { g } = make({ bots: lateBots(9000), onSlash: (b) => slashes.push(`${b.id}:${b.hearts}`), rng: () => 0.04 });
+    const t0 = Date.now();
+    g.start();
+    await vi.advanceTimersByTimeAsync(think - 10);
+    for (const id of [1, 2, 3]) expect(g.board(id)!.hearts).toBe(8);
+    await vi.advanceTimersByTimeAsync(20);
+    for (const id of [1, 2, 3]) {
+      expect(g.board(id)).toMatchObject({ hearts: 7, slashAt: t0 + think, result: null });
+      expect(g.board(id)!.board.history).toHaveLength(0);
+      expect(slashes).toContain(`${id}:7`);
+    }
+    await vi.advanceTimersByTimeAsync(9000 - think + 100);
+    for (const id of [1, 2, 3]) {
+      expect(g.board(id)!.hearts).toBe(7);
+      expect(g.board(id)!.board.history.length).toBeGreaterThanOrEqual(1);
+    }
     g.stop();
   });
 
@@ -360,7 +404,7 @@ describe("phase 2 without the God King's help (Eric, Nov 14: greyed in his place
     const m = new SoloMatch([], "Ann", { ...DEFAULT_SETTINGS, ...RAID_SETTINGS }) as unknown as Record<string, (...a: unknown[]) => unknown> & { phase2: unknown; phase: { kind: string; at: number }; exit: unknown; simul: unknown };
     let started = 0;
     let moved = 0;
-    m.phase2 = { start: () => started++, stop() {}, move: () => moved++, outcome: { beaten: false, won: 0, of: 4, decided: false }, state: { boards: [], slow: 0, ultAt: null } };
+    m.phase2 = { start: () => started++, stop() {}, move: () => moved++, outcome: { beaten: false, won: 0, of: 4, decided: false }, state: { boards: [] } };
     const t0 = Date.now();
     m.startSimul!();
     expect(m.phase).toEqual({ kind: "simul", at: t0 + PHASE_CHANGE.countdownMs });
@@ -387,7 +431,7 @@ describe("phase 2 without the God King's help (Eric, Nov 14: greyed in his place
     m.phase = { kind: "boss", boss: {}, until: 0, fall: true, toPhase2: true };
     m.phase2Seats = [HUMAN];
     expect(rows()).toEqual([[false, "playing", 1]]);
-    const board = (result: object | null) => ({ boards: [{ id: 0, player: HUMAN, result }], slow: 0, ultAt: null });
+    const board = (result: object | null) => ({ boards: [{ id: 0, player: HUMAN, result }] });
     m.phase2 = { stop() {}, state: board(null) };
     m.phase = { kind: "phaseChange", at: 0, splitAt: 0 };
     expect(rows()).toEqual([[false, "playing", 1]]);
@@ -413,11 +457,19 @@ describe("phase 2 without the God King's help (Eric, Nov 14: greyed in his place
     const fen = chess960Fen(100);
     const mv = legalMoves(fen)[0]!;
     const board = (id: number, player: string) => ({ id, player, number: 100, board: { fen: applyMove(fen, mv), lastMove: mv, history: [mv], bases: [{ ply: 0, fen }] }, bankMs: 1000, turnAt: null, result: { winner: "crowd", how: "mate" } });
-    m.phase2 = { stop() {}, outcome: { won: 4, of: 4, beaten: true }, state: { boards: [board(0, HUMAN), board(1, "b1"), board(2, "b2"), board(3, "b3")], slow: 0, ultAt: null } };
+    m.phase2 = { stop() {}, outcome: { won: 4, of: 4, beaten: true }, state: { boards: [board(0, HUMAN), board(1, "b1"), board(2, "b2"), board(3, "b3")] } };
     m.phase = { kind: "simul", at: 0 };
     m.finishPhase2();
     expect(m.phase).toMatchObject({ kind: "results", placement: 1, bossResult: "crowd", simul: { won: 4, of: 4 }, simulBoard: { id: 0, you: true, history: [mv], bases: [{ ply: 0, fen }], result: { winner: "crowd", how: "mate" } } });
     m.stop?.();
+  });
+
+  it("the result's review says how your board ended, as its tag does: a board lost to its hearts is \"too slow\" (the review of #744, m3)", () => {
+    expect(boardEndWords({ winner: "boss", how: "slow" })).toBe("Your board is lost: too slow.");
+    expect(boardEndWords({ winner: "boss", how: "time" })).toBe("Your board is lost on time.");
+    expect(boardEndWords({ winner: "boss", how: "resign" })).toBe("Your board is lost: you resigned.");
+    expect(boardEndWords({ winner: "boss", how: "mate" })).toBe("Your board is lost.");
+    expect(boardEndWords({ winner: "crowd", how: "mate" })).toBe("Your board is won.");
   });
 
   it("a phase 2 board, move by move, for the result's review: its Chess960 start, then each move's position and SAN (as fenAtPly), in one pass", () => {
@@ -445,7 +497,7 @@ describe("phase 2 without the God King's help (Eric, Nov 14: greyed in his place
     const frames: FrameRequestCallback[] = [];
     vi.stubGlobal("requestAnimationFrame", (f: FrameRequestCallback) => frames.push(f));
     type Solo = Record<string, (...a: unknown[]) => unknown> & { phase2: unknown; phase: { kind: string; at: number } };
-    const pretend = (count: () => void) => ({ start: count, stop() {}, move() {}, outcome: { beaten: false, won: 0, of: 4, decided: false }, state: { boards: [], slow: 0, ultAt: null } });
+    const pretend = (count: () => void) => ({ start: count, stop() {}, move() {}, outcome: { beaten: false, won: 0, of: 4, decided: false }, state: { boards: [] } });
     const m = new SoloMatch([], "Ann", { ...DEFAULT_SETTINGS, ...RAID_SETTINGS }) as unknown as Solo;
     let started = 0;
     m.phase2 = pretend(() => started++);
@@ -477,7 +529,7 @@ describe("phase 2 without the God King's help (Eric, Nov 14: greyed in his place
     // (White-box: the moments of SoloMatch's phase 2 that had the God King speak, driven with a pretend Phase2Game.)
     const m = new SoloMatch([], "Ann", { ...DEFAULT_SETTINGS, ...RAID_SETTINGS }) as unknown as Record<string, (...a: unknown[]) => unknown> & { phase2: unknown };
     const outcome = { beaten: false, won: 0, of: 4, decided: false };
-    m.phase2 = { start() {}, stop() {}, outcome, state: { boards: [], slow: 0, ultAt: null } };
+    m.phase2 = { start() {}, stop() {}, outcome, state: { boards: [] } };
     resetKingSpeech();
     bossVoice.reset();
     m.startSimul!();
@@ -490,5 +542,84 @@ describe("phase 2 without the God King's help (Eric, Nov 14: greyed in his place
     expect(kingLine()).toBeNull();
     expect(bossVoice.line()).not.toBeNull();
     (m as unknown as { stop(): void }).stop?.();
+  });
+});
+
+describe("his slash as he cuts a heart, and his line (Eric, Nov 16)", () => {
+  const S = RECLUSE_PHASE2.slash;
+  it("a slow wind-up (his blade's glint drawn back, slowly at first), then a fast stroke across the heart; the halves slide apart along the cut and fade; nothing flashes", () => {
+    const drawn = (t: number) => {
+      const g = slashLook(t).glint!;
+      return Math.hypot(g.x - 0.7, g.y + 0.15);
+    };
+    const early = slashLook(S.windMs * 0.25);
+    expect(early.glint).not.toBeNull();
+    expect(early.blade).toBeNull();
+    expect(early.a).toEqual({ x: -0, y: -0, r: -0, o: 1 });
+    expect(drawn(S.windMs * 0.25)).toBeLessThan(drawn(S.windMs * 0.75) / 10);
+    // (The stroke: most of the way across within 30 ms of the cut, all of it in 90; the glint gone.)
+    expect(slashLook(S.windMs).glint).toBeNull();
+    expect(slashLook(S.windMs + 30).blade!.len).toBeGreaterThan(0.6);
+    expect(slashLook(S.windMs + 90).blade!.len).toBe(1);
+    expect(slashLook(S.windMs + 400).blade).toBeNull();
+    // (The halves: the upper left's up and left, the lower right's down and right, gone by the end.)
+    const end = slashLook(S.ms - 1);
+    expect(end.a.x).toBeLessThan(-0.25);
+    expect(end.a.y).toBeLessThan(-0.2);
+    expect(end.b.x).toBeGreaterThan(0.25);
+    expect(end.b.y).toBeGreaterThan(0.25);
+    expect(Math.max(end.a.o, end.b.o)).toBeLessThan(0.02);
+    expect(slashLook(S.ms - 1).done).toBe(false);
+    expect(slashLook(S.ms).done).toBe(true);
+    // (Never brighter than the heart itself: every opacity within 0 to 1, no flash layer at all.)
+    for (let t = 0; t <= S.ms; t += 10) {
+      const l = slashLook(t);
+      for (const o of [l.a.o, l.b.o, l.glint?.o ?? 0, l.blade?.o ?? 0]) expect(o >= 0 && o <= 1).toBe(true);
+    }
+  });
+
+  it("a board lost to its last heart greys out slowly by CSS the compositor runs (never a filter set from script each frame), once the cut is over, its word coming in as it does", () => {
+    const css = readFileSync(new URL("../src/styles.css", import.meta.url), "utf8");
+    expect(css).toMatch(/\.rc-wasted > \.board-wrap > \.board \{\s*will-change: filter;\s*animation: rc-grey var\(--rc-grey-ms, 2600ms\) ease-in-out var\(--rc-grey-d, 0ms\) both;\s*\}/);
+    expect(css).toMatch(/@keyframes rc-grey \{\s*from \{\s*filter: grayscale\(0\) brightness\(1\);\s*\}\s*to \{\s*filter: grayscale\(1\) brightness\(0\.7\);/);
+    expect(css).toMatch(/\.rc-wasted \.rc-wasted-word \{\s*animation: rc-wasted-word 600ms ease-out calc\(var\(--rc-grey-d, 0ms\) \+ 0\.35 \* var\(--rc-grey-ms, 2600ms\)\) both;/);
+    expect(S.greyMs).toBeGreaterThanOrEqual(2000);
+  });
+
+  it("the sound's swish lands on the cut (recluse-sounds.ts SLASH_CUT_S)", () => {
+    expect(SLASH_CUT_S * 1000).toBe(S.windMs);
+  });
+
+  it("his line on each cut, harder as your hearts run out: taunts while 3 or more are left, harder at 2 and 1, the hardest as the last goes; every one different", () => {
+    const L = RECLUSE_LINES.slash;
+    expect(slashLine(7)).toBe(L.taunt[0]);
+    expect(slashLine(3)).toBe(L.taunt[4]);
+    expect(slashLine(2)).toBe(L.hard[0]);
+    expect(slashLine(1)).toBe(L.hard[1]);
+    expect(L.last).toContain(slashLine(0, 0));
+    expect(slashLine(0, 1)).not.toBe(slashLine(0, 0));
+    const eight = Array.from({ length: RECLUSE_PHASE2.hearts }, (_, i) => slashLine(RECLUSE_PHASE2.hearts - 1 - i));
+    expect(new Set(eight).size).toBe(eight.length);
+    // (About 10 lines, short, and none says the allowance or any number.)
+    const all = [...L.taunt, ...L.hard, ...L.last];
+    expect(all.length).toBeGreaterThanOrEqual(9);
+    for (const l of all) {
+      expect(l.length).toBeLessThanOrEqual(48);
+      expect(l).not.toMatch(/\d/);
+    }
+  });
+
+  it("cuts in on whatever he's saying at once (INTERRUPT), even a critical line still typing or his chatter", () => {
+    const v = new Voice();
+    v.say(RECLUSE_LINES.boardWon[0], "won", CRITICAL, 1000);
+    v.say(slashLine(7), "cut", INTERRUPT, 1050);
+    expect(v.line(1050)?.text).toBe(slashLine(7));
+    const w = new Voice();
+    w.say(RECLUSE_LINES.engine[0], "talk", CHATTER, 1000);
+    w.say(slashLine(2), "cut2", INTERRUPT, 1010);
+    expect(w.line(1010)?.text).toBe(slashLine(2));
+    // (A critical line said over it waits its turn, as over any critical one.)
+    w.say(RECLUSE_LINES.boardWon[0], "won2", CRITICAL, 1020);
+    expect(w.line(1020)?.text).toBe(slashLine(2));
   });
 });

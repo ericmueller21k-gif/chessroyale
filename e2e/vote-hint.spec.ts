@@ -30,7 +30,7 @@ test("Crowd: the first vote on this device shows the hint until you vote; the se
   await expect(hint(page)).toHaveText("Drag your pawn into a zone to vote");
   await aboveZones(page);
   // Voting (a card) puts it away.
-  await page.getByRole("radio", { name: /Duel/ }).click();
+  await page.getByRole("radio", { name: /Chaos/ }).click();
   await expect(hint(page)).toHaveCount(0);
   // The second vote: no hint.
   await expect(page.getByRole("heading", { name: "How does it start?" })).toBeVisible({ timeout: 15_000 });

@@ -3,7 +3,7 @@
 // frames (every 120 ms) around the character, and prints a timeline of which animation showed.
 //   npm run frames:character -- <out-dir> [boss name, default "Boingo"] [phone|desktop|both] [kit=<name>] [fx] [fxperf]
 // `kit=<name>` plays the named character kit in that boss's place (a kit drawn before its boss is playable, such
-// as kit="Jefferson"). `fx` then plays the bosses' power art over the board where it will show (the ice, the
+// as kit="Jefferson", or one in ART_KITS: kit="Chandy"). `fx` then plays the bosses' power art over the board where it will show (the ice, the
 // pies, the blizzard, the funhouse, and the power moments in his spot; with kit="Jefferson" his fire: the tile's
 // stages, a piece burning, the sparkler, the Roman candle on the board, its rockets, fireballs and shots left),
 // with frames every ~70 ms.
@@ -35,16 +35,24 @@ async function run(name, context) {
   const p = await browser.newPage(context);
   p.on("pageerror", (e) => console.log(name, "pageerror", e.message));
   if (fxPerf) await p.addInitScript(instrument);
+  // (The first-time walkthrough marked seen, as every e2e test's context does: it would cover the screen and block the taps.)
+  await p.addInitScript(() => {
+    try {
+      localStorage.setItem("hunchess.tutorial.dismissed", "1");
+    } catch {}
+  });
   // (The hidden /bosses: the solo boss picker at once, every boss by name.)
   await p.goto(url + "bosses?debug&clock=30&nolanding");
   // The named kit in every boss's place: the same module the app uses, from the dev server.
   if (kitName)
     await p.evaluate(async (name) => {
       const m = await import("/src/characters/kits.ts");
-      if (!m.BOSS_KITS[name]) throw new Error(`no kit "${name}"`);
+      // (A roster boss's kit, or one drawn ahead of its boss: ART_KITS, Chandy's.)
+      const kit = m.BOSS_KITS[name] ?? m.ART_KITS?.[name];
+      if (!kit) throw new Error(`no kit "${name}"`);
       for (const k of Object.keys(m.BOSS_KITS)) {
         m.BOSS_KITS[`original:${k}`] = m.BOSS_KITS[k];
-        m.BOSS_KITS[k] = m.BOSS_KITS[name];
+        m.BOSS_KITS[k] = kit;
       }
     }, kitName);
   await p.getByRole("dialog", { name: "Choose your boss" }).getByRole("button", { name: new RegExp(bossName) }).click();

@@ -1,10 +1,11 @@
 import { hollowLobby } from "./bosses/hollow.ts";
 import { dashLobby } from "./bosses/dash.ts";
+import { chandyLobby } from "./bosses/chandy.ts";
 import { SERVER_LOST_MS, phase2Unvouched, quickMove, recluseLobby, mateFirst, recluseNoResult, recluseNoResultFor, retryDelay, type Phase2Lobby, type Phase2SearchRequest, type Recluse1Ask, type Recluse2Record } from "./bosses/recluse.ts";
 import type { BossLobby } from "./bosses/base.ts";
 import { hearsTyped, typedReads, typedSay, typedSeat, type TypedSeats } from "./typed-chat.ts";
 import { QUICK_CHAT, botChatLines, canSay, canSayToAll, chatCheck, chatSay, chatSent, mulberry32, noChatSent, ownedChatPacks, type BotChatMoment, type ChatSent } from "@chessroyale/core";
-import { FAIRPLAY, type FairMove } from "@chessroyale/core";
+import { CROWD_PARTY, FAIRPLAY, packParties, type FairMove } from "@chessroyale/core";
 import { BOSS_BRAIN, BOSS_CHECK, BOSS_PARTY, BOSS_POWERS, HIDDEN_ROOM, RECLUSE_ONLINE, RECLUSE_PHASE2, finishBoss, recluseNextForm, DEFAULT_SETTINGS, JUDGES, isTeamMatch, type JudgeConfig, FRONT_DOOR, LEAVING, LOBBY_LIFE, MATCHMAKING, isRankedMatch, type PlayerState, brilliance, cleanLook, matchFeats, type ItemLook, type MatchFeats, botVotes, castPregameVote, closePregameVote, raidBossElo, bossDef, clockAfterVote, cutSeconds, pregameVotes, voteResultMs, type Augment, type DrawRule, type Settings } from "@chessroyale/core";
 import {
   MatchRunner,
@@ -19,6 +20,9 @@ import {
   landedEarlyMs,
   fullMoonMs,
   zebraTurnMs,
+  chandyTurnMs,
+  dodgeSeen,
+  dodgeOver,
   popOffMs,
   folioTurnMs,
   landsAfterHisMove,
@@ -42,6 +46,7 @@ import {
   type NetFinal,
   type NetStanding,
   type NetRush,
+  type NetDodge,
   type Opening,
   type RoundReport,
   type RunnerSnapshot,
@@ -273,6 +278,7 @@ export type Timer =
   | "judgeTick"
   | "lights"
   | "rush"
+  | "dodge"
   | "partyStart"
   | "phase2";
 
@@ -291,6 +297,11 @@ export interface LiveMatchBoard {
 export interface LobbyRecord {
   code: string;
   createdAt: number;
+  /**
+   * A matchmade 50 v 50's parties (Nov 16, docs/decisions/2026-11-16-crowd-party.md), by their pass: the seats held for them
+   * (`size`, until `until`: then any not taken go back to everyone), and who of them has joined. Each plays on one team.
+   */
+  crowdParties?: Record<string, { size: number; ids: string[]; until: number }>;
   /** (`phase2`: the Hidden Boss's phase change and four boards online, from the cutscene's hold on: `recluse2`.) */
   phase: "lobby" | "opening" | "vote" | "play" | "scoring" | "reveal" | "stageBreak" | "final" | "boss" | "phase2" | "results";
   humans: Human[];
@@ -379,7 +390,7 @@ export interface LobbyRecord {
    * "repaint": it picks Smudgy's Repaint pair (his whole turn). "water": it places the hippo gardener's watering (his whole turn).
    * (The circus tiger's hoops come with his move: asked with it, the request's `hoops`.)
    */
-  bossKind?: "elo" | "stumble" | "stagger" | "best" | "funhouse" | "extra" | "bounce" | "tusks" | "fuse" | "slam" | "hop" | "carrots" | "repaint" | "water";
+  bossKind?: "elo" | "stumble" | "stagger" | "best" | "funhouse" | "extra" | "bounce" | "tusks" | "fuse" | "slam" | "hop" | "carrots" | "repaint" | "water" | "queenlock";
   /** Big Boy's Big Bounce, Alfil's fusion and Slam, the hopper's hop: the candidates the host was sent (the answer must be one of them). */
   bounceCandidates?: string[];
   /** The boss's move, held until it has "thought" long enough (your queen banner plays first), and when that is. */
@@ -420,6 +431,8 @@ export interface LobbyRecord {
   lights?: { key: string; at: number; ended: number; endedAt?: number[]; taps: Record<string, string[][]>; tapAt?: Record<string, number[][]> };
   /** Dash's Scramble Rush in progress (the crowd's turn waits; the phase "boss"): when it began, each person's placements, and once judged, its verdict's end. */
   rush?: { key: string; at: number; places: Record<string, Record<string, string>>; moved?: Record<string, Record<string, number>>; judged?: boolean };
+  /** Chandy's Dodge on (bosses/chandy.ts): its key, start, the round being voted on and each person's vote in it. */
+  dodge?: { key: string; at: number; round: number; votes: Record<string, string> };
   /**
    * Matchmade ("Play now"): starts by itself when full or at `fillAt`, bots filling the rest. `filledAt`: the seats
    * were filled then (bots pop in on the queue screen) and the match begins FRONT_DOOR.fillShowMs later; `waitMs`:
@@ -716,6 +729,8 @@ export class LobbyCore {
     // lobby was made with (one made before a boss was rested, by code, picked for a raid, or a queue's filling lobby).
     if (settings.bossesOff) this.settings = { ...this.settings, bossesOff: settings.bossesOff };
     if (record.moveClock) this.settings = { ...this.settings, moveClockSeconds: record.moveClock, moveClockSteps: [] };
+    // (The Hidden Boss's phase 2 stored by an older server, a deploy mid-fight: what it didn't store filled in. The review of #744, M2.)
+    if (record.recluse2) recluseLobby.upgrade(record.recluse2);
     if (record.runner) {
       // (The clock for powers that run in real time, the hippo gardener's seeds: the server's.)
       this.runner = MatchRunner.restore(record.runner, { settings: this.settings, rng, engines: [], library, clock: () => this.io.now() });
@@ -942,16 +957,73 @@ export class LobbyCore {
   hurry(at: number) {
     const a = this.r.auto;
     if (!a || a.botsOff || a.filledAt || a.fillAt === null || this.r.phase !== "lobby") return;
-    const fillAt = Math.max(this.io.now() + MATCHMAKING.switchMinWaitMs, Math.min(a.fillAt, at));
+    // (Never before a 50 v 50 party's members on their way have had their hold: H2.)
+    const fillAt = Math.max(this.io.now() + MATCHMAKING.switchMinWaitMs, Math.min(a.fillAt, at), this.partyHoldEnd());
     if (fillAt >= a.fillAt) return;
     a.fillAt = fillAt;
     this.setTimer("autoStart", fillAt);
     this.broadcast(this.lobbyMessage(), false);
   }
 
-  /** Matchmaking: seats still free for new players (0 once it no longer takes players). */
+  /** Matchmaking: seats still free for new players (0 once it no longer takes players), less those held for parties on their way. */
   seatsLeft(): number {
-    return this.joinable() ? this.settings.lobbySize - this.r.humans.length : 0;
+    return this.joinable() ? Math.max(0, this.settings.lobbySize - this.r.humans.length - this.partyHeld()) : 0;
+  }
+
+  /** Seats held for 50 v 50 parties' members still on their way (until their hold runs out). */
+  private partyHeld(): number {
+    const now = this.io.now();
+    return Object.values(this.r.crowdParties ?? {}).reduce((n, p) => n + (p.until > now ? Math.max(0, p.size - p.ids.length) : 0), 0);
+  }
+
+  /**
+   * Matchmaking: a 50 v 50 party's seats, all `size` of them, held `ms` under its `pass` (its members join with it), or none.
+   * `singles` seats are held for players on their way already. Every party here must still fit whole on one team (packParties,
+   * half the seats a side), each counted at its full size: a member arriving after the hold still joins its group (the fix round
+   * of #747, L1). A lobby already filling (not `fresh`) takes a party only while its hold ends before the fill (H2: else bots take
+   * the seats of members still on their way); a `fresh` lobby, made for this party, holds them until its fill at most. True: held
+   * (asked again for the same pass: as it was).
+   */
+  reserveParty(size: number, pass: string, ms: number, singles = 0, fresh = false): boolean {
+    if (!pass || !(size >= 1) || this.r.party || !isTeamMatch(this.settings)) return false;
+    if (this.crowdPartyOf(pass)) return true;
+    if (size > this.seatsLeft() - singles) return false;
+    const now = this.io.now();
+    const fillAt = this.r.auto?.fillAt ?? null;
+    if (fillAt !== null && !fresh && fillAt - now < ms) return false;
+    const sizes = [...Object.values(this.r.crowdParties ?? {}).map((p) => p.size), size];
+    const half = Math.floor(this.settings.lobbySize / 2);
+    if (!packParties(sizes, half, this.settings.lobbySize - half, () => 0.5)) return false;
+    const hold = fillAt !== null && fresh ? Math.max(0, Math.min(ms, fillAt - now)) : ms;
+    this.r.crowdParties = { ...(this.r.crowdParties ?? {}), [pass]: { size, ids: [], until: now + hold } };
+    return true;
+  }
+
+  /** The 50 v 50 party held here under this pass, if any (its own key only: a pass is the app's word). */
+  private crowdPartyOf(pass: unknown): NonNullable<LobbyRecord["crowdParties"]>[string] | undefined {
+    const all = this.r.crowdParties;
+    return typeof pass === "string" && all && Object.hasOwn(all, pass) ? all[pass] : undefined;
+  }
+
+  /**
+   * A 50 v 50 party's pass held here with a seat still free in its group, while its hold lasts: the matchmaker sent its members here,
+   * so a member on the other side of fair play's engine pool (one pooled member takes the whole party to the pool's queue) is let in
+   * (H1). Once the hold ends the door is shut (N4: a pooled friend who joined the party after its Find match can't take a late
+   * member's seat in a clean lobby).
+   */
+  crowdPassOpen(pass: unknown): boolean {
+    const p = this.crowdPartyOf(pass);
+    return !!p && p.ids.length < p.size && p.until > this.io.now();
+  }
+
+  /** When the last hold for a 50 v 50 party's members on their way ends (0: none): the fill never comes before it. */
+  private partyHoldEnd(): number {
+    return Math.max(0, ...Object.values(this.r.crowdParties ?? {}).map((p) => (p.ids.length < p.size ? p.until : 0)));
+  }
+
+  /** Whether this player came in as a 50 v 50 party's member (their seat was held, not one of the anonymous ones). */
+  inCrowdParty(playerId: string): boolean {
+    return Object.values(this.r.crowdParties ?? {}).some((p) => p.ids.includes(playerId));
   }
 
   private standings(): NetStanding[] {
@@ -1079,6 +1151,9 @@ export class LobbyCore {
       pl.seats[id] = seat;
       pl.members = { ...(pl.members ?? {}), [id]: admit.member };
     }
+    // A 50 v 50 party's member: in its group (they'll play on one team), while it has room for them.
+    const crowd = !pl ? this.crowdPartyOf(party.pass) : undefined;
+    if (crowd && crowd.ids.length < crowd.size) crowd.ids.push(id);
     if (!this.r.hostId) this.r.hostId = id;
     delete this.r.emptiedAt;
     this.send(id, { t: "welcome", playerId: id, token: newToken, code: this.r.code }, false);
@@ -1134,6 +1209,9 @@ export class LobbyCore {
       this.r.accounts = rest;
     }
     if (this.r.hostId === playerId) this.r.hostId = this.pickHost(playerId);
+    // A 50 v 50 party's member who leaves before the fill is out of its group: a friend left alone plays as a single (ranked,
+    // no party line), and the seat in the group is open again for a return with the pass (held while its hold lasts).
+    for (const p of Object.values(this.r.crowdParties ?? {})) p.ids = p.ids.filter((id) => id !== playerId);
     // A private lobby's last person has gone: it closes now (lobbyClosing), and its code stops working. (Not a party's
     // battle: the others may still be on their way; it starts with whoever comes, or closes when nothing happens.)
     if (!this.r.auto && !this.r.party && !this.r.humans.length) this.r.emptiedAt = this.io.now();
@@ -1247,7 +1325,7 @@ export class LobbyCore {
   }
 
   private netLeft(l: LeftHuman): NetLeft {
-    return { how: l.how, result: l.result ? { placement: l.result.placement, players: l.result.players, ranked: l.result.ranked } : null };
+    return { how: l.how, result: l.result ? { placement: l.result.placement, players: l.result.players, ranked: l.result.ranked, ...(!l.result.ranked && this.partied(l.id) ? { partied: true as const } : {}) } : null };
   }
 
   /**
@@ -1512,8 +1590,8 @@ export class LobbyCore {
    */
   ultimateTrigger(playerId: string, admin: boolean): boolean {
     if (!admin || !BOSS_POWERS.ultimateTestButton || !this.human(playerId) || !this.runner?.boss || this.r.phase === "results") return false;
-    // (The Hidden Boss's phase 2: his "5 SECONDS!" now, as solo's trigger brings it.)
-    const ok = this.r.recluse2 ? recluseLobby.ult(this.phase2Lobby) : this.runner.triggerUltimate();
+    // (The Hidden Boss's phase 2: a heart of the admin's own board cut now, as solo's trigger does.)
+    const ok = this.r.recluse2 ? recluseLobby.ult(this.phase2Lobby, playerId) : this.runner.triggerUltimate();
     if (ok) console.log(`test trigger: ${playerId} brings the ultimate in ${this.r.code}`);
     // (A test control touched the battle: no XP for anyone in it, "No XP: test game." Review m3, Nov 9.)
     if (ok) this.r.overrides = { ...this.r.overrides, tested: true };
@@ -1637,6 +1715,8 @@ export class LobbyCore {
         return hollowLobby.lightsTap(this.bossLobby, playerId, msg.key, msg.round, msg.square);
       case "rushPlace":
         return dashLobby.rushPlace(this.bossLobby, playerId, msg.key, msg.places);
+      case "dodgeVote":
+        return chandyLobby.dodgeVote(this.bossLobby, playerId, msg.key, msg.round, msg.square);
       case "kick":
         return this.partyKick(playerId, msg.playerId);
       case "phase2Move":
@@ -1696,6 +1776,8 @@ export class LobbyCore {
       library: this.library,
       entrants: [...this.r.humans.map((h) => ({ id: h.id, name: h.name, isBot: false, practice: !!h.practice })), ...bots],
       clock: () => this.io.now(),
+      // (A 50 v 50's parties: each on one team, those still here.)
+      ...(this.r.crowdParties ? { together: Object.values(this.r.crowdParties).map((p) => p.ids.filter((id) => this.human(id))) } : {}),
     });
     const now = this.io.now();
     if (this.r.auto) {
@@ -1786,6 +1868,8 @@ export class LobbyCore {
         return hollowLobby.lightsStep(this.bossLobby);
       case "rush":
         return dashLobby.rushStep(this.bossLobby);
+      case "dodge":
+        return chandyLobby.dodgeStep(this.bossLobby);
       case "phase2":
         return recluseLobby.step(this.phase2Lobby);
       case "partyStart":
@@ -1811,10 +1895,13 @@ export class LobbyCore {
   private voteView(): NetVote {
     const v = this.r.vote!;
     const side = (id: string) => this.runner?.player(id)?.colour ?? "w";
+    const votes = pregameVotes(this.settings);
     return {
       key: v.key,
       index: v.index,
-      count: pregameVotes(this.settings).length,
+      // (Which vote, by its id: the rework's "pick" holds the first place "format" had, so an app looks it up by id, not place.)
+      ...(votes[v.index] ? { id: votes[v.index]!.id } : {}),
+      count: votes.length,
       startsAt: v.startsAt,
       until: v.until,
       votes: [
@@ -1891,8 +1978,22 @@ export class LobbyCore {
 
   // ---------------- Boss battle ----------------
 
-  private bossMessage(until: number, opts: { thinking?: boolean; justKilled?: string | null; fall?: boolean; rush?: NetRush } = {}): Outgoing {
-    return { t: "boss", boss: this.runner!.bossView(opts.justKilled ?? null)!, standings: this.standings(), until, ...(opts.thinking ? { thinking: true } : {}), ...(opts.fall ? { fall: true } : {}), ...(opts.rush ? { rush: opts.rush } : {}) };
+  private bossMessage(until: number, opts: { thinking?: boolean; justKilled?: string | null; fall?: boolean; rush?: NetRush; dodge?: NetDodge } = {}): Outgoing {
+    return { t: "boss", boss: this.bossViewSent(opts.justKilled ?? null), standings: this.standings(), until, ...(opts.thinking ? { thinking: true } : {}), ...(opts.fall ? { fall: true } : {}), ...(opts.rush ? { rush: opts.rush } : {}), ...(opts.dodge ? { dodge: opts.dodge } : {}) };
+  }
+
+  /**
+   * The boss's view as every message sends it (the boss's, a round's, a reveal's): Chandy's Dodge, until it's over, only as far as it
+   * has been seen (dodgeSeen: no safe square before its vote closes, each teleport in its time). Dodge is set up as his move applies
+   * and plays from the next round on (startDodge): until then nothing of it has been seen. (Each message is stored as sent, so a
+   * device back from a reload, `last`, gets no more than everyone had then.)
+   */
+  private bossViewSent(justKilled: string | null = null): NetBoss {
+    const view = this.runner!.bossView(justKilled)!;
+    const d = view.powers?.chandy?.dodge;
+    if (!d || dodgeOver(d)) return view;
+    const l = this.r.dodge;
+    return { ...view, powers: { ...view.powers!, chandy: { ...view.powers!.chandy!, dodge: dodgeSeen(d, l ? this.io.now() - l.at : -1) } } };
   }
 
   /** The boss's turn: everyone sees it thinking while the host's engine plays its move. */
@@ -2195,7 +2296,7 @@ export class LobbyCore {
     const burnt = !!b?.powers?.burnt?.some((x) => x.turn === b.crowdMoves && (x.piece || x.fizzled));
     // (Alfil's pieces came down early after your move: their landing plays first too; so does Moo's Full Moon, his
     // transformation at the start of his turn.)
-    const own = landedEarlyMs(b) + fullMoonMs(b) + folioTurnMs(b) + popOffMs(b) + zebraTurnMs(b);
+    const own = landedEarlyMs(b) + fullMoonMs(b) + folioTurnMs(b) + popOffMs(b) + zebraTurnMs(b) + chandyTurnMs(b);
     return queenSlain(view) || burnt || own ? this.io.now() + bossThinkMs(view, burnt, own) : undefined;
   }
 
@@ -2228,7 +2329,7 @@ export class LobbyCore {
     // (A pick among candidate positions, not a move: Big Boy's bounce, Alfil's cast, fusion and Slam, the hopper's hop;
     // and the Carrot Patch's cast, which only asks the pass guard.)
     const kind = this.r.bossKind;
-    const pick = kind === "bounce" || kind === "tusks" || kind === "fuse" || kind === "slam" || kind === "hop" || kind === "carrots" || kind === "repaint" || kind === "water";
+    const pick = kind === "bounce" || kind === "tusks" || kind === "fuse" || kind === "slam" || kind === "hop" || kind === "carrots" || kind === "repaint" || kind === "water" || kind === "queenlock";
     // A power limits the moves: the boss's (a pie), or the crowd's for the move Boingo plays for it.
     const allowed = funhouse ? runner.crowdAllowed() : runner.bossAllowed();
     // (Wrangler's turn: his long pulls, a drag or the showdown to work out too, ordered by a seed of the turn's own.)
@@ -2238,6 +2339,8 @@ export class LobbyCore {
     const land = kind === "elo" || kind === "stumble" || kind === "stagger" || kind === "fuse" ? landsAfterHisMove(runner.state.boss) : null;
     // (Chub & Chirp's Carrot Patch: his ordinary move in the race goes through his race brain, on the host's engine.)
     const race = kind === "elo" ? (runner.bossRace("elo")?.race ?? null) : null;
+    // (Chandy's locks: his ordinary move steered toward them, the same on the host and a checker, as it decides the move.)
+    const lock = kind === "elo" ? runner.bossLocks() : null;
     const own = kind === "elo" || kind === "stumble" || kind === "stagger" || kind === "best";
     const bare = checker && !this.bossExtrasAsked();
     // (Moo's Moonbeam lands after this move: the host lists the crowd's top moves after it.)
@@ -2274,7 +2377,7 @@ export class LobbyCore {
       ...(move ? hoopsAsk(runner) : {}),
       ...(move ? creaseAsk(runner) : {}),
       // (A step that spends his whole turn: the pass guard, on the host's engine. The server never searches.)
-      ...(kind === "fuse" || kind === "carrots" ? { pass: true as const } : {}),
+      ...(kind === "fuse" || kind === "carrots" || kind === "queenlock" ? { pass: true as const } : {}),
       // (`only`: the move that plays, its extras asked of the host (playChecked, N2): that move alone, no long pull, no brain.)
       ...(only ? { allowed: [only] } : allowed && !pick ? { allowed } : {}),
       ...(brain ? { brain } : {}),
@@ -2285,6 +2388,7 @@ export class LobbyCore {
       ...(asks ? { ...(asks.pull && !only ? { pull: asks.pull } : {}), ...(asks.drag && !bare ? { drag: true as const } : {}), ...(asks.showdown && !bare ? { showdown: asks.showdown } : {}), seed: asks.seed } : {}),
       ...(land ? { land: land.map((x) => ({ ...x })) } : {}),
       ...(race ? { race } : {}),
+      ...(lock ? { lock } : {}),
       ...(beam ? { beam } : {}),
       ...(balloon ? { balloon } : {}),
     });
@@ -2381,6 +2485,24 @@ export class LobbyCore {
     this.r.phase = "boss";
     this.r.bossKey = `c-${++this.r.counter}`;
     this.r.bossKind = "carrots";
+    this.r.bossMinAt = this.thinkMinAt();
+    this.broadcast(this.bossMessage(0, { thinking: true }));
+    const host = this.hostNow();
+    this.r.hostId = host;
+    if (host) this.sendBossRequest(host);
+    this.setTimer("bossTimeout", this.io.now() + BOSS_TIMEOUT_MS);
+  }
+
+  /**
+   * Chandy's queen lock (at the start of his turn, his move meter's pick: the runner's queenLockDue): everyone sees him get ready
+   * (thinking) while the host's engine checks the pass guard (the request's `pass`: PASS_WAIT when passing would lose real
+   * material); then the aim, his whole turn; then the crowd's turn, its moments (the aim's first). PASS_WAIT: no aim, he moves.
+   */
+  private requestQueenLock() {
+    this.sealPremoves();
+    this.r.phase = "boss";
+    this.r.bossKey = `q-${++this.r.counter}`;
+    this.r.bossKind = "queenlock";
     this.r.bossMinAt = this.thinkMinAt();
     this.broadcast(this.bossMessage(0, { thinking: true }));
     const host = this.hostNow();
@@ -2507,6 +2629,15 @@ export class LobbyCore {
       this.broadcast(this.bossMessage(until));
       return this.setTimer("nextRound", until);
     }
+    if (this.r.bossKind === "queenlock") {
+      // Chandy's queen lock: his whole turn spent aiming (the crowd's turn begins as after his move: its moments, the aim's). The
+      // host's PASS_WAIT (the pass guard: it waits, and he moves): straight on.
+      this.r.bossKind = undefined;
+      this.runner!.applyQueenLock(move === PASS_WAIT ? PASS_WAIT : null);
+      const until = this.io.now() + (!this.runner!.bossToMove() ? bossTurnShowMs(this.runner!.bossView()) : 0);
+      this.broadcast(this.bossMessage(until));
+      return this.setTimer("nextRound", until);
+    }
     if (this.r.bossKind === "carrots") {
       // Chub & Chirp's cast: his whole turn (the crowd's turn begins as after his move: its moments, the cast's first).
       // None due any more (nothing came of it), or the host's PASS_WAIT (the pass guard: it waits, and he moves):
@@ -2566,6 +2697,16 @@ export class LobbyCore {
       this.broadcast(this.bossMessage(until));
       return this.setTimer("nextRound", until);
     }
+    // Chandy's first capture: the crosshair locks onto the piece before his move shows (his point, while he still thinks), then the
+    // move, held for the moment as your queen banner holds it (bossMinAt; the same on solo: playBoss's beforeShow).
+    const holdMs = this.runner!.bossMoveMoment(move);
+    if (holdMs) {
+      this.r.bossMinAt = this.io.now() + holdMs;
+      this.r.bossPending = move;
+      this.r.bossPendingExtras = extras;
+      this.broadcast(this.bossMessage(0, { thinking: true }));
+      return this.setTimer("bossPlay", this.r.bossMinAt);
+    }
     // (Wrangler's drag or showdown line-up, Moo's lines for his Moonbeam, the circus tiger's hoops and balloon square,
     // Folio's Crease line: the runner checks each against the rules before it's used.)
     this.runner!.applyBossMove(move, undefined, { drag: extras.drag ?? null, showdown: extras.showdown ?? null, outside: extras.outside ?? null, beam: extras.beam ?? null, balloon: extras.balloon ?? null, hoops: extras.hoops ?? null, crease: extras.crease ?? null });
@@ -2617,7 +2758,7 @@ export class LobbyCore {
     // Nobody can run the engine: the boss plays a random allowed move so the match can go on (in his funhouse, the
     // crowd's: a random allowed one too). His extra move needs the engine to stay small: without one, he skips it.
     const runner = this.runner!;
-    if (this.r.bossKind === "extra" || this.r.bossKind === "bounce" || this.r.bossKind === "tusks" || this.r.bossKind === "fuse" || this.r.bossKind === "slam" || this.r.bossKind === "hop" || this.r.bossKind === "carrots" || this.r.bossKind === "repaint" || this.r.bossKind === "water") return this.playBoss("");
+    if (this.r.bossKind === "extra" || this.r.bossKind === "bounce" || this.r.bossKind === "tusks" || this.r.bossKind === "fuse" || this.r.bossKind === "slam" || this.r.bossKind === "hop" || this.r.bossKind === "carrots" || this.r.bossKind === "repaint" || this.r.bossKind === "water" || this.r.bossKind === "queenlock") return this.playBoss("");
     const legal = (this.r.bossKind === "funhouse" ? runner.crowdAllowed() : runner.bossAllowed()) ?? legalMoves(runner.boards.get(runner.state.boards[0]!)!.fen);
     this.playBoss(legal[Math.floor(this.rng() * legal.length)]!);
   }
@@ -2737,6 +2878,8 @@ export class LobbyCore {
     const runner = this.runner;
     if (!runner) return;
     if (runner.isOver()) return this.finishMatch();
+    // (The 50 v 50 rework: its one game over (by the rules or the move limit) ends the match for everyone still in.)
+    if (runner.endGameIfOver()) return this.finishMatch();
     if (runner.boss) {
       // (The Hidden Boss's child beaten, his fall over (he grew up: the fall path below, his rules' fallMs): a new match against his
       // adult form, the next of his forms (RECLUSE_FORMS), from the starting position, with its own intro, as solo's nextForm.)
@@ -2783,9 +2926,10 @@ export class LobbyCore {
       // (Hollow's Lights out, Big Boy's Big Bounce, Alfil's steps, Chub & Chirp's Carrot Patch cast (his whole turn) and
       // hop, Smudgy's Repaint and the hippo gardener's watering (each his whole turn) come at the start of his turn, before
       // his move. The circus tiger's hoops come after his move, with it: requestBoss.)
-      if (runner.bossToMove()) return runner.lightsOutDue() ? hollowLobby.startLights(this.bossLobby) : runner.bounceDue() ? this.requestBounce() : runner.alfilStep() ? this.requestAlfil() : runner.carrotDue() ? this.requestCarrots() : runner.repaintDue() ? this.requestRepaint() : runner.waterDue() ? this.requestWater() : runner.hopDue() ? this.requestHop() : this.requestBoss();
-      // (Dash's Scramble Rush, as the crowd's turn begins: the turn waits for it.)
+      if (runner.bossToMove()) return runner.lightsOutDue() ? hollowLobby.startLights(this.bossLobby) : runner.bounceDue() ? this.requestBounce() : runner.alfilStep() ? this.requestAlfil() : runner.carrotDue() ? this.requestCarrots() : runner.repaintDue() ? this.requestRepaint() : runner.waterDue() ? this.requestWater() : runner.hopDue() ? this.requestHop() : runner.queenLockDue() ? this.requestQueenLock() : this.requestBoss();
+      // (Dash's Scramble Rush, as the crowd's turn begins: the turn waits for it; Chandy's Dodge too.)
       if (runner.rushDue()) return dashLobby.startRush(this.bossLobby);
+      if (runner.dodgeDue()) return chandyLobby.startDodge(this.bossLobby);
       // (A failed Lights out or Scramble Rush: his extra move, after his own and before the crowd's turn.)
       if (runner.extraMoveDue()) return this.requestExtra();
       // (Boingo's funhouse: his move for the crowd, as its turn begins.)
@@ -2819,7 +2963,7 @@ export class LobbyCore {
     const alive = new Set(runner.alive().map((p) => p.id));
     const inRound = new Set(playing.map((h) => h.id));
     const crowd = this.settings.mode === "crowd";
-    const bossNow = runner.boss ? runner.bossView()! : undefined;
+    const bossNow = runner.boss ? this.bossViewSent() : undefined;
     for (const h of this.r.humans) {
       // Crowd 50 v 50: the team not picking still gets the board, to watch the vote come in.
       const watching = crowd && !final && alive.has(h.id) && !inRound.has(h.id);
@@ -3254,7 +3398,7 @@ export class LobbyCore {
     // The God King's Last Stand plays out in the reveal (the next move's clock starts after it: nobody loses time).
     const stand = report.boards.some((b) => b.lastStand);
     const until = this.io.now() + (this.settings.revealSeconds + this.settings.drawnMoveSeconds) * 1000 + (kingActs ? kingMoveMs(this.settings) : 0) + (stand ? lastStandMs() : 0);
-    const bossNow = runner.boss ? runner.bossView()! : undefined;
+    const bossNow = runner.boss ? this.bossViewSent() : undefined;
     const st = this.standings();
     const cutoff = this.cutoff();
     const slots = this.slots();
@@ -3305,6 +3449,8 @@ export class LobbyCore {
       }
       return this.nextRound();
     }
+    // (The 50 v 50 rework: a game over on any move ends the match, before a cut due on that move: it cuts nobody.)
+    if (runner.endGameIfOver()) return this.finishMatch();
     if (!runner.stageComplete()) return this.nextRound();
     if (runner.isFinal()) {
       runner.finishFinal();
@@ -4254,11 +4400,20 @@ export class LobbyCore {
    * unranked for those who stay, nor for the one who left. Only someone who left before move 1 doesn't count.
    */
   /**
-   * Whether `h`'s result counts for ranking: the match's (ranked), not practicing, and not resting on a Hidden Boss's phase 2 whose
-   * moves of his stood on one device's word (phase2Unvouched: the players of its boards only).
+   * Whether `h`'s result counts for ranking: the match's (ranked), not practicing, not resting on a Hidden Boss's phase 2 whose
+   * moves of his stood on one device's word (phase2Unvouched: the players of its boards only), and not a 50 v 50 party's member.
    */
   private rankedFor(h: { id: string; practice?: boolean }): boolean {
-    return this.ranked() && !h.practice && !phase2Unvouched(this.r, h.id);
+    return this.ranked() && !h.practice && !phase2Unvouched(this.r, h.id) && !this.partied(h.id);
+  }
+
+  /**
+   * `id` played in a 50 v 50 party of 2 or more friends: their own result isn't ranked unless CROWD_PARTY.ranked (the fix rounds of
+   * #747, M3 and N2: the director's call until Eric decides). The singles beside them stay ranked: a single's rating comes from their
+   * own moves, and the risk (friends relaying one player's moves) is in the party's own ratings.
+   */
+  private partied(id: string): boolean {
+    return !CROWD_PARTY.ranked && Object.values(this.r.crowdParties ?? {}).some((p) => p.ids.length >= 2 && p.ids.includes(id));
   }
 
   ranked(): boolean {
@@ -4343,12 +4498,16 @@ export class LobbyCore {
     this.r.timer = null;
     this.r.endedAt = this.io.now();
     const winner = runner.state.players.find((p) => p.placement === 1);
+    // (The 50 v 50 rework: the podium's titles and each player's "out at move" and points a move, in the standings' rows.)
+    const rework = runner.crowdResults();
+    const st = this.standings();
     const msg: Outgoing = {
       t: "results",
       placements: { ...this.r.placements },
       winner: winner ? this.nameOf(winner.id) : "",
       lossesByStage: Object.fromEntries(this.r.humans.map((h) => [h.id, runner.player(h.id).lossesByStage])),
-      standings: this.standings(),
+      standings: rework ? st.map((row) => ({ ...row, ...(rework.players[row.id] ?? {}) })) : st,
+      ...(rework ? { podium: rework.podium } : {}),
       ...(this.settings.mode === "crowd" ? { gameWinner: runner.gameWinner() } : {}),
       ...(runner.boss?.result ? { bossResult: runner.boss.result } : {}),
       // (The Hidden Boss's bullet clock ran out: he won on time. Read in the same event as the battle ended.)
@@ -4368,7 +4527,9 @@ export class LobbyCore {
     // its players', nothing counts for or against them.)
     const lone = { ...msg, ranked: false, unvouched: true as const };
     const board = { ...msg, ranked: false, noResult: "board" as const };
-    for (const h of this.r.humans) this.send(h.id, recluseNoResultFor(this.r, h.id) ? board : phase2Unvouched(this.r, h.id) ? lone : msg);
+    // (A 50 v 50 party's members: theirs isn't ranked, and their results say it's for the party: N2.)
+    const partied = { ...msg, ranked: false, partied: true as const };
+    for (const h of this.r.humans) this.send(h.id, recluseNoResultFor(this.r, h.id) ? board : phase2Unvouched(this.r, h.id) ? lone : this.partied(h.id) ? partied : msg);
     this.botChat({ kind: "end" });
     const js = this.r.judges;
     if (js?.stats.jobs) console.log(`judges in ${this.r.code}: ${JSON.stringify(js.stats)}`);

@@ -41,7 +41,7 @@ import { RIGHT_SLOT_TOOLS } from "../components/FrontMenu.tsx";
 import { UserIcon } from "../components/PixelIcon.tsx";
 import { openProfile } from "../profile-nav.ts";
 import { account, myPawnColor, onAccountChange, playerName } from "../account.ts";
-import { TOWN_ASKED, testSwitchesAllowed } from "../test-switches.ts";
+import { TOWN_ASKED, testParams, testSwitchesAllowed } from "../test-switches.ts";
 import { play, warmSounds } from "../sound.ts";
 import { preloadMusic, roomMusic, roomMusicLoad, splashDone, splashMusic, townMusic } from "../music.ts";
 import { AreaBanner, areaBannerOf, type AreaBannerText } from "./AreaBanner.tsx";
@@ -68,7 +68,7 @@ import { PAWN_HEAD, PAWN_PX, Renderer, pawnImage, type Hit, type YouArt } from "
 import { dropRiders, leaveRider, ridersHeld, rideArt, shareRider, type Rider, type RiderPawn } from "./rides.ts";
 import { rideSpeed } from "../components/rides/scale.ts";
 import { rideMoving, rideSoundState, rideStep, warmRideSound } from "../ride-sound.ts";
-import { HIDDEN_ROOM, MUSIC, mountOf, secondColor, shownLook, sideOfPawn } from "@chessroyale/core";
+import { BOSS_ROSTER, HIDDEN_ROOM, MUSIC, adminPlayable, mountOf, secondColor, shownLook, sideOfPawn } from "@chessroyale/core";
 import { painter2d, type Backend, type Painter } from "./paint.ts";
 import { painterGL } from "./paint-gl.ts";
 import { reportTownFallback } from "../problems.ts";
@@ -145,6 +145,14 @@ function fitRows(card: HTMLElement): void {
     }
   }
 }
+
+/** A town boss whose rules are in (core's roster, with his character and powers). Chandy's home came first (Nov 16). */
+const bossIn = (id: string): boolean => BOSS_ROSTER.some((b) => b.id === id && adminPlayable(b));
+/**
+ * A town boss you can challenge: his rules are in, or (test switch `introPreview`, Nov 16) his intro alone plays to its wipe, which then
+ * slides off and leaves you in his room: the e2e and the stills of an intro whose boss's rules come later (Chandy's).
+ */
+const bossReady = (id: string): boolean => bossIn(id) || testParams().has("introPreview");
 
 export function TownScreen({
   onBack,
@@ -392,6 +400,14 @@ export function TownScreen({
     // covering frame (each boss's last frame, Folio's crumpled ball) holds until it is, MUSIC.splashHoldMs at most.)
     const music = splashMusic(id);
     await storm.covered;
+    // (An intro's preview, `introPreview`: no battle to start; the wipe slides off over the room as the intro left it.)
+    if (!bossIn(id)) {
+      step("stormCovers");
+      await storm.out();
+      step("stormGone");
+      splashDone();
+      return;
+    }
     const ready = Promise.race([music, later(MUSIC.splashHoldMs)]);
     step("stormCovers");
     try {
@@ -844,9 +860,11 @@ export function TownScreen({
               <>
                 <h2>{home.boss}</h2>
                 {card.line && <p class="town-card-text town-card-line">{card.line}</p>}
-                <button type="button" class="town-btn primary" onClick={() => ctl.current?.confirm()}>
+                {/* (A boss whose rules aren't in yet, Chandy's on Nov 16: Challenge alone greyed, "Coming soon": nothing hidden.) */}
+                <button type="button" class="town-btn primary" disabled={!bossReady(home.id)} onClick={() => ctl.current?.confirm()}>
                   Challenge alone
                 </button>
+                {!bossReady(home.id) && <div class="town-soon">Coming soon</div>}
               </>
             )}
             {/* A home with its inside built (Nov 2: Babur's and Puddles'): its name and "Go in", centered, nothing else (Eric, Nov 2: "chop
@@ -2491,7 +2509,8 @@ function startTown(
     // its solos and the bosses' themes fetched after it.)
     setTimeout(() => {
       if (!alive) return;
-      townMusic(true);
+      // (`?townsolo`, a test switch: its first solo 37 s in, every time it starts; Nov 16.)
+      townMusic(true, testParams().has("townsolo"));
       void preloadMusic();
     }, MUSIC.townPreloadAfterMs);
   };

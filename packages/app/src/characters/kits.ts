@@ -35,6 +35,8 @@ import { BOSS_BEAVER_ATTACK as TIMBER_ATTACK } from "./timber.ts";
 import { TIMBER_CHANCE, TIMBER_LINES } from "./timber-lines.ts";
 import { BOSS_ZEBRA as ZEBRA, BOSS_ZEBRA_PORTRAIT } from "./zebra.ts";
 import { ZEBRA_ATTACK } from "./zebra-figure.ts";
+import { CHANDY, CHANDY_PORTRAIT, CHANDY_SOUNDS, CHANDY_SPRITE } from "./chandy.ts";
+import { CHANDY_LINES } from "./chandy-lines.ts";
 import { ZEBRA_CHANCE, ZEBRA_LINES } from "./zebra-lines.ts";
 import { DASH_ATTACK, DASH_FIGURE as DASH } from "./dash-figure.ts";
 import { DASH_CHANCE, DASH_LINES } from "./dash-lines.ts";
@@ -124,8 +126,8 @@ export interface BossKit extends BeatLines {
   /** The part of a frame a portrait shows, and from which animation and frame. */
   portrait: { x: number; y: number; w: number; h: number; anim: string; frame: number };
   /**
-   * A figure whose look changes in the battle (the Hidden Boss: his age, his suit): its portrait is this part of its bar's bust (`bar`)
-   * as the bust is drawn now (the loop his figure rests in, his suit), so a computer's face follows him as a phone's bust does
+   * A figure whose look changes in the battle (the Hidden Boss: his age, his final form): its portrait is this part of its bar's bust (`bar`)
+   * as the bust is drawn now (the loop his figure rests in, his final form), so a computer's face follows him as a phone's bust does
    * (BossFace, Nov 14). Undefined: `portrait`, one picture.
    */
   barFace?: { x: number; y: number; w: number; h: number };
@@ -169,11 +171,16 @@ export interface BossKit extends BeatLines {
    * their `p_` twin where the character has one (`p_move` for `move`), and its idle is `idle` here. See `poweredKit`.
    */
   powered?: { on: (boss: Pick<BossView, "id" | "startMove" | "powers">, now: number, stage?: Stage) => boolean; idle: string };
+  /**
+   * A figure that grows through the battle (Chandy's rifle: his locked pieces taken, 0-5): every moment's animation and loop is its
+   * stage's twin (`idle_s3` for `idle`) where the character has one; stage 0 its own. See `stagedKit`.
+   */
+  stageOf?: (boss: Pick<BossView, "powers">) => number;
   /** A figure that now and then changes how it rests (Moo hugs the moon, then sits on it): see characters/stance.ts. */
   rest?: Stance;
   /**
-   * Wears a suit from a moment on (the Hidden Boss, from his transformation: BossCharacter's `setSuitAt`): the same frames, their
-   * parts swapped for the suit's (recluse.ts, `suited`).
+   * Changes its look from a moment on (the Hidden Boss's final form, from his transformation: BossCharacter's `setSuitAt`; the name
+   * is round 3b's suit): the same frames, their parts swapped for the final form's (recluse.ts, `coated`).
    */
   suit?: boolean;
   /**
@@ -1083,16 +1090,40 @@ export const BOSS_KITS: Record<string, BossKit> = {
     // (His real "Best by test.", word for word: only when he's White and the battle's game opened 1.e4.)
     lineOf: (beat, boss) => (beat === "entrance" && boss.crowdSide === "b" && boss.board.history[0] === "e2e4" ? RECLUSE_LINES.introE4 : undefined),
     portrait: { ...RECLUSE_PORTRAIT, anim: "idle", frame: 0 },
-    // (A computer's face: his bust's, as it's drawn now, so it wears his suit in phase 2.)
+    // (A computer's face: his bust's, as it's drawn now, so it wears his final form in phase 2.)
     barFace: RECLUSE_BUST_PORTRAIT,
     // (The bust is 50 px wide: the wider box on a phone, as Sawyer's and Wrangler's.)
     wide: true,
-    // (Phase 2: his suit and helmet, from his transformation on.)
+    // (Phase 2: his final form, from his transformation on.)
     suit: true,
     // (His words above his head as it's drawn now, beside the board: kneeling as he mumbles, beaten.)
     heads: RECLUSE_HEADS,
   },
+  // Chandy (docs/decisions/2026-11-16-chandy-art.md, his rules 2026-11-16-chandy-rules.md): every moment at the rifle's stage now (his
+  // locked pieces taken, 0-5: `stageOf`, each animation's `_sN` twin); he points at what he locks, every shot a fire. His sounds are
+  // placeholders from other packs until his own (CHANDY_CUES); his lines are placeholders for Eric.
+  Chandy: {
+    // (His phone bar's fit: npx tsx scripts/bar-fit.ts.)
+    barScale: 0.76,
+    barShift: 12,
+    barName: 53,
+    ch: CHANDY,
+    sprite: CHANDY_SPRITE,
+    anims: { entrance: "point", thinking: "idle", move: "point", capture: "fire", strike: "fire", power: "fire", powerHit: "point", ultimateWarn: "aim", ultimate: "fire", ultimateHit: "fire", hurt: "stow", check: "fire", smug: "aim", rattled: "stow", victory: "fire", defeat: "stow" },
+    sounds: CHANDY_SOUNDS,
+    lines: CHANDY_LINES,
+    chance: { entrance: 1, capture: 0.3, rattled: 0.3, victory: 1, defeat: 1, ultimateWarn: 1 },
+    portrait: { ...CHANDY_PORTRAIT, anim: "idle", frame: 0 },
+    stageOf: (boss) => boss.powers?.chandy?.upgrades ?? 0,
+  },
 };
+
+/**
+ * Kits drawn ahead of their boss (Nov 16): a boss's art, complete as a kit, before his rules put him in the roster. Not in BOSS_KITS
+ * (that's the roster's: its tests walk every playable boss), so nothing in the game plays one; the art's previews do. The rules job
+ * moves a kit into BOSS_KITS (Chandy's moved there with his rules, Nov 16). None now.
+ */
+export const ART_KITS: Readonly<Record<string, BossKit>> = {};
 
 /**
  * The Hidden Boss in his child form (BossView.form "child", RECLUSE_CHILD; Nov 13): his growing figure (the child, 13, 20, then his
@@ -1158,6 +1189,34 @@ export function poweredKit(kit: BossKit): BossKit {
     poweredKits.set(kit, (k = { ...kit, anims, loops }));
   }
   return k;
+}
+
+const stagedKits = new WeakMap<BossKit, Map<number, BossKit>>();
+/** The kit at a stage of its figure (BossKit.stageOf): each moment's and loop's `_sN` twin where the character has one. Made once a kit and stage. */
+export function stagedKit(kit: BossKit, stage: number): BossKit {
+  if (!stage) return kit;
+  let byStage = stagedKits.get(kit);
+  if (!byStage) stagedKits.set(kit, (byStage = new Map()));
+  let k = byStage.get(stage);
+  if (!k) {
+    const twin = (name: string) => (kit.ch.anims[`${name}_s${stage}`] ? `${name}_s${stage}` : name);
+    const anims: Partial<Record<Beat, string>> = { ...kit.anims };
+    // (Only the moments it draws: those it names, and those its character has under the moment's own name.)
+    for (const b of BEAT_NAMES) {
+      const a = kit.anims[b] ?? (kit.ch.anims[b] ? b : undefined);
+      if (a) anims[b] = twin(a);
+    }
+    const loops: Partial<Record<Loop, string>> = { ...kit.loops };
+    for (const l of LOOP_NAMES) loops[l] = twin(kit.loops?.[l] ?? l);
+    byStage.set(stage, (k = { ...kit, anims, loops }));
+  }
+  return k;
+}
+
+/** The kit as it draws now: powered up while it is (poweredKit), at its figure's stage (stagedKit). */
+export function liveKit(kit: BossKit, boss: Pick<BossView, "id" | "startMove" | "powers">, now: number, stage?: Stage): BossKit {
+  const k = kit.powered?.on(boss, now, stage) ? poweredKit(kit) : kit;
+  return kit.stageOf ? stagedKit(k, kit.stageOf(boss)) : k;
 }
 
 /**

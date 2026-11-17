@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CROWD_KNOCKOUTS, CROWD_START, DEFAULT_SETTINGS, FRONT_DOOR, OPENING_ALLOWANCE, crowdFinalists, PREGAME_VOTES, RAID_SETTINGS, modeSettings, mulberry32, type Settings, voteResultMs } from "@chessroyale/core";
+import { CROWD_KNOCKOUTS, CROWD_START, CROWD_VOTES, DEFAULT_SETTINGS, FRONT_DOOR, OPENING_ALLOWANCE, PREGAME_VOTES, RAID_SETTINGS, modeSettings, mulberry32, type Settings, voteResultMs } from "@chessroyale/core";
 import { kingStrikeMs, lastStandMs, START_FEN, applyMove, bossIntroTimeline, freestyleBoard, isChess960Fen, legalMoves, pieceAt, sanLineToUci, toSan, type BoardScore, type MatchRunner, type Opening, type ServerMessage } from "@chessroyale/chess";
 import { LobbyCore, newLobbyRecord } from "../src/lobby.ts";
 
@@ -333,7 +333,8 @@ describe("lobby: Crowd mode", () => {
       const rest = b.votes.slice(1).map((v) => v[1]);
       expect(rest).toEqual([...rest].sort((x, y) => y - x));
       if (rest.length) expect(rest[0]).toBe(Math.max(...[...tally].filter(([m]) => m !== rev.playedMove).map(([, n]) => n)));
-      expect(JSON.stringify(b)).not.toMatch(/Ann|Bo|p1|p2|bot/);
+      // (Names never: the votes are moves and counts. The FEN itself can read "p1", a pawn and an empty square.)
+      expect(JSON.stringify({ ...b, fen: "" })).not.toMatch(/Ann|Bo|p1|p2|bot/);
       L.advance(10_000);
     }
   });
@@ -380,14 +381,16 @@ describe("lobby: Crowd mode", () => {
     throw new Error("the humans were always on the same team");
   });
 
-  it("pre-game votes: everyone votes on the ending, the start and the speed; the winners set the match's settings", () => {
+  it("pre-game votes: everyone votes on how moves are picked (the rework's, C2), the start and the speed; the winners set the match's settings", () => {
     const L = setup({ ...modeSettings("crowd", { augments: true }), boardIntroSeconds: 0 });
     L.core.connect(undefined, "Ann", "computer");
     L.core.connect(undefined, "Bo", "phone");
     L.core.message("p1", { t: "start" });
     const v = L.last("p2", "vote")!.vote;
     expect(v.index).toBe(0);
-    expect(v.count).toBe(PREGAME_VOTES.length);
+    expect(v.count).toBe(CROWD_VOTES.length);
+    // (Its id: the app looks the vote up by it, so an app and a lobby made before or after the rework agree.)
+    expect(v.id).toBe("pick");
     // The bots' votes, all decided as it opens: most of the 98 bots vote (a few don't: voteBotSkip).
     const botsVoting = v.votes.length;
     expect(v.votes.every((x) => x.playerId.startsWith("bot") && !x.joined)).toBe(true);
@@ -413,19 +416,19 @@ describe("lobby: Crowd mode", () => {
     expect(joined.every((x) => x.option === done.result && x.at === L.now)).toBe(true);
     expect(done.votes.find((x) => x.playerId === "p1")).toMatchObject({ option: 1 });
     expect(done.votes.filter((x) => !x.joined)).toEqual(expect.arrayContaining(v.votes));
-    const format = PREGAME_VOTES[0]!.options[done.result!]!;
-    expect(L.core.record.overrides?.finalFormat).toBe(format.patch.finalFormat);
+    const pick = CROWD_VOTES[0]!.options[done.result!]!;
+    expect(L.core.record.overrides?.crowdPick).toBe(pick.patch.crowdPick);
     L.advance(voteResultMs(DEFAULT_SETTINGS));
     // How it starts (Eric, Oct 24: the second vote now), then the speed.
-    expect(L.last("p1", "vote")!.vote.index).toBe(1);
+    expect(L.last("p1", "vote")!.vote).toMatchObject({ index: 1, id: "start" });
     L.advance(DEFAULT_SETTINGS.voteSeconds * 1000);
-    const start = PREGAME_VOTES[1]!.options[L.last("p1", "vote")!.vote.result!]!;
+    const start = CROWD_VOTES[1]!.options[L.last("p1", "vote")!.vote.result!]!;
     expect(L.core.record.overrides).toMatchObject(start.patch);
     L.advance(voteResultMs(DEFAULT_SETTINGS));
     const speedVote = L.last("p1", "vote")!.vote;
-    expect(speedVote.index).toBe(2);
+    expect(speedVote).toMatchObject({ index: 2, id: "speed" });
     L.advance(DEFAULT_SETTINGS.voteSeconds * 1000);
-    const speed = PREGAME_VOTES[2]!.options[L.last("p1", "vote")!.vote.result!]!;
+    const speed = CROWD_VOTES[2]!.options[L.last("p1", "vote")!.vote.result!]!;
     L.advance(voteResultMs(DEFAULT_SETTINGS));
     // The game starts with the voted time control: its cap and increment on the round, its bank for everyone.
     const round = L.last("p1", "round")!;
@@ -435,23 +438,23 @@ describe("lobby: Crowd mode", () => {
     expect(L.core.record.overrides).toMatchObject(speed.patch);
   });
 
-  it("pre-game votes: nobody votes, so the default wins (Team final, Normal, then Blitz 5+3) and everyone joins it", () => {
+  it("pre-game votes: nobody votes, so the default wins (Strong since the rework, Normal, then Blitz 5+3) and everyone joins it", () => {
     const L = setup({ ...modeSettings("crowd", { augments: true }), boardIntroSeconds: 0, voteBotSkip: 1 });
     L.core.connect(undefined, "Ann", "computer");
     L.core.connect(undefined, "Bo", "phone");
     L.core.message("p1", { t: "start" });
-    for (const [index, want] of [[0, "team"], [1, "normal"], [2, "blitz"]] as const) {
+    for (const [index, want] of [[0, "strong"], [1, "normal"], [2, "blitz"]] as const) {
       const v = L.last("p1", "vote")!.vote;
       expect(v.index).toBe(index);
       expect(v.votes).toEqual([]);
       L.advance(DEFAULT_SETTINGS.voteSeconds * 1000);
       const done = L.last("p2", "vote")!.vote;
-      expect(PREGAME_VOTES[index]!.options[done.result!]!.id).toBe(want);
+      expect(CROWD_VOTES[index]!.options[done.result!]!.id).toBe(want);
       expect(done.votes).toHaveLength(100);
       expect(done.votes.every((x) => x.joined && x.option === done.result)).toBe(true);
       L.advance(voteResultMs(DEFAULT_SETTINGS));
     }
-    expect(L.core.record.overrides).toMatchObject({ finalFormat: "team", crowdStart: "normal", openingMoves: 0, timeBankSeconds: 300, timeIncrementSeconds: 3, moveClockSeconds: 15 });
+    expect(L.core.record.overrides).toMatchObject({ crowdPick: "strong", crowdStart: "normal", openingMoves: 0, timeBankSeconds: 300, timeIncrementSeconds: 3, moveClockSeconds: 15 });
     const round = L.last("p1", "round")!;
     expect([round.moveClock, round.increment, round.deadline - round.startsAt!]).toEqual([15, 3, 15_000]);
   });
@@ -676,30 +679,17 @@ describe("lobby: Crowd mode", () => {
     expect([1, 2, 5, 6, 7].map((m) => clocks.get(m))).toEqual([10, 10, 10, 15, 15]);
   });
 
-  it("the boss final online (always the Hidden Boss): the host plays his moves, he never strikes, results carry the outcome", () => {
-    const L = setup({ ...modeSettings("crowd", { augments: false }), finalFormat: "boss", knockoutsPerStage: CROWD_KNOCKOUTS.boss, stageRounds: [], firstStageRounds: 1, roundsPerStage: 1, boardIntroSeconds: 0, bossMaxMoves: 7 });
+  it("the 50 v 50 rework online (C2): its one game played to the move limit (a test's ?limit=), no endings; the results carry the podium and each row's out-at-move and points a move; the places in the new order", () => {
+    // A cut every move (?rounds=1): 8 cuts by move 4 (White's 5th is the 1 v 1's first), the limit after Black's 6th.
+    const L = setup({ ...modeSettings("crowd", { augments: false }), stageRounds: [], firstStageRounds: 1, roundsPerStage: 1, boardIntroSeconds: 0, crowdMoveLimit: 6 });
     // (Ann has switched the eval bar off; Bo's app is from before the setting: it doesn't say.)
     L.core.connect(undefined, "Ann", "computer", false, null, undefined, undefined, null, false);
     L.core.connect(undefined, "Bo", "phone");
     L.core.message("p1", { t: "start" });
     L.advance(1000);
-    let bossMoves = 0;
-    let strikes = 0;
+    const breaks: number[] = [];
     for (let i = 0; i < 400 && L.core.record.phase !== "results"; i++) {
-      const req = L.last("p1", "bossRequest") ?? L.last("p2", "bossRequest");
-      if (req && L.core.record.phase === "boss" && L.core.record.bossKey === req.key) {
-        const host = L.last("p1", "bossRequest") ? "p1" : "p2";
-        L.core.message(host, { t: "bossMove", key: req.key, move: legalMoves(req.fen)[0]! });
-        bossMoves++;
-        // (Held a moment if the crowd just took its queen: its banner plays first.)
-        if (L.core.record.bossPending) L.advance(2100);
-        const b = L.last("p2", "boss")!;
-        expect(b.boss.lastMove).not.toBeNull();
-        L.take("p1");
-        L.take("p2");
-        L.advance(2000);
-        continue;
-      }
+      expect(["play", "scoring", "reveal", "stageBreak", "opening"]).toContain(L.core.record.phase);
       if (L.core.record.phase === "play") {
         for (const id of ["p1", "p2"]) {
           const r = L.last(id, "round");
@@ -708,42 +698,50 @@ describe("lobby: Crowd mode", () => {
         L.advance(25_000);
       }
       if (L.core.record.phase === "scoring") L.hostScores("p1") || L.hostScores("p2");
-      const b = L.last("p1", "boss");
-      if (b?.boss.justKilled) {
-        strikes++;
+      const sb = L.last("p1", "stageBreak");
+      if (sb) {
+        breaks.push(sb.stage);
         L.take("p1");
       }
       L.advance(5000);
     }
     expect(L.core.record.phase).toBe("results");
-    expect(bossMoves).toBeGreaterThan(0);
-    expect(L.core.save().runner!.state.boss!.id).toBe("recluse");
-    expect(strikes).toBe(0);
+    // Eight cuts, no final, no boss; the game to Black's 6th move.
+    expect(breaks).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
+    const runner = L.core.save().runner!;
+    expect(runner.state.final).toBeUndefined();
+    expect(runner.state.boss).toBeUndefined();
+    expect(runner.boards[0]!.fen.split(" ")[5]).toBe("7");
     const res = L.last("p1", "results")!;
-    expect(["crowd", "boss", "draw"]).toContain(res.bossResult);
-    expect(Object.keys(res.placements)).toHaveLength(100);
-    // What goes on their profiles: cuts faced and survived, brilliant moves, the best move, the boss battle if reached.
-    const stages = CROWD_KNOCKOUTS.boss.length;
+    expect(Object.values(res.placements).sort((a, b) => a - b)).toEqual(Array.from({ length: 100 }, (_, i) => i + 1));
+    // The podium: the winner is 1st of a won game (none drawn), the best player someone who played.
+    const first = Object.entries(res.placements).find(([, n]) => n === 1)![0];
+    expect(res.podium).toBeDefined();
+    expect(res.podium!.winner).toBe(res.gameWinner ? first : undefined);
+    expect(res.podium!.best).toBeTruthy();
+    // Each row: a cut's move (after 1, 2, 3 or 4 here: ?rounds=1 cuts each ply, by Black's move number), or null for the two
+    // still in at the end; and points a move.
+    for (const row of res.standings) {
+      expect(row.perMove === null || row.perMove! >= 0).toBe(true);
+      if (row.placement! <= 2) expect(row.outAtMove).toBeNull();
+      else expect(typeof row.outAtMove).toBe("number");
+    }
+    // The 1 v 1's two: one a side, the winner first.
+    const top2 = res.standings.filter((r) => r.placement! <= 2);
+    expect(new Set(top2.map((r) => r.team))).toEqual(new Set(["w", "b"]));
+    if (res.gameWinner) expect(top2.find((r) => r.placement === 1)!.team).toBe(res.gameWinner);
+    // What goes on their profiles (moved here from the old boss final's test, C4): cuts faced, brilliant moves, the best move;
+    // no boss battle. Whether each had the eval bar on, as their app said when they joined.
     const mine = L.core.humanResults();
     expect(mine).toHaveLength(2);
-    // Whether each had the eval bar on, as their app said when they joined.
     expect(mine.find((r) => r.playerId === "p1")!.evalBar).toBe(false);
     expect(mine.find((r) => r.playerId === "p2")!.evalBar).toBeNull();
     for (const r of mine) {
       expect(r.cuts).toBeGreaterThan(0);
-      expect(r.cuts).toBeLessThanOrEqual(stages);
-      // (The top 4 fought him: crowdFinalists.)
-      const fought = r.placement <= crowdFinalists("boss");
-      expect(r.cutsSurvived).toBe(r.cuts === stages && fought ? stages : r.cuts! - 1);
       expect(r.brilliant).toBeGreaterThanOrEqual(0);
       expect(r.bestMove).toMatch(/^(?:[KQRBN]?[a-h]?[1-8]?x?[a-h][1-8](?:=[QRBN])?|O-O(?:-O)?)[+#]?$/);
       expect(r.bossElo).toBeNull();
-      if (fought) {
-        expect(r.strikes).toBe(0);
-        expect(r.strikesSurvived).toBe(0);
-        expect(r.survived).toBe(true);
-        expect(r.lastStand).toBe(false);
-      } else expect(r.strikes).toBeNull();
+      expect(r.strikes).toBeNull();
     }
   });
 

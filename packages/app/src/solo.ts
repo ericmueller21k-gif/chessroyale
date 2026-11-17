@@ -1,8 +1,8 @@
 import { RECLUSE_CHILD, RECLUSE_CUTSCENE, RECLUSE_PHASE2, BOSS_ALONE_SCORING, bossClockSettings, BOSS_BRAIN, BOSS_POWERS, DEFAULT_SETTINGS, MATCHMAKING, type ItemLook, type MatchmakingType, botVotes, castPregameVote, clockAfterVote, closePregameVote, cutSeconds, pregameVotes, voteResultMs, type Augment, type BossBrain, type PlayerState, type Settings } from "@chessroyale/core";
 import { GUARD_WORDS, MatchRunner, START_FEN, baseAt, ShowdownScout, brainLine as brainWords, boardSlots, type HumanUciEngine, netBoard, type LobbyPlayer, type LivePick, toSan, type BoardSlot, type BoardState, type NetFinal, type Opening, type RoundReport, type UciEngine } from "@chessroyale/chess";
-import { bulletClock, crowdRace, phase2Numbers, phase2Standings, phase2ToMove, botRoster, bossIntroTimeline, bossThinkMs, landedEarlyMs, fullMoonMs, folioTurnMs, popOffMs, zebraTurnMs, bossTurnShowMs, judgeTaps, bossRules, kingHelpBlocked, kingMoveMs, kingStrikeMs, lightsDeadline, lightsOutTimeline, lightsRoundEnd, lastStandMs, powerMomentMs, rushKeep, rushMovesLeft, rushSquares, rushTimeline } from "@chessroyale/chess";
+import { type Phase2Board, bulletClock, crowdRace, phase2Numbers, phase2Standings, phase2ToMove, botRoster, bossIntroTimeline, bossThinkMs, landedEarlyMs, fullMoonMs, folioTurnMs, popOffMs, zebraTurnMs, chandyTurnMs, dodgeTimeline, dodgeArena, dodgeEndAt, dodgeOver, bossTurnShowMs, judgeTaps, bossRules, kingHelpBlocked, kingMoveMs, kingStrikeMs, lightsDeadline, lightsOutTimeline, lightsRoundEnd, lastStandMs, powerMomentMs, rushKeep, rushMovesLeft, rushSquares, rushTimeline } from "@chessroyale/chess";
 import type { BossView, BoardView, DarkNote, ExitKind, FinalView, GameView, Hint, LightsView, MoveRecord, RushView, Phase, SimulView, Standing, VoteView } from "./game.ts";
-import { PHASE2_ULT_ANIMS, PHASE_CHANGE, Phase2Game, phase2Follows, phase2Mates, phaseChangeRun } from "./recluse-phase2.ts";
+import { PHASE_CHANGE, Phase2Game, cueSlash, phase2Follows, phase2Mates, phaseChangeRun } from "./recluse-phase2.ts";
 import { RECLUSE_LINES } from "./characters/recluse-lines.ts";
 import { playInPlace, resetBeats, setSuitAt, setFigureRun } from "./components/BossCharacter.tsx";
 import { resetBattleBanners } from "./battle-banners.ts";
@@ -454,6 +454,7 @@ export class SoloMatch implements GameView {
     this.voteState = {
       key: `vote-${index}`,
       index,
+      id: votes[index]!.id,
       count: votes.length,
       startsAt: now,
       until: now + ms,
@@ -785,6 +786,74 @@ export class SoloMatch implements GameView {
     this.set({ kind: "boss", boss: this.bossSnapshot(), until: 0, lights });
   }
 
+  // ---------------- Chandy's queen lock and Dodge ----------------
+
+  /**
+   * Chandy's queen lock (at the start of his turn, his meter's pick): he gets ready (thinking) while this device's engines check the
+   * pass guard, then the aim, his whole turn; then your turn, its moments (the aim's first) before your clock starts. When passing
+   * would lose real material it waits and he plays his move (as online). No engine answer: the aim.
+   */
+  private async queenLockTurn() {
+    const snap = this.bossSnapshot();
+    this.set({ kind: "boss", boss: snap, until: 0, thinking: true });
+    const aim = this.runner.playQueenLock(this.engines).catch(() => this.runner.applyQueenLock(null));
+    await Promise.all([aim, new Promise((r) => setTimeout(r, bossThinkMs(snap)))]);
+    if (this.stopped) return;
+    const showMs = !this.runner.bossToMove() ? bossTurnShowMs(this.runner.bossView(), this.alone) : 0;
+    this.set({ kind: "boss", boss: this.bossSnapshot(), until: Date.now() + showMs });
+    this.timer = setTimeout(() => this.nextRound(), showMs);
+  }
+
+  /** Dodge on (your turn waits for it): its key, when it began, the round on and your vote in it. */
+  private dodge: { key: string; at: number; round: number; mine?: string } | null = null;
+
+  /** As your turn begins: the scope-in, the warning volley, then three rounds of the vote, each closed here as the server closes them online. */
+  private dodgeTurn() {
+    if (this.timer) clearTimeout(this.timer);
+    const at = Date.now();
+    this.dodge = { key: `d-${at}`, at, round: 0 };
+    this.showDodge();
+    this.armDodge();
+  }
+  private showDodge() {
+    const d = this.dodge!;
+    this.set({ kind: "boss", boss: this.bossSnapshot(), until: 0, dodge: { key: d.key, at: d.at, round: d.round, votes: d.mine ? { [d.mine]: 1 } : {}, ...(d.mine ? { mine: d.mine } : {}) } });
+  }
+  private armDodge() {
+    const d = this.dodge!;
+    const full = this.runner.state.boss?.powers?.chandy?.dodge;
+    const tl = dodgeTimeline();
+    if (this.timer) clearTimeout(this.timer);
+    const due = !full || dodgeOver(full) ? d.at + (full ? dodgeEndAt(full) : tl.rounds[0]!.end) : d.at + tl.rounds[full.results.length]!.closeAt;
+    this.timer = setTimeout(() => this.dodgeStep(), Math.max(0, due - Date.now()));
+  }
+  /** A round closes (your vote, or a square from the seed; in a Solo raid the bots' too), or (over) on with the battle. */
+  private dodgeStep() {
+    const d = this.dodge;
+    const full = this.runner.state.boss?.powers?.chandy?.dodge;
+    if (!d || !full || this.stopped) return;
+    if (!dodgeOver(full)) {
+      this.runner.finishDodgeRound(this.you.alive && d.mine ? { [HUMAN]: d.mine } : {});
+      d.round++;
+      d.mine = undefined;
+      this.showDodge();
+      return this.armDodge();
+    }
+    this.dodge = null;
+    this.nextRound();
+  }
+  /** Dodge: your vote in the round on, while its vote is open (as the server counts it online). */
+  dodgeVote(square: string) {
+    const d = this.dodge;
+    const full = this.runner.state.boss?.powers?.chandy?.dodge;
+    if (!d || !full || dodgeOver(full) || this.phase.kind !== "boss" || !this.phase.dodge || !this.you.alive || !dodgeArena(full.center).includes(square)) return;
+    const r = dodgeTimeline().rounds[d.round]!;
+    const t = Date.now() - d.at;
+    if (t < r.voteAt - 300 || t > r.voteEnd) return;
+    d.mine = square;
+    this.showDodge();
+  }
+
   // ---------------- Dash's Scramble Rush ----------------
 
   /** The Rush on (your turn waits for it): its key, when it began, your placements so far. */
@@ -926,8 +995,8 @@ export class SoloMatch implements GameView {
   /** Testing (admins): the boss's ultimate as the next crowd turn begins. */
   triggerUltimate() {
     if (!BOSS_POWERS.ultimateTestButton || !account().profile?.admin) return;
-    // (The Hidden Boss's phase 2: his ultimate now.)
-    if (this.phase.kind === "simul") return void (this.phase2Playing && this.phase2?.ult());
+    // (The Hidden Boss's phase 2 has no ultimate since Nov 16: the trigger cuts one of your hearts now, the slash on demand.)
+    if (this.phase.kind === "simul") return void (this.phase2Playing && this.phase2?.slash());
     if (this.runner.triggerUltimate()) this.emit();
   }
   get boss(): BossView | null {
@@ -962,9 +1031,18 @@ export class SoloMatch implements GameView {
     // (G-REX's fire has just burnt something, or Alfil's pieces came down early, or Moo's Full Moon came, or Folio folded a
     // piece or wrote its Revision: it plays out before the boss's move.)
     const burnt = !!snap.powers?.burnt?.some((b) => b.turn === snap.crowdMoves && (b.piece || b.fizzled));
-    const landed = landedEarlyMs(snap) + fullMoonMs(snap) + folioTurnMs(snap) + popOffMs(snap) + zebraTurnMs(snap);
+    const landed = landedEarlyMs(snap) + fullMoonMs(snap) + folioTurnMs(snap) + popOffMs(snap) + zebraTurnMs(snap) + chandyTurnMs(snap);
     const minThink = bossThinkMs(snap, burnt, landed) - (this.alone && !burnt && !landed ? Date.now() - this.movedAt : 0);
-    await Promise.all([this.runner.playBoss(this.engines[0]), new Promise((r) => setTimeout(r, Math.max(0, minThink)))]);
+    const thinkEnd = Date.now() + Math.max(0, minThink);
+    // (Chandy's first capture: once the thinking's moments are done, the crosshair locks onto the piece he's about to take, then his
+    // move shows; as the server holds the host's move.)
+    const beforeShow = async (ms: number) => {
+      await new Promise((r) => setTimeout(r, Math.max(0, thinkEnd - Date.now())));
+      if (this.stopped) return;
+      this.set({ kind: "boss", boss: this.bossSnapshot(), until: 0, thinking: true });
+      await new Promise((r) => setTimeout(r, ms));
+    };
+    await Promise.all([this.runner.playBoss(this.engines[0], beforeShow), new Promise((r) => setTimeout(r, Math.max(0, minThink)))]);
     if (this.stopped) return;
     // As the turn passes to you, any power that comes with it (a freeze, a pie, the warning, the blizzard) plays out
     // before your clock starts.
@@ -1159,7 +1237,7 @@ export class SoloMatch implements GameView {
 
   /**
    * His phase change (PHASE_CHANGE, about 23 s; not skippable, like a boss's intro): his transformation by the book's light,
-   * carrying on from his cutscene (the white-out, his suit, his visor up for his line), his leap and the split on the music's drop,
+   * carrying on from his cutscene (the white-out, his final form, his first line), his leap and the split on the music's drop,
    * the book back in his hands, the shuffle, his leap back. The God King stays in his place, greyed (he says nothing in phase 2,
    * and can't be called). Phase 2's boards are set up now (each its own Chess960 start, from the battle's seed), so the
    * shuffle shows where they go; their clocks start after it, and a countdown on them (startSimul). `fromFall`: after phase 1's fall, whose mumbling carries
@@ -1191,15 +1269,13 @@ export class SoloMatch implements GameView {
       rng: this.rng,
       onChange: () => this.emit(),
       onResult: (b) => this.phase2Result(b.result!.winner),
-      onSlow: (id, ult) => this.phase2Slow(id, ult),
-      onUlt: () => this.phase2Ult(),
+      onSlash: (b) => this.phase2Slash(b),
       onDone: () => this.phase2Done(),
     });
-    this.lastSlow = null;
-    // (The slow move's sound made ahead, off the page, before play begins.)
-    warmSounds(["recluseSlow", "recluseSpark", "recluseArc"]);
+    // (The slash's sound made ahead, off the page, before play begins.)
+    warmSounds(["recluseSlash", "recluseSpark", "recluseArc"]);
     // Where he stands: empty while the board draws him (from the start, as in his cutscene), and once he's back he rests in
-    // phase 2's idle. His suit from the white-out on, for the rest of the fight.
+    // phase 2's idle. His final form from the white-out on, for the rest of the fight.
     setFigureRun(phaseChangeRun(at));
     setSuitAt(at + PHASE_CHANGE.whiteFull);
     // (The board cracks into four at `splitAt`: his music's drop is put there, music.ts.)
@@ -1238,30 +1314,12 @@ export class SoloMatch implements GameView {
     bossVoice.say(lines[Math.floor(this.rng() * lines.length)]!, "recluse:phase2", NORMAL);
   }
 
-  private phase2Lines = { won: 0, lost: 0, slow: 0 };
+  private phase2Lines = { won: 0, lost: 0 };
 
-  /**
-   * A slow move (the team's count, the X marks beside every board): a soft sound, and his word on it if nothing else is
-   * being said (one bubble: it waits a little, then lapses).
-   */
-  private phase2Slow(boardId: number, ult: boolean) {
-    // (Soft and low: two notes falling. The board it was on flashes its marks, and the dock names it, for a moment.)
-    play("recluseSlow");
-    this.lastSlow = { board: boardId, at: Date.now() };
-    // (The one that brings his ultimate: his ultimate's line instead.)
-    if (ult) return;
-    const lines = RECLUSE_LINES.slow;
-    bossVoice.say(lines[this.phase2Lines.slow++ % lines.length]!, `recluse:p2:slow:${this.phase2Lines.slow}`, LOW);
-  }
-  /** The last slow move: on which board, and when (its marks flash, the dock names it). */
-  private lastSlow: { board: number; at: number } | null = null;
-
-  /** His ultimate: his line, the spellbook where he stands; from now on a few seconds a move on every board. */
-  private phase2Ult() {
-    const at = Date.now();
-    playInPlace(`recluse:ult2:${at}`, PHASE2_ULT_ANIMS, at);
-    const lines = RECLUSE_LINES.ult2;
-    bossVoice.say(lines[Math.floor(this.rng() * lines.length)]!, `recluse:p2:ult:${at}`, CRITICAL);
+  /** A heart cut (Eric, Nov 16): yours, the slash's sound and his line; a bot's, the slash on its board alone (Recluse2.tsx). */
+  private phase2Slash(b: Phase2Board) {
+    // (Which last line from the moment it came, not the match's random source: drawing from it would move everything drawn after.)
+    if (b.player === HUMAN) cueSlash(b.hearts, `solo:${b.slashAt}`, b.slashAt ?? 0);
   }
   /** A board decided: his word on it (a draw: nothing). The board's own tag says won or lost; the God King says nothing. */
   private phase2Result(winner: "crowd" | "boss" | "draw") {
@@ -1326,9 +1384,6 @@ export class SoloMatch implements GameView {
       from: this.phase2From,
       playing: this.phase2Playing,
       ...o,
-      slow: g.state.slow,
-      lastSlow: this.lastSlow,
-      ultAt: g.state.ultAt,
       boards: g.state.boards.map((b) => ({
         id: b.id,
         you: b.player === HUMAN,
@@ -1342,6 +1397,8 @@ export class SoloMatch implements GameView {
         turnAt: this.phase2Playing ? b.turnAt : null,
         toMove: this.phase2Playing ? phase2ToMove(b) : null,
         result: b.result,
+        hearts: b.hearts,
+        slashAt: b.slashAt,
       })),
     };
     this.simulCache = { state: g.state, playing: this.phase2Playing, view };
@@ -1357,6 +1414,8 @@ export class SoloMatch implements GameView {
 
   private nextRound() {
     if (this.runner.isOver()) return this.finish();
+    // (The 50 v 50 rework: its one game over (by the rules or the move limit) ends the match for everyone still in.)
+    if (this.runner.endGameIfOver()) return this.finish();
     if (!this.you.alive) return void this.simulateRest();
     if (this.runner.boss) {
       // (Testing, ?phase=2: the Hidden Boss's phase 2 at once, from the phase change.)
@@ -1404,9 +1463,10 @@ export class SoloMatch implements GameView {
       }
       // (Hollow's Lights out, Big Boy's Big Bounce, Alfil's steps, Chub & Chirp's Carrot Patch cast (his whole turn) and
       // hop come at the start of his turn, before his move.)
-      if (this.runner.bossToMove()) return void (this.runner.lightsOutDue() ? this.lightsOutTurn() : this.runner.bounceDue() ? this.bounceTurn() : this.runner.alfilStep() ? this.alfilTurn() : this.runner.carrotDue() ? this.carrotTurn() : this.runner.repaintDue() ? this.repaintTurn() : this.runner.waterDue() ? this.waterTurn() : this.runner.hopDue() ? this.hopTurn() : this.bossTurn());
-      // (Dash's Scramble Rush, as your turn begins: the turn waits for it.)
+      if (this.runner.bossToMove()) return void (this.runner.lightsOutDue() ? this.lightsOutTurn() : this.runner.bounceDue() ? this.bounceTurn() : this.runner.alfilStep() ? this.alfilTurn() : this.runner.carrotDue() ? this.carrotTurn() : this.runner.repaintDue() ? this.repaintTurn() : this.runner.waterDue() ? this.waterTurn() : this.runner.hopDue() ? this.hopTurn() : this.runner.queenLockDue() ? this.queenLockTurn() : this.bossTurn());
+      // (Dash's Scramble Rush, as your turn begins: the turn waits for it; Chandy's Dodge too.)
       if (this.runner.rushDue()) return void this.rushTurn();
+      if (this.runner.dodgeDue()) return void this.dodgeTurn();
       // (A failed Lights out or Scramble Rush: his extra move, after his own and before your turn.)
       if (this.runner.extraMoveDue()) return void this.extraTurn();
       // (Boingo's funhouse: his move for you, as your turn begins.)
@@ -1549,6 +1609,8 @@ export class SoloMatch implements GameView {
 
   private afterReveal() {
     if (this.runner.boss) return this.afterBossRound();
+    // (The 50 v 50 rework: a game over on any move ends the match, before a cut due on that move: it cuts nobody.)
+    if (this.runner.endGameIfOver()) return this.finish();
     if (!this.runner.stageComplete()) return this.nextRound();
     const stage = this.runner.state.stage;
     const before = this.standings();
@@ -1667,11 +1729,15 @@ export class SoloMatch implements GameView {
           // (The hippo gardener's watering: his whole turn; the pass guard, or no engine answer: he moves.)
           if (this.runner.waterDue()) await this.runner.playWater(this.engines).catch(() => this.runner.applyWater(null));
           if (this.runner.hopDue()) await this.runner.playHop(this.engines).catch(() => this.runner.applyHop(null));
+          // (Chandy's queen lock: his whole turn, unless the pass guard has it wait.)
+          if (this.runner.queenLockDue()) await this.runner.playQueenLock(this.engines).catch(() => this.runner.applyQueenLock(null));
           if (this.runner.bossToMove()) await this.runner.playBoss(this.engines[0]);
           continue;
         }
-        // (Dash's Scramble Rush with nobody watching: the bots' from the seed.)
+        // (Dash's Scramble Rush with nobody watching: the bots' from the seed; Chandy's Dodge: the bots' votes.)
         if (this.runner.rushDue()) this.runner.finishRush({});
+        while (this.runner.dodgeDue()) this.runner.finishDodgeRound({});
+        if (this.runner.stageComplete()) continue;
         if (this.runner.extraMoveDue()) {
           await this.runner.playExtraMove(this.engines[0]);
           continue;
@@ -1686,9 +1752,12 @@ export class SoloMatch implements GameView {
         if (this.runner.bossKillDue()) this.runner.bossKill();
         continue;
       }
+      // (The 50 v 50 rework: its game over ends the match, ahead of any cut.)
+      if (this.runner.endGameIfOver()) break;
       this.runner.deal();
       await this.runner.score(new Map());
       if (this.stopped) return;
+      if (this.runner.endGameIfOver()) break;
       if (this.runner.final) this.runner.afterFinalTurn();
       if (this.runner.stageComplete()) {
         if (this.runner.isFinal() && this.runner.final) this.runner.finishFinal();

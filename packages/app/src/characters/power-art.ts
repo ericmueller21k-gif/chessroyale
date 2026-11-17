@@ -304,8 +304,9 @@
  * (sparkFly, candleShot, fireballFall's fall) with a CSS transform, never by redrawing.
  */
 import type { SoundName } from "../sound.ts";
+import { CHANDY_DODGE_SOUNDS, CHANDY_SOUNDS } from "./chandy.ts";
 import { EFFECT_SPRITES, TOY_LETTER_NAMES, type ToyLetter } from "./effects.ts";
-import type { Anim, Character } from "./sprite.ts";
+import { animLength, cueAt, type Anim, type Character } from "./sprite.ts";
 
 /** The power moments' animation names, every boss's. */
 export const POWER_ANIMS = [
@@ -636,6 +637,21 @@ export const EFFECTS: Record<EffectName, Effect> = {
   creasePencil: { ch: EFFECT_SPRITES.creasePencil, covers: "square", loop: "E", sounds: {} },
   inkStrike: { ch: EFFECT_SPRITES.inkStrike, covers: "square", start: "strike", loop: "struck", sounds: { strike: "folioScratch" } },
   inkHit: { ch: EFFECT_SPRITES.inkHit, covers: "square", start: "hitHL", sounds: {} },
+  // Chandy's (effects/chandy.ts): placeholder sounds until his own pack (chandy.ts CHANDY_SOUNDS, CHANDY_CUES). The beam's squares pick
+  // their loop by name (row, col, cross); Dodge's lines play `flash`, then the beam (`travel`, `hold`, `fade`); its hits on your king
+  // `crack`, `kill`, `shatter` (his Dodge sounds: CHANDY_DODGE_SOUNDS).
+  chandyCrosshair: { ch: EFFECT_SPRITES.chandyCrosshair, covers: "square", start: "lock", loop: "held3", stages: [{ loop: "held3" }, { loop: "held2" }, { loop: "held1" }], end: "drop", sounds: CHANDY_SOUNDS },
+  chandyScatter: { ch: EFFECT_SPRITES.chandyScatter, covers: "square", start: "land", loop: "held", end: "fade", sounds: CHANDY_SOUNDS },
+  chandyScatterBurst: { ch: EFFECT_SPRITES.chandyScatterBurst, covers: "square", start: "burst", sounds: CHANDY_SOUNDS },
+  chandyBeam: { ch: EFFECT_SPRITES.chandyBeam, covers: "square", start: "rowIn", loop: "row", end: "rowOut", sounds: CHANDY_SOUNDS },
+  chandyShield: { ch: EFFECT_SPRITES.chandyShield, covers: "square", start: "up", loop: "held", end: "pop", sounds: CHANDY_SOUNDS },
+  chandyDizzy: { ch: EFFECT_SPRITES.chandyDizzy, covers: "square", start: "hit", loop: "dizzy", end: "clear", sounds: CHANDY_SOUNDS },
+  chandyQueenAim: { ch: EFFECT_SPRITES.chandyQueenAim, covers: "square", start: "on", loop: "aim", end: "fade", sounds: CHANDY_SOUNDS },
+  chandyRound: { ch: EFFECT_SPRITES.chandyRound, covers: "square", loop: "fly", end: "trail", sounds: CHANDY_SOUNDS },
+  chandyShatter: { ch: EFFECT_SPRITES.chandyShatter, covers: "square", start: "shatter", sounds: CHANDY_SOUNDS },
+  chandyDodgeRow: { ch: EFFECT_SPRITES.chandyDodgeRow, covers: "square", start: "travel", loop: "hold", end: "fade", sounds: CHANDY_DODGE_SOUNDS },
+  chandyDodgeCol: { ch: EFFECT_SPRITES.chandyDodgeCol, covers: "square", start: "travel", loop: "hold", end: "fade", sounds: CHANDY_DODGE_SOUNDS },
+  chandyDodgeKing: { ch: EFFECT_SPRITES.chandyDodgeKing, covers: "square", start: "crack", end: "shatter11", sounds: CHANDY_DODGE_SOUNDS },
 };
 
 // ---------------- Big Boy's toy block, for the board ----------------
@@ -650,18 +666,8 @@ export function blockItem(square: string, state: "land" | "sit" | "poof", since:
   return { square, name: "toyBlock", anim: `${state}${l}`, since };
 }
 
-/** An animation's length in ms. */
-export const animLength = (a: Anim) => a.frames.reduce((s, f) => s + f.ms, 0);
-
-/** When a cue fires in an animation, in ms from its start (the start of its first frame with that cue), or null. */
-export function cueAt(a: Anim, cue: string): number | null {
-  let t = 0;
-  for (const f of a.frames) {
-    if (f.cue === cue) return t;
-    t += f.ms;
-  }
-  return null;
-}
+// (animLength and cueAt are sprite.ts's: read without the bosses' effects. Re-exported here for the files that took them from here.)
+export { animLength, cueAt } from "./sprite.ts";
 
 // ---------------- Hollow's dark, for the board ----------------
 

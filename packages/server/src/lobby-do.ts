@@ -463,7 +463,8 @@ export class Lobby extends DurableObject<Env> {
 
   /** Whether the lobby is open, and where its match is (null: no such lobby, or it has closed). */
   /** Whether it's open and where it's at; `matchmade` (PLAY's queue, not a code's lobby) and `mode` for friends' invites. */
-  async status(): Promise<{ phase: "waiting" | "playing" | "over"; matchmade: boolean; mode: "crowd" | "raid" | "classic" } | null> {
+  /** `parties` (the e2e's test hook, where the test switches are on): each 50 v 50 party's group here, by its members' accounts. */
+  async status(parties = false): Promise<{ phase: "waiting" | "playing" | "over"; matchmade: boolean; mode: "crowd" | "raid" | "classic"; parties?: string[][] } | null> {
     if (!this.record || (await this.closeIfDue())) return null;
     const r = this.record;
     const o = r.overrides ?? {};
@@ -471,6 +472,7 @@ export class Lobby extends DurableObject<Env> {
       phase: r.phase === "results" ? "over" : r.phase === "lobby" && !r.auto?.filledAt ? "waiting" : "playing",
       matchmade: !!r.auto,
       mode: o.raid ? "raid" : o.mode === "crowd" ? "crowd" : "classic",
+      ...(parties ? { parties: Object.values(r.crowdParties ?? {}).map((p) => p.ids.map((id) => r.accounts?.[id] ?? id)) } : {}),
     };
   }
 
@@ -481,7 +483,7 @@ export class Lobby extends DurableObject<Env> {
   async create(
     code: string,
     overrides?: LobbyRecord["overrides"],
-    auto?: { fillAt: number | null; botsOff?: boolean; reserve?: number; reserveMs?: number; engine?: boolean },
+    auto?: { fillAt: number | null; botsOff?: boolean; reserve?: number; reserveMs?: number; engine?: boolean; party?: { size: number; pass: string } },
     keepMs?: number,
     party?: PartyLobby,
   ): Promise<boolean | number> {
@@ -497,9 +499,29 @@ export class Lobby extends DurableObject<Env> {
     if (auto) core.setAuto(auto.fillAt, !!auto.botsOff);
     // (Stored with its alarm: the fill time, or when it closes if nobody ever starts it.)
     await this.persist(core);
-    // Matchmaking in batches: seats for the players on their way (how many it could give).
+    // Matchmaking in batches: seats for the players on their way (how many it could give), or a 50 v 50 party's, whole.
+    if (auto?.party) {
+      const held = core.reserveParty(auto.party.size, auto.party.pass, auto.reserveMs ?? CAPACITY.queue.reservationMs, 0, true);
+      if (held) await this.persist(core);
+      // (Not held, never so in a new lobby: 0, not false, so the matchmaker doesn't take it for a code in use.)
+      return held ? true : 0;
+    }
     if (auto?.reserve) return this.reserveSeats(core, auto.reserve, auto.reserveMs ?? CAPACITY.queue.reservationMs);
     return true;
+  }
+
+  /**
+   * Matchmaking: a 50 v 50 party's seats, all of them under its pass (held `ms` for its members to connect), or none: false when
+   * they won't fit (with the seats held for others, and every party here whole on one team: LobbyCore.reserveParty).
+   */
+  async reserveParty(size: number, pass: string, ms: number): Promise<boolean> {
+    if (!this.record || (await this.closeIfDue())) return false;
+    const core = this.core(this.record.code);
+    const now = Date.now();
+    this.reservations = this.reservations.filter((t) => t > now);
+    const held = core.reserveParty(size, pass, ms, this.reservations.length);
+    if (held) await this.persist(core);
+    return held;
   }
 
   /** Matchmaking: still taking players. */
@@ -607,8 +629,9 @@ export class Lobby extends DurableObject<Env> {
         ws.close(1008, "Banned");
         return;
       }
-      // (The other side of the engine pool: told what anyone is told once a match has begun.)
-      if (attached?.apart) {
+      // (The other side of the engine pool: told what anyone is told once a match has begun. Not a 50 v 50 party's member with
+      // its pass: one pooled member takes the whole party to the pool's queue, so the server sent them here. The fix round of #747, H1.)
+      if (attached?.apart && !core.crowdPassOpen(msg.party)) {
         ws.send(JSON.stringify({ t: "error", message: MATCH_STARTED, now: Date.now() }));
         ws.close(1008, MATCH_STARTED);
         return;
@@ -620,8 +643,8 @@ export class Lobby extends DurableObject<Env> {
       // Their rating is the one stored on their account, never the app's word: a low one claimed would meet a weaker raid
       // boss. None yet, or no account: null, the prior (docs/decisions/2026-10-16-server-side-rating.md).
       const result = core.connect(msg.token, joining?.name ?? msg.name, msg.device, practice, joining?.rating ?? null, msg.look, attached?.userId, typeof msg.lastBoss === "string" ? msg.lastBoss : null, typeof msg.evalBar === "boolean" ? msg.evalBar : null, !!attached?.admin || this.env.MAIA_TEST === "1", { pass: msg.party, seat: msg.seat }, msg.seeded === true);
-      // A new player took a seat: one held for the players on their way is theirs (the oldest).
-      if (result.ok && this.record.humans.length > before) this.reservations.shift();
+      // A new player took a seat: one held for the players on their way is theirs (the oldest). (A party's member had their own.)
+      if (result.ok && this.record.humans.length > before && !core.inCrowdParty(result.playerId)) this.reservations.shift();
       if (!result.ok) {
         ws.send(JSON.stringify({ t: "error", message: result.message, ...("ended" in result ? { ended: true } : {}), ...("left" in result ? { left: result.left } : {}), now: Date.now() }));
         ws.close(1008, result.message);

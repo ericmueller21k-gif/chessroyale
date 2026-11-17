@@ -21,6 +21,7 @@ import { HOUSE_FOLIO, HOUSE_FOLIO_SIGN, HOUSE_FOLIO_LIGHTS, HOUSE_FOLIO_POOLS } 
 import { HOUSE_TIMBER, HOUSE_TIMBER_SIGN, HOUSE_TIMBER_LIGHTS, HOUSE_TIMBER_POOLS } from "./timber.ts";
 import { HOUSE_BLITZ, HOUSE_BLITZ_SIGN, HOUSE_BLITZ_LIGHTS, HOUSE_BLITZ_POOLS } from "./blitz.ts";
 import { HOUSE_ZEBRA, HOUSE_ZEBRA_SIGN, HOUSE_ZEBRA_LIGHTS } from "./zebra.ts";
+import { HOUSE_CHANDY, HOUSE_CHANDY_SIGN, HOUSE_CHANDY_LIGHTS } from "./chandy.ts";
 import { HOUSE_RECLUSE, HOUSE_RECLUSE_SIGN, HOUSE_RECLUSE_LIGHTS, HOUSE_RECLUSE_POOLS } from "./recluse.ts";
 
 export interface HouseArt {
@@ -57,6 +58,8 @@ export const HOUSES: Record<HomeId, HouseArt> = {
   // (The Walk-up, the Hidden Boss's building, Nov 13: no sign (an empty face: Eric, "no address plate or name on it"); in an admin's town
   // only while he's in the game for admins first.)
   recluse: { ch: HOUSE_RECLUSE, sign: HOUSE_RECLUSE_SIGN, lights: HOUSE_RECLUSE_LIGHTS, pools: HOUSE_RECLUSE_POOLS },
+  // (Chandy's Swamp, Nov 16; in an admin's town only while he's in the game for admins first.)
+  chandy: { ch: HOUSE_CHANDY, sign: HOUSE_CHANDY_SIGN, lights: HOUSE_CHANDY_LIGHTS, pools: [] },
 };
 
 /**

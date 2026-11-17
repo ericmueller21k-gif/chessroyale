@@ -17,7 +17,14 @@ export interface AreaBannerText {
 /** What a room's banner says, from its data: its home's name, its boss's (a room without one: none), "BACK ROOM" for a back room. */
 export function areaBannerOf(def: { boss?: string | null; part?: "back" | "landing" | "top" }, homeName: string): AreaBannerText {
   // (The walk-up's floors, Nov 13: "Second floor", "Top floor" over its name; its hall, as every home's front, its boss's.)
-  const sub = def.part === "back" ? "Back room" : def.part === "landing" ? "Second floor" : def.part === "top" ? "Top floor" : def.boss ? `${def.boss}'s` : null;
+  // (Not the boss's name again over a name that starts with it, Nov 16: "CHANDY'S" over "CHANDY'S SWAMP".)
+  const own = def.boss ? `${def.boss}'s` : null;
+  // (Any name that starts with the boss's own name, as a whole word, possessive or not: "Puddles' Botanical Garden", and
+  // "Ginger Igloo", "Hollow Peak", "Moo & Moon Meadow" too (Eric, Nov 16: "they say the boss's name twice").)
+  const lead = homeName.toLowerCase();
+  const name = def.boss?.toLowerCase() ?? "";
+  const repeats = !!name && lead.startsWith(name) && /^(?:$|[\s'’])/.test(lead.slice(name.length));
+  const sub = def.part === "back" ? "Back room" : def.part === "landing" ? "Second floor" : def.part === "top" ? "Top floor" : own && !repeats ? own : null;
   return { sub: sub && sub.toUpperCase(), title: homeName.toUpperCase() };
 }
 

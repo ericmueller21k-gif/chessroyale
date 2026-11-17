@@ -20,6 +20,8 @@ import { phase2Headline } from "../recluse-phase2.ts";
 
 /** An online match where one device's word stood alone (LobbyRecord.unvouched: nobody could check a host's scores or the boss's move). */
 export const UNVOUCHED_LINE = "Only one device checked this match: it pays as a solo game.";
+/** A 50 v 50 you played in a party of friends (CROWD_PARTY.ranked off): why yours didn't count, in place of the unranked line. */
+export const PARTIED_LINE = "Party matches aren't ranked, so your ranking didn't change.";
 
 export function ResultsScreen({ match, placement, winner, onAgain, onHome, homeText = "Home" }: { match: GameView; placement: number; winner: string; onAgain: () => void; onHome: () => void; /** Its leaving button's words: "Back to town" after a boss challenged in the town. */ homeText?: string }) {
   const played = match.moves.filter((m) => m.move !== null);
@@ -180,9 +182,11 @@ export function ResultsScreen({ match, placement, winner, onAgain, onHome, homeT
         {match.unvouched && noResult !== "board" && <p class="results-unranked">{UNVOUCHED_LINE}</p>}
         {match.ranked === false && !match.unvouched && noResult !== "board" && (match.serverPaced || !bossResult) && (
           <p class="results-unranked">
-            {match.serverPaced
-              ? `Unranked: fewer than ${rankedMinHumans(match.settings.lobbySize)} real players, so your ranking didn't change.`
-              : "Unranked: solo games don't count for ranking."}
+            {match.partied
+              ? PARTIED_LINE
+              : match.serverPaced
+                ? `Unranked: fewer than ${rankedMinHumans(match.settings.lobbySize)} real players, so your ranking didn't change.`
+                : "Unranked: solo games don't count for ranking."}
           </p>
         )}
         {/* XP (Nov 9): the bar filling from your old XP to the new, on every result screen (a boss battle's: under your pawn). */}

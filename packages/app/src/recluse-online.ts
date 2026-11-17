@@ -3,17 +3,17 @@
  * The server sends the whole of it on every change (`phase2`); this keeps it, turns the server's times into this device's, switches
  * the match's phase at the server's moments (the cutscene's hold, his phase change from `at`, the boards and their countdown, the
  * clocks from `clocksAt`), so everyone in the fight sees each at the same time, and plays his words and sounds as solo's do
- * (solo.ts: startPhaseChange, startClocks, phase2Slow, phase2Ult, phase2Result, phase2Done). Your move is shown at once and sent,
+ * (solo.ts: startPhaseChange, startClocks, phase2Slash, phase2Result, phase2Done). Your move is shown at once and sent,
  * and kept over the server's word until that has it, decides your board, or refuses it (a word sent before it got your move, from
  * another board's, never puts your piece back). The screens are solo's (screens/Recluse2.tsx), through NetMatch's GameView.
  */
 import { applyMove, legalMoves, sideToMove, type ClientMessage, type NetPhase2 } from "@chessroyale/chess";
 import type { Phase, SimulView } from "./game.ts";
-import { PHASE2_ULT_ANIMS, PHASE_CHANGE, phaseChangeRun } from "./recluse-phase2.ts";
+import { PHASE_CHANGE, cueSlash, phaseChangeRun } from "./recluse-phase2.ts";
 import { RECLUSE_LINES } from "./characters/recluse-lines.ts";
-import { playInPlace, setSuitAt, setFigureRun } from "./components/BossCharacter.tsx";
-import { play, warmSounds } from "./sound.ts";
-import { CRITICAL, LOW, NORMAL, bossVoice } from "./speech.tsx";
+import { setSuitAt, setFigureRun } from "./components/boss-figure.ts";
+import { warmSounds } from "./sound.ts";
+import { CRITICAL, NORMAL, bossVoice } from "./speech.tsx";
 import { resetKingSpeech } from "./godKing.ts";
 
 /** What phase 2 uses of its match (NetMatch). */
@@ -39,7 +39,7 @@ export class OnlinePhase2 {
   cutscene: { at: number; until: number } | null = null;
   private timer: ReturnType<typeof setTimeout> | null = null;
   private cache: { p: NetPhase2; playing: boolean; me: string | null; view: SimulView } | null = null;
-  private lines = { won: 0, lost: 0, slow: 0 };
+  private lines = { won: 0, lost: 0 };
   /** Your board's turn the look-aways count for (its move count), so a new turn starts them once (a pause ending isn't one). */
   private turnFrom: number | null = null;
   /**
@@ -98,11 +98,11 @@ export class OnlinePhase2 {
     const at = this.m.local(p.at);
     // (The cutscene's hold, from his fall's end to his phase change: also for a device back during it, which missed its event.)
     this.cutscene = { at: this.m.local(p.cutAt), until: at };
-    this.lines = { won: 0, lost: 0, slow: 0 };
+    this.lines = { won: 0, lost: 0 };
     this.playing = false;
     // (Phase 1's words are over: the God King says nothing more; his mumbling carries on into the phase change, as solo's.)
     resetKingSpeech();
-    warmSounds(["recluseSlow", "recluseSpark", "recluseArc"]);
+    warmSounds(["recluseSlash", "recluseSpark", "recluseArc"]);
     setFigureRun(phaseChangeRun(at));
     setSuitAt(at + PHASE_CHANGE.whiteFull);
   }
@@ -163,21 +163,13 @@ export class OnlinePhase2 {
     this.turnFrom = t;
   }
 
-  /** What changed since its last word: a slow move, his ultimate, a board decided, every board decided. As solo's. */
+  /** What changed since its last word: a heart of yours cut, a board decided, every board decided. As solo's. */
   private cues(prev: NetPhase2, p: NetPhase2) {
-    if (p.slow > prev.slow) {
-      play("recluseSlow");
-      // (The one that brings his ultimate: his ultimate's line instead.)
-      if (p.ultAt === null || prev.ultAt !== null) {
-        const lines = RECLUSE_LINES.slow;
-        bossVoice.say(lines[this.lines.slow++ % lines.length]!, `recluse:p2:slow:${p.key}:${p.slow}`, LOW);
-      }
-    }
-    if (p.ultAt !== null && prev.ultAt === null) {
-      const at = this.m.local(p.ultAt);
-      playInPlace(`recluse:ult2:${p.key}`, PHASE2_ULT_ANIMS, at);
-      const lines = RECLUSE_LINES.ult2;
-      bossVoice.say(lines[Math.abs(hash(p.key)) % lines.length]!, `recluse:p2:ult:${p.key}`, CRITICAL);
+    // (A heart of yours: the slash's sound and his line, on your screen only. Others' hearts: the slash on their boards alone.)
+    const me = this.m.myId();
+    for (const b of p.boards) {
+      const was = prev.boards.find((x) => x.id === b.id);
+      if (b.player === me && was && b.hearts < was.hearts) cueSlash(b.hearts, `${p.key}:${b.id}`, hash(`${p.key}:${b.slashAt}`));
     }
     if (!p.done)
       for (const b of p.boards) {
@@ -222,7 +214,7 @@ export class OnlinePhase2 {
     this.counting = false;
     this.awayHeld = 0;
     const now = Date.now();
-    const left = b.turnAt === null || p.ultAt !== null ? b.bankMs : Math.max(0, b.bankMs - (now - this.m.local(b.turnAt)));
+    const left = b.turnAt === null ? b.bankMs : Math.max(0, b.bankMs - (now - this.m.local(b.turnAt)));
     const shown = { ...b, fen: applyMove(b.fen, mv), lastMove: mv, history: [...b.history, mv], turnAt: null, bankMs: left };
     this.pending = { key: p.key, board: boardId, ply, move: mv, shown };
     this.p = { ...p, boards: p.boards.map((x) => (x === b ? shown : x)) };
@@ -254,9 +246,6 @@ export class OnlinePhase2 {
       of,
       decided,
       beaten: !noResult && decided && won === of,
-      slow: p.slow,
-      lastSlow: p.lastSlow ? { board: p.lastSlow.board, at: this.m.local(p.lastSlow.at) } : null,
-      ultAt: p.ultAt === null ? null : this.m.local(p.ultAt),
       paused: p.paused === undefined ? null : this.m.local(p.paused),
       ...(noResult ? { noResult: true } : {}),
       boards: order.map((b) => ({
@@ -272,6 +261,8 @@ export class OnlinePhase2 {
         turnAt: this.playing && b.turnAt !== null ? this.m.local(b.turnAt) : null,
         toMove: this.playing && !b.result ? (sideToMove(b.fen) === "w" ? "crowd" : "boss") : null,
         result: b.result,
+        hearts: b.hearts,
+        slashAt: b.slashAt === null ? null : this.m.local(b.slashAt),
       })),
     };
     this.cache = { p, playing: this.playing, me, view };

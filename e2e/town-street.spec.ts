@@ -320,7 +320,13 @@ test("the street town's WebGL context lost: nothing drawn until it's back, then 
     });
   // (A mark on this page: gone once the page has loaded again.)
   const mark = () => page.evaluate(() => void ((window as unknown as { __mark?: number }).__mark = 1));
-  const marked = () => page.evaluate(() => (window as unknown as { __mark?: number }).__mark === 1);
+  // (Read while the page may be loading again: a read the reload cuts off is the old page gone, so its mark too. Main's run, Nov 15:
+  // the poll's read landed mid-reload, threw "Execution context was destroyed", and expect.poll doesn't retry a throw.)
+  const marked = () =>
+    page.evaluate(() => (window as unknown as { __mark?: number }).__mark === 1).catch((e: Error) => {
+      if (/Execution context was destroyed|navigation/.test(e.message)) return false;
+      throw e;
+    });
   await mark();
   for (let i = 0; i < 2; i++) {
     await lose(true);
@@ -525,9 +531,13 @@ test.describe(() => {
     expect(gets.sort(), "each piece, once").toEqual([...town, ...names.map((n) => `/music/${n}.mp3`)].sort());
     const decoded = await page.evaluate(() => (window as unknown as { __decoded: number[] }).__decoded);
     expect(decoded.filter((b) => sizes.includes(b)), "no theme decoded").toEqual([]);
-    // (The town's solos: fetched, not decoded till a solo's turn nears, minutes away; Nov 15, memory on phones.)
+    // (The town's solos: fetched, not decoded till a solo's turn nears; Nov 15, memory on phones. Since Nov 16 a third of the starts are
+    // partway in, the first solo (a) under 70 s away: that one, and only it, decoded at once.)
     const soloSizes = town.slice(1).map((u) => statSync(`${dir}/${u.slice("/music/".length)}`).size);
-    expect(decoded.filter((b) => soloSizes.includes(b)), "no solo decoded").toEqual([]);
+    const early = (await townLog()).some((l) => l.startsWith("music:town:entry:"));
+    const solosDecoded = async () => (await page.evaluate(() => (window as unknown as { __decoded: number[] }).__decoded)).filter((b) => soloSizes.includes(b));
+    if (early) await expect.poll(solosDecoded, { timeout: 15_000, message: "only the first solo decoded" }).toEqual([soloSizes[0]]);
+    else expect(decoded.filter((b) => soloSizes.includes(b)), "no solo decoded").toEqual([]);
     const log = await page.evaluate(() => (window as unknown as { __soundLog: string[] }).__soundLog);
     expect(log.filter((l) => l.startsWith("music:load")), "no theme loaded to play").toEqual([]);
     // Music off (Settings → Sound): none fetched.
