@@ -1,4 +1,4 @@
-# Dash: the slow-move taunt and the fake second move. god-king lane (boss powers). Opus, xhigh (boss rules, solo and online)
+# Dash: the slow-move taunt, the fake second move and the lying-down clock tap. god-king lane (boss powers). Opus, xhigh (boss rules, solo and online)
 
 Branch `claude/dash-stall` from main. About 2 h. Read CLAUDE.md, `.claude/agents/god-king.md`, `.claude/LESSONS.md`, `docs/areas/bosses.md`
 (Dash: Clock Slap, Time Scramble, his kit and lines), `docs/rules/eric.md`, and the boss test kit.
@@ -24,3 +24,17 @@ something ... pick something better. then at 30 s is when he fake plays, this on
 clocks unchanged after); `e2e/boss-smoke.spec.ts` stays green; one e2e check of the skit (a test switch to fire it early is fine:
 TEST_SWITCHES only). One GIF of the skit (phone) on a `stills/dash-stall` branch. `.pr-body.md` (short: rule, lines, changed checks old →
 new) and `.done`. Lines are placeholders for Eric. Commits end with the `Claude-Session:` line only, no model names. No PR.
+
+## Added (Eric, Nov 17): the lying-down clock tap, once a battle
+"one more goofy animation, once per game he goes down laying down with his chess clock by your clock, like this one in pic, he sets or
+holds his clock next to it and starts tapping it for a few seconds" (his screenshot: the under-board time pill, "5:32", at the board's
+bottom right).
+- Once a battle, on one of your moves (a seeded random move, never the stall skit's, never during another power, a cutscene or his
+  Last Stand): Dash **lies down on his side right beside your clock** (the time pill under the board: phone and computer, wherever it
+  sits), his chess clock set next to it or held up against it, and **taps it for a few seconds** (about 3 s, the click sound each tap,
+  a bored grin), then hops up and goes back to his spot. It covers nothing you need: never over the board's squares or the pill's
+  digits; your clock keeps running as normal.
+- **The new poses are drawn by the paid API** (the art runner on `claude/boss-art`, Opus, its default; `notes/RULES.md`: never by
+  hand): a lying-down pose with the clock and a tap loop, from his finished art (`characters/boss-blitz.ts`). Cap $6; say the estimate
+  first. Then wire it like his other moments.
+- Same checks as above, plus one GIF of this gag (phone and computer).
