@@ -3289,9 +3289,15 @@ export class LobbyCore {
     (round.powerUps ??= {})[playerId] = true;
   }
 
-  /** Picks are locked: ask the host's browser to score every board. */
+  /**
+   * Picks are locked: ask the host's browser to score every board. Not during Dash's fake move (his stall skit's last beat): a
+   * round done in its hold (its last pick landing then, or the last person it waits for leaving) locks as it ends, so the reveal
+   * never cuts "Nahh, jk bro" short (the review of #770, 5). The deadline is always after it (moved back by its length).
+   */
   private lock() {
     if (!this.runner || !this.r.round || this.r.phase !== "play") return;
+    const fake = this.r.round.stall?.fake;
+    if (fake && this.io.now() < fake.until) return this.setTimer("lock", fake.until);
     this.r.phase = "scoring";
     // (Boss tokens: each person's own moves, the picks that went in this turn.)
     for (const h of this.r.humans) {
