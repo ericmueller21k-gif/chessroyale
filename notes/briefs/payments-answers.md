@@ -31,3 +31,9 @@ for a key and crates should be earned every level and from other areas easily so
   support@ can always say yes.
 - Earn-first nudges (proposal): every pack shows "or about N games of play"; next free crate/key shown; no purchase pop-ups, no
   timers on paid packs, no fake discounts; "Play to earn" first in the coin screen.
+
+## Eric, Nov 17 ~15:40 UTC (approves the round-2 proposals: "This looks good")
+"keep all currency still as one number, but to make it simple, when you make a purchase add a one time popup that says your
+refundable coin balance can be viewed anytime in your profile with a single line below here that says something like 'total coins,
+refundable coins'" -> one coin number everywhere; after the first purchase, a one-time pop-up; your own profile gets one line
+"Total coins N · Refundable N" (in the payments build). Key 100 coins = $1, refunds plan, earn-first nudges: approved.
