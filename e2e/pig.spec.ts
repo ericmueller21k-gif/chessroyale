@@ -223,8 +223,29 @@ test("Wrangler's long pull as his first move, then a lasso drag (?power=drag)", 
     tug: { selector: '.pg-layer[data-stage="tug"]' },
   });
   await page.evaluate(() => ((window as any).__soundLog = []));
+  // Every frame of the pull: his figure's pose, facing, feet (% of the board) and mirror (Eric, Nov 17: a boss faces the way it walks, or what it acts on).
+  await page.evaluate(() => {
+    const seen: { anim: string; faces: string; x: number; mirrored: boolean }[] = ((window as any).__pigFaces = []);
+    const tick = () => {
+      const el = document.querySelector<HTMLElement>('.pg-layer[data-lasso] .pg-pig');
+      if (el) seen.push({ anim: el.dataset.anim!, faces: el.dataset.faces!, x: parseFloat(el.style.left) + (parseFloat(el.style.width) * parseFloat(el.style.transformOrigin)) / 100, mirrored: el.style.scale === "-1 1" });
+      if (seen.length < 2000) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  });
   await play(page, "e2e4");
   await yourMove(page);
+  {
+    const seen: { anim: string; faces: string; x: number; mirrored: boolean }[] = await page.evaluate(() => (window as any).__pigFaces);
+    expect(seen.filter((f) => f.anim === "lasso").length, "his lasso drawn").toBeGreaterThan(5);
+    // Hopping out to d5 (from his corner, top left, to our right) and back (to our left): he faces the way he goes. His art faces
+    // our left (sprites.ts ART_FACING), so he's mirrored exactly when he faces our right.
+    const hops = seen.flatMap((f, i) => (i > 0 && f.anim === "leap" && seen[i - 1]!.anim === "leap" && Math.abs(f.x - seen[i - 1]!.x) > 0.5 ? [{ ...f, dx: f.x - seen[i - 1]!.x }] : []));
+    expect(hops.some((h) => h.dx > 0) && hops.some((h) => h.dx < 0), "both hops sampled").toBe(true);
+    for (const h of hops) expect({ faces: h.faces, mirrored: h.mirrored }, `hop dx ${h.dx}`).toEqual({ faces: h.dx > 0 ? "right" : "left", mirrored: h.dx > 0 });
+    // Roping: toward the pawn on d5 (its middle 43.75% across, White below), his loop on it.
+    for (const f of seen.filter((x) => x.anim === "lasso")) expect(f.faces, `lasso at ${f.x}`).toBe(f.x > 43.75 ? "left" : "right");
+  }
   expect(await page.evaluate(() => (window as any).match.brainLine as string)).toMatch(/^Stockfish/);
   const b1 = await bossNow(page);
   expect(b1.powers.pull).toEqual({ turn: 2, from: "d7", via: "d5", to: "d4" });
