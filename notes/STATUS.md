@@ -1,3 +1,4 @@
+- Nov 17 ~22:40 UTC: container restarted (scratchpad kept). Wrangler board facing .done -> #781 (713e042), CI watched, stills sent. He was backwards on hop back, showdown, haul. Open for Eric: lasso pose snout leans away (redraw = his call). No helpers running.
 - Nov 17 ~22:25 UTC: #780 LIVE e64d470; main GREEN. Wrangler board-facing helper running. Waiting on Eric: payments.
 - Nov 17 ~22:05 UTC: #777 casters LIVE 6cd7ed3, main GREEN. #780 dash lock-in-hold merged e64d470; deploy+main watched. No helpers running. Queue: Wrangler facing flag (Pig.tsx) check. Waiting on Eric: payments 6 calls (#772 held).
 - Nov 17 ~21:45 UTC: main GREEN on d934811. #777 had conflicts with #778 (Tiger.tsx imports, bosses.md): resolved by director, pushed 70cd33f, CI watched. watchers-pause helper (xhigh, alone) running.
