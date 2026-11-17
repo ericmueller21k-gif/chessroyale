@@ -7567,6 +7567,9 @@ body:has([aria-modal="true"]:not(#rotate-lock), .mm-scrim) > .dk-plus {
   width: min(100%, 300px);
 }
 .cut-outview {
+  /* (A computer's window is wide: the column a phone has, centered.) */
+  width: min(100%, 560px);
+  align-self: center;
   flex: 1 0 auto;
   display: flex;
   flex-direction: column;
@@ -27751,7 +27754,9 @@ body.cs-on .mm-scrim {
 /* ---- The 50 v 50 rework's results (C3; mockup crowd-podium): the podium, the best player's line, your row and the chart ----
    Every box has a fixed size, so nothing moves as names, tags and rows fill in (Eric's rules). */
 .podium {
-  width: 100%;
+  /* (A computer's window is wide: the column a phone has, centered.) */
+  width: min(100%, 560px);
+  align-self: center;
   display: flex;
   flex-direction: column;
   gap: 10px;
