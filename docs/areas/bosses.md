@@ -1004,7 +1004,14 @@ Each boss lives in its own files, one per layer, on a shared base. The shared fi
 
 **The sprite kit** (Nov 6, `characters/sprite-kit.ts`, registry `sprites.ts`; docs/decisions/2026-11-06-sprite-kit.md): a figure as data (`Sprite`: its
 character, the way its art faces, anchors, ramps, frame templates) and the shared rules (ink outline, ramps of 3+ steps, crisp from 1.5x, `TEXEL`).
-Facing is data: callers ask for a facing (`facingAs`, `mirrorFor`, `artFacing`), never guess. A kit's `sprite` makes its `ch` that sprite turned to
+Facing is data: callers ask for a facing (`facingAs`, `mirrorFor`, `artFacing`), never guess. **Every boss faces its board and foe
+everywhere it stands (Nov 17, docs/decisions/2026-11-17-boss-facing.md):** each boss's art facing is data (a sprite's, else `ART_FACING` in
+sprites.ts, by eye: left, right or front), each place's is `PLACE_FACING` (kits.ts: right in a phone's bar, beside a computer's board and on
+the results; left on the select's stage), and `placeFacing` mirrors the drawing about its feet when they differ (`.bc-mirror`; the stage's
+`.bs-mirror`), never a front-facing one; bubbles and words never. The bar's numbers (`barShift`) are measured from the mirrored drawing,
+which also keeps every moment on screen (test/bar-fit.ts); `SIDE_REACH` is swapped for a mirrored side figure; effects from a hand or chest
+use `figurePoint` (BossCharacter.tsx: Babur's limp balloon, which he turns to the pump to toss; Puddles' seeds; Dash's slap). A phone's
+casters at the board's corner (`.pm-caster`) still draw the art as drawn: a follow-up. The town and the rooms turn bosses by the same data. A kit's `sprite` makes its `ch` that sprite turned to
 face the board (`BOARD_FACING`, our right); portraits and the select stage draw the art (`artOf`). Smudgy is the pilot; others move when next
 touched. Big Boy (Nov 7) faces `front`: never mirrored; his attack on a king to his right is drawn `turned`, his shirt's word (`reads`) reading. Tests: `test/sprite-kit.test.ts`; facing at the battle's start: `e2e/smudgy.spec.ts`, `e2e/boss-challenge.spec.ts` (`looks`).
 
