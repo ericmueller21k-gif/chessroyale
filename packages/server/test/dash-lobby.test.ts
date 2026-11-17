@@ -380,4 +380,30 @@ describe("Dash's stall skit online (Eric, Nov 17)", () => {
     expect(l.runner().boss!.powers!.dash!.stall ?? null).toBeNull();
     expect(l.core.nextAlarm).toBe(deadline + l.settings.lateGraceMs);
   });
+
+  it("the round done in his fake move's hold (the last pick lands in it, or the last person it waits for drops): it locks as the hold ends, never over \"Nahh, jk bro\" (the review of #770, 5)", () => {
+    for (const how of ["pick", "drop"] as const) {
+      const l = dashLobby("", ["P1", "P2"]);
+      l.toRound();
+      const round = l.core.save().round!;
+      const fen = l.runner().boards.get(l.runner().state.boards[0]!)!.fen;
+      l.core.message("p1", { t: "pick", key: round.key, move: legalMoves(fen)[0]! });
+      until(l, round.deadline);
+      const fake = stalls(l, "p1").find((m) => m.beat === "fake")!;
+      expect(fake, how).toBeDefined();
+      until(l, fake.at + 1000);
+      if (how === "pick") l.core.message("p2", { t: "pick", key: round.key, move: legalMoves(fen)[1]! });
+      else l.core.disconnect("p2");
+      // (Its pick counts; the round waits for the hold's end.)
+      expect(l.core.save().phase, how).toBe("play");
+      expect(l.last("p1", "locked"), how).toBeUndefined();
+      expect(l.core.nextAlarm, how).toBe(fake.until);
+      if (how === "pick") expect(l.core.save().round!.picks["p2"]?.move).toBe(legalMoves(fen)[1]);
+      until(l, fake.until - 100);
+      expect(l.last("p1", "locked"), how).toBeUndefined();
+      until(l, fake.until);
+      expect(l.last("p1", "locked"), how).toMatchObject({ key: round.key });
+      expect(l.core.save().phase, how).toBe("scoring");
+    }
+  });
 });
