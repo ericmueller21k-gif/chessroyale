@@ -11,7 +11,7 @@ const overlaps = (a: { x: number; y: number; width: number; height: number }, b:
   a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
 
 /**
- * Waits until this page's team is picking and the board takes moves; meanwhile the other page picks any legal move
+ * Waits until this page's team is picking and the board takes moves, with at least 3 s left on the move; meanwhile the other page picks any legal move
  * whenever it has to (so a round never waits for it).
  */
 async function untilMyTurn(p: Page, other: Page) {
@@ -28,7 +28,8 @@ async function untilMyTurn(p: Page, other: Page) {
     }
     const ready = await p.evaluate(() => {
       const m = (window as any).match;
-      return m?.phase.kind === "play" && Date.now() > m.phase.startsAt + 400;
+      // (And at least 3 s left on this move: entered late in a turn, the round could lock between tapMove's two taps, Nov 17.)
+      return m?.phase.kind === "play" && Date.now() > m.phase.startsAt + 400 && m.phase.deadline - Date.now() > 3000;
     });
     if (ready) return;
     await p.waitForTimeout(200);
