@@ -133,8 +133,10 @@ export function figurePoint(cv: Element, ch: Character, x: number, y: number, mi
   const k = r.width / ch.w;
   // (Its box as laid out, before a mirror: a mirror about its feet moves the box by twice their distance from its middle.)
   const left = drawnMirrored(cv) ? r.right - 2 * ch.foot[0] * k : r.left;
-  return { x: left + (mirrored ? 2 * ch.foot[0] - x : x) * k, y: r.top + y * (r.height / ch.h) };
+  return { x: left + drawnX(ch, x, mirrored) * k, y: r.top + y * (r.height / ch.h) };
 }
+/** Where column `x` of a figure's frame is drawn across its box (frame px), the figure `mirrored` about its feet or not: the one mirror every hand-tied effect uses (figurePoint, PowerParts.tsx casterPoint). */
+export const drawnX = (ch: Character, x: number, mirrored: boolean): number => (mirrored ? 2 * ch.foot[0] - x : x);
 
 /**
  * A boss figure's canvas box as it stands at rest in its place: drawn `mirrored` (about its feet, its place's turn: placeFacing) or not,

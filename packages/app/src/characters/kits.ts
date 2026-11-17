@@ -1245,9 +1245,10 @@ export const facingOf = (kit: BossKit, ch: Character = kit.ch): ArtFacing => (ki
 /**
  * Which way a boss faces in each place it stands (Eric, Nov 17: "have all the bosses facing the right way"): toward the board it plays on
  * and its foe. A phone's bar and a computer's side stand it left of the board (BOARD_FACING), the results left of the God King; the
- * boss select's stage right of your pawn. A figure drawn facing front is never turned (`mirrorFor`).
+ * boss select's stage right of your pawn; a phone's cast at the board's top-left corner (`caster`: PowerParts.tsx `Cast`) faces the board
+ * too. A figure drawn facing front is never turned (`mirrorFor`).
  */
-export const PLACE_FACING: Readonly<Record<"bar" | "side" | "results" | "stage", Facing>> = { bar: BOARD_FACING, side: BOARD_FACING, results: BOARD_FACING, stage: "left" };
+export const PLACE_FACING: Readonly<Record<"bar" | "side" | "results" | "stage" | "caster", Facing>> = { bar: BOARD_FACING, side: BOARD_FACING, results: BOARD_FACING, stage: "left", caster: BOARD_FACING };
 
 /** Which way a kit's figure `ch` faces on the screen in `place`, and whether that's its drawing mirrored (about its feet; styles.css `.bc-mirror`). */
 export function placeFacing(kit: BossKit, ch: Character, place: keyof typeof PLACE_FACING): { faces: ArtFacing; mirror: boolean } {

@@ -152,11 +152,35 @@ test("Chub & Chirp's Carrot Patch (the test switches): the cast and its ladder, 
     };
     requestAnimationFrame(look);
   });
+  // (The first carrot as it leaves, its first frame on screen, and his figure at the corner then: Nov 17, every boss faces the board.)
+  await page.evaluate(() => {
+    const w = window as any;
+    w.__toss = null;
+    const look = () => {
+      const fly = document.querySelector(".pm-carrots .hp-fly");
+      const cv = document.querySelector(".pm-caster canvas");
+      if (fly && cv) {
+        const f = fly.getBoundingClientRect();
+        const c = cv.getBoundingClientRect();
+        w.__toss = { x: f.left + f.width / 2, y: f.top + f.height / 2, box: { left: c.left, top: c.top, width: c.width }, mirrored: new DOMMatrixReadOnly(getComputedStyle(cv).transform).a < 0 };
+      } else requestAnimationFrame(look);
+    };
+    requestAnimationFrame(look);
+  });
   // (A quiet first move: passing after it costs him nothing, so the pass guard lets the cast come at once. After a
   // move like 3.d4, passing would lose real material and it waits: docs/decisions/2026-10-18-turn-passing-guard.md.)
   await play(page, crowd === "w" ? "d2d3" : "d7d6");
   await yourMove(page);
   expect(await castSeen.seen()).toEqual({ banner: true, fly: true, ladder: true, top: true, canvas: true, dock: true });
+  // On a phone he casts at the board's corner turned to face it (drawn facing left: mirrored about his feet), and the first carrot
+  // leaves Chub's paw as drawn (15.6, 23.5 of his 84 px frame, its column mirrored), within a few of his pixels, on the board's side
+  // of his feet (44): not from where his paw would be unturned, behind him.
+  const toss = await page.evaluate(() => (window as any).__toss);
+  expect(toss.mirrored).toBe(true);
+  const k = toss.box.width / 84;
+  const paw = { x: toss.box.left + (84 - 15.6) * k, y: toss.box.top + 23.5 * k };
+  expect(Math.hypot(toss.x - paw.x, toss.y - paw.y) / k).toBeLessThan(12);
+  expect(toss.x).toBeGreaterThan(toss.box.left + (84 - 44) * k);
   let c = (await bossNow(page)).powers.carrots;
   expect(c.squares).toHaveLength(5);
   // The dock's count: his, yours, your moves left.

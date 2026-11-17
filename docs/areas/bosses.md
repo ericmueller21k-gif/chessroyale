@@ -1014,7 +1014,10 @@ which also keeps every moment on screen (test/bar-fit.ts); `SIDE_REACH` is swapp
 use `figurePoint` (BossCharacter.tsx: Babur's limp balloon, which he turns to the pump to toss; Puddles' seeds; Dash's slap). A side figure's
 place (`fitSides`) and Babur's pump beside him (`pumpPlace`) are measured from his box at rest in his place (`figureRestBox`), never as a run
 turns him that moment (docs/decisions/2026-11-17-tiger-pump-mid-toss.md). A phone's
-casters at the board's corner (`.pm-caster`) still draw the art as drawn: a follow-up. The town and the rooms turn bosses by the same data. A kit's `sprite` makes its `ch` that sprite turned to
+cast at the board's corner (`.pm-caster`, PowerParts.tsx `Cast`) turns the same way (`PLACE_FACING.caster`, `.pm-mirror` about its feet, Nov 17:
+Sawyer, Wrangler's warning, Alfil, Chub & Chirp, Moo, Puddles, Babur, Folio, Timber), and what it throws leaves the drawn hand through
+`casterPoint` (its box in % of the board and a frame pixel; the same mirror as `figurePoint`, `drawnX`): Chub's carrots, Babur's hoops
+(`HOOP_PAW`, his paw at `throw1`). Test: e2e/hopper.spec.ts (the first carrot within Chub's paw); docs/decisions/2026-11-17-pm-caster-mirror.md. The town and the rooms turn bosses by the same data. A kit's `sprite` makes its `ch` that sprite turned to
 face the board (`BOARD_FACING`, our right); portraits and the select stage draw the art (`artOf`). Smudgy is the pilot; others move when next
 touched. Big Boy (Nov 7) faces `front`: never mirrored; his attack on a king to his right is drawn `turned`, his shirt's word (`reads`) reading. Tests: `test/sprite-kit.test.ts`; facing at the battle's start: `e2e/smudgy.spec.ts`, `e2e/boss-challenge.spec.ts` (`looks`).
 
