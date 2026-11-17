@@ -138,6 +138,21 @@ export function figurePoint(cv: Element, ch: Character, x: number, y: number, mi
 /** Where column `x` of a figure's frame is drawn across its box (frame px), the figure `mirrored` about its feet or not: the one mirror every hand-tied effect uses (figurePoint, PowerParts.tsx casterPoint). */
 export const drawnX = (ch: Character, x: number, mirrored: boolean): number => (mirrored ? 2 * ch.foot[0] - x : x);
 
+/**
+ * A boss figure's canvas box as it stands at rest in its place: drawn `mirrored` (about its feet, its place's turn: placeFacing) or not,
+ * whichever way a run turns it this moment. What its place is measured from (his room beside the board, Babur's pump in front of him):
+ * Babur's toss turns him to his pump for a moment, and his drawn box then stands 4 art px over, so a screen drawn mid-toss measured his
+ * pump's place from it and put it in the taller bar (Nov 17, main's red tiger.spec).
+ */
+export function figureRestBox(cv: Element, ch: Character, mirrored: boolean): { left: number; top: number; right: number; bottom: number; width: number; height: number } {
+  const r = cv.getBoundingClientRect();
+  const k = r.width / ch.w;
+  // (Its box as laid out, before a mirror (figurePoint), then turned as its place turns it.)
+  const laid = drawnMirrored(cv) ? r.right - 2 * ch.foot[0] * k : r.left;
+  const left = mirrored ? laid + 2 * ch.foot[0] * k - r.width : laid;
+  return { left, top: r.top, right: left + r.width, bottom: r.bottom, width: r.width, height: r.height };
+}
+
 export function playInPlace(key: string, anims: readonly string[], since = Date.now(), move?: FigureMove) {
   if (inPlace.run?.key !== key) inPlace.run = { key, since, anims, move };
 }
@@ -640,11 +655,14 @@ function fitSides(side: HTMLElement | null, name: string) {
   // whichever frame is showing: his entrance may be mid-drop.)
   const kit = bossKit(name);
   const box = rect(side.querySelector(".boss-char"));
-  const cv = rect(side.querySelector(".boss-char-sprite"));
+  const sprite = side.querySelector(".boss-char-sprite");
   const drawn = kit ? SIDE_REACH[kit.ch.id] : undefined;
-  if (!wrap || !box || !cv || !kit || !drawn) return;
-  // (Mirrored to face the board (placeFacing), his reach toward it is what he reaches behind him as drawn.)
+  if (!wrap || !box || !sprite || !kit || !drawn) return;
+  // (Mirrored to face the board (placeFacing), his reach toward it is what he reaches behind him as drawn. His box as he stands there,
+  // not as a run turns him for a moment: figureRestBox.)
   const mirror = placeFacing(kit, kit.ch, "side").mirror;
+  const cv = figureRestBox(sprite, kit.ch, mirror);
+  if (!cv.width) return;
   const reach = mirror ? ([drawn[2], drawn[1], drawn[0], drawn[3]] as const) : drawn;
   const sx = cv.width / kit.ch.w;
   // (Turned, the side he held behind him faces the board: his swings that way (SIDE_SWING: Timber's 44 when he moves, against his rest's

@@ -3,7 +3,7 @@ import { createPortal } from "preact/compat";
 import { BOSS_POWERS } from "@chessroyale/core";
 import { HOOPS_BEATS, TIGER_ANIM } from "@chessroyale/chess";
 import { pickLine } from "../characters/boss-beats.ts";
-import { bossKit, facingOf, type BossKit } from "../characters/kits.ts";
+import { bossKit, facingOf, placeFacing, type BossKit } from "../characters/kits.ts";
 import { mirrorFor, toward } from "../characters/sprite-kit.ts";
 import { EFFECTS } from "../characters/power-art.ts";
 import { HOP_AIR_AT, HOP_AIR_MS } from "../characters/tiger-figure.ts";
@@ -18,7 +18,7 @@ import { gardenNow, realMs } from "../garden-clock.ts";
 import { NORMAL, bossVoice } from "../speech.tsx";
 import { FLY_MS, LAND_MS, colorLook, flyAnim, landAnim, landBeats, noteTiger, popReactAt, pumpShows, ringShows, type EndShow, type TigerShow } from "../tiger-show.ts";
 import { SpriteAnim, prewarm, prewarmSprite } from "./BossEffect.tsx";
-import { figureBusy, figurePoint, playInPlace, type FigureMove } from "./BossCharacter.tsx";
+import { figureBusy, figurePoint, figureRestBox, playInPlace, type FigureMove } from "./BossCharacter.tsx";
 import { casterPoint, type BoardLayerProps, type BossUi, type Moment, type MomentProps, type MomentUi } from "./PowerParts.tsx";
 
 /**
@@ -256,7 +256,7 @@ let lastPlace: PumpPlace = PHONE;
  * Works out the pump's place on this screen, beside him if there's room with the bar at its usual size, else in the taller bar (whose
  * class it leaves on `slot`). Synchronous: the class comes off and on again in the same task, never painted in between.
  */
-function pumpPlace(slot: HTMLElement, figW: number): PumpPlace {
+function pumpPlace(slot: HTMLElement, kit: BossKit | null): PumpPlace {
   if (!matchMedia(COMPUTER).matches) return PHONE;
   const screen = slot.closest<HTMLElement>(".screen") ?? document.body;
   const board = screen.querySelector<HTMLElement>(".hb-board");
@@ -272,14 +272,16 @@ function pumpPlace(slot: HTMLElement, figW: number): PumpPlace {
   // the smaller board's, and a pump measured at that size could fit where the real one doesn't, flipping back and forth.)
   const root = board.closest<HTMLElement>(".hb") ?? board;
   const drawn = boardSize(parseFloat(getComputedStyle(root).width) || board.offsetWidth, window.devicePixelRatio || 1);
-  const fig = sprite?.getBoundingClientRect();
-  if (side && fig && fig.width > 0) {
+  // (His box as he stands there, facing the board, not as his toss turns him to the pump for a moment: figureRestBox. Measured mid-toss,
+  // a screen drawn then put the pump 4 of his art px over, in the taller bar at 1440 × 900: Nov 17.)
+  const fig = sprite && kit ? figureRestBox(sprite, kit.ch, placeFacing(kit, kit.ch, "side").mirror) : null;
+  if (side && fig && kit && fig.width > 0) {
     const s = pumpScale(drawn);
     const at = side.getBoundingClientRect();
     const keep = [...document.querySelectorAll(KEEP_CLEAR)].map((e) => e.getBoundingClientRect());
     // (On his feet's line: his box's bottom, which stands `--side-lift` over the side's where he comes over the board's corner.)
     const feet = side.querySelector(".boss-char")?.getBoundingClientRect().bottom ?? at.bottom;
-    const box = sidePump(fig, fig.width / figW, feet, s * zoom, { w: document.documentElement.clientWidth, h: innerHeight }, keep);
+    const box = sidePump(fig, fig.width / kit.ch.w, feet, s * zoom, { w: document.documentElement.clientWidth, h: innerHeight }, keep);
     if (box) return { at: "side", scale: s, x: (box.left - at.left) / zoom, side };
   }
   slot.classList.add("tg-tall");
@@ -335,13 +337,12 @@ export function TigerPump({ boss, moments }: { boss: BossView; moments: () => Mo
   const show = pumpShows(rec, b, gardenNow(), now, document.visibilityState !== "hidden", realMs);
   const limp = rec?.place ? limps.get(`${rec.key}:${rec.place.key}`) : undefined;
   useWake([show.wake, rec?.place?.putAt ?? null, limp ? limp.at : null, limp ? limp.at + LIMP_FLY_MS : null]);
-  const figW = kit?.ch.w ?? 76;
   useLayoutEffect(() => {
     const el = slot.current;
     if (!el) return;
     const run = () => {
       if (!el.isConnected) return;
-      const p = pumpPlace(el, figW);
+      const p = pumpPlace(el, kit);
       lastPlace = p;
       setPlace((old) => (samePlace(old, p) ? old : p));
     };

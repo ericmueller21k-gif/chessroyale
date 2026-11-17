@@ -1011,7 +1011,9 @@ the results; left on the select's stage), and `placeFacing` mirrors the drawing 
 `.bs-mirror`), never a front-facing one; bubbles and words never. The bar's numbers (`barShift`) are measured from the mirrored drawing,
 which also keeps every moment on screen (test/bar-fit.ts); `SIDE_REACH` is swapped for a mirrored side figure, and its swings toward the board (`SIDE_SWING`, every frame: Timber's
 44 when he moves, against his rest's 38) are held within `over` too (an unturned figure keeps its place); effects from a hand or chest
-use `figurePoint` (BossCharacter.tsx: Babur's limp balloon, which he turns to the pump to toss; Puddles' seeds; Dash's slap). A phone's
+use `figurePoint` (BossCharacter.tsx: Babur's limp balloon, which he turns to the pump to toss; Puddles' seeds; Dash's slap). A side figure's
+place (`fitSides`) and Babur's pump beside him (`pumpPlace`) are measured from his box at rest in his place (`figureRestBox`), never as a run
+turns him that moment (docs/decisions/2026-11-17-tiger-pump-mid-toss.md). A phone's
 cast at the board's corner (`.pm-caster`, PowerParts.tsx `Cast`) turns the same way (`PLACE_FACING.caster`, `.pm-mirror` about its feet, Nov 17:
 Sawyer, Wrangler's warning, Alfil, Chub & Chirp, Moo, Puddles, Babur, Folio, Timber), and what it throws leaves the drawn hand through
 `casterPoint` (its box in % of the board and a frame pixel; the same mirror as `figurePoint`, `drawnX`): Chub's carrots, Babur's hoops

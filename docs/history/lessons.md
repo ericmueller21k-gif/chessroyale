@@ -1109,3 +1109,15 @@ left a different seam. The checks looked at a few frames at phone size, not his 
 
 **The fix:** the star is drawn once, behind; the ride's front draws nothing; the pawn is clipped by a shape the ride gives (`pose.hide`)
 whose edge is the lip's own line. docs/decisions/2026-11-17-star-seat-one-layer.md.
+
+## Babur's pump in the taller bar after a toss (Nov 17, 2026)
+
+**What happened:** main's full run failed tiger.spec's pump on a computer once: at 1440 × 900 the pump was in the taller bar, not
+beside Babur; it passed on the retry. #774's own runs passed.
+
+**Why:** #774 made Babur turn to his pump for his toss (`.bc-flip`). His side place (`fitSides`) and the pump's (`pumpPlace`) measured his
+sprite's box as drawn that moment: a screen drawn mid-toss read a box 4 art px over, stood him 13 px further left, and the pump, 3 px
+inside its limit there, went in the taller bar for good. Only a turn change landing inside the toss showed it.
+
+**The fix:** both measure his box at rest in his place (`figureRestBox`); the spec now turns him and re-measures, every side size.
+docs/decisions/2026-11-17-tiger-pump-mid-toss.md.
