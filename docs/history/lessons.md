@@ -1084,3 +1084,16 @@ dropped the rest, and a night street draws about 260. The rows' rear walls are d
 and nothing could cut them. Every solid building hid the bug: there's rarely anything in front of a lit window but a passer-by.
 
 **The fix:** the list grows; an open home leaves the row behind it open. docs/decisions/2026-11-16-chandy-pond.md.
+
+## Off the first load, onto the first tap (Nov 17, 2026)
+
+**What happened:** the morning after the bundle split (#759) went live, main turned red four times on tests that open a screen: solo's
+"Today's openings" and chat-mod's lobby heading missed their 5 s, boss-select's stage figure wasn't drawn yet.
+
+**Why:** the split took every boss's code off the first load into the match's chunk, which home fetches 1.5 s after it shows. Its
+evaluation (the bosses' kits are built as it loads) costs 0.4 s on a fast machine and a few seconds on a busy CI runner, where it had been
+part of the page load before. Tests tap on within a second of home, so it ran after their tap: inside the very wait they time (a blank
+lobby screen meanwhile, or the opening of a solo match pushed past its 5 s). On a phone, a player tapping fast saw the same blank lobby.
+
+**The fix:** home loads it as soon as play is next (the Bot level box, the queue, Play with friends), making a lobby keeps home until it's
+in, and the e2e helpers wait for it once before the tap into a match. docs/decisions/2026-11-17-match-chunk-on-intent.md.
