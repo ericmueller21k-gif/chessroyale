@@ -1,3 +1,4 @@
+- Nov 17 ~21:45 UTC: main GREEN on d934811. #777 had conflicts with #778 (Tiger.tsx imports, bosses.md): resolved by director, pushed 70cd33f, CI watched. watchers-pause helper (xhigh, alone) running.
 - Nov 17 ~21:10 UTC: #779 dash spec get-up fix merged d934811 (spec only; app was right). Main full run on d934811 watched; if green, merge #777 casters. No helpers running. Queue: dash stall findings 4+5 (xhigh), Wrangler facing flag (Pig.tsx). Waiting on Eric: payments 6 calls.
 - Nov 17 ~20:35 UTC: #778 tiger pump fix merged 597b8b0 (fix-forward). #777 casters green, held until main green. dash-spec-main helper still running; watcher armed.
 - Nov 17 ~20:20 UTC: main RED on 5be698e (#776 after #775): dash.spec:576 phone fails twice (lie entries on move 2). Fix helper claude/dash-spec-main. Also tiger flake helper running. Moo LIVE 5be698e.
