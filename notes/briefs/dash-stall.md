@@ -38,3 +38,11 @@ bottom right).
   hand): a lying-down pose with the clock and a tap loop, from his finished art (`characters/boss-blitz.ts`). Cap $6; say the estimate
   first. Then wire it like his other moments.
 - Same checks as above, plus one GIF of this gag (phone and computer).
+
+## Added (Eric, Nov 17): group battles too
+"yes it should be in groups too, what can we do to make it happen". A group battle's move clock is 20 s (`moveClockSeconds`), so 30 s
+never comes. **The director's call:** in a battle with a per-move clock, the beats come at fractions of that move's clock: the slam at
+**50%** (10 s of 20), the fake move at **75%** (15 s), and **the move clock pauses for both skits** (the team loses no picking time;
+picks already in stay; a pick can't be made during the fake move's hold, then the clock resumes). Solo (a bank clock with no short
+move clock) keeps 20 s and 30 s. Both as settings (`DASH_STALL`: seconds for solo, fractions for a move clock), once a battle either
+way. Online: the server times it and pauses the clock; the parity test covers solo vs online.
