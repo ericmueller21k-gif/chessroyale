@@ -1,5 +1,6 @@
 import { useLayoutEffect } from "preact/hooks";
 import { MOO_BEATS, POWER_FX } from "@chessroyale/chess";
+import { MOO_CINEMATIC } from "@chessroyale/core";
 import { MOO_LINES } from "../characters/moo.ts";
 import type { Character, Frame } from "../characters/sprite.ts";
 import { noteCalm, noteSwap } from "../characters/moo-state.ts";
@@ -8,6 +9,7 @@ import { EFFECTS, animLength, type SquareItem } from "../characters/power-art.ts
 import type { BossView } from "../game.ts";
 import { NORMAL, CRITICAL, bossVoice } from "../speech.tsx";
 import { BoardEffects, SpriteAnim, prewarm, prewarmSprite } from "./BossEffect.tsx";
+import { MooCinematic, prewarmCinematic } from "./MooCinematic.tsx";
 import { hash, onSquare, ragePct, type BossUi, type Moment, type MomentProps, type MomentUi } from "./PowerParts.tsx";
 
 /**
@@ -129,9 +131,16 @@ function flurryMoment({ cast }: MomentProps) {
   return <div class="power-moment pm-flurry">{cast("beam1", B.flurry.beamAt)}</div>;
 }
 
-/** The Full Moon: the moon swells and he takes in its power; his colors go gold at the `swap` cue. */
-function fullMoonView({ cast }: MomentProps) {
-  return <div class="power-moment pm-fullmoon">{cast("swap", B.fullMoon.swapAt)}</div>;
+/**
+ * The Full Moon: the cinematic (MooCinematic.tsx; Eric, Nov 17): he hops onto the board, the field and the close-up over the board
+ * and everything above it, his transformation in the field (the moon swells, his colors go gold at the `swap` cue), and he hops back.
+ */
+function fullMoonView({ moment }: MomentProps) {
+  return (
+    <div class="power-moment pm-fullmoon">
+      <MooCinematic at={moment.at} />
+    </div>
+  );
 }
 
 /** The daze: the aura fizzles, his colors go back at the `calm` cue. */
@@ -148,7 +157,8 @@ const MOMENTS: Record<"moonbeam" | "flurry" | "fullMoon" | "dazed", MomentUi> = 
   moonbeam: { order: 0, kit: "power", lineAt: B.moonbeam.beamAt, view: moonbeamMoment },
   // (The flurry takes the place of that turn's Moonbeam; it is part of his ultimate, so its line cuts in.)
   flurry: { order: 2, kit: "ultimateHit", line: (kit, m) => ownLine("flurry", kit, m.key), lineAt: B.flurry.beamAt, priority: () => CRITICAL, view: flurryMoment },
-  fullMoon: { order: 2, kit: "ultimate", view: fullMoonView },
+  // (The Moon's line once the field has faded, as he hops back: the cinematic covers his bar on a phone until then.)
+  fullMoon: { order: 2, kit: "ultimate", lineAt: B.fullMoon.total - MOO_CINEMATIC.hopBackMs, view: fullMoonView },
   // (The daze is the end of his ultimate, and comes straight after the Moonbeam his last move may bring: its line cuts in on that one,
   // or the Moon would wait and be dropped as stale.)
   dazed: { order: 3, kit: "powerHit", line: (kit, m) => ownLine("dazed", kit, m.key), priority: () => CRITICAL, view: dazedMoment },
@@ -267,6 +277,7 @@ export function prewarmMoo(name: string): void {
     const ka = kit.kingAttack;
     if (ka?.poweredAnim) drip(ka.ch, (ka.ch.anims[ka.poweredAnim]?.frames ?? []).filter(heavy));
   });
+  prewarmCinematic();
   for (const fx of ["moonbeam", "moonScorch"] as const) prewarm(fx, Object.entries(EFFECTS[fx].ch.anims).flatMap(([a, an]) => an.frames.map((_, i) => [a, i] as const)));
 }
 

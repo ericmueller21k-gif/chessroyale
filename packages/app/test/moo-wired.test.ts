@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { BOSS_ROSTER, isPlayable, menuBosses, playableBosses, type PowerEvent } from "@chessroyale/core";
-import { KING_ATTACKERS, MOO_BEATS, MOO_FX, POWER_FX, START_FEN } from "@chessroyale/chess";
+import { BOSS_ROSTER, MOO_CINEMATIC, isPlayable, menuBosses, playableBosses, type PowerEvent } from "@chessroyale/core";
+import { KING_ATTACKERS, MOO_BEATS, MOO_FX, POWER_FX, START_FEN, fullMoonMs } from "@chessroyale/chess";
+import { cineBeats, closeFrame, closeOpacity, cineFigure, fieldOpacity } from "../src/components/MooCinematic.tsx";
 import { momentsOf, powerLine } from "../src/components/BossPowers.tsx";
 import { FADE_MS, MOO_UI, beamPhase, fallAtOf, fullMoonMoment, heldMarks, moonPixels, moonStep, noteMooMoments, scorchItems, waxLevel } from "../src/components/Moo.tsx";
 import { ragePct, type Moment } from "../src/components/PowerParts.tsx";
@@ -167,8 +168,10 @@ describe("his moments are timed by his animations", () => {
     expect(B.flurry.total).toBe(animLength(MOO.anims.flurry!));
     expect(B.flurry.total).toBeGreaterThanOrEqual(B.flurry.beamAt + 4 * B.flurry.stagger + fall + hit);
     for (let i = 0; i < 5; i++) expect(cueAt(MOO.anims.flurry!, `beam${i + 1}`)).toBe(B.flurry.beamAt + i * B.flurry.stagger);
-    expect(cueAt(MOO.anims.fullMoon!, "swap")).toBe(B.fullMoon.swapAt);
-    expect(B.fullMoon.total).toBe(animLength(MOO.anims.fullMoon!));
+    // The Full Moon: the cinematic (Nov 17), his transformation inside it from `transformAt`, its `swap` that far into it.
+    expect(cueAt(MOO.anims.fullMoon!, "swap")).toBe(B.fullMoon.transformSwapAt);
+    expect(B.fullMoon.transformMs).toBe(animLength(MOO.anims.fullMoon!));
+    expect(B.fullMoon.swapAt).toBe(B.fullMoon.transformAt + B.fullMoon.transformSwapAt);
     expect(cueAt(MOO.anims.dazed!, "calm")).toBe(B.dazed.calmAt);
     expect(B.dazed.total).toBe(animLength(MOO.anims.dazed!));
     expect(MOO_FX).toEqual({ moonbeam: B.moonbeam.total, flurry: B.flurry.total, fullMoon: B.fullMoon.total, dazed: B.dazed.total });
@@ -194,6 +197,42 @@ describe("his moments are timed by his animations", () => {
     // (A screen drawn again carries on: the same start.)
     expect(fullMoonMoment(thinking, 9000)[0]!.at).toBe(7000);
     expect(fullMoonMoment(view([]), 7000)).toEqual([]);
+  });
+});
+
+describe("the Full Moon's cinematic", () => {
+  it("adds its beats up to the Full Moon's length, which his thinking waits for (fullMoonMs), at about 7 s", () => {
+    const c = MOO_CINEMATIC;
+    expect(B.fullMoon.transformAt).toBe(c.hopMs + c.fadeInMs + c.fieldMs + c.closeMs);
+    expect(B.fullMoon.total).toBe(B.fullMoon.transformAt + B.fullMoon.transformMs + c.afterMs + c.fadeOutMs + c.hopBackMs);
+    expect(fullMoonMs({ powers: { events: [{ kind: "fullMoon" }] } })).toBe(B.fullMoon.total);
+    expect(B.fullMoon.total).toBeGreaterThanOrEqual(6500);
+    expect(B.fullMoon.total).toBeLessThanOrEqual(8000);
+    const b = cineBeats();
+    expect([b.landed, b.close, b.closeEnd, b.transform, b.fadeOut, b.hopBack, b.end]).toEqual([...[b.landed, b.close, b.closeEnd, b.transform, b.fadeOut, b.hopBack, b.end]].sort((x, y) => x - y));
+    expect(b.closeEnd).toBe(b.transform);
+    expect(b.end).toBe(B.fullMoon.total);
+    // (His hops are his `move` and its powered twin, which fit in theirs; the eyes whiten inside the close-up, its cut out after.)
+    expect(animLength(MOO.anims.move!)).toBeLessThanOrEqual(c.hopMs);
+    expect(animLength(MOO.anims.p_move!)).toBeLessThanOrEqual(c.hopBackMs);
+    expect(c.whitenAt + 4 * c.eyeStepMs).toBeLessThanOrEqual(c.closeMs - c.cutMs);
+  });
+
+  it("fades the field in after the hop and out before the hop back, cuts to the close-up and back, whitens the eyes, and plays his animations in turn", () => {
+    const b = cineBeats();
+    expect(fieldOpacity(0)).toBe(0);
+    expect(fieldOpacity(b.landed + MOO_CINEMATIC.fadeInMs)).toBe(1);
+    expect(fieldOpacity(b.transform + 100)).toBe(1);
+    expect(fieldOpacity(b.hopBack)).toBe(0);
+    expect(closeOpacity(b.close - 1)).toBe(0);
+    expect(closeOpacity(b.close + MOO_CINEMATIC.cutMs)).toBe(1);
+    expect(closeOpacity(b.closeEnd)).toBe(0);
+    expect(closeFrame(b.close)).toBe(0);
+    expect(closeFrame(b.close + MOO_CINEMATIC.whitenAt)).toBe(1);
+    expect(closeFrame(b.closeEnd - 1)).toBe(4);
+    expect([0, b.landed, b.transform, b.transform + B.fullMoon.transformMs, b.hopBack].map((t) => cineFigure(t).anim)).toEqual(["move", "idle", "fullMoon", "powerIdle", "p_move"]);
+    // (The Moon's line once the field has faded.)
+    expect(MOO_UI.moments.fullMoon.lineAt).toBe(b.hopBack);
   });
 });
 

@@ -2298,6 +2298,39 @@ export const RECLUSE_CUTSCENE = {
 } as const;
 
 /**
+ * Moo & Moon's Full Moon cinematic (Eric, Nov 17: "the game pauses, he jumps down onto the center of the board, then the board
+ * and everything above it like the boss bar, is replaced with a singular cinematic drawing of a field of grass with a starry
+ * night and a giant moon… a super close up of moo and moon from a side profile angle staring up at the moon… their eyes start
+ * turning white, then it goes back to the first scene and this is where he does the transformation, then the background fades
+ * and then once it fades he hops back to his spot"; components/MooCinematic.tsx; docs/decisions/2026-11-17-moo-cinematic.md).
+ * It plays at the start of his turn, while he thinks (no clock runs for the crowd), so its whole length is his Full Moon's
+ * (MOO_BEATS.fullMoon in packages/chess/src/bosses/moo.ts adds the beats up, his transformation's own length among them: the
+ * server and solo wait that long). Beats in order, ms:
+ */
+export const MOO_CINEMATIC = {
+  /** He hops from his spot onto the board (his `move`: a crouch, the hop, the landing; at least its 710 ms). */
+  hopMs: 720,
+  /** The field fades in over the board and everything above it (a CSS fade). */
+  fadeInMs: 500,
+  /** The field holds, him standing in it, before the cut to the close-up. */
+  fieldMs: 700,
+  /** The close-up of the two of them looking up at the moon, the cuts to it and back included. */
+  closeMs: 2200,
+  /** The cut to the close-up and back: a quick crossfade, each way, inside `closeMs`. */
+  cutMs: 160,
+  /** Into the close-up, their eyes start turning white (`eyeStepMs` a step, four steps), then hold white and glowing. */
+  whitenAt: 900,
+  eyeStepMs: 220,
+  /** (His transformation in the field: his `fullMoon` animation's own length, MOO_BEATS.fullMoon.transformMs.) */
+  /** After the transformation, he stands powered up in the field a moment. */
+  afterMs: 400,
+  /** The field fades out (a CSS fade). */
+  fadeOutMs: 500,
+  /** He hops back to his spot (his powered `move`). */
+  hopBackMs: 720,
+} as const;
+
+/**
  * His phase 2 online (Nov 13; docs/decisions/2026-11-13-recluse-online-phase2.md): the lobby server runs the four boards
  * (packages/server/src/bosses/recluse.ts). His moves come from the engine server alone, never a player's device and never a quick
  * move (Eric, Nov 13: "we can't have him breaking"; docs/decisions/2026-11-13-recluse-server-only.md). The bots' from the host's

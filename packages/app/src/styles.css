@@ -23129,6 +23129,42 @@ button.sq-tiny {
 }
 
 /* ---- Moo & Moon (components/Moo.tsx; mo- for Moo) ---- */
+/* His Full Moon's cinematic (components/MooCinematic.tsx; Eric, Nov 17): over the board and everything above it, the field, his figure
+   in it, and the close-up over both. Nothing in it takes a tap. Placed in screen pixels by the component; the pictures stay crisp. */
+.mo-cine {
+  position: fixed;
+  inset: 0;
+  z-index: 880;
+  pointer-events: none;
+}
+.mo-area {
+  position: absolute;
+  overflow: hidden;
+}
+.mo-pic {
+  position: absolute;
+  background-repeat: no-repeat;
+  image-rendering: pixelated;
+}
+.mo-field {
+  z-index: 1;
+}
+.mo-close {
+  z-index: 3;
+}
+.mo-cine .mo-cine-fig {
+  position: absolute;
+  z-index: 2;
+  height: auto;
+  image-rendering: pixelated;
+}
+/* On a computer his figure beside the board hides while he's out in the field (a phone's in the bar hides for every moment). */
+@media (min-width: 900px) and (min-height: 600px) {
+  .screen:has(.power-moment.pm-fullmoon) .boss-char.place-side .boss-char-sprite {
+    visibility: hidden;
+  }
+}
+
 /* He casts from the board's top-left corner, in his own frame's shape (74 x 108, with room above him for the flurry's rising moon:
    MOO.h). His feet where the others': 17% down the board, his middle 10% across. */
 .pm-caster.pm-by-moo {

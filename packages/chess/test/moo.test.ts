@@ -126,7 +126,9 @@ describe("Moo & Moon on the roster", () => {
     // (The board art's FLURRY_STAGGER_MS, the moon's beam1 to beam5 cues 120 ms apart.)
     expect(f.stagger).toBe(120);
     expect(f.total).toBeGreaterThanOrEqual(f.beamAt + (BOSS_POWERS.flurryBeams - 1) * f.stagger + f.fallMs + f.hitMs);
-    expect(MOO_FX).toEqual({ moonbeam: 1040, flurry: 1430, fullMoon: 1340, dazed: 1250 });
+    // (The Full Moon is its cinematic, Nov 17: MOO_CINEMATIC's beats and his transformation's 1340 ms.)
+    expect(MOO_BEATS.fullMoon.transformMs).toBe(1340);
+    expect(MOO_FX).toEqual({ moonbeam: 1040, flurry: 1430, fullMoon: 7080, dazed: 1250 });
   });
 });
 
