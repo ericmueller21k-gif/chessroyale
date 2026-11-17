@@ -3,7 +3,8 @@ import { createPortal } from "preact/compat";
 import { BOSS_POWERS } from "@chessroyale/core";
 import { HOOPS_BEATS, TIGER_ANIM } from "@chessroyale/chess";
 import { pickLine } from "../characters/boss-beats.ts";
-import { bossKit, type BossKit } from "../characters/kits.ts";
+import { bossKit, facingOf, type BossKit } from "../characters/kits.ts";
+import { mirrorFor, toward } from "../characters/sprite-kit.ts";
 import { EFFECTS } from "../characters/power-art.ts";
 import { HOP_AIR_AT, HOP_AIR_MS } from "../characters/tiger-figure.ts";
 import { PUMP_OVER, PUMP_OVER_MAX } from "../characters/side-size.ts";
@@ -17,7 +18,7 @@ import { gardenNow, realMs } from "../garden-clock.ts";
 import { NORMAL, bossVoice } from "../speech.tsx";
 import { FLY_MS, LAND_MS, colorLook, flyAnim, landAnim, landBeats, noteTiger, popReactAt, pumpShows, ringShows, type EndShow, type TigerShow } from "../tiger-show.ts";
 import { SpriteAnim, prewarm, prewarmSprite } from "./BossEffect.tsx";
-import { figureBusy, playInPlace, type FigureMove } from "./BossCharacter.tsx";
+import { figureBusy, figurePoint, playInPlace, type FigureMove } from "./BossCharacter.tsx";
 import type { BoardLayerProps, BossUi, Moment, MomentProps, MomentUi } from "./PowerParts.tsx";
 
 /**
@@ -84,7 +85,7 @@ export const NOZZLE_REACH = 23;
 
 /**
  * His trip along the bar, `t` ms into it: across by `dx` px while airborne (a small arc), `place` beside the pump, and back. Facing the
- * pump on the way and at it (he's drawn facing our left: mirrored when it's to his right), facing back on the way home.
+ * pump on the way and at it, facing back on the way home (his figure turns to face it: BossCharacter, kits.ts `placeFacing`).
  */
 export function tripMove(dx: number): FigureMove {
   const backAt = HOP_TRIP_MS + PLACE_MS;
@@ -94,7 +95,7 @@ export function tripMove(dx: number): FigureMove {
     const u = t < backAt ? Math.max(0, Math.min(1, go)) : 1 - Math.max(0, Math.min(1, back));
     const air = t < backAt ? go : back;
     const y = air > 0 && air < 1 ? -10 * Math.sin(Math.PI * air) : 0;
-    return { x: dx * u, y, flip: t < backAt ? dx > 0 : dx < 0 };
+    return { x: dx * u, y, face: (t < backAt) === dx > 0 ? "right" : "left" };
   };
 }
 
@@ -147,15 +148,21 @@ function actPlace(kit: BossKit, rec: TigerShow, now: number): void {
     playInPlace(`tiger:${id}`, ["hopTrip", "place", "hopTrip"], now, tripMove(dx));
     pl.putAt = now + HOP_TRIP_MS + TOUCH_AT;
   } else {
-    playInPlace(`tiger:${id}`, ["place"], now);
     const side = document.querySelector<HTMLElement>(".boss-char.place-side .boss-char-sprite");
     const sr = side?.getBoundingClientRect();
-    if (sr && sr.width > 0 && pump) {
+    if (side && sr && sr.width > 0 && pump) {
+      // (He turns to the pump for his toss (it stands beside him, toward the window's edge), his paw where it is then; facing the board
+      // again after it: Nov 17.)
+      const face = toward(figurePoint(side, kit.ch, kit.ch.foot[0], 0).x, onPump(pump).x);
+      playInPlace(`tiger:${id}`, ["place"], now, () => ({ x: 0, y: 0, face }));
       // (The limp balloon at the pump's own scale: it lands on the nozzle as the balloon it becomes.)
-      limps.set(id, { from: { x: sr.left + (PAW_LIMP.x / kit.ch.w) * sr.width, y: sr.top + (PAW_LIMP.y / kit.ch.h) * sr.height }, to: onPump(pump), at: now + TOUCH_AT, look: colorLook(pl.color), scale: pump.getBoundingClientRect().width / PUMP_W });
+      limps.set(id, { from: figurePoint(side, kit.ch, PAW_LIMP.x, PAW_LIMP.y, mirrorFor(facingOf(kit), face)), to: onPump(pump), at: now + TOUCH_AT, look: colorLook(pl.color), scale: pump.getBoundingClientRect().width / PUMP_W });
       if (limps.size > 4) limps.delete(limps.keys().next().value!);
       pl.putAt = now + TOUCH_AT + LIMP_FLY_MS;
-    } else pl.putAt = now + TOUCH_AT;
+    } else {
+      playInPlace(`tiger:${id}`, ["place"], now);
+      pl.putAt = now + TOUCH_AT;
+    }
   }
   // His word for it, now and then (its chance), as the balloon goes on.
   later(`say:${id}`, now + TOUCH_AT, () => bossVoice.say(pickLine(kit, "place", id), id, NORMAL));

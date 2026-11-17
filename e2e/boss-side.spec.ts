@@ -1,6 +1,6 @@
 import { expect, type Page } from "@playwright/test";
 import { Chess } from "chess.js";
-import { BOSS_KITS } from "../packages/app/src/characters/kits.ts";
+import { BOSS_KITS, placeFacing } from "../packages/app/src/characters/kits.ts";
 import { GOD_KING } from "../packages/app/src/characters/god-king.ts";
 import { SIDE_FEEL } from "../packages/app/src/characters/side-size.ts";
 import { renderFrame, type Character } from "../packages/app/src/characters/sprite.ts";
@@ -27,8 +27,10 @@ async function gap(page: Page): Promise<{ gap: number; side: number }> {
       const board = document.querySelector(sel)!.getBoundingClientRect();
       const box = c.getBoundingClientRect();
       const d = c.getContext("2d")!.getImageData(0, 0, c.width, c.height).data;
+      // (Mirrored to face the board (kits.ts placeFacing), its frame's columns run right to left: its rightmost on screen is its leftmost drawn.)
+      const m = new DOMMatrixReadOnly(getComputedStyle(c).transform).a < 0;
       let right = -1;
-      for (let y = 0; y < c.height; y++) for (let x = c.width - 1; x > right; x--) if (d[(y * c.width + x) * 4 + 3]! > 0) right = x;
+      for (let y = 0; y < c.height; y++) for (let x = 0; x < c.width; x++) if (d[(y * c.width + x) * 4 + 3]! > 0) right = Math.max(right, m ? c.width - 1 - x : x);
       return { g: board.left - (box.left + ((right + 1) * box.width) / c.width), side: board.width };
     }, BOARD_SEL.wrap);
     least = Math.min(least, g.g);
@@ -84,16 +86,16 @@ function restBoxes(ch: Character): number[][] {
   }
   return out;
 }
-/** The union of `boxes` (frame px) drawn in a canvas at `r` (page px) whose frame is `w` × `h`. */
-const onPage = (boxes: number[][], r: number[], w: number, h: number) => {
+/** The union of `boxes` (frame px) drawn in a canvas at `r` (page px) whose frame is `w` × `h`, mirrored (`m`: facing the board) or not. */
+const onPage = (boxes: number[][], r: number[], w: number, h: number, m = false) => {
   const sx = (r[2]! - r[0]!) / w, sy = (r[3]! - r[1]!) / h;
-  const u = boxes.reduce((a, b) => [Math.min(a[0]!, b[0]!), Math.min(a[1]!, b[1]!), Math.max(a[2]!, b[2]!), Math.max(a[3]!, b[3]!)], [Infinity, Infinity, -Infinity, -Infinity]);
+  const u = (m ? boxes.map(([x0, y0, x1, y1]) => [w - x1!, y0!, w - x0!, y1!]) : boxes).reduce((a, b) => [Math.min(a[0]!, b[0]!), Math.min(a[1]!, b[1]!), Math.max(a[2]!, b[2]!), Math.max(a[3]!, b[3]!)], [Infinity, Infinity, -Infinity, -Infinity]);
   return [r[0]! + u[0]! * sx, r[1]! + u[1]! * sy, r[0]! + u[2]! * sx, r[1]! + u[3]! * sy].map(Math.round);
 };
 const KING_BOXES = restBoxes(GOD_KING);
 for (const [name, kit] of Object.entries(BOSS_KITS)) {
   const id = kit.ch.id;
-  test(`Eric's rule (Nov 4): ${id} and the God King whole on screen at rest and at the end of every beat, phone and computer`, async ({ page }) => {
+  test(`Eric's rule (Nov 4): ${id} and the God King whole on screen at rest and at the end of every beat, phone and computer; ${id} facing the board (Nov 17)`, async ({ page }) => {
     test.setTimeout(180_000);
     const project = test.info().project.name as keyof typeof SIZES;
     await asAdmin(page);
@@ -114,7 +116,9 @@ for (const [name, kit] of Object.entries(BOSS_KITS)) {
           const b = e?.getBoundingClientRect();
           return b ? [b.left, b.top, b.right, b.bottom] : null;
         };
-        return { boss: box(".boss-char:not(.place-results) .boss-char-sprite"), king: box(".boss-dock .gk-unit .gk-canvas"), you: box(".boss-dock .you-pawn-bob"), moves: box(".mv-side"), win: [innerWidth, innerHeight], scroll: [document.documentElement.scrollWidth, document.documentElement.clientWidth] };
+        const fig = [...document.querySelectorAll<HTMLElement>(".boss-char:not(.place-results)")].find((x) => x.getBoundingClientRect().width > 0);
+        const cv = fig?.querySelector(".boss-char-sprite");
+        return { faces: fig?.dataset.faces ?? null, mirror: !!cv && new DOMMatrixReadOnly(getComputedStyle(cv).transform).a < 0, boss: box(".boss-char:not(.place-results) .boss-char-sprite"), king: box(".boss-dock .gk-unit .gk-canvas"), you: box(".boss-dock .you-pawn-bob"), moves: box(".mv-side"), win: [innerWidth, innerHeight], scroll: [document.documentElement.scrollWidth, document.documentElement.clientWidth] };
       });
       const inside = (b: number[], what: string) => {
         expect(b[0]!, `${w} × ${h}: ${what} ${b} past the window's left`).toBeGreaterThanOrEqual(0);
@@ -127,8 +131,13 @@ for (const [name, kit] of Object.entries(BOSS_KITS)) {
         if (r.moves) expect(b[0]! < r.moves[2]! && r.moves[0]! < b[2]! && b[1]! < r.moves[3]! && r.moves[1]! < b[3]!, `${w} × ${h}: ${what} ${b} over the move list ${r.moves}`).toBe(false);
       };
       expect(r.boss, `${w} × ${h}: ${name} drawn`).not.toBeNull();
-      inside(onPage(boss, r.boss!, ch.w, ch.h), name);
-      clearOf(onPage(boss, r.boss!, ch.w, ch.h), name);
+      // Facing the board (Eric, Nov 17: "have all the bosses facing the right way"): toward our right beside it (a phone's bar, a
+      // computer's side), its drawing mirrored exactly when its art faces our left (kits.ts placeFacing; a front-facing one never).
+      const want = placeFacing(kit, ch, project === "phone" ? "bar" : "side");
+      expect([r.faces, r.mirror], `${w} × ${h}: ${name} faces the board`).toEqual([want.faces, want.mirror]);
+      expect(want.faces, `${w} × ${h}: ${name} faces the board`).not.toBe("left");
+      inside(onPage(boss, r.boss!, ch.w, ch.h, r.mirror), name);
+      clearOf(onPage(boss, r.boss!, ch.w, ch.h, r.mirror), name);
       expect(r.king, `${w} × ${h}: the God King drawn`).not.toBeNull();
       inside(onPage(KING_BOXES, r.king!, GOD_KING.w, GOD_KING.h), "the God King");
       clearOf(onPage(KING_BOXES, r.king!, GOD_KING.w, GOD_KING.h), "the God King");

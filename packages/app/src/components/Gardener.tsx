@@ -12,7 +12,7 @@ import { frontMs } from "../garden-sweep.ts";
 import { addToss, currentTosses, freshLanding, hasTossed, onTosses, resetTosses, seedReading, tossSquares, type Toss } from "../garden-seeds.ts";
 import { NORMAL, Say, bossVoice } from "../speech.tsx";
 import { BoardEffects, BossEffect, prewarm, prewarmSprite, type BoardItem } from "./BossEffect.tsx";
-import { figureBusy, playInPlace } from "./BossCharacter.tsx";
+import { figureBusy, figurePoint, playInPlace } from "./BossCharacter.tsx";
 import { SoundAt, onSquare, type BoardLayerProps, type BossUi, type Moment, type MomentProps, type MomentUi } from "./PowerParts.tsx";
 
 /**
@@ -187,9 +187,10 @@ function handOnBoard(root: HTMLElement | null, kit: BossKit): { x: number; y: nu
   const b = board.getBoundingClientRect();
   if (!b.width) return null;
   for (const el of document.querySelectorAll<HTMLElement>(".boss-char:not(.place-results) .boss-char-sprite")) {
-    const r = el.getBoundingClientRect();
-    if (r.width < 1) continue;
-    return { x: (r.left + (HAND.x / kit.ch.w) * r.width - b.left) / b.width, y: (r.top + (HAND.y / kit.ch.h) * r.height - b.top) / b.width };
+    if (el.getBoundingClientRect().width < 1) continue;
+    // (Where his hand is, whichever way his figure faces there: figurePoint.)
+    const at = figurePoint(el, el.closest(".place-bar") && kit.bar ? kit.bar : kit.ch, HAND.x, HAND.y);
+    return { x: (at.x - b.left) / b.width, y: (at.y - b.top) / b.width };
   }
   return null;
 }

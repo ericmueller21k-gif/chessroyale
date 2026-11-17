@@ -10973,6 +10973,10 @@ button.fd-logo {
 .bs-spot .bs-sprite {
   height: auto;
 }
+/* (Facing your pawn across the stage: a boss drawn facing our right mirrored about its frame's middle, placeOnStage's feet with it. Nov 17.) */
+.bs-sprite.bs-mirror {
+  transform: scaleX(-1);
+}
 .bs-q-big {
   font-size: 90px;
   color: var(--fd-sub);
@@ -23332,18 +23336,17 @@ button.sq-tiny {
   left: -5%;
   top: -20%;
 }
-/* His hop along a phone's bar to the pump and back: facing the way he goes (his drawing faces our left), mirrored about his feet. */
+/* A boss faces the board and its foe wherever it stands (Eric, Nov 17; kits.ts `placeFacing`): a figure drawn facing the other way is
+   mirrored about its feet (`.bc-mirror`; only the image: the bubble and its words are its own children and stay as they are), and a run
+   that moves it (Babur's hop along a phone's bar to his pump and back) turns it the way it goes (`.bc-flip`, against its place's turn).
+   Pixel-crisp: whole-pixel scale, nearest filtering. */
+.boss-char.bc-mirror .boss-char-sprite,
 .boss-char.bc-flip .boss-char-sprite {
   transform: scaleX(-1);
   transform-origin: calc(var(--bc-fx) * var(--bc-scale) * 1px) 100%;
 }
-/* The results, and a computer's battle (the boss stands left of the board): a figure drawn facing our left turns to its right
-   (the God King, the board), mirrored about its feet (only the image: the bubble and its words are its own children and stay as
-   they are). Pixel-crisp: whole-pixel scale, nearest filtering. Eric, Nov 17: "this damn cheetah still facing the wrong way". */
-.boss-char.place-results.art-left .boss-char-sprite,
-.boss-char.place-side.art-left .boss-char-sprite {
-  transform: scaleX(-1);
-  transform-origin: calc(var(--bc-fx) * var(--bc-scale) * 1px) 100%;
+.boss-char.bc-mirror.bc-flip .boss-char-sprite {
+  transform: none;
 }
 /* The pump in the bar's free room, at its right end, standing on the room's bottom: 2x (68 x 72) on a phone, its foot 3 px below the
    room's bottom, inside the bar's padding, so a stage-4 balloon's top and a pop's over-swell clear the status at any width

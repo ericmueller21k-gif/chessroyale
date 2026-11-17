@@ -1,4 +1,4 @@
-import { artOf, bossKit } from "../characters/kits.ts";
+import { artOf, bossKit, placeFacing } from "../characters/kits.ts";
 import { frameKeys, type Character } from "../characters/sprite.ts";
 import { STAGE_PAWN, STAGE_PAWN_FIGURE, STAGE_RISE } from "../characters/boss-select.ts";
 import { SpriteAnim, prewarmAnims } from "./BossEffect.tsx";
@@ -31,8 +31,8 @@ const STAGE_FOOT_X: Readonly<Record<string, number>> = { bigboy: 49.5 };
  */
 const STAGE_ROOM = (1 - 0.12) * ((100 * 96) / 124) - 1;
 const placed = new Map<string, { left: number; width: number }>();
-function placeOnStage(ch: Character, idle: string, rise: boolean): { left: number; width: number } {
-  const key = `${ch.id}:${rise}`;
+function placeOnStage(ch: Character, idle: string, rise: boolean, mirror: boolean): { left: number; width: number } {
+  const key = `${ch.id}:${rise}:${mirror}`;
   let p = placed.get(key);
   if (!p) {
     const rows = frameKeys(ch, ch.anims[idle]!.frames[0]!);
@@ -45,7 +45,8 @@ function placeOnStage(ch: Character, idle: string, rise: boolean): { left: numbe
     const room = STAGE_ROOM + (rise ? STAGE_RISE : 0);
     const px = Math.max(before, Math.min((STAGE_PAWN * STAGE_PAWN_FIGURE) / tall, room / tall, 100 / ch.w));
     const width = ch.w * px;
-    const footX = STAGE_FOOT_X[ch.id] ?? ch.foot[0];
+    // (Mirrored about its frame's middle, its feet go with it.)
+    const footX = mirror ? ch.w - (STAGE_FOOT_X[ch.id] ?? ch.foot[0]) : (STAGE_FOOT_X[ch.id] ?? ch.foot[0]);
     placed.set(key, (p = { left: Math.max(0, Math.min(100 - width, FOOT_AT - footX * px)), width }));
   }
   return p;
@@ -55,8 +56,11 @@ export function BossStageFigure({ name, since, still, rise }: { name: string; si
   const kit = bossKit(name);
   if (!kit) return null;
   const idle = kit.anims.idle ?? "idle";
-  const { left, width } = placeOnStage(artOf(kit), idle, rise);
-  return <SpriteAnim ch={artOf(kit)} anim={idle} since={since} still={still} class="bs-sprite" style={{ left: `${left}cqi`, width: `${width}cqi` }} />;
+  // (Facing your pawn across the stage, left of it (Nov 17, kits.ts PLACE_FACING): a drawing that faces the other way mirrored.)
+  const art = artOf(kit);
+  const { mirror } = placeFacing(kit, art, "stage");
+  const { left, width } = placeOnStage(art, idle, rise, mirror);
+  return <SpriteAnim ch={art} anim={idle} since={since} still={still} class={`bs-sprite${mirror ? " bs-mirror" : ""}`} style={{ left: `${left}cqi`, width: `${width}cqi` }} />;
 }
 
 /** The picked boss's moves made ahead in quiet slices (sprite.ts lazyAnim; BossEffect.tsx prewarmAnims), on the Boss raid screen. */
