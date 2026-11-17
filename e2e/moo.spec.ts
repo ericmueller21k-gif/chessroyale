@@ -86,7 +86,10 @@ async function record(page: Page) {
         t: Date.now(),
         anim: bar?.getAttribute("data-anim") ?? null,
         barGold: gold(bar?.querySelector("canvas") ?? null),
-        casterGold: gold(document.querySelector<HTMLCanvasElement>(".pm-caster canvas")),
+        casterGold: gold(document.querySelector<HTMLCanvasElement>(".pm-caster canvas, canvas.mo-cine-fig")),
+        cine: document.querySelector(".mo-cine")
+          ? [...document.querySelectorAll<HTMLElement>(".mo-pic")].map((e) => `${e.classList.contains("mo-close") ? "close" : "field"}:${e.dataset.frame}:${e.style.opacity}`)
+          : null,
         moments: [...document.querySelectorAll(".power-moment")].map((e) => e.className.replace("power-moment", "").trim()),
         beams: [...document.querySelectorAll<HTMLElement>(".mo-beam")].map((e) => {
           const r = e.getBoundingClientRect();
@@ -109,6 +112,8 @@ type Rec = {
   anim: string | null;
   barGold: number | null;
   casterGold: number | null;
+  /** The Full Moon's cinematic, while it's up: each picture showing, "field" or "close", its frame and opacity. */
+  cine: string[] | null;
   moments: string[];
   beams: { square: string; phase: string; left: number; right: number; top: number; bottom: number }[];
   phase: string | null;
@@ -230,7 +235,7 @@ test("Moo & Moon: a moonbeam falls on one of your pieces and burns a crescent in
   expect(errors).toEqual([]);
 });
 
-test("Moo & Moon: the Full Moon warns, he turns powered up, the flurry drops five beams 120 ms apart, his moves are powered through five, then he's dazed and himself again", async ({ page }) => {
+test("Moo & Moon: the Full Moon warns, its cinematic plays (the field, the close-up, his eyes white), he turns powered up, the flurry drops five beams 120 ms apart, his moves are powered through five, then he's dazed and himself again", async ({ page }) => {
   test.skip(desktop(), "one run is enough: a phone (the bar's figure is the one measured)");
   test.setTimeout(300_000);
   const errors: string[] = [];
@@ -281,7 +286,20 @@ test("Moo & Moon: the Full Moon warns, he turns powered up, the flurry drops fiv
   expect(last.fullMoon).toBeNull();
   expect(last.barGold, "himself again: no gold").toBe(0);
 
-  // The caster at the board's corner: the transformation starts as himself and goes gold as it swaps; the flurry's is powered; the
+  // The Full Moon's cinematic (Nov 17): the field over the board and the boss bar, the close-up with their eyes normal, then white,
+  // then the field again; all of it gone again before the flurry, and the turn goes on to yours.
+  const cine = rec.flatMap((r, i) => (r.cine ? [{ i, pics: r.cine }] : []));
+  const shown = new Set(cine.flatMap((c) => c.pics.filter((p) => p.endsWith(":1")).map((p) => p.split(":").slice(0, 2).join(":"))));
+  expect([...shown].some((p) => p.startsWith("field:")), `the field shows: ${[...shown]}`).toBe(true);
+  expect(shown.has("close:4") && shown.has("close:8"), `the close-up, eyes normal then white: ${[...shown]}`).toBe(true);
+  const firstWhite = cine.find((c) => c.pics.includes("close:8:1"))!.i;
+  expect(cine.some((c) => c.i > firstWhite && c.pics.some((p) => p.startsWith("field:") && p.endsWith(":1"))), "back to the field after the close-up").toBe(true);
+  const cineEnd = cine.at(-1)!.i;
+  const flurryOn = rec.findIndex((r) => r.moments.includes("pm-flurry"));
+  expect(flurryOn, "the cinematic is gone before the flurry").toBeGreaterThan(cineEnd);
+  expect(rec.slice(cineEnd + 1).some((r) => r.phase === "play"), "the turn goes on to yours").toBe(true);
+
+  // The figure in the cinematic: the transformation starts as himself and goes gold as it swaps; the flurry's caster is powered; the
   // daze starts powered and his colors go back.
   const casts = rec.filter((r) => r.casterGold !== null);
   expect(casts.some((r) => r.moments.includes("pm-fullmoon") && r.casterGold! > 100), "the Full Moon's caster goes gold").toBe(true);

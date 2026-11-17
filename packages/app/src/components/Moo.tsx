@@ -135,10 +135,10 @@ function flurryMoment({ cast }: MomentProps) {
  * The Full Moon: the cinematic (MooCinematic.tsx; Eric, Nov 17): he hops onto the board, the field and the close-up over the board
  * and everything above it, his transformation in the field (the moon swells, his colors go gold at the `swap` cue), and he hops back.
  */
-function fullMoonView({ moment }: MomentProps) {
+function fullMoonView({ moment, boss }: MomentProps) {
   return (
     <div class="power-moment pm-fullmoon">
-      <MooCinematic at={moment.at} />
+      <MooCinematic at={moment.at} name={boss.name} />
     </div>
   );
 }
@@ -157,8 +157,8 @@ const MOMENTS: Record<"moonbeam" | "flurry" | "fullMoon" | "dazed", MomentUi> = 
   moonbeam: { order: 0, kit: "power", lineAt: B.moonbeam.beamAt, view: moonbeamMoment },
   // (The flurry takes the place of that turn's Moonbeam; it is part of his ultimate, so its line cuts in.)
   flurry: { order: 2, kit: "ultimateHit", line: (kit, m) => ownLine("flurry", kit, m.key), lineAt: B.flurry.beamAt, priority: () => CRITICAL, view: flurryMoment },
-  // (The Moon's line once the field has faded, as he hops back: the cinematic covers his bar on a phone until then.)
-  fullMoon: { order: 2, kit: "ultimate", lineAt: B.fullMoon.total - MOO_CINEMATIC.hopBackMs, view: fullMoonView },
+  // (The Moon's line as he lands back in his spot (his `move` is down 300 ms in): the cinematic covers his bar on a phone until then.)
+  fullMoon: { order: 2, kit: "ultimate", lineAt: B.fullMoon.total - MOO_CINEMATIC.hopBackMs + 300, view: fullMoonView },
   // (The daze is the end of his ultimate, and comes straight after the Moonbeam his last move may bring: its line cuts in on that one,
   // or the Moon would wait and be dropped as stale.)
   dazed: { order: 3, kit: "powerHit", line: (kit, m) => ownLine("dazed", kit, m.key), priority: () => CRITICAL, view: dazedMoment },

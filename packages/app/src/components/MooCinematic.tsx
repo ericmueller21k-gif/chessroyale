@@ -98,7 +98,8 @@ export function prewarmCinematic(): void {
   sheet.decode?.().catch(() => undefined);
 }
 
-export function MooCinematic({ at }: { at: number }) {
+/** `name`: the boss's name, as his kit is found (bossKit). */
+export function MooCinematic({ at, name }: { at: number; name: string }) {
   const now = useFrameNow();
   const [board, setBoard] = useState<HTMLElement | null>(null);
   const [spot, setSpot] = useState<Box | null>(null);
@@ -107,7 +108,7 @@ export function MooCinematic({ at }: { at: number }) {
     setSpot(spotBox());
   }, []);
   const rect = useRect(board);
-  const kit = bossKit("moo");
+  const kit = bossKit(name);
   const t = now - at;
   if (!rect || !kit || t < 0 || t >= B.total) return null;
   const b = cineBeats();
@@ -142,7 +143,7 @@ export function MooCinematic({ at }: { at: number }) {
         {pic(FIELD[Math.floor(Math.max(0, t) / FIELD_MS) % FIELD.length]!, fieldOpacity(t), "mo-field")}
         {pic(CLOSE[closeFrame(t)]!, closeOpacity(t), "mo-close")}
       </div>
-      <BossMoment boss="moo" anim={f.anim} since={at + f.since} class="mo-cine-fig" style={{ left: `${fig.x}px`, top: `${fig.y}px`, width: `${fig.w}px` }} />
+      <BossMoment boss={name} anim={f.anim} since={at + f.since} class="mo-cine-fig" style={{ left: `${fig.x}px`, top: `${fig.y}px`, width: `${fig.w}px` }} />
     </div>,
     document.body,
   );

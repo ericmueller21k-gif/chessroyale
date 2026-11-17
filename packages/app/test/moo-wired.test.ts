@@ -231,8 +231,8 @@ describe("the Full Moon's cinematic", () => {
     expect(closeFrame(b.close + MOO_CINEMATIC.whitenAt)).toBe(1);
     expect(closeFrame(b.closeEnd - 1)).toBe(4);
     expect([0, b.landed, b.transform, b.transform + B.fullMoon.transformMs, b.hopBack].map((t) => cineFigure(t).anim)).toEqual(["move", "idle", "fullMoon", "powerIdle", "p_move"]);
-    // (The Moon's line once the field has faded.)
-    expect(MOO_UI.moments.fullMoon.lineAt).toBe(b.hopBack);
+    // (The Moon's line as he lands back in his spot.)
+    expect(MOO_UI.moments.fullMoon.lineAt).toBe(b.hopBack + 300);
   });
 });
 
