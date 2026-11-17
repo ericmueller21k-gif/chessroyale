@@ -1,3 +1,4 @@
+- Nov 17 16:23 UTC: boss-facing helper started (claude/boss-facing), watcher armed. Running: coin-icon + boss-facing (2 high). Moo helper idle on Eric. Payments #772 held for Eric.
 - Nov 17 ~16:35 UTC: #770 Dash LIVE d2bacaf; main full run GREEN.
 - Nov 17 ~16:20 UTC: #770 Dash stall merged d2bacaf; deploy + main watched. Follow-up queued: dash findings 4 (watchers not told of pause; King strike too) + 5 (lock during hold).
 - Nov 17 ~16:15 UTC: #771 star seat LIVE 410cc3c; main full run GREEN.
