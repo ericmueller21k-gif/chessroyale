@@ -1009,7 +1009,8 @@ everywhere it stands (Nov 17, docs/decisions/2026-11-17-boss-facing.md):** each 
 sprites.ts, by eye: left, right or front), each place's is `PLACE_FACING` (kits.ts: right in a phone's bar, beside a computer's board and on
 the results; left on the select's stage), and `placeFacing` mirrors the drawing about its feet when they differ (`.bc-mirror`; the stage's
 `.bs-mirror`), never a front-facing one; bubbles and words never. The bar's numbers (`barShift`) are measured from the mirrored drawing,
-which also keeps every moment on screen (test/bar-fit.ts); `SIDE_REACH` is swapped for a mirrored side figure; effects from a hand or chest
+which also keeps every moment on screen (test/bar-fit.ts); `SIDE_REACH` is swapped for a mirrored side figure, and its swings toward the board (`SIDE_SWING`, every frame: Timber's
+44 when he moves, against his rest's 38) are held within `over` too (an unturned figure keeps its place); effects from a hand or chest
 use `figurePoint` (BossCharacter.tsx: Babur's limp balloon, which he turns to the pump to toss; Puddles' seeds; Dash's slap). A phone's
 casters at the board's corner (`.pm-caster`) still draw the art as drawn: a follow-up. The town and the rooms turn bosses by the same data. A kit's `sprite` makes its `ch` that sprite turned to
 face the board (`BOARD_FACING`, our right); portraits and the select stage draw the art (`artOf`). Smudgy is the pilot; others move when next

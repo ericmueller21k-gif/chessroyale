@@ -15,5 +15,10 @@ bosses facing the right way".
 - **Hand-tied effects** follow the turn (`figurePoint`): Babur turns to his pump for his toss on a computer, then back; Puddles' seeds;
   Dash's slap to his chest. The side figure's room (`SIDE_REACH`) is swapped when mirrored and measured from his feet (his turned
   box's left edge put a wide mirrored frame, Wrangler's, 75 px over the board).
+- **A turned side figure's swings** (Nov 17, PR #774's red Timber check): the side he held behind him now faces the board, and its
+  mid-beat frames reach past his rest (`SIDE_SWING`, every frame, measured by the unit test; Timber's move 44 against 38: 41 px over a
+  1440 × 900 board, its limit 38). `sideSizes` keeps that swing within `over`; where his room is short his far side goes over the menu
+  (Eric's Nov 4 rule allows it), at the same one size. Only for turned figures: unturned ones keep the places Eric playtested, though
+  some swing past `over` too (Jefferson, Don Dough +7, Hollow +6; Chandy's rifle in his non-aim frames): the director's call.
 - **Not in this change:** a phone's casters at the board's top-left corner (`.pm-caster`) still draw each boss as drawn: their projectiles
   leave from hands measured on the unmirrored art (Babur's hoops, Chub's carrots, Puddles' spray…), so turning them is per boss work.
