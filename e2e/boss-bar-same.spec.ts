@@ -87,7 +87,9 @@ const snap = (page: Page): Promise<Snap & { anim: string | null }> =>
       const cr = cv.getBoundingClientRect();
       const sx = cr.width / cv.width;
       const sy = cr.height / cv.height;
-      if (maxX >= 0) pixels = { minX: cr.x + minX * sx, maxX: cr.x + (maxX + 1) * sx, minY: cr.y + minY * sy, maxY: cr.y + (maxY + 1) * sy };
+      // (Mirrored to face the board (kits.ts placeFacing), its frame's columns run right to left.)
+      const m = new DOMMatrixReadOnly(getComputedStyle(cv).transform).a < 0;
+      if (maxX >= 0) pixels = { minX: cr.x + (m ? cv.width - maxX - 1 : minX) * sx, maxX: cr.x + (m ? cv.width - minX : maxX + 1) * sx, minY: cr.y + minY * sy, maxY: cr.y + (maxY + 1) * sy };
     }
     const name = document.querySelector(".boss-name strong") as HTMLElement | null;
     const hud = document.querySelector(".screen.game .hud-row");

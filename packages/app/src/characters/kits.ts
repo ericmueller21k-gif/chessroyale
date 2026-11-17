@@ -19,7 +19,8 @@ import { RECLUSE, RECLUSE_BUST, RECLUSE_BUST_PORTRAIT, RECLUSE_HEADS, RECLUSE_PO
 import { ALFIL, ALFIL_ATTACK, ALFIL_CHANCE, ALFIL_LINES, ALFIL_PORTRAIT } from "./alfil.ts";
 import { HOPPER, HOPPER_ATTACK, HOPPER_CHANCE, HOPPER_LINES, HOPPER_PORTRAIT } from "./hopper.ts";
 import { SMUDGY_ATTACK, SMUDGY_CHANCE, SMUDGY_LINES, SMUDGY_PORTRAIT, SMUDGY_SPRITE } from "./smudgy.ts";
-import { BOARD_FACING, facingAs, type Sprite } from "./sprite-kit.ts";
+import { BOARD_FACING, drawnFacing, facingAs, mirrorFor, type ArtFacing, type Facing, type Sprite } from "./sprite-kit.ts";
+import { artFacing } from "./sprites.ts";
 import { MOO, MOO_ATTACK, MOO_CHANCE, MOO_LINES, MOO_PORTRAIT } from "./moo.ts";
 import { GARDENER, GARDENER_ATTACK, GARDENER_PORTRAIT } from "./gardener.ts";
 import { GARDENER_BAR } from "./gardener-bar.ts";
@@ -183,12 +184,6 @@ export interface BossKit extends BeatLines {
    * is round 3b's suit): the same frames, their parts swapped for the final form's (recluse.ts, `coated`).
    */
   suit?: boolean;
-  /**
-   * Its drawing faces our left as drawn (not on the sprite kit). On the result screen, where the God King stands to its right, and
-   * beside a computer's board (it stands to the board's left), its image is mirrored about its feet (styles.css, `.art-left`); its
-   * bubble and words never are. Judged by eye, Nov 8; the board's side, Nov 17.
-   */
-  artFacesLeft?: boolean;
 }
 
 /**
@@ -346,9 +341,8 @@ export const BOSS_KITS: Record<string, BossKit> = {
     kingAttack: { ch: BIGBOY_ATTACK, anim: "kingAttack", perSquare: 36, stand: 1, facesLeft: true, hit: bonkItem },
   },
   "Sawyer": {
-    artFacesLeft: true,
     barScale: 1.34,
-    barShift: 21,
+    barShift: 18,
     barName: 32,
     ch: SAWYER,
     anims: {
@@ -386,8 +380,8 @@ export const BOSS_KITS: Record<string, BossKit> = {
   },
   "Wrangler": {
     barScale: 1.28,
-    barShift: 18,
-    barName: 28,
+    barShift: 41,
+    barName: 52,
     ch: PIG,
     anims: {
       entrance: "taunt",
@@ -438,9 +432,8 @@ export const BOSS_KITS: Record<string, BossKit> = {
   },
   // Alfil, the woolly mammoth (Eric, Oct 17): docs/decisions/2026-10-17-alfil-wired.md.
   "Alfil": {
-    artFacesLeft: true,
     barScale: 1.13,
-    barShift: 19,
+    barShift: 5,
     barName: 17,
     ch: ALFIL,
     anims: {
@@ -488,9 +481,8 @@ export const BOSS_KITS: Record<string, BossKit> = {
   // Eric's own, in one table (recluse-lines.ts).
   // Chub & Chirp, a rabbit riding a grasshopper (Eric, Oct 18): docs/decisions/2026-10-18-hopper-wired.md.
   "Chub & Chirp": {
-    artFacesLeft: true,
     barScale: 1.15,
-    barShift: 11,
+    barShift: 4,
     barName: 8,
     ch: HOPPER,
     anims: {
@@ -594,7 +586,6 @@ export const BOSS_KITS: Record<string, BossKit> = {
   },
   // Moo & Moon, a cow and his friend the Moon (Eric, Oct 20): docs/decisions/2026-10-20-moo-wired.md.
   "Moo": {
-    artFacesLeft: true,
     barScale: 0.96,
     barShift: 1,
     ch: MOO,
@@ -667,9 +658,8 @@ export const BOSS_KITS: Record<string, BossKit> = {
   },
   // Puddles, the hippo gardener (Eric, Oct 20-21): docs/decisions/2026-10-23-gardener-wired.md.
   "Gardener": {
-    artFacesLeft: true,
     barScale: 1.15,
-    barShift: 3,
+    barShift: 1,
     ch: GARDENER,
     // (A phone's bar: the same drawing with the water off, which would run past his box into his name.)
     bar: GARDENER_BAR,
@@ -727,7 +717,6 @@ export const BOSS_KITS: Record<string, BossKit> = {
   },
   // Babur, the circus tiger (Eric, Oct 23-24): docs/decisions/2026-10-24-tiger-wired.md.
   "Tiger": {
-    artFacesLeft: true,
     barScale: 1.26,
     barShift: 8,
     barName: 9,
@@ -793,9 +782,8 @@ export const BOSS_KITS: Record<string, BossKit> = {
   },
   // Folio, the paper crane (the director's, Oct 26; "it" everywhere): docs/decisions/2026-10-27-folio-wired.md.
   "Folio": {
-    artFacesLeft: true,
     barScale: 1.13,
-    barShift: 19,
+    barShift: 14,
     barName: 26,
     ch: FOLIO,
     // (A phone's boss bar: the same drawing and animations without its faint halo, a pixel to the left, its frame stopping 5 px short
@@ -851,9 +839,8 @@ export const BOSS_KITS: Record<string, BossKit> = {
   // Timber, the beaver builder (Eric's idea, Oct 20; approved Nov 1): docs/decisions/2026-11-01-timber.md. His sounds are his own,
   // all wood (Eric, Nov 2: "a gnawing wood sound… Wood knocking, cutting, saw, thumping"): characters/timber-sounds.ts.
   "Timber": {
-    artFacesLeft: true,
     barScale: 1.09,
-    barShift: 9,
+    barShift: 19,
     barName: 21,
     ch: TIMBER,
     anims: {
@@ -923,9 +910,9 @@ export const BOSS_KITS: Record<string, BossKit> = {
   // art branch's boss-blitz, as drawn (characters/boss-blitz.ts). His sounds are his own: sneakers and a chess clock
   // (characters/dash-sounds.ts); Tick's ding, chomp and step too.
   "Dash": {
-    artFacesLeft: true,
     barScale: 0.98,
-    barShift: 5,
+    barShift: 15,
+    barName: 14,
     ch: DASH,
     anims: {
       // (His periodic strike on a piece in a raid: his capture's double fist pump.)
@@ -950,6 +937,7 @@ export const BOSS_KITS: Record<string, BossKit> = {
       snap: "dashSnap",
       point: "dashSnap",
       yes: "dashYeah",
+      laugh: "dashLaugh",
       "ta-da": "dashYeah",
       cheer: "dashYeah",
       windup: "dashWhoosh",
@@ -1247,3 +1235,23 @@ export const kitName = (name: string, roster: readonly BossDef[] = BOSS_ROSTER):
 export const bossKit = (name: string | undefined | null): BossKit | null => (name ? ((WIP_KIT_ASKED && !name.startsWith("original:") ? wipKit() : null) ?? BOSS_KITS[kitName(name)] ?? null) : null);
 /** A boss's art as drawn (its portrait, the select screen): its sprite's, where it's on the sprite kit; else its board figure. */
 export const artOf = (kit: BossKit): Character => kit.sprite?.ch ?? kit.ch;
+
+/**
+ * Which way a kit's figure faces as drawn (its `ch`, its bar's, or its art: `artOf`), before a place turns it: a sprite's measured facing
+ * (sprite-kit.ts `drawnFacing`), else its art's (sprites.ts, by eye). Nov 17: the one rule every place turns a boss by (`PLACE_FACING`).
+ */
+export const facingOf = (kit: BossKit, ch: Character = kit.ch): ArtFacing => (kit.sprite ? drawnFacing(kit.sprite, ch) : (artFacing(kit.ch.id) ?? BOARD_FACING));
+
+/**
+ * Which way a boss faces in each place it stands (Eric, Nov 17: "have all the bosses facing the right way"): toward the board it plays on
+ * and its foe. A phone's bar and a computer's side stand it left of the board (BOARD_FACING), the results left of the God King; the
+ * boss select's stage right of your pawn. A figure drawn facing front is never turned (`mirrorFor`).
+ */
+export const PLACE_FACING: Readonly<Record<"bar" | "side" | "results" | "stage", Facing>> = { bar: BOARD_FACING, side: BOARD_FACING, results: BOARD_FACING, stage: "left" };
+
+/** Which way a kit's figure `ch` faces on the screen in `place`, and whether that's its drawing mirrored (about its feet; styles.css `.bc-mirror`). */
+export function placeFacing(kit: BossKit, ch: Character, place: keyof typeof PLACE_FACING): { faces: ArtFacing; mirror: boolean } {
+  const art = facingOf(kit, ch);
+  const mirror = mirrorFor(art, PLACE_FACING[place]);
+  return { faces: mirror ? PLACE_FACING[place] : art, mirror };
+}

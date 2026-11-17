@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { BOSS_ADMIN_FIRST, BOSS_CLOCK, BOSS_POWERS, BOSS_ROSTER, adminFirst, bossClockSettings, isPlayable, menuBosses, mulberry32, type Settings } from "@chessroyale/core";
-import { DASH_ANIM, DASH_FX, MatchRunner, extraMoveCandidates, passTurn, POWER_FX, boardPieces, botRushCorrect, bossThinkMs, chooseRush, dashMoveClock, flagMove, legalMoves, rushFen, rushHeld, rushJudge, rushKeep, rushMovesLeft, rushTimeline, scrambleLeft, scrambleOn, slappedClock } from "../src/index.ts";
+import { BOSS_ADMIN_FIRST, BOSS_CLOCK, BOSS_POWERS, BOSS_ROSTER, DASH_STALL, DASH_TAP, adminFirst, bossClockSettings, isPlayable, menuBosses, mulberry32, type Settings } from "@chessroyale/core";
+import { DASH_ANIM, DASH_FX, MatchRunner, applyMove, inCheck, pieceAt, stallMove, stallPausedMs, stallPlan, stallTimeline, tapTurn, extraMoveCandidates, passTurn, POWER_FX, boardPieces, botRushCorrect, bossThinkMs, chooseRush, dashMoveClock, flagMove, legalMoves, rushFen, rushHeld, rushJudge, rushKeep, rushMovesLeft, rushTimeline, scrambleLeft, scrambleOn, slappedClock } from "../src/index.ts";
 import { KIT_OPENING, crowdPick, fakeEngine, kitSettings } from "./boss-kit-lib.ts";
 
 /**
@@ -482,5 +482,131 @@ describe("Dash v2: the Scramble Rush in a battle", () => {
     }
     // (It came in these battles: his meter half full by about turn 13.)
     expect(came).toBeGreaterThan(0);
+  });
+});
+
+describe("Dash: his stall skit and his clock tap (Eric, Nov 17)", () => {
+  const fresh = (seed = 7, extra: Record<string, unknown> = {}) =>
+    ({ id: "dash", crowdMoves: 0, crowdSide: "w", powers: { seed, turn: 1, events: [], dash: { slaps: 0, stolen: 0, flags: 0 }, ...extra } }) as never;
+  const START = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+
+  it("when: on a bank at slamSeconds and fakeSeconds (20 s, 30 s); on a move clock at its half and three quarters (10 s, 15 s of 20); the test switch's; the skit's beats add up", () => {
+    expect([DASH_STALL.slamSeconds, DASH_STALL.fakeSeconds, DASH_STALL.slamShare, DASH_STALL.fakeShare, DASH_STALL.slamMs]).toEqual([20, 30, 0.5, 0.75, 5000]);
+    expect(stallPlan(fresh(), START, 610_000, true)).toMatchObject({ slamAt: 20_000, fakeAt: 30_000 });
+    expect(stallPlan(fresh(), START, 20_000, false)).toMatchObject({ slamAt: 10_000, fakeAt: 15_000 });
+    expect(stallPlan(fresh(), START, 610_000, true, "stall")).toMatchObject(DASH_STALL.test);
+    const tl = stallTimeline();
+    expect([tl.bragAt, tl.jkAt, tl.backAt, tl.total]).toEqual([DASH_STALL.landMs, DASH_STALL.landMs + DASH_STALL.bragMs, DASH_STALL.landMs + DASH_STALL.bragMs + DASH_STALL.jkMs, DASH_STALL.landMs + DASH_STALL.bragMs + DASH_STALL.jkMs + DASH_STALL.backMs]);
+  });
+
+  it("not on a move that can't reach the fake move with marginMs to spare, once it has come, with another moment of his, a scramble, his Rush, the re-pick after a Last Stand, in check, or for another boss", () => {
+    expect(stallPlan(fresh(), START, 30_000 + DASH_STALL.marginMs - 1, true)).toBeNull();
+    expect(stallPlan(fresh(), START, 30_000 + DASH_STALL.marginMs, true)).not.toBeNull();
+    expect(stallPlan(fresh(7, { dash: { slaps: 0, stolen: 0, flags: 0, stall: { at: 3, move: "g8f6" } } }), START, 610_000, true)).toBeNull();
+    // (A reconnect mid-skit: the pauses so far, the slam's left out when the fake move came alone.)
+    const hold = stallTimeline().total;
+    expect(stallPausedMs({ beat: "slam", at: 0, until: DASH_STALL.slamMs })).toBe(DASH_STALL.slamMs);
+    expect(stallPausedMs({ beat: "fake", at: 0, until: hold })).toBe(DASH_STALL.slamMs + hold);
+    expect(stallPausedMs({ beat: "fake", at: 0, until: hold, alone: true })).toBe(hold);
+    // (Each once a battle, apart: after the slam, the fake move alone; after both, nothing.)
+    expect(stallPlan(fresh(7, { dash: { slaps: 0, stolen: 0, flags: 0, slam: { at: 3 } } }), START, 610_000, true)).toMatchObject({ slamAt: null, fakeAt: 30_000 });
+    expect(stallPlan(fresh(7, { dash: { slaps: 0, stolen: 0, flags: 0, slam: { at: 3 } } }), START, 20_000, false)).toMatchObject({ slamAt: null, fakeAt: 15_000 });
+    expect(stallPlan(fresh(7, { dash: { slaps: 0, stolen: 0, flags: 0, slam: { at: 3 }, stall: { at: 5, move: "g8f6" } } }), START, 610_000, true)).toBeNull();
+    for (const kind of ["slap", "flag", "clockFit", "warn", "scramble", "rushWarn", "clockTap"]) expect(stallPlan(fresh(7, { events: [{ kind, turn: 1 }] }), START, 610_000, true), kind).toBeNull();
+    expect(stallPlan(fresh(7, { ultAt: 1 }), START, 610_000, true)).toBeNull();
+    expect(stallPlan(fresh(7, { dash: { slaps: 0, stolen: 0, flags: 0, rush: { at: 0, moves: [] } } }), START, 610_000, true)).toBeNull();
+    expect(stallPlan({ ...(fresh() as object), barred: "e2e4" } as never, START, 610_000, true)).toBeNull();
+    const check = "rnb1kbnr/pppp1ppp/8/4p3/6Pq/5P2/PPPPP2P/RNBQKBNR w KQkq - 1 3";
+    expect(inCheck(check)).toBe(true);
+    expect(stallPlan(fresh(), check, 610_000, true)).toBeNull();
+    expect(stallPlan({ ...(fresh() as object), id: "tiger" } as never, START, 610_000, true)).toBeNull();
+  });
+
+  it("his move: one of his legal moves were you to pass, quiet (no capture, castling, promotion or en passant), giving no check; the same from the same seed and turn", () => {
+    const fens = [START, "r1bqk2r/pppp1ppp/2n2n2/2b1p3/2B1P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 4 4", "8/2P5/8/3k4/8/8/4K3/7r w - - 0 1"];
+    for (const fen of fens)
+      for (let seed = 1; seed < 40; seed++) {
+        const passed = passTurn(fen)!;
+        const m = stallMove(passed, seed, 3)!;
+        expect(legalMoves(passed)).toContain(m);
+        expect(m.length).toBe(4);
+        expect(pieceAt(passed, m.slice(2, 4))).toBeNull();
+        expect(inCheck(applyMove(passed, m))).toBe(false);
+        expect(stallMove(passed, seed, 3)).toBe(m);
+      }
+    expect(new Set(Array.from({ length: 30 }, (_, i) => stallMove(passTurn(START)!, i, 1))).size).toBeGreaterThan(3);
+  });
+
+  it("through a battle: planned on your move, recorded once as the fake move comes, the position and the clocks as they were; never again after", async () => {
+    const r = battle(11, { bank: true });
+    r.deal();
+    const plan = r.stallPlan("h0")!;
+    expect(plan).toMatchObject({ slamAt: 20_000, fakeAt: 30_000 });
+    const before = { fen: fenOf(r), banks: r.state.players.map((p) => p.bankMs), history: r.boards.get(r.state.boards[0]!)!.history.length };
+    r.stalled(plan.move);
+    expect(r.boss!.powers!.dash!.stall).toEqual({ at: 0, move: plan.move });
+    expect({ fen: fenOf(r), banks: r.state.players.map((p) => p.bankMs), history: r.boards.get(r.state.boards[0]!)!.history.length }).toEqual(before);
+    r.stalled("a7a6");
+    expect(r.boss!.powers!.dash!.stall!.move).toBe(plan.move);
+    r.slammed();
+    r.slammed();
+    expect(r.boss!.powers!.dash!.slam).toEqual({ at: 0 });
+    for (let i = 0; i < 6 && !r.boss!.result; i++) {
+      await crowdMove(r);
+      if (r.boss!.result) break;
+      await r.playBoss(fakeEngine());
+      r.deal();
+      expect(r.stallPlan("h0"), `turn ${i + 2}`).toBeNull();
+    }
+  });
+
+  it("armed until it comes: a move before the fake move (the plan never recorded) leaves it for a later move", async () => {
+    const r = battle(12, { bank: true });
+    r.deal();
+    expect(r.stallPlan("h0")).not.toBeNull();
+    // (Your move goes in before it: nothing recorded. The next move with none of his moments has it planned again.)
+    let again = 0;
+    for (let i = 0; i < 8 && !again && !r.boss!.result; i++) {
+      await crowdMove(r);
+      if (r.boss!.result) break;
+      await r.playBoss(fakeEngine());
+      r.deal();
+      expect(r.boss!.powers!.dash!.stall ?? null).toBeNull();
+      if (!r.boss!.powers!.events.length && passTurn(fenOf(r))) {
+        expect(r.stallPlan("h0")).not.toBeNull();
+        again++;
+      }
+    }
+    expect(again).toBe(1);
+  });
+
+  it("his clock tap: once a battle, from his seeded turn (DASH_TAP's range; the test switch: the first), on the first turn with nothing else of his; screen only (it holds nothing)", async () => {
+    for (let seed = 0; seed < 50; seed++) {
+      const t = tapTurn(seed);
+      expect(t).toBeGreaterThanOrEqual(DASH_TAP.from);
+      expect(t).toBeLessThanOrEqual(DASH_TAP.to);
+    }
+    expect(tapTurn(3, "clocktap")).toBe(1);
+    expect(POWER_FX.clockTap).toBe(0);
+    for (const seed of [21, 22, 23]) {
+      const r = battle(seed, { bank: true });
+      const taps: number[] = [];
+      for (let i = 0; i < 14 && !r.boss!.result; i++) {
+        r.deal();
+        const ev = r.boss!.powers!.events;
+        if (ev.some((e) => e.kind === "clockTap")) {
+          taps.push(r.boss!.crowdMoves + 1);
+          expect(ev.length, `alone on its turn (seed ${seed})`).toBe(1);
+          expect(r.boss!.powers!.dash!.tap).toEqual({ at: r.boss!.crowdMoves });
+          // (Never the stall skit's move.)
+          expect(r.stallPlan("h0")).toBeNull();
+        }
+        await crowdMove(r);
+        if (r.boss!.result) break;
+        await r.playBoss(fakeEngine());
+      }
+      expect(taps.length, `seed ${seed}`).toBe(1);
+      expect(taps[0]!).toBeGreaterThanOrEqual(tapTurn(r.boss!.powers!.seed));
+    }
   });
 });

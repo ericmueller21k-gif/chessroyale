@@ -1,5 +1,5 @@
 import { BOSS_ROSTER } from "@chessroyale/core";
-import { BAR_TOP_GAP, BOSS_KITS, type BossKit } from "../src/characters/kits.ts";
+import { BAR_TOP_GAP, BOSS_KITS, placeFacing, type BossKit } from "../src/characters/kits.ts";
 import { renderFrame } from "../src/characters/sprite.ts";
 
 /**
@@ -99,22 +99,31 @@ export function momentOk(all: Extent, s: number, shift: number): boolean {
 /**
  * A boss's bar numbers: its size, the largest hundredth that has every rest frame reach no higher than BAR_TOP_GAP under the bar's top
  * (and stay in the bottom padding); its drawing's shift, the least whole px that keeps every rest frame 2 px in from the bar's left edge
- * (a drawing that reaches further left than the box moves right); and the name column's offset, the least whole px that keeps it 2 px clear.
+ * (a drawing that reaches further left than the box moves right) and every frame of `all` on the screen; and the name column's offset, the least whole px that keeps it 2 px clear.
  */
-export function barFit(rest: Extent): { barScale: number; barShift: number; barName: number } {
+export function barFit(rest: Extent, all?: Extent): { barScale: number; barShift: number; barName: number } {
   const cap = Math.min((REST_UP - BAR_TOP_GAP) / rest.up, BAR_PAD_BOTTOM / Math.max(rest.down, 1e-9));
   const barScale = Math.floor(cap * 100 + 1e-9) / 100;
-  const barShift = Math.ceil(rest.left * barScale - REST_LEFT - 1e-9);
+  // (And never a moment off the screen's left edge (`all`, every frame): Nov 17, Wrangler's lasso and Dash's entrance, turned to face the
+  // board, reach that way.)
+  const barShift = Math.max(Math.ceil(rest.left * barScale - REST_LEFT - 1e-9), all ? Math.ceil(all.left * barScale - MOMENT_LEFT - 1e-9) : -Infinity);
   const barName = Math.max(0, Math.ceil(rest.right * barScale + barShift - REST_RIGHT - 1e-9));
   return { barScale, barShift, barName };
 }
 
-/** Every playable boss's kit, the character its bar draws, its idle's and its rest frames' reach, and every frame's. */
+/** An extent mirrored about the feet: its left and right swapped. */
+const mirrored = (e: Extent): Extent => ({ ...e, left: e.right, right: e.left });
+
+/**
+ * Every playable boss's kit, the character its bar draws, its idle's and its rest frames' reach, and every frame's: as the bar draws it,
+ * mirrored about its feet where it turns to face the board (kits.ts placeFacing, Nov 17).
+ */
 export function barRows() {
   return PLAYABLE.map((def) => {
     const kit: BossKit = BOSS_KITS[def.kit!]!;
     const ch = kit.bar ?? kit.ch;
     const idle = [kit.loops?.idle ?? "idle", ...(kit.powered ? [kit.powered.idle] : [])];
-    return { name: def.kit!, kit, idle: extentOf(ch, idle), rest: restExtent(ch), all: extentOf(ch, Object.keys(ch.anims)) };
+    const as = placeFacing(kit, ch, "bar").mirror ? mirrored : (e: Extent) => e;
+    return { name: def.kit!, kit, idle: as(extentOf(ch, idle)), rest: as(restExtent(ch)), all: as(extentOf(ch, Object.keys(ch.anims))) };
   });
 }

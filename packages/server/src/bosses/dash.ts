@@ -4,7 +4,8 @@
  * late grace) the runner judges them with the same code the screens use (rushJudge, bots' from the seed), everyone sees the
  * verdict, then the match goes on: his extra move if the crowd failed it, else the crowd's turn. The game's board never changes.
  */
-import { rushKeep, rushTimeline } from "@chessroyale/chess";
+import { DASH_STALL } from "@chessroyale/core";
+import { rushKeep, rushTimeline, stallTimeline } from "@chessroyale/chess";
 import type { BossLobby } from "./base.ts";
 
 /** The Rush begins: the boss's screen with it to everyone, its end timed here. */
@@ -50,5 +51,45 @@ function rushPlace(lobby: BossLobby, playerId: string, key: string, places: unkn
   r.moved = { ...r.moved, [playerId]: kept.moved };
 }
 
+/**
+ * His stall skit's next beat, as the move's clock reaches it (the round's "stall" timer; his rules' stallPlan, planned as the round
+ * opened): the slam, or his fake second move. While the round is still open (someone still to pick), it begins now: the move clock
+ * stands still for its length (every deadline, and every bot still thinking, moves back by that long, as for the King's strike),
+ * everyone in the round is told (those who've picked too), and each beat is recorded as it comes (each once a battle, apart:
+ * the slam as it starts, the fake move as it lands; after a move made between them the fake move comes alone later). A pick that reaches here during the fake move's hold was made before it (the board takes none then)
+ * and counts as ever: nobody's pick is lost. A beat that fires late, with the round's deadline (near) gone, is dropped: the round
+ * locks as it would have, and nobody's clock moves back.
+ */
+function stallBeat(lobby: BossLobby) {
+  const round = lobby.r.round;
+  const runner = lobby.runner;
+  const st = round?.stall;
+  if (lobby.r.phase !== "play" || !round || !runner || !st?.next) return;
+  const now = lobby.now();
+  if (now >= round.deadline - DASH_STALL.marginMs / 2) {
+    st.next = undefined;
+    return lobby.armRound();
+  }
+  const beat = st.next;
+  const ms = beat === "slam" ? DASH_STALL.slamMs : stallTimeline().total;
+  st[beat] = { at: now, until: now + ms };
+  st.next = beat === "slam" ? "fake" : undefined;
+  round.deadline += ms;
+  for (const id of Object.keys(round.deadlines)) round.deadlines[id]! += ms;
+  for (const [id, at] of Object.entries(round.botsDoneIn ?? {})) if (round.startedAt + at > now) round.botsDoneIn![id] = at + ms;
+  if (beat === "slam") runner.slammed();
+  else runner.stalled(st.plan.move);
+  const shown = { beat, at: now, until: now + ms, ...(beat === "fake" ? { move: st.plan.move, ...(st.slam ? {} : { alone: true }) } : {}) };
+  for (const h of lobby.roundHumans()) {
+    const deadline = round.deadlines[h.id] ?? round.deadline;
+    lobby.send(h.id, { t: "stall", key: round.key, deadline, ...shown }, false);
+    // (A reconnect mid-skit: the round as it's re-sent carries the beat and the deadline it moved to.)
+    const last = lobby.r.last[h.id];
+    if (last?.t === "round" && last.key === round.key) lobby.r.last[h.id] = { ...last, deadline, stall: shown };
+  }
+  lobby.sendTally();
+  lobby.armRound();
+}
+
 /** His part on the lobby server. */
-export const dashLobby = { startRush, rushStep, rushPlace };
+export const dashLobby = { startRush, rushStep, rushPlace, stallBeat };

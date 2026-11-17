@@ -128,6 +128,8 @@ async function look(page: Page) {
               t = Math.min(t, y);
               b = Math.max(b, y);
             }
+        // (Mirrored to face the board (kits.ts placeFacing), its frame's columns run right to left.)
+        if (new DOMMatrixReadOnly(getComputedStyle(c).transform).a < 0) [l, r] = [c.width - r - 1, c.width - l - 1];
         if (r >= 0) boss = { x: cb.left + (l * cb.width) / c.width, r: cb.left + ((r + 1) * cb.width) / c.width, y: cb.top + (t * cb.height) / c.height, b: cb.top + ((b + 1) * cb.height) / c.height };
       }
       const ev = document.querySelector(".board-row > .eval-bar");

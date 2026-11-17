@@ -45,6 +45,13 @@ export interface RiderPose {
   pawnY: number;
   pawnTilt?: number;
   cut: number;
+  /**
+   * (Optional, Nov 17: Moon's Ride's seat) Where the rider (the pawn and its items, one group) is hidden, as an SVG path on the
+   * ride's square as it draws this frame (before the ride's size): in place of the straight `cut`, which then only places the pawn
+   * (scale.ts). Its edge lies on a line the ride draws behind the pawn (a seat's near lip), so the pawn sinks behind it with
+   * nothing of the ride drawn over it.
+   */
+  hide?: string;
 }
 
 /** One view of a ride: its own idle and move, a pose a frame, and its two drawings (the side view is the RiderDraft's own fields). */
@@ -102,6 +109,9 @@ export interface RiderDraft extends RiderViewDraft {
   /** What it leaves on the ground as it runs, in place of the town's droplets (none: the droplets). */
   trail?: RiderTrail;
 }
+
+/** Everything round a rider (a box far past any ride's): a pose's `hide` is cut out of it (even-odd) to clip the rider. */
+export const HIDE_ALL = "M -300 -300 H 400 V 400 H -300 Z";
 
 /** The three views, in the order the town keeps them (a walker's `view`: 0 side, 1 back, 2 front). */
 export const FACINGS: readonly RiderFacing[] = ["side", "back", "front"];

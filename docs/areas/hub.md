@@ -179,7 +179,7 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
     While a 1 v 1 search runs, a choice asks "Leave the 1 v 1 queue?" first (App's `leavingDuelFirst`).
   - **`/bosses`** (unlisted, not admin-gated; Eric's shortcut): opens the solo boss picker at once ("Choose your boss":
     every boss you can meet and a random one, and for an admin the Hidden Boss after them; the difficulty), over home.
-  - Your icon (no coins at the top: the shop and your own profile show them, Eric, Oct 18), and the live line ("214 online · 9 matches running · 31 in queue") with the typical
+  - Your icon (no coins at the top: the shop shows them, Eric, Oct 18; the profile's coins pill went Nov 17), and the live line ("214 online · 9 matches running · 31 in queue") with the typical
   - **On a game's screen** (Nov 1, Eric: "the side menu… on the desktop still"; docs/decisions/2026-11-01-game-screens-computer.md):
     a computer with a mouse has the same side menu beside every game screen (`GameFrame`, `game-frame.css`): 232 px with labels from
     1800 px wide (round 2; 1366 before), icons only below it (labels as tooltips). An item leaves the match through the gear's own Resign or Leave confirm,

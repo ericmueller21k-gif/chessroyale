@@ -6545,8 +6545,21 @@ body:has([aria-modal="true"]:not(#rotate-lock), .mm-scrim) > .dk-plus {
   gap: 10px;
 }
 .shop-coins {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
+}
+/* The coin (components/Coin.tsx): never squashed by a flex row, centered on the text beside it; smooth when shrunk, pixel-sharp
+   from 40 px up. */
+.coin-icon {
+  display: inline-block;
+  flex: none;
+  vertical-align: middle;
+}
+.coin-icon.sharp {
+  image-rendering: pixelated;
 }
 .shop-note {
   margin: 0;
@@ -6789,9 +6802,6 @@ body:has([aria-modal="true"]:not(#rotate-lock), .mm-scrim) > .dk-plus {
   color: #7a6a4a;
   font-size: 13px;
   font-weight: 700;
-}
-.shop-price span {
-  font-size: 17px;
 }
 .shop-ribbon {
   position: absolute;
@@ -10963,6 +10973,10 @@ button.fd-logo {
 .bs-spot .bs-sprite {
   height: auto;
 }
+/* (Facing your pawn across the stage: a boss drawn facing our right mirrored about its frame's middle, placeOnStage's feet with it. Nov 17.) */
+.bs-sprite.bs-mirror {
+  transform: scaleX(-1);
+}
 .bs-q-big {
   font-size: 90px;
   color: var(--fd-sub);
@@ -12522,10 +12536,6 @@ a.fd-row-link {
   padding: 5px 12px;
   font-size: 14px;
   line-height: 18px;
-}
-/* Your coins on your own profile: gold, as the coin. */
-.fd-pill.fp-coins {
-  color: var(--fd-gold-text);
 }
 /* Your 1 v 1 rank under your name on home: its tier's color, darkened in light (as the 1 v 1 pill: core's ranked test
    checks each tier's color stays 4.5:1 through these mixes, so change them together). */
@@ -23326,18 +23336,17 @@ button.sq-tiny {
   left: -5%;
   top: -20%;
 }
-/* His hop along a phone's bar to the pump and back: facing the way he goes (his drawing faces our left), mirrored about his feet. */
+/* A boss faces the board and its foe wherever it stands (Eric, Nov 17; kits.ts `placeFacing`): a figure drawn facing the other way is
+   mirrored about its feet (`.bc-mirror`; only the image: the bubble and its words are its own children and stay as they are), and a run
+   that moves it (Babur's hop along a phone's bar to his pump and back) turns it the way it goes (`.bc-flip`, against its place's turn).
+   Pixel-crisp: whole-pixel scale, nearest filtering. */
+.boss-char.bc-mirror .boss-char-sprite,
 .boss-char.bc-flip .boss-char-sprite {
   transform: scaleX(-1);
   transform-origin: calc(var(--bc-fx) * var(--bc-scale) * 1px) 100%;
 }
-/* The results, and a computer's battle (the boss stands left of the board): a figure drawn facing our left turns to its right
-   (the God King, the board), mirrored about its feet (only the image: the bubble and its words are its own children and stay as
-   they are). Pixel-crisp: whole-pixel scale, nearest filtering. Eric, Nov 17: "this damn cheetah still facing the wrong way". */
-.boss-char.place-results.art-left .boss-char-sprite,
-.boss-char.place-side.art-left .boss-char-sprite {
-  transform: scaleX(-1);
-  transform-origin: calc(var(--bc-fx) * var(--bc-scale) * 1px) 100%;
+.boss-char.bc-mirror.bc-flip .boss-char-sprite {
+  transform: none;
 }
 /* The pump in the bar's free room, at its right end, standing on the room's bottom: 2x (68 x 72) on a phone, its foot 3 px below the
    room's bottom, inside the bar's padding, so a stage-4 balloon's top and a pop's over-swell clear the status at any width
@@ -27990,4 +27999,25 @@ body.cs-on .mm-scrim {
 }
 .pod-dot.b {
   background: #111;
+}
+
+/* Dash's lying-down clock tap (Eric, Nov 17; DashStall.tsx, DashTap): beside your clock under the board, on the page's top layer,
+   placed once from the clock's time (left, top, size), mirrored when he lies on its left; taking no taps. His figure where he
+   stands is away meanwhile (its place kept). */
+.dash-lie {
+  position: fixed;
+  z-index: 55;
+  pointer-events: none;
+}
+.dash-lie.mirror {
+  transform: scaleX(-1);
+}
+.dash-lie-sprite {
+  display: block;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+}
+body.dash-away .boss-char .boss-char-sprite {
+  visibility: hidden;
 }

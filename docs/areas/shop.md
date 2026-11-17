@@ -26,8 +26,8 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
   (`SHOP.discount`, 0.5; `shopPrice` and `discountLabel` in `core/shop.ts`, whole coins, half up): a red "50% OFF" ribbon on every card
   and the bundle, the full price struck through beside the discounted one; at 0 no ribbons and no strike. **Limited items**
   (`SHOP.limited`: Gift, Beta): a gold clock in the card's top-left corner; its tap opens "Limited: a rotating shop item. It leaves the
-  shop when its time is up." (OK, Escape or a tap outside close either pop-up; nothing moves). Prices: `SHOP.prices`. The coin is the
-  top bar's 🪙. **The Mythic Crate** (`MythicCrateArt`: purple and black, gold crown, the HunChess crate's glint tinted lilac) is
+  shop when its time is up." (OK, Escape or a tap outside close either pop-up; nothing moves). Prices: `SHOP.prices`. The coin is
+  `Coin` (components/Coin.tsx: a king's head on a boss-token-style gold coin, Nov 17), in the top bar, price pills and Buy buttons. **The Mythic Crate** (`MythicCrateArt`: purple and black, gold crown, the HunChess crate's glint tinted lilac) is
   defined only in the decision note for now (a Fischer Random pull; each of the bundle's crates `SHOP.bundleMythicChance` likely).
   `BossCrateArt({ boss })` lays a boss's token over the seal (for the inventory, not wired there yet).
 - **Crates** (`core/crates.ts`): two series, **Beta Crate · Series 001** (listed first; it ships in batches, the plan
@@ -72,7 +72,7 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
   knight saddled, the knight your pawn's color, only its blanket the item's color). Their names and lines are the drawings' own. **In no crate yet** (the
   crate comes later): only admins have them, as admin copies (red, emerald second color, 100%: "Admins own one of every item", below).
   **Where the drawings came from:** copied as drawn from `claude/boss-art` (`scripts/boss-art/out/<ride>/<ride>.tsx`; their
-  `summary.md`, `views-summary.md` and `trail-summary.md` there have the artist's notes; Nov 1; Moon's Ride redrawn as a rounded star Nov 17, from `out/star-ride/`, its id kept; the same day its pawn sunk into a hollowed-out seat, cut 70, and the edge round the seat curved so nothing beside the pawn is cut straight) into
+  `summary.md`, `views-summary.md` and `trail-summary.md` there have the artist's notes; Nov 1; Moon's Ride redrawn as a rounded star Nov 17, from `out/star-ride/`, its id kept; the same day its pawn sunk into a hollowed-out seat, cut 70, and the edge round the seat curved so nothing beside the pawn is cut straight; then the star drawn once, behind the pawn, which a ride's `pose.hide` clips below the seat's lip: nothing of a ride's drawing over the pawn, [2026-11-17-star-seat-one-layer.md](../decisions/2026-11-17-star-seat-one-layer.md)) into
   `components/rides/` (`kit.ts`: the types; `load.ts`: each drawing its own chunk, loaded when a ride is drawn, Nov 1: town-square.md,
   "Rides"); only their import lines changed and the `!`s the app's typecheck asks for, and
   Hollow's Bulb's green cord was taken out of every view by hand (Eric, Nov 1: "we don't really need that"). The old cat, `hollow-steed`, isn't one. Each is a `Back` and a `Front` with the pawn

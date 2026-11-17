@@ -10,6 +10,8 @@ import { clockShown } from "../clock-text.ts";
 import { BOSS_POWERS } from "@chessroyale/core";
 import type { BossView } from "../game.ts";
 import { InPlace, rageWarn, type BossUi, type Moment, type MomentProps, type MomentUi } from "./PowerParts.tsx";
+import { figurePoint } from "./BossCharacter.tsx";
+import { DASH_FIGURE as DASH } from "../characters/dash-figure.ts";
 
 /**
  * Dash's powers on screen (his rules: packages/chess/src/bosses/dash.ts; docs/decisions/2026-11-03-dash.md). "Your time" is the
@@ -55,10 +57,10 @@ export const slapText = (ms: number): string => `−${Math.round(ms / 1000)}s`;
 // ---------------- His moments ----------------
 
 /** His figure as drawn now: the boss bar's on a phone, the one beside the board on a computer (the one with a box). */
-function figureBox(): DOMRect | null {
+function figureEl(): HTMLElement | null {
   for (const el of document.querySelectorAll<HTMLElement>(".boss-char .boss-char-sprite")) {
     const r = el.getBoundingClientRect();
-    if (r.width > 0 && r.height > 0) return r;
+    if (r.width > 0 && r.height > 0) return el;
   }
   return null;
 }
@@ -76,13 +78,14 @@ function SlapFlight({ ms, startAt, now }: { ms: number; startAt: number; now: nu
     if (!el) return;
     const clock = document.querySelector<HTMLElement>(".dk-clock .dk-time") ?? document.querySelector<HTMLElement>(".dk-clock");
     const c = clock?.getBoundingClientRect();
-    const d = figureBox();
+    const d = figureEl();
     // (No clock on the page: it rises from the screen's foot. No figure: to the screen's top-left, where his bar is.)
     const fx = c ? c.left + c.width / 2 : window.innerWidth / 2;
     const fy = c ? c.top + c.height / 2 : window.innerHeight;
-    // (To his chest: the figure's box is his frame, his feet at its foot.)
-    const tx = d ? d.left + d.width * 0.45 : 40;
-    const ty = d ? d.top + d.height * 0.6 : 60;
+    // (To his chest, 45% across his frame and 60% down as drawn, whichever way he faces: figurePoint.)
+    const chest = d ? figurePoint(d, DASH, DASH.w * 0.45, DASH.h * 0.6) : { x: 40, y: 60 };
+    const tx = chest.x;
+    const ty = chest.y;
     el.style.setProperty("--fx", `${fx}px`);
     el.style.setProperty("--fy", `${fy}px`);
     el.style.setProperty("--tx", `${tx - fx}px`);
@@ -184,7 +187,7 @@ function rushExtraMoment({ boss, banner }: MomentProps) {
 /** One of his lines for a moment, the same on every screen (by the moment's key). */
 const lineOf = (lines: readonly string[], key: string): string => lines[hash(key) % lines.length]!;
 
-const MOMENTS: Record<"slap" | "scramble" | "flag" | "clockFit" | "popOff" | "popOffFast" | "rushWarn" | "rushExtra", MomentUi> = {
+const MOMENTS: Record<"slap" | "scramble" | "flag" | "clockFit" | "popOff" | "popOffFast" | "rushWarn" | "rushExtra" | "clockTap", MomentUi> = {
   // (Your time ran out on your last move: first, his jab.)
   flag: { order: 1, kit: "cheer", view: flagMoment, dock: () => DASH_WORDS.flag, line: (kit, m) => (kit ? pickLine(kit, "flag", m.key) : null) },
   slap: { order: 2, kit: "power", lineAt: B.slap.slamAt, view: slapMoment, dock: () => DASH_WORDS.slap },
@@ -197,6 +200,8 @@ const MOMENTS: Record<"slap" | "scramble" | "flag" | "clockFit" | "popOff" | "po
   popOffFast: { order: 2, kit: "power", view: popOffFastMoment, line: (_kit, m) => lineOf(DASH_LOVE_LINES, m.key), priority: () => CRITICAL },
   // (His Scramble Rush a turn ahead, as any ultimate's warning: RAGE!, "Next turn: Scramble Rush", his clock held up, his line.)
   rushWarn: { order: 1, kit: "ultimateWarn", view: (p) => rageWarn(p, "Scramble Rush", undefined, true), line: (_kit, m) => lineOf(DASH_RUSH_LINES.warn, m.key) },
+  // (His lying-down clock tap plays on your move, by your clock, not on his screen: DashTap in DashStall.tsx. It holds nothing.)
+  clockTap: { order: 5, view: () => <div class="power-moment pm-tap pm-stay" />, line: () => null },
   rushExtra: { order: 3, kit: "ultimateHit", own: (boss) => boss.powers?.dash?.rush?.extra === "played" && boss.powers.events.some((e) => e.kind === "rushExtra"), view: rushExtraMoment, line: () => null },
 };
 
