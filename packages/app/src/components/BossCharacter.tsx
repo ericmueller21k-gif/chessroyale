@@ -33,7 +33,7 @@ import { CRITICAL, LOW, NORMAL, VoiceBubble, bossVoice, holdMs, type Priority } 
 import { mateAttack, prewarmKingAttack } from "./KingAttack.tsx";
 import { lightsId, syncLights } from "../characters/lights.ts";
 import { seenFen } from "../camo.ts";
-import { KING_REACH, SIDE_FEEL, SIDE_REACH, sideSizes } from "../characters/side-size.ts";
+import { KING_REACH, SIDE_FEEL, SIDE_REACH, SIDE_SWING, sideSizes } from "../characters/side-size.ts";
 import { GOD_KING } from "../characters/god-king.ts";
 import { testSwitchesAllowed } from "../test-switches.ts";
 
@@ -646,6 +646,9 @@ function fitSides(side: HTMLElement | null, name: string) {
   const mirror = placeFacing(kit, kit.ch, "side").mirror;
   const reach = mirror ? ([drawn[2], drawn[1], drawn[0], drawn[3]] as const) : drawn;
   const sx = cv.width / kit.ch.w;
+  // (Turned, the side he held behind him faces the board: his swings that way (SIDE_SWING: Timber's 44 when he moves, against his rest's
+  // 38) are held within `over` as his rest is. An unturned figure keeps the place it had.)
+  const swing = mirror ? Math.max(0, (SIDE_SWING[kit.ch.id]?.[0] ?? 0) - reach[2]) * sx : 0;
   // (His feet on the page: a mirror about them keeps them where they are, while his frame's box turns round them.)
   const feetX = mirror ? cv.right - kit.ch.foot[0] * sx : cv.left + kit.ch.foot[0] * sx;
   const now = (v: string, d: number) => parseFloat(at.getPropertyValue(v)) || d;
@@ -685,6 +688,7 @@ function fitSides(side: HTMLElement | null, name: string) {
       bossRight: feetX + reach[2] * sx,
       bossTop: cv.top + (kit.ch.foot[1] - reach[1]) * sx,
       bossMid: box.left + box.width / 2,
+      bossSwing: swing,
       k,
       right,
       fixed: !!dock?.classList.contains("dk-party"),

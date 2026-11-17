@@ -1,6 +1,6 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { KING_REACH, OVER_BOARD, SIDE_FEEL, SIDE_REACH, SIDE_TALLEST, SIDE_WIDEST, sideSizes, type SideRoom } from "../src/characters/side-size.ts";
+import { KING_REACH, OVER_BOARD, SIDE_FEEL, SIDE_REACH, SIDE_SWING, SIDE_TALLEST, SIDE_WIDEST, sideSizes, type SideRoom } from "../src/characters/side-size.ts";
 import { GOD_KING } from "../src/characters/god-king.ts";
 import { BOSS_KITS } from "../src/characters/kits.ts";
 import { BOSS_INTROS, CHALLENGE_FEEL, bubbleSize, drawnTop } from "../src/town/shops/challenge.ts";
@@ -22,14 +22,14 @@ describe("a computer's corner casts", () => {
 });
 
 describe("the figures beside the board on a computer (sideSizes)", () => {
-  const reachOf = (ch: { id?: string; w: number; h: number; foot: readonly number[]; anims: Record<string, { loop?: boolean; frames: unknown[] }> }) => {
+  const reachOf = (ch: { id?: string; w: number; h: number; foot: readonly number[]; anims: Record<string, { loop?: boolean; frames: unknown[] }> }, every = false) => {
     let x0 = Infinity;
     let y0 = Infinity;
     let x1 = -Infinity;
     let y1 = -Infinity;
     // (Chandy's level rifle lies over the board: OVER_BOARD's animations aren't his room.)
     for (const [name, a] of Object.entries(ch.anims))
-      for (const f of OVER_BOARD[ch.id ?? ""]?.test(name) ? [] : a.loop ? a.frames : a.frames.slice(-1)) {
+      for (const f of OVER_BOARD[ch.id ?? ""]?.test(name) ? [] : a.loop || every ? a.frames : a.frames.slice(-1)) {
         const { w, h, data } = renderFrame(ch as never, f as never);
         for (let y = 0; y < h; y++)
           for (let x = 0; x < w; x++)
@@ -45,6 +45,22 @@ describe("the figures beside the board on a computer (sideSizes)", () => {
   it("SIDE_REACH and KING_REACH are each figure's drawing's reach from its feet (left, up, right, down), at rest and where each beat ends", () => {
     for (const kit of Object.values(BOSS_KITS)) expect(SIDE_REACH[kit.ch.id], kit.ch.id).toEqual(reachOf(kit.ch));
     expect([...KING_REACH]).toEqual(reachOf(GOD_KING));
+  });
+  it("SIDE_SWING is each boss's drawing's reach from its feet, left and right, over every frame it plays (mid-beat too)", () => {
+    for (const kit of Object.values(BOSS_KITS)) {
+      const [l, , r] = reachOf(kit.ch, true);
+      expect(SIDE_SWING[kit.ch.id], kit.ch.id).toEqual([l, r]);
+    }
+  });
+  it("a boss's swing toward the board stays within `over` of it, his far side over the menu where his room is short (Timber turned, Nov 17)", () => {
+    // (Timber at 1440 x 900, as measured: his rest 84 wide, his swing 6 past it toward the board.)
+    const r = { board: 760, boardLeft: 346, boardRight: 1106, boardBottom: 823, leftLimit: 90, rightLimit: 1440, s: 2, bossLeft: 50, bossRight: 218, bossTop: 600, bossMid: 142, right: null, k: 1 };
+    const rest = sideSizes(r, SIDE_FEEL, "timber");
+    const swung = sideSizes({ ...r, bossSwing: 12 }, SIDE_FEEL, "timber");
+    expect(swung.s).toBe(rest.s);
+    const right = (p: typeof rest) => p.bossMid! + ((218 - 142) / 2) * p.s;
+    expect(right(swung) + 6 * swung.s).toBeLessThanOrEqual(346 + 760 * SIDE_FEEL.over + 0.1);
+    expect(right(rest) + 6 * rest.s).toBeGreaterThan(346 + 760 * SIDE_FEEL.over);
   });
   // Rooms as measured at 2× (scripts/stills-battle-desktop.mjs sides, Boss alone, no eval bar): the board, the empty column's left edge;
   // Hollow and Folio (Folio's drawing the widest), his box's middle 86 px left of the board; your pawn's middle 86 px right of it, its
