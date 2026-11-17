@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CROWD_KNOCKOUTS, CROWD_PRE_REWORK, CROWD_START, CROWD_VOTES, DEFAULT_SETTINGS, FRONT_DOOR, OPENING_ALLOWANCE, crowdFinalists, PREGAME_VOTES, RAID_SETTINGS, modeSettings, mulberry32, type Settings, voteResultMs } from "@chessroyale/core";
+import { CROWD_KNOCKOUTS, CROWD_START, CROWD_VOTES, DEFAULT_SETTINGS, FRONT_DOOR, OPENING_ALLOWANCE, PREGAME_VOTES, RAID_SETTINGS, modeSettings, mulberry32, type Settings, voteResultMs } from "@chessroyale/core";
 import { kingStrikeMs, lastStandMs, START_FEN, applyMove, bossIntroTimeline, freestyleBoard, isChess960Fen, legalMoves, pieceAt, sanLineToUci, toSan, type BoardScore, type MatchRunner, type Opening, type ServerMessage } from "@chessroyale/chess";
 import { LobbyCore, newLobbyRecord } from "../src/lobby.ts";
 
@@ -679,82 +679,11 @@ describe("lobby: Crowd mode", () => {
     expect([1, 2, 5, 6, 7].map((m) => clocks.get(m))).toEqual([10, 10, 10, 15, 15]);
   });
 
-  it("the boss final online (always the Hidden Boss): the host plays his moves, he never strikes, results carry the outcome", () => {
-    // (The 50 v 50 before the rework, CROWD_PRE_REWORK: the rework has no boss final. C4 retires this with it.)
-    const L = setup({ ...modeSettings("crowd", { augments: false }), ...CROWD_PRE_REWORK, finalFormat: "boss", knockoutsPerStage: CROWD_KNOCKOUTS.boss, stageRounds: [], firstStageRounds: 1, roundsPerStage: 1, boardIntroSeconds: 0, bossMaxMoves: 7 });
-    // (Ann has switched the eval bar off; Bo's app is from before the setting: it doesn't say.)
-    L.core.connect(undefined, "Ann", "computer", false, null, undefined, undefined, null, false);
-    L.core.connect(undefined, "Bo", "phone");
-    L.core.message("p1", { t: "start" });
-    L.advance(1000);
-    let bossMoves = 0;
-    let strikes = 0;
-    for (let i = 0; i < 400 && L.core.record.phase !== "results"; i++) {
-      const req = L.last("p1", "bossRequest") ?? L.last("p2", "bossRequest");
-      if (req && L.core.record.phase === "boss" && L.core.record.bossKey === req.key) {
-        const host = L.last("p1", "bossRequest") ? "p1" : "p2";
-        L.core.message(host, { t: "bossMove", key: req.key, move: legalMoves(req.fen)[0]! });
-        bossMoves++;
-        // (Held a moment if the crowd just took its queen: its banner plays first.)
-        if (L.core.record.bossPending) L.advance(2100);
-        const b = L.last("p2", "boss")!;
-        expect(b.boss.lastMove).not.toBeNull();
-        L.take("p1");
-        L.take("p2");
-        L.advance(2000);
-        continue;
-      }
-      if (L.core.record.phase === "play") {
-        for (const id of ["p1", "p2"]) {
-          const r = L.last(id, "round");
-          if (r?.board && !r.watching && r.alive) L.core.message(id, { t: "pick", key: r.key, move: legalMoves(r.board.fen)[0]! });
-        }
-        L.advance(25_000);
-      }
-      if (L.core.record.phase === "scoring") L.hostScores("p1") || L.hostScores("p2");
-      const b = L.last("p1", "boss");
-      if (b?.boss.justKilled) {
-        strikes++;
-        L.take("p1");
-      }
-      L.advance(5000);
-    }
-    expect(L.core.record.phase).toBe("results");
-    expect(bossMoves).toBeGreaterThan(0);
-    expect(L.core.save().runner!.state.boss!.id).toBe("recluse");
-    expect(strikes).toBe(0);
-    const res = L.last("p1", "results")!;
-    expect(["crowd", "boss", "draw"]).toContain(res.bossResult);
-    expect(Object.keys(res.placements)).toHaveLength(100);
-    // What goes on their profiles: cuts faced and survived, brilliant moves, the best move, the boss battle if reached.
-    const stages = CROWD_KNOCKOUTS.boss.length;
-    const mine = L.core.humanResults();
-    expect(mine).toHaveLength(2);
-    // Whether each had the eval bar on, as their app said when they joined.
-    expect(mine.find((r) => r.playerId === "p1")!.evalBar).toBe(false);
-    expect(mine.find((r) => r.playerId === "p2")!.evalBar).toBeNull();
-    for (const r of mine) {
-      expect(r.cuts).toBeGreaterThan(0);
-      expect(r.cuts).toBeLessThanOrEqual(stages);
-      // (The top 4 fought him: crowdFinalists.)
-      const fought = r.placement <= crowdFinalists("boss");
-      expect(r.cutsSurvived).toBe(r.cuts === stages && fought ? stages : r.cuts! - 1);
-      expect(r.brilliant).toBeGreaterThanOrEqual(0);
-      expect(r.bestMove).toMatch(/^(?:[KQRBN]?[a-h]?[1-8]?x?[a-h][1-8](?:=[QRBN])?|O-O(?:-O)?)[+#]?$/);
-      expect(r.bossElo).toBeNull();
-      if (fought) {
-        expect(r.strikes).toBe(0);
-        expect(r.strikesSurvived).toBe(0);
-        expect(r.survived).toBe(true);
-        expect(r.lastStand).toBe(false);
-      } else expect(r.strikes).toBeNull();
-    }
-  });
-
   it("the 50 v 50 rework online (C2): its one game played to the move limit (a test's ?limit=), no endings; the results carry the podium and each row's out-at-move and points a move; the places in the new order", () => {
     // A cut every move (?rounds=1): 8 cuts by move 4 (White's 5th is the 1 v 1's first), the limit after Black's 6th.
     const L = setup({ ...modeSettings("crowd", { augments: false }), stageRounds: [], firstStageRounds: 1, roundsPerStage: 1, boardIntroSeconds: 0, crowdMoveLimit: 6 });
-    L.core.connect(undefined, "Ann", "computer");
+    // (Ann has switched the eval bar off; Bo's app is from before the setting: it doesn't say.)
+    L.core.connect(undefined, "Ann", "computer", false, null, undefined, undefined, null, false);
     L.core.connect(undefined, "Bo", "phone");
     L.core.message("p1", { t: "start" });
     L.advance(1000);
@@ -801,6 +730,19 @@ describe("lobby: Crowd mode", () => {
     const top2 = res.standings.filter((r) => r.placement! <= 2);
     expect(new Set(top2.map((r) => r.team))).toEqual(new Set(["w", "b"]));
     if (res.gameWinner) expect(top2.find((r) => r.placement === 1)!.team).toBe(res.gameWinner);
+    // What goes on their profiles (moved here from the old boss final's test, C4): cuts faced, brilliant moves, the best move;
+    // no boss battle. Whether each had the eval bar on, as their app said when they joined.
+    const mine = L.core.humanResults();
+    expect(mine).toHaveLength(2);
+    expect(mine.find((r) => r.playerId === "p1")!.evalBar).toBe(false);
+    expect(mine.find((r) => r.playerId === "p2")!.evalBar).toBeNull();
+    for (const r of mine) {
+      expect(r.cuts).toBeGreaterThan(0);
+      expect(r.brilliant).toBeGreaterThanOrEqual(0);
+      expect(r.bestMove).toMatch(/^(?:[KQRBN]?[a-h]?[1-8]?x?[a-h][1-8](?:=[QRBN])?|O-O(?:-O)?)[+#]?$/);
+      expect(r.bossElo).toBeNull();
+      expect(r.strikes).toBeNull();
+    }
   });
 
   it("matchmade lobbies start by themselves: at the fill time with bots, or as soon as they're full", () => {

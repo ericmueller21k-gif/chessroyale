@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CROWD_PRE_REWORK, DEFAULT_SETTINGS, FAIRPLAY, RAID_SETTINGS, modeSettings, mulberry32 } from "@chessroyale/core";
+import { DEFAULT_SETTINGS, FAIRPLAY, RAID_SETTINGS, modeSettings, mulberry32 } from "@chessroyale/core";
 import { applyMove, legalMoves, sanLineToUci, type BoardScore, type Opening, type ServerMessage } from "@chessroyale/chess";
 import { LobbyCore, newLobbyRecord } from "../src/lobby.ts";
 
@@ -248,49 +248,6 @@ describe("premoves in the lobby (fair play's timing)", () => {
     expect([picks.p1?.premove, picks.p2?.premove, picks.p3?.premove]).toEqual([true, undefined, undefined]);
     expect([picks.p1?.move, picks.p2?.move, picks.p3?.move]).toEqual([a, b, c]);
   });
-
-  it("a final: told before the other finalist's turn opened: marked; told between movers (their move showing): timed", () => {
-    const L = finalLobby();
-    // The duel final, p1 against p2, taking turns. Wait for a turn of p1's to open.
-    const turn = (id: string) => {
-      for (let i = 0; i < 40 && !(L.core.record.phase === "play" && L.core.record.round!.deadlines[id] !== undefined); i++) L.advance(1000);
-      const r = L.last(id, "round")!;
-      L.advance(Math.max(0, r.startsAt - L.now));
-      return r;
-    };
-    const play = (id: string, r: { key: string; board?: { fen: string } | null }, move: string, premove = false) => {
-      L.advance(200);
-      L.core.message(id, { t: "pick", key: r.key, move, ...(premove ? { premove: true as const } : {}) });
-      L.scores(move);
-    };
-    let r = turn("p1");
-    let fen = r.board!.fen;
-    const m1 = legalMoves(fen)[0]!;
-    const reply1 = legalMoves(applyMove(fen, m1))[0]!;
-    const next1 = legalMoves(applyMove(applyMove(fen, m1), reply1))[0]!;
-    play("p1", r, m1);
-    // p1 tells its next right after its own move, before p2's turn opens: it counts.
-    L.core.message("p1", { t: "premove", move: next1 });
-    r = turn("p2");
-    play("p2", r, reply1);
-    r = turn("p1");
-    expect(L.core.record.round!.premoved).toEqual({ p1: next1 });
-    play("p1", r, next1, true);
-    expect(L.core.record.round!.picks.p1).toMatchObject({ move: next1, premove: true });
-
-    // Now p2's turn; once it's played and shows (between movers), p1 tells its next: it doesn't count.
-    r = turn("p2");
-    fen = r.board!.fen;
-    const reply2 = legalMoves(fen)[0]!;
-    const next2 = legalMoves(applyMove(fen, reply2))[0]!;
-    play("p2", r, reply2);
-    expect(L.core.record.phase).toBe("final");
-    L.core.message("p1", { t: "premove", move: next2 });
-    r = turn("p1");
-    expect(L.core.record.round!.premoved).toBeUndefined();
-    play("p1", r, next2, true);
-    expect(L.last("p1", "final")!.final.last?.move).toBe(next2);
-  });
 });
 
 /** A raid's library (as the boss lobby tests have it): openings long enough for a raid's settings. */
@@ -327,43 +284,6 @@ function raidLobby() {
   core.message("p1", { t: "start" });
   advance(1000);
   for (let i = 0; i < 120 && core.record.phase !== "play"; i++) advance(1000);
-  return { core, last, advance, scores: (best: string) => answerScores(core, last, best), get now() { return now; } };
-}
-
-/** A Crowd lobby whose short knockouts leave its two people facing each other in the duel final. */
-function finalLobby() {
-  let now = 1_000_000;
-  const inbox = new Map<string, ServerMessage[]>();
-  const core = new LobbyCore(
-    newLobbyRecord("ABCDE", now),
-    { now: () => now, send: (id, msg) => inbox.set(id, [...(inbox.get(id) ?? []), { ...msg, now } as ServerMessage]) },
-    library,
-    mulberry32(3),
-    // (The 50 v 50 before the rework, its duel: the rework has no final. C4 retires this with it.)
-    { ...DEFAULT_SETTINGS, ...modeSettings("crowd", { augments: false }), ...CROWD_PRE_REWORK, finalFormat: "duel", knockoutsPerStage: [2, 2], stageRounds: [], firstStageRounds: 1, roundsPerStage: 1, boardIntroSeconds: 0 },
-  );
-  const last = <T extends ServerMessage["t"]>(id: string, t: T) =>
-    [...(inbox.get(id) ?? [])].reverse().find((m) => m.t === t) as Extract<ServerMessage, { t: T }> | undefined;
-  const advance = (ms: number) => {
-    now += ms;
-    if (core.nextAlarm && core.nextAlarm <= now) core.alarm();
-  };
-  for (let i = 1; i <= 2; i++) core.connect(undefined, `P${i}`, "computer");
-  core.message("p1", { t: "start" });
-  advance(2000);
-  // Through the knockouts: each person picks the judges' best, the bots something worse, so both people reach the final.
-  for (let i = 0; i < 200 && !last("p1", "final"); i++) {
-    if (core.record.phase === "play") {
-      for (const id of Object.keys(core.record.round!.deadlines)) {
-        const r = last(id, "round");
-        if (r?.board && !core.record.round!.picks[id]) core.message(id, { t: "pick", key: r.key, move: legalMoves(r.board.fen)[0]! });
-      }
-    }
-    if (core.record.phase === "scoring") answerScores(core, last, null);
-    advance(1000);
-  }
-  const f = last("p1", "final")!.final;
-  expect(f.teams).toEqual([["p1"], ["p2"]]);
   return { core, last, advance, scores: (best: string) => answerScores(core, last, best), get now() { return now; } };
 }
 
