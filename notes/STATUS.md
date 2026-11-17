@@ -1,3 +1,4 @@
+- Nov 17 ~15:05 UTC: Eric angry: star seat still has lines (#768 not enough). Cause: Front = masked copy of the star over the pawn. Brief star-seat-one-layer.md (clip pawn, no copy). FIRST in queue when Dash .done (with boss-facing; moo-cinematic after).
 - Nov 17 ~14:55 UTC: Eric: Moo & Moon Full Moon cinematic (field + giant moon; side close-up, eyes white; transform; hop back). Brief notes/briefs/moo-cinematic.md, phase 1 = stills then .question STOP. QUEUED with boss-facing: both high, start together when Dash .done.
 - Nov 17 ~14:45 UTC: #769 LIVE dd5fb4f; main full run GREEN (flake cluster fixed).
 - Nov 17 14:15 UTC: Eric: all bosses facing the right way -> brief notes/briefs/boss-facing.md (Opus high). QUEUED: starts the moment Dash (xhigh, alone) is .done, unless Eric OKs two at once.
