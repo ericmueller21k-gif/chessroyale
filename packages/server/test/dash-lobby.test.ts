@@ -257,6 +257,7 @@ describe("Dash's stall skit online (Eric, Nov 17)", () => {
     const total = stallTimeline().total;
     expect(fake).toMatchObject({ beat: "fake", move: round.stall!.plan.move, deadline: deadline + DASH_STALL.slamMs + total });
     expect(fake.until - fake.at).toBe(total);
+    expect(fake.alone).toBeUndefined();
     expect(l.runner().boss!.powers!.dash!.stall).toEqual({ at: l.runner().boss!.crowdMoves, move: round.stall!.plan.move });
     // (A reconnect mid-skit gets the round with its beat and the deadline it moved to.)
     expect(rec.last["p2"]).toMatchObject({ t: "round", deadline: fake.deadline, stall: { beat: "fake", move: fake.move } });
@@ -270,7 +271,7 @@ describe("Dash's stall skit online (Eric, Nov 17)", () => {
     expect(l.runner().boards.get(l.runner().state.boards[0]!)!.fen).toBe(fen);
   });
 
-  it("once a battle: spent at the slam (a move before the fake move ends it there, and it never comes again); a King's strike before the slam leaves it for a later move", () => {
+  it("each once a battle, apart (Eric: \"each still occur once per game\"): the slam spent as it starts, never a second; a move between it and the fake move leaves the fake move for a later move, alone; a King's strike before the slam leaves both for later", () => {
     const l = dashLobby("", ["P1"]);
     l.toRound();
     let round = l.core.save().round!;
@@ -295,11 +296,25 @@ describe("Dash's stall skit online (Eric, Nov 17)", () => {
     l.inbox.set("p1", []);
     until(l, round.startedAt + clock * DASH_STALL.slamShare + 100);
     expect(stalls(l, "p1").map((m) => m.beat)).toEqual(["slam"]);
-    const crowdMoves = l.runner().boss!.crowdMoves;
-    expect(l.runner().boss!.powers!.dash!.stall).toEqual({ at: crowdMoves, move: round.stall!.plan.move });
+    expect(l.runner().boss!.powers!.dash!.slam).toEqual({ at: l.runner().boss!.crowdMoves });
     pick();
     expect(l.hostScores()).toBe(true);
-    // Never again: no plan on the moves after, and no slam however long the move takes.
+    expect(l.runner().boss!.powers!.dash!.stall ?? null).toBeNull();
+    // The next move: the fake move alone at three quarters, no slam first; its pause only (no slam's).
+    l.toRound();
+    round = l.core.save().round!;
+    expect(round.stall?.plan.slamAt).toBeNull();
+    expect(round.stall?.next).toBe("fake");
+    const { deadline } = round;
+    l.inbox.set("p1", []);
+    until(l, round.startedAt + clock * DASH_STALL.fakeShare + 100);
+    const total = stallTimeline().total;
+    expect(stalls(l, "p1")).toEqual([expect.objectContaining({ beat: "fake", alone: true, move: round.stall!.plan.move, deadline: deadline + total })]);
+    expect(l.runner().boss!.powers!.dash!.stall).toEqual({ at: l.runner().boss!.crowdMoves, move: round.stall!.plan.move });
+    until(l, l.core.save().round!.stall!.fake!.until + 100);
+    pick();
+    expect(l.hostScores()).toBe(true);
+    // Never again: no plan on the moves after, and no beat however long the move takes.
     for (let n = 0; n < 2; n++) {
       l.toRound();
       round = l.core.save().round!;

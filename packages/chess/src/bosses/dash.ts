@@ -275,12 +275,21 @@ function tapNow(next: BossPowerState, t: { turn: number; seed: number; test: str
 
 /**
  * His stall skit on this crowd move (Eric, Nov 17; docs/decisions/2026-11-17-dash-stall.md): when it comes, on the move's own
- * clock (ms of thinking, the skit's pauses left out): the slam at `slamAt` (DASH_STALL.slamMs long), his fake second move at
- * `fakeAt` (stallTimeline().total long), `move` being the move he plays and takes back. The move's clock stands still through
- * both, for everyone.
+ * clock (ms of thinking, the skit's pauses left out): the slam at `slamAt` (DASH_STALL.slamMs long; null: his slam is spent, so
+ * the fake move comes alone), his fake second move at `fakeAt` (stallTimeline().total long), `move` being the move he plays and
+ * takes back. The move's clock stands still through both, for everyone.
  */
+/**
+ * How long the move's clock has stood still for his stall skit on this move by the beat now on (`at` to `until`; a reconnect
+ * mid-skit, net.ts): its slam's pause unless the fake move came alone (`alone`: his slam spent on an earlier move), plus the fake
+ * move's hold when that's the beat.
+ */
+export function stallPausedMs(stall: { beat: "slam" | "fake"; at: number; until: number; alone?: boolean }, s: typeof DASH_STALL = DASH_STALL): number {
+  return (stall.beat === "slam" || !stall.alone ? s.slamMs : 0) + (stall.beat === "fake" ? stall.until - stall.at : 0);
+}
+
 export interface StallPlan {
-  slamAt: number;
+  slamAt: number | null;
   fakeAt: number;
   move: string;
 }
@@ -321,9 +330,9 @@ export function stallMove(passed: string, seed: number, turn: number): string | 
 
 /**
  * Whether his stall skit can come on the crowd move now being picked, and when (Eric, Nov 17: once a battle; "if you take more
- * than 30 seconds to move"). Null: not on this move. `allowedMs`: the move's clock (ms); `bank`: the battle's time is a bank
+ * than 30 seconds to move"; "each still occur once per game": the slam and the fake move each once, apart). Null: not on this move. `allowedMs`: the move's clock (ms); `bank`: the battle's time is a bank
  * (Boss alone, a Boss Battle party: DASH_STALL's seconds) or else a move clock (a raid, a group battle: DASH_STALL's shares of
- * the move's clock). Not once it has come (`dash.stall`), nor on a move with any other moment of his (an event this turn, his
+ * the move's clock). After the slam (`dash.slam`), the fake move alone (no `slamAt`). Not once the fake move has come (`dash.stall`), nor on a move with any other moment of his (an event this turn, his
  * clock tap among them), a Time Scramble's move, his Scramble Rush's turn, the re-pick after the God King's Last Stand, with the
  * crowd in check (he can't move again then), with no quiet move of his, or when the move's clock can't reach the fake move with
  * DASH_STALL.marginMs to spare. The test switch ?power=stall: DASH_STALL.test's beats.
@@ -335,7 +344,7 @@ export function stallPlan(boss: BossState | null | undefined, fen: string, allow
   const turn = turnOf(boss);
   if (p.turn !== turn || p.events.length || scrambleOn(p, turn) || (d.rush && d.rush.at >= boss.crowdMoves) || rushWarned(d)) return null;
   const quick = test === "stall";
-  const slamAt = quick ? s.test.slamAt : bank ? s.slamSeconds * 1000 : Math.round(allowedMs * s.slamShare);
+  const slamAt = d.slam ? null : quick ? s.test.slamAt : bank ? s.slamSeconds * 1000 : Math.round(allowedMs * s.slamShare);
   const fakeAt = quick ? s.test.fakeAt : bank ? s.fakeSeconds * 1000 : Math.round(allowedMs * s.fakeShare);
   if (allowedMs - fakeAt < s.marginMs) return null;
   const passed = passTurn(fen);
@@ -570,7 +579,7 @@ export interface DashView {
   rush?: DashRush | null;
   /** His pop-off (Eric, Nov 7): his turn it comes on, so his screen plays it while he thinks. */
   popOff?: { at: number } | null;
-  /** His stall skit, once its slam has come (Eric, Nov 17; spent there): the crowd move it came on and the move he'd take back. */
+  /** His stall skit's fake move, once it has come (Eric, Nov 17): the crowd move it came on and the move he took back. */
   stall?: { at: number; move: string } | null;
   /** His lying-down clock tap, once it has come (Eric, Nov 17): the crowd move it came on. */
   tap?: { at: number } | null;
@@ -638,10 +647,21 @@ export const dashBattle = {
   },
 
   /**
-   * His stall skit has begun: its slam came (stallPlan's), on the crowd move being picked now (`move`: the move he plays and takes
-   * back if the move's clock reaches his fake move). Once a battle (Eric, Nov 17: "this only fire at once 1 time per game"): the
-   * skit is spent at the slam, so a move made before the fake move ends it there, never to come again. Nothing on the board or
-   * any clock changes here: the screens show it, and the round's clock stands still for it where it's timed (solo.ts, the lobby).
+   * His stall skit's slam has come (stallPlan's), on the crowd move being picked now: spent as it starts, never a second (Eric,
+   * Nov 17: "each still occur once per game"). His fake move stays armed until it lands (`stalled`): after a move made between
+   * the two it comes alone on a later move. Nothing on the board or any clock changes here.
+   */
+  slammed(b: Battle): void {
+    const boss = b.state.boss;
+    const p = boss?.powers;
+    if (!boss || !p || boss.id !== "dash" || p.dash?.slam) return;
+    b.state = { ...b.state, boss: { ...boss, powers: { ...p, dash: { ...dashOf(p), slam: { at: boss.crowdMoves } } } } };
+  },
+
+  /**
+   * His stall skit's fake move has come (its hold began; stallPlan's): once a battle, on the crowd move being picked now (`move`:
+   * the move he plays and takes back). Nothing on the board or any clock changes here: the screens show it, and the round's
+   * clock stands still for it where it's timed (solo.ts, the lobby).
    */
   stalled(b: Battle, move: string): void {
     const boss = b.state.boss;

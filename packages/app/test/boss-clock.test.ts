@@ -1,6 +1,6 @@
 import { beforeAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { BOSS_POWERS, DASH_STALL, DEFAULT_SETTINGS, RAID_SETTINGS, type Settings } from "@chessroyale/core";
-import { bulletIncrementAt, legalMoves, type UciEngine } from "@chessroyale/chess";
+import { bulletIncrementAt, legalMoves, stallTimeline, type UciEngine } from "@chessroyale/chess";
 import { HUMAN, loadOpenings, SoloMatch } from "../src/solo.ts";
 import { COUNT_FROM_SECONDS } from "../src/components/Countdown.tsx";
 import { DOCK_PLUS_MS, clockLeft } from "../src/components/BossDock.tsx";
@@ -195,24 +195,41 @@ describe("Dash's stall skit in solo (Eric, Nov 17: once a battle)", () => {
     if (Date.now() < t) await vi.advanceTimersByTimeAsync(t - Date.now());
   };
 
-  it("spent at the slam: a move before the fake move ends it there, and it never comes again on a later move", async () => {
+  it("each once a battle, apart (Eric: \"each still occur once per game\"): a move between the slam and the fake move; the fake move comes alone on the next move (its pause only); then neither again", async () => {
     const m = await dashToPlay();
     let p = m.phase as Extract<SoloMatch["phase"], { kind: "play" }>;
     expect(p.stall).toBeUndefined();
     await until(p.startsAt + DASH_STALL.test.slamAt + 100);
     p = m.phase as typeof p;
     expect(p.stall?.beat).toBe("slam");
-    expect(m.runner.boss!.powers!.dash!.stall).toMatchObject({ at: m.runner.boss!.crowdMoves });
-    // You move before the fake move.
+    expect(m.runner.boss!.powers!.dash!.slam).toEqual({ at: m.runner.boss!.crowdMoves });
+    // You move before the fake move: it stays armed.
     await until(p.stall!.until + 200);
     play(m);
-    // The moves after: no slam and no fake move, however long each takes.
-    for (let n = 0; n < 2; n++) {
-      for (let i = 0; i < 240 && (m.phase.kind !== "play" || (m.phase as typeof p).board.ply === p.board.ply); i++) await vi.advanceTimersByTimeAsync(250);
+    expect(m.runner.boss!.powers!.dash!.stall ?? null).toBeNull();
+    const next = async () => {
+      const ply = p.board.ply;
+      for (let i = 0; i < 240 && (m.phase.kind !== "play" || (m.phase as typeof p).board.ply === ply); i++) await vi.advanceTimersByTimeAsync(250);
       p = m.phase as typeof p;
       expect(p.kind).toBe("play");
+    };
+    // The next move: no slam, the fake move alone at its time, the deadline moved back by its hold only.
+    await next();
+    const deadline = p.deadline;
+    await until(p.startsAt + DASH_STALL.test.slamAt + 500);
+    expect((m.phase as typeof p).stall).toBeUndefined();
+    await until(p.startsAt + DASH_STALL.test.fakeAt + 100);
+    p = m.phase as typeof p;
+    expect(p.stall).toMatchObject({ beat: "fake", alone: true });
+    expect(p.deadline).toBe(deadline + stallTimeline().total);
+    expect(m.runner.boss!.powers!.dash!.stall).toMatchObject({ at: m.runner.boss!.crowdMoves, move: p.stall!.move });
+    await until(p.stall!.until + 200);
+    play(m);
+    // The moves after: neither, however long each takes.
+    for (let n = 0; n < 2; n++) {
+      await next();
       await until(p.startsAt + DASH_STALL.test.fakeAt + DASH_STALL.slamMs + 1000);
-      expect((m.phase as typeof p).stall, `move ${n + 2}`).toBeUndefined();
+      expect((m.phase as typeof p).stall, `move ${n + 3}`).toBeUndefined();
       play(m);
     }
   });

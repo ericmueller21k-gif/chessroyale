@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { BOSS_ADMIN_FIRST, BOSS_CLOCK, BOSS_POWERS, BOSS_ROSTER, DASH_STALL, DASH_TAP, adminFirst, bossClockSettings, isPlayable, menuBosses, mulberry32, type Settings } from "@chessroyale/core";
-import { DASH_ANIM, DASH_FX, MatchRunner, applyMove, inCheck, pieceAt, stallMove, stallPlan, stallTimeline, tapTurn, extraMoveCandidates, passTurn, POWER_FX, boardPieces, botRushCorrect, bossThinkMs, chooseRush, dashMoveClock, flagMove, legalMoves, rushFen, rushHeld, rushJudge, rushKeep, rushMovesLeft, rushTimeline, scrambleLeft, scrambleOn, slappedClock } from "../src/index.ts";
+import { DASH_ANIM, DASH_FX, MatchRunner, applyMove, inCheck, pieceAt, stallMove, stallPausedMs, stallPlan, stallTimeline, tapTurn, extraMoveCandidates, passTurn, POWER_FX, boardPieces, botRushCorrect, bossThinkMs, chooseRush, dashMoveClock, flagMove, legalMoves, rushFen, rushHeld, rushJudge, rushKeep, rushMovesLeft, rushTimeline, scrambleLeft, scrambleOn, slappedClock } from "../src/index.ts";
 import { KIT_OPENING, crowdPick, fakeEngine, kitSettings } from "./boss-kit-lib.ts";
 
 /**
@@ -503,6 +503,15 @@ describe("Dash: his stall skit and his clock tap (Eric, Nov 17)", () => {
     expect(stallPlan(fresh(), START, 30_000 + DASH_STALL.marginMs - 1, true)).toBeNull();
     expect(stallPlan(fresh(), START, 30_000 + DASH_STALL.marginMs, true)).not.toBeNull();
     expect(stallPlan(fresh(7, { dash: { slaps: 0, stolen: 0, flags: 0, stall: { at: 3, move: "g8f6" } } }), START, 610_000, true)).toBeNull();
+    // (A reconnect mid-skit: the pauses so far, the slam's left out when the fake move came alone.)
+    const hold = stallTimeline().total;
+    expect(stallPausedMs({ beat: "slam", at: 0, until: DASH_STALL.slamMs })).toBe(DASH_STALL.slamMs);
+    expect(stallPausedMs({ beat: "fake", at: 0, until: hold })).toBe(DASH_STALL.slamMs + hold);
+    expect(stallPausedMs({ beat: "fake", at: 0, until: hold, alone: true })).toBe(hold);
+    // (Each once a battle, apart: after the slam, the fake move alone; after both, nothing.)
+    expect(stallPlan(fresh(7, { dash: { slaps: 0, stolen: 0, flags: 0, slam: { at: 3 } } }), START, 610_000, true)).toMatchObject({ slamAt: null, fakeAt: 30_000 });
+    expect(stallPlan(fresh(7, { dash: { slaps: 0, stolen: 0, flags: 0, slam: { at: 3 } } }), START, 20_000, false)).toMatchObject({ slamAt: null, fakeAt: 15_000 });
+    expect(stallPlan(fresh(7, { dash: { slaps: 0, stolen: 0, flags: 0, slam: { at: 3 }, stall: { at: 5, move: "g8f6" } } }), START, 610_000, true)).toBeNull();
     for (const kind of ["slap", "flag", "clockFit", "warn", "scramble", "rushWarn", "clockTap"]) expect(stallPlan(fresh(7, { events: [{ kind, turn: 1 }] }), START, 610_000, true), kind).toBeNull();
     expect(stallPlan(fresh(7, { ultAt: 1 }), START, 610_000, true)).toBeNull();
     expect(stallPlan(fresh(7, { dash: { slaps: 0, stolen: 0, flags: 0, rush: { at: 0, moves: [] } } }), START, 610_000, true)).toBeNull();
@@ -539,6 +548,9 @@ describe("Dash: his stall skit and his clock tap (Eric, Nov 17)", () => {
     expect({ fen: fenOf(r), banks: r.state.players.map((p) => p.bankMs), history: r.boards.get(r.state.boards[0]!)!.history.length }).toEqual(before);
     r.stalled("a7a6");
     expect(r.boss!.powers!.dash!.stall!.move).toBe(plan.move);
+    r.slammed();
+    r.slammed();
+    expect(r.boss!.powers!.dash!.slam).toEqual({ at: 0 });
     for (let i = 0; i < 6 && !r.boss!.result; i++) {
       await crowdMove(r);
       if (r.boss!.result) break;

@@ -3033,7 +3033,7 @@ export class LobbyCore {
     }
     // (Dash's stall skit, once a battle: its beats timed here on this move's clock, if it comes on this move.)
     const stall = runner.boss ? runner.stallPlan(playing[0]!.id) : null;
-    if (stall) this.r.round.stall = { plan: stall, next: "slam" };
+    if (stall) this.r.round.stall = { plan: stall, next: stall.slamAt === null ? "fake" : "slam" };
     this.armRound();
   }
 
@@ -3042,7 +3042,7 @@ export class LobbyCore {
     const round = this.r.round!;
     const st = round.stall;
     if (st?.next) {
-      let at = round.startedAt + (st.next === "slam" ? st.plan.slamAt : st.plan.fakeAt);
+      let at = round.startedAt + (st.next === "slam" ? (st.plan.slamAt ?? 0) : st.plan.fakeAt);
       for (const w of this.frozenWindows(round)) if (w.at < at) at += w.until - w.at;
       if (at < round.deadline) return this.setTimer("stall", at);
     }

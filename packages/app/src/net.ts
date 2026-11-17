@@ -64,6 +64,7 @@ import {
   dodgeTimeline,
   rushSquares,
   rushTimeline,
+  stallPausedMs,
   brainLine as brainWords,
   GUARD_WORDS,
   type BrainNote,
@@ -754,7 +755,7 @@ export class NetMatch implements GameView {
           const deadline = this.local(m.deadline);
           // (A reconnect mid Dash's stall skit: its beat, and the clock's pauses for it left out of the move's own time.)
           const stall = m.stall ? { ...m.stall, at: this.local(m.stall.at), until: this.local(m.stall.until) } : undefined;
-          const paused = m.stall ? DASH_STALL.slamMs + (m.stall.beat === "fake" ? m.stall.until - m.stall.at : 0) : 0;
+          const paused = m.stall ? stallPausedMs(m.stall) : 0;
           return this.setPhase({ kind: "play", board: this.toView(m.board), startsAt, deadline, allowedMs: Math.max(0, deadline - startsAt - paused), ...(m.moveClock ? { clock: m.moveClock } : {}), ...(stall ? { stall } : {}) });
         }
         return this.emit();

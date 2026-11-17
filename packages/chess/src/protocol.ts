@@ -737,6 +737,8 @@ export interface NetStall {
   at: number;
   until: number;
   move?: string;
+  /** The fake move came alone on this move (his slam spent on an earlier one): no slam's pause before it. */
+  alone?: boolean;
 }
 
 export type ServerMessage = { now: number } & (

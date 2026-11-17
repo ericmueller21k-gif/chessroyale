@@ -55,8 +55,8 @@ function rushPlace(lobby: BossLobby, playerId: string, key: string, places: unkn
  * His stall skit's next beat, as the move's clock reaches it (the round's "stall" timer; his rules' stallPlan, planned as the round
  * opened): the slam, or his fake second move. While the round is still open (someone still to pick), it begins now: the move clock
  * stands still for its length (every deadline, and every bot still thinking, moves back by that long, as for the King's strike),
- * everyone in the round is told (those who've picked too), and the skit is recorded at the slam (once a battle: a move before the
- * fake move ends it there). A pick that reaches here during the fake move's hold was made before it (the board takes none then)
+ * everyone in the round is told (those who've picked too), and each beat is recorded as it comes (each once a battle, apart:
+ * the slam as it starts, the fake move as it lands; after a move made between them the fake move comes alone later). A pick that reaches here during the fake move's hold was made before it (the board takes none then)
  * and counts as ever: nobody's pick is lost. A beat that fires late, with the round's deadline (near) gone, is dropped: the round
  * locks as it would have, and nobody's clock moves back.
  */
@@ -77,8 +77,9 @@ function stallBeat(lobby: BossLobby) {
   round.deadline += ms;
   for (const id of Object.keys(round.deadlines)) round.deadlines[id]! += ms;
   for (const [id, at] of Object.entries(round.botsDoneIn ?? {})) if (round.startedAt + at > now) round.botsDoneIn![id] = at + ms;
-  if (beat === "slam") runner.stalled(st.plan.move);
-  const shown = { beat, at: now, until: now + ms, ...(beat === "fake" ? { move: st.plan.move } : {}) };
+  if (beat === "slam") runner.slammed();
+  else runner.stalled(st.plan.move);
+  const shown = { beat, at: now, until: now + ms, ...(beat === "fake" ? { move: st.plan.move, ...(st.slam ? {} : { alone: true }) } : {}) };
   for (const h of lobby.roundHumans()) {
     const deadline = round.deadlines[h.id] ?? round.deadline;
     lobby.send(h.id, { t: "stall", key: round.key, deadline, ...shown }, false);

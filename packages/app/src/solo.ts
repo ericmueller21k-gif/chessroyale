@@ -1516,16 +1516,16 @@ export class SoloMatch implements GameView {
   /**
    * Dash's stall skit on this move (his rules' stallPlan; docs/decisions/2026-11-17-dash-stall.md): the slam and the fake move,
    * each when the move's clock reaches it (its pauses left out: the King's strike, the slam), each stopping the clock for its
-   * length as the King's strike does (the deadline moved back, the bots still thinking too). The skit is recorded as the slam
-   * comes (runner.stalled: once a battle); a move of yours before the fake move ends it there, and a move before the slam leaves
-   * it armed for a later move.
+   * length as the King's strike does (the deadline moved back, the bots still thinking too). Each is recorded as it comes, each
+   * once a battle apart (runner.slammed, runner.stalled): a move of yours between them leaves the fake move for a later move,
+   * where it comes alone (the plan's `slamAt` null).
    */
   private stall: { plan: StallPlan; slam?: { at: number; until: number }; fake?: { at: number; until: number }; timer: ReturnType<typeof setTimeout> | null } | null = null;
   private clearStall() {
     if (this.stall?.timer) clearTimeout(this.stall.timer);
     this.stall = null;
   }
-  /** The beats still to come won't (you moved, or the King struck): before the slam the skit waits for a later move; after it, it's spent. */
+  /** The beats still to come won't (you moved, or the King struck): each not yet come waits for a later move. */
   private cancelStall() {
     if (this.stall?.timer) clearTimeout(this.stall.timer);
     if (this.stall) this.stall.timer = null;
@@ -1549,9 +1549,9 @@ export class SoloMatch implements GameView {
   private armStall() {
     const st = this.stall;
     if (!st) return;
-    const beat = !st.slam ? "slam" : !st.fake ? "fake" : null;
+    const beat = !st.slam && st.plan.slamAt !== null ? "slam" : !st.fake ? "fake" : null;
     if (!beat) return;
-    let at = this.playStartedAt + (beat === "slam" ? st.plan.slamAt : st.plan.fakeAt);
+    let at = this.playStartedAt + (beat === "slam" ? (st.plan.slamAt ?? 0) : st.plan.fakeAt);
     for (const w of this.frozenWindows()) if (w.at < at) at += w.until - w.at;
     st.timer = setTimeout(() => this.stallBeat(beat), Math.max(0, at - Date.now()));
   }
@@ -1568,8 +1568,9 @@ export class SoloMatch implements GameView {
     const deadline = phase.deadline + ms;
     if (this.timer) clearTimeout(this.timer);
     this.timer = setTimeout(() => this.submit(null), deadline - now + this.settings.lateGraceMs);
-    if (beat === "slam") this.runner.stalled(st.plan.move);
-    this.set({ ...phase, deadline, stall: { beat, at: now, until: now + ms, ...(beat === "fake" ? { move: st.plan.move } : {}) } });
+    if (beat === "slam") this.runner.slammed();
+    else this.runner.stalled(st.plan.move);
+    this.set({ ...phase, deadline, stall: { beat, at: now, until: now + ms, ...(beat === "fake" ? { move: st.plan.move, ...(st.slam ? {} : { alone: true }) } : {}) } });
     this.armStall();
   }
 
