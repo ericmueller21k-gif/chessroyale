@@ -1,6 +1,8 @@
 // Copied as drawn from `claude/boss-art` (scripts/boss-art/out/star-ride/star-ride.tsx, Nov 17: Moon's Ride redrawn as a puffy
 // rounded star, Eric Nov 16; its side view, front and back views and trail mark; Nov 17 third pass: the pawn sunk into a hollowed-out seat; fourth: no straight edge round it): only the import lines changed, its id kept as
 // "moon-ride" (so owners keep it), its name and line kept until Eric picks new ones, and the `!`s the app's stricter typecheck asks for.
+// Fifth pass (Nov 17, one layer, here only: how it's composed, not its art): the star, its seat and the fizz are drawn once, behind the
+// pawn; the front draws nothing; the pawn is hidden below the seat's lip by the pose's `hide` (docs/decisions/2026-11-17-star-seat-one-layer.md).
 // The art's kit there (scripts/boss-art/item-kit.tsx) is a copy of ../item-paint.tsx and ./kit.ts. Notes: docs/areas/shop.md, "Rides".
 import type { RiderDraft, RiderProps, RiderViewDraft } from "./kit.ts";
 import { Region, LINE, lw, darken, lighten, isLight, type Paint } from "../item-paint.tsx";

@@ -60,6 +60,18 @@ describe("the rides", () => {
     for (const [id, c] of Object.entries(RIDE_CELLS)) expect(c.hash, `${id}: run npx tsx scripts/measure-rides.ts`).toBe(rideHash(id, ROOT));
   });
 
+  it("Moon's Ride draws nothing over its rider (Nov 17, one layer): every frame of every view has an empty front and hides the rider by its own shape, its seat's lip", () => {
+    const d = RIDES["moon-ride"]!;
+    for (const view of FACINGS) {
+      const v = viewOf(d, view);
+      for (const anim of ["idle", "move"] as const)
+        for (let f = 0; f < v[anim].ms.length; f++) {
+          expect(v.Front({ p: {} as never, p2: {} as never, side: "w", f, anim, view })).toBeNull();
+          // (One closed shape: the lip's near arc between two shoulders, everything below them.)
+          expect(v.pose(anim, f).hide).toMatch(/^M [^MZ]* A [^MZ]* Z$/);
+        }
+    }
+  });
   it("each ride's measured numbers are its drawing's (Nov 1, rides lazy): its tile's box, each view's frames (times, seats, lift) and its trail's, so every box is sized before the drawing loads", () => {
     for (const id of RIDE_IDS) {
       const d = RIDES[id]!;
