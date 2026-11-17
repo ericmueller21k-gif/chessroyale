@@ -377,3 +377,26 @@ maybe like 33% of the time, but it should always play a solo before 5 minutes or
 - A solo joins only at a pass's end, so "early" means entering the theme late. Its clean entry points: bar 77
   (141.395349 s in: 37 s of theme, then the solo) and bar 61 (111.627907 s in: 67 s of theme). Sent to the director
   with the rest; no new audio needed unless those entries sound rough with a fade-in.
+
+## The runaway train (Nov 17, song_aj.py): sent, no verdict yet
+
+"New song use this as a guide, feel free to come up with something a bit wild and throw in some dark melody vibes and
+a beautiful slowed down piano theme in the middle with some character to it". His plan ("High-Speed Runaway-Train
+Synth-Metal & Heroic Arcade Rock": 162 beats a minute, E minor, a chorus a whole step up in F sharp minor, four
+patches, five sections) as a guide this time, not a script: a third kind of brief, between "stick to the script" and
+a style to write in. Its frame is kept (tempo, keys, chords, patches, sections, the riff's notes); every tune is mine.
+- Wild: the train is in the music. A steam whistle; the brakes (bar 56: the tape slows to a stop, pitch and all,
+  under a snare roll that winds down with it: the Ride's `speed`); the tempo climbing from 81 back to 162 over four
+  bars as it pulls out.
+- Dark: the riff's flat fifth; the verse ending down a half step; over the breakdown a slow line on the lead, each
+  chord's fifth sinking onto its flat fifth.
+- The piano: ten bars at half tempo, the chorus's tune at half speed on the soft piano, a rolling left hand in the
+  shape of his own (song_ah.py), grace notes, octaves, a small bell above, strings under its second half, C#7#9
+  where the chorus has C#m7. No steam under it (a steady noise drowns a sparse solo).
+- 90 bars, 2:31: the plan's 64 are 1:35, so after the piano it has the chorus once more and the turnaround before
+  the plan's breakdown.
+- Measured: -16.0 LUFS, peak -1.1 dBFS; the band's sections within 1.5 dB of each other, the piano about 3 dB under
+  them; its top end 1 to 2 dB under Chandy's (a palm-muted guitar is dark). The whistle chords are chord tones where
+  they sound (a diminished one over a plain fifth read as "off" on paper, so the riff's is minor).
+- No boss named. Not handed over.
+
