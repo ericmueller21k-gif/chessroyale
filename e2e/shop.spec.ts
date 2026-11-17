@@ -1659,10 +1659,10 @@ test("the Shop tab's page (Eric's mockup, Nov 9): the special offer, five cards 
   const computer = testInfo.project.name === "desktop";
   await asSignedIn(page, "shopper");
   await page.goto("/shop");
-  // The coin (Eric, Nov 17: a king's head on a boss-style coin, no emoji): the top bar's is the drawn one, loaded, at 20 px.
+  // The coin (Eric, Nov 17: a king's head on a boss-style coin, no emoji): the top bar's is the drawn one (40 x 40), loaded.
   const coin = page.locator(".shop-coins img.coin-icon");
   await expect(coin).toBeVisible();
-  await expect.poll(() => coin.evaluate((i: HTMLImageElement) => (i.complete ? i.naturalWidth : 0))).toBe(20);
+  await expect.poll(() => coin.evaluate((i: HTMLImageElement) => (i.complete ? i.naturalWidth : 0))).toBe(40);
   await expect(page.locator(".shop-coins")).not.toContainText("🪙");
   const pct = Math.round(SHOP.discount * 100);
   await expect(page.getByText(`Everything in the shop is ${pct}% off during beta.`)).toBeVisible();
