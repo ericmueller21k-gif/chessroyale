@@ -15413,6 +15413,12 @@ img.qicon {
 .screen:has(.power-moment:not(.pm-stay)) .boss-char-sprite {
   visibility: hidden;
 }
+/* Facing the board there (Nov 17, kits.ts `placeFacing`): a drawing that faces away is mirrored about its feet (`--pm-fx`, their place
+   across its frame), as the bar's figure is (`.bc-mirror`). */
+.pm-caster.pm-mirror .boss-moment {
+  transform: scaleX(-1);
+  transform-origin: var(--pm-fx) 100%;
+}
 /* A computer: the boss casts where it stands, by the board's bottom-left corner, its words beside it (PowerParts.tsx, Cast; Eric,
    Nov 4: Hollow's darkness drew him at the board's top-left, half off the window). Its figure there hides only while a moment draws
    it somewhere else (`.boss-moment`: on the board, Wrangler's leap, Boingo's funhouse, Hollow's Lights out…). */
