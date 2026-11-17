@@ -10,3 +10,9 @@ all); `MOO_BEATS.fullMoon.total` adds them up, so solo and the server wait for i
 
 **Calls:** he lands where the field has its clear patch (the board's middle across, near its second rank). It covers, on a phone, the whole width from the screen's top to the board's bottom; on a computer, the board's column
 from the top. The close-up is his rig's sprite (Moo 4x, the Moon 5x). The Moon's line comes as he lands back.
+
+**Review fixes (the director's calls, Nov 17; review of #776):** while the field is up it takes taps, and an open match menu shows
+above it (`body.mo-on .mm-scrim`). A Full Moon first seen within `rejoinMs` (1.5 s) of a rejoin (a reload or late join: the round
+resent) is skipped, his swap noted as past: no protocol change. QUEEN SLAIN! on the same move plays first: the cinematic starts
+`bossBannerMs() + 500` later and his think is the sum (`fullMoonMs`, solo and the server), plus `tailPadMs` (200 ms). In an area
+wider than 4:3 his feet stay inside it, his scale is capped and the close-up fits. The boxes are read each frame.
