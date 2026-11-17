@@ -55,7 +55,8 @@ async function watch(page: Page) {
       // sits in the bar over the board, on a computer beside it.)
       if (document.querySelector(".pm-caster")) r.caster++;
       const fig = document.querySelector(".boss-char .boss-char-sprite");
-      if (fig && getComputedStyle(fig).visibility === "hidden") r.hidden++;
+      // (Except while he lies by your clock, his clock tap: then he's there, Nov 17.)
+      if (fig && getComputedStyle(fig).visibility === "hidden" && !document.querySelector(".dash-lie")) r.hidden++;
       const b = document.querySelector(".board-wrap")?.getBoundingClientRect();
       const f = fig?.getBoundingClientRect();
       if (b && f && f.width > 0) {

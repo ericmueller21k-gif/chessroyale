@@ -950,6 +950,7 @@ export const BOSS_KITS: Record<string, BossKit> = {
       snap: "dashSnap",
       point: "dashSnap",
       yes: "dashYeah",
+      laugh: "dashLaugh",
       "ta-da": "dashYeah",
       cheer: "dashYeah",
       windup: "dashWhoosh",

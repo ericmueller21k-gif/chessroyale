@@ -198,7 +198,7 @@ const MOMENTS: Record<"slap" | "scramble" | "flag" | "clockFit" | "popOff" | "po
   // (His Scramble Rush a turn ahead, as any ultimate's warning: RAGE!, "Next turn: Scramble Rush", his clock held up, his line.)
   rushWarn: { order: 1, kit: "ultimateWarn", view: (p) => rageWarn(p, "Scramble Rush", undefined, true), line: (_kit, m) => lineOf(DASH_RUSH_LINES.warn, m.key) },
   // (His lying-down clock tap plays on your move, by your clock, not on his screen: DashTap in DashStall.tsx. It holds nothing.)
-  clockTap: { order: 5, kit: "power", view: () => null, line: () => null },
+  clockTap: { order: 5, kit: "power", view: () => <div class="power-moment pm-tap pm-stay" />, line: () => null },
   rushExtra: { order: 3, kit: "ultimateHit", own: (boss) => boss.powers?.dash?.rush?.extra === "played" && boss.powers.events.some((e) => e.kind === "rushExtra"), view: rushExtraMoment, line: () => null },
 };
 

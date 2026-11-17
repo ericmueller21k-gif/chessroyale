@@ -22,6 +22,7 @@ export type DashSound =
   | "whirr"
   | "flag"
   | "yeah"
+  | "laugh"
   | "oof"
   | "yawn"
   | "slump"
@@ -160,6 +161,15 @@ const SOUNDS: Record<DashSound, (rate: number) => Float32Array> = {
     const v = voice(rate, pitch, (t) => 500 + 300 * open(t), (t) => 1600 + 300 * open(t), 857, 0.3);
     return render(rate, 0.26, (t) => Math.min(1, t / 0.015) * (t < 0.16 ? 1 : Math.max(0, 1 - (t - 0.16) / 0.1)) * v(t));
   },
+  // His "ha-ha-ha!" (the stall skit's "jk, bro", Nov 17): three quick syllables of his "yeah" voice, each a little lower.
+  laugh: (rate) => {
+    const syl = 0.11;
+    const gap = 0.045;
+    const k = (t: number) => Math.min(2, Math.floor(t / (syl + gap)));
+    const into = (t: number) => t - k(t) * (syl + gap);
+    const v = voice(rate, (t) => 420 - 45 * k(t) - 90 * Math.min(1, into(t) / syl), (t) => 650 + 150 * Math.min(1, into(t) / 0.04), () => 1700, 859, 0.3);
+    return render(rate, 3 * syl + 2 * gap, (t) => (into(t) < syl ? Math.min(1, into(t) / 0.012) * Math.max(0, 1 - into(t) / syl) ** 0.7 : 0) * v(t));
+  },
   // A startled "oof", short and falling.
   oof: (rate) => {
     const v = voice(rate, (t) => 330 - 120 * Math.min(1, t / 0.16), () => 520, () => 1100, 863, 0.45);
@@ -229,6 +239,7 @@ const LEVEL: Record<DashSound, number> = {
   whirr: 0.247,
   flag: 0.49,
   yeah: 0.0763,
+  laugh: 0.133,
   oof: 0.143,
   yawn: 0.101,
   slump: 0.108,

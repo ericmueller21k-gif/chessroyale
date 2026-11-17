@@ -280,3 +280,76 @@ describe("Dash's intro", () => {
     expect(def.name).not.toMatch(pic);
   });
 });
+
+describe("Dash's stall skit and clock tap on screen (Eric, Nov 17)", async () => {
+  const { DASH_STALL, DASH_TAP } = await import("@chessroyale/core");
+  const { stallTimeline, passTurn, applyMove } = await import("@chessroyale/chess");
+  const { DASH_LIE } = await import("../src/characters/dash-lie.ts");
+  const { DASH_STALL_LINES, DASH_TAP_LINES } = await import("../src/characters/dash-lines.ts");
+  const { frozenWindow, stallBoard, stallHolding, tapTimeline } = await import("../src/components/DashStall.tsx");
+  const len = (a: { frames: readonly { ms: number }[] }) => a.frames.reduce((t, f) => t + f.ms, 0);
+  const cues = (a: { frames: readonly { cue?: string }[] }) => a.frames.flatMap((f) => (f.cue ? [f.cue] : []));
+
+  it("his new poses, as drawn by the art runner: a slam loop (two slams a cycle, his slam sound each), the brag loop, the laugh once (his own laugh); the lying figure's three", () => {
+    const A = DASH_FIGURE.anims;
+    expect(A.slam!.loop).toBe(true);
+    expect(cues(A.slam!)).toEqual(["slam", "slam"]);
+    expect(A.fakeSmug!.loop).toBe(true);
+    expect(cues(A.fakeSmug!)).toEqual([]);
+    expect(A.jkLaugh!.loop).toBe(false);
+    expect(cues(A.jkLaugh!)).toEqual(["laugh"]);
+    expect(kit.sounds.laugh).toBe("dashLaugh");
+    // (The laugh plays inside its beat; the brag fills the time to it.)
+    expect(len(A.jkLaugh!)).toBeLessThanOrEqual(DASH_STALL.jkMs);
+    expect(len(A.move!) + 2 * len(A.fakeSmug!)).toBeGreaterThanOrEqual(stallTimeline().jkAt);
+    expect(Object.keys(DASH_LIE.anims).sort()).toEqual(["getUp", "idle", "lieDown"]);
+    expect(cues(DASH_LIE.anims.idle!)).toEqual(["tap", "tap"]);
+    expect(cues(DASH_LIE.anims.lieDown!)).toEqual(["zip"]);
+    expect(cues(DASH_LIE.anims.getUp!)).toEqual(["zip"]);
+    for (const c of ["tap", "zip"]) expect(kit.sounds[c], c).toBeTruthy();
+  });
+
+  it("the lying figure is his: every color of it his own palette's, but its speed lines, tap lines, dust and shadow; nothing cut off at its frame's edge", () => {
+    const his = new Set(Object.values(BOSS_BLITZ.palette).map((c) => c.toLowerCase()));
+    const fx = new Set(["L", "l", "u", "v", "Z"]);
+    for (const [k, c] of Object.entries(DASH_LIE.palette)) if (!fx.has(k)) expect(his.has(c.toLowerCase()), `${k} ${c}`).toBe(true);
+    for (const [name, an] of Object.entries(DASH_LIE.anims))
+      for (const [i, f] of an.frames.entries()) {
+        const r = renderFrame(DASH_LIE, f);
+        for (let x = 0; x < r.w; x++)
+          for (const y of [0, r.h - 1]) expect(r.data[(y * r.w + x) * 4 + 3], `${name} ${i} edge`).toBe(0);
+        for (let y = 0; y < r.h; y++) for (const x of [0, r.w - 1]) expect(r.data[(y * r.w + x) * 4 + 3], `${name} ${i} edge`).toBe(0);
+      }
+  });
+
+  it("his lines: three of each, placeholders for Eric, none naming him", () => {
+    for (const ls of [DASH_STALL_LINES.slam, DASH_STALL_LINES.brag, DASH_STALL_LINES.jk, DASH_TAP_LINES]) {
+      expect(ls.length).toBe(3);
+      for (const l of ls) expect(l).not.toMatch(/\b(Dash|Blitz)\b/);
+    }
+  });
+
+  it("the board: his fake move from its landing until it slides back, then the position as it was; no move taken through the hold; the clocks hold through the latest pause", () => {
+    const white = "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2";
+    const move = "g8f6";
+    const stall = { beat: "fake" as const, at: 10_000, until: 10_000 + stallTimeline().total, move };
+    expect(stallBoard(white, stall, 9_999)).toBeNull();
+    expect(stallBoard(white, stall, 10_000)).toEqual({ fen: applyMove(passTurn(white)!, move), lastMove: move });
+    expect(stallBoard(white, stall, 10_000 + stallTimeline().backAt)).toBeNull();
+    expect(stallBoard(white, { ...stall, beat: "slam" }, 10_100)).toBeNull();
+    expect(stallHolding(stall, 10_000)).toBe(true);
+    expect(stallHolding(stall, stall.until)).toBe(false);
+    expect(stallHolding({ ...stall, beat: "slam" }, 10_100)).toBe(false);
+    expect(frozenWindow({ calls: 1, needed: 1, mine: true, at: 1000, until: 3000 }, stall)).toEqual({ at: stall.at, until: stall.until });
+    expect(frozenWindow({ calls: 1, needed: 1, mine: true, at: 20_000, until: 23_000 }, stall)).toEqual({ at: 20_000, until: 23_000 });
+    expect(frozenWindow(undefined, undefined)).toBeUndefined();
+  });
+
+  it("the clock tap's beats: after your clock starts, his lie-down, about three seconds of taps, his zip off", () => {
+    const tl = tapTimeline();
+    expect(tl.lieAt).toBe(DASH_TAP.delayMs);
+    expect(tl.upAt - tl.lieAt).toBe(len(DASH_LIE.anims.lieDown!) + DASH_TAP.tapMs);
+    expect(tl.total - tl.upAt).toBe(len(DASH_LIE.anims.getUp!));
+    expect(DASH_TAP.tapMs).toBe(3000);
+  });
+});
