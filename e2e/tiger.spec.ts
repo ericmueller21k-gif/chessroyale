@@ -601,6 +601,19 @@ test("Babur's pump on a computer at 1280 × 800, 1440 × 900, 1920 × 1080 and 1
       expect(Math.abs(pump.y + pump.height - (feet.y + feet.height)), `${at}: on his baseline`).toBeLessThan(1.5);
       expect(Math.abs(pump.y + pump.height - (board.y + board.height)), `${at}: by the board's bottom`).toBeLessThan(6);
       await expect(page.locator(".boss-bar .tg-pump")).toHaveCount(0);
+      // His place and his pump's measured while his toss turns him to it (`.bc-flip`) are those at rest (Nov 17: a screen drawn
+      // mid-toss stood him 13 px over at 1440 × 900, and from the next turn the pump was in the taller bar).
+      const placed = () => page.evaluate(() => [(document.querySelector(".arena") as HTMLElement).style.getPropertyValue("--side-d"), document.querySelector(".tg-side-pump")?.getAttribute("style")]);
+      const frames = () => page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+      const atRest = await placed();
+      for (const turned of [true, false]) {
+        await page.evaluate((t) => {
+          document.querySelector(".boss-char.place-side")!.classList.toggle("bc-flip", t);
+          dispatchEvent(new Event("resize"));
+        }, turned);
+        await frames();
+        expect(await placed(), `${at}: measured ${turned ? "mid-toss" : "at rest again"}`).toEqual(atRest);
+      }
     } else {
       const bar = (await page.locator(".boss-bar").boundingBox())!;
       expect(pump.y, `${at}: inside the bar`).toBeGreaterThanOrEqual(bar.y);
