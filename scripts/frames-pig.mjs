@@ -143,7 +143,8 @@ async function run(name, context) {
     const startOf = (k) => s.until - seq.slice(seq.indexOf(k)).reduce((t, x) => t + (MS[x] ?? 0), 0);
     const labels = ev.filter((k) => want[k] && !done.has(k));
     for (const l of labels) for (const ms of want[l]) stills.push({ label: `${l}-${String(ms).padStart(4, "0")}`, t: startOf(l) + ms });
-    const end = await waitUntil((x) => x.kind === "play", 60_000);
+    // (Or the results: a battle can end on his move, and the stills taken so far are still written.)
+    const end = await waitUntil((x) => x.kind === "play" || x.kind === "results", 60_000);
     // His meter full (the first turn it is): his line typing out and holding, his ready loop; a few seconds of it.
     if (end.boss?.powers?.ready !== null && end.boss?.powers?.ready !== undefined && !done.has("ready")) {
       done.add("ready");
@@ -157,6 +158,7 @@ async function run(name, context) {
       mark(l, s.now - 300, end.now + 800);
       log(`${l}: events ${ev.join(", ")}; pull ${JSON.stringify(s.boss.powers.pull)} drag ${JSON.stringify(s.boss.powers.drag)} showdown ${JSON.stringify(s.boss.powers.showdown?.pairs)}`);
     }
+    if (end.kind === "results") break;
     if (labels.length) {
       await new Promise((r) => setTimeout(r, 1200));
       await p.screenshot({ path: join(outDir, `${name}-${labels.join("+")}-after.png`) });

@@ -1,10 +1,13 @@
 import { DRAG, PULL, SHOWDOWN, pieceAt, withPiece, withoutPiece } from "@chessroyale/chess";
 import type { LassoDrag, LongPull, ShowdownResult } from "@chessroyale/core";
 import { CATCH_AT, HAUL_FISTS, PIG, PIG_LEAP } from "../characters/pig.ts";
-import { bossKit } from "../characters/kits.ts";
+import { bossKit, facingOf } from "../characters/kits.ts";
+import { mirrorFor, toward, type ArtFacing, type Facing } from "../characters/sprite-kit.ts";
+import { artFacing } from "../characters/sprites.ts";
 import { cueAt } from "../characters/power-art.ts";
 import type { BossView } from "../game.ts";
 import { BossMoment, prewarmSprite } from "./BossEffect.tsx";
+import { drawnX } from "./BossCharacter.tsx";
 import { squareXY } from "./GodKing.tsx";
 import { PIECE_WORD, SoundAt, hash, type BossUi, type KitMoment, type Moment, type MomentProps } from "./PowerParts.tsx";
 
@@ -43,7 +46,7 @@ const PIG_W = 47;
 const PX = PIG_W / PIG.w;
 /** His corner of the board (its top left), where he hops from and back to (his feet). */
 const CORNER: Pt = { x: 7, y: 3 };
-/** Where his loop drops (CATCH) from his feet, in % of the board, facing right. */
+/** Where his loop drops (CATCH) from his feet, in % of the board, as drawn (not mirrored). */
 const CATCH_OFF: Pt = { x: (CATCH_AT[0] - PIG.foot[0]) * PX, y: (CATCH_AT[1] - PIG.foot[1]) * PX };
 const FLIGHT = PIG_LEAP.landAt - PIG_LEAP.upAt;
 /** Where he lands in the middle for his showdown's wind-up (his feet). */
@@ -59,9 +62,27 @@ const LASSO = {
   },
 };
 
-/** One of his figures on the board: his frame placed by his feet, facing right (or left, `flip`), playing `anim` from `since`. */
-function Figure({ boss, at, flip, anim, since, then, id }: { boss: BossView; at: Pt; flip: boolean; anim: string; since: number; then?: string; id: string }) {
+/**
+ * Which way he faces (Eric's rule, Nov 17: a boss faces the way it walks, or what it acts on). Two drawings, two facings, both data:
+ * his art's (`facingOf`: sprites.ts ART_FACING, his snout to our left), for his hops, his wind-up and his haul; and his lasso throw's,
+ * measured from the art itself (its CATCH lies right of his feet: the loop flies to our right, his eyes on it), for his roping. Each is
+ * mirrored about his feet when it differs from the way he must face (`mirrorFor`), the rule every place turns a boss by.
+ */
+const THROW_FACING: ArtFacing = toward(PIG.foot[0], CATCH_AT[0]);
+const artFacingOf = (boss: BossView): ArtFacing => {
+  const kit = bossKit(boss.name);
+  return kit ? facingOf(kit) : (artFacing(PIG.id) ?? "left");
+};
+/** The way he faces hopping from `a` to `b`: the way he goes, or `still` when he goes (nearly) straight up or down the board. */
+const hopFacing = (a: Pt, b: Pt, still: Facing): Facing => (Math.abs(b.x - a.x) < 1 ? still : toward(a.x, b.x));
+
+/**
+ * One of his figures on the board: his frame placed by his feet, playing `anim` from `since`, facing `faces` on the screen: the drawing
+ * (`drawn`: the way that pose faces as drawn) mirrored about his feet when they differ. `data-faces`: the way he faces on screen.
+ */
+function Figure({ boss, at, faces, drawn, anim, since, then, id }: { boss: BossView; at: Pt; faces: Facing; drawn: ArtFacing; anim: string; since: number; then?: string; id: string }) {
   const h = (PIG_W * PIG.h) / PIG.w;
+  const flip = mirrorFor(drawn, faces);
   return (
     <span
       key={id}
@@ -75,6 +96,7 @@ function Figure({ boss, at, flip, anim, since, then, id }: { boss: BossView; at:
         ...(flip ? { scale: "-1 1" } : {}),
       }}
       data-anim={anim}
+      data-faces={drawn === "front" ? "front" : faces}
     >
       <BossMoment key={`${id}:${anim}:${since}`} boss={boss.name} anim={anim} since={since} then={then} />
     </span>
@@ -125,16 +147,16 @@ const lassoOf = (boss: BossView, m: Pick<Moment, "kind">): Lasso | null => {
 const slideAt = (): number => DRAG.catchAt + (LASSO.tug - LASSO.catch);
 
 /**
- * Where he stands to rope a piece and which way he faces: his loop (CATCH) drops on the piece; he stands on the side it
- * comes toward (it's hauled to him), or the roomier side when it moves up or down the board, or the other side when
- * that would put him off the board.
+ * Where he stands to rope a piece and which way he faces (`faces`: toward it, his throw mirrored or not, `flip`): his loop (CATCH)
+ * drops on the piece; he stands on the side it comes toward (it's hauled to him), or the roomier side when it moves up or down the
+ * board, or the other side when that would put him off the board.
  */
-export function lassoStand(from: Pt, to: Pt): { feet: Pt; flip: boolean } {
+export function lassoStand(from: Pt, to: Pt): { feet: Pt; flip: boolean; faces: Facing } {
   const dx = to.x - from.x;
-  let flip = dx > 0.1 ? true : dx < -0.1 ? false : from.x < 50;
-  const feetFor = (f: boolean): Pt => ({ x: from.x - (f ? -CATCH_OFF.x : CATCH_OFF.x), y: from.y - CATCH_OFF.y });
-  if (feetFor(flip).x < 4 || feetFor(flip).x > 96) flip = !flip;
-  return { feet: feetFor(flip), flip };
+  let faces: Facing = dx > 0.1 ? "left" : dx < -0.1 ? "right" : from.x < 50 ? "left" : "right";
+  const feetFor = (f: Facing): Pt => ({ x: from.x - (mirrorFor(THROW_FACING, f) ? -CATCH_OFF.x : CATCH_OFF.x), y: from.y - CATCH_OFF.y });
+  if (feetFor(faces).x < 4 || feetFor(faces).x > 96) faces = faces === "left" ? "right" : "left";
+  return { feet: feetFor(faces), flip: mirrorFor(THROW_FACING, faces), faces };
 }
 
 function lassoMoment({ boss, moment, now, t, orientation, banner }: MomentProps) {
@@ -157,6 +179,13 @@ function lassoMoment({ boss, moment, now, t, orientation, banner }: MomentProps)
   const goingBack = t >= B.backAt - PIG_LEAP.upAt;
   const at = goingBack ? back : t < B.landAt ? out : { at: spot, shadow: null };
   const anim = t < B.landAt ? { anim: "leap", since: moment.at + B.hopAt - PIG_LEAP.upAt } : goingBack ? { anim: "leap", since: moment.at + B.backAt - PIG_LEAP.upAt } : { anim: "lasso", since: moment.at + B.catchAt - LASSO.catch };
+  // He faces the way he hops, out and back (his art's facing), and the piece he ropes (his throw's): he turns as he lands and as he crouches to go.
+  const art = artFacingOf(boss);
+  const face: { faces: Facing; drawn: ArtFacing } = goingBack
+    ? { faces: hopFacing(spot, CORNER, stand.faces), drawn: art }
+    : t < B.landAt
+      ? { faces: hopFacing(CORNER, stand.feet, stand.faces), drawn: art }
+      : { faces: stand.faces, drawn: THROW_FACING };
   const sliding = t >= s0 && t < s0 + B.slideMs + SLIDE_OVERLAP;
   const shown = t >= B.hopAt - PIG_LEAP.upAt && t < B.backAt + FLIGHT + 120;
   return (
@@ -165,8 +194,7 @@ function lassoMoment({ boss, moment, now, t, orientation, banner }: MomentProps)
       <div class="hb-pieces pg-layer" aria-hidden="true" data-lasso={`${l.from}${l.to}`} data-stage={t < s0 ? "rope" : sliding ? "tug" : "done"}>
         {at.shadow && <Shadow at={at.shadow.at} size={at.shadow.size} />}
         {sliding && <AirPiece code={pieceCode(l.color, l.type)} at={lerp(from, to, u)} square={u < 0.5 ? l.from : l.to} />}
-        {/* (Hopping back, he faces his corner, to the left.) */}
-        {shown && <Figure boss={boss} at={at.at} flip={goingBack ? true : stand.flip} anim={anim.anim} since={anim.since} id={`lasso-${moment.key}`} />}
+        {shown && <Figure boss={boss} at={at.at} faces={face.faces} drawn={face.drawn} anim={anim.anim} since={anim.since} id={`lasso-${moment.key}`} />}
       </div>
     </div>
   );
@@ -176,8 +204,8 @@ const SLIDE_OVERLAP = 60;
 
 // ---------------- SHOWDOWN! ----------------
 
-/** His fists' place on the board while he hauls from his corner (% of the board): the ropes run from them. */
-const FISTS: Pt[] = HAUL_FISTS.map(([x, y]) => ({ x: CORNER.x + (x - PIG.foot[0]) * PX, y: CORNER.y + (y - PIG.foot[1]) * PX }));
+/** His fists' place on the board while he hauls from his corner (% of the board), drawn mirrored or not: the ropes run from them. */
+const fistsAt = (mirrored: boolean): Pt[] => HAUL_FISTS.map(([x, y]) => ({ x: CORNER.x + (drawnX(PIG, x, mirrored) - PIG.foot[0]) * PX, y: CORNER.y + (y - PIG.foot[1]) * PX }));
 
 /** Each pair's yank: when it starts and ends (ms into the moment). */
 const yankOf = (k: number) => ({ t0: SHOWDOWN.pairs[k] ?? SHOWDOWN.pairs[SHOWDOWN.pairs.length - 1]! + (k - SHOWDOWN.pairs.length + 1) * 500, ms: SHOWDOWN.yankMs });
@@ -203,6 +231,10 @@ function showdownMoment({ boss, moment, now, t, orientation, banner }: MomentPro
         : t < SHOWDOWN.cornerAt + 200
           ? { anim: "leap", since: moment.at + SHOWDOWN.throwAt - PIG_LEAP.upAt }
           : { anim: "haul", since: moment.at + SHOWDOWN.cornerAt + 200 };
+  // He faces the way he leaps (into the middle, holding it through the wind-up; back to his corner), then the board as he hauls.
+  const art = artFacingOf(boss);
+  const faces: Facing = t < SHOWDOWN.throwAt - PIG_LEAP.upAt ? hopFacing(CORNER, MIDDLE, "right") : anim.anim === "haul" ? toward(CORNER.x, 50) : hopFacing(MIDDLE, CORNER, "left");
+  const FISTS = fistsAt(mirrorFor(art, toward(CORNER.x, 50)));
   const ropes: { from: Pt; to: Pt; loop: boolean; key: string }[] = [];
   const air: { code: string; at: Pt; square: string }[] = [];
   pairs.forEach((p, k) => {
@@ -246,7 +278,7 @@ function showdownMoment({ boss, moment, now, t, orientation, banner }: MomentPro
         {air.map((a) => (
           <AirPiece key={`${a.square}${a.code}`} code={a.code} at={a.at} square={a.square} />
         ))}
-        <Figure boss={boss} at={pos.at} flip={false} anim={anim.anim} since={anim.since} then={anim.anim === "haul" ? undefined : "idle"} id={`showdown-${moment.key}`} />
+        <Figure boss={boss} at={pos.at} faces={faces} drawn={art} anim={anim.anim} since={anim.since} then={anim.anim === "haul" ? undefined : "idle"} id={`showdown-${moment.key}`} />
       </div>
     </div>
   );
