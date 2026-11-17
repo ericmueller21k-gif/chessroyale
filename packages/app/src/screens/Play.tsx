@@ -333,7 +333,7 @@ export function PlayScreen({
           command={command ? { mode: "strike", startAt: command.startAt } : undefined}
           nav={{ view: history, total: board.history.length }}
           panel={layout.strip ? <BossPanel match={match} /> : undefined}
-          canCall={!waiting && !intro && !shown.replaying && !striking}
+          canCall={!waiting && !intro && !shown.replaying && !striking && !stallHolding(stall, now)}
           strike={strike}
           // After his Last Stand: the power-ups he left you (the engine's top 3 moves, as in Crowd).
           powerUp={{ enabled: canMove, inUse: hint !== null }}

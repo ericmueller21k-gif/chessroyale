@@ -1532,6 +1532,9 @@ export class NetMatch implements GameView {
   kingCalled = false;
   callKing(strike = false) {
     if (this.phase.kind !== "play" || !this.key || !this.boss?.kingCharges || this.kingCalled) return;
+    // (Not during Dash's stall beats: the server refuses a strike then, and the board takes no move in his fake move's hold.)
+    const st = this.phase.stall;
+    if (st && Date.now() >= st.at && Date.now() < st.until && (strike || st.beat === "fake")) return;
     if (kingHelpBlocked(this.boss)) {
       // The Hidden Boss (the Crowd's boss final): the God King doesn't come, but the try spends a charge as if he had
       // (Eric, Oct 14), as solo's does: the server spends it; it's gone here at once, and the next boss view says what

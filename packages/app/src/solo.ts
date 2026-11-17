@@ -643,6 +643,8 @@ export class SoloMatch implements GameView {
       return;
     }
     if (this.phase.kind !== "play" || !this.runner.boss?.kingCharges || this.kingCalled) return;
+    // (Not while Dash's fake move is on the board: the board takes no move then, the King's neither.)
+    if (this.stallHolding(Date.now())) return;
     if (strike) return this.callStrike();
     this.kingCalled = true;
     this.runner.kingCallers.add(HUMAN);
