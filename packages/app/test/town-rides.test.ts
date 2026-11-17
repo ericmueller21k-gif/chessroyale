@@ -42,15 +42,14 @@ describe("the rides", () => {
     for (const def of [...rides, ...outfits]) {
       const d = RIDES[def.id]!;
       expect([def.name, def.description, def.tier, def.colors]).toEqual([d.name, d.description, def.slot === "ride" ? "mythic" : d.tier, d.colors]);
-      // A view measured for each view drawn (Moon's Ride: its side only, as Eric left it).
+      // A view measured for each view drawn.
       for (const v of ["back", "front"] as const) expect(!!RIDE_CELLS[def.id]![v], `${def.id} ${v}`).toBe(!!d.views?.[v]);
       expect(TOWN_FEEL.rides[def.id], def.id).toBeDefined();
     }
-    expect(RIDES["moon-ride"]!.views).toBeUndefined();
-    expect(RIDES["moon-ride"]!.trail).toBeUndefined();
-    // Every other ride has both views and a trail mark, inside the art's limits (40 x 30 units); an outfit both views, the droplets.
+    // Every ride has both views and a trail mark (Moon's Ride too since its star, Nov 17), inside the art's limits (40 x 30
+    // units); an outfit both views, the droplets.
     expect([!!RIDES["banana-suit"]!.views?.back, !!RIDES["banana-suit"]!.views?.front, RIDES["banana-suit"]!.trail]).toEqual([true, true, undefined]);
-    for (const d of Object.values(RIDES).filter((x) => x.id !== "moon-ride" && x.id !== "banana-suit")) {
+    for (const d of Object.values(RIDES).filter((x) => x.id !== "banana-suit")) {
       expect([!!d.views?.back, !!d.views?.front, !!d.trail], d.id).toEqual([true, true, true]);
       expect(d.trail!.w, d.id).toBeLessThanOrEqual(40);
       expect(d.trail!.h, d.id).toBeLessThanOrEqual(30);
@@ -149,8 +148,9 @@ describe("a rider", () => {
     const back = { ...pawn, top: 0.25 };
     const rd = new Rider(art("riding-chirp"), RED, pawn, back, false);
     expect(rd.views.map((v) => v.pawn)).toEqual([pawn, back, pawn]);
-    // (Moon's Ride has no back view: its side, the pawn as dressed.)
-    const moon = new Rider(art("moon-ride"), RED, pawn, back, false);
+    // (A ride measured with no back view shows its side, the pawn as dressed: Moon's Ride's crescent did, until its star, Nov 17.)
+    const sideOnly = { ...art("moon-ride"), cells: { ...art("moon-ride").cells, back: undefined, front: undefined } };
+    const moon = new Rider(sideOnly, RED, pawn, back, false);
     expect(moon.views.map((v) => v.pawn)).toEqual([pawn, pawn, pawn]);
     expect(new Set(moon.views).size).toBe(1);
   });
@@ -225,7 +225,7 @@ describe("a rider", () => {
     expect(rv.moveIndex(1)).toBe(d.move.ms.length - 1);
     // The trail (Chirp's prints: 160, 150, 150, 140 ms): gone after 600 ms, one on every square.
     expect(rd.trail).toMatchObject({ ends: [160, 310, 460, 600], life: 600, every: 1 });
-    expect(new Rider(art("moon-ride"), RED, pawn, pawn, false).trail).toBeNull();
+    expect(new Rider({ ...art("moon-ride"), cells: { ...art("moon-ride").cells, trail: undefined } }, RED, pawn, pawn, false).trail).toBeNull();
     rd.drop();
   });
 

@@ -434,11 +434,11 @@ before the rows are laid (`street.ts lotHere`), so each row fills the place with
   bot's; the walk keeps its pace), lifted by the move's hop (the grasshopper's) instead of the hobble, its shadows shrinking with it;
   mirrored facing left as a pawn is. **Its view** (Nov 1, Eric: "a run up and a run down"): walking left or right its side, up the
   screen its back, down the screen its front (never mirrored); standing, the idle of the view it last walked in (`Walker.view`), for
-  you and everyone else alike; a ride without views (Moon's Ride) keeps its side. From behind, the pawn's face items don't show (its
+  you and everyone else alike; a ride without views keeps its side (none since Moon's Ride's star, Nov 17). From behind, the pawn's face items don't show (its
   hat does: the back view carries the pawn dressed without its face slot). **Its trail** (Nov 1; Eric: "Chirp's… definitely the way to
   go"): while you run on a ride with a `trail`, each square you leave gets its mark, on its own times and fade (`trail.ms`), pointing the
   way you went (the side's mirrored going left), at the ride's size, **in place of the droplets**; standing, none come; yours only, as
-  the droplets are. No ride, or Moon's Ride: the droplets. **Its pace**: `RIDES.speed` in settings, one number a ride (Cheetah Shoes
+  the droplets are. No ride (or an outfit): the droplets. **Its pace**: `RIDES.speed` in settings, one number a ride (Cheetah Shoes
   2): a step takes `youStepMs` (or a bot's `botStepMs`) over it. The pawn keeps its size (the ride is drawn at the pawn's scale) and its ride stands on the square's
   middle (its feet, the moon's shadow: `TOWN_FEEL.rides`). **Its name tag sits over the highest of the ride and the pawn standing** (a
   hat, the moon's stars) and doesn't jump with the hop, as a sidekick's doesn't; the card sits over it as over any tag; tags and the
@@ -1352,7 +1352,7 @@ noted wherever a slice changed one.
   (fourteen homes 8 to 10 squares from their nearest neighbors, none near the start, the Colosseum's ground and the park
   clear, and the start south of it on the park's promenade), the walk around a home, and the eased steps meeting the even ones at the same speed.
 - `packages/app/test/town-rides.test.ts` (Oct 31, rides; Nov 1, sizes; Nov 1, every boss's with views and trails): every ride item
-  has its drawing (its name and line the drawing's) and its measured views, every drawing is a ride item; all but Moon's Ride have a
+  has its drawing (its name and line the drawing's) and its measured views, every drawing is a ride item; every ride has a
   back, a front and a trail inside the art's limits; the cells are each drawing as drawn now (the hash: run
   `npx tsx scripts/measure-rides.ts` after a change); every ride 0.75 by one default, Cheetah Shoes' speed 2; in each view a rider
   stands its ride's feet on the square's middle, its tag over the higher of the ride and its pawn, its times and lift the view's; from
