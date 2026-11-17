@@ -14,7 +14,12 @@ const base = `http://localhost:${process.env.E2E_PORT || 8788}`;
 const IDS = (only ?? "clown,gingerbread,grex,hollow,bigboy,sawyer,pig,alfil,hopper,smudgy,moo,gardener,tiger,folio,timber,dash,zebra,recluse,chandy").split(",");
 const b = await chromium.launch(process.env.PW_CHROMIUM ? { executablePath: process.env.PW_CHROMIUM } : {});
 const shots = {};
-const keep = (place, id, buf, faces) => ((shots[place] ??= []).push({ id, src: `data:image/png;base64,${buf.toString("base64")}`, faces }));
+// (Each crop is also saved on its own, <out>/<place>/<boss>.png, for a before/after sheet: scripts/stills-boss-facing-sheet.mjs.)
+const keep = (place, id, buf, faces) => {
+  (shots[place] ??= []).push({ id, src: `data:image/png;base64,${buf.toString("base64")}`, faces });
+  mkdirSync(`${out}/${place}`, { recursive: true });
+  writeFileSync(`${out}/${place}/${id.replace(/[^\w&]+/g, "_")}.png`, buf);
+};
 
 async function crop(p, sel, pad = 24) {
   const el = p.locator(sel).first();
