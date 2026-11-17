@@ -1,12 +1,12 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "preact/hooks";
 import { bossBeat, type Beat, type BeatResult, type Stage } from "../characters/boss-beats.ts";
-import { BOSS_KITS, artOf, bossKit, bossKitOf, liveKit, type BossKit } from "../characters/kits.ts";
+import { BOSS_KITS, artOf, bossKit, bossKitOf, liveKit, placeFacing, type BossKit } from "../characters/kits.ts";
 import { growingRun, resetGrowing } from "./RecluseChild.ts";
 import { figure, onResetBeats, setFigureRun, suit } from "./boss-figure.ts";
 import { stanceAt } from "../characters/stance.ts";
 import { resetMoo } from "../characters/moo-state.ts";
 import { type Anim, type Character, type Frame } from "../characters/sprite.ts";
-import { drawnFacing } from "../characters/sprite-kit.ts";
+import type { Facing } from "../characters/sprite-kit.ts";
 import type { BossView, GameView, Phase } from "../game.ts";
 import { play, warmSounds } from "../sound.ts";
 import { cueHaptic } from "../haptics.ts";
@@ -116,10 +116,26 @@ function figureShowing(ch: Character, now: number): { anim: string; frame: numbe
  */
 /**
  * Where a run in place moves the figure in a phone's boss bar, `t` ms into it (Babur's hop along the bar to his pump and back): across
- * by `x` and up by `y` px, and facing the other way (`flip`, mirrored about his feet). A computer's figure stays where it is.
+ * by `x` and up by `y` px, facing `face` (the way he goes: his drawing mirrored about his feet where it faces the other way). A computer's
+ * figure stays where it is.
  */
-export type FigureMove = (t: number) => { x: number; y: number; flip: boolean };
+export type FigureMove = (t: number) => { x: number; y: number; face: Facing };
 const inPlace: { run: { key: string; since: number; anims: readonly string[]; move?: FigureMove } | null } = { run: null };
+/** Whether a boss figure's canvas is drawn mirrored now (its place's turn or a run's: styles.css `.bc-mirror`, `.bc-flip`). */
+export const drawnMirrored = (cv: Element): boolean => new DOMMatrixReadOnly(getComputedStyle(cv).transform).a < 0;
+
+/**
+ * Where a pixel of a boss figure's frame (a hand, its chest) is on the screen, with the figure drawn `mirrored` (about its feet) or not:
+ * as drawn now unless asked (Nov 17: an effect from a hand lands where the hand is, whichever way the figure faces).
+ */
+export function figurePoint(cv: Element, ch: Character, x: number, y: number, mirrored = drawnMirrored(cv)): { x: number; y: number } {
+  const r = cv.getBoundingClientRect();
+  const k = r.width / ch.w;
+  // (Its box as laid out, before a mirror: a mirror about its feet moves the box by twice their distance from its middle.)
+  const left = drawnMirrored(cv) ? r.right - 2 * ch.foot[0] * k : r.left;
+  return { x: left + (mirrored ? 2 * ch.foot[0] - x : x) * k, y: r.top + y * (r.height / ch.h) };
+}
+
 export function playInPlace(key: string, anims: readonly string[], since = Date.now(), move?: FigureMove) {
   if (inPlace.run?.key !== key) inPlace.run = { key, since, anims, move };
 }
@@ -299,6 +315,8 @@ function Character({ boss, stage, place, muteFall }: { boss: BossView; stage: St
     // (A figure whose height changes with what's drawn, the Hidden Boss's child growing up: his words stand on the top of the drawing
     // shown now, set as its animation changes (BossKit.heads); the tallest of them for one not listed.)
     let head = -1;
+    // (Which way he faces where he stands (placeFacing): a run that moves him turns him the way he goes, `bc-flip` against his place's turn.)
+    const stand = placeFacing(full ?? kit, kit.ch, place).faces;
     const tallest = kit.heads ? Math.max(...Object.values(kit.heads)) : 0;
     const draw = () => {
       const now = Date.now();
@@ -307,13 +325,15 @@ function Character({ boss, stage, place, muteFall }: { boss: BossView; stage: St
       const live = liveKit(kit, nowRef.current.boss, now, nowRef.current.stage);
       const own = inPlaceShowing(kit.ch, now);
       let s = own ?? figureShowing(kit.ch, now) ?? showing(live, beat, now, since);
-      // (A run that moves the figure along a phone's bar: Babur's hop to his pump.)
-      const mv = own && place === "bar" && inPlace.run?.move ? inPlace.run.move(now - inPlace.run.since) : null;
-      const moveId = mv ? `${Math.round(mv.x)},${Math.round(mv.y)},${mv.flip}` : "";
+      // (A run that moves or turns the figure: Babur's hop along a phone's bar to his pump, his toss to it on a computer.)
+      const mv = own && inPlace.run?.move ? inPlace.run.move(now - inPlace.run.since) : null;
+      const moveId = mv ? `${Math.round(mv.x)},${Math.round(mv.y)},${mv.face}` : "";
       if (moveId !== moved && box.current) {
         moved = moveId;
         box.current.style.translate = mv && (mv.x || mv.y) ? `${Math.round(mv.x)}px ${Math.round(mv.y)}px` : "";
-        box.current.classList.toggle("bc-flip", !!mv?.flip);
+        const turn = !!mv && stand !== "front" && stand !== mv.face;
+        box.current.classList.toggle("bc-flip", turn);
+        box.current.dataset.faces = turn ? mv!.face : stand;
       }
       // (Moo at rest: his idle, then now and then the sit and back: stance.ts. Never over a moment, which has settled into its
       // idle first, and never powered up.)
@@ -391,10 +411,12 @@ function Character({ boss, stage, place, muteFall }: { boss: BossView; stage: St
   }, [fallAt]);
   if (!kit || !beat) return null;
   const { ch } = kit;
+  // (Which way he faces here: toward the board and his foe, his drawing mirrored about his feet where it faces the other way; kits.ts.)
+  const facing = placeFacing(full ?? kit, ch, place);
   // (A phone's bar: his size and his drawing's shift in the box (kits.ts barScale, barShift; styles.css). Full size and no shift otherwise.)
   const barSize = place === "bar" ? { "--bc-scale": kit.barScale ?? 1, "--bc-shift": kit.barShift ?? 0 } : {};
   return (
-    <div ref={box} class={`boss-char place-${place} ch-${ch.id}${kit.tall ? " tall" : ""}${kit.wide ? " wide" : ""}${kit.heads ? " bc-heads" : ""}${(place === "results" || place === "side") && kit.artFacesLeft ? " art-left" : ""}`} data-anim={beat.anim} data-faces={kit.sprite ? drawnFacing(kit.sprite, ch) : undefined} aria-hidden="true" style={{ "--bc-w": ch.w, "--bc-h": ch.h, "--bc-fx": ch.foot[0], "--bc-fy": ch.foot[1], ...barSize }}>
+    <div ref={box} class={`boss-char place-${place} ch-${ch.id}${kit.tall ? " tall" : ""}${kit.wide ? " wide" : ""}${kit.heads ? " bc-heads" : ""}${facing.mirror ? " bc-mirror" : ""}`} data-anim={beat.anim} data-faces={facing.faces} aria-hidden="true" style={{ "--bc-w": ch.w, "--bc-h": ch.h, "--bc-fx": ch.foot[0], "--bc-fy": ch.foot[1], ...barSize }}>
       <canvas ref={cv} class="boss-char-sprite" width={ch.w} height={ch.h} />
       {/* Its words: a pixel text box beside it that types itself out and fades at the end (like the God King's). In the
           boss bar, the bar holds them instead, in its name's room (BossBar): never over its status or the board. */}
@@ -618,8 +640,10 @@ function fitSides(side: HTMLElement | null, name: string) {
   const kit = bossKit(name);
   const box = rect(side.querySelector(".boss-char"));
   const cv = rect(side.querySelector(".boss-char-sprite"));
-  const reach = kit ? SIDE_REACH[kit.ch.id] : undefined;
-  if (!wrap || !box || !cv || !kit || !reach) return;
+  const drawn = kit ? SIDE_REACH[kit.ch.id] : undefined;
+  if (!wrap || !box || !cv || !kit || !drawn) return;
+  // (Mirrored to face the board (placeFacing), his reach toward it is what he reaches behind him as drawn.)
+  const reach = placeFacing(kit, kit.ch, "side").mirror ? ([drawn[2], drawn[1], drawn[0], drawn[3]] as const) : drawn;
   const sx = cv.width / kit.ch.w;
   const now = (v: string, d: number) => parseFloat(at.getPropertyValue(v)) || d;
   const s = now("--side-s", 2);

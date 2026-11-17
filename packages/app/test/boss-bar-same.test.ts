@@ -20,7 +20,7 @@ describe("the phone boss bar's figure: as tall as the bar, whole inside it at re
     const nameOff = kit.barName ?? 0;
 
     it(`${name}: its bar numbers are its art's (scale ${scale}, shift ${shift}, name +${nameOff}; npx tsx scripts/bar-fit.ts)`, () => {
-      expect({ barScale: scale, barShift: shift, barName: nameOff }).toEqual(barFit(rest));
+      expect({ barScale: scale, barShift: shift, barName: nameOff }).toEqual(barFit(rest, all));
     });
 
     it(`${name}: as tall as the bar less ${BAR_TOP_GAP} px at rest, within a hundredth`, () => {
