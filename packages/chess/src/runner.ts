@@ -61,6 +61,10 @@ import {
   bossKill,
   bossKillDue,
   finishBoss,
+  finishGame,
+  crowdLimitReached,
+  crowdLimitVerdict,
+  crowdPodium,
   matchLoss,
   teamFinalCutIn,
   teamFinalStep,
@@ -74,7 +78,7 @@ import type { BoardSlot, NetBoard, NetBoss, NetFinal, NetStanding } from "./prot
 import { BOSS_OPENING, FREESTYLE_OPENING, boardEnd, boardStatus, freestyleBoard, newBoard, playOnBoard, recentMoves, type BoardState } from "./boards.ts";
 import { freestyleStart } from "./chess960.ts";
 import { pickOpenings, type Opening } from "./openings.ts";
-import { START_FEN, applyMove, baseAt, gameEnd, legalMoves, materialSlips, moveNumber, sideToMove, toSan } from "./rules.ts";
+import { START_FEN, applyMove, baseAt, gameEnd, legalMoves, materialSlips, moveNumber, sideToMove, toSan, type GameEnd } from "./rules.ts";
 import type { MoveScore } from "./uci.ts";
 import { BOSS_BRAIN, BOSS_LEVEL, ENGINE_MAX_ELO, RECLUSE_CHILD, bossBrainFor, bossLevelBase, bossLevelNow, bossRatingShown, childRating, childStep, levelForMaia, type BossBrain, type BossBrainPlan, type BossForm } from "@chessroyale/core";
 import { humanBrainMove, within, type BrainNote, type HumanEngineLike } from "./boss-brain.ts";
@@ -610,7 +614,8 @@ export class MatchRunner {
     this.strikeBots = null;
     this.planned = new Map();
     this.planning = null;
-    const over = this.state.boards.filter((id) => boardStatus(this.boards.get(id)!).gameOver);
+    // (The 50 v 50 rework plays one game to its end: a game over ends the match, endGameIfOver, before anything is dealt.)
+    const over = this.reworked ? [] : this.state.boards.filter((id) => boardStatus(this.boards.get(id)!).gameOver);
     if (over.length) {
       const live = this.state.boards.filter((id) => !over.includes(id));
       for (const id of over) this.retiredThisRound.push({ boardId: id, reason: "game_over" });
@@ -2312,7 +2317,8 @@ export class MatchRunner {
   /**
    * Who won the game on the board when the match ended: the side that mated,
    * or the side the engine rates clearly ahead (60%+) if it's unfinished;
-   * otherwise a draw (null).
+   * otherwise a draw (null). The 50 v 50 rework: an unfinished game (the move limit) is the judge's verdict instead,
+   * a side at `crowdLimitWin` (75%) or more (crowdLimitVerdict), from the agreed numbers the board keeps.
    */
   gameWinner(): Side | null {
     const id = this.state.boards[0];
@@ -2323,7 +2329,62 @@ export class MatchRunner {
     const other: Side = toMove === "w" ? "b" : "w";
     if (end === "checkmate") return other;
     if (end) return null;
+    if (this.reworked) return crowdLimitVerdict(board.expected, toMove, this.settings);
     return board.expected >= 0.6 ? toMove : board.expected <= 0.4 ? other : null;
+  }
+
+  // ---- The 50 v 50 rework's end (Settings.crowdCuts; docs/decisions/2026-11-16-crowd-rework-runner.md) ----
+
+  /** A Crowd 50 v 50 on the rework (crowdCuts): one game played to its end, cuts down to a 1 v 1, no endings. */
+  get reworked(): boolean {
+    return isTeamMatch(this.settings) && !!this.settings.crowdCuts?.length;
+  }
+
+  /**
+   * How the rework's game is over, or null while it plays on: by the board's rules (mate, stalemate, threefold repetition,
+   * the fifty-move rule, insufficient material) or at the move limit (after Black's move `crowdMoveLimit`, crowdLimitReached).
+   * Not while anyone is still to be placed in another way (a boss battle never comes in the rework).
+   */
+  crowdGameEnd(): GameEnd | "limit" | null {
+    if (!this.reworked || this.state.boss || this.isOver()) return null;
+    const id = this.state.boards[0];
+    const board = id === undefined ? undefined : this.boards.get(id);
+    if (!board) return null;
+    const end = boardEnd(board);
+    if (end) return end;
+    return crowdLimitReached(this.settings, moveNumber(board.fen)) ? "limit" : null;
+  }
+
+  /**
+   * The rework's game is over (crowdGameEnd): everyone still in is placed now (finishGame: the winning side's first, each by
+   * score; a draw, both together), and the match is over. Checked after each move's reveal and before each deal, ahead of
+   * any cut: a game over on a cut's move cuts nobody. True when it ended the match here.
+   */
+  endGameIfOver(): boolean {
+    if (!this.crowdGameEnd()) return false;
+    this.state = finishGame(this.state, this.opts.rng, this.gameWinner(), this.settings);
+    return true;
+  }
+
+  /**
+   * The rework's results, once the match is over (null otherwise, or not the rework): the podium's titles (crowdPodium: the
+   * winner, 1st of a won game; the best player, never a seat a person left: PlayerState.leftAt) and, for every player, the
+   * move they went out after (a cut's, or the one they left at; null: still in at the end) and the counted points they gave
+   * away a move over the match (matchLoss, 2 decimals; null: no move).
+   */
+  crowdResults(): { podium: { winner?: string; best: string | null }; players: Record<string, { outAtMove: number | null; perMove: number | null }> } | null {
+    if (!this.reworked || !this.isOver()) return null;
+    const cuts = this.settings.crowdCuts!;
+    const left = new Set(this.state.players.filter((p) => p.leftAt !== undefined).map((p) => p.id));
+    const podium = crowdPodium(this.state, this.gameWinner(), this.settings, left);
+    const players: Record<string, { outAtMove: number | null; perMove: number | null }> = {};
+    for (const p of this.state.players) {
+      // (Placed at the end (finishGame) is at the last stage, or 1st; a cut's stage is before it.)
+      const cut = p.outInStage !== null && p.outInStage < this.state.stage ? (cuts[p.outInStage]?.after ?? null) : null;
+      const ml = matchLoss(p, this.settings);
+      players[p.id] = { outAtMove: !p.isBot && p.leftAt !== undefined ? p.leftAt : cut, perMove: Number.isFinite(ml) ? Math.round(ml * 100) / 100 : null };
+    }
+    return { podium, players };
   }
 
   isFinal(): boolean {
@@ -2350,11 +2411,13 @@ export class MatchRunner {
     const rename = (x: string) => (x === id ? bot.id : x);
     const s = this.state;
     const f = s.final;
+    // (The rework: once a move has been played, the seat a person left is never the best player: PlayerState.leftAt.)
+    const leftAt = this.reworked && (s.stage > 0 || s.round > 0) ? { leftAt: this.clockMove() } : {};
     this.state = {
       ...s,
       players: s.players.map((p) =>
         p.id === id
-          ? { ...p, id: bot.id, name: bot.name, isBot: true, skill: bot.skill, practice: false, lastGroupmates: p.lastGroupmates.map(rename) }
+          ? { ...p, id: bot.id, name: bot.name, isBot: true, skill: bot.skill, practice: false, lastGroupmates: p.lastGroupmates.map(rename), ...leftAt }
           : p.lastGroupmates.includes(id)
             ? { ...p, lastGroupmates: p.lastGroupmates.map(rename) }
             : p,
@@ -2376,7 +2439,9 @@ export class MatchRunner {
     if (!p) return this.state.players.length;
     if (!p.alive) return p.placement ?? this.alive().length + 1;
     const place = this.alive().length;
-    this.state = { ...this.state, players: this.state.players.map((x) => (x.id === id ? { ...x, alive: false, outInStage: this.state.stage, placement: place } : x)) };
+    // (The rework: the move they left at, for the results' "out at move", and never the best player: PlayerState.leftAt.)
+    const leftAt = this.reworked ? { leftAt: this.clockMove() } : {};
+    this.state = { ...this.state, players: this.state.players.map((x) => (x.id === id ? { ...x, alive: false, outInStage: this.state.stage, placement: place, ...leftAt } : x)) };
     this.groups = new Map([...this.groups].map(([b, ids]) => [b, ids.filter((x) => x !== id)]));
     this.kingCallers?.delete(id);
     this.kingStrikers?.delete(id);

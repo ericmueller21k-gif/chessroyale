@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   CROWD_KNOCKOUTS,
   CROWD_PICK,
+  CROWD_PRE_REWORK,
   CROWD_REWORK,
   CROWD_SETTINGS,
   CROWD_VOTES,
@@ -108,7 +109,7 @@ describe("how moves are picked (the 50 v 50 rework, Eric, Nov 16): Strong | Majo
     ]);
     expect(pick.options.map((o) => [o.label, o.blurb])).toEqual([
       ["Strong", `The best of your team's top ${CROWD_PICK.strongTop} picks is played`],
-      ["Majority", "Your team's most-picked move is played"],
+      ["Majority", "Your team's top pick, sometimes 2nd or 3rd"],
       ["Chaos", "Any move your team picked, all equally likely"],
     ]);
     expect(JSON.stringify(pick.options)).not.toMatch(/\p{Extended_Pictographic}/u);
@@ -120,9 +121,10 @@ describe("how moves are picked (the 50 v 50 rework, Eric, Nov 16): Strong | Majo
     expect(pick.options.map((o) => o.patch)).toEqual([{ crowdPick: "strong" }, { crowdPick: "majority" }, { crowdPick: "chaos" }]);
   });
 
-  it("held where the 50 v 50 has the rework's cuts; today's 50 v 50 keeps how it ends until C2; none with the votes off or in a raid", () => {
+  it("held where the 50 v 50 has the rework's cuts, as every 50 v 50 since C2 (the old one held how it ends); none with the votes off or in a raid", () => {
     expect(pregameVotes(rework)).toBe(CROWD_VOTES);
-    expect(pregameVotes(crowd)).toBe(PREGAME_VOTES);
+    expect(pregameVotes(crowd)).toBe(CROWD_VOTES);
+    expect(pregameVotes({ ...crowd, ...CROWD_PRE_REWORK })).toBe(PREGAME_VOTES);
     expect(pregameVotes({ ...rework, augments: false })).toEqual([]);
     expect(pregameVotes({ ...rework, ...RAID_SETTINGS })).toEqual([]);
   });

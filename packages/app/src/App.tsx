@@ -106,9 +106,11 @@ function overridesFromUrl(modeId?: ModeChoiceId, matchBoss = false): Partial<Set
   const crowd = mode === "crowd" || raid;
   // Testing, admins: Boss alone (a raid alone, the boss picked) may meet a boss hidden from players (the Hidden Boss).
   const hidden = raid && !matchBoss && isAdmin();
-  // ?format=team|boss|duel: skip the pre-game votes and play that ending (for testing).
+  // ?format=team|boss|duel: skip the pre-game votes (for testing). Before the 50 v 50 rework it also played that ending; the rework
+  // has none (crowdCuts), so there it only skips the votes (Strong plays), as the lobby's switch (lobby-options.ts).
   const format = q.get("format") as FinalFormat | null;
-  const forced = crowd && format && format in CROWD_KNOCKOUTS ? { finalFormat: format, knockoutsPerStage: CROWD_KNOCKOUTS[format], augments: false } : {};
+  const ending = !raid && modeSettings("crowd").crowdCuts?.length ? {} : { finalFormat: format, knockoutsPerStage: CROWD_KNOCKOUTS[format as FinalFormat] };
+  const forced = crowd && format && format in CROWD_KNOCKOUTS ? { ...ending, augments: false } : {};
   // ?speed=bullet|blitz|rapid: that time control (for testing, with ?format=; old ids map over, unknown ones are Blitz).
   const speed = crowd ? (speedOption(q.get("speed"))?.patch ?? {}) : {};
   // ?start=normal|random|freestyle: that start (for testing, with ?format=, like ?speed=; an unknown id is Normal).
@@ -140,6 +142,8 @@ function overridesFromUrl(modeId?: ModeChoiceId, matchBoss = false): Partial<Set
       stageRounds: n("rounds") ? [] : undefined,
       moveClockSeconds: n("clock"),
       finalMaxTurns: n("finalTurns"),
+      // ?limit=N: the 50 v 50 rework's game ends after Black's move N (crowdMoveLimit, 60), the judge's verdict deciding (tests).
+      crowdMoveLimit: crowd && !raid ? n("limit") : undefined,
       bossMaxMoves: n("bossMoves"),
       drawRuleByStage: draw && DRAW_RULES.includes(draw) ? [draw] : undefined,
     }),

@@ -42,9 +42,12 @@ const score = (r: ReturnType<typeof scoreGroup>, id: string) => r.players.find((
 describe("raids score with 50 v 50's math; Boss alone as before", () => {
   it("a raid (online and Solo) has RAID_SCORING: 50 v 50's numbers, the cap by crowd move, no bubble", () => {
     expect(RAID_SETTINGS.crowdScoring).toBe(RAID_SCORING);
-    const { capFromMove, cutGrace, streakMinAverage, ...rest } = RAID_SCORING;
-    const { capFromMove: _c, cutGrace: _g, streakMinAverage: _s, ...crowd } = CROWD_SCORING;
+    const { capFromMove, cutGrace, streakMinAverage, sharedMinPicks, ...rest } = RAID_SCORING;
+    const { capFromMove: _c, cutGrace: _g, streakMinAverage: _s, sharedMinPicks: _m, ...crowd } = CROWD_SCORING;
     expect(rest).toEqual(crowd);
+    // (The relief at any size in a raid: 50 v 50's small sides are why it has sharedMinPicks.)
+    expect(sharedMinPicks).toBeUndefined();
+    expect(CROWD_SCORING.sharedMinPicks).toBe(5);
     expect(capFromMove).toHaveLength(RAID_SCORING.cap.length);
     expect(cutGrace).toBe(0);
     expect(streakMinAverage).toBeGreaterThan(0);

@@ -186,7 +186,6 @@
         "e2e/boss-powers.spec.ts",
         "e2e/boss-select.spec.ts",
         "e2e/boss-speech.spec.ts",
-        "e2e/crowd-hidden.spec.ts",
         "e2e/formats.spec.ts",
         "e2e/grex.spec.ts",
         "e2e/hollow.spec.ts",
@@ -262,7 +261,6 @@
         "e2e/boss-powers.spec.ts",
         "e2e/boss-side.spec.ts",
         "e2e/side-same-size.spec.ts",
-        "e2e/crowd-hidden.spec.ts",
         "e2e/recluse.spec.ts"
       ]
     },
@@ -297,7 +295,6 @@
       "specs": [
         "e2e/boss-powers.spec.ts",
         "e2e/boss-speech.spec.ts",
-        "e2e/crowd-hidden.spec.ts",
         "e2e/formats.spec.ts",
         "e2e/king-attack.spec.ts",
         "e2e/king-save-altered.spec.ts",
@@ -495,7 +492,7 @@
         "packages/app/src/recluse-online.ts",
         "packages/server/src/bosses/recluse.ts"
       ],
-      "specs": ["e2e/crowd-hidden.spec.ts", "e2e/formats.spec.ts", "e2e/hidden-boss-room.spec.ts", "e2e/recluse.spec.ts"]
+      "specs": ["e2e/formats.spec.ts", "e2e/hidden-boss-room.spec.ts", "e2e/recluse.spec.ts"]
     },
     "Sawyer": {
       "paths": [
@@ -540,7 +537,6 @@
       "specs": [
         "e2e/crowd.spec.ts",
         "e2e/crowd-play.spec.ts",
-        "e2e/crowd-hidden.spec.ts",
         "e2e/crowd-scoring.spec.ts",
         "e2e/match-screen.spec.ts",
         "e2e/opening-vote.spec.ts",
@@ -569,7 +565,7 @@
         "packages/app/src/match-exit.ts",
         "packages/app/src/components/MatchMenu.tsx"
       ],
-      "specs": ["e2e/crowd.spec.ts", "e2e/crowd-play.spec.ts", "e2e/crowd-hidden.spec.ts", "e2e/formats.spec.ts", "e2e/match-menu.spec.ts", "e2e/problems.spec.ts", "e2e/resign.spec.ts", "e2e/boss-review.spec.ts", "e2e/boss-result.spec.ts", "e2e/xp.spec.ts"]
+      "specs": ["e2e/crowd.spec.ts", "e2e/crowd-play.spec.ts", "e2e/formats.spec.ts", "e2e/match-menu.spec.ts", "e2e/problems.spec.ts", "e2e/resign.spec.ts", "e2e/boss-review.spec.ts", "e2e/boss-result.spec.ts", "e2e/xp.spec.ts"]
     },
     "home and the front door": {
       "paths": [

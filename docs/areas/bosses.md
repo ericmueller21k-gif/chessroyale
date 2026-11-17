@@ -168,8 +168,7 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
   moving them to the server needs Maia on the engine server (it runs Stockfish only) or Stockfish for his adult form online, a design
   call for Eric and the director. Other bosses are unchanged (another device, then a random move): a follow-up if Eric wants the same
   for every boss.
-  Tests: server `recluse-online.test.ts` ("his phase 1 move when no device answers"), `crowd-hidden-boss.test.ts` ("no result in
-  phase 1"), chess `boss-brain.test.ts` (`bossMoveFromScores`).
+  Tests: server `recluse-online.test.ts` ("his phase 1 move when no device answers"), chess `boss-brain.test.ts` (`bossMoveFromScores`).
 - **The brain (Oct 12: every boss on Maia; DECISIONS.md, "Every boss on Maia"):** every boss plays its normal moves
   with **Maia-3** (a human-like model, a separate AGPL program in its own worker: `packages/maia-worker/`), no guard,
   at a Maia rating for its level (its strength, plus a crowd's margin), clearly favored in plain chess (Eric, Oct 12:
@@ -361,7 +360,7 @@ below):
   (`OnlinePhase2`: the view with your board first, the phase at the server's moments, his lines and sounds as solo's, your move shown
   at once and kept over the server's word until it has it or refuses it, sent again on a reconnect), `NetMatch`'s `simul`,
   `simulMove`, `bossNote`, `phase2Ahead` (his themes fetched ahead). Tests: `server/test/recluse-online.test.ts`,
-  `crowd-hidden-boss.test.ts`, `engine-server.test.ts`, `app/test/recluse-online.test.ts`, `e2e/hidden-boss-room.spec.ts`.
+  `engine-server.test.ts`, `app/test/recluse-online.test.ts`, `e2e/hidden-boss-room.spec.ts`.
 - **Not done (Nov 13, phase 2):** XP's move count online is phase 1's picks only; a reload in the middle of his room's fight doesn't
   know it's the room's (no 🏆 after it). A third engine instance for him (`max_instances` 2 → 3) is Eric's spend, asked for only once the
   logs show other lobbies' searches delaying him. A mate in one is found with the position read once (`matingMoves`: 0.3 to 3.5 ms;
@@ -1286,8 +1285,8 @@ sampling, the guards, `forPlayers`), `BOSS_TIERS` and each boss's `offset` in `b
   `extra=packages/app/src/characters/recluse-ages.ts only=recluse-child,recluse-teen,recluse-young,recluse-grow,recluse-ghost`.
   His cutscene between the adult form and his transformation (in the fight since Nov 13: "His cutscene" above):
   `npm run preview:cutscene -- <dir> [phone|computer]` plays it alone over a real fight (a dev-only module; videos and stills).
-- The Hidden Boss in the Crowd's final: `packages/chess/test/crowd.test.ts` ("50 v 50 boss final"),
-  `packages/server/test/crowd-hidden-boss.test.ts` (online), e2e `e2e/crowd-hidden.spec.ts`; [crowd.md](crowd.md).
+- The Hidden Boss in the Crowd's final: unreached since the 50 v 50 rework (C2); its tests retired in C4, his code stays
+  ([crowd.md](crowd.md)).
 - The Hidden Boss: unit `packages/chess/test/recluse.test.ts` (hidden from players, his brain, the bullet clock and
   its increment, the loss on time, the God King blocked and a try spending its charge, no strikes), `packages/chess/test/recluse-phase2.test.ts` (phase 2's starts, ply-0 bases,
   clocks, time, resign, all four must win, the Stockfish-only brain), `packages/app/test/recluse-phase2.test.ts` (the

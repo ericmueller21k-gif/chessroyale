@@ -246,13 +246,13 @@ test("50 v 50's AFK rule (Eric, Nov 4): each miss says a move was picked for you
   if (stills) await page.screenshot({ path: `${stills}/removed-phone.png` });
 });
 
-test("Crowd 50 v 50: plays your team's turns, watches the other team's, survives cuts, through the team final to results", async ({ page }) => {
+test("Crowd 50 v 50: plays your team's turns, watches the other team's, survives cuts, to the game's end (the 1 v 1, the move limit) and results", async ({ page }) => {
   test.setTimeout(10 * 60_000);
   test.skip(test.info().project.name !== "phone", "one run is enough");
   // Two rounds a stage (one move: one ply for each team; a real match's are longer, CROWD_STAGE_ROUNDS). With one, a stage is a
   // single ply, so at the first cut the team that hasn't moved yet is all tied on 0 and its cut is a coin flip: you
-  // could go out before ever playing.
-  await page.goto("/?debug&pace=quick&mode=crowd&rounds=2&clock=20&augments=0&finalTurns=12");
+  // could go out before ever playing. Since the rework (C2): 8 cuts by move 8, then the 1 v 1 to a test's move limit (?limit=12).
+  await page.goto("/?debug&pace=quick&mode=crowd&rounds=2&clock=20&augments=0&limit=12");
   await soloFromHome(page);
   const seen = new Set<string>();
   const stopAt = Date.now() + 9 * 60_000;

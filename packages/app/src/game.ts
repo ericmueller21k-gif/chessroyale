@@ -505,7 +505,9 @@ export const isCrowdFifty = (m: Pick<GameView, "settings" | "boss">) => isCrowd(
 export const scoreDp = (s: Pick<Settings, "crowdScoring">) => (s.crowdScoring ? 2 : 1);
 
 /** What a Crowd match's last cut leads to, by name: the team final, the boss final or the duel. */
-export function finalName(s: Pick<Settings, "finalFormat">): string {
+export function finalName(s: Pick<Settings, "finalFormat"> & Partial<Pick<Settings, "crowdCuts">>): string {
+  // (The 50 v 50 rework has no ending: what follows its last cut is the 1 v 1, the last player of each side.)
+  if (s.crowdCuts?.length) return "1 v 1";
   return s.finalFormat === "boss" ? "Boss final" : s.finalFormat === "duel" ? "Duel" : "Team final";
 }
 

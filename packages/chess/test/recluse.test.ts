@@ -156,7 +156,7 @@ describe("who meets him: hidden from players, an admin's Boss alone, and the Cro
     // (Still hidden from players everywhere else: the rule above is untouched.)
     expect(isPlayable(def)).toBe(false);
     for (const [admin, raid] of [[false, false], [false, true]] as const) expect(menuBosses({ admin, raid }).map((b) => b.id)).not.toContain("recluse");
-    // The match runner's Crowd final meets him: crowd.test.ts ("50 v 50 boss final"); the lobby's: crowd-hidden-boss.test.ts.
+    // (The Crowd final that met him through the runner and the lobby is unreached since the 50 v 50 rework; its tests went in C4.)
   });
 });
 

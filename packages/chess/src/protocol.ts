@@ -98,6 +98,13 @@ export interface NetStanding {
   look?: ItemLook;
   /** A person's account (a tap on their name opens /api/profile/UID). */
   uid?: string;
+  /**
+   * The 50 v 50 rework's results only (MatchRunner.crowdResults): the game's move they went out after (a cut's, or the one they
+   * left at), null while still in at the end; and the counted points they gave away a move over the match (2 decimals), null
+   * with no move. Missing: another message, another mode, or an older server.
+   */
+  outAtMove?: number | null;
+  perMove?: number | null;
 }
 
 export interface NetPick {
@@ -526,8 +533,10 @@ export interface NetLightsOut {
 /** A pre-game vote, for every screen: everyone's votes, each visible from `at` (server time). */
 export interface NetVote {
   key: string;
-  /** Which vote (index into PREGAME_VOTES) and how many there are. */
+  /** Which vote (index into the settings' pregameVotes: CROWD_VOTES since the 50 v 50 rework) and how many there are. */
   index: number;
+  /** The vote's id ("pick", "start", "speed"; "format" before the rework). Missing: an older server (look it up by index). */
+  id?: string;
   count: number;
   startsAt: number;
   until: number;
@@ -1097,8 +1106,17 @@ export type ServerMessage = { now: number } & (
       lossesByStage: Record<string, number[][]>;
       /** The final leaderboard (ratings, time, power-ups), for the results screen. */
       standings: NetStanding[];
-      /** Crowd: who won the game on the board (the side that mated, or the side clearly ahead), null for a draw. */
+      /**
+       * Crowd: who won the game on the board (the side that mated, or the side clearly ahead: the 50 v 50 rework's judge's verdict at
+       * the move limit, 75%), null for a draw.
+       */
       gameWinner?: "w" | "b" | null;
+      /**
+       * The 50 v 50 rework's podium (MatchRunner.crowdResults): the winner, 1st place of a won game (missing: a draw), and the best
+       * player (the fewest counted points a move among those who survived half the cuts; null: nobody qualified). Each row of
+       * `standings` then has `outAtMove` and `perMove`. Missing: not the rework, or an older server.
+       */
+      podium?: { winner?: string; best: string | null };
       /** Boss battle: who won it. */
       bossResult?: "crowd" | "boss" | "draw";
       /** Boss battle: the boss won on time (the Hidden Boss's bullet clock ran out). Missing: not on time, or an older server. */

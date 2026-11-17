@@ -1,9 +1,5 @@
 import { expect, type Page } from "@playwright/test";
-import { crowdFinalBoss } from "@chessroyale/core";
 import { BOARD_SEL, engineTop, named, soloFromHome, submitMove, test, bossAloneFromHome, pickMode } from "./helpers.ts";
-
-/** The boss final's boss (Eric, Oct 14: always the Hidden Boss), by his roster name. */
-const finalBoss = crowdFinalBoss()!;
 
 /** page.evaluate that shrugs off a dropped execution context (seen under heavy load while the page carries on). */
 async function safely<T>(f: () => Promise<T>, fallback: T): Promise<T> {
@@ -46,25 +42,25 @@ async function playToResults(page: Page, seen: Set<string>, minutes: number) {
   }
 }
 
-test("pre-game votes: the cards vote too; the winners set the ending and the clock", async ({ page }) => {
+test("pre-game votes: the cards vote too; the winners set how moves are picked (the rework's first vote, C2) and the clock", async ({ page }) => {
   test.setTimeout(3 * 60_000);
   test.skip(test.info().project.name !== "phone", "one run is enough");
   await page.goto("/?debug&mode=crowd&augments=1");
   await soloFromHome(page);
   await expect(page.locator(".vote-screen")).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByRole("heading", { name: "How does it end?" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "How are moves picked?" })).toBeVisible();
   await expect(page.locator(".vote-zone")).toHaveCount(3);
-  // Vote 1: tap the middle card (the boss final: the Hidden Boss). (Dragging your pawn is in votes.spec.ts.)
-  await page.getByRole("radio", { name: new RegExp(finalBoss.name) }).click();
+  // Vote 1: tap the middle card (Majority). (Dragging your pawn is in votes.spec.ts.)
+  await page.getByRole("radio", { name: /Majority/ }).click();
   await expect.poll(() => page.evaluate(() => (window as any).match.myVote)).toBe(1);
-  await expect(page.locator(".vote-card.on")).toContainText(finalBoss.name);
+  await expect(page.locator(".vote-card.on")).toContainText("Majority");
   // Your pawn walks into that zone.
   await expect(page.locator(".vote-me.in")).toBeVisible();
   // Votes come in live; then the result.
   await expect.poll(async () => Number(await page.locator(".vote-zone-count").nth(1).textContent())).toBeGreaterThan(1);
   await expect(page.locator(".vote-banner")).toBeVisible({ timeout: 15_000 });
-  const format = await page.evaluate(() => (window as any).match.settings.finalFormat);
-  expect(["team", "boss", "duel"]).toContain(format);
+  const pick = await page.evaluate(() => (window as any).match.settings.crowdPick);
+  expect(["strong", "majority", "chaos"]).toContain(pick);
   // Vote 2, how it starts (e2e/opening-vote.spec.ts); then vote 3: tap the Bullet card.
   await expect(page.getByRole("heading", { name: "How does it start?" })).toBeVisible({ timeout: 10_000 });
   await expect(page.getByRole("heading", { name: "How fast?" })).toBeVisible({ timeout: 20_000 });
@@ -86,23 +82,6 @@ test("pre-game votes: the cards vote too; the winners set the ending and the clo
     { cap: 15, bank: 300, increment: 3, mine: 300_000 },
     { cap: 20, bank: 600, increment: 5, mine: 600_000 },
   ][result]);
-});
-
-test("team final: the top 8 play 4v4, the weakest on each side go out, everyone is placed", async ({ page }) => {
-  test.setTimeout(10 * 60_000);
-  test.skip(test.info().project.name !== "phone", "one run is enough");
-  await page.goto("/?debug&pace=quick&mode=crowd&format=team&rounds=1&clock=20&finalTurns=30");
-  await soloFromHome(page);
-  const seen = new Set<string>();
-  await playToResults(page, seen, 9);
-  expect(await phase(page)).toBe("results");
-  const f = await page.evaluate(() => (window as any).match.runner.state.final);
-  expect(f.format).toBe("team");
-  // 30 turns: 24 for the 4v4 step, then the first cut (one from each side).
-  expect(f.out.length).toBe(2);
-  const places = await page.evaluate(() => (window as any).match.runner.state.players.map((p: any) => p.placement).sort((a: number, b: number) => a - b));
-  expect(places).toEqual(Array.from({ length: 100 }, (_, i) => i + 1));
-  if (seen.has("final")) await expect(page.locator(".team-result")).toBeVisible();
 });
 
 test("boss raid (solo): you against a boss from the starting position (Eric, Oct 21); the King can strike it", async ({ page }) => {
@@ -354,8 +333,6 @@ test("the God King's Last Stand (solo raid, ?laststand=1): the ?? warning, he ta
   await expect(facts).toContainText("Your chances");
   await expect(page.locator(`.ls-card .mini ${BOARD_SEL.arrowLine}`).first()).toBeAttached();
 });
-
-// (The boss final's two battles, solo and online, are crowd-hidden.spec.ts's: their checks merged there, Nov 2.)
 
 test("Play now: players land in the same lobby, the count climbs, bots fill it and the votes begin", { tag: "@phone-only" }, async ({ browser }) => {
   test.setTimeout(3 * 60_000);

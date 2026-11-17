@@ -1895,10 +1895,13 @@ export class LobbyCore {
   private voteView(): NetVote {
     const v = this.r.vote!;
     const side = (id: string) => this.runner?.player(id)?.colour ?? "w";
+    const votes = pregameVotes(this.settings);
     return {
       key: v.key,
       index: v.index,
-      count: pregameVotes(this.settings).length,
+      // (Which vote, by its id: the rework's "pick" holds the first place "format" had, so an app looks it up by id, not place.)
+      ...(votes[v.index] ? { id: votes[v.index]!.id } : {}),
+      count: votes.length,
       startsAt: v.startsAt,
       until: v.until,
       votes: [
@@ -2875,6 +2878,8 @@ export class LobbyCore {
     const runner = this.runner;
     if (!runner) return;
     if (runner.isOver()) return this.finishMatch();
+    // (The 50 v 50 rework: its one game over (by the rules or the move limit) ends the match for everyone still in.)
+    if (runner.endGameIfOver()) return this.finishMatch();
     if (runner.boss) {
       // (The Hidden Boss's child beaten, his fall over (he grew up: the fall path below, his rules' fallMs): a new match against his
       // adult form, the next of his forms (RECLUSE_FORMS), from the starting position, with its own intro, as solo's nextForm.)
@@ -3444,6 +3449,8 @@ export class LobbyCore {
       }
       return this.nextRound();
     }
+    // (The 50 v 50 rework: a game over on any move ends the match, before a cut due on that move: it cuts nobody.)
+    if (runner.endGameIfOver()) return this.finishMatch();
     if (!runner.stageComplete()) return this.nextRound();
     if (runner.isFinal()) {
       runner.finishFinal();
@@ -4491,12 +4498,16 @@ export class LobbyCore {
     this.r.timer = null;
     this.r.endedAt = this.io.now();
     const winner = runner.state.players.find((p) => p.placement === 1);
+    // (The 50 v 50 rework: the podium's titles and each player's "out at move" and points a move, in the standings' rows.)
+    const rework = runner.crowdResults();
+    const st = this.standings();
     const msg: Outgoing = {
       t: "results",
       placements: { ...this.r.placements },
       winner: winner ? this.nameOf(winner.id) : "",
       lossesByStage: Object.fromEntries(this.r.humans.map((h) => [h.id, runner.player(h.id).lossesByStage])),
-      standings: this.standings(),
+      standings: rework ? st.map((row) => ({ ...row, ...(rework.players[row.id] ?? {}) })) : st,
+      ...(rework ? { podium: rework.podium } : {}),
       ...(this.settings.mode === "crowd" ? { gameWinner: runner.gameWinner() } : {}),
       ...(runner.boss?.result ? { bossResult: runner.boss.result } : {}),
       // (The Hidden Boss's bullet clock ran out: he won on time. Read in the same event as the battle ended.)

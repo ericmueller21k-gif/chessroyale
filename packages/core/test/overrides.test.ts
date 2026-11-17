@@ -10,11 +10,10 @@ describe("mode settings with playtest overrides", () => {
     const s = { ...DEFAULT_SETTINGS, ...modeSettings("crowd"), ...definedOnly({ firstStageRounds: 1, moveClockSeconds: 9 }) };
     expect(s).toMatchObject({ firstStageRounds: 1, moveClockSeconds: 9, roundsPerStage: 2 });
   });
-  it("the rounds in a stage (Nov 1): the Crowd's own list, its last entry covering later stages; emptied (a test's ?rounds=) or unset, the first stage's then roundsPerStage", () => {
+  it("the rounds in a stage (Nov 1): the Crowd's own (its cuts' schedule), its last entry covering later stages; emptied (a test's ?rounds=) or unset, the first stage's then roundsPerStage", () => {
     const crowd = { ...DEFAULT_SETTINGS, ...modeSettings("crowd") };
-    expect([0, 1, 2, 3, 4, 5, 6, 7, 8].map((i) => roundsInStage(crowd, i))).toEqual([20, 10, 8, 8, 6, 6, 6, 4, 4]);
-    // Cuts after moves 10, 15, 19, 23, 26, 29 (the team final), 32 (the boss final) and 34 (the duel).
-    expect(CROWD_STAGE_ROUNDS.map((_, i) => CROWD_STAGE_ROUNDS.slice(0, i + 1).reduce((a, b) => a + b, 0) / 2)).toEqual([10, 15, 19, 23, 26, 29, 32, 34]);
+    // The rework's (C2, Nov 16): cuts after moves 14, 18, 22, 26, 30, 33, 39 and 42, then the 1 v 1 to move 60 (crowdStageRounds).
+    expect([0, 1, 2, 3, 4, 5, 6, 7, 8].map((i) => roundsInStage(crowd, i))).toEqual([28, 8, 8, 8, 8, 6, 12, 6, 36]);
     const rounds = { ...crowd, stageRounds: [], firstStageRounds: 2, roundsPerStage: 2 };
     expect([0, 1, 5].map((i) => roundsInStage(rounds, i))).toEqual([2, 2, 2]);
     expect([0, 1].map((i) => roundsInStage(DEFAULT_SETTINGS, i))).toEqual([DEFAULT_SETTINGS.firstStageRounds, DEFAULT_SETTINGS.roundsPerStage]);

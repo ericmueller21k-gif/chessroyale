@@ -2,7 +2,7 @@ import { memo } from "preact/compat";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import type { ComponentChildren } from "preact";
 import {
-  PREGAME_VOTES,
+  heldVotes,
   bossFinalOption,
   clampToZone,
   rosterWithout,
@@ -15,6 +15,7 @@ import {
   type BoardSpot,
   type ItemLook,
   type PregameVote,
+  type Settings,
 } from "@chessroyale/core";
 import { START_FEN } from "@chessroyale/chess";
 import { Avatar } from "../components/Items.tsx";
@@ -94,7 +95,8 @@ export interface VoteHost {
   standings(): readonly VotePlayer[];
   isYou(id: string): boolean;
   castVote(option: number): void;
-  settings: { voteYouScale?: number };
+  /** (A Crowd match's settings say which votes it holds: pregameVotes, through heldVotes; Squads passes its own `def`.) */
+  settings: { voteYouScale?: number } & Partial<Pick<Settings, "mode" | "crowdTeams" | "augments" | "crowdCuts">>;
   evaluate?: GameView["evaluate"];
 }
 
@@ -116,10 +118,16 @@ function FirstVoteHint({ open, done }: { open: boolean; done: boolean }) {
   return <VoteHint show={useVoteHint(open, done)} text="Drag your pawn into a zone to vote" class="vh-zones" />;
 }
 
+/** A Crowd match's votes, the one held among them (heldVotes: by the message's id, else its settings' pregameVotes). */
+function crowdVotes(vote: VoteView, match: VoteHost): readonly PregameVote[] {
+  const s = match.settings;
+  return heldVotes(vote, { mode: s.mode ?? "crowd", crowdTeams: s.crowdTeams ?? true, augments: s.augments ?? true, crowdCuts: s.crowdCuts });
+}
+
 export function VoteScreen({
   match,
   vote,
-  def: given = PREGAME_VOTES[vote.index]!,
+  def: given = crowdVotes(vote, match)[vote.index]!,
   next,
   evalBar = true,
   extra,
@@ -129,7 +137,7 @@ export function VoteScreen({
 }: {
   match: VoteHost;
   vote: VoteView;
-  /** The votes being held (Crowd's PREGAME_VOTES by default; Squads' own). */
+  /** The votes being held (Crowd's by default, crowdVotes: the rework's CROWD_VOTES; Squads' own). */
   def?: PregameVote;
   /** What comes after the last vote ("The game begins"), and the next vote's title. */
   next?: (index: number) => string;
@@ -290,7 +298,7 @@ export function VoteScreen({
   const overZone = dragAt ? voteZoneAt(dragAt) : null;
   const overOption = overZone === null ? null : zoneOf(overZone);
 
-  const nextLabel = next ? next(vote.index + 1) : vote.index + 1 < vote.count ? PREGAME_VOTES[vote.index + 1]!.title : "The game begins";
+  const nextLabel = next ? next(vote.index + 1) : vote.index + 1 < vote.count ? (crowdVotes(vote, match)[vote.index + 1]?.title ?? "The game begins") : "The game begins";
   const nextIn = vote.nextAt ? Math.max(0, Math.ceil((vote.nextAt - now) / 1000)) : null;
   const hint = winner
     ? joined.length && now < Math.max(walkedAt, vote.until) + CROWD_LINE_MS
