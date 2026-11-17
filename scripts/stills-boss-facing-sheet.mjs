@@ -15,12 +15,12 @@ for (const plat of ["phone", "desktop"]) {
   const rows = places
     .map((place) => {
       const ids = readdirSync(`${after}/${place}`).map((f) => f.replace(/\.png$/, ""));
-      const strip = (dir, label) =>
-        `<div class="row"><b>${label}</b>${ids.map((id) => (existsSync(`${dir}/${place}/${id}.png`) ? `<figure><img src="${img(`${dir}/${place}/${id}.png`)}"><figcaption>${id}</figcaption></figure>` : `<figure class="none">${id}</figure>`)).join("")}</div>`;
-      return `<h2>${place.replace(`${plat}-`, "")}</h2>${strip(before, "Before")}${strip(after, "After")}`;
+      const one = (dir, id) => (existsSync(`${dir}/${place}/${id}.png`) ? `<img src="${img(`${dir}/${place}/${id}.png`)}">` : "<i>none</i>");
+      // (Each boss a pair: before over after.)
+      return `<h2>${place.replace(`${plat}-`, "")} <small>(each boss: before above, after below)</small></h2><div class="pairs">${ids.map((id) => `<figure>${one(before, id)}${one(after, id)}<figcaption>${id}</figcaption></figure>`).join("")}</div>`;
     })
     .join("");
-  await page.setContent(`<style>body{margin:0;padding:8px;background:#2a2c33;color:#eee;font:13px sans-serif}h2{margin:10px 0 4px;color:#f2c14e}.row{display:flex;gap:4px;align-items:flex-end;margin-bottom:4px}.row b{width:52px}figure{margin:0;text-align:center;background:#111}img{height:120px;display:block}.none{width:60px;height:120px}</style><h1 style="margin:0">${plat}: every boss, before and after</h1>${rows}`);
+  await page.setContent(`<style>body{margin:0;padding:8px;width:1984px;background:#2a2c33;color:#eee;font:13px sans-serif}h2{margin:12px 0 4px;color:#f2c14e}small{color:#aaa;font-weight:normal}.pairs{display:flex;flex-wrap:wrap;gap:6px}figure{margin:0;text-align:center;background:#111;padding:3px;display:flex;flex-direction:column;gap:3px;align-items:center}img{height:130px;display:block}</style><h1 style="margin:0">${plat}: every boss, before and after</h1>${rows}`);
   await page.waitForTimeout(300);
   await page.screenshot({ path: `${outArg}/${plat}.png`, fullPage: true });
   console.log("wrote", `${outArg}/${plat}.png`);
