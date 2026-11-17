@@ -1,9 +1,9 @@
 import { useLayoutEffect } from "preact/hooks";
-import { MOO_BEATS, POWER_FX } from "@chessroyale/chess";
+import { MOO_BEATS, POWER_FX, fullMoonLeadMs } from "@chessroyale/chess";
 import { MOO_CINEMATIC } from "@chessroyale/core";
 import { MOO_LINES } from "../characters/moo.ts";
 import type { Character, Frame } from "../characters/sprite.ts";
-import { noteCalm, noteSwap } from "../characters/moo-state.ts";
+import { noteCalm, noteSwap, rejoinedAt } from "../characters/moo-state.ts";
 import { bossKit } from "../characters/kits.ts";
 import { EFFECTS, animLength, type SquareItem } from "../characters/power-art.ts";
 import type { BossView } from "../game.ts";
@@ -168,25 +168,32 @@ const MOMENTS: Record<"moonbeam" | "flurry" | "fullMoon" | "dazed", MomentUi> = 
 const fullMoonSeen = new Map<string, number>();
 
 /**
- * The Full Moon's transformation, as a moment of his thinking screen (it comes as the crowd's move lands, at the start of his
- * turn, and his move waits for it): from when this device first saw it. Its `swap` is noted for `mooPowered`. None when the
- * Full Moon isn't coming now.
+ * The Full Moon's cinematic, as a moment of his thinking screen (it comes as the crowd's move lands, at the start of his turn, and
+ * his move waits for it): from when this device first saw it, after QUEEN SLAIN! if his queen just fell (fullMoonLeadMs, as his
+ * thinking waits). Its `swap` is noted for `mooPowered`. None when the Full Moon isn't coming now, or when it was first seen just as
+ * this device rejoined (a reload or a late join: the round resent, his thinking already under way): then the cinematic is
+ * skipped and he's powered at once (review of #776, #2), as it would be cut off by his move.
  */
 export function fullMoonMoment(boss: BossView, now = Date.now()): Moment[] {
   const p = boss.powers;
   if (boss.id !== "moo" || !p) return [];
   return p.events
     .filter((e) => e.kind === "fullMoon" && e.turn === p.turn)
-    .map((e): Moment => {
+    .flatMap((e): Moment[] => {
       const key = `${boss.id}:fullMoon:${e.turn}`;
       const seenKey = `${boss.startMove}:${key}`;
       let at = fullMoonSeen.get(seenKey);
       if (at === undefined) {
-        fullMoonSeen.set(seenKey, (at = now));
+        const late = now - rejoinedAt() < MOO_CINEMATIC.rejoinMs;
+        fullMoonSeen.set(seenKey, (at = late ? -Infinity : now + fullMoonLeadMs(boss)));
         if (fullMoonSeen.size > 20) fullMoonSeen.delete(fullMoonSeen.keys().next().value!);
       }
+      if (at === -Infinity) {
+        noteSwap(boss, -Infinity);
+        return [];
+      }
       noteSwap(boss, at + B.fullMoon.swapAt);
-      return { kind: "fullMoon", key, at, ms: POWER_FX.fullMoon };
+      return [{ kind: "fullMoon", key, at, ms: POWER_FX.fullMoon }];
     });
 }
 

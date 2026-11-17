@@ -2328,6 +2328,17 @@ export const MOO_CINEMATIC = {
   fadeOutMs: 500,
   /** He hops back to his spot (his powered `move`). */
   hopBackMs: 720,
+  /**
+   * His thinking lasts this much past the cinematic's end (fullMoonMs, solo and the server): a late first frame on a device or its
+   * move arriving sooner than its thinking did never cuts the hop back (review of #776, #6). Inside his thinking: no player's time.
+   */
+  tailPadMs: 200,
+  /**
+   * Seen first with his thinking already under way (a reload or a late join: the round resent as the device rejoins), the cinematic
+   * is skipped and he's drawn powered at once: started then, his move would cut it off (review of #776, #2). How soon after the
+   * device rejoins a Full Moon counts as resent.
+   */
+  rejoinMs: 1500,
 } as const;
 
 /**

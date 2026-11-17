@@ -23130,7 +23130,9 @@ button.sq-tiny {
 
 /* ---- Moo & Moon (components/Moo.tsx; mo- for Moo) ---- */
 /* His Full Moon's cinematic (components/MooCinematic.tsx; Eric, Nov 17): over the board and everything above it, the field, his figure
-   in it, and the close-up over both. Nothing in it takes a tap. Placed in screen pixels by the component; the pictures stay crisp. */
+   in it, and the close-up over both. While the field is up it takes every tap (`mo-block`: nothing hidden under it is reached blind);
+   a match menu already open shows above it (`mo-on`, as the Hidden Boss's `cs-on`). Placed in screen pixels by the component; the
+   pictures stay crisp. */
 .mo-cine {
   position: fixed;
   inset: 0;
@@ -23140,6 +23142,12 @@ button.sq-tiny {
 .mo-area {
   position: absolute;
   overflow: hidden;
+}
+.mo-area.mo-block {
+  pointer-events: auto;
+}
+body.mo-on .mm-scrim {
+  z-index: 881;
 }
 .mo-pic {
   position: absolute;

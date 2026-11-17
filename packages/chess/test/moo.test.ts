@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { BOSS_LEVEL, BOSS_POWERS, BOSS_ROSTER, ENGINE_MAX_ELO, bossLevelNow, bossRatingShown, isPlayable, mulberry32, type BossPowerState, type BossState, type PowerEvent } from "@chessroyale/core";
+import { BOSS_LEVEL, BOSS_POWERS, BOSS_ROSTER, MOO_CINEMATIC, ENGINE_MAX_ELO, bossLevelNow, bossRatingShown, isPlayable, mulberry32, type BossPowerState, type BossState, type PowerEvent } from "@chessroyale/core";
 import {
   BOSS_OPENING,
   MOO_BEATS,
@@ -392,7 +392,7 @@ describe("Full Moon", () => {
     expect(r.bossView()!.powers!.fullMoon).toEqual({ left: BOSS_POWERS.fullMoonMoves });
     // His thinking lasts at least as long as the transformation.
     const view = r.bossView()!;
-    expect(fullMoonMs(view)).toBe(MOO_FX.fullMoon);
+    expect(fullMoonMs(view)).toBe(MOO_FX.fullMoon + MOO_CINEMATIC.tailPadMs);
     expect(bossThinkMs(view, false, fullMoonMs(view))).toBeGreaterThanOrEqual(MOO_FX.fullMoon);
     expect(r.bossMoveKind()).toBe("best");
   });

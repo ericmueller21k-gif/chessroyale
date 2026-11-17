@@ -11,10 +11,11 @@
  * Two pictures in one sheet (characters/moo-cinematic.png: the field's four frames, its stars twinkling, and the close-up's five,
  * normal to white eyes; drawn on claude/boss-art: scripts/boss-art/out/arena-moo-field and scripts/boss-art/moo-closeup), his own
  * sprite over the field, and opacities: no canvas of its own, no filters. Everything from the moment's start, so a screen drawn
- * later carries on and everyone online sees the same. Nothing takes a tap (pointer-events: none).
+ * later carries on (a device that first sees it as it rejoins skips it: Moo.tsx, fullMoonMoment). While the field is up it takes
+ * every tap, so nothing hidden under it is reached blind; a match menu already open shows above it (`mo-on`).
  */
 import { createPortal } from "preact/compat";
-import { useLayoutEffect, useState } from "preact/hooks";
+import { useLayoutEffect } from "preact/hooks";
 import { MOO_CINEMATIC as C } from "@chessroyale/core";
 import { MOO_BEATS } from "@chessroyale/chess";
 import sheetUrl from "../characters/moo-cinematic.png?url";
@@ -22,7 +23,7 @@ import { bossKit } from "../characters/kits.ts";
 import { BossMoment } from "./BossEffect.tsx";
 import { useFrameNow } from "./Countdown.tsx";
 import { onComputer } from "./PowerParts.tsx";
-import { boardOnScreen, useRect } from "./RecluseCutscene.tsx";
+import { boardOnScreen } from "./RecluseCutscene.tsx";
 
 const B = MOO_BEATS.fullMoon;
 /** The pictures' own size (art pixels) and the sheet's frames: the field's four, then the close-up's five. */
@@ -98,50 +99,67 @@ export function prewarmCinematic(): void {
   sheet.decode?.().catch(() => undefined);
 }
 
+/** A figure's scale at most this share of the area's height per art pixel: in a wide area the field's cover scale would make him giant. */
+const FIG_MAX = 1 / 200;
+
 /** `name`: the boss's name, as his kit is found (bossKit). */
 export function MooCinematic({ at, name }: { at: number; name: string }) {
   const now = useFrameNow();
-  const [board, setBoard] = useState<HTMLElement | null>(null);
-  const [spot, setSpot] = useState<Box | null>(null);
-  useLayoutEffect(() => {
-    setBoard(boardOnScreen());
-    setSpot(spotBox());
-  }, []);
-  const rect = useRect(board);
-  const kit = bossKit(name);
   const t = now - at;
-  if (!rect || !kit || t < 0 || t >= B.total) return null;
+  const on = t >= 0 && t < B.total;
+  // (While it plays, a match menu already open shows above it: `mo-on` on the page, as the Hidden Boss's `cs-on`; review of #776, #1.)
+  useLayoutEffect(() => {
+    if (!on) return;
+    document.body.classList.add("mo-on");
+    return () => document.body.classList.remove("mo-on");
+  }, [on]);
+  const kit = bossKit(name);
+  // The board's box and his spot's, read each frame: a board re-mounted or a phone turned mid-cinematic is followed (review, #7).
+  const rect = on ? boardOnScreen()?.getBoundingClientRect() : null;
+  if (!rect || !rect.width || !kit) return null;
   const b = cineBeats();
   // The area: the board and everything above it.
   const computer = onComputer();
   const area = { x: computer ? rect.x : 0, y: 0, w: computer ? rect.width : innerWidth, h: rect.bottom };
-  // The pictures cover it, centered (the art keeps what matters away from its edges), in whole screen pixels.
-  const k = Math.max(area.w / W, area.h / H);
-  const sw = Math.ceil(W * k);
-  const sh = Math.ceil(H * k);
-  const sx = Math.round((area.w - sw) / 2);
-  const sy = Math.round((area.h - sh) / 2);
-  const pic = (frame: number, opacity: number, cls: string) =>
+  // The pictures cover it, centered (the art keeps what matters away from its edges), in whole screen pixels. The close-up fits
+  // instead in an area wider than 4:3 (a short, wide window), where covering would show only a thin band of it (review, #5).
+  const cover = Math.max(area.w / W, area.h / H);
+  const place = (k: number) => {
+    const w = Math.ceil(W * k);
+    const h = Math.ceil(H * k);
+    return { x: Math.round((area.w - w) / 2), y: Math.round((area.h - h) / 2), w, h };
+  };
+  const field = place(cover);
+  const close = area.w / area.h > 4 / 3 ? place(Math.min(area.w / W, area.h / H)) : field;
+  const pic = (frame: number, opacity: number, cls: string, r: typeof field) =>
     opacity > 0 && (
       <div
         class={`mo-pic ${cls}`}
         data-frame={frame}
-        style={{ left: `${sx}px`, top: `${sy}px`, width: `${sw}px`, height: `${sh}px`, opacity: String(opacity), backgroundImage: `url(${sheetUrl})`, backgroundSize: `${sw * 9}px ${sh}px`, backgroundPosition: `${-frame * sw}px 0` }}
+        style={{ left: `${r.x}px`, top: `${r.y}px`, width: `${r.w}px`, height: `${r.h}px`, opacity: String(opacity), backgroundImage: `url(${sheetUrl})`, backgroundSize: `${r.w * 9}px ${r.h}px`, backgroundPosition: `${-frame * r.w}px 0` }}
       />
     );
-  // His figure: at the field's scale where he stands in it, flying between there and his spot on the hops.
+  // His figure: where he stands in the field, his feet kept inside the area and his scale capped, flying between there and his spot
+  // on the hops.
   const ch = kit.ch;
-  const stand: Box = { x: area.x + sx + (SPOT[0] - ch.foot[0]) * (sw / W), y: sy + (SPOT[1] - ch.foot[1]) * (sh / H), w: ch.w * (sw / W) };
+  const k = field.w / W;
+  const kf = Math.min(k, area.h * FIG_MAX);
+  const feet = { x: area.x + field.x + SPOT[0] * k, y: Math.min(field.y + SPOT[1] * k, area.h * 0.92) };
+  const stand: Box = { x: feet.x - ch.foot[0] * kf, y: feet.y - ch.foot[1] * kf, w: ch.w * kf };
+  const spot = t < b.landed || t >= b.hopBack ? spotBox() : null;
   const from = spot ?? { x: area.x + area.w * 0.1, y: area.y, w: stand.w / 2 };
   const hop = t < b.landed ? hopP(t) : t >= b.hopBack ? 1 - hopP(t - b.hopBack) : 1;
   const lift = Math.sin(Math.PI * hop) * Math.max(40, 0.3 * Math.hypot(stand.x - from.x, stand.y - from.y));
   const fig: Box = { x: from.x + (stand.x - from.x) * hop, y: from.y + (stand.y - from.y) * hop - lift, w: from.w + (stand.w - from.w) * hop };
   const f = cineFigure(t);
+  // (While the field is up it takes every tap: nothing hidden under it, the board's premoves or the top bar's menu, is reached
+  // blind; review, #1 and #4. On the hops the board shows, and takes taps as ever.)
+  const fieldUp = fieldOpacity(t) > 0;
   return createPortal(
     <div class="mo-cine" data-t={Math.round(t)}>
-      <div class="mo-area" style={{ left: `${area.x}px`, top: `${area.y}px`, width: `${area.w}px`, height: `${area.h}px` }}>
-        {pic(FIELD[Math.floor(Math.max(0, t) / FIELD_MS) % FIELD.length]!, fieldOpacity(t), "mo-field")}
-        {pic(CLOSE[closeFrame(t)]!, closeOpacity(t), "mo-close")}
+      <div class={`mo-area${fieldUp ? " mo-block" : ""}`} style={{ left: `${area.x}px`, top: `${area.y}px`, width: `${area.w}px`, height: `${area.h}px` }}>
+        {pic(FIELD[Math.floor(Math.max(0, t) / FIELD_MS) % FIELD.length]!, fieldOpacity(t), "mo-field", field)}
+        {pic(CLOSE[closeFrame(t)]!, closeOpacity(t), "mo-close", close)}
       </div>
       <BossMoment boss={name} anim={f.anim} since={at + f.since} class="mo-cine-fig" style={{ left: `${fig.x}px`, top: `${fig.y}px`, width: `${fig.w}px` }} />
     </div>,
