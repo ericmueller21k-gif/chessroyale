@@ -553,6 +553,8 @@ test("the seed meter in the bar at 320, 360, 390 and 1280: under the rage meter,
       let minX = c.width, maxX = -1;
       for (let y = 0; y < c.height; y++) for (let x = 0; x < c.width; x++) if (px[(y * c.width + x) * 4 + 3]! > 24) { minX = Math.min(minX, x); maxX = Math.max(maxX, x); }
       const k = r.width / c.width;
+      // (Mirrored to face the board (kits.ts placeFacing), its frame's columns run right to left.)
+      if (new DOMMatrixReadOnly(getComputedStyle(c).transform).a < 0) [minX, maxX] = [c.width - maxX - 1, c.width - minX - 1];
       return { left: r.left + minX * k, right: r.left + (maxX + 1) * k, seen: maxX >= 0 };
     });
     expect(fig.seen).toBe(true);
