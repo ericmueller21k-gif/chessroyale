@@ -1,3 +1,4 @@
+- Nov 17 ~20:35 UTC: #778 tiger pump fix merged 597b8b0 (fix-forward). #777 casters green, held until main green. dash-spec-main helper still running; watcher armed.
 - Nov 17 ~20:20 UTC: main RED on 5be698e (#776 after #775): dash.spec:576 phone fails twice (lie entries on move 2). Fix helper claude/dash-spec-main. Also tiger flake helper running. Moo LIVE 5be698e.
 - Nov 17 20:15 UTC: pm-caster .done -> #777 (268598e), CI watched, still sent. Helper flagged Wrangler facing in Pig.tsx (unchanged): look later. Running: tiger-pump-flake helper.
 - Nov 17 ~20:05 UTC: main RED on be0435e (#775 merge): tiger.spec:552 desktop retry-pass (pump place tall vs side at 1440x900), likely since #774. Fix helper claude/tiger-pump-flake. Dash tap LIVE be0435e. Moo deploy/main watched.
