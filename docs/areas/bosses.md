@@ -1011,7 +1011,9 @@ the results; left on the select's stage), and `placeFacing` mirrors the drawing 
 `.bs-mirror`), never a front-facing one; bubbles and words never. The bar's numbers (`barShift`) are measured from the mirrored drawing,
 which also keeps every moment on screen (test/bar-fit.ts); `SIDE_REACH` is swapped for a mirrored side figure, and its swings toward the board (`SIDE_SWING`, every frame: Timber's
 44 when he moves, against his rest's 38) are held within `over` too (an unturned figure keeps its place); effects from a hand or chest
-use `figurePoint` (BossCharacter.tsx: Babur's limp balloon, which he turns to the pump to toss; Puddles' seeds; Dash's slap). A phone's
+use `figurePoint` (BossCharacter.tsx: Babur's limp balloon, which he turns to the pump to toss; Puddles' seeds; Dash's slap). A side figure's
+place (`fitSides`) and Babur's pump beside him (`pumpPlace`) are measured from his box at rest in his place (`figureRestBox`), never as a run
+turns him that moment (docs/decisions/2026-11-17-tiger-pump-mid-toss.md). A phone's
 casters at the board's corner (`.pm-caster`) still draw the art as drawn: a follow-up. The town and the rooms turn bosses by the same data. A kit's `sprite` makes its `ch` that sprite turned to
 face the board (`BOARD_FACING`, our right); portraits and the select stage draw the art (`artOf`). Smudgy is the pilot; others move when next
 touched. Big Boy (Nov 7) faces `front`: never mirrored; his attack on a king to his right is drawn `turned`, his shirt's word (`reads`) reading. Tests: `test/sprite-kit.test.ts`; facing at the battle's start: `e2e/smudgy.spec.ts`, `e2e/boss-challenge.spec.ts` (`looks`).
