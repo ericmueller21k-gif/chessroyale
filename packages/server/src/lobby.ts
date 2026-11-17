@@ -70,6 +70,7 @@ import {
   recheckTargets,
   kingMoveMs,
   kingStrikeMs,
+  type StallPlan,
   verdictBoard,
   verdictMoves,
   type JudgedBoard,
@@ -278,6 +279,7 @@ export type Timer =
   | "judgeTick"
   | "lights"
   | "rush"
+  | "stall"
   | "dodge"
   | "partyStart"
   | "phase2";
@@ -331,6 +333,11 @@ export interface LobbyRecord {
     kingStrikes?: Record<string, true>;
     /** Boss battle: the King's strike on screen (the move clock stands still from `at` to `until`). */
     strike?: { at: number; until: number };
+    /**
+     * Dash's stall skit on this move (bosses/dash.ts on this server; his rules' stallPlan): its plan, the beat still to come
+     * (`next`; none: no more on this move), and each beat once it came (the move clock stands still from `at` to `until`).
+     */
+    stall?: { plan: StallPlan; next?: "slam" | "fake"; slam?: { at: number; until: number }; fake?: { at: number; until: number } };
     /** Crowd: the host's (or a judge's) early bot picks, and when each bot finishes (ms after the clock starts). */
     botPlan?: { picks: Record<string, string>; powerUps: string[]; by?: string };
     botsDoneIn?: Record<string, number>;
@@ -798,6 +805,7 @@ export class LobbyCore {
       pick: (playerId, key, move, away) => lobby.pick(playerId, key, move, away),
       sendTally: () => lobby.sendTally(),
       roundHumans: () => lobby.roundHumans(),
+      armRound: () => lobby.armRound(),
       roundDone: () => lobby.roundDone(),
       lock: () => lobby.lock(),
     };
@@ -1868,6 +1876,8 @@ export class LobbyCore {
         return hollowLobby.lightsStep(this.bossLobby);
       case "rush":
         return dashLobby.rushStep(this.bossLobby);
+      case "stall":
+        return dashLobby.stallBeat(this.bossLobby);
       case "dodge":
         return chandyLobby.dodgeStep(this.bossLobby);
       case "phase2":
@@ -3021,7 +3031,27 @@ export class LobbyCore {
       const mover = [...runner.groups.values()][0]![0]!;
       return this.setTimer("lock", this.io.now() + Math.min(6000, Math.max(1500, runner.botThinkTimes()[mover] ?? 2500)));
     }
-    this.setTimer("lock", deadline + this.settings.lateGraceMs);
+    // (Dash's stall skit, once a battle: its beats timed here on this move's clock, if it comes on this move.)
+    const stall = runner.boss ? runner.stallPlan(playing[0]!.id) : null;
+    if (stall) this.r.round.stall = { plan: stall, next: stall.slamAt === null ? "fake" : "slam" };
+    this.armRound();
+  }
+
+  /** The round's timer: its stall beat still to come (Dash's), when the move's clock reaches it; else its lock at the deadline. */
+  private armRound() {
+    const round = this.r.round!;
+    const st = round.stall;
+    if (st?.next) {
+      let at = round.startedAt + (st.next === "slam" ? (st.plan.slamAt ?? 0) : st.plan.fakeAt);
+      for (const w of this.frozenWindows(round)) if (w.at < at) at += w.until - w.at;
+      if (at < round.deadline) return this.setTimer("stall", at);
+    }
+    this.setTimer("lock", round.deadline + this.settings.lateGraceMs);
+  }
+
+  /** The windows the move clock stood still this round: the King's strike and Dash's stall beats, in order. */
+  private frozenWindows(round: NonNullable<LobbyRecord["round"]>): { at: number; until: number }[] {
+    return [round.strike, round.stall?.slam, round.stall?.fake].filter((w): w is { at: number; until: number } => !!w).sort((a, b) => a.at - b.at);
   }
 
   /**
@@ -3104,6 +3134,8 @@ export class LobbyCore {
     const runner = this.runner!;
     const now = this.io.now();
     if (round.kingStrikes?.[playerId] || round.strike || now < round.startedAt - 500 || now > round.deadline) return;
+    // (Not during Dash's stall beat: his skit has the clock stopped.)
+    if ([round.stall?.slam, round.stall?.fake].some((w) => w && now >= w.at && now < w.until)) return;
     (round.kingStrikes ??= {})[playerId] = true;
     runner.kingStrikers = new Set(Object.keys(round.kingStrikes));
     const { struck, calls } = runner.callStrike(playerId);
@@ -3115,6 +3147,8 @@ export class LobbyCore {
     }
     const ms = kingStrikeMs(this.settings);
     round.strike = { at: now, until: now + ms };
+    // (Dash's stall beats still to come wait for a later move: never after the King's strike on the same move.)
+    if (round.stall) round.stall.next = undefined;
     round.deadline += ms;
     for (const id of Object.keys(round.deadlines)) round.deadlines[id]! += ms;
     for (const [id, at] of Object.entries(round.botsDoneIn ?? {})) if (round.startedAt + at > now) round.botsDoneIn![id] = at + ms;
@@ -3125,10 +3159,9 @@ export class LobbyCore {
     this.setTimer("lock", round.deadline + this.settings.lateGraceMs);
   }
 
-  /** Time spent on this move so far (or up to `upTo`), leaving out the King's strike. */
+  /** Time spent on this move so far (or up to `upTo`), leaving out the King's strike and Dash's stall beats. */
   private thinkTime(round: NonNullable<LobbyRecord["round"]>, upTo: number): number {
-    const s = round.strike;
-    const frozen = s ? Math.max(0, Math.min(upTo, s.until) - s.at) : 0;
+    const frozen = this.frozenWindows(round).reduce((t, w) => t + Math.max(0, Math.min(upTo, w.until) - w.at), 0);
     return Math.max(0, upTo - round.startedAt - frozen);
   }
 

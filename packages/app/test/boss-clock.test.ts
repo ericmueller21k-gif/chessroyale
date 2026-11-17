@@ -1,6 +1,6 @@
 import { beforeAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { BOSS_POWERS, DEFAULT_SETTINGS, RAID_SETTINGS, type Settings } from "@chessroyale/core";
-import { bulletIncrementAt, legalMoves, type UciEngine } from "@chessroyale/chess";
+import { BOSS_POWERS, DASH_STALL, DEFAULT_SETTINGS, RAID_SETTINGS, type Settings } from "@chessroyale/core";
+import { bulletIncrementAt, legalMoves, stallTimeline, type UciEngine } from "@chessroyale/chess";
 import { HUMAN, loadOpenings, SoloMatch } from "../src/solo.ts";
 import { COUNT_FROM_SECONDS } from "../src/components/Countdown.tsx";
 import { DOCK_PLUS_MS, clockLeft } from "../src/components/BossDock.tsx";
@@ -157,5 +157,90 @@ describe("the dock's clock: what it shows", () => {
     expect(clockLeft(frozen, 5_000)).toBe(16_000);
     expect(clockLeft(frozen, 7_000)).toBe(16_000);
     expect(clockLeft(frozen, 9_000)).toBe(15_000);
+  });
+});
+
+describe("Dash's stall skit in solo (Eric, Nov 17: once a battle)", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.stubGlobal("fetch", () => Promise.reject(new Error("offline")));
+    vi.stubGlobal("location", { search: "" });
+    vi.stubGlobal("Worker", class { onmessage = null; onerror = null; postMessage() {} terminate() {} });
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  const play = (m: SoloMatch) => {
+    const p = m.phase as Extract<SoloMatch["phase"], { kind: "play" }>;
+    m.submit((m.runner.crowdAllowed() ?? legalMoves(p.board.fen))[0]!);
+  };
+  /** Boss alone against Dash, his stall skit on the test switch's quick beats (as ?power=stall): the slam 1.5 s in, the fake move 3.5 s. */
+  async function dashToPlay() {
+    const m = new SoloMatch([engine], "Ann", { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossFixedElo: 1600, bossId: "dash", bossUnfinished: true, bossPowerTest: "stall" } as Settings);
+    m.start();
+    // (Out of his opening book first: his state, and so his skit, begins after it. Each move played at once until it's planned.)
+    for (let moves = 0; moves < 30; moves++) {
+      for (let i = 0; i < 240 && m.phase.kind !== "play"; i++) await vi.advanceTimersByTimeAsync(250);
+      expect(m.phase.kind).toBe("play");
+      if (m.runner.stallPlan(HUMAN)) return m;
+      const ply = (m.phase as Extract<SoloMatch["phase"], { kind: "play" }>).board.ply;
+      play(m);
+      for (let i = 0; i < 240 && (m.phase.kind !== "play" || (m.phase as Extract<SoloMatch["phase"], { kind: "play" }>).board.ply === ply); i++) await vi.advanceTimersByTimeAsync(250);
+    }
+    throw new Error("no stall skit planned");
+  }
+  const until = async (t: number) => {
+    if (Date.now() < t) await vi.advanceTimersByTimeAsync(t - Date.now());
+  };
+
+  it("each once a battle, apart (Eric: \"each still occur once per game\"): a move between the slam and the fake move; the fake move comes alone on the next move (its pause only); then neither again", async () => {
+    const m = await dashToPlay();
+    let p = m.phase as Extract<SoloMatch["phase"], { kind: "play" }>;
+    expect(p.stall).toBeUndefined();
+    await until(p.startsAt + DASH_STALL.test.slamAt + 100);
+    p = m.phase as typeof p;
+    expect(p.stall?.beat).toBe("slam");
+    expect(m.runner.boss!.powers!.dash!.slam).toEqual({ at: m.runner.boss!.crowdMoves });
+    // You move before the fake move: it stays armed.
+    await until(p.stall!.until + 200);
+    play(m);
+    expect(m.runner.boss!.powers!.dash!.stall ?? null).toBeNull();
+    const next = async () => {
+      const ply = p.board.ply;
+      for (let i = 0; i < 240 && (m.phase.kind !== "play" || (m.phase as typeof p).board.ply === ply); i++) await vi.advanceTimersByTimeAsync(250);
+      p = m.phase as typeof p;
+      expect(p.kind).toBe("play");
+    };
+    // The next move: no slam, the fake move alone at its time, the deadline moved back by its hold only.
+    await next();
+    const deadline = p.deadline;
+    await until(p.startsAt + DASH_STALL.test.slamAt + 500);
+    expect((m.phase as typeof p).stall).toBeUndefined();
+    await until(p.startsAt + DASH_STALL.test.fakeAt + 100);
+    p = m.phase as typeof p;
+    expect(p.stall).toMatchObject({ beat: "fake", alone: true });
+    expect(p.deadline).toBe(deadline + stallTimeline().total);
+    expect(m.runner.boss!.powers!.dash!.stall).toMatchObject({ at: m.runner.boss!.crowdMoves, move: p.stall!.move });
+    await until(p.stall!.until + 200);
+    play(m);
+    // The moves after: neither, however long each takes.
+    for (let n = 0; n < 2; n++) {
+      await next();
+      await until(p.startsAt + DASH_STALL.test.fakeAt + DASH_STALL.slamMs + 1000);
+      expect((m.phase as typeof p).stall, `move ${n + 3}`).toBeUndefined();
+      play(m);
+    }
+  });
+
+  it("disposed mid-move: the skit's timer dies with the match (no beat, no turn restarted, nothing recorded)", async () => {
+    const m = await dashToPlay();
+    const p = m.phase as Extract<SoloMatch["phase"], { kind: "play" }>;
+    await until(p.startsAt + DASH_STALL.test.slamAt - 500);
+    m.dispose();
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(m.phase).toBe(p);
+    expect(m.runner.boss!.powers!.dash!.stall ?? null).toBeNull();
   });
 });
