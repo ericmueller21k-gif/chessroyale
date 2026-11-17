@@ -279,7 +279,8 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
   the app looks votes up by (`heldVotes`). No shared-blunder relief with 4 or fewer real picks (`sharedMinPicks`, the director's
   call). After the last cut there are no stage ends (`stageComplete`); the top bar says "1 v 1".
   **The screens (C3, docs/decisions/2026-11-17-crowd-rework-c3.md):** the top bar counts down (`cutCountdown` in `game.ts`: "cut in
-  2", "4 v 4 next" on a cut's own move, "1 v 1 from move 43" through the 2 v 2, then "1 v 1"); one "1 V 1!" banner on the 1 v 1's
+  2", "4 v 4 next" on a cut's own move, "1 v 1 from move 43" through the 2 v 2, then "1 v 1"; to 480 px `shortCountdown`'s
+  "to 4v4" and "1v1 at 43", the line there being about 60 px); one "1 V 1!" banner on the 1 v 1's
   first turn (`OneVOneBanner`, Crowd.tsx; the boss battles' `FightBanner`); the cut screen out (`CutOut`, mockup `crowd-cut`): your
   place and the gap to your team's last one through, "Why was I cut?", a fixed still-in box (each side's count and names, the stages
   to come: `stagesAhead` / `stagesLine`), and at its foot **Spectate** and **Leave the match**, side by side, always both, sticky at the
