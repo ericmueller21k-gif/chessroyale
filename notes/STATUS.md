@@ -1,3 +1,4 @@
+- Nov 17 18:25 UTC: moo new close-up (real sprites zoomed, Moo 4x Moon 5x, no API) sent to Eric; helper idle on his OK.
 - Nov 17 18:17 UTC: Eric: Dash clock tap fired on move 4 though he played instantly -> helper session_01JuCWRtx9rBN3HpMifuQV7A (claude/dash-tap-slow): tap only after 10 s / 30% of move clock, once, never with slam. Moo helper resumed for close-up redo. pm-caster helper stopped 3 min in to keep 2 Opus high max; requeued (brief pm-caster-mirror.md; branch claude/pm-caster-mirror may have WIP).
 - Nov 17 18:20 UTC: Eric: moo close-up "slop", Moon too small, OK as zoomed real sprites. Sent to moo helper (redo from sprite, nearest-neighbor, Moon bigger, both eyes white, timing as proposed). Watcher armed (old .question still on branch: check head on fire).
 - Nov 17 18:13 UTC: pm-caster helper session_01JuCWRtTmYY9WX3aTfNKCvr (claude/pm-caster-mirror), watcher armed.
