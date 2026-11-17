@@ -352,4 +352,16 @@ describe("Dash's stall skit and clock tap on screen (Eric, Nov 17)", async () =>
     expect(tl.total - tl.upAt).toBe(len(DASH_LIE.anims.getUp!));
     expect(DASH_TAP.tapMs).toBe(3000);
   });
+
+  it("the clock tap is screen only: his move as it comes keeps its own line (no quiet), and its moment plays no animation or line of his kit's", async () => {
+    const { quietMove } = await import("../src/components/BossCharacter.tsx");
+    const { powerLine } = await import("../src/components/BossPowers.tsx");
+    const fen = "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1";
+    const boss = (kinds: string[]) => ({ id: "dash", name: "Dash", crowdSide: "w", board: { fen }, powers: { events: kinds.map((kind) => ({ kind, turn: 5 })) } }) as never;
+    expect(quietMove("bossMove", boss(["clockTap"]))).toBe(false);
+    expect(quietMove("bossMove", boss(["slap"]))).toBe(true);
+    expect(quietMove("bossMove", boss(["clockTap", "slap"]))).toBe(true);
+    expect(DASH_UI.moments!.clockTap!.kit).toBeUndefined();
+    expect(powerLine(kit, { kind: "clockTap", key: "t5" })).toBeNull();
+  });
 });

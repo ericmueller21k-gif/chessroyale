@@ -365,7 +365,7 @@ function Character({ boss, stage, place, muteFall }: { boss: BossView; stage: St
   useEffect(() => {
     if (kit?.heads && testSwitchesAllowed()) (globalThis as { bossFigure?: (loop: string) => void }).bossFigure = (loop) => setFigureRun({ since: Date.now(), anims: [], loop, talks: true });
   }, [kit]);
-  const quiet = stage === "bossMove" && (!!boss.powers?.events.length || mateAttack(boss));
+  const quiet = quietMove(stage, boss);
   useLayoutEffect(() => {
     // (A line of its own for the moment, from the battle, over its kit's: the Hidden Boss's "Best by test.")
     const said = beat ? (kit?.lineOf?.(beat.anim, boss) ?? beat.line) : null;
@@ -408,6 +408,15 @@ function Character({ boss, stage, place, muteFall }: { boss: BossView; stage: St
  * A boss's name with his small portrait, where a line used to put his emoji (Eric, Nov 5: "it should say Wrangler there or a
  * small picture of him or both"): "[portrait] Wrangler plays d4". `The ` is left off the name, as the banners do.
  */
+/**
+ * The boss's move says nothing of its own (its move, capture or check line): a power's moment comes with it (the moment's line is
+ * the boss's word that turn), or its mate attacks the crowd's king. Not for Dash's clock tap: screen only, a moment with no line
+ * or animation of its own as his move lands (his tap's lines come in your turn: DashStall.tsx), so his move keeps its line.
+ */
+export function quietMove(stage: Stage, boss: BossView): boolean {
+  return stage === "bossMove" && (!!boss.powers?.events.some((e) => e.kind !== "clockTap") || mateAttack(boss));
+}
+
 export function BossTag({ boss, live = true }: { boss: Pick<BossView, "name" | "icon">; /** His face as he looks now (BossFace's `live`): a battle's lines, where it's used (Results' is a boss without a character). */ live?: boolean }) {
   return (
     <span class="boss-tag">
