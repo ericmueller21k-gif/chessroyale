@@ -1,8 +1,8 @@
-"""Song AJ (Eric, Nov 17): a runaway-train rock theme, a loop of about 2:31 (no boss named yet). His brief: "New song
-use this as a guide, feel free to come up with something a bit wild and throw in some dark melody vibes and a
-beautiful slowed down piano theme in the middle with some character to it". The guide is his own plan (made with
-another assistant, as the others were), "High-Speed Runaway-Train Synth-Metal & Heroic Arcade Rock": this time a
-guide, not a script, so its frame is kept and the rest is written here.
+"""Song AJ (Eric, Nov 17): a runaway-train rock theme, a loop of 2:16 (no boss named yet). His brief: "New song use
+this as a guide, feel free to come up with something a bit wild and throw in some dark melody vibes and a beautiful
+slowed down piano theme in the middle with some character to it". The guide is his own plan (made with another
+assistant, as the others were), "High-Speed Runaway-Train Synth-Metal & Heroic Arcade Rock": this time a guide, not
+a script, so its frame is kept and the rest is written here.
 Kept from the plan:
   - 162 beats a minute, four in a bar. A heavy rock kit (kicks on 1 and 3 with a 16th's pickup into each, two in the
     chorus; a gated snare on 2 and 4; hats or a ride in 8ths; crashes on the band's hits). A bass in 16ths that never
@@ -18,38 +18,45 @@ Kept from the plan:
     band's hits ending each phrase); the pre-chorus (Cmaj7, D, Bm7, C#7sus4 to C#7); the chorus (twice, the second an
     octave up with string pads and a square wave's 16ths; Bm7 to C#7#9 after it); the breakdown (stabs on D5, C5, B5
     traded with tom and snare fills, a long B7#9, a bar's snare roll, and bar 1).
-Written here, and original (none of it is any song's or any game's): every melody (the riff's rhythm and tail, the
-verse and the line under it, the pre-chorus's 16ths, the chorus's tune and its second lead), and what he asked for
-beyond the plan:
-  - "A bit wild": the train is in it. A steam whistle (three pipes: minor over the riff, diminished over the sevenths). The brakes: in bar 56 the
-    whole band's tape slows to a stop, pitch and all, over a snare roll that winds down with it. And the way out of
-    the piano: the tempo climbs from 81 back to 162 over four bars, the whistle's two toots, chuffs of steam on the
-    beat, the chug doubling from 8ths to 16ths.
+Written here, and original (none of it is any song's or any game's): every melody. And what Eric asked for as he
+heard it, in his order:
   - "Dark melody vibes": the riff's flat fifth; the verse's second time ending down a half step onto E (F natural);
-    the whistle's chord over the sevenths; the piano's C#7#9; and over the breakdown a slow line on the lead, each
-    chord's fifth sinking a half step onto its flat fifth (A to G sharp over D, G to F sharp over C, F sharp to F
-    over B).
-  - "A beautiful slowed down piano theme in the middle with some character to it": after the brakes, ten bars at half
-    the tempo (81). The chorus's tune, at half its speed, on the soft piano: a left hand that rolls in 8ths (root,
-    fifth, ninth, tenth: the shape of Eric's own left hand in song_ah.py); grace notes; the second half in octaves
-    with a small bell far above and strings coming in under; C#7#9 where the chorus has C#m7.
-The plan's 64 bars are 1:35 at this pace and he wants 2:30 to 2:45 (SOUNDS.md), so after the piano the song goes
-round its chorus once more (both leads together), the turnaround, and then the plan's breakdown. 90 bars.
+    the steam whistle's chords; and over the breakdown a slow line on the lead, each chord's fifth sinking a half
+    step onto its flat fifth (A to G sharp over D, G to F sharp over C, F sharp to F over B).
+  - "At 1:05 ... add another synth layer on top playing another melody at a higher octave at a little faster, then
+    they both come together at the end on a [harmony] for a few notes": a second synth (three sawtooths) over the
+    chorus's second time (COUNTER).
+  - "At like 30 seconds till the different part around 42 seconds add it again but now the deeper tone the song starts
+    with ... quieter than the lead ... another counter melody": a low line under the verse's second time (LOW_2),
+    first on the riff's overdriven lead; then "I almost wish it was maybe a different instrument instead of that synth
+    ... Try doing a piano for that": the same line on a bright piano, in octaves.
+  - "Kind of scrap that whole piano slowdown thing in the middle ... and then just actually continue creating the
+    counter melody with the higher pitched synth ... for another 25-30 seconds ... on top of that dueling melody now
+    add a third instrument ... A xylophone, I guess, or a glockenspiel ... for about 10 12 seconds": the first go's
+    middle (the brakes, ten bars of piano at half the tempo, the tempo climbing back) is gone; it is in the
+    repository's history (the commit before this one). In its place, twenty bars at full speed: the turnaround with
+    the second synth over the lead (thirds for its last three notes), then a duel of sixteen bars over F#m7, Dmaj7,
+    Bm7, C#7sus4 to C#7: first the lead and the synth trade, one running in 8ths while the other holds, a bar each;
+    then the lead takes long notes, the synth runs over it, and a glockenspiel rings on top (12 s), the two closing
+    in thirds.
+The plan's 64 bars are 1:35 at this pace. After the duel the song goes round its chorus once more (both leads
+together), the turnaround, and then the plan's breakdown: 92 bars, 2:16. That is under the 2:30 to 2:45 he asks of a
+theme (SOUNDS.md): the slow middle was what carried it there, and this version is one he asked to hear.
   python3 song_aj.py <out.wav>
 
   bars  1-4    0:00  the band's stabs (Em, D, C, B7), drum breaks between; a run up the B7
   bars  5-12   0:06  the locomotive: the riff over the E pedal
-  bars 13-28   0:18  the verse, twice: the brass, a square wave under it; the second time (0:30) the riff's low lead
-                     under them with a tune of its own
+  bars 13-28   0:18  the verse, twice: the brass, a square wave under it; the second time (0:30) a piano's low line
+                     under them
   bars 29-36   0:41  the pre-chorus: the flute-and-bell's 16ths, climbing to C#7
-  bars 37-52   0:53  the chorus (F sharp minor), twice: the second (1:05) an octave up, pads and 16ths under it, and a
-                     second synth's own tune over it, the two in thirds for its last five notes
-  bars 53-56   1:17  Bm7, C#7#9; the brakes
-  bars 57-66   1:23  the piano, at half the tempo: the chorus's tune, slowed
-  bars 67-70   1:53  the train pulls out: 81 to 162
-  bars 71-78   2:01  the chorus once more, two leads
-  bars 79-82   2:13  Bm7, C#7#9
-  bars 83-90   2:19  the breakdown: stabs and fills on D5, C5, B5; the long B7#9, the roll, and bar 1
+  bars 37-52   0:53  the chorus (F sharp minor), twice: the second (1:05) an octave up, pads and 16ths under it, and
+                     the second synth's own tune over it, the two in thirds for its last five notes
+  bars 53-56   1:17  Bm7, C#7#9: the lead's way down, the second synth over it
+  bars 57-64   1:23  the duel: the lead and the synth trade, a bar each
+  bars 65-72   1:35  the duel again: the lead's long notes, the synth running over them, the glockenspiel on top
+  bars 73-80   1:47  the chorus once more, two leads
+  bars 81-84   1:59  Bm7, C#7#9
+  bars 85-92   2:04  the breakdown: stabs and fills on D5, C5, B5; the long B7#9, the roll, and bar 1
 """
 import sys
 
@@ -58,14 +65,11 @@ import numpy as np
 from song_r import beats, notes
 from synth import Ride, n, write_wav
 
-BPM, SLOW, BARS = 162, 81, 90
+BPM, BARS = 162, 92
 BEATS = 4 * BARS
+TAPE = BEATS * 60 / BPM  # 136.3 s
 bar0 = lambda bar: 4 * (bar - 1)  # the beat a bar (from 1) starts at
-# The tape's ride: (from beat, to beat, tempo there, tempo by its end, speed there, speed by its end, waver). Bar 56
-# is the brakes (the tape slows to a stop, pitch and all); bars 57-66 the piano's half tempo; bars 67-70 pull out.
-RIDE = [(0, 220, BPM, BPM, 1.0, 1.0, 0.0), (220, 224, BPM, BPM, 1.0, 0.36, 0.0), (224, 264, SLOW, SLOW, 1.0, 1.0, 0.0),
-        (264, 280, SLOW, BPM, 1.0, 1.0, 0.0), (280, BEATS, BPM, BPM, 1.0, 1.0, 0.0)]
-TAPE = 150.0  # s of tape: a round length (quick transforms); the tempos give 150.44, so they run 0.3% fast
+RIDE = [(0, BEATS, BPM, BPM, 1.0, 1.0, 0.0)]
 
 # A chord: the bass's note, the guitar's root, the brass's stab, the pad's four notes, the square wave's 16ths.
 GRID = {
@@ -81,8 +85,9 @@ GRID = {
 VERSE_CH = "Em Em Cmaj7 Cmaj7 D D Bm7 Em"
 CHORUS_CH = "Dmaj7 E F#m7 F#m7 Dmaj7 E C#m7 F#m7"
 TURN_CH = "Bm7 Bm7 C#7#9 C#7#9"
+DUEL_CH = "F#m7 F#m7 Dmaj7 Dmaj7 Bm7 Bm7 C#7sus4 C#7"
 CHORDS = (f"Em D C B7  {'Em ' * 8} {VERSE_CH} {VERSE_CH}  Cmaj7 Cmaj7 D D Bm7 Bm7 C#7sus4 C#7  {CHORUS_CH} {CHORUS_CH}  {TURN_CH}  "
-          f"{'F#m7 ' * 10} C#7sus4 C#7sus4 C#7 C#7  {CHORUS_CH}  {TURN_CH}  D5 D5 C5 C5 B5 B5 B7#9 B7#9").split()
+          f"{DUEL_CH} {DUEL_CH}  {CHORUS_CH}  {TURN_CH}  D5 D5 C5 C5 B5 B5 B7#9 B7#9").split()
 assert len(CHORDS) == BARS, len(CHORDS)
 
 # ---- the lines. Lengths in beats; .25 is a 16th; a note may cross a barline. ----
@@ -107,10 +112,10 @@ UNDER_2 = (
     "G4:.5 B4:.5 E5:.5 G5:1 E5:.5 E5:1 | G5:.75 E5:.75 E5:.5 B4:2 | C5:.5 E5:.5 G5:.5 G5:1 G5:.5 E5:1 | G5:.75 E5:.75 E5:.5 C5:1 -:1 | "
     "F#5:.5 G5:.5 B5:.5 C6:1 B5:.5 G5:1 | B5:.75 G5:.75 F#5:.5 D5:1 F#5:.5 G5:.5 | B5:1 F#5:.5 D5:.5 F#5:.5 B5:.5 D6:1 | B5:1.5 B5:.25 G5:.25 E5:.5 D5:.5 B4:1"
 )
-# Under the verse's second time, the riff's low lead again with a tune of its own (Eric, Nov 17: "at like 30 seconds
-# till the different part around 42 seconds add it again but now the deeper tone the song starts with but we don't
-# hear again, but make it quieter than the lead now and make it play another counter melody"): the riff's own notes
-# and push, following the chords; it rests for the band's hits, and its last bar is the riff's seven notes.
+# Under the verse's second time, a low line with a tune of its own (Eric, Nov 17: "at like 30 seconds till the
+# different part around 42 seconds add it again but now the deeper tone the song starts with ... quieter than the lead
+# ... another counter melody"; then: "Try doing a piano for that"): the riff's own notes and push, following the
+# chords; it rests for the band's hits, and its last bar is the riff's seven notes. On the piano, in octaves.
 LOW_2 = (
     "E3:.75 G3:.75 A3:.5 B3:1 A3:.5 G3:.5 | E3:1.5 D3:.5 E3:.5 G3:.5 Bb3:.5 A3:.5 | G3:.75 E3:.75 G3:.5 C4:1 B3:.5 G3:.5 | E3:1.5 G3:.5 A3:.5 B3:.5 -:1 | "
     "D3:.75 F#3:.75 A3:.5 C4:1 B3:.5 A3:.5 | F#3:1.5 E3:.5 F#3:.5 A3:.5 -:1 | B2:.75 D3:.75 F#3:.5 A3:1 F#3:.5 D3:.5 | E3:1 G3:.5 A3:.5 Bb3:.5 A3:.5 G3:.5 E3:.5"
@@ -133,30 +138,38 @@ COUNTER = (
     "-:1 F#6:.5 E6:.5 F#6:.5 A6:.5 F#6:.5 E6:.5 | G#6:1 E6:.5 G#6:.5 B6:1 G#6:.5 E6:.5 | E6:.5 F#6:.5 A6:1 G#6:.5 F#6:.5 E6:.5 C#6:.5 | E6:1.5 F#6:.5 E6:.5 C#6:.5 E6:1 | "
     "-:1 A6:.5 F#6:.5 A6:.5 B6:.5 A6:.5 F#6:.5 | G#6:1 B6:.5 G#6:.5 E6:.5 G#6:.5 B6:1 | B6:.5 G#6:.5 F#6:.5 G#6:.5 E6:1 D6:1 | E6:1.5 C#6:.5 A5:2"
 )
-# Bm7, C#7#9: the lead's way down, and the long E sharp (the first time into the brakes; the second into the breakdown).
-TURN_BRAKES = "D6:2 C#6:1 B5:1 | A5:1.5 B5:.5 D6:2 | F6:7"
+# Bm7, C#7#9: the lead's way down, its long E sharp, and three notes home; and the second synth over it the first
+# time (8ths, then a third above those last three).
 TURN_ON = "D6:2 C#6:1 B5:1 | A5:1.5 B5:.5 D6:2 | F6:4 | G#6:2 F6:1 C#6:1"
+TURN_SYNTH = "F#6:.5 A6:.5 B6:.5 A6:.5 F#6:.5 D6:.5 F#6:.5 A6:.5 | F#6:1 D6:.5 F#6:.5 A6:.5 B6:.5 A6:.5 F#6:.5 | G#6:.5 B6:.5 G#6:.5 F6:.5 G#6:.5 B6:.5 C#7:1 | B6:2 G#6:1 F6:1"
+# The duel (bars 57-72; F#m7, Dmaj7, Bm7, C#7sus4 to C#7, two bars each, twice). First the two trade: one runs in
+# 8ths while the other holds, a bar each. Then the lead takes long notes and the synth runs over it; they close in
+# thirds. The glockenspiel's notes for that second time, a bar a line: six to the bar, off the beat.
+LEAD_D1 = (
+    "C#5:.5 F#5:.5 A5:.5 G#5:.5 A5:.5 C#6:.5 B5:.5 A5:.5 | G#5:3 F#5:.5 G#5:.5 | A5:.5 F#5:.5 D5:.5 F#5:.5 A5:.5 D6:.5 C#6:.5 A5:.5 | C#6:3 B5:.5 A5:.5 | "
+    "B5:.5 D6:.5 F#6:.5 E6:.5 D6:.5 B5:.5 A5:.5 F#5:.5 | A5:3 B5:.5 C#6:.5 | C#6:.5 B5:.5 G#5:.5 F#5:.5 G#5:.5 B5:.5 C#6:.5 F#6:.5 | F6:4"
+)
+SYNTH_D1 = (
+    "E6:3.5 F#6:.5 | A6:.5 G#6:.5 F#6:.5 E6:.5 F#6:.5 A6:.5 G#6:.5 E6:.5 | F#6:3.5 E6:.5 | E6:.5 F#6:.5 A6:.5 F#6:.5 E6:.5 F#6:.5 A6:.5 B6:.5 | "
+    "A6:3.5 F#6:.5 | D6:.5 F#6:.5 E6:.5 D6:.5 F#6:.5 A6:.5 B6:.5 A6:.5 | G#6:3.5 F#6:.5 | F6:.5 G#6:.5 B6:.5 G#6:.5 F6:.5 G#6:.5 B6:1"
+)
+LEAD_D2 = "C#6:3 B5:.5 A5:.5 | F#5:1 A5:1 C#6:2 | D6:3 C#6:.5 A5:.5 | F#5:1 A5:1 D6:2 | F#6:3 E6:.5 D6:.5 | B5:1 D6:1 F#6:2 | G#6:2 F#6:1 C#6:1 | F6:1.5 G#6:.5 F6:2"
+SYNTH_D2 = (
+    "E6:.5 F#6:.5 A6:.5 F#6:.5 E6:.5 C#6:.5 E6:.5 F#6:.5 | A6:1 G#6:.5 F#6:.5 E6:.5 F#6:.5 A6:1 | F#6:.5 A6:.5 B6:.5 A6:.5 F#6:.5 E6:.5 F#6:.5 A6:.5 | B6:1 A6:.5 F#6:.5 A6:.5 B6:.5 A6:1 | "
+    "A6:.5 B6:.5 C#7:.5 B6:.5 A6:.5 F#6:.5 A6:.5 B6:.5 | A6:1 B6:.5 A6:.5 F#6:.5 A6:.5 B6:1 | B6:2 B6:1 G#6:1 | G#6:1.5 B6:.5 G#6:2"
+)
+GLOCK = ("E7 C#7 A6 E7 C#7 F#6", "E7 C#7 A6 E7 C#7 A6", "D7 C#7 A6 D7 C#7 F#6", "D7 C#7 A6 D7 A6 F#6", "D7 B6 A6 D7 B6 F#6", "F#7 D7 B6 F#7 D7 B6",
+         "C#7 B6 G#6 C#7 B6 F#6", "C#7 B6 G#6 F6 G#6 C#7")
+GLOCK_AT = (0, 3, 6, 8, 11, 14)  # where they fall in the bar (16ths)
 # The breakdown's line on the lead: each chord's fifth, then down a half step onto its flat fifth.
 DREAD = "A5:4 G#5:4 G5:4 F#5:4 F#5:4 F5:4"
-# The piano (bars 57-66). Its left hand, a bar a line, eight 8ths; its right: two bars in, then the chorus's tune at
-# half its speed, the second half in octaves. "X>Y" is a grace note into Y; "X+Y" two notes together.
-LEFT = (
-    "F#2 C#3 G#3 A3 F#2 C#3 G#3 A3", "C#2 G#2 B2 F3 C#2 G#2 B2 F3",
-    "D2 A2 E3 F#3 D2 A2 E3 F#3", "E2 B2 F#3 G#3 E2 B2 F#3 G#3", "F#2 C#3 E3 A3 F#2 C#3 E3 A3", "F#2 C#3 G#3 A3 C#4 A3 G#3 C#3",
-    "D2 A2 E3 F#3 D2 A2 E3 F#3", "E2 B2 F#3 G#3 B3 G#3 F#3 B2", "C#2 G#2 B2 F3 C#2 G#2 E3 F3", "F#2 C#3 G#3 A3 C#4 A3 G#3 F#3",
-)
-RIGHT = (
-    "-:4 | -:2 G#4:.5 B4:.5 C#5:.5 F5:.5 | "
-    "F#4:.5 A4:.5 C#5:3 | C#5:.5 B4:1 G#4:1 B4:1.5 | A4:2 B4>A4:.5 G#4:.5 F#4:1 | C#4:.5 F#4:.5 A4:2 C#5:.5 E5:.5 | "
-    "F#4+F#5:.5 A4+A5:.5 D5+D6:3 | E6>D5+D6:.5 C#5+C#6:1 B4+B5:1 E5+E6:1.5 | E5+E6:2 C#5+C#6:1 B4+B5:1 | D6>C#5+C#6:1.5 A4+A5:.5 F#4+F#5:2"
-)
 # The stabs: where they fall in the bar (16ths), and the fills that take the rest of it (s: snare; h, m, l: toms).
 HITS_A, HITS_B = (0, 3, 6), (0, 3, 6, 9, 12)
 FILLS = ("sshhmmll", "s.sshhml", "hhmmllss", "hmlshmls")
 for _line, _beats in ((RIFF, 8), (RIFF_OUT, 8), (VERSE_1, 32), (UNDER_1, 32), (VERSE_2, 32), (UNDER_2, 32), (LOW_2, 32), (CHORUS, 32), (CHORUS_UNDER, 32), (COUNTER, 32),
-                      (TURN_BRAKES, 15), (TURN_ON, 16), (DREAD, 24), (RIGHT.replace("B4>", "").replace("E6>", "").replace("D6>", "").replace("+", ""), 40)):
+                      (TURN_ON, 16), (TURN_SYNTH, 16), (LEAD_D1, 32), (SYNTH_D1, 32), (LEAD_D2, 32), (SYNTH_D2, 32), (DREAD, 24)):
     assert beats(_line) == _beats, (_line[:30], beats(_line))
-assert all(len(bar.split()) == 8 for bar in LEFT) and len(LEFT) == 10
+assert all(len(bar.split()) == len(GLOCK_AT) for bar in GLOCK) and len(GLOCK) == 8
 
 
 def render(window=None) -> np.ndarray:
@@ -405,49 +418,42 @@ def render(window=None) -> np.ndarray:
             w += np.sin(ph) + 0.5 * np.sin(2 * ph + 1) + 0.33 * np.sin(3 * ph + 2) + 0.15 * np.sin(4 * ph)
         put("fx", b, w / 3 * np.minimum(1, t / 0.04) * tail(k, 0.12) * (1 + 0.08 * np.sin(tau * 11 * t)) * vol, pan)
 
-    def chuff(b, vol=0.03, secs=0.11):
-        """A puff of steam."""
-        k = int(secs * sr)
-        t = np.arange(k) / sr
-        put("fx", b, hiss(k, 6000, 0.3) * np.sin(np.pi * np.minimum(1, t / secs)) ** 0.7 * np.exp(-t / 0.05) * vol, -0.1)
+    strung = {}
 
-    # ---- the piano ----
-    def felt(b, m, vol, pan, ring=1.2):
-        w = x.struck("felt", m)
-        put("piano", b, w * np.exp(-np.arange(len(w)) / sr / ring) * vol, pan)
+    def string(m):
+        """A note of the bright piano: three strings a hair apart, overtones to 9 kHz that die sooner the higher they
+        are, the hammer's tick. Its loudest point 1; kept once made."""
+        if m not in strung:
+            k = int(1.6 * sr)
+            t = np.arange(k) / sr
+            f0 = x.hz(m)
+            h = np.arange(1, min(24, max(2, int(9000 / f0))) + 1)
+            w = np.zeros(k)
+            for off in (-1.5, 0.3, 1.6):
+                ph = np.outer(h * np.sqrt(1 + 0.0004 * h * h), tau * f0 * 2 ** (off / 1200) * t) + h[:, None]
+                w += ((1 / h**1.25)[:, None] * np.sin(ph) * np.exp(-np.outer(1 + 0.35 * h, t) / (0.9 * (262 / f0) ** 0.35))).sum(axis=0)
+            w = w * np.minimum(1, t / 0.002) + 0.2 * hiss(k, 9000, 0.5) * np.exp(-t / 0.004)
+            strung[m] = w / np.abs(w).max() * tail(k, 0.15)
+        return strung[m]
 
-    def glass(b, m, vol=0.02, pan=0.35):
-        """A small bell far above the piano: its overtones the note's own harmonics."""
-        k = int(1.6 * sr)
+    def keys(start, text, vol=1.0, pan=-0.2):
+        """A line on the piano, in octaves (a rock piano's two hands): each note let go a little after the next begins."""
+        for b, d, m in notes(start, text):
+            at(b, d)
+            k = min(int(1.6 * sr), x.k(d + 0.3))
+            fade = int(0.08 * sr)
+            for up, a in ((0, 1.0), (12, 0.8)):
+                w = string(m + up)[:k]
+                put("piano", b, w * np.minimum(1, (len(w) - np.arange(len(w))) / fade) * 0.2 * vol * a * (1.0 if d >= 0.75 else 0.85), pan)
+
+    def glock(b, m, vol=0.03, pan=0.35):
+        """The glockenspiel: a bright bar under a hard mallet, its overtones the note's own harmonics (so it sits in
+        the chord), gone in half a second."""
+        k = int(0.9 * sr)
         t = np.arange(k) / sr
         ph = tau * x.hz(m) * t
-        put("bell", b, np.sin(ph + 1.2 * np.exp(-t / 0.2) * np.sin(4 * ph)) * np.exp(-t / 0.45) * np.minimum(1, t / 0.002) * tail(k, 0.2) * vol, pan)
-
-    def piano(first):
-        """Ten bars at half the tempo: the left hand's rolling 8ths, the right hand's tune (graces, octaves), the bell
-        over the octaves; steam settling at its start, strings under its second half."""
-        for j, steps in enumerate(LEFT):
-            for i, name in enumerate(steps.split()):
-                felt(bar0(first + j) + i / 2, n(name), 0.2 * (1.0 if i % 4 == 0 else 0.82), -0.15, 0.9)
-        t = float(bar0(first))
-        for tok in RIGHT.replace("|", " ").split():
-            names, _, d = tok.partition(":")
-            d = float(d)
-            if names != "-":
-                *graces, main = names.split(">")
-                for g in graces:
-                    felt(t - 0.12, n(g), 0.12, 0.2)
-                pair = [n(c) for c in main.split("+")]
-                for m in pair:
-                    felt(t, m, 0.3 * (0.72 if len(pair) > 1 and m == max(pair) else 1.0) * (1.0 if d >= 1 else 0.85), 0.2)
-                if len(pair) > 1 and d >= 1:
-                    glass(t, max(pair) + 12)
-            t += d
-        # (Strings under its second half; no steam under the piano itself: a steady noise drowns a sparse solo.)
-        for j, name in enumerate(("Dmaj7", "E", "C#7#9", "F#m7")):
-            at(bar0(first + 6 + j), 4)
-            for i, m in enumerate(n(c) for c in GRID[name][3].split()):
-                put("pad", bar0(first + 6 + j), x.strings(m, 4, 0.012 + 0.002 * j, attack=0.5, release=0.5), (-0.5, -0.15, 0.15, 0.5)[i])
+        w = np.sin(ph + 1.3 * np.exp(-t / 0.05) * np.sin(4 * ph)) * np.exp(-t / 0.22) + 0.25 * np.sin(3 * ph) * np.exp(-t / 0.03)
+        put("bell", b, w * np.minimum(1, t / 0.0008) * tail(k, 0.1) * vol, pan)
 
     # ---- the sections ----
     def stabs(bar, name, hits, text, vol=1.0):
@@ -486,7 +492,7 @@ def render(window=None) -> np.ndarray:
 
     def verse(first, tune, under, low=None):
         """Eight bars: the brass's tune, the square wave under it; the band's two hits ending each phrase. `low`: the
-        riff's low lead under them with a tune of its own, quieter than the brass."""
+        piano under them with a low tune of its own, quieter than the brass."""
         for j in range(8):
             bar = first + j
             if j % 2 == 1:
@@ -499,7 +505,7 @@ def render(window=None) -> np.ndarray:
         crash(bar0(first), 0.05)
         brass(bar0(first), tune), square(bar0(first), under)
         if low:
-            soar(bar0(first), low, 0.63, -0.2, knee=1100.0)
+            keys(bar0(first), low)
 
     def pre(first):
         """Eight bars: the flute-and-bell's 16ths and its answers; the guitar's chords held open under them, the kit
@@ -541,38 +547,30 @@ def render(window=None) -> np.ndarray:
         if counter:
             synth(bar0(first), COUNTER)
 
-    def turn(first, brakes):
-        """Bm7, Bm7, C#7#9, C#7#9: the lead's way down and its long E sharp. `brakes`: the last bar is one held chord
-        and a roll winding down, as the tape slows to a stop (the RIDE)."""
+    def turn(first, over=None):
+        """Bm7, Bm7, C#7#9, C#7#9: the lead's way down, its long E sharp and three notes home. `over`: the second
+        synth's line above it."""
         for j in range(4):
-            bar = first + j
-            if brakes and j == 3:
-                slam(bar0(bar), "C#7#9", 3.0, 1.1)
-                whistle(bar0(bar), 2.8, 0.04, "F5 G#5 B5")
-                roll(bar0(bar) + 0.25, 2.75, 0.24, 0.05, kicks=False)
-            else:
-                train(bar, 1.05, fills="sshhmmll" if j == 3 else "", double=True, ride=True)
-                pad(bar)
+            train(first + j, 1.05, fills="sshhmmll" if j == 3 else "", double=True, ride=True)
+            pad(first + j)
         crash(bar0(first), 0.05), crash(bar0(first + 2), 0.06)
-        soar(bar0(first), TURN_BRAKES if brakes else TURN_ON, 1.75)
+        soar(bar0(first), TURN_ON, 1.75)
+        if over:
+            synth(bar0(first), over)
 
-    def pull_out(first):
-        """Four bars, the tempo climbing from 81 to 162 (the RIDE): the whistle's two toots; a chuff of steam on each
-        beat; the bass and the muted guitar in 8ths, then 16ths; the kick on the beat; the flute-and-bell's 16ths
-        and the snare's roll in the last two bars."""
-        for j in range(4):
+    def duel(first):
+        """Sixteen bars over the locomotive: the lead and the second synth trade, a bar each; then the lead's long
+        notes, the synth running over them and the glockenspiel on top, the two closing in thirds."""
+        for j in range(16):
             bar = first + j
-            b = bar0(bar)
-            rumble(bar, 0.7 + 0.1 * j, eighths=j == 0), chug(bar, 0.6 + 0.13 * j, eighths=j == 0)
-            for i in range(4):
-                kick(b + i, 0.42 + 0.03 * j), chuff(b + i, 0.03)
-                if j >= 1:
-                    hat(b + i + 0.5, 0.025)
-            if j >= 2:
-                for i, name in enumerate(RUNS[4 + j].split()):
-                    chime(b + i / 4, n(name), 0.22, 0.045 * (0.85 + 0.3 * i / 15), 0.3 * np.sin(0.8 * i))
-        whistle(bar0(first), 0.6, 0.04, "F5 G#5 B5"), whistle(bar0(first) + 1, 1.6, 0.04, "F5 G#5 B5")
-        roll(bar0(first + 2), 8, 0.05, 0.28, kicks=False)
+            train(bar, 1.05, fills=FILLS[3] if j == 7 else "sshhmmll" if j == 15 else "sshm" if j % 4 == 3 else "", double=True, ride=True)
+            pad(bar)
+            if j >= 8:
+                for i, name in zip(GLOCK_AT, GLOCK[j - 8].split()):
+                    glock(bar0(bar) + i / 4, n(name))
+        crash(bar0(first), 0.065), crash(bar0(first + 8), 0.06)
+        soar(bar0(first), LEAD_D1, 1.75), synth(bar0(first), SYNTH_D1, 1.15)
+        soar(bar0(first + 8), LEAD_D2, 1.75), synth(bar0(first + 8), SYNTH_D2, 1.15)
 
     def breakdown(first):
         """Eight bars: stabs on D5, C5 and B5 traded with tom and snare fills, the lead's slow line over them; the long
@@ -593,16 +591,11 @@ def render(window=None) -> np.ndarray:
     verse(13, VERSE_1, UNDER_1), verse(21, VERSE_2, UNDER_2, LOW_2)
     pre(29)
     chorus(37), chorus(45, high=True, counter=True)
-    turn(53, brakes=True)
-    # The stop: steam let go, a far whistle; then the piano.
-    k = int(1.6 * sr)
-    put("fx", bar0(57), hiss(k, 5000, 0.3) * np.exp(-np.arange(k) / sr / 0.45) * np.minimum(1, np.arange(k) / (0.03 * sr)) * 0.025, -0.1)
-    whistle(bar0(57) + 2, 3, 0.012, "C#5 F#5 A5", -0.4)
-    piano(57)
-    pull_out(67)
-    chorus(71, high=True, two=True)
-    turn(79, brakes=False)
-    breakdown(83)
+    turn(53, TURN_SYNTH)
+    duel(57)
+    chorus(73, high=True, two=True)
+    turn(81)
+    breakdown(85)
 
     # A hall for the leads, the brass, the flute, the pads, the piano and the whistle; none for the kit, the bass or
     # the guitar.
@@ -620,9 +613,9 @@ def render(window=None) -> np.ndarray:
     x.beat_s = 60 / BPM
     x.echo("lead", 0.75, 0.12, 0.05), x.echo("lead2", 0.75, 0.12, 0.05), x.echo("flute", 0.75, 0.16, 0.07), x.echo("synth", 0.75, 0.14, 0.06)
     for name, secs, wet in (("lead", 1.3, 0.16), ("lead2", 1.3, 0.16), ("synth", 1.3, 0.16), ("brass", 1.0, 0.13), ("square", 1.0, 0.12), ("flute", 1.5, 0.25), ("pad", 2.0, 0.35),
-                            ("piano", 2.0, 0.3), ("bell", 2.2, 0.4), ("fx", 2.0, 0.35)):
+                            ("piano", 1.0, 0.12), ("bell", 1.6, 0.3), ("fx", 2.0, 0.35)):
         room(name, secs, wet)
-    levels = {"lead": 1.0, "lead2": 1.0, "synth": 1.9, "brass": 1.8, "square": 1.25, "flute": 2.2, "pad": 2.2, "piano": 1.2, "bell": 3.0, "fx": 1.6, "gtr": 1.0, "bass": 0.7,
+    levels = {"lead": 1.0, "lead2": 1.0, "synth": 1.9, "brass": 1.8, "square": 1.25, "flute": 2.2, "pad": 2.2, "piano": 0.6, "bell": 2.4, "fx": 1.6, "gtr": 1.0, "bass": 0.7,
               "kick": 0.5, "snare": 1.0, "toms": 1.0, "hats": 5.2, "crash": 1.8}
     return x.play(x.mixdown(levels, lowpass=9000, room=0.03))
 

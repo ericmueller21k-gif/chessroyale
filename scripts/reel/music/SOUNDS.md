@@ -378,7 +378,7 @@ maybe like 33% of the time, but it should always play a solo before 5 minutes or
   (141.395349 s in: 37 s of theme, then the solo) and bar 61 (111.627907 s in: 67 s of theme). Sent to the director
   with the rest; no new audio needed unless those entries sound rough with a fade-in.
 
-## The runaway train (Nov 17, song_aj.py): sent, no verdict yet
+## The runaway train (Nov 17, song_aj.py): four versions sent, no verdict yet
 
 "New song use this as a guide, feel free to come up with something a bit wild and throw in some dark melody vibes and
 a beautiful slowed down piano theme in the middle with some character to it". His plan ("High-Speed Runaway-Train
@@ -409,4 +409,16 @@ a style to write in. Its frame is kept (tempo, keys, chords, patches, sections, 
   melody". 0:30 to 0:41 is the verse's second time. The riff's low overdriven lead comes back under it with a tune of
   its own (the riff's notes and push, following the chords, resting for the band's hits, its last bar the riff
   itself), about 5 dB under the brass. Sent as v3.
+- His third: the 0:30 line "is actually fine. I almost wish it was maybe a different instrument instead of that synth
+  ... Try doing a piano for that"; and "kind of scrap that whole piano slowdown thing in the middle ... and then just
+  actually continue creating the counter melody with the higher pitched synth ... for another 25-30 seconds ... on top
+  of that dueling melody now add a third instrument ... A xylophone, I guess, or a glockenspiel ... for about 10 12
+  seconds ... I want to see how that comes out." So v4:
+  - the 0:30 line on a bright piano, in octaves, about 5 dB under the brass;
+  - the brakes, the slow piano and the tempo's climb are out (they are in the history: commit 51daba23); in their
+    place, at full speed, the turnaround with the second synth over the lead, then sixteen bars of duel over F#m7,
+    Dmaj7, Bm7, C#7sus4 to C#7: the lead and the synth trading a bar each, then the lead's long notes with the synth
+    running over them and a glockenspiel on top for the last 12 seconds, the two closing in thirds;
+  - 92 bars, 2:16: under his 2:30 to 2:45, since the slow middle was what carried it there. Told him; his call.
+  - Measured: the duel has most of its energy between 1 and 2 kHz (three high voices at once): the risk is shrill.
 
