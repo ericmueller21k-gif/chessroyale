@@ -1,3 +1,4 @@
+- Nov 17 ~01:40 UTC: Eric OK to end "big majority always wins" for Strong/Chaos; Majority mode = the old draw (70% sure, else 60/30/10); keep the old code (he may bring it back and drop the modes). Sent to the C4 helper.
 - Nov 17 ~01:30 UTC: C2 DONE (304ae96; helper archived). Ends Eric rule "big majority always wins" (asked Eric for OK; its guard runs on CROWD_PRE_REWORK). No flag fall in 50v50 (move 60 is the only bound: told Eric). C4 helper (Opus medium) on the C2 branch, then one PR. Star ride helper (Opus high) started. chat80 queued.
 - Nov 17 ~01:20 UTC: main after #761 RED by retry-pass chat.spec:80 [desktop] (2nd sighting; Eric guard). Brief chat80.md queued with the star ride after C2.
 - Nov 17 ~00:55 UTC: #761 smoke fix MERGED (8721620); main run watched. C2 running; star ride waits on C2.
