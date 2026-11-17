@@ -1,3 +1,4 @@
+- Nov 17 18:20 UTC: Eric: moo close-up "slop", Moon too small, OK as zoomed real sprites. Sent to moo helper (redo from sprite, nearest-neighbor, Moon bigger, both eyes white, timing as proposed). Watcher armed (old .question still on branch: check head on fire).
 - Nov 17 18:13 UTC: pm-caster helper session_01JuCWRtTmYY9WX3aTfNKCvr (claude/pm-caster-mirror), watcher armed.
 - Nov 17 ~18:35 UTC: #774 boss facing merged 4e35f10 (Timber swing + gardener spec hand fixed); deploy + main watched. No helpers running. Waiting on Eric: moo 3 Qs, payments 6 calls. Queue: pm-caster mirrored hands, dash findings 4+5.
 - Nov 17 17:31 UTC: #774 red: timber.spec:165 desktop (Timber 41 px over the board once mirrored; failed + retry). Fix helper session_01JuCWRrkt8mtu3Y6S5geDVF on claude/boss-facing, watcher armed.
