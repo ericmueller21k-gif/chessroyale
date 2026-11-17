@@ -23331,9 +23331,11 @@ button.sq-tiny {
   transform: scaleX(-1);
   transform-origin: calc(var(--bc-fx) * var(--bc-scale) * 1px) 100%;
 }
-/* The results: a figure drawn facing our left turns to the God King on its right, mirrored about its feet (only the image: the
-   bubble and its words are its own children and stay as they are). Pixel-crisp: whole-pixel scale, nearest filtering. */
-.boss-char.place-results.art-left .boss-char-sprite {
+/* The results, and a computer's battle (the boss stands left of the board): a figure drawn facing our left turns to its right
+   (the God King, the board), mirrored about its feet (only the image: the bubble and its words are its own children and stay as
+   they are). Pixel-crisp: whole-pixel scale, nearest filtering. Eric, Nov 17: "this damn cheetah still facing the wrong way". */
+.boss-char.place-results.art-left .boss-char-sprite,
+.boss-char.place-side.art-left .boss-char-sprite {
   transform: scaleX(-1);
   transform-origin: calc(var(--bc-fx) * var(--bc-scale) * 1px) 100%;
 }

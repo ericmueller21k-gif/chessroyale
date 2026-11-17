@@ -184,8 +184,9 @@ export interface BossKit extends BeatLines {
    */
   suit?: boolean;
   /**
-   * Its drawing faces our left as drawn (not on the sprite kit). On the result screen, where the God King stands to its right, its
-   * image is mirrored about its feet (styles.css, `.art-left`); its bubble and words never are. Judged by eye, Nov 8.
+   * Its drawing faces our left as drawn (not on the sprite kit). On the result screen, where the God King stands to its right, and
+   * beside a computer's board (it stands to the board's left), its image is mirrored about its feet (styles.css, `.art-left`); its
+   * bubble and words never are. Judged by eye, Nov 8; the board's side, Nov 17.
    */
   artFacesLeft?: boolean;
 }
