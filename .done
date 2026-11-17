@@ -1,0 +1,1 @@
+C3 fix done: a cut player in a solo 50 v 50 watches only after tapping Spectate; otherwise the rest plays out at once to the results (unit solo-cut-out.test.ts fails without it). e2e phone: account.spec and crowd.spec, 6 passed.
