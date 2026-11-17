@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import {
   CROWD_BOTS,
   CROWD_PICK,
-  CROWD_PRE_REWORK,
   CROWD_SETTINGS,
   DEFAULT_SETTINGS,
   botChoose,
@@ -92,9 +91,8 @@ describe("the team's played move (crowdPlayedFromTop)", () => {
     expect(crowdTopOdds(picks({ a: 20, b: 20, c: 5 }), 3)).toEqual({ a: 20 / 45, b: 20 / 45, c: 5 / 45 });
   });
 
-  it("50 v 50 draws by those odds from the turn's random source; elsewhere the most popular is played", () => {
-    // (The draw before the rework, until C4 retires it: 50 v 50 plays its pick vote's mode since Nov 16, the next check.)
-    const CROWD: Settings = { ...DEFAULT_SETTINGS, ...CROWD_SETTINGS, ...CROWD_PRE_REWORK };
+  it("50 v 50's Majority mode draws by those odds from the turn's random source (Eric, Nov 17); elsewhere the most popular is played", () => {
+    const CROWD: Settings = { ...DEFAULT_SETTINGS, ...CROWD_SETTINGS, crowdPick: "majority" };
     const moves = picks({ a: 30, b: 15, c: 5, d: 4 });
     const seen = new Map<string, number>();
     for (let seed = 1; seed <= 4000; seed++) {

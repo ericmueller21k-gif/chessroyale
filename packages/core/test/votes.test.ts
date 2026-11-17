@@ -109,7 +109,7 @@ describe("how moves are picked (the 50 v 50 rework, Eric, Nov 16): Strong | Majo
     ]);
     expect(pick.options.map((o) => [o.label, o.blurb])).toEqual([
       ["Strong", `The best of your team's top ${CROWD_PICK.strongTop} picks is played`],
-      ["Majority", "Your team's most-picked move is played"],
+      ["Majority", "Usually your team's most-picked move; now and then its 2nd or 3rd"],
       ["Chaos", "Any move your team picked, all equally likely"],
     ]);
     expect(JSON.stringify(pick.options)).not.toMatch(/\p{Extended_Pictographic}/u);

@@ -32,7 +32,8 @@ export type FinalFormat = "team" | "boss" | "duel";
 /**
  * How a Crowd 50 v 50 team's move is picked since the rework (the vote "How are moves picked?", Eric, Nov 16; CROWD_PICK):
  * - strong: the judge's best of the team's 3 most-picked moves, or one as good (within 3% expected score), drawn
- * - majority: the most-picked move (a tie drawn among the tied)
+ * - majority: the old 50 v 50's draw (Eric, Nov 17): the most-picked at 70% of the picks or more, always; else one of the top 3
+ *   by their picks (crowdSureShare, crowdPlayedFromTop, crowdTopOdds)
  * - chaos: any move the team picked, each equally likely
  */
 export type CrowdPick = "strong" | "majority" | "chaos";
@@ -989,7 +990,9 @@ export const CROWD_STAGE_ROUNDS: readonly number[] = [20, 10, 8, 8, 6, 6, 6, 4];
  * - **strong** (nobody votes: this): the team's `strongTop` most-picked moves (a tie for the last place goes to the
  *   better-scored); the judge's best of them is played, or, when others are within `strongClose` expected score of it (0.03:
  *   about 30 centipawns), one of those close ones and it, drawn at equal odds;
- * - **majority**: the most-picked move, a tie drawn among the tied;
+ * - **majority** (Eric, Nov 17: "it almost always does the majority but sometimes the 2nd or 3rd option"): the old 50 v 50's
+ *   draw, kept one setting away in case the old way comes back: the most-picked move at `crowdSureShare` (0.7) of the team's real
+ *   picks or more, always; below it, one of the `crowdPlayedFromTop` (3) most-picked by their picks (`crowdTopOdds`);
  * - **chaos**: one of the distinct moves the team picked, each equally likely, however many picked it (Eric's default for his
  *   question 2: "totally random").
  * The 1 v 1 needs no rule: one player's pick is the only move.

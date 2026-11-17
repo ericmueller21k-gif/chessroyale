@@ -83,12 +83,16 @@ describe("how moves are picked (crowdPick)", () => {
     expect(crowdPickOdds("strong", picks({ a: 20, b: 15, c: 5, d: 5 }), { a: 2, b: 9, c: 20, d: 1 })).toEqual({ d: 0.5, a: 0.5 });
   });
 
-  it("Majority: the most-picked; a tie drawn evenly among the tied, whatever the judge says", () => {
-    expect(crowdPickOdds("majority", picks({ a: 11, b: 10, c: 3 }), { a: 40, b: 0, c: 0 })).toEqual({ a: 1 });
-    expect(crowdPickOdds("majority", picks({ a: 10, b: 10, c: 3 }), { a: 40, b: 0, c: 0 })).toEqual({ a: 0.5, b: 0.5 });
-    const seen = played(picks({ a: 10, b: 10, c: 3 }), { a: 40, b: 0, c: 0 }, majority);
-    expect(seen.has("c")).toBe(false);
-    expect(seen.get("a")! / 3000).toBeCloseTo(0.5, 1);
+  it("Majority: the old 50 v 50's draw (Eric, Nov 17): 70% or more always; else the top 3 by their picks, whatever the judge says", () => {
+    // 17 of 24 (71%): always, a blunder too. (The guard's own checks: crowd-afk.test.ts.)
+    expect(crowdPickOdds("majority", picks({ a: 17, b: 4, c: 3 }), { a: 40, b: 0, c: 0 })).toEqual({ a: 1 });
+    // 11-10-3: by their picks, so the 2nd or 3rd sometimes.
+    expect(crowdPickOdds("majority", picks({ a: 11, b: 10, c: 3 }), { a: 40, b: 0, c: 0 })).toEqual({ a: 11 / 24, b: 10 / 24, c: 3 / 24 });
+    // A tie across third place is left out.
+    expect(crowdPickOdds("majority", picks({ a: 10, b: 10, c: 3, d: 3 }), { a: 40, b: 0, c: 0, d: 0 })).toEqual({ a: 0.5, b: 0.5 });
+    const seen = played(picks({ a: 11, b: 10, c: 3 }), { a: 40, b: 0, c: 0 }, majority);
+    expect(seen.get("c")!).toBeGreaterThan(0);
+    expect(seen.get("a")! / 3000).toBeCloseTo(11 / 24, 1);
   });
 
   it("Chaos: every move the team picked equally likely, one pick or forty", () => {
@@ -104,8 +108,8 @@ describe("how moves are picked (crowdPick)", () => {
   });
 
   it("a miss's pick made for it never counts; nobody picked leaves the move to the runner (the engine's top 5)", () => {
-    // Three real picks (a, a, b) and five misses: the tally is the three.
-    const group = [...["a", "a", "b"].map((m, i) => ({ playerId: `p${i}`, move: m })), ...Array.from({ length: 5 }, (_, i) => ({ playerId: `m${i}`, move: null }))];
+    // Four real picks (a, a, a, b: 75%, Majority's sure share) and five misses: the tally is the four.
+    const group = [...["a", "a", "a", "b"].map((m, i) => ({ playerId: `p${i}`, move: m })), ...Array.from({ length: 5 }, (_, i) => ({ playerId: `m${i}`, move: null }))];
     const r = scoreGroup(group, judged({ a: 5, b: 0, c: 1 }), mulberry32(1), majority, "popular");
     expect(r.drawOdds).toEqual({ a: 1 });
     expect(r.playedMove).toBe("a");
@@ -186,7 +190,7 @@ describe("the cuts, equal from each side, down to a 1 v 1 (CROWD_CUTS)", () => {
     expect(cutPlan(state, standings(state, () => 0.5, REWORK), REWORK).out).toEqual([]);
   });
 
-  it("every 50 v 50 has the rework since C2 (CROWD_SETTINGS); the 50 v 50 before it only with CROWD_PRE_REWORK (Eric's majority guard and the FAQ, until C3)", () => {
+  it("every 50 v 50 has the rework since C2 (CROWD_SETTINGS); the 50 v 50 before it only with CROWD_PRE_REWORK (the FAQ until C3, the live window's replays)", () => {
     const today: Settings = { ...DEFAULT_SETTINGS, ...CROWD_SETTINGS };
     expect(today).toMatchObject(CROWD_REWORK);
     expect(today.crowdCuts).toBe(CROWD_CUTS);

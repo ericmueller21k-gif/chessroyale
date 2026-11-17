@@ -149,7 +149,7 @@ function pickVote(): PregameVote {
   const top = CROWD_PICK.strongTop;
   const options: VoteOption[] = [
     { id: "strong", label: "Strong", blurb: `The best of your team's top ${top} picks is played`, patch: { crowdPick: "strong" } },
-    { id: "majority", label: "Majority", blurb: "Your team's most-picked move is played", patch: { crowdPick: "majority" } },
+    { id: "majority", label: "Majority", blurb: "Usually your team's most-picked move; now and then its 2nd or 3rd", patch: { crowdPick: "majority" } },
     { id: "chaos", label: "Chaos", blurb: "Any move your team picked, all equally likely", patch: { crowdPick: "chaos" } },
   ];
   return { id: "pick", title: "How are moves picked?", defaultOption: optionIndex(options, "strong"), options };

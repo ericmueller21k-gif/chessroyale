@@ -61,10 +61,11 @@ removed (old → new) and says whether any of them guards a rule here.
 - **50 v 50: a big majority always wins (Eric, Nov 4: "10 people on white, a 7-2-1 split, the 7 should always win, but a
   6-3-1 could go to the 3").** When the most-picked move has at least `crowdSureShare` (0.7) of the team's real picks, it's
   played, always, a blunder too; below it, the draw from the top 3. A miss's pick made for it never counts in that share.
-  **Ended by the 50 v 50 rework (Eric's go, Nov 16; the design: "today's 70% sure share and 60/30/10 odds go"):** since C2 the
-  move is the pick vote's (Strong, Majority, Chaos: `crowd-rework.test.ts`); the guard below runs on `CROWD_PRE_REWORK` (the old
-  draw, its code still there) until Eric OKs retiring both (asked Nov 17; C4 left them). [2026-11-16-crowd-rework-runner.md](../decisions/2026-11-16-crowd-rework-runner.md).
-  - Guard: `packages/core/test/crowd-afk.test.ts`, "a big majority always wins": "10 on a team, 7-2-1: the 7 always (every seed);
+  **In Majority mode since the rework (Eric's OK, Nov 17: "For the majority mode I wonder if we should still use this, so it
+  almost always does the majority but sometimes the 2nd or 3rd option"):** the 50 v 50's move is the pick vote's (Strong,
+  Majority, Chaos); Majority is this draw and keeps this rule; Strong and Chaos don't follow it. Eric may bring it back for every
+  game, so the draw's code and settings stay one setting away. [2026-11-17-crowd-rework-c4.md](../decisions/2026-11-17-crowd-rework-c4.md).
+  - Guard: `packages/core/test/crowd-afk.test.ts` (on the 50 v 50's settings with `crowdPick: "majority"`), "a big majority always wins": "10 on a team, 7-2-1: the 7 always (every seed);
     85%: always, a blunder too", "6-3-1: the draw as before (60 / 30 / 10), so the 3 sometimes", "the share counts real picks only".
   - Decision: [2026-11-04-crowd-votes-afk.md](../decisions/2026-11-04-crowd-votes-afk.md).
 - **50 v 50: the AFK rule (Eric, Nov 4: "no move at all = default to a random top 5 move, but your penalty is simply you get the

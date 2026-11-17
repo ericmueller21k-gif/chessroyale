@@ -1,17 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { CROWD_MISSES, CROWD_PRE_REWORK, CROWD_SETTINGS, DEFAULT_SETTINGS, crowdTopOdds, drawMove, mulberry32, scoreGroup, type GroupEvaluation, type ScoreContext, type Settings } from "../src/index.ts";
+import { CROWD_MISSES, CROWD_SETTINGS, DEFAULT_SETTINGS, crowdTopOdds, drawMove, mulberry32, scoreGroup, type GroupEvaluation, type ScoreContext, type Settings } from "../src/index.ts";
 
 // docs/decisions/2026-11-04-crowd-votes-afk.md: 50 v 50's sure majority (crowdSureShare) and its misses (CrowdMisses).
 // The runner's side (the pick made for a miss, the 4th miss's removal, bots never): packages/chess/test/crowd.test.ts.
 
 const CROWD: Settings = { ...DEFAULT_SETTINGS, ...CROWD_SETTINGS };
-// (The sure share is the draw before the rework: since Nov 16 (Eric's go on the rework, notes/designs/crowd-rework.md: "today's 70%
-// sure share and 60/30/10 odds go") 50 v 50 plays its pick vote's mode, crowd-rework.test.ts. Its checks run on the 50 v 50 before
-// the rework until step C4 retires that draw.)
-const BEFORE: Settings = { ...CROWD, ...CROWD_PRE_REWORK };
+// (Since the rework 50 v 50 plays its pick vote's mode (crowd-rework.test.ts). Eric, Nov 17: Majority is this draw ("it almost
+// always does the majority but sometimes the 2nd or 3rd option"), so the rule holds in Majority; Strong and Chaos don't follow it.)
+const MAJORITY: Settings = { ...CROWD, crowdPick: "majority" };
 const picks = (counts: Record<string, number>) => Object.entries(counts).flatMap(([m, n]) => Array<string>(n).fill(m));
 /** How often each move is played over many seeds. */
-function played(moves: readonly string[], settings = BEFORE, seeds = 2000): Map<string, number> {
+function played(moves: readonly string[], settings = MAJORITY, seeds = 2000): Map<string, number> {
   const seen = new Map<string, number>();
   for (let seed = 1; seed <= seeds; seed++) {
     const m = drawMove(moves, {}, "popular", mulberry32(seed), settings);
@@ -20,7 +19,7 @@ function played(moves: readonly string[], settings = BEFORE, seeds = 2000): Map<
   return seen;
 }
 
-describe("a big majority always wins (crowdSureShare, Eric, Nov 4)", () => {
+describe("a big majority always wins (crowdSureShare, Eric, Nov 4; in Majority mode since the rework, Nov 17)", () => {
   it("is 50 v 50's 0.7, and only 50 v 50 draws from the top", () => {
     expect(CROWD.crowdSureShare).toBe(0.7);
     expect(CROWD.crowdPlayedFromTop).toBeGreaterThan(1);
@@ -53,7 +52,7 @@ describe("a big majority always wins (crowdSureShare, Eric, Nov 4)", () => {
     const evaluation: GroupEvaluation = { bestMove: "a", bestExpected: 0.6, expectedAfter: { a: 0.6, b: 0.55, c: 0.5 } };
     const group = [...picks({ a: 7, b: 2, c: 1 }), null, null, null, null, null].map((move, i) => ({ playerId: `p${i}`, move }));
     for (let seed = 1; seed <= 200; seed++) {
-      const r = scoreGroup(group, evaluation, mulberry32(seed), BEFORE, "popular", undefined, { stage: 0, streaks: false });
+      const r = scoreGroup(group, evaluation, mulberry32(seed), MAJORITY, "popular", undefined, { stage: 0, streaks: false });
       expect(r.playedMove).toBe("a");
       expect(r.drawOdds).toEqual({ a: 1 });
     }

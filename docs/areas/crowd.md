@@ -264,11 +264,12 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
   step C2** (`CROWD_SETTINGS` takes `CROWD_REWORK`; docs/decisions/2026-11-16-crowd-rework-core.md and
   2026-11-16-crowd-rework-runner.md). Where it differs from the older paragraphs on this page (the endings, the top-3 draw and its
   sure share, CROWD_STAGE_ROUNDS' cuts), it wins; those paragraphs stand for `CROWD_PRE_REWORK` (the FAQ's
-  words until C3; Eric's majority guard until he OKs its retirement). C4 retired the old endings' tests and sims (2026-11-17-crowd-rework-c4.md). One game to its end (mate, a draw by the rules, or after Black's move 60 the judge's verdict:
+  words until C3; the old draw's settings stay for Majority mode, Eric, Nov 17). C4 retired the old endings' tests and sims (2026-11-17-crowd-rework-c4.md). One game to its end (mate, a draw by the rules, or after Black's move 60 the judge's verdict:
   75%+ wins; `MatchRunner.endGameIfOver`, called by the lobby and solo after each reveal and before each deal, ahead of any cut: a
   game over on a cut's move cuts nobody; a finished board is never replaced); no endings. The vote "How are moves picked?" (`CROWD_VOTES`,
   held where `crowdCuts` is set) replaces "How does it end?": **Strong** (the judge's best of the team's 3 most-picked, or one within
-  3% of it, drawn; nobody votes), **Majority**, **Chaos** (`crowdPickOdds`). Cuts by the game's move number (`CROWD_CUTS`: after 14,
+  3% of it, drawn; nobody votes), **Majority** (the old draw since Nov 17: 70% of the real picks or more plays, always;
+  else one of the top 3 by their picks; `majorityOf`, Eric's rule "a big majority always wins"), **Chaos** (`crowdPickOdds`). Cuts by the game's move number (`CROWD_CUTS`: after 14,
   18, 22, 26, 30, 33, 39, 42, leaving 34, 23, 15, 10, 6, 4, 2, 1 a side; `crowdStageRounds`), counted from each cut's keep with
   today's tie rules; then the 1 v 1, an ordinary stage. Survivors keep 50% at each cut (`crowdCarry`, 2 decimals). The end's places
   (`finishGame`): those still in first, the winning side's then the losing side's (a draw: together), by score; each cut's below.
@@ -302,7 +303,7 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
 ## Settings
 
 The rework's (in `CROWD_SETTINGS` since C2): `CROWD_REWORK`, `CROWD_CUTS`, `CROWD_PICK`, `CROWD_BEST`, `CROWD_SCORING.sharedMinPicks`;
-`CROWD_PRE_REWORK` (the old 50 v 50: the FAQ's words until C3, Eric's majority guard until his OK; C4 retired the rest).
+`CROWD_PRE_REWORK` (the old 50 v 50: the FAQ's words until C3; C4 retired the rest). Majority mode reads `crowdSureShare` and `crowdPlayedFromTop` (Nov 17).
 `OPENING_ALLOWANCE` (points, flatThrough, goneBy, materialPawns), `CROWD_MISSES` (the AFK rule), `crowdSureShare`, `CROWD_SCORING` (the cap and its stages and curve, the piece bar, the shared-blunder relief, streaks, rare finds, a miss, the bubble grace), `RAID_SCORING` (50 v 50's, the cap by crowd move, streaks on live moves only, no bubble), `BOSS_ALONE_SCORING`, `CROWD_START` (the start vote's random opening length), `LEAVING` (the away time, the seat's bot, the app's wait for an answer), `DEFAULT_SETTINGS`, `CROWD_SETTINGS`, `RAID_SETTINGS`, `CROWD_KNOCKOUTS` (and `crowdFinalists`), `QUICK_PACE`
 (the `?pace=quick` test switch, per mode; players always play the mode's own pace), the clock (`timeBankSeconds`, `timeIncrementSeconds`, `moveClockSeconds`;
 `moveClockSteps` for a rising clock, unused today), the vote keys (`voteSeconds`, `voteBotSkip`, …), `teamFinal*`. The
