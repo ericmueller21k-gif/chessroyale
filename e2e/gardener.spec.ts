@@ -266,7 +266,9 @@ test("the opening's five seeds: his plant animation, five seeds arcing from his 
     const c = [...document.querySelectorAll<HTMLElement>(".boss-char:not(.place-results) .boss-char-sprite")].find((e) => e.getBoundingClientRect().width > 0)!;
     const r = c.getBoundingClientRect();
     const k = r.width / 90;
-    return { x: r.left + 23 * k, y: r.top + 54.5 * k, unit: document.querySelector(".hb-board")!.getBoundingClientRect().width / 8 };
+    // (Mirrored to face the board (kits.ts placeFacing), its frame's columns run right to left: the hand 23 px from its right.)
+    const m = new DOMMatrixReadOnly(getComputedStyle(c).transform).a < 0;
+    return { x: m ? r.right - 23 * k : r.left + 23 * k, y: r.top + 54.5 * k, unit: document.querySelector(".hb-board")!.getBoundingClientRect().width / 8 };
   });
   // (Where its flight starts, not where its first frame is drawn: a busy page (CI's desktop) draws a seed late, already on its way,
   // 170 to 530 px from his hand with the CPU slowed 4x. The flight is CSS on the page's clock, so it still lands on time.)
