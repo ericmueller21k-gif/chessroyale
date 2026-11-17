@@ -1,3 +1,4 @@
+- Nov 17 19:33 UTC: #775 final 211cb0b and #776 final 274e17a CI watched (both review fixes in). pm-caster helper restarted, watcher armed. Queue: dash stall findings 4+5 (xhigh, alone).
 - Nov 17 19:14 UTC: review/moo-cinematic: 7 findings (hidden menu/premove taps, reload restart, queen banner hidden, wide windows, tail margin, stale boxes). Fix helper session_01JuCWRtJ8qyWkX2E8Apu5Th on claude/moo-cinematic. Running: 2 fix helpers (high). Watcher armed on both.
 - Nov 17 19:12 UTC: review/dash-tap-slow: 4 findings (raid movers see crawl/joke; tick loops forever; solo/server margin; slap hidden in joke case = accepted). Fix helper session_01JuCWRvMJf2oSz5ACFYeMYq on claude/dash-tap-slow. Moo review running. Watcher armed.
 - Nov 17 19:08 UTC: moo cinematic .done -> #776 (87aff8d), CI watched, GIFs sent; review helper (review/moo-cinematic). Running: 2 reviewers (high). Queue: pm-caster-mirror, dash findings 4+5.
