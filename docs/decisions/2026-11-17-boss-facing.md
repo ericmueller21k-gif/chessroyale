@@ -13,6 +13,7 @@ bosses facing the right way".
 - **The phone's bar now turns too** (it never did): its `barShift` is measured from the mirrored drawing, and now also keeps every moment
   on the screen's left edge (Wrangler's lasso, Dash's entrance reach that way once turned): Wrangler's name column moves 52 px (Chandy's 53).
 - **Hand-tied effects** follow the turn (`figurePoint`): Babur turns to his pump for his toss on a computer, then back; Puddles' seeds;
-  Dash's slap to his chest. The side figure's room (`SIDE_REACH`) is swapped when mirrored.
+  Dash's slap to his chest. The side figure's room (`SIDE_REACH`) is swapped when mirrored and measured from his feet (his turned
+  box's left edge put a wide mirrored frame, Wrangler's, 75 px over the board).
 - **Not in this change:** a phone's casters at the board's top-left corner (`.pm-caster`) still draw each boss as drawn: their projectiles
   leave from hands measured on the unmirrored art (Babur's hoops, Chub's carrots, Puddles' spray…), so turning them is per boss work.
