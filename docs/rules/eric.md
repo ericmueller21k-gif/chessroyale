@@ -63,7 +63,7 @@ removed (old → new) and says whether any of them guards a rule here.
   played, always, a blunder too; below it, the draw from the top 3. A miss's pick made for it never counts in that share.
   **Ended by the 50 v 50 rework (Eric's go, Nov 16; the design: "today's 70% sure share and 60/30/10 odds go"):** since C2 the
   move is the pick vote's (Strong, Majority, Chaos: `crowd-rework.test.ts`); the guard below runs on `CROWD_PRE_REWORK` (the old
-  draw, its code still there) until C4 retires both. [2026-11-16-crowd-rework-runner.md](../decisions/2026-11-16-crowd-rework-runner.md).
+  draw, its code still there) until Eric OKs retiring both (asked Nov 17; C4 left them). [2026-11-16-crowd-rework-runner.md](../decisions/2026-11-16-crowd-rework-runner.md).
   - Guard: `packages/core/test/crowd-afk.test.ts`, "a big majority always wins": "10 on a team, 7-2-1: the 7 always (every seed);
     85%: always, a blunder too", "6-3-1: the draw as before (60 / 30 / 10), so the 3 sometimes", "the share counts real picks only".
   - Decision: [2026-11-04-crowd-votes-afk.md](../decisions/2026-11-04-crowd-votes-afk.md).

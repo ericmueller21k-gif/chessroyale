@@ -181,8 +181,7 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
   (`botSkillForRating`, `BOT_LOBBY.skillAt`: a Maia player's points given away a move at that rating, matched in the
   Crowd). `botRoster` seats them everywhere a lobby is filled (solo, online, Squads, a Solo raid). Not Maia: about
   0.75 s of Maia a team turn on a computer, about 3 s on a phone (`reports/crowd-bots.md`). Test:
-  `npx tsx packages/sim/scripts/crowd-bots-sim.ts tuned 10` (an engine-best player among 99 bots; `summary` writes
-  `reports/crowd-bots.md`).
+  `reports/crowd-bots.md` (its sim, `crowd-bots-sim.ts`, retired with the old 50 v 50 in C4).
   **Solo's Bot level** (Nov 9; [2026-11-09-home-modes-bot-level.md](../decisions/2026-11-09-home-modes-bot-level.md)): home's Bots asks
   the bots' average (`BOT_LEVELS`: 700, 950, 1150 = the curve above, 1500, 1900, your own rating, or Random, uniform 600 to 2200), carried
   as `Settings.botLevel` into `botStrength` (each bot's rating fixed by name + level; the curve narrows near 600 and 2200 so a level's
@@ -192,8 +191,8 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
   one shared lean from the turn's seed (a focus on the engine's numbers and a taste per line, the same for every bot of
   the team), then each bot weighs the first 5 lines under 15 points by exp(-focus x loss / T + taste) and any other line
   far lower; a bot holding a power-up uses it on a sharp turn only 25% of the time (before, all of them at once: the
-  unanimous castles). Online the lean rides in the judge job's rules (`JudgeRules.crowdBots`). Probe:
-  `npx tsx packages/sim/scripts/crowd-spread-probe.ts 48 40 normal 501 4 now|before` (reports/crowd-spread.md).
+  unanimous castles). Online the lean rides in the judge job's rules (`JudgeRules.crowdBots`). Report:
+  reports/crowd-spread.md (its probe retired with the old 50 v 50 in C4).
 - **Test switch `?weakbots=1`** (solo, and a lobby you create; `WEAK_BOTS`): every bot plays loosely (`WEAK_BOT_SKILL`:
   a temperature of 8 points or more, `botStrength`; since Nov 1 every bot is that loose anyway), and people rank above bots in the standings (`peopleFirst`), so every cut takes
   bots first and a test's player surely reaches the boss final's top 4. Loose bots alone stopped doing it on Oct 15: the
@@ -264,8 +263,8 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
 - **The 50 v 50 rework (Eric, Nov 16; `notes/designs/crowd-rework.md` on `design/crowd-rework`): every 50 v 50 plays it since
   step C2** (`CROWD_SETTINGS` takes `CROWD_REWORK`; docs/decisions/2026-11-16-crowd-rework-core.md and
   2026-11-16-crowd-rework-runner.md). Where it differs from the older paragraphs on this page (the endings, the top-3 draw and its
-  sure share, CROWD_STAGE_ROUNDS' cuts), it wins; those paragraphs stand for `CROWD_PRE_REWORK` (the old endings' tests, the FAQ's
-  words until C3) and go with C4. One game to its end (mate, a draw by the rules, or after Black's move 60 the judge's verdict:
+  sure share, CROWD_STAGE_ROUNDS' cuts), it wins; those paragraphs stand for `CROWD_PRE_REWORK` (the FAQ's
+  words until C3; Eric's majority guard until he OKs its retirement). C4 retired the old endings' tests and sims (2026-11-17-crowd-rework-c4.md). One game to its end (mate, a draw by the rules, or after Black's move 60 the judge's verdict:
   75%+ wins; `MatchRunner.endGameIfOver`, called by the lobby and solo after each reveal and before each deal, ahead of any cut: a
   game over on a cut's move cuts nobody; a finished board is never replaced); no endings. The vote "How are moves picked?" (`CROWD_VOTES`,
   held where `crowdCuts` is set) replaces "How does it end?": **Strong** (the judge's best of the team's 3 most-picked, or one within
@@ -303,7 +302,7 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
 ## Settings
 
 The rework's (in `CROWD_SETTINGS` since C2): `CROWD_REWORK`, `CROWD_CUTS`, `CROWD_PICK`, `CROWD_BEST`, `CROWD_SCORING.sharedMinPicks`;
-`CROWD_PRE_REWORK` (the old 50 v 50, for its tests until C4).
+`CROWD_PRE_REWORK` (the old 50 v 50: the FAQ's words until C3, Eric's majority guard until his OK; C4 retired the rest).
 `OPENING_ALLOWANCE` (points, flatThrough, goneBy, materialPawns), `CROWD_MISSES` (the AFK rule), `crowdSureShare`, `CROWD_SCORING` (the cap and its stages and curve, the piece bar, the shared-blunder relief, streaks, rare finds, a miss, the bubble grace), `RAID_SCORING` (50 v 50's, the cap by crowd move, streaks on live moves only, no bubble), `BOSS_ALONE_SCORING`, `CROWD_START` (the start vote's random opening length), `LEAVING` (the away time, the seat's bot, the app's wait for an answer), `DEFAULT_SETTINGS`, `CROWD_SETTINGS`, `RAID_SETTINGS`, `CROWD_KNOCKOUTS` (and `crowdFinalists`), `QUICK_PACE`
 (the `?pace=quick` test switch, per mode; players always play the mode's own pace), the clock (`timeBankSeconds`, `timeIncrementSeconds`, `moveClockSeconds`;
 `moveClockSteps` for a rising clock, unused today), the vote keys (`voteSeconds`, `voteBotSkip`, …), `teamFinal*`. The
@@ -313,11 +312,10 @@ time controls themselves are in the vote data (`PREGAME_VOTES` in `votes.ts`).
 
 - The opening allowance and ties: unit `packages/core/test/opening-allowance.test.ts` (the taper, counted against raw,
   brilliance on raw), `cut-ties.test.ts` (ties go through, what's owed carries, the endings' sizes, the last cut's
-  tie-break, 50 v 50's teams, the boss's tied strike, the team final's steps), `packages/chess/test/exchange.test.ts`
+  tie-break, 50 v 50's teams, the boss's tied strike), `packages/chess/test/exchange.test.ts`
   (the exchange check: hanging, a missed capture, a gambit, en passant, promotion, a capture with check; two judges
-  agree), `runner.test.ts` (Classic's boards with ties kept in), `packages/app/test/faq.test.ts`. Sims:
-  `packages/sim/scripts/opening-allowance.ts` (the calibration, `reports/opening-allowance.md`) and
-  `allowance-sim.ts` (before/after Crowd matches, `reports/allowance-sim.md`).
+  agree), `runner.test.ts` (Classic's boards with ties kept in), `packages/app/test/faq.test.ts`. Sim:
+  `packages/sim/scripts/opening-allowance.ts` (the calibration, `reports/opening-allowance.md`).
 - The rework: unit `packages/core/test/crowd-rework.test.ts` (each pick mode, the schedule to the 1 v 1, the carry,
   rounds of 2 and 1 a side, the relief from 5 picks, the places, best player, the move limit), `votes.test.ts` (the pick vote),
   `cut-ties.test.ts` (cuts by keep: ties, what's owed, a short side), `crowd-bot-spread.test.ts` (Strong over bots' picks);
@@ -326,16 +324,15 @@ time controls themselves are in the vote data (`PREGAME_VOTES` in `votes.ts`).
 - 50 v 50's bots and played move: unit `packages/core/test/crowd-bot-spread.test.ts` (a team at lobby ratings never all
   picks one move, Eric's castle included; the plurality moves between good lines; the top-3 odds and ties; the draw),
   `packages/chess/test/judge.test.ts` (the lean from the seed alone), `packages/server/test/lobby.test.ts` (the live
-  window leads with the played move). Probe: `packages/sim/scripts/crowd-spread-probe.ts`.
+  window leads with the played move).
 - 50 v 50's sure majority and the AFK rule: unit `packages/core/test/crowd-afk.test.ts`, `packages/chess/test/crowd.test.ts`
   ("50 v 50's misses"), `packages/server/test/resign.test.ts` ("50 v 50's AFK rule"); e2e `e2e/crowd.spec.ts` ("50 v 50's
   AFK rule": the line at 390 and 320 px, the removal).
 - 50 v 50's scoring: unit `packages/core/test/crowd-scoring.test.ts` (the cap's shape and its stages, pieces uncapped,
   the shared relief's thresholds, streaks and their start and ramp, a miss, rare finds and the switch, the bubble grace
   and what carries, 2 decimals), `packages/app/test/faq.test.ts`; e2e `e2e/crowd-scoring.spec.ts` (the fire's tiers,
-  steady rows and no spill at 320 and 1280, reduced motion; the shoutout and its bonus, the board still); the sim
-  `packages/sim/scripts/crowd-scoring-trace.ts` (records Maia or bot matches) and `crowd-scoring-sim.ts` (re-scores them
-  under every variant: `reports/crowd-scoring.md`).
+  steady rows and no spill at 320 and 1280, reduced motion; the shoutout and its bonus, the board still);
+  `reports/crowd-scoring.md` (its sims retired with the old 50 v 50 in C4).
 - A raid's scoring: unit `packages/core/test/raid-scoring.test.ts` (raids on and Boss alone off, the cap by crowd move,
   streaks on live moves only, the strike by points given away and its tie-break); e2e `e2e/boss-dock.spec.ts` (the dock's
   line to 2 decimals in a Solo raid); the sim `packages/sim/scripts/raid-scoring-trace.ts` (records Maia raids through
@@ -343,29 +340,22 @@ time controls themselves are in the vote data (`PREGAME_VOTES` in `votes.ts`).
 - The start vote: unit `packages/core/test/votes.test.ts` (its cards, default, patches, `?start=`), `packages/chess/test/opening-vote.test.ts`
   (each start's board, seeded, the balance window, a Freestyle game through the runner, castling both ways, the snapshot),
   `packages/server/test/lobby.test.ts` ("the start vote online": Freestyle and Random opening, castling, a lobby that
-  sleeps), `packages/app/test/board-logic.test.ts`, `faq.test.ts`; e2e `e2e/opening-vote.spec.ts`; the sim
-  `crowd-sim.ts [matches] [start] [team|boss|duel]` (the cuts, before → after: `reports/crowd-sim.md`, Nov 1).
+  sleeps), `packages/app/test/board-logic.test.ts`, `faq.test.ts`; e2e `e2e/opening-vote.spec.ts`.
 - Unit: `packages/core/test/match.test.ts`, `scoring.test.ts`, `votes.test.ts`, `brilliance.test.ts`,
   `packages/chess/test/crowd.test.ts`, `runner.test.ts`, `replay-cache.test.ts`, `long-match.test.ts`. The clock vote:
   `votes.test.ts` (each time control, the bank math, the calibration), `crowd.test.ts` (the runner) and
   `packages/server/test/lobby.test.ts` ("the clock vote online"); e2e `votes.spec.ts` (Bullet's clock, solo and online)
   and `formats.spec.ts` (the cards set the clock).
-- Resigning: `packages/server/test/resign.test.ts`, `lobby-life.test.ts`, `packages/chess/test/crowd.test.ts` ("leaving");
+- Resigning: `packages/server/test/resign.test.ts`, `lobby-life.test.ts`, `packages/chess/test/crowd.test.ts` ("who left");
   e2e `e2e/resign.spec.ts` (Boss alone, a Solo 50 v 50, Squads, an online raid; phone and computer).
-- The boss final (the Hidden Boss): unit `packages/core/test/votes.test.ts` (his card, the knockouts), `boss.test.ts`
-  (`crowdFinalBoss`), `packages/chess/test/crowd.test.ts` ("50 v 50 boss final"), `packages/server/test/crowd-hidden-boss.test.ts`
-  (online: his brain and strength, the God King tried, the bullet clock and a loss on time, his fall then phase 2 to the result;
-  the child first: his rising strength, his fall, one new match against the man, phase 2, the results; Maia's loaders told once),
-  `packages/app/test/recluse-phase2.test.ts` (phase 2 in a solo Crowd's final), `recluse-online.test.ts` (the man however a
-  device hears of him first: the child's lines, beats, banners, 🏆 and premoves dropped), `faq.test.ts`; e2e
-  `e2e/crowd-hidden.spec.ts` (the card; solo through phase 2, no strikes, the God King never comes; online to the result at the
-  man, `?form=adult`, his replies played by the host's browser, on the phone since Nov 13: it never ran before;
-  formats.spec.ts' two boss-battle tests merged in, Nov 2).
+- The boss final (the Hidden Boss): unreached since C2, its tests retired in C4 (`crowd.test.ts`' boss finals,
+  `crowd-hidden-boss.test.ts`, `e2e/crowd-hidden.spec.ts`); his code stays. His room's fight keeps its own tests
+  (`packages/server/test/recluse-online.test.ts`, `e2e/hidden-boss-room.spec.ts`, `e2e/recluse.spec.ts`).
 - e2e: `e2e/crowd.spec.ts`, `formats.spec.ts`, `votes.spec.ts`, `match-screen.spec.ts`, `panel.spec.ts`,
   `solo.spec.ts`, `multiplayer.spec.ts`, `castling.spec.ts`, `perf.spec.ts`.
 - Frames: `npm run frames:boss` (one move, real taps), `frames:flash` (white flashes), `frames:vote`, `frames:chat`.
 - Perf: `npm run perf:boss -- <dir> crowd phone 25`.
-- Sims: `npm run simulate` (`reports/playtest.md`), `packages/sim/scripts/crowd-sim.ts`, `format-sim.ts`.
+- Sims: `npm run simulate` (`reports/playtest.md`), `format-sim.ts`.
 
 ## Rules for this area (from `.claude/LESSONS.md`)
 
