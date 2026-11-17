@@ -256,7 +256,7 @@ export type Phase =
    * left once you were already out (your place as it stood; the winner isn't known). `simulBoard`: the Hidden Boss's phase 2, the
    * board you played as it ended (this device's view, never sent or stored), for the result's review (QA #12, Nov 14).
    */
-  | { kind: "results"; placement: number; winner: string; youWon: boolean; gameWinner?: "w" | "b" | null; bossResult?: "crowd" | "boss" | "draw"; left?: LeftResult; timeout?: boolean; carrots?: boolean; blackout?: boolean; simul?: { won: number; of: number }; noResult?: "board" | "watched"; simulBoard?: SimulBoardView };
+  | { kind: "results"; placement: number; winner: string; youWon: boolean; gameWinner?: "w" | "b" | null; /** The 50 v 50 rework's podium titles (C3): each standing then has `outAtMove` and `perMove`. */ podium?: { winner?: string; best: string | null }; bossResult?: "crowd" | "boss" | "draw"; left?: LeftResult; timeout?: boolean; carrots?: boolean; blackout?: boolean; simul?: { won: number; of: number }; noResult?: "board" | "watched"; simulBoard?: SimulBoardView };
 
 /** One of the Hidden Boss's phase 2 boards as the screens see it (board 0 is yours). */
 export interface SimulBoardView {
@@ -358,6 +358,13 @@ export interface GameView {
   submit(move: string | null, premove?: boolean): void;
   skipReveal(): void;
   continueFromBreak(): void;
+  /**
+   * The 50 v 50 rework's cut screen, out (C3; Eric, Nov 16: "make sure there's a spectate option"): watch to the podium. Solo: the
+   * break ends now and the game plays on before you; online: from the next move (the server's watching rounds). Not tapping it
+   * spectates too, once the break ends. `spectateAsked`: tapped (its button shows it).
+   */
+  spectate?(): void;
+  readonly spectateAsked?: boolean;
   /** The 2v2 final once it has started (also during your own turn in it). */
   readonly final: FinalView | null;
   /** Every board slot as it stands now, for the strip of tiny boards along the top. */
@@ -510,6 +517,64 @@ export function finalName(s: Pick<Settings, "finalFormat"> & Partial<Pick<Settin
   if (s.crowdCuts?.length) return "1 v 1";
   return s.finalFormat === "boss" ? "Boss final" : s.finalFormat === "duel" ? "Duel" : "Team final";
 }
+
+type CutSettings = Pick<Settings, "roundsPerStage" | "firstStageRounds" | "stageRounds"> & Partial<Pick<Settings, "crowdCuts" | "crowdMoveLimit" | "openingMoves">>;
+
+/** "4 v 4": a stage's size a side. */
+export const versus = (n: number) => `${n} v ${n}`;
+
+/**
+ * The 50 v 50 rework's top bar, after "Move 31" (C3; the design's rule 3): "cut in 2" counting down in moves as the board numbers
+ * them, "4 v 4 next" on a cut's own move (the size it leaves), "1 v 1 from move 43" through the last stage before it ("1 v 1
+ * next" on its cut's move), then "1 v 1". Null: not the rework (the old words, "cut in 2" / "cut now"). Moves are counted from
+ * the stage's plies (roundsInStage), so a test's `?rounds=` reads true too.
+ */
+export function cutCountdown(s: CutSettings, stage: number, roundsPlayed: number, moveNo: number | null): string | null {
+  const cuts = s.crowdCuts;
+  if (!cuts?.length) return null;
+  if (stage >= cuts.length) return "1 v 1";
+  const movesLeft = Math.ceil((roundsInStage(s, stage) - roundsPlayed) / 2);
+  const last = stage === cuts.length - 1;
+  if (movesLeft <= 1) return `${last ? "1 v 1" : versus(cuts[stage]!.keep)} next`;
+  return last && moveNo ? `1 v 1 from move ${moveNo + movesLeft}` : `cut in ${movesLeft}`;
+}
+
+/**
+ * The 50 v 50 rework's stages from `stage` on, by the game's move numbers (the cut screen's box, C3): each stage's size a side and
+ * its first and last move, the 1 v 1 last (its last move the limit). From the schedule (CROWD_CUTS), counted as the board counts:
+ * a test's `?rounds=` stages by their plies from `fromMove`, the move the stage begins.
+ */
+export function stagesAhead(s: CutSettings, stage: number, fromMove: number): { size: number; from: number; to: number }[] {
+  const cuts = s.crowdCuts ?? [];
+  const out: { size: number; from: number; to: number }[] = [];
+  let from = fromMove;
+  for (let i = stage; i <= cuts.length; i++) {
+    const size = i === 0 ? CROWD_SIDE : cuts[i - 1]!.keep;
+    const moves = Math.max(1, Math.ceil(roundsInStage(s, i) / 2));
+    const to = i < cuts.length ? from + moves - 1 : (s.crowdMoveLimit ?? from + moves - 1);
+    out.push({ size, from, to });
+    from = to + 1;
+  }
+  return out;
+}
+
+/** A 50 v 50's side (CROWD_LOBBY_SIZE / 2). */
+const CROWD_SIDE = 50;
+
+/** The rework's stages in words, from the next ("The 4 v 4 plays moves 34-39, then 2 v 2, then the 1 v 1 from move 43."). */
+export function stagesLine(ahead: readonly { size: number; from: number; to: number }[]): string {
+  const [next, ...rest] = ahead;
+  if (!next) return "";
+  const span = (a: { from: number; to: number }) => (a.from === a.to ? `move ${a.from}` : `moves ${a.from}-${a.to}`);
+  if (next.size === 1) return `The 1 v 1 plays ${span(next)}.`;
+  const one = rest.find((a) => a.size === 1);
+  const between = rest.filter((a) => a.size > 1).map((a) => versus(a.size));
+  return `The ${versus(next.size)} plays ${span(next)}, ${between.length ? `then ${between.join(", ")}, ` : ""}then the 1 v 1${one ? ` from move ${one.from}` : ""}.`;
+}
+
+/** The rework's 1 v 1 has just begun (its first turn, solo or online): the banner's moment (C3). */
+export const oneVOneBegins = (m: Pick<GameView, "settings" | "stage" | "roundsPlayed" | "boss">) =>
+  !m.boss && !!m.settings.crowdCuts?.length && m.stage === m.settings.crowdCuts.length && m.roundsPlayed === 0;
 
 /**
  * The results table's rows: your average loss per move in each part of the match, named for what was played. Classic:

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BOSS_BRAIN, BOSS_DIFFICULTY, BOSS_POWERS, BOSS_ROSTER, BOSS_TIERS, CROWD_KNOCKOUTS, CROWD_START, DEFAULT_SETTINGS, LEAVES, LEAVING, RANKED_1V1, RECLUSE_CHILD, RECLUSE_PHASE2, HIDDEN_ROOM, crowdFinalBoss, crowdFinalists, fixedLevel, isPlayable, lastStandBar, maiaRatingFor, maiaTopRating } from "@chessroyale/core";
+import { BOSS_BRAIN, BOSS_DIFFICULTY, BOSS_POWERS, BOSS_ROSTER, BOSS_TIERS, CROWD_START, DEFAULT_SETTINGS, LEAVES, LEAVING, RANKED_1V1, RECLUSE_CHILD, RECLUSE_PHASE2, HIDDEN_ROOM, crowdFinalBoss, fixedLevel, isPlayable, lastStandBar, maiaRatingFor, maiaTopRating } from "@chessroyale/core";
 import { BOSS_BLOCKS, FAQ_DEFAULTS, eloExpected, faqAnchors, faqPage, faqPlainText, faqSections, num, ranked1v1, rankedLeaving, type FaqSources } from "../src/faq/content.ts";
 import { inlineText, linksOf, parse, plainText } from "../src/faq/markdown.ts";
 
@@ -404,12 +404,28 @@ describe("the FAQ's numbers come from the settings", () => {
     expect(moved).toContain("gives up 5 pawns' worth");
   });
 
-  it("the Crowd's cuts (Nov 1): how many go at each and after which move, from CROWD_KNOCKOUTS and CROWD_STAGE_ROUNDS", () => {
-    expect(section("modes")).toContain(
-      "No one goes out for the first 10 moves. Then the lowest scorers are cut, the same number from each team: 30 after move 10, 22 after move 15, 16 after move 19, 12 after move 23, 8 after move 26 and 4 after move 29, which leaves 8 for the team final. A boss final adds 1 more cut (4 after move 32); a duel adds 2 more cuts (4 after move 32 and 2 after move 34).",
-    );
-    const moved = section("modes", { ...FAQ_DEFAULTS, crowd: { ...FAQ_DEFAULTS.crowd, stageRounds: [12, 6] }, crowdKnockouts: { team: [50, 40], boss: [50, 40, 6], duel: [50, 40, 6, 2] } });
-    expect(moved).toContain("No one goes out for the first 6 moves. Then the lowest scorers are cut, the same number from each team: 50 after move 6 and 40 after move 9, which leaves 10 for the team final. A boss final adds 1 more cut (6 after move 12); a duel adds 2 more cuts (6 after move 12 and 2 after move 15).");
+  it("the 50 v 50 rework (C3): the pick vote, the cuts by move and what each leaves, the soft reset, the 1 v 1, the move limit, places, the podium and Spectate; every number from the settings", () => {
+    const t = section("modes");
+    expect(t).toContain("How are moves picked? The first vote before move 1, then how it starts, then the clock. Nobody voting means Strong.");
+    expect(t).toContain("Strong: of your team's 3 most-picked moves, the engine's best is played. If another of them is close to it (within 3% of its chances of winning");
+    expect(t).toContain("Majority: your team's top pick, sometimes the 2nd or 3rd: one of the 3 most-picked moves is drawn by how many picked each");
+    expect(t).toContain("A big majority always wins: a move 70% or more of the team picked is always played");
+    expect(t).toContain("Chaos: any move someone on your team picked, each equally likely, however many picked it.");
+    expect(t).toContain("The cuts: after moves 14, 18, 22, 26, 30, 33, 39 and 42, the lowest scorers on each side go out, the same number from each, leaving 34, 23, 15, 10, 6, 4 and 2 a side (the 4 v 4 plays the longest, moves 34-39).");
+    expect(t).toContain("At each cut, everyone who goes through keeps half their score");
+    expect(t).toContain("The 1 v 1: from move 43, each side's last player picks alone, and their pick is played, to the end of the game.");
+    expect(t).toContain("or, after Black's move 60, the engine's verdict: a side with a 75% chance or more of winning wins; otherwise it's a draw.");
+    expect(t).toContain("Best player: the fewest points given away a move over the whole match, among those who went through at least half of the cuts");
+    expect(t).toContain("Spectate watches the game to the end (the live board, who's left and the scores), or Leave the match: your place stands either way.");
+    // (The old 50 v 50's words are gone: no ending to vote on.)
+    expect(t).not.toMatch(/team final|boss final|duel between|How does it end/i);
+    // Other numbers change the words.
+    const C = FAQ_DEFAULTS.crowd;
+    const moved = section("modes", { ...FAQ_DEFAULTS, crowd: { ...C, crowdCuts: [{ after: 10, keep: 20 }, { after: 20, keep: 5 }, { after: 30, keep: 1 }], crowdCarry: 0.25, crowdMoveLimit: 50 } });
+    expect(moved).toContain("after moves 10, 20 and 30, the lowest scorers on each side go out, the same number from each, leaving 20 and 5 a side");
+    expect(moved).toContain("keeps 25% of their score");
+    expect(moved).toContain("The 1 v 1: from move 31");
+    expect(moved).toContain("after Black's move 50");
   });
 
   it("a raid's scoring: 50 v 50's, the limit by crowd move, the strike by points given away; Boss alone as before; every number from RAID_SCORING", () => {
@@ -429,7 +445,7 @@ describe("the FAQ's numbers come from the settings", () => {
   it("ties at the cut line go through; the boss's tied strike waits", () => {
     const modes = section("modes");
     expect(modes).toContain("everyone tied exactly with the last player through stays in, and the cuts still to come take the extra, a little at each");
-    expect(modes).toContain("Only the last cut before the ending breaks a tie");
+    expect(modes).toContain("Only the last cut, into the 1 v 1, breaks a tie");
     expect(modes).toContain("If two are still tied for the worst, nobody is struck");
   });
 
@@ -516,11 +532,10 @@ describe("the FAQ's numbers come from the settings", () => {
 describe("the FAQ on the start vote (Eric, Oct 24: Normal | Random opening | Freestyle)", () => {
   it("the three starts in the vote's words, the random opening's moves and the default from the data; never Chess960 or Fischer Random", () => {
     const t = section("modes");
-    expect(t).toContain("Then on how it starts, then on the clock.");
     expect(t).toContain(`Normal, the usual starting position; Random opening, a real, balanced opening already ${CROWD_START.randomOpeningMoves} moves in for each side, so the game picks up at move ${CROWD_START.randomOpeningMoves + 1}; or Freestyle: the pieces on the back row start shuffled`);
     expect(t).toContain("To castle in Freestyle, move your king onto its rook");
     expect(t).toContain("Nobody voting means Normal.");
-    expect(t).toContain("a boss final is played from the usual starting position");
+    expect(t).not.toContain("a boss final is played from the usual starting position");
     expect(t).not.toMatch(/960|Fischer/);
     // Other numbers and labels change the words.
     const V = FAQ_DEFAULTS.startVote;
@@ -531,26 +546,24 @@ describe("the FAQ on the start vote (Eric, Oct 24: Normal | Random opening | Fre
   });
 });
 
-describe("the FAQ on the Crowd's boss final (Eric, Oct 14: always the Hidden Boss, the top 4)", () => {
+describe("the FAQ on the Hidden Boss (met in his room in Chess Town; the Crowd's boss final went with the 50 v 50 rework, Nov 16)", () => {
   const him = crowdFinalBoss()!;
-  it("names him (the roster's name) and the number who face him (the knockouts), never typed", () => {
+  it("Boss Battle's section sends you to his room; the strike line is the raid's only", () => {
     const t = section("modes");
-    // (The Crowd's ending is the boss final; "the Hidden Boss" with its article in a sentence.)
-    expect(t).toContain(`a boss final (the top ${crowdFinalists("boss")} team up against the ${him.name})`);
-    expect(t).toContain(`The Crowd's boss final is always the ${him.name}, for the last ${crowdFinalists("boss")} of a 50 v 50.`);
-    // No strikes in the Crowd's final: the strike line is the raid's only.
+    expect(t).toContain(`The ${him.name} isn't on this screen: he's met in his room in Chess Town.`);
     expect(t).toContain("until half the group is left.");
-    // Other knockouts, another name: the words follow.
+    expect(t).not.toContain("The Crowd's boss final");
     const renamed = BOSS_ROSTER.map(({ the: _, ...b }) => (b.id === him.id ? { ...b, name: "A Powerful Foe" } : b));
-    const moved = section("modes", { ...FAQ_DEFAULTS, roster: renamed, crowdKnockouts: { ...CROWD_KNOCKOUTS, boss: CROWD_KNOCKOUTS.team } });
-    expect(moved).toContain("a boss final (the top 8 team up against A Powerful Foe)");
+    const moved = section("modes", { ...FAQ_DEFAULTS, roster: renamed });
+    expect(moved).toContain("A Powerful Foe isn't on this screen");
     expect(moved).not.toContain(him.name);
   });
 
-  it("his block: met in the Crowd's final and in his room in the town (Nov 13); no God King help, no strikes; the bullet clock and his second phase, numbers from the settings", () => {
+  it("his block: met in his room in the town (Nov 13); no God King help, no strikes; the bullet clock and his second phase, numbers from the settings", () => {
     const t = section("boss-powers");
     expect(anchorsOf(faqPage().sections.find((s) => s.id === "boss-powers")!.blocks)).toContain(`boss-${him.id}`);
-    expect(t).toContain(`Met in the Crowd's boss final, where it's always him, against the top ${crowdFinalists("boss")}, and in Chess Town`);
+    expect(t).toContain("Met in Chess Town: up the stairs of his walk-up");
+    expect(t).not.toContain("Crowd's boss final");
     expect(t).toContain(`up to ${HIDDEN_ROOM.players} players in his room challenge him together`);
     expect(t).toContain(`within ${HIDDEN_ROOM.capSec / 60} minutes, the request ends`);
     expect(t).toContain(`full as turn ${BOSS_POWERS.bulletTurn} begins`);
@@ -558,7 +571,7 @@ describe("the FAQ on the Crowd's boss final (Eric, Oct 14: always the Hidden Bos
     expect(t).toContain(`${RECLUSE_PHASE2.boards} boards of Freestyle chess at once`);
     expect(t).toContain(`against Stockfish at ${RECLUSE_PHASE2.elo}`);
     expect(t).toContain(`A ${RECLUSE_PHASE2.change.countdownSeconds}-second countdown on every board, then`);
-    expect(t).toContain("his second phase follows, online and in a Solo game");
+    expect(t).toContain("Beaten: his second phase follows: he transforms");
     // (Phase 2's hearts, Eric, Nov 16: each player's own, 10 minutes a board; the allowance for lag is never written.)
     expect(t).toContain(`then 10 minutes a board with no added time`);
     expect(t).toContain(`Each of you has ${RECLUSE_PHASE2.hearts} hearts of your own: a move that takes longer than ${RECLUSE_PHASE2.slowMoveSeconds} s costs one`);
@@ -573,13 +586,14 @@ describe("the FAQ on the Crowd's boss final (Eric, Oct 14: always the Hidden Bos
     expect(moved).toContain("whoever loses all 10 loses their board");
   });
 
-  it("his strength and brain are fixed (the Crowd's battle no longer follows the finalists' ratings), the boy's climbing first (Nov 13); the God King can't help against the man", () => {
+  it("his strength and brain are fixed (no rating decides it), the boy's climbing first (Nov 13); the God King can't help against the man", () => {
     const t = section("boss-brain");
-    expect(t).toContain(`The Crowd's boss final is always the ${him.name}. He starts as a boy: Maia at ${num(RECLUSE_CHILD.startRating)}, ${num(RECLUSE_CHILD.stepRating)} stronger every ${RECLUSE_CHILD.everyPlies} moves on the board, up to ${num(maiaTopRating())}.`);
+    expect(t).toContain(`The ${him.name} (his room in Chess Town) starts as a boy: Maia at ${num(RECLUSE_CHILD.startRating)}, ${num(RECLUSE_CHILD.stepRating)} stronger every ${RECLUSE_CHILD.everyPlies} moves on the board, up to ${num(maiaTopRating())}.`);
     expect(t).toContain(`Beat the boy and the man comes next, whose strength is fixed at ${fixedLevel()}. Neither follows anyone's rating`);
     expect(t).toContain(`Maia at its top rating, ${maiaTopRating()}, with no guard`);
     expect(t).toContain("The boy he starts as has the same brain at his own rating");
-    expect(section("god-king")).toContain(`His help doesn't work against the ${him.name}, the Crowd's boss, once he's grown up: calling him then only spends a charge. Against the boy he starts as, it works.`);
+    expect(section("god-king")).toContain(`His help doesn't work against the ${him.name} once he's grown up: calling him then only spends a charge. Against the boy he starts as, it works.`);
+    expect(section("god-king")).not.toContain("Crowd's boss final");
   });
 });
 
