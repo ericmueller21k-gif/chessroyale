@@ -523,6 +523,7 @@
     "Crowd: the votes, the board's crowd and the match screen": {
       "paths": [
         "packages/app/src/screens/Crowd.tsx",
+        "packages/app/src/components/Podium.tsx",
         "packages/app/src/screens/Vote.tsx",
         "packages/app/src/screens/Reveal.tsx",
         "packages/app/src/components/CrowdGhosts.tsx",
