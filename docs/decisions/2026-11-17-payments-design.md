@@ -163,7 +163,7 @@ growing pile of locked crates is the pressure the CS:GO key model is criticized 
 2 → 1). Crates still come every level and from the daily reward and quests, play opens nearly all of them, and buying only goes
 faster. If Eric keeps 2, play coins still matter most. Never pay-to-win either way: everything bought is cosmetic.
 
-**Each pack, as the coin screen shows it:**
+**Each pack, as the coin screen shows it** (hours of play = coins ÷ 108, at 1.8 a minute):
 
 | Pack | Coins | Keys | Hours of play | Bonus |
 | --- | --- | --- | --- | --- |
@@ -172,8 +172,6 @@ faster. If Eric keeps 2, play coins still matter most. Never pay-to-win either w
 | $9.99 | 1,100 | 11 | about 10 | 10% |
 | $19.99 | 2,300 | 23 | about 21 | 15% |
 | $49.99 | 6,000 | 60 | about 56 | 20% |
-
-Hours of play = coins ÷ 108 (1.8 a minute).
 
 ## 5. Who may buy
 
@@ -248,5 +246,4 @@ Order: 1-3 can start now; 4 waits for Stripe test keys (Eric's step 2); 6-7 afte
 3. **1 crate a level (from 2)**, so play opens most crates. This one changes an approved number, so it's Eric's choice.
 4. A paid key is used before an earned one, so the item it opens can be returned. Item return gives the crate back (a true undo).
 5. Chargebacks under $20 aren't countered. Prices are shown before tax. A card from outside US/CA is refunded at once.
-6. The age band is asked at the first Buy, not at sign-up. It's asked again after 6 months for under-18 bands; it moves up one band
-   at most.
+6. The age band is asked at the first Buy, not at sign-up; an under-18 band again after 6 months, up one band at most.
