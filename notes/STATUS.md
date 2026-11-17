@@ -1,3 +1,4 @@
+- Nov 17 ~22:05 UTC: #777 casters LIVE 6cd7ed3, main GREEN. #780 dash lock-in-hold merged e64d470; deploy+main watched. No helpers running. Queue: Wrangler facing flag (Pig.tsx) check. Waiting on Eric: payments 6 calls (#772 held).
 - Nov 17 ~21:45 UTC: main GREEN on d934811. #777 had conflicts with #778 (Tiger.tsx imports, bosses.md): resolved by director, pushed 70cd33f, CI watched. watchers-pause helper (xhigh, alone) running.
 - Nov 17 ~21:10 UTC: #779 dash spec get-up fix merged d934811 (spec only; app was right). Main full run on d934811 watched; if green, merge #777 casters. No helpers running. Queue: dash stall findings 4+5 (xhigh), Wrangler facing flag (Pig.tsx). Waiting on Eric: payments 6 calls.
 - Nov 17 ~20:35 UTC: #778 tiger pump fix merged 597b8b0 (fix-forward). #777 casters green, held until main green. dash-spec-main helper still running; watcher armed.
