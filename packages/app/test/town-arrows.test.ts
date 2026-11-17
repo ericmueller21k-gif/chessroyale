@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { KEY_DIR, hold, isHeld, keySteps, keyWalk, releaseAll, type KeyStep } from "../src/town/arrows.ts";
 import { TOWN_FEEL } from "../src/town/feel.ts";
-import { Walker, screenRow } from "../src/town/world.ts";
+import { Walker, ease, screenRow } from "../src/town/world.ts";
 import { makeRoom, stepFor } from "../src/town/shops/room.ts";
 
 /**
@@ -116,6 +116,75 @@ describe("keyWalk: a held key runs the walker on, at a tap's pace, and a release
     expect(dr).toBeGreaterThanOrEqual(3);
     expect(Math.abs(dc - dr)).toBeLessThanOrEqual(1);
     expect(now).toBeGreaterThan(0);
+  });
+
+  // Eric, Nov 17: "when you tap on keys u only move 1 square in the town, not 2". The square after a key's step is asked for as the
+  // step begins (so a held walk runs on), and dropped if the key is let go before that step ends.
+  describe("a tap walks one square; a hold runs on with no stop; the ease stays smooth", () => {
+    const S = TOWN_FEEL.youStepMs;
+    /** Frames every `dt` ms from `now` for `ms`, the key walk asked each frame while a key is held (as Town.tsx does); x per frame. */
+    const frames = (w: Walker, k: { start: () => void }, now: number, ms: number, dt: number, xs: number[]): number => {
+      const pose = { x: 0, y: 0, hop: 0, tilt: 0, step: false, t: 0 };
+      for (let t = 0; t < ms; t += dt) {
+        if (isHeld("right")) k.start();
+        w.update(now + t);
+        xs.push(w.pose(now + t, pose).x);
+      }
+      return now + ms;
+    };
+    for (const tapMs of [16, 48, S - 10]) {
+      it(`a tap of ${tapMs} ms (let go within the step) walks exactly one square and eases to a stop there`, () => {
+        const w = new Walker({ c: 5, r: 5 }, S, true, TOWN_FEEL.walkEase);
+        const k = keyWalk(w, () => true);
+        const xs: number[] = [];
+        hold("right", true);
+        let now = frames(w, k, 0, tapMs, 4, xs);
+        hold("right", false);
+        now = frames(w, k, now, 600, 4, xs);
+        expect(w.moving()).toBe(false);
+        expect(w.hereC(), "one square").toBe(6);
+        expect(xs[xs.length - 1]).toBe(6);
+        // No jump: never further in a 4 ms frame than an even step's 4 ms (plus a little for the ease), never backward.
+        for (let i = 1; i < xs.length; i++) {
+          expect(xs[i]! - xs[i - 1]!, `frame ${i}`).toBeGreaterThanOrEqual(0);
+          expect(xs[i]! - xs[i - 1]!, `frame ${i}`).toBeLessThan((4 / S) * 1.6);
+        }
+        expect(now).toBeGreaterThan(0);
+      });
+    }
+    it("held across two step-times walks two or more squares with no stop between them, then stops after the step it's on", () => {
+      const w = new Walker({ c: 5, r: 5 }, S, true, TOWN_FEEL.walkEase);
+      const k = keyWalk(w, () => true);
+      const xs: number[] = [];
+      hold("right", true);
+      let now = frames(w, k, 0, 2 * S + 10, 2, xs);
+      expect(w.hereC(), "on its third square by now").toBeGreaterThanOrEqual(7);
+      hold("right", false);
+      now = frames(w, k, now, 600, 2, xs);
+      expect(w.moving()).toBe(false);
+      expect(w.hereC(), "the step it was on when let go, no more").toBe(8);
+      // No stop between the squares: past the first step's ease-in, every 2 ms frame moves at least half an even step's 2 ms until
+      // the last step's ease-out begins; and nothing ever jumps.
+      const even = 2 / S;
+      for (let i = 1; i < xs.length; i++) {
+        const d = xs[i]! - xs[i - 1]!;
+        expect(d, `frame ${i}`).toBeLessThan(even * 1.6);
+        if (xs[i]! > 5.5 && xs[i]! < 7.5) expect(d, `frame ${i} at ${xs[i]}`).toBeGreaterThan(even * 0.5);
+      }
+    });
+  });
+
+  it("ease: a whole last step is as before (from 0), and a late ease-out starts at the same place and speed as the even step", () => {
+    const old = (t: number, first: boolean, last: boolean, a: number) => t + a * ((first && last ? t * t * (3 - 2 * t) : first ? t * t * (2 - t) : last ? t * (1 + t - t * t) : t) - t);
+    for (const t of [0, 0.1, 0.37, 0.5, 0.8, 1])
+      for (const first of [false, true]) for (const last of [false, true]) expect(ease(t, first, last, 0.5)).toBeCloseTo(old(t, first, last, 0.5), 12);
+    for (const from of [0.3, 0.7]) {
+      const h = 1e-4;
+      expect(ease(from, true, true, 0.5, from)).toBeCloseTo(ease(from, true, false, 0.5), 12);
+      expect((ease(from + h, true, true, 0.5, from) - ease(from, true, true, 0.5, from)) / h).toBeCloseTo((ease(from + h, true, false, 0.5) - ease(from, true, false, 0.5)) / h, 3);
+      expect(ease(1, true, true, 0.5, from)).toBe(1);
+      expect(ease(1, false, true, 0.5, from)).toBe(1);
+    }
   });
 
   it("a held key the walker can't step onto (a wall on one side) walks the other way that's open", () => {

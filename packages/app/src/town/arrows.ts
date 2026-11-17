@@ -3,7 +3,7 @@
  * diagonal (one square across, then one along, so every step is the same as a tap's). The on-screen arrows (bottom right, over the
  * zoom pill) and the keyboard's arrow keys (and WASD) feed one set of held directions; the walker asks for its next square as it
  * begins each step (Walker.run), so the walk runs on without stopping between squares, and stops after the step in progress once
- * nothing is held. Walls, the floor and people are the walker's own checks (`ok`). Nothing here allocates on a frame that walks
+ * nothing is held: let go before that step ends and the square it asked for is dropped, so a tap walks one square (Nov 17). Walls, the floor and people are the walker's own checks (`ok`). Nothing here allocates on a frame that walks
  * nowhere. No DOM beyond the window's key events, so the choices are tested on their own.
  */
 import { screenRow, type Walker, type Sq } from "./world.ts";
@@ -26,6 +26,9 @@ export const isHeld = (d: Dir): boolean => on[d];
 
 /** Whether any direction is held now. */
 export const anyHeld = (): boolean => on.up || on.down || on.left || on.right;
+
+/** Whether the held directions ask for a step (opposite keys cancel): `keySteps` would give one. */
+export const wantsStep = (): boolean => on.left !== on.right || on.up !== on.down;
 
 /** Calls `f` whenever a direction is pressed or released. Returns its stop. */
 export function onHeld(f: () => void): () => void {
@@ -145,7 +148,7 @@ export function keyWalk(
     }
     return null;
   };
-  w.run(next);
+  w.run(next, wantsStep);
   return {
     start: () => {
       if (w.moving() || !anyHeld()) return;
