@@ -1,3 +1,4 @@
+- Nov 17 ~16:35 UTC: #770 Dash LIVE d2bacaf; main full run GREEN.
 - Nov 17 ~16:20 UTC: #770 Dash stall merged d2bacaf; deploy + main watched. Follow-up queued: dash findings 4 (watchers not told of pause; King strike too) + 5 (lock during hold).
 - Nov 17 ~16:15 UTC: #771 star seat LIVE 410cc3c; main full run GREEN.
 - Nov 17 15:55 UTC: payments design done -> PR (docs only, 5c02c58), held for Eric OK of 6 calls (play coins all modes; 1 crate/level; other prices halved; paid key first + item return gives crate back; no counter <$20 disputes; age band at first Buy). Coin-icon helper session_01JuCWRtCZyvsdX2jteniSxx running. Moo helper idle on Eric answers.
