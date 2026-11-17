@@ -1,3 +1,4 @@
+- Nov 17 15:35 UTC: Eric payments round 2 (payments-answers.md): AI legal review at end; key ~$1; crates earned; refunds hassle-free; earn-first. Proposals sent.
 - Nov 17 15:25 UTC: Eric: slam and fake move each once per game independently (move between them -> fake still comes later at 30 s, alone). Sent to fix helper session_01JuCWRvgADv6G7HGf2yAbbt (option b).
 - Nov 17 15:20 UTC: Eric answered payments (notes/briefs/payments-answers.md). Picks sent back for OK. Payments design helper queued after moo stills.
 - Nov 17 15:08 UTC: review/dash-stall: 6 findings, nothing match-breaking. Fix helper (high) on claude/dash-stall for 1 (spend skit at slam, Eric once/game), 2, 3, 6. Queued: 4 (watchers not told of pause, also King strike) + 5 (lock during hold).
