@@ -118,19 +118,35 @@ const nearArc = (cx: number, cy: number, rx: number, ry: number) =>
 const farArc = (cx: number, cy: number, rx: number, ry: number) =>
   `M ${n1(cx - rx)} ${n1(cy)} A ${n1(rx)} ${n1(ry)} 0 0 1 ${n1(cx + rx)} ${n1(cy)}`;
 /**
- * Where the rider is hidden (the pose's `hide`, Nov 17: one layer): below the dip's near lip, down the dip's width, so the pawn and
- * its items sink behind the lip's line, drawn behind them (SeatLip); beside the dip nothing is hidden (an item hanging beside the
- * pawn lies in front of the star). `tf` places a point of the seat as this frame draws it (bob and tilt); `rot` its tilt.
+ * Where the rider is hidden (the pose's `hide`; Nov 17, one layer: nothing of the star is drawn over the pawn). Inside the dip, below
+ * the near lip's arc, so the pawn sinks behind the lip's line (SeatLip, drawn behind it). The pawn's base and most skins (a suit, a
+ * coat, the chimney) are wider than the dip at the ride's size, so beside it the edge is a soft shoulder: it leaves the arc smoothly
+ * (same tangent) partway up each side and sweeps outward and gently down (as the fourth pass's front copy's edge did), and below it
+ * all is hidden. `tf` places a point of the seat as this frame draws it (its bob, and in the side view's move its tilt); `rot` that tilt.
  */
+const LIP_IN = 0.5; // the edge sits this far inside the lip line's middle: a little more than half the line shows under the pawn
+const LIP_T0 = (30 * Math.PI) / 180; // where the shoulder leaves the near arc (0 = the dip's side, 90 = its bottom)
+const SH_OUT = 64; // the shoulder's far end, out from the dip's middle...
+const SH_DROP = 21; // ...and this far below the rim's middle line
 const pt = (q: V2) => `${n1(q[0])} ${n1(q[1])}`;
-const LIP_IN = 0.5; // the edge sits this far inside the lip line's middle, so the line shows a little more than half its width below the pawn
 const hideD = (cx: number, cy: number, rx: number, ry: number, tf: (q: V2) => V2, rot: number) => {
   const r = rx - LIP_IN;
   const q = ry - LIP_IN;
-  const L = tf([cx - r, cy]);
-  const R = tf([cx + r, cy]);
-  return `M ${pt(L)} A ${n1(r)} ${n1(q)} ${rot} 0 0 ${pt(R)} L ${pt(tf([cx + r, cy + 200]))} L ${pt(tf([cx - r, cy + 200]))} Z`;
+  /** One side's shoulder (s = -1 left, 1 right), from its far end in to the arc: far end, two controls, on the arc. */
+  const shoulder = (s: number): V2[] => {
+    const p0: V2 = [cx + s * r * Math.cos(LIP_T0), cy + q * Math.sin(LIP_T0)];
+    const tan = unit([s * r * Math.sin(LIP_T0), -q * Math.cos(LIP_T0)]); // along the arc, outward and up
+    const e: V2 = [cx + s * SH_OUT, cy + SH_DROP];
+    return [e, add(e, [-s * 21, -7.5]), add(p0, mul(tan, 6.5)), p0].map(tf);
+  };
+  const [eL, aL, bL, pL] = shoulder(-1);
+  const [eR, aR, bR, pR] = shoulder(1);
+  return (
+    `M ${pt(tf([cx - 130, 200]))} L ${pt(tf([cx - 130, cy + 48]))} L ${pt(eL!)} C ${pt(aL!)} ${pt(bL!)} ${pt(pL!)}` +
+    ` A ${n1(r)} ${n1(q)} ${rot} 0 0 ${pt(pR!)} C ${pt(bR!)} ${pt(aR!)} ${pt(eR!)} L ${pt(tf([cx + 130, cy + 48]))} L ${pt(tf([cx + 130, 200]))} Z`
+  );
 };
+
 /** The dip's inside and far rim (behind the pawn): the far inner wall lit, the floor, the near wall in the lip's shade. */
 function SeatInside({ p, cx, cy, rx, ry }: { p: Paint; cx: number; cy: number; rx: number; ry: number }) {
   const hex = p.hex;
@@ -277,6 +293,7 @@ function Back({ p, f, anim }: RiderProps) {
         <Star p={p} />
         <SeatInside p={p} {...SEAT_SIDE} />
         <SeatLip p={p} {...SEAT_SIDE} />
+        <SideFizz f={f} anim={anim} />
       </g>
     </g>
   );
@@ -305,12 +322,13 @@ const SPARKS = [
   { born: 7, dx: -0.65, dy: 0.75, c: "#ffffff", r: 2.4 },
 ];
 
-/** In front of the pawn: only the move's fizz from the back point (the star is drawn once, behind: the pawn sinks behind its lip). */
-function Front({ f, anim }: RiderProps) {
+/** The move's fizz from the back point (behind the pawn, like the point). */
+function SideFizz({ f, anim }: { f: number; anim: "idle" | "move" }) {
+  if (anim !== "move") return null;
   const [ox, oy] = at(216, VIS - 3, T * 0.35);
   return (
-    <g transform={sideGroup(anim, f)}>
-      {anim === "move" && (
+    <g>
+      {(
         <>
           {SPARKS.map((sp, i) => {
             const age = (f - sp.born + MOVE_N) % MOVE_N;
@@ -333,6 +351,12 @@ function Front({ f, anim }: RiderProps) {
     </g>
   );
 }
+
+/**
+ * In front of the pawn: nothing (Nov 17, one layer). The star, its seat's lip and the fizz are all drawn behind; the rider is hidden
+ * below the lip by the pose's `hide`, so no edge of the star ever lands on the pawn or its items.
+ */
+const Front = (_: RiderProps) => null;
 
 // ---------------------------------------------------------------------------------------------------------------
 // Front and back views: the same star, turned so a point faces the camera (straight down the picture), centered on
@@ -491,8 +515,24 @@ function viewBack(view: "front" | "back") {
     const g = geoFor(view, anim);
     const rx = 34 - b * 1.6;
     const sh = `${p.id}-vstar-shadow`;
-    // front view, moving: the fizz from the two far points, beside the pawn (it may hide some of it)
+    // front view, moving: the fizz from the two far points, beside the pawn (it may hide some of it); back view (moving away), from
+    // the near point, under the pawn's hidden part (all behind it: Nov 17, one layer)
     let fizz = null;
+    if (view === "back" && anim === "move") {
+      const [ox, oy] = atV(-90, VIS - 4, T * 0.4 * g.tf, g);
+      fizz = (
+        <>
+          {SPARKS.map((sp, i) => {
+            const age = (f - sp.born + MOVE_N) % MOVE_N;
+            if (age > 2) return null;
+            const dy = 0.45 + (0.4 * (-sp.dx - 0.55)) / 0.45;
+            return fizzSpark(i, ox, oy, sp.dy * 1.1, dy, age, sp.c, sp.r, 1.9);
+          })}
+          <circle cx={ox} cy={oy} r={f % 2 ? 3.4 : 4.2} fill="#ffe9a0" opacity="0.55" />
+          <circle cx={ox} cy={oy} r={f % 2 ? 1.9 : 2.5} fill="#fffbe6" />
+        </>
+      );
+    }
     if (view === "front" && anim === "move") {
       const tips = [atV(54, VIS - 4, 0, g), atV(126, VIS - 4, 0, g)];
       fizz = (
@@ -537,33 +577,6 @@ function viewBack(view: "front" | "back") {
   };
 }
 
-/** In front of the pawn, both views: moving away, the fizz from the near point (the star is drawn once, behind). */
-function viewFront(view: "front" | "back") {
-  return function ViewFront({ f, anim }: RiderProps) {
-    const b = bob(anim, f);
-    const g = geoFor(view, anim);
-    let fizz = null;
-    if (view === "back" && anim === "move") {
-      const [ox, oy] = atV(-90, VIS - 4, T * 0.4 * g.tf, g);
-      fizz = (
-        <>
-          {SPARKS.map((sp, i) => {
-            const age = (f - sp.born + MOVE_N) % MOVE_N;
-            if (age > 2) return null;
-            const dy = 0.45 + (0.4 * (-sp.dx - 0.55)) / 0.45;
-            return fizzSpark(i, ox, oy, sp.dy * 1.1, dy, age, sp.c, sp.r, 1.9);
-          })}
-          <circle cx={ox} cy={oy} r={f % 2 ? 3.4 : 4.2} fill="#ffe9a0" opacity="0.55" />
-          <circle cx={ox} cy={oy} r={f % 2 ? 1.9 : 2.5} fill="#fffbe6" />
-        </>
-      );
-    }
-    return (
-      <g transform={`translate(0 ${n1(-b)})`}>{fizz}</g>
-    );
-  };
-}
-
 const viewPose = (view: "front" | "back") => (anim: "idle" | "move", f: number) => {
   const b = bob(anim, f);
   const s = seatV(geoFor(view, anim));
@@ -583,14 +596,14 @@ const frontView: RiderViewDraft = {
   move: { ms: Array(MOVE_N).fill(70) },
   pose: viewPose("front"),
   Back: viewBack("front"),
-  Front: viewFront("front"),
+  Front,
 };
 const backView: RiderViewDraft = {
   idle: { ms: Array(IDLE_N).fill(170) },
   move: { ms: Array(MOVE_N).fill(70) },
   pose: viewPose("back"),
   Back: viewBack("back"),
-  Front: viewFront("back"),
+  Front,
 };
 
 export const moonRide: RiderDraft = {
