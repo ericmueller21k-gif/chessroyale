@@ -347,7 +347,7 @@ export function PlayScreen({
             ) : stalling ? (
               // (Dash's stall skit: the clock stands still for it; DashStall.tsx.)
               <span>
-                <strong>{stall!.beat === "slam" ? `${match.boss!.name} wants your move.` : `${match.boss!.name} moved again?!`}</strong> <span class="muted">Clock stopped.</span>
+                <strong>{stall!.beat === "slam" ? "Hurry up!" : "He moved again?!"}</strong> <span class="muted">Clock stopped.</span>
               </span>
             ) : waiting && alone && picked ? (
               // Alone, your move is simply played: the boss is already thinking about its reply.
