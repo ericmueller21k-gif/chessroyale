@@ -316,6 +316,8 @@ test("Crowd 50 v 50: plays your team's turns, watches the other team's, survives
   // a fixed box, your row pinned in view at its foot; nothing past the screen's edge.
   for (const [w, h] of [[320, 568], [390, 844], [1280, 800]] as const) {
     await page.setViewportSize({ width: w, height: h });
+    // (A frame or two for what lays itself out on a resize; once, at 320, the page was 19 px wide just after it.)
+    await page.waitForTimeout(400);
     const pod = await page.evaluate(() => {
       const r = (el: Element | null) => (el ? el.getBoundingClientRect() : null);
       const steps = [...document.querySelectorAll(".pod-steps .pod-step")].map((s) => ({ cls: s.className, x: r(s)!.x, block: r(s.querySelector(".pod-block"))!.height, pawn: !!s.querySelector(".pod-pawn svg"), name: (s.querySelector(".pod-name") as HTMLElement).innerText, pts: (s.querySelector(".pod-pts") as HTMLElement).innerText, nameClip: s.querySelector(".pod-name")!.scrollWidth > s.querySelector(".pod-name")!.clientWidth + 1 }));
@@ -323,7 +325,11 @@ test("Crowd 50 v 50: plays your team's turns, watches the other team's, survives
       const you = r(document.querySelector(".pod-chart .pod-row.you"))!;
       const best = document.querySelector(".pod-best") as HTMLElement;
       const pageBox = r(document.querySelector(".podium"))!;
-      return { steps, chart: { top: chart.top, bottom: chart.bottom, h: chart.height }, you: { top: you.top, bottom: you.bottom }, rows: document.querySelectorAll(".pod-chart .pod-row:not(.pod-title):not(.pod-cols)").length, bestText: best.innerText, bestH: best.getBoundingClientRect().height, bestLine: parseFloat(getComputedStyle(best).lineHeight) || 20, bestClip: best.scrollWidth > best.clientWidth + 1, spill: document.documentElement.scrollWidth - innerWidth, podRight: pageBox.right, podLeft: pageBox.left, youRow: (document.querySelector(".pod-you") as HTMLElement).innerText };
+      return { steps, chart: { top: chart.top, bottom: chart.bottom, h: chart.height }, you: { top: you.top, bottom: you.bottom }, rows: document.querySelectorAll(".pod-chart .pod-row:not(.pod-title):not(.pod-cols)").length, bestText: best.innerText, bestH: best.getBoundingClientRect().height, bestLine: parseFloat(getComputedStyle(best).lineHeight) || 20, bestClip: best.scrollWidth > best.clientWidth + 1, spill: document.documentElement.scrollWidth - innerWidth, wide: [...document.querySelectorAll("body *")].filter((e) => {
+        if (e.getBoundingClientRect().right <= innerWidth + 0.5) return false;
+        for (let p = e.parentElement; p && p !== document.body; p = p.parentElement) if (getComputedStyle(p).overflowX !== "visible") return false;
+        return true;
+      }).slice(0, 5).map((e) => `${e.tagName}.${e.className} ${Math.round(e.getBoundingClientRect().right)}`), podRight: pageBox.right, podLeft: pageBox.left, youRow: (document.querySelector(".pod-you") as HTMLElement).innerText };
     });
     const at = `${w} px`;
     expect(pod.steps.map((s) => s.cls.match(/pod-(\d)/)![1]), at).toEqual(["2", "1", "3"]);
@@ -341,7 +347,7 @@ test("Crowd 50 v 50: plays your team's turns, watches the other team's, survives
     expect(Math.round(pod.chart.h), `${at}: the chart's box`).toBe(330);
     expect(pod.you.top, `${at}: your row in the chart's view`).toBeGreaterThanOrEqual(pod.chart.top - 0.5);
     expect(pod.you.bottom, `${at}: your row in the chart's view`).toBeLessThanOrEqual(pod.chart.bottom + 0.5);
-    expect(pod.spill, `${at}: no sideways scroll`).toBeLessThanOrEqual(0);
+    expect(pod.spill, `${at}: no sideways scroll (${pod.wide.join(", ")})`).toBeLessThanOrEqual(0);
     expect(pod.podLeft, at).toBeGreaterThanOrEqual(0);
     expect(pod.podRight, at).toBeLessThanOrEqual(w);
   }
