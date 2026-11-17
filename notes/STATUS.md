@@ -1,3 +1,4 @@
+- Nov 17 ~03:40 UTC: #762 LIVE (7f52277); main full run GREEN, no retries. Star ride #763 green, waiting Eric. Running: C3 (high), chat80 (high).
 - Nov 17 ~03:10 UTC: #762 C2+C4 MERGED (7f52277; hopper:212 retry-pass on its PR, known); deploy + main watched; C3 told to merge main. Star seat DONE ($1.40; all-in $4.15) -> PR (ddfeea9) waiting Eric look + name; seat chat left open for Eric. chat80 + hopper:212 queued.
 - Nov 17 ~02:30 UTC: C2+C4 -> PR #762 (f2e244a; whole suite). C3 screens helper (Opus high) from the C2 branch. Star seat helper (high) running. chat80 queued after one of them.
 - Nov 17 ~02:10 UTC: Eric asked the star ride helper for a hollowed-out seat (pawn sunk in); the director archived that session seconds after its run started (mistake). Fresh helper on the saved brief (claude/boss-art 2a7c571). Lesson: check a helper is idle (no new user turn) before archiving.
