@@ -595,6 +595,12 @@ describe("Dash: his stall skit and his clock tap (Eric, Nov 17)", () => {
     // (A move clock too short for the skit still has the tap; one too short for the tap has nothing.)
     expect(stallPlan(onMove(3), START, 7_000, false)).toMatchObject({ tapAt: 2_100, slamAt: null, fakeAt: null, move: null });
     expect(stallPlan(onMove(3), START, 9_000, true)).toBeNull();
+    // (Never in the move's last DASH_STALL.marginMs (review of #775: solo started a crawl at 10.0 s of a 10.3 s bank, and flagged under
+    // it): solo and the server plan the same.)
+    expect(DASH_STALL.marginMs).toBe(2000);
+    expect(stallPlan(onMove(3), START, 10_300, true)).toBeNull();
+    expect(stallPlan(onMove(3), START, 11_999, true)).toBeNull();
+    expect(stallPlan(onMove(3), START, 12_000, true)).toMatchObject({ tapAt: 10_000, slamAt: null });
     for (const kind of ["slap", "flag", "clockFit", "warn", "scramble", "rushWarn"]) expect(stallPlan(onMove(5, { events: [{ kind, turn: 5 }] }), START, 610_000, true), kind).toBeNull();
   });
 

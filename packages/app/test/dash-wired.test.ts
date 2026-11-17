@@ -286,7 +286,7 @@ describe("Dash's stall skit and clock tap on screen (Eric, Nov 17)", async () =>
   const { stallTimeline, passTurn, applyMove } = await import("@chessroyale/chess");
   const { DASH_LIE } = await import("../src/characters/dash-lie.ts");
   const { DASH_STALL_LINES, DASH_TAP_BORED_LINES, DASH_TAP_JOKE_LINES, DASH_TAP_LINES } = await import("../src/characters/dash-lines.ts");
-  const { frozenWindow, stallBoard, stallHolding, stallOn, tapLengths, tapTimeline } = await import("../src/components/DashStall.tsx");
+  const { frozenWindow, stallBoard, stallHolding, stallOn, tapLengths, tapSeen, tapTimeline } = await import("../src/components/DashStall.tsx");
   const len = (a: { frames: readonly { ms: number }[] }) => a.frames.reduce((t, f) => t + f.ms, 0);
   const cues = (a: { frames: readonly { cue?: string }[] }) => a.frames.flatMap((f) => (f.cue ? [f.cue] : []));
 
@@ -363,6 +363,32 @@ describe("Dash's stall skit and clock tap on screen (Eric, Nov 17)", async () =>
     // (His tap stops no clock.)
     expect(frozenWindow(undefined, { beat: "tap", at: 5000, until: 5000 })).toBeUndefined();
     expect(stallOn({ beat: "tap", at: 5000, until: 5000 }, 5000)).toBe(false);
+  });
+
+  it("his clock tap ticks aloud only for DASH_TAP.tapMs after he's down (review of #775: it ticked ~2.5 times a second for the whole move); then he taps on silently", () => {
+    expect(DASH_TAP.tapMs).toBe(3000);
+    const tl = tapTimeline(1000, undefined);
+    expect(tl.quietAt).toBe(tl.downAt + DASH_TAP.tapMs);
+    expect(tl.quietAt).toBeLessThan(tl.boredAt);
+  });
+
+  it("only the players still thinking see his clock tap (review of #775): one who already moved (a raid's scoring, a party's pick) never gets the crawl or the joke; your pick gets him up", () => {
+    const boss = (crowdMoves: number) => ({ id: "dash", crowdMoves }) as never;
+    const tap = { beat: "tap" as const, at: 5000, until: 5000 };
+    // (Still thinking: he lies down; a reconnect (no tap seen before) the same.)
+    expect(tapSeen(null, { boss: boss(4), phase: { kind: "play", stall: tap } }, 5100)).toEqual({ at: 5000, turn: 4 });
+    expect(tapSeen(null, { boss: boss(4), phase: { kind: "play", stall: tap }, myPick: null }, 9000)).toEqual({ at: 5000, turn: 4 });
+    // (Already moved: a raid's scoring phase, a party's pick: nothing.)
+    expect(tapSeen(null, { boss: boss(4), phase: { kind: "scoring", stall: tap } }, 5100)).toBeNull();
+    expect(tapSeen(null, { boss: boss(4), phase: { kind: "play", stall: tap }, myPick: "e2e4" }, 5100)).toBeNull();
+    // (Seen while thinking, then your pick: he gets up (a party's pick keeps the phase `play`), as your move going in does.)
+    const seen = tapSeen(null, { boss: boss(4), phase: { kind: "play", stall: tap } }, 5100)!;
+    expect(tapSeen(seen, { boss: boss(4), phase: { kind: "play", stall: tap }, myPick: "e2e4" }, 12_000)).toEqual({ at: 5000, turn: 4, moved: 12_000 });
+    expect(tapSeen(seen, { boss: boss(4), phase: { kind: "scoring", stall: tap } }, 12_000)).toEqual({ at: 5000, turn: 4, moved: 12_000 });
+    expect(tapSeen(seen, { boss: boss(5), phase: { kind: "play", stall: null } }, 12_000)).toEqual({ at: 5000, turn: 4, moved: 12_000 });
+    // (Once up, the time he got up stays.)
+    const up = tapSeen(seen, { boss: boss(4), phase: { kind: "scoring", stall: tap } }, 12_000);
+    expect(tapSeen(up, { boss: boss(5), phase: { kind: "play", stall: null } }, 20_000)).toEqual(up);
   });
 
   it("the clock tap is no moment of his: his move keeps its own line", async () => {

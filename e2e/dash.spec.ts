@@ -592,6 +592,8 @@ test.describe("Dash's stall skit and clock tap (Eric, Nov 17)", () => {
     expect(first.ms).toBeGreaterThanOrEqual(DASH_TAP.afterMs - 50);
     expect(first.ms).toBeLessThan(DASH_TAP.afterMs + 1000);
     expect(await beatOf(page)).toBe("tap");
+    // (His taps tick aloud at first, silent DASH_TAP.tapMs after he's down: review of #775.)
+    expect(await lie.getAttribute("data-quiet")).toBeNull();
     const t0 = await page.locator(".dk-clock .dk-time").textContent();
     await expect.poll(() => said(page, DASH_TAP_LINES), { timeout: 4_000 }).toBe(true);
     const say = page.locator(".dash-say");
@@ -617,6 +619,7 @@ test.describe("Dash's stall skit and clock tap (Eric, Nov 17)", () => {
     // (Still there past his slam's 20 s and his fake move's 30 s: neither comes on his move. Bored 20 s after he lay down.)
     await expect.poll(() => said(page, DASH_TAP_BORED_LINES), { timeout: 25_000 }).toBe(true);
     await expect(lie).toBeVisible();
+    await expect(lie).toHaveAttribute("data-quiet", "");
     expect(await beatOf(page)).toBe("tap");
     // (Your move: he zips back to his spot.)
     await playOne(page);

@@ -321,7 +321,7 @@ export function stallMove(passed: string, seed: number, turn: number): string | 
 /**
  * Whether his lying-down clock tap or his stall skit can come on the crowd move now being picked, and when (StallPlan). His clock tap
  * (Eric, Nov 17: a bored "hurry up", only when you're slow; DASH_TAP): once a battle (`dash.tap`), from crowd move `fromMove`
- * (?power=clocktap: the first) at `afterMs` of a bank's move or `afterShare` of a move clock; on the move it came, nothing more of his.
+ * (?power=clocktap: the first) at `afterMs` of a bank's move or `afterShare` of a move clock, with DASH_STALL.marginMs to spare; on the move it came, nothing more of his.
  * His stall skit (Eric, Nov 17: once a battle; "if you take more
  * than 30 seconds to move"; "each still occur once per game": the slam and the fake move each once, apart). Null: not on this move. `allowedMs`: the move's clock (ms); `bank`: the battle's time is a bank
  * (Boss alone, a Boss Battle party: DASH_STALL's seconds) or else a move clock (a raid, a group battle: DASH_STALL's shares of
@@ -338,7 +338,8 @@ export function stallPlan(boss: BossState | null | undefined, fen: string, allow
   // (His tap came on this move: nothing more of his on it.)
   if (d.tap && d.tap.at === boss.crowdMoves) return null;
   const tapMs = bank ? t.afterMs : Math.round(allowedMs * t.afterShare);
-  const tapAt = !d.tap && turn >= (test === "clocktap" ? 1 : t.fromMove) && tapMs < allowedMs ? tapMs : null;
+  // (Never in the move's last DASH_STALL.marginMs: solo and the server agree on it, and a move about to end doesn't spend it.)
+  const tapAt = !d.tap && turn >= (test === "clocktap" ? 1 : t.fromMove) && tapMs <= allowedMs - s.marginMs ? tapMs : null;
   const skit = d.stall ? null : skitPlan(d, fen, p.seed, turn, allowedMs, bank, test, s);
   if (tapAt === null && !skit) return null;
   return { tapAt, slamAt: skit?.slamAt ?? null, fakeAt: skit?.fakeAt ?? null, move: skit?.move ?? null };

@@ -2180,9 +2180,11 @@ export const DASH_STALL = {
  * party) or `afterShare` of a move clock (a raid, a group battle: 6 s of 20); timed with his stall skit's beats (stallPlan), never on
  * its move ("the bigger gag is reserved for another turn"). He lies by your clock until you move ("stay in the crawl position"),
  * `boredMs` after lying down still no move: his "not moving till you do" line; your move before he's down: his crawl still
- * finishes, his "just a joke" line, `jokeMs`, then up. Your clock keeps running as ever.
+ * finishes, his "just a joke" line, `jokeMs`, then up. Your clock keeps running as ever. His taps tick aloud for the first `tapMs`
+ * after he's down, then go silent (he keeps tapping). Never with less than DASH_STALL.marginMs of the move's clock left after it.
+ * Only the players still thinking see it: a player who already moved never does (their pick gets him up).
  */
-export const DASH_TAP = { fromMove: 3, afterMs: 10_000, afterShare: 0.3, boredMs: 20_000, jokeMs: 1800 } as const;
+export const DASH_TAP = { fromMove: 3, afterMs: 10_000, afterShare: 0.3, boredMs: 20_000, jokeMs: 1800, tapMs: 3000 } as const;
 
 /**
  * The Hidden Boss's phase 2 (Eric, Oct 14; DECISIONS.md, "The Hidden Boss, phase 2"): four boards of Chess960 at once,
