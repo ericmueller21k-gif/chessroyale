@@ -186,7 +186,7 @@ describe("the cuts, equal from each side, down to a 1 v 1 (CROWD_CUTS)", () => {
     expect(cutPlan(state, standings(state, () => 0.5, REWORK), REWORK).out).toEqual([]);
   });
 
-  it("every 50 v 50 has the rework since C2 (CROWD_SETTINGS); the 50 v 50 before it only with CROWD_PRE_REWORK (the old endings' tests)", () => {
+  it("every 50 v 50 has the rework since C2 (CROWD_SETTINGS); the 50 v 50 before it only with CROWD_PRE_REWORK (Eric's majority guard and the FAQ, until C3)", () => {
     const today: Settings = { ...DEFAULT_SETTINGS, ...CROWD_SETTINGS };
     expect(today).toMatchObject(CROWD_REWORK);
     expect(today.crowdCuts).toBe(CROWD_CUTS);
