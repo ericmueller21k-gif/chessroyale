@@ -1,25 +1,17 @@
-Stills ready on stills/moo-cinematic: OK to build?
+New close-up on stills/moo-cinematic: OK to build?
 
-The stills (1-4 are the four asked for; 5-7 are extras):
-- 1-A-field-phone, 2-A-field-computer: Scene A, the moonlit field with a giant full moon, stars and a little red barn on the
-  hills. Moo's own sprite stands on the grass in the middle at the scene's pixel size (2x on a phone, 3x on a computer).
-- 3-B-closeup-normal, 4-B-closeup-white-eyes: Scene B, the close-up of Moo and the Moon in profile looking up to the upper
-  left, with light shafts and sparkles coming from the moon off screen. The eyes go from brown to glowing white over 5 frames.
-- 5: Scene A with Moo powered up (how the transformation would look there). 6: Scene B on a computer. 7: Scene B's two frames
-  side by side, unframed.
+Scene B is now the game's own Moo & Moon zoomed in, after Eric's answer ("im fine if it just looks like a zoomed in version of the
+real ones"). No new drawing and no API spend:
+- Moo comes from his own rig (moo.ts `mooLayers`), drawn 4x as big as in the game, with his head lifted and his eyes looking up
+  to the upper left. The Moon is the game's own Moon drawn 5x as big, in front of him and nearer the camera, so it's about as
+  big as his head.
+- Behind them: a starry night sky, with diagonal shafts of moonlight and sparkles falling from the upper left, off screen.
+- Their eyes turn white: Moo's go to his own glowing powered-up eyes, and the Moon's turn white too. Both get a soft gold glow,
+  and the light gets stronger. 5 frames (9-B-closeup-eyes-whiten.gif shows them playing).
+- Stills: 3 and 4 on a phone (normal, then white eyes), 6 and 7 on a computer, 8 the two frames side by side.
+- Scene A (1, 2, 5) is unchanged.
 
-What it covers:
-- On a phone: the top bar, the boss bar and the board (390 x 515). The move strip, the clock and everything below stay.
-- On a computer: the board column from the top of the screen to the board's bottom, boss bar included. The side panels stay.
-  Moo's usual spot left of the board is empty while he's out on the field.
+Timing stays as proposed: about 7 s in all, each beat a setting.
 
-Questions for Eric:
-1. Is the close-up OK? It took a second pass to read as Moo. His neck is still a bit long and his head a bit small; another
-   pass would cost about $1.
-2. Both pairs of eyes turn white, Moo's and the Moon's ("their eyes"). Keep both, or only Moo's?
-3. Proposed timing, about 7 s in all, each beat a setting: hop to the center 0.6 s, the field fades in 0.5 s and holds 0.8 s,
-   the close-up 2.0 s (the eyes whiten in its last 1.3 s), back to the field for his transformation 1.4 s, the fade-out 0.5 s,
-   the hop back 0.6 s. OK?
-
-API spend so far: $3.13 of the $8 cap for phase 1 (field $0.96; close-up $1.32 + $0.85). The art is on claude/boss-art
-(scripts/boss-art/out/arena-moo-field, arena-moo-closeup).
+API spend: still $3.13 of the $8 cap (the old close-up's $2.17 is set aside). Scripts: claude/boss-art,
+scripts/boss-art/moo-closeup/ (parts.ts renders the rig's parts, compose.py builds the frames).
