@@ -27765,7 +27765,7 @@ body.cs-on .mm-scrim {
   margin: 0;
   font-size: 14px;
 }
-.pod-head {
+.podium .pod-head {
   margin: 0;
   /* (Clear of the gear in the corner: "Black wins on the judge's verdict" is the longest.) */
   padding: 0 34px;
