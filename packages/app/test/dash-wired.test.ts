@@ -285,8 +285,8 @@ describe("Dash's stall skit and clock tap on screen (Eric, Nov 17)", async () =>
   const { DASH_STALL, DASH_TAP } = await import("@chessroyale/core");
   const { stallTimeline, passTurn, applyMove } = await import("@chessroyale/chess");
   const { DASH_LIE } = await import("../src/characters/dash-lie.ts");
-  const { DASH_STALL_LINES, DASH_TAP_LINES } = await import("../src/characters/dash-lines.ts");
-  const { frozenWindow, spendTap, stallBoard, stallHolding, tapAt, tapBattle, tapSpent, tapTimeline } = await import("../src/components/DashStall.tsx");
+  const { DASH_STALL_LINES, DASH_TAP_BORED_LINES, DASH_TAP_JOKE_LINES, DASH_TAP_LINES } = await import("../src/characters/dash-lines.ts");
+  const { frozenWindow, stallBoard, stallHolding, stallOn, tapLengths, tapTimeline } = await import("../src/components/DashStall.tsx");
   const len = (a: { frames: readonly { ms: number }[] }) => a.frames.reduce((t, f) => t + f.ms, 0);
   const cues = (a: { frames: readonly { cue?: string }[] }) => a.frames.flatMap((f) => (f.cue ? [f.cue] : []));
 
@@ -345,67 +345,27 @@ describe("Dash's stall skit and clock tap on screen (Eric, Nov 17)", async () =>
     expect(frozenWindow(undefined, undefined)).toBeUndefined();
   });
 
-  it("the clock tap's beats: his lie-down, about three seconds of taps, his zip off", () => {
-    const tl = tapTimeline();
-    expect(tl.upAt).toBe(len(DASH_LIE.anims.lieDown!) + DASH_TAP.tapMs);
-    expect(tl.total - tl.upAt).toBe(len(DASH_LIE.anims.getUp!));
-    expect(DASH_TAP.tapMs).toBe(3000);
+  it("the clock tap's beats (Eric, Nov 17): his crawl in always finishes; he stays lying until your move, then zips back; your move in before he was down: the joke first; still no move 20 s after he's down: the bored line", () => {
+    const { down, up } = tapLengths();
+    expect(down).toBe(len(DASH_LIE.anims.lieDown!));
+    expect(up).toBe(len(DASH_LIE.anims.getUp!));
+    expect([DASH_TAP.boredMs, DASH_TAP.jokeMs]).toEqual([20_000, 1800]);
+    // (No move yet: lying, the bored line due.)
+    const lying = tapTimeline(1000, undefined);
+    expect(lying).toMatchObject({ downAt: 1000 + down, joke: false, upAt: Infinity, boredAt: 1000 + down + DASH_TAP.boredMs });
+    // (Your move as he lies there: up at once.)
+    expect(tapTimeline(1000, 9000)).toMatchObject({ joke: false, upAt: 9000, endAt: 9000 + up });
+    // (Your move the moment he started: the crawl finishes, the joke, then up.)
+    expect(tapTimeline(1000, 1100)).toMatchObject({ joke: true, upAt: 1000 + down + DASH_TAP.jokeMs, endAt: 1000 + down + DASH_TAP.jokeMs + up });
+    for (const ls of [DASH_TAP_LINES, DASH_TAP_JOKE_LINES, DASH_TAP_BORED_LINES]) expect(ls.length).toBeGreaterThan(0);
+    expect(DASH_TAP_JOKE_LINES[0]).toMatch(/just a joke/);
+    expect(DASH_TAP_BORED_LINES[0]).toMatch(/not moving till you do/);
+    // (His tap stops no clock.)
+    expect(frozenWindow(undefined, { beat: "tap", at: 5000, until: 5000 })).toBeUndefined();
+    expect(stallOn({ beat: "tap", at: 5000, until: 5000 }, 5000)).toBe(false);
   });
 
-  // (A crowd move's view of him: `turn` the crowd move now; his powers', his clock's and his own fields.)
-  const view = (turn: number, extra: Record<string, unknown> = {}, dash: Record<string, unknown> = {}, boss: Record<string, unknown> = {}) =>
-    ({ id: "dash", crowdMoves: turn - 1, startMove: 1, ...boss, powers: { turn, events: [], ...extra, dash: { scramble: null, key: 7, ...dash } } }) as never;
-
-  it("the clock tap only when you're slow (Eric, Nov 17: \"it fired off like 5 seconds into the match even tho I played all my moves instantly\"): at 10 s of a bank's move, 30% of a move clock, from move 3; a quicker move gets none", () => {
-    expect([DASH_TAP.fromMove, DASH_TAP.afterMs, DASH_TAP.afterShare]).toEqual([3, 10_000, 0.3]);
-    // (Boss alone, a party: 10 s; a raid's 20 s move clock: 6 s. Moves 1 and 2: never; ?power=clocktap: from the first.)
-    expect(tapAt(view(3), 600_000, true)).toBe(10_000);
-    expect(tapAt(view(3), 20_000, false)).toBe(6_000);
-    expect(tapAt(view(9), 30_000, false)).toBe(9_000);
-    for (const turn of [1, 2]) expect(tapAt(view(turn), 600_000, true), `move ${turn}`).toBeNull();
-    expect(tapAt(view(1), 600_000, true, "clocktap")).toBe(10_000);
-    // (Never on a move with another moment of his, the re-pick after the Last Stand, a battle over, or a view from another move.)
-    for (const kind of ["slap", "flag", "clockFit", "warn", "scramble", "rushWarn"]) expect(tapAt(view(5, { events: [{ kind, turn: 5 }] }), 600_000, true), kind).toBeNull();
-    expect(tapAt(view(5, {}, { scramble: { at: 4, moves: 5, seconds: 3 } }), 600_000, true)).toBeNull();
-    expect(tapAt(view(5, {}, { rush: { at: 4, moves: [] } }), 600_000, true)).toBeNull();
-    expect(tapAt(view(6, {}, { rush: { at: 4, moves: [] } }), 600_000, true)).toBe(10_000);
-    expect(tapAt(view(5, {}, {}, { barred: "e2e4" }), 600_000, true)).toBeNull();
-    expect(tapAt(view(5, {}, {}, { result: "boss" }), 600_000, true)).toBeNull();
-    expect(tapAt(view(5, { turn: 4 }), 600_000, true)).toBeNull();
-    expect(tapAt({ ...(view(5) as object), id: "grex" } as never, 600_000, true)).toBeNull();
-  });
-
-  it("the clock tap never with the stall skit's slam: it ends by the slam's time (20 s of a bank, 50% of a move clock) and your time's end, else it waits for a later move", () => {
-    const total = tapTimeline().total;
-    for (const bank of [true, false])
-      for (let ms = 3_000; ms <= 120_000; ms += 1_000) {
-        const at = tapAt(view(5), ms, bank);
-        const slam = bank ? DASH_STALL.slamSeconds * 1000 : Math.round(ms * DASH_STALL.slamShare);
-        if (at !== null) expect(at + total, `${bank ? "bank" : "move clock"} ${ms}`).toBeLessThanOrEqual(Math.min(slam, ms));
-      }
-    // (A raid's 20 s fits; a clock his slaps cut to 14 s doesn't, nor a bank with 12 s left, nor ?power=stall's early slam.)
-    expect(tapAt(view(5), 20_000, false)).not.toBeNull();
-    expect(tapAt(view(5), 14_000, false)).toBeNull();
-    expect(tapAt(view(5), 12_000, true)).toBeNull();
-    expect(tapAt(view(5), 600_000, true, "stall")).toBeNull();
-    // (His fake move spent: no beat of the skit left to clash with.)
-    expect(tapAt(view(5, {}, { stall: { at: 2, move: "g8f6" } }), 600_000, true, "stall")).toBe(10_000);
-  });
-
-  it("the clock tap once a battle on this screen, a reload included (the battle's tag kept); the next battle has its own", () => {
-    const a = tapBattle(view(5));
-    const b = tapBattle(view(5, {}, { key: 8 }));
-    expect(a).not.toBe(b);
-    expect(tapBattle(view(9))).toBe(a);
-    expect(tapSpent(a)).toBe(false);
-    spendTap(a);
-    expect(tapSpent(a)).toBe(true);
-    expect(tapSpent(b)).toBe(false);
-    spendTap(b);
-    expect(tapSpent(b)).toBe(true);
-  });
-
-  it("the clock tap is screen only: no moment of his for it, so his move keeps its own line", async () => {
+  it("the clock tap is no moment of his: his move keeps its own line", async () => {
     const { quietMove } = await import("../src/components/BossCharacter.tsx");
     const fen = "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1";
     const boss = (kinds: string[]) => ({ id: "dash", name: "Dash", crowdSide: "w", board: { fen }, powers: { events: kinds.map((kind) => ({ kind, turn: 5 })) } }) as never;

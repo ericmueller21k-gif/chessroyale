@@ -101,7 +101,7 @@ export type PowerId = "freeze" | "blizzard" | "pie" | "funhouse" | "sparkler" | 
 export const POWER_IDS: readonly PowerId[] = ["freeze", "blizzard", "pie", "funhouse", "sparkler", "candle", "dark", "lightsout", "blocks", "bounce", "cuts", "boardsaw", "drag", "showdown", "nohelp", "bullet", "tusks", "slam", "leapfrog", "carrotpatch", "camouflage", "repaint", "moonbeam", "fullmoon", "seeds", "water", "balloons", "hoops", "draft", "crease", "revision", "scraps", "gnaw", "clockslap", "scramble", "rush", "clockfit", "popoff", "split", "dough", "goldplate", "lockon", "dodge", "scatter", "beam", "shields", "rapidfire", "queenlock"];
 /**
  * Test switches that aren't a power of their own (?power=<id>), for one boss's moments: Dash's stall skit early (`stall`: its slam and
- * fake move a few seconds into the first move it can come on) and his lying-down clock tap from the first move (`clocktap`; screen only: DashTap in the app's DashStall.tsx).
+ * fake move a few seconds into the first move it can come on) and his lying-down clock tap from the first move (`clocktap`).
  */
 export const POWER_TEST_SWITCHES: readonly string[] = ["stall", "clocktap"];
 
@@ -1155,6 +1155,11 @@ export interface DashState {
    * slam it comes alone on a later move.
    */
   stall?: { at: number; move: string } | null;
+  /**
+   * His lying-down clock tap (once a battle; Eric, Nov 17; DASH_TAP): it came on the crowd move after crowd move `at`, as your move's
+   * clock reached its time (stallPlan's `tapAt`); nothing more of his came on that move.
+   */
+  tap?: { at: number } | null;
 }
 
 /**

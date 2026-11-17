@@ -731,9 +731,12 @@ export interface NetBossBrain {
   stockfishShare?: number;
 }
 
-/** Dash's stall skit's beat (the "stall" message; a round's `stall`): the slam, or his fake move `move`, from `at` to `until`. */
+/**
+ * Dash's beat on this move (the "stall" message; a round's `stall`): his stall skit's slam, or his fake move `move`, from `at` to
+ * `until`; or his lying-down clock tap (`tap`, `at` = `until`: no pause), lying by your clock until you move.
+ */
 export interface NetStall {
-  beat: "slam" | "fake";
+  beat: "tap" | "slam" | "fake";
   at: number;
   until: number;
   move?: string;

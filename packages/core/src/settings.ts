@@ -2175,13 +2175,14 @@ export const DASH_STALL = {
 
 /**
  * Dash's lying-down clock tap (Eric, Nov 17: "once per game he goes down laying down with his chess clock by your clock… and starts
- * tapping it for a few seconds"; a bored "hurry up", so only when you're slow: "it fired off like 5 seconds into the match even tho I
- * played all my moves instantly"): once a battle, from crowd move `fromMove`, on the first move of yours that runs `afterMs` of a
- * bank's clock (Boss alone, a party) or `afterShare` of a move clock (a raid, a group battle: 6 s of 20); `tapMs` of taps. Never on a
- * move with another moment of his, and it ends before his stall skit's slam could come (DASH_STALL), else a later move. Your move
- * before then: nothing, still armed. Screen only (DashTap in the app's DashStall.tsx): your clock keeps running as ever.
+ * tapping it"; a bored "hurry up", so only when you're slow: "it fired off like 5 seconds into the match even tho I played all my
+ * moves instantly"): once a battle, from crowd move `fromMove`, as a move of yours runs `afterMs` of a bank's clock (Boss alone, a
+ * party) or `afterShare` of a move clock (a raid, a group battle: 6 s of 20); timed with his stall skit's beats (stallPlan), never on
+ * its move ("the bigger gag is reserved for another turn"). He lies by your clock until you move ("stay in the crawl position"),
+ * `boredMs` after lying down still no move: his "not moving till you do" line; your move before he's down: his crawl still
+ * finishes, his "just a joke" line, `jokeMs`, then up. Your clock keeps running as ever.
  */
-export const DASH_TAP = { fromMove: 3, afterMs: 10_000, afterShare: 0.3, tapMs: 3000 } as const;
+export const DASH_TAP = { fromMove: 3, afterMs: 10_000, afterShare: 0.3, boredMs: 20_000, jokeMs: 1800 } as const;
 
 /**
  * The Hidden Boss's phase 2 (Eric, Oct 14; DECISIONS.md, "The Hidden Boss, phase 2"): four boards of Chess960 at once,

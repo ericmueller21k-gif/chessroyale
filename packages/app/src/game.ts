@@ -218,7 +218,8 @@ export interface StrikeState {
  * already includes it); the board takes no move during the fake move.
  */
 export interface StallState {
-  beat: "slam" | "fake";
+  /** (`tap`: his lying-down clock tap began at `at`; no pause, `until` = `at`. DashTap in DashStall.tsx.) */
+  beat: "tap" | "slam" | "fake";
   at: number;
   until: number;
   move?: string;

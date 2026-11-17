@@ -28021,3 +28021,26 @@ body.cs-on .mm-scrim {
 body.dash-away .boss-char .boss-char-sprite {
   visibility: hidden;
 }
+/* (His words stand over him while he's down there, not in their usual box: Eric, Nov 17, "it should show above him like over the
+   board a bit". A point centered on him at his cap's top, never under the time's top; as the Hidden Boss's .rc-say-at.) */
+body.dash-away .bc-bubble:not(.dash-say) {
+  display: none;
+}
+.dash-say-at {
+  position: fixed;
+  z-index: 56;
+  width: 600px;
+  height: 0;
+  pointer-events: none;
+}
+.dash-say-at > .dash-say {
+  left: 0;
+  right: 0;
+  bottom: 6px;
+  margin-inline: auto;
+}
+.dash-say-at > .dash-say::after {
+  left: 50%;
+  right: auto;
+  margin-left: -6px;
+}

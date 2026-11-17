@@ -4,10 +4,10 @@ import { DASH_STALL, DASH_TAP } from "@chessroyale/core";
 import { applyMove, passTurn, stallTimeline } from "@chessroyale/chess";
 import { hash } from "../characters/boss-beats.ts";
 import { DASH_FIGURE } from "../characters/dash-figure.ts";
-import { DASH_STALL_LINES, DASH_TAP_LINES } from "../characters/dash-lines.ts";
+import { DASH_STALL_LINES, DASH_TAP_BORED_LINES, DASH_TAP_JOKE_LINES, DASH_TAP_LINES } from "../characters/dash-lines.ts";
 import { DASH_LIE } from "../characters/dash-lie.ts";
 import { bossKit } from "../characters/kits.ts";
-import { CRITICAL, NORMAL, bossVoice } from "../speech.tsx";
+import { CRITICAL, NORMAL, VoiceBubble, bossVoice } from "../speech.tsx";
 import { SpriteAnim } from "./BossEffect.tsx";
 import type { BossView, StallState, StrikeState } from "../game.ts";
 import { playInPlace, stopInPlace } from "./BossCharacter.tsx";
@@ -34,7 +34,8 @@ const keyOf = (boss: BossView, beat: string) => `dash-stall:${boss.startMove}:${
  */
 export function frozenWindow(strike?: StrikeState, stall?: StallState | null): { at: number; until: number } | undefined {
   const s = strike?.at !== undefined && strike.until !== undefined ? { at: strike.at, until: strike.until } : undefined;
-  const d = stall ? { at: stall.at, until: stall.until } : undefined;
+  // (His clock tap stops no clock.)
+  const d = stall && stall.beat !== "tap" ? { at: stall.at, until: stall.until } : undefined;
   return s && d ? (d.at >= s.at ? d : s) : (s ?? d);
 }
 
@@ -73,7 +74,7 @@ function slamRun(): string[] {
  */
 export function DashStall({ boss, stall }: { boss: BossView | null | undefined; stall: StallState | null | undefined }) {
   useEffect(() => {
-    if (!stall || boss?.id !== "dash") return;
+    if (!stall || stall.beat === "tap" || boss?.id !== "dash") return;
     const key = keyOf(boss, stall.beat);
     const timers: number[] = [];
     const at = (t: number, f: () => void) => void timers.push(window.setTimeout(f, Math.max(0, t - Date.now())));
@@ -103,60 +104,28 @@ export function DashStall({ boss, stall }: { boss: BossView | null | undefined; 
 
 const animMs = (name: string) => DASH_LIE.anims[name]!.frames.reduce((t, f) => t + f.ms, 0);
 
+/** His lie-down and his getting up (ms): the crawl in always plays to its end (Eric, Nov 17: "let the crawl finish"). */
+export const tapLengths = () => ({ down: animMs("lieDown"), up: animMs("getUp") });
+
 /**
- * His lying-down clock tap's beats (ms from his lie-down): he zips in and lies down by your clock (`lieDown`), taps his for
- * DASH_TAP.tapMs (`idle`, a tick a tap), then springs up and zips off (`getUp`); his figure where he stands is away meanwhile. Your
- * move cuts it short (he gets up at once).
+ * His clock tap on screen, from his lie-down at `at` (his rules' tap beat, solo's or the server's): down `down` ms later; up when
+ * your move is in (`moved`), or, your move in before he was down, after his "just a joke" line (DASH_TAP.jokeMs from his landing,
+ * `joke`); gone `up` ms after that. `upAt` Infinity: still lying (your move still open). His "not moving till you do" line at
+ * `boredAt`.
  */
-export function tapTimeline() {
-  const upAt = animMs("lieDown") + DASH_TAP.tapMs;
-  return { upAt, total: upAt + animMs("getUp") };
+export function tapTimeline(at: number, moved: number | undefined) {
+  const { down, up } = tapLengths();
+  const downAt = at + down;
+  const joke = moved !== undefined && moved < downAt;
+  const upAt = moved === undefined ? Infinity : joke ? downAt + DASH_TAP.jokeMs : moved;
+  return { downAt, joke, upAt, endAt: upAt + up, boredAt: downAt + DASH_TAP.boredMs };
 }
 
 /**
- * When on this move his clock tap would start (ms of your move's own clock), or null: not on this move (Eric, Nov 17: only when
- * you're slow; DASH_TAP). From crowd move DASH_TAP.fromMove (?power=clocktap: the first), never on a move with another moment of
- * his (an event this turn, a Time Scramble's move, his Scramble Rush's turn) nor the re-pick after the God King's Last Stand: at
- * `afterMs` of a bank's move (`bank`: Boss alone, a party) or `afterShare` of the move's clock (`allowedMs`: a raid, a group
- * battle), and only when all of it ends before his stall skit's slam could come (DASH_STALL; his fake move still to come) and
- * before your time's up. Spent (once a battle) is the screen's to know: tapSpent.
+ * Where his lying figure goes: beside your clock (the dock's time), its clock against the time, his feet on its line; and the point
+ * his words stand on (`say`): over him, centered on him, never lower than the time's top (so never over him or the digits).
  */
-export function tapAt(boss: BossView | null | undefined, allowedMs: number, bank: boolean, test = ""): number | null {
-  const p = boss?.id === "dash" ? boss.powers : null;
-  const d = p?.dash;
-  if (!boss || !p || !d || boss.result || boss.barred) return null;
-  const turn = boss.crowdMoves + 1;
-  if (turn < (test === "clocktap" ? 1 : DASH_TAP.fromMove) || p.turn !== turn || p.events.length || d.scramble || (d.rush && d.rush.at >= boss.crowdMoves)) return null;
-  const at = bank ? DASH_TAP.afterMs : Math.round(allowedMs * DASH_TAP.afterShare);
-  const slam = d.stall ? Infinity : test === "stall" ? DASH_STALL.test.slamAt : bank ? DASH_STALL.slamSeconds * 1000 : Math.round(allowedMs * DASH_STALL.slamShare);
-  return at + tapTimeline().total <= Math.min(slam, allowedMs) ? at : null;
-}
-
-/**
- * The battle his tap came in on this device (its tag: the battle's first move and DashView's `key`), kept across a reload so a
- * reconnect never plays it again; in memory where the browser keeps nothing.
- */
-const TAP_KEY = "brc.dashTap";
-let tapMemory = "";
-export const tapBattle = (boss: BossView): string => `${boss.startMove}:${boss.powers?.dash?.key ?? "?"}`;
-export function tapSpent(battle: string): boolean {
-  try {
-    return (localStorage.getItem(TAP_KEY) ?? tapMemory) === battle;
-  } catch {
-    return tapMemory === battle;
-  }
-}
-export function spendTap(battle: string) {
-  tapMemory = battle;
-  try {
-    localStorage.setItem(TAP_KEY, battle);
-  } catch {
-    // (Memory only.)
-  }
-}
-
-/** Where his lying figure goes: beside your clock (the dock's time), its clock against the time, his feet on its line. */
-function placeLie(el: HTMLElement) {
+function placeLie(el: HTMLElement, say: HTMLElement | null) {
   const time = document.querySelector<HTMLElement>(".dk-clock .dk-time") ?? document.querySelector<HTMLElement>(".dk-clock");
   const t = time?.getBoundingClientRect();
   if (!t || !t.width) return false;
@@ -174,96 +143,82 @@ function placeLie(el: HTMLElement) {
   // he lies on its right.)
   const left = t.left - 4 - w;
   const mirror = left >= 4;
-  el.style.left = `${mirror ? left : Math.min(window.innerWidth - w - 4, t.right + 4)}px`;
-  el.style.top = `${t.bottom + 2 - h * floor}px`;
+  const x = mirror ? left : Math.min(window.innerWidth - w - 4, t.right + 4);
+  const y = t.bottom + 2 - h * floor;
+  el.style.left = `${x}px`;
+  el.style.top = `${y}px`;
   el.style.width = `${w}px`;
   el.style.height = `${h}px`;
   el.classList.toggle("mirror", mirror);
+  if (say) {
+    say.style.left = `${x + w / 2 - 300}px`;
+    say.style.top = `${Math.min(y + 9 * k, t.top)}px`;
+  }
   return true;
 }
 
 /**
- * Dash's lying-down clock tap on your move (Eric, Nov 17: "once per game he goes down laying down with his chess clock by your
- * clock… and starts tapping it for a few seconds"; only when you're taking a while: tapAt): beside your clock under the board
- * (DockClock's time, phone and computer alike), never over the board's squares or the time's digits, on the page's top layer (a
- * portal, placed once as it shows, then still). Decided by this screen's own clock, solo and online alike (no rules event): your
- * move's clock (`startsAt`, `frozen`: the King's strike's pause left out) reaching tapAt. Your clock runs as ever. Not with a stall
- * beat of his on this move (`stalled`).
+ * Dash's lying-down clock tap (Eric, Nov 17: "once per game he goes down laying down with his chess clock by your clock… and starts
+ * tapping it"; only when you're slow: his rules' tap beat, at 10 s of your move or 30% of its clock, solo's or the server's, the
+ * play phase's `stall` with beat `tap`). He zips down beside your clock under the board (DockClock's time, phone and computer alike),
+ * never over the board's squares or the time's digits, on the page's top layer (a portal, placed once as it shows, then still), and
+ * stays there tapping his clock until your move is in ("stay in the crawl position"); then he zips back. His crawl in always
+ * finishes: your move in before he's down, "just a joke" first. His words stand over him meanwhile ("his chat box didn't follow
+ * him"), his figure and its usual box away. Drawn beside the match's screens, so a move going in (its screen changing) doesn't cut
+ * him off. A reconnect mid-tap: he's lying.
  */
-export function DashTap({
-  boss,
-  startsAt,
-  allowedMs,
-  bank,
-  test,
-  frozen,
-  stalled,
-  waiting,
-}: {
-  boss: BossView | null | undefined;
-  startsAt: number;
-  allowedMs: number;
-  bank: boolean;
-  test: string;
-  frozen?: { at: number; until: number };
-  stalled: boolean;
-  waiting: boolean;
-}) {
-  const turn = boss?.crowdMoves ?? -1;
+export function DashTap({ match }: { match: { boss: BossView | null; phase: { kind: string; stall?: StallState | null } } }) {
+  const boss = match.boss;
+  const ph = match.phase;
+  const live = boss?.id === "dash" && (ph.kind === "play" || ph.kind === "scoring") && ph.stall?.beat === "tap" ? ph.stall : null;
+  // (His tap on this move: when he lay down, the move it is, and when your move went in.)
+  const tap = useRef<{ at: number; turn: number; moved?: number } | null>(null);
+  if (live && boss && tap.current?.at !== live.at) tap.current = { at: live.at, turn: boss.crowdMoves };
+  const t = tap.current;
   const now = Date.now();
-  // (When it came on this move: its lie-down, on the wall clock.)
-  const came = useRef<{ turn: number; at: number } | null>(null);
-  if (boss && !waiting && !stalled && startsAt > 0 && came.current?.turn !== turn) {
-    const at = tapAt(boss, allowedMs, bank, test);
-    // (The wall time your move's clock reaches it: a pause of the clock before then pushes it back.)
-    let lie = at === null ? 0 : startsAt + at;
-    if (lie && frozen && frozen.at >= startsAt && frozen.at < lie) lie += frozen.until - frozen.at;
-    const battle = tapBattle(boss);
-    // (Only while it's still on: a screen back after its whole tap leaves it armed for a later move.)
-    if (lie && now >= lie && now < lie + tapTimeline().upAt && (!frozen || now < frozen.at || now >= frozen.until) && !tapSpent(battle)) {
-      spendTap(battle);
-      came.current = { turn, at: lie };
-    }
-  }
-  const from = came.current?.turn === turn ? came.current.at : 0;
-  const tl = tapTimeline();
-  // (Your move went in before he was up: he gets up now.)
-  const [cut, setCut] = useState<{ turn: number; at: number } | null>(null);
-  useEffect(() => {
-    const t = Date.now();
-    if (waiting && from && t < from + tl.upAt && cut?.turn !== turn) setCut({ turn, at: t });
-  }, [waiting, from]);
-  const upAt = cut?.turn === turn ? cut.at : from + tl.upAt;
-  const endAt = upAt + animMs("getUp");
-  const shown = !!from && now < endAt;
+  if (t && t.moved === undefined && !(ph.kind === "play" && boss?.crowdMoves === t.turn)) t.moved = now;
+  const tl = t ? tapTimeline(t.at, t.moved) : null;
+  const shown = !!tl && now < tl.endAt;
   const [, redraw] = useState(0);
   useEffect(() => {
-    if (!from) return;
-    const marks = [upAt, endAt].filter((t) => t > Date.now());
-    const timers = marks.map((t) => window.setTimeout(() => redraw((n) => n + 1), t - Date.now() + 5));
+    if (!tl || !shown) return;
+    const marks = [tl.downAt, tl.upAt, tl.endAt, tl.boredAt].filter((m) => m > Date.now() && m < Infinity);
+    const timers = marks.map((m) => window.setTimeout(() => redraw((n) => n + 1), m - Date.now() + 5));
     return () => timers.forEach(clearTimeout);
-  }, [from, upAt]);
-  // (His line as he lies down; his figure where he stands away meanwhile.)
+  }, [t?.at, t?.moved, shown]);
+  // (His lines: as he's down, the tap's (or, your move already in, the joke); still lying boredMs later, the bored one.)
+  const key = t && boss ? `dash-tap:${boss.startMove}:${t.turn}` : "";
+  const down = !!tl && now >= tl.downAt;
+  const bored = !!tl && now >= tl.boredAt && now < tl.upAt;
   useEffect(() => {
-    if (!shown || !boss) return;
-    const key = `dash-tap:${boss.startMove}:${turn}`;
-    bossVoice.say(DASH_TAP_LINES[hash(key) % DASH_TAP_LINES.length]!, key, NORMAL);
-  }, [shown && turn]);
+    if (!down || !tl) return;
+    if (tl.joke) bossVoice.say(DASH_TAP_JOKE_LINES[hash(key) % DASH_TAP_JOKE_LINES.length]!, `${key}:joke`, CRITICAL);
+    else if (now < tl.upAt) bossVoice.say(DASH_TAP_LINES[hash(key) % DASH_TAP_LINES.length]!, key, NORMAL);
+  }, [down && key]);
+  useEffect(() => {
+    if (bored) bossVoice.say(DASH_TAP_BORED_LINES[hash(key) % DASH_TAP_BORED_LINES.length]!, `${key}:bored`, CRITICAL);
+  }, [bored && key]);
   useEffect(() => {
     if (typeof document === "undefined") return;
     document.body.classList.toggle("dash-away", shown);
     return () => document.body.classList.remove("dash-away");
   }, [shown]);
   const ref = useRef<HTMLDivElement>(null);
+  const sayRef = useRef<HTMLSpanElement>(null);
   useLayoutEffect(() => {
-    if (shown && ref.current) placeLie(ref.current);
+    if (shown && ref.current) placeLie(ref.current, sayRef.current);
   }, [shown]);
-  if (!shown || typeof document === "undefined") return null;
-  const up = now >= upAt;
+  if (!shown || !tl || !t || typeof document === "undefined") return null;
+  const up = now >= tl.upAt;
   return createPortal(
-    <div ref={ref} class="dash-lie" aria-hidden="true" data-beat={up ? "up" : "tap"}>
-      <SpriteAnim ch={DASH_LIE} anim={up ? "getUp" : "lieDown"} since={up ? upAt : from} then={up ? undefined : "idle"} sounds={bossKit(boss!.name)?.sounds ?? {}} id={`tap:${turn}`} class="dash-lie-sprite" />
-    </div>,
+    <>
+      <div ref={ref} class="dash-lie" aria-hidden="true" data-beat={up ? "up" : "tap"}>
+        <SpriteAnim ch={DASH_LIE} anim={up ? "getUp" : "lieDown"} since={up ? tl.upAt : t.at} then={up ? undefined : "idle"} sounds={bossKit(boss?.name ?? "Dash")?.sounds ?? {}} id={`tap:${t.at}`} class="dash-lie-sprite" />
+      </div>
+      <span ref={sayRef} class="dash-say-at">
+        <VoiceBubble voice={bossVoice} class="bc-bubble dash-say" />
+      </span>
+    </>,
     document.body,
   );
 }
