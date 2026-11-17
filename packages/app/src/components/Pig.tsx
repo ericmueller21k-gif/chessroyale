@@ -204,8 +204,12 @@ const SLIDE_OVERLAP = 60;
 
 // ---------------- SHOWDOWN! ----------------
 
-/** His fists' place on the board while he hauls from his corner (% of the board), drawn mirrored or not: the ropes run from them. */
-const fistsAt = (mirrored: boolean): Pt[] => HAUL_FISTS.map(([x, y]) => ({ x: CORNER.x + (drawnX(PIG, x, mirrored) - PIG.foot[0]) * PX, y: CORNER.y + (y - PIG.foot[1]) * PX }));
+/**
+ * His fists' place on the board while he hauls from his corner (% of the board), drawn mirrored or not: the ropes run from them, the
+ * fist on our left first (the crowd's ropes, as drawn unmirrored), so they don't cross when he's turned.
+ */
+const fistsAt = (mirrored: boolean): Pt[] =>
+  HAUL_FISTS.map(([x, y]) => ({ x: CORNER.x + (drawnX(PIG, x, mirrored) - PIG.foot[0]) * PX, y: CORNER.y + (y - PIG.foot[1]) * PX })).sort((a, b) => a.x - b.x);
 
 /** Each pair's yank: when it starts and ends (ms into the moment). */
 const yankOf = (k: number) => ({ t0: SHOWDOWN.pairs[k] ?? SHOWDOWN.pairs[SHOWDOWN.pairs.length - 1]! + (k - SHOWDOWN.pairs.length + 1) * 500, ms: SHOWDOWN.yankMs });
