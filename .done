@@ -1,6 +1,0 @@
-dash-watchers-pause: done.
-- Finding 5 fixed in lock() (a round done in the fake move's hold locks at fake.until), test in dash-lobby.test.ts (fails without it).
-- Finding 4: no code. Nobody can watch a boss battle from outside the round (deal() puts everyone alive in it; spectatorsWatch()
-  needs crowdCuts, which never reach a final, so never a boss). Recorded in docs/decisions/2026-11-17-dash-pause-watchers.md,
-  with a comment at both sends. No protocol change.
-- Checks: typecheck, server unit tests (1294), e2e dash + boss-smoke phone (29): all pass. PR body: .pr-body.md.
