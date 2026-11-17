@@ -1,3 +1,4 @@
+- Nov 17 19:08 UTC: moo cinematic .done -> #776 (87aff8d), CI watched, GIFs sent; review helper (review/moo-cinematic). Running: 2 reviewers (high). Queue: pm-caster-mirror, dash findings 4+5.
 - Nov 17 19:05 UTC: dash tap .done -> #775 (57b2c26), CI watched; review helper session_01JuCWRvBnv4A7GdwWskYHJW (review/dash-tap-slow). Moo phase 2 running. Watchers armed.
 - Nov 17 18:40 UTC: Eric: tap and stall never share a move ("reserved for another turn"). Sent to dash-tap helper: tap start becomes a timed beat (solo + server) and drops that move stall beats. Now touches server timing -> needs the boss-lane review pass before merge.
 - Nov 17 18:35 UTC: Eric: crawl always finishes (instant move -> "ayy homie relax it is just a joke"), he stays lying until you move, 20 s later "bro I am not moving till you do". Read "entire match" as that move. Sent to dash-tap helper; slam/fake interrupt the lie.
