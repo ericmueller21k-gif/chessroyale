@@ -1,0 +1,5 @@
+# Dash's clock tap only when you're slow (Nov 17, 2026)
+
+Eric (with a screenshot of it at move 4, his moves in 0-2 s): "Bugged already, it fired off like 5 seconds into the match even tho I played all my moves instantly". It was a seeded turn 3-9, 900 ms into that move, however fast you played.
+- **Now** (the director's call): once a battle, from move 3, on the first move of yours that runs 10 s of a bank (Boss alone, a party) or 30% of a move clock (raids, group battles: 6 s of 20); a move before then gets nothing and it stays armed (`DASH_TAP`). Never on a move with another moment of his; it ends before his stall skit's slam (20 s / 50%) could come, else a later move (a 20 s clock just fits; one his slaps cut to 14 s doesn't). `?power=clocktap`: the same from move 1.
+- **The screen's own clock decides** (`tapAt`, `DashTap` in DashStall.tsx), solo and online alike: no rules event (`clockTap`, `tapTurn` and `DashState.tap` are gone). Once a battle per screen, a reload included: the battle's tag (`DashView.key`, 12 bits from the seed, as Hollow's `lights`) is kept in localStorage as it starts. *(mine)*
