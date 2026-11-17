@@ -533,6 +533,8 @@ export interface Pose {
   capAt?: Pt;
   /** The whole of him moved sideways (zipping in). */
   dx?: number;
+  /** Angry brows: the inner ends down hard (his stall skit's slam). */
+  angry?: boolean;
 }
 const r2 = (v: number) => Math.round(v * 2) / 2;
 const toward = (p: Pt, q: Pt, d: number): Pt => {
@@ -627,7 +629,7 @@ export function layers(pose: Pose = {}): Layer[] {
     Hd(placed("head", head)),
     Hd(placed(`mouth:${mk}`, () => (mk === "smirk" || mk === "grin" ? mouth(mk) : mouth2(mk)))),
     Hd(placed(`eyes:${lid}:${look}`, () => (OLD_EYES.includes(lid) ? eyes(lid as Eyes, look) : eyes2(lid as Exclude<Eyes2, Eyes>, look)))),
-    pose.worry ? Hd(placed("browWorry", browWorry)) : Hd(placed(`brow:${pose.brow ?? 0}`, () => brow(pose.brow ?? 0))),
+    pose.worry ? Hd(placed("browWorry", browWorry)) : pose.angry ? Hd(placed("browAngry", browAngry)) : Hd(placed(`brow:${pose.brow ?? 0}`, () => brow(pose.brow ?? 0))),
     at(placed("cap", cap), hd[0] + cp[0], dy + hd[1] + cp[1]),
     ...clockL,
     ...(pose.blur ? [nearArm(pose.blur)] : []),
@@ -1021,6 +1023,95 @@ const victory: Anim = lazyAnim(() => ({
   ),
 }));
 
+// ================================================================================================================
+// ---- His stall skit (Eric, Nov 17): slam (loop), fakeSmug (loop), jkLaugh. Added below; nothing above changes. One new
+// pose field (`angry`) and one new part (`browAngry`).
+// ================================================================================================================
+
+/** Angry brows: the inner ends (toward the nose) pulled down hard over the eyes. */
+function browAngry(): P {
+  return painted(22, 21, 18, 6, (_F, S) => {
+    S(["....sss", "..sss..", "sss...."], 31, 22);
+    S(["s..", ".ss"], 24, 23);
+  }, false);
+}
+
+/** Slam (loop, 2 slams, 760 ms): the clock held out toward the board, the paw wound up high, hammered down (sparks, the
+ * clock jolts, the flag jumps), a quick second slam, back up. Fed up: angry brows, ears back, gritted teeth, a yell. */
+const HOLD: Pt = [-4, -6];
+const JOLT: Pt = [-4, -4];
+const SLAM_AT = (c: Pt): Pt => [25.5 + c[0], 54 + c[1]];
+const smear = (pts: readonly Pt[]): Speck[] => pts.map(([x, y], i) => sp(x, y, ["N", "N", "M", "M", "J", "J"][i] ?? "J"));
+const ANGRY: Pose = { angry: true, ears: 3, eyes: "half" };
+const slam: Anim = {
+  loop: true,
+  frames: [
+    F(140, { ...ANGRY, clock: HOLD, at: [60, 21], gesture: "open", lift: 2, head: [1, -1], mouth: "grimace", tail: 3 }),
+    F(40, { ...ANGRY, clock: HOLD, at: [34, 46], gesture: "open", lift: 1, head: [0, 0], mouth: "wide", tail: 2 }, {
+      specks: [...smear([[56, 27], [55, 29], [54, 31], [53, 33], [52, 35], [51, 37]]), ...smear([[61, 29], [60, 31], [59, 33], [58, 35], [57, 37]]), ...smear([[47, 31], [46, 33], [45, 35]])],
+    }),
+    F(120, { ...ANGRY, eyes: "shut", clock: JOLT, at: SLAM_AT(JOLT), gesture: "open", press: true, sink: 2, head: [-1, 2], mouth: "wide", flag: 1, flagY: 3, tail: -2 }, {
+      cue: "slam",
+      shake: [0, 2],
+      specks: bigClick(JOLT[1] + 2, 0, JOLT[0]),
+    }),
+    F(80, { ...ANGRY, clock: [-4, -5], at: [24, 47.5], gesture: "open", sink: 1, head: [0, 0], mouth: "grimace", flag: -1, flagY: 1, tail: -1 }, {
+      specks: bigClick(-5 + 1, 1, -4),
+    }),
+    F(70, { ...ANGRY, clock: HOLD, at: [55, 33], gesture: "open", lift: 1, head: [1, 0], mouth: "grimace", flag: 1, tail: 1 }),
+    F(110, { ...ANGRY, eyes: "shut", clock: JOLT, at: SLAM_AT(JOLT), gesture: "open", press: true, sink: 2, head: [-1, 2], mouth: "wide", flag: -1, flagY: 3, tail: -2 }, {
+      cue: "slam",
+      shake: [1, 1],
+      specks: bigClick(JOLT[1] + 2, 0, JOLT[0]),
+    }),
+    F(90, { ...ANGRY, clock: [-4, -5], at: [25, 47.5], gesture: "open", sink: 1, head: [0, 0], mouth: "grimace", flag: 1, flagY: 1, tail: 0 }, {
+      specks: bigClick(-5 + 1, 1, -4),
+    }),
+    F(110, { ...ANGRY, clock: HOLD, at: [57, 27], gesture: "open", lift: 1, head: [1, 0], mouth: "grimace", flag: -1, tail: 2 }),
+  ],
+};
+
+/** FakeSmug (loop, 1290 ms): "I'm going again": leaning back, chin up, sly at us, buffing his claws on his jacket, then a
+ * slow finger gun at the board (his second move) and back; the tail flicking. */
+const SMUG: Pose = { head: [2, -1], eyes2: "sly", mouth: "grin", brow: 1 };
+const fakeSmug: Anim = {
+  loop: true,
+  frames: [
+    F(150, { ...SMUG, at: [39, 51], tail: 0 }),
+    F(150, { ...SMUG, at: [41, 53], tail: 2 }),
+    F(150, { ...SMUG, at: [39, 51], tail: 3 }),
+    F(150, { ...SMUG, at: [41, 53], tail: 1 }, { specks: [sp(37, 49, "O"), sp(36, 48, "Y"), sp(38, 50, "Y")] }),
+    F(130, { ...SMUG, at: [30, 47], gesture: "point", head: [1, -1], tail: -1 }),
+    F(420, { ...SMUG, at: POINT, gesture: "point", head: [1, -1], brow: 2, tail: -2 }, { specks: star(POINT[0] - 10, POINT[1] - 1) }),
+    F(140, { ...SMUG, at: [34, 50], tail: -1 }),
+  ],
+};
+
+/** JkLaugh (once, 1390 ms): "Nahh, jk bro": he bursts out laughing, head thrown back, eyes shut, slapping his knee twice,
+ * shoulders bouncing; straightens up with a wink and a finger gun; ends on his idle's first pose. */
+const KNEE: Pt = [40, 80];
+/** Laugh lines bursting off his open mouth (x, y the burst's middle): three short dashes fanned out to our left. */
+const haha = (x: number, y: number): Speck[] => [
+  sp(x, y - 5, "O"), sp(x - 1, y - 6, "N"), sp(x - 2, y - 7, "M"),
+  sp(x - 1, y, "O"), sp(x - 2, y, "N"), sp(x - 3, y, "M"),
+  sp(x, y + 5, "O"), sp(x - 1, y + 6, "N"), sp(x - 2, y + 7, "M"),
+];
+const jkLaugh: Anim = {
+  loop: false,
+  frames: [
+    F(120, { head: [3, -2], eyes2: "joy", mouth: "wide", brow: 2, ears: 1, at: [53, 38], gesture: "open", lift: 2, tail: 3 }, { cue: "laugh", specks: haha(17, 34) }),
+    F(110, { head: [-1, 2], eyes2: "joy", mouth: "wide", brow: 1, at: KNEE, gesture: "open", sink: 2, tail: -1 }, { shake: [0, 1], specks: [sp(35, 82, "O"), sp(34, 79, "N"), sp(47, 80, "N"), sp(36, 85, "M")] }),
+    F(100, { head: [3, -2], eyes2: "joy", mouth: "wide", brow: 2, ears: 1, at: [51, 42], gesture: "open", lift: 1, tail: 3 }, { specks: haha(17, 35) }),
+    F(110, { head: [-1, 2], eyes2: "joy", mouth: "wide", brow: 1, at: KNEE, gesture: "open", sink: 2, tail: -1 }, { shake: [0, 1], specks: [sp(35, 82, "O"), sp(34, 79, "N"), sp(47, 80, "N"), sp(36, 85, "M")] }),
+    F(100, { head: [2, -1], eyes2: "joy", mouth: "wide", brow: 1, at: [44, 58], gesture: "open", lift: 1, tail: 2 }, { specks: haha(16, 36) }),
+    F(100, { head: [2, 0], eyes2: "joy", mouth: "grin", brow: 1, at: [44, 58], gesture: "open", sink: 1, tail: 0 }),
+    F(100, { head: [1, -1], eyes2: "joy", mouth: "wide", brow: 1, at: [44, 58], gesture: "open", lift: 1, tail: 1 }),
+    F(90, { eyes2: "us", mouth: "grin", brow: 1, hand: "up", tail: 2 }),
+    F(380, { at: [24, 47], gesture: "point", eyes2: "wink", mouth: "grin", brow: 2, tail: 1 }, { specks: star(12, 44, true) }),
+    F(180, {}),
+  ],
+};
+
 export const BOSS_BLITZ: Character = {
   id: "dash",
   name: "Dash",
@@ -1030,6 +1121,6 @@ export const BOSS_BLITZ: Character = {
   palette: PALETTE,
   halo: "#3a2e22",
   parts: PARTS,
-  anims: { idle, entrance, thinking, move, capture, hurt, check, smug, rattled, defeat, victory, clockSlap, scrambleWarn, timeScramble },
+  anims: { idle, entrance, thinking, move, capture, hurt, check, smug, rattled, defeat, victory, clockSlap, scrambleWarn, timeScramble, slam, fakeSmug, jkLaugh },
 };
 

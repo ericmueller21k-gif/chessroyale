@@ -123,6 +123,8 @@ import {
   bulletClock,
   dashMoveClock,
   dashBattle,
+  stallPlan,
+  type StallPlan,
   bulletIncrement,
   stopReason,
   alfilBattle,
@@ -1544,6 +1546,25 @@ export class MatchRunner {
   /** Plays his extra move (from the host's engine online; see hollowBattle.applyExtraMove, dashBattle's). Returns it, or null. */
   applyExtraMove(move: string | null): string | null {
     return dashBattle.extraMoveDue(this.battle) ? dashBattle.applyExtraMove(this.battle, move) : hollowBattle.applyExtraMove(this.battle, move);
+  }
+
+  /**
+   * Dash's stall skit on the crowd move about to be picked (stallPlan: once a battle, null when not on this move): when its slam and
+   * its fake move come on the move's clock (`playerId`'s; the crowd's first by default), and the move he takes back. The round's
+   * timer (solo.ts, the lobby) plays the beats, stops the clock for them and calls `stalled` as the fake move comes.
+   */
+  stallPlan(playerId?: string): StallPlan | null {
+    const boss = this.state.boss;
+    if (!boss || boss.id !== "dash" || this.bossToMove() || this.isFinal()) return null;
+    const id = playerId ?? this.alive()[0]?.id;
+    const board = this.boards.get(this.state.boards[0]!);
+    if (!id || !board) return null;
+    return stallPlan(boss, board.fen, this.allowedMsFor(id), !!this.settings.bossClock, this.settings.bossPowerTest ?? "");
+  }
+
+  /** Dash's stall skit's fake move has come on this crowd move (dashBattle.stalled): once a battle. */
+  stalled(move: string): void {
+    dashBattle.stalled(this.battle, move);
   }
 
   /** Dash's Scramble Rush is due: it came as this crowd turn began, and the turn waits for it (dashBattle.rushDue). */

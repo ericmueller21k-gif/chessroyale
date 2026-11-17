@@ -123,6 +123,10 @@ const inPlace: { run: { key: string; since: number; anims: readonly string[]; mo
 export function playInPlace(key: string, anims: readonly string[], since = Date.now(), move?: FigureMove) {
   if (inPlace.run?.key !== key) inPlace.run = { key, since, anims, move };
 }
+/** Ends a run in place started with a key beginning `prefix`, if it's the one on (Dash's stall slam, cut short as your move goes in). */
+export function stopInPlace(prefix: string) {
+  if (inPlace.run?.key.startsWith(prefix)) inPlace.run = null;
+}
 /** What a run in place shows at `now`, or null once it's over (or before it starts). */
 function inPlaceShowing(ch: Character, now: number): { anim: string; frame: number; tag: string } | null {
   const run = inPlace.run;

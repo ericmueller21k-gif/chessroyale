@@ -1,6 +1,6 @@
-import { RECLUSE_CHILD, RECLUSE_CUTSCENE, RECLUSE_PHASE2, BOSS_ALONE_SCORING, bossClockSettings, BOSS_BRAIN, BOSS_POWERS, DEFAULT_SETTINGS, MATCHMAKING, type ItemLook, type MatchmakingType, botVotes, castPregameVote, clockAfterVote, closePregameVote, cutSeconds, pregameVotes, voteResultMs, type Augment, type BossBrain, type PlayerState, type Settings } from "@chessroyale/core";
+import { DASH_STALL, RECLUSE_CHILD, RECLUSE_CUTSCENE, RECLUSE_PHASE2, BOSS_ALONE_SCORING, bossClockSettings, BOSS_BRAIN, BOSS_POWERS, DEFAULT_SETTINGS, MATCHMAKING, type ItemLook, type MatchmakingType, botVotes, castPregameVote, clockAfterVote, closePregameVote, cutSeconds, pregameVotes, voteResultMs, type Augment, type BossBrain, type PlayerState, type Settings } from "@chessroyale/core";
 import { GUARD_WORDS, MatchRunner, START_FEN, baseAt, ShowdownScout, brainLine as brainWords, boardSlots, type HumanUciEngine, netBoard, type LobbyPlayer, type LivePick, toSan, type BoardSlot, type BoardState, type NetFinal, type Opening, type RoundReport, type UciEngine } from "@chessroyale/chess";
-import { type Phase2Board, bulletClock, crowdRace, phase2Numbers, phase2Standings, phase2ToMove, botRoster, bossIntroTimeline, bossThinkMs, landedEarlyMs, fullMoonMs, folioTurnMs, popOffMs, zebraTurnMs, chandyTurnMs, dodgeTimeline, dodgeArena, dodgeEndAt, dodgeOver, bossTurnShowMs, judgeTaps, bossRules, kingHelpBlocked, kingMoveMs, kingStrikeMs, lightsDeadline, lightsOutTimeline, lightsRoundEnd, lastStandMs, powerMomentMs, rushKeep, rushMovesLeft, rushSquares, rushTimeline } from "@chessroyale/chess";
+import { type Phase2Board, bulletClock, crowdRace, phase2Numbers, phase2Standings, phase2ToMove, botRoster, bossIntroTimeline, bossThinkMs, landedEarlyMs, fullMoonMs, folioTurnMs, popOffMs, zebraTurnMs, chandyTurnMs, dodgeTimeline, dodgeArena, dodgeEndAt, dodgeOver, bossTurnShowMs, judgeTaps, bossRules, kingHelpBlocked, kingMoveMs, kingStrikeMs, lightsDeadline, lightsOutTimeline, lightsRoundEnd, lastStandMs, powerMomentMs, rushKeep, rushMovesLeft, rushSquares, rushTimeline, stallTimeline, type StallPlan } from "@chessroyale/chess";
 import type { BossView, BoardView, DarkNote, ExitKind, FinalView, GameView, Hint, LightsView, MoveRecord, RushView, Phase, SimulView, Standing, VoteView } from "./game.ts";
 import { PHASE_CHANGE, Phase2Game, cueSlash, phase2Follows, phase2Mates, phaseChangeRun } from "./recluse-phase2.ts";
 import { RECLUSE_LINES } from "./characters/recluse-lines.ts";
@@ -574,6 +574,7 @@ export class SoloMatch implements GameView {
     clearPremoves(this);
     this.kingCalled = false;
     this.frozen = null;
+    this.clearStall();
     this.bossIntro();
   }
 
@@ -650,12 +651,15 @@ export class SoloMatch implements GameView {
   private callStrike() {
     const phase = this.phase;
     if (phase.kind !== "play" || phase.strike?.mine || Date.now() < this.playStartedAt - 300) return;
+    // (Not during Dash's stall beat: his skit has the clock stopped. One still to come waits for a later move: StallPlan.)
+    if (this.stallBeatOn(Date.now())) return;
     const { struck, calls } = this.runner.callStrike(HUMAN);
     const needed = Math.floor((this.runner.groups.values().next().value?.length ?? 1) / 2) + 1;
     if (!struck) return this.set({ ...phase, strike: { calls, needed, mine: true } });
     const ms = kingStrikeMs(this.settings);
     const at = Date.now();
     this.frozen = { at, until: at + ms };
+    this.cancelStall();
     this.progress.postpone(ms);
     if (this.live) for (const [id, t] of Object.entries(this.live.times)) if (this.live.startsAt + t > at) this.live.times[id] = t + ms;
     const deadline = phase.deadline + ms;
@@ -672,6 +676,7 @@ export class SoloMatch implements GameView {
   darkTry(move: string) {
     if (this.phase.kind !== "play" || !this.runner.boss || Date.now() < this.playStartedAt - 300) return;
     if (this.frozen && Date.now() < this.frozen.until) return; // While the King strikes.
+    if (this.stallHolding(Date.now())) return; // While Dash's fake move is on the board.
     if (this.darkNote?.forced || this.darkNote?.blackout) return;
     const out = this.runner.darkTry(HUMAN, move);
     if (out.kind === "move") {
@@ -1481,6 +1486,7 @@ export class SoloMatch implements GameView {
     this.runner.deal();
     this.kingCalled = false;
     this.frozen = null;
+    this.clearStall();
     this.darkNote = null;
     this.runner.prefetch();
     // (Wrangler's showdown may follow your move: this device scouts line-ups while you think.)
@@ -1496,6 +1502,71 @@ export class SoloMatch implements GameView {
     const allowed = this.runner.allowedMsFor(HUMAN);
     this.set({ kind: "play", board: boardView(board), startsAt: this.playStartedAt, deadline: this.playStartedAt + allowed, allowedMs: allowed, clock: this.runner.moveClock() });
     this.timer = setTimeout(() => this.submit(null), intro + allowed + this.settings.lateGraceMs);
+    // (Dash's stall skit, once a battle: its beats on this move's clock, if it comes on this move.)
+    const plan = this.runner.stallPlan(HUMAN);
+    if (plan) {
+      this.stall = { plan, timer: null };
+      this.armStall();
+    }
+  }
+
+  /**
+   * Dash's stall skit on this move (his rules' stallPlan; docs/decisions/2026-11-17-dash-stall.md): the slam and the fake move,
+   * each when the move's clock reaches it (its pauses left out: the King's strike, the slam), each stopping the clock for its
+   * length as the King's strike does (the deadline moved back, the bots still thinking too). The fake move is recorded as it
+   * comes (runner.stalled: once a battle); a move of yours before then leaves it armed for a later move.
+   */
+  private stall: { plan: StallPlan; slam?: { at: number; until: number }; fake?: { at: number; until: number }; timer: ReturnType<typeof setTimeout> | null } | null = null;
+  private clearStall() {
+    if (this.stall?.timer) clearTimeout(this.stall.timer);
+    this.stall = null;
+  }
+  /** The beats still to come won't (the King struck first): the skit waits for a later move. */
+  private cancelStall() {
+    if (this.stall?.timer) clearTimeout(this.stall.timer);
+    if (this.stall) this.stall.timer = null;
+  }
+  /** The windows the clock stood still this move: the King's strike and the stall's beats. */
+  private frozenWindows(): { at: number; until: number }[] {
+    return [this.frozen, this.stall?.slam, this.stall?.fake].filter((w): w is { at: number; until: number } => !!w).sort((a, b) => a.at - b.at);
+  }
+  /** Time the clock stood still this move, up to `now`. */
+  private frozenMs(now: number): number {
+    return this.frozenWindows().reduce((t, w) => t + Math.max(0, Math.min(now, w.until) - w.at), 0);
+  }
+  private stallBeatOn(now: number): boolean {
+    return [this.stall?.slam, this.stall?.fake].some((w) => !!w && now >= w.at && now < w.until);
+  }
+  private stallHolding(now: number): boolean {
+    const f = this.stall?.fake;
+    return !!f && now >= f.at && now < f.until;
+  }
+  /** The next beat, set for when the move's clock reaches it. */
+  private armStall() {
+    const st = this.stall;
+    if (!st) return;
+    const beat = !st.slam ? "slam" : !st.fake ? "fake" : null;
+    if (!beat) return;
+    let at = this.playStartedAt + (beat === "slam" ? st.plan.slamAt : st.plan.fakeAt);
+    for (const w of this.frozenWindows()) if (w.at < at) at += w.until - w.at;
+    st.timer = setTimeout(() => this.stallBeat(beat), Math.max(0, at - Date.now()));
+  }
+  private stallBeat(beat: "slam" | "fake") {
+    const phase = this.phase;
+    const st = this.stall;
+    if (phase.kind !== "play" || !st) return;
+    st.timer = null;
+    const now = Date.now();
+    const ms = beat === "slam" ? DASH_STALL.slamMs : stallTimeline().total;
+    st[beat] = { at: now, until: now + ms };
+    this.progress.postpone(ms);
+    if (this.live) for (const [id, t] of Object.entries(this.live.times)) if (this.live.startsAt + t > now) this.live.times[id] = t + ms;
+    const deadline = phase.deadline + ms;
+    if (this.timer) clearTimeout(this.timer);
+    this.timer = setTimeout(() => this.submit(null), deadline - now + this.settings.lateGraceMs);
+    if (beat === "fake") this.runner.stalled(st.plan.move);
+    this.set({ ...phase, deadline, stall: { beat, at: now, until: now + ms, ...(beat === "fake" ? { move: st.plan.move } : {}) } });
+    this.armStall();
   }
 
   /** The human's pick; final once made. */
@@ -1511,9 +1582,11 @@ export class SoloMatch implements GameView {
     if (move !== null && this.runner.boss && !(this.runner.crowdAllowed() ?? [move]).includes(move)) return;
     const now = Date.now();
     if (move !== null && this.frozen && now < this.frozen.until) return; // While the King strikes.
+    if (move !== null && this.stallHolding(now)) return; // While Dash's fake move is on the board.
     // (Only now, the move accepted: a refused one leaves the turn's timeout running, so the turn still ends.)
     if (this.timer) clearTimeout(this.timer);
-    const frozen = this.frozen ? Math.max(0, Math.min(now, this.frozen.until) - this.frozen.at) : 0;
+    const frozen = this.frozenMs(now);
+    this.cancelStall();
     const thinkMs = Math.max(0, Math.min(now - this.playStartedAt - frozen, allowed));
     const usedPowerUp = this.hint !== null;
     const inFinal = !!this.runner.final;

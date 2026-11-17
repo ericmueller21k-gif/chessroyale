@@ -1139,6 +1139,13 @@ export interface DashState {
   rushWarn?: number;
   /** His pop-off (once a battle; Eric, Nov 7): his turn `at`, it plays before his move lands, while he thinks. */
   popOff?: { at: number } | null;
+  /**
+   * His stall skit (once a battle; Eric, Nov 17; DASH_STALL): its fake move came on the crowd move after crowd move `at` (`move`:
+   * the move he played and took back). Until then it stays armed.
+   */
+  stall?: { at: number; move: string } | null;
+  /** His lying-down clock tap (once a battle; Eric, Nov 17; DASH_TAP): it came as the crowd move after crowd move `at` began. */
+  tap?: { at: number } | null;
 }
 
 /**
@@ -1631,6 +1638,8 @@ export type PowerEventKind =
   | "popOffFast"
   | "rushWarn"
   | "rushExtra"
+  // Dash's lying-down clock tap (Eric, Nov 17: once a battle, beside your clock; screen only, no clock stops).
+  | "clockTap"
   // Don Dough: a lump of dough dropped (Rising Dough), risen into his piece, squashed by yours; Gold Plate's gilding; his comment
   // on your opening.
   | "doughDrop"
