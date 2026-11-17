@@ -1,3 +1,4 @@
+- Nov 17 16:33 UTC: coin icon .done -> #773 (5d0caae), CI watched, stills sent; merge when green unless Eric objects. Art $1.29.
 - Nov 17 16:23 UTC: boss-facing helper started (claude/boss-facing), watcher armed. Running: coin-icon + boss-facing (2 high). Moo helper idle on Eric. Payments #772 held for Eric.
 - Nov 17 ~16:35 UTC: #770 Dash LIVE d2bacaf; main full run GREEN.
 - Nov 17 ~16:20 UTC: #770 Dash stall merged d2bacaf; deploy + main watched. Follow-up queued: dash findings 4 (watchers not told of pause; King strike too) + 5 (lock during hold).
