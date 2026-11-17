@@ -709,13 +709,13 @@ export function HomeScreen({
   // The bosses' tiles and faces draw from the first load's portraits (BossPortrait.tsx: nothing to make). Their figures, powers and the
   // match's screens are the match's chunk (lazy-game.ts, Nov 16: the bundle split), fetched a moment after home shows (where the tiles'
   // faces were made until then), so the Boss Battle screen's stage and a match don't wait for it; and there, the picked boss's moves
-  // made in quiet slices. Not while a game is starting (the Bot level box, the queue: home fills in place; App fetches it then anyway).
-  const starting = botBox || (queue !== undefined && queue !== null);
+  // made in quiet slices. At once when play is next (the Bot level box, the queue, Play with friends: Nov 17): a tap there within that
+  // moment had the chunk's work (a slow phone's second or two) land after it, on a blank lobby or a longer wait.
+  const playNext = botBox || (queue !== undefined && queue !== null) || friends;
   useEffect(() => {
-    if (starting) return;
-    const t = setTimeout(() => void game.preload(), 1500);
+    const t = setTimeout(() => void game.preload(), playNext ? 0 : 1500);
     return () => clearTimeout(t);
-  }, [starting]);
+  }, [playNext]);
   useEffect(() => {
     if (!raid) return;
     let stop = () => {};
