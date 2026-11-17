@@ -1,4 +1,4 @@
-import { XP, BOSS_TIERS, POWER_IDS, WEAK_BOTS, bossDef, bossIdFromLink, isPlayable, LOBBY_LIFE, CROWD_KNOCKOUTS, RAID_SETTINGS, DRAW_RULES, QUICK_PACE, definedOnly, modeSettings, speedOption, startOption, type DrawRule, type FinalFormat } from "@chessroyale/core";
+import { XP, BOSS_TIERS, POWER_IDS, POWER_TEST_SWITCHES, WEAK_BOTS, bossDef, bossIdFromLink, isPlayable, LOBBY_LIFE, CROWD_KNOCKOUTS, RAID_SETTINGS, DRAW_RULES, QUICK_PACE, definedOnly, modeSettings, speedOption, startOption, type DrawRule, type FinalFormat } from "@chessroyale/core";
 import type { LobbyRecord } from "./lobby.ts";
 
 /**
@@ -58,7 +58,7 @@ export function lobbyOptions(query: URLSearchParams, test: boolean, xpGameOn = f
       })(),
       ...(() => {
         const p = q.get("power");
-        return p && (POWER_IDS as readonly string[]).includes(p) ? { bossPowerTest: p } : {};
+        return p && ([...POWER_IDS, ...POWER_TEST_SWITCHES] as readonly string[]).includes(p) ? { bossPowerTest: p } : {};
       })(),
       roundsPerStage: n("rounds"),
       firstStageRounds: n("rounds"),

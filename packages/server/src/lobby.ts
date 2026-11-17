@@ -3032,7 +3032,7 @@ export class LobbyCore {
       return this.setTimer("lock", this.io.now() + Math.min(6000, Math.max(1500, runner.botThinkTimes()[mover] ?? 2500)));
     }
     // (Dash's stall skit, once a battle: its beats timed here on this move's clock, if it comes on this move.)
-    const stall = runner.boss && !final ? runner.stallPlan(playing[0]!.id) : null;
+    const stall = runner.boss ? runner.stallPlan(playing[0]!.id) : null;
     if (stall) this.r.round.stall = { plan: stall, next: "slam" };
     this.armRound();
   }

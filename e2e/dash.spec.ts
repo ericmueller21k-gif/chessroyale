@@ -1,7 +1,8 @@
 import { expect, type Page } from "@playwright/test";
 import { Chess } from "chess.js";
-import { BOSS_CLOCK, BOSS_POWERS } from "@chessroyale/core";
-import { DASH_FIT_LINES, DASH_LOVE_LINES, DASH_POPOFF_LINES, DASH_RUSH_LINES } from "../packages/app/src/characters/dash-lines.ts";
+import { BOSS_CLOCK, BOSS_POWERS, DASH_STALL } from "@chessroyale/core";
+import { stallTimeline } from "@chessroyale/chess";
+import { DASH_FIT_LINES, DASH_LOVE_LINES, DASH_POPOFF_LINES, DASH_RUSH_LINES, DASH_STALL_LINES, DASH_TAP_LINES } from "../packages/app/src/characters/dash-lines.ts";
 import { BOARD_SEL, asAdmin, openBossRaid, submitMove, test } from "./helpers.ts";
 
 /**
@@ -505,5 +506,79 @@ test.describe("Dash's clock", () => {
     expect(seen.cues["fit10:click"]).toBe(2 * BOSS_POWERS.dashPopOff.hits);
     expect(seen.cues["fit3:click"]).toBe(2 * BOSS_POWERS.dashPopOff.smacks);
     expect(errors).toEqual([]);
+  });
+});
+
+test.describe("Dash's stall skit and clock tap (Eric, Nov 17)", () => {
+  test("the stall skit (&power=stall): the slam, his fake move on the board and taken back, the clock stopped for both, your move refused meanwhile, once a battle", { tag: "@phone-only" }, async ({ page }) => {
+    test.setTimeout(150_000);
+    const errors: string[] = [];
+    page.on("pageerror", (e) => errors.push(e.message));
+    await asAdmin(page);
+    await page.goto("/?debug&pace=quick&laststand=0&brain=stockfish&boss=dash&power=stall&mode=raid");
+    await openBossRaid(page);
+    await page.getByRole("main").getByRole("button", { name: /^Boss alone/ }).click();
+    await yourMove(page);
+    const before = await page.evaluate(() => ({ fen: (window as any).match.phase.board.fen as string, deadline: (window as any).match.phase.deadline as number }));
+    const stallOf = () => page.evaluate(() => (window as any).match.phase.stall ?? null);
+    // (The slam, 1.5 s into your clock: his hurry-up line, the dock says the clock stopped, and the clock holds.)
+    await expect.poll(async () => (await stallOf())?.beat ?? null, { timeout: 15_000 }).toBe("slam");
+    const slam = await stallOf();
+    expect(slam.until - slam.at).toBe(DASH_STALL.slamMs);
+    expect(await page.evaluate(() => (window as any).match.phase.deadline)).toBe(before.deadline + DASH_STALL.slamMs);
+    await expect(page.locator(".boss-dock")).toContainText("Clock stopped");
+    await expect.poll(() => page.evaluate(() => document.body.textContent ?? "").then((t) => DASH_STALL_LINES.slam.some((l) => t.includes(l))), { timeout: 5_000 }).toBe(true);
+    const held = await page.locator(".dk-clock .dk-time").textContent();
+    await page.waitForTimeout(1500);
+    expect(await page.locator(".dk-clock .dk-time").textContent()).toBe(held);
+    // (His fake move, 3.5 s of your clock later: on the board, your move refused, the clock still; then back.)
+    await expect.poll(async () => (await stallOf())?.beat ?? null, { timeout: 15_000 }).toBe("fake");
+    const fake = await stallOf();
+    const tl = stallTimeline();
+    expect(fake.until - fake.at).toBe(tl.total);
+    expect(await page.evaluate(() => (window as any).match.phase.deadline)).toBe(before.deadline + DASH_STALL.slamMs + tl.total);
+    await expect(page.locator(`${BOARD_SEL.piece}[data-square="${fake.move.slice(2, 4)}"]`)).toHaveCount(1, { timeout: 2_000 });
+    expect(await page.locator(`${BOARD_SEL.piece}[data-square="${fake.move.slice(0, 2)}"]`).count()).toBe(0);
+    const legal = new Chess(before.fen).moves({ verbose: true }).map((m) => m.from + m.to + (m.promotion ?? ""));
+    await submitMove(page, legal.sort()[0], before.fen);
+    expect(await phase(page)).toBe("play");
+    await expect.poll(() => page.evaluate(() => document.body.textContent ?? "").then((t) => DASH_STALL_LINES.jk.some((l) => t.includes(l))), { timeout: 6_000 }).toBe(true);
+    // (Back: the board as it was, the move recorded once, the clock where it stood.)
+    await page.waitForTimeout(Math.max(0, fake.until - (await page.evaluate(() => Date.now())) + 300));
+    await expect(page.locator(`${BOARD_SEL.piece}[data-square="${fake.move.slice(0, 2)}"]`)).toHaveCount(1);
+    expect(await page.evaluate(() => (window as any).match.phase.board.fen)).toBe(before.fen);
+    expect(await page.evaluate(() => (window as any).match.boss.powers.dash.stall)).toMatchObject({ move: fake.move });
+    // (Once a battle: your next move has none.)
+    await submitMove(page, legal.sort()[0], before.fen);
+    await yourMove(page);
+    await page.waitForTimeout(DASH_STALL.test.slamAt + 1500);
+    expect(await stallOf()).toBeNull();
+    expect(errors).toEqual([]);
+  });
+
+  test("the clock tap (&power=clocktap): he lies down beside your clock and taps his, never over the board or the time, his spot empty meanwhile; your clock runs", async ({ page }) => {
+    test.setTimeout(120_000);
+    await asAdmin(page);
+    await page.goto("/?debug&pace=quick&laststand=0&brain=stockfish&boss=dash&power=clocktap&mode=raid");
+    await openBossRaid(page);
+    await page.getByRole("main").getByRole("button", { name: /^Boss alone/ }).click();
+    await yourMove(page);
+    const lie = page.locator(".dash-lie");
+    await expect(lie).toBeVisible({ timeout: 5_000 });
+    const t0 = await page.locator(".dk-clock .dk-time").textContent();
+    await expect.poll(() => page.evaluate(() => document.body.textContent ?? "").then((t) => DASH_TAP_LINES.some((l) => t.includes(l))), { timeout: 4_000 }).toBe(true);
+    const [box, board, time] = await Promise.all([lie.boundingBox(), page.locator(BOARD_SEL.squares).boundingBox(), page.locator(".dk-clock .dk-time").boundingBox()]);
+    // (Never over the board's squares nor the time's digits; whole on the screen.)
+    const frameTop = box!.y + (box!.height * 9) / 60;
+    expect(frameTop).toBeGreaterThanOrEqual(board!.y + board!.height - 1);
+    expect(box!.x + box!.width <= time!.x + 1 || box!.x >= time!.x + time!.width - 1).toBe(true);
+    expect(box!.x).toBeGreaterThanOrEqual(0);
+    expect(box!.x + box!.width).toBeLessThanOrEqual(page.viewportSize()!.width);
+    await expect(page.locator(".boss-char .boss-char-sprite").first()).toHaveCSS("visibility", "hidden");
+    await page.waitForTimeout(1500);
+    expect(await page.locator(".dk-clock .dk-time").textContent()).not.toBe(t0);
+    // (Then he's up and back in his spot.)
+    await expect(lie).toHaveCount(0, { timeout: 6_000 });
+    await expect(page.locator(".boss-char .boss-char-sprite").first()).toHaveCSS("visibility", "visible");
   });
 });

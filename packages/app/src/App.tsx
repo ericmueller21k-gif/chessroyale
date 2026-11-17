@@ -1,6 +1,6 @@
 import type { ComponentChildren } from "preact";
 import { useEffect, useLayoutEffect, useReducer, useRef, useState } from "preact/hooks";
-import { type Activity, type InviteKind, type MatchmakingType, CROWD_MISSES, RECLUSE_MUSIC, recluseChildFirst, SQUADS, botLevelMean, POWER_IDS, WEAK_BOTS, bossDef, bossIdFromLink, CROWD_KNOCKOUTS, RAID_SETTINGS, bossPartySettings, hiddenRoomSettings, HIDDEN_ROOM, raidBossElo, DEFAULT_SETTINGS, DRAW_RULES, QUICK_PACE, bestMoveOf, definedOnly, matchFeats, modeSettings, pausedLine, speedOption, startOption, type DrawRule, type FinalFormat, type ModeChoiceId, type Settings } from "@chessroyale/core";
+import { type Activity, type InviteKind, type MatchmakingType, CROWD_MISSES, RECLUSE_MUSIC, recluseChildFirst, SQUADS, botLevelMean, POWER_IDS, POWER_TEST_SWITCHES, WEAK_BOTS, bossDef, bossIdFromLink, CROWD_KNOCKOUTS, RAID_SETTINGS, bossPartySettings, hiddenRoomSettings, HIDDEN_ROOM, raidBossElo, DEFAULT_SETTINGS, DRAW_RULES, QUICK_PACE, bestMoveOf, definedOnly, matchFeats, modeSettings, pausedLine, speedOption, startOption, type DrawRule, type FinalFormat, type ModeChoiceId, type Settings } from "@chessroyale/core";
 import { bossInUrl, bossTierFromUrl, chosenBoss, chosenHomeMode, chosenMode, lobbyModeOf, prefetchBossAlone, raidInUrl, rememberBossPick } from "./screens/Home.tsx";
 import { lastBoss } from "./boss-history.ts";
 import { unlockAudio } from "./components/Countdown.tsx";
@@ -157,7 +157,7 @@ function overridesFromUrl(modeId?: ModeChoiceId, matchBoss = false): Partial<Set
     bossAvoid: lastBoss() ?? "",
     // Never a boss that's resting (a kill switch, status.ts): a solo game skips them as the server's lobbies do.
     ...(pausedBosses().length ? { bossesOff: pausedBosses() } : {}),
-    ...((POWER_IDS as readonly string[]).includes(q.get("power") ?? "") ? { bossPowerTest: q.get("power")! } : {}),
+    ...(([...POWER_IDS, ...POWER_TEST_SWITCHES] as readonly string[]).includes(q.get("power") ?? "") ? { bossPowerTest: q.get("power")! } : {}),
     ...(raid ? {} : chosenBoss() && bossInUrl() ? { bossId: chosenBoss() } : {}),
     // Testing, Hollow: ?bulbs=N, Boss alone's strand starts with N bulbs out (3, 7 and 10 come fast); ?darkblock=2 or 3,
     // his first cover brings a block of that size too.

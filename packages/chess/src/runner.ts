@@ -1555,7 +1555,7 @@ export class MatchRunner {
    */
   stallPlan(playerId?: string): StallPlan | null {
     const boss = this.state.boss;
-    if (!boss || boss.id !== "dash" || this.bossToMove() || this.isFinal()) return null;
+    if (!boss || boss.id !== "dash" || this.bossToMove()) return null;
     const id = playerId ?? this.alive()[0]?.id;
     const board = this.boards.get(this.state.boards[0]!);
     if (!id || !board) return null;
