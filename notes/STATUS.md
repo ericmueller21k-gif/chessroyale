@@ -1,3 +1,4 @@
+- Nov 17 17:31 UTC: #774 red: timber.spec:165 desktop (Timber 41 px over the board once mirrored; failed + retry). Fix helper session_01JuCWRrkt8mtu3Y6S5geDVF on claude/boss-facing, watcher armed.
 - Nov 17 17:25 UTC: boss facing .done -> #774 (733f672), CI watched, stills sent. Follow-ups: phone .pm-caster projectile hands when mirrored; dash findings 4+5. No helpers running; moo idle on Eric; payments #772 held.
 - Nov 17 ~17:15 UTC: #773 coin icon LIVE a5ee2dd (main run result in this line next).
 - Nov 17 16:33 UTC: coin icon .done -> #773 (5d0caae), CI watched, stills sent; merge when green unless Eric objects. Art $1.29.
