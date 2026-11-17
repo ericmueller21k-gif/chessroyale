@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { CROWD_CUTS, CROWD_SETTINGS, DEFAULT_SETTINGS, RAID_SETTINGS, type Settings } from "@chessroyale/core";
-import { cutCountdown, lossRows, stagesAhead, stagesLine } from "../src/game.ts";
+import { cutCountdown, lossRows, shortCountdown, stagesAhead, stagesLine } from "../src/game.ts";
 import { endWords } from "../src/components/Podium.tsx";
 
 /** The results table names what was played (the audit, Oct 15: a boss battle's row read "Duel"). */
@@ -42,6 +42,8 @@ describe("the 50 v 50 rework's words", () => {
     expect(cutCountdown(s, 7, 3, 41)).toBe("1 v 1 from move 43");
     expect(cutCountdown(s, 7, 4, 42)).toBe("1 v 1 next");
     expect(cutCountdown(s, CROWD_CUTS.length, 0, 43)).toBe("1 v 1");
+    // A narrow phone's: about 60 px under "Move 34".
+    expect(["34 v 34 next", "1 v 1 from move 43", "1 v 1"].map(shortCountdown)).toEqual(["34v34 next", "1v1 at 43", "1v1"]);
     // Not the rework: the old words stay the Hud's.
     expect(cutCountdown({ ...s, crowdCuts: undefined }, 0, 0, 1)).toBeNull();
   });

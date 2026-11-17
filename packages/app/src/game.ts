@@ -539,6 +539,9 @@ export function cutCountdown(s: CutSettings, stage: number, roundsPlayed: number
   return last && moveNo ? `1 v 1 from move ${moveNo + movesLeft}` : `cut in ${movesLeft}`;
 }
 
+/** cutCountdown's words for a narrow phone's top bar: "34v34 next", "1v1 at 43", "1v1". */
+export const shortCountdown = (words: string) => words.replace(/ v /g, "v").replace(" from move ", " at ");
+
 /**
  * The 50 v 50 rework's stages from `stage` on, by the game's move numbers (the cut screen's box, C3): each stage's size a side and
  * its first and last move, the 1 v 1 last (its last move the limit). From the schedule (CROWD_CUTS), counted as the board counts:

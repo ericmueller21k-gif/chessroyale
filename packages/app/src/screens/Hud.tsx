@@ -7,7 +7,7 @@ import { useMedia } from "../components/QuickChat.tsx";
 import { exitFor } from "../match-exit.ts";
 import { clockShown } from "../clock-text.ts";
 import { BoardsStrip } from "../components/TinyBoard.tsx";
-import { bossAlone, cutCountdown, isCrowd, myBoardId, towerView, type GameView } from "../game.ts";
+import { bossAlone, cutCountdown, isCrowd, shortCountdown, myBoardId, towerView, type GameView } from "../game.ts";
 import { roundsInStage } from "@chessroyale/core";
 import { BossBar } from "./Boss.tsx";
 
@@ -112,7 +112,17 @@ export function Hud({ match, stripFrozen = false }: { match: GameView; stripFroz
                   <span>{moveNo ? `Move ${moveNo}` : "Crowd"}</span>
                   <span class="muted">
                     <span class="hud-dot"> · </span>
-                    {countdown ?? (movesLeft <= 1 ? "cut now" : `cut in ${movesLeft}`)}
+                    {countdown ? (
+                      // (A narrow phone's line under "Move 34" has about 60 px: "34v34 next", "1v1 at 43" there; C3.)
+                      <>
+                        <span class="cd-long">{countdown}</span>
+                        <span class="cd-short">{shortCountdown(countdown)}</span>
+                      </>
+                    ) : movesLeft <= 1 ? (
+                      "cut now"
+                    ) : (
+                      `cut in ${movesLeft}`
+                    )}
                   </span>
                 </span>
               </>

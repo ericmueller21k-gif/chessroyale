@@ -315,6 +315,10 @@ p {
 .hud-stage-text > span {
   white-space: nowrap;
 }
+/* (The 50 v 50's countdown: the full words, or a narrow phone's short ones below.) */
+.hud-stage-text .cd-short {
+  display: none;
+}
 @media (max-width: 480px) {
   .screen .hud-row {
     gap: 6px;
@@ -358,6 +362,12 @@ p {
   }
   .hud-stage-text > .muted {
     font-size: 11px;
+  }
+  .hud-stage-text .cd-long {
+    display: none;
+  }
+  .hud-stage-text .cd-short {
+    display: inline;
   }
   .hud-dot {
     display: none;
@@ -27784,18 +27794,21 @@ body.cs-on .mm-scrim {
   gap: 8px;
   margin-top: 4px;
 }
+/* (Every step has the same rows: two tags' room, the pawn, the name, the points, the block; each row its column's width.) */
 .pod-step {
   display: grid;
-  grid-template-rows: 26px 60px 22px 18px auto;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: 42px 60px 22px 18px auto;
   justify-items: center;
   align-items: end;
   min-width: 0;
 }
+/* (One player can be Winner and Best player: the tags stack.) */
 .pod-tags {
   display: flex;
-  flex-wrap: nowrap;
-  gap: 3px;
-  align-self: end;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
   max-width: 100%;
 }
 .pod-tag {
@@ -27824,7 +27837,8 @@ body.cs-on .mm-scrim {
   height: 100%;
 }
 .pod-name {
-  max-width: 100%;
+  width: 100%;
+  text-align: center;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
