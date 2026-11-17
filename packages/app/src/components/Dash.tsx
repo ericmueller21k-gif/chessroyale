@@ -187,7 +187,7 @@ function rushExtraMoment({ boss, banner }: MomentProps) {
 /** One of his lines for a moment, the same on every screen (by the moment's key). */
 const lineOf = (lines: readonly string[], key: string): string => lines[hash(key) % lines.length]!;
 
-const MOMENTS: Record<"slap" | "scramble" | "flag" | "clockFit" | "popOff" | "popOffFast" | "rushWarn" | "rushExtra" | "clockTap", MomentUi> = {
+const MOMENTS: Record<"slap" | "scramble" | "flag" | "clockFit" | "popOff" | "popOffFast" | "rushWarn" | "rushExtra", MomentUi> = {
   // (Your time ran out on your last move: first, his jab.)
   flag: { order: 1, kit: "cheer", view: flagMoment, dock: () => DASH_WORDS.flag, line: (kit, m) => (kit ? pickLine(kit, "flag", m.key) : null) },
   slap: { order: 2, kit: "power", lineAt: B.slap.slamAt, view: slapMoment, dock: () => DASH_WORDS.slap },
@@ -200,8 +200,6 @@ const MOMENTS: Record<"slap" | "scramble" | "flag" | "clockFit" | "popOff" | "po
   popOffFast: { order: 2, kit: "power", view: popOffFastMoment, line: (_kit, m) => lineOf(DASH_LOVE_LINES, m.key), priority: () => CRITICAL },
   // (His Scramble Rush a turn ahead, as any ultimate's warning: RAGE!, "Next turn: Scramble Rush", his clock held up, his line.)
   rushWarn: { order: 1, kit: "ultimateWarn", view: (p) => rageWarn(p, "Scramble Rush", undefined, true), line: (_kit, m) => lineOf(DASH_RUSH_LINES.warn, m.key) },
-  // (His lying-down clock tap plays on your move, by your clock, not on his screen: DashTap in DashStall.tsx. It holds nothing.)
-  clockTap: { order: 5, view: () => <div class="power-moment pm-tap pm-stay" />, line: () => null },
   rushExtra: { order: 3, kit: "ultimateHit", own: (boss) => boss.powers?.dash?.rush?.extra === "played" && boss.powers.events.some((e) => e.kind === "rushExtra"), view: rushExtraMoment, line: () => null },
 };
 

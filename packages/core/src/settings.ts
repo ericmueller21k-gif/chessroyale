@@ -2175,11 +2175,16 @@ export const DASH_STALL = {
 
 /**
  * Dash's lying-down clock tap (Eric, Nov 17: "once per game he goes down laying down with his chess clock by your clock… and starts
- * tapping it for a few seconds"): once a battle, as a crowd move begins, from a crowd turn drawn from the battle's seed (`from` to
- * `to`), the first one with nothing else of his; screen only, `delayMs` after your clock starts, `tapMs` of taps. Your clock keeps
- * running as ever.
+ * tapping it"; a bored "hurry up", so only when you're slow: "it fired off like 5 seconds into the match even tho I played all my
+ * moves instantly"): once a battle, from crowd move `fromMove`, as a move of yours runs `afterMs` of a bank's clock (Boss alone, a
+ * party) or `afterShare` of a move clock (a raid, a group battle: 6 s of 20); timed with his stall skit's beats (stallPlan), never on
+ * its move ("the bigger gag is reserved for another turn"). He lies by your clock until you move ("stay in the crawl position"),
+ * `boredMs` after lying down still no move: his "not moving till you do" line; your move before he's down: his crawl still
+ * finishes, his "just a joke" line, `jokeMs`, then up. Your clock keeps running as ever. His taps tick aloud for the first `tapMs`
+ * after he's down, then go silent (he keeps tapping). Never with less than DASH_STALL.marginMs of the move's clock left after it.
+ * Only the players still thinking see it: a player who already moved never does (their pick gets him up).
  */
-export const DASH_TAP = { from: 3, to: 9, delayMs: 900, tapMs: 3000 } as const;
+export const DASH_TAP = { fromMove: 3, afterMs: 10_000, afterShare: 0.3, boredMs: 20_000, jokeMs: 1800, tapMs: 3000 } as const;
 
 /**
  * The Hidden Boss's phase 2 (Eric, Oct 14; DECISIONS.md, "The Hidden Boss, phase 2"): four boards of Chess960 at once,
@@ -2295,6 +2300,50 @@ export const RECLUSE_CUTSCENE = {
    * `recluseCutsceneTimeline().endAt`: a unit test keeps the two equal; change it with the lines or the times above).
    */
   holdMs: 107_480,
+} as const;
+
+/**
+ * Moo & Moon's Full Moon cinematic (Eric, Nov 17: "the game pauses, he jumps down onto the center of the board, then the board
+ * and everything above it like the boss bar, is replaced with a singular cinematic drawing of a field of grass with a starry
+ * night and a giant moon… a super close up of moo and moon from a side profile angle staring up at the moon… their eyes start
+ * turning white, then it goes back to the first scene and this is where he does the transformation, then the background fades
+ * and then once it fades he hops back to his spot"; components/MooCinematic.tsx; docs/decisions/2026-11-17-moo-cinematic.md).
+ * It plays at the start of his turn, while he thinks (no clock runs for the crowd), so its whole length is his Full Moon's
+ * (MOO_BEATS.fullMoon in packages/chess/src/bosses/moo.ts adds the beats up, his transformation's own length among them: the
+ * server and solo wait that long). Beats in order, ms:
+ */
+export const MOO_CINEMATIC = {
+  /** He hops from his spot onto the board (his `move`: a crouch, the hop, the landing; at least its 710 ms). */
+  hopMs: 720,
+  /** The field fades in over the board and everything above it (a CSS fade). */
+  fadeInMs: 500,
+  /** The field holds, him standing in it, before the cut to the close-up. */
+  fieldMs: 700,
+  /** The close-up of the two of them looking up at the moon, the cuts to it and back included. */
+  closeMs: 2200,
+  /** The cut to the close-up and back: a quick crossfade, each way, inside `closeMs`. */
+  cutMs: 160,
+  /** Into the close-up, their eyes start turning white (`eyeStepMs` a step, four steps), then hold white and glowing. */
+  whitenAt: 900,
+  eyeStepMs: 220,
+  /** (His transformation in the field: his `fullMoon` animation's own length, MOO_BEATS.fullMoon.transformMs.) */
+  /** After the transformation, he stands powered up in the field a moment. */
+  afterMs: 400,
+  /** The field fades out (a CSS fade). */
+  fadeOutMs: 500,
+  /** He hops back to his spot (his powered `move`). */
+  hopBackMs: 720,
+  /**
+   * His thinking lasts this much past the cinematic's end (fullMoonMs, solo and the server): a late first frame on a device or its
+   * move arriving sooner than its thinking did never cuts the hop back (review of #776, #6). Inside his thinking: no player's time.
+   */
+  tailPadMs: 200,
+  /**
+   * Seen first with his thinking already under way (a reload or a late join: the round resent as the device rejoins), the cinematic
+   * is skipped and he's drawn powered at once: started then, his move would cut it off (review of #776, #2). How soon after the
+   * device rejoins a Full Moon counts as resent.
+   */
+  rejoinMs: 1500,
 } as const;
 
 /**

@@ -1562,6 +1562,11 @@ export class MatchRunner {
     return stallPlan(boss, board.fen, this.allowedMsFor(id), !!this.settings.bossClock, this.settings.bossPowerTest ?? "");
   }
 
+  /** Dash's clock tap has come on this crowd move (dashBattle.tapped): once a battle; nothing more of his on this move. */
+  tapped(): void {
+    dashBattle.tapped(this.battle);
+  }
+
   /** Dash's stall skit's slam has come on this crowd move (dashBattle.slammed): once a battle, spent as it starts. */
   slammed(): void {
     dashBattle.slammed(this.battle);

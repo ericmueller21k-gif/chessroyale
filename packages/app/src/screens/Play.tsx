@@ -27,7 +27,7 @@ import { bossKit } from "../characters/kits.ts";
 import { CRITICAL, NORMAL, bossVoice } from "../speech.tsx";
 import { play } from "../sound.ts";
 import { ScrambleCount } from "../components/Dash.tsx";
-import { DashStall, DashTap, frozenWindow, stallBoard, stallHolding, stallOn } from "../components/DashStall.tsx";
+import { DashStall, frozenWindow, stallBoard, stallHolding, stallOn } from "../components/DashStall.tsx";
 import { duelCount, duelTurn } from "../components/Pig.tsx";
 import { bulletControl, bulletIncrementOn, bulletOn, kingBlocked } from "../components/Recluse.tsx";
 import { WipPreview, wipPower } from "../components/WipPreview.tsx";
@@ -314,7 +314,6 @@ export function PlayScreen({
             )}
             {ending && !striking && !stalling && <CenterCount label="Round end" n={secsLeft} />}
             {match.boss?.id === "dash" && <DashStall boss={match.boss} stall={stall} />}
-            {match.boss?.id === "dash" && <DashTap boss={match.boss} startsAt={waiting ? 0 : startsAt} waiting={waiting} />}
             {godKing && <KingSummon {...godKing} />}
             {command && <KingCommand {...command} />}
             {crowd && waiting && !history.browsing && <LiveGhosts match={match} fen={board.fen} orientation={orientation} />}

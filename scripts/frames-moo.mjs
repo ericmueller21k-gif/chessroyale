@@ -50,13 +50,18 @@ async function run(stage) {
   });
   await cdp.send("Page.startScreencast", { format: "jpeg", quality: 80, everyNthFrame: 1, ...(device === "phone" ? { maxWidth: 780, maxHeight: 1688 } : {}) });
   const query = stage === "beam" ? "&power=moonbeam&laststand=0" : stage === "full" ? "&power=fullmoon&laststand=0" : stage === "attack" ? "&laststand=1" : "&laststand=0";
+  // (The first-time walkthrough and the quests overlay marked seen, as the e2e helpers do; then home's Boss Battle card, his tile, START.)
+  await p.addInitScript(() => {
+    localStorage.setItem("hunchess.tutorial.dismissed", "1");
+    localStorage.setItem("hunchess.quests.seenDay", "9999999999999");
+    localStorage.setItem("hunchess.quests.noPop", "1");
+  });
   await p.goto(`${url}?debug&clock=60&nolanding&brain=stockfish&boss=moo${query}`);
-  await p.getByRole("main").getByRole("button", { name: /^Boss raid/ }).click();
+  await p.getByRole("main").getByRole("button", { name: /^Boss Battle/ }).click();
+  await p.getByRole("radiogroup", { name: "Bosses" }).getByRole("radio", { name: "Moo & Moon", exact: true }).click();
+  await p.getByRole("main").getByRole("button", { name: "START" }).click();
   const t0 = Date.now();
-  for (let i = 0; i < 5 && !(await p.evaluate(() => !!window.match)); i++) {
-    await p.getByRole("main").getByRole("button", { name: /^Boss alone/ }).click();
-    await p.waitForTimeout(1500);
-  }
+  for (let i = 0; i < 20 && !(await p.evaluate(() => !!window.match)); i++) await p.waitForTimeout(500);
   const log = (s) => console.log(`${name} +${Date.now() - t0}ms ${s}`);
   const gifs = [];
   const stills = [];
@@ -173,7 +178,8 @@ async function run(stage) {
       if (s.kind === "boss" && s.thinking && has(s, "fullMoon") && !startAt) {
         startAt = s.now;
         log("the Full Moon comes");
-        stills.push(...[0, 300, 500, 700, 900, 1200].map((ms) => ({ label: `full-${String(ms).padStart(4, "0")}`, t: s.now + ms })));
+        // (The cinematic, Nov 17: the hop, the field fading in, the close-up and its eyes, the transformation, the fade, the hop back.)
+        stills.push(...[0, 200, 400, 720, 1000, 1500, 2100, 2700, 3300, 3700, 4200, 4600, 5000, 5500, 5900, 6200, 6500, 6900, 7300].map((ms) => ({ label: `full-${String(ms).padStart(4, "0")}`, t: s.now + ms })));
         const n = await waitUntil((x) => x.kind === "boss" && !x.thinking, 30_000);
         log(`his move, the flurry: ${JSON.stringify(n.boss.powers.stunned)}`);
         flurryAt = n.now;

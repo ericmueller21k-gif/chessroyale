@@ -94,6 +94,10 @@ export const DASH_STALL_LINES = {
 
 /** His lying-down clock tap (Eric, Nov 17): a bored line as he lies down by your clock (placeholders for Eric). */
 export const DASH_TAP_LINES: readonly string[] = ["Take your time. I'll just lie here.", "Wake me up when you move, bro.", "Comfy down here, cuz. No rush. Kinda rush."];
+/** His clock tap, your move in before he was down (Eric, Nov 17: "simply have him say something like 'ayy homie relax it's a just a joke'"; placeholder). */
+export const DASH_TAP_JOKE_LINES: readonly string[] = ["Ayy homie, relax, it's just a joke."];
+/** His clock tap, still no move DASH_TAP.boredMs after he lay down (Eric, Nov 17: "bro I'm not moving till you do"; placeholder). */
+export const DASH_TAP_BORED_LINES: readonly string[] = ["Bro, I'm not moving till you do."];
 
 /** How often each moment speaks: every boss's beats, his slap, his scramble and your flag always. */
 export const DASH_CHANCE: Partial<Record<Beat, number>> = {

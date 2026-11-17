@@ -1,13 +1,15 @@
 import { useLayoutEffect } from "preact/hooks";
-import { MOO_BEATS, POWER_FX } from "@chessroyale/chess";
+import { MOO_BEATS, POWER_FX, fullMoonLeadMs } from "@chessroyale/chess";
+import { MOO_CINEMATIC } from "@chessroyale/core";
 import { MOO_LINES } from "../characters/moo.ts";
 import type { Character, Frame } from "../characters/sprite.ts";
-import { noteCalm, noteSwap } from "../characters/moo-state.ts";
+import { noteCalm, noteSwap, rejoinedAt } from "../characters/moo-state.ts";
 import { bossKit } from "../characters/kits.ts";
 import { EFFECTS, animLength, type SquareItem } from "../characters/power-art.ts";
 import type { BossView } from "../game.ts";
 import { NORMAL, CRITICAL, bossVoice } from "../speech.tsx";
 import { BoardEffects, SpriteAnim, prewarm, prewarmSprite } from "./BossEffect.tsx";
+import { MooCinematic, prewarmCinematic } from "./MooCinematic.tsx";
 import { hash, onSquare, ragePct, type BossUi, type Moment, type MomentProps, type MomentUi } from "./PowerParts.tsx";
 
 /**
@@ -129,9 +131,16 @@ function flurryMoment({ cast }: MomentProps) {
   return <div class="power-moment pm-flurry">{cast("beam1", B.flurry.beamAt)}</div>;
 }
 
-/** The Full Moon: the moon swells and he takes in its power; his colors go gold at the `swap` cue. */
-function fullMoonView({ cast }: MomentProps) {
-  return <div class="power-moment pm-fullmoon">{cast("swap", B.fullMoon.swapAt)}</div>;
+/**
+ * The Full Moon: the cinematic (MooCinematic.tsx; Eric, Nov 17): he hops onto the board, the field and the close-up over the board
+ * and everything above it, his transformation in the field (the moon swells, his colors go gold at the `swap` cue), and he hops back.
+ */
+function fullMoonView({ moment, boss }: MomentProps) {
+  return (
+    <div class="power-moment pm-fullmoon">
+      <MooCinematic at={moment.at} name={boss.name} />
+    </div>
+  );
 }
 
 /** The daze: the aura fizzles, his colors go back at the `calm` cue. */
@@ -148,7 +157,8 @@ const MOMENTS: Record<"moonbeam" | "flurry" | "fullMoon" | "dazed", MomentUi> = 
   moonbeam: { order: 0, kit: "power", lineAt: B.moonbeam.beamAt, view: moonbeamMoment },
   // (The flurry takes the place of that turn's Moonbeam; it is part of his ultimate, so its line cuts in.)
   flurry: { order: 2, kit: "ultimateHit", line: (kit, m) => ownLine("flurry", kit, m.key), lineAt: B.flurry.beamAt, priority: () => CRITICAL, view: flurryMoment },
-  fullMoon: { order: 2, kit: "ultimate", view: fullMoonView },
+  // (The Moon's line as he lands back in his spot (his `move` is down 300 ms in): the cinematic covers his bar on a phone until then.)
+  fullMoon: { order: 2, kit: "ultimate", lineAt: B.fullMoon.total - MOO_CINEMATIC.hopBackMs + 300, view: fullMoonView },
   // (The daze is the end of his ultimate, and comes straight after the Moonbeam his last move may bring: its line cuts in on that one,
   // or the Moon would wait and be dropped as stale.)
   dazed: { order: 3, kit: "powerHit", line: (kit, m) => ownLine("dazed", kit, m.key), priority: () => CRITICAL, view: dazedMoment },
@@ -158,25 +168,32 @@ const MOMENTS: Record<"moonbeam" | "flurry" | "fullMoon" | "dazed", MomentUi> = 
 const fullMoonSeen = new Map<string, number>();
 
 /**
- * The Full Moon's transformation, as a moment of his thinking screen (it comes as the crowd's move lands, at the start of his
- * turn, and his move waits for it): from when this device first saw it. Its `swap` is noted for `mooPowered`. None when the
- * Full Moon isn't coming now.
+ * The Full Moon's cinematic, as a moment of his thinking screen (it comes as the crowd's move lands, at the start of his turn, and
+ * his move waits for it): from when this device first saw it, after QUEEN SLAIN! if his queen just fell (fullMoonLeadMs, as his
+ * thinking waits). Its `swap` is noted for `mooPowered`. None when the Full Moon isn't coming now, or when it was first seen just as
+ * this device rejoined (a reload or a late join: the round resent, his thinking already under way): then the cinematic is
+ * skipped and he's powered at once (review of #776, #2), as it would be cut off by his move.
  */
 export function fullMoonMoment(boss: BossView, now = Date.now()): Moment[] {
   const p = boss.powers;
   if (boss.id !== "moo" || !p) return [];
   return p.events
     .filter((e) => e.kind === "fullMoon" && e.turn === p.turn)
-    .map((e): Moment => {
+    .flatMap((e): Moment[] => {
       const key = `${boss.id}:fullMoon:${e.turn}`;
       const seenKey = `${boss.startMove}:${key}`;
       let at = fullMoonSeen.get(seenKey);
       if (at === undefined) {
-        fullMoonSeen.set(seenKey, (at = now));
+        const late = now - rejoinedAt() < MOO_CINEMATIC.rejoinMs;
+        fullMoonSeen.set(seenKey, (at = late ? -Infinity : now + fullMoonLeadMs(boss)));
         if (fullMoonSeen.size > 20) fullMoonSeen.delete(fullMoonSeen.keys().next().value!);
       }
+      if (at === -Infinity) {
+        noteSwap(boss, -Infinity);
+        return [];
+      }
       noteSwap(boss, at + B.fullMoon.swapAt);
-      return { kind: "fullMoon", key, at, ms: POWER_FX.fullMoon };
+      return [{ kind: "fullMoon", key, at, ms: POWER_FX.fullMoon }];
     });
 }
 
@@ -267,6 +284,7 @@ export function prewarmMoo(name: string): void {
     const ka = kit.kingAttack;
     if (ka?.poweredAnim) drip(ka.ch, (ka.ch.anims[ka.poweredAnim]?.frames ?? []).filter(heavy));
   });
+  prewarmCinematic();
   for (const fx of ["moonbeam", "moonScorch"] as const) prewarm(fx, Object.entries(EFFECTS[fx].ch.anims).flatMap(([a, an]) => an.frames.map((_, i) => [a, i] as const)));
 }
 

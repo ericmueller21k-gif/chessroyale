@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BOSS_POWERS, DASH_STALL, DEFAULT_SETTINGS, RAID_SETTINGS, mulberry32, type Settings } from "@chessroyale/core";
+import { BOSS_POWERS, DASH_STALL, DASH_TAP, DEFAULT_SETTINGS, RAID_SETTINGS, mulberry32, type Settings } from "@chessroyale/core";
 import { MatchRunner, legalMoves, rushTimeline, sanLineToUci, stallTimeline, type BoardScore, type Opening, type ServerMessage } from "@chessroyale/chess";
 import { LobbyCore, newLobbyRecord } from "../src/lobby.ts";
 
@@ -236,7 +236,7 @@ describe("Dash's stall skit online (Eric, Nov 17)", () => {
     const { startedAt, deadline } = round;
     const fen = l.runner().boards.get(l.runner().state.boards[0]!)!.fen;
     // (Planned as the round opened, by the same rules solo uses: a copy of the runner as solo holds it plans the same.)
-    expect(round.stall?.plan).toEqual({ slamAt: Math.round(clock * DASH_STALL.slamShare), fakeAt: Math.round(clock * DASH_STALL.fakeShare), move: round.stall!.plan.move });
+    expect(round.stall?.plan).toEqual({ tapAt: null, slamAt: Math.round(clock * DASH_STALL.slamShare), fakeAt: Math.round(clock * DASH_STALL.fakeShare), move: round.stall!.plan.move });
     const copy = MatchRunner.restore(structuredClone(l.runner().snapshot()), { settings: l.runner().settings, rng: mulberry32(1), engines: [], library });
     expect(copy.stallPlan()).toEqual(round.stall!.plan);
     // One picks early; the other doesn't: the round is still open.
@@ -300,7 +300,10 @@ describe("Dash's stall skit online (Eric, Nov 17)", () => {
     pick();
     expect(l.hostScores()).toBe(true);
     expect(l.runner().boss!.powers!.dash!.stall ?? null).toBeNull();
-    // The next move: the fake move alone at three quarters, no slam first; its pause only (no slam's).
+    // The next move: the fake move alone at three quarters, no slam first; its pause only (no slam's). (His clock tap spent earlier,
+    // so the move is the fake move's: his tap's own move is the next test's.)
+    const spent = l.runner().boss!.powers!.dash!;
+    spent.tap = { at: -1 };
     l.toRound();
     round = l.core.save().round!;
     expect(round.stall?.plan.slamAt).toBeNull();
@@ -325,6 +328,39 @@ describe("Dash's stall skit online (Eric, Nov 17)", () => {
       pick();
       expect(l.hostScores()).toBe(true);
     }
+  });
+
+  it("his clock tap (Eric, Nov 17; ?power=clocktap: from move 1): at 30% of the move clock, no clock stopped, everyone told; nothing more of his on its move however long it takes (\"the bigger gag is reserved for another turn\"); the next slow move has the slam; once a battle", () => {
+    const l = dashLobby("clocktap", ["P1"]);
+    l.toRound();
+    let round = l.core.save().round!;
+    const clock = l.runner().moveClock() * 1000;
+    const pick = () => l.core.message("p1", { t: "pick", key: l.core.save().round!.key, move: (l.runner().crowdAllowed() ?? legalMoves(l.runner().boards.get(l.runner().state.boards[0]!)!.fen))[0]! });
+    expect(round.stall?.plan).toMatchObject({ tapAt: Math.round(clock * DASH_TAP.afterShare), slamAt: Math.round(clock * DASH_STALL.slamShare) });
+    expect(round.stall?.next).toBe("tap");
+    const { deadline } = round;
+    l.inbox.set("p1", []);
+    until(l, round.startedAt + clock * DASH_TAP.afterShare + 100);
+    const [tapped] = stalls(l, "p1");
+    expect(tapped).toMatchObject({ beat: "tap", deadline });
+    expect(tapped!.until).toBe(tapped!.at);
+    expect(l.runner().boss!.powers!.dash!.tap).toEqual({ at: l.runner().boss!.crowdMoves });
+    expect(l.core.save().round!.deadline).toBe(deadline);
+    // (A reconnect: the round as it's re-sent carries the tap, so the screen shows him lying.)
+    expect((l.core.save().last.p1 as { stall?: { beat: string } } | undefined)?.stall?.beat).toBe("tap");
+    until(l, deadline - 100);
+    expect(stalls(l, "p1").map((m) => m.beat)).toEqual(["tap"]);
+    expect(l.runner().boss!.powers!.dash!.slam ?? null).toBeNull();
+    pick();
+    expect(l.hostScores()).toBe(true);
+    // The next move: the skit, no tap; its slam at half the clock.
+    l.toRound();
+    round = l.core.save().round!;
+    expect(round.stall?.plan.tapAt).toBeNull();
+    expect(round.stall?.next).toBe("slam");
+    l.inbox.set("p1", []);
+    until(l, round.startedAt + clock * DASH_STALL.slamShare + 100);
+    expect(stalls(l, "p1").map((m) => m.beat)).toEqual(["slam"]);
   });
 
   it("a beat whose alarm fires late, with the round's deadline gone: dropped; nobody's deadline moves back and the round locks as it would have", () => {

@@ -61,6 +61,7 @@ import {
   type LeftHow,
   type NetLeft,
   applyRecheck,
+  nextBeat,
   blameJudge,
   deepTargets,
   quickPart,
@@ -334,10 +335,11 @@ export interface LobbyRecord {
     /** Boss battle: the King's strike on screen (the move clock stands still from `at` to `until`). */
     strike?: { at: number; until: number };
     /**
-     * Dash's stall skit on this move (bosses/dash.ts on this server; his rules' stallPlan): its plan, the beat still to come
-     * (`next`; none: no more on this move), and each beat once it came (the move clock stands still from `at` to `until`).
+     * Dash's beats on this move (bosses/dash.ts on this server; his rules' stallPlan): its plan, the beat still to come (`next`; none:
+     * no more on this move), and each beat once it came (his clock tap: no pause; the skit's: the move clock stands still from `at`
+     * to `until`).
      */
-    stall?: { plan: StallPlan; next?: "slam" | "fake"; slam?: { at: number; until: number }; fake?: { at: number; until: number } };
+    stall?: { plan: StallPlan; next?: "tap" | "slam" | "fake"; tap?: { at: number; until: number }; slam?: { at: number; until: number }; fake?: { at: number; until: number } };
     /** Crowd: the host's (or a judge's) early bot picks, and when each bot finishes (ms after the clock starts). */
     botPlan?: { picks: Record<string, string>; powerUps: string[]; by?: string };
     botsDoneIn?: Record<string, number>;
@@ -2306,7 +2308,7 @@ export class LobbyCore {
     const burnt = !!b?.powers?.burnt?.some((x) => x.turn === b.crowdMoves && (x.piece || x.fizzled));
     // (Alfil's pieces came down early after your move: their landing plays first too; so does Moo's Full Moon, his
     // transformation at the start of his turn.)
-    const own = landedEarlyMs(b) + fullMoonMs(b) + folioTurnMs(b) + popOffMs(b) + zebraTurnMs(b) + chandyTurnMs(b);
+    const own = landedEarlyMs(b) + fullMoonMs(view) + folioTurnMs(b) + popOffMs(b) + zebraTurnMs(b) + chandyTurnMs(b);
     return queenSlain(view) || burnt || own ? this.io.now() + bossThinkMs(view, burnt, own) : undefined;
   }
 
@@ -3031,9 +3033,9 @@ export class LobbyCore {
       const mover = [...runner.groups.values()][0]![0]!;
       return this.setTimer("lock", this.io.now() + Math.min(6000, Math.max(1500, runner.botThinkTimes()[mover] ?? 2500)));
     }
-    // (Dash's stall skit, once a battle: its beats timed here on this move's clock, if it comes on this move.)
+    // (Dash's clock tap or stall skit, each once a battle: his beats timed here on this move's clock, if one comes on this move.)
     const stall = runner.boss ? runner.stallPlan(playing[0]!.id) : null;
-    if (stall) this.r.round.stall = { plan: stall, next: stall.slamAt === null ? "fake" : "slam" };
+    if (stall) this.r.round.stall = { plan: stall, next: nextBeat(stall, {})?.beat };
     this.armRound();
   }
 
@@ -3041,8 +3043,9 @@ export class LobbyCore {
   private armRound() {
     const round = this.r.round!;
     const st = round.stall;
-    if (st?.next) {
-      let at = round.startedAt + (st.next === "slam" ? (st.plan.slamAt ?? 0) : st.plan.fakeAt);
+    const nb = st?.next ? nextBeat(st.plan, st) : null;
+    if (nb) {
+      let at = round.startedAt + nb.at;
       for (const w of this.frozenWindows(round)) if (w.at < at) at += w.until - w.at;
       if (at < round.deadline) return this.setTimer("stall", at);
     }

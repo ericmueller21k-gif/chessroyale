@@ -8,6 +8,7 @@ import { RaceTower } from "./components/RaceTower.tsx";
 import { resetBoardsStrip } from "./components/TinyBoard.tsx";
 import { enginePool, warmEngine } from "./engine.ts";
 import { bossAlone, cutLabel, elimination, isCrowd, roundLive, scoreDp, towerView, type GameView } from "./game.ts";
+import { DashTap } from "./components/DashStall.tsx";
 import { NetMatch, forgetSeat, hasSeat, lobbyStatus, type LobbyGone, type LobbyResult } from "./net.ts";
 import { exitFor, exitMatch, onExitMatch, setExitTo } from "./match-exit.ts";
 import { useRecluseTalk } from "./recluse-talk.ts";
@@ -2396,6 +2397,8 @@ export function App() {
           </aside>
           )}
           {screen}
+          {/* (Dash's clock tap: beside the match's screens, so his crawl finishes as your move goes in. DashStall.tsx.) */}
+          {(match as GameView).boss?.id === "dash" && <DashTap match={match as GameView} />}
         </div>
       </GameFrame>
       {sideConfirm}

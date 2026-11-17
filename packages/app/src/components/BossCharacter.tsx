@@ -434,11 +434,10 @@ function Character({ boss, stage, place, muteFall }: { boss: BossView; stage: St
  */
 /**
  * The boss's move says nothing of its own (its move, capture or check line): a power's moment comes with it (the moment's line is
- * the boss's word that turn), or its mate attacks the crowd's king. Not for Dash's clock tap: screen only, a moment with no line
- * or animation of its own as his move lands (his tap's lines come in your turn: DashStall.tsx), so his move keeps its line.
+ * the boss's word that turn), or its mate attacks the crowd's king.
  */
 export function quietMove(stage: Stage, boss: BossView): boolean {
-  return stage === "bossMove" && (!!boss.powers?.events.some((e) => e.kind !== "clockTap") || mateAttack(boss));
+  return stage === "bossMove" && (!!boss.powers?.events.length || mateAttack(boss));
 }
 
 export function BossTag({ boss, live = true }: { boss: Pick<BossView, "name" | "icon">; /** His face as he looks now (BossFace's `live`): a battle's lines, where it's used (Results' is a boss without a character). */ live?: boolean }) {
