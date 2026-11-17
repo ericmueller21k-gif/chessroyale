@@ -1097,3 +1097,15 @@ lobby screen meanwhile, or the opening of a solo match pushed past its 5 s). On 
 
 **The fix:** home loads it as soon as play is next (the Bot level box, the queue, Play with friends), making a lobby keeps home until it's
 in, and the e2e helpers wait for it once before the tap into a match. docs/decisions/2026-11-17-match-chunk-on-intent.md.
+
+## Lines on the star's seat (Nov 17, 2026)
+
+**What happened:** Moon's Ride's pawn was sunk into a seat on the star. Eric, with his own look (suit, crown, parrot), saw a horizontal
+line, then (after a fix) lines again: the lip's arc across his coat, a light band and a dark curve under it, a dark stroke over an item.
+
+**Why:** the seat was made by drawing a second copy of the star in front of the pawn, masked to what lies before the lip. Every edge of
+that copy (its outline, its rim light, its shading, the mask's own edge) fell on the pawn and its items. Four passes moved the mask; each
+left a different seam. The checks looked at a few frames at phone size, not his look zoomed in.
+
+**The fix:** the star is drawn once, behind; the ride's front draws nothing; the pawn is clipped by a shape the ride gives (`pose.hide`)
+whose edge is the lip's own line. docs/decisions/2026-11-17-star-seat-one-layer.md.

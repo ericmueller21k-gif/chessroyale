@@ -22,7 +22,7 @@ import { hunchessBase } from "@chessroyale/core";
 import { RIDE_PX, type RideCell, type RideCells } from "./ride-cells.ts";
 import { TOWN_FEEL } from "./feel.ts";
 import { rideScale, scaledAt, scaledSeat, seatAnchor } from "../components/rides/scale.ts";
-import { FACINGS, type RiderDraft, type RiderFacing } from "../components/rides/kit.ts";
+import { FACINGS, HIDE_ALL, viewOf, type RiderDraft, type RiderFacing } from "../components/rides/kit.ts";
 import { loadRide, rideCells } from "../components/rides/load.ts";
 import { RideLayer, RideMark, svgImage, svgText, type RideColors } from "../components/rides/draw.tsx";
 import { art2d } from "./paint.ts";
@@ -60,6 +60,9 @@ export class RiderView {
   readonly idleEnds: number[];
   readonly idleLoop: number;
   readonly moveEnds: number[];
+  /** The point the ride is drawn at its scale about (its saddle: `seatAnchor`), and that scale. */
+  readonly anchor: readonly [number, number];
+  readonly k: number;
   /** The ride's cell on the pawn's square at its scale (x, y, w, h, in units). */
   readonly cell: readonly [number, number, number, number];
   /** Where the pawn sits on each frame at its scale (x, y, tilt, cut: `scaledSeat`). */
@@ -75,7 +78,8 @@ export class RiderView {
   ) {
     // (A frame's row: [ms, x, y, tilt, cut], a move's then its dy.)
     const seat = (row: readonly number[]) => row.slice(1, 5);
-    const a = seatAnchor(seat(m.idle[0]!));
+    const a = (this.anchor = seatAnchor(seat(m.idle[0]!)));
+    this.k = k;
     const [cx, cy, cw, ch] = (this.cell = [scaledAt(m.cell[0], a[0], k), scaledAt(m.cell[1], a[1], k), m.cell[2] * k, m.cell[3] * k]);
     this.seats = { idle: m.idle.map((r) => scaledSeat(seat(r), a, k)), move: m.move.map((r) => scaledSeat(seat(r), a, k)) };
     this.lift = m.move.map((r) => -r[5]! * k);
@@ -227,7 +231,9 @@ export class Rider {
         for (let i = 0; i < rv.seats[anim].length; i++) {
           // (The ride's layers drawn at its size, so they're put down pixel for pixel.)
           const layer = (part: "Back" | "Front") => svgText(h(RideLayer, { d, view: rv.facing, c: this.colors, anim, f: i, part }), cell, s * k);
-          jobs.push({ make: () => [layer("Back"), layer("Front")], done: ([b, f]) => (rv.frames[anim][i] = this.frame(rv, anim, i, b!, f!)) });
+          // (A ride that hides its rider by a shape of its own, behind its seat's lip: the pose's `hide`, in place of the straight cut.)
+          const hide = viewOf(d, rv.facing).pose(anim, i).hide;
+          jobs.push({ make: () => [layer("Back"), layer("Front")], done: ([b, f]) => (rv.frames[anim][i] = this.frame(rv, anim, i, b!, f!, hide)) });
         }
     }
     const tr = this.trail;
@@ -291,8 +297,11 @@ export class Rider {
     }
     if (this.trail) for (const v of this.trail.frames) for (const n of v) for (const c of n.splice(0)) if (c) c.width = c.height = 0;
   }
-  /** One frame of a view: the ride's back, the pawn raised onto its seat, tilted and hidden below the seat, the ride's front. */
-  private frame(rv: RiderView, anim: "idle" | "move", i: number, back: HTMLImageElement, front: HTMLImageElement): HTMLCanvasElement {
+  /**
+   * One frame of a view: the ride's back, the pawn raised onto its seat, tilted and hidden below the seat (its straight cut, or the
+   * ride's own `hide`: a shape on the ride's square, at the ride's size), the ride's front.
+   */
+  private frame(rv: RiderView, anim: "idle" | "move", i: number, back: HTMLImageElement, front: HTMLImageElement, hide?: string): HTMLCanvasElement {
     const s = RIDE_PX;
     const pawn = rv.pawn;
     const c = document.createElement("canvas");
@@ -306,6 +315,15 @@ export class Rider {
     g.drawImage(back, cx, cy, rv.cell[2] * s, rv.cell[3] * s);
     const [px, py, tilt, seatCut] = rv.seats[anim][i]! as [number, number, number, number];
     g.save();
+    if (hide) {
+      // Hidden inside the ride's shape, on the ride's square at its size (as its layers were drawn: about its saddle).
+      const [ax, ay] = rv.anchor;
+      g.translate((ax - rv.x0) * s, (ay - rv.y0) * s);
+      g.scale(rv.k * s, rv.k * s);
+      g.translate(-ax, -ay);
+      g.clip(new Path2D(`${HIDE_ALL} ${hide}`), "evenodd");
+      g.setTransform(1, 0, 0, 1, 0, 0);
+    }
     // The pawn's square, on its seat: tilted round its base (50, 88), hidden below the seat's cut.
     g.translate((px - rv.x0) * s, (py - rv.y0) * s);
     if (tilt) {
@@ -313,9 +331,11 @@ export class Rider {
       g.rotate((tilt * Math.PI) / 180);
       g.translate(-50 * s, -88 * s);
     }
-    g.beginPath();
-    g.rect(-60 * s, -60 * s, 220 * s, (60 + seatCut) * s);
-    g.clip();
+    if (!hide) {
+      g.beginPath();
+      g.rect(-60 * s, -60 * s, 220 * s, (60 + seatCut) * s);
+      g.clip();
+    }
     const p = 100 * pawn.pad;
     g.drawImage(pawn.img, -p * s, -p * s, (100 + 2 * p) * s, (100 + 2 * p) * s);
     g.restore();
