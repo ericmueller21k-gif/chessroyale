@@ -46,3 +46,9 @@ never comes. **The director's call:** in a battle with a per-move clock, the bea
 picks already in stay; a pick can't be made during the fake move's hold, then the clock resumes). Solo (a bank clock with no short
 move clock) keeps 20 s and 30 s. Both as settings (`DASH_STALL`: seconds for solo, fractions for a move clock), once a battle either
 way. Online: the server times it and pauses the clock; the parity test covers solo vs online.
+
+## Added (Eric, Nov 17): use the API for the art
+"yea have the API do whatever it can for this since we have credits now". Every new pose or animation in this job is drawn by the API
+art runner (Opus): the lying-down clock tap, a hard clock-slam loop if his current slap doesn't read as "5 s straight", a smug pose for
+the fake move and a laughing "jk bro" beat. Cap $15 for the job in all (say each run's estimate first; the month's budget is $200).
+Report the $ per run.
