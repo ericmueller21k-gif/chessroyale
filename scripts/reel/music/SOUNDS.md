@@ -399,4 +399,9 @@ a style to write in. Its frame is kept (tempo, keys, chords, patches, sections, 
   them; its top end 1 to 2 dB under Chandy's (a palm-muted guitar is dark). The whistle chords are chord tones where
   they sound (a diminished one over a plain fifth read as "off" on paper, so the riff's is minor).
 - No boss named. Not handed over.
+- His first note on it (Nov 17): "At 1:05 it starts a new bar ... add another synth layer on top playing another
+  melody at a higher octave at a little faster, then they both come together at the end on a [harmony] for a few
+  notes before moving into the next part". 1:05 is the chorus's second time. A second synth (three sawtooths) has its
+  own tune there in 8ths, an octave over the lead and moving where the lead holds; for the tune's last five notes it
+  takes the lead's rhythm a third above it. The square wave's 16ths are a little softer under it. Sent as v2.
 

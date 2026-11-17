@@ -41,7 +41,8 @@ round its chorus once more (both leads together), the turnaround, and then the p
   bars  5-12   0:06  the locomotive: the riff over the E pedal
   bars 13-28   0:18  the verse, twice: the brass, a square wave under it
   bars 29-36   0:41  the pre-chorus: the flute-and-bell's 16ths, climbing to C#7
-  bars 37-52   0:53  the chorus (F sharp minor), twice: the second an octave up, pads and 16ths under it
+  bars 37-52   0:53  the chorus (F sharp minor), twice: the second (1:05) an octave up, pads and 16ths under it, and a
+                     second synth's own tune over it, the two in thirds for its last five notes
   bars 53-56   1:17  Bm7, C#7#9; the brakes
   bars 57-66   1:23  the piano, at half the tempo: the chorus's tune, slowed
   bars 67-70   1:53  the train pulls out: 81 to 162
@@ -115,6 +116,14 @@ RUNS = (
 # The chorus: long notes tied over the barlines. As written it is the high one; the first time is an octave under.
 CHORUS = "F#5:.5 A5:.5 C#6:3.5 | B5:1 G#5:1 B5:1.5 | A5:2.5 G#5:.5 F#5:1 | C#5:.5 F#5:.5 A5:3 | F#5:.5 A5:.5 D6:3.5 | C#6:1 B5:1 E6:1.5 | E6:2 C#6:1 B5:1 | C#6:1.5 A5:.5 F#5:2"
 CHORUS_UNDER = "D5:.5 F#5:.5 A5:3.5 | G#5:1 E5:1 G#5:1.5 | F#5:2.5 E5:.5 C#5:1 | A4:.5 C#5:.5 F#5:3 | D5:.5 F#5:.5 A5:3.5 | G#5:1 G#5:1 B5:1.5 | C#6:2 G#5:1 G#5:1 | A5:1.5 F#5:.5 C#5:2"
+# A second synth over the chorus's second time (Eric, Nov 17: "At 1:05 ... add another synth layer on top playing
+# another melody at a higher octave at a little faster, then they both come together at the end on a [harmony] for a
+# few notes before moving into the next part"): 8ths an octave over the lead, moving where the lead holds; from the
+# seventh bar's third beat it takes the lead's rhythm a third above it, for the tune's last five notes.
+COUNTER = (
+    "-:1 F#6:.5 E6:.5 F#6:.5 A6:.5 F#6:.5 E6:.5 | G#6:1 E6:.5 G#6:.5 B6:1 G#6:.5 E6:.5 | E6:.5 F#6:.5 A6:1 G#6:.5 F#6:.5 E6:.5 C#6:.5 | E6:1.5 F#6:.5 E6:.5 C#6:.5 E6:1 | "
+    "-:1 A6:.5 F#6:.5 A6:.5 B6:.5 A6:.5 F#6:.5 | G#6:1 B6:.5 G#6:.5 E6:.5 G#6:.5 B6:1 | B6:.5 G#6:.5 F#6:.5 G#6:.5 E6:1 D6:1 | E6:1.5 C#6:.5 A5:2"
+)
 # Bm7, C#7#9: the lead's way down, and the long E sharp (the first time into the brakes; the second into the breakdown).
 TURN_BRAKES = "D6:2 C#6:1 B5:1 | A5:1.5 B5:.5 D6:2 | F6:7"
 TURN_ON = "D6:2 C#6:1 B5:1 | A5:1.5 B5:.5 D6:2 | F6:4 | G#6:2 F6:1 C#6:1"
@@ -135,7 +144,7 @@ RIGHT = (
 # The stabs: where they fall in the bar (16ths), and the fills that take the rest of it (s: snare; h, m, l: toms).
 HITS_A, HITS_B = (0, 3, 6), (0, 3, 6, 9, 12)
 FILLS = ("sshhmmll", "s.sshhml", "hhmmllss", "hmlshmls")
-for _line, _beats in ((RIFF, 8), (RIFF_OUT, 8), (VERSE_1, 32), (UNDER_1, 32), (VERSE_2, 32), (UNDER_2, 32), (CHORUS, 32), (CHORUS_UNDER, 32),
+for _line, _beats in ((RIFF, 8), (RIFF_OUT, 8), (VERSE_1, 32), (UNDER_1, 32), (VERSE_2, 32), (UNDER_2, 32), (CHORUS, 32), (CHORUS_UNDER, 32), (COUNTER, 32),
                       (TURN_BRAKES, 15), (TURN_ON, 16), (DREAD, 24), (RIGHT.replace("B4>", "").replace("E6>", "").replace("D6>", "").replace("+", ""), 40)):
     assert beats(_line) == _beats, (_line[:30], beats(_line))
 assert all(len(bar.split()) == 8 for bar in LEFT) and len(LEFT) == 10
@@ -351,6 +360,14 @@ def render(window=None) -> np.ndarray:
             put(bus, b, x.drive(m, d * 0.98, 0.07 * vol, vib=0.007 if d >= 1 else 0.0, vib_hz=6.0, attack=0.015, release=0.04, knee=knee, glide=glide, glide_s=0.015), pan)
             last = (m, b + d)
 
+    SAW = [1 / h for h in range(1, 13)]
+
+    def synth(start, text, vol=1.0, pan=0.3):
+        """The second synth: three sawtooths a hair apart, a quick attack, a 6 Hz vibrato on a note of a beat or more."""
+        for b, d, m in notes(start, text):
+            at(b, d)
+            put("synth", b, x.tone(m, d * 0.92, SAW, 0.07 * vol, detune=(-8, 0, 7), vib=0.006 if d >= 1 else 0.0, vib_hz=6.0, attack=0.004, release=0.03), pan)
+
     def pad(bar, vol=0.018):
         """A bar of the string pad."""
         at(bar0(bar), 4)
@@ -495,19 +512,22 @@ def render(window=None) -> np.ndarray:
         crash(bar0(first), 0.05)
         roll(bar0(first + 7), 4, 0.07, 0.28)
 
-    def chorus(first, high=False, two=False):
+    def chorus(first, high=False, two=False, counter=False):
         """Eight bars of the chorus over the locomotive at full steam (two kicks into each beat, the ride). The first
         time the lead an octave under; `high`: as written, with the pads and the square wave's 16ths; `two`: the
-        second lead a third or a sixth under it."""
+        second lead a third or a sixth under it; `counter`: the second synth's own tune over it (the square wave's 16ths a
+        little softer under that), joining the lead in thirds at the end."""
         for j in range(8):
             bar = first + j
             train(bar, 1.05, fills="sshm" if j == 3 else FILLS[3] if j == 7 else "", double=True, ride=True)
             if high:
-                pad(bar), arp(bar)
+                pad(bar), arp(bar, 0.7 if counter else 1.0)
         crash(bar0(first), 0.065)
         soar(bar0(first), CHORUS, 1.75 if high else 1.4, 0.0, "lead", 0 if high else -12)
         if two:
             soar(bar0(first), CHORUS_UNDER, 1.0, -0.3, "lead2")
+        if counter:
+            synth(bar0(first), COUNTER)
 
     def turn(first, brakes):
         """Bm7, Bm7, C#7#9, C#7#9: the lead's way down and its long E sharp. `brakes`: the last bar is one held chord
@@ -560,7 +580,7 @@ def render(window=None) -> np.ndarray:
     intro(1), riff(5)
     verse(13, VERSE_1, UNDER_1), verse(21, VERSE_2, UNDER_2)
     pre(29)
-    chorus(37), chorus(45, high=True)
+    chorus(37), chorus(45, high=True, counter=True)
     turn(53, brakes=True)
     # The stop: steam let go, a far whistle; then the piano.
     k = int(1.6 * sr)
@@ -586,11 +606,11 @@ def render(window=None) -> np.ndarray:
         x.buses[name] = bus + wet * np.fft.irfft(np.fft.rfft(bus, axis=1) * np.fft.rfft(ir, axis=1) / (1 + (f / 4500) ** 2) * (f > 150), n=size, axis=1)
 
     x.beat_s = 60 / BPM
-    x.echo("lead", 0.75, 0.12, 0.05), x.echo("lead2", 0.75, 0.12, 0.05), x.echo("flute", 0.75, 0.16, 0.07)
-    for name, secs, wet in (("lead", 1.3, 0.16), ("lead2", 1.3, 0.16), ("brass", 1.0, 0.13), ("square", 1.0, 0.12), ("flute", 1.5, 0.25), ("pad", 2.0, 0.35),
+    x.echo("lead", 0.75, 0.12, 0.05), x.echo("lead2", 0.75, 0.12, 0.05), x.echo("flute", 0.75, 0.16, 0.07), x.echo("synth", 0.75, 0.14, 0.06)
+    for name, secs, wet in (("lead", 1.3, 0.16), ("lead2", 1.3, 0.16), ("synth", 1.3, 0.16), ("brass", 1.0, 0.13), ("square", 1.0, 0.12), ("flute", 1.5, 0.25), ("pad", 2.0, 0.35),
                             ("piano", 2.0, 0.3), ("bell", 2.2, 0.4), ("fx", 2.0, 0.35)):
         room(name, secs, wet)
-    levels = {"lead": 1.0, "lead2": 1.0, "brass": 1.8, "square": 1.25, "flute": 2.2, "pad": 2.2, "piano": 1.2, "bell": 3.0, "fx": 1.6, "gtr": 1.0, "bass": 0.7,
+    levels = {"lead": 1.0, "lead2": 1.0, "synth": 1.9, "brass": 1.8, "square": 1.25, "flute": 2.2, "pad": 2.2, "piano": 1.2, "bell": 3.0, "fx": 1.6, "gtr": 1.0, "bass": 0.7,
               "kick": 0.5, "snare": 1.0, "toms": 1.0, "hats": 5.2, "crash": 1.8}
     return x.play(x.mixdown(levels, lowpass=9000, room=0.03))
 
