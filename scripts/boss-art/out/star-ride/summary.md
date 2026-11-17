@@ -1,34 +1,26 @@
 # Boss art (rider): star-ride
 
-- Model claude-opus-5-5, effort high, adaptive thinking. 10 turns, 7 renders.
-- Spend: **$1.40** of the $6 cap (22 input, 85,493 cache-write, 468,380 cache-read, 43,826 output tokens).
+- Model claude-opus-5-5, effort high, adaptive thinking. 15 turns, 6 renders.
+- Spend: **$0.92** of the $4 cap (32 input, 66,331 cache-write, 595,518 cache-read, 23,211 output tokens).
 - Finished: it called done.
 - The drawing: scripts/boss-art/out/star-ride/star-ride.tsx.
 - Previews: scripts/boss-art/out/star-ride/preview/idle.png, scripts/boss-art/out/star-ride/preview/move.png, scripts/boss-art/out/star-ride/preview/look.png, scripts/boss-art/out/star-ride/preview/front-idle.png, scripts/boss-art/out/star-ride/preview/front-move.png, scripts/boss-art/out/star-ride/preview/back-idle.png, scripts/boss-art/out/star-ride/preview/back-move.png, scripts/boss-art/out/star-ride/preview/views.png, scripts/boss-art/out/star-ride/preview/trail.png. Each look it took: scripts/boss-art/out/star-ride/looks/.
 
 ## Its notes
 
-I've given Moon's Ride (star-ride, mythic) a hollowed-out seat in the middle of the star, and the pawn now sits down in it in all three views. I copied the finished file and changed only the seat; the description is unchanged.
+I took out the straight line. The edge where the star covers the pawn is now curved all the way across, in all three views and in every idle and move frame. Everything else is the same as the seat-star file: the star, the seat and its shading, cut 70, pawnY -8.5, side pawnX -3, the hover, the fizz, the shadow, the front and back views and the trail.
 
-**The seat**
-- A round dip in the middle of the top face, squashed to an oval by the camera angle: 49 units wide, about the width of the pawn's base, and centered on the star.
-- Inside, it's the item's color shaded darker: a lit band along the far inner wall, a darker floor with the pawn's own shade, and the near wall in shadow under the lip.
-- A thin soft light band runs along the far rim, and a lighter line just under the near lip's edge reads as its rounded top.
-- **Behind the pawn (`Back`):** the dip's inside and its far rim.
-- **In front of the pawn (`Front`):** the part of the star in front of the near lip, plus the lip's outline. That outline curves up at the pawn's sides, so it looks like the pawn sits down into a round hole.
-- I hide that front part with a mask rather than a clip. A clip drew a faint line along its edge.
+**What I checked:** The renders only show a plain pawn, so I tested with temporary stand-in items drawn in the pawn's layer: a coat wide enough to reach the cut line (y 61.5, x 5 to 89 in the side view), a two-feather parrot tail and a long blade. In all three views, at rest and through the move, the coat's flat bottom never showed, and the tail and blade tucked behind the star with a rounded edge. I've removed the stand-ins. The plain pawn looks the same as before.
 
-**Pawn numbers (all three views):** cut **70**, pawnY **-8.5** (it was -26 with no cut). The pawn is now about 17 units lower, so its head top sits at about y 11.5. In the side view pawnX is -3, which centers the pawn on the star's middle at x 47. Front and back use pawnX 0.
+**The curve:** On each side, the edge now leaves the near arc 30° up from the end of the seat, at y = cy + 0.5 × ry. In the side view that's (25.8, 52.6) and (68.2, 52.6). It leaves along the arc's own direction, so there's no corner at the join. It rises about 1.5 units to a soft crest just outside the seat's rim, around (21.6, 51) and (72.4, 51). From there it sweeps outward and gently down:
+- At x 5 and x 89 it's at about y 56, which is 5.5 units above the pawn's cut line (y 61.5).
+- At x -17 and x 111 it's at y 65.
+- Beyond those x it runs off past the star, where nothing is drawn.
 
-**Motion: unchanged from the finished star**
-- **Idle (12 × 170 ms):** a slow hover bob of about 2.5 units, with the ground shadow shrinking as the star rises. No sparks.
-- **Move (8 × 70 ms, dx 0 to 100):** a faster bob and a 3° lean forward, with the sparkler fizz popping from the back point.
-- **Front and back views:** the star still pitches a little toward the way it's going. It now pivots round the seat, so the pawn, its cut and the lip stay lined up in every frame.
-- **Trail:** the fallen-spark mark is untouched.
+The curve is built from the seat's own size, so the front and back views get the same shape. It turns and bobs with the star, and the pawn does too, so it stays the same distance above the cut line in every frame. There's no outline along the new outer edge; it's just the star's face carrying on.
 
-I looked at it in red, yellow, cobalt, pearl and midnight, with white and black pawns, in all three views at 4x and at town size. There were no warnings, and it's still under 125 units wide.
+**One change to the lip outline you should know about:** The bold outline still traces the whole near arc and looks the same as before. But its two short upper ends, from the seat's sides down to where the curve leaves the arc, are now drawn behind the pawn instead of in front. Without that, a coat's side or a parrot's tail sticking out there would have had a dark line drawn over it, with the item showing on both sides. Now items lie cleanly over those ends.
 
-**Choices you might want to change**
-- **How deep the pawn sinks:** at the middle about the bottom quarter of the pawn is hidden, more at the sides where the lip curves up. A cut of 72 with pawnY -10.5 would raise it a little.
-- **Seat size:** the dip's radius is 24.5 in the star's own plane, close to the inner notches (about 26.5). The rim nearly touches the notches, and it can't get much bigger without breaking through them.
-- **Tile box:** I changed it to [-4, 4, 106, 102] because the pawn is lower now.
+**Choices you might want to change:**
+- **Where items tuck in:** Items at the pawn's sides now show down to about y 51 to 56 before they tuck behind the star. Before, they were cut at y 44. If you'd rather they tuck in higher, set `LIP_T0` (the join, 30°) lower and `SH_DROP` (21) smaller.
+- **A shade along the new edge:** I left it off. It would also show when no item crosses the edge, as a line across the star's face.

@@ -112,9 +112,30 @@ const nearArc = (cx: number, cy: number, rx: number, ry: number) =>
 /** The far half of the rim, left to right over the middle. */
 const farArc = (cx: number, cy: number, rx: number, ry: number) =>
   `M ${n1(cx - rx)} ${n1(cy)} A ${n1(rx)} ${n1(ry)} 0 0 1 ${n1(cx + rx)} ${n1(cy)}`;
-/** Everything in front of the near lip: below the rim's middle line outside it, below the near arc inside it. */
-const frontClipD = (cx: number, cy: number, rx: number, ry: number) =>
-  `M -60 ${n1(cy)} H ${n1(cx - rx)} A ${n1(rx)} ${n1(ry)} 0 0 0 ${n1(cx + rx)} ${n1(cy)} H 160 V 170 H -60 Z`;
+// The edge of what Front draws over the pawn: inside the dip, the near lip's arc; outside it, a soft shoulder that
+// leaves the arc smoothly (same tangent) partway up each side, rolls over just outside the dip and sweeps outward and
+// gently down, staying well above the pawn's cut line (y 61.5) out past the pawn's widest items. Curved everywhere.
+const LIP_T0 = (30 * Math.PI) / 180; // where the shoulder leaves the near arc (0 = the dip's side, 90 = its bottom)
+const SH_OUT = 64; // the shoulder's far end, out from the dip's middle...
+const SH_DROP = 21; // ...and this far below the rim's middle line
+/** The shoulder on one side (s = -1 left, 1 right), drawn from its far end in to the arc: [far end, c1, c2, on the arc]. */
+const shoulder = (cx: number, cy: number, rx: number, ry: number, s: number): V2[] => {
+  const p0: V2 = [cx + s * rx * Math.cos(LIP_T0), cy + ry * Math.sin(LIP_T0)];
+  const tan = unit([s * rx * Math.sin(LIP_T0), -ry * Math.cos(LIP_T0)]); // along the arc, outward and up
+  const e: V2 = [cx + s * SH_OUT, cy + SH_DROP];
+  return [e, add(e, [-s * 21, -7.5]), add(p0, mul(tan, 6.5)), p0];
+};
+const pt = (q: V2) => `${n1(q[0])} ${n1(q[1])}`;
+/** Everything in front of the near lip: below the near arc inside the dip, below the shoulders outside it. */
+const frontClipD = (cx: number, cy: number, rx: number, ry: number) => {
+  const [eL, aL, bL, pL] = shoulder(cx, cy, rx, ry, -1);
+  const [eR, aR, bR, pR] = shoulder(cx, cy, rx, ry, 1);
+  return (
+    `M ${n1(cx - 130)} 170 L ${n1(cx - 130)} ${n1(cy + 48)} L ${pt(eL)} C ${pt(aL)} ${pt(bL)} ${pt(pL)}` +
+    ` A ${n1(rx)} ${n1(ry)} 0 0 0 ${pt(pR)} C ${pt(bR)} ${pt(aR)} ${pt(eR)} L ${n1(cx + 130)} ${n1(cy + 48)} L ${n1(cx + 130)} 170 Z`
+  );
+};
+
 
 /** The dip's inside and far rim (behind the pawn): the far inner wall lit, the floor, the near wall in the lip's shade. */
 function SeatInside({ p, cx, cy, rx, ry }: { p: Paint; cx: number; cy: number; rx: number; ry: number }) {
@@ -152,11 +173,34 @@ function SeatInside({ p, cx, cy, rx, ry }: { p: Paint; cx: number; cy: number; r
 
 /** The dip's near lip (in front of the pawn): its edge, and its rounded top catching the light just below. */
 function SeatLip({ p, cx, cy, rx, ry }: { p: Paint; cx: number; cy: number; rx: number; ry: number }) {
+  // the lip's bold edge in front only along the part of the near arc that is the Front's edge (between the shoulders);
+  // its two upper ends, beside the pawn, are drawn behind it (LipEnds), so whatever pokes out sideways lies over them
+  const s = Math.sin(LIP_T0) * ry;
+  const c = Math.cos(LIP_T0) * rx;
   return (
     <g>
       <path d={nearArc(cx, cy + 2.4, rx * 0.86, ry)} fill="none" stroke="#fff" stroke-linecap="round" opacity={isDark(p.hex) ? 0.5 : 0.42} {...lw(2.2)} />
-      <path d={nearArc(cx, cy, rx, ry)} fill="none" {...LINE} {...lw(2.6)} />
+      <path
+        d={`M ${n1(cx - c)} ${n1(cy + s)} A ${n1(rx)} ${n1(ry)} 0 0 0 ${n1(cx + c)} ${n1(cy + s)}`}
+        fill="none"
+        {...LINE}
+        stroke-linecap="butt"
+        {...lw(2.6)}
+      />
     </g>
+  );
+}
+/** The near lip's two upper ends (the dip's sides, beside the pawn), behind the pawn. */
+function LipEnds({ cx, cy, rx, ry }: { cx: number; cy: number; rx: number; ry: number }) {
+  const s = Math.sin(LIP_T0) * ry;
+  const c = Math.cos(LIP_T0) * rx;
+  return (
+    <path
+      d={`M ${n1(cx - rx)} ${n1(cy)} A ${n1(rx)} ${n1(ry)} 0 0 0 ${n1(cx - c)} ${n1(cy + s)} M ${n1(cx + c)} ${n1(cy + s)} A ${n1(rx)} ${n1(ry)} 0 0 0 ${n1(cx + rx)} ${n1(cy)}`}
+      fill="none"
+      {...LINE}
+      {...lw(2.6)}
+    />
   );
 }
 
@@ -246,6 +290,7 @@ function Back({ p, f, anim }: RiderProps) {
       <g transform={sideGroup(anim, f)}>
         <Star p={p} />
         <SeatInside p={p} {...SEAT_SIDE} />
+        <LipEnds {...SEAT_SIDE} />
       </g>
     </g>
   );
@@ -507,6 +552,7 @@ function viewBack(view: "front" | "back") {
         <g transform={`translate(0 ${n1(-b)})`}>
           <StarV p={p} g={g} />
           <SeatInside p={p} {...seatV(g)} />
+          <LipEnds {...seatV(g)} />
           {fizz}
         </g>
       </g>
