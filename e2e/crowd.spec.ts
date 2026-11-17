@@ -43,10 +43,10 @@ test("narrow phones: the top bar's numbers stay clear of the options button, and
     });
     expect(bar.spill, `${device}: ${bar.text}`).toBeLessThanOrEqual(0);
     expect(bar.clear, `${device}: the cut pill runs under the options button`).toBeGreaterThanOrEqual(0);
-    expect(bar.labelCut, `${device}: "Move 34 · 34v34 next" is cut short`).toBe(false);
+    expect(bar.labelCut, `${device}: "Move 34 · to 34v34" is cut short`).toBe(false);
     // The countdown is in moves, as the board counts them (Nov 1): with ?rounds=2 a stage is one move, so this one is the
-    // cut's, which says what it leaves since the 50 v 50 rework (C3; "cut now" before it): "34 v 34 next", on a narrow phone "34v34 next".
-    expect(bar.text, device).toContain("34v34 next");
+    // cut's, which says what it leaves since the 50 v 50 rework (C3; "cut now" before it): "34 v 34 next", on a narrow phone "to 34v34".
+    expect(bar.text, device).toContain("to 34v34");
     // Play to the first cut (up to 30 go out: ties at the line go through) and hold it there. You play the engine's best
     // move, so you go through: nobody's pick scores better than yours, and you start well above your team's line. (A
     // bot's pick, which this copied before, is now and then a random legal move, `botRandomMoveChance`; one put you out,

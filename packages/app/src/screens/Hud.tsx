@@ -113,7 +113,7 @@ export function Hud({ match, stripFrozen = false }: { match: GameView; stripFroz
                   <span class="muted">
                     <span class="hud-dot"> · </span>
                     {countdown ? (
-                      // (A narrow phone's line under "Move 34" has about 60 px: "34v34 next", "1v1 at 43" there; C3.)
+                      // (A narrow phone's line under "Move 34" has about 60 px: "to 34v34", "1v1 at 43" there; C3.)
                       <>
                         <span class="cd-long">{countdown}</span>
                         <span class="cd-short">{shortCountdown(countdown)}</span>

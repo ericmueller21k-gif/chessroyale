@@ -43,7 +43,7 @@ describe("the 50 v 50 rework's words", () => {
     expect(cutCountdown(s, 7, 4, 42)).toBe("1 v 1 next");
     expect(cutCountdown(s, CROWD_CUTS.length, 0, 43)).toBe("1 v 1");
     // A narrow phone's: about 60 px under "Move 34".
-    expect(["34 v 34 next", "1 v 1 from move 43", "1 v 1"].map(shortCountdown)).toEqual(["34v34 next", "1v1 at 43", "1v1"]);
+    expect(["34 v 34 next", "1 v 1 from move 43", "1 v 1"].map(shortCountdown)).toEqual(["to 34v34", "1v1 at 43", "1v1"]);
     // Not the rework: the old words stay the Hud's.
     expect(cutCountdown({ ...s, crowdCuts: undefined }, 0, 0, 1)).toBeNull();
   });
