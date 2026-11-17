@@ -1,3 +1,4 @@
+- Nov 17 ~18:35 UTC: #774 boss facing merged 4e35f10 (Timber swing + gardener spec hand fixed); deploy + main watched. No helpers running. Waiting on Eric: moo 3 Qs, payments 6 calls. Queue: pm-caster mirrored hands, dash findings 4+5.
 - Nov 17 17:31 UTC: #774 red: timber.spec:165 desktop (Timber 41 px over the board once mirrored; failed + retry). Fix helper session_01JuCWRrkt8mtu3Y6S5geDVF on claude/boss-facing, watcher armed.
 - Nov 17 17:25 UTC: boss facing .done -> #774 (733f672), CI watched, stills sent. Follow-ups: phone .pm-caster projectile hands when mirrored; dash findings 4+5. No helpers running; moo idle on Eric; payments #772 held.
 - Nov 17 ~17:15 UTC: #773 coin icon LIVE a5ee2dd (main run result in this line next).
