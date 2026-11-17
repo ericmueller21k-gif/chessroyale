@@ -1,6 +1,6 @@
 import { expect, type Page } from "@playwright/test";
 import { Chess } from "chess.js";
-import { BOSS_CLOCK, BOSS_POWERS, DASH_STALL } from "@chessroyale/core";
+import { BOSS_CLOCK, BOSS_POWERS, DASH_STALL, DASH_TAP } from "@chessroyale/core";
 import { stallTimeline } from "@chessroyale/chess";
 import { DASH_FIT_LINES, DASH_LOVE_LINES, DASH_POPOFF_LINES, DASH_RUSH_LINES, DASH_STALL_LINES, DASH_TAP_LINES } from "../packages/app/src/characters/dash-lines.ts";
 import { BOARD_SEL, asAdmin, openBossRaid, submitMove, test } from "./helpers.ts";
@@ -557,15 +557,35 @@ test.describe("Dash's stall skit and clock tap (Eric, Nov 17)", () => {
     expect(errors).toEqual([]);
   });
 
-  test("the clock tap (&power=clocktap): he lies down beside your clock and taps his, never over the board or the time, his spot empty meanwhile; your clock runs", async ({ page }) => {
-    test.setTimeout(120_000);
+  test("the clock tap (&power=clocktap) only when you're slow: none on a quick move; at 10 s of the next he lies down beside your clock and taps his, never over the board or the time, his spot empty meanwhile, your clock running, up before his slam; once", async ({ page }) => {
+    test.setTimeout(180_000);
     await asAdmin(page);
     await page.goto("/?debug&pace=quick&laststand=0&brain=stockfish&boss=dash&power=clocktap&mode=raid");
     await openBossRaid(page);
     await page.getByRole("main").getByRole("button", { name: /^Boss alone/ }).click();
+    // (Every frame: when his lying figure shows, by the crowd move and the ms of its clock.)
+    await page.evaluate(() => {
+      const w = window as any;
+      w.__lie = [] as { move: number; ms: number; at: number }[];
+      const look = () => {
+        const ph = w.match?.phase;
+        if (document.querySelector(".dash-lie")) w.__lie.push({ move: w.match?.boss?.crowdMoves ?? -1, ms: ph?.kind === "play" ? Date.now() - ph.startsAt : -1, at: Date.now() });
+        requestAnimationFrame(look);
+      };
+      requestAnimationFrame(look);
+    });
+    const lies = () => page.evaluate(() => (window as any).__lie as { move: number; ms: number; at: number }[]);
+    // (Move 1, played at once: nothing.)
+    await playOne(page);
     await yourMove(page);
+    expect(await lies()).toEqual([]);
+    // (Move 2, taking a while: at 10 s of it, not before.)
     const lie = page.locator(".dash-lie");
-    await expect(lie).toBeVisible({ timeout: 5_000 });
+    await expect(lie).toBeVisible({ timeout: 15_000 });
+    const first = (await lies())[0]!;
+    expect(first.move).toBe(1);
+    expect(first.ms).toBeGreaterThanOrEqual(DASH_TAP.afterMs - 50);
+    expect(first.ms).toBeLessThan(DASH_TAP.afterMs + 1000);
     const t0 = await page.locator(".dk-clock .dk-time").textContent();
     await expect.poll(() => page.evaluate(() => document.body.textContent ?? "").then((t) => DASH_TAP_LINES.some((l) => t.includes(l))), { timeout: 4_000 }).toBe(true);
     const [box, board, time] = await Promise.all([lie.boundingBox(), page.locator(BOARD_SEL.squares).boundingBox(), page.locator(".dk-clock .dk-time").boundingBox()]);
@@ -578,8 +598,17 @@ test.describe("Dash's stall skit and clock tap (Eric, Nov 17)", () => {
     await expect(page.locator(".boss-char .boss-char-sprite").first()).toHaveCSS("visibility", "hidden");
     await page.waitForTimeout(1500);
     expect(await page.locator(".dk-clock .dk-time").textContent()).not.toBe(t0);
-    // (Then he's up and back in his spot.)
+    // (Then he's up and back in his spot, before his stall skit's slam at 20 s of the same move.)
     await expect(lie).toHaveCount(0, { timeout: 6_000 });
     await expect(page.locator(".boss-char .boss-char-sprite").first()).toHaveCSS("visibility", "visible");
+    await expect.poll(() => page.evaluate(() => (window as any).match.phase.stall?.beat ?? null), { timeout: 15_000 }).toBe("slam");
+    const slamAt = await page.evaluate(() => (window as any).match.phase.stall.at as number);
+    expect(Math.max(...(await lies()).map((l) => l.at))).toBeLessThan(slamAt);
+    await playOne(page);
+    // (Move 3, slow again: once a battle, so nothing.)
+    await yourMove(page);
+    await page.waitForTimeout(DASH_TAP.afterMs + 2000);
+    expect((await lies()).filter((l) => l.move !== 1)).toEqual([]);
+    expect(await page.locator(".dash-lie").count()).toBe(0);
   });
 });
