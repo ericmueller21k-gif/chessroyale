@@ -1,4 +1,4 @@
-import { BOSS_POWERS, bannerPlusMs, bossBannerMs } from "@chessroyale/core";
+import { BOSS_POWERS, MOO_CINEMATIC, bannerPlusMs, bossBannerMs } from "@chessroyale/core";
 import { gameEnd, sideToMove, type Base, type Capture } from "./rules.ts";
 import { GINGER_FX } from "./bosses/ginger.ts";
 import { BOINGO_FX } from "./bosses/boingo.ts";
@@ -293,12 +293,22 @@ export function bossThinkMs(boss: QueenSlainView, burnt = false, afterMs = 0): n
   return Math.max(queenSlain(boss) ? bossBannerMs() + 500 : boss.id === "dash" ? BOSS_POWERS.dashThinkMs : 1200, burnt ? FIRE_BURN_MS : 0, afterMs);
 }
 
+/** Moo's Full Moon came at the start of his turn (as the crowd's move just played landed: its `fullMoon` among this turn's events). */
+const fullMoonNow = (boss: { powers?: { events?: readonly { kind: string }[] } | null } | null | undefined): boolean =>
+  !!boss?.powers?.events?.some((e) => e.kind === "fullMoon");
+
 /**
- * Moo's Full Moon came at the start of his turn (as the crowd's move just played landed: its `fullMoon` among this turn's
- * events): his transformation plays before his move, so his thinking lasts at least as long (the ms; 0: none).
+ * How long after his thinking screen comes his Full Moon's cinematic starts: when the crowd's move that brought it also took his
+ * queen, after QUEEN SLAIN! and its beat (the same wait bossThinkMs gives the banner alone; review of #776, #3), else at once.
  */
-export const fullMoonMs = (boss: { powers?: { events?: readonly { kind: string }[] } | null } | null | undefined): number =>
-  boss?.powers?.events?.some((e) => e.kind === "fullMoon") ? POWER_FX.fullMoon : 0;
+export const fullMoonLeadMs = (boss: QueenSlainView): number => (fullMoonNow(boss) && queenSlain(boss) ? bossBannerMs() + 500 : 0);
+
+/**
+ * Moo's Full Moon came at the start of his turn: his cinematic plays before his move, so his thinking lasts at least as long
+ * (the ms; 0: none): QUEEN SLAIN! first if his queen just fell (fullMoonLeadMs), the cinematic, and a margin after it
+ * (MOO_CINEMATIC.tailPadMs: a late frame or a slow connection never cuts its end). The same in solo and on the server.
+ */
+export const fullMoonMs = (boss: QueenSlainView): number => (fullMoonNow(boss) ? fullMoonLeadMs(boss) + POWER_FX.fullMoon + MOO_CINEMATIC.tailPadMs : 0);
 
 /**
  * Don Dough's moments at the start of his turn (as the crowd's move just played landed: a `doughRise` or `doughSquash` marked

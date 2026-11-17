@@ -1,13 +1,14 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { BOSS_ROSTER, isPlayable, menuBosses, playableBosses, type PowerEvent } from "@chessroyale/core";
-import { KING_ATTACKERS, MOO_BEATS, MOO_FX, POWER_FX, START_FEN } from "@chessroyale/chess";
+import { BOSS_ROSTER, MOO_CINEMATIC, bossBannerMs, isPlayable, menuBosses, playableBosses, type PowerEvent } from "@chessroyale/core";
+import { KING_ATTACKERS, MOO_BEATS, MOO_FX, POWER_FX, START_FEN, bossThinkMs, fullMoonLeadMs, fullMoonMs } from "@chessroyale/chess";
+import { cineBeats, closeFrame, closeOpacity, cineFigure, fieldOpacity } from "../src/components/MooCinematic.tsx";
 import { momentsOf, powerLine } from "../src/components/BossPowers.tsx";
 import { FADE_MS, MOO_UI, beamPhase, fallAtOf, fullMoonMoment, heldMarks, moonPixels, moonStep, noteMooMoments, scorchItems, waxLevel } from "../src/components/Moo.tsx";
 import { ragePct, type Moment } from "../src/components/PowerParts.tsx";
 import { MOO, MOO_ATTACK, MOO_CHANCE, MOO_ICONS, MOO_LINES, MOO_POWER_PALETTE, type MooIconId } from "../src/characters/moo.ts";
 import { MOONBEAM, MOON_SCORCH, FLURRY_STAGGER_MS } from "../src/characters/effects/moo.ts";
 import { MOO_SOUNDS, mooSound } from "../src/characters/moo-sounds.ts";
-import { mooPowered, noteCalm, noteSwap, resetMoo } from "../src/characters/moo-state.ts";
+import { mooPowered, noteCalm, noteRejoin, noteSwap, resetMoo } from "../src/characters/moo-state.ts";
 import { stanceAt, stanceCycle } from "../src/characters/stance.ts";
 import { MOVE_MEAN_DB, MOVE_PEAK } from "../src/characters/synth.ts";
 import { SELECT_LINES, SELECT_SOUND, selectLine } from "../src/characters/boss-select.ts";
@@ -24,7 +25,10 @@ import type { BossView } from "../src/game.ts";
  * (MOO_BEATS), the stunned mark on the board, his powered-up look during the Full Moon, his hug and sit, the Moon on his meter,
  * and the select screen (docs/decisions/2026-10-20-moo-wired.md). The art's own tests: moo.test.ts; the icon tokens': speech-icons.test.ts.
  */
-afterEach(() => resetMoo());
+afterEach(() => {
+  resetMoo();
+  noteRejoin(-Infinity);
+});
 
 const NAME = "Moo";
 const B = MOO_BEATS;
@@ -167,8 +171,10 @@ describe("his moments are timed by his animations", () => {
     expect(B.flurry.total).toBe(animLength(MOO.anims.flurry!));
     expect(B.flurry.total).toBeGreaterThanOrEqual(B.flurry.beamAt + 4 * B.flurry.stagger + fall + hit);
     for (let i = 0; i < 5; i++) expect(cueAt(MOO.anims.flurry!, `beam${i + 1}`)).toBe(B.flurry.beamAt + i * B.flurry.stagger);
-    expect(cueAt(MOO.anims.fullMoon!, "swap")).toBe(B.fullMoon.swapAt);
-    expect(B.fullMoon.total).toBe(animLength(MOO.anims.fullMoon!));
+    // The Full Moon: the cinematic (Nov 17), his transformation inside it from `transformAt`, its `swap` that far into it.
+    expect(cueAt(MOO.anims.fullMoon!, "swap")).toBe(B.fullMoon.transformSwapAt);
+    expect(B.fullMoon.transformMs).toBe(animLength(MOO.anims.fullMoon!));
+    expect(B.fullMoon.swapAt).toBe(B.fullMoon.transformAt + B.fullMoon.transformSwapAt);
     expect(cueAt(MOO.anims.dazed!, "calm")).toBe(B.dazed.calmAt);
     expect(B.dazed.total).toBe(animLength(MOO.anims.dazed!));
     expect(MOO_FX).toEqual({ moonbeam: B.moonbeam.total, flurry: B.flurry.total, fullMoon: B.fullMoon.total, dazed: B.dazed.total });
@@ -194,6 +200,73 @@ describe("his moments are timed by his animations", () => {
     // (A screen drawn again carries on: the same start.)
     expect(fullMoonMoment(thinking, 9000)[0]!.at).toBe(7000);
     expect(fullMoonMoment(view([]), 7000)).toEqual([]);
+  });
+
+  it("starts the Full Moon after QUEEN SLAIN! when the crowd's move took his queen, and his thinking (solo's and the server's: fullMoonMs) waits for both in turn (review of #776, #3, #6)", () => {
+    const took = { board: { fen: START_FEN, history: ["e2e4", "e7e5", "d1h5", "d8h4", "h5h4"], captures: [{ ply: 5, side: "w", from: "h5", to: "h4", piece: "q", color: "b" }] } };
+    const both = view([{ kind: "fullMoon", turn: 5 }], { ultAt: 4, fullMoon: { left: 5 } }, { ...took, startMove: 4 });
+    const lead = bossBannerMs() + 500;
+    expect(fullMoonLeadMs(both)).toBe(lead);
+    expect(fullMoonMoment(both, 7000)[0]).toMatchObject({ at: 7000 + lead, ms: B.fullMoon.total });
+    // (Solo and the server both wait bossThinkMs(view, burnt, fullMoonMs(view) + …): the banner's time, then the whole cinematic, then the margin.)
+    const total = lead + B.fullMoon.total + MOO_CINEMATIC.tailPadMs;
+    expect(fullMoonMs(both)).toBe(total);
+    expect(bossThinkMs(both, false, fullMoonMs(both))).toBe(total);
+    // (Without the queen: the cinematic at once, and the margin.)
+    const alone = view([{ kind: "fullMoon", turn: 5 }], { ultAt: 4, fullMoon: { left: 5 } });
+    expect(fullMoonLeadMs(alone)).toBe(0);
+    expect(bossThinkMs(alone, false, fullMoonMs(alone))).toBe(B.fullMoon.total + MOO_CINEMATIC.tailPadMs);
+    // (His queen taken on a turn without the Full Moon: QUEEN SLAIN!'s usual wait, nothing of his.)
+    expect(fullMoonMs(view([], {}, took))).toBe(0);
+  });
+
+  it("skips the cinematic when the Full Moon is first seen just as the device rejoins (a reload or a late join: the round resent), drawing him powered at once (review of #776, #2)", () => {
+    const thinking = view([{ kind: "fullMoon", turn: 6 }], { turn: 6, ultAt: 5, fullMoon: { left: 5 } }, { startMove: 2 });
+    noteRejoin(10_000);
+    expect(fullMoonMoment(thinking, 10_000 + MOO_CINEMATIC.rejoinMs - 1)).toEqual([]);
+    expect(mooPowered(thinking, 10_000 + MOO_CINEMATIC.rejoinMs)).toBe(true);
+    // (And it stays skipped on every later screen of that thinking.)
+    expect(fullMoonMoment(thinking, 20_000)).toEqual([]);
+    // (A Full Moon first seen well after the rejoin plays in full.)
+    const later = view([{ kind: "fullMoon", turn: 7 }], { turn: 7, ultAt: 6, fullMoon: { left: 5 } }, { startMove: 3 });
+    expect(fullMoonMoment(later, 10_000 + MOO_CINEMATIC.rejoinMs)[0]).toMatchObject({ at: 10_000 + MOO_CINEMATIC.rejoinMs });
+    expect(mooPowered(later, 10_000 + MOO_CINEMATIC.rejoinMs)).toBe(false);
+  });
+});
+
+describe("the Full Moon's cinematic", () => {
+  it("adds its beats up to the Full Moon's length, which his thinking waits for (fullMoonMs), at about 7 s", () => {
+    const c = MOO_CINEMATIC;
+    expect(B.fullMoon.transformAt).toBe(c.hopMs + c.fadeInMs + c.fieldMs + c.closeMs);
+    expect(B.fullMoon.total).toBe(B.fullMoon.transformAt + B.fullMoon.transformMs + c.afterMs + c.fadeOutMs + c.hopBackMs);
+    expect(fullMoonMs(view([{ kind: "fullMoon", turn: 5 }]))).toBe(B.fullMoon.total + c.tailPadMs);
+    expect(B.fullMoon.total).toBeGreaterThanOrEqual(6500);
+    expect(B.fullMoon.total).toBeLessThanOrEqual(8000);
+    const b = cineBeats();
+    expect([b.landed, b.close, b.closeEnd, b.transform, b.fadeOut, b.hopBack, b.end]).toEqual([...[b.landed, b.close, b.closeEnd, b.transform, b.fadeOut, b.hopBack, b.end]].sort((x, y) => x - y));
+    expect(b.closeEnd).toBe(b.transform);
+    expect(b.end).toBe(B.fullMoon.total);
+    // (His hops are his `move` and its powered twin, which fit in theirs; the eyes whiten inside the close-up, its cut out after.)
+    expect(animLength(MOO.anims.move!)).toBeLessThanOrEqual(c.hopMs);
+    expect(animLength(MOO.anims.p_move!)).toBeLessThanOrEqual(c.hopBackMs);
+    expect(c.whitenAt + 4 * c.eyeStepMs).toBeLessThanOrEqual(c.closeMs - c.cutMs);
+  });
+
+  it("fades the field in after the hop and out before the hop back, cuts to the close-up and back, whitens the eyes, and plays his animations in turn", () => {
+    const b = cineBeats();
+    expect(fieldOpacity(0)).toBe(0);
+    expect(fieldOpacity(b.landed + MOO_CINEMATIC.fadeInMs)).toBe(1);
+    expect(fieldOpacity(b.transform + 100)).toBe(1);
+    expect(fieldOpacity(b.hopBack)).toBe(0);
+    expect(closeOpacity(b.close - 1)).toBe(0);
+    expect(closeOpacity(b.close + MOO_CINEMATIC.cutMs)).toBe(1);
+    expect(closeOpacity(b.closeEnd)).toBe(0);
+    expect(closeFrame(b.close)).toBe(0);
+    expect(closeFrame(b.close + MOO_CINEMATIC.whitenAt)).toBe(1);
+    expect(closeFrame(b.closeEnd - 1)).toBe(4);
+    expect([0, b.landed, b.transform, b.transform + B.fullMoon.transformMs, b.hopBack].map((t) => cineFigure(t).anim)).toEqual(["move", "idle", "fullMoon", "powerIdle", "p_move"]);
+    // (The Moon's line as he lands back in his spot.)
+    expect(MOO_UI.moments.fullMoon.lineAt).toBe(b.hopBack + 300);
   });
 });
 

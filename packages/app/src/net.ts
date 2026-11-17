@@ -92,6 +92,7 @@ import { MatchChat } from "./chat.ts";
 import { isAdmin, maiaAllowed } from "./boss-brain.ts";
 import { resetKingSpeech } from "./godKing.ts";
 import { resetBeats } from "./components/boss-figure.ts";
+import { noteRejoin } from "./characters/moo-state.ts";
 import { resetBattleBanners } from "./battle-banners.ts";
 import { bossVoice } from "./speech.tsx";
 import { maiaSaved, prefetchMaia, startMaia } from "./maia.ts";
@@ -677,6 +678,8 @@ export class NetMatch implements GameView {
         if (this.premoveTold) this.send({ t: "premove", move: this.premoveTold });
         this.phase2.onWelcome();
         this.chat.onWelcome();
+        // (A Full Moon resent now is already under way: Moo's cinematic skips it.)
+        noteRejoin();
         // This device's engine speed, so the lobby can share out the judging (once per page; sent again on reconnect).
         void this.reportSpeed();
         // (Back after a dropped connection with Maia still loaded: the lobby forgot it as it took the seat back.)

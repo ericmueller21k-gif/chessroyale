@@ -1,0 +1,168 @@
+/**
+ * Moo & Moon's Full Moon cinematic (Eric, Nov 17; docs/decisions/2026-11-17-moo-cinematic.md), the Full Moon's moment while he
+ * thinks (components/Moo.tsx, `fullMoon`). Its beats, all settings (MOO_CINEMATIC in settings.ts; MOO_BEATS.fullMoon adds them up,
+ * so the server and solo wait for all of it):
+ * 1. He hops from his spot (the phone's bar, or beside the board on a computer) onto the board (his `move`).
+ * 2. The field fades in over the board and everything above it: on a phone the whole width from the screen's top to the board's
+ *    bottom (the top bar and the boss bar), on a computer the board's column from the top (the boss bar). He stands in it.
+ * 3. A quick cut to the close-up of the two of them looking up at the moon; their eyes turn white; a quick cut back.
+ * 4. His transformation (`fullMoon`, his colors going gold at its `swap`), a beat powered up, the field fades out.
+ * 5. He hops back to his spot (his powered `move`).
+ * Two pictures in one sheet (characters/moo-cinematic.png: the field's four frames, its stars twinkling, and the close-up's five,
+ * normal to white eyes; drawn on claude/boss-art: scripts/boss-art/out/arena-moo-field and scripts/boss-art/moo-closeup), his own
+ * sprite over the field, and opacities: no canvas of its own, no filters. Everything from the moment's start, so a screen drawn
+ * later carries on (a device that first sees it as it rejoins skips it: Moo.tsx, fullMoonMoment). While the field is up it takes
+ * every tap, so nothing hidden under it is reached blind; a match menu already open shows above it (`mo-on`).
+ */
+import { createPortal } from "preact/compat";
+import { useLayoutEffect } from "preact/hooks";
+import { MOO_CINEMATIC as C } from "@chessroyale/core";
+import { MOO_BEATS } from "@chessroyale/chess";
+import sheetUrl from "../characters/moo-cinematic.png?url";
+import { bossKit } from "../characters/kits.ts";
+import { BossMoment } from "./BossEffect.tsx";
+import { useFrameNow } from "./Countdown.tsx";
+import { onComputer } from "./PowerParts.tsx";
+import { boardOnScreen } from "./RecluseCutscene.tsx";
+
+const B = MOO_BEATS.fullMoon;
+/** The pictures' own size (art pixels) and the sheet's frames: the field's four, then the close-up's five. */
+const W = 200;
+const H = 260;
+const FIELD = [0, 1, 2, 3];
+const FIELD_MS = 400;
+const CLOSE = [4, 5, 6, 7, 8];
+/** Where he stands in the field (art pixels): the field was drawn with this patch clear for him. */
+const SPOT: readonly [number, number] = [100, 205];
+
+/** Each beat's start (ms into the moment). */
+export const cineBeats = () => {
+  const close = C.hopMs + C.fadeInMs + C.fieldMs;
+  const fadeOut = B.transformAt + B.transformMs + C.afterMs;
+  return { landed: C.hopMs, close, closeEnd: close + C.closeMs, transform: B.transformAt, fadeOut, hopBack: fadeOut + C.fadeOutMs, end: B.total };
+};
+
+const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
+const ramp = (t: number, from: number, ms: number) => clamp01((t - from) / Math.max(1, ms));
+
+/** The field's opacity at `t`: fading in after the hop, out before the hop back. */
+export function fieldOpacity(t: number): number {
+  const b = cineBeats();
+  return Math.min(ramp(t, b.landed, C.fadeInMs), 1 - ramp(t, b.fadeOut, C.fadeOutMs));
+}
+
+/** The close-up's opacity at `t`: a quick cut in, a quick cut out. */
+export function closeOpacity(t: number): number {
+  const b = cineBeats();
+  return Math.min(ramp(t, b.close, C.cutMs), 1 - ramp(t, b.closeEnd - C.cutMs, C.cutMs));
+}
+
+/** The close-up's frame at `t` (0: their eyes as ever; 4: white and glowing). */
+export function closeFrame(t: number): number {
+  const into = t - cineBeats().close - C.whitenAt;
+  return into < 0 ? 0 : Math.min(4, 1 + Math.floor(into / C.eyeStepMs));
+}
+
+/** His animation at `t`, and since when (ms into the moment). */
+export function cineFigure(t: number): { anim: string; since: number } {
+  const b = cineBeats();
+  if (t < b.landed) return { anim: "move", since: 0 };
+  if (t < b.transform) return { anim: "idle", since: b.landed };
+  if (t < b.transform + B.transformMs) return { anim: "fullMoon", since: b.transform };
+  if (t < b.hopBack) return { anim: "powerIdle", since: b.transform + B.transformMs };
+  return { anim: "p_move", since: b.hopBack };
+}
+
+/** How far along a hop he is at `t` ms into it: off the ground at `move`'s second frame, down at its fourth (100 to 300 ms). */
+const HOP_UP = 90;
+const HOP_DOWN = 300;
+const hopP = (t: number) => {
+  const p = clamp01((t - HOP_UP) / (HOP_DOWN - HOP_UP));
+  return p < 0.5 ? 2 * p * p : 1 - 2 * (1 - p) * (1 - p);
+};
+
+type Box = { x: number; y: number; w: number };
+
+/** His figure's box in its usual spot (the bar's on a phone, beside the board on a computer): where he hops from and back to. */
+function spotBox(): Box | null {
+  const c = [...document.querySelectorAll<HTMLElement>(".boss-char.ch-moo .boss-char-sprite")].find((e) => e.offsetParent);
+  const r = c?.getBoundingClientRect();
+  return r && r.width ? { x: r.x, y: r.y, w: r.width } : null;
+}
+
+/** The pictures fetched and decoded ahead, as his battle starts (Moo.tsx, prewarmMoo): never a blank first frame. */
+let sheet: HTMLImageElement | null = null;
+export function prewarmCinematic(): void {
+  if (sheet || typeof Image === "undefined") return;
+  sheet = new Image();
+  sheet.src = sheetUrl;
+  sheet.decode?.().catch(() => undefined);
+}
+
+/** A figure's scale at most this share of the area's height per art pixel: in a wide area the field's cover scale would make him giant. */
+const FIG_MAX = 1 / 200;
+
+/** `name`: the boss's name, as his kit is found (bossKit). */
+export function MooCinematic({ at, name }: { at: number; name: string }) {
+  const now = useFrameNow();
+  const t = now - at;
+  const on = t >= 0 && t < B.total;
+  // (While it plays, a match menu already open shows above it: `mo-on` on the page, as the Hidden Boss's `cs-on`; review of #776, #1.)
+  useLayoutEffect(() => {
+    if (!on) return;
+    document.body.classList.add("mo-on");
+    return () => document.body.classList.remove("mo-on");
+  }, [on]);
+  const kit = bossKit(name);
+  // The board's box and his spot's, read each frame: a board re-mounted or a phone turned mid-cinematic is followed (review, #7).
+  const rect = on ? boardOnScreen()?.getBoundingClientRect() : null;
+  if (!rect || !rect.width || !kit) return null;
+  const b = cineBeats();
+  // The area: the board and everything above it.
+  const computer = onComputer();
+  const area = { x: computer ? rect.x : 0, y: 0, w: computer ? rect.width : innerWidth, h: rect.bottom };
+  // The pictures cover it, centered (the art keeps what matters away from its edges), in whole screen pixels. The close-up fits
+  // instead in an area wider than 4:3 (a short, wide window), where covering would show only a thin band of it (review, #5).
+  const cover = Math.max(area.w / W, area.h / H);
+  const place = (k: number) => {
+    const w = Math.ceil(W * k);
+    const h = Math.ceil(H * k);
+    return { x: Math.round((area.w - w) / 2), y: Math.round((area.h - h) / 2), w, h };
+  };
+  const field = place(cover);
+  const close = area.w / area.h > 4 / 3 ? place(Math.min(area.w / W, area.h / H)) : field;
+  const pic = (frame: number, opacity: number, cls: string, r: typeof field) =>
+    opacity > 0 && (
+      <div
+        class={`mo-pic ${cls}`}
+        data-frame={frame}
+        style={{ left: `${r.x}px`, top: `${r.y}px`, width: `${r.w}px`, height: `${r.h}px`, opacity: String(opacity), backgroundImage: `url(${sheetUrl})`, backgroundSize: `${r.w * 9}px ${r.h}px`, backgroundPosition: `${-frame * r.w}px 0` }}
+      />
+    );
+  // His figure: where he stands in the field, his feet kept inside the area and his scale capped, flying between there and his spot
+  // on the hops.
+  const ch = kit.ch;
+  const k = field.w / W;
+  const kf = Math.min(k, area.h * FIG_MAX);
+  const feet = { x: area.x + field.x + SPOT[0] * k, y: Math.min(field.y + SPOT[1] * k, area.h * 0.92) };
+  const stand: Box = { x: feet.x - ch.foot[0] * kf, y: feet.y - ch.foot[1] * kf, w: ch.w * kf };
+  const spot = t < b.landed || t >= b.hopBack ? spotBox() : null;
+  const from = spot ?? { x: area.x + area.w * 0.1, y: area.y, w: stand.w / 2 };
+  const hop = t < b.landed ? hopP(t) : t >= b.hopBack ? 1 - hopP(t - b.hopBack) : 1;
+  const lift = Math.sin(Math.PI * hop) * Math.max(40, 0.3 * Math.hypot(stand.x - from.x, stand.y - from.y));
+  const fig: Box = { x: from.x + (stand.x - from.x) * hop, y: from.y + (stand.y - from.y) * hop - lift, w: from.w + (stand.w - from.w) * hop };
+  const f = cineFigure(t);
+  // (While the field is up it takes every tap: nothing hidden under it, the board's premoves or the top bar's menu, is reached
+  // blind; review, #1 and #4. On the hops the board shows, and takes taps as ever.)
+  const fieldUp = fieldOpacity(t) > 0;
+  return createPortal(
+    <div class="mo-cine" data-t={Math.round(t)}>
+      <div class={`mo-area${fieldUp ? " mo-block" : ""}`} style={{ left: `${area.x}px`, top: `${area.y}px`, width: `${area.w}px`, height: `${area.h}px` }}>
+        {pic(FIELD[Math.floor(Math.max(0, t) / FIELD_MS) % FIELD.length]!, fieldOpacity(t), "mo-field", field)}
+        {pic(CLOSE[closeFrame(t)]!, closeOpacity(t), "mo-close", close)}
+      </div>
+      <BossMoment boss={name} anim={f.anim} since={at + f.since} class="mo-cine-fig" style={{ left: `${fig.x}px`, top: `${fig.y}px`, width: `${fig.w}px` }} />
+    </div>,
+    document.body,
+  );
+}

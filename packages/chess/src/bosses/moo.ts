@@ -27,7 +27,7 @@
  * - After his last move at full strength, `dazed` as the crowd's turn begins: he's himself again. The meter is held empty
  *   from the transformation until then (ultimateRunning), then fills again.
  */
-import { BOSS_POWERS, type BossPowerSettings, type BossPowerState, type MooState, type PowerEvent } from "@chessroyale/core";
+import { BOSS_POWERS, MOO_CINEMATIC, type BossPowerSettings, type BossPowerState, type MooState, type PowerEvent } from "@chessroyale/core";
 import { applyMove, legalMoves, pieceAt, sideToMove } from "../rules.ts";
 import type { EngineLike } from "../runner.ts";
 import { VALUE, from, heldIn, meterFull, powerRoll, testSwitch, turnOf, unleashed, type Battle, type BossRules, type Side } from "./base.ts";
@@ -41,14 +41,23 @@ import { VALUE, from, heldIn, meterFull, powerRoll, testSwitch, turnOf, unleashe
  * - **flurry** (as the crowd's turn after his first move at full strength begins): his `flurry` animation (1430 ms), its
  *   `beam1` to `beam5` cues from `beamAt`, `stagger` ms apart: a beam falls on each square in turn, each falling and
  *   hitting as the moonbeam's.
- * - **fullMoon** (at the start of his turn, while he thinks): his transformation (1340 ms), his colors swapping at `swapAt`.
+ * - **fullMoon** (at the start of his turn, while he thinks): the cinematic (Eric, Nov 17; MOO_CINEMATIC in settings.ts, its beats
+ *   in order): he hops onto the board, the field fades in, the close-up (their eyes whiten), back in the field his transformation
+ *   (`transformMs`, 1340 ms, his colors swapping `transformSwapAt` into it) from `transformAt`, a beat powered up, the field fades
+ *   out, he hops back. `swapAt` is the swap from the moment's start; `total` is the whole cinematic, so his move waits for it all.
  * - **dazed** (as the crowd's turn after his last move at full strength begins): 1250 ms, back to his own colors at `calmAt`.
  * Each total is the longest of the animation and its last beam's fall and hit.
  */
 export const MOO_BEATS = {
   moonbeam: { beamAt: 350, fallMs: 220, hitMs: 240, total: 1040 },
   flurry: { beamAt: 380, stagger: 120, fallMs: 220, hitMs: 240, total: 1430 },
-  fullMoon: { swapAt: 480, total: 1340 },
+  fullMoon: (() => {
+    const c = MOO_CINEMATIC;
+    const transformMs = 1340;
+    const transformSwapAt = 480;
+    const transformAt = c.hopMs + c.fadeInMs + c.fieldMs + c.closeMs;
+    return { transformMs, transformSwapAt, transformAt, swapAt: transformAt + transformSwapAt, total: transformAt + transformMs + c.afterMs + c.fadeOutMs + c.hopBackMs };
+  })(),
   dazed: { calmAt: 280, total: 1250 },
 } as const;
 

@@ -41,6 +41,11 @@ export function mooPowered(boss: Pick<BossView, "id" | "startMove" | "powers">, 
   return calm === undefined || now < calm;
 }
 
+/** When this device last (re)joined its lobby online (net.ts, on `welcome`): a Full Moon first seen just then was resent, under way. */
+let rejoined = -Infinity;
+export const noteRejoin = (now = Date.now()) => void (rejoined = now);
+export const rejoinedAt = () => rejoined;
+
 /** A new battle: nothing noted. */
 export function resetMoo() {
   swaps.clear();

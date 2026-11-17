@@ -58,7 +58,7 @@ function figAt(tl: CutTimeline, t: number): { anim: string; then?: string; since
 }
 
 /** The board on screen (the biggest one shown: a phone's fall shows one), when none is given. */
-function boardOnScreen(): HTMLElement | null {
+export function boardOnScreen(): HTMLElement | null {
   const boards = [...document.querySelectorAll<HTMLElement>(".board-wrap")].filter((b) => b.offsetParent);
   return boards.sort((a, b) => b.getBoundingClientRect().width - a.getBoundingClientRect().width)[0] ?? null;
 }
