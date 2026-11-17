@@ -1,3 +1,4 @@
+- Nov 17 ~07:30 UTC: Eric: Dash stall skit (20 s clock slam 5 s + line; 30 s fake second move, "jk bro", taken back; once a battle). Brief dash-stall.md, xhigh, starts when the seat lip + key tap helpers finish.
 - Nov 17 ~07:25 UTC: Eric: Dash faces away from the board on a computer -> #766 (fa1b9ff): artFacesLeft mirrored in place-side too (9 bosses), CI watched. Running: seat lip fix (seat chat), town key tap helper.
 - Nov 17 ~07:10 UTC: Eric: horizontal line across the pawn on the star seat (straight cut shows) -> sent to the seat chat (new branch claude/star-ride-lip, API cap $4). Eric: arrow key tap moves 2 squares -> helper (Opus high) claude/town-key-tap. Moon ride was on Eric already: his saved ride (moon-ride id kept).
 - Nov 17 ~06:55 UTC: #763 star ride LIVE (ca19e30). #765 chat80 MERGED (d08c166; helper archived). Main run (covers both) watched. No helpers running except the idle open chats (seat, C3) left for Eric.
