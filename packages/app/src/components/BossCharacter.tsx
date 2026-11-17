@@ -643,8 +643,11 @@ function fitSides(side: HTMLElement | null, name: string) {
   const drawn = kit ? SIDE_REACH[kit.ch.id] : undefined;
   if (!wrap || !box || !cv || !kit || !drawn) return;
   // (Mirrored to face the board (placeFacing), his reach toward it is what he reaches behind him as drawn.)
-  const reach = placeFacing(kit, kit.ch, "side").mirror ? ([drawn[2], drawn[1], drawn[0], drawn[3]] as const) : drawn;
+  const mirror = placeFacing(kit, kit.ch, "side").mirror;
+  const reach = mirror ? ([drawn[2], drawn[1], drawn[0], drawn[3]] as const) : drawn;
   const sx = cv.width / kit.ch.w;
+  // (His feet on the page: a mirror about them keeps them where they are, while his frame's box turns round them.)
+  const feetX = mirror ? cv.right - kit.ch.foot[0] * sx : cv.left + kit.ch.foot[0] * sx;
   const now = (v: string, d: number) => parseFloat(at.getPropertyValue(v)) || d;
   const s = now("--side-s", 2);
   const k = now("--king-k", 1);
@@ -678,8 +681,8 @@ function fitSides(side: HTMLElement | null, name: string) {
       leftLimit: space?.left ?? screen.getBoundingClientRect().left,
       rightLimit: Math.min(document.documentElement.clientWidth, chat && chat.left > wrap.right ? chat.left : Infinity),
       s,
-      bossLeft: cv.left + (kit.ch.foot[0] - reach[0]) * sx,
-      bossRight: cv.left + (kit.ch.foot[0] + reach[2]) * sx,
+      bossLeft: feetX - reach[0] * sx,
+      bossRight: feetX + reach[2] * sx,
       bossTop: cv.top + (kit.ch.foot[1] - reach[1]) * sx,
       bossMid: box.left + box.width / 2,
       k,
@@ -707,7 +710,7 @@ function fitSides(side: HTMLElement | null, name: string) {
     // Over the board's edge, the few pixels his drawing has under his feet (SIDE_REACH's down) would lie over the dock's row under the
     // board: he stands that much higher there.
     const row = rect(dock?.querySelector(":scope > .boss-dock-main"));
-    const overRow = place.bossMid + (cv.left + (kit.ch.foot[0] + reach[2]) * sx - (box.left + box.width / 2)) * (place.s / s) > (row?.left ?? Infinity);
+    const overRow = place.bossMid + (feetX + reach[2] * sx - (box.left + box.width / 2)) * (place.s / s) > (row?.left ?? Infinity);
     const under = reach[3] * place.s;
     const lift = row && overRow ? Math.max(0, Math.ceil(wrap.bottom + under - row.top + 1)) : 0;
     at.setProperty("--side-lift", `${lift}px`);
