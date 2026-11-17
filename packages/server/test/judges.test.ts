@@ -511,7 +511,11 @@ describe("deep checks on players' computers (the switch on)", () => {
       lastKey = L.core.record.round!.key;
       L.pickAll(3);
       if (round > 0) {
-        expect(L.last("p3", "round")?.board ?? null).toBeNull();
+        // (Out, never in the round: no board to play. Since the 50 v 50 rework's Spectate (C3) a cut player watches the board as the
+        // team not picking does: `watching`.)
+        const r = L.last("p3", "round");
+        expect(r?.board == null || r?.watching === true).toBe(true);
+        expect(r?.alive).toBe(false);
         judged = L.judgesOf().includes("p3");
       }
       for (const id of L.judgesOf()) await L.answerSplit(id);

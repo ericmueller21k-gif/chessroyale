@@ -263,8 +263,8 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
 - **The 50 v 50 rework (Eric, Nov 16; `notes/designs/crowd-rework.md` on `design/crowd-rework`): every 50 v 50 plays it since
   step C2** (`CROWD_SETTINGS` takes `CROWD_REWORK`; docs/decisions/2026-11-16-crowd-rework-core.md and
   2026-11-16-crowd-rework-runner.md). Where it differs from the older paragraphs on this page (the endings, the top-3 draw and its
-  sure share, CROWD_STAGE_ROUNDS' cuts), it wins; those paragraphs stand for `CROWD_PRE_REWORK` (the FAQ's
-  words until C3; the old draw's settings stay for Majority mode, Eric, Nov 17). C4 retired the old endings' tests and sims (2026-11-17-crowd-rework-c4.md). One game to its end (mate, a draw by the rules, or after Black's move 60 the judge's verdict:
+  sure share, CROWD_STAGE_ROUNDS' cuts), it wins; those paragraphs stand for `CROWD_PRE_REWORK` (the old draw's settings stay for
+  Majority mode, Eric, Nov 17; the FAQ reads the rework since C3). C4 retired the old endings' tests and sims (2026-11-17-crowd-rework-c4.md). One game to its end (mate, a draw by the rules, or after Black's move 60 the judge's verdict:
   75%+ wins; `MatchRunner.endGameIfOver`, called by the lobby and solo after each reveal and before each deal, ahead of any cut: a
   game over on a cut's move cuts nobody; a finished board is never replaced); no endings. The vote "How are moves picked?" (`CROWD_VOTES`,
   held where `crowdCuts` is set) replaces "How does it end?": **Strong** (the judge's best of the team's 3 most-picked, or one within
@@ -277,7 +277,21 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
   made, never one who left: `PlayerState.leftAt`, set by `retire` and by `handOver` once a move is played). Online the results carry
   them (`podium`) and each standings row's `outAtMove` and `perMove` (`MatchRunner.crowdResults`); the vote message its `id`, which
   the app looks votes up by (`heldVotes`). No shared-blunder relief with 4 or fewer real picks (`sharedMinPicks`, the director's
-  call). After the last cut there are no stage ends (`stageComplete`); the top bar says "1 v 1". 50 v 50 has no flag fall (an empty
+  call). After the last cut there are no stage ends (`stageComplete`); the top bar says "1 v 1".
+  **The screens (C3, docs/decisions/2026-11-17-crowd-rework-c3.md):** the top bar counts down (`cutCountdown` in `game.ts`: "cut in
+  2", "4 v 4 next" on a cut's own move, "1 v 1 from move 43" through the 2 v 2, then "1 v 1"; to 480 px `shortCountdown`'s
+  "to 4v4" and "1v1 at 43", the line there being about 60 px); one "1 V 1!" banner on the 1 v 1's
+  first turn (`OneVOneBanner`, Crowd.tsx; the boss battles' `FightBanner`); the cut screen out (`CutOut`, mockup `crowd-cut`): your
+  place and the gap to your team's last one through, "Why was I cut?", a fixed still-in box (each side's count and names, the stages
+  to come: `stagesAhead` / `stagesLine`), and at its foot **Spectate** and **Leave the match**, side by side, always both, sticky at the
+  bottom, in the same place every cut. Spectating is the watch screen ("you're watching", no premoves): online the server sends a cut
+  player the watching rounds, tallies and reveals (`LobbyCore.spectatorsWatch`), and not tapping either spectates once the break
+  ends; solo plays on before you once you tap Spectate (`watchesToEnd`), else the rest is played out at once to your result, as
+  before (unit `packages/app/test/solo-cut-out.test.ts`). The results (`components/Podium.tsx`, mockup `crowd-podium`): the
+  mode line, how the game ended (`endWords`), the podium (2nd, 1st tallest, 3rd; each player's own dressed pawn, name, points a move;
+  "Winner" and "Best player" tags), a fixed best-player line, your row (place, out at move, points a move, RP's spot greyed until
+  C5) and the chart of all 100 in a 330 px box that scrolls inside, your row pinned at its foot. Solo the rows' `outAtMove` / `perMove`
+  come from `runner.crowdResults()` (`SoloMatch.crowdRows`), online from the results message; the phase carries `podium`. 50 v 50 has no flag fall (an empty
   bank still gets its increment; a side's last seat always goes to a bot). Test switches: `?limit=N` (the move limit), and `?format=`
   only skips the votes.
 - **Classic** (64 players, 8 boards, rotating) still runs but is frozen: Eric will rework it; don't invest in it.
@@ -303,7 +317,7 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
 ## Settings
 
 The rework's (in `CROWD_SETTINGS` since C2): `CROWD_REWORK`, `CROWD_CUTS`, `CROWD_PICK`, `CROWD_BEST`, `CROWD_SCORING.sharedMinPicks`;
-`CROWD_PRE_REWORK` (the old 50 v 50: the FAQ's words until C3; C4 retired the rest). Majority mode reads `crowdSureShare` and `crowdPlayedFromTop` (Nov 17).
+`CROWD_PRE_REWORK` (the old 50 v 50: no screen or FAQ reads it since C3; C4 retired the rest). Majority mode reads `crowdSureShare` and `crowdPlayedFromTop` (Nov 17).
 `OPENING_ALLOWANCE` (points, flatThrough, goneBy, materialPawns), `CROWD_MISSES` (the AFK rule), `crowdSureShare`, `CROWD_SCORING` (the cap and its stages and curve, the piece bar, the shared-blunder relief, streaks, rare finds, a miss, the bubble grace), `RAID_SCORING` (50 v 50's, the cap by crowd move, streaks on live moves only, no bubble), `BOSS_ALONE_SCORING`, `CROWD_START` (the start vote's random opening length), `LEAVING` (the away time, the seat's bot, the app's wait for an answer), `DEFAULT_SETTINGS`, `CROWD_SETTINGS`, `RAID_SETTINGS`, `CROWD_KNOCKOUTS` (and `crowdFinalists`), `QUICK_PACE`
 (the `?pace=quick` test switch, per mode; players always play the mode's own pace), the clock (`timeBankSeconds`, `timeIncrementSeconds`, `moveClockSeconds`;
 `moveClockSteps` for a rising clock, unused today), the vote keys (`voteSeconds`, `voteBotSkip`, …), `teamFinal*`. The
@@ -322,6 +336,9 @@ time controls themselves are in the vote data (`PREGAME_VOTES` in `votes.ts`).
   `cut-ties.test.ts` (cuts by keep: ties, what's owed, a short side), `crowd-bot-spread.test.ts` (Strong over bots' picks);
   `packages/chess/test/crowd.test.ts` ("the 50 v 50 rework (C2)": to move 60, a mate on a cut's move, who left),
   `packages/server/test/lobby.test.ts` ("the 50 v 50 rework online"), `resign.test.ts` ("the 50 v 50 rework (C2)").
+  The screens (C3): unit `packages/app/test/results-rows.test.ts` ("the 50 v 50 rework's words"), `faq.test.ts` ("the 50 v 50
+  rework (C3)…"); e2e `crowd.spec.ts` (the top bar's "34 v 34 next"; "online, once you're out…": the out view, the foot fixed from
+  cut to cut, spectating after the break; the full match's podium at 320 / 390 / 1280).
 - 50 v 50's bots and played move: unit `packages/core/test/crowd-bot-spread.test.ts` (a team at lobby ratings never all
   picks one move, Eric's castle included; the plurality moves between good lines; the top-3 odds and ties; the draw),
   `packages/chess/test/judge.test.ts` (the lean from the seed alone), `packages/server/test/lobby.test.ts` (the live

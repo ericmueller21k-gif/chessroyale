@@ -200,8 +200,11 @@ export class SoloMatch implements GameView {
     // and that stays the truth for the result.)
     const k = this.phase.kind;
     const boards = k === "phaseChange" || k === "simul" ? this.phase2?.state.boards : k === "boss" && this.phase.toPhase2 ? this.phase2Seats.map((player) => ({ player })) : null;
-    return (boards ? phase2Standings(rows, boards) : rows).map((s) => ({ ...s, isYou: s.id === HUMAN }));
+    const extra = this.crowdRows;
+    return (boards ? phase2Standings(rows, boards) : rows).map((s) => ({ ...s, ...(extra?.[s.id] ?? {}), isYou: s.id === HUMAN }));
   }
+  /** The 50 v 50 rework's results rows (MatchRunner.crowdResults), once it's over: out at move, points a move. */
+  private crowdRows: Record<string, { outAtMove: number | null; perMove: number | null }> | null = null;
   slots(): BoardSlot[] {
     return this.runner ? boardSlots(this.runner.boards, this.runner.state.boards) : [];
   }
@@ -1416,7 +1419,9 @@ export class SoloMatch implements GameView {
     if (this.runner.isOver()) return this.finish();
     // (The 50 v 50 rework: its one game over (by the rules or the move limit) ends the match for everyone still in.)
     if (this.runner.endGameIfOver()) return this.finish();
-    if (!this.you.alive) return void this.simulateRest();
+    // (Out: the rest played out at once, your result straight after; in the 50 v 50 rework, once you tap Spectate, you watch it to
+    // the podium instead (C3). Not by default: the bots' game at watch pace can run to move 60, and nothing then needs you.)
+    if (!this.you.alive && !this.watchesToEnd()) return void this.simulateRest();
     if (this.runner.boss) {
       // (Testing, ?phase=2: the Hidden Boss's phase 2 at once, from the phase change.)
       if (!this.bossIntroDone && this.phase2Jump && this.runner.state.boss?.id === "recluse") {
@@ -1633,6 +1638,18 @@ export class SoloMatch implements GameView {
     });
   }
 
+  /** The 50 v 50 rework (C3): out, you watch the game to its end once you've tapped the cut screen's Spectate. */
+  private watchesToEnd(): boolean {
+    return this.spectateAsked && this.settings.mode === "crowd" && !this.settings.raid && !!this.settings.crowdCuts?.length;
+  }
+
+  spectateAsked = false;
+  /** The cut screen's Spectate, out: the break ends now and the game plays on before you. */
+  spectate() {
+    this.spectateAsked = true;
+    this.continueFromBreak();
+  }
+
   continueFromBreak() {
     if (this.phase.kind !== "stageBreak") return;
     if (this.timer) clearTimeout(this.timer);
@@ -1773,12 +1790,16 @@ export class SoloMatch implements GameView {
     this.freeBrain();
     this.runner.showdownScout?.reset();
     const winner = this.runner.state.players.find((p) => p.placement === 1);
+    // (The 50 v 50 rework, as online: the podium's titles, and each row's out at move and points a move: standings().)
+    const rework = this.runner.crowdResults();
+    this.crowdRows = rework?.players ?? null;
     this.set({
       kind: "results",
       placement: this.you.placement!,
       winner: winner?.name ?? "",
       youWon: this.you.placement === 1,
       ...(this.settings.mode === "crowd" ? { gameWinner: this.runner.gameWinner() } : {}),
+      ...(rework ? { podium: rework.podium } : {}),
       ...(this.runner.boss?.result ? { bossResult: this.runner.boss.result } : {}),
       // (The bullet clock ran out: the Hidden Boss won on time.)
       ...(this.runner.bossTimedOut ? { timeout: true } : {}),

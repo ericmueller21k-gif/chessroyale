@@ -984,6 +984,8 @@ export class NetMatch implements GameView {
       winner: m.winner,
       youWon: placement === 1,
       gameWinner: m.gameWinner,
+      // (The 50 v 50 rework: the podium's titles; the standings' rows carry each player's out at move and points a move.)
+      ...(m.podium ? { podium: m.podium } : {}),
       ...(m.bossResult ? { bossResult: m.bossResult } : {}),
       // (The Hidden Boss's bullet clock ran out: he won on time.)
       ...(m.timeout ? { timeout: true } : {}),
@@ -1564,4 +1566,10 @@ export class NetMatch implements GameView {
 
   skipReveal() {}
   continueFromBreak() {}
+  /** (The 50 v 50 rework's Spectate, out: the server sends the watching rounds from the next move anyway; the tap is shown.) */
+  spectateAsked = false;
+  spectate() {
+    this.spectateAsked = true;
+    this.emit();
+  }
 }

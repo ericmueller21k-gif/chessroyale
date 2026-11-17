@@ -20,9 +20,10 @@ import { LastStand, clearSquare, lastStandBoard } from "../components/LastStand.
 import { KING_COMMAND, KING_SUMMON, LAST_STAND, lastStandMs } from "@chessroyale/chess";
 import { BossDock, Dots } from "../components/BossDock.tsx";
 import { BossSide } from "../components/BossCharacter.tsx";
-import { allowanceNote, allowanceShort, bossAlone, missLine, elimination, finalName, isCrowdFifty, myTeam, scoreDp, type BoardView, type GameView, type GroupReveal, type Standing } from "../game.ts";
+import { allowanceNote, allowanceShort, bossAlone, missLine, elimination, finalName, isCrowdFifty, myTeam, oneVOneBegins, scoreDp, stagesAhead, stagesLine, versus, type BoardView, type GameView, type GroupReveal, type Standing } from "../game.ts";
 import { StreakFire } from "../components/StreakFire.tsx";
 import { GavelPiece } from "../components/Gavel.tsx";
+import { FightBanner } from "../components/FightBanner.tsx";
 import { Avatar } from "../components/Items.tsx";
 import { PlayerName } from "../components/PlayerName.tsx";
 import { Breakdown } from "../components/Breakdown.tsx";
@@ -68,6 +69,28 @@ export function LiveGhosts({ match, fen, orientation }: { match: GameView; fen: 
 const fmt = (x: number, dp = 1) => (x >= 0 ? "+" : "") + x.toFixed(dp);
 
 /** Names in a line ("You", "Ana and Ben", "You, Ana and Ben"): you first. */
+/** Matches whose 1 v 1 banner has shown (once a match, whichever screen its first turn is on). */
+const oneVOneShown = new WeakSet<object>();
+
+/**
+ * The 50 v 50 rework's one banner as the 1 v 1 begins (C3; the design's rule 3): "1 V 1!" and the two left, White's first, over
+ * the board of its first turn (yours to play, or to watch), once a match. The boss battles' banner (FightBanner), reused.
+ */
+export function OneVOneBanner({ match }: { match: GameView }) {
+  const [show] = useState(() => {
+    if (!oneVOneBegins(match) || oneVOneShown.has(match)) return false;
+    oneVOneShown.add(match);
+    return true;
+  });
+  if (!show) return null;
+  const left = match.standings().filter((s) => !s.out);
+  const name = (side: "w" | "b") => {
+    const p = left.find((s) => s.team === side);
+    return p ? (p.isYou ? "You" : p.name) : side === "w" ? "White" : "Black";
+  };
+  return <FightBanner text="1 V 1!" sub={`${name("w")} v ${name("b")}`} />;
+}
+
 export function namesLine(ids: readonly string[], match: Pick<GameView, "isYou" | "nameOf">): string {
   const names = [...ids].sort((a, b) => Number(match.isYou(b)) - Number(match.isYou(a))).map((id) => (match.isYou(id) ? "You" : match.nameOf(id)));
   return names.length < 2 ? (names[0] ?? "") : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
@@ -102,22 +125,26 @@ export function WatchScreen({
   const fifty = isCrowdFifty(match);
   const lockedPhone = useMedia(LOCKED_PHONE) && fifty;
   const you = standings.find((s) => s.isYou);
+  // (Cut in a 50 v 50 rework: watching to the podium, Spectate on the cut screen; C3.)
+  const spectating = !!you?.out;
   const noHistory = { ply: 0, browsing: false, go: () => {}, live: () => {} } as unknown as ReturnType<typeof useHistoryView>;
-  const powerRow = fifty ? <HistoryNav view={noHistory} total={0} extra={<PowerUps count={match.practice ? Infinity : (you?.powerUps ?? 0)} max={match.settings.powerUpsMax} used={false} disabled onUse={() => {}} />} /> : null;
+  const powerRow = fifty ? <HistoryNav view={noHistory} total={0} extra={<PowerUps count={spectating ? 0 : match.practice ? Infinity : (you?.powerUps ?? 0)} max={match.settings.powerUpsMax} used={false} disabled onUse={() => {}} />} /> : null;
   return (
     <div class={`screen game crowd${isCrowdFifty(match) ? " crowd-50" : ""}`}>
       <Hud match={match} />
       <div class="board-area">
         <div class="opening-name">
-          <strong>{sideName(side)} team</strong> is choosing<span class="on-team"> · you're on <strong>{sideName(team)}</strong></span>
+          <strong>{sideName(side)} team</strong> is choosing<span class="on-team"> · {spectating ? "you're watching" : <>you're on <strong>{sideName(team)}</strong></>}</span>
         </div>
         <div class="board-row">
           <EvalBar fen={board.fen} orientation={team} evaluate={(f) => match.evaluate(f)} />
-          <Board fen={shown.fen} orientation={team === "w" ? "white" : "black"} lastMove={shown.lastMove} premove={{ key: seatKey(match, board.id, team), side: team }}>
+          {/* (Cut, watching to the podium (the 50 v 50 rework's Spectate): no premoves, nothing of yours to play.) */}
+          <Board fen={shown.fen} orientation={team === "w" ? "white" : "black"} lastMove={shown.lastMove} premove={spectating ? undefined : { key: seatKey(match, board.id, team), side: team }}>
             {!counting && deadline > 0 && <TimerBar startsAt={startsAt} deadline={deadline} total={Math.max(1, deadline - startsAt)} />}
             <BoardClock match={match} you={standings.find((s) => s.isYou)} turn={!counting && deadline > 0 ? { startsAt, deadline, yours: false } : null} />
             {/* (The picks come in over the board as it stands, once its replay is done.) */}
             {!shown.replaying && <LiveGhosts match={match} fen={board.fen} orientation={team === "w" ? "white" : "black"} />}
+            <OneVOneBanner match={match} />
           </Board>
         </div>
         {!lockedPhone && powerRow}
@@ -133,7 +160,7 @@ export function WatchScreen({
             </span>
             <span>
               <strong>{counting ? "Counting the votes…" : `${sideName(side)} is voting.`}</strong>{" "}
-              {counting ? "" : "Your team moves next."}
+              {counting ? "" : spectating ? "You're watching." : "Your team moves next."}
             </span>
             {choosing.length > 0 && (
               <span class="waiting-count">
@@ -680,6 +707,7 @@ export function CrowdCut({
   until,
   augments,
   moveClock,
+  nextBoards,
 }: {
   match: GameView;
   stage: number;
@@ -689,6 +717,8 @@ export function CrowdCut({
   until?: number;
   augments?: boolean;
   moveClock?: number;
+  /** (The board the next stage plays on: the cut's move is the one before its move number.) */
+  nextBoards?: BoardView[];
 }) {
   const now = useFrameNow();
   const [start] = useState(Date.now());
@@ -724,18 +754,30 @@ export function CrowdCut({
   const me = standings.find((p) => p.isYou);
   // Online, once you're out you stay on this screen and see the later cuts too.
   const outBefore = !youOut && !!me?.out;
-  const through = standings.filter((p) => !p.out && !cutNow.has(p.id));
+  // (50 v 50: the line is your team's, each side cut on its own.)
+  const through = standings.filter((p) => !p.out && !cutNow.has(p.id) && (!me?.team || p.team === me.team));
   const line = through.length ? Math.min(...through.map((p) => p.points)) : 0;
   useEffect(() => {
     if (youOut && me) elimination.current = { stage, you: me.points, line, placement: match.placement, out: knockedOut.length, left: aliveAfter, lastCut: final };
   }, [stage]);
+  // The 50 v 50 rework (C3): the size the cut leaves a side ("4 v 4 next"), and, out, the cut screen of the mockup crowd-cut:
+  // your place and the gap to the last one through, why, who's still in and the stages to come, and at its foot Spectate and
+  // Leave the match, side by side, always both (Eric, Nov 16).
+  const cuts = s.crowdCuts;
+  const keep = cuts?.length ? (cuts[Math.min(stage, cuts.length - 1)]?.keep ?? 1) : null;
+  const outView = keep !== null && (youOut || outBefore);
+  // (The cut came after Black's move, the next board's move number less one; after White's (a test's one-ply stages), that move.)
+  const nextFen = nextBoards?.[0]?.fen.split(" ");
+  const nextMove = Number(nextFen?.[5]) || null;
+  const cutMove = nextMove ? (nextFen?.[1] === "b" ? nextMove : nextMove - 1) : null;
   return (
-    <div class={`screen crowd-cut judge${slammed ? " slammed" : ""}`} onClick={() => !match.serverPaced && !augments && !why && match.continueFromBreak()}>
+    <div class={`screen crowd-cut judge${slammed ? " slammed" : ""}${outView ? " out" : ""}`} onClick={() => !match.serverPaced && !augments && !why && match.continueFromBreak()}>
       <div class="cut-head">
         <span class="cut-badge">CUT</span>
         <span>
           {/* (Real numbers: ties at the line go through, so a cut can take fewer than usual, or nobody.) */}
-          {knockedOut.length ? `${knockedOut.length} out` : "Nobody out"} · {aliveAfter} left{final ? ` · the ${next.toLowerCase()} is next` : ""}
+          {knockedOut.length ? `${knockedOut.length} out` : "Nobody out"} ·{" "}
+          {keep !== null ? `${final ? "1 v 1" : versus(keep)} next` : `${aliveAfter} left${final ? ` · the ${next.toLowerCase()} is next` : ""}`}
         </span>
       </div>
       <div class="judge-stage">
@@ -753,7 +795,9 @@ export function CrowdCut({
           );
         })}
       </div>
-      {slammed && (
+      {outView ? (
+        <CutOut match={match} slammed={slammed} youOut={youOut} standings={standings} cutNow={cutNow} me={me} line={line} stage={stage} cutMove={cutMove} nextMove={nextMove} onWhy={() => setWhy(true)} />
+      ) : slammed && (
         <>
           <p class={youOut || outBefore ? "out-msg" : "safe-msg"}>
             {youOut
@@ -766,7 +810,9 @@ export function CrowdCut({
                   : next === "Duel"
                     ? "You're in the duel!"
                     : `You made the ${next.toLowerCase()}!`
-                : "You're through."}
+                : keep !== null
+                  ? `You're through to the ${versus(keep)}.`
+                  : "You're through."}
           </p>
           {youOut && (
             <button
@@ -800,7 +846,16 @@ export function CrowdCut({
       )}
       {why && (
         <div onClick={(e) => e.stopPropagation()}>
-          <Breakdown moves={match.moves} you={me?.points} line={line} placement={match.placement} lastCut={final} onClose={() => setWhy(false)} dp={scoreDp(match.settings)} />
+          {/* (Out earlier: the breakdown of your own cut, as it was then.) */}
+          <Breakdown
+            moves={match.moves}
+            you={outBefore ? elimination.current?.you : me?.points}
+            line={outBefore ? elimination.current?.line : line}
+            placement={match.placement}
+            lastCut={outBefore ? elimination.current?.lastCut : final}
+            onClose={() => setWhy(false)}
+            dp={scoreDp(match.settings)}
+          />
         </div>
       )}
       {augments && !youOut && !outBefore && (
@@ -832,7 +887,111 @@ export function CrowdCut({
           </div>
         </>
       )}
-      {left !== null && <p class="muted small cut-timer">Next round in {left}…</p>}
+      {left !== null && !outView && <p class="muted small cut-timer">Next round in {left}…</p>}
+    </div>
+  );
+}
+
+/** The names on one side of the still-in box: the best first; the box shows as many as fit, the count in its title. */
+const sideNames = (xs: readonly Standing[]) => [...xs].sort((a, b) => b.points - a.points).map((p) => (p.isYou ? "You" : p.name)).join(", ");
+
+/**
+ * The 50 v 50 rework's cut screen once you're out (C3; mockup crowd-cut, the design's rule 8): your place and the gap to the last
+ * one through, "Why was I cut?", a fixed box of who's still in a side and the stages to come, and at its foot Spectate (watch to
+ * the podium: the live board, who's left, the scores) and Leave the match, side by side, always both, in the same place every cut
+ * (Eric, Nov 16: "make sure there's a spectate option"). Not tapping either spectates too, when the break ends. Everything has its
+ * place from the screen's first frame: what the gavel decides fades in over boxes already there (nothing hidden, nothing shifts).
+ */
+function CutOut({
+  match,
+  slammed,
+  youOut,
+  standings,
+  cutNow,
+  me,
+  line,
+  stage,
+  cutMove,
+  nextMove,
+  onWhy,
+}: {
+  match: GameView;
+  slammed: boolean;
+  youOut: boolean;
+  standings: Standing[];
+  cutNow: ReadonlySet<string>;
+  me: Standing | undefined;
+  line: number;
+  stage: number;
+  cutMove: number | null;
+  nextMove: number | null;
+  onWhy: () => void;
+}) {
+  const s = match.settings;
+  const dp = scoreDp(s);
+  const place = match.placement ?? 0;
+  const still = standings.filter((p) => !p.out && !cutNow.has(p.id));
+  const white = still.filter((p) => p.team !== "b");
+  const black = still.filter((p) => p.team === "b");
+  const size = Math.max(white.length, black.length);
+  const ahead = nextMove ? stagesAhead(s, stage + 1, nextMove) : [];
+  const gap = me ? Math.max(0, line - me.points) : 0;
+  // (Out earlier: why you were cut then, from your own cut's numbers; after a reload they're gone, so the row greys.)
+  const canWhy = youOut || !!elimination.current;
+  const stop = (fn: () => void) => (e: Event) => {
+    e.stopPropagation();
+    fn();
+  };
+  return (
+    <div class={`cut-outview${slammed ? " on" : ""}`}>
+      <h2 class="co-title">
+        You're out: {place}
+        {ordinal(place)} of {match.totalPlayers}
+      </h2>
+      <p class="co-sub muted">
+        {youOut
+          ? `Cut at move ${cutMove ?? "?"} · ${gap.toFixed(dp)} behind the last one through`
+          : `You went out earlier · ${size ? `${size} a side still in` : "watching to the end"}`}
+      </p>
+      <button type="button" class="co-why" disabled={!canWhy} onClick={stop(onWhy)}>
+        <strong>Why was I cut?</strong>
+        <span class="muted">Breakdown ›</span>
+      </button>
+      <div class="co-still" aria-label="Still in">
+        <p class="co-still-line">
+          {/* (Ties at a line go through, so the sides can differ for a while: "50 v 48".) */}
+          <strong>Still in: {white.length === black.length ? `${size} a side` : `${white.length} v ${black.length}`}.</strong> <span class="muted">{stagesLine(ahead)}</span>
+        </p>
+        <div class="co-sides">
+          {(
+            [
+              ["White", white],
+              ["Black", black],
+            ] as const
+          ).map(([side, xs]) => (
+            <div class="co-side" key={side}>
+              <span class="co-side-name">
+                {side} <span class="muted">· {xs.length}</span>
+              </span>
+              <span class="co-names muted">{sideNames(xs)}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+      {/* (Chat with your team is a tab of the scoreboard while you spectate.) */}
+      <div class="co-foot">
+        <div class="co-buttons">
+          <button type="button" class={`btn btn-primary co-spectate${match.spectateAsked ? " on" : ""}`} disabled={!match.spectate} onClick={stop(() => match.spectate?.())}>
+            <span class="co-btn-main">Spectate</span>
+            <span class="co-btn-sub">{match.spectateAsked ? "from the next move" : "watch to the podium"}</span>
+          </button>
+          <button type="button" class="btn btn-secondary co-leave" disabled={!match.exit} onClick={stop(exitMatch)}>
+            <span class="co-btn-main">Leave the match</span>
+            <span class="co-btn-sub">your place stands</span>
+          </button>
+        </div>
+        <p class="co-note muted small">Spectating: the live board, who's left and the scores. Leave any time from ⚙.</p>
+      </div>
     </div>
   );
 }

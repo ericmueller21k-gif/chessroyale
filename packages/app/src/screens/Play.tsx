@@ -18,7 +18,7 @@ import { PowerUps } from "../components/PowerUpButton.tsx";
 import { BossDock, Dots } from "../components/BossDock.tsx";
 import { BossFace, BossSide } from "../components/BossCharacter.tsx";
 import { KingCommand, KingSummon, kingSquare } from "../components/GodKing.tsx";
-import { LiveGhosts } from "./Crowd.tsx";
+import { LiveGhosts, OneVOneBanner } from "./Crowd.tsx";
 import { DarkCost, PowerBoard, crowdView } from "../components/BossPowers.tsx";
 import { goldClink, zebraGold } from "../components/Zebra.tsx";
 import { boingoDecor } from "../components/Boingo.tsx";
@@ -307,6 +307,7 @@ export function PlayScreen({
             {godKing && <KingSummon {...godKing} />}
             {command && <KingCommand {...command} />}
             {crowd && waiting && !history.browsing && <LiveGhosts match={match} fen={board.fen} orientation={orientation} />}
+            <OneVOneBanner match={match} />
           </Board>
         </div>
         {/* (On a phone the power-up row is in the middle box below, with the status line: see the footer.) */}

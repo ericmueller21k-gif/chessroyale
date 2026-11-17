@@ -32,8 +32,8 @@ import {
   BOSS_TIERS,
   BRILLIANT,
   CRATES,
-  CROWD_KNOCKOUTS,
-  CROWD_PRE_REWORK,
+  CROWD_BEST,
+  CROWD_PICK,
   CROWD_SETTINGS,
   DEFAULT_SETTINGS,
   ENGINE_MIN_ELO,
@@ -64,14 +64,11 @@ import {
   bossStrength,
   bossStumbleChance,
   crowdFinalBoss,
-  crowdFinalists,
   fixedLevel,
   isPlayable,
   adminFirst,
   maiaTopRating,
   rankedMinHumans,
-  roundsInStage,
-  kingCharges,
   lastStandBar,
   liveStrip,
   tierItems,
@@ -83,7 +80,6 @@ import {
   type BossDef,
   type BossPowerSettings,
   type CrateDef,
-  type FinalFormat,
   type PregameVote,
   type Settings,
   type SquadsSettings,
@@ -105,7 +101,9 @@ export interface FaqSources {
   settings: Settings;
   crowd: Settings;
   raid: Settings;
-  crowdKnockouts: Readonly<Record<FinalFormat, readonly number[]>>;
+  /** The 50 v 50's pick modes (Strong's top picks and its close band) and who can be its best player (CROWD_PICK, CROWD_BEST). */
+  crowdPick: { strongTop: number; strongClose: number };
+  crowdBest: { cutsShare: number };
   powers: BossPowerSettings;
   brain: BossBrainSettings;
   difficulty: readonly { id: string; label: string; elo: number; maia: number }[];
@@ -138,7 +136,7 @@ export interface FaqSources {
   leaving: { awayMs: number };
   /** Squads' "Jump to my next board" (Relay): on for a device that hasn't set it. */
   squadsWatching: { jumpToNext: boolean };
-  /** The Hidden Boss's second phase (the Crowd's boss final, solo): its boards, clock and ultimate. */
+  /** The Hidden Boss's second phase: its boards, clock and ultimate. */
   phase2: typeof RECLUSE_PHASE2;
   /** The opening allowance: points off each early move's loss, through which move, gone by which, the material bar. */
   allowance: { points: number; flatThrough: number; goneBy: number; materialPawns: number };
@@ -152,11 +150,11 @@ export interface FaqSources {
 
 export const FAQ_DEFAULTS: FaqSources = {
   settings: DEFAULT_SETTINGS,
-  // (The 50 v 50 as it was before the rework (CROWD_PRE_REWORK) until step C3 rewrites its sections for the rework: one coherent
-  // description, not the old endings' words over the rework's cut moves. docs/decisions/2026-11-16-crowd-rework-runner.md.)
-  crowd: { ...DEFAULT_SETTINGS, ...CROWD_SETTINGS, ...CROWD_PRE_REWORK },
+  // (The 50 v 50 as it plays since the rework, C3: the pick vote, the cuts to a 1 v 1, one game to its end.)
+  crowd: { ...DEFAULT_SETTINGS, ...CROWD_SETTINGS },
   raid: { ...DEFAULT_SETTINGS, ...RAID_SETTINGS },
-  crowdKnockouts: CROWD_KNOCKOUTS,
+  crowdPick: CROWD_PICK,
+  crowdBest: CROWD_BEST,
   powers: BOSS_POWERS,
   brain: BOSS_BRAIN,
   difficulty: BOSS_DIFFICULTY,
@@ -213,6 +211,8 @@ const n = (x: number, word: string, plural = `${word}s`) => `${num(x)} ${x === 1
 const range = (r: readonly [number, number] | readonly number[], unit = "") => `${num(r[0]!)}${unit} to ${num(r[1]!)}${unit}`;
 const ordinal = (x: number) => `${x}${x % 100 >= 11 && x % 100 <= 13 ? "th" : (["th", "st", "nd", "rd"][x % 10] ?? "th")}`;
 const sum = (xs: readonly number[]) => xs.reduce((a, b) => a + b, 0);
+/** "The Hidden Boss" at a sentence's start. */
+const capitalFirst = (x: string) => x.charAt(0).toUpperCase() + x.slice(1);
 const logit = (p: number) => Math.log(p / (1 - p));
 /** The usual rating formula: the expected score of a player `d` points stronger. */
 export const eloExpected = (d: number) => 1 / (1 + 10 ** (-d / 400));
@@ -233,7 +233,6 @@ function modes(src: FaqSources): FaqSection {
   const S = src.settings;
   const Q = src.squads;
   const team = C.lobbySize / 2;
-  const left = (k: readonly number[]) => C.lobbySize - sum(k);
   // The clock vote's time controls: "Bullet 3+2 (3 minutes, +2 s a move, at most 10 s on a move)".
   const V = src.clockVote;
   const timeControl = (p: Partial<Settings>) => `${n(Number(p.timeBankSeconds) / 60, "minute")}, +${num(Number(p.timeIncrementSeconds))} s a move, at most ${num(Number(p.moveClockSeconds))} s on a move`;
@@ -243,13 +242,18 @@ function modes(src: FaqSources): FaqSection {
     const o = V.options.find((x) => x.patch.timeBankSeconds === p.timeBankSeconds && x.patch.timeIncrementSeconds === p.timeIncrementSeconds && x.patch.moveClockSeconds === p.moveClockSeconds);
     return o ? `**${o.label}**` : timeControl(p);
   };
-  const teamSizes = S.teamFinalSizes.map((x) => `${x}v${x}`);
-  // The cuts (CROWD_KNOCKOUTS, CROWD_STAGE_ROUNDS): how many go at each and after which move the teams play (a stage's
-  // rounds are plies, one move from each team). The team final's cuts, then the ones the boss final and the duel add.
-  const cutAfter = (i: number) => Math.ceil(sum(Array.from({ length: i + 1 }, (_, j) => roundsInStage(C, j))) / 2);
+  // The cuts (CROWD_CUTS, by the board's move numbers): after which move, and how many a side are left; the 1 v 1 after the last.
+  const cuts = C.crowdCuts ?? [];
   const andList = (xs: readonly string[]) => (xs.length > 1 ? `${xs.slice(0, -1).join(", ")} and ${xs.at(-1)}` : (xs[0] ?? ""));
-  const TK = src.crowdKnockouts.team;
-  const cutsFrom = (f: FinalFormat, from: number) => andList(src.crowdKnockouts[f].slice(from).map((k, i) => `${k} after move ${cutAfter(from + i)}`));
+  const vs = (k: number) => `${k} v ${k}`;
+  const lastCut = cuts.at(-1);
+  // (The longest stage after the first, by moves: "the 4 v 4 plays 6 moves, 34-39".)
+  const stages = cuts.slice(0, -1).map((c, i) => ({ keep: c.keep, from: c.after + 1, to: cuts[i + 1]!.after }));
+  const longest = stages.reduce<(typeof stages)[number] | null>((a, b) => (!a || b.to - b.from > a.to - a.from ? b : a), null);
+  const carry = C.crowdCarry ?? 1;
+  const carryWords = carry === 0.5 ? "half" : `${pct(carry, 0)} of`;
+  const P = src.crowdPick;
+  const sure = C.crowdSureShare;
   // The start vote's options by their id (their labels and opening moves from the vote's data).
   const SV = src.startVote;
   const startBy = (id: string) => SV.options.find((o) => o.patch.crowdStart === id);
@@ -258,7 +262,6 @@ function modes(src: FaqSources): FaqSection {
   const clocks = squadsClocks(Q);
   // The boss final's boss (Eric, Oct 14: always the Hidden Boss), by his roster name, linked to his block.
   const finalBoss = crowdFinalBoss(src.roster);
-  const finalFoe = finalBoss ? `[${bossInText(finalBoss.name, false, src.roster)}](#boss-${finalBoss.id})` : "a boss, with the God King";
   return {
     id: "modes",
     title: "The modes",
@@ -266,11 +269,19 @@ function modes(src: FaqSources): FaqSection {
 ### Crowd · 50 v 50 {#mode-crowd}
 
 - **${C.lobbySize} players, one game of chess**, from the first move. Two teams of ${team}: your team plays White or Black all game.
-- Each turn, everyone on the side to move picks a move before the clock runs out, and **one of the ${n(C.crowdPlayedFromTop, "most popular pick")} is played**, drawn by how many picked each: if 30 pick one move, 15 another and 5 a third, they're played 60%, 30% and 10% of the time. Moves tied for the last of those places are left out. So the crowd's favorite usually plays, but not always.${C.crowdSureShare < 1 ? ` **A big majority always wins:** a move ${pct(C.crowdSureShare, 0)} or more of the team picked is always played, even a blunder (of 10 picks, ${Math.ceil(C.crowdSureShare * 10 - 1e-9)} on one move always play it; ${Math.ceil(C.crowdSureShare * 10 - 1e-9) - 1} on it can still lose to another).` : ""}${C.crowdMisses ? ` Pick nothing and a move is picked for you, one of the engine's top ${C.crowdMisses.defaultFromTop}, but it doesn't count in the vote ([a missed move](#crowd-scoring)).` : ""}
-- Every pick is scored (see [How your moves are scored](#scoring)). No one goes out for the first ${n(cutAfter(0), "move")}. Then the lowest scorers are cut, the same number from each team: ${cutsFrom("team", 0)}, which leaves ${left(TK)} for the team final. A boss final adds ${n(src.crowdKnockouts.boss.length - TK.length, "more cut")} (${cutsFrom("boss", TK.length)}); a duel adds ${n(src.crowdKnockouts.duel.length - TK.length, "more cut")} (${cutsFrom("duel", TK.length)}). The moves count from the first one the teams play (a Random opening's own moves don't count). Scores carry over all game.
-- **A tie at the cut line goes through:** everyone tied exactly with the last player through stays in, and the cuts still to come take the extra, a little at each. So does anyone within ${n(src.crowdScoring.cutGrace, "point")} of that player ([the bubble](#crowd-scoring)). Only the last cut before the ending breaks a tie, so the ending has its size: fewer points given away before the [opening allowance](#opening-allowance) go through, then less thinking time.
-- **You vote on the ending** before move 1: a team final (the top ${left(src.crowdKnockouts.team)} play on: ${teamSizes.slice(0, -1).join(", ")}, then ${teamSizes.at(-1)} to the end), a boss final (the top ${left(src.crowdKnockouts.boss)} team up against ${finalFoe}) or a duel (the best of each side, 1v1). Then on how it starts, then on the clock.
-- **How it starts**, voted on before move 1: ${startLabel("normal")}, the usual starting position; ${startLabel("random")}, a real, balanced opening already ${n(randomMoves, "move")} in for each side, so the game picks up at move ${randomMoves + 1}; or ${startLabel("freestyle")}: the pieces on the back row start shuffled, the same for both sides and different every game. To castle in Freestyle, move your king onto its rook: the king lands on the g- or c-file with the rook beside it, as usual. Nobody voting means ${SV.options[SV.defaultOption]?.label}. Both teams play from that start; a boss final is played from the usual starting position.
+- **How are moves picked?** The first vote before move 1, then how it starts, then the clock. Nobody voting means Strong. Each turn everyone on the side to move picks a move before the clock runs out, and then:
+  - **Strong:** of your team's ${n(P.strongTop, "most-picked move")}, the engine's best is played. If another of them is close to it (within ${pct(P.strongClose, 0)} of its chances of winning, about a third of a pawn), one of the close ones is drawn, each equally likely.
+  - **Majority:** your team's top pick, sometimes the 2nd or 3rd: one of the ${n(C.crowdPlayedFromTop, "most-picked move")} is drawn by how many picked each, so if 30 pick one move, 15 another and 5 a third, they're played 60%, 30% and 10% of the time.${sure < 1 ? ` **A big majority always wins:** a move ${pct(sure, 0)} or more of the team picked is always played, even a blunder.` : ""}
+  - **Chaos:** any move someone on your team picked, each equally likely, however many picked it.
+  - ${C.crowdMisses ? `Pick nothing and a move is picked for you, one of the engine's top ${C.crowdMisses.defaultFromTop}, but it never counts in the pick ([a missed move](#crowd-scoring)). ` : ""}If nobody on your team picked, one of the engine's top moves is played.
+- Every pick is scored (see [How your moves are scored](#scoring)), against the rest of your own team. **The cuts:** after moves ${andList(cuts.map((c) => String(c.after)))}, the lowest scorers on each side go out, the same number from each, leaving ${andList(cuts.slice(0, -1).map((c) => String(c.keep)))} a side${longest ? ` (the ${vs(longest.keep)} plays the longest, moves ${longest.from}-${longest.to})` : ""}. The moves are the board's own, whatever the start. At each cut, everyone who goes through keeps **${carryWords} their score** and builds on it from there.
+- **The 1 v 1:** from move ${(lastCut?.after ?? 0) + 1}, each side's last player picks alone, and their pick is played, to the end of the game.
+- **A tie at the cut line goes through:** everyone tied exactly with the last player through stays in, and the cuts still to come take the extra, a little at each. So does anyone within ${n(src.crowdScoring.cutGrace, "point")} of that player ([the bubble](#crowd-scoring)). Only the last cut, into the 1 v 1, breaks a tie: fewer points given away before the [opening allowance](#opening-allowance) goes through, then less thinking time, then a coin.
+- **One game, played to its end:** checkmate, stalemate or a draw by the rules, or, after Black's move ${C.crowdMoveLimit ?? "?"}, the engine's verdict: a side with a ${pct(C.crowdLimitWin ?? 0.75, 0)} chance or more of winning wins; otherwise it's a draw. A game that ends before the 1 v 1 ends the match for everyone still in.
+- **Places:** those still in at the end come first, the winning side's then the losing side's (a draw: together), each by score; in the 1 v 1 the winner is 1st (a draw: the better score over the whole match). Then everyone who was cut, the last cut's first, both sides together, by their score at their cut.
+- **The podium:** the top 3 at the end, 1st in the middle. **Winner:** 1st place in a game that was won (a draw has none). **Best player:** the fewest points given away a move over the whole match, among those who went through at least ${src.crowdBest.cutsShare === 0.5 ? "half" : pct(src.crowdBest.cutsShare, 0)} of the cuts (never one who left); one player can be both. Under the podium, your row and the chart of all ${C.lobbySize}.
+- **Cut?** **Spectate** watches the game to the end (the live board, who's left and the scores), or **Leave the match**: your place stands either way.
+- **How it starts**, voted on before move 1: ${startLabel("normal")}, the usual starting position; ${startLabel("random")}, a real, balanced opening already ${n(randomMoves, "move")} in for each side, so the game picks up at move ${randomMoves + 1}; or ${startLabel("freestyle")}: the pieces on the back row start shuffled, the same for both sides and different every game. To castle in Freestyle, move your king onto its rook: the king lands on the g- or c-file with the rook beside it, as usual. Nobody voting means ${SV.options[SV.defaultOption]?.label}. Both teams play from that start.
 - **The clock is a chess time control**, voted on before move 1: ${timeControls.slice(0, -1).join(", ")} or ${timeControls.at(-1)}. Nobody voting means ${V.options[V.defaultOption]?.label}. Your minutes last the whole game, and each of your moves adds its seconds as it starts; the time you take comes out of your bank, so what a quick move doesn't use is saved for later, as on a chess clock. No move can go past its cap, because your whole team picks together; with an empty bank you still get the added seconds. Your bank is beside the board's clock and in the scoreboard's Bank column. A group Boss Battle is ${namedClock(R)}.
 - **${n(C.powerUpsAtStart, "power-up")}** each: a power-up shows the engine's top 3 moves for that turn.
 - How you play, under the modes on the home screen: **Solo queue** puts you in a lobby, with bots filling empty seats after a short wait; **Party** opens your party's queue screen: tap a **+** to invite up to ${CROWD_PARTY_MAX - 1} friends from your friends list, then the party's leader taps **Find match** and you all join the same matchmaking, together on one team (which side is drawn at random)${CROWD_PARTY.ranked ? "" : "; a party of 2 or more plays unranked (XP as usual), and everyone else in the match stays ranked"}; **Bots** is you and ${C.lobbySize - 1} bots, at once, at the level you pick: ${BOT_LEVELS.filter((l) => l.mean !== null).map((l) => `${l.label} (about ${l.mean})`).join(", ")}, My level (about your rating) or Random (every bot's rating random). A level is the bots' average: each bot is a few hundred points either side of it.
@@ -281,12 +292,12 @@ function modes(src: FaqSources): FaqSection {
 - **A group Boss Battle:** up to ${R.lobbySize} players pick the crowd's moves together against a [boss](#boss-brain); the most popular pick is played. Every boss starts from the starting position.
 - **Where:** **Boss Battle** on the home screen. The bosses are at the top: tap one to see it on the stage below, with you and, behind you, two spots for friends (tap one to invite them), or **?** for a random one. Under the boss's name, the arrows pick its difficulty (${src.difficulty.length} levels, shown by the dots), and **START** meets the boss you picked. Group Boss Battles (**Join a Boss Battle**, **People only**, **Play with bots** and **Play with friends**) are moving to Chess Town's Colosseum and aren't on the home screen for now.
 - **Scoring:** the [50 v 50 way](#raid-scoring), its limit widening with the crowd's moves (Boss alone scores as before).
-- **The boss strikes:** every ${n(S.bossKillEvery, "crowd move")} in a group battle it knocks out the player who gave away the most points since its last strike (as the judge counts them, before the [scoring's limit](#raid-scoring), after the [opening allowance](#opening-allowance); a missed move counts as ${n(S.finalMissLoss, "point")}, and a tie goes against the weaker player over the match), until half the group is left${finalBoss ? "" : ` (in the Crowd's boss final, until ${S.bossMinSurvivors} are left)`}. If two are still tied for the worst, nobody is struck: it strikes after the next crowd move instead.
+- **The boss strikes:** every ${n(S.bossKillEvery, "crowd move")} in a group battle it knocks out the player who gave away the most points since its last strike (as the judge counts them, before the [scoring's limit](#raid-scoring), after the [opening allowance](#opening-allowance); a missed move counts as ${n(S.finalMissLoss, "point")}, and a tie goes against the weaker player over the match), until half the group is left. If two are still tied for the worst, nobody is struck: it strikes after the next crowd move instead.
 - **The God King** fights on your side, with ${n(S.kingChargesMax, "charge")} ([more on him](#god-king)).
 - The battle ends in checkmate or a draw, or after ${n(S.bossMaxMoves, "crowd move")}, when the engine judges the position.
 - **With friends** (up to ${BOSS_PARTY.max} of you): invite them from the spots behind you. The leader (with the crown) picks the boss and the difficulty; everyone else taps **READY**, and the leader's **START** works once everyone is ready. In the battle everyone picks every move and sees the others' picks as they come. Two or more on one move: it's played. Otherwise the engine's best pick is played, or, if two are within ${BOSS_PARTY.closeCp} centipawns, one of those at random. The team shares one ${BOSS_CLOCK.bankSeconds / 60} + ${BOSS_CLOCK.incrementSeconds} clock, and the turn waits for everyone: ${BOSS_PARTY.afkKickSec} seconds after the turn's first pick, the leader can remove someone who hasn't picked. The boss never strikes anyone down.
 - **Boss alone** (**START** on the Boss Battle screen): just you against the boss you picked there, at a difficulty from ${src.difficulty[0]?.label} to ${src.difficulty.at(-1)?.label}. You pick every move, on a ${BOSS_CLOCK.bankSeconds / 60} + ${BOSS_CLOCK.incrementSeconds} clock: ${BOSS_CLOCK.bankSeconds / 60} minutes for the battle, and ${BOSS_CLOCK.incrementSeconds} seconds added as each move begins. The boss has no clock, and never strikes you down. If your clock runs out, the boss wins on time.
-- **The Crowd's boss final** is ${finalBoss ? `always ${finalFoe}, for` : "the same fight for"} the last ${left(src.crowdKnockouts.boss)} of a 50 v 50.${finalBoss ? ` He's met in one other place: [his room in Chess Town](#boss-${finalBoss.id}).` : ""}
+${finalBoss ? `- **${capitalFirst(bossInText(finalBoss.name, false, src.roster))}** isn't on this screen: he's met in [his room in Chess Town](#boss-${finalBoss.id}).` : ""}
 
 ### Squads {#mode-squads}
 
@@ -461,7 +472,7 @@ ${
       ? `- **A missed move** (no pick in time): a move is picked for you, one of the engine's top ${misses.defaultFromTop} at random, but it never counts in your team's vote. You score the lowest score anyone on your team who picked got that move, so missing is never better than the worst real pick (if nobody on your team picked, ${cs.missCaps} times the limit below zero). The reveal tells you each time ("Missed: a move was picked for you (1 of ${misses.allowed})"). **Miss more than ${n(misses.allowed, "move")} in a game and you're removed for being away**: it counts as resigning, a loss, out in the last place still open, and a bot takes your seat.`
       : `- **A missed move** scores ${cs.missCaps} times the limit below zero${firstCap === null ? "" : ` (${num(-cs.missCaps * firstCap)} before the first cut)`}.`
   }
-- **The bubble:** at a cut, anyone within ${n(cs.cutGrace, "point")} of the last player through goes through too, like a tie (except at the last cut before the ending).`;
+- **The bubble:** at a cut, anyone within ${n(cs.cutGrace, "point")} of the last player through goes through too, like a tie (except at the last cut, into the 1 v 1).`;
 }
 
 /**
@@ -579,8 +590,7 @@ function bossBrain(src: FaqSources): FaqSection {
   const tiers = src.tiers;
   const playable = src.roster.filter(isPlayable);
   const bossById = (id: string) => playable.find((b) => b.id === id) ?? playable[0]!;
-  const finalists = src.crowd.lobbySize - sum(src.crowdKnockouts.boss);
-  // The Crowd's boss final (always the Hidden Boss): his brain and strength are fixed (BOSS_BRAIN.fixed).
+  // The Hidden Boss (his room in the town): his brain and strength are fixed (BOSS_BRAIN.fixed).
   const finalBoss = crowdFinalBoss(src.roster);
   const fixed = finalBoss && M.fixed[finalBoss.id] ? finalBoss : null;
   const floor = bossStrength(-1e9, null);
@@ -667,8 +677,8 @@ A boss's strength is a rating on Stockfish's scale, set as the battle starts:
 - **Play with bots and Boss alone** work the same way from your own rating (unrated, ${src.priorRating}).
 ${
   fixed
-    ? `- **The Crowd's boss final** is always ${bossInText(fixed.name, false, src.roster)}. He starts as a boy: Maia at ${num(RECLUSE_CHILD.startRating)}, ${num(RECLUSE_CHILD.stepRating)} stronger every ${n(RECLUSE_CHILD.everyPlies, "move")} on the board, up to ${num(maiaTopRating(M))}. Beat the boy and the man comes next, whose strength is fixed at ${fixedLevel(M)}. Neither follows anyone's rating: no tier, offset or difficulty ([his block](#boss-${fixed.id})).`
-    : `- **The Crowd's boss final** comes from how the people among the last ${finalists} played that match (bots count only if no person is left among them): a weighted average of their ratings (the best counts ${finalists} times, the next ${finalists - 1}, down to the weakest once), ${S.bossEloOffset < 0 ? "minus" : "plus"} ${Math.abs(S.bossEloOffset)} (a crowd picking together plays better than its average member), kept within ${range(S.bossEloRange)}. The weighting makes it a real fight for the best players.`
+    ? `- **${capitalFirst(bossInText(fixed.name, false, src.roster))}** (his room in Chess Town) starts as a boy: Maia at ${num(RECLUSE_CHILD.startRating)}, ${num(RECLUSE_CHILD.stepRating)} stronger every ${n(RECLUSE_CHILD.everyPlies, "move")} on the board, up to ${num(maiaTopRating(M))}. Beat the boy and the man comes next, whose strength is fixed at ${fixedLevel(M)}. Neither follows anyone's rating: no tier, offset or difficulty ([his block](#boss-${fixed.id})).`
+    : ""
 }
 - Then each boss's **offset** is added: bosses with nastier powers play a little weaker underneath.
 - **Boss alone** adds your difficulty too: ${diffs}. In Boss alone the difficulty also sets how well the boss plays its moves, whatever your rating: Maia at a human's rating, ${src.difficulty.map((d) => `${d.label} ${d.maia}`).join(", ")} (its powers on top; [Brain 2](#maia-brain)).
@@ -734,7 +744,7 @@ Maia runs in your browser as its own program. Its license and source code are in
 
 ### The handover: from Maia to Stockfish {#handover}
 
-A boss's strength is on Stockfish's scale, the one your rating is on; Maia's ratings are on a human scale, and the two don't line up one to one. So a Maia boss plays at a Maia rating that rises with its **level**, along straight lines. The level is the boss's strength${margin ? `, plus ${num(margin)} when a crowd plays it (a group Boss Battle${fixed ? "" : " or the Crowd's boss final"}: a crowd voting together plays above its average member); in Boss alone it's the strength itself` : ""}.
+A boss's strength is on Stockfish's scale, the one your rating is on; Maia's ratings are on a human scale, and the two don't line up one to one. So a Maia boss plays at a Maia rating that rises with its **level**, along straight lines. The level is the boss's strength${margin ? `, plus ${num(margin)} when a crowd plays it (a group Boss Battle: a crowd voting together plays above its average member); in Boss alone it's the strength itself` : ""}.
 
 $ level = strength${margin ? ` + ${num(margin)} (a crowd)` : ""}
 ${lines.join("\n")}
@@ -928,28 +938,28 @@ Plays from the game so far. A special-ops alligator with an energy rifle that gr
 };
 
 /**
- * The Crowd's boss final's boss (Eric, Oct 14: always the Hidden Boss; since Nov 13 also from his room in the town, HIDDEN_ROOM): his opening, his
+ * The Hidden Boss (the Crowd's boss final's until the 50 v 50 rework, Nov 16; since Nov 13 met in his room in the town, HIDDEN_ROOM): his opening, his
  * passive and ultimate, and his second phase, every number from the settings (BOSS_POWERS, RECLUSE_PHASE2, BOSS_BRAIN).
  */
 function crowdFinalBlock(src: FaqSources, b: BossDef): string {
   const p = src.powers;
   const P = src.phase2;
-  const n2 = crowdFinalists("boss", src.crowdKnockouts, src.crowd.lobbySize);
+  const n2 = HIDDEN_ROOM.players;
   const clock = (sec: number) => (sec % 60 ? `${num(sec)} s` : n(sec / 60, "minute"));
   const increment = p.bulletIncrementSeconds > 0 ? `; the first ${n(p.bulletPlainMoves, "move")} on it add no time, then each move made in time adds ${num(p.bulletIncrementSeconds)} s` : ", and nothing adds time";
   return `
-Met in the Crowd's boss final, where it's always him, against the top ${n2}, and in Chess Town: up the stairs of his walk-up to the top floor, where up to ${n(HIDDEN_ROOM.players, "player")} in his room challenge him together (each taps **Challenge**; at ${HIDDEN_ROOM.players} you fight him as one team: the move most of you picked is played, and a tie goes to the stronger move; if ${HIDDEN_ROOM.players} haven't challenged within ${n(HIDDEN_ROOM.capSec / 60, "minute")}, the request ends). He plays from the starting position (he has no memorized openings), with the crowd as White, and his strength never follows anyone's rating: Maia at its top, raw. More in [his strength and brain](#boss-strength).
+Met in Chess Town: up the stairs of his walk-up to the top floor, where up to ${n(HIDDEN_ROOM.players, "player")} in his room challenge him together (each taps **Challenge**; at ${HIDDEN_ROOM.players} you fight him as one team: the move most of you picked is played, and a tie goes to the stronger move; if ${HIDDEN_ROOM.players} haven't challenged within ${n(HIDDEN_ROOM.capSec / 60, "minute")}, the request ends). He plays from the starting position (he has no memorized openings), with the crowd as White, and his strength never follows anyone's rating: Maia at its top, raw. More in [his strength and brain](#boss-strength).
 
 - **First, the child**: he begins as a boy with no powers at all (no No Help, no Bullet: the God King's help works), Maia at ${num(RECLUSE_CHILD.startRating)}, ${num(RECLUSE_CHILD.stepRating)} stronger every ${n(RECLUSE_CHILD.everyPlies, "move")} on the board (yours and his), up to ${num(maiaTopRating())}, the man's own strength. His level climbs with it, and he grows older as it does. Beat him and he grows up: a new game starts from the beginning, against the man below. If the boy wins or it's a draw, the fight is over.
 - **No Help** (passive): the God King's help doesn't work against him: his move, his strike and his Last Stand never come. Calling him spends a charge all the same, and ${bossInText(b.name, false, src.roster)} mocks it. He never strikes anyone down either: all ${n2} of you play to the end.
 - **Bullet** (ultimate): a meter of his own, full as turn ${p.bulletTurn} begins, when it comes with no warning. From then on every bank is ${clock(p.bulletBankSeconds)}, with no cap on a move${increment}. If everyone still in runs out of time, he wins on time.
-- **Beaten:** his second phase follows, online and in a Solo game: he transforms (the God King stays in his place, but can't be called for the rest of the fight), then ${n(P.boards, "board")} of Freestyle chess at once (the back-row pieces shuffled), each from its own start, one for each of you who fought him (bots on any left over; online, a bot plays on for anyone who leaves), against Stockfish at ${num(P.elo)}. A ${num(P.change.countdownSeconds)}-second countdown on every board, then ${clock(P.bankSeconds)} a board with no added time, and a board whose clock runs out is lost; all ${num(P.boards)} must be won. Each of you has ${num(P.hearts)} hearts of your own: a move that takes longer than ${num(P.slowMoveSeconds)} s costs one (he cuts it; then take the time you need on that move), and whoever loses all ${num(P.hearts)} loses their board.`;
+- **Beaten:** his second phase follows: he transforms (the God King stays in his place, but can't be called for the rest of the fight), then ${n(P.boards, "board")} of Freestyle chess at once (the back-row pieces shuffled), each from its own start, one for each of you who fought him (bots on any left over; online, a bot plays on for anyone who leaves), against Stockfish at ${num(P.elo)}. A ${num(P.change.countdownSeconds)}-second countdown on every board, then ${clock(P.bankSeconds)} a board with no added time, and a board whose clock runs out is lost; all ${num(P.boards)} must be won. Each of you has ${num(P.hearts)} hearts of your own: a move that takes longer than ${num(P.slowMoveSeconds)} s costs one (he cuts it; then take the time you need on that move), and whoever loses all ${num(P.hearts)} loses their board.`;
 }
 
 function bossPowers(src: FaqSources): FaqSection {
   const p = src.powers;
   const playable = src.roster.filter(isPlayable);
-  // (Still to come: those without their art and powers. The Crowd's boss final's boss has his own block, after the rest.)
+  // (Still to come: those without their art and powers. The Hidden Boss has his own block, after the rest.)
   const later = src.roster.filter((b) => b.kit === null || b.powers === null).map((b) => b.name);
   const finalBoss = crowdFinalBoss(src.roster);
   const level = Math.ceil(p.rageFull / (p.ragePerMove || 1));
@@ -1011,7 +1021,7 @@ ${later.length ? `\n### Still to come {#bosses-later}\n\n${n(later.length, "more
 
 function godKing(src: FaqSources): FaqSection {
   const S = src.settings;
-  // (The Crowd's boss final's boss, the Hidden Boss: the God King's help doesn't work against him.)
+  // (The Hidden Boss: the God King's help doesn't work against him.)
   const finalBoss = crowdFinalBoss(src.roster);
   // (The crowd's moves played before the first one he can save: none on its first lastStandFromMove moves.)
   const from = S.lastStandFromMove;
@@ -1035,11 +1045,11 @@ function godKing(src: FaqSources): FaqSection {
     body: `
 ### Who he is {#king-who}
 
-The crowd's champion in every Boss Battle (alone, in a party or in a group) and the Crowd's boss final. He stands by the board in your side's colors, talks now and then, and acts when the crowd calls him. He's there for the big moments, not to play the game for you.${finalBoss ? ` His help doesn't work against [${bossInText(finalBoss.name, false, src.roster)}](#boss-${finalBoss.id}), the Crowd's boss, once he's grown up: calling him then only spends a charge. Against the boy he starts as, it works.` : ""}
+The crowd's champion in every Boss Battle (alone, in a party or in a group). He stands by the board in your side's colors, talks now and then, and acts when the crowd calls him. He's there for the big moments, not to play the game for you.${finalBoss ? ` His help doesn't work against [${bossInText(finalBoss.name, false, src.roster)}](#boss-${finalBoss.id}) once he's grown up: calling him then only spends a charge. Against the boy he starts as, it works.` : ""}
 
 ### Strike or play: his charges {#king-charges}
 
-He has up to ${n(S.kingChargesMax, "charge")}. In a Boss Battle he starts with ${S.kingChargesMax}. In the Crowd's boss final, the finalists' leftover power-ups become his charges: one for every ${S.kingPowerUpsPerCharge}, rounded, at least ${kingCharges(0, S)} and at most ${S.kingChargesMax}.${finalBoss ? ` Once [${bossInText(finalBoss.name, false, src.roster)}](#boss-${finalBoss.id}) has grown up there, a call only spends one: his help doesn't work against the man.` : ""} Tap him to open his menu:
+He has up to ${n(S.kingChargesMax, "charge")}. In a Boss Battle he starts with ${S.kingChargesMax}.${finalBoss ? ` Once [${bossInText(finalBoss.name, false, src.roster)}](#boss-${finalBoss.id}) has grown up, a call only spends one: his help doesn't work against the man.` : ""} Tap him to open his menu:
 
 - **Play this move:** he plays the judge's best move for the crowd (stronger than the boss).
 - **Strike the boss:** three bolts on the boss's king, and the boss's next move is one that gives away ${range(S.kingStrikeLoss)} points (never a piece for nothing). One strike a move. It enrages the boss too: ${src.powers.rageStrike} on its [rage meter](#rage-meter) (unless an ultimate is under way; Wrangler's meter is his own, and a strike adds nothing to it).
