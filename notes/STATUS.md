@@ -1,3 +1,4 @@
+- Nov 17 20:15 UTC: pm-caster .done -> #777 (268598e), CI watched, still sent. Helper flagged Wrangler facing in Pig.tsx (unchanged): look later. Running: tiger-pump-flake helper.
 - Nov 17 ~20:05 UTC: main RED on be0435e (#775 merge): tiger.spec:552 desktop retry-pass (pump place tall vs side at 1440x900), likely since #774. Fix helper claude/tiger-pump-flake. Dash tap LIVE be0435e. Moo deploy/main watched.
 - Nov 17 ~19:52 UTC: #775 dash tap merged be0435e; #776 moo cinematic merged 5be698e. Deploys + main runs watched. pm-caster running.
 - Nov 17 19:33 UTC: #775 final 211cb0b and #776 final 274e17a CI watched (both review fixes in). pm-caster helper restarted, watcher armed. Queue: dash stall findings 4+5 (xhigh, alone).
