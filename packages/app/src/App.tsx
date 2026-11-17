@@ -1447,6 +1447,8 @@ export function App() {
 
   const createLobby = async (modeId?: ModeChoiceId) => {
     setLoading(true);
+    // (The lobby's screen, with the match's: home stays, loading, until both are here, never a blank screen between: Nov 17.)
+    const screens = game.preload();
     try {
       // (The test switches ride along for those allowed them; the server checks again: lobby-options.ts.)
       const params = testParams();
@@ -1462,6 +1464,7 @@ export function App() {
       const body = (await res.json()) as { code?: string; message?: string; banned?: boolean };
       if (body.banned) return showBanNotice();
       if (!body.code) throw new Error(body.message ?? "Couldn't create a lobby.");
+      await screens;
       joinLobby(body.code, { mode });
       return body.code;
     } catch (e) {

@@ -219,12 +219,24 @@ export async function soloFromHome(page: Page) {
   await startBotLevel(page);
 }
 
+/**
+ * The match's screens are in (packages/app/src/lazy-game.ts: their chunk, off the first load since Nov 10, every boss's code with it
+ * since Nov 16). Home loads them a moment after it shows, or at once when play is next (the Bot level box, Play with friends, the Boss
+ * Battle screen), as a player has them by the time they tap on. A test taps on within that moment, and on a busy runner the chunk's
+ * work (a second or more) then fell inside the next step's wait (Nov 17: solo:80/151, chat-mod:31, boss-select:304/375). So the
+ * helpers that open those wait here once, before the tap into the match, never a longer timeout per test.
+ */
+export async function matchScreens(page: Page) {
+  await page.locator("html[data-match-chunk]").waitFor({ state: "attached", timeout: 30_000 });
+}
+
 /** The Bot level box (PLAY with Bots): its OK, picking Medium first when nothing is picked. */
 export async function startBotLevel(page: Page) {
   const box = page.getByRole("dialog", { name: "Bot level" });
   await box.waitFor();
   const ok = box.getByRole("button", { name: "OK", exact: true });
   if (await ok.isDisabled()) await box.getByRole("radio", { name: /^Medium/ }).click();
+  await matchScreens(page);
   await ok.click();
 }
 
@@ -248,6 +260,7 @@ export async function createLobbyFromHome(page: Page) {
   await page.getByRole("button", { name: "PLAY", exact: true }).or(raidScreen).first().waitFor();
   if (await raidScreen.isVisible()) await page.getByRole("main").getByRole("button", { name: /^Play with friends/ }).click();
   else await openPlayWithFriends(page);
+  await matchScreens(page);
   await page.getByRole("button", { name: /^(Get friend code|Get a Classic friend code|Create a Boss Battle)$/ }).click();
 }
 
@@ -571,12 +584,14 @@ export async function openBossRaid(page: Page) {
   await page.goto(`${to.pathname}${to.search}`);
   await expect(page.getByRole("heading", { name: "Boss Battle", exact: true })).toBeVisible();
   await expect(page.getByRole("main").getByRole("button", { name: /^Join a Boss Battle/ })).toBeVisible();
+  await matchScreens(page);
 }
 
 /** Home → Boss Battle's card → its screen: the tiles, the stage and START (Eric, Oct 26; renamed Oct 29). */
 export async function openSoloBoss(page: Page) {
   await page.getByRole("main").getByRole("button", { name: /^Boss Battle/ }).click();
   await expect(page.getByRole("heading", { name: "Boss Battle", exact: true })).toBeVisible();
+  await matchScreens(page);
 }
 
 /**
