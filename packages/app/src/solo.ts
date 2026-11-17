@@ -1,6 +1,6 @@
 import { DASH_STALL, RECLUSE_CHILD, RECLUSE_CUTSCENE, RECLUSE_PHASE2, BOSS_ALONE_SCORING, bossClockSettings, BOSS_BRAIN, BOSS_POWERS, DEFAULT_SETTINGS, MATCHMAKING, type ItemLook, type MatchmakingType, botVotes, castPregameVote, clockAfterVote, closePregameVote, cutSeconds, pregameVotes, voteResultMs, type Augment, type BossBrain, type PlayerState, type Settings } from "@chessroyale/core";
 import { GUARD_WORDS, MatchRunner, START_FEN, baseAt, ShowdownScout, brainLine as brainWords, boardSlots, type HumanUciEngine, netBoard, type LobbyPlayer, type LivePick, toSan, type BoardSlot, type BoardState, type NetFinal, type Opening, type RoundReport, type UciEngine } from "@chessroyale/chess";
-import { type Phase2Board, bulletClock, crowdRace, phase2Numbers, phase2Standings, phase2ToMove, botRoster, bossIntroTimeline, bossThinkMs, landedEarlyMs, fullMoonMs, folioTurnMs, popOffMs, zebraTurnMs, chandyTurnMs, dodgeTimeline, dodgeArena, dodgeEndAt, dodgeOver, bossTurnShowMs, judgeTaps, bossRules, kingHelpBlocked, kingMoveMs, kingStrikeMs, lightsDeadline, lightsOutTimeline, lightsRoundEnd, lastStandMs, powerMomentMs, rushKeep, rushMovesLeft, rushSquares, rushTimeline, stallTimeline, type StallPlan } from "@chessroyale/chess";
+import { type Phase2Board, bulletClock, crowdRace, phase2Numbers, phase2Standings, phase2ToMove, botRoster, bossIntroTimeline, bossThinkMs, landedEarlyMs, fullMoonMs, folioTurnMs, popOffMs, zebraTurnMs, chandyTurnMs, dodgeTimeline, dodgeArena, dodgeEndAt, dodgeOver, bossTurnShowMs, judgeTaps, bossRules, kingHelpBlocked, kingMoveMs, kingStrikeMs, lightsDeadline, lightsOutTimeline, lightsRoundEnd, lastStandMs, powerMomentMs, rushKeep, rushMovesLeft, rushSquares, rushTimeline, stallTimeline, nextBeat, type StallPlan } from "@chessroyale/chess";
 import type { BossView, BoardView, DarkNote, ExitKind, FinalView, GameView, Hint, LightsView, MoveRecord, RushView, Phase, SimulView, Standing, VoteView } from "./game.ts";
 import { PHASE_CHANGE, Phase2Game, cueSlash, phase2Follows, phase2Mates, phaseChangeRun } from "./recluse-phase2.ts";
 import { RECLUSE_LINES } from "./characters/recluse-lines.ts";
@@ -1505,7 +1505,7 @@ export class SoloMatch implements GameView {
     const allowed = this.runner.allowedMsFor(HUMAN);
     this.set({ kind: "play", board: boardView(board), startsAt: this.playStartedAt, deadline: this.playStartedAt + allowed, allowedMs: allowed, clock: this.runner.moveClock() });
     this.timer = setTimeout(() => this.submit(null), intro + allowed + this.settings.lateGraceMs);
-    // (Dash's stall skit, once a battle: its beats on this move's clock, if it comes on this move.)
+    // (Dash's clock tap or stall skit, each once a battle: his beats on this move's clock, if one comes on this move.)
     const plan = this.runner.stallPlan(HUMAN);
     if (plan) {
       this.stall = { plan, timer: null };
@@ -1514,13 +1514,14 @@ export class SoloMatch implements GameView {
   }
 
   /**
-   * Dash's stall skit on this move (his rules' stallPlan; docs/decisions/2026-11-17-dash-stall.md): the slam and the fake move,
+   * Dash's beats on this move (his rules' stallPlan and nextBeat): his clock tap (no pause: your clock runs; nothing more of his on
+   * this move after it; docs/decisions/2026-11-17-dash-tap-when-slow.md), or his stall skit (docs/decisions/2026-11-17-dash-stall.md): the slam and the fake move,
    * each when the move's clock reaches it (its pauses left out: the King's strike, the slam), each stopping the clock for its
    * length as the King's strike does (the deadline moved back, the bots still thinking too). Each is recorded as it comes, each
    * once a battle apart (runner.slammed, runner.stalled): a move of yours between them leaves the fake move for a later move,
    * where it comes alone (the plan's `slamAt` null).
    */
-  private stall: { plan: StallPlan; slam?: { at: number; until: number }; fake?: { at: number; until: number }; timer: ReturnType<typeof setTimeout> | null } | null = null;
+  private stall: { plan: StallPlan; tap?: { at: number; until: number }; slam?: { at: number; until: number }; fake?: { at: number; until: number }; timer: ReturnType<typeof setTimeout> | null } | null = null;
   private clearStall() {
     if (this.stall?.timer) clearTimeout(this.stall.timer);
     this.stall = null;
@@ -1549,18 +1550,24 @@ export class SoloMatch implements GameView {
   private armStall() {
     const st = this.stall;
     if (!st) return;
-    const beat = !st.slam && st.plan.slamAt !== null ? "slam" : !st.fake ? "fake" : null;
-    if (!beat) return;
-    let at = this.playStartedAt + (beat === "slam" ? (st.plan.slamAt ?? 0) : st.plan.fakeAt);
+    const nb = nextBeat(st.plan, st);
+    if (!nb) return;
+    let at = this.playStartedAt + nb.at;
     for (const w of this.frozenWindows()) if (w.at < at) at += w.until - w.at;
-    st.timer = setTimeout(() => this.stallBeat(beat), Math.max(0, at - Date.now()));
+    st.timer = setTimeout(() => this.stallBeat(nb.beat), Math.max(0, at - Date.now()));
   }
-  private stallBeat(beat: "slam" | "fake") {
+  private stallBeat(beat: "tap" | "slam" | "fake") {
     const phase = this.phase;
     const st = this.stall;
     if (this.stopped || phase.kind !== "play" || !st) return;
     st.timer = null;
     const now = Date.now();
+    if (beat === "tap") {
+      // (His clock tap: no pause, your clock runs; nothing more of his on this move.)
+      st.tap = { at: now, until: now };
+      this.runner.tapped();
+      return this.set({ ...phase, stall: { beat, at: now, until: now } });
+    }
     const ms = beat === "slam" ? DASH_STALL.slamMs : stallTimeline().total;
     st[beat] = { at: now, until: now + ms };
     this.progress.postpone(ms);
@@ -1569,8 +1576,8 @@ export class SoloMatch implements GameView {
     if (this.timer) clearTimeout(this.timer);
     this.timer = setTimeout(() => this.submit(null), deadline - now + this.settings.lateGraceMs);
     if (beat === "slam") this.runner.slammed();
-    else this.runner.stalled(st.plan.move);
-    this.set({ ...phase, deadline, stall: { beat, at: now, until: now + ms, ...(beat === "fake" ? { move: st.plan.move, ...(st.slam ? {} : { alone: true }) } : {}) } });
+    else this.runner.stalled(st.plan.move!);
+    this.set({ ...phase, deadline, stall: { beat, at: now, until: now + ms, ...(beat === "fake" ? { move: st.plan.move!, ...(st.slam ? {} : { alone: true }) } : {}) } });
     this.armStall();
   }
 

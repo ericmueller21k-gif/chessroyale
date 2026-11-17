@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { BOSS_ADMIN_FIRST, BOSS_CLOCK, BOSS_POWERS, BOSS_ROSTER, DASH_STALL, DASH_TAP, adminFirst, bossClockSettings, isPlayable, menuBosses, mulberry32, type Settings } from "@chessroyale/core";
-import { DASH_ANIM, DASH_FX, MatchRunner, applyMove, inCheck, pieceAt, stallMove, stallPausedMs, stallPlan, stallTimeline, tapTurn, extraMoveCandidates, passTurn, POWER_FX, boardPieces, botRushCorrect, bossThinkMs, chooseRush, dashMoveClock, flagMove, legalMoves, rushFen, rushHeld, rushJudge, rushKeep, rushMovesLeft, rushTimeline, scrambleLeft, scrambleOn, slappedClock } from "../src/index.ts";
+import { DASH_ANIM, DASH_FX, MatchRunner, applyMove, inCheck, pieceAt, stallMove, stallPausedMs, stallPlan, stallTimeline, dashView, nextBeat, extraMoveCandidates, passTurn, POWER_FX, boardPieces, botRushCorrect, bossThinkMs, chooseRush, dashMoveClock, flagMove, legalMoves, rushFen, rushHeld, rushJudge, rushKeep, rushMovesLeft, rushTimeline, scrambleLeft, scrambleOn, slappedClock } from "../src/index.ts";
 import { KIT_OPENING, crowdPick, fakeEngine, kitSettings } from "./boss-kit-lib.ts";
 
 /**
@@ -512,7 +512,7 @@ describe("Dash: his stall skit and his clock tap (Eric, Nov 17)", () => {
     expect(stallPlan(fresh(7, { dash: { slaps: 0, stolen: 0, flags: 0, slam: { at: 3 } } }), START, 610_000, true)).toMatchObject({ slamAt: null, fakeAt: 30_000 });
     expect(stallPlan(fresh(7, { dash: { slaps: 0, stolen: 0, flags: 0, slam: { at: 3 } } }), START, 20_000, false)).toMatchObject({ slamAt: null, fakeAt: 15_000 });
     expect(stallPlan(fresh(7, { dash: { slaps: 0, stolen: 0, flags: 0, slam: { at: 3 }, stall: { at: 5, move: "g8f6" } } }), START, 610_000, true)).toBeNull();
-    for (const kind of ["slap", "flag", "clockFit", "warn", "scramble", "rushWarn", "clockTap"]) expect(stallPlan(fresh(7, { events: [{ kind, turn: 1 }] }), START, 610_000, true), kind).toBeNull();
+    for (const kind of ["slap", "flag", "clockFit", "warn", "scramble", "rushWarn"]) expect(stallPlan(fresh(7, { events: [{ kind, turn: 1 }] }), START, 610_000, true), kind).toBeNull();
     expect(stallPlan(fresh(7, { ultAt: 1 }), START, 610_000, true)).toBeNull();
     expect(stallPlan(fresh(7, { dash: { slaps: 0, stolen: 0, flags: 0, rush: { at: 0, moves: [] } } }), START, 610_000, true)).toBeNull();
     expect(stallPlan({ ...(fresh() as object), barred: "e2e4" } as never, START, 610_000, true)).toBeNull();
@@ -543,7 +543,7 @@ describe("Dash: his stall skit and his clock tap (Eric, Nov 17)", () => {
     const plan = r.stallPlan("h0")!;
     expect(plan).toMatchObject({ slamAt: 20_000, fakeAt: 30_000 });
     const before = { fen: fenOf(r), banks: r.state.players.map((p) => p.bankMs), history: r.boards.get(r.state.boards[0]!)!.history.length };
-    r.stalled(plan.move);
+    r.stalled(plan.move!);
     expect(r.boss!.powers!.dash!.stall).toEqual({ at: 0, move: plan.move });
     expect({ fen: fenOf(r), banks: r.state.players.map((p) => p.bankMs), history: r.boards.get(r.state.boards[0]!)!.history.length }).toEqual(before);
     r.stalled("a7a6");
@@ -556,7 +556,9 @@ describe("Dash: his stall skit and his clock tap (Eric, Nov 17)", () => {
       if (r.boss!.result) break;
       await r.playBoss(fakeEngine());
       r.deal();
-      expect(r.stallPlan("h0"), `turn ${i + 2}`).toBeNull();
+      // (The skit spent; his clock tap may still come.)
+      expect(r.stallPlan("h0")?.fakeAt ?? null, `turn ${i + 2}`).toBeNull();
+      expect(r.stallPlan("h0")?.slamAt ?? null, `turn ${i + 2}`).toBeNull();
     }
   });
 
@@ -580,33 +582,67 @@ describe("Dash: his stall skit and his clock tap (Eric, Nov 17)", () => {
     expect(again).toBe(1);
   });
 
-  it("his clock tap: once a battle, from his seeded turn (DASH_TAP's range; the test switch: the first), on the first turn with nothing else of his; screen only (it holds nothing)", async () => {
-    for (let seed = 0; seed < 50; seed++) {
-      const t = tapTurn(seed);
-      expect(t).toBeGreaterThanOrEqual(DASH_TAP.from);
-      expect(t).toBeLessThanOrEqual(DASH_TAP.to);
-    }
-    expect(tapTurn(3, "clocktap")).toBe(1);
-    expect(POWER_FX.clockTap).toBe(0);
-    for (const seed of [21, 22, 23]) {
-      const r = battle(seed, { bank: true });
-      const taps: number[] = [];
-      for (let i = 0; i < 14 && !r.boss!.result; i++) {
-        r.deal();
-        const ev = r.boss!.powers!.events;
-        if (ev.some((e) => e.kind === "clockTap")) {
-          taps.push(r.boss!.crowdMoves + 1);
-          expect(ev.length, `alone on its turn (seed ${seed})`).toBe(1);
-          expect(r.boss!.powers!.dash!.tap).toEqual({ at: r.boss!.crowdMoves });
-          // (Never the stall skit's move.)
-          expect(r.stallPlan("h0")).toBeNull();
-        }
-        await crowdMove(r);
-        if (r.boss!.result) break;
-        await r.playBoss(fakeEngine());
+  // (Crowd move `turn`, his powers' fields `powers`.)
+  const onMove = (turn: number, powers: Record<string, unknown> = {}, dash: Record<string, unknown> = {}) =>
+    ({ id: "dash", crowdMoves: turn - 1, crowdSide: "w", powers: { seed: 7, turn, events: [], ...powers, dash: { slaps: 0, stolen: 0, flags: 0, ...dash } } }) as never;
+
+  it("his clock tap only when you're slow (Eric, Nov 17: \"it fired off like 5 seconds into the match even tho I played all my moves instantly\"): from move 3 at 10 s of a bank's move, 30% of a move clock; ?power=clocktap from the first; never with another moment of his", () => {
+    expect([DASH_TAP.fromMove, DASH_TAP.afterMs, DASH_TAP.afterShare]).toEqual([3, 10_000, 0.3]);
+    for (const turn of [1, 2]) expect(stallPlan(onMove(turn), START, 610_000, true)?.tapAt ?? null, `move ${turn}`).toBeNull();
+    expect(stallPlan(onMove(3), START, 610_000, true)).toMatchObject({ tapAt: 10_000, slamAt: 20_000, fakeAt: 30_000 });
+    expect(stallPlan(onMove(3), START, 20_000, false)).toMatchObject({ tapAt: 6_000, slamAt: 10_000, fakeAt: 15_000 });
+    expect(stallPlan(onMove(1), START, 610_000, true, "clocktap")).toMatchObject({ tapAt: 10_000 });
+    // (A move clock too short for the skit still has the tap; one too short for the tap has nothing.)
+    expect(stallPlan(onMove(3), START, 7_000, false)).toMatchObject({ tapAt: 2_100, slamAt: null, fakeAt: null, move: null });
+    expect(stallPlan(onMove(3), START, 9_000, true)).toBeNull();
+    // (Never in the move's last DASH_STALL.marginMs (review of #775: solo started a crawl at 10.0 s of a 10.3 s bank, and flagged under
+    // it): solo and the server plan the same.)
+    expect(DASH_STALL.marginMs).toBe(2000);
+    expect(stallPlan(onMove(3), START, 10_300, true)).toBeNull();
+    expect(stallPlan(onMove(3), START, 11_999, true)).toBeNull();
+    expect(stallPlan(onMove(3), START, 12_000, true)).toMatchObject({ tapAt: 10_000, slamAt: null });
+    for (const kind of ["slap", "flag", "clockFit", "warn", "scramble", "rushWarn"]) expect(stallPlan(onMove(5, { events: [{ kind, turn: 5 }] }), START, 610_000, true), kind).toBeNull();
+  });
+
+  it("his clock tap and his stall skit never share a move (Eric, Nov 17: \"the bigger gag is reserved for another turn\"): the first to come takes it", () => {
+    const plan = { tapAt: 10_000, slamAt: 20_000, fakeAt: 30_000, move: "g8f6" };
+    expect(nextBeat(plan, {})).toEqual({ beat: "tap", at: 10_000 });
+    expect(nextBeat(plan, { tap: {} })).toBeNull();
+    expect(nextBeat({ ...plan, tapAt: null }, {})).toEqual({ beat: "slam", at: 20_000 });
+    expect(nextBeat(plan, { slam: {} })).toEqual({ beat: "fake", at: 30_000 });
+    expect(nextBeat(plan, { slam: {}, fake: {} })).toBeNull();
+    // (His slam spent on an earlier move: the tap still comes first, at 10 s against the fake move's 30.)
+    expect(nextBeat({ ...plan, slamAt: null }, {})).toEqual({ beat: "tap", at: 10_000 });
+    // (?power=stall's early beats: the skit takes the move, the tap waits.)
+    expect(nextBeat({ ...plan, slamAt: 1500, fakeAt: 3500 }, {})).toEqual({ beat: "slam", at: 1500 });
+    expect(nextBeat({ ...plan, slamAt: 1500, fakeAt: 3500 }, { slam: {} })).toEqual({ beat: "fake", at: 3500 });
+  });
+
+  it("his clock tap through a battle: recorded once as it comes, nothing more of his on its move (no slam, no fake move), the skit on the next slow move; the position and clocks as they were", async () => {
+    const r = battle(13, { bank: true, test: "clocktap" });
+    r.deal();
+    expect(r.stallPlan("h0")).toMatchObject({ tapAt: 10_000, slamAt: 20_000 });
+    const before = { fen: fenOf(r), banks: r.state.players.map((p) => p.bankMs) };
+    r.tapped();
+    r.tapped();
+    expect(r.boss!.powers!.dash!.tap).toEqual({ at: 0 });
+    expect(dashView(r.boss!.powers!)!.tap).toEqual({ at: 0 });
+    expect({ fen: fenOf(r), banks: r.state.players.map((p) => p.bankMs) }).toEqual(before);
+    expect(r.stallPlan("h0")).toBeNull();
+    let skit = 0;
+    for (let i = 0; i < 6 && !skit && !r.boss!.result; i++) {
+      await crowdMove(r);
+      if (r.boss!.result) break;
+      await r.playBoss(fakeEngine());
+      r.deal();
+      const plan = r.stallPlan("h0");
+      expect(plan?.tapAt ?? null).toBeNull();
+      if (plan) {
+        expect(plan).toMatchObject({ slamAt: 20_000, fakeAt: 30_000 });
+        skit++;
       }
-      expect(taps.length, `seed ${seed}`).toBe(1);
-      expect(taps[0]!).toBeGreaterThanOrEqual(tapTurn(r.boss!.powers!.seed));
     }
+    expect(skit).toBe(1);
+    expect(r.boss!.powers!.events.map((e) => e.kind as string)).not.toContain("clockTap");
   });
 });
