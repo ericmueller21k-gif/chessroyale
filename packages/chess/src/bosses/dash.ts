@@ -63,8 +63,6 @@ export const DASH_FX = {
   flag: DASH_ANIM.check,
   clockFit: 1500,
   rushExtra: 2200,
-  // (His lying-down clock tap holds nothing: your clock runs through it, Eric, Nov 17.)
-  clockTap: 0,
   // (His pop-off's two beats, while he thinks: dashPopOff's popMs and loveMs.)
   popOff: BOSS_POWERS.dashPopOff.popMs,
   popOffFast: BOSS_POWERS.dashPopOff.loveMs,
@@ -169,11 +167,6 @@ export const DASH: BossRules = {
       t.events.push({ kind: "rushWarn", turn: t.turn });
       return;
     }
-    // His lying-down clock tap (Eric, Nov 17), once a battle: from his seeded turn on, the first crowd turn with nothing else of his.
-    if (tapNow(next, t)) {
-      next.dash = { ...d, tap: { at: t.turn - 1 } };
-      t.events.push({ kind: "clockTap", turn: t.turn });
-    }
   },
   // (His slaps come at his turn's end, after a capture: afterBossMove.)
   passive() {},
@@ -252,26 +245,7 @@ export function popOffTurns(seed: number, s: BossPowerSettings["dashPopOff"] = B
 export const popOffMs = (boss: { id?: string; powers?: { turn?: number; dash?: { popOff?: { at: number } | null } | null } | null } | null | undefined): number =>
   popOffPending(boss) ? DASH_FX.popOff + DASH_FX.popOffFast : 0;
 
-// ---------------- His lying-down clock tap and his stall skit (Eric, Nov 17) ----------------
-
-/**
- * The crowd turn his lying-down clock tap may come from (DASH_TAP: from the battle's seed, `from` to `to`; the test switch
- * ?power=clocktap: the first). It comes on the first crowd turn from then on with nothing else of his (tapNow).
- */
-export const tapTurn = (seed: number, test = "", s: typeof DASH_TAP = DASH_TAP): number =>
-  test === "clocktap" ? 1 : s.from + Math.floor(powerRoll(seed, "tap", 0) * (s.to - s.from + 1));
-
-/**
- * His clock tap comes as this crowd turn begins: once a battle, from tapTurn on, on a turn with none of his other moments (no
- * event yet this turn: a warning, a slap, a flag, a clock fit, the Scramble Rush's warning), no Time Scramble under way and no
- * Scramble Rush or extra move of his on it. Screen only: nobody's clock changes (DASH_TAP).
- */
-function tapNow(next: BossPowerState, t: { turn: number; seed: number; test: string; events: readonly unknown[]; s: BossPowerSettings }): boolean {
-  const d = next.dash;
-  if (!d || d.tap || t.turn < tapTurn(t.seed, t.test) || t.events.length) return false;
-  if (scrambleOn(next, t.turn, t.s) || rushWarned(d) || (d.rush && d.rush.at >= t.turn - 1)) return false;
-  return true;
-}
+// ---------------- His stall skit (Eric, Nov 17) ----------------
 
 /**
  * His stall skit on this crowd move (Eric, Nov 17; docs/decisions/2026-11-17-dash-stall.md): when it comes, on the move's own
@@ -332,8 +306,7 @@ export function stallMove(passed: string, seed: number, turn: number): string | 
  * Whether his stall skit can come on the crowd move now being picked, and when (Eric, Nov 17: once a battle; "if you take more
  * than 30 seconds to move"; "each still occur once per game": the slam and the fake move each once, apart). Null: not on this move. `allowedMs`: the move's clock (ms); `bank`: the battle's time is a bank
  * (Boss alone, a Boss Battle party: DASH_STALL's seconds) or else a move clock (a raid, a group battle: DASH_STALL's shares of
- * the move's clock). After the slam (`dash.slam`), the fake move alone (no `slamAt`). Not once the fake move has come (`dash.stall`), nor on a move with any other moment of his (an event this turn, his
- * clock tap among them), a Time Scramble's move, his Scramble Rush's turn, the re-pick after the God King's Last Stand, with the
+ * the move's clock). After the slam (`dash.slam`), the fake move alone (no `slamAt`). Not once the fake move has come (`dash.stall`), nor on a move with any other moment of his (an event this turn), a Time Scramble's move, his Scramble Rush's turn, the re-pick after the God King's Last Stand, with the
  * crowd in check (he can't move again then), with no quiet move of his, or when the move's clock can't reach the fake move with
  * DASH_STALL.marginMs to spare. The test switch ?power=stall: DASH_STALL.test's beats.
  */
@@ -581,8 +554,12 @@ export interface DashView {
   popOff?: { at: number } | null;
   /** His stall skit's fake move, once it has come (Eric, Nov 17): the crowd move it came on and the move he took back. */
   stall?: { at: number; move: string } | null;
-  /** His lying-down clock tap, once it has come (Eric, Nov 17): the crowd move it came on. */
-  tap?: { at: number } | null;
+  /**
+   * The battle's tag for his lying-down clock tap (a screen's own moment, once a battle: DashTap in the app's DashStall.tsx): a
+   * number from 0 to 4095 drawn from the battle's seed (12 bits, as Hollow's `lights`, so it gives nothing of the seed away), so a
+   * screen knows the battle it already played it in (a reload doesn't play it again) from the next.
+   */
+  key?: number;
 }
 
 export function dashView(p: BossPowerState, s: DashSettings = BOSS_POWERS): DashView | null {
@@ -598,7 +575,7 @@ export function dashView(p: BossPowerState, s: DashSettings = BOSS_POWERS): Dash
     ...(d.rush ? { rush: { ...d.rush, moves: d.rush.moves.map((m) => ({ ...m })) } } : {}),
     ...(d.popOff ? { popOff: { ...d.popOff } } : {}),
     ...(d.stall ? { stall: { ...d.stall } } : {}),
-    ...(d.tap ? { tap: { ...d.tap } } : {}),
+    key: Math.floor(powerRoll(p.seed, "tap") * 4096),
   };
 }
 

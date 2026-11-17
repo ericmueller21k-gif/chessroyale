@@ -314,7 +314,9 @@ export function PlayScreen({
             )}
             {ending && !striking && !stalling && <CenterCount label="Round end" n={secsLeft} />}
             {match.boss?.id === "dash" && <DashStall boss={match.boss} stall={stall} />}
-            {match.boss?.id === "dash" && <DashTap boss={match.boss} startsAt={waiting ? 0 : startsAt} waiting={waiting} />}
+            {match.boss?.id === "dash" && (
+              <DashTap boss={match.boss} startsAt={startsAt} allowedMs={total} bank={!!match.settings.bossClock} test={match.settings.bossPowerTest ?? ""} frozen={frozen} stalled={!!stall} waiting={waiting} />
+            )}
             {godKing && <KingSummon {...godKing} />}
             {command && <KingCommand {...command} />}
             {crowd && waiting && !history.browsing && <LiveGhosts match={match} fen={board.fen} orientation={orientation} />}
