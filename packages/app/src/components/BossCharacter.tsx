@@ -390,7 +390,7 @@ function Character({ boss, stage, place, muteFall }: { boss: BossView; stage: St
   // (A phone's bar: his size and his drawing's shift in the box (kits.ts barScale, barShift; styles.css). Full size and no shift otherwise.)
   const barSize = place === "bar" ? { "--bc-scale": kit.barScale ?? 1, "--bc-shift": kit.barShift ?? 0 } : {};
   return (
-    <div ref={box} class={`boss-char place-${place} ch-${ch.id}${kit.tall ? " tall" : ""}${kit.wide ? " wide" : ""}${kit.heads ? " bc-heads" : ""}${place === "results" && kit.artFacesLeft ? " art-left" : ""}`} data-anim={beat.anim} data-faces={kit.sprite ? drawnFacing(kit.sprite, ch) : undefined} aria-hidden="true" style={{ "--bc-w": ch.w, "--bc-h": ch.h, "--bc-fx": ch.foot[0], "--bc-fy": ch.foot[1], ...barSize }}>
+    <div ref={box} class={`boss-char place-${place} ch-${ch.id}${kit.tall ? " tall" : ""}${kit.wide ? " wide" : ""}${kit.heads ? " bc-heads" : ""}${(place === "results" || place === "side") && kit.artFacesLeft ? " art-left" : ""}`} data-anim={beat.anim} data-faces={kit.sprite ? drawnFacing(kit.sprite, ch) : undefined} aria-hidden="true" style={{ "--bc-w": ch.w, "--bc-h": ch.h, "--bc-fx": ch.foot[0], "--bc-fy": ch.foot[1], ...barSize }}>
       <canvas ref={cv} class="boss-char-sprite" width={ch.w} height={ch.h} />
       {/* Its words: a pixel text box beside it that types itself out and fades at the end (like the God King's). In the
           boss bar, the bar holds them instead, in its name's room (BossBar): never over its status or the board. */}
