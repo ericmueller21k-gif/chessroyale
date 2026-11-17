@@ -557,19 +557,20 @@ test.describe("Dash's stall skit and clock tap (Eric, Nov 17)", () => {
     expect(errors).toEqual([]);
   });
 
-  /** Every frame from now: when his lying figure shows, by the crowd move and the ms of its clock. */
+  /** Every frame from now: when his lying figure shows, by the crowd move, the ms of its clock (-1: not your move) and its beat. */
   const watchLie = (page: Page) =>
     page.evaluate(() => {
       const w = window as any;
-      w.__lie = [] as { move: number; ms: number; at: number }[];
+      w.__lie = [] as { move: number; ms: number; at: number; beat: string | null }[];
       const look = () => {
         const ph = w.match?.phase;
-        if (document.querySelector(".dash-lie")) w.__lie.push({ move: w.match?.boss?.crowdMoves ?? -1, ms: ph?.kind === "play" ? Date.now() - ph.startsAt : -1, at: Date.now() });
+        const lie = document.querySelector(".dash-lie");
+        if (lie) w.__lie.push({ move: w.match?.boss?.crowdMoves ?? -1, ms: ph?.kind === "play" ? Date.now() - ph.startsAt : -1, at: Date.now(), beat: lie.getAttribute("data-beat") });
         requestAnimationFrame(look);
       };
       requestAnimationFrame(look);
     });
-  const lies = (page: Page) => page.evaluate(() => (window as any).__lie as { move: number; ms: number; at: number }[]);
+  const lies = (page: Page) => page.evaluate(() => (window as any).__lie as { move: number; ms: number; at: number; beat: string | null }[]);
   const beatOf = (page: Page) => page.evaluate(() => (window as any).match.phase.stall?.beat ?? null);
   const said = (page: Page, lines: readonly string[]) => page.evaluate(() => document.body.textContent ?? "").then((t) => lines.some((l) => t.includes(l)));
 
@@ -628,7 +629,11 @@ test.describe("Dash's stall skit and clock tap (Eric, Nov 17)", () => {
     // (Move 3, slow again: once a battle, so no tap; the skit's slam at 20 s.)
     await yourMove(page);
     await expect.poll(() => beatOf(page), { timeout: 25_000 }).toBe("slam");
-    expect((await lies(page)).filter((l) => l.move !== 1)).toEqual([]);
+    // (Never lying on a later move. His getting up from your move 2 can run on past the count of moves: your move scored at once,
+    // as when it's among the judge's top moves already searched, his turn starts within the get-up. Only that, never on your clock.)
+    const later = (await lies(page)).filter((l) => l.move !== 1);
+    expect(later.filter((l) => l.beat !== "up" || l.ms !== -1)).toEqual([]);
+    if (later.length) expect(later[later.length - 1]!.at - later[0]!.at).toBeLessThan(1000);
     expect(await page.locator(".dash-lie").count()).toBe(0);
   });
 
