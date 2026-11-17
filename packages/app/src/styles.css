@@ -12523,10 +12523,6 @@ a.fd-row-link {
   font-size: 14px;
   line-height: 18px;
 }
-/* Your coins on your own profile: gold, as the coin. */
-.fd-pill.fp-coins {
-  color: var(--fd-gold-text);
-}
 /* Your 1 v 1 rank under your name on home: its tier's color, darkened in light (as the 1 v 1 pill: core's ranked test
    checks each tier's color stays 4.5:1 through these mixes, so change them together). */
 .fd-rank {
