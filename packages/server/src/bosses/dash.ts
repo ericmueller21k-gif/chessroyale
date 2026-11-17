@@ -85,6 +85,8 @@ function stallBeat(lobby: BossLobby) {
   else if (beat === "slam") runner.slammed();
   else runner.stalled(st.plan.move!);
   const shown = { beat, at: now, until: now + ms, ...(beat === "fake" ? { move: st.plan.move!, ...(st.slam ? {} : { alone: true }) } : {}) };
+  // (Only those in the round see the move's clock: nobody watches a boss battle from outside it. Should that change, they need the
+  // moved deadline too: docs/decisions/2026-11-17-dash-pause-watchers.md.)
   for (const h of lobby.roundHumans()) {
     const deadline = round.deadlines[h.id] ?? round.deadline;
     lobby.send(h.id, { t: "stall", key: round.key, deadline, ...shown }, false);

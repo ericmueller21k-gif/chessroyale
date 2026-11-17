@@ -3155,6 +3155,9 @@ export class LobbyCore {
     round.deadline += ms;
     for (const id of Object.keys(round.deadlines)) round.deadlines[id]! += ms;
     for (const [id, at] of Object.entries(round.botsDoneIn ?? {})) if (round.startedAt + at > now) round.botsDoneIn![id] = at + ms;
+    // (Only those in the round see the move's clock: nobody watches a boss battle from outside it (`deal()` puts everyone left in
+    // the round; a cut player watches only in the 50 v 50 rework, which meets no boss). Should that change, they need the moved
+    // deadline too: docs/decisions/2026-11-17-dash-pause-watchers.md.)
     for (const h of this.roundHumans()) {
       this.send(h.id, { t: "strike", key: round.key, calls, needed, at: now, until: now + ms, deadline: round.deadlines[h.id] ?? round.deadline });
     }
