@@ -782,6 +782,8 @@
         "packages/app/src/icon-pixels.ts",
         "packages/app/src/boss-tokens.ts",
         "packages/app/src/components/TokenArt.tsx",
+        "packages/app/src/components/Coin.tsx",
+        "packages/app/src/coin/**",
         "packages/app/src/components/TokenBox.tsx",
         "packages/app/src/components/tokens/**",
         "packages/app/src/components/WelcomeNotice.tsx",
