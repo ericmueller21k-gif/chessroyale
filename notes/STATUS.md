@@ -1,3 +1,4 @@
+- Nov 17 ~14:55 UTC: Eric: Moo & Moon Full Moon cinematic (field + giant moon; side close-up, eyes white; transform; hop back). Brief notes/briefs/moo-cinematic.md, phase 1 = stills then .question STOP. QUEUED with boss-facing: both high, start together when Dash .done.
 - Nov 17 ~14:45 UTC: #769 LIVE dd5fb4f; main full run GREEN (flake cluster fixed).
 - Nov 17 14:15 UTC: Eric: all bosses facing the right way -> brief notes/briefs/boss-facing.md (Opus high). QUEUED: starts the moment Dash (xhigh, alone) is .done, unless Eric OKs two at once.
 - Nov 17 13:50 UTC: MISS: lazy-flakes .done at 08:28 sat unseen 5h20m (no watcher armed on its branch). Rule: arm wait-any/.done watcher the moment a helper starts. #769 lazy-flakes opened (f5a8081). Dash stall helper session_01JuCWRrRBCwbLHxE4PhTVuy (xhigh, alone) on claude/dash-stall, watcher armed.
