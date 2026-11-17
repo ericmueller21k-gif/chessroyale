@@ -1,3 +1,4 @@
+- Nov 17 15:27 UTC: star seat .done -> #771 (0f77d26), CI watched, stills sent. Moo cinematic phase-1 helper session_01JuCWRs9kYAizLzgT62WDsr. Dash fix helper still running. Watcher on dash-stall + moo-cinematic. Next slot: payments design, then boss-facing.
 - Nov 17 15:35 UTC: Eric payments round 2 (payments-answers.md): AI legal review at end; key ~$1; crates earned; refunds hassle-free; earn-first. Proposals sent.
 - Nov 17 15:25 UTC: Eric: slam and fake move each once per game independently (move between them -> fake still comes later at 30 s, alone). Sent to fix helper session_01JuCWRvgADv6G7HGf2yAbbt (option b).
 - Nov 17 15:20 UTC: Eric answered payments (notes/briefs/payments-answers.md). Picks sent back for OK. Payments design helper queued after moo stills.
