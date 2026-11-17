@@ -151,3 +151,4 @@ checks it (stills at phone + computer sizes). Guard: docs/rules/eric.md + a chec
 - **Hidden Boss: parallel helpers allowed** (Eric, Nov 13 16:15 UTC: "I want the boss done... Just fire up another worker on it then. I know what I say about one at a time, but come on"). REVISED same day (16:20 UTC): **two helpers at once, in total** ("I just want to run two in total at a time... we don't need five running, that'll kill my usage"). When one finishes, the next paused or queued one starts, until the Hidden Boss is done.
 
 - **A ban locks the whole device** (Eric, Nov 13: "just the whole device is banned... If you get banned and your sister gets upset about it, so be it. We can always revert it later"). No "sign in to another account" on a banned device.
+- Arm a .done/.question watcher on a helper's branch the moment it starts (Nov 17: a finished helper sat unseen 5 h 20 min).

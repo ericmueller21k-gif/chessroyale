@@ -1,3 +1,4 @@
+- Nov 17 13:50 UTC: MISS: lazy-flakes .done at 08:28 sat unseen 5h20m (no watcher armed on its branch). Rule: arm wait-any/.done watcher the moment a helper starts. #769 lazy-flakes opened (f5a8081). Dash stall helper session_01JuCWRrRBCwbLHxE4PhTVuy (xhigh, alone) on claude/dash-stall, watcher armed.
 - Nov 17 ~08:25 UTC: main full run on fc5be3f GREEN (no retry-passes this time). lazy-flakes still running.
 - Nov 17 ~07:52 UTC: #767 (one tap = one square) + #768 (star seat curved edge) merged, LIVE fc5be3f. Main full run on fc5be3f watched. lazy-flakes helper (session_01JuCWRt9DLGqYvhcgmp4Zcz) found tap-to-lobby 0.4s->1.3s since #759; profiling. Next: Dash stall (xhigh alone) after it.
 - Nov 17 ~07:50 UTC: #766 LIVE; main RED by retry-passes after #765/#766: solo:80/151, chat-mod:31, king-attack:192 (pattern since #759 lazy chunk) -> helper (Opus high) claude/lazy-flakes. Key tap + star lip done: PRs next. Dash stall waits (xhigh alone).
