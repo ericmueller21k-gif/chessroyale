@@ -26,8 +26,8 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
   (`SHOP.discount`, 0.5; `shopPrice` and `discountLabel` in `core/shop.ts`, whole coins, half up): a red "50% OFF" ribbon on every card
   and the bundle, the full price struck through beside the discounted one; at 0 no ribbons and no strike. **Limited items**
   (`SHOP.limited`: Gift, Beta): a gold clock in the card's top-left corner; its tap opens "Limited: a rotating shop item. It leaves the
-  shop when its time is up." (OK, Escape or a tap outside close either pop-up; nothing moves). Prices: `SHOP.prices`. The coin is the
-  top bar's 🪙. **The Mythic Crate** (`MythicCrateArt`: purple and black, gold crown, the HunChess crate's glint tinted lilac) is
+  shop when its time is up." (OK, Escape or a tap outside close either pop-up; nothing moves). Prices: `SHOP.prices`. The coin is
+  `Coin` (components/Coin.tsx: a king's head on a boss-token-style gold coin, Nov 17), in the top bar, price pills and Buy buttons. **The Mythic Crate** (`MythicCrateArt`: purple and black, gold crown, the HunChess crate's glint tinted lilac) is
   defined only in the decision note for now (a Fischer Random pull; each of the bundle's crates `SHOP.bundleMythicChance` likely).
   `BossCrateArt({ boss })` lays a boss's token over the seal (for the inventory, not wired there yet).
 - **Crates** (`core/crates.ts`): two series, **Beta Crate · Series 001** (listed first; it ships in batches, the plan

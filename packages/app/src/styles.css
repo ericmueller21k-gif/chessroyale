@@ -6545,8 +6545,21 @@ body:has([aria-modal="true"]:not(#rotate-lock), .mm-scrim) > .dk-plus {
   gap: 10px;
 }
 .shop-coins {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
+}
+/* The coin (components/Coin.tsx): never squashed by a flex row, centered on the text beside it; smooth when shrunk, pixel-sharp
+   from 40 px up. */
+.coin-icon {
+  display: inline-block;
+  flex: none;
+  vertical-align: middle;
+}
+.coin-icon.sharp {
+  image-rendering: pixelated;
 }
 .shop-note {
   margin: 0;
@@ -6789,9 +6802,6 @@ body:has([aria-modal="true"]:not(#rotate-lock), .mm-scrim) > .dk-plus {
   color: #7a6a4a;
   font-size: 13px;
   font-weight: 700;
-}
-.shop-price span {
-  font-size: 17px;
 }
 .shop-ribbon {
   position: absolute;
@@ -12522,10 +12532,6 @@ a.fd-row-link {
   padding: 5px 12px;
   font-size: 14px;
   line-height: 18px;
-}
-/* Your coins on your own profile: gold, as the coin. */
-.fd-pill.fp-coins {
-  color: var(--fd-gold-text);
 }
 /* Your 1 v 1 rank under your name on home: its tier's color, darkened in light (as the 1 v 1 pill: core's ranked test
    checks each tier's color stays 4.5:1 through these mixes, so change them together). */

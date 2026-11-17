@@ -56,6 +56,8 @@ test("your profile: tap your pawn; the same structure as anyone's, with your own
   await expect(page.locator(".fd-pills .fd-card-rank")).toHaveText("Paragon 5 · 45 RP");
   await expect(page.locator(".fd-pills")).toContainText("Rating 1612");
   await expect(page.locator(".fd-pills")).not.toContainText(/Weighty|Novice|Expert/);
+  // No coins pill in that row (Eric, Nov 17: "a random coin thing in the profile… just remove that"): the shop shows them.
+  await expect(page.locator(".fd-pills")).not.toContainText(/coins/);
   await expect(page.getByRole("button", { name: "Edit name & icon" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Open locker" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Report", exact: true })).toHaveCount(0);

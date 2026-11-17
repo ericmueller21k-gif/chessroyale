@@ -234,7 +234,7 @@ function EditSheet({ onClose, drawFirst = false }: { onClose: () => void; drawFi
 /**
  * A profile screen (docs/decisions/2026-10-28-public-profile.md). Another player's name or face opens the public profile
  * (PublicProfile.tsx: the same page for everyone, Eric, Oct 28). Your own pawn opens this one, today's, which has your
- * coins, Edit name & icon, the locker, Friends, Quick chat and Settings, and "View public profile" at its top (that page,
+ * Edit name & icon, the locker, Friends, Quick chat and Settings, and "View public profile" at its top (that page,
  * as others see yours). A bot, or someone with no account, gets a card saying so.
  */
 export function PlayerProfileScreen({
@@ -387,8 +387,7 @@ function OwnProfileScreen({
           {p.banned ? <span class="fd-pill fp-banned">Banned</span> : <HeaderRank p={p} own={own} />}
           {!p.banned && <RatingPill rating={p.rating} />}
           {p.topPercent !== null && <span class="fd-pill">Top {p.topPercent}%</span>}
-          {/* (Your coins: on your profile and in the shop, not in home's top bar, Eric, Oct 18.) */}
-          {own && me?.shop && <span class="fd-pill fp-coins">● {me.shop.coins.toLocaleString("en-US")} coins</span>}
+          {/* (No coins pill since Nov 17, Eric: "a random coin thing in the profile… just remove that"; the shop shows them.) */}
         </div>
         {own && (
           <div class="fd-card-actions">
