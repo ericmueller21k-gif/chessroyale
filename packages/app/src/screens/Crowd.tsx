@@ -777,7 +777,7 @@ export function CrowdCut({
         <span>
           {/* (Real numbers: ties at the line go through, so a cut can take fewer than usual, or nobody.) */}
           {knockedOut.length ? `${knockedOut.length} out` : "Nobody out"} ·{" "}
-          {keep !== null ? `${cutMove ? `move ${cutMove} · ` : ""}${final ? "1 v 1" : versus(keep)} next` : `${aliveAfter} left${final ? ` · the ${next.toLowerCase()} is next` : ""}`}
+          {keep !== null ? `${final ? "1 v 1" : versus(keep)} next` : `${aliveAfter} left${final ? ` · the ${next.toLowerCase()} is next` : ""}`}
         </span>
       </div>
       <div class="judge-stage">
@@ -985,7 +985,7 @@ function CutOut({
             <span class="co-btn-main">Spectate</span>
             <span class="co-btn-sub">{match.spectateAsked ? "from the next move" : "watch to the podium"}</span>
           </button>
-          <button type="button" class="btn btn-secondary co-leave leave-match" disabled={!match.exit} onClick={stop(exitMatch)}>
+          <button type="button" class="btn btn-secondary co-leave" disabled={!match.exit} onClick={stop(exitMatch)}>
             <span class="co-btn-main">Leave the match</span>
             <span class="co-btn-sub">your place stands</span>
           </button>
