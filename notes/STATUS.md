@@ -1,3 +1,4 @@
+- Nov 17 ~08:25 UTC: main full run on fc5be3f GREEN (no retry-passes this time). lazy-flakes still running.
 - Nov 17 ~07:52 UTC: #767 (one tap = one square) + #768 (star seat curved edge) merged, LIVE fc5be3f. Main full run on fc5be3f watched. lazy-flakes helper (session_01JuCWRt9DLGqYvhcgmp4Zcz) found tap-to-lobby 0.4s->1.3s since #759; profiling. Next: Dash stall (xhigh alone) after it.
 - Nov 17 ~07:50 UTC: #766 LIVE; main RED by retry-passes after #765/#766: solo:80/151, chat-mod:31, king-attack:192 (pattern since #759 lazy chunk) -> helper (Opus high) claude/lazy-flakes. Key tap + star lip done: PRs next. Dash stall waits (xhigh alone).
 - Nov 17 ~07:30 UTC: Eric: Dash stall skit (20 s clock slam 5 s + line; 30 s fake second move, "jk bro", taken back; once a battle). Brief dash-stall.md, xhigh, starts when the seat lip + key tap helpers finish.
