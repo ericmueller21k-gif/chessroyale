@@ -91,6 +91,11 @@ async function record(page: Page) {
           ? [...document.querySelectorAll<HTMLElement>(".mo-pic")].map((e) => `${e.classList.contains("mo-close") ? "close" : "field"}:${e.dataset.frame}:${e.style.opacity}`)
           : null,
         moments: [...document.querySelectorAll(".power-moment")].map((e) => e.className.replace("power-moment", "").trim()),
+        // (What a tap on the board's middle would reach: the cinematic's field, while it's up, or the board.)
+        tapCine: (() => {
+          const b = document.querySelector(".board-wrap")?.getBoundingClientRect();
+          return b ? !!document.elementFromPoint(b.x + b.width / 2, b.y + b.height / 2)?.closest(".mo-cine") : null;
+        })(),
         beams: [...document.querySelectorAll<HTMLElement>(".mo-beam")].map((e) => {
           const r = e.getBoundingClientRect();
           return { square: e.dataset.square, phase: e.dataset.phase, left: r.left, right: r.right, top: r.top, bottom: r.bottom };
@@ -115,6 +120,8 @@ type Rec = {
   /** The Full Moon's cinematic, while it's up: each picture showing, "field" or "close", its frame and opacity. */
   cine: string[] | null;
   moments: string[];
+  /** Whether a tap on the board's middle would land on the cinematic (its field takes taps while it's up). */
+  tapCine: boolean | null;
   beams: { square: string; phase: string; left: number; right: number; top: number; bottom: number }[];
   phase: string | null;
   stunned: string[];
@@ -294,6 +301,11 @@ test("Moo & Moon: the Full Moon warns, its cinematic plays (the field, the close
   expect(shown.has("close:4") && shown.has("close:8"), `the close-up, eyes normal then white: ${[...shown]}`).toBe(true);
   const firstWhite = cine.find((c) => c.pics.includes("close:8:1"))!.i;
   expect(cine.some((c) => c.i > firstWhite && c.pics.some((p) => p.startsWith("field:") && p.endsWith(":1"))), "back to the field after the close-up").toBe(true);
+  // (While the field is up, a tap on the board reaches the field, never the hidden board; on the hops and after, the board.)
+  const fieldUp = cine.filter((c) => c.pics.some((p) => p.startsWith("field:") && p.endsWith(":1")));
+  expect(fieldUp.length).toBeGreaterThan(10);
+  expect(fieldUp.every((c) => rec[c.i]!.tapCine), "the field takes the taps").toBe(true);
+  expect(rec.filter((r) => !r.cine && r.phase === "play").every((r) => r.tapCine === false), "the board takes them again after").toBe(true);
   const cineEnd = cine.at(-1)!.i;
   const flurryOn = rec.findIndex((r) => r.moments.includes("pm-flurry"));
   expect(flurryOn, "the cinematic is gone before the flurry").toBeGreaterThan(cineEnd);
