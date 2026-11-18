@@ -1,3 +1,4 @@
+- Nov 18 ~04:45 UTC: Eric: Big Boy (b) yes; payments design v2 approved (merging #772 docs); Stripe later this week; more boss updates coming. Queue (xhigh, alone, after ginger fixes + thinking-moments): bigboy-powerturn; then payments build PRs 2-3; PR1 prices (medium) can pair.
 - Nov 18 ~04:40 UTC: review/ginger: no rule/sync bug; 3 visual fixes -> helper on #787; finding 4 (thinking moments replay on draw, shared) -> separate helper claude/thinking-moments-draw.
 - Nov 18 ~04:35 UTC: Ginger merged main, both features kept -> #787 (0b32828), CI + review (session_01JuCWRsEpu6jJvZ6b1J6jHN) watched. Note: bigboy.spec:144 flaked once locally (scattered block still on c4 5 s after new tower) - watch main.
 - Nov 18 ~04:30 UTC: #786 chat float fix merged 1bd2caa; deploy + main watched. Ginger .done but conflicts with main (#784): helper resolving (session_01JuCWRuej8R44hTFo3nyns5); then review pass.

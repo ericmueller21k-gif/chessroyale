@@ -70,3 +70,7 @@ Still open (round 3 calls 1-3): play coins in every mode; 1 crate a level; the l
 - Prices: crates 50-75 fine "as long as it's something we can easily tweak later ... run some simulation or look at what the average
   game does". 1 crate a level: yes. New quest reward: a "crate bonus": your next 5 level-ups give double crates; drops occasionally
   from daily quests.
+
+## Eric, Nov 18 ~04:45 UTC (round 6)
+"everything with the payment stuff sounds like you've already answered it ... seems good how you have it" -> the design v2's six calls
+approved. Stripe account: "later this week" (test mode first). More boss updates coming from Eric.
