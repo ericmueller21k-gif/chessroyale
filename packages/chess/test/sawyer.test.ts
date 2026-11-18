@@ -514,8 +514,9 @@ describe("Sawyer's saw cuts", () => {
         judged++;
       }
       // His own move didn't cross it either, while it was there.
-      const last = r.boards.get(0)!.lastMove!;
-      if (cut && cut.until >= r.boss!.crowdMoves) expect(cutStops(last, cut)).toBe(false);
+      const board = r.boards.get(0)!;
+      const last = board.lastMove!;
+      if (cut && cut.until >= r.boss!.crowdMoves) expect(cutStops(last, cut, fenAtPly(board.history, board.history.length - 1, board.bases))).toBe(false);
     }
     const on = seen.filter((s) => s.cut).map((s) => s.turn);
     expect(on.slice(0, 9)).toEqual([3, 4, 5, 7, 8, 9, 11, 12, 13]);
@@ -540,11 +541,11 @@ describe("Sawyer's board saw", () => {
     const fen = "r3k2r/pppq1ppp/2n2n2/3pp3/3PP3/2N2N2/PPPQ1PPP/R3K2R w KQkq - 0 1";
     const allowed = crowdAllowed(bossWith(fen, { boardSaw: { at: 4, until: 8 } }), fen)!;
     expect(allowed.length).toBeGreaterThan(0);
-    for (const m of allowed) expect(sawnStops(m)).toBe(false);
+    for (const m of allowed) expect(sawnStops(m, fen)).toBe(false);
     expect(allowed).toContain("e1g1");
     expect(allowed).not.toContain("e1c1");
     const black = fen.replace(" w ", " b ");
-    for (const m of bossAllowed(bossWith(black, { boardSaw: { at: 4, until: 8 } }), black)!) expect(sawnStops(m)).toBe(false);
+    for (const m of bossAllowed(bossWith(black, { boardSaw: { at: 4, until: 8 } }), black)!) expect(sawnStops(m, black)).toBe(false);
   });
 
   it("knows which half favors him on material", () => {
@@ -599,7 +600,7 @@ describe("Sawyer's board saw", () => {
     await turn(r);
     expect(r.boss!.powers!.ultAt).toBe(3);
     expect(r.boss!.powers!.boardSaw).toEqual({ at: 3, until: 7 });
-    for (const m of r.crowdAllowed() ?? []) expect(sawnStops(m)).toBe(false);
+    for (const m of r.crowdAllowed() ?? []) expect(sawnStops(m, fenOf(r))).toBe(false);
     expect(r.bossView()!.powers!.boardSaw).toEqual({ at: 3, until: 7 });
     // The cut that was due on turn 3 waits a turn.
     expect(r.boss!.powers!.cut ?? null).toBeNull();
