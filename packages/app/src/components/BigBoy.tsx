@@ -1,10 +1,11 @@
 import { useLayoutEffect } from "preact/hooks";
-import { BLOCK, BOUNCE, SNACK, pieceAt, withPiece, withoutPiece } from "@chessroyale/chess";
+import { BLOCK, BOUNCE, POWER_FX, SNACK, STACK, TOPPLE, pieceAt, withPiece, withoutPiece } from "@chessroyale/chess";
 import type { BounceResult } from "@chessroyale/core";
 import { bounceShape } from "../characters/bigboy.ts";
 import { bossKit } from "../characters/kits.ts";
 import { pickLine } from "../characters/boss-beats.ts";
 import { animLength, blockItem, blockLetter, EFFECTS } from "../characters/power-art.ts";
+import { TOWER_BLOCKS } from "../characters/effects/bigboy-tower.ts";
 import type { BossView } from "../game.ts";
 import { BoardEffects, BossEffect, BossMoment, prewarm, prewarmSprite, type BoardItem } from "./BossEffect.tsx";
 import { squareXY } from "./GodKing.tsx";
@@ -317,7 +318,7 @@ export function SnackTime({ boss, since, now, orientation }: { boss: BossView; s
 const warmed = new Set<string>();
 /**
  * His powers' frames drawn ahead, a slice each animation frame (prewarm), from when his battle shows: the snack first
- * (it plays a few seconds in), then the toss and the toy block, then the bounce and its crash, so none of them stalls
+ * (it plays a few seconds in), then the toss, the toy block and his tower, then the bounce and its crash, so none of them stalls
  * a slow phone the first time it shows (.claude/LESSONS.md: "A stall the first time an effect shows").
  */
 export function prewarmBigBoy(name: string, look?: string): void {
@@ -329,42 +330,130 @@ export function prewarmBigBoy(name: string, look?: string): void {
   const fx = (n: keyof typeof EFFECTS) => Object.entries(EFFECTS[n].ch.anims).flatMap(([a, an]) => an.frames.map((_, i) => [a, i] as const));
   prewarm("blockFly", fx("blockFly"));
   prewarm("toyBlock", fx("toyBlock"));
+  prewarm("toyTower", fx("toyTower"));
   prewarm("bouncePuff", fx("bouncePuff"));
   prewarm("bounceCrash", fx("bounceCrash"));
 }
 
-// ---------------- His powers on screen: the toy block, the Big Bounce's moment ----------------
+// ---------------- His powers on screen: the tower, its blocks, the Big Bounce's moment ----------------
 
-/** When this device saw a toy block go (it puffs away from then, as the next turn begins). */
-const blockGone = new Map<string, number>();
-/** The last toy block each battle showed (so one that has just gone puffs away). */
-const blockLast = new Map<string, { square: string; until: number }>();
+
+/** Where block `k` (0: the bottom) of a tower on `square` is, in % of the board: its middle in the drawing (TOWER_BLOCKS, frame px). */
+function towerPoint(square: string, k: number, o: Orientation): Pt {
+  const c = centreOf(square, o);
+  const [bx, by] = TOWER_BLOCKS[Math.min(k, TOWER_BLOCKS.length - 1)]!;
+  // (The square is the frame's bottom 32 rows, columns 8 to 39: its middle at (24, 120).)
+  return { x: c.x + ((bx - 24) / 32) * 12.5, y: c.y + ((by - 120) / 32) * 12.5 };
+}
+
+/** The topple's beats for its i-th block (landing order): when it leaves the tower and when it lands, from the moment's start. */
+const flightOf = (i: number) => ({ off: TOPPLE.flyAt + i * TOPPLE.every, land: TOPPLE.flyAt + i * TOPPLE.every + TOPPLE.flight });
+
+/** The topple moment of the scatter on the board (the turn's, or the one your move made while he thinks), if one is playing. */
+const toppleMoment = (moments: readonly Moment[], p: NonNullable<BossView["powers"]>) =>
+  p.scatter ? (moments.find((m) => m.kind === "topple" && m.square === p.scatter!.from && m.by === p.scatter!.by) ?? null) : null;
+
 /**
- * Big Boy's toy block on the board: landing as his toss arrives (its moment), sitting while it lasts, and puffing away
- * once it's gone (as the turn after its last begins). One canvas over the board, under any banner, never taking a tap.
+ * The tower's drawing now (`toyTower`'s animation and since), or null: standing (`stand<N>`, its sway growing with its height,
+ * by the clock: the same phase everywhere); its new block landing as the turn's moment lands it (`add<N>`: the block moment's
+ * first, the stack moment's next); going over in its topple (`tip<N>`, ending empty).
  */
-function blockItems(boss: BossView, now: number, appearAt: (square: string) => number): BoardItem[] {
+function towerAnim(p: NonNullable<BossView["powers"]>, moments: readonly Moment[], now: number): { square: string; anim: string; then?: string; since: number } | null {
+  const tower = p.tower;
+  if (tower) {
+    const m = moments.find((x) => (x.kind === "stack" || x.kind === "block") && x.square === tower.square && now < x.at + x.ms);
+    if (m) {
+      const lands = m.at + (m.kind === "stack" ? STACK.landAt : BLOCK.landAt);
+      // (The block falls in for ADD_FALL ms before it clacks on: the clack as the toss lands it.)
+      const from = lands - ADD_FALL;
+      if (now < from) return m.kind === "stack" && tower.height > 1 ? { square: tower.square, anim: `stand${tower.height - 1}`, since: 0 } : null;
+      return { square: tower.square, anim: `add${tower.height}`, then: `stand${tower.height}`, since: from };
+    }
+    return { square: tower.square, anim: `stand${tower.height}`, since: 0 };
+  }
+  const sc = p.scatter;
+  const m = sc && toppleMoment(moments, p);
+  if (!sc || !m || now >= m.at + m.ms) return null;
+  const h = Math.min(10, Math.max(2, sc.height));
+  if (now < m.at + TOPPLE.tipAt) return { square: sc.from, anim: `stand${Math.max(1, sc.height)}`, since: 0 };
+  return { square: sc.from, anim: `tip${h}`, since: m.at + TOPPLE.tipAt };
+}
+/** How long an added block falls before it clacks on (its add animation's falling frames). */
+const ADD_FALL = 120;
+
+/** When this device saw each of his scattered blocks go (they puff away from then, as the crowd's move on their last turn is played). */
+const blocksGone = new Map<string, number>();
+/** The scattered blocks each battle showed last (so ones that have just gone puff away). */
+const blocksLast = new Map<string, { squares: readonly string[]; until: number }>();
+
+/**
+ * His scattered blocks on the board: each landing as its flight in the topple lands it (or simply there), sitting while they
+ * last, and puffing away once they've gone (as the crowd's move on their last turn is played: never into his reply after it). One canvas over the board, under any
+ * banner, never taking a tap. Each looks like his toy block always has.
+ */
+function scatterItems(boss: BossView, now: number, appearAt: (square: string) => number): BoardItem[] {
   const p = boss.powers;
   if (!p || p.passive !== "blocks") return [];
   const key = `${boss.id}:${boss.startMove}:${boss.board.generation}`;
-  const block = p.block ?? null;
   const out: BoardItem[] = [];
-  if (block) {
-    blockLast.set(key, { square: block.square, until: block.until });
-    const since = appearAt(block.square);
-    if (now >= since) out.push(blockItem(block.square, since ? "land" : "sit", since));
+  if (p.scatter?.squares.length) {
+    blocksLast.set(key, { squares: p.scatter.squares, until: p.scatter.until });
+    for (const sq of p.scatter.squares) {
+      const since = appearAt(sq);
+      if (now >= since) out.push(blockItem(sq, since ? "land" : "sit", since));
+    }
   } else {
-    const last = blockLast.get(key);
-    if (last && last.until < p.turn) {
-      const tag = `${key}:${last.square}:${last.until}`;
-      let at = blockGone.get(tag);
-      if (at === undefined) blockGone.set(tag, (at = now));
-      if (now < at + POOF_MS()) out.push(blockItem(last.square, "poof", at));
+    const last = blocksLast.get(key);
+    if (last && last.until <= p.turn) {
+      const tag = `${key}:${last.squares.join()}:${last.until}`;
+      let at = blocksGone.get(tag);
+      if (at === undefined) {
+        blocksGone.set(tag, (at = now));
+        if (blocksGone.size > 20) blocksGone.delete(blocksGone.keys().next().value!);
+      }
+      if (now < at + POOF_MS()) for (const sq of last.squares) out.push(blockItem(sq, "poof", at));
     }
   }
   return out;
 }
 const POOF_MS = () => animLength(EFFECTS.toyBlock.ch.anims.poofA!);
+
+/** The blocks in the air in a topple: each from its place in the tower to its square, a short lob, tumbling (nearest first). */
+function ToppleFlights({ moment, from, squares, now, orientation }: { moment: Moment; from: string; squares: readonly string[]; now: number; orientation: Orientation }) {
+  return (
+    <>
+      {squares.map((sq, i) => {
+        const f = flightOf(i);
+        const at = moment.at + f.off;
+        if (now < at || now >= moment.at + f.land) return null;
+        const pt = towerPoint(from, i, orientation);
+        return <Flight key={`tf-${sq}`} name="blockFly" anim={`fly${blockLetter(sq)}`} square={sq} orientation={orientation} since={at} ms={TOPPLE.flight} from={pt} />;
+      })}
+    </>
+  );
+}
+
+/** When this device first saw each topple your move made (it plays while he thinks, from then). */
+const toppleSeen = new Map<string, number>();
+/**
+ * The topple your move just made (your piece onto his tower), as a moment of his thinking screen, from when this device first
+ * saw it: the tower going over, its blocks flying out to their squares, his line. None when your move toppled nothing.
+ */
+export function yourTopple(boss: BossView, now = Date.now()): Moment[] {
+  const p = boss.powers;
+  if (boss.id !== "bigboy" || !p?.scatter) return [];
+  return p.events
+    .filter((e) => e.kind === "topple" && e.by === "crowd" && e.turn === p.turn)
+    .map((e): Moment => {
+      const key = `${boss.id}:topple:${e.turn}:crowd:${e.square}`;
+      let at = toppleSeen.get(`${boss.startMove}:${key}`);
+      if (at === undefined) {
+        toppleSeen.set(`${boss.startMove}:${key}`, (at = now));
+        if (toppleSeen.size > 20) toppleSeen.delete(toppleSeen.keys().next().value!);
+      }
+      return { kind: "topple", key, at, ms: POWER_FX.topple, ...(e.square ? { square: e.square } : {}), squares: e.squares ?? [], by: "crowd", ...(e.height ? { height: e.height } : {}) };
+    });
+}
 
 function blockMoment({ moment, t, orientation, banner, cast }: MomentProps) {
   const letter = moment.square ? blockLetter(moment.square) : "A";
@@ -379,6 +468,20 @@ function blockMoment({ moment, t, orientation, banner, cast }: MomentProps) {
   );
 }
 
+/** One more block on his tower: his toss from the corner (the block drops onto the top as it lands: the board layer's add<N>). */
+function stackMoment({ cast }: MomentProps) {
+  return <div class="power-moment pm-stack">{cast("toss", STACK.flyAt)}</div>;
+}
+
+/** His tower toppling: the tower goes over and its blocks fly out (the board layer and ToppleFlights). */
+function toppleMomentView({ moment, now, orientation }: MomentProps) {
+  return (
+    <div class="power-moment pm-topple">
+      {moment.square && <ToppleFlights moment={moment} from={moment.square} squares={moment.squares ?? []} now={now} orientation={orientation} />}
+    </div>
+  );
+}
+
 function bounceMoment({ boss, moment, now, orientation, banner }: MomentProps) {
   return (
     <div class="power-moment pm-bounce">
@@ -388,6 +491,9 @@ function bounceMoment({ boss, moment, now, orientation, banner }: MomentProps) {
   );
 }
 
+/** His tower's lines as it grows (Nov 18): at 3, 6 and 9 blocks, and its wobble at 10. */
+const STACK_BEATS: Partial<Record<number, "stack3" | "stack6" | "stack9" | "wobble">> = { 3: "stack3", 6: "stack6", 9: "stack9", 10: "wobble" };
+
 /** Big Boy's powers on screen. His rules: packages/chess/src/bosses/bigboy.ts. */
 export const BIGBOY_UI = {
   id: "bigboy",
@@ -395,17 +501,38 @@ export const BIGBOY_UI = {
   ultimate: { name: "the Big Bounce", when: "After your move" },
   moments: {
     block: { order: 0, kit: "power", appearAt: (m, square) => (m.square === square ? m.at + BLOCK.landAt : undefined), view: blockMoment },
+    stack: { order: 0, kit: "power", line: (kit, m) => (kit && m.height && STACK_BEATS[m.height] ? pickLine(kit, STACK_BEATS[m.height]!, m.key) : null), view: stackMoment },
+    topple: {
+      order: 0,
+      line: (kit, m) => (kit ? pickLine(kit, m.by === "crowd" ? "toppleYours" : "toppleHis", m.key) : null),
+      dock: (m) => (m.squares?.length ? "His blocks: nothing moves onto them or past them this turn." : null),
+      appearAt: (m, square) => {
+        const i = m.squares?.indexOf(square) ?? -1;
+        return i >= 0 ? m.at + flightOf(i).land : undefined;
+      },
+      view: toppleMomentView,
+    },
     // The Big Bounce, at the start of his turn before his move: its own screen.
     // (Its banner is its name alone: what it does to you, in the dock.)
     bounce: { order: 3, kit: "ultimate", dock: () => "Your pieces land on new squares.", own: (boss) => !!boss.powers?.bounce && boss.powers.bounce.at === boss.crowdMoves && boss.powers.events.some((e) => e.kind === "bounce"), view: bounceMoment },
   },
-  // His toy block: landing as his toss arrives, sitting while it lasts, puffing away as it goes.
-  board: ({ boss, orientation, now, appearAt }) => {
-    const blocks = blockItems(boss, now, appearAt);
+  // His tower under the pieces (it rises over the squares behind it; the pieces stay in view), his scattered blocks over the board
+  // (on empty squares), landing as their flights land, puffing away as they go.
+  board: ({ boss, p, orientation, now, moments, appearAt }) => {
+    const tower = towerAnim(p, moments, now);
+    const blocks = scatterItems(boss, now, appearAt);
     return {
+      under: tower && (
+        <div class="bb-under" aria-hidden="true">
+          <span class="bb-tower" style={onSquare(tower.square, orientation)} data-square={tower.square} data-anim={tower.anim}>
+            <BossEffect name="toyTower" anim={tower.anim} then={tower.then} since={tower.since} />
+          </span>
+        </div>
+      ),
       over: (
         <>
           {blocks.length > 0 && <BoardEffects items={blocks} orientation={orientation} class="pw-fire-board pw-block-board" />}
+          {p.tower && <span key={`tower-${p.tower.square}`} class="pw-block pw-tower" style={onSquare(p.tower.square, orientation)} data-square={p.tower.square} data-height={p.tower.height} />}
           {blocks.map((b) => (
             <span key={`block-${b.square}`} class="pw-block" style={onSquare(b.square, orientation)} data-square={b.square} data-state={b.anim!.replace(/[A-Z]$/, "")} />
           ))}

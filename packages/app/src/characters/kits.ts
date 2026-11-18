@@ -1090,7 +1090,7 @@ export const BOSS_KITS: Record<string, BossKit> = {
   },
   // Chandy (docs/decisions/2026-11-16-chandy-art.md, his rules 2026-11-16-chandy-rules.md): every moment at the rifle's stage now (his
   // locked pieces taken, 0-5: `stageOf`, each animation's `_sN` twin); he points at what he locks, every shot a fire. His sounds are
-  // placeholders from other packs until his own (CHANDY_CUES); his lines are placeholders for Eric.
+  // his own (chandy-sounds.ts, Nov 18); his lines are placeholders for Eric.
   Chandy: {
     // (His phone bar's fit: npx tsx scripts/bar-fit.ts.)
     barScale: 0.76,

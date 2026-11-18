@@ -572,7 +572,7 @@ export function warnThenUnleash(next: BossPowerState, t: TurnContext): boolean {
 export type BossLastMove = { move: string; san: string; staggered?: boolean; captured?: string; through?: StopReason };
 
 /** The power fields `BossRules.stopReason` reads: the same in the match's state and in the screens' view. */
-export type StopFields = Partial<Pick<BossPowerState, "cut" | "boardSaw" | "pies" | "block" | "crease" | "turn">> & {
+export type StopFields = Partial<Pick<BossPowerState, "cut" | "boardSaw" | "pies" | "tower" | "scatter" | "crease" | "turn">> & {
   camo?: { square: string | null } | null;
   garden?: { plants: readonly { square: string }[] } | null;
   hoops?: { blocks: readonly string[] } | null;

@@ -274,6 +274,45 @@ test("Big Boy on a slow phone: his snack, his toy block and the whole Big Bounce
   }
 });
 
+test("Big Boy's tower on a slow phone: a block dropping on (the 9th), its wobble at 10 and its topple (the tip, ten blocks flying out) stay within budget, the first time they show (Nov 18)", { tag: "@perf" }, async ({ page }) => {
+  test.skip(test.info().project.name !== "phone", "one run is enough (the phone, slowed)");
+  test.setTimeout(4 * 60_000);
+  await page.addInitScript(instrument);
+  // (?power=tower: his first tower 8 tall on turn 2; 9 and 10 on turns 3 and 4; it falls as turn 5 begins.)
+  await page.goto("/?debug&nolanding&clock=60&boss=bigboy&power=tower&laststand=0");
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send("Emulation.setCPUThrottlingRate", { rate: 4 });
+  await bossAloneFromHome(page);
+  const through = async (until: () => Promise<boolean>, ms = 60_000) => {
+    await page.evaluate(() => ((window as any).__perf.frames = []));
+    await expect.poll(until, { timeout: ms }).toBe(true);
+    return frameStats(((await page.evaluate(() => (window as any).__perf.frames.splice(0))) as [number][]).map((f) => f[0]));
+  };
+  // A quiet move, never onto his tower (that would knock it over).
+  const move = async () => {
+    await expect.poll(() => phase(page), { timeout: 60_000 }).toBe("play");
+    const { fen, allowed, tower } = await page.evaluate(() => ({ fen: (window as any).match.phase.board.fen as string, allowed: ((window as any).match.boss?.powers?.allowed ?? null) as string[] | null, tower: ((window as any).match.boss?.powers?.tower?.square ?? null) as string | null }));
+    const legal = new Chess(fen).moves({ verbose: true }).filter((m) => !m.captured && m.to !== tower && (!allowed || allowed.includes(m.from + m.to)));
+    await page.evaluate((uci) => (window as any).match.submit(uci), legal[0]!.from + legal[0]!.to);
+    await expect.poll(() => phase(page), { timeout: 20_000 }).not.toBe("play");
+  };
+  await move();
+  await expect.poll(() => phase(page), { timeout: 60_000 }).toBe("play");
+  await move();
+  const stack = await through(() => phase(page).then((p) => p === "play"));
+  await move();
+  const wobble = await through(() => phase(page).then((p) => p === "play"));
+  await move();
+  const topple = await through(() => phase(page).then((p) => p === "play"));
+  const powers = await page.evaluate(() => (window as any).match.boss.powers);
+  expect(powers.scatter?.by).toBe("boss");
+  console.log(`Big Boy's tower (slowed phone): 9th block ${f(stack)}; 10th and its wobble ${f(wobble)}; topple (${powers.scatter.squares.length} blocks) ${f(topple)}`);
+  for (const [what, s] of [["stack", stack], ["wobble", wobble], ["topple", topple]] as const) {
+    expect(s.p95, `${what}: 95th percentile frame (ms)`).toBeLessThan(50);
+    expect(s.slow, `${what}: share of dropped frames`).toBeLessThan(0.15);
+  }
+});
+
 test("Sawyer on a slow phone: the split, the board saw and his first saw cut stay within budget, the first time they show", { tag: "@perf" }, async ({ page }) => {
   test.skip(test.info().project.name !== "phone", "one run is enough (the phone, slowed)");
   test.setTimeout(4 * 60_000);

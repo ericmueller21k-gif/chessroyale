@@ -1264,7 +1264,7 @@ export const CHANDY_CLONE: Character = {
 export const cloneMuzzle = (pose: "level" | "down"): Pt => build(5, CLONE_POSES[pose]).muzzle;
 
 /**
- * His sound cues and what each should sound like (the sound pack comes with the rules job; `sounds` in his kit maps each to a sound).
+ * His sound cues and what each should sound like (his pack: chandy-sounds.ts; `sounds` in his kit maps each to a sound: CHANDY_SOUNDS).
  * Figure: lock, unsling, aim, fire, stow. Clones: teleport, appear, fade. Board art (effects/chandy.ts): lock, unlock, spark, fizz,
  * scatter, beam, beamOff, shield, pop, zap, clear, aim, aimOff, whoosh, shatter, flash, blast.
  */
@@ -1300,38 +1300,41 @@ export const CHANDY_CUES: Readonly<Record<string, string>> = {
 };
 
 /**
- * His cues' sounds until his own pack comes (placeholders from other bosses' packs, the nearest in feel; CHANDY_CUES says what each
- * should be). The figure's and the clones' cues and his board art's (power-art.ts EFFECTS uses the same map).
+ * His cues' sounds, all his own (characters/chandy-sounds.ts: Eric, Nov 18, "I think I noticed a big boy sound reused in chandy, can't
+ * do that"; "pulse style sounds"). The figure's and the clones' cues and his board art's (power-art.ts EFFECTS uses the same map).
+ * Where cues share a sound: the aim's hum off is the beam's hum off; the board's shatter (his queen shot) is Dodge's king shatter.
+ * The upgrade window's sound is here for when the window plays one (it doesn't yet).
  */
 export const CHANDY_SOUNDS: Record<string, SoundName> = {
-  lock: "hollowTick",
-  unlock: "hollowTick",
-  unsling: "pigDraw",
-  aim: "mooHum",
-  fire: "mooZap",
-  stow: "bigboyClack",
-  teleport: "gingerWhoosh",
-  appear: "hopperPop",
-  fade: "hollowFizz",
-  spark: "grexSparkle",
-  fizz: "grexFizz",
-  scatter: "gingerBurst",
-  beam: "mooBeam",
-  beamOff: "mooFizz",
-  shield: "mooShimmer",
-  pop: "hopperPop",
-  zap: "mooZap",
-  clear: "gardenerChime",
-  aimOff: "hollowTick",
-  whoosh: "gingerWhoosh",
-  shatter: "sawyerCrack",
-  flash: "hollowTick",
-  blast: "gingerBlast",
+  lock: "chandyLock",
+  unlock: "chandyUnlock",
+  unsling: "chandyUnsling",
+  aim: "chandyCharge",
+  fire: "chandyShot",
+  stow: "chandyStow",
+  teleport: "chandyCloak",
+  appear: "chandyDecloak",
+  fade: "chandyFade",
+  spark: "chandySpark",
+  fizz: "chandyStatic",
+  scatter: "chandyScatter",
+  beam: "chandyHum",
+  beamOff: "chandyHumOff",
+  shield: "chandyShield",
+  pop: "chandyPop",
+  zap: "chandyZaps",
+  clear: "chandyClear",
+  aimOff: "chandyHumOff",
+  whoosh: "chandyRound",
+  shatter: "chandyShatter",
+  flash: "chandyAlarm",
+  blast: "chandyBlast",
+  upgrade: "chandyUpgrade",
 };
 
 /**
- * Dodge's beams and hits (Eric, Nov 16): their own sounds by name (sound.ts: placeholders until Eric's: a proton laser for the beams),
- * over his other cues. The flash keeps his.
+ * Dodge's beams and hits (Eric, Nov 16): their own sounds by name (chandy-sounds.ts: a heavy laser for the beams, Nov 18), over
+ * his other cues. The flash keeps his.
  */
 export const CHANDY_DODGE_SOUNDS: Record<string, SoundName> = { ...CHANDY_SOUNDS, laser: "chandyBeam", crack: "chandyCrack", crackle: "chandyCrackle", kingShatter: "chandyShatter" };
 

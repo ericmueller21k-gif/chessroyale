@@ -19,6 +19,9 @@
  *   from his hand (PIG_INTRO_HANDS) to wherever the loop has flown.
  * - `yank` (loops, 4 x 120 ms): heels dug in, leaning back to our right, both fists on the rope low on our left, a heave
  *   every other frame (cue `yank` on f0 and f2, a shake, dust off his heels). Code drags the bale while it plays.
+ * - `reel` (loops, 4 x 120 ms; Nov 18, Eric: "when he wrangles the chessboard, it still looks weird"): once the bale has slid past him
+ *   to his right he turns to it, both fists on the rope low on our right, leaning back to our left (cue `yank` on f0 and f2, as the
+ *   yank's). Its rope leaves his front fist, the coil arm's (PIG_INTRO_HANDS.reel).
  * - `crossThrow` (once, 10 frames, 1.03 s): he shakes his coil out into a second loop (cue `windup` f0), spins both overhead,
  *   crosses his arms and throws both at once, one each way (cue `throw` f7): his right arm (the lasso, on our left)
  *   across to our right, his left (on our right) across to our left; he holds them out, crossed. From f8 both ropes are
@@ -79,9 +82,10 @@ const grip = (p: PigPose, fist: Pt): Pt => [OX + fist[0] + (p.lean ?? 0), OY + f
 
 const HANDS: Record<string, (Pt | null)[]> = {};
 const HANDS2: Record<string, (Pt | null)[]> = {};
-/** Builds an animation, noting each frame's grips: `h1` the lasso arm's (his right, on our left), `h2` the other's. */
-function anim(name: string, loop: boolean, frames: { ms: number; p: PigPose; extra?: Partial<Frame>; h1?: boolean; h2?: boolean }[]): Anim {
-  HANDS[name] = frames.map((f) => (f.h1 && f.p.fistL ? grip(f.p, f.p.fistL) : null));
+/** Builds an animation, noting each frame's grips: `h1` the lasso's rope (his lasso arm's, his right, on our left; or `"R"`), `h2` the other's. */
+function anim(name: string, loop: boolean, frames: { ms: number; p: PigPose; extra?: Partial<Frame>; h1?: boolean | "R"; h2?: boolean }[]): Anim {
+  // (`h1: "R"`: the lasso's rope leaves his other fist, the coil arm's, when that one leads on it: the reel, both hands on the rope.)
+  HANDS[name] = frames.map((f) => (f.h1 === "R" ? (f.p.fistR ? grip(f.p, f.p.fistR) : null) : f.h1 && f.p.fistL ? grip(f.p, f.p.fistL) : null));
   HANDS2[name] = frames.map((f) => (f.h2 && f.p.fistR ? grip(f.p, f.p.fistR) : null));
   return { loop, frames: frames.map((f) => fr(f.ms, f.p, f.extra)) };
 }
@@ -113,6 +117,21 @@ const yank = lazyAnim(() => anim("yank", true, [
   { ms: 120, p: YANK_HEAVE, extra: { specks: [...dust([6, 70], 1), ...dust([60, 70], 1)] }, h1: true },
   { ms: 120, p: YANK_GRIP, extra: { cue: "yank", shake: [1, 0], specks: dust([6, 70], 2) }, h1: true },
   { ms: 120, p: { ...YANK_GRIP, mood: "grit" }, h1: true },
+]));
+
+// ---- reel (Nov 18, redrawn by the API: claude/boss-art scripts/boss-art/out/pig-redraw): the bale now past him on our RIGHT (the
+// drag's second part, from CHALLENGE_FEEL.rope.reelAt): he looks at it, leans back to our left, heels dug in, both fists low on our
+// right, the rope running off to our right from his front fist (his coil arm's: `h1: "R"`); a short piece of it between his fists and
+// its end hanging from his back fist are his (`hold`). The yank's beat: a heave every other frame (cue `yank` f0 and f2).
+
+const REEL_ARMS: PigPose = { look: "right", fistR: [66, 50], elbowR: [60, 48], fistL: [57, 48], elbowL: [44, 51], loop: null, coil: null, hold: true, front: true, feet: { l: [-1, 0], r: [3, 0] } };
+const REEL_HEAVE: PigPose = { ...REEL_ARMS, mood: "grit", lean: -3, bob: 2, headDx: -1 };
+const REEL_GRIP: PigPose = { ...REEL_ARMS, mood: "fierce", lean: -1, bob: 1 };
+const reel = lazyAnim(() => anim("reel", true, [
+  { ms: 120, p: REEL_HEAVE, extra: { cue: "yank", shake: [-1, 0], specks: [...dust([72, 70], 0), ...dust([18, 70], 0)] }, h1: "R" },
+  { ms: 120, p: REEL_HEAVE, extra: { specks: [...dust([72, 70], 1), ...dust([18, 70], 1)] }, h1: "R" },
+  { ms: 120, p: REEL_GRIP, extra: { cue: "yank", shake: [-1, 0], specks: dust([72, 70], 2) }, h1: "R" },
+  { ms: 120, p: { ...REEL_GRIP, mood: "grit" }, h1: "R" },
 ]));
 
 // ---- crossThrow: the coil shaken out into a second loop, both spun up, arms crossed, both thrown at once, one each way.
@@ -170,7 +189,7 @@ export const BOSS_PIG_INTRO: Character = {
   ...PIG,
   id: "pig-intro",
   name: "Wrangler (his intro)",
-  anims: { idle, spin, throw: throwA, yank, crossThrow, doubleYank, brag },
+  anims: { idle, spin, throw: throwA, yank, reel, crossThrow, doubleYank, brag },
 };
 
 /**

@@ -129,7 +129,13 @@ const AUDIT: Record<string, { on: Record<string, Patch>; off: Patch } | { none: 
     off: () => ({ fire: [], candle: null }),
   },
   hollow: { on: { "a square in the dark": (f) => ({ dark: [{ square: crowdPiece(f), at: 1, until: 3 }] }) }, off: () => ({ dark: [] }) },
-  bigboy: { on: { "a toy block": (f) => ({ block: { square: emptyTarget(f), at: 1, until: 3 } }) }, off: () => ({ block: null }) },
+  bigboy: {
+    on: {
+      "his tower": (f) => ({ tower: { square: emptyTarget(f), height: 3, at: 1 } }),
+      "his scattered blocks": (f) => ({ scatter: { from: "a8", height: 1, squares: [emptyTarget(f)], by: "boss", at: 1, until: 3 } }),
+    },
+    off: () => ({ tower: null, scatter: null }),
+  },
   pig: {
     on: { "the turn after his lasso drag": () => ({ drag: { turn: 1, from: "c2", to: "c2", piece: "p" } }) },
     off: () => ({ drag: null, showdown: null, pull: null }),
