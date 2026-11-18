@@ -422,7 +422,7 @@ a style to write in. Its frame is kept (tempo, keys, chords, patches, sections, 
   - 92 bars, 2:16: under his 2:30 to 2:45, since the slow middle was what carried it there. Told him; his call.
   - Measured: the duel has most of its energy between 1 and 2 kHz (three high voices at once): the risk is shrill.
 
-## The battle tower (Nov 18, song_ak.py): sent, no verdict yet
+## The battle tower, first go (Nov 18, song_ak.py): thrown out; shelved, maybe a defeat song
 
 "A simple 1 minute looping beat that is a slower pace designed for the new battle tower ... really just background
 noise like the town song, but needs to have a more serious feel to it, slow is good here, not too many high note hits
@@ -439,4 +439,24 @@ written here.
   0-60 Hz band of anything low and slow against the town's.
 - Measured: -16.0 LUFS, peak about -1.8 dBFS, 60.00 s, its eight two-bar spans within 1 dB of each other, the seam
   clean. Not handed over: the tower isn't named in the game's files yet.
+- His verdict: "wtf this is depressing as shit, shelve this for a defeat song maybe, can you try again, think more like
+  fight scene build up game style, maybe that's what I should a started with, discard the original dark vision".
+  It did what the brief said (slow, serious, dark, eerie, low), and that was the trouble: every one of those words
+  pulls the same way, and together they made a dirge. A place players stand in before a fight wants forward motion
+  whatever its mood. Kept as it is, for a defeat screen if he wants one.
+
+## The battle tower, second go (Nov 18, song_al.py): sent, no verdict yet
+
+"Think more like fight scene build up game style ... discard the original dark vision." Still one minute, still a
+loop, still the tower's background. Written here.
+- 128 beats a minute, 32 bars, 60.0 s. C minor, but two of its four chords are major (Cm, Cm, A flat, B flat) and the
+  tune leaps a fifth and climbs.
+- It builds: a layer every eight bars. The pulse (low strings and violas in 8ths, a kick, timpani); the short
+  strings' 16ths, hats, a snare on 3, the horns' tune; the low drums and held strings, trumpets over the tune; then
+  everything, the snare on 2 and 4, the trumpets' rise, and two bars on G with a roll. The loop's first bar is the
+  pulse again.
+- One accent runs through the low strings, the low drums and the kick: three, three, two.
+- Measured: -16.0 LUFS, peak -1.0 dBFS, 60.00 s. It climbs 4.4 dB from its first eight bars to its last (the first
+  render climbed 7, and its opening was nearly all under 250 Hz: the violas' pulse was added for small speakers).
+- Not handed over.
 
