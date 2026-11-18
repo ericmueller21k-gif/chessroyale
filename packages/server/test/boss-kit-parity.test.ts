@@ -274,11 +274,12 @@ describe("the boss kit: solo and online agree", () => {
     expect(local.result).toBe(net.result);
   }, 60_000);
 
-  it("chandy, no switch: his first capture's lock (the host's move, then the lock moment, then the move) is the same solo and online", async () => {
+  it("chandy, no switch: his first two captures' locks (the host's move, then the lock moment, then the move) are the same solo and online", async () => {
     const { trace: net, start } = await online("chandy", "");
     const local = await solo(start);
     const firsts = [...net.events].filter((e) => e.includes('"kind":"lockOn"') && e.includes('"first":true'));
-    expect(firsts.length).toBe(1);
+    // (His first two captures each locked as the move shows: Eric, Nov 18.)
+    expect(firsts.length).toBe(BOSS_POWERS.chandy.teachCaptures);
     expect(local.turns).toEqual(net.turns);
     expect({ onlyOnline: [...net.events].filter((e) => !local.events.has(e)), onlySolo: [...local.events].filter((e) => !net.events.has(e)) }).toEqual({ onlyOnline: [], onlySolo: [] });
     expect(local.result).toBe(net.result);

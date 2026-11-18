@@ -35,6 +35,15 @@ it was rare because it was one random pick among four or five every sixth move, 
 before: 10 battles each, within noise). A stand-in engine's 80 battles (both sides, before) had 66 picks of 834 that couldn't land,
 19 of 30 repeats breaking the rule: the fallback was a random other move, his last one included.
 
+**Run F (Nov 18, Eric's two changes; docs/decisions/2026-11-18-chandy-move-mix.md):** his first two captures each locked and an
+upgrade (`teachCaptures` 2), and the queen lock his first unlock while you have a queen (`queenLockFirst`). 5 battles each on seeds
+11 to 14, no switches; before: run E's after rows (seeds 11, 12) and `raid-teachBeforeN13/14`; after: `raid-teachAfterN11-14`.
+
+| Run F (20 battles each) | Upgrade 1 / 2 / 3 / 5 (median crowd move) | 5 upgrades | Queen lock first unlock | Queen lock aimed | Pass guard waits | Crowd: draws / boss wins |
+|---|---|---|---|---|---|---|
+| Before | 6.5 / 15.5 / 21.5 / 25.5 | 18 | 3 | 6 times, in 5 battles (0.3 a battle) | 4 | 2 / 18 |
+| After | 8 / **11** / **18.5** / 27 | 18 | **20** | **18 times, in 14 battles (0.9 a battle)** | 12 | 2 / 18 |
+
 ## How: the raid sim
 
 `npx tsx packages/sim/scripts/boss-sim.ts raid chandy 8 <seed> 0 <tag>`, four processes side by side (seeds 11 to 14); a crowd of
