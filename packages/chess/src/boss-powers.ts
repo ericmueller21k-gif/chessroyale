@@ -50,6 +50,8 @@ import { bossRules } from "./bosses/index.ts";
 export { bossPowers, heldIn, materialOf, moveLoss, moveSquares, powerRoll, rageNow, ragePoints, rageSpeedOf, rageTick, topEach, unleashed };
 // (The pass guard: one rule for every power that spends his whole turn.)
 export { PASS_WAIT, passAnswer, passLoses, passScores, type PassScore } from "./bosses/base.ts";
+// The board layer (every boss's marks at once: board-layer.ts).
+export * from "./board-layer.ts";
 export type { Battle, BossAsks, BossLastMove, BossRules, JudgedEvaluation, JudgedMove, RageRates, StopFields, TurnContext };
 export * from "./bosses/ginger.ts";
 export * from "./bosses/boingo.ts";

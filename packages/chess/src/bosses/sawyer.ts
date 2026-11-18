@@ -17,6 +17,7 @@
  */
 import { BOSS_POWERS, type BossPowerState, type BossState, type SawCut, type SplitPawn } from "@chessroyale/core";
 import { BOSS_OPENING, newBoard } from "../boards.ts";
+import { moveEdges } from "../board-layer.ts";
 import { legalMoves, pieceAt, withPiece } from "../rules.ts";
 import { VALUE, crowdHalf, from, meterFull, other, powerRoll, testSwitch, to, turnOf, type Battle, type BossRules, type Side, type TurnContext } from "./base.ts";
 
@@ -176,32 +177,7 @@ export const halfPawns = (boss: Pick<BossState, "powers"> | null | undefined): S
 
 // ---------------- The cuts ----------------
 
-/** An edge between two orthogonally neighboring squares, in order (the lower file first, or the lower rank on one file). */
-export function edgeOf(s1: string, s2: string): { a: string; b: string } {
-  return file(s1) < file(s2) || (file(s1) === file(s2) && rank(s1) < rank(s2)) ? { a: s1, b: s2 } : { a: s2, b: s1 };
-}
-
-/**
- * The edges a move crosses straight on its way: every edge between the squares of a slide along a rank or file (a
- * rook, a queen, a king's step, a pawn's push or double step), and a castling king's way on to his rook's corner (the
- * king's path and the rook's, as Big Boy's toy block counts it; `fen` says it's a king). A diagonal move passes at the
- * corners and a knight jumps: neither crosses an edge.
- */
-export function moveEdges(move: string, fen?: string): { a: string; b: string }[] {
-  const a = from(move);
-  const b = to(move);
-  const df = file(b) - file(a);
-  const dr = rank(b) - rank(a);
-  if (df !== 0 && dr !== 0) return [];
-  let end = b;
-  if (fen && dr === 0 && Math.abs(df) === 2 && pieceAt(fen, a)?.type === "k") end = square(df > 0 ? 7 : 0, rank(a));
-  const n = Math.max(Math.abs(file(end) - file(a)), Math.abs(rank(end) - rank(a)));
-  const sf = Math.sign(file(end) - file(a));
-  const sr = Math.sign(rank(end) - rank(a));
-  const out: { a: string; b: string }[] = [];
-  for (let k = 0; k < n; k++) out.push(edgeOf(square(file(a) + sf * k, rank(a) + sr * k), square(file(a) + sf * (k + 1), rank(a) + sr * (k + 1))));
-  return out;
-}
+// (The edges' geometry, edgeOf and moveEdges, lives in the board layer: board-layer.ts.)
 
 /** A saw cut stops a move: it crosses the cut's edge straight (moveEdges). It never stops an attack. */
 export const crossesCut = (move: string, cut: Pick<SawCut, "a" | "b"> | null | undefined, fen?: string): boolean =>
