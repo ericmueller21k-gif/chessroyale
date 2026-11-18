@@ -3,7 +3,7 @@ import { hapticOnce } from "../haptics.ts";
 import { KING_ATTACK, SNACK, bossIntroTimeline, bossRules, fenAtPly, inCheck, pieceAt, withPiece } from "@chessroyale/chess";
 import { BLIZZARD, BURN, BossBarExtra, CANDLE, FUNHOUSE, FireBurn, HOLLOW_CASTER, THAW, angleView, dockLine, noMoveLine, PowerBoard, PowerMoment, RageMeter, funhouseView, mateMomentsOf, momentAt, momentsOf, thawOver, useMomentSpeech } from "../components/BossPowers.tsx";
 import { BossMoment } from "../components/BossEffect.tsx";
-import { SnackTime, bounceFen, bounceJolt, snackPawnShown } from "../components/BigBoy.tsx";
+import { SnackTime, bounceFen, bounceJolt, snackPawnShown, yourTopple } from "../components/BigBoy.tsx";
 import { boardSawJolt, splitFen, splitStill } from "../components/Sawyer.tsx";
 import { SHOWDOWN_KING_AT, pigBoard } from "../components/Pig.tsx";
 import { alfilFen, alfilJolt, earlyLanding } from "../components/Alfil.tsx";
@@ -282,12 +282,12 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
   // Boss powers: the moments that come as the turn passes to the crowd (after the boss's move), or the funhouse's own.
   // (Beaten, the Hidden Boss's fall: the board holds while he collapses; no moment of the last turn plays again.)
   // (While he thinks, only Alfil's pieces coming down early, at the start of his turn: earlyLanding; a carrot of Chub &
-  // Chirp's your move just pulled: yourPulls; Smudgy's hidden rook your move just took: rookTakenMoment; Moo's Full Moon,
+  // Chirp's your move just pulled: yourPulls; Big Boy's tower your move knocked over: yourTopple; Smudgy's hidden rook your move just took: rookTakenMoment; Moo's Full Moon,
   // as your move lands: fullMoonMoment; Folio's fold and Revision, as your move lands: folioMoments; and Dash's pop-off: popOffMoments.)
   const moments = useMemo(() => {
     if (intro || victim || fall) return [];
     if (mating) return mateMomentsOf(boss, until);
-    if (thinking) return lights || rush || dodge ? [] : [earlyLanding(boss), ...yourPulls(boss), ...rookTakenMoment(boss), ...fullMoonMoment(boss), ...folioMoments(boss), ...popOffMoments(boss), ...zebraTurnMoments(boss), ...chandyTurnMoments(boss)].filter((m) => m !== null);
+    if (thinking) return lights || rush || dodge ? [] : [earlyLanding(boss), ...yourPulls(boss), ...yourTopple(boss), ...rookTakenMoment(boss), ...fullMoonMoment(boss), ...folioMoments(boss), ...popOffMoments(boss), ...zebraTurnMoments(boss), ...chandyTurnMoments(boss)].filter((m) => m !== null);
     return momentsOf(boss, until);
   }, [boss.board.fen, boss.powers?.events.length, until, thinking, intro, victim, mating, fall]);
   // (Moo's daze: he's drawn powered up until its `calm`, noted from the moment's start.)

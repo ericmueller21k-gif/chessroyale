@@ -37,7 +37,8 @@ describe("the dock's words", () => {
     expect(refusedLine({ id: "sawyer", powers: { boardSaw: { at: 3, until: 7 } } }, OPEN, "d2g5")).toBe("The board saw blocks that move.");
     expect(refusedLine({ id: "sawyer", powers: { cut: { a: "d2", b: "d3", at: 3, until: 5 } } }, OPEN, "d2d3")).toBe("The saw cut blocks that move.");
     expect(refusedLine({ id: "clown", powers: { pies: [{ square: "d3", until: 4 }] } }, AFTER_E4_E5, "d2d3")).toBe("A pie blocks that square.");
-    expect(refusedLine({ id: "bigboy", powers: { block: { square: "f3", at: 2, until: 4 } } }, AFTER_E4_E5, "g1f3")).toBe("A toy block is in the way.");
+    expect(refusedLine({ id: "bigboy", powers: { tower: { square: "f3", height: 1, at: 2 } } }, AFTER_E4_E5, "g1f3")).toBe("A toy block is in the way.");
+    expect(refusedLine({ id: "bigboy", powers: { scatter: { from: "g3", height: 3, squares: ["f3"], by: "boss", at: 2, until: 2 } } }, AFTER_E4_E5, "g1f3")).toBe("A toy block is in the way.");
     expect(refusedLine({ id: "gingerbread", powers: { iced: ["g1"] } }, AFTER_E4_E5, "g1f3")).toBe("That piece is frozen.");
     expect(refusedLine({ id: "gingerbread", powers: { iced: ["h1"] } }, "k6r/8/8/8/8/8/5N2/4K2R w K - 0 20", "e1g1")).toBe("That piece is frozen.");
     expect(refusedLine({ id: "gingerbread", barred: "g1f3", powers: {} }, AFTER_E4_E5, "g1f3")).toBe("The God King took that move back.");

@@ -424,7 +424,7 @@ export const POWER_MOMENTS: Record<string, BossPowerMoments> = {
     },
   },
   "Big Boy": {
-    power: { anim: "toss", hit: "toss", effects: ["blockFly", "toyBlock"] },
+    power: { anim: "toss", hit: "toss", effects: ["blockFly", "toyBlock", "toyTower"] },
     ultimateWarn: { anim: "wail" },
     ultimate: { anim: "bigBounce", hit: "crash", onBoard: true, effects: ["bouncePuff", "bounceCrash"] },
     more: {
@@ -571,6 +571,8 @@ export const EFFECTS: Record<EffectName, Effect> = {
   lashHit: { ch: EFFECT_SPRITES.lashHit, covers: "square", start: "hitFL0", sounds: {} },
   toyBlock: { ch: EFFECT_SPRITES.toyBlock, covers: "square", start: "landA", loop: "sitA", end: "poofA", sounds: { clack: "bigboyClack", poof: "bigboyPoof" } },
   blockFly: { ch: EFFECT_SPRITES.blockFly, covers: "square", loop: "flyA", sounds: {} },
+  // (Big Boy's tower, Nov 18: one square's width and a half, four squares and a quarter tall; the square is its bottom 32 rows.)
+  toyTower: { ch: EFFECT_SPRITES.toyTower, covers: "strip", loop: "stand1", sounds: { clack: "bigboyClack", crash: "bigboyCrash" } },
   bouncePuff: { ch: EFFECT_SPRITES.bouncePuff, covers: "square", start: "puff", sounds: {} },
   bounceCrash: { ch: EFFECT_SPRITES.bounceCrash, covers: "board", start: "crash", sounds: {} },
   sawCut: { ch: EFFECT_SPRITES.sawCut, covers: "square", start: "openN", loop: "rawN", end: "healN", stages: [{ loop: "rawN" }, { into: "tape1N", loop: "taped1N" }, { into: "tape2N", loop: "taped2N" }], sounds: { tape: "sawyerTape" } },
