@@ -512,7 +512,10 @@ describe("Dash: his stall skit and his clock tap (Eric, Nov 17)", () => {
     expect(stallPlan(fresh(7, { dash: { slaps: 0, stolen: 0, flags: 0, slam: { at: 3 } } }), START, 610_000, true)).toMatchObject({ slamAt: null, fakeAt: 30_000 });
     expect(stallPlan(fresh(7, { dash: { slaps: 0, stolen: 0, flags: 0, slam: { at: 3 } } }), START, 20_000, false)).toMatchObject({ slamAt: null, fakeAt: 15_000 });
     expect(stallPlan(fresh(7, { dash: { slaps: 0, stolen: 0, flags: 0, slam: { at: 3 }, stall: { at: 5, move: "g8f6" } } }), START, 610_000, true)).toBeNull();
-    for (const kind of ["slap", "flag", "clockFit", "warn", "scramble", "rushWarn"]) expect(stallPlan(fresh(7, { events: [{ kind, turn: 1 }] }), START, 610_000, true), kind).toBeNull();
+    // (Eric, Nov 18: the short moments at a move's start, over before its clock starts, leave his beats on it: a real game has one on
+    // most moves (a slap after each capture, a clock fit every 4-5 turns). Those still to play on the move rule them out.)
+    for (const kind of ["slap", "flag", "clockFit"]) expect(stallPlan(fresh(7, { events: [{ kind, turn: 1 }] }), START, 610_000, true), kind).toMatchObject({ slamAt: 20_000, fakeAt: 30_000 });
+    for (const kind of ["warn", "scramble", "rushWarn", "rushExtra"]) expect(stallPlan(fresh(7, { events: [{ kind, turn: 1 }] }), START, 610_000, true), kind).toBeNull();
     expect(stallPlan(fresh(7, { ultAt: 1 }), START, 610_000, true)).toBeNull();
     expect(stallPlan(fresh(7, { dash: { slaps: 0, stolen: 0, flags: 0, rush: { at: 0, moves: [] } } }), START, 610_000, true)).toBeNull();
     expect(stallPlan({ ...(fresh() as object), barred: "e2e4" } as never, START, 610_000, true)).toBeNull();
@@ -601,7 +604,9 @@ describe("Dash: his stall skit and his clock tap (Eric, Nov 17)", () => {
     expect(stallPlan(onMove(3), START, 10_300, true)).toBeNull();
     expect(stallPlan(onMove(3), START, 11_999, true)).toBeNull();
     expect(stallPlan(onMove(3), START, 12_000, true)).toMatchObject({ tapAt: 10_000, slamAt: null });
-    for (const kind of ["slap", "flag", "clockFit", "warn", "scramble", "rushWarn"]) expect(stallPlan(onMove(5, { events: [{ kind, turn: 5 }] }), START, 610_000, true), kind).toBeNull();
+    // (Beside the short moments at a move's start (Eric, Nov 18); never with one still to play on it.)
+    for (const kind of ["slap", "flag", "clockFit"]) expect(stallPlan(onMove(5, { events: [{ kind, turn: 5 }] }), START, 610_000, true), kind).toMatchObject({ tapAt: 10_000 });
+    for (const kind of ["warn", "scramble", "rushWarn", "rushExtra"]) expect(stallPlan(onMove(5, { events: [{ kind, turn: 5 }] }), START, 610_000, true), kind).toBeNull();
   });
 
   it("his clock tap and his stall skit never share a move (Eric, Nov 17: \"the bigger gag is reserved for another turn\"): the first to come takes it", () => {
