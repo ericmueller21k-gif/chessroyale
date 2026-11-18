@@ -476,7 +476,9 @@ door's look; every class is `sq-`.
   the party sheet at once, as does "Play with friends", and PLAY opens it while picked): create a party (its code and invite link,
   `/squads/party/CODE`, copy or share), or join by code or link; the members (leader, connected); the leader presses
   PLAY for everyone. When the party is placed, everyone joins the lobby with its pass, the party's socket closes, and
-  after the lobby "Back to your party" reconnects (the leader queues again). Escape closes the sheet as ✕ does, from
+  after the lobby "Back to your party" reconnects (the leader queues again). A party found closed (Squads', Boss Battle's or
+  50 v 50's) is forgotten by this device at once (`forgetParty`, squads.ts), so "That party has closed." shows once, never on
+  the next visit (Nov 18, `2026-11-18-closed-party-once.md`). Escape closes the sheet as ✕ does, from
   its first frame (leaving a party made while it was open; `2026-10-16-flaky-e2e-batch-4.md`).
 - **The waiting room** is the home screen's queue (as Crowd's), 32 seats: people as they join (your party's dashed),
   then the eight squads of four once bots fill. Its Exit with "Keep me in the queue" (Nov 10, [matchmaking.md](matchmaking.md)) lets you
