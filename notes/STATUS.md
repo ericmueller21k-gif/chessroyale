@@ -1,3 +1,4 @@
+- Nov 18 ~03:35 UTC: #785 Chandy sounds LIVE 67a971b; main GREEN. #784 bigboy: guard collision (toyTower not in FX_FILES) fixed by director 6ee4f34, CI watched. Ginger running.
 - Nov 18 ~03:30 UTC: bigboy final (d09b12a) on CI, PR body updated. Ginger Super Freeze helper (xhigh, alone) started.
 - Nov 18 ~03:20 UTC: container restarted again; watchers re-armed. #785 Chandy sounds merged 67a971b; deploy + main watched. Bigboy fix helper finishing (dedfe2c pushed).
 - Nov 18 02:40 UTC: review/bigboy-tower: lifetimes off by his move, solo bounce cuts topple, tower hides move dots, his piece on a block; Last Stand effectively off vs Big Boy (Eric call). Fix helper (high) on claude/bigboy-tower.
