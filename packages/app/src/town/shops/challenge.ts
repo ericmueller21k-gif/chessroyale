@@ -366,13 +366,14 @@ export const BOSS_INTROS: Readonly<Partial<Record<HomeId, BossIntro>>> = {
   // back door to where you stand (`seated`: no hop back) while his goons carry the table, chairs and board out (zebra-scene.ts
   // SetupScene). His camera centered on the table so the five watching behind it show.)
   // (Nov 16: his own, the board on its post and the platform rising out of his swamp: shops/intros/chandy.ts. His line a placeholder until
-  // his lines come with his rules; his sounds placeholders from other packs, as his art's are.)
+  // his lines come with his rules. His sounds his own (chandy-sounds.ts, Nov 18): water streaming off the board and the platform as
+  // each rises, the milk crates set down, a swamp splash as the storm comes in.)
   chandy: {
     name: "Chandy",
     line: "Stand still. The water does the rest.",
     layout: "across",
     custom: true,
-    cues: { rise: "gardenerDrips", crate: "zebraPlop", storm: "smudgySplash" },
+    cues: { rise: "chandySurface", crate: "chandyCrate", storm: "chandySplash" },
   },
   zebra: {
     name: "Don Dough",

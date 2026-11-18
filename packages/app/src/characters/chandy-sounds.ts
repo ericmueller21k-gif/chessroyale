@@ -356,8 +356,8 @@ const SOUNDS: Record<ChandySound, (rate: number) => Float32Array> = {
   beam: (rate) => {
     const D = 0.95;
     const z = zap(0, 0.08, 2400, 300, 50);
-    const lo1 = lowpass(rate, 1400, osc(rate, () => 138, saw));
-    const lo2 = lowpass(rate, 1400, osc(rate, () => 141.5, saw));
+    const lo1 = lowpass(rate, 1100, lowpass(rate, 1400, osc(rate, () => 138, saw)));
+    const lo2 = lowpass(rate, 1100, lowpass(rate, 1400, osc(rate, () => 141.5, saw)));
     const whine = osc(rate, () => 2350, sine);
     const grit = bandpass(rate, () => 3200, 2, noise(509));
     return render(rate, D, (t) => {
@@ -440,7 +440,7 @@ const LEVEL: Record<ChandySound, number> = {
   alarm: 0.096,
   blast: 0.17,
   upgrade: 0.162,
-  beam: 0.155,
+  beam: 0.16,
   crack: 0.312,
   crackle: 0.435,
   surface: 0.288,

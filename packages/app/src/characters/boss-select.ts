@@ -45,8 +45,8 @@ export const SELECT_SOUND: Readonly<Record<string, SoundName>> = {
   dash: "dashHello",
   // His bread rifle's little pop, then his belly laugh.
   zebra: "zebraPop",
-  // Chandy: his rifle's zap (a placeholder from Moo's pack until his own: chandy.ts CHANDY_CUES).
-  chandy: "mooZap",
+  // Chandy: his rifle's pulse shot (his own: chandy-sounds.ts).
+  chandy: "chandyShot",
   // The Hidden Boss: his low, ominous hum (the stare).
   recluse: "recluseHum",
 };

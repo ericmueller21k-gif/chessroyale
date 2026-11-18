@@ -18,6 +18,7 @@ import { folioSound } from "./folio-sounds.ts";
 import { timberSound } from "./timber-sounds.ts";
 import { dashSound } from "./dash-sounds.ts";
 import { zebraSound } from "./zebra-sounds.ts";
+import { chandySound } from "./chandy-sounds.ts";
 import { clawSound } from "../claw/sounds.ts";
 
 /**
@@ -47,6 +48,7 @@ const MAKERS = {
   timber: timberSound,
   dash: dashSound,
   zebra: zebraSound,
+  chandy: chandySound,
   // (Boingo's claw machine's, not a boss's: the same cache, worker and ahead-of-time making.)
   claw: clawSound,
 } as const;
