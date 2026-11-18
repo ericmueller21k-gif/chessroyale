@@ -149,6 +149,18 @@ describe("Squads screens: YOU and NEXT", () => {
     expect(myBoards(m, "spectator")).toBeNull();
   });
 
+  it("Relay: NEXT skips a finished board to the one the quick jump shows (Nov 18)", () => {
+    const m = match();
+    const over = { winner: "w" as const, how: "mate" as const };
+    const done = (...ids: number[]) => ({ ...m, boards: m.boards.map((b) => (ids.includes(b.id) ? { ...b, result: over } : b)) });
+    expect(myBoards(done(1), "a0")).toEqual({ you: 0, next: 2 });
+    expect(myBoards(done(1), "a0")!.next).toBe(studyBoard(done(1), "a0"));
+    expect(myBoards(done(1, 2), "a0")).toEqual({ you: 0, next: 3 });
+    // None left but yours: no NEXT. Your own board finished: YOU stays on it (you scout it this turn).
+    expect(myBoards(done(1, 2, 3), "a0")).toEqual({ you: 0, next: null });
+    expect(myBoards(done(0), "a0")).toEqual({ you: 0, next: 1 });
+  });
+
   it("Pairs: your pair's slot this turn and next (player 1's pair alternates)", () => {
     const m = match({}, 2);
     // Turn 0: 1+2 play board 1, 3+4 board 2; turn 1: 2+4 on board 1, 1+3 on board 2.

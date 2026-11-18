@@ -127,14 +127,16 @@ export function myRelayMoves(m: Pick<NetSquadsMatch, "sides" | "turn" | "boards"
  * Your board this turn and next (Relay: your next two moves' boards, one board along each; this turn's, or where you
  * slot in when it's your turn to wait; Pairs: your pair's slot; the final: its one board). Null when you're not in the
  * match. `next` is null in the final.
+ * Relay's `next` skips a finished board (you'd only scout it), as the quick jump does (`studyBoard`): NEXT marks the
+ * board the jump shows (Nov 18: NEXT sat on a board just won by mate while the jump rightly showed the one after it).
  */
 export function myBoards(m: Pick<NetSquadsMatch, "format" | "sides" | "turn" | "boards">, playerId: string | null): { you: number; next: number | null } | null {
   const seat = seatIn(m, playerId);
   if (seat < 0) return null;
   const n = m.boards.length;
   if (m.format === "relay" && n > 1) {
-    const [a, b] = myRelayMoves(m, playerId, 2);
-    return { you: a?.board ?? 0, next: b?.board ?? null };
+    const [a, ...after] = myRelayMoves(m, playerId, n);
+    return { you: a?.board ?? 0, next: after.find((x) => !m.boards[x.board]?.result)?.board ?? null };
   }
   if (m.format === "pairs" && n > 1) {
     const slot = (turn: number) => (pairSchedule(turn)[0].includes(seat) ? 0 : 1);
