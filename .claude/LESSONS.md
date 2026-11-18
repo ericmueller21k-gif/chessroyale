@@ -349,6 +349,12 @@ Tests check *what* ends up on the screen, not *how it gets there*, nor how long 
 
 ## Eric's rules hold
 
+- **A boss's sounds are its own** (Nov 18, [story](../docs/history/lessons.md#chandy-played-other-bosses-sounds-nov-18-2026)):
+  - A boss never plays a sound from another boss's pack, not even as a placeholder: a placeholder ships. Until its own pack
+    exists, a cue is silent or the app's own (the soft `pop`). Its own sound is named after its pack (`chandy…`) **and** made
+    from its own module (sound.ts's MAKE): a name alone can hide another pack's sound.
+  - `packages/app/test/boss-sounds-own.test.ts` checks every boss's kit, select sound, intro cues and board art; a new boss adds
+    its line to its `PACKS` (and its effects file to `FX_FILES`).
 - **An options panel that disappeared** (Oct 25, [story](../docs/history/lessons.md#an-options-panel-that-disappeared-oct-25-2026)):
   - Eric's standing rules are in [`docs/rules/eric.md`](../docs/rules/eric.md). A change that breaks one, or edits a test that
     guards one, needs his OK first. Above all, the default for every change: nothing hidden behind another tap (greyed

@@ -27,6 +27,7 @@ import { folioSound, type FolioSound } from "./characters/folio-sounds.ts";
 import { timberSound, type TimberSound } from "./characters/timber-sounds.ts";
 import { dashSound, type DashSound } from "./characters/dash-sounds.ts";
 import { zebraSound, type ZebraSound } from "./characters/zebra-sounds.ts";
+import { chandySound, type ChandySound } from "./characters/chandy-sounds.ts";
 import { clawSound, type ClawSound } from "./claw/sounds.ts";
 import { godKingSound } from "./characters/god-king-sounds.ts";
 import { captureWorkerError } from "./problems.ts";
@@ -557,6 +558,7 @@ const timberBoss = (name: TimberSound) => (t: number) => buffer(timberSound(name
 const clawPlay = (name: ClawSound) => (t: number) => buffer(clawSound(name, ctx!.sampleRate), t);
 const dashBoss = (name: DashSound) => (t: number) => buffer(dashSound(name, ctx!.sampleRate), t);
 const zebraBoss = (name: ZebraSound) => (t: number) => buffer(zebraSound(name, ctx!.sampleRate), t);
+const chandyBoss = (name: ChandySound) => (t: number) => buffer(chandySound(name, ctx!.sampleRate), t);
 const zebraRoom = (name: ZebraSound) => (t: number) => buffer(zebraSound(name, ctx!.sampleRate), t);
 /** Timber's build sound picks one of these each time (Eric, Nov 2: "interchangeable between the tap, the whack, and the knock"). */
 export const TIMBER_BUILD = ["timberTap", "timberWhack", "timberKnock"] as const satisfies readonly SoundName[];
@@ -1034,11 +1036,36 @@ export type SoundName =
   | "mooZap"
   | "mooShimmer"
   | "mooFizz"
-  // Chandy's Dodge (Eric, Nov 16): placeholders from other packs until his own (a proton laser for the beams: Eric's mock-up).
+  // Chandy, the special ops alligator (a raid boss): synthesized, his own pulse-style hunter tech, see characters/chandy-sounds.ts.
+  | "chandyLock"
+  | "chandyUnlock"
+  | "chandyUnsling"
+  | "chandyCharge"
+  | "chandyShot"
+  | "chandyStow"
+  | "chandyCloak"
+  | "chandyDecloak"
+  | "chandyFade"
+  | "chandySpark"
+  | "chandyStatic"
+  | "chandyScatter"
+  | "chandyHum"
+  | "chandyHumOff"
+  | "chandyShield"
+  | "chandyPop"
+  | "chandyZaps"
+  | "chandyClear"
+  | "chandyRound"
+  | "chandyShatter"
+  | "chandyAlarm"
+  | "chandyBlast"
+  | "chandyUpgrade"
   | "chandyBeam"
   | "chandyCrack"
   | "chandyCrackle"
-  | "chandyShatter"
+  | "chandySurface"
+  | "chandyCrate"
+  | "chandySplash"
   // Puddles, the hippo gardener (a raid boss): synthesized, see characters/gardener-sounds.ts.
   | "gardenerGrunt"
   | "gardenerBellow"
@@ -1441,10 +1468,35 @@ const SOUNDS: Record<SoundName, (t: number) => void> = {
   mooZap: mooBoss("zap"),
   mooShimmer: mooBoss("shimmer"),
   mooFizz: mooBoss("fizz"),
-  chandyBeam: mooBoss("beam"),
-  chandyCrack: sawyer("crack"),
-  chandyCrackle: ginger("crackle"),
-  chandyShatter: hollow("smash"),
+  chandyLock: chandyBoss("lock"),
+  chandyUnlock: chandyBoss("unlock"),
+  chandyUnsling: chandyBoss("unsling"),
+  chandyCharge: chandyBoss("charge"),
+  chandyShot: chandyBoss("shot"),
+  chandyStow: chandyBoss("stow"),
+  chandyCloak: chandyBoss("cloak"),
+  chandyDecloak: chandyBoss("decloak"),
+  chandyFade: chandyBoss("fade"),
+  chandySpark: chandyBoss("spark"),
+  chandyStatic: chandyBoss("static"),
+  chandyScatter: chandyBoss("scatter"),
+  chandyHum: chandyBoss("hum"),
+  chandyHumOff: chandyBoss("humOff"),
+  chandyShield: chandyBoss("shield"),
+  chandyPop: chandyBoss("pop"),
+  chandyZaps: chandyBoss("zaps"),
+  chandyClear: chandyBoss("clear"),
+  chandyRound: chandyBoss("round"),
+  chandyShatter: chandyBoss("shatter"),
+  chandyAlarm: chandyBoss("alarm"),
+  chandyBlast: chandyBoss("blast"),
+  chandyUpgrade: chandyBoss("upgrade"),
+  chandyBeam: chandyBoss("beam"),
+  chandyCrack: chandyBoss("crack"),
+  chandyCrackle: chandyBoss("crackle"),
+  chandySurface: chandyBoss("surface"),
+  chandyCrate: chandyBoss("crate"),
+  chandySplash: chandyBoss("splash"),
   gardenerGrunt: gardenerBoss("grunt"),
   gardenerBellow: gardenerBoss("bellow"),
   gardenerCheer: gardenerBoss("cheer"),
@@ -1772,10 +1824,35 @@ const MAKE: Partial<Record<SoundName, readonly BossSound[]>> = {
   mooZap: [["moo", "zap"]],
   mooShimmer: [["moo", "shimmer"]],
   mooFizz: [["moo", "fizz"]],
-  chandyBeam: [["moo", "beam"]],
-  chandyCrack: [["sawyer", "crack"]],
-  chandyCrackle: [["ginger", "crackle"]],
-  chandyShatter: [["hollow", "smash"]],
+  chandyLock: [["chandy", "lock"]],
+  chandyUnlock: [["chandy", "unlock"]],
+  chandyUnsling: [["chandy", "unsling"]],
+  chandyCharge: [["chandy", "charge"]],
+  chandyShot: [["chandy", "shot"]],
+  chandyStow: [["chandy", "stow"]],
+  chandyCloak: [["chandy", "cloak"]],
+  chandyDecloak: [["chandy", "decloak"]],
+  chandyFade: [["chandy", "fade"]],
+  chandySpark: [["chandy", "spark"]],
+  chandyStatic: [["chandy", "static"]],
+  chandyScatter: [["chandy", "scatter"]],
+  chandyHum: [["chandy", "hum"]],
+  chandyHumOff: [["chandy", "humOff"]],
+  chandyShield: [["chandy", "shield"]],
+  chandyPop: [["chandy", "pop"]],
+  chandyZaps: [["chandy", "zaps"]],
+  chandyClear: [["chandy", "clear"]],
+  chandyRound: [["chandy", "round"]],
+  chandyShatter: [["chandy", "shatter"]],
+  chandyAlarm: [["chandy", "alarm"]],
+  chandyBlast: [["chandy", "blast"]],
+  chandyUpgrade: [["chandy", "upgrade"]],
+  chandyBeam: [["chandy", "beam"]],
+  chandyCrack: [["chandy", "crack"]],
+  chandyCrackle: [["chandy", "crackle"]],
+  chandySurface: [["chandy", "surface"]],
+  chandyCrate: [["chandy", "crate"]],
+  chandySplash: [["chandy", "splash"]],
   gardenerGrunt: [["gardener", "grunt"]],
   gardenerBellow: [["gardener", "bellow"]],
   gardenerCheer: [["gardener", "cheer"]],
