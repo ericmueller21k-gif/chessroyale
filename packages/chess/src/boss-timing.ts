@@ -331,8 +331,8 @@ export const bigboyTurnMs = (boss: { powers?: { events?: readonly { kind: string
 };
 
 /**
- * Chandy's moments while he thinks (the queen lock's shot as his turn begins; his first lock, on the piece his first capture takes,
- * marked as that move is about to show: the server holds the move for it, bossMoveMoment): his thinking lasts at least as long (the
+ * Chandy's moments while he thinks (the queen lock's shot as his turn begins; a taught capture's lock, on the piece each of his first
+ * captures takes, chandy.teachCaptures, marked as that move is about to show: the server holds the move for it, bossMoveMoment): his thinking lasts at least as long (the
  * ms; 0: none).
  */
 export const chandyTurnMs = (boss: { powers?: { events?: readonly { kind: string; first?: boolean }[] } | null } | null | undefined): number =>

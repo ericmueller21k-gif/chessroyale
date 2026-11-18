@@ -1403,7 +1403,7 @@ export class MatchRunner {
     const move = await ordinary();
     const end = balloon || hoops ? await this.tigerTurnEnd(fen, move, hoops, balloon, engine) : {};
     const line = crease ? await creasePick(this.opts.engines.length ? this.opts.engines : [engine], applyMove(fen, move), crease).catch(() => null) : null;
-    // (A moment that plays with his move known, before it shows: Chandy's first lock. Solo shows it and waits; the sims don't.)
+    // (A moment that plays with his move known, before it shows: a taught capture's lock, Chandy's. Solo shows it and waits; the sims don't.)
     const holdMs = this.bossMoveMoment(move);
     if (holdMs && beforeShow) await beforeShow(holdMs);
     this.applyBossMove(move, kind === "stagger", { ...(beam ? { beam: await beamLines(engine, fen, move, beam) } : {}), ...end, ...(crease ? { crease: line?.line ?? null, creaseLoss: line?.loss ?? null } : {}) });
@@ -1634,8 +1634,8 @@ export class MatchRunner {
   }
 
   /**
-   * A moment of the boss's that plays with his move known, before it shows (Chandy's first capture: the crosshair locks onto the piece
-   * he's about to take, chandyBattle.firstLock): marks it and returns how long it holds the screen (ms) before the move may show; 0:
+   * A moment of the boss's that plays with his move known, before it shows (Chandy's first captures, chandy.teachCaptures: the
+   * crosshair locks onto the piece he's about to take, chandyBattle.firstLock): marks it and returns how long it holds the screen (ms) before the move may show; 0:
    * none. The server holds the host's move that long; solo's playBoss waits (its `beforeShow`).
    */
   bossMoveMoment(move: string): number {

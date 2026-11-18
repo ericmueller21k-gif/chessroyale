@@ -2712,8 +2712,9 @@ export class LobbyCore {
       this.broadcast(this.bossMessage(until));
       return this.setTimer("nextRound", until);
     }
-    // Chandy's first capture: the crosshair locks onto the piece before his move shows (his point, while he still thinks), then the
-    // move, held for the moment as your queen banner holds it (bossMinAt; the same on solo: playBoss's beforeShow).
+    // Chandy's first captures (chandy.teachCaptures): the crosshair locks onto the piece before his move shows (his point, while he
+    // still thinks), then the move, held for the moment as your queen banner holds it (bossMinAt, from now: after any queen shot's
+    // hold this turn, thinkMinAt; the same on solo: playBoss's beforeShow).
     const holdMs = this.runner!.bossMoveMoment(move);
     if (holdMs) {
       this.r.bossMinAt = this.io.now() + holdMs;

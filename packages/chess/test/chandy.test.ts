@@ -64,8 +64,6 @@ function battle(seed: number, test = "", side: "w" | "b" = "w"): MatchRunner {
   return new MatchRunner({ settings: kitSettings({ boss: "chandy", test, maxMoves: 60 }), rng: mulberry32(seed), engines: [fakeEngine()], library: [KIT_OPENING], entrants: [{ id: "h0", name: "H", isBot: false }], raidSide: side });
 }
 const fenOf = (r: MatchRunner) => r.boards.get(r.state.boards[0]!)!.fen;
-/** A queen of `side`'s on the board. */
-const queenOn = (fen: string, side: "w" | "b") => fen.split(" ")[0]!.includes(side === "w" ? "Q" : "q");
 const cOf = (r: MatchRunner): ChandyState => r.boss!.powers!.chandy!;
 
 /** The board and his state set by hand (`fen`: whoever is to move), as a turn of the crowd's or his. */
@@ -204,35 +202,40 @@ describe("the locks (L1-L6)", () => {
       const taken = sq ? pieceAt(before, sq) : null;
       if (taken && taken.color === r.boss!.crowdSide) caught++;
       expect(marks).toEqual(taken && taken.color === r.boss!.crowdSide ? [sq] : []);
-      // (His first unlock: the queen lock, your queen still on the board; Eric, Nov 18.)
-      if (caught === 1 && marks.length) expect([cOf(r).unlocked, queenOn(fenOf(r), r.boss!.crowdSide)]).toEqual([["queenlock"], true]);
+      // (His first unlock: the queen lock when it could come then, your queen on the board with a save (Eric, Nov 18; the review of
+      // #797); else the usual random one. Here your queen is deep in his camp with nothing to put in front of her: random.)
+      if (caught === 1 && marks.length) expect([cOf(r).unlocked[0] === "queenlock", queenLockAim(fenOf(r), r.boss!.crowdSide, 0, 0) !== null]).toEqual([false, false]);
       // (Upgrades 1 and 2 come with the captures; the hunt only once both have taught it.)
       expect([cOf(r).upgrades, cOf(r).marked ?? 0, cOf(r).taught]).toEqual([caught, caught, caught >= S.teachCaptures ? true : undefined]);
     }
     expect(caught).toBe(S.teachCaptures);
   });
 
-  it("the queen lock is his first unlock while you have a queen; without one, as before (Eric, Nov 18: make that upgrade happen earlier)", async () => {
+  it("the queen lock is his first unlock while it could come then (a queen of yours with a save); else as before (Eric, Nov 18: make that upgrade happen earlier; the review of #797)", async () => {
     for (let seed = 0; seed < 20; seed++) {
       expect(unlockPick([], seed, 0, true)).toBe("queenlock");
       expect(unlockPick(["beam"], seed, 1, true)).toBe("queenlock");
       expect(unlockPick(["queenlock"], seed, 1, true)).not.toBe("queenlock");
     }
     expect(new Set(Array.from({ length: 40 }, (_, seed) => unlockPick([], seed, 0, false))).size).toBe(5);
-    // (Your queen taken by his first capture: no queen, so his unlock is the usual random one, never forced.)
-    const picks = new Set<string>();
-    for (let seed = 0; seed < 30; seed++) {
-      const r = battle(seed);
-      await crowdMove(r);
-      onPosition(r, "4k3/8/5n2/3Q4/8/8/8/R3K3 b - - 0 1", "w");
-      r.applyBossMove("f6d5");
-      picks.add(cOf(r).unlocked[0]!);
+    // (Your queen taken by his first capture: no queen; your queen on d1 with no pawn, knight or bishop to put in front of her: the
+    // queen lock couldn't come. Either way his unlock is the usual random one, never forced.)
+    for (const fen of ["4k3/8/5n2/3Q4/8/8/8/R3K3 b - - 0 1", "4k3/8/5n2/3N4/8/8/8/R2QK3 b - - 0 1"]) {
+      const picks = new Set<string>();
+      for (let seed = 0; seed < 30; seed++) {
+        const r = battle(seed);
+        await crowdMove(r);
+        onPosition(r, fen, "w");
+        r.applyBossMove("f6d5");
+        expect(queenLockAim(fenOf(r), "w", seed, 0)).toBeNull();
+        picks.add(cOf(r).unlocked[0]!);
+      }
+      expect(picks.size).toBeGreaterThan(2);
     }
-    expect(picks.size).toBeGreaterThan(2);
-    // (Your queen still there: the queen lock.)
+    // (Your queen still there, your d2 pawn in front of her: the queen lock.)
     const r = battle(3);
     await crowdMove(r);
-    onPosition(r, "4k3/8/5n2/3N4/8/8/8/R2QK3 b - - 0 1", "w");
+    onPosition(r, "4k3/8/5n2/3N4/8/8/3P4/R2QK3 b - - 0 1", "w");
     r.applyBossMove("f6d5");
     expect(cOf(r).unlocked).toEqual(["queenlock"]);
   });
@@ -622,7 +625,7 @@ describe("the queen lock", () => {
 });
 
 describe("the queen lock's pass guard (the review's M1)", () => {
-  it("refused (passing would lose real material): the meter picks another unlocked move, which lands as your turn begins; none: it empties", async () => {
+  it("refused (passing would lose real material): the meter picks another unlocked move, which lands as your turn begins; none: it's due again on his next turn", async () => {
     const r = battle(8);
     await crowdMove(r);
     onPosition(r, "4k3/pppp4/8/8/8/8/3P4/3QK2R b - - 0 1", "w", { upgrades: 2, unlocked: ["queenlock", "rapidfire"], fresh: "queenlock", due: "queenlock", meter: S.meterEvery });
@@ -635,14 +638,18 @@ describe("the queen lock's pass guard (the review's M1)", () => {
     expect(r.boss!.powers!.events.some((e) => e.kind === "rapidFire")).toBe(true);
     expect(cOf(r).due ?? null).toBeNull();
     expect(cOf(r).meter).toBe(0);
-    // (The queen lock alone unlocked: the meter empties, the queen lock can come on a later fill.)
+    // (The queen lock alone unlocked: it stays due, the meter full, and it's checked again on his next turn: the pass guard's rule for
+    // every power that spends his turn, Oct 18. Until Nov 18 the meter emptied, leaving his first unlock dead until upgrade 2.)
     const r2 = battle(8);
     await crowdMove(r2);
     onPosition(r2, "4k3/pppp4/8/8/8/8/3P4/3QK2R b - - 0 1", "w", { upgrades: 1, unlocked: ["queenlock"], fresh: "queenlock", due: "queenlock", meter: S.meterEvery });
     expect(r2.applyQueenLock(PASS_WAIT)).toBeNull();
-    expect(cOf(r2).due ?? null).toBeNull();
-    expect(cOf(r2).meter).toBe(0);
-    expect(r2.queenLockDue()).toBe(false);
+    expect([cOf(r2).due, cOf(r2).meter, r2.queenLockDue(), r2.bossToMove()]).toEqual(["queenlock", S.meterEvery, false, true]);
+    r2.applyBossMove("a7a6");
+    await crowdMove(r2, () => "h1g1");
+    expect([cOf(r2).due, cOf(r2).meter, r2.queenLockDue()]).toEqual(["queenlock", S.meterEvery, true]);
+    expect(r2.applyQueenLock(null)).toBe("d1");
+    expect([cOf(r2).due ?? null, cOf(r2).meter]).toEqual([null, 0]);
   });
 });
 

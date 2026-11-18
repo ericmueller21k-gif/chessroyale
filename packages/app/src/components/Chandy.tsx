@@ -3,7 +3,8 @@
  * docs/ideas/chandy-wiring.md; docs/decisions/2026-11-16-chandy-rules.md), all from the shared state and each moment's start, so
  * everyone online sees the same thing:
  * - **His locks:** a crosshair on each locked piece of yours, its pips counting the turns it has left (3, 2, 1); a new one snaps on
- *   as he points (`lockOn`; his first, on the piece his first capture takes, before that move shows: chandyTurnMoments).
+ *   as he points (`lockOn`; on each of his first captures, chandy.teachCaptures, on the piece it takes, before that move shows:
+ *   chandyTurnMoments).
  * - **The upgrade window** (`upgrade`, 2 s, the clock held): the rifle at its new stage, the part snapping on, "UPGRADE!", the move
  *   it unlocked (ChandyUpgrade), front and center over the board.
  * - **His meter's moves** (each with its banner, your pawn on it, and his shot from the board's corner): scatter shot's burst and
@@ -198,9 +199,10 @@ const MOMENTS: Record<"lockOn" | "upgrade" | "scatterShot" | "beam" | "shields" 
 const turnSeen = new Map<string, number>();
 
 /**
- * His moments in his turn, while he thinks (the queen lock's shot as it begins; his first lock as his first capture is about to show,
- * with his move known: chandyBattle.firstLock), from this turn's events, each from when this device first saw it and never before the
- * one ahead of it ends; his move waits for them (chandyTurnMs, and the server's hold of his first capture).
+ * His moments in his turn, while he thinks (the queen lock's shot as it begins; a taught capture's lock as one of his first captures,
+ * chandy.teachCaptures, is about to show, with his move known: chandyBattle.firstLock; both in one turn: the shot, then the lock), from
+ * this turn's events, each from when this device first saw it and never before the one ahead of it ends; his move waits for them
+ * (chandyTurnMs, and the server's hold of a taught capture).
  */
 export function chandyTurnMoments(boss: BossView, now = Date.now()): Moment[] {
   const p = boss.powers;
