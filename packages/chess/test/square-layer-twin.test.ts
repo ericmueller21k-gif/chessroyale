@@ -4,6 +4,7 @@ import {
   applyMove,
   beamAllows,
   blockedBy,
+  capturedSquare,
   boardAltered,
   bossAllowed,
   bossRules,
@@ -14,13 +15,11 @@ import {
   lands,
   legalMoves,
   moveSquares,
-  pawnOnGold,
   pieceAt,
   piedSquares,
   plantSquares,
   stopFieldsOf,
   stopReason,
-  takesShield,
   toyStops,
   toysAfterCrowd,
   toysTakeReply,
@@ -142,6 +141,12 @@ const oldPlantStops = (m: string, plants: readonly string[], fen: string): boole
 
 /** chandy.ts `beamAllows`. */
 const oldBeamAllows = (fen: string, m: string, squares: readonly string[]): boolean => !oldHeldIn(fen, m, squares) && !moveSquares(m, fen).slice(1).some((sq) => squares.includes(sq));
+
+/** chandy.ts `takesShield` (on the layer since PR 5: shield-layer-twin.test.ts). */
+const takesShield = (fen: string, m: string, shields: readonly string[]): boolean => shields.includes(capturedSquare(fen, m) ?? "");
+
+/** zebra.ts `pawnOnGold` (on the layer since PR 5: shield-layer-twin.test.ts). */
+const pawnOnGold = (fen: string, m: string, gold: readonly string[]): boolean => gold.includes(m.slice(2, 4)) && pieceAt(fen, m.slice(0, 2))?.type === "p";
 
 /** chandy.ts `chandyStop`. */
 function oldChandyStop(f: ChandyStopFields | null, fen: string, m: string): StopReason | null {

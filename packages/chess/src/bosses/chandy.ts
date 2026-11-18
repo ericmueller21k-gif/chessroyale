@@ -506,8 +506,6 @@ export function chooseShields(fen: string, crowd: Side, seed: number, n: number,
     .map((p) => p.square);
 }
 
-/** A crowd move taking a shielded piece (`fen`: before it). */
-export const takesShield = (fen: string, move: string, shields: readonly string[]): boolean => shields.includes(capturedSquare(fen, move) ?? "");
 
 // ---------------- Rapid fire ----------------
 
@@ -816,7 +814,7 @@ export function mateOpen(next: Pick<BossPowerState, "chandy">, t: Pick<TurnConte
   const c = next.chandy;
   const f = stopFieldsOf({ chandy: c, turn: t.turn });
   const marks = chandyMarks(f, on(c?.dizzy, t.turn)?.squares ?? []);
-  const ok = (m: string) => !marksStop(marks, t.fen, m) && !(f?.shields.length && takesShield(t.fen, m, f.shields));
+  const ok = (m: string) => !marksStop(marks, t.fen, m);
   return mates.some(ok) || !legalMoves(t.fen).some(ok);
 }
 
@@ -923,15 +921,10 @@ export const CHANDY: BossRules = {
   },
   // On the board layer (chandyMarks): rapid fire's dizzy pieces and those under the beam don't move this turn, nor castle with a
   // held rook; the beam's squares are walls to the crowd's pieces; nobody lands on a scatter shot's square, him included, through
-  // his move after your turn (Boingo's pie rule).
+  // his move after your turn (Boingo's pie rule); the crowd takes no shielded piece this turn.
   layer: (boss) => {
     const p = boss.powers!;
     return chandyMarks(stopFieldsOf(p), on(chandyOf(p).dizzy, p.turn)?.squares ?? []);
-  },
-  // The shields.
-  crowdFilter(allowed, boss, fen) {
-    const shields = stopFieldsOf(boss.powers)?.shields ?? [];
-    return shields.length ? allowed.filter((m) => !takesShield(fen, m, shields)) : allowed;
   },
   stopReason: (boss, fen, m) => chandyStop(stopFieldsOf(boss.powers), fen, m),
   powerTurn: (boss) => {
@@ -980,17 +973,19 @@ export function stopFieldsOf(p: StopFields | null | undefined): ChandyStopFields
 }
 
 /**
- * His marks on the board layer this crowd turn (`f`: the beam's and scatter shot's squares; `dizzy`: rapid fire's pieces): the
- * dizzy pieces and the crowd's pieces under the beam held; the beam's squares walls to the crowd's pieces (nothing lands on or
- * slides through one; a knight jumps); the scatter shot's squares landed on by nobody, him included. Null: none.
+ * His marks on the board layer this crowd turn (`f`: the beam's and scatter shot's squares and the shields; `dizzy`: rapid fire's
+ * pieces): the dizzy pieces and the crowd's pieces under the beam held; the beam's squares walls to the crowd's pieces (nothing
+ * lands on or slides through one; a knight jumps); the scatter shot's squares landed on by nobody, him included; his shielded
+ * pieces taken by none of the crowd's. Null: none.
  */
 export function chandyMarks(f: ChandyStopFields | null, dizzy: readonly string[] = []): LayerMarks | null {
   const beam = f?.beam ?? [];
   const scatter = f?.scatter ?? [];
-  if (!beam.length && !scatter.length && !dizzy.length) return null;
+  const shields = f?.shields ?? [];
+  if (!beam.length && !scatter.length && !shields.length && !dizzy.length) return null;
   const held = (kind: "dizzy" | "beam", squares: readonly string[]): PieceMark[] => squares.map((square) => ({ square, kind, held: true, binds: "crowd", by: "chandy" }));
   return {
-    pieces: [...held("dizzy", dizzy), ...held("beam", beam)],
+    pieces: [...held("dizzy", dizzy), ...held("beam", beam), ...shields.map((square): PieceMark => ({ square, kind: "shield", shieldFrom: "all", binds: "crowd", by: "chandy" }))],
     squares: [
       ...beam.map((square): SquareMark => ({ square, kind: "beam", noLand: true, noPass: true, binds: "crowd", by: "chandy" })),
       ...scatter.map((square): SquareMark => ({ square, kind: "scatter", noLand: true, binds: "both", by: "chandy" })),
@@ -1001,10 +996,7 @@ export function chandyMarks(f: ChandyStopFields | null, dizzy: readonly string[]
 /** Which of his powers stops `move` now (the screens' words): the beam (a held piece in it, or a wall), a scatter shot's square, a shield. */
 export function chandyStop(f: ChandyStopFields | null, fen: string, move: string): "beam" | "scatter" | "shield" | null {
   if (!f) return null;
-  const mark = marksStop(chandyMarks(f), fen, move);
-  if (mark) return mark.kind as "beam" | "scatter";
-  if (f.shields.length && takesShield(fen, move, f.shields)) return "shield";
-  return null;
+  return (marksStop(chandyMarks(f), fen, move)?.kind as "beam" | "scatter" | "shield" | undefined) ?? null;
 }
 
 // ---------------- What the screens get ----------------
