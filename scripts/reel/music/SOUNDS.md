@@ -422,3 +422,21 @@ a style to write in. Its frame is kept (tempo, keys, chords, patches, sections, 
   - 92 bars, 2:16: under his 2:30 to 2:45, since the slow middle was what carried it there. Told him; his call.
   - Measured: the duel has most of its energy between 1 and 2 kHz (three high voices at once): the risk is shrill.
 
+## The battle tower (Nov 18, song_ak.py): sent, no verdict yet
+
+"A simple 1 minute looping beat that is a slower pace designed for the new battle tower ... really just background
+noise like the town song, but needs to have a more serious feel to it, slow is good here, not too many high note hits
+ring out ... I'll leave the rest to you. A dark eerie musical instrument choices is a good starting point". No plan:
+written here.
+- One minute exactly: 64 beats a minute, sixteen bars. D minor: Dm, Bb, Gm, A7 with its flat ninth, eight bars twice.
+- A beat that never stops: a deep soft kick, a dull snare on 2 and 4, a clock's tick and tock far down, a low
+  drum's two beats ending every fourth bar.
+- All low voices: a men's choir humming the chords, a bass clarinet with the tune (long notes, bars of rest between
+  phrases, never above A4), a cello answering in its rests, a soft piano tolling low fifths, a round bass. No bells
+  or chimes, and the mix is cut darker than the themes' (lowpass 6500).
+- A lesson: a slow, low piece puts its energy where a phone plays nothing. The first render had more under 60 Hz than
+  in any other band; the bass now has as much of its octave as of its note, and the kick sits higher. Check the
+  0-60 Hz band of anything low and slow against the town's.
+- Measured: -16.0 LUFS, peak about -1.8 dBFS, 60.00 s, its eight two-bar spans within 1 dB of each other, the seam
+  clean. Not handed over: the tower isn't named in the game's files yet.
+
