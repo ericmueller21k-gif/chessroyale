@@ -1,3 +1,4 @@
+- Nov 18 ~09:30 UTC: #799 LIVE (c4c49be). Main RED on retry-pass only: global-chat.spec:142 [desktop] (Ann's typed line not cleared in 5 s on first try). Unrelated to #799. Helper on it (brief global-chat-142-flake.md, high).
 - Nov 18 ~09:25 UTC: #798 LIVE (cf4e7a4), main GREEN. #799 MERGED (c4c49be): deploy + main run watched. Queue empty; no helpers. For Eric (morning): rook fallback for the queen lock (proposal); Stripe later this week.
 - Nov 18 ~09:10 UTC: follow-up done -> #799 (ef0e09b: queen lock first only if aimable; refused queen lock stays due; dead early slot 10->5 of 20), CI bsdptynz9 (full suite: runner/lobby touched). Merge when green and main after #798 is green (bdpfp8o1m). No helpers running; queue empty.
 - Nov 18 ~09:00 UTC: main on 826609e (#797) GREEN, live. #798 weapon screen MERGED (cf4e7a4): deploy + main run watched. Follow-up helper running (b31h905z4).
