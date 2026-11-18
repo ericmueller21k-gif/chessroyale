@@ -34,3 +34,11 @@ character's cinematic (Moo's Full Moon, Chandy's Dodge, the Hidden Boss) is left
 
 Use the code as it is: name the functions, files and settings each part touches. No code, no stills (a mockup of the assist bar is
 welcome as one still on `stills/boss-assists` if it helps). Done: `.pr-body.md` (under 30 lines) and `.done`; push and end.
+
+**REDIRECTED (Eric, Nov 18): the Battle Tower instead.** "I'm worried though this mode would get too crazy and take away from the
+experience of fighting the normal bosses ... you vs 3 bosses and we call it the battle tower." "It's a progressive system where bosses
+start like 1 boss then 2, maybe 2 again, then 3 etc, also their maia elo is increased as you progress, the first rounds are quite easy,
+it's a giant skyscraper ... you walk to the next floor but it really is just the same floor redrawn as stage 2 etc, also ... save
+progress so people can stop after a game and return later." And: "Tell me which ones are kept out ... I might disagree and want some
+added." Design: the move list IN/OUT (first), several bosses on one board, the climb, the skyscraper, save progress (D1, full lane),
+the build plan. Files: docs/decisions/2026-11-18-battle-tower-design.md, docs/areas/battle-tower.md. Sent to the helper.

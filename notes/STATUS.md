@@ -1,3 +1,4 @@
+- Nov 18 ~10:50 UTC: Eric redirected: Battle Tower (floors: 1 boss, then 2, 2, 3...; Maia elo rising; skyscraper walk between floors; save progress). Design helper redirected (session_01JuCWRstt7nGETno39ihmpk); move IN/OUT list first for Eric.
 - Nov 18 ~10:40 UTC: Eric: new mode 'Boss Assists' next to Auto Chess: 3 random bosses per side, 2 normal moves + 1 ultimate assigned at start, moves that don't fit left out, nothing selectable, meter, board square layer. Design-only helper (brief boss-assists-design.md, high).
 - Nov 18 ~10:20 UTC: #800 LIVE (0fc2b8b), main full run GREEN (no flaky). Everything merged and green. Queue empty. For Eric: rook fallback for the queen lock (proposal); Stripe later this week; optional e2e follow-up on dev-proxy 5 s holds (docs/decisions/2026-11-18-global-chat-142.md).
 - Nov 18 ~10:15 UTC: #800 chat fix MERGED (0fc2b8b): deploy + main run watched. Queue empty; no helpers.
