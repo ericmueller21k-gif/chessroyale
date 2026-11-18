@@ -1,3 +1,4 @@
+- Nov 18 ~05:15 UTC: #789 thinking-moments-on-draw PR (9452e13), CI watched. Payments PR1 prices helper started (claude/pay-prices, high). Ginger fixes helper running.
 - Nov 18 ~05:10 UTC: main RED on 1bd2caa (home-ranked:300 live window remount = app fix LiveFrame; bigboy:144 = spec counted .pw-tower). Director fix PR claude/main-red-nov18 (9d0ec51), CI watched. #772 green, held until main green. Ginger fixes + thinking-moments helpers running.
 - Nov 18 ~04:45 UTC: Eric: Big Boy (b) yes; payments design v2 approved (merging #772 docs); Stripe later this week; more boss updates coming. Queue (xhigh, alone, after ginger fixes + thinking-moments): bigboy-powerturn; then payments build PRs 2-3; PR1 prices (medium) can pair.
 - Nov 18 ~04:40 UTC: review/ginger: no rule/sync bug; 3 visual fixes -> helper on #787; finding 4 (thinking moments replay on draw, shared) -> separate helper claude/thinking-moments-draw.
