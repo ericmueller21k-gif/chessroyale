@@ -13,8 +13,9 @@
  * chess-legal moves are ever filtered: marks never stop an attack (pins and checks work across all of them), and check
  * is always answered.
  *
- * Today's bosses move onto it one family a PR through `BossRules.layer`: held pieces (Ginger, Boingo, Moo, Folio, Chandy) so
- * far; square marks, edges and shields next.
+ * Today's bosses move onto it one family a PR through `BossRules.layer`: held pieces (Ginger, Boingo, Moo, Folio, Chandy) and
+ * square marks (Boingo's pies, Big Boy's toy blocks, Puddles' plants, Chandy's scatter and beam, Don Dough's dough) so far;
+ * edges and shields next.
  */
 import type { StopReason } from "@chessroyale/core";
 import { legalMoves, pieceAt, sideToMove } from "./rules.ts";
@@ -257,6 +258,22 @@ export function layerStop(layer: BoardLayer, fen: string, move: string): LayerMa
   }
   return null;
 }
+
+/**
+ * The first of one boss's `marks` that stops `move` (legal in `fen`): for the side to move, the crowd playing `crowd`; without
+ * `crowd`, whichever side each binds (the screens' words for a refused move or the boss's lifted one, and a power's own look at
+ * what its marks would stop).
+ */
+export function marksStop(marks: LayerMarks | null | undefined, fen: string, move: string, crowd?: Side): LayerMark | null {
+  if (!marks) return null;
+  if (crowd) return layerStop(mergeLayers(crowd, [marks]), fen, move);
+  const both = <T extends MarkBase>(ms: readonly T[] | undefined): T[] => (ms ?? []).map((m) => (m.binds === "both" ? m : { ...m, binds: "both" }));
+  return layerStop({ crowd: "w", squares: both(marks.squares), edges: both(marks.edges), pieces: both(marks.pieces) }, fen, move);
+}
+
+/** One of `marks` binds the bosses' moves (`binds`: "both" or "bosses"). */
+export const bindsBosses = (marks: LayerMarks | null | undefined): boolean =>
+  !!marks && [...(marks.squares ?? []), ...(marks.edges ?? []), ...(marks.pieces ?? [])].some((m) => m.binds !== "crowd");
 
 /**
  * The legal moves (`legal`: of `fen`, the side to move's) no mark stops, and the lift in one place (every power's ground rule:

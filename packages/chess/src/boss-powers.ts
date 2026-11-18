@@ -15,7 +15,7 @@
  * Turns are the crowd's: turn N is the crowd's Nth move of the battle (crowdMoves + 1 while it's being picked).
  */
 import { BOSS_POWERS, type BossPowerSettings, type BossPowerState, type BossState, type PowerEvent, type StopReason } from "@chessroyale/core";
-import { layerStop, mergeLayers } from "./board-layer.ts";
+import { bindsBosses, layerStop, mergeLayers } from "./board-layer.ts";
 import { legalMoves } from "./rules.ts";
 import type { EngineLike } from "./runner.ts";
 import type { MoveScore } from "./uci.ts";
@@ -186,16 +186,34 @@ export function crowdAllowed(boss: BossState | null | undefined, fen: string): s
 }
 
 /**
+ * What stops the boss's own moves now (`fen`: him to move), or null: nothing does. His boss's marks on the board that bind
+ * him (`layer`, read by the board layer's `layerStop`: a pie, a toy block, a plant, a scatter shot's square, his dough), then
+ * its other stops (`bossStops`: Sawyer's saw, the hoops, the paint).
+ */
+function bossLimit(boss: BossState | null | undefined, fen: string): ((move: string) => boolean) | null {
+  const rules = boss?.powers ? bossRules(boss) : null;
+  if (!rules) return null;
+  const marks = rules.layer?.(boss!, fen);
+  const layer = bindsBosses(marks) ? mergeLayers(boss!.crowdSide, [marks]) : null;
+  const stops = rules.bossStops?.(boss!) ?? null;
+  if (!layer && !stops) return null;
+  return (m) => (!!layer && !!layerStop(layer, fen, m)) || !!stops?.(m, fen);
+}
+
+/**
  * The moves the boss may play (a pie stops it: nothing onto it; a toy block: nothing onto it or through it), or null
  * when every legal move is allowed. Never none: a restriction that would leave no move lifts.
  */
 export function bossAllowed(boss: BossState | null | undefined, fen: string): string[] | null {
-  const stops = boss ? (bossRules(boss)?.bossStops?.(boss) ?? null) : null;
+  const stops = bossLimit(boss, fen);
   if (!stops) return null;
   const legal = legalMoves(fen);
-  const allowed = legal.filter((m) => !stops(m, fen));
+  const allowed = legal.filter((m) => !stops(m));
   return allowed.length && allowed.length < legal.length ? allowed : null;
 }
+
+/** A power stops the boss's `move` now (`fen`: him to move): played anyway, it went through (his only move, the limit lifted). */
+export const bossStopped = (boss: BossState | null | undefined, fen: string, move: string): boolean => !!bossLimit(boss, fen)?.(move);
 
 /** A crowd move is allowed this turn. */
 export const crowdMayPlay = (boss: BossState | null | undefined, fen: string, move: string): boolean => {
@@ -225,8 +243,8 @@ export function powerTurn(boss: BossState | null | undefined, fen?: string): boo
  * A boss's power has changed the board this crowd turn (`fen`: the crowd to move), so the God King's Last Stand sits out
  * (Eric, Oct 24: Babur's hoop stopped the recapture the plain-chess judge feared;
  * docs/decisions/2026-10-24-king-save-off-on-altered-boards.md). One rule for every boss, no list: a power touches the
- * turn (`powerTurn`, fair play's own test), something stops his moves (`bossStops`), something stops any of the crowd's
- * (`layer`, `crowdFilter`), or something else of his is on the board (`altersBoard`: Hollow's dark, the Roman candle's shadows,
+ * turn (`powerTurn`, fair play's own test), something stops his moves (`bossStops`, or a mark that binds him: `layer`),
+ * something stops any of the crowd's (`layer`, `crowdFilter`), or something else of his is on the board (`altersBoard`: Hollow's dark, the Roman candle's shadows,
  * the carrots). A boss with its own test (`standAltered`: Big Boy's, his toy blocks only where they take away the reply the
  * Last Stand would replay; Eric's (b), Nov 18) answers in its place, given the crowd's move (`stand`: the played move and the
  * judge's feared reply; without it, the general rule). `rules`: the boss's (a test's stand-in).
@@ -240,6 +258,7 @@ export function boardAltered(
   if (!boss?.powers || !rules) return false;
   if (rules.standAltered && stand) return rules.standAltered(boss, fen, stand.played, stand.reply);
   if (rules.powerTurn?.(boss, fen) || rules.bossStops?.(boss) || rules.altersBoard?.(boss)) return true;
+  if (rules.layer && bindsBosses(rules.layer(boss, fen))) return true;
   if (!rules.crowdFilter && !rules.layer) return false;
   const legal = legalMoves(fen);
   return limitCrowd(rules, boss, fen, legal).length < legal.length;

@@ -70,8 +70,8 @@ import type { BoardState } from "../boards.ts";
 import { applyMove, attackedSquares, exchangeNet, fenAtPly, kingAttacked, legalMoves, matingMoves, pieceAt, sideToMove, withoutPiece } from "../rules.ts";
 import type { EngineLike } from "../runner.ts";
 import type { MoveScore } from "../uci.ts";
-import { heldBy, PASS_WAIT, VALUE, from, logit, moveSquares, other, powerRoll, testSwitch, to, turnOf, type Battle, type BossRules, type Side, type StopFields, type TurnContext } from "./base.ts";
-import { heldIn } from "../board-layer.ts";
+import { PASS_WAIT, VALUE, from, logit, other, powerRoll, testSwitch, to, turnOf, type Battle, type BossRules, type Side, type StopFields, type TurnContext } from "./base.ts";
+import { heldIn, marksStop, type LayerMarks, type PieceMark, type SquareMark } from "../board-layer.ts";
 import { lands } from "./boingo.ts";
 import { passTurn } from "./hollow.ts";
 import { castAnswer } from "./hopper.ts";
@@ -441,7 +441,7 @@ export function chooseScatter(fen: string, crowd: Side, seed: number, n: number,
   const pick = pickTop(ordered, s.looks, seed, "scatter-pick", n);
   if (!pick) return null;
   const squares = [...pick.squares];
-  while (squares.length && !legal.some((m) => !lands(m, fen).some((sq) => squares.includes(sq)))) squares.pop();
+  while (squares.length && !legal.some((m) => !marksStop(chandyMarks({ scatter: squares, beam: [], shields: [] }), fen, m))) squares.pop();
   return squares.length ? { spot: pick.spot, squares } : null;
 }
 
@@ -457,8 +457,8 @@ export function beamSquares(rank: number, file: string): string[] {
   return [...out];
 }
 
-/** A crowd move under a beam's cover (`squares`): none of its pieces in it moves, nothing lands on or slides through it. */
-export const beamAllows = (fen: string, move: string, squares: readonly string[]): boolean => !heldIn(fen, move, squares) && !moveSquares(move, fen).slice(1).some((sq) => squares.includes(sq));
+/** A crowd move under a beam's cover (`squares`): none of its pieces in it moves, nothing lands on or slides through it (chandyMarks). */
+export const beamAllows = (fen: string, move: string, squares: readonly string[]): boolean => !marksStop(chandyMarks({ beam: squares, scatter: [], shields: [] }), fen, move);
 
 /**
  * The beam's rank and file (`fen`: the crowd to move): never the crowd king's rank or file; the pairs holding the most of the
@@ -814,9 +814,9 @@ export function mateOpen(next: Pick<BossPowerState, "chandy">, t: Pick<TurnConte
   const mates = matingMoves(t.fen);
   if (!mates.length) return false;
   const c = next.chandy;
-  const held = [...(on(c?.dizzy, t.turn)?.squares ?? []), ...(on(c?.beam, t.turn)?.squares ?? [])];
   const f = stopFieldsOf({ chandy: c, turn: t.turn });
-  const ok = (m: string) => !(held.length && heldIn(t.fen, m, held)) && !chandyStop(f, t.fen, m);
+  const marks = chandyMarks(f, on(c?.dizzy, t.turn)?.squares ?? []);
+  const ok = (m: string) => !marksStop(marks, t.fen, m) && !(f?.shields.length && takesShield(t.fen, m, f.shields));
   return mates.some(ok) || !legalMoves(t.fen).some(ok);
 }
 
@@ -921,26 +921,17 @@ export const CHANDY: BossRules = {
     }
     next.chandy = c;
   },
-  // Rapid fire's dizzy pieces and those under the beam: they don't move this turn, nor castle with a held rook (held on the
-  // board layer).
+  // On the board layer (chandyMarks): rapid fire's dizzy pieces and those under the beam don't move this turn, nor castle with a
+  // held rook; the beam's squares are walls to the crowd's pieces; nobody lands on a scatter shot's square, him included, through
+  // his move after your turn (Boingo's pie rule).
   layer: (boss) => {
     const p = boss.powers!;
-    const c = chandyOf(p);
-    const dizzy = heldBy(boss, "dizzy", on(c.dizzy, p.turn)?.squares ?? []);
-    const beam = heldBy(boss, "beam", on(c.beam, p.turn)?.squares ?? []);
-    return dizzy || beam ? { pieces: [...(dizzy?.pieces ?? []), ...(beam?.pieces ?? [])] } : null;
+    return chandyMarks(stopFieldsOf(p), on(chandyOf(p).dizzy, p.turn)?.squares ?? []);
   },
-  // The beam's walls, the scatter shot's squares, the shields.
+  // The shields.
   crowdFilter(allowed, boss, fen) {
-    const f = stopFieldsOf(boss.powers);
-    if (!f || (!f.scatter.length && !f.beam.length && !f.shields.length)) return allowed;
-    return allowed.filter((m) => !chandyStop(f, fen, m));
-  },
-  // Nobody lands on a scatter shot's square, him included, through his move after your turn (Boingo's pie rule).
-  bossStops(boss) {
-    const p = boss.powers!;
-    const sc = on(chandyOf(p).scatter, p.turn);
-    return sc ? (m, fen) => lands(m, fen).some((sq) => sc.squares.includes(sq)) : null;
+    const shields = stopFieldsOf(boss.powers)?.shields ?? [];
+    return shields.length ? allowed.filter((m) => !takesShield(fen, m, shields)) : allowed;
   },
   stopReason: (boss, fen, m) => chandyStop(stopFieldsOf(boss.powers), fen, m),
   powerTurn: (boss) => {
@@ -988,11 +979,30 @@ export function stopFieldsOf(p: StopFields | null | undefined): ChandyStopFields
   return { scatter: now(c.scatter), beam: now(c.beam), shields: now(c.shields) };
 }
 
+/**
+ * His marks on the board layer this crowd turn (`f`: the beam's and scatter shot's squares; `dizzy`: rapid fire's pieces): the
+ * dizzy pieces and the crowd's pieces under the beam held; the beam's squares walls to the crowd's pieces (nothing lands on or
+ * slides through one; a knight jumps); the scatter shot's squares landed on by nobody, him included. Null: none.
+ */
+export function chandyMarks(f: ChandyStopFields | null, dizzy: readonly string[] = []): LayerMarks | null {
+  const beam = f?.beam ?? [];
+  const scatter = f?.scatter ?? [];
+  if (!beam.length && !scatter.length && !dizzy.length) return null;
+  const held = (kind: "dizzy" | "beam", squares: readonly string[]): PieceMark[] => squares.map((square) => ({ square, kind, held: true, binds: "crowd", by: "chandy" }));
+  return {
+    pieces: [...held("dizzy", dizzy), ...held("beam", beam)],
+    squares: [
+      ...beam.map((square): SquareMark => ({ square, kind: "beam", noLand: true, noPass: true, binds: "crowd", by: "chandy" })),
+      ...scatter.map((square): SquareMark => ({ square, kind: "scatter", noLand: true, binds: "both", by: "chandy" })),
+    ],
+  };
+}
+
 /** Which of his powers stops `move` now (the screens' words): the beam (a held piece in it, or a wall), a scatter shot's square, a shield. */
 export function chandyStop(f: ChandyStopFields | null, fen: string, move: string): "beam" | "scatter" | "shield" | null {
   if (!f) return null;
-  if (f.beam.length && !beamAllows(fen, move, f.beam)) return "beam";
-  if (f.scatter.length && lands(move, fen).some((sq) => f.scatter.includes(sq))) return "scatter";
+  const mark = marksStop(chandyMarks(f), fen, move);
+  if (mark) return mark.kind as "beam" | "scatter";
   if (f.shields.length && takesShield(fen, move, f.shields)) return "shield";
   return null;
 }

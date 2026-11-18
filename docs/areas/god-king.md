@@ -52,7 +52,8 @@ Lane: `god-king`. The bosses' own rules and art are on [bosses.md](bosses.md).
   are plain chess's, so while a boss's power has changed the board the Last Stand sits out: the move stands, nothing is
   spent, no word; once the board is plain again he saves as before. One rule for every boss (`boardAltered` in
   `boss-powers.ts`, from the runner's `lastStandFor`): a power touches the turn (`powerTurn`, fair play's own test),
-  something stops his moves (`bossStops`), something stops any of the crowd's (`crowdFilter`), or something else of his
+  something stops his moves (`bossStops`, or a mark on the board layer that binds him), something stops any of the crowd's
+  (the board layer's marks, `crowdFilter`), or something else of his
   is on the board (`altersBoard`: Hollow's dark, the Roman candle's shadows, the carrots). Big Boy's toy blocks are the
   one exception (`standAltered`, Eric's (b), Nov 18: his tower stands nearly every turn, which kept the save off for good):
   they keep him off only when they take away the boss's reply the judge fears, as the blocks will stand for that reply (a

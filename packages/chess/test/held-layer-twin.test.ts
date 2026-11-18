@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { BOSS_ROSTER, type BossState } from "@chessroyale/core";
-import { boardAltered, bossRules, crowdAllowed, legalMoves, pieceAt, type BossRules } from "../src/index.ts";
+import { bindsBosses, boardAltered, bossRules, crowdAllowed, layerStop, legalMoves, mergeLayers, pieceAt, type BossRules } from "../src/index.ts";
 import { kitBattles, quickSearches, runBattle, type KitBattle } from "./boss-kit-lib.ts";
 
 /**
@@ -34,9 +34,17 @@ function oldHeldIn(fen: string, move: string, held: readonly string[]): boolean 
   return held.includes(`${f1 > f0 ? "h" : "a"}${move[1]}`);
 }
 
-/** boss-powers.ts `limitCrowd`: the held pieces' moves out, then the boss's other limits. */
+/**
+ * boss-powers.ts `limitCrowd`: the held pieces' moves out, then the boss's other limits (since PR 3 the square marks on the
+ * layer too: square-layer-twin.test.ts is their twin).
+ */
 function oldLimitCrowd(rules: BossRules, boss: BossState, fen: string, legal: string[], held: readonly string[]): string[] {
-  const free = held.length ? legal.filter((m) => !oldHeldIn(fen, m, held)) : legal;
+  let free = held.length ? legal.filter((m) => !oldHeldIn(fen, m, held)) : legal;
+  const marks = rules.layer?.(boss, fen);
+  if (marks?.squares?.length || marks?.edges?.length) {
+    const rest = mergeLayers(boss.crowdSide, [{ squares: marks.squares, edges: marks.edges }]);
+    free = free.filter((m) => !layerStop(rest, fen, m));
+  }
   return rules.crowdFilter ? rules.crowdFilter(free, boss, fen) : free;
 }
 
@@ -56,6 +64,8 @@ function oldCrowdAllowed(rules: BossRules, boss: BossState, fen: string, held: r
 /** boss-powers.ts `boardAltered`, the general test (every boss here has a held list, so it never stops early). */
 function oldBoardAltered(rules: BossRules, boss: BossState, fen: string, held: readonly string[]): boolean {
   if (rules.powerTurn?.(boss, fen) || rules.bossStops?.(boss) || rules.altersBoard?.(boss)) return true;
+  // (A square mark that binds him, since PR 3: his bossStops before.)
+  if (bindsBosses(rules.layer?.(boss, fen))) return true;
   const legal = legalMoves(fen);
   return oldLimitCrowd(rules, boss, fen, legal, held).length < legal.length;
 }
@@ -87,8 +97,9 @@ describe("the held pieces on the board layer: the twin of today's rule", () => {
       const diffs: string[] = [];
       try {
         for (const k of battlesOf(id)) {
-          await runBattle(k, null, (r, fen) => {
+          await runBattle(k, null, (r, fen, who) => {
             const boss = r.boss!;
+            if (who !== "crowd") return;
             if (!boss.powers) return;
             const rules = bossRules(boss)!;
             const held = (rules.layer?.(boss, fen)?.pieces ?? []).filter((m) => m.held).map((m) => m.square);

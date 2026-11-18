@@ -15,7 +15,7 @@ import { applyMove, legalMoves, pieceAt, sideToMove, toSan } from "../rules.ts";
 import type { EngineLike } from "../runner.ts";
 import type { MoveScore } from "../uci.ts";
 import { heldBy, VALUE, bossPowers, from, moveLoss, powerRoll, to, turnOf, warnThenUnleash, type Battle, type BossRules, type Side } from "./base.ts";
-import { heldIn } from "../board-layer.ts";
+import { heldIn, marksStop, movePaths, type SquareMark } from "../board-layer.ts";
 
 /**
  * How long each of his moments holds the screen (ms; POWER_FX in boss-timing.ts). The pie's: its banner, his throw, the
@@ -26,29 +26,12 @@ export const BOINGO_FX = { pie: 2700, funhouse: 5200, spin: 2600 } as const;
 
 /**
  * The squares a move lands a piece on: its target, and castling's rook too (the review of the face pie, Nov 12: a rook could castle
- * onto a pie). Castling is any king move that also moves its own rook (standard or Chess960 notation alike): found by playing it.
+ * onto a pie). The board layer's ways (movePaths): castling, standard or Chess960 notation alike, lands the king and his rook.
  */
-export function lands(m: string, fen: string): string[] {
-  const king = pieceAt(fen, from(m));
-  if (king?.type !== "k" || from(m)[1] !== to(m)[1]) return [to(m)];
-  const near = Math.abs(from(m).charCodeAt(0) - to(m).charCodeAt(0));
-  const own = pieceAt(fen, to(m));
-  if (near < 2 && !(own && own.color === king.color)) return [to(m)];
-  try {
-    const after = applyMove(fen, m);
-    const rank = from(m)[1]!;
-    const out = new Set<string>([to(m)]);
-    for (const f of "abcdefgh") {
-      const sq = `${f}${rank}`;
-      const p = pieceAt(after, sq);
-      const was = pieceAt(fen, sq);
-      if (p && p.color === king.color && (!was || was.type !== p.type || was.color !== p.color)) out.add(sq);
-    }
-    return [...out];
-  } catch {
-    return [to(m)];
-  }
-}
+export const lands = (m: string, fen: string): string[] => movePaths(m, fen).map((p) => p.to);
+
+/** Pies on `squares`: nothing lands on one, either side (castling's rook included). Boingo's part of the board layer. */
+export const pieMarks = (squares: readonly string[]): SquareMark[] => squares.map((square) => ({ square, kind: "pie", noLand: true, binds: "both", by: "clown" }));
 
 /** The legal moves of the side not to move (as if it were its turn): what a square would block for the boss. */
 function movesOfOther(fen: string): string[] {
@@ -116,7 +99,8 @@ export function choosePieThrow(
       if (!pied || pied.some((sq) => pieceAt(fen, sq) || taken.includes(sq))) continue;
       const marked = marks.find((m) => m.square === square)?.n ?? 0;
       const freeze = marked + 1 >= Math.max(1, s.pieSplatsToFreeze);
-      const onPie = (m: string) => lands(m, fen).some((sq) => pied.includes(sq));
+      const pies = { squares: pieMarks(pied) };
+      const onPie = (m: string) => !!marksStop(pies, fen, m);
       if (!legal.some((m) => !onPie(m) && !(freeze && heldIn(fen, m, [square])))) continue;
       if (his.length && his.every(onPie)) continue;
       const own = legal.filter((m) => from(m) === square && onPie(m)).length;
@@ -271,21 +255,13 @@ export const BOINGO: BossRules = {
     t.events.push({ kind: "pie", turn: t.turn, square: pick.square, squares: [...pick.pied] });
     next.nextPassive = t.turn + (test ? 1 : Math.max(1, t.s.pieEvery));
   },
-  // A frozen piece can't move, nor castle with a frozen rook (held on the board layer).
-  layer: (boss) => heldBy(boss, "frozen", boss.powers!.frozen ? [boss.powers!.frozen.square] : []),
-  // Nobody can move onto a pie, the boss included.
-  crowdFilter(allowed, boss, fen) {
-    const pied = piedSquares(boss);
-    return pied.length ? allowed.filter((m) => !lands(m, fen).some((sq) => pied.includes(sq))) : allowed;
+  // On the board layer: a frozen piece can't move, nor castle with a frozen rook; nobody can move onto a pie, the boss included.
+  layer: (boss) => {
+    const pies = pieMarks(piedSquares(boss));
+    const frozen = heldBy(boss, "frozen", boss.powers!.frozen ? [boss.powers!.frozen.square] : []);
+    return frozen || pies.length ? { pieces: frozen?.pieces ?? [], squares: pies } : null;
   },
-  bossStops(boss) {
-    const pied = piedSquares(boss);
-    return pied.length ? (m) => pied.includes(to(m)) : null;
-  },
-  stopReason: (boss, fen, m) => {
-    const pied = (boss.powers?.pies ?? []).map((x) => x.square);
-    return pied.length && lands(m, fen).some((sq) => pied.includes(sq)) ? "pie" : null;
-  },
+  stopReason: (boss, fen, m) => (marksStop({ squares: pieMarks((boss.powers?.pies ?? []).map((x) => x.square)) }, fen, m) ? "pie" : null),
   powerTurn: (boss) => piedSquares(boss).length > 0 || !!boss.powers!.frozen || boardAngle(boss) !== 0,
   // The frozen piece shows ice (as Ginger's freeze), through the boss's turn after it too.
   iced: (boss) => (boss.powers!.frozen ? [boss.powers!.frozen.square] : []),
