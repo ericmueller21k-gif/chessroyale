@@ -1,3 +1,5 @@
+**PARKED (Eric, Nov 18): "Maybe for now then we stick to white, but need to consider changing this later for sure." Not started; pick up when Eric says.**
+
 # Every boss battle: you play White or Black at random (Eric, Nov 18). Opus, xhigh (every boss's rules, solo and online), alone
 
 Branch `claude/boss-random-side` from main. About 1.5-2 h. Read CLAUDE.md, `.claude/LESSONS.md`, `docs/areas/bosses.md`,
