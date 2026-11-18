@@ -1271,6 +1271,17 @@ export const BOSS_POWERS = {
     [4, 5],
   ] as readonly (readonly [number, number])[],
   /**
+   * Ginger's Super Freeze, his second meter (Eric, Nov 18: "another ult meter bar ... it'll probably be around turn like 8 to 15";
+   * "up to twice in 60 moves"; docs/decisions/2026-11-18-ginger-super-freeze.md). It fills one step a crowd move, full after a number
+   * of crowd moves drawn from the seed in superFreezeEvery (so the first is ready between crowd turns 8 and 15), and comes as the
+   * crowd's move lands on the turn it's full (the start of his turn, while he thinks): the crowd's piece whose 3 x 3 holds the most of
+   * the crowd's pieces (never the king; ties from the seed), and every one of the crowd's pieces in that 3 x 3 but the king is frozen
+   * for the crowd's next turn (the farthest from its middle let go first until the crowd has a legal move). Empty squares in it stay
+   * open. At most superFreezeMax a battle; it fills again from empty after each. Never on the blizzard's turns (it waits).
+   */
+  superFreezeEvery: [8, 15] as readonly [number, number],
+  superFreezeMax: 2,
+  /**
    * Boingo's pie (Eric, Nov 12: thrown in the face of one of the crowd's pieces whose two squares diagonally behind it are
    * empty; it splits onto those two squares): every pieEvery crowd turns from firstPassive (the next turn when there's no
    * target), the two squares pied for pieTurns crowd turns (nobody, either side, may move onto them; Eric: "just one

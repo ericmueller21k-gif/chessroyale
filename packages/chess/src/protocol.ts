@@ -319,6 +319,12 @@ export interface NetBossPowers {
   iced: string[];
   thaw?: string[];
   /**
+   * Ginger's Super Freeze, his second meter (Nov 18; missing for other bosses and from older servers): the meter (0-1, empty for good
+   * once spent), how many have come and the most a battle, the crowd's pieces it holds this turn, and its last one's middle square
+   * and the crowd move it came after.
+   */
+  superFreeze?: { meter: number; used: number; max: number; held: string[]; target: string | null; at: number | null };
+  /**
    * Boingo's funhouse: how far the board is turned clockwise from the crowd's own view this turn (0, 90, 180, 270;
    * missing from older servers), `flipped` when it's 180 (older screens), and the funhouse itself (the turn it came, the
    * side of its quarter turn, and the crowd's move he played for it as it came: `move`, `san`).

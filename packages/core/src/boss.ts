@@ -77,7 +77,7 @@ export interface BossInfo {
 }
 
 /** The boss powers there are: a passive (or opening) and an ultimate per boss. */
-export type PowerId = "freeze" | "blizzard" | "pie" | "funhouse" | "sparkler" | "candle" | "dark" | "lightsout" | "blocks" | "bounce" | "cuts" | "boardsaw" | "drag" | "showdown" | "nohelp" | "bullet" | "tusks" | "slam" | "leapfrog" | "carrotpatch" | "camouflage" | "repaint" | "moonbeam" | "fullmoon" | "seeds" | "water" | "balloons" | "hoops" | "draft" | "crease" | "revision" | "scraps" | "gnaw" | "clockslap" | "scramble" | "rush" | "clockfit" | "popoff" | "split" | "dough" | "goldplate" | "lockon" | "dodge" | "scatter" | "beam" | "shields" | "rapidfire" | "queenlock";
+export type PowerId = "freeze" | "blizzard" | "pie" | "funhouse" | "sparkler" | "candle" | "dark" | "lightsout" | "blocks" | "bounce" | "cuts" | "boardsaw" | "drag" | "showdown" | "nohelp" | "bullet" | "tusks" | "slam" | "leapfrog" | "carrotpatch" | "camouflage" | "repaint" | "moonbeam" | "fullmoon" | "seeds" | "water" | "balloons" | "hoops" | "draft" | "crease" | "revision" | "scraps" | "gnaw" | "clockslap" | "scramble" | "rush" | "clockfit" | "popoff" | "split" | "dough" | "goldplate" | "lockon" | "dodge" | "scatter" | "beam" | "shields" | "rapidfire" | "queenlock" | "superfreeze";
 /**
  * Every power, for the test switch (?power=<id>: a boss's ultimate comes early; its passive as usual, but for Wrangler's
  * drag and Alfil's Tusks, which come sooner and more often, the hopper's Leapfrog, whose battle starts with a hop due
@@ -98,7 +98,7 @@ export type PowerId = "freeze" | "blizzard" | "pie" | "funhouse" | "sparkler" | 
  * his five moves has a switch of its own (?power=scatter, beam, shields, rapidfire, queenlock: not on his BOSS_ROSTER line): that
  * move unlocked from the start and his move meter full from the second turn (bosses/chandy.ts).
  */
-export const POWER_IDS: readonly PowerId[] = ["freeze", "blizzard", "pie", "funhouse", "sparkler", "candle", "dark", "lightsout", "blocks", "bounce", "cuts", "boardsaw", "drag", "showdown", "nohelp", "bullet", "tusks", "slam", "leapfrog", "carrotpatch", "camouflage", "repaint", "moonbeam", "fullmoon", "seeds", "water", "balloons", "hoops", "draft", "crease", "revision", "scraps", "gnaw", "clockslap", "scramble", "rush", "clockfit", "popoff", "split", "dough", "goldplate", "lockon", "dodge", "scatter", "beam", "shields", "rapidfire", "queenlock"];
+export const POWER_IDS: readonly PowerId[] = ["freeze", "blizzard", "pie", "funhouse", "sparkler", "candle", "dark", "lightsout", "blocks", "bounce", "cuts", "boardsaw", "drag", "showdown", "nohelp", "bullet", "tusks", "slam", "leapfrog", "carrotpatch", "camouflage", "repaint", "moonbeam", "fullmoon", "seeds", "water", "balloons", "hoops", "draft", "crease", "revision", "scraps", "gnaw", "clockslap", "scramble", "rush", "clockfit", "popoff", "split", "dough", "goldplate", "lockon", "dodge", "scatter", "beam", "shields", "rapidfire", "queenlock", "superfreeze"];
 /**
  * Test switches that aren't a power of their own (?power=<id>), for one boss's moments: Dash's stall skit early (`stall`: its slam and
  * fake move a few seconds into the first move it can come on) and his lying-down clock tap from the first move (`clocktap`).
@@ -576,6 +576,11 @@ export interface BossPowerState {
    */
   blizzard?: { turn: number; square: string; at?: number; iced?: string[]; next?: string[] } | null;
   /**
+   * Ginger's Super Freeze (his second meter; Eric, Nov 18; docs/decisions/2026-11-18-ginger-super-freeze.md): set as his battle's
+   * first crowd turn begins.
+   */
+  superFreeze?: SuperFreezeState | null;
+  /**
    * Boingo's pies: each pied square (nobody may move onto it) through its crowd turn; up to BOSS_POWERS.pieMax. Since Nov 12
    * a throw pies the two squares diagonally behind the piece it hits (Eric's face pie).
    */
@@ -775,6 +780,26 @@ export interface BossPowerState {
  *   full strength. Null: none.
  * - `dazed`: the crowd turn whose start plays the Full Moon's end (after his last move at full strength).
  */
+/**
+ * Ginger's Super Freeze, his second meter (Eric, Nov 18): it fills one step a crowd move and is full as crowd turn `since + need`
+ * begins; as that turn's move lands (the start of his turn) it comes, at most BOSS_POWERS.superFreezeMax times a battle, then
+ * fills again from empty.
+ */
+export interface SuperFreezeState {
+  /** The crowd moves when the meter last emptied (0: the battle's start; else the crowd move his last Super Freeze came after). */
+  since: number;
+  /** The crowd moves it takes to fill this time (BOSS_POWERS.superFreezeEvery, from the seed; the test switch: 1, then 2). */
+  need: number;
+  /** How many have come this battle. */
+  used: number;
+  /**
+   * The last one: after crowd move `at` (the start of his turn), on the crowd's piece on `target`; `squares`, the crowd's pieces
+   * then in the 3 x 3 round it (never the king). They're held on crowd turn `at + 1`: `held`, set as that turn begins, those still
+   * there (his move may take one) that leave the crowd a legal move (the farthest from `target` let go first).
+   */
+  hit: { at: number; target: string; squares: string[]; held?: string[] } | null;
+}
+
 export interface MooState {
   moves: number;
   stun: { turn: number; squares: string[]; flurry?: true } | null;
@@ -1577,6 +1602,8 @@ export interface BurnEvent {
  */
 export type PowerEventKind =
   | "freeze"
+  // Ginger's Super Freeze (Nov 18): at the start of his turn, the 3 x 3 round `square` iced; `squares`, the crowd's pieces in it.
+  | "superFreeze"
   | "pie"
   | "warn"
   | "blizzard"

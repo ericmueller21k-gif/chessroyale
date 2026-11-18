@@ -1,6 +1,6 @@
 import { BOSS_POWERS, MOO_CINEMATIC, bannerPlusMs, bossBannerMs } from "@chessroyale/core";
 import { gameEnd, sideToMove, type Base, type Capture } from "./rules.ts";
-import { GINGER_FX } from "./bosses/ginger.ts";
+import { GINGER_FX, SUPER_FREEZE_BEATS } from "./bosses/ginger.ts";
 import { BOINGO_FX } from "./bosses/boingo.ts";
 import { FIRE_BURN_MS, GREX_FX } from "./bosses/grex.ts";
 import { CLAIM_MS, HOLLOW_FX, HOLLOW_FX_EXTRA } from "./bosses/hollow.ts";
@@ -94,6 +94,8 @@ export const powerFxMs = (e: FxEvent): number => (POWER_FX[e.kind] ?? 0) + (POWE
 export const POWER_BANNERS: Partial<Record<keyof typeof POWER_FX, readonly (readonly [from: number, window: number])[]>> = {
   warn: [[0, 1500]],
   freeze: [[0, 1500]],
+  // (Ginger's SUPER FREEZE!, Nov 18: off the board as he starts charging.)
+  superFreeze: [[0, SUPER_FREEZE_BEATS.chargeAt]],
   blizzard: [[0, 1300]],
   thaw: [[0, 1300]],
   pie: [[0, 1450]],
@@ -324,6 +326,24 @@ export const zebraTurnMs = (boss: { powers?: { events?: readonly { kind: string;
  */
 export const chandyTurnMs = (boss: { powers?: { events?: readonly { kind: string; first?: boolean }[] } | null } | null | undefined): number =>
   powerMomentMs((boss?.powers?.events ?? []).filter((e): e is { kind: "lockOn" | "queenShot" } => e.kind === "queenShot" || (e.kind === "lockOn" && !!e.first)));
+
+/** Ginger's Super Freeze came at the start of his turn (as the crowd's move just played landed: its `superFreeze` among this turn's events). */
+const superFreezeNow = (boss: { powers?: { events?: readonly { kind: string }[] } | null } | null | undefined): boolean =>
+  !!boss?.powers?.events?.some((e) => e.kind === "superFreeze");
+
+/**
+ * How long after his thinking screen comes his Super Freeze's moment starts: when the crowd's move that brought it also took his
+ * queen, after QUEEN SLAIN! and its beat (as Moo's Full Moon: fullMoonLeadMs), else at once.
+ */
+export const superFreezeLeadMs = (boss: QueenSlainView): number => (superFreezeNow(boss) && queenSlain(boss) ? bossBannerMs() + 500 : 0);
+
+/**
+ * Ginger's Super Freeze at the start of his turn (Nov 18): it plays while he thinks, so his thinking lasts at least as long (the ms;
+ * 0: none): QUEEN SLAIN! first if his queen just fell (superFreezeLeadMs), the moment (its banner's hold included) and a margin after
+ * it (MOO_CINEMATIC.tailPadMs, the same margin: a late frame or a slow connection never cuts its end). The same in solo and online.
+ */
+export const gingerTurnMs = (boss: QueenSlainView): number =>
+  superFreezeNow(boss) ? superFreezeLeadMs(boss) + powerMomentMs((boss.powers?.events ?? []).filter((e): e is { kind: "superFreeze" } => e.kind === "superFreeze")) + MOO_CINEMATIC.tailPadMs : 0;
 
 /**
  * Folio's moments at the start of its turn (as the crowd's move just played landed: a `fold` or a `revision` among this
