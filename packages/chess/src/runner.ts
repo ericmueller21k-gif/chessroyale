@@ -34,6 +34,10 @@ import {
   type GroupEvaluation,
   type GroupResult,
   type BossState,
+  type BossOwn,
+  BATTLE_TOWER,
+  BOSS_OWN_FIELDS,
+  BOSS_ROSTER,
   type MatchState,
   type PlayerState,
   type RetireReason,
@@ -94,6 +98,18 @@ import {
   judgeCandidates,
   powerTurn,
   prepareTurn,
+  sideBoardAltered,
+  sideBossAllowed,
+  sideBossStopped,
+  sideCrowdAllowed,
+  sideEvaluation,
+  sideIcedSquares,
+  sideMustScore,
+  sideOffers,
+  sidePowerTurn,
+  sideRanked,
+  sideRates,
+  sideStopReason,
   rageOf,
   ragePaused,
   strikeRage,
@@ -109,6 +125,7 @@ import {
   triggerUltimate,
   type LightsTally,
   darkSquares,
+  darkForcedMoveFrom,
   bigboyBattle,
   boingoBattle,
   shownAngle,
@@ -260,6 +277,20 @@ export interface RunnerSnapshot {
  * The engine is any object with `topMoves` and `scoreMoves`; several engines
  * can be passed to search boards in parallel.
  */
+/** A boss in full on a side of several: the battle's shared fields from `b` (the boss in focus), his own part from `own`. */
+function withOwn(b: BossState, own: BossOwn): BossState {
+  const shared: Partial<BossState> = { ...b };
+  for (const k of BOSS_OWN_FIELDS) delete shared[k];
+  return { ...shared, ...own } as BossState;
+}
+
+/** A boss's own part (BossOwn): his id, strength and powers. */
+function ownOf(b: BossState): BossOwn {
+  const own: Partial<Record<keyof BossOwn, unknown>> = {};
+  for (const k of BOSS_OWN_FIELDS) if (b[k] !== undefined) own[k] = b[k];
+  return own as BossOwn;
+}
+
 export class MatchRunner {
   state: MatchState;
   boards = new Map<number, BoardState>();
@@ -357,6 +388,7 @@ export class MatchRunner {
 
   /** Boss raid: the boss is there from the start, from the starting position; strikes stop at half the group; the King has every charge. */
   private startRaid() {
+    if ((this.settings.bossIds?.length ?? 0) > 1) return this.startSide();
     const id = this.state.boards[0]!;
     const board = this.boards.get(id)!;
     const n = this.alive().length;
@@ -426,6 +458,7 @@ export class MatchRunner {
   private preparePowers() {
     const b = this.state.boss;
     if (!b?.powers) return;
+    if (this.several()) return this.prepareSide();
     const board = this.boards.get(this.state.boards[0]!)!;
     const hisMoved = sideToMove(board.fen) === b.crowdSide;
     if (this.finalGameOver() && !carrotBattle.won(b)) {
@@ -442,41 +475,45 @@ export class MatchRunner {
 
   /** Boss battle, Hollow's dark: the squares covered this turn (their pieces hidden; a move touching one goes unchecked). */
   darkSquares(): string[] {
+    if (this.several()) return [...new Set(this.sideBosses().flatMap((b) => darkSquares(b)))];
     return darkSquares(this.state.boss);
   }
 
   /** Hollow's dark: a move attempt that touches a dark square, sent unchecked (see hollowBattle.darkTry). */
   darkTry(playerId: string, move: string): DarkTryResult {
-    return hollowBattle.darkTry(this.battle, playerId, move);
+    return this.asBoss(this.bossIndex("hollow"), () => hollowBattle.darkTry(this.battle, playerId, move));
   }
 
   /** Hollow in Boss alone: the dark is to play your move this turn (a 3rd or 7th bulb out), not yet picked. */
   darkForcedDue(): boolean {
-    return hollowBattle.darkForcedDue(this.battle);
+    return this.asBoss(this.bossIndex("hollow"), () => hollowBattle.darkForcedDue(this.battle));
   }
 
   /** The dark's move for you (a bad one: darkForcedMoveFrom), from this device's engine: the turn's only move from now. */
   async playDarkForced(engine: EngineLike = this.opts.engines[0]!): Promise<string> {
+    // (Several bosses: Hollow's, with him in focus only while his rules are asked, never across the engine's wait.)
+    if (this.several()) return this.applyDarkForced(await darkForcedMoveFrom(engine, this.boards.get(this.state.boards[0]!)!.fen, this.crowdAllowed()));
     return hollowBattle.playDarkForced(this.battle, engine);
   }
 
   /** Sets the dark's move for you (an engine's answer; see hollowBattle.applyDarkForced). */
   applyDarkForced(move: string): string {
-    return hollowBattle.applyDarkForced(this.battle, move);
+    return this.asBoss(this.bossIndex("hollow"), () => hollowBattle.applyDarkForced(this.battle, move));
   }
 
   /** The battle was Hollow's by his last bulb (Boss alone): for the result screen (the results' `blackout`). */
   get bossBlackout(): boolean {
-    return blackedOut(this.state.boss);
+    return this.sideBosses().some((b) => blackedOut(b)) || blackedOut(this.state.boss);
   }
 
   /** Hollow's dark: each player's wrong attempts into the dark this round. */
   darkTries(): Record<string, number> {
-    return hollowBattle.darkTries(this.battle);
+    return this.asBoss(this.bossIndex("hollow"), () => hollowBattle.darkTries(this.battle));
   }
 
   /** Boss battle, G-REX's fire: the tiles ablaze this crowd turn (a crowd piece left on one burns after the move). */
   fireBurn(): string[] {
+    if (this.several()) return [...new Set(this.sideBosses().flatMap((b) => ablaze(b)))];
     return this.state.boss ? ablaze(this.state.boss) : [];
   }
 
@@ -484,6 +521,8 @@ export class MatchRunner {
   crowdAllowed(boardId = this.state.boards[0]!): string[] | null {
     const b = this.state.boss;
     if (!b) return null;
+    // (Several bosses: every boss's marks and limits at once: sideCrowdAllowed. One: crowdAllowed, as ever.)
+    if (this.several()) return sideCrowdAllowed(this.sideBosses(), this.boards.get(boardId)!.fen);
     return crowdAllowed(b, this.boards.get(boardId)!.fen);
   }
 
@@ -522,7 +561,7 @@ export class MatchRunner {
   /** This round's move clock in seconds (see moveClockAt): the same everywhere a clock is set. */
   moveClock(boardId?: number): number {
     // (Dash's clock: a scrambled move's seconds, a slapped move's shorter clock on a raid's timer: dashMoveClock.)
-    return dashMoveClock(this.state.boss, moveClockAt(this.settings, this.clockMove(boardId)));
+    return dashMoveClock(this.several() ? this.sideBosses().find((b) => b.id === "dash") : this.state.boss, moveClockAt(this.settings, this.clockMove(boardId)));
   }
 
   /**
@@ -570,7 +609,7 @@ export class MatchRunner {
   bossOutOfTime(): boolean {
     if (!this.state.boss || (!bulletClock(this.state.boss) && !this.settings.bossClock)) return false;
     // (Against a boss with noTimeLoss, Dash, an empty bank isn't a loss: a move nobody picked in time is played for the crowd.)
-    if (bossRules(this.state.boss)?.noTimeLoss) return false;
+    if (bossRules(this.state.boss)?.noTimeLoss || (this.several() && this.sideBosses().some((b) => bossRules(b)?.noTimeLoss))) return false;
     const alive = this.alive();
     return alive.length > 0 && alive.every((p) => p.bankMs <= 0);
   }
@@ -691,12 +730,12 @@ export class MatchRunner {
     const allowed = crowdTurn ? (this.crowdAllowed(id) ?? undefined) : undefined;
     // (The boss's rules for the judge, e.g. G-REX's fire: a piece left on a tile ablaze counts as gone, and the moves
     // that save it are always looked at.)
-    const boss = crowdTurn ? this.state.boss : null;
-    const escapes = judgeMustScore(boss, fen).filter((m) => !all.some((x) => x.move === m) && (!allowed || allowed.includes(m)));
+    const side = crowdTurn ? this.sideBosses() : [];
+    const escapes = sideMustScore(side, fen).filter((m) => !all.some((x) => x.move === m) && (!allowed || allowed.includes(m)));
     const withEscapes = escapes.length ? [...all, ...(await engine.scoreMoves(fen, escapes))] : all;
-    if (!allowed) return judgeRanked(boss, withEscapes, fen).slice(0, Math.max(all.length, 1));
+    if (!allowed) return sideRanked(side, withEscapes, fen).slice(0, Math.max(all.length, 1));
     const top = judgeCandidates({ allowed }, withEscapes, (await allowedSearch(engine, { fen, allowed }, withEscapes)) ?? []);
-    return judgeRanked(boss, top.length ? top : all, fen);
+    return sideRanked(side, top.length ? top : all, fen);
   }
 
   /**
@@ -804,7 +843,7 @@ export class MatchRunner {
     const allowed = this.crowdAllowed(boardId);
     const legal = allowed ?? legalMoves(board.fen);
     // (The boss's rules for the judge, e.g. G-REX's fire: the bots see a piece left on a tile ablaze as gone.)
-    const open = judgeRanked(this.state.boss, allowed ? judgeCandidates({ allowed }, top) : [...top], board.fen);
+    const open = sideRanked(this.sideBosses(), allowed ? judgeCandidates({ allowed }, top) : [...top], board.fen);
     const best = open[0]?.expected ?? top[0]!.expected;
     const candidates = open.map((m) => ({ move: m.move, loss: Math.max(0, (best - m.expected) * 100) }));
     // Crowd 50 v 50: the team's lean this turn, drawn once (the plan and the scoring share it).
@@ -849,7 +888,7 @@ export class MatchRunner {
     const open = await allowedSearch(engine, { fen: board.fen, allowed, picks: humans }, all);
     const top = judgeCandidates({ allowed }, all, open ?? []);
     // (The boss's rules may offer the bots more moves, scored first: Chub & Chirp's race, the moves that pull a carrot.)
-    const offers = judgeOffers(this.state.boss, board.fen).filter((m) => (!allowed || allowed.includes(m)) && !top.some((t) => t.move === m));
+    const offers = sideOffers(this.sideBosses(), board.fen).filter((m) => (!allowed || allowed.includes(m)) && !top.some((t) => t.move === m));
     const offered = offers.length ? await engine.scoreMoves(board.fen, offers) : [];
     const botPicks = this.botPicksFor(boardId, playerIds, [...top, ...offered]);
     const picks: Record<string, string | null> = {};
@@ -858,7 +897,7 @@ export class MatchRunner {
     for (const m of open ?? []) known.set(m.move, m.expected);
     for (const m of offered) known.set(m.move, m.expected);
     // (The boss's rules for the judge, e.g. G-REX's fire: every move that takes a piece off a tile ablaze is scored too.)
-    const escapes = judgeMustScore(this.state.boss, board.fen).filter((m) => !allowed || allowed.includes(m));
+    const escapes = sideMustScore(this.sideBosses(), board.fen).filter((m) => !allowed || allowed.includes(m));
     const missing = [...new Set([...Object.values(picks), ...escapes].flatMap((m) => (m && !known.has(m) ? [m] : [])))];
     const extra = [...(open ?? []), ...offered, ...(missing.length ? await engine.scoreMoves(board.fen, missing) : [])];
     for (const m of extra) known.set(m.move, m.expected);
@@ -892,7 +931,7 @@ export class MatchRunner {
     // path's numbers come in raw). Then the best move is the highest-scored of the judge's best and the picks (bestOf:
     // after any re-check, which weighed a pick above the first line against it like for like), on every path.
     const pickList = playerIds.map((id) => picks[id] ?? null);
-    const judged = judgeEvaluation(this.state.boss, limited.evaluation, board.fen);
+    const judged = sideEvaluation(this.sideBosses(), limited.evaluation, board.fen);
     const evaluation = bestOf(judged, pickList);
     // Boss battle: humans who called the King instead of picking abstain: no score, not a miss.
     const abstained = new Set(this.state.boss ? playerIds.filter((id) => !picks[id] && !this.player(id).isBot && this.kingCallers.has(id)) : []);
@@ -918,12 +957,12 @@ export class MatchRunner {
     this.missesOn(board.fen, result, scored);
     for (const id of abstained) result.players.push({ playerId: id, move: null, loss: null, roundScore: 0, abstained: true });
     // The boss's own costs on the round (Hollow's wrong attempts into the dark).
-    if (this.state.boss) bossRules(this.state.boss)?.scoreRound?.(this.battle, result.players);
+    if (this.state.boss) this.forEachBoss(() => bossRules(this.state.boss)?.scoreRound?.(this.battle, result.players));
     const king = this.kingDecision(playerIds, result);
     if (king.plays) result.playedMove = evaluation.bestMove;
     // Nobody picked in time: a boss's rules may play another move for the crowd than the engine's best (Dash's flag: one of the
     // judge's top moves at random). The lobby resolves its rounds here too, so solo and online agree.
-    const flag = this.state.boss && !king.plays && !pickList.some((m) => m) ? (bossRules(this.state.boss)?.outOfTime?.(this.state.boss, board.fen, this.crowdAllowed(boardId) ?? legalMoves(board.fen), scored.map((m) => m.move)) ?? null) : null;
+    const flag = this.state.boss && !king.plays && !pickList.some((m) => m) ? (this.sideBosses().reduce<string | null>((f, b) => f ?? bossRules(b)?.outOfTime?.(b, board.fen, this.crowdAllowed(boardId) ?? legalMoves(board.fen), scored.map((m) => m.move)) ?? null, null)) : null;
     if (flag) result.playedMove = flag;
     const lastStand = king.plays ? undefined : this.lastStandFor(board.fen, result.playedMove, best, scored, rawEvaluation);
     // Fair play where the boss's judge changed the numbers (Chub & Chirp's race): the turn counts only when the engine's
@@ -933,7 +972,7 @@ export class MatchRunner {
     // of it for a move already lost (expected under 0.1%). Any other such turn doesn't count (`power`): there the engine's numbers can charge a
     // carrot move more than the game does, and the race's read differently from any engine's (another best, other finds,
     // only moves, decided).
-    const power = powerTurn(this.state.boss, board.fen);
+    const power = this.several() ? sidePowerTurn(this.sideBosses(), board.fen) : powerTurn(this.state.boss, board.fen);
     let fairScored: BoardRound["fairScored"];
     let raceOff = false;
     if (!power && judged !== limited.evaluation) {
@@ -1075,7 +1114,7 @@ export class MatchRunner {
     const b = this.state.boss;
     // (Never when only one move was open: his re-pick has to leave the crowd another, a power's limits included. Never
     // against a boss his help doesn't work against: the Hidden Boss.)
-    if (!b || b.lastStand || b.barred || bossRules(b)?.blocksKing || (crowdAllowed(b, fen) ?? legalMoves(fen)).length < 2) return undefined;
+    if (!b || b.lastStand || b.barred || bossRules(b)?.blocksKing || ((this.several() ? sideCrowdAllowed(this.sideBosses(), fen) : crowdAllowed(b, fen)) ?? legalMoves(fen)).length < 2) return undefined;
     const mine = scored.find((m) => m.move === played);
     const loss = mine?.loss ?? 0;
     const charges = b.kingCharges ?? 0;
@@ -1087,7 +1126,7 @@ export class MatchRunner {
     // may be one the board doesn't allow (Eric, Oct 24: Babur's hoop). The move stands and nothing is spent. Big Boy's toy
     // blocks count only where they take that reply away (Eric's (b), Nov 18: `stand`). The test switch, ?laststand=1,
     // still calls him on any board.)
-    if (!this.forceLastStand && boardAltered(b, fen, bossRules(b), { played, reply })) return undefined;
+    if (!this.forceLastStand && (this.several() ? sideBoardAltered(this.sideBosses(), fen, { played, reply }) : boardAltered(b, fen, bossRules(b), { played, reply }))) return undefined;
     const mate = evaluation.mates?.[played];
     const legalReply = !!reply && legalMoves(applyMove(fen, played)).includes(reply);
     const round3 = (x: number) => Math.round(x * 1000) / 1000;
@@ -1228,8 +1267,10 @@ export class MatchRunner {
       // burns what was left on its tiles; Folio's Revision reads the judge's numbers).
       if (this.state.boss?.powers) {
         this.state = { ...this.state, boss: { ...this.state.boss, powers: { ...this.state.boss.powers, judged: moverExpected } } };
+        // (Several bosses: every boss's meter reads the judged eval.)
+        if (this.several()) this.updateSide((b) => (b.powers ? { ...b, powers: { ...b.powers, judged: moverExpected } } : b));
         this.afterCrowdMove(r.result.playedMove, { best: Math.max(moverExpected, r.scored[0]?.expected ?? moverExpected), played: moverExpected, ...(r.king ? { king: true } : {}), ...(r.flag ? { flag: true } : {}) });
-        if (bossRules(this.state.boss)?.crossedOut?.(this.state.boss!)) crossed.add(r.boardId);
+        if (this.several() ? this.sideBosses().some((b) => bossRules(b)?.crossedOut?.(b)) : bossRules(this.state.boss)?.crossedOut?.(this.state.boss!)) crossed.add(r.boardId);
       }
     }
     const away = this.awayOut();
@@ -1299,7 +1340,7 @@ export class MatchRunner {
   }
 
   stageComplete(): boolean {
-    if (this.state.boss) return this.finalGameOver() || this.state.boss.crowdMoves >= this.settings.bossMaxMoves || this.bossOutOfTime() || carrotBattle.won(this.state.boss) || blackedOut(this.state.boss) || dodgeWon(this.state.boss) || (this.bossForceWin && this.bossToMove());
+    if (this.state.boss) return this.finalGameOver() || this.state.boss.crowdMoves >= this.settings.bossMaxMoves || this.bossOutOfTime() || this.sideBosses().some((b) => carrotBattle.won(b) || blackedOut(b) || dodgeWon(b)) || (this.bossForceWin && this.bossToMove());
     if (this.state.final) return finalComplete(this.state, this.settings) || this.finalGameOver();
     return stageComplete(this.state, this.settings);
   }
@@ -1464,6 +1505,8 @@ export class MatchRunner {
 
   /** The moves the boss may play now (a pie stops it too), or null: any legal move. */
   bossAllowed(): string[] | null {
+    // (Several bosses: every mark that binds the bosses and the side's guards: sideBossAllowed. One: bossAllowed, as ever.)
+    if (this.several()) return sideBossAllowed(this.sideBosses(), this.boards.get(this.state.boards[0]!)!.fen);
     return bossAllowed(this.state.boss, this.boards.get(this.state.boards[0]!)!.fen);
   }
 
@@ -1490,12 +1533,13 @@ export class MatchRunner {
     const taken = played.captures?.at(-1);
     const captured = taken && taken.ply === played.history.length ? taken.piece : undefined;
     // (A power stops it: it stopped every move he had, so the limit lifted for the turn. The screens say which power.)
-    const through = bossStopped(boss, board.fen, m) ? stopReason(boss, board.fen, m) : null;
+    const side = this.several() ? this.sideBosses() : null;
+    const through = side ? (sideBossStopped(side, board.fen, m) ? sideStopReason(side, board.fen, m) : null) : bossStopped(boss, board.fen, m) ? stopReason(boss, board.fen, m) : null;
     this.bossLast = { move: shown, san: special && m === special.play ? special.san : toSan(board.fen, m), ...(staggered ? { staggered: true } : {}), ...(captured ? { captured } : {}), ...(through ? { through } : {}) };
     if (this.state.boss?.staggerNext) this.state = { ...this.state, boss: { ...this.state.boss, staggerNext: false } };
     // (The boss's own after-move effect: Sawyer's split pawn after his first move; Wrangler's pull, drag or showdown.)
     if (this.state.boss?.powers) bossRules(this.state.boss)?.afterBossMove?.(this.battle, m, { ...extras, ...(shown !== m ? { special: shown } : {}) });
-    this.preparePowers();
+    this.bossTurnOver();
     return m;
   }
 
@@ -1505,7 +1549,14 @@ export class MatchRunner {
    */
   private afterCrowdMove(move: string | null, judged: JudgedMove | null = null) {
     const b = this.state.boss;
-    if (b) bossRules(b)?.afterCrowdMove?.(this.battle, move, judged);
+    if (!b) return;
+    if (!this.several()) {
+      bossRules(b)?.afterCrowdMove?.(this.battle, move, judged);
+      return;
+    }
+    // (Several bosses: every boss's own effect, the one in focus first; then the boss to move comes into focus.)
+    this.forEachBoss(() => bossRules(this.state.boss)?.afterCrowdMove?.(this.battle, move, judged));
+    this.refocus();
   }
 
   /** Folio's Crease is wanted with the boss's move now: what the host's engines need to pick its line after it, or null. */
@@ -1519,6 +1570,12 @@ export class MatchRunner {
    */
   triggerUltimate(): boolean {
     if (!this.state.boss || this.finalGameOver() || this.isOver()) return false;
+    // (Several bosses: every boss's, each coming on his own turn change, one a turn change.)
+    if (this.several()) return this.forEachBoss(() => this.triggerOne()).some((ok) => ok);
+    return this.triggerOne();
+  }
+
+  private triggerOne(): boolean {
     const t = triggerUltimate(this.state.boss);
     if (t.ok && t.boss) this.state = { ...this.state, boss: t.boss };
     return t.ok;
@@ -1556,7 +1613,10 @@ export class MatchRunner {
 
   /** Plays his extra move (from the host's engine online; see hollowBattle.applyExtraMove, dashBattle's). Returns it, or null. */
   applyExtraMove(move: string | null): string | null {
-    return dashBattle.extraMoveDue(this.battle) ? dashBattle.applyExtraMove(this.battle, move) : hollowBattle.applyExtraMove(this.battle, move);
+    const played = dashBattle.extraMoveDue(this.battle) ? dashBattle.applyExtraMove(this.battle, move) : hollowBattle.applyExtraMove(this.battle, move);
+    // (Several bosses: Hollow's second move came, his turn again before the next boss's; the order goes on after it.)
+    if (this.several()) this.refocus();
+    return played;
   }
 
   /**
@@ -1565,7 +1625,7 @@ export class MatchRunner {
    * timer (solo.ts, the lobby) plays the beats, stops the clock for them and calls `slammed` and `stalled` as each comes.
    */
   stallPlan(playerId?: string): StallPlan | null {
-    const boss = this.state.boss;
+    const boss = this.several() ? this.sideBosses().find((b) => b.id === "dash") : this.state.boss;
     if (!boss || boss.id !== "dash" || this.bossToMove()) return null;
     const id = playerId ?? this.alive()[0]?.id;
     const board = this.boards.get(this.state.boards[0]!);
@@ -1575,17 +1635,17 @@ export class MatchRunner {
 
   /** Dash's clock tap has come on this crowd move (dashBattle.tapped): once a battle; nothing more of his on this move. */
   tapped(): void {
-    dashBattle.tapped(this.battle);
+    this.asBoss(this.bossIndex("dash"), () => dashBattle.tapped(this.battle));
   }
 
   /** Dash's stall skit's slam has come on this crowd move (dashBattle.slammed): once a battle, spent as it starts. */
   slammed(): void {
-    dashBattle.slammed(this.battle);
+    this.asBoss(this.bossIndex("dash"), () => dashBattle.slammed(this.battle));
   }
 
   /** Dash's stall skit's fake move has come on this crowd move (dashBattle.stalled): once a battle, spent as it lands. */
   stalled(move: string): void {
-    dashBattle.stalled(this.battle, move);
+    this.asBoss(this.bossIndex("dash"), () => dashBattle.stalled(this.battle, move));
   }
 
   /** Dash's Scramble Rush is due: it came as this crowd turn began, and the turn waits for it (dashBattle.rushDue). */
@@ -1800,6 +1860,7 @@ export class MatchRunner {
   /** The Carrot Patch's race as the crowd's judge weighs its move now (the score jobs' `race`), or null. */
   raceJob(): CarrotRace | null {
     const b = this.state.boss;
+    if (this.several()) return this.sideBosses().reduce<CarrotRace | null>((r, x) => r ?? crowdRace(x, this.boards.get(this.state.boards[0]!)!.fen), null);
     return b ? crowdRace(b, this.boards.get(this.state.boards[0]!)!.fen) : null;
   }
 
@@ -1809,7 +1870,9 @@ export class MatchRunner {
    */
   bossRace(kind: BossMoveKind = this.state.boss?.staggerNext ? "stagger" : "elo"): BossRace | null {
     if (kind !== "elo") return null;
-    const race = bossRace(this.state.boss, this.boards.get(this.state.boards[0]!)!.fen);
+    // (Several bosses: in the Carrot Patch's race every boss's move goes through the race brain, not only Chub & Chirp's.)
+    const fen = this.boards.get(this.state.boards[0]!)!.fen;
+    const race = this.several() ? this.sideBosses().reduce<ReturnType<typeof bossRace>>((r, b) => r ?? bossRace(b, fen), null) : bossRace(this.state.boss, fen);
     return race ? { race, looks: BOSS_POWERS.carrotLooks, nodes: BOSS_POWERS.carrotNodes, ...(this.settings.bossCarrotTest !== undefined ? { eager: true } : {}) } : null;
   }
 
@@ -1819,7 +1882,7 @@ export class MatchRunner {
    * on the spot"); a mate is his anyway, with the mate's own line.
    */
   get bossCarrotWin(): boolean {
-    return carrotBattle.won(this.state.boss) && boardEnd(this.boards.get(this.state.boards[0]!)!) !== "checkmate";
+    return this.sideBosses().some((b) => carrotBattle.won(b)) && boardEnd(this.boards.get(this.state.boards[0]!)!) !== "checkmate";
   }
 
   /**
@@ -1930,7 +1993,7 @@ export class MatchRunner {
       crowdAllowed: (boardId) => runner.crowdAllowed(boardId),
       boardOf: (playerId) => runner.boardOf(playerId),
       afterCrowdMove: (move) => runner.afterCrowdMove(move),
-      bossPassed: () => runner.preparePowers(),
+      bossPassed: () => runner.bossTurnOver(),
       memo: runner.bossMemo,
       now: () => runner.clockNow(),
       random: () => runner.opts.rng(),
@@ -1963,7 +2026,7 @@ export class MatchRunner {
     const timeout = this.bossOutOfTime() && !this.finalGameOver();
     const winner = this.gameWinner();
     // (Hollow's last bulb out, Boss alone, and a Dodge hit: his, whatever the board says.)
-    const result = this.bossForceWin ? "crowd" : timeout || this.bossCarrotWin || blackedOut(b) || dodgeWon(b) ? "boss" : winner === null ? "draw" : winner === b.crowdSide ? "crowd" : "boss";
+    const result = this.bossForceWin ? "crowd" : timeout || this.bossCarrotWin || this.sideBosses().some((x) => blackedOut(x) || dodgeWon(x)) ? "boss" : winner === null ? "draw" : winner === b.crowdSide ? "crowd" : "boss";
     // (The Hidden Boss's child beaten: the fight goes on, a new match against his adult form (nextBossForm). Nobody is placed.)
     if (b.form === "child" && result === "crowd") {
       this.state = { ...this.state, boss: { ...b, result } };
@@ -2064,10 +2127,10 @@ export class MatchRunner {
     if (!b) return null;
     const board = this.boards.get(this.state.boards[0]!)!;
     const s = this.settings;
-    const same = [b, board, board.fen, board.lastMove, board.history, board.history.length, board.bases, this.alive().length, this.bossLast, justKilled, s.bossMinSurvivors, s.bossMaxMoves, s.bossKillEvery, !!s.raid, !!s.bossNoStrikes];
+    const same = [b, board, board.fen, board.lastMove, board.history, board.history.length, board.bases, this.alive().length, this.bossLast, justKilled, s.bossMinSurvivors, s.bossMaxMoves, s.bossKillEvery, !!s.raid, !!s.bossNoStrikes, this.state.bosses];
     const m = this.bossViewMemo;
     if (m && m.same.length === same.length && m.same.every((x, i) => x === same[i])) return m.view;
-    const key = JSON.stringify([b, board.id, board.generation, board.fen, board.lastMove, board.history.join(" "), this.alive().length, this.bossLast, justKilled, s.bossMinSurvivors, s.bossMaxMoves, s.bossKillEvery, !!s.raid, !!s.bossNoStrikes]);
+    const key = JSON.stringify([b, board.id, board.generation, board.fen, board.lastMove, board.history.join(" "), this.alive().length, this.bossLast, justKilled, s.bossMinSurvivors, s.bossMaxMoves, s.bossKillEvery, !!s.raid, !!s.bossNoStrikes, ...(this.state.bosses ? [this.state.bosses, this.state.focus] : [])]);
     this.bossViewMemo = { key, same, view: m?.key === key ? m.view : this.buildBossView(b, justKilled) };
     return this.bossViewMemo.view;
   }
@@ -2121,7 +2184,7 @@ export class MatchRunner {
               passive: powers.passive,
               ultimate: powers.ultimate,
               turn: p.turn,
-              rage: rageOf(b),
+              rage: rageOf(b, this.rageRates()),
               paused: ragePaused(b),
               warned: p.warnAt !== undefined && p.ultAt === undefined,
               ultAt: p.ultAt ?? null,
@@ -2130,13 +2193,14 @@ export class MatchRunner {
               pie: p.pies?.length ? { ...p.pies[p.pies.length - 1]! } : null,
               pies: (p.pies ?? []).map((x) => ({ ...x })),
               // (Through the boss's turn too: the frozen piece, the blizzard's ice until it thaws.)
-              iced: icedSquares(b, fen),
+              iced: this.several() ? sideIcedSquares(this.sideBosses(), fen) : icedSquares(b, fen),
               // (The funhouse's angle as this crowd turn was set up: it turns as the next begins, with its moment.)
               angle: shownAngle(p.funhouse, p.turn),
               flipped: shownAngle(p.funhouse, p.turn) === 180,
               funhouse: p.funhouse ? { ...p.funhouse } : null,
-              events: p.events,
-              allowed: sideToMove(fen) === b.crowdSide ? crowdAllowed(b, fen) : null,
+              // (Several bosses: the moments queue, every boss's this turn change, the one in focus first, then the rest in turn order.)
+              events: this.several() ? this.sideBosses().flatMap((x) => x.powers?.events ?? []) : p.events,
+              allowed: sideToMove(fen) === b.crowdSide ? (this.several() ? sideCrowdAllowed(this.sideBosses(), fen) : crowdAllowed(b, fen)) : null,
               fire: (p.fire ?? []).map((t) => ({ square: t.square, lit: t.lit, stage: fireStage(t, p.turn) })),
               burnt: p.burnt ?? [],
               candle: p.candle ? { at: p.candle.at, left: p.candle.left } : null,
@@ -2205,6 +2269,213 @@ export class MatchRunner {
         kingCharges: kingCharges(alive.reduce((n, p) => n + p.powerUps, 0), this.settings),
         kingMoves: [],
       },
+    };
+    this.preparePowers();
+  }
+
+  // ---------------- Several bosses on one side (the Battle Tower) ----------------
+  //
+  // `state.boss` is always one boss in full: the one in focus (`state.focus`), so every boss's own code (bosses/<boss>.ts,
+  // reading `state.boss`) runs as it does alone. The focus is the boss to move while the bosses are to move, and the boss whose
+  // turn change it is while the crowd is (the boss after the one who moved). Whatever reads the whole side (the crowd's moves,
+  // the bosses' guards, the judge, the moments queue) reads sideBosses. docs/decisions/2026-11-18-several-bosses.md.
+
+  /** Several bosses on one side (2 or 3: settings.bossIds). */
+  several(): boolean {
+    return (this.state.bosses?.length ?? 0) > 1 && !!this.state.boss;
+  }
+
+  /**
+   * The bosses on the side, each in full (his own part and the battle's shared fields), the one in focus first, then the rest
+   * in turn order. One boss: [the boss]; none: [].
+   */
+  sideBosses(): BossState[] {
+    const b = this.state.boss;
+    if (!b) return [];
+    const own = this.state.bosses;
+    if (!own || own.length < 2) return [b];
+    const f = this.state.focus ?? 0;
+    return own.map((_, k) => (f + k) % own.length).map((i) => (i === f ? b : withOwn(b, own[i]!)));
+  }
+
+  /** Several bosses: the index (in the order dealt) of the boss with this id on the side; -1: none (or one boss). */
+  private bossIndex(id: string): number {
+    const own = this.state.bosses;
+    if (!this.several() || !own) return -1;
+    return this.state.boss?.id === id ? (this.state.focus ?? 0) : own.findIndex((o) => o.id === id);
+  }
+
+  /** Several bosses: boss `i` (in the order dealt) comes into focus; the one in focus till now keeps his own part in the list. */
+  private setFocus(i: number) {
+    const own = this.state.bosses;
+    const b = this.state.boss;
+    const f = this.state.focus ?? 0;
+    if (!own || !b || i === f || i < 0 || i >= own.length) return;
+    const list = own.map((o, k) => (k === f ? ownOf(b) : o));
+    this.state = { ...this.state, bosses: list, boss: withOwn(b, list[i]!), focus: i };
+  }
+
+  /**
+   * `fn` (synchronous, never across an engine's wait) with boss `i` in focus, then the focus back as it was; when `fn` changed
+   * nothing, the very same state. One boss, `i` already in focus, or -1 (none such): just `fn`.
+   */
+  private asBoss<T>(i: number, fn: () => T): T {
+    const f = this.state.focus ?? 0;
+    if (!this.several() || i < 0 || i === f) return fn();
+    const saved = this.state;
+    this.setFocus(i);
+    const mid = this.state;
+    try {
+      return fn();
+    } finally {
+      if (this.state === mid) this.state = saved;
+      else this.setFocus(f);
+    }
+  }
+
+  /** `fn` for every boss on the side, each in focus in turn, the one in focus first; one boss: once. */
+  private forEachBoss<T>(fn: () => T): T[] {
+    if (!this.several()) return [fn()];
+    const n = this.state.bosses!.length;
+    const f = this.state.focus ?? 0;
+    return Array.from({ length: n }, (_, k) => this.asBoss((f + k) % n, fn));
+  }
+
+  /** `fn` on every boss on the side (a change to each one's own part: his powers). */
+  private updateSide(fn: (b: BossState) => BossState) {
+    const b = this.state.boss;
+    if (!b) return;
+    const nb = fn(b);
+    const own = this.state.bosses;
+    if (!this.several() || !own) {
+      this.state = { ...this.state, boss: nb };
+      return;
+    }
+    const f = this.state.focus ?? 0;
+    this.state = { ...this.state, boss: nb, bosses: own.map((o, i) => (i === f ? ownOf(nb) : ownOf(fn(withOwn(nb, o))))) };
+  }
+
+  /**
+   * Several bosses: who comes into focus now, from the battle as it stands. The bosses to move: one whose move comes out of turn
+   * (BossRules.outOfTurn: Wrangler's reply to the showdown's duel, Folio's move again after Revision), else the boss after the one
+   * who moved last. The crowd to move: the boss after the one who moved (his turn change), or Hollow himself while his second
+   * move is due (Lights out failed: his turn again before the next boss's). The order goes on from the boss after whoever moved.
+   */
+  private focusNow(): number {
+    const n = this.state.bosses!.length;
+    const moved = (((this.state.moved ?? n - 1) % n) + n) % n;
+    const next = (moved + 1) % n;
+    if (this.bossToMove()) {
+      const board = this.boards.get(this.state.boards[0]!)!;
+      const f = this.state.focus ?? 0;
+      const k = this.sideBosses().findIndex((b) => !!b.powers && !!bossRules(b)?.outOfTurn?.(b, board));
+      return k < 0 ? next : (f + k) % n;
+    }
+    return this.asBoss(moved, () => hollowBattle.extraMoveDue(this.battle)) ? moved : next;
+  }
+
+  /** Several bosses: the boss focusNow names comes into focus. */
+  private refocus() {
+    if (this.several()) this.setFocus(this.focusNow());
+  }
+
+  /**
+   * The boss's turn is over (his move played, or a power that spends his whole turn: Battle.bossPassed). Several bosses: he made
+   * the side's last move, and the next boss comes into focus. Then the crowd's turn is set up (preparePowers).
+   */
+  private bossTurnOver() {
+    if (this.several()) {
+      this.state = { ...this.state, moved: this.state.focus ?? 0 };
+      this.refocus();
+    }
+    this.preparePowers();
+  }
+
+  /**
+   * Several bosses: the crowd's turn set up (preparePowers' rules), every boss's turn steps (prepareTurn), the one in focus first,
+   * then the rest in turn order: each boss's passive and meter on every crowd turn, his meter at BATTLE_TOWER.rageScale of its
+   * speed; his ultimate's step only at his own turn change (in focus), so one ultimate comes a turn change and a cinematic never
+   * meets another's. The move just played is passed only to the boss who played it.
+   */
+  private prepareSide() {
+    const board = this.boards.get(this.state.boards[0]!)!;
+    const hisMoved = sideToMove(board.fen) === this.state.boss!.crowdSide;
+    if (this.finalGameOver() && !this.sideBosses().some((b) => carrotBattle.won(b))) {
+      if (hisMoved) this.updateSide((b) => (b.powers?.events.length ? { ...b, powers: { ...b.powers, events: [] } } : b));
+      return;
+    }
+    if (!hisMoved) return;
+    const s = this.rageRates();
+    const f = this.state.focus ?? 0;
+    const moved = this.state.moved;
+    this.forEachBoss(() => {
+      const b = this.state.boss!;
+      const i = this.state.focus ?? 0;
+      if (!b.powers) return;
+      const next = prepareTurn(b, board.fen, this.settings.bossPowerTest, s, i === moved ? board.lastMove : null, i !== f);
+      this.state = { ...this.state, boss: next };
+      if (next.powers?.turn !== b.powers.turn) bossRules(next)?.turnBegun?.(this.battle);
+    });
+  }
+
+  /** The rage rates on this side: several bosses, each meter at BATTLE_TOWER.rageScale of its speed (sideRates); one, BOSS_POWERS. */
+  private rageRates(): BossPowerSettings {
+    return this.several() ? sideRates(BOSS_POWERS, this.state.bosses!.map((o) => o.id)) : BOSS_POWERS;
+  }
+
+  /**
+   * Several bosses on one side (settings.bossIds, the Battle Tower): every one dealt, in the order given, from the starting
+   * position. The crowd keeps the side the usual pick gave it (White; Black only by the raid's test switch), but a boss who
+   * always plays Black (Hollow) claims the dark side first. Each boss has his own seed (one draw each from the match's random
+   * source), strength and powers, and does what he does before move 1 (Big Boy's snack), in the order dealt; the battle's own
+   * fields (the crowd's moves, the God King) are shared. The first boss dealt makes the side's first move. Never two bosses
+   * BATTLE_TOWER.apart keeps apart.
+   */
+  private startSide() {
+    const ids = [...this.settings.bossIds!];
+    const defs = ids.map((id) => BOSS_ROSTER.find((d) => d.id === id && d.powers));
+    const unknown = ids.filter((_, i) => !defs[i]);
+    if (unknown.length) throw new Error(`several bosses: no boss with powers named ${unknown.join(", ")}`);
+    if (ids.length > BATTLE_TOWER.maxBosses || new Set(ids).size < ids.length) throw new Error(`several bosses: 2 to ${BATTLE_TOWER.maxBosses} different bosses, not ${ids.join(", ")}`);
+    const apart = BATTLE_TOWER.apart.find(([a, b]) => ids.includes(a) && ids.includes(b));
+    if (apart) throw new Error(`several bosses: ${apart[0]} and ${apart[1]} never share a floor (BATTLE_TOWER.apart)`);
+    const id = this.state.boards[0]!;
+    const board = this.boards.get(id)!;
+    const n = this.alive().length;
+    this.bossLast = null;
+    const seeds = defs.map(() => Math.floor(this.opts.rng() * 2 ** 32));
+    let crowdSide = sideToMove(board.fen);
+    const claimer = crowdSide === "b" ? defs.findIndex((d) => bossRules(d!)?.opening?.crowdWhite) : -1;
+    if (claimer >= 0) crowdSide = "w";
+    this.boards.set(id, newBoard(id, BOSS_OPENING, 0, board.generation));
+    const setUps = defs.map((d, i) => bossRules(d!)?.opening?.setUp?.(this.battle, { boardId: id, seed: seeds[i]!, crowdSide, generation: board.generation }) ?? null);
+    const fen = this.boards.get(id)!.fen;
+    const tier = this.settings.bossFixedElo || raidBossElo([]);
+    const own: BossOwn[] = defs.map((d, i) => ({
+      id: d!.id,
+      ...this.firstForm(d!.id),
+      powers: { ...initPowers(seeds[i]!, fen, crowdSide), ...(i === claimer ? { claimed: true } : {}), ...(setUps[i] ?? {}) },
+      tier,
+      elo: bossStrength(tier, d!, this.settings.bossDifficulty),
+    }));
+    this.state = {
+      ...this.state,
+      players: this.state.players.map((p) => ({ ...p, colour: null, powerUps: 0 })),
+      boss: {
+        ...own[0]!,
+        crowdSide,
+        startPly: this.boards.get(id)!.history.length,
+        crowdMoves: 0,
+        sinceKill: 0,
+        kills: [],
+        kingCharges: this.settings.kingChargesMax,
+        kingMoves: [],
+        kingStrikes: [],
+        minSurvivors: Math.ceil(n / 2),
+      },
+      bosses: own,
+      focus: 0,
+      moved: own.length - 1,
     };
     this.preparePowers();
   }

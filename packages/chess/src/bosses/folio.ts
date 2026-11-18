@@ -405,6 +405,8 @@ export const FOLIO: BossRules = {
     const r = boss.powers?.folio?.revision;
     return !!r && r.at === boss.crowdMoves && !r.move;
   },
+  // (Several bosses on one side: Revision's move is its own again, out of turn: only its own move is ever crossed out.)
+  outOfTurn: (boss) => crossedOut(boss),
   afterCrowdMove(b, move, judged) {
     folioBattle.afterCrowdMove(b, move, judged ?? null);
   },

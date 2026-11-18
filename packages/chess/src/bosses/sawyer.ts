@@ -297,6 +297,8 @@ export const SAWYER: BossRules = {
     return edges.length ? { edges } : null;
   },
   // His own moves: his first is a pawn move (no pawn move: any, as the dispatcher lifts it); the cuts stop him too (layer).
+  // (His first move is his own: on a side of several bosses it binds only his.)
+  ownStops: true,
   bossStops(boss) {
     const p = boss.powers;
     return p && firstMoveDue(p) ? (m, fen) => pieceAt(fen, from(m))?.type !== "p" : null;

@@ -14,7 +14,7 @@
  *
  * Turns are the crowd's: turn N is the crowd's Nth move of the battle (crowdMoves + 1 while it's being picked).
  */
-import { BOSS_POWERS, type BossPowerSettings, type BossPowerState, type BossState, type PowerEvent, type StopReason } from "@chessroyale/core";
+import { BATTLE_TOWER, BOSS_POWERS, type BossPowerSettings, type BossPowerState, type BossState, type PowerEvent, type StopReason } from "@chessroyale/core";
 import { bindsBosses, layerStop, mergeLayers } from "./board-layer.ts";
 import { legalMoves } from "./rules.ts";
 import type { EngineLike } from "./runner.ts";
@@ -93,9 +93,10 @@ export function initPowers(seed: number, fen: string, crowdSide: Side): BossPowe
  * The meter is the same for every boss; the rest is the boss's own rules (BossRules), in this order: the ultimate
  * under way (still running: the meter stays empty; over: it clears, and the meter fills again from empty), what wore
  * off, the ultimate's step, anything every turn, then the passive (not on the turn the ultimate came, if it was due
- * then: it waits a turn).
+ * then: it waits a turn). `hold` (several bosses on one side: not the turn change before his own move): the ultimate's step
+ * is left out (the meter still fills; a warning and the test trigger wait), so one ultimate comes a turn change.
  */
-export function prepareTurn(boss: BossState, fen: string, test = "", s: BossPowerSettings = BOSS_POWERS, lastMove: string | null = null): BossState {
+export function prepareTurn(boss: BossState, fen: string, test = "", s: BossPowerSettings = BOSS_POWERS, lastMove: string | null = null, hold = false): BossState {
   const powers = bossPowers(boss);
   const p = boss.powers;
   const rules = bossRules(boss);
@@ -110,7 +111,7 @@ export function prepareTurn(boss: BossState, fen: string, test = "", s: BossPowe
   const charge = (p.charge ?? 0) + moved * rageTick(p.judged, s);
   // (An ultimate at the start of the boss's turn keeps the test trigger until then.)
   const { ultNext, ...rest } = p;
-  const next: BossPowerState = { ...rest, turn, lost, charge, events, ...(ultNext && (rules.ultimateOnHisTurn || rules.triggerAtHisTurn) ? { ultNext } : {}) };
+  const next: BossPowerState = { ...rest, turn, lost, charge, events, ...(ultNext && (hold || rules.ultimateOnHisTurn || rules.triggerAtHisTurn) ? { ultNext } : {}) };
   const t: TurnContext = { turn, fen, crowd, seed: p.seed, passive: powers.passive, ultimate: powers.ultimate, test, ultNext: !!ultNext, lastMove, rageSpeed: rageSpeedOf(boss.id, s), s, events };
   // The ultimate under way: while its effect runs, nothing gathers in the meter (it stays empty); once it's over, the
   // meter fills again from empty, and the next can come.
@@ -123,7 +124,9 @@ export function prepareTurn(boss: BossState, fen: string, test = "", s: BossPowe
   }
   rules.wearOff?.(next, t);
   const before = next.ultAt;
-  const ultNow = before === undefined ? rules.ultimate(next, t) : false;
+  // (`hold`: several bosses on one side, and this turn change isn't his (sideTurn): his ultimate's step waits, its warning and
+  // the test trigger kept.)
+  const ultNow = before === undefined && !hold ? rules.ultimate(next, t) : false;
   if (before === undefined && next.ultAt !== undefined) unleashed(next, s);
   rules.everyTurn?.(next, t);
   if (ultNow && turn >= next.nextPassive) next.nextPassive = turn + 1;
@@ -398,4 +401,126 @@ export async function allowedSearch(engine: Pick<EngineLike, "scoreMoves">, job:
   const have = new Set(top.map((m) => m.move));
   const moves = [...new Set([...job.allowed, ...(job.picks ?? [])].filter((m) => !have.has(m)))].sort();
   return engine.scoreMoves(job.fen, moves);
+}
+
+// ---------------- Several bosses on one side (the Battle Tower) ----------------
+
+/*
+ * A side of several bosses (`side`: each in full, the boss in focus first, then the rest in turn order: the runner's
+ * sideBosses). Every function here gives exactly today's answer for a side of one (it asks the one-boss function above), so
+ * no battle of one boss changes. Several: every boss's marks merge into one layer (the most restrictive wins), every boss's
+ * other limits apply in turn, and the lift and the Last Stand's barred move come last, once, as for one boss.
+ */
+
+/** The crowd's moves under every boss on the side at once (crowdAllowed's rules), or null: any legal move. */
+export function sideCrowdAllowed(side: readonly BossState[], fen: string): string[] | null {
+  if (side.length < 2) return crowdAllowed(side[0], fen);
+  const barred = side[0]!.barred;
+  const live = side.filter((b) => b.powers && bossRules(b));
+  if (!live.length && !barred) return null;
+  const legal = legalMoves(fen);
+  let allowed = legal;
+  if (live.length) {
+    const layer = mergeLayers(side[0]!.crowdSide, live.map((b) => bossRules(b)!.layer?.(b, fen)));
+    allowed = legal.filter((m) => !layerStop(layer, fen, m));
+    for (const b of live) {
+      const filter = bossRules(b)!.crowdFilter;
+      if (filter) allowed = filter(allowed, b, fen);
+    }
+    if (!allowed.length) allowed = legal;
+  }
+  if (barred) {
+    const open = allowed.filter((m) => m !== barred);
+    allowed = open.length ? open : legal.filter((m) => m !== barred);
+    if (!allowed.length) allowed = legal;
+  }
+  return allowed.length === legal.length ? null : allowed;
+}
+
+/**
+ * What stops the move of the boss to move (`side[0]`, him to move in `fen`): every mark on the board that binds the bosses,
+ * whoever put it there, and every boss's other stops (Smudgy's disguise, the hoops: the whole side's guards), but a stop that
+ * binds only his own moves (`ownStops`: Sawyer's first move) only from the boss himself.
+ */
+function sideBossLimit(side: readonly BossState[], fen: string): ((move: string) => boolean) | null {
+  if (side.length < 2) return bossLimit(side[0], fen);
+  const live = side.filter((b) => b.powers && bossRules(b));
+  const marks = live.map((b) => bossRules(b)!.layer?.(b, fen));
+  const layer = marks.some(bindsBosses) ? mergeLayers(side[0]!.crowdSide, marks) : null;
+  const stops = live.flatMap((b) => {
+    const rules = bossRules(b)!;
+    const stop = b === side[0] || !rules.ownStops ? rules.bossStops?.(b) : null;
+    return stop ? [stop] : [];
+  });
+  if (!layer && !stops.length) return null;
+  return (m) => (!!layer && !!layerStop(layer, fen, m)) || stops.some((stop) => stop(m, fen));
+}
+
+/** The moves the boss to move (`side[0]`) may play (bossAllowed's rules, every boss's guards), or null: any legal move. */
+export function sideBossAllowed(side: readonly BossState[], fen: string): string[] | null {
+  if (side.length < 2) return bossAllowed(side[0], fen);
+  const stops = sideBossLimit(side, fen);
+  if (!stops) return null;
+  const legal = legalMoves(fen);
+  const allowed = legal.filter((m) => !stops(m));
+  return allowed.length && allowed.length < legal.length ? allowed : null;
+}
+
+/** A power stops the move of the boss to move (`side[0]`) now: played anyway, it went through (bossStopped's rules). */
+export const sideBossStopped = (side: readonly BossState[], fen: string, move: string): boolean => (side.length < 2 ? bossStopped(side[0], fen, move) : !!sideBossLimit(side, fen)?.(move));
+
+/** Which power stops `move` now, either side, for the screens' words: the first boss's on the side that names one (stopReason). */
+export function sideStopReason(side: readonly BossState[], fen: string, move: string): StopReason | null {
+  for (const b of side) {
+    const why = stopReason(b, fen, move);
+    if (why) return why;
+  }
+  return null;
+}
+
+/** A power of any boss on the side touches this crowd turn (powerTurn): its picks aren't fair-play signals. */
+export const sidePowerTurn = (side: readonly BossState[], fen?: string): boolean => side.some((b) => powerTurn(b, fen));
+
+/** Any boss's power has changed the board this crowd turn (boardAltered): the God King's Last Stand sits out. */
+export const sideBoardAltered = (side: readonly BossState[], fen: string, stand?: { played: string; reply?: string }): boolean =>
+  side.some((b) => boardAltered(b, fen, bossRules(b), stand));
+
+/** The squares that show ice, every boss's (icedSquares). */
+export function sideIcedSquares(side: readonly BossState[], fen: string): string[] {
+  if (side.length < 2) return icedSquares(side[0], fen);
+  return [...new Set(side.flatMap((b) => icedSquares(b, fen)))];
+}
+
+/** The moves the judge must score too this crowd turn, under every boss's rules (judgeMustScore). */
+export function sideMustScore(side: readonly BossState[], fen: string): string[] {
+  if (side.length < 2) return judgeMustScore(side[0], fen);
+  return [...new Set(side.flatMap((b) => judgeMustScore(b, fen)))];
+}
+
+/** The moves the bots may pick besides the top moves, under every boss's rules (judgeOffers). */
+export function sideOffers(side: readonly BossState[], fen: string): string[] {
+  if (side.length < 2) return judgeOffers(side[0], fen);
+  return [...new Set(side.flatMap((b) => judgeOffers(b, fen)))];
+}
+
+/** Top moves as the judge ranks them under every boss's rules, each in turn (judgeRanked). */
+export function sideRanked(side: readonly BossState[], top: readonly MoveScore[], fen: string): MoveScore[] {
+  if (side.length < 2) return judgeRanked(side[0], top, fen);
+  return side.reduce<MoveScore[]>((ranked, b) => judgeRanked(b, ranked, fen), [...top]);
+}
+
+/** A board's evaluation as the judge sees it under every boss's rules, each in turn (judgeEvaluation). */
+export function sideEvaluation<E extends JudgedEvaluation>(side: readonly BossState[], evaluation: E, fen: string): E {
+  if (side.length < 2) return judgeEvaluation(side[0], evaluation, fen);
+  return side.reduce((e, b) => judgeEvaluation(b, e, fen), evaluation);
+}
+
+/**
+ * Each boss's rage meter on a side of `n` bosses fills at BATTLE_TOWER.rageScale[n - 1] of its speed: the rates with every
+ * boss's speed scaled (one boss: the rates as they are).
+ */
+export function sideRates<R extends Pick<BossPowerSettings, "rageSpeed">>(s: R, ids: readonly (string | undefined)[], scale: readonly number[] = BATTLE_TOWER.rageScale): R {
+  if (ids.length < 2) return s;
+  const k = scale[ids.length - 1] ?? scale[scale.length - 1] ?? 1;
+  return { ...s, rageSpeed: { ...s.rageSpeed, ...Object.fromEntries(ids.filter((id): id is string => !!id).map((id) => [id, rageSpeedOf(id, s) * k])) } };
 }

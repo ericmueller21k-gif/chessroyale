@@ -365,6 +365,11 @@ export interface BossRules {
   /** What else stops the boss's own moves now (Sawyer's first move, a pawn's; the hoops), or null: nothing does. */
   bossStops?(boss: BossState): ((move: string, fen: string) => boolean) | null;
   /**
+   * Several bosses on one side: its `bossStops` bind only its own moves (Sawyer's first move, a pawn's), not every boss's on the
+   * side, as the side's guards do (Smudgy's disguise, the hoops: sideBossAllowed).
+   */
+  ownStops?: boolean;
+  /**
    * Which of its powers stops `move` now, either side (for the screens' words: a refused move of yours, the boss's only
    * move through it), or null. It reads only fields the screens' view carries too (`StopFields`), so the app asks it.
    */
@@ -438,6 +443,12 @@ export interface BossRules {
    * play it alike. The King's strike still staggers it.
    */
   bestReply?(boss: BossState, board: BoardState): boolean;
+  /**
+   * Several bosses on one side: his move now (`board`: the bosses to move) comes out of turn, before the boss whose turn it is
+   * (Wrangler's reply to the showdown's duel; Folio's move again after Revision crossed out its own); the order then goes on
+   * from the boss after him. Left out: never.
+   */
+  outOfTurn?(boss: BossState, board: BoardState): boolean;
   /**
    * What the boss's turn must work out besides its move, with the engine (Wrangler's long pull, drag and showdown), in
    * the position before its move: the server asks the host's device for it with the move; solo works it out. Null:

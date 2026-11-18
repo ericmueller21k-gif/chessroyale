@@ -107,6 +107,12 @@ export interface Settings {
    * when there's another (your last boss solo; online, the one most of the lobby met last).
    */
   bossId: string;
+  /**
+   * Several bosses on one side (the Battle Tower, PR 6: a runner option and a test switch until the tower's rules deal them):
+   * 2 or 3 BOSS_ROSTER ids with powers, in the order they take turns. A raid then starts with them all (`bossId` unused).
+   * Unset or one: one boss, as ever.
+   */
+  bossIds?: readonly string[];
   bossAvoid: string;
   /**
    * Bosses resting (kill switches: pauses.ts), by id: never met, at random or picked (a picked one is replaced by a
@@ -1251,6 +1257,17 @@ export const BOSS_ALONE_SCORING: Partial<Settings> = { crowdScoring: undefined }
  * Boss powers (boss-powers.ts in the chess package). Turns are the crowd's moves. Every power is decided on the
  * server from the match's seed and the position, never breaks check and never leaves the crowd without a move.
  */
+/**
+ * The Battle Tower (docs/decisions/2026-11-18-battle-tower-design.md). Several bosses on one side (PR 6): each boss's rage
+ * meter fills at `rageScale[n - 1]` of its speed on a floor of n bosses (first guesses; the tower's sim tunes them), and the
+ * bosses in `apart` are never on one floor (Hollow and Smudgy: both hide what is on a square; Eric, Nov 18).
+ */
+export const BATTLE_TOWER = {
+  rageScale: [1, 0.75, 0.6] as readonly number[],
+  apart: [["hollow", "smudgy"]] as readonly (readonly [string, string])[],
+  maxBosses: 3,
+} as const;
+
 export const BOSS_POWERS = {
   /** The first passive comes as this crowd turn begins. */
   firstPassive: 2,

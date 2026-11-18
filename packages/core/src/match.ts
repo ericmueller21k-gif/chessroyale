@@ -170,6 +170,11 @@ export interface BossState {
   powers?: BossPowerState;
 }
 
+/** A boss's own part on a side of several (MatchState.bosses): the rest of BossState is the battle's, shared. */
+export type BossOwn = Pick<BossState, "id" | "elo" | "tier" | "form" | "powers">;
+/** The fields of a boss's own part (BossOwn). */
+export const BOSS_OWN_FIELDS = ["id", "elo", "tier", "form", "powers"] as const satisfies readonly (keyof BossState)[];
+
 /** The King's charges: the ten's leftover power-ups, one charge per kingPowerUpsPerCharge (rounded), 1 to kingChargesMax. */
 export function kingCharges(powerUpsLeft: number, s: Pick<Settings, "kingPowerUpsPerCharge" | "kingChargesMax">): number {
   return Math.max(1, Math.min(s.kingChargesMax, Math.round(powerUpsLeft / s.kingPowerUpsPerCharge)));
@@ -185,6 +190,17 @@ export interface MatchState {
   final?: FinalState;
   /** Set once the knockout stages are over in a boss battle. */
   boss?: BossState;
+  /**
+   * Several bosses on one side (the Battle Tower: 2 or 3), each one's own part (`BossOwn`: his id, strength and powers), in
+   * the order dealt. `boss` is always one of them in full with the battle's shared fields (the crowd's moves, the God King,
+   * the result): the boss in focus (`focus`), whose entry here is refreshed only as the focus moves, so the side is read
+   * through the runner (`sideBosses`). Unset: one boss, as every battle before the tower.
+   */
+  bosses?: BossOwn[];
+  /** Several bosses: the boss in focus (an index into `bosses`): the boss to move, or the one whose crowd turn this is. */
+  focus?: number;
+  /** Several bosses: who made the side's last move (an index into `bosses`; the last of them before any). */
+  moved?: number;
   /**
    * Knockouts cuts left over because players tied with the last one through (they all went through): owed by the cuts
    * still to come, spread evenly over them, in each pool (a team in Crowd 50 v 50, else "all"). See cutPlan.
