@@ -1096,36 +1096,36 @@ export const FIRE_POSES: Record<"grab" | "swing" | "aim" | "fire", ChandyPose> =
   },
 };
 /** Unsling, aim, fire, hold: every one of his moves fires this (its cues: "unsling", "aim", "fire"). */
-function fireOf(stage: RifleStage): Anim {
+function fireOf(stage: RifleStage, P = FIRE_POSES): Anim {
   return {
     loop: false,
     frames: [
-      frame(stage, 140, FIRE_POSES.grab, { cue: "unsling" }),
-      frame(stage, 120, FIRE_POSES.swing),
-      frame(stage, 260, FIRE_POSES.aim, {
+      frame(stage, 140, P.grab, { cue: "unsling" }),
+      frame(stage, 120, P.swing),
+      frame(stage, 260, P.aim, {
         cue: "aim",
         specks: (b) => flare([b.lens[0] - 1, b.lens[1] - 1], 3),
       }),
-      frame(stage, 90, FIRE_POSES.fire, {
+      frame(stage, 90, P.fire, {
         cue: "fire",
         shake: [-1, 0],
         specks: (b) => burst(b.muzzle, 0),
       }),
-      frame(stage, 110, FIRE_POSES.fire, { specks: (b) => burst(b.muzzle, 1) }),
-      frame(stage, 300, FIRE_POSES.aim),
+      frame(stage, 110, P.fire, { specks: (b) => burst(b.muzzle, 1) }),
+      frame(stage, 300, P.aim),
     ],
   };
 }
 /** Held aiming (a loop: the rifle level in his hands, the lens lit), between shots or while a power plays out. */
-const aimOf = (stage: RifleStage): Anim => ({
+const aimOf = (stage: RifleStage, P = FIRE_POSES): Anim => ({
   loop: true,
-  frames: [frame(stage, 1000, FIRE_POSES.aim)],
+  frames: [frame(stage, 1000, P.aim)],
 });
 /** Back on his back: the swing reversed. */
-function stowOf(stage: RifleStage): Anim {
+function stowOf(stage: RifleStage, P = FIRE_POSES): Anim {
   return {
     loop: false,
-    frames: [frame(stage, 120, FIRE_POSES.swing, { cue: "stow" }), frame(stage, 120, FIRE_POSES.grab), frame(stage, 200, REST)],
+    frames: [frame(stage, 120, P.swing, { cue: "stow" }), frame(stage, 120, P.grab), frame(stage, 200, REST)],
   };
 }
 
@@ -1156,6 +1156,45 @@ export const CHANDY: Character = {
   parts: CHANDY_PARTS,
   anims: Object.fromEntries(
     STAGES.flatMap((st) => Object.entries(MAKERS).map(([name, make]) => [chandyAnim(name, st), lazyAnim(() => make(st))])),
+  ),
+};
+
+/**
+ * His firing poses in a phone's boss bar (Eric, Nov 18: his name "moved too far to the right"): the rifle held tipped down BAR_TILT
+ * degrees, at the board under the bar, his hands with it, and swung round low; so it runs under his name column's meters (kits.ts
+ * barUnder), never through them, and his name sits where his rested figure puts it. Beside the board (a computer) he aims level.
+ */
+export const BAR_TILT = 21;
+/** A point `[x, y]` from his near shoulder turned `deg` about the rifle's butt `at` (his hand on the rifle, turned with it). */
+const turned = ([x, y]: Pt, [ax, ay]: Pt, deg: number): Pt => {
+  const r = (deg * Math.PI) / 180;
+  const [dx, dy] = [x - ax, y - ay];
+  return [Math.round(ax + dx * Math.cos(r) - dy * Math.sin(r)), Math.round(ay + dx * Math.sin(r) + dy * Math.cos(r))];
+};
+const tipped = (p: ChandyPose, deg: number): ChandyPose => {
+  const g = p.gun as { at: Pt; deg: number; front: boolean };
+  const [elbow, hand] = p.armN!;
+  return { ...p, gun: { ...g, deg: g.deg + deg }, armN: [turned(elbow, g.at, deg / 2), turned(hand, g.at, deg)] };
+};
+// (The swing comes round low, its far arm down; the shot's kick stays at the aim's angle: so no frame rises into the meters.)
+export const BAR_FIRE_POSES: typeof FIRE_POSES = {
+  grab: FIRE_POSES.grab,
+  swing: { ...tipped(FIRE_POSES.swing, 30 + BAR_TILT + 6), armF: ARMS.hang },
+  aim: tipped(FIRE_POSES.aim, BAR_TILT),
+  fire: tipped(FIRE_POSES.fire, 3 + BAR_TILT),
+};
+/** His figure in a phone's boss bar (kits.ts `bar`): CHANDY with BAR_FIRE_POSES (his rest and point are the same animations). */
+export const CHANDY_BAR: Character = {
+  ...CHANDY,
+  id: "chandy-bar",
+  anims: Object.fromEntries(
+    STAGES.flatMap((st) =>
+      Object.keys(MAKERS).map((name) => {
+        const key = chandyAnim(name, st);
+        const make = name === "fire" ? fireOf : name === "aim" ? aimOf : name === "stow" ? stowOf : null;
+        return [key, make ? lazyAnim(() => make(st, BAR_FIRE_POSES)) : CHANDY.anims[key]!];
+      }),
+    ),
   ),
 };
 
@@ -1269,8 +1308,8 @@ export const cloneMuzzle = (pose: "level" | "down"): Pt => build(5, CLONE_POSES[
  * scatter, beam, beamOff, shield, pop, zap, clear, aim, aimOff, whoosh, shatter, flash, blast.
  */
 export const CHANDY_CUES: Readonly<Record<string, string>> = {
-  lock: "a scope's lock-on chirp, two rising beeps",
-  unlock: "one falling beep",
+  lock: "the scope locking on, low and heavy: a deep hum whose throb speeds up, a soft click, a growl under it (no chirp: Eric, Nov 18)",
+  unlock: "the hum sinking and slowing, a low hiss out",
   unsling: "a strap's slide and a rifle's clack",
   aim: "a short energy whine winding up",
   fire: "an energy rifle's crack: a zap with a low thump, no gunpowder",
@@ -1290,7 +1329,7 @@ export const CHANDY_CUES: Readonly<Record<string, string>> = {
   aimOff: "the aim's hum off",
   whoosh: "a round's whoosh",
   shatter: "glass-like shatter, no gore",
-  flash: "three alarm blips",
+  flash: "three heavy, low alarm pulses",
   blast: "a big energy pop",
   upgrade: "the window: a part clicking on, a rising chord",
   laser: "Dodge's beams: a proton laser firing and holding (Eric's mock-up to come: the sound chandyBeam)",
