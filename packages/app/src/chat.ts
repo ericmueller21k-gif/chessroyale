@@ -355,7 +355,7 @@ export class MatchChat {
     if (chatOff() || !this.enabled) return out;
     for (const l of this.lines(now)) {
       const say = chatSay(l.say);
-      if (say?.kind === "emoji" && now - l.at < QUICK_CHAT.emojiFloatMs)
+      if (say?.kind === "emoji" && now - (this.floatFrom.get(l.n) ?? l.at) < QUICK_CHAT.emojiFloatMs)
         out.set(l.from, { text: say.text, key: l.n, ...(l.to === "all" && l.team && this.host.teams() ? { team: l.team } : {}) });
     }
     return out;
@@ -396,10 +396,17 @@ export class MatchChat {
       this.lastTick = Date.now();
       play("chat");
     }
+    // (Its float counts from now, as it shows here: not from the server's stamp, which a late delivery or this device's estimate
+    // of the server's clock can put seconds back, so the float was over before it arrived: Nov 18, chat.spec's emoji, a busy runner.)
+    const from = Math.max(l.at, Date.now());
+    this.floatFrom.set(l.n, from);
+    if (this.floatFrom.size > QUICK_CHAT.feedSize * 4) this.floatFrom.delete(this.floatFrom.keys().next().value!);
     this.host.emit();
     // Redraw again once its float is over.
-    this.wakeAt(l.at + QUICK_CHAT.emojiFloatMs + 50);
+    this.wakeAt(from + QUICK_CHAT.emojiFloatMs + 50);
   }
+  /** When each line's emoji float began on this device (arrived), by line number. */
+  private floatFrom = new Map<number, number>();
 
   /** A bot's line shows a moment after it was sent. */
   private later(l: ChatLine) {
