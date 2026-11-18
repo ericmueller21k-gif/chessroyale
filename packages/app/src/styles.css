@@ -546,6 +546,14 @@ p {
 .hb square.check {
   background: radial-gradient(ellipse at center, rgba(255, 0, 0, 1) 0%, rgba(231, 0, 0, 1) 25%, rgba(169, 0, 0, 0) 89%, rgba(158, 0, 0, 0) 100%);
 }
+/* The square marks over a boss's under-layers (z-index 1: Big Boy's tower, Zebra's dough, the candle's shadows), so a move dot
+   on his tower's square shows (review of #784): the pieces' own z-index, the pieces coming later in the board, so still on top. */
+.hb square.move-dest,
+.hb square.last-move,
+.hb square.selected,
+.hb square.check {
+  z-index: 2;
+}
 .hb piece {
   position: absolute;
   top: 0;

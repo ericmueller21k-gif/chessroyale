@@ -1,5 +1,6 @@
 import { expect, type Page } from "@playwright/test";
 import { Chess } from "chess.js";
+import { POWER_FX } from "@chessroyale/chess";
 import { BOARD_SEL, test, watchFor, watchSpans, bossAloneFromHome } from "./helpers.ts";
 
 /**
@@ -144,6 +145,7 @@ test("Big Boy's tall tower (?power=tower): knocked over (or falling by itself), 
   test.setTimeout(6 * 60_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
+  await asAdmin(page);
   await page.goto("/?debug&clock=60&boss=bigboy&power=tower&laststand=0");
   await bossAloneFromHome(page);
   const seen = await watchFor(page, { tip: { selector: '.bb-tower[data-anim^="tip"]' }, flight: { selector: ".pm-topple .pw-flight.blockFly" } });
@@ -163,7 +165,31 @@ test("Big Boy's tall tower (?power=tower): knocked over (or falling by itself), 
     }
     const onto = (p.allowed ?? []).filter((m: string) => m.slice(2, 4) === p.tower.square).sort();
     if (onto.length) {
-      await play(page, onto[0]);
+      // (The Big Bounce on the same turn, by the admins' trigger: your topple plays out in full before it, as online.)
+      await page.locator(".ult-test").click();
+      await expect(page.locator(".ult-test")).toHaveAccessibleName("Ultimate next turn (testing)");
+      // The move dot on the tower's square shows over it (the square marks over the under-layer; review of #784): with the tower
+      // made hit-testable for a moment, the top element at the dot is the square, not the tower.
+      await tap(page, onto[0].slice(0, 2));
+      const dot = page.locator(`${BOARD_SEL.squares} square.move-dest`);
+      await expect(dot.first()).toBeVisible({ timeout: 5000 });
+      const at = await squareAt(page, p.tower.square);
+      const top = await page.evaluate(([x, y]) => {
+        const s = document.createElement("style");
+        s.textContent = ".bb-under, .bb-under * { pointer-events: auto !important; }";
+        document.head.append(s);
+        const e = document.elementFromPoint(x!, y!);
+        s.remove();
+        return `${e?.tagName.toLowerCase()}.${e?.className}`;
+      }, [at.x, at.y]);
+      expect(top).toMatch(/^square\..*move-dest/);
+      const order = await watchSpans(page, { topple: { selector: ".pm-topple" }, tip: { selector: '.bb-tower[data-anim^="tip"]' }, bounce: { selector: ".pm-bounce" } });
+      await tap(page, onto[0].slice(2, 4));
+      await expect.poll(() => phase(page), { timeout: 10_000 }).not.toBe("play");
+      await expect.poll(async () => (await order.spans()).bounce, { timeout: 30_000 }).not.toBeNull();
+      const o = await order.spans();
+      expect(o.tip!.last).toBeLessThan(o.bounce!.first);
+      expect(o.bounce!.first - o.topple!.first).toBeGreaterThanOrEqual(POWER_FX.topple - 100);
       // Knocked over with your move: it falls while he thinks.
       await expect.poll(async () => (await powers(page)).scatter?.by ?? null, { timeout: 30_000 }).toBe("crowd");
       scatter = (await powers(page)).scatter;
