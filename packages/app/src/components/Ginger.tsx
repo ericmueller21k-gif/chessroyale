@@ -2,7 +2,10 @@ import type { JSX } from "preact";
 import { SUPER_FREEZE_BEATS, bannerLeadMs, pieceAt, powerFxMs, sideToMove, superBox, superFreezeLeadMs } from "@chessroyale/chess";
 import { EFFECTS, animLength } from "../characters/power-art.ts";
 import type { BossView } from "../game.ts";
+import { MOO_CINEMATIC } from "@chessroyale/core";
 import { GINGER_BATTLE } from "../characters/ginger-super.ts";
+import { rejoinedAt } from "../characters/moo-state.ts";
+import { onResetBeats } from "./boss-figure.ts";
 import { BossEffect, SpriteAnim, prewarm, prewarmSprite } from "./BossEffect.tsx";
 import { squareXY } from "./GodKing.tsx";
 import { Flight, PIECE_WORD, onSquare, type BossUi, type Moment, type MomentProps } from "./PowerParts.tsx";
@@ -146,12 +149,23 @@ export function gingerMoments(boss: BossView, now = Date.now()): Moment[] {
   if (!e) return [];
   const key = `${boss.id}:superFreeze:${e.turn}`;
   const lead = bannerLeadMs("superFreeze");
-  const seen = seenAt(`${boss.startMove}:${key}`, now) + superFreezeLeadMs(boss);
+  // (First seen just as this device rejoined, the round resent with his thinking under way: skipped, its pieces iced at once, as
+  // his move would cut it off; Moo's Full Moon's rule, MOO_CINEMATIC.rejoinMs.)
+  const seenKey = `${boss.startMove}:${key}`;
+  if (!superSeen.has(seenKey) && now - rejoinedAt() < MOO_CINEMATIC.rejoinMs) superSeen.set(seenKey, -Infinity);
+  const first = seenAt(seenKey, now);
+  if (first === -Infinity) return [];
+  const seen = first + superFreezeLeadMs(boss);
   return [{ kind: "superFreeze", key, at: seen + lead, ms: powerFxMs({ kind: "superFreeze" }) - lead, lead, ...(e.square ? { square: e.square } : {}), ...(e.squares ? { squares: [...e.squares] } : {}) }];
 }
 
 /** When the Super Freeze's pieces began to melt on this device (as his turn after their turn starts). */
 const meltSeen = new Map<string, number>();
+// A new battle forgets both (a rematch's Super Freeze on the same turn plays again).
+onResetBeats(() => {
+  superSeen.clear();
+  meltSeen.clear();
+});
 
 /**
  * His Super Freeze's meter, beside his rage meter (Eric, Nov 18: "another ult meter bar"): a small ice-blue bar filling a step each

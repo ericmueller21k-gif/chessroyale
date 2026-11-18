@@ -7,6 +7,8 @@ import { BOSS_KITS } from "../src/characters/kits.ts";
 import { EFFECTS } from "../src/characters/power-art.ts";
 import { animLength, renderFrame } from "../src/characters/sprite.ts";
 import { gingerMoments } from "../src/components/Ginger.tsx";
+import { resetBeats } from "../src/components/boss-figure.ts";
+import { noteRejoin } from "../src/characters/moo-state.ts";
 import type { BossView } from "../src/game.ts";
 
 /**
@@ -82,5 +84,13 @@ describe("Ginger's Super Freeze: the art against its beats", () => {
     // (Another turn's, or another boss's: none.)
     expect(gingerMoments({ ...boss, powers: { ...boss.powers!, turn: 10 } } as BossView)).toEqual([]);
     expect(gingerMoments({ ...boss, id: "moo" } as BossView)).toEqual([]);
+    // A new battle (a rematch, the same turn): it plays again, from when it's seen.
+    resetBeats();
+    expect(gingerMoments(boss, 50_000)[0]!.at).toBe(50_000 + bannerLeadMs("superFreeze"));
+    // First seen just as this device rejoined (his thinking under way): skipped, as his move would cut it off.
+    resetBeats();
+    noteRejoin(90_000);
+    expect(gingerMoments(boss, 90_200)).toEqual([]);
+    expect(gingerMoments(boss, 95_000)).toEqual([]);
   });
 });
