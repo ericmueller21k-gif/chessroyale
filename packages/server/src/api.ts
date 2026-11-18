@@ -295,8 +295,12 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
             .then((t) => (young ? enterOnly(t) : t))
             .catch(() => null);
     }
+    // ?watch=CODE (a test switch): the live window shows that lobby's match alone, never another test's (live.ts `counts`).
+    const watch = (env as AdminEnv).TEST_SWITCHES === "1" && env.LIVE ? url.searchParams.get("watch") : null;
+    const featured = watch ? { featured: (await liveHub(env as Required<Pick<AccountEnv, "LIVE">>).liveCounts(watch)).featured } : {};
     return json({
       ...liveCache.body,
+      ...featured,
       fillSeconds: Math.max(3, Math.min(600, Number(env.MATCH_FILL_SECONDS ?? 60) || 60)),
       ...(chat ? { chat } : {}),
       ...(town ? { town } : {}),
