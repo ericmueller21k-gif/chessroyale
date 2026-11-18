@@ -639,7 +639,7 @@ export const EFFECTS: Record<EffectName, Effect> = {
   creasePencil: { ch: EFFECT_SPRITES.creasePencil, covers: "square", loop: "E", sounds: {} },
   inkStrike: { ch: EFFECT_SPRITES.inkStrike, covers: "square", start: "strike", loop: "struck", sounds: { strike: "folioScratch" } },
   inkHit: { ch: EFFECT_SPRITES.inkHit, covers: "square", start: "hitHL", sounds: {} },
-  // Chandy's (effects/chandy.ts): placeholder sounds until his own pack (chandy.ts CHANDY_SOUNDS, CHANDY_CUES). The beam's squares pick
+  // Chandy's (effects/chandy.ts): his own sounds (chandy.ts CHANDY_SOUNDS, CHANDY_CUES; chandy-sounds.ts). The beam's squares pick
   // their loop by name (row, col, cross); Dodge's lines play `flash`, then the beam (`travel`, `hold`, `fade`); its hits on your king
   // `crack`, `kill`, `shatter` (his Dodge sounds: CHANDY_DODGE_SOUNDS).
   chandyCrosshair: { ch: EFFECT_SPRITES.chandyCrosshair, covers: "square", start: "lock", loop: "held3", stages: [{ loop: "held3" }, { loop: "held2" }, { loop: "held1" }], end: "drop", sounds: CHANDY_SOUNDS },
