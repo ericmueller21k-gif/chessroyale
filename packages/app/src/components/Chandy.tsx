@@ -19,7 +19,7 @@ import { CHANDY_FIRE_AT, CHANDY_FX, dodgeTimeline, linesAfter, type ChandyView }
 import { BOSS_POWERS, type ChandyMove, type DodgeLine } from "@chessroyale/core";
 import type { BossView, DodgeRun } from "../game.ts";
 import { BoardEffects, onEachFrame, prewarm, prewarmAnims, prewarmSprite, type BoardItem } from "./BossEffect.tsx";
-import { CHANDY, CHANDY_CLONE, CHANDY_RIFLE } from "../characters/chandy.ts";
+import { CHANDY, CHANDY_BAR, CHANDY_CLONE, CHANDY_RIFLE } from "../characters/chandy.ts";
 import { spriteCanvas } from "../characters/sprite-kit.ts";
 import { EFFECTS, type EffectName } from "../characters/power-art.ts";
 import { ChandyDodge, type DodgeView } from "./ChandyDodge.tsx";
@@ -403,7 +403,8 @@ function warmCanvases(ch: typeof CHANDY_CLONE, done?: () => void): void {
 /**
  * His art made ahead, in quiet slices from the battle's start (BossCharacter's warm-up; .claude/LESSONS.md, "A stall the first time an
  * effect shows"): Dodge's clones were made as its vote opened, a 3.9 s stall on a slowed phone that swallowed the whole vote (Nov 16).
- * Then the rifle's stages (the upgrade window), his figure at each stage, and his board art.
+ * Then the rifle's stages (the upgrade window), his figure at each stage (and his phone bar's own firing frames: CHANDY_BAR), and his
+ * board art.
  */
 export function prewarmChandy(): void {
   if (warmed) return;
@@ -412,7 +413,8 @@ export function prewarmChandy(): void {
     warmCanvases(CHANDY_CLONE, () =>
       warmCanvases(CHANDY_RIFLE, () => {
         const staged = Object.entries(CHANDY.anims).filter(([name]) => /_s\d$/.test(name));
-        prewarmSprite(CHANDY, staged.flatMap(([, a]) => a.frames));
+        const barOwn = Object.entries(CHANDY_BAR.anims).filter(([name, a]) => /_s\d$/.test(name) && a !== CHANDY.anims[name]);
+        prewarmSprite(CHANDY, [...staged, ...barOwn].flatMap(([, a]) => a.frames));
         for (const fx of Object.keys(EFFECTS).filter((k) => k.startsWith("chandy")) as EffectName[]) prewarm(fx, Object.entries(EFFECTS[fx].ch.anims).flatMap(([a, an]) => an.frames.map((_, i) => [a, i] as const)));
       }),
     ),

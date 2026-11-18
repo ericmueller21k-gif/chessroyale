@@ -308,8 +308,8 @@ function Character({ boss, stage, place, muteFall }: { boss: BossView; stage: St
       if (kit.ch.id === "folio") prewarmFolio();
       // (The Hidden Boss's phase change: his rage, his leap onto the board, the book thrown down, the chant.)
       if (kit.ch.id === "recluse") prewarmRecluse(boss.crowdSide);
-      // (Chandy's Dodge clones, the rifle's stages, his figure at each, his board art.)
-      if (kit.ch.id === "chandy") prewarmChandy();
+      // (Chandy's Dodge clones, the rifle's stages, his figure at each (his phone bar's too, "chandy-bar"), his board art.)
+      if (kit.ch.id === "chandy" || kit.ch.id === "chandy-bar") prewarmChandy();
       // (Its attack on a king too: the God King's Last Stand, or its mate.)
       prewarmKingAttack(kit.ch.name);
     });

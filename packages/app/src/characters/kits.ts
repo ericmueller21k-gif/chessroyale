@@ -37,7 +37,7 @@ import { BOSS_BEAVER_ATTACK as TIMBER_ATTACK } from "./timber.ts";
 import { TIMBER_CHANCE, TIMBER_LINES } from "./timber-lines.ts";
 import { BOSS_ZEBRA as ZEBRA, BOSS_ZEBRA_PORTRAIT } from "./zebra.ts";
 import { ZEBRA_ATTACK } from "./zebra-figure.ts";
-import { CHANDY, CHANDY_PORTRAIT, CHANDY_SOUNDS, CHANDY_SPRITE } from "./chandy.ts";
+import { CHANDY, CHANDY_BAR, CHANDY_PORTRAIT, CHANDY_SOUNDS, CHANDY_SPRITE } from "./chandy.ts";
 import { CHANDY_LINES } from "./chandy-lines.ts";
 import { ZEBRA_CHANCE, ZEBRA_LINES } from "./zebra-lines.ts";
 import { DASH_ATTACK, DASH_FIGURE as DASH } from "./dash-figure.ts";
@@ -163,6 +163,12 @@ export interface BossKit extends BeatLines {
    * Undefined: 0.
    */
   barName?: number;
+  /**
+   * Where the name column's text and meters end, px under a phone bar's top, for a figure whose rest frames may reach past the column under
+   * them, through the bar's empty band (Chandy's rifle held out, tipped at the board: Eric, Nov 18, his name "moved too far to the right").
+   * barName is then measured only from the rows above it (2 px clear), and no frame reaches past the column above it. Undefined: every row.
+   */
+  barUnder?: number;
   /** A recolor (one of the character's `looks`) from the battle's state: Big Boy's black pawn. */
   lookOf?: (boss: BossView) => string | undefined;
   /** Its attack on a king (the God King's Last Stand, its mate), if it has one: see KingAttackKit. */
@@ -1094,11 +1100,14 @@ export const BOSS_KITS: Record<string, BossKit> = {
   // locked pieces taken, 0-5: `stageOf`, each animation's `_sN` twin); he points at what he locks, every shot a fire. His sounds are
   // his own (chandy-sounds.ts, Nov 18); his lines are placeholders for Eric.
   Chandy: {
-    // (His phone bar's fit: npx tsx scripts/bar-fit.ts.)
+    // (His phone bar's fit: npx tsx scripts/bar-fit.ts. In the bar his rifle comes out tipped down at the board (CHANDY_BAR), under his name
+    // column's meters, which end 51 px under the bar's top (e2e/boss-bar-same.spec.ts), so his name sits where his rested figure puts it.)
     barScale: 0.76,
     barShift: 12,
-    barName: 53,
+    barName: 6,
+    barUnder: 51,
     ch: CHANDY,
+    bar: CHANDY_BAR,
     sprite: CHANDY_SPRITE,
     anims: { entrance: "point", thinking: "idle", move: "point", capture: "fire", strike: "fire", power: "fire", powerHit: "point", ultimateWarn: "aim", ultimate: "fire", ultimateHit: "fire", hurt: "stow", check: "fire", smug: "aim", rattled: "stow", victory: "fire", defeat: "stow" },
     sounds: CHANDY_SOUNDS,

@@ -14,13 +14,13 @@ import { barFit, barRows, momentOk, restOk, BAR_PAD_BOTTOM, REST_LEFT, REST_RIGH
  * The e2e specs (e2e/boss-bar-same.spec.ts, e2e/boss-bar.spec.ts) measure the real page; this checks every frame, which the page can't.
  */
 describe("the phone boss bar's figure: as tall as the bar, whole inside it at rest, every frame", () => {
-  for (const { name, kit, rest, all, idle } of barRows()) {
+  for (const { name, kit, rest, all, idle, beside, under } of barRows()) {
     const scale = kit.barScale ?? 1;
     const shift = kit.barShift ?? 0;
     const nameOff = kit.barName ?? 0;
 
     it(`${name}: its bar numbers are its art's (scale ${scale}, shift ${shift}, name +${nameOff}; npx tsx scripts/bar-fit.ts)`, () => {
-      expect({ barScale: scale, barShift: shift, barName: nameOff }).toEqual(barFit(rest, all));
+      expect({ barScale: scale, barShift: shift, barName: nameOff }).toEqual(barFit(rest, all, beside));
     });
 
     it(`${name}: as tall as the bar less ${BAR_TOP_GAP} px at rest, within a hundredth`, () => {
@@ -33,9 +33,12 @@ describe("the phone boss bar's figure: as tall as the bar, whole inside it at re
 
     it(`${name}: every rest frame whole inside the bar, with its shift ${shift} px and name column +${nameOff} px`, () => {
       expect(rest.left * scale - shift, `${name}: the left edge 2 px in from the bar's left edge`).toBeLessThanOrEqual(REST_LEFT);
-      expect(rest.right * scale + shift, `${name}: the right edge 2 px short of the name column`).toBeLessThanOrEqual(REST_RIGHT + nameOff);
+      expect(beside.right * scale + shift, `${name}: the right edge 2 px short of the name column (where its text and meters are)`).toBeLessThanOrEqual(REST_RIGHT + nameOff);
+      // (Every frame too, a moment's, where the column's text and meters are, for a figure that reaches past the column under them:
+      // kits.ts barUnder, Chandy's rifle.)
+      if (kit.barUnder !== undefined) expect(under.right * scale + shift, `${name}: no frame into the name column's text and meters`).toBeLessThanOrEqual(REST_RIGHT + nameOff);
       expect(rest.down * scale, `${name}: the bottom within the bar's padding`).toBeLessThanOrEqual(BAR_PAD_BOTTOM);
-      expect(restOk(rest, scale, shift, nameOff), `${name}: restOk`).toBe(true);
+      expect(restOk({ ...rest, right: beside.right }, scale, shift, nameOff), `${name}: restOk`).toBe(true);
     });
 
     it(`${name}: a moment (the victory too) on the screen, with its shift of ${shift} px`, () => {
