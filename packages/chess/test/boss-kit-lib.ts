@@ -152,6 +152,8 @@ export interface KitBattle {
   maxMoves: number;
   /** The game so far (the stress start, or the usual one). */
   opening: Opening;
+  /** Several bosses on one side (the Battle Tower: settings.bossIds), `boss` the first; none: him alone. */
+  bosses?: readonly string[];
 }
 
 /**
@@ -182,8 +184,21 @@ export function kitBattles(def: BossDef, maxMoves: number, extra = 0): KitBattle
   return out;
 }
 
-export const kitSettings = (b: Pick<KitBattle, "boss" | "test" | "maxMoves">, patch: Partial<Settings> = {}): Settings =>
-  ({ ...DEFAULT_SETTINGS, ...RAID_SETTINGS, bossFixedElo: 2000, bossId: b.boss, bossUnfinished: true, bossHidden: true, lastStandFrom: 999, bossMaxMoves: b.maxMoves, bossPowerTest: b.test, ...patch }) as Settings;
+export const kitSettings = (b: Pick<KitBattle, "boss" | "test" | "maxMoves" | "bosses">, patch: Partial<Settings> = {}): Settings =>
+  ({
+    ...DEFAULT_SETTINGS,
+    ...RAID_SETTINGS,
+    bossFixedElo: 2000,
+    bossId: b.boss,
+    bossUnfinished: true,
+    bossHidden: true,
+    lastStandFrom: 999,
+    bossMaxMoves: b.maxMoves,
+    bossPowerTest: b.test,
+    // (Several bosses: the tower's side, no strikes on the crowd, as a Boss Battle party.)
+    ...(b.bosses ? { bossIds: b.bosses, bossNoStrikes: true } : {}),
+    ...patch,
+  }) as Settings;
 
 /** Every boss in the roster (hidden ones too), with powers. */
 export const kitBosses = (): BossDef[] => BOSS_ROSTER.filter((d) => d.powers);
@@ -497,15 +512,16 @@ export async function runBattle(k: KitBattle, sf: StockfishMoves | null, watch?:
   const settings = kitSettings(k);
   const engines = [fakeEngine()];
   const r = new MatchRunner({ settings, rng: mulberry32(k.seed), engines, library: [k.opening], entrants: [{ id: "h0", name: "H", isBot: false }], raidSide: k.side });
-  const where = `${k.boss} (seed ${k.seed}, crowd ${k.side === "w" ? "White" : "Black"}, ?power=${k.test || "none"}, from ${k.opening.id})`;
+  const where = `${k.bosses ? k.bosses.join(" + ") : k.boss} (seed ${k.seed}, crowd ${k.side === "w" ? "White" : "Black"}, ?power=${k.test || "none"}, from ${k.opening.id})`;
   const c = new Checker(where, sf, settings);
   const run: KitRun = { result: null, steps: 0, played: {}, events: new Set(), failures: c.failures, ran: c.ran };
   const note = (s: string) => (run.played[s] = (run.played[s] ?? 0) + 1);
   const seen = () => {
-    for (const e of r.boss?.powers?.events ?? []) run.events.add(e.kind);
+    for (const b of r.sideBosses()) for (const e of b.powers?.events ?? []) run.events.add(e.kind);
   };
-  if (r.boss?.id !== k.boss) {
-    c.failures.push(`${where}: the runner met ${r.boss?.id ?? "no boss"} instead`);
+  const met = r.state.bosses?.map((o) => o.id).join(" + ") ?? r.boss?.id;
+  if (met !== (k.bosses ? k.bosses.join(" + ") : k.boss)) {
+    c.failures.push(`${where}: the runner met ${met ?? "no boss"} instead`);
     return run;
   }
   const rng = mulberry32(k.seed * 7919);
