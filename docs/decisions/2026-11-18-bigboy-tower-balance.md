@@ -28,10 +28,10 @@ sim, same seeds (raid, 50 bots, seeds 1-13 and 31-43, one battle each, his tier 
 | `tower` (first pass) | the tower, all blocks scatter | 0.02 | 0-1-25 | 36 |
 | `half` (run 1) | the tower, half the blocks scatter (`towerScatterShare` 0.5) | 0.00 | 0-0-26 | 36 |
 | `base18` (run 2, control) | today's main: the old single block, no tower | 0.00 | 0-0-26 | 32 |
-| `old15` (run 3, control) | main as of Nov 15 (`e47619c`) | RUN3 | RUN3WDL | RUN3MOVES |
+| `old15` (run 3, control) | main as of Nov 15 (`e47619c`) | 0.00 | 0-0-26 | 37 |
 
-- Today's Big Boy without the tower loses every battle in this sim too. The references are from an older sim: their
-  rows carry no tier or Elo (the sim added those before Nov 8), so they aren't today's.
+- Today's Big Boy without the tower loses every battle in this sim too, and so did the Nov 15 code. The references are
+  from an older sim: their rows carry no tier or Elo (the sim added those before Nov 8), so they aren't today's.
 - Halving the scatter changed nothing measurable. So I didn't change Eric's design: `towerScatterShare` stays 1 (all
   blocks), `towerScatterReach` 3, `towerMax` 10. The share stays a setting, for later tuning.
 - For the director (engine lane): re-baseline the raid sim before tuning any boss against `ref1` or `rf1`/`rf2`. Today

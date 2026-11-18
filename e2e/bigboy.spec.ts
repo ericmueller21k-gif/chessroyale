@@ -127,7 +127,13 @@ test("Big Boy's snack before move 1, your move's knock, and his tower's first bl
   for (let h = 2; h <= 4; h++) {
     await play(page, await allowedMove(page, ["h2h3", "a2a3", "h3h4", "a3a4", "b1c3", "g1f3"]));
     await yourMove(page);
-    expect((await powers(page)).tower).toMatchObject({ square: sq, height: h });
+    // (His piece may topple it too, rarely: on a turn it's open to him and his engine picks that move. Then the stacking ends here.)
+    const now = await powers(page);
+    if (!now.tower && now.scatter?.by === "boss" && h > 2) {
+      expect(now.scatter).toMatchObject({ from: sq, height: h - 1 });
+      break;
+    }
+    expect(now.tower).toMatchObject({ square: sq, height: h });
     await expect(page.locator(`.pw-tower[data-square="${sq}"]`)).toHaveAttribute("data-height", String(h));
     await expect(page.locator(`.bb-tower[data-square="${sq}"]`)).toHaveAttribute("data-anim", `stand${h}`, { timeout: 5000 });
   }

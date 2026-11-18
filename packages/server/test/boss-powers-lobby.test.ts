@@ -687,6 +687,58 @@ describe("Big Boy online", () => {
     expect(r4.boss!.powers!.tower).toEqual(L.last("p2", "round")!.boss!.powers!.tower);
   });
 
+  it("his piece onto his tower online (a turn it's open to him: rarely): the request allows it, the host's move stands, it topples as the next turn begins, the same for everyone", () => {
+    const powers = BOSS_POWERS as unknown as Record<string, number>;
+    const was = powers.towerBossChance!;
+    try {
+      // (Open on every turn here: hisToppleOpen's roll is the rule's; this test is the server's part.)
+      powers.towerBossChance = 1;
+      const L = raid({ bossId: "bigboy" });
+      play(L);
+      hostBoss(L);
+      const r2 = toRound(L);
+      // The tower moved (5 tall) under a square his reply can land on, once the crowd's move (kept off it) is in.
+      const runner = (L.core as unknown as { runner: MatchRunner }).runner;
+      const fen = r2.board!.fen;
+      let pick: { crowd: string; his: string; square: string } | null = null;
+      for (const crowd of legalMoves(fen).sort()) {
+        const after = applyMove(fen, crowd);
+        const his = legalMoves(after).sort().find((m) => m.length === 4 && !pieceAt(after, m.slice(2, 4)) && !blockedBy(crowd, m.slice(2, 4), fen) && !inCheck(applyMove(after, m)));
+        if (his) {
+          pick = { crowd, his, square: his.slice(2, 4) };
+          break;
+        }
+      }
+      expect(pick).not.toBeNull();
+      const { crowd, his, square } = pick!;
+      runner.state = { ...runner.state, boss: { ...runner.state.boss!, powers: { ...runner.state.boss!.powers!, tower: { square, height: 5, at: 2 } } } };
+      for (const id of ["p1", "p2"]) L.core.message(id, { t: "pick", key: L.last(id, "round")!.key, move: crowd });
+      expect(L.hostScores("p1")).toBe(true);
+      L.advance(30_000);
+      const ask = L.last("p1", "bossRequest")!;
+      expect(ask.allowed ?? legalMoves(ask.fen)).toContain(his);
+      L.core.message("p1", { t: "bossMove", key: ask.key, move: his });
+      const r3 = toRound(L);
+      expect(r3.board!.history.at(-1)).toBe(his);
+      expect(r3.boss!.powers!.tower).toBeNull();
+      const scatter = r3.boss!.powers!.scatter!;
+      expect(scatter).toMatchObject({ from: square, height: 5, by: "boss", at: 3, until: 3 });
+      expect(scatter.squares.length).toBeGreaterThan(0);
+      expect(r3.boss!.powers!.events).toContainEqual(expect.objectContaining({ kind: "topple", by: "boss", square, squares: scatter.squares }));
+      expect(L.last("p2", "round")!.boss!.powers!.scatter).toEqual(scatter);
+      for (const m of r3.boss!.powers!.allowed ?? []) for (const sq of scatter.squares) expect(blockedBy(m, sq, r3.board!.fen)).toBe(false);
+      // Through the crowd's turn 3 and his move after it; turn 4: gone, a new tower at once.
+      play(L);
+      const ask4 = hostBoss(L);
+      for (const m of ask4.allowed ?? []) for (const sq of scatter.squares) expect(blockedBy(m, sq, ask4.fen)).toBe(false);
+      const r4 = toRound(L);
+      expect(r4.boss!.powers!.scatter).toBeNull();
+      expect(r4.boss!.powers!.tower).toMatchObject({ height: 1, at: 4 });
+    } finally {
+      powers.towerBossChance = was;
+    }
+  });
+
   it("the Big Bounce: at the start of his turn the host scores the candidates; everyone sees the bounce and the new position; then his move", () => {
     const L = raid({ bossId: "bigboy", bossPowerTest: "bounce" });
     play(L);
