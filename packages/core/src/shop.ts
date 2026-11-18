@@ -48,10 +48,10 @@ export interface ShopItem {
 export const SHOP_ITEMS: readonly ShopItem[] = [
   // God King effects: his bolts, beam and glow.
   { id: "king-holy", slot: "king", name: "Holy Light", description: "Gold and white, as the heavens intended.", price: 0, starter: true, look: { bolt: "#fff6c2", glow: "#ffd54a", beam: "#fff3c4" } },
-  { id: "king-storm", slot: "king", name: "Stormcaller", description: "Crackling blue lightning.", price: 400, look: { bolt: "#e0f2fe", glow: "#38bdf8", beam: "#bae6fd" } },
-  { id: "king-hellfire", slot: "king", name: "Hellfire", description: "He descends wreathed in flame.", price: 600, look: { bolt: "#ffedd5", glow: "#f97316", beam: "#fdba74" } },
-  { id: "king-void", slot: "king", name: "Voidborn", description: "Purple light from beyond the board.", price: 600, look: { bolt: "#f3e8ff", glow: "#a855f7", beam: "#d8b4fe" } },
-  { id: "king-emerald", slot: "king", name: "Emerald Oath", description: "Green fire of an ancient order.", price: 500, look: { bolt: "#dcfce7", glow: "#22c55e", beam: "#bbf7d0" } },
+  { id: "king-storm", slot: "king", name: "Stormcaller", description: "Crackling blue lightning.", price: SHOP.godKing["king-storm"] ?? 0, look: { bolt: "#e0f2fe", glow: "#38bdf8", beam: "#bae6fd" } },
+  { id: "king-hellfire", slot: "king", name: "Hellfire", description: "He descends wreathed in flame.", price: SHOP.godKing["king-hellfire"] ?? 0, look: { bolt: "#ffedd5", glow: "#f97316", beam: "#fdba74" } },
+  { id: "king-void", slot: "king", name: "Voidborn", description: "Purple light from beyond the board.", price: SHOP.godKing["king-void"] ?? 0, look: { bolt: "#f3e8ff", glow: "#a855f7", beam: "#d8b4fe" } },
+  { id: "king-emerald", slot: "king", name: "Emerald Oath", description: "Green fire of an ancient order.", price: SHOP.godKing["king-emerald"] ?? 0, look: { bolt: "#dcfce7", glow: "#22c55e", beam: "#bbf7d0" } },
   // (The pawn hats moved into the Beta crate, Oct 11, 2026: drawn and worn like any crate item. Ids like "hat-party"
   // still stored from testing are ignored.)
   // Quick chat packs (core/chat.ts holds their lines; prices are in settings.ts). The free ones everyone has.

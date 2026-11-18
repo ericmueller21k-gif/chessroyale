@@ -38,6 +38,8 @@ vi.mock("@chessroyale/core", async (orig) => {
 const T0 = 1_800_000_000_000;
 const MIN = 60_000;
 const DAY = 86_400_000;
+/** Stormcaller's price (SHOP.godKing: 300 since Nov 18, 400 before). */
+const STORM = SHOP_ITEMS.find((i) => i.id === "king-storm")!.price;
 const tiger = bossCrateOf("tiger")!;
 type Db = ReturnType<typeof memoryDb>["db"];
 
@@ -129,16 +131,16 @@ describe("each path, keyed by its event: replayed or raced, it changes a balance
     const both = await Promise.all([buyItem(sql, a.id, "king-storm", T0), buyItem(sql, a.id, "king-storm", T0)]);
     expect(both.every((r) => r.ok)).toBe(true);
     expect((await buyItem(sql, a.id, "king-storm", T0 + 1)).ok).toBe(true);
-    expect(coinsOf(db, a.id)).toBe(600);
+    expect(coinsOf(db, a.id)).toBe(1000 - STORM);
     expect(legsOf(db, "shop:")).toEqual([
       { leg: 0, asset_kind: "shop", asset_id: "king-storm", delta: 1 },
-      { leg: 1, asset_kind: "coins", asset_id: "", delta: -400 },
+      { leg: 1, asset_kind: "coins", asset_id: "", delta: -STORM },
     ]);
     // Ranked: a game recorded twice (a retry whose answer was lost) pays once.
     const g = duel(a.id, b.id, "1-0", T0 + 10 * MIN);
     const first = await recordDuel(sql, g, notHeld);
     await recordDuel(sql, g, notHeld);
-    expect(coinsOf(db, a.id)).toBe(600 + first!.w.coins);
+    expect(coinsOf(db, a.id)).toBe(1000 - STORM + first!.w.coins);
     expect(legsOf(db, `ranked:${g.id}:`)).toEqual([
       { leg: 0, asset_kind: "coins", asset_id: "", delta: first!.w.coins },
       { leg: 0, asset_kind: "coins", asset_id: "", delta: first!.b.coins },
@@ -585,7 +587,7 @@ describe("reconciliation: each balance is its ledger's sum", () => {
     expect(d.ledger.changes.map((c) => [c.asset_kind, c.delta, c.reason])).toEqual([
       ["coins", 500, "test"],
       ["shop", 1, "shop"],
-      ["coins", -400, "shop"],
+      ["coins", -STORM, "shop"],
       ["keys", 2, "admin grant"],
       ["token", 1, "admin grant"],
     ]);
