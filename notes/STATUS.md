@@ -1,3 +1,4 @@
+- Nov 18 ~09:25 UTC: #798 LIVE (cf4e7a4), main GREEN. #799 MERGED (c4c49be): deploy + main run watched. Queue empty; no helpers. For Eric (morning): rook fallback for the queen lock (proposal); Stripe later this week.
 - Nov 18 ~09:10 UTC: follow-up done -> #799 (ef0e09b: queen lock first only if aimable; refused queen lock stays due; dead early slot 10->5 of 20), CI bsdptynz9 (full suite: runner/lobby touched). Merge when green and main after #798 is green (bdpfp8o1m). No helpers running; queue empty.
 - Nov 18 ~09:00 UTC: main on 826609e (#797) GREEN, live. #798 weapon screen MERGED (cf4e7a4): deploy + main run watched. Follow-up helper running (b31h905z4).
 - Nov 18 ~08:45 UTC: #797 MERGED (826609e), deploy + main run bocdotiwo. Follow-up helper session_01JuCWRtW1jUKtpEY3bdxue5 (xhigh, alone) on claude/chandy-mix-followup, watcher b31h905z4. #798 weapon screen CI b83nxcv9l: merge after main on 826609e.
