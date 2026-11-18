@@ -318,6 +318,17 @@ export const zebraTurnMs = (boss: { powers?: { events?: readonly { kind: string;
   powerMomentMs((boss?.powers?.events ?? []).filter((e): e is { kind: "doughRise" | "doughSquash" | "goldPlate" } => e.kind === "goldPlate" || ((e.kind === "doughRise" || e.kind === "doughSquash") && e.by === "crowd")));
 
 /**
+ * Big Boy's tower your move just knocked over (a `topple` by the crowd among this turn's events, Nov 18): it falls while he thinks,
+ * so his thinking lasts at least as long (the ms; 0: none). Once his Big Bounce has come after it, nothing more: it played in the
+ * thinking before the bounce. The same in solo and on the server.
+ */
+export const bigboyTurnMs = (boss: { powers?: { events?: readonly { kind: string; by?: string }[] } | null } | null | undefined): number => {
+  const ev = boss?.powers?.events ?? [];
+  const i = ev.findIndex((e) => e.kind === "topple" && e.by === "crowd");
+  return i >= 0 && !ev.slice(i + 1).some((e) => e.kind === "bounce") ? POWER_FX.topple : 0;
+};
+
+/**
  * Chandy's moments while he thinks (the queen lock's shot as his turn begins; his first lock, on the piece his first capture takes,
  * marked as that move is about to show: the server holds the move for it, bossMoveMoment): his thinking lasts at least as long (the
  * ms; 0: none).

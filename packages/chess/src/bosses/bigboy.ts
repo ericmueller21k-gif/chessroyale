@@ -291,15 +291,24 @@ export function bounceCandidates(
   const out: BounceCandidate[] = [];
   const seen = new Set<string>();
   const hanging = gridHanging(gridOf(fen), crowd);
+  // (His promotions already there, him to move: the bounce may keep them, never add one.)
+  let promos = new Set<string>();
+  try {
+    promos = new Set(legalMoves(fen).filter((m) => m.length === 5));
+  } catch {
+    promos = new Set();
+  }
   for (let a = 0; out.length < s.bounceCandidates && a < s.bounceCandidates * 30; a++) {
     const c = bounceTry(fen, crowd, mulberry32(Math.floor(powerRoll(seed, "bounce", at, a) * 2 ** 32)), blocks, s);
     if (!c) continue;
     const key = c.fen.split(" ")[0]!;
     if (seen.has(key) || gridHanging(c.grid, crowd) > hanging) continue;
     seen.add(key);
-    // (And he has a move: never a stalemate.)
+    // (And he has a move: never a stalemate. Nor a promotion he hadn't before it: a crowd piece thrown onto a square his pawn
+    // takes on its last rank, or out of its way, would hand him a queen for nothing. The boss kit's invariant 5.)
     try {
-      if (!legalMoves(c.fen).length) continue;
+      const his = legalMoves(c.fen);
+      if (!his.length || his.some((m) => m.length === 5 && !promos.has(m))) continue;
     } catch {
       continue;
     }
