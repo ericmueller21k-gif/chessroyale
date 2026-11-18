@@ -1,3 +1,4 @@
+- Nov 18 ~21:45 UTC: PR 2 held pieces done -> #803 (5538a23), director reviewed core diff (OK, no behavior change, twin test). CI brgone6lh. Next: PR 3 square marks (same brief) after #803 merges.
 - Nov 18 ~21:15 UTC: #802 board layer MERGED (f0a5fef), main run bsyr6yr72. PRs 2-5 brief tower-2-5-bosses-onto-layer.md; PR 2 (held) starting after main green or now (xhigh alone).
 - Nov 18 ~21:00 UTC: PR 1 board layer done -> #802 (8f251b5), CI watched. Next after merge: PR 2-5 (bosses onto the layer, xhigh, one family a PR). Usage warning: one helper at a time.
 - Nov 18 ~20:35 UTC: #801 Tower design MERGED (82de537, docs). PR 1 board layer helper started (xhigh alone), branch claude/tower-board-layer, watcher armed. Audit #1 after PR 6 (Fable high, docs/areas/battle-tower-audit.md).
