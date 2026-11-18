@@ -24,7 +24,9 @@
  *   says (it starts over from empty once the move fires); a queen lock that can't come then (queenLockOk) waits for the meter.
  *
  * **The move meter** (from the first upgrade): one of your moves a notch, full at chandy.meterEvery. Full as his turn begins, he
- * picks a move: the newest unlock first, else random among the unlocked (the queen lock only when it can come). The queen lock is
+ * picks a move (meterOrder): the newest unlock first, never the one he fired last while another can come, then the ones he has fired
+ * the fewest times, ties at random (the queen lock only when it can come; Eric, Nov 18). A pick that can't land takes the next in
+ * that order that can. The queen lock is
  * his whole turn, at once (the pass guard may refuse it: the meter picks another unlocked move, none: it empties); the others land as your next turn begins, after his move:
  * - **Scatter shot** (`scatterShot`): a spot with at least four empty squares round it; four of them blocked through your turn and
  *   his move after it, as Boingo's pies (nobody lands on one; a slide passes through), the ones taking away the most of your moves.
@@ -357,16 +359,27 @@ export function steerPick(fen: string, pick: string, top: readonly MoveScore[], 
 // ---------------- The move meter ----------------
 
 /**
- * The move the full meter fires (`skip`: moves that can't come now): the newest unlock first, else random among the unlocked, never
- * the one he fired last while another can come (Eric, Nov 16: "Despite 2 weapon unlocks he just did this move twice in a row").
+ * The order his meter takes his unlocked moves in (`skip`: moves that can't come now), first to last: the newest unlock first; never
+ * the one he fired last while another can come (Eric, Nov 16: "Despite 2 weapon unlocks he just did this move twice in a row"); then
+ * the ones he has fired the fewest times this battle, ties at random (Eric, Nov 18: "he literally had all 5 but kept spamming the
+ * scatter shot ... he randomly skipped one entirely": a plain random pick let one come four times in eight while another never came).
+ * One order for the meter's pick, the queen lock's wait and a pick that can't land (landMove), so they all keep the same rule.
  */
-export function meterPick(c: Pick<ChandyState, "unlocked" | "fresh" | "used" | "last">, seed: number, skip: readonly ChandyMove[] = []): ChandyMove | null {
+export function meterOrder(c: Pick<ChandyState, "unlocked" | "fresh" | "used" | "last" | "fired">, seed: number, skip: readonly ChandyMove[] = []): ChandyMove[] {
   const open = c.unlocked.filter((m) => !skip.includes(m));
-  if (!open.length) return null;
-  if (c.fresh && open.includes(c.fresh)) return c.fresh;
-  const fresh = open.length > 1 && c.last ? open.filter((m) => m !== c.last) : open;
-  return fresh[Math.floor(powerRoll(seed, "meter", c.used) * fresh.length)]!;
+  const fresh = c.fresh && open.includes(c.fresh) ? [c.fresh] : [];
+  const rest = seeded(
+    open.filter((m) => m !== c.fresh),
+    seed,
+    (x) => x,
+    "meter",
+    c.used,
+  ).sort((a, b) => Number(open.length > 1 && a === c.last) - Number(open.length > 1 && b === c.last) || (c.fired?.[a] ?? 0) - (c.fired?.[b] ?? 0));
+  return [...fresh, ...rest];
 }
+
+/** The move the full meter fires (`skip`: moves that can't come now): the first of meterOrder; null: none can. */
+export const meterPick = (c: Pick<ChandyState, "unlocked" | "fresh" | "used" | "last" | "fired">, seed: number, skip: readonly ChandyMove[] = []): ChandyMove | null => meterOrder(c, seed, skip)[0] ?? null;
 
 /** The move an upgrade unlocks: random among those still locked (from the seed and the upgrade's number); none once all five are. */
 export function unlockPick(unlocked: readonly ChandyMove[], seed: number, n: number): ChandyMove | null {
@@ -796,18 +809,22 @@ export function mateOpen(next: Pick<BossPowerState, "chandy">, t: Pick<TurnConte
   return mates.some(ok) || !legalMoves(t.fen).some(ok);
 }
 
+/** His state after firing `m`: it counts (meterOrder), it's the one he fired last, and no longer new. */
+const fired = (c: ChandyState, m: ChandyMove): Partial<ChandyState> => ({ used: c.used + 1, last: m, fired: { ...c.fired, [m]: (c.fired?.[m] ?? 0) + 1 }, fresh: c.fresh === m ? null : c.fresh });
+
 /**
- * The move the meter picked lands as the crowd's turn begins (`t.fen`: the crowd to move): it, or (it can't here) another unlocked
- * move that can, never the queen lock (his whole turn: at its start). None can: it waits, the meter full.
+ * The move the meter picked lands as the crowd's turn begins (`t.fen`: the crowd to move): it, or (it can't here: say shields with
+ * only his king left) the next in the meter's order that can (meterOrder: not the one he fired last while another can, the least
+ * fired), never the queen lock (his whole turn: at its start). None can: it waits, the meter full.
  */
 function landMove(c: ChandyState, t: TurnContext): ChandyState {
   const s = t.s.chandy;
   const n = c.used;
-  const tries = [c.due!, ...seeded(c.unlocked.filter((m) => m !== c.due && m !== "queenlock"), t.seed, (x) => x, "land", n)];
+  const tries = [c.due!, ...meterOrder(c, t.seed, [c.due!, "queenlock"])];
   for (const m of tries) {
     const done = (x: Partial<ChandyState>, e: PowerEvent): ChandyState => {
       t.events.push(e);
-      return { ...c, ...x, due: null, meter: 0, used: n + 1, last: m, fresh: c.fresh === m ? null : c.fresh };
+      return { ...c, ...x, due: null, meter: 0, ...fired(c, m) };
     };
     if (m === "scatter") {
       const pick = chooseScatter(t.fen, t.crowd, t.seed, n, s);
@@ -1189,7 +1206,7 @@ export const chandyBattle = {
     setBoard(b, passed);
     b.boards.set(b.state.boards[0]!, { ...boardOf(b), expected: 1 - board.expected, lastMove: null });
     b.bossLast = null;
-    setChandy(b, (x) => ({ ...x, moves: x.moves + 1, aim: { square: queen, turn: turnOf(boss) }, due: null, meter: 0, used: x.used + 1, last: "queenlock", fresh: x.fresh === "queenlock" ? null : x.fresh }));
+    setChandy(b, (x) => ({ ...x, moves: x.moves + 1, aim: { square: queen, turn: turnOf(boss) }, due: null, meter: 0, ...fired(x, "queenlock") }));
     b.bossPassed();
     return queen;
   },
