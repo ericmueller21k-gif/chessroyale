@@ -1121,3 +1121,18 @@ inside its limit there, went in the taller bar for good. Only a turn change land
 
 **The fix:** both measure his box at rest in his place (`figureRestBox`); the spec now turns him and re-measures, every side size.
 docs/decisions/2026-11-17-tiger-pump-mid-toss.md.
+
+
+## Chandy played other bosses' sounds (Nov 18, 2026)
+
+**What happened:** Eric, playing Chandy: "I think I noticed a big boy sound reused in chandy, can't do that". Every one of Chandy's
+23 cues was a placeholder from another boss's pack (Big Boy's clack, Moo's zap, Hollow's tick…), and so were his intro's three and
+Dodge's four, which had his own names (`chandyBeam`…) but were made from Moo's, Sawyer's, Ginger's and Hollow's sounds.
+
+**Why:** his art and rules shipped before his sound pack, with "the nearest in feel" borrowed to fill in, each marked "until his own".
+Nothing checked whose a sound was, so the placeholders went live and stayed.
+
+**The fix:** his own synthesized pack (`characters/chandy-sounds.ts`), and the cause: one test over every boss's sounds
+(`boss-sounds-own.test.ts`) that fails on any sound named after, or made from, another boss's pack. No more borrowed placeholders.
+docs/decisions/2026-11-18-chandy-sounds.md.
+
