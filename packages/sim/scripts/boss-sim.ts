@@ -311,6 +311,8 @@ interface RaidPatch {
    * the lump's value (pawn 1 … queen 9), in pawns, against the crowd's best move. Left out: the bots never aim for it.
    */
   squash?: number;
+  /** A test switch (`?power=`), as solo's link sets it: Chandy's `dodge` gives him all five moves from the start (reports/chandy-sim.md, run E). */
+  test?: string;
 }
 
 /** A wrong move into the dark: from a dark square to one it can't legally go to (the first such, for the sim's model). */
@@ -385,7 +387,7 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
       while (strikeTurns.size < strikes) strikeTurns.add(6 + Math.floor(strikeRng() * 25));
       // (A boss whose powers are built before its art: met as the test link does, bossUnfinished.)
       // (Dash: Boss Battle's clock, the bank his slaps take from: the player's time model below.)
-      const s = { ...settings, ...RAID_SETTINGS, ...(bossId === "dash" ? bossClockSettings({ ...settings, ...RAID_SETTINGS }) : {}), bossId, bossUnfinished: true, engineNodes: RAID_NODES, bossNodes: RAID_NODES, ...(patch.tier ? { bossFixedElo: patch.tier } : {}), ...(patch.difficulty ? { bossDifficulty: patch.difficulty } : {}), ...(patch.alone ? { ...BOSS_ALONE_SCORING, bossNoStrikes: true, hollowBulbs: patch.bulbs !== false } : {}) } as Settings;
+      const s = { ...settings, ...RAID_SETTINGS, ...(bossId === "dash" ? bossClockSettings({ ...settings, ...RAID_SETTINGS }) : {}), bossId, ...(patch.test ? { bossPowerTest: patch.test } : {}), bossUnfinished: true, engineNodes: RAID_NODES, bossNodes: RAID_NODES, ...(patch.tier ? { bossFixedElo: patch.tier } : {}), ...(patch.difficulty ? { bossDifficulty: patch.difficulty } : {}), ...(patch.alone ? { ...BOSS_ALONE_SCORING, bossNoStrikes: true, hollowBulbs: patch.bulbs !== false } : {}) } as Settings;
       // (The clock for the hippo gardener's seeds: the crowd's pick (patch.pickSec), the reveal, his turn and the moments.)
       let clockMs = 0;
       const pickSec = patch.pickSec ?? 10;

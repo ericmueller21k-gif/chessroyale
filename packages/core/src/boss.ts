@@ -1105,6 +1105,8 @@ export interface ChandyDodge {
 export interface ChandyState {
   moves: number;
   locks: ChandyLock[];
+  /** His captures marked so far, the first chandy.teachCaptures (each an upgrade); `taught` once they're done: the hunt begins. */
+  marked?: number;
   taught?: true;
   upgrades: number;
   unlocked: ChandyMove[];
@@ -1112,8 +1114,10 @@ export interface ChandyState {
   meter: number;
   due?: ChandyMove | null;
   used: number;
-  /** The move he fired last: the meter picks another while one can come (chandy.ts meterPick). */
+  /** The move he fired last: the meter picks another while one can come (chandy.ts meterOrder). */
   last?: ChandyMove;
+  /** How many times he has fired each move this battle: the meter takes the least fired first (chandy.ts meterOrder). */
+  fired?: Partial<Record<ChandyMove, number>>;
   scatter?: { spot: string; squares: string[]; turn: number } | null;
   beam?: { rank: number; file: string; squares: string[]; turn: number } | null;
   shields?: { squares: string[]; turn: number } | null;

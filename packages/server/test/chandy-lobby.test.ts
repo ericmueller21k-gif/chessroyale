@@ -178,7 +178,8 @@ describe("Chandy online: his first capture", () => {
     L.advance(200);
     expect(r.boards.get(id)!.fen).not.toBe(fen);
     const c = r.boss!.powers!.chandy!;
-    expect([c.taught, c.upgrades]).toEqual([true, 1]);
+    // (His second capture teaches too, Eric, Nov 18: the hunt from then.)
+    expect([c.marked, c.taught, c.upgrades]).toEqual([1, undefined, 1]);
     const shown = L.log.slice(before).filter((x) => x.id === "p1" && x.msg.t === "boss").map((x) => x.msg as Extract<Msg, { t: "boss" }>).at(-1)!;
     expect(shown.thinking).toBeFalsy();
     expect(shown.boss.powers?.events.some((e) => e.kind === "upgrade")).toBe(true);
