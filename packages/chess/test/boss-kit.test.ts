@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { BOSS_ROSTER } from "@chessroyale/core";
-import { applyMove, sanLineToUci, START_FEN } from "../src/index.ts";
-import { KNOWN_STEPS, PROMOTION_OPT_OUT, StockfishMoves, epKept, kitBattles, kitBosses, newPromotions, positionProblems, quickSearches, runBattle, unknownSteps } from "./boss-kit-lib.ts";
+import { BOSS_ROSTER, mulberry32 } from "@chessroyale/core";
+import { MatchRunner, applyMove, boardEnd, bossShowMs, bossTurnShowMs, legalMoves, sanLineToUci, START_FEN } from "../src/index.ts";
+import { KIT_OPENING, KNOWN_STEPS, PROMOTION_OPT_OUT, StockfishMoves, epKept, fakeEngine, kitBattles, kitBosses, kitSettings, newPromotions, positionProblems, quickSearches, runBattle, unknownSteps } from "./boss-kit-lib.ts";
 
 /**
  * The shared boss test kit (Oct 18; docs/decisions/2026-10-18-boss-test-kit.md): every boss in BOSS_ROSTER, hidden
@@ -49,6 +49,39 @@ describe("the boss kit: its own ground", () => {
       expect(why.length, id).toBeGreaterThan(10);
     }
   });
+});
+
+describe("a draw on his move: the turn's moments don't play again (review of #787, finding 4)", () => {
+  // (The moment came as your move landed and played while he thought; his move then draws: no new turn begins, so the turn's
+  // events are spent. Before the fix they stayed in the view: the last show ran their length again and played them again.)
+  const cases = [
+    { boss: "moo", test: "fullmoon", kind: "fullMoon", crowdMoves: 2, fen: "8/8/8/8/8/3q4/5k2/7K b - - 1 60", move: "d3g3", end: "stalemate" },
+    { boss: "folio", test: "revision", kind: "revision", crowdMoves: 5, fen: "8/8/8/8/4Nk2/8/8/K7 b - - 0 60", move: "f4e4", end: "insufficient_material" },
+  ] as const;
+  for (const c of cases) {
+    it(`${c.boss}: ${c.kind} while he thinks, then his move ends it by ${c.end}`, async () => {
+      const r = new MatchRunner({ settings: kitSettings({ boss: c.boss, test: c.test, maxMoves: 40 }), rng: mulberry32(3), engines: [fakeEngine()], library: [KIT_OPENING], entrants: [{ id: "h0", name: "H", isBot: false }], raidSide: "w" });
+      while (r.boss!.crowdMoves < c.crowdMoves) {
+        if (r.bossToMove()) await r.playBoss();
+        else {
+          r.deal();
+          const fen = r.boards.get(0)!.fen;
+          await r.score(new Map([["h0", { move: [...(r.crowdAllowed() ?? legalMoves(fen))].sort()[0]!, thinkMs: 1000 }]]));
+        }
+      }
+      expect(r.bossToMove()).toBe(true);
+      expect(r.bossView()!.powers!.events.map((e) => e.kind)).toContain(c.kind);
+      // (His move from a position of our own: a base on the board at its ply, as the carrots' tests do.)
+      const board = r.boards.get(0)!;
+      r.boards.set(0, { ...board, fen: c.fen, bases: [...(board.bases ?? []), { ply: board.history.length, fen: c.fen }] });
+      r.applyBossMove(c.move);
+      expect(boardEnd(r.boards.get(0)!)).toBe(c.end);
+      const view = r.bossView()!;
+      expect(view.powers!.events).toEqual([]);
+      expect(bossTurnShowMs(view)).toBe(bossShowMs(view.lastMove));
+      expect(r.finishBossBattle()).toBe("draw");
+    });
+  }
 });
 
 describe("the boss kit: its checks catch the past bugs' own positions", () => {

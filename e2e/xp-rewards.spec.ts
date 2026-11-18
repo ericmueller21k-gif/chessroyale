@@ -74,13 +74,14 @@ test("the daily reward: the day's first counted game of 15 moves says \"Daily re
   expect((await locker(page)).seriesCrates).toEqual({ "winter-1": 1 });
 });
 
-test("a level-up: its toast (\"Level 2!\", 2 Winter Crates and a key); the Crates tab shows them, opens one with the key, then the other is locked and refused", async ({ page }, testInfo) => {
+test("a level-up: its toast (\"Level 2!\", a Winter Crate and a key, beside the daily's crate); the Crates tab shows them, opens one with the key, then the other is locked and refused", async ({ page }, testInfo) => {
   test.setTimeout(4 * 60_000);
-  // 990 XP, then +170: Level 2.
-  await wonGame(page, 990);
+  // 990 XP, then +170 and the daily's +200: Level 2. (20 moves, so the daily reward's crate comes too: a level pays 1 crate since
+  // Nov 18, and the crate left after the open is the daily's.)
+  await wonGame(page, 990, 20);
   const toast = page.getByTestId("reward-box");
   await expect(toast).toContainText("Level 2!");
-  await expect(toast).toContainText("+2 Winter Crates · +1 crate key");
+  await expect(toast).toContainText("+1 Winter Crate · +1 crate key");
   await expect(toast.locator('[data-thing="crates"]')).toHaveText("×2");
   await expect(toast.locator('[data-thing="keys"]')).toHaveText("×1");
   if (SHOTS) await page.screenshot({ path: `${SHOTS}/levelup-toast-${testInfo.project.name}.png` });
@@ -121,7 +122,7 @@ test("every 10th level: a boss crate to choose; its toast says so, the Crates ta
   await wonGame(page, 8_900);
   const toast = page.getByTestId("reward-box");
   await expect(toast).toContainText("Level 10!");
-  await expect(toast).toContainText("+18 Winter Crates · +9 crate keys");
+  await expect(toast).toContainText("+9 Winter Crates · +9 crate keys");
   await expect(toast).toContainText("Choose your boss crate in Crates.");
   expect((await locker(page)).bossPicks).toBe(1);
   await page.goto("/shop?crates");

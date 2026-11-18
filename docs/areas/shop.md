@@ -10,7 +10,7 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
   "The shop is resting for a bit. Back soon." and the server refuses getting items and opening crates; the locker
   (wearing what you have) stays.
 - **The shop** (`core/shop.ts`): God King effects (the color of his bolts, beam and halo; one is always on, Holy
-  Light the free starter) and chat packs (not equipped: you use every pack you own). Prices in coins; `SHOP_FREE` is
+  Light the free starter) and chat packs (not equipped: you use every pack you own). Prices in coins (God King effects `SHOP.godKing`, 300-400; chat packs `QUICK_CHAT.packPrices`, 100-150; both since Nov 18); `SHOP_FREE` is
   on (its items are free: "Get · Free"; the "free while we test" note is gone since Nov 9). The pawn hats it used to sell are Beta crate items now (Oct 11, 2026); the shop
   is kept for God King packs and, later, things like boss and attack animations.
 - **Buying with coins is one transaction** (`buyItem`, one D1 batch: all of it or none): the item goes in only if the
@@ -26,7 +26,7 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
   (`SHOP.discount`, 0.5; `shopPrice` and `discountLabel` in `core/shop.ts`, whole coins, half up): a red "50% OFF" ribbon on every card
   and the bundle, the full price struck through beside the discounted one; at 0 no ribbons and no strike. **Limited items**
   (`SHOP.limited`: Gift, Beta): a gold clock in the card's top-left corner; its tap opens "Limited: a rotating shop item. It leaves the
-  shop when its time is up." (OK, Escape or a tap outside close either pop-up; nothing moves). Prices: `SHOP.prices`. The coin is
+  shop when its time is up." (OK, Escape or a tap outside close either pop-up; nothing moves). Prices: `SHOP.prices` (full, in coins; Nov 18, the payments design's table 8: key 100, HunChess 50, Gift and Beta 75, boss crate 200, bundle 400; [2026-11-18-coin-prices.md](../decisions/2026-11-18-coin-prices.md)). The coin is
   `Coin` (components/Coin.tsx: a king's head on a boss-token-style gold coin, Nov 17), in the top bar, price pills and Buy buttons. **The Mythic Crate** (`MythicCrateArt`: purple and black, gold crown, the HunChess crate's glint tinted lilac) is
   defined only in the decision note for now (a Fischer Random pull; each of the bundle's crates `SHOP.bundleMythicChance` likely).
   `BossCrateArt({ boss })` lays a boss's token over the seal (for the inventory, not wired there yet).
@@ -45,7 +45,7 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
   Crates are opened on the server, so nobody can make themselves a Pearl crown.
 - **Crates need keys** (Nov 9, XP phase 2; [2026-11-09-xp-phase2-crates.md](../decisions/2026-11-09-xp-phase2-crates.md)): a series crate
   opens, for everyone (admins too), only with one of that crate held (`series_crates`, by series; ledger kind `series_crate`) and one crate
-  key, in one ledger op ("You need a Winter Crate and a crate key to open it."). Crates come from the daily reward, each level (2 and a key),
+  key, in one ledger op ("You need a Winter Crate and a crate key to open it."). Crates come from the daily reward, each level (1 and a key, `XP.levelCrates`: 2 until Nov 18),
   some quests (a win quest's crate; the weekly's crate and key: [accounts.md](accounts.md), "Quests") and Squads' placements, all of the newest series (`XP.rewardCrate`); a crate held before (the wallet's old `crates`) became a Winter
   Crate as the locker was read. The Crates tab shows each series crate's count and a padlock while it can't open; its Open is greyed
   without both. `?fischer=1` / `?shiny=1` only where `TEST_SWITCHES` is "1". Every 10th level's boss crate is picked in the Crates tab's

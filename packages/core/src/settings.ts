@@ -3496,10 +3496,16 @@ export const SHOP = {
   /** The beta discount on everything in the shop (0.5 = 50% off; 0 = none: no ribbons, no struck prices). */
   discount: 0.5,
   /**
-   * Full prices in coins (the director's numbers from the coin economy: a game pays about 1.8 coins a minute, at most 70, about
-   * 20 paying games a day). The page shows them struck through, the discounted price beside them (`shopPrice` in shop.ts).
+   * Full prices in coins (Eric, Nov 18: 100 coins = $1, a key 100 = $1, crates 50-75 "as long as it's something we can easily tweak
+   * later"; the payments design, section 8: docs/decisions/2026-11-17-payments-design.md). The page shows them struck through, the
+   * discounted price beside them (`shopPrice` in shop.ts); the beta's discount ends when real money turns on.
    */
-  prices: { key: 250, hunchess: 100, gift: 150, beta: 150, boss: 400, bundle: 900 },
+  prices: { key: 100, hunchess: 50, gift: 75, beta: 75, boss: 200, bundle: 400 },
+  /**
+   * The God King effects' prices in coins, by item id (Holy Light, the starter, is free). Nov 18: 400-600 became 300-400 (the
+   * payments design's table 8; each old price p is now p / 2 + 100: 400 → 300, 500 → 350, 600 → 400).
+   */
+  godKing: { "king-storm": 300, "king-hellfire": 400, "king-void": 400, "king-emerald": 350 } as Readonly<Record<string, number>>,
   /** The limited, rotating items: a gold clock on their card. */
   limited: ["gift", "beta"] as readonly string[],
   /** The bundle's 3 random crates: each this likely to be a Mythic Crate (a Fischer Random pull: Legendary or Mythic). Wired with purchases. */
@@ -3569,14 +3575,14 @@ export const QUICK_CHAT = {
   /** Everyone's picks until they choose their own (new and existing players alike): free lines and emoji only. */
   defaultLines: ["good-luck", "have-fun", "nice-move", "wow", "oops", "trust-crowd", "defend-king", "go-mate", "gg", "thanks"] as readonly string[],
   defaultEmoji: ["e-thumbs", "e-clap", "e-laugh", "e-wow", "e-grimace", "e-fire", "e-skull", "e-party"] as readonly string[],
-  /** Shop prices of the packs, in coins (everything is free while SHOP_FREE is on). */
+  /** Shop prices of the packs, in coins (everything is free while SHOP_FREE is on). Nov 18: halved, 200-300 to 100-150 (the payments design). */
   packPrices: {
-    godking: 300,
-    winter: 200,
-    spicy: 250,
-    "emoji-chess": 200,
-    "emoji-winter": 200,
-    "emoji-royal": 300,
+    godking: 150,
+    winter: 100,
+    spicy: 125,
+    "emoji-chess": 100,
+    "emoji-winter": 100,
+    "emoji-royal": 150,
   } as Readonly<Record<string, number>>,
 } as const;
 
@@ -4130,7 +4136,8 @@ export const XP = {
   dailyMinMoves: 15,
   dailySoloMinMinutes: 3,
   dailyCrates: 1,
-  levelCrates: 2,
+  /** 1 since Nov 18 (was 2; Eric: "One crate per level seems fine"; the payments design, section 6). */
+  levelCrates: 1,
   levelKeys: 1,
   bossCrateEvery: 10,
   levelsPerGame: 20,
