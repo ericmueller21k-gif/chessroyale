@@ -8,7 +8,7 @@ import { PIG_SOUNDS, pigSound } from "../src/characters/pig-sounds.ts";
 import { POWER_MOMENTS, animLength, cueAt } from "../src/characters/power-art.ts";
 import { frameKeys, renderFrame } from "../src/characters/sprite.ts";
 import { MOVE_MEAN_DB, MOVE_PEAK } from "../src/characters/synth.ts";
-import { duelCount, duelTurn, lassoStand, pigBoard, showdownFen } from "../src/components/Pig.tsx";
+import { duelCount, duelTurn, lassoStand, pairRopes, pigBoard, showdownFen } from "../src/components/Pig.tsx";
 import { powerLine } from "../src/components/BossPowers.tsx";
 import { squareXY } from "../src/components/GodKing.tsx";
 import { POWER_WORDS, powersLine } from "../src/power-words.ts";
@@ -86,6 +86,38 @@ describe("Wrangler, the cowboy pig", () => {
     expect(keys[CATCH_AT[1]]![CATCH_AT[0] - 9]).toBeTruthy();
     expect(CATCH_AT[0] - CATCH[0]).toBe(PIG.foot[0] - 40);
     expect(CATCH[0]).toBeGreaterThan(80);
+  });
+
+  // (Nov 18, Eric: "he kind of looks the wrong way and pulls": redrawn so he looks at what he ropes and pulls away from it.)
+  it("every rope he holds starts in his fist, and he looks at the loop from his throw to the end of his tug", () => {
+    const fists = (f: (typeof idle.frames)[number]) => f.layers.filter((l) => l.part === "fist").map((l) => [l.x + 3, l.y + 3] as const);
+    for (const name of ["lasso", "windup", "idle", "ready"]) {
+      PIG.anims[name]!.frames.forEach((f, i) => {
+        for (const l of f.layers.filter((x) => x.part.startsWith("line:"))) {
+          const [sx, sy] = l.part.slice(5).split(";")[0]!.split(",").map(Number);
+          const near = Math.min(...fists(f).map(([x, y]) => Math.hypot(x - (sx! + 3), y - (sy! + 3))));
+          expect(near, `${name} f${i}: the rope starts ${near.toFixed(1)} px from his nearest fist`).toBeLessThanOrEqual(3);
+        }
+      });
+    }
+    const lasso = PIG.anims.lasso!.frames;
+    const thrown = lasso.findIndex((f) => f.cue === "throw");
+    const tugged = lasso.findIndex((f) => f.cue === "tug");
+    const looks = lasso.map((f) => !!f.layers.find((l) => l.part.startsWith("head:"))!.flipX);
+    expect(looks.slice(thrown, tugged + 4).every(Boolean), "his head turned to the loop, our right").toBe(true);
+    expect(looks.slice(0, thrown).some(Boolean), "spinning, as drawn").toBe(false);
+  });
+
+  it("hauls his showdown's ropes from his fists (HAUL_FISTS), leaning back away from them, looking at them", () => {
+    const rest = idle.frames[0]!.layers.find((l) => l.part === "body")!.x;
+    for (const f of PIG.anims.haul!.frames) {
+      const fists = f.layers.filter((l) => l.part === "fist").map((l) => [l.x + 3, l.y + 3]);
+      for (const h of HAUL_FISTS) expect(fists).toContainEqual([...h]);
+      // The ropes go out to our left (where he faces, as drawn): his fists left of his feet, his body leaning to our right.
+      for (const [x] of HAUL_FISTS) expect(x).toBeLessThan(PIG.foot[0]);
+      expect(f.layers.find((l) => l.part === "body")!.x).toBeGreaterThan(rest);
+      expect(f.layers.find((l) => l.part.startsWith("head:"))!.flipX).toBeFalsy();
+    }
   });
 
   it("has a portrait inside his frame that shows his hat, eyes, snout and teeth", () => {
@@ -231,6 +263,21 @@ describe("on the board", () => {
     expect(duelCount(view(l.fen, { showdown: { ...sd, pairs: sd.pairs.slice(0, 2) }, allowed: l.duels.slice(0, 2) }))).toBe(2);
     expect(duelTurn(view(l.fen, { showdown: sd, allowed: l.duels, turn: 4 }))).toBe(false);
     expect(duelCount(view(l.fen, { showdown: sd, turn: 4 }))).toBe(0);
+    // His two ropes never cross as they shoot out, whichever squares a pair's pieces come from (either way he's drawn, either side below).
+    type P = { x: number; y: number };
+    const side = (p: P, q: P, r: P) => Math.sign((q.x - p.x) * (r.y - p.y) - (q.y - p.y) * (r.x - p.x));
+    const squares = [..."abcdefgh"].flatMap((f) => [..."12345678"].map((r) => f + r));
+    const crossed: string[] = [];
+    for (const mirrored of [true, false])
+      for (const o of ["white", "black"] as const)
+        for (const a of squares)
+          for (const b of squares) {
+            if (a === b) continue;
+            const [c, h] = pairRopes(mirrored, a, b, o);
+            const x = side(c.from, c.to, h.from) * side(c.from, c.to, h.to) < 0 && side(h.from, h.to, c.from) * side(h.from, h.to, c.to) < 0;
+            if (x) crossed.push(`${a}${b}`);
+          }
+    expect(crossed.slice(0, 5), `${crossed.length} crossing`).toEqual([]);
   });
 });
 
