@@ -27351,12 +27351,9 @@ body.cs-on .mm-scrim {
     height: 10px;
   }
 }
-.ch-upgrade {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  z-index: 30;
-  translate: -50% -50%;
+/* (His upgrade window's container, shared by his weapon screen: the God King's command-window look, blue, white border, pixel font.) */
+.ch-upgrade,
+.ch-weapon {
   width: min(92%, 352px);
   box-sizing: border-box;
   display: grid;
@@ -27369,6 +27366,13 @@ body.cs-on .mm-scrim {
   border: 3px solid #f4f4f4;
   border-radius: 6px;
   box-shadow: 0 0 0 2px #0b0b1a, 4px 6px 0 rgba(0, 0, 0, 0.35);
+}
+.ch-upgrade {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 30;
+  translate: -50% -50%;
   pointer-events: none;
   animation: ch-up-life 2000ms linear both;
   animation-delay: var(--ch-ago, 0ms);
@@ -27444,6 +27448,118 @@ body.cs-on .mm-scrim {
 .ch-up-note {
   animation: ch-up-title 2000ms steps(1, end) both;
   animation-delay: var(--ch-ago, 0ms);
+}
+
+/* Chandy's weapon screen (ChandyWeapon.tsx; Eric, Nov 18): a tap on his figure opens it. The tap target fills his figure's box (the box
+   itself never takes a tap); the screen sits over a light dim, centered, in his upgrade window's container, still (no life animation). */
+.ch-look-tap {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  pointer-events: auto;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.ch-look-tap[aria-disabled="true"] {
+  cursor: default;
+}
+.ch-look-tap:focus-visible {
+  outline: 2px solid #f2c14e;
+  outline-offset: 2px;
+}
+.ch-look-back {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.35);
+}
+.ch-weapon {
+  position: relative;
+  width: min(calc(100vw - 32px), 352px);
+  outline: none;
+}
+.ch-weapon .ch-up-title {
+  font-size: 14px;
+}
+.ch-weapon .ch-up-title,
+.ch-weapon .ch-up-label,
+.ch-weapon .ch-up-note {
+  animation: none;
+}
+.ch-weapon-x {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #fff;
+  cursor: pointer;
+}
+.ch-weapon-moves {
+  list-style: none;
+  margin: 2px 0 0;
+  padding: 0;
+  width: 100%;
+  display: grid;
+  gap: 4px;
+}
+.ch-weapon-moves > li {
+  display: grid;
+  grid-template-columns: 10px auto 1fr;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.25);
+  font-size: 8px;
+  line-height: 1.3;
+  opacity: 0.45;
+}
+.ch-weapon-moves > li.on {
+  border-color: #58e6ff;
+  opacity: 1;
+}
+.ch-weapon-moves > li > i {
+  width: 10px;
+  height: 10px;
+  background: #3a4270;
+}
+.ch-weapon-moves > li.on > i {
+  background: #58e6ff;
+  box-shadow: 0 0 6px #58e6ff;
+}
+.ch-wm-what {
+  justify-self: end;
+  text-align: right;
+  font-size: 7px;
+  color: #c9d1ff;
+}
+.ch-weapon-meter {
+  width: 100%;
+  display: grid;
+  gap: 5px;
+  padding: 0 2px;
+  box-sizing: border-box;
+  font-size: 7px;
+  color: #c9d1ff;
+}
+.ch-weapon-meter .ch-meter {
+  height: 10px;
+}
+.ch-weapon-meter.ch-off {
+  opacity: 0.45;
 }
 
 .cd-root {

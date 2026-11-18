@@ -994,6 +994,9 @@ top part is left and the review right. Decision: `docs/decisions/2026-11-02-boss
   His phone bar is sized by his body, his rifle a prop (`barProps`: 1.19, was 0.76), and draws `CHANDY_BAR` (chandy.ts): the same
   figure, his rifle held tipped `BAR_TILT` (21°) down at the board, so it runs under his meters (kits.ts `barUnder`) and his name sits
   beside him (5 px from his body); beside the board he aims level.
+  **A tap on him** (bar or beside the board) opens his weapon screen (Nov 18, `components/ChandyWeapon.tsx`, his upgrade window's
+  container): the rifle at its stage, "n/5", his five moves (lit once unlocked, the rest greyed), his meter; only on your side's turn,
+  closing itself as anything moves (`lookKey`); the clock runs. docs/decisions/2026-11-18-chandy-weapon-screen.md.
 
 ## Where the code is
 

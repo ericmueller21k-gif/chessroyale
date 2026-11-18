@@ -12,7 +12,8 @@ import { chandyItems, dodgeFen, dodgeView } from "../src/components/Chandy.tsx";
 import { WARN } from "../src/components/BossPowers.tsx";
 import type { MomentProps } from "../src/components/PowerParts.tsx";
 import { refusedLine } from "../src/refused.ts";
-import type { BossView } from "../src/game.ts";
+import type { BossView, GameView } from "../src/game.ts";
+import { lookKey, weaponView } from "../src/components/ChandyWeapon.tsx";
 
 const fire = CHANDY.anims.fire!;
 const fireCue = (() => {
@@ -175,5 +176,40 @@ describe("Dodge's warning", () => {
     warn(null);
     warn(5);
     expect(said).toEqual(["RAGE! Next turn: Dodge", "RAGE! Now: Dodge"]);
+  });
+});
+
+describe("his weapon screen (Eric, Nov 18: tap him to see his rifle and its upgrades)", () => {
+  it("before any upgrade: the rifle at stage 0, all five moves greyed, the meter off, how he upgrades", () => {
+    const v = weaponView(EMPTY);
+    expect(v.stage).toBe(0);
+    expect(v.label).toBe("Base 0/5");
+    expect(v.moves.map((m) => m.id)).toEqual(["scatter", "beam", "shields", "rapidfire", "queenlock"]);
+    expect(v.moves.every((m) => !m.on)).toBe(true);
+    expect(v.meter).toBeNull();
+    expect(v.note).toMatch(/locked piece he takes upgrades his rifle/);
+  });
+  it("lights the moves he has, in one fixed order whatever order they came in; the stage and meter from his view", () => {
+    const v = weaponView({ upgrades: 2, unlocked: ["queenlock", "beam"], meter: 0.456 });
+    expect(v.stage).toBe(2);
+    expect(v.label).toBe("Big scope 2/5");
+    expect(v.moves.filter((m) => m.on).map((m) => m.id)).toEqual(["beam", "queenlock"]);
+    expect(v.meter).toBe(46);
+    const full = weaponView({ upgrades: 5, unlocked: ["scatter", "beam", "shields", "rapidfire", "queenlock"], meter: 1 });
+    expect(full.stage).toBe(5);
+    expect(full.moves.every((m) => m.on)).toBe(true);
+    expect(full.note).toBe("Fully upgraded.");
+  });
+  it("can open only on the crowd's turn with him in play: never in his turn, in Dodge or once the battle's over; any move closes it", () => {
+    const boss = bossWith({ ...EMPTY, upgrades: 1, unlocked: ["beam"], meter: 0 });
+    const play = { kind: "play" } as GameView["phase"];
+    const k = lookKey({ boss, phase: play });
+    expect(k).not.toBeNull();
+    expect(lookKey({ boss, phase: { kind: "scoring" } as GameView["phase"] })).toBe(k);
+    expect(lookKey({ boss, phase: { kind: "boss" } as GameView["phase"] })).toBeNull();
+    expect(lookKey({ boss: bossWith({ ...EMPTY, dodge: {} }), phase: play })).toBeNull();
+    expect(lookKey({ boss: { ...boss, result: "boss" } as BossView, phase: play })).toBeNull();
+    const moved = { ...boss, board: { ...boss.board, history: ["e2e4"] } } as BossView;
+    expect(lookKey({ boss: moved, phase: play })).not.toBe(k);
   });
 });

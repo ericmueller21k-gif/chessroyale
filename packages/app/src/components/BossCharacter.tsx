@@ -1,3 +1,4 @@
+import type { ComponentChildren } from "preact";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "preact/hooks";
 import { bossBeat, type Beat, type BeatResult, type Stage } from "../characters/boss-beats.ts";
 import { BOSS_KITS, artOf, bossKit, bossKitOf, liveKit, placeFacing, type BossKit } from "../characters/kits.ts";
@@ -23,6 +24,7 @@ import { prewarmHopper } from "./Hopper.tsx";
 import { prewarmSmudgy } from "./Smudgy.tsx";
 import { prewarmMoo } from "./Moo.tsx";
 import { prewarmChandy } from "./Chandy.tsx";
+import { ChandyLook } from "./ChandyWeapon.tsx";
 import { prewarmGardener, resetGarden } from "./Gardener.tsx";
 import { prewarmTiger } from "./Tiger.tsx";
 import { resetTiger } from "../tiger-show.ts";
@@ -40,8 +42,8 @@ import { testSwitchesAllowed } from "../test-switches.ts";
 /**
  * A raid boss as a character (if it has one: see characters/kits.ts), standing across the board from the God King: on a
  * phone at the left of the boss bar above the board (he's under the board on the right), on a computer by the board's
- * bottom-left corner (he's by its bottom-right, facing him: Eric, Oct 11). It never takes a tap and never covers a
- * piece.
+ * bottom-left corner (he's by its bottom-right, facing him: Eric, Oct 11). It never takes a tap (but Chandy's, whose tap
+ * opens his weapon screen: ChandyWeapon.tsx) and never covers a piece.
  *
  * What it does comes from the shared match state (characters/boss-beats.ts): every player sees the same animation
  * and the same line. An animation plays once per moment, from when this device first saw the moment, so a new
@@ -236,10 +238,16 @@ export function BossCharacter({ match, place }: { match: GameView; place: "bar" 
   // only ever flashed its first line in his bar before it: none then (Eric, Nov 16: "get rid of that line").)
   const p = match.phase;
   const mute = p.kind === "boss" && !!p.fall && !!p.toPhase2;
-  return boss && bossKitOf(boss) ? <Character boss={boss} stage={bossStage(match.phase, boss)} place={place} muteFall={mute} /> : null;
+  // (Chandy: a tap on him opens his weapon screen, his figure's only tap; ChandyWeapon.tsx.)
+  const look = boss?.id === "chandy" && place !== "results" ? <ChandyLook match={match} place={place} /> : null;
+  return boss && bossKitOf(boss) ? (
+    <Character boss={boss} stage={bossStage(match.phase, boss)} place={place} muteFall={mute}>
+      {look}
+    </Character>
+  ) : null;
 }
 
-function Character({ boss, stage, place, muteFall }: { boss: BossView; stage: Stage; place: "bar" | "side" | "results"; muteFall?: boolean }) {
+function Character({ boss, stage, place, muteFall, children }: { boss: BossView; stage: Stage; place: "bar" | "side" | "results"; muteFall?: boolean; children?: ComponentChildren }) {
   // (A form of its own: the Hidden Boss's child, his growing figure; his age followed by a figure run, RecluseChild.ts.)
   const full = bossKitOf(boss);
   useLayoutEffect(() => {
@@ -438,6 +446,7 @@ function Character({ boss, stage, place, muteFall }: { boss: BossView; stage: St
       {/* Its words: a pixel text box beside it that types itself out and fades at the end (like the God King's). In the
           boss bar, the bar holds them instead, in its name's room (BossBar): never over its status or the board. */}
       {place !== "bar" && <VoiceBubble voice={bossVoice} class="bc-bubble" />}
+      {children}
     </div>
   );
 }
