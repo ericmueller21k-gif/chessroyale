@@ -24,7 +24,7 @@
  *   00:00 and tries again after the next move. Rises after the crowd's move come before his move (he can play the new piece);
  *   after his move, before the crowd's turn.
  * - **The squash (the director's call):** a move of the crowd's landing on a lump's square squashes it (gone). His own pieces
- *   never move onto one (bossStops; the limit lifts if it's his only move, and then his move squashes it). A lump never blocks
+ *   never move onto one (the board layer; the limit lifts if it's his only move, and then his move squashes it). A lump never blocks
  *   a move through its square.
  *
  * His ultimate, Gold Plate (the rage meter, `rageSpeed.zebra`, at most maxUltimates.zebra a battle):
@@ -33,7 +33,7 @@
  *   strongest piece that isn't (a rook, then a bishop or knight; ties by the seed). Kings and pawns never.
  * - **From then on, the crowd's pawns can't capture a gold piece** for the rest of the battle (other pieces can). A gold piece
  *   keeps its gold as it moves (`gold`: its square now). In the move lists as Big Boy's blocks and Babur's hoops are
- *   (crowdFilter: the crowd's allowed moves, the judge's and the bots', the engines' searchmoves); a turn it would leave the
+ *   (the board layer, goldMarks: the crowd's allowed moves, the judge's and the bots', the engines' searchmoves); a turn it would leave the
  *   crowd no legal move, it lifts for that move. The screens say "gold" for a refused pawn capture (stopReason).
  * - The admins' trigger: at the start of his next turn, without the warning.
  *
@@ -45,7 +45,7 @@ import { BOSS_OPENING, newBoard } from "../boards.ts";
 import { openingNameFor } from "../openings.ts";
 import { fenAtPly, legalMoves, moveNumber, pieceAt, positionOver, sideToMove, withPiece } from "../rules.ts";
 import { VALUE, from, materialOf, meterFull, other, powerRoll, testSwitch, to, turnOf, unleashed, type Battle, type BossRules, type Side, type StopFields } from "./base.ts";
-import { marksStop, type SquareMark } from "../board-layer.ts";
+import { marksStop, type LayerMarks, type PieceMark, type SquareMark } from "../board-layer.ts";
 import { BALLOON_TEST_MOVES, hoopsGuard, landRefused } from "./tiger.ts";
 import { tidyEnPassant } from "./timber.ts";
 
@@ -200,8 +200,15 @@ export function dropDue(z: ZebraState, at: number, s: Pick<BossPowerSettings, "d
 
 // ---------------- Gold Plate ----------------
 
-/** A move that's a pawn's capture of a gold piece (`fen`: before it; `gold`: the gold pieces' squares). */
-export const pawnOnGold = (fen: string, move: string, gold: readonly string[]): boolean => gold.includes(to(move)) && pieceAt(fen, from(move))?.type === "p";
+/** His gold pieces (`gold`: their squares), on the board layer: the crowd's pawns never take one (other pieces can). */
+export const goldMarks = (gold: readonly string[]): PieceMark[] => gold.map((square) => ({ square, kind: "gold", shieldFrom: "pawns", binds: "crowd", by: "zebra" }));
+
+/** His marks on the board layer (`z`: the match's state or the screens' view): the gold pieces, the dough. Null: none. */
+export function zebraMarks(z: Pick<ZebraState, "gold" | "lumps"> | null | undefined): LayerMarks | null {
+  const gold = z?.gold ?? [];
+  const lumps = (z?.lumps ?? []).map((l) => l.square);
+  return gold.length || lumps.length ? { pieces: goldMarks(gold), squares: doughMarks(lumps) } : null;
+}
 
 /**
  * The piece Gold Plate gilds (`fen`: any position; `his`: his side; `gold`: his gold pieces' squares): his queen, else his
@@ -304,21 +311,15 @@ export const ZEBRA: BossRules = {
         pick: z.talk.pick,
         ...(z.talk.name ? { opening: z.talk.name } : {}),
       });
-    const pawnCan = z.gold.length > 0 && legalMoves(t.fen).some((m) => pawnOnGold(t.fen, m, z.gold));
+    const gold = { pieces: goldMarks(z.gold) };
+    const pawnCan = z.gold.length > 0 && legalMoves(t.fen).some((m) => marksStop(gold, t.fen, m, t.crowd));
     if (pawnCan) next.zebra = { ...z, goldTurn: t.turn };
   },
   // (His dough comes at his turns' ends and rises by the moves: afterCrowdMove, afterBossMove.)
   passive() {},
-  // Gold Plate: the crowd's pawns can't take a gold piece (lifted for a turn it would leave no move: the dispatcher).
-  crowdFilter(allowed, boss, fen) {
-    const gold = boss.powers?.zebra?.gold ?? [];
-    return gold.length ? allowed.filter((m) => !pawnOnGold(fen, m, gold)) : allowed;
-  },
-  // On the board layer: his pieces never move onto his dough (lifted if it's his only move).
-  layer: (boss) => {
-    const lumps = doughSquares(boss.powers);
-    return lumps.length ? { squares: doughMarks(lumps) } : null;
-  },
+  // On the board layer (zebraMarks): Gold Plate's gold, which the crowd's pawns can't take; his dough, which his pieces never move
+  // onto (each lifted for a turn it would leave no move: the dispatcher).
+  layer: (boss) => zebraMarks(boss.powers?.zebra),
   stopReason: (boss, fen, m) => zebraStop(boss.powers?.zebra ?? null, fen, m),
   // The turn a piece rose (the board changed outside a move) and a turn a pawn could have taken a gold piece don't count for
   // fair play.
@@ -361,7 +362,7 @@ export const ZEBRA: BossRules = {
  */
 export function zebraStop(z: NonNullable<StopFields["zebra"]> | null, fen: string, move: string): "gold" | "dough" | null {
   if (!z) return null;
-  if (pawnOnGold(fen, move, z.gold)) return "gold";
+  if (z.gold.length && marksStop({ pieces: goldMarks(z.gold) }, fen, move)) return "gold";
   if (z.his && z.lumps.length && marksStop({ squares: doughMarks(z.lumps.map((l) => l.square)) }, fen, move, other(z.his))) return "dough";
   return null;
 }

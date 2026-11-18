@@ -36,13 +36,14 @@ function oldHeldIn(fen: string, move: string, held: readonly string[]): boolean 
 
 /**
  * boss-powers.ts `limitCrowd`: the held pieces' moves out, then the boss's other limits (since PR 3 the square marks on the
- * layer too: square-layer-twin.test.ts is their twin).
+ * layer too, since PR 5 the shields: square-layer-twin.test.ts and shield-layer-twin.test.ts are their twins).
  */
 function oldLimitCrowd(rules: BossRules, boss: BossState, fen: string, legal: string[], held: readonly string[]): string[] {
   let free = held.length ? legal.filter((m) => !oldHeldIn(fen, m, held)) : legal;
   const marks = rules.layer?.(boss, fen);
-  if (marks?.squares?.length || marks?.edges?.length) {
-    const rest = mergeLayers(boss.crowdSide, [{ squares: marks.squares, edges: marks.edges }]);
+  const shields = (marks?.pieces ?? []).filter((m) => m.shieldFrom);
+  if (marks?.squares?.length || marks?.edges?.length || shields.length) {
+    const rest = mergeLayers(boss.crowdSide, [{ squares: marks?.squares, edges: marks?.edges, pieces: shields }]);
     free = free.filter((m) => !layerStop(rest, fen, m));
   }
   return rules.crowdFilter ? rules.crowdFilter(free, boss, fen) : free;
