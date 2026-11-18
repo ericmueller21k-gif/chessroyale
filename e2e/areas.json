@@ -316,6 +316,7 @@
         "packages/chess/src/bosses/bigboy.ts",
         "packages/app/src/characters/bigboy*.ts",
         "packages/app/src/characters/effects/bigboy.ts",
+        "packages/app/src/characters/effects/bigboy-tower.ts",
         "packages/app/src/components/BigBoy.tsx"
       ],
       "specs": ["e2e/bigboy.spec.ts", "e2e/boss-speech.spec.ts", "e2e/king-attack.spec.ts"]

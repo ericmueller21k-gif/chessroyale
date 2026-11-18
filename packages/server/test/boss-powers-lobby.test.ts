@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { BOSS_BRAIN, BOSS_POWERS, bossBannerMs, DEFAULT_SETTINGS, RAID_SETTINGS, bossBrainFor, maiaRatingFor, mulberry32, playableBosses, type Settings } from "@chessroyale/core";
-import { FIRE_BURN_MS, KING_ATTACK, applyMove, choosePieThrow, powerFxMs, bossMoveFrom, bossShowMs, bossTurnShowMs, dragOptions, powerMomentMs, extraMoveCandidates, inCheck, initPowers, legalMoves, lightsOutTimeline, lineups, passTurn, pieceAt, queenSlain, sanLineToUci, sideToMove, withPiece, withoutPiece, type BoardScore, type BossMoveKind, type EngineLike, type HumanEngineLike, type MatchRunner, type Opening, type ServerMessage } from "@chessroyale/chess";
+import { FIRE_BURN_MS, KING_ATTACK, applyMove, blockedBy, choosePieThrow, powerFxMs, bossMoveFrom, bossShowMs, bossTurnShowMs, dragOptions, powerMomentMs, extraMoveCandidates, inCheck, initPowers, legalMoves, lightsOutTimeline, lineups, passTurn, pieceAt, queenSlain, sanLineToUci, sideToMove, withPiece, withoutPiece, type BoardScore, type BossMoveKind, type EngineLike, type HumanEngineLike, type MatchRunner, type Opening, type ServerMessage } from "@chessroyale/chess";
 import { LobbyCore, newLobbyRecord } from "../src/lobby.ts";
 
 afterEach(() => vi.restoreAllMocks());
@@ -612,7 +612,7 @@ describe("Big Boy online", () => {
   /** Everyone plays an allowed move that keeps the battle going (any of them: the toy block's limits). */
   const play = (L: ReturnType<typeof setup>) => crowdMove(L);
 
-  it("his snack before move 1 and his toy blocks: the same for everyone, the crowd's moves and the jobs keep off the block", () => {
+  it("his snack before move 1 and his tower's first block: the same for everyone, the crowd's moves and the jobs keep off the block", () => {
     const L = raid({ bossId: "bigboy" });
     const r1 = L.last("p1", "round")!;
     expect(r1.boss!.id).toBe("bigboy");
@@ -628,7 +628,7 @@ describe("Big Boy online", () => {
     const block = b.boss.powers!.events.find((e) => e.kind === "block")!;
     expect(block).toMatchObject({ kind: "block", turn: 2 });
     expect(b.boss.powers).toEqual(L.last("p2", "boss")!.boss.powers);
-    expect(b.boss.powers!.block).toEqual({ square: block.square, at: 2, until: 2 + BOSS_POWERS.blockTurns - 1 });
+    expect(b.boss.powers!.tower).toEqual({ square: block.square, height: 1, at: 2 });
     expect(b.until - L.now).toBeGreaterThanOrEqual(powerFxMs({ kind: "block" }));
     const r2 = toRound(L);
     const allowed = r2.boss!.powers!.allowed!;
@@ -639,6 +639,104 @@ describe("Big Boy online", () => {
     L.core.message("p1", { t: "pick", key: r2.key, move: legalMoves(r2.board!.fen).find((m) => m.slice(2, 4) === block.square)! });
     const req = crowdMove(L);
     expect(req.jobs[0]!.allowed).toEqual(allowed);
+  });
+
+  it("his tower online (the test switch: 8 tall at once): it grows a block a turn, the crowd's move onto it topples it, everyone sees the same blocks; a reconnect sees them too", () => {
+    const L = raid({ bossId: "bigboy", bossPowerTest: "tower" });
+    play(L);
+    hostBoss(L);
+    const r2 = toRound(L);
+    const tower = r2.boss!.powers!.tower!;
+    expect(tower).toMatchObject({ height: BOSS_POWERS.towerTest, at: 2 });
+    expect(r2.boss!.powers!.tower).toEqual(L.last("p2", "round")!.boss!.powers!.tower);
+    // The crowd's moves keep off it but onto it (from 2 blocks, a topple), and never slide through it.
+    const allowed = r2.boss!.powers!.allowed ?? legalMoves(r2.board!.fen);
+    for (const m of allowed) if (m.slice(2, 4) !== tower.square) expect(blockedBy(m, tower.square, r2.board!.fen)).toBe(false);
+    const onto = allowed.filter((m) => m.slice(2, 4) === tower.square).sort();
+    expect(onto.length).toBeGreaterThan(0);
+    // Everyone plays onto it: it topples with the move, before his turn: the same scatter for both, his request kept off it.
+    for (const id of ["p1", "p2"]) L.core.message(id, { t: "pick", key: L.last(id, "round")!.key, move: onto[0]! });
+    expect(L.hostScores("p1")).toBe(true);
+    L.advance(30_000);
+    const ask = L.last("p1", "bossRequest")!;
+    const runner = (L.core as unknown as { runner: MatchRunner }).runner;
+    const scatter = runner.state.boss!.powers!.scatter!;
+    expect(scatter).toMatchObject({ from: tower.square, by: "crowd", at: 2, until: 3 });
+    expect(scatter.squares.length).toBeGreaterThan(0);
+    for (const m of ask.allowed ?? []) for (const sq of scatter.squares) expect(blockedBy(m, sq, ask.fen)).toBe(false);
+    const thinking = L.last("p2", "boss")!;
+    expect(thinking.boss.powers!.scatter).toEqual(scatter);
+    expect(thinking.boss.powers!.events.at(-1)).toMatchObject({ kind: "topple", by: "crowd", square: tower.square, squares: scatter.squares });
+    hostBoss(L);
+    const r3 = toRound(L);
+    expect(r3.boss!.powers!.tower).toBeNull();
+    expect(r3.boss!.powers!.scatter?.squares).toEqual(scatter.squares.filter((sq) => !pieceAt(r3.board!.fen, sq)));
+    // p2 drops and comes back: the round again, the blocks where they are.
+    const token = L.core.record.humans[1]!.token;
+    L.core.disconnect("p2");
+    L.take("p2");
+    L.core.connect(token, undefined);
+    L.core.resendTo("p2");
+    expect(L.last("p2", "round")!.boss!.powers!.scatter).toEqual(r3.boss!.powers!.scatter);
+    // Turn 4: they've gone, and a new tower stands at once.
+    play(L);
+    hostBoss(L);
+    const r4 = toRound(L);
+    expect(r4.boss!.powers!.scatter).toBeNull();
+    expect(r4.boss!.powers!.tower).toMatchObject({ height: 1, at: 4 });
+    expect(r4.boss!.powers!.tower).toEqual(L.last("p2", "round")!.boss!.powers!.tower);
+  });
+
+  it("his piece onto his tower online (a turn it's open to him: rarely): the request allows it, the host's move stands, it topples as the next turn begins, the same for everyone", () => {
+    const powers = BOSS_POWERS as unknown as Record<string, number>;
+    const was = powers.towerBossChance!;
+    try {
+      // (Open on every turn here: hisToppleOpen's roll is the rule's; this test is the server's part.)
+      powers.towerBossChance = 1;
+      const L = raid({ bossId: "bigboy" });
+      play(L);
+      hostBoss(L);
+      const r2 = toRound(L);
+      // The tower moved (5 tall) under a square his reply can land on, once the crowd's move (kept off it) is in.
+      const runner = (L.core as unknown as { runner: MatchRunner }).runner;
+      const fen = r2.board!.fen;
+      let pick: { crowd: string; his: string; square: string } | null = null;
+      for (const crowd of legalMoves(fen).sort()) {
+        const after = applyMove(fen, crowd);
+        const his = legalMoves(after).sort().find((m) => m.length === 4 && !pieceAt(after, m.slice(2, 4)) && !blockedBy(crowd, m.slice(2, 4), fen) && !inCheck(applyMove(after, m)));
+        if (his) {
+          pick = { crowd, his, square: his.slice(2, 4) };
+          break;
+        }
+      }
+      expect(pick).not.toBeNull();
+      const { crowd, his, square } = pick!;
+      runner.state = { ...runner.state, boss: { ...runner.state.boss!, powers: { ...runner.state.boss!.powers!, tower: { square, height: 5, at: 2 } } } };
+      for (const id of ["p1", "p2"]) L.core.message(id, { t: "pick", key: L.last(id, "round")!.key, move: crowd });
+      expect(L.hostScores("p1")).toBe(true);
+      L.advance(30_000);
+      const ask = L.last("p1", "bossRequest")!;
+      expect(ask.allowed ?? legalMoves(ask.fen)).toContain(his);
+      L.core.message("p1", { t: "bossMove", key: ask.key, move: his });
+      const r3 = toRound(L);
+      expect(r3.board!.history.at(-1)).toBe(his);
+      expect(r3.boss!.powers!.tower).toBeNull();
+      const scatter = r3.boss!.powers!.scatter!;
+      expect(scatter).toMatchObject({ from: square, height: 5, by: "boss", at: 3, until: 3 });
+      expect(scatter.squares.length).toBeGreaterThan(0);
+      expect(r3.boss!.powers!.events).toContainEqual(expect.objectContaining({ kind: "topple", by: "boss", square, squares: scatter.squares }));
+      expect(L.last("p2", "round")!.boss!.powers!.scatter).toEqual(scatter);
+      for (const m of r3.boss!.powers!.allowed ?? []) for (const sq of scatter.squares) expect(blockedBy(m, sq, r3.board!.fen)).toBe(false);
+      // Through the crowd's turn 3 and his move after it; turn 4: gone, a new tower at once.
+      play(L);
+      const ask4 = hostBoss(L);
+      for (const m of ask4.allowed ?? []) for (const sq of scatter.squares) expect(blockedBy(m, sq, ask4.fen)).toBe(false);
+      const r4 = toRound(L);
+      expect(r4.boss!.powers!.scatter).toBeNull();
+      expect(r4.boss!.powers!.tower).toMatchObject({ height: 1, at: 4 });
+    } finally {
+      powers.towerBossChance = was;
+    }
   });
 
   it("the Big Bounce: at the start of his turn the host scores the candidates; everyone sees the bounce and the new position; then his move", () => {
@@ -691,7 +789,7 @@ describe("Big Boy online", () => {
     const runner = (L.core as unknown as { runner: MatchRunner }).runner;
     const board = runner.boards.get(0)!;
     const ply = board.history.length;
-    const { fen, take } = queenEnPrise(board.fen, runner.state.boss!.powers!.block?.square ?? null);
+    const { fen, take } = queenEnPrise(board.fen, runner.state.boss!.powers!.tower?.square ?? null);
     runner.boards.set(0, { ...board, fen, bases: [...(board.bases ?? []).filter((x) => x.ply !== ply), { ply, fen }] });
     const r = toRound(L);
     expect(r.board!.fen).toBe(fen);

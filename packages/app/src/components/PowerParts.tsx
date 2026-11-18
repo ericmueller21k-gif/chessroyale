@@ -38,6 +38,8 @@ export interface Moment {
   first?: true;
   /** Hollow's block of the dark: its size (2 or 3). */
   size?: number;
+  /** Big Boy's tower: its height after this block (`stack`), or as it fell (`topple`). */
+  height?: number;
   /** Jefferson's fireproof laugh: which of his lines (from the seed). */
   pick?: number;
   /** Wrangler's drag standing in for his showdown (none could be lined up). */
@@ -103,7 +105,7 @@ export interface MomentUi {
   /** It plays on a screen of its own (the funhouse, his extra move, the Big Bounce) when this says so. */
   own?: (boss: BossView) => boolean;
   /** Its line, when the kit's lines for its moment aren't the whole story (Hollow's first cover of the dark). */
-  line?: (kit: BossKit | null, m: Pick<Moment, "kind" | "key" | "first" | "pick" | "ult" | "by" | "tier" | "shape" | "opening">) => string | null;
+  line?: (kit: BossKit | null, m: Pick<Moment, "kind" | "key" | "first" | "pick" | "ult" | "by" | "tier" | "shape" | "opening" | "height">) => string | null;
   /** When the boss says its line (ms into the moment: as it begins unless given), into its voice (speech.tsx). */
   lineAt?: number;
   /** How much its line matters (speech.tsx): an ultimate's cuts in on another line, anything else waits its turn. */

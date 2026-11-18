@@ -546,6 +546,14 @@ p {
 .hb square.check {
   background: radial-gradient(ellipse at center, rgba(255, 0, 0, 1) 0%, rgba(231, 0, 0, 1) 25%, rgba(169, 0, 0, 0) 89%, rgba(158, 0, 0, 0) 100%);
 }
+/* The square marks over a boss's under-layers (z-index 1: Big Boy's tower, Zebra's dough, the candle's shadows), so a move dot
+   on his tower's square shows (review of #784): the pieces' own z-index, the pieces coming later in the board, so still on top. */
+.hb square.move-dest,
+.hb square.last-move,
+.hb square.selected,
+.hb square.check {
+  z-index: 2;
+}
 .hb piece {
   position: absolute;
   top: 0;
@@ -16875,6 +16883,25 @@ img.qicon {
 }
 .pw-block-board {
   z-index: 3;
+}
+/* Big Boy's tower (Nov 18): under the pieces (it rises over the squares behind its own; the pieces stay in view), on the board's own
+   squares. Its drawing is 48 x 136 px over a 32 px square: a square and a half wide, four and a quarter tall, the square its bottom. */
+.board-wrap > .bb-under {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: var(--board-size, 100%);
+  height: var(--board-size, 100%);
+  z-index: 1;
+  pointer-events: none;
+}
+.bb-tower {
+  position: absolute;
+  left: calc(var(--board-size, 100%) * (var(--sq-x, 0) - 0.25) / 8);
+  top: calc(var(--board-size, 100%) * (var(--sq-y, 0) - 3.25) / 8);
+  width: calc(var(--board-size, 100%) * 1.5 / 8);
+  height: calc(var(--board-size, 100%) * 4.25 / 8);
+  pointer-events: none;
 }
 /* The bounce and the snack: on the board's own squares (eighths of --board-size), over the pieces, never taking a tap. */
 .bb-layer {

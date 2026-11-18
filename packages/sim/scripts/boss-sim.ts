@@ -18,6 +18,10 @@
  * `offset`, a boss's Elo offset by id; `counter`, the crowd takes one of Alfil's marked pawns when the best such capture
  * costs at most that many pawns against its best move (the bots' own picks read the judge, which doesn't know about the
  * fusion: a crowd that knows the rule plays the counter when it's cheaper than what the fusion gives him).
+ * Big Boy (id bigboy): each row logs his towers' topples (after which crowd turn; by the crowd's move, his piece, or by itself
+ * at towerMax; its height and the blocks that scattered), his tallest tower, and the crowd turns with his toys up (`toyTurns`) and
+ * those where they took a legal move away (`limitedTurns`: fair play's question). Half the blocks scattering:
+ * `{"powers": {"towerScatterShare": 0.5}}`.
  * Chub & Chirp's Leapfrog (id hopper): each row logs the hops and, for every turn of his with a pawn nose to nose that
  * couldn't hop, why (hopOptions; `cap`: out of hops). (The hop as his move, the variant the sim turned down, can't be
  * run from here: its switch went with it. It ran on commit eb678d7 only, checked out: reports/hopper-sim.md.)
@@ -397,10 +401,28 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
       const creases: { at: number; line: string; loss: number | null; warned: number | null }[] = [];
       const creasesOff: number[] = [];
       let seen = -1;
+      // (Big Boy: each tower's topple (after which crowd turn, by whom: the crowd's move, his piece, or by itself at towerMax; its
+      // height and how many blocks scattered), from his scattered blocks as each turn is looked at; and his tallest tower.)
+      // (And for fair play: the crowd turns with a tower or blocks up (powerTurn), and those where one actually takes a legal move away.)
+      const bigboy = { topples: [] as { at: number; by: "crowd" | "piece" | "self"; height: number; blocks: number }[], tallest: 0, toyTurns: 0, limitedTurns: 0 };
+      const toppleSeen = new Set<string>();
       const look = () => {
         const p = runner.boss?.powers;
+        if (bossId === "bigboy" && p) {
+          bigboy.tallest = Math.max(bigboy.tallest, p.tower?.height ?? 0);
+          const sc = p.scatter;
+          const key = sc && `${sc.at}:${sc.from}:${sc.by}`;
+          if (sc && key && !toppleSeen.has(key)) {
+            toppleSeen.add(key);
+            bigboy.topples.push({ at: sc.at, by: sc.by === "crowd" ? "crowd" : sc.height < BOSS_POWERS.towerMax ? "piece" : "self", height: sc.height, blocks: sc.squares.length });
+          }
+        }
         if (!p || p.turn === seen) return;
         seen = p.turn;
+        if (bossId === "bigboy" && (p.tower || p.scatter) && !runner.bossToMove()) {
+          bigboy.toyTurns++;
+          if (runner.crowdAllowed()) bigboy.limitedTurns++;
+        }
         for (const e of p.events) if (ULT_EVENTS.has(e.kind)) ults.push({ kind: e.kind, turn: e.turn });
         for (const e of p.events) if ((e.kind as string) === "darkBlock") hollow.blocks.push({ turn: e.turn, size: (e as { size?: number }).size ?? 2, squares: e.squares?.length ?? 0 });
       };
@@ -848,7 +870,7 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
           }
         : null;
       if (zs) for (const g of zs.gilds) ults.push({ kind: "goldPlate", turn: g.at });
-      const row = { boss: bossId, tag, seed, game: g, strikes: struck, tier: b.tier, elo: b.elo, result: result ?? b.result ?? null, moves: b.crowdMoves, ults: ults.length, ultTurns: ults.map((u) => u.turn), kinds: [...new Set(ults.map((u) => u.kind))], secs: Math.round((Date.now() - t0) / 1000), ...(bossId === "alfil" ? { alfil } : {}), ...(bossId === "hopper" ? { hopper, carrots } : {}), ...(bossId === "smudgy" ? { camo: camoRow, ...smudgy } : {}), ...(bossId === "moo" ? { moo } : {}), ...(bossId === "gingerbread" ? { superFreeze: { used: b.powers?.superFreeze?.used ?? 0, last: b.powers?.superFreeze?.hit ? { after: b.powers.superFreeze.hit.at, squares: b.powers.superFreeze.hit.squares.length, held: b.powers.superFreeze.hit.held?.length ?? null } : null } } : {}), ...(bossId === "gardener" ? { garden } : {}), ...(bossId === "tiger" ? { tiger: { ...tiger, placed: b.powers?.balloon?.placed ?? 0 } } : {}), ...(bossId === "folio" ? { folio: folioRow } : {}), ...(bossId === "timber" ? { timber: { ...timber, scraps: b.powers?.workshop?.n ?? 0, pickSec } } : {}), ...(bossId === "dash" ? { dash: { ...dash, slapSeen: undefined } } : {}), ...(bossId === "zebra" ? { zebra: zebraRow } : {}), ...(bossId === "chandy" ? { chandy: { ...chandy, fifthAt: chandy.upgrades[BOSS_POWERS.chandy.upgradesMax - 1] ?? null, unlocked: b.powers?.chandy?.unlocked ?? [] } } : {}), ...(bossId === "hollow" ? { alone: !!patch.alone, bulbs: !!patch.alone && patch.bulbs !== false, difficulty: patch.difficulty ?? 0, darkMiss: patch.darkMiss ?? 0, hollow } : {}) };
+      const row = { boss: bossId, tag, seed, game: g, strikes: struck, tier: b.tier, elo: b.elo, result: result ?? b.result ?? null, moves: b.crowdMoves, ults: ults.length, ultTurns: ults.map((u) => u.turn), kinds: [...new Set(ults.map((u) => u.kind))], secs: Math.round((Date.now() - t0) / 1000), ...(bossId === "alfil" ? { alfil } : {}), ...(bossId === "hopper" ? { hopper, carrots } : {}), ...(bossId === "bigboy" ? { bigboy } : {}), ...(bossId === "smudgy" ? { camo: camoRow, ...smudgy } : {}), ...(bossId === "moo" ? { moo } : {}), ...(bossId === "gingerbread" ? { superFreeze: { used: b.powers?.superFreeze?.used ?? 0, last: b.powers?.superFreeze?.hit ? { after: b.powers.superFreeze.hit.at, squares: b.powers.superFreeze.hit.squares.length, held: b.powers.superFreeze.hit.held?.length ?? null } : null } } : {}), ...(bossId === "gardener" ? { garden } : {}), ...(bossId === "tiger" ? { tiger: { ...tiger, placed: b.powers?.balloon?.placed ?? 0 } } : {}), ...(bossId === "folio" ? { folio: folioRow } : {}), ...(bossId === "timber" ? { timber: { ...timber, scraps: b.powers?.workshop?.n ?? 0, pickSec } } : {}), ...(bossId === "dash" ? { dash: { ...dash, slapSeen: undefined } } : {}), ...(bossId === "zebra" ? { zebra: zebraRow } : {}), ...(bossId === "chandy" ? { chandy: { ...chandy, fifthAt: chandy.upgrades[BOSS_POWERS.chandy.upgradesMax - 1] ?? null, unlocked: b.powers?.chandy?.unlocked ?? [] } } : {}), ...(bossId === "hollow" ? { alone: !!patch.alone, bulbs: !!patch.alone && patch.bulbs !== false, difficulty: patch.difficulty ?? 0, darkMiss: patch.darkMiss ?? 0, hollow } : {}) };
       appendFileSync(root + `reports/boss-sim/raid-${tag}.jsonl`, JSON.stringify(row) + "\n");
       console.log(JSON.stringify(row));
     }

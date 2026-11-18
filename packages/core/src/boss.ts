@@ -103,7 +103,7 @@ export const POWER_IDS: readonly PowerId[] = ["freeze", "blizzard", "pie", "funh
  * Test switches that aren't a power of their own (?power=<id>), for one boss's moments: Dash's stall skit early (`stall`: its slam and
  * fake move a few seconds into the first move it can come on) and his lying-down clock tap from the first move (`clocktap`).
  */
-export const POWER_TEST_SWITCHES: readonly string[] = ["stall", "clocktap"];
+export const POWER_TEST_SWITCHES: readonly string[] = ["stall", "clocktap", "tower"];
 
 /**
  * A raid boss: the base template every boss fills in. Its powers' rules (which moves are allowed, what happens after
@@ -665,8 +665,16 @@ export interface BossPowerState {
   lightsOut?: LightsOutTest | null;
   /** Big Boy's snack: the crowd's center pawn he ate before move 1 (its square). */
   snack?: { square: string };
-  /** Big Boy's toy block: its square (empty; nothing may move onto it or slide through it), the crowd turn it landed, its last. */
-  block?: { square: string; at: number; until: number } | null;
+  /**
+   * Big Boy's tower of toy blocks (Nov 18): its square (empty; nothing slides through it, and nothing moves onto it but a crowd
+   * piece once it's BOSS_POWERS.towerEnter tall, which topples it, or rarely one of his: hisToppleOpen), its height in blocks (1
+   * to towerMax), the crowd turn its first block landed. Never at the same time as `scatter`.
+   */
+  tower?: { square: string; height: number; at: number } | null;
+  /** The blocks of his last tower once it toppled, until they vanish (TowerScatter). */
+  scatter?: TowerScatter | null;
+  /** How many of his towers have toppled this battle (the test switch's tall first tower is the first one's only). */
+  topples?: number;
   /** Big Boy's Big Bounce (his ultimate, at the start of his turn, after the crowd's move): what it did, once it has. */
   bounce?: BounceResult | null;
   /** Sawyer's split pawn, once his first move is played (unset until then: his first move must be a pawn move). */
@@ -1267,6 +1275,23 @@ export interface SawCut {
  * gardener's plain plant, as a toy block (either side). `hoop`: the circus tiger's burning hoop, either side (nothing crosses its
  * wall, and no check across it). `crease`: Folio's Crease, the crowd's moves only (none across its line; Folio's pieces cross it).
  */
+/**
+ * Big Boy's toppled tower: its blocks, each on its own square (an empty square near it when it fell; nothing may move onto one or
+ * slide through it, either side, a knight jumps it), in landing order (nearest first); where the tower stood (`from`) and how
+ * tall it was (towerScatterShare of its blocks scatter); who toppled it (`by`: the crowd's move onto it, or "boss": it fell by
+ * itself at towerMax, or his piece moved onto it); the crowd turn it fell on (`at`); and the last crowd turn they stand
+ * (`until`): one crowd turn always (toppled by the crowd's move, through his next turn and the crowd's next; "boss", as a crowd
+ * turn begins, through that turn and his move after it). Then they vanish and a new tower starts.
+ */
+export interface TowerScatter {
+  from: string;
+  height: number;
+  squares: string[];
+  by: CarrotSide;
+  at: number;
+  until: number;
+}
+
 export type StopReason = "boardsaw" | "cut" | "pie" | "block" | "paint" | "plant" | "hoop" | "crease" | "gold" | "dough" | "beam" | "scatter" | "shield";
 
 /** Wrangler's long pull: his center pawn's double step (`from` to `via`), lassoed on to `to`, as crowd turn `turn` begins. */
@@ -1620,6 +1645,10 @@ export type PowerEventKind =
   | "darkBlock"
   | "extra"
   | "block"
+  // Big Boy's tower (Nov 18): one more block on it (`square`, its `height` now), and its topple (`square` where it stood, `squares`
+  // where its blocks landed in order, `by` the crowd's move onto it or by itself).
+  | "stack"
+  | "topple"
   | "bounce"
   | "split"
   | "cut"
@@ -1713,6 +1742,8 @@ export interface PowerEvent {
   first?: true;
   /** Hollow's block of the dark: 2 (a 2 x 2) or 3 (his 3 x 3). */
   size?: number;
+  /** Big Boy's tower: how many blocks it has after this one (`stack`). */
+  height?: number;
   /**
    * Which of the boss's lines (0-4095 from the seed; the app takes it modulo its lines): Jefferson's fireproof laugh,
    * Boingo's joke as his funhouse plays the crowd's move.

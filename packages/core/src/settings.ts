@@ -1481,13 +1481,31 @@ export const BOSS_POWERS = {
    */
   lightsOutExtraGain: 3,
   /**
-   * Big Boy's toy blocks: from the crowd's 2nd turn (firstPassive), every blockEvery crowd turns he tosses a toy block
-   * onto an empty square in the crowd's half that one of its pieces could move to. It stays blockTurns crowd turns (and
-   * the boss's replies in between): nothing may move onto it or slide through it, either side. Never leaves anyone
-   * without a move, never blocks the only way out of check (it lifts for that turn).
+   * Big Boy's toy-block tower (Eric, Nov 18; docs/decisions/2026-11-18-bigboy-tower.md): from the crowd's 2nd turn (firstPassive)
+   * he tosses a block onto an empty square of the crowd's half that one of its pieces could move to (as his block always did), and
+   * as each crowd turn after it begins, one more on the same square, up to towerMax. Nothing slides through it, either side;
+   * nothing moves onto a single block; from towerEnter blocks a crowd piece may move onto it (a legal move to its square, never
+   * castling), which topples it. At towerMax it wobbles through a crowd turn, then topples by itself as the next crowd turn
+   * begins (after his move).
+   * His pieces may topple it too, but rarely (Eric, Nov 18: "both but he usually doesn't"): on a towerBossChance share of his
+   * turns (seeded, the same on every device) a tower towerEnter tall or more is open to his pieces as well, and he moves onto
+   * it only if his engine (or brain) picks that move on its own, no bonus; on the other turns it's closed to him as ever.
+   * The topple: towerScatterShare of its blocks (rounded up) scatter to empty squares within towerScatterReach of it (any
+   * direction; never onto a piece, never off the board), each drawn in turn with weight 1 / distance^towerScatterPower from the
+   * battle's seed, nearest landing first; fewer when there aren't enough; a square that would leave the side to move without a
+   * legal move is passed over (the rest of the tower breaks up where it falls). Each blocks as a single block does, through one
+   * crowd turn (toppled by the crowd's move: his next turn and the crowd's next; by his piece: the crowd's next turn and his
+   * next; by itself: the crowd's next), then they all vanish and a new tower starts at once. Never leaves anyone without a
+   * move, never blocks the only way out of check (the blocks lift for that turn).
    */
-  blockEvery: 4,
-  blockTurns: 3,
+  towerMax: 10,
+  towerEnter: 2,
+  towerBossChance: 0.25,
+  towerScatterShare: 1,
+  towerScatterReach: 3,
+  towerScatterPower: 2,
+  /** Testing (?boss=bigboy&power=tower): his first tower starts this many blocks tall, so it tops out and topples within a few turns. */
+  towerTest: 8,
   /**
    * The Big Bounce (Big Boy's ultimate, at the start of his turn, from the rage meter): the crowd's pieces thrown about.
    * Each candidate moves bouncePieces of them (never the king, no captures), each to an empty square within bounceReach

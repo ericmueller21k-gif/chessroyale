@@ -43,8 +43,15 @@ export type Beat =
   | "lightsFailed"
   // Hollow's taunt on a misplay (a wrong move into the dark, alone or in a crowd; Nov 5), at random, never the same twice running.
   | "misplay"
-  // Big Boy's snack before move 1 (the crowd's pawn, eaten).
+  // Big Boy's snack before move 1 (the crowd's pawn, eaten); his tower (Nov 18) at 3, 6 and 9 blocks, wobbling at 10, toppled by
+  // your piece, and falling by itself.
   | "snack"
+  | "stack3"
+  | "stack6"
+  | "stack9"
+  | "wobble"
+  | "toppleYours"
+  | "toppleHis"
   // Sawyer's split pawn after his first move (that pawn sawn in two).
   | "split"
   // Wrangler's long pull (his first move), the drag standing in for the test trigger's showdown, and his meter full
