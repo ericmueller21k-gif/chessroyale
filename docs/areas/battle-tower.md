@@ -9,8 +9,10 @@ The design and its calls, waiting for Eric's OK: [docs/decisions/2026-11-18-batt
   one game from the starting position against 1, 2 or 3 bosses at once on one board (blocks of 1, 2, 2, 3), taking turns to move,
   each with its own powers and meter, their Maia rating rising from 600 to 1800.
 - Every boss's moves are in except the Hidden Boss's (a few with a one-line limit; Hollow and Smudgy never share a floor).
-- Three hearts a run; between floors you walk up (the same floor drawn again with the next number) and may stop: the run is
-  saved on the server (guests too) and resumes on that floor.
+- You play White (random sides later). Three hearts a run. Every floor is one snug room in HunChess's colors (the town's
+  challenge room as the model: `town/shops/challenge.ts`), its number big on both side walls; you walk in to the board and the
+  floor's bosses come out of the top door. Between floors you may stop: the run is saved on the server (guests too) and resumes
+  on that floor.
 - A party picks every move: the most picked is played, a tie goes to the engine's best (`partyMove`), the Boss Battle party's
   no-pick rules.
 - Built on **the board layer** (`packages/chess/src/board-layer.ts`, first): one state per square, edge and piece, every boss's
@@ -26,7 +28,7 @@ The design and its calls, waiting for Eric's OK: [docs/decisions/2026-11-18-batt
 | The climb | core `tower.ts`, `BATTLE_TOWER` in `packages/core/src/settings.ts` |
 | Saving | `packages/server/src/tower.ts` (`tower_runs`, `tower_best`), `account-data.ts`, the sign-in merge |
 | The party | Boss Battle's party (`PartyCore`, kind "tower", max 4), the lobby on the draw rule "party" |
-| The screens | the tower's screen, the floor scene, the boss bar for 2-3 bosses; the home card in `screens/Home.tsx` |
+| The screens | the tower's screen, the tower's room (the challenge room's walking and seating), the boss bar for 2-3 bosses; the home card in `screens/Home.tsx` |
 
 ## Tests (planned)
 

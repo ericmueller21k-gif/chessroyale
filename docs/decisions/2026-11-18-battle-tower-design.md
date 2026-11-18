@@ -226,8 +226,10 @@ of 1, 2, 2, 3 meet 24 bosses; the playable pool is 14 (18 once the four admins-f
 once before any comes back, the repeats coming last. Never Hollow with Smudgy on a floor (section 1). The next
 floor's bosses are dealt when the floor before is won and saved with the run, so stopping and coming back meets the same bosses.
 
-**Your side:** you play **White on every floor** (call): one rule for every floor, every boss is fine as Black, and Hollow already
-claims the dark side. Every floor from the starting position, with no book opening (as a Boss Battle).
+**Your side:** you play **White on every floor**, as in every boss battle today (Eric, Nov 18: "Maybe for now then we stick to
+white, but need to consider changing this later for sure"). White or Black at random is a later item (the build plan's last row):
+it waits on every boss working with the crowd as Black. Every floor from the starting position, with no book opening (as a Boss
+Battle).
 
 ### Losing, hearts, the end of a run
 
@@ -250,22 +252,36 @@ performance bonus for a win, and pays the device's word (a solo game) no bonus. 
   server saw), since a solo run is the device's word (open call 8).
 - No new currency, no timers, nothing bought: the payments design's "earn first" rules hold.
 
-## 4. The skyscraper
+## 4. The skyscraper: one room, every floor
 
-**Between floors you walk up.** After a floor's result, the **floor scene** (one screen, phone and computer): a floor of the
-skyscraper drawn in the game's pixel style, a big sign "FLOOR 3" on its wall, the stairs at one end. Your pawn (a party's pawns, in
-seat order, in their seat colors) walks from the door to the stairs and up (transforms only, as the 1 v 1 stage's pawn drops: about
-3 s); the scene is drawn again the same with the sign now "FLOOR 4" (Eric: "the same floor redrawn as stage 2"), the next floor's
-bosses stand at the far end in their idle sprites (the reveal: names under them), and the board slides in.
+**Eric, Nov 18:** "For drawing each room make it simple just a challenge style room with a center circle like we do, but the room is
+hunchess color themed maybe ... the redraw simply adds a number posted on the wall on both sides like a big '4' the chess board and
+chairs are just hunchess color themed as well nothing special, the bosses appear the same every time. There's an above door and once
+you walk in and go to the board they will come out the top door and walk to the board, the room itself can be snug."
 
-- **Nothing hidden:** the run's strip is always at the top of the scene and the game screen ("Battle Tower · Floor 4 of 12", the
-  hearts, the bosses beaten as small portraits); **Continue** and **Stop here (saved)** are always on the scene, greyed while the
-  pawns walk.
-- **Phone:** the scene fills the game frame above the two buttons; the pawns and the bosses whole on screen. **Computer:** the
-  scene in the board's column, the right column as on home. A light and a dark scene.
-- **Reduced motion:** no walk; the sign changes with a fade.
-- One floor drawing for every floor (its number and the bosses change), so the art is one job (the characters lane, its own
-  still for Eric first). A later idea: the tower as a building in Chess Town (open call 11).
+**One room, reused for every floor.** The model is Chess Town's challenge rooms (a boss's home in challenge mode:
+`packages/app/src/town/shops/challenge.ts`, `ShopRoom.tsx`; the intro's flow and drawing in `shops/intro.ts`): a snug room with a
+**center circle** on its floor (the circle the challenge's marks are found from: `marksOf` reads the floor's `circle-*` / `ring-*`
+tiles), the table in its middle.
+- **In HunChess's own colors:** the walls, floor and circle in the game's palette (not a boss's); a plain board and two chairs in the
+  same colors (the town's `PARK_TABLE`, a stool each side, recolored; the board painted by `paintTable`). Nothing else in the room.
+- **The floor number** painted big on **both side walls** ("4"): the only thing that changes from floor to floor.
+- **A door at the top** (the far wall), and you come in from the bottom.
+- **The flow, each floor:** you walk in (a party: every member's pawn, in seat order and seat colors) and up to your mark at the
+  board; then that floor's bosses (one, two or three) come out of the top door one after another and walk to the board, on their
+  marks on the far side, each the same sprite as everywhere else ("the bosses appear the same every time"); the board comes up as
+  a challenge's does. Reuse the challenge's walking, marks and seating (`CHALLENGE_FEEL`, `marksOf`, the "facing" layout: the bosses
+  north, you south; its three marks spread across the far side of the table for three bosses) and its zoom-and-fade into the board.
+- **Between floors:** after a floor's result the room comes back with the number one higher on both walls, and you walk in again:
+  "you climb each floor but not truly". **Continue** and **Stop here (saved)** are under the room, always shown, greyed while anyone
+  walks.
+- **Nothing hidden:** the run's strip is always at the top of the room and of the game screen ("Battle Tower · Floor 4 of 12", the
+  hearts, the bosses beaten as small portraits).
+- **Phone and computer:** the room in the challenge mode's own framing (`CHALLENGE_FEEL.cam`: everything in view); on a computer in
+  the board's column with the right column as on home. Every figure whole on screen (Eric's rule of Nov 4).
+- **Reduced motion:** no walking: everyone on their marks, the number changes with a fade.
+- **Art:** one room, by the art runner (its still for Eric first), in the characters lane; the walking and seating code is the
+  challenge room's. A later idea: the tower as a building in Chess Town (open call 11).
 
 ## 5. Saving progress
 
@@ -321,7 +337,7 @@ saves results (`lobby-do.ts`, `writeResult`), never by a device.
   turn's first pick (`BOSS_PARTY.afkKickSec`) the members who have picked may kick whoever hasn't; the clock running out loses the
   floor. (Not 50 v 50's AFK rule: no move is ever picked for anyone in a party.)
 - **The screens:** each member's pick shows live on the board in their seat color, as a Boss Battle party's do; the members' pawns
-  stand in the floor scene and on the result.
+  stand in the tower's room and on the result.
 - **Whose run:** the party's run is held by the leader's account (`tower_runs.user_id`, `kind` 'party'), separate from their solo
   run. Every member's own best (`tower_best`, 'party') rises with each floor won while they're in it. **A member who leaves** keeps
   the floors they were there for; the run goes on. **The leader leaving** between floors passes the party, and the run with it
@@ -347,14 +363,15 @@ Each PR on its own branch. The layer first; then several bosses on one board; th
 | 1 | **The board layer**: `board-layer.ts` (marks, `layerStop`, `layerMoves` with the lift, `followLayer`, `wearLayer`), Sawyer's edge helpers moved in, unit tests (every mark, overlaps, the lift, castling, promotion, en passant) | targeted | xhigh | ~400 lines |
 | 2-5 | Today's bosses onto the layer, one family a PR (held pieces; square marks; edges; shields) | boss | xhigh | small to medium each |
 | 6 | **Several bosses in the runner**: `bosses: BossState[]`, the turn order, every boss's turn steps, the merged layer, one ultimate and one cinematic a turn change, `rageScale`; the boss kit run over pairs and threes (seeded), `BATTLE_TOWER.apart` from what it finds | boss, and the director may mark it full (the runner's core) | xhigh | large |
-| 7 | Mockup stills for Eric (`stills/battle-tower`): the bar with 2 and 3 bosses (phone, computer), the floor scene, the tower's screen, the home row | light | high | one still a platform |
+| 7 | Mockup stills for Eric (`stills/battle-tower`): the bar with 2 and 3 bosses (phone, computer), the tower's room, the tower's screen, the home row | light | high | one still a platform |
 | 8 | **The climb's rules**: core `tower.ts` (the floors, the deal, hearts, the run's steps), `BATTLE_TOWER` in settings.ts, unit tests | targeted | xhigh | small |
 | 9 | **Saving**: `tower.ts` on the server (the tables, the routes, the sign-in merge, export and delete) | **full** (stored data) | xhigh | medium |
 | 10 | **Solo tower screens**: the tower's screen, the battle with 2-3 bosses on the bar and beside the board, the moments queue, the run's strip, the result; `e2e/battle-tower.spec.ts` and its `e2e/areas.json` entry | targeted | high | large |
-| 11 | **The floor scene** (its art in the characters lane, its still first) | targeted | high | medium |
+| 11 | **The tower's room** (the art runner's one room in HunChess colors, its still first; the challenge room's walking and seating reused) | targeted | high | medium |
 | 12 | **The party**: kind "tower", max 4, the lobby's floors on the party rule with `closeCp` 0, the room writing the run | **full** (stored data, the server) | xhigh | medium |
 | 13 | The home card and its check in `e2e/home-layout.spec.ts` | light | medium | small |
 | 14 | One sim run: bot climbers through the 12 floors, alone and as a party of 4, for the Maia curve and `rageScale` (`reports/tower-sim.md`) | light | medium | small |
+| later | White or Black at random on every floor, once every boss works with the crowd as Black (Eric: "need to consider changing this later for sure") | boss | xhigh | |
 
 ## Open calls for Eric (one line each)
 
@@ -366,7 +383,7 @@ Each PR on its own branch. The layer first; then several bosses on one board; th
 6. The Hidden Boss as the tower's top floor (alone, after floor 12)?
 7. Three hearts a run, a draw costing a heart, the floor's bosses dealt anew after a loss: OK?
 8. The top's reward: an emblem; and a crate or coins only for a party's run (the server saw it), since solo is the device's word?
-9. You play White on every floor: OK?
+9. (Settled: White for now, random later.) The room: one HunChess-colored room, the number on both walls, the bosses through the top door: as you described?
 10. A tie in a party goes to the engine's best always (no 30-centipawn random): OK?
 11. The tower as a building in Chess Town later, or only the home card?
 12. Never the same boss twice in a run (while the pool allows): OK?
