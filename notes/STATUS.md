@@ -1,3 +1,4 @@
+- Nov 18 ~21:00 UTC: PR 1 board layer done -> #802 (8f251b5), CI watched. Next after merge: PR 2-5 (bosses onto the layer, xhigh, one family a PR). Usage warning: one helper at a time.
 - Nov 18 ~20:35 UTC: #801 Tower design MERGED (82de537, docs). PR 1 board layer helper started (xhigh alone), branch claude/tower-board-layer, watcher armed. Audit #1 after PR 6 (Fable high, docs/areas/battle-tower-audit.md).
 - Nov 18 ~20:20 UTC: Eric: an auditor (Fable, high) checks the Tower build. Wrote docs/areas/battle-tower-audit.md (its brief) + design section 8: runs after PRs 6, 10, 12; read-only; findings to docs/decisions/<date>-battle-tower-audit-<n>.md on audit/battle-tower-<n>. #801 head 2215b19, CI watched.
 - Nov 18 ~20:10 UTC: Tower design final (#801, 8130ad4), CI watched; merge when green. Then PR 1 board layer (brief tower-1-board-layer.md, xhigh alone).
