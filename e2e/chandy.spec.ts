@@ -92,6 +92,45 @@ test.describe("Chandy", () => {
     await expect(tiles.getByRole("radio", { name: "Chandy", exact: true })).toBeVisible();
   });
 
+  // (Eric, Nov 18: "when you tap chandy a weapon screen comes up that shows his gun and which upgrade he has"; ChandyWeapon.tsx.) Phone
+  // (his bar) and computer (beside the board): a look, not a pause.
+  test("a tap on him opens his weapon screen: his rifle at its stage, the move he has lit, the rest greyed; it closes (X, Escape, outside) and the clock runs", async ({ page }) => {
+    test.setTimeout(120_000);
+    await battle(page, "beam");
+    const tap = page.locator(".ch-look-tap:visible");
+    const screen = page.locator(".ch-weapon");
+    // (Never over the board: his tap target takes no square's tap.)
+    const over = await tap.evaluate((el) => {
+      const t = el.getBoundingClientRect();
+      const b = document.querySelector(".board")!.getBoundingClientRect();
+      return Math.max(0, Math.min(t.right, b.right) - Math.max(t.left, b.left)) * Math.max(0, Math.min(t.bottom, b.bottom) - Math.max(t.top, b.top));
+    });
+    expect(over).toBe(0);
+    await tap.click();
+    await expect(screen).toBeVisible();
+    await expect(screen.locator(".ch-up-label")).toHaveText(/1\/5$/);
+    await expect(screen.locator("li")).toHaveCount(5);
+    await expect(screen.locator("li.on")).toHaveCount(1);
+    await expect(screen.locator("li.on")).toHaveAttribute("data-move", "beam");
+    expect(await screen.getAttribute("data-stage")).toBe("1");
+    // (The clock runs under it: still your move, and its time goes down.)
+    const time = page.locator(".dk-clock .dk-time");
+    const before = await time.textContent();
+    await expect.poll(() => time.textContent(), { timeout: 5_000 }).not.toBe(before);
+    expect(await phase(page)).toBe("play");
+    await expect(screen).toBeVisible();
+    await screen.getByRole("button", { name: "Close" }).click();
+    await expect(screen).toHaveCount(0);
+    await tap.click();
+    await expect(screen).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(screen).toHaveCount(0);
+    await tap.click();
+    await expect(screen).toBeVisible();
+    await page.mouse.click(4, 4);
+    await expect(screen).toHaveCount(0);
+  });
+
   const MOVES: [power: string, kind: string, banner: RegExp][] = [
     ["scatter", "scatterShot", /SCATTER SHOT!/],
     ["beam", "beam", /BEAM!/],
