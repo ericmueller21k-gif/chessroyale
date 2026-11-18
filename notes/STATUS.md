@@ -1,3 +1,4 @@
+- Nov 18 ~03:20 UTC: container restarted again; watchers re-armed. #785 Chandy sounds merged 67a971b; deploy + main watched. Bigboy fix helper finishing (dedfe2c pushed).
 - Nov 18 02:40 UTC: review/bigboy-tower: lifetimes off by his move, solo bounce cuts topple, tower hides move dots, his piece on a block; Last Stand effectively off vs Big Boy (Eric call). Fix helper (high) on claude/bigboy-tower.
 - Nov 18 ~02:30 UTC: bigboy balance done (72c665f): tower not the cause, sim baseline stale (main also 0.00); Eric design kept; his topple 25% share. Review helper + chandy sounds started. TODO: re-baseline raid sim (engine lane); fair-play power-turn proposal for bigboy (follow-up, fairplay lane, ask Eric?).
 - Nov 18 ~02:25 UTC: #783 Dash fix LIVE fe16431; main GREEN. Bigboy balance helper running (#784 held).
