@@ -20,6 +20,7 @@ import { SELECT_SOUND } from "../src/characters/boss-select.ts";
 import { BOSS_INTROS } from "../src/town/shops/challenge.ts";
 import * as fxAlfil from "../src/characters/effects/alfil.ts";
 import * as fxBigboy from "../src/characters/effects/bigboy.ts";
+import * as fxBigboyTower from "../src/characters/effects/bigboy-tower.ts";
 import * as fxBoingo from "../src/characters/effects/boingo.ts";
 import * as fxChandy from "../src/characters/effects/chandy.ts";
 import * as fxDash from "../src/characters/effects/dash.ts";
@@ -66,7 +67,7 @@ const PACKS: Record<string, { prefix: string; module: string }> = {
 /** Each boss's effects files (its board art), by roster id. */
 const FX_FILES: Record<string, readonly object[]> = {
   alfil: [fxAlfil],
-  bigboy: [fxBigboy],
+  bigboy: [fxBigboy, fxBigboyTower],
   clown: [fxBoingo],
   chandy: [fxChandy],
   dash: [fxDash],
