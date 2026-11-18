@@ -216,6 +216,22 @@ describe("his challenge intro (Nov 4: Eric's design)", () => {
     for (const k of ["b:tumble", "b:land", "w:tumble", "w:land"]) expect(INTRO_PIG_BUCKET_HANDLE[k]!.length, k).toBeGreaterThan(0);
   });
 
+  it("he yanks the bale while it's behind him and reels it in facing it once it has slid past him to his right (Nov 18: reelAt)", () => {
+    const ci = introOf("pig")!;
+    const m = seatedMarks(marksOf(SHOP_PIG_LAYOUT, "across", SHOP_PIG_MARKS, marksFeel(null, CHALLENGE_FEEL, ci.clear))!);
+    // The bale's column along its slide (ShopRoom's ropeBale: from the stand, round `bend`, to the table).
+    const [qc] = CHALLENGE_FEEL.rope.bend;
+    const col = (u: number) => (1 - u) ** 2 * SHOP_PIG_BOARD_AT.col + 2 * (1 - u) * u * qc + u * u * m.table.c;
+    expect(Math.abs(col(CHALLENGE_FEEL.rope.reelAt) - m.boss.c)).toBeLessThan(0.1);
+    for (let t = at("drag"); t < at("land"); t += 40) {
+      const r = ropeAt(beats, anims, t);
+      expect(r.move!.anim, `${t - at("drag")} ms into the drag`).toBe(col(r.bale!.u) < m.boss.c ? "yank" : "reel");
+    }
+    // The reel heaves on the yank's beat (a cue on the same frames), so the drag's sound doesn't jump as he turns.
+    expect(BOSS_PIG_INTRO.anims.reel!.frames.map((f) => [f.ms, f.cue])).toEqual(BOSS_PIG_INTRO.anims.yank!.frames.map((f) => [f.ms, f.cue]));
+    expect(PIG_INTRO_HANDS.reel!.every((h) => h !== null)).toBe(true);
+  });
+
   it("the lasso: released on the throw's release frame, on the bale through the drag, free and reeled in before the cross throw", () => {
     expect(ropeAt(beats, anims, T.release)).toMatchObject({ lasso: { anim: "fly" } });
     expect(ropeAt(beats, anims, T.arrive)).toMatchObject({ lasso: { anim: "catch" } });
