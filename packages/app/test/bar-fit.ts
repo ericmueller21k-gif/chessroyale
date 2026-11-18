@@ -113,7 +113,8 @@ export function momentOk(all: Extent, s: number, shift: number): boolean {
  * (a drawing that reaches further left than the box moves right) and every frame of `all` on the screen; and the name column's offset, the least whole px that keeps it 2 px clear.
  */
 export function barFit(rest: Extent, all?: Extent, beside: Extent = rest): { barScale: number; barShift: number; barName: number } {
-  const cap = Math.min((REST_UP - BAR_TOP_GAP) / rest.up, BAR_PAD_BOTTOM / Math.max(rest.down, 1e-9));
+  // (`rest` is its body's, for a kit with props (kits.ts barProps): a prop may rise over the bar's top, never off the screen's, `all`.)
+  const cap = Math.min((REST_UP - BAR_TOP_GAP) / rest.up, BAR_PAD_BOTTOM / Math.max(rest.down, 1e-9), all ? MOMENT_UP / all.up : Infinity);
   const barScale = Math.floor(cap * 100 + 1e-9) / 100;
   // (And never a moment off the screen's left edge (`all`, every frame): Nov 17, Wrangler's lasso and Dash's entrance, turned to face the
   // board, reach that way.)
@@ -123,26 +124,41 @@ export function barFit(rest: Extent, all?: Extent, beside: Extent = rest): { bar
   return { barScale, barShift, barName };
 }
 
+/**
+ * A figure's body alone: every frame without its props' layers (kits.ts barProps, its parts' name prefixes: Chandy's rifle) and its
+ * specks (a muzzle's burst, a lens's flare). A prop doesn't size a boss (Eric, Nov 18: Chandy "just obviously needs to be bigger", as
+ * Babur's balloons, Oct 24).
+ */
+export function bodyOf(ch: Ch, props: readonly string[]): Ch {
+  const body = (f: Frame): Frame => ({ ...f, specks: undefined, layers: f.layers.filter((l) => !props.some((p) => String(l.part).startsWith(p))) });
+  return { ...ch, anims: Object.fromEntries(Object.entries(ch.anims).map(([n, a]) => [n, { ...a, frames: a.frames.map(body) }])) };
+}
+
+/** Each side's farther reach of two extents. */
+const either = (a: Extent, b: Extent): Extent => ({ left: Math.max(a.left, b.left), right: Math.max(a.right, b.right), up: Math.max(a.up, b.up), down: Math.max(a.down, b.down) });
+
 /** An extent mirrored about the feet: its left and right swapped. */
 const mirrored = (e: Extent): Extent => ({ ...e, left: e.right, right: e.left });
 
 /**
- * Every playable boss's kit, the character its bar draws, its idle's and its rest frames' reach, and every frame's: as the bar draws it,
- * mirrored about its feet where it turns to face the board (kits.ts placeFacing, Nov 17). `beside`: what of its rest frames reaches the name
- * column's height (all of them; with barUnder, the rows above where the column's text and meters end, at its fitted size), and `under`:
- * every frame's reach in those rows (Chandy's rifle: never into them).
+ * Every playable boss's kit, the character its bar draws, and its reach as the bar draws it (mirrored about its feet where it turns to
+ * face the board: kits.ts placeFacing, Nov 17): `idle`, its idle's; `rest`, its rest frames' (its body's alone, for a kit with props:
+ * kits.ts barProps), which size and place it; `all`, every frame's, props and all, which stay on the screen; `beside`, what must clear
+ * the name column (its rest frames, props too; with barUnder, the body and the rows above where the column's text and meters end, at its
+ * fitted size); `under`, every frame's reach in those rows (Chandy's rifle: never into them).
  */
 export function barRows() {
   return PLAYABLE.map((def) => {
     const kit: BossKit = BOSS_KITS[def.kit!]!;
     const ch = kit.bar ?? kit.ch;
+    const body = kit.barProps ? bodyOf(ch, kit.barProps) : ch;
     const idle = [kit.loops?.idle ?? "idle", ...(kit.powered ? [kit.powered.idle] : [])];
     const as = placeFacing(kit, ch, "bar").mirror ? mirrored : (e: Extent) => e;
-    const rest = as(restExtent(ch));
+    const rest = as(restExtent(body));
     const all = as(extentOf(ch, Object.keys(ch.anims)));
     const above = kit.barUnder === undefined ? undefined : besideAbove(kit.barUnder, barFit(rest, all).barScale);
-    const beside = above === undefined ? rest : as(restExtent(ch, above));
+    const beside = above === undefined ? as(restExtent(ch)) : either(rest, as(restExtent(ch, above)));
     const under = above === undefined ? all : as(extentOf(ch, Object.keys(ch.anims), above));
-    return { name: def.kit!, kit, idle: as(extentOf(ch, idle)), rest, all, beside, under };
+    return { name: def.kit!, kit, idle: as(extentOf(body, idle)), rest, all, beside, under };
   });
 }

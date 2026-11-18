@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { BAR_TOP_GAP } from "../src/characters/kits.ts";
-import { barFit, barRows, momentOk, restOk, BAR_PAD_BOTTOM, REST_LEFT, REST_RIGHT, REST_UP } from "./bar-fit.ts";
+import { barFit, barRows, momentOk, restOk, BAR_PAD_BOTTOM, MOMENT_UP, REST_LEFT, REST_RIGHT, REST_UP } from "./bar-fit.ts";
 
 /**
  * The phone boss bar's figure, every frame (Eric, Oct 24; Nov 4: every boss whole inside the bar; Nov 12: "every boss as tall as their
@@ -26,7 +26,7 @@ describe("the phone boss bar's figure: as tall as the bar, whole inside it at re
     it(`${name}: as tall as the bar less ${BAR_TOP_GAP} px at rest, within a hundredth`, () => {
       expect(rest.up * scale).toBeLessThanOrEqual(REST_UP - BAR_TOP_GAP);
       const more = scale + 0.01;
-      expect(rest.up * more > REST_UP - BAR_TOP_GAP || rest.down * more > BAR_PAD_BOTTOM, `${name}: a hundredth more wouldn't fit`).toBe(true);
+      expect(rest.up * more > REST_UP - BAR_TOP_GAP || rest.down * more > BAR_PAD_BOTTOM || all.up * more > MOMENT_UP, `${name}: a hundredth more wouldn't fit (or a prop would be off the screen)`).toBe(true);
       // (Its idle at least half the bar: a figure that rests much taller than its idle is the one place it reads smaller.)
       expect((idle.up + idle.down) * scale, `${name}: its idle's height`).toBeGreaterThan(REST_UP / 2);
     });

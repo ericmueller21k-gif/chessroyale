@@ -1164,7 +1164,7 @@ export const CHANDY: Character = {
  * degrees, at the board under the bar, his hands with it, and swung round low; so it runs under his name column's meters (kits.ts
  * barUnder), never through them, and his name sits where his rested figure puts it. Beside the board (a computer) he aims level.
  */
-export const BAR_TILT = 12;
+export const BAR_TILT = 21;
 /** A point `[x, y]` from his near shoulder turned `deg` about the rifle's butt `at` (his hand on the rifle, turned with it). */
 const turned = ([x, y]: Pt, [ax, ay]: Pt, deg: number): Pt => {
   const r = (deg * Math.PI) / 180;
@@ -1176,11 +1176,12 @@ const tipped = (p: ChandyPose, deg: number): ChandyPose => {
   const [elbow, hand] = p.armN!;
   return { ...p, gun: { ...g, deg: g.deg + deg }, armN: [turned(elbow, g.at, deg / 2), turned(hand, g.at, deg)] };
 };
+// (The swing comes round low, its far arm down; the shot's kick stays at the aim's angle: so no frame rises into the meters.)
 export const BAR_FIRE_POSES: typeof FIRE_POSES = {
   grab: FIRE_POSES.grab,
-  swing: tipped(FIRE_POSES.swing, 30 + BAR_TILT),
+  swing: { ...tipped(FIRE_POSES.swing, 30 + BAR_TILT + 6), armF: ARMS.hang },
   aim: tipped(FIRE_POSES.aim, BAR_TILT),
-  fire: tipped(FIRE_POSES.fire, BAR_TILT),
+  fire: tipped(FIRE_POSES.fire, 3 + BAR_TILT),
 };
 /** His figure in a phone's boss bar (kits.ts `bar`): CHANDY with BAR_FIRE_POSES (his rest and point are the same animations). */
 export const CHANDY_BAR: Character = {

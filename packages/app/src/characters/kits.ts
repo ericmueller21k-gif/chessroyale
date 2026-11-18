@@ -169,6 +169,12 @@ export interface BossKit extends BeatLines {
    * barName is then measured only from the rows above it (2 px clear), and no frame reaches past the column above it. Undefined: every row.
    */
   barUnder?: number;
+  /**
+   * Its props in a phone's bar: the name prefixes of the parts that aren't its body (Chandy's rifle, "rifle:"). The bar's size and place
+   * (barScale, barShift, barName) are its body's alone, so a prop never shrinks it (Eric, Nov 18: "he just obviously needs to be bigger";
+   * Babur's balloons, Oct 24); a prop may rise over the bar's top, never off the screen. Undefined: every part is its body.
+   */
+  barProps?: readonly string[];
   /** A recolor (one of the character's `looks`) from the battle's state: Big Boy's black pawn. */
   lookOf?: (boss: BossView) => string | undefined;
   /** Its attack on a king (the God King's Last Stand, its mate), if it has one: see KingAttackKit. */
@@ -1102,10 +1108,11 @@ export const BOSS_KITS: Record<string, BossKit> = {
   Chandy: {
     // (His phone bar's fit: npx tsx scripts/bar-fit.ts. In the bar his rifle comes out tipped down at the board (CHANDY_BAR), under his name
     // column's meters, which end 51 px under the bar's top (e2e/boss-bar-same.spec.ts), so his name sits where his rested figure puts it.)
-    barScale: 0.76,
-    barShift: 12,
-    barName: 6,
+    barScale: 1.19,
+    barShift: 23,
+    barName: 38,
     barUnder: 51,
+    barProps: ["rifle:"],
     ch: CHANDY,
     bar: CHANDY_BAR,
     sprite: CHANDY_SPRITE,

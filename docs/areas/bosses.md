@@ -694,9 +694,12 @@ below):
   is the largest hundredth at which every frame it rests in (its loops but the victory, the last frame of each one-shot) reaches no
   higher than `BAR_TOP_GAP` (3 px) under the bar's top, in its own proportions; `barShift`, the least sideways shift that keeps it 2 px
   inside the bar's left edge; `barName`, the least move right of the name column that keeps it 2 px clear. All three are measured from
-  the art (`packages/app/test/bar-fit.ts`; `npx tsx scripts/bar-fit.ts` prints them after a change to a drawing or to the gap). A kit
-  with `barUnder` (Chandy, Nov 18) measures `barName` only from the rows above where its name column's text and meters end: under them
-  the bar is empty, and his rifle may reach past the column there, never into them (docs/decisions/2026-11-18-chandy-bar-chirp.md). Moo &
+  the art (`packages/app/test/bar-fit.ts`; `npx tsx scripts/bar-fit.ts` prints them after a change to a drawing or to the gap).
+  **A prop never sizes a boss** (Eric, Nov 18, Chandy: "he just obviously needs to be bigger"): a kit names its props' parts
+  (`barProps`, part-name prefixes: his `"rifle:"`), and its size, shift and name column are its body's alone; a prop may rise over the
+  bar's top, never off the screen. With `barUnder` (where its name column's text and meters end), a prop may reach past the column
+  below that line, never into them (docs/decisions/2026-11-18-chandy-bar-chirp.md). A new boss holding or wearing a prop that reaches
+  past his body names it. Moo &
   Moon and Puddles stay a little shorter (their thinking pose, every turn, is their tallest). The victory, the battle won, may rise
   over the bar, never off the screen. The name column is as wide as its name and bars, at most 130 px (`fit-content`), and the
   status ("N moves left") is never wrapped, so a column moved right takes its room from the empty middle; the boss's own room
@@ -984,8 +987,9 @@ top part is left and the review right. Decision: `docs/decisions/2026-11-02-boss
   His sounds are his own (Nov 18, `characters/chandy-sounds.ts`: pulse-style hunter tech, synthesized; `CHANDY_SOUNDS` maps his
   cues, `CHANDY_CUES` says what each is; his intro's three are his swamp's), tested in `chandy.test.ts`. His scope's lock, unlock
   and Dodge's alarm are low and heavy (a throbbing hum, 150 to 260 Hz, a growl under the lock), not beeps (Eric: "a bird chirping").
-  A phone's bar draws `CHANDY_BAR` (chandy.ts): the same figure, his rifle held tipped `BAR_TILT` (12°) down at the board, so it runs
-  under his meters (kits.ts `barUnder`) and his name sits beside him (`barName` 6, was 53); beside the board he aims level.
+  His phone bar is sized by his body, his rifle a prop (`barProps`: 1.19, was 0.76), and draws `CHANDY_BAR` (chandy.ts): the same
+  figure, his rifle held tipped `BAR_TILT` (21°) down at the board, so it runs under his meters (kits.ts `barUnder`) and his name sits
+  beside him (5 px from his body); beside the board he aims level.
 
 ## Where the code is
 
@@ -1090,7 +1094,8 @@ A boss's screen file fills in a `BossUi` (`components/PowerParts.tsx`): its mome
 
 **What a new boss must still add:** his own rule tests (`packages/chess/test/<boss>.test.ts`: his rules' numbers from
 his sheet, his guards, the judge's view, his moments), a lobby test only for a request or message of his own, app tests
-for his character and moments, and `e2e/<boss>.spec.ts` for what his powers show. Three things the kit needs from him:
+for his character and moments, and `e2e/<boss>.spec.ts` for what his powers show; a prop he holds or wears that reaches past his
+body is named in his kit (`barProps`), so it doesn't size his phone bar. Three things the kit needs from him:
 
 - a power that decides the battle names its event `<something>Win` (as `carrotWin`): the kit's result checks key on it;
 - a new kind of step at the start of his turn (a runner method `…Due` or `…Step`) goes into the kit's driver
