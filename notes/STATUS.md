@@ -1,3 +1,4 @@
+- Nov 18 ~23:45 UTC: PR 5 shields done -> #807 (5a3d979), CI watched. Note: #806 (edges) and #807 both touch board-layer.ts/base.ts/bosses.md: merge #806 first, then merge main into #807 and re-run. After both: PR 6 several bosses in the runner (xhigh, large), then Audit 1 (Fable high).
 - Nov 18 ~23:30 UTC: #805 live-window fix MERGED (bf9e482), main run watched. Running: PR 5 shields (xhigh). #806 PR 4 CI b6h2tc05k.
 - Nov 18 ~23:20 UTC: PR 4 edges done -> #806 (ceb3a30), CI watched. PR 5 shields helper session_01JuCWRtX2k9bvsNL9Do6oNL (xhigh alone), watcher ba5jqa11l. #805 live-window fix CI b0ry1ib33.
 - Nov 18 ~23:10 UTC: #804 LIVE (3a993b5), main full run GREEN (no flaky this time).
