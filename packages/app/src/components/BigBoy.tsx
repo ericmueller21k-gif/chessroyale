@@ -4,7 +4,7 @@ import type { BounceResult } from "@chessroyale/core";
 import { bounceShape } from "../characters/bigboy.ts";
 import { bossKit } from "../characters/kits.ts";
 import { pickLine } from "../characters/boss-beats.ts";
-import { animLength, blockItem, blockLetter, EFFECTS } from "../characters/power-art.ts";
+import { animLength, blockItem, EFFECTS } from "../characters/power-art.ts";
 import { TOWER_BLOCKS } from "../characters/effects/bigboy-tower.ts";
 import type { BossView } from "../game.ts";
 import { BoardEffects, BossEffect, BossMoment, prewarm, prewarmSprite, type BoardItem } from "./BossEffect.tsx";
@@ -342,8 +342,8 @@ export function prewarmBigBoy(name: string, look?: string): void {
 function towerPoint(square: string, k: number, o: Orientation): Pt {
   const c = centreOf(square, o);
   const [bx, by] = TOWER_BLOCKS[Math.min(k, TOWER_BLOCKS.length - 1)]!;
-  // (The square is the frame's bottom 32 rows, columns 8 to 39: its middle at (24, 120).)
-  return { x: c.x + ((bx - 24) / 32) * 12.5, y: c.y + ((by - 120) / 32) * 12.5 };
+  // (Seen from above, Nov 18: the square is the frame's middle, x and y 32 to 63: its middle at (48, 48).)
+  return { x: c.x + ((bx - 48) / 32) * 12.5, y: c.y + ((by - 48) / 32) * 12.5 };
 }
 
 /** The topple's beats for its i-th block (landing order): when it leaves the tower and when it lands, from the moment's start. */
@@ -398,10 +398,11 @@ function scatterItems(boss: BossView, now: number, appearAt: (square: string) =>
   const out: BoardItem[] = [];
   if (p.scatter?.squares.length) {
     blocksLast.set(key, { squares: p.scatter.squares, until: p.scatter.until });
-    for (const sq of p.scatter.squares) {
+    // (Its i-th square takes the tower's block i + 1: its number and color, as its flight from the tower showed it.)
+    p.scatter.squares.forEach((sq, i) => {
       const since = appearAt(sq);
-      if (now >= since) out.push(blockItem(sq, since ? "land" : "sit", since));
-    }
+      if (now >= since) out.push(blockItem(sq, since ? "land" : "sit", since, i + 1));
+    });
   } else {
     const last = blocksLast.get(key);
     if (last && last.until <= p.turn) {
@@ -411,12 +412,12 @@ function scatterItems(boss: BossView, now: number, appearAt: (square: string) =>
         blocksGone.set(tag, (at = now));
         if (blocksGone.size > 20) blocksGone.delete(blocksGone.keys().next().value!);
       }
-      if (now < at + POOF_MS()) for (const sq of last.squares) out.push(blockItem(sq, "poof", at));
+      if (now < at + POOF_MS()) last.squares.forEach((sq, i) => out.push(blockItem(sq, "poof", at, i + 1)));
     }
   }
   return out;
 }
-const POOF_MS = () => animLength(EFFECTS.toyBlock.ch.anims.poofA!);
+const POOF_MS = () => animLength(EFFECTS.toyBlock.ch.anims.poof1!);
 
 /** The blocks in the air in a topple: each from its place in the tower to its square, a short lob, tumbling (nearest first). */
 function ToppleFlights({ moment, from, squares, now, orientation }: { moment: Moment; from: string; squares: readonly string[]; now: number; orientation: Orientation }) {
@@ -427,7 +428,7 @@ function ToppleFlights({ moment, from, squares, now, orientation }: { moment: Mo
         const at = moment.at + f.off;
         if (now < at || now >= moment.at + f.land) return null;
         const pt = towerPoint(from, i, orientation);
-        return <Flight key={`tf-${sq}`} name="blockFly" anim={`fly${blockLetter(sq)}`} square={sq} orientation={orientation} since={at} ms={TOPPLE.flight} from={pt} />;
+        return <Flight key={`tf-${sq}`} name="blockFly" anim={`fly${i + 1}`} square={sq} orientation={orientation} since={at} ms={TOPPLE.flight} from={pt} />;
       })}
     </>
   );
@@ -456,13 +457,12 @@ export function yourTopple(boss: BossView, now = Date.now()): Moment[] {
 }
 
 function blockMoment({ moment, t, orientation, banner, cast }: MomentProps) {
-  const letter = moment.square ? blockLetter(moment.square) : "A";
   return (
     <div class="power-moment pm-block">
       {banner("TOY BLOCK!", moment.square ? `Blocked: ${moment.square}` : undefined, "toy", BLOCK.flyAt)}
       {cast("toss", BLOCK.flyAt)}
       {moment.square && t >= BLOCK.flyAt && t < BLOCK.landAt && (
-        <Flight name="blockFly" anim={`fly${letter}`} square={moment.square} orientation={orientation} since={moment.at + BLOCK.flyAt} ms={BLOCK.landAt - BLOCK.flyAt} />
+        <Flight name="blockFly" anim="fly1" square={moment.square} orientation={orientation} since={moment.at + BLOCK.flyAt} ms={BLOCK.landAt - BLOCK.flyAt} />
       )}
     </div>
   );
