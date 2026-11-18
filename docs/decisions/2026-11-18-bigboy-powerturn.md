@@ -34,3 +34,20 @@ off for the whole battle (before the tower, about one turn in four had a block).
 - **Deeper lines stay plain chess:** a block his second move or the crowd's next one would meet isn't looked at. That's what
   (b) accepts; one move deep is what the save names and shows.
 - **`powerTurn` without the position** (only tests call it so) answers as before: his toys up count.
+
+## The review's fixes (Nov 18, PR #791)
+
+- **Online, his reply is the judges' joint word.** The Last Stand now turns on the judge's reply for Big Boy, and two judges
+  were compared only on their numbers: a modified client could name a reply his toys leave open and call the save past them
+  (or the reverse). Fix (the review's least-code one): a job judges settle together keeps only the replies both name alike
+  (`sharedReplies`: agreed, and two of three); a re-check keeps the replies settled with the quick part. My call: the engine
+  server's verdict too. It names no replies, so the closer judge's stood, and a tie in distance went to the first judge, the
+  same opening. A missing or disputed reply reads as not known: the save sits out while his toys
+  stand, the call above. Honest engines are deterministic, so their replies match and nothing changes for them.
+- **Not** adding replies to `boardsAgree`: a mismatch would then be a dispute, sent to the engine server, for a value that
+  only Big Boy's save reads.
+- `baseBoard` drops a reply that isn't a legal move after its move (the runner already showed only legal ones).
+- A judge answering alone, the host, or a dispute with no verdict: the reply is that device's word, as its numbers are
+  (spot-checked, or the match unvouched).
+- `toysTakeReply` returns false when no block stands (a scatter with none left), reply known or not.
+

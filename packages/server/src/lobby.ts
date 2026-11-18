@@ -67,6 +67,7 @@ import {
   deepTargets,
   quickPart,
   boardsAgree,
+  sharedReplies,
   distanceFrom,
   judgedBoard,
   recheckTargets,
@@ -3849,7 +3850,8 @@ export class LobbyCore {
       const { agree, diff } = boardsAgree(t.boards[a]!, t.boards[b]!, this.jcfg.tolerance);
       if (agree) {
         this.jr.stats.agreed++;
-        return this.accept(t, t.boards[a]!, "agreed");
+        // (Their replies aren't compared: only those both name alike count. Big Boy's Last Stand turns on the reply.)
+        return this.accept(t, { ...t.boards[a]!, replies: sharedReplies([t.boards[a]!, t.boards[b]!]) }, "agreed");
       }
       this.jr.stats.disagreed++;
       console.log(`judges disagree: ${this.r.code} job ${t.job.id} (${a} v ${b}), worst difference ${(diff * 100).toFixed(1)} points`);
@@ -3950,13 +3952,14 @@ export class LobbyCore {
     if (w.from.length === 1) {
       // (No engine server, one judge: its re-check stands, as a device's always did without the server.)
       t.awaitDeep = undefined;
-      if (boards[0]) t.done = { ...t.done, board: boards[0] };
+      if (boards[0]) t.done = { ...t.done, board: { ...boards[0], replies: t.done.board.replies } };
       return;
     }
     if (boards.every((b) => b) && boardsAgree(boards[0]!, boards[1]!, this.jcfg.tolerance).agree) {
       this.jr.stats.deepAgreed++;
       t.awaitDeep = undefined;
-      t.done = { ...t.done, board: boards[0]! };
+      // (A re-check changes only numbers: the replies settled with the quick part stand.)
+      t.done = { ...t.done, board: { ...boards[0]!, replies: t.done.board.replies } };
       return;
     }
     this.jr.stats.deepDisagreed++;
@@ -3984,7 +3987,7 @@ export class LobbyCore {
     // nothing came, the quick numbers.
     const ok = t.deepBoards ? undefined : (w?.from ?? []).find((j) => t.deepReports?.[j] && !(this.jr.devices[j]?.strikes ?? 0));
     const full = ok ? judgedBoard(t.job, { ...t.reports[ok]!, deep: t.deepReports![ok]! }) : null;
-    if (full) t.done = { ...t.done, board: full };
+    if (full) t.done = { ...t.done, board: { ...full, replies: t.done.board.replies } };
     console.log(`judges: ${why} on ${t.job.id} in ${this.r.code}, and no engine server: ${full ? `${ok}'s re-check` : "the quick numbers"} stand`);
   }
 
@@ -4126,7 +4129,9 @@ export class LobbyCore {
     // (A tie: the judge with fewer strikes.)
     const strikesOf = (j: string) => this.jr.devices[j]?.strikes ?? 0;
     const closer = distances[0]! < distances[1]! || (distances[0] === distances[1] && strikesOf(a) <= strikesOf(b)) ? a : b;
-    t.done = { board: closer === a ? first : verdictBoard(t.job, moves, t.boards[b]!)!, how: "verdict" };
+    // (The server names no replies: only those both judges name alike count, as when they agree.)
+    const verdict = closer === a ? first : verdictBoard(t.job, moves, t.boards[b]!)!;
+    t.done = { board: { ...verdict, replies: sharedReplies([verdict, t.boards[a]!, t.boards[b]!]) }, how: "verdict" };
     const refereed = !!t.refereed;
     console.log(`judges: verdict for ${t.job.id} in ${this.r.code}: ${a} ${distances[0]!.toFixed(1)} and ${b} ${distances[1]!.toFixed(1)} points off${refereed ? " (a third device decides who's to blame)" : ""}`);
     // A third device will say exactly who was off; without one, blame goes by distance from the verdict.
@@ -4190,7 +4195,7 @@ export class LobbyCore {
         if (Array.isArray(deep) && t.job.recheck) (t.deepReports ??= {})[playerId] = deep;
         t.judges = [matches[0]!];
         t.majorityPair = [matches[0]!, playerId];
-        this.accept(t, ref.boards[matches[0]!]!, "majority");
+        this.accept(t, { ...ref.boards[matches[0]!]!, replies: sharedReplies([ref.boards[matches[0]!]!, mine]) }, "majority");
       } else this.fallback(t, "the second opinion matched neither judge");
       this.afterJudging();
     }

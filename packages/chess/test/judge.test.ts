@@ -10,6 +10,7 @@ import {
   legalMoves,
   recheckTargets,
   runJudgeJob,
+  sharedReplies,
   verdictBoard,
   verdictMoves,
   type EngineLike,
@@ -87,6 +88,18 @@ describe("judge jobs", () => {
     expect(judgedBoard(j, { ...report, top: [...report.top.slice(1), { move: "a1a8", expected: 0.9 }] })).toBeNull();
     expect(judgedBoard(j, { ...report, top: report.top.map((m, i) => (i ? m : { ...m, expected: 1.4 })) })).toBeNull();
     expect(judgedBoard(j, null as never)).toBeNull();
+  });
+
+  it("the boss's replies: one that isn't a legal move after its move reads as not known; judges settling together keep only those they name alike", async () => {
+    const j = job();
+    const report = await runJudgeJob(fakeEngine(), j);
+    // (After f1c4 Black's g8f6 is legal; e1g1 is White's castle, not Black's move; "zzzz" is junk.)
+    const named: Record<string, string> = { f1c4: "g8f6", a2a3: "e1g1", g2g4: "zzzz" };
+    const name = (list: typeof report.top) => list.map((m) => (named[m.move] ? { ...m, reply: named[m.move] } : m));
+    expect(judgedBoard(j, { ...report, top: name(report.top), extra: name(report.extra) })!.replies).toEqual({ f1c4: "g8f6" });
+    expect(sharedReplies([{ replies: { a: "x", b: "y", c: "z" } }, { replies: { a: "x", b: "w" } }])).toEqual({ a: "x" });
+    expect(sharedReplies([{ replies: { a: "x" } }])).toEqual({ a: "x" });
+    expect(sharedReplies([])).toEqual({});
   });
 
   it("an inflated score is a disagreement; so are other bot picks", async () => {

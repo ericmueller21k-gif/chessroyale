@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { BOSS_BRAIN, BOSS_POWERS, bossBannerMs, DEFAULT_SETTINGS, RAID_SETTINGS, bossBrainFor, maiaRatingFor, mulberry32, playableBosses, type Settings } from "@chessroyale/core";
-import { FIRE_BURN_MS, KING_ATTACK, applyMove, blockedBy, choosePieThrow, powerFxMs, bossMoveFrom, bossShowMs, bossTurnShowMs, dragOptions, powerMomentMs, extraMoveCandidates, inCheck, initPowers, legalMoves, lightsOutTimeline, lineups, passTurn, pieceAt, queenSlain, sanLineToUci, sideToMove, withPiece, withoutPiece, type BoardScore, type BossMoveKind, type EngineLike, type HumanEngineLike, type MatchRunner, type Opening, type ServerMessage } from "@chessroyale/chess";
+import { FIRE_BURN_MS, KING_ATTACK, applyMove, blockedBy, choosePieThrow, powerFxMs, bossMoveFrom, bossShowMs, bossTurnShowMs, dragOptions, powerMomentMs, extraMoveCandidates, inCheck, initPowers, legalMoves, runJudgeJob, lightsOutTimeline, lineups, passTurn, pieceAt, queenSlain, sanLineToUci, sideToMove, withPiece, withoutPiece, type BoardScore, type BossMoveKind, type EngineLike, type HumanEngineLike, type MatchRunner, type Opening, type ServerMessage } from "@chessroyale/chess";
 import { LobbyCore, newLobbyRecord } from "../src/lobby.ts";
 
 afterEach(() => vi.restoreAllMocks());
@@ -703,6 +703,68 @@ describe("Big Boy online", () => {
     // Both kinds of toy turn came up: one that takes a move away (no signal), one that takes none (it counts).
     expect(seen.some((t) => t.toys && t.limited)).toBe(true);
     expect(seen.some((t) => t.toys && !t.limited)).toBe(true);
+  });
+
+  it("the Last Stand with two judges (the review of #791): only a reply both name counts, so a judge faking his reply can't call the save past his toys; honest judges' reply stands", async () => {
+    // The crowd hangs its queen (d1d5); his rook takes it (d8d5), sliding through d7. A tower on d7 takes that reply away (the
+    // save sits out); one on h3 doesn't (it comes). A judge naming another reply (g8h7, which no toy stops) would call it past
+    // the tower on d7 if its word alone counted: the board two judges agree on was the first one's, replies and all.
+    const HANG = "3r2k1/8/8/8/8/8/8/3Q2K1 w - - 0 1";
+    const [BLUNDER, REPLY, FAKE] = ["d1d5", "d8d5", "g8h7"];
+    /** A judge's engine on HANG: the blunder gives away 47 points from 55%, with `reply` as his answer to it. */
+    const judge = (reply: string): EngineLike => {
+      const ranked = (fen: string, moves: readonly string[]) =>
+        moves
+          .map((m) => ({ move: m, expected: fen === HANG && m === BLUNDER ? 0.08 : 0.55 - 0.001 * legalMoves(fen).indexOf(m), ...(fen === HANG && m === BLUNDER ? { reply } : {}) }))
+          .sort((a, b) => b.expected - a.expected);
+      return {
+        topMoves: async (fen, n) => ranked(fen, legalMoves(fen)).slice(0, n),
+        topMovesAt: async (fen, n, _nodes, only) => ranked(fen, only ?? legalMoves(fen)).slice(0, n),
+        scoreMoves: async (fen, moves) => ranked(fen, [...new Set(moves)]),
+        scoreMovesAt: async (fen, moves) => ranked(fen, [...new Set(moves)]),
+      };
+    };
+    /**
+     * The crowd's second move on HANG, his tower on `square`, judged by both devices; `liar`: the judge (in the order they
+     * were drawn: the first is the one whose board stood before the fix) naming FAKE instead.
+     */
+    async function stand(square: string, liar?: 0 | 1) {
+      // (Not on the first move, which the host scores before the devices report their speed.)
+      const L = raid({ bossId: "bigboy", lastStandFrom: DEFAULT_SETTINGS.lastStandFrom, lastStandFromMove: 1 });
+      play(L);
+      hostBoss(L);
+      for (const id of ["p1", "p2"]) L.core.message(id, { t: "speed", nps: 800_000 });
+      const runner = (L.core as unknown as { runner: MatchRunner }).runner;
+      const board = runner.boards.get(0)!;
+      const ply = board.history.length;
+      runner.boards.set(0, { ...board, fen: HANG, bases: [...(board.bases ?? []).filter((x) => x.ply !== ply), { ply, fen: HANG }] });
+      const boss = runner.state.boss!;
+      expect(boss.crowdSide).toBe("w");
+      runner.state = { ...runner.state, boss: { ...boss, powers: { ...boss.powers!, tower: { square, height: 3, at: 2 }, scatter: null } } };
+      const r = toRound(L);
+      expect(r.board!.fen).toBe(HANG);
+      expect(r.boss!.powers!.allowed ?? legalMoves(HANG)).toContain(BLUNDER);
+      for (const id of ["p1", "p2"]) L.core.message(id, { t: "pick", key: L.last(id, "round")!.key, move: BLUNDER });
+      const order = Object.values(L.core.record.judges?.tasks ?? {})[0]?.judges ?? [];
+      expect([...order].sort()).toEqual(["p1", "p2"]);
+      for (const id of order) {
+        const jobs = (L.inbox.get(id) ?? []).flatMap((m) => (m.t === "judge" ? m.jobs.map((job) => ({ job, key: m.key })) : []));
+        L.inbox.set(id, (L.inbox.get(id) ?? []).filter((m) => m.t !== "judge"));
+        expect(jobs.length).toBe(1);
+        const reply = liar !== undefined && id === order[liar] ? FAKE : REPLY;
+        for (const { job, key } of jobs) L.core.message(id, { t: "judged", key, id: job.id, report: await runJudgeJob(judge(reply), job) });
+      }
+      const v = L.last("p1", "reveal")!;
+      expect(v.judged).toBe(true);
+      expect(v.playedMove).toBe(BLUNDER);
+      return v;
+    }
+    // Honest judges: the reply stands, and decides as in solo.
+    expect((await stand("h3")).lastStand).toMatchObject({ move: BLUNDER, reply: REPLY });
+    expect((await stand("d7")).lastStand).toBeUndefined();
+    // Either judge faking it: his reply reads as not known, and the save sits out for his toys.
+    expect((await stand("d7", 0)).lastStand).toBeUndefined();
+    expect((await stand("d7", 1)).lastStand).toBeUndefined();
   });
 
   it("his piece onto his tower online (a turn it's open to him: rarely): the request allows it, the host's move stands, it topples as the next turn begins, the same for everyone", () => {

@@ -29,6 +29,7 @@ import {
   pieceAt,
   powerMomentMs,
   bannerWaitMs,
+  powerRoll,
   powerTurn,
   prepareTurn,
   queenSlain,
@@ -914,6 +915,24 @@ describe("Big Boy's toys, fair play and the Last Stand (Eric's (b))", () => {
     // The reply not known: it sits out, as before.
     expect(toysTakeReply(at(tower("h3")), HANG, BLUNDER, undefined)).toBe(true);
     expect(toysTakeReply(at({ tower: null, scatter: null }), HANG, BLUNDER, undefined)).toBe(false);
+    // A scatter with no block left (none could land, or each one stepped on): no toys, reply known or not.
+    expect(toysTakeReply(at(scatter([])), HANG, BLUNDER, undefined)).toBe(false);
+    expect(toysTakeReply(at(scatter([])), HANG, BLUNDER, REPLY)).toBe(false);
+  });
+
+  it("the Last Stand: his reply lands on the tower: on a turn it's open to him (seeded) it topples it, no limit; on any other turn it's stopped", () => {
+    // The crowd's rook leaves the back rank (e3a3); his rook's reply d8d1 (mate) lands on the tower's square, nothing on its way.
+    const BACK = "3r2k1/8/8/8/8/4R3/5PPP/6K1 w - - 0 1";
+    const [move, reply] = ["e3a3", "d8d1"];
+    // (The draw for his turn after crowd turn 1, as hisToppleOpen makes it: found here, not taken from it.)
+    const seeds = Array.from({ length: 100 }, (_, i) => i + 1);
+    const openSeed = seeds.find((seed) => powerRoll(seed, "his-topple", 1) < BOSS_POWERS.towerBossChance)!;
+    const closedSeed = seeds.find((seed) => powerRoll(seed, "his-topple", 1) >= BOSS_POWERS.towerBossChance)!;
+    const on = (seed: number, height = 3) => ({ ...at(tower("d1", height)), seed }) as BossPowerState;
+    expect(toysTakeReply(on(openSeed), BACK, move, reply)).toBe(false);
+    expect(toysTakeReply(on(closedSeed), BACK, move, reply)).toBe(true);
+    // A single block is too short to topple: it stops the reply on any turn.
+    expect(toysTakeReply(on(openSeed, 1), BACK, move, reply)).toBe(true);
   });
 
   it("the Last Stand on a crowd move that topples the tower: its scattered blocks (seeded) take his reply away exactly when one lands on its way", () => {

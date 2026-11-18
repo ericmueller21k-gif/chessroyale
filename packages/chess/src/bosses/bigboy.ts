@@ -256,7 +256,8 @@ export function toysTakeMove(p: Pick<BossPowerState, "tower" | "scatter"> | null
  * (a feared reply nobody can check). Not when they'd take every move of his (his limit lifts: every move is open).
  */
 export function toysTakeReply(p: BossPowerState, fen: string, played: string, reply: string | undefined, s: BossPowerSettings = BOSS_POWERS): boolean {
-  if (!p.tower && !p.scatter) return false;
+  // (No block stands: no tower, and no scattered block left, if any scattered: nothing to take away, reply known or not.)
+  if (!toyBlockSquares(p).length) return false;
   if (!reply) return true;
   let after: string;
   try {
