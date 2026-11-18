@@ -69,7 +69,7 @@ Lane: `hub`. What a profile shows is on [hub.md](hub.md).
   XP is capped at `XP.soloMinutesPerDay` (120) minutes an XP day. A friends' lobby's win pays once an XP day per opponent. A match that rested on one device's word (Nov 10: a host scoring alone, a boss move nobody checked; a Squads lobby of one party) pays as a solo game, under both solo caps; in the Hidden Boss's phase 2 online, a move of his from a device or the server's quick move does so for its board players only (`phase2Unvouched`, Nov 13). Merging a guest adds its XP; deleting closes it in the ledger; the download has it all.
 - **The daily reward and level rewards** (Nov 9, phase 2; `server/rewards.ts`, decisions `2026-11-09-xp-phase2-*.md`): the XP day's first
   counted game with `XP.dailyMinMoves` (15) of your own moves (solo: also 3 minutes of the server's time) pays +200 XP ("Daily reward
-  +200" in the box) and a Winter Crate, once a day (`daily:<day>:<ledger id>`). Each level reached pays 2 Winter Crates and a crate key,
+  +200" in the box) and a Winter Crate, once a day (`daily:<day>:<ledger id>`). Each level reached pays a Winter Crate and a crate key (`XP.levelCrates`, 2 until Nov 18),
   every 10th also a boss crate to pick (`wallets.boss_picks`), once per level (`level:<n>:<ledger id>`), every level owed at the next
   counted game (at most 20 a game). Both go through the ledger in the game's XP grant; what a game paid is kept on its result
   (`results.xp_rewards`) and shown in a toast at the top once the bar fills (`components/RewardBox.tsx`). `PAUSE_REWARDS` grants

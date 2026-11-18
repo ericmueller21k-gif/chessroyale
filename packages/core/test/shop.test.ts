@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest";
 import { SHOP, discountLabel, shopPrice } from "../src/index.ts";
 
 describe("the shop's beta discount (SHOP.discount)", () => {
-  it("halves every price at 50% off: 250, 100, 150, 150, 400, 900 become 125, 50, 75, 75, 200, 450", () => {
+  it("halves every price at 50% off: 100, 50, 75, 75, 200, 400 become 50, 25, 38, 38, 100, 200", () => {
     const p = SHOP.prices;
-    expect([p.key, p.hunchess, p.gift, p.beta, p.boss, p.bundle].map((x) => shopPrice(x, 0.5))).toEqual([125, 50, 75, 75, 200, 450]);
+    expect([p.key, p.hunchess, p.gift, p.beta, p.boss, p.bundle].map((x) => shopPrice(x, 0.5))).toEqual([50, 25, 38, 38, 100, 200]);
   });
   it("rounds to whole coins, half up", () => {
     expect(shopPrice(75, 0.5)).toBe(38);
