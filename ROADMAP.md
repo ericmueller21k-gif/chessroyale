@@ -400,6 +400,16 @@ Added Oct 14, 2026 (Eric; notes only, nothing built):
     an invite does when the other player is already in a match. It's stored data and a client-server change, so it
     takes the full test lane.
 
+## Payments, play coins and the coin reward (Eric, Nov 17-18, 2026: planned, held for his OK of the design)
+
+The design and the build in PRs: [docs/decisions/2026-11-17-payments-design.md](docs/decisions/2026-11-17-payments-design.md). Play
+coins in every counted game (1.8 a minute, 300 a day) plus a performance bonus past the cap; a coin boost (2.5x, coins only) and a
+crate bonus that drop from daily quests; Stripe coin packs with no-questions refunds of unspent coins.
+
+- **The coin reward** (Eric, Nov 18: "send me a mock-up"): after a game that paid coins, a strip under the XP box (the FF window style,
+  its space always there), coins dropping into a pile while the count clocks up like a gas pump, a coin clink. Mockup: branch
+  `stills/coin-reward-mockup`. PR 3 of the build, after play coins (PR 2).
+
 ## Live ops: alerts, an on-call agent, a live-site bot (Eric, Nov 9, 2026: build before launch, not urgent)
 
 The design is `docs/ideas/live-ops.md`. Push alerts to Discord when real players hit errors, and a scheduled agent that confirms
