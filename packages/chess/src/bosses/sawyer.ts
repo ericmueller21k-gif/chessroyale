@@ -17,7 +17,7 @@
  */
 import { BOSS_POWERS, type BossPowerState, type BossState, type SawCut, type SplitPawn } from "@chessroyale/core";
 import { BOSS_OPENING, newBoard } from "../boards.ts";
-import { moveEdges } from "../board-layer.ts";
+import { marksStop, moveEdges, type EdgeMark } from "../board-layer.ts";
 import { legalMoves, pieceAt, withPiece } from "../rules.ts";
 import { VALUE, crowdHalf, from, meterFull, other, powerRoll, testSwitch, to, turnOf, type Battle, type BossRules, type Side, type TurnContext } from "./base.ts";
 
@@ -179,12 +179,18 @@ export const halfPawns = (boss: Pick<BossState, "powers"> | null | undefined): S
 
 // (The edges' geometry, edgeOf and moveEdges, lives in the board layer: board-layer.ts.)
 
-/** A saw cut stops a move: it crosses the cut's edge straight (moveEdges). It never stops an attack. */
-export const crossesCut = (move: string, cut: Pick<SawCut, "a" | "b"> | null | undefined, fen?: string): boolean =>
-  !!cut && moveEdges(move, fen).some((e) => e.a === cut.a && e.b === cut.b);
-
-/** A move crosses between the board's halves (files a-d and e-h): any move, knights included, castling's king too. */
-export const crossesMiddle = (move: string): boolean => file(from(move)) <= 3 !== file(to(move)) <= 3;
+/**
+ * His cuts on the board now, his part of the board layer (board-layer.ts), stopping both sides' moves: the board saw's line, the
+ * eight edges between the d and e files (`across: "all"`: no move crosses between the halves, knights and castling's king
+ * included), then the saw cut's edge (`"straight"`: no move crosses it straight; a diagonal passes at its corners, a knight
+ * jumps it; castling's king and rook each count). In that order, so the screens name the board saw first. Never an attack.
+ */
+export function sawMarks(p: Partial<Pick<BossPowerState, "cut" | "boardSaw">> | null | undefined): EdgeMark[] {
+  const marks: EdgeMark[] = [];
+  if (p?.boardSaw) for (let r = 1; r <= 8; r++) marks.push({ a: `d${r}`, b: `e${r}`, across: "all", kind: "boardsaw", binds: "both", by: "sawyer" });
+  if (p?.cut) marks.push({ a: p.cut.a, b: p.cut.b, across: "straight", kind: "cut", binds: "both", by: "sawyer" });
+  return marks;
+}
 
 /**
  * Where Sawyer saws a cut: an edge between two squares of the crowd's half that one of its legal moves crosses now (so
@@ -242,9 +248,6 @@ export function favouredHalf(fen: string, crowd: Side): "a-d" | "e-h" | null {
 /** The board saw may be warned of now: the rage meter full, turn boardSawFrom or later, and a half of the board his. */
 export const boardSawReady = (next: BossPowerState, t: TurnContext): boolean => meterFull(next, t) && t.turn >= t.s.boardSawFrom && favouredHalf(t.fen, t.crowd) !== null;
 
-/** What stops a move under his cuts now (either side): the saw cut's edge, the board saw's line. */
-export const sawStops = (p: Pick<BossPowerState, "cut" | "boardSaw">, move: string, fen: string): boolean => crossesCut(move, p.cut, fen) || (!!p.boardSaw && crossesMiddle(move));
-
 /** Sawyer: the split pawn after his first move, a saw cut every few turns, and the board saw. */
 export const SAWYER: BossRules = {
   id: "sawyer",
@@ -288,20 +291,21 @@ export const SAWYER: BossRules = {
       next.nextPassive = t.turn + t.s.sawEvery;
     } else next.nextPassive = t.turn + 1;
   },
-  crowdFilter(allowed, boss, fen) {
-    const p = boss.powers!;
-    return p.cut || p.boardSaw ? allowed.filter((m) => !sawStops(p, m, fen)) : allowed;
+  // His cuts on the board (sawMarks), both sides' moves (the dispatcher lifts them for a turn they'd leave no move).
+  layer(boss) {
+    const edges = sawMarks(boss.powers);
+    return edges.length ? { edges } : null;
   },
-  // His own moves: his first is a pawn move (no pawn move: any, as the dispatcher lifts it); the cuts stop him too.
+  // His own moves: his first is a pawn move (no pawn move: any, as the dispatcher lifts it); the cuts stop him too (layer).
   bossStops(boss) {
     const p = boss.powers;
-    if (!p) return null;
-    const first = firstMoveDue(p);
-    if (!first && !p.cut && !p.boardSaw) return null;
-    return (m, fen) => (first && pieceAt(fen, from(m))?.type !== "p") || sawStops(p, m, fen);
+    return p && firstMoveDue(p) ? (m, fen) => pieceAt(fen, from(m))?.type !== "p" : null;
   },
   // Which saw stops a move (the screens' words): the board saw's line, else the saw cut's edge.
-  stopReason: (boss, fen, m) => (boss.powers?.boardSaw && crossesMiddle(m) ? "boardsaw" : crossesCut(m, boss.powers?.cut, fen) ? "cut" : null),
+  stopReason: (boss, fen, m) => {
+    const hit = marksStop({ edges: sawMarks(boss.powers) }, fen, m);
+    return hit ? (hit.kind === "boardsaw" ? "boardsaw" : "cut") : null;
+  },
   powerTurn: (boss) => !!boss.powers!.cut || !!boss.powers!.boardSaw,
   // After his move: the first one splits its pawn (a base on the board: the position changes outside a move); after
   // any other, the halves follow.

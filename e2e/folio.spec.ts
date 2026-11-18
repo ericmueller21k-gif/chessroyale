@@ -1,10 +1,13 @@
 import { expect, type Page } from "@playwright/test";
 import { Chess, type Square } from "chess.js";
 import { BOSS_POWERS } from "@chessroyale/core";
-import { crossesCrease } from "@chessroyale/chess";
+import { creaseMarks, marksStop } from "@chessroyale/chess";
 import { BOARD_SEL, test, bossAloneFromHome, createLobbyFromHome, engineTop, submitMove } from "./helpers.ts";
 import { REFUSED } from "../packages/app/src/refused.ts";
 import { FOLIO_LINES } from "../packages/app/src/characters/folio-lines.ts";
+
+/** The board layer stops `move` (`fen`: before it) under the crease on `line` (creaseMarks). */
+const creaseStops = (move: string, line: string, fen: string): boolean => !!marksStop({ edges: creaseMarks(line) }, fen, move);
 
 /**
  * Folio, the paper crane, played alone (and online for a reload), the state read from the game and what the screens draw read from
@@ -213,8 +216,8 @@ test("Folio's Crease: its pencil line with the warning ('Mind the crease.' once)
       held++;
       last = p.crease.until - p.crease.at + 1;
       first ??= last;
-      for (const mv of s.allowed ?? []) expect(crossesCrease(mv, p.crease.line, s.fen), mv).toBe(false);
-      const across = new Chess(s.fen).moves({ verbose: true }).find((mv) => crossesCrease(mv.from + mv.to, p.crease.line, s.fen) && !mv.promotion);
+      for (const mv of s.allowed ?? []) expect(creaseStops(mv, p.crease.line, s.fen), mv).toBe(false);
+      const across = new Chess(s.fen).moves({ verbose: true }).find((mv) => creaseStops(mv.from + mv.to, p.crease.line, s.fen) && !mv.promotion);
       if (!tried && across && s.allowed) {
         tried = true;
         await refused(page, s.fen, across.from + across.to, REFUSED.crease);

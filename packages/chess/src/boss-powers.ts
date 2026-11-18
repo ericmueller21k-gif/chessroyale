@@ -187,8 +187,8 @@ export function crowdAllowed(boss: BossState | null | undefined, fen: string): s
 
 /**
  * What stops the boss's own moves now (`fen`: him to move), or null: nothing does. His boss's marks on the board that bind
- * him (`layer`, read by the board layer's `layerStop`: a pie, a toy block, a plant, a scatter shot's square, his dough), then
- * its other stops (`bossStops`: Sawyer's saw, the hoops, the paint).
+ * him (`layer`, read by the board layer's `layerStop`: a pie, a toy block, a plant, a scatter shot's square, his dough, Sawyer's
+ * saw), then its other stops (`bossStops`: Sawyer's first move, the hoops, the paint).
  */
 function bossLimit(boss: BossState | null | undefined, fen: string): ((move: string) => boolean) | null {
   const rules = boss?.powers ? bossRules(boss) : null;
