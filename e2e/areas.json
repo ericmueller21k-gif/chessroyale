@@ -170,6 +170,7 @@
     "bosses: the rules they all share (powers, timing, the brain)": {
       "paths": [
         "packages/chess/src/boss-powers.ts",
+        "packages/chess/src/board-layer.ts",
         "packages/chess/src/boss-timing.ts",
         "packages/chess/src/boss-brain.ts",
         "packages/chess/src/bosses/base.ts",

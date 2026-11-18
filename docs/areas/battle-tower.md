@@ -1,6 +1,7 @@
-# The Battle Tower (designed, not built)
+# The Battle Tower (designed; being built)
 
-Lane: the director (the rules: `god-king`; the floor art: `characters`; saving: the director, full lane). **Nothing is built yet.**
+Lane: the director (the rules: `god-king`; the floor art: `characters`; saving: the director, full lane). **Built so far: the
+board layer (PR 1), read by no boss yet.**
 The design, its calls settled with Eric (Nov 18): [docs/decisions/2026-11-18-battle-tower-design.md](../decisions/2026-11-18-battle-tower-design.md).
 
 ## What it will be
@@ -16,9 +17,19 @@ The design, its calls settled with Eric (Nov 18): [docs/decisions/2026-11-18-bat
   on that floor; a solo floor rejoins after a reload.
 - A party picks every move: the most picked is played, a tie goes to the engine's best (`partyMove`), the Boss Battle party's
   no-pick rules.
-- Built on **the board layer** (`packages/chess/src/board-layer.ts`, first): one state per square, edge and piece, every boss's
-  marks at once, the most restrictive winning, one "always a legal move" lift; today's bosses move onto it with no change to
-  any boss battle.
+- Built on **the board layer** (`packages/chess/src/board-layer.ts`, built Nov 18): one state per square, edge and piece, every
+  boss's marks at once, the most restrictive winning, one "always a legal move" lift; today's bosses move onto it with no change
+  to any boss battle (PRs 2-5).
+
+## The board layer (built)
+
+- **Marks:** square (`noLand`, `noPass`, both a wall, neither drawn: fire), edge (`across: "straight"`: rank and file moves only;
+  `"all"`: every move whose line meets it, corners included), piece (`held`, `shieldFrom: "pawns" | "all"`, or drawn); each with
+  `binds` ("both", "crowd", "bosses": the layer's `crowd` says which side is the crowd's), `until` (its last crowd turn) and `by`.
+- **Functions:** `movePaths` (castling's king and rook, Chess960's too), `layerStop` (the first mark that stops a legal move:
+  held, squares, edges, shields), `layerMoves` (`{ moves, lifted }`), `followLayer`, `wearLayer`, `mergeLayers`. Sawyer's
+  `edgeOf` and `moveEdges` live here now.
+- Calls made: [2026-11-18-board-layer.md](../decisions/2026-11-18-board-layer.md).
 
 ## The audit
 
@@ -29,7 +40,7 @@ An independent auditor (Fable, high) checks the build three times (after PRs 6, 
 
 | Part | Files (planned) |
 | --- | --- |
-| The board layer | `packages/chess/src/board-layer.ts`; the dispatcher reads it (`boss-powers.ts`) |
+| The board layer | `packages/chess/src/board-layer.ts` (built; exported through `boss-powers.ts`); the dispatcher reads it from PR 2 |
 | Several bosses on one board | `MatchState.bosses` (`packages/core/src/match.ts`), the runner and `prepareTurn` per boss |
 | The climb | core `tower.ts`, `BATTLE_TOWER` in `packages/core/src/settings.ts` |
 | Saving | `packages/server/src/tower.ts` (`tower_runs`, `tower_best`), `account-data.ts`, the sign-in merge |
@@ -38,6 +49,6 @@ An independent auditor (Fable, high) checks the build three times (after PRs 6, 
 
 ## Tests (planned)
 
-`board-layer` unit tests; the boss kit (`packages/chess/test/boss-kit.test.ts`) and `e2e/boss-smoke.spec.ts` guard every boss
+`packages/chess/test/board-layer.test.ts` (every mark, overlaps, the lift, castling, promotion, en passant); the boss kit (`packages/chess/test/boss-kit.test.ts`) and `e2e/boss-smoke.spec.ts` guard every boss
 moved onto the layer, and run over pairs and threes of bosses; core `tower` unit tests; `e2e/battle-tower.spec.ts` (its
 `e2e/areas.json` entry).
