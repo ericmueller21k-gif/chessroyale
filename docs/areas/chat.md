@@ -55,7 +55,8 @@ Lane: `social`.
   answered "too young" keeps the quick chips and never gets typed lines; guests read. One message every `gapMs` (5 s), and server-wide
   `capCount` a `capWindowMs` with a line up to `queueMs`, then "Chat is busy, try again." `CHAT_TYPED` false brings the chips back.
   The last `keep` lines kept for newcomers. Reading rides on the live line's poll
-  (`/api/live?chat=N`): no socket or poll of its own. Posting is POST `/api/chat`. With
+  (`/api/live?chat=N`): no socket or poll of its own. Posting is POST `/api/chat`; a line sent the moment chat was turned on waits for the
+  switch's save (`chatOnSaved`, chat-on.ts), since the server refuses a post until `chat_on` is saved (Nov 18). With
   `GLOBAL_CHAT_BOTS` on, a bot line now and then while someone has it open (made when someone asks, never on a timer).
   A deleted account's lines leave it (`GlobalChat.forgetAccount`, through the live hub), and a player's own lines are
   in their data download ([accounts.md](accounts.md)).

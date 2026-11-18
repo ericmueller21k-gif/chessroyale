@@ -2,6 +2,7 @@ import { isBlocked } from "./friends.ts";
 import { GLOBAL_CHAT, chatSay } from "@chessroyale/core";
 import type { ChatBlock } from "@chessroyale/chess";
 import { chatBlockText, mutes, setChatBlock } from "./chat-mod.ts";
+import { chatOnSaved } from "./chat-on.ts";
 import { rideLive } from "./live.ts";
 import { testSwitchesAllowed } from "./test-switches.ts";
 
@@ -132,6 +133,8 @@ export class GlobalChatStore {
     this.emit();
     let ok = false;
     try {
+      // (Chat just turned on: its save first, or the server would refuse this line as "Turn on chat first.")
+      await chatOnSaved();
       const room = globalTestRoom();
       const res = await fetcher("/api/chat", {
         method: "POST",

@@ -145,7 +145,12 @@ test("a device the age gate marked too young keeps the quick chips (typed text r
   const room = `t3${run}`;
   const ann = await player(browser, `Ann3${run}`, room);
   await field(ann).fill("typed hello");
+  // (The field empties when the server takes the line: the answer is waited for itself, and a refusal fails here with its status. On
+  // CI the local server's dev proxy now and then holds a request 4 to 5 s on a dropped connection before sending it again: Nov 18,
+  // docs/decisions/2026-11-18-global-chat-142.md.)
+  const answered = ann.waitForResponse((r) => r.url().endsWith("/api/chat") && r.request().method() === "POST");
   await field(ann).press("Enter");
+  expect((await answered).status()).toBe(200);
   await expect(field(ann)).toHaveValue("");
 
   const kid = await player(browser, `Kid${run}`, room, { young: true });
