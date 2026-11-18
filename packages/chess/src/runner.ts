@@ -416,13 +416,22 @@ export class MatchRunner {
   /**
    * Boss battle: the powers for the crowd turn about to begin (once per turn; see prepareTurn). None once the board's
    * game is over, but for his fifth carrot's moments (the pull and his win) when the same move stalemates or mates: they
-   * play before the result, as after any fifth carrot.
+   * play before the result, as after any fifth carrot. His move ended it otherwise (a mate, or a draw: stalemate,
+   * repetition, fifty moves, too little material): the turn's events are cleared, as a new turn would. They have all
+   * played (as the turn began, and while he thought: Moo's Full Moon, Folio's fold and Revision, Don Dough's dough,
+   * Chandy's shot, Ginger's Super Freeze), so the last show neither waits for them again nor plays them again (review
+   * of #787, finding 4).
    */
   private preparePowers() {
     const b = this.state.boss;
-    if (!b?.powers || (this.finalGameOver() && !carrotBattle.won(b))) return;
+    if (!b?.powers) return;
     const board = this.boards.get(this.state.boards[0]!)!;
-    if (sideToMove(board.fen) !== b.crowdSide) return;
+    const hisMoved = sideToMove(board.fen) === b.crowdSide;
+    if (this.finalGameOver() && !carrotBattle.won(b)) {
+      if (hisMoved && b.powers.events.length) this.state = { ...this.state, boss: { ...b, powers: { ...b.powers, events: [] } } };
+      return;
+    }
+    if (!hisMoved) return;
     // (The boss's move just played: Hollow covers its piece's square after his first.)
     const next = prepareTurn(b, board.fen, this.settings.bossPowerTest, BOSS_POWERS, board.lastMove);
     this.state = { ...this.state, boss: next };
