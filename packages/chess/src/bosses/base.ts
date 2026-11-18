@@ -25,6 +25,7 @@ import {
   type StopReason,
 } from "@chessroyale/core";
 import type { BoardState } from "../boards.ts";
+import type { HeldKind, LayerMarks } from "../board-layer.ts";
 import type { Opening } from "../openings.ts";
 import type { NetBossPowers } from "../protocol.ts";
 import { pieceAt } from "../rules.ts";
@@ -37,18 +38,9 @@ export const other = (s: Side): Side => (s === "w" ? "b" : "w");
 export const from = (m: string) => m.slice(0, 2);
 export const to = (m: string) => m.slice(2, 4);
 
-/**
- * A held piece (`held`: a square of it) takes no part in `move` (`fen`: before it): the piece moving is held, or the move
- * is castling and the rook it moves is held (its corner on the king's rank: the h-file for a king's step to the g-file,
- * the a-file for one to the c-file). One rule for every power that holds the crowd's pieces (`BossRules.held`).
- */
-export function heldIn(fen: string, move: string, held: ReadonlySet<string> | readonly string[]): boolean {
-  const has = (sq: string) => ("has" in held ? held.has(sq) : held.includes(sq));
-  if (has(from(move))) return true;
-  const f0 = move.charCodeAt(0);
-  const f1 = move.charCodeAt(2);
-  if (Math.abs(f1 - f0) !== 2 || move[1] !== move[3] || pieceAt(fen, from(move))?.type !== "k") return false;
-  return has(`${f1 > f0 ? "h" : "a"}${move[1]}`);
+/** The crowd's pieces on `squares`, held by `boss`'s power (its part of the board layer: BossRules.layer); null for none. */
+export function heldBy(boss: Pick<BossState, "id">, kind: HeldKind | "beam", squares: readonly string[]): LayerMarks | null {
+  return squares.length ? { pieces: squares.map((square) => ({ square, kind, held: true, binds: "crowd", by: boss.id ?? "" })) } : null;
 }
 
 /** Material on the board for one side (pawns 1, knights and bishops 3, rooks 5, queens 9). */
@@ -356,12 +348,14 @@ export interface BossRules {
   /** The passive's step. */
   passive(next: BossPowerState, t: TurnContext): void;
   /**
-   * The crowd's pieces its powers hold this crowd turn (`fen`: the crowd to move), by square: Ginger's frozen piece and
-   * his blizzard's ice, Moo's stunned pieces, Folio's folded piece. One rule for all of them (Eric, Oct 27): the
-   * dispatcher leaves out a held piece's moves and castling with a held rook (`heldIn`), and lifts it for the turn with
-   * the other limits if no move is left. A power that holds pieces says so here, never in `crowdFilter`.
+   * Its marks on the board this crowd turn (`fen`: the crowd to move), its part of the board layer (board-layer.ts): the
+   * crowd's pieces its powers hold (`heldBy`): Ginger's frozen piece, his blizzard's and Super Freeze's ice, Boingo's frozen
+   * piece, Moo's stunned pieces, Folio's folded piece, Chandy's dizzy pieces and those under his beam. One rule for all of
+   * them (Eric, Oct 27): the dispatcher leaves out every move the layer stops (a held piece's, castling with a held rook),
+   * then the boss's other limits (`crowdFilter`), and lifts them all for the turn if no move is left. A power that holds
+   * pieces says so here, never in `crowdFilter`.
    */
-  held?(boss: BossState, fen: string): readonly string[];
+  layer?(boss: BossState, fen: string): LayerMarks | null;
   /** Its other limits on the crowd's moves this turn (the dispatcher lifts them for the turn if none are left). */
   crowdFilter?(allowed: string[], boss: BossState, fen: string): string[];
   /** What stops the boss's own moves now (a pie, a toy block), or null: nothing does. */

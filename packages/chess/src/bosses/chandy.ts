@@ -70,7 +70,8 @@ import type { BoardState } from "../boards.ts";
 import { applyMove, attackedSquares, exchangeNet, fenAtPly, kingAttacked, legalMoves, matingMoves, pieceAt, sideToMove, withoutPiece } from "../rules.ts";
 import type { EngineLike } from "../runner.ts";
 import type { MoveScore } from "../uci.ts";
-import { PASS_WAIT, VALUE, from, heldIn, logit, moveSquares, other, powerRoll, testSwitch, to, turnOf, type Battle, type BossRules, type Side, type StopFields, type TurnContext } from "./base.ts";
+import { heldBy, PASS_WAIT, VALUE, from, logit, moveSquares, other, powerRoll, testSwitch, to, turnOf, type Battle, type BossRules, type Side, type StopFields, type TurnContext } from "./base.ts";
+import { heldIn } from "../board-layer.ts";
 import { lands } from "./boingo.ts";
 import { passTurn } from "./hollow.ts";
 import { castAnswer } from "./hopper.ts";
@@ -920,11 +921,14 @@ export const CHANDY: BossRules = {
     }
     next.chandy = c;
   },
-  // Rapid fire's dizzy pieces and those under the beam: they don't move this turn, nor castle with a held rook (heldIn).
-  held: (boss) => {
+  // Rapid fire's dizzy pieces and those under the beam: they don't move this turn, nor castle with a held rook (held on the
+  // board layer).
+  layer: (boss) => {
     const p = boss.powers!;
     const c = chandyOf(p);
-    return [...(on(c.dizzy, p.turn)?.squares ?? []), ...(on(c.beam, p.turn)?.squares ?? [])];
+    const dizzy = heldBy(boss, "dizzy", on(c.dizzy, p.turn)?.squares ?? []);
+    const beam = heldBy(boss, "beam", on(c.beam, p.turn)?.squares ?? []);
+    return dizzy || beam ? { pieces: [...(dizzy?.pieces ?? []), ...(beam?.pieces ?? [])] } : null;
   },
   // The beam's walls, the scatter shot's squares, the shields.
   crowdFilter(allowed, boss, fen) {

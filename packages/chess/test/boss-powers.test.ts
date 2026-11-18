@@ -35,6 +35,7 @@ import {
   type JudgeJob,
   type Opening,
   bossRules,
+  heldBy,
   limitCrowd,
 } from "../src/index.ts";
 
@@ -145,17 +146,18 @@ describe("boss powers: the ground rules", () => {
     expect(legal).toEqual(expect.arrayContaining(["e1g1", "e1c1"]));
     const b = battle("gingerbread", fen);
     // A stand-in boss holding the a1 rook: none of its moves and no castling long; castling short and the rest stay.
-    const long = limitCrowd({ held: () => ["a1"] }, b, fen, legal);
+    const long = limitCrowd({ layer: () => heldBy(b, "frozen", ["a1"]) }, b, fen, legal);
     expect(long).toEqual(legal.filter((m) => m !== "e1c1" && !m.startsWith("a1")));
     // Holding the h1 rook: no castling short.
-    expect(limitCrowd({ held: () => ["h1"] }, b, fen, legal)).toEqual(legal.filter((m) => m !== "e1g1" && !m.startsWith("h1")));
+    expect(limitCrowd({ layer: () => heldBy(b, "frozen", ["h1"]) }, b, fen, legal)).toEqual(legal.filter((m) => m !== "e1g1" && !m.startsWith("h1")));
     // Its other limits (crowdFilter) see only the moves the held pieces leave.
     const seen: string[][] = [];
-    const both = limitCrowd({ held: () => ["a1"], crowdFilter: (a) => (seen.push([...a]), a.filter((m) => !m.startsWith("f2"))) }, b, fen, legal);
+    const both = limitCrowd({ layer: () => heldBy(b, "frozen", ["a1"]), crowdFilter: (a) => (seen.push([...a]), a.filter((m) => !m.startsWith("f2"))) }, b, fen, legal);
     expect(seen).toEqual([long]);
     expect(both).toEqual(long.filter((m) => !m.startsWith("f2")));
-    // Every boss whose powers hold pieces says so through `held`: the freeze and the blizzard, the moonbeam, the fold.
-    for (const id of ["gingerbread", "moo", "folio"]) expect(bossRules({ ...b, id })?.held, id).toBeTypeOf("function");
+    // Every boss whose powers hold pieces says so through `layer` (the board layer): the freeze and the blizzard, the pie's
+    // freeze, the moonbeam, the fold, rapid fire and the beam.
+    for (const id of ["gingerbread", "clown", "moo", "folio", "chandy"]) expect(bossRules({ ...b, id })?.layer, id).toBeTypeOf("function");
   });
 
   it("a frozen rook can't castle either (the king's step that moves it)", () => {

@@ -14,7 +14,8 @@ import { playOnBoard } from "../boards.ts";
 import { applyMove, legalMoves, pieceAt, sideToMove, toSan } from "../rules.ts";
 import type { EngineLike } from "../runner.ts";
 import type { MoveScore } from "../uci.ts";
-import { VALUE, bossPowers, from, heldIn, moveLoss, powerRoll, to, turnOf, warnThenUnleash, type Battle, type BossRules, type Side } from "./base.ts";
+import { heldBy, VALUE, bossPowers, from, moveLoss, powerRoll, to, turnOf, warnThenUnleash, type Battle, type BossRules, type Side } from "./base.ts";
+import { heldIn } from "../board-layer.ts";
 
 /**
  * How long each of his moments holds the screen (ms; POWER_FX in boss-timing.ts). The pie's: its banner, his throw, the
@@ -270,8 +271,8 @@ export const BOINGO: BossRules = {
     t.events.push({ kind: "pie", turn: t.turn, square: pick.square, squares: [...pick.pied] });
     next.nextPassive = t.turn + (test ? 1 : Math.max(1, t.s.pieEvery));
   },
-  // A frozen piece can't move, nor castle with a frozen rook (the held pieces' one rule: heldIn).
-  held: (boss) => (boss.powers!.frozen ? [boss.powers!.frozen.square] : []),
+  // A frozen piece can't move, nor castle with a frozen rook (held on the board layer).
+  layer: (boss) => heldBy(boss, "frozen", boss.powers!.frozen ? [boss.powers!.frozen.square] : []),
   // Nobody can move onto a pie, the boss included.
   crowdFilter(allowed, boss, fen) {
     const pied = piedSquares(boss);

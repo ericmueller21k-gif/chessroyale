@@ -169,6 +169,15 @@ export function movePaths(move: string, fen: string): PiecePath[] {
   return [{ from: a, to: b }];
 }
 
+/**
+ * A piece on one of `squares` takes part in `move` (`fen`: before it): it moves, or castles as the rook (movePaths). The
+ * held mark's rule, for a power choosing pieces to hold (the crowd keeps a move with them held) and the screens' words.
+ */
+export function heldIn(fen: string, move: string, squares: ReadonlySet<string> | readonly string[]): boolean {
+  const has = (sq: string) => ("has" in squares ? squares.has(sq) : squares.includes(sq));
+  return movePaths(move, fen).some((p) => has(p.from));
+}
+
 /** The squares a piece passes over on its way (a slide along a rank, file or diagonal; a pawn's double step); a knight's jump passes none. */
 function passedOn(p: PiecePath): string[] {
   const df = file(p.to) - file(p.from);
