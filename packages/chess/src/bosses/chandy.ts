@@ -21,8 +21,8 @@
  *   engine-best reply). Online the host steers with the request's `lock` (steerPick), the same function as here.
  * - **Upgrades:** only taking a locked piece upgrades the rifle (to chandy.upgradesMax); each unlocks one of his five moves at
  *   random, the queen lock first while it could come right then (you have a queen it can aim at: queenLockAim; chandy.queenLockFirst;
- *   Eric, Nov 18: "make that upgrade happen earlier"; unlockPick) (the rifle's parts come in a fixed order: the art's), shown in the upgrade window as your turn begins (`upgrade`, 2 s,
- *   the clock held). After the fifth: no window.
+ *   Eric, Nov 18: "make that upgrade happen earlier"; unlockPick) (the rifle's parts come in a fixed order: the art's), shown in the
+ *   upgrade window as your turn begins (`upgrade`, 2 s, the clock held). After the fifth: no window.
  * - **A new unlock fires at once** (chandy.fireOnUnlock; Eric, Nov 16): on his turn after its upgrade window, whatever his meter
  *   says (it starts over from empty once the move fires); a queen lock that can't come then (queenLockOk) waits for the meter.
  *
@@ -1198,8 +1198,8 @@ export const chandyBattle = {
 
   /**
    * The queen lock's aim (his whole turn): `answer` PASS_WAIT (the host's pass guard): no aim, the meter's pick another unlocked move
-   * (none: the queen lock stays due, checked again on his next turn), and he plays his move; anything else aims: the turn passes to the crowd (a base), the aim on her square, the meter spent, and the crowd's turn
-   * set up as after his move (its moment, the aim's). Returns her square; null: none was due, or it waits.
+   * (none: the queen lock stays due, checked again on his next turn), and he plays his move; anything else aims: the turn passes to
+   * the crowd (a base), the aim on her square, the meter spent, and the crowd's turn set up as after his move (its moment, the aim's). Returns her square; null: none was due, or it waits.
    */
   applyQueenLock(b: Battle, answer: string | null = null): string | null {
     if (!chandyBattle.queenLockDue(b)) return null;
