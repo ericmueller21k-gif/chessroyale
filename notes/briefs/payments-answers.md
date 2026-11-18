@@ -52,3 +52,21 @@ greyed until text, or close); a quiet flag: the 3rd refund (chargebacks count) s
 (when trading exists), no extra message. Age stays self-declared (the bands as proposed).
 Director's reading to confirm: unspent bought coins come off with the refund (a number, not an item); opened items stay.
 Still open (round 3 calls 1-3): play coins in every mode; 1 crate a level; the lower coin prices.
+
+## Eric, Nov 18 (round 5; voice, essentials)
+- "Yeah, take back the coins." (unspent bought coins come off with a refund; opened items stay)
+- Admin: "another tab for anyone that's done refunds ... where it also shows their comments or chargebacks ... separate from the ban one".
+- Held accounts: "just gray it out ... you can still click it, but it just looks gray, and then if you click it, it just can say ...
+  purchasing is not possible on this account" (he considered a fake "error processing" and dropped it as too complicated).
+- Chargebacks: "after one chargeback ... the second chargeback closes the account, as long as we're legally allowed ... put up a
+  message ... we don't fight them, but they do cost us money ... any further chargebacks will result in a termination of your account".
+- Coins from every mode, time-based, capped (300/day for minutes), "but you can also continue to get more ... if you place well ...
+  we don't want people to be like, oh well, I can't get more coins, so I don't want to play anymore" -> director does the math.
+- Coin boost (no real money): "2.5 times coin boost for your next certain hours of play", from a crate that occasionally drops from a
+  daily quest. "Forget the experience. I want experience to be genuine based on amount of playtime." Art by the API runner.
+- Coin reward feel (roadmap + mockup): after a match with coins, a box (the Final Fantasy-style pop-up style we already use) or a spot
+  on the results screen; coins dropping and a counter clocking up like a gas pump; a nice coin sound; cheap on the GPU (a few
+  pre-drawn coin sprites/loops, not each coin simulated). "send me a mock-up".
+- Prices: crates 50-75 fine "as long as it's something we can easily tweak later ... run some simulation or look at what the average
+  game does". 1 crate a level: yes. New quest reward: a "crate bonus": your next 5 level-ups give double crates; drops occasionally
+  from daily quests.
