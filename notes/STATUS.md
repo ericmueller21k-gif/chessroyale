@@ -1,3 +1,4 @@
+- Nov 18 ~01:50 UTC: #782 Wrangler redraw LIVE 2a0798a; main GREEN.
 - Nov 18 ~01:20 UTC: #782 Wrangler redraw merged 2a0798a (ropes never cross); deploy + main watched. Running: bigboy tower (xhigh alone). Queue: chandy sounds (pulse style), ginger superfreeze. Payments #772 waits on Eric 6 calls.
 - Nov 18 ~01:20 UTC: Eric: Big Boy sound reused in Chandy. Found: CHANDY_SOUNDS all placeholders (17 borrowed). Brief chandy-own-sounds.md (high) QUEUED after bigboy (xhigh alone); then ginger.
 - Nov 18 01:10 UTC: Eric answered: tower lifetime reading OK; both can topple (he rarely); ginger: empty ice passable, king never, up to 2 per 60 moves. Sent to bigboy helper; ginger brief updated.
