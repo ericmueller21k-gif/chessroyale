@@ -1,3 +1,4 @@
+- Nov 18 ~02:30 UTC: bigboy balance done (72c665f): tower not the cause, sim baseline stale (main also 0.00); Eric design kept; his topple 25% share. Review helper + chandy sounds started. TODO: re-baseline raid sim (engine lane); fair-play power-turn proposal for bigboy (follow-up, fairplay lane, ask Eric?).
 - Nov 18 ~02:25 UTC: #783 Dash fix LIVE fe16431; main GREEN. Bigboy balance helper running (#784 held).
 - Nov 18 ~02:05 UTC: bigboy tower .done (a81d016) but crowd 0.02 vs 0.27-0.35 (far too strong); his-topple answer missed. Balance helper (xhigh) on claude/bigboy-tower. PR opened as draft, held. #783 dash fix merged fe16431, deploy watched.
 - Nov 18 ~02:20 UTC: Eric "fix it yourself". Director fixed Dash skit not firing: stallPlan blocked whole move on ANY event (slap/clockFit = most moves). STALL_BESIDE lets short turn-start moments through. Real-flow solo test fails on old code. #783 (6df72d4), CI watched. Lesson: real-flow tests, not test switches only.
