@@ -371,13 +371,24 @@ export interface BossRules {
    * move through it), or null. It reads only fields the screens' view carries too (`StopFields`), so the app asks it.
    */
   stopReason?(boss: { powers?: StopFields | null }, fen: string, move: string): StopReason | null;
-  /** A power touches this crowd turn: its picks don't count as fair-play signals. */
-  powerTurn?(boss: BossState): boolean;
+  /**
+   * A power touches this crowd turn: its picks don't count as fair-play signals. `fen`: the position, the crowd to move, for a
+   * boss whose answer depends on it (Big Boy's toy blocks count only when they take one of the crowd's moves away); every other
+   * boss reads its state alone. Without it, such a boss answers as if its power touched the turn (its toys up: a power turn).
+   */
+  powerTurn?(boss: BossState, fen?: string): boolean;
   /**
    * Something of its powers is on the board now that powerTurn, bossStops and crowdFilter don't show (Hollow's dark, the
    * Roman candle's shadows, the carrots): the God King's Last Stand sits out (boardAltered in boss-powers.ts).
    */
   altersBoard?(boss: BossState): boolean;
+  /**
+   * The Last Stand's own test for this boss, in place of boardAltered's general one (its powerTurn, bossStops, crowdFilter and
+   * altersBoard then don't count for the Last Stand): its powers change the board for the crowd's move `played` (`fen`: before
+   * it). `reply`: the boss's reply the judge fears, the one the Last Stand would replay (undefined: not known). Big Boy's (Eric's
+   * (b), Nov 18): only when his toy blocks take that reply away.
+   */
+  standAltered?(boss: BossState, fen: string, played: string, reply: string | undefined): boolean;
   /** The squares that show ice (`crowdAllowed`: the dispatcher's). */
   iced?(boss: BossState, fen: string, crowdAllowed: (boss: BossState, fen: string) => string[] | null): string[];
   /**
