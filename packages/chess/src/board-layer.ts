@@ -139,7 +139,7 @@ export function moveEdges(move: string, fen?: string): { a: string; b: string }[
 }
 
 /** One piece's way in a move: where it stands and where it lands. */
-export interface Path {
+export interface PiecePath {
   from: string;
   to: string;
 }
@@ -147,10 +147,10 @@ export interface Path {
 /**
  * The pieces a move moves (`fen`: before it), each from its square to where it lands: one piece, or castling's king and
  * rook. Castling is the king's move two files along his rank (a normal board: the rook from its corner) or onto his own
- * rook (Chess960, as UCI writes it): the king lands on the g- or c-file, the rook beside him on the f- or d-file. A piece
- * that stays where it is (a Chess960 king already on his square) has no path.
+ * rook (Chess960, as UCI writes it): the king lands on the g- or c-file, the rook beside him on the f- or d-file (a Chess960
+ * king already on his square goes nowhere, but still takes part: held, he doesn't castle).
  */
-export function movePaths(move: string, fen: string): Path[] {
+export function movePaths(move: string, fen: string): PiecePath[] {
   const a = from(move);
   const b = to(move);
   const king = pieceAt(fen, a);
@@ -163,14 +163,14 @@ export function movePaths(move: string, fen: string): Path[] {
       return [
         { from: a, to: `${side ? "g" : "c"}${a[1]}` },
         { from: rook, to: `${side ? "f" : "d"}${a[1]}` },
-      ].filter((p) => p.from !== p.to);
+      ];
     }
   }
   return [{ from: a, to: b }];
 }
 
 /** The squares a piece passes over on its way (a slide along a rank, file or diagonal; a pawn's double step); a knight's jump passes none. */
-function passedOn(p: Path): string[] {
+function passedOn(p: PiecePath): string[] {
   const df = file(p.to) - file(p.from);
   const dr = rank(p.to) - rank(p.from);
   if (df !== 0 && dr !== 0 && Math.abs(df) !== Math.abs(dr)) return [];
@@ -185,7 +185,7 @@ function passedOn(p: Path): string[] {
  * `straight`: only a way along a rank or file counts (it meets an edge at its middle; a diagonal only ever at corners, a
  * knight anywhere). Squares' middles sit on halves, so every number here is exact.
  */
-function crossesEdge(p: Path, e: Pick<EdgeMark, "a" | "b">, straight: boolean): boolean {
+function crossesEdge(p: PiecePath, e: Pick<EdgeMark, "a" | "b">, straight: boolean): boolean {
   const x1 = file(p.from) + 0.5;
   const y1 = rank(p.from) - 0.5;
   const x2 = file(p.to) + 0.5;

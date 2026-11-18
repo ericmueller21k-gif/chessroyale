@@ -62,8 +62,9 @@ describe("movePaths: the pieces a move moves", () => {
     expect(movePaths("e8g8", CASTLE_B)).toEqual([{ from: "e8", to: "g8" }, { from: "h8", to: "f8" }]);
     expect(movePaths("e1f1", CASTLE)).toEqual([{ from: "e1", to: "f1" }]);
     expect(legalMoves(C960)).toEqual(expect.arrayContaining(["g1h1", "g1b1"]));
-    // (The king already on g1: only the rook moves.)
-    expect(movePaths("g1h1", C960)).toEqual([{ from: "h1", to: "f1" }]);
+    // (The king already on g1 goes nowhere; held, he doesn't castle.)
+    expect(movePaths("g1h1", C960)).toEqual([{ from: "g1", to: "g1" }, { from: "h1", to: "f1" }]);
+    expect(layerStop(layer({ pieces: [piece("g1")] }), C960, "g1h1")?.kind).toBe("frozen");
     expect(movePaths("g1b1", C960)).toEqual([{ from: "g1", to: "c1" }, { from: "b1", to: "d1" }]);
   });
 });
