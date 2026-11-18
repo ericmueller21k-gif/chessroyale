@@ -808,7 +808,8 @@ export const BOSS_BLOCKS: Record<string, (p: BossPowerSettings, b: BossDef) => s
 Plays from the game so far.
 
 - **Freeze** (passive): from turn ${p.firstPassive}, one of your pieces that matters (one of your three most valuable, mobile pieces; never the king) is iced and can't move for ${n(p.freezeTurns, "turn")}. Then again every ${range(p.freezeEvery)} turns.
-- **Blizzard** (ultimate): ${blizzardWords(p)}`,
+- **Blizzard** (ultimate): ${blizzardWords(p)}
+- **Super Freeze** (his second meter, the small ice-blue bar beside his rage meter): it fills a step with each of your moves and is full after ${range(p.superFreezeEvery)} of them (it glows then). As your move lands on that turn, at the start of his turn, he charges up and blasts the one of your pieces (never your king) with the most of your pieces round it, and a block of ice grows over the 3 x 3 squares round it: every piece of yours in it but your king is frozen for your next turn (it can't move, nor castle if it's a rook), then thaws as his turn starts. Empty squares in it stay open. It never leaves you without a legal move (in check too: he lets go of the pieces farthest from its middle first), never comes on a Blizzard's turns (it waits), and comes at most ${n(p.superFreezeMax, "time")} a battle; the meter fills again after the first.`,
   clown: (p) => `
 Plays from the game so far.
 

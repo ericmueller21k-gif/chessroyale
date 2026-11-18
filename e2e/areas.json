@@ -334,9 +334,12 @@
         "packages/chess/src/bosses/ginger.ts",
         "packages/app/src/characters/gingerbread*.ts",
         "packages/app/src/characters/effects/ginger.ts",
-        "packages/app/src/components/Ginger.tsx"
+        "packages/app/src/characters/effects/ginger-superice.ts",
+        "packages/app/src/characters/ginger-super.ts",
+        "packages/app/src/components/Ginger.tsx",
+        "e2e/ginger.spec.ts"
       ],
-      "specs": ["e2e/boss-dock.spec.ts", "e2e/boss-powers.spec.ts", "e2e/king-attack.spec.ts", "e2e/maia.spec.ts", "e2e/resign.spec.ts", "e2e/boss-review.spec.ts"]
+      "specs": ["e2e/boss-dock.spec.ts", "e2e/boss-powers.spec.ts", "e2e/ginger.spec.ts", "e2e/king-attack.spec.ts", "e2e/maia.spec.ts", "e2e/resign.spec.ts", "e2e/boss-review.spec.ts"]
     },
     "Jefferson (grex)": {
       "paths": [
