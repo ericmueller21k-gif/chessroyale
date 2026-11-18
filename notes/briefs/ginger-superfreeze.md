@@ -10,3 +10,6 @@ Director's reading (to confirm with Eric): a second meter that fills to fire aro
 3x3 holds the most crowd pieces; every crowd piece in that 3x3 is frozen for the crowd's next turn (the king never; always a legal move left);
 empty iced squares: passable unless Eric says otherwise; the ice shows through his turn's end, thaws as his turn starts; a 4-5 s charge-up and
 expanding-ice animation on his turn (no clock runs); refills for another later (once or twice a battle). Full brief when Big Boy is done.
+
+**Eric's answers (Nov 18, ~01:10 UTC):** empty iced squares passable, only the pieces frozen ("yea that works"); the king never frozen and
+a legal move always left ("yes"); it fires "up to twice in 60 moves" (the meter refills; at most 2 a battle).

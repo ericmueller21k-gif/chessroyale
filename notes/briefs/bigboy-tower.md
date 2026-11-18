@@ -48,3 +48,6 @@ Boss lane, plus the review pass the director runs.
 
 Done: `.pr-body.md` (under 60 lines; player-visible; changed checks old → new; art $; sim result) and `.done`, end. Eric-only questions:
 `.question`, end. No PRs, no CI waits.
+
+**Eric's answers (Nov 18, ~01:10 UTC), sent to the helper:** 1) the lifetime reading is right; 2) "both but he usually doesn't": his pieces
+may topple a tower of height >= 2 too, rarely chosen.
