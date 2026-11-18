@@ -1,3 +1,4 @@
+- Nov 18 ~02:20 UTC: Eric "fix it yourself". Director fixed Dash skit not firing: stallPlan blocked whole move on ANY event (slap/clockFit = most moves). STALL_BESIDE lets short turn-start moments through. Real-flow solo test fails on old code. #783 (6df72d4), CI watched. Lesson: real-flow tests, not test switches only.
 - Nov 18 ~02:00 UTC: Eric LIVE BUG: Dash slam/fake never fired after the tap (waited 60 s). Brief dash-skit-not-firing.md (xhigh) queued FIRST after bigboy; asked Eric the mode.
 - Nov 18 ~01:50 UTC: #782 Wrangler redraw LIVE 2a0798a; main GREEN.
 - Nov 18 ~01:20 UTC: #782 Wrangler redraw merged 2a0798a (ropes never cross); deploy + main watched. Running: bigboy tower (xhigh alone). Queue: chandy sounds (pulse style), ginger superfreeze. Payments #772 waits on Eric 6 calls.
