@@ -116,4 +116,17 @@ describe("several bosses: the design's out-of-turn rules", () => {
     expect(movers[replay - 1]!.id).toBe("folio");
     expect(movers[replay + 1]?.id).toBe("gingerbread");
   }, 60_000);
+
+  it("Wrangler's reply to the showdown's duel is the side's very next move, out of turn; the order then goes on after him", async () => {
+    const movers: string[] = [];
+    const run = await runBattle(battle(["pig", "gingerbread"], "showdown", 99, 24), null, (r, _fen, who) => {
+      if (who === "boss") movers.push(r.boss!.id!);
+    });
+    expect(run.events.has("showdown")).toBe(true);
+    const twice = movers.findIndex((m, i) => i > 0 && m === "pig" && movers[i - 1] === "pig");
+    expect(twice).toBeGreaterThan(0);
+    expect(movers[twice + 1]).toBe("gingerbread");
+    // (Only there: every other move in the order dealt.)
+    expect(movers.filter((m, i) => i > 0 && m === movers[i - 1]).length).toBe(1);
+  }, 60_000);
 });

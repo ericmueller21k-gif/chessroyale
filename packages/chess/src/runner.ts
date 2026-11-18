@@ -2392,10 +2392,11 @@ export class MatchRunner {
   }
 
   /**
-   * Several bosses: the crowd's turn set up (preparePowers' rules), every boss's turn steps (prepareTurn), the one in focus first,
-   * then the rest in turn order: each boss's passive and meter on every crowd turn, his meter at BATTLE_TOWER.rageScale of its
-   * speed; his ultimate's step only at his own turn change (in focus), so one ultimate comes a turn change and a cinematic never
-   * meets another's. The move just played is passed only to the boss who played it.
+   * Several bosses: the crowd's turn set up (preparePowers' rules), every boss's turn steps (prepareTurn): each boss's passive and
+   * meter on every crowd turn, his meter at BATTLE_TOWER.rageScale of its speed. His ultimate's step only at his own turn change:
+   * the one after his own move for an ultimate his move prepares (`triggerAtHisTurn`: Wrangler's line-up, Folio's crease), the
+   * one before it for every other (in focus); and one ultimate a turn change, that first one first (its line-up is ready), the
+   * other waiting, its warning kept. The move just played is passed only to the boss who played it.
    */
   private prepareSide() {
     const board = this.boards.get(this.state.boards[0]!)!;
@@ -2406,16 +2407,24 @@ export class MatchRunner {
     }
     if (!hisMoved) return;
     const s = this.rageRates();
+    const n = this.state.bosses!.length;
     const f = this.state.focus ?? 0;
-    const moved = this.state.moved;
-    this.forEachBoss(() => {
-      const b = this.state.boss!;
-      const i = this.state.focus ?? 0;
-      if (!b.powers) return;
-      const next = prepareTurn(b, board.fen, this.settings.bossPowerTest, s, i === moved ? board.lastMove : null, i !== f);
-      this.state = { ...this.state, boss: next };
-      if (next.powers?.turn !== b.powers.turn) bossRules(next)?.turnBegun?.(this.battle);
-    });
+    const moved = this.state.moved ?? n - 1;
+    const ids = this.state.bosses!.map((o, i) => (i === f ? this.state.boss!.id : o.id));
+    const afterHis = (i: number) => !!bossRules({ id: ids[i] })?.triggerAtHisTurn;
+    const order = [moved, ...Array.from({ length: n }, (_, k) => (f + k) % n).filter((i) => i !== moved)];
+    let came = false;
+    for (const i of order) {
+      this.asBoss(i, () => {
+        const b = this.state.boss!;
+        if (!b.powers) return;
+        const mine = afterHis(i) ? i === moved : i === f;
+        const next = prepareTurn(b, board.fen, this.settings.bossPowerTest, s, i === moved ? board.lastMove : null, !mine || came);
+        if (next.powers?.ultAt !== undefined && b.powers.ultAt === undefined) came = true;
+        this.state = { ...this.state, boss: next };
+        if (next.powers?.turn !== b.powers.turn) bossRules(next)?.turnBegun?.(this.battle);
+      });
+    }
   }
 
   /** The rage rates on this side: several bosses, each meter at BATTLE_TOWER.rageScale of its speed (sideRates); one, BOSS_POWERS. */
