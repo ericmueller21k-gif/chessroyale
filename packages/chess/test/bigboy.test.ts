@@ -285,7 +285,7 @@ describe("Big Boy's toy blocks", () => {
     expect(t(13).scatter).toBe(0);
   });
 
-  it("from 2 blocks a crowd piece moves onto it and topples it: the blocks stand through his move and the crowd's next turn, then vanish and a new tower starts", async () => {
+  it("from 2 blocks a crowd piece moves onto it and topples it: the blocks stand through his move and the crowd's next turn, gone as its move is played (never his next reply), and a new tower starts", async () => {
     const r = raid({ patch: { bossMaxMoves: 40, bossPowerTest: "tower" } });
     // The test switch: the battle's first tower starts towerTest tall.
     await turn(r);
@@ -317,8 +317,14 @@ describe("Big Boy's toy blocks", () => {
     expect(r.boss!.powers!.turn).toBe(3);
     expect(r.boss!.powers!.scatter?.squares).toEqual(scattered.filter((sq) => !pieceAt(fenOf(r), sq)));
     for (const m of r.crowdAllowed() ?? []) for (const sq of r.boss!.powers!.scatter!.squares) expect(blockedBy(m, sq, fenOf(r))).toBe(false);
-    await turn(r);
-    // Turn 4: gone, and a new tower at once (one block, his toss).
+    // The crowd's move on turn 3: the blocks go with it (Eric: gone at the end of the crowd's next turn), so his reply to it is
+    // free: no limit on his move.
+    await r.score(new Map([["h0", { move: [...(r.crowdAllowed() ?? legalMoves(fenOf(r)))].sort()[0]!, thinkMs: 1000 }]]));
+    expect(r.boss!.powers!.scatter).toBeNull();
+    expect(bossAllowed(r.boss!, fenOf(r))).toBeNull();
+    if (r.bounceDue()) await r.playBounce();
+    await r.playBoss();
+    // Turn 4: a new tower at once (one block, his toss).
     const z = r.boss!.powers!;
     expect(z.turn).toBe(4);
     expect(z.scatter).toBeNull();
@@ -415,6 +421,18 @@ describe("Big Boy's toy blocks", () => {
     }
   });
 
+  it("a scattered block a piece of his stands on (his only move, the limit lifted) is gone as the crowd's turn begins", () => {
+    // His knight on e4, a scattered block on e4 from the crowd's topple of turn 4 (standing through the crowd's turn 5).
+    const fen = "4k3/8/8/8/4n3/8/8/K3R3 w - - 0 1";
+    const powers = initPowers(1, fen, "w");
+    const b = { id: "bigboy", crowdSide: "w", crowdMoves: 4, powers: { ...powers, turn: 4, nextPassive: 99, tower: null, scatter: { from: "e3", height: 4, squares: ["e4", "c2"], by: "crowd" as const, at: 4, until: 5 } } } as unknown as BossState;
+    const q = prepareTurn(b, fen).powers!;
+    expect(q.turn).toBe(5);
+    expect(q.scatter).toMatchObject({ squares: ["c2"], until: 5 });
+    // The crowd may take the knight there (the rook's way to it is clear).
+    expect(crowdAllowed(prepareTurn(b, fen), fen) ?? legalMoves(fen)).toContain("e1e4");
+  });
+
   it("his pieces may topple it too, but rarely: open to them on a seeded share of his turns (towerBossChance), from 2 blocks, never through it", () => {
     // (His move now: the crowd turn just played is `turn`; the roll is the battle's seed and that turn, the same everywhere.)
     const state = (seed: number, turn: number, height: number) => ({ seed, turn, tower: { square: "a4", height, at: 2 } });
@@ -449,7 +467,7 @@ describe("Big Boy's toy blocks", () => {
     expect(allowedShut).not.toContain("a1a8");
   });
 
-  it("his piece on it topples it as the crowd's next turn begins: its blocks (half its height, rounded up) stand through that turn and his next move, then vanish and a new tower starts", async () => {
+  it("his piece on it topples it as the crowd's next turn begins: its blocks (half its height, rounded up) stand through that turn only, gone as its move is played, and a new tower starts", async () => {
     const was = { towerBossChance: BOSS_POWERS.towerBossChance, towerScatterShare: BOSS_POWERS.towerScatterShare };
     const powers = BOSS_POWERS as unknown as Record<string, number>;
     try {
@@ -472,7 +490,7 @@ describe("Big Boy's toy blocks", () => {
       expect(r.bossAllowed() ?? legalMoves(fen)).toContain(move);
       expect(r.applyBossMove(move)).toBe(move);
       expect(r.bossView()!.lastMove?.through).toBeUndefined();
-      // The crowd's turn 4 begins: toppled by his piece, three of its five blocks scattered, standing through this turn.
+      // The crowd's turn 4 begins: toppled by his piece, three of its five blocks scattered, standing through this turn only.
       const q = r.boss!.powers!;
       expect(q.turn).toBe(4);
       expect(q.tower).toBeNull();
@@ -486,12 +504,11 @@ describe("Big Boy's toy blocks", () => {
       for (const m of r.crowdAllowed() ?? []) for (const sq of blocks) expect(blockedBy(m, sq, fenOf(r))).toBe(false);
       const next = (r.crowdAllowed() ?? legalMoves(fenOf(r))).sort()[0]!;
       await r.score(new Map([["h0", { move: next, thinkMs: 1000 }]]));
-      // His next move: still kept off them.
-      const left = r.boss!.powers!.scatter!.squares;
-      expect(left.length).toBeGreaterThan(0);
-      for (const m of bossAllowed(r.boss!, fenOf(r)) ?? []) for (const sq of left) expect(blockedBy(m, sq, fenOf(r))).toBe(false);
+      // Gone as the crowd's move is played (Eric: at the end of the crowd's next turn): his next move is free.
+      expect(r.boss!.powers!.scatter).toBeNull();
+      expect(bossAllowed(r.boss!, fenOf(r))).toBeNull();
       await r.playBoss();
-      // Turn 5: gone, and a new tower at once.
+      // Turn 5: a new tower at once.
       const z = r.boss!.powers!;
       expect(z.turn).toBe(5);
       expect(z.scatter).toBeNull();

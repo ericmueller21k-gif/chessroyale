@@ -9,8 +9,8 @@ Eric (Nov 18, answering whether only the crowd topples the tower): "both but he 
   online the server sends the host the moves he may play, as for every power that stops him). On those turns a move onto
   it is one of his moves like any other: his engine or brain plays it only if it picks it. No bonus. On the other turns
   it stops his pieces as before.
-- Its blocks are timed from his move, as Eric's rule times the crowd's: they stand through the crowd's next turn and his
-  next move, then go and a new tower starts (the topple comes as that crowd turn begins, `by: "boss"`, as his fall at
+- Its blocks stand through the crowd's next turn and go as its move is played (the review's fix: Eric's rule, gone at
+  the end of the crowd's next turn, every time), and a new tower starts (the topple comes as that crowd turn begins, `by: "boss"`, as his fall at
   `towerMax` does; the same drawing and lines).
 - Why a seeded gate and not "only when it's clearly his best": a margin would have to run through every way his move is
   chosen (Stockfish at his strength, Maia, the engine server's scores) and the host's request. The gate is one pure roll

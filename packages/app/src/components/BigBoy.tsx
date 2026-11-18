@@ -381,14 +381,14 @@ function towerAnim(p: NonNullable<BossView["powers"]>, moments: readonly Moment[
 /** How long an added block falls before it clacks on (its add animation's falling frames). */
 const ADD_FALL = 120;
 
-/** When this device saw each of his scattered blocks go (they puff away from then, as the turn after their last begins). */
+/** When this device saw each of his scattered blocks go (they puff away from then, as the crowd's move on their last turn is played). */
 const blocksGone = new Map<string, number>();
 /** The scattered blocks each battle showed last (so ones that have just gone puff away). */
 const blocksLast = new Map<string, { squares: readonly string[]; until: number }>();
 
 /**
  * His scattered blocks on the board: each landing as its flight in the topple lands it (or simply there), sitting while they
- * last, and puffing away once they've gone (as the turn after their last begins). One canvas over the board, under any
+ * last, and puffing away once they've gone (as the crowd's move on their last turn is played: never into his reply after it). One canvas over the board, under any
  * banner, never taking a tap. Each looks like his toy block always has.
  */
 function scatterItems(boss: BossView, now: number, appearAt: (square: string) => number): BoardItem[] {
@@ -404,7 +404,7 @@ function scatterItems(boss: BossView, now: number, appearAt: (square: string) =>
     }
   } else {
     const last = blocksLast.get(key);
-    if (last && last.until < p.turn) {
+    if (last && last.until <= p.turn) {
       const tag = `${key}:${last.squares.join()}:${last.until}`;
       let at = blocksGone.get(tag);
       if (at === undefined) {

@@ -199,8 +199,8 @@ export const scatterCount = (height: number, s: Pick<BossPowerSettings, "towerSc
 
 /**
  * His tower topples (`by` the crowd's move onto it, or by itself / by his piece as a crowd turn begins): scatterCount of its
- * blocks scatter (scatterSquares, on `fen`: the position now, its side to move kept a move), standing through crowd turn
- * `until`; the tower is gone. Returns the topple's event (crowd turn `turn`).
+ * blocks scatter (scatterSquares, on `fen`: the position now, its side to move kept a move), standing until the crowd's
+ * move on turn `until` is played (never into his reply to it); the tower is gone. Returns the topple's event (crowd turn `turn`).
  */
 function topple(next: BossPowerState, fen: string, by: "crowd" | "boss", turn: number, until: number, s: BossPowerSettings): PowerEvent {
   const tower = next.tower!;
@@ -416,9 +416,11 @@ export function bounceResult(before: string, crowd: Side, seed: number, at: numb
 export const BIGBOY: BossRules = {
   id: "bigboy",
   ultimateOnHisTurn: true,
-  // The scattered blocks stand through their last crowd turn (`until`), then vanish.
+  // The scattered blocks go as the crowd's move on their last turn (`until`) is played (afterCrowdMove; here only if that
+  // never ran). One a piece of his now stands on (his only move, the limit lifted) is gone, as the crowd's case.
   wearOff(next, t) {
     if (next.scatter && next.scatter.until < t.turn) next.scatter = null;
+    if (next.scatter?.squares.some((sq) => pieceAt(t.fen, sq))) next.scatter = { ...next.scatter, squares: next.scatter.squares.filter((sq) => !pieceAt(t.fen, sq)) };
   },
   // The Big Bounce: the meter full as a turn begins, its warning ("RAGE!") that turn; it comes at the start of his turn,
   // after the crowd's move (bounceDue). The test switch: warned as the second turn begins. The trigger (`ultNext`, kept):
@@ -432,9 +434,9 @@ export const BIGBOY: BossRules = {
   },
   // His tower, as each crowd turn begins (after his move): from firstPassive, its first block (a new tower once the last one's
   // scattered blocks have gone); then one more each turn up to towerMax; at towerMax a turn on, it topples by itself, its blocks
-  // standing through this crowd turn (and his move after it). A piece of his on its square (his move onto it on a turn it was
-  // open to him, or his only move, the limit lifted) topples it the same way: its blocks stand through the crowd's next turn
-  // and his next, timed from his move. The test switch (?power=tower): the battle's first tower starts towerTest tall.
+  // standing through this crowd turn, gone as its move is played (Eric: always gone at the end of the crowd's next turn). A
+  // piece of his on its square (his move onto it on a turn it was open to him, or his only move, the limit lifted) topples it
+  // the same way. The test switch (?power=tower): the battle's first tower starts towerTest tall.
   passive(next, t) {
     if (t.turn < next.nextPassive || next.scatter) return;
     const tower = next.tower;
@@ -465,14 +467,17 @@ export const BIGBOY: BossRules = {
   // (Asked only of a move that isn't allowed, or his only move let through: any block it touches is why.)
   stopReason: (boss, fen, m) => (toyStops(m, boss.powers, fen, false) ? "block" : null),
   powerTurn: (boss) => !!boss.powers!.tower || !!boss.powers!.scatter,
-  // The crowd's move landed on his tower (the move that topples it; or any onto it, its limit lifted): it topples, its blocks
-  // standing through his next turn and the crowd's next. A scattered block a piece now stands on (its limit lifted) is gone.
+  // The scattered blocks whose last crowd turn this was go now, before his reply (Eric: gone at the end of the crowd's next
+  // turn, every time). The crowd's move landed on his tower (the move that topples it; or any onto it, its limit lifted): it
+  // topples, its blocks standing through his reply and the crowd's next turn. A scattered block a piece now stands on (its
+  // limit lifted) is gone.
   afterCrowdMove(b) {
     const boss = b.state.boss;
     const p = boss?.powers;
     if (!boss || !p || (!p.tower && !p.scatter)) return;
     const fen = b.boards.get(b.state.boards[0]!)!.fen;
     const next: BossPowerState = { ...p };
+    if (next.scatter && next.scatter.until <= p.turn) next.scatter = null;
     if (next.scatter?.squares.some((sq) => pieceAt(fen, sq))) next.scatter = { ...next.scatter, squares: next.scatter.squares.filter((sq) => !pieceAt(fen, sq)) };
     if (next.tower && pieceAt(fen, next.tower.square)) next.events = [...p.events, topple(next, fen, "crowd", p.turn, p.turn + 1, BOSS_POWERS)];
     b.state = { ...b.state, boss: { ...boss, powers: next } };
