@@ -427,7 +427,7 @@ function ToppleFlights({ moment, from, squares, now, orientation }: { moment: Mo
         const at = moment.at + f.off;
         if (now < at || now >= moment.at + f.land) return null;
         const pt = towerPoint(from, i, orientation);
-        return <Flight key={`tf-${sq}`} name="blockFly" anim={`fly${blockLetter(sq)}`} square={sq} orientation={orientation} since={at} ms={TOPPLE.flight} from={{ x: pt.x / 100, y: pt.y / 100 }} />;
+        return <Flight key={`tf-${sq}`} name="blockFly" anim={`fly${blockLetter(sq)}`} square={sq} orientation={orientation} since={at} ms={TOPPLE.flight} from={pt} />;
       })}
     </>
   );
