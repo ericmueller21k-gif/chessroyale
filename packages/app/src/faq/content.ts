@@ -1080,7 +1080,7 @@ ${rows}
 
 **What you see:** a warning, everything freezes, he dives onto the piece's square with his cut-in, the piece slides back, he takes the blow (the boss drops in and attacks him: Hollow lashes him with his string of lights, Alfil jabs him with his ankus, Sawyer saws at him, Wrangler cracks his lasso at him, Boingo pies him, Big Boy bonks him with his lollipop, Ginger jabs him with his candy cane and Jefferson fires his Roman candle at him), staggers, falls and fades. Then the crowd picks again. He's gone for the rest of the battle, and the charges he fell with go to the crowd: everyone still in gets ${n(S.lastStandPowerUps, "power-up")} for each (a power-up shows the engine's top 3 moves). He never steps in when only one move was possible.
 
-He also sits out while a boss's power has changed the board (hoops, blocks, plants, frozen or hidden squares…): your move stands, nothing is spent, and once the board is back to normal he's ready again.
+He also sits out while a boss's power has changed the board (hoops, blocks, plants, frozen or hidden squares…): your move stands, nothing is spent, and once the board is back to normal he's ready again. Big Boy's toy blocks are the exception: they keep him out only when a block stops the boss's reply that would punish your move.
 `,
   };
 }

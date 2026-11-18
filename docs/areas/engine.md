@@ -50,7 +50,9 @@ Lane: `engine`. The bosses' strength is here; their powers are on [bosses.md](bo
   the first's class (computer with computer) when that class has `pairClassMin` 3 other accounts left, else from
   anyone; never two of one account (2026-11-10-judge-pairing.md). A device sends the engine's raw output;
   the lobby works out the board with the same code (`judge.ts`: `runJudgeJob`, `judgedBoard`). Two honest answers are
-  identical (`JUDGES.tolerance` 0). A disagreement asks a third device and the engine server at once; strikes bench a
+  identical (`JUDGES.tolerance` 0). The boss's reply to each move (what the Last Stand shows, and for Big Boy whether it
+  comes) isn't compared: a job judges settle together (agreed, two of three, or the server's verdict) keeps only the replies
+  both name alike, and a reply that isn't a legal move after its move is dropped (`sharedReplies`, `baseBoard`; the review of #791). A disagreement asks a third device and the engine server at once; strikes bench a
   device. Fewer than two capable devices (or `JUDGES.on` false): the lobby's **host** scores every round (`pickHost`
   prefers a connected computer over a phone); its boards are checked for shape (`hostBoardOk`: legal moves, chances
   0 to 1, every pick and bot scored), and one that doesn't hold together scores every pick the same. The values of a
