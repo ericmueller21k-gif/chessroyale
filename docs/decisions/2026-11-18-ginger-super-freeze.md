@@ -50,3 +50,21 @@ and a legal move always left ("yes"); "up to twice in 60 moves".
 
 Drawn by the paid art runner on `claude/boss-art` (Opus, high), $2.95 of a $15 cap: the 3 x 3 ice block ($1.75,
 `scripts/boss-art/out/ginger-superice/`) and his charge-up and blast ($1.20, `scripts/boss-art/out/ginger-supercharge/`).
+
+## The sim (his raid, today's main as the control at the same seeds)
+
+`npx tsx packages/sim/scripts/boss-sim.ts raid gingerbread 13 <1|31> 0 <tag>`: 50 bots against Ginger at his tier (1600, Stockfish at
+1500), 26 battles each, the same seeds; rows in `reports/boss-sim/raid-sfg-{a,b}.jsonl` and the control's `raid-sfg-ctl-{a,b}.jsonl`
+(main at 67a971b, run from its own checkout).
+
+| Run | Crowd score | W-D-L | Avg crowd moves | Blizzards a battle |
+|---|---|---|---|---|
+| Super Freeze | 0.02 | 0-1-25 | 37.0 | 1.65 |
+| Control (main) | 0.00 | 0-0-26 | 40.3 | 1.73 |
+
+- It came twice in 25 battles of 26 (once in the other, which ended first); the second after crowd moves 16 to 30 (22.5 on average),
+  freezing 2 to 6 pieces (4.2 on average). The first's timing (8 to 15, unless the Blizzard holds it) is checked in real battles by
+  `ginger-superfreeze.test.ts`.
+- Both runs are at the floor: today's raid sim beats the crowd almost every time against Ginger with or without it, as Big Boy's balance
+  run found for him (docs/decisions/2026-11-18-bigboy-tower-balance.md: the references are from an older sim). So it can't show the Super
+  Freeze's cost in score; its battles end about 3 moves sooner. Re-tune once the raid sim is re-baselined (the engine lane).
