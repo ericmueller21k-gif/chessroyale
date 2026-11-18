@@ -406,6 +406,16 @@ Each PR on its own branch. The layer first; then several bosses on one board; th
 | 14 | One sim run: bot climbers up the 99 floors, alone and as a party of 4, for `maiaStep` and `rageScale` (how far a run gets) (`reports/tower-sim.md`) | light | medium | small |
 | later | White or Black at random on every floor, once every boss works with the crowd as Black (Eric: "need to consider changing this later for sure") | boss | xhigh | |
 
+## 8. The audit (Eric, Nov 18)
+
+Eric: "Write in the plan a plan for an auditor to inspect this code when it's being built and has made some progress, we want it to
+look for optimization or issues, it will run fable at high." An independent, read-only auditor (Fable, effort high) runs three
+times: after PR 6 (the rules core), after PR 10 (the first playable solo tower) and after PR 12 (the whole mode). Its brief, which
+explains the mode and its job, is [docs/areas/battle-tower-audit.md](../areas/battle-tower-audit.md): correctness first, then lag
+on a phone, then simpler code, then stored data and fair play, then the design itself; each finding proved, written to
+`docs/decisions/<date>-battle-tower-audit-<n>.md` on `audit/battle-tower-<n>`. The director weighs each finding; the next build
+PR or a follow-up takes the fixes.
+
 ## The calls, settled (Eric, Nov 18: none objected to)
 
 1. The bosses take turns in the order dealt, each keeping "his turn" (not the strongest always moving).

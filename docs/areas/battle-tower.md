@@ -20,6 +20,11 @@ The design, its calls settled with Eric (Nov 18): [docs/decisions/2026-11-18-bat
   marks at once, the most restrictive winning, one "always a legal move" lift; today's bosses move onto it with no change to
   any boss battle.
 
+## The audit
+
+An independent auditor (Fable, high) checks the build three times (after PRs 6, 10 and 12): its brief is
+[battle-tower-audit.md](battle-tower-audit.md).
+
 ## Where the code will be
 
 | Part | Files (planned) |
