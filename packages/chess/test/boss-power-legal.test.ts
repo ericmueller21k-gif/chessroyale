@@ -9,6 +9,7 @@ import {
   brainLine,
   crossesMiddle,
   crowdAllowed,
+  hisToppleOpen,
   initPowers,
   legalMoves,
   sanLineToUci,
@@ -42,6 +43,8 @@ const hash = (s: string) => {
 function bossWith(id: string, fen: string, powers: Partial<BossPowerState>, crowdMoves = 3): BossState {
   return { id, crowdSide: "w", crowdMoves, powers: { ...initPowers(1, fen, "w"), turn: crowdMoves + 1, ...powers } } as unknown as BossState;
 }
+/** A crowd turn (battle seed 1) on which Big Boy's tower is closed to his pieces (hisToppleOpen: most of his turns). */
+const TOWER_SHUT = Array.from({ length: 40 }, (_, t) => t + 1).find((turn) => !hisToppleOpen({ seed: 1, turn, tower: { square: "f6", height: 3, at: 1 } }))!;
 const DONE_SPLIT: Pick<BossPowerState, "split"> = { split: { turn: 2, pawn: null, square: null, halves: [] } };
 
 /**
@@ -107,7 +110,9 @@ const POWERS: { name: string; boss: BossState; fen: string; favorites: string[];
   { name: "Sawyer's saw cut", boss: bossWith("sawyer", OPEN, { ...DONE_SPLIT, cut: { a: "d6", b: "d7", at: 4, until: 6 } }), fen: OPEN, favorites: ["d7d6"], why: "cut" },
   { name: "Sawyer's first move (a pawn's)", boss: bossWith("sawyer", AFTER_E4, {}, 0), fen: AFTER_E4, favorites: ["g8f6", "b8c6"], why: null },
   { name: "Boingo's pie", boss: bossWith("clown", AFTER_E4, { pies: [{ square: "e5", until: 3 }] }, 0), fen: AFTER_E4, favorites: ["e7e5"], why: "pie" },
-  { name: "Big Boy's toy block", boss: bossWith("bigboy", AFTER_E4, { block: { square: "f6", at: 1, until: 3 } }, 0), fen: AFTER_E4, favorites: ["g8f6"], why: "block" },
+  // (On a turn his tower is closed to him, as most are: hisToppleOpen.)
+  { name: "Big Boy's tower", boss: bossWith("bigboy", AFTER_E4, { tower: { square: "f6", height: 3, at: 1 }, turn: TOWER_SHUT }, 0), fen: AFTER_E4, favorites: ["g8f6"], why: "block" },
+  { name: "Big Boy's scattered blocks", boss: bossWith("bigboy", AFTER_E4, { scatter: { from: "e6", height: 2, squares: ["f6", "c6"], by: "crowd", at: 1, until: 2 } }, 0), fen: AFTER_E4, favorites: ["g8f6", "b8c6"], why: "block" },
 ];
 
 describe("Eric's position (Oct 17): the boss's queen across the board saw was his only move", () => {
@@ -263,10 +268,11 @@ describe("which power stops a move (the screens' words)", () => {
     // (The screens' view: the same fields, the boss's id.)
     expect(stopReason({ id: "sawyer", powers: { boardSaw: { at: 4, until: 8 } } }, OPEN, "c6e7")).toBe("boardsaw");
     expect(stopReason({ id: "clown", powers: { pies: [{ square: "e5", until: 3 }] } }, AFTER_E4, "e7e5")).toBe("pie");
-    expect(stopReason({ id: "bigboy", powers: { block: { square: "f6", at: 1, until: 3 } } }, AFTER_E4, "g8f6")).toBe("block");
-    // (Slides through a block too.)
+    expect(stopReason({ id: "bigboy", powers: { tower: { square: "f6", height: 1, at: 1 } } }, AFTER_E4, "g8f6")).toBe("block");
+    // (Slides through a block too: a tower, or a scattered block.)
     const slide = "rnbqkbnr/ppp2ppp/8/3pp3/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1";
-    expect(stopReason({ id: "bigboy", powers: { block: { square: "e7", at: 1, until: 3 } } }, slide, "f8d6")).toBe("block");
+    expect(stopReason({ id: "bigboy", powers: { tower: { square: "e7", height: 4, at: 1 } } }, slide, "f8d6")).toBe("block");
+    expect(stopReason({ id: "bigboy", powers: { scatter: { from: "e6", height: 1, squares: ["e7"], by: "boss", at: 1, until: 1 } } }, slide, "f8d6")).toBe("block");
     // (Folio's Crease stops only the side it's set against, the crowd's: here Black's, so e7-e5 across 5|6; a move of the
     // other side across it, or one not crossing it, is never stopped.)
     expect(stopReason({ id: "folio", powers: { crease: { line: "5|6", at: 4, until: 7, side: "b" } } }, AFTER_E4, "e7e5")).toBe("crease");

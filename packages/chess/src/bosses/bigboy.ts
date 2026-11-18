@@ -1,13 +1,17 @@
 /**
  * Big Boy, the baby boss (BOSS_ROSTER "bigboy"): his rules. He opens with his snack: the battle starts from the starting
- * position less one of the crowd's center pawns, which he eats before move 1. His passive, toy blocks: every few turns
- * a block lands on an empty square in the crowd's half, and nothing (either side) may move onto it or slide through it
- * while it's there (a knight jumps it; it never stops an attack). His ultimate, the Big Bounce, comes at the start of his
+ * position less one of the crowd's center pawns, which he eats before move 1. His passive, the toy-block tower (Eric,
+ * Nov 18): a block lands on an empty square in the crowd's half, and as every crowd turn after it begins he stacks one
+ * more there, up to towerMax. Nothing slides through it (a knight jumps it; it never stops an attack); from towerEnter
+ * blocks a crowd piece may move onto it, which topples it (his pieces too, rarely: on a seeded share of his turns, when his
+ * engine picks that move); at towerMax it wobbles a turn and topples by itself. Some of its blocks (towerScatterShare)
+ * scatter to empty squares nearby, each blocking as one block does (nothing onto it or through it, either side) for one
+ * crowd turn; then they vanish and a new tower starts. His ultimate, the Big Bounce, comes at the start of his
  * turn after its warning: a few of the crowd's pieces are thrown to new squares nearby, into a position a little worse
- * for the crowd. Numbers: BOSS_POWERS.block*, bounce*. His art and moments are the app's (characters/bigboy.ts,
+ * for the crowd. Numbers: BOSS_POWERS.tower*, bounce*. His art and moments are the app's (characters/bigboy.ts,
  * components/BigBoy.tsx, the toys in characters/effects/).
  */
-import { BOSS_POWERS, mulberry32, type BossPowerSettings, type BossState, type BounceResult } from "@chessroyale/core";
+import { BOSS_POWERS, mulberry32, type BossPowerSettings, type BossPowerState, type BossState, type BounceResult, type PowerEvent } from "@chessroyale/core";
 import { BOSS_OPENING, newBoard } from "../boards.ts";
 import { legalMoves, pieceAt, withoutPiece } from "../rules.ts";
 import type { EngineLike } from "../runner.ts";
@@ -46,11 +50,21 @@ export const BOUNCE = {
   total: 6200,
 } as const;
 
-/** Big Boy's toy block: the banner, then his toss from the board's corner, the block's flight, and it lands. */
+/** Big Boy's toy block (a new tower's first): the banner, then his toss from the board's corner, the block's flight, and it lands. */
 export const BLOCK = { flyAt: 1450, landAt: 1850 } as const;
 
+/** One more block on his tower (no banner): his toss from the board's corner, the block's flight up to the top, it lands. */
+export const STACK = { flyAt: 300, landAt: 650, ms: 900 } as const;
+
+/**
+ * His tower topples (no banner), by itself as a crowd turn begins or by the crowd's move onto it (while he thinks): it wobbles,
+ * goes over at `tipAt` (its tip animation), and from `flyAt` its blocks fly out to their squares in landing order (nearest first),
+ * one every `every` ms, each `flight` ms in a short arc, landing with a bounce; held to `ms` (ten blocks land by then).
+ */
+export const TOPPLE = { tipAt: 450, flyAt: 750, every: 70, flight: 420, ms: 2200 } as const;
+
 /** How long each of his moments holds the screen (ms; POWER_FX in boss-timing.ts). */
-export const BIGBOY_FX = { block: 2300, bounce: BOUNCE.total } as const;
+export const BIGBOY_FX = { block: 2300, stack: STACK.ms, topple: TOPPLE.ms, bounce: BOUNCE.total } as const;
 
 /** Big Boy opens with his snack: the battle starts from the starting position less one of the crowd's center pawns. */
 export const startsWithSnack = (def: { powers: { passive: string } | null } | null | undefined): boolean => def?.powers?.passive === "blocks";
@@ -83,8 +97,119 @@ export function chooseBlock(fen: string, crowd: Side, seed: number, turn: number
   return options.length ? options[Math.floor(powerRoll(seed, "block", turn) * options.length)]! : null;
 }
 
-/** The toy block on the board now, if any. */
-export const blockSquare = (boss: Pick<BossState, "powers"> | null | undefined): string | null => boss?.powers?.block?.square ?? null;
+/** His tower on the board now, if any. */
+export const towerOf = (boss: Pick<BossState, "powers"> | null | undefined) => boss?.powers?.tower ?? null;
+
+/** The squares his toy blocks stand on now: the tower's, or its scattered blocks' (never both at once). */
+export function toyBlockSquares(p: Pick<BossPowerState, "tower" | "scatter"> | null | undefined): string[] {
+  return [...(p?.tower ? [p.tower.square] : []), ...(p?.scatter?.squares ?? [])];
+}
+
+/** A castling move (the king two files along): its way runs on past where he lands, to the rook's corner. */
+const castles = (move: string, fen: string): boolean => Math.abs(move.charCodeAt(0) - move.charCodeAt(2)) === 2 && pieceAt(fen, move.slice(0, 2))?.type === "k";
+
+/**
+ * A move topples his tower: it lands on the tower's square (an ordinary legal move: a slide that ends there, a knight's
+ * jump, a pawn's step or capture; never castling, whose way runs on past it), and the tower is towerEnter blocks or more.
+ * (The crowd's may, always; his only on a turn his tower is open to him: hisToppleOpen.)
+ */
+export function topples(move: string, tower: { square: string; height: number } | null | undefined, fen: string, s: Pick<BossPowerSettings, "towerEnter"> = BOSS_POWERS): boolean {
+  return !!tower && tower.height >= s.towerEnter && to(move) === tower.square && !castles(move, fen);
+}
+
+/**
+ * His tower is open to his own pieces on his move now (Eric, Nov 18: "both but he usually doesn't"): on a towerBossChance share
+ * of his turns, drawn from the battle's seed and the crowd turn just played (`p.turn`; the same on the server, the host and in
+ * solo, as the server sends the host the moves he may play). Open, a move of his onto it (towerEnter tall or more) is one of his
+ * moves like any other: his engine or brain plays it only if it picks it, no bonus. Closed (most turns), it stops his pieces as
+ * a single block does.
+ */
+export function hisToppleOpen(p: Pick<BossPowerState, "seed" | "turn" | "tower"> | null | undefined, s: Pick<BossPowerSettings, "towerEnter" | "towerBossChance"> = BOSS_POWERS): boolean {
+  return !!p?.tower && p.tower.height >= s.towerEnter && powerRoll(p.seed, "his-topple", p.turn) < s.towerBossChance;
+}
+
+/**
+ * His toy blocks stop a move (`mayTopple`: the move may topple the tower: always the crowd's, his only when hisToppleOpen):
+ * onto or through a scattered block; through the tower; onto the tower, unless the move may topple it and does (`topples`). A
+ * knight jumps them all; none ever stops an attack.
+ */
+export function toyStops(move: string, p: Pick<BossPowerState, "tower" | "scatter"> | null | undefined, fen: string, mayTopple: boolean, s: Pick<BossPowerSettings, "towerEnter"> = BOSS_POWERS): boolean {
+  if (p?.scatter?.squares.some((sq) => blockedBy(move, sq, fen))) return true;
+  const t = p?.tower;
+  if (!t || !blockedBy(move, t.square, fen)) return false;
+  // (Onto it, not through it: its square is where the move lands and nowhere on its way.)
+  return !(mayTopple && topples(move, t, fen, s) && moveSquares(move, fen).indexOf(t.square) === 1);
+}
+
+/**
+ * Where a toppled tower's blocks land (Eric: "it favors the closer ones, but ... some scattered further away"): up to `height`
+ * empty squares within towerScatterReach of its square (any direction; never its own square, a piece's or off the board), each
+ * drawn in turn with weight 1 / distance^towerScatterPower (the distance between the squares' middles), from the battle's seed,
+ * the crowd turn and who toppled it: the same on every device. A square that would leave the side to move in `fen` without a
+ * legal move (the blocks so far with it) is passed over. Fewer when there aren't enough. In landing order: nearest first (a
+ * tie in the order drawn).
+ */
+export function scatterSquares(
+  fen: string,
+  from: string,
+  height: number,
+  seed: number,
+  turn: number,
+  by: "crowd" | "boss",
+  s: Pick<BossPowerSettings, "towerScatterReach" | "towerScatterPower"> = BOSS_POWERS,
+): string[] {
+  const f0 = from.charCodeAt(0) - 97;
+  const r0 = Number(from[1]) - 1;
+  const R = s.towerScatterReach;
+  const pool: { sq: string; d: number; w: number }[] = [];
+  for (let df = -R; df <= R; df++)
+    for (let dr = -R; dr <= R; dr++) {
+      const f = f0 + df;
+      const r = r0 + dr;
+      if ((!df && !dr) || f < 0 || f > 7 || r < 0 || r > 7) continue;
+      const sq = `${"abcdefgh"[f]}${r + 1}`;
+      if (pieceAt(fen, sq)) continue;
+      const d = Math.hypot(df, dr);
+      pool.push({ sq, d, w: d ** -s.towerScatterPower });
+    }
+  pool.sort((a, b) => (a.sq < b.sq ? -1 : 1));
+  let legal: string[] = [];
+  try {
+    legal = legalMoves(fen);
+  } catch {
+    legal = [];
+  }
+  const rnd = mulberry32(Math.floor(powerRoll(seed, "topple", turn, by) * 2 ** 32));
+  const out: { sq: string; d: number }[] = [];
+  while (out.length < height && pool.length) {
+    let x = rnd() * pool.reduce((t, c) => t + c.w, 0);
+    let i = 0;
+    while (i < pool.length - 1 && x >= pool[i]!.w) x -= pool[i++]!.w;
+    const [c] = pool.splice(i, 1);
+    const blocks = [...out.map((o) => o.sq), c!.sq];
+    // (Never the last way out: the side to move keeps a legal move none of the blocks stops.)
+    if (legal.length && !legal.some((m) => !blocks.some((b) => blockedBy(m, b, fen)))) continue;
+    out.push({ sq: c!.sq, d: c!.d });
+  }
+  return out.sort((a, b) => a.d - b.d).map((o) => o.sq);
+}
+
+/** How many of a toppled tower's blocks scatter (towerScatterShare of its height, rounded up; the rest break up where it falls). */
+export const scatterCount = (height: number, s: Pick<BossPowerSettings, "towerScatterShare"> = BOSS_POWERS): number => Math.ceil(height * s.towerScatterShare - 1e-9);
+
+/**
+ * His tower topples (`by` the crowd's move onto it, or by itself / by his piece as a crowd turn begins): scatterCount of its
+ * blocks scatter (scatterSquares, on `fen`: the position now, its side to move kept a move), standing until the crowd's
+ * move on turn `until` is played (never into his reply to it); the tower is gone. Returns the topple's event (crowd turn `turn`).
+ */
+function topple(next: BossPowerState, fen: string, by: "crowd" | "boss", turn: number, until: number, s: BossPowerSettings): PowerEvent {
+  const tower = next.tower!;
+  const squares = scatterSquares(fen, tower.square, scatterCount(tower.height, s), next.seed, turn, by, s);
+  next.tower = null;
+  next.scatter = { from: tower.square, height: tower.height, squares, by, at: turn, until };
+  next.topples = (next.topples ?? 0) + 1;
+  return { kind: "topple", turn, square: tower.square, squares: [...squares], by, height: tower.height };
+}
 
 /**
  * The Big Bounce is due: the start of his turn (the crowd has just moved) on the turn the rage meter warned, or after
@@ -103,10 +228,10 @@ export interface BounceCandidate {
 
 /**
  * Where a crowd piece may land in the Big Bounce: an empty square within `reach` (in both directions) of where it
- * stood, never the toy block; a pawn only sideways along its rank (so it never reaches the first or last rank, and
+ * stood, never one of his toy blocks (the tower's square, a scattered block's); a pawn only sideways along its rank (so it never reaches the first or last rank, and
  * the pawns stay plausible); a bishop on its own color (my call: a position that could come up in a game).
  */
-function landings(sq: string, type: string, g: Grid, block: string | null, reach: number): string[] {
+function landings(sq: string, type: string, g: Grid, blocks: readonly string[], reach: number): string[] {
   const f0 = sq.charCodeAt(0) - 97;
   const r0 = Number(sq[1]);
   const out: string[] = [];
@@ -117,7 +242,7 @@ function landings(sq: string, type: string, g: Grid, block: string | null, reach
       if ((!df && !dr) || f < 0 || f > 7 || r < 1 || r > 8) continue;
       if (type === "p" && dr !== 0) continue;
       const t = `${"abcdefgh"[f]}${r}`;
-      if (g.has(t) || t === block) continue;
+      if (g.has(t) || blocks.includes(t)) continue;
       if (type === "b" && isLight(t) !== isLight(sq)) continue;
       out.push(t);
     }
@@ -125,7 +250,7 @@ function landings(sq: string, type: string, g: Grid, block: string | null, reach
 }
 
 /** One random try at a bounced position (a seeded random source), or null when it doesn't hold together. */
-function bounceTry(fen: string, crowd: Side, rnd: () => number, block: string | null, s: Pick<BossPowerSettings, "bouncePieces" | "bounceReach">): (BounceCandidate & { grid: Grid }) | null {
+function bounceTry(fen: string, crowd: Side, rnd: () => number, blocks: readonly string[], s: Pick<BossPowerSettings, "bouncePieces" | "bounceReach">): (BounceCandidate & { grid: Grid }) | null {
   const [lo, hi] = s.bouncePieces;
   const want = lo + Math.floor(rnd() * (hi - lo + 1));
   const g = gridOf(fen);
@@ -142,7 +267,7 @@ function bounceTry(fen: string, crowd: Side, rnd: () => number, block: string | 
     if (moves.length >= want) break;
     const c = g.get(sq);
     if (!c || landed.has(sq)) continue;
-    const options = landings(sq, c.toLowerCase(), g, block, s.bounceReach);
+    const options = landings(sq, c.toLowerCase(), g, blocks, s.bounceReach);
     if (!options.length) continue;
     const t = options[Math.floor(rnd() * options.length)]!;
     g.delete(sq);
@@ -167,7 +292,7 @@ function bounceTry(fen: string, crowd: Side, rnd: () => number, block: string | 
 /**
  * The Big Bounce's candidates, from the seed: up to bounceCandidates positions with him to move, each moving
  * bouncePieces of the crowd's pieces (never the king, no captures: each to an empty square within bounceReach, a pawn
- * only sideways, never onto the toy block), the crowd's king not in check, his neither, castling rights gone with a
+ * only sideways, never onto a toy block), the crowd's king not in check, his neither, castling rights gone with a
  * moved rook, en passant cleared. A try that leaves more of the crowd's material hanging than before is dropped (he'd
  * simply take it: far past a pawn and a half). Pure: the server, the host and solo work out the same list.
  */
@@ -176,21 +301,30 @@ export function bounceCandidates(
   crowd: Side,
   seed: number,
   at: number,
-  block: string | null = null,
+  blocks: readonly string[] = [],
   s: Pick<BossPowerSettings, "bouncePieces" | "bounceReach" | "bounceCandidates"> = BOSS_POWERS,
 ): BounceCandidate[] {
   const out: BounceCandidate[] = [];
   const seen = new Set<string>();
   const hanging = gridHanging(gridOf(fen), crowd);
+  // (His promotions already there, him to move: the bounce may keep them, never add one.)
+  let promos = new Set<string>();
+  try {
+    promos = new Set(legalMoves(fen).filter((m) => m.length === 5));
+  } catch {
+    promos = new Set();
+  }
   for (let a = 0; out.length < s.bounceCandidates && a < s.bounceCandidates * 30; a++) {
-    const c = bounceTry(fen, crowd, mulberry32(Math.floor(powerRoll(seed, "bounce", at, a) * 2 ** 32)), block, s);
+    const c = bounceTry(fen, crowd, mulberry32(Math.floor(powerRoll(seed, "bounce", at, a) * 2 ** 32)), blocks, s);
     if (!c) continue;
     const key = c.fen.split(" ")[0]!;
     if (seen.has(key) || gridHanging(c.grid, crowd) > hanging) continue;
     seen.add(key);
-    // (And he has a move: never a stalemate.)
+    // (And he has a move: never a stalemate. Nor a promotion he hadn't before it: a crowd piece thrown onto a square his pawn
+    // takes on its last rank, or out of its way, would hand him a queen for nothing. The boss kit's invariant 5.)
     try {
-      if (!legalMoves(c.fen).length) continue;
+      const his = legalMoves(c.fen);
+      if (!his.length || his.some((m) => m.length === 5 && !promos.has(m))) continue;
     } catch {
       continue;
     }
@@ -278,12 +412,15 @@ export function bounceResult(before: string, crowd: Side, seed: number, at: numb
   return { at, before, moves, spots: bounceSpots(moves, crowd, seed, at), loss: picked ? loss : null };
 }
 
-/** Big Boy: a toy block nobody can move onto or through, and the Big Bounce at the start of his turn. */
+/** Big Boy: his tower of toy blocks (and its scattered blocks), and the Big Bounce at the start of his turn. */
 export const BIGBOY: BossRules = {
   id: "bigboy",
   ultimateOnHisTurn: true,
+  // The scattered blocks go as the crowd's move on their last turn (`until`) is played (afterCrowdMove; here only if that
+  // never ran). One a piece of his now stands on (his only move, the limit lifted) is gone, as the crowd's case.
   wearOff(next, t) {
-    if (next.block && next.block.until < t.turn) next.block = null;
+    if (next.scatter && next.scatter.until < t.turn) next.scatter = null;
+    if (next.scatter?.squares.some((sq) => pieceAt(t.fen, sq))) next.scatter = { ...next.scatter, squares: next.scatter.squares.filter((sq) => !pieceAt(t.fen, sq)) };
   },
   // The Big Bounce: the meter full as a turn begins, its warning ("RAGE!") that turn; it comes at the start of his turn,
   // after the crowd's move (bounceDue). The test switch: warned as the second turn begins. The trigger (`ultNext`, kept):
@@ -295,27 +432,56 @@ export const BIGBOY: BossRules = {
     }
     return false;
   },
-  // A toy block every blockEvery turns, blockTurns turns on the board.
+  // His tower, as each crowd turn begins (after his move): from firstPassive, its first block (a new tower once the last one's
+  // scattered blocks have gone); then one more each turn up to towerMax; at towerMax a turn on, it topples by itself, its blocks
+  // standing through this crowd turn, gone as its move is played (Eric: always gone at the end of the crowd's next turn). A
+  // piece of his on its square (his move onto it on a turn it was open to him, or his only move, the limit lifted) topples it
+  // the same way. The test switch (?power=tower): the battle's first tower starts towerTest tall.
   passive(next, t) {
-    if (t.turn < next.nextPassive || next.block) return;
-    const square = chooseBlock(t.fen, t.crowd, t.seed, t.turn);
-    if (square) {
-      next.block = { square, at: t.turn, until: t.turn + t.s.blockTurns - 1 };
+    if (t.turn < next.nextPassive || next.scatter) return;
+    const tower = next.tower;
+    if (!tower) {
+      const square = chooseBlock(t.fen, t.crowd, t.seed, t.turn);
+      if (!square) return;
+      next.tower = { square, height: t.test === "tower" && !next.topples ? Math.min(t.s.towerTest, t.s.towerMax) : 1, at: t.turn };
       t.events.push({ kind: "block", turn: t.turn, square });
-      next.nextPassive = t.turn + t.s.blockEvery;
-    } else next.nextPassive = t.turn + 1;
+    } else if (tower.height >= t.s.towerMax || pieceAt(t.fen, tower.square)) {
+      t.events.push(topple(next, t.fen, "boss", t.turn, t.turn, t.s));
+    } else {
+      next.tower = { ...tower, height: tower.height + 1 };
+      t.events.push({ kind: "stack", turn: t.turn, square: tower.square, height: tower.height + 1 });
+    }
   },
-  // Nothing moves onto the block or through it, the boss included.
+  // Nothing of the crowd's onto a block or through one, nor through the tower; onto the tower only to topple it.
   crowdFilter(allowed, boss, fen) {
-    const block = boss.powers!.block;
-    return block ? allowed.filter((m) => !blockedBy(m, block.square, fen)) : allowed;
+    const p = boss.powers!;
+    return p.tower || p.scatter ? allowed.filter((m) => !toyStops(m, p, fen, true)) : allowed;
   },
+  // His own pieces: never onto a block or through one; into the tower only on a turn it's open to him (hisToppleOpen).
   bossStops(boss) {
-    const block = boss.powers?.block?.square;
-    return block ? (m, fen) => blockedBy(m, block, fen) : null;
+    const p = boss.powers;
+    if (!p?.tower && !p?.scatter) return null;
+    const open = hisToppleOpen(p);
+    return (m, fen) => toyStops(m, p, fen, open);
   },
-  stopReason: (boss, fen, m) => (blockedBy(m, boss.powers?.block?.square, fen) ? "block" : null),
-  powerTurn: (boss) => !!boss.powers!.block,
+  // (Asked only of a move that isn't allowed, or his only move let through: any block it touches is why.)
+  stopReason: (boss, fen, m) => (toyStops(m, boss.powers, fen, false) ? "block" : null),
+  powerTurn: (boss) => !!boss.powers!.tower || !!boss.powers!.scatter,
+  // The scattered blocks whose last crowd turn this was go now, before his reply (Eric: gone at the end of the crowd's next
+  // turn, every time). The crowd's move landed on his tower (the move that topples it; or any onto it, its limit lifted): it
+  // topples, its blocks standing through his reply and the crowd's next turn. A scattered block a piece now stands on (its
+  // limit lifted) is gone.
+  afterCrowdMove(b) {
+    const boss = b.state.boss;
+    const p = boss?.powers;
+    if (!boss || !p || (!p.tower && !p.scatter)) return;
+    const fen = b.boards.get(b.state.boards[0]!)!.fen;
+    const next: BossPowerState = { ...p };
+    if (next.scatter && next.scatter.until <= p.turn) next.scatter = null;
+    if (next.scatter?.squares.some((sq) => pieceAt(fen, sq))) next.scatter = { ...next.scatter, squares: next.scatter.squares.filter((sq) => !pieceAt(fen, sq)) };
+    if (next.tower && pieceAt(fen, next.tower.square)) next.events = [...p.events, topple(next, fen, "crowd", p.turn, p.turn + 1, BOSS_POWERS)];
+    b.state = { ...b.state, boss: { ...boss, powers: next } };
+  },
   // From the starting position (sides as usual), less the crowd's center pawn he eats before move 1: a base at ply 0
   // (the position changed outside a move: every replay plays from it).
   opening: {
@@ -328,7 +494,7 @@ export const BIGBOY: BossRules = {
       return { snack: { square } };
     },
   },
-  view: (p) => ({ block: p.block ? { square: p.block.square, at: p.block.at, until: p.block.until } : null, snack: p.snack?.square ?? null, bounce: p.bounce ?? null }),
+  view: (p) => ({ tower: p.tower ? { ...p.tower } : null, scatter: p.scatter ? { ...p.scatter, squares: [...p.scatter.squares] } : null, snack: p.snack?.square ?? null, bounce: p.bounce ?? null }),
 };
 
 // ---------------- The Big Bounce in a match ----------------
@@ -374,10 +540,11 @@ export async function bounceFrom(
 function bounceList(b: Battle): BounceCandidate[] {
   const boss = b.state.boss!;
   const fen = b.boards.get(b.state.boards[0]!)!.fen;
-  const key = `${fen}|${boss.crowdMoves}|${boss.powers!.seed}|${blockSquare(boss)}`;
+  const blocks = toyBlockSquares(boss.powers);
+  const key = `${fen}|${boss.crowdMoves}|${boss.powers!.seed}|${blocks.join(",")}`;
   const memo = b.memo.get("bounce") as { key: string; list: BounceCandidate[] } | undefined;
   if (memo?.key === key) return memo.list;
-  const list = bounceCandidates(fen, boss.crowdSide, boss.powers!.seed, boss.crowdMoves, blockSquare(boss));
+  const list = bounceCandidates(fen, boss.crowdSide, boss.powers!.seed, boss.crowdMoves, blocks);
   b.memo.set("bounce", { key, list });
   return list;
 }

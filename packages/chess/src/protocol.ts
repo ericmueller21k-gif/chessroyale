@@ -1,4 +1,4 @@
-import type { BossBrain, BounceResult, BurnEvent, Fusion, LassoDrag, LeapfrogHop, LightsOutTarget, LongPull, PowerEvent, PowerId, RepaintResult, SawCut, ShowdownResult, SlamLanding, SlamPiece, SlamResult, SplatMark, SplitPawn, StopReason, TusksCast } from "@chessroyale/core";
+import type { BossBrain, BounceResult, BurnEvent, Fusion, LassoDrag, LeapfrogHop, LightsOutTarget, LongPull, PowerEvent, PowerId, RepaintResult, SawCut, ShowdownResult, SlamLanding, SlamPiece, SlamResult, SplatMark, SplitPawn, StopReason, TowerScatter, TusksCast } from "@chessroyale/core";
 import type { Base, Capture } from "./rules.ts";
 import type { ItemLook } from "@chessroyale/core";
 import type { Augment, DrawRule, MaterialSlip } from "@chessroyale/core";
@@ -375,11 +375,13 @@ export interface NetBossPowers {
    */
   lights?: number;
   /**
-   * Big Boy (missing for other bosses): his toy block (its square, the crowd turn it landed and its last; nothing may
-   * move onto it or through it), the crowd's center pawn he ate before move 1, and his Big Bounce once it has happened
-   * (the position before it, the pieces it moved, where he bounced).
+   * Big Boy (missing for other bosses): his tower of toy blocks (its square, its height, the crowd turn its first block
+   * landed), or once it has toppled its scattered blocks (where they stand, until when, who toppled it: TowerScatter), the
+   * crowd's center pawn he ate before move 1, and his Big Bounce once it has happened (the position before it, the pieces it
+   * moved, where he bounced). Optional: an older server sent `block` instead (its single block), which the screens ignore.
    */
-  block?: { square: string; at: number; until: number } | null;
+  tower?: { square: string; height: number; at: number } | null;
+  scatter?: TowerScatter | null;
   snack?: string | null;
   bounce?: BounceResult | null;
   /**

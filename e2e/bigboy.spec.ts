@@ -1,11 +1,13 @@
 import { expect, type Page } from "@playwright/test";
 import { Chess } from "chess.js";
+import { POWER_FX } from "@chessroyale/chess";
 import { BOARD_SEL, test, watchFor, watchSpans, bossAloneFromHome } from "./helpers.ts";
 
 /**
  * Big Boy, the baby boss, played alone on a phone and a computer with real taps: his snack before move 1 (he waddles
- * over and eats the crowd's d- or e-pawn), your move's knock first after a real think, his toy block (TOY BLOCK!, the
- * block on an empty square of your half, no move dots onto it, gone after its 3 turns), and the Big Bounce from the
+ * over and eats the crowd's d- or e-pawn), your move's knock first after a real think, his toy-block tower (TOY BLOCK!,
+ * the first block on an empty square of your half, no move dots onto it; one more block each turn; the test switch's tall
+ * tower knocked over or falling by itself, its blocks scattered, blocking a turn, then gone and a new tower), and the Big Bounce from the
  * admins' test trigger (BIG BOUNCE!, pieces knocked into the air, the crash, every piece settling into the new position,
  * then his move), its sounds through the mute switch. Each banner is off the board before its power plays (Oct 16).
  */
@@ -37,11 +39,11 @@ async function play(page: Page, move: string) {
   }
   await expect.poll(() => phase(page), { timeout: 10_000 }).not.toBe("play");
 }
-/** An allowed move once it's your move (the toy block's limits), preferring `want`. */
+/** An allowed move once it's your move (the toy blocks' limits), preferring `want`; never onto his tower (that knocks it over). */
 async function allowedMove(page: Page, want: string[] = []): Promise<string> {
   await yourMove(page);
-  const { fen, allowed } = await page.evaluate(() => ({ fen: (window as any).match.phase.board.fen as string, allowed: (window as any).match.boss?.powers?.allowed as string[] | null }));
-  const legal = allowed ?? new Chess(fen).moves({ verbose: true }).map((m) => m.from + m.to + (m.promotion ?? ""));
+  const { fen, allowed, tower } = await page.evaluate(() => ({ fen: (window as any).match.phase.board.fen as string, allowed: (window as any).match.boss?.powers?.allowed as string[] | null, tower: ((window as any).match.boss?.powers?.tower?.square ?? null) as string | null }));
+  const legal = (allowed ?? new Chess(fen).moves({ verbose: true }).map((m) => m.from + m.to + (m.promotion ?? ""))).filter((m) => m.slice(2, 4) !== tower);
   // (A quiet move: nothing that gives a piece away, so the battle goes on.)
   return want.find((m) => legal.includes(m)) ?? legal.filter((m) => m.length === 4).sort()[0]!;
 }
@@ -57,7 +59,7 @@ const covered = (page: Page, square: string, canvas: string) =>
       }, [q.x, q.y]),
   );
 
-test("Big Boy's snack before move 1, your move's knock, and his toy block (no dots onto it, gone after its turns)", { tag: "@phone-only" }, async ({ page }) => {
+test("Big Boy's snack before move 1, your move's knock, and his tower's first block (no dots onto it), one more each turn", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(6 * 60_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
@@ -96,11 +98,14 @@ test("Big Boy's snack before move 1, your move's knock, and his toy block (no do
   expect(thrown.flight).not.toBeNull();
   expect(thrown.banner!.last).toBeLessThan(thrown.flight!.first);
   const p2 = await powers(page);
-  const sq: string = p2.block.square;
+  const sq: string = p2.tower.square;
+  expect(p2.tower.height).toBe(1);
   expect(Number(sq[1])).toBeLessThanOrEqual(4);
   expect(new Chess(await page.evaluate(() => (window as any).match.phase.board.fen)).get(sq as never)).toBeFalsy();
-  await expect(page.locator(`.pw-block[data-square="${sq}"]`)).toHaveCount(1);
-  await expect.poll(() => covered(page, sq, ".pw-block-board"), { timeout: 5000 }).toBeGreaterThan(0);
+  await expect(page.locator(`.pw-tower[data-square="${sq}"]`)).toHaveAttribute("data-height", "1");
+  // (The tower is drawn under the pieces, its block on its square.)
+  await expect(page.locator(`.bb-tower[data-square="${sq}"]`)).toHaveAttribute("data-anim", "stand1", { timeout: 5000 });
+  await expect.poll(() => covered(page, sq, ".bb-tower canvas"), { timeout: 5000 }).toBeGreaterThan(0);
   expect(p2.allowed.some((m: string) => m.slice(2, 4) === sq)).toBe(false);
   // A piece that could have gone there: picked up, no dot on the block.
   const fen = await page.evaluate(() => (window as any).match.phase.board.fen as string);
@@ -119,11 +124,102 @@ test("Big Boy's snack before move 1, your move's knock, and his toy block (no do
     expect(dotsThere).toBe(0);
     await tap(page, onto.from);
   }
-  // Three turns, then it's gone (puffed away).
-  for (let i = 0; i < 3; i++) await play(page, await allowedMove(page, ["h2h3", "a2a3", "h3h4", "a3a4", "b1c3", "g1f3"]));
+  // One more block each turn (his toss, the block dropping onto the top), on the same square.
+  for (let h = 2; h <= 4; h++) {
+    await play(page, await allowedMove(page, ["h2h3", "a2a3", "h3h4", "a3a4", "b1c3", "g1f3"]));
+    await yourMove(page);
+    // (His piece may topple it too, rarely: on a turn it's open to him and his engine picks that move. Then the stacking ends here.)
+    const now = await powers(page);
+    if (!now.tower && now.scatter?.by === "boss" && h > 2) {
+      expect(now.scatter).toMatchObject({ from: sq, height: h - 1 });
+      break;
+    }
+    expect(now.tower).toMatchObject({ square: sq, height: h });
+    await expect(page.locator(`.pw-tower[data-square="${sq}"]`)).toHaveAttribute("data-height", String(h));
+    await expect(page.locator(`.bb-tower[data-square="${sq}"]`)).toHaveAttribute("data-anim", `stand${h}`, { timeout: 5000 });
+  }
+  expect(errors).toEqual([]);
+});
+
+test("Big Boy's tall tower (?power=tower): knocked over (or falling by itself), its blocks land near it and block a turn, then vanish and a new tower starts", { tag: "@phone-only" }, async ({ page }) => {
+  test.setTimeout(6 * 60_000);
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await asAdmin(page);
+  await page.goto("/?debug&clock=60&boss=bigboy&power=tower&laststand=0");
+  await bossAloneFromHome(page);
+  const seen = await watchFor(page, { tip: { selector: '.bb-tower[data-anim^="tip"]' }, flight: { selector: ".pm-topple .pw-flight.blockFly" } });
+  await play(page, await allowedMove(page, ["g1f3", "b1c3"]));
   await yourMove(page);
-  expect((await powers(page)).block).toBeNull();
-  await expect(page.locator(`.pw-block[data-square="${sq}"]`)).toHaveCount(0);
+  const tower = (await powers(page)).tower;
+  expect(tower.height).toBe(8);
+  await expect(page.locator(`.bb-tower[data-square="${tower.square}"]`)).toHaveAttribute("data-anim", "stand8", { timeout: 5000 });
+  // Your piece onto it when one can go there (it's 2 blocks or more); else it grows to 10 and falls by itself.
+  let scatter: any = null;
+  for (let i = 0; i < 5 && !scatter; i++) {
+    await yourMove(page);
+    const p = await powers(page);
+    if (p.scatter) {
+      scatter = p.scatter;
+      break;
+    }
+    const onto = (p.allowed ?? []).filter((m: string) => m.slice(2, 4) === p.tower.square).sort();
+    if (onto.length) {
+      // (The Big Bounce on the same turn, by the admins' trigger: your topple plays out in full before it, as online.)
+      await page.locator(".ult-test").click();
+      await expect(page.locator(".ult-test")).toHaveAccessibleName("Ultimate next turn (testing)");
+      // The move dot on the tower's square shows over it (the square marks over the under-layer; review of #784): with the tower
+      // made hit-testable for a moment, the top element at the dot is the square, not the tower.
+      await tap(page, onto[0].slice(0, 2));
+      const dot = page.locator(`${BOARD_SEL.squares} square.move-dest`);
+      await expect(dot.first()).toBeVisible({ timeout: 5000 });
+      const at = await squareAt(page, p.tower.square);
+      const top = await page.evaluate(([x, y]) => {
+        const s = document.createElement("style");
+        s.textContent = ".bb-under, .bb-under * { pointer-events: auto !important; }";
+        document.head.append(s);
+        const e = document.elementFromPoint(x!, y!);
+        s.remove();
+        return `${e?.tagName.toLowerCase()}.${e?.className}`;
+      }, [at.x, at.y]);
+      expect(top).toMatch(/^square\..*move-dest/);
+      const order = await watchSpans(page, { topple: { selector: ".pm-topple" }, tip: { selector: '.bb-tower[data-anim^="tip"]' }, bounce: { selector: ".pm-bounce" } });
+      await tap(page, onto[0].slice(2, 4));
+      await expect.poll(() => phase(page), { timeout: 10_000 }).not.toBe("play");
+      await expect.poll(async () => (await order.spans()).bounce, { timeout: 30_000 }).not.toBeNull();
+      const o = await order.spans();
+      expect(o.tip!.last).toBeLessThan(o.bounce!.first);
+      expect(o.bounce!.first - o.topple!.first).toBeGreaterThanOrEqual(POWER_FX.topple - 100);
+      // Knocked over with your move: it falls while he thinks.
+      await expect.poll(async () => (await powers(page)).scatter?.by ?? null, { timeout: 30_000 }).toBe("crowd");
+      scatter = (await powers(page)).scatter;
+    } else await play(page, await allowedMove(page, ["h2h3", "a2a3", "h3h4", "a3a4"]));
+  }
+  expect(scatter).not.toBeNull();
+  await expect.poll(async () => (await seen.seen()).tip, { timeout: 15_000 }).toBe(true);
+  await expect.poll(async () => (await seen.seen()).flight, { timeout: 15_000 }).toBe(true);
+  expect(scatter.squares.length).toBeGreaterThan(0);
+  // Each block on an empty square near where the tower stood; nothing of yours onto one or through one.
+  await yourMove(page);
+  const p = await powers(page);
+  const fen = await page.evaluate(() => (window as any).match.phase.board.fen as string);
+  for (const sq of p.scatter.squares) {
+    expect(new Chess(fen).get(sq as never)).toBeFalsy();
+    expect(Math.max(Math.abs(sq.charCodeAt(0) - scatter.from.charCodeAt(0)), Math.abs(Number(sq[1]) - Number(scatter.from[1])))).toBeLessThanOrEqual(3);
+    await expect(page.locator(`.pw-block[data-square="${sq}"]`)).toHaveCount(1);
+    expect((p.allowed ?? []).some((m: string) => m.slice(2, 4) === sq)).toBe(false);
+  }
+  expect(p.tower).toBeNull();
+  await expect(page.locator(".bb-tower")).toHaveCount(0);
+  // Then they vanish, and a new tower starts at once.
+  for (let i = 0; i < 3 && (await powers(page)).scatter; i++) {
+    await play(page, await allowedMove(page, ["h2h3", "a2a3", "h3h4", "a3a4", "b1c3"]));
+    await yourMove(page);
+  }
+  const z = await powers(page);
+  expect(z.scatter).toBeNull();
+  expect(z.tower).toMatchObject({ height: 1 });
+  for (const sq of scatter.squares) await expect(page.locator(`.pw-block[data-square="${sq}"]`)).toHaveCount(0, { timeout: 5000 });
   expect(errors).toEqual([]);
 });
 
