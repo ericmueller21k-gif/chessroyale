@@ -9,6 +9,7 @@ import {
   brainLine,
   crossesMiddle,
   crowdAllowed,
+  hisToppleOpen,
   initPowers,
   legalMoves,
   sanLineToUci,
@@ -42,6 +43,8 @@ const hash = (s: string) => {
 function bossWith(id: string, fen: string, powers: Partial<BossPowerState>, crowdMoves = 3): BossState {
   return { id, crowdSide: "w", crowdMoves, powers: { ...initPowers(1, fen, "w"), turn: crowdMoves + 1, ...powers } } as unknown as BossState;
 }
+/** A crowd turn (battle seed 1) on which Big Boy's tower is closed to his pieces (hisToppleOpen: most of his turns). */
+const TOWER_SHUT = Array.from({ length: 40 }, (_, t) => t + 1).find((turn) => !hisToppleOpen({ seed: 1, turn, tower: { square: "f6", height: 3, at: 1 } }))!;
 const DONE_SPLIT: Pick<BossPowerState, "split"> = { split: { turn: 2, pawn: null, square: null, halves: [] } };
 
 /**
@@ -107,7 +110,8 @@ const POWERS: { name: string; boss: BossState; fen: string; favorites: string[];
   { name: "Sawyer's saw cut", boss: bossWith("sawyer", OPEN, { ...DONE_SPLIT, cut: { a: "d6", b: "d7", at: 4, until: 6 } }), fen: OPEN, favorites: ["d7d6"], why: "cut" },
   { name: "Sawyer's first move (a pawn's)", boss: bossWith("sawyer", AFTER_E4, {}, 0), fen: AFTER_E4, favorites: ["g8f6", "b8c6"], why: null },
   { name: "Boingo's pie", boss: bossWith("clown", AFTER_E4, { pies: [{ square: "e5", until: 3 }] }, 0), fen: AFTER_E4, favorites: ["e7e5"], why: "pie" },
-  { name: "Big Boy's tower", boss: bossWith("bigboy", AFTER_E4, { tower: { square: "f6", height: 3, at: 1 } }, 0), fen: AFTER_E4, favorites: ["g8f6"], why: "block" },
+  // (On a turn his tower is closed to him, as most are: hisToppleOpen.)
+  { name: "Big Boy's tower", boss: bossWith("bigboy", AFTER_E4, { tower: { square: "f6", height: 3, at: 1 }, turn: TOWER_SHUT }, 0), fen: AFTER_E4, favorites: ["g8f6"], why: "block" },
   { name: "Big Boy's scattered blocks", boss: bossWith("bigboy", AFTER_E4, { scatter: { from: "e6", height: 2, squares: ["f6", "c6"], by: "crowd", at: 1, until: 2 } }, 0), fen: AFTER_E4, favorites: ["g8f6", "b8c6"], why: "block" },
 ];
 

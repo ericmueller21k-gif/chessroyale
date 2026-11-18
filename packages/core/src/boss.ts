@@ -662,8 +662,8 @@ export interface BossPowerState {
   snack?: { square: string };
   /**
    * Big Boy's tower of toy blocks (Nov 18): its square (empty; nothing slides through it, and nothing moves onto it but a crowd
-   * piece once it's BOSS_POWERS.towerEnter tall, which topples it), its height in blocks (1 to towerMax), the crowd turn its first
-   * block landed. Never at the same time as `scatter`.
+   * piece once it's BOSS_POWERS.towerEnter tall, which topples it, or rarely one of his: hisToppleOpen), its height in blocks (1
+   * to towerMax), the crowd turn its first block landed. Never at the same time as `scatter`.
    */
   tower?: { square: string; height: number; at: number } | null;
   /** The blocks of his last tower once it toppled, until they vanish (TowerScatter). */
@@ -1253,9 +1253,10 @@ export interface SawCut {
 /**
  * Big Boy's toppled tower: its blocks, each on its own square (an empty square near it when it fell; nothing may move onto one or
  * slide through it, either side, a knight jumps it), in landing order (nearest first); where the tower stood (`from`) and how
- * tall it was; who toppled it (`by`: the crowd's move onto it, or it fell by itself at towerMax); the crowd turn it fell on
- * (`at`); and the last crowd turn they stand (`until`): one crowd turn always (toppled by the crowd's move, through his next
- * turn and the crowd's next; by itself as a crowd turn begins, through that turn). Then they vanish and a new tower starts.
+ * tall it was (towerScatterShare of its blocks scatter); who toppled it (`by`: the crowd's move onto it, or "boss": it fell by
+ * itself at towerMax, or his piece moved onto it); the crowd turn it fell on (`at`); and the last crowd turn they stand
+ * (`until`): one crowd turn always (toppled by the crowd's move, through his next turn and the crowd's next; "boss", as a crowd
+ * turn begins, through that turn and his move after it). Then they vanish and a new tower starts.
  */
 export interface TowerScatter {
   from: string;
