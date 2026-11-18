@@ -21,3 +21,8 @@ gardenerChime, sawyerCrack, gingerBlast ...). `CHANDY_CUES` (just above it) says
 4. Loudness tests as the other packs have; listen-check notes in the PR (each sound's intent, length, peak). Targeted lane.
 
 Done: `.pr-body.md` (under 40 lines; changed checks old → new) and `.done`, end. No PRs, no CI waits.
+
+**Eric, Nov 18 (style):** "Should be pulse style sounds like predator too maybe". So his pack's character: pulsing, sci-fi hunter tech:
+plasma/pulse shots, a charging pulse, electric targeting hums and chirps, a cloak-like shimmer for the teleport. In that spirit, not a copy:
+no imitation of the film creature's signature clicking call or its exact plasma-caster sound (house rule: never copy famous characters).
+Say in the PR how each sound is built.
