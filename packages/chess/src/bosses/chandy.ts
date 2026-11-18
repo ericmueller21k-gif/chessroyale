@@ -20,9 +20,9 @@
  *   within chandy.chaseMargin (his own pick if it does). Only on his ordinary moves (not the King's strike, a slip or a power's
  *   engine-best reply). Online the host steers with the request's `lock` (steerPick), the same function as here.
  * - **Upgrades:** only taking a locked piece upgrades the rifle (to chandy.upgradesMax); each unlocks one of his five moves at
- *   random, the queen lock first while you have a queen (chandy.queenLockFirst; Eric, Nov 18: "make that upgrade happen earlier";
- *   unlockPick) (the rifle's parts come in a fixed order: the art's), shown in the upgrade window as your turn begins (`upgrade`, 2 s,
- *   the clock held). After the fifth: no window.
+ *   random, the queen lock first while it could come right then (you have a queen it can aim at: queenLockAim; chandy.queenLockFirst;
+ *   Eric, Nov 18: "make that upgrade happen earlier"; unlockPick) (the rifle's parts come in a fixed order: the art's), shown in the
+ *   upgrade window as your turn begins (`upgrade`, 2 s, the clock held). After the fifth: no window.
  * - **A new unlock fires at once** (chandy.fireOnUnlock; Eric, Nov 16): on his turn after its upgrade window, whatever his meter
  *   says (it starts over from empty once the move fires); a queen lock that can't come then (queenLockOk) waits for the meter.
  *
@@ -30,7 +30,8 @@
  * picks a move (meterOrder): the newest unlock first, never the one he fired last while another can come, then the ones he has fired
  * the fewest times, ties at random (the queen lock only when it can come; Eric, Nov 18). A pick that can't land takes the next in
  * that order that can. The queen lock is
- * his whole turn, at once (the pass guard may refuse it: the meter picks another unlocked move, none: it empties); the others land as your next turn begins, after his move:
+ * his whole turn, at once (the pass guard may refuse it: the meter picks another unlocked move; none: it stays due, checked again on his
+ * next turn, the pass guard's own rule); the others land as your next turn begins, after his move:
  * - **Scatter shot** (`scatterShot`): a spot with at least four empty squares round it; four of them blocked through your turn and
  *   his move after it, as Boingo's pies (nobody lands on one; a slide passes through), the ones taking away the most of your moves.
  * - **Beam** (`beam`): a rank and a file, never your king's, the pair holding the most of your pieces; for your turn its squares
@@ -385,8 +386,9 @@ export function meterOrder(c: Pick<ChandyState, "unlocked" | "fresh" | "used" | 
 export const meterPick = (c: Pick<ChandyState, "unlocked" | "fresh" | "used" | "last" | "fired">, seed: number, skip: readonly ChandyMove[] = []): ChandyMove | null => meterOrder(c, seed, skip)[0] ?? null;
 
 /**
- * The move an upgrade unlocks: the queen lock while it's still locked and you have a queen (`queen`; chandy.queenLockFirst: Eric, Nov
- * 18, "make that upgrade happen earlier": in his game the queens were gone before it came), else random among those still locked
+ * The move an upgrade unlocks: the queen lock while it's still locked and it could come right then (`queen`: you have a queen it can
+ * aim at, afterHisMove; chandy.queenLockFirst: Eric, Nov 18, "make that upgrade happen earlier": in his game the queens were gone
+ * before it came), else random among those still locked
  * (from the seed and the upgrade's number); none once all five are.
  */
 export function unlockPick(unlocked: readonly ChandyMove[], seed: number, n: number, queen = false): ChandyMove | null {
@@ -1040,7 +1042,7 @@ export const chandyBattle = {
   /**
    * After the crowd's move (him to move): his locks and the queen lock's aim follow their pieces; the queen lock fires if it was
    * aimed (a base: the board changed outside a move); his meter takes a notch (from the first upgrade) and, full, picks his move; and
-   * his first lock, if it's time (L1). Not once the battle is over on the board.
+   * that's all: a taught capture's lock comes with his move (firstLock). Not once the battle is over on the board.
    */
   afterCrowdMove(b: Battle, move: string | null): void {
     const boss = b.state.boss;
@@ -1088,10 +1090,10 @@ export const chandyBattle = {
   },
 
   /**
-   * His first capture, as his move is about to show (`move`: the move he plays; him to move): the crosshair locks onto the piece it
-   * takes (never the king; your queen too), his point (`lockOn` with `first`, this crowd turn's moment while he still thinks), and
-   * the move shows after it (the server holds it, solo waits: CHANDY_FX.lockOn). Returns the square; null: not his first capture,
-   * or it's marked already.
+   * Each of his first captures (chandy.teachCaptures), as his move is about to show (`move`: the move he plays; him to move): the
+   * crosshair locks onto the piece it takes (never the king; your queen too), his point (`lockOn` with `first`, this crowd turn's
+   * moment while he still thinks; after the queen lock's shot when one came as this turn began), and the move shows after it (the
+   * server holds it, solo waits: CHANDY_FX.lockOn). Returns the square; null: not one of those captures, or it's marked already.
    */
   firstLock(b: Battle, move: string): string | null {
     const boss = b.state.boss;
@@ -1133,7 +1135,9 @@ export const chandyBattle = {
       const hit = first || (taken ? c.locks.some((l) => l.square === taken) : false);
       c.locks = locksAfter(before, move, c.locks);
       if (hit && c.upgrades < s.upgradesMax) {
-        const queen = s.queenLockFirst && piecesOf(boardOf(b).fen, boss.crowdSide).some((x) => x.type === "q");
+        // (The queen lock first only when it could come now: a queen of yours with a save, the test queenLockOk makes after his
+        // pass, on the board after this move, you to move. The review of #797: with a queen it can't aim at, the slot sat dead.)
+        const queen = s.queenLockFirst && queenLockAim(boardOf(b).fen, boss.crowdSide, p.seed, c.used) !== null;
         const unlock = unlockPick(c.unlocked, p.seed, c.upgrades, queen);
         const stage = c.upgrades + 1;
         // (Shown as your next turn begins: everyTurn.)
@@ -1194,8 +1198,8 @@ export const chandyBattle = {
 
   /**
    * The queen lock's aim (his whole turn): `answer` PASS_WAIT (the host's pass guard): no aim, the meter's pick another unlocked move
-   * (none: the meter empties), and he plays his move; anything else aims: the turn passes to the crowd (a base), the aim on her square, the meter spent, and the crowd's turn
-   * set up as after his move (its moment, the aim's). Returns her square; null: none was due, or it waits.
+   * (none: the queen lock stays due, checked again on his next turn), and he plays his move; anything else aims: the turn passes to
+   * the crowd (a base), the aim on her square, the meter spent, and the crowd's turn set up as after his move (its moment, the aim's). Returns her square; null: none was due, or it waits.
    */
   applyQueenLock(b: Battle, answer: string | null = null): string | null {
     if (!chandyBattle.queenLockDue(b)) return null;
@@ -1203,12 +1207,11 @@ export const chandyBattle = {
     const p = boss.powers!;
     const c = chandyOf(p);
     if (answer === PASS_WAIT) {
-      // (The meter picks another unlocked move instead, landing as your next turn begins; none: it empties. The queen lock can come
-      // back on a later fill. The review of #739, M1: the design's own "else the meter picks another unlocked move".)
-      setChandy(b, (x) => {
-        const other = meterPick(x, p.seed, ["queenlock"]);
-        return { ...x, passWait: boss.crowdMoves, due: other, ...(other ? {} : { meter: 0 }) };
-      });
+      // (The meter picks another unlocked move instead, landing as your next turn begins: the review of #739, M1, the design's own
+      // "else the meter picks another unlocked move". None can: the queen lock stays due, the meter full, checked again on his next
+      // turn, as the pass guard has every power that spends his turn (Oct 18; it emptied the meter until Nov 18: right after his
+      // first upgrade, mid-trade, that left the queen lock, his only move, dead until upgrade 2 in 10 battles of 20).)
+      setChandy(b, (x) => ({ ...x, passWait: boss.crowdMoves, due: meterPick(x, p.seed, ["queenlock"]) ?? "queenlock" }));
       return null;
     }
     const board = boardOf(b);

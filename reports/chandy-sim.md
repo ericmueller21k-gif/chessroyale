@@ -44,6 +44,24 @@ upgrade (`teachCaptures` 2), and the queen lock his first unlock while you have 
 | Before | 6.5 / 15.5 / 21.5 / 25.5 | 18 | 3 | 6 times, in 5 battles (0.3 a battle) | 4 | 2 / 18 |
 | After | 8 / **11** / **18.5** / 27 | 18 | **20** | **18 times, in 14 battles (0.9 a battle)** | 12 | 2 / 18 |
 
+**Run G (Nov 18, the review of #797's follow-up; docs/decisions/2026-11-18-chandy-queen-lock-first.md):** battles where his first
+unlock (the queen lock) never fired before upgrade 2. Before: run F's after rows (`raid-teachAfterN11-14`). G1: the queen lock first
+only when it could come then (`queenLockAim` on the board after his capture; `raid-okOnlyN11-14`). G2: that, and a queen lock the pass
+guard refuses, with nothing else unlocked, due again on his next turn (it emptied the meter; `raid-firstAfterN11-14`). 5 battles each
+on seeds 11 to 14, no switches.
+
+| Run G (20 battles each) | Never fired before upgrade 2 (upgrade 2 the very next turn) | Why | Queen lock first unlock | Aimed (battles) | Pass guard waits | Upgrade 1 / 2 / 3 / 5 (median crowd move); 1 to 2 | Crowd: draws / boss wins |
+|---|---|---|---|---|---|---|---|
+| Before | 10 (4) | the guard refused it, then the meter emptied: all 10 | 20 | 18 (14) | 12 | 8 / 11 / 18.5 / 27; 3.5 | 2 / 18 |
+| G1 | 10 (4) | the guard: 8; it couldn't come: 2 | 20 | 17 (15) | 13 | 7.5 / 10.5 / 19 / 28; 2.5 | 2 / 18 |
+| **G2** | **5 (4)** | upgrade 2 the next turn (the guard kept his capture): 4; the guard four turns running: 1 | 20 | 20 (15) | 10 | 9 / 14 / 19 / 26.5; **5** | 0 / 20 |
+
+G1's check never changed an unlock here (the bots' queen always had a save at his first capture); it covers the review's case (a
+queen with nothing to shield her), which the unit test pins. Without upgrade 2 the very next turn: 6 battles of 16 before, 6 of 15
+with G1, **1 of 16 with G2**. The trade: the aim is his whole turn, so upgrade 2 comes later (1 to 2: 5 of your moves, median, was
+3.5); upgrades 3 and 5 didn't move. The crowd's results are within noise (20 battles; the sims vary run to run: upgrade 1, which
+neither change touches, moved from 8 to 9).
+
 ## How: the raid sim
 
 `npx tsx packages/sim/scripts/boss-sim.ts raid chandy 8 <seed> 0 <tag>`, four processes side by side (seeds 11 to 14); a crowd of

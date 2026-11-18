@@ -1089,8 +1089,8 @@ export interface ChandyDodge {
 
 /**
  * Chandy's powers in a battle (id chandy; Eric, Nov 15-16; the chess package's bosses/chandy.ts).
- * - `moves`: his moves this battle; `locks`: the crowd's pieces locked now (at most chandy.maxLocks); `taught`: his first lock has
- *   come (the one that teaches it, as his turn begins).
+ * - `moves`: his moves this battle; `locks`: the crowd's pieces locked now (at most chandy.maxLocks); `taught`: his captures that teach
+ *   it have come (chandy.teachCaptures, each locked as his move shows: `marked` counts them).
  * - `upgrades`: locked pieces taken (0-5), each an upgrade of the rifle; `unlocked`: the moves those upgrades unlocked, in order;
  *   `fresh`: the newest, the next one his meter uses.
  * - `meter`: the crowd's moves toward his next move (full at chandy.meterEvery), counting from the first upgrade; `due`: the move
