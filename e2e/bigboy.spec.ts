@@ -219,7 +219,8 @@ test("Big Boy's tall tower (?power=tower): knocked over (or falling by itself), 
   const z = await powers(page);
   expect(z.scatter).toBeNull();
   expect(z.tower).toMatchObject({ height: 1 });
-  for (const sq of scatter.squares) await expect(page.locator(`.pw-block[data-square="${sq}"]`)).toHaveCount(0, { timeout: 5000 });
+  // (Only the scattered blocks: the new tower's own mark, `.pw-block.pw-tower`, may stand on a square one of them had: Nov 18, main.)
+  for (const sq of scatter.squares) await expect(page.locator(`.pw-block:not(.pw-tower)[data-square="${sq}"]`)).toHaveCount(0, { timeout: 5000 });
   expect(errors).toEqual([]);
 });
 
