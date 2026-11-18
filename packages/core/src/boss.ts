@@ -1105,6 +1105,8 @@ export interface ChandyDodge {
 export interface ChandyState {
   moves: number;
   locks: ChandyLock[];
+  /** His captures marked so far, the first chandy.teachCaptures (each an upgrade); `taught` once they're done: the hunt begins. */
+  marked?: number;
   taught?: true;
   upgrades: number;
   unlocked: ChandyMove[];

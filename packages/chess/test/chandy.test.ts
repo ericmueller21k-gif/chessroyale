@@ -64,6 +64,8 @@ function battle(seed: number, test = "", side: "w" | "b" = "w"): MatchRunner {
   return new MatchRunner({ settings: kitSettings({ boss: "chandy", test, maxMoves: 60 }), rng: mulberry32(seed), engines: [fakeEngine()], library: [KIT_OPENING], entrants: [{ id: "h0", name: "H", isBot: false }], raidSide: side });
 }
 const fenOf = (r: MatchRunner) => r.boards.get(r.state.boards[0]!)!.fen;
+/** A queen of `side`'s on the board. */
+const queenOn = (fen: string, side: "w" | "b") => fen.split(" ")[0]!.includes(side === "w" ? "Q" : "q");
 const cOf = (r: MatchRunner): ChandyState => r.boss!.powers!.chandy!;
 
 /** The board and his state set by hand (`fen`: whoever is to move), as a turn of the crowd's or his. */
@@ -176,14 +178,17 @@ describe("the locks (L1-L6)", () => {
     expect(order.indexOf("c2")).toBeLessThan(order.indexOf("a2"));
   });
 
-  it("no lock before his first capture (Eric, Nov 16): his moves until then lock nothing, and his first capture is locked and upgrades", async () => {
+  it("no lock before his first two captures (Eric, Nov 16 and 18): his moves lock nothing, never steered; each capture is locked and upgrades", async () => {
     const r = battle(11);
-    let firstAt = -1;
-    for (let i = 0; i < 40 && firstAt < 0; i++) {
+    let caught = 0;
+    for (let i = 0; i < 120 && caught < S.teachCaptures; i++) {
       if (!r.bossToMove()) {
         await crowdMove(r);
         continue;
       }
+      // (The queen lock his first upgrade may unlock: his whole turn, as the game plays it.)
+      if (r.queenLockDue()) await r.playQueenLock().catch(() => r.applyQueenLock(null));
+      if (!r.bossToMove()) continue;
       const before = fenOf(r);
       expect(cOf(r).locks).toEqual([]);
       expect(r.bossLocks()).toBeNull();
@@ -197,18 +202,39 @@ describe("the locks (L1-L6)", () => {
       });
       const sq = capturedSquare(before, move);
       const taken = sq ? pieceAt(before, sq) : null;
-      if (taken && taken.color === r.boss!.crowdSide) {
-        firstAt = i;
-        expect(marks).toEqual([sq]);
-        expect(cOf(r).taught).toBe(true);
-        expect(cOf(r).upgrades).toBe(1);
-      } else {
-        expect(marks).toEqual([]);
-        expect(cOf(r).upgrades).toBe(0);
-        expect(cOf(r).taught).toBeUndefined();
-      }
+      if (taken && taken.color === r.boss!.crowdSide) caught++;
+      expect(marks).toEqual(taken && taken.color === r.boss!.crowdSide ? [sq] : []);
+      // (His first unlock: the queen lock, your queen still on the board; Eric, Nov 18.)
+      if (caught === 1 && marks.length) expect([cOf(r).unlocked, queenOn(fenOf(r), r.boss!.crowdSide)]).toEqual([["queenlock"], true]);
+      // (Upgrades 1 and 2 come with the captures; the hunt only once both have taught it.)
+      expect([cOf(r).upgrades, cOf(r).marked ?? 0, cOf(r).taught]).toEqual([caught, caught, caught >= S.teachCaptures ? true : undefined]);
     }
-    expect(firstAt).toBeGreaterThanOrEqual(0);
+    expect(caught).toBe(S.teachCaptures);
+  });
+
+  it("the queen lock is his first unlock while you have a queen; without one, as before (Eric, Nov 18: make that upgrade happen earlier)", async () => {
+    for (let seed = 0; seed < 20; seed++) {
+      expect(unlockPick([], seed, 0, true)).toBe("queenlock");
+      expect(unlockPick(["beam"], seed, 1, true)).toBe("queenlock");
+      expect(unlockPick(["queenlock"], seed, 1, true)).not.toBe("queenlock");
+    }
+    expect(new Set(Array.from({ length: 40 }, (_, seed) => unlockPick([], seed, 0, false))).size).toBe(5);
+    // (Your queen taken by his first capture: no queen, so his unlock is the usual random one, never forced.)
+    const picks = new Set<string>();
+    for (let seed = 0; seed < 30; seed++) {
+      const r = battle(seed);
+      await crowdMove(r);
+      onPosition(r, "4k3/8/5n2/3Q4/8/8/8/R3K3 b - - 0 1", "w");
+      r.applyBossMove("f6d5");
+      picks.add(cOf(r).unlocked[0]!);
+    }
+    expect(picks.size).toBeGreaterThan(2);
+    // (Your queen still there: the queen lock.)
+    const r = battle(3);
+    await crowdMove(r);
+    onPosition(r, "4k3/8/5n2/3N4/8/8/8/R2QK3 b - - 0 1", "w");
+    r.applyBossMove("f6d5");
+    expect(cOf(r).unlocked).toEqual(["queenlock"]);
   });
 
   it("his first capture: the crosshair locks onto the piece right before he takes it (never steered), then upgrade 1; your queen too", async () => {
@@ -234,7 +260,8 @@ describe("the locks (L1-L6)", () => {
       expect(pieceAt(fenOf(r), square)?.type).toBe(piece);
       r.applyBossMove(move);
       const c = cOf(r);
-      expect([c.taught, c.upgrades, c.locks.filter((l) => l.square === square)]).toEqual([true, 1, []]);
+      // (Taught once: his second capture teaches it too, Eric, Nov 18; the hunt from then.)
+      expect([c.marked, c.taught, c.upgrades, c.locks.filter((l) => l.square === square)]).toEqual([1, undefined, 1, []]);
       expect(r.boss!.powers!.events.find((e) => e.kind === "upgrade")).toMatchObject({ stage: 1, unlock: c.unlocked[0] });
     }
   });
@@ -244,15 +271,15 @@ describe("the locks (L1-L6)", () => {
     await crowdMove(r);
     onPosition(r, "4k3/8/5n2/3N4/8/8/8/R3K3 b - - 0 1", "w");
     r.applyBossMove("f6d5");
-    expect([cOf(r).taught, cOf(r).upgrades]).toEqual([true, 1]);
+    expect([cOf(r).marked, cOf(r).upgrades]).toEqual([1, 1]);
     // (Marked on d5, but the move played took the a1 rook: that's his first capture, and the mark goes.)
     const r2 = battle(3);
     await crowdMove(r2);
     onPosition(r2, "r3k3/8/5n2/3N4/8/8/8/R3K3 b - - 0 1", "w");
     expect(r2.bossMoveMoment("f6d5")).toBe(CHANDY_FX.lockOn);
     r2.applyBossMove("a8a1");
-    // (The mark, from before his move, is gone; a lock now is his first hunt's, from after it.)
-    expect([cOf(r2).taught, cOf(r2).upgrades, cOf(r2).locks.filter((l) => l.at === 0)]).toEqual([true, 1, []]);
+    // (The mark, from before his move, is gone; no hunt yet: his second capture teaches too.)
+    expect([cOf(r2).marked, cOf(r2).upgrades, cOf(r2).locks]).toEqual([1, 1, []]);
   });
 
   it("the test switch's capture (?power=lockon): a capture that nets him no loss, the most netting first; null: none", () => {
