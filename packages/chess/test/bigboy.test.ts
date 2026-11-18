@@ -40,7 +40,6 @@ import {
   hisToppleOpen,
   sideToMove,
   snackSquare,
-  topples,
   toyBlockSquares,
   toyStops,
   toysTakeMove,
@@ -241,14 +240,14 @@ describe("Big Boy's toy blocks", () => {
   });
 
   it("stop moves onto them and through them (slides, a pawn's double step, castling), but not a knight's jump", () => {
-    expect(blockedBy("e2e4", "e4")).toBe(true);
-    expect(blockedBy("e2e4", "e3")).toBe(true); // a double step slides over e3
-    expect(blockedBy("f1c4", "e2")).toBe(true);
-    expect(blockedBy("f1c4", "d3")).toBe(true);
-    expect(blockedBy("f1c4", "d4")).toBe(false);
-    expect(blockedBy("g1f3", "g2")).toBe(false); // a knight jumps
-    expect(blockedBy("g1f3", "f3")).toBe(true);
-    expect(blockedBy("a1a4", "a3")).toBe(true);
+    expect(blockedBy("e2e4", "e4", START_FEN)).toBe(true);
+    expect(blockedBy("e2e4", "e3", START_FEN)).toBe(true); // a double step slides over e3
+    expect(blockedBy("f1c4", "e2", START_FEN)).toBe(true);
+    expect(blockedBy("f1c4", "d3", START_FEN)).toBe(true);
+    expect(blockedBy("f1c4", "d4", START_FEN)).toBe(false);
+    expect(blockedBy("g1f3", "g2", START_FEN)).toBe(false); // a knight jumps
+    expect(blockedBy("g1f3", "f3", START_FEN)).toBe(true);
+    expect(blockedBy("a1a4", "a3", START_FEN)).toBe(true);
     const castle = "r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1";
     expect(blockedBy("e1g1", "f1", castle)).toBe(true);
     expect(blockedBy("e1c1", "b1", castle)).toBe(true); // the rook slides over b1
@@ -320,7 +319,7 @@ describe("Big Boy's toy blocks", () => {
     const his = bossAllowed(r.boss!, fen);
     if (his) for (const m of his) for (const sq of scattered) expect(blockedBy(m, sq, fen)).toBe(false);
     await r.playBoss();
-    expect(scattered.some((sq) => blockedBy(r.boards.get(0)!.lastMove!, sq))).toBe(false);
+    expect(scattered.some((sq) => blockedBy(r.boards.get(0)!.lastMove!, sq, fen))).toBe(false);
     // The crowd's next turn (3): still there, the crowd's moves kept off them.
     r.deal();
     expect(r.boss!.powers!.turn).toBe(3);
@@ -346,15 +345,13 @@ describe("Big Boy's toy blocks", () => {
     const p = (height: number, square: string) => ({ tower: { square, height, at: 2 }, scatter: null });
     expect(toyStops("c3b5", p(1, "b5"), fen, true)).toBe(true);
     expect(toyStops("c3b5", p(2, "b5"), fen, true)).toBe(false);
-    expect(topples("c3b5", p(2, "b5").tower, fen)).toBe(true);
     // His own pieces, on a turn it's closed to them (most of his turns: hisToppleOpen), never enter it.
     expect(toyStops("c3b5", p(5, "b5"), fen, false)).toBe(true);
     // A slide through it: never.
     expect(toyStops("d2g5", p(5, "f4"), fen, true)).toBe(true);
     expect(toyStops("d2f4", p(5, "f4"), fen, true)).toBe(false);
-    // Castling: the king's way runs on to the rook's corner.
+    // Castling never topples it: the rook's way passes over it.
     expect(toyStops("e1g1", p(5, "g1"), fen, true)).toBe(true);
-    expect(topples("e1g1", p(5, "g1").tower, fen)).toBe(false);
     // A scattered block: nothing onto it or through it, either side.
     const sc = { tower: null, scatter: { from: "e3", height: 2, squares: ["b5", "e3"], by: "crowd" as const, at: 2, until: 3 } };
     expect(toyStops("c3b5", sc, fen, true)).toBe(true);

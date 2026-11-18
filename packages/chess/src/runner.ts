@@ -86,6 +86,7 @@ import {
   allowedSearch,
   boardAltered,
   bossAllowed,
+  bossStopped,
   boardFlipped,
   crowdAllowed,
   icedSquares,
@@ -1489,7 +1490,7 @@ export class MatchRunner {
     const taken = played.captures?.at(-1);
     const captured = taken && taken.ply === played.history.length ? taken.piece : undefined;
     // (A power stops it: it stopped every move he had, so the limit lifted for the turn. The screens say which power.)
-    const through = boss?.powers && bossRules(boss)?.bossStops?.(boss)?.(m, board.fen) ? stopReason(boss, board.fen, m) : null;
+    const through = bossStopped(boss, board.fen, m) ? stopReason(boss, board.fen, m) : null;
     this.bossLast = { move: shown, san: special && m === special.play ? special.san : toSan(board.fen, m), ...(staggered ? { staggered: true } : {}), ...(captured ? { captured } : {}), ...(through ? { through } : {}) };
     if (this.state.boss?.staggerNext) this.state = { ...this.state, boss: { ...this.state.boss, staggerNext: false } };
     // (The boss's own after-move effect: Sawyer's split pawn after his first move; Wrangler's pull, drag or showdown.)
