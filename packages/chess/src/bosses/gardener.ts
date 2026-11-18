@@ -41,7 +41,7 @@ import { kingAttacked, legalMoves, mateInOne, pieceAt, sideToMove, withPiece, wi
 import type { EngineLike } from "../runner.ts";
 import { stockfishRefuses } from "../uci.ts";
 import { PASS_WAIT, eachOn, logit, meterFull, moveSquares, other, passLoses, powerRoll, testSwitch, ticksAt, unleashed, type Battle, type BossRules, type Side } from "./base.ts";
-import { blockedBy } from "./bigboy.ts";
+import { marksStop, type SquareMark } from "../board-layer.ts";
 import { passTurn } from "./hollow.ts";
 
 /**
@@ -170,8 +170,11 @@ export const waterCode = (placed: readonly Placed[]): string => (placed.length ?
 const SQUARES: readonly string[] = [..."abcdefgh"].flatMap((f) => [1, 2, 3, 4, 5, 6, 7, 8].map((r) => `${f}${r}`));
 const isSquare = (sq: string) => SQUARES.includes(sq);
 
-/** A move a plain plant stops (lands on it or passes over it; a knight jumps it), as a toy block does. */
-export const plantStops = (move: string, plants: readonly string[], fen?: string): boolean => plants.some((p) => blockedBy(move, p, fen));
+/** Plain plants on `squares`, on the board layer: nothing lands on one or passes over it, either side (a toy block's way). */
+export const plantMarks = (squares: readonly string[]): SquareMark[] => squares.map((square) => ({ square, kind: "plant", noLand: true, noPass: true, binds: "both", by: "gardener" }));
+
+/** A move a plain plant stops (`fen`: before it; lands on it or passes over it; a knight jumps it), as a toy block does. */
+export const plantStops = (move: string, plants: readonly string[], fen: string): boolean => plants.length > 0 && !!marksStop({ squares: plantMarks(plants) }, fen, move);
 
 /**
  * A position a watering may leave (the crowd to move, `plants` on the board): one the engine plays, neither side in
@@ -506,14 +509,10 @@ export const GARDENER: BossRules = {
   },
   // (Seeds come by the clock: nothing happens as a turn begins.)
   passive() {},
-  // Nothing moves onto a plain plant or through it, either side (a toy block's way).
-  crowdFilter(allowed, boss, fen) {
+  // On the board layer: nothing moves onto a plain plant or through it, either side (a toy block's way).
+  layer: (boss) => {
     const plants = plantSquares(boss.powers);
-    return plants.length ? allowed.filter((m) => !plantStops(m, plants, fen)) : allowed;
-  },
-  bossStops(boss) {
-    const plants = plantSquares(boss.powers);
-    return plants.length ? (m, fen) => plantStops(m, plants, fen) : null;
+    return plants.length ? { squares: plantMarks(plants) } : null;
   },
   stopReason: (boss, fen, m) => (plantStops(m, (boss.powers?.garden?.plants ?? []).map((p) => p.square), fen) ? "plant" : null),
   // A turn with a plant on the board, and the turn after a watering (the board changed), don't count for fair play.

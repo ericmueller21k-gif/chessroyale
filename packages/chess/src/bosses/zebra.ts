@@ -45,6 +45,7 @@ import { BOSS_OPENING, newBoard } from "../boards.ts";
 import { openingNameFor } from "../openings.ts";
 import { fenAtPly, legalMoves, moveNumber, pieceAt, positionOver, sideToMove, withPiece } from "../rules.ts";
 import { VALUE, from, materialOf, meterFull, other, powerRoll, testSwitch, to, turnOf, unleashed, type Battle, type BossRules, type Side, type StopFields } from "./base.ts";
+import { marksStop, type SquareMark } from "../board-layer.ts";
 import { BALLOON_TEST_MOVES, hoopsGuard, landRefused } from "./tiger.ts";
 import { tidyEnPassant } from "./timber.ts";
 
@@ -189,6 +190,9 @@ export function riseCheck(fen: string, piece: DoughPiece, square: string, his: S
 /** The squares of the dough on the board. */
 export const doughSquares = (p: Pick<BossPowerState, "zebra"> | null | undefined): string[] => (p?.zebra?.lumps ?? []).map((l) => l.square);
 
+/** His dough on `squares`, on the board layer: his pieces never land on it (the crowd's squash it). */
+export const doughMarks = (squares: readonly string[]): SquareMark[] => squares.map((square) => ({ square, kind: "dough", noLand: true, binds: "bosses", by: "zebra" }));
+
 /** His `n`-th drop is due at the end of his turn after crowd move `at`. */
 export function dropDue(z: ZebraState, at: number, s: Pick<BossPowerSettings, "doughDrops" | "doughLast" | "doughLive"> = BOSS_POWERS): boolean {
   return z.drops < s.doughDrops && at >= z.next && at <= s.doughLast && z.lumps.length < s.doughLive;
@@ -310,10 +314,10 @@ export const ZEBRA: BossRules = {
     const gold = boss.powers?.zebra?.gold ?? [];
     return gold.length ? allowed.filter((m) => !pawnOnGold(fen, m, gold)) : allowed;
   },
-  // His pieces never move onto his dough (lifted if it's his only move).
-  bossStops(boss) {
+  // On the board layer: his pieces never move onto his dough (lifted if it's his only move).
+  layer: (boss) => {
     const lumps = doughSquares(boss.powers);
-    return lumps.length ? (m) => lumps.includes(to(m)) : null;
+    return lumps.length ? { squares: doughMarks(lumps) } : null;
   },
   stopReason: (boss, fen, m) => zebraStop(boss.powers?.zebra ?? null, fen, m),
   // The turn a piece rose (the board changed outside a move) and a turn a pawn could have taken a gold piece don't count for
@@ -358,8 +362,7 @@ export const ZEBRA: BossRules = {
 export function zebraStop(z: NonNullable<StopFields["zebra"]> | null, fen: string, move: string): "gold" | "dough" | null {
   if (!z) return null;
   if (pawnOnGold(fen, move, z.gold)) return "gold";
-  const pc = pieceAt(fen, from(move));
-  if (z.his && pc?.color === z.his && z.lumps.some((l) => l.square === to(move))) return "dough";
+  if (z.his && z.lumps.length && marksStop({ squares: doughMarks(z.lumps.map((l) => l.square)) }, fen, move, other(z.his))) return "dough";
   return null;
 }
 

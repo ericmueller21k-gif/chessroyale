@@ -16,7 +16,8 @@ import { BOSS_OPENING, newBoard } from "../boards.ts";
 import { applyMove, legalMoves, pieceAt, withoutPiece } from "../rules.ts";
 import type { EngineLike } from "../runner.ts";
 import type { MoveScore } from "../uci.ts";
-import { bossPowers, crowdHalf, logit, meterFull, moveSquares, other, powerRoll, testSwitch, to, topEach, unleashed, type Battle, type BossRules, type Side } from "./base.ts";
+import { bossPowers, crowdHalf, logit, meterFull, other, powerRoll, testSwitch, to, topEach, unleashed, type Battle, type BossRules, type Side } from "./base.ts";
+import { marksStop, type Binds, type SquareMark } from "../board-layer.ts";
 import { gridHanging, gridKingAttacked, gridOf, isLight, placementOf, type Grid } from "./grid.ts";
 
 /**
@@ -74,12 +75,15 @@ export function snackSquare(seed: number, crowd: Side): string {
   return `${powerRoll(seed, "snack") < 0.5 ? "d" : "e"}${crowd === "w" ? 2 : 7}`;
 }
 
+/** A toy block on `square`, on the board layer: nothing lands on it or passes over it (for the sides `binds` binds). */
+const toyBlock = (square: string, binds: Binds = "both"): SquareMark => ({ square, kind: "block", noLand: true, noPass: true, binds, by: "bigboy" });
+
 /**
- * A toy block stops a move: it lands on the block, or slides over it (a rank, file or diagonal, a pawn's double step, a
- * castling king's way to his rook's corner). A knight jumps it. It never stops an attack: a piece behind it still gives
- * check and pins as in ordinary chess (the block only takes moves away, like the pie).
+ * A toy block stops a move (`fen`: before it): it lands on the block, or slides over it (a rank, file or diagonal, a pawn's
+ * double step, castling's king or rook). A knight jumps it. It never stops an attack: a piece behind it still gives check and
+ * pins as in ordinary chess (the block only takes moves away, like the pie). The board layer's rule (a wall: layerStop).
  */
-export const blockedBy = (move: string, block: string | null | undefined, fen?: string): boolean => !!block && moveSquares(move, fen).slice(1).includes(block);
+export const blockedBy = (move: string, block: string | null | undefined, fen: string): boolean => !!block && !!marksStop({ squares: [toyBlock(block)] }, fen, move);
 
 /**
  * Where Big Boy tosses his toy block: an empty square on the crowd's half that one of its pieces could move to now
@@ -105,18 +109,6 @@ export function toyBlockSquares(p: Pick<BossPowerState, "tower" | "scatter"> | n
   return [...(p?.tower ? [p.tower.square] : []), ...(p?.scatter?.squares ?? [])];
 }
 
-/** A castling move (the king two files along): its way runs on past where he lands, to the rook's corner. */
-const castles = (move: string, fen: string): boolean => Math.abs(move.charCodeAt(0) - move.charCodeAt(2)) === 2 && pieceAt(fen, move.slice(0, 2))?.type === "k";
-
-/**
- * A move topples his tower: it lands on the tower's square (an ordinary legal move: a slide that ends there, a knight's
- * jump, a pawn's step or capture; never castling, whose way runs on past it), and the tower is towerEnter blocks or more.
- * (The crowd's may, always; his only on a turn his tower is open to him: hisToppleOpen.)
- */
-export function topples(move: string, tower: { square: string; height: number } | null | undefined, fen: string, s: Pick<BossPowerSettings, "towerEnter"> = BOSS_POWERS): boolean {
-  return !!tower && tower.height >= s.towerEnter && to(move) === tower.square && !castles(move, fen);
-}
-
 /**
  * His tower is open to his own pieces on his move now (Eric, Nov 18: "both but he usually doesn't"): on a towerBossChance share
  * of his turns, drawn from the battle's seed and the crowd turn just played (`p.turn`; the same on the server, the host and in
@@ -129,17 +121,22 @@ export function hisToppleOpen(p: Pick<BossPowerState, "seed" | "turn" | "tower">
 }
 
 /**
- * His toy blocks stop a move (`mayTopple`: the move may topple the tower: always the crowd's, his only when hisToppleOpen):
- * onto or through a scattered block; through the tower; onto the tower, unless the move may topple it and does (`topples`). A
- * knight jumps them all; none ever stops an attack.
+ * His toys on the board layer (`mayTopple`: a move may topple the tower, for the sides `binds` binds: always the crowd's, his
+ * only when hisToppleOpen): each scattered block a wall (nothing onto it or through it); the tower nothing passes over, nor lands
+ * on unless a move may topple it and it's towerEnter blocks or more (castling never does: its rook's way passes it).
  */
-export function toyStops(move: string, p: Pick<BossPowerState, "tower" | "scatter"> | null | undefined, fen: string, mayTopple: boolean, s: Pick<BossPowerSettings, "towerEnter"> = BOSS_POWERS): boolean {
-  if (p?.scatter?.squares.some((sq) => blockedBy(move, sq, fen))) return true;
+export function toyMarks(p: Pick<BossPowerState, "tower" | "scatter"> | null | undefined, mayTopple: boolean, s: Pick<BossPowerSettings, "towerEnter"> = BOSS_POWERS, binds: Binds = "both"): SquareMark[] {
   const t = p?.tower;
-  if (!t || !blockedBy(move, t.square, fen)) return false;
-  // (Onto it, not through it: its square is where the move lands and nowhere on its way.)
-  return !(mayTopple && topples(move, t, fen, s) && moveSquares(move, fen).indexOf(t.square) === 1);
+  return [...(p?.scatter?.squares ?? []).map((sq) => toyBlock(sq, binds)), ...(t ? [{ ...toyBlock(t.square, binds), noLand: !(mayTopple && t.height >= s.towerEnter) }] : [])];
 }
+
+/**
+ * His toy blocks stop a move (`mayTopple`: the move may topple the tower: always the crowd's, his only when hisToppleOpen):
+ * onto or through a scattered block; through the tower; onto the tower, unless the move may topple it and does. A knight
+ * jumps them all; none ever stops an attack. The board layer's rule (toyMarks).
+ */
+export const toyStops = (move: string, p: Pick<BossPowerState, "tower" | "scatter"> | null | undefined, fen: string, mayTopple: boolean, s: Pick<BossPowerSettings, "towerEnter"> = BOSS_POWERS): boolean =>
+  !!marksStop({ squares: toyMarks(p, mayTopple, s) }, fen, move);
 
 /**
  * Where a toppled tower's blocks land (Eric: "it favors the closer ones, but ... some scattered further away"): up to `height`
@@ -514,17 +511,13 @@ export const BIGBOY: BossRules = {
       t.events.push({ kind: "stack", turn: t.turn, square: tower.square, height: tower.height + 1 });
     }
   },
-  // Nothing of the crowd's onto a block or through one, nor through the tower; onto the tower only to topple it.
-  crowdFilter(allowed, boss, fen) {
+  // On the board layer: nothing onto a block or through one, nor through the tower, either side; onto the tower the crowd's
+  // pieces only to topple it, his only on a turn it's open to him (hisToppleOpen).
+  layer(boss) {
     const p = boss.powers!;
-    return p.tower || p.scatter ? allowed.filter((m) => !toyStops(m, p, fen, true)) : allowed;
-  },
-  // His own pieces: never onto a block or through one; into the tower only on a turn it's open to him (hisToppleOpen).
-  bossStops(boss) {
-    const p = boss.powers;
-    if (!p?.tower && !p?.scatter) return null;
-    const open = hisToppleOpen(p);
-    return (m, fen) => toyStops(m, p, fen, open);
+    if (!p.tower && !p.scatter) return null;
+    const tower = { tower: p.tower };
+    return { squares: [...toyMarks({ scatter: p.scatter }, true), ...toyMarks(tower, true, BOSS_POWERS, "crowd"), ...toyMarks(tower, hisToppleOpen(p), BOSS_POWERS, "bosses")] };
   },
   // (Asked only of a move that isn't allowed, or his only move let through: any block it touches is why.)
   stopReason: (boss, fen, m) => (toyStops(m, boss.powers, fen, false) ? "block" : null),
