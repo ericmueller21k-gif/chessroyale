@@ -1063,6 +1063,17 @@ export const currentParty = (kind: PartyKind = "squads") => {
   return c && /^[A-Z2-9]{5}$/.test(c) && stored(partyKey(c, kind)) ? c : null;
 };
 
+/**
+ * This device forgets a party: its seat token, its last placing and, if it's the party this device was last in, that too. A party
+ * found closed is forgotten at once (Eric, Nov 18: "That party has closed." came back every time the Boss Battle screen opened,
+ * because the closed party stayed this device's current one and was tried again on each visit). A notice once, never again.
+ */
+export function forgetParty(code: string, kind: PartyKind = "squads") {
+  store(partyKey(code, kind), null);
+  store(`${partyKey(code, kind)}.placed`, null);
+  if (stored(partyCurrentKey(kind)) === code.toUpperCase()) store(partyCurrentKey(kind), null);
+}
+
 /** GET /api/squads/party/CODE (or Boss Battle's): open or not; null when it can't tell. */
 export async function partyStatus(code: string, kind: PartyKind = "squads"): Promise<boolean | null> {
   try {
@@ -1161,6 +1172,7 @@ export class PartyClient {
       void partyStatus(this.code, this.kind).then((open) => {
         if (open === false) {
           this.error = "That party has closed.";
+          this.forget();
           this.close();
           this.emit();
         } else again();
@@ -1208,6 +1220,7 @@ export class PartyClient {
         break;
       case "closed":
         this.error = "That party has closed.";
+        this.forget();
         this.close();
         break;
     }
@@ -1243,9 +1256,7 @@ export class PartyClient {
 
   /** This device forgets the party (left, or kicked). */
   private forget() {
-    store(partyKey(this.code, this.kind), null);
-    store(`${partyKey(this.code, this.kind)}.placed`, null);
-    if (stored(partyCurrentKey(this.kind)) === this.code) store(partyCurrentKey(this.kind), null);
+    forgetParty(this.code, this.kind);
   }
 
   /** Leave the party for good (this device forgets it). */
