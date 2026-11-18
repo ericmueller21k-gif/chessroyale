@@ -30,7 +30,8 @@
 import { BOSS_POWERS, MOO_CINEMATIC, type BossPowerSettings, type BossPowerState, type MooState, type PowerEvent } from "@chessroyale/core";
 import { applyMove, legalMoves, pieceAt, sideToMove } from "../rules.ts";
 import type { EngineLike } from "../runner.ts";
-import { VALUE, from, heldIn, meterFull, powerRoll, testSwitch, turnOf, unleashed, type Battle, type BossRules, type Side } from "./base.ts";
+import { heldBy, VALUE, from, meterFull, powerRoll, testSwitch, turnOf, unleashed, type Battle, type BossRules, type Side } from "./base.ts";
+import { heldIn } from "../board-layer.ts";
 
 /**
  * Each of his moments beat by beat (ms into it), from his animations (docs/decisions/2026-10-20-moo-animations.md), so
@@ -200,8 +201,8 @@ export const MOO: BossRules = {
   },
   // (Moonbeam works through his moves: afterBossMove.)
   passive() {},
-  // Stunned pieces can't move this turn, nor castle with a stunned rook (the held pieces' one rule: heldIn).
-  held: (boss) => stunOn(mooOf(boss.powers), turnOf(boss))?.squares ?? [],
+  // Stunned pieces can't move this turn, nor castle with a stunned rook (held on the board layer).
+  layer: (boss) => heldBy(boss, "stunned", stunOn(mooOf(boss.powers), turnOf(boss))?.squares ?? []),
   powerTurn: (boss) => !!stunOn(mooOf(boss.powers), turnOf(boss)),
   // The Full Moon: his moves are the engine's at full strength (the runner's "best").
   bestReply: (boss) => (boss.powers?.moo?.full?.left ?? 0) > 0,

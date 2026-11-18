@@ -11,7 +11,8 @@
 import { BOSS_POWERS, type BossPowerSettings, type BossPowerState, type BossState, type SuperFreezeState } from "@chessroyale/core";
 import { boardEnd } from "../boards.ts";
 import { legalMoves, pieceAt, sideToMove } from "../rules.ts";
-import { VALUE, bossPowers, from, heldIn, powerRoll, to, turnOf, warnThenUnleash, type Battle, type BossRules, type Side, type TurnContext } from "./base.ts";
+import { heldBy, VALUE, bossPowers, from, powerRoll, to, turnOf, warnThenUnleash, type Battle, type BossRules, type Side, type TurnContext } from "./base.ts";
+import { heldIn } from "../board-layer.ts";
 
 /**
  * His Super Freeze beat by beat (ms into its moment, after its banner's hold; Eric, Nov 18: "that animation might even take 4 or 5
@@ -373,14 +374,14 @@ export const GINGER: BossRules = {
       next.nextPassive = t.turn + lo + Math.floor(powerRoll(t.seed, "every", t.turn) * (hi - lo + 1));
     } else next.nextPassive = t.turn + 1;
   },
-  // Frozen pieces can't move, nor castle with a frozen rook (the held pieces' one rule: heldIn); in the blizzard only its
-  // free pieces move (none can: everything, as the dispatcher lifts it).
-  held(boss, fen) {
+  // Frozen pieces can't move, nor castle with a frozen rook (held on the board layer); in the blizzard only its free pieces
+  // move (none can: everything, as the dispatcher lifts it).
+  layer(boss, fen) {
     const ice = blizzardIce(boss, turnOf(boss), fen);
-    if (ice) return [...ice];
+    if (ice) return heldBy(boss, "frozen", [...ice]);
     const frozen = boss.powers!.frozen;
     // (The Super Freeze's pieces on its turn, with the freeze's piece.)
-    return [...(frozen ? [frozen.square] : []), ...superHeldOn(boss.powers, turnOf(boss))];
+    return heldBy(boss, "frozen", [...(frozen ? [frozen.square] : []), ...superHeldOn(boss.powers, turnOf(boss))]);
   },
   powerTurn: (boss) => !!boss.powers!.frozen || blizzardNow(boss) || superHeldOn(boss.powers, turnOf(boss)).length > 0,
   afterCrowdMove(b) {

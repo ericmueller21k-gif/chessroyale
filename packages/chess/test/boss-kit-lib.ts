@@ -490,9 +490,9 @@ export interface KitRun {
 /**
  * One battle through the match runner, as solo plays one (simulateRest's order of steps), every invariant after every
  * step. The steps at the start of his turn are the runner's own (KNOWN_STEPS); his move is `playBoss` on the stand-in
- * engine.
+ * engine. `watch`: called as each crowd turn is dealt, the crowd to move (the board layer's twin test reads it).
  */
-export async function runBattle(k: KitBattle, sf: StockfishMoves | null): Promise<KitRun> {
+export async function runBattle(k: KitBattle, sf: StockfishMoves | null, watch?: (r: MatchRunner, fen: string) => void): Promise<KitRun> {
   const settings = kitSettings(k);
   const engines = [fakeEngine()];
   const r = new MatchRunner({ settings, rng: mulberry32(k.seed), engines, library: [k.opening], entrants: [{ id: "h0", name: "H", isBot: false }], raidSide: k.side });
@@ -614,6 +614,7 @@ export async function runBattle(k: KitBattle, sf: StockfishMoves | null): Promis
     r.deal();
     const fen = r.boards.get(r.state.boards[0]!)!.fen;
     const allowed = r.crowdAllowed() ?? legalMoves(fen);
+    watch?.(r, fen);
     if (k.strikes.includes(r.boss!.crowdMoves + 1)) callStrike(r);
     // (Hollow alone, the 3rd or 7th bulb out: the dark's move is the crowd's. The driver never tries the dark, so only a
     // battle set up with it comes here.)

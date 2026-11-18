@@ -15,12 +15,13 @@
  * Turns are the crowd's: turn N is the crowd's Nth move of the battle (crowdMoves + 1 while it's being picked).
  */
 import { BOSS_POWERS, type BossPowerSettings, type BossPowerState, type BossState, type PowerEvent, type StopReason } from "@chessroyale/core";
+import { layerStop, mergeLayers } from "./board-layer.ts";
 import { legalMoves } from "./rules.ts";
 import type { EngineLike } from "./runner.ts";
 import type { MoveScore } from "./uci.ts";
 import {
   bossPowers,
-  heldIn,
+  heldBy,
   materialOf,
   moveLoss,
   moveSquares,
@@ -47,7 +48,7 @@ import {
 import { bossRules } from "./bosses/index.ts";
 
 // Every boss's file, and the shared pieces of the base boss, for the whole package.
-export { bossPowers, heldIn, materialOf, moveLoss, moveSquares, powerRoll, rageNow, ragePoints, rageSpeedOf, rageTick, topEach, unleashed };
+export { bossPowers, heldBy, materialOf, moveLoss, moveSquares, powerRoll, rageNow, ragePoints, rageSpeedOf, rageTick, topEach, unleashed };
 // (The pass guard: one rule for every power that spends his whole turn.)
 export { PASS_WAIT, passAnswer, passLoses, passScores, type PassScore } from "./bosses/base.ts";
 // The board layer (every boss's marks at once: board-layer.ts).
@@ -225,7 +226,7 @@ export function powerTurn(boss: BossState | null | undefined, fen?: string): boo
  * (Eric, Oct 24: Babur's hoop stopped the recapture the plain-chess judge feared;
  * docs/decisions/2026-10-24-king-save-off-on-altered-boards.md). One rule for every boss, no list: a power touches the
  * turn (`powerTurn`, fair play's own test), something stops his moves (`bossStops`), something stops any of the crowd's
- * (`held`, `crowdFilter`), or something else of his is on the board (`altersBoard`: Hollow's dark, the Roman candle's shadows,
+ * (`layer`, `crowdFilter`), or something else of his is on the board (`altersBoard`: Hollow's dark, the Roman candle's shadows,
  * the carrots). A boss with its own test (`standAltered`: Big Boy's, his toy blocks only where they take away the reply the
  * Last Stand would replay; Eric's (b), Nov 18) answers in its place, given the crowd's move (`stand`: the played move and the
  * judge's feared reply; without it, the general rule). `rules`: the boss's (a test's stand-in).
@@ -239,20 +240,21 @@ export function boardAltered(
   if (!boss?.powers || !rules) return false;
   if (rules.standAltered && stand) return rules.standAltered(boss, fen, stand.played, stand.reply);
   if (rules.powerTurn?.(boss, fen) || rules.bossStops?.(boss) || rules.altersBoard?.(boss)) return true;
-  if (!rules.crowdFilter && !rules.held) return false;
+  if (!rules.crowdFilter && !rules.layer) return false;
   const legal = legalMoves(fen);
   return limitCrowd(rules, boss, fen, legal).length < legal.length;
 }
 
 /**
- * A boss's limits on the crowd's `legal` moves (none may be left: the caller lifts them): its held pieces first, one rule
- * for every boss (Eric, Oct 27): a held piece doesn't move, nor castles with a held rook (`heldIn`); then its other limits
- * (`crowdFilter`).
+ * A boss's limits on the crowd's `legal` moves (none may be left: the caller lifts them): its marks on the board first
+ * (`layer`, read by the board layer's `layerStop`), one rule for every boss (Eric, Oct 27): a held piece doesn't move, nor
+ * castles with a held rook; then its other limits (`crowdFilter`).
  */
-export function limitCrowd(rules: Pick<BossRules, "held" | "crowdFilter"> | null | undefined, boss: BossState, fen: string, legal: string[]): string[] {
+export function limitCrowd(rules: Pick<BossRules, "layer" | "crowdFilter"> | null | undefined, boss: BossState, fen: string, legal: string[]): string[] {
   if (!rules) return legal;
-  const held = rules.held?.(boss, fen) ?? [];
-  const free = held.length ? legal.filter((m) => !heldIn(fen, m, held)) : legal;
+  const marks = rules.layer?.(boss, fen);
+  const layer = marks ? mergeLayers(boss.crowdSide, [marks]) : null;
+  const free = layer ? legal.filter((m) => !layerStop(layer, fen, m)) : legal;
   return rules.crowdFilter ? rules.crowdFilter(free, boss, fen) : free;
 }
 

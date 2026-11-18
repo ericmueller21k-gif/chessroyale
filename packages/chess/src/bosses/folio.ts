@@ -24,7 +24,7 @@ import { Chess, type Square } from "chess.js";
 import { boardEnd } from "../boards.ts";
 import { applyMove, baseAt, fenAtPly, legalMoves, matingMoves, pieceAt, toSan } from "../rules.ts";
 import type { EngineLike } from "../runner.ts";
-import { VALUE, eachOn, from, logit, materialOf, meterFull, other, powerRoll, rageNow, rageSpeedOf, rageTick, testSwitch, to, turnOf, type Battle, type BossRules, type JudgedMove, type Side } from "./base.ts";
+import { heldBy, VALUE, eachOn, from, logit, materialOf, meterFull, other, powerRoll, rageNow, rageSpeedOf, rageTick, testSwitch, to, turnOf, type Battle, type BossRules, type JudgedMove, type Side } from "./base.ts";
 
 /**
  * How long each of its moments holds the screen (ms; POWER_FX in boss-timing.ts). `fold` and `revision` play at the start
@@ -392,12 +392,12 @@ export const FOLIO: BossRules = {
     t.events.push({ kind: "draft", turn: t.turn, square: pick.square, squares: [pick.attacker, ...pick.line, pick.square] });
     next.nextPassive = t.turn + (t.test === "draft" ? 1 : Math.max(1, Math.round(t.s.draftEvery)));
   },
-  // A folded piece doesn't move, nor castles (the held pieces' one rule: heldIn); none of the crowd's pieces crosses the
-  // crease (the dispatcher lifts both for a turn they'd leave no move, or no way out of check). Folio's own moves are never
-  // stopped: no bossStops.
-  held(boss) {
+  // A folded piece doesn't move, nor castles (held on the board layer); none of the crowd's pieces crosses the crease (the
+  // dispatcher lifts both for a turn they'd leave no move, or no way out of check). Folio's own moves are never stopped: no
+  // bossStops.
+  layer(boss) {
     const folded = foldedOn(folioOf(boss.powers), turnOf(boss));
-    return folded ? [folded] : [];
+    return heldBy(boss, "folded", folded ? [folded] : []);
   },
   crowdFilter(allowed, boss, fen) {
     const line = creaseOn(boss.powers, turnOf(boss));
