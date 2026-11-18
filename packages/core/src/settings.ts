@@ -4987,7 +4987,7 @@ export const HAPTICS = {
   },
   /** The art's cues that vibrate: "<art id> <cue>", or "<art id> <animation> <cue>" for a cue that's in other animations too. */
   cues: {
-    "toy-block clack": "bigboyBlock",
+    "toy-block-top clack": "bigboyBlock",
     "bigboy crash": "bigboyBounce",
     "tigerPump pop": "baburPop",
     "ice-overlay freeze crackle": "gingerFreeze",

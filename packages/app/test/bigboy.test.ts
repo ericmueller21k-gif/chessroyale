@@ -4,7 +4,8 @@ import { BOUNCE, SNACK, START_FEN, applyMove, bounceCandidates, bounceResult, pi
 import { BIGBOY, bounceShape } from "../src/characters/bigboy.ts";
 import { BIGBOY_SOUNDS, bigBoySound } from "../src/characters/bigboy-sounds.ts";
 import { BOSS_KITS } from "../src/characters/kits.ts";
-import { EFFECTS, POWER_MOMENTS, animLength, blockItem, blockLetter, cueAt } from "../src/characters/power-art.ts";
+import { EFFECTS, POWER_MOMENTS, animLength, blockItem, cueAt } from "../src/characters/power-art.ts";
+import { TOWER_BLOCKS, TOWER_TOPS } from "../src/characters/effects/bigboy-tower.ts";
 import { MOVE_MEAN_DB, MOVE_PEAK } from "../src/characters/synth.ts";
 import { frameKeys } from "../src/characters/sprite.ts";
 import { bounceFen, bounceFlyers, spotSquares } from "../src/components/BigBoy.tsx";
@@ -143,25 +144,67 @@ describe("his Big Bounce", () => {
 });
 
 describe("his toy block", () => {
-  it("is an ABC block: A, B or C by its square, landing (a clack), sitting, puffing away (ends empty)", () => {
-    expect(new Set(["a1", "b1", "c1", "a2", "b2", "c2"].map(blockLetter))).toEqual(new Set(["A", "B", "C"]));
+  it("is block n from his tower (1 to 10): landing (a clack), sitting, puffing away (ends empty), tumbling in flight", () => {
     const fx = EFFECTS.toyBlock;
-    for (const l of ["A", "B", "C"]) {
-      expect(fx.ch.anims[`land${l}`]!.frames.some((f) => f.cue === "clack")).toBe(true);
-      expect(fx.ch.anims[`sit${l}`]!.loop).toBe(true);
-      expect(fx.ch.anims[`poof${l}`]!.frames.at(-1)!.layers).toEqual([]);
-      expect(EFFECTS.blockFly.ch.anims[`fly${l}`]!.loop).toBe(true);
+    for (let n = 1; n <= 10; n++) {
+      expect(fx.ch.anims[`land${n}`]!.frames.some((f) => f.cue === "clack")).toBe(true);
+      expect(fx.ch.anims[`sit${n}`]!.loop).toBe(true);
+      expect(fx.ch.anims[`poof${n}`]!.frames.at(-1)!.layers).toEqual([]);
+      expect(EFFECTS.blockFly.ch.anims[`fly${n}`]!.loop).toBe(true);
     }
     expect(fx.sounds).toEqual({ clack: "bigboyClack", poof: "bigboyPoof" });
-    expect(blockItem("c3", "land", 5)).toEqual({ square: "c3", name: "toyBlock", anim: `land${blockLetter("c3")}`, then: `sit${blockLetter("c3")}`, since: 5 });
+    expect(blockItem("c3", "land", 5, 3)).toEqual({ square: "c3", name: "toyBlock", anim: "land3", then: "sit3", since: 5 });
+    expect(blockItem("c3", "sit", 5, 12).anim).toBe("sit10");
     expect(POWER_MOMENTS["Big Boy"]!.power).toMatchObject({ anim: "toss", hit: "toss" });
     expect(cueAt(BIGBOY.anims.toss!, "toss")).not.toBeNull();
   });
 
-  it("fills the middle of its square, a little shadow under it", () => {
-    const keys = frameKeys(EFFECTS.toyBlock.ch, EFFECTS.toyBlock.ch.anims.sitA!.frames[0]!);
-    expect(keys[18]![14]).toBeTruthy();
+  it("fills the middle of its square, and nothing of it (outline included) is cut off at the square's edge", () => {
+    const keys = frameKeys(EFFECTS.toyBlock.ch, EFFECTS.toyBlock.ch.anims.sit1!.frames[0]!);
+    expect(keys[15]![15]).toBeTruthy();
     expect(keys.flat().filter(Boolean).length).toBeGreaterThan(32 * 32 * 0.4);
+    // (They're drawn in the tower's frame and cut out as one square: every part's box, its outline too, inside the square.)
+    for (const ch of [EFFECTS.toyBlock.ch, EFFECTS.blockFly.ch])
+      for (const [name, an] of Object.entries(ch.anims))
+        an.frames.forEach((f, i) => {
+          for (const l of f.layers) {
+            const p = ch.parts[l.part]!;
+            const o = p.outline === false ? 0 : 1;
+            const [w, h] = (l.rot ?? 0) % 2 ? [p.grid.length, p.grid[0]!.length] : [p.grid[0]!.length, p.grid.length];
+            expect([l.x - o, l.y - o, 32 - (l.x + w + o), 32 - (l.y + h + o)].every((v) => v >= 0), `${name} frame ${i}: ${l.part}`).toBe(true);
+          }
+        });
+  });
+});
+
+describe("his tower, seen from above (Nov 18)", () => {
+  const ch = EFFECTS.toyTower.ch;
+  const keysOf = (a: string, i: number) => frameKeys(ch, ch.anims[a]!.frames[i]!);
+  it("stands 1 to 10 blocks (the sway from rest), adds each block (its fall the 120 ms before its clack, ending as it stands), tips over (ending empty)", () => {
+    for (let n = 1; n <= 10; n++) {
+      expect(ch.anims[`stand${n}`]!.loop).toBe(true);
+      const add = ch.anims[`add${n}`]!;
+      const clack = add.frames.findIndex((f) => f.cue === "clack");
+      expect(add.frames.slice(0, clack).reduce((s, f) => s + f.ms, 0), `add${n}`).toBe(120);
+      expect(keysOf(`add${n}`, add.frames.length - 1), `add${n} ends as stand${n}`).toEqual(keysOf(`stand${n}`, 0));
+      if (n >= 2) {
+        expect(ch.anims[`tip${n}`]!.frames[0]!.cue).toBe("crash");
+        expect(ch.anims[`tip${n}`]!.frames.at(-1)!.layers).toEqual([]);
+      }
+    }
+  });
+
+  it("stays about on its square: centered on it, the tallest no more than about three quarters of a square above it, nothing at the frame's edge", () => {
+    expect([ch.w, ch.h]).toEqual([96, 96]);
+    expect(TOWER_BLOCKS).toHaveLength(10);
+    for (const [x, y] of TOWER_BLOCKS) expect(Math.abs(x - 48) <= 4 && y <= 48 && y >= 20).toBe(true);
+    expect(TOWER_TOPS[9]!).toBeGreaterThanOrEqual(32 - 26);
+    for (const name of ["stand10", "add10", "tip10"])
+      ch.anims[name]!.frames.forEach((_, i) => {
+        const k = keysOf(name, i);
+        const edge = k[0]!.some(Boolean) || k[95]!.some(Boolean) || k.some((r) => r[0] || r[95]);
+        expect(edge, `${name} frame ${i}`).toBe(false);
+      });
   });
 });
 

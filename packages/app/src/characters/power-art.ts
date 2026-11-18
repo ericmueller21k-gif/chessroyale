@@ -82,8 +82,9 @@
  *
  *   "Big Boy"
  *     power        "toss"       He pulls out a toy block, winds up over his shoulder and throws it; at `toss` it leaves
- *                               his hand: fly `blockFly` (fly<letter>) from him to the square, then play `toyBlock`
- *                               land<letter>, sit<letter> (loop) while it lasts, poof<letter> when it goes (blockItem()).
+ *                               his hand: fly `blockFly` (fly1) from him to the square, where it lands as his tower's
+ *                               first block (`toyTower` add1). A toppled tower's blocks fly (fly<n>, block n) to their
+ *                               squares and play `toyBlock` land<n>, sit<n> (loop) while they last, poof<n> (blockItem()).
  *     ultimateWarn "wail"       His tantrum (a wail as he goes red), for the one-turn warning.
  *     ultimate     "bigBounce"  Played ON THE BOARD (hide him in his corner meanwhile), from BOUNCE.leapAt
  *                               (boss-timing.ts): a leap, then three landings (each a squash with its `boing`) on the
@@ -305,7 +306,7 @@
  */
 import type { SoundName } from "../sound.ts";
 import { CHANDY_DODGE_SOUNDS, CHANDY_SOUNDS } from "./chandy.ts";
-import { EFFECT_SPRITES, TOY_LETTER_NAMES, type ToyLetter } from "./effects.ts";
+import { EFFECT_SPRITES } from "./effects.ts";
 import { animLength, cueAt, type Anim, type Character } from "./sprite.ts";
 
 /** The power moments' animation names, every boss's. */
@@ -573,9 +574,9 @@ export const EFFECTS: Record<EffectName, Effect> = {
   nightSquare: { ch: EFFECT_SPRITES.nightSquare, covers: "square", loop: "night0D", end: "dawn0D", sounds: { found: "hollowFound", answer: "hollowWhisper" } },
   nightLabel: { ch: EFFECT_SPRITES.nightLabel, covers: "square", loop: "a", sounds: {} },
   lashHit: { ch: EFFECT_SPRITES.lashHit, covers: "square", start: "hitFL0", sounds: {} },
-  toyBlock: { ch: EFFECT_SPRITES.toyBlock, covers: "square", start: "landA", loop: "sitA", end: "poofA", sounds: { clack: "bigboyClack", poof: "bigboyPoof" } },
-  blockFly: { ch: EFFECT_SPRITES.blockFly, covers: "square", loop: "flyA", sounds: {} },
-  // (Big Boy's tower, Nov 18: one square's width and a half, four squares and a quarter tall; the square is its bottom 32 rows.)
+  toyBlock: { ch: EFFECT_SPRITES.toyBlock, covers: "square", start: "land1", loop: "sit1", end: "poof1", sounds: { clack: "bigboyClack", poof: "bigboyPoof" } },
+  blockFly: { ch: EFFECT_SPRITES.blockFly, covers: "square", loop: "fly1", sounds: {} },
+  // (Big Boy's tower, Nov 18, seen from above: three squares each way, its square in the middle.)
   toyTower: { ch: EFFECT_SPRITES.toyTower, covers: "strip", loop: "stand1", sounds: { clack: "bigboyClack", crash: "bigboyCrash" } },
   bouncePuff: { ch: EFFECT_SPRITES.bouncePuff, covers: "square", start: "puff", sounds: {} },
   bounceCrash: { ch: EFFECT_SPRITES.bounceCrash, covers: "board", start: "crash", sounds: {} },
@@ -662,14 +663,14 @@ export const EFFECTS: Record<EffectName, Effect> = {
 
 // ---------------- Big Boy's toy block, for the board ----------------
 
-/** A toy block's letter, by its square (A, B or C): the same everywhere, and the next one usually another. */
-export const blockLetter = (square: string): ToyLetter => TOY_LETTER_NAMES[(square.charCodeAt(0) - 97 + Number(square[1])) % 3]!;
-
-/** A toy block's look on its square: landing (then sitting), sitting, or going (ends empty). */
-export function blockItem(square: string, state: "land" | "sit" | "poof", since: number): SquareItem {
-  const l = blockLetter(square);
-  if (state === "land") return { square, name: "toyBlock", anim: `land${l}`, then: `sit${l}`, since };
-  return { square, name: "toyBlock", anim: `${state}${l}`, since };
+/**
+ * A toy block's look on its square: landing (then sitting), sitting, or going (ends empty). `n` is its number (1 to 10): a scattered
+ * block is the tower's block n (its color and number), as the tower drew it.
+ */
+export function blockItem(square: string, state: "land" | "sit" | "poof", since: number, n: number): SquareItem {
+  const b = Math.min(10, Math.max(1, Math.round(n)));
+  if (state === "land") return { square, name: "toyBlock", anim: `land${b}`, then: `sit${b}`, since };
+  return { square, name: "toyBlock", anim: `${state}${b}`, since };
 }
 
 // (animLength and cueAt are sprite.ts's: read without the bosses' effects. Re-exported here for the files that took them from here.)

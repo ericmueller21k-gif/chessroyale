@@ -1,9 +1,9 @@
-/** Big Boy's effects: the toy block and its flight, the Big Bounce's dust and crash. See ../effects.ts. */
+/** Big Boy's effects: the Big Bounce's dust and crash (his toy blocks and tower: bigboy-tower.ts). See ../effects.ts. */
 import { canvas, ellipse, inEllipse, shade, toGrid } from "../paint.ts";
 import { lazyAnim, lazyParts, type Anim, type Character, type Frame, type Layer, type Part, type Speck } from "../sprite.ts";
 import { BOARD, SQUARE, hitAnims } from "./common.ts";
 
-// ---- Big Boy's toys: the toy block (an ABC block on an empty square), its flight, his bounce's dust and crash.
+// ---- Big Boy's toys: his bounce's dust and crash (the palette is his toy blocks').
 
 const TOY_PALETTE = {
   k: "#2a1712",
@@ -24,46 +24,6 @@ const TOY_PALETTE = {
   S: "#f3ecdccc",
 } as const;
 
-/** The block's letters, 7 x 9 (and 3 x 5 for the little one in flight), with their panel's color key. */
-const TOY_LETTERS = {
-  A: { panel: "r", side: "U", big: ["..###..", ".##.##.", "##...##", "##...##", "##...##", "#######", "##...##", "##...##", "##...##"], small: [".#.", "#.#", "###", "#.#", "#.#"] },
-  B: { panel: "u", side: "G", big: ["######.", "##...##", "##...##", "##...##", "######.", "##...##", "##...##", "##...##", "######."], small: ["##.", "#.#", "##.", "#.#", "##."] },
-  C: { panel: "g", side: "R", big: [".#####.", "##...##", "##.....", "##.....", "##.....", "##.....", "##.....", "##...##", ".#####."], small: [".##", "#..", "#..", "#..", ".##"] },
-} as const;
-export type ToyLetter = keyof typeof TOY_LETTERS;
-export const TOY_LETTER_NAMES = Object.keys(TOY_LETTERS) as ToyLetter[];
-
-/**
- * A toy block seen from the front and a little above (light from the top left): a wooden cube, its front `w` x `h`
- * with a colored panel and its letter, its top and right side `d` deep, the side's panel another color.
- */
-function toyCube(letter: ToyLetter, w: number, h: number, d: number): Part {
-  const L = TOY_LETTERS[letter];
-  const cv = canvas(w + d, h + d);
-  // The top: light wood, slanting back to the right.
-  for (let j = 0; j < d; j++) for (let x = 0; x < w; x++) cv[j]![x + d - j] = j === d - 1 || x === 0 ? "O" : "o";
-  // The side: dark wood, its own panel.
-  for (let i = 0; i < d; i++)
-    for (let y = d - 1 - i; y < d - 1 - i + h; y++) {
-      const inner = i > 0 && i < d - 1 && y > d - i + 1 && y < d - 1 - i + h - 2;
-      cv[y]![w + i] = inner ? L.side : "D";
-    }
-  // The front: a wooden rim, the panel, the letter (with a shade down and to its right).
-  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) cv[d + y]![x] = x < 2 || y < 2 || x >= w - 2 || y >= h - 2 ? (x === 0 || y === 0 ? "o" : "O") : L.panel;
-  const glyph = w >= 14 && h >= 13 ? L.big : L.small;
-  const gx = Math.floor((w - glyph[0]!.length) / 2);
-  const gy = d + Math.floor((h - glyph.length) / 2);
-  glyph.forEach((row, y) => [...row].forEach((c, x) => c === "#" && cv[gy + y + 1]?.[gx + x + 1] === L.panel && (cv[gy + y + 1]![gx + x + 1] = "y")));
-  glyph.forEach((row, y) => [...row].forEach((c, x) => c === "#" && (cv[gy + y]![gx + x] = "Y")));
-  return { grid: toGrid(cv) };
-}
-
-/** Its shadow on the board, `w` wide. */
-function toyShadow(w: number): Part {
-  const cv = canvas(w, 4);
-  ellipse(cv, w / 2, 2, w / 2, 2, "z");
-  return { grid: toGrid(cv), outline: false };
-}
 /** A puff of dust, `r` across. */
 function dustPuff(r: number, k: "s" | "S"): Part {
   const cv = canvas(2 * r + 1, 2 * r + 1);
@@ -73,91 +33,9 @@ function dustPuff(r: number, k: "s" | "S"): Part {
 
 const TOY_PARTS = (() => {
   const { parts, add } = lazyParts();
-  for (const l of TOY_LETTER_NAMES) {
-    add(`${l}:n`, () => toyCube(l, 18, 18, 5));
-    add(`${l}:sq`, () => toyCube(l, 21, 14, 5));
-    add(`${l}:st`, () => toyCube(l, 15, 21, 5));
-    add(`${l}:14`, () => toyCube(l, 14, 14, 4));
-    add(`${l}:9`, () => toyCube(l, 9, 9, 3));
-  }
-  for (const w of [8, 14, 20, 24]) add(`shadow${w}`, () => toyShadow(w));
   for (const r of [2, 3, 4, 5, 6, 7, 8]) for (const k of ["s", "S"] as const) add(`puff${r}${k}`, () => dustPuff(r, k));
   return parts;
 })();
-
-/** The block's place in its square: its front's bottom-left corner on the board, `w` x `h`, `d` deep, `lift` up off it. */
-const cubeAt = (l: ToyLetter, kind: "n" | "sq" | "st" | "14" | "9", lift = 0): Layer[] => {
-  const [w, h, d] = ({ n: [18, 18, 5], sq: [21, 14, 5], st: [15, 21, 5], "14": [14, 14, 4], "9": [9, 9, 3] } as const)[kind];
-  const x = Math.round(14 - w / 2 - d / 2 + 2);
-  const y = 28 - h - d - lift;
-  return [{ part: `${l}:${kind}`, x, y }];
-};
-const shadowAt = (w: number): Layer => ({ part: `shadow${w}`, x: Math.round(16 - w / 2), y: 27 });
-/** Dust puffing out round the block's foot, `t` frames on. */
-const toyDust = (t: number): Layer[] =>
-  t > 3
-    ? []
-    : [
-        { part: `puff${2 + Math.min(3, t)}s`, x: 3 - t * 2, y: 24 - t },
-        { part: `puff${2 + Math.min(3, t)}S`, x: 23 + t * 2, y: 24 - t },
-      ];
-/** A glint running along the block's top edge (`i` of 6). */
-const toyGlint = (i: number): Speck[] => (i < 3 ? [[8 + i * 6, 6 + (i === 0 ? 0 : 0), "F"], [9 + i * 6, 6, "F"]] : []);
-
-const toyAnims: Record<string, Anim> = {};
-for (const l of TOY_LETTER_NAMES) {
-  /** It lands: thrown in from above (stretched as it falls), clacks down squashed, bounces a little, and settles. */
-  toyAnims[`land${l}`] = {
-    loop: false,
-    frames: [
-      { ms: 50, layers: [shadowAt(8), ...cubeAt(l, "st", 13)] },
-      { ms: 50, layers: [shadowAt(14), ...cubeAt(l, "st", 5)] },
-      { ms: 70, cue: "clack", shake: [0, 1], layers: [shadowAt(24), ...cubeAt(l, "sq"), ...toyDust(0)] },
-      { ms: 70, layers: [shadowAt(20), ...cubeAt(l, "n", 2), ...toyDust(1)] },
-      { ms: 60, layers: [shadowAt(20), ...cubeAt(l, "n"), ...toyDust(2)] },
-      { ms: 100, layers: [shadowAt(20), ...cubeAt(l, "n"), ...toyDust(3)] },
-    ],
-  };
-  /** Sitting there while it lasts; a glint runs along its top now and then. */
-  toyAnims[`sit${l}`] = { loop: true, frames: Array.from({ length: 8 }, (_, i): Frame => ({ ms: i < 3 ? 90 : 300, layers: [shadowAt(20), ...cubeAt(l, "n")], specks: toyGlint(i) })) };
-  /** It goes: a puff of dust and it shrinks away (ends empty). */
-  toyAnims[`poof${l}`] = {
-    loop: false,
-    frames: [
-      { ms: 70, cue: "poof", layers: [shadowAt(20), ...cubeAt(l, "14"), ...toyDust(0)] },
-      { ms: 70, layers: [shadowAt(14), ...cubeAt(l, "9"), ...toyDust(1)] },
-      { ms: 80, layers: [...toyDust(2)] },
-      { ms: 80, layers: [...toyDust(3)] },
-      { ms: 40, layers: [] },
-    ],
-  };
-  /** In flight (on its own sprite, blockFly): tumbling end over end. */
-  toyAnims[`fly${l}`] = {
-    loop: true,
-    frames: ([0, 1, 2, 3] as const).map((rot): Frame => ({ ms: 70, layers: [{ part: `${l}:9`, x: 10, y: 10, rot }] })),
-  };
-}
-
-export const TOY_BLOCK: Character = {
-  id: "toy-block",
-  name: "A toy block on a square",
-  w: SQUARE,
-  h: SQUARE,
-  foot: [16, 31],
-  palette: TOY_PALETTE,
-  parts: TOY_PARTS,
-  anims: Object.fromEntries(Object.entries(toyAnims).filter(([k]) => !k.startsWith("fly"))),
-};
-export const BLOCK_FLY: Character = {
-  id: "block-fly",
-  name: "A toy block in flight",
-  w: SQUARE,
-  h: SQUARE,
-  foot: [16, 31],
-  palette: TOY_PALETTE,
-  parts: TOY_PARTS,
-  anims: Object.fromEntries(Object.entries(toyAnims).filter(([k]) => k.startsWith("fly"))),
-};
 
 /** Dust puffing up off a square as he lands on it (one of his bounce's 2x2 block, each square its own). */
 export const BOUNCE_PUFF: Character = {

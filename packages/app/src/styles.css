@@ -16884,8 +16884,8 @@ img.qicon {
 .pw-block-board {
   z-index: 3;
 }
-/* Big Boy's tower (Nov 18): under the pieces (it rises over the squares behind its own; the pieces stay in view), on the board's own
-   squares. Its drawing is 48 x 136 px over a 32 px square: a square and a half wide, four and a quarter tall, the square its bottom. */
+/* Big Boy's tower (Nov 18): under the pieces (the pieces stay in view), on the board's own squares. Seen from above, its drawing is
+   96 x 96 px centered on its 32 px square: three squares each way, the square its middle (its shadow, its wobble, a falling block). */
 .board-wrap > .bb-under {
   position: absolute;
   top: 0;
@@ -16894,13 +16894,16 @@ img.qicon {
   height: var(--board-size, 100%);
   z-index: 1;
   pointer-events: none;
+  /* (Its frame reaches a square past an edge file, and a tall tower's shadow below the bottom rank: cut at the board's edges, so it
+     never widens the page or spills under the board. It stands only on the crowd's half, rising up the board: nothing is lost at the top.) */
+  overflow: clip;
 }
 .bb-tower {
   position: absolute;
-  left: calc(var(--board-size, 100%) * (var(--sq-x, 0) - 0.25) / 8);
-  top: calc(var(--board-size, 100%) * (var(--sq-y, 0) - 3.25) / 8);
-  width: calc(var(--board-size, 100%) * 1.5 / 8);
-  height: calc(var(--board-size, 100%) * 4.25 / 8);
+  left: calc(var(--board-size, 100%) * (var(--sq-x, 0) - 1) / 8);
+  top: calc(var(--board-size, 100%) * (var(--sq-y, 0) - 1) / 8);
+  width: calc(var(--board-size, 100%) * 3 / 8);
+  height: calc(var(--board-size, 100%) * 3 / 8);
   pointer-events: none;
 }
 /* The bounce and the snack: on the board's own squares (eighths of --board-size), over the pieces, never taking a tap. */

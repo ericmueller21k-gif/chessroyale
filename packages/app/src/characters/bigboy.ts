@@ -389,7 +389,7 @@ for (let s = 0; s < 12; s++) add(`candy:${s}`, () => candy(s / 2));
 add("pawn", () => ({ grid: ["..xx..", ".xxxX.", ".xxxX.", "..xX..", ".xxxX.", "xxxxXX", "XXXXXX"] }));
 add("pawn:bit", () => ({ grid: ["......", "......", ".x.xX.", "..xX..", ".xxxX.", "xxxxXX", "XXXXXX"] }));
 add("pawn:crumb", () => ({ grid: ["xxX.", "xXXX"] }));
-/** A toy block in his hand (the board's own, characters/effects.ts toyBlock, is bigger): wood, a red panel, a letter. */
+/** A toy block in his hand (the board's own, characters/effects/bigboy-tower.ts, is bigger and numbered): wood, a red panel. */
 add("block", () => ({ grid: [".ooooo..", "ooooooo.", "OOOOOOOD", "OaYYaaOD", "OaYaYaOD", "OaYYaaOD", "OaaaaaOD", "OOOOOOD."] }));
 
 const r1 = (v: number) => Math.round(v * 2) / 2;
