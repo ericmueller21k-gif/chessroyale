@@ -1,3 +1,4 @@
+- Nov 18 ~10:15 UTC: #800 chat fix MERGED (0fc2b8b): deploy + main run watched. Queue empty; no helpers.
 - Nov 18 ~09:55 UTC: global-chat:142 cause: local dev proxy (wrangler) holds a request 4-5 s on a dropped connection then resends (not prod). Real app bug found too: a send right after turning chat on was refused before the save landed (now waits: chatOnSaved). -> #800 (3679c41), CI b81mae442. Open follow-up (decision note): the dev proxy's hold can hit any 5 s wait in e2e.
 - Nov 18 ~09:30 UTC: #799 LIVE (c4c49be). Main RED on retry-pass only: global-chat.spec:142 [desktop] (Ann's typed line not cleared in 5 s on first try). Unrelated to #799. Helper on it (brief global-chat-142-flake.md, high).
 - Nov 18 ~09:25 UTC: #798 LIVE (cf4e7a4), main GREEN. #799 MERGED (c4c49be): deploy + main run watched. Queue empty; no helpers. For Eric (morning): rook fallback for the queen lock (proposal); Stripe later this week.
