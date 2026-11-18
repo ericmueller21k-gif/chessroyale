@@ -130,7 +130,7 @@ export class LiveHub extends DurableObject<Env> {
     await this.ctx.storage.delete(`lobby:${code}`);
   }
 
-  async counts(): Promise<LiveCounts> {
+  async counts(only?: string): Promise<LiveCounts> {
     const now = Date.now();
     if ((!this.waits || now - this.waits.at > 60_000) && this.env.DB) {
       const sql = d1Sql(this.env.DB);
@@ -141,13 +141,13 @@ export class LiveHub extends DurableObject<Env> {
         this.waits = { at: now, value: this.waits?.value ?? { crowd: null, boss: null } };
       }
     }
-    return this.board.counts(now, this.waits?.value ?? { crowd: null, boss: null });
+    return this.board.counts(now, this.waits?.value ?? { crowd: null, boss: null }, only);
   }
 
-  /** The live line's numbers (each Worker instance asks at most every 3 s). */
-  async liveCounts(): Promise<LiveCounts> {
+  /** The live line's numbers (each Worker instance asks at most every 3 s). `only`: the live window's match is that lobby's (a test switch). */
+  async liveCounts(only?: string): Promise<LiveCounts> {
     countCall("hub.counts");
-    return this.counts();
+    return this.counts(only);
   }
 
   /** People in lobbies now (the overload limit). */

@@ -117,17 +117,24 @@ test("computer: a real match running shows in the live window as Live (no Bot ma
   // Someone plays: PLAY (Crowd), the bots fill after 8 s.
   const player = await (await browser.newContext({ viewport: { width: 1280, height: 800 } })).newPage();
   await named(player, "Real Rita");
-  await player.goto(`/?pool=livewin-${Date.now().toString(36)}`);
+  // (`?debug`: her match on `window`, for its code and phase.)
+  await player.goto(`/?debug&pool=livewin-${Date.now().toString(36)}`);
   await pickMode(player);
   await player.getByRole("button", { name: "PLAY", exact: true }).click();
   await expect(player.locator(".fd-seats")).toBeVisible();
+  // (Her match alone in the window, `?watch=` (a test switch): the window shows the matchmade match with the most people, and
+  // another spec's on this server (lobby-chat's, two people) took it on main's run 44396356591, the line flipping between theirs.)
+  await expect.poll(() => player.evaluate(() => (window as any).match?.code ?? "")).not.toBe("");
+  const lobby: string = await player.evaluate(() => (window as any).match.code);
   await named(page, "Watcher");
   // (The switch back is the window's: a route takes the real match off the live line on cue.)
   let hide = false;
   await page.route((u) => u.pathname === "/api/live", async (route) => {
+    const url = new URL(route.request().url());
+    url.searchParams.set("watch", lobby);
     // (The route's fetch is Node's, not the browser's: a kept-alive connection the local server had closed came back ECONNRESET, where
     // the browser would have sent the request again on a new one, as it does for the app. So does this, once. Main run 43478703204.)
-    const res = await route.fetch().catch(() => route.fetch());
+    const res = await route.fetch({ url: url.href }).catch(() => route.fetch({ url: url.href }));
     const body = await res.json();
     await route.fulfill({ response: res, json: hide ? { ...body, featured: null } : body });
   });
@@ -136,8 +143,9 @@ test("computer: a real match running shows in the live window as Live (no Bot ma
   await expect(real).toBeVisible({ timeout: 60_000 });
   await expect(real.locator(".fd-livewin-tag")).toHaveText(/Live/);
   await expect(page.getByText("Bot match", { exact: false })).toHaveCount(0);
-  // The first move: the crowd's votes on it.
-  await expect(real.locator(".fd-livewin-line")).toHaveText(/^(White|Black)'s crowd: \S+ \d+/, { timeout: 90_000 });
+  // The first move: the crowd's votes on it, once her match has played it (its pace is the match's: the pre-game votes, a round).
+  await expect.poll(() => player.evaluate(() => (window as any).match?.phase.kind), { timeout: 120_000 }).toBe("reveal");
+  await expect(real.locator(".fd-livewin-line")).toHaveText(/^(White|Black)'s crowd: \S+ \d+/, { timeout: 15_000 });
   await expect(real.locator(".fd-livewin-meta")).toHaveText(/^Move \d+ · \d+ left$/);
   await expect(real.locator(".board-wrap piece").first()).toBeVisible();
   hide = true;
