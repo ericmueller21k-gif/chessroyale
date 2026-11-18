@@ -64,9 +64,10 @@ for Last Stand rounds; the God King's move goes through `finishRound`, so his mo
 - **Scenario:** a tower 6 tall on e4 (crowd White, board from White). Tap the Nf3 knight: its dot on e5 is under the tower's upper
   blocks, and the dot on e4 itself is under the bottom block. If his last move was ...d6-e5, the last-move tint on e5 is hidden too.
 - **Fix:** take one still to confirm first. If it's as the CSS says, the least code is to lift the square marks over the layer:
-  give `.hb square.move-dest`, `.last-move`, `.selected` and `.check` a z-index between the tower and the pieces (1 < z < 2, e.g.
-  1.5 is not valid, so move the under-layers to 1 and the marks to 2 with the pieces at 3, or make the tower semi-transparent
-  above its first block). Whichever way, add one focused check to `e2e/bigboy.spec.ts`: on a 2+ tower, the move dot on its
+  give `.hb square.move-dest`, `.last-move`, `.selected` and `.check` a z-index above the under-layers (1) and below the
+  pieces (2). Since z-index takes whole numbers, renumber: the under-layers (`.bb-under`, `.zb-under`, the candle shadows) stay at
+  1, the square marks go to 2, and the pieces go to 3 with everything stacked above them moved up one. Or, simpler, draw the
+  tower semi-transparent above its first block. Whichever way, add one focused check to `e2e/bigboy.spec.ts`: on a 2+ tower, the move dot on its
   square is the top element at that point (`elementFromPoint`).
 
 ## 4. Low: his piece can end up on a scattered block, which then makes it uncapturable and covers it
