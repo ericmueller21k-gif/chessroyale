@@ -1,3 +1,4 @@
+- Nov 18 ~23:20 UTC: PR 4 edges done -> #806 (ceb3a30), CI watched. PR 5 shields helper session_01JuCWRtX2k9bvsNL9Do6oNL (xhigh alone), watcher ba5jqa11l. #805 live-window fix CI b0ry1ib33.
 - Nov 18 ~23:10 UTC: #804 LIVE (3a993b5), main full run GREEN (no flaky this time).
 - Nov 18 ~23:00 UTC: live-window cause = test isolation (another spec's queue match took the window), not an app bug; fix #805 (2e6ccf7, test switch gated by TEST_SWITCHES), CI watched. PR 4 edges helper session_01JuCWRtiamKsa41cbx8UKWS (xhigh alone), watcher bir61xij8.
 - Nov 18 ~22:50 UTC: container restarted ~22:35 (watchers re-armed). #804 PR 3 green (full suite) and MERGED (3a993b5); main run watched. Live-window helper running (watcher bjshud8uv). Next: PR 4 edges after it.
