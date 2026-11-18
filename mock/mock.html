@@ -1,0 +1,202 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Coin reward mockup</title>
+<style>
+@font-face { font-family: "Press Start 2P"; src: url("press-start-2p.woff2") format("woff2"); }
+:root { --bg:#f3f1ec; --surface:#fff; --text:#1d1f24; --muted:#6a6f7a; --line:#d9d5cc; --accent:#c8860d; --good:#198754; }
+:root.dark { --bg:#16181d; --surface:#20232a; --text:#eef0f4; --muted:#9aa2b1; --line:#343946; --accent:#f4b740; --good:#4cc38a; }
+* { box-sizing: border-box; }
+html, body { margin:0; height:100%; background:var(--bg); color:var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+.title { font-family:"Press Start 2P"; font-size:30px; color:#1d1f24; text-shadow:3px 3px 0 #e8b54a; text-align:center; margin:0; }
+.dark .title { color:#fff; }
+.gear { position:absolute; top:14px; right:14px; width:46px; height:46px; border:1px solid var(--line); border-radius:12px;
+  background:var(--surface); display:grid; place-items:center; font-size:22px; }
+.pawn { font-size:120px; line-height:1; text-align:center; color:var(--text); }
+.headline { text-align:center; font-weight:800; font-size:22px; color:var(--good); margin:6px 0 0; }
+.sub { text-align:center; color:var(--muted); font-size:15px; margin:4px 0 0; }
+/* The XP box, as styles.css has it (78 px, fixed). */
+.xp-box { width:100%; max-width:420px; height:78px; margin:10px auto 0; padding:9px 12px 8px; display:grid;
+  grid-template-rows:20px 10px 18px; row-gap:6px; border:1px solid var(--line); border-radius:12px; background:var(--surface); }
+.xp-top { display:flex; justify-content:space-between; align-items:center; }
+.xp-gain { color:var(--good); font-weight:800; font-size:19px; }
+.xp-name, .xp-level { color:var(--muted); font-weight:700; font-size:15px; }
+.xp-bar { background:color-mix(in srgb, var(--muted) 25%, transparent); border-radius:6px; overflow:hidden; }
+.xp-fill { height:100%; background:var(--good); width:62%; }
+.xp-parts { color:var(--muted); font-size:14px; } .xp-parts b { color:var(--text); }
+/* The coin strip: the FF window (.ff-window), fixed height, right under the XP box. */
+.coin-strip { position:relative; width:100%; max-width:420px; height:78px; margin:10px auto 0; overflow:hidden;
+  color:#fff; background:linear-gradient(180deg,#2a3cbd 0%,#13207a 55%,#0a1150 100%); border:3px solid #f4f4f4;
+  border-radius:8px; box-shadow:0 0 0 2px #0b0b1a, 4px 6px 0 rgba(0,0,0,.18); }
+.coin-strip canvas { position:absolute; left:0; top:0; }
+.cs-text { position:absolute; left:100px; right:10px; top:9px; bottom:7px; display:grid; grid-template-rows:24px 1fr 14px; }
+.cs-row1 { display:flex; align-items:center; gap:10px; }
+.cs-label { font-family:"Press Start 2P"; font-size:9px; letter-spacing:.04em; color:#c9d2ff; }
+.pump { display:flex; font-family:"Press Start 2P"; font-size:20px; color:#ffd54a; text-shadow:2px 2px 0 #0b0b1a; }
+.pump .d { width:20px; height:24px; overflow:hidden; position:relative; text-align:center; }
+.pump .d span { position:absolute; left:0; right:0; line-height:24px; }
+.pump .plus { width:20px; line-height:24px; }
+.cs-today { position:absolute; left:0; top:33px; font-family:"Press Start 2P"; font-size:7px; color:#c9d2ff; }
+.cs-parts { font-family:"Press Start 2P"; font-size:7px; color:#fff; align-self:end; white-space:nowrap; }
+.cs-parts .dim { opacity:.0; }
+.cs-parts b { color:#ffd54a; font-weight:normal; }
+.boost { position:absolute; right:8px; top:8px; font-family:"Press Start 2P"; font-size:8px; color:#0b0b1a;
+  background:linear-gradient(180deg,#ffe98a,#f4b740); border:2px solid #fff; border-radius:4px; padding:3px 4px; box-shadow:0 0 0 1px #0b0b1a; }
+.cs-boostleft { position:absolute; left:100px; top:42px; font-family:"Press Start 2P"; font-size:7px; color:#ffe98a; }
+.tiles { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin:16px auto 0; max-width:420px; }
+.tile { background:var(--surface); border-radius:14px; padding:12px 6px; text-align:center; }
+.tile b { display:block; font-size:24px; } .tile span { color:var(--muted); font-size:12.5px; }
+.note { text-align:center; color:var(--muted); font-size:13px; margin:12px 0 0; }
+.buttons { display:flex; justify-content:center; gap:12px; margin-top:12px; }
+.btn { padding:14px 22px; border-radius:14px; font-weight:800; font-size:19px; background:#e8e4dc; color:#1d1f24; }
+.dark .btn { background:#2c3039; color:#eef0f4; }
+.btn.go { background:var(--accent); color:#fff; }
+/* Phone */
+.phone { position:relative; width:390px; height:844px; padding:22px 16px 0; }
+.phone .pawn { margin-top:90px; }
+/* Computer */
+.computer { width:1280px; height:800px; display:grid; grid-template-columns:80px 560px 1fr; }
+.side { border-right:1px solid var(--line); display:flex; flex-direction:column; align-items:center; gap:30px; padding-top:22px;
+  font-weight:900; color:var(--text); font-size:22px; }
+.side i { font-style:normal; color:var(--accent); font-size:22px; }
+.left { padding:24px 36px 0; display:flex; flex-direction:column; align-items:center; }
+.left .title { font-size:24px; }
+.left .pawn { margin-top:56px; font-size:110px; }
+.left .xp-box { max-width:340px; }
+.left .coin-strip { max-width:340px; }
+.left .cs-boostleft { position:absolute; left:100px; top:42px; font-family:"Press Start 2P"; font-size:7px; color:#ffe98a; }
+.tiles { width:100%; max-width:470px; }
+.right { padding:24px 32px; }
+.right h2 { margin:0 0 12px; font-size:26px; }
+.board { width:600px; height:600px; display:grid; grid-template-columns:repeat(8,1fr); grid-template-rows:repeat(8,1fr); }
+.board div { display:grid; place-items:center; font-size:56px; line-height:1; }
+.board .l { background:#f0dbb5; } .board .k { background:#c2ab8a; }
+.cap { color:var(--muted); font-size:13px; margin-top:10px; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+const q = new URLSearchParams(location.search);
+const view = q.get("view") || "phone";       // phone | computer
+const T = Number(q.get("t") || 99);          // ms since the strip started (99 = the end)
+const boost = q.get("boost") === "1";
+const capped = q.get("capped") === "1";
+if (q.get("dark") === "1") document.documentElement.classList.add("dark");
+
+// What this game paid (the server's grant): parts in order. Shown as each part's share of the count is reached.
+const parts = capped
+  ? [{ n: "Win", v: 15 }, { n: "Top 3", v: 10 }]
+  : [{ n: "15 min", v: 27 }, { n: "Win", v: 15 }, { n: "Top 3", v: 10 }];
+const mult = boost ? 2.5 : 1;
+const total = parts.reduce((s, p) => s + Math.round(p.v * mult), 0);
+const today = capped ? "300/300 · FULL" : boost ? "213/300" : "186/300";
+
+const strip = () => `
+  <div class="coin-strip" data-testid="coin-strip">
+    <canvas id="cv"></canvas>
+    <div class="cs-text">
+      <div class="cs-row1"><span class="pump" id="pump"></span><span class="cs-label">COINS</span></div>
+      <div></div>
+      <div class="cs-parts" id="parts"></div>
+      ${boost ? "" : `<span class="cs-today">PLAY TODAY ${today}</span>`}
+    </div>
+    ${boost ? `<span class="boost">×2.5 BOOST</span><span class="cs-boostleft">1 h 31 min of boost left</span>` : ""}
+  </div>`;
+
+const xp = (compact) => `
+  <div class="xp-box">
+    <div class="xp-top"><span class="xp-gain">+200 XP</span><span class="xp-name">Player</span><span class="xp-level">Level 7</span></div>
+    <div class="xp-bar"><div class="xp-fill"></div></div>
+    <div class="xp-parts">Win <b>+50</b> · Daily reward <b>+0</b></div>
+  </div>`;
+
+const tiles = `<div class="tiles"><div class="tile"><b>1,640</b><span>Engine rating (est.)</span></div>
+  <div class="tile"><b>4.2 s</b><span>Average time per move</span></div><div class="tile"><b>2nd</b><span>Your team's scoreboard</span></div></div>`;
+
+if (view === "phone") {
+  document.getElementById("root").innerHTML = `<div class="phone">
+    <h1 class="title">Victory!</h1><div class="gear">⚙</div>
+    <div class="pawn">♙</div>
+    <p class="headline">Your team won!</p><p class="sub">50 v 50 · you scored 2nd on White</p>
+    ${xp()}${strip()}${tiles}
+    <p class="note">Scoring took 18 ms per round on this device.</p>
+    <div class="buttons"><span class="btn">Home</span><span class="btn go">Play again</span></div></div>`;
+} else {
+  const back = ["♜","","♝","♛","♚","♝","","♜","♟","♟","♟","♟","","♟","♟","♟","","","♞","","","♞","","","","","","","♟","","","♕",
+    "","","♗","","♙","","","","","","","","","","","","♙","♙","♙","♙","","♙","♙","♙","♖","♘","♗","","♔","","♘","♖"];
+  const sq = back.map((p, i) => `<div class="${((i >> 3) + i) % 2 ? "k" : "l"}">${p}</div>`).join("");
+  document.getElementById("root").innerHTML = `<div class="computer">
+    <div class="side">HC<i>▷</i><i>♔</i><i>♚</i><i>⚇</i><i>⛉</i><i>♙</i></div>
+    <div class="left"><h1 class="title">Victory!</h1><div class="pawn">♙</div>
+      <p class="headline">Your team won!</p><p class="sub">50 v 50 · you scored 2nd on White</p>
+      ${xp()}${strip()}${tiles}
+      <div class="buttons"><span class="btn">Home</span><span class="btn go">Play again</span></div></div>
+    <div class="right"><h2>Your game, move by move</h2><div class="board">${sq}</div>
+      <p class="cap">The coin strip sits under the XP box, the same width; it never covers anything.</p></div></div>`;
+}
+
+// ---- The strip's animation, drawn at time T (a still of the real loop). ----
+// Coins: one sprite per ~5 coins (at most 12), each dropping from the strip's top into the pile at its left, staggered.
+// The sprite: coin.png pre-drawn in 6 spin frames once (an offscreen canvas): no per-coin simulation, no filters per frame.
+const img = new Image();
+img.src = "coin.png";
+img.onload = () => {
+  const box = document.querySelector(".coin-strip");
+  const W = box.clientWidth, H = box.clientHeight, dpr = devicePixelRatio || 1;
+  const cv = document.getElementById("cv");
+  cv.width = W * dpr; cv.height = H * dpr; cv.style.width = W + "px"; cv.style.height = H + "px";
+  const g = cv.getContext("2d"); g.scale(dpr, dpr); g.imageSmoothingEnabled = false;
+  const S = 24;                                    // a coin's size on screen (half the 40 px drawing)
+  const frames = [1, 0.8, 0.45, 0.12, 0.45, 0.8].map((sx) => {
+    const c = document.createElement("canvas"); c.width = 40; c.height = 40;
+    const x = c.getContext("2d"); x.imageSmoothingEnabled = false;
+    const w = Math.max(4, Math.round(40 * sx)); x.drawImage(img, (40 - w) / 2, 0, w, 40);
+    if (sx < 0.5) { x.globalCompositeOperation = "source-atop"; x.fillStyle = "rgba(120,70,0,.35)"; x.fillRect(0, 0, 40, 40); }
+    return c;
+  });
+  const n = Math.min(10, Math.max(3, Math.round(total / 5)));
+  const STAGGER = 110, FALL = 420;                // ms between coins, ms for one fall
+  const END = (n - 1) * STAGGER + FALL;
+  const t = T === 99 ? END + 400 : T;
+  // The pile: landed coins stack in a little heap at the strip's left (x 14..74), back to front.
+  // A pyramid of 4-3-2-1, filled bottom row first.
+  const spot = (i) => { const row = i < 4 ? 0 : i < 7 ? 1 : i < 9 ? 2 : 3; const j = i - [0, 4, 7, 9][row];
+    return { x: 10 + row * 9 + j * 18, y: H - 6 - S - row * 12 }; };
+  let landed = 0;
+  for (let i = 0; i < n; i++) {
+    const s = t - i * STAGGER; if (s < 0) continue;
+    const p = spot(i);
+    if (s >= FALL) { g.drawImage(frames[0], p.x, p.y, S, S); landed++; continue; }
+    const k = s / FALL;                              // ease-in fall with a small bounce at the end
+    const y0 = -S, y = k < 0.85 ? y0 + (p.y - y0) * (k / 0.85) ** 2 : p.y - Math.sin(((k - 0.85) / 0.15) * Math.PI) * 5;
+    const f = frames[Math.floor(s / 60) % 6];
+    g.drawImage(f, p.x, y, S, S);
+  }
+  // A sparkle over the pile at the end (two pre-drawn plus marks).
+  if (t >= END) { g.fillStyle = "#fff"; for (const [x, y] of [[74, 12], [14, 24]]) { g.fillRect(x, y - 3, 2, 8); g.fillRect(x - 3, y, 8, 2); } }
+
+  // The counter: a gas pump. The count follows the coins landed (smoothly), each digit a column that rolls.
+  const shown = t >= END ? total : total * Math.min(1, Math.max(0, (t - FALL * 0.6) / (END - FALL * 0.6)));
+  const digits = String(total).length;
+  let html = `<span class="plus">+</span>`;
+  for (let d = digits - 1; d >= 0; d--) {
+    const v = shown / 10 ** d, cur = Math.floor(v) % 10, frac = d === 0 ? v - Math.floor(v) : 0;
+    html += `<span class="d"><span style="top:${-frac * 24}px">${cur}</span><span style="top:${24 - frac * 24}px">${(cur + 1) % 10}</span></span>`;
+  }
+  document.getElementById("pump").innerHTML = html;
+  // The parts: each appears as the count reaches its share (the XP box's rule).
+  let acc = 0;
+  document.getElementById("parts").innerHTML = parts.map((p, i) => {
+    const on = shown >= acc * mult || i === 0; acc += p.v;
+    const val = p.note ? `<b>·</b> ${p.note}` : `<b>+${Math.round(p.v * mult)}</b>`;
+    return `<span class="${on ? "" : "dim"}">${i ? " · " : ""}${p.n} ${val}</span>`;
+  }).join("");
+  document.body.dataset.ready = "1";
+};
+</script>
+</body>
+</html>
