@@ -231,6 +231,8 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
     moment (`LIVE_WINDOW`; replays in `packages/app/public/replays/crowd-bots.json`, never fetched on phones).
     A computer's only (`LIVE_WINDOW_MEDIA`: 1280 px wide, 600 px tall, a mouse; never mounted on a phone or tablet)
     and always silent, whatever the sound setting (its board is `silent`; Eric, Oct 12).
+    A test switch, `/api/live?watch=CODE`, puts that lobby's match alone in the window (an e2e's own: another spec's on the shared
+    server would take it, Nov 18, [the note](../decisions/2026-11-18-live-window-watch.md)).
 - **The live line** is GET `/api/live`: polled every `FRONT_DOOR.livePollMs` while a front-door screen shows it, every
   `heartbeatMs` elsewhere (a match), never while the tab is hidden; a request with no answer is given up after `liveTimeoutMs` (10 s,
   Nov 11: one that never answered stopped every later one, and the chats riding on it). The same request says you're here. Online = seen
