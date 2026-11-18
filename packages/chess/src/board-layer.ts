@@ -13,7 +13,8 @@
  * chess-legal moves are ever filtered: marks never stop an attack (pins and checks work across all of them), and check
  * is always answered.
  *
- * Not yet read by any boss: today's bosses move onto it one family a PR (held pieces, square marks, edges, shields).
+ * Today's bosses move onto it one family a PR through `BossRules.layer`: held pieces (Ginger, Boingo, Moo, Folio, Chandy) so
+ * far; square marks, edges and shields next.
  */
 import type { StopReason } from "@chessroyale/core";
 import { legalMoves, pieceAt, sideToMove } from "./rules.ts";
