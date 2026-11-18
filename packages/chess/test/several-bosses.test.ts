@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { BATTLE_TOWER, BOSS_POWERS, mulberry32 } from "@chessroyale/core";
-import { MatchRunner, crowdAllowed, legalMoves, rageOf, sideRates } from "../src/index.ts";
-import { KIT_OPENING, fakeEngine, kitSettings, runBattle, type KitBattle } from "./boss-kit-lib.ts";
+import type { BossState, Settings } from "@chessroyale/core";
+import { MatchRunner, bossRules, crowdAllowed, legalMoves, pieceAt, rageOf, sideRates } from "../src/index.ts";
+import { KIT_OPENING, fakeEngine, kitSettings, runBattle, sideTracked, type KitBattle } from "./boss-kit-lib.ts";
 
 /**
  * Several bosses on one side (Battle Tower PR 6; docs/decisions/2026-11-18-several-bosses.md): the deal, the turn order, the
@@ -9,8 +10,11 @@ import { KIT_OPENING, fakeEngine, kitSettings, runBattle, type KitBattle } from 
  * kit over every pair and a sample of threes is boss-kit-side.test.ts.
  */
 
-const runner = (bosses: readonly string[], test = "", seed = 5) =>
-  new MatchRunner({ settings: kitSettings({ boss: bosses[0]!, bosses, test, maxMoves: 30 }), rng: mulberry32(seed), engines: [fakeEngine()], library: [KIT_OPENING], entrants: [{ id: "h0", name: "H", isBot: false }], raidSide: "w" });
+const runner = (bosses: readonly string[], test = "", seed = 5, patch: Partial<Settings> = {}) =>
+  new MatchRunner({ settings: kitSettings({ boss: bosses[0]!, bosses, test, maxMoves: 30 }, patch), rng: mulberry32(seed), engines: [fakeEngine()], library: [KIT_OPENING], entrants: [{ id: "h0", name: "H", isBot: false }], raidSide: "w" });
+
+/** The boss with this id on the side, in full. */
+const sideBoss = (r: MatchRunner, id: string): BossState => r.sideBosses().find((b) => b.id === id)!;
 
 const battle = (bosses: string[], test = "", triggerFrom = 99, maxMoves = 24): KitBattle => ({ boss: bosses[0]!, bosses, seed: 11, side: "w", test, triggerFrom, strikes: [], maxMoves, opening: KIT_OPENING });
 
@@ -63,21 +67,72 @@ describe("several bosses: the turn order and the merged layer", () => {
     expect(problems).toEqual([]);
     expect(limited).toBeGreaterThan(3);
     expect(movers.length).toBeGreaterThan(12);
-    // (Sawyer's first move is his own: a pawn's; the others' moves aren't bound by it.)
     expect(movers.slice(0, 9)).toEqual(["gingerbread", "clown", "sawyer", "gingerbread", "clown", "sawyer", "gingerbread", "clown", "sawyer"]);
   }, 60_000);
 
-  it("one ultimate a turn change: each boss's ultimate comes only at his own turn change, every boss's in turn", async () => {
-    // (Every turn an ultimate came on, by boss, read at every step: the funhouse's first turn is never dealt.)
-    const at = new Map<string, Set<number>>();
-    let last: { id: string; ults: number }[] = [];
-    await runBattle(battle(["gingerbread", "clown", "grex"], "", 2, 30), null, (r) => {
-      for (const b of r.sideBosses()) if (b.powers?.ultAt !== undefined) at.set(b.id!, new Set([...(at.get(b.id!) ?? []), b.powers.ultAt]));
-      last = r.sideBosses().map((b) => ({ id: b.id!, ults: b.powers?.ults ?? 0 }));
+  it("Sawyer's first move is his own: a pawn's, and it never binds the others' moves while it's due", async () => {
+    const others: string[] = [];
+    let first: string | null = null;
+    await runBattle(battle(["gingerbread", "clown", "sawyer"], "", 99, 12), null, (r, fen, who) => {
+      if (who !== "boss" || sideBoss(r, "sawyer").powers?.split) return;
+      const mover = r.boss!.id!;
+      const allowed = r.bossAllowed() ?? legalMoves(fen);
+      if (mover === "sawyer") {
+        first = allowed.every((m) => pieceAt(fen, m.slice(0, 2))?.type === "p") ? "pawn" : `not only pawns: ${allowed.join(",")}`;
+        return;
+      }
+      // (While his first move is due, the others may move a piece: his rule isn't theirs.)
+      if (!allowed.some((m) => pieceAt(fen, m.slice(0, 2))?.type !== "p")) others.push(`${mover}: ${allowed.join(",")}`);
     });
-    const turns = [...at.values()].flatMap((t) => [...t]);
-    expect(turns.length).toBe(new Set(turns).size);
-    expect(last.filter((b) => b.ults < 1)).toEqual([]);
+    expect(first).toBe("pawn");
+    expect(others).toEqual([]);
+  }, 60_000);
+
+  for (const side of [
+    ["gingerbread", "clown", "grex"],
+    ["gingerbread", "moo"],
+    ["gingerbread", "zebra"],
+  ]) {
+    it(`one ultimate a turn change, each at his own (${side.join(" + ")}): a boss's ultimate comes as his own turn begins or at his own turn change`, async () => {
+      // (Each step the kit watches: a crowd turn dealt, or a boss to move. An ultimate that came since the last step (its ultAt newly
+      // set) came at this step's turn change: one a step, and the boss's own: the boss to move when his turn begins (an ultimate his
+      // afterCrowdMove brings, Moo's Full Moon, Don Dough's Gold Plate), else the boss whose turn change the crowd's turn is (the next
+      // to move), or the one who just moved for an ultimate his move prepares (triggerAtHisTurn).)
+      const had = new Map<string, boolean>();
+      const wrong: string[] = [];
+      const came = new Set<string>();
+      await runBattle(battle(side, "", 2, 30), null, (r, _fen, who) => {
+        const now = r.sideBosses().filter((b) => b.powers?.ultAt !== undefined && !had.get(b.id!));
+        for (const b of r.sideBosses()) had.set(b.id!, b.powers?.ultAt !== undefined);
+        if (now.length > 1) wrong.push(`${now.map((b) => b.id).join(" and ")} at one turn change`);
+        const moved = r.state.bosses![r.state.moved ?? 0]!.id;
+        for (const b of now) {
+          came.add(b.id!);
+          const own = who === "boss" ? r.boss!.id : bossRules(b)?.triggerAtHisTurn ? moved : r.sideBosses()[0]!.id;
+          if (own !== b.id) wrong.push(`${b.id}'s ultimate came at ${own}'s ${who === "boss" ? "turn" : "turn change"}`);
+        }
+      });
+      expect(wrong).toEqual([]);
+      expect([...came].sort()).toEqual([...side].sort());
+    }, 60_000);
+  }
+
+  it("Hollow's second move holds no ultimate: the boss after him gets his ultimate's step at the turn change after Hollow's move", async () => {
+    let pulled = 0;
+    const held: string[] = [];
+    await runBattle(battle(["hollow", "gingerbread"], "lightsout", 99, 24), null, (r, _fen, who) => {
+      const ginger = sideBoss(r, "gingerbread");
+      // (Ginger's trigger, pulled as Hollow plays the move his second move follows: due at the turn change after it, Ginger's.)
+      if (who === "boss" && !pulled && r.boss!.id === "hollow" && r.boss!.powers?.lightsOut?.extra === "due" && ginger.powers?.ultAt === undefined) pulled += r.triggerUltimate() ? 1 : 0;
+      // (The crowd's turn after Hollow's move and his second: its turn change is the next boss's in the order, Ginger's.)
+      const own = r.state.bosses![((r.state.moved ?? 0) + 1) % 2]!.id;
+      if (who === "crowd" && pulled && own === "gingerbread") {
+        if (ginger.powers?.ultNext) held.push(`turn ${ginger.powers.turn}: Ginger's trigger held at his own turn change`);
+        if (r.boss!.id !== "gingerbread") held.push(`turn ${ginger.powers?.turn}: the crowd's turn read from ${r.boss!.id}, not Ginger`);
+      }
+    });
+    expect(pulled).toBe(1);
+    expect(held).toEqual([]);
   }, 60_000);
 
   it("each meter fills at BATTLE_TOWER.rageScale of its speed (2 bosses 75%, 3 bosses 60%); the bar reads the same rates", () => {
@@ -89,6 +144,58 @@ describe("several bosses: the turn order and the merged layer", () => {
     const b = { ...r.boss!, powers: { ...r.boss!.powers!, charge: 40 } };
     expect(rageOf(b, sideRates(BOSS_POWERS, ["gingerbread", "clown"]))).toBeCloseTo(rageOf(b)! * 0.75);
   });
+});
+
+describe("several bosses: each boss's own turn, and every move reaching every boss (the review of PR #808)", () => {
+  it("Smudgy's forced moves are his own: the boss to move before him is never held to one, and his Camouflage isn't worn down by the others' turns", async () => {
+    const held: string[] = [];
+    let smudgy: BossState | null = null;
+    await runBattle(battle(["gingerbread", "smudgy"], "", 99, 24), null, (r, _fen, who) => {
+      smudgy = sideBoss(r, "smudgy");
+      const due = smudgy.powers?.camo?.due;
+      if (who === "boss" && r.boss!.id !== "smudgy" && due && r.bossAllowed()?.join() === due) held.push(`${r.boss!.id} held to ${due}`);
+    });
+    expect(held).toEqual([]);
+    const camo = (smudgy as BossState | null)?.powers?.camo;
+    expect(camo?.missed).toBe(0);
+    expect(camo?.off).toBeUndefined();
+    expect(camo?.swap).toBeTruthy();
+  }, 60_000);
+
+  it("another boss may step Smudgy's hidden rook as a pawn would (the disguise binds the side), and his rook is followed", async () => {
+    const r = runner(["gingerbread", "smudgy"], "", 5, { bossPaintTest: 1 });
+    expect(sideBoss(r, "smudgy").powers?.camo?.square).toBe("d7");
+    r.deal();
+    await r.score(new Map([["h0", { move: "a2a3", thinkMs: 1000 }]]));
+    expect(r.boss!.id).toBe("gingerbread");
+    expect(r.bossAllowed() ?? legalMoves(r.boards.get(0)!.fen)).toContain("d7d6");
+    r.applyBossMove("d7d6");
+    const camo = sideBoss(r, "smudgy").powers!.camo!;
+    expect(camo.square).toBe("d6");
+    expect(sideTracked(sideBoss(r, "smudgy"))).toEqual([["hidden rook", "d6"]]);
+    // (The crowd's board masks the rook where it stands now.)
+    expect(r.bossView()?.powers?.camo?.square).toBe("d6");
+  });
+
+  for (const partner of ["zebra", "sawyer", "gingerbread"]) {
+    it(`Folio's Revision (with ${partner}): the crowd move it crosses out reaches no other boss (his hooks, his judged numbers)`, async () => {
+      // (The others' powers as the crowd's turn was dealt, and as the bosses' turn begins after a Revision: the same.)
+      let dealt = new Map<string, string>();
+      let revisions = 0;
+      const changed: string[] = [];
+      const others = (r: MatchRunner) => r.sideBosses().filter((b) => b.id !== "folio");
+      const key = (b: BossState) => JSON.stringify({ ...b.powers, events: undefined });
+      await runBattle(battle(["folio", partner], "revision", 99, 24), null, (r, _fen, who) => {
+        if (who === "crowd") dealt = new Map(others(r).map((b) => [b.id!, key(b)]));
+        const rev = sideBoss(r, "folio").powers?.folio?.revision;
+        if (who !== "boss" || r.boss!.id !== "folio" || rev?.at !== r.boss!.crowdMoves || rev.move) return;
+        revisions++;
+        for (const b of others(r)) if (key(b) !== dealt.get(b.id!)) changed.push(`${b.id} at crowd move ${r.boss!.crowdMoves}`);
+      });
+      expect(revisions).toBeGreaterThan(0);
+      expect(changed).toEqual([]);
+    }, 60_000);
+  }
 });
 
 describe("several bosses: the design's out-of-turn rules", () => {

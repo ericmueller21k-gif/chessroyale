@@ -27,12 +27,16 @@
  *  7. A power's moments precede the result (#275's N-a): when the board's game ends on his move, the turn his rules
  *     would set up (prepareTurn) declares nothing the view leaves out; a battle the boss won with no mate, no time-out
  *     and before the move cap carries its declaring event in the last view before the result.
+ *  8. Several bosses on one side: every piece of the side a boss tracks stands where he tracks it (sideTracked).
+ *  9. Several bosses on one side: the boss to move is never held to another boss's own forced move.
  */
 import { vi } from "vitest";
-import { BOSS_POWERS, BOSS_ROSTER, DEFAULT_SETTINGS, RAID_SETTINGS, mulberry32, type BossDef, type Settings } from "@chessroyale/core";
+import { BOSS_POWERS, BOSS_ROSTER, DEFAULT_SETTINGS, RAID_SETTINGS, mulberry32, type BossDef, type BossState, type Settings } from "@chessroyale/core";
 import {
   MatchRunner,
   boardEnd,
+  bossAllowed,
+  bossRules,
   fenAtPly,
   legalMoves,
   pieceAt,
@@ -313,6 +317,22 @@ export const stalemateFor = (side: "w" | "b") => (side === "w" ? "7k/8/8/8/8/1q6
 
 const winsIn = (events: readonly { kind: string; turn: number }[] | undefined) => (events ?? []).filter((e) => /Win$/.test(e.kind));
 
+/**
+ * The squares a boss tracks a piece of the bosses' side on (invariant 8): Smudgy's hidden rook, Sawyer's split halves, Alfil's Tusks
+ * pawns and elephants, Don Dough's gold pieces.
+ */
+export function sideTracked(b: BossState): [string, string][] {
+  const p = b.powers;
+  if (!p) return [];
+  return [
+    ...(p.camo?.square ? [["hidden rook", p.camo.square] as [string, string]] : []),
+    ...(p.split?.halves ?? []).map((h): [string, string] => ["split half", h.square]),
+    ...(p.tusks?.pawns ?? []).map((sq): [string, string] => ["Tusks pawn", sq]),
+    ...(p.elephants ?? []).map((sq): [string, string] => ["elephant", sq]),
+    ...(p.zebra?.gold ?? []).map((sq): [string, string] => ["gold piece", sq]),
+  ];
+}
+
 /** A failed invariant: where it happened, so it can be replayed (the battle, the step, the position, the moves). */
 export class KitFailure extends Error {}
 
@@ -362,6 +382,9 @@ export class Checker {
       if (allowed && !allowed.length) this.fail(`the ${crowdTurn ? "crowd" : "boss"} is left no allowed move`, r, step);
       for (const m of allowed ?? []) if (!legal.includes(m)) this.fail(`the ${crowdTurn ? "crowd" : "boss"} is allowed an illegal move ${m}`, r, step);
     }
+    // 8 and 9. Several bosses on one side: each boss's tracked pieces stand where he tracks them, and no boss is held to another's
+    // own forced move.
+    if (r.several()) this.side(r, step);
     // 4. The replay reproduces it; the view builds.
     this.count("replay");
     const replay = fenAtPly(b.history, b.history.length, b.bases);
@@ -388,6 +411,35 @@ export class Checker {
       copy.boards.set(cb.id, { ...cb, fen: stale, bases: [...(cb.bases ?? []).filter((x) => x.ply !== cb.history.length), { ply: cb.history.length, fen: stale }] });
       const result = copy.stageComplete() ? copy.finishBossBattle() : "not over";
       if (result !== "boss") this.fail(`${w.kind} declared the battle his, but with the same move stalemating it ends "${result}"`, r, step);
+    }
+  }
+
+  /**
+   * Invariants 8 and 9 (several bosses on one side; the review of PR #808). 8: every square a boss tracks a piece of the side on
+   * (sideTracked) holds a piece of the bosses' side: another boss's move reaches his trackers too. 9: the boss to move is never held
+   * to another boss's own forced move (Smudgy's Camouflage step): when another boss's own stops (bossStops) leave a single move,
+   * the side's allowed moves are that move alone only when the boss to move's own rules alone say so too.
+   */
+  private side(r: MatchRunner, step: string) {
+    const fen = this.board(r).fen;
+    const side = r.sideBosses();
+    this.count("tracked pieces in place");
+    for (const b of side)
+      for (const [what, sq] of sideTracked(b)) {
+        const pc = pieceAt(fen, sq);
+        if (!pc || pc.color === b.crowdSide) this.fail(`${b.id}'s ${what} on ${sq}: ${pc ? "a piece of the crowd's" : "an empty square"} stands there`, r, step);
+      }
+    if (!r.bossToMove() || r.stageComplete()) return;
+    const allowed = r.bossAllowed();
+    if (allowed?.length !== 1) return;
+    const legal = legalMoves(fen);
+    this.count("no other boss's forced move");
+    for (const other of side.slice(1)) {
+      const stop = bossRules(other)?.bossStops?.(other);
+      const forced = stop ? legal.filter((m) => !stop(m, fen)) : [];
+      if (forced.length !== 1 || forced[0] !== allowed[0]) continue;
+      const own = bossAllowed(side[0]!, fen) ?? legal;
+      if (own.length > 1) this.fail(`${side[0]!.id} to move is held to ${other.id}'s own forced move ${allowed[0]}`, r, step);
     }
   }
 
