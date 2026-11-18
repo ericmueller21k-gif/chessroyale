@@ -23,6 +23,7 @@ import * as fxBigboy from "../src/characters/effects/bigboy.ts";
 import * as fxBigboyTower from "../src/characters/effects/bigboy-tower.ts";
 import * as fxBoingo from "../src/characters/effects/boingo.ts";
 import * as fxChandy from "../src/characters/effects/chandy.ts";
+import * as fxGingerSuper from "../src/characters/effects/ginger-superice.ts";
 import * as fxDash from "../src/characters/effects/dash.ts";
 import * as fxFolio from "../src/characters/effects/folio.ts";
 import * as fxGardener from "../src/characters/effects/gardener.ts";
@@ -73,7 +74,7 @@ const FX_FILES: Record<string, readonly object[]> = {
   dash: [fxDash],
   folio: [fxFolio],
   gardener: [fxGardener],
-  gingerbread: [fxGinger],
+  gingerbread: [fxGinger, fxGingerSuper],
   grex: [fxGrex],
   hollow: [fxHollow],
   hopper: [fxHopper],

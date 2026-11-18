@@ -585,3 +585,26 @@ test("Moo & Moon's Full Moon cinematic on a slow phone: the hop, the field, the 
   expect(s.p95, "95th percentile frame (ms)").toBeLessThan(50);
   expect(s.slow, "share of dropped frames").toBeLessThan(0.15);
 });
+
+test("Ginger's Super Freeze on a slow phone: his charge-up and blast, the ice block growing over the 3 x 3 and its settle stay within budget, the first time they show (Nov 18)", { tag: "@perf" }, async ({ page }) => {
+  test.skip(test.info().project.name !== "phone", "one run is enough (the phone, slowed)");
+  test.setTimeout(4 * 60_000);
+  await page.addInitScript(instrument);
+  // (?power=superfreeze: it comes as your first move lands.)
+  await page.goto("/?debug&nolanding&clock=60&boss=gingerbread&power=superfreeze&laststand=0");
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send("Emulation.setCPUThrottlingRate", { rate: 4 });
+  await bossAloneFromHome(page);
+  await expect.poll(() => phase(page), { timeout: 60_000 }).toBe("play");
+  const { fen } = await page.evaluate(() => ({ fen: (window as any).match.phase.board.fen as string }));
+  const legal = new Chess(fen).moves({ verbose: true }).filter((m) => !m.captured);
+  await page.evaluate((uci) => (window as any).match.submit(uci), legal[0]!.from + legal[0]!.to);
+  // The moment, from its banner to your turn (his move after it).
+  await page.locator(".fight-banner.power-cut", { hasText: "SUPER FREEZE!" }).waitFor({ timeout: 30_000 });
+  await page.evaluate(() => ((window as any).__perf.frames = []));
+  await expect.poll(() => phase(page), { timeout: 40_000 }).toBe("play");
+  const s = frameStats(((await page.evaluate(() => (window as any).__perf.frames.splice(0))) as [number][]).map((x) => x[0]));
+  console.log(`Ginger's Super Freeze (slowed phone): ${f(s)}`);
+  expect(s.p95, "95th percentile frame (ms)").toBeLessThan(50);
+  expect(s.slow, "share of dropped frames").toBeLessThan(0.15);
+});

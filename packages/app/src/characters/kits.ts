@@ -10,7 +10,8 @@ import type { SoundName } from "../sound.ts";
 import type { Beat, BeatLines, Loop, Stage } from "./boss-beats.ts";
 import { BIGBOY_ATTACK, BIGBOY_CHANCE, BIGBOY_LINES, BIGBOY_PORTRAIT, BIGBOY_SPRITE } from "./bigboy.ts";
 import { CLOWN, CLOWN_ATTACK, CLOWN_CHANCE, CLOWN_LINES, CLOWN_PORTRAIT } from "./clown.ts";
-import { GINGER_ATTACK, GINGER_CHANCE, GINGER_LINES, GINGER_PORTRAIT, GINGERBREAD } from "./gingerbread.ts";
+import { GINGER_ATTACK, GINGER_CHANCE, GINGER_LINES, GINGER_PORTRAIT } from "./gingerbread.ts";
+import { GINGER_BATTLE } from "./ginger-super.ts";
 import { GREX, GREX_ATTACK, GREX_CHANCE, GREX_LINES, GREX_PORTRAIT } from "./grex.ts";
 import { HOLLOW, HOLLOW_ATTACK, HOLLOW_CHANCE, HOLLOW_LINES, HOLLOW_PORTRAIT } from "./hollow.ts";
 import { SAWYER, SAWYER_ATTACK, SAWYER_CHANCE, SAWYER_LINES, SAWYER_PORTRAIT } from "./sawyer.ts";
@@ -224,9 +225,10 @@ export const BOSS_KITS: Record<string, BossKit> = {
     barScale: 1.45,
     barShift: 19,
     barName: 21,
-    ch: GINGERBREAD,
-    anims: { strike: "capture", power: "freezeCast", ultimateWarn: "check", ultimate: "blizzard" },
-    sounds: { jingle: "gingerJingle", crunch: "gingerCrunch", crackle: "gingerCrackle", freeze: "gingerCrackle", blizzard: "gingerCrackle" },
+    // (His drawing with his Super Freeze's cast: ginger-super.ts, Nov 18.)
+    ch: GINGER_BATTLE,
+    anims: { strike: "capture", power: "freezeCast", ultimateWarn: "check", ultimate: "blizzard", superFreeze: "superFreeze" },
+    sounds: { jingle: "gingerJingle", crunch: "gingerCrunch", crackle: "gingerCrackle", freeze: "gingerCrackle", blizzard: "gingerCrackle", charge: "gingerCharge", blast: "gingerBlast" },
     lines: GINGER_LINES,
     chance: GINGER_CHANCE,
     portrait: { ...GINGER_PORTRAIT, anim: "idle", frame: 0 },

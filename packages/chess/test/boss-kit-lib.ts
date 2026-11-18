@@ -155,9 +155,16 @@ export interface KitBattle {
 }
 
 /**
+ * A boss's powers beyond its passive and ultimate, by their test switches (?power=): each gets a battle of its own in the kit, switched
+ * on early, the trigger pulled from the middle (Ginger's Super Freeze, his second meter: Nov 18).
+ */
+export const KIT_EXTRA_TESTS: Readonly<Record<string, readonly string[]>> = { gingerbread: ["superfreeze"] };
+
+/**
  * The battles each boss gets: his passive switched on early (crowd White); his ultimate switched on early and the
  * admins' trigger pulled again and again (crowd Black); and from the stress start with the trigger pulled from the
- * first turn (crowd White). `extra` more seeds of each (KIT_SEEDS, for a deeper run by hand).
+ * first turn (crowd White); and each of his other powers' test switches (KIT_EXTRA_TESTS). `extra` more seeds of each
+ * (KIT_SEEDS, for a deeper run by hand).
  */
 export function kitBattles(def: BossDef, maxMoves: number, extra = 0): KitBattle[] {
   const p = def.powers;
@@ -169,6 +176,7 @@ export function kitBattles(def: BossDef, maxMoves: number, extra = 0): KitBattle
       { boss: def.id, seed: base, side: "w", test: p.passive, triggerFrom: 12, strikes: [3, 9], maxMoves, opening: KIT_OPENING },
       { boss: def.id, seed: base + 1, side: "b", test: p.ultimate, triggerFrom: 1, strikes: [6], maxMoves, opening: KIT_OPENING },
       { boss: def.id, seed: base + 2, side: "w", test: "", triggerFrom: 1, strikes: [4], maxMoves, opening: KIT_STRESS },
+      ...(KIT_EXTRA_TESTS[def.id] ?? []).map((test, i): KitBattle => ({ boss: def.id, seed: base + 3 + i, side: i % 2 ? "w" : "b", test, triggerFrom: 6, strikes: [5], maxMoves, opening: KIT_OPENING })),
     );
   }
   return out;
