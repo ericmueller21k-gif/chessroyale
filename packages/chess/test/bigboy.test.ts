@@ -33,8 +33,12 @@ import {
   queenSlain,
   rageOf,
   sanLineToUci,
+  scatterSquares,
   sideToMove,
   snackSquare,
+  topples,
+  toyBlockSquares,
+  toyStops,
   triggerUltimate,
   withoutPiece,
   type EngineLike,
@@ -42,8 +46,8 @@ import {
 } from "../src/index.ts";
 
 /**
- * Big Boy, the baby boss: his snack (the crowd's d- or e-pawn eaten before move 1), his toy blocks (an empty square on
- * the crowd's half nothing may move onto or slide through, every 4 turns for 3) and the Big Bounce (the crowd's pieces
+ * Big Boy, the baby boss: his snack (the crowd's d- or e-pawn eaten before move 1), his toy-block tower (Nov 18: one more
+ * block each turn up to 10, toppled by a crowd piece from 2 or by itself at 10, its blocks scattered for a turn) and the Big Bounce (the crowd's pieces
  * thrown into a position a little worse for it, at the start of his turn). See DECISIONS.md, "Big Boy".
  */
 
@@ -96,11 +100,11 @@ function queenEnPrise(r: MatchRunner): string {
   const board = r.boards.get(0)!;
   const crowd = r.boss!.crowdSide;
   const boss = crowd === "w" ? "b" : "w";
-  const block = r.boss!.powers!.block?.square ?? null;
+  const blocks = toyBlockSquares(r.boss!.powers);
   for (const sq of crowd === "w" ? ["d3", "e3", "c3", "f3", "b3", "g3", "a3", "h3"] : ["d6", "e6", "c6", "f6", "b6", "g6", "a6", "h6"]) {
     const c = new Chess(board.fen);
     const q = c.findPiece({ type: "q", color: boss })[0];
-    if (!q || sq === block || c.get(sq as never)) continue;
+    if (!q || blocks.includes(sq) || c.get(sq as never)) continue;
     c.remove(q as never);
     c.put({ type: "q", color: boss }, sq as never);
     const fen = c.fen();
@@ -244,58 +248,160 @@ describe("Big Boy's toy blocks", () => {
     expect(blockedBy("e1g1", "b1", castle)).toBe(false);
   });
 
-  it("every 4 crowd turns from the 2nd, for 3 turns, blocking both sides; a toy-block turn is a power turn", async () => {
-    const r = raid({ patch: { bossMaxMoves: 30 } });
-    const seen: { turn: number; square: string | null }[] = [];
-    for (let i = 0; i < 12 && !r.isOver(); i++) {
+  it("his tower: a block from the 2nd crowd turn, one more each turn on the same square up to 10, then it topples by itself; a new one right after its blocks go", async () => {
+    // (The crowd never plays onto it here: a move onto the tower is left out, so only the rules move it.)
+    const r = raid({ patch: { bossMaxMoves: 40 } });
+    const seen: { turn: number; height: number | null; scatter: number }[] = [];
+    let square: string | null = null;
+    for (let i = 0; i < 18 && !r.isOver(); i++) {
       const b = r.boss!;
-      const block = b.powers!.block ?? null;
-      seen.push({ turn: b.powers!.turn, square: block?.square ?? null });
-      if (block) {
+      const p = b.powers!;
+      seen.push({ turn: p.turn, height: p.tower?.height ?? null, scatter: p.scatter?.squares.length ?? 0 });
+      expect(p.tower && p.scatter).toBeFalsy();
+      if (p.tower) {
+        if (square && p.tower.height > 1) expect(p.tower.square).toBe(square);
+        square = p.tower.square;
         const fen = fenOf(r);
-        const allowed = r.crowdAllowed();
-        // Nothing of the crowd's onto it or through it.
-        for (const m of allowed ?? legalMoves(fen)) expect(blockedBy(m, block.square, fen)).toBe(false);
+        // Nothing of the crowd's through it; onto it only from 2 blocks (a topple); his pieces never.
+        for (const m of r.crowdAllowed() ?? legalMoves(fen)) {
+          if (m.slice(2, 4) === p.tower.square) expect(p.tower.height).toBeGreaterThanOrEqual(BOSS_POWERS.towerEnter);
+          else expect(blockedBy(m, p.tower.square, fen)).toBe(false);
+        }
         expect(powerTurn(b)).toBe(true);
-        expect(r.bossView()!.powers!.block).toEqual({ square: block.square, at: block.at, until: block.until });
+        expect(r.bossView()!.powers!.tower).toEqual(p.tower);
       }
-      await turn(r);
-      // The boss's own move didn't touch it either (while it's still there).
-      const last = r.boards.get(0)!.lastMove!;
-      if (block && block.until >= r.boss!.crowdMoves) expect(blockedBy(last, block.square)).toBe(false);
+      const allowed = (r.crowdAllowed() ?? legalMoves(fenOf(r))).filter((m) => m.slice(2, 4) !== p.tower?.square).sort();
+      await turn(r, allowed[0]);
     }
-    const on = seen.filter((s) => s.square).map((s) => s.turn);
-    expect(on.slice(0, 9)).toEqual([2, 3, 4, 6, 7, 8, 10, 11, 12]);
-    expect(seen.find((s) => s.turn === 2)!.square).toBe(seen.find((s) => s.turn === 4)!.square);
-    expect(seen.find((s) => s.turn === 5)!.square).toBeNull();
+    const t = (turn: number) => seen.find((x) => x.turn === turn)!;
+    expect(t(1).height).toBeNull();
+    for (let k = 2; k <= 11; k++) expect(t(k).height).toBe(k - 1);
+    // At 10 for a crowd turn (turn 11), toppled as turn 12 begins: its blocks stand through it, gone as turn 13 begins with a new tower.
+    expect(t(12).height).toBeNull();
+    expect(t(12).scatter).toBeGreaterThan(0);
+    expect(t(13).height).toBe(1);
+    expect(t(13).scatter).toBe(0);
   });
 
-  it("never leaves a side without a move, and never blocks the only way out of check", () => {
-    const boss = (fen: string, square: string): BossState => {
+  it("from 2 blocks a crowd piece moves onto it and topples it: the blocks stand through his move and the crowd's next turn, then vanish and a new tower starts", async () => {
+    const r = raid({ patch: { bossMaxMoves: 40, bossPowerTest: "tower" } });
+    // The test switch: the battle's first tower starts towerTest tall.
+    await turn(r);
+    const p = r.boss!.powers!;
+    expect(p.tower).toMatchObject({ height: BOSS_POWERS.towerTest, at: 2 });
+    expect(p.events).toContainEqual({ kind: "block", turn: 2, square: p.tower!.square });
+    const tower = p.tower!;
+    const onto = (r.crowdAllowed() ?? legalMoves(fenOf(r))).filter((m) => m.slice(2, 4) === tower.square);
+    expect(onto.length).toBeGreaterThan(0);
+    // The crowd's move onto it: the topple, with the move (an event of this turn's, by the crowd).
+    r.deal();
+    await r.score(new Map([["h0", { move: onto.sort()[0]!, thinkMs: 1000 }]]));
+    const q = r.boss!.powers!;
+    expect(q.tower).toBeNull();
+    expect(q.scatter).toMatchObject({ from: tower.square, height: tower.height, by: "crowd", at: 2, until: 3 });
+    expect(q.events.at(-1)).toEqual({ kind: "topple", turn: 2, square: tower.square, squares: q.scatter!.squares, by: "crowd", height: tower.height });
+    const scattered = q.scatter!.squares;
+    expect(scattered.length).toBeGreaterThan(0);
+    expect(scattered.length).toBeLessThanOrEqual(tower.height);
+    const fen = fenOf(r);
+    for (const sq of scattered) expect(pieceAt(fen, sq)).toBeNull();
+    // His move: never onto or through one.
+    const his = bossAllowed(r.boss!, fen);
+    if (his) for (const m of his) for (const sq of scattered) expect(blockedBy(m, sq, fen)).toBe(false);
+    await r.playBoss();
+    expect(scattered.some((sq) => blockedBy(r.boards.get(0)!.lastMove!, sq))).toBe(false);
+    // The crowd's next turn (3): still there, the crowd's moves kept off them.
+    r.deal();
+    expect(r.boss!.powers!.turn).toBe(3);
+    expect(r.boss!.powers!.scatter?.squares).toEqual(scattered.filter((sq) => !pieceAt(fenOf(r), sq)));
+    for (const m of r.crowdAllowed() ?? []) for (const sq of r.boss!.powers!.scatter!.squares) expect(blockedBy(m, sq, fenOf(r))).toBe(false);
+    await turn(r);
+    // Turn 4: gone, and a new tower at once (one block, his toss).
+    const z = r.boss!.powers!;
+    expect(z.turn).toBe(4);
+    expect(z.scatter).toBeNull();
+    expect(z.tower).toMatchObject({ height: 1, at: 4 });
+    expect(z.events.map((e) => e.kind)).toContain("block");
+  });
+
+  it("onto a single block never; through a tower never; castling never topples it", () => {
+    const fen = "r3k2r/pppq1ppp/2n2n2/3pp3/3PP3/2N2N2/PPPQ1PPP/R3K2R w KQkq - 0 1";
+    const p = (height: number, square: string) => ({ tower: { square, height, at: 2 }, scatter: null });
+    expect(toyStops("c3b5", p(1, "b5"), fen, true)).toBe(true);
+    expect(toyStops("c3b5", p(2, "b5"), fen, true)).toBe(false);
+    expect(topples("c3b5", p(2, "b5").tower, fen)).toBe(true);
+    // His own pieces never enter it.
+    expect(toyStops("c3b5", p(5, "b5"), fen, false)).toBe(true);
+    // A slide through it: never.
+    expect(toyStops("d2g5", p(5, "f4"), fen, true)).toBe(true);
+    expect(toyStops("d2f4", p(5, "f4"), fen, true)).toBe(false);
+    // Castling: the king's way runs on to the rook's corner.
+    expect(toyStops("e1g1", p(5, "g1"), fen, true)).toBe(true);
+    expect(topples("e1g1", p(5, "g1").tower, fen)).toBe(false);
+    // A scattered block: nothing onto it or through it, either side.
+    const sc = { tower: null, scatter: { from: "e3", height: 2, squares: ["b5", "e3"], by: "crowd" as const, at: 2, until: 3 } };
+    expect(toyStops("c3b5", sc, fen, true)).toBe(true);
+    expect(toyStops("d2f4", sc, fen, true)).toBe(true); // over e3
+    expect(toyStops("a2a3", sc, fen, true)).toBe(false);
+    expect(toyStops("c3e2", sc, fen, true)).toBe(false); // a knight jumps
+  });
+
+  it("the topple scatters its blocks to empty squares near it, seeded, nearest first, more near than far, never onto a piece", () => {
+    const fen = "r1bqkbnr/pppp1ppp/2n5/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 3 3";
+    const ring = [0, 0, 0, 0];
+    for (let seed = 0; seed < 200; seed++) {
+      const out = scatterSquares(fen, "d3", 10, seed, 5, "crowd");
+      expect(out).toEqual(scatterSquares(fen, "d3", 10, seed, 5, "crowd"));
+      expect(out.length).toBeLessThanOrEqual(10);
+      expect(new Set(out).size).toBe(out.length);
+      let last = 0;
+      for (const sq of out) {
+        expect(pieceAt(fen, sq)).toBeNull();
+        expect(sq).not.toBe("d3");
+        const d = Math.hypot(sq.charCodeAt(0) - "d".charCodeAt(0), Number(sq[1]) - 3);
+        expect(d).toBeGreaterThanOrEqual(last);
+        last = d;
+        const c = dist(sq, "d3");
+        expect(c).toBeLessThanOrEqual(BOSS_POWERS.towerScatterReach);
+        ring[c]!++;
+      }
+    }
+    // Weighted toward close: the squares next to it (8 of them) land far more often per square than the furthest ring's (up to 24).
+    expect(ring[1]! / 8).toBeGreaterThan((ring[3]! / 24) * 2);
+    expect(ring[3]).toBeGreaterThan(0);
+    // Not enough empty squares: fewer blocks (a crowded corner).
+    const crowded = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+    expect(scatterSquares(crowded, "a3", 10, 1, 2, "boss").length).toBeLessThanOrEqual(10);
+    expect(scatterSquares(crowded, "a3", 10, 1, 2, "boss").every((sq) => !pieceAt(crowded, sq))).toBe(true);
+    // Different seeds, different scatters.
+    expect(new Set(Array.from({ length: 20 }, (_, s) => scatterSquares(fen, "d3", 5, s, 5, "crowd").join())).size).toBeGreaterThan(10);
+  });
+
+  it("the scatter never takes the side to move's last legal move (the only way out of check stays open)", () => {
+    // White to move, in check from the rook on a1 along the first rank, boxed in: the only way out is Ng1.
+    const check = "6k1/8/8/8/8/7N/6PP/r6K w - - 0 1";
+    expect(legalMoves(check)).toEqual(["h3g1"]);
+    for (let seed = 0; seed < 40; seed++) {
+      const out = scatterSquares(check, "g3", 10, seed, 4, "boss");
+      expect(out).not.toContain("g1");
+      expect(out.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("never leaves a side without a move, and never blocks the only way out of check (the blocks lift for the turn)", () => {
+    const boss = (fen: string, square: string, height = 1): BossState => {
       const powers = initPowers(1, fen, "w");
-      return { id: "bigboy", crowdSide: "w", crowdMoves: 3, powers: { ...powers, turn: 4, block: { square, at: 4, until: 6 } } } as unknown as BossState;
+      return { id: "bigboy", crowdSide: "w", crowdMoves: 3, powers: { ...powers, turn: 4, tower: { square, height, at: 2 } } } as unknown as BossState;
     };
     // K on h1 checked by the rook on a1 along the first rank, boxed in by its pawns: the only way out is Ng1.
     const check = "6k1/8/8/8/8/7N/6PP/r6K w - - 0 1";
-    expect(inCheck(check)).toBe(true);
-    const legal = legalMoves(check);
-    expect(legal).toEqual(["h3g1"]);
-    // Block every escape's squares in turn: the block lifts whenever it would leave none.
-    for (const m of legal) {
-      const only = legal.filter((x) => !blockedBy(x, m.slice(2, 4), check));
-      const allowed = crowdAllowed(boss(check, m.slice(2, 4)), check);
-      if (!only.length) expect(allowed).toBeNull(); // lifted: every legal move allowed
-      else expect(allowed ?? legal).toEqual(expect.arrayContaining(only));
-    }
-    // A king boxed in with one move: blocking it lifts.
-    const boxed = "k7/8/1K6/8/8/8/8/1Q6 b - - 0 1";
-    const bm = legalMoves(boxed);
-    expect(bm).toHaveLength(1);
-    const blackCrowd = { id: "bigboy", crowdSide: "b", crowdMoves: 3, powers: { ...initPowers(1, boxed, "b"), turn: 4, block: { square: bm[0]!.slice(2, 4), at: 4, until: 6 } } } as unknown as BossState;
-    expect(crowdAllowed(blackCrowd, boxed)).toBeNull();
-    // The boss is stopped too, and lifted the same way.
+    expect(crowdAllowed(boss(check, "g1"), check)).toBeNull(); // lifted: every legal move allowed
+    // A scattered block on it: the same.
+    const sc = { ...boss(check, "g1"), powers: { ...boss(check, "g1").powers!, tower: null, scatter: { from: "g3", height: 1, squares: ["g1"], by: "boss" as const, at: 4, until: 4 } } } as BossState;
+    expect(crowdAllowed(sc, check)).toBeNull();
+    // The boss is stopped too (never into the tower), and lifted the same way.
     const open = "4k3/8/8/8/8/8/8/R3K3 w Q - 0 1";
-    const allowed = bossAllowed(boss(open, "a4"), open)!;
+    const allowed = bossAllowed(boss(open, "a4", 5), open)!;
     expect(allowed).not.toContain("a1a4");
     expect(allowed).not.toContain("a1a8"); // through a4
     expect(allowed).toContain("a1a3");
@@ -309,7 +415,7 @@ describe("Big Boy's Big Bounce: the new position", () => {
       const crowd = sideToMove(fen) === "w" ? "b" : "w";
       for (let seed = 0; seed < 12; seed++) {
         const block = seed % 3 === 0 ? (chooseBlock(applyMove(fen, legalMoves(fen)[0]!), crowd, seed, 2) ?? null) : null;
-        const cands = bounceCandidates(fen, crowd, seed, 7, block);
+        const cands = bounceCandidates(fen, crowd, seed, 7, block ? [block] : []);
         for (const c of cands) {
           total++;
           // A legal position, him to move, the crowd's king not in check, his neither, and he has a move.
@@ -355,7 +461,7 @@ describe("Big Boy's Big Bounce: the new position", () => {
           expect(hangingValue(c.fen, crowd)).toBeLessThanOrEqual(hangingValue(fen, crowd));
         }
         // The same list everywhere, from the seed.
-        expect(bounceCandidates(fen, crowd, seed, 7, block)).toEqual(cands);
+        expect(bounceCandidates(fen, crowd, seed, 7, block ? [block] : [])).toEqual(cands);
       }
     }
     expect(total).toBeGreaterThan(400);
@@ -492,7 +598,7 @@ describe("Big Boy's Big Bounce in a battle", () => {
     const after = fenOf(r);
     if (res.moves.length) {
       expect(after).not.toBe(before);
-      expect(bounceCandidates(before, "w", r.boss!.powers!.seed, 2, null).map((c) => c.fen)).toContain(after);
+      expect(bounceCandidates(before, "w", r.boss!.powers!.seed, 2, toyBlockSquares(r.boss!.powers)).map((c) => c.fen)).toContain(after);
       // A base where the position changed: replays keep the bounced pieces where they landed.
       expect(r.boards.get(0)!.bases).toContainEqual({ ply, fen: after });
     }
