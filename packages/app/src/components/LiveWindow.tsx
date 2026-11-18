@@ -1,4 +1,5 @@
 import { useEffect, useState } from "preact/hooks";
+import type { ComponentChildren } from "preact";
 import { bossThreat } from "@chessroyale/core";
 import { useLive, type LiveCounts } from "../live.ts";
 import { loadReplays, replayAt, replayView, type ReplayFile } from "../bot-replays.ts";
@@ -34,7 +35,7 @@ export function LiveWindow() {
     const t = setTimeout(() => setNow(Date.now()), Math.max(50, moment.until - Date.now() + 20));
     return () => clearTimeout(t);
   }, [moment?.until]);
-  if (real) return <RealMatch match={real} />;
+  if (real) return <LiveFrame {...realFrame(real)} />;
   if (!file || !moment) return <section class="fd-livewin empty" aria-hidden="true" />;
   const r = file.replays[moment.replay]!;
   const v = replayView(r, moment.ply);
@@ -53,16 +54,25 @@ export function LiveWindow() {
   ) : (
     <Votes who={`${sideName}'s crowd`} votes={v.votes} />
   );
+  return <LiveFrame real={false} label="Bot match, a recording" tag="Bot match" mode="Crowd · 50 v 50" meta={meta} boardKey={r.id} fen={v.fen} lastMove={v.lastMove} line={line} />;
+}
+
+/**
+ * The window itself, one shape for a recording and a real match, so a live match replacing the recording (or the other way)
+ * changes what's in it and never rebuilds the window or its board's box (Nov 18: the box was gone for a moment as it swapped,
+ * read as null by home-ranked.spec on main).
+ */
+function LiveFrame({ real, label, tag, mode, meta, boardKey, fen, lastMove, line }: { real: boolean; label: string; tag: ComponentChildren; mode: string; meta: string; boardKey?: string; fen: string; lastMove?: string | null; line: ComponentChildren }) {
   return (
-    <section class="fd-livewin" aria-label="Bot match, a recording">
+    <section class={`fd-livewin${real ? " real" : ""}`} aria-label={label}>
       <header class="fd-livewin-head">
-        <span class="fd-livewin-tag">Bot match</span>
-        <span class="fd-livewin-mode">Crowd · 50 v 50</span>
+        <span class={`fd-livewin-tag${real ? " live" : ""}`}>{tag}</span>
+        <span class="fd-livewin-mode">{mode}</span>
         <span class="fd-livewin-meta">{meta}</span>
       </header>
       <div class="fd-livewin-board">
         <div class="fd-livewin-sq">
-          <Board key={r.id} fen={v.fen} lastMove={v.lastMove} orientation="white" small silent />
+          <Board key={boardKey} fen={fen} lastMove={lastMove} orientation="white" small silent />
         </div>
       </div>
       <p class="fd-livewin-line">{line}</p>
@@ -70,42 +80,31 @@ export function LiveWindow() {
   );
 }
 
-/** A real match: its board and the crowd's votes on the move just played (no names), and no "Bot match" label. */
-function RealMatch({ match }: { match: NonNullable<LiveCounts["featured"]> }) {
+/** A real match, for the window: its board and the crowd's votes on the move just played (no names), and no "Bot match" label. */
+function realFrame(match: NonNullable<LiveCounts["featured"]>): Parameters<typeof LiveFrame>[0] {
   const b = match.board;
   // (The side that just moved: the one not to move now.)
   const moved = b.fen.split(" ")[1] === "w" ? "Black" : "White";
   const mode = match.mode === "boss" ? `Boss Battle${match.bossElo ? ` · ${"💀".repeat(bossThreat(match.bossElo))}` : ""}` : "Crowd · 50 v 50";
   const meta = [b.ply ? `Move ${Math.ceil(b.ply / 2)}` : "Starting", match.alive !== null ? `${match.alive} left` : null].filter(Boolean).join(" · ");
-  return (
-    <section class="fd-livewin real" aria-label="Live match">
-      <header class="fd-livewin-head">
-        <span class="fd-livewin-tag live">
-          <span class="fd-dot" /> Live
-        </span>
-        <span class="fd-livewin-mode">{mode}</span>
-        <span class="fd-livewin-meta">{meta}</span>
-      </header>
-      <div class="fd-livewin-board">
-        <div class="fd-livewin-sq">
-          <Board fen={b.fen} lastMove={b.lastMove} orientation="white" small silent />
-        </div>
-      </div>
-      <p class="fd-livewin-line">
-        {b.votes.length === 1 && b.votes[0]![1] === 1 ? (
-          <>
-            {moved} plays <strong>{b.votes[0]![0]}</strong>
-          </>
-        ) : b.votes.length ? (
-          <Votes who={`${moved}'s crowd`} votes={b.votes} />
-        ) : b.ply ? (
-          "The match is on"
-        ) : (
-          "A match is starting"
-        )}
-      </p>
-    </section>
+  const line =
+    b.votes.length === 1 && b.votes[0]![1] === 1 ? (
+      <>
+        {moved} plays <strong>{b.votes[0]![0]}</strong>
+      </>
+    ) : b.votes.length ? (
+      <Votes who={`${moved}'s crowd`} votes={b.votes} />
+    ) : b.ply ? (
+      "The match is on"
+    ) : (
+      "A match is starting"
+    );
+  const tag = (
+    <>
+      <span class="fd-dot" /> Live
+    </>
   );
+  return { real: true, label: "Live match", tag, mode, meta, fen: b.fen, lastMove: b.lastMove, line };
 }
 
 /** "White's crowd: Nf3 31 · e4 12 · d4 5", the move played first and bold (in 50 v 50 drawn from the top 3), then the most voted. */
