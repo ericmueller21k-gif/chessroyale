@@ -2,7 +2,8 @@ import type { JSX } from "preact";
 import { SUPER_FREEZE_BEATS, bannerLeadMs, pieceAt, powerFxMs, sideToMove, superBox, superFreezeLeadMs } from "@chessroyale/chess";
 import { EFFECTS, animLength } from "../characters/power-art.ts";
 import type { BossView } from "../game.ts";
-import { BossEffect, SpriteAnim, prewarm } from "./BossEffect.tsx";
+import { GINGER_BATTLE } from "../characters/ginger-super.ts";
+import { BossEffect, SpriteAnim, prewarm, prewarmSprite } from "./BossEffect.tsx";
 import { squareXY } from "./GodKing.tsx";
 import { Flight, PIECE_WORD, onSquare, type BossUi, type Moment, type MomentProps } from "./PowerParts.tsx";
 
@@ -189,11 +190,17 @@ export function prewarmGinger(): void {
 }
 
 let superWarmed = false;
-/** His Super Freeze's ice block drawn ahead, a slice a frame, once his meter is half full (the block's 27 frames). */
+/**
+ * His Super Freeze drawn ahead, a slice a frame, once his meter is half full: his cast's frames (the charge, the held charge, the
+ * blast), then the ice block's (grow, hold, settle). Its first showing is then no stall on a phone (LESSONS: "A stall the first
+ * time an effect shows").
+ */
 export function prewarmSuperIce(): void {
   if (superWarmed) return;
   superWarmed = true;
-  prewarm("superIce", Object.entries(EFFECTS.superIce.ch.anims).flatMap(([a, an]) => an.frames.map((_, i) => [a, i] as const)));
+  prewarmSprite(GINGER_BATTLE, GINGER_BATTLE.anims.superFreeze!.frames, undefined, () =>
+    prewarm("superIce", Object.entries(EFFECTS.superIce.ch.anims).flatMap(([a, an]) => an.frames.map((_, i) => [a, i] as const))),
+  );
 }
 
 export const GINGER_UI = {
