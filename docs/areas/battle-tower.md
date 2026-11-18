@@ -1,7 +1,7 @@
 # The Battle Tower (designed; being built)
 
 Lane: the director (the rules: `god-king`; the floor art: `characters`; saving: the director, full lane). **Built so far: the
-board layer (PR 1); the held pieces read through it (PR 2).**
+board layer (PR 1); the held pieces (PR 2) and the square marks (PR 3) read through it.**
 The design, its calls settled with Eric (Nov 18): [docs/decisions/2026-11-18-battle-tower-design.md](../decisions/2026-11-18-battle-tower-design.md).
 
 ## What it will be
@@ -40,7 +40,7 @@ An independent auditor (Fable, high) checks the build three times (after PRs 6, 
 
 | Part | Files (planned) |
 | --- | --- |
-| The board layer | `packages/chess/src/board-layer.ts` (built; exported through `boss-powers.ts`); the dispatcher reads it (`limitCrowd`, `boardAltered`) through each boss's `layer` hook: held pieces from PR 2 |
+| The board layer | `packages/chess/src/board-layer.ts` (built; exported through `boss-powers.ts`); the dispatcher reads it (`limitCrowd`, `bossAllowed`, `bossStopped`, `boardAltered`) through each boss's `layer` hook: held pieces from PR 2, square marks (pies, toy blocks, plants, Chandy's beam and scatter, Don Dough's dough) from PR 3 |
 | Several bosses on one board | `MatchState.bosses` (`packages/core/src/match.ts`), the runner and `prepareTurn` per boss |
 | The climb | core `tower.ts`, `BATTLE_TOWER` in `packages/core/src/settings.ts` |
 | Saving | `packages/server/src/tower.ts` (`tower_runs`, `tower_best`), `account-data.ts`, the sign-in merge |
@@ -50,6 +50,6 @@ An independent auditor (Fable, high) checks the build three times (after PRs 6, 
 ## Tests (planned)
 
 `packages/chess/test/board-layer.test.ts` (every mark, overlaps, the lift, castling, promotion, en passant); each family's twin
-(today's rule, frozen, against the layer over seeded battles: `held-layer-twin.test.ts` for the held pieces); the boss kit (`packages/chess/test/boss-kit.test.ts`) and `e2e/boss-smoke.spec.ts` guard every boss
+(today's rule, frozen, against the layer over seeded battles: `held-layer-twin.test.ts` for the held pieces, `square-layer-twin.test.ts` for the square marks); the boss kit (`packages/chess/test/boss-kit.test.ts`) and `e2e/boss-smoke.spec.ts` guard every boss
 moved onto the layer, and run over pairs and threes of bosses; core `tower` unit tests; `e2e/battle-tower.spec.ts` (its
 `e2e/areas.json` entry).
