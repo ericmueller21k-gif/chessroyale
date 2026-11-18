@@ -164,7 +164,7 @@ Never dealt.
 
 | Move | Kind | In? | Why | Cast by a player | Lasts |
 | --- | --- | --- | --- | --- | --- |
-| Draft | normal | **in** | Pure pick (`chooseDraft`, `attackStands`) | An ink mark under the most valuable of their defended pieces that one of the caster's pieces attacks. They have `draftWindow` (2) of their moves to end that attack; if it still stands, the piece is folded: it can't move. The mark clears as the attack ends. Nothing attacked: it fizzles (refund). | the window, then `foldTurns` (4) |
+| Draft | normal | **in** | Pure pick (`chooseDraft`, `attackStands`) | An ink mark under the most valuable of their defended pieces that one of the caster's pieces attacks (never one a cheaper piece attacks). They have `draftWindow` (2) of their moves to end that attack; if it still stands, the piece is folded: it can't move. The mark clears as the attack ends. Nothing attacked: it fizzles (refund). | the window, then `foldTurns` (4) |
 | Crease | ultimate | out | Engine pick (`creasePick`) | | |
 | Revision | once a battle | out | It crosses moves out and plays the engine's best (`bestReply`) | | |
 
