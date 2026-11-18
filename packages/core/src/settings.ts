@@ -2075,8 +2075,8 @@ export const BOSS_POWERS = {
    *   (or adding an attacker) within `chaseMargin`.
    * - **The rifle:** each locked piece he takes is an upgrade (`upgradesMax`), each unlocking one of his five moves at random; the
    *   upgrade window holds everything `upgradeMs` (Eric: 2 s).
-   * - **The move meter:** from the first upgrade, full every `meterEvery` of your moves; it fires a random unlocked move (a new unlock
-   *   first). `fireOnUnlock` (Eric, Nov 16; false turns it off): a new unlock fires on his turn after its upgrade window whatever the
+   * - **The move meter:** from the first upgrade, full every `meterEvery` of your moves; it fires an unlocked move: a new unlock first,
+   *   never the one he fired last while another can come, then the least fired, ties at random (Eric, Nov 18; chandy.ts meterOrder). `fireOnUnlock` (Eric, Nov 16; false turns it off): a new unlock fires on his turn after its upgrade window whatever the
    *   meter says, and the meter starts over (a queen lock that can't come then waits for the meter). Scatter shot blocks `scatterSquares` squares round a spot (a pick of the top `looks`, as every pick of his below);
    *   shields cover `shieldCount` of his pieces; rapid fire stuns `rapidCount` of yours.
    * - **Dodge** (his ultimate, once a battle: maxUltimates.chandy; Eric, Nov 16: "He only ults once per game, no matter what"; "It

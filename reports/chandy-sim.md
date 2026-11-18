@@ -17,6 +17,24 @@ his rage full `dodgeAfterMoves` 3 of your moves after the fifth upgrade, the las
 scores 0.09 (± 0.05) in 44 moves; 5 upgrades in 28 battles of 32 (88%), the fifth at move 31 (median).** In the pack: Don Dough
 0.05, Dash 0.15, Puddles 0.17, the plain boss 0.10. (Run B shipped first: the rage meter filling as every boss's, twice at most.)
 
+**Run E (Nov 18, his move mix; docs/decisions/2026-11-18-chandy-move-mix.md):** Eric, after a real game: "he literally had all 5 but
+kept spamming the scatter shot ... he randomly skipped one entirely". The same sim, 5 battles each on seeds 11 and 12, and 5 each on
+13 and 14 with all five moves from the start (`'{"test":"dodge"}'`), before (main at af1fc97) and after (`meterOrder`): the rows
+`raid-mixBefore*` and `raid-mixAfter*`, each pick and landing traced by a hook in chandy.ts kept out of the code:
+
+| Run E | His moves a battle | One move half or more of a battle's moves | Top move's share (median) | Queen lock landed | Twice in a row while another could come |
+|---|---|---|---|---|---|
+| Normal, before | 7.4 | 3 battles of 10 | 0.40 | 1 battle of 10 (picked 3 times, 2 waited) | 0 (4 with one move to fire) |
+| Normal, after | 7.8 | **0 of 10** | **0.29** | **4 of 10** (picked 7, 2 waited) | 0 (8 with one move to fire) |
+| All five, before | 6.4 | 0 of 9 | 0.40 | 4 of 10 | 1 (3 picks couldn't land) |
+| All five, after | 5.0 | 0 of 8 | 0.25 | 6 of 10 | 0 (2 couldn't land) |
+
+The queen lock could come on 41% of the crowd's turns from the first upgrade (74% of those with a queen; the bots had her on 55%):
+it was rare because it was one random pick among four or five every sixth move, not by its own rule. The crowd's results didn't move
+(normal: 1 win before, 2 draws after; all five: the boss won all 20; the all-five battles ran 27 crowd moves (median) after, 41
+before: 10 battles each, within noise). A stand-in engine's 80 battles (both sides, before) had 66 picks of 834 that couldn't land,
+19 of 30 repeats breaking the rule: the fallback was a random other move, his last one included.
+
 ## How: the raid sim
 
 `npx tsx packages/sim/scripts/boss-sim.ts raid chandy 8 <seed> 0 <tag>`, four processes side by side (seeds 11 to 14); a crowd of
