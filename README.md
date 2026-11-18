@@ -1,0 +1,1 @@
+Eric picked option 3 (Nov 18): Big Boy tower seen from above, count on the top block. Quick mockups by the director (not the art: the real blocks are the original carved wooden style). mock-tower2.py/mock-tower3.py: the geometry used (grow 0.035/block, rise 2.4 art px/block, jitter JX/JY).
