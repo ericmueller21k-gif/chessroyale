@@ -124,6 +124,17 @@ describe("quick chat in the app", () => {
     expect(chat.floats().size).toBe(0);
   });
 
+  it("an emoji floats its whole time from when it arrives, even stamped seconds earlier (a late delivery, or this device's estimate of the server's clock off: Nov 18, chat.spec's emoji on a busy runner)", () => {
+    const { chat, line } = setup();
+    chat.onLog([], ["basics", "emoji-basics"]);
+    chat.onLine(line(1, "p2", "e-fire", { at: Date.now() - QUICK_CHAT.emojiFloatMs - 500 }));
+    expect(chat.floats().get("p2")?.text).toBe("🔥");
+    vi.advanceTimersByTime(QUICK_CHAT.emojiFloatMs - 100);
+    expect(chat.floats().get("p2")?.text).toBe("🔥");
+    vi.advanceTimersByTime(200);
+    expect(chat.floats().size).toBe(0);
+  });
+
   it("emoji go to everyone with All on; one from the other team floats from the scoreboard's header with their chip", () => {
     const { chat, sent, line } = setup();
     chat.onLog([], ["basics", "emoji-basics"]);
