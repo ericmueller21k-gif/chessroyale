@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Chess } from "chess.js";
-import { BOSS_POWERS, bossBannerMs, BOSS_ROSTER, DEFAULT_SETTINGS, RAID_SETTINGS, isPlayable, mulberry32, type BossState, type Settings } from "@chessroyale/core";
+import { BOSS_POWERS, bossBannerMs, BOSS_ROSTER, DEFAULT_SETTINGS, RAID_SETTINGS, isPlayable, mulberry32, type BossPowerState, type BossState, type Settings } from "@chessroyale/core";
 import {
   BOUNCE,
   MatchRunner,
@@ -13,6 +13,7 @@ import {
   bounceDue,
   bounceFrom,
   bounceSpots,
+  boardAltered,
   bossThinkMs,
   chooseBlock,
   crowdAllowed,
@@ -28,6 +29,7 @@ import {
   pieceAt,
   powerMomentMs,
   bannerWaitMs,
+  powerRoll,
   powerTurn,
   prepareTurn,
   queenSlain,
@@ -41,11 +43,14 @@ import {
   topples,
   toyBlockSquares,
   toyStops,
+  toysTakeMove,
+  toysTakeReply,
   triggerUltimate,
   withoutPiece,
   type EngineLike,
   type Opening,
 } from "../src/index.ts";
+import { kitSettings } from "./boss-kit-lib.ts";
 
 /**
  * Big Boy, the baby boss: his snack (the crowd's d- or e-pawn eaten before move 1), his toy-block tower (Nov 18: one more
@@ -269,6 +274,10 @@ describe("Big Boy's toy blocks", () => {
           if (m.slice(2, 4) === p.tower.square) expect(p.tower.height).toBeGreaterThanOrEqual(BOSS_POWERS.towerEnter);
           else expect(blockedBy(m, p.tower.square, fen)).toBe(false);
         }
+        // A power turn for fair play only when it takes a crowd move away (Eric's (b), Nov 18): a new single block always does
+        // (it sits where a crowd piece could move); a taller one where something slides through it. Without the position, it counts.
+        expect(powerTurn(b, fen)).toBe(r.crowdAllowed() !== null);
+        if (p.tower.height === 1) expect(powerTurn(b, fen)).toBe(true);
         expect(powerTurn(b)).toBe(true);
         expect(r.bossView()!.powers!.tower).toEqual(p.tower);
       }
@@ -856,5 +865,139 @@ describe("Big Boy's Big Bounce in a battle", () => {
     }
     expect(picks).toBeGreaterThan(20);
     expect(inBand).toBeGreaterThan(5);
+  });
+});
+
+/**
+ * Eric's (b), Nov 18: his toys stand nearly every turn, so a turn with them up counts as a power turn (fair play) only when a
+ * block actually takes one of the crowd's legal moves away, and the God King's Last Stand sits out for them only when a block
+ * takes away the reply it would replay (the judge's feared answer, as his toys will stand for it). The same in solo and online:
+ * both resolve the round in the runner.
+ */
+describe("Big Boy's toys, fair play and the Last Stand (Eric's (b))", () => {
+  // The crowd (White) hangs its queen on d5; his rook on d8 takes it, sliding through d7 and d6.
+  const HANG = "3r2k1/8/8/8/8/8/8/3Q2K1 w - - 0 1";
+  const BLUNDER = "d1d5";
+  const REPLY = "d8d5";
+  const tower = (square: string, height = 3) => ({ tower: { square, height, at: 1 }, scatter: null });
+  const scatter = (squares: string[], until = 2) => ({ tower: null, scatter: { from: "a8", height: squares.length, squares, by: "boss" as const, at: 1, until } });
+  // d7: on the d-file (the queen's d1-d8 slides through it, his rook's reply too); b3: a 1-tall block on the queen's d1-a4
+  // diagonal (her moves to b3 and a4), nowhere near his reply; h3: on no move of either side's.
+  const POWERS = { seed: 1, turn: 1, material: 39, lost: 0, nextPassive: 2, events: [] } as unknown as BossPowerState;
+  const at = (patch: Partial<BossPowerState>, turn = 1) => ({ ...POWERS, turn, ...patch }) as BossPowerState;
+
+  it("a block takes a crowd move away: a power turn; a tower nothing slides through, open to a topple, takes none: not one", () => {
+    expect(toysTakeMove(at(tower("d7")), HANG)).toBe(true);
+    expect(toysTakeMove(at(tower("b3", 1)), HANG)).toBe(true);
+    expect(toysTakeMove(at(scatter(["d7"])), HANG)).toBe(true);
+    expect(toysTakeMove(at(tower("h3")), HANG)).toBe(false);
+    // (A tower a piece may move onto, 2 or more tall, standing where nothing slides: the move onto it is open, nothing is lost.)
+    expect(toysTakeMove(at(tower("a4")), HANG)).toBe(false);
+    expect(toysTakeMove(at(tower("a4", 1)), HANG)).toBe(true);
+    expect(toysTakeMove(at({ tower: null, scatter: null }), HANG)).toBe(false);
+    // The dispatcher: with the position, the rule; without it, his toys up count (as before).
+    const boss = (patch: Partial<BossPowerState>) => ({ id: "bigboy", crowdSide: "w", crowdMoves: 0, powers: at(patch) }) as unknown as BossState;
+    expect(powerTurn(boss(tower("h3")), HANG)).toBe(false);
+    expect(powerTurn(boss(tower("d7")), HANG)).toBe(true);
+    expect(powerTurn(boss(tower("h3")))).toBe(true);
+    expect(powerTurn(boss({ tower: null, scatter: null }))).toBe(false);
+  });
+
+  it("the Last Stand: a block takes his reply away (onto or through it, as his toys will stand for it): it sits out; else it doesn't", () => {
+    expect(toysTakeReply(at(tower("d7")), HANG, BLUNDER, REPLY)).toBe(true);
+    expect(toysTakeReply(at(tower("d6", 1)), HANG, BLUNDER, REPLY)).toBe(true);
+    expect(toysTakeReply(at(scatter(["d6"])), HANG, BLUNDER, REPLY)).toBe(true);
+    expect(toysTakeReply(at(tower("b3", 1)), HANG, BLUNDER, REPLY)).toBe(false);
+    expect(toysTakeReply(at(tower("h3")), HANG, BLUNDER, REPLY)).toBe(false);
+    // A scattered block whose last crowd turn this is goes as the crowd's move is played, before his reply: no limit on it.
+    expect(toysTakeReply(at(scatter(["d7"], 1)), HANG, BLUNDER, REPLY)).toBe(false);
+    expect(toysTakeReply(at(scatter(["d7"], 2)), HANG, BLUNDER, REPLY)).toBe(true);
+    // The reply not known: it sits out, as before.
+    expect(toysTakeReply(at(tower("h3")), HANG, BLUNDER, undefined)).toBe(true);
+    expect(toysTakeReply(at({ tower: null, scatter: null }), HANG, BLUNDER, undefined)).toBe(false);
+    // A scatter with no block left (none could land, or each one stepped on): no toys, reply known or not.
+    expect(toysTakeReply(at(scatter([])), HANG, BLUNDER, undefined)).toBe(false);
+    expect(toysTakeReply(at(scatter([])), HANG, BLUNDER, REPLY)).toBe(false);
+  });
+
+  it("the Last Stand: his reply lands on the tower: on a turn it's open to him (seeded) it topples it, no limit; on any other turn it's stopped", () => {
+    // The crowd's rook leaves the back rank (e3a3); his rook's reply d8d1 (mate) lands on the tower's square, nothing on its way.
+    const BACK = "3r2k1/8/8/8/8/4R3/5PPP/6K1 w - - 0 1";
+    const [move, reply] = ["e3a3", "d8d1"];
+    // (The draw for his turn after crowd turn 1, as hisToppleOpen makes it: found here, not taken from it.)
+    const seeds = Array.from({ length: 100 }, (_, i) => i + 1);
+    const openSeed = seeds.find((seed) => powerRoll(seed, "his-topple", 1) < BOSS_POWERS.towerBossChance)!;
+    const closedSeed = seeds.find((seed) => powerRoll(seed, "his-topple", 1) >= BOSS_POWERS.towerBossChance)!;
+    const on = (seed: number, height = 3) => ({ ...at(tower("d1", height)), seed }) as BossPowerState;
+    expect(toysTakeReply(on(openSeed), BACK, move, reply)).toBe(false);
+    expect(toysTakeReply(on(closedSeed), BACK, move, reply)).toBe(true);
+    // A single block is too short to topple: it stops the reply on any turn.
+    expect(toysTakeReply(on(openSeed, 1), BACK, move, reply)).toBe(true);
+  });
+
+  it("the Last Stand on a crowd move that topples the tower: its scattered blocks (seeded) take his reply away exactly when one lands on its way", () => {
+    // The queen's move onto a 3-tall tower on d5 topples it; his rook's reply runs through d7 and d6.
+    let blocked = 0;
+    let open = 0;
+    for (let seed = 1; seed <= 60; seed++) {
+      const p = { ...at(tower("d5")), seed } as BossPowerState;
+      const after = applyMove(HANG, BLUNDER);
+      const landed = scatterSquares(after, "d5", scatterCount(3), seed, 1, "crowd");
+      const onWay = landed.some((sq) => sq === "d6" || sq === "d7");
+      expect(toysTakeReply(p, HANG, BLUNDER, REPLY), `seed ${seed}: ${landed.join(",")}`).toBe(onWay);
+      if (onWay) blocked++;
+      else open++;
+    }
+    expect(blocked).toBeGreaterThan(0);
+    expect(open).toBeGreaterThan(0);
+  });
+
+  /** The battle on HANG, his toys patched in, a scripted judge: the crowd's `move` gives away 47 points from 55%; its reply known or not. */
+  async function round(patch: Partial<BossPowerState>, move = BLUNDER, reply: string | null = REPLY) {
+    const exp = (fen: string, m: string) => (m === move ? 0.08 : 0.55 - 0.001 * legalMoves(fen).indexOf(m));
+    const ranked = (fen: string, moves: readonly string[]) =>
+      moves.map((m) => ({ move: m, expected: exp(fen, m), ...(m === move && reply ? { reply } : {}) })).sort((a, b) => b.expected - a.expected);
+    const engine: EngineLike = {
+      topMoves: async (fen, n) => ranked(fen, legalMoves(fen)).slice(0, n),
+      topMovesAt: async (fen, n, _nodes, only) => ranked(fen, only ?? legalMoves(fen)).slice(0, n),
+      scoreMoves: async (fen, moves) => ranked(fen, [...new Set(moves)]),
+      playAtElo: async (fen) => ranked(fen, legalMoves(fen))[0]?.move ?? "0000",
+    };
+    // (The save on the battle's first move: the first-five-moves rule off here, as in king-save-altered.test.ts.)
+    const settings = kitSettings({ boss: "bigboy", test: "", maxMoves: 50 }, { lastStandFrom: DEFAULT_SETTINGS.lastStandFrom, lastStandFromMove: 0 });
+    const r = new MatchRunner({ settings, rng: mulberry32(7), engines: [engine], library: [opening(LINE)], entrants: [{ id: "h0", name: "H", isBot: false }], raidSide: "w" });
+    const id = r.state.boards[0]!;
+    const board = r.boards.get(id)!;
+    r.boards.set(id, { ...board, fen: HANG, bases: [...(board.bases ?? []).filter((x) => x.ply !== board.history.length), { ply: board.history.length, fen: HANG }] });
+    const boss = r.state.boss!;
+    r.state = { ...r.state, boss: { ...boss, powers: { ...boss.powers!, ...patch } } };
+    r.deal();
+    const res = await r.score(new Map([["h0", { move, thinkMs: 1000 }]]));
+    return { r, round: res.boards[0]! };
+  }
+
+  it("in the match: a tower that takes no move away counts for fair play and lets the Last Stand come; one that takes a move and his reply away does neither", async () => {
+    const plain = await round(tower("h3"));
+    expect(plain.round.power).toBeUndefined();
+    expect(plain.round.lastStand).toMatchObject({ move: BLUNDER, reply: REPLY });
+    expect(plain.r.state.boss!.barred).toBe(BLUNDER);
+
+    const blocking = await round(tower("d7"));
+    expect(blocking.round.power).toBe(true);
+    expect(blocking.round.lastStand).toBeUndefined();
+    expect(blocking.r.state.boss!.barred).toBeUndefined();
+    expect(blocking.r.state.boss!.kingCharges).toBe(3);
+  });
+
+  it("in the match: a block that takes a crowd move away but not his reply: no fair-play signal, and the Last Stand still comes; his reply not known: it sits out", async () => {
+    const aside = await round(tower("b3", 1));
+    expect(aside.round.power).toBe(true);
+    expect(aside.round.lastStand).toMatchObject({ move: BLUNDER, reply: REPLY });
+    const unknown = await round(tower("h3"), BLUNDER, null);
+    expect(unknown.round.power).toBeUndefined();
+    expect(unknown.round.lastStand).toBeUndefined();
+    // (boardAltered without the crowd's move, the general rule: his toys up, his moves stopped.)
+    expect(boardAltered(unknown.r.state.boss, HANG)).toBe(true);
+    expect(boardAltered(unknown.r.state.boss, HANG, undefined, { played: BLUNDER, reply: REPLY })).toBe(false);
   });
 });

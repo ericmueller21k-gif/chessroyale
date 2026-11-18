@@ -129,6 +129,8 @@ const AUDIT: Record<string, { on: Record<string, Patch>; off: Patch } | { none: 
     off: () => ({ fire: [], candle: null }),
   },
   hollow: { on: { "a square in the dark": (f) => ({ dark: [{ square: crowdPiece(f), at: 1, until: 3 }] }) }, off: () => ({ dark: [] }) },
+  // (Big Boy's toys count only where they take away the reply the save would replay (Eric's (b), Nov 18; bigboy.test.ts). This
+  // scripted judge names no reply, and an unknown reply keeps the save off while his toys stand, as before.)
   bigboy: {
     on: {
       "his tower": (f) => ({ tower: { square: emptyTarget(f), height: 3, at: 1 } }),

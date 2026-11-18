@@ -9,7 +9,7 @@
  * reports are identical (the browser engine is deterministic: reports/judge-determinism.md).
  */
 import { DEFAULT_SETTINGS, botChoose, botLeanFor, mulberry32, type CrowdBotSpread } from "@chessroyale/core";
-import { legalMoves, sideToMove } from "./rules.ts";
+import { applyMove, legalMoves, sideToMove } from "./rules.ts";
 import type { MoveScore } from "./uci.ts";
 import { applyRecheck, recheckTargets, repliesFrom, type EngineLike, type RecheckSettings } from "./runner.ts";
 import { allowedSearch, fireEscapes, fireRanked, jobAllows, judgeCandidates, judgeTop, racePulls, raceRanked, type CarrotRace } from "./boss-powers.ts";
@@ -199,7 +199,31 @@ function baseBoard(job: JudgeJob, report: JudgeReport, bots: { picks: string[]; 
   // Every pick (people's and bots') must be scored.
   if (![...job.picks, ...bots.picks].every((m) => expectedAfter[m] !== undefined)) return null;
   const { replies, mates } = repliesFrom([top, report.extra]);
-  return { bestMove: top[0]!.move, bestExpected: top[0]!.expected, expectedAfter, botPicks: bots.picks, botPowerUps: bots.powerUps, replies, mates, rechecked: [] };
+  return { bestMove: top[0]!.move, bestExpected: top[0]!.expected, expectedAfter, botPicks: bots.picks, botPowerUps: bots.powerUps, replies: legalReplies(job.fen, replies), mates, rechecked: [] };
+}
+
+/** A judge's replies that are legal moves after their move; any other is junk, dropped (read as not known). */
+function legalReplies(fen: string, replies: Record<string, string>): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(replies).filter(([m, r]) => {
+      try {
+        return legalMoves(applyMove(fen, m)).includes(r);
+      } catch {
+        return false;
+      }
+    }),
+  );
+}
+
+/**
+ * The replies every board names alike. Two judges' boards agree on the numbers, but nothing compares their replies, and
+ * Big Boy's Last Stand turns on the reply (his toys sit it out only when they take it away): so where judges settle a job
+ * together, a reply one of them leaves out or names differently reads as not known (the save sits out for his toys).
+ * Honest judges' engines are deterministic, so their replies match and nothing changes for them.
+ */
+export function sharedReplies(boards: readonly Pick<JudgedBoard, "replies">[]): Record<string, string> {
+  const [first, ...rest] = boards;
+  return Object.fromEntries(Object.entries(first?.replies ?? {}).filter(([m, r]) => rest.every((b) => b.replies?.[m] === r)));
 }
 
 /**

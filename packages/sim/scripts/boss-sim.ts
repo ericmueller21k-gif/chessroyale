@@ -403,7 +403,8 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
       let seen = -1;
       // (Big Boy: each tower's topple (after which crowd turn, by whom: the crowd's move, his piece, or by itself at towerMax; its
       // height and how many blocks scattered), from his scattered blocks as each turn is looked at; and his tallest tower.)
-      // (And for fair play: the crowd turns with a tower or blocks up (powerTurn), and those where one actually takes a legal move away.)
+      // (And for fair play: the crowd turns with a tower or blocks up, and those where one actually takes a legal move away: since Nov 18
+      // only these are power turns (powerTurn, Eric's (b)); the rest count.)
       const bigboy = { topples: [] as { at: number; by: "crowd" | "piece" | "self"; height: number; blocks: number }[], tallest: 0, toyTurns: 0, limitedTurns: 0 };
       const toppleSeen = new Set<string>();
       const look = () => {

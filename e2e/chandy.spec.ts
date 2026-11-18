@@ -150,6 +150,40 @@ test.describe("Chandy", () => {
     const errors: string[] = [];
     page.on("pageerror", (e) => errors.push(e.message));
     await battle(page, "lockon");
+    // (His phone bar, every frame (Eric, Nov 18, his name "moved too far to the right"): his name column never moves, and his drawing (the
+    // rifle out, tipped at the board: kits.ts barUnder) never touches its name, level or meters; `out`, frames it reached past the column.)
+    await page.evaluate(() => {
+      const w = window as any;
+      w.__bar = { lefts: [] as number[], over: 0, out: 0 };
+      const look = () => {
+        const bar = document.querySelector(".boss-bar");
+        const cv = document.querySelector(".boss-char.place-bar canvas") as HTMLCanvasElement | null;
+        const name = bar?.querySelector(".boss-name");
+        if (bar && cv && name && cv.width) {
+          const b = bar.getBoundingClientRect();
+          const n = name.getBoundingClientRect();
+          if (!w.__bar.lefts.includes(Math.round(n.left - b.left))) w.__bar.lefts.push(Math.round(n.left - b.left));
+          const c = cv.getBoundingClientRect();
+          const k = c.width / cv.width;
+          const g = cv.getContext("2d")!;
+          const drawn = (l: number, t: number, r: number, btm: number) => {
+            const x0 = Math.max(0, Math.floor((l - c.left) / k)), x1 = Math.min(cv.width, Math.ceil((r - c.left) / k));
+            const y0 = Math.max(0, Math.floor((t - c.top) / k)), y1 = Math.min(cv.height, Math.ceil((btm - c.top) / k));
+            if (x1 <= x0 || y1 <= y0) return false;
+            const d = g.getImageData(x0, y0, x1 - x0, y1 - y0).data;
+            for (let i = 3; i < d.length; i += 4) if (d[i]! > 0) return true;
+            return false;
+          };
+          for (const el of name.children) {
+            const r = el.getBoundingClientRect();
+            if (r.width && drawn(r.left, r.top, r.right, r.bottom)) w.__bar.over++;
+          }
+          if (drawn(n.left, b.top, c.right, b.bottom)) w.__bar.out++;
+        }
+        requestAnimationFrame(look);
+      };
+      requestAnimationFrame(look);
+    });
     // (Each of your moves leaves a piece he can take for free; the switch has him take one as soon as he can: his first capture.)
     const hang = (legal: { uci: string; piece: string; to: string; captured?: string }[], fen: string) => {
       const c = new Chess(fen);
@@ -171,6 +205,10 @@ test.describe("Chandy", () => {
     const c = await page.evaluate(() => (window as any).match.boss.powers.chandy);
     expect(c.upgrades).toBeGreaterThanOrEqual(1);
     await expect(page.locator(".ch-pips > i.on")).toHaveCount(c.upgrades);
+    const bar = await page.evaluate(() => (window as any).__bar as { lefts: number[]; over: number; out: number });
+    expect(bar.out, "his rifle came out past the name column in the bar").toBeGreaterThan(0);
+    expect(bar.over, "frames his drawing touched his name, level or meters").toBe(0);
+    expect(bar.lefts, "his name column never moved").toHaveLength(1);
     expect(errors).toEqual([]);
   });
 

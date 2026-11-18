@@ -13,7 +13,7 @@
  */
 import { BOSS_POWERS, mulberry32, type BossPowerSettings, type BossPowerState, type BossState, type BounceResult, type PowerEvent } from "@chessroyale/core";
 import { BOSS_OPENING, newBoard } from "../boards.ts";
-import { legalMoves, pieceAt, withoutPiece } from "../rules.ts";
+import { applyMove, legalMoves, pieceAt, withoutPiece } from "../rules.ts";
 import type { EngineLike } from "../runner.ts";
 import type { MoveScore } from "../uci.ts";
 import { bossPowers, crowdHalf, logit, meterFull, moveSquares, other, powerRoll, testSwitch, to, topEach, unleashed, type Battle, type BossRules, type Side } from "./base.ts";
@@ -209,6 +209,68 @@ function topple(next: BossPowerState, fen: string, by: "crowd" | "boss", turn: n
   next.scatter = { from: tower.square, height: tower.height, squares, by, at: turn, until };
   next.topples = (next.topples ?? 0) + 1;
   return { kind: "topple", turn, square: tower.square, squares: [...squares], by, height: tower.height };
+}
+
+/**
+ * His toys as they'll stand for his reply to the crowd's move (`after`: the position after it, him to move; `p`: as the crowd's
+ * turn left them): the scattered blocks whose last crowd turn this was go (Eric: gone at the end of the crowd's next turn,
+ * every time); one a piece now stands on (its limit lifted) is gone; and the crowd's move landed on his tower (the move that
+ * topples it; or any onto it, its limit lifted): it topples, its blocks standing through his reply and the crowd's next turn.
+ * Pure: the match's afterCrowdMove, and the Last Stand's look at what his reply would meet (standAltered).
+ */
+export function toysAfterCrowd(p: BossPowerState, after: string, s: BossPowerSettings = BOSS_POWERS): BossPowerState {
+  const next: BossPowerState = { ...p };
+  if (next.scatter && next.scatter.until <= p.turn) next.scatter = null;
+  if (next.scatter?.squares.some((sq) => pieceAt(after, sq))) next.scatter = { ...next.scatter, squares: next.scatter.squares.filter((sq) => !pieceAt(after, sq)) };
+  if (next.tower && pieceAt(after, next.tower.square)) next.events = [...p.events, topple(next, after, "crowd", p.turn, p.turn + 1, s)];
+  return next;
+}
+
+/** The legal moves in `fen` (none where it can't be read). */
+function legalIn(fen: string): string[] {
+  try {
+    return legalMoves(fen);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * His toys take away one of the crowd's legal moves now (`fen`: the crowd to move): a move onto or through a scattered block,
+ * through the tower, or onto it while it's too short to topple. Not when they'd take every one (the limit lifts: every move
+ * is open). Eric's (b), Nov 18: only such a turn is a power turn for fair play; a tower nothing slides through, standing
+ * where a piece may topple it, takes nothing away, and the crowd's picks count as on a plain board.
+ */
+export function toysTakeMove(p: Pick<BossPowerState, "tower" | "scatter"> | null | undefined, fen: string): boolean {
+  if (!p?.tower && !p?.scatter) return false;
+  const legal = legalIn(fen);
+  const open = legal.filter((m) => !toyStops(m, p, fen, true));
+  return open.length > 0 && open.length < legal.length;
+}
+
+/**
+ * His toys take away the reply the God King's Last Stand would replay (`reply`, the judge's: his best answer to the crowd's
+ * move `played`, `fen` before it), as they'd stand for that reply (toysAfterCrowd: a topple's scattered blocks too; the tower
+ * open to him on a turn it is, hisToppleOpen). Eric's (b), Nov 18: only then does his Last Stand sit out for the toys (the
+ * judge's numbers are plain chess's, and that reply can't be played). Not known (`reply` undefined): it sits out, as before
+ * (a feared reply nobody can check). Not when they'd take every move of his (his limit lifts: every move is open).
+ */
+export function toysTakeReply(p: BossPowerState, fen: string, played: string, reply: string | undefined, s: BossPowerSettings = BOSS_POWERS): boolean {
+  // (No block stands: no tower, and no scattered block left, if any scattered: nothing to take away, reply known or not.)
+  if (!toyBlockSquares(p).length) return false;
+  if (!reply) return true;
+  let after: string;
+  try {
+    after = applyMove(fen, played);
+  } catch {
+    return true;
+  }
+  const next = toysAfterCrowd(p, after, s);
+  if (!next.tower && !next.scatter) return false;
+  const open = hisToppleOpen(next, s);
+  const legal = legalIn(after);
+  const allowed = legal.filter((m) => !toyStops(m, next, after, open, s));
+  return allowed.length > 0 && !allowed.includes(reply);
 }
 
 /**
@@ -466,21 +528,21 @@ export const BIGBOY: BossRules = {
   },
   // (Asked only of a move that isn't allowed, or his only move let through: any block it touches is why.)
   stopReason: (boss, fen, m) => (toyStops(m, boss.powers, fen, false) ? "block" : null),
-  powerTurn: (boss) => !!boss.powers!.tower || !!boss.powers!.scatter,
-  // The scattered blocks whose last crowd turn this was go now, before his reply (Eric: gone at the end of the crowd's next
-  // turn, every time). The crowd's move landed on his tower (the move that topples it; or any onto it, its limit lifted): it
-  // topples, its blocks standing through his reply and the crowd's next turn. A scattered block a piece now stands on (its
-  // limit lifted) is gone.
+  // A turn with his toys up is a power turn (fair play) only when they take one of the crowd's moves away (Eric's (b), Nov 18:
+  // the tower stands nearly every turn; a tower nothing slides through, open to a topple, changes nothing the crowd may play).
+  // Without the position, his toys up count.
+  powerTurn: (boss, fen) => (fen === undefined ? !!boss.powers!.tower || !!boss.powers!.scatter : toysTakeMove(boss.powers, fen)),
+  // The Last Stand sits out for his toys only when they take away the reply it would replay (Eric's (b), Nov 18): in place of
+  // the general rule (his bossStops alone would keep it off whenever the tower stands, nearly every turn).
+  standAltered: (boss, fen, played, reply) => toysTakeReply(boss.powers!, fen, played, reply),
+  // His toys as the crowd's move is played, before his reply (toysAfterCrowd): the scattered blocks whose last crowd turn this
+  // was go; a crowd piece on his tower topples it.
   afterCrowdMove(b) {
     const boss = b.state.boss;
     const p = boss?.powers;
     if (!boss || !p || (!p.tower && !p.scatter)) return;
     const fen = b.boards.get(b.state.boards[0]!)!.fen;
-    const next: BossPowerState = { ...p };
-    if (next.scatter && next.scatter.until <= p.turn) next.scatter = null;
-    if (next.scatter?.squares.some((sq) => pieceAt(fen, sq))) next.scatter = { ...next.scatter, squares: next.scatter.squares.filter((sq) => !pieceAt(fen, sq)) };
-    if (next.tower && pieceAt(fen, next.tower.square)) next.events = [...p.events, topple(next, fen, "crowd", p.turn, p.turn + 1, BOSS_POWERS)];
-    b.state = { ...b.state, boss: { ...boss, powers: next } };
+    b.state = { ...b.state, boss: { ...boss, powers: toysAfterCrowd(p, fen) } };
   },
   // From the starting position (sides as usual), less the crowd's center pawn he eats before move 1: a base at ply 0
   // (the position changed outside a move: every replay plays from it).

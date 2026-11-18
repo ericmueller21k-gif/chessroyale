@@ -190,3 +190,22 @@ test("a pop-up note floats over the screen and pushes nothing: home (PLAY) and B
   await expectSameBox(tile, tileAt);
   await expectSameBox(play1, playOptAt);
 });
+
+test("a remembered Boss Battle party that has closed: its note once, then this device forgets it (never again on the next visit)", async ({ page }) => {
+  test.setTimeout(2 * 60_000);
+  // (Eric, Nov 18: "That party has closed." came back every time he opened Boss Battle: the closed party stayed this device's.)
+  await page.goto("/?debug");
+  await page.evaluate(() => {
+    localStorage.setItem("brc.bossparty.current", "ZZZZZ");
+    localStorage.setItem("brc.bossparty.ZZZZZ", "a-seat-token");
+  });
+  await page.goto("/?debug&mode=raid");
+  await expect(note(page)).toContainText("That party has closed.", { timeout: 20_000 });
+  expect(await page.evaluate(() => [localStorage.getItem("brc.bossparty.current"), localStorage.getItem("brc.bossparty.ZZZZZ")])).toEqual([null, null]);
+  await note(page).getByRole("button", { name: "Dismiss" }).click();
+  // The next visit: Boss Battle again, and no note.
+  await page.goto("/?debug&mode=raid");
+  await expect(page.locator(".bs-tile").first()).toBeVisible();
+  await page.waitForTimeout(3000);
+  await expect(note(page)).toHaveCount(0);
+});
