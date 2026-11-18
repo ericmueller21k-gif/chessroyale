@@ -16894,8 +16894,9 @@ img.qicon {
   height: var(--board-size, 100%);
   z-index: 1;
   pointer-events: none;
-  /* (Its frame reaches a square past an edge file: cut at the board's sides, so it never widens the page.) */
-  overflow-x: clip;
+  /* (Its frame reaches a square past an edge file, and a tall tower's shadow below the bottom rank: cut at the board's edges, so it
+     never widens the page or spills under the board. It stands only on the crowd's half, rising up the board: nothing is lost at the top.) */
+  overflow: clip;
 }
 .bb-tower {
   position: absolute;

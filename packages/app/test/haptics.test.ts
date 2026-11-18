@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { HAPTICS } from "@chessroyale/core";
+import { EFFECTS } from "../src/characters/power-art.ts";
 import { pickedUp, type Press } from "../src/board/logic.ts";
 
 /** A device: its storage, its navigator, and (an iPhone) the page's hidden switch, counting its ticks. */
@@ -155,7 +156,8 @@ describe("haptics (Eric, Nov 9): a tick on a tap and a move, a few boss moments"
   it("the boss moments: each art cue in HAPTICS.cues, its animation where named; a moment once for its key", async () => {
     const { vibrate } = device();
     const { cueHaptic, hapticOnce } = await load();
-    cueHaptic("toy-block", "landA", "clack");
+    // (The scattered block's own art id and landing, read from the art: a renamed sprite can't slip past this, Nov 18.)
+    cueHaptic(EFFECTS.toyBlock.ch.id, "land1", "clack");
     cueHaptic("bigboy", "bigBounce", "crash");
     cueHaptic("tigerPump", "popQ4", "pop");
     cueHaptic("ice-overlay", "freeze", "crackle");

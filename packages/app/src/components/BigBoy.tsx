@@ -536,7 +536,7 @@ export const BIGBOY_UI = {
           {blocks.length > 0 && <BoardEffects items={blocks} orientation={orientation} class="pw-fire-board pw-block-board" />}
           {p.tower && <span key={`tower-${p.tower.square}`} class="pw-block pw-tower" style={onSquare(p.tower.square, orientation)} data-square={p.tower.square} data-height={p.tower.height} />}
           {blocks.map((b) => (
-            <span key={`block-${b.square}`} class="pw-block" style={onSquare(b.square, orientation)} data-square={b.square} data-state={b.anim!.replace(/[A-Z]$/, "")} />
+            <span key={`block-${b.square}`} class="pw-block" style={onSquare(b.square, orientation)} data-square={b.square} data-state={b.anim!.replace(/\d+$/, "")} />
           ))}
         </>
       ),

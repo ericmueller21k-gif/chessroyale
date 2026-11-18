@@ -20,3 +20,8 @@ it"; "wobbling ... like a building"; "a pretty easy collapsing animation, becaus
 - Left as it was: after the collapse each block shows again only as its flight starts (`TOPPLE.every` 70 ms apart, up to about
   0.6 s for block 10), as with the old tower; holding the heap until each flight takes its block would be a follow-up if Eric
   sees it.
+- Review fixes (director, Nov 18; `.review.md` on `review/bigboy-tower-topdown`): the landing buzz is back (the cue key is the new
+  art's id, `toy-block-top clack`; the haptics test now reads the id from the art, so a rename can't slip past it); the under-layer
+  clips both ways (`overflow: clip`), so a tall tower's shadow on the bottom rank stays on the board; scattered blocks'
+  `data-state` reads `sit`/`land`/`poof` again; stale comments. Accepted: on an a- or h-file the 10-tower's top block is cut by
+  about a sixth of a square at the board's edge as it wobbles (mirroring the sway there would be more code).
