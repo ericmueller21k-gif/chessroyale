@@ -9,7 +9,9 @@ Lane: `fairplay`. The reviewer's brief: `docs/fairplay-reviewer.md`. The numbers
   never numbers a browser makes up: strength, hard finds measured against the crowd, timing. The one exception is the
   look-away count (only the browser can see the page hidden), weak evidence that can add a few points, never ban.
 - **Recording.** During a match the lobby records each human pick's signals (`noteFair`, the `fair` record). Turns a
-  boss power touches (`powerTurn`) don't count, nor a crowd move a power crossed out after it was played (Folio's
+  boss power touches (`powerTurn`) don't count (Big Boy's toy blocks only on a turn they take one of the crowd's legal moves
+  away, Eric's (b), Nov 18: his tower stands nearly every turn, so before that his battles gave no signal turns;
+  [docs/decisions/2026-11-18-bigboy-powerturn.md](../decisions/2026-11-18-bigboy-powerturn.md)), nor a crowd move a power crossed out after it was played (Folio's
   Revision: the runner asks `BossRules.crossedOut` after the move and marks that round `power` in its report;
   [docs/decisions/2026-10-27-folio-rules.md](../decisions/2026-10-27-folio-rules.md)). Where a boss's judge changes the numbers (Chub & Chirp's carrot race),
   a turn counts only when the engine's best move is also the race's best move, and is then recorded with the engine's

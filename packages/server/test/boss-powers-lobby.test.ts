@@ -687,6 +687,24 @@ describe("Big Boy online", () => {
     expect(r4.boss!.powers!.tower).toEqual(L.last("p2", "round")!.boss!.powers!.tower);
   });
 
+  it("fair play online (Eric's (b), Nov 18): a turn with his toys up counts unless they take one of the crowd's moves away (the round's allowed list), as in solo", () => {
+    const L = raid({ bossId: "bigboy", bossPowerTest: "tower" });
+    const seen: { toys: boolean; limited: boolean }[] = [];
+    for (let i = 0; i < 8; i++) {
+      const r = L.last("p1", "round")!;
+      const p = r.boss!.powers!;
+      seen.push({ toys: !!p.tower || !!p.scatter?.squares.length, limited: !!p.allowed });
+      play(L);
+      hostBoss(L);
+      toRound(L);
+    }
+    const power = L.core.fairMoves("p1").map((m) => !!m.power);
+    expect(power).toEqual(seen.map((t) => t.limited));
+    // Both kinds of toy turn came up: one that takes a move away (no signal), one that takes none (it counts).
+    expect(seen.some((t) => t.toys && t.limited)).toBe(true);
+    expect(seen.some((t) => t.toys && !t.limited)).toBe(true);
+  });
+
   it("his piece onto his tower online (a turn it's open to him: rarely): the request allows it, the host's move stands, it topples as the next turn begins, the same for everyone", () => {
     const powers = BOSS_POWERS as unknown as Record<string, number>;
     const was = powers.towerBossChance!;
