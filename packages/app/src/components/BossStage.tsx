@@ -46,9 +46,10 @@ function placeOnStage(ch: Character, idle: string, rise: boolean, mirror: boolea
     const tallAll = Math.max(tall, ch.foot[1] - Math.max(0, rows.findIndex((r) => r.some((k) => k !== null))));
     // (Never wider than the stage, by what it draws, props and all, not its frame: Chandy's frame keeps empty room for his rifle held
     // level, which halved him. A wide one, Wrangler's lasso out to one side, slides over to stay whole.)
-    let x0 = ch.w;
-    let x1 = -1;
-    for (const r of rows) r.forEach((k, x) => k !== null && ((x0 = Math.min(x0, x)), (x1 = Math.max(x1, x))));
+    // (Only a kit with props measures what it draws: every other boss's frame is its figure, and keeps its size and place.)
+    let x0 = props.length ? ch.w : 0;
+    let x1 = props.length ? -1 : ch.w - 1;
+    if (props.length) for (const r of rows) r.forEach((k, x) => k !== null && ((x0 = Math.min(x0, x)), (x1 = Math.max(x1, x))));
     if (x1 < x0) [x0, x1] = [0, ch.w - 1];
     if (mirror) [x0, x1] = [ch.w - 1 - x1, ch.w - 1 - x0];
     const drawn = x1 - x0 + 1;
