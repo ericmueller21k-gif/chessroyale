@@ -405,9 +405,16 @@ export const GINGER: BossRules = {
     return [...new Set([...(p.frozen ? [p.frozen.square] : []), ...sup])].sort();
   },
   // The pieces whose ice thaws as the next crowd turn begins (cracked and dripping on screen); the Super Freeze's meter (0-1, empty
-  // for good once spent), how many have come, and the pieces it holds this turn.
-  view: (p) => ({
-    thaw: [...(p.blizzard?.next ?? [])],
-    ...(p.superFreeze ? { superFreeze: { meter: superMeter(p, p.turn) ?? 0, used: p.superFreeze.used, max: BOSS_POWERS.superFreezeMax, held: superHeldOn(p, p.turn), target: p.superFreeze.hit?.target ?? null, at: p.superFreeze.hit?.at ?? null } } : {}),
-  }),
+  // for good once spent), how many have come, the pieces it holds this turn, and whether a full meter waits for the blizzard (the
+  // test afterCrowdMove uses: it won't come as this move lands).
+  view: (p) => {
+    const sf = p.superFreeze;
+    if (!sf) return { thaw: [...(p.blizzard?.next ?? [])] };
+    const meter = superMeter(p, p.turn) ?? 0;
+    const waiting = meter >= 1 && sf.used < BOSS_POWERS.superFreezeMax && blizzardOn(p, p.turn + 1, BOSS_POWERS);
+    return {
+      thaw: [...(p.blizzard?.next ?? [])],
+      superFreeze: { meter, used: sf.used, max: BOSS_POWERS.superFreezeMax, held: superHeldOn(p, p.turn), target: sf.hit?.target ?? null, at: sf.hit?.at ?? null, waiting },
+    };
+  },
 };

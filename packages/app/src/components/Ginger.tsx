@@ -116,10 +116,11 @@ const superBlockStyle = (target: string, orientation: "white" | "black") => onSq
 
 function superFreezeMoment({ boss, moment, t, orientation, banner, cast }: MomentProps) {
   const piece = moment.square ? pieceAt(boss.board.fen, moment.square) : null;
+  // (No count: some may be let go as your turn begins, so you keep a legal move, and his move may take one.)
   const n = moment.squares?.length ?? 0;
   return (
     <div class="power-moment pm-superfreeze">
-      {banner("SUPER FREEZE!", piece ? (n > 1 ? `Your ${PIECE_WORD[piece.type]} and ${n - 1} more are frozen` : `Your ${PIECE_WORD[piece.type]} is frozen`) : undefined, "cold", SF.chargeAt)}
+      {banner("SUPER FREEZE!", piece ? (n > 1 ? `Your ${PIECE_WORD[piece.type]} and the pieces around it are iced` : `Your ${PIECE_WORD[piece.type]} is iced`) : undefined, "cold", SF.chargeAt)}
       {cast("blast", SF.boltAt)}
       {moment.square && t >= SF.boltAt && t < SF.iceAt && <Flight name="iceBolt" square={moment.square} orientation={orientation} since={moment.at + SF.boltAt} ms={SF.flyMs} aim />}
     </div>
@@ -169,21 +170,22 @@ onResetBeats(() => {
 
 /**
  * His Super Freeze's meter, beside his rage meter (Eric, Nov 18: "another ult meter bar"): a small ice-blue bar filling a step each
- * crowd move, greyed until it's full (nothing hidden: Eric's rule), lit and glowing when it comes as your move lands; empty and greyed
- * for good once both have come.
+ * crowd move, greyed until it's full (nothing hidden: Eric's rule), lit and glowing when it comes as your move lands; full but still
+ * greyed while the Blizzard holds it back (`waiting`: it won't come on those moves); empty and greyed for good once both have come.
  */
-function SuperMeter({ boss }: { boss: BossView }) {
+export function SuperMeter({ boss }: { boss: BossView }) {
   const sf = boss.powers?.superFreeze;
   if (!sf || boss.result) return null;
   const spent = sf.used >= sf.max;
-  const full = !spent && sf.meter >= 1;
+  const waiting = !spent && sf.meter >= 1 && !!sf.waiting;
+  const full = !spent && sf.meter >= 1 && !waiting;
   const pct = Math.round(Math.max(0, Math.min(1, sf.meter)) * 100);
   const left = sf.max - sf.used;
   return (
     <span
-      class={`gs-meter${full ? " full" : " dim"}${spent ? " spent" : ""}`}
+      class={`gs-meter${full ? " full" : " dim"}${waiting ? " waiting" : ""}${spent ? " spent" : ""}`}
       role="meter"
-      aria-label={spent ? "Super Freeze: none left this battle" : full ? "Super Freeze ready: it comes as your move lands" : `Super Freeze ${pct}%, ${left} left`}
+      aria-label={spent ? "Super Freeze: none left this battle" : waiting ? "Super Freeze: waits for the Blizzard" : full ? "Super Freeze ready: it comes as your move lands" : `Super Freeze ${pct}%, ${left} left`}
       aria-valuenow={pct}
       aria-valuemin={0}
       aria-valuemax={100}
@@ -260,6 +262,13 @@ export const GINGER_UI = {
     const supMeltAt = meltKey ? (meltSeen.get(meltKey) ?? (meltSeen.set(meltKey, now), now)) : 0;
     if (meltSeen.size > 20) meltSeen.delete(meltSeen.keys().next().value!);
     const supMelting = meltKey ? sf!.held.filter((sq) => crowd(sq) && !iced.includes(sq) && now < supMeltAt + MELT_MS()) : [];
+    // The pieces it let go (so the crowd keeps a legal move) melt as the crowd's turn starts: those in its 3 x 3 still the crowd's
+    // (the crowd hasn't moved since; a piece his move took went with its ice), not held and not iced otherwise.
+    const goKey = sf && sf.at !== null && sf.target && !hisTurn && p.turn === sf.at + 1 ? `${boss.startMove}:${sf.at}:go` : "";
+    const goAt = goKey ? (meltSeen.get(goKey) ?? (meltSeen.set(goKey, now), now)) : 0;
+    const letGo = goKey ? superBox(sf!.target!).filter((sq) => crowd(sq) && pieceAt(board, sq)?.type !== "k" && !sf!.held.includes(sq) && !iced.includes(sq) && now < goAt + MELT_MS()) : [];
+    // The freeze's piece, iced before the Super Freeze came: its ice stays on as the block grows (no blank till the block settles).
+    const keep = sup && p.frozen && supSquares.has(p.frozen.square) && !moments.some((m) => m.kind === "freeze" && m.square === p.frozen!.square) ? p.frozen.square : null;
     const block = (sq: string, anim: JSX.Element, state = "") => (
       <span key={`ice-${sq}`} class={`pw-ice${state}`} style={onSquare(sq, orientation)} data-square={sq}>
         {anim}
@@ -284,15 +293,16 @@ export const GINGER_UI = {
       over: [
         supBlock,
         ...iced.map((sq) => {
-          const t = appearAt(sq);
+          const t = sq === keep ? 0 : appearAt(sq);
           if (now < t) return null;
           // (The Super Freeze's pieces: the block's breaking is their freezing.)
-          if (sup && supSquares.has(sq)) return block(sq, <SpriteAnim ch={fx.ch} anim={fx.loop!} since={t} id={sq} />);
+          if (sup && supSquares.has(sq) && sq !== keep) return block(sq, <SpriteAnim ch={fx.ch} anim={fx.loop!} since={t} id={sq} />);
           if (due.has(sq) && now >= crackAt) return block(sq, <SpriteAnim ch={fx.ch} anim="crack" then="thinning" since={crackAt} sounds={sq === firstCrack ? fx.sounds : {}} id={sq} />, " thawing");
           // (In the blizzard a dozen pieces ice over at once: the sweep's wind is their sound, not a dozen crackles.)
           return block(sq, <SpriteAnim ch={fx.ch} anim={fx.start!} then={fx.loop} since={t} sounds={blizzard ? {} : fx.sounds} id={sq} />);
         }),
         ...supMelting.map((sq) => block(sq, <SpriteAnim ch={fx.ch} anim={fx.end!} since={supMeltAt} sounds={sq === supMelting[0] ? fx.sounds : {}} id={sq} />, " melting")),
+        ...letGo.map((sq) => block(sq, <SpriteAnim ch={fx.ch} anim={fx.end!} since={goAt} sounds={sq === letGo[0] ? fx.sounds : {}} id={sq} />, " melting")),
         ...melting.map((sq) =>
           block(sq, now < meltAt ? <SpriteAnim ch={fx.ch} anim="thinning" since={0} id={sq} /> : <SpriteAnim ch={fx.ch} anim={fx.end!} since={meltAt} sounds={sq === melting[0] ? fx.sounds : {}} id={sq} />, now < meltAt ? " thawing" : " melting"),
         ),
