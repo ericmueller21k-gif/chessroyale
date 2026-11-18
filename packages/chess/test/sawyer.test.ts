@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BOSS_POWERS, BOSS_ROSTER, DEFAULT_SETTINGS, RAID_SETTINGS, isPlayable, mulberry32, type BossPowerState, type BossState, type Settings } from "@chessroyale/core";
+import { BOSS_POWERS, BOSS_ROSTER, DEFAULT_SETTINGS, RAID_SETTINGS, isPlayable, mulberry32, type BossPowerState, type BossState, type SawCut, type Settings } from "@chessroyale/core";
 import {
   BOARD_SAW,
   MatchRunner,
@@ -12,8 +12,6 @@ import {
   bossAllowed,
   chooseCut,
   chooseSplit,
-  crossesCut,
-  crossesMiddle,
   crowdAllowed,
   favouredHalf,
   fenAtPly,
@@ -21,6 +19,7 @@ import {
   inCheck,
   initPowers,
   legalMoves,
+  marksStop,
   moveEdges,
   pieceAt,
   powerMomentMs,
@@ -28,6 +27,7 @@ import {
   powerTurn,
   prepareTurn,
   rageOf,
+  sawMarks,
   sanLineToUci,
   splitRoom,
   splitSquare,
@@ -90,6 +90,12 @@ function bossWith(fen: string, powers: Partial<BossPowerState>, crowdSide: "w" |
   return { id: "sawyer", crowdSide, crowdMoves, powers: { ...initPowers(1, fen, crowdSide), turn: crowdMoves + 1, split: { turn: 2, pawn: null, square: null, halves: [] }, ...powers } } as unknown as BossState;
 }
 const cutOf = (a: string, b: string, at = 4) => ({ a, b, at, until: at + 2 });
+/** Two lone kings out of the way: a position for a move's geometry alone (a king's two-file step would castle). */
+const KINGS = "k6K/8/8/8/8/8/8/8 w - - 0 1";
+/** The board layer stops `move` (`fen`: before it) under a saw cut (sawMarks). */
+const cutStops = (move: string, cut: SawCut | null | undefined, fen = KINGS): boolean => !!cut && !!marksStop({ edges: sawMarks({ cut }) }, fen, move);
+/** The board layer stops `move` (`fen`: before it) under the board saw (sawMarks). */
+const sawnStops = (move: string, fen = KINGS): boolean => !!marksStop({ edges: sawMarks({ boardSaw: { at: 1, until: 1 } }) }, fen, move);
 
 describe("Sawyer: who he is", () => {
   it("is on the roster as sawyer (🪚) with saw cuts and the board saw, playable, and weaker underneath for his pawn", () => {
@@ -382,41 +388,41 @@ describe("Sawyer's saw cuts", () => {
   it("block straight moves across their edge: sliders, pawns and the king; a piece still lands from another side", () => {
     // A rook's slide crosses every edge on its way.
     expect(moveEdges("a1a4")).toEqual([{ a: "a1", b: "a2" }, { a: "a2", b: "a3" }, { a: "a3", b: "a4" }]);
-    expect(crossesCut("a1a4", cutOf("a2", "a3"))).toBe(true);
-    expect(crossesCut("a1a2", cutOf("a2", "a3"))).toBe(false);
-    expect(crossesCut("h1d1", cutOf("d1", "e1"))).toBe(true);
-    expect(crossesCut("d8d1", cutOf("d4", "d5"))).toBe(true);
+    expect(cutStops("a1a4", cutOf("a2", "a3"))).toBe(true);
+    expect(cutStops("a1a2", cutOf("a2", "a3"))).toBe(false);
+    expect(cutStops("h1d1", cutOf("d1", "e1"))).toBe(true);
+    expect(cutStops("d8d1", cutOf("d4", "d5"))).toBe(true);
     // A pawn's push and double step.
-    expect(crossesCut("e2e4", cutOf("e3", "e4"))).toBe(true);
-    expect(crossesCut("e2e4", cutOf("e2", "e3"))).toBe(true);
-    expect(crossesCut("e2e3", cutOf("e3", "e4"))).toBe(false);
-    expect(crossesCut("e7e5", cutOf("e5", "e6"))).toBe(true);
+    expect(cutStops("e2e4", cutOf("e3", "e4"))).toBe(true);
+    expect(cutStops("e2e4", cutOf("e2", "e3"))).toBe(true);
+    expect(cutStops("e2e3", cutOf("e3", "e4"))).toBe(false);
+    expect(cutStops("e7e5", cutOf("e5", "e6"))).toBe(true);
     // The king's step.
-    expect(crossesCut("e1e2", cutOf("e1", "e2"))).toBe(true);
-    expect(crossesCut("e1d1", cutOf("d1", "e1"))).toBe(true);
+    expect(cutStops("e1e2", cutOf("e1", "e2"))).toBe(true);
+    expect(cutStops("e1d1", cutOf("d1", "e1"))).toBe(true);
     // Landing on e4 from d4 (another side) is fine.
-    expect(crossesCut("d4e4", cutOf("e3", "e4"))).toBe(false);
-    expect(crossesCut("e5e4", cutOf("e3", "e4"))).toBe(false);
+    expect(cutStops("d4e4", cutOf("e3", "e4"))).toBe(false);
+    expect(cutStops("e5e4", cutOf("e3", "e4"))).toBe(false);
   });
 
   it("knights jump a cut, and diagonal moves pass at the corners (a bishop, a pawn's capture, the king's diagonal step)", () => {
     expect(moveEdges("g1f3")).toEqual([]);
     expect(moveEdges("b1d2")).toEqual([]);
-    expect(crossesCut("g1f3", cutOf("g1", "g2"))).toBe(false);
-    expect(crossesCut("f1c4", cutOf("e1", "e2"))).toBe(false);
-    expect(crossesCut("e4d5", cutOf("d4", "e4"))).toBe(false);
-    expect(crossesCut("e1f2", cutOf("e1", "e2"))).toBe(false);
+    expect(cutStops("g1f3", cutOf("g1", "g2"))).toBe(false);
+    expect(cutStops("f1c4", cutOf("e1", "e2"))).toBe(false);
+    expect(cutStops("e4d5", cutOf("d4", "e4"))).toBe(false);
+    expect(cutStops("e1f2", cutOf("e1", "e2"))).toBe(false);
   });
 
   it("castling: blocked by a cut on the king's way or the rook's", () => {
     const castle = "r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1";
     expect(moveEdges("e1g1", castle)).toEqual([{ a: "e1", b: "f1" }, { a: "f1", b: "g1" }, { a: "g1", b: "h1" }]);
-    expect(crossesCut("e1g1", cutOf("f1", "g1"), castle)).toBe(true);
-    expect(crossesCut("e1g1", cutOf("g1", "h1"), castle)).toBe(true); // the rook's way
-    expect(crossesCut("e1c1", cutOf("a1", "b1"), castle)).toBe(true); // the rook's way
-    expect(crossesCut("e1c1", cutOf("c1", "d1"), castle)).toBe(true);
-    expect(crossesCut("e1g1", cutOf("c1", "d1"), castle)).toBe(false);
-    expect(crossesCut("e1g1", cutOf("e1", "e2"), castle)).toBe(false);
+    expect(cutStops("e1g1", cutOf("f1", "g1"), castle)).toBe(true);
+    expect(cutStops("e1g1", cutOf("g1", "h1"), castle)).toBe(true); // the rook's way
+    expect(cutStops("e1c1", cutOf("a1", "b1"), castle)).toBe(true); // the rook's way
+    expect(cutStops("e1c1", cutOf("c1", "d1"), castle)).toBe(true);
+    expect(cutStops("e1g1", cutOf("c1", "d1"), castle)).toBe(false);
+    expect(cutStops("e1g1", cutOf("e1", "e2"), castle)).toBe(false);
     // In a battle: the allowed moves leave out castling across the cut, keep the other side's.
     const allowed = crowdAllowed(bossWith(castle, { cut: cutOf("f1", "g1") }), castle)!;
     expect(allowed).not.toContain("e1g1");
@@ -487,7 +493,7 @@ describe("Sawyer's saw cuts", () => {
 
   it("every 4 crowd turns from the 3rd, for 3 turns then a turn's gap, blocking both sides; a cut turn is a power turn; the judge plays by it", async () => {
     // The engine likes moves across the cut best: the judge must still pick an allowed one.
-    const r = raid({ patch: { bossMaxMoves: 30 }, engine: (get) => fakeEngine((fen, m) => (crossesCut(m, get().boss?.powers?.cut, fen) ? 0.97 : 0.3 + 0.4 * hash(fen + m))) });
+    const r = raid({ patch: { bossMaxMoves: 30 }, engine: (get) => fakeEngine((fen, m) => (cutStops(m, get().boss?.powers?.cut, fen) ? 0.97 : 0.3 + 0.4 * hash(fen + m))) });
     const seen: { turn: number; cut: string | null }[] = [];
     let judged = 0;
     for (let i = 0; i < 14 && !r.isOver(); i++) {
@@ -497,7 +503,7 @@ describe("Sawyer's saw cuts", () => {
       const fen = fenOf(r);
       const allowed = r.crowdAllowed();
       if (cut) {
-        for (const m of allowed ?? legalMoves(fen)) if (allowed) expect(crossesCut(m, cut, fen)).toBe(false);
+        for (const m of allowed ?? legalMoves(fen)) if (allowed) expect(cutStops(m, cut, fen)).toBe(false);
         expect(powerTurn(b)).toBe(true);
         expect(r.bossView()!.powers!.cut).toEqual(cut);
         if (cut.at === b.powers!.turn) expect(b.powers!.events).toContainEqual({ kind: "cut", turn: cut.at, square: cut.a, squares: [cut.a, cut.b] });
@@ -508,8 +514,9 @@ describe("Sawyer's saw cuts", () => {
         judged++;
       }
       // His own move didn't cross it either, while it was there.
-      const last = r.boards.get(0)!.lastMove!;
-      if (cut && cut.until >= r.boss!.crowdMoves) expect(crossesCut(last, cut)).toBe(false);
+      const board = r.boards.get(0)!;
+      const last = board.lastMove!;
+      if (cut && cut.until >= r.boss!.crowdMoves) expect(cutStops(last, cut, fenAtPly(board.history, board.history.length - 1, board.bases))).toBe(false);
     }
     const on = seen.filter((s) => s.cut).map((s) => s.turn);
     expect(on.slice(0, 9)).toEqual([3, 4, 5, 7, 8, 9, 11, 12, 13]);
@@ -522,23 +529,23 @@ describe("Sawyer's saw cuts", () => {
 
 describe("Sawyer's board saw", () => {
   it("no move crosses between the d and e files, knights and castling included", () => {
-    expect(crossesMiddle("d4e5")).toBe(true);
-    expect(crossesMiddle("e4d5")).toBe(true);
-    expect(crossesMiddle("d2e4")).toBe(true); // a knight
-    expect(crossesMiddle("g1f3")).toBe(false);
-    expect(crossesMiddle("b1d2")).toBe(false);
-    expect(crossesMiddle("a1h1")).toBe(true);
-    expect(crossesMiddle("e1c1")).toBe(true); // castling long
-    expect(crossesMiddle("e1g1")).toBe(false);
-    expect(crossesMiddle("d1d8")).toBe(false);
+    expect(sawnStops("d4e5")).toBe(true);
+    expect(sawnStops("e4d5")).toBe(true);
+    expect(sawnStops("d2e4")).toBe(true); // a knight
+    expect(sawnStops("g1f3")).toBe(false);
+    expect(sawnStops("b1d2")).toBe(false);
+    expect(sawnStops("a1h1")).toBe(true);
+    expect(sawnStops("e1c1")).toBe(true); // castling long
+    expect(sawnStops("e1g1")).toBe(false);
+    expect(sawnStops("d1d8")).toBe(false);
     const fen = "r3k2r/pppq1ppp/2n2n2/3pp3/3PP3/2N2N2/PPPQ1PPP/R3K2R w KQkq - 0 1";
     const allowed = crowdAllowed(bossWith(fen, { boardSaw: { at: 4, until: 8 } }), fen)!;
     expect(allowed.length).toBeGreaterThan(0);
-    for (const m of allowed) expect(crossesMiddle(m)).toBe(false);
+    for (const m of allowed) expect(sawnStops(m, fen)).toBe(false);
     expect(allowed).toContain("e1g1");
     expect(allowed).not.toContain("e1c1");
     const black = fen.replace(" w ", " b ");
-    for (const m of bossAllowed(bossWith(black, { boardSaw: { at: 4, until: 8 } }), black)!) expect(crossesMiddle(m)).toBe(false);
+    for (const m of bossAllowed(bossWith(black, { boardSaw: { at: 4, until: 8 } }), black)!) expect(sawnStops(m, black)).toBe(false);
   });
 
   it("knows which half favors him on material", () => {
@@ -593,7 +600,7 @@ describe("Sawyer's board saw", () => {
     await turn(r);
     expect(r.boss!.powers!.ultAt).toBe(3);
     expect(r.boss!.powers!.boardSaw).toEqual({ at: 3, until: 7 });
-    for (const m of r.crowdAllowed() ?? []) expect(crossesMiddle(m)).toBe(false);
+    for (const m of r.crowdAllowed() ?? []) expect(sawnStops(m, fenOf(r))).toBe(false);
     expect(r.bossView()!.powers!.boardSaw).toEqual({ at: 3, until: 7 });
     // The cut that was due on turn 3 waits a turn.
     expect(r.boss!.powers!.cut ?? null).toBeNull();

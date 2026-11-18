@@ -18,9 +18,9 @@ import {
   chooseDraft,
   creaseCheck,
   creaseGuard,
+  creaseMarks,
   creaseMoves,
   creaseScores,
-  crossesCrease,
   crowdAllowed,
   fenAtPly,
   folioBattle,
@@ -28,6 +28,7 @@ import {
   folioTurnMs,
   initPowers,
   legalMoves,
+  marksStop,
   matingMoves,
   gameEndWith,
   rageNow,
@@ -48,6 +49,11 @@ import {
   type EngineLike,
   type Opening,
 } from "../src/index.ts";
+
+/** Two lone kings out of the way: a position for a move's geometry alone (a king's two-file step would castle). */
+const KINGS = "k6K/8/8/8/8/8/8/8 w - - 0 1";
+/** The board layer stops `move` (`fen`: before it), either side, under the crease on `line` (creaseMarks). */
+const creaseStops = (move: string, line: string | null | undefined, fen = KINGS): boolean => !!line && !!marksStop({ edges: creaseMarks(line) }, fen, move);
 
 /**
  * Folio, the paper crane (docs/decisions/2026-10-27-folio-rules.md): Draft (an ink mark under your most valuable attacked,
@@ -299,20 +305,20 @@ describe("Folio's Draft: two of your moves to answer it, then the fold", () => {
 
 describe("Folio's Crease: the line", () => {
   it("a move crosses it whenever a piece it moves ends on the other side: knights too, castling's king and its rook; never an attack", () => {
-    expect(crossesCrease("e2e4", "d|e")).toBe(false);
-    expect(crossesCrease("d4e5", "d|e")).toBe(true);
-    expect(crossesCrease("d2f3", "d|e")).toBe(true);
-    expect(crossesCrease("e2e4", "4|5")).toBe(false);
-    expect(crossesCrease("e4e5", "4|5")).toBe(true);
-    expect(crossesCrease("g1f3", "4|5")).toBe(false);
-    expect(crossesCrease("b8a6", "6|7")).toBe(true);
+    expect(creaseStops("e2e4", "d|e")).toBe(false);
+    expect(creaseStops("d4e5", "d|e")).toBe(true);
+    expect(creaseStops("d2f3", "d|e")).toBe(true);
+    expect(creaseStops("e2e4", "4|5")).toBe(false);
+    expect(creaseStops("e4e5", "4|5")).toBe(true);
+    expect(creaseStops("g1f3", "4|5")).toBe(false);
+    expect(creaseStops("b8a6", "6|7")).toBe(true);
     // Castling short: the king crosses f|g; on g|h only its rook does (h1 to f1).
     const castle = "r3k2r/pppppppp/8/8/8/8/PPPPPPPP/R3K2R w KQkq - 0 1";
-    expect(crossesCrease("e1g1", "f|g", castle)).toBe(true);
-    expect(crossesCrease("e1g1", "g|h", castle)).toBe(true);
-    expect(crossesCrease("e1g1", "g|h")).toBe(false);
-    expect(crossesCrease("e1c1", "a|b", castle)).toBe(true);
-    expect(crossesCrease("e1c1", "1|2", castle)).toBe(false);
+    expect(creaseStops("e1g1", "f|g", castle)).toBe(true);
+    expect(creaseStops("e1g1", "g|h", castle)).toBe(true);
+    expect(creaseStops("e1g1", "g|h")).toBe(false);
+    expect(creaseStops("e1c1", "a|b", castle)).toBe(true);
+    expect(creaseStops("e1c1", "1|2", castle)).toBe(false);
     expect(creaseMoves(castle, "g|h")).not.toContain("e1g1");
   });
 
@@ -405,7 +411,7 @@ describe("Folio's Crease: through a battle", () => {
       const held = p.crease && p.crease.until >= p.turn ? p.crease : null;
       if (held) {
         expect(held.line).toBe(line);
-        for (const m of r.crowdAllowed() ?? []) expect(crossesCrease(m, line, fenOfR(r))).toBe(false);
+        for (const m of r.crowdAllowed() ?? []) expect(creaseStops(m, line, fenOfR(r))).toBe(false);
         expect(rageOf(r.boss)).toBe(p.turn === held.at ? 1 : 0);
         if (p.turn > held.at) expect(ragePaused(r.boss)).toBe(true);
       }
@@ -437,7 +443,7 @@ describe("Folio's Crease: through a battle", () => {
     // Its moves across it (Black's, here across d|e): never stopped, never named as stopped.
     const open = "r3k2r/pppq1ppp/2n2n2/3pp3/3PP3/2N2N2/PPPQ1PPP/R3K2R b KQkq - 0 1";
     const his = { ...boss, powers: { ...boss.powers, crease: { line: "d|e", at: 5, until: 8, side: "w" } } } as unknown as BossState;
-    expect(legalMoves(open).some((m) => crossesCrease(m, "d|e", open))).toBe(true);
+    expect(legalMoves(open).some((m) => creaseStops(m, "d|e", open))).toBe(true);
     expect(bossAllowed(his, open)).toBeNull();
     expect(stopReason(his, open, "d7g4")).toBeNull();
   });
@@ -709,11 +715,11 @@ describe("Folio: a small fuzz (seeded battles with every switch)", () => {
             expect(allowed.length).toBeGreaterThan(0);
             for (const m of allowed) {
               expect(m.slice(0, 2), `${seed}: folded ${folded}`).not.toBe(folded);
-              expect(crossesCrease(m, p.crease?.line, fen)).toBe(false);
+              expect(creaseStops(m, p.crease?.line, fen)).toBe(false);
             }
           } else if (folded || p.crease) {
             // (Nothing to stop, or lifted: every legal move would have been stopped.)
-            const stopped = legal.filter((m) => m.slice(0, 2) === folded || crossesCrease(m, p.crease?.line, fen)).length;
+            const stopped = legal.filter((m) => m.slice(0, 2) === folded || creaseStops(m, p.crease?.line, fen)).length;
             expect(stopped === 0 || stopped === legal.length, `${seed}: ${stopped} of ${legal.length} stopped`).toBe(true);
           }
           if (p.events.some((e) => e.kind === "draft")) {

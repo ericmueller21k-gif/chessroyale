@@ -11,7 +11,7 @@
  * - **Crease** (ultimate, the rage meter's): the engine picks one of the 14 inner lines with Folio's move (creasePick, on
  *   the host's engines online), shown on the warning's turn; as the next crowd turn begins the board is creased along it
  *   for creaseTurns crowd turns: none of the crowd's pieces crosses it, and Folio's may (it folds the board toward itself:
- *   the director's call, Oct 27); for the crowd's moves, Sawyer's board saw's rules (crossesCrease).
+ *   the director's call, Oct 27); for the crowd's moves, Sawyer's board saw's rules (creaseMarks, on the board layer).
  * - **Revision** (once a battle): right after a crowd move that punishes its last move (revisionDrop, by the judge's own
  *   numbers), both moves are crossed out: the board goes back to before its move (a base), it plays the engine's best
  *   there (bestReply), and the crowd moves again.
@@ -22,6 +22,7 @@
 import { BOSS_POWERS, mulberry32, type BossPowerSettings, type BossPowerState, type BossState, type FolioState } from "@chessroyale/core";
 import { Chess, type Square } from "chess.js";
 import { boardEnd } from "../boards.ts";
+import { marksStop, type EdgeMark } from "../board-layer.ts";
 import { applyMove, baseAt, fenAtPly, legalMoves, matingMoves, pieceAt, toSan } from "../rules.ts";
 import type { EngineLike } from "../runner.ts";
 import { heldBy, VALUE, eachOn, from, logit, materialOf, meterFull, other, powerRoll, rageNow, rageSpeedOf, rageTick, testSwitch, to, turnOf, type Battle, type BossRules, type JudgedMove, type Side } from "./base.ts";
@@ -123,34 +124,25 @@ export function foldedOn(f: FolioState, turn: number): string | null {
 /** The 14 inner lines a crease may fall on: between neighboring files ("a|b" to "g|h"), then ranks ("1|2" to "7|8"). */
 export const CREASE_LINES: readonly string[] = [...[0, 1, 2, 3, 4, 5, 6].map((i) => `${FILES[i]}|${FILES[i + 1]}`), ...[1, 2, 3, 4, 5, 6, 7].map((r) => `${r}|${r + 1}`)];
 
-/** The side of a line a square is on: 0, the a-file or first-rank side; 1, the other. */
-function sideOf(line: string, sq: string): 0 | 1 {
-  const c = line[0]!;
-  return c >= "a" && c <= "h" ? (file(sq) <= file(`${c}1`) ? 0 : 1) : rank(sq) <= Number(c) ? 0 : 1;
-}
-
 /**
- * A move crosses the crease: a piece it moves ends on the other side of the line from where it started. Any move,
- * knights included (Sawyer's board saw's rule); castling's king, and its rook too (on a line between files the saw never
- * sat on, the rook can cross it alone: no piece of the crowd's may cross, so neither may). Never an attack: checks and
- * pins work across it as in ordinary chess. It stops the crowd's moves only (Crease.side); Folio's pieces cross freely.
+ * The crease on `line` (CREASE_LINES' code), its part of the board layer (board-layer.ts): the line's eight edges, `across:
+ * "all"` (Sawyer's board saw's rule): no piece a move moves ends on the other side of it, knights included, castling's king and
+ * its rook too (on a line between files the saw never sat on, the rook can cross it alone: no piece of the crowd's may cross, so
+ * neither may). Never an attack: checks and pins work across it as in ordinary chess. It binds the crowd only (Crease.side);
+ * Folio's pieces cross freely.
  */
-export function crossesCrease(move: string, line: string | null | undefined, fen?: string): boolean {
-  if (!line) return false;
-  const a = from(move);
-  const b = to(move);
-  if (sideOf(line, a) !== sideOf(line, b)) return true;
-  if (fen && rank(a) === rank(b) && Math.abs(file(b) - file(a)) === 2 && pieceAt(fen, a)?.type === "k") {
-    const kingside = file(b) > file(a);
-    return sideOf(line, square(kingside ? 7 : 0, rank(a))) !== sideOf(line, square(kingside ? 5 : 3, rank(a)));
-  }
-  return false;
+export function creaseMarks(line: string): EdgeMark[] {
+  const [x, y] = [line[0]!, line[2]!];
+  const between = (i: number) => (x >= "a" && x <= "h" ? { a: `${x}${i + 1}`, b: `${y}${i + 1}` } : { a: `${FILES[i]}${x}`, b: `${FILES[i]}${y}` });
+  return [...FILES].map((_, i): EdgeMark => ({ ...between(i), across: "all", kind: "crease", binds: "crowd", by: "folio" }));
 }
 
-/** The legal moves the crease leaves the side to move (all of them with none). */
+/** The legal moves the crease leaves the side to move, either side (all of them with none). */
 export function creaseMoves(fen: string, line: string | null | undefined): string[] {
   const legal = legalMoves(fen);
-  return line ? legal.filter((m) => !crossesCrease(m, line, fen)) : legal;
+  if (!line) return legal;
+  const crease = { edges: creaseMarks(line) };
+  return legal.filter((m) => !marksStop(crease, fen, m));
 }
 
 /** Remembered answers of safeAfter (the guard asks about the same position for each line): a few positions, newest last. */
@@ -392,21 +384,19 @@ export const FOLIO: BossRules = {
     t.events.push({ kind: "draft", turn: t.turn, square: pick.square, squares: [pick.attacker, ...pick.line, pick.square] });
     next.nextPassive = t.turn + (t.test === "draft" ? 1 : Math.max(1, Math.round(t.s.draftEvery)));
   },
-  // A folded piece doesn't move, nor castles (held on the board layer); none of the crowd's pieces crosses the crease (the
-  // dispatcher lifts both for a turn they'd leave no move, or no way out of check). Folio's own moves are never stopped: no
-  // bossStops.
+  // A folded piece doesn't move, nor castles, and none of the crowd's pieces crosses the crease (both on the board layer; the
+  // dispatcher lifts them for a turn they'd leave no move, or no way out of check). Folio's own moves are never stopped: no
+  // mark binds it, no bossStops.
   layer(boss) {
     const folded = foldedOn(folioOf(boss.powers), turnOf(boss));
-    return heldBy(boss, "folded", folded ? [folded] : []);
-  },
-  crowdFilter(allowed, boss, fen) {
     const line = creaseOn(boss.powers, turnOf(boss));
-    return line ? allowed.filter((m) => !crossesCrease(m, line, fen)) : allowed;
+    const held = heldBy(boss, "folded", folded ? [folded] : []);
+    return line ? { ...held, edges: creaseMarks(line) } : held;
   },
   // (A move of the crowd's across it: the screens' words. Folio's cross it freely.)
   stopReason: (boss, fen, m) => {
     const c = boss.powers?.crease;
-    return c && crossesCrease(m, c.line, fen) && pieceAt(fen, from(m))?.color === c.side ? "crease" : null;
+    return c && marksStop({ edges: creaseMarks(c.line) }, fen, m, c.side) ? "crease" : null;
   },
   // A turn with a folded piece or the crease doesn't count for fair play (the crossed-out turn: crossedOut).
   powerTurn: (boss) => !!creaseOn(boss.powers, turnOf(boss)) || !!foldedOn(folioOf(boss.powers), turnOf(boss)),

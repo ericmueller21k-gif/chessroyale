@@ -7,12 +7,13 @@ import {
   bossAllowed,
   bossMoveFrom,
   brainLine,
-  crossesMiddle,
   crowdAllowed,
   hisToppleOpen,
   initPowers,
   legalMoves,
+  marksStop,
   sanLineToUci,
+  sawMarks,
   stopReason,
   type BossMoveKind,
   type BrainNote,
@@ -46,6 +47,8 @@ function bossWith(id: string, fen: string, powers: Partial<BossPowerState>, crow
 /** A crowd turn (battle seed 1) on which Big Boy's tower is closed to his pieces (hisToppleOpen: most of his turns). */
 const TOWER_SHUT = Array.from({ length: 40 }, (_, t) => t + 1).find((turn) => !hisToppleOpen({ seed: 1, turn, tower: { square: "f6", height: 3, at: 1 } }))!;
 const DONE_SPLIT: Pick<BossPowerState, "split"> = { split: { turn: 2, pawn: null, square: null, halves: [] } };
+/** The board layer stops `move` (`fen`: before it) under the board saw (Sawyer's sawMarks). */
+const sawnStops = (move: string, fen: string): boolean => !!marksStop({ edges: sawMarks({ boardSaw: { at: 1, until: 1 } }) }, fen, move);
 
 /**
  * A stand-in Stockfish that loves the moves a power stops (`favorites`, scored 0.95, its limited-strength move the
@@ -133,13 +136,13 @@ describe("Eric's position (Oct 17): the boss's queen across the board saw was hi
   it("after Nf6+ his only legal move is Qxf6, across the saw: the limit lifts (never the only way out of check)", () => {
     expect(applyMove(BEFORE, "h5f6").split(" ").slice(0, 4)).toEqual(ERIC.split(" ").slice(0, 4));
     expect(legalMoves(ERIC)).toEqual(["d8f6"]);
-    expect(crossesMiddle("d8f6")).toBe(true);
+    expect(sawnStops("d8f6", ERIC)).toBe(true);
     expect(bossAllowed(saw(ERIC), ERIC)).toBeNull();
     // (Not a hole in the saw: with any other move to play, Qxf6's like is stopped. The knight back on h5, no check.)
     const calm = "3qk2r/1q4Q1/1p1p4/3PpP1N/4PP2/8/1p3K2/7R b k - 0 35";
     const allowed = bossAllowed(saw(calm), calm)!;
     expect(allowed.length).toBeGreaterThan(0);
-    for (const m of allowed) expect(crossesMiddle(m)).toBe(false);
+    for (const m of allowed) expect(sawnStops(m, calm)).toBe(false);
     expect(legalMoves(calm)).toContain("d8f6");
   });
 
@@ -171,7 +174,7 @@ describe("Eric's position (Oct 17): the boss's queen across the board saw was hi
     const b = r.state.boss!;
     r.state = { ...r.state, boss: { ...b, crowdSide: "w", powers: { ...b.powers!, ...DONE_SPLIT, cut: null, boardSaw: { at: 1, until: 5 } } } };
     const move = await r.playBoss();
-    expect(crossesMiddle(move)).toBe(false);
+    expect(sawnStops(move, calm)).toBe(false);
     expect(r.bossView()!.lastMove!.through).toBeUndefined();
   });
 });

@@ -352,16 +352,17 @@ export interface BossRules {
    * crowd's pieces its powers hold (`heldBy`): Ginger's frozen piece, his blizzard's and Super Freeze's ice, Boingo's frozen
    * piece, Moo's stunned pieces, Folio's folded piece, Chandy's dizzy pieces and those under his beam; and its marks on
    * squares: Boingo's pies, Big Boy's toy blocks, Puddles' plants, Chandy's beam and scatter shot, Don Dough's dough; its
-   * shields: Don Dough's gold, Chandy's shields. One rule for all of them (Eric, Oct 27): the dispatcher leaves out every move
-   * the layer stops for the side to move (a held piece's, castling with a held rook, onto or through a square's mark, taking a
-   * shielded piece), then the boss's other limits (`crowdFilter`, `bossStops`),
+   * edges: Sawyer's saw cut and board saw, Folio's crease; and its shields: Don Dough's gold, Chandy's shields. One rule for all
+   * of them (Eric, Oct 27): the dispatcher leaves out every move the layer stops for the side to move (a held piece's, castling
+   * with a held rook, onto or through a square's mark, across an edge's, taking a shielded piece), then the boss's other limits
+   * (`crowdFilter`, `bossStops`),
    * and lifts them all for the turn if no move is left. A power with marks on the board says so here, never in `crowdFilter`
    * or `bossStops`.
    */
   layer?(boss: BossState, fen: string): LayerMarks | null;
   /** Its other limits on the crowd's moves this turn (the dispatcher lifts them for the turn if none are left). */
   crowdFilter?(allowed: string[], boss: BossState, fen: string): string[];
-  /** What else stops the boss's own moves now (Sawyer's saw, the hoops), or null: nothing does. */
+  /** What else stops the boss's own moves now (Sawyer's first move, a pawn's; the hoops), or null: nothing does. */
   bossStops?(boss: BossState): ((move: string, fen: string) => boolean) | null;
   /**
    * Which of its powers stops `move` now, either side (for the screens' words: a refused move of yours, the boss's only
