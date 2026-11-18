@@ -1,3 +1,4 @@
+- Nov 18 ~09:10 UTC: follow-up done -> #799 (ef0e09b: queen lock first only if aimable; refused queen lock stays due; dead early slot 10->5 of 20), CI bsdptynz9 (full suite: runner/lobby touched). Merge when green and main after #798 is green (bdpfp8o1m). No helpers running; queue empty.
 - Nov 18 ~09:00 UTC: main on 826609e (#797) GREEN, live. #798 weapon screen MERGED (cf4e7a4): deploy + main run watched. Follow-up helper running (b31h905z4).
 - Nov 18 ~08:45 UTC: #797 MERGED (826609e), deploy + main run bocdotiwo. Follow-up helper session_01JuCWRtW1jUKtpEY3bdxue5 (xhigh, alone) on claude/chandy-mix-followup, watcher b31h905z4. #798 weapon screen CI b83nxcv9l: merge after main on 826609e.
 - Nov 18 ~08:40 UTC: weapon screen done -> #798 (9af7d38), CI b83nxcv9l; stills sent to Eric. #797 move-mix CI b2iev4z49 still running. Next: merge #797 when green, then start the follow-up (xhigh, from main after #797), merge #798 when green.
