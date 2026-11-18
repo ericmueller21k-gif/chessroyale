@@ -351,9 +351,10 @@ export interface BossRules {
    * Its marks on the board now (`fen`: the position, either side to move), its part of the board layer (board-layer.ts): the
    * crowd's pieces its powers hold (`heldBy`): Ginger's frozen piece, his blizzard's and Super Freeze's ice, Boingo's frozen
    * piece, Moo's stunned pieces, Folio's folded piece, Chandy's dizzy pieces and those under his beam; and its marks on
-   * squares: Boingo's pies, Big Boy's toy blocks, Puddles' plants, Chandy's beam and scatter shot, Don Dough's dough. One rule
-   * for all of them (Eric, Oct 27): the dispatcher leaves out every move the layer stops for the side to move (a held piece's,
-   * castling with a held rook, onto or through a square's mark), then the boss's other limits (`crowdFilter`, `bossStops`),
+   * squares: Boingo's pies, Big Boy's toy blocks, Puddles' plants, Chandy's beam and scatter shot, Don Dough's dough; its
+   * shields: Don Dough's gold, Chandy's shields. One rule for all of them (Eric, Oct 27): the dispatcher leaves out every move
+   * the layer stops for the side to move (a held piece's, castling with a held rook, onto or through a square's mark, taking a
+   * shielded piece), then the boss's other limits (`crowdFilter`, `bossStops`),
    * and lifts them all for the turn if no move is left. A power with marks on the board says so here, never in `crowdFilter`
    * or `bossStops`.
    */

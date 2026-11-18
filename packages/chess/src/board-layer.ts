@@ -14,8 +14,8 @@
  * is always answered.
  *
  * Today's bosses move onto it one family a PR through `BossRules.layer`: held pieces (Ginger, Boingo, Moo, Folio, Chandy) and
- * square marks (Boingo's pies, Big Boy's toy blocks, Puddles' plants, Chandy's scatter and beam, Don Dough's dough) so far;
- * edges and shields next.
+ * square marks (Boingo's pies, Big Boy's toy blocks, Puddles' plants, Chandy's scatter and beam, Don Dough's dough) and shields
+ * (Don Dough's gold, Chandy's shields) so far; edges next.
  */
 import type { StopReason } from "@chessroyale/core";
 import { legalMoves, pieceAt, sideToMove } from "./rules.ts";
