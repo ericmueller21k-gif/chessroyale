@@ -1,1 +1,0 @@
-Big Boy tower balance pass done (Nov 18): his rare topple (towerBossChance 0.25, seeded; tests solo, server, e2e); strength: the tower is not the cause, today main and Nov 15 main both lose 26/26 in the raid sim, so Eric design kept (towerScatterShare 1); fair-play proposal in the PR body and docs/decisions/2026-11-18-bigboy-tower-balance.md.
