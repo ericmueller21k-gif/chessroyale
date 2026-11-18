@@ -8,7 +8,7 @@ import { PIG_SOUNDS, pigSound } from "../src/characters/pig-sounds.ts";
 import { POWER_MOMENTS, animLength, cueAt } from "../src/characters/power-art.ts";
 import { frameKeys, renderFrame } from "../src/characters/sprite.ts";
 import { MOVE_MEAN_DB, MOVE_PEAK } from "../src/characters/synth.ts";
-import { duelCount, duelTurn, lassoStand, pigBoard, showdownFen } from "../src/components/Pig.tsx";
+import { duelCount, duelTurn, lassoStand, pairRopes, pigBoard, showdownFen } from "../src/components/Pig.tsx";
 import { powerLine } from "../src/components/BossPowers.tsx";
 import { squareXY } from "../src/components/GodKing.tsx";
 import { POWER_WORDS, powersLine } from "../src/power-words.ts";
@@ -263,6 +263,21 @@ describe("on the board", () => {
     expect(duelCount(view(l.fen, { showdown: { ...sd, pairs: sd.pairs.slice(0, 2) }, allowed: l.duels.slice(0, 2) }))).toBe(2);
     expect(duelTurn(view(l.fen, { showdown: sd, allowed: l.duels, turn: 4 }))).toBe(false);
     expect(duelCount(view(l.fen, { showdown: sd, turn: 4 }))).toBe(0);
+    // His two ropes never cross as they shoot out, whichever squares a pair's pieces come from (either way he's drawn, either side below).
+    type P = { x: number; y: number };
+    const side = (p: P, q: P, r: P) => Math.sign((q.x - p.x) * (r.y - p.y) - (q.y - p.y) * (r.x - p.x));
+    const squares = [..."abcdefgh"].flatMap((f) => [..."12345678"].map((r) => f + r));
+    const crossed: string[] = [];
+    for (const mirrored of [true, false])
+      for (const o of ["white", "black"] as const)
+        for (const a of squares)
+          for (const b of squares) {
+            if (a === b) continue;
+            const [c, h] = pairRopes(mirrored, a, b, o);
+            const x = side(c.from, c.to, h.from) * side(c.from, c.to, h.to) < 0 && side(h.from, h.to, c.from) * side(h.from, h.to, c.to) < 0;
+            if (x) crossed.push(`${a}${b}`);
+          }
+    expect(crossed.slice(0, 5), `${crossed.length} crossing`).toEqual([]);
   });
 });
 

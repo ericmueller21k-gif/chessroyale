@@ -21,3 +21,10 @@ normal when he does his wrangle and he pulls … also when he does his startup a
   little cross-eyed.
 - Tests: pig.test.ts (every rope he holds starts in his fist; he looks at the loop from the throw to the tug; the haul's fists, its
   lean), shop-wrangler.test.ts (yank, then reel, as the bale passes him). Stills: branch `stills/wrangler-redraw`.
+
+## Review fix: the showdown's ropes never cross (Nov 18)
+
+The review found the haul's two ropes crossing at his fists in about half of square pairs (fists handed out by a fixed order). Each
+pair now gives its ropes their fists by the shorter total rope length (`pairRopes` in `Pig.tsx`), decided once per pair from its
+from-squares. The call: the review suggested ordering by angle from the fists' midpoint; that still crossed in 24 pairs when he's
+drawn unmirrored, while the shortest pairing of two points with two points never crosses, in the same few lines.
