@@ -15,7 +15,7 @@ and `docs/history/`.
 | Ranked 1 v 1: classic chess, the on-board time-control vote, ranks and placements | [ranked.md](ranked.md) | `ranked` (ratings, ranks, pairing), the director (rules, screens) |
 | The front door: home, queue, profiles, the live line | [hub.md](hub.md) | `hub` |
 | Auto chess, the demo: buy chess pieces with gold, place them, the engine plays the position out (a bot, in the browser) | [autochess.md](autochess.md) | the director |
-| Boss Assists (designed, not built): 1 v 1 chess with three random bosses' moves as assists, and the shared board layer | [boss-assists.md](boss-assists.md) | the director, `god-king` (rules) |
+| The Battle Tower (designed, not built): climb 12 floors against 1 to 3 bosses at once, alone or a party of 4, saved between floors; and the shared board layer | [battle-tower.md](battle-tower.md) | the director, `god-king` (rules) |
 | The town square (/town, Chess Town's button on home): the world where players walk and meet the bosses at their homes (slice 1: the world, five homes, bots) | [town-square.md](town-square.md) | the director |
 | Inside the Colosseum (/colosseum, the town card's "Look inside (preview)"): the arena in WebGL 2, its views, bots playing on its floor | [colosseum.md](colosseum.md) | the director |
 | Accounts and sign-in | [accounts.md](accounts.md) | `hub` |
