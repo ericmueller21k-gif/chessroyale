@@ -46,6 +46,10 @@ interface Seen {
   allowed: string[] | null;
   held: string[];
   events: PowerEvent[];
+  /** The meter as the screens show it, and whether it waits for the blizzard. */
+  meter: number | null;
+  waiting: boolean;
+  used: number;
 }
 
 /** A whole battle (the crowd's moves picked at random from its allowed ones, `seed`'s), with every crowd turn and Super Freeze seen. */
@@ -67,7 +71,7 @@ async function playThrough(seed: number, test = "", maxMoves = 60) {
     const fen = fenOf(r);
     const allowed = r.crowdAllowed();
     const view = r.bossView()!.powers!;
-    turns.push({ turn: r.state.boss!.crowdMoves + 1, fen, allowed, held: view.superFreeze?.held ?? [], events: view.events });
+    turns.push({ turn: r.state.boss!.crowdMoves + 1, fen, allowed, held: view.superFreeze?.held ?? [], events: view.events, meter: view.superFreeze?.meter ?? null, waiting: !!view.superFreeze?.waiting, used: view.superFreeze?.used ?? 0 });
     const move = crowdPick(fen, allowed ?? legalMoves(fen), rng);
     await r.score(new Map([["h0", { move, thinkMs: 1000 }]]));
   }
@@ -199,6 +203,29 @@ describe("Ginger's Super Freeze in real battles (no test switch)", () => {
     expect(firsts.length).toBeGreaterThanOrEqual(5);
     expect(twice).toBeGreaterThanOrEqual(1);
   }, 120_000);
+
+  it("the meter's `waiting` (full, held back by the blizzard) says exactly when a full meter won't come as the move lands (review, Nov 18)", async () => {
+    let waits = 0;
+    let comes = 0;
+    for (let seed = 1; seed <= 12; seed++) {
+      const { turns, fired } = await playThrough(seed);
+      for (const t of turns) {
+        const full = t.meter !== null && t.meter >= 1 && t.used < BOSS_POWERS.superFreezeMax;
+        if (!full) {
+          expect(t.waiting).toBe(false);
+          continue;
+        }
+        // (The battle went on after this move: the next crowd turn was seen.)
+        if (!turns.some((x) => x.turn === t.turn + 1)) continue;
+        const came = fired.some((f) => f.after === t.turn);
+        expect(came).toBe(!t.waiting);
+        if (t.waiting) waits++;
+        else comes++;
+      }
+    }
+    expect(comes).toBeGreaterThan(0);
+    expect(waits).toBeGreaterThan(0);
+  }, 240_000);
 
   it("the test switch (?power=superfreeze): after the crowd's first move, then its third", async () => {
     const { fired, turns } = await playThrough(3, "superfreeze", 12);
