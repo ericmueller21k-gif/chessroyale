@@ -37,3 +37,18 @@ for a key and crates should be earned every level and from other areas easily so
 refundable coin balance can be viewed anytime in your profile with a single line below here that says something like 'total coins,
 refundable coins'" -> one coin number everywhere; after the first purchase, a one-time pop-up; your own profile gets one line
 "Total coins N · Refundable N" (in the payments build). Key 100 coins = $1, refunds plan, earn-first nudges: approved.
+
+## Eric, Nov 18 (round 4: refunds, chargebacks, age; word-for-word essentials)
+"don't fight chargebacks ... err on the side of being very user friendly ... when people refund, send a message that says, like, you
+know, sorry, you weren't happy. Please keep your items as a thanks for trying HunChess. If there's something we could be doing
+better, please submit a comment ... optional ... a submit that's grayed out. If they type something, they can submit. Otherwise,
+they can just bypass ... The honor system ... put a quiet flag in the system ... I don't think we even need to build a system for
+taking back items ... disable purchasing on their account with real money ... and also disable trading ... three refunds after that.
+Just put a 90-day hold on trading and purchasing real in-game currency. And we don't even need to put a message up, just the same
+refund message ... if someone lies [about age], uses their parents' credit card, let's call that a good problem to have ... not fight"
+
+Decided: never fight a chargeback; refunds keep items (no item return/undo system); refund pop-up with an optional comment (Submit
+greyed until text, or close); a quiet flag: the 3rd refund (chargebacks count) starts a 90-day hold on buying coins and on trading
+(when trading exists), no extra message. Age stays self-declared (the bands as proposed).
+Director's reading to confirm: unspent bought coins come off with the refund (a number, not an item); opened items stay.
+Still open (round 3 calls 1-3): play coins in every mode; 1 crate a level; the lower coin prices.
