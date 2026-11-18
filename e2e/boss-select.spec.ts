@@ -846,3 +846,24 @@ test("Boss Battle (Eric, Oct 29): home's card and the screen's header say so; fi
   await openSoloBoss(page);
   await expect(page.locator(".bs-level")).toHaveText("Very hard");
 });
+
+test("Chandy stands as tall as the others on the stage, sized by his body, not his rifle's room (Eric, Nov 18: \"why is this mofo so SMALL\")", async ({ page }) => {
+  // (Admins first, Nov 16: his tile is on an admin's Boss raid screen.)
+  await asAdmin(page);
+  for (const [w, h] of [[1280, 800], [360, 640]] as const) {
+    await page.setViewportSize({ width: w, height: h });
+    await page.goto("/?mode=raid");
+    const tall = async (name: string) => {
+      await tile(page, name).click();
+      await expect.poll(() => figureDrawn(page)).toBe(true);
+      await page.waitForTimeout(500);
+      const b = (await bossPaint(page))!;
+      return b.bottom - b.top;
+    };
+    const sawyer = await tall("Sawyer");
+    const chandy = await tall("Chandy");
+    // (His body is about 0.9 of the others', his slung rifle's tip at the stage's room: before, about 0.7 with the rifle, his body 0.63.)
+    expect(chandy, `${w}: Chandy's painted height (rifle and all) against Sawyer's`).toBeGreaterThanOrEqual(sawyer * 0.95);
+    expect(await sideways(page), `${w}: no sideways scroll`).toBe(0);
+  }
+});
