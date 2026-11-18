@@ -694,7 +694,9 @@ below):
   is the largest hundredth at which every frame it rests in (its loops but the victory, the last frame of each one-shot) reaches no
   higher than `BAR_TOP_GAP` (3 px) under the bar's top, in its own proportions; `barShift`, the least sideways shift that keeps it 2 px
   inside the bar's left edge; `barName`, the least move right of the name column that keeps it 2 px clear. All three are measured from
-  the art (`packages/app/test/bar-fit.ts`; `npx tsx scripts/bar-fit.ts` prints them after a change to a drawing or to the gap). Moo &
+  the art (`packages/app/test/bar-fit.ts`; `npx tsx scripts/bar-fit.ts` prints them after a change to a drawing or to the gap). A kit
+  with `barUnder` (Chandy, Nov 18) measures `barName` only from the rows above where its name column's text and meters end: under them
+  the bar is empty, and his rifle may reach past the column there, never into them (docs/decisions/2026-11-18-chandy-bar-chirp.md). Moo &
   Moon and Puddles stay a little shorter (their thinking pose, every turn, is their tallest). The victory, the battle won, may rise
   over the bar, never off the screen. The name column is as wide as its name and bars, at most 130 px (`fit-content`), and the
   status ("N moves left") is never wrapped, so a column moved right takes its room from the empty middle; the boss's own room
@@ -980,7 +982,10 @@ top part is left and the review right. Decision: `docs/decisions/2026-11-02-boss
   Dodge's view and dock); his art is made ahead in slices at the battle's start (`prewarmChandy`: a 3.9 s stall on a slowed phone
   once swallowed a vote).
   His sounds are his own (Nov 18, `characters/chandy-sounds.ts`: pulse-style hunter tech, synthesized; `CHANDY_SOUNDS` maps his
-  cues, `CHANDY_CUES` says what each is; his intro's three are his swamp's), tested in `chandy.test.ts`.
+  cues, `CHANDY_CUES` says what each is; his intro's three are his swamp's), tested in `chandy.test.ts`. His scope's lock, unlock
+  and Dodge's alarm are low and heavy (a throbbing hum, 150 to 260 Hz, a growl under the lock), not beeps (Eric: "a bird chirping").
+  A phone's bar draws `CHANDY_BAR` (chandy.ts): the same figure, his rifle held tipped `BAR_TILT` (12°) down at the board, so it runs
+  under his meters (kits.ts `barUnder`) and his name sits beside him (`barName` 6, was 53); beside the board he aims level.
 
 ## Where the code is
 
