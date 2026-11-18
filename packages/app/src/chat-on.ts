@@ -40,11 +40,22 @@ export function chatOn(): boolean {
 /** Whether turning chat on asks first (the notice shows once: not seen on this device, nor ever on for this account). */
 export const chatNoticeDue = () => read(SEEN_KEY) !== "1" && !chatOn();
 
+/**
+ * The account's latest chat switch on its way to the server (it shows at once; the save follows). A message waits for it
+ * (global-chat.ts): the server refuses a post from an account whose chat_on isn't saved yet ("Turn on chat first."), so a line sent
+ * the moment chat was turned on was refused while the field showed it could go (Nov 18). Never rejects.
+ */
+let saving: Promise<void> = Promise.resolve();
+export const chatOnSaved = (): Promise<void> => saving;
+
 /** Turns chat on or off (the account's, or this device's for a guest). Turning it on marks the notice seen. */
 export async function setChatOn(on: boolean): Promise<void> {
   if (on) write(SEEN_KEY, "1");
-  if (account().profile?.user.signedIn) await updateChatOn(on);
-  else write(GUEST_KEY, on ? "1" : null);
+  if (account().profile?.user.signedIn) {
+    const save = updateChatOn(on);
+    saving = save.catch(() => undefined);
+    await save;
+  } else write(GUEST_KEY, on ? "1" : null);
   emit();
 }
 

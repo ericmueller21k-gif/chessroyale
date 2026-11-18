@@ -2,6 +2,18 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { GLOBAL_CHAT } from "@chessroyale/core";
 import { GlobalChatStore, type GlobalLine } from "../src/global-chat.ts";
 import { chatBlockNow, mutes, setChatBlock } from "../src/chat-mod.ts";
+import { setChatOn } from "../src/chat-on.ts";
+
+// (Only the chat switch's save is held here, for "a line waits for chat's switch to be saved"; everything else is the real account.)
+const gate = vi.hoisted(() => ({ signedIn: false, release: null as null | (() => void) }));
+vi.mock("../src/account.ts", async (orig) => {
+  const real = await orig<typeof import("../src/account.ts")>();
+  return {
+    ...real,
+    account: () => (gate.signedIn ? { ...real.account(), profile: { user: { id: "me", name: "Me", signedIn: true } } } : real.account()),
+    updateChatOn: () => new Promise<void>((done) => (gate.release = done)),
+  };
+});
 
 const T0 = 1_800_000_000_000;
 const line = (n: number, patch: Partial<GlobalLine> = {}): GlobalLine => ({ n, at: T0 + n, from: `p${n}`, name: `P${n}`, rating: null, icon: "♟", say: "gg", ...patch });
@@ -66,6 +78,29 @@ describe("global chat in the app", () => {
     expect(d.error).toBe("Chat is busy, try again.");
     // (A busy refusal doesn't start the wait.)
     expect(d.readyAt("me")).toBeLessThanOrEqual(T0);
+  });
+
+  it("a line sent the moment chat was turned on waits for the switch's save (the server refuses a post until chat_on is saved: Nov 18)", async () => {
+    gate.signedIn = true;
+    try {
+      const turningOn = setChatOn(true);
+      const c = new GlobalChatStore();
+      const asked: string[] = [];
+      const spy = (async (u: string) => {
+        asked.push(u);
+        return new Response(JSON.stringify({ ok: true, chat: { n: 0, lines: [] }, waitMs: 5_000 }), { status: 200 });
+      }) as unknown as typeof fetch;
+      const went = c.type("typed hello", spy);
+      await new Promise((r) => setTimeout(r, 20));
+      expect(asked).toEqual([]);
+      expect(c.sending).toBe(true);
+      gate.release!();
+      await turningOn;
+      expect(await went).toBe(true);
+      expect(asked).toEqual(["/api/chat"]);
+    } finally {
+      gate.signedIn = false;
+    }
   });
 
   it("mutes a player's lines on this device", () => {
