@@ -188,7 +188,7 @@ export function BossBarExtra({ boss, until = 0, part = "bar" }: { boss: BossView
 /** The boss's line for a power's moment (its kit's), the same on every screen; null without one. */
 export function powerLine(kit: BossKit | null, m: Pick<Moment, "kind" | "key" | "first" | "pick" | "ult" | "by" | "tier" | "shape" | "opening">): string | null {
   const ui = MOMENT_UI[m.kind];
-  return ui.line ? ui.line(kit, m) : kitLine(kit, ui.kit, m.key);
+  return ui.line ? ui.line(kit, m) : ui.kit ? kitLine(kit, ui.kit, m.key) : null;
 }
 
 /**
@@ -226,7 +226,8 @@ export function useMomentSpeech(boss: BossView, moments: readonly Moment[], now:
 
 /** The boss's animation for a power's moment, from its kit (e.g. freezeCast, pieThrow, check, blizzard, funhouse). */
 const kitAnim = (kit: BossKit | null, kind: PowerEventKind) => {
-  const name = kit?.anims[MOMENT_UI[kind].kit];
+  const k = MOMENT_UI[kind].kit;
+  const name = k && kit?.anims[k];
   return name && kit!.ch.anims[name] ? name : null;
 };
 

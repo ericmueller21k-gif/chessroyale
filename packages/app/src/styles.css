@@ -6545,8 +6545,21 @@ body:has([aria-modal="true"]:not(#rotate-lock), .mm-scrim) > .dk-plus {
   gap: 10px;
 }
 .shop-coins {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
+}
+/* The coin (components/Coin.tsx): never squashed by a flex row, centered on the text beside it; smooth when shrunk, pixel-sharp
+   from 40 px up. */
+.coin-icon {
+  display: inline-block;
+  flex: none;
+  vertical-align: middle;
+}
+.coin-icon.sharp {
+  image-rendering: pixelated;
 }
 .shop-note {
   margin: 0;
@@ -6789,9 +6802,6 @@ body:has([aria-modal="true"]:not(#rotate-lock), .mm-scrim) > .dk-plus {
   color: #7a6a4a;
   font-size: 13px;
   font-weight: 700;
-}
-.shop-price span {
-  font-size: 17px;
 }
 .shop-ribbon {
   position: absolute;
@@ -10963,6 +10973,10 @@ button.fd-logo {
 .bs-spot .bs-sprite {
   height: auto;
 }
+/* (Facing your pawn across the stage: a boss drawn facing our right mirrored about its frame's middle, placeOnStage's feet with it. Nov 17.) */
+.bs-sprite.bs-mirror {
+  transform: scaleX(-1);
+}
 .bs-q-big {
   font-size: 90px;
   color: var(--fd-sub);
@@ -12522,10 +12536,6 @@ a.fd-row-link {
   padding: 5px 12px;
   font-size: 14px;
   line-height: 18px;
-}
-/* Your coins on your own profile: gold, as the coin. */
-.fd-pill.fp-coins {
-  color: var(--fd-gold-text);
 }
 /* Your 1 v 1 rank under your name on home: its tier's color, darkened in light (as the 1 v 1 pill: core's ranked test
    checks each tier's color stays 4.5:1 through these mixes, so change them together). */
@@ -15402,6 +15412,12 @@ img.qicon {
 }
 .screen:has(.power-moment:not(.pm-stay)) .boss-char-sprite {
   visibility: hidden;
+}
+/* Facing the board there (Nov 17, kits.ts `placeFacing`): a drawing that faces away is mirrored about its feet (`--pm-fx`, their place
+   across its frame), as the bar's figure is (`.bc-mirror`). */
+.pm-caster.pm-mirror .boss-moment {
+  transform: scaleX(-1);
+  transform-origin: var(--pm-fx) 100%;
 }
 /* A computer: the boss casts where it stands, by the board's bottom-left corner, its words beside it (PowerParts.tsx, Cast; Eric,
    Nov 4: Hollow's darkness drew him at the board's top-left, half off the window). Its figure there hides only while a moment draws
@@ -23119,6 +23135,50 @@ button.sq-tiny {
 }
 
 /* ---- Moo & Moon (components/Moo.tsx; mo- for Moo) ---- */
+/* His Full Moon's cinematic (components/MooCinematic.tsx; Eric, Nov 17): over the board and everything above it, the field, his figure
+   in it, and the close-up over both. While the field is up it takes every tap (`mo-block`: nothing hidden under it is reached blind);
+   a match menu already open shows above it (`mo-on`, as the Hidden Boss's `cs-on`). Placed in screen pixels by the component; the
+   pictures stay crisp. */
+.mo-cine {
+  position: fixed;
+  inset: 0;
+  z-index: 880;
+  pointer-events: none;
+}
+.mo-area {
+  position: absolute;
+  overflow: hidden;
+}
+.mo-area.mo-block {
+  pointer-events: auto;
+}
+body.mo-on .mm-scrim {
+  z-index: 881;
+}
+.mo-pic {
+  position: absolute;
+  background-repeat: no-repeat;
+  image-rendering: pixelated;
+}
+.mo-field {
+  z-index: 1;
+}
+.mo-close {
+  z-index: 3;
+}
+.mo-cine .mo-cine-fig {
+  position: absolute;
+  z-index: 2;
+  height: auto;
+  image-rendering: pixelated;
+}
+/* On a computer his figure beside the board hides while he's out in the field (a phone's in the bar hides for every moment). */
+@media (min-width: 900px) and (min-height: 600px) {
+  .screen:has(.power-moment.pm-fullmoon) .boss-char.place-side .boss-char-sprite {
+    visibility: hidden;
+  }
+}
+
 /* He casts from the board's top-left corner, in his own frame's shape (74 x 108, with room above him for the flurry's rising moon:
    MOO.h). His feet where the others': 17% down the board, his middle 10% across. */
 .pm-caster.pm-by-moo {
@@ -23326,18 +23386,17 @@ button.sq-tiny {
   left: -5%;
   top: -20%;
 }
-/* His hop along a phone's bar to the pump and back: facing the way he goes (his drawing faces our left), mirrored about his feet. */
+/* A boss faces the board and its foe wherever it stands (Eric, Nov 17; kits.ts `placeFacing`): a figure drawn facing the other way is
+   mirrored about its feet (`.bc-mirror`; only the image: the bubble and its words are its own children and stay as they are), and a run
+   that moves it (Babur's hop along a phone's bar to his pump and back) turns it the way it goes (`.bc-flip`, against its place's turn).
+   Pixel-crisp: whole-pixel scale, nearest filtering. */
+.boss-char.bc-mirror .boss-char-sprite,
 .boss-char.bc-flip .boss-char-sprite {
   transform: scaleX(-1);
   transform-origin: calc(var(--bc-fx) * var(--bc-scale) * 1px) 100%;
 }
-/* The results, and a computer's battle (the boss stands left of the board): a figure drawn facing our left turns to its right
-   (the God King, the board), mirrored about its feet (only the image: the bubble and its words are its own children and stay as
-   they are). Pixel-crisp: whole-pixel scale, nearest filtering. Eric, Nov 17: "this damn cheetah still facing the wrong way". */
-.boss-char.place-results.art-left .boss-char-sprite,
-.boss-char.place-side.art-left .boss-char-sprite {
-  transform: scaleX(-1);
-  transform-origin: calc(var(--bc-fx) * var(--bc-scale) * 1px) 100%;
+.boss-char.bc-mirror.bc-flip .boss-char-sprite {
+  transform: none;
 }
 /* The pump in the bar's free room, at its right end, standing on the room's bottom: 2x (68 x 72) on a phone, its foot 3 px below the
    room's bottom, inside the bar's padding, so a stage-4 balloon's top and a pop's over-swell clear the status at any width
@@ -27990,4 +28049,48 @@ body.cs-on .mm-scrim {
 }
 .pod-dot.b {
   background: #111;
+}
+
+/* Dash's lying-down clock tap (Eric, Nov 17; DashStall.tsx, DashTap): beside your clock under the board, on the page's top layer,
+   placed once from the clock's time (left, top, size), mirrored when he lies on its left; taking no taps. His figure where he
+   stands is away meanwhile (its place kept). */
+.dash-lie {
+  position: fixed;
+  z-index: 55;
+  pointer-events: none;
+}
+.dash-lie.mirror {
+  transform: scaleX(-1);
+}
+.dash-lie-sprite {
+  display: block;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+}
+body.dash-away .boss-char .boss-char-sprite {
+  visibility: hidden;
+}
+/* (His words stand over him while he's down there, not in their usual box: Eric, Nov 17, "it should show above him like over the
+   board a bit". A point centered on him at his cap's top, never under the time's top; as the Hidden Boss's .rc-say-at.) */
+body.dash-away .bc-bubble:not(.dash-say) {
+  display: none;
+}
+.dash-say-at {
+  position: fixed;
+  z-index: 56;
+  width: 600px;
+  height: 0;
+  pointer-events: none;
+}
+.dash-say-at > .dash-say {
+  left: 0;
+  right: 0;
+  bottom: 6px;
+  margin-inline: auto;
+}
+.dash-say-at > .dash-say::after {
+  left: 50%;
+  right: auto;
+  margin-left: -6px;
 }

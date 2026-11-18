@@ -518,3 +518,31 @@ for (const who of ["a player's town", "an admin's town"] as const)
     expect(loaded, "tap to the town's first frame (ms)").toBeLessThan(8000);
     expect(long, "longest task (ms)").toBeLessThan(2000);
   });
+
+test("Moo & Moon's Full Moon cinematic on a slow phone: the hop, the field, the close-up, the transformation and the hop back stay within budget, the first time they show (Nov 17)", { tag: "@perf" }, async ({ page }) => {
+  test.skip(test.info().project.name !== "phone", "one run is enough (the phone, slowed)");
+  test.setTimeout(4 * 60_000);
+  await page.addInitScript(instrument);
+  // (?power=fullmoon: the warning as the 2nd turn begins, the Full Moon as your 2nd move lands.)
+  await page.goto("/?debug&nolanding&clock=60&boss=moo&power=fullmoon&laststand=0");
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send("Emulation.setCPUThrottlingRate", { rate: 4 });
+  await bossAloneFromHome(page);
+  const move = async () => {
+    await expect.poll(() => phase(page), { timeout: 60_000 }).toBe("play");
+    const { fen, allowed } = await page.evaluate(() => ({ fen: (window as any).match.phase.board.fen as string, allowed: ((window as any).match.boss?.powers?.allowed ?? null) as string[] | null }));
+    const legal = new Chess(fen).moves({ verbose: true }).filter((m) => !m.captured && (!allowed || allowed.includes(m.from + m.to)));
+    await page.evaluate((uci) => (window as any).match.submit(uci), legal[0]!.from + legal[0]!.to);
+    await expect.poll(() => phase(page), { timeout: 20_000 }).not.toBe("play");
+  };
+  await move();
+  await move();
+  // The cinematic, from its first frame to its last.
+  await page.locator(".mo-cine").waitFor({ timeout: 30_000 });
+  await page.evaluate(() => ((window as any).__perf.frames = []));
+  await expect(page.locator(".mo-cine")).toHaveCount(0, { timeout: 30_000 });
+  const s = frameStats(((await page.evaluate(() => (window as any).__perf.frames.splice(0))) as [number][]).map((x) => x[0]));
+  console.log(`Moo's Full Moon cinematic (slowed phone): ${f(s)}`);
+  expect(s.p95, "95th percentile frame (ms)").toBeLessThan(50);
+  expect(s.slow, "share of dropped frames").toBeLessThan(0.15);
+});

@@ -79,11 +79,40 @@ export const SIDE_REACH: Readonly<Record<string, readonly [left: number, up: num
   tiger: [31, 89, 31, 2],
   folio: [46, 80, 41, 2],
   timber: [38, 84, 46, 4],
-  dash: [39, 95, 28, 2],
+  dash: [39, 95, 28, 4],
   zebra: [33, 96, 51, 2],
   recluse: [30, 135, 30, 2],
   // (Chandy at rest: his frames with the rifle held level, aiming and firing, lie over the board: OVER_BOARD.)
   chandy: [57, 117, 43, 3],
+};
+
+/**
+ * How far each boss's drawing reaches from its feet, left and right (sprite px), over every frame it plays beside the board (mid-beat too:
+ * a lunge, a swing), OVER_BOARD's animations left out; the same unit test measures them. A figure mirrored to face the board (kits.ts
+ * `placeFacing`) turns toward it the side it held behind it as drawn, whose swings its rest's room (SIDE_REACH) never counted: its room
+ * keeps them within `over` too (BossCharacter.tsx fitSides, `bossSwing`). Nov 17: Timber, turned, swings 44 toward the board when he moves,
+ * gnaws or builds, 6 past his rest's 38: 41 px over a 1440 × 900 board against its 38.
+ */
+export const SIDE_SWING: Readonly<Record<string, readonly [left: number, right: number]>> = {
+  clown: [33, 34],
+  gingerbread: [38, 38],
+  grex: [42, 49],
+  hollow: [38, 45],
+  bigboy: [38, 33],
+  sawyer: [44, 37],
+  pig: [41, 69],
+  alfil: [46, 32],
+  hopper: [40, 34],
+  smudgy: [39, 51],
+  moo: [34, 35],
+  gardener: [54, 33],
+  tiger: [32, 34],
+  folio: [51, 42],
+  timber: [44, 47],
+  dash: [39, 64],
+  zebra: [33, 58],
+  recluse: [31, 30],
+  chandy: [57, 98],
 };
 
 /**
@@ -111,6 +140,8 @@ export type SideRoom = {
   bossRight: number;
   bossTop: number;
   bossMid: number;
+  /** How much further than his drawing's right edge his frames swing toward the board (page px at `s`; SIDE_SWING): kept within `over` too. */
+  bossSwing?: number;
   /**
    * Right of the board at `k` (null: no God King in his place): the first figure's middle (your pawn's, else the God King's), its inner
    * edge (your pawn's drawing; the God King's box when he's alone: he stays off the board), the outer edge of everything drawn there, and
@@ -151,9 +182,11 @@ export function sideSizes(r: SideRoom, feel: typeof SIDE_FEEL = SIDE_FEEL, boss 
   const fitUp = up > 0 ? (r.boardBottom - feel.margin) / (up + taller) : Infinity;
   const shared = Math.max(feel.min, down(Math.min(want, fitLeft, fitUp), feel.step));
   const s = r.bossFixed ? feel.min : shared;
-  // (His drawing's right edge a gap off the board, or as far over it as his room needs, never further; a boss who leans, over it by `over`.)
+  // (His drawing's right edge a gap off the board, or as far over it as his room needs, never further; a boss who leans, over it by `over`.
+  // His swing toward the board (`bossSwing`) over it by `over` at most too: his far side then over the menu where his room is short.)
   const lean = feel.lean.includes(boss);
-  const bossRight = lean ? r.boardLeft + over : Math.min(r.boardLeft + over, Math.max(r.boardLeft - feel.gap, r.leftLimit + feel.margin + (lc + rc) * s));
+  const most = r.boardLeft + over - ((r.bossSwing ?? 0) / r.s) * s;
+  const bossRight = lean ? most : Math.min(most, Math.max(r.boardLeft - feel.gap, r.leftLimit + feel.margin + (lc + rc) * s));
   const bossMid = r.bossFixed ? null : r1(bossRight - rc * s);
   if (!r.right) return { s, k: 1, bossMid, firstMid: null };
   // Right of the board: your pawn and the God King the one size over 2, filling at most `kingFill` of their room.

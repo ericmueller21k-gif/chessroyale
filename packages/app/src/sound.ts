@@ -1134,6 +1134,7 @@ export type SoundName =
   | "dashWhirr"
   | "dashFlag"
   | "dashYeah"
+  | "dashLaugh"
   | "dashOof"
   | "dashYawn"
   | "dashSlump"
@@ -1532,6 +1533,7 @@ const SOUNDS: Record<SoundName, (t: number) => void> = {
   dashWhirr: dashBoss("whirr"),
   dashFlag: dashBoss("flag"),
   dashYeah: dashBoss("yeah"),
+  dashLaugh: dashBoss("laugh"),
   dashOof: dashBoss("oof"),
   dashYawn: dashBoss("yawn"),
   dashSlump: dashBoss("slump"),
@@ -1862,6 +1864,7 @@ const MAKE: Partial<Record<SoundName, readonly BossSound[]>> = {
   dashWhirr: [["dash", "whirr"]],
   dashFlag: [["dash", "flag"]],
   dashYeah: [["dash", "yeah"]],
+  dashLaugh: [["dash", "laugh"]],
   dashOof: [["dash", "oof"]],
   dashYawn: [["dash", "yawn"]],
   dashSlump: [["dash", "slump"]],

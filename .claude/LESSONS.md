@@ -400,4 +400,8 @@ Tests check *what* ends up on the screen, not *how it gets there*, nor how long 
     Load it when that tap is next (the box or sheet before it), and keep the screen until it's here, never a blank one between.
   - Tests wait for it once, in the shared helper, where a player would have it (`matchScreens`), never with a longer timeout per test.
 
+- **Babur's pump in the taller bar after a toss** (Nov 17, [story](../docs/history/lessons.md#baburs-pump-in-the-taller-bar-after-a-toss-nov-17-2026)):
+  - A layout is measured from settled state (a figure at rest in its place, `figureRestBox`), never from what's drawn this moment: a
+    turn, a hop or a mid-animation frame changes the box for a moment, and a measure taken then can stick for the whole match.
+
 - **The FAQ follows the rules** (Oct 11): a PR that changes a rule, a number's meaning or a boss updates its words in `packages/app/src/faq/content.ts` in the same PR; numbers there come from the settings objects, never typed in.

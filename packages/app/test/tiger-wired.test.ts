@@ -265,14 +265,14 @@ describe("the rings", () => {
 });
 
 describe("his trip along a phone's bar", () => {
-  it("hops across while airborne, places facing the pump (mirrored when it's to his right), and comes home facing back", () => {
+  it("hops across while airborne, places facing the pump, and comes home facing back", () => {
     const m = tripMove(200);
-    expect(m(0)).toEqual({ x: 0, y: 0, flip: true });
+    expect(m(0)).toEqual({ x: 0, y: 0, face: "right" });
     expect(m(HOP_TRIP_MS - 10).x).toBe(200);
-    expect(m(HOP_TRIP_MS + 400)).toMatchObject({ x: 200, flip: true });
+    expect(m(HOP_TRIP_MS + 400)).toMatchObject({ x: 200, face: "right" });
     const home = m(2 * HOP_TRIP_MS + TIGER_ANIM.place + 10);
-    expect(home).toMatchObject({ x: 0, flip: false });
-    expect(tripMove(-50)(HOP_TRIP_MS + 100).flip).toBe(false);
+    expect(home).toMatchObject({ x: 0, face: "left" });
+    expect(tripMove(-50)(HOP_TRIP_MS + 100).face).toBe("left");
   });
 });
 

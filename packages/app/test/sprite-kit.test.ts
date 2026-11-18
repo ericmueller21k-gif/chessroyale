@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { BOARD_FACING, KIT, TEMPLATES, crisp, drawnFacing, facingAs, mirrorFor, toward, turned, type Sprite } from "../src/characters/sprite-kit.ts";
 import { SPRITES, artFacing } from "../src/characters/sprites.ts";
 import { frameKeys, renderFrame, type Character } from "../src/characters/sprite.ts";
-import { BOSS_KITS } from "../src/characters/kits.ts";
+import { BOSS_KITS, PLACE_FACING, artOf, placeFacing } from "../src/characters/kits.ts";
 import { SMUDGY, SMUDGY_SPRITE } from "../src/characters/smudgy.ts";
 import { BIGBOY, BIGBOY_ATTACK, BIGBOY_SPRITE } from "../src/characters/bigboy.ts";
 import { BOSS_INTROS } from "../src/town/shops/challenge.ts";
@@ -192,4 +192,26 @@ describe("every boss's figure, scene by scene: mirrored or not (Eric, Nov 7)", (
       }
     }
   });
+});
+
+/**
+ * Every boss faces the board it plays on and its foe, wherever it stands (Eric, Nov 17: "Can we send a helper to have all the bosses facing
+ * the right way"; docs/decisions/2026-11-17-boss-facing.md): one rule, its art's facing (a sprite's measured, else sprites.ts by eye) and
+ * the place's (kits.ts PLACE_FACING): our right in a phone's bar, beside a computer's board and on the results; our left on the select's
+ * stage, right of your pawn. e2e/boss-side.spec.ts checks the bar and the side on the page.
+ */
+describe("every boss faces its board and its foe in every place (Nov 17)", () => {
+  for (const [name, kit] of Object.entries(BOSS_KITS)) {
+    it(`${name}: its art's facing is data, and every place turns it to face the right way`, () => {
+      expect(kit.sprite?.facing ?? artFacing(kit.ch.id), `${name}: its art's facing (sprites.ts)`).not.toBeNull();
+      const art = kit.sprite?.facing ?? artFacing(kit.ch.id)!;
+      for (const [place, ch] of [["bar", kit.bar ?? kit.ch], ["side", kit.ch], ["results", kit.ch], ["stage", artOf(kit)]] as const) {
+        const want = PLACE_FACING[place];
+        const f = placeFacing(kit, ch, place);
+        expect(f.faces, `${name} in the ${place}`).toBe(art === "front" ? "front" : want);
+      }
+      // (The stage draws the art as drawn, mirrored exactly when it faces our right.)
+      expect(placeFacing(kit, artOf(kit), "stage").mirror, name).toBe(art === "right");
+    });
+  }
 });

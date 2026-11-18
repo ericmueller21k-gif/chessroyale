@@ -389,6 +389,7 @@
         "packages/app/src/characters/sidekicks/blitz.ts",
         "packages/app/src/components/Dash.tsx",
         "packages/app/src/components/DashRush.tsx",
+        "packages/app/src/components/DashStall.tsx",
         "packages/server/src/bosses/dash.ts"
       ],
       "specs": ["e2e/dash.spec.ts", "e2e/boss-smoke.spec.ts", "e2e/king-attack.spec.ts"]
@@ -461,6 +462,8 @@
         "packages/app/src/characters/stance.ts",
         "packages/app/src/characters/effects/moo.ts",
         "packages/app/src/components/Moo.tsx",
+        "packages/app/src/components/MooCinematic.tsx",
+        "packages/app/src/characters/moo-cinematic.png",
         "packages/app/src/speech-icons.ts"
       ],
       "specs": ["e2e/boss-speech.spec.ts", "e2e/king-attack.spec.ts", "e2e/moo.spec.ts"]
@@ -782,6 +785,8 @@
         "packages/app/src/icon-pixels.ts",
         "packages/app/src/boss-tokens.ts",
         "packages/app/src/components/TokenArt.tsx",
+        "packages/app/src/components/Coin.tsx",
+        "packages/app/src/coin/**",
         "packages/app/src/components/TokenBox.tsx",
         "packages/app/src/components/tokens/**",
         "packages/app/src/components/WelcomeNotice.tsx",

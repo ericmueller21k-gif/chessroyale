@@ -29,4 +29,6 @@ export interface BossLobby {
   /** Everyone the round waits for has moved (the people here: someone away doesn't hold it up). */
   roundDone(): boolean;
   lock(): void;
+  /** The round's timer again (its next beat of Dash's stall, else its lock), after its deadlines moved. */
+  armRound(): void;
 }

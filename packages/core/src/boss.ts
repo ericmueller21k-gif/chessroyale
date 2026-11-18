@@ -99,6 +99,11 @@ export type PowerId = "freeze" | "blizzard" | "pie" | "funhouse" | "sparkler" | 
  * move unlocked from the start and his move meter full from the second turn (bosses/chandy.ts).
  */
 export const POWER_IDS: readonly PowerId[] = ["freeze", "blizzard", "pie", "funhouse", "sparkler", "candle", "dark", "lightsout", "blocks", "bounce", "cuts", "boardsaw", "drag", "showdown", "nohelp", "bullet", "tusks", "slam", "leapfrog", "carrotpatch", "camouflage", "repaint", "moonbeam", "fullmoon", "seeds", "water", "balloons", "hoops", "draft", "crease", "revision", "scraps", "gnaw", "clockslap", "scramble", "rush", "clockfit", "popoff", "split", "dough", "goldplate", "lockon", "dodge", "scatter", "beam", "shields", "rapidfire", "queenlock"];
+/**
+ * Test switches that aren't a power of their own (?power=<id>), for one boss's moments: Dash's stall skit early (`stall`: its slam and
+ * fake move a few seconds into the first move it can come on) and his lying-down clock tap from the first move (`clocktap`).
+ */
+export const POWER_TEST_SWITCHES: readonly string[] = ["stall", "clocktap"];
 
 /**
  * A raid boss: the base template every boss fills in. Its powers' rules (which moves are allowed, what happens after
@@ -1139,6 +1144,22 @@ export interface DashState {
   rushWarn?: number;
   /** His pop-off (once a battle; Eric, Nov 7): his turn `at`, it plays before his move lands, while he thinks. */
   popOff?: { at: number } | null;
+  /**
+   * His stall skit's slam (once a battle; Eric, Nov 17: "each still occur once per game"; DASH_STALL): it came on the crowd move
+   * after crowd move `at`. Spent as it starts: never a second slam.
+   */
+  slam?: { at: number } | null;
+  /**
+   * His stall skit's fake move (once a battle, apart from the slam; Eric, Nov 17; DASH_STALL): it came on the crowd move after
+   * crowd move `at` (`move`: the move he played and took back). Spent only as it lands: until then it stays armed, and after a
+   * slam it comes alone on a later move.
+   */
+  stall?: { at: number; move: string } | null;
+  /**
+   * His lying-down clock tap (once a battle; Eric, Nov 17; DASH_TAP): it came on the crowd move after crowd move `at`, as your move's
+   * clock reached its time (stallPlan's `tapAt`); nothing more of his came on that move.
+   */
+  tap?: { at: number } | null;
 }
 
 /**

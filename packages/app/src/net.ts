@@ -64,6 +64,7 @@ import {
   dodgeTimeline,
   rushSquares,
   rushTimeline,
+  stallPausedMs,
   brainLine as brainWords,
   GUARD_WORDS,
   type BrainNote,
@@ -91,6 +92,7 @@ import { MatchChat } from "./chat.ts";
 import { isAdmin, maiaAllowed } from "./boss-brain.ts";
 import { resetKingSpeech } from "./godKing.ts";
 import { resetBeats } from "./components/boss-figure.ts";
+import { noteRejoin } from "./characters/moo-state.ts";
 import { resetBattleBanners } from "./battle-banners.ts";
 import { bossVoice } from "./speech.tsx";
 import { maiaSaved, prefetchMaia, startMaia } from "./maia.ts";
@@ -676,6 +678,8 @@ export class NetMatch implements GameView {
         if (this.premoveTold) this.send({ t: "premove", move: this.premoveTold });
         this.phase2.onWelcome();
         this.chat.onWelcome();
+        // (A Full Moon resent now is already under way: Moo's cinematic skips it.)
+        noteRejoin();
         // This device's engine speed, so the lobby can share out the judging (once per page; sent again on reconnect).
         void this.reportSpeed();
         // (Back after a dropped connection with Maia still loaded: the lobby forgot it as it took the seat back.)
@@ -752,7 +756,10 @@ export class NetMatch implements GameView {
           const startsAt = this.local(m.startsAt ?? m.now);
           this.playStartedAt = startsAt;
           const deadline = this.local(m.deadline);
-          return this.setPhase({ kind: "play", board: this.toView(m.board), startsAt, deadline, allowedMs: Math.max(0, deadline - startsAt), ...(m.moveClock ? { clock: m.moveClock } : {}) });
+          // (A reconnect mid Dash's stall skit: its beat, and the clock's pauses for it left out of the move's own time.)
+          const stall = m.stall ? { ...m.stall, at: this.local(m.stall.at), until: this.local(m.stall.until) } : undefined;
+          const paused = m.stall ? stallPausedMs(m.stall) : 0;
+          return this.setPhase({ kind: "play", board: this.toView(m.board), startsAt, deadline, allowedMs: Math.max(0, deadline - startsAt - paused), ...(m.moveClock ? { clock: m.moveClock } : {}), ...(stall ? { stall } : {}) });
         }
         return this.emit();
       case "moved":
@@ -778,6 +785,14 @@ export class NetMatch implements GameView {
         if (m.at !== undefined && m.until !== undefined && prev?.at === undefined) this.progress.postpone(m.until - m.at);
         if (this.phase.kind === "scoring") return this.setPhase({ ...this.phase, strike });
         return this.setPhase({ ...this.phase, ...(m.deadline !== undefined ? { deadline: this.local(m.deadline) } : {}), strike });
+      }
+      case "stall": {
+        // Dash's stall skit (DashStall.tsx): a beat begins; the clock stands still for it, for those who picked too.
+        if (m.key !== this.key || (this.phase.kind !== "play" && (this.phase.kind !== "scoring" || this.phase.watched))) return;
+        const stall = { beat: m.beat, at: this.local(m.at), until: this.local(m.until), ...(m.move ? { move: m.move } : {}) };
+        this.progress.postpone(m.until - m.at);
+        if (this.phase.kind === "scoring") return this.setPhase({ ...this.phase, stall });
+        return this.setPhase({ ...this.phase, deadline: this.local(m.deadline), stall });
       }
       case "tally":
         if (m.key !== this.key) return;
@@ -1485,6 +1500,8 @@ export class NetMatch implements GameView {
     if (move === this.boss?.barred || (this.boss?.powers?.allowed && !this.boss.powers.allowed.includes(move))) return;
     if (Date.now() < this.phase.startsAt - 300) return; // Before the clock starts.
     if (this.phase.strike?.until && Date.now() < this.phase.strike.until) return; // While the King strikes.
+    // (While Dash's fake move is on the board: the board takes no move then.)
+    if (this.phase.stall?.beat === "fake" && Date.now() >= this.phase.stall.at && Date.now() < this.phase.stall.until) return;
     // A Boss Battle party: your pick shows as your arrow and can change until the last pick resolves the turn (the server
     // says "locked" then), so the turn stays open here.
     if (this.party) {
@@ -1501,7 +1518,8 @@ export class NetMatch implements GameView {
     this.send({ t: "pick", key: this.key, move, ...(away ? { away } : {}), ...(premove ? { premove: true as const } : {}) });
     crumb(`move ${move}`);
     if (this.myId) this.progress.mark(this.myId);
-    this.setPhase({ kind: "scoring", board: this.phase.board, move, strike: this.phase.strike });
+    // (The crowd's turn goes on for the rest: a stall beat under way plays on for you too.)
+    this.setPhase({ kind: "scoring", board: this.phase.board, move, strike: this.phase.strike, ...(this.phase.stall ? { stall: this.phase.stall } : {}) });
   }
 
   /** A Boss Battle party: kick a member who hasn't picked a minute after the turn's first pick (the server checks). */
@@ -1518,6 +1536,9 @@ export class NetMatch implements GameView {
   kingCalled = false;
   callKing(strike = false) {
     if (this.phase.kind !== "play" || !this.key || !this.boss?.kingCharges || this.kingCalled) return;
+    // (Not during Dash's stall beats: the server refuses a strike then, and the board takes no move in his fake move's hold.)
+    const st = this.phase.stall;
+    if (st && Date.now() >= st.at && Date.now() < st.until && (strike || st.beat === "fake")) return;
     if (kingHelpBlocked(this.boss)) {
       // The Hidden Boss (the Crowd's boss final): the God King doesn't come, but the try spends a charge as if he had
       // (Eric, Oct 14), as solo's does: the server spends it; it's gone here at once, and the next boss view says what

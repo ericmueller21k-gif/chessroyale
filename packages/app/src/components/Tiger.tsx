@@ -3,7 +3,8 @@ import { createPortal } from "preact/compat";
 import { BOSS_POWERS } from "@chessroyale/core";
 import { HOOPS_BEATS, TIGER_ANIM } from "@chessroyale/chess";
 import { pickLine } from "../characters/boss-beats.ts";
-import { bossKit, type BossKit } from "../characters/kits.ts";
+import { bossKit, facingOf, placeFacing, type BossKit } from "../characters/kits.ts";
+import { mirrorFor, toward } from "../characters/sprite-kit.ts";
 import { EFFECTS } from "../characters/power-art.ts";
 import { HOP_AIR_AT, HOP_AIR_MS } from "../characters/tiger-figure.ts";
 import { PUMP_OVER, PUMP_OVER_MAX } from "../characters/side-size.ts";
@@ -17,8 +18,8 @@ import { gardenNow, realMs } from "../garden-clock.ts";
 import { NORMAL, bossVoice } from "../speech.tsx";
 import { FLY_MS, LAND_MS, colorLook, flyAnim, landAnim, landBeats, noteTiger, popReactAt, pumpShows, ringShows, type EndShow, type TigerShow } from "../tiger-show.ts";
 import { SpriteAnim, prewarm, prewarmSprite } from "./BossEffect.tsx";
-import { figureBusy, playInPlace, type FigureMove } from "./BossCharacter.tsx";
-import type { BoardLayerProps, BossUi, Moment, MomentProps, MomentUi } from "./PowerParts.tsx";
+import { figureBusy, figurePoint, figureRestBox, playInPlace, type FigureMove } from "./BossCharacter.tsx";
+import { casterPoint, type BoardLayerProps, type BossUi, type Moment, type MomentProps, type MomentUi } from "./PowerParts.tsx";
 
 /**
  * Babur's, the circus tiger's, powers on screen (his rules: packages/chess/src/bosses/tiger.ts; docs/decisions/2026-10-23-tiger-rules.md
@@ -84,7 +85,7 @@ export const NOZZLE_REACH = 23;
 
 /**
  * His trip along the bar, `t` ms into it: across by `dx` px while airborne (a small arc), `place` beside the pump, and back. Facing the
- * pump on the way and at it (he's drawn facing our left: mirrored when it's to his right), facing back on the way home.
+ * pump on the way and at it, facing back on the way home (his figure turns to face it: BossCharacter, kits.ts `placeFacing`).
  */
 export function tripMove(dx: number): FigureMove {
   const backAt = HOP_TRIP_MS + PLACE_MS;
@@ -94,7 +95,7 @@ export function tripMove(dx: number): FigureMove {
     const u = t < backAt ? Math.max(0, Math.min(1, go)) : 1 - Math.max(0, Math.min(1, back));
     const air = t < backAt ? go : back;
     const y = air > 0 && air < 1 ? -10 * Math.sin(Math.PI * air) : 0;
-    return { x: dx * u, y, flip: t < backAt ? dx > 0 : dx < 0 };
+    return { x: dx * u, y, face: (t < backAt) === dx > 0 ? "right" : "left" };
   };
 }
 
@@ -147,15 +148,21 @@ function actPlace(kit: BossKit, rec: TigerShow, now: number): void {
     playInPlace(`tiger:${id}`, ["hopTrip", "place", "hopTrip"], now, tripMove(dx));
     pl.putAt = now + HOP_TRIP_MS + TOUCH_AT;
   } else {
-    playInPlace(`tiger:${id}`, ["place"], now);
     const side = document.querySelector<HTMLElement>(".boss-char.place-side .boss-char-sprite");
     const sr = side?.getBoundingClientRect();
-    if (sr && sr.width > 0 && pump) {
+    if (side && sr && sr.width > 0 && pump) {
+      // (He turns to the pump for his toss (it stands beside him, toward the window's edge), his paw where it is then; facing the board
+      // again after it: Nov 17.)
+      const face = toward(figurePoint(side, kit.ch, kit.ch.foot[0], 0).x, onPump(pump).x);
+      playInPlace(`tiger:${id}`, ["place"], now, () => ({ x: 0, y: 0, face }));
       // (The limp balloon at the pump's own scale: it lands on the nozzle as the balloon it becomes.)
-      limps.set(id, { from: { x: sr.left + (PAW_LIMP.x / kit.ch.w) * sr.width, y: sr.top + (PAW_LIMP.y / kit.ch.h) * sr.height }, to: onPump(pump), at: now + TOUCH_AT, look: colorLook(pl.color), scale: pump.getBoundingClientRect().width / PUMP_W });
+      limps.set(id, { from: figurePoint(side, kit.ch, PAW_LIMP.x, PAW_LIMP.y, mirrorFor(facingOf(kit), face)), to: onPump(pump), at: now + TOUCH_AT, look: colorLook(pl.color), scale: pump.getBoundingClientRect().width / PUMP_W });
       if (limps.size > 4) limps.delete(limps.keys().next().value!);
       pl.putAt = now + TOUCH_AT + LIMP_FLY_MS;
-    } else pl.putAt = now + TOUCH_AT;
+    } else {
+      playInPlace(`tiger:${id}`, ["place"], now);
+      pl.putAt = now + TOUCH_AT;
+    }
   }
   // His word for it, now and then (its chance), as the balloon goes on.
   later(`say:${id}`, now + TOUCH_AT, () => bossVoice.say(pickLine(kit, "place", id), id, NORMAL));
@@ -249,7 +256,7 @@ let lastPlace: PumpPlace = PHONE;
  * Works out the pump's place on this screen, beside him if there's room with the bar at its usual size, else in the taller bar (whose
  * class it leaves on `slot`). Synchronous: the class comes off and on again in the same task, never painted in between.
  */
-function pumpPlace(slot: HTMLElement, figW: number): PumpPlace {
+function pumpPlace(slot: HTMLElement, kit: BossKit | null): PumpPlace {
   if (!matchMedia(COMPUTER).matches) return PHONE;
   const screen = slot.closest<HTMLElement>(".screen") ?? document.body;
   const board = screen.querySelector<HTMLElement>(".hb-board");
@@ -265,14 +272,16 @@ function pumpPlace(slot: HTMLElement, figW: number): PumpPlace {
   // the smaller board's, and a pump measured at that size could fit where the real one doesn't, flipping back and forth.)
   const root = board.closest<HTMLElement>(".hb") ?? board;
   const drawn = boardSize(parseFloat(getComputedStyle(root).width) || board.offsetWidth, window.devicePixelRatio || 1);
-  const fig = sprite?.getBoundingClientRect();
-  if (side && fig && fig.width > 0) {
+  // (His box as he stands there, facing the board, not as his toss turns him to the pump for a moment: figureRestBox. Measured mid-toss,
+  // a screen drawn then put the pump 4 of his art px over, in the taller bar at 1440 × 900: Nov 17.)
+  const fig = sprite && kit ? figureRestBox(sprite, kit.ch, placeFacing(kit, kit.ch, "side").mirror) : null;
+  if (side && fig && kit && fig.width > 0) {
     const s = pumpScale(drawn);
     const at = side.getBoundingClientRect();
     const keep = [...document.querySelectorAll(KEEP_CLEAR)].map((e) => e.getBoundingClientRect());
     // (On his feet's line: his box's bottom, which stands `--side-lift` over the side's where he comes over the board's corner.)
     const feet = side.querySelector(".boss-char")?.getBoundingClientRect().bottom ?? at.bottom;
-    const box = sidePump(fig, fig.width / figW, feet, s * zoom, { w: document.documentElement.clientWidth, h: innerHeight }, keep);
+    const box = sidePump(fig, fig.width / kit.ch.w, feet, s * zoom, { w: document.documentElement.clientWidth, h: innerHeight }, keep);
     if (box) return { at: "side", scale: s, x: (box.left - at.left) / zoom, side };
   }
   slot.classList.add("tg-tall");
@@ -328,13 +337,12 @@ export function TigerPump({ boss, moments }: { boss: BossView; moments: () => Mo
   const show = pumpShows(rec, b, gardenNow(), now, document.visibilityState !== "hidden", realMs);
   const limp = rec?.place ? limps.get(`${rec.key}:${rec.place.key}`) : undefined;
   useWake([show.wake, rec?.place?.putAt ?? null, limp ? limp.at : null, limp ? limp.at + LIMP_FLY_MS : null]);
-  const figW = kit?.ch.w ?? 76;
   useLayoutEffect(() => {
     const el = slot.current;
     if (!el) return;
     const run = () => {
       if (!el.isConnected) return;
-      const p = pumpPlace(el, figW);
+      const p = pumpPlace(el, kit);
       lastPlace = p;
       setPlace((old) => (samePlace(old, p) ? old : p));
     };
@@ -484,15 +492,20 @@ function TigerLayer({ boss, p, orientation, moments, now }: BoardLayerProps) {
 
 const nothing = () => null;
 
-/** Where a hoop leaves his paw (board units), as he casts at the board's top-left corner (.pm-caster.pm-by-tiger): measured on his frame. */
-export const HOOP_PAW = { x: 0.03, y: 0.0 } as const;
+/** Where he casts his hoops at the board's top-left corner on a phone (% of the board: CSS .pm-caster.pm-by-tiger). */
+export const TIGER_CASTER = { left: -5, top: -20, width: 28 } as const;
+/** His throwing paw in his frame (px), at his `hoops` cast's `throw1` cue: where each hoop leaves. */
+export const HOOP_PAW = { x: 24, y: 70 } as const;
 
 /**
  * The hoops: the HOOPS! banner (off the board before the first throw), his cast at the board's corner, and each hoop flying from his
  * paw to its block at its throw (its ring is the board's).
  */
-function hoopsMoment({ boss, moment, t, orientation, banner, cast }: MomentProps) {
+function hoopsMoment({ boss, moment, t, orientation, banner, cast, kit }: MomentProps) {
   const blocks = boss.powers?.hoops?.blocks ?? [];
+  // (His paw as drawn at the corner, turned to face the board: casterPoint, in board units.)
+  const at = kit ? casterPoint(kit, TIGER_CASTER, HOOP_PAW.x, HOOP_PAW.y) : { x: 0, y: 0 };
+  const paw = { x: at.x / 100, y: at.y / 100 };
   return (
     <div class="power-moment pm-hoops">
       {banner("HOOPS!", `No crossing the rings for ${BOSS_POWERS.hoopsCrowdMoves} moves`, "fire", HOOPS_BEATS.throwsAt[0])}
@@ -503,8 +516,8 @@ function hoopsMoment({ boss, moment, t, orientation, banner, cast }: MomentProps
           if (t0 === undefined || t < t0 || t >= t0 + HOOPS_BEATS.flyMs) return null;
           const u = (t - t0) / HOOPS_BEATS.flyMs;
           const { col, row } = blockCell(corner, orientation);
-          const x = HOOP_PAW.x + ((col + 1) / 8 - HOOP_PAW.x) * u;
-          const y = HOOP_PAW.y + ((row + 1) / 8 - HOOP_PAW.y) * u - 0.12 * Math.sin(Math.PI * u);
+          const x = paw.x + ((col + 1) / 8 - paw.x) * u;
+          const y = paw.y + ((row + 1) / 8 - paw.y) * u - 0.12 * Math.sin(Math.PI * u);
           return (
             <span key={`hoop-${corner}`} class="tg-hoop" data-corner={corner} style={{ "--x1": r4(x - 1 / 16), "--y1": r4(y - 1 / 16) }}>
               <SpriteAnim ch={EFFECTS.hoopFly.ch} anim="fly" since={moment.at + t0} id={`hoop:${moment.key}:${i}`} />

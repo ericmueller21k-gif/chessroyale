@@ -9,6 +9,7 @@ import { play } from "../sound.ts";
 import { useAccount } from "./Profile.tsx";
 import { CratesPanel, LockerPanel } from "./Crates.tsx";
 import { BackButton } from "../components/FrontDoor.tsx";
+import { Coin } from "../components/Coin.tsx";
 import { isPaused, useServerStatus } from "../status.ts";
 
 /**
@@ -62,7 +63,7 @@ export function ShopScreen({ onBack, initial }: { onBack: () => void; initial?: 
       <div class="shop-head">
         <BackButton onClick={onBack} />
         <span class="shop-coins" aria-label={`${shop?.coins ?? 0} coins`}>
-          🪙 {shop?.coins ?? 0}
+          <Coin /> {shop?.coins ?? 0}
         </span>
       </div>
       <div class="area-tabs" role="tablist">
@@ -133,7 +134,13 @@ export function ShopScreen({ onBack, initial }: { onBack: () => void; initial?: 
                     </button>
                   ) : (
                     <button type="button" class="btn btn-small btn-primary" disabled={busy !== null} onClick={() => void act(item.id, buyShopItem)}>
-                      {SHOP_FREE || item.price === 0 ? "Get · Free" : `Buy · 🪙 ${item.price}`}
+                      {SHOP_FREE || item.price === 0 ? (
+                        "Get · Free"
+                      ) : (
+                        <>
+                          Buy · <Coin /> {item.price}
+                        </>
+                      )}
                     </button>
                   )}
                 </div>
@@ -271,7 +278,7 @@ function Price({ id, onTap }: { id: Offer; onTap: () => void }) {
   const now = shopPrice(full);
   return (
     <button type="button" class="shop-price" aria-label={now === full ? `${now} coins` : `${now} coins, was ${full}`} onClick={onTap}>
-      <span aria-hidden="true">🪙</span>
+      <Coin />
       {now !== full && <s>{full}</s>}
       <b>{now}</b>
     </button>

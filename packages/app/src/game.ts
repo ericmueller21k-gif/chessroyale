@@ -212,6 +212,19 @@ export interface StrikeState {
   until?: number;
 }
 
+/**
+ * Boss battle: Dash's stall skit on this move (Eric, Nov 17; his rules' stallPlan): its beat on screen from `at` to `until` (the
+ * slam, or his fake second move `move`, played and taken back). The move clock stands still meanwhile (the play phase's deadline
+ * already includes it); the board takes no move during the fake move.
+ */
+export interface StallState {
+  /** (`tap`: his lying-down clock tap began at `at`; no pause, `until` = `at`. DashTap in DashStall.tsx.) */
+  beat: "tap" | "slam" | "fake";
+  at: number;
+  until: number;
+  move?: string;
+}
+
 export type Phase =
   | { kind: "loading" }
   | { kind: "lobby" }
@@ -220,9 +233,9 @@ export type Phase =
    * `startsAt`: when the move clock starts (after the new board's settling-in countdown). `clock`: this move's clock
    * in seconds, the time control's cap (`allowedMs` is less when a time bank runs low).
    */
-  | { kind: "play"; board: BoardView; startsAt: number; deadline: number; allowedMs: number; clock?: number; strike?: StrikeState }
+  | { kind: "play"; board: BoardView; startsAt: number; deadline: number; allowedMs: number; clock?: number; strike?: StrikeState; stall?: StallState }
   /** `watched`: Crowd 50 v 50, the other team's vote is being counted. */
-  | { kind: "scoring"; board: BoardView; move: string | null; watched?: boolean; strike?: StrikeState }
+  | { kind: "scoring"; board: BoardView; move: string | null; watched?: boolean; strike?: StrikeState; stall?: StallState }
   /** `until`: when the next board comes up (local time). */
   | { kind: "reveal"; mine: GroupReveal; board: BoardView; until: number }
   /** Crowd 50 v 50: the other team is choosing; you watch the vote come in. */

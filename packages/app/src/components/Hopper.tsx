@@ -10,7 +10,7 @@ import { play } from "../sound.ts";
 import { CRITICAL } from "../speech.tsx";
 import { BoardEffects, BossEffect, BossMoment, prewarm, prewarmSprite, type BoardItem } from "./BossEffect.tsx";
 import { squareXY } from "./GodKing.tsx";
-import { Cast, PIECE_WORD, SoundAt, hash, type BossUi, type Moment, type MomentProps, type MomentUi } from "./PowerParts.tsx";
+import { Cast, PIECE_WORD, SoundAt, casterPoint, hash, type BossUi, type Moment, type MomentProps, type MomentUi } from "./PowerParts.tsx";
 
 /**
  * Chub & Chirp's powers on screen (the code id: hopper; their rules: packages/chess/src/bosses/hopper.ts and carrots.ts;
@@ -51,7 +51,7 @@ export const CAST_LINE = `${HOPPER_NAME} spent their turn planting carrots.`;
  * carrot leaves Chub's paw at its toss (frame pixels 15.6, 23.5 of his 84 x 84 frame, measured on the cast's toss frames).
  */
 export const HOPPER_CASTER = { left: -6, top: -17, width: 30 } as const;
-const PAW: Pt = { x: HOPPER_CASTER.left + (HOPPER_CASTER.width * 15.6) / 84, y: HOPPER_CASTER.top + (HOPPER_CASTER.width * 23.5) / 84 };
+const PAW = { x: 15.6, y: 23.5 } as const;
 
 /** When each prize piece drops (ms after the spin's prizeAt, one after another) and how long it falls. */
 export const PRIZE_DROP = { stagger: 160, fallMs: 450 } as const;
@@ -227,8 +227,10 @@ function Ladder() {
 }
 
 /** "CARROT PATCH!", then the cast: a carrot tossed each bound, tumbling to its square; then his ladder. */
-function castMoment({ boss, moment, t, orientation, banner, cast }: MomentProps) {
+function castMoment({ boss, moment, t, orientation, banner, cast, kit }: MomentProps) {
   const squares = boss.powers?.carrots?.squares ?? moment.squares ?? [];
+  // (His paw as drawn at the corner, turned to face the board or not: casterPoint.)
+  const paw: Pt = kit ? casterPoint(kit, HOPPER_CASTER, PAW.x, PAW.y) : { x: HOPPER_CASTER.left, y: HOPPER_CASTER.top };
   return (
     <div class="power-moment pm-carrots">
       {banner("CARROT PATCH!", `${BOSS_POWERS.carrotCount} carrots, ${BOSS_POWERS.carrotMoves} moves each`, "carrot", B.carrots.tosses[0])}
@@ -239,7 +241,7 @@ function castMoment({ boss, moment, t, orientation, banner, cast }: MomentProps)
           if (t < t0 || t >= t0 + B.carrots.flightMs) return null;
           const u = (t - t0) / B.carrots.flightMs;
           const end = centreOf(sq, orientation);
-          const at = { x: PAW.x + (end.x - PAW.x) * u, y: PAW.y + (end.y - PAW.y) * u - 14 * Math.sin(Math.PI * u) };
+          const at = { x: paw.x + (end.x - paw.x) * u, y: paw.y + (end.y - paw.y) * u - 14 * Math.sin(Math.PI * u) };
           return (
             <span key={`fly-${sq}`} class="hp-fly" style={{ left: `${r2(at.x - 6.25)}%`, top: `${r2(at.y - 6.25)}%` }} data-square={sq}>
               <BossEffect name="carrotFly" since={moment.at + t0} id={`fly-${sq}`} />

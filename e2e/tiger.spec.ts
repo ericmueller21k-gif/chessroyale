@@ -57,7 +57,7 @@ type Rec = {
   now: number;
   pump: string | null;
   pumpBox: { x: number; y: number; w: number; h: number } | null;
-  bar: { anim: string; translate: string; flip: boolean; left: number; right: number } | null;
+  bar: { anim: string; translate: string; faces: string; left: number; right: number } | null;
   side: string | null;
   fly: string | null;
   land: string | null;
@@ -91,7 +91,7 @@ async function record(page: Page) {
         now: Date.now(),
         pump: slot?.getAttribute("data-anim") ?? null,
         pumpBox: pump && pump.width ? { x: pump.x, y: pump.y, w: pump.width, h: pump.height } : null,
-        bar: bar && barBox && barBox.width ? { anim: bar.dataset.anim, translate: bar.style.translate, flip: bar.classList.contains("bc-flip"), left: barBox.left, right: barBox.right } : null,
+        bar: bar && barBox && barBox.width ? { anim: bar.dataset.anim, translate: bar.style.translate, faces: bar.dataset.faces, left: barBox.left, right: barBox.right } : null,
         side: side && side.getBoundingClientRect().width ? side.dataset.anim : null,
         fly: document.querySelector(".tg-fly")?.getAttribute("data-square") ?? null,
         land: document.querySelector(".tg-land")?.getAttribute("data-square") ?? null,
@@ -359,7 +359,9 @@ test("Babur: a balloon put on the pump at the start of his turn (a phone: his ho
     const trip = rec.filter((r) => r.bar && r.bar.translate);
     expect(rec.some((r) => r.bar?.anim === "hopTrip"), "his hop").toBe(true);
     expect(trip.length, "carried along the bar").toBeGreaterThan(5);
-    expect(trip.some((r) => r.bar!.flip), "facing the pump").toBe(true);
+    // (Facing the pump on his way there and at it, home on his way back: his figure faces the way he goes, kits.ts placeFacing.)
+    const pumpRight = rec.find((r) => r.pumpBox)!.pumpBox!.x > trip[0]!.bar!.left;
+    expect(trip.filter((r) => r.bar!.anim === "place").every((r) => r.bar!.faces === (pumpRight ? "right" : "left")), "facing the pump").toBe(true);
     // At the pump: beside it, inside the screen; home again after.
     const at = trip.filter((r) => r.bar!.anim === "place");
     expect(at.length, "his place beside the pump").toBeGreaterThan(3);
@@ -599,6 +601,19 @@ test("Babur's pump on a computer at 1280 × 800, 1440 × 900, 1920 × 1080 and 1
       expect(Math.abs(pump.y + pump.height - (feet.y + feet.height)), `${at}: on his baseline`).toBeLessThan(1.5);
       expect(Math.abs(pump.y + pump.height - (board.y + board.height)), `${at}: by the board's bottom`).toBeLessThan(6);
       await expect(page.locator(".boss-bar .tg-pump")).toHaveCount(0);
+      // His place and his pump's measured while his toss turns him to it (`.bc-flip`) are those at rest (Nov 17: a screen drawn
+      // mid-toss stood him 13 px over at 1440 × 900, and from the next turn the pump was in the taller bar).
+      const placed = () => page.evaluate(() => [(document.querySelector(".arena") as HTMLElement).style.getPropertyValue("--side-d"), document.querySelector(".tg-side-pump")?.getAttribute("style")]);
+      const frames = () => page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+      const atRest = await placed();
+      for (const turned of [true, false]) {
+        await page.evaluate((t) => {
+          document.querySelector(".boss-char.place-side")!.classList.toggle("bc-flip", t);
+          dispatchEvent(new Event("resize"));
+        }, turned);
+        await frames();
+        expect(await placed(), `${at}: measured ${turned ? "mid-toss" : "at rest again"}`).toEqual(atRest);
+      }
     } else {
       const bar = (await page.locator(".boss-bar").boundingBox())!;
       expect(pump.y, `${at}: inside the bar`).toBeGreaterThanOrEqual(bar.y);

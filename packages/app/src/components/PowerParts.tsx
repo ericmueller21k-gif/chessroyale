@@ -2,9 +2,9 @@ import { useContext, useLayoutEffect, useRef } from "preact/hooks";
 import { BoardTurn, type QuarterTurn } from "../board-view.ts";
 import type { ComponentChildren, JSX } from "preact";
 import type { ChandyMove, PowerEvent, PowerEventKind, WaterGrowth } from "@chessroyale/core";
-import type { BossKit } from "../characters/kits.ts";
+import { bossKit, placeFacing, type BossKit } from "../characters/kits.ts";
 import type { BossView } from "../game.ts";
-import { BossFace, playInPlace } from "./BossCharacter.tsx";
+import { BossFace, drawnX, playInPlace } from "./BossCharacter.tsx";
 import { BossEffect, BossMoment, type BoardItem } from "./BossEffect.tsx";
 import { COMPUTER_LAYOUT } from "./MatchMenu.tsx";
 import { bannerLength } from "./FightBanner.tsx";
@@ -90,8 +90,8 @@ export interface MomentProps {
 export interface MomentUi {
   /** Its place when several play in one turn (passives first, then the warning, then ultimates). */
   order: number;
-  /** Which of the kit's moments it is. */
-  kit: KitMoment;
+  /** Which of the kit's moments it is. Left out: none (no animation or line of the kit's: Dash's screen-only clock tap). */
+  kit?: KitMoment;
   /**
    * What it means for you, in the dock, only where no banner says it (a moment without a banner, or whose banner has no
    * line under its name). Left out: the dock keeps the turn's own line (the boss's move). Never the power's name: the
@@ -183,11 +183,25 @@ export const onComputer = () => !!computer?.matches;
 export function Cast({ boss, anim, since, now, then = "idle", runKey, class: cls = "", style }: { boss: string; anim: string; since: number; now: number; then?: string; runKey: string; class?: string; style?: Record<string, string> }) {
   if (onComputer()) return <InPlace runKey={runKey} anims={[anim]} since={since} />;
   if (now < since) return null;
+  // (Facing the board, as everywhere it stands (Nov 17, kits.ts `placeFacing`): a drawing that faces away mirrored about its feet, so
+  // its feet stay on the corner and what it throws leaves the hand that's drawn: casterPoint.)
+  const kit = bossKit(boss);
+  const mirror = !!kit && placeFacing(kit, kit.ch, "caster").mirror;
   return (
-    <span class={`pm-caster ${cls}`} style={style}>
+    <span class={`pm-caster ${cls}${mirror ? " pm-mirror" : ""}`} style={mirror ? { ...style, "--pm-fx": `${(100 * kit!.ch.foot[0]) / kit!.ch.w}%` } : style}>
       <BossMoment boss={boss} anim={anim} since={since} then={then} />
     </span>
   );
+}
+
+/**
+ * Where a pixel of a boss's frame (a paw, a hand) is on the board as it casts at the board's top-left corner on a phone (`Cast`), in % of
+ * the board's width: `box` is its `.pm-caster` box (% of the board: its CSS left, top and width), its figure turned as `Cast` turns it
+ * (the same mirror as figurePoint's: drawnX). So a carrot or a hoop leaves the paw that's drawn, turned or not (Nov 17).
+ */
+export function casterPoint(kit: BossKit, box: { left: number; top: number; width: number }, x: number, y: number): { x: number; y: number } {
+  const k = box.width / kit.ch.w;
+  return { x: box.left + drawnX(kit.ch, x, placeFacing(kit, kit.ch, "caster").mirror) * k, y: box.top + y * k };
 }
 
 export const at = (square: string, orientation: "white" | "black", turn: QuarterTurn = 0) => {

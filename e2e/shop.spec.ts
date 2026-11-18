@@ -1659,6 +1659,11 @@ test("the Shop tab's page (Eric's mockup, Nov 9): the special offer, five cards 
   const computer = testInfo.project.name === "desktop";
   await asSignedIn(page, "shopper");
   await page.goto("/shop");
+  // The coin (Eric, Nov 17: a king's head on a boss-style coin, no emoji): the top bar's is the drawn one (40 x 40), loaded.
+  const coin = page.locator(".shop-coins img.coin-icon");
+  await expect(coin).toBeVisible();
+  await expect.poll(() => coin.evaluate((i: HTMLImageElement) => (i.complete ? i.naturalWidth : 0))).toBe(40);
+  await expect(page.locator(".shop-coins")).not.toContainText("🪙");
   const pct = Math.round(SHOP.discount * 100);
   await expect(page.getByText(`Everything in the shop is ${pct}% off during beta.`)).toBeVisible();
   const offer = page.locator(".shop-offer");
@@ -1674,6 +1679,7 @@ test("the Shop tab's page (Eric's mockup, Nov 9): the special offer, five cards 
     await expect(box.locator(".shop-ribbon")).toHaveText(discountLabel()!);
     await expect(box.locator(".shop-price s")).toHaveText(String(SHOP.prices[id]));
     await expect(box.locator(".shop-price b")).toHaveText(String(shopPrice(SHOP.prices[id])));
+    await expect(box.locator(".shop-price img.coin-icon")).toHaveCount(1);
   }
   expect(discountLabel()).toBe(`${pct}% OFF`);
   // The clock on the limited items only.

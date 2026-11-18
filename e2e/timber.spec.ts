@@ -210,6 +210,8 @@ test.describe("Timber", () => {
                 y1 = Math.max(y1, y);
               }
           if (x1 < 0) return null;
+          // (Mirrored to face the board (kits.ts placeFacing), its frame's columns run right to left.)
+          if (new DOMMatrixReadOnly(getComputedStyle(c).transform).a < 0) [x0, x1] = [c.width - x1 - 1, c.width - x0 - 1];
           const sx = r.width / c.width, sy = r.height / c.height;
           return [r.left + x0 * sx, r.top + y0 * sy, r.left + (x1 + 1) * sx, r.top + (y1 + 1) * sy].map(Math.round);
         };
