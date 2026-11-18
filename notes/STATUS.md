@@ -1,3 +1,4 @@
+- Nov 18 ~22:00 UTC: #803 PR 2 MERGED (8fc582a), main run bb46rf5g2. PR 3 square marks helper session_01JuCWRvr7G1nbPFjyvHZWK2 (xhigh alone), watcher bclxzkc0m.
 - Nov 18 ~21:45 UTC: PR 2 held pieces done -> #803 (5538a23), director reviewed core diff (OK, no behavior change, twin test). CI brgone6lh. Next: PR 3 square marks (same brief) after #803 merges.
 - Nov 18 ~21:15 UTC: #802 board layer MERGED (f0a5fef), main run bsyr6yr72. PRs 2-5 brief tower-2-5-bosses-onto-layer.md; PR 2 (held) starting after main green or now (xhigh alone).
 - Nov 18 ~21:00 UTC: PR 1 board layer done -> #802 (8f251b5), CI watched. Next after merge: PR 2-5 (bosses onto the layer, xhigh, one family a PR). Usage warning: one helper at a time.
