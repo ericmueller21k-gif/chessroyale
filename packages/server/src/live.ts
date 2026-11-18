@@ -295,8 +295,12 @@ export class LiveBoard {
     return online;
   }
 
-  /** The home page's public line (Squads left out: its lobbies count for the overload limit and the health view only). */
-  counts(now: number, waits: LiveCounts["waits"]): LiveCounts {
+  /**
+   * The home page's public line (Squads left out: its lobbies count for the overload limit and the health view only).
+   * `only`: the live window shows that lobby's match alone (a test switch, `/api/live?watch=CODE`: an e2e's own match, which
+   * another spec's on the same server would otherwise take the window from).
+   */
+  counts(now: number, waits: LiveCounts["waits"], only?: string): LiveCounts {
     const online = this.online(now);
     const fresh = now - FRONT_DOOR.matchStaleMs;
     const shown = [...this.lobbies.values()].filter((l) => l.mode !== "squads" && l.updatedAt > fresh);
@@ -304,7 +308,7 @@ export class LiveBoard {
     let queue = 0;
     for (const l of shown) if (l.phase === "waiting" && l.kind === "queue") queue += l.humans;
     // (Matchmade only: a private lobby's game is its friends', not the front page's.)
-    const watch = playing.filter((l) => l.board && l.kind === "queue").sort((a, b) => b.humans - a.humans || (b.startedAt ?? 0) - (a.startedAt ?? 0))[0];
+    const watch = playing.filter((l) => l.board && l.kind === "queue" && (only === undefined || l.code === only)).sort((a, b) => b.humans - a.humans || (b.startedAt ?? 0) - (a.startedAt ?? 0))[0];
     return {
       online,
       matches: playing.length,

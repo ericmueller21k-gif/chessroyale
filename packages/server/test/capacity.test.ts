@@ -64,6 +64,9 @@ describe("the live hub's board", () => {
     const c = board.counts(now, { crowd: null, boss: null });
     expect(c.featured).toEqual({ mode: "crowd", alive: 80, total: 100, bossElo: null, startedAt: now - 90_000, board: at("b", 20) });
     expect(JSON.stringify(c.featured)).not.toMatch(/AAAAA|BBBBB|code|humans/);
+    // (A test switch, `?watch=CODE`: that lobby's match alone, fewer people or not; none while it has no board or is over.)
+    expect(board.counts(now, { crowd: null, boss: null }, "AAAAA").featured?.board.fen).toBe("a");
+    expect(board.counts(now, { crowd: null, boss: null }, "CCCCC").featured).toBeNull();
     // A tie on people: the newest. The match ending: the next one.
     board.report(lobby("FFFFF", { humans: 5, startedAt: now - 10_000, board: at("f", 2) }), now - 500);
     expect(board.counts(now, { crowd: null, boss: null }).featured?.board.fen).toBe("f");
@@ -72,6 +75,7 @@ describe("the live hub's board", () => {
     expect(board.counts(now, { crowd: null, boss: null }).featured?.board.fen).toBe("a");
     board.report(lobby("AAAAA", { phase: "over" }), now);
     expect(board.counts(now, { crowd: null, boss: null }).featured).toBeNull();
+    expect(board.counts(now, { crowd: null, boss: null }, "AAAAA").featured).toBeNull();
   });
 
   it("gives the same numbers as the D1 live line for the same reports and visits", async () => {
