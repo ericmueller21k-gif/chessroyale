@@ -23,3 +23,8 @@ rule for Eric in one line, e.g. a fallback or a looser condition.
 Checks: a unit test that fails before and passes after (a real seeded battle's sequence of picks), the boss kit, Chandy's tests,
 the server's boss tests. One sim run at one setting for the before/after mix. Boss lane (rules). Done: `.pr-body.md` (under 40 lines:
 the cause in plain words, the before/after mix per battle, changed checks old → new) and `.done`; push and end.
+
+**Added (Eric, Nov 18, later):** (1) "make that upgrade [the queen lock] happen earlier": director's call, while the crowd has a queen
+it is his first unlock; else as today. (2) "for the 1st and 2nd capture he should apply the same thing where he locks onto the 2nd
+piece he captures right beforehand": his second capture is taught like the first (lock, point, capture: upgrade 2); the hunt from the
+third. Sent to the helper (session_01JuCWRtAQ1mUWjYnoEL6Fxr).
