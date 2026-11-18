@@ -314,6 +314,7 @@ export const POWER_ANIMS = [
   "funhouse",
   "freezeCast",
   "blizzard",
+  "superFreeze",
   "ignite",
   "candleWarn",
   "romanCandle",
@@ -402,6 +403,7 @@ export const POWER_MOMENTS: Record<string, BossPowerMoments> = {
     power: { anim: "freezeCast", hit: "freeze", effects: ["iceBolt", "iceOverlay"] },
     ultimateWarn: { anim: "check" },
     ultimate: { anim: "blizzard", hit: "blizzard", effects: ["blizzardSweep", "iceOverlay"] },
+    more: { superFreeze: { anim: "superFreeze", hit: "blast", effects: ["iceBolt", "superIce", "iceOverlay"] } },
   },
   "Jefferson": {
     power: { anim: "ignite", hit: "throw", effects: ["sparkFly", "fireTile"] },
@@ -542,6 +544,8 @@ export const EFFECTS: Record<EffectName, Effect> = {
   iceOverlay: { ch: EFFECT_SPRITES.iceOverlay, covers: "square", start: "freeze", loop: "frozen", stages: [{ loop: "frozen" }, { loop: "thinning", into: "crack" }], end: "thaw", sounds: { crackle: "gingerCrackle" } },
   iceBolt: { ch: EFFECT_SPRITES.iceBolt, covers: "square", loop: "fly", sounds: {} },
   blizzardSweep: { ch: EFFECT_SPRITES.blizzardSweep, covers: "board", start: "sweep", sounds: { wind: "gingerWind" } },
+  // (Ginger's Super Freeze, Nov 18: the 3 x 3 block, three squares a side, placed round its middle square.)
+  superIce: { ch: EFFECT_SPRITES.superIce, covers: "strip", start: "grow", loop: "hold", end: "settle", sounds: { burst: "gingerBurst", crackle: "gingerCrackle" } },
   pieSplat: { ch: EFFECT_SPRITES.pieSplat, covers: "square", start: "splat", loop: "pied", end: "fade", sounds: { splat: "clownSplat" } },
   pieFly: { ch: EFFECT_SPRITES.pieFly, covers: "square", loop: "fly", sounds: {} },
   fireTile: {

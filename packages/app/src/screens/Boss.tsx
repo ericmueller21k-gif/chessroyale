@@ -12,6 +12,7 @@ import { rookTakenMoment, smudgyFen } from "../components/Smudgy.tsx";
 import { fullMoonMoment, noteMooMoments } from "../components/Moo.tsx";
 import { popOffMoments } from "../components/Dash.tsx";
 import { folioMoments, revisionFen } from "../components/Folio.tsx";
+import { gingerMoments } from "../components/Ginger.tsx";
 import { gardenerFen } from "../components/Gardener.tsx";
 import { boingoDecor } from "../components/Boingo.tsx";
 import { timberFen } from "../components/Timber.tsx";
@@ -283,11 +284,12 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
   // (Beaten, the Hidden Boss's fall: the board holds while he collapses; no moment of the last turn plays again.)
   // (While he thinks, only Alfil's pieces coming down early, at the start of his turn: earlyLanding; a carrot of Chub &
   // Chirp's your move just pulled: yourPulls; Smudgy's hidden rook your move just took: rookTakenMoment; Moo's Full Moon,
-  // as your move lands: fullMoonMoment; Folio's fold and Revision, as your move lands: folioMoments; and Dash's pop-off: popOffMoments.)
+  // as your move lands: fullMoonMoment; Ginger's Super Freeze: gingerMoments; Folio's fold and Revision, as your move lands: folioMoments;
+  // and Dash's pop-off: popOffMoments.)
   const moments = useMemo(() => {
     if (intro || victim || fall) return [];
     if (mating) return mateMomentsOf(boss, until);
-    if (thinking) return lights || rush || dodge ? [] : [earlyLanding(boss), ...yourPulls(boss), ...rookTakenMoment(boss), ...fullMoonMoment(boss), ...folioMoments(boss), ...popOffMoments(boss), ...zebraTurnMoments(boss), ...chandyTurnMoments(boss)].filter((m) => m !== null);
+    if (thinking) return lights || rush || dodge ? [] : [earlyLanding(boss), ...yourPulls(boss), ...rookTakenMoment(boss), ...fullMoonMoment(boss), ...gingerMoments(boss), ...folioMoments(boss), ...popOffMoments(boss), ...zebraTurnMoments(boss), ...chandyTurnMoments(boss)].filter((m) => m !== null);
     return momentsOf(boss, until);
   }, [boss.board.fen, boss.powers?.events.length, until, thinking, intro, victim, mating, fall]);
   // (Moo's daze: he's drawn powered up until its `calm`, noted from the moment's start.)

@@ -9,6 +9,7 @@ import type { BossDef, PowerId } from "@chessroyale/core";
 export const POWER_WORDS: Record<PowerId, string> = {
   freeze: "freezes a piece",
   blizzard: "Blizzard",
+  superfreeze: "Super Freeze",
   pie: "pies a square",
   funhouse: "Funhouse",
   sparkler: "sets squares alight",

@@ -82,6 +82,8 @@ export type Beat =
   | "wince"
   // Folio's: a marked piece folded, and its Revision (its Draft's mark is `power`, the Crease's warning `ultimateWarn`).
   | "fold"
+  // Ginger's Super Freeze (Nov 18): his line as its moment begins, while he thinks.
+  | "superFreeze"
   | "revision"
   // Timber's: a Gnaw with none of your pawns to eat (his drop is `power`, its landing `cheer` or `bigCheer`; the Gnaw `ultimate`).
   | "gnawNone"

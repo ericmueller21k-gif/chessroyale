@@ -16,23 +16,23 @@ import { VALUE, bossPowers, from, heldIn, powerRoll, to, turnOf, warnThenUnleash
 /**
  * His Super Freeze beat by beat (ms into its moment, after its banner's hold; Eric, Nov 18: "that animation might even take 4 or 5
  * seconds for him to do a charge up and make an expanding ice block"), played while he thinks at the start of his turn, so his
- * move waits for it all (gingerTurnMs in boss-timing.ts): the banner (SUPER FREEZE!) until `chargeAt`; his intro's `charge`
- * (`chargeMs`), his `superCharge` loop until `blastAt`, his `superBlast`, whose `blast` cue fires the ice bolt at `boltAt`; the bolt
- * flies to the piece (`flyMs`) and the ice block grows over the 3 x 3 from `iceAt` (`growMs`, each square's ice whole at its step:
- * the art's SUPER_ICE_STEPS), holds (`holdMs`) and settles into each frozen piece's own ice (`settleMs`). `total` is the whole of it.
- * The app's art matches these numbers (a test in packages/app/test/gingerbread.test.ts).
+ * move waits for it all (gingerTurnMs in boss-timing.ts). The banner (SUPER FREEZE!) until `chargeAt`; then his cast (`castMs`: his
+ * intro's charge, one cycle of his charged hold, his blast), whose `blast` cue fires the ice bolt at `boltAt`; the bolt flies to the
+ * piece (`flyMs`) and the ice block grows over the 3 x 3 from `iceAt` (`growMs`; each square's ice whole at its step, the art's
+ * SUPER_ICE_STEPS), holds (`holdMs`) and settles into each frozen piece's own ice from `settleAt` (`settleMs`). `total` is the whole
+ * of it. The app's art matches these numbers (packages/app/test/ginger-superfreeze.test.ts).
  */
 export const SUPER_FREEZE_BEATS = (() => {
   const chargeAt = 1300;
-  const chargeMs = 1090;
-  const blastAt = chargeAt + chargeMs + 720;
-  const boltAt = blastAt + 200;
+  const castMs = 2620;
+  const boltAt = chargeAt + 2090;
   const flyMs = 260;
   const iceAt = boltAt + flyMs;
-  const growMs = 1500;
+  const growMs = 1520;
   const holdMs = 300;
-  const settleMs = 450;
-  return { chargeAt, chargeMs, blastAt, boltAt, flyMs, iceAt, growMs, holdMs, settleAt: iceAt + growMs + holdMs, settleMs, total: iceAt + growMs + holdMs + settleMs };
+  const settleMs = 440;
+  const settleAt = iceAt + growMs + holdMs;
+  return { chargeAt, castMs, boltAt, flyMs, iceAt, growMs, holdMs, settleAt, settleMs, total: settleAt + settleMs };
 })();
 
 /** How long each of his moments holds the screen (ms; POWER_FX in boss-timing.ts). */

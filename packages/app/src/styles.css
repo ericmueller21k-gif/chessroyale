@@ -15277,6 +15277,67 @@ img.qicon {
 /* Ginger's ice (and the cold burst as it forms): exactly on its square, in eighths of the board's own size
    (--board-size), never % of the wrap, which can be a few pixels wider (Eric, Oct 11: the blocks didn't line up). The block
    is the square's shape, the same on every square whatever the piece (characters/effects/ginger.ts). */
+/* Ginger's Super Freeze (Nov 18): the block of ice over the 3 x 3 round its middle square, three squares a side, in eighths of the
+   board's own size; cut at the board's edge by its clip (a piece on the edge has a 3 x 3 partly off the board). Over the pieces,
+   see-through, under the moment's banner. */
+.pw-superclip {
+  z-index: 4;
+}
+.pw-superice {
+  position: absolute;
+  left: calc(var(--board-size, 100%) * (var(--sq-x, 0) - 1) / 8);
+  top: calc(var(--board-size, 100%) * (var(--sq-y, 0) - 1) / 8);
+  width: calc(var(--board-size, 100%) * 3 / 8);
+  height: calc(var(--board-size, 100%) * 3 / 8);
+  pointer-events: none;
+}
+.pw-superice canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+}
+/* His Super Freeze's meter, beside the rage meter: ice blue, greyed until it's full (nothing hidden), lit and glowing when full. */
+.gs-meter {
+  display: inline-block;
+  position: relative;
+  width: 22px;
+  height: 6px;
+  margin-left: 6px;
+  border: 1px solid rgba(186, 230, 253, 0.55);
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+}
+.gs-meter i {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: linear-gradient(90deg, #7dd3fc, #e0f7ff);
+  transition: width 600ms ease-out;
+}
+.gs-meter.dim {
+  opacity: 0.55;
+  filter: grayscale(0.6);
+}
+.gs-meter.full {
+  border-color: #e0f7ff;
+  animation: gs-glow 700ms ease-in-out infinite alternate;
+}
+@keyframes gs-glow {
+  to {
+    box-shadow: 0 0 8px 2px rgba(125, 211, 252, 0.9);
+  }
+}
+.gs-meter.spent {
+  border-style: dashed;
+}
+@media (min-width: 900px) and (min-height: 600px) {
+  .boss-bar .gs-meter {
+    width: 44px;
+    height: 10px;
+    border-radius: 5px;
+  }
+}
 .pw-ice,
 .pw-frost {
   position: absolute;
