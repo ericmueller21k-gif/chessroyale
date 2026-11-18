@@ -1,7 +1,8 @@
 # The Battle Tower: the design (Nov 18, 2026)
 
-**Status: design only, nothing built.** It replaces the Boss Assists design written earlier the same day (Eric dropped that mode,
-below). The calls are the director's and this design's, each waiting for Eric's OK; the open calls, one line each, are at the end.
+**Status: design only, nothing built; settled with Eric (Nov 18).** It replaces the Boss Assists design written earlier the same day
+(Eric dropped that mode, below). Eric answered every call; the ones he didn't object to stand as proposed ("What else you need").
+The settled calls are listed at the end.
 Area stub: [docs/areas/battle-tower.md](../areas/battle-tower.md).
 
 **Eric, Nov 18:**
@@ -15,6 +16,9 @@ Area stub: [docs/areas/battle-tower.md](../areas/battle-tower.md).
 - "Also you can party up to 4 people and the majority pick is always chosen first followed by best engine move if draws, it's a
   full team effort this way. No move follows our normal rules."
 - Its place: a new mode next to Auto chess; it replaces nothing.
+- His last answers: "That's a bit too small for elo, I'd go with 100 increase per starting at 600, solo bosses get a little bit
+  extra strength tho. After it caps out it stays there, at 50 wins god forbid anyone got there, we swap to stock fish and continue
+  up. hollow and smudgy I'm saying it's fine they don't share, I assume you have a reason so I trust. What else you need"
 - Then (his answers to this design's first draft): "The climb is infinite but technically ends at 99, floors. Easy to program a
   loop. Maia gets stronger every game slightly as you climb. Whatever the minimum increase is lmk, maybe need to change. No hidden
   boss. All moves should be included ideally, that's fine for hollow and smudgy. No hearts, one loss and you're out."
@@ -45,7 +49,7 @@ its line). Not in the tower: the Hidden Boss (Eric: "No hidden boss") and the bo
 | Boingo the Clown | Funhouse | ultimate | IN (the whole board turns, every boss's marks with it; its forced first move is the crowd's, as alone) |
 | Jefferson | Sparkler | normal | IN |
 | Jefferson | Roman candle | ultimate | IN (its fireballs land on the bosses' half too; no boss's piece burns, as his own never do) |
-| Hollow | Dark | normal | IN (with Smudgy on the floor too: a move that touches the dark is Hollow's, unchecked as alone; any other move the paint stops is refused at no cost, as alone) |
+| Hollow | Dark | normal | IN, WITH A RULE: never on a floor with Smudgy (below) |
 | Hollow | Lights out | ultimate | IN (a memory test that holds the clock; a crowd that finds too few gives *him* a second move: his turn again before the next boss's) |
 | Big Boy | Snack | opening | IN (he eats a center pawn before move 1) |
 | Big Boy | Toy-block tower | normal | IN |
@@ -60,7 +64,7 @@ its line). Not in the tower: the Hidden Boss (Eric: "No hidden boss") and the bo
 | Alfil | Mammoth Slam | ultimate | IN |
 | Chub & Chirp | Leapfrog | normal | IN |
 | Chub & Chirp | Carrot Patch | ultimate | IN, WITH A RULE: during the race every boss's move goes through the race brain (`raceGuard`), not only theirs. Needed: otherwise two of three boss moves ignore the race and it's no race |
-| Smudgy | Camouflage | normal | IN, WITH A RULE: his hidden rook's disguise (`keepsDisguise`) binds every boss's moves, since they all play that rook. Needed: another boss's ordinary rook move would give it away at once (`unmask`) |
+| Smudgy | Camouflage | normal | IN, WITH A RULE: his hidden rook's disguise (`keepsDisguise`) binds every boss's moves, since they all play that rook (needed: another boss's ordinary rook move would give it away at once, `unmask`); never on a floor with Hollow (below) |
 | Smudgy | Repaint | ultimate | IN |
 | Moo & Moon | Moonbeam | normal | IN |
 | Moo & Moon | Full Moon | ultimate | IN (the cinematic plays alone in the moments queue; full strength on his own turns only) |
@@ -85,9 +89,10 @@ its line). Not in the tower: the Hidden Boss (Eric: "No hidden boss") and the bo
 | The Pawn Golem, Bone Archer, Black Knight, Storm Witch, Tower Tyrant, Frost Dragon, Grandmaster Wraith, Demon Lord, Engine Eternal | none yet | | **OUT**: no art or powers (`kit: null`, `powers: null`). **To come in:** be built, like any boss |
 
 **Rules behind the list:**
-- **Every boss with powers is dealt** but the Hidden Boss; any two or three may share a floor (Eric: "that's fine for hollow and
-  smudgy"). If the build's fuzz (PR 6: the boss kit over pairs and threes) finds a pair that breaks the rules, it gets a rule like
-  the four above, not a ban.
+- **Every boss with powers is dealt** but the Hidden Boss, and any two or three may share a floor, **except Hollow with Smudgy**
+  (`BATTLE_TOWER.apart`; Eric: "it's fine they don't share"). Why: both hide what is on a square (the dark hides it, the paint
+  disguises his rook), and a wrong try costs points under Hollow but is refused free under Smudgy, so one tap would mean two things.
+  A pair the build's fuzz (PR 6: the boss kit over pairs and threes) finds breaking gets a rule like the four above, or joins `apart`.
 - **Admins-first bosses** (`BOSS_ADMIN_FIRST`: Timber, Dash, Don Dough, Chandy) are dealt to players once they're live, as every
   mode does (`isPlayable`); an admin's run deals them too (as `menuBosses` lists them for admins).
 - **Wrangler's showdown, Hollow's second move:** the two places a boss moves out of turn. The order then goes on from the boss
@@ -201,29 +206,44 @@ same `stopReason`), deleted with the old path in the same PR. Boss lane each.
 ### Floors: 99, the pattern looping
 
 **99 floors** (Eric: "infinite but technically ends at 99"). **The boss count loops 1, 2, 2, 3** (Eric's "1 boss then 2, maybe 2
-again, then 3"): floor `f` has `BATTLE_TOWER.pattern[(f - 1) % 4]` bosses, so floors 1, 5, 9 … 97 have one, 4, 8 … 96 three; a
-pattern is one setting (open call 2).
+again, then 3"; "Easy to program a loop"): floor `f` has `BATTLE_TOWER.pattern[(f - 1) % 4]` bosses, so floors 1, 5, 9 … 97 have
+one, 4, 8 … 96 three; the pattern is one setting.
 
-**Maia rises every floor** (Eric: "gets stronger every game slightly"): floor `f` plays at `maiaStart + maiaStep × (f - 1)`, at most
-Maia's top, `BOSS_BRAIN.maiaRating`'s last point (2500):
+**The bosses get stronger every floor, Maia first, then Stockfish** (Eric, Nov 18):
 
-- **The minimum step is 1.** Maia-3 takes a whole-number rating (the Maia box rounds it: `packages/maia-worker/src/model.ts`), so 1
-  rating point a floor is the least that changes anything; a step that small is felt only over many floors.
-- **The proposal (the director's): +20 a floor from 600** (`maiaStart`: Maia's floor, `BOSS_BRAIN.maiaRatingMin`): 2500 is reached
-  at floor 96 and held to 99. Named by Boss alone's levels (`BOSS_DIFFICULTY`):
+- **Floors 1 to 50, Maia:** floor `f` plays at `maiaStart + maiaStep × (f - 1)` = **600, +100 a floor** (Eric: "100 increase per
+  starting at 600"), capped at Maia's top, `BOSS_BRAIN.maiaRating`'s last point (2500), reached at floor 20 and held to floor 50
+  ("After it caps out it stays there"). The brain is Boss alone's: `bossBrainFor(…, { alone: rating })` in core `boss.ts`, Maia raw at
+  that rating (`BOSS_BRAIN.brain`), no bridge band, the same for every boss.
+- **A one-boss floor plays a little stronger** (Eric: "solo bosses get a little bit extra strength"): `BATTLE_TOWER.soloBonus`,
+  **+200** (the director's proposal), within the same caps.
+- **From floor 51 ("at 50 wins … we swap to stock fish and continue up"): Stockfish**, the engine every device already runs for the
+  bosses: the brain `"stockfish"` (`BossBrain`; Stockfish at a UCI_Elo with the blunder guard, `bossMaxLoss` and `bossMaxLogitLoss`,
+  as a Stockfish boss always plays), its UCI_Elo `stockfishStart` **2500, +25 a floor** (`BATTLE_TOWER.stockfishStep`, the
+  director's proposal), up to Stockfish's ceiling, `ENGINE_MAX_ELO` (3190, core `boss.ts`), reached at floor 79; **from floor 80,
+  full strength**: no limit, the engine's best each move (the move kind "best", as Moo's Full Moon and Wrangler's showdown reply
+  already play it).
+- **Who runs it:** alone, this device's Stockfish (solo's `startBrain`, as Boss alone); in a party, the host's device with a
+  checker, as every online boss move today (`hostBoss` in `net.ts`, `BOSS_CHECK`: the host's and a checker's moves from one seed,
+  the engine server settling a disagreement; engine.md, "Two devices play each online boss move").
 
-| Floors | Maia | About |
-| --- | --- | --- |
-| 1 | 600 | under Very easy (Maia's floor) |
-| 6 | 700 | Very easy |
-| 28 | 1140 | Easy (1150) |
-| 51 | 1600 | Medium |
-| 73 | 2040 | Hard (2050) |
-| 96 to 99 | 2500 | Very hard (Maia's top) |
+| Floor | Bosses | Brain | Rating |
+| --- | --- | --- | --- |
+| 1 | 1 | Maia | 800 (600 + 200 for a lone boss) |
+| 2 to 4 | 2, 2, 3 | Maia | 700, 800, 900 |
+| 5 | 1 | Maia | 1200 (1000 + 200) |
+| 10 | 2 | Maia | 1500 (Easy is 1150, Medium 1600) |
+| 15 | 2 | Maia | 2000 (about Hard, 2050) |
+| 18 | 2 | Maia | 2300 |
+| 20 to 50 | | Maia | 2500 (Maia's top, Very hard) |
+| 51 | 2 | Stockfish | 2500 |
+| 60 | 3 | Stockfish | 2725 |
+| 79 | 2 | Stockfish | 3190 (its top) |
+| 80 to 99 | | Stockfish | full strength |
 
 Each boss plays the floor's rating (as Boss alone ignores your rating: `bossAloneMaia`); a party plays the same ratings (as a Boss
-Battle party does: no crowd margin). `BATTLE_TOWER` holds `floors` (99), `pattern`, `maiaStart`, `maiaStep`: a playtest changes a
-number, not code.
+Battle party does: no crowd margin). `BATTLE_TOWER` holds `floors` (99), `pattern`, `maiaStart`, `maiaStep`, `soloBonus`,
+`stockfishFrom` (51), `stockfishStart`, `stockfishStep`, `apart`: a playtest changes a number, not code.
 
 ### The deal
 
@@ -257,7 +277,7 @@ performance bonus for a win, and pays the device's word (a solo game) no bonus. 
 | Each floor played | a counted game: XP minutes under the solo cap, play coins, the daily reward's game | a counted game: XP minutes, play coins |
 | Each floor won | nothing more (no bonus for solo, as Boss alone) | a win: +50 XP and the 15-coin win bonus, through the day's diminishing steps |
 | Boss tokens | a drop chance, as any boss battle (`countBossBattle`: a token of one of that floor's bosses) | the same |
-| Milestones (floors 10, 25, 50, 75, 99) | a profile emblem for each, marked "solo" | the emblem; a crate at 25, 50, 75 and 99, once an account (open call 6) |
+| Milestones (floors 10, 25, 50, 75, 99) | a profile emblem for each, marked "solo" | the emblem; a crate at 25, 50, 75 and 99, once an account |
 
 No new currency, no timers, nothing bought: the payments design's "earn first" rules hold.
 
@@ -290,7 +310,7 @@ tiles), the table in its middle.
   the board's column with the right column as on home. Every figure whole on screen (Eric's rule of Nov 4).
 - **Reduced motion:** no walking: everyone on their marks, the number changes with a fade.
 - **Art:** one room, by the art runner (its still for Eric first), in the characters lane; the walking and seating code is the
-  challenge room's. A later idea: the tower as a building in Chess Town (open call 10).
+  challenge room's. A later idea: the tower as a building in Chess Town.
 
 ## 5. Saving progress
 
@@ -386,15 +406,22 @@ Each PR on its own branch. The layer first; then several bosses on one board; th
 | 14 | One sim run: bot climbers up the 99 floors, alone and as a party of 4, for `maiaStep` and `rageScale` (how far a run gets) (`reports/tower-sim.md`) | light | medium | small |
 | later | White or Black at random on every floor, once every boss works with the crowd as Black (Eric: "need to consider changing this later for sure") | boss | xhigh | |
 
-## Open calls for Eric (one line each)
+## The calls, settled (Eric, Nov 18: none objected to)
 
-1. Maia: +20 a floor from 600 (Maia's top, 2500, at floor 96), or another step (1 is the least)?
-2. The boss count looping 1, 2, 2, 3 for all 99 floors, or another pattern?
-3. The bosses take turns in the order dealt (each keeps "his turn"), rather than the strongest always moving: OK?
-4. A draw ends the run too (only a win climbs): OK?
-5. Leaving mid-floor counts as a loss (free before your 2nd move); a solo reload rejoins the floor, a loss only if nothing can be restored: OK?
-6. Rewards: an emblem at floors 10, 25, 50, 75 and 99, and a crate at 25, 50, 75 and 99 for a party's run only (solo is the device's word): OK?
-7. A tie in a party goes to the engine's best always (no 30-centipawn random): OK?
-8. The deal: every boss once before any comes twice, never the same boss on two floors in a row: OK?
-9. Each boss's meter slower on shared floors (100%, 75%, 60% for 1, 2, 3 bosses) to start, tuned by the sim: OK?
-10. The tower as a building in Chess Town later, or only the home card?
+1. The bosses take turns in the order dealt, each keeping "his turn" (not the strongest always moving).
+2. Maia +100 a floor from 600 to 2500, +200 on one-boss floors; Stockfish from floor 51 at 2500, +25 a floor to 3190, then full strength.
+3. Hollow and Smudgy never on one floor (`apart`); every other move in, four with a rule.
+4. The boss count loops 1, 2, 2, 3 over 99 floors.
+5. One loss ends the run, and so does a draw; only a win climbs.
+6. Leaving mid-floor is a loss, free before your 2nd move; a solo floor rejoins after a reload, a loss only if nothing can be restored.
+7. Rewards: emblems at floors 10, 25, 50, 75, 99; crates at 25, 50, 75, 99 for a party's run only (solo is the device's word).
+8. A party's tie goes to the engine's best always (`closeCp` 0).
+9. The deal: every boss once before any comes twice, never the same boss on two floors in a row.
+10. Each boss's meter at 100%, 75%, 60% on floors of 1, 2, 3 bosses, tuned by the sim.
+11. The home card only; the tower as a building in Chess Town later.
+12. White on every floor for now; random sides later.
+
+## Still open
+
+1. The numbers the director proposed (the +200 lone-boss bonus, Stockfish's +25 a floor, the meters' 75% and 60%) are first
+   guesses for the sim (PR 14) to check, not Eric's.

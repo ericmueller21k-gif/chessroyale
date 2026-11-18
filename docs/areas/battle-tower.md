@@ -1,14 +1,15 @@
 # The Battle Tower (designed, not built)
 
 Lane: the director (the rules: `god-king`; the floor art: `characters`; saving: the director, full lane). **Nothing is built yet.**
-The design and its calls, waiting for Eric's OK: [docs/decisions/2026-11-18-battle-tower-design.md](../decisions/2026-11-18-battle-tower-design.md).
+The design, its calls settled with Eric (Nov 18): [docs/decisions/2026-11-18-battle-tower-design.md](../decisions/2026-11-18-battle-tower-design.md).
 
 ## What it will be
 
 - A climb of up to 99 floors (a skyscraper), alone or as a party of up to 4, next to Auto chess under home's Other modes. Each floor is
-  one game from the starting position against 1, 2 or 3 bosses at once on one board (blocks of 1, 2, 2, 3), taking turns to move,
-  each with its own powers and meter, their Maia rating rising from 600 to 1800.
-- Every boss's moves are in, a few with a one-line rule; the Hidden Boss isn't in the tower.
+  one game from the starting position against 1, 2 or 3 bosses at once on one board (the pattern 1, 2, 2, 3 looping), taking turns
+  to move, each with its own powers and meter, stronger every floor: Maia from 600, +100 a floor, to 2500 (a lone boss +200);
+  from floor 51 Stockfish from 2500, +25 a floor, to full strength.
+- Every boss's moves are in, a few with a one-line rule; Hollow and Smudgy never share a floor; the Hidden Boss isn't in the tower.
 - You play White (random sides later). One loss (or a draw, or leaving) ends the run. Every floor is one snug room in HunChess's colors (the town's
   challenge room as the model: `town/shops/challenge.ts`), its number big on both side walls; you walk in to the board and the
   floor's bosses come out of the top door. Between floors you may stop: the run is saved on the server (guests too) and resumes
