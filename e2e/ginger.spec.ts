@@ -71,7 +71,7 @@ test("Ginger's Super Freeze (?power=superfreeze): the meter, the moment while he
   expect(row.overlap).toBeGreaterThan(0);
 
   // Your move lands: SUPER FREEZE! while he thinks, his cast, the block of ice over the 3 x 3; his move waits for all of it.
-  const seen = await watchFor(page, { banner: { selector: ".fight-banner.power-cut", text: /SUPER FREEZE!.*Your (pawn|knight|bishop|rook|queen)( and \d+ more)? (is|are) frozen/ }, block: { selector: ".pw-superice" } });
+  const seen = await watchFor(page, { banner: { selector: ".fight-banner.power-cut", text: /SUPER FREEZE!.*Your (pawn|knight|bishop|rook|queen)( and the pieces around it)? (is|are) iced/ }, block: { selector: ".pw-superice" } });
   const times = await watchMoment(page);
   await playBest(page);
   await expect.poll(async () => (await seen.seen()).banner, { timeout: 15_000 }).toBe(true);
