@@ -15,12 +15,15 @@ Area stub: [docs/areas/battle-tower.md](../areas/battle-tower.md).
 - "Also you can party up to 4 people and the majority pick is always chosen first followed by best engine move if draws, it's a
   full team effort this way. No move follows our normal rules."
 - Its place: a new mode next to Auto chess; it replaces nothing.
+- Then (his answers to this design's first draft): "The climb is infinite but technically ends at 99, floors. Easy to program a
+  loop. Maia gets stronger every game slightly as you climb. Whatever the minimum increase is lmk, maybe need to change. No hidden
+  boss. All moves should be included ideally, that's fine for hollow and smudgy. No hearts, one loss and you're out."
 
 **The mode in one paragraph.** You (alone, or a party of up to 4 picking every move together) climb a skyscraper. Each floor is
 one game of chess from the starting position against 1, 2 or 3 bosses at once, all on the other side of one board, taking turns
-to move, each with its own powers and its own meter. Their Maia rating rises floor by floor from very easy. Between floors you walk
-to the next floor (the same floor drawn again with the next number) and may stop there: the run is saved to your account and
-picks up on that floor when you come back.
+to move, each with its own powers and its own meter. Their Maia rating rises a little every floor, from very easy, up to 99 floors.
+One loss and the run is over. Between floors you walk to the next floor (the same room drawn again with the next number) and may
+stop there: the run is saved to your account and picks up on that floor when you come back.
 
 ## 1. The move list: every boss's moves with 2 or 3 bosses on one board
 
@@ -29,8 +32,9 @@ each boss still has "his turn" and "his first move", the things nearly every pow
 own powers' state. Picks that need an engine work as today: alone, this device's engines (as Boss alone); in a party, the host's
 device with the server checking the answer (as a Boss Battle party). So most moves come in as they are.
 
-**The plain list.** IN: works as it does alone. IN, LIMITED: works, with the one rule in the line. OUT: not in the tower, with
-why and what it would need to come in.
+**The plain list (Eric: "All moves should be included").** Every move is IN. IN: works as it does alone. IN, WITH A RULE: works,
+with the one rule in the line; each rule is kept only where a boss's power needs it to work at all beside other bosses (said in
+its line). Not in the tower: the Hidden Boss (Eric: "No hidden boss") and the bosses not built yet.
 
 | Boss | Move | Kind | In the tower? |
 | --- | --- | --- | --- |
@@ -41,7 +45,7 @@ why and what it would need to come in.
 | Boingo the Clown | Funhouse | ultimate | IN (the whole board turns, every boss's marks with it; its forced first move is the crowd's, as alone) |
 | Jefferson | Sparkler | normal | IN |
 | Jefferson | Roman candle | ultimate | IN (its fireballs land on the bosses' half too; no boss's piece burns, as his own never do) |
-| Hollow | Dark | normal | IN, LIMITED: never on a floor with Smudgy (both hide what a piece is; a wrong try costs differently under each) |
+| Hollow | Dark | normal | IN (with Smudgy on the floor too: a move that touches the dark is Hollow's, unchecked as alone; any other move the paint stops is refused at no cost, as alone) |
 | Hollow | Lights out | ultimate | IN (a memory test that holds the clock; a crowd that finds too few gives *him* a second move: his turn again before the next boss's) |
 | Big Boy | Snack | opening | IN (he eats a center pawn before move 1) |
 | Big Boy | Toy-block tower | normal | IN |
@@ -51,12 +55,12 @@ why and what it would need to come in.
 | Sawyer | Board saw | ultimate | IN (its gate, "one half more his on material", reads the whole bosses' side) |
 | Wrangler | Long pull | opening | IN (his own first move; if the other bosses already moved the center pawns, an ordinary move, as today when none is sound) |
 | Wrangler | Lasso drag | normal | IN |
-| Wrangler | SHOWDOWN! | ultimate | IN, LIMITED: his reply to the duel is the bosses' very next move, out of turn (the engine's best, as today), then the order goes on |
+| Wrangler | SHOWDOWN! | ultimate | IN, WITH A RULE: his reply to the duel is the bosses' very next move, out of turn (the engine's best, as today), then the order goes on. Needed: the line-up is scored with his reply next (`bestReply`) |
 | Alfil | Tusks | normal | IN (the fusion is his turn's move) |
 | Alfil | Mammoth Slam | ultimate | IN |
 | Chub & Chirp | Leapfrog | normal | IN |
-| Chub & Chirp | Carrot Patch | ultimate | IN, LIMITED: during the race every boss's move goes through the race brain (`raceGuard`), not only theirs |
-| Smudgy | Camouflage | normal | IN, LIMITED: his hidden rook's disguise (`keepsDisguise`) binds every boss's moves, since they all play that rook; never with Hollow |
+| Chub & Chirp | Carrot Patch | ultimate | IN, WITH A RULE: during the race every boss's move goes through the race brain (`raceGuard`), not only theirs. Needed: otherwise two of three boss moves ignore the race and it's no race |
+| Smudgy | Camouflage | normal | IN, WITH A RULE: his hidden rook's disguise (`keepsDisguise`) binds every boss's moves, since they all play that rook. Needed: another boss's ordinary rook move would give it away at once (`unmask`) |
 | Smudgy | Repaint | ultimate | IN |
 | Moo & Moon | Moonbeam | normal | IN |
 | Moo & Moon | Full Moon | ultimate | IN (the cinematic plays alone in the moments queue; full strength on his own turns only) |
@@ -66,7 +70,7 @@ why and what it would need to come in.
 | Babur | Hoops | ultimate | IN (the walls bind every boss's pieces, as they bind his) |
 | Folio | Draft | normal | IN |
 | Folio | Crease | ultimate | IN (every boss's pieces may cross it, as Folio's do) |
-| Folio | Revision | once a battle | IN, LIMITED: only right after a move of *its own* (going back over another boss's move would undo that boss's turn) |
+| Folio | Revision | once a battle | IN, WITH A RULE: only right after a move of *its own*. Needed: going back over another boss's move would undo that boss's turn and its powers' steps |
 | Timber | Scraps | normal | IN (his drops' lead guard, `workshopLeadMax`, reads the whole side's material) |
 | Timber | Gnaw | ultimate | IN |
 | Dash | Clock Slap | normal | IN |
@@ -77,12 +81,13 @@ why and what it would need to come in.
 | Chandy | Lock-on | normal | IN (it steers only his own moves) |
 | Chandy | Scatter shot, Beam, Shields, Rapid fire, Queen lock | his five | IN |
 | Chandy | Dodge | ultimate | IN (a cinematic minigame; the board comes back as it was) |
-| Hidden Boss | No help, Bullet, phase 2 | all | **OUT**: No help switches the God King off for the whole floor, not one boss; his brain is fixed at Maia's top (2500), whatever the floor; Bullet is the whole team's clock; and phase 2 splits the board into four, which other bosses can't share. **To come in:** a floor of his own, alone: the tower's top (open call 6) |
+| Hidden Boss | No help, Bullet, phase 2 | all | **Not in the tower** (Eric: "No hidden boss") |
 | The Pawn Golem, Bone Archer, Black Knight, Storm Witch, Tower Tyrant, Frost Dragon, Grandmaster Wraith, Demon Lord, Engine Eternal | none yet | | **OUT**: no art or powers (`kit: null`, `powers: null`). **To come in:** be built, like any boss |
 
-**Rules behind the list (each a call):**
-- **Only the Hidden Boss is out**, and the bosses not built yet. Everything else's conflicts have a one-line rule above.
-- **Never together on a floor:** Hollow and Smudgy. A list (`BATTLE_TOWER.apart`), so a pair the build's fuzz finds can join it.
+**Rules behind the list:**
+- **Every boss with powers is dealt** but the Hidden Boss; any two or three may share a floor (Eric: "that's fine for hollow and
+  smudgy"). If the build's fuzz (PR 6: the boss kit over pairs and threes) finds a pair that breaks the rules, it gets a rule like
+  the four above, not a ban.
 - **Admins-first bosses** (`BOSS_ADMIN_FIRST`: Timber, Dash, Don Dough, Chandy) are dealt to players once they're live, as every
   mode does (`isPlayable`); an admin's run deals them too (as `menuBosses` lists them for admins).
 - **Wrangler's showdown, Hollow's second move:** the two places a boss moves out of turn. The order then goes on from the boss
@@ -193,64 +198,68 @@ same `stopReason`), deleted with the old path in the same PR. Boss lane each.
 
 ## 3. The climb
 
-### Floors (proposal)
+### Floors: 99, the pattern looping
 
-**12 floors, in three blocks of four: 1, 2, 2, 3 bosses**, Maia rising every block and inside it. A block's first floor is one boss
-again, a breather that still steps up in strength (Eric's "1 boss then 2, maybe 2 again, then 3"). The ratings are Maia ratings,
-named by Boss alone's levels (`BOSS_DIFFICULTY`) and Maia's floor (`BOSS_BRAIN.maiaRatingMin`, 600):
+**99 floors** (Eric: "infinite but technically ends at 99"). **The boss count loops 1, 2, 2, 3** (Eric's "1 boss then 2, maybe 2
+again, then 3"): floor `f` has `BATTLE_TOWER.pattern[(f - 1) % 4]` bosses, so floors 1, 5, 9 … 97 have one, 4, 8 … 96 three; a
+pattern is one setting (open call 2).
 
-| Floor | Bosses | Maia | About |
-| --- | --- | --- | --- |
-| 1 | 1 | 600 | under Very easy (Maia's floor) |
-| 2 | 2 | 600 | |
-| 3 | 2 | 700 | Very easy |
-| 4 | 3 | 700 | Very easy |
-| 5 | 1 | 1150 | Easy |
-| 6 | 2 | 1150 | Easy |
-| 7 | 2 | 1300 | |
-| 8 | 3 | 1300 | |
-| 9 | 1 | 1600 | Medium |
-| 10 | 2 | 1600 | Medium |
-| 11 | 2 | 1800 | |
-| 12 | 3 | 1800 | |
+**Maia rises every floor** (Eric: "gets stronger every game slightly"): floor `f` plays at `maiaStart + maiaStep × (f - 1)`, at most
+Maia's top, `BOSS_BRAIN.maiaRating`'s last point (2500):
 
-Every number is a row in `BATTLE_TOWER.floors` (settings.ts), so a playtest changes a number, not code. Hard (2050) and Very hard
-(2500) are left for a harder tower later (open call 5): three bosses' powers at Medium are already far stronger than one boss at
-Medium. Each boss plays the floor's rating (as Boss alone ignores your rating: `bossAloneMaia`); a party plays the same ratings (as a
-Boss Battle party does: no crowd margin).
+- **The minimum step is 1.** Maia-3 takes a whole-number rating (the Maia box rounds it: `packages/maia-worker/src/model.ts`), so 1
+  rating point a floor is the least that changes anything; a step that small is felt only over many floors.
+- **The proposal (the director's): +20 a floor from 600** (`maiaStart`: Maia's floor, `BOSS_BRAIN.maiaRatingMin`): 2500 is reached
+  at floor 96 and held to 99. Named by Boss alone's levels (`BOSS_DIFFICULTY`):
+
+| Floors | Maia | About |
+| --- | --- | --- |
+| 1 | 600 | under Very easy (Maia's floor) |
+| 6 | 700 | Very easy |
+| 28 | 1140 | Easy (1150) |
+| 51 | 1600 | Medium |
+| 73 | 2040 | Hard (2050) |
+| 96 to 99 | 2500 | Very hard (Maia's top) |
+
+Each boss plays the floor's rating (as Boss alone ignores your rating: `bossAloneMaia`); a party plays the same ratings (as a Boss
+Battle party does: no crowd margin). `BATTLE_TOWER` holds `floors` (99), `pattern`, `maiaStart`, `maiaStep`: a playtest changes a
+number, not code.
 
 ### The deal
 
-**Which bosses:** at random from the run's seed, **never the same boss twice in a run** while the pool allows (call). Twelve floors
-of 1, 2, 2, 3 meet 24 bosses; the playable pool is 14 (18 once the four admins-first bosses are live), so a run meets each playable boss
-once before any comes back, the repeats coming last. Never Hollow with Smudgy on a floor (section 1). The next
-floor's bosses are dealt when the floor before is won and saved with the run, so stopping and coming back meets the same bosses.
+**Which bosses:** from the run's seed, as a shuffled deck of the pool, dealt floor by floor and shuffled again when it runs out, so a
+run meets every boss in the pool once before any comes twice, and never the same boss on two floors in a row (call). The pool: every
+playable boss but the Hidden Boss (14 today; 18 once the four admins-first bosses are live). The next floor's bosses are dealt as the
+floor before is won and saved with the run, so stopping and coming back meets the same bosses.
 
 **Your side:** you play **White on every floor**, as in every boss battle today (Eric, Nov 18: "Maybe for now then we stick to
 white, but need to consider changing this later for sure"). White or Black at random is a later item (the build plan's last row):
 it waits on every boss working with the crowd as Black. Every floor from the starting position, with no book opening (as a Boss
 Battle).
 
-### Losing, hearts, the end of a run
+### One loss and you're out
 
-- **Three hearts a run** (call; the Hidden Boss's phase 2 already shows hearts). A floor lost (mate, out of time, resign) or drawn
-  costs a heart and you fight that floor again, its bosses dealt anew. The third heart lost ends the run; your best floor stays on
-  your profile.
-- **The top:** floor 12 won, the run is complete: its result screen, your best floor "12 (top)", and a new run can start.
-- **The God King** comes with his usual charges each floor (as Boss alone), so a floor is always winnable.
+- **Only a win climbs** (Eric: "No hearts, one loss and you're out"). A floor lost (mate, out of time, resign) ends the run, and
+  **a draw ends it too** (the director's call: a draw isn't a win, as a raid's isn't). Your best floor stays on your profile; a new
+  run starts from floor 1.
+- **Leaving mid-floor counts as a loss** (Leave, or a party all gone), so leaving can't dodge one. Before your 2nd move, Leave is
+  free: the floor is fought again later, the same bosses.
+- **Floor 99 won:** the run is complete: its result, your best "99 (top)".
+- **The God King** comes with his usual charges each floor (as Boss alone).
 
 ### Rewards (proposals, inside the payments design's rules)
 
 The payments design (docs/decisions/2026-11-17-payments-design.md, section 6) pays coins by every counted game's XP minutes plus a
 performance bonus for a win, and pays the device's word (a solo game) no bonus. So:
-- **Each floor is a counted game**, as a boss battle is today: XP minutes (`XP`, solo floors under the solo cap), play coins,
-  the daily reward's game; and a **boss token drop** chance as any boss battle (`countBossBattle`, a token of one of that floor's
-  bosses).
-- **A floor won online (a party's)** is "a beaten raid boss": the win's XP (+50) and the win bonus (15 coins), through the day's
-  diminishing steps like every other bonus. Solo floors: no bonus (the device's word), as Boss alone.
-- **The top** gives a profile emblem ("Tower: top"); online only for anything worth coins or a crate (a party's run, which the
-  server saw), since a solo run is the device's word (open call 8).
-- No new currency, no timers, nothing bought: the payments design's "earn first" rules hold.
+
+| What | Solo floor (the device's word) | A party's floor (the server saw it) |
+| --- | --- | --- |
+| Each floor played | a counted game: XP minutes under the solo cap, play coins, the daily reward's game | a counted game: XP minutes, play coins |
+| Each floor won | nothing more (no bonus for solo, as Boss alone) | a win: +50 XP and the 15-coin win bonus, through the day's diminishing steps |
+| Boss tokens | a drop chance, as any boss battle (`countBossBattle`: a token of one of that floor's bosses) | the same |
+| Milestones (floors 10, 25, 50, 75, 99) | a profile emblem for each, marked "solo" | the emblem; a crate at 25, 50, 75 and 99, once an account (open call 6) |
+
+No new currency, no timers, nothing bought: the payments design's "earn first" rules hold.
 
 ## 4. The skyscraper: one room, every floor
 
@@ -275,13 +284,13 @@ tiles), the table in its middle.
 - **Between floors:** after a floor's result the room comes back with the number one higher on both walls, and you walk in again:
   "you climb each floor but not truly". **Continue** and **Stop here (saved)** are under the room, always shown, greyed while anyone
   walks.
-- **Nothing hidden:** the run's strip is always at the top of the room and of the game screen ("Battle Tower · Floor 4 of 12", the
-  hearts, the bosses beaten as small portraits).
+- **Nothing hidden:** the run's strip is always at the top of the room and of the game screen ("Battle Tower · Floor 4 of 99", the
+  next floor's Maia rating, the bosses beaten as small portraits).
 - **Phone and computer:** the room in the challenge mode's own framing (`CHALLENGE_FEEL.cam`: everything in view); on a computer in
   the board's column with the right column as on home. Every figure whole on screen (Eric's rule of Nov 4).
 - **Reduced motion:** no walking: everyone on their marks, the number changes with a fade.
 - **Art:** one room, by the art runner (its still for Eric first), in the characters lane; the walking and seating code is the
-  challenge room's. A later idea: the tower as a building in Chess Town (open call 11).
+  challenge room's. A later idea: the tower as a building in Chess Town (open call 10).
 
 ## 5. Saving progress
 
@@ -298,18 +307,20 @@ tower_runs (
   user_id TEXT NOT NULL,     -- who holds the run: the player; a party's leader
   kind TEXT NOT NULL,        -- 'solo' | 'party'
   seed INTEGER NOT NULL,     -- deals every floor's bosses
-  floor INTEGER NOT NULL,    -- the next floor to fight (1-12)
-  hearts INTEGER NOT NULL,   -- left (3 to 0)
+  floor INTEGER NOT NULL,    -- the next floor to fight (1-99)
   met TEXT NOT NULL,         -- JSON: the bosses met so far (never twice), and the next floor's deal
   members TEXT,              -- a party's: JSON [{ uid, fromFloor }]
-  fight TEXT,                -- the floor under way: { id, startedAt, restarts } (solo) or { lobby } (a party's); null between floors
-  status TEXT NOT NULL,      -- 'open' | 'top' | 'out' | 'abandoned'
+  fight TEXT,                -- the floor under way: { id, startedAt } (solo) or { lobby } (a party's); null between floors
+  status TEXT NOT NULL,      -- 'open' | 'top' (floor 99 won) | 'out' (lost, drawn or left) | 'abandoned' (replaced by a new run)
   started_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL
 )
 CREATE UNIQUE INDEX tower_runs_open ON tower_runs (user_id, kind) WHERE status = 'open'   -- one open run each, solo and party
-tower_best (user_id TEXT, kind TEXT, floor INTEGER, at INTEGER, PRIMARY KEY (user_id, kind))  -- the profile's best floor
+tower_best (user_id TEXT, kind TEXT, floor INTEGER, at INTEGER, PRIMARY KEY (user_id, kind))  -- the best floor reached, 1-99
 ```
+
+A milestone's crate is paid once an account through the ledger with its own op key (`tower:<floor>:<ledger id>`), as the daily reward
+is (`daily:<day>:<ledger id>`): no table of its own; the emblems follow from `tower_best`.
 
 **Routes:** `GET /api/tower` (your open runs and bests), `POST /api/tower/run` (a new run: replaces an open one after a confirm),
 `POST /api/tower/floor/start` and `/finish` (solo: the server notes the start's time, as `startSoloBattle` / `finishSoloBattle` do,
@@ -317,9 +328,11 @@ and accepts a result only for the floor it started), `POST /api/tower/stop`. A p
 saves results (`lobby-do.ts`, `writeResult`), never by a device.
 
 **Mid-floor:**
-- **Solo** (on the device, as Boss alone): a floor in progress isn't saved. A reload or a closed app restarts that floor with the
-  same bosses, **free once a floor** (`fight.restarts`), so a crash costs nothing; the second time, or Leave mid-floor after your
-  2nd move, counts as the floor lost (a heart), so leaving can't dodge a loss. Before your 2nd move, Leave is free.
+- **Solo** (on the device, as Boss alone): a solo battle can't be restored after a reload today (`solo.ts` keeps nothing). So the
+  tower adds it: after every move the device keeps the floor's game (the match state, every boss's power state, the moves: plain
+  data, as the server already sends it) in its own storage, and a reload or a reopened app **rejoins the floor where it was**, the
+  server's `fight` saying it's the floor started. Nothing to restore (storage cleared, another device): the floor counts as lost.
+  Rejoining gives back the same position, so a reload can't dodge a loss.
 - **A party** (on the server, as a Boss Battle party): seats survive reloads, so a member's reload rejoins the floor; the floor
   goes on without anyone who's gone (the party rule waits only for those connected).
 
@@ -350,8 +363,8 @@ saves results (`lobby-do.ts`, `writeResult`), never by a device.
 ## 6. Its place on home
 
 A third card under **Other modes**, beside Boss Battle and Auto chess (`Home.tsx`, `rd-pair`): the three cards a third wide each at
-today's 56 px, the picture over the name on a phone (no room beside it at 390 px), the short line on a computer ("Climb 12 floors").
-Its picture: the skyscraper. Tapping it opens the tower's own screen: your run (floor, hearts, the next floor's bosses: "Continue
+today's 56 px, the picture over the name on a phone (no room beside it at 390 px), the short line on a computer ("Climb 99 floors").
+Its picture: the skyscraper. Tapping it opens the tower's own screen: your run (its floor and the next floor's bosses: "Continue
 floor 5") or "Start a run", Solo or Party (the party's invite circles as Boss Battle's), and your bests. Mockup first.
 
 ## 7. The build plan
@@ -362,30 +375,26 @@ Each PR on its own branch. The layer first; then several bosses on one board; th
 | --- | --- | --- | --- | --- |
 | 1 | **The board layer**: `board-layer.ts` (marks, `layerStop`, `layerMoves` with the lift, `followLayer`, `wearLayer`), Sawyer's edge helpers moved in, unit tests (every mark, overlaps, the lift, castling, promotion, en passant) | targeted | xhigh | ~400 lines |
 | 2-5 | Today's bosses onto the layer, one family a PR (held pieces; square marks; edges; shields) | boss | xhigh | small to medium each |
-| 6 | **Several bosses in the runner**: `bosses: BossState[]`, the turn order, every boss's turn steps, the merged layer, one ultimate and one cinematic a turn change, `rageScale`; the boss kit run over pairs and threes (seeded), `BATTLE_TOWER.apart` from what it finds | boss, and the director may mark it full (the runner's core) | xhigh | large |
+| 6 | **Several bosses in the runner**: `bosses: BossState[]`, the turn order, every boss's turn steps, the merged layer, one ultimate and one cinematic a turn change, `rageScale`; the boss kit run over pairs and threes (seeded), a rule for any pair it finds breaking | boss, and the director may mark it full (the runner's core) | xhigh | large |
 | 7 | Mockup stills for Eric (`stills/battle-tower`): the bar with 2 and 3 bosses (phone, computer), the tower's room, the tower's screen, the home row | light | high | one still a platform |
-| 8 | **The climb's rules**: core `tower.ts` (the floors, the deal, hearts, the run's steps), `BATTLE_TOWER` in settings.ts, unit tests | targeted | xhigh | small |
+| 8 | **The climb's rules**: core `tower.ts` (the floors' pattern and Maia, the deal, one loss out, the run's steps), `BATTLE_TOWER` in settings.ts, unit tests | targeted | xhigh | small |
 | 9 | **Saving**: `tower.ts` on the server (the tables, the routes, the sign-in merge, export and delete) | **full** (stored data) | xhigh | medium |
-| 10 | **Solo tower screens**: the tower's screen, the battle with 2-3 bosses on the bar and beside the board, the moments queue, the run's strip, the result; `e2e/battle-tower.spec.ts` and its `e2e/areas.json` entry | targeted | high | large |
+| 10 | **Solo tower screens and the solo restore** (the floor's game kept on the device after every move, rejoined after a reload): the tower's screen, the battle with 2-3 bosses on the bar and beside the board, the moments queue, the run's strip, the result; `e2e/battle-tower.spec.ts` and its `e2e/areas.json` entry | targeted | high | large |
 | 11 | **The tower's room** (the art runner's one room in HunChess colors, its still first; the challenge room's walking and seating reused) | targeted | high | medium |
 | 12 | **The party**: kind "tower", max 4, the lobby's floors on the party rule with `closeCp` 0, the room writing the run | **full** (stored data, the server) | xhigh | medium |
 | 13 | The home card and its check in `e2e/home-layout.spec.ts` | light | medium | small |
-| 14 | One sim run: bot climbers through the 12 floors, alone and as a party of 4, for the Maia curve and `rageScale` (`reports/tower-sim.md`) | light | medium | small |
+| 14 | One sim run: bot climbers up the 99 floors, alone and as a party of 4, for `maiaStep` and `rageScale` (how far a run gets) (`reports/tower-sim.md`) | light | medium | small |
 | later | White or Black at random on every floor, once every boss works with the crowd as Black (Eric: "need to consider changing this later for sure") | boss | xhigh | |
 
 ## Open calls for Eric (one line each)
 
-1. The move list: anything OUT you want IN, or IN you want OUT? (Only the Hidden Boss is out.)
-2. The bosses take turns in the order dealt (each keeps "his turn"), rather than the strongest always moving: OK?
-3. Hollow and Smudgy never on one floor: OK?
-4. 12 floors in blocks of 1, 2, 2, 3 bosses, Maia 600 up to 1800 (the table): OK, or another count or curve?
-5. A harder tower later (Hard and Very hard, 2050 to 2500), or one tower going higher?
-6. The Hidden Boss as the tower's top floor (alone, after floor 12)?
-7. Three hearts a run, a draw costing a heart, the floor's bosses dealt anew after a loss: OK?
-8. The top's reward: an emblem; and a crate or coins only for a party's run (the server saw it), since solo is the device's word?
-9. (Settled: White for now, random later.) The room: one HunChess-colored room, the number on both walls, the bosses through the top door: as you described?
-10. A tie in a party goes to the engine's best always (no 30-centipawn random): OK?
-11. The tower as a building in Chess Town later, or only the home card?
-12. Never the same boss twice in a run (while the pool allows): OK?
-13. A solo floor's reload restarts it free once; leaving after your 2nd move costs a heart: OK?
-14. Each boss's meter slower on shared floors (100%, 75%, 60% for 1, 2, 3 bosses) to start, tuned by the sim: OK?
+1. Maia: +20 a floor from 600 (Maia's top, 2500, at floor 96), or another step (1 is the least)?
+2. The boss count looping 1, 2, 2, 3 for all 99 floors, or another pattern?
+3. The bosses take turns in the order dealt (each keeps "his turn"), rather than the strongest always moving: OK?
+4. A draw ends the run too (only a win climbs): OK?
+5. Leaving mid-floor counts as a loss (free before your 2nd move); a solo reload rejoins the floor, a loss only if nothing can be restored: OK?
+6. Rewards: an emblem at floors 10, 25, 50, 75 and 99, and a crate at 25, 50, 75 and 99 for a party's run only (solo is the device's word): OK?
+7. A tie in a party goes to the engine's best always (no 30-centipawn random): OK?
+8. The deal: every boss once before any comes twice, never the same boss on two floors in a row: OK?
+9. Each boss's meter slower on shared floors (100%, 75%, 60% for 1, 2, 3 bosses) to start, tuned by the sim: OK?
+10. The tower as a building in Chess Town later, or only the home card?

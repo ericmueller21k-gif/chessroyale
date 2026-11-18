@@ -5,14 +5,14 @@ The design and its calls, waiting for Eric's OK: [docs/decisions/2026-11-18-batt
 
 ## What it will be
 
-- A climb of 12 floors (a skyscraper), alone or as a party of up to 4, next to Auto chess under home's Other modes. Each floor is
+- A climb of up to 99 floors (a skyscraper), alone or as a party of up to 4, next to Auto chess under home's Other modes. Each floor is
   one game from the starting position against 1, 2 or 3 bosses at once on one board (blocks of 1, 2, 2, 3), taking turns to move,
   each with its own powers and meter, their Maia rating rising from 600 to 1800.
-- Every boss's moves are in except the Hidden Boss's (a few with a one-line limit; Hollow and Smudgy never share a floor).
-- You play White (random sides later). Three hearts a run. Every floor is one snug room in HunChess's colors (the town's
+- Every boss's moves are in, a few with a one-line rule; the Hidden Boss isn't in the tower.
+- You play White (random sides later). One loss (or a draw, or leaving) ends the run. Every floor is one snug room in HunChess's colors (the town's
   challenge room as the model: `town/shops/challenge.ts`), its number big on both side walls; you walk in to the board and the
   floor's bosses come out of the top door. Between floors you may stop: the run is saved on the server (guests too) and resumes
-  on that floor.
+  on that floor; a solo floor rejoins after a reload.
 - A party picks every move: the most picked is played, a tie goes to the engine's best (`partyMove`), the Boss Battle party's
   no-pick rules.
 - Built on **the board layer** (`packages/chess/src/board-layer.ts`, first): one state per square, edge and piece, every boss's
