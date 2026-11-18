@@ -494,7 +494,7 @@ door's look; every class is `sq-`.
   (`MatchMenu`: the gear, with Sound, Animations and Resign, on a phone and a computer; `squadsExit` says what it offers), and the
   votes' top line too; resigning shows "You resigned" (your record, the bot in your seat), then Queue again or Home.
 - **A match** (`screens/SquadsMatch.tsx`): the score and round on top, the strip, every board in the lobby as tiny
-  boards (`TinyBoard`, match by match, your squad's ringed, YOU on your board and NEXT on next turn's; tappable only once
+  boards (`TinyBoard`, match by match, your squad's ringed, YOU on your board and NEXT on the next board you'll move on (Relay skips a finished one, as the quick jump does: Nov 18); tappable only once
   you've moved or locked in: one opens full size with "Back to my board"; a new half that asks something of you brings
   you back), your board full size with « » through its moves (from its own start), and under it both squads' clocks
   with the free seconds counting down between them. The timer bar over the board is your move's deadline (no ticks).
