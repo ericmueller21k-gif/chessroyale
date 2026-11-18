@@ -19,7 +19,8 @@
  * costs at most that many pawns against its best move (the bots' own picks read the judge, which doesn't know about the
  * fusion: a crowd that knows the rule plays the counter when it's cheaper than what the fusion gives him).
  * Big Boy (id bigboy): each row logs his towers' topples (after which crowd turn; by the crowd's move, his piece, or by itself
- * at towerMax; its height and the blocks that scattered) and his tallest tower. Half the blocks scattering:
+ * at towerMax; its height and the blocks that scattered), his tallest tower, and the crowd turns with his toys up (`toyTurns`) and
+ * those where they took a legal move away (`limitedTurns`: fair play's question). Half the blocks scattering:
  * `{"powers": {"towerScatterShare": 0.5}}`.
  * Chub & Chirp's Leapfrog (id hopper): each row logs the hops and, for every turn of his with a pawn nose to nose that
  * couldn't hop, why (hopOptions; `cap`: out of hops). (The hop as his move, the variant the sim turned down, can't be
@@ -402,7 +403,8 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
       let seen = -1;
       // (Big Boy: each tower's topple (after which crowd turn, by whom: the crowd's move, his piece, or by itself at towerMax; its
       // height and how many blocks scattered), from his scattered blocks as each turn is looked at; and his tallest tower.)
-      const bigboy = { topples: [] as { at: number; by: "crowd" | "piece" | "self"; height: number; blocks: number }[], tallest: 0 };
+      // (And for fair play: the crowd turns with a tower or blocks up (powerTurn), and those where one actually takes a legal move away.)
+      const bigboy = { topples: [] as { at: number; by: "crowd" | "piece" | "self"; height: number; blocks: number }[], tallest: 0, toyTurns: 0, limitedTurns: 0 };
       const toppleSeen = new Set<string>();
       const look = () => {
         const p = runner.boss?.powers;
@@ -417,6 +419,10 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
         }
         if (!p || p.turn === seen) return;
         seen = p.turn;
+        if (bossId === "bigboy" && (p.tower || p.scatter) && !runner.bossToMove()) {
+          bigboy.toyTurns++;
+          if (runner.crowdAllowed()) bigboy.limitedTurns++;
+        }
         for (const e of p.events) if (ULT_EVENTS.has(e.kind)) ults.push({ kind: e.kind, turn: e.turn });
         for (const e of p.events) if ((e.kind as string) === "darkBlock") hollow.blocks.push({ turn: e.turn, size: (e as { size?: number }).size ?? 2, squares: e.squares?.length ?? 0 });
       };
