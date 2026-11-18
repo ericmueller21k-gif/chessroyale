@@ -1307,8 +1307,8 @@ export const cloneMuzzle = (pose: "level" | "down"): Pt => build(5, CLONE_POSES[
  * scatter, beam, beamOff, shield, pop, zap, clear, aim, aimOff, whoosh, shatter, flash, blast.
  */
 export const CHANDY_CUES: Readonly<Record<string, string>> = {
-  lock: "a scope's lock-on chirp, two rising beeps",
-  unlock: "one falling beep",
+  lock: "the scope locking on, low and heavy: a deep hum whose throb speeds up, a soft click, a growl under it (no chirp: Eric, Nov 18)",
+  unlock: "the hum sinking and slowing, a low hiss out",
   unsling: "a strap's slide and a rifle's clack",
   aim: "a short energy whine winding up",
   fire: "an energy rifle's crack: a zap with a low thump, no gunpowder",
@@ -1328,7 +1328,7 @@ export const CHANDY_CUES: Readonly<Record<string, string>> = {
   aimOff: "the aim's hum off",
   whoosh: "a round's whoosh",
   shatter: "glass-like shatter, no gore",
-  flash: "three alarm blips",
+  flash: "three heavy, low alarm pulses",
   blast: "a big energy pop",
   upgrade: "the window: a part clicking on, a rising chord",
   laser: "Dodge's beams: a proton laser firing and holding (Eric's mock-up to come: the sound chandyBeam)",
