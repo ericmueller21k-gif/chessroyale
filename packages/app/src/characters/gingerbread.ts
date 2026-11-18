@@ -791,6 +791,8 @@ export const GINGER_LINES: Partial<Record<import("./boss-beats.ts").Beat, readon
   ultimate: ["Let it snow!", "Freeze, all of you!", "Snow day! Ha!"],
   kingAttack: ["Frostbite, your majesty!", "Snap! Snap! Snap!", "Feeling a chill yet?"],
   ultimateHit: ["Melting? Already?!", "Hmph. Don't get comfy.", "My lovely ice!", "Drip, drip… bah!"],
+  // His Super Freeze (Nov 18; placeholders in his voice, for Eric to change).
+  superFreeze: ["Huddle up, cookies… SUPER FREEZE!", "All bunched up? Perfect!", "Deep freeze, all of you!", "Stay frosty, the lot of you!"],
 };
 export const GINGER_CHANCE: Partial<Record<import("./boss-beats.ts").Beat, number>> = {
   entrance: 1,

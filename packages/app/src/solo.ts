@@ -1,6 +1,6 @@
 import { DASH_STALL, RECLUSE_CHILD, RECLUSE_CUTSCENE, RECLUSE_PHASE2, BOSS_ALONE_SCORING, bossClockSettings, BOSS_BRAIN, BOSS_POWERS, DEFAULT_SETTINGS, MATCHMAKING, type ItemLook, type MatchmakingType, botVotes, castPregameVote, clockAfterVote, closePregameVote, cutSeconds, pregameVotes, voteResultMs, type Augment, type BossBrain, type PlayerState, type Settings } from "@chessroyale/core";
 import { GUARD_WORDS, MatchRunner, START_FEN, baseAt, ShowdownScout, brainLine as brainWords, boardSlots, type HumanUciEngine, netBoard, type LobbyPlayer, type LivePick, toSan, type BoardSlot, type BoardState, type NetFinal, type Opening, type RoundReport, type UciEngine } from "@chessroyale/chess";
-import { type Phase2Board, bulletClock, crowdRace, phase2Numbers, phase2Standings, phase2ToMove, botRoster, bossIntroTimeline, bossThinkMs, landedEarlyMs, fullMoonMs, folioTurnMs, popOffMs, zebraTurnMs, chandyTurnMs, bigboyTurnMs, dodgeTimeline, dodgeArena, dodgeEndAt, dodgeOver, bossTurnShowMs, judgeTaps, bossRules, kingHelpBlocked, kingMoveMs, kingStrikeMs, lightsDeadline, lightsOutTimeline, lightsRoundEnd, lastStandMs, powerMomentMs, rushKeep, rushMovesLeft, rushSquares, rushTimeline, stallTimeline, nextBeat, type StallPlan } from "@chessroyale/chess";
+import { type Phase2Board, bulletClock, crowdRace, phase2Numbers, phase2Standings, phase2ToMove, botRoster, bossIntroTimeline, bossThinkMs, landedEarlyMs, fullMoonMs, gingerTurnMs, folioTurnMs, popOffMs, zebraTurnMs, chandyTurnMs, bigboyTurnMs, dodgeTimeline, dodgeArena, dodgeEndAt, dodgeOver, bossTurnShowMs, judgeTaps, bossRules, kingHelpBlocked, kingMoveMs, kingStrikeMs, lightsDeadline, lightsOutTimeline, lightsRoundEnd, lastStandMs, powerMomentMs, rushKeep, rushMovesLeft, rushSquares, rushTimeline, stallTimeline, nextBeat, type StallPlan } from "@chessroyale/chess";
 import type { BossView, BoardView, DarkNote, ExitKind, FinalView, GameView, Hint, LightsView, MoveRecord, RushView, Phase, SimulView, Standing, VoteView } from "./game.ts";
 import { PHASE_CHANGE, Phase2Game, cueSlash, phase2Follows, phase2Mates, phaseChangeRun } from "./recluse-phase2.ts";
 import { RECLUSE_LINES } from "./characters/recluse-lines.ts";
@@ -32,7 +32,7 @@ const FINAL_SHOW_MS = 3200;
 /** Boss battle: how long the boss's move shows, how long it thinks at least, and how long a strike shows. */
 const BOSS_KILL_MS = 3800;
 /** The moments of the crowd's move that his thinking waits for (Alfil's early landing, Moo's Full Moon, Folio, Boingo's pop, Zebra, Chandy, Big Boy's topple): the server's sum (thinkMinAt). */
-const landedMs = (snap: BossView) => landedEarlyMs(snap) + fullMoonMs(snap) + folioTurnMs(snap) + popOffMs(snap) + zebraTurnMs(snap) + chandyTurnMs(snap) + bigboyTurnMs(snap);
+const landedMs = (snap: BossView) => landedEarlyMs(snap) + fullMoonMs(snap) + gingerTurnMs(snap) + folioTurnMs(snap) + popOffMs(snap) + zebraTurnMs(snap) + chandyTurnMs(snap) + bigboyTurnMs(snap);
 /**
  * The opening library (packages/chess/data/openings.json: 350 kB of the first load's main chunk until Nov 6): its own chunk now,
  * loaded on first use. Home asks for it once the page is idle (App.tsx), and a solo match waits for it before it starts

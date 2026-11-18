@@ -92,10 +92,11 @@ export const SIDE_REACH: Readonly<Record<string, readonly [left: number, up: num
  * `placeFacing`) turns toward it the side it held behind it as drawn, whose swings its rest's room (SIDE_REACH) never counted: its room
  * keeps them within `over` too (BossCharacter.tsx fitSides, `bossSwing`). Nov 17: Timber, turned, swings 44 toward the board when he moves,
  * gnaws or builds, 6 past his rest's 38: 41 px over a 1440 × 900 board against its 38.
+ * Nov 18: Ginger 40 and 39 (was 38 and 38): his Super Freeze cast, its glowing orb and the blast a step past his other frames.
  */
 export const SIDE_SWING: Readonly<Record<string, readonly [left: number, right: number]>> = {
   clown: [33, 34],
-  gingerbread: [38, 38],
+  gingerbread: [40, 39],
   grex: [42, 49],
   hollow: [38, 45],
   bigboy: [38, 33],

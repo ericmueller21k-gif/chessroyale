@@ -265,6 +265,15 @@ describe("the boss kit: solo and online agree", () => {
     }, 60_000);
   }
 
+  it("gingerbread, ?power=superfreeze: his Super Freeze (at the start of his turn, while he thinks) is the same solo and online", async () => {
+    const { trace: net, start } = await online("gingerbread", "superfreeze");
+    const local = await solo(start);
+    expect([...net.events].some((e) => e.includes("superFreeze"))).toBe(true);
+    expect(local.turns).toEqual(net.turns);
+    expect({ onlyOnline: [...net.events].filter((e) => !local.events.has(e)), onlySolo: [...local.events].filter((e) => !net.events.has(e)) }).toEqual({ onlyOnline: [], onlySolo: [] });
+    expect(local.result).toBe(net.result);
+  }, 60_000);
+
   it("chandy, no switch: his first capture's lock (the host's move, then the lock moment, then the move) is the same solo and online", async () => {
     const { trace: net, start } = await online("chandy", "");
     const local = await solo(start);
