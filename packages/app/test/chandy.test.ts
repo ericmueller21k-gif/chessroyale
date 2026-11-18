@@ -8,6 +8,10 @@ import { CHANDY, CHANDY_CLONE, CHANDY_CLONE_HALO, CHANDY_CLONE_PALETTE, CHANDY_C
 import { EFFECTS } from "../src/characters/power-art.ts";
 import { frameKeys, renderFrame, type Character } from "../src/characters/sprite.ts";
 import type { Beat } from "../src/characters/boss-beats.ts";
+import { CHANDY_SOUND_NAMES, chandySound } from "../src/characters/chandy-sounds.ts";
+import { MOVE_MEAN_DB, MOVE_PEAK } from "../src/characters/synth.ts";
+import { SELECT_SOUND } from "../src/characters/boss-select.ts";
+import { BOSS_INTROS } from "../src/town/shops/challenge.ts";
 
 const whole = (ch: Character) => {
   for (const [name, anim] of Object.entries(ch.anims))
@@ -79,5 +83,35 @@ describe("Chandy's art", () => {
     expect([CHANDY_DODGE_SOUNDS.laser, CHANDY_DODGE_SOUNDS.crack, CHANDY_DODGE_SOUNDS.crackle, CHANDY_DODGE_SOUNDS.kingShatter]).toEqual(["chandyBeam", "chandyCrack", "chandyCrackle", "chandyShatter"]);
     const P = CHANDY_PORTRAIT;
     expect(P.x >= 0 && P.y >= 0 && P.x + P.w <= CHANDY.w && P.y + P.h <= CHANDY.h).toBe(true);
+  });
+
+  it("his sounds are his own (Eric, Nov 18): every cue's from his pack, and every sound in it is used", () => {
+    const own = (n: string) => `chandy${n[0]!.toUpperCase()}${n.slice(1)}`;
+    const mine = new Set(CHANDY_SOUND_NAMES.map(own));
+    const used = [...Object.values(CHANDY_DODGE_SOUNDS), SELECT_SOUND.chandy!, ...Object.values(BOSS_INTROS.chandy!.cues)];
+    for (const s of used) expect(mine.has(s), s).toBe(true);
+    for (const s of mine) expect(used.includes(s as (typeof used)[number]), s).toBe(true);
+    for (const cue of Object.keys(CHANDY_CUES)) expect(CHANDY_DODGE_SOUNDS[cue], cue).toBeTruthy();
+    expect(SELECT_SOUND.chandy).toBe("chandyShot");
+  });
+
+  it("every one of his sounds is quieter than a piece's move (peak and loudness), and the same every time", () => {
+    for (const name of CHANDY_SOUND_NAMES)
+      for (const rate of [44100, 48000]) {
+        const s = chandySound(name, rate);
+        let peak = 0;
+        let sum = 0;
+        for (const v of s) {
+          expect(Number.isFinite(v)).toBe(true);
+          peak = Math.max(peak, Math.abs(v));
+          sum += v * v;
+        }
+        expect(peak, name).toBeLessThan(MOVE_PEAK / 2);
+        const db = 10 * Math.log10(sum / s.length);
+        expect(db, name).toBeLessThan(MOVE_MEAN_DB - 2);
+        expect(db, name).toBeGreaterThan(MOVE_MEAN_DB - 6);
+        expect(s.length / rate, name).toBeLessThan(1.3);
+      }
+    expect(chandySound("shot", 44100)).toEqual(chandySound("shot", 44100));
   });
 });
