@@ -1,3 +1,4 @@
+- Nov 18 ~03:55 UTC: #784 Big Boy tower merged 6ed5647; deploy + main watched. Open for Eric: Last Stand vs Big Boy (a/b), payments 6 calls. Queue: re-baseline raid sim (engine), bigboy fair-play power turns (after Eric).
 - Nov 18 ~03:35 UTC: #785 Chandy sounds LIVE 67a971b; main GREEN. #784 bigboy: guard collision (toyTower not in FX_FILES) fixed by director 6ee4f34, CI watched. Ginger running.
 - Nov 18 ~03:30 UTC: bigboy final (d09b12a) on CI, PR body updated. Ginger Super Freeze helper (xhigh, alone) started.
 - Nov 18 ~03:20 UTC: container restarted again; watchers re-armed. #785 Chandy sounds merged 67a971b; deploy + main watched. Bigboy fix helper finishing (dedfe2c pushed).
