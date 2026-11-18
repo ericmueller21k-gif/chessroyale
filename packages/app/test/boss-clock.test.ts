@@ -1,5 +1,5 @@
 import { beforeAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { BOSS_POWERS, DASH_STALL, DEFAULT_SETTINGS, RAID_SETTINGS, type Settings } from "@chessroyale/core";
+import { BOSS_POWERS, DASH_STALL, DEFAULT_SETTINGS, RAID_SETTINGS, bossClockSettings, type Settings } from "@chessroyale/core";
 import { bulletIncrementAt, legalMoves, stallTimeline, type UciEngine } from "@chessroyale/chess";
 import { HUMAN, loadOpenings, SoloMatch } from "../src/solo.ts";
 import { COUNT_FROM_SECONDS } from "../src/components/Countdown.tsx";
@@ -233,6 +233,41 @@ describe("Dash's stall skit in solo (Eric, Nov 17: once a battle)", () => {
       play(m);
     }
   });
+
+  it("a real battle (no test switch, Boss alone's bank): his beats still come on a move that began with a short moment of his (a slap, a clock fit); Eric, Nov 18: \"his 20/30 second gag isn't firing ... I did nothing for a minute and he just stood there\"", async () => {
+    const s = { ...DEFAULT_SETTINGS, ...RAID_SETTINGS, ...bossClockSettings({ bossMaxMoves: RAID_SETTINGS.bossMaxMoves ?? DEFAULT_SETTINGS.bossMaxMoves }), bossFixedElo: 1600, bossId: "dash", bossUnfinished: true } as Settings;
+    const m = new SoloMatch([engine], "Ann", s);
+    m.start();
+    type P = Extract<SoloMatch["phase"], { kind: "play" }>;
+    const beats: string[] = [];
+    let tested = 0;
+    for (let move = 0; move < 20 && tested < 2; move++) {
+      for (let i = 0; i < 400 && m.phase.kind !== "play"; i++) await vi.advanceTimersByTimeAsync(250);
+      expect(m.phase.kind).toBe("play");
+      let p = m.phase as P;
+      const kinds = m.runner.boss!.powers?.events.map((e) => e.kind) ?? [];
+      // (On a move that began with his slap or clock fit and still has a beat to come, wait out the skit's whole time.)
+      if (kinds.some((k) => k === "slap" || k === "clockFit") && m.runner.stallPlan(HUMAN)) {
+        tested++;
+        const end = p.startsAt + DASH_STALL.fakeSeconds * 1000 + DASH_STALL.slamMs + 2000;
+        const seen: string[] = [];
+        while (Date.now() < end && m.phase.kind === "play") {
+          await vi.advanceTimersByTimeAsync(250);
+          const q = m.phase as P;
+          if (q.stall && !seen.includes(q.stall.beat)) seen.push(q.stall.beat);
+          if (q.stall?.beat === "fake" && Date.now() > q.stall.until) break;
+        }
+        expect(seen.length, `move ${move} began with ${kinds.join(",")}`).toBeGreaterThan(0);
+        beats.push(...seen);
+        p = m.phase as P;
+      }
+      const ply = p.board.ply;
+      play(m);
+      for (let i = 0; i < 400 && (m.phase.kind !== "play" || (m.phase as P).board.ply === ply); i++) await vi.advanceTimersByTimeAsync(250);
+    }
+    expect(tested, "a move that began with a slap or clock fit").toBeGreaterThan(0);
+    expect(beats.length).toBeGreaterThan(0);
+  }, 60_000);
 
   it("disposed mid-move: the skit's timer dies with the match (no beat, no turn restarted, nothing recorded)", async () => {
     const m = await dashToPlay();

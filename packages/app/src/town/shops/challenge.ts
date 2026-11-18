@@ -519,9 +519,11 @@ export const CHALLENGE_FEEL = {
    * release frame over `offMs` (`offArc` squares up), to just off the screen's edges; on the double yank's first heave the buckets
    * tumble in along the floor from there (`tumbleMs`, eased, `tumbleSouth` squares in front of the table's row, to the stools' places)
    * and land upside down (their frames); the knots come untied and the ropes reel in (`reelMs`); his brag (his frames); his attack.
-   * About 12 s from the marks to the wipe.
+   * About 12 s from the marks to the wipe. `reelAt` (Nov 18, Eric: "when he wrangles the chessboard, it still looks weird"): how far
+   * along its slide (eased, 0 to 1) the bale passes his column to his right; from there he reels it in facing it (his `reel`), his back
+   * no longer to it (shop-wrangler.test.ts measures it against the room).
    */
-  rope: { spinMs: 1000, flyMs: 440, flyArc: 1.1, yankLeadMs: 100, slideMs: 1600, bend: [5, 9], freeAfterMs: 200, reelMs: 200, offMs: 400, offArc: 0.8, tumbleMs: 760, tumbleSouth: 0.4 },
+  rope: { spinMs: 1000, flyMs: 440, flyArc: 1.1, yankLeadMs: 100, slideMs: 1600, bend: [5, 9], freeAfterMs: 200, reelMs: 200, offMs: 400, offArc: 0.8, tumbleMs: 760, tumbleSouth: 0.4, reelAt: 0.67 },
   /**
    * Jefferson's own (Nov 4; Eric's design: "he hollers for his crew. The crew stop what they're doing and come over… they stand round
    * the table behind, watching… The floor tile at your mark rises on its piston and lifts you level with the board"; the art's
@@ -905,8 +907,11 @@ export function darkAnims(w: {
     poolInMs: w.pool.inMs,
   };
 }
-/** Wrangler's moves (characters/pig-intro.ts BOSS_PIG_INTRO): the spin, the throw, the yank, the cross throw, the double yank, the brag. */
-export const ROPE_MOVES = ["spin", "throw", "yank", "crossThrow", "doubleYank", "brag"] as const;
+/**
+ * Wrangler's moves (characters/pig-intro.ts BOSS_PIG_INTRO): the spin, the throw, the yank (the bale behind him), the reel (the bale
+ * past him, on his right), the cross throw, the double yank, the brag.
+ */
+export const ROPE_MOVES = ["spin", "throw", "yank", "reel", "crossThrow", "doubleYank", "brag"] as const;
 export type RopeMove = (typeof ROPE_MOVES)[number];
 /** His props' animations (shops/pig-intro-art.ts): the loop's flight, catch and flick free; the bale's slide and landing; a bucket's tumble and its landing (`drop`). */
 export const ROPE_GEAR = ["fly", "catch", "free", "slide", "land", "tumble", "drop"] as const;
@@ -1842,10 +1847,14 @@ export function ropeAt(beats: readonly IntroBeat[], a: RopeAnims, t: number, fee
   const G = a.gear;
   const at = (s: IntroStep) => stepAt(beats, s);
   const me = (anim: RopeMove, ms: number, loop: boolean) => ({ anim, frame: frameAt(M[anim], ms, loop) });
+  const slide0 = at("drag") + R.yankLeadMs;
+  /** How far along its slide the bale is (eased, 0 to 1), as `bale.u` below. */
+  const slid = (tt: number) => (tt < slide0 ? 0 : smooth(ramp(tt, slide0, R.slideMs)));
   let move: RopeNow["move"] = null;
   if (t >= at("spin") && t < at("throw")) move = me("spin", t - at("spin"), true);
   else if (t >= at("throw") && t < at("drag")) move = me("throw", t - at("throw"), false);
-  else if (t >= at("drag") && t < at("land")) move = me("yank", t - at("drag"), true);
+  // (The drag: he yanks the bale from behind him, then turns to reel it in once it has slid past him to his right: `reelAt`.)
+  else if (t >= at("drag") && t < at("land")) move = me(slid(t) >= R.reelAt ? "reel" : "yank", t - at("drag"), true);
   else if (t >= at("cross") && t < at("haul")) move = me("crossThrow", t - at("cross"), false);
   else if (t >= at("haul") && t < at("brag")) move = me("doubleYank", t - at("haul"), false);
   else if (t >= at("brag") && t < at("swing")) move = me("brag", t - at("brag"), false);

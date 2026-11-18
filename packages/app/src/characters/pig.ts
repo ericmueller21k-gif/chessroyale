@@ -458,7 +458,7 @@ add("shadow", shadow);
 add("fist", fist);
 
 const r2 = (v: number) => Math.round(v * 2) / 2;
-type Placed = { name: string; at: Pt };
+type Placed = { name: string; at: Pt; w?: number };
 function limb(kind: "arm" | "leg", pts: readonly Pt[]): Placed {
   const q = pts.map((p): Pt => [r2(p[0]), r2(p[1])]);
   const name = `${kind}:${q.map((p) => p.join(",")).join(";")}`;
@@ -467,16 +467,16 @@ function limb(kind: "arm" | "leg", pts: readonly Pt[]): Placed {
   const b = boxOf(q, Math.ceil(Math.max(r, r1)) + 1);
   return { name, at: [b.x0, b.y0] };
 }
-const placedCache = new Map<string, Pt>();
-/** A part painted with its own top-left (a rope, the hat): registered by name, its top-left worked out once. */
+const placedCache = new Map<string, { at: Pt; w: number }>();
+/** A part painted with its own top-left (a rope, the hat): registered by name, its top-left (and width) worked out once. */
 function placedPart(name: string, make: () => { part: Part; at: Pt }): Placed {
-  let at = placedCache.get(name);
-  if (!at) {
+  let got = placedCache.get(name);
+  if (!got) {
     const made = make();
     add(name, () => made.part);
-    placedCache.set(name, (at = made.at));
+    placedCache.set(name, (got = { at: made.at, w: Math.max(...made.part.grid.map((r) => r.length)) }));
   }
-  return { name, at };
+  return { name, at: got.at, w: got.w };
 }
 const hatLayer = (deg: number) => placedPart(`hat:${deg}`, () => hat(deg));
 const q2 = (l: Loop): Loop => ({ c: [r2(l.c[0]), r2(l.c[1])], rx: r2(l.rx), ry: r2(l.ry), tilt: Math.round(l.tilt) });
@@ -579,7 +579,14 @@ export interface PigPose {
   bow2?: Pt;
   /** His feet moved (a stomp): each foot's offset, its leg following. */
   feet?: { l?: Pt; r?: Pt };
+  /** His head and hat turned to our right (his own head and hat parts drawn mirrored about his skull's middle, x 37.5, so they sit on his neck as before). Left out: to our left, as drawn. */
+  look?: "right";
+  /** Both hands on one rope: the line to the loop runs from his coil arm's fist (in front), the lasso fist behind it holding the rope's end. */
+  hold?: boolean;
 }
+
+/** His head and hat are mirrored about x = MIRROR_X2 / 2 (his skull's middle, 37.5) when he looks to our right. */
+const MIRROR_X2 = 75;
 
 /** A fist circling a little as it spins its loop (eighths of a turn). */
 const circling = (fist: Pt, spin: number, dir = 1): Pt => {
@@ -611,8 +618,13 @@ export function pigLayers(p: PigPose): Layer[] {
   const loop = spinning ? spinLoop(spin, grow) : p.loop;
   const loopL = loop ? loopLayer(loop, -spin, spinning ? spin / 8 + 0.25 : null) : null;
   const grip: Pt = [fL[0], fL[1] - 2];
-  const honda = loop ? nearestOnLoop(loop, grip) : null;
-  const line = loop && honda ? lineLayer(grip, honda, p.bow ?? [(grip[0] + honda[0]) / 2 - 1.5, (grip[1] + honda[1]) / 2]) : null;
+  // Held in both hands: the line runs taut from the front (coil arm's) fist; between the fists, the rope's end.
+  const fR0 = up(p.fistR ?? FIST_R);
+  const from: Pt = p.hold ? [fR0[0], fR0[1] - 1] : grip;
+  const honda = loop ? nearestOnLoop(loop, from) : null;
+  const line = loop && honda ? lineLayer(from, honda, p.bow ?? (p.hold ? [(from[0] + honda[0]) / 2, (from[1] + honda[1]) / 2] : [(grip[0] + honda[0]) / 2 - 1.5, (grip[1] + honda[1]) / 2])) : null;
+  const between = p.hold ? lineLayer([fL[0], fL[1] - 1], from, [(fL[0] + from[0]) / 2, (fL[1] - 1 + from[1]) / 2]) : null;
+  const tail = p.hold ? lineLayer([fL[0] - 1, fL[1]], [fL[0] - 3, fL[1] + 9], [fL[0] - 4, fL[1] + 4]) : null;
   // The slack hanging from his spinning fist (paid out when he throws).
   const slack = spinning ? placedPart(`slack:${r2(fL[0])},${r2(fL[1])}`, () => rope(densify(loopPoints({ c: [fL[0] - 2.5, fL[1] + 5.5], rx: 2.2, ry: 5.2, tilt: 12 }, 40).map((q) => q.p), true), 1)) : null;
   // The coil arm: the coil hanging from its fist, or the second loop.
@@ -651,8 +663,12 @@ export function pigLayers(p: PigPose): Layer[] {
     ...(slack ? [L(slack)] : []),
     ...(p.front ? [] : [L(armL)]),
     ...back(line),
-    at(`head:${p.mood ?? "sneer"}`, HX + hx, HY + hy),
-    at(hatL.name, hatL.at[0] + hx + (ht.dx ?? 0), hatL.at[1] + hy + (ht.dy ?? 0)),
+    ...(p.look === "right"
+      ? [
+          at(`head:${p.mood ?? "sneer"}`, MIRROR_X2 - (HX + HEAD_W) + hx, HY + hy, true),
+          at(hatL.name, MIRROR_X2 - (hatL.at[0] + hatL.w!) + hx - (ht.dx ?? 0), hatL.at[1] + hy + (ht.dy ?? 0), true),
+        ]
+      : [at(`head:${p.mood ?? "sneer"}`, HX + hx, HY + hy), at(hatL.name, hatL.at[0] + hx + (ht.dx ?? 0), hatL.at[1] + hy + (ht.dy ?? 0))]),
     ...(p.front ? [] : [at("fist", fL[0] - 3, fL[1] - 3)]),
     L(armR),
     ...coilRings.map(L),
@@ -660,6 +676,8 @@ export function pigLayers(p: PigPose): Layer[] {
     ...(p.front ? [] : [at("fist", fR[0] - 3, fR[1] - 3)]),
     // Thrown: the arms, the lines and the loops across the front of him, the fists over the lines.
     ...(p.front ? [L(armL)] : []),
+    ...ahead(tail),
+    ...ahead(between),
     ...ahead(line),
     ...ahead(loopL),
     ...ahead(line2),
@@ -736,29 +754,33 @@ const settle = (from: number, p: PigPose = {}): Frame[] => Array.from({ length: 
  */
 export const CATCH: Pt = [96, 66];
 const THROW_ARM = { fistL: [24, 27] as Pt, elbowL: [22, 36] as Pt };
-const CAST_ARM = { fistL: [37, 44] as Pt, elbowL: [31, 46.5] as Pt };
-const HAUL_ARM = { fistL: [18, 48] as Pt, elbowL: [22, 49.5] as Pt };
+const CAST_ARM = { fistL: [43, 46] as Pt, elbowL: [33, 49] as Pt };
+/** Both hands on the rope, pulling to our right: the coil arm's fist in front at his hip, the lasso fist behind it; the coil put away. */
+const TUG_ARMS = { fistR: [63, 52] as Pt, elbowR: [59, 49] as Pt, fistL: [47, 50] as Pt, elbowL: [36, 52] as Pt, coil: null, hold: true };
 const lasso: Anim = lazyAnim(() => (() => {
   const frames: Frame[] = [];
   // Wind-up: two quick turns, the loop widening, a lean back.
   [0, 2, 4, 6, 0, 2, 4, 6].forEach((s, i) => frames.push(f(55, { mood: i < 4 ? "sneer" : "fierce", spin: s, grow: Math.min(2, i * 0.5), lean: i > 3 ? -1 : 0 }, i === 0 ? { cue: "whirl" } : {})));
   // The throw: overhead, out across him, the loop flying out to our right and dropping onto its mark.
-  frames.push(f(70, { mood: "fierce", ...THROW_ARM, loop: { c: [40, 7], rx: 13, ry: 3.5, tilt: 4 }, front: true }, { cue: "throw" }));
-  frames.push(f(55, { mood: "wild", fistL: [31, 34], elbowL: [27, 41], loop: { c: [56, 11], rx: 12.5, ry: 4.5, tilt: 10 }, front: true, bow: [44, 16] }));
-  frames.push(f(70, { mood: "wild", ...CAST_ARM, loop: { c: [68, 20], rx: 11.5, ry: 6, tilt: 18 }, front: true, bow: [52, 22] }));
-  frames.push(f(70, { mood: "wild", ...CAST_ARM, loop: { c: [86, 38], rx: 10, ry: 6.5, tilt: 20 }, front: true, bow: [62, 30] }));
-  frames.push(f(70, { mood: "wild", ...CAST_ARM, loop: { c: [94, 56], rx: 9.5, ry: 4.5, tilt: 8 }, front: true, bow: [66, 46] }));
-  frames.push(f(140, { mood: "wild", ...CAST_ARM, loop: { c: CATCH, rx: 9, ry: 2.6, tilt: 0 }, front: true, bow: [70, 64] }, { cue: "catch" }));
-  frames.push(f(120, { mood: "smug", ...CAST_ARM, loop: { c: CATCH, rx: 9, ry: 2.6, tilt: 0 }, front: true, bow: [68, 62] }));
-  // The tug: he hauls back, the rope snaps taut, the loop closes on its catch and drags it a little way (a square).
+  // (From the throw to the end of the tug he looks to our right, at the loop.)
+  const R = { look: "right" as const };
+  frames.push(f(70, { mood: "fierce", ...R, ...THROW_ARM, loop: { c: [40, 7], rx: 13, ry: 3.5, tilt: 4 }, front: true }, { cue: "throw" }));
+  frames.push(f(55, { mood: "wild", ...R, fistL: [31, 34], elbowL: [27, 41], loop: { c: [56, 11], rx: 12.5, ry: 4.5, tilt: 10 }, front: true, bow: [44, 16] }));
+  frames.push(f(70, { mood: "wild", ...R, ...CAST_ARM, loop: { c: [68, 20], rx: 11.5, ry: 6, tilt: 18 }, front: true, bow: [52, 22] }));
+  frames.push(f(70, { mood: "wild", ...R, ...CAST_ARM, loop: { c: [86, 38], rx: 10, ry: 6.5, tilt: 20 }, front: true, bow: [62, 30] }));
+  frames.push(f(70, { mood: "wild", ...R, ...CAST_ARM, loop: { c: [94, 56], rx: 9.5, ry: 4.5, tilt: 8 }, front: true, bow: [66, 46] }));
+  frames.push(f(140, { mood: "wild", ...R, ...CAST_ARM, loop: { c: CATCH, rx: 9, ry: 2.6, tilt: 0 }, front: true, bow: [70, 64] }, { cue: "catch" }));
+  frames.push(f(120, { mood: "smug", ...R, ...CAST_ARM, loop: { c: CATCH, rx: 9, ry: 2.6, tilt: 0 }, front: true, bow: [68, 62] }));
+  // The tug: both hands on the rope (his coil arm's fist in front, reaching toward the loop; his lasso fist behind it), he
+  // leans back away from it, boots planted, the rope snaps taut, the loop closes on its catch and drags it a little way.
   const haul = (dx: number, t: number, extra: Partial<Frame> = {}) =>
-    f(95, { mood: "grit", lean: -2, bob: 1, ...HAUL_ARM, loop: { c: [CATCH[0] - dx, CATCH[1]], rx: 6, ry: 2.2, tilt: 0 }, front: true, bow: [(16 + CATCH[0] - dx) / 2, 56 + dx * 0.1] }, { ...extra, specks: dust([CATCH[0] - dx, CATCH[1] + 1], t, 10) });
-  frames.push(f(60, { mood: "grit", lean: -1, fistL: [28, 47], elbowL: [27, 49], loop: { c: CATCH, rx: 7.5, ry: 2.4, tilt: 0 }, front: true }, { cue: "tug" }));
+    f(95, { mood: "grit", ...R, ...TUG_ARMS, lean: -3, bob: 1, headDx: -1, loop: { c: [CATCH[0] - dx, CATCH[1]], rx: 6, ry: 2.2, tilt: 0 }, front: true }, { ...extra, specks: dust([CATCH[0] - dx, CATCH[1] + 1], t, 10) });
+  frames.push(f(60, { mood: "grit", ...R, ...TUG_ARMS, lean: -1, fistR: [64, 51], elbowR: [59, 48], loop: { c: CATCH, rx: 7.5, ry: 2.4, tilt: 0 }, front: true }, { cue: "tug" }));
   frames.push(haul(0, 0, { shake: [-1, 0] }));
   frames.push(haul(5, 1, { shake: [1, 0] }));
   frames.push(haul(10, 2));
-  // The flick home: the loop springs up off its catch and back over his head.
-  frames.push(f(60, { mood: "sneer", lean: -1, fistL: [17, 39], elbowL: [21, 45], loop: { c: [78, 46], rx: 6, ry: 3.5, tilt: -10 }, bow: [44, 36] }));
+  // The flick home: his lasso fist snaps up in front of him, the loop springs up off its catch and back over his head.
+  frames.push(f(60, { mood: "sneer", ...R, lean: -1, fistL: [21, 29], elbowL: [20, 38], loop: { c: [78, 46], rx: 6, ry: 3.5, tilt: -10 }, bow: [50, 26] }));
   frames.push(f(75, { mood: "sneer", fistL: [17, 30], elbowL: [21, 38], loop: { c: [60, 18], rx: 7, ry: 4, tilt: -12 }, bow: [40, 12] }));
   frames.push(f(75, { mood: "sneer", fistL: [16, 31], loop: { c: [24, 9], rx: 12, ry: 5, tilt: -10 } }));
   frames.push(...settle(4));
@@ -822,7 +844,7 @@ const windup: Anim = lazyAnim(() => (() => {
     s++;
   }
   // Both thrown, out to our right, dropping onto their marks.
-  const cast = { mood: "wild" as Mood, ...CAST_ARM, fistR: [60, 40] as Pt, elbowR: [57, 44] as Pt, front: true };
+  const cast = { mood: "wild" as Mood, look: "right" as const, fistL: [43, 46] as Pt, elbowL: [33, 49] as Pt, fistR: [60, 40] as Pt, elbowR: [57, 44] as Pt, front: true };
   F(70, { ...cast, ...THROW_ARM, fistR: [56, 26], elbowR: [56, 36], loop: { c: [30, 7.5], rx: 12, ry: 3.5, tilt: 4 }, loop2: { c: [52, 7.5], rx: 12, ry: 3.5, tilt: -4 } }, { cue: "throw" });
   F(55, { ...cast, fistL: [31, 34], elbowL: [27, 41], fistR: [58, 32], elbowR: [57, 40], loop: { c: [44, 10], rx: 12, ry: 4.5, tilt: 8 }, loop2: { c: [66, 10], rx: 12, ry: 4.5, tilt: 8 }, bow: [38, 18], bow2: [62, 18] });
   F(70, { ...cast, loop: { c: [60, 22], rx: 11, ry: 5.5, tilt: 16 }, loop2: { c: [80, 18], rx: 11, ry: 5.5, tilt: 16 }, bow: [46, 26], bow2: [70, 24] });
@@ -830,12 +852,12 @@ const windup: Anim = lazyAnim(() => (() => {
   F(150, { ...cast, loop: { c: CATCH2, rx: 8, ry: 2.5, tilt: 0 }, loop2: { c: [CATCH[0] + 2, CATCH[1] - 2], rx: 8, ry: 2.5, tilt: 0 }, bow: [52, 62], bow2: [80, 58] }, { cue: "catch" });
   // The mighty yank: both hauled in, the ground shaking.
   const yank = (dx: number, t: number, extra: Partial<Frame> = {}) =>
-    F(110, { mood: "grit", lean: -2, bob: 1, ...HAUL_ARM, fistR: [52, 50], elbowR: [55, 47], front: true, loop: { c: [CATCH2[0] - dx, CATCH2[1]], rx: 5.5, ry: 2, tilt: 0 }, loop2: { c: [CATCH[0] + 2 - dx, CATCH[1] - 2], rx: 5.5, ry: 2, tilt: 0 } }, { ...extra, specks: [...dust([CATCH2[0] - dx, CATCH2[1] + 1], t, 8), ...dust([CATCH[0] + 2 - dx, CATCH[1] - 1], t, 8)] });
+    F(110, { mood: "grit", look: "right", lean: -3, bob: 1, headDx: -1, fistL: [47, 51], elbowL: [36, 53], fistR: [64, 52], elbowR: [60, 49], front: true, loop: { c: [CATCH2[0] - dx, CATCH2[1]], rx: 5.5, ry: 2, tilt: 0 }, loop2: { c: [CATCH[0] + 2 - dx, CATCH[1] - 2], rx: 5.5, ry: 2, tilt: 0 } }, { ...extra, specks: [...dust([CATCH2[0] - dx, CATCH2[1] + 1], t, 8), ...dust([CATCH[0] + 2 - dx, CATCH[1] - 1], t, 8)] });
   yank(0, 0, { cue: "tug", shake: [-1, 1] });
   yank(6, 1, { shake: [1, 0] });
   yank(12, 2, { shake: [-1, 0] });
   // Gathered up: the loops flicked home, the second one back into its coil; he spins on, smug.
-  F(60, { mood: "sneer", lean: -1, fistL: [17, 39], elbowL: [21, 45], fistR: [60, 46], elbowR: [57, 48], loop: { c: [70, 46], rx: 6, ry: 3.5, tilt: -10 }, loop2: { c: [88, 52], rx: 5, ry: 3, tilt: -10 }, bow: [40, 36], bow2: [74, 44] });
+  F(60, { mood: "sneer", look: "right", lean: -1, fistL: [21, 29], elbowL: [20, 38], fistR: [60, 46], elbowR: [57, 48], loop: { c: [70, 46], rx: 6, ry: 3.5, tilt: -10 }, loop2: { c: [88, 52], rx: 5, ry: 3, tilt: -10 }, bow: [46, 26], bow2: [74, 44] });
   F(80, { mood: "sneer", fistL: [19, 28], elbowL: [21, 37], fistR: [63, 40], elbowR: [59, 45], loop: { c: [62, 18], rx: 7, ry: 4, tilt: -12 }, loop2: { c: [72, 50], rx: 4.5, ry: 7, tilt: 10 }, bow: [42, 12] });
   F(80, { mood: "sneer", fistL: [18, 29], loop: { c: [36, 9], rx: 11, ry: 4.5, tilt: -8 }, coil: 1 });
   frames.push(...settle(s % 8, { mood: "laugh" }));
@@ -869,21 +891,39 @@ const leap: Anim = lazyAnim(() => (() => {
  * leaning back, a heave every half second (cue `tug` on each, a little dust), no loop in his hands (they're out on the
  * board). Loops: the board plays it for as long as the pairs come in.
  */
+/** The haul's fists where they stay in every frame (drawing space, the lean and bob included): his lasso fist in front, his coil arm's behind it. */
+const HAUL_FRONT: Pt = [14, 50];
+const HAUL_BACK: Pt = [24, 52];
 export const HAUL_FISTS: readonly Pt[] = [
-  [18 + OX, 48 + OY],
-  [52 + OX, 50 + OY],
+  [HAUL_FRONT[0] + OX, HAUL_FRONT[1] + OY],
+  [HAUL_BACK[0] + OX, HAUL_BACK[1] + OY],
 ];
 const haul: Anim = lazyAnim(() => (() => {
   const frames: Frame[] = [];
-  const pose = (lean: number, bob: number, mood: Mood): PigPose => ({ mood, lean, bob, ...HAUL_ARM, fistR: [52, 50], elbowR: [55, 47], loop: null, loop2: null, coil: null });
+  // He faces our left, where the ropes go: leaning back to our right, heels dug in, both fists low in front of him on our left.
+  const pose = (lean: number, bob: number, mood: Mood): PigPose => ({
+    mood,
+    lean,
+    bob,
+    headDx: lean > 2 ? 1 : 0,
+    fistL: [HAUL_FRONT[0] - lean, HAUL_FRONT[1] - bob],
+    elbowL: [22, 50],
+    fistR: [HAUL_BACK[0] - lean, HAUL_BACK[1] - bob],
+    elbowR: [37, 52],
+    feet: { l: [-3, 0], r: [1, 0] },
+    loop: null,
+    loop2: null,
+    coil: null,
+  });
   for (let i = 0; i < 2; i++) {
-    frames.push(f(110, pose(-2, 1, "grit"), { cue: "tug", shake: [-1, 0], specks: dust([30, 70], 0, 6) }));
-    frames.push(f(110, pose(-2, 1, "grit"), { specks: dust([30, 70], 1, 6) }));
-    frames.push(f(140, pose(-1, 0, i ? "smug" : "fierce")));
-    frames.push(f(140, pose(-1, 0, "fierce")));
+    frames.push(f(110, pose(3, 2, "grit"), { cue: "tug", shake: [-1, 0], specks: dust([24, 70], 0, 6) }));
+    frames.push(f(110, pose(3, 2, "grit"), { specks: dust([24, 70], 1, 6) }));
+    frames.push(f(140, pose(1, 1, i ? "smug" : "fierce")));
+    frames.push(f(140, pose(1, 1, "fierce")));
   }
   return { loop: true, frames };
 })());
+
 
 /** Where his lasso's loop lands (CATCH) in his frame (frame pixels, as `foot` is): the board puts it on the piece he drags. */
 export const CATCH_AT: Pt = [CATCH[0] + OX, CATCH[1] + OY];

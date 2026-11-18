@@ -204,12 +204,26 @@ const SLIDE_OVERLAP = 60;
 
 // ---------------- SHOWDOWN! ----------------
 
-/**
- * His fists' place on the board while he hauls from his corner (% of the board), drawn mirrored or not: the ropes run from them, the
- * fist on our left first (the crowd's ropes, as drawn unmirrored), so they don't cross when he's turned.
- */
+/** His fists' place on the board while he hauls from his corner (% of the board), drawn mirrored or not: the fist on our left first. */
 const fistsAt = (mirrored: boolean): Pt[] =>
   HAUL_FISTS.map(([x, y]) => ({ x: CORNER.x + (drawnX(PIG, x, mirrored) - PIG.foot[0]) * PX, y: CORNER.y + (y - PIG.foot[1]) * PX })).sort((a, b) => a.x - b.x);
+
+/**
+ * A showdown pair's two ropes as they shoot out: from a fist to each from-square (the crowd's first). Each fist takes the rope
+ * that gives the shorter total length (the shortest pairing of two points with two points never crosses), decided once per
+ * pair, from its from-squares, so a rope never jumps fists mid-yank.
+ */
+export function pairRopes(mirrored: boolean, crowdFrom: string, bossFrom: string, orientation: Orientation): [{ from: Pt; to: Pt }, { from: Pt; to: Pt }] {
+  const [left, right] = fistsAt(mirrored) as [Pt, Pt];
+  const a = centreOf(crowdFrom, orientation);
+  const b = centreOf(bossFrom, orientation);
+  const len = (p: Pt, q: Pt) => Math.hypot(p.x - q.x, p.y - q.y);
+  const [fa, fb] = len(left, a) + len(right, b) <= len(right, a) + len(left, b) ? [left, right] : [right, left];
+  return [
+    { from: fa, to: a },
+    { from: fb, to: b },
+  ];
+}
 
 /** Each pair's yank: when it starts and ends (ms into the moment). */
 const yankOf = (k: number) => ({ t0: SHOWDOWN.pairs[k] ?? SHOWDOWN.pairs[SHOWDOWN.pairs.length - 1]! + (k - SHOWDOWN.pairs.length + 1) * 500, ms: SHOWDOWN.yankMs });
@@ -238,17 +252,17 @@ function showdownMoment({ boss, moment, now, t, orientation, banner }: MomentPro
   // He faces the way he leaps (into the middle, holding it through the wind-up; back to his corner), then the board as he hauls.
   const art = artFacingOf(boss);
   const faces: Facing = t < SHOWDOWN.throwAt - PIG_LEAP.upAt ? hopFacing(CORNER, MIDDLE, "right") : anim.anim === "haul" ? toward(CORNER.x, 50) : hopFacing(MIDDLE, CORNER, "left");
-  const FISTS = fistsAt(mirrorFor(art, toward(CORNER.x, 50)));
+  const mirrored = mirrorFor(art, toward(CORNER.x, 50));
   const ropes: { from: Pt; to: Pt; loop: boolean; key: string }[] = [];
   const air: { code: string; at: Pt; square: string }[] = [];
   pairs.forEach((p, k) => {
     const { t0, ms } = yankOf(k);
-    const ends: [string, string, "w" | "b", Pt][] = [
-      [p.crowdFrom, p.crowd, crowd, FISTS[0]!],
-      [p.bossFrom, p.boss, his, FISTS[1]!],
+    const [cr, hr] = pairRopes(mirrored, p.crowdFrom, p.bossFrom, orientation);
+    const ends: [string, string, "w" | "b", Pt, Pt][] = [
+      [p.crowdFrom, p.crowd, crowd, cr.from, cr.to],
+      [p.bossFrom, p.boss, his, hr.from, hr.to],
     ];
-    for (const [i, [fromSq, toSq, color, fist]] of ends.entries()) {
-      const a = centreOf(fromSq, orientation);
+    for (const [i, [fromSq, toSq, color, fist, a]] of ends.entries()) {
       const b = centreOf(toSq, orientation);
       if (t >= t0 - ROPE_OUT && t < t0) ropes.push({ from: fist, to: lerp(fist, a, ease((t - (t0 - ROPE_OUT)) / ROPE_OUT)), loop: false, key: `${k}${i}` });
       else if (t >= t0 && t < t0 + ms + SLIDE_OVERLAP) {

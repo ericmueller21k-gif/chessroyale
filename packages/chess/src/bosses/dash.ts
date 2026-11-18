@@ -319,13 +319,21 @@ export function stallMove(passed: string, seed: number, turn: number): string | 
 }
 
 /**
+ * His moments that play as the crowd's turn begins and are over before its clock starts (DASH_FX: the slap, his flag's finger gun,
+ * the clock fit, each a second or two, held by POWER_FX): his tap (10 s) and his skit (20 s, 30 s) can still come later on that move.
+ * Eric, Nov 18: "his 20/30 second gag isn't firing ... I did nothing for a minute and he just stood there": any event of his on a move
+ * used to rule his beats out for all of it, and a slap after each capture or a clock fit every 4-5 turns made that most moves.
+ */
+const STALL_BESIDE: ReadonlySet<string> = new Set(["slap", "flag", "clockFit"]);
+
+/**
  * Whether his lying-down clock tap or his stall skit can come on the crowd move now being picked, and when (StallPlan). His clock tap
  * (Eric, Nov 17: a bored "hurry up", only when you're slow; DASH_TAP): once a battle (`dash.tap`), from crowd move `fromMove`
  * (?power=clocktap: the first) at `afterMs` of a bank's move or `afterShare` of a move clock, with DASH_STALL.marginMs to spare; on the move it came, nothing more of his.
  * His stall skit (Eric, Nov 17: once a battle; "if you take more
  * than 30 seconds to move"; "each still occur once per game": the slam and the fake move each once, apart). Null: not on this move. `allowedMs`: the move's clock (ms); `bank`: the battle's time is a bank
  * (Boss alone, a Boss Battle party: DASH_STALL's seconds) or else a move clock (a raid, a group battle: DASH_STALL's shares of
- * the move's clock). After the slam (`dash.slam`), the fake move alone (no `slamAt`). Not once the fake move has come (`dash.stall`), nor on a move with any other moment of his (an event this turn), a Time Scramble's move, his Scramble Rush's turn, the re-pick after the God King's Last Stand, with the
+ * the move's clock). After the slam (`dash.slam`), the fake move alone (no `slamAt`). Not once the fake move has come (`dash.stall`), nor on a move with another moment of his still to play on it (an event this turn but the short ones at its start: STALL_BESIDE), a Time Scramble's move, his Scramble Rush's turn, the re-pick after the God King's Last Stand, with the
  * crowd in check (he can't move again then), with no quiet move of his, or when the move's clock can't reach the fake move with
  * DASH_STALL.marginMs to spare. The test switch ?power=stall: DASH_STALL.test's beats.
  */
@@ -334,7 +342,7 @@ export function stallPlan(boss: BossState | null | undefined, fen: string, allow
   const d = p?.dash;
   if (!boss || boss.id !== "dash" || !p || !d || boss.result || boss.barred?.length) return null;
   const turn = turnOf(boss);
-  if (p.turn !== turn || p.events.length || scrambleOn(p, turn) || (d.rush && d.rush.at >= boss.crowdMoves) || rushWarned(d)) return null;
+  if (p.turn !== turn || p.events.some((e) => !STALL_BESIDE.has(e.kind)) || scrambleOn(p, turn) || (d.rush && d.rush.at >= boss.crowdMoves) || rushWarned(d)) return null;
   // (His tap came on this move: nothing more of his on it.)
   if (d.tap && d.tap.at === boss.crowdMoves) return null;
   const tapMs = bank ? t.afterMs : Math.round(allowedMs * t.afterShare);
