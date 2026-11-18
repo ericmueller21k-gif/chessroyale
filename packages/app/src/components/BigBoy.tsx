@@ -461,8 +461,10 @@ function blockMoment({ moment, t, orientation, banner, cast }: MomentProps) {
     <div class="power-moment pm-block">
       {banner("TOY BLOCK!", moment.square ? `Blocked: ${moment.square}` : undefined, "toy", BLOCK.flyAt)}
       {cast("toss", BLOCK.flyAt)}
-      {moment.square && t >= BLOCK.flyAt && t < BLOCK.landAt && (
-        <Flight name="blockFly" anim="fly1" square={moment.square} orientation={orientation} since={moment.at + BLOCK.flyAt} ms={BLOCK.landAt - BLOCK.flyAt} />
+      {/* (The toss carries it to its square; as the tower's add1 starts its drop from above, ADD_FALL before it lands, the flight
+          ends: never both at once.) */}
+      {moment.square && t >= BLOCK.flyAt && t < BLOCK.landAt - ADD_FALL && (
+        <Flight name="blockFly" anim="fly1" square={moment.square} orientation={orientation} since={moment.at + BLOCK.flyAt} ms={BLOCK.landAt - ADD_FALL - BLOCK.flyAt} />
       )}
     </div>
   );
