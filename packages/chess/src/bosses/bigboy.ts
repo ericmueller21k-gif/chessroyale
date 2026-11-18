@@ -3,7 +3,8 @@
  * position less one of the crowd's center pawns, which he eats before move 1. His passive, the toy-block tower (Eric,
  * Nov 18): a block lands on an empty square in the crowd's half, and as every crowd turn after it begins he stacks one
  * more there, up to towerMax. Nothing slides through it (a knight jumps it; it never stops an attack); from towerEnter
- * blocks a crowd piece may move onto it, which topples it; at towerMax it wobbles a turn and topples by itself. Its blocks
+ * blocks a crowd piece may move onto it, which topples it (his pieces too, rarely: on a seeded share of his turns, when his
+ * engine picks that move); at towerMax it wobbles a turn and topples by itself. Some of its blocks (towerScatterShare)
  * scatter to empty squares nearby, each blocking as one block does (nothing onto it or through it, either side) for one
  * crowd turn; then they vanish and a new tower starts. His ultimate, the Big Bounce, comes at the start of his
  * turn after its warning: a few of the crowd's pieces are thrown to new squares nearby, into a position a little worse
@@ -108,24 +109,36 @@ export function toyBlockSquares(p: Pick<BossPowerState, "tower" | "scatter"> | n
 const castles = (move: string, fen: string): boolean => Math.abs(move.charCodeAt(0) - move.charCodeAt(2)) === 2 && pieceAt(fen, move.slice(0, 2))?.type === "k";
 
 /**
- * A crowd move topples his tower: it lands on the tower's square (an ordinary legal move: a slide that ends there, a knight's
+ * A move topples his tower: it lands on the tower's square (an ordinary legal move: a slide that ends there, a knight's
  * jump, a pawn's step or capture; never castling, whose way runs on past it), and the tower is towerEnter blocks or more.
+ * (The crowd's may, always; his only on a turn his tower is open to him: hisToppleOpen.)
  */
 export function topples(move: string, tower: { square: string; height: number } | null | undefined, fen: string, s: Pick<BossPowerSettings, "towerEnter"> = BOSS_POWERS): boolean {
   return !!tower && tower.height >= s.towerEnter && to(move) === tower.square && !castles(move, fen);
 }
 
 /**
- * His toy blocks stop a move (`crowd`: one of the crowd's; else his): onto or through a scattered block; through the tower;
- * onto the tower, unless it's the crowd's move and it topples it (`topples`). His pieces never enter the tower. A knight
- * jumps them all; none ever stops an attack.
+ * His tower is open to his own pieces on his move now (Eric, Nov 18: "both but he usually doesn't"): on a towerBossChance share
+ * of his turns, drawn from the battle's seed and the crowd turn just played (`p.turn`; the same on the server, the host and in
+ * solo, as the server sends the host the moves he may play). Open, a move of his onto it (towerEnter tall or more) is one of his
+ * moves like any other: his engine or brain plays it only if it picks it, no bonus. Closed (most turns), it stops his pieces as
+ * a single block does.
  */
-export function toyStops(move: string, p: Pick<BossPowerState, "tower" | "scatter"> | null | undefined, fen: string, crowd: boolean, s: Pick<BossPowerSettings, "towerEnter"> = BOSS_POWERS): boolean {
+export function hisToppleOpen(p: Pick<BossPowerState, "seed" | "turn" | "tower"> | null | undefined, s: Pick<BossPowerSettings, "towerEnter" | "towerBossChance"> = BOSS_POWERS): boolean {
+  return !!p?.tower && p.tower.height >= s.towerEnter && powerRoll(p.seed, "his-topple", p.turn) < s.towerBossChance;
+}
+
+/**
+ * His toy blocks stop a move (`mayTopple`: the move may topple the tower: always the crowd's, his only when hisToppleOpen):
+ * onto or through a scattered block; through the tower; onto the tower, unless the move may topple it and does (`topples`). A
+ * knight jumps them all; none ever stops an attack.
+ */
+export function toyStops(move: string, p: Pick<BossPowerState, "tower" | "scatter"> | null | undefined, fen: string, mayTopple: boolean, s: Pick<BossPowerSettings, "towerEnter"> = BOSS_POWERS): boolean {
   if (p?.scatter?.squares.some((sq) => blockedBy(move, sq, fen))) return true;
   const t = p?.tower;
   if (!t || !blockedBy(move, t.square, fen)) return false;
   // (Onto it, not through it: its square is where the move lands and nowhere on its way.)
-  return !(crowd && topples(move, t, fen, s) && moveSquares(move, fen).indexOf(t.square) === 1);
+  return !(mayTopple && topples(move, t, fen, s) && moveSquares(move, fen).indexOf(t.square) === 1);
 }
 
 /**
@@ -181,14 +194,17 @@ export function scatterSquares(
   return out.sort((a, b) => a.d - b.d).map((o) => o.sq);
 }
 
+/** How many of a toppled tower's blocks scatter (towerScatterShare of its height, rounded up; the rest break up where it falls). */
+export const scatterCount = (height: number, s: Pick<BossPowerSettings, "towerScatterShare"> = BOSS_POWERS): number => Math.ceil(height * s.towerScatterShare - 1e-9);
+
 /**
- * His tower topples (`by` the crowd's move onto it, or by itself / by his piece as a crowd turn begins): its blocks scatter
- * (scatterSquares, on `fen`: the position now, its side to move kept a move), standing through crowd turn `until`; the
- * tower is gone. Returns the topple's event (crowd turn `turn`).
+ * His tower topples (`by` the crowd's move onto it, or by itself / by his piece as a crowd turn begins): scatterCount of its
+ * blocks scatter (scatterSquares, on `fen`: the position now, its side to move kept a move), standing through crowd turn
+ * `until`; the tower is gone. Returns the topple's event (crowd turn `turn`).
  */
 function topple(next: BossPowerState, fen: string, by: "crowd" | "boss", turn: number, until: number, s: BossPowerSettings): PowerEvent {
   const tower = next.tower!;
-  const squares = scatterSquares(fen, tower.square, tower.height, next.seed, turn, by, s);
+  const squares = scatterSquares(fen, tower.square, scatterCount(tower.height, s), next.seed, turn, by, s);
   next.tower = null;
   next.scatter = { from: tower.square, height: tower.height, squares, by, at: turn, until };
   next.topples = (next.topples ?? 0) + 1;
@@ -416,8 +432,9 @@ export const BIGBOY: BossRules = {
   },
   // His tower, as each crowd turn begins (after his move): from firstPassive, its first block (a new tower once the last one's
   // scattered blocks have gone); then one more each turn up to towerMax; at towerMax a turn on, it topples by itself, its blocks
-  // standing through this crowd turn. (A piece of his on its square: his only move went onto it, the limit lifted: it topples
-  // as well.) The test switch (?power=tower): the battle's first tower starts towerTest tall.
+  // standing through this crowd turn (and his move after it). A piece of his on its square (his move onto it on a turn it was
+  // open to him, or his only move, the limit lifted) topples it the same way: its blocks stand through the crowd's next turn
+  // and his next, timed from his move. The test switch (?power=tower): the battle's first tower starts towerTest tall.
   passive(next, t) {
     if (t.turn < next.nextPassive || next.scatter) return;
     const tower = next.tower;
@@ -438,10 +455,12 @@ export const BIGBOY: BossRules = {
     const p = boss.powers!;
     return p.tower || p.scatter ? allowed.filter((m) => !toyStops(m, p, fen, true)) : allowed;
   },
-  // His own pieces: never onto a block or through one, never into the tower.
+  // His own pieces: never onto a block or through one; into the tower only on a turn it's open to him (hisToppleOpen).
   bossStops(boss) {
     const p = boss.powers;
-    return p?.tower || p?.scatter ? (m, fen) => toyStops(m, p, fen, false) : null;
+    if (!p?.tower && !p?.scatter) return null;
+    const open = hisToppleOpen(p);
+    return (m, fen) => toyStops(m, p, fen, open);
   },
   // (Asked only of a move that isn't allowed, or his only move let through: any block it touches is why.)
   stopReason: (boss, fen, m) => (toyStops(m, boss.powers, fen, false) ? "block" : null),

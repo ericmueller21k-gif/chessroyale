@@ -1476,15 +1476,21 @@ export const BOSS_POWERS = {
    * nothing moves onto a single block; from towerEnter blocks a crowd piece may move onto it (a legal move to its square, never
    * castling), which topples it. At towerMax it wobbles through a crowd turn, then topples by itself as the next crowd turn
    * begins (after his move).
-   * The topple: its blocks scatter to empty squares within towerScatterReach of it (any direction; never onto a piece, never
-   * off the board), each drawn in turn with weight 1 / distance^towerScatterPower from the battle's seed, nearest landing first;
-   * fewer when there aren't enough; a square that would leave the side to move without a legal move is passed over. Each blocks
-   * as a single block does, through one crowd turn (toppled by the crowd's move: his next turn and the crowd's next; by itself:
-   * the crowd's next), then they all vanish and a new tower starts at once. Never leaves anyone without a move, never blocks the
-   * only way out of check (the blocks lift for that turn).
+   * His pieces may topple it too, but rarely (Eric, Nov 18: "both but he usually doesn't"): on a towerBossChance share of his
+   * turns (seeded, the same on every device) a tower towerEnter tall or more is open to his pieces as well, and he moves onto
+   * it only if his engine (or brain) picks that move on its own, no bonus; on the other turns it's closed to him as ever.
+   * The topple: towerScatterShare of its blocks (rounded up) scatter to empty squares within towerScatterReach of it (any
+   * direction; never onto a piece, never off the board), each drawn in turn with weight 1 / distance^towerScatterPower from the
+   * battle's seed, nearest landing first; fewer when there aren't enough; a square that would leave the side to move without a
+   * legal move is passed over (the rest of the tower breaks up where it falls). Each blocks as a single block does, through one
+   * crowd turn (toppled by the crowd's move: his next turn and the crowd's next; by his piece: the crowd's next turn and his
+   * next; by itself: the crowd's next), then they all vanish and a new tower starts at once. Never leaves anyone without a
+   * move, never blocks the only way out of check (the blocks lift for that turn).
    */
   towerMax: 10,
   towerEnter: 2,
+  towerBossChance: 0.25,
+  towerScatterShare: 1,
   towerScatterReach: 3,
   towerScatterPower: 2,
   /** Testing (?boss=bigboy&power=tower): his first tower starts this many blocks tall, so it tops out and topples within a few turns. */
