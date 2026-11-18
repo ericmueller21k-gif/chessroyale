@@ -519,7 +519,8 @@ export const mateMoments = <E extends { kind: string }>(events: readonly E[] | n
  * How long the boss's move holds the screen before the crowd's turn (or the result), solo and online: its move (and its
  * banner if it took the queen), then its powers' moments; at a mate, its attack on the crowd's king if it has one, which
  * the result waits for. No power's moment comes with a mate, but for his fifth carrot's (`mateMoments`): the move, the
- * pull and his win, then the attack (`mateHoldMs` after the moments), then the result.
+ * pull and his win, then the attack (`mateHoldMs` after the moments), then the result. Nor with a draw on his move: the
+ * runner clears the turn's events, all played already (preparePowers), so his move alone holds the screen.
  */
 export function bossTurnShowMs(view: { id?: string; crowdSide: "w" | "b"; board: { fen: string }; lastMove?: { captured?: string } | null; powers?: { events: readonly { kind: keyof typeof POWER_FX; first?: boolean }[] } } | null | undefined, alone = false): number {
   if (mateAttackDue(view)) {

@@ -1131,7 +1131,7 @@ function crates(src: FaqSources): FaqSection {
     body: `
 **Everything here is cosmetic.** Nothing you own changes how a match is played or scored. Items dress your pawn (head, face, skin and weapon) on the vote board, the cut screen and your profile.
 
-**Crates and keys.** Each crate in the Crates tab opens with **one crate key**: you need the crate and a key. You earn crates from [leveling up and the daily reward](#xp) (${src.xp.levelCrates} crates and ${n(src.xp.levelKeys, "key")} each level, and a crate for the day's first game), and from Squads placements. Crates come often; keys are scarcer, so you'll usually have a few crates waiting. A crate with a padlock is one you can't open yet: you have none, or no key. Crates and keys are never sold for now.
+**Crates and keys.** Each crate in the Crates tab opens with **one crate key**: you need the crate and a key. You earn crates from [leveling up and the daily reward](#xp) (${n(src.xp.levelCrates, "crate")} and ${n(src.xp.levelKeys, "key")} each level, and a crate for the day's first game), and from Squads placements. Crates come often; keys are scarcer, so you'll usually have a few crates waiting. A crate with a padlock is one you can't open yet: you have none, or no key. Crates and keys are never sold for now.
 
 Every item from a crate rolls three things, each on its own:
 
