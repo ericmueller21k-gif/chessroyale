@@ -1,3 +1,0 @@
-bigboy-tower done (Nov 18). PR body: .pr-body.md. Stills: branch stills/bigboy-tower. Art: claude/boss-art out/bigboy-tower ($1.63).
-Sim: crowd 0.02 over 26 battles vs today's 0.35: clearly stronger; levers proposed in the PR body (engine lane to tune).
-Local: unit suites (core, chess, app, server) green; e2e bigboy.spec (phone) green; tower @perf green. CI runs every spec (hubs).
