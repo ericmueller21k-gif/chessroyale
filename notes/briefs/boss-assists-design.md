@@ -42,3 +42,5 @@ it's a giant skyscraper ... you walk to the next floor but it really is just the
 progress so people can stop after a game and return later." And: "Tell me which ones are kept out ... I might disagree and want some
 added." Design: the move list IN/OUT (first), several bosses on one board, the climb, the skyscraper, save progress (D1, full lane),
 the build plan. Files: docs/decisions/2026-11-18-battle-tower-design.md, docs/areas/battle-tower.md. Sent to the helper.
+
+**Added (Eric, Nov 18):** "you can party up to 4 people and the majority pick is always chosen first followed by best engine move if draws, it's a full team effort this way. No move follows our normal rules." Sent to the helper.
