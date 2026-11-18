@@ -13,6 +13,24 @@ import { KIT_OPENING, StockfishMoves, hash, kitBosses, quickSearches, runBattle,
 
 const MAX_MOVES = 16;
 const THREES = Number(process.env.KIT_THREES ?? 12);
+/** More seeds of each pair, for a deeper run by hand: `KIT_PAIR_SEEDS=3 npx vitest run packages/chess/test/boss-kit-side.test.ts`. */
+const PAIR_SEEDS = Number(process.env.KIT_PAIR_SEEDS ?? 1);
+
+/**
+ * Pairs the kit finds breaking, the seeds they break on (1: CI's; more by hand: KIT_PAIR_SEEDS) and the rule proposed for each (the
+ * design's style), reported to the director, not fixed here (docs/decisions/2026-11-18-several-bosses.md). Their battles must still
+ * break (it.fails): once the rule is built, or the pair joins BATTLE_TOWER.apart, the check goes red until its entry here goes.
+ */
+export const PAIR_BREAKS: Readonly<Record<string, { seeds: readonly number[]; rule: string }>> = {
+  "smudgy + alfil": {
+    seeds: [1, 2, 3],
+    rule: "Smudgy | Repaint | IN, WITH A RULE: never while another boss's power holds pieces off the board (Alfil's Slam): it waits, its warning kept (his pawn painted the crowd's while its pawns were in the air: 9 crowd pawns as they land)",
+  },
+  "alfil + grex": {
+    seeds: [2],
+    rule: "Alfil | Mammoth Slam | IN, WITH A RULE: never lifts a crowd piece that stands in a boss pawn's way to promoting (the side's next move would promote it: a pawn on c2 queened as the c1 bishop went up)",
+  },
+};
 
 /** The tower's bosses: every one with powers but the Hidden Boss. */
 export const towerBosses = (): string[] => kitBosses().map((d) => d.id).filter((id) => id !== "recluse");
@@ -44,10 +62,10 @@ export function kitThrees(count: number): string[][] {
   return out;
 }
 
-const battle = (bosses: string[]): KitBattle => ({
+const battle = (bosses: string[], k = 0): KitBattle => ({
   boss: bosses[0]!,
   bosses,
-  seed: 1 + Math.floor(hash(bosses.join("+")) * 100000),
+  seed: 1 + Math.floor(hash(bosses.join("+")) * 100000) + 7 * k,
   side: "w",
   test: "",
   triggerFrom: 2,
@@ -80,18 +98,31 @@ describe("the boss kit over several bosses: its own ground", () => {
 });
 
 /** One battle of several bosses; its failures (the first few), and the kinds of step it played. */
-async function side(bosses: string[]) {
-  const run = await runBattle(battle(bosses), sf);
+async function side(bosses: string[], k = 0) {
+  const run = await runBattle(battle(bosses, k), sf);
   return { failures: run.failures.slice(0, 3), played: run.played, steps: run.steps, result: run.result };
 }
 
 describe("the boss kit over several bosses: every pair", () => {
+  it("every known break is a pair the kit plays, with its proposed rule", () => {
+    const names = new Set(kitPairs().map((p) => p.join(" + ")));
+    for (const [pair, { seeds, rule }] of Object.entries(PAIR_BREAKS)) {
+      expect(names.has(pair), pair).toBe(true);
+      expect(seeds.length, pair).toBeGreaterThan(0);
+      expect(rule).toMatch(/ \| .+ \| /);
+    }
+  });
   for (const pair of kitPairs()) {
-    it(`${pair.join(" + ")}: the invariants after every step`, async () => {
-      const r = await side(pair);
-      expect(r.failures.join("\n\n")).toBe("");
-      expect(r.played.boss ?? 0).toBeGreaterThan(2);
-    }, 60_000);
+    const name = pair.join(" + ");
+    for (let k = 0; k < PAIR_SEEDS; k++) {
+      const known = !!PAIR_BREAKS[name]?.seeds.includes(k + 1);
+      (known ? it.fails : it)(`${name}${k ? ` (seed ${k + 1})` : ""}: the invariants after every step${known ? " (a known break: PAIR_BREAKS)" : ""}`, async () => {
+        const r = await side(pair, k);
+        expect(r.failures.join("\n\n")).toBe("");
+        // (Enough of a battle: a move from each of two bosses at least; Lights out lost at once can end one there.)
+        expect(r.played.boss ?? 0).toBeGreaterThanOrEqual(2);
+      }, 60_000);
+    }
   }
 });
 

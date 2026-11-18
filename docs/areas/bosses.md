@@ -1074,9 +1074,15 @@ A boss's rules are a `BossRules` object; every hook sees only its own boss's bat
 | `specialMove(boss, fen, move)` | A boss move its rules play as something else, with its name on screen | Wrangler (the long pull: the double step, then the base) |
 | `bestReply(boss, board)` | The boss's move now is a follow-up its power's engine search scored: the engine's best at full strength (`bossMoveKind` "best"), never the brain's, a slip or a stumble | Wrangler (his reply to the showdown's duel, and his next moves while its tactics are live), Moo & Moon (his moves during the Full Moon: the engine at full strength), Folio (its move in place of the two Revision crossed out) |
 | `asks(boss, fen)` | What the boss's turn must work out with the engine besides its move (the server asks the host with the move) | Wrangler (his pulls, a drag, the showdown) |
+| `outOfTurn(boss, board)` | Several bosses on one side (the Battle Tower): his move now comes out of turn, before the boss whose turn it is; the order goes on after him | Wrangler (his reply to the duel), Folio (its move again after Revision) |
+| `ownStops` | Several bosses: its `bossStops` bind only its own moves, not every boss's on the side | Sawyer (his first move) |
 | `scoreRound(b, players)` | Its own costs on a round's scores | Hollow (dark tries) |
 | `opening` | `fromStart`, `crowdWhite`, `setUp` before move 1 | Hollow, Big Boy (the snack), Sawyer (his cuts from turn 3), the circus tiger (`setUp`: his test switch's start, `BALLOON_TEST_MOVES`) |
 | `view(p)` | Its fields for the screens (`NetBossPowers`) | Hollow, Big Boy, Sawyer, Wrangler (his meter `ready`, the `scout` cue), Moo & Moon (`stunned`, `fullMoon`), the hippo gardener (`garden`: the meter's `since` and `base`, `fixed`, the plants with `left`, his last watering, how many), the circus tiger (`balloon`, `balloonLast`, `balloons`, `hoops`), Folio (`draft`, `folded`, `crease`, `creaseNext`, `revision`) |
+
+**Several bosses on one side** (the Battle Tower, PR 6; [decision](../decisions/2026-11-18-several-bosses.md)): `state.boss` is the
+boss in focus in full, so every hook above still sees only its own boss; the runner reads the whole side (`sideBosses`) through the
+dispatcher's `side*` functions (one boss: today's functions, unchanged).
 
 A boss's screen file fills in a `BossUi` (`components/PowerParts.tsx`): its moments by event kind (`order`, `kit` moment, `dock` words where no banner says what it means, `appearAt`, `own` screen, `line`, `lineAt`, `priority`, `view`), its ultimate's name for the warning, an optional `bar` piece (its passive's bar, the row under the rage meter: Hollow's bulbs, Puddles' Seeds), `ultBar` (beside the rage meter: Moo's moon), `barProp` (its prop in the boss bar's free room at the right, under the status: none yet) and its `board` layer. A moment's line is said for it (its kit's line for the moment, as the moment begins, an ultimate's critical): a view never draws a boss's words itself. While a moment plays the boss's figure leaves its spot (it steps up to cast), unless the view's root has `pm-stay` (a moment it doesn't cast in: Ginger's thaw).
 
