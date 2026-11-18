@@ -32,12 +32,15 @@ export type Extent = { left: number; right: number; up: number; down: number };
 type Ch = Parameters<typeof renderFrame>[0];
 type Frame = Parameters<typeof renderFrame>[1];
 
-/** A frame's drawn pixels, from its feet (the kit's `foot`; the same pixels the canvas draws). */
-export function frameExtent(ch: Ch, frame: Frame): Extent | null {
+/**
+ * A frame's drawn pixels, from its feet (the kit's `foot`; the same pixels the canvas draws). With `above`, only the rows whose top is more
+ * than that many of its pixels above the feet (what reaches the name column's text and meters: kits.ts barUnder).
+ */
+export function frameExtent(ch: Ch, frame: Frame, above = -Infinity): Extent | null {
   const { w, h, data } = renderFrame(ch, frame);
   const [fx, fy] = ch.foot;
   let minX = Infinity, maxX = -1, minY = Infinity, maxY = -1;
-  for (let y = 0; y < h; y++)
+  for (let y = 0; y < Math.min(h, fy - above); y++)
     for (let x = 0; x < w; x++)
       if (data[(y * w + x) * 4 + 3]! > 0) {
         minX = Math.min(minX, x);
@@ -48,10 +51,10 @@ export function frameExtent(ch: Ch, frame: Frame): Extent | null {
   return maxX < 0 ? null : { left: fx - minX, right: maxX + 1 - fx, up: fy - minY, down: maxY + 1 - fy };
 }
 
-const widest = (frames: Iterable<[Ch, Frame]>): Extent => {
+const widest = (frames: Iterable<[Ch, Frame]>, above?: number): Extent => {
   const worst: Extent = { left: 0, right: 0, up: 0, down: 0 };
   for (const [ch, frame] of frames) {
-    const e = frameExtent(ch, frame);
+    const e = frameExtent(ch, frame, above);
     if (!e) continue;
     worst.left = Math.max(worst.left, e.left);
     worst.right = Math.max(worst.right, e.right);
@@ -68,23 +71,31 @@ const widest = (frames: Iterable<[Ch, Frame]>): Extent => {
 export const NOT_REST: readonly string[] = ["victory"];
 
 /** Each side's farthest reach over every rest frame: a loop's frames, and the last frame of each one-shot (where each beat ends), but NOT_REST. */
-export const restExtent = (ch: Ch): Extent =>
+export const restExtent = (ch: Ch, above?: number): Extent =>
   widest(
     Object.entries(ch.anims)
       .filter(([name]) => !NOT_REST.includes(name))
       .flatMap(([, anim]) => (anim.loop ? anim.frames : anim.frames.slice(-1)).map((f): [Ch, Frame] => [ch, f])),
+    above,
   );
 
 /** Each side's farthest reach over every frame of the given animations. */
-export function extentOf(ch: Ch, anims: string[]): Extent {
+export function extentOf(ch: Ch, anims: string[], above?: number): Extent {
   return widest(
     anims.flatMap((name) => {
       const anim = ch.anims[name];
       if (!anim) throw new Error(`${ch.id}: no animation ${name}`);
       return anim.frames.map((f): [Ch, Frame] => [ch, f]);
     }),
+    above,
   );
 }
+
+/**
+ * How many of a figure's pixels above its feet, at size `s`, a row must reach to be beside the name column's text and meters when they end
+ * `under` px under the bar's top (kits.ts barUnder): 2 px clear of them. Below that the bar is empty, and a figure may reach past the column.
+ */
+export const besideAbove = (under: number, s: number): number => (FEET_Y - (BAR_TOP + under + 2)) / s;
 
 /** The room at rest: every rest frame inside the bar (2 px in from its left edge, under its top, in its bottom padding, 2 px short of the name column). */
 export function restOk(rest: Extent, s: number, shift: number, name = 0): boolean {
@@ -101,29 +112,53 @@ export function momentOk(all: Extent, s: number, shift: number): boolean {
  * (and stay in the bottom padding); its drawing's shift, the least whole px that keeps every rest frame 2 px in from the bar's left edge
  * (a drawing that reaches further left than the box moves right) and every frame of `all` on the screen; and the name column's offset, the least whole px that keeps it 2 px clear.
  */
-export function barFit(rest: Extent, all?: Extent): { barScale: number; barShift: number; barName: number } {
-  const cap = Math.min((REST_UP - BAR_TOP_GAP) / rest.up, BAR_PAD_BOTTOM / Math.max(rest.down, 1e-9));
+export function barFit(rest: Extent, all?: Extent, beside: Extent = rest): { barScale: number; barShift: number; barName: number } {
+  // (`rest` is its body's, for a kit with props (kits.ts barProps): a prop may rise over the bar's top, never off the screen's, `all`.)
+  const cap = Math.min((REST_UP - BAR_TOP_GAP) / rest.up, BAR_PAD_BOTTOM / Math.max(rest.down, 1e-9), all ? MOMENT_UP / all.up : Infinity);
   const barScale = Math.floor(cap * 100 + 1e-9) / 100;
   // (And never a moment off the screen's left edge (`all`, every frame): Nov 17, Wrangler's lasso and Dash's entrance, turned to face the
   // board, reach that way.)
   const barShift = Math.max(Math.ceil(rest.left * barScale - REST_LEFT - 1e-9), all ? Math.ceil(all.left * barScale - MOMENT_LEFT - 1e-9) : -Infinity);
-  const barName = Math.max(0, Math.ceil(rest.right * barScale + barShift - REST_RIGHT - 1e-9));
+  // (Measured from what reaches the name column's height: every rest frame, or for a kit with barUnder, the rows above where its text ends.)
+  const barName = Math.max(0, Math.ceil(beside.right * barScale + barShift - REST_RIGHT - 1e-9));
   return { barScale, barShift, barName };
 }
+
+/**
+ * A figure's body alone: every frame without its props' layers (kits.ts barProps, its parts' name prefixes: Chandy's rifle) and its
+ * specks (a muzzle's burst, a lens's flare). A prop doesn't size a boss (Eric, Nov 18: Chandy "just obviously needs to be bigger", as
+ * Babur's balloons, Oct 24).
+ */
+export function bodyOf(ch: Ch, props: readonly string[]): Ch {
+  const body = (f: Frame): Frame => ({ ...f, specks: undefined, layers: f.layers.filter((l) => !props.some((p) => String(l.part).startsWith(p))) });
+  return { ...ch, anims: Object.fromEntries(Object.entries(ch.anims).map(([n, a]) => [n, { ...a, frames: a.frames.map(body) }])) };
+}
+
+/** Each side's farther reach of two extents. */
+const either = (a: Extent, b: Extent): Extent => ({ left: Math.max(a.left, b.left), right: Math.max(a.right, b.right), up: Math.max(a.up, b.up), down: Math.max(a.down, b.down) });
 
 /** An extent mirrored about the feet: its left and right swapped. */
 const mirrored = (e: Extent): Extent => ({ ...e, left: e.right, right: e.left });
 
 /**
- * Every playable boss's kit, the character its bar draws, its idle's and its rest frames' reach, and every frame's: as the bar draws it,
- * mirrored about its feet where it turns to face the board (kits.ts placeFacing, Nov 17).
+ * Every playable boss's kit, the character its bar draws, and its reach as the bar draws it (mirrored about its feet where it turns to
+ * face the board: kits.ts placeFacing, Nov 17): `idle`, its idle's; `rest`, its rest frames' (its body's alone, for a kit with props:
+ * kits.ts barProps), which size and place it; `all`, every frame's, props and all, which stay on the screen; `beside`, what must clear
+ * the name column (its rest frames, props too; with barUnder, the body and the rows above where the column's text and meters end, at its
+ * fitted size); `under`, every frame's reach in those rows (Chandy's rifle: never into them).
  */
 export function barRows() {
   return PLAYABLE.map((def) => {
     const kit: BossKit = BOSS_KITS[def.kit!]!;
     const ch = kit.bar ?? kit.ch;
+    const body = kit.barProps ? bodyOf(ch, kit.barProps) : ch;
     const idle = [kit.loops?.idle ?? "idle", ...(kit.powered ? [kit.powered.idle] : [])];
     const as = placeFacing(kit, ch, "bar").mirror ? mirrored : (e: Extent) => e;
-    return { name: def.kit!, kit, idle: as(extentOf(ch, idle)), rest: as(restExtent(ch)), all: as(extentOf(ch, Object.keys(ch.anims))) };
+    const rest = as(restExtent(body));
+    const all = as(extentOf(ch, Object.keys(ch.anims)));
+    const above = kit.barUnder === undefined ? undefined : besideAbove(kit.barUnder, barFit(rest, all).barScale);
+    const beside = above === undefined ? as(restExtent(ch)) : either(rest, as(restExtent(ch, above)));
+    const under = above === undefined ? all : as(extentOf(ch, Object.keys(ch.anims), above));
+    return { name: def.kit!, kit, idle: as(extentOf(body, idle)), rest, all, beside, under };
   });
 }

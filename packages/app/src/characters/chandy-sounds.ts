@@ -127,17 +127,47 @@ function shimmerTone(freqs: readonly number[]): Voice {
   return (t) => freqs.reduce((s, f, i) => s + Math.sin(TAU * f * t + i * 1.7) * (0.6 + 0.4 * Math.sin(TAU * (3 + i * 1.3) * t)), 0) / freqs.length;
 }
 
+/**
+ * A reptile's growl: a dark rumble (noise under 260 Hz, twice) shaped by a slow flutter `hz` times a second, as a throat's vibrato, and
+ * a touch of a 55 Hz pulse in it. Low enough to feel more than hear on a phone's speaker; the hum over it carries the pitch.
+ */
+function growlOf(rate: number, seed: number, hz: number): Voice {
+  const rumble = lowpass(rate, 260, lowpass(rate, 260, noise(seed)));
+  const body = lowpass(rate, 400, osc(rate, () => 55, saw));
+  return (t) => (0.6 + 0.4 * Math.sin(TAU * hz * t)) * (3.2 * rumble(t) + 0.35 * body(t));
+}
+
 const SOUNDS: Record<ChandySound, (rate: number) => Float32Array> = {
-  // The scope's lock-on: two rising beeps, the second higher (a chirp up, then a firmer one).
+  // The scope's lock-on (Eric, Nov 18: the two high beeps "sounds like a bird chirping. He's a crocodile"): low and heavy. A deep
+  // electronic hum (a rounded pulse wave, 150 Hz rising to 230) whose throb speeds up as it locks in, 7 to 26 a second; a soft
+  // click as it locks; the hum held a moment at its new pitch; and under it all a reptile's growl, a dark rumble fluttering slowly.
   lock: (rate) => {
-    const a = beep(0, 0.055, 1500, 1750);
-    const b = beep(0.085, 0.075, 2000, 2250);
-    return render(rate, 0.18, (t) => a(t) + b(t));
+    const D = 0.5;
+    const lockAt = 0.3;
+    const hum = pulseWave(rate, (t) => 150 + 80 * Math.min(1, t / lockAt) ** 2, 1400);
+    const sub = osc(rate, (t) => 75 + 40 * Math.min(1, t / lockAt) ** 2, sine);
+    const click = clink(rate, lockAt, 520, 0.012, 541);
+    const growl = growlOf(rate, 547, 26);
+    return render(rate, D, (t) => {
+      const env = Math.min(1, t / 0.05) * Math.min(1, (D - t) / 0.08);
+      // (Its throb speeds up into the lock, then holds steady: the phase of a rate rising 7 to 26 a second.)
+      const ph = t < lockAt ? 7 * t + (19 * t * t) / (2 * lockAt) : 7 * lockAt + (19 * lockAt) / 2 + 26 * (t - lockAt);
+      const pulse = 1 - 0.75 * (0.5 - 0.5 * Math.tanh(3 * Math.sin(TAU * ph)));
+      return env * (pulse * (hum(t) + 0.7 * sub(t)) + 1.1 * growl(t)) + 0.5 * click(t);
+    });
   },
-  // The lock let go: one falling beep.
+  // The lock let go: the hum the other way, sinking 230 Hz to 120 as its throb slows (26 to 6 a second) and fades, with a low breath of
+  // a hiss out (a crocodile's, not a bird's).
   unlock: (rate) => {
-    const a = beep(0, 0.11, 1800, 1150);
-    return render(rate, 0.13, (t) => a(t));
+    const D = 0.36;
+    const hum = pulseWave(rate, (t) => 230 - 110 * Math.min(1, t / D), 1200);
+    const hiss = bandpass(rate, () => 900, 0.8, murk(rate, 2200, 551));
+    return render(rate, D, (t) => {
+      const ph = 26 * t - (20 * t * t) / (2 * D);
+      const pulse = 1 - 0.7 * (0.5 - 0.5 * Math.tanh(3 * Math.sin(TAU * ph)));
+      const env = Math.min(1, t / 0.01) * (1 - t / D) ** 1.4;
+      return env * (pulse * hum(t) + 0.9 * Math.sin(Math.PI * Math.min(1, t / D)) * hiss(t));
+    });
   },
   // The rifle off his back: the sling's strap sliding (a soft rising rasp), then the rifle clacking into his hands.
   unsling: (rate) => {
@@ -313,16 +343,19 @@ const SOUNDS: Record<ChandySound, (rate: number) => Float32Array> = {
       return 0.32 * s + 1.5 * Math.exp(-t / 0.035) * burst(t) + 0.6 * low(t);
     });
   },
-  // Dodge's warning: three alarm blips, a rounded pulse tone.
+  // Dodge's warning: three heavy alarm pulses, low (a rounded pulse tone at 260 Hz with its octave under it, each throbbing), a knock under
+  // each; his voice, not a beeper's.
   alarm: (rate) => {
-    const tone = pulseWave(rate, () => 940, 2600);
-    return render(rate, 0.36, (t) => {
+    const tone = pulseWave(rate, () => 260, 1500);
+    const under = osc(rate, () => 130, sine);
+    const knocks = [0, 0.13, 0.26].map((at) => thump(at, 120, 70, 0.03));
+    return render(rate, 0.42, (t) => {
       let env = 0;
-      for (const at of [0, 0.12, 0.24]) {
+      for (const at of [0, 0.13, 0.26]) {
         const a = t - at;
-        if (a >= 0 && a < 0.075) env = Math.min(1, a / 0.004) * Math.min(1, (0.075 - a) / 0.01);
+        if (a >= 0 && a < 0.09) env = Math.min(1, a / 0.006) * Math.min(1, (0.09 - a) / 0.015);
       }
-      return env * tone(t);
+      return env * throb(t, 40, 0.5) * (tone(t) + 0.8 * under(t)) + 0.6 * knocks.reduce((s, k) => s + k(t), 0);
     });
   },
   // A big energy pop: a deep thump, a long falling zap, a rush of noise, the throb fading.
@@ -417,8 +450,8 @@ const SOUNDS: Record<ChandySound, (rate: number) => Float32Array> = {
 
 /** Trims each to sit a little under a move's loudness, as the other bosses' do; a soft ceiling keeps the peaks well under its. */
 const LEVEL: Record<ChandySound, number> = {
-  lock: 0.115,
-  unlock: 0.102,
+  lock: 0.0880,
+  unlock: 0.180,
   unsling: 0.193,
   charge: 0.233,
   shot: 0.238,

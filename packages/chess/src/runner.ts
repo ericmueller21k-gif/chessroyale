@@ -932,7 +932,7 @@ export class MatchRunner {
     // of it for a move already lost (expected under 0.1%). Any other such turn doesn't count (`power`): there the engine's numbers can charge a
     // carrot move more than the game does, and the race's read differently from any engine's (another best, other finds,
     // only moves, decided).
-    const power = powerTurn(this.state.boss);
+    const power = powerTurn(this.state.boss, board.fen);
     let fairScored: BoardRound["fairScored"];
     let raceOff = false;
     if (!power && judged !== limited.evaluation) {
@@ -1080,12 +1080,13 @@ export class MatchRunner {
     const charges = b.kingCharges ?? 0;
     const bar = Math.round(lastStandBar(best, b.crowdMoves, charges, this.settings) * 10) / 10;
     if (!this.forceLastStand && !lastStandDue(loss, best, b.crowdMoves, charges, this.settings)) return undefined;
-    // (Never while a boss's power has changed the board: the judge's numbers are plain chess's, and the reply they fear
-    // may be one the board doesn't allow (Eric, Oct 24: Babur's hoop). The move stands and nothing is spent. The test
-    // switch, ?laststand=1, still calls him on any board.)
-    if (!this.forceLastStand && boardAltered(b, fen)) return undefined;
     // What it loses: the boss's best reply (only if it's a legal move there) and a mate it allows (the crowd mated).
     const reply = evaluation.replies?.[played];
+    // (Never while a boss's power has changed the board: the judge's numbers are plain chess's, and the reply they fear
+    // may be one the board doesn't allow (Eric, Oct 24: Babur's hoop). The move stands and nothing is spent. Big Boy's toy
+    // blocks count only where they take that reply away (Eric's (b), Nov 18: `stand`). The test switch, ?laststand=1,
+    // still calls him on any board.)
+    if (!this.forceLastStand && boardAltered(b, fen, bossRules(b), { played, reply })) return undefined;
     const mate = evaluation.mates?.[played];
     const legalReply = !!reply && legalMoves(applyMove(fen, played)).includes(reply);
     const round3 = (x: number) => Math.round(x * 1000) / 1000;

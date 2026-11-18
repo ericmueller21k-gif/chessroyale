@@ -209,12 +209,13 @@ export function stopReason(boss: { id?: string; powers?: StopFields | null } | n
 }
 
 /**
- * A power touches this crowd turn (a frozen piece, a pie, a toy block, the blizzard, a flipped board, fire): its picks
- * don't count as fair-play signals.
+ * A power touches this crowd turn (a frozen piece, a pie, the blizzard, a flipped board, fire; Big Boy's toy blocks only
+ * where they take one of the crowd's moves away: Eric's (b), Nov 18): its picks don't count as fair-play signals. `fen`: the
+ * position, the crowd to move (the match always passes it; without it, Big Boy's toys up count, as before).
  */
-export function powerTurn(boss: BossState | null | undefined): boolean {
+export function powerTurn(boss: BossState | null | undefined, fen?: string): boolean {
   const p = boss?.powers;
-  return !!p && !!bossRules(boss)?.powerTurn?.(boss!);
+  return !!p && !!bossRules(boss)?.powerTurn?.(boss!, fen);
 }
 
 /**
@@ -223,11 +224,19 @@ export function powerTurn(boss: BossState | null | undefined): boolean {
  * docs/decisions/2026-10-24-king-save-off-on-altered-boards.md). One rule for every boss, no list: a power touches the
  * turn (`powerTurn`, fair play's own test), something stops his moves (`bossStops`), something stops any of the crowd's
  * (`held`, `crowdFilter`), or something else of his is on the board (`altersBoard`: Hollow's dark, the Roman candle's shadows,
- * the carrots). `rules`: the boss's (a test's stand-in).
+ * the carrots). A boss with its own test (`standAltered`: Big Boy's, his toy blocks only where they take away the reply the
+ * Last Stand would replay; Eric's (b), Nov 18) answers in its place, given the crowd's move (`stand`: the played move and the
+ * judge's feared reply; without it, the general rule). `rules`: the boss's (a test's stand-in).
  */
-export function boardAltered(boss: BossState | null | undefined, fen: string, rules: BossRules | null = bossRules(boss)): boolean {
+export function boardAltered(
+  boss: BossState | null | undefined,
+  fen: string,
+  rules: BossRules | null = bossRules(boss),
+  stand?: { played: string; reply?: string },
+): boolean {
   if (!boss?.powers || !rules) return false;
-  if (rules.powerTurn?.(boss) || rules.bossStops?.(boss) || rules.altersBoard?.(boss)) return true;
+  if (rules.standAltered && stand) return rules.standAltered(boss, fen, stand.played, stand.reply);
+  if (rules.powerTurn?.(boss, fen) || rules.bossStops?.(boss) || rules.altersBoard?.(boss)) return true;
   if (!rules.crowdFilter && !rules.held) return false;
   const legal = legalMoves(fen);
   return limitCrowd(rules, boss, fen, legal).length < legal.length;

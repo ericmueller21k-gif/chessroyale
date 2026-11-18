@@ -42,7 +42,7 @@ import { leaveLegal, legalPageOf, type LegalPage } from "./screens/legal-page.ts
 import { useMedia } from "./components/QuickChat.tsx";
 import { LobbyChat } from "./components/LobbyChat.tsx";
 import { queuedSquads } from "./move-replay.ts";
-import { PartyClient, SquadsClient, createParty, crowdPartyScreen, crowdPassFor, currentParty, currentSquads, forgetSquads, markCrowdPartyScreen, partyStatus, rememberCrowdPass, squadsQueue, squadsSeat, squadsStatus, squadsTestLobby } from "./squads.ts";
+import { PartyClient, SquadsClient, createParty, crowdPartyScreen, crowdPassFor, currentParty, currentSquads, forgetParty, forgetSquads, markCrowdPartyScreen, partyStatus, rememberCrowdPass, squadsQueue, squadsSeat, squadsStatus, squadsTestLobby } from "./squads.ts";
 import { squadsExit, squadsWaiting } from "./screens/squads-exit.ts";
 import { lazyGroup } from "./lazy.tsx";
 import { dropShell, markHome } from "./shell.ts";
@@ -1141,7 +1141,10 @@ export function App() {
   const joinBossParty = async (code: string) => {
     setBossPartyError(null);
     const open = await partyStatus(code, "boss");
-    if (open === false) return setBossPartyError("That party has closed.");
+    if (open === false) {
+      forgetParty(code, "boss");
+      return setBossPartyError("That party has closed.");
+    }
     const p: PartyClient = new PartyClient(code.toUpperCase(), (lobby, pass, seat) => bossPlaced(p)(lobby, pass, seat), "boss");
     setBossParty((old) => {
       old?.close();
@@ -1177,7 +1180,10 @@ export function App() {
    */
   const joinCrowdParty = async (code: string, inside?: (ok: boolean) => void, quiet = false): Promise<void> => {
     const open = await partyStatus(code, "crowd");
-    if (open === false) return inside?.(false);
+    if (open === false) {
+      forgetParty(code, "crowd");
+      return inside?.(false);
+    }
     const p = newCrowdClient(code, crowdPlaced);
     if (quiet) quietParty.current = p;
     if (inside) {
@@ -1274,7 +1280,10 @@ export function App() {
     setPartyError(null);
     setPartyOpen(true);
     const open = await partyStatus(code);
-    if (open === false) return setPartyError("That party has closed.");
+    if (open === false) {
+      forgetParty(code);
+      return setPartyError("That party has closed.");
+    }
     const p = new PartyClient(code.toUpperCase(), partyPlaced);
     setParty((old) => {
       old?.close();
