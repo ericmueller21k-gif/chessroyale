@@ -259,6 +259,10 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
     (Eric, Oct 12: unscored, once a funhouse); any turn a power touches doesn't count for fair play (`powerTurn`).
   - The clock stands still through every power's moment (`POWER_FX`, `powerMomentMs`): the crowd's clock starts after
     them, solo and online, so a power never costs anyone thinking time.
+  - **His move ends the battle** (a mate or a draw): no new turn begins, so the runner clears the turn's events
+    (`preparePowers`): they have all played, as the turn began and while he thought, and the last show is his move alone
+    (and a mate's attack), never a replay. The one exception is his fifth carrot's pull and win (`mateMoments`). Nov 18,
+    review of #787 (finding 4); the boss kit's "a draw on his move" test.
   - **A turned board** (Boingo's funhouse, Oct 11): upside down is the other side's orientation, as before; a quarter
     turn is drawn by moving every square to where the turned board shows it (`packages/app/src/board-view.ts`:
     `viewSquare`, `viewFen`), so the board maps taps and drags exactly as usual and each move is turned back
