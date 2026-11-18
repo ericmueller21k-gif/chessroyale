@@ -413,15 +413,16 @@ describe("Big Boy's toy blocks", () => {
     // A scattered block on it: the same.
     const sc = { ...boss(check, "g1"), powers: { ...boss(check, "g1").powers!, tower: null, scatter: { from: "g3", height: 1, squares: ["g1"], by: "boss" as const, at: 4, until: 4 } } } as BossState;
     expect(crowdAllowed(sc, check)).toBeNull();
-    // The boss is stopped too (into the tower on a turn it's closed to him), and lifted the same way.
-    const open = "4k3/8/8/8/8/8/8/R3K3 w Q - 0 1";
+    // The boss is stopped too (into the tower on a turn it's closed to him), and lifted the same way. (Him to move: his marks
+    // on the board layer bind the side to move.)
+    const open = "r3k3/8/8/8/8/8/8/4K3 b q - 0 1";
     const was = BOSS_POWERS.towerBossChance;
     try {
       (BOSS_POWERS as { towerBossChance: number }).towerBossChance = 0;
-      const allowed = bossAllowed(boss(open, "a4", 5), open)!;
-      expect(allowed).not.toContain("a1a4");
-      expect(allowed).not.toContain("a1a8"); // through a4
-      expect(allowed).toContain("a1a3");
+      const allowed = bossAllowed(boss(open, "a5", 5), open)!;
+      expect(allowed).not.toContain("a8a5");
+      expect(allowed).not.toContain("a8a1"); // through a5
+      expect(allowed).toContain("a8a6");
     } finally {
       (BOSS_POWERS as { towerBossChance: number }).towerBossChance = was;
     }
