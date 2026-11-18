@@ -1133,7 +1133,9 @@ export const chandyBattle = {
       const hit = first || (taken ? c.locks.some((l) => l.square === taken) : false);
       c.locks = locksAfter(before, move, c.locks);
       if (hit && c.upgrades < s.upgradesMax) {
-        const queen = s.queenLockFirst && piecesOf(boardOf(b).fen, boss.crowdSide).some((x) => x.type === "q");
+        // (The queen lock first only when it could come now: a queen of yours with a save, the test queenLockOk makes after his
+        // pass, on the board after this move, you to move. The review of #797: with a queen it can't aim at, the slot sat dead.)
+        const queen = s.queenLockFirst && queenLockAim(boardOf(b).fen, boss.crowdSide, p.seed, c.used) !== null;
         const unlock = unlockPick(c.unlocked, p.seed, c.upgrades, queen);
         const stage = c.upgrades + 1;
         // (Shown as your next turn begins: everyTurn.)
