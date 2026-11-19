@@ -588,6 +588,9 @@ test.describe("Dash's stall skit and clock tap (Eric, Nov 17)", () => {
     // (Move 2, taking a while: at 10 s of it, not before.)
     const lie = page.locator(".dash-lie");
     await expect(lie).toBeVisible({ timeout: 15_000 });
+    // (The recorder writes on its next frame after the lie shows: wait for its entry rather than read the list the moment the
+    // lie is seen, which raced it on a busy CI runner, Nov 19.)
+    await expect.poll(async () => (await lies(page)).length, { timeout: 5_000 }).toBeGreaterThan(0);
     const first = (await lies(page))[0]!;
     expect(first.move).toBe(1);
     expect(first.ms).toBeGreaterThanOrEqual(DASH_TAP.afterMs - 50);
