@@ -51,6 +51,7 @@ import { ENGINE_CALLS_SCHEMA } from "./engine-calls.ts";
 import { QUESTS_COLUMNS, QUESTS_SCHEMA, questDeletes } from "./quests.ts";
 import { TOWER_SCHEMA, towerMoves } from "./tower.ts";
 import { isBlockedText } from "./text-filter.ts";
+import { botPresence, isFriendBot } from "./friend-bot-schedule.ts";
 import { chatModMoves, chatStanding, type ChatNotice } from "./chat-mod.ts";
 import type { ChatBlock } from "@chessroyale/chess";
 
@@ -1202,6 +1203,7 @@ export async function publicProfile(sql: Sql, userId: string, now: number, admin
   }
   const raids = rows.filter((r) => r.mode === "boss");
   const banned = (await sql.first<{ status: string }>("SELECT status FROM fairplay_cases WHERE user_id = ?", userId))?.status === "banned";
+  const bot = u.test === 1 && isFriendBot(u.id) ? botPresence(u.id, now) : null;
   return {
     id: u.id,
     name: u.name,
@@ -1209,8 +1211,9 @@ export async function publicProfile(sql: Sql, userId: string, now: number, admin
     look: (await lockerState(sql, u.id, admins(u))).look,
     pawn: pawnColorOf(u.pawn_color),
     joinedAt: u.created_at,
-    lastSeen: u.hide_online ? null : u.last_seen,
-    online: !u.hide_online && u.last_seen !== null && now - u.last_seen < FRONT_DOOR.onlineWindowMs,
+    // (A friend bot's from its schedule, as its friends list shows it: friend-bot-schedule.ts.)
+    lastSeen: u.hide_online ? null : bot ? bot.lastSeen : u.last_seen,
+    online: bot ? bot.online : !u.hide_online && u.last_seen !== null && now - u.last_seen < FRONT_DOOR.onlineWindowMs,
     ...(u.hide_online ? { hidden: true } : {}),
     rating: banned ? null : rating,
     topPercent: banned ? null : top,

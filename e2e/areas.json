@@ -782,7 +782,9 @@
         "packages/app/src/components/Friends.tsx",
         "packages/app/src/screens/Friends.tsx",
         "packages/server/src/friends.ts",
-        "packages/server/src/friends-api.ts"
+        "packages/server/src/friends-api.ts",
+        "packages/server/src/friend-bots.ts",
+        "packages/server/src/friend-bot-schedule.ts"
       ],
       "specs": ["e2e/friends.spec.ts", "e2e/profile.spec.ts"]
     },

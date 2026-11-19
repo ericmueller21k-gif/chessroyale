@@ -6,7 +6,7 @@
  * application (access.ts). Anyone else gets "Not found". See docs/areas/ops.md, "Errors and player reports", "Health". Also the
  * item ledger's backfill (POST /api/admin/ledger/backfill: ledgerBackfill below).
  */
-import { OPS } from "@chessroyale/core";
+import { ACTIVITY_LINES, FRIEND_BOTS, OPS } from "@chessroyale/core";
 import { d1Sql, ensureSchema, userFromToken, type Sql } from "./accounts.ts";
 import { SESSION_COOKIE, readCookie } from "./api.ts";
 import { adminPage, esc, isAdmin, when, type AdminEnv } from "./admin.ts";
@@ -15,6 +15,7 @@ import { viaAccess, type AccessEnv } from "./access.ts";
 import { health, type Health } from "./health.ts";
 import { alertState, alertsStatus, SIGNALS, type AlertEnv, type Signal } from "./alerts.ts";
 import { backfillLedger, ledgerCheck } from "./ledger.ts";
+import { friendBots } from "./friend-bots.ts";
 import type { EngineEnv } from "./engine.ts";
 import type { Env } from "./index.ts";
 
@@ -64,8 +65,8 @@ export async function handleOpsAdmin(request: Request, env: OpsEnv): Promise<Res
   const q = (url.searchParams.get("q") ?? "").trim().slice(0, 100);
   const kind = REPORT_KINDS.find((k) => k === url.searchParams.get("kind")) ?? "";
   const found = /^[A-Z2-9]{6}$/.test(id) ? await reportById(sql, id) : null;
-  const [errors, reports, h, alerts] = await Promise.all([topErrors(sql, now, 30, q), latestReports(sql, 50, kind), health(env, sql, now), alertsView(env, sql)]);
-  return adminPage("Ops", page(user!.email!, { ...h, alerts }, { id, q, kind }, found, errors, reports));
+  const [errors, reports, h, alerts, bots] = await Promise.all([topErrors(sql, now, 30, q), latestReports(sql, 50, kind), health(env, sql, now), alertsView(env, sql), friendBots(sql, user!.id, now)]);
+  return adminPage("Ops", page(user!.email!, { ...h, alerts }, { id, q, kind }, found, errors, reports) + botsSection(bots));
 }
 
 /** Alerts to Discord (alerts.ts): on or off and why, and what's paging now. */
@@ -93,6 +94,22 @@ async function ledgerBackfill(request: Request, env: OpsEnv): Promise<Response> 
   const legs = await backfillLedger(sql, now);
   const disagree = (await ledgerCheck(sql, OPS.ledgerCheck.accounts)).length;
   return new Response(JSON.stringify({ legs, disagree }), { headers: { "content-type": "application/json", "cache-control": "no-store" } });
+}
+
+/**
+ * Friend bots (friend-bots.ts): the admin's own, each with what its friends list shows now, and the buttons to add or remove them.
+ * Remove stays, greyed, while there are none (nothing hidden).
+ */
+function botsSection(bots: Awaited<ReturnType<typeof friendBots>>): string {
+  const rows = bots
+    .map((b) => `<tr><td><a href="/profile/${esc(b.id)}">${esc(b.name)}</a></td><td>${b.online ? (b.doing ? esc(ACTIVITY_LINES[b.doing]) : "Online") : `offline, last on ${when(b.lastSeen)}`}</td></tr>`)
+    .join("");
+  return `<h2 id="friend-bots">Friend bots</h2><div class="card">
+<p class="muted">Test accounts with players' names on your own friends list, coming and going as people do (a schedule from the time and
+each bot's id: nothing is written while they "play"). Nobody else sees them. Remove deletes them.</p>
+${bots.length ? `<table><tr><th>Bot</th><th>Now</th></tr>${rows}</table>` : '<p class="muted">You have none.</p>'}
+<form class="row" method="post" action="/api/admin/friend-bots"><button name="action" value="add">${bots.length ? "Add any missing" : `Add ${FRIEND_BOTS.count} friend bots`}</button>
+<button name="action" value="remove"${bots.length ? "" : " disabled"}>Remove them</button></form></div>`;
 }
 
 function reportCard(r: ReportRow): string {
