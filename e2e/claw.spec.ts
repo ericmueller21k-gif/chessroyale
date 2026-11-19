@@ -167,7 +167,15 @@ test("the claw machine in Boingo's Funhouse: walk up (the camera closes in), the
   await shot("claw-won");
   // Open now: the Crates tab's own opening, to its reveal; the crate is gone from the inventory.
   await machine.getByRole("button", { name: "Open now" }).click();
-  await expect(page.locator(".claw-machine .reveal-card")).toBeVisible({ timeout: 30_000 });
+  // (Nov 19: once on main's first try the reveal never came in 30 s, and CI keeps no trace of a first try; it didn't happen again
+  // in 14 runs here, Fischer Random's longer opening included. If it does, the failure says what the panel showed: "Opening…"
+  // (no answer), an error line, the coin slot again (closed or reset), or no panel at all, and any page error.)
+  await expect(page.locator(".claw-machine .reveal-card"))
+    .toBeVisible({ timeout: 30_000 })
+    .catch(async (e: Error) => {
+      const shown = await page.locator(".claw-root").innerText({ timeout: 1000 }).catch(() => "(no claw panel)");
+      throw new Error(`no reveal; the panel showed: ${JSON.stringify(shown.slice(0, 300))}; page errors: ${JSON.stringify(errors)}`, { cause: e });
+    });
   expect((await locker(page)).bossCrates[folio.id] ?? 0).toBe(0);
   await page.getByRole("button", { name: /Done/ }).click();
   await expect(machine.locator(".claw-screen")).toHaveText("Insert one boss coin");

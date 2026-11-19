@@ -380,9 +380,9 @@ async function playByHand(page: Page, how: "tap" | "drag", phone: boolean, lasti
     await page.mouse.move(b.x, b.y, { steps: 5 });
     await page.mouse.up();
   }
-  // (A promotion asks for the piece: a queen.)
-  const promo = page.locator(".promo-piece.q");
-  if (await promo.isVisible().catch(() => false)) await promo.click();
+  // (A promotion asks for the piece: the one the move promotes to. The engine's best can be an underpromotion, c7c8r on Nov 19:
+  // always tapping the queen played c7c8q. A test bug, not the picker's: it chose exactly the piece tapped.)
+  if (move.length > 4) await page.locator(`.promo-piece.${move[4]}`).click();
   // The game has the move you meant: the square you touched was the square you meant.
   await expect.poll(() => page.evaluate((n) => (window as any).match.runner.boards.get(0).history[n] ?? null, plies), { timeout: 15_000 }).toBe(move.slice(0, 4) + (move.length > 4 ? move[4] : ""));
   return move;
