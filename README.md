@@ -67,3 +67,10 @@ script. Nothing here is app code. Phone 428 × 746 (Eric's), computer 1440 × 90
   "Climb 99 floors"), which needs 70 px. Home is 14 px taller than today, once (it never moves after).
 - The skyscraper picture is a plain dashed box labeled "ART RUNNER": the art runner draws it.
 - Not changed: the computer's side menu (it lists Boss Battle; the design says the home card only). Director: add "Battle Tower" there?
+
+## PR 10: as built (Nov 19)
+
+The real app on a local server, 2× pixels. `pr10/1-phone-428-floor-2-battle.png`: floor 2 (two bosses), your move after the bosses'
+reply: the run's strip (the boss beaten on floor 1, next floor's rating, moves left), the bar split in two, the boss to move lit with
+TO MOVE. `pr10/2-computer-1440-tower-screen.png`: the tower's screen with a run saved on floor 2 (floor 1 won, then "Stop here
+(saved)"): the run's card, bests, Solo | Party (Party greyed: coming soon), the floor's two bosses on the stage, CONTINUE FLOOR 2.
