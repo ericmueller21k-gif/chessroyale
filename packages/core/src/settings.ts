@@ -1269,7 +1269,10 @@ export const BOSS_ALONE_SCORING: Partial<Settings> = { crowdScoring: undefined }
  * docs/decisions/2026-11-19-tower-apart-pairs.md.
  */
 export const BATTLE_TOWER = {
-  /** The climb (core tower.ts; the design's section 3): 99 floors, each one game; only a win climbs. */
+  /**
+   * The climb (core tower.ts; the design's section 3): 99 floors, each one game; only a win climbs. Only ever raised: a run saved
+   * above it would end there as the top (core finishFloor), its best held at it (server tower.ts, soloBest).
+   */
   floors: 99,
   /** How many bosses a floor has, looping: floor f has pattern[(f - 1) % pattern.length] (Eric: "1 boss then 2, maybe 2 again, then 3"). */
   pattern: [1, 2, 2, 3] as readonly number[],
@@ -1287,6 +1290,12 @@ export const BATTLE_TOWER = {
   stockfishStep: 25,
   /** Leaving a floor under way is free before your leaveFreeBefore-th move (the floor fought again later, the same bosses), else a loss. */
   leaveFreeBefore: 2,
+  /**
+   * A solo floor reported won sooner than this after its start, by the server's clock, is refused, the floor still under way (server
+   * tower.ts, finishTowerFloor): a sanity check on the device's word, well under any real win (a four-move mate takes longer). Not
+   * where TEST_SWITCHES is on (local, e2e, staging).
+   */
+  soloWinMinSeconds: 10,
   rageScale: [1, 0.75, 0.6] as readonly number[],
   apart: [["hollow", "smudgy"], ["smudgy", "alfil"], ["alfil", "grex"], ["dash", "smudgy"]] as readonly (readonly [string, string])[],
   maxBosses: 3,

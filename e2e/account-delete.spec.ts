@@ -28,6 +28,28 @@ test("Settings: download my data, then delete the account (asked first); it's go
     await post("/api/locker/open", { crate: "beta-001" });
     localStorage.setItem("brc.theme", "dark");
   });
+  // A Battle Tower climb (the server's tower.ts, on this D1): floor 1 won, floor 2 under way. One open run only (a second start asks
+  // first); a result taken once (sent again, the same answer; another refused with the run).
+  const tower = await page.evaluate(async () => {
+    const post = (path: string, body: unknown) =>
+      fetch(path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }).then(async (r) => ({ status: r.status, body: (await r.json()) as Record<string, any> })); // eslint-disable-line @typescript-eslint/no-explicit-any
+    const made = await post("/api/tower/run", {});
+    const again = await post("/api/tower/run", {});
+    const fight = (await post("/api/tower/floor/start", {})).body.fight.id as string;
+    const won = await post("/api/tower/floor/finish", { fight, outcome: "won" });
+    const replay = await post("/api/tower/floor/finish", { fight, outcome: "won" });
+    const other = await post("/api/tower/floor/finish", { fight, outcome: "lost" });
+    const next = await post("/api/tower/floor/start", {});
+    return {
+      made: made.status,
+      again: [again.status, again.body.confirm],
+      won: [won.status, won.body.best],
+      replay: [replay.status, replay.body.floor, replay.body.best],
+      other: [other.status, other.body.run.floor],
+      next: next.body.floor,
+    };
+  });
+  expect(tower).toEqual({ made: 200, again: [409, true], won: [200, 1], replay: [200, 1, 1], other: [409, 2], next: 2 });
   const cookie = (await page.context().cookies()).find((c) => c.name === "hc_session")!;
 
   // Download my data: a JSON file of everything kept about the account.
@@ -37,11 +59,12 @@ test("Settings: download my data, then delete the account (asked first); it's go
   const chunks: Buffer[] = [];
   for await (const c of (await download.createReadStream())!) chunks.push(c as Buffer);
   const file = JSON.parse(Buffer.concat(chunks).toString("utf8"));
-  expect(Object.keys(file)).toEqual(expect.arrayContaining(["exportedAt", "about", "account", "sessions", "results", "shop", "locker", "reports", "friends", "problemReports", "fairPlay"]));
+  expect(Object.keys(file)).toEqual(expect.arrayContaining(["exportedAt", "about", "account", "sessions", "results", "shop", "locker", "reports", "friends", "problemReports", "fairPlay", "tower"]));
   expect(file.account).toMatchObject({ id, name: "Delia" });
   expect(file.results.map((r: { placement: number }) => r.placement)).toEqual([7]);
   expect(file.locker.items).toHaveLength(1);
   expect(file.fairPlay).toEqual({ banned: false, appeals: [] });
+  expect(file.tower).toMatchObject({ runs: [{ kind: "solo", floor: 2, status: "open" }], best: [{ kind: "solo", floor: 1 }] });
 
   // Delete account asks first; "Keep it" keeps it.
   await page.getByRole("button", { name: /^Delete account/ }).click();
@@ -79,6 +102,8 @@ test("Settings: download my data, then delete the account (asked first); it's go
     ["items", "user_id"],
     ["equipped_items", "user_id"],
     ["wallets", "user_id"],
+    ["tower_runs", "user_id"],
+    ["tower_best", "user_id"],
   ]) {
     expect(await d1(page, `SELECT 1 AS x FROM ${table} WHERE ${column} = ?`, id), `${table}.${column}`).toHaveLength(0);
   }

@@ -31,6 +31,8 @@ import { GlobalChat } from "../src/global-chat.ts";
 import { LiveBoard } from "../src/live.ts";
 import { equipLocker, openCrate } from "../src/locker.ts";
 import { countBossBattle, grantTestItems, startSoloBattle } from "../src/boss-tokens.ts";
+import { finishTowerFloor, newTowerRun, startTowerFloor } from "../src/tower.ts";
+import { towerPool } from "@chessroyale/core";
 import { memoryDb, stockCrates } from "./memory-db.ts";
 
 /**
@@ -110,6 +112,11 @@ async function world() {
   // Chat moderation: a moderator warned her (a note to her, a reason for the log); Bo's chat ban stays his.
   await decideChat(sql, a.id, { action: "warn", reason: "taunting after every move", note: "Keep it friendly." }, "admin:eric@example.com", T0 + 14);
   await decideChat(sql, bo.user.id, { action: "ban", days: 1, reason: "spamming the lobby" }, "admin:eric@example.com", T0 + 15);
+  // The Battle Tower: a climb with floor 1 won (her best) and floor 2 under way.
+  await newTowerRun(sql, a.id, T0 + 16, { confirm: false, pool: towerPool(), seed: 7 });
+  const fight = (await startTowerFloor(sql, a.id, T0 + 17, { pool: towerPool() })).body.fight as { id: string };
+  expect((await finishTowerFloor(sql, a.id, T0 + 60_000, { fight: fight.id, outcome: "won" }, { pool: towerPool(), minWinMs: 0 })).status).toBe(200);
+  await startTowerFloor(sql, a.id, T0 + 60_001, { pool: towerPool() });
   return { sql, d1, ann, bo, cy, a, phone };
 }
 
@@ -164,6 +171,8 @@ const SCHEMA_COLUMNS: Record<string, string> = {
   sessions: "token_hash user_id created_at expires_at",
   solo_battles: "user_id id started_at",
   solo_games: "user_id id started_at test_minutes",
+  tower_best: "user_id kind floor at",
+  tower_runs: "id user_id kind seed floor met members fight last status started_at updated_at",
   users: "id name icon email google_sub created_at last_seen rating allow_invites hide_online dnd pawn_color age_ok_at chat_on test",
   wallets: "user_id coins crates crate_keys xp boss_picks",
   welcome_crates: "user_id milestone granted_at games seen_at opened_at item_id def",
@@ -237,6 +246,10 @@ describe("download my data", () => {
     expect(d.problemReports.errors.map((e: { message: string; hour: string }) => [e.message, e.hour])).toEqual([["boom", new Date(T0).toISOString()]]);
     // Chat moderation: the warning as she saw it, with its note (not why, nor who); not Bo's ban.
     expect(d.chatModeration).toEqual({ decisions: [{ at: new Date(T0 + 14).toISOString(), action: "warn", until: null, note: "Keep it friendly.", ended_at: null }] });
+    // The Battle Tower: her climb (floor 2 under way, floor 1's bosses met) and her best, never the run's seed or deck.
+    expect(d.tower.runs).toMatchObject([{ kind: "solo", floor: 2, status: "open", fight_at: new Date(T0 + 60_001).toISOString(), started_at: new Date(T0 + 16).toISOString() }]);
+    expect(d.tower.runs[0].floors).toHaveLength(2);
+    expect(d.tower.best).toEqual([{ kind: "solo", floor: 1, at: new Date(T0 + 60_000).toISOString() }]);
     // Nothing of anyone else's but the names the app shows her: no other email, no report about her, no hash.
     const text = JSON.stringify(d);
     for (const secret of ["bo@example.com", "cy@example.com", "Offensive name or icon", "token_hash", "code_hash", DEVICE, "more bosses", "bang", "taunting", "eric@example.com", "spamming"]) {
