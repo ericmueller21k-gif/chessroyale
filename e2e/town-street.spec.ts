@@ -666,10 +666,10 @@ test("the Hidden Boss's walk-up: its door, the hall, up two flights to his room,
 
 /**
  * The Battle Tower (Nov 19; docs/areas/town-square.md, "The Battle Tower"), in everyone's town: its door on Colosseum Row opens the lobby,
- * the clerk's card ("Clerk") has Talk, a link to the tower's screen (/tower, PR 10's), and Go out at the glass doors brings you back to
- * the street. `STILLS=<dir>` writes the stills for the PR.
+ * the clerk's card ("Clerk") starts your climb (Start, "Start over" greyed with no run: PR 11b, the tower's flow is battle-tower.spec.ts),
+ * and Go out at the glass doors brings you back to the street. `STILLS=<dir>` writes the stills for the PR.
  */
-test("the Battle Tower: its door opens the lobby, the clerk's Talk links to /tower, and back out", async ({ page }) => {
+test("the Battle Tower: its door opens the lobby, the clerk's card offers Start, and back out", async ({ page }) => {
   test.setTimeout(120_000);
   const errors = watchErrors(page);
   type Hooks = { __townGlide?: (to: string) => void; __townAt?: (k: string, id: string) => { x: number; y: number } | null; __shopAt?: (k: string, s?: unknown) => { x: number; y: number } | null; __shopLook?: (k: string) => boolean };
@@ -696,7 +696,7 @@ test("the Battle Tower: its door opens the lobby, the clerk's Talk links to /tow
   await expect(room).toHaveAttribute("data-room", "tower");
   await expect(page.getByRole("heading", { name: "Battle Tower" })).toBeVisible();
   await still("tower-lobby", 3500);
-  // The clerk: a tap walks you up to the counter, and his card says "Clerk" with Talk, a link to the tower's screen.
+  // The clerk: a tap walks you up to the counter, and his card says "Clerk" with Start (no run yet) and "Start over" greyed.
   const clerk = page.getByRole("dialog", { name: "Clerk", exact: true });
   await expect(async () => {
     if (await clerk.isVisible()) return;
@@ -707,7 +707,8 @@ test("the Battle Tower: its door opens the lobby, the clerk's Talk links to /tow
     await expect(clerk).toBeVisible({ timeout: 10_000 });
   }).toPass({ timeout: 40_000 });
   await expect(clerk.getByRole("heading")).toHaveText("Clerk");
-  await expect(clerk.getByRole("link", { name: "Talk" })).toHaveAttribute("href", "/tower");
+  await expect(clerk.getByRole("button", { name: "Start", exact: true })).toBeEnabled({ timeout: 20_000 });
+  await expect(clerk.getByRole("button", { name: "Start over" })).toBeDisabled();
   await page.waitForTimeout(800);
   await still("tower-clerk");
   await page.keyboard.press("Escape");
