@@ -1,6 +1,7 @@
 import { FRIENDS, FRONT_DOOR, CAPACITY, isInviteSetting, levelOf, type FriendsState, type InviteKind, type InviteSetting, type PlayerSearchEntry } from "@chessroyale/core";
 import type { Sql, Stmt } from "./accounts.ts";
 import type { Presence } from "./live.ts";
+import { botPresence, isFriendBot } from "./friend-bot-schedule.ts";
 
 /**
  * Friends and invites in D1 (docs/decisions/2026-10-15-friends-and-invites.md; the tables are listed in docs/areas/accounts.md for the
@@ -336,7 +337,7 @@ export async function friendsState(sql: Sql, meId: string, now: number, presence
   ]);
   const live = await presenceRows(rows, now, presenceOf);
   const friends = rows
-    .map((r) => ({ id: r.id, name: r.name, since: r.since, ...live[r.id]!, hidden: !!r.hide_online, lastSeen: r.hide_online ? null : r.last_seen }))
+    .map((r) => ({ id: r.id, name: r.name, since: r.since, ...live[r.id]!, hidden: !!r.hide_online, lastSeen: r.hide_online ? null : isFriendBot(r.id) ? botPresence(r.id, now).lastSeen : r.last_seen }))
     .sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name, "en", { sensitivity: "base" }));
   return {
     friends,
@@ -360,14 +361,17 @@ interface FriendRow {
 
 /** Online, in a match and what they're doing for each friend: the live hub's (one call), nothing for one who hides it. */
 async function presenceRows(rows: FriendRow[], now: number, presenceOf?: PresenceOf): Promise<Record<string, Presence>> {
-  const shown = rows.filter((r) => !r.hide_online).map((r) => r.id);
+  // (Friend bots aren't in the live hub: their schedule says, from the time and their id. friend-bot-schedule.ts.)
+  const shown = rows.filter((r) => !r.hide_online && !isFriendBot(r.id)).map((r) => r.id);
   const live = shown.length && presenceOf ? await presenceOf(shown).catch(() => null) : null;
   const out: Record<string, Presence> = {};
   for (const r of rows) {
     // (Without the live hub: D1's last_seen, which a request touches every 15 s there.)
     const p: Presence = r.hide_online
       ? { online: false, busy: false }
-      : (live?.[r.id] ?? { online: !live && r.last_seen !== null && now - r.last_seen < FRONT_DOOR.onlineWindowMs + CAPACITY.presence.lastSeenWriteMs, busy: false });
+      : isFriendBot(r.id)
+        ? botPresence(r.id, now)
+        : (live?.[r.id] ?? { online: !live && r.last_seen !== null && now - r.last_seen < FRONT_DOOR.onlineWindowMs + CAPACITY.presence.lastSeenWriteMs, busy: false });
     out[r.id] = { online: p.online, busy: p.online && p.busy, ...(p.online && p.doing ? { doing: p.doing } : {}) };
   }
   return out;
