@@ -1,3 +1,4 @@
+- Nov 19 ~07:25 UTC: #814 flakes-2 MERGED (ceab372); main watcher armed. All work merged; nothing running. Blocked on Eric: mockups (PR 10, PR 13), art spend (PR 11), 3 audit questions.
 - Nov 19 ~07:05 UTC: #813 LIVE (7d6e306), main full run GREEN (no flaky retries). #814 CI bbw5ar3bk.
 - Nov 19 ~06:55 UTC: #812 LIVE (fdca626), main full run GREEN; live /api/tower answers 401 without a session (wired). Flakes-2 -> #814 (83b1434; chandy vote tap fixed: test timing; town SW not reproduced, now reports its stage), CI watched. Main watcher bbrx7p41m for 7d6e306 (#813). No helpers running. Waiting on Eric for PR 10 (mockups) and PR 11 (art spend).
 - Nov 19 ~06:30 UTC: #813 flakes-1 MERGED (7d6e306). Main watchers: b05vr5543 (#812 fdca626), new one for 7d6e306. ASKED ERIC: mockups OK?, side menu?, approve paid art run for the tower room (PR 11, under $20 cap)?, 3 audit questions.
