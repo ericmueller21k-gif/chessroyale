@@ -120,6 +120,8 @@ export const BOSS_FACE: Record<HomeId, readonly [x: number, y: number, size: num
   recluse: [32, 34, 44],
   // (His snout and eye strap.)
   chandy: [36, 26, 44],
+  // (The Battle Tower has nobody out front: its chip shows its glass door under the sunburst, in its own picture.)
+  tower: [46, 500, 52],
 };
 
 // ---- Colors (the prototype's, sampled from Eric's reference picture).

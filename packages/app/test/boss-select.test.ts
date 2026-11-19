@@ -183,7 +183,7 @@ describe("a boss's sound when tapped in the town square (Eric, Oct 27)", () => {
     expect(townSound("tiger", 0)).toBe(SELECT_SOUND.tiger);
     expect(townSound("tiger", 5)).toBe(SELECT_SOUND.tiger);
     expect([0, 1, 2, 3].map((n) => townSound("folio", n))).toEqual(["folioMurmur", "folioHum", "folioMurmur", "folioHum"]);
-    // Every boss with a home in the town has one.
-    for (const h of HOMES) expect(townSound(h.id, 0), h.id).toBeTruthy();
+    // Every boss with a home in the town has one (the Battle Tower, Nov 19, is no boss's).
+    for (const h of HOMES.filter((h) => h.id !== "tower")) expect(townSound(h.id, 0), h.id).toBeTruthy();
   });
 });

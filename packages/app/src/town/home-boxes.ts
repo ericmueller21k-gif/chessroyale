@@ -29,6 +29,8 @@
  *   recluse    The Walk-up                  red-brown brick, three rows of arched windows down each side (it's a corner building:
  *                                           its east side faces Seam Avenue), a flat tar roof behind its cornice, a water tank on
  *                                           its bulkhead (Nov 13, the Hidden Boss's)
+ *   tower      Battle Tower                 slate glass curtain walls, gold corners, up to where its front melts into the sky (no roof
+ *                                           is ever seen: Nov 19, the art's)
  *   chandy     Chandy's Swamp               no building: cypresses and brush ringing it (leafy walls on its sides and back, their
  *                                           crowns on top) and the swamp's water filling its middle (Nov 16)
  */
@@ -36,12 +38,13 @@ import type { Character } from "../characters/sprite.ts";
 import type { LightSpot } from "./houses/kit.ts";
 import { HOUSES } from "./houses/index.ts";
 import { HOUSE_CHANDY_DOOR } from "./houses/chandy.ts";
+import { HOUSE_TOWER_DOOR } from "./houses/tower.ts";
 import {
   BASE, blockF, domeRoof, flatRoof, gableRoof, hipRoof, hipWideRoof, quadF, sideArt, SQ, vaultRoof,
   type Face, type SideSpec, type TownBox,
 } from "./town-kit.ts";
 
-export type HomeId = "tiger" | "gingerbread" | "grex" | "hollow" | "moo" | "clown" | "bigboy" | "sawyer" | "pig" | "smudgy" | "hopper" | "gardener" | "alfil" | "folio" | "timber" | "blitz" | "zebra" | "recluse" | "chandy";
+export type HomeId = "tiger" | "gingerbread" | "grex" | "hollow" | "moo" | "clown" | "bigboy" | "sawyer" | "pig" | "smudgy" | "hopper" | "gardener" | "alfil" | "folio" | "timber" | "blitz" | "zebra" | "recluse" | "chandy" | "tower";
 
 /** A home's box: its sides (null: its roof runs to the ground there), roof, palette, and where its door is on its front. */
 interface HomeSpec {
@@ -186,6 +189,14 @@ export const HOME_SPECS: Record<HomeId, HomeSpec> = {
     back: { h: 118, side: { mat: "foliage", corner: false } },
     roof: flatRoof(4, 140, 6, "water").map((f) => ({ ...f, rim: false })),
     pal: { ...ramp("#1f3d1f", "#2f5a2a", "#4f8a3c"), ...roofRamp("#1d3a2c", "#284c37", "#4b7d5d"), r: "#7aae4c", s: "#4f8a3c", S: "#2f5a2a" },
+  },
+  // (The Battle Tower, Nov 19: its shaft x 12 to 131, solid up to 458 px over its foot (houses/tower.ts); its base, 8 px wider each side,
+  // stands out as a front only. The sides are slate glass in gold corners; no roof: its front dissolves into the sky from there.)
+  tower: {
+    body: [12, 132], eave: [458, 458], door: HOUSE_TOWER_DOOR,
+    side: { mat: "glass", trim: [0] },
+    roof: [],
+    pal: { ...ramp("#20232a", "#2a3446", "#5a6a84"), g: "#c8860d", G: "#8a5c08" },
   },
   hollow: {
     body: [28, 124], eave: null, door: 81, taper: 0.55,

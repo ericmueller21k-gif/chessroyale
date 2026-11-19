@@ -173,24 +173,24 @@ export const tableAt = (c: number, r: number): Table | null => TABLES.find((t) =
 /** Your square when the page opens: the street town's start (its plan's). */
 export const START: Sq = STREET_START;
 
-export type HomeId = "tiger" | "gingerbread" | "grex" | "hollow" | "moo" | "clown" | "bigboy" | "sawyer" | "pig" | "smudgy" | "hopper" | "gardener" | "alfil" | "folio" | "timber" | "dash" | "zebra" | "recluse" | "chandy";
+export type HomeId = "tiger" | "gingerbread" | "grex" | "hollow" | "moo" | "clown" | "bigboy" | "sawyer" | "pig" | "smudgy" | "hopper" | "gardener" | "alfil" | "folio" | "timber" | "dash" | "zebra" | "recluse" | "chandy" | "tower";
 /**
  * The homes whose boss isn't out in the town: Rolling Dough (Nov 11, Eric's design: Don Dough is the kingpin "in the back room (not
  * out in the town)"; you meet him in his bakery's back room). They're last in ALL_HOMES, so the town's bosses keep the homes' order.
  */
-export type IndoorId = "zebra" | "recluse";
+export type IndoorId = "zebra" | "recluse" | "tower";
 /** The Hidden Boss's name: core's one string (Eric names him later; the real one never appears anywhere). */
 const RECLUSE_NAME: string = BOSS_ROSTER.find((b) => b.id === "recluse")!.name;
 /** A home whose boss roams the town round it. */
 export type TownBossId = Exclude<HomeId, IndoorId>;
-export const hasTownBoss = <H extends { id: HomeId }>(h: H): h is H & { id: TownBossId } => h.id !== "zebra" && h.id !== "recluse";
+export const hasTownBoss = <H extends { id: HomeId }>(h: H): h is H & { id: TownBossId } => h.id !== "zebra" && h.id !== "recluse" && h.id !== "tower";
 /**
  * The homes with nobody out front (Nov 13: the Hidden Boss's walk-up; he's upstairs, and no stand-in waits at its door). They're last in
  * ALL_HOMES, so the town's figures (its bosses and stand-ins, `Town.bosses`) keep the homes' order, each at its home's index.
  */
-export type NoFigureId = "recluse";
+export type NoFigureId = "recluse" | "tower";
 /** A home with someone out front: its boss, or its stand-in. */
-export const hasFigure = (h: { id: HomeId }): boolean => h.id !== "recluse";
+export const hasFigure = (h: { id: HomeId }): boolean => h.id !== "recluse" && h.id !== "tower";
 /**
  * A home whose boss is inside has a stand-in out front, where the others' bosses stand (Eric, Nov 11: "people are going to be used to
  * seeing a guy out front"): Rolling Dough's guard. He stands still on its rest square, says nothing on his own, and his card's Talk says
@@ -302,6 +302,11 @@ export const ALL_HOMES: readonly Home[] = (
     // In an admin's town only while he's in the game for admins first (core's BOSS_ADMIN_FIRST; his Boss Battle tile stays locked:
     // adminOnly). His name is core's one string. docs/decisions/2026-11-13-hidden-boss-building.md.)
     { id: "recluse", boss: RECLUSE_NAME, name: "The Walk-up", color: "#8a3b2a", cx: 45, cy: 7 },
+    // (Nov 19: the Battle Tower, Chess Town's skyscraper, no boss's (Eric: "go into the town and then going into the big building in
+    // there ... talk to the guy at the front"). The street town: Colosseum Row's north side, columns 45-48, between Dash's Kicks and
+    // Seam Avenue (street-plan.json). Nobody out front (hasFigure): its clerk is at the lobby's counter (shops/shops.ts). Last of the
+    // homes. Its ring the app's deep gold. In everyone's town. docs/decisions/2026-11-19-tower-building.md.)
+    { id: "tower", boss: "Battle Tower", name: "Battle Tower", color: "#c8860d", cx: 47, cy: 2 },
   ] satisfies Omit<Home, "half" | "foot" | "hw" | "hd" | "door" | "entry" | "rest" | "wander">[]
 ).map(streetHome);
 /**

@@ -315,7 +315,9 @@ export function TownScreen({
    * one surface each; his room's walls and the child at his game, on the clock, so his game is where it is whenever you come up).
    */
   const roomFxOf = (id: HomeId, part: RoomPart): Promise<RoomFx | null> | null =>
-    id !== "recluse"
+    id === "tower"
+      ? chunk(import("./shops/tower-scene.ts")).then((m) => m.TOWER_LOBBY_FX)
+      : id !== "recluse"
       ? null
       : part === "top"
         ? chunk(import("./shops/recluse-scene.ts")).then((m) => {

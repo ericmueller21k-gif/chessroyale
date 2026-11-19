@@ -889,6 +889,12 @@ exception: about 7 squares from Ginger's igloo (`town-camera.test.ts`).
   Hidden Boss's walk-up": the door, up two flights, his card,
   back down; `STILLS=<dir>` writes the stills).
 
+## The Battle Tower (Nov 19; everyone's town)
+
+- **Front** (`houses/tower.ts`, 144 x 592): Colosseum Row 45-48, its sign "BATTLE TOWER"; nobody out front (`hasFigure`); box: slate glass sides, no roof. Card: Go in.
+- **Lobby** (`shops/tower-art.ts`, `tower-scene.ts` its side walls): the clerk (`towerclerk`, `tall: 57`, tag and card "Clerk"); Talk is a link to `/tower` (`ShopDef.talkTo`); the elevator solid (its door is PR 11b's); "BEST FLOORS" written on the empty board (`RoomArt.sign.ink`).
+- e2e `town-street.spec.ts` ("the Battle Tower"). [2026-11-19-tower-building.md](../decisions/2026-11-19-tower-building.md)
+
 ## Chandy's Swamp (Nov 16; an admin's town only, as Chandy is admins first)
 
 - **Front** (`houses/chandy.ts`, 144 × 170): cypresses as tall as the row houses, a pond between going back to a far bank half way up

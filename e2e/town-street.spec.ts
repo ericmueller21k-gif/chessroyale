@@ -663,3 +663,71 @@ test("the Hidden Boss's walk-up: its door, the hall, up two flights to his room,
   await expect(room).toHaveAttribute("data-room", "recluse");
   expect(errors).toEqual([]);
 });
+
+/**
+ * The Battle Tower (Nov 19; docs/areas/town-square.md, "The Battle Tower"), in everyone's town: its door on Colosseum Row opens the lobby,
+ * the clerk's card ("Clerk") has Talk, a link to the tower's screen (/tower, PR 10's), and Go out at the glass doors brings you back to
+ * the street. `STILLS=<dir>` writes the stills for the PR.
+ */
+test("the Battle Tower: its door opens the lobby, the clerk's Talk links to /tower, and back out", async ({ page }) => {
+  test.setTimeout(120_000);
+  const errors = watchErrors(page);
+  type Hooks = { __townGlide?: (to: string) => void; __townAt?: (k: string, id: string) => { x: number; y: number } | null; __shopAt?: (k: string, s?: unknown) => { x: number; y: number } | null; __shopLook?: (k: string) => boolean };
+  const room = page.locator("canvas.town-shop-canvas");
+  const still = async (name: string, settle = 0) => {
+    if (!STILLS) return;
+    mkdirSync(STILLS, { recursive: true });
+    await page.waitForTimeout(settle);
+    await page.screenshot({ path: `${STILLS}/${name}-${test.info().project.name}.png` });
+  };
+  await page.goto("/town?sky=day");
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
+  await page.evaluate(() => (window as unknown as Hooks).__townGlide?.("tower"));
+  const homeAt = () => page.evaluate(() => (window as unknown as Hooks).__townAt?.("home", "tower") ?? null);
+  await expect.poll(homeAt, { message: "the tower comes into view", timeout: 20_000 }).not.toBeNull();
+  await page.waitForTimeout(1500);
+  await still("tower-street");
+  // Its card: its name and Go in, nothing else.
+  const card = await tapInTown(page, "home", "tower", page.getByRole("dialog", { name: "Battle Tower", exact: true }));
+  await expect(card.getByRole("heading")).toHaveText("Battle Tower");
+  await expect(card.getByRole("button")).toHaveText(["Go in"]);
+  await card.getByRole("button", { name: "Go in" }).click();
+  await expect(room).toHaveAttribute("data-ready", "1", { timeout: 20_000 });
+  await expect(room).toHaveAttribute("data-room", "tower");
+  await expect(page.getByRole("heading", { name: "Battle Tower" })).toBeVisible();
+  await still("tower-lobby", 3500);
+  // The clerk: a tap walks you up to the counter, and his card says "Clerk" with Talk, a link to the tower's screen.
+  const clerk = page.getByRole("dialog", { name: "Clerk", exact: true });
+  await expect(async () => {
+    if (await clerk.isVisible()) return;
+    const xy = await page.evaluate(() => (window as unknown as Hooks).__shopAt?.("keeper") ?? null);
+    const cv = xy && (await room.boundingBox());
+    expect(xy && cv, "the clerk on screen").toBeTruthy();
+    await page.mouse.click(cv!.x + xy!.x, cv!.y + xy!.y);
+    await expect(clerk).toBeVisible({ timeout: 10_000 });
+  }).toPass({ timeout: 40_000 });
+  await expect(clerk.getByRole("heading")).toHaveText("Clerk");
+  await expect(clerk.getByRole("link", { name: "Talk" })).toHaveAttribute("href", "/tower");
+  await page.waitForTimeout(800);
+  await still("tower-clerk");
+  await page.keyboard.press("Escape");
+  await expect(clerk).toBeHidden();
+  // Out through the glass doors (a tap walks you there; its card's Go out): the street again.
+  const door = page.getByRole("dialog", { name: "Door", exact: true });
+  await expect(async () => {
+    if (await door.isVisible()) return;
+    // (On a computer the doors are below the room's fixed view: the view brought to them, as a drag there would.)
+    if (!(await page.evaluate(() => (window as unknown as Hooks).__shopAt?.("door") ?? null))) {
+      await page.evaluate(() => (window as unknown as Hooks).__shopLook?.("door"));
+      await page.waitForTimeout(300);
+    }
+    const xy = await page.evaluate(() => (window as unknown as Hooks).__shopAt?.("door") ?? null);
+    const cv = xy && (await room.boundingBox());
+    expect(xy && cv, "the glass doors on screen").toBeTruthy();
+    await page.mouse.click(cv!.x + xy!.x, cv!.y + xy!.y);
+    await expect(door).toBeVisible({ timeout: 10_000 });
+  }).toPass({ timeout: 40_000 });
+  await door.getByRole("button", { name: "Go out" }).click();
+  await expect(room).toHaveCount(0, { timeout: 20_000 });
+  expect(errors).toEqual([]);
+});

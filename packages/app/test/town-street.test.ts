@@ -43,9 +43,9 @@ describe("the street town's layout is the plan's (Nov 5)", () => {
     expect(walkable(START.c, START.r)).toBe(true);
   });
 
-  it("has all seventeen homes (an admin's, Rolling Dough the seventeenth since Nov 11), each on its lot, its picture's foot on the lot's front line, centred", () => {
+  it("has every home (twenty since the Battle Tower, Nov 19), each on its lot, its picture's foot on the lot's front line, centred", () => {
     expect(HOMES).toEqual(ALL_HOMES);
-    expect(HOMES).toHaveLength(19);
+    expect(HOMES).toHaveLength(20);
     for (const h of HOMES) {
       const l = lotOf(h.id);
       expect(h.cx, h.id).toBe(l.c0 + (l.w - 1) / 2);
@@ -94,13 +94,13 @@ describe("the street town's layout is the plan's (Nov 5)", () => {
     expect(LAMPS).toHaveLength(PLAN.props.filter((p) => p.kind === "lamp").length);
     // (A lamp stands on a sidewalk, never under a row.)
     for (const l of LAMPS) expect(ROW_GROUND[l.r * N + l.c], at(l.c, l.r)).toBe(0);
-    expect(STREET_LOTS.filter((l) => l.kind === "home")).toHaveLength(19);
+    expect(STREET_LOTS.filter((l) => l.kind === "home")).toHaveLength(20);
   });
 
   it("no lamp stands in front of a boss's home (Eric, Nov 7: \"lamp posts right in front of Big Boy's Crib and Dash's Kicks… it just looks bad\"): none in any home's frontage box, its lot's width (its picture's, shifted) and half a square either side, from its front to the street's walking line", () => {
     const MARGIN = 0.5;
     const homes = STREET_LOTS.filter((l) => l.kind === "home");
-    expect(homes).toHaveLength(19);
+    expect(homes).toHaveLength(20);
     for (const h of homes) {
       // (Every home's front faces south, onto the sidewalk row just south of it: the walking line is that row's street edge.)
       expect(h.facing, h.id).toBe("S");
@@ -260,5 +260,21 @@ describe("Rolling Dough stands clear of the other homes (Eric, Nov 11: \"make su
       return Math.max(dc, dr);
     };
     for (const h of homes) if (h !== zebra) expect(gap(zebra, h), h.id).toBeGreaterThanOrEqual(4);
+  });
+});
+
+describe("the Battle Tower (Nov 19): Chess Town's skyscraper on Colosseum Row", () => {
+  it("stands on its lot (columns 45-48, the art's), nobody out front, its door square on the sidewalk, the walk past it open (its lamps gone)", () => {
+    const lot = lotOf("tower");
+    expect([lot.c0, lot.r0, lot.w, lot.d, lot.street]).toEqual([45, 40, 4, 4, "colosseum-row"]);
+    const home = HOMES.find((h) => h.id === "tower")!;
+    expect(home.name).toBe("Battle Tower");
+    expect(hasTownBoss(home)).toBe(false);
+    expect(createTown().bosses.some((b) => b.home.id === "tower")).toBe(false);
+    // (Its lot isn't walked on; the sidewalk in front of it, its door square too, is, from the start.)
+    const d = stepsFrom(START);
+    for (let c = 45; c <= 48; c++) expect(walkable(c, 40), at(c, 40)).toBe(false);
+    for (let c = 43; c <= 50; c++) expect(d[39 * N + c]! >= 0 && walkable(c, 39), at(c, 39)).toBe(true);
+    expect(home.door).toEqual({ c: 47, r: 39 });
   });
 });
