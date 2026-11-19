@@ -121,6 +121,7 @@ The design, its calls settled with Eric (Nov 18): [docs/decisions/2026-11-18-bat
   or closed (`KeptGame.turnMs`) and given back as used on a rejoin, and while the page is hidden your turn's clock stands still (no time
   passes while you're away); the floor's XP game id is kept (`KeptFloor.xp`) and a rejoin goes on with it, never a new one
   (xp.ts `noteFloorGame`). [2026-11-19-tower-audit-2-fixes.md](../decisions/2026-11-19-tower-audit-2-fixes.md).
+- **Hollow's wrong tries and the quests (Nov 20):** a wrong try into the dark keeps the floor as it happens (a reload has the same bulbs out); a floor counts for XP and the profile but never the boss quests (the result's `tower`, core `soloQuestMode`). [2026-11-20-tower-hollow-quests.md](../decisions/2026-11-20-tower-hollow-quests.md).
 - **A shared floor's screens (audit 2, finding 1):** the view's top level is the boss in focus; each boss's own part (`side.bosses`, his own
   ice too) is drawn as he would be alone (`boss-side.ts`: `sideOf`, `partsOf`, `partOf`, `moverOf`, `plyMoverOf`, `onSide`): `PowerBoard`
   once a boss with his own moments, his decor, gold, elephants, dark and the power-specific board animations from his part; every

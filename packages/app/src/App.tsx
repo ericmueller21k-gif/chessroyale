@@ -521,6 +521,7 @@ export function App() {
         // (Removed for idling: "No XP: you left the match.", as online. Review m6.)
         left: how === "afk",
         test: soloTestGame(practiceOn()),
+        ...(solo.tower ? { tower: true } : {}),
       });
       settleSoloXp(solo, xp);
     });

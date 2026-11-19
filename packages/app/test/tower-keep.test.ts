@@ -131,4 +131,38 @@ describe("a tower floor kept on the device (audit 2, finding 2)", () => {
     expect(loadKept()!.game!.turnMs).toBe(used + 5_000);
     r.dispose();
   });
+
+  it("Hollow's wrong try into the dark is kept as it happens: a reload mid-turn has the same bulbs out (Nov 20)", async () => {
+    const one = { towerFloor: 1, bossId: "hollow", bossIds: ["hollow"], bossAvoid: "" } satisfies Partial<Settings>;
+    const m = new SoloMatch([engine], "Ann", { ...settings, ...one } as Settings, false, false);
+    m.tower = new FloorPlay({ ...kept0, floor: 1, bosses: one.bossIds, settings: one, beaten: [] }, 0);
+    m.tower.begin();
+    m.start();
+    // (Your turns until the dark covers a square: his moves cover them.)
+    const dark = () => (m.runner.state.boss?.powers?.dark ?? []).map((d) => d.square);
+    for (let t = 0; t < 12 && !(yourTurn(m) && dark().length); t++) {
+      await until(m, () => yourTurn(m), "your turn");
+      if (dark().length) break;
+      const fen = (m.phase as { board: { fen: string } }).board.fen;
+      m.submit((m.runner.crowdAllowed() ?? legalMoves(fen))[0]!);
+      await until(m, () => !yourTurn(m), "his turn");
+    }
+    await until(m, () => yourTurn(m) && dark().length > 0, "your turn with the dark on the board");
+    const fen = (m.phase as { board: { fen: string } }).board.fen;
+    const sq = dark()[0]!;
+    const to = ["a1", "h8", "a8", "h1"].find((t) => t !== sq && !legalMoves(fen).includes(`${sq}${t}`))!;
+    const out0 = m.runner.state.boss!.powers!.strand?.out ?? 0;
+    m.darkTry(`${sq}${to}`);
+    expect(m.runner.state.boss!.powers!.strand!.out).toBe(out0 + 1);
+    // Kept at once: no step of the bosses' turn in between.
+    const kept = loadKept()!;
+    expect(kept.game!.snapshot.state.boss!.powers!.strand!.out).toBe(out0 + 1);
+    m.dispose();
+    const r = new SoloMatch([engine], "Ann", { ...settings, ...one } as Settings, false, false);
+    r.tower = new FloorPlay(kept, 0);
+    r.resume(kept.game!);
+    await until(r, () => yourTurn(r), "your turn, rejoined");
+    expect(r.runner.state.boss!.powers!.strand!.out).toBe(out0 + 1);
+    r.dispose();
+  });
 });
