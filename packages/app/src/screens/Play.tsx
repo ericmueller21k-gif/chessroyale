@@ -1,4 +1,5 @@
 import { SideFigures } from "./TowerBar.tsx";
+import { onSide, partOf, partsOf, sideOf } from "../boss-side.ts";
 import { useEffect, useMemo, useState } from "preact/hooks";
 import { BOSS_POWERS } from "@chessroyale/core";
 import { applyMove, fenAtPly, legalMoves, sideToMove } from "@chessroyale/chess";
@@ -122,7 +123,11 @@ export function PlayScreen({
   const total = allowedMs ?? match.settings.moveClockSeconds * 1000;
   const secsLeft = Math.ceil((deadline - now) / 1000);
   // (Dash's Time Scramble: its own 3-2-1 stands in for the round's end count, ScrambleCount.)
-  const scrambled = match.boss?.id === "dash" && !!match.boss.powers?.dash?.scramble;
+  // (A floor of several: each boss's own things from his own part of the view, whoever is to move: audit 2, finding 1. Else the boss.)
+  const own = (id: string) => (match.boss ? partOf(match.boss, id) : null);
+  const dash = own("dash");
+  const hollow = own("hollow");
+  const scrambled = dash?.id === "dash" && !!dash.powers?.dash?.scramble;
   const ending = !waiting && !intro && deadline > 0 && secsLeft > 0 && secsLeft <= COUNT_FROM_SECONDS && !scrambled;
 
   const hint = match.hint;
@@ -193,21 +198,22 @@ export function PlayScreen({
   // Boss battle: the God King striking the boss. The clock stands still and nobody moves until he's gone.
   const striking = !!strike?.at && now < strike.until!;
   // Hollow's dark: the squares covered (their pieces hidden), and how your last attempt into it went.
-  const dark = useMemo(() => (match.boss?.powers?.dark ?? []).map((d) => d.square), [match.boss?.powers?.dark?.map((d) => d.square).join()]);
+  const dark = useMemo(() => (hollow?.powers?.dark ?? []).map((d) => d.square), [hollow?.powers?.dark?.map((d) => d.square).join()]);
   const note = match.darkNote;
   // (Boss alone, his bulbs: no move of yours while the dark moves for you, nor once the last bulb is out.)
   const canMove = !waiting && !intro && !shown.replaying && !history.browsing && !striking && !stallHolding(stall, now) && !note?.pending && !note?.forced && !note?.blackout;
   // His word on each wrong move into the dark (a taunt at random, never the same twice running; Eric, Nov 5), and in Boss
   // alone the dark's move for you and the blackout, each with its sound.
-  const strand = match.boss?.powers?.strand;
+  const strand = hollow?.powers?.strand;
   useEffect(() => {
     if (!note || note.pending || !match.boss) return;
     if (note.blackout) return void play("hollowBlackout");
     if (note.forced) {
       play("hollowForced");
-      return void bossVoice.say(HOLLOW_BULB_LINES.forced, `forced:${note.at}`, CRITICAL);
+      return void bossVoice.say(HOLLOW_BULB_LINES.forced, `hollow:forced:${note.at}`, CRITICAL);
     }
-    bossVoice.say(hollowTaunt(bossKit(match.boss.name)?.lines.misplay), `misplay:${note.at}`, NORMAL);
+    // (Keyed by his id: on a floor of several, his own bubble says it, TowerBar speakerOf.)
+    bossVoice.say(hollowTaunt(bossKit((hollow ?? match.boss).name)?.lines.misplay), `hollow:misplay:${note.at}`, NORMAL);
   }, [note?.at]);
   // Premoves (chess.com's; docs/areas/board.md): kept by the match, this board and your side through the boss's and the
   // other team's screens; the first plays as soon as you can move (after the opening and the countdown). Not in Classic's
@@ -260,7 +266,7 @@ export function PlayScreen({
     const prevFen = board.history.length >= 2 ? seenFen(fenAtPly(board.history, board.history.length - 2, board.bases)) : undefined;
     const cues = turnCues({ fen: seen, side, charges: match.boss.kingCharges, ply: board.ply, ours: w === undefined ? undefined : side === "w" ? w : 1 - w, struckAt: strike?.at, prevFen, noHelp: kingBlocked(match.boss) });
     // (Wrangler's forced duel: the move must be a duel, so "move your queen" or "shield the king" can't be heeded.)
-    return duelTurn(match.boss) ? cues.filter((c) => c.cue !== "queenDanger" && c.cue !== "mateThreat") : cues;
+    return duelTurn(own("pig")!) ? cues.filter((c) => c.cue !== "queenDanger" && c.cue !== "mateThreat") : cues;
   }, [board.fen, strike?.at, waiting]);
 
   return (
@@ -296,15 +302,16 @@ export function PlayScreen({
         <div class="board-row">
           {match.boss && <SideFigures match={match} />}
           <EvalBar fen={history.fen ?? board.fen} orientation={orientation === "white" ? "w" : "b"} evaluate={(f) => match.evaluate(f)} />
-          <Board fen={fen} unmasked={drawnTrue} orientation={orientation} turn={view.turn} lastMove={lastMove} interactive={canMove} moves={offeredMoves} stopped={stoppedMove} onMove={(m, how) => match.submit(m, how?.premove)} premove={premove} onRefused={match.boss ? (m) => (setRefused({ line: refusedLine(match.boss!, board.fen, m), fen: board.fen, at: Date.now() }), goldClink(match.boss, board.fen, m)) : undefined} arrows={arrows} dark={dark} onDarkTry={(m) => match.darkTry(m)} elephants={history.browsing ? undefined : match.boss?.powers?.elephants} gold={history.browsing ? undefined : zebraGold(match.boss)} decor={history.browsing ? undefined : boingoDecor(match.boss)}>
+          <Board fen={fen} unmasked={drawnTrue} orientation={orientation} turn={view.turn} lastMove={lastMove} interactive={canMove} moves={offeredMoves} stopped={stoppedMove} onMove={(m, how) => match.submit(m, how?.premove)} premove={premove} onRefused={match.boss ? (m) => (setRefused({ line: refusedLine(match.boss!, board.fen, m), fen: board.fen, at: Date.now() }), goldClink(own("zebra"), board.fen, m)) : undefined} arrows={arrows} dark={dark} onDarkTry={(m) => match.darkTry(m)} elephants={history.browsing || !match.boss ? undefined : onSide(match.boss, (b) => b.powers?.elephants)} gold={history.browsing ? undefined : zebraGold(own("zebra"))} decor={history.browsing ? undefined : boingoDecor(own("clown"))}>
             {/* (Stepping back through the game keeps the dark on its squares: it belongs to the square.) */}
-            {match.boss?.powers && (!history.browsing || dark.length > 0) && <PowerBoard boss={match.boss} orientation={orientation} fen={fen} />}
+            {/* (A floor of several: every boss's marks, each from his own part of the view: audit 2, finding 1.) */}
+            {match.boss?.powers && (!history.browsing || dark.length > 0) && partsOf(match.boss).map((b) => <PowerBoard key={b.id} boss={b} orientation={orientation} fen={fen} />)}
             {note && !note.pending && <DarkCost square={note.move.slice(2, 4)} since={note.at} now={now} orientation={orientation} points={!strand} />}
             {note?.forced && <DarkForced since={note.at} now={now} />}
             {match.boss && wipPower() && <WipPreview fen={fen} orientation={orientation} crowd={match.boss.crowdSide} />}
             {!waiting && deadline > 0 && <TimerBar startsAt={startsAt} deadline={deadline} total={total} frozen={frozen} />}
             {/* (Dash's Time Scramble: a scrambled move's big 3-2-1 over the board, taking no taps.) */}
-            {match.boss?.id === "dash" && !waiting && deadline > 0 && <ScrambleCount boss={match.boss} startsAt={startsAt} deadline={deadline} />}
+            {dash?.id === "dash" && !waiting && deadline > 0 && <ScrambleCount boss={dash} startsAt={startsAt} deadline={deadline} />}
             {match.settings.mode === "crowd" && !match.boss && deadline > 0 && <BoardClock match={match} you={you} turn={{ startsAt, deadline, yours: true, done: waiting }} />}
             {intro && (
               <CenterCount
@@ -314,7 +321,7 @@ export function PlayScreen({
               />
             )}
             {ending && !striking && !stalling && <CenterCount label="Round end" n={secsLeft} />}
-            {match.boss?.id === "dash" && <DashStall boss={match.boss} stall={stall} />}
+            {dash?.id === "dash" && <DashStall boss={dash} stall={stall} />}
             {godKing && <KingSummon {...godKing} />}
             {command && <KingCommand {...command} />}
             {crowd && waiting && !history.browsing && <LiveGhosts match={match} fen={board.fen} orientation={orientation} />}
@@ -350,9 +357,10 @@ export function PlayScreen({
                 <strong>{stall!.beat === "slam" ? "Hurry up!" : "He moved again?!"}</strong> <span class="muted">Clock stopped.</span>
               </span>
             ) : waiting && alone && picked ? (
-              // Alone, your move is simply played: the boss is already thinking about its reply.
+              // Alone, your move is simply played: the boss is already thinking about its reply. (A floor of several: the boss to move
+              // next, by name: audit 2, finding 1.)
               <span>
-                <Dots /> <strong>The boss</strong> is thinking…
+                <Dots /> <strong>{sideOf(match.boss) ? match.boss.name : "The boss"}</strong> is thinking…
               </span>
             ) : waiting ? (
               <span>
@@ -370,11 +378,11 @@ export function PlayScreen({
                   {strike.calls}/{strike.needed} needed. Pick your move.
                 </span>
               </span>
-            ) : duelTurn(match.boss) ? (
+            ) : duelTurn(own("pig")!) ? (
               // Wrangler's showdown: the rule the player must play by, whole, for the whole turn. (Not the power's
               // name: its banners said it.)
               <span class="duel-note">
-                <strong>Take one of his {duelCount(match.boss) === 2 ? "two" : "three"} duels.</strong>
+                <strong>Take one of his {duelCount(own("pig")!) === 2 ? "two" : "three"} duels.</strong>
               </span>
             ) : refusedNow ? (
               // A move of yours a power refused: why, the dock's whole line for a moment (refused.ts; the box around
@@ -465,7 +473,7 @@ export function PlayScreen({
       )}
       {match.boss ? besideBoard(match, layout, <UnderBoard match={match} />) : <UnderBoard match={match} />}
       {/* Boss alone, the last bulb out: the whole screen goes black, his line, then the loss screen. */}
-      {note?.blackout && match.boss && <HollowBlackout since={note.at} boss={match.boss} />}
+      {note?.blackout && match.boss && <HollowBlackout since={note.at} boss={hollow ?? match.boss} />}
     </div>
   );
 }

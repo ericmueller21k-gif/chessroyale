@@ -284,12 +284,13 @@
   padding: 2px 4px 4px;
   border: 3px solid transparent;
   border-radius: 12px;
+}
+/* (The others dimmed, never hidden; their words not: a boss's moment's line shows by his own part, whole: audit 2, finding 1.) */
+.tw-part:not(.tw-to-move) > :not(.tw-bubble) {
   opacity: 0.5;
   filter: grayscale(0.7);
 }
 .tw-part.tw-to-move {
-  opacity: 1;
-  filter: none;
   border-color: #f2c14e;
   background: rgba(255, 255, 255, 0.07);
 }
@@ -399,13 +400,18 @@
   display: flex;
   align-items: flex-end;
   justify-content: flex-end;
-  opacity: 0.5;
-  filter: grayscale(0.7);
   transition: transform 0.3s ease;
 }
+.tw-side-body {
+  position: relative;
+  display: block;
+}
+.tw-side-fig:not(.tw-to-move) .tw-fig-box,
+.tw-side-fig:not(.tw-to-move) .tw-part-portrait {
+  opacity: 0.5;
+  filter: grayscale(0.7);
+}
 .tw-side-fig.tw-to-move {
-  opacity: 1;
-  filter: none;
   transform: translateX(18px);
 }
 .tw-fig {

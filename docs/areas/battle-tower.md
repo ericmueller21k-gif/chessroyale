@@ -8,7 +8,7 @@ The design, its calls settled with Eric (Nov 18): [docs/decisions/2026-11-18-bat
 
 ## What it will be
 
-- A climb of up to 99 floors (a skyscraper), alone or as a party of up to 4, next to Auto chess under home's Other modes. Each floor is
+- A climb of up to 99 floors (a skyscraper), alone or as a party of up to 4, opened from the town's clerk only (Eric, Nov 19: no home card). Each floor is
   one game from the starting position against 1, 2 or 3 bosses at once on one board (the pattern 1, 2, 2, 3 looping), taking turns
   to move, each with its own powers and meter, stronger every floor: Maia from 600, +100 a floor, to 2500 (a lone boss +200);
   from floor 51 Stockfish from 2500, +25 a floor, to full strength.
@@ -115,6 +115,17 @@ The design, its calls settled with Eric (Nov 18): [docs/decisions/2026-11-18-bat
   usual result (`TowerResult.tsx`: one button, Back to the tower) → the floor room on your mark: won, the elevator open (Up to floor N+1);
   out, shut. Bests on the lobby's board. Between floors leave by the way down or Back. A match's address is `/tower`: a reload rejoins it
   (`brc.tower.solo`, the restore). A start carries this device's id (`brc.tower.device`, kept in `fight`): a lost start answer is still its own. Calls: [2026-11-19-tower-solo-screens.md](../decisions/2026-11-19-tower-solo-screens.md), [2026-11-19-tower-flow.md](../decisions/2026-11-19-tower-flow.md).
+- **The restore (audit 2):** kept as each round begins **and** as each step of the bosses' turn has played (solo.ts `nextRoundIn`), so a reload
+  rejoins after his reply; **the clock** (the director's call): the time used on your turn is kept with the game as the page is hidden
+  or closed (`KeptGame.turnMs`) and given back as used on a rejoin, and while the page is hidden your turn's clock stands still (no time
+  passes while you're away); the floor's XP game id is kept (`KeptFloor.xp`) and a rejoin goes on with it, never a new one
+  (xp.ts `noteFloorGame`). [2026-11-19-tower-audit-2-fixes.md](../decisions/2026-11-19-tower-audit-2-fixes.md).
+- **A shared floor's screens (audit 2, finding 1):** the view's top level is the boss in focus; each boss's own part (`side.bosses`, his own
+  ice too) is drawn as he would be alone (`boss-side.ts`: `sideOf`, `partsOf`, `partOf`, `moverOf`, `plyMoverOf`, `onSide`): `PowerBoard`
+  once a boss with his own moments, his decor, gold, elephants, dark and the power-specific board animations from his part; every
+  moment names its boss (`PowerEvent.boss`, the view only), so its banner, caster and words are his and his bubble shows by his part of
+  the bar (`speakerOf`: a line keyed by his id); `refusedLine` asks every boss on the side; the move list's faces by ply
+  (`side.movers`, from `MatchState.movers`) and "Ginger is thinking…" name the boss. One boss: unchanged.
 
 ### For PR 10 (the app)
 

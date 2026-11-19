@@ -64,11 +64,18 @@ export const THROUGH: Record<StopReason, string> = {
   shield: "His only move: past the shield.",
 };
 
-/** The boss as the screens see it, as far as these words need. */
-type BossLike = { id?: string; barred?: string | null; powers?: (StopFields & { iced?: readonly string[]; folded?: readonly string[]; stunned?: readonly string[]; chandy?: { dizzy?: readonly string[] } | null }) | null; lastMove?: { through?: StopReason } | null };
+/** The boss as the screens see it, as far as these words need (on a floor of several, each boss's own part: `side`). */
+type BossLike = { id?: string; barred?: string | null; powers?: (StopFields & { iced?: readonly string[]; folded?: readonly string[]; stunned?: readonly string[]; chandy?: { dizzy?: readonly string[] } | null }) | null; lastMove?: { through?: StopReason } | null; side?: { bosses: readonly BossLike[] } };
 
-/** Why `move` (legal in chess, not allowed now) was refused, in the dock's words. */
+/**
+ * Why `move` (legal in chess, not allowed now) was refused, in the dock's words. On a floor of several, every boss on the side is asked
+ * (each his own marks), the first with a reason answering: the move may be stopped by a boss not in focus (audit 2, finding 1).
+ */
 export function refusedLine(boss: BossLike, fen: string, move: string): string {
+  for (const b of boss.side && boss.side.bosses.length > 1 ? [boss, ...boss.side.bosses] : []) {
+    const line = refusedLine({ ...b, side: undefined }, fen, move);
+    if (line !== REFUSED_OTHER) return line;
+  }
   if (boss.barred && boss.barred === move) return REFUSED.barred;
   // (Ginger's ice: the frozen piece's own move, or castling with a frozen rook.)
   if (boss.powers?.iced?.length && heldIn(fen, move, boss.powers.iced)) return REFUSED.frozen;

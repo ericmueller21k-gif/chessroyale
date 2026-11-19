@@ -2177,10 +2177,10 @@ export class MatchRunner {
     if (!b) return null;
     const board = this.boards.get(this.state.boards[0]!)!;
     const s = this.settings;
-    const same = [b, board, board.fen, board.lastMove, board.history, board.history.length, board.bases, this.alive().length, this.bossLast, justKilled, s.bossMinSurvivors, s.bossMaxMoves, s.bossKillEvery, !!s.raid, !!s.bossNoStrikes, this.state.bosses];
+    const same = [b, board, board.fen, board.lastMove, board.history, board.history.length, board.bases, this.alive().length, this.bossLast, justKilled, s.bossMinSurvivors, s.bossMaxMoves, s.bossKillEvery, !!s.raid, !!s.bossNoStrikes, this.state.bosses, this.state.movers];
     const m = this.bossViewMemo;
     if (m && m.same.length === same.length && m.same.every((x, i) => x === same[i])) return m.view;
-    const key = JSON.stringify([b, board.id, board.generation, board.fen, board.lastMove, board.history.join(" "), this.alive().length, this.bossLast, justKilled, s.bossMinSurvivors, s.bossMaxMoves, s.bossKillEvery, !!s.raid, !!s.bossNoStrikes, ...(this.state.bosses ? [this.state.bosses, this.state.focus] : [])]);
+    const key = JSON.stringify([b, board.id, board.generation, board.fen, board.lastMove, board.history.join(" "), this.alive().length, this.bossLast, justKilled, s.bossMinSurvivors, s.bossMaxMoves, s.bossKillEvery, !!s.raid, !!s.bossNoStrikes, ...(this.state.bosses ? [this.state.bosses, this.state.focus, this.state.moved, this.state.movers] : [])]);
     this.bossViewMemo = { key, same, view: m?.key === key ? m.view : this.buildBossView(b, justKilled) };
     return this.bossViewMemo.view;
   }
@@ -2190,16 +2190,18 @@ export class MatchRunner {
     const view = this.oneBossView(b, justKilled);
     const own = this.state.bosses;
     if (!this.several() || !own) return view;
-    // (Several bosses: each one's own bar, in the order dealt; the side's shared fields from the boss in focus.)
+    // (Several bosses: each one's own part, in the order dealt (his bar, his marks, his own ice: the screens draw each boss from his own,
+    // audit 2, finding 1); the side's shared fields from the boss in focus.)
     const f = this.state.focus ?? 0;
     const bosses = own.map((o, i) => {
-      const { board: _board, ...one } = i === f ? view : this.oneBossView(withOwn(b, o), justKilled);
+      const { board: _board, ...one } = this.oneBossView(i === f ? b : withOwn(b, o), justKilled, true);
       return one;
     });
-    return { ...view, side: { bosses, toMove: f, moved: this.state.moved ?? own.length - 1 } };
+    return { ...view, side: { bosses, toMove: f, moved: this.state.moved ?? own.length - 1, movers: this.state.movers ?? [] } };
   }
 
-  private oneBossView(b: BossState, justKilled: string | null): NetBoss {
+  /** One boss's view; `part`: his own part of a side's (his own ice, not the side's: the view's top level has the side's). */
+  private oneBossView(b: BossState, justKilled: string | null, part = false): NetBoss {
     const def = chooseBoss(0, b.id, null, undefined, true, true);
     const info = { name: def.name, icon: def.icon, threat: bossThreat(b.elo) };
     // (His bar's level: the battle's own, and what his strength now makes of it; "???" for the Hidden Boss.)
@@ -2256,13 +2258,14 @@ export class MatchRunner {
               pie: p.pies?.length ? { ...p.pies[p.pies.length - 1]! } : null,
               pies: (p.pies ?? []).map((x) => ({ ...x })),
               // (Through the boss's turn too: the frozen piece, the blizzard's ice until it thaws.)
-              iced: this.several() ? sideIcedSquares(this.sideBosses(), fen) : icedSquares(b, fen),
+              iced: this.several() && !part ? sideIcedSquares(this.sideBosses(), fen) : icedSquares(b, fen),
               // (The funhouse's angle as this crowd turn was set up: it turns as the next begins, with its moment.)
               angle: shownAngle(p.funhouse, p.turn),
               flipped: shownAngle(p.funhouse, p.turn) === 180,
               funhouse: p.funhouse ? { ...p.funhouse } : null,
-              // (Several bosses: the moments queue, every boss's this turn change, the one in focus first, then the rest in turn order.)
-              events: this.several() ? this.sideBosses().flatMap((x) => x.powers?.events ?? []) : p.events,
+              // (Several bosses: the moments queue, every boss's this turn change, the one in focus first, then the rest in turn order;
+              // each names its boss, for its banner's caster and his words: audit 2, finding 1.)
+              events: this.several() ? this.sideBosses().flatMap((x) => (x.powers?.events ?? []).map((e) => ({ ...e, boss: x.id }))) : p.events,
               allowed: sideToMove(fen) === b.crowdSide ? (this.several() ? sideCrowdAllowed(this.sideBosses(), fen) : crowdAllowed(b, fen)) : null,
               fire: (p.fire ?? []).map((t) => ({ square: t.square, lit: t.lit, stage: fireStage(t, p.turn) })),
               burnt: p.burnt ?? [],
@@ -2511,7 +2514,11 @@ export class MatchRunner {
   private bossTurnOver() {
     if (this.several()) {
       this.followBoard();
-      this.state = { ...this.state, moved: this.state.focus ?? 0 };
+      // (He made the side's plies since the last boss's turn ended: noted by ply for the move list's faces, MatchState.movers.)
+      const f = this.state.focus ?? 0;
+      const plies = this.boards.get(this.state.boards[0]!)!.history.length;
+      const movers = this.state.movers ?? [];
+      this.state = { ...this.state, moved: f, movers: movers.length < plies ? [...movers, ...Array<number>(plies - movers.length).fill(f)] : movers };
       this.refocus();
     }
     this.preparePowers();

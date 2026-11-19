@@ -120,6 +120,11 @@ export interface KeptGame {
   moves: MoveRecord[];
   /** The bosses' entrance has played. */
   intro: boolean;
+  /**
+   * The time you've used on this turn of yours (ms), kept as you go away (the page hidden or closed): a rejoin gives it back as used,
+   * and no time passes while you're away (the director's call on audit 2's finding 2). Unset: none used, or not your turn.
+   */
+  turnMs?: number;
 }
 
 /**
@@ -136,6 +141,8 @@ export interface KeptFloor {
   game?: KeptGame;
   done?: FloorOutcome | "left";
   moves?: number;
+  /** The floor's XP game on the server (xp.ts noteSoloGame), so a rejoin goes on with it rather than starting another (audit 2, finding 6). */
+  xp?: string;
 }
 
 const KEY = "brc.tower.solo";
@@ -179,8 +186,8 @@ export function readKept(text: string | null): KeptFloor | null {
   if (!k.settings || typeof k.settings !== "object" || !Array.isArray(k.beaten)) return null;
   if (k.done !== undefined && !["won", "lost", "drawn", "left"].includes(k.done)) return null;
   const g = k.game;
-  const game = g && typeof g === "object" && g.snapshot && typeof g.snapshot === "object" && (g.snapshot as Partial<RunnerSnapshot>).state && Array.isArray((g.snapshot as Partial<RunnerSnapshot>).boards) && Array.isArray(g.moves) ? { snapshot: g.snapshot, moves: g.moves, intro: !!g.intro } : undefined;
-  return { v: 1, fight: k.fight, floor: k.floor!, bosses: k.bosses, settings: k.settings, beaten: k.beaten, ...(game ? { game } : {}), ...(k.done ? { done: k.done } : {}), ...(Number.isInteger(k.moves) ? { moves: k.moves } : {}) };
+  const game = g && typeof g === "object" && g.snapshot && typeof g.snapshot === "object" && (g.snapshot as Partial<RunnerSnapshot>).state && Array.isArray((g.snapshot as Partial<RunnerSnapshot>).boards) && Array.isArray(g.moves) ? { snapshot: g.snapshot, moves: g.moves, intro: !!g.intro, ...(typeof g.turnMs === "number" && Number.isFinite(g.turnMs) && g.turnMs > 0 ? { turnMs: g.turnMs } : {}) } : undefined;
+  return { v: 1, fight: k.fight, floor: k.floor!, bosses: k.bosses, settings: k.settings, beaten: k.beaten, ...(game ? { game } : {}), ...(k.done ? { done: k.done } : {}), ...(Number.isInteger(k.moves) ? { moves: k.moves } : {}), ...(typeof k.xp === "string" ? { xp: k.xp } : {}) };
 }
 
 export function loadKept(): KeptFloor | null {
@@ -317,6 +324,18 @@ export class FloorPlay {
   keep(game: KeptGame): void {
     if (this.kept.done) return;
     this.kept = { ...this.kept, game };
+    saveKept(this.kept);
+  }
+  /** The time you've used on this turn, kept with the game as it stands (KeptGame.turnMs): the snapshot is the turn's start's. */
+  keepTurn(ms: number): void {
+    const game = this.kept.game;
+    if (this.kept.done || !game) return;
+    this.keep({ ...game, turnMs: Math.max(0, Math.round(ms)) });
+  }
+  /** The floor's XP game on the server, kept for a rejoin (KeptFloor.xp). */
+  noteXp(id: string): void {
+    if (this.kept.done || this.kept.xp === id) return;
+    this.kept = { ...this.kept, xp: id };
     saveKept(this.kept);
   }
   /** The floor's over (a result, or you left after `moves` of your moves): the result to send, kept until the server takes it. */

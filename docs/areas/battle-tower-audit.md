@@ -9,7 +9,7 @@ whole job description. Read it to the end before opening any code.
 The full design, with every call Eric settled: [docs/decisions/2026-11-18-battle-tower-design.md](../decisions/2026-11-18-battle-tower-design.md).
 Its area page: [battle-tower.md](battle-tower.md). In short:
 
-- **A climb of up to 99 floors**, alone or as a party of up to 4, a mode next to Auto chess on home. It replaces nothing.
+- **A climb of up to 99 floors**, alone or as a party of up to 4, opened from the town's clerk only (Eric, Nov 19: no home card). It replaces nothing.
 - **Each floor is one game of chess** from the starting position, you as White, against 1, 2 or 3 bosses at once on one board. The
   boss count loops 1, 2, 2, 3. The bosses share the other side and take turns moving in the order they were dealt; each keeps his own
   powers and his own meter (slower on shared floors: 100%, 75%, 60%).

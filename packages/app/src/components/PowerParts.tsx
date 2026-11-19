@@ -59,6 +59,8 @@ export interface Moment {
   /** Chandy's upgrade: the rifle's stage now, and the move it unlocked. */
   stage?: number;
   unlock?: ChandyMove;
+  /** A Battle Tower floor of several: the boss who cast it (his id), for its banner, his figure and his words (audit 2, finding 1). */
+  boss?: string;
 }
 
 /** Which of a boss kit's moments a power's moment is (its animation and lines: characters/power-art.ts). */

@@ -24,6 +24,16 @@ export function noteSoloGame(match: object): void {
       .catch(() => null),
   );
 }
+/**
+ * A Battle Tower floor's XP game (every floor is a counted solo game): a new floor's noted as it begins, its id handed to `keep` (kept
+ * with the floor on the device); a rejoin goes on with the id kept (null: none, so no XP), never a new game, which would time the floor
+ * from the reload (audit 2, finding 6).
+ */
+export function noteFloorGame(match: object, rejoin: { xp?: string } | null, keep: (id: string) => void): void {
+  if (rejoin) return void soloGames.set(match, Promise.resolve(rejoin.xp ?? null));
+  noteSoloGame(match);
+  void soloGameId(match).then((id) => id && keep(id));
+}
 /** The id the server gave this solo game as it began (null: none). */
 export const soloGameId = (match: object): Promise<string | null> => soloGames.get(match) ?? Promise.resolve(null);
 

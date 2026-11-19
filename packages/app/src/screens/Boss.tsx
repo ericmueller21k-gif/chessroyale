@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useState } from "preact/hooks";
 import { hapticOnce } from "../haptics.ts";
 import { KING_ATTACK, SNACK, bossIntroTimeline, bossRules, fenAtPly, inCheck, pieceAt, withPiece } from "@chessroyale/chess";
-import { BLIZZARD, BURN, BossBarExtra, CANDLE, FUNHOUSE, FireBurn, HOLLOW_CASTER, THAW, angleView, dockLine, noMoveLine, PowerBoard, PowerMoment, RageMeter, funhouseView, mateMomentsOf, momentAt, momentsOf, thawOver, useMomentSpeech } from "../components/BossPowers.tsx";
+import { BLIZZARD, BURN, BossBarExtra, CANDLE, casterOf, FUNHOUSE, FireBurn, HOLLOW_CASTER, THAW, angleView, dockLine, noMoveLine, PowerBoard, PowerMoment, RageMeter, funhouseView, mateMomentsOf, momentAt, momentsOf, thawOver, useMomentSpeech } from "../components/BossPowers.tsx";
 import { BossMoment } from "../components/BossEffect.tsx";
 import { SnackTime, bounceFen, bounceJolt, snackPawnShown, yourTopple } from "../components/BigBoy.tsx";
 import { boardSawJolt, splitFen, splitStill } from "../components/Sawyer.tsx";
@@ -37,7 +37,8 @@ import { RushLayer, rushBoard, rushDock } from "../components/DashRush.tsx";
 import { DodgeLayer, chandyTurnMoments, dodgeDock, dodgeFen } from "../components/Chandy.tsx";
 import { seenKey, useStillKey } from "../hooks.ts";
 import { Hud } from "./Hud.tsx";
-import { SideFigures, moverOf } from "./TowerBar.tsx";
+import { SideFigures } from "./TowerBar.tsx";
+import { moverOf, onSide, partOf, partsOf, sideOf } from "../boss-side.ts";
 import { BossDock, Dots } from "../components/BossDock.tsx";
 import { BossCharacter, BossFace, BossTag, hasCharacter, resetBeats } from "../components/BossCharacter.tsx";
 import { WipPreview, wipPower } from "../components/WipPreview.tsx";
@@ -287,7 +288,10 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
   // The boss's mate: its attack on the crowd's king (its kit has one), from KING_ATTACK.mateAt into the screen's last
   // KING_ATTACK.mateHoldMs; the result waits for it (bossTurnShowMs). No power's moment comes with a mate, but Chub &
   // Chirp's fifth carrot's (mateMoments): the pull and his win play first, ending as that last stretch begins.
-  const mating = !intro && !thinking && !victim && mateAttack(boss);
+  // (A floor of several: the boss whose move mated, from his own part of the view, and every boss's own drawing from his: own(id).)
+  const own = (id: string) => partOf(boss, id);
+  const mover = moverOf(boss);
+  const mating = !intro && !thinking && !victim && mateAttack(mover);
   const mateKing = mating ? kingSquare(boss.board.fen, boss.crowdSide) : null;
   const attackAt = until - KING_ATTACK.mateHoldMs + KING_ATTACK.mateAt;
   // Boss powers: the moments that come as the turn passes to the crowd (after the boss's move), or the funhouse's own.
@@ -298,11 +302,12 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
   const moments = useMemo(() => {
     if (intro || victim || fall) return [];
     if (mating) return mateMomentsOf(boss, until);
-    if (thinking) return lights || rush || dodge ? [] : [earlyLanding(boss), ...yourPulls(boss), ...yourTopple(boss), ...rookTakenMoment(boss), ...fullMoonMoment(boss), ...gingerMoments(boss), ...folioMoments(boss), ...popOffMoments(boss), ...zebraTurnMoments(boss), ...chandyTurnMoments(boss)].filter((m) => m !== null);
+    // (A floor of several: each boss's own, from his own part of the view, named his for its banner and words: audit 2, finding 1.)
+    if (thinking) return lights || rush || dodge ? [] : partsOf(boss).flatMap((b) => [earlyLanding(b), ...yourPulls(b), ...yourTopple(b), ...rookTakenMoment(b), ...fullMoonMoment(b), ...gingerMoments(b), ...folioMoments(b), ...popOffMoments(b), ...zebraTurnMoments(b), ...chandyTurnMoments(b)].filter((m) => m !== null).map((m) => (sideOf(boss) ? { ...m, boss: b.id } : m)));
     return momentsOf(boss, until);
   }, [boss.board.fen, boss.powers?.events.length, until, thinking, intro, victim, mating, fall]);
   // (Moo's daze: he's drawn powered up until its `calm`, noted from the moment's start.)
-  noteMooMoments(boss, moments);
+  noteMooMoments(own("moo"), moments);
   const moment = momentAt(moments, now);
   // Each moment's line, into the boss's voice: its text box keeps it up for its time, into the crowd's turn.
   useMomentSpeech(boss, moments, now);
@@ -312,8 +317,8 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
   const bounce = moments.find((m) => m.kind === "bounce" || m.kind === "hop") ?? null;
   // Boingo's funhouse and its later steps: the board as it was until its spin, the spin, then the new angle. In the
   // funhouse's own screen, the crowd's move he plays for it lands at its beat (FUNHOUSE.moveAt).
-  const fun = funhouseView(moments, now, boss.powers, bossKit(boss.name));
-  const funMove = funhouse ? (boss.powers?.funhouse ?? null) : null;
+  const fun = funhouseView(moments, now, own("clown").powers, bossKit(own("clown").name));
+  const funMove = funhouse ? (own("clown").powers?.funhouse ?? null) : null;
   const funPlayed = !!funhouse && now >= funhouse.at + FUNHOUSE.moveAt;
   // The God King's word on the boss's move.
   const kingCues = useMemo(() => {
@@ -367,7 +372,7 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
     kingSay(free.has("q") ? "blizzard" : free.has("k") && free.size === 1 ? "blizzardKing" : "blizzardOne", `blizzard-${blizzard!.key}`);
   }, [blizzardLine]);
   useEffect(() => {
-    if (thawSaid) kingSay(thawOver(boss) ? "thawed" : "thaw", `thaw-${thaw!.key}`);
+    if (thawSaid) kingSay(thawOver(own("gingerbread")) ? "thawed" : "thaw", `thaw-${thaw!.key}`);
   }, [thawSaid]);
   useEffect(() => {
     if (funLine) kingSay("funhouse", `funhouse-${funhouse!.key}`);
@@ -390,10 +395,10 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
   const orientation = view.orientation;
   // G-REX's fire after the crowd's move (while the boss thinks): a piece left on a tile ablaze burns, shown on the
   // board until its flare; a tile under the king fizzles. The God King's warning the first time a piece steps onto one.
-  const burnt = thinking && !intro && !victim ? (boss.powers?.burnt ?? []).filter((b) => b.turn === boss.crowdMoves) : [];
+  const burnt = thinking && !intro && !victim ? (own("grex").powers?.burnt ?? []).filter((b) => b.turn === boss.crowdMoves) : [];
   const burnAt = burnStart(burnt.length ? `${boss.id}:${boss.crowdMoves}:${boss.board.ply}` : "");
   const burning = burnt.filter((b) => b.piece);
-  const stepped = boss.powers?.stepped ?? null;
+  const stepped = own("grex").powers?.stepped ?? null;
   useEffect(() => {
     if (thinking && stepped !== null && stepped === boss.crowdMoves) kingSay("fireTile", `fire-tile-${boss.id}-${stepped}`);
   }, [thinking, stepped]);
@@ -402,38 +407,38 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
   const lastShown = funMove?.move ? (funPlayed ? funMove.move : null) : introLast;
   // The Big Bounce: the board before it, less the pieces up in the air, then the new position as they come down; the
   // eval bar keeps the position before it until they've all settled. The board jolts as he lands and at the crash.
-  const bounceShown = bounceFen(boss.powers?.bounce, bounce && now >= bounce.at - (bounce.lead ?? 0) ? bounce : null, now, boss.board.fen);
+  const bounceShown = bounceFen(own("bigboy").powers?.bounce, bounce && now >= bounce.at - (bounce.lead ?? 0) ? bounce : null, now, boss.board.fen);
   // Sawyer's split after his first move: the new half isn't on the board until the pawn cracks, and both are in the air
   // (the moment draws them) until they've landed; the board doesn't animate those changes.
   const split = moments.find((m) => m.kind === "split") ?? null;
-  const splitShown = bounceShown ? null : splitFen(boss.powers?.split, split, now, fenShown);
+  const splitShown = bounceShown ? null : splitFen(own("sawyer").powers?.split, split, now, fenShown);
   // Wrangler's long pull, lasso drag and showdown: the piece where it was until his tug, the line-up's pieces where they
   // stood until each pair is yanked in (the moment draws them on their way); the eval bar keeps the position before.
-  const pig = bounceShown || splitShown ? null : pigBoard(boss, moments, now, fenShown);
+  const pig = bounceShown || splitShown ? null : pigBoard(own("pig"), moments, now, fenShown);
   // Alfil's moments: the fusion's pawns until they lift and its elephant once it lands, the Slam's pieces until they
   // fly, the landing's once they're down (each moment draws its own on their way); the board doesn't animate those.
-  const alfil = bounceShown || splitShown || pig ? null : alfilFen(boss, moments, now, fenShown);
+  const alfil = bounceShown || splitShown || pig ? null : alfilFen(own("alfil"), moments, now, fenShown);
   // Chub & Chirp's: the hop's pawn on its square until it takes off and on the next once it has landed, the spin's prize
   // pieces once they've dropped (each moment draws its own on their way); the board doesn't animate those.
-  const hopper = bounceShown || splitShown || pig || alfil ? null : hopperFen(boss, moments, now, fenShown);
+  const hopper = bounceShown || splitShown || pig || alfil ? null : hopperFen(own("hopper"), moments, now, fenShown);
   // Smudgy's: the rook where he lifted it until the paint covers his pawns, a revealed rook still a pawn until the paint drips
   // off it, a Repaint's pieces in their old colors until each stroke (his hidden rook itself is drawn as a pawn by the board:
   // camo.ts); the board doesn't animate what his moment changes under the paint.
-  const smudgy = bounceShown || splitShown || pig || alfil || hopper ? null : smudgyFen(boss, moments, now, fenShown);
+  const smudgy = bounceShown || splitShown || pig || alfil || hopper ? null : smudgyFen(own("smudgy"), moments, now, fenShown);
   // Puddles': the position before his watering until each outcome's cue (a piece a killer plant eats, until its snap; a grown piece, until
   // its pop, which pops in); the board shows the rest as it fades and appears.
-  const gardener = bounceShown || splitShown || pig || alfil || hopper || smudgy ? null : gardenerFen(boss, moments, now, fenShown);
+  const gardener = bounceShown || splitShown || pig || alfil || hopper || smudgy ? null : gardenerFen(own("gardener"), moments, now, fenShown);
   // Folio's Revision: the position after your move until its moment takes both moves back (the game's board is already back:
   // a base); the board slides the pieces back then.
   const revised = bounceShown || splitShown || pig || alfil || hopper || smudgy || gardener ? null : revisionFen(boss, moments, now);
   // Timber's: a piece he dropped off its square until his plank lands; a pawn he gnaws on its square until his last chomp.
-  const timber = bounceShown || splitShown || pig || alfil || hopper || smudgy || gardener || revised ? null : timberFen(boss, moments, now, fenShown);
+  const timber = bounceShown || splitShown || pig || alfil || hopper || smudgy || gardener || revised ? null : timberFen(own("timber"), moments, now, fenShown);
   // Don Dough's: a piece risen from his dough off its square until the rise's pop.
-  const zebra = bounceShown || splitShown || pig || alfil || hopper || smudgy || gardener || revised || timber ? null : zebraFen(boss, moments, now, fenShown);
+  const zebra = bounceShown || splitShown || pig || alfil || hopper || smudgy || gardener || revised || timber ? null : zebraFen(own("zebra"), moments, now, fenShown);
   // (Dash's Scramble Rush: his sweep, your placements, then the position as it was: the game's never changed.)
   const boardFen = dodge ? dodgeFen(boss, fenShown) : rush ? rushBoard(boss, rush, now) : (bounceShown ?? splitShown ?? pig?.fen ?? alfil ?? hopper ?? smudgy?.fen ?? gardener?.fen ?? revised?.fen ?? timber?.fen ?? zebra?.fen ?? fenShown);
   const rushLines = rush ? rushDock(boss, rush, now) : dodge ? dodgeDock(boss, dodge, now) : null;
-  const evalFen = bounceShown && bounceShown !== boss.board.fen ? (boss.powers?.bounce?.before ?? fenShown) : (pig?.evalFen ?? fenShown);
+  const evalFen = bounceShown && bounceShown !== boss.board.fen ? (own("bigboy").powers?.bounce?.before ?? fenShown) : (pig?.evalFen ?? fenShown);
   const jolt = bounceJolt(bounce && now >= bounce.at ? bounce : null, now) ?? boardSawJolt(moment, now) ?? alfilJolt(moment, now);
   // (One or two pieces by name; more, how many: the dock's line stays one line.)
   const burnNames = burning.length > 2 ? `${burning.length} pieces` : burning.map((b) => PIECE_NAME[b.piece!] ?? "piece").join(" and ");
@@ -454,7 +459,7 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
   const snacking = !!snack && t >= tl.claimAt + SNACK.grabAt && t < tl.bannerAt;
   const momentLine = moment ? dockLine(moment) : null;
   // (A turn of his with no move to show: Alfil's fusion was his move.)
-  const noMove = !intro && !thinking && !victim && !boss.lastMove ? noMoveLine(boss) : null;
+  const noMove = !intro && !thinking && !victim && !boss.lastMove ? noMoveLine(mover) : null;
   // (Lights out, before its first round, as the night falls: the dock as on every other screen, your clock held, what
   // it means for you; its rounds take the whole box, with the crowd's meter: LightsDock.)
   const lightsStart = !!lights && lightsStatus(lights, match.settings.lateGraceMs, now).key === "start";
@@ -497,11 +502,11 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
                 // (Short enough for a phone's dock with the move in it: his icon says who.)
                 <>
                   {/* (Only his picture here, as the line always had: the name would push "Not scored." out of a phone's dock.) */}
-                  <BossFace boss={boss} class="boss-tag-face" label={boss.name} live /> Plays <strong>your</strong> move{funPlayed ? <>: <strong>{funMove.san}</strong></> : "…"}
+                  <BossFace boss={own("clown")} class="boss-tag-face" label={own("clown").name} live /> Plays <strong>your</strong> move{funPlayed ? <>: <strong>{funMove.san}</strong></> : "…"}
                 </>
               ) : momentLine ? (
                 <>
-                  <BossTag boss={boss} />: <strong>{momentLine}</strong>
+                  <BossTag boss={casterOf(boss, moment)} />: <strong>{momentLine}</strong>
                 </>
               ) : victim ? (
                 <strong class="bad">
@@ -513,16 +518,17 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
                 </>
               ) : thinking ? (
                 <>
-                  <Dots /> <strong>The boss</strong> is thinking…
+                  {/* (A floor of several: the boss to move, by name.) */}
+                  <Dots /> <strong>{sideOf(boss) ? boss.name : "The boss"}</strong> is thinking…
                 </>
               ) : boss.lastMove ? (
                 <>
                   {/* (His reveal isn't named until the paint drips: "Boss plays …", smudgyFen's `hush`.) */}
-                  <PlaysLine boss={moverOf(boss)} san={smudgy?.hush ? "…" : boss.lastMove.san} />
+                  <PlaysLine boss={mover} san={smudgy?.hush ? "…" : boss.lastMove.san} />
                 </>
               ) : noMove ? (
                 <>
-                  <BossTag boss={boss} />: <strong>{noMove}</strong>
+                  <BossTag boss={mover} />: <strong>{noMove}</strong>
                 </>
               ) : null}
             </span>
@@ -566,14 +572,15 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
         <div class={`board-row${fun.spin === "half" ? " pw-flipping" : fun.spin ? ` pw-turning-${fun.spin}` : ""}`}>
           {bossSide}
           <EvalBar fen={evalFen} orientation={orientation === "white" ? "w" : "b"} evaluate={(f) => match.evaluate(f)} />
-          <Board fen={boardFen} orientation={orientation} turn={view.turn} lastMove={pig?.lastMove ?? revised?.lastMove ?? lastShown} animate={!rush && !bounceShown && !splitStill(split, now) && !pig?.still && !alfil && !hopper && !smudgy?.still} elephants={intro ? undefined : boss.powers?.elephants} gold={intro ? undefined : zebraGold(boss, moments, now)} decor={gardener?.decor ?? (intro ? undefined : boingoDecor(boss, moments, now))} premove={{ key: seatKey(match, boss.board.id, boss.crowdSide), side: boss.crowdSide, watch: !!lights || !!rush || !!loading }}>
-            {!intro && <PowerBoard boss={boss} orientation={orientation} moments={moments} now={now} fen={boardFen} />}
+          <Board fen={boardFen} orientation={orientation} turn={view.turn} lastMove={pig?.lastMove ?? revised?.lastMove ?? lastShown} animate={!rush && !bounceShown && !splitStill(split, now) && !pig?.still && !alfil && !hopper && !smudgy?.still} elephants={intro ? undefined : onSide(boss, (b) => b.powers?.elephants)} gold={intro ? undefined : zebraGold(own("zebra"), moments, now)} decor={gardener?.decor ?? (intro ? undefined : boingoDecor(own("clown"), moments, now))} premove={{ key: seatKey(match, boss.board.id, boss.crowdSide), side: boss.crowdSide, watch: !!lights || !!rush || !!loading }}>
+            {/* (A floor of several: every boss's marks, each from his own part of the view with his own moments: audit 2, finding 1.) */}
+            {!intro && partsOf(boss).map((b) => <PowerBoard key={b.id} boss={b} orientation={orientation} moments={sideOf(boss) ? moments.filter((m) => !m.boss || m.boss === b.id) : moments} now={now} fen={boardFen} />)}
             {rush && <RushLayer boss={boss} view={rush} now={now} orientation={orientation} onPlace={(from, to) => match.rushPlace(from, to)} />}
             {dodge && <DodgeLayer boss={boss} run={dodge} now={now} onPick={(sq) => match.dodgeVote(sq)} />}
             {lights && <LightsOutLayer boss={boss} lights={lights} now={now} orientation={orientation} graceMs={match.settings.lateGraceMs} onTap={(sq) => match.lightsTap(sq)} />}
             {wipPower() && <WipPreview fen={fenShown} orientation={orientation} crowd={boss.crowdSide} />}
             <PowerMoment boss={boss} moment={moment} now={now} orientation={orientation} side={boss.crowdSide} />
-            {mateKing && <KingAttack boss={boss} square={mateKing} orientation={orientation} startAt={attackAt} now={now} seed={`mate:${boss.board.fen}`} king={boss.crowdSide} />}
+            {mateKing && <KingAttack boss={mover} square={mateKing} orientation={orientation} startAt={attackAt} now={now} seed={`mate:${boss.board.fen}`} king={boss.crowdSide} />}
             <FireBurn burnt={burnt} since={burnAt} now={now} orientation={orientation} />
             {claimed && t >= tl.claimAt && t < tl.bannerAt && <ClaimDark boss={boss} since={mountedAt + tl.claimAt} now={now} />}
             {snack && t >= tl.claimAt && t < tl.bannerAt && <SnackTime boss={boss} since={snackAt} now={now} orientation={orientation} />}
@@ -581,7 +588,7 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
             {/* (The queen banners are silent for now: Eric, Oct 11, the gasp sounded wrong. Its file is kept, unused:
                 queenGasp in sound.ts, public/sounds/banner/queen-gasp.mp3.) */}
             {queenBanner?.kind === "slain" && <FightBanner key={queenBanner.key} tone="hero" face={<GodKingPortrait side={boss.crowdSide} />} text="QUEEN SLAIN!" sub={`You take ${bossInText(boss.name)}'s queen`} ms={bossBannerMs()} />}
-            {queenBanner?.kind === "down" && <FightBanner key={queenBanner.key} tone="boss" face={<BossFace boss={boss} />} text="QUEEN DOWN!" sub={`${bossInText(boss.name, true)} takes your queen`} ms={bossBannerMs()} />}
+            {queenBanner?.kind === "down" && <FightBanner key={queenBanner.key} tone="boss" face={<BossFace boss={mover} />} text="QUEEN DOWN!" sub={`${bossInText(mover.name, true)} takes your queen`} ms={bossBannerMs()} />}
             {loading && <BrainLoading match={match} boss={boss} />}
             {showCard && (
               // (After the loading step, whose card it takes over from: no entrance, so the board doesn't blink between.)

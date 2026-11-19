@@ -215,9 +215,11 @@ export interface NetBoss {
   /**
    * Several bosses on one side (the Battle Tower's floors of 2 or 3): each boss's own view (his name, level, meters and powers; the
    * board is the battle's), in the order dealt, which is their turn order; `toMove` (an index into it): the boss in focus, the one
-   * whose move comes next (the rest of this view is his); `moved`: who made the side's last move. Missing with one boss.
+   * whose move comes next (the rest of this view is his); `moved`: who made the side's last move; `movers`: who made each of the side's
+   * moves, by the board's ply (MatchState.movers: read for the side's plies only; an older game's has none). Every moment in the
+   * queue (`powers.events`) names its boss (`boss`). Missing with one boss.
    */
-  side?: { bosses: Omit<NetBoss, "board" | "side">[]; toMove: number; moved: number };
+  side?: { bosses: Omit<NetBoss, "board" | "side">[]; toMove: number; moved: number; movers?: number[] };
   name: string;
   icon: string;
   /** 1 to 5: how scary the boss is (its Elo stays secret). */
