@@ -7,7 +7,8 @@ import { BossFace } from "../components/BossCharacter.tsx";
 import { useMedia } from "../components/QuickChat.tsx";
 import { VoiceBubble, bossVoice } from "../speech.tsx";
 import { BossLevel } from "./Boss.tsx";
-import { Beaten, floorRating } from "./Tower.tsx";
+import { Beaten } from "./Tower.tsx";
+import { floorRating } from "../tower.ts";
 import type { BossView, GameView } from "../game.ts";
 
 /**

@@ -1,4 +1,4 @@
-import { BATTLE_TOWER, type Settings } from "@chessroyale/core";
+import { BATTLE_TOWER, bossDef, floorBossCount, floorStrength, type Settings } from "@chessroyale/core";
 import type { RunnerSnapshot } from "@chessroyale/chess";
 import type { MoveRecord } from "./game.ts";
 
@@ -94,6 +94,18 @@ export const towerApi = {
   finish: (fight: string, outcome: FloorOutcome) => ask<{ outcome: FloorOutcome; floor: number; status: string; run: TowerRun | null; best: number }>("/api/tower/floor/finish", { fight, outcome }),
   stop: (fight: string, moves: number | undefined, free = false) => ask<{ stopped: "between" | "free" | "lost"; floor?: number; status?: string; run: TowerRun | null }>("/api/tower/stop", { fight, ...(moves !== undefined ? { moves } : {}), ...(free ? { free: true } : {}) }),
 };
+
+/** A boss as the screens draw it: his own, or a safe stand-in for an id this app doesn't know (a boss renamed or removed since). */
+export function towerBoss(id: string): { id: string; name: string; icon: string; known: boolean } {
+  const d = bossDef(id);
+  return d ? { id: d.id, name: d.name, icon: d.icon, known: true } : { id, name: "A boss", icon: "?", known: false };
+}
+
+/** A floor's rating as shown: Maia's or Stockfish's number, or "Full strength" from the floor Stockfish plays its best. */
+export function floorRating(floor: number, bosses = floorBossCount(floor)): string {
+  const s = floorStrength(floor, bosses);
+  return s.full ? "Full strength" : String(s.rating);
+}
 
 // ---------------- The floor kept on this device ----------------
 

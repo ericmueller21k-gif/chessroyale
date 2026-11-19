@@ -1,8 +1,7 @@
 import { useEffect, useState } from "preact/hooks";
 import { BATTLE_TOWER, floorBossCount } from "@chessroyale/core";
 import { RESULT_ATTACK_MS } from "../components/ResultDuo.tsx";
-import { askFloor, enterTowerFloor, floorOutcome, type TowerEnd } from "../tower.ts";
-import { floorRating } from "./Tower.tsx";
+import { askFloor, enterTowerFloor, floorOutcome, floorRating, type TowerEnd } from "../tower.ts";
 import type { GameView } from "../game.ts";
 
 /** The result's buttons stay greyed while its pictures play (ResultDuo: a beat, then the boss's attack or bow). */

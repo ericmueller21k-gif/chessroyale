@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "preact/hooks";
-import { BATTLE_TOWER, bossDef, floorBossCount, floorStrength, type ItemLook } from "@chessroyale/core";
+import { BATTLE_TOWER, floorBossCount, type ItemLook } from "@chessroyale/core";
 import { BackButton, DressedPawn } from "../components/FrontDoor.tsx";
 import { BossPortrait } from "../components/BossPortrait.tsx";
 import { Confirm } from "../components/MatchMenu.tsx";
@@ -7,7 +7,7 @@ import { SwordsIcon } from "../town/CardIcons.tsx";
 import { game } from "../lazy-game.ts";
 import { portraitName } from "../characters/portraits.ts";
 import { useMedia } from "../components/QuickChat.tsx";
-import { TOWER_WORDS, askFloor, enterTowerFloor, loadKept, settle, towerApi, type FloorStart, type TowerState } from "../tower.ts";
+import { TOWER_WORDS, askFloor, floorRating, towerBoss, enterTowerFloor, loadKept, settle, towerApi, type FloorStart, type TowerState } from "../tower.ts";
 import "../tower.css";
 
 /**
@@ -20,18 +20,6 @@ import "../tower.css";
 
 /** A boss on the stage (BossStage.tsx, in the match's chunk); nothing until it's here (the spot keeps its size). */
 const StageFigure = game.screen("BossStageFigure", null);
-
-/** A boss as the screens draw it: his own, or a safe stand-in for an id this app doesn't know (a boss renamed or removed since). */
-export function towerBoss(id: string): { id: string; name: string; icon: string; known: boolean } {
-  const d = bossDef(id);
-  return d ? { id: d.id, name: d.name, icon: d.icon, known: true } : { id, name: "A boss", icon: "?", known: false };
-}
-
-/** A floor's rating as shown: Maia's or Stockfish's number, or "Full strength" from the floor Stockfish plays its best. */
-export function floorRating(floor: number, bosses = floorBossCount(floor)): string {
-  const s = floorStrength(floor, bosses);
-  return s.full ? "Full strength" : String(s.rating);
-}
 
 /** Portraits of the bosses beaten, the last `max` (the rest counted: "+3"), never cut off. */
 export function Beaten({ ids, max }: { ids: readonly string[]; max: number }) {
