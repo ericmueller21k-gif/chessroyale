@@ -15,6 +15,7 @@ import { requestId } from "./ledger.ts";
 import { pickBossCrate } from "./rewards.ts";
 import { SOLO_TESTED, endSoloGame, gameXpOf, grantXp, setTestXp, startSoloGame } from "./xp.ts";
 import { questsAnswer, rerollQuest, setTestQuests } from "./quests.ts";
+import { towerResponse } from "./tower.ts";
 import { chatIconResponse, chatPostResponse, chatSlice, globalRoomOf } from "./global-chat-api.ts";
 import { forgetLook, townHereResponse } from "./town-here-api.ts";
 import { hiddenRoomResponse } from "./hidden-room-api.ts";
@@ -209,7 +210,9 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
     path !== "/api/boss/token" &&
     !path.startsWith("/api/xp") &&
     path !== "/api/quests" &&
-    !path.startsWith("/api/quests/")
+    !path.startsWith("/api/quests/") &&
+    path !== "/api/tower" &&
+    !path.startsWith("/api/tower/")
   )
     return null;
   const google = !!(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET);
@@ -776,6 +779,15 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
       const b = (await request.json().catch(() => ({}))) as { quests?: unknown } | null;
       return (await setTestQuests(sql, current.id, b?.quests, now)) ? json(await questsAnswer(sql, current.id, now, paused)) : json({ message: "Bad quests" }, 400);
     }
+  }
+
+  // The Battle Tower (Nov 19; tower.ts): GET /api/tower, POST /api/tower/run, /floor/start, /floor/finish, /stop. A guest's run is
+  // saved as an account's. Solo resting (PAUSE_SOLO): no new run or floor; one under way still finishes or stops. The bosses resting
+  // are never dealt.
+  if (path === "/api/tower" || path.startsWith("/api/tower/")) {
+    if ((path === "/api/tower/run" || path === "/api/tower/floor/start") && request.method === "POST" && isPaused(env, "solo", now)) return pausedResponse("solo");
+    const tower = await towerResponse(request, sql, current.id, { off: pausedBosses(env, now), testSwitches: (env as AdminEnv).TEST_SWITCHES === "1" }, now);
+    if (tower) return tower;
   }
 
   // POST /api/results: a solo match's result, from the browser. Its XP (Nov 9) is the server's: the time between the game's start

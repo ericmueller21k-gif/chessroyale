@@ -30,6 +30,7 @@ import { socialDeletes } from "./friends.ts";
 import { rankedDownload, rankedErase } from "./ranked.ts";
 import { eraseMoves, ledgerDownload } from "./ledger.ts";
 import { questDeletes, questsDownload } from "./quests.ts";
+import { towerDeletes, towerDownload } from "./tower.ts";
 
 /** What a store's erase needs to know, worked out before the batch. */
 export interface EraseContext {
@@ -137,6 +138,15 @@ export const ACCOUNT_STORES: AccountStore[] = [
     }),
     // (The series crates go with the ledger's store, below.)
     erase: (u) => [stmt("DELETE FROM solo_games WHERE user_id = ?", u.id)],
+  },
+  {
+    // The Battle Tower (tower.ts, Nov 19): your climbs (each one's kind, the floor it's on or ended on, how it ended, the bosses of
+    // every floor dealt, when it began and last changed, when a floor under way began) and your best floor of each kind. Never a
+    // run's seed or the bosses still to deal: they're the game's dealing, not about you (and would show the floors to come).
+    name: "tower",
+    tables: ["tower_runs", "tower_best"],
+    export: (sql, u) => towerDownload(sql, u.id),
+    erase: (u) => towerDeletes(u.id),
   },
   {
     // The engine server's per-account cap (engine-calls.ts, Nov 10): how many times today the account called its open routes.

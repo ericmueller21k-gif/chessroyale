@@ -1287,6 +1287,12 @@ export const BATTLE_TOWER = {
   stockfishStep: 25,
   /** Leaving a floor under way is free before your leaveFreeBefore-th move (the floor fought again later, the same bosses), else a loss. */
   leaveFreeBefore: 2,
+  /**
+   * A solo floor reported won sooner than this after its start, by the server's clock, is refused, the floor still under way (server
+   * tower.ts, finishTowerFloor): a sanity check on the device's word, well under any real win (a four-move mate takes longer). Not
+   * where TEST_SWITCHES is on (local, e2e, staging).
+   */
+  soloWinMinSeconds: 10,
   rageScale: [1, 0.75, 0.6] as readonly number[],
   apart: [["hollow", "smudgy"], ["smudgy", "alfil"], ["alfil", "grex"], ["dash", "smudgy"]] as readonly (readonly [string, string])[],
   maxBosses: 3,

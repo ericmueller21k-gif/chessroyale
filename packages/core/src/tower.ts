@@ -170,8 +170,17 @@ export function startFloor(run: TowerRun, pool: readonly string[], s: TowerRules
     const { bosses, deck, decks } = deal({ ...run, deck: [...dealt, ...run.deck] }, floor, run.floors[floor - 2] ?? [], pool, s);
     next = { ...run, floors: [...run.floors.slice(0, -1), bosses], deck, decks };
   }
-  const bosses = next.floors[floor - 1]!;
-  return { run: next, settings: { towerFloor: floor, bossId: bosses[0]!, bossIds: bosses, bossAvoid: "" } };
+  return { run: next, settings: floorSettings(next) };
+}
+
+/**
+ * The match runner's settings for the run's floor as it's dealt (its bosses in turn order, and the floor, which sets their strength:
+ * floorStrength): startFloor's, and the server's for a floor already under way (its bosses as they were when it began).
+ */
+export function floorSettings(run: Pick<TowerRun, "floors">): Partial<Settings> {
+  const floor = run.floors.length;
+  const bosses = run.floors[floor - 1] ?? [];
+  return { towerFloor: floor, bossId: bosses[0]!, bossIds: bosses, bossAvoid: "" };
 }
 
 /**
